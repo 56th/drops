@@ -30,7 +30,7 @@
 #include "geom/simplex.h"
 #include "misc/container.h"
 #include "parallel/addeddata.h"
-#include "parallel/distributeddatatypes.h"
+//#include "parallel/distributeddatatypes.h"
 
 
 #ifndef DROPS_PARDISTRIBUTEDDATA_H
@@ -153,21 +153,30 @@ class DynamicDataInterfaceCL
     }*/
 
     /// \brief these are the callings of the variable number of arguements function DDD_TypeDefine
-    static void TypeDefineAddedVec(DDD_TYPE&, DROPS::AddedVecCL*&, DDD_ELEM_TYPE, DROPS::Uint*, long unsigned int, DDD_ELEM_TYPE, DROPS::Point3DCL*, long unsigned int, DDD_ELEM_TYPE, DROPS::AddedVecCL*);
+    static void TypeDefineAddedVec(TypeT&, DROPS::AddedVecCL*&, ElemT, DROPS::Uint*, long unsigned int, ElemT, DROPS::Point3DCL*, long unsigned int, ElemT, DROPS::AddedVecCL*);
 
-    static void TypeDefineAddedScal(DDD_TYPE&, DROPS::AddedScalCL*&, DDD_ELEM_TYPE, DROPS::Uint*, long unsigned int, DDD_ELEM_TYPE, double*, long unsigned int, DDD_ELEM_TYPE, DROPS::AddedScalCL*);
+    static void TypeDefineAddedScal(TypeT&, DROPS::AddedScalCL*&, ElemT, DROPS::Uint*, long unsigned int, ElemT, double*, long unsigned int, ElemT, DROPS::AddedScalCL*);
 
-    static void TypeDefineChildPtrT(DDD_TYPE&, DROPS::TetraCL**&, DDD_ELEM_TYPE, DROPS::TetraCL**, long unsigned int, DDD_TYPE, DDD_ELEM_TYPE, DROPS::TetraCL**);
+    static void TypeDefineChildPtrT(TypeT&, DROPS::TetraCL**&, ElemT, DROPS::TetraCL**, long unsigned int, TypeT, ElemT, DROPS::TetraCL**);
 
-    static void TypeDefineBndPtT(DDD_TYPE&, DROPS::BndPointCL*&, DDD_ELEM_TYPE, DROPS::BndIdxT*, long unsigned int, DDD_ELEM_TYPE, DROPS::Point2DCL*, long unsigned int, DDD_ELEM_TYPE, DROPS::BndPointCL*);
+    static void TypeDefineBndPtT(TypeT&, DROPS::BndPointCL*&, ElemT, DROPS::BndIdxT*, long unsigned int, ElemT, DROPS::Point2DCL*, long unsigned int, ElemT, DROPS::BndPointCL*);
 
-    static void TypeDefineTetra(DDD_TYPE&, DROPS::TetraCL*&, DDD_ELEM_TYPE, DDD_HEADER*, DDD_ELEM_TYPE, DROPS::Usint*, long unsigned int, DDD_ELEM_TYPE, DROPS::Usint*, long unsigned int, DDD_ELEM_TYPE, DROPS::SArrayCL<DROPS::VertexCL*, 4u>*, long unsigned int, DDD_TYPE, DDD_ELEM_TYPE, DROPS::SArrayCL<DROPS::EdgeCL*, 6u>*, long unsigned int, DDD_TYPE, DDD_ELEM_TYPE, DROPS::SArrayCL<DROPS::FaceCL*, 4u>*, long unsigned int, DDD_TYPE, DDD_ELEM_TYPE, DROPS::TetraCL**, long unsigned int, DDD_TYPE, DDD_ELEM_TYPE, DROPS::UnknownHandleCL*, long unsigned int, DDD_ELEM_TYPE, DROPS::TetraCL*);
+    static void TypeDefineTetra(TypeT& xt, DROPS::TetraCL*& a, ElemT b, HEADERT* c, ElemT d, DROPS::Usint* e, long unsigned int f, 
+                                ElemT g, DROPS::Usint* h, long unsigned int i, ElemT j, DROPS::SArrayCL<DROPS::VertexCL*, 4u>* l, long unsigned int m, TypeT n, 
+                                ElemT o, DROPS::SArrayCL<DROPS::EdgeCL*, 6u>* q, long unsigned int r, TypeT s, ElemT t, DROPS::SArrayCL<DROPS::FaceCL*, 4u>* v,
+                                long unsigned int w, TypeT x, ElemT y, DROPS::TetraCL** z, long unsigned int a1, TypeT b1, ElemT c1, DROPS::UnknownHandleCL* d1, 
+                                long unsigned int e1, ElemT f1, DROPS::TetraCL* g1);
 
-    static void TypeDefineFace(DDD_TYPE&, DROPS::FaceCL*&, DDD_ELEM_TYPE, DDD_HEADER*, DDD_ELEM_TYPE, const DROPS::BndIdxT*, long unsigned int, DDD_ELEM_TYPE, bool*, long unsigned int, DDD_ELEM_TYPE, DROPS::FaceCL*);
+    static void TypeDefineFace(TypeT&, DROPS::FaceCL*&, ElemT, HEADERT*, ElemT, const DROPS::BndIdxT*, 
+                               long unsigned int, ElemT, bool*, long unsigned int, ElemT, DROPS::FaceCL*);
 
-    static void TypeDefineEdge(DDD_TYPE&, DROPS::EdgeCL*&, DDD_ELEM_TYPE, DDD_HEADER*, DDD_ELEM_TYPE, DROPS::SArrayCL<DROPS::VertexCL*, 2u>*, long unsigned int, DDD_TYPE, DDD_ELEM_TYPE, DROPS::VertexCL**, long unsigned int, DDD_TYPE, DDD_ELEM_TYPE, DROPS::SArrayCL<short unsigned int, 2u>*, long unsigned int, DDD_ELEM_TYPE, short int*, long unsigned int, DDD_ELEM_TYPE, short int*, long unsigned int, DDD_ELEM_TYPE, bool*, long unsigned int, DDD_ELEM_TYPE, DROPS::EdgeCL*);
+    static void TypeDefineEdge(TypeT&, DROPS::EdgeCL*&, ElemT, HEADERT*, ElemT, DROPS::SArrayCL<DROPS::VertexCL*, 2u>*, long unsigned int, TypeT, ElemT, DROPS::VertexCL**, 
+                               long unsigned int, TypeT, ElemT, DROPS::SArrayCL<short unsigned int, 2u>*, long unsigned int, ElemT, short int*, long unsigned int, 
+                               ElemT, short int*, long unsigned int, ElemT, bool*, long unsigned int, ElemT, DROPS::EdgeCL*);
 
-    static void TypeDefineVertex(DDD_TYPE&, DROPS::VertexCL*&, DDD_ELEM_TYPE, DROPS::IdCL<DROPS::VertexCL>*, long unsigned int, DDD_ELEM_TYPE, DROPS::Point3DCL*, long unsigned int, DDD_ELEM_TYPE, std::vector<DROPS::BndPointCL, std::allocator<DROPS::BndPointCL> >**, long unsigned int, DDD_ELEM_TYPE, bool*, long unsigned int, DDD_ELEM_TYPE, DDD_HEADER*, DDD_ELEM_TYPE, DROPS::UnknownHandleCL*, long unsigned int, DDD_ELEM_TYPE, DROPS::VertexCL*);
+    static void TypeDefineVertex(TypeT&, DROPS::VertexCL*&, ElemT, DROPS::IdCL<DROPS::VertexCL>*, long unsigned int, ElemT, DROPS::Point3DCL*, long unsigned int, ElemT, 
+                                 std::vector<DROPS::BndPointCL, std::allocator<DROPS::BndPointCL> >**, long unsigned int, ElemT, bool*, long unsigned int, ElemT, 
+                                 HEADERT*, ElemT, DROPS::UnknownHandleCL*, long unsigned int, ElemT, DROPS::VertexCL*);
 
     /// \brief Get number of used processes
     static PROCT InfoProcs (void);

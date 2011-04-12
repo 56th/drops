@@ -117,7 +117,7 @@ class ParInexactUzawaCL : public ParStokesSolverBaseCL<ApcT, SpcT>
         inneriter_ = 0;
         ParInexactUzawa( A, B, v, p, b, c, base::GetExV(), base::GetExP(), *base::Apc_,
                          *base::Spc_, base::_iter, base::_res, inneriter_, ApcMeth, innerreduction_,
-                         innermaxiter_, true, base::output_
+                         innermaxiter_, base::output_
                        );
     }
 
@@ -129,7 +129,7 @@ class ParInexactUzawaCL : public ParStokesSolverBaseCL<ApcT, SpcT>
         inneriter_ = 0;
         ParInexactUzawa( A, B, v, p, b, c, base::GetExV(), base::GetExP(), *base::Apc_,
                          *base::Spc_, base::_iter, base::_res, inneriter_, ApcMeth,
-                         innerreduction_, innermaxiter_, true, base::output_
+                         innerreduction_, innermaxiter_, base::output_
                        );
     }
 
@@ -226,7 +226,7 @@ template <typename Mat, typename Vec, typename PC1, typename PC2, typename ExVCL
   bool ParInexactUzawa(const Mat& A, const Mat& B, Vec& xu_acc, Vec& xp_acc, const Vec& f, const Vec& g,
                     const ExVCL& exV, const ExPCL& exP, PC1& Apc, PC2& Spc,
                     int& max_iter, double& tol, int &usedinnerit, InexactUzawaApcMethodT apcmeth,
-                    double innerred, int innermaxiter, bool useAcc, std::ostream* output)
+                    double innerred, int innermaxiter, std::ostream* output)
 /// \param[in]     A            Coefficient matrix for velocities
 /// \param[in]     B            Coefficient matrix for coupling velocity and pressure
 /// \param[in,out] xu_acc IN:   initial vector for velocity, OUT: velocity result
@@ -243,7 +243,6 @@ template <typename Mat, typename Vec, typename PC1, typename PC2, typename ExVCL
 /// \param[in]     apcmeth      Characteristics of the preconditioner for the A-block
 /// \param[in]     innerred     inner reduction
 /// \param[in]     innermaxiter maximal inner solver steps
-/// \param[in]     useAcc       use accur variant for performing inner products and norms or do not use accure variant
 /// \param[in,out] output       Debug information
 {
     if (Apc.NeedDiag())
@@ -266,8 +265,8 @@ template <typename Mat, typename Vec, typename PC1, typename PC2, typename ExVCL
     double innertol;
     int inneriter;
     int pr_iter_cumulative= 0;
-    double res_u = exV.Norm_sq( ru, false, useAcc);
-    double res_p = exP.Norm_sq( rp, false, useAcc);
+    double res_u = exV.Norm_sq( ru, false);
+    double res_p = exP.Norm_sq( rp, false);
     double resid0= std::sqrt( res_u + res_p);
     double resid= resid0;
     if (output)
@@ -299,18 +298,17 @@ template <typename Mat, typename Vec, typename PC1, typename PC2, typename ExVCL
 //                 UzawaPCG( Apc, A, B, z, zbar, zhat, c, Spc, inneriter, innertol);
 //                 break;
             case APC_SYM:
-                innertol= innerred*exP.Norm(c, false, useAcc);
-                if (useAcc)
-                    ParAccurPCG( *asc, z, c, exP, Spc, inneriter, innertol);
-                else
-                    ParPCG( *asc, z, c, exP, Spc, inneriter, innertol);
+                innertol= innerred*exP.Norm(c, false);
+                ParPCG( *asc, z, c, exP, Spc, inneriter, innertol);
                 break;
             default:
                 std::cout << "WARNING: InexactUzawa: Unknown apcmeth; using GMRes.\n";
             // fall through
             case APC_OTHER:
                 innertol= innerred; // GMRES can do relative tolerances.
-                ParModGMRES( *asc, z, c, exP, Spc, /*restart*/ inneriter, inneriter, innertol, /*relative errors*/ true, useAcc, /*use MGS*/false, LeftPreconditioning);
+                ParModGMRES( *asc, z, c, exP, Spc, /*restart*/ inneriter, 
+                    inneriter, innertol, /*relative errors*/ true, /*use MGS*/false, 
+                    LeftPreconditioning);
                 break;
         }
         if (apcmeth != APC_SYM_LINEAR) {
@@ -326,8 +324,8 @@ template <typename Mat, typename Vec, typename PC1, typename PC2, typename ExVCL
         xp_acc+= z;             // z is in every case accumulated, because it is a result of a solver
         ru-= A*du + zbar;
         rp= g - B*xu_acc;
-        res_u= exV.Norm_sq( ru, false, useAcc);
-        res_p = exP.Norm_sq( rp, false, useAcc);
+        res_u= exV.Norm_sq( ru, false);
+        res_p = exP.Norm_sq( rp, false);
         resid= std::sqrt( res_u + res_p);
         if (output)
           IF_MASTER

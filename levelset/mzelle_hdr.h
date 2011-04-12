@@ -387,7 +387,7 @@ void SetInitialConditions(StokesT& Stokes, const LevelsetP2CL& lset, MultiGridCL
         ParJac0CL jacpc( Stokes.vel_idx.GetFinest());
         typedef ParPCGSolverCL<ParJac0CL> PCGSolverT;
         typedef SolverAsPreCL<PCGSolverT> PCGPcT;
-        PCGSolverT PCGSolver(200, 1e-2, Stokes.vel_idx.GetFinest(), jacpc, /*rel*/ true, /*acc*/ true);
+        PCGSolverT PCGSolver(200, 1e-2, Stokes.vel_idx.GetFinest(), jacpc, /*rel*/ true);
         PCGPcT     apc(PCGSolver);
         ISBBTPreCL bbtispc( &Stokes.B.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.M.Data.GetFinest(), Stokes.pr_idx.GetFinest(), Stokes.vel_idx.GetFinest(), 0.0, 1.0, 1e-4, 1e-4);
         ParInexactUzawaCL<PCGPcT, ISBBTPreCL, APC_SYM> inexactuzawasolver( apc, bbtispc, Stokes.vel_idx.GetFinest(), Stokes.pr_idx.GetFinest(),
@@ -458,8 +458,8 @@ class TwoPhaseStoreCL
             WriteTime( filename.str() + "time");
 
         // write multigrid
-        MGSerializationCL ser( mg_, filename.str());
-        ser.WriteMG();
+//        MGSerializationCL ser( mg_, filename.str());
+//        ser.WriteMG();
 
         // write numerical data
         WriteFEToFile(Stokes_.v, mg_, filename.str() + "velocity", binary_);

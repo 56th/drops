@@ -628,7 +628,6 @@ void CoupledTimeDisc2PhaseBaseCL<LsetSolverT,RelaxationPolicyT>::DoStep( int max
     InitStep();
     RelaxationPolicyT relax;
 #ifdef _PAR
-    const bool useAccur=true;
     ExchangeCL& ExVel  = Stokes_.v.RowIdx->GetEx();
 #endif
     double res_u = 0.0;
@@ -650,7 +649,7 @@ void CoupledTimeDisc2PhaseBaseCL<LsetSolverT,RelaxationPolicyT>::DoStep( int max
 #ifndef _PAR
         res_u   = std::sqrt( dot( Stokes_.v.Data, Stokes_.M.Data*Stokes_.v.Data));
 #else
-        res_u   = std::sqrt( ExVel.ParDot( Stokes_.v.Data, true, Stokes_.M.Data*Stokes_.v.Data, true, useAccur));
+        res_u   = std::sqrt( ExVel.ParDot( Stokes_.v.Data, true, Stokes_.M.Data*Stokes_.v.Data, true));
 #endif
 
         std::cout << "residual of u: " << res_u << std::endl;
@@ -1016,10 +1015,10 @@ RecThetaScheme2PhaseCL<LsetSolverT,RelaxationPolicyT>::RecThetaScheme2PhaseCL
     ispc_( &Stokes_.B.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(), &Stokes_.M.Data.GetFinest(), Stokes_.pr_idx.GetFinest(), 1.0, 0.0, 1e-4, 1e-4),
     Ssolver_( ispc_, 200, 200, 1e-10, true)
 #else
-    MsolverPC_(Stokes.vel_idx.GetFinest()), Msolver_(200, 1e-10, Stokes.vel_idx.GetFinest(), MsolverPC_, false, true),
+    MsolverPC_(Stokes.vel_idx.GetFinest()), Msolver_(200, 1e-10, Stokes.vel_idx.GetFinest(), MsolverPC_, false),
     SsolverPC_(Stokes.B.Data.GetFinestPtr(), Stokes.prM.Data.GetFinestPtr(), Stokes.M.Data.GetFinestPtr(),
                Stokes.pr_idx.GetFinest(), Stokes.vel_idx.GetFinest(), 1.0, 0.0, 1e-4, 1e-4),
-               Ssolver_(100, 200, 1e-10, Stokes.pr_idx.GetFinest(), SsolverPC_, true)
+               Ssolver_(100, 200, 1e-10, Stokes.pr_idx.GetFinest(), SsolverPC_)
 #endif
 {
     stab_ *= stk_theta_;

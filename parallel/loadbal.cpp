@@ -32,19 +32,9 @@ namespace DROPS{
 /****************************************************************************
 * L O A D  B A L  C L A S S                                                 *
 ****************************************************************************/
-// static initialisation
+// static initialization
 Uint     LoadBalCL::TriangLevel_ = 0;
-IFT      LoadBalCL::FaceIF_      = 0;
 idxtype* LoadBalCL::myfirstVert_ = 0;
-
-
-/****************************************************************************
-* W R A P P E R                                                             *
-*****************************************************************************
-* Converts C++ functions to C functions, so DDD can use them correctly      *
-****************************************************************************/
-extern "C" int HandlerScatterC( OBJT o, void *d) {return LoadBalCL::HandlerScatter(o,d);}
-extern "C" int HandlerGatherC ( OBJT o, void *d) {return LoadBalCL::HandlerGather(o,d);}
 
 
 /// \brief Constructor
@@ -62,8 +52,6 @@ LoadBalCL::LoadBalCL(MultiGridCL& mg, int partitioner, int TriLevel, PartMethod 
 {
     partitioner_ = PartitionerCL::newPartitioner( Partitioner(partitioner), 1.05, meth);   // Pointer to the partitioner class
     mg_=&mg;
-    if (FaceIF_==0)
-        InitIF();
 
     if (TriLevel<0)
         TriangLevel_=mg_->GetLastLevel();
@@ -77,56 +65,16 @@ LoadBalCL::LoadBalCL(MultiGridCL& mg, int partitioner, int TriLevel, PartMethod 
 LoadBalCL::~LoadBalCL()
 {
     DeleteGraph();
+    delete partitioner_;
 }
 
-
-/// \brief Init the DDD interface for communicate adjacenies between processors
-void LoadBalCL::InitIF()
-/** \todo (of) Falls nicht nur das letzte Triangulierungslevel balanciert werden
-    soll, mussen auch LB-Nummern auf Ghosts versendet werden!
-*/
+bool LoadBalCL::CommunicateAdjacencyCL::Gather( const DiST::TransferableCL& t,
+    DiST::Helper::SendStreamCL& s)
 {
-    TypeT  O[8];
-    PrioT  A[3], B[3];
-    /* O is an array of object types, A and B are arrays of priorities */
-
-    /* interface of faces */
-    O[0] = FaceCL::GetType();
-    A[0]= PrioHasUnk;   B[0]= PrioHasUnk;
-    A[1]= PrioMaster;   B[1]= PrioMaster;
-    A[2]= PrioGhost;    B[2]= PrioGhost;
-
-    // Da auf der letzten Triangulierung keine Ghosts vorkommen, sind die Ghost-
-    // Subsimplices fuer die Kommunikation der Graph-Verts bedeutungslos. Fuer
-    // die Lastverteilung von anderen Triangulierungen oder die Lastverteilung
-    // fuer Mehrgitterverfahren muessen die Ghosts evtl. beruecksichtigt werden...
-
-    FaceIF_ = DynamicDataInterfaceCL::IFDefine(1, O, 2, A, 2, B);
-    DynamicDataInterfaceCL::IFSetName( FaceIF_, (char*)"Face-Interface for LB");
-}
-
-
-/// \brief Communicate adjacencies between processors
-/// \pre pointer to myfirstvert_ has to be set!
-void LoadBalCL::CommunicateAdjacency()
-{
-    DynamicDataInterfaceCL::IFExchange( FaceIF_, sizeof(idxtype), &HandlerGatherC, &HandlerScatterC);
-    myfirstVert_=0;
-}
-
-
-/// \brief Gather adjacency information at processor-boundary
-int LoadBalCL::HandlerGather( OBJT obj, void *buf)
-/** This function is called by DDD within the CommunicateAdjacency procedure
-    \param obj a pointer to a face on a processor boundary
-    \param buf buffer, where to place the load balancing number
-*/
-{
-    FaceCL* const fp = ddd_cast<FaceCL*>( obj);            // transform DDD-Object to a FaceCL-pointer
-    idxtype* sendbuf = static_cast<idxtype*>(buf);         // transform buf into a storage for idxtype
-
+    FaceCL* fp;
+    simplex_cast( t, fp);
     if (!fp->IsInTriang( TriangLevel_) )                   // this is not correct
-        return 1;
+        return false;
 
     const TetraCL* tp= fp->GetSomeTetra();                 // get a arbitrary tetraeder
 
@@ -138,23 +86,49 @@ int LoadBalCL::HandlerGather( OBJT obj, void *buf)
            DebugLoadBalC);
 
     if (tp->HasLbNr())                                     // if the neighbor tetra has a LoadBalance Nr (children are numbered too!)
-        *sendbuf= tp->GetLbNr() + *myfirstVert_ ;// put the number into the send buffer
+        s << tp->GetLbNr() + myfirstVert_;                 // put the number into the send buffer
 
-    return 0;
+    return true;
+}
+
+bool LoadBalCL::CommunicateAdjacencyCL::Scatter( DiST::TransferableCL& t, const size_t numData, DiST::Helper::RecvStreamCL& r)
+{
+    FaceCL* fp;
+    simplex_cast( t, fp);
+    idxtype neighnum;
+    const TetraCL* tp= fp->GetSomeTetra();
+    if (tp->HasGhost() )                                   // if this tetra has ghost, this is not the right one
+        tp= fp->GetNeighborTetra( tp);                     // get the next one
+    const idxtype locallbnr=  tp->GetLbNr() + myfirstVert_;
+
+    for ( size_t i=0; i<numData; ++i){
+        r >> neighnum;
+        if ( locallbnr!=neighnum)
+             fp->SetLbNeigh(neighnum);
+
+    }
+    return true;
+}
+
+void LoadBalCL::CommunicateAdjacencyCL::Call()
+{
+    DiST::InterfaceCL::DimListT dimlist; dimlist.push_back( 2);
+    DiST::PrioListT Prios; Prios.push_back(PrioMaster);
+    const DiST::LevelListCL allLevels;
+
+    DiST::InterfaceCL comm( allLevels, Prios, Prios, dimlist);
+    comm.PerformInterfaceComm( *this);
 }
 
 
-/// \brief Gather adjacency information at processor-boundary
-int LoadBalCL::HandlerScatter( OBJT obj, void *buf)
-/**  Store the recieved load balance number in the FaceCL
-    \param obj a pointer to a face on a processor boundary
-    \param buf recieved load balancing number
-*/
+/// \brief Communicate adjacencies between processors
+/// \pre pointer to myfirstvert_ has to be set!
+void LoadBalCL::CommunicateAdjacency()
 {
-    FaceCL* const fp= ddd_cast<FaceCL*>( obj);                 // transform DDD-Object to a FaceCL-pointer
-    const idxtype* const recvbuf= static_cast<idxtype*>(buf);  // transform recieved data to a idxtype-pointe
-    fp->SetLbNeigh(*recvbuf);                                  // store the number correct
-    return 0;
+//    myfirstVert_=0;
+    CommunicateAdjacencyCL comm( *myfirstVert_);
+    comm.Call();
+    //DynamicDataInterfaceCL::IFExchange( FaceIF_, sizeof(idxtype), &HandlerGatherC, &HandlerScatterC);
 }
 
 
@@ -298,8 +272,9 @@ void LoadBalCL::GetWeightUnk( const TetraCL& t, size_t& wgtpos)
     \param wgtpos  in: where to put the weight in the array vwgt,
                   out: where to put the next weight in the array vwgt
 */
-void LoadBalCL::GetWeightLset( const TetraCL& t, size_t& wgtpos)
+void LoadBalCL::GetWeightLset( __UNUSED__ const TetraCL& t, __UNUSED__ size_t& wgtpos)
 {
+//    throw DROPSErrCL("LoadBalCL::GetWeightLset: Merge CVS and SVN\n");
     InterfacePatchCL patch;                              // check for intersection
     if ( t.IsUnrefined()){
         if (CheckForLsetUnk(t)){
@@ -583,15 +558,19 @@ void LoadBalCL::Migrate()
 */
 {
 #if DROPSDebugC
-	GIDT observe1 = 207360, observe2=0, observe3=0;
+/*
+    GIDT observe1 = 207360, observe2=0, observe3=0;
+*/
 #endif
     if (ProcCL::MyRank()==0)
         Comment("- Start Migrating"<<std::endl, DebugLoadBalC);
 
-    Uint me = ProcCL::MyRank();
+    ParMultiGridCL& pmg= ParMultiGridCL::Instance();
+    pmg.TransferBegin();
+    int me = ProcCL::MyRank();
     partitioner_->GetGraph().movedMultiNodes=0;
 
-    PROCT dest;
+    int dest;
     for (LbIteratorCL it= GetLbTetraBegin(), end= GetLbTetraEnd(); it!=end; ++it)
     {
         dest =  static_cast<PROCT>(partitioner_->GetGraph().part[it->GetLbNr()]);
@@ -599,37 +578,37 @@ void LoadBalCL::Migrate()
         if (dest==me) continue;
         partitioner_->GetGraph().movedMultiNodes++;
 #if DROPSDebugC
+/*
         if ( it->GetGID()==observe1 || it->GetGID()==observe2 || it->GetGID()==observe3)
             std::cout << "["<<ProcCL::MyRank()<<"] ===> Transfer des Tetras mit GID "<<it->GetGID() << " nach " << dest << " als ";
+*/
 #endif
 
         if (it->IsUnrefined() )
         { // E1-Xfer
-            ParMultiGridCL::TXfer( *it, dest, PrioMaster, true);
+            pmg.Transfer( *it, dest, PrioMaster, true);
 #if DROPSDebugC
+/*
             if ( it->GetGID()==observe1 || it->GetGID()==observe2 || it->GetGID()==observe3)
                 std::cout << "E1-Xfer mit delete =1 und PrioMaster" << std::endl;
+*/
 #endif
         }
         else
         { // E2-Xfer
-        	PrioT asPrio=PrioGhost;
-
-            for( int* proclist= DynamicDataInterfaceExtraCL::InfoProcList( it->GetHdr() ); *proclist!=-1; proclist+= 2){
-                if (*proclist==dest){
-                    if (proclist[1]>=PrioMaster){
-                        asPrio=PrioMaster;
-                    }
-                }
-            }
+            Priority asPrio=PrioGhost,
+                destPrio= DiST::InfoCL::Instance().GetRemoteData( *it).GetPrio(dest);
+            if ( destPrio!=NoPrio && destPrio >= PrioMaster)
+                asPrio= PrioMaster;
 #if DROPSDebugC
+/*
             if ( it->GetGID()==observe1 || it->GetGID()==observe2 || it->GetGID()==observe3)
                 std::cout << "E2-Xfer mit delete ="<< (it->GetPrio()==PrioGhost)
                         << " und Prio"<<(asPrio==PrioMaster?"Master":"Ghost")<<" Unrefined=" << it->IsUnrefined()
                         << std::endl;
+*/
 #endif
-
-            ParMultiGridCL::TXfer( *it, dest, asPrio, it->GetPrio()==PrioGhost);
+            pmg.Transfer( *it, dest, asPrio, it->GetPrio()==PrioGhost);
         }
 
         it->DelLbNr();
@@ -640,35 +619,39 @@ void LoadBalCL::Migrate()
             {
                 if ((*ch)->IsUnrefined() || (*ch)->HasGhost() )
                 { // M1-Xfer
-                    ParMultiGridCL::TXfer( **ch, dest, PrioMaster, true);
+                    pmg.Transfer( **ch, dest, PrioMaster, true);
 #if DROPSDebugC
+/*
                     if ( it->GetGID()==observe1 || (*ch)->GetGID()==observe1 || (*ch)->GetGID()==observe2 || (*ch)->GetGID()==observe3)
                         std::cout << "["<<ProcCL::MyRank()<<"]===> Transfer des Tetras mit GID "<< (*ch)->GetGID()
                                 << " als Kind von " << it->GetGID() << " nach " << dest
                                 << " als M1-Xfer mit delete =1 und PrioMaster" << std::endl;
+*/
 #endif
                 }
                 else
                 { // M2-Xfer
                     const bool E2Xfer= it.IsInLbSet( **ch) && partitioner_->GetGraph().part[(*ch)->GetLbNr()]!=static_cast<idxtype>(me);
 
-                    ParMultiGridCL::TXfer( **ch, dest, PrioMaster, E2Xfer);
+                    pmg.Transfer( **ch, dest, PrioMaster, E2Xfer);
                     if (!E2Xfer)
                     {
-                        ParMultiGridCL::PrioChange(*ch,PrioGhost);
+                        pmg.PrioChange(*ch,PrioGhost);
                     }
 #if DROPSDebugC
+/*
                     if ( (*ch)->GetGID()==observe1 || (*ch)->GetGID()==observe2 || (*ch)->GetGID()==observe3)
                         std::cout << "["<<ProcCL::MyRank()<<"]===> Transfer des Tetras mit GID "<< (*ch)->GetGID()
                                 << " als Kind von " << it->GetGID() << " nach " << dest
                                 << " als M2-Xfer mit delete =" << E2Xfer
                                 << " und PrioMaster und ChangePrio to Prio"<< (E2Xfer?"Master":"Ghost") << std::endl;
+*/
 #endif
                 }
             }
         }
     }
-
+    pmg.TransferEnd();
     partitioner_->GetGraph().movedMultiNodes= ProcCL::GlobalSum(partitioner_->GetGraph().movedMultiNodes);
 }
 
@@ -754,36 +737,36 @@ void LoadBalCL::PrintGraphInfo(std::ostream& os) const
 
     // print vtxdist
     for (int i=0; i<=size; ++i){
-        os << vtxdist[i] << ' ';
         if (i%10==0) os << std::endl;
+        os << vtxdist[i] << ' ';
     }
     os << std::endl;
 
     // print xadj
     for (int i=0; i<=loc_num_verts; ++i){
-        os << xadj[i] << ' ';
         if (i%10==0) os << std::endl;
+        os << xadj[i] << ' ';
     }
     os << std::endl;
 
     // print adjncy_
     for (int i=0; i<loc_num_edges; ++i){
-        os << adjncy[i] << ' ';
         if (i%10==0) os << std::endl;
+        os << adjncy[i] << ' ';
     }
     os << std::endl;
 
     // print vwgt
     for (int i=0; i<loc_num_verts; ++i){
-        os << vwgt[i];
         if (i%10==0) os << std::endl;
+        os << vwgt[i];
     }
     os << std::endl;
 
     // print adjwgt
     for (int i=0; i<loc_num_edges; ++i){
-         os << adjwgt[i];
         if (i%10==0) os << std::endl;
+         os << adjwgt[i];
     }
     os << std::endl;
 }
@@ -820,7 +803,7 @@ LoadBalHandlerCL::LoadBalHandlerCL(const MGBuilderCL &builder, int master, Parti
     // Create a multigrid
     mg_ = new MultiGridCL(builder);
     // tell ParMultiGridCL about the multigrid
-    ParMultiGridCL::AttachTo(*mg_);
+//    ParMultiGridCL::AttachTo(*mg_);
     // Create new LoadBalancingCL
     lb_ = new LoadBalCL(*mg_, part, -1, meth);
 
@@ -859,9 +842,7 @@ LoadBalHandlerCL::LoadBalHandlerCL(const MGBuilderCL &builder, int master, Parti
         std::cout << "  - Migration ...\n";
 
     if (debugMode_) timer.Reset();
-    ParMultiGridCL::XferStart();
     lb_->Migrate();
-    ParMultiGridCL::XferEnd();
     if (debugMode_){
         timer.Stop();
         duration = timer.GetMaxTime();
@@ -874,9 +855,9 @@ LoadBalHandlerCL::LoadBalHandlerCL(const MGBuilderCL &builder, int master, Parti
 
 
 void LoadBalHandlerCL::DoMigration()
-/** This function encapsulate all necessary steps to perform a loadbalancing
-    step. So it create the graph, call ParMetis to compute the partitioning
-    and finally do the migration.
+/** This function encapsulates all necessary steps to perform a load balancing
+    step. So it creates the graph, calls ParMetis to compute the partitioning
+    and finally does the migration.
 */
 {
     // Just do a migration if this is wished
@@ -920,15 +901,13 @@ void LoadBalHandlerCL::DoMigration()
     if (debugMode_ && ProcCL::IamMaster()) std::cout << "  - Migration ... \n";
     if (debugMode_) timer.Reset();
 
-    ParMultiGridCL::XferStart();
     lb_->Migrate();
-    ParMultiGridCL::XferEnd();
 
     // After the transfer there may be some unknowns on ghost. These can be destroyed now.
 //     if (xferUnknowns_){
 //         ParMultiGridCL::DeleteUnksOnGhosts();
 //     }
-    ParMultiGridCL::MarkSimplicesForUnknowns();
+//    ParMultiGridCL::MarkSimplicesForUnknowns();
 
     movedNodes_ = lb_->GetMovedMultiNodes();
     edgeCut_    = lb_->GetEdgeCut();
@@ -969,12 +948,17 @@ void LoadBalHandlerCL::DoInitDistribution(int)
 
     if (debugMode_ && ProcCL::IamMaster())
         std::cout << "  - Migration ...\n";
-    ParMultiGridCL::XferStart();
+
     lb_->Migrate();
-    ParMultiGridCL::XferEnd();
     movedNodes_ = lb_->GetMovedMultiNodes();
     edgeCut_    = lb_->GetEdgeCut();
-    ParMultiGridCL::MarkSimplicesForUnknowns();
+    if (debugMode_){
+        if (ProcCL::IamMaster()){
+            std::cout << "       --> "<<GetMovedMultiNodes()<<" moved multinodes\n";
+            std::cout << "       --> "<<GetEdgeCut()<<" edge cut\n";
+        }
+    }
+//    ParMultiGridCL::MarkSimplicesForUnknowns();
     lb_->DeleteGraph();
 }
 }   // end of namespace DROPS

@@ -228,10 +228,11 @@ int ParInitZeroExactCL::ExecGatherDistTriang(OBJT obj)
     if ( sp->Unknowns.Exist() && sp->Unknowns.Exist( idx)){
         const IdxT dof= sp->Unknowns( idx);
         if ( !(*distTriangs_)[dof].empty()){
-            const ExchangeCL::ProcNumCT neighs= actualData_->phi.RowIdx->GetEx().GetProcs(dof);
+            throw DROPSErrCL( "ParInitZeroExactCL::ExecGatherDistTriang uses old ExchangeCL functions\n");
+/*            const ExchangeCL::ProcNumCT neighs= actualData_->phi.RowIdx->GetEx().GetProcs(dof);
             for ( typename ExchangeCL::ProcNumCT::const_iterator it=neighs.begin(); it!=neighs.end(); ++it)
                 toSend_->insert( (*distTriangs_)[dof].begin(), (*distTriangs_)[dof].end());
-            maxTriangsPerDOF_= std::max( maxTriangsPerDOF_, (*distTriangs_)[dof].size());
+            maxTriangsPerDOF_= std::max( maxTriangsPerDOF_, (*distTriangs_)[dof].size());*/
         }
     }
     return 0;
@@ -346,38 +347,7 @@ template<typename SimplexT>
 }
 #endif
 
-#ifdef _PAR
-template<class SimplexT>
-  int ParDirectDistanceCL::HandlerFrontierGather(OBJT objp, void* buffer)
-/** Put value of phi, the perpendicular foot (if available) and proc id
-    into the buffer. If the simplex is not marked as frontier, take -1
-    as proc id
-*/
-{
-    SimplexT* sp   = ddd_cast<SimplexT*>( objp);                // simplex (vertex/edge)
-    TransferST *buf= static_cast<TransferST*>( buffer);         // content of message
-    IdxT dof= sp->Unknowns( actualData_->phi.RowIdx->GetIdx());   // where to find phi
-    // fill buffer
-    buf->value = actualData_->phi.Data[dof];
-    buf->perp  = actualData_->perpFoot[dof] ? *(actualData_->perpFoot[dof]) : Point3DCL(std::numeric_limits<double>::max());
-    buf->procID= actualData_->typ[dof]==ReparamDataCL::Finished ? ProcCL::MyRank() : -1;
-    return 0;
-}
-
-template<class SimplexT>
-  int ParDirectDistanceCL::HandlerFrontierScatter(OBJT objp, void* buffer)
-{
-    SimplexT* sp      = ddd_cast<SimplexT*>( objp);
-    TransferST* buf   = static_cast<TransferST*>( buffer);
-    IdxT dof= sp->Unknowns( actualData_->phi.RowIdx->GetIdx());
-    if ( buf->procID>=0)
-        onProc_[dof].push_front( TransferST(*buf));
-    return 0;
-}
-
-#endif
-
-InitZeroP2CL::RepTetra::RepTetra( const TetraCL& t, LocalP1CL<Point3DCL>* Gref, const ReparamDataCL& data) 
+InitZeroP2CL::RepTetra::RepTetra( const TetraCL& t, LocalP1CL<Point3DCL>* Gref, const ReparamDataCL& data)
     : w2b(t)
 {
     GetTrafoTr( T, det, t);

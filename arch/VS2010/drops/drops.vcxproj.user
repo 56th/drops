@@ -6,7 +6,8 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <MpiDebuggerWorkingDirectory>$(SolutionDir)..\..\levelset</MpiDebuggerWorkingDirectory>
     <DebuggerFlavor>MpiClusterDebugger</DebuggerFlavor>
-    <MpiDebuggerApplicationArguments>risingbutanoldroplet.param</MpiDebuggerApplicationArguments>
+    <MpiDebuggerApplicationArguments>
+    </MpiDebuggerApplicationArguments>
     <MpiDebuggerAdditionalMpiExecArguments>-wdir $(SolutionDir)..\..\levelset</MpiDebuggerAdditionalMpiExecArguments>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">

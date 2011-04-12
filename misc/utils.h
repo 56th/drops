@@ -46,8 +46,26 @@
 #  include <sys/types.h>
 #endif
 #include <cmath>
-#if __GNUC__ >= 4 && !defined(__INTEL_COMPILER)
-#    include <tr1/unordered_map>
+
+// Use of unordered maps
+#if defined(_MSC_VER) && !defined(__INTEL_COMPILER)
+#  include <unordered_map>
+#  define DROPS_STD_UNORDERED_MAP std::unordered_map
+#  define DROPS_STD_HASH          std::hash
+#  include <unordered_set>
+#  define DROPS_STD_UNORDERED_SET std::unordered_set
+#elif defined(__INTEL_COMPILER) || (__GNUC__>=4)
+#  include <tr1/unordered_map>
+#  define DROPS_STD_UNORDERED_MAP std::tr1::unordered_map 
+#  define DROPS_STD_HASH          std::tr1::hash
+#  include <tr1/unordered_set>
+#  define DROPS_STD_UNORDERED_SET std::tr1::unordered_set
+#elif defined(__SUNPRO_CC) || defined(__PGI)
+#  include <hash_map>
+#  define DROPS_STD_UNORDERED_MAP std::hash_map
+#  define DROPS_STD_HASH          std::hash
+#  include <set>
+#  define DROPS_STD_UNORDERED_SET std::set
 #endif
 
 #ifndef M_PI
@@ -116,6 +134,7 @@ const double DoubleEpsC = 1.0e-9; // numeric_limits<double>::epsilon();
 #define DebugDiscretizeC  1024
 #define DebugSubscribeC   2048
 #define DebugOutPutC      4096
+#define DebugDiSTC        8192
 //@}
 
 /// The stream for dedug output.
@@ -131,7 +150,7 @@ const double DoubleEpsC = 1.0e-9; // numeric_limits<double>::epsilon();
 //#define DROPSDebugC 25  //(DROPS::DebugNumericC | DROPS::DebugUnknownsC | DROPS::DebugContainerC )
 //#define DROPSDebugC ~0  // all bits set
 #ifndef DROPSDebugC 
-  #define DROPSDebugC 0
+  #define DROPSDebugC ~0
 #endif  
 
 /// \brief Throws an error upon a failed assertion.

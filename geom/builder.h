@@ -395,6 +395,8 @@ class ReadMeshBuilderCL : public MGBuilderCL
 
     mutable std::map<Uint, BndIdxT> zone_id2bndidx_;
 
+    mutable SimplexFactoryCL* factory_;
+
 
     bool // Find next (, that is not in a MeshString.
     NextSection() const;
@@ -417,8 +419,7 @@ class ReadMeshBuilderCL : public MGBuilderCL
     AddVertexBndDescription(VertexCL*, Uint) const;
          // Adds a boundary-idx to the edge given by the vertices. If the edge does not
     void // exist, it is created and recycled.
-    CreateUpdateBndEdge(MultiGridCL::EdgeLevelCont&,
-                        VertexCL*, VertexCL*, Uint) const;
+    CreateUpdateBndEdge( VertexCL*, VertexCL*, Uint) const;
 
     void // Deallocate memory of data-members
     Clear() const;
@@ -486,6 +487,7 @@ class FileBuilderCL : public MGBuilderCL
     mutable std::map<size_t, EdgeCL*>     edgeAddressMap;
     mutable std::map<size_t, FaceCL*>     faceAddressMap;
     mutable std::map<size_t, TetraCL*>   tetraAddressMap;
+    mutable SimplexFactoryCL* factory_;
 
 #ifdef _PAR
     /// \brief Read parallel information from a stream
@@ -504,7 +506,7 @@ class FileBuilderCL : public MGBuilderCL
     void buildBoundary (MultiGridCL* mgp) const {bndbuilder_->buildBoundary(mgp);};
 
   public:
-    FileBuilderCL (std::string path, MGBuilderCL* bndbuilder) : path_(path), bndbuilder_(bndbuilder) {};
+    FileBuilderCL (std::string path, MGBuilderCL* bndbuilder) : path_(path), bndbuilder_(bndbuilder), factory_(0) {};
     virtual void build(MultiGridCL*) const;
 };
 
@@ -557,11 +559,13 @@ template <>
 void FileBuilderCL::ReadParInfo<EdgeCL>(std::istream&, EdgeCL&) const;
 
 template <typename SimplexT>
-  void FileBuilderCL::ReadParInfo(std::istream& is, SimplexT& s) const
+  void FileBuilderCL::ReadParInfo(std::istream&, SimplexT& ) const
 /// read information from stream \a is, tell simplex these information. If
 /// the simplex was a distributed object while serialization notify DDD about
 /// the this distributed object
 {
+    throw DROPSErrCL("FileBuilderCL::ReadParInfo: Only DDD conform");
+    /*
 	PrioT prio;
     int numDist, distProc;
     GIDT oldGid;
@@ -576,11 +580,14 @@ template <typename SimplexT>
             DynamicDataInterfaceCL::IdentifyNumber( s.GetHdr(), distProc, oldGid);
         }
     }
+    */
 }
 
 template <typename SimplexT>
-  void MGSerializationCL::WriteParInfo(std::ofstream& os, const SimplexT& s) const
+  void MGSerializationCL::WriteParInfo(std::ofstream& , const SimplexT& ) const
 {
+    throw DROPSErrCL("FileBuilderCL::ReadParInfo: Only DDD conform");
+/*
     os << ' ' << s.GetPrio() << ' ' << s.GetNumDist()-1;
     if ( !s.IsLocal()){
         os << ' ' << s.GetGID();
@@ -588,6 +595,7 @@ template <typename SimplexT>
             if ( *proclist!=ProcCL::MyRank())
                 os << ' ' << (*proclist);
     }
+*/
 }
 #endif
 

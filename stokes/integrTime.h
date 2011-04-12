@@ -431,7 +431,7 @@ class ISBBTPreCL : public SchurPreBaseCL
           M_( M_pr), Mvel_( Mvel), tolA_(tolA), tolM_(tolM),
           BBT_( 0, TRANSP_MUL, 0, MUL, vel_idx, pr_idx),
           PCsolver1_( pr_idx), PCsolver2_(pr_idx),
-          solver_( 800, tolA_, pr_idx, PCsolver1_, /*relative*/ true, /*accure*/ true),
+          solver_( 800, tolA_, pr_idx, PCsolver1_, /*relative*/ true),
           solver2_( 500, tolM_, pr_idx, PCsolver2_, /*relative*/ true),
           vel_idx_( &vel_idx), pr_idx_( &pr_idx), regularize_( regularize) {}
     ISBBTPreCL (const ISBBTPreCL& pc)
@@ -442,7 +442,7 @@ class ISBBTPreCL : public SchurPreBaseCL
           Dprsqrtinv_( pc.Dprsqrtinv_),
           BBT_( Bs_, TRANSP_MUL, Bs_, MUL, *pc.vel_idx_, *pc.pr_idx_),
           PCsolver1_( *pc.pr_idx_), PCsolver2_( *pc.pr_idx_),
-          solver_( 800, tolA_, *pc.pr_idx_, PCsolver1_, /*relative*/ true, /*accure*/ true),
+          solver_( 800, tolA_, *pc.pr_idx_, PCsolver1_, /*relative*/ true),
           solver2_( 500, tolM_, *pc.pr_idx_, PCsolver2_, /*relative*/ true),
           vel_idx_( pc.vel_idx_), pr_idx_( pc.pr_idx_), regularize_( pc.regularize_){}
 

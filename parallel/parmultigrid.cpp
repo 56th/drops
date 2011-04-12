@@ -18,39 +18,6 @@ namespace DROPS
 *****************************************************************************
 * initial assignment of the static members of ParMultiGridCL                *
 ****************************************************************************/
-IFT ParMultiGridCL::_EdgeIF =0;
-IFT ParMultiGridCL::_TetraIF=0;
-IFT ParMultiGridCL::_FaceIF =0;
-IFT ParMultiGridCL::NotMasterIF_=0;
-IFT ParMultiGridCL::_GhToMaTetra_IF=0;
-
-TypeT ParMultiGridCL::_BndPtT         =0;        // TypeT "0" means invalide (see. ddd/typemgr)
-TypeT ParMultiGridCL::_ChildPtrT      =0;
-
-MultiGridCL*    ParMultiGridCL::_mg       =0;
-MG_VertexContT* ParMultiGridCL::_VertCont =0;
-MG_EdgeContT*   ParMultiGridCL::_EdgeCont =0;
-MG_FaceContT*   ParMultiGridCL::_FaceCont =0;
-MG_TetraContT*  ParMultiGridCL::_TetraCont=0;
-
-ParMultiGridCL::TetraPCT ParMultiGridCL::ToHandleTetra_= TetraPCT();
-
-ParMultiGridCL::VecDescPCT ParMultiGridCL::_VecDesc =   VecDescPCT();
-ParMultiGridCL::BufferCT   ParMultiGridCL::_RecvBuf =   BufferCT();
-ParMultiGridCL::ScalBndCT   ParMultiGridCL::_ScalBnd =  ScalBndCT();
-ParMultiGridCL::VecBndCT    ParMultiGridCL::_VecBnd    = VecBndCT();
-
-bool ParMultiGridCL::TransferMode   = false;
-bool ParMultiGridCL::PrioChangeMode = false;
-IdxT ParMultiGridCL::_RecvBufPos    = 0;
-
-int ParMultiGridCL::_level           =-1;
-bool ParMultiGridCL::_UnkOnSimplex[3]={false, false, false};
-
-VecDescCL* ParMultiGridCL::_actualVec=0;
-
-std::ostream *ParMultiGridCL::_os   = 0;
-bool          ParMultiGridCL::_sane = true;
 ParMultiGridCL* ParMultiGridCL::instance_ = 0;
 
 /****************************************************************************
@@ -58,6 +25,7 @@ ParMultiGridCL* ParMultiGridCL::instance_ = 0;
 *****************************************************************************
 * Converts C++ functions to C functions, so DDD can use them correctly      *
 ****************************************************************************/
+/*
 extern "C" void DeleteObjC(void* buffer, size_t size, int ddd_type) {ParMultiGridCL::DeleteObj(buffer,size,ddd_type);}
 
 extern "C" void HandlerVDeleteC(OBJT obj) {ParMultiGridCL::HandlerDelete<VertexCL>(obj);}
@@ -115,7 +83,7 @@ extern "C" int GatherInterpolValuesVC (OBJT o, void* b) { return ParMultiGridCL:
 extern "C" int ScatterInterpolValuesVC(OBJT o, void* b) { return ParMultiGridCL::ScatterInterpolValues<VertexCL>(o,b); }
 extern "C" int GatherInterpolValuesEC (OBJT o, void* b) { return ParMultiGridCL::GatherInterpolValues<EdgeCL>(o,b); }
 extern "C" int ScatterInterpolValuesEC(OBJT o, void* b) { return ParMultiGridCL::ScatterInterpolValues<EdgeCL>(o,b); }
-
+*/
 
 /****************************************************************************
 * C O N S T R U C T O R S                                                   *
@@ -128,22 +96,20 @@ extern "C" int ScatterInterpolValuesEC(OBJT o, void* b) { return ParMultiGridCL:
 ///
 /// Init the parallel stuff
 ParMultiGridCL::ParMultiGridCL()
+    : mg_(0), modify_(0), transfer_(0)
 {
-    Assert(EdgeCL::GetType()==0, DROPSErrCL("ParMultiGridCL: Constructor is called twice"),DebugParallelC);
-
-    // Init the DDD stuff
-    DeclareAll();       // Declare all DDD-Types
-    DefineAll();        // Define all DDD-Types
-    InitIF();           // Define all DDD-Interface
-    SetAllHandler();    // Set the DDD-Handlers
+    Assert( instance_==0, DROPSErrCL("ParMultiGridCL: Constructor is called twice"), DebugParallelC);
 
     // Init the containers for the unknowns
     _RecvBuf.resize(0);
 
     // There are no active transfers neither Prio-Change-enviroment while creating this class
-    TransferMode=false;
-    PrioChangeMode=false;
     _UnkOnSimplex[0]= _UnkOnSimplex[1]= _UnkOnSimplex[2]= false;
+
+    // for Identify, we need all priorities except PrioVGhost
+    priosId_.push_back(PrioNeutral); priosId_.push_back(PrioKilledGhost);
+    priosId_.push_back(PrioGhost);   priosId_.push_back(PrioMaster);
+    priosId_.push_back(PrioHasUnk);
 }
 
 ParMultiGridCL::~ParMultiGridCL()
@@ -156,11 +122,11 @@ ParMultiGridCL::~ParMultiGridCL()
 void ParMultiGridCL::AttachTo( MultiGridCL& mg)
 {
     // Store referenz to the Multigrid and to the simplex containers
-    _mg= &mg;
-    _VertCont=  &_mg->_Vertices;
-    _EdgeCont=  &_mg->_Edges;
-    _FaceCont=  &_mg->_Faces;
-    _TetraCont= &_mg->_Tetras;
+    mg_= &mg;
+//    _VertCont=  &mg_->_Vertices;
+//    _EdgeCont=  &mg_->_Edges;
+//    _FaceCont=  &mg_->_Faces;
+//    _TetraCont= &mg_->_Tetras;
 }
 
 /// \brief Store a pointer to a scalar boundary condition, that belongs to an Index
@@ -253,7 +219,7 @@ void ParMultiGridCL::HandleUnknownsAfterRefine(/*const std::vector<VecDescCL*> &
 */
 {
     Assert(_RecvBuf.size()==0, DROPSErrCL("ParMultiGridCL::HandleUnknownsAfterRefine: Recieve Buffer is not empty!"), DebugParallelNumC);
-    if (!_mg->UnknownsForRefine())
+    if (!mg_->UnknownsForRefine())
         return;
     Assert(VecDescRecv(), DROPSErrCL("ParMultiGridCL::HandleUnknownsAfterRefine: missing vector describers"), DebugParallelNumC);
 
@@ -264,56 +230,48 @@ void ParMultiGridCL::HandleUnknownsAfterRefine(/*const std::vector<VecDescCL*> &
     _RecvBuf.resize(numKnownUnknowns);
 
     // Transfer the unknowns to the right processor
-    DynamicDataInterfaceCL::IFOneway( _GhToMaTetra_IF,                               // transfer unknowns from killed ghost-tetra to corresponding master tetra
-                  IF_FORWARD,                                    // transfer in one direction
-                  NumberOfUnknownsOnTetra()*sizeof(TransferUnkT),// number of (double+bool) values
-                  &GatherUnknownsRefC, &ScatterUnknownsRefC);    // handler for gather and scatter
+    /// \todo DiST: Implement Transfer of unknowns
+//    DynamicDataInterfaceCL::IFOneway( _GhToMaTetra_IF,                               // transfer unknowns from killed ghost-tetra to corresponding master tetra
+//                  IF_FORWARD,                                    // transfer in one direction
+//                  NumberOfUnknownsOnTetra()*sizeof(TransferUnkT),// number of (double+bool) values
+//                  &GatherUnknownsRefC, &ScatterUnknownsRefC);    // handler for gather and scatter
 
     // Right now no more unused simplices are needed any more!
-    _mg->PrepareModify();
+    mg_->PrepareModify();
 
     // kill all subsimplices, that has not beed done by refinement algorithm
-    for (Uint l=0; l<=_mg->GetLastLevel(); ++l)
+    for (Uint l=0; l<=mg_->GetLastLevel(); ++l)
     {
-        _mg->_Vertices[l].remove_if( std::mem_fun_ref(&VertexCL::IsMarkedForRemovement) );
-        _mg->_Edges[l].remove_if( std::mem_fun_ref(&EdgeCL::IsMarkedForRemovement) );
-        _mg->_Faces[l].remove_if( std::mem_fun_ref(&FaceCL::IsMarkedForRemovement) );
+        mg_->Vertices_[l].remove_if( std::mem_fun_ref(&VertexCL::IsMarkedForRemovement) );
+        mg_->Edges_[l].remove_if( std::mem_fun_ref(&EdgeCL::IsMarkedForRemovement) );
+        mg_->Faces_[l].remove_if( std::mem_fun_ref(&FaceCL::IsMarkedForRemovement) );
     }
 
     // Kill Ghosts tetras that are not needed any more
-    if (_mg->KilledGhosts())
+    if ( mg_->KilledGhosts())
     {
-        std::list<MultiGridCL::TetraIterator>::iterator end(_mg->toDelGhosts_.end());
-        // unsubscribe them from the DDD-System
-        DynamicDataInterfaceCL::XferBegin();
-        for (std::list<MultiGridCL::TetraIterator>::iterator it(_mg->toDelGhosts_.begin()); it!=end; ++it)
-            (*it)->XferDelete();
-        DynamicDataInterfaceCL::XferEnd();
-
-        // physically delete them
-        for (std::list<MultiGridCL::TetraIterator>::iterator it(_mg->toDelGhosts_.begin()); it!=end; ++it)
-        {
-            Assert((*it)->GetChildBegin()==0,
-                   DROPSErrCL("ParMultiGridCL::HandleUnknownsAfterRefine: Killing Ghost tetra, that has children"),
-                   DebugParallelNumC);
-            _mg->_Tetras[(*it)->GetLevel()].erase(*it);
-        }
-
+        std::list<MultiGridCL::TetraIterator>::iterator end(mg_->toDelGhosts_.end());
+        // unsubscribe them from the DiST-System
+        DiST::ModifyCL modify( *mg_, true, true);
+        modify.Init();
+        for (std::list<MultiGridCL::TetraIterator>::iterator it(mg_->toDelGhosts_.begin()); it!=end; ++it)
+            modify.Delete( **it);
+        modify.Finalize();
         // information about ghost, that should be deleted are not needed any more
-        _mg->toDelGhosts_.resize(0);
+        mg_->toDelGhosts_.resize(0);
     }
 
     // there are no more ghost tetras for deleting
-    _mg->killedGhostTetra_= false;
+    mg_->killedGhostTetra_= false;
 
     // Adjust level
-    while ( _mg->GetLastLevel()>0 && _mg->_Tetras[_mg->GetLastLevel()].empty() )
-        _mg->RemoveLastLevel();
+    while ( mg_->GetLastLevel()>0 && mg_->Tetras_[mg_->GetLastLevel()].empty() )
+        mg_->RemoveLastLevel();
     AdjustLevel();
 
     // no more modifications has to be done
-    _mg->FinalizeModify();
-    _mg->ClearTriangCache();
+    mg_->FinalizeModify();
+    mg_->ClearTriangCache();
 }
 
 /// \brief Fill a new vector describer class with datas (Has to be called after the refinement an migration algorithm!)
@@ -354,16 +312,16 @@ void ParMultiGridCL::HandleNewIdx(IdxDescCL* oldIdxDesc, VecDescCL* newVecDesc)
            DROPSErrCL("ParMultiGridCL::HandleNewIdx: number of unknowns on tetras does not match"), DebugParallelNumC);
 
     // Put unknowns on vertices into the new vector
-    for (MultiGridCL::const_VertexIterator sit=_mg->GetAllVertexBegin();
-            sit!=_mg->GetAllVertexEnd(); ++sit)
+    for (MultiGridCL::const_VertexIterator sit=mg_->GetAllVertexBegin();
+            sit!=mg_->GetAllVertexEnd(); ++sit)
     {
         PutData(sit, old_data, new_data, old_idx, new_idx, oldIdxDesc);
     }
 
     // Put unknowns on edges into the new vector and interpolate very special midvertices
     if (oldIdxDesc->NumUnknownsEdge()){
-        for (MultiGridCL::const_EdgeIterator sit=_mg->GetAllEdgeBegin();
-                sit!=_mg->GetAllEdgeEnd(); ++sit)
+        for (MultiGridCL::const_EdgeIterator sit=mg_->GetAllEdgeBegin();
+                sit!=mg_->GetAllEdgeEnd(); ++sit)
         {
             if (oldIdxDesc->NumUnknownsVertex()==1)
                 PutData(sit, old_data, new_data, old_idx, new_idx, oldIdxDesc, GetBndCond<BndDataCL<double> >(oldIdxDesc));
@@ -377,9 +335,11 @@ void ParMultiGridCL::HandleNewIdx(IdxDescCL* oldIdxDesc, VecDescCL* newVecDesc)
 void ParMultiGridCL::CompleteRepair(VecDescCL* newVec)
 /** After RepairAfterRefine[P1|P2] call this function to exchange interpolated
     values.
-    \param newVec the interpolated VecDescCL*/
+    \todo DiST: Implement me
+    \param newVec the interpolated VecDescCL
+*/
 {
-
+/*
     Assert(newVec->RowIdx->NumUnknownsEdge()==0 || newVec->RowIdx->NumUnknownsEdge()==newVec->RowIdx->NumUnknownsVertex(),
            DROPSErrCL("ParMultiGridCL::CompleteRepair: Unknowns on vertices and edges must be the same"),
            DebugParallelNumC);
@@ -403,6 +363,7 @@ void ParMultiGridCL::CompleteRepair(VecDescCL* newVec)
                     );
         _actualVec=0;
     }
+*/
 }
 
 /// \brief Put datas on a vertex from the old vector into a new vector
@@ -460,8 +421,11 @@ void ParMultiGridCL::RescueUnknownsOnEdges()
          Dirichlet BC, this must be checked.</li>
      <li>P2-finite elements: The value on the edge is set to the midvertex. Here
          no check for Dirichlet BC is needed.</li>
-    </ol>*/
+    </ol>
+    \todo DiST: Implement me
+*/
 {
+/*
     Assert(UnknownsOnSimplices(),
            DROPSErrCL("ParMultiGridCL::RescueUnknownsOnEdges: Called without unknowns"),
            DebugParallelNumC);
@@ -524,6 +488,7 @@ void ParMultiGridCL::RescueUnknownsOnEdges()
             }
         }
     }
+*/
 }
 
 /// \brief Delete recieve Buffer
@@ -898,13 +863,13 @@ int ParMultiGridCL::ScatterUnknownsMigE(OBJT obj, void* buf)
 /// \brief Clear all XferNew-Marks
 void ParMultiGridCL::DelAllUnkRecv()
 {
-    for (MultiGridCL::const_VertexIterator sit=_mg->GetAllVertexBegin(); sit!=_mg->GetAllVertexEnd(); ++sit){
+    for (MultiGridCL::const_VertexIterator sit=mg_->GetAllVertexBegin(); sit!=mg_->GetAllVertexEnd(); ++sit){
         sit->Unknowns.ResetUnkRecieved();
     }
-    for (MultiGridCL::const_EdgeIterator sit=_mg->GetAllEdgeBegin(); sit!=_mg->GetAllEdgeEnd(); ++sit){
+    for (MultiGridCL::const_EdgeIterator sit=mg_->GetAllEdgeBegin(); sit!=mg_->GetAllEdgeEnd(); ++sit){
         sit->Unknowns.ResetUnkRecieved();
     }
-    for (MultiGridCL::const_TetraIterator sit=_mg->GetAllTetraBegin(); sit!=_mg->GetAllTetraEnd(); ++sit){
+    for (MultiGridCL::const_TetraIterator sit=mg_->GetAllTetraBegin(); sit!=mg_->GetAllTetraEnd(); ++sit){
         sit->Unknowns.ResetUnkRecieved();
     }
 }
@@ -912,95 +877,623 @@ void ParMultiGridCL::DelAllUnkRecv()
 /// \brief Marks all tetras on last level!
 void ParMultiGridCL::MarkAll()
 {
-    for (MultiGridCL::TriangTetraIteratorCL it=_mg->GetTriangTetraBegin(); it!=_mg->GetTriangTetraEnd(); ++it)
+    for (MultiGridCL::TriangTetraIteratorCL it=mg_->GetTriangTetraBegin(); it!=mg_->GetTriangTetraEnd(); ++it)
         it->SetRegRefMark();
 }
 
 /// \brief Refine the Multigrid by calling the procedure ParRefine from the MulitGridCL
 void ParMultiGridCL::Refine()
 {
-    _mg->Refine();
+    mg_->Refine();
+}
+
+
+/// \brief This function assures, that every proc has the same number of level. This is important in the refinement algorithm
+/** Make sure, the containers are modifiable*/
+void ParMultiGridCL::AdjustLevel()
+{
+    int myLastLevel  =mg_->GetLastLevel();
+    int allLastLevel = ProcCL::GlobalMax(myLastLevel);       // this procedure is from parallel.h
+
+    // all procs should have the same number of levels!
+    for (; myLastLevel<allLastLevel; ++myLastLevel)
+    {
+        mg_->AppendLevel();
+    }
 }
 
 /****************************************************************************
-* I N I T   A N D   E N D   X F E R                                         *
+* C H E C K I N G   F O R   S A N I T Y                                          *
 *****************************************************************************
-* Call these functions to start and end xfer-commands                       *
+*   Functions for checking the sanity of the parallel structures                 *
+****************************************************************************/
+class ParMultiGridCL::SanityCheckCL
+{
+  private:
+    int           level_;    ///< level to check
+    std::ostream& os_;      ///< where to report errors
+
+  public:
+    SanityCheckCL( int level, std::ostream& os) : level_(level), os_(os) {}
+
+    ///\name Handler for DiST::InterfaceCL
+    //@{
+    bool Gather( DiST::TransferableCL& t, DiST::Helper::SendStreamCL& send)
+    {
+        if ( t.GetDim()==1){        // edge
+            EdgeCL* ep= 0;
+            simplex_cast( t, ep);
+            for ( Uint i=0; i<2; ++i)
+                send << ep->GetVertex(i)->GetGID();
+        }
+        else if ( t.GetDim()==2){   // face
+            FaceCL* fp= 0;
+            simplex_cast( t, fp);
+            for ( Uint i=0; i<3; ++i)
+                send << fp->GetVertex( i)->GetGID();
+            for ( Uint i=0; i<3; ++i)
+                send << fp->GetEdge( i)->GetGID();
+        }
+        return true;
+    }
+
+    bool Scatter( DiST::TransferableCL& t, const size_t& numData, DiST::Helper::RecvStreamCL& recv)
+    {
+        DiST::Helper::GeomIdCL gid;
+        bool sane= true;
+        if ( t.GetDim()==1){        // edge
+            EdgeCL* ep= 0;
+            simplex_cast( t, ep);
+            for ( size_t i=0; i<numData; ++i){
+                for ( Uint i=0; i<2; ++i){
+                    recv >> gid;
+                    if ( gid!=ep->GetVertex(0)->GetGID()){
+                        os_ << "Vertex " << i << " of edge does not match for local edge\n";
+                        ep->DebugInfo( os_);
+                        sane= false;
+                    }
+                }
+            }
+        }
+        else if ( t.GetDim()==2){   // face
+            FaceCL* fp= 0;
+            simplex_cast( t, fp);
+            for ( size_t i=0; i<numData; ++i){
+                for ( Uint i=0; i<3; ++i){
+                    recv >> gid;
+                    if ( gid!=fp->GetVertex( i)->GetGID()){
+                        os_ << "Vertex " << i << " of face does not match for local face\n";
+                        fp->DebugInfo( os_);
+                        sane= false;
+                    }
+                }
+                for ( Uint i=0; i<3; ++i){
+                    recv >> gid;
+                    if ( gid!=fp->GetEdge( i)->GetGID()){
+                        os_ << "Edge " << i << " of face does not match for local face\n";
+                        fp->DebugInfo( os_);
+                        sane= false;
+                    }
+                }
+            }
+        }
+        return sane;
+    }
+
+    bool Call()
+    // do interface comm
+    {
+        DiST::InterfaceCL::DimListT dimlist;
+        dimlist.push_back( 1); dimlist.push_back( 2);
+
+        const DiST::PrioListT   allPrios;
+        DiST::LevelListCL Lvls; Lvls.push_back( level_);
+        // communicate over all objects
+        DiST::InterfaceCL comm( Lvls, allPrios, allPrios, dimlist);
+        return comm.PerformInterfaceComm( *this);
+    }
+    //@}
+};
+
+/// \brief Check for sanity
+/** Check if the edges and faces have the same subsimpilces (check with GID).
+    Interface-function, calls Gather-, ScatterEdgeSane (EdgeIF)
+    and Gather- ScatterFaceSane (FaceIF) and check multigrid for sanity.*/
+bool ParMultiGridCL::IsSane(std::ostream& os, int Level) const
+{
+    bool sane= true;
+
+    // Checking all levels
+    if (Level==-1)
+    {
+        Uint maxLevel= ProcCL::GlobalMax( mg_->GetLastLevel());
+        if (maxLevel != mg_->GetLastLevel() )
+        {
+            sane= false;
+            os << "Local MultiGrid has too few levels: " << mg_->GetLastLevel()
+                    << " instead of " << maxLevel <<std::endl;
+        }
+        for (Uint lvl=0; lvl<=maxLevel; ++lvl)
+        {
+            sane= ParMultiGridCL::IsSane( os, lvl) && sane;
+        }
+    }
+    // checking on level
+    else
+    {
+        Comment("Checking level " << Level << std::endl,DebugParallelC);
+
+        sane= mg_->IsSane( os, Level);
+
+        Comment("Checking inter-processor dependencies on level " << Level << std::endl, DebugParallelC);
+
+        SanityCheckCL sanitycheck( Level, os);
+
+        sane= sanitycheck.Call() && sane;
+    }
+    return sane;
+}
+
+
+
+/****************************************************************************
+* F U N C T I O N S   F O R   I N T E R F A C E S                           *
+*****************************************************************************
+* The following functions are handlers to call the DDD-Interfaces correctly *
+****************************************************************************/
+
+/// \brief accumulate the marks for refinement on Edges on Level (-1==all levels)
+/** Interface-function (EdgeIF) calls Gather- and ScatterEdgeMFR
+    In the case, a tetra has changed its prio from ghost to master, local edges may
+    have inconsistent MFR. This MFR on edges are repaired here, too.
+*/
+class ParMultiGridCL::HandlerAccMFRCL
+{
+  private:
+    int level_;
+
+  public:
+    HandlerAccMFRCL( int level) : level_(level) {}
+    /// \brief Set AccMFR to zero and put my MFR into the message
+    bool Gather( DiST::TransferableCL& t, DiST::Helper::SendStreamCL& send)
+    {
+        EdgeCL* ep; simplex_cast( t, ep);
+        if ( !ep->IsMarkedForRemovement()){
+            ep->SetAccMFR( 0);
+            send << ep->GetMFR();
+        }
+        else
+            return false;
+        return true;
+
+    }
+    /// \brief Add received MFR to the accumulated MFR
+    bool Scatter( DiST::TransferableCL& t, const size_t& numData, DiST::Helper::RecvStreamCL& recv)
+    {
+        EdgeCL* ep; simplex_cast( t, ep);
+        ep->SetAccMFR( 0);
+        short int recvMFR=-1;
+        for ( size_t i=0; i<numData; ++i){
+            recv >> recvMFR;
+            ep->SetAccMFR( ep->GetAccMFR()+recvMFR);
+        }
+        return true;
+    }
+    /// \brief Actually perform the communication
+    void Call()
+    {
+        const DiST::PrioListCL allPrios;
+        DiST::LevelListCL Lvls;
+        if ( level_!=-1)
+            Lvls.push_back( level_);
+        DiST::InterfaceCL::DimListT dimlist; dimlist.push_back( DiST::GetDim<EdgeCL>());
+        DiST::InterfaceCL interf( Lvls, allPrios, allPrios, dimlist);
+        if ( !interf.PerformInterfaceComm( *this))
+            throw DROPSErrCL("HandlerAccMFRCL::Call: Interface communication is broken");
+    }
+};
+
+/// \brief accumulate the marks for refinement on Edges on Level (-1==all levels)
+/** Interface-function (EdgeIF) calls Gather- and ScatterEdgeMFR
+    In the case, a tetra has changed its prio from ghost to master, local edges may
+    have inconsistent MFR. This MFR on edges are repaired here, too.*/
+void ParMultiGridCL::AccumulateMFR( int Level)
+{
+    HandlerAccMFRCL handlerMFR( Level);
+    handlerMFR.Call();
+
+    for (TetraPCT::iterator it(ToHandleTetra_.begin()); it!=ToHandleTetra_.end(); ++it)
+        for (TetraCL::const_EdgePIterator epiter((*it)->GetEdgesBegin()); epiter!=(*it)->GetEdgesEnd(); ++epiter)
+            if ((*epiter)->IsLocal() && (*epiter)->GetAccMFR()!=(*epiter)->GetMFR())
+                (*epiter)->AccMFR_=(*epiter)->MFR_;
+    ToHandleTetra_.clear();
+}
+
+class ParMultiGridCL::HandlerRefMarkCL
+{
+private:
+    int level_;
+public:
+    HandlerRefMarkCL( int level) : level_(level) {}
+    /// \brief For tetra on proc bnd, only the ghost copy called the function TetraCL::RestrictMark. Therefore,
+    ///     send the mark to the master copy.
+    bool Gather( DiST::TransferableCL& t, DiST::Helper::SendStreamCL& send)
+    {
+        TetraCL* tp; simplex_cast( t, tp);
+
+        Assert( t.GetPrio()==PrioGhost, DROPSErrCL("HandlerRefMarkCL::Gather: called for non-ghost"), DebugParallelC);
+        send << tp->IsMarkedForRegRef();
+        return true;
+    }
+    /// \brief This is called by the master copy. The corresponding ghost copy definitely put in the
+    ///     message, whether the tetrahedron is marked for regular refinement
+    bool Scatter( DiST::TransferableCL& t, const size_t& numData, DiST::Helper::RecvStreamCL& recv)
+    {
+        TetraCL* tp; simplex_cast( t, tp);
+
+        Assert( t.GetPrio()==PrioMaster, DROPSErrCL("HandlerRefMarkCL::Gather: called for non-master"), DebugParallelC);
+        Assert( numData==1, DROPSErrCL("HandlerRefMarkCL::Scatter: Received data from more than one ghost"), DebugParallelC);
+        Assert( !tp->IsUnrefined(), DROPSErrCL("HandlerRefMarkCL::Scatter: Master has Ghost, eventhough, tetrahedron is unrefined!"), DebugParallelC);
+
+        bool MarkForRegRef=false;
+        recv >> MarkForRegRef;
+        // Do the work that cannot be done in TetraCL::RestrictMark
+        if ( tp->IsRegularlyRef()){
+            if ( !MarkForRegRef){
+                tp->SetNoRefMark();
+                tp->UnCommitRegRefMark();
+            }
+        }
+        else{ // tetra is irregularly refined
+            if (MarkForRegRef){
+                tp->SetRegRefMark();
+                tp->CommitRegRefMark();
+            }
+            else{
+                tp->SetNoRefMark();
+            }
+        }
+        return true;
+    }
+    /// \brief Actually perform the communication
+    void Call()
+    {
+        DiST::PrioListCL prioGhost; prioGhost.push_back( PrioGhost);
+        DiST::PrioListCL prioMaster; prioMaster.push_back( PrioMaster);
+        DiST::InterfaceCL::DimListT dimlist; dimlist.push_back( DiST::GetDim<TetraCL>());
+        DiST::LevelListCL Lvls;
+        if ( level_!=-1)
+            Lvls.push_back( level_);
+        DiST::InterfaceCL interf( Lvls, prioGhost, prioMaster, dimlist);
+        if ( !interf.PerformInterfaceComm( *this))
+            throw DROPSErrCL("HandlerRefMarkCL::Call: Interface communication is broken");
+    }
+};
+
+/// \brief Communicate the Refinement Marks from all procs
+/** Interface-function (TetraIF) calls Gather- and ScatterTetraRestrictMarks */
+void ParMultiGridCL::CommunicateRefMarks( Uint Level)
+{
+	HandlerRefMarkCL handler( (int)Level);
+    handler.Call();
+}
+
+class ParMultiGridCL::RescueGhostVertsCL
+{
+private:
+    Uint level_;
+    Uint lastLevel_;
+
+public:
+    RescueGhostVertsCL( Uint level, Uint lastLevel) : level_(level), lastLevel_(lastLevel) {}
+    bool operator() ( DiST::TransferableCL& t)
+    {
+        TetraCL* tp; simplex_cast( t, tp);
+        if ( !tp->IsGhost())
+            return true;
+        if ( !tp->IsMarkedForNoRef())
+            std::for_each( tp->GetVertBegin(), tp->GetVertEnd(), std::mem_fun( &VertexCL::ClearRemoveMark) );
+        return true;
+    }
+    void Call()
+    {
+        DiST::PrioListCL prioGhost; prioGhost.push_back( PrioGhost);
+        DiST::InterfaceCL::DimListT dimlist; dimlist.push_back( DiST::GetDim<TetraCL>());
+        // Vertices on  <level> can only owned by ghost tetras on  <Level> to <LastLevel-1>.
+        DiST::LevelListCL Lvls;
+        for ( Uint lvl= level_; lvl<lastLevel_; ++lvl)
+            Lvls.push_back( lvl);
+        DiST::InterfaceCL interf( Lvls, prioGhost, prioGhost, dimlist);
+        interf.ExecuteLocal( *this);
+    }
+};
+
+/// \brief Treat Ghost-Vertices, so they are not deleted
+/** Vertices has to be treated special for removement, because they can be found in other
+    levels then the ghost tetra (which is deleted). <p>
+    Interface-function (TetraIF) ExecGhVertRescue */
+void ParMultiGridCL::RescueGhostVerts( Uint Level)
+{
+    RescueGhostVertsCL rescueGhostVerts( Level, mg_->GetLastLevel());
+    rescueGhostVerts.Call();
+}
+
+
+class ParMultiGridCL::TreatHasGhostsCL
+{
+protected:
+    int level_;
+    DiST::ModifyCL& modify_;
+
+    void ChangePrioForAllSubs( TetraCL& t, Priority prio)
+    {
+//        std::cout << "[" << ProcCL::MyRank() << "]: Change Prio of Tetra " << t.GetGID() << " from "
+//            << PriorityToString(t.GetPrio()) << " to " << PriorityToString( prio) << std::endl;
+        for (TetraCL::const_VertexPIterator it= t.GetVertBegin(), end= t.GetVertEnd(); it!=end; ++it){
+//            std::cout << "[" << ProcCL::MyRank() << "]:   - for vertex " << (*it)->GetGID()
+//                      << " from " << PriorityToString((*it)->GetPrio()) << " to "
+//                      << PriorityToString( prio) << std::endl;
+            modify_.ChangePrio( **it, prio);
+        }
+        for (TetraCL::const_EdgePIterator it= t.GetEdgesBegin(), end= t.GetEdgesEnd(); it!=end; ++it){
+//            std::cout << "[" << ProcCL::MyRank() << "]:   - for edge " << (*it)->GetGID()
+//                      << " from " << PriorityToString((*it)->GetPrio()) << " to "
+//                      << PriorityToString( prio) << std::endl;
+            modify_.ChangePrio( **it, prio);
+        }
+        for (TetraCL::const_FacePIterator it= t.GetFacesBegin(), end= t.GetFacesEnd(); it!=end; ++it){
+//            std::cout << "[" << ProcCL::MyRank() << "]:   - for face " << (*it)->GetGID()
+//                      << " from " << PriorityToString((*it)->GetPrio()) << " to "
+//                      << PriorityToString( prio) << std::endl;
+            modify_.ChangePrio( **it, prio);
+        }
+    }
+
+    void ClearRemoveMarkForAllSubs( TetraCL& t)
+    {
+        std::for_each( t.GetVertBegin(),  t.GetVertEnd(), std::mem_fun( &VertexCL::ClearRemoveMark) );
+        std::for_each( t.GetEdgesBegin(), t.GetEdgesEnd(), std::mem_fun( &EdgeCL::ClearRemoveMark) );
+        std::for_each( t.GetFacesBegin(), t.GetFacesEnd(), std::mem_fun( &FaceCL::ClearRemoveMark) );
+    }
+
+public:
+    TreatHasGhostsCL( int level, DiST::ModifyCL& modify) : level_(level), modify_(modify) {}
+    bool operator() ( DiST::TransferableCL& t)
+    {
+        TetraCL* tp; simplex_cast( t, tp);
+        Assert( !tp->IsGhost(), DROPSErrCL("TreatHasGhostsCL::operator(): Called for a ghost tetrahedron"), DebugParallelC);
+        // Check if this tetrahedron needs to be handled
+        if ( !tp->HasGhost()) return true;                          // there is no ghost copy, so everything is already done
+        if ( tp->IsGhost() && tp->IsMarkedForNoRef()) return true;  // this tetrahedron will be deleted anyway, so ignore it
+
+        // this tetrahedron won't be deleted, so rescue the sub-simplices ...
+        ClearRemoveMarkForAllSubs( *tp);
+        // and set their priority to PrioVGhost
+        ChangePrioForAllSubs( *tp, PrioVGhost);
+        // Delete all children, these are stored by the ghost copy
+        tp->DeleteChildren();
+        return true;
+    }
+    void Call()
+    {
+        DiST::PrioListCL prioMaster; prioMaster.push_back( PrioMaster);
+        DiST::InterfaceCL::DimListT dimlist; dimlist.push_back( DiST::GetDim<TetraCL>());
+        DiST::LevelListCL Lvls;
+        if ( level_!=-1)
+            Lvls.push_back( level_);
+        DiST::InterfaceCL interf( Lvls, prioMaster, prioMaster, dimlist, false);
+        interf.ExecuteLocal( *this);
+    }
+};
+
+/// \brief Treat subsimplices that has Ghosts
+/** Mark subsimplices of HasGhosts as VGhost and rescue them <p>
+    Interface-function (TetraIF) calls ExecHasGhostC*/
+void ParMultiGridCL::TreatHasGhosts( int Level)
+{
+    TreatHasGhostsCL treatHasGhost( Level, *modify_);
+    treatHasGhost.Call();
+}
+
+class ParMultiGridCL::RescueGhostsCL : public ParMultiGridCL::TreatHasGhostsCL
+{
+public:
+    typedef ParMultiGridCL::TreatHasGhostsCL base;
+    RescueGhostsCL( int level, DiST::ModifyCL& modify) : base( level, modify) {}
+    /// \brief This is called for ghost tetrahedra. If the tetrahedron won't be deleted,
+    ///     rescue all the sub-simplices and set their priority to PrioGhost
+    bool operator() ( DiST::TransferableCL& t)
+    {
+        TetraCL* tp; simplex_cast( t, tp);
+        Assert( tp->IsGhost(), DROPSErrCL("RescueGhostsCL::operator(): Called for a non-ghost tetrahedron"), DebugParallelC);
+        if (!tp->IsMarkedForNoRef()){
+            ChangePrioForAllSubs( *tp, PrioGhost);
+            ClearRemoveMarkForAllSubs( *tp);
+        }
+        // remove link to parent
+        tp->Parent_=0;
+        return true;
+    }
+    void Call()
+    {
+        DiST::PrioListCL prioGhost; prioGhost.push_back( PrioGhost);
+        DiST::InterfaceCL::DimListT dimlist; dimlist.push_back( DiST::GetDim<TetraCL>());
+        DiST::LevelListCL Lvls;
+        if ( level_!=-1)
+            Lvls.push_back( level_);
+        DiST::InterfaceCL interf( Lvls, prioGhost, prioGhost, dimlist);
+        interf.ExecuteLocal( *this);
+    }
+};
+
+/// \brief Treat Ghosts, so they are not deleted
+/** Removes the del-mark on all ghost on level k+1 without NoRefMark, so they are not deleted.
+    This proecude markes them also as Ghost <p>
+    Interface-function (TetraIF) calls ExecGhostRescue */
+void ParMultiGridCL::TreatGhosts( int Level)
+{
+    RescueGhostsCL rescueGhostSubs( Level, *modify_);
+    rescueGhostSubs.Call();
+}
+
+
+class ParMultiGridCL::RescueMasterCL : public ParMultiGridCL::TreatHasGhostsCL
+{
+public:
+    typedef ParMultiGridCL::TreatHasGhostsCL base;
+    RescueMasterCL( int level, DiST::ModifyCL& modify)
+        : base( level, modify) {}
+    /// \brief This is called for master tetrahedra. If the tetrahedron won't be deleted or is handled by a TreatHasGhostsCL,
+    ///     rescue all the sub-simplices and set their priority to PrioGhost
+    bool operator() ( DiST::TransferableCL& t)
+    {
+        TetraCL* tp; simplex_cast( t, tp);
+        Assert( !tp->IsGhost(), DROPSErrCL("RescueMasterCL::operator(): Called for a ghost tetrahedron"), DebugParallelC);
+        if ( !(tp->IsMarkedForRemovement() || tp->HasGhost())){
+            ChangePrioForAllSubs( *tp, PrioMaster);
+            ClearRemoveMarkForAllSubs( *tp);
+        }
+        return true;
+    }
+    void Call()
+    {
+        DiST::PrioListCL prioMaster; prioMaster.push_back( PrioMaster);
+        DiST::InterfaceCL::DimListT dimlist; dimlist.push_back( DiST::GetDim<TetraCL>());
+        const DiST::LevelListCL AllLvls;
+        DiST::InterfaceCL interf( AllLvls, prioMaster, prioMaster, dimlist, false);
+        interf.ExecuteLocal( *this);
+    }
+};
+
+/// \brief Set prios of all subsimplices right
+/** This uses TreatHasGhosts(), TreatGhosts() and RescueSubs() */
+void ParMultiGridCL::AdaptPrioOnSubs()
+{
+    Comment( "Adapting prios on subsimplices...\n", DebugParallelC);
+    ModifyBegin();
+    TreatHasGhostsCL treatHasGhost(-1, *modify_);
+    RescueGhostsCL rescueGhostSubs(-1, *modify_);
+    RescueMasterCL rescueMasterSubs(-1, *modify_);
+    treatHasGhost.Call();
+    rescueGhostSubs.Call();
+    rescueMasterSubs.Call(); // for all master tetras
+    // additionally, we have to treat all ghost tetras which are not marked for no refinement
+//    for (MultiGridCL::TetraIterator it= mg_->GetAllTetraBegin(), end= mg_->GetAllTetraEnd(); it!=end; ++it)
+//        if (!it->IsMarkedForRemovement() && it->IsGhost() && !it->IsMarkedForNoRef())
+//            rescueMasterSubs(*it);
+    ModifyEnd();
+    Comment( "AdaptPrioOnSubs done.\n", DebugParallelC);
+}
+
+class ParMultiGridCL::AdaptVGhostMidVertexCL
+{
+private:
+    int level_;
+public:
+    AdaptVGhostMidVertexCL( int level=-1) : level_(level) {}
+    /** \brief Delete MidVertex of PrioVGhost edges*/
+    bool operator() ( DiST::TransferableCL& t)
+    {
+        EdgeCL* ep; simplex_cast( t, ep);
+        DiST::Helper::GeomIdCL midVertGID(ep->GetLevel()+1, GetBaryCenter(*ep), DiST::GetDim<VertexCL>());
+        if ( ep->GetMidVertex() && !DiST::InfoCL::Instance().Exists(midVertGID))
+            ep->RemoveMidVertex();
+        return true;
+    }
+    void Call()
+    {
+        DiST::PrioListCL prio; prio.push_back( PrioVGhost);
+        DiST::InterfaceCL::DimListT dimlist; dimlist.push_back( DiST::GetDim<EdgeCL>());
+        DiST::LevelListCL Lvls;
+        if ( level_!=-1)
+            Lvls.push_back( level_);
+        DiST::InterfaceCL interf( Lvls, prio, prio, dimlist);
+        interf.ExecuteLocal( *this);
+    }
+
+};
+
+
+/// \brief Adapt midvertex pointers on VGhost-Edges
+/** Interface-function (EdgeIF) calls ExecAdaptVGhostMidVertexC*/
+void ParMultiGridCL::AdaptMidVertex( int Level)
+{
+    AdaptVGhostMidVertexCL adaptVGhostVerts(Level);
+    adaptVGhostVerts.Call();
+}
+
+/****************************************************************************
+* B E G I N   A N D   E N D   T R A N S F E R                               *
+*****************************************************************************
+* Call these functions to start and end transfer-commands                   *
 * They are preparing and finishing everything for the transfer.             *
 ****************************************************************************/
 /// \brief prepare everything for the transfers
 ///
-/// Call this everytime before using an transfer command!
-void ParMultiGridCL::XferStart(int Level)
+/// Call this everytime before using a transfer command!
+void ParMultiGridCL::TransferBegin(int Level)
 {
-    Assert(!TransferMode, DROPSErrCL("ParMultiGridCL: XferStart: Allready called XferStart"), DebugParallelC);
-    TransferMode=true;          // Now the Transfer-Mode has been started
+    Assert( !transfer_, DROPSErrCL("ParMultiGridCL::TransferBegin: already called TransferBegin"), DebugParallelC);
+    Assert( !modify_, DROPSErrCL("ParMultiGridCL::TransferBegin: cannot use Transfer module inside Modify module, call ModifyEnd() before"), DebugParallelC);
+    modify_= transfer_= new DiST::TransferCL( *mg_, true, true);
     ToHandleTetra_.clear();     // There is no tetra that has changed prio from ghost to master within transfer so far
-
-    _mg->ClearTriangCache();    // Remove old iterators, new iterators are comming!
-    _mg->PrepareModify();       // the recieved simplices have to be stored, so be prepared for that
 
     // all procs should have the same number of levels!
     AdjustLevel();
 
-    _level = (Level==-1) ? _mg->GetLastLevel() : Level;
+    level_ = (Level==-1) ? mg_->GetLastLevel() : Level;
 
-    Comment("- Starting Xfer"<<std::endl, DebugParallelC);
-    DynamicDataInterfaceCL::XferBegin();
+    Comment("- Starting Transfer"<<std::endl, DebugParallelC);
+    transfer_->Init();
 }
 
 /// \brief End the transfer phase by sending simplices, delete unused simplices and eventually rescue unknowns
 /** */
-void ParMultiGridCL::XferEnd()
+void ParMultiGridCL::TransferEnd()
 {
-    Assert(TransferMode && _level!=-1, DROPSErrCL("ParMultiGridCL: XferEnd: Not in Transfer-Mode"), DebugParallelC);
-    DynamicDataInterfaceCL::XferEnd();
+    Assert( transfer_ , DROPSErrCL("ParMultiGridCL::TransferEnd: not in Transfer mode"), DebugParallelC);
+    transfer_->Finalize();
+    delete transfer_;    modify_= transfer_= 0;
 
-    // All Tetraeders, that are marked for removement, should be removed now!
-    // All Subsimplices are marked for removement
-    for (int l=0; l<=_level; ++l)
+    // All tetras, that are marked for removement, should be removed now!
+    // All subsimplices are marked for removement
+    for (int l=0; l<=level_; ++l)
     {
-        (*_TetraCont)[l].remove_if( std::mem_fun_ref(&TetraCL::IsMarkedForRemovement) );
-        for_each( _mg->GetVerticesBegin(l), _mg->GetVerticesEnd(l), std::mem_fun_ref( &VertexCL::SetRemoveMark ) );
-        for_each( _mg->GetEdgesBegin(l), _mg->GetEdgesEnd(l), std::mem_fun_ref( &EdgeCL::SetRemoveMark ) );
-        for_each( _mg->GetFacesBegin(l), _mg->GetFacesEnd(l), std::mem_fun_ref( &FaceCL::SetRemoveMark ) );
+//        mg_->Tetras_[l].remove_if( std::mem_fun_ref(&TetraCL::IsMarkedForRemovement) );
+//        for_each( mg_->GetVerticesBegin(l), mg_->GetVerticesEnd(l), std::mem_fun_ref( &VertexCL::SetRemoveMark ) );
+//        for_each( mg_->GetEdgesBegin(l), mg_->GetEdgesEnd(l), std::mem_fun_ref( &EdgeCL::SetRemoveMark ) );
+//        for_each( mg_->GetFacesBegin(l), mg_->GetFacesEnd(l), std::mem_fun_ref( &FaceCL::SetRemoveMark ) );
     }
 
-    DynamicDataInterfaceCL::XferBegin();        // for removement/priochange of subsimplices
+    ModifyBegin();
 
     Comment("  * Rescue HasGhosts"<<std::endl,DebugParallelC);
     TreatHasGhosts();       // mark subs of HasGhosts as VGhost, rescue subs
     Comment("  * Rescue Ghosts"<<std::endl,DebugParallelC);
     TreatGhosts();          // rescue subs of Ghosts, mark as Ghost
-    Comment("  * Rescue Subs"<<std::endl,DebugParallelC);
-    // Rescue subs of tetras and remove link to parent, if tetra is ghost
-    for (int l=0; l<=_level; ++l){
-        for (MultiGridCL::TetraIterator sit((*_TetraCont)[l].begin()), tEnd((*_TetraCont)[l].end()); sit!=tEnd; ++sit){
-            RescueSubs(*sit);
-            if (sit->IsGhost() && sit->GetParent() ){
-                sit->_Parent=0;
-            }
-        }
-    }
+    Comment("  * Rescue Masters"<<std::endl,DebugParallelC);
+    RescueMasterCL rescueMasterSubs(-1, *modify_);
+    rescueMasterSubs.Call();
+    // Remove link to parent, if tetra is ghost (note: already done in TreatGhosts)
+//    for (int l=0; l<=level_; ++l){
+//        for (MultiGridCL::TetraIterator sit(mg_->Tetras_[l].begin()); sit!=mg_->Tetras_[l].end(); ++sit){
+//            if (sit->IsGhost() && sit->GetParent() ){
+//                sit->Parent_=0;
+//            }
+//        }
+//    }
 
-    Comment("  * Tell DDD to delete Objects!"<<std::endl,DebugParallelC);
-    for (int l=0; l<=_level; ++l)
-    {
-        for (MultiGridCL::VertexIterator sit((*_VertCont)[l].begin()), tEnd((*_VertCont)[l].end()); sit!=tEnd; ++sit)
-        {
-            if ( sit->IsMarkedForRemovement() ) sit->XferDelete();
-        }
-        for (MultiGridCL::EdgeIterator sit((*_EdgeCont)[l].begin()), tEnd((*_EdgeCont)[l].end()); sit!=tEnd; ++sit)
-        {
-            if ( sit->IsMarkedForRemovement() ) sit->XferDelete();
-        }
-        for (MultiGridCL::FaceIterator sit((*_FaceCont)[l].begin()), tEnd((*_FaceCont)[l].end()); sit!=tEnd; ++sit)
-        {
-            if ( sit->IsMarkedForRemovement() ) sit->XferDelete();
-        }
-    }
-
-    DynamicDataInterfaceCL::XferEnd();
+//    Comment("  * Tell DiST to delete Objects!"<<std::endl,DebugParallelC);
+//    for (MultiGridCL::VertexIterator sit( mg_->GetAllVertexBegin()); sit!=mg_->GetAllVertexEnd(level_); ++sit)
+//        if ( sit->IsMarkedForRemovement())
+//            modify_->Delete( *sit);
+//    for (MultiGridCL::EdgeIterator sit( mg_->GetAllEdgeBegin()); sit!=mg_->GetAllEdgeEnd(level_); ++sit)
+//        if ( sit->IsMarkedForRemovement())
+//            modify_->Delete( *sit);
+//    for (MultiGridCL::FaceIterator sit( mg_->GetAllFaceBegin()); sit!=mg_->GetAllFaceEnd(level_); ++sit)
+//        if ( sit->IsMarkedForRemovement())
+//            modify_->Delete( *sit);
+    ModifyEnd();
 
     // Adapt midvertex pointers on VGhost-Edges
     Comment("  * Adapting Midvertex on VGhost-Edges"<<std::endl,DebugParallelC);
@@ -1011,7 +1504,8 @@ void ParMultiGridCL::XferEnd()
     AccumulateMFR();
 
     // Rescue unknowns on edges, that are deleted and midvertex stays on processor
-    if (VecDescRecv()){
+    /// \todo DiST: Implement rescue of dof!
+/*    if (VecDescRecv()){
         Comment("  * Send unknowns "<<std::endl,DebugParallelC);
         DynamicDataInterfaceCL::IFExchange(AllSimplexIFCL<VertexCL>::GetIF(),               // exchange datas over distributed vertices
                        NumberOfUnknownsOnVertex()* sizeof(TransferUnkT),// number of datas to be exchanged
@@ -1025,423 +1519,49 @@ void ParMultiGridCL::XferEnd()
                       );
         RescueUnknownsOnEdges();
     }
+*/
 
     // now physically delete the simplices with RemoveMark from memory
-    Comment("- Delete all unused Simplices!"<<std::endl,DebugParallelC);
-    for (int l=0; l<=_level; ++l)
-    {
-        (*_VertCont)[l].remove_if( std::mem_fun_ref(&VertexCL::IsMarkedForRemovement) );
-        (*_EdgeCont)[l].remove_if( std::mem_fun_ref(&EdgeCL::IsMarkedForRemovement) );
-        (*_FaceCont)[l].remove_if( std::mem_fun_ref(&FaceCL::IsMarkedForRemovement) );
-    }
+//    Comment("- Delete all unused Simplices!"<<std::endl,DebugParallelC);
+//    mg_->PrepareModify();
+//    for (int l=0; l<=level_; ++l)
+//    {
+//        mg_->Vertices_[l].remove_if( std::mem_fun_ref(&VertexCL::IsMarkedForRemovement) );
+//        mg_->Edges_[l].remove_if( std::mem_fun_ref(&EdgeCL::IsMarkedForRemovement) );
+//        mg_->Faces_[l].remove_if( std::mem_fun_ref(&FaceCL::IsMarkedForRemovement) );
+//    }
+//
+//    level_=-1; // invalidate level_
+//    mg_->FinalizeModify();
+//    mg_->ClearTriangCache();
 
-    TransferMode = false;       // Now the Transfer-Mode has been ended
-    _level=-1;                  // and so _level is also set on no transfer active!
-    _mg->FinalizeModify();      // No more elements may be added
-    _mg->ClearTriangCache();
-
-    Comment("- Xfer finished"<<std::endl,DebugParallelC);
-}
-
-
-/// \brief This function assures, that every proc has the same number of level. This is important in the refinement algorithm
-/** Make sure, the containers are modifiable*/
-void ParMultiGridCL::AdjustLevel()
-{
-    int myLastLevel  =_mg->GetLastLevel();
-    int allLastLevel = ProcCL::GlobalMax(myLastLevel);       // this procedure is from parallel.h
-
-    // all procs should have the same number of levels!
-    for (; myLastLevel<allLastLevel; ++myLastLevel)
-    {
-        _mg->AppendLevel();
-    }
-}
-
-/****************************************************************************
-* C H E C K I N G   F O R   S A N I T Y                                          *
-*****************************************************************************
-*   Functions for checking the sanity of the parallel structures                 *
-****************************************************************************/
-/// \brief Check for sanity
-/** Check if the edges and faces have the same subsimpilces (check with GID).
-    Interface-function, calls Gather-, ScatterEdgeSane (EdgeIF)
-    and Gather- ScatterFaceSane (FaceIF) and check multigrid for sanity.*/
-bool ParMultiGridCL::IsSane(std::ostream& os, int Level)
-{
-    bool sane= true;
-
-    // Checking all levels
-    if (Level==-1)
-    {
-        Uint maxLevel= ProcCL::GlobalMax( _mg->GetLastLevel());
-        if (maxLevel != _mg->GetLastLevel() )
-        {
-            sane= false;
-            os << "Local MultiGrid has too few levels: " << _mg->GetLastLevel()
-                    << " instead of " << maxLevel <<std::endl;
-        }
-        for (Uint lvl=0; lvl<=maxLevel; ++lvl)
-        {
-            _sane= ParMultiGridCL::IsSane( os, lvl);
-            sane= sane && _sane;
-        }
-    }
-    // checking on level
-    else
-    {
-        Comment("Checking level " << Level << std::endl,DebugParallelC);
-
-        sane= _mg->IsSane( os, Level);
-        _sane= true; _os= &os;
-
-        Comment("Checking inter-processor dependencies on level " << Level << std::endl, DebugParallelC);
-
-        DynamicDataInterfaceCL::IFAOnewayX( _EdgeIF, Level, IF_FORWARD, 2*sizeof(GIDT), &GatherEdgeSaneC, &ScatterEdgeSaneC);
-        DynamicDataInterfaceCL::IFAOnewayX( _FaceIF, Level, IF_FORWARD, 6*sizeof(GIDT), &GatherFaceSaneC, &ScatterFaceSaneC);
-
-        sane= sane && _sane;
-    }
-    return sane;
-}
-
-/** Checking if the edges have the same both vertices on all procs that share this edge,
-    collect the gids */
-int ParMultiGridCL::GatherEdgeSane( OBJT obj, void* data, PROCT, ATTRT)
-{
-	GIDT* vert= static_cast<GIDT*>(data);
-    EdgeCL* ep= ddd_cast<EdgeCL*>(obj);
-    vert[0]= ep->GetVertex(0)->GetGID();
-    vert[1]= ep->GetVertex(1)->GetGID();
-    return 0;
-}
-
-/** Checking if the edges have the same both vertices on all procs that share this edge,
-    recieve the gids */
-int ParMultiGridCL::ScatterEdgeSane( OBJT obj, void* data, PROCT proc, ATTRT)
-{
-	GIDT* vert= static_cast<GIDT*>(data);
-    EdgeCL* ep= ddd_cast<EdgeCL*>(obj);
-    if (vert[0]!=ep->GetVertex(0)->GetGID() || vert[1]!=ep->GetVertex(1)->GetGID())
-    {
-        *_os << "Vertices of distributed edge differ on proc " << proc
-                << " (Verts " << vert[0] << ", " << vert[1] << "). Local edge:\n";
-        ep->DebugInfo( *_os);
-        _sane= false;
-    }
-    return 0;
-}
-
-/** Checking if the faces have the same three vertices and three edges on all procs that share this edge
-    collect information */
-int ParMultiGridCL::GatherFaceSane( OBJT obj, void* data, PROCT, ATTRT)
-{
-	GIDT* vertedge= static_cast<GIDT*>(data);
-    FaceCL* fp= ddd_cast<FaceCL*>(obj);
-    vertedge[0]= fp->GetVertex(0)->GetGID();
-    vertedge[1]= fp->GetVertex(1)->GetGID();
-    vertedge[2]= fp->GetVertex(2)->GetGID();
-    vertedge[3]= fp->GetEdge(0)->GetGID();
-    vertedge[4]= fp->GetEdge(1)->GetGID();
-    vertedge[5]= fp->GetEdge(2)->GetGID();
-    return 0;
-}
-
-/** Checking if the faces have the same three vertices and three edges on all procs that share this edge
-    recieve information */
-int ParMultiGridCL::ScatterFaceSane( OBJT obj, void* data, PROCT proc, ATTRT)
-{
-	GIDT* ve= static_cast<GIDT*>(data);
-    FaceCL* fp= ddd_cast<FaceCL*>(obj);
-    if (ve[0]!=fp->GetVertex(0)->GetGID() || ve[1]!=fp->GetVertex(1)->GetGID() || ve[2]!=fp->GetVertex(2)->GetGID())
-    {
-        *_os << "Vertices of distributed face differ on proc " << proc
-                << " (Verts " << ve[0] << ", " << ve[1] << ", "<< ve[2] << "). Local face:\n";
-        fp->DebugInfo( *_os);
-        _sane= false;
-    }
-    if (ve[3]!=fp->GetEdge(0)->GetGID() ||
-           ve[4]!=fp->GetEdge(1)->GetGID() ||
-           ve[5]!=fp->GetEdge(2)->GetGID())
-    {
-        *_os << "Edges of distributed face differ on proc " << proc
-                << " (Verts " << ve[0] << ", " << ve[1] << ", "<< ve[2] << "). Local face:\n";
-        fp->DebugInfo( *_os);
-        _sane= false;
-    }
-    return 0;
-}
-
-/****************************************************************************
-* F U N C T I O N S   F O R   I N T E R F A C E S                            *
-*****************************************************************************
-* The following functions are handlers to call the DDD-Interfaces correct    *
-****************************************************************************/
-/// \brief accumulate the marks for refinement on Edges on Level (-1==all levels)
-/** Interface-function (EdgeIF) calls Gather- and ScatterEdgeMFR
-    In the case, a tetra has changed its prio from ghost to master, local edges may
-    have inconsistent MFR. This MFR on edges are repaired here, too.*/
-void ParMultiGridCL::AccumulateMFR( int Level)
-{
-    if (Level==-1)
-    	DynamicDataInterfaceCL::IFOneway( _EdgeIF, IF_FORWARD, sizeof(short int), &GatherEdgeMFRC, &ScatterEdgeMFRC);
-    else
-    	DynamicDataInterfaceCL::IFAOneway( _EdgeIF, Level, IF_FORWARD, sizeof(short int), &GatherEdgeMFRC, &ScatterEdgeMFRC);
-
-    for (TetraPCT::iterator it(ToHandleTetra_.begin()); it!=ToHandleTetra_.end(); ++it)
-        for (TetraCL::const_EdgePIterator epiter((*it)->GetEdgesBegin()); epiter!=(*it)->GetEdgesEnd(); ++epiter)
-            if ((*epiter)->IsLocal() && (*epiter)->GetAccMFR()!=(*epiter)->GetMFR())
-                (*epiter)->_AccMFR=(*epiter)->_MFR;
-    ToHandleTetra_.clear();
-}
-
-/** Set AccMFR to MFR and put this information into the message */
-int ParMultiGridCL::GatherEdgeMFR( OBJT obj, void* buf)
-{
-    EdgeCL* const ep= ddd_cast<EdgeCL*>(obj);
-    short int* buffer= static_cast<short int*>(buf);
-    if (!ep->IsMarkedForRemovement())
-        *buffer= ep->_AccMFR= ep->_MFR;
-    else
-        *buffer=0;
-
-    AllComment("- Submit MFR from edge: "<<ep->GetGID()<<" as "<<ep->_AccMFR<<std::endl, DebugParallelHardC);
-    return 0;
-}
-
-/** increase value of AccMFR */
-int ParMultiGridCL::ScatterEdgeMFR( OBJT obj, void* buf)
-{
-    EdgeCL* ep=ddd_cast<EdgeCL*>(obj);
-
-    ep->_AccMFR += *static_cast<short int*>(buf);
-
-    AllComment("- Recieve MFR from edge: "<<ep->GetGID()<<", now "<<ep->_AccMFR<<std::endl, DebugParallelHardC);
-    return 0;
-// Ghost-Kanten enthalten hinterher ebenfalls globalen Wert!
-}
-
-
-/// \brief Communicate the Refinement Marks from all procs
-/** Interface-function (TetraIF) calls Gather- and ScatterTetraRestrictMarks */
-void ParMultiGridCL::CommunicateRefMarks( Uint Level)
-{
-	DynamicDataInterfaceCL::IFAOneway( _TetraIF, Level, IF_FORWARD, sizeof(bool), &GatherTetraRestrictMarksC, &ScatterTetraRestrictMarksC);
-}
-
-/** Put flag, if the Tetra is marked for Refinement into message */
-int ParMultiGridCL::GatherTetraRestrictMarks( OBJT obj, void* buf)
-{
-    TetraCL* const tp = ddd_cast<TetraCL*>(obj);
-    *static_cast<bool*>(buf)= tp->IsMarkedForRegRef();
-    AllComment("- Submit RegRefMark from tetra: "<<tp->GetGID()<<" as "<<tp->IsMarkedForRegRef()<<std::endl, DebugParallelHardC);
-    return 0;
-}
-
-/** Recieve, if the tetra is marked for refinement on an other proc and increas or decrease the MFR on all edges*/
-int ParMultiGridCL::ScatterTetraRestrictMarks( OBJT obj, void* buf)
-// Hole Arbeit nach, die in TetraCL::RestrictMarks nicht verrichtet werden konnte.
-{
-    bool MarkForRegRef= *static_cast<bool*>(buf);
-    TetraCL* tp= ddd_cast<TetraCL*>(obj);
-    AllComment("- Recieve RegRefMark from tetra: "<<tp->GetGID()<<" as "<<MarkForRegRef<<std::endl,DebugParallelHardC);
-
-    if (tp->IsRegularlyRef() )
-    {
-        if (!MarkForRegRef)
-        {
-            tp->SetNoRefMark();
-            tp->UnCommitRegRefMark();
-        }
-    }
-    else // tetra is irregularly refined
-    {
-
-        Assert( !tp->IsUnrefined(), DROPSErrCL("ParMultiGridCL: ScatterTetraRestrictMarks: Master has Ghost eventhough it is unrefined!"), DebugParallelC);
-        if (MarkForRegRef)
-        {
-            tp->SetRegRefMark();
-            tp->CommitRegRefMark();
-        }
-        else
-            tp->SetNoRefMark();
-    }
-    return 0;
-}
-
-/// \brief Treat Ghosts, so they are not deleted
-/** Removes the del-mark on all ghost on level k+1 without NoRefMark, so they are not deleted.
-    This proecude markes them also as Ghost <p>
-    Interface-function (TetraIF) calls ExecGhostRescue */
-void ParMultiGridCL::TreatGhosts( int Level)
-{
-    if (Level==-1)
-    	DynamicDataInterfaceCL::IFExecLocal( _TetraIF, &ExecGhostRescueC);
-    else
-    	DynamicDataInterfaceCL::IFAExecLocal( _TetraIF, Level, &ExecGhostRescueC);
-}
-
-/** Set Prio for all subsimplices on PrioGhost and removes their Remove-Mark*/
-int ParMultiGridCL::ExecGhostRescue( OBJT obj)
-{
-    TetraCL* const tp= ddd_cast<TetraCL*>(obj);
-    if (!tp->IsGhost() ) return 1;
-    if (!tp->IsMarkedForNoRef())
-    {  // rescue all subsimplices and set their Prio to PrioGhost
-        for (TetraCL::const_VertexPIterator it= tp->GetVertBegin(), end= tp->GetVertEnd(); it!=end; ++it)
-            PrioChange( *it, PrioGhost);
-        for (TetraCL::const_EdgePIterator it= tp->GetEdgesBegin(), end= tp->GetEdgesEnd(); it!=end; ++it)
-            PrioChange( *it, PrioGhost);
-        for (TetraCL::const_FacePIterator it= tp->GetFacesBegin(), end= tp->GetFacesEnd(); it!=end; ++it)
-            PrioChange( *it, PrioGhost);
-        std::for_each( tp->GetVertBegin(), tp->GetVertEnd(), std::mem_fun( &VertexCL::ClearRemoveMark) );
-        std::for_each( tp->GetEdgesBegin(), tp->GetEdgesEnd(), std::mem_fun( &EdgeCL::ClearRemoveMark) );
-        std::for_each( tp->GetFacesBegin(), tp->GetFacesEnd(), std::mem_fun( &FaceCL::ClearRemoveMark) );
-    }
-    return 0;
-}
-
-/// \brief Treat Ghost-Vertices, so they are not deleted
-/** Vertices has to be treated special for removement, because they can be found in other
-    levels then the tetra. <p>
-    Interface-function (TetraIF) ExecGhVertRescue */
-void ParMultiGridCL::RescueGhostVerts( Uint Level)
-{
-    // Vertices on  <level> can only owned by ghost tetras on  <Level> to <LastLevel-1>.
-    for (Uint lvl= Level, maxLevel= _mg->GetLastLevel(); lvl<maxLevel; ++lvl)
-    	DynamicDataInterfaceCL::IFAExecLocal( _TetraIF, lvl, &ExecGhVertRescueC);
-}
-
-/** Rescue vertices of ghost tetras */
-int ParMultiGridCL::ExecGhVertRescue( OBJT obj)
-{
-    TetraCL* const tp= ddd_cast<TetraCL*>(obj);
-    if (!tp->IsGhost()) return 1;
-
-    if (!tp->IsMarkedForNoRef())
-        std::for_each( tp->GetVertBegin(), tp->GetVertEnd(), std::mem_fun( &VertexCL::ClearRemoveMark) );
-
-    return 0;
-}
-
-/// \brief Treat subsimplices that has Ghosts
-/** Mark subsimplices of HasGhosts as VGhost and rescue them <p>
-    Interface-function (TetraIF) calls ExecHasGhostC*/
-void ParMultiGridCL::TreatHasGhosts( int Level)
-{
-    if (Level==-1)
-    	DynamicDataInterfaceCL::IFExecLocal( _TetraIF, &ExecHasGhostC);
-    else
-    	DynamicDataInterfaceCL::IFAExecLocal( _TetraIF, Level, &ExecHasGhostC);
-}
-
-/** Set prio for all subsimpilces to PrioVGhost and delete the pointers to children */
-int ParMultiGridCL::ExecHasGhost( OBJT obj)
-{
-    TetraCL* const tp= ddd_cast<TetraCL*>(obj);
-    if (!tp->HasGhost() ) return 1;
-
-    // This tetra will be removed, so ignore it!
-    if (tp->IsGhost() && tp->IsMarkedForNoRef()) return 1;
-
-    std::for_each( tp->GetVertBegin(), tp->GetVertEnd(), std::mem_fun( &VertexCL::ClearRemoveMark) );
-    std::for_each( tp->GetEdgesBegin(), tp->GetEdgesEnd(), std::mem_fun( &EdgeCL::ClearRemoveMark) );
-    std::for_each( tp->GetFacesBegin(), tp->GetFacesEnd(), std::mem_fun( &FaceCL::ClearRemoveMark) );
-
-    for (TetraCL::const_VertexPIterator it= tp->GetVertBegin(), end= tp->GetVertEnd(); it!=end; ++it)
-        PrioChange( *it, PrioVGhost);
-    for (TetraCL::const_EdgePIterator it= tp->GetEdgesBegin(), end= tp->GetEdgesEnd(); it!=end; ++it)
-        PrioChange( *it, PrioVGhost);
-    for (TetraCL::const_FacePIterator it= tp->GetFacesBegin(), end= tp->GetFacesEnd(); it!=end; ++it)
-        PrioChange( *it, PrioVGhost);
-
-    if (tp->_Children) { delete tp->_Children; tp->_Children= 0; }
-    return 0;
-}
-
-/// \brief Adapt midvertex pointers on VGhost-Edges
-/** Interface-function (EdgeIF) calls ExecAdaptVGhostMidVertexC*/
-void ParMultiGridCL::AdaptMidVertex( int Level)
-{
-    if (Level==-1)
-    	DynamicDataInterfaceCL::IFExecLocal( _EdgeIF, &ExecAdaptVGhostMidVertexC);
-    else
-    	DynamicDataInterfaceCL::IFAExecLocal( _EdgeIF, Level, &ExecAdaptVGhostMidVertexC);
-}
-
-/** Delete MidVertex of PrioVGhost Kanten*/
-int ParMultiGridCL::ExecAdaptVGhostMidVertex( OBJT obj)
-{
-    EdgeCL* const ep= ddd_cast<EdgeCL*>(obj);
-
-    if (ep->GetPrio()!=PrioVGhost) return 1;
-
-    if (ep->GetMidVertex() && ep->GetMidVertex()->IsMarkedForRemovement())
-    {
-        ep->RemoveMidVertex();
-    }
-    return 0;
-}
-
-/// \brief Set prios of all subsimplices right
-/** This uses TreatHasGhosts(), TreatGhosts() and RescueSubs() */
-void ParMultiGridCL::AdaptPrioOnSubs()
-{
-	DynamicDataInterfaceCL::XferBegin();  // for removement/priochange of subsimplices
-    TreatHasGhosts(); // mark subs of HasGhosts as VGhost, rescue subs
-    TreatGhosts();    // rescue subs of Ghosts, mark as Ghost
-    for (Uint level=0; level<=_mg->GetLastLevel(); ++level)
-    {
-        for (MultiGridCL::TetraIterator sit((*_TetraCont)[level].begin()), tEnd((*_TetraCont)[level].end()); sit!=tEnd; ++sit)
-            if (!sit->IsGhost() || !sit->IsMarkedForNoRef())
-                RescueSubs(*sit);
-        //for_each( _mg->GetTetrasBegin(level), _mg->GetTetrasEnd(level), RescueSubs);
-    }
-    DynamicDataInterfaceCL::XferEnd();
-}
-
-/// \brief Rescue all subsimplices and set prios to PrioMaster
-void ParMultiGridCL::RescueSubs( TetraCL& t)
-{
-    if (t.IsMarkedForRemovement() || t.HasGhost() || t.IsGhost() ) return;
-    // keep my sub simplices!
-    std::for_each( t.GetVertBegin(), t.GetVertEnd(), std::mem_fun( &VertexCL::ClearRemoveMark) );
-    std::for_each( t.GetEdgesBegin(), t.GetEdgesEnd(), std::mem_fun( &EdgeCL::ClearRemoveMark) );
-    std::for_each( t.GetFacesBegin(), t.GetFacesEnd(), std::mem_fun( &FaceCL::ClearRemoveMark) );
-
-        // mark my subs with prio Master
-    for (TetraCL::const_VertexPIterator it= t.GetVertBegin(), end= t.GetVertEnd(); it!=end; ++it)
-        PrioChange( *it, PrioMaster);
-    for (TetraCL::const_EdgePIterator it= t.GetEdgesBegin(), end= t.GetEdgesEnd(); it!=end; ++it)
-        PrioChange( *it, PrioMaster);
-    for (TetraCL::const_FacePIterator it= t.GetFacesBegin(), end= t.GetFacesEnd(); it!=end; ++it)
-        PrioChange( *it, PrioMaster);
+    Comment("- Transfer finished"<<std::endl,DebugParallelC);
 }
 
 void ParMultiGridCL::MarkSimplicesForUnknowns(int lvl)
 {
-	DynamicDataInterfaceCL::XferBegin();
-    for (MultiGridCL::TriangTetraIteratorCL  tit(_mg->GetTriangTetraBegin(lvl)), tend(_mg->GetTriangTetraEnd(lvl));
-         tit!=tend; ++tit)
+	ModifyBegin();
+    for (MultiGridCL::TriangTetraIteratorCL tit(mg_->GetTriangTetraBegin(lvl));
+         tit!=mg_->GetTriangTetraEnd(lvl); ++tit)
     {
         // master tetras in last triang level are able to store unknowns the rest isn't
-        for (TetraCL::const_VertexPIterator it(tit->GetVertBegin()), end(tit->GetVertEnd()); it!=end; ++it)
+        for (TetraCL::const_VertexPIterator it(tit->GetVertBegin()); it!=tit->GetVertEnd(); ++it)
         {
             Assert((*it)->GetPrio()!=PrioVGhost, DROPSErrCL("ParMultiGridCL::MarkSimplicesForUnknowns: Marking PrioVGhost as PrioHasUnk"), DebugParallelNumC);
-            PrioChange( *it, PrioHasUnk);
+            modify_->ChangePrio( **it, PrioHasUnk);
         }
-        for (TetraCL::const_EdgePIterator it(tit->GetEdgesBegin()), end(tit->GetEdgesEnd()); it!=end; ++it)
+        for (TetraCL::const_EdgePIterator it(tit->GetEdgesBegin()); it!=tit->GetEdgesEnd(); ++it)
         {
             Assert((*it)->GetPrio()!=PrioVGhost, DROPSErrCL("ParMultiGridCL::MarkSimplicesForUnknowns: Marking PrioVGhost as PrioHasUnk"), DebugParallelNumC);
-            PrioChange( *it, PrioHasUnk);
+            modify_->ChangePrio( **it, PrioHasUnk);
         }
-        for (TetraCL::const_FacePIterator it(tit->GetFacesBegin()), end(tit->GetFacesEnd()); it!=end; ++it)
+        for (TetraCL::const_FacePIterator it(tit->GetFacesBegin()); it!=tit->GetFacesEnd(); ++it)
         {
             Assert((*it)->GetPrio()!=PrioVGhost, DROPSErrCL("ParMultiGridCL::MarkSimplicesForUnknowns: Marking PrioVGhost as PrioHasUnk"), DebugParallelNumC);
-            PrioChange( *it, PrioHasUnk);
+            modify_->ChangePrio( **it, PrioHasUnk);
         }
     }
-    DynamicDataInterfaceCL::XferEnd();
+    ModifyEnd();
 }
 
 /// \brief Destroy unknowns on non-master vertices, edges and tetras if there are information about them
@@ -1451,15 +1571,15 @@ void ParMultiGridCL::DeleteUnksOnGhosts(int Level)
 */
 {
     if (_UnkOnSimplex[0])
-        for (MultiGridCL::VertexIterator sit(_mg->GetAllVertexBegin(Level)), end(_mg->GetAllVertexEnd(Level)); sit!=end; ++sit)
+        for (MultiGridCL::VertexIterator sit(mg_->GetAllVertexBegin(Level)), end(mg_->GetAllVertexEnd(Level)); sit!=end; ++sit)
             if (!sit->IsMaster() && sit->Unknowns.Exist())
                 sit->Unknowns.Destroy();
     if (_UnkOnSimplex[1])
-        for (MultiGridCL::EdgeIterator sit(_mg->GetAllEdgeBegin(Level)), end(_mg->GetAllEdgeEnd(Level)); sit!=end; ++sit)
+        for (MultiGridCL::EdgeIterator sit(mg_->GetAllEdgeBegin(Level)), end(mg_->GetAllEdgeEnd(Level)); sit!=end; ++sit)
             if (!sit->IsMaster() && sit->Unknowns.Exist())
                 sit->Unknowns.Destroy();
     if (_UnkOnSimplex[2])
-        for (MultiGridCL::TetraIterator sit(_mg->GetAllTetraBegin(Level)), end(_mg->GetAllTetraEnd(Level)); sit!=end; ++sit)
+        for (MultiGridCL::TetraIterator sit(mg_->GetAllTetraBegin(Level)), end(mg_->GetAllTetraEnd(Level)); sit!=end; ++sit)
             if (!sit->IsMaster() && sit->Unknowns.Exist())
                 sit->Unknowns.Destroy();
 
@@ -1493,59 +1613,35 @@ template<class SimplexT>
 }
 
 /****************************************************************************
-* I D E N T I F Y  -  F U N C T I O N S                                          *
+* I D E N T I F Y  -  F U N C T I O N S                                     *
 *****************************************************************************
-*   The folowing functions indentify Vertices, Edges or Faces. If procs      *
-*   creates the same subsimplices, this have to be done.                         *
+*   The following functions identify Vertices, Edges or Faces. If procs     *
+*   create the same subsimplices independently from each other, this has    *
+*   to be done to update the remote data lists accordingly.                 *
 ****************************************************************************/
 /// \brief Identify a vertex by parent edge
 void ParMultiGridCL::IdentifyVertex( const EdgeCL* Parent)
 {
-	HDRT parhdr= const_cast<HDRT>( Parent->GetHdr()),
-    hdr= const_cast<HDRT>( Parent->GetMidVertex()->GetHdr());
-    for( int* proclist= DynamicDataInterfaceExtraCL::InfoProcList( parhdr)+2; *proclist!=-1; proclist+= 2)
-        if (proclist[1]!=PrioVGhost)
-        {
-        	DynamicDataInterfaceCL::IdentifyObject( hdr, *proclist, parhdr);
-        }
+    VertexCL* vp= const_cast<VertexCL*>( Parent->GetMidVertex());
+    vp->Identify( *Parent, priosId_);
 }
 
 /// \brief Identify an edge by parent edge
-void ParMultiGridCL::IdentifyEdge( EdgeCL* Me, const EdgeCL* Parent, Uint nr)
+void ParMultiGridCL::IdentifyEdge( EdgeCL* Me, const EdgeCL* Parent)
 {
-	HDRT parhdr= const_cast<HDRT>( Parent->GetHdr());
-    for( int* proclist= DynamicDataInterfaceExtraCL::InfoProcList( parhdr)+2; *proclist!=-1; proclist+= 2)
-        if (proclist[1]!=PrioVGhost)
-        {
-        	DynamicDataInterfaceCL::IdentifyObject( Me->GetHdr(), *proclist, parhdr);
-        	DynamicDataInterfaceCL::IdentifyNumber( Me->GetHdr(), *proclist, nr);
-        }
+    Me->Identify( *Parent, priosId_);
 }
 
 /// \brief Identify an edge by parent face and two vertices
-void ParMultiGridCL::IdentifyEdge( EdgeCL* Me, const FaceCL* Parent, const VertexCL* vp0, const VertexCL* vp1)
+void ParMultiGridCL::IdentifyEdge( EdgeCL* Me, const FaceCL* Parent)
 {
-	HDRT parhdr= const_cast<HDRT>( Parent->GetHdr()),
-    hdr0= const_cast<HDRT>( vp0->GetHdr()),
-    hdr1= const_cast<HDRT>( vp1->GetHdr());
-    for( int* proclist= DynamicDataInterfaceExtraCL::InfoProcList( parhdr)+2; *proclist!=-1; proclist+= 2)
-        if (proclist[1]!=PrioVGhost)
-        {
-        	DynamicDataInterfaceCL::IdentifyObject( Me->GetHdr(), *proclist, hdr0);
-        	DynamicDataInterfaceCL::IdentifyObject( Me->GetHdr(), *proclist, hdr1);
-        }
+    Me->Identify( *Parent, priosId_);
 }
 
 /// \brief Identify a face with parent face and a number
-void ParMultiGridCL::IdentifyFace( FaceCL* Me, const FaceCL* Parent, Uint nr)
+void ParMultiGridCL::IdentifyFace( FaceCL* Me, const FaceCL* Parent)
 {
-	HDRT parhdr= const_cast<HDRT>( Parent->GetHdr());
-    for( int* proclist= DynamicDataInterfaceExtraCL::InfoProcList( parhdr)+2; *proclist!=-1; proclist+= 2)
-        if (proclist[1]!=PrioVGhost)
-        {
-        	DynamicDataInterfaceCL::IdentifyObject( Me->GetHdr(), *proclist, parhdr);
-        	DynamicDataInterfaceCL::IdentifyNumber( Me->GetHdr(), *proclist, nr);
-        }
+    Me->Identify( *Parent, priosId_);
 }
 
 /****************************************************************************
@@ -1555,8 +1651,11 @@ void ParMultiGridCL::IdentifyFace( FaceCL* Me, const FaceCL* Parent, Uint nr)
 *   AddedScal, AddedVec, BndPtr, ChildPtr                                        *
 ****************************************************************************/
 /// \brief Declare all DDD-Types
+/// \todo DiST: Remove this function
+/*
 void ParMultiGridCL::DeclareAll()
 {
+
     VertexCL::Declare();
     EdgeCL::Declare();
     FaceCL::Declare();
@@ -1567,6 +1666,7 @@ void ParMultiGridCL::DeclareAll()
     DeclareChildPtrT();
     Comment("- All Types are declared" << std::endl, DebugParallelC);
 }
+*/
 
 /****************************************************************************
 * D E F I N E A L L                                                             *
@@ -1575,6 +1675,8 @@ void ParMultiGridCL::DeclareAll()
 *   AddedScal, AddedVec, BndPtr, ChildPtr                                        *
 ****************************************************************************/
 /// \brief Define all DDD-Types
+/// \todo DiST: Remove this function
+/*
 void ParMultiGridCL::DefineAll()
 {
     VertexCL::Define();
@@ -1587,6 +1689,7 @@ void ParMultiGridCL::DefineAll()
     DefineChildPtrT();
     Comment("- All Types are defined" << std::endl, DebugParallelC);
 }
+*/
 
 /****************************************************************************
 * I N I T  I F                                                                      *
@@ -1596,6 +1699,8 @@ void ParMultiGridCL::DefineAll()
 * user does not have to worry about that!                                       *
 ****************************************************************************/
 /// \brief Initialize all Interfaces
+/// \todo DiST: Remove this function
+/*
 void ParMultiGridCL::InitIF()
 {
 	TypeT  O[4];
@@ -1643,13 +1748,15 @@ void ParMultiGridCL::InitIF()
     AllSimplexIFCL<VertexCL>::InitIF();
     AllSimplexIFCL<EdgeCL>::InitIF();
 }
+*/
 
 /****************************************************************************
 * < S i m p l e x > X f e r                                                 *
 *****************************************************************************
 * These procedures transfer a simplex from the calling proc to another      *
-* proc. XferStart() and XferEnd() have to call before and after respectively*
+* proc. XferBegin() and XferEnd() have to call before and after respectively*
 ****************************************************************************/
+/*
 /// \brief Send a Vertex
 void ParMultiGridCL::VXfer(VertexCL &v, PROCT dest, PrioT prio, bool del)
 {
@@ -1678,25 +1785,21 @@ void ParMultiGridCL::FXfer(FaceCL &f, PROCT dest, PrioT prio, bool del)
 
     const HDRT hdr= const_cast<HDRT>(&f._dddH);
     DynamicDataInterfaceCL::XferCopyObj(hdr, dest, prio);
-    // del richtig berücksichtigen!
+    // del richtig beruecksichtigen!
 }
+*/
 
 /// \brief Send a Tetra
-void ParMultiGridCL::TXfer(TetraCL &t, PROCT dest, PrioT prio, bool del)
+void ParMultiGridCL::Transfer(TetraCL &t, int dest, Priority prio, bool del)
 {
-    const HDRT hdr= const_cast<HDRT>(&t._dddH);
-
-    DynamicDataInterfaceCL::XferCopyObj( hdr, dest, prio);
-
+    transfer_->MarkForTransfer( t, dest, prio, del);
     if (del)  // not Ma->Gh-Copy
     {
         t.UnlinkFromFaces();
-        t.XferDelete();
     }
     if (t.IsRegularlyRef() && t.IsMaster() && prio==PrioMaster)
         t.UnCommitRegRefMark();
 }
-
 
 /****************************************************************************
 * H A N D L E R S   F O R   D D D                                           *
@@ -1708,10 +1811,12 @@ void ParMultiGridCL::TXfer(TetraCL &t, PROCT dest, PrioT prio, bool del)
 //  Deleting an object by DDD
 //----------------------------
 /// \brief Handle delete of an object
-/** Set the remove mark and desctuct the DDD-Hdr. The real delete of the object is done within
-    the code.*/
+///
+/// Set the remove mark and desctuct the DDD-Hdr. The real delete of the object is done within
+/// the code.
 template<class SimplexT> void ParMultiGridCL::HandlerDelete( OBJT obj)
 {
+
     SimplexT* const sp= ddd_cast<SimplexT*>(obj);
     sp->SetRemoveMark();
     //  Ich denke, dass man hier den Hdr_Destructor nicht braucht, da er automatisch von DDD aufgerufen wird
@@ -1722,6 +1827,8 @@ template<class SimplexT> void ParMultiGridCL::HandlerDelete( OBJT obj)
 
 //  Construct an object by DDD
 //-----------------------------
+/// \todo DiST: Do we need the handlers for construction and sending; of doesn't think so
+/*
 /// \brief Construct a vertex and return it as a DDD-Object
 OBJT ParMultiGridCL::HandlerVConstructor( size_t, PrioT, ATTRT level){
     (*_VertCont)[level].push_back( VertexCL());
@@ -1745,13 +1852,16 @@ OBJT ParMultiGridCL::HandlerTConstructor( size_t, PrioT, ATTRT level){
     (*_TetraCont)[level].push_back( TetraCL());
     return ddd_cast(&(*_TetraCont)[level].back());
 }
+*/
 
 //  Transfer an object by DDD
 //----------------------------
 /// \brief transfer a vertex
-/** Check if numerical data have to be transfered too. If this case happens, tell DDD that additional
-    data will be transfered. Than DDD calls the Gather and Scatter functions <p>
-    The Recylce-Bin is also destroyed and boundary information are send too*/
+///
+/// Check if numerical data have to be transfered too. If this case happens, tell DDD that additional
+/// data will be transfered. Than DDD calls the Gather and Scatter functions <p>
+/// The Recylce-Bin is also destroyed and boundary information are send too
+/*
 void ParMultiGridCL::HandlerVXfer( OBJT obj, __UNUSED__ PROCT proc, __UNUSED__ PrioT prio)
 {
     VertexCL* const vp= ddd_cast<VertexCL*>(obj);
@@ -1788,10 +1898,12 @@ void ParMultiGridCL::HandlerVXfer( OBJT obj, __UNUSED__ PROCT proc, __UNUSED__ P
             << "with " << numSendScalUnk << " scalar unknowns and "
             << "with " << numSendVecUnk  << " vectoriel unknowns!" << std::endl, DebugParallelHardC);
 }
+*/
 
 /// \brief transfer an edge
 /** Check if numerical data have to be transfered too. If this case happens, tell DDD that additional
     data will be transfered. Than DDD calls the Gather and Scatter functions <p>*/
+/*
 void ParMultiGridCL::HandlerEXfer(OBJT obj, __UNUSED__ PROCT proc, PrioT)
 {
     EdgeCL* const ep= ddd_cast<EdgeCL*>(obj);
@@ -1824,17 +1936,20 @@ void ParMultiGridCL::HandlerEXfer(OBJT obj, __UNUSED__ PROCT proc, PrioT)
             << "with " << numSendScalUnk << " scalar unknowns and "
             << "with " << numSendVecUnk  << " vectoriel unknowns!" << std::endl, DebugParallelHardC);
 }
+*/
 
 /// \brief transfer a face
 /** Nothing is done. <p>*/
+/*
 void ParMultiGridCL::HandlerFXfer(__UNUSED__ OBJT obj, __UNUSED__ PROCT proc, PrioT)
 {
     AllComment("  * Face with GID " << ddd_cast<FaceCL*>(obj)->GetGID() << " from " << ProcCL::MyRank() << " to " << proc << std::endl, DebugParallelHardC);
 }
-
+*/
 /// \brief transfer a tetra
 /** Transfer a tetraeder with all subsimplices. Also pointer to childern are transfered and
     if neccessary numerical data.*/
+/*
 void ParMultiGridCL::HandlerTXfer(OBJT obj, PROCT proc, PrioT prio)
 {
     TetraCL* const tp= ddd_cast<TetraCL*>(obj);
@@ -1881,6 +1996,7 @@ void ParMultiGridCL::HandlerTXfer(OBJT obj, PROCT proc, PrioT prio)
             << " with " << numSendVecUnk << " vectoriel unknowns"
             << " and " << numChilds << " Children" << std::endl, DebugParallelHardC);
 }
+*/
 
 //  Gather and Scatter-Handlers
 //-----------------------------
@@ -1889,6 +2005,7 @@ void ParMultiGridCL::HandlerTXfer(OBJT obj, PROCT proc, PrioT prio)
 /** These procedures put additional data to a message or recieve this data.
     This data might be geometrical or numerical, like boundary-information or children-information,
     or the numerical values onto the simplex. */
+/*
 void ParMultiGridCL::HandlerVGather( OBJT obj, int cnt, TypeT type, void* buf)
 {
     VertexCL* const vp= ddd_cast<VertexCL*>(obj);
@@ -1910,8 +2027,9 @@ void ParMultiGridCL::HandlerVGather( OBJT obj, int cnt, TypeT type, void* buf)
     else if ( VecDescRecv() && (type == AddedScalCL::GetType() || type == AddedVecCL::GetType()) )
         SendUnknowns(vp,type,buf,cnt);
 }
-
-void ParMultiGridCL::HandlerVScatter( OBJT obj, int cnt, TypeT type, void* buf, int /*newness*/)
+*/
+/*
+void ParMultiGridCL::HandlerVScatter( OBJT obj, int cnt, TypeT type, void* buf, int newness)
 {
     VertexCL* const vp= ddd_cast<VertexCL*>(obj);
     Assert(type==AddedScalCL::GetType() || type==AddedVecCL::GetType() || type==_BndPtT ,
@@ -1931,7 +2049,9 @@ void ParMultiGridCL::HandlerVScatter( OBJT obj, int cnt, TypeT type, void* buf, 
     else if ( VecDescRecv() && (type == AddedScalCL::GetType() || type==AddedVecCL::GetType()) )
         RecvUnknowns(vp,type,buf,cnt);
 }
+*/
 
+/*
 void ParMultiGridCL::HandlerEGather( OBJT obj, int cnt, TypeT type, void* buf)
 {
     EdgeCL* const ep= ddd_cast<EdgeCL*>(obj);
@@ -1941,8 +2061,9 @@ void ParMultiGridCL::HandlerEGather( OBJT obj, int cnt, TypeT type, void* buf)
     if ( VecDescRecv() && (type == AddedScalCL::GetType() || type == AddedVecCL::GetType()) )
         SendUnknowns(ep,type,buf,cnt);
 }
-
-void ParMultiGridCL::HandlerEScatter( OBJT obj, int cnt, TypeT type, void* buf, int /*newness*/)
+*/
+/*
+void ParMultiGridCL::HandlerEScatter( OBJT obj, int cnt, TypeT type, void* buf, int newness)
 {
     EdgeCL* const ep= ddd_cast<EdgeCL*>(obj);
     Assert(type==AddedScalCL::GetType() || type==AddedVecCL::GetType(),
@@ -1951,9 +2072,10 @@ void ParMultiGridCL::HandlerEScatter( OBJT obj, int cnt, TypeT type, void* buf, 
     if ( VecDescRecv() && (type == AddedScalCL::GetType() || type==AddedVecCL::GetType()) )
         RecvUnknowns(ep,type,buf,cnt);
 }
-
+*/
 /// \brief Collect additional data for a tetra transfer
 /** The additional data may be pointer to children or numerical data within a migration.*/
+/*
 void ParMultiGridCL::HandlerTGather( OBJT obj, int cnt, TypeT type, void* buf)
 {
     TetraCL* const tp= ddd_cast<TetraCL*>(obj);
@@ -1966,19 +2088,14 @@ void ParMultiGridCL::HandlerTGather( OBJT obj, int cnt, TypeT type, void* buf)
         {
             *buffer= *it;
         }
-        // For Problem prob2_sun_2_procs.param (Test-Case for pointer-length in DDD!)
-//      if (tp->GetGID()==1728){
-//          std::cout << "["<<ProcCL::MyRank()<<"]  sizeof(*buffer)="<<sizeof(*buffer)<<", sizeof(*ChildPIterator)="<<sizeof(*(tp->GetChildBegin()))<<"  Tetra: "<<tp->GetGID()<<", werde folgende Kinder versenden:\n   ";
-//          for (int i=0; i<cnt; ++i)
-//              std::cout << (tmp[i])->GetGID() <<",  ";
-//          std::cout  << std::endl;
-//      }
     }
     else if ( VecDescRecv() && (type == AddedScalCL::GetType() || type == AddedVecCL::GetType()) )
         SendUnknowns(tp,type,buf,cnt);
 }
+*/
 
 /// \brief Recieve additional data for a tetra transfer
+/*
 void ParMultiGridCL::HandlerTScatter( OBJT obj, int cnt, TypeT type, void* buf, int newness)
 {
     TetraCL* const tp= ddd_cast<TetraCL*>(obj);
@@ -1987,7 +2104,7 @@ void ParMultiGridCL::HandlerTScatter( OBJT obj, int cnt, TypeT type, void* buf, 
     if (newness!=XFER_NEW && tp->IsGhost() )
     {
         // This case shouldn't happen, because this case is catched by the migrate function in LoadBalCL
-        std::cout << ">>>>["<<ProcCL::MyRank()<<"] HandlerScatterTetra: ("<<tp->GetGID()<<") Master replaced by Ghost, continuing anyway, workaround enabled! Seems to be an illegal xfer!!!!"<<std::endl;
+        std::cerr << ">>>>["<<ProcCL::MyRank()<<"] HandlerScatterTetra: ("<<tp->GetGID()<<") Master replaced by Ghost, continuing anyway, workaround enabled! Seems to be an illegal xfer!!!!"<<std::endl;
         tp->GetHdr()->prio= PrioMaster;
     }
 
@@ -2013,11 +2130,15 @@ void ParMultiGridCL::HandlerTScatter( OBJT obj, int cnt, TypeT type, void* buf, 
     else if ( VecDescRecv() && (type == AddedScalCL::GetType() || type==AddedVecCL::GetType()) )
         RecvUnknowns(tp,type,buf,cnt);
 }
+*/
+
 
 /// \brief Make Edge MFR consistent
 /** If a tetra is regular refined and the priority is master and the tetraeder is made on this proc within the actual
     transfer mode, then this tetra increas MFR and set AccMFR to MFR.
-    XferEnd() will accumulate the MFRs.*/
+    XferEnd() will accumulate the MFRs.
+*/
+/*
 void ParMultiGridCL::HandlerTObjMkCons( OBJT obj, int newness)
 {
     TetraCL* const tp= ddd_cast<TetraCL*>(obj);
@@ -2033,7 +2154,7 @@ void ParMultiGridCL::HandlerTObjMkCons( OBJT obj, int newness)
             (*it)->_AccMFR= (*it)->_MFR;
     }
 }
-
+*/
 
 
 /// \brief Set Prio of an tetra
@@ -2041,6 +2162,7 @@ void ParMultiGridCL::HandlerTObjMkCons( OBJT obj, int newness)
     If Prio changes from Ghost to Master, the MFR-Counter on Edges must be increased.
     The accumulated MFR will be set correct within AccumulateMFR().
 */
+/*
 void ParMultiGridCL::HandlerTSetPrio( OBJT obj, PrioT prio)
 {
     TetraCL* const tp= ddd_cast<TetraCL*>(obj);
@@ -2052,18 +2174,20 @@ void ParMultiGridCL::HandlerTSetPrio( OBJT obj, PrioT prio)
         tp->_Parent= 0;
     if (prio==PrioMaster && tp->GetPrio()==PrioGhost && tp->IsRegularlyRef())
     {   // It may happen, that this routine increases the MFR on a ghost edge, that will be after the transfer
-        // not distributed any more. So remeber this tetra and repait the MFR on local edges of this tetra
+        // not distributed any more. So remember this tetra and repair the MFR on local edges of this tetra
         // within ParMultiGridCL::AccumulateMFR()
         tp->CommitRegRefMark();
         ToHandleTetra_.push_back(tp);
     }
 }
+*/
 
 
 //  Update-Handlers
 //-----------------------------
 /// \brief Update tetra after recieving
 /** link tetra tho faces and set prio to ghost, if no parent is found*/
+/*
 void ParMultiGridCL::HandlerTUpdate( OBJT obj)
 {
     TetraCL* const tp= ddd_cast<TetraCL*>(obj);
@@ -2093,7 +2217,7 @@ void ParMultiGridCL::HandlerTUpdate( OBJT obj)
         AllComment("    + to face with GID: " << const_cast<FaceCL*>(tp->GetFace(i))->GetGID()<<std::endl, DebugParallelHardC);
     }
 }
-
+*/
 
 
 /****************************************************************************
@@ -2116,6 +2240,7 @@ void ParMultiGridCL::DeleteObj(void * /* buffer*/, size_t /*size*/, int ddd_typ)
 *****************************************************************************
 * This procedure tells DDD how to treat DROPS-stuff                         *
 ****************************************************************************/
+/*
 void ParMultiGridCL::SetAllHandler()
 {
     // How to construct Simplices
@@ -2160,7 +2285,7 @@ void ParMultiGridCL::SetAllHandler()
 
     Comment("- All Handlers are set" << std::endl, DebugParallelC);
 }
-
+*/
 
 /****************************************************************************
 * G E T  M G                                                                *
@@ -2168,8 +2293,8 @@ void ParMultiGridCL::SetAllHandler()
 /// \brief Recieve a reference to the stored MultiGrid
 MultiGridCL& ParMultiGridCL::GetMG()
 {
-    Assert(_mg!=0, DROPSErrCL("ParMultiGridCL: GetMG: No MultiGrid is assigned"), DebugParallelC);
-    return *_mg;
+    Assert(mg_!=0, DROPSErrCL("ParMultiGridCL: GetMG: No MultiGrid is assigned"), DebugParallelC);
+    return *mg_;
 }
 
 
@@ -2178,40 +2303,49 @@ MultiGridCL& ParMultiGridCL::GetMG()
 ****************************************************************************/
 /// \brief Show an simplex by GID
 /** Search on proc (or all procs) for a simplex of given GID and show DebugInfo*/
-void ParMultiGridCL::Show( GIDT gid, char *mesg, int proc)
+void ParMultiGridCL::Show( const DiST::Helper::GeomIdCL& gid, char *mesg, int proc)
 {
-    for (Uint l= 0; l<= _mg->GetLastLevel(); ++l)
+    for (Uint l= 0; l<= mg_->GetLastLevel(); ++l)
     {
-        ShowSimplex( _mg->GetVerticesBegin(l), _mg->GetVerticesEnd(l), gid, mesg, proc);
-        ShowSimplex( _mg->GetEdgesBegin(l), _mg->GetEdgesEnd(l), gid, mesg, proc);
-        ShowSimplex( _mg->GetFacesBegin(l), _mg->GetFacesEnd(l), gid, mesg, proc);
-        ShowSimplex( _mg->GetTetrasBegin(l), _mg->GetTetrasEnd(l), gid, mesg, proc);
+        ShowSimplex( mg_->GetVerticesBegin(l), mg_->GetVerticesEnd(l), gid, mesg, proc);
+        ShowSimplex( mg_->GetEdgesBegin(l), mg_->GetEdgesEnd(l), gid, mesg, proc);
+        ShowSimplex( mg_->GetFacesBegin(l), mg_->GetFacesEnd(l), gid, mesg, proc);
+        ShowSimplex( mg_->GetTetrasBegin(l), mg_->GetTetrasEnd(l), gid, mesg, proc);
     }
 
     if (proc != -1 && proc == ProcCL::MyRank() )
     {
-    	HDRT hdr= DynamicDataInterfaceCL::SearchHdr( gid);
-        if (!hdr)
-        {
+        const DiST::Helper::RemoteDataListCL& rdl=
+            DiST::InfoCL::Instance().GetRemoteList( gid.dim);
+        DiST::Helper::RemoteDataListCL::const_iterator it= rdl.find( gid);
+        if ( it==rdl.end()){
             std::cerr << "...stored only locally." << std::endl;
-            return;
         }
-        for( int* proclist= DynamicDataInterfaceExtraCL::InfoProcList( hdr); *proclist!=-1; proclist+= 2)
-            std::cerr << "...stored on proc " << *proclist << " with prio " << PrioToString((Uint)proclist[1]) << std::endl;
+        else{
+            DiST::Helper::RemoteDataCL::ProcList_const_iterator pit=
+                it->second.GetProcListBegin();
+            for ( ; pit!=it->second.GetProcListEnd(); ++pit){
+                std::cerr << "...stored on proc " << pit->proc
+                          << " with prio " << PriorityToString(pit->prio)
+                          << std::endl;
+            }
+        }
     }
 }
 
 
 /// \brief Writes all vertices, edges, faces and tetraeders onto the ostream
-void ParMultiGridCL::DebugInfo(std::ostream &os)
+/// \todo DiST: Implement me!
+void ParMultiGridCL::DebugInfo(std::ostream &) const
 {
+/*
     os << "I have:\n";
     os << _VertCont->size() << " vertices, " << _EdgeCont->size() << " edges, " << _FaceCont->size() << " faces,"
             << _TetraCont->size() << " tetras" << std::endl;
 
     os << "\nThe Vertices are:\n";
-    MultiGridCL::const_VertexIterator vit=_mg->GetAllVertexBegin();
-    for (; vit!=_mg->GetAllVertexEnd(); ++vit){
+    MultiGridCL::const_VertexIterator vit=mg_->GetAllVertexBegin();
+    for (; vit!=mg_->GetAllVertexEnd(); ++vit){
         vit->DebugInfo(os);
 //         if (vit->Unknowns.Exist())
 //         {
@@ -2231,8 +2365,8 @@ void ParMultiGridCL::DebugInfo(std::ostream &os)
     }
 
     os << "\nThe Edges are:\n";
-    MultiGridCL::const_EdgeIterator eit=_mg->GetAllEdgeBegin();
-    for (; eit!=_mg->GetAllEdgeEnd(); ++eit)
+    MultiGridCL::const_EdgeIterator eit=mg_->GetAllEdgeBegin();
+    for (; eit!=mg_->GetAllEdgeEnd(); ++eit)
     {
         eit->DebugInfo(os);
 //         if (eit->Unknowns.Exist())
@@ -2253,16 +2387,17 @@ void ParMultiGridCL::DebugInfo(std::ostream &os)
     }
 
     os << "\nThe Faces are:\n";
-    MultiGridCL::const_FaceIterator fit=_mg->GetAllFaceBegin();
-    for (; fit!=_mg->GetAllFaceEnd(); ++fit)
+    MultiGridCL::const_FaceIterator fit=mg_->GetAllFaceBegin();
+    for (; fit!=mg_->GetAllFaceEnd(); ++fit)
         fit->DebugInfo(os);
 
     os << "\nThe Tetras are:\n";
-    MultiGridCL::const_TetraIterator sit(_mg->GetAllTetraBegin());
-    for (; sit!=_mg->GetAllTetraEnd(); ++sit)
+    MultiGridCL::const_TetraIterator sit(mg_->GetAllTetraBegin());
+    for (; sit!=mg_->GetAllTetraEnd(); ++sit)
         sit->DebugInfo(os);
 
     os << "\n";
+*/
 }
 
 /// \brief Calc Balance over procs over tetras in the last triangulation level
@@ -2271,7 +2406,7 @@ void ParMultiGridCL::DebugInfo(std::ostream &os)
     (1 is perfect, 0 is unbalanced) */
 double ParMultiGridCL::GetBalance()
 {
-    int myTetras = _mg->_TriangTetra.size();                                    // all procs count their tetras
+    int myTetras = mg_->TriangTetra_.size();                                    // all procs count their tetras
     int maxTetras = ProcCL::GlobalMax(myTetras);
     int minTetras = ProcCL::GlobalMin(myTetras);
 
@@ -2279,6 +2414,7 @@ double ParMultiGridCL::GetBalance()
 }
 
 /// \brief Display all types that are defined and declared
+/*
 void ParMultiGridCL::ShowTypes() const
 {
 	DynamicDataInterfaceCL::TypeDisplay(VertexCL::GetType());
@@ -2290,44 +2426,26 @@ void ParMultiGridCL::ShowTypes() const
 	DynamicDataInterfaceCL::TypeDisplay(_BndPtT);
 	DynamicDataInterfaceCL::TypeDisplay(_ChildPtrT);
 }
+*/
 
 /// \brief Display all interfaces used by ParMultiGridCL
 ///
 /// Show all interfaces, that the DDD-System knows. This procedure uses the DDD-function DynamicDataInterfaceCL::IFDisplayAll
+/*
 void ParMultiGridCL::ShowInterfaces() const
 {
 	DynamicDataInterfaceCL::IFDisplayAll();
 }
+*/
 
 /// \brief DDD-Consisty-Check
+/// \todo DiST: Implement a consisty check!
+/*
 void ParMultiGridCL::ConsCheck()
 {
 	DynamicDataInterfaceCL::ConsCheck();
 }
-
-void ParMultiGridCL::ShowTetraIF()
-{
-	DynamicDataInterfaceCL::IFDisplay(_TetraIF);
-}
-
-void ParMultiGridCL::ShowEdgeIF()
-{
-	DynamicDataInterfaceCL::IFDisplay(_EdgeIF);
-}
-
-/// \brief Display the handled VecDescCL
-void ParMultiGridCL::ShowVecDesc()
-{
-    for (size_t i=0; i<_VecDesc.size(); ++i)
-        if (_VecDesc[i])
-            std::cout << " - VecDesc["<<i<<"]"
-                    << ": Level " << _VecDesc[i]->RowIdx->TriangLevel()
-                    << ", #Unknowns " << _VecDesc[i]->RowIdx->NumUnknowns()
-                    << ", Idx " <<  _VecDesc[i]->RowIdx->GetIdx()
-                    << std::endl;
-        else
-            std::cout << " - VecDesc["<<i<<"] doen't exists!" << std::endl;
-}
+*/
 
 /// \brief Get the size of the recieve buffer
 size_t ParMultiGridCL::GetRecvBufferSize()
@@ -2339,8 +2457,9 @@ size_t ParMultiGridCL::GetRecvBufferSize()
 * P A R A L L E L   F U N C T I O N S   F R O M   M U L T I G R I D         *
 *****************************************************************************
 * Declare and Define the simplices and of the Types declared in             *
-* parmulitgrid.h                                                            *
+* parmultigrid.h                                                            *
 ****************************************************************************/
+/*
 void VertexCL::Declare(){
     Assert(!_dddT, DROPSErrCL("VertexCL: Declare: Type allready declared"), DebugParallelC);
     _dddT = DynamicDataInterfaceCL::TypeDeclare((char*)"Vertex");
@@ -2413,7 +2532,7 @@ void EdgeCL::Define()
                     EL_END,    e+1);
     // neglect other members for now:
     // Unknowns
-    /* eventuell noch:        EL_GDATA,  &e->_AccMFR, sizeof(e->_AccMFR),*/
+    // eventuell noch:        EL_GDATA,  &e->_AccMFR, sizeof(e->_AccMFR),
 }
 
 
@@ -2485,6 +2604,7 @@ void AddedVecCL::Define()
                     EL_GDATA, &add->data_, sizeof(add->data_),
                     EL_END,   add+1);
 }
+*/
 
 void PrintMG(const DROPS::ParMultiGridCL& pmg, int type)
 /** Write out all information about vertices, edges, faces and tetrahedra that
@@ -2499,9 +2619,9 @@ void PrintMG(const DROPS::ParMultiGridCL& pmg, int type)
     char filename[30];
 
     if (type==REF)
-        std::sprintf(filename, "output/%i_MG_REF_%i.mg",me,REFnum++);
+        std::sprintf(filename, "output/%img__REF_%i.mg",me,REFnum++);
     else if (type == MIG)
-        std::sprintf(filename, "output/%i_MG_MIG_%i.mg",me,MIGnum++);
+        std::sprintf(filename, "output/%img__MIG_%i.mg",me,MIGnum++);
     if (me==0)
         std::cout << " - Writing multigrid into: " << filename<< " (for proc 0)"<<std::endl;
 

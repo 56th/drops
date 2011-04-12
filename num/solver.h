@@ -1532,6 +1532,7 @@ class SolverBaseCL
     virtual int    GetIter    () const { return _iter; }
     virtual bool   GetRelError() const { return rel_; }
 
+    virtual void SetOutput( std::ostream* os) { output_=os; }
 };
 
 /// \brief base class for "expensive" preconditioners.
@@ -1918,7 +1919,6 @@ class SolverAsPreCL: public PreBaseCL
 //           IF_MASTER
 //             std::cout << "===> Warning: Cannot solve inner system!\n";
         if (output_ != 0)
-          IF_MASTER
             *output_ << "SolverAsPreCL: iterations: " << solver_.GetIter()
                      << "\trelative residual: " << solver_.GetResid() << std::endl;
         AddIter( solver_.GetIter());

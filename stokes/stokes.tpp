@@ -917,8 +917,8 @@ void StokesP2P1CL<Coeff>::CheckSolution(const VelVecDescCL* lsgvel, const VecDes
 #else
     VectorCL res1_acc(res1);
     VectorCL res2_acc(res2);
-    const double norm_res1      = std::sqrt(exV.ParDotAcc(res1_acc,res1));
-    const double norm_res2      = std::sqrt(exP.ParDotAcc(res2_acc,res2));
+    const double norm_res1      = exV.Norm( res1, false, &res1_acc);
+    const double norm_res2      = exP.Norm( res2, false, &res2_acc);
     const double norm_sup_res_1 = ProcCL::GlobalMax(supnorm(res1_acc));
     const double norm_sup_res_2 = ProcCL::GlobalMax(supnorm(res2_acc));
 #endif

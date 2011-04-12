@@ -100,14 +100,18 @@ template <class DistFctT>
         notify_pre_refine();
         mg_.Refine();
 #ifdef _PAR
-        pmg_->HandleUnknownsAfterRefine();
+        throw DROPSErrCL ("AdapTriangCL::ModifyGridStep uses DDD\n");
+        //pmg_->HandleUnknownsAfterRefine();
         if (lb)
             lb_.DoMigration();
 #endif
         notify_post_refine();
 #ifdef _PAR
+        throw DROPSErrCL ("AdapTriangCL::ModifyGridStep uses DDD\n");
+        /*
         Assert(!DDD_ConsCheck(), DROPSErrCL("AdapTriangCL::ModifyGridStep: Failure in DDD_ConsCheck"),
                DebugParallelC|DebugParallelNumC|DebugLoadBalC);
+               */
 #endif
     }
     return modified;

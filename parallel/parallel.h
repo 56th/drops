@@ -31,9 +31,6 @@
 #include <numeric>
 #include "misc/utils.h"
 #include "parallel/distributeddatatypes.h"
-#ifdef HAVE_ZOLTAN
-#include <zoltan.h>
-#endif
 
 
 namespace DROPS
@@ -47,7 +44,6 @@ template<typename T> T ddd_cast (OBJT p)
 
 template<typename T> OBJT ddd_cast (T* p)
   { return reinterpret_cast<OBJT>(p); }
-
 
 /***************************************************************************
 *   G L O B A L - O P E R A T I O N S                                      *
@@ -157,9 +153,12 @@ class ProcCL
       /// \brief MPI-Gatherv-wrapper or MPI-Allgatherv wrapper if root<0 (both data-types are the same)
     template<typename T>
     static inline void Gatherv( const T*, int, T*, const int*, const int*, int root);
-      /// \brief MPI-Gatherv-wrapper or MPI-Allgatherv wrapper if root<0 (both data-types are the same)
+      /// \brief MPI-Scatterv-wrapper or MPI-Allgatherv wrapper if root<0 (both data-types are the same)
     template<typename T>
     static inline void Scatterv( const T*, const int*, const int*, T*, int, int root=Drops_MasterC);
+      /// \brief Alltoall
+    template<typename T>
+    static inline void Alltoall( const T*, int, T*);
       /// \brief MPI-Probe-wrapper
     static inline void Probe(int, int, StatusT&);
       /// \brief MPI-Get_count-wrapper
@@ -186,6 +185,9 @@ class ProcCL
       /// \brief MPI-wrapper for creating an indexed datatype
     template <typename T>
     static inline DatatypeT CreateIndexed(int count, const int*, const int*);
+      /// \brief MPI-wrapper for creating an blocked indexed datatype
+    template <typename T>
+    static inline DatatypeT CreateBlockIndexed(int count, const int, const int*);
       /// \brief MPI-wrapper for creating a structured datatype
     static inline DatatypeT CreateStruct(int, const int*, const AintT*, const DatatypeT*);
       /// \brief MPI-Wrapper for commiting a datatype
@@ -214,7 +216,6 @@ class ProcCL
     static inline int GetCount(StatusT&);
     template <typename T>
     static inline int GetMessageLength(int, int);
-    static inline int GetMessageLength(int, int, DatatypeT&);
       /// \brief MPI-Waitall-wrapper for all requests in a valarray
     static inline void WaitAll(std::valarray<RequestT>&);
       /// \brief MPI-Waitall-wrapper for all requests in a vector
@@ -309,7 +310,7 @@ class ProcCL
     /// \name Gather operations
     //@{
     template<typename T>
-    static void Gather(T myData, T* allData, int proc=-1)
+    static void Gather(T myData, T* allData, int proc)
         { Gather(&myData, allData, 1, proc); }
 
     template<typename T>
@@ -344,6 +345,14 @@ class ProcCL
         Gatherv( Addr(myData), (int)myData.size(), Addr(allData), Addr( recvc), Addr( displ), proc);
         return allData;
     }
+    template<typename T>
+    static std::valarray<T> Alltoall( const std::valarray<T>& myData)
+    {
+        const size_t numperproc= static_cast<int>(myData.size())/Size();
+        std::valarray<T> recvData( ProcCL::Size()*numperproc);
+        Alltoall( Addr(myData), numperproc, Addr(recvData));
+        return recvData;
+    }
     //@}
 };
 
@@ -351,14 +360,7 @@ class ProcCL
 class ProcInitCL
 {
   public:
-    ProcInitCL(int* argc, char*** argv) {
-        ProcCL::Instance( argc, argv);
-#ifdef HAVE_ZOLTAN
-        float ver;
-        if (Zoltan_Initialize( *argc, *argv, &ver)!=ZOLTAN_OK)
-            throw DROPSErrCL("Cannot initialize Zoltan");
-#endif
-    }
+    ProcInitCL(int* argc, char*** argv) { ProcCL::Instance( argc, argv); }
     ~ProcInitCL() { if (ProcCL::InstancePtr()) delete ProcCL::InstancePtr(); }
 };
 
@@ -386,17 +388,10 @@ template<> struct ProcCL::MPI_TT<byte>
 template<> struct ProcCL::MPI_TT<float>
   { static const ProcCL::DatatypeT& dtype; };
 
-template<> struct ProcCL::MPI_TT<short int>
-  { static const ProcCL::DatatypeT& dtype; };
-
-#ifdef DROPS_WIN
-# ifdef WIN64
+#ifdef WIN64
 template<> struct ProcCL::MPI_TT<size_t>
   { static const ProcCL::DatatypeT& dtype; };
-# endif
 #endif
-
-
 
 } // namespace DROPS
 

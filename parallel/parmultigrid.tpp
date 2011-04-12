@@ -25,9 +25,9 @@
 namespace DROPS{
 
 template<class IterT>
-void ShowSimplex( IterT begin, IterT end, DDD_GID gid, char *mesg, int proc= -1)
+void ShowSimplex( IterT begin, IterT end, const DiST::Helper::GeomIdCL& gid, char *mesg, int proc= -1)
 {
-    if (proc!=DDD_InfoMe() && proc!=-1)
+    if (proc!=ProcCL::MyRank() && proc!=-1)
         return;
     for (IterT it= begin; it!=end; ++it)
         if (it->GetGID()==gid)
@@ -37,32 +37,37 @@ void ShowSimplex( IterT begin, IterT end, DDD_GID gid, char *mesg, int proc= -1)
         }
 }
 
-
-/// \brief Check if a simplex lies on a boundary between procs
-template<class SimplexT>
-  bool ParMultiGridCL::IsOnProcBnd( const SimplexT* s)
+void ParMultiGridCL::ModifyBegin()
 {
-    const DDD_HDR hdr= s->GetHdr();
+    if (transfer_) // modify module inside transfer module is just ignored
+        return;
+    Assert( !modify_, DROPSErrCL("ParMultiGridCL::ModifyBegin: already called ModifyBegin"), DebugParallelC);
+    modify_= new DiST::ModifyCL(*mg_, false); modify_->Init();
+}
 
-    if (DDD_InfoIsLocal( hdr ) )
-        return false;
-    Uint counter= 0;
-    for( int* proclist= DDD_InfoProcList( hdr); *proclist!=-1; proclist+= 2)
-        if (*(proclist+1)!=PrioVGhost)
-            ++counter;
-    return counter>=2;
+void ParMultiGridCL::ModifyEnd()
+{
+    if (transfer_)  // modify module inside transfer module is just ignored
+        return;
+    Assert( modify_ , DROPSErrCL("ParMultiGridCL::ModifyEnd: not in Modify mode"), DebugParallelC);
+    modify_->Finalize();
+    delete modify_; modify_=0;
 }
 
 /// \brief Change the priority of a simplex
 template<class SimplexT>
-  void ParMultiGridCL::PrioChange(SimplexT* const Tp, Uint Prio)
+  void ParMultiGridCL::PrioChange(SimplexT* const Tp, Priority Prio)
 {
 //  Assert(PrioChangeMode || TransferMode, DROPSErrCL("ParMultiGridCL: PrioChange: There must be an active Xfer- or PrioChange-Mode, to run this procedure"), DebugParallelC);
-    if (Tp->GetPrio()!=Prio)
-    {
-        DDD_XferPrioChange( Tp->GetHdr(), Prio);
-        Tp->SetPrio(Prio);
-    }
+    modify_->ChangePrio( *Tp, Prio);
+}
+
+/// \brief Delete simplex from distributed multigrid
+template<class SimplexT>
+  void ParMultiGridCL::Delete(SimplexT* const Tp)
+{
+//  Assert(PrioChangeMode || TransferMode, DROPSErrCL("ParMultiGridCL::Delete: There must be an active Xfer- or PrioChange-Mode, to run this procedure"), DebugParallelC);
+    modify_->Delete( *Tp);
 }
 
 /// \brief Recieve Information, if all Vector-Describers are recieved
@@ -122,7 +127,7 @@ bool ParMultiGridCL::UnknownsOnSimplices()
 
 /// \brief Gather unknowns on a simplex, that cannot be set by another proc
 template<typename SimplexT>
-int ParMultiGridCL::GatherInterpolValues (DDD_OBJ obj, void* buf)
+int ParMultiGridCL::GatherInterpolValues (OBJT obj, void* buf)
 /** For a detailt situation describtion look at ScatterInterpolValues*/
 {
     SimplexT* const sp= ddd_cast<SimplexT*>(obj);
@@ -149,7 +154,7 @@ int ParMultiGridCL::GatherInterpolValues (DDD_OBJ obj, void* buf)
 
 /// \brief Scatter unknowns on a simplex, that cannot be set on this proc
 template<typename SimplexT>
-int ParMultiGridCL::ScatterInterpolValues(DDD_OBJ obj, void* buf)
+int ParMultiGridCL::ScatterInterpolValues(OBJT obj, void* buf)
 /** If a unknown on a distributed simplex has not been interpolated by a proc
     due to a lack of information, the information are exchanged here. */
 {
@@ -189,7 +194,7 @@ int ParMultiGridCL::ScatterInterpolValues(DDD_OBJ obj, void* buf)
 *   - cnt:  number of unknowns (in terms of double)                         *
 ****************************************************************************/
 template<class SimplexT>
-  void ParMultiGridCL::SendUnknowns(SimplexT* sp, DDD_TYPE type, void *buf, int cnt)
+  void ParMultiGridCL::SendUnknowns(SimplexT* sp, TypeT type, void *buf, int cnt)
 {
     if (cnt==0) return;
 
@@ -269,7 +274,7 @@ template<class SimplexT>
 *   exists before this simplex is recieved.                                 *
 ****************************************************************************/
 template<class SimplexT>
-  void ParMultiGridCL::RecvUnknowns(SimplexT *sp, DDD_TYPE type, void *buf, int cnt)
+  void ParMultiGridCL::RecvUnknowns(SimplexT *sp, TypeT type, void *buf, int cnt)
 {
     if (cnt==0) return;                                                     // nothing to recieved so skipp
     if (type == AddedScalCL::GetType())                                     // recieve scalar values
@@ -371,21 +376,21 @@ template<typename SimplexT>
     Assert(s.Unknowns.Exist() && s.Unknowns.Exist(idx),
            DROPSErrCL("ParMultiGridCL::GetDof<Point3DCL>: No Unknowns on the simplex"),
            DebugParallelNumC);
-    Assert(pos<0 || _VecDesc[pos]->RowIdx->GetIdx()==idx,
+    Assert(pos<0 || ParMultiGridCL::Instance()._VecDesc[pos]->RowIdx->GetIdx()==idx,
            DROPSErrCL("ParMultiGridCL::GetDof<Point3DCL>: Wrong position is given"),
            DebugParallelNumC);
 
     Point3DCL dof;
     if (s.Unknowns.UnkRecieved(idx)){               // unknowns are stored within recieve buffer
         for (int i=0; i<3; ++i)
-            dof[i]= _RecvBuf[s.Unknowns(idx)+i];
+            dof[i]= ParMultiGridCL::Instance()._RecvBuf[s.Unknowns(idx)+i];
     }
     else{                                           // unknowns are stored within VecDesc
         // find index in _VecDesc
         if (pos<0){
             pos=std::numeric_limits<int>::max();
-            for (int i=0; i<(int)_VecDesc.size() && pos>i; ++i)
-                if (_VecDesc[i]->RowIdx->GetIdx()==idx)
+            for (int i=0; i<(int)ParMultiGridCL::Instance()._VecDesc.size() && pos>i; ++i)
+                if (ParMultiGridCL::Instance()._VecDesc[i]->RowIdx->GetIdx()==idx)
                     pos=i;
         }
 
@@ -394,7 +399,7 @@ template<typename SimplexT>
                DebugParallelNumC);
 
         for (int i=0; i<3; ++i)
-            dof[i]= _VecDesc[pos]->Data[s.Unknowns(idx)+i];
+            dof[i]= ParMultiGridCL::Instance()._VecDesc[pos]->Data[s.Unknowns(idx)+i];
     }
     return dof;
 }
@@ -412,19 +417,19 @@ template<typename SimplexT>
            DROPSErrCL("ParMultiGridCL::GetDof<double>: No Unknowns on the simplex"),
            DebugParallelNumC);
 
-    Assert(pos<0 || _VecDesc[pos]->RowIdx->GetIdx()==idx,
+    Assert(pos<0 || ParMultiGridCL::Instance()._VecDesc[pos]->RowIdx->GetIdx()==idx,
            DROPSErrCL("ParMultiGridCL::GetDof<double>: Wrong position is given"),
            DebugParallelNumC);
 
     double dof;
     if (s.Unknowns.UnkRecieved(idx))    // unknown can be found within recieve buffer
-        dof= _RecvBuf[s.Unknowns(idx)];
+        dof= ParMultiGridCL::Instance()._RecvBuf[s.Unknowns(idx)];
     else{                               // unknown can be found in VecDesc
         // find index in _VecDesc
         if (pos<0){
             pos=std::numeric_limits<int>::max();
-            for (int i=0; i<(int)_VecDesc.size() && pos>i; ++i)
-                if (_VecDesc[i]->RowIdx->GetIdx()==idx)
+            for (int i=0; i<(int)ParMultiGridCL::Instance()._VecDesc.size() && pos>i; ++i)
+                if (ParMultiGridCL::Instance()._VecDesc[i]->RowIdx->GetIdx()==idx)
                     pos=i;
         }
 
@@ -433,7 +438,7 @@ template<typename SimplexT>
             DROPSErrCL("ParMultiGridCL::GetDof<double>: No appropriate index known"),
             DebugParallelNumC);
 
-        dof= _VecDesc[pos]->Data[s.Unknowns(idx)];
+        dof= ParMultiGridCL::Instance()._VecDesc[pos]->Data[s.Unknowns(idx)];
     }
     return dof;
 }

@@ -83,7 +83,8 @@ class AdapTriangCL
             (*obs)->pre_refine();
 #else
         if (!observer_.empty()){
-            pmg_->DeleteVecDesc();
+            throw DROPSErrCL ("AdapTriangCL:notify_pre_refine does not work\n");
+//            pmg_->DeleteVecDesc();
             for (ObserverContT::iterator obs= observer_.begin(); obs != observer_.end(); ++obs){
                 (*obs)->pre_refine();
                 if ( GetLb().GetLB().GetWeightFnct()&2)
@@ -99,8 +100,9 @@ class AdapTriangCL
             (*obs)->post_refine();
 #ifdef _PAR
         if ( !observer_.empty() ){
-            pmg_->DelAllUnkRecv();
-            pmg_->DeleteRecvBuffer();
+            throw DROPSErrCL ("AdapTriangCL:notify_post_refine does not work\n");
+//            pmg_->DelAllUnkRecv();
+//            pmg_->DeleteRecvBuffer();
         }
         GetLb().GetLB().RemoveIdx();
 #endif

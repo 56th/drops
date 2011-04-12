@@ -186,17 +186,17 @@ IdxT IdxDescCL::GetExclusiveNumUnknowns(const MultiGridCL &mg, int lvl) const
     if (NumUnknownsVertex())
         for (MultiGridCL::const_TriangVertexIteratorCL it(mg.GetTriangVertexBegin(lvl)), end(mg.GetTriangVertexEnd(lvl)); it != end; ++it)
             if ( it->Unknowns.Exist() && it->Unknowns.Exist(GetIdx()))
-                if (it->IsExclusive())
+                if ( it->AmIOwner())
                     ret += NumUnknownsVertex();
     if (NumUnknownsEdge())
         for (MultiGridCL::const_TriangEdgeIteratorCL it(mg.GetTriangEdgeBegin(lvl)), end(mg.GetTriangEdgeEnd(lvl)); it != end; ++it)
             if ( it->Unknowns.Exist() && it->Unknowns.Exist(GetIdx()))
-                if (it->IsExclusive())
+                if (it->AmIOwner())
                     ret += NumUnknownsEdge();
     if (NumUnknownsTetra())
         for (MultiGridCL::const_TriangTetraIteratorCL it(mg.GetTriangTetraBegin(lvl)), end(mg.GetTriangTetraEnd(lvl)); it != end; ++it)
             if ( it->Unknowns.Exist() && it->Unknowns.Exist(GetIdx()))
-                if (it->IsExclusive())
+                if (it->AmIOwner())
                     ret += NumUnknownsTetra();
     return ret;
 }
@@ -539,13 +539,8 @@ IdxT ExtIdxDescCL::UpdateXNumbering( IdxDescCL* Idx, const MultiGridCL& mg, cons
     }
 #ifdef _PAR
     // communicate extended dofs on vertices
-    current_Idx_= Idx;
-    DynamicDataInterfaceCL::IFExchange(InterfaceCL<VertexCL>::GetIF(),  // exchange datas over distributed vertices
-                   sizeof(bool),                    // number of datas to be exchanged
-                   HandlerGatherUpdateXNumbC,       // how to gather datas
-                   HandlerScatterUpdateXNumbC       // how to scatter datas
-                  );
-    current_Idx_= 0;
+    CommunicateXFEMNumbCL comm( Idx);
+    comm.Call();
 
     // number all extended dofs from other procs (where extended dof is flagged by NoIdx-1)
     for (size_t i=0; i<Xidx_.size(); ++i)
@@ -556,30 +551,47 @@ IdxT ExtIdxDescCL::UpdateXNumbering( IdxDescCL* Idx, const MultiGridCL& mg, cons
 }
 
 #ifdef _PAR
-IdxDescCL* ExtIdxDescCL::current_Idx_= 0;
-
-int ExtIdxDescCL::HandlerGatherUpdateXNumb( OBJT objp, void* buf)
+bool ExtIdxDescCL::CommunicateXFEMNumbCL::Gather( const DiST::TransferableCL& t, DiST::Helper::SendStreamCL& s)
 {
-    VertexCL* const sp= ddd_cast<VertexCL*>(objp);
-    bool* buffer= static_cast<bool*>(buf);
+    VertexCL* sp = 0;
+    simplex_cast( t, sp);
+
     if (sp->Unknowns.Exist(current_Idx_->GetIdx()))
-        *buffer= current_Idx_->IsExtended( sp->Unknowns(current_Idx_->GetIdx()));
+        s << current_Idx_->IsExtended( sp->Unknowns(current_Idx_->GetIdx()));
     else
-        *buffer= false;
-    return 0;
+        s << false;
+    return true;
 }
 
-int ExtIdxDescCL::HandlerScatterUpdateXNumb( OBJT objp, void* buf)
+bool ExtIdxDescCL::CommunicateXFEMNumbCL::Scatter( DiST::TransferableCL& t, const size_t numData, DiST::Helper::RecvStreamCL& r)
 {
-    VertexCL* const sp= ddd_cast<VertexCL*>(objp);
-    bool RemoteExtended= *static_cast<bool*>(buf);
+    VertexCL* sp= 0;
+    simplex_cast( t, sp);
+
+    bool RemoteExtended = false, tmp;
+    for (size_t i = 0; i< numData; ++i) {
+        r >> tmp;
+        RemoteExtended = RemoteExtended || tmp;
+    }
     if (!sp->Unknowns.Exist(current_Idx_->GetIdx()))
-        return 0;
+        return true;
     const IdxT dof= sp->Unknowns(current_Idx_->GetIdx());
 
     if (!current_Idx_->IsExtended( dof) && RemoteExtended)
         current_Idx_->GetXidx()[dof]= NoIdx-1;
-    return 0;
+    return true;
+}
+
+void ExtIdxDescCL::CommunicateXFEMNumbCL::Call()
+    ///\todo: should be done for all levels, introduce level list for interface constructor?
+{
+    DiST::InterfaceCL::DimListT dimlist; dimlist.push_back( 0);
+    DiST::PrioListT Prios; Prios.push_back(PrioMaster);
+    const Uint max_lvl= current_Idx_->TriangLevel();
+    DiST::LevelListCL Levels(max_lvl);
+
+    DiST::InterfaceCL comm( Levels, Prios, Prios, dimlist);
+    comm.PerformInterfaceComm( *this);
 }
 #endif
 

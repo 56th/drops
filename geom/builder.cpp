@@ -69,11 +69,12 @@ void BrickBuilderCL::buildBoundary (MultiGridCL* mgp) const
     Bnd.push_back( new AffineSquareCL(_orig+_e3, _orig+_e3+_e1, _orig+_e3+_e2) ); // e1-e2-plane
 }
 
+/// \todo Check, if the parallelepiped spanned by e1,e2,e3 is degenerated
+/// \todo Do we need the local vector ta?
 void BrickBuilderCL::build (MultiGridCL* mgp) const
 {
-    // Check, if the parallelepiped spanned by e1,e2,e3 is degenerated
-
     AppendLevel(mgp);
+    SimplexFactoryCL factory( this->GetVertices( mgp), this->GetEdges( mgp), this->GetFaces( mgp), this->GetTetras( mgp));
 
     // Create boundary
     buildBoundary(mgp);
@@ -92,10 +93,9 @@ void BrickBuilderCL::build (MultiGridCL* mgp) const
         for (Uint i2=0; i2<=_n2; ++i2)
             for (Uint i1=0; i1<=_n1; ++i1)
             {
-                verts.push_back( VertexCL(_orig + static_cast<double>(i1)*off1
-                                                + static_cast<double>(i2)*off2
-                                                + static_cast<double>(i3)*off3, 0) );
-                va[v_idx(i3,i2,i1)]= &verts.back();
+                va[v_idx(i3,i2,i1)]= &factory.MakeVertex(_orig + static_cast<double>(i1)*off1
+                                                               + static_cast<double>(i2)*off2
+                                                               + static_cast<double>(i3)*off3, 0);
                 if (i1 == 0)    // y-z-plane
                     verts.back().AddBnd( BndPointCL(0, static_cast<double>(i2)/static_cast<double>(_n2)*e1_2D
                                                       +static_cast<double>(i3)/static_cast<double>(_n3)*e2_2D) );
@@ -120,8 +120,6 @@ void BrickBuilderCL::build (MultiGridCL* mgp) const
     // Create edges by calling BuildEdges() an BuildFaces() for every new tetrahedron;
     // this will search for all the ones needed and add missing edges automatically;
     // Create tetras
-    MultiGridCL::EdgeLevelCont& edges= GetEdges(mgp)[0];
-    MultiGridCL::FaceLevelCont& faces= GetFaces(mgp)[0];
     MultiGridCL::TetraLevelCont& tetras= GetTetras(mgp)[0];
     std::vector<TetraCL*> ta(_n3*_n2*_n1*6);
 
@@ -129,30 +127,29 @@ void BrickBuilderCL::build (MultiGridCL* mgp) const
         for (Uint i2=0; i2<_n2; ++i2)
             for (Uint i1=0; i1<_n1; ++i1)
             {   // Add tetrahedrons in one mini-brick; less-than ordering of indices of e_i used
-                tetras.push_back( TetraCL(va[v_idx(i3,i2,i1)], va[v_idx(i3,i2,i1+1)], va[v_idx(i3,i2+1,i1+1)], va[v_idx(i3+1,i2+1,i1+1)], 0) );
-                ta[t_idx(i3,i2,i1,0)]= &tetras.back();
-                tetras.back().BuildEdges(edges);
-                tetras.back().BuildAndLinkFaces(faces);
-                tetras.push_back( TetraCL(va[v_idx(i3,i2,i1)], va[v_idx(i3,i2,i1+1)], va[v_idx(i3+1,i2,i1+1)], va[v_idx(i3+1,i2+1,i1+1)], 0) );
-                ta[t_idx(i3,i2,i1,1)]= &tetras.back();
-                tetras.back().BuildEdges(edges);
-                tetras.back().BuildAndLinkFaces(faces);
-                tetras.push_back( TetraCL(va[v_idx(i3,i2,i1)], va[v_idx(i3,i2+1,i1)], va[v_idx(i3,i2+1,i1+1)], va[v_idx(i3+1,i2+1,i1+1)], 0) );
-                ta[t_idx(i3,i2,i1,2)]= &tetras.back();
-                tetras.back().BuildEdges(edges);
-                tetras.back().BuildAndLinkFaces(faces);
-                tetras.push_back( TetraCL(va[v_idx(i3,i2,i1)], va[v_idx(i3,i2+1,i1)], va[v_idx(i3+1,i2+1,i1)], va[v_idx(i3+1,i2+1,i1+1)], 0) );
-                ta[t_idx(i3,i2,i1,3)]= &tetras.back();
-                tetras.back().BuildEdges(edges);
-                tetras.back().BuildAndLinkFaces(faces);
-                tetras.push_back( TetraCL(va[v_idx(i3,i2,i1)], va[v_idx(i3+1,i2,i1)], va[v_idx(i3+1,i2,i1+1)], va[v_idx(i3+1,i2+1,i1+1)], 0) );
-                ta[t_idx(i3,i2,i1,4)]= &tetras.back();
-                tetras.back().BuildEdges(edges);
-                tetras.back().BuildAndLinkFaces(faces);
-                tetras.push_back( TetraCL(va[v_idx(i3,i2,i1)], va[v_idx(i3+1,i2,i1)], va[v_idx(i3+1,i2+1,i1)], va[v_idx(i3+1,i2+1,i1+1)], 0) );
-                ta[t_idx(i3,i2,i1,5)]= &tetras.back();
-                tetras.back().BuildEdges(edges);
-                tetras.back().BuildAndLinkFaces(faces);
+                ta[t_idx(i3,i2,i1,0)]= &factory.MakeTetra( va[v_idx(i3,i2,i1)], va[v_idx(i3,i2,i1+1)], va[v_idx(i3,i2+1,i1+1)], va[v_idx(i3+1,i2+1,i1+1)], 0);
+                tetras.back().BuildEdges(factory);
+                tetras.back().BuildAndLinkFaces(factory);
+
+                ta[t_idx(i3,i2,i1,1)]= &factory.MakeTetra( va[v_idx(i3,i2,i1)], va[v_idx(i3,i2,i1+1)], va[v_idx(i3+1,i2,i1+1)], va[v_idx(i3+1,i2+1,i1+1)], 0);
+                tetras.back().BuildEdges(factory);
+                tetras.back().BuildAndLinkFaces(factory);
+
+                ta[t_idx(i3,i2,i1,2)]= &factory.MakeTetra( va[v_idx(i3,i2,i1)], va[v_idx(i3,i2+1,i1)], va[v_idx(i3,i2+1,i1+1)], va[v_idx(i3+1,i2+1,i1+1)], 0);
+                tetras.back().BuildEdges(factory);
+                tetras.back().BuildAndLinkFaces(factory);
+
+                ta[t_idx(i3,i2,i1,3)]= &factory.MakeTetra( va[v_idx(i3,i2,i1)], va[v_idx(i3,i2+1,i1)], va[v_idx(i3+1,i2+1,i1)], va[v_idx(i3+1,i2+1,i1+1)], 0);
+                tetras.back().BuildEdges(factory);
+                tetras.back().BuildAndLinkFaces(factory);
+
+                ta[t_idx(i3,i2,i1,4)]= &factory.MakeTetra( va[v_idx(i3,i2,i1)], va[v_idx(i3+1,i2,i1)], va[v_idx(i3+1,i2,i1+1)], va[v_idx(i3+1,i2+1,i1+1)], 0);
+                tetras.back().BuildEdges(factory);
+                tetras.back().BuildAndLinkFaces(factory);
+
+                ta[t_idx(i3,i2,i1,5)]= &factory.MakeTetra( va[v_idx(i3,i2,i1)], va[v_idx(i3+1,i2,i1)], va[v_idx(i3+1,i2+1,i1)], va[v_idx(i3+1,i2+1,i1+1)], 0);
+                tetras.back().BuildEdges(factory);
+                tetras.back().BuildAndLinkFaces(factory);
             }
     std::for_each( va.begin(), va.end(), std::mem_fun( &VertexCL::DestroyRecycleBin ) );
 }
@@ -199,11 +196,13 @@ void CavityBuilderCL::buildBoundary (MultiGridCL* mgp) const
     Bnd.push_back( new AffineSquareCL(orig_c+e3_c, orig_c+e3_c+e1_c, orig_c+e3_c+e2_c) ); // e1-e2-plane
 }
 
+/// \todo Check, if the parallelepiped spanned by e1,e2,e3 is degenerated
 void CavityBuilderCL::build (MultiGridCL* mgp) const
 {
-    // Check, if the parallelepiped spanned by e1,e2,e3 is degenerated
+    SimplexFactoryCL factory( this->GetVertices(mgp), this->GetEdges(mgp), this->GetFaces(mgp), this->GetTetras(mgp));
 
     AppendLevel(mgp);
+
 
     // Create boundary
     buildBoundary(mgp);
@@ -227,10 +226,9 @@ void CavityBuilderCL::build (MultiGridCL* mgp) const
                     (i3>cavityorigin_[2] && i3<cavityorigin_[2]+cavity_[2])) { //strictly in the cavity
                     continue;
                 }
-                verts.push_back( VertexCL(_orig + static_cast<double>(i1)*off1
-                                                + static_cast<double>(i2)*off2
-                                                + static_cast<double>(i3)*off3, 0) );
-                va[v_idx(i3,i2,i1)]= &verts.back();
+                va[v_idx(i3,i2,i1)]= &factory.MakeVertex( _orig + static_cast<double>(i1)*off1
+                                                                + static_cast<double>(i2)*off2
+                                                                + static_cast<double>(i3)*off3, 0);
                 if (i1 == 0)    // y-z-plane
                     verts.back().AddBnd( BndPointCL(0, static_cast<double>(i2)/static_cast<double>(_n2)*e1_2D
                                                       +static_cast<double>(i3)/static_cast<double>(_n3)*e2_2D) );
@@ -289,8 +287,6 @@ void CavityBuilderCL::build (MultiGridCL* mgp) const
     // Create edges by calling BuildEdges() an BuildFaces() for every new tetrahedron;
     // this will search for all the ones needed and add missing edges automatically;
     // Create tetras
-    MultiGridCL::EdgeLevelCont& edges= GetEdges(mgp)[0];
-    MultiGridCL::FaceLevelCont& faces= GetFaces(mgp)[0];
     MultiGridCL::TetraLevelCont& tetras= GetTetras(mgp)[0];
     std::vector<TetraCL*> ta(_n3*_n2*_n1*6);
 
@@ -303,30 +299,29 @@ void CavityBuilderCL::build (MultiGridCL* mgp) const
                     (i3>=cavityorigin_[2] && i3<cavityorigin_[2]+cavity_[2])) { //strictly in the cavity
                     continue;
                 }
-                tetras.push_back( TetraCL(va[v_idx(i3,i2,i1)], va[v_idx(i3,i2,i1+1)], va[v_idx(i3,i2+1,i1+1)], va[v_idx(i3+1,i2+1,i1+1)], 0) );
-                ta[t_idx(i3,i2,i1,0)]= &tetras.back();
-                tetras.back().BuildEdges(edges);
-                tetras.back().BuildAndLinkFaces(faces);
-                tetras.push_back( TetraCL(va[v_idx(i3,i2,i1)], va[v_idx(i3,i2,i1+1)], va[v_idx(i3+1,i2,i1+1)], va[v_idx(i3+1,i2+1,i1+1)], 0) );
-                ta[t_idx(i3,i2,i1,1)]= &tetras.back();
-                tetras.back().BuildEdges(edges);
-                tetras.back().BuildAndLinkFaces(faces);
-                tetras.push_back( TetraCL(va[v_idx(i3,i2,i1)], va[v_idx(i3,i2+1,i1)], va[v_idx(i3,i2+1,i1+1)], va[v_idx(i3+1,i2+1,i1+1)], 0) );
-                ta[t_idx(i3,i2,i1,2)]= &tetras.back();
-                tetras.back().BuildEdges(edges);
-                tetras.back().BuildAndLinkFaces(faces);
-                tetras.push_back( TetraCL(va[v_idx(i3,i2,i1)], va[v_idx(i3,i2+1,i1)], va[v_idx(i3+1,i2+1,i1)], va[v_idx(i3+1,i2+1,i1+1)], 0) );
-                ta[t_idx(i3,i2,i1,3)]= &tetras.back();
-                tetras.back().BuildEdges(edges);
-                tetras.back().BuildAndLinkFaces(faces);
-                tetras.push_back( TetraCL(va[v_idx(i3,i2,i1)], va[v_idx(i3+1,i2,i1)], va[v_idx(i3+1,i2,i1+1)], va[v_idx(i3+1,i2+1,i1+1)], 0) );
-                ta[t_idx(i3,i2,i1,4)]= &tetras.back();
-                tetras.back().BuildEdges(edges);
-                tetras.back().BuildAndLinkFaces(faces);
-                tetras.push_back( TetraCL(va[v_idx(i3,i2,i1)], va[v_idx(i3+1,i2,i1)], va[v_idx(i3+1,i2+1,i1)], va[v_idx(i3+1,i2+1,i1+1)], 0) );
-                ta[t_idx(i3,i2,i1,5)]= &tetras.back();
-                tetras.back().BuildEdges(edges);
-                tetras.back().BuildAndLinkFaces(faces);
+                ta[t_idx(i3,i2,i1,0)]= &factory.MakeTetra( va[v_idx(i3,i2,i1)], va[v_idx(i3,i2,i1+1)], va[v_idx(i3,i2+1,i1+1)], va[v_idx(i3+1,i2+1,i1+1)], 0);
+                tetras.back().BuildEdges(factory);
+                tetras.back().BuildAndLinkFaces(factory);
+
+                ta[t_idx(i3,i2,i1,1)]= &factory.MakeTetra( va[v_idx(i3,i2,i1)], va[v_idx(i3,i2,i1+1)], va[v_idx(i3+1,i2,i1+1)], va[v_idx(i3+1,i2+1,i1+1)], 0);
+                tetras.back().BuildEdges(factory);
+                tetras.back().BuildAndLinkFaces(factory);
+
+                ta[t_idx(i3,i2,i1,2)]= &factory.MakeTetra( va[v_idx(i3,i2,i1)], va[v_idx(i3,i2+1,i1)], va[v_idx(i3,i2+1,i1+1)], va[v_idx(i3+1,i2+1,i1+1)], 0);
+                tetras.back().BuildEdges(factory);
+                tetras.back().BuildAndLinkFaces(factory);
+
+                ta[t_idx(i3,i2,i1,3)]= &factory.MakeTetra( va[v_idx(i3,i2,i1)], va[v_idx(i3,i2+1,i1)], va[v_idx(i3+1,i2+1,i1)], va[v_idx(i3+1,i2+1,i1+1)], 0);
+                tetras.back().BuildEdges(factory);
+                tetras.back().BuildAndLinkFaces(factory);
+
+                ta[t_idx(i3,i2,i1,4)]= &factory.MakeTetra( va[v_idx(i3,i2,i1)], va[v_idx(i3+1,i2,i1)], va[v_idx(i3+1,i2,i1+1)], va[v_idx(i3+1,i2+1,i1+1)], 0);
+                tetras.back().BuildEdges(factory);
+                tetras.back().BuildAndLinkFaces(factory);
+
+                ta[t_idx(i3,i2,i1,5)]= &factory.MakeTetra( va[v_idx(i3,i2,i1)], va[v_idx(i3+1,i2,i1)], va[v_idx(i3+1,i2+1,i1)], va[v_idx(i3+1,i2+1,i1+1)], 0);
+                tetras.back().BuildEdges(factory);
+                tetras.back().BuildAndLinkFaces(factory);
             }
     std::for_each( verts.begin(), verts.end(), std::mem_fun_ref( &VertexCL::DestroyRecycleBin ) );
 }
@@ -400,6 +395,7 @@ void LBuilderCL::build (MultiGridCL* mgp) const
 //     const double b2= _db2/_dn2;
 
     // Check, if the parallelepiped spanned by e1,e2,e3 is degenerated
+    SimplexFactoryCL factory( this->GetVertices(mgp), this->GetEdges(mgp), this->GetFaces(mgp), this->GetTetras(mgp));
 
     AppendLevel(mgp);
 
@@ -421,11 +417,10 @@ void LBuilderCL::build (MultiGridCL* mgp) const
             for (Uint i1=0; i1<=_n1; ++i1)
                 if (i1<=_b1 || (i1>_b1 && i2<=_b2)) // stay in the L-shaped form
                 {
-                    verts.push_back( VertexCL(_orig + static_cast<double>(i1)*off1
-                                                    + static_cast<double>(i2)*off2
-                                                    + static_cast<double>(i3)*off3,
-                                              static_cast<Uint>(0)) );
-                    va[v_idx(i3,i2,i1)]= &verts.back();
+                    va[v_idx(i3,i2,i1)]= &factory.MakeVertex(_orig + static_cast<double>(i1)*off1
+                                                                   + static_cast<double>(i2)*off2
+                                                                   + static_cast<double>(i3)*off3,
+                                                             static_cast<Uint>(0));
                     if (i1 == 0 && i2 <= _b2)    // y-z-plane
                         verts.back().AddBnd( BndPointCL(0, static_cast<double>(i2)/_db2*e1_2D
                                                           +static_cast<double>(i3)/_dn3*e2_2D) );
@@ -474,8 +469,6 @@ void LBuilderCL::build (MultiGridCL* mgp) const
     // Create edges/faces by calling BuildEdges() and BuildAndLinkFaces(() for every new tetrahedron;
     // this will search for all the ones needed and add missing edges automatically;
     // Create tetras
-    MultiGridCL::EdgeLevelCont& edges= GetEdges(mgp)[0];
-    MultiGridCL::FaceLevelCont& faces= GetFaces(mgp)[0];
     MultiGridCL::TetraLevelCont& tetras= GetTetras(mgp)[0];
     std::vector<TetraCL*> ta(_n3*_n2*_n1*6);
 
@@ -485,30 +478,29 @@ void LBuilderCL::build (MultiGridCL* mgp) const
             // Add tetrahedrons in one mini-brick; less-than ordering of indices of e_i used
                 if (i1<_b1 || (i1>=_b1 && i2<_b2))
                 {
-                    tetras.push_back( TetraCL(va[v_idx(i3,i2,i1)], va[v_idx(i3,i2,i1+1)], va[v_idx(i3,i2+1,i1+1)], va[v_idx(i3+1,i2+1,i1+1)], 0) );
-                    ta[t_idx(i3,i2,i1,0)]= &tetras.back();
-                    tetras.back().BuildEdges(edges);
-                    tetras.back().BuildAndLinkFaces(faces);
-                    tetras.push_back( TetraCL(va[v_idx(i3,i2,i1)], va[v_idx(i3,i2,i1+1)], va[v_idx(i3+1,i2,i1+1)], va[v_idx(i3+1,i2+1,i1+1)], 0) );
-                    ta[t_idx(i3,i2,i1,1)]= &tetras.back();
-                    tetras.back().BuildEdges(edges);
-                    tetras.back().BuildAndLinkFaces(faces);
-                    tetras.push_back( TetraCL(va[v_idx(i3,i2,i1)], va[v_idx(i3,i2+1,i1)], va[v_idx(i3,i2+1,i1+1)], va[v_idx(i3+1,i2+1,i1+1)], 0) );
-                    ta[t_idx(i3,i2,i1,2)]= &tetras.back();
-                    tetras.back().BuildEdges(edges);
-                    tetras.back().BuildAndLinkFaces(faces);
-                    tetras.push_back( TetraCL(va[v_idx(i3,i2,i1)], va[v_idx(i3,i2+1,i1)], va[v_idx(i3+1,i2+1,i1)], va[v_idx(i3+1,i2+1,i1+1)], 0) );
-                    ta[t_idx(i3,i2,i1,3)]= &tetras.back();
-                    tetras.back().BuildEdges(edges);
-                    tetras.back().BuildAndLinkFaces(faces);
-                    tetras.push_back( TetraCL(va[v_idx(i3,i2,i1)], va[v_idx(i3+1,i2,i1)], va[v_idx(i3+1,i2,i1+1)], va[v_idx(i3+1,i2+1,i1+1)], 0) );
-                    ta[t_idx(i3,i2,i1,4)]= &tetras.back();
-                    tetras.back().BuildEdges(edges);
-                    tetras.back().BuildAndLinkFaces(faces);
-                    tetras.push_back( TetraCL(va[v_idx(i3,i2,i1)], va[v_idx(i3+1,i2,i1)], va[v_idx(i3+1,i2+1,i1)], va[v_idx(i3+1,i2+1,i1+1)], 0) );
-                    ta[t_idx(i3,i2,i1,5)]= &tetras.back();
-                    tetras.back().BuildEdges(edges);
-                    tetras.back().BuildAndLinkFaces(faces);
+                    ta[t_idx(i3,i2,i1,0)]= &factory.MakeTetra( va[v_idx(i3,i2,i1)], va[v_idx(i3,i2,i1+1)], va[v_idx(i3,i2+1,i1+1)], va[v_idx(i3+1,i2+1,i1+1)], 0);
+                    tetras.back().BuildEdges(factory);
+                    tetras.back().BuildAndLinkFaces(factory);
+
+                    ta[t_idx(i3,i2,i1,1)]= &factory.MakeTetra( va[v_idx(i3,i2,i1)], va[v_idx(i3,i2,i1+1)], va[v_idx(i3+1,i2,i1+1)], va[v_idx(i3+1,i2+1,i1+1)], 0);
+                    tetras.back().BuildEdges(factory);
+                    tetras.back().BuildAndLinkFaces(factory);
+
+                    ta[t_idx(i3,i2,i1,2)]= &factory.MakeTetra( va[v_idx(i3,i2,i1)], va[v_idx(i3,i2+1,i1)], va[v_idx(i3,i2+1,i1+1)], va[v_idx(i3+1,i2+1,i1+1)], 0);
+                    tetras.back().BuildEdges(factory);
+                    tetras.back().BuildAndLinkFaces(factory);
+
+                    ta[t_idx(i3,i2,i1,3)]= &factory.MakeTetra( va[v_idx(i3,i2,i1)], va[v_idx(i3,i2+1,i1)], va[v_idx(i3+1,i2+1,i1)], va[v_idx(i3+1,i2+1,i1+1)], 0);
+                    tetras.back().BuildEdges(factory);
+                    tetras.back().BuildAndLinkFaces(factory);
+
+                    ta[t_idx(i3,i2,i1,4)]= &factory.MakeTetra( va[v_idx(i3,i2,i1)], va[v_idx(i3+1,i2,i1)], va[v_idx(i3+1,i2,i1+1)], va[v_idx(i3+1,i2+1,i1+1)], 0);
+                    tetras.back().BuildEdges(factory);
+                    tetras.back().BuildAndLinkFaces(factory);
+
+                    ta[t_idx(i3,i2,i1,5)]= &factory.MakeTetra( va[v_idx(i3,i2,i1)], va[v_idx(i3+1,i2,i1)], va[v_idx(i3+1,i2+1,i1)], va[v_idx(i3+1,i2+1,i1+1)], 0);
+                    tetras.back().BuildEdges(factory);
+                    tetras.back().BuildAndLinkFaces(factory);
                 }
     std::for_each( va.begin(), va.end(), std::mem_fun( &VertexCL::DestroyRecycleBin ) );
 }
@@ -581,6 +573,7 @@ void BBuilderCL::build (MultiGridCL* mgp) const
     const double _db3= static_cast<double>(_b3);
 
     // Check, if the parallelepiped spanned by e1,e2,e3 is degenerated
+    SimplexFactoryCL factory( this->GetVertices(mgp), this->GetEdges(mgp), this->GetFaces(mgp), this->GetTetras(mgp));
 
     AppendLevel(mgp);
 
@@ -601,11 +594,10 @@ void BBuilderCL::build (MultiGridCL* mgp) const
             for (Uint i1=0; i1<=_n1; ++i1)
                 if (i3<=_b3 || i2<=_b2 || i1<=_b1 ) // stay in the domain
                 {
-                    verts.push_back( VertexCL(_orig + static_cast<double>(i1)*off1
-                                                    + static_cast<double>(i2)*off2
-                                                    + static_cast<double>(i3)*off3,
-                                              static_cast<Uint>(0)) );
-                    va[v_idx(i3,i2,i1)]= &verts.back();
+                    va[v_idx(i3,i2,i1)]= &factory.MakeVertex(_orig + static_cast<double>(i1)*off1
+                                                                   + static_cast<double>(i2)*off2
+                                                                   + static_cast<double>(i3)*off3,
+                                                             static_cast<Uint>(0));
 
                     // y-z-plane
                     if (i1 == 0 && i2 <= _b2 && i3<=_b3)
@@ -690,8 +682,6 @@ void BBuilderCL::build (MultiGridCL* mgp) const
     // Create edges by calling BuildEdges() for every new tetrahedron; this will search for all the ones
     // needed and add missing edges automatically;
     // Create tetras
-    MultiGridCL::EdgeLevelCont& edges= GetEdges(mgp)[0];
-    MultiGridCL::FaceLevelCont& faces= GetFaces(mgp)[0];
     MultiGridCL::TetraLevelCont& tetras= GetTetras(mgp)[0];
     std::vector<TetraCL*> ta(_n3*_n2*_n1*6);
     for (Uint i3=0; i3<_n3; ++i3)
@@ -700,30 +690,29 @@ void BBuilderCL::build (MultiGridCL* mgp) const
             // Add tetrahedrons in one mini-brick; less-than ordering of indices of e_i used
                 if (i1<_b1 || i2<_b2 || i3<_b3 )
                 {
-                    tetras.push_back( TetraCL(va[v_idx(i3,i2,i1)], va[v_idx(i3,i2,i1+1)], va[v_idx(i3,i2+1,i1+1)], va[v_idx(i3+1,i2+1,i1+1)], 0) );
-                    ta[t_idx(i3,i2,i1,0)]= &tetras.back();
-                    tetras.back().BuildEdges(edges);
-                    tetras.back().BuildAndLinkFaces(faces);
-                    tetras.push_back( TetraCL(va[v_idx(i3,i2,i1)], va[v_idx(i3,i2,i1+1)], va[v_idx(i3+1,i2,i1+1)], va[v_idx(i3+1,i2+1,i1+1)], 0) );
-                    ta[t_idx(i3,i2,i1,1)]= &tetras.back();
-                    tetras.back().BuildEdges(edges);
-                    tetras.back().BuildAndLinkFaces(faces);
-                    tetras.push_back( TetraCL(va[v_idx(i3,i2,i1)], va[v_idx(i3,i2+1,i1)], va[v_idx(i3,i2+1,i1+1)], va[v_idx(i3+1,i2+1,i1+1)], 0) );
-                    ta[t_idx(i3,i2,i1,2)]= &tetras.back();
-                    tetras.back().BuildEdges(edges);
-                    tetras.back().BuildAndLinkFaces(faces);
-                    tetras.push_back( TetraCL(va[v_idx(i3,i2,i1)], va[v_idx(i3,i2+1,i1)], va[v_idx(i3+1,i2+1,i1)], va[v_idx(i3+1,i2+1,i1+1)], 0) );
-                    ta[t_idx(i3,i2,i1,3)]= &tetras.back();
-                    tetras.back().BuildEdges(edges);
-                    tetras.back().BuildAndLinkFaces(faces);
-                    tetras.push_back( TetraCL(va[v_idx(i3,i2,i1)], va[v_idx(i3+1,i2,i1)], va[v_idx(i3+1,i2,i1+1)], va[v_idx(i3+1,i2+1,i1+1)], 0) );
-                    ta[t_idx(i3,i2,i1,4)]= &tetras.back();
-                    tetras.back().BuildEdges(edges);
-                    tetras.back().BuildAndLinkFaces(faces);
-                    tetras.push_back( TetraCL(va[v_idx(i3,i2,i1)], va[v_idx(i3+1,i2,i1)], va[v_idx(i3+1,i2+1,i1)], va[v_idx(i3+1,i2+1,i1+1)], 0) );
-                    ta[t_idx(i3,i2,i1,5)]= &tetras.back();
-                    tetras.back().BuildEdges(edges);
-                    tetras.back().BuildAndLinkFaces(faces);
+                    ta[t_idx(i3,i2,i1,0)]= &factory.MakeTetra( va[v_idx(i3,i2,i1)], va[v_idx(i3,i2,i1+1)], va[v_idx(i3,i2+1,i1+1)], va[v_idx(i3+1,i2+1,i1+1)], 0);
+                    tetras.back().BuildEdges(factory);
+                    tetras.back().BuildAndLinkFaces(factory);
+
+                    ta[t_idx(i3,i2,i1,1)]= &factory.MakeTetra( va[v_idx(i3,i2,i1)], va[v_idx(i3,i2,i1+1)], va[v_idx(i3+1,i2,i1+1)], va[v_idx(i3+1,i2+1,i1+1)], 0);
+                    tetras.back().BuildEdges(factory);
+                    tetras.back().BuildAndLinkFaces(factory);
+
+                    ta[t_idx(i3,i2,i1,2)]= &factory.MakeTetra( va[v_idx(i3,i2,i1)], va[v_idx(i3,i2+1,i1)], va[v_idx(i3,i2+1,i1+1)], va[v_idx(i3+1,i2+1,i1+1)], 0);
+                    tetras.back().BuildEdges(factory);
+                    tetras.back().BuildAndLinkFaces(factory);
+
+                    ta[t_idx(i3,i2,i1,3)]= &factory.MakeTetra( va[v_idx(i3,i2,i1)], va[v_idx(i3,i2+1,i1)], va[v_idx(i3+1,i2+1,i1)], va[v_idx(i3+1,i2+1,i1+1)], 0);
+                    tetras.back().BuildEdges(factory);
+                    tetras.back().BuildAndLinkFaces(factory);
+
+                    ta[t_idx(i3,i2,i1,4)]= &factory.MakeTetra( va[v_idx(i3,i2,i1)], va[v_idx(i3+1,i2,i1)], va[v_idx(i3+1,i2,i1+1)], va[v_idx(i3+1,i2+1,i1+1)], 0);
+                    tetras.back().BuildEdges(factory);
+                    tetras.back().BuildAndLinkFaces(factory);
+
+                    ta[t_idx(i3,i2,i1,5)]= &factory.MakeTetra( va[v_idx(i3,i2,i1)], va[v_idx(i3+1,i2,i1)], va[v_idx(i3+1,i2+1,i1)], va[v_idx(i3+1,i2+1,i1+1)], 0);
+                    tetras.back().BuildEdges(factory);
+                    tetras.back().BuildAndLinkFaces(factory);
                 }
     std::for_each( verts.begin(), verts.end(), std::mem_fun_ref( &VertexCL::DestroyRecycleBin ) );
 }
@@ -812,6 +801,8 @@ void TetraBuilderCL::buildBoundary(MultiGridCL* mgp) const
 
 void TetraBuilderCL::build(MultiGridCL* mgp) const
 {
+    SimplexFactoryCL factory( this->GetVertices(mgp), this->GetEdges(mgp), this->GetFaces(mgp), this->GetTetras(mgp));
+
     AppendLevel( mgp);
 
     // Create boundary
@@ -821,29 +812,25 @@ void TetraBuilderCL::build(MultiGridCL* mgp) const
     MultiGridCL::VertexLevelCont& verts= GetVertices(mgp)[0];
     std::vector<VertexCL*> va( 4);
     // origin
-    verts.push_back( VertexCL( p0_, 0));
-    va[0]= &verts.back();
+    va[0]= &factory.MakeVertex( p0_, 0);
     verts.back().AddBnd( BndPointCL( 0, std_basis<2>( 0)));
     verts.back().AddBnd( BndPointCL( 1, std_basis<2>( 0)));
     verts.back().AddBnd( BndPointCL( 2, std_basis<2>( 0)));
     verts.back().BndSort();
     // e1
-    verts.push_back( VertexCL( p1_, 0));
-    va[1]= &verts.back();
+    va[1]= &factory.MakeVertex(  p1_, 0); 
     verts.back().AddBnd( BndPointCL( 0, std_basis<2>( 1)));
     verts.back().AddBnd( BndPointCL( 1, std_basis<2>( 1)));
     verts.back().AddBnd( BndPointCL( 3, std_basis<2>( 0)));
     verts.back().BndSort();
     // e2
-    verts.push_back( VertexCL( p2_, 0));
-    va[2]= &verts.back();
+    va[2]= &factory.MakeVertex( p2_, 0);
     verts.back().AddBnd( BndPointCL( 0, std_basis<2>( 2)));
     verts.back().AddBnd( BndPointCL( 2, std_basis<2>( 1)));
     verts.back().AddBnd( BndPointCL( 3, std_basis<2>( 1)));
     verts.back().BndSort();
     // e3
-    verts.push_back( VertexCL( p3_, 0));
-    va[3]= &verts.back();
+    va[3]= &factory.MakeVertex( p3_, 0);
     verts.back().AddBnd( BndPointCL( 1, std_basis<2>( 2)));
     verts.back().AddBnd( BndPointCL( 2, std_basis<2>( 2)));
     verts.back().AddBnd( BndPointCL( 3, std_basis<2>( 2)));
@@ -852,16 +839,13 @@ void TetraBuilderCL::build(MultiGridCL* mgp) const
     // Create edges by calling BuildEdges() an BuildFaces() for every new tetrahedron;
     // this will search for all the ones needed and add missing edges automatically;
     // Create tetras
-    MultiGridCL::EdgeLevelCont& edges= GetEdges(mgp)[0];
-    MultiGridCL::FaceLevelCont& faces= GetFaces(mgp)[0];
     MultiGridCL::TetraLevelCont& tetras= GetTetras(mgp)[0];
     TetraCL* tp;
 
     // Add tetrahedron
-    tetras.push_back( TetraCL( va[0], va[1], va[2], va[3], 0));
-    tp= &tetras.back();
-    tetras.back().BuildEdges( edges);
-    tetras.back().BuildAndLinkFaces( faces);
+    tp= &factory.MakeTetra( va[0], va[1], va[2], va[3], 0);
+    tetras.back().BuildEdges( factory);
+    tetras.back().BuildAndLinkFaces( factory);
 
     // Clean up recycle bins, that are used by BuildEdges and BuildAndLinkFaces.
     std::for_each( va.begin(), va.end(), std::mem_fun( &VertexCL::DestroyRecycleBin));
@@ -876,7 +860,9 @@ void TetraBuilderCL::build(MultiGridCL* mgp) const
     // PrepareModify and FinalizeModify may only be called in turns and building
     // is finished anyway.
     FinalizeModify( mgp);
-    mgp->Refine();
+    if (rule_!=0){
+        mgp->Refine();
+    }
     // Needed due to FinalizeModify() in MultiGridCL-constructor.
     PrepareModify( mgp);
 }
@@ -1301,8 +1287,7 @@ ReadMeshBuilderCL::AddVertexBndDescription(VertexCL* vp, Uint bndidx) const
 }
 
 void
-ReadMeshBuilderCL::CreateUpdateBndEdge(MultiGridCL::EdgeLevelCont& edges,
-                                       VertexCL* vp0, VertexCL* vp1,
+ReadMeshBuilderCL::CreateUpdateBndEdge(VertexCL* vp0, VertexCL* vp1,
                                        Uint bndidx) const
 {
     if (vp1->GetId() < vp0->GetId() ) // Take care: We have to look for the edge at its first vertex.
@@ -1313,8 +1298,7 @@ ReadMeshBuilderCL::CreateUpdateBndEdge(MultiGridCL::EdgeLevelCont& edges,
             ep->AddBndIdx( bndidx);
     }
     else {
-        edges.push_back( EdgeCL( vp0, vp1, 0, bndidx));
-        ep= &edges.back();
+        ep= &factory_->MakeEdge(vp0, vp1, 0, bndidx);
         ep->SortVertices(); // Shoud be a nop due to the beginning of CreateUpdateEdge.
         ep->RecycleMe();
     }
@@ -1332,7 +1316,7 @@ ReadMeshBuilderCL::Clear() const
 }
 
 ReadMeshBuilderCL::ReadMeshBuilderCL(std::istream& f, std::ostream* msg)
-        :f_( f), msg_( msg) {}
+    : f_( f), msg_( msg), factory_(0) {}
 
 void
 ReadMeshBuilderCL::buildBoundaryImp(MultiGridCL* mgp) const
@@ -1360,6 +1344,7 @@ ReadMeshBuilderCL::buildBoundary(MultiGridCL* mgp) const
     Clear();
 }
 
+/// \todo Did I determine the barycenter of a face correctly?
 void
 ReadMeshBuilderCL::build(MultiGridCL* mgp) const
 {
@@ -1370,6 +1355,8 @@ ReadMeshBuilderCL::build(MultiGridCL* mgp) const
     mfaces_.Check();
     cells_.Check();
 
+    SimplexFactoryCL factory( this->GetVertices(mgp), this->GetEdges(mgp), this->GetFaces(mgp), this->GetTetras(mgp));
+
     AppendLevel( mgp);
 
     // Create boundary
@@ -1377,12 +1364,10 @@ ReadMeshBuilderCL::build(MultiGridCL* mgp) const
     // Enter vertices into mgp;
     // We assume that the nodes are numbered consecutively, starting at 1.
     IdCL<VertexCL>::ResetCounter( 1);
-    MultiGridCL::VertexLevelCont& verts= GetVertices( mgp)[0];
     std::vector<VertexCL*> va;
     va.reserve( nodes_.num_expected);
     for (Uint i= 0; i<nodes_.num_expected; ++i) {
-        verts.push_back( VertexCL( nodes_.section[0].point[i], 0));
-        va.push_back( &verts.back());
+        va.push_back( &factory_->MakeVertex( nodes_.section[0].point[i], 0));
     }
 
     // We create the faces. On the fly, we gather tetra-definitions and add boundary descriptions
@@ -1393,13 +1378,21 @@ ReadMeshBuilderCL::build(MultiGridCL* mgp) const
     MultiGridCL::FaceLevelCont& faces= GetFaces(mgp)[0];
     std::vector<FaceCL*> fa;
     std::vector<HybridCellCL> thecells( cells_.num_expected);
-    MultiGridCL::EdgeLevelCont& edges= GetEdges(mgp)[0];
     for (Uint s= 0; s<mfaces_.section.size(); ++s) {
         MFaceSectionCL& section= mfaces_.section[s];
         switch(section.headerinfo[3]) { // switch on the boundary condition.
           case 2: // Inner faces
             for (Uint i= 0; i<section.mface.size(); ++i) {
-                faces.push_back( FaceCL( 0)); // Default is no boundary segment.
+#ifdef _PAR
+                const Point3DCL bary=
+                    (va[section.mface[i][0]]->GetCoord()
+                    +va[section.mface[i][1]]->GetCoord()
+                    +va[section.mface[i][2]]->GetCoord())/3.0;
+                factory_->MakeFace( 0, bary); // Default is no boundary segment. (And the face is generated in the container faces)
+                throw DROPSErrCL("Plase check this point and remove this exeption, if this is right!");
+#else
+                factory_->MakeFace( 0); // Default is no boundary segment.
+#endif
                 fa.push_back( &faces.back());
                 thecells[section.mface[i][3]-1].push_back( &faces.back(), section.mface[i]);
                 thecells[section.mface[i][4]-1].push_back( &faces.back(), section.mface[i]);
@@ -1407,7 +1400,16 @@ ReadMeshBuilderCL::build(MultiGridCL* mgp) const
             break;
           default: // boundary-faces
             for (Uint i= 0; i<section.mface.size(); ++i) {
-                faces.push_back( FaceCL( 0, zone_id2bndidx_[section.headerinfo[0]])); // Default is no boundary segment.
+#ifdef _PAR
+                const Point3DCL bary=
+                    (va[section.mface[i][0]]->GetCoord()
+                    +va[section.mface[i][1]]->GetCoord()
+                    +va[section.mface[i][2]]->GetCoord())/3.0;
+                factory_->MakeFace( 0, bary, zone_id2bndidx_[section.headerinfo[0]]); // Default is no boundary segment.
+                throw DROPSErrCL("Plase check this point and remove this exeption, if this is right!");
+#else
+                factory_->MakeFace( 0, zone_id2bndidx_[section.headerinfo[0]]); // Default is no boundary segment.
+#endif
                 fa.push_back( &faces.back());
                 if (section.mface[i][3] != 0) // A cell on the right
                     thecells[section.mface[i][3]-1].push_back( &faces.back(), section.mface[i]);
@@ -1416,13 +1418,13 @@ ReadMeshBuilderCL::build(MultiGridCL* mgp) const
                 AddVertexBndDescription( va[section.mface[i][0]-1], zone_id2bndidx_[section.headerinfo[0]]);
                 AddVertexBndDescription( va[section.mface[i][1]-1], zone_id2bndidx_[section.headerinfo[0]]);
                 AddVertexBndDescription( va[section.mface[i][2]-1], zone_id2bndidx_[section.headerinfo[0]]);
-                CreateUpdateBndEdge( edges, va[section.mface[i][0]-1],
+                CreateUpdateBndEdge( va[section.mface[i][0]-1],
                                      va[section.mface[i][1]-1],
                                      zone_id2bndidx_[section.headerinfo[0]]);
-                CreateUpdateBndEdge( edges, va[section.mface[i][0]-1],
+                CreateUpdateBndEdge( va[section.mface[i][0]-1],
                                      va[section.mface[i][2]-1],
                                      zone_id2bndidx_[section.headerinfo[0]]);
-                CreateUpdateBndEdge( edges, va[section.mface[i][1]-1],
+                CreateUpdateBndEdge( va[section.mface[i][1]-1],
                                      va[section.mface[i][2]-1],
                                      zone_id2bndidx_[section.headerinfo[0]]);
 
@@ -1439,9 +1441,8 @@ ReadMeshBuilderCL::build(MultiGridCL* mgp) const
     for (Uint i= 0; i<thecells.size(); ++i) {
         thecells[i].Check();
         std::vector<Uint> vi= thecells[i].Vertices();
-        tetras.push_back( TetraCL( va[vi[0]-1], va[vi[1]-1], va[vi[2]-1], va[vi[3]-1], 0));
-        ta.push_back( &tetras.back());
-        tetras.back().BuildEdges( edges);
+        ta.push_back( &factory_->MakeTetra(va[vi[0]-1], va[vi[1]-1], va[vi[2]-1], va[vi[3]-1], 0));
+        tetras.back().BuildEdges( *factory_);
         for (Uint f= 0; f<4; ++f) {
             thecells[i].face( f)->LinkTetra( &tetras.back());
             tetras.back().SetFace( f, thecells[i].Face( vi[VertOfFace( f, 0)],
@@ -1454,6 +1455,7 @@ ReadMeshBuilderCL::build(MultiGridCL* mgp) const
     // Should be a nop by construction in the builder, but one never knows...
     mgp->MakeConsistentNumbering();
     Clear(); // save memory.
+    delete factory_; factory_=0;
 }
 
 const char*
@@ -1505,8 +1507,10 @@ void EmptyReadMeshBuilderCL::build(MultiGridCL* mgp) const
 *******************************************************************/
 #ifdef _PAR
 template <>
-  void FileBuilderCL::ReadParInfo<EdgeCL>(std::istream& is, EdgeCL& s) const
+  void FileBuilderCL::ReadParInfo<EdgeCL>(std::istream&, EdgeCL&) const
 {
+    throw DROPSErrCL("FileBuilderCL::ReadParInfo: Only conform to DDD!");
+/*
 	  PrioT prio;
       int numDist, distProc;
       GIDT oldGid;
@@ -1520,9 +1524,10 @@ template <>
           for (int i=0; i<numDist; ++i){
               is >> distProc;
               Assert( distProc!=ProcCL::MyRank(), DROPSErrCL("FileBuilderCL::ReadParInfo: Cannot identify with myself"), DebugParallelC);
-              DynamicDataInterfaceCL::IdentifyNumber( s.GetHdr(), distProc, oldGid);
+              //DynamicDataInterfaceCL::IdentifyNumber( s.GetHdr(), distProc, oldGid);
           }
       }
+*/
 }
 #endif
 
@@ -1568,7 +1573,7 @@ void FileBuilderCL::BuildVerts(MultiGridCL* mgp) const
         }
 
         max_id= std::max( max_id, id);
-        verts[level].push_back( VertexCL ( point, level, IdCL<VertexCL>( id)));
+        factory_->MakeVertex( point, level, IdCL<VertexCL>( id));
         if (rmmark) verts[level].back().SetRemoveMark();
 
 #ifdef _PAR
@@ -1627,7 +1632,7 @@ void FileBuilderCL::BuildEdges(MultiGridCL* mgp) const
         VertexCL* vertex1   (vertexAddressMap[vert1]);
         VertexCL* midvertex (vertexAddressMap[midvert]);
         Assert(vertex0!=0 && vertex1!=0, DROPSErrCL("FileBuilderCL::BuildEdges: Vertex is missing"), DebugRefineEasyC);
-        edges[level].push_back( EdgeCL (vertex0, vertex1, level, bnd0, bnd1, mfr));
+        factory_->MakeEdge(vertex0, vertex1, level, bnd0, bnd1, mfr);
         edges[level].back().SetMidVertex (midvertex);
         if (rmmark) edges[level].back().SetRemoveMark();
         edgeAddressMap[idx]= &edges[level].back();
@@ -1663,7 +1668,11 @@ void FileBuilderCL::BuildFacesI(MultiGridCL* mgp) const
         face_file >> bnd >> level
                   >> rmmark;
 
-        faces[level].push_back(FaceCL (level, bnd));
+#ifndef _PAR
+        factory_->MakeFace(level, bnd);
+#else
+        throw DROPSErrCL("Cannot generate a face without barycenter");
+#endif
         if (rmmark) faces[level].back().SetRemoveMark();
         faceAddressMap[idx]= &faces[level].back();
 #ifdef _PAR
@@ -1713,10 +1722,10 @@ void FileBuilderCL::BuildTetras(MultiGridCL* mgp) const
         TetraCL* par = tetraAddressMap[parent];
 #ifdef _PAR
         if (!parent)
-            tetras[level].push_back( TetraCL (verts[0], verts[1], verts[2], verts[3], par, level, IdCL<TetraCL>( id)));
+            factory_->MakeTetra( verts[0], verts[1], verts[2], verts[3], par, level, IdCL<TetraCL>( id));
         else
 #endif
-            tetras[level].push_back( TetraCL (verts[0], verts[1], verts[2], verts[3], par, IdCL<TetraCL>( id)));
+            factory_->MakeTetra(verts[0], verts[1], verts[2], verts[3], par, IdCL<TetraCL>( id));
         tetras[level].back().SetRefRule(refrule);
         tetras[level].back().SetRefMark (refmark);
 
@@ -1811,9 +1820,10 @@ void FileBuilderCL::AddChildren() const
 void FileBuilderCL::build(MultiGridCL* mgp) const
 {
     AppendLevel(mgp);
-
+    SimplexFactoryCL factory( this->GetVertices(mgp), this->GetEdges(mgp), this->GetFaces(mgp), this->GetTetras(mgp));
 #ifdef _PAR
-    DynamicDataInterfaceCL::IdentifyBegin();
+    throw DROPSErrCL("FileBuilderCL::build: Identify is missing!");
+//    DynamicDataInterfaceCL::IdentifyBegin();
 #endif
     // Create vertices
     std::cout << "Building Vertices ";
@@ -1849,9 +1859,11 @@ void FileBuilderCL::build(MultiGridCL* mgp) const
     std::cout << "--> success\n";
 
 #ifdef _PAR
-    DynamicDataInterfaceCL::IdentifyEnd();
+    throw DROPSErrCL("FileBuilderCL::build: Identify is missing!");
+    //DynamicDataInterfaceCL::IdentifyEnd();
 #endif
     PrepareModify(mgp);     // FinalizeModify(mgp); is called in constructor of MultiGridCL
+    delete factory_; factory_=0;
 }
 
 void FileBuilderCL::CheckFile( const std::ifstream& is) const

@@ -265,26 +265,53 @@
     <ClCompile Include="..\..\..\levelset\brick_transp.cpp">
       <Filter>target</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\navstokes\instatnavstokes2phase.cpp">
-      <Filter>navstokes</Filter>
+    <ClCompile Include="..\..\..\partests\TestSedPar.cpp">
+      <Filter>target</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\levelset\coupling.cpp">
-      <Filter>levelset</Filter>
+    <ClCompile Include="..\..\..\partests\TestRefPar.cpp">
+      <Filter>target</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\poisson\poissonCoeff.cpp">
-      <Filter>poisson</Filter>
+    <ClCompile Include="..\..\..\partests\TestExchangePar.cpp">
+      <Filter>target</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\geom\bndScalarFunctions.cpp">
-      <Filter>geom</Filter>
+    <ClCompile Include="..\..\..\partests\TestPoissonPar.cpp">
+      <Filter>target</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\geom\bndVelFunctions.cpp">
-      <Filter>geom</Filter>
+    <ClCompile Include="..\..\..\partests\TestInterpolPar.cpp">
+      <Filter>target</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\geom\principallattice.cpp">
-      <Filter>geom</Filter>
+    <ClCompile Include="..\..\..\tests\dist_streamtest.cpp">
+      <Filter>target</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\misc\bndmap.cpp">
-      <Filter>misc</Filter>
+    <ClCompile Include="..\..\..\parallel\DiST.cpp">
+      <Filter>parallel</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tests\dist_remotedatatest.cpp">
+      <Filter>target</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tests\dist_sendtetraofbrick.cpp">
+      <Filter>target</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tests\dist_simplexsend.cpp">
+      <Filter>target</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tests\dist_interface.cpp">
+      <Filter>target</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tests\dist_exchange.cpp">
+      <Filter>target</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tests\dist_poisson.cpp">
+      <Filter>target</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tests\dist_sdropsP2.cpp">
+      <Filter>target</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\parallel\parref.cpp">
+      <Filter>parallel</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tests\dist_ref.cpp">
+      <Filter>target</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -501,14 +528,11 @@
     <ClInclude Include="..\..\..\surfactant\params.h">
       <Filter>surfactant</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\poisson\poissonCoeff.h">
-      <Filter>poisson</Filter>
+    <ClInclude Include="..\..\..\parallel\DiST.h">
+      <Filter>parallel</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\geom\principallattice.h">
-      <Filter>geom</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\misc\bndmap.h">
-      <Filter>misc</Filter>
+    <ClInclude Include="..\..\..\parallel\parref.h">
+      <Filter>parallel</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -620,7 +644,10 @@
     <None Include="..\..\..\surfactant\ifacetransp.tpp">
       <Filter>surfactant</Filter>
     </None>
-    <None Include="..\..\..\geom\geomselect.tpp">
+    <None Include="..\..\..\parallel\DiST.tpp">
+      <Filter>parallel</Filter>
+    </None>
+    <None Include="..\..\..\geom\simplex.tpp">
       <Filter>geom</Filter>
     </None>
   </ItemGroup>

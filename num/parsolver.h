@@ -68,40 +68,26 @@ namespace DROPS
 // implemented parallel methods for solving a linear system
 //***************************************************************************
 template <typename Mat, typename Vec, typename ExCL>
-bool ParCG(const Mat& A,Vec& x_acc,const Vec& b, const ExCL& ExX, int& max_iter, double& tol);
+bool ParCG(const Mat& A,Vec& x_acc,const Vec& b, const ExCL& ExX, int& max_iter, double& tol, 
+           bool measure_relative_tol, std::ostream* output=0);
 
 template <typename Mat, typename Vec, typename PreCon, typename ExCL>
-        bool ParPCG(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, PreCon& M, int& max_iter, double& tol, bool measure_relative_tol=false);
-
-template <typename Mat, typename Vec, typename PreCon, typename ExCL>
-bool ParAccurPCG(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, PreCon& M, int& max_iter, double& tol, bool measure_relative_tol=false, std::ostream* output=0);
-
-// Preconditioned GMRES with Gramm-Schmidt
-template <typename Mat, typename Vec, typename PreCon, typename ExCL>
-bool ParPreGS_GMRES(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, PreCon& M,
-                    int m, int& max_iter, double& tol, bool measure_relative_tol =true);
-
-// Preconditioned GMRES with modified Gramm-Schmidt
-template <typename Mat, typename Vec, typename PreCon, typename ExCL>
-bool ParPreMGS_GMRES(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, PreCon& M,
-                     int m, int& max_iter, double& tol, bool measure_relative_tol =true);
-
-// Preconditioned GMRES with unmodified Gramm-Schmidt and accurate inner product computation
-template <typename Mat, typename Vec, typename PreCon, typename ExCL>
-bool ParAccurPreGS_GMRES(const Mat& A, Vec& x, const Vec& b, const ExCL& ExX, PreCon& M,
-                         int m, int& max_iter, double& tol, bool measure_relative_tol_=true);
+bool ParPCG(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, PreCon& M, int& max_iter, 
+            double& tol, bool measure_relative_tol=false, std::ostream* output=0);
 
 // Preconditioned GMRES
 template <typename Mat, typename Vec, typename PreCon, typename ExCL>
 bool ParGMRES(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, PreCon& M,
-              int m, int& max_iter, double& tol, bool measure_relative_tol=true, bool useAcc=true,
-              PreMethGMRES method=LeftPreconditioning);
+              int m, int& max_iter, double& tol, bool measure_relative_tol=true,
+              PreMethGMRES method=LeftPreconditioning,
+              std::ostream* output=0);
 
 // Preconditioned GMRES with modifications for better scalability.
 template <typename Mat, typename Vec, typename PreCon, typename ExCL>
 bool ParModGMRES(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, PreCon& M,
-                 int m, int& max_iter, double& tol, bool measure_relative_tol=true, bool useAcc=true,
-                 bool useMGS=false, PreMethGMRES method=LeftPreconditioning);
+                 int m, int& max_iter, double& tol, bool measure_relative_tol=true,
+                 bool useMGS=false, PreMethGMRES method=LeftPreconditioning,
+                 std::ostream* output=0);
 
 // BiCGSTAB
 template <typename Mat, typename Vec, typename PreCon, typename ExCL>
@@ -110,7 +96,7 @@ bool ParBiCGSTAB(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, PreCon
 // Preconditioned GCR with truncation with high accuracy
 template <typename Mat, typename Vec, typename PreCon, typename ExCL>
 bool ParPGCR(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, PreCon& M,
-             int m, int& max_iter, double& tol, bool measure_relative_tol =true, bool useAcc=true);
+             int m, int& max_iter, double& tol, bool measure_relative_tol =true);
 
 // Preconditioned GCR with truncation and modifications to reduce sync-points
 template <typename Mat, typename Vec, typename PreCon, typename ExCL>
@@ -149,25 +135,20 @@ class ParSolverBaseCL : public SolverBaseCL
 {
   private:
     const IdxDescCL* idx_;      // for getting the ExchangeCL
-    bool             acc_;      // use accurate version for computing norms and inner products
 
   public:
     /// \brief Constructor
-    ParSolverBaseCL(int maxiter, double tol, const IdxDescCL& idx, bool rel= false, bool acc= true, std::ostream* output=0)
-      : SolverBaseCL(maxiter, tol, rel, output), idx_(&idx), acc_(acc) {}
+    ParSolverBaseCL(int maxiter, double tol, const IdxDescCL& idx, bool rel= false, std::ostream* output=0)
+      : SolverBaseCL(maxiter, tol, rel, output), idx_(&idx) {}
     /// \brief Constructor, that does not initialize the index description
-    ParSolverBaseCL(int maxiter, double tol, bool rel= false, bool acc= true, std::ostream* output=0)
-      : SolverBaseCL(maxiter, tol, rel, output), idx_(0), acc_(acc) {}
+    ParSolverBaseCL(int maxiter, double tol, bool rel= false, std::ostream* output=0)
+      : SolverBaseCL(maxiter, tol, rel, output), idx_(0) {}
 
     /// \brief Ask for ExchangeCL
     const ExchangeCL& GetEx() const {
         Assert(idx_, DROPSErrCL("ParSolverBaseCL::GetEx: Index not set, do you want to use an ExchangeBlockCL?"), DebugParallelNumC);
         return idx_->GetEx();
     }
-
-
-    bool              Accurate()          const { return acc_; }              ///< Check if accurate version of inner products and norms are used
-    void              SetAccurate(bool a)       { acc_= a; }                  ///< Set to accurate version
 };
 
 // ***************************************************************************
@@ -187,11 +168,11 @@ class ParPreSolverBaseCL : public ParSolverBaseCL
     typedef PC PrecondT;                            ///< Preconditioner
 
     /// \brief Constructor
-    ParPreSolverBaseCL(int maxiter, double tol, const IdxDescCL& idx, PC& pc, bool rel=true, bool acc= true, std::ostream* output=0)
-      : base(maxiter, tol, idx, rel, acc, output), pc_(pc) {}
+    ParPreSolverBaseCL(int maxiter, double tol, const IdxDescCL& idx, PC& pc, bool rel=true, std::ostream* output=0)
+      : base(maxiter, tol, idx, rel, output), pc_(pc) {}
     /// \brief Constructor, that does not initialize the index description
-    ParPreSolverBaseCL(int maxiter, double tol, PC& pc, bool rel=true, bool acc= true, std::ostream* output=0)
-      : base(maxiter, tol, rel, acc, output), pc_(pc) {}
+    ParPreSolverBaseCL(int maxiter, double tol, PC& pc, bool rel=true, std::ostream* output=0)
+      : base(maxiter, tol, rel, output), pc_(pc) {}
 
     PC& GetPC()             {return pc_;}          ///< return reference on preconditioner
     const PC& GetPC() const {return pc_;}          ///< return constant reference on preconditioner
@@ -215,8 +196,8 @@ class ParCGSolverCL : public ParSolverBaseCL
     /// \brief Constructor for parallel CG-Solver
     /** Tries to solve a linear equation system within \a maxiter steps with
         accuracy \a tol. The ExCL \a ex is used to do parallel inner products.*/
-    ParCGSolverCL(int maxiter, double tol, const IdxDescCL& idx, bool rel= false, bool acc=true, std::ostream* output=0)
-      : base(maxiter, tol, idx, rel, acc, output) {}
+    ParCGSolverCL(int maxiter, double tol, const IdxDescCL& idx, bool rel= false, std::ostream* output=0)
+      : base(maxiter, tol, idx, rel, output) {}
 
     /// \brief Solve a linear equation system with Conjugate-Gradients-Method
     template <typename Mat, typename Vec>
@@ -227,7 +208,7 @@ class ParCGSolverCL : public ParSolverBaseCL
     {
         base::_res=  base::_tol;
         base::_iter= base::_maxiter;
-        ParCG(A, x, b, base::GetEx(), base::_iter, base::_res);
+        ParCG(A, x, b, base::GetEx(), base::_iter, base::_res, base::rel_, base::output_);
     }
 };
 
@@ -247,8 +228,10 @@ class ParPCGSolverCL : public ParPreSolverBaseCL<PC>
         accuracy \a tol. The ExCL \a ex is used to do parallel inner products. \a pc is
         the given preconditioner. If \a rel is given, the residual is computed relative and
         with \a acc the inner products are determined with accure variant (see ExchangeCL). */
-    ParPCGSolverCL(int maxiter, double tol, const IdxDescCL &idx, PC& pc, bool rel=false, bool acc=true, std::ostream* output=0)
-      : base(maxiter, tol, idx, pc, rel, acc, output) {}
+    ParPCGSolverCL(int maxiter, double tol, const IdxDescCL &idx, PC& pc, bool rel=false, std::ostream* output=0)
+      : base(maxiter, tol, idx, pc, rel, output) {}
+    ParPCGSolverCL(int maxiter, double tol, PC& pc, bool rel=false, std::ostream* output=0)
+      : base(maxiter, tol, pc, rel, output) {}
 
     /// \brief Solve a linear equation system with Conjugate Gradients-Method
     template <typename Mat, typename Vec>
@@ -259,11 +242,19 @@ class ParPCGSolverCL : public ParPreSolverBaseCL<PC>
     {
         base::_res=  base::_tol;
         base::_iter= base::_maxiter;
-        if (base::Accurate())
-            ParAccurPCG(A, x, b, base::GetEx(),  base::GetPC(), base::_iter, base::_res, base::rel_, base::output_);
-        else
-            ParPCG(A, x, b, base::GetEx(),  base::GetPC(), base::_iter, base::_res, base::rel_);
+        ParPCG(A, x, b, base::GetEx(), base::GetPC(), base::_iter, base::_res, base::rel_, base::output_);
     }
+    template <typename Mat, typename Vec>
+      void Solve(const Mat& A, Vec& x, const Vec &b, const ExchangeBlockCL& ex)
+    /// Solve the linear equation system with coefficient matrix \a A and rhs \a b iterative with
+    /// preconditioned GCR algorithm, uses \a x as start-vector and result vector.
+    /// \post x has accumulated form
+    {
+        base::_res  = base::_tol;
+        base::_iter = base::_maxiter;
+        ParPCG(A, x, b, ex, base::GetPC(), base::_iter, base::_res, base::rel_, base::output_);
+    }
+
 };
 
 // ***************************************************************************
@@ -290,10 +281,10 @@ class ParPreGMResSolverCL : public ParPreSolverBaseCL<PC>
         (this configuration needs less memory!). By setting \a ModGS the modified Gramm-Schmidt
         algorithm is used for the Arnoldi method.*/
     ParPreGMResSolverCL(int restart, int maxiter, double tol, const IdxDescCL& idx, PC &pc,
-                        bool rel=true, bool acc=true, bool ModGS=false,
+                        bool rel=true, bool ModGS=false,
                         PreMethGMRES method=LeftPreconditioning, bool mod=true,
                         std::ostream* output=0)
-      : base(maxiter, tol, idx, pc, rel, acc, output),
+      : base(maxiter, tol, idx, pc, rel, output),
         restart_(restart), useModGS_(ModGS), method_(method), mod_(mod) {}
 
     int  GetRestart()           const { return restart_; }  ///< number of iterations before restart
@@ -311,12 +302,12 @@ class ParPreGMResSolverCL : public ParPreSolverBaseCL<PC>
 
         if (mod_)
             ParModGMRES(A, x, b, base::GetEx(), base::GetPC(), restart_,
-                        base::_iter, base::_res, base::GetRelError(), base::Accurate(),
-                        useModGS_, method_);
+                        base::_iter, base::_res, base::GetRelError(),
+                        useModGS_, method_, base::output_);
         else
             ParGMRES(A, x, b, base::GetEx(),  base::GetPC(), restart_,
-                     base::_iter, base::_res, base::GetRelError(), base::Accurate(),
-                     method_);
+                     base::_iter, base::_res, base::GetRelError(),
+                     method_, base::output_);
     }
 };
 
@@ -335,8 +326,8 @@ class ParBiCGSTABSolverCL : public ParPreSolverBaseCL<PC>
         accuracy \a tol. The ExCL \a ex is used to do parallel inner products. \a pc is
         the given preconditioner. If \a rel is given, the residual is computed relative. */
     ParBiCGSTABSolverCL(int maxiter, double tol, const IdxDescCL &idx, PC& pc, bool rel=true,
-                        bool acc=true, std::ostream* output=0)
-      : base(maxiter, tol, idx, pc, rel, acc, output) {}
+                        std::ostream* output=0)
+      : base(maxiter, tol, idx, pc, rel, output) {}
 
     /// \brief Solve a linear equation system with preconditioned Bi-Conjugate Gradient Stabilized-Method
     template <typename Mat, typename Vec>
@@ -374,12 +365,12 @@ class ParPreGCRSolverCL : public ParPreSolverBaseCL<PC>
         \todo (of) <b>truncation strategy with modified GCR do not work!</b>
     */
     ParPreGCRSolverCL(int trunc, int maxiter, double tol, const IdxDescCL& idx, PC &pc, bool mod=false,
-                      bool rel=true, bool acc=true, std::ostream* output=0)
-      : base(maxiter, tol, idx, pc, rel, acc, output), trunc_(trunc), mod_(mod) {}
+                      bool rel=true,std::ostream* output=0)
+      : base(maxiter, tol, idx, pc, rel, output), trunc_(trunc), mod_(mod) {}
     /// \brief Constructor, that does not initialize the index description
     ParPreGCRSolverCL(int trunc, int maxiter, double tol, PC &pc, bool mod=false,
-                      bool rel=true, bool acc=true, std::ostream* output=0)
-      : base(maxiter, tol, pc, rel, acc, output), trunc_(trunc), mod_(mod) {}
+                      bool rel=true, std::ostream* output=0)
+      : base(maxiter, tol, pc, rel, output), trunc_(trunc), mod_(mod) {}
 
     /// \brief Solve a linear equation system with preconditioned Generalized Conjugate Residuals-Method
     template <typename Mat, typename Vec>
@@ -394,13 +385,10 @@ class ParPreGCRSolverCL : public ParPreSolverBaseCL<PC>
         return;
 
         if (mod_){
-            if (base::Accurate())
-                ParModAccurPGCR(A, x, b, base::GetEx(), base::GetPC(), trunc_, base::_iter, base::_res, base::GetRelError(), base::output_);
-            else
-                ParModPGCR(A, x, b, base::GetEx(), base::GetPC(), trunc_, base::_iter, base::_res, base::GetRelError());
+            ParModAccurPGCR(A, x, b, base::GetEx(), base::GetPC(), trunc_, base::_iter, base::_res, base::GetRelError(), base::output_);
         }
         else
-            ParPGCR(A, x, b, base::GetEx(), base::GetPC(), trunc_, base::_iter, base::_res, base::GetRelError(), base::Accurate());
+            ParPGCR(A, x, b, base::GetEx(), base::GetPC(), trunc_, base::_iter, base::_res, base::GetRelError());
     }
 
     /// \brief Solve a linear equation system with preconditioned Generalized Conjugate Residuals-Method
@@ -433,8 +421,8 @@ class ParQMRSolverCL : public ParSolverBaseCL
         accuracy \a tol. The ExCL \a ex is used to do parallel inner products. The
         Lanczos-Algorithm to compute the bi-orthogonal-basis is given by a Lanczos class \a lan.
         If \a measure_relative_tol is given, the residual is computed relative.*/
-    ParQMRSolverCL(int maxiter, double tol, const IdxDescCL& idx, Lanczos &lan, bool rel=true, bool acc= true, std::ostream* output=0) :
-        base(maxiter, tol, idx, rel, acc, output), lan_(&lan) {}
+    ParQMRSolverCL(int maxiter, double tol, const IdxDescCL& idx, Lanczos &lan, bool rel=true, std::ostream* output=0) :
+        base(maxiter, tol, idx, rel, output), lan_(&lan) {}
 
     /// \brief Solve a linear equation system with Quasi Minimal Residuals-Method
     template <typename Mat, typename Vec>
@@ -455,7 +443,8 @@ class ParQMRSolverCL : public ParSolverBaseCL
 
 /// \brief Parallel CG-Algorithm
 template <typename Mat, typename Vec, typename ExCL>
-bool ParCG(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, int& max_iter, double& tol)
+bool ParCG(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, int& max_iter, 
+        double& tol, bool measure_relative_tol, std::ostream* output)
     /// \param[in]     A        local distributed coefficients-matrix of the linear equation system
     /// \param[in,out] x_acc    start vector and the solution in accumulated form
     /// \param[in]     b        rhs of the linear equation system (distributed form)
@@ -464,48 +453,47 @@ bool ParCG(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, int& max_ite
     /// \param[in,out] tol      IN: tolerance for the residual, OUT: residual
     /// \return                 convergence within max_iter iterations
 {
-    Vec r ( b - A*x_acc ), r_acc(r);
+    Vec r( b - A*x_acc ), r_acc(r);
+    double normb= ExX.Norm( b, false), 
+           res,   
+           resid=ExX.Norm_sq( r, false, &r_acc);
+    Vec d_acc( -r_acc);
 
-    double alpha = ExX.ParDotAcc(r_acc,r);
-    Vec p_acc (r_acc);
+    if (normb == 0.0 || measure_relative_tol == false) normb= 1.0;
 
-    tol*= tol;
-
-    if (alpha<=tol)
+    if ((res= std::sqrt( resid)/normb) <= tol)
     {
-        if (alpha<0)
-            std::cout << "["<<ProcCL::MyRank()<<"]==> negative squared norm of resid in CG because of accumulation!" << std::endl;
-        tol= std::sqrt(alpha);
+        tol= res;
         max_iter= 0;
         return true;
     }
 
-    for (int i=1; i<=max_iter; ++i)
+    for (int i= 1; i <= max_iter; ++i)
     {
-        const Vec    v      = A*p_acc;
-        const double gamma  = ProcCL::GlobalSum(dot( v, p_acc));
-        const double lambda = alpha/gamma;
-        double       beta   = alpha;
+        const Vec    Ad= A*d_acc;
+        const double delta= ExX.ParDot( Ad, false, d_acc, true);
+        const double alpha= resid/delta;
+        double       beta= resid;
 
-        x_acc += lambda * p_acc;
-        r     -= lambda*v;
+        axpy(alpha, d_acc, x_acc);  // x+= alpha*d;
+        axpy(alpha, Ad, r); // r+= alpha*Ad;
 
-        alpha = ExX.Norm_sq_Acc(r_acc,r);
+        resid= ExX.Norm_sq( r, false, &r_acc);
 
-        if (alpha<=tol)
+        if ( output){
+            (*output) << "ParCG: " << i << " resid " << std::sqrt(resid) << std::endl;
+        }
+
+        if ((res= std::sqrt( resid)/normb) <= tol)
         {
-            if (alpha<0)
-                std::cout << "["<<ProcCL::MyRank()<<"]==> negative squared norm of resid in CG because of accumulation!" << std::endl;
-
-            tol= std::sqrt(std::fabs(alpha));
+            tol= res;
             max_iter= i;
             return true;
         }
-
-        p_acc=r_acc + (alpha/beta) * p_acc;
+        beta= resid / beta;
+        d_acc= beta*d_acc-r_acc;
     }
-    tol= std::sqrt(std::fabs(alpha));
-
+    tol= res;
     return false;
 }
 
@@ -513,7 +501,8 @@ bool ParCG(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, int& max_ite
 /// \brief Parallel preconditioned CG-Algorithm
 template <typename Mat, typename Vec, typename PreCon, typename ExCL>
 bool ParPCG(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX,
-            PreCon& M, int& max_iter, double& tol, bool measure_relative_tol)
+            PreCon& M, int& max_iter, double& tol, bool measure_relative_tol,
+            std::ostream* output)
     /// \param[in]     A                    local distributed coefficients-matrix of the linear equation system
     /// \param[in,out] x_acc                start vector and the solution in accumulated form
     /// \param[in]     b                    rhs of the linear equation system (distributed form)
@@ -522,85 +511,6 @@ bool ParPCG(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX,
     /// \param[in,out] max_iter             IN: maximal iterations, OUT: used iterations
     /// \param[in,out] tol                  IN: tolerance for the residual, OUT: residual
     /// \param[in]     measure_relative_tol measure resid relative
-    /// \return                             convergence within max_iter iterations
-{
-    // Check if preconditioner needs diagonal of matrix. The preconditioner
-    // only computes the diagonal new, if the matrix has changed
-    if (M.NeedDiag())
-        M.SetDiag(A);
-
-    const size_t n= b.size();
-    Vec p_acc(n), z_acc(n), q(n), r( b - A*x_acc), r_acc(r);
-
-    double rho,
-           rho_1= 0.0,
-           resid= std::sqrt(ExX.ParDotAcc(r_acc,r)),
-           normb= ExX.Norm(b);
-
-    if (normb == 0.0 || measure_relative_tol == false)
-        normb= 1.0;
-    resid = resid/normb;
-
-
-    if (resid<=tol){
-        tol= resid;
-        max_iter= 0;
-        return true;
-    }
-
-    for (int i=1; i<=max_iter; ++i)
-    {
-        M.Apply(A, z_acc, r);
-        if (M.RetAcc())
-            rho = ProcCL::GlobalSum(dot(z_acc,r));
-        else
-            rho= ExX.ParDotAcc( z_acc, r);
-
-        if (i == 1)
-            p_acc= z_acc;
-        else
-            p_acc = z_acc + (rho/rho_1)*p_acc;
-
-        q= A*p_acc;
-        const double lambda = ProcCL::GlobalSum(dot(p_acc, q));
-        const double alpha  = rho/lambda;
-
-        x_acc += alpha * p_acc;
-        r     -= alpha * q;
-
-        const double res= ExX.Norm_sq_Acc(r_acc, r);
-        resid= std::sqrt(res<0 ? 0 : res) / normb;
-
-        if (resid<=tol){
-            if (res<0){
-                std::cout << "["<<ProcCL::MyRank()<<"]==> negative squared norm of resid in PCG because of accumulation!"
-                          << "\n   Please use accurate version."<<std::endl;
-                resid=0;
-            }
-
-            tol= resid;
-            max_iter= i;
-            return true;
-        }
-        rho_1= rho;
-    }
-    tol= resid;
-    return false;
-}
-
-/// \brief Parallel preconditioned CG-Algorithm with higher accuracy as ParPCG
-template <typename Mat, typename Vec, typename PreCon, typename ExCL>
-  bool ParAccurPCG(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX,
-                   PreCon& M, int& max_iter, double& tol, bool measure_relative_tol, std::ostream* output)
-    /// \param[in]     A                    local distributed coefficients-matrix of the linear equation system
-    /// \param[in,out] x_acc                start vector and the solution in accumulated form
-    /// \param[in]     b                    rhs of the linear equation system (distributed form)
-    /// \param[in]     ExX                  ExchangeCL corresponding to the RowIdx of x and the ColIdx of A
-    /// \param[in,out] M                    Preconditioner
-    /// \param[in,out] max_iter             IN: maximal iterations, OUT: used iterations
-    /// \param[in,out] tol                  IN: tolerance for the residual, OUT: residual
-    /// \param[in]     measure_relative_tol measure resid relative
-    /// \param[in]     output               write information onto output stream
     /// \return                             convergence within max_iter iterations
 {
     // Check if preconditioner needs diagonal of matrix. The preconditioner
@@ -611,15 +521,15 @@ template <typename Mat, typename Vec, typename PreCon, typename ExCL>
     const size_t n= b.size();
     Vec p_acc(n), z(n), z_acc(n), q(n), q_acc(n), r( b - A*x_acc), r_acc(r);
 
-
     double rho,
            rho_1= 0.0,
-           resid= ExX.Norm(r, false, true, &r_acc), //std::sqrt(ExX.AccNorm_sq(r,r_acc)),      // accumulation of r
-           normb= ExX.Norm(b);
+           resid= ExX.Norm( r, false, &r_acc),
+           normb= ExX.Norm( b, false);
 
     if (normb == 0.0 || measure_relative_tol == false)
         normb= 1.0;
     resid = resid/normb;
+
 
     if (resid<=tol){
         tol= resid;
@@ -629,37 +539,30 @@ template <typename Mat, typename Vec, typename PreCon, typename ExCL>
 
     for (int i=1; i<=max_iter; ++i)
     {
-        if (M.RetAcc()){
-            M.Apply(A, z_acc, r);
-            rho = ExX.ParDot(r_acc, true, z_acc, true);     //GlobalSum(ExX.LocAccDot(z_acc,r_acc));
-        }
-        else{
-            M.Apply(A, z, r);
-            rho= ExX.ParDot(z, false, r_acc, true, true, &z_acc);  //ExX.AccParDot( z, r_acc, z_acc);           // accumulation of z_acc
-        }
+        M.Apply(A, z, r);
+        rho = ExX.ParDot( z, M.RetAcc(), r_acc, true, &z_acc);
 
         if (i == 1)
             p_acc= z_acc;
-        else{
-            p_acc = z_acc + (rho/rho_1)*p_acc;              // z_xpay(p_acc, z_acc, (rho/rho_1), p_acc);
-        }
+        else
+            p_acc = z_acc + (rho/rho_1)*p_acc;
 
         q= A*p_acc;
-        const double lambda = ExX.AccParDot(q,p_acc,q_acc); // accumulation of q
+
+        const double lambda = ExX.ParDot( q, false, p_acc, true, &q_acc);
         const double alpha  = rho/lambda;
 
-        x_acc += alpha * p_acc;                             //axpy(alpha, p_acc, x_acc)
-        r     -= alpha*q;                                   //axpy(-alpha, q, r)
+        x_acc += alpha * p_acc;
+        r     -= alpha * q;
+        r_acc -= alpha * q_acc;
 
-        resid= ExX.Norm(r, false, true, &r_acc);//std::sqrt(ExX.AccNorm_sq(r, r_acc));         // accumulation of r_acc
-        resid= resid/normb;
+        resid= ExX.Norm( r_acc, true) / normb;
 
-        if (output){
-            if (ProcCL::IamMaster())
-                (*output) << "ParAccurPCG: "<<i<<": residual "<<resid<<std::endl;
+        if ( output){
+            (*output) << "ParPCG: " << i << " resid " << resid << std::endl;
         }
-        if (resid<=tol)
-        {
+
+        if (resid<=tol){
             tol= resid;
             max_iter= i;
             return true;
@@ -688,11 +591,11 @@ void StandardGrammSchmidt(DMatrixCL<double>& H,
 {
     if (acc_v&&acc_w){                          // both vectors are accumulated
         for (int k=0; k<=i; ++k)
-            tmpHCol[k] = ex.LocDot(w,true,v[k],true,/*accur*/true);
+            tmpHCol[k] = ex.LocalDot( w, true, v[k], true);
     }
     else if (!acc_v&&!acc_w){                   // one of the both vectors have to be accumulated: really bad!
         for (int k=0; k<=i; ++k)
-            tmpHCol[k] = ex.LocDot(w,false,v[k],false,/*accur*/false);
+            tmpHCol[k] = ex.LocalDot( w, false, v[k], false);
     }
     else        // update of w do only works on same types
         throw DROPSErrCL("StandardGrammSchmidt: Cannot do Gramm Schmidt on that kind of vectors!");
@@ -717,13 +620,13 @@ void ModifiedGrammSchmidt(DMatrixCL<double>& H, Vec& w, bool acc_w, const std::v
 {
     if (acc_v&&acc_w){
         for (int k=0; k<=i; ++k){
-            H( k, i)= ex.ParDot( w, true, v[k], true, /*useAccur*/true);
+            H( k, i)= ex.ParDot( w, true, v[k], true);
             w-= H( k, i)*v[k];
         }
     }
     else if (!acc_v&&!acc_w){
         for (int k=0; k<=i; ++k){
-            H( k, i)= ex.ParDot( w, false, v[k], false, /*useAccur*/false);
+            H( k, i)= ex.ParDot( w, false, v[k], false);
             w-= H( k, i)*v[k];
         }
     }
@@ -738,7 +641,7 @@ void ModifiedGrammSchmidt(DMatrixCL<double>& H, Vec& w, bool acc_w, const std::v
 template <typename Mat, typename Vec, typename PreCon, typename ExCL>
   bool ParGMRES(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, PreCon& M,
                 int m, int& max_iter, double& tol,
-                bool measure_relative_tol, bool useAcc, PreMethGMRES method)
+                bool measure_relative_tol, PreMethGMRES method, std::ostream* output)
     /// \param[in]     A                    local distributed coefficients-matrix of the linear equation system
     /// \param[in,out] x_acc                start vector and the solution in accumulated form
     /// \param[in]     b                    rhs of the linear equation system (distributed form)
@@ -748,7 +651,6 @@ template <typename Mat, typename Vec, typename PreCon, typename ExCL>
     /// \param[in,out] max_iter             IN: maximal iterations, OUT: used iterations
     /// \param[in,out] tol                  IN: tolerance for the residual, OUT: residual
     /// \param[in]     measure_relative_tol if true stop if |M^(-1)(b-Ax)|/|M^(-1)b| <= tol, else stop if |M^(-1)(b-Ax)|<=tol
-    /// \param[in]     useAcc               use accur variant for performing inner products and norms or do not use accure variant
     /// \param[in]     method               left or right preconditioning (see solver.h for definition and declaration)
     /// \return  convergence within max_iter iterations
     /// \pre     the preconditioner should be able to handle a accumulated b
@@ -781,15 +683,15 @@ template <typename Mat, typename Vec, typename PreCon, typename ExCL>
         if (method == RightPreconditioning)
         {
             r= b - A*x_acc;
-            beta = ExX.Norm(r, false, useAcc);
-            normb= ExX.Norm(b, false, useAcc);
+            beta = ExX.Norm(r, false);
+            normb= ExX.Norm(b, false);
         }
         else
         {
             M.Apply( A, r, Vec( b - A*x_acc));
-            beta= ExX.Norm(r, false, useAcc);
+            beta= ExX.Norm(r, false);
             M.Apply( A, w, b);
-            normb= ExX.Norm(w, false, useAcc);
+            normb= ExX.Norm(w, false);
         }
         if (normb == 0.0 || measure_relative_tol == false) normb= 1.0;
 
@@ -816,13 +718,13 @@ template <typename Mat, typename Vec, typename PreCon, typename ExCL>
                 else
                     M.Apply( A, w, A*ExX.GetAccumulate(v[i]));
                 for (int k= 0; k <= i; ++k ) {
-                    H( k, i)= ExX.ParDot( w, false, v[k], false, useAcc);
+                    H( k, i)= ExX.ParDot( w, false, v[k], false);
                     w-= H( k, i)*v[k];
                 }
 
                 if (i == m - 1) break;
 
-                H( i + 1, i)= ExX.Norm(w, false, useAcc);
+                H( i + 1, i)= ExX.Norm(w, false);
                 v[i + 1]= w*(1.0/H( i + 1, i));
 
                 for (int k= 0; k < i; ++k)
@@ -833,6 +735,8 @@ template <typename Mat, typename Vec, typename PreCon, typename ExCL>
                 GMRES_ApplyPlaneRotation( s[i], s[i+1], cs[i], sn[i]);
 
                 resid= std::abs( s[i+1])/normb;
+                if (output)
+                    (*output) << "ParGMRES: " << j << " resid " << resid << std::endl;
                 if (resid <= tol) {
                     if (method == RightPreconditioning)
                     {
@@ -865,7 +769,7 @@ template <typename Mat, typename Vec, typename PreCon, typename ExCL>
                 GMRES_Update( x_acc, i-1, H, s, ExX.GetAccumulate(v));
                 M.Apply( A, r, Vec( b - A*x_acc));
             }
-            beta=ExX.Norm(r, false, useAcc);
+            beta=ExX.Norm(r, false);
             resid= beta/normb;
             if (resid <= tol) {
                 tol= resid;
@@ -890,15 +794,15 @@ template <typename Mat, typename Vec, typename PreCon, typename ExCL>
         if (method == RightPreconditioning)
         {
             Vec r_tmp(b - A*x_acc);
-            beta = ExX.Norm(r_tmp, false, useAcc, &r);
-            normb= ExX.Norm(b, false, useAcc);
+            beta = ExX.Norm(r_tmp, false, &r);
+            normb= ExX.Norm(b, false);
         }
         else
         {
             M.Apply( A, r, Vec( b - A*x_acc));
-            beta = ExX.Norm(r, true, true);                                 // This works only with useAcc==true
+            beta = ExX.Norm(r, true);
             M.Apply( A, w, b);
-            normb= ExX.Norm(w, true, true);                                 // This works only with useAcc==true
+            normb= ExX.Norm(w, true);
         }
         if (normb == 0.0 || measure_relative_tol == false) normb= 1.0;
 
@@ -926,13 +830,13 @@ template <typename Mat, typename Vec, typename PreCon, typename ExCL>
                 else
                     M.Apply( A, w, A*v[i]);
                 for (int k= 0; k <= i; ++k ) {
-                    H( k, i)= ExX.ParDot(w, true, v[k], true, true);        // This works only with useAcc==true
+                    H( k, i)= ExX.ParDot(w, true, v[k], true);
                     w-= H( k, i)*v[k];
                 }
 
                 if (i == m - 1) break;
 
-                H( i + 1, i)= ExX.Norm(w, true, true);                      // This works only with useAcc==true
+                H( i + 1, i)= ExX.Norm(w, true);
                 v[i + 1]= w*(1.0/H( i + 1, i));
 
                 for (int k= 0; k < i; ++k)
@@ -943,6 +847,8 @@ template <typename Mat, typename Vec, typename PreCon, typename ExCL>
                 GMRES_ApplyPlaneRotation( s[i], s[i+1], cs[i], sn[i]);
 
                 resid= std::abs( s[i+1])/normb;
+                if (output)
+                    (*output) << "ParGMRES: " << j << " resid " << resid << std::endl;
 
                 if (resid <= tol) {
                     if (method == RightPreconditioning)
@@ -973,7 +879,7 @@ template <typename Mat, typename Vec, typename PreCon, typename ExCL>
                 GMRES_Update( x_acc, i-1, H, s, v);
                 M.Apply( A, r, Vec( b - A*x_acc));
             }
-            beta=ExX.Norm(r, true, true);                       // this works only with useAcc==true
+            beta=ExX.Norm(r, true);
             resid= beta/normb;
             if (resid <= tol) {
                 tol= resid;
@@ -991,7 +897,7 @@ template <typename Mat, typename Vec, typename PreCon, typename ExCL>
 template <typename Mat, typename Vec, typename PreCon, typename ExCL>
   bool ParModGMRES(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, PreCon& M,
                    int m, int& max_iter, double& tol,
-                   bool measure_relative_tol, bool useAcc, bool useMGS, PreMethGMRES method)
+                   bool measure_relative_tol, bool useMGS, PreMethGMRES method, std::ostream* output)
     /// \param[in]     A                    local distributed coefficients-matrix of the linear equation system
     /// \param[in,out] x_acc                start vector and the solution in accumulated form
     /// \param[in]     b                    rhs of the linear equation system (distributed form)
@@ -1001,7 +907,6 @@ template <typename Mat, typename Vec, typename PreCon, typename ExCL>
     /// \param[in,out] max_iter             IN: maximal iterations, OUT: used iterations
     /// \param[in,out] tol                  IN: tolerance for the residual, OUT: residual
     /// \param[in]     measure_relative_tol if true stop if |M^(-1)(b-Ax)|/|M^(-1)b| <= tol, else stop if |M^(-1)(b-Ax)|<=tol
-    /// \param[in]     useAcc               use accur variant for performing inner products and norms or do not use accure variant
     /// \param[in]     useMGS               use modified Gramm-Schmidt ortogonalization (many more sync-points exists!)
     /// \param[in]     method               left or right preconditioning (see solver.h for definition and declaration)
     /// \return  convergence within max_iter iterations
@@ -1029,14 +934,14 @@ template <typename Mat, typename Vec, typename PreCon, typename ExCL>
 
     if (method == RightPreconditioning){
         r    = b - A*x_acc;
-        beta = ExX.Norm(r, false, useAcc, &r_acc);
-        normb= ExX.Norm(b, false, useAcc);
+        beta = ExX.Norm(r, false, &r_acc);
+        normb= ExX.Norm(b, false);
     }
     else{
         M.Apply(A, r, VectorCL( b-A*x_acc));
-        beta = ExX.Norm(r, M.RetAcc(), useAcc, &r_acc);
+        beta = ExX.Norm(r, M.RetAcc(), &r_acc);
         M.Apply(A, w, b);
-        normb = ExX.Norm(w, M.RetAcc(), useAcc, &w_acc);
+        normb = ExX.Norm(w, M.RetAcc(), &w_acc);
     }
 
     if (normb == 0. || measure_relative_tol==false) normb=1.0;
@@ -1075,7 +980,7 @@ template <typename Mat, typename Vec, typename PreCon, typename ExCL>
             else
                 ModifiedGrammSchmidt(H, w_acc, true, v_acc, true, i, ExX);
 
-            H(i+1,i) = ExX.Norm(w_acc, true, useAcc);
+            H(i+1,i) = ExX.Norm(w_acc, true);
             v_acc[i+1] = w_acc * (1.0 / H(i+1,i));
 
             for (int k=0; k<i; ++k)
@@ -1086,6 +991,8 @@ template <typename Mat, typename Vec, typename PreCon, typename ExCL>
             GMRES_ApplyPlaneRotation(gamma[i], gamma[i+1], c[i], s[i]);
 
             resid = std::abs(gamma[i+1])/normb;
+            if (output)
+                (*output) << "ParModGMRES: " << j << " resid " << resid << std::endl;
 
             if (resid<=tol){            // finished
                 if (method == RightPreconditioning){
@@ -1105,12 +1012,12 @@ template <typename Mat, typename Vec, typename PreCon, typename ExCL>
             M.Apply( A, t_acc, z_acc);                      // hopefully M does the right thing
             x_acc += t_acc;
             r      = b-A*x_acc;
-            beta = ExX.Norm(r, false, useAcc, &r_acc);
+            beta = ExX.Norm(r, false, &r_acc);
         }
         else{
             GMRES_Update(x_acc, i-1, H, gamma, v_acc);
             M.Apply(A, r, static_cast<Vec>( b-A*x_acc));
-            beta = ExX.Norm(r, M.RetAcc(), ( M.RetAcc()?true:useAcc), &r_acc);
+            beta = ExX.Norm(r, M.RetAcc(), &r_acc);
         }
 
 
@@ -1155,10 +1062,10 @@ template <typename Mat, typename Vec, typename PreCon, typename ExCL>
 
     VectorCL dots(4), glob_dots(4);
 
-    double normb = std::sqrt(ExX.AccNorm_sq(b));
+    double normb = ExX.Norm(b, false);
     if ( normb==0. || !measure_relative_tol) normb= 1.;
 
-    sigma = ExX.AccNorm_sq(r, r_acc);
+    sigma = ExX.Norm(r, false, &r_acc);
     resid = std::sqrt(sigma) / normb;
 
     M.Apply(A, r0hat_acc, r);
@@ -1178,8 +1085,8 @@ template <typename Mat, typename Vec, typename PreCon, typename ExCL>
 
         v= A*phat_acc;
 
-        dots[0]= ExX.LocDot(    v, false, r0hat_acc, true, true, &v_acc);
-        dots[1]= ExX.LocNorm_sq(r_acc, true, true);
+        dots[0]= ExX.LocalDot( v, false, r0hat_acc, true, &v_acc);
+        dots[1]= ExX.LocalNorm_sq( r_acc, true);
 
         ProcCL::GlobalSum(Addr(dots), Addr(glob_dots), 2);
 
@@ -1209,7 +1116,7 @@ template <typename Mat, typename Vec, typename PreCon, typename ExCL>
 
         if (!M.RetAcc()){
             M.Apply(A,that,t);
-            dots[0]= ExX.LocDot(that, false, shat_acc, true, true, &that_acc);
+            dots[0]= ExX.LocalDot( that, false, shat_acc, true, &that_acc);
         }
         else{
             M.Apply(A,that_acc,t);
@@ -1218,7 +1125,7 @@ template <typename Mat, typename Vec, typename PreCon, typename ExCL>
 
         dots[1]= ExX.LocAccDot(that_acc, that_acc);
         dots[2]= ExX.LocAccDot(r0hat_acc, s_acc);
-        dots[3]= ExX.LocDot(t, false, r0hat_acc, true, true, &t_acc);
+        dots[3]= ExX.LocalDot( t, false, r0hat_acc, true, &t_acc);
 
         ProcCL::GlobalSum(Addr(dots), Addr(glob_dots), 4);
 
@@ -1276,7 +1183,7 @@ bool ParModPGCR(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, PreCon&
     double normb = ExX.Norm(b);
     if (normb==0.0 || measure_relative_tol==false) normb=1.0;
 
-    double resid = std::sqrt(ExX.ParDotAcc(r_acc,r))/normb;
+    double resid = ExX.Norm(r, false, &r_acc)/normb;
     if (resid<tol){
         max_iter=0; tol=resid; return true;
     }
@@ -1317,7 +1224,7 @@ bool ParModPGCR(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, PreCon&
 
         resid = std::sqrt(a[k]) / normb;
         if (true && j%20==0){
-            double realresid = ExX.Norm(static_cast<Vec>(b-A*x_acc));
+            double realresid = ExX.Norm(static_cast<Vec>(b-A*x_acc), false);
             if (ProcCL::IamMaster())
                 std::cout << "j: "<<j<<"\tresid="<< resid<<", realresid " <<realresid << std::endl;
         }
@@ -1388,11 +1295,11 @@ bool ParModAccurPGCR(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, Pr
     VectorCL a_loc(m+1), a(m+1), c(m), gamma_loc(2), gamma(2);  // derived from std::valarray, so all doubles are stored consecutive in memory!
     VectorCL b_acc(b.size());
 
-    double normb = ExX.Norm(b, false, true, &b_acc);
+    double normb = ExX.Norm( b, false, &b_acc);
     if (normb==0.0 || measure_relative_tol==false)
         normb=1.0;
 
-    double resid= ExX.Norm(r, false, true, &r_acc)/normb;
+    double resid= ExX.Norm(r, false, &r_acc)/normb;
     if (resid<tol){
         max_iter=0; tol=resid; return true;
     }
@@ -1407,8 +1314,8 @@ bool ParModAccurPGCR(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, Pr
     for (int j=0; j<max_iter; ++j)
     {
         // Calc of (r,Ap) / (Ap,Ap)
-        gamma_loc[0]= ExX.LocNorm_sq( Ap[last_idx], false, true, &Ap_acc[last_idx]);
-        gamma_loc[1]= ExX.LocDot( r_acc, true, Ap_acc[last_idx], true, true);
+        gamma_loc[0]= ExX.LocalNorm_sq( Ap[last_idx], false, &Ap_acc[last_idx]);
+        gamma_loc[1]= ExX.LocalDot( r_acc, true, Ap_acc[last_idx], true);
         ProcCL::GlobalSum(Addr(gamma_loc), Addr(gamma), 2);
         const double alpha = gamma[1] / gamma[0];
 
@@ -1424,8 +1331,8 @@ bool ParModAccurPGCR(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, Pr
         c[last_idx] = gamma[0];
         int k;
         for (k=0; k<=j && k<m; ++k)
-            a_loc[k]= ExX.LocDot( y_acc, true, Ap_acc[k], true, true);
-        a_loc[k]= ExX.LocDot( z_acc, true, r_acc, true, true);  // calc of the residual
+            a_loc[k]= ExX.LocalDot( y_acc, true, Ap_acc[k], true);
+        a_loc[k]= ExX.LocalDot( z_acc, true, r_acc, true);  // calc of the residual
 
         ProcCL::GlobalSum(Addr(a_loc), Addr(a), k+1);
 
@@ -1485,7 +1392,7 @@ bool ParModAccurPGCR(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, Pr
 ///        with same strategy as serial version
 template <typename Mat, typename Vec, typename PreCon, typename ExCL>
 bool ParPGCR(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, PreCon& M,
-             int m, int& max_iter, double& tol, bool measure_relative_tol, bool useAcc)
+             int m, int& max_iter, double& tol, bool measure_relative_tol)
     /// \param[in]     A                    coefficients of the linear equation system
     /// \param[in,out] x_acc                IN: start vector, OUT: solution of the linear equation system
     /// \param[in]     b                    rhs of the linear equation system
@@ -1495,7 +1402,6 @@ bool ParPGCR(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, PreCon& M,
     /// \param[in,out] max_iter             IN: maximal iterations, OUT: used iterations
     /// \param[in,out] tol                  IN: tolerance for the residual, OUT: residual
     /// \param[in]     measure_relative_tol if true stop if |M^(-1)(b-Ax)|/|M^(-1)b| <= tol, else stop if |M^(-1)(b-Ax)|<=tol
-    /// \param[in]     useAcc               use accurate or fast variant for inner products and norms
     /// \return                             convergence within max_iter iterations
 {
     // Check if preconditioner needs diagonal of matrix. The preconditioner
@@ -1513,15 +1419,15 @@ bool ParPGCR(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, PreCon& M,
     // Norm Berechnung der rechten Seite detailliert:
 //         VectorCL b0( b[std::slice( 0, A.num_rows( 0), 1)]);
 //         VectorCL b1( b[std::slice( A.num_rows( 0), A.num_rows( 1), 1)]);
-//         double normb0= ExX.Get(0).Norm( b0, false, useAcc);
-//         double normb1= ExX.Get(1).Norm( b1, false, useAcc);
+//         double normb0= ExX.Get(0).Norm( b0, false);
+//         double normb1= ExX.Get(1).Norm( b1, false);
 //         double max_rhs=GlobalMax(supnorm(b));
     // Norm Berechnung der rechten Seite detailliert:
 
-    double normb= ExX.Norm( b, false, useAcc);
+    double normb= ExX.Norm( b, false);
 //         const double mynorm=normb;
     if (normb == 0.0 || measure_relative_tol == false) normb= 1.0;
-    double resid= ExX.Norm( r, false, useAcc)/normb;
+    double resid= ExX.Norm( r, false)/normb;
 
 //     IF_MASTER
 //       std::cout << "Starting GCR with tol: "<<tol<<",\tnorm_rhs: "<<mynorm<<'\n'
@@ -1557,19 +1463,19 @@ bool ParPGCR(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, PreCon& M,
         vn= A*sn;
 
         for (int i= 0; i < k && i < m; ++i) {
-            const double alpha= ExX.ParDot( vn, false, v[i], false, useAcc);
+            const double alpha= ExX.ParDot( vn, false, v[i], false);
             a[i]= alpha;
             vn-= alpha*v[i];
             sn-= alpha*s[i];
         }
-        const double beta= ExX.Norm( vn, false, useAcc);
+        const double beta= ExX.Norm( vn, false);
         vn/= beta;
         sn/= beta;
-        const double gamma= ExX.ParDot( r, false, vn, false, useAcc);
+        const double gamma= ExX.ParDot( r, false, vn, false);
         x_acc+= gamma*sn;
 
         r-= gamma*vn;
-        resid= ExX.Norm( r, false, useAcc)/normb;
+        resid= ExX.Norm( r, false)/normb;
         if (k < m) {
             s.push_back( sn);
             v.push_back( vn);
@@ -1608,9 +1514,9 @@ bool ParQMR(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, Lanczos lan
 
     Vec d_acc(x_acc.size()), s(d_acc), r(b-A*x_acc), r_acc(r);
 
-    double normb = ExX.Norm_sq(b);
+    double normb = ExX.Norm_sq(b, false);
     if (normb==0.0 || measure_relative_tol==false) normb=1.0;
-    double norm_r = std::sqrt(std::fabs(ExX.ParDotAcc(r_acc,r)));
+    double norm_r = ExX.Norm( r, false, &r_acc);
 
     if (norm_r/normb<std::sqrt(tol))
     {
@@ -1650,8 +1556,7 @@ bool ParQMR(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, Lanczos lan
         x_acc  += d_acc;
         r      -= s;
 
-        r_acc   = r;
-        norm_r  = ExX.ParDotAcc(r_acc,r);
+        norm_r  = ExX.Norm(r, false, &r_acc);
 
         if (norm_r<0)
             std::cout << "["<<ProcCL::MyRank()<<"]==> negative squared norm of resid in QMR because of accumulation!" << std::endl;
@@ -1674,7 +1579,6 @@ bool ParGCRMod(const Mat& A, Vec& x, const Vec& b, const ExCL& ExX, PreCon& M,
 */
 {
     const size_t N= x.size();
-    const bool useAccur= true;
     if (M.NeedDiag())
         M.SetDiag(A);
 
@@ -1690,15 +1594,15 @@ bool ParGCRMod(const Mat& A, Vec& x, const Vec& b, const ExCL& ExX, PreCon& M,
     std::vector<Vec> p_acc( m, Vec(N)), Ap_acc( m, Vec(N));
     double resid, alpha;
 
-    resid     = ExX.Norm( r, false, useAccur, &r_acc);
+    resid     = ExX.Norm( r, false, &r_acc);
     p_acc[0]  = r_acc;
     Ap_acc[0] = ExX.GetAccumulate( Vec(A*p_acc[0]));
 
     for ( int j=0; j<max_iter; ++j){
         // compute alpha and resid
-        gamma[0]= ExX.LocDot(     r_acc,     true, Ap_acc[j], true, useAccur);
-        gamma[1]= ExX.LocDot(     Ap_acc[j], true, Ap_acc[j], true, useAccur);
-        gamma[2]= ExX.LocNorm_sq( r_acc,     true, useAccur);
+        gamma[0]= ExX.LocalDot(     r_acc,     true, Ap_acc[j], true);
+        gamma[1]= ExX.LocalDot(     Ap_acc[j], true, Ap_acc[j], true);
+        gamma[2]= ExX.LocalNorm_sq( r_acc,   true);
         gamma_glob=ProcCL::GlobalSum( gamma);
         alpha= gamma_glob[0]/gamma_glob[1];
         resid= gamma_glob[2];
@@ -1716,8 +1620,8 @@ bool ParGCRMod(const Mat& A, Vec& x, const Vec& b, const ExCL& ExX, PreCon& M,
         // compute orthogonalization
         Ar_acc= ExX.GetAccumulate( (Vec)(A*r_acc));
         for ( int i=0; i<=j; ++i){
-            tau[ 2*i+0]= ExX.LocDot( Ar_acc,    true, Ap_acc[i], true, useAccur);
-            tau[ 2*i+1]= ExX.LocDot( Ap_acc[i], true, Ap_acc[i], true, useAccur);
+            tau[ 2*i+0]= ExX.LocalDot( Ar_acc,    true, Ap_acc[i], true);
+            tau[ 2*i+1]= ExX.LocalDot( Ap_acc[i], true, Ap_acc[i], true);
         }
         ProcCL::GlobalSum( Addr(tau), Addr(tau_glob), 2*(j+1));
         for ( int i=0; i<=j; ++i) beta[i]= -tau_glob[2*i]/tau_glob[2*i+1];

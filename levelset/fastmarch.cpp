@@ -754,8 +754,9 @@ void ParInitZeroExactCL::GatherDistTriang()
 {
     actualData_= &data_; toSend_= &toSendDistTriang_; distTriangs_= &dofToDistTriang_;
     maxTriangsPerDOF_=0;
-    DynamicDataInterfaceCL::IFExecLocal( InterfaceCL<VertexCL>::GetIF(), &ExecGatherDistTriangVertexC);
-    DynamicDataInterfaceCL::IFExecLocal( InterfaceCL<EdgeCL>::GetIF(),   &ExecGatherDistTriangEdgeC);
+    throw DROPSErrCL ("ParInitZeroExactCL::GatherDistTriang() uses DDD\n");
+    //DynamicDataInterfaceCL::IFExecLocal( InterfaceCL<VertexCL>::GetIF(), &ExecGatherDistTriangVertexC);
+    //DynamicDataInterfaceCL::IFExecLocal( InterfaceCL<EdgeCL>::GetIF(),   &ExecGatherDistTriangEdgeC);
     actualData_= 0; toSend_= 0; distTriangs_= 0;
 }
 
@@ -773,7 +774,8 @@ void ParInitZeroExactCL::CommunicateDistTriang()
         distTriang_[*it].GetQR().Serialize( Addr(sendBuf)+i*dPerDistTriang+9);
     }
     // send data to neighbors
-    const ExchangeCL::ProcNumCT neighs= data_.phi.RowIdx->GetEx().GetNeighbors();
+    throw DROPSErrCL ("ParInitZeroExactCL::CommunicateDistTriang uses old ExchangeCL interface\n");
+/*    const ExchangeCL::ProcNumCT neighs= data_.phi.RowIdx->GetEx().GetNeighbors();
     std::vector<ProcCL::RequestT> req( data_.phi.RowIdx->GetEx().GetNumNeighs());
     size_t pos=0;
     for ( ExchangeCL::ProcNumCT::const_iterator it= neighs.begin(); it!=neighs.end(); ++it, ++pos){
@@ -796,7 +798,7 @@ void ParInitZeroExactCL::CommunicateDistTriang()
             distTriang_.push_back( InitZeroExactCL::DistanceTriangCL(Addr(recvBuf)+i*dPerDistTriang));
         }
     }
-    ProcCL::WaitAll( req);
+    ProcCL::WaitAll( req);*/
 }
 
 void ParInitZeroExactCL::AssociateTrianglesOnProcBnd()
@@ -804,10 +806,11 @@ void ParInitZeroExactCL::AssociateTrianglesOnProcBnd()
     actualData_= &data_; toSend_=&toSendDistTriang_;
     distTriangs_=&dofToDistTriang_; actualOffset_= &offset_;
     maxTriangsPerDOF_= ProcCL::GlobalMax( maxTriangsPerDOF_);
-    DynamicDataInterfaceCL::IFExchange(InterfaceCL<VertexCL>::GetIF(), (maxTriangsPerDOF_+2)*sizeof(IdxT),
+    throw DROPSErrCL ("ParInitZeroExactCL::AssociateTrianglesOnProcBnd() uses DDD\n");
+/*    DynamicDataInterfaceCL::IFExchange(InterfaceCL<VertexCL>::GetIF(), (maxTriangsPerDOF_+2)*sizeof(IdxT),
                    HandlerDistTriangGatherPosVertexC, HandlerDistTriangScatterPosVertexC);
     DynamicDataInterfaceCL::IFExchange(InterfaceCL<EdgeCL>::GetIF(), (maxTriangsPerDOF_+2)*sizeof(IdxT),
-                   HandlerDistTriangGatherPosEdgeC, HandlerDistTriangScatterPosEdgeC);
+                   HandlerDistTriangGatherPosEdgeC, HandlerDistTriangScatterPosEdgeC);*/
     actualData_=0; toSend_=0;
     distTriangs_=0; actualOffset_=0;
 }
@@ -1188,10 +1191,12 @@ void FastmarchingOnMasterCL::CreateGlobNumb()
 
     // Now, get global numbers of distributed DOF not stored on this process
     actualData_= &data_;        // make data static accessible, so DDD can access it
-    DynamicDataInterfaceCL::IFExchange(InterfaceCL<VertexCL>::GetIF(), sizeof(IdxT),
+    throw DROPSErrCL("FastmarchingOnMasterCL::CreateGlobNumb() uses DDD\n");
+
+/*    DynamicDataInterfaceCL::IFExchange(InterfaceCL<VertexCL>::GetIF(), sizeof(IdxT),
                    HandlerGlobDOFGatherVertexC, HandlerGlobDOFScatterVertexC );
     DynamicDataInterfaceCL::IFExchange(InterfaceCL<EdgeCL>::GetIF(), sizeof(IdxT),
-                   HandlerGlobDOFGatherEdgeC, HandlerGlobDOFScatterEdgeC );
+                   HandlerGlobDOFGatherEdgeC, HandlerGlobDOFScatterEdgeC );*/
     actualData_= 0;
 
     // in debug mode, check if everything is right
@@ -1235,10 +1240,11 @@ void FastmarchingOnMasterCL::DistributeFinished()
     Comment("Distribute Finished\n", DebugParallelNumC);
 
     actualData_= &data_;
-    DynamicDataInterfaceCL::IFExchange(InterfaceCL<VertexCL>::GetIF(),  sizeof(CoupMarkValST),
+    throw DROPSErrCL("FastmarchingOnMasterCL::DistributeFinished uses DDD\n");
+/*    DynamicDataInterfaceCL::IFExchange(InterfaceCL<VertexCL>::GetIF(),  sizeof(CoupMarkValST),
                    HandlerFinishedGatherVertexC,   HandlerFinishedScatterVertexC );
     DynamicDataInterfaceCL::IFExchange(InterfaceCL<EdgeCL>::GetIF(), sizeof(CoupMarkValST),
-                   HandlerFinishedGatherEdgeC,   HandlerFinishedScatterEdgeC );
+                   HandlerFinishedGatherEdgeC,   HandlerFinishedScatterEdgeC );*/
     actualData_=0 ;
 }
 
@@ -1518,26 +1524,61 @@ ParDirectDistanceCL::MultiFrontT ParDirectDistanceCL::onProc_=
     std::map<IdxT, std::list<ParDirectDistanceCL::TransferST> >();
 ReparamDataCL* ParDirectDistanceCL::actualData_=0;
 
-extern "C" int HandlerFrontierGatherVertexC(OBJT objp, void* buf){
-    return ParDirectDistanceCL::HandlerFrontierGather<VertexCL>(objp,buf);
+bool ParDirectDistanceCL::CommunicateFrontierCL::Gather( const DiST::TransferableCL& t, DiST::Helper::SendStreamCL& s)
+{
+    VertexCL* sp = 0;
+    simplex_cast( t, sp);
+
+    IdxT dof= sp->Unknowns( actualData_->phi.RowIdx->GetIdx());   // where to find phi
+    // fill buffer
+    s << actualData_->phi.Data[dof];
+    for (int i=0; i<3; ++i)
+        s << actualData_->perpFoot[dof] ? (*(actualData_->perpFoot[dof]))[i] : Point3DCL(std::numeric_limits<double>::max())[i];
+    s << (actualData_->typ[dof]==ReparamDataCL::Finished ? ProcCL::MyRank() : -1);
+    return true;
 }
-extern "C" int HandlerFrontierGatherEdgeC(OBJT objp, void* buf){
-    return ParDirectDistanceCL::HandlerFrontierGather<EdgeCL>(objp,buf);
+
+bool ParDirectDistanceCL::CommunicateFrontierCL::Scatter( DiST::TransferableCL& t, const size_t numData, DiST::Helper::RecvStreamCL& r)
+{
+    VertexCL* sp= 0;
+    simplex_cast( t, sp);
+
+    TransferST tmp;
+    IdxT dof= sp->Unknowns( actualData_->phi.RowIdx->GetIdx());
+    
+    for (size_t i = 0; i< numData; ++i) {
+        r >> tmp.value;
+        for (int i=0; i<3; ++i)
+            r>> tmp.perp[i];
+        r>> tmp.procID;
+        if ( tmp.procID>=0)
+            onProc_[dof].push_front( TransferST(tmp));
+    }
+    
+    return true;
 }
-extern "C" int HandlerFrontierScatterVertexC(OBJT objp, void* buf){
-    return ParDirectDistanceCL::HandlerFrontierScatter<VertexCL>(objp,buf);
-}
-extern "C" int HandlerFrontierScatterEdgeC(OBJT objp, void* buf){
-    return ParDirectDistanceCL::HandlerFrontierScatter<EdgeCL>(objp,buf);
+
+void ParDirectDistanceCL::CommunicateFrontierCL::Call()
+///\todo: should be done for all levels, introduce level list for interface constructor?
+{
+    DiST::InterfaceCL::DimListT dimlist; dimlist.push_back( 0);// dimlist.push_back( 1);
+    DiST::PrioListT Prios; Prios.push_back(PrioMaster);
+    DiST::LevelListCL Levels( lvl_);
+    
+    DiST::InterfaceCL comm( Levels, Prios, Prios, dimlist);
+    comm.PerformInterfaceComm( *this);
 }
 
 void ParDirectDistanceCL::CommunicateFrontierSetOnProcBnd()
 {
     actualData_=&data_;
-    DynamicDataInterfaceCL::IFExchange(InterfaceCL<VertexCL>::GetIF(), sizeof(TransferST),
+    CommunicateFrontierCL comm( data_.mg.GetLastLevel());
+    comm.Call();
+//    throw DROPSErrCL("ParDirectDistanceCL::CommunicateFrontierSetOnProcBnd uses DDD\n");
+/*    DynamicDataInterfaceCL::IFExchange(InterfaceCL<VertexCL>::GetIF(), sizeof(TransferST),
             HandlerFrontierGatherVertexC, HandlerFrontierScatterVertexC );
     DynamicDataInterfaceCL::IFExchange(InterfaceCL<EdgeCL>::GetIF(), sizeof(TransferST),
-            HandlerFrontierGatherEdgeC, HandlerFrontierScatterEdgeC );
+            HandlerFrontierGatherEdgeC, HandlerFrontierScatterEdgeC );*/
     actualData_=0;
 
     for ( MultiFrontT::iterator it=onProc_.begin(); it!=onProc_.end(); ++it){

@@ -85,12 +85,13 @@ inline double ParLanczos3CL<Mat,Vec>::GetBreakDownEps()
 template <typename Mat, typename Vec>
 bool ParLanczos3CL<Mat,Vec>::Step()
 {
+    Vec  u( u_acc_.size());
     if (!init_)
     {       // if not inited do a modificated step (there is no u_acc_ and no alpha_next_
-        w_acc_      = w_[1];                                                    // accumulate w0
-        u_acc_      = (*A_)*v_acc_[1];                                          // A*v0
-        alpha_      = ex_->ParDotAcc(u_acc_,w_[1]);                             // (Av0,w0)
-        ex_->Accumulate(w_acc_);                                                // send distributed entries of w0
+        u           = (*A_)*v_acc_[1];                                          // A*v0
+        alpha_      = ex_->ParDot(u, false, w_[1], false, &u_acc_, &w_acc_);     // (Av0,w0)
+//        alpha_      = ex_->ParDotAcc(u_acc_,w_[1]);                           // (Av0,w0)
+//        ex_->Accumulate(u_acc_);                                              // send distributed entries of w0
         v_acc_.push_back( static_cast<Vec>(u_acc_-alpha_*v_acc_[1]));           // initial three term recursion for K(A,v0)
         w_.push_back( static_cast<Vec>(transp_mul((*A_),w_acc_)-alpha_*w_[1])); // initial three term recursion for K(A^T,w0)
     }
@@ -105,10 +106,12 @@ bool ParLanczos3CL<Mat,Vec>::Step()
     }
 
     // calc A*v for the next step
-    u_acc_ =(*A_)*v_acc_[1];
+    u =(*A_)*v_acc_[1];
     // do two global reduce operations the same time, so collect local entries first
-    val_loc_[0] = ex_->DotAcc(u_acc_, w_[1]);       // this will be alpha_next_
-    val_loc_[1] = dot(v_acc_[1],w_[1]);             // = xi := (\hat{v}_{j+1},\hat{w}_{j+1})
+    val_loc_[0] = ex_->LocalDot( u, false, w_acc_, true, &u_acc_);
+    val_loc_[1] = ex_->LocalDot( v_acc_[1], true, w_acc_, true);
+    // val_loc_[0] = ex_->DotAcc(u_acc_, w_[1]);       // this will be alpha_next_
+    // val_loc_[1] = dot(v_acc_[1],w_[1]);             // = xi := (\hat{v}_{j+1},\hat{w}_{j+1})
     // now do global reduce on two doubles
     ProcCL::GlobalSum(val_loc_,val_glob_,2);
 

@@ -119,6 +119,12 @@ template<typename T>
     Communicator_.Scatterv( sendDatam sendcount, displs, ProcCL::MPI_TT<T>::dtype, recvData, recvcount, ProcCL::MPI_TT<T>::dtype, root);
 }
 
+template<typename T>
+  static void ProcCL::Alltoall( const T* sendData, int count, T* recvData)
+{
+    Communicator_.Alltoall( sendData, count, ProcCL::MPI_TT<T>::dtype, recvData, count, ProcCL::MPI_TT<T>::dtype);
+}
+
 inline void ProcCL::Probe(int source, int tag, ProcCL::StatusT& status)
   { Communicator_.Probe(source, tag, status); }
 
@@ -223,6 +229,12 @@ template<typename T>
     MPI_Scatterv( const_cast<T*>(sendData), const_cast<int*>(sendcount), const_cast<int*>(displs), ProcCL::MPI_TT<T>::dtype, recvData, recvcount, ProcCL::MPI_TT<T>::dtype, root, Communicator_);
 }
 
+template<typename T>
+  inline void ProcCL::Alltoall( const T* sendData, int count, T* recvData)
+{
+    MPI_Alltoall( const_cast<T*>(sendData), count, ProcCL::MPI_TT<T>::dtype, recvData, count, ProcCL::MPI_TT<T>::dtype, Communicator_);
+}
+
 inline void ProcCL::Probe(int source, int tag, ProcCL::StatusT& status)
   { MPI_Probe(source, tag, Communicator_, &status);}
 
@@ -237,8 +249,9 @@ inline void ProcCL::Wait(RequestT& req){
     MPI_Wait(&req, &tmpStat);
 }
 
-inline void ProcCL::WaitAll(int count, RequestT* req){    
-    std::valarray<StatusT> tmpStat(StatusT(), count);
+inline void ProcCL::WaitAll(int count, RequestT* req){
+    StatusT dummyStat;
+    std::valarray<StatusT> tmpStat(dummyStat, count);
     MPI_Waitall(count, req, Addr(tmpStat));
 }
 
@@ -277,6 +290,14 @@ template <typename T>
   inline ProcCL::DatatypeT ProcCL::CreateIndexed(int count, const int array_of_blocklengths[], const int array_of_displacements[]){
     DatatypeT newtype;
     MPI_Type_indexed(count, const_cast<int*>(array_of_blocklengths), const_cast<int*>(array_of_displacements), MPI_TT<T>::dtype, &newtype);
+    return newtype;
+}
+
+template <typename T>
+  inline ProcCL::DatatypeT ProcCL::CreateBlockIndexed(int count, const int blocklength, const int* array_of_displacements)
+{
+    DatatypeT newtype;
+    MPI_Type_create_indexed_block( count, blocklength, const_cast<int*>(array_of_displacements), MPI_TT<T>::dtype, &newtype);
     return newtype;
 }
 
@@ -324,13 +345,6 @@ template <typename T>
     StatusT status;
     Probe(source, tag, status);
     return GetCount<T>(status);
-}
-
-inline int ProcCL::GetMessageLength(int source, int tag, DatatypeT& type)
-{
-    StatusT status;
-    Probe(source, tag, status);
-    return GetCount(status, type);
 }
 
 inline void ProcCL::WaitAll(std::valarray<ProcCL::RequestT>& reqs)

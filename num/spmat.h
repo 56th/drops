@@ -231,12 +231,13 @@ inline T KahanInnerProd( Iterator first1, const Iterator& end1, Iterator first2,
 
 /// \brief Use Kahan's algorithm to perform an inner product on given indices
 template <typename T, typename Cont, typename Iterator>
-inline T KahanInnerProd( const Cont& a, const Cont&b, Iterator firstIdx, const Iterator& endIdx, const T init=(T)0)
+inline T KahanInnerProd( const Cont& a, const Cont&b, const Iterator& firstIdx, const Iterator& endIdx, const T init=(T)0, const size_t offset=0)
 {
+    Iterator first=firstIdx;
     T sum= init, c=T(0), t, y;
-    while(firstIdx!=endIdx){
-        y  = a[*firstIdx]*b[*firstIdx] - c;
-        ++firstIdx;
+    while(first!=endIdx){
+        y  = a[*first+offset]*b[*first+offset] - c;
+        ++first;
         t  = sum + y;
         c  = (t-sum)-y;
         sum= t;
@@ -415,8 +416,8 @@ public:
     SparseMatBuilderCL(spmatT* mat, size_t rows, size_t cols, bool reuse= false)
         : _rows(rows), _cols(cols), _mat(mat), _reuse( reuse)
     {
-        Assert( _rows%BlockTrait::num_rows == 0, "SparseMatBuilderCL (): number of rows incompatible with block_type", DebugNumericC);
-        Assert( _cols%BlockTrait::num_cols == 0, "SparseMatBuilderCL (): number of columns incompatible with block_type", DebugNumericC);
+        Assert( _rows%BlockTraitT::num_rows == 0, "SparseMatBuilderCL (): number of rows incompatible with block_type", DebugNumericC);
+        Assert( _cols%BlockTraitT::num_cols == 0, "SparseMatBuilderCL (): number of columns incompatible with block_type", DebugNumericC);
         mat->IncrementVersion();
         if (_reuse)
         {
@@ -437,8 +438,9 @@ public:
 
     block_type& operator() (size_t i, size_t j)
     {
-        Assert( i < _rows/BlockTraitT::num_rows && j <_cols/BlockTraitT::num_cols,
-            "SparseMatBuilderCL (): index out of bounds", DebugNumericC);
+///Todo: Assert anpassen
+  //      Assert( i < _rows/BlockTraitT::num_rows && j <_cols/BlockTraitT::num_cols,
+  //          "SparseMatBuilderCL (): index out of bounds", DebugNumericC);
 
         if (!_reuse)
             return _coupl[i/BlockTraitT::num_rows][j/BlockTraitT::num_cols];

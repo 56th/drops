@@ -31,12 +31,16 @@
 #include "num/spmat.h"
 
 #ifdef _PAR
+#  include "parallel/DiST.h"
 #  include "parallel/parallel.h"   // for parallel reductions
 #  include "parallel/interface.h"  // for accumulation of vectors
 #endif
 
 namespace DROPS
 {
+
+/// Prints a text-message describing the given boundary-condition.
+void BndCondInfo (BndCondT, std::ostream&);
 
 enum FiniteElementT
 /// \brief enum for several FE types
@@ -104,6 +108,16 @@ class FE_InfoCL
     Uint NumUnknownsEdge()   const { return NumUnknownsEdge_; }
     Uint NumUnknownsFace()   const { return NumUnknownsFace_; }
     Uint NumUnknownsTetra()  const { return NumUnknownsTetra_; }
+    Uint NumUnknownsSimplex( const DiST::TransferableCL& t) const
+    {
+        switch (t.GetDim()){
+        case 0: return NumUnknownsVertex();
+        case 1: return NumUnknownsEdge();
+        case 2: return NumUnknownsFace();
+        case 3: return NumUnknownsTetra();
+        default: throw DROPSErrCL("IdxDescCL::NumUnknownsSimplex: Unknown dimension");
+        }
+    }
     template<class SimplexT> Uint GetNumUnknownsOnSimplex() const
     { throw DROPSErrCL("IdxDescCL::GetNumUnknowns: Unknown Simplex type"); }
     //@}
@@ -145,7 +159,16 @@ class ExtIdxDescCL
     ExtendedIdxT Xidx_old_;   ///< old extended index, used by member function Old2New(...)
     const VecDescCL* lset_;
 #ifdef _PAR
-    static IdxDescCL* current_Idx_;  ///< for DDD handlers
+    class CommunicateXFEMNumbCL
+    {
+    private:
+        IdxDescCL* current_Idx_;
+      public:
+        CommunicateXFEMNumbCL( IdxDescCL* idx) : current_Idx_(idx) {}
+        bool Gather( const DiST::TransferableCL& t, DiST::Helper::SendStreamCL& s);
+        bool Scatter( DiST::TransferableCL& t, const size_t numData, DiST::Helper::RecvStreamCL& r);
+        void Call();
+    };
 #endif
 
     ExtIdxDescCL( double omit_bound= 1./32. ) : omit_bound_( omit_bound ), lset_(0) {}
@@ -175,20 +198,9 @@ class ExtIdxDescCL
     void Old2New( VecDescCL* );
 
     const VecDescCL& GetLevelset() const { return *lset_; }
-#ifdef _PAR
-    /// \brief Gather xdof information on a vertex (for DDD)
-    static int HandlerGatherUpdateXNumb ( OBJT objp, void* buf);
-    /// \brief Scatter xdof information on a vertex (for DDD)
-    static int HandlerScatterUpdateXNumb( OBJT objp, void* buf);
-#endif
 };
 
 #ifdef _PAR
-/// \name Wrapper for gathering and scattering data for ExtIdxDescCL::UpdateXNumbering
-//@{
-extern "C" inline int HandlerGatherUpdateXNumbC (OBJT objp, void* buf) { return ExtIdxDescCL::HandlerGatherUpdateXNumb ( objp, buf); }
-extern "C" inline int HandlerScatterUpdateXNumbC(OBJT objp, void* buf) { return ExtIdxDescCL::HandlerScatterUpdateXNumb( objp, buf); }
-//@}
 class ExchangeCL;
 #endif
 
@@ -339,6 +351,15 @@ class MLIdxDescCL : public MLDataCL<IdxDescCL>
     Uint NumUnknownsEdge()   const { return this->GetFinest().NumUnknownsEdge(); }
     Uint NumUnknownsFace()   const { return this->GetFinest().NumUnknownsFace(); }
     Uint NumUnknownsTetra()  const { return this->GetFinest().NumUnknownsTetra(); }
+    Uint NumUnknowns( const DiST::TransferableCL& t) const
+    {
+        switch (t.GetDim()){
+        case 0: return NumUnknownsVertex();
+        case 1: return NumUnknownsEdge();
+        case 2: return NumUnknownsFace();
+        case 3: return NumUnknownsTetra();
+        }
+    }
     template<class SimplexT> Uint GetNumUnknownsOnSimplex() const
     { return this->GetFinest().GetNumUnknownsOnSimplex<SimplexT>(); }
     //@}
@@ -523,7 +544,7 @@ class VecDescBaseCL
     /// \brief The default-constructor creates an empty vector and sets RowIdx to 0.
     VecDescBaseCL()
         :RowIdx( 0), t( 0.0) {}
-    /// \brief Initialize RowIdx with idx and contruct Data with the given size.
+    /// \brief Initialize RowIdx with idx and construct Data with the given size.
     VecDescBaseCL( IdxDescCL* idx) : t( 0.0) { SetIdx( idx); }
     VecDescBaseCL( MLIdxDescCL* idx): t( 0.0) { SetIdx( &(idx->GetFinest()) ); }
 

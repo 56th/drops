@@ -73,9 +73,8 @@ void cplDeltaSquaredPolicyCL::Update( VecDescCL& v)
 #ifndef _PAR
     omega_*= -dot( v_diff_, v_old_) / norm_sq( v_diff_);
 #else
-    const bool useAccur=true;
     ExchangeCL& ExVel  = v.RowIdx->GetEx();
-    omega_*=-ExVel.ParDot( v_diff_, true, v_old_, true, useAccur) / ExVel.Norm_sq( v_diff_, true, useAccur);
+    omega_*=-ExVel.ParDot( v_diff_, true, v_old_, true) / ExVel.Norm_sq( v_diff_, true);
 #endif
     if (output_)
         (*output_) << "omega: " << omega_ << std::endl;
@@ -90,9 +89,8 @@ void cplBroydenPolicyCL::Update( VecDescCL& v)
 #ifndef _PAR
     sigma_ = norm_sq( v.Data);
 #else
-    const bool useAccur=true;
     ExchangeCL& ExVel  = v.RowIdx->GetEx();
-    sigma_ = ExVel.Norm_sq( v.Data, true, useAccur);
+    sigma_ = ExVel.Norm_sq( v.Data, true);
 #endif
 
     if (output_)
@@ -125,7 +123,7 @@ void cplBroydenPolicyCL::Update( VecDescCL& v)
 #ifndef _PAR
     gamma_.push_back( norm_sq( w1));
 #else
-    gamma_.push_back( ExVel.Norm_sq( w1, true, useAccur));
+    gamma_.push_back( ExVel.Norm_sq( w1, true));
 #endif
 
     kappa_ /= (1.0-2.0*theta);
@@ -142,7 +140,7 @@ void cplBroydenPolicyCL::Update( VecDescCL& v)
 #ifndef _PAR
     const double factor = 1.0 - ( dot( w1, v1)) / gamma_.back();
 #else
-    const double factor = 1.0 - ( ExVel.ParDot( w1, true, v1, true, useAccur)) / gamma_.back();
+    const double factor = 1.0 - ( ExVel.ParDot( w1, true, v1, true)) / gamma_.back();
 #endif
     v1*= factor;
 
@@ -150,7 +148,7 @@ void cplBroydenPolicyCL::Update( VecDescCL& v)
 #ifndef _PAR
         const double beta = ( dot (deltaF1_[j], v1))/ gamma_[j];
 #else
-        const double beta = ( ExVel.ParDot (deltaF1_[j], true, v1, true, useAccur)) / gamma_[j];
+        const double beta = ( ExVel.ParDot (deltaF1_[j], true, v1, true)) / gamma_[j];
 #endif
         v1 -= beta*F1_[j+1];
     }

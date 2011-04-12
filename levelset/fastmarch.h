@@ -586,29 +586,24 @@ class ParDirectDistanceCL : public DirectDistanceCL
     /// \brief Clean up memory
     void CleanUp();
 
+    class CommunicateFrontierCL
+    {
+        private:
+            int lvl_;
+        public:
+            CommunicateFrontierCL( int lvl) : lvl_(lvl) {}
+            bool Gather( const DiST::TransferableCL& t, DiST::Helper::SendStreamCL& s);
+            bool Scatter( DiST::TransferableCL& t, const size_t numData, DiST::Helper::RecvStreamCL& r);
+            void Call();
+    };
+
   public:
     ParDirectDistanceCL( ReparamDataCL& data, size_t numNeigh=100)
         : base(data, numNeigh) {}
     ~ParDirectDistanceCL() {CleanUp(); }
     /// \brief Determine unsigned distances by the direct computing of distances on multiple processors
     void Perform();
-
-  public:
-    /// \name Handlers for DDD
-    //@{
-    template<class SimplexT>
-      static int HandlerFrontierGather(OBJT, void*);         ///< Gather finished DoF
-    template<class SimplexT>
-      static int HandlerFrontierScatter(OBJT, void*);        ///< Scatter finished DoF
-    //@}
 };
-/// \name  Wrapper for DDD
-//@{
-extern "C" int HandlerFrontierGatherVertexC(OBJT objp, void* buf);
-extern "C" int HandlerFrontierGatherEdgeC(OBJT objp, void* buf);
-extern "C" int HandlerFrontierScatterVertexC(OBJT objp, void* buf);
-extern "C" int HandlerFrontierScatterEdgeC(OBJT objp, void* buf);
-//@}
 #endif
 
 // fwd declaration

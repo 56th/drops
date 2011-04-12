@@ -212,7 +212,6 @@ template<class NavStokesT>
 #ifdef _PAR
     ExchangeCL& ExVel= ns.vel_idx.GetEx();
     ExchangeCL& ExPr = ns.pr_idx.GetEx();
-    const bool useAccur=true;
 #endif
     VecDescCL v_omw( v.RowIdx);
     v_omw.t = v.t;
@@ -230,8 +229,8 @@ template<class NavStokesT>
     omega_ = ExVel.ParDot(d_, false,
                             VectorCL( A*v.Data + alpha*(ns.N.Data.GetFinest()*v.Data)
                                       + transp_mul( B, p) - b - alpha*cplN.Data),
-                            false, useAccur, &d_acc_);
-    omega_+= ExPr.ParDot(e_, false, VectorCL( B*v.Data - c), false, useAccur, &e_acc_);
+                            false, &d_acc_);
+    omega_+= ExPr.ParDot(e_, false, VectorCL( B*v.Data - c), false, &e_acc_);
     omega_/= ExVel.Norm_sq(d_acc_, true) + ExPr.Norm_sq(e_acc_, true);
 #endif
 }
@@ -254,10 +253,9 @@ template<class NavStokesT>
 #else
     ExchangeCL& ExVel  = ns.vel_idx.GetEx();
     ExchangeCL& ExPr   = ns.pr_idx.GetEx();
-    const bool useAccur= true;
-    omega_*= -(ExVel.ParDot( w_diff_, true, w_old_, true, useAccur)
-               + ExPr.ParDot( q_diff_, true, q_old_, true, useAccur))
-              / (ExVel.Norm_sq( w_diff_, true, useAccur) + ExPr.Norm_sq( q_diff_, true, useAccur));
+    omega_*= -(ExVel.ParDot( w_diff_, true, w_old_, true)
+               + ExPr.ParDot( q_diff_, true, q_old_, true))
+              / (ExVel.Norm_sq( w_diff_, true) + ExPr.Norm_sq( q_diff_, true));
 #endif
 
     w_old_= w; q_old_= q;
@@ -277,7 +275,6 @@ AdaptFixedPtDefectCorrCL<NavStokesT, RelaxationPolicyT>::Solve(
              w_acc( v.Data.size()), q_acc( p.size());
     ExchangeCL& ExVel= NS_.vel_idx.GetEx();
     ExchangeCL& ExPr = NS_.pr_idx.GetEx();
-    const bool useAccur=true;
 #endif
     double res0= 1.;
     int oseenIter= 0;
@@ -293,7 +290,7 @@ AdaptFixedPtDefectCorrCL<NavStokesT, RelaxationPolicyT>::Solve(
 #ifndef _PAR
         _res= std::sqrt( norm_sq( d) + norm_sq( e) );
 #else
-        _res= std::sqrt( ExVel.Norm_sq(d, false, useAccur, &d_acc) + ExPr.Norm_sq(e, false, useAccur, &e_acc) );
+        _res= std::sqrt( ExVel.Norm_sq(d, false, &d_acc) + ExPr.Norm_sq(e, false, &e_acc) );
 #endif
         /// \todo(merge) Do we need this output? Or should/could we use the (*output_)?
         std::cout << _iter << ": res = " << _res << " reltol: " << this->GetRelError() << std::endl;
@@ -337,7 +334,6 @@ AdaptFixedPtDefectCorrCL<NavStokesT, RelaxationPolicyT>::Solve(
              w_acc( v.Data.size()), q_acc( p.size());
     ExchangeCL& ExVel= NS_.vel_idx.GetEx();
     ExchangeCL& ExPr = NS_.pr_idx.GetEx();
-    const bool useAccur=true;
 #endif
     double res0= 1.;
     int oseenIter= 0;
@@ -353,7 +349,7 @@ AdaptFixedPtDefectCorrCL<NavStokesT, RelaxationPolicyT>::Solve(
 #ifndef _PAR
         _res= std::sqrt( norm_sq( d) + norm_sq( e) );
 #else
-        _res= std::sqrt( ExVel.Norm_sq(d, false, useAccur, &d_acc) + ExPr.Norm_sq(e, false, useAccur, &e_acc) );
+        _res= std::sqrt( ExVel.Norm_sq(d, false, &d_acc) + ExPr.Norm_sq(e, false, &e_acc) );
 #endif
         std::cout << _iter << ": res = " << _res << " reltol: " << this->GetRelError() << std::endl;
         if (this->GetRelError() == true && _iter == 0)

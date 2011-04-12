@@ -65,20 +65,34 @@ MuteStdOstreamCL* ProcCL::mute_=0;
     const ProcCL::DatatypeT& ProcCL::MPI_TT<char>::dtype   = MPI_CHAR;
     const ProcCL::DatatypeT& ProcCL::MPI_TT<byte>::dtype   = MPI_CHAR;
     const ProcCL::DatatypeT& ProcCL::MPI_TT<float>::dtype  = MPI_FLOAT;
-#ifdef DROPS_WIN
-# ifdef WIN64
-    const ProcCL::DatatypeT& ProcCL::MPI_TT<size_t>::dtype = MPI_UNSIGNED_LONG;
-# endif
+#ifdef WIN64
+    const ProcCL::DatatypeT& ProcCL::MPI_TT<size_t>::dtype = MPI_UNSIGNED;
 #endif
 #endif
 
 ProcCL::ProcCL(int* argc, char*** argv)
 {
     Assert(size_==0, DROPSErrCL("ProcCL instanciated multiple times"), DebugParallelC);
-
+#ifdef _DDD
     DynamicDataInterfaceCL::Init(argc, argv);               // DDD Initialisieren und die Informationen beziehen
-    my_rank_ = DynamicDataInterfaceCL::InfoMe();
-    size_    = DynamicDataInterfaceCL::InfoProcs();
+#else
+# ifdef _MPICXX_INTERFACE
+    MPI::Init( *argc, *argv);
+# else
+    MPI_Init( argc, argv);
+# endif
+#endif
+
+    int rank=-1, size=-1;
+#ifdef _MPICXX_INTERFACE
+    rank= Communicator_::Get_rank();
+    size= Communicator_::size();
+#else
+    MPI_Comm_rank( Communicator_ , &rank);
+    MPI_Comm_size( Communicator_, &size );
+#endif
+    my_rank_=(Uint)rank;
+    size_=(Uint)size;
     procDigits_= 1;
     int procs  = Size();
     while( procs>9){
@@ -90,7 +104,10 @@ ProcCL::ProcCL(int* argc, char*** argv)
 
 ProcCL::~ProcCL()
 {
+#ifdef _DDD
 	DynamicDataInterfaceCL::Exit();             // Logoff from DDD
+#endif
+    MPI_Finalize();
     size_=0;                // Now, this class can be initialized again...
     RecoverStdOstreams();
     delete mute_;

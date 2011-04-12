@@ -701,17 +701,17 @@ template <class StokesT, class ParamsT, class ProlongationVelT, class Prolongati
       bbtispc_ ( Stokes_.B.Data.GetFinestPtr(), Stokes_.prM.Data.GetFinestPtr(), Stokes_.M.Data.GetFinestPtr(),
                  Stokes.pr_idx.GetFinest(), Stokes.vel_idx.GetFinest(), kA_, kM_, C_.stk_PcSTol, C_.stk_PcSTol),
       GMResSolver_(/*restart*/ 100, C_.stk_PcAIter, C_.stk_PcATol, Stokes.vel_idx.GetFinest(), JACVelPc_,
-                   /*rel*/ true, /*accure*/ true, /*ModGS*/ false),
+                   /*rel*/ true, /*ModGS*/ false),
       GMResPc_( GMResSolver_),
       PCGSolver_(C_.stk_PcAIter, C_.stk_PcATol, Stokes.vel_idx.GetFinest(), JACVelPc_,
-                 /*rel*/ true, /*acc*/ true),
+                 /*rel*/ true),
       PCGPc_(PCGSolver_),
       LBlockGMResBBTOseenPc_( GMResPc_, bbtispc_),
-      GCRGMResBBT_( C.stk_OuterIter, C.stk_OuterIter, C.stk_OuterTol, LBlockGMResBBTOseenPc_, true, false, true, &std::cout)
+      GCRGMResBBT_( C.stk_OuterIter, C.stk_OuterIter, C.stk_OuterTol, LBlockGMResBBTOseenPc_, true, false, &std::cout)
 #ifdef _HYPRE
       , hypreAMG_( Stokes.vel_idx.GetFinest(), C_.stk_PcAIter, C_.stk_PcATol), AMGPc_(hypreAMG_),
       LBlockAMGBBTOseenPc_( AMGPc_, bbtispc_),
-      GCRAMGBBT_( C.stk_OuterIter, C.stk_OuterIter, C.stk_OuterTol, LBlockAMGBBTOseenPc_, true, false, true, &std::cout)
+      GCRAMGBBT_( C.stk_OuterIter, C.stk_OuterIter, C.stk_OuterTol, LBlockAMGBBTOseenPc_, true, false, &std::cout)
 #endif
     {}
 
@@ -724,17 +724,17 @@ template <class StokesT, class ParamsT, class ProlongationVelT, class Prolongati
         case 20301 :
             stokessolver = new ParInexactUzawaCL<PCGPcT, ISBBTPreCL, APC_SYM>
                         ( PCGPc_, bbtispc_, Stokes_.vel_idx.GetFinest(), Stokes_.pr_idx.GetFinest(),
-                          C_.stk_OuterIter, C_.stk_OuterTol, C_.stk_InnerTol, 500, &std::cout);
+                          C_.stk_OuterIter, C_.stk_OuterTol, C_.stk_InnerTol, C_.stk_InnerIter, &std::cout);
         break;
         case 20400 :
             stokessolver = new ParInexactUzawaCL<GMResPcT, ParDummyPcCL, APC_OTHER>
                          ( GMResPc_, DummyPrPc_, Stokes_.vel_idx.GetFinest(), Stokes_.pr_idx.GetFinest(),
-                           C_.stk_OuterIter, C_.stk_OuterTol, C_.stk_InnerTol, 500, &std::cout);
+                           C_.stk_OuterIter, C_.stk_OuterTol, C_.stk_InnerTol, C_.stk_InnerIter, &std::cout);
         break;
         case 20401 :
             stokessolver = new ParInexactUzawaCL<GMResPcT, ISBBTPreCL, APC_OTHER>
                         ( GMResPc_, bbtispc_, Stokes_.vel_idx.GetFinest(), Stokes_.pr_idx.GetFinest(),
-                          C_.stk_OuterIter, C_.stk_OuterTol, C_.stk_InnerTol, 500, &std::cout);
+                          C_.stk_OuterIter, C_.stk_OuterTol, C_.stk_InnerTol, C_.stk_InnerIter, &std::cout);
         break;
         case 10401 :
             stokessolver = new BlockMatrixSolverCL<ParPreGCRSolverCL<LBlockGMResBBTOseenPcT> >
@@ -744,7 +744,7 @@ template <class StokesT, class ParamsT, class ProlongationVelT, class Prolongati
         case 22001 :
             stokessolver = new ParInexactUzawaCL<AMGPcT, ISBBTPreCL, APC_OTHER>
                         ( AMGPc_, bbtispc_, Stokes_.vel_idx.GetFinest(), Stokes_.pr_idx.GetFinest(),
-                          C_.stk_OuterIter, C_.stk_OuterTol, C_.stk_InnerTol, 500, &std::cout);
+                          C_.stk_OuterIter, C_.stk_OuterTol, C_.stk_InnerTol, C_.stk_InnerIter, &std::cout);
         break;
         case 12001 :
             stokessolver = new BlockMatrixSolverCL<ParPreGCRSolverCL<LBlockAMGBBTOseenPcT> >

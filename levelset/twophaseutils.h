@@ -39,7 +39,7 @@ namespace DROPS {
 
 /// \brief Display a detailed list of unknowns
 template <typename StokesT, typename LevelsetT>
-  void DisplayUnks(const StokesT& Stokes, const LevelsetT& levelset, __UNUSED__ const MultiGridCL& MG)
+  void DisplayUnks(__UNUSED__ const StokesT& Stokes, __UNUSED__ const LevelsetT& levelset, __UNUSED__ const MultiGridCL& MG)
 /** This functions write information about unknowns on the display. These
     informations are for the level-set-, pressure- and velocity-DOF:
     - global DOF
@@ -70,7 +70,7 @@ template <typename StokesT, typename LevelsetT>
     Ulint GVsize     = vidx->GetGlobalNumUnknowns(MG);
     Ulint GLsize     = lidx->GetGlobalNumUnknowns(MG);
 
-    // accumulated size of unknwons
+    // accumulated size of unknowns
     Ulint Psize_acc = ProcCL::GlobalSum(Psize);
     Ulint Vsize_acc = ProcCL::GlobalSum(Vsize);
     Ulint Lsize_acc = ProcCL::GlobalSum(Lsize);
@@ -86,9 +86,9 @@ template <typename StokesT, typename LevelsetT>
     double L_ratio   = (double)L_max/(double)L_min;
 
     // number on boundaries
-    Ulint P_accmax= ProcCL::GlobalMax(ExP.AccDistIndex.size()), P_accmin= ProcCL::GlobalMin(ExP.AccDistIndex.size());
-    Ulint V_accmax= ProcCL::GlobalMax(ExV.AccDistIndex.size()), V_accmin= ProcCL::GlobalMin(ExV.AccDistIndex.size());
-    Ulint L_accmax= ProcCL::GlobalMax(ExL.AccDistIndex.size()), L_accmin= ProcCL::GlobalMin(ExL.AccDistIndex.size());
+    Ulint P_accmax= ProcCL::GlobalMax(ExP.DistrIndex.size()), P_accmin= ProcCL::GlobalMin(ExP.DistrIndex.size());
+    Ulint V_accmax= ProcCL::GlobalMax(ExV.DistrIndex.size()), V_accmin= ProcCL::GlobalMin(ExV.DistrIndex.size());
+    Ulint L_accmax= ProcCL::GlobalMax(ExL.DistrIndex.size()), L_accmin= ProcCL::GlobalMin(ExL.DistrIndex.size());
 
     // ratio of these unknowns
     double P_accratio= (double)P_accmax / (double)P_accmin;

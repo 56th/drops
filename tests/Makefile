@@ -11,7 +11,9 @@ EXEC =  ip1test ip2test mattest prolongationp2test reftest testfe \
         p2local quadbase globallist triang quadCut bicgstab gcr blockmat \
         mass quad5 downwind quad5_2D interfaceP1FE serialization xfem \
         directsolver f_Gamma neq splitboundary reparam_init reparam \
-        extendP1onChild principallattice
+        extendP1onChild principallattice dist_streamtest dist_remotedatatest \
+        dist_sendtetraofbrick dist_simplexsend dist_interface dist_exchange \
+        dist_poisson dist_sdropsP2 dist_twophasedrops dist_ref dist_modify
 
 DELETE = $(EXEC) *.out *.diff *.off *.mg *.dat
 
@@ -22,10 +24,9 @@ OBJ = $(CPP:%.cpp=%.o)
 # include common rules:
 include ../Make.common
 
-PAR_OBJ_ = ../parallel/parallel.o ../parallel/parmultigrid.o \
-           ../parallel/partime.o ../parallel/addeddata.o ../parallel/loadbal.o \
-           ../parallel/exchange.o ../parallel/memmgr_std.o ../parallel/parmgserialization.o \
-           ../parallel/logger.o ../parallel/parddd.o ../parallel/partitioner.o
+PAR_OBJ_ = ../parallel/parallel.o ../parallel/partime.o  \
+           ../parallel/exchange.o  ../parallel/parmultigrid.o \
+           ../parallel/logger.o ../parallel/DiST.o ../parallel/loadbal.o ../parallel/partitioner.o
 
 PAR_OBJ = $(if $(PAR_BUILD),$(PAR_OBJ_),)
 
@@ -39,6 +40,8 @@ TESTNAME = drivencavity-adaptiv-schur drivencavity-adaptiv-uzawa \
 # rules
 
 default: ClrScr
+
+dist: dist_streamtest dist_remotedatatest dist_sendtetraofbrick dist_modify dist_simplexsend dist_interface dist_exchange dist_poisson dist_sdropsP2 dist_twophasedrops dist_ref
 
 check: $(TESTNAME:%=check_%) ip1check
 	@echo "--> All testcases have been executed!"
@@ -231,6 +234,93 @@ reparam: \
 principallattice: \
     ../tests/principallattice.o ../misc/utils.o ../geom/principallattice.o ../num/discretize.o ../geom/topo.o \
     ../num/fe.o ../num/interfacePatch.o ../misc/problem.o ../num/unknowns.o ../geom/simplex.o ../geom/multigrid.o
+	$(CXX) -o $@ $^ $(LFLAGS)
+
+dist_streamtest: \
+    ../tests/dist_streamtest.o \
+    ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
+    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
+    ../num/fe.o ../num/interfacePatch.o $(PAR_OBJ)
+	$(CXX) -o $@ $^ $(LFLAGS)
+
+dist_remotedatatest: \
+    ../tests/dist_remotedatatest.o \
+    ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
+    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
+    ../num/fe.o ../num/interfacePatch.o $(PAR_OBJ)
+	$(CXX) -o $@ $^ $(LFLAGS)
+
+dist_sendtetraofbrick: \
+    ../tests/dist_sendtetraofbrick.o \
+    ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
+    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
+    ../num/fe.o ../num/interfacePatch.o $(PAR_OBJ)
+	$(CXX) -o $@ $^ $(LFLAGS)
+
+dist_modify: \
+    ../tests/dist_modify.o \
+    ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
+    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
+    ../num/fe.o ../num/interfacePatch.o $(PAR_OBJ)
+	$(CXX) -o $@ $^ $(LFLAGS)
+
+dist_simplexsend: \
+    ../tests/dist_simplexsend.o  \
+    ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
+    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
+    ../num/fe.o ../num/interfacePatch.o $(PAR_OBJ)
+	$(CXX) -o $@ $^ $(LFLAGS)
+
+dist_interface: \
+    ../tests/dist_interface.o  \
+    ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
+    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
+    ../num/fe.o ../num/interfacePatch.o $(PAR_OBJ)
+	$(CXX) -o $@ $^ $(LFLAGS)
+
+dist_ref: \
+    ../tests/dist_ref.o \
+    ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
+    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o ../out/vtkOut.o ../parallel/parmultigrid.o \
+    ../num/fe.o ../num/interfacePatch.o ../levelset/levelset.o ../levelset/fastmarch.o ../levelset/surfacetension.o $(PAR_OBJ)
+	$(CXX) -o $@ $^ $(LFLAGS)
+
+dist_exchange: \
+    ../tests/dist_exchange.o  \
+    ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
+    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
+    ../num/fe.o ../num/interfacePatch.o $(PAR_OBJ)
+	$(CXX) -o $@ $^ $(LFLAGS)
+
+dist_poisson: \
+    ../tests/dist_poisson.o ../geom/boundary.o ../geom/builder.o\
+    ../geom/simplex.o ../geom/multigrid.o ../num/unknowns.o ../geom/topo.o \
+    ../poisson/poisson.o ../misc/problem.o ../misc/utils.o ../out/output.o \
+    ../num/fe.o ../num/discretize.o ../num/interfacePatch.o ../geom/geomselect.o\
+    ../poisson/poissonparams.o ../misc/params.o ../levelset/lsetparams.o \
+    ../out/vtkOut.o ../misc/bndmap.o ../geom/bndScalarFunctions.o\
+    ../geom/bndVelFunctions.o ../poisson/poissonCoeff.o \
+    ../num/hypre.o $(PAR_OBJ)
+	$(CXX) -o $@ $^ $(LFLAGS)
+
+dist_sdropsP2: \
+    ../tests/dist_sdropsP2.o ../geom/boundary.o ../geom/builder.o ../geom/simplex.o ../geom/multigrid.o \
+    ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o \
+    ../misc/utils.o ../num/discretize.o ../num/interfacePatch.o ../num/stokessolver.o \
+    ../num/fe.o ../stokes/integrTime.o \
+    $(PAR_OBJ)
+	$(CXX) -o $@ $^ $(LFLAGS)
+
+dist_twophasedrops: \
+    ../tests/dist_twophasedrops.o ../geom/boundary.o ../geom/builder.o ../geom/simplex.o ../geom/multigrid.o \
+    ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o ../levelset/levelset.o \
+    ../misc/utils.o ../out/output.o ../num/discretize.o ../levelset/lsetparams.o ../navstokes/instatnavstokes2phase.o \
+    ../misc/params.o ../levelset/fastmarch.o ../stokes/instatstokes2phase.o ../num/MGsolver.o\
+    ../num/fe.o  ../stokes/integrTime.o ../out/vtkOut.o \
+    ../num/interfacePatch.o ../levelset/surfacetension.o \
+    ../geom/geomselect.o  ../levelset/twophaseutils.o ../num/hypre.o ../levelset/coupling.o ../geom/bndVelFunctions.o \
+    ../geom/bndScalarFunctions.o ../misc/bndmap.o ../levelset/twophaseCoeff.o \
+    $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 ../tests/directsolver.o:
