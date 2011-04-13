@@ -343,8 +343,12 @@ class ExchangeBlockCL
 
     /// \brief Accumulate a vector
     void Accumulate( VectorCL&) const;
+    /// \brief Accumulate a vector of vectors
+    void Accumulate( std::vector<VectorCL>&) const;
     /// \brief Get an accumulated copy of a vector
     VectorCL GetAccumulate (const VectorCL&) const;
+    /// \brief Get accumulated version of a vector of vectors
+    std::vector<VectorCL> GetAccumulate( const std::vector<VectorCL>&) const;
 
     /// \brief Parallel inner product without final reduction over all processes
     double LocalDot( const VectorCL&, bool, const VectorCL&, bool, VectorCL* x_acc=0, VectorCL* y_acc=0) const;

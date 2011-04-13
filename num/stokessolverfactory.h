@@ -662,6 +662,9 @@ class StokesSolverFactoryCL : public StokesSolverFactoryBaseCL<StokesT, ParamsT,
 
 //GCR solver
     ParPreGCRSolverCL<LBlockGMResBBTOseenPcT> GCRGMResBBT_;
+    
+//GMRes solver
+    ParPreGMResSolverCL<LBlockGMResBBTOseenPcT> GMResGMResBBT_;
 
 #ifdef _HYPRE
      //Algebraic MG solver
@@ -707,7 +710,8 @@ template <class StokesT, class ParamsT, class ProlongationVelT, class Prolongati
                  /*rel*/ true),
       PCGPc_(PCGSolver_),
       LBlockGMResBBTOseenPc_( GMResPc_, bbtispc_),
-      GCRGMResBBT_( C.stk_OuterIter, C.stk_OuterIter, C.stk_OuterTol, LBlockGMResBBTOseenPc_, true, false, &std::cout)
+      GCRGMResBBT_( C.stk_OuterIter, C.stk_OuterIter, C.stk_OuterTol, LBlockGMResBBTOseenPc_, true, false, &std::cout),
+      GMResGMResBBT_( C.stk_OuterIter, C.stk_OuterIter, C.stk_OuterTol, LBlockGMResBBTOseenPc_, true, false, LeftPreconditioning, true, &std::cout)
 #ifdef _HYPRE
       , hypreAMG_( Stokes.vel_idx.GetFinest(), C_.stk_PcAIter, C_.stk_PcATol), AMGPc_(hypreAMG_),
       LBlockAMGBBTOseenPc_( AMGPc_, bbtispc_),
@@ -739,6 +743,10 @@ template <class StokesT, class ParamsT, class ProlongationVelT, class Prolongati
         case 10401 :
             stokessolver = new BlockMatrixSolverCL<ParPreGCRSolverCL<LBlockGMResBBTOseenPcT> >
                         ( GCRGMResBBT_, Stokes_.vel_idx.GetFinest(), Stokes_.pr_idx.GetFinest());
+        break;
+        case 40401 :
+            stokessolver = new BlockMatrixSolverCL<ParPreGMResSolverCL<LBlockGMResBBTOseenPcT> >
+                        ( GMResGMResBBT_, Stokes_.vel_idx.GetFinest(), Stokes_.pr_idx.GetFinest());
         break;
 #ifdef _HYPRE
         case 22001 :

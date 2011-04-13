@@ -950,10 +950,24 @@ void ExchangeBlockCL::Accumulate( VectorCL& v) const
     }
 }
 
+void ExchangeBlockCL::Accumulate( std::vector<VectorCL>& v) const
+{
+    for (size_t i = 0; i< v.size(); ++i)
+        Accumulate(v[i]);
+}
+
 VectorCL ExchangeBlockCL::GetAccumulate (const VectorCL& v) const
 /** For a detailed description, see ExchangeCL::GetAccumulate. */
 {
     VectorCL v_acc(v);
+    Accumulate( v_acc);
+    return v_acc;
+}
+
+std::vector<VectorCL> ExchangeBlockCL::GetAccumulate( const std::vector<VectorCL>& v) const
+/** Get an accumulated copy of the distributed vectors given in \a v. */
+{
+    std::vector<VectorCL> v_acc( v);
     Accumulate( v_acc);
     return v_acc;
 }

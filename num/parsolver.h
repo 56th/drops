@@ -266,7 +266,7 @@ class ParPreGMResSolverCL : public ParPreSolverBaseCL<PC>
   private:
     typedef ParPreSolverBaseCL<PC> base;
     int          restart_;                  // number of iterations before restart
-    bool         useModGS_;                 // which Gramm-Schmidt method should be used to compute Krylov basis
+    bool         useModGS_;                 // which Gram-Schmidt method should be used to compute Krylov basis
     PreMethGMRES method_;                   // left or right preconditioning
     bool         mod_;                      // use modified variant for better scalability
 
@@ -276,15 +276,20 @@ class ParPreGMResSolverCL : public ParPreSolverBaseCL<PC>
     /** Tries to solve a linear equation system within \a maxiter steps with
         accuracy \a tol. After \a restart steps, a restart is performed. The ExCL
         \a ex is used to do parallel inner products. \a pc is
-        the given preconditioner. If \a rel is given, the residual is computed relative and
-        with \a acc the inner products are determined with accure variant (see ExchangeCL).
-        (this configuration needs less memory!). By setting \a ModGS the modified Gramm-Schmidt
+        the given preconditioner. If \a rel is given, the residual is computed relative.
+        (this configuration needs less memory!). By setting \a ModGS the modified Gram-Schmidt
         algorithm is used for the Arnoldi method.*/
     ParPreGMResSolverCL(int restart, int maxiter, double tol, const IdxDescCL& idx, PC &pc,
                         bool rel=true, bool ModGS=false,
                         PreMethGMRES method=LeftPreconditioning, bool mod=true,
                         std::ostream* output=0)
       : base(maxiter, tol, idx, pc, rel, output),
+        restart_(restart), useModGS_(ModGS), method_(method), mod_(mod) {}
+    ParPreGMResSolverCL(int restart, int maxiter, double tol, PC &pc,
+                        bool rel=true, bool ModGS=false,
+                        PreMethGMRES method=LeftPreconditioning, bool mod=true,
+                        std::ostream* output=0)
+      : base(maxiter, tol, pc, rel, output),
         restart_(restart), useModGS_(ModGS), method_(method), mod_(mod) {}
 
     int  GetRestart()           const { return restart_; }  ///< number of iterations before restart
@@ -306,6 +311,25 @@ class ParPreGMResSolverCL : public ParPreSolverBaseCL<PC>
                         useModGS_, method_, base::output_);
         else
             ParGMRES(A, x, b, base::GetEx(),  base::GetPC(), restart_,
+                     base::_iter, base::_res, base::GetRelError(),
+                     method_, base::output_);
+    }
+    /// \brief Solve a linear equation system with a preconditioned Generalized Minimal Residuals-Method
+    template <typename Mat, typename Vec>
+      void Solve(const Mat& A, Vec& x, const Vec& b, const ExchangeBlockCL& ex)
+    /// Solve the linear equation system with coefficient matrix \a A and rhs \a b iterative with
+    /// preconditioned GMRES algorithm, uses \a x as start-vector and result vector.
+    /// \post x has accumulated form
+    {
+        base::_res=  base::_tol;
+        base::_iter= base::_maxiter;
+
+        if (mod_)
+            ParModGMRES(A, x, b, ex, base::GetPC(), restart_,
+                        base::_iter, base::_res, base::GetRelError(),
+                        useModGS_, method_, base::output_);
+        else
+            ParGMRES(A, x, b, ex, base::GetPC(), restart_,
                      base::_iter, base::_res, base::GetRelError(),
                      method_, base::output_);
     }
@@ -574,9 +598,9 @@ bool ParPCG(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX,
 }
 
 
-/// \brief Computes an orthogonal vector on i vectors by the standard Gramm-Schmidt method
+/// \brief Computes an orthogonal vector on i vectors by the standard Gram-Schmidt method
 template <typename Vec, typename ExCL>
-void StandardGrammSchmidt(DMatrixCL<double>& H,
+void StandardGramSchmidt(DMatrixCL<double>& H,
                           Vec& w, bool acc_w, const std::vector<Vec>& v, bool acc_v,
                           int i, const ExCL& ex, Vec& tmpHCol)
 /// This routine uses only one synchronization point.
@@ -598,7 +622,7 @@ void StandardGrammSchmidt(DMatrixCL<double>& H,
             tmpHCol[k] = ex.LocalDot( w, false, v[k], false);
     }
     else        // update of w do only works on same types
-        throw DROPSErrCL("StandardGrammSchmidt: Cannot do Gramm Schmidt on that kind of vectors!");
+        throw DROPSErrCL("StandardGramSchmidt: Cannot do Gramm Schmidt on that kind of vectors!");
 
     // Syncpoint!
     ProcCL::GlobalSum(Addr(tmpHCol), H.GetCol(i), i+1);
@@ -607,9 +631,9 @@ void StandardGrammSchmidt(DMatrixCL<double>& H,
 }
 
 
-/// \brief Computes an orthogonal vector on i vectors by the modified Gramm-Schmidt method
+/// \brief Computes an orthogonal vector on i vectors by the modified Gram-Schmidt method
 template <typename Vec, typename ExCL>
-void ModifiedGrammSchmidt(DMatrixCL<double>& H, Vec& w, bool acc_w, const std::vector<Vec>& v, bool acc_v, int i, const ExCL& ex)
+void ModifiedGramSchmidt(DMatrixCL<double>& H, Vec& w, bool acc_w, const std::vector<Vec>& v, bool acc_v, int i, const ExCL& ex)
 /// \param H     Hessenberg matrix
 /// \param w     orthogonal vector
 /// \param acc_w is w accumulated
@@ -735,7 +759,7 @@ template <typename Mat, typename Vec, typename PreCon, typename ExCL>
                 GMRES_ApplyPlaneRotation( s[i], s[i+1], cs[i], sn[i]);
 
                 resid= std::abs( s[i+1])/normb;
-                if (output)
+                if (output && j%10 == 0)
                     (*output) << "ParGMRES: " << j << " resid " << resid << std::endl;
                 if (resid <= tol) {
                     if (method == RightPreconditioning)
@@ -976,9 +1000,9 @@ template <typename Mat, typename Vec, typename PreCon, typename ExCL>
 
             // Gramm-Schmidt ortogonalization without  update of w!
             if (!useMGS)
-                StandardGrammSchmidt(H, w_acc, true, v_acc, true, i, ExX, tmpHCol);
+                StandardGramSchmidt(H, w_acc, true, v_acc, true, i, ExX, tmpHCol);
             else
-                ModifiedGrammSchmidt(H, w_acc, true, v_acc, true, i, ExX);
+                ModifiedGramSchmidt(H, w_acc, true, v_acc, true, i, ExX);
 
             H(i+1,i) = ExX.Norm(w_acc, true);
             v_acc[i+1] = w_acc * (1.0 / H(i+1,i));
