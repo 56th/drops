@@ -1526,44 +1526,37 @@ ReparamDataCL* ParDirectDistanceCL::actualData_=0;
 
 bool ParDirectDistanceCL::CommunicateFrontierCL::Gather( const DiST::TransferableCL& t, DiST::Helper::SendStreamCL& s)
 {
-    VertexCL* sp = 0;
-    simplex_cast( t, sp);
+    if (!t.Unknowns.Exist() || t.Unknowns.Exist(actualData_->phi.RowIdx->GetIdx()))
+        return false;
 
-    IdxT dof= sp->Unknowns( actualData_->phi.RowIdx->GetIdx());   // where to find phi
+    IdxT dof= t.Unknowns( actualData_->phi.RowIdx->GetIdx());   // where to find phi
+    const Point3DCL tmp = actualData_->perpFoot[dof] ? (*(actualData_->perpFoot[dof])) : Point3DCL(std::numeric_limits<double>::max());
     // fill buffer
-    s << actualData_->phi.Data[dof];
-    for (int i=0; i<3; ++i)
-        s << actualData_->perpFoot[dof] ? (*(actualData_->perpFoot[dof]))[i] : Point3DCL(std::numeric_limits<double>::max())[i];
-    s << (actualData_->typ[dof]==ReparamDataCL::Finished ? ProcCL::MyRank() : -1);
+    s << actualData_->phi.Data[dof] << tmp << (actualData_->typ[dof]==ReparamDataCL::Finished ? ProcCL::MyRank() : -1);
     return true;
 }
 
 bool ParDirectDistanceCL::CommunicateFrontierCL::Scatter( DiST::TransferableCL& t, const size_t numData, DiST::Helper::RecvStreamCL& r)
 {
-    VertexCL* sp= 0;
-    simplex_cast( t, sp);
-
+    if (!t.Unknowns.Exist() || t.Unknowns.Exist(actualData_->phi.RowIdx->GetIdx()))
+        return false;
     TransferST tmp;
-    IdxT dof= sp->Unknowns( actualData_->phi.RowIdx->GetIdx());
+    IdxT dof= t.Unknowns( actualData_->phi.RowIdx->GetIdx());
     
     for (size_t i = 0; i< numData; ++i) {
-        r >> tmp.value;
-        for (int i=0; i<3; ++i)
-            r>> tmp.perp[i];
-        r>> tmp.procID;
+        r >> tmp.value >> tmp.perp >> tmp.procID;
         if ( tmp.procID>=0)
             onProc_[dof].push_front( TransferST(tmp));
     }
-    
     return true;
 }
 
 void ParDirectDistanceCL::CommunicateFrontierCL::Call()
 ///\todo: should be done for all levels, introduce level list for interface constructor?
 {
-    DiST::InterfaceCL::DimListT dimlist; dimlist.push_back( 0);// dimlist.push_back( 1);
+    DiST::InterfaceCL::DimListT dimlist; dimlist.push_back( 0); dimlist.push_back( 1);
     DiST::PrioListT Prios; Prios.push_back(PrioMaster);
-    DiST::LevelListCL Levels( lvl_);
+    DiST::LevelListCL Levels( maxlvl_);
     
     DiST::InterfaceCL comm( Levels, Prios, Prios, dimlist);
     comm.PerformInterfaceComm( *this);
@@ -1574,11 +1567,6 @@ void ParDirectDistanceCL::CommunicateFrontierSetOnProcBnd()
     actualData_=&data_;
     CommunicateFrontierCL comm( data_.mg.GetLastLevel());
     comm.Call();
-//    throw DROPSErrCL("ParDirectDistanceCL::CommunicateFrontierSetOnProcBnd uses DDD\n");
-/*    DynamicDataInterfaceCL::IFExchange(InterfaceCL<VertexCL>::GetIF(), sizeof(TransferST),
-            HandlerFrontierGatherVertexC, HandlerFrontierScatterVertexC );
-    DynamicDataInterfaceCL::IFExchange(InterfaceCL<EdgeCL>::GetIF(), sizeof(TransferST),
-            HandlerFrontierGatherEdgeC, HandlerFrontierScatterEdgeC );*/
     actualData_=0;
 
     for ( MultiFrontT::iterator it=onProc_.begin(); it!=onProc_.end(); ++it){
