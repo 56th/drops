@@ -809,6 +809,33 @@ class World2BaryCoordCL
     BaryCoordCL operator() (const Point3DCL& p) const;
 };
 
+///\brief Compute world-coordinates from a tetra and barycentric coordinates.
+/// This class is similar to GetWorldCoord( tetra, barycoord). It is better suited for many consecutive evaluations. It can be used in std-algorithms.
+class Bary2WorldCoordCL
+{
+  private:
+    SMatrixCL<3,4> mat_;
+
+  public:
+    typedef Point3DCL value_type;
+
+    Bary2WorldCoordCL (const TetraCL& tet) : mat_( Uninitialized) {
+        for (int i= 0; i < 4; ++i)
+            mat_.col( i, tet.GetVertex( i)->GetCoord());
+    }
+    Point3DCL operator() (const BaryCoordCL& b) const { return mat_*b; }
+};
+
+/// \brief Collect the faces of the the children of a refined tetra that refine a given face.
+///
+/// If the tetra is unrefined, the given face is returned.
+/// \todo The mapping (refrule, face) -> (list of (child, face of child)) could be
+///     precomputed and put in a table in geom/topo.{h,cpp}
+/// \param p The parent tetra
+/// \param f Face number in the parent (0..3)
+/// \param childfaces Collects the pointers to the child faces that refine face f of p
+void ComputeChildFacesOfFace (const TetraCL& p, Uint f, std::vector<const FaceCL*>& childfaces);
+
 } // end of namespace DROPS
 
 #include "../geom/simplex.tpp"
