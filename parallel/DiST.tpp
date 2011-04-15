@@ -56,7 +56,7 @@ LevelListCL::LevelListCL( Uint max_level)
 namespace Helper{
 
 template<class T>
-ErrorCL::ErrorCL(const std::string& mesg, T data, const GeomIdCL& gid)
+ErrorCL::ErrorCL(const std::string& mesg, const T& data, const GeomIdCL& gid)
   : DROPSErrCL(mesg), gid_(gid)
 {
     std::ostringstream oss;
@@ -454,14 +454,14 @@ void DiST::TransferCL::ReceiveSimplices( DiST::Helper::RecvStreamCL& recvstream,
 const Helper::RemoteDataCL& InfoCL::GetRemoteData( const Helper::GeomIdCL& h) const
 {
     Helper::RemoteDataListCL::const_iterator it= remoteData_[h.dim].find( h);
-    Assert( it!=remoteData_[h.dim].end(), Helper::ErrorCL("InfoCL::GetRemoteData (const): Simplex not registered: ", h, Helper::NoGID), DebugDiSTC);
+    Assert( it!=remoteData_[h.dim].end(), Helper::ErrorCL( "InfoCL::GetRemoteData (const): Simplex not registered: ", h, Helper::NoGID), DebugDiSTC);
     return it->second;
 }
 
 Helper::RemoteDataCL& InfoCL::GetRemoteData( const Helper::GeomIdCL& h)
 {
     Helper::RemoteDataListCL::iterator it= remoteData_[h.dim].find( h);
-    Assert( it!=remoteData_[h.dim].end(), Helper::ErrorCL("InfoCL::GetRemoteData: Simplex not registered: ", h, Helper::NoGID), DebugDiSTC);
+    Assert( it!=remoteData_[h.dim].end(), Helper::ErrorCL( "InfoCL::GetRemoteData: Simplex not registered: ", h, Helper::NoGID), DebugDiSTC);
     return it->second;
 }
 

@@ -112,7 +112,7 @@ void RemoteDataCL::MakeConsistent()
             end= GetProcListEnd();
     for (; it->proc!=me && it!=end; ++it) {}
     if (it==end)
-        throw DROPSErrCL( "RemoteDataCL::MakeConsistent: found no entry for local object in proc list");
+        throw ErrorCL( "RemoteDataCL::MakeConsistent: found no entry for local object in proc list", GetLocalObject().GetGID());
     // local entry at first position
     std::swap( *GetProcListBegin(), *it);
 }
@@ -122,8 +122,10 @@ void RemoteDataCL::UpdateOwner( const LoadVecT& load)
 {
     double minLoad= std::numeric_limits<double>::max();
     owner_= std::numeric_limits<int>::max();
+    const bool masterExists= GetNumPrio(PrioMaster) > 0;
     for (ProcListT::const_iterator it= GetProcListBegin(), end= GetProcListEnd(); it!=end; ++it) {
-        /// \todo only search among master objects?
+        if (masterExists && it->prio < PrioMaster)
+        	continue;
         const int proc= it->proc;
         if (load[proc] < minLoad) {
             minLoad= load[proc];
@@ -140,6 +142,15 @@ Priority RemoteDataCL::GetPrio(int rank) const
             return it->prio;
 
     return NoPrio;
+}
+
+Uint RemoteDataCL::GetNumPrio(Priority prio) const
+{
+    Uint num= 0;
+	for (ProcListT::const_iterator it= GetProcListBegin(), end= GetProcListEnd(); it!=end; ++it)
+        if (it->prio >= prio)
+            ++num;
+    return num;
 }
 
 void RemoteDataCL::Identify( const TransferableCL& parent, const PrioListCL& prios)

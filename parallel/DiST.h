@@ -169,7 +169,7 @@ class ErrorCL: public DROPSErrCL
       : DROPSErrCL(mesg), gid_(gid) {}
     /// print one piece of data
     template<class T>
-    ErrorCL(const std::string& mesg, T data, const GeomIdCL& gid= NoGID);
+    ErrorCL(const std::string& mesg, const T& data, const GeomIdCL& gid= NoGID);
 
     std::ostream& what  (std::ostream&) const;
     void handle() const;
@@ -352,6 +352,7 @@ class RemoteDataCL
            bool     AmIOwner()     const { return owner_==ProcCL::MyRank(); }   ///< Ask if the calling process is the owner
     inline Priority GetLocalPrio() const;                                       ///< Get the priority of the local stored entity
            Priority GetPrio(int rank) const;                                    ///< Get the priority of process with given \a rank. Returns NoPrio, if simplex is not stored on \a rank.
+           Uint     GetNumPrio(Priority prio) const;                            ///< Get the number of processes with priority >= \a prio
            bool     IsLocal()      const { return GetNumProcs()==1; }           ///< Check if the simplex is only stored on this process
     inline bool     IsOnProcBnd()  const;                                       ///< Check if the simplex is located on a process boundary
 
