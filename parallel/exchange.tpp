@@ -155,14 +155,13 @@ inline IdxT ExchangeCL::GetExternalIdxFromProc( const IdxT localdof, int proc) c
 }
 
 inline int ExchangeBuilderCL::HandlerDOFExchangeCL::getSendPos( const int dof, const int p) const
-/** If the element \a dof is not found in \vec, NoInt_ is returned. */
+/** If the element \a dof is not found in \vec, NoInt_ is returned.*/
 {
     std::vector<int>::const_iterator it, 
         begin=sendList_.find(p)->second.begin(), 
         end=sendList_.find(p)->second.end();
     it= std::lower_bound( begin, end, dof);
     if ( it==end){
-        printf("WARNING: Proc %d does not find dof %d to be send", ProcCL::MyRank(), dof);
         return NoInt_;
     }
     return static_cast<IdxT>( std::distance(begin, it));
