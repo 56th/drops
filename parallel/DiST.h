@@ -353,6 +353,7 @@ class RemoteDataCL
     inline Priority GetLocalPrio() const;                                       ///< Get the priority of the local stored entity
            Priority GetPrio(int rank) const;                                    ///< Get the priority of process with given \a rank. Returns NoPrio, if simplex is not stored on \a rank.
            bool     IsLocal()      const { return GetNumProcs()==1; }           ///< Check if the simplex is only stored on this process
+    inline bool     IsDistributed( Priority prio=NoPrio) const;                 ///< Check if a simplex is distributed and at least one remote object has a priority>=prio
     inline bool     IsOnProcBnd()  const;                                       ///< Check if the simplex is located on a process boundary
 
     /// \brief Debugging
@@ -629,6 +630,8 @@ class TransferableCL
     bool                    MayStoreUnk() const { return GetPrio()==PrioMaster; }            ///< Check for ability of storing unknowns due to priority \todo Is PrioMaster correct?
     bool                    IsLocal()     const { return GetNumDist()==1; }                  ///< Check if the simplex is local
     Uint                    GetNumDist () const { return GetRemoteData().GetNumProcs(); }    ///< Get number of procs on which the simplex is stored
+    bool                    IsDistributed( Priority prio=NoPrio) const                       ///< Check a copy with priority >= prio exists on another process
+        { return GetRemoteData().IsDistributed(prio); }
     int                     GetOwner()    const { return GetRemoteData().GetOwnerProc(); }   ///< Get the process rank of the owning process
     bool                    AmIOwner()    const { return GetRemoteData().AmIOwner(); }       ///< Check if I am the owner
     virtual bool            IsOnProcBnd() const { return GetRemoteData().IsOnProcBnd(); }    ///< Check if the simplex is located at a process boundary (overloaded by tetras)

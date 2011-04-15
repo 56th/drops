@@ -105,6 +105,16 @@ bool RemoteDataCL::IsOnProcBnd() const
     return (counter>=2);
 }
 
+bool RemoteDataCL::IsDistributed( Priority prio) const
+{
+    ProcList_const_iterator it=GetProcListBegin()+1;
+    for ( ; it!=GetProcListEnd(); ++it){
+        if ( it->prio>=prio)
+            return true;
+    }
+    return false;
+}
+
 // R E M O T E  D A T A  L I S T  C L A S S
 // ----------------------------------------
 
