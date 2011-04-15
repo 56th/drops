@@ -1246,6 +1246,13 @@ void ExchangeBuilderCL::HandlerDOFExchangeCL::buildRecvStructures(
     for ( mit=recvList_.begin(); mit!=recvList_.end(); ++mit){
         const int fromproc= mit->first;
         if ( fromproc!=ProcCL::MyRank()){
+            std::cout << "In ... buildRecvStructures, first 10 positions are\n";
+            int j=0;
+            for (RecvDofT::mapped_type::const_iterator it=mit->second.begin(); j!=10; ++it, ++j){
+                std::cout << it->first << ' ';
+            }
+            std::cout << std::endl;
+
             ex_recvlist.push_back( RecvNumDataCL<double>(fromproc));
             std::vector<IdxT>& sysnums= ex_recvlist.back().sysnums_;
             sysnums.reserve( numUnk*mit->second.size());
@@ -1274,8 +1281,8 @@ void ExchangeBuilderCL::HandlerDOFtoOwnerCL::collectDOFonSimplex( const DiST::Tr
 */
 {
     const Uint idx= rowidx_.GetIdx();
-    // Only collect data on distributed simplices
-    if ( s.IsLocal())
+    // Only collect data on simplices, where the dof are distributed among processes
+    if ( !s.IsDistributed( PrioMaster))
         return;
     // Only collect data on simplices, where a dof is given
     if ( s.Unknowns.Exist() && s.Unknowns.Exist(idx)){
@@ -1304,8 +1311,9 @@ bool ExchangeBuilderCL::HandlerDOFtoOwnerCL::Gather( DiST::TransferableCL& t,
 */
 {
     const Uint idx= rowidx_.GetIdx();
-    if ( t.Unknowns.Exist() && t.Unknowns.Exist( idx)){
+    if ( t.Unknowns.Exist() && t.Unknowns.Exist( idx) && t.IsDistributed(PrioMaster)){
         send << ProcCL::MyRank();
+
         const IdxT dof= t.Unknowns(idx);
         const Uint numUnk= rowidx_.NumUnknownsSimplex( t);
         const int firstPos= getSendPos( static_cast<int>(dof), t.GetOwner())*numUnk;
@@ -1352,6 +1360,7 @@ bool ExchangeBuilderCL::HandlerDOFtoOwnerCL::Scatter( DiST::TransferableCL& t,
         recv >> sender;
         // receive non-extended dof
         recv >> sendpos;
+
         recvList_[sender][sendpos]= dof;
         // receive extended dof
         recv >> sendpos;
@@ -1361,6 +1370,7 @@ bool ExchangeBuilderCL::HandlerDOFtoOwnerCL::Scatter( DiST::TransferableCL& t,
                 DebugParallelNumC);
             recvList_[sender][sendpos]= exdof;
         }
+
     }
     return true;
 }
@@ -1376,8 +1386,8 @@ void ExchangeBuilderCL::HandlerDOFFromOwnerCL::collectDOFonSimplex( const DiST::
 */
 {
     const Uint idx= rowidx_.GetIdx();
-    // Only collect data on distributed simplices and on simplices, I am owner of
-    if ( s.IsLocal() || !s.AmIOwner())
+    // Only collect data on simplices where DOF are distributed and I am owner of
+    if ( !s.IsDistributed(PrioMaster) || !s.AmIOwner())
         return;
     // Only collect data on simplices, where a dof is given
     if ( s.Unknowns.Exist() && s.Unknowns.Exist(idx)){
@@ -1411,7 +1421,7 @@ bool ExchangeBuilderCL::HandlerDOFFromOwnerCL::Gather( DiST::TransferableCL& t,
         DebugParallelNumC);
 
     const Uint idx= rowidx_.GetIdx();
-    if ( t.Unknowns.Exist() && t.Unknowns.Exist( idx)){
+    if ( t.Unknowns.Exist() && t.Unknowns.Exist( idx) && t.IsDistributed( PrioMaster)){
         // local information
         const IdxT dof= t.Unknowns(idx);
         const bool isExtended= (rowidx_.IsExtended() && rowidx_.GetXidx()[dof]!=NoIdx);
@@ -1510,7 +1520,7 @@ void ExchangeBuilderCL::HandlerDOFDirectCommCL::collectDOFonSimplex( const DiST:
 {
     const Uint idx= rowidx_.GetIdx();
     // Only collect data on distributed simplices
-    if ( s.IsLocal())
+    if ( !s.IsDistributed( PrioMaster))
         return;
     // Only collect data on simplices, where a dof is given
     if ( s.Unknowns.Exist() && s.Unknowns.Exist(idx)){
