@@ -1246,13 +1246,6 @@ void ExchangeBuilderCL::HandlerDOFExchangeCL::buildRecvStructures(
     for ( mit=recvList_.begin(); mit!=recvList_.end(); ++mit){
         const int fromproc= mit->first;
         if ( fromproc!=ProcCL::MyRank()){
-            std::cout << "In ... buildRecvStructures, first 10 positions are\n";
-            int j=0;
-            for (RecvDofT::mapped_type::const_iterator it=mit->second.begin(); j!=10; ++it, ++j){
-                std::cout << it->first << ' ';
-            }
-            std::cout << std::endl;
-
             ex_recvlist.push_back( RecvNumDataCL<double>(fromproc));
             std::vector<IdxT>& sysnums= ex_recvlist.back().sysnums_;
             sysnums.reserve( numUnk*mit->second.size());

@@ -91,6 +91,14 @@ Priority RemoteDataCL::GetLocalPrio() const
     return procList_.front().prio;
 }
 
+bool RemoteDataCL::PrioExists(Priority prio) const
+{
+	for (ProcListT::const_iterator it= GetProcListBegin(), end= GetProcListEnd(); it!=end; ++it)
+        if (it->prio >= prio)
+            return true;
+    return false;
+}
+
 /** Checks, if the simplex is not stored only local and at least two non VGhost copies exist. */
 bool RemoteDataCL::IsOnProcBnd() const
 {
@@ -98,19 +106,20 @@ bool RemoteDataCL::IsOnProcBnd() const
         return false;
     size_t counter=0;
     for ( ProcList_const_iterator it(GetProcListBegin()); it!=GetProcListEnd(); ++it){
-        if ( it->prio > PrioVGhost){
-            ++counter;
-        }
+        if ( it->prio > PrioVGhost)
+            if (++counter >= 2)
+            	return true;
     }
-    return (counter>=2);
+    return false;
 }
 
 bool RemoteDataCL::IsDistributed( Priority prio) const
 {
-    ProcList_const_iterator it=GetProcListBegin()+1;
-    for ( ; it!=GetProcListEnd(); ++it){
+    Uint num= 0;
+    for (ProcList_const_iterator it=GetProcListBegin(); it!=GetProcListEnd(); ++it){
         if ( it->prio>=prio)
-            return true;
+        	if (++num >= 2)
+        		return true;
     }
     return false;
 }

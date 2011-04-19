@@ -352,9 +352,9 @@ class RemoteDataCL
            bool     AmIOwner()     const { return owner_==ProcCL::MyRank(); }   ///< Ask if the calling process is the owner
     inline Priority GetLocalPrio() const;                                       ///< Get the priority of the local stored entity
            Priority GetPrio(int rank) const;                                    ///< Get the priority of process with given \a rank. Returns NoPrio, if simplex is not stored on \a rank.
-           Uint     GetNumPrio(Priority prio) const;                            ///< Get the number of processes with priority >= \a prio
+    inline bool     PrioExists(Priority prio) const;                            ///< Check that there exists a remote object with priority >= \a prio
            bool     IsLocal()      const { return GetNumProcs()==1; }           ///< Check if the simplex is only stored on this process
-    inline bool     IsDistributed( Priority prio=NoPrio) const;                 ///< Check if a simplex is distributed and at least one remote object has a priority>=prio
+    inline bool     IsDistributed( Priority prio=NoPrio) const;                 ///< Check if a simplex is distributed and at least two remote objects have a priority>=prio
     inline bool     IsOnProcBnd()  const;                                       ///< Check if the simplex is located on a process boundary
 
     /// \brief Debugging
