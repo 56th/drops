@@ -263,7 +263,7 @@ class ExchangeCL
         { return neighs_.size(); }
     NeighListT_const_iterator GetNeighBegin() const                     ///< Get iterator to the first neighbor process
         { return neighs_.begin(); }
-    NeighListT_const_iterator GetNeighEnd() const                       ///< Get iterator behin the last neighbor process
+    NeighListT_const_iterator GetNeighEnd() const                       ///< Get iterator behind the last neighbor process
         { return neighs_.end(); }
     //@}
 

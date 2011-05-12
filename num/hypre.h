@@ -69,11 +69,11 @@ class HypreIndexCL
     inline int  GetLower() const { return idx_beg_[ProcCL::MyRank()]; }
     /// \brief Get last index of this process
     inline int  GetUpper() const { return idx_beg_[ProcCL::MyRank()+1]-1; }
-    /// \brief Get number of indices this process is resposnsible for
+    /// \brief Get number of indices this process is responsible for
     int  GetNumExclusive() const { return (int) num_exclusive_; }
     /// \brief Check if a local index is exclusive
     inline bool IsLocExclusive( int loc_i) const { return idx_.GetEx().IsExclusive( (size_t)loc_i); }
-    /// \brief Check if a global index is exclusibe
+    /// \brief Check if a global index is exclusive
     bool IsGlobExclusive( int glob_i) const { return glob_i>=GetLower() && glob_i<=GetUpper(); }
     /// \brief Get exclusive process of a local index
     inline int  GetLocExclusiveProc( int loc_i) const { return idx_.GetEx().GetExclusiveProc( (size_t)(loc_i)); }
@@ -94,8 +94,8 @@ class HypreMatrixCL
 {
   private:
     const MatrixCL      M_;             ///< DROPS matrix
-    HypreIndexCL        colidx_;        ///< HYPRE index to respresent the column
-    HypreIndexCL        rowidx_;        ///< HYPRE index to respresent the row
+    HypreIndexCL        colidx_;        ///< HYPRE index to represent the column
+    HypreIndexCL        rowidx_;        ///< HYPRE index to represent the row
     HYPRE_IJMatrix      ijMat_;         ///< HYPRE matrix
     HYPRE_ParCSRMatrix  parMat_;        ///< HYPRE parallel crs matrix
     std::vector<int>    cols_,          ///< column indices of all non-zeros (the row indices are given by rowidx_)
@@ -151,7 +151,7 @@ class HypreMatrixCL
     //@}
 };
 
-/// \brief Respresent a vector in HYPRE format
+/// \brief Represent a vector in HYPRE format
 class HypreVectorCL
 {
   private:
