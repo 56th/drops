@@ -148,7 +148,7 @@ RemoteDataListIteratorCL RemoteDataListCL::endLvlPrioIt ()
     invoke any communication.*/
 void RemoteDataListCL::Register( TransferableCL& t, Priority prio)
 {
-    Assert( this->find(t.GetGID())==this->end(), DROPSErrCL("RemoteDataListCL::Register: Simplex already known"), DebugDiSTC);
+    Assert( this->find(t.GetGID())==this->end(), ErrorCL("RemoteDataListCL::Register: Simplex already known: ", t.GetGID()), DebugDiSTC);
     (*this)[t.GetGID()]= RemoteDataCL( &t, prio);
 }
 
@@ -156,7 +156,7 @@ void RemoteDataListCL::Register( TransferableCL& t, Priority prio)
     invoke any communication.*/
 void RemoteDataListCL::Register( TransferableCL& t, const RemoteDataCL::ProcListT& pl)
 {
-    Assert( this->find(t.GetGID())==this->end(), DROPSErrCL("RemoteDataListCL::Register: Simplex already known"), DebugDiSTC);
+    Assert( this->find(t.GetGID())==this->end(), ErrorCL("RemoteDataListCL::Register: Simplex already known", t.GetGID()), DebugDiSTC);
     (*this)[t.GetGID()]= RemoteDataCL( &t, pl);
 }
 
@@ -164,7 +164,7 @@ void RemoteDataListCL::Register( TransferableCL& t, const RemoteDataCL::ProcList
     invoke any communication.*/
 void RemoteDataListCL::Unregister( TransferableCL& t)
 {
-    Assert( this->find(t.GetGID())!=this->end(), DROPSErrCL("RemoteDataListCL::Unregister: Simplex unknown"), DebugDiSTC);
+    Assert( this->find(t.GetGID())!=this->end(), ErrorCL("RemoteDataListCL::Unregister: Simplex unknown", t.GetGID()), DebugDiSTC);
     this->erase(t.GetGID());
 }
 
@@ -447,6 +447,10 @@ bool InterfaceCL::ExecuteLocal( ExecuteHandlerT& handler, const IteratorT& begin
 // T R A N S F E R  C L A S S
 //---------------------------
 
+// template specialization for tetras
+template <>
+void DiST::TransferCL::ReceiveSimplices<TetraCL>( DiST::Helper::RecvStreamCL& recvstream, size_t num);
+
 /** Receive \a num simplices of type SimplexT from the \a recvstream and update the
     corresponding remote data list
 */
@@ -465,7 +469,6 @@ void DiST::TransferCL::ReceiveSimplices( DiST::Helper::RecvStreamCL& recvstream,
         CreateSimplex<SimplexT>( stmp, procList); // creates simplex and remote data list entry
     }
 }
-
 
 // I N F O  C L A S S
 // ------------------

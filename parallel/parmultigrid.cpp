@@ -1793,10 +1793,6 @@ void ParMultiGridCL::FXfer(FaceCL &f, PROCT dest, PrioT prio, bool del)
 void ParMultiGridCL::Transfer(TetraCL &t, int dest, Priority prio, bool del)
 {
     transfer_->MarkForTransfer( t, dest, prio, del);
-    if (del)  // not Ma->Gh-Copy
-    {
-        t.UnlinkFromFaces();
-    }
     if (t.IsRegularlyRef() && t.IsMaster() && prio==PrioMaster)
         t.UnCommitRegRefMark();
 }
