@@ -88,7 +88,7 @@ void ISBBTPreCL::Update() const
 #endif
 }
 
-#ifndef _PAR
+
 void MinCommPreCL::Update() const
 {
     std::cout << "MinCommPreCL::Update: old/new versions: " << Aversion_  << '/' << A_->Version()
@@ -101,23 +101,39 @@ void MinCommPreCL::Update() const
     Mversion_= M_->Version();
     Mvelversion_= Mvel_->Version();
 
+#ifndef _PAR
     Assert( Mvel_->GetDiag().min() > 0., "MinCommPreCL::Update: Mvel_->GetDiag().min() <= 0\n", DebugNumericC);
     VectorCL Dvelsqrt( std::sqrt( Mvel_->GetDiag()));
+#else
+    BBT_.SetBlock0( Bs_);
+    BBT_.SetBlock1( Bs_);
+    if (solver_.GetPC().NeedDiag())
+        solver_.GetPC().SetDiag(BBT_);
+    Assert( vel_idx_->GetEx().GetAccumulate(Mvel_->GetDiag()).min() > 0., "MinCommPreCL::Update: Mvel_->GetDiag().min() <= 0\n", DebugNumericC);
+    VectorCL Dvelsqrt( sqrt(vel_idx_->GetEx().GetAccumulate(Mvel_->GetDiag())));
+#endif
     Dvelsqrtinv_.resize( Mvel_->num_rows());
     Dvelsqrtinv_= 1.0/Dvelsqrt;
     ScaleCols( *Bs_, Dvelsqrtinv_);
 
+#ifndef _PAR
     Assert( M_->GetDiag().min() > 0., "MinCommPreCL::Update: M_->GetDiag().min() <= 0\n", DebugNumericC);
     VectorCL Dprsqrt( std::sqrt( M_->GetDiag()));
+#else
+    Assert( pr_idx_->GetEx().GetAccumulate( M_->GetDiag()).min() > 0., "MinCommPreCL::Update: M_->GetDiag().min() <= 0\n", DebugNumericC);
+    VectorCL Dprsqrt( std::sqrt( pr_idx_->GetEx().GetAccumulate( M_->GetDiag())));
+#endif
     Dprsqrtinv_.resize( M_->num_rows());
     Dprsqrtinv_= 1.0/Dprsqrt;
     ScaleRows( *Bs_, Dprsqrtinv_);
 
+#ifndef _PAR
     if (regularize_ != 0.)
         Regularize( *Bs_, *pr_idx_, Dprsqrt, spc_, regularize_);
+#endif
 }
 
-
+#ifndef _PAR
 void BDinvBTPreCL::Update() const
 {
     std::cout << "BDinvBTPreCL::Update: old/new versions: " << Lversion_  << '/' << L_->Version()
