@@ -172,9 +172,10 @@ void EdgeCL::UnPack( DiST::Helper::RecvStreamCL& istrstream)
     istrstream >>  Bnd_[0] >>  Bnd_[1] >> AccMFR_ >> RemoveMark_;
     Vertices_[0]= DiST::InfoCL::Instance().GetVertex(vertex0);
     Vertices_[1]= DiST::InfoCL::Instance().GetVertex(vertex1);
-    if ( midVertex!=DiST::Helper::NoGID){
+    if ( midVertex!=DiST::Helper::NoGID && DiST::InfoCL::Instance().Exists(midVertex)) {
         MidVertex_= DiST::InfoCL::Instance().GetVertex(midVertex);
-    }
+    } // else if (midVertex!=DiST::Helper::NoGID) std::cerr << ">> [" << ProcCL::MyRank() << "] EdgeCL::Unpack: missing midvertex " << midVertex << std::endl;
+
 }
 
 #endif
@@ -192,16 +193,26 @@ void FaceCL::LinkTetra(const TetraCL* tp)
 
     if (tp->GetLevel()==GetLevel()) // tetra on same level
     {
-        if (Neighbors_[0] && Neighbors_[0]!=tp) // in sequential version:  if Neighbors_[0]!=0 then  Neighbors_[0]!=tp is always true
-            offset=1;
+        if (Neighbors_[2]==0 && Neighbors_[3]==0) {
+            if (Neighbors_[0] && Neighbors_[0]!=tp) // in sequential version:  if Neighbors_[0]!=0 then  Neighbors_[0]!=tp is always true
+                offset=1;
+        } else { // during transfer, the children are unpacked before their parents. Hence, we have to find the position where one of the children is stored on the next level.
+            if (!is_in( tp->GetChildBegin(), tp->GetChildEnd(), Neighbors_[2]))
+            	if (Neighbors_[3]==0 || is_in( tp->GetChildBegin(), tp->GetChildEnd(), Neighbors_[3]))
+            		offset=1;
+        }
     }
     else                            // green child of parent
     {
         Assert(tp->GetLevel() == GetLevel()+1, DROPSErrCL("FaceCL::LinkTetra: Illegal level of green tetra"), DebugRefineEasyC);
+        if (tp->GetParent()) {
         // tetra is stored on the same side as the parent
-        offset= Neighbors_[0]==tp->GetParent() ? 2 : 3;
+            offset= Neighbors_[0]==tp->GetParent() ? 2 : 3;
+        } else { // during transfer, the children are unpacked before their parents. Hence, we need another strategy here.
+            offset= (Neighbors_[2] && Neighbors_[2]!=tp) ? 3 : 2;
+        }
     }
-    Assert(!Neighbors_[offset] || Neighbors_[offset]==tp, DROPSErrCL("FaceCL::LinkTetra: Link occupied by another tetra!"), DebugRefineEasyC);
+    Assert(!Neighbors_[offset] || Neighbors_[offset]==tp, DiST::Helper::ErrorCL("FaceCL::LinkTetra: Link occupied by another tetra ", Neighbors_[offset] ? Neighbors_[offset]->GetGID() : DiST::Helper::NoGID, GetGID()), DebugRefineEasyC);
     Neighbors_[offset]= tp;
 }
 
@@ -573,6 +584,7 @@ It recycles and rescues simplices, that will be reused:
                           newRule.Children, newRule.Children + newRule.ChildNum,
                           std::back_inserter(commonChildren) );
 
+    Assert(Children_, DiST::Helper::ErrorCL( "TetraCL::RecycleReusables: no children array", this->GetGID()), DebugDiSTC);
     for (Uint ch=0; ch<myRule.ChildNum; ++ch)
     {
         const ChildDataCL childdat= GetChildData(myRule.Children[ch]);
@@ -927,20 +939,64 @@ void TetraCL::UnPack( DiST::Helper::RecvStreamCL& istrstream)
         Faces_[i]= DiST::InfoCL::Instance().GetFace(tmp);
     }
     istrstream >> tmp;
-//    Parent_= tmp==DiST::Helper::NoGID ? 0 : DiST::InfoCL::Instance().GetTetra(tmp);
-    Parent_= 0; // will be set by parent itself in TransferCL::CreateSimplex<TetraCL>(...)
+    if (DiST::InfoCL::Instance().Exists(tmp))
+        Parent_= DiST::InfoCL::Instance().GetTetra(tmp);
+    else
+        Parent_= 0; // will be set by parent itself in DiST::TransferCL::CreateSimplex<TetraCL>(...)
     Uint numChildren, ch= 0;
     istrstream >> numChildren;
     if (numChildren>0) {
         if ( !Children_ ) Children_= new SArrayCL<TetraCL*, MaxChildrenC>;
+        bool delChildren= false;
         for (; ch<numChildren; ++ch) {
             istrstream >> tmp;
-            TetraCL* child= tmp==DiST::Helper::NoGID ? 0 : DiST::InfoCL::Instance().GetTetra(tmp);
-            (*Children_)[ch]= child;
+            if (DiST::InfoCL::Instance().Exists(tmp))
+                (*Children_)[ch]= DiST::InfoCL::Instance().GetTetra(tmp);
+            else // children not on processor: delete Children_ array
+                delChildren= true;
         }
-        for (; ch < MaxChildrenC; ++ch)
-            (*Children_)[ch]= 0;
+        if (delChildren)
+        	DeleteChildren();
+        else {
+			for (; ch < MaxChildrenC; ++ch)
+				(*Children_)[ch]= 0;
+        }
     }
+}
+
+/**
+ * - For former HasGhost, set children array and midvertex pointers properly.
+ * - For former Ghost, set parent pointer properly.
+ */
+void TetraCL::Merge( const TetraCL& t)
+{
+	if (!Children_) { // former HasGhost: set children array and midvertex pointers on edges properly
+//		std::cerr << "Merging former HasGhost: children = ";
+		Children_= new SArrayCL<TetraCL*, MaxChildrenC>;
+		const RefRuleCL refrule= GetRefData();
+		for (Uint ch=0; ch<MaxChildrenC; ++ch) {
+			TetraCL* chp= (*Children_)[ch]= (*t.Children_)[ch];
+			if (chp) { // try to link some child verts as midvertex of my edges
+//				std::cerr << chp->GetGID() << " {";
+				const ChildDataCL childdat= GetChildData(refrule.Children[ch]);
+				for (Uint v=0; v<NumVertsC; ++v) {
+					const Ubyte vert= childdat.Vertices[v];
+					if (IsMidVert(vert)) {
+						VertexCL* midvertp= chp->Vertices_[v];
+						Edges_[EdgeOfMidVert(vert)]->SetMidVertex( midvertp);
+//						std::cerr << GetEdge(EdgeOfMidVert(vert))->GetGID() << ',';
+						Assert( GetBaryCenter(*GetEdge(EdgeOfMidVert(vert))) == midvertp->GetCoord(), DiST::Helper::ErrorCL("TetraCL::Merge: merged wrong midvertex = ", midvertp->GetGID(), Edges_[EdgeOfMidVert(vert)]->GetGID()), DebugDiSTC);
+					}
+				}
+//				std::cerr << "}\n";
+			}
+		}
+//		std::cerr << std::endl;
+	} else if (!Parent_) { // former ghost: set parent pointer properly
+//		std::cerr << "Merging former Ghost: parent = ";
+		Parent_= t.Parent_;
+//		if (Parent_) std::cerr << Parent_->GetGID() << std::endl;
+	}
 }
 
 #endif

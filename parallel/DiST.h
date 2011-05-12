@@ -298,6 +298,7 @@ class RemoteDataCL
         ProcListEntryCL( const std::pair<int,Priority>& p) : proc(p.first), prio(p.second) {}
 
         bool operator== (const ProcListEntryCL& p) const { return p.proc==proc && p.prio==prio; }
+        bool operator== (int rank) const { return rank==proc; }
     };
 
     typedef std::vector< ProcListEntryCL> ProcListT;                ///< list containing couplings of process ranks and priorities
@@ -559,7 +560,6 @@ class SimplexTransferInfoCL
   public:
     SimplexTransferInfoCL( RemoteDataCL& rd, bool updateSubs)
         : rd_(rd), RemoveMark_(false), UpdateSubs_(updateSubs), proc_bc_(rd.GetOwnerProc()) {}
-
     SimplexTransferInfoCL( const SimplexTransferInfoCL& sti)
         : rd_(sti.rd_), postProcs_(sti.postProcs_), procsToSend_(sti.procsToSend_), RemoveMark_(sti.RemoveMark_), UpdateSubs_(sti.UpdateSubs_), proc_bc_(sti.proc_bc_) {}
 
@@ -575,7 +575,7 @@ class SimplexTransferInfoCL
     /// return set of procs/prios where simplex has to be sent to
     const ProcSetT& GetSendToProcs() const { return procsToSend_; }
     /// compute set of procs/prios where simplex has to be sent to (call after post proc list is complete)
-    void ComputeSendToProcs();
+    void ComputeSendToProcs( bool tetra);
     /// mark simplex for deletion
     void SetRemoveMark()       { RemoveMark_= true; }
     /// return whether simplex will be removed

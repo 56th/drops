@@ -31,6 +31,21 @@
 
 namespace DROPS{
 namespace DiST{
+
+std::ostream& operator<< ( std::ostream& os, const Helper::SimplexTransferInfoCL::ProcSetT& pl)
+// for debugging
+{
+	Helper::SimplexTransferInfoCL::ProcSetT::const_iterator it( pl.begin());
+    if (it!=pl.end()) {
+    	os << '(' << it->first << ',' << PriorityToString( it->second) << ')';
+    	++it;
+    }
+    for (; it!=pl.end(); ++it) {
+        os << ", (" << it->first << ',' << PriorityToString( it->second) << ')';
+    }
+    return os;
+}
+
 namespace Helper{
 
 // E R R O R   C L A S S
@@ -104,6 +119,20 @@ RecvStreamCL& operator>> ( RecvStreamCL& is, Point3DCL& h)
 // R E M O T E  D A T A  C L
 //--------------------------
 
+std::ostream& operator<< ( std::ostream& os, const RemoteDataCL::ProcListT& pl)
+// for debugging
+{
+	RemoteDataCL::ProcList_const_iterator it( pl.begin());
+    if (it!=pl.end()) {
+    	os << '(' << it->proc << ',' << PriorityToString( it->prio) << ')';
+    	++it;
+    }
+    for (; it!=pl.end(); ++it) {
+        os << ", (" << it->proc << ',' << PriorityToString( it->prio) << ')';
+    }
+    return os;
+}
+
 void RemoteDataCL::MakeConsistent()
 {
     const int me= ProcCL::MyRank();
@@ -111,8 +140,11 @@ void RemoteDataCL::MakeConsistent()
     ProcListT::iterator it= GetProcListBegin(),
             end= GetProcListEnd();
     for (; it->proc!=me && it!=end; ++it) {}
-    if (it==end)
+    if (it==end) {
+    	std::cerr << "RemoteDataCL::MakeConsistent: found no entry for local object in proc list, my rank = " << me << std::endl;
+    	this->DebugInfo(std::cerr);
         throw ErrorCL( "RemoteDataCL::MakeConsistent: found no entry for local object in proc list", GetLocalObject().GetGID());
+    }
     // local entry at first position
     std::swap( *GetProcListBegin(), *it);
 }
@@ -163,14 +195,7 @@ void RemoteDataCL::Identify( const TransferableCL& parent, const PrioListCL& pri
 void RemoteDataCL::DebugInfo( std::ostream& os) const
 {
     os << "Simplex " << localObj_->GetGID() << '\n'
-       << " o stored on ";
-    ProcList_const_iterator it(GetProcListBegin());
-    os << '(' << it->proc << ',' << PriorityToString( it->prio) << ')';
-    ++it;
-    for (; it!=GetProcListEnd(); ++it){
-        os << ", (" << it->proc << ',' << PriorityToString( it->prio) << ')';
-    }
-    os << std::endl;
+       << " o stored on " << procList_ << std::endl;
 }
 
 bool RemoteDataCL::IsSane( std::ostream& os) const
@@ -322,12 +347,15 @@ void SimplexTransferInfoCL::AddProcSet( const ProcSetT& procs)
     }
 }
 
-void SimplexTransferInfoCL::ComputeSendToProcs()
+void SimplexTransferInfoCL::ComputeSendToProcs( bool tetra)
+/// For tetrahedra (\a tetra == true) we have to treat the special case that the object should be sent also to processes which already have a remote copy.
 {
-    // procsToSend_ = postProcs_ - remote data proc list
     procsToSend_= postProcs_;
-    for (RemoteDataCL::ProcListT::const_iterator it= rd_.GetProcListBegin(), end= rd_.GetProcListEnd(); it!=end; ++it)
-        procsToSend_.erase( it->proc);
+    if (tetra)
+    	procsToSend_.erase( ProcCL::MyRank());
+    else // for all sub-simplices (non-tetra): procsToSend_ = postProcs_ - remote data proc list
+    	for (RemoteDataCL::ProcListT::const_iterator it= rd_.GetProcListBegin(), end= rd_.GetProcListEnd(); it!=end; ++it)
+    		procsToSend_.erase( it->proc);
 }
 
 }   // end of namespace Helper
@@ -800,7 +828,7 @@ bool ModifyCL::AssignPostProcs()
                 foundDel= true;
                 info.SetRemoveMark();
             }
-            info.ComputeSendToProcs();
+            info.ComputeSendToProcs( dim==3); // tetras have to be treated in a special way
         }
     return foundDel;
 }
@@ -934,7 +962,8 @@ void TransferCL::UpdateSendRemoteData( const TransferableCL& t, Helper::SimplexT
     Helper::RemoteDataCL::ProcListT proclist( sti.GetPostProcs().begin(), sti.GetPostProcs().end());
     if (!sti.WillBeRemoved())
         rd.SetProcList( proclist);
-    if (sti.GetBroadcaster()==ProcCL::MyRank()) { // write simplex and remote data to all procs in SendToProcs
+    if (sti.GetBroadcaster()==ProcCL::MyRank() || t.GetDim()==GetDim<TetraCL>()) {
+    	// write simplex and remote data to all procs in SendToProcs
         for (ProcSetT::const_iterator sit= sti.GetSendToProcs().begin(), send= sti.GetSendToProcs().end(); sit!=send; ++sit) {
             (*sendBuffer_[sit->first]) << t << proclist;
         }
@@ -952,7 +981,7 @@ void TransferCL::FillSendBuffer()
     // first count number of messages to be sent
     for (int dim=0; dim<4; ++dim)
         for (UpdateListT::const_iterator it= entsToUpdt_[dim].begin(), end= entsToUpdt_[dim].end(); it!=end; ++it)
-            if (it->second.GetBroadcaster()==me) {
+            if (it->second.GetBroadcaster()==me || dim==GetDim<TetraCL>()) {
                 const Helper::SimplexTransferInfoCL& sti= it->second;
                 for (ProcSetT::const_iterator pit= sti.GetSendToProcs().begin(), pend= sti.GetSendToProcs().end(); pit!=pend; ++pit)
                     numMsg[pit->first][dim]++;
@@ -1044,6 +1073,26 @@ TetraCL& TransferCL::CreateSimplex<TetraCL>  ( const TetraCL& s,  const Helper::
 
     }
     return t;
+}
+
+template <>
+void DiST::TransferCL::ReceiveSimplices<TetraCL>( DiST::Helper::RecvStreamCL& recvstream, size_t num)
+{
+    for ( size_t i=0; i<num; ++i) {
+        TetraCL stmp;                                   // temporary to receive a single simplex
+        DiST::Helper::RemoteDataCL::ProcListT procList; // temporary to receive process list
+
+        // receive simplex
+        stmp.UnPack( recvstream);
+        Assert( stmp.GetDim()==GetDim<TetraCL>(), DROPSErrCL("Mismatch in dimension of a received simplex!"), DebugDiSTC);
+        // receive proc/prio list
+        recvstream >> procList;
+        if (!InfoCL::Instance().Exists(stmp.GetGID()))
+        	CreateSimplex<TetraCL>( stmp, procList); // creates simplex and remote data list entry
+        else { // merge with existing tetra
+        	InfoCL::Instance().GetTetra( stmp.GetGID())->Merge(stmp);
+        }
+    }
 }
 
 
