@@ -492,7 +492,6 @@ void ISBBTPreCL::Apply(const Mat&, Vec& p, const Vec& c) const
 //            std::cout << "ISBBTPreCL p: iterations: " << solver_.GetIter()
 //                       << "\tresidual: " <<  solver_.GetResid();
         if (solver_.GetIter() == solver_.GetMaxIter()){
-          IF_MASTER
             std::cout << "ISBBTPreCL::Apply: BBT-solve: " << solver_.GetIter()
                     << '\t' << solver_.GetResid() << '\n';
         }
@@ -505,7 +504,6 @@ void ISBBTPreCL::Apply(const Mat&, Vec& p, const Vec& c) const
 //                       << "\tresidual: " <<  solver2_.GetResid()
 //                       << '\n';
         if (solver2_.GetIter() == solver2_.GetMaxIter()){
-          IF_MASTER
             std::cout << "ISBBTPreCL::Apply: M-solve: " << solver2_.GetIter()
                     << '\t' << solver2_.GetResid() << '\n';
         }
@@ -519,7 +517,7 @@ void ISBBTPreCL::Apply(const Mat&, Vec& p, const Vec& c) const
 // It is a scaled version of the Min-Commutator-PC of Elman and can be used
 // with P1X-elements.
 //**************************************************************************
-#ifndef _PAR
+
 class MinCommPreCL : public SchurPreBaseCL
 {
   private:
@@ -529,15 +527,24 @@ class MinCommPreCL : public SchurPreBaseCL
     mutable VectorCL Dprsqrtinv_, Dvelsqrtinv_;
     double  tol_;
 
+#ifndef _PAR
     typedef NEGSPcCL SPcT_;
     SPcT_ spc_;
     mutable PCGNESolverCL<SPcT_> solver_;
+#else
+    mutable CompositeMatrixCL BBT_;
+    typedef ParJacNEG0CL    PCSolver1T;                         ///< type of the preconditioner for solver 1
+    PCSolver1T PCsolver1_;
+    mutable ParPCGSolverCL<PCSolver1T> solver_;                 ///< solver for BB^T
+    const IdxDescCL* vel_idx_;                                  ///< Accessing ExchangeCL for velocity
+#endif
     const IdxDescCL* pr_idx_;                                   ///< Used to determine, how to represent the kernel of BB^T in case of pure Dirichlet-BCs.
     double regularize_;
 
     void Update () const;
 
   public:
+#ifndef _PAR
     MinCommPreCL (const MatrixCL* A, MatrixCL* B, MatrixCL* Mvel, MatrixCL* M_pr, const IdxDescCL& pr_idx,
                   double tol=1e-2, double regularize= 0.0)
         : SchurPreBaseCL( 0, 0), A_( A), B_( B), Mvel_( Mvel), M_( M_pr), Bs_( 0),
@@ -554,6 +561,24 @@ class MinCommPreCL : public SchurPreBaseCL
           Dprsqrtinv_( pc.Dprsqrtinv_), Dvelsqrtinv_( pc.Dvelsqrtinv_), tol_(pc.tol_),
           spc_( pc.spc_), solver_( spc_, 200, tol_, /*relative*/ true),
           pr_idx_( pc.pr_idx_), regularize_( pc.regularize_) {}
+#else
+    MinCommPreCL (const MatrixCL* A, MatrixCL* B, MatrixCL* Mvel, MatrixCL* M_pr, const IdxDescCL& pr_idx, const IdxDescCL& vel_idx,
+                  double tol=1e-2, double regularize= 0.0)
+        : SchurPreBaseCL( 0, 0), A_( A), B_( B), Mvel_( Mvel), M_( M_pr), Bs_( 0),
+          Aversion_( 0), Bversion_( 0), Mvelversion_( 0), Mversion_( 0),
+          tol_(tol), BBT_( 0, TRANSP_MUL, 0, MUL, vel_idx, pr_idx),
+          PCsolver1_( pr_idx), solver_( 800, tol_, pr_idx, PCsolver1_, /*relative*/ true),
+          vel_idx_( &vel_idx), pr_idx_( &pr_idx), regularize_( regularize) {}
+
+    MinCommPreCL (const MinCommPreCL & pc)
+        : SchurPreBaseCL( pc.kA_, pc.kM_), A_( pc.A_), B_( pc.B_), Mvel_( pc.Mvel_), M_( pc.M_),
+          Bs_( pc.Bs_ == 0 ? 0 : new MatrixCL( *pc.Bs_)),
+          Aversion_( pc.Aversion_), Bversion_( pc.Bversion_), Mvelversion_( pc.Mvelversion_),
+          Mversion_( pc.Mversion_),
+          Dprsqrtinv_( pc.Dprsqrtinv_), Dvelsqrtinv_( pc.Dvelsqrtinv_), tol_(pc.tol_), BBT_( 0, TRANSP_MUL, 0, MUL, *pc.vel_idx_, *pc.pr_idx_),
+          PCsolver1_( *pc.pr_idx_), solver_( 800, tol_, *pc.pr_idx_, PCsolver1_, /*relative*/ true),
+          vel_idx_( pc.vel_idx_), pr_idx_( pc.pr_idx_), regularize_( pc.regularize_) {}
+#endif
 
     MinCommPreCL& operator= (const MinCommPreCL&) {
         throw DROPSErrCL( "MinCommPreCL::operator= is not permitted.\n");
@@ -576,6 +601,14 @@ class MinCommPreCL : public SchurPreBaseCL
         pr_idx_= pr_idx;
         Aversion_ = Bversion_ = Mvelversion_ = Mversion_ = 0;
     }
+    /// \name Parallel preconditioner setup ...
+    //@{
+    bool NeedDiag() const { return false; }
+    void SetDiag(const VectorCL&) {}        // just for consistency
+    template<typename Mat>
+    void SetDiag(const Mat&) {}             // just for consistency
+    bool RetAcc()   const { return true; }
+    //@}
 };
 
 template <typename Mat, typename Vec>
@@ -586,7 +619,11 @@ template <typename Mat, typename Vec>
         Update();
 
     VectorCL y( b.size());
+#ifndef _PAR
     solver_.Solve( *Bs_, y, VectorCL( Dprsqrtinv_*b));
+#else
+    solver_.Solve( BBT_, y, VectorCL( Dprsqrtinv_*b));
+#endif
     if (solver_.GetIter() == solver_.GetMaxIter())
         std::cout << "MinCommPreCL::Apply: 1st BBT-solve: " << solver_.GetIter()
                   << '\t' << solver_.GetResid() << '\n';
@@ -594,13 +631,19 @@ template <typename Mat, typename Vec>
     VectorCL z( Dprsqrtinv_*((*B_)*VectorCL( Dvelsqrtinv_*Dvelsqrtinv_*
         ( (*A_)*VectorCL( Dvelsqrtinv_*Dvelsqrtinv_*transp_mul( *B_, y)) ))));
     VectorCL t( b.size());
+#ifndef _PAR
     solver_.Solve( *Bs_, t, z);
+#else
+    solver_.Solve( BBT_, t, z);
+#endif
     if (solver_.GetIter() == solver_.GetMaxIter())
         std::cout << "MinCommPreCL::Apply: 2nd BBT-solve: " << solver_.GetIter()
                   << '\t' << solver_.GetResid() << '\n';
     x= Dprsqrtinv_*t;
 }
 
+
+#ifndef _PAR
 //**************************************************************************
 // Preconditioner for the instationary (Navier-) Stokes-equations.
 // It uses the approximate Schur complement B diag(L)^{-1} B^T

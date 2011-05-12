@@ -1,6 +1,6 @@
 /// \file parsolver.h
 /// \brief Parallel basic iterative solvers
-/// \author LNM RWTH Aachen: Sven Gross, Joerg Peters, Volker Reichelt; SC RWTH Aachen: Oliver Fortmeier
+/// \author LNM RWTH Aachen: Patrick Esser, Sven Gross, Joerg Peters, Volker Reichelt; SC RWTH Aachen: Oliver Fortmeier
 
 /*
  * This file is part of DROPS.
@@ -56,6 +56,7 @@
 // *   - preconditioned Bi-Conjugate Gradient Stabilized (ParBiCGSTABSolverCL)  *
 // *   - preconditioned Generalized Conjugate Residuals (ParPreGCRSolverCL)     *
 // *   - (preconditioned) Quasi Minimal Residual (ParQMRSolverCL)               *
+// *   - (preconditioned) CG for the normal equations (ParCGNeSolverCL)         *
 // * Declaration of parallel solver functions                                   *
 // ******************************************************************************
 
@@ -117,6 +118,10 @@ bool ParQMR(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, Lanczos lan
 template <typename Mat, typename Vec, typename PreCon, typename ExCL>
 bool ParGCR(const Mat& A, Vec& x, const Vec& b, const ExCL& ExX, PreCon& M,
     int m, int& max_iter, double& tol, bool measure_relative_tol= true, std::ostream* output=0);
+
+template <typename Mat, typename Vec, typename PreCon, typename ExCL>
+bool ParPCGNE(const Mat& A, Vec& u, const Vec& b, const ExCL& ExX, const PreCon& M,
+    int& max_iter, double& tol, bool measure_relative_tol= false, std::ostream* output=0);
 
 
 //***************************************************************************
@@ -461,6 +466,37 @@ class ParQMRSolverCL : public ParSolverBaseCL
     }
 };
 
+///\brief Solver for A*A^Tx=b with Craig's method and left preconditioning.
+///
+/// A preconditioned CG version for matrices of the form A*A^T. Note that *A* must be
+/// supplied, not A*A^T, to the Solve-method.
+template <typename PC>
+class ParPCGNESolverCL : public ParPreSolverBaseCL<PC>
+{
+  private:
+    typedef ParPreSolverBaseCL<PC> base;
+
+  public:
+    ParPCGNESolverCL( int maxiter, double tol, const IdxDescCL& idx, PC& pc, bool rel= false, std::ostream* output=0)
+        : base( maxiter, tol, idx, pc, rel, output) {}
+
+    template <typename Mat, typename Vec>
+    void Solve(const Mat& A, Vec& x, const Vec& b)
+    {
+    	base::_res=  base::_tol;
+    	base::_iter= base::_maxiter;
+        ParPCGNE(A, x, b, base::GetEx(), base::GetPC(), base::_iter, base::_res, base::rel_, base::output_);
+    }
+
+    template <typename Mat, typename Vec>
+    void Solve(const Mat& A, Vec& x, const Vec& b, int& numIter, double& resid) const
+    {
+    	resid=   base::_tol;
+    	numIter= base::_maxiter;
+    	ParPCGNE(A, x, b, base::GetEx(), base::GetPC(), numIter, resid, base::rel_, base::output_);
+    }
+};
+
 //***************************************************************************
 // Implementations of the methods
 //***************************************************************************
@@ -622,7 +658,7 @@ void StandardGramSchmidt(DMatrixCL<double>& H,
             tmpHCol[k] = ex.LocalDot( w, false, v[k], false);
     }
     else        // update of w do only works on same types
-        throw DROPSErrCL("StandardGramSchmidt: Cannot do Gramm Schmidt on that kind of vectors!");
+        throw DROPSErrCL("StandardGramSchmidt: Cannot do Gram Schmidt on that kind of vectors!");
 
     // Syncpoint!
     ProcCL::GlobalSum(Addr(tmpHCol), H.GetCol(i), i+1);
@@ -655,7 +691,7 @@ void ModifiedGramSchmidt(DMatrixCL<double>& H, Vec& w, bool acc_w, const std::ve
         }
     }
     else
-        throw DROPSErrCL("StandardGrammSchmidt: Cannot do Gramm Schmidt on that kind of vectors!");
+        throw DROPSErrCL("StandardGramSchmidt: Cannot do Gram Schmidt on that kind of vectors!");
 }
 
 /// \brief Parallel GMRES-method.
@@ -931,7 +967,7 @@ template <typename Mat, typename Vec, typename PreCon, typename ExCL>
     /// \param[in,out] max_iter             IN: maximal iterations, OUT: used iterations
     /// \param[in,out] tol                  IN: tolerance for the residual, OUT: residual
     /// \param[in]     measure_relative_tol if true stop if |M^(-1)(b-Ax)|/|M^(-1)b| <= tol, else stop if |M^(-1)(b-Ax)|<=tol
-    /// \param[in]     useMGS               use modified Gramm-Schmidt ortogonalization (many more sync-points exists!)
+    /// \param[in]     useMGS               use modified Gram-Schmidt ortogonalization (many more sync-points exists!)
     /// \param[in]     method               left or right preconditioning (see solver.h for definition and declaration)
     /// \return  convergence within max_iter iterations
     /// \pre     the preconditioner should be able to handle a accumulated b
@@ -998,7 +1034,7 @@ template <typename Mat, typename Vec, typename PreCon, typename ExCL>
                     w_acc = w;
             }
 
-            // Gramm-Schmidt ortogonalization without  update of w!
+            // Gram-Schmidt ortogonalization without  update of w!
             if (!useMGS)
                 StandardGramSchmidt(H, w_acc, true, v_acc, true, i, ExX, tmpHCol);
             else
@@ -1721,6 +1757,71 @@ bool ParGCR(const Mat& A, Vec& x, const Vec& b, const ExCL& ExX, PreCon& M,
             s[min_idx]= sn;
             v[min_idx]= vn;
         }
+    }
+    tol= resid;
+    return false;
+}
+
+/// \brief PCGNE: Preconditioned CG for the normal equations (error-minimization)
+///
+/// Solve A*A^T x = b with left preconditioner M. This is more stable than PCG with
+/// a CompositeMatrixCL.
+///
+/// The return value indicates convergence within max_iter (input)
+/// iterations (true), or no convergence within max_iter iterations (false).
+/// Upon successful return, output arguments have the following values:
+///
+/// \param A - matrix (not necessarily quadratic)
+/// \param b - right hand side
+/// \param u - approximate solution to A*A^T u = b
+/// \param M - preconditioner
+/// \param max_iter - number of iterations performed before tolerance was reached
+/// \param tol - 2-norm of the (relative, see below) residual after the final iteration
+/// \param measure_relative_tol - If true, stop if |b - A*A^T u|/|b| <= tol,
+///        if false, stop if |b - A*A^T u| <= tol.
+template <typename Mat, typename Vec, typename PreCon, typename ExCL>
+bool
+ParPCGNE(const Mat& A, Vec& u, const Vec& b, const ExCL& ExX, const PreCon& M,
+    int& max_iter, double& tol, bool measure_relative_tol= false, std::ostream* output=0)
+{
+    Vec r( b - A*transp_mul( A, u));
+    double normb= ExX.Norm( b, false);
+    if (normb == 0.0 || measure_relative_tol == false) normb= 1.0;
+
+    double resid= ExX.Norm( r, false)/normb;
+    if (output)
+        (*output) << "PCGNE: iter: 0 resid: " << resid <<'\n';
+    if (resid <= tol) {
+        tol= resid;
+        max_iter= 0;
+        return true;
+    }
+
+    const size_t n= A.num_rows();
+    const size_t num_cols= A.num_cols();
+
+    Vec z( n);
+    M.Apply( A, z, r);
+    Vec qt( z), pt( num_cols);
+    double rho= ExX.ParDot( z, true, r, false), rho_1;
+
+    for (int i= 1; i <= max_iter; ++i) {
+        pt= transp_mul( A, qt);
+        const double alpha= rho/ExX.Norm_sq( pt, false);
+        u+= alpha*qt;
+        r-= alpha*(A*pt);
+        M.Apply( A, z, r);
+
+        resid= ExX.Norm( r, false)/normb;
+        if ( output && i%10 == 0) (*output) << "PCGNE: iter: " << i << " resid: " << resid <<'\n';
+        if (resid <= tol) {
+            tol= resid;
+            max_iter= i;
+            return true;
+        }
+        rho_1= rho;
+        rho= ExX.ParDot( z, true, r, false);
+        qt= z + (rho/rho_1)*qt;
     }
     tol= resid;
     return false;

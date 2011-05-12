@@ -642,6 +642,7 @@ class StokesSolverFactoryCL : public StokesSolverFactoryBaseCL<StokesT, ParamsT,
 
 // PC for instat. Schur complement
     ISBBTPreCL      bbtispc_;
+    MinCommPreCL    mincomm_;
 
 // PC for A-block
     //JAC-GMRes
@@ -659,9 +660,13 @@ class StokesSolverFactoryCL : public StokesSolverFactoryBaseCL<StokesT, ParamsT,
 // BlockPC
     typedef BlockPreCL<GMResPcT, ISBBTPreCL, LowerBlockPreCL> LBlockGMResBBTOseenPcT;
     LBlockGMResBBTOseenPcT LBlockGMResBBTOseenPc_;
+    typedef BlockPreCL<GMResPcT, MinCommPreCL, LowerBlockPreCL> LBlockGMResMinCommOseenPcT;
+    LBlockGMResMinCommOseenPcT LBlockGMResMinCommOseenPc_;
+
 
 //GCR solver
     ParPreGCRSolverCL<LBlockGMResBBTOseenPcT> GCRGMResBBT_;
+    ParPreGCRSolverCL<LBlockGMResMinCommOseenPcT> GCRGMResMinComm_;
     
 //GMRes solver
     ParPreGMResSolverCL<LBlockGMResBBTOseenPcT> GMResGMResBBT_;
@@ -703,6 +708,8 @@ template <class StokesT, class ParamsT, class ProlongationVelT, class Prolongati
       JACPrPc_( Stokes.pr_idx.GetFinest()), JACVelPc_( Stokes.vel_idx.GetFinest()),
       bbtispc_ ( Stokes_.B.Data.GetFinestPtr(), Stokes_.prM.Data.GetFinestPtr(), Stokes_.M.Data.GetFinestPtr(),
                  Stokes.pr_idx.GetFinest(), Stokes.vel_idx.GetFinest(), kA_, kM_, C_.stk_PcSTol, C_.stk_PcSTol),
+      mincomm_( Stokes_.A.Data.GetFinestPtr(), Stokes_.B.Data.GetFinestPtr(), Stokes_.M.Data.GetFinestPtr(), Stokes_.prM.Data.GetFinestPtr(),
+                 Stokes.pr_idx.GetFinest(), Stokes.vel_idx.GetFinest(), C_.stk_PcSTol),
       GMResSolver_(/*restart*/ 100, C_.stk_PcAIter, C_.stk_PcATol, Stokes.vel_idx.GetFinest(), JACVelPc_,
                    /*rel*/ true, /*ModGS*/ false),
       GMResPc_( GMResSolver_),
@@ -710,7 +717,9 @@ template <class StokesT, class ParamsT, class ProlongationVelT, class Prolongati
                  /*rel*/ true),
       PCGPc_(PCGSolver_),
       LBlockGMResBBTOseenPc_( GMResPc_, bbtispc_),
+      LBlockGMResMinCommOseenPc_( GMResPc_, mincomm_),
       GCRGMResBBT_( C.stk_OuterIter, C.stk_OuterIter, C.stk_OuterTol, LBlockGMResBBTOseenPc_, true, false, &std::cout),
+      GCRGMResMinComm_( C.stk_OuterIter, C.stk_OuterIter, C.stk_OuterTol, LBlockGMResMinCommOseenPc_, true, false, &std::cout),
       GMResGMResBBT_( C.stk_OuterIter, C.stk_OuterIter, C.stk_OuterTol, LBlockGMResBBTOseenPc_, true, false, LeftPreconditioning, true, &std::cout)
 #ifdef _HYPRE
       , hypreAMG_( Stokes.vel_idx.GetFinest(), C_.stk_PcAIter, C_.stk_PcATol), AMGPc_(hypreAMG_),
@@ -740,9 +749,18 @@ template <class StokesT, class ParamsT, class ProlongationVelT, class Prolongati
                         ( GMResPc_, bbtispc_, Stokes_.vel_idx.GetFinest(), Stokes_.pr_idx.GetFinest(),
                           C_.stk_OuterIter, C_.stk_OuterTol, C_.stk_InnerTol, C_.stk_InnerIter, &std::cout);
         break;
+        case 20402 :
+            stokessolver = new ParInexactUzawaCL<GMResPcT, MinCommPreCL, APC_OTHER>
+                        ( GMResPc_, mincomm_, Stokes_.vel_idx.GetFinest(), Stokes_.pr_idx.GetFinest(),
+                          C_.stk_OuterIter, C_.stk_OuterTol, C_.stk_InnerTol, C_.stk_InnerIter, &std::cout);
+        break;
         case 10401 :
             stokessolver = new BlockMatrixSolverCL<ParPreGCRSolverCL<LBlockGMResBBTOseenPcT> >
                         ( GCRGMResBBT_, Stokes_.vel_idx.GetFinest(), Stokes_.pr_idx.GetFinest());
+        break;
+        case 10402 :
+            stokessolver = new BlockMatrixSolverCL<ParPreGCRSolverCL<LBlockGMResMinCommOseenPcT> >
+                        ( GCRGMResMinComm_, Stokes_.vel_idx.GetFinest(), Stokes_.pr_idx.GetFinest());
         break;
         case 40401 :
             stokessolver = new BlockMatrixSolverCL<ParPreGMResSolverCL<LBlockGMResBBTOseenPcT> >
