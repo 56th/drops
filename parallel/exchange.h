@@ -103,11 +103,11 @@ class RecvNumDataCL
     /// \brief Ask for the sender
     int GetSender() const { return fromproc_; }
     /// \brief Receive data
-    inline ProcCL::RequestT Irecv(int tag, VectorCL& recvBuf, Ulint offset) const;
+    inline ProcCL::RequestT Irecv( int tag, VectorBaseCL<T>& recvBuf, Ulint offset) const;
     /// \brief Accumulate the received data (adding values from \a recvBuf to \a x)
-    inline void Accumulate(VectorCL& x, Ulint offsetV, const VectorCL& recvBuf, Ulint offsetRecv) const;
+    inline void Accumulate( VectorBaseCL<T>& x, Ulint offsetV, const VectorBaseCL<T>& recvBuf, Ulint offsetRecv) const;
     /// \brief Assign the received data ( by taking values from \a recvBuf)
-    inline void Assign(VectorCL& x, Ulint offsetV, const VectorCL& recvBuf, Ulint offsetRecv) const;
+    inline void Assign( VectorBaseCL<T>& x, Ulint offsetV, const VectorBaseCL<T>& recvBuf, Ulint offsetRecv) const;
 };
 
 
@@ -263,7 +263,7 @@ class ExchangeCL
         { return neighs_.size(); }
     NeighListT_const_iterator GetNeighBegin() const                     ///< Get iterator to the first neighbor process
         { return neighs_.begin(); }
-    NeighListT_const_iterator GetNeighEnd() const                       ///< Get iterator behin the last neighbor process
+    NeighListT_const_iterator GetNeighEnd() const                       ///< Get iterator behind the last neighbor process
         { return neighs_.end(); }
     //@}
 
@@ -280,6 +280,16 @@ class ExchangeCL
         { return dofProcList_[localdof].size(); }
     inline IdxT GetExternalIdxFromProc( const IdxT localdof, int proc) const;   ///< Get dof number of proc
     //@}
+
+    bool AmIOwner( IdxT dof) const {
+    	if ( GetNumProcs( dof) == 1)
+    		return true;
+    	for ( size_t i = 0; i< OwnerDistrIndex.size(); ++i)
+    		if (OwnerDistrIndex[i] == dof)
+    			return true;
+
+    	return false;
+    }
 };
 
 

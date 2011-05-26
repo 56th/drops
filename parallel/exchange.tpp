@@ -80,7 +80,7 @@ inline ProcCL::RequestT SendNumDataCL<T>::Isend(
 
 
 template <typename T>
-ProcCL::RequestT RecvNumDataCL<T>::Irecv(int tag, VectorCL& recvBuf, 
+ProcCL::RequestT RecvNumDataCL<T>::Irecv(int tag, VectorBaseCL<T>& recvBuf,
     Ulint offset) const
 /** This procedure receives the datas with an non-blocking non-synchronous MPI
     Receive.
@@ -99,8 +99,8 @@ ProcCL::RequestT RecvNumDataCL<T>::Irecv(int tag, VectorCL& recvBuf,
 }
 
 template <typename T>
-void RecvNumDataCL<T>::Accumulate(VectorCL& v, Ulint offsetV, 
-    const VectorCL& recvBuf, Ulint offsetRecv) const
+void RecvNumDataCL<T>::Accumulate(VectorBaseCL<T>& v, Ulint offsetV,
+    const VectorBaseCL<T>& recvBuf, Ulint offsetRecv) const
 /** This procedure accumulates received data. It assumes, that the data has been
     received.
     \param v          original value, that contains all local unknowns
@@ -116,8 +116,8 @@ void RecvNumDataCL<T>::Accumulate(VectorCL& v, Ulint offsetV,
 }
 
 template <typename T>
-void  RecvNumDataCL<T>::Assign(VectorCL& v, Ulint offsetV, 
-    const VectorCL& recvBuf, Ulint offsetRecv) const
+void  RecvNumDataCL<T>::Assign(VectorBaseCL<T>& v, Ulint offsetV,
+    const VectorBaseCL<T>& recvBuf, Ulint offsetRecv) const
 /** This procedure assigns the received data. It assumes, that the data has been
     received.
     \param v          original value, that contains all local unknowns
