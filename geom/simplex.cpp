@@ -172,10 +172,8 @@ void EdgeCL::UnPack( DiST::Helper::RecvStreamCL& istrstream)
     istrstream >>  Bnd_[0] >>  Bnd_[1] >> AccMFR_ >> RemoveMark_;
     Vertices_[0]= DiST::InfoCL::Instance().GetVertex(vertex0);
     Vertices_[1]= DiST::InfoCL::Instance().GetVertex(vertex1);
-    if ( midVertex!=DiST::Helper::NoGID && DiST::InfoCL::Instance().Exists(midVertex)) {
+    if ( DiST::InfoCL::Instance().Exists(midVertex))
         MidVertex_= DiST::InfoCL::Instance().GetVertex(midVertex);
-    } // else if (midVertex!=DiST::Helper::NoGID) std::cerr << ">> [" << ProcCL::MyRank() << "] EdgeCL::Unpack: missing midvertex " << midVertex << std::endl;
-
 }
 
 #endif
@@ -197,9 +195,13 @@ void FaceCL::LinkTetra(const TetraCL* tp)
             if (Neighbors_[0] && Neighbors_[0]!=tp) // in sequential version:  if Neighbors_[0]!=0 then  Neighbors_[0]!=tp is always true
                 offset=1;
         } else { // during transfer, the children are unpacked before their parents. Hence, we have to find the position where one of the children is stored on the next level.
-            if (!is_in( tp->GetChildBegin(), tp->GetChildEnd(), Neighbors_[2]))
+        	if (tp->GetChildBegin()==tp->GetChildEnd()) { // no children known to tetra -> use position where no children are linked
+        		offset= Neighbors_[2] ? 1 : 0;
+                Assert( Neighbors_[offset+2]==0, DiST::Helper::ErrorCL("FaceCL::LinkTetra: Occupied child position ", offset+2, GetGID()), DebugRefineEasyC);
+        	} else if (!is_in( tp->GetChildBegin(), tp->GetChildEnd(), Neighbors_[2]))
             	if (Neighbors_[3]==0 || is_in( tp->GetChildBegin(), tp->GetChildEnd(), Neighbors_[3]))
             		offset=1;
+            Assert( Neighbors_[offset+2]==0 || is_in( tp->GetChildBegin(), tp->GetChildEnd(), Neighbors_[offset+2]), DiST::Helper::ErrorCL("FaceCL::LinkTetra: Wrong child at position ", offset+2, GetGID()), DebugRefineEasyC);
         }
     }
     else                            // green child of parent
@@ -208,11 +210,13 @@ void FaceCL::LinkTetra(const TetraCL* tp)
         if (tp->GetParent()) {
         // tetra is stored on the same side as the parent
             offset= Neighbors_[0]==tp->GetParent() ? 2 : 3;
-        } else { // during transfer, the children are unpacked before their parents. Hence, we need another strategy here.
-            offset= (Neighbors_[2] && Neighbors_[2]!=tp) ? 3 : 2;
+            Assert( tp->GetParent()==Neighbors_[offset-2], DiST::Helper::ErrorCL("FaceCL::LinkTetra: Wrong parent at position ", offset-2, GetGID()), DebugRefineEasyC);
+        } else { // during transfer, the children are unpacked before their parents. Hence, we need an empty position without parent.
+            offset= (Neighbors_[0]==0 && (Neighbors_[2]==0 || Neighbors_[2]==tp)) ? 2 : 3;
+            Assert( !Neighbors_[offset-2], DiST::Helper::ErrorCL("FaceCL::LinkTetra: Occupied parent position ", offset-2, GetGID()), DebugRefineEasyC);
         }
     }
-    Assert(!Neighbors_[offset] || Neighbors_[offset]==tp, DiST::Helper::ErrorCL("FaceCL::LinkTetra: Link occupied by another tetra ", Neighbors_[offset] ? Neighbors_[offset]->GetGID() : DiST::Helper::NoGID, GetGID()), DebugRefineEasyC);
+    Assert(!Neighbors_[offset] || Neighbors_[offset]==tp, DiST::Helper::ErrorCL("FaceCL::LinkTetra: Link occupied by another tetra, while linking ", Neighbors_[offset] ? tp->GetGID() : DiST::Helper::NoGID, GetGID()), DebugRefineEasyC);
     Neighbors_[offset]= tp;
 }
 
@@ -970,33 +974,11 @@ void TetraCL::UnPack( DiST::Helper::RecvStreamCL& istrstream)
  */
 void TetraCL::Merge( const TetraCL& t)
 {
-	if (!Children_) { // former HasGhost: set children array and midvertex pointers on edges properly
-//		std::cerr << "Merging former HasGhost: children = ";
+	if (!Children_) { // former HasGhost: set children array properly. Midvertex pointers will be set by ParMultiGridCL::AdaptMidVertex().
 		Children_= new SArrayCL<TetraCL*, MaxChildrenC>;
-		const RefRuleCL refrule= GetRefData();
-		for (Uint ch=0; ch<MaxChildrenC; ++ch) {
-			TetraCL* chp= (*Children_)[ch]= (*t.Children_)[ch];
-			if (chp) { // try to link some child verts as midvertex of my edges
-//				std::cerr << chp->GetGID() << " {";
-				const ChildDataCL childdat= GetChildData(refrule.Children[ch]);
-				for (Uint v=0; v<NumVertsC; ++v) {
-					const Ubyte vert= childdat.Vertices[v];
-					if (IsMidVert(vert)) {
-						VertexCL* midvertp= chp->Vertices_[v];
-						Edges_[EdgeOfMidVert(vert)]->SetMidVertex( midvertp);
-//						std::cerr << GetEdge(EdgeOfMidVert(vert))->GetGID() << ',';
-						Assert( GetBaryCenter(*GetEdge(EdgeOfMidVert(vert))) == midvertp->GetCoord(), DiST::Helper::ErrorCL("TetraCL::Merge: merged wrong midvertex = ", midvertp->GetGID(), Edges_[EdgeOfMidVert(vert)]->GetGID()), DebugDiSTC);
-					}
-				}
-//				std::cerr << "}\n";
-			}
-		}
-//		std::cerr << std::endl;
-	} else if (!Parent_) { // former ghost: set parent pointer properly
-//		std::cerr << "Merging former Ghost: parent = ";
+		std::copy( t.Children_->begin(), t.Children_->end(), Children_->begin());
+	} else if (!Parent_) // former ghost: set parent pointer properly
 		Parent_= t.Parent_;
-//		if (Parent_) std::cerr << Parent_->GetGID() << std::endl;
-	}
 }
 
 #endif
@@ -1157,7 +1139,7 @@ Check for:
     if ( IsLocal() && AccMFR_!=MFR_)
     {
         sane= false;
-        os << "Unconsistent MFR for undistributed edge. ";
+        os << "Inconsistent MFR for undistributed edge. ";
     }
 
     // Check if the hash is computed correctly
@@ -1183,7 +1165,11 @@ void EdgeCL::DebugInfo (std::ostream& os) const
        << " level: " << GetLevel() << ", barycenter " << GetBary() << '\n'
        << " vertices: " << GetVertex(0)->GetGID() << ", " << GetVertex(1)->GetGID() << '\n'
        << ' ' << ( IsMarkedForRemovement() ? "is" : "is not") << " marked for removement\n"
-       << " mark for refinement: " << GetMFR();
+       << " mark for refinement: "
+#ifdef _PAR
+       << "acc.= " << GetAccMFR() << ", local= "
+#endif
+       << GetMFR();
     if (IsRefined())
        os << ", midvertex " << GetMidVertex()->GetGID();
     os << '\n';
@@ -1238,6 +1224,11 @@ Check for:
 //        sane= false;
 //        os << "Two neighbors are linked eventhough face is on boundary" << std::endl;
 //    }
+    for (int i=0; i<2; ++i)
+    	if (GetNeighbor(i) && GetNeighbor(i+2) && !is_in( GetNeighbor(i)->GetChildBegin(), GetNeighbor(i)->GetChildEnd(), GetNeighbor(i+2))) {
+    		sane= false;
+    		os << "Unrelated tetra and child at position " << i << ". ";
+    	}
     if (IsMarkedForRemovement()){
         sane=false;
         os << "Face is marked for removement\n";
@@ -1365,7 +1356,7 @@ Check for:
     bool sane= true;
 
     // Check, if the volume of my children adds up to my volume
-    if ( Children_){
+    if ( Children_) {
         double vol = 0.0;
         for ( const_ChildPIterator ch(GetChildBegin()); ch!=GetChildEnd(); ++ch)
             vol += (*ch)->GetVolume();

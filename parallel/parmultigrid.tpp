@@ -55,10 +55,15 @@ void ParMultiGridCL::ModifyEnd()
 }
 
 /// \brief Change the priority of a simplex
+template<>
+  void ParMultiGridCL::PrioChange<TetraCL>(TetraCL* const Tp, Priority Prio);
+
+
+/// \brief Change the priority of a simplex
 template<class SimplexT>
   void ParMultiGridCL::PrioChange(SimplexT* const Tp, Priority Prio)
 {
-//  Assert(PrioChangeMode || TransferMode, DROPSErrCL("ParMultiGridCL: PrioChange: There must be an active Xfer- or PrioChange-Mode, to run this procedure"), DebugParallelC);
+    Assert( modify_, DROPSErrCL("ParMultiGridCL::PrioChange: There must be an active Transfer or Modify module to run this procedure"), DebugParallelC);
     modify_->ChangePrio( *Tp, Prio);
 }
 
@@ -66,7 +71,7 @@ template<class SimplexT>
 template<class SimplexT>
   void ParMultiGridCL::Delete(SimplexT* const Tp)
 {
-//  Assert(PrioChangeMode || TransferMode, DROPSErrCL("ParMultiGridCL::Delete: There must be an active Xfer- or PrioChange-Mode, to run this procedure"), DebugParallelC);
+    Assert( modify_, DROPSErrCL("ParMultiGridCL::Delete: There must be an active Transfer or Modify module to run this procedure"), DebugParallelC);
     modify_->Delete( *Tp);
 }
 

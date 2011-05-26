@@ -347,15 +347,34 @@ void SimplexTransferInfoCL::AddProcSet( const ProcSetT& procs)
     }
 }
 
+int SimplexTransferInfoCL::GetPostProc( Priority prio) const
+{
+	for (ProcSetT::const_iterator it= postProcs_.begin(), end= postProcs_.end(); it!=end; ++it)
+		if (it->second==prio)
+			return it->first;
+	return -1;
+}
+
 void SimplexTransferInfoCL::ComputeSendToProcs( bool tetra)
 /// For tetrahedra (\a tetra == true) we have to treat the special case that the object should be sent also to processes which already have a remote copy.
 {
-    procsToSend_= postProcs_;
-    if (tetra)
-    	procsToSend_.erase( ProcCL::MyRank());
-    else // for all sub-simplices (non-tetra): procsToSend_ = postProcs_ - remote data proc list
+    if (tetra) {
+    	const int me= ProcCL::MyRank();
+    	if (postProcs_.size()==2 && rd_.GetNumProcs()==2) { // Ma/Gh before and after transfer: only send to remote post procs with same prio
+    		procsToSend_.clear();
+    		Priority myprio= rd_.GetLocalPrio();
+    		const int p= GetPostProc(myprio);
+			if (p!=-1 && p!=me)
+				procsToSend_[p]= myprio;
+    	} else { // send to all remote post procs
+			procsToSend_= postProcs_;
+			procsToSend_.erase( me);
+    	}
+    } else { // for all sub-simplices (non-tetra): procsToSend_ = postProcs_ - remote data proc list
+        procsToSend_= postProcs_;
     	for (RemoteDataCL::ProcListT::const_iterator it= rd_.GetProcListBegin(), end= rd_.GetProcListEnd(); it!=end; ++it)
     		procsToSend_.erase( it->proc);
+    }
 }
 
 }   // end of namespace Helper
@@ -670,17 +689,28 @@ class ModifyCL::CommToUpdateHandlerCL
         if (dim==GetDim<TetraCL>()) { // tetra: write SimplexTransferInfoCL::UpdateSubs_
             const bool updateSubs= it->second.UpdateSubs();
             os << updateSubs;
+            const int remoteProc= (++(it->second.GetRemoteData().GetProcListBegin()))->proc;
+            os << it->second.WillBeOnProc(remoteProc);
         }
         return true;
     }
 
     bool Scatter( TransferableCL& t, const size_t, Helper::RecvStreamCL& is)
     {
-        bool updateSubs= false;
         const Usint dim= t.GetDim();
-        if (dim==GetDim<TetraCL>())
-            is >> updateSubs;
-        mod_.AddSimplexToUpdate( dim, &t, updateSubs);
+        if (dim==GetDim<TetraCL>()) { // tetra
+            bool updateSubs, transferHere;
+            is >> updateSubs >> transferHere;
+
+            ModifyCL::UpdateListT& ul= mod_.entsToUpdt_[dim];
+            ModifyCL::UpdateIterator it= ul.find( &t);
+            if (it==ul.end()) { // not already in update list
+            	it= mod_.AddSimplexToUpdate( dim, &t, updateSubs);
+            	if (!transferHere) // add (local proc,local prio) to update list, otherwise local Ma/Gh copy will be lost
+            		it->second.AddProc( ProcCL::MyRank(), t.GetPrio());
+            }
+        } else // non-tetra
+        	mod_.AddSimplexToUpdate( dim, &t, false);
         return true;
     }
 
@@ -801,13 +831,13 @@ bool ModifyCL::AssignPostProcs()
                     send= verts.end();
             if (sit!=send) // simplex to be updated
                 sit->second.AddProcSet( *postProcs);
-        }
+            }
         for ( Uint i=0; i<NumEdgesC; ++i) {
             const UpdateIterator sit= edges.find( t->GetEdge(i)),
                     send= edges.end();
             if (sit!=send) // simplex to be updated
                 sit->second.AddProcSet( *postProcs);
-        }
+            }
         for ( Uint i=0; i<NumFacesC; ++i) {
             const UpdateIterator sit= faces.find( t->GetFace(i)),
                     send= faces.end();
@@ -931,8 +961,12 @@ void TransferCL::MarkForTransfer( const TetraCL& t, int toProc, Priority prio, b
     Helper::SimplexTransferInfoCL& info= it->second;
     /// add/merge proc/prio
     info.AddProc( toProc, prio);
-    if (!del) // keep local object
-        info.AddProc( ProcCL::MyRank(), info.GetRemoteData().GetLocalPrio());
+    if (!del) { // keep local object, if not already there
+    	prio= info.GetRemoteData().GetLocalPrio();
+        if (info.GetPostProc(prio)==-1) // prio not found
+        	info.AddProc( ProcCL::MyRank(), prio);
+    } else
+    	info.RemoveProc( ProcCL::MyRank());
 
     // Code below was copied from ParMultiGridCL::Transfer. Please use ParMultiGridCL::Transfer directly!
 //    if (t.IsRegularlyRef() && t.IsMaster() && prio==PrioMaster)
@@ -1008,30 +1042,45 @@ void TransferCL::FillSendBuffer()
 
 void TransferCL::Receive()
 {
-    // get message length for each other process
+    // compute send pattern (procs I send to get a "1")
     std::valarray<int> send(0, ProcCL::Size());
     for ( SendBufT::const_iterator it(sendBuffer_.begin()), end(sendBuffer_.end()); it!=end; ++it){
         send[ it->first]= 1;
     }
-    // get the message length of all other processes
+    // get the receive pattern (procs I receive from have a nonzero entry)
     std::valarray<int> IreceiveFrom= ProcCL::Alltoall( send);
+    // get the number of procs to receive from
+    int numRecvFrom= 0;
     for ( int p=0; p < ProcCL::Size(); ++p)
+        if ( IreceiveFrom[p]>0)
+        	++numRecvFrom;
+    // receive from other processes
+    std::vector<Helper::RecvStreamCL*> recv( numRecvFrom);
+    std::vector<SArrayCL<size_t,4> >   numMsg( numRecvFrom);
+    for ( int p=0, i=0; p < ProcCL::Size(); ++p)
         if ( IreceiveFrom[p]>0) {
-            Helper::RecvStreamCL recvstream( binary_);
-            recvstream.Recv( p);
-            size_t numMsg[4];
+        	recv[i]= new Helper::RecvStreamCL( binary_);
+            recv[i]->Recv( p);
             // receive number of verts/edges/faces/tetras
             for (int dim=0; dim<4; ++dim)
-                recvstream >> numMsg[dim];
-            // Receive vertices
-            ReceiveSimplices<VertexCL>( recvstream, numMsg[0]);
-            // Receive edges
-            ReceiveSimplices<EdgeCL>  ( recvstream, numMsg[1]);
-            // Receive faces
-            ReceiveSimplices<FaceCL>  ( recvstream, numMsg[2]);
-            // receive tetras
-            ReceiveSimplices<TetraCL> ( recvstream, numMsg[3]);
+                (*recv[i]) >> numMsg[i][dim];
+            ++i;
         }
+    // Receive vertices
+    for (int i=0; i<numRecvFrom; ++i)
+    	ReceiveSimplices<VertexCL>( *recv[i], numMsg[i][0]);
+    // Receive edges
+    for (int i=0; i<numRecvFrom; ++i)
+    	ReceiveSimplices<EdgeCL>  ( *recv[i], numMsg[i][1]);
+    // Receive faces
+    for (int i=0; i<numRecvFrom; ++i)
+    	ReceiveSimplices<FaceCL>  ( *recv[i], numMsg[i][2]);
+    // receive tetras
+    for (int i=0; i<numRecvFrom; ++i) {
+    	ReceiveSimplices<TetraCL> ( *recv[i], numMsg[i][3]);
+    	// current receive stream not needed anymore
+    	delete recv[i];
+    }
 }
 
 template <>
@@ -1060,16 +1109,16 @@ TetraCL& TransferCL::CreateSimplex<TetraCL>  ( const TetraCL& s,  const Helper::
     for ( Uint i=0; i<NumFacesC; ++i)
         const_cast<FaceCL*>(t.GetFace(i))->LinkTetra(&t);
     { // TODO: hier experimentell, sollte per Handler ausgelagert werden (aus ParMultiGridCL::HandlerTObjMkCons).
-//        if (t.IsRegularlyRef() && t.IsMaster())
-//        {
-//            t.CommitRegRefMark();
-//            // nun wird auf allen Edges _AccMFR:=_MFR gesetzt, um Unkonsistenzen bei vorher verteilt
-//            // und nun nur noch lokal gespeicherten Edges zu vermeiden. Ein abschliessenden
-//            // AccumulateMFR in XferEnd() setzt auf den verteilt gespeicherten Edges dann die
-//            // richtigen _AccMFR-Werte.
-//            for (TetraCL::const_EdgePIterator it= t.GetEdgesBegin(), end= t.GetEdgesEnd(); it!=end; ++it)
-//                (*it)->SetAccMFR( (*it)->GetMFR());
-//        }
+        if (t.IsRegularlyRef() && t.IsMaster())
+        {
+            t.CommitRegRefMark();
+            // nun wird auf allen Edges _AccMFR:=_MFR gesetzt, um Unkonsistenzen bei vorher verteilt
+            // und nun nur noch lokal gespeicherten Edges zu vermeiden. Ein abschliessenden
+            // AccumulateMFR in XferEnd() setzt auf den verteilt gespeicherten Edges dann die
+            // richtigen _AccMFR-Werte.
+            for (TetraCL::const_EdgePIterator it= t.GetEdgesBegin(), end= t.GetEdgesEnd(); it!=end; ++it)
+                (*it)->SetAccMFR( (*it)->GetMFR());
+        }
 
     }
     return t;

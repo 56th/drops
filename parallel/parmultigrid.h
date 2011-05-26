@@ -155,7 +155,7 @@ class ParMultiGridCL
     class RescueGhostsCL;
     class RescueMasterCL;
     //@}
-    class AdaptVGhostMidVertexCL;           ///< Delete MidVertex of PrioVGhost edges
+    class AdaptMidVertexCL;           ///< Delete or set mid-vertex of edges
     //@}
 
 
@@ -262,7 +262,7 @@ class ParMultiGridCL
     void TreatHasGhosts (int Level= -1);                                 // Rescue all subsimplices of tetra that has ghosts
     void AdaptPrioOnSubs();                                              // Set prios of all subsimplices right
     void RescueSubs(TetraCL&);                                           // All subsimplices of tetra are rescued and get prio PrioMaster
-    void AdaptMidVertex (int Level= -1);                                 // Set MidVertices with vertical overlapping
+    void AdaptMidVertex ();                                              // Delete or set mid-vertex for all edges
 
   private:
     // functions concerning the interfaces and handlers

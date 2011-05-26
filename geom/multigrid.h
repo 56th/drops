@@ -314,10 +314,10 @@ class MultiGridCL
     void SplitMultiBoundaryTetras();                            ///< Tetras adjacent to more than one boundary-segment are subdivided into four tetras using the barycenter. This method must be called prior to Refine or MakeConsistentNumbering.
     void SizeInfo(std::ostream&);                               // all procs have to call this function in parallel mode!
     void ElemInfo(std::ostream&, int Level= -1) const;          // all procs have to call this function in parallel mode
-    void DebugInfo(std::ostream&) const;                        ///< Put all vertices, edges, faces, and tetras on the stream
+    void DebugInfo(std::ostream&, int Level=-1) const;          ///< Put all vertices, edges, faces, and tetras on the stream
 #ifdef _PAR
     Uint GetNumDistributedObjects() const;                      // get number of distributed objects
-    Uint GetNumTriangTetra(int Level=-1);                       // get number of tetraeder of a given level
+    Uint GetNumTriangTetra(int Level=-1);                       // get number of tetras of a given level
     Uint GetNumTriangFace(int Level=-1);                        // get number of faces of a given level
     Uint GetNumDistributedFaces(int Level=-1);                  // get number of faces on processor boundary
     SimplexFactoryCL& GetSimplexFactory() { return factory_; }

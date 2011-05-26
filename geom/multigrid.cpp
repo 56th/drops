@@ -1033,15 +1033,15 @@ void MultiGridCL::ElemInfo(std::ostream& os, int Level) const
          << rmin << " <= h_max/h_min <= " << rmax << std::endl;
 }
 
-void MultiGridCL::DebugInfo(std::ostream& os) const
+void MultiGridCL::DebugInfo(std::ostream& os, int Level) const
 {
-    for (const_VertexIterator sit(GetVerticesBegin()), end(GetVerticesEnd()); sit!=end; ++sit)
+    for (const_VertexIterator sit(GetVerticesBegin(Level)), end(GetVerticesEnd(Level)); sit!=end; ++sit)
         sit->DebugInfo( os);
-    for (const_EdgeIterator sit(GetEdgesBegin()), end(GetEdgesEnd()); sit!=end; ++sit)
+    for (const_EdgeIterator sit(GetEdgesBegin(Level)), end(GetEdgesEnd(Level)); sit!=end; ++sit)
         sit->DebugInfo( os);
-    for (const_FaceIterator sit(GetFacesBegin()), end(GetFacesEnd()); sit!=end; ++sit)
+    for (const_FaceIterator sit(GetFacesBegin(Level)), end(GetFacesEnd(Level)); sit!=end; ++sit)
         sit->DebugInfo( os);
-    for (const_TetraIterator sit(GetTetrasBegin()), end(GetTetrasEnd()); sit!=end; ++sit)
+    for (const_TetraIterator sit(GetTetrasBegin(Level)), end(GetTetrasEnd(Level)); sit!=end; ++sit)
         sit->DebugInfo( os);
 }
 

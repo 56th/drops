@@ -552,18 +552,20 @@ void LoadBalCL::DeleteGraph()
 
 /// \brief Do migration of the tetrahedra
 void LoadBalCL::Migrate()
-/** Iteratate over the tetrahedra that are in the loadbalancing set and tell
-    DDD on which processer these tetras belong. For a detailed description see
+/** Iterate over the tetrahedra that are in the loadbalancing set and tell
+    DiST to which process these tetras belong. For a detailed description see
     Diploma thesis of Sven Gross.
 */
 {
 #if DROPSDebugC
 /*
-    GIDT observe1 = 207360, observe2=0, observe3=0;
+	Point3DCL p= MakePoint3D( 0.6875, 0.625, 0.0625),
+	    q= MakePoint3D( 0.5, 0.75, 0.25),
+	    r= MakePoint3D( 0.8125, 0.9375, 0.375);
+	DiST::Helper::GeomIdCL observe1(2,p,3), observe2(0,q,3), observe3(2,r,3);
 */
 #endif
-    if (ProcCL::MyRank()==0)
-        Comment("- Start Migrating"<<std::endl, DebugLoadBalC);
+    Comment("- Start Migrating"<<std::endl, DebugLoadBalC);
 
     ParMultiGridCL& pmg= ParMultiGridCL::Instance();
     pmg.TransferBegin();
@@ -580,22 +582,22 @@ void LoadBalCL::Migrate()
 #if DROPSDebugC
 /*
         if ( it->GetGID()==observe1 || it->GetGID()==observe2 || it->GetGID()==observe3)
-            std::cout << "["<<ProcCL::MyRank()<<"] ===> Transfer des Tetras mit GID "<<it->GetGID() << " nach " << dest << " als ";
+            cdebug << " ===> Transfer des Tetras mit GID "<<it->GetGID() << " nach " << dest << " als ";
 */
 #endif
 
         if (it->IsUnrefined() )
-        { // E1-Xfer
+        { // E1-Xfer: parent transfer without children
             pmg.Transfer( *it, dest, PrioMaster, true);
 #if DROPSDebugC
 /*
             if ( it->GetGID()==observe1 || it->GetGID()==observe2 || it->GetGID()==observe3)
-                std::cout << "E1-Xfer mit delete =1 und PrioMaster" << std::endl;
+                std::cerr << "E1-Xfer mit delete =1 und PrioMaster" << std::endl;
 */
 #endif
         }
         else
-        { // E2-Xfer
+        { // E2-Xfer: parent transfer with children (M1/M2-Xfer)
             Priority asPrio=PrioGhost,
                 destPrio= DiST::InfoCL::Instance().GetRemoteData( *it).GetPrio(dest);
             if ( destPrio!=NoPrio && destPrio >= PrioMaster)
@@ -603,7 +605,7 @@ void LoadBalCL::Migrate()
 #if DROPSDebugC
 /*
             if ( it->GetGID()==observe1 || it->GetGID()==observe2 || it->GetGID()==observe3)
-                std::cout << "E2-Xfer mit delete ="<< (it->GetPrio()==PrioGhost)
+                std::cerr << "E2-Xfer mit delete ="<< (it->GetPrio()==PrioGhost)
                         << " und Prio"<<(asPrio==PrioMaster?"Master":"Ghost")<<" Unrefined=" << it->IsUnrefined()
                         << std::endl;
 */
@@ -618,19 +620,19 @@ void LoadBalCL::Migrate()
             for (TetraCL::ChildPIterator ch(it->GetChildBegin()), chend(it->GetChildEnd()); ch!=chend; ++ch)
             {
                 if ((*ch)->IsUnrefined() || (*ch)->HasGhost() )
-                { // M1-Xfer
+                { // M1-Xfer: master transfer of unrefined child
                     pmg.Transfer( **ch, dest, PrioMaster, true);
 #if DROPSDebugC
 /*
                     if ( it->GetGID()==observe1 || (*ch)->GetGID()==observe1 || (*ch)->GetGID()==observe2 || (*ch)->GetGID()==observe3)
-                        std::cout << "["<<ProcCL::MyRank()<<"]===> Transfer des Tetras mit GID "<< (*ch)->GetGID()
+                        cdebug <<" ===> Transfer des Tetras mit GID "<< (*ch)->GetGID()
                                 << " als Kind von " << it->GetGID() << " nach " << dest
                                 << " als M1-Xfer mit delete =1 und PrioMaster" << std::endl;
 */
 #endif
                 }
                 else
-                { // M2-Xfer
+                { // M2-Xfer: master transfer of refined child. Maybe additional E2-Xfer for this child (as a parent of its children).
                     const bool E2Xfer= it.IsInLbSet( **ch) && partitioner_->GetGraph().part[(*ch)->GetLbNr()]!=static_cast<idxtype>(me);
 
                     pmg.Transfer( **ch, dest, PrioMaster, E2Xfer);
@@ -641,7 +643,7 @@ void LoadBalCL::Migrate()
 #if DROPSDebugC
 /*
                     if ( (*ch)->GetGID()==observe1 || (*ch)->GetGID()==observe2 || (*ch)->GetGID()==observe3)
-                        std::cout << "["<<ProcCL::MyRank()<<"]===> Transfer des Tetras mit GID "<< (*ch)->GetGID()
+                        cdebug << " ===> Transfer des Tetras mit GID "<< (*ch)->GetGID()
                                 << " als Kind von " << it->GetGID() << " nach " << dest
                                 << " als M2-Xfer mit delete =" << E2Xfer
                                 << " und PrioMaster und ChangePrio to Prio"<< (E2Xfer?"Master":"Ghost") << std::endl;

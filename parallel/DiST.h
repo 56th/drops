@@ -568,8 +568,12 @@ class SimplexTransferInfoCL
     void AddProc( int proc, Priority prio, bool changeLocalPrio=false);
     /// \brief Adds new proc/prio entries without changing existing entries.
     void AddProcSet( const ProcSetT& procs);
+    /// \brief Remove \a proc entry from set of post procs
+    void RemoveProc( int proc) { postProcs_.erase(proc); }
     /// return whether simplex will be on proc \a p after transfer
     bool WillBeOnProc( int p) const { return postProcs_.find(p) != postProcs_.end(); }
+    /// return process rank where simplex will have a certain \a prio after transfer (return -1 if such a rank doesn't exist)
+    int GetPostProc( Priority prio) const;
     /// return set of procs/prios after transfer
     const ProcSetT& GetPostProcs() const { return postProcs_; }
     /// return set of procs/prios where simplex has to be sent to

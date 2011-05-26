@@ -1210,7 +1210,7 @@ public:
 
 /// \brief Treat Ghost-Vertices, so they are not deleted
 /** Vertices has to be treated special for removement, because they can be found in other
-    levels then the ghost tetra (which is deleted). <p>
+    levels than the ghost tetra (which is deleted). <p>
     Interface-function (TetraIF) ExecGhVertRescue */
 void ParMultiGridCL::RescueGhostVerts( Uint Level)
 {
@@ -1239,7 +1239,7 @@ protected:
 //            std::cout << "[" << ProcCL::MyRank() << "]:   - for edge " << (*it)->GetGID()
 //                      << " from " << PriorityToString((*it)->GetPrio()) << " to "
 //                      << PriorityToString( prio) << std::endl;
-            modify_.ChangePrio( **it, prio);
+        	modify_.ChangePrio( **it, prio);
         }
         for (TetraCL::const_FacePIterator it= t.GetFacesBegin(), end= t.GetFacesEnd(); it!=end; ++it){
 //            std::cout << "[" << ProcCL::MyRank() << "]:   - for face " << (*it)->GetGID()
@@ -1286,7 +1286,7 @@ public:
     }
 };
 
-/// \brief Treat subsimplices that has Ghosts
+/// \brief Treat subsimplices that of HasGhosts
 /** Mark subsimplices of HasGhosts as VGhost and rescue them <p>
     Interface-function (TetraIF) calls ExecHasGhostC*/
 void ParMultiGridCL::TreatHasGhosts( int Level)
@@ -1385,41 +1385,49 @@ void ParMultiGridCL::AdaptPrioOnSubs()
     Comment( "AdaptPrioOnSubs done.\n", DebugParallelC);
 }
 
-class ParMultiGridCL::AdaptVGhostMidVertexCL
+class ParMultiGridCL::AdaptMidVertexCL
 {
-private:
-    int level_;
-public:
-    AdaptVGhostMidVertexCL( int level=-1) : level_(level) {}
-    /** \brief Delete MidVertex of PrioVGhost edges*/
-    bool operator() ( DiST::TransferableCL& t)
+  public:
+    AdaptMidVertexCL() {}
+    /** \brief Delete mid-vertex of PrioVGhost edges and set mid-vertex of the other edges, if necessary.*/
+    void operator() ( EdgeCL& e)
     {
-        EdgeCL* ep; simplex_cast( t, ep);
-        DiST::Helper::GeomIdCL midVertGID(ep->GetLevel()+1, GetBaryCenter(*ep), DiST::GetDim<VertexCL>());
-        if ( ep->GetMidVertex() && !DiST::InfoCL::Instance().Exists(midVertGID))
-            ep->RemoveMidVertex();
-        return true;
+        if (e.GetPrio()==PrioVGhost)
+            e.RemoveMidVertex();
+        else if ( !e.GetMidVertex() && e.IsMarkedForRef()) {
+            const DiST::Helper::GeomIdCL midVertGID( e.GetLevel()+1, e.GetGID().bary, DiST::GetDim<VertexCL>());
+        	e.SetMidVertex( DiST::InfoCL::Instance().GetVertex(midVertGID));
+        }
     }
-    void Call()
-    {
-        DiST::PrioListCL prio; prio.push_back( PrioVGhost);
-        DiST::InterfaceCL::DimListT dimlist; dimlist.push_back( DiST::GetDim<EdgeCL>());
-        DiST::LevelListCL Lvls;
-        if ( level_!=-1)
-            Lvls.push_back( level_);
-        DiST::InterfaceCL interf( Lvls, prio, prio, dimlist);
-        interf.ExecuteLocal( *this);
-    }
-
 };
 
 
-/// \brief Adapt midvertex pointers on VGhost-Edges
-/** Interface-function (EdgeIF) calls ExecAdaptVGhostMidVertexC*/
-void ParMultiGridCL::AdaptMidVertex( int Level)
+/// \brief Adapt mid-vertex pointers on edges
+void ParMultiGridCL::AdaptMidVertex()
 {
-    AdaptVGhostMidVertexCL adaptVGhostVerts(Level);
-    adaptVGhostVerts.Call();
+    AdaptMidVertexCL adaptMidVerts;
+    std::for_each( mg_->GetAllEdgeBegin(), mg_->GetAllEdgeEnd(), adaptMidVerts);
+}
+
+/// \brief Change the priority of a tetra
+template<>
+  void ParMultiGridCL::PrioChange<TetraCL>(TetraCL* const Tp, Priority Prio)
+{
+    Assert( modify_, DROPSErrCL("ParMultiGridCL::PrioChange: There must be an active Transfer or Modify module to run this procedure"), DebugParallelC);
+    Assert(!(Prio==PrioGhost && Tp->IsMaster() && !Tp->IsLocal() ),
+             DROPSErrCL("ParMultiGridCL::PrioChange: illegal prio for T"),
+             DebugParallelC
+          );
+    modify_->ChangePrio( *Tp, Prio);
+    if (Prio==PrioMaster && Tp->GetPrio()==PrioGhost && Tp->IsRegularlyRef())
+    {   // It may happen, that this routine increases the MFR on a ghost edge, that will be after the transfer
+        // not distributed any more. So remember this tetra and repair the MFR on local edges of this tetra
+        // within ParMultiGridCL::AccumulateMFR()
+    	cdebug << "@@@@ PrioChange<TetraCL> for " << Tp->GetGID() << ": " << PriorityToString(Tp->GetPrio()) << " => " << PriorityToString(Prio) << std::endl;
+    	for (int i=0; i<6; ++i) cdebug << Tp->GetEdge(i)->GetGID() << "  "; cdebug << std::endl;
+        Tp->CommitRegRefMark();
+        ToHandleTetra_.push_back(Tp);
+    }
 }
 
 /****************************************************************************
@@ -1496,7 +1504,7 @@ void ParMultiGridCL::TransferEnd()
     ModifyEnd();
 
     // Adapt midvertex pointers on VGhost-Edges
-    Comment("  * Adapting Midvertex on VGhost-Edges"<<std::endl,DebugParallelC);
+    Comment("  * Adapting Midvertex on Edges"<<std::endl,DebugParallelC);
     AdaptMidVertex();
 
     // Accumulate Ref-counter on edges
