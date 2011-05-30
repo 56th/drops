@@ -302,7 +302,7 @@ void MultiGridCL::UnrefineGrid (Uint Level)
     if (killedGhost)
         killedGhostTetra_=true;
 
-    // now all removemarks are set. Now put simplices into recycle bin and clear remove marks of stilled used tetras
+    // now all remove marks are set. Now put simplices into recycle bin and clear remove marks of still used tetras
     for (TetraIterator tIt(Tetras_[Level].begin()), tEnd(Tetras_[Level].end()); tIt!=tEnd; )
     {
         if (tIt->HasGhost()){
@@ -375,7 +375,7 @@ void MultiGridCL::UnrefineGrid (Uint Level)
     // now DiST can internally delete references and information!
     pmg.ModifyEnd();
 
-    // kill ghost tetras, that aren't need any more
+    // kill ghost tetras, that aren't needed any more
     if (!withUnknowns_){
         for (std::list<TetraIterator>::iterator it=toDelGhosts_.begin(); it!=toDelGhosts_.end(); ++it)
             Tetras_[Level].erase(*it);

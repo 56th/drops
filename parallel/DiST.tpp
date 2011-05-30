@@ -368,11 +368,18 @@ bool InterfaceCL::ScatterData( HandlerT& handler)
         while ( tmp!=Helper::NoGID){
             recv >> numData;
             if ( !recv){
+            	cdebug << "error while reading object " << tmp << std::endl;
                 throw DROPSErrCL("InterfaceCL::ScatterData: Receive stream is broken!");
             }
             Helper::RemoteDataCL& rd= InfoCL::Instance().GetRemoteData(tmp);
             const bool scatter_result= handler.Scatter( rd.GetLocalObject(), numData, (*it->second));
             result= result && scatter_result;
+#if DROPSDebugC & DebugDiSTC
+            // check for delimiter
+            char delim;
+            recv >> delim;
+            Assert( delim=='|', Helper::ErrorCL("InterfaceCL::ScatterData: incomplete receive while reading object ", tmp), DebugDiSTC);
+#endif
             recv >> tmp;
         }
     }

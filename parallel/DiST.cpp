@@ -194,7 +194,7 @@ void RemoteDataCL::Identify( const TransferableCL& parent, const PrioListCL& pri
 
 void RemoteDataCL::DebugInfo( std::ostream& os) const
 {
-    os << "Simplex " << localObj_->GetGID() << '\n'
+    os << "Simplex " << localObj_->GetGID() << ", owner = " << owner_ << '\n'
        << " o stored on " << procList_ << std::endl;
 }
 
@@ -252,7 +252,7 @@ class RemoteDataListCL::DebugHandlerCL
     bool Gather( const TransferableCL& t, Helper::SendStreamCL& s)
     { // write proc/prio list
         Helper::RemoteDataCL::ProcListT proclist( t.GetProcListBegin(), t.GetProcListEnd());
-        s << proclist;
+        s << proclist << t.GetOwner();
         return true;
     }
 
@@ -261,7 +261,13 @@ class RemoteDataListCL::DebugHandlerCL
         Helper::RemoteDataCL::ProcListT myplist( t.GetProcListBegin(), t.GetProcListEnd());
         for (size_t i=0; i<numData; ++i) {
             Helper::RemoteDataCL::ProcListT plist;
-            r >> plist;
+            int owner;
+            r >> plist >> owner;
+            if (owner != t.GetOwner()) {
+            	os_ << "Inconsistent owner, mine = " << t.GetOwner() << ", remote = " << owner << std::endl;
+                t.DebugInfo( os_);
+            	return false;
+            }
             if (myplist.size() != plist.size()) {
                 os_ << "Differing size of remote data for simplex " << t.GetGID() << std::endl;
                 t.DebugInfo( os_);
@@ -453,15 +459,15 @@ void InterfaceCL::Communicate( CommPhase phase)
     (1) The data collected by the gather routine is sent to processes which are owner of
     at least one entity. Let p denote a process who is owner of an entity.
     (2) Then, p receives data from the processes given in the member variable
-    ownerRecvFrom_. An order the data according the GID of the corresponding entity.
+    ownerRecvFrom_ and orders the data according the GID of the corresponding entity.
     (3) After receiving the data from the processes owning a non-owner copy, p generates
     a send stream containing the following data:
     GID_1 numData_1 data_1, GID_2 numData_2 data_2, ..., GID_n numData_n data_n NoGID.
     Here, numData_i describes the number of copies of the entity with GID_i which have
-    send some data to the owner.
-    (4a) The data which are collected in phase (3) is sent to the processes who owns
+    sent some data to the owner.
+    (4a) The data which are collected in phase (3) is sent to the processes who own
     at least one entity covered by the "to"-interface.
-    (4b) For receiving the data, each process receive data from the previously computed
+    (4b) For receiving the data, each process receives data from the previously computed
     list IRecvFromOwners_.
     \param phase How to communicate, i.e., copies -> owner -> copies, copies -> owner, owner -> copies
 
@@ -568,6 +574,11 @@ void InterfaceCL::Communicate( CommPhase phase)
                     DebugDiSTC);
                 (*sendstreams[pit->proc]) << it->first << itNum->second;
                 sendstreams[pit->proc]->write( Addr(it->second), it->second.size());
+#if DROPSDebugC & DebugDiSTC
+                // append delimiting char to find inconsistent gather/scatter routines
+                const char delim= '|';
+                (*sendstreams[pit->proc]) << delim;
+#endif
             }
         }
     }
@@ -695,13 +706,15 @@ class ModifyCL::CommToUpdateHandlerCL
         return true;
     }
 
-    bool Scatter( TransferableCL& t, const size_t, Helper::RecvStreamCL& is)
+    bool Scatter( TransferableCL& t, const size_t numData, Helper::RecvStreamCL& is)
     {
         const Usint dim= t.GetDim();
         if (dim==GetDim<TetraCL>()) { // tetra
-            bool updateSubs, transferHere;
-            is >> updateSubs >> transferHere;
-
+            bool updateSubs= false, upSubs, transferHere;
+            for (size_t i=0; i<numData; ++i) {
+            	is >> upSubs >> transferHere;
+            	updateSubs= updateSubs || upSubs;
+            }
             ModifyCL::UpdateListT& ul= mod_.entsToUpdt_[dim];
             ModifyCL::UpdateIterator it= ul.find( &t);
             if (it==ul.end()) { // not already in update list
@@ -724,7 +737,7 @@ class ModifyCL::CommToUpdateHandlerCL
         const PrioListT   allPrios;
         const LevelListCL allLvls;
         // communicate over all objects
-        InterfaceCL comm( allLvls, allPrios, allPrios, dimlist, mod_.binary_);
+        InterfaceCL comm( allLvls, allPrios, allPrios, dimlist, /*dist*/ true, mod_.binary_);
         comm.PerformInterfaceComm( *this);
     }
 };
@@ -749,7 +762,6 @@ void ModifyCL::Finalize()
         DeleteUnusedSimplices( del_);
         if (del_) InfoCL::Instance().PostMultiGridMod();
     }
-    UpdateOwners();
     // Now we are ready to remove the update lists
     delete[] entsToUpdt_;
     entsToUpdt_= 0;
@@ -865,6 +877,7 @@ bool ModifyCL::AssignPostProcs()
 
 void ModifyCL::UpdateRemoteData()
 {
+    const Helper::RemoteDataCL::LoadVecT& loadOfProc= InfoCL::Instance().GetLoadVector();
     for (int dim=0; dim<4; ++dim)
         for (UpdateListT::iterator it= entsToUpdt_[dim].begin(), end= entsToUpdt_[dim].end(); it!=end; ++it) {
             Helper::SimplexTransferInfoCL& sti= it->second;
@@ -872,18 +885,9 @@ void ModifyCL::UpdateRemoteData()
                 // update remote data
                 Helper::RemoteDataCL::ProcListT proclist( sti.GetPostProcs().begin(), sti.GetPostProcs().end());
                 sti.GetRemoteData().SetProcList( proclist);
+                sti.GetRemoteData().UpdateOwner(loadOfProc);
             }
         }
-}
-
-void ModifyCL::UpdateOwners()
-{
-    const Helper::RemoteDataCL::LoadVecT& loadOfProc= InfoCL::Instance().GetLoadVector();
-    InfoCL& info= InfoCL::Instance();
-    for (int dim=0; dim<4; ++dim)
-        for (Helper::RemoteDataListCL::iterator it= info.GetRemoteList(dim).begin(), end= info.GetRemoteList(dim).end(); it!=end; ++it)
-            if (!it->second.GetLocalObject().IsMarkedForRemovement())
-                it->second.UpdateOwner(loadOfProc);
 }
 
 void ModifyCL::DeleteUnusedSimplices( bool del)
@@ -1002,6 +1006,15 @@ void TransferCL::UpdateSendRemoteData( const TransferableCL& t, Helper::SimplexT
             (*sendBuffer_[sit->first]) << t << proclist;
         }
     }
+}
+
+void TransferCL::UpdateOwners()
+{
+    const Helper::RemoteDataCL::LoadVecT& loadOfProc= InfoCL::Instance().GetLoadVector();
+    InfoCL& info= InfoCL::Instance();
+    for (int dim=0; dim<4; ++dim)
+        for (Helper::RemoteDataListCL::iterator it= info.GetRemoteList(dim).begin(), end= info.GetRemoteList(dim).end(); it!=end; ++it)
+                it->second.UpdateOwner(loadOfProc);
 }
 
 /** Generate for each process that gets some data a buffer containing all

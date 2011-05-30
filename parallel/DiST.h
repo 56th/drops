@@ -132,7 +132,7 @@ struct GeomIdCL
 
 inline std::ostream& operator << ( std::ostream& os, const GeomIdCL& h)
 {
-    static char scode[]= "VEFT"; // simplex code for each dimension
+    static char scode[]= "VEFT?"; // simplex code for each dimension
     os << scode[h.dim] << h.level << " (" << h.bary << ')';
     return os;
 }
@@ -815,10 +815,8 @@ class ModifyCL
     void CreateUpdateList();
     /// \brief Assign new procs (needs interface comm.) and determine which simplices will be deleted after transfer
     bool AssignPostProcs();
-    /// \brief Update the remote data to account for changed prios
+    /// \brief Update the remote data (incl. owner) to account for changed prios
     void UpdateRemoteData();
-    /// \brief Update ownership (in remote data)
-    void UpdateOwners();
     /// \brief Delete all simplices that are not needed any more.
     void DeleteUnusedSimplices( bool del);
 
@@ -862,6 +860,8 @@ class TransferCL : public ModifyCL
     SortedListT* SortUpdateTetras();
     /// Update and send remote data of a given simplex.
     void UpdateSendRemoteData( const TransferableCL&, Helper::SimplexTransferInfoCL&);
+    /// \brief Update ownership (in remote data) for all registered objects
+    void UpdateOwners();
     /// \brief allocate and fill send buffers, update remote data
     void FillSendBuffer();
     /// \brief Receive and create simplices and remote data

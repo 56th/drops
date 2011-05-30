@@ -1398,6 +1398,8 @@ class ParMultiGridCL::AdaptMidVertexCL
             const DiST::Helper::GeomIdCL midVertGID( e.GetLevel()+1, e.GetGID().bary, DiST::GetDim<VertexCL>());
         	e.SetMidVertex( DiST::InfoCL::Instance().GetVertex(midVertGID));
         }
+        if (e.IsLocal())
+        	e.SetAccMFR( e.GetMFR());
     }
 };
 
