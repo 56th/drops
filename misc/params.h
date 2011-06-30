@@ -1,6 +1,6 @@
 /// \file params.h
 /// \brief read parameters from file.
-/// \author LNM RWTH Aachen: Joerg Grande, Sven Gross, Volker Reichelt; SC RWTH Aachen: Oliver Fortmeier
+/// \author LNM RWTH Aachen: Joerg Grande, Sven Gross, Volker Reichelt, Thorolf Schulte; SC RWTH Aachen: Oliver Fortmeier
 
 /*
  * This file is part of DROPS.
@@ -25,13 +25,93 @@
 #ifndef DROPS_MISC_PARAMS_H
 #define DROPS_MISC_PARAMS_H
 
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/exceptions.hpp>
+#include <boost/property_tree/json_parser.hpp>
+#include <boost/property_tree/exceptions.hpp>
 #include "misc/container.h"
 #include <string>
 #include <map>
 #include <fstream>
 
+//#define PARAMDEBUG
+
 namespace DROPS
 {
+
+/// \brief Parser and container for JSON parameter files
+/// Usage
+///   - see trac
+
+class ParamCL: public boost::property_tree::ptree
+{
+  public:
+    ParamCL();
+
+    template <typename OutType>
+    OutType get(const std::string & pathInPT) const
+    {
+#ifdef PARAMDEBUG
+      try {
+          OutType tmp = this->pt.get<OutType>(pathInPT);
+      }
+      catch(boost::property_tree::ptree_error & e) {
+        std::cout << "Trying to get '" << pathInPT << "' failed.\n";
+      }
+#endif
+      return this->pt.get<OutType>(pathInPT);
+    }
+
+    template <typename OutType>
+    OutType get(const char* pathInPT) const
+    {
+      return get<OutType>(std::string(pathInPT));
+    }
+
+    template <typename InType>
+    void put(const std::string & pathToNode, InType value)
+    {
+      this->pt.put(pathToNode, value);
+    }
+
+    template <typename OutType>
+    OutType get(const std::string & pathInPT, OutType default_val)
+    {
+#ifdef PARAMDEBUG
+      try {
+          OutType tmp = this->pt.get(pathInPT, default_val);
+      }
+      catch(boost::property_tree::ptree_error & e) {
+        std::cout << "Trying to get '" << pathInPT << "' failed.\n";
+      }
+#endif
+
+      OutType val = this->pt.get(pathInPT, default_val);
+      //using default_val? then add it to tree for next use.
+      //Currently this is a bad implementation due to far more put's than necessary.
+      if (val == default_val)
+        this->pt.put(pathInPT, val);
+      return val;
+    }
+
+//    DROPS::Point3DCL get(const std::string pathInPT) const;
+
+    friend std::istream &operator>>(std::istream& stream, ParamCL& P);
+    friend std::ostream &operator<<(std::ostream& stream, ParamCL& P);
+
+    //Point3DCL getPoint(const std::string pathInPT) const;
+
+  private:
+    boost::property_tree::ptree pt;
+
+    void open(const std::string path);
+    std::ostream& print(std::ostream& s);
+    void print(boost::property_tree::ptree child, std::string level, std::ostream& s);
+
+};
+
+template<>
+DROPS::Point3DCL ParamCL::get<DROPS::Point3DCL>(const std::string & pathInPT) const;
 
 ///   \brief Parser for parameter files used by ParamBaseCL.
 ///

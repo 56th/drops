@@ -30,42 +30,64 @@
 #include "navstokes/navstokes.h"
 #include <fstream>
 
+typedef double    (*instat_scalar_fun_ptr)(const DROPS::Point3DCL&, double);
+typedef DROPS::Point3DCL (*instat_vector_fun_ptr)(const DROPS::Point3DCL&, double);
 
-struct NS1CL
+static double Reaction(const DROPS::Point3DCL&, double =0)
 {
-    static DROPS::SVectorCL<3> LsgVel(const DROPS::Point3DCL& p, double)
+    return 0.0;
+}
+   
+DROPS::Point3DCL Source( const DROPS::Point3DCL& p, double)
+{
+    DROPS::SVectorCL<3> ret(0.0);
+    ret[2]= 3*p[2];
+    return ret; 
+}
+
+
+static DROPS::SVectorCL<3> LsgVel(const DROPS::Point3DCL& p, double)
+{
+    DROPS::SVectorCL<3> ret;
+    ret[0]= p[0];
+    ret[1]= p[1];
+    ret[2]= -2*p[2];
+    return ret;
+}
+    
+static double LsgPr(const DROPS::Point3DCL& p, double)
+{
+    return -(p[0]*p[0]+p[1]*p[1]+p[2]*p[2])/2;
+}
+
+// q*u - nu*laplace u + (u*D)u + Dp = f
+//                           -div u = 0
+class StokesCoeffCL
+{
+  public:
+    //reaction
+    static instat_scalar_fun_ptr q;
+    //source term
+    static instat_vector_fun_ptr f;
+        
+    const double nu;
+
+    StokesCoeffCL(): nu(1.0)
     {
-        DROPS::SVectorCL<3> ret;
-        ret[0]= p[0];
-        ret[1]= p[1];
-        ret[2]= -2*p[2];
-        return ret;
+       q = &Reaction,
+       f = &Source;
     }
-
-    static double LsgPr(const DROPS::Point3DCL& p, double)
-    {
-        return -(p[0]*p[0]+p[1]*p[1]+p[2]*p[2])/2;
-    }
-
-    // q*u - nu*laplace u + (u*D)u + Dp = f
-    //                           -div u = 0
-    class StokesCoeffCL
-    {
-      public:
-        static double q(const DROPS::Point3DCL&) { return 0.0; }
-        static DROPS::SVectorCL<3> f(const DROPS::Point3DCL& p, double)
-            { DROPS::SVectorCL<3> ret(0.0); ret[2]= 3*p[2]; return ret; }
-        const double nu;
-
-        StokesCoeffCL() : nu(1.0) {}
-    };
 
 };
 
-typedef DROPS::StokesP2P1CL<NS1CL::StokesCoeffCL>
+instat_scalar_fun_ptr StokesCoeffCL::q;
+instat_vector_fun_ptr StokesCoeffCL::f;
+
+
+typedef DROPS::StokesP2P1CL<StokesCoeffCL>
         StokesOnBrickCL;
 typedef StokesOnBrickCL MyStokesCL;
-typedef NS1CL MyPdeCL;
+
 
 namespace DROPS // for Strategy
 {
@@ -124,6 +146,8 @@ void StrategyNavSt(NavierStokesP2P1CL<Coeff>& NS, int maxStep, double fp_tol, in
     MLMatDescCL* A= &NS.A;
     MLMatDescCL* B= &NS.B;
     MLMatDescCL* N= &NS.N;
+    MLMatDescCL* M= &NS.M;
+    VelVecDescCL  cplM( vidx1);
     int step= 0;
 
     vidx1->SetFE( vecP2_FE);
@@ -144,6 +168,7 @@ void StrategyNavSt(NavierStokesP2P1CL<Coeff>& NS, int maxStep, double fp_tol, in
         c->SetIdx(pidx1);
         p1->SetIdx(pidx1);
         v1->SetIdx(vidx1);
+        cplM.SetIdx(vidx1);
         std::cout << "Anzahl der Druck-Unbekannten: " << p2->Data.size() << ", "
                   << p1->Data.size() << std::endl;
         std::cout << "Anzahl der Geschwindigkeitsunbekannten: " << v2->Data.size() << ", "
@@ -158,11 +183,14 @@ void StrategyNavSt(NavierStokesP2P1CL<Coeff>& NS, int maxStep, double fp_tol, in
             p2->Reset();
         }
         A->SetIdx(vidx1, vidx1);
+        M->SetIdx(vidx1, vidx1);
         B->SetIdx(pidx1, vidx1);
         N->SetIdx(vidx1, vidx1);
         time.Reset();
         time.Start();
-        NS.SetupSystem(A, b, B, c);
+
+        NS.SetupSystem1( A, M, b, b, &cplM, NS.v.t);
+        NS.SetupSystem2( B, c, NS.v.t);
         time.Stop();
         std::cout << time.GetTime() << " seconds for setting up all systems!" << std::endl;
         time.Reset();
@@ -185,12 +213,11 @@ void StrategyNavSt(NavierStokesP2P1CL<Coeff>& NS, int maxStep, double fp_tol, in
         //---------------------------------------
         time.Reset();
 
-        MLMatDescCL M;
-        M.SetIdx( pidx1, pidx1);
-        NS.SetupPrMass( &M);
-        AFPDeCo_Uzawa_PCG_CL<NavStokesCL> statsolver(NS, M.Data.GetFinest(), fp_maxiter, fp_tol,
+        NS.prM.SetIdx( pidx1, pidx1);
+        NS.SetupPrMass( &NS.prM);
+        AFPDeCo_Uzawa_PCG_CL<NavStokesCL> statsolver(NS, NS.prM.Data.GetFinest(), fp_maxiter, fp_tol,
                                                      2000, poi_maxiter, poi_tol, uzawa_red);
-//        FPDeCo_Uzawa_PCG_CL<NavStokesCL> statsolver(NS, M.Data, fp_maxiter, fp_tol,
+//        FPDeCo_Uzawa_PCG_CL<NavStokesCL> statsolver(NS, NS.prM.Data, fp_maxiter, fp_tol,
 //                                                  2000, poi_maxiter, poi_tol, uzawa_red);
 //        AFPDeCo_Schur_PCG_CL<NavStokesCL> statsolver(NS, fp_maxiter, fp_tol,
 //                                                   2000, poi_maxiter, poi_tol, uzawa_red);
@@ -259,10 +286,11 @@ void StrategyNavSt(NavierStokesP2P1CL<Coeff>& NS, int maxStep, double fp_tol, in
 
         time.Stop();
         std::cout << "Das Verfahren brauchte "<<time.GetTime()<<" Sekunden.\n";
-        NS.CheckSolution(v1, vidx1, p1, &MyPdeCL::LsgVel, &MyPdeCL::LsgPr);
+        NS.CheckSolution(v1, vidx1, p1, &LsgVel, &LsgPr);
         MarkAll(MG);
 
         A->Reset();
+        M->Reset();
         B->Reset();
         b->Reset();
         c->Reset();
@@ -307,7 +335,7 @@ int main (int argc, char** argv)
     const bool IsNeumann[6]=
         {false, false, false, false, false, false};
     const DROPS::StokesBndDataCL::VelBndDataCL::bnd_val_fun bnd_fun[6]=
-        { &NS1CL::LsgVel, &NS1CL::LsgVel, &NS1CL::LsgVel, &NS1CL::LsgVel, &NS1CL::LsgVel, &NS1CL::LsgVel };
+        { &LsgVel, &LsgVel, &LsgVel, &LsgVel, &LsgVel, &LsgVel };
 
     DROPS::RBColorMapperCL colormap;
 
@@ -324,11 +352,11 @@ int main (int argc, char** argv)
         std::cout << "uzawa_red: " << uzawa_red << ", ";
         std::cout << "num_ref: " << num_ref << std::endl;
 
-        typedef DROPS::NavierStokesP2P1CL<MyPdeCL::StokesCoeffCL>
+        typedef DROPS::NavierStokesP2P1CL<StokesCoeffCL>
                 NSOnBrickCL;
         typedef NSOnBrickCL MyNavierStokesCL;
 
-        MyNavierStokesCL prob(brick, MyPdeCL::StokesCoeffCL(), DROPS::StokesBndDataCL(6, IsNeumann, bnd_fun));
+        MyNavierStokesCL prob(brick, StokesCoeffCL(), DROPS::StokesBndDataCL(6, IsNeumann, bnd_fun));
         DROPS::MultiGridCL& mg = prob.GetMG();
 
         StrategyNavSt(prob, num_ref, fp_tol, fp_maxiter, uzawa_red, poi_tol, poi_maxiter);

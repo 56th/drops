@@ -274,7 +274,9 @@ void Strategy( StokesP2P1CL<CoeffCL>& Stokes)
     std::cout << line << "Discretize (setup linear equation system) ...\n";
 
     timer.Reset();
-    Stokes.SetupSystem( &Stokes.A, &Stokes.b, &Stokes.B, &Stokes.c);
+    VelVecDescCL  cplM( &Stokes.vel_idx);
+    Stokes.SetupSystem1( &Stokes.A, &Stokes.M, &Stokes.b, &Stokes.b, &cplM, 0.0);
+    Stokes.SetupSystem2( &Stokes.B, &Stokes.c, 0.0);
     MLMatDescCL prM( &Stokes.pr_idx, &Stokes.pr_idx);
     Stokes.SetupPrMass( &prM);
     timer.Stop();
@@ -292,12 +294,12 @@ void Strategy( StokesP2P1CL<CoeffCL>& Stokes)
 
     // check the result
     // -------------------------------------------------------------------------
-    std::cout << line << "Check result against known solution ...\n";
+/*    std::cout << line << "Check result against known solution ...\n";
 
     timer.Reset();
     Stokes.CheckSolution( &Stokes.v, &Stokes.p, &StatStokesCL::SolVel, &StatStokesCL::SolPr, 0);
     timer.Stop();
-    std::cout << " o time " << timer.GetTime() << " s" << std::endl;
+    std::cout << " o time " << timer.GetTime() << " s" << std::endl;*/
 }
 
 } // end of namespace DROPS

@@ -196,7 +196,7 @@ xfem: \
 f_Gamma: \
     ../tests/f_Gamma.o ../geom/boundary.o ../geom/builder.o ../geom/simplex.o ../geom/multigrid.o \
     ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o ../levelset/levelset.o \
-    ../misc/utils.o ../out/output.o ../num/discretize.o ../levelset/lsetparams.o ../num/interfacePatch.o \
+    ../misc/utils.o ../out/output.o ../num/discretize.o ../num/interfacePatch.o \
     ../misc/params.o ../levelset/fastmarch.o ../stokes/instatstokes2phase.o \
     ../levelset/surfacetension.o ../misc/bndmap.o ../geom/bndVelFunctions.o \
     ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o 
@@ -229,7 +229,7 @@ reparam: \
     ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
     ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
     ../num/fe.o ../out/ensightOut.o ../num/interfacePatch.o ../levelset/surfacetension.o \
-    ../levelset/params.o ../misc/params.o ../levelset/lsetparams.o ../out/vtkOut.o $(PAR_OBJ)
+    ../misc/params.o ../out/vtkOut.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 principallattice: \
@@ -300,8 +300,7 @@ dist_poisson: \
     ../geom/simplex.o ../geom/multigrid.o ../num/unknowns.o ../geom/topo.o \
     ../poisson/poisson.o ../misc/problem.o ../misc/utils.o ../out/output.o \
     ../num/fe.o ../num/discretize.o ../num/interfacePatch.o ../geom/geomselect.o\
-    ../poisson/poissonparams.o ../misc/params.o ../levelset/lsetparams.o \
-    ../out/vtkOut.o ../misc/bndmap.o ../geom/bndScalarFunctions.o\
+    ../misc/params.o ../out/vtkOut.o ../misc/bndmap.o ../geom/bndScalarFunctions.o\
     ../geom/bndVelFunctions.o ../poisson/poissonCoeff.o \
     ../num/hypre.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
@@ -317,7 +316,7 @@ dist_sdropsP2: \
 dist_twophasedrops: \
     ../tests/dist_twophasedrops.o ../geom/boundary.o ../geom/builder.o ../geom/simplex.o ../geom/multigrid.o \
     ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o ../levelset/levelset.o \
-    ../misc/utils.o ../out/output.o ../num/discretize.o ../levelset/lsetparams.o ../navstokes/instatnavstokes2phase.o \
+    ../misc/utils.o ../out/output.o ../num/discretize.o ../navstokes/instatnavstokes2phase.o \
     ../misc/params.o ../levelset/fastmarch.o ../stokes/instatstokes2phase.o ../num/MGsolver.o\
     ../num/fe.o  ../stokes/integrTime.o ../out/vtkOut.o \
     ../num/interfacePatch.o ../levelset/surfacetension.o \
@@ -364,7 +363,7 @@ endif
 ../tests/TestBrickflowSer.o: ../num/interfacePatch.tpp ../misc/KDtree.h
 ../tests/TestBrickflowSer.o: ../misc/KDtree.tpp ../levelset/fastmarch.tpp
 ../tests/TestBrickflowSer.o: ../levelset/adaptriang.tpp ../partests/params.h
-../tests/TestBrickflowSer.o: ../misc/params.h ../levelset/params.h
+../tests/TestBrickflowSer.o: ../misc/params.h
 ../tests/TestBrickflowSer.o: ../out/output.h ../out/ensightOut.h
 ../tests/TestBrickflowSer.o: ../navstokes/instatnavstokes2phase.h
 ../tests/TestBrickflowSer.o: ../stokes/instatstokes2phase.h
@@ -379,7 +378,7 @@ endif
 ../tests/TestGMRESSer.o: ../num/spmat.h ../num/spblockmat.h ../num/fe.h
 ../tests/TestGMRESSer.o: ../misc/problem.h ../levelset/mgobserve.h
 ../tests/TestGMRESSer.o: ../num/fe.tpp ../out/output.h ../partests/params.h
-../tests/TestGMRESSer.o: ../misc/params.h ../levelset/params.h
+../tests/TestGMRESSer.o: ../misc/params.h 
 ../tests/TestInterpolSer.o: ../geom/multigrid.h ../geom/simplex.h
 ../tests/TestInterpolSer.o: ../misc/utils.h ../geom/boundary.h
 ../tests/TestInterpolSer.o: ../misc/container.h ../geom/topo.h
@@ -391,7 +390,7 @@ endif
 ../tests/TestSedSer.o: ../geom/boundary.h ../misc/container.h ../geom/topo.h
 ../tests/TestSedSer.o: ../num/unknowns.h ../geom/builder.h ../num/bndData.h
 ../tests/TestSedSer.o: ../partests/params.h ../misc/params.h
-../tests/TestSedSer.o: ../levelset/params.h ../levelset/adaptriang.h
+../tests/TestSedSer.o: ../levelset/adaptriang.h
 ../tests/TestSedSer.o: ../levelset/mgobserve.h ../levelset/levelset.h
 ../tests/TestSedSer.o: ../num/spmat.h ../num/discretize.h ../misc/problem.h
 ../tests/TestSedSer.o: ../num/fe.h ../num/fe.tpp ../num/discretize.tpp
@@ -444,7 +443,7 @@ endif
 ../tests/f_Gamma.o: ../num/MGsolver.tpp ../stokes/instatstokes2phase.tpp
 ../tests/f_Gamma.o: ../stokes/integrTime.h ../num/stokessolver.h
 ../tests/f_Gamma.o: ../levelset/coupling.h ../num/nssolver.h
-../tests/f_Gamma.o: ../levelset/coupling.tpp ../levelset/params.h
+../tests/f_Gamma.o: ../levelset/coupling.tpp
 ../tests/f_Gamma.o: ../misc/params.h
 ../tests/gcr.o: ../num/solver.h ../misc/container.h ../misc/utils.h
 ../tests/gcr.o: ../num/spmat.h ../num/spblockmat.h
@@ -543,7 +542,7 @@ endif
 ../tests/reparam.o: ../num/interfacePatch.tpp ../misc/KDtree.h
 ../tests/reparam.o: ../misc/KDtree.tpp ../levelset/fastmarch.tpp
 ../tests/reparam.o: ../levelset/adaptriang.h ../levelset/adaptriang.tpp
-../tests/reparam.o: ../levelset/params.h ../misc/params.h ../out/ensightOut.h
+../tests/reparam.o: ../misc/params.h ../out/ensightOut.h
 ../tests/reparam.o: ../out/vtkOut.h
 ../tests/reparam_init.o: ../misc/utils.h ../geom/multigrid.h
 ../tests/reparam_init.o: ../geom/simplex.h ../geom/boundary.h
