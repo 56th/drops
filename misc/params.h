@@ -25,11 +25,8 @@
 #ifndef DROPS_MISC_PARAMS_H
 #define DROPS_MISC_PARAMS_H
 
-#include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/exceptions.hpp>
-#include <boost/property_tree/json_parser.hpp>
-#include <boost/property_tree/exceptions.hpp>
 #include "misc/container.h"
+#include "misc/utils.h"
 #include <string>
 #include <map>
 #include <fstream>
@@ -86,12 +83,15 @@ class ParamCL: public boost::property_tree::ptree
       }
 #endif
 
-      OutType val = this->pt.get(pathInPT, default_val);
-      //using default_val? then add it to tree for next use.
-      //Currently this is a bad implementation due to far more put's than necessary.
-      if (val == default_val)
-        this->pt.put(pathInPT, val);
-      return val;
+      //value in container?
+      try {
+          return this->pt.get<OutType>(pathInPT);
+      }
+      //no? then add for next time
+      catch (boost::property_tree::ptree_error & e) {
+          this->pt.put(pathInPT, default_val);
+          return default_val;
+      }
     }
 
 //    DROPS::Point3DCL get(const std::string pathInPT) const;

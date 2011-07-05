@@ -648,8 +648,7 @@ is called if MarkEqRule(). It safes all sub simplices from removement.
 
     for (Uint ch=0; ch<myRule.ChildNum; ++ch)
     {
-        const ChildDataCL childdat= GetChildData(myRule.Children[ch]);
-        TetraCL* const child= (*Children_)[ch];
+        TetraCL* const child= (*_Children)[ch];
 
         for (VertexPIterator vertPIt(child->Vertices_.begin()); vertPIt!=child->Vertices_.end(); ++vertPIt)
             (*vertPIt)->ClearRemoveMark();
