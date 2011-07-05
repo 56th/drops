@@ -42,6 +42,7 @@ typedef Point3DCL (*instat_vector_fun_ptr)(const Point3DCL&, double);
 typedef bool      (*match_fun)        (const Point3DCL&, const Point3DCL&);
 
 typedef double    (*SmoothFunT)           (double,double);
+typedef SMatrixCL<3, 3> (*instat_matrix_fun_ptr) (const Point3DCL&, double);
 
 
 // SmoothedJumpCL for jumping coefficients
@@ -251,6 +252,33 @@ outer_product(const GridFunctionCL<Point3DCL>& a, const GridFunctionCL<Point3DCL
     return ret;
 }
 
+inline GridFunctionCL< SMatrixCL<3,3> >
+outer_product (const Point3DCL& a, const GridFunctionCL<Point3DCL>& b)
+{
+    GridFunctionCL< SMatrixCL<3,3> > ret( b.size());
+    for (size_t i= 0; i<b.size(); ++i)
+        ret[i]= outer_product( a, b[i]);
+    return ret;
+}
+
+inline GridFunctionCL<>
+frobenius_norm_sq (const GridFunctionCL< SMatrixCL<3,3> >& a)
+{
+    GridFunctionCL<> ret( double(), a.size());
+    for (size_t i= 0; i<a.size(); ++i)
+        ret[i]= frobenius_norm_sq( a[i]);
+    return ret;
+}
+
+inline GridFunctionCL<>
+trace (const GridFunctionCL< SMatrixCL<3,3> >& a)
+{
+    GridFunctionCL<> ret( double(), a.size());
+    for (size_t i= 0; i<a.size(); ++i)
+        ret[i]= trace( a[i]);
+    return ret;
+}
+
 //**************************************************************************
 // Class:   LocalP1CL                                                      *
 // Template Parameter:                                                     *
@@ -357,8 +385,8 @@ DROPS_DEFINE_VALARRAY_DERIVATIVE(LocalP2CL, T, base_type)
 
 ///\brief Evaluates a function expecting world-coordinates and time as arguments in barycentric coordinates on a tetra.
 /// This gives the function the interface of the LocalFE-classes.
-template <class T>
-class WorldCoordFunctionAsLocalFECL
+template <class T= double>
+class BaryEvalCL
 {
   public:
     typedef T (*fun_type)(const Point3DCL&, double);
@@ -370,7 +398,7 @@ class WorldCoordFunctionAsLocalFECL
     fun_type f_;
 
   public:
-    WorldCoordFunctionAsLocalFECL (const TetraCL& tet, double t, fun_type f)
+    BaryEvalCL (const TetraCL& tet, double t, fun_type f)
         : mapper_( tet), t_( t), f_(f) {}
 
     value_type operator() (const BaryCoordCL& b) const { return f_( mapper_( b), t_); }
@@ -410,7 +438,7 @@ class Quad2DataCL
 };
 
 ///\brief Weights to integrate the product \f$f*\phi_i\f$, where \f$\phi_i\f$ is a P1-basis-function, exactly up to degree 2 of f with the quadrature points of Quad2DataCL
-/// Use with quad( f, absdet, Quad2Data_Mul_P2_CL(), i).
+/// Use with quad( f, absdet, Quad2Data_Mul_P1_CL(), i).
 class Quad2Data_Mul_P1_CL
 {
   public:

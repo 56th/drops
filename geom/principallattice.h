@@ -1,4 +1,4 @@
-/// \file principallattice.cpp
+/// \file principallattice.h
 /// \brief The principal lattice on the reference tetra obtained by slicing with planes parallel to the faces.
 /// \author LNM RWTH Aachen: Joerg Grande; SC RWTH Aachen:
 
@@ -47,7 +47,13 @@ class PrincipalLatticeCL
   private:
     /// \brief cache for computed lattices
     ///@{
-    static std::vector<const PrincipalLatticeCL*> cache_;
+    class PrincipalLatticeCacheCL : public std::vector<const PrincipalLatticeCL*>
+    {
+      public:
+    	~PrincipalLatticeCacheCL() { for ( size_t i = 0; i< this->size(); ++i) if ((*this)[i]) delete (*this)[i];; }
+    };
+
+    static PrincipalLatticeCacheCL cache_;
     static bool is_memoized (Uint n)
         { return n-1 < cache_.size() && cache_[n-1]; }
     static const PrincipalLatticeCL& read_cache (Uint n) { return *cache_[n-1]; }
@@ -95,6 +101,9 @@ class PrincipalLatticeCL
     static const PrincipalLatticeCL& instance (Uint n)
         { return is_memoized( n) ? read_cache( n) : memoize( n); }
 };
+
+extern const size_t p1_dof_on_lattice_2[4];  ///< For vertex i (in 0..3) as counted in topo.h, p1_dof_on_lattice_2[i] is the number of the vertex in the principal lattice of order 2.
+extern const size_t p2_dof_on_lattice_2[10]; ///< For a P2-dof i (numbered from 0..9: vertexes, then edges) as counted in topo.h, p2_dof_on_lattice_2[i] is the number of the vertex in the principal lattice of order 2.
 
 } // end of namespace DROPS
 

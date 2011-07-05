@@ -81,10 +81,12 @@ bool CheckAccumulation( MultiGridCL& mg)
         vec_desc[i]= new VecDescCL( idx_desc[i]);
         vec_desc[i]->Data= 1.0;
     }
-    idx_desc[0]->GetEx().Accumulate( vec_desc[0]->Data);
-    std::cout << " Number of neighbors of process " << ProcCL::Master() 
-                << ": " << idx_desc[0]->GetEx().GetNumNeighs() << std::endl;
 
+    for (size_t i = 0; i< num_idx; ++i) {
+        idx_desc[i]->GetEx().Accumulate( vec_desc[i]->Data);
+    }
+    std::cout << " Number of neighbors of process " << ProcCL::Master()
+              << ": " << idx_desc[0]->GetEx().GetNumNeighs() << std::endl;
     bool correct=true;
     // Check on vertices
     DROPS_FOR_TRIANG_VERTEX( mg, 0, it){
@@ -96,6 +98,7 @@ bool CheckAccumulation( MultiGridCL& mg)
                     for ( Uint j=0; j<idx_desc[i]->NumUnknownsVertex(); ++j){
                         if ( (double)it->GetNumDist()!=vec_desc[i]->Data[dof+j]){
                             correct= false;
+                            printf("Proc nr %d, testcase %ld: %f should be %f\n", ProcCL::MyRank(), i, (double)it->GetNumDist(), vec_desc[i]->Data[dof+j]);
                         }
                     }
                 }

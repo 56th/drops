@@ -119,8 +119,8 @@ template <typename Mat, typename Vec, typename PreCon, typename ExCL>
 bool ParGCR(const Mat& A, Vec& x, const Vec& b, const ExCL& ExX, PreCon& M,
     int m, int& max_iter, double& tol, bool measure_relative_tol= true, std::ostream* output=0);
 
-template <typename Mat, typename Vec, typename PreCon, typename ExCL>
-bool ParPCGNE(const Mat& A, Vec& u, const Vec& b, const ExCL& ExX, const PreCon& M,
+template <typename Mat, typename Vec, typename PreCon, typename ExACL, typename ExATranspCL>
+bool ParPCGNE(const Mat& A, Vec& u, const Vec& b, const ExACL& ExAX, const ExATranspCL& ExATranspX, const PreCon& M,
     int& max_iter, double& tol, bool measure_relative_tol= false, std::ostream* output=0);
 
 
@@ -475,25 +475,26 @@ class ParPCGNESolverCL : public ParPreSolverBaseCL<PC>
 {
   private:
     typedef ParPreSolverBaseCL<PC> base;
+    const IdxDescCL* idxAtransp_;
 
   public:
-    ParPCGNESolverCL( int maxiter, double tol, const IdxDescCL& idx, PC& pc, bool rel= false, std::ostream* output=0)
-        : base( maxiter, tol, idx, pc, rel, output) {}
+    ParPCGNESolverCL( int maxiter, double tol, const IdxDescCL& idxA, const IdxDescCL& idxAtransp, PC& pc, bool rel= false, std::ostream* output=0)
+        : base( maxiter, tol, idxA, pc, rel, output), idxAtransp_( &idxAtransp) {}
 
     template <typename Mat, typename Vec>
     void Solve(const Mat& A, Vec& x, const Vec& b)
     {
-    	base::_res=  base::_tol;
-    	base::_iter= base::_maxiter;
-        ParPCGNE(A, x, b, base::GetEx(), base::GetPC(), base::_iter, base::_res, base::rel_, base::output_);
+        base::_res=  base::_tol;
+        base::_iter= base::_maxiter;
+        ParPCGNE(A, x, b, base::GetEx(), idxAtransp_->GetEx(), base::GetPC(), base::_iter, base::_res, base::rel_, base::output_);
     }
 
     template <typename Mat, typename Vec>
     void Solve(const Mat& A, Vec& x, const Vec& b, int& numIter, double& resid) const
     {
-    	resid=   base::_tol;
-    	numIter= base::_maxiter;
-    	ParPCGNE(A, x, b, base::GetEx(), base::GetPC(), numIter, resid, base::rel_, base::output_);
+        resid=   base::_tol;
+        numIter= base::_maxiter;
+        ParPCGNE(A, x, b, base::GetEx(), idxAtransp_->GetEx(), base::GetPC(), numIter, resid, base::rel_, base::output_);
     }
 };
 
@@ -1779,16 +1780,19 @@ bool ParGCR(const Mat& A, Vec& x, const Vec& b, const ExCL& ExX, PreCon& M,
 /// \param tol - 2-norm of the (relative, see below) residual after the final iteration
 /// \param measure_relative_tol - If true, stop if |b - A*A^T u|/|b| <= tol,
 ///        if false, stop if |b - A*A^T u| <= tol.
-template <typename Mat, typename Vec, typename PreCon, typename ExCL>
+template <typename Mat, typename Vec, typename PreCon, typename ExACL, typename ExATranspCL>
 bool
-ParPCGNE(const Mat& A, Vec& u, const Vec& b, const ExCL& ExX, const PreCon& M,
+ParPCGNE(const Mat& A, Vec& u, const Vec& b, const ExACL& ExAX,  const ExATranspCL& ExATranspX, const PreCon& M,
     int& max_iter, double& tol, bool measure_relative_tol= false, std::ostream* output=0)
 {
-    Vec r( b - A*transp_mul( A, u));
-    double normb= ExX.Norm( b, false);
+    Vec Atranspu( transp_mul( A, u));
+    ExAX.Accumulate( Atranspu);
+    Vec r( b - A*Atranspu);
+
+    double normb= ExATranspX.Norm( b, false);
     if (normb == 0.0 || measure_relative_tol == false) normb= 1.0;
 
-    double resid= ExX.Norm( r, false)/normb;
+    double resid= ExATranspX.Norm( r, false)/normb;
     if (output)
         (*output) << "PCGNE: iter: 0 resid: " << resid <<'\n';
     if (resid <= tol) {
@@ -1802,17 +1806,19 @@ ParPCGNE(const Mat& A, Vec& u, const Vec& b, const ExCL& ExX, const PreCon& M,
 
     Vec z( n);
     M.Apply( A, z, r);
-    Vec qt( z), pt( num_cols);
-    double rho= ExX.ParDot( z, true, r, false), rho_1;
+    Vec pt( num_cols);
+    Vec qtacc( z), ptacc( pt), racc(r), zacc(z);
+    
+    double rho= ExATranspX.ParDot( z, false, r, false, &qtacc), rho_1; // M returns non accumulated vector ???
 
     for (int i= 1; i <= max_iter; ++i) {
-        pt= transp_mul( A, qt);
-        const double alpha= rho/ExX.Norm_sq( pt, false);
-        u+= alpha*qt;
-        r-= alpha*(A*pt);
-        M.Apply( A, z, r);
+        pt= transp_mul( A, qtacc);
+        const double alpha= rho/ExAX.Norm_sq( pt, false, &ptacc);
+        u+= alpha*qtacc;
+        r-= alpha*(A*ptacc);
+        M.Apply( A, z, r); // M returns non accumulated vector ???
 
-        resid= ExX.Norm( r, false)/normb;
+        resid= ExATranspX.Norm( r, false, &racc)/normb;
         if ( output && i%10 == 0) (*output) << "PCGNE: iter: " << i << " resid: " << resid <<'\n';
         if (resid <= tol) {
             tol= resid;
@@ -1820,8 +1826,8 @@ ParPCGNE(const Mat& A, Vec& u, const Vec& b, const ExCL& ExX, const PreCon& M,
             return true;
         }
         rho_1= rho;
-        rho= ExX.ParDot( z, true, r, false);
-        qt= z + (rho/rho_1)*qt;
+        rho= ExATranspX.ParDot( z, false, racc, true, &zacc);
+        qtacc= zacc + (rho/rho_1)*qtacc;
     }
     tol= resid;
     return false;

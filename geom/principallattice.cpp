@@ -26,7 +26,7 @@
 
 namespace DROPS {
 
-std::vector<const PrincipalLatticeCL*> PrincipalLatticeCL::cache_;
+PrincipalLatticeCL::PrincipalLatticeCacheCL PrincipalLatticeCL::cache_;
 
 PrincipalLatticeCL::TetraContT PrincipalLatticeCL::tetra_;
 
@@ -87,5 +87,11 @@ const PrincipalLatticeCL& PrincipalLatticeCL::memoize (Uint n)
     }
     return *(cache_[n-1]= new PrincipalLatticeCL( n));
 }
+
+const size_t p1_dof_on_lattice_2[4]= { 0, 4, 7, 9 };
+const size_t p2_dof_on_lattice_2[10]= {
+    0, 4, 7, 9,      // vertexes
+    1, 2, 5, 3, 6, 8 // edges
+};
 
 } // end of namespace DROPS
