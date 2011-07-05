@@ -947,7 +947,7 @@ class ParMultiGridCL::SanityCheckCL
             for ( size_t i=0; i<numData; ++i){
                 for ( Uint i=0; i<2; ++i){
                     recv >> gid;
-                    if ( gid!=ep->GetVertex(0)->GetGID()){
+                    if ( gid!=ep->GetVertex( i)->GetGID()){
                         os_ << "Vertex " << i << " of edge does not match for local edge\n";
                         ep->DebugInfo( os_);
                         sane= false;
@@ -1398,8 +1398,13 @@ class ParMultiGridCL::AdaptMidVertexCL
             const DiST::Helper::GeomIdCL midVertGID( e.GetLevel()+1, e.GetGID().bary, DiST::GetDim<VertexCL>());
         	e.SetMidVertex( DiST::InfoCL::Instance().GetVertex(midVertGID));
         }
-        if (e.IsLocal())
-        	e.SetAccMFR( e.GetMFR());
+        if (e.IsLocal() && e.GetMFR() != e.GetAccMFR()) { // set local MFR = AccMFR
+//        	e.SetAccMFR(e.GetMFR());
+            const int accMFR= e.GetAccMFR();
+        	e.ResetMarkForRef();
+        	for (int i=0; i<accMFR; ++i)
+        	    e.IncMarkForRef();
+        }
     }
 };
 

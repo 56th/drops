@@ -1225,7 +1225,7 @@ Check for:
 //        os << "Two neighbors are linked eventhough face is on boundary" << std::endl;
 //    }
     for (int i=0; i<2; ++i)
-    	if (GetNeighbor(i) && GetNeighbor(i+2) && !is_in( GetNeighbor(i)->GetChildBegin(), GetNeighbor(i)->GetChildEnd(), GetNeighbor(i+2))) {
+    	if (GetNeighbor(i) && GetNeighbor(i+2) && GetNeighbor(i) != GetNeighbor(i+2)->GetParent()/*!is_in( GetNeighbor(i)->GetChildBegin(), GetNeighbor(i)->GetChildEnd(), GetNeighbor(i+2))*/) {
     		sane= false;
     		os << "Unrelated tetra and child at position " << i << ". ";
     	}
@@ -1473,11 +1473,8 @@ Check for:
         if ( static_cast<bool>(RefRule_ & mask) != GetEdge(edge)->IsMarkedForRef() )
         {
             sane= false;
-            os << "Refinement rule does not match refinement of edge " << edge << ". ";
-            os << "Because Edge is " << (GetEdge(edge)->IsMarkedForRef() ? "" : "not")
-                    << " marked for refinement! ";
+            os << "Refinement rule does not match refinement of " << (GetEdge(edge)->IsMarkedForRef() ? "" : "un") <<"refined edge " << edge << ". ";
         }
-
     }
 #ifdef _PAR
     const Priority prio= HasGhost() ? PrioVGhost : GetPrio();

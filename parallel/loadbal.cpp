@@ -794,7 +794,7 @@ LoadBalHandlerCL::~LoadBalHandlerCL()
 LoadBalHandlerCL::LoadBalHandlerCL(const MGBuilderCL &builder, int master, Partitioner part, PartMethod meth, bool geom, bool debug)
 /// \param[in] builder Builder that creates a multigrid
 /// \param[in] master  The master creates the whole multigrid, the other procs creates an empty multigrid
-/// \param[in] meth    Methode that is used to compute the graph-partitioning
+/// \param[in] meth    Method that is used to compute the graph-partitioning
 /// \param[in] geom    Should geometric information be used to compute the graph-partitioning
 /// \param[in] debug   Print information about moved multinodes, edgecut and time
 {
@@ -940,7 +940,7 @@ void LoadBalHandlerCL::DoInitDistribution(int)
         std::cout << "Skip migration, because only one proc is involved!\n"; return;
     }
 
-    if (debugMode_ && ProcCL::IamMaster())
+    if (debugMode_)
         std::cout << "  - Create dual reduced graph ...\n";
     lb_->CreateDualRedGraph(true);
 
@@ -948,17 +948,15 @@ void LoadBalHandlerCL::DoInitDistribution(int)
         std::cout << "  - Create graph partition ...\n";
     lb_->PartitionSer( ProcCL::Master());
 
-    if (debugMode_ && ProcCL::IamMaster())
+    if (debugMode_)
         std::cout << "  - Migration ...\n";
 
     lb_->Migrate();
     movedNodes_ = lb_->GetMovedMultiNodes();
     edgeCut_    = lb_->GetEdgeCut();
     if (debugMode_){
-        if (ProcCL::IamMaster()){
-            std::cout << "       --> "<<GetMovedMultiNodes()<<" moved multinodes\n";
-            std::cout << "       --> "<<GetEdgeCut()<<" edge cut\n";
-        }
+        std::cout << "       --> "<<GetMovedMultiNodes()<<" moved multinodes\n";
+        std::cout << "       --> "<<GetEdgeCut()<<" edge cut\n";
     }
 //    ParMultiGridCL::MarkSimplicesForUnknowns();
     lb_->DeleteGraph();

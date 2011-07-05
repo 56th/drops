@@ -998,8 +998,13 @@ void TransferCL::UpdateSendRemoteData( const TransferableCL& t, Helper::SimplexT
     Helper::RemoteDataCL& rd= sti.GetRemoteData();
     // update remote data
     Helper::RemoteDataCL::ProcListT proclist( sti.GetPostProcs().begin(), sti.GetPostProcs().end());
-    if (!sti.WillBeRemoved())
+    if (!sti.WillBeRemoved()) {
+        const Priority oldPrio= rd.GetLocalPrio();
         rd.SetProcList( proclist);
+        const Priority newPrio= rd.GetLocalPrio();
+//        if (oldPrio != newPrio)
+//            InfoCL::Instance().Observe().OnPrioChange( t, oldPrio, newPrio);
+    }
     if (sti.GetBroadcaster()==ProcCL::MyRank() || t.GetDim()==GetDim<TetraCL>()) {
     	// write simplex and remote data to all procs in SendToProcs
         for (ProcSetT::const_iterator sit= sti.GetSendToProcs().begin(), send= sti.GetSendToProcs().end(); sit!=send; ++sit) {
@@ -1121,19 +1126,6 @@ TetraCL& TransferCL::CreateSimplex<TetraCL>  ( const TetraCL& s,  const Helper::
     // now link to faces
     for ( Uint i=0; i<NumFacesC; ++i)
         const_cast<FaceCL*>(t.GetFace(i))->LinkTetra(&t);
-    { // TODO: hier experimentell, sollte per Handler ausgelagert werden (aus ParMultiGridCL::HandlerTObjMkCons).
-        if (t.IsRegularlyRef() && t.IsMaster())
-        {
-            t.CommitRegRefMark();
-            // nun wird auf allen Edges _AccMFR:=_MFR gesetzt, um Unkonsistenzen bei vorher verteilt
-            // und nun nur noch lokal gespeicherten Edges zu vermeiden. Ein abschliessenden
-            // AccumulateMFR in XferEnd() setzt auf den verteilt gespeicherten Edges dann die
-            // richtigen _AccMFR-Werte.
-            for (TetraCL::const_EdgePIterator it= t.GetEdgesBegin(), end= t.GetEdgesEnd(); it!=end; ++it)
-                (*it)->SetAccMFR( (*it)->GetMFR());
-        }
-
-    }
     return t;
 }
 
@@ -1149,11 +1141,26 @@ void DiST::TransferCL::ReceiveSimplices<TetraCL>( DiST::Helper::RecvStreamCL& re
         Assert( stmp.GetDim()==GetDim<TetraCL>(), DROPSErrCL("Mismatch in dimension of a received simplex!"), DebugDiSTC);
         // receive proc/prio list
         recvstream >> procList;
+        TetraCL* tp= 0;
         if (!InfoCL::Instance().Exists(stmp.GetGID()))
-        	CreateSimplex<TetraCL>( stmp, procList); // creates simplex and remote data list entry
+        	tp= &CreateSimplex<TetraCL>( stmp, procList); // creates simplex and remote data list entry
         else { // merge with existing tetra
-        	InfoCL::Instance().GetTetra( stmp.GetGID())->Merge(stmp);
+        	tp= InfoCL::Instance().GetTetra( stmp.GetGID());
+            tp->Merge(stmp);
         }
+
+        // TODO: hier experimentell, sollte per Handler ausgelagert werden (aus ParMultiGridCL::HandlerTObjMkCons).
+        if (tp->IsRegularlyRef() && tp->IsMaster())
+        {
+            tp->CommitRegRefMark();
+            // nun wird auf allen Edges _AccMFR:=_MFR gesetzt, um Unkonsistenzen bei vorher verteilt
+            // und nun nur noch lokal gespeicherten Edges zu vermeiden. Ein abschliessenden
+            // AccumulateMFR in XferEnd() setzt auf den verteilt gespeicherten Edges dann die
+            // richtigen _AccMFR-Werte.
+            for (TetraCL::const_EdgePIterator it= tp->GetEdgesBegin(), end= tp->GetEdgesEnd(); it!=end; ++it)
+                (*it)->SetAccMFR( (*it)->GetMFR());
+        }
+
     }
 }
 

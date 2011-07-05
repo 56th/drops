@@ -1,0 +1,620 @@
+/// \file dist_TestRefPar.cpp
+/// \brief DiST variant of Olli's DDD refinement/coarsening test case partests/TestRefPar
+/// \author LNM RWTH Aachen: Sven Gross; SC RWTH Aachen: Oliver Fortmeier
+
+/*
+ * This file is part of DROPS.
+ *
+ * DROPS is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * DROPS is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with DROPS. If not, see <http://www.gnu.org/licenses/>.
+ *
+ *
+ * Copyright 2009 LNM/SC RWTH Aachen, Germany
+*/
+
+// "parallel" Header-Files
+#include "parallel/parmultigrid.h"
+#include "parallel/DiST.h"
+#include "parallel/partime.h"
+#include "parallel/metispartioner.h"
+#include "parallel/loadbal.h"
+#include "parallel/parmgserialization.h"
+
+// geometry Header-Files
+#include "geom/builder.h"
+#include "geom/multigrid.h"
+
+// Ausgabe in geomview-format
+#include "out/output.h"
+#include "partests/params.h"
+
+// Standard-Header-Files fuer Ausgaben
+#include <iostream>
+#include <iomanip>
+#include <fstream>
+#include <stdlib.h>
+
+using namespace std;
+
+/****************************************************************************
+* G L O B A L E  V A R I A B L E N                                          *
+****************************************************************************/
+// Zeiten, die gemessen werden sollen
+enum TimePart{
+    T_Ref,
+    T_SetupGraph,
+    T_CalcDist,
+    T_Migration,
+    T_Check,
+    T_print
+};
+
+// Tabelle, in der die Zeiten stehen
+DROPS::TimeStoreCL Times(6);
+
+// Parameter-Klasse
+DROPS::ParamParRefCL C;
+
+/****************************************************************************
+    * S E T   D E S C R I B E R   F O R   T I M E S T O R E  C L                *
+****************************************************************************/
+void SetDescriber()
+{
+    Times.SetDescriber(T_Ref, "Refinement");
+    Times.SetDescriber(T_SetupGraph, "Setup loadbalancing graph");
+    Times.SetDescriber(T_CalcDist, "Calculate Distribution");
+    Times.SetDescriber(T_Migration, "Migration");
+    Times.SetDescriber(T_Check, "Checking MG");
+    Times.SetDescriber(T_print, "Printing");
+    Times.SetCounterDescriber("Moved MultiNodes");
+}
+
+/****************************************************************************
+* F I L E  H A N D L I N G                                                  *
+****************************************************************************/
+void PrintGEO(const DROPS::ParMultiGridCL& pmg)
+{
+    const int me=DROPS::ProcCL::MyRank();
+    static int num=0;
+    char filename[30];
+    sprintf (filename, "output/geo_%i_GEOM_%i.geo",me,num++);
+    ofstream file(filename);
+    file << DROPS::GeomMGOutCL(pmg.GetMG(),-1,false,0.08,0.15) << std::endl;
+    file.close();
+}
+
+/****************************************************************************
+* C H E C K  P A R  M U L T I  G R I D                                      *
+*****************************************************************************
+*   Checkt, ob die parallele Verteilung und die MultiGrid-Struktur gesund   *
+*   zu sein scheint. Zudem wird der Check von DDD aufgerufen                *
+****************************************************************************/
+void CheckParMultiGrid(DROPS::ParMultiGridCL& pmg, int type)
+{
+    DROPS::ParTimerCL time;
+    double duration;
+
+    if (type==DROPS::MIG && !C.checkMig) return;
+    if (type==DROPS::REF && !C.checkRef) return;
+    std::cout << "  - Check of parallel MultiGrid... ";
+
+    char dat[30];
+    sprintf(dat,"output/sane%i.chk", DROPS::ProcCL::MyRank());
+    ofstream check(dat);
+    time.Reset();
+
+    if ( DROPS::ProcCL::Check( DROPS::DiST::InfoCL::Instance().IsSane( check)))
+        std::cout << " DiST-module seems to be alright!" << std::endl;
+    else
+        std::cout << " DiST-module seems to be broken!" << std::endl;
+    bool pmg_sane = pmg.IsSane(check),
+         mg_sane  = pmg.GetMG().IsSane(check);
+
+    std::cout << "  - Check of parallel MultiGrid... ";
+    if (DROPS::ProcCL::Check(pmg_sane && mg_sane)){
+         std::cout << "OK\n";
+    }
+    else{
+        // Always exit on error
+        std::cout << "not OK!!!\n";
+        std::cout << "EXIT: Error found in multigrid\n";
+        exit(-1);
+    }
+    time.Stop();
+    duration = time.GetMaxTime();
+    Times.AddTime(T_Check,duration);
+    if (C.printTime) std::cout << "       --> "<<duration<<" sec\n";
+    check.close();
+
+    DROPS::DiST::Helper::GeomIdCL gid(1,DROPS::MakePoint3D(0.3125, 0.09375, 0.28125),3);
+if (DROPS::DiST::InfoCL::Instance().Exists(gid))
+    DROPS::DiST::InfoCL::Instance().GetTetra(gid)->DebugInfo(cdebug);
+}
+
+/****************************************************************************
+* M A R K I N G   S T R A T E G I E S                                       *
+*****************************************************************************
+*   Setze Markierungen auf den Tetraedern. Zum Verfeinern und Vergroebern.  *
+****************************************************************************/
+void MarkDrop (DROPS::MultiGridCL& mg, DROPS::Uint maxLevel)
+{
+    DROPS::Point3DCL Mitte; Mitte[0]=0.5; Mitte[1]=0.5; Mitte[2]=0.5;
+
+    for (DROPS::MultiGridCL::TriangTetraIteratorCL It(mg.GetTriangTetraBegin(maxLevel)),
+         ItEnd(mg.GetTriangTetraEnd(maxLevel)); It!=ItEnd; ++It)
+    {
+        if ( (GetBaryCenter(*It)-Mitte).norm()<=std::max(0.1,1.5*std::pow(It->GetVolume(),1.0/3.0)) )
+            It->SetRegRefMark();
+    }
+}
+
+void UnMarkDrop (DROPS::MultiGridCL& mg, DROPS::Uint maxLevel)
+{
+    DROPS::Point3DCL Mitte; Mitte[0]=0.5; Mitte[1]=0.5; Mitte[2]=0.5;
+
+    for (DROPS::MultiGridCL::TriangTetraIteratorCL It(mg.GetTriangTetraBegin(maxLevel)),
+         ItEnd(mg.GetTriangTetraEnd(maxLevel)); It!=ItEnd; ++It)
+    {
+        if ( (GetBaryCenter(*It)-Mitte).norm()<=std::max(0.1,1.5*std::pow(It->GetVolume(),1.0/3.0)) )
+            It->SetRemoveMark();
+    }
+}
+
+void MarkCorner (DROPS::MultiGridCL& mg, DROPS::Uint maxLevel)
+{
+    DROPS::Point3DCL Corner; Corner[0]=0.; Corner[1]=0.; Corner[2]=0.;
+
+    for (DROPS::MultiGridCL::TriangTetraIteratorCL It(mg.GetTriangTetraBegin(maxLevel)),
+         ItEnd(mg.GetTriangTetraEnd(maxLevel)); It!=ItEnd; ++It)
+    {
+        if ( (GetBaryCenter(*It)-Corner).norm()<=0.3)
+            It->SetRegRefMark();
+    }
+}
+
+bool MarkAround(DROPS::MultiGridCL& mg, const DROPS::Point3DCL& p, double rad, int maxLevel= -1)
+{
+    bool mod=false;
+    if (maxLevel==-1)
+        maxLevel = mg.GetLastLevel()+1;
+    for (DROPS::MultiGridCL::TriangTetraIteratorCL it= mg.GetTriangTetraBegin(),
+         end= mg.GetTriangTetraEnd(); it!=end; ++it)
+    {
+        if ((int)it->GetLevel()<maxLevel && (GetBaryCenter(*it)-p).norm()<=rad )
+        {
+            it->SetRegRefMark();
+            mod=true;
+        }
+    }
+    return mod;
+}
+
+bool UnMarkAround(DROPS::MultiGridCL& mg, const DROPS::Point3DCL& p, double rad)
+{
+    bool mod=false;
+    for (DROPS::MultiGridCL::TriangTetraIteratorCL it= mg.GetTriangTetraBegin(),
+         end= mg.GetTriangTetraEnd(); it!=end; ++it)
+    {
+        if ((GetBaryCenter(*it)-p).norm()<=rad )
+        {
+            it->SetRemoveMark();
+            mod=true;
+        }
+    }
+    return mod;
+}
+
+bool UnMarkForGhostKill (DROPS::MultiGridCL& mg, DROPS::Uint maxLevel)
+// search for a ghost tetra and unmark all children
+{
+    int done=1;
+    if (DROPS::ProcCL::MyRank()!=0)
+        DROPS::ProcCL::Recv(&done, 1, DROPS::ProcCL::MyRank()-1, 563738);
+    else
+        done=0;
+    if (!done)
+    {
+        for (DROPS::MultiGridCL::const_TetraIterator  It(mg.GetTetrasBegin(maxLevel-1)),
+            ItEnd(mg.GetTetrasEnd(maxLevel-1)); It!=ItEnd && !done; ++It)
+        {
+            if (It->IsGhost() && It->IsRegularlyRef()){
+                for (DROPS::TetraCL::const_ChildPIterator ch(It->GetChildBegin()),
+                    chEnd(It->GetChildEnd()); ch!=chEnd; ++ch)
+                    (*ch)->SetRemoveMark();
+                std::cout << "Tetra "<<It->GetGID()<<" marked for ghost-kill by proc "<<DROPS::ProcCL::MyRank()<<std::endl;
+                done=1;
+            }
+        }
+    }
+    if (DROPS::ProcCL::MyRank()<DROPS::ProcCL::Size()-1)
+        DROPS::ProcCL::Send(&done, 1, DROPS::ProcCL::MyRank()+1, 563738);
+
+
+    return DROPS::ProcCL::GlobalOr(done);
+}
+
+DROPS::MultiGridCL* CreateInitGrid(int master= 0)
+{
+    using namespace DROPS;
+    MultiGridCL *mg;
+    const int size = ProcCL::Size();
+    DROPS::ParTimerCL time;
+    double duration;
+
+    Point3DCL e1(0.0), e2(0.0), e3(0.0), orig(0.0);
+
+    if(C.init_cond==0)
+    {
+        e1[0]=C.brk_dim[0]; e2[1]=C.brk_dim[1]; e3[2]= C.brk_dim[2];
+        if (ProcCL::MyRank()==master)
+        {
+            BrickBuilderCL brick(C.brk_orig, e1, e2, e3, C.brk_BasicRefX, C.brk_BasicRefY, C.brk_BasicRefZ);
+            mg = new DROPS::MultiGridCL(brick);
+        }
+        else
+        {
+            EmptyBrickBuilderCL emptyBrick(C.brk_orig, e1, e2, e3);
+            mg = new DROPS::MultiGridCL(emptyBrick);
+        }
+    }
+    else if (C.init_cond==1)
+    {
+        e1[0]=e2[1]=e3[2]= 1.;
+        if (ProcCL::MyRank()==master)
+        {
+            BrickBuilderCL builder(orig, e1, e2, e3, 4, 4, 4);
+            FileBuilderCL fileBuilder(C.init_pre, &builder);
+            mg = new DROPS::MultiGridCL(fileBuilder);
+
+            std::ofstream serSanity("sanity.txt");
+
+            std::cout << "\n \n MultiGrid mit "<<mg->GetNumLevel()<<" Leveln aus Datei gelesen\n \n";
+            serSanity << SanityMGOutCL(*mg) << std::endl;
+        }
+        else
+        {
+            EmptyBrickBuilderCL builder(orig, e1, e2, e3, C.refined+1);
+            mg = new DROPS::MultiGridCL(builder);
+        }
+    }
+    else
+    {
+        throw DROPSErrCL("Unknown init condition");
+    }
+
+    // now distribute the grid on master to other procs
+//    pmg.AttachTo(*mg);
+
+    LoadBalHandlerCL lb(*mg, metis);
+    if (size>1)
+    {
+        time.Reset();
+        lb.DoInitDistribution();
+        time.Stop();
+        if (C.printTime){
+            duration = time.GetMaxTime();
+            std::cout << "       --> "<<duration<<" sec\n";
+        }
+        Times.IncCounter(lb.GetMovedMultiNodes());
+    }
+
+    return mg;
+}
+
+void DoMigration(DROPS::LoadBalCL &LoadBal, int lb)
+{
+    DROPS::ParTimerCL time;
+    double duration;
+    const int size = DROPS::ProcCL::Size();
+    if (size>0 && lb!=0)
+    {
+        cout << "  - Erstelle Graphen ... \n";
+        LoadBal.DeleteGraph();
+        time.Reset();
+        LoadBal.CreateDualRedGraph();
+        time.Stop(); duration = time.GetMaxTime();
+        Times.AddTime(T_SetupGraph, duration);
+        if (C.printTime) std::cout << "       --> "<<duration<<" sec\n";
+
+        cout << "  - Erstelle Partitionen ... \n";
+        time.Reset();
+        LoadBal.PartitionPar();
+
+        time.Stop(); duration = time.GetMaxTime();
+        Times.AddTime(T_CalcDist, duration);
+        if (C.printTime) std::cout << "       --> "<<duration<<" sec\n";
+        cout << "  - Migration ... \n";
+        time.Reset();
+        if (lb!=0){
+            LoadBal.Migrate();
+        }
+        time.Stop(); duration = time.GetMaxTime();
+        Times.AddTime(T_Migration, duration);
+        if (C.printTime)
+            std::cout << "       --> "<<duration<<" sec, moved MulitNodes " << LoadBal.GetMovedMultiNodes() << "\n";
+        Times.IncCounter(LoadBal.GetMovedMultiNodes());
+    }
+}
+
+using namespace DROPS;
+/****************************************************************************
+* M A I N                                                                   *
+****************************************************************************/
+int main(int argc, char* argv[])
+{
+    DROPS::ProcInitCL procinit(&argc, &argv);
+    if (C.printTime)
+        DROPS::ParTimerCL::TestBandwidth(std::cout);
+    try
+    {
+        const char line[] = "----------------------------------------------------------------------------------";
+        const char dline[]= "==================================================================================";
+        SetDescriber();
+
+        DROPS::ParTimerCL alltime, time;
+        double duration;
+
+        const int me= DROPS::ProcCL::MyRank();
+
+        // Parameter file einlesen ...
+        if (argc!=2){
+            std::cout << "You have to specify one parameter:\n\t" << argv[0] << " <param_file>" << std::endl; return 1;
+        }
+        std::ifstream param( argv[1]);
+        if (!param){
+            std::cout << "error while opening parameter file\n"; return 1;
+        }
+
+        param >> C;
+
+        param.close();
+        std::cout << C << std::endl;
+
+        cout << dline << endl << " + Erstelle initiales Gitter (Wuerfel der Laenge 1) auf Prozessor 0 ...\n";
+
+        DROPS::MultiGridCL &mg = *CreateInitGrid();
+        DROPS::ParMultiGridCL& pmg= DROPS::ParMultiGridCL::Instance();
+
+        if (C.printSize){
+            cout << "  - Verteilung der Elemente:\n";
+            mg.SizeInfo(cout);
+        }
+        if (C.printPMG){
+            cout << " + Schreibe Debug-Informationen in ein File ... ";
+            PrintMG(pmg);
+            cout << " OK\n";
+        }
+        if (C.printGEO){
+            cout << " + Schreibe das Multigrid im Geomview-Format in ein File ... ";
+            PrintGEO(pmg);
+            cout << " OK\n";
+        }
+
+        CheckParMultiGrid(pmg,REF);
+
+		cout << dline << endl << " Verfeinere das Gitter nun " << C.markall << " mal global, " << C.markdrop
+				<< " mal in der Mitte um den Tropfen\n und " << C.markcorner << " mal um der Ecke (0,0,0)\n"
+				<< " Es wird die Strategie ";
+		switch (C.refineStrategy){
+			case 0 : cout << "No Loadbalancing ";break;
+			case 1 : cout << "AdaptiveRefine "; break;
+			case 2 : cout << "PartKWay "; break;
+			default: cout << "Unbekannte Strategy ...\n EXIT"; exit(0);
+		}
+		cout << "verwendet. Es markiert der Prozessor " << C.markingproc << "\n" << dline << endl;
+
+		int movedRefNodes=0, movedCoarseNodes=0;
+        int numrefs;
+
+        switch (C.Strategy)
+        {
+            case 0:  numrefs= C.markall+C.markdrop+C.markcorner; break;
+            case 1:  numrefs=5; break;
+            case 2:  numrefs=C.markall; break;
+            case 3:  numrefs=C.markall; break;
+            default: throw DROPSErrCL("Specify the refinement strategy!");
+        }
+
+        DROPS::LoadBalCL LoadBal(mg, metis);
+        for (int ref=0; ref<C.markall+C.markdrop+C.markcorner; ++ref)
+        {
+            DROPS::Point3DCL e, e1;
+            bool marked=false;
+            bool killedghost=false;
+
+            switch (C.Strategy)
+            {
+            case 0:
+                cout << " + Refine " << (ref) << " : ";
+                if (ref < C.markall){
+                    cout << "all ...\n";
+                    if (C.markingproc==-1 || C.markingproc==me)
+                        DROPS::MarkAll(mg);
+                }
+                else if (ref < C.markdrop+C.markall){
+                    cout << "drop ...\n";
+                    if (C.markingproc==-1 || C.markingproc==me)
+                        MarkDrop(mg, mg.GetLastLevel());
+                }
+                else{
+                    cout << "corner ...\n";
+                    if (C.markingproc==-1 || C.markingproc==me)
+                        MarkCorner(mg, mg.GetLastLevel());
+                }
+            break;
+            case 1:
+                e[0]=1.; e[1]=2.; e[2]=0.5;
+                e1[0]=0.;  e1[1]=0.; e1[2]=0.5;
+                switch (ref)
+                {
+                    case 0:
+                        std::cout << "Mark all "<<std::endl;
+                        MarkAll(mg);
+                        marked=true;
+                        break;
+                    case 1:
+                        std::cout << "Mark all"<<std::endl;
+                        MarkAll(mg);
+    //                     marked=MarkAround(mg, e1, 0.5);
+                        marked=true;
+                        break;
+                    case 2:
+                        std::cout << "Mark around "<<e<<std::endl;
+                        marked=MarkAround(mg, e, 0.5);
+                        break;
+                    case 3:
+                        std::cout << "UnMark around "<<e<<std::endl;
+                        marked=UnMarkAround(mg, e, 0.6);
+                        break;
+                    case 4:
+                        std::cout << "UnMark for ghost tetra kill"<<std::endl;
+                        killedghost=UnMarkForGhostKill(mg, mg.GetLastLevel());
+                        killedghost= ProcCL::GlobalOr(killedghost);
+                        if (ProcCL::IamMaster() && killedghost)
+                            std::cout << "A ghost tetra will be killed"<<std::endl;
+                        break;
+                    default:
+                        std::cout << "I do not know this case!\n";
+                }
+            break;
+            case 3:
+                if (ref%2==0)
+                    MarkAll(mg);
+                else
+                    UnMarkAll(mg);
+                marked=true;
+            break;
+            }   // end of switch C.Strategy
+
+
+            time.Reset(); pmg.Refine(); time.Stop();
+            duration = time.GetMaxTime();
+            Times.AddTime(T_Ref,duration);
+            if (C.printTime) std::cout << "       --> "<<duration<<" sec\n";
+
+            if (C.printPMG){
+                cout << "  - Schreibe Debug-Informationen in ein File ... ";
+                PrintMG(pmg,REF);
+                cout << " OK\n";
+            }
+
+            if (C.checkRef)
+                CheckParMultiGrid(pmg,REF);
+
+//            DynamicDataInterfaceCL::ConsCheck();
+            DoMigration( LoadBal,C.refineStrategy);
+            movedRefNodes += LoadBal.GetMovedMultiNodes();
+
+            if (C.printPMG){
+                cout << "  - Schreibe Debug-Informationen in ein File ... ";
+                PrintMG(pmg,MIG);
+                cout << " OK\n";
+            }
+            if (C.printGEO){
+                cout << "  - Schreibe das Multigrid im Geomview-Format in ein File ... ";
+                PrintGEO(pmg);
+                cout << " OK\n";
+            }
+            if (C.printSize){
+                cout << "  - Verteilung der Elemente:\n";
+                mg.SizeInfo(cout);
+            }
+
+            if (C.checkMig)
+                CheckParMultiGrid(pmg,MIG);
+
+            if (ref!=C.markall+C.markdrop+C.markcorner-1) cout << line << endl;
+        }
+
+        if (C.middleMig){
+            cout <<dline<<endl<< " + Last-Verteilung zwischen dem Verfeinern und Vergroebern ...\n";
+            DoMigration( LoadBal,0);
+            movedRefNodes += LoadBal.GetMovedMultiNodes();
+            CheckParMultiGrid(pmg,MIG);
+        }
+
+		cout <<dline<<endl << " Vergroebere nun das Gitter zunaechst " << C.coarsedrop
+				<< " mal um den Tropfen herum und dann " << C.coarseall << " ueberall\n Es wird die Strategie ";
+		switch (C.coarseStrategy){
+			case 0 : cout << "No Loadbalancing ";break;
+			case 1 : cout << "AdaptiveRefine "; break;
+			case 2 : cout << "PartKWay "; break;
+			default: cout << "Unbekannte Strategy ...\n EXIT"; exit(0);
+		}
+		cout << "verwendet. Es markiert der Prozessor " << C.unmarkingproc << "\n" << dline << endl;
+
+        for (int ref =0; ref<C.coarsedrop+C.coarseall; ++ref)
+        {
+            if (ref < C.coarsedrop){
+                cout << " + Coarse drop (" << ref << ") ... \n";
+                if (C.unmarkingproc==-1 || C.unmarkingproc==me)
+                    UnMarkDrop(mg, mg.GetLastLevel());
+            }
+            else {
+                cout << " + Coarse all (" << ref << ") ... \n";
+                if (C.unmarkingproc==-1 || C.unmarkingproc==me){
+                    DROPS::UnMarkAll(mg);
+                }
+            }
+
+            time.Reset(); pmg.Refine(); time.Stop();
+            duration = time.GetMaxTime();
+            Times.AddTime(T_Ref,duration);
+            if (C.printTime) std::cout << "       --> "<<duration<<" sec\n";
+            if (C.printPMG)
+            {
+                cout << "  - Schreibe Debug-Informationen in ein File ... ";
+                PrintMG(pmg, REF);
+                cout << " OK\n";
+            }
+            if (C.printGEO){
+                cout << "  - Schreibe das Multigrid im Geomview-Format in ein File ... ";
+                PrintGEO(pmg);
+                cout << " OK\n";
+            }
+
+            CheckParMultiGrid(pmg,REF);
+
+            DoMigration( LoadBal,C.coarseStrategy);
+
+            movedCoarseNodes += LoadBal.GetMovedMultiNodes();
+
+            if (C.printSize){
+                cout << "  - Verteilung der Elemente:\n";
+                mg.SizeInfo(cout);
+            }
+            if (C.printPMG)
+            {
+                cout << "  - Schreibe Debug-Informationen in ein File ... ";
+                PrintMG(pmg, MIG);
+                cout << " OK\n";
+            }
+
+            CheckParMultiGrid(pmg,MIG);
+
+            if (ref!=C.coarsedrop+C.coarseall-1) cout << line << endl;
+        }
+
+		cout << dline<< endl;
+
+        if (C.printTime)
+            Times.Print(cout);
+		cout << "Moved Multinodes for refinement: " << movedRefNodes << endl
+	  		 << "Moved Multinodes for coarsening: " << movedCoarseNodes << endl
+		   	 << dline << endl << "Shuting down ...\n";
+
+    }
+    catch (DROPS::DROPSErrCL err) { err.handle(); }
+    return 0;
+}
+

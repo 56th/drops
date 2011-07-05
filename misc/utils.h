@@ -56,7 +56,7 @@
 #  define DROPS_STD_UNORDERED_SET std::unordered_set
 #elif defined(__INTEL_COMPILER) || (__GNUC__>=4)
 #  include <tr1/unordered_map>
-#  define DROPS_STD_UNORDERED_MAP std::tr1::unordered_map 
+#  define DROPS_STD_UNORDERED_MAP std::tr1::unordered_map
 #  define DROPS_STD_HASH          std::tr1::hash
 #  include <tr1/unordered_set>
 #  define DROPS_STD_UNORDERED_SET std::tr1::unordered_set
@@ -67,6 +67,7 @@
 #  include <set>
 #  define DROPS_STD_UNORDERED_SET std::set
 #endif
+
 
 #ifndef M_PI
 # ifdef DROPS_WIN
@@ -142,16 +143,16 @@ const double DoubleEpsC = 1.0e-9; // numeric_limits<double>::epsilon();
 #ifndef _PAR
 #  define cdebug std::cout
 #else
-#  define cdebug std::cout << "["<<ProcCL::MyRank()<<"]: "
+#  define cdebug std::cerr << "["<<DROPS::ProcCL::MyRank()<<"]: "
 #endif
 
 /// \brief This macro controls, for which portions of the code debugging and
 /// error-reporting is activated.
 //#define DROPSDebugC 25  //(DROPS::DebugNumericC | DROPS::DebugUnknownsC | DROPS::DebugContainerC )
 //#define DROPSDebugC ~0  // all bits set
-#ifndef DROPSDebugC 
+#ifndef DROPSDebugC
   #define DROPSDebugC ~0
-#endif  
+#endif
 
 /// \brief Throws an error upon a failed assertion.
 ///

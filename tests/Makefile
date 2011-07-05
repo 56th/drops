@@ -13,7 +13,8 @@ EXEC =  ip1test ip2test mattest prolongationp2test reftest testfe \
         directsolver f_Gamma neq splitboundary reparam_init reparam \
         extendP1onChild principallattice dist_streamtest dist_remotedatatest \
         dist_sendtetraofbrick dist_simplexsend dist_interface dist_exchange \
-        dist_poisson dist_sdropsP2 dist_twophasedrops dist_ref dist_modify
+        dist_poisson dist_sdropsP2 dist_twophasedrops dist_ref dist_modify \
+        dist_TestRefPar
 
 DELETE = $(EXEC) *.out *.diff *.off *.mg *.dat
 
@@ -286,6 +287,14 @@ dist_ref: \
     ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
     ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o ../out/vtkOut.o ../parallel/parmultigrid.o \
     ../num/fe.o ../num/interfacePatch.o ../levelset/levelset.o ../levelset/fastmarch.o ../levelset/surfacetension.o $(PAR_OBJ)
+	$(CXX) -o $@ $^ $(LFLAGS)
+
+dist_TestRefPar: \
+    ../tests/dist_TestRefPar.o \
+    ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
+    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o ../out/vtkOut.o ../parallel/parmultigrid.o \
+    ../num/fe.o ../num/interfacePatch.o ../levelset/levelset.o ../levelset/fastmarch.o ../levelset/surfacetension.o \
+    ../misc/params.o ../partests/params.o ../levelset/lsetparams.o ../out/output.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 dist_exchange: \
