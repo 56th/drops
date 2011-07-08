@@ -42,7 +42,8 @@ TESTNAME = drivencavity-adaptiv-schur drivencavity-adaptiv-uzawa \
 
 default: ClrScr
 
-dist: dist_streamtest dist_remotedatatest dist_sendtetraofbrick dist_modify dist_simplexsend dist_interface dist_exchange dist_poisson dist_sdropsP2 dist_twophasedrops dist_ref
+dist: dist_streamtest dist_remotedatatest dist_sendtetraofbrick dist_modify dist_simplexsend dist_interface dist_exchange dist_poisson dist_sdropsP2 dist_twophasedrops \
+    dist_ref dist_TestRefPar
 
 check: $(TESTNAME:%=check_%) ip1check
 	@echo "--> All testcases have been executed!"

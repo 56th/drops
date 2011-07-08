@@ -36,7 +36,9 @@
 
 // Ausgabe in geomview-format
 #include "out/output.h"
-#include "partests/params.h"
+
+// Parameterdatei
+#include "misc/params.h"
 
 // Standard-Header-Files fuer Ausgaben
 #include <iostream>
@@ -63,7 +65,7 @@ enum TimePart{
 DROPS::TimeStoreCL Times(6);
 
 // Parameter-Klasse
-DROPS::ParamParRefCL C;
+DROPS::ParamCL C;
 
 /****************************************************************************
     * S E T   D E S C R I B E R   F O R   T I M E S T O R E  C L                *
@@ -104,8 +106,8 @@ void CheckParMultiGrid(DROPS::ParMultiGridCL& pmg, int type)
     DROPS::ParTimerCL time;
     double duration;
 
-    if (type==DROPS::MIG && !C.checkMig) return;
-    if (type==DROPS::REF && !C.checkRef) return;
+    if (type==DROPS::MIG && !C.get<int>("Misc.CheckAfterMig")) return;
+    if (type==DROPS::REF && !C.get<int>("Misc.CheckAfterRef")) return;
     std::cout << "  - Check of parallel MultiGrid... ";
 
     char dat[30];
@@ -133,7 +135,7 @@ void CheckParMultiGrid(DROPS::ParMultiGridCL& pmg, int type)
     time.Stop();
     duration = time.GetMaxTime();
     Times.AddTime(T_Check,duration);
-    if (C.printTime) std::cout << "       --> "<<duration<<" sec\n";
+    if (C.get<int>("Misc.PrintTime")) std::cout << "       --> "<<duration<<" sec\n";
     check.close();
 
     DROPS::DiST::Helper::GeomIdCL gid(1,DROPS::MakePoint3D(0.3125, 0.09375, 0.28125),3);
@@ -253,27 +255,29 @@ DROPS::MultiGridCL* CreateInitGrid(int master= 0)
 
     Point3DCL e1(0.0), e2(0.0), e3(0.0), orig(0.0);
 
-    if(C.init_cond==0)
+    if(C.get<int>("Refine.InitCond")==0)
     {
-        e1[0]=C.brk_dim[0]; e2[1]=C.brk_dim[1]; e3[2]= C.brk_dim[2];
+        const Point3DCL brk_dim = C.get<Point3DCL>("Brick.dim"),
+                        brk_orig= C.get<Point3DCL>("Brick.orig");
+        e1[0]=brk_dim[0]; e2[1]=brk_dim[1]; e3[2]= brk_dim[2];
         if (ProcCL::MyRank()==master)
         {
-            BrickBuilderCL brick(C.brk_orig, e1, e2, e3, C.brk_BasicRefX, C.brk_BasicRefY, C.brk_BasicRefZ);
+            BrickBuilderCL brick(brk_orig, e1, e2, e3, C.get<int>("Brick.BasicRefX"), C.get<int>("Brick.BasicRefY"), C.get<int>("Brick.BasicRefZ"));
             mg = new DROPS::MultiGridCL(brick);
         }
         else
         {
-            EmptyBrickBuilderCL emptyBrick(C.brk_orig, e1, e2, e3);
+            EmptyBrickBuilderCL emptyBrick(brk_orig, e1, e2, e3);
             mg = new DROPS::MultiGridCL(emptyBrick);
         }
     }
-    else if (C.init_cond==1)
+    else if (C.get<int>("Refine.InitCond")==1)
     {
         e1[0]=e2[1]=e3[2]= 1.;
         if (ProcCL::MyRank()==master)
         {
             BrickBuilderCL builder(orig, e1, e2, e3, 4, 4, 4);
-            FileBuilderCL fileBuilder(C.init_pre, &builder);
+            FileBuilderCL fileBuilder(C.get<std::string>("Misc.InitPrefix"), &builder);
             mg = new DROPS::MultiGridCL(fileBuilder);
 
             std::ofstream serSanity("sanity.txt");
@@ -283,7 +287,7 @@ DROPS::MultiGridCL* CreateInitGrid(int master= 0)
         }
         else
         {
-            EmptyBrickBuilderCL builder(orig, e1, e2, e3, C.refined+1);
+            EmptyBrickBuilderCL builder(orig, e1, e2, e3, C.get<int>("Refine.Refined")+1);
             mg = new DROPS::MultiGridCL(builder);
         }
     }
@@ -301,7 +305,7 @@ DROPS::MultiGridCL* CreateInitGrid(int master= 0)
         time.Reset();
         lb.DoInitDistribution();
         time.Stop();
-        if (C.printTime){
+        if (C.get<int>("Misc.PrintTime")){
             duration = time.GetMaxTime();
             std::cout << "       --> "<<duration<<" sec\n";
         }
@@ -316,6 +320,7 @@ void DoMigration(DROPS::LoadBalCL &LoadBal, int lb)
     DROPS::ParTimerCL time;
     double duration;
     const int size = DROPS::ProcCL::Size();
+    const bool printTime= C.get<int>("Misc.PrintTime");
     if (size>0 && lb!=0)
     {
         cout << "  - Erstelle Graphen ... \n";
@@ -324,7 +329,7 @@ void DoMigration(DROPS::LoadBalCL &LoadBal, int lb)
         LoadBal.CreateDualRedGraph();
         time.Stop(); duration = time.GetMaxTime();
         Times.AddTime(T_SetupGraph, duration);
-        if (C.printTime) std::cout << "       --> "<<duration<<" sec\n";
+        if (printTime) std::cout << "       --> "<<duration<<" sec\n";
 
         cout << "  - Erstelle Partitionen ... \n";
         time.Reset();
@@ -332,7 +337,7 @@ void DoMigration(DROPS::LoadBalCL &LoadBal, int lb)
 
         time.Stop(); duration = time.GetMaxTime();
         Times.AddTime(T_CalcDist, duration);
-        if (C.printTime) std::cout << "       --> "<<duration<<" sec\n";
+        if (printTime) std::cout << "       --> "<<duration<<" sec\n";
         cout << "  - Migration ... \n";
         time.Reset();
         if (lb!=0){
@@ -340,7 +345,7 @@ void DoMigration(DROPS::LoadBalCL &LoadBal, int lb)
         }
         time.Stop(); duration = time.GetMaxTime();
         Times.AddTime(T_Migration, duration);
-        if (C.printTime)
+        if (printTime)
             std::cout << "       --> "<<duration<<" sec, moved MulitNodes " << LoadBal.GetMovedMultiNodes() << "\n";
         Times.IncCounter(LoadBal.GetMovedMultiNodes());
     }
@@ -353,8 +358,6 @@ using namespace DROPS;
 int main(int argc, char* argv[])
 {
     DROPS::ProcInitCL procinit(&argc, &argv);
-    if (C.printTime)
-        DROPS::ParTimerCL::TestBandwidth(std::cout);
     try
     {
         const char line[] = "----------------------------------------------------------------------------------";
@@ -380,21 +383,28 @@ int main(int argc, char* argv[])
         param.close();
         std::cout << C << std::endl;
 
+        const bool printTime= C.get<int>("Misc.PrintTime"),
+                   printSize= C.get<int>("Misc.PrintSize"),
+                   printPMG=  C.get<int>("Misc.PrintPMG"),
+                   printGEO=  C.get<int>("Misc.PrintGEO");
+        if (printTime)
+            DROPS::ParTimerCL::TestBandwidth(std::cout);
+
         cout << dline << endl << " + Erstelle initiales Gitter (Wuerfel der Laenge 1) auf Prozessor 0 ...\n";
 
         DROPS::MultiGridCL &mg = *CreateInitGrid();
         DROPS::ParMultiGridCL& pmg= DROPS::ParMultiGridCL::Instance();
 
-        if (C.printSize){
+        if (printSize){
             cout << "  - Verteilung der Elemente:\n";
             mg.SizeInfo(cout);
         }
-        if (C.printPMG){
+        if (printPMG){
             cout << " + Schreibe Debug-Informationen in ein File ... ";
             PrintMG(pmg);
             cout << " OK\n";
         }
-        if (C.printGEO){
+        if (printGEO){
             cout << " + Schreibe das Multigrid im Geomview-Format in ein File ... ";
             PrintGEO(pmg);
             cout << " OK\n";
@@ -402,53 +412,57 @@ int main(int argc, char* argv[])
 
         CheckParMultiGrid(pmg,REF);
 
-		cout << dline << endl << " Verfeinere das Gitter nun " << C.markall << " mal global, " << C.markdrop
-				<< " mal in der Mitte um den Tropfen\n und " << C.markcorner << " mal um der Ecke (0,0,0)\n"
+		const int markall   =  C.get<int>("Refine.All"),
+		          markdrop  =  C.get<int>("Refine.Drop"),
+		          markcorner=  C.get<int>("Refine.Corner"),
+		          markingproc= C.get<int>("Refine.MarkingProc");
+        cout << dline << endl << " Verfeinere das Gitter nun " << markall << " mal global, " << markdrop
+				<< " mal in der Mitte um den Tropfen\n und " << markcorner << " mal um der Ecke (0,0,0)\n"
 				<< " Es wird die Strategie ";
-		switch (C.refineStrategy){
+		switch (C.get<int>("LoadBalancing.RefineStrategy")){
 			case 0 : cout << "No Loadbalancing ";break;
 			case 1 : cout << "AdaptiveRefine "; break;
 			case 2 : cout << "PartKWay "; break;
 			default: cout << "Unbekannte Strategy ...\n EXIT"; exit(0);
 		}
-		cout << "verwendet. Es markiert der Prozessor " << C.markingproc << "\n" << dline << endl;
+		cout << "verwendet. Es markiert der Prozessor " << markingproc << "\n" << dline << endl;
 
 		int movedRefNodes=0, movedCoarseNodes=0;
         int numrefs;
 
-        switch (C.Strategy)
+        switch (C.get<int>("Refine.Strategy"))
         {
-            case 0:  numrefs= C.markall+C.markdrop+C.markcorner; break;
+            case 0:  numrefs= markall+markdrop+markcorner; break;
             case 1:  numrefs=5; break;
-            case 2:  numrefs=C.markall; break;
-            case 3:  numrefs=C.markall; break;
+            case 2:  numrefs=markall; break;
+            case 3:  numrefs=markall; break;
             default: throw DROPSErrCL("Specify the refinement strategy!");
         }
 
         DROPS::LoadBalCL LoadBal(mg, metis);
-        for (int ref=0; ref<C.markall+C.markdrop+C.markcorner; ++ref)
+        for (int ref=0; ref<markall+markdrop+markcorner; ++ref)
         {
             DROPS::Point3DCL e, e1;
             bool marked=false;
             bool killedghost=false;
 
-            switch (C.Strategy)
+            switch (C.get<int>("Refine.Strategy"))
             {
             case 0:
                 cout << " + Refine " << (ref) << " : ";
-                if (ref < C.markall){
+                if (ref < markall){
                     cout << "all ...\n";
-                    if (C.markingproc==-1 || C.markingproc==me)
+                    if (markingproc==-1 || markingproc==me)
                         DROPS::MarkAll(mg);
                 }
-                else if (ref < C.markdrop+C.markall){
+                else if (ref < markdrop+markall){
                     cout << "drop ...\n";
-                    if (C.markingproc==-1 || C.markingproc==me)
+                    if (markingproc==-1 || markingproc==me)
                         MarkDrop(mg, mg.GetLastLevel());
                 }
                 else{
                     cout << "corner ...\n";
-                    if (C.markingproc==-1 || C.markingproc==me)
+                    if (markingproc==-1 || markingproc==me)
                         MarkCorner(mg, mg.GetLastLevel());
                 }
             break;
@@ -500,69 +514,72 @@ int main(int argc, char* argv[])
             time.Reset(); pmg.Refine(); time.Stop();
             duration = time.GetMaxTime();
             Times.AddTime(T_Ref,duration);
-            if (C.printTime) std::cout << "       --> "<<duration<<" sec\n";
+            if (printTime) std::cout << "       --> "<<duration<<" sec\n";
 
-            if (C.printPMG){
+            if (printPMG){
                 cout << "  - Schreibe Debug-Informationen in ein File ... ";
                 PrintMG(pmg,REF);
                 cout << " OK\n";
             }
 
-            if (C.checkRef)
+            if (C.get<int>("Misc.CheckAfterRef"))
                 CheckParMultiGrid(pmg,REF);
 
 //            DynamicDataInterfaceCL::ConsCheck();
-            DoMigration( LoadBal,C.refineStrategy);
+            DoMigration( LoadBal,C.get<int>("LoadBalancing.RefineStrategy"));
             movedRefNodes += LoadBal.GetMovedMultiNodes();
 
-            if (C.printPMG){
+            if (printPMG){
                 cout << "  - Schreibe Debug-Informationen in ein File ... ";
                 PrintMG(pmg,MIG);
                 cout << " OK\n";
             }
-            if (C.printGEO){
+            if (printGEO){
                 cout << "  - Schreibe das Multigrid im Geomview-Format in ein File ... ";
                 PrintGEO(pmg);
                 cout << " OK\n";
             }
-            if (C.printSize){
+            if (printSize){
                 cout << "  - Verteilung der Elemente:\n";
                 mg.SizeInfo(cout);
             }
 
-            if (C.checkMig)
+            if (C.get<int>("Misc.CheckAfterMig"))
                 CheckParMultiGrid(pmg,MIG);
 
-            if (ref!=C.markall+C.markdrop+C.markcorner-1) cout << line << endl;
+            if (ref!=markall+markdrop+markcorner-1) cout << line << endl;
         }
 
-        if (C.middleMig){
+        if (C.get<int>("LoadBalancing.MiddleMig")){
             cout <<dline<<endl<< " + Last-Verteilung zwischen dem Verfeinern und Vergroebern ...\n";
             DoMigration( LoadBal,0);
             movedRefNodes += LoadBal.GetMovedMultiNodes();
             CheckParMultiGrid(pmg,MIG);
         }
 
-		cout <<dline<<endl << " Vergroebere nun das Gitter zunaechst " << C.coarsedrop
-				<< " mal um den Tropfen herum und dann " << C.coarseall << " ueberall\n Es wird die Strategie ";
-		switch (C.coarseStrategy){
+        const int coarseall    = C.get<int>("Coarsen.All"),
+                  coarsedrop   = C.get<int>("Coarsen.Drop"),
+                  unmarkingproc= C.get<int>("Coarsen.MarkingProc");
+		cout <<dline<<endl << " Vergroebere nun das Gitter zunaechst " << coarsedrop
+				<< " mal um den Tropfen herum und dann " << coarseall << " ueberall\n Es wird die Strategie ";
+		switch (C.get<int>("LoadBalancing.CoarsenStrategy")){
 			case 0 : cout << "No Loadbalancing ";break;
 			case 1 : cout << "AdaptiveRefine "; break;
 			case 2 : cout << "PartKWay "; break;
 			default: cout << "Unbekannte Strategy ...\n EXIT"; exit(0);
 		}
-		cout << "verwendet. Es markiert der Prozessor " << C.unmarkingproc << "\n" << dline << endl;
+		cout << "verwendet. Es markiert der Prozessor " << unmarkingproc << "\n" << dline << endl;
 
-        for (int ref =0; ref<C.coarsedrop+C.coarseall; ++ref)
+        for (int ref =0; ref<coarsedrop+coarseall; ++ref)
         {
-            if (ref < C.coarsedrop){
+            if (ref < coarsedrop){
                 cout << " + Coarse drop (" << ref << ") ... \n";
-                if (C.unmarkingproc==-1 || C.unmarkingproc==me)
+                if (unmarkingproc==-1 || unmarkingproc==me)
                     UnMarkDrop(mg, mg.GetLastLevel());
             }
             else {
                 cout << " + Coarse all (" << ref << ") ... \n";
-                if (C.unmarkingproc==-1 || C.unmarkingproc==me){
+                if (unmarkingproc==-1 || unmarkingproc==me){
                     DROPS::UnMarkAll(mg);
                 }
             }
@@ -570,14 +587,14 @@ int main(int argc, char* argv[])
             time.Reset(); pmg.Refine(); time.Stop();
             duration = time.GetMaxTime();
             Times.AddTime(T_Ref,duration);
-            if (C.printTime) std::cout << "       --> "<<duration<<" sec\n";
-            if (C.printPMG)
+            if (printTime) std::cout << "       --> "<<duration<<" sec\n";
+            if (printPMG)
             {
                 cout << "  - Schreibe Debug-Informationen in ein File ... ";
                 PrintMG(pmg, REF);
                 cout << " OK\n";
             }
-            if (C.printGEO){
+            if (printGEO){
                 cout << "  - Schreibe das Multigrid im Geomview-Format in ein File ... ";
                 PrintGEO(pmg);
                 cout << " OK\n";
@@ -585,15 +602,15 @@ int main(int argc, char* argv[])
 
             CheckParMultiGrid(pmg,REF);
 
-            DoMigration( LoadBal,C.coarseStrategy);
+            DoMigration( LoadBal,C.get<int>("LoadBalancing.CoarsenStrategy"));
 
             movedCoarseNodes += LoadBal.GetMovedMultiNodes();
 
-            if (C.printSize){
+            if (printSize){
                 cout << "  - Verteilung der Elemente:\n";
                 mg.SizeInfo(cout);
             }
-            if (C.printPMG)
+            if (printPMG)
             {
                 cout << "  - Schreibe Debug-Informationen in ein File ... ";
                 PrintMG(pmg, MIG);
@@ -602,12 +619,12 @@ int main(int argc, char* argv[])
 
             CheckParMultiGrid(pmg,MIG);
 
-            if (ref!=C.coarsedrop+C.coarseall-1) cout << line << endl;
+            if (ref!=coarsedrop+coarseall-1) cout << line << endl;
         }
 
 		cout << dline<< endl;
 
-        if (C.printTime)
+        if (printTime)
             Times.Print(cout);
 		cout << "Moved Multinodes for refinement: " << movedRefNodes << endl
 	  		 << "Moved Multinodes for coarsening: " << movedCoarseNodes << endl
