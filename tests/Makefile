@@ -295,7 +295,7 @@ dist_TestRefPar: \
     ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
     ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o ../out/vtkOut.o ../parallel/parmultigrid.o \
     ../num/fe.o ../num/interfacePatch.o ../levelset/levelset.o ../levelset/fastmarch.o ../levelset/surfacetension.o \
-    ../misc/params.o ../partests/params.o ../levelset/lsetparams.o ../out/output.o $(PAR_OBJ)
+    ../misc/params.o ../out/output.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 dist_exchange: \
