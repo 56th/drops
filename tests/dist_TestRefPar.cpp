@@ -562,7 +562,7 @@ int main(int argc, char* argv[])
                   unmarkingproc= C.get<int>("Coarsen.MarkingProc");
 		cout <<dline<<endl << " Vergroebere nun das Gitter zunaechst " << coarsedrop
 				<< " mal um den Tropfen herum und dann " << coarseall << " ueberall\n Es wird die Strategie ";
-		switch (C.get<int>("LoadBalancing.CoarsenStrategy")){
+		switch (C.get<int>("LoadBalancing.CoarseStrategy")){
 			case 0 : cout << "No Loadbalancing ";break;
 			case 1 : cout << "AdaptiveRefine "; break;
 			case 2 : cout << "PartKWay "; break;
@@ -602,7 +602,7 @@ int main(int argc, char* argv[])
 
             CheckParMultiGrid(pmg,REF);
 
-            DoMigration( LoadBal,C.get<int>("LoadBalancing.CoarsenStrategy"));
+            DoMigration( LoadBal,C.get<int>("LoadBalancing.CoarseStrategy"));
 
             movedCoarseNodes += LoadBal.GetMovedMultiNodes();
 
