@@ -11,7 +11,7 @@ EXEC =  ip1test ip2test mattest prolongationp2test reftest testfe \
         p2local quadbase globallist triang quadCut bicgstab gcr blockmat \
         mass quad5 downwind quad5_2D interfaceP1FE serialization xfem \
         directsolver f_Gamma neq splitboundary reparam_init reparam \
-        extendP1onChild principallattice dist_streamtest dist_remotedatatest \
+        extendP1onChild principallattice quad_extra dist_streamtest dist_remotedatatest \
         dist_sendtetraofbrick dist_simplexsend dist_interface dist_exchange \
         dist_poisson dist_sdropsP2 dist_twophasedrops dist_ref dist_modify \
         dist_TestRefPar
@@ -146,7 +146,8 @@ triang: \
 quadCut: \
     ../tests/quadCut.o  ../misc/utils.o ../geom/builder.o ../geom/simplex.o ../geom/multigrid.o \
     ../geom/boundary.o ../geom/topo.o ../num/unknowns.o ../misc/problem.o ../num/interfacePatch.o \
-    ../levelset/levelset.o ../levelset/fastmarch.o ../num/discretize.o ../num/fe.o ../levelset/surfacetension.o
+    ../levelset/levelset.o ../levelset/fastmarch.o ../num/discretize.o ../num/fe.o ../levelset/surfacetension.o \
+    ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 bicgstab: \
@@ -167,7 +168,8 @@ mass: \
 quad5: \
     ../tests/quad5.o ../misc/utils.o ../geom/builder.o ../geom/simplex.o ../geom/multigrid.o \
     ../geom/boundary.o ../geom/topo.o ../num/unknowns.o ../misc/problem.o \
-    ../num/fe.o ../num/discretize.o ../num/interfacePatch.o
+    ../num/fe.o ../num/discretize.o ../num/interfacePatch.o\
+    ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 downwind: \
@@ -183,7 +185,8 @@ quad5_2D: \
 interfaceP1FE: \
     ../tests/interfaceP1FE.o  ../misc/utils.o ../geom/builder.o ../geom/simplex.o ../geom/multigrid.o \
     ../geom/boundary.o ../geom/topo.o ../num/unknowns.o ../misc/problem.o ../num/interfacePatch.o \
-    ../levelset/levelset.o ../levelset/fastmarch.o ../num/discretize.o ../num/fe.o ../levelset/surfacetension.o
+    ../levelset/levelset.o ../levelset/fastmarch.o ../num/discretize.o ../num/fe.o ../levelset/surfacetension.o \
+    ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 xfem: \
@@ -223,7 +226,8 @@ reparam_init: \
     ../num/unknowns.o ../misc/utils.o ../geom/topo.o ../out/output.o \
     ../misc/problem.o ../levelset/levelset.o ../num/fe.o \
     ../misc/utils.o ../num/discretize.o ../num/interfacePatch.o \
-    ../levelset/fastmarch.o ../levelset/surfacetension.o ../out/ensightOut.o
+    ../levelset/fastmarch.o ../levelset/surfacetension.o ../out/ensightOut.o \
+    ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 reparam: \
@@ -231,7 +235,8 @@ reparam: \
     ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
     ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
     ../num/fe.o ../out/ensightOut.o ../num/interfacePatch.o ../levelset/surfacetension.o \
-    ../misc/params.o ../out/vtkOut.o $(PAR_OBJ)
+    ../misc/params.o ../out/vtkOut.o ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o \
+    ../num/quadrature.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 principallattice: \
@@ -239,6 +244,13 @@ principallattice: \
     ../num/fe.o ../num/interfacePatch.o ../misc/problem.o ../num/unknowns.o ../geom/simplex.o \
     ../geom/multigrid.o ../geom/builder.o ../geom/boundary.o ../num/unknowns.o ../geom/reftetracut.o \
     ../geom/subtriangulation.o ../num/quadrature.o
+	$(CXX) -o $@ $^ $(LFLAGS)
+
+quad_extra: \
+    ../tests/quad_extra.o ../misc/utils.o ../geom/builder.o ../geom/simplex.o ../geom/multigrid.o \
+    ../geom/boundary.o ../geom/topo.o ../num/unknowns.o ../misc/problem.o \
+    ../num/fe.o ../num/discretize.o ../num/interfacePatch.o\
+    ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 dist_streamtest: \
@@ -287,7 +299,8 @@ dist_ref: \
     ../tests/dist_ref.o \
     ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
     ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o ../out/vtkOut.o ../parallel/parmultigrid.o \
-    ../num/fe.o ../num/interfacePatch.o ../levelset/levelset.o ../levelset/fastmarch.o ../levelset/surfacetension.o $(PAR_OBJ)
+    ../num/fe.o ../num/interfacePatch.o ../levelset/levelset.o ../levelset/fastmarch.o ../levelset/surfacetension.o \
+    ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 dist_TestRefPar: \
@@ -295,7 +308,7 @@ dist_TestRefPar: \
     ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
     ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o ../out/vtkOut.o ../parallel/parmultigrid.o \
     ../num/fe.o ../num/interfacePatch.o ../levelset/levelset.o ../levelset/fastmarch.o ../levelset/surfacetension.o \
-    ../misc/params.o ../partests/params.o ../levelset/lsetparams.o ../out/output.o $(PAR_OBJ)
+    ../misc/params.o ../out/output.o ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 dist_exchange: \
@@ -327,9 +340,9 @@ dist_twophasedrops: \
     ../tests/dist_twophasedrops.o ../geom/boundary.o ../geom/builder.o ../geom/simplex.o ../geom/multigrid.o \
     ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o ../levelset/levelset.o \
     ../misc/utils.o ../out/output.o ../num/discretize.o ../navstokes/instatnavstokes2phase.o \
-    ../misc/params.o ../levelset/fastmarch.o ../stokes/instatstokes2phase.o ../num/MGsolver.o\
-    ../num/fe.o  ../stokes/integrTime.o ../out/vtkOut.o \
-    ../num/interfacePatch.o ../levelset/surfacetension.o \
+    ../misc/params.o ../levelset/fastmarch.o ../stokes/instatstokes2phase.o ../num/MGsolver.o \
+    ../num/fe.o ../stokes/integrTime.o  \
+    ../num/interfacePatch.o ../out/vtkOut.o ../levelset/surfacetension.o \
     ../geom/geomselect.o  ../levelset/twophaseutils.o ../num/hypre.o ../levelset/coupling.o ../geom/bndVelFunctions.o \
     ../geom/bndScalarFunctions.o ../misc/bndmap.o ../levelset/twophaseCoeff.o \
     ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o \
