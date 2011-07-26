@@ -970,7 +970,7 @@ private:
     bool IsSane( std::ostream&) const;
     void DebugInfo( std::ostream&) const;
     void SizeInfo( std::ostream&) const;
-    void ShowSimplex( const size_t hash_val, std::ostream&) const;     ///< Show the debug information of a simplex by a given hash value
+    void ShowSimplex( const Helper::GeomIdCL&, std::ostream&) const;     ///< Show the debug information of a simplex given by its geometric id
     //@}
 };
 

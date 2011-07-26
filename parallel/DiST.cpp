@@ -700,8 +700,9 @@ class ModifyCL::CommToUpdateHandlerCL
         if (dim==GetDim<TetraCL>()) { // tetra: write SimplexTransferInfoCL::UpdateSubs_
             const bool updateSubs= it->second.UpdateSubs();
             os << updateSubs;
-            const int remoteProc= (++(it->second.GetRemoteData().GetProcListBegin()))->proc;
-            os << it->second.WillBeOnProc(remoteProc);
+            const int remoteProc= (++(it->second.GetRemoteData().GetProcListBegin()))->proc, // only called for distributed objects, so there are 2 tetras
+                postRemote= it->second.WillBeOnProc(remoteProc) ? remoteProc : -1;
+            os << postRemote;
         }
         return true;
     }
@@ -710,10 +711,12 @@ class ModifyCL::CommToUpdateHandlerCL
     {
         const Usint dim= t.GetDim();
         if (dim==GetDim<TetraCL>()) { // tetra
-            bool updateSubs= false, upSubs, transferHere;
+            bool updateSubs= false, upSubs, transferHere= false;
+            int postproc;
             for (size_t i=0; i<numData; ++i) {
-            	is >> upSubs >> transferHere;
+            	is >> upSubs >> postproc;
             	updateSubs= updateSubs || upSubs;
+            	transferHere= transferHere || postproc==ProcCL::MyRank(); // some remote will transfer tetra to me
             }
             ModifyCL::UpdateListT& ul= mod_.entsToUpdt_[dim];
             ModifyCL::UpdateIterator it= ul.find( &t);
@@ -1142,15 +1145,16 @@ void DiST::TransferCL::ReceiveSimplices<TetraCL>( DiST::Helper::RecvStreamCL& re
         // receive proc/prio list
         recvstream >> procList;
         TetraCL* tp= 0;
+        bool formerMaster= false;
         if (!InfoCL::Instance().Exists(stmp.GetGID()))
         	tp= &CreateSimplex<TetraCL>( stmp, procList); // creates simplex and remote data list entry
         else { // merge with existing tetra
         	tp= InfoCL::Instance().GetTetra( stmp.GetGID());
-            tp->Merge(stmp);
+            formerMaster= tp->Merge(stmp);
         }
 
         // TODO: hier experimentell, sollte per Handler ausgelagert werden (aus ParMultiGridCL::HandlerTObjMkCons).
-        if (tp->IsRegularlyRef() && tp->IsMaster())
+        if (tp->IsRegularlyRef() && tp->IsMaster() && !formerMaster)
         {
             tp->CommitRegRefMark();
             // nun wird auf allen Edges _AccMFR:=_MFR gesetzt, um Unkonsistenzen bei vorher verteilt
@@ -1238,22 +1242,16 @@ void InfoCL::SizeInfo( std::ostream& os) const
     os << std::endl;
 }
 
-/** Unfortunately, I know no better solution than iterate over all simplices
-    and check if the value of the GID fits.
-    \param hash_val hash value of a GID
+/** Show debug information of simplex given by its geometric id.
+    \param gid geometric id of simplex
+    \param os output stream
 */
-void InfoCL::ShowSimplex( const size_t hash_val, std::ostream& os) const
+void InfoCL::ShowSimplex( const Helper::GeomIdCL& gid, std::ostream& os) const
 {
-    for ( size_t i=0; i<4; ++i){
-        for ( Helper::RemoteDataListCL::const_iterator it( remoteData_[i].begin()); it!=remoteData_[i].end(); ++it){
-            if ( remoteData_[i].hash_function()( it->first)==hash_val){
-                it->second.GetLocalObject().DebugInfo( os);
-                return;
-            }
-        }
+    if (Exists(gid)) {
+        GetRemoteData(gid).GetLocalObject().DebugInfo( os);
+        return;
     }
-    os << "Simplex with hash value " << hash_val << " not known on process " << ProcCL::MyRank() << std::endl;;
-
 }
 
 }   // end of namespace DiST

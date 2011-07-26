@@ -640,7 +640,7 @@ class TetraCL
     /// \brief Generate tetra from a stream
     void UnPack( DiST::Helper::RecvStreamCL&);
     /// \brief Merge tetra with given tetra. Needed by DiST::TransferCL.
-    void Merge( const TetraCL&);
+    bool Merge( const TetraCL&);
 
     /// \brief Check if simplex is exclusive
     bool IsExclusive( const Priority=PrioMaster) const;
@@ -725,8 +725,7 @@ class TetraCL
 template <typename SimplexT>
 void simplex_cast( const DiST::TransferableCL& t, SimplexT*& s)
 {
-    if ( DiST::GetDim<SimplexT>()!=t.GetDim())
-        throw DROPSErrCL("simplex_cast: dimension does not match.");
+    Assert( DiST::GetDim<SimplexT>() == t.GetDim(), DiST::Helper::ErrorCL("simplex_cast: dimension does not match for ", t.GetGID(), DiST::Helper::NoGID), ~0);
     s= dynamic_cast<SimplexT*>(const_cast<DiST::TransferableCL*>(&t));
 }
 

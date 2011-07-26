@@ -407,7 +407,7 @@ void ComputeChildFacesOfFace (const TetraCL& p, Uint f, std::vector<const FaceCL
         childfaces.push_back( p.GetFace( f));
         return;
     }
-    
+
     bool done= false; // Used to shortcut the search for child faces, if the child face coincides with the parent face.
     const RefRuleCL& ref= p.GetRefData();
     for (Uint c= 0; c < ref.ChildNum && !done; ++c) { // Loop over all children
@@ -968,16 +968,18 @@ void TetraCL::UnPack( DiST::Helper::RecvStreamCL& istrstream)
 }
 
 /**
- * - For former HasGhost, set children array and midvertex pointers properly.
- * - For former Ghost, set parent pointer properly.
+ * - For former HasGhost, set children array and midvertex pointers properly and return true.
+ * - For former Ghost, set parent pointer properly and return false.
  */
-void TetraCL::Merge( const TetraCL& t)
+bool TetraCL::Merge( const TetraCL& t)
 {
 	if (!Children_) { // former HasGhost: set children array properly. Midvertex pointers will be set by ParMultiGridCL::AdaptMidVertex().
 		Children_= new SArrayCL<TetraCL*, MaxChildrenC>;
 		std::copy( t.Children_->begin(), t.Children_->end(), Children_->begin());
+		return true;
 	} else if (!Parent_) // former ghost: set parent pointer properly
 		Parent_= t.Parent_;
+	return false;
 }
 
 #endif

@@ -39,7 +39,7 @@
 
 namespace DROPS
 {
-    
+
 BoundaryCL::~BoundaryCL()
 {
     for (SegPtrCont::iterator It=Bnd_.begin(); It!=Bnd_.end(); ++It)
@@ -259,8 +259,6 @@ void MultiGridCL::UnrefineGrid (Uint Level)
             ++tIt;
             continue;
         }
-
-
         if ( !tIt->IsUnrefined() )
         {
             if ( tIt->IsMarkEqRule() )
@@ -272,8 +270,6 @@ void MultiGridCL::UnrefineGrid (Uint Level)
                 // if tetra is ghost and will have no children on this proc after unref, we can delete this tetra
                 if ( tIt->IsGhost() && tIt->IsMarkedForNoRef())
                 {
-                    if (!withUnknowns_)
-                        pmg.Delete( &*tIt);
                     tIt->UnlinkFromFaces();
                     if (Level==0){  //mark subs for removement (are rescued after this loop)
                         std::for_each( tIt->GetVertBegin(), tIt->GetVertEnd(), std::mem_fun( &VertexCL::SetRemoveMark) );
@@ -301,7 +297,10 @@ void MultiGridCL::UnrefineGrid (Uint Level)
     }
     if (killedGhost)
         killedGhostTetra_=true;
-
+    if (ProcCL::GlobalOr(killedGhost)) {
+        pmg.ModifyEnd(); // to set killed ghost prios in the respective remote data
+        pmg.ModifyBegin();
+    }
     // now all remove marks are set. Now put simplices into recycle bin and clear remove marks of still used tetras
     for (TetraIterator tIt(Tetras_[Level].begin()), tEnd(Tetras_[Level].end()); tIt!=tEnd; )
     {
@@ -350,7 +349,8 @@ void MultiGridCL::UnrefineGrid (Uint Level)
     // also if numerical data will be submitted after the refinement algorithm, no parallel information will be
     // needed on the simplices, because all datas of a tetra will be submitted. Hence this subsimplices can be
     // unsubscribed from the DiST module
-    if (killedGhost)
+
+    if (killedGhostTetra_ && Level==GetLastLevel()-1)
     {
         for_each_if( Faces_[0].begin(), Faces_[0].end(),
                 Delete_fun<FaceCL>(), std::mem_fun_ref(&FaceCL::IsMarkedForRemovement) );
@@ -363,6 +363,12 @@ void MultiGridCL::UnrefineGrid (Uint Level)
     // tetras on next level can be deleted anyway
     for_each_if( Tetras_[nextLevel].begin(), Tetras_[nextLevel].end(),
             Delete_fun<TetraCL>(), std::mem_fun_ref(&TetraCL::IsMarkedForRemovement) );
+    // delete ghost tetras, that aren't needed any more
+    if (!withUnknowns_){
+        Delete_fun<TetraCL> del;
+        for (std::list<TetraIterator>::iterator it=toDelGhosts_.begin(); it!=toDelGhosts_.end(); ++it)
+            del(**it);
+    }
 
     // parallel information about subsimplices aren't needed any more
     for_each_if( Faces_[nextLevel].begin(), Faces_[nextLevel].end(),
@@ -381,6 +387,7 @@ void MultiGridCL::UnrefineGrid (Uint Level)
             Tetras_[Level].erase(*it);
         toDelGhosts_.resize(0);
     }
+
 
     Comment("Now physically unlinking and removing superfluous tetras." << std::endl, DebugRefineEasyC);
     for (TetraIterator it= Tetras_[nextLevel].begin(), end= Tetras_[nextLevel].end(); it!=end; )
@@ -495,6 +502,7 @@ void MultiGridCL::Refine()
 
     const int tmpLastLevel( GetLastLevel() );
 
+
     for (int Level=tmpLastLevel; Level>=0; --Level)
     {
         RestrictMarks(Level);
@@ -539,7 +547,7 @@ void MultiGridCL::Refine()
         if (killedGhostTetra_){
             // todo of: Kann man das DynamicDataInterfaceCL::XferBegin und DDD_XferEnd aus der for-schleife herausziehen?
         	// DynamicDataInterfaceCL::XferBegin();
-            DiST::ModifyCL modify( *this, true, true);
+            DiST::ModifyCL modify( *this, /*del*/true);
             modify.Init();
             for (std::list<TetraIterator>::iterator it=toDelGhosts_.begin(); it!=toDelGhosts_.end(); ++it)
                 modify.Delete( **it);

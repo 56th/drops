@@ -149,6 +149,7 @@ RemoteDataListIteratorCL RemoteDataListCL::endLvlPrioIt ()
 void RemoteDataListCL::Register( TransferableCL& t, Priority prio)
 {
     Assert( this->find(t.GetGID())==this->end(), ErrorCL("RemoteDataListCL::Register: Simplex already known: ", t.GetGID()), DebugDiSTC);
+    Assert( empty() || begin()->first.dim==t.GetDim(), ErrorCL("RemoteDataListCL::Register: wrong dimension of ", t.GetGID(), NoGID), DebugDiSTC);
     (*this)[t.GetGID()]= RemoteDataCL( &t, prio);
 }
 
@@ -157,6 +158,7 @@ void RemoteDataListCL::Register( TransferableCL& t, Priority prio)
 void RemoteDataListCL::Register( TransferableCL& t, const RemoteDataCL::ProcListT& pl)
 {
     Assert( this->find(t.GetGID())==this->end(), ErrorCL("RemoteDataListCL::Register: Simplex already known", t.GetGID()), DebugDiSTC);
+    Assert( empty() || begin()->first.dim==t.GetDim(), ErrorCL("RemoteDataListCL::Register: wrong dimension of ", t.GetGID(), NoGID), DebugDiSTC);
     (*this)[t.GetGID()]= RemoteDataCL( &t, pl);
 }
 

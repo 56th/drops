@@ -1071,11 +1071,11 @@ class ParMultiGridCL::HandlerAccMFRCL
     bool Scatter( DiST::TransferableCL& t, const size_t& numData, DiST::Helper::RecvStreamCL& recv)
     {
         EdgeCL* ep; simplex_cast( t, ep);
-        ep->SetAccMFR( 0);
+        ep->AccMFR_= 0;
         short int recvMFR=-1;
         for ( size_t i=0; i<numData; ++i){
             recv >> recvMFR;
-            ep->SetAccMFR( ep->GetAccMFR()+recvMFR);
+            ep->AccMFR_+= recvMFR;
         }
         return true;
     }
