@@ -336,7 +336,7 @@ class RemoteDataCL
     ProcList_const_iterator GetProcListEnd  () const { return procList_.end(); }
     //@}
 
-          Uint            GetNumProcs()       const { return procList_.size(); }///< Get number of processes owning the distributed entity
+          Uint            GetNumProcs( Priority prio=NoPrio) const;             ///< Get number of processes owning the distributed entity
     const TransferableCL& GetLocalObject()    const { return *localObj_; }      ///< Get a constant reference to the local stored entity
           TransferableCL& GetLocalObject()          { return *localObj_; }      ///< Get a reference to the local stored entity
     const TransferableCL* GetLocalObjectPtr() const { return localObj_; }       ///< Get a constant pointer to the local stored entity
@@ -634,7 +634,8 @@ class TransferableCL
     bool                    IsMaster()    const { return GetPrio()>=PrioMaster; }            ///< Check if simplex is a master copy
     bool                    MayStoreUnk() const { return GetPrio()==PrioMaster; }            ///< Check for ability of storing unknowns due to priority \todo Is PrioMaster correct?
     bool                    IsLocal()     const { return GetNumDist()==1; }                  ///< Check if the simplex is local
-    Uint                    GetNumDist () const { return GetRemoteData().GetNumProcs(); }    ///< Get number of procs on which the simplex is stored
+    Uint                    GetNumDist ( Priority prio=NoPrio) const                         ///< Get number of procs on which the simplex with priority >= prio is stored
+        { return GetRemoteData().GetNumProcs(prio); }
     bool                    IsDistributed( Priority prio=NoPrio) const                       ///< Check a copy with priority >= prio exists on another process
         { return GetRemoteData().IsDistributed(prio); }
     int                     GetOwner()    const { return GetRemoteData().GetOwnerProc(); }   ///< Get the process rank of the owning process

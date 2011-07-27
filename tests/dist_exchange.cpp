@@ -46,7 +46,7 @@ void BuildBrick( MultiGridCL*& mg)
     Point3DCL origin, e1, e2, e3;
     e1[0]= e2[1]= e3[2]= 1.;
     if ( ProcCL::IamMaster()){
-        Uint ref[3]= { 8, 8, 8};
+        Uint ref[3]= { 2, 2, 2};
         builder = new BrickBuilderCL( origin, e1, e2, e3, ref[0], ref[1], ref[2]);
     }
     else{
@@ -54,13 +54,6 @@ void BuildBrick( MultiGridCL*& mg)
     }
     mg = new MultiGridCL( *builder);
     delete builder;
-}
-
-/// \brief Process 0 sends its i-th tetrahedron to process i
-void SendTetras( MultiGridCL& mg)
-{
-    LoadBalHandlerCL lb( mg, DROPS::metis);             // loadbalancing
-    lb.DoInitDistribution( DROPS::ProcCL::Master());    // distribute initial grid
 }
 
 /// \brief Check, if accumulation is correct
@@ -77,7 +70,7 @@ bool CheckAccumulation( MultiGridCL& mg)
     idx_desc[2]= new IdxDescCL( vecP2_FE);
 
     for ( size_t i=0; i<num_idx; ++i){
-        idx_desc[i]->CreateNumbering( 0, mg);
+        idx_desc[i]->CreateNumbering( mg.GetLastLevel(), mg);
         vec_desc[i]= new VecDescCL( idx_desc[i]);
         vec_desc[i]->Data= 1.0;
     }
@@ -85,36 +78,43 @@ bool CheckAccumulation( MultiGridCL& mg)
     for (size_t i = 0; i< num_idx; ++i) {
         idx_desc[i]->GetEx().Accumulate( vec_desc[i]->Data);
     }
+    
     std::cout << " Number of neighbors of process " << ProcCL::Master()
               << ": " << idx_desc[0]->GetEx().GetNumNeighs() << std::endl;
     bool correct=true;
     // Check on vertices
-    DROPS_FOR_TRIANG_VERTEX( mg, 0, it){
+    DROPS_FOR_TRIANG_VERTEX( mg, mg.GetLastLevel(), it){
         if ( it->Unknowns.Exist()){
             for ( size_t i=0; i<num_idx; ++i){
                 const Uint idx=idx_desc[i]->GetIdx();
                 if (it->Unknowns.Exist( idx)){
                     const IdxT dof= it->Unknowns( idx);
                     for ( Uint j=0; j<idx_desc[i]->NumUnknownsVertex(); ++j){
-                        if ( (double)it->GetNumDist()!=vec_desc[i]->Data[dof+j]){
+                        if ( (double)it->GetNumDist( PrioGhost)!=vec_desc[i]->Data[dof+j]){
                             correct= false;
-                            printf("Proc nr %d, testcase %ld: %f should be %f\n", ProcCL::MyRank(), i, (double)it->GetNumDist(), vec_desc[i]->Data[dof+j]);
+                            printf("Proc nr %d, testcase %ld: %f should be %f, Prio is %i on level %i with bary: %f %f %f\n",
+                            		ProcCL::MyRank(), i, vec_desc[i]->Data[dof+j], (double)it->GetNumDist( PrioGhost), it->GetPrio(),
+                            		it->GetLevel(), it->GetBary()[0], it->GetBary()[1], it->GetBary()[2]);
                         }
                     }
+
                 }
             }
         }
     }
     // Check on edges
-    DROPS_FOR_TRIANG_EDGE( mg, 0, it){
+    DROPS_FOR_TRIANG_EDGE( mg, mg.GetLastLevel(), it){
         if ( it->Unknowns.Exist()){
             for ( size_t i=0; i<num_idx; ++i){
                 const Uint idx=idx_desc[i]->GetIdx();
                 if (it->Unknowns.Exist( idx)){
                     const IdxT dof= it->Unknowns( idx);
                     for ( Uint j=0; j<idx_desc[i]->NumUnknownsEdge(); ++j)
-                        if ( (double)it->GetNumDist()!=vec_desc[i]->Data[dof+j]){
+                        if ( (double)it->GetNumDist( PrioGhost)!=vec_desc[i]->Data[dof+j]){
                             correct= false;
+                            printf("Proc nr %d, testcase %ld: %f should be %f, Prio is %i on level %i with bary: %f %f %f\n",
+                            		ProcCL::MyRank(), i, vec_desc[i]->Data[dof+j], (double)it->GetNumDist( PrioGhost), it->GetPrio(),
+                            		it->GetLevel(), it->GetBary()[0], it->GetBary()[1], it->GetBary()[2]);
                     }
                 }
             }
@@ -149,9 +149,9 @@ bool CheckAccumulation( MultiGridCL& mg)
 std::valarray<double> getReferenceValue( const MultiGridCL& mg, IdxDescCL* idxDesc)
 {
     std::valarray<double> result(3);
-    VectorCL x( idxDesc->NumUnknowns()), x_acc( idxDesc->NumUnknowns());
+    result = 0.0;
     const Uint idx= idxDesc->GetIdx();
-    DROPS_FOR_TRIANG_CONST_VERTEX( mg, 0, it){
+    DROPS_FOR_TRIANG_CONST_VERTEX( mg, mg.GetLastLevel(), it){
         if ( it->Unknowns.Exist() && it->Unknowns.Exist(idx)){
             if ( it->IsLocal()){
                 result[0] += idxDesc->NumUnknownsVertex();
@@ -160,13 +160,13 @@ std::valarray<double> getReferenceValue( const MultiGridCL& mg, IdxDescCL* idxDe
             }
             else if ( it->AmIOwner()){
                 result[0] += idxDesc->NumUnknownsVertex();
-                result[1] += it->GetNumDist()*idxDesc->NumUnknownsVertex();
-                result[2] += it->GetNumDist()*it->GetNumDist()*idxDesc->NumUnknownsVertex();
+                result[1] += it->GetNumDist( PrioGhost)*idxDesc->NumUnknownsVertex();
+                result[2] += it->GetNumDist( PrioGhost)*it->GetNumDist( PrioGhost)*idxDesc->NumUnknownsVertex();
             }
         }
     }
     // Check on edges
-    DROPS_FOR_TRIANG_CONST_EDGE( mg, 0, it){
+    DROPS_FOR_TRIANG_CONST_EDGE( mg, mg.GetLastLevel(), it){
         if ( it->Unknowns.Exist() && it->Unknowns.Exist(idx)){
             if ( it->IsLocal()){
                 result[0] += idxDesc->NumUnknownsEdge();
@@ -175,8 +175,8 @@ std::valarray<double> getReferenceValue( const MultiGridCL& mg, IdxDescCL* idxDe
             }
             else if ( it->AmIOwner()){
                 result[0] += idxDesc->NumUnknownsEdge();
-                result[1] += it->GetNumDist()*idxDesc->NumUnknownsEdge();
-                result[2] += it->GetNumDist()*it->GetNumDist()*idxDesc->NumUnknownsEdge();
+                result[1] += it->GetNumDist( PrioGhost)*idxDesc->NumUnknownsEdge();
+                result[2] += it->GetNumDist( PrioGhost)*it->GetNumDist( PrioGhost)*idxDesc->NumUnknownsEdge();
             }
         }
     }
@@ -311,7 +311,7 @@ bool CheckInnerProducts( MultiGridCL& mg)
     for ( size_t i=0; i<num_idx; ++i){
         std::cout << " - Check case " << (i+1) << std::endl;
 
-        idx_desc[i]->CreateNumbering( 0, mg);
+        idx_desc[i]->CreateNumbering( mg.GetLastLevel(), mg);
         vec_desc[i]= new VecDescCL( idx_desc[i]);
         vec_desc[i]->Data= 1.0;
         VectorCL x( vec_desc[i]->Data), y( x);
@@ -330,7 +330,7 @@ bool CheckInnerProducts( MultiGridCL& mg)
         if ( !CheckDot( idx_desc[i]->GetEx(), x, false, y, false, ref_result[2])){
             case_correct= false;
         }
-        
+
         if ( !ProcCL::Check(case_correct)) correct=false;
         else std::cout << "   => Case " << i << " is correct" << std::endl;
     }
@@ -373,7 +373,7 @@ void MakeTimeMeasurements( MultiGridCL& mg, const size_t num_test)
     IdxDescCL idx( vecP2_FE);
     idx.CreateNumbering( mg.GetLastLevel(), mg);
     ParTimerCL timer;
-    VectorCL x( 1., idx.NumUnknowns()), x_acc(x), y(x), y_acc(y);
+    VectorCL x( 1., idx.NumUnknowns()), x_acc(x), y(1., idx.NumUnknowns()), y_acc(y);
     const size_t size_acc   = ProcCL::GlobalSum( x.size()),
                  size_global= idx.GetGlobalNumUnknowns(mg);
 
@@ -431,10 +431,41 @@ int main( int argc, char **argv)
         }
         DROPS::MultiGridCL* mg= 0;
         DROPS::BuildBrick( mg);
-        DROPS::SendTetras( *mg);
+        DROPS::LoadBalHandlerCL lb( *mg, DROPS::metis);     // loadbalancing
+        lb.DoInitDistribution( DROPS::ProcCL::Master());    // distribute initial grid
+        MarkAll( *mg);
+        mg->Refine();
+        mg->SizeInfo( std::cout);
+        lb.DoMigration();
         mg->SizeInfo( std::cout);
 
-        std::cout << "Check accumulation and innner products for four cases:\n"
+/*        for (DROPS::MultiGridCL::VertexIterator it = mg->GetAllVertexBegin(); it != mg->GetAllVertexEnd(); ++it){
+      		if ( it->GetBary()[0] == 0.5 && it->GetBary()[1] == 0.0 && it->GetBary()[2] == 0.5){
+  				if (it->AmIOwner())
+  					printf("vertex is on proc nr %d, level: %d, prio: %d and AmIOwner is true with coord %f %f %f\n",
+  							DROPS::ProcCL::MyRank(), it->GetLevel(), it->GetPrio(),
+  							it->GetBary()[0], it->GetBary()[1], it->GetBary()[2]);
+  				else
+  					printf("vertex is on proc nr %d, level: %d, prio: %d and AmIOwner is false with coord %f %f %f\n",
+  							DROPS::ProcCL::MyRank(), it->GetLevel(), it->GetPrio(),
+  							it->GetBary()[0], it->GetBary()[1], it->GetBary()[2]);
+        	}
+        }
+*/
+/*        for (DROPS::MultiGridCL::TetraIterator it = mg->GetAllTetraBegin(); it != mg->GetAllTetraEnd(); ++it){
+        	for (DROPS::Uint i=0; i<4; ++i) {
+        		if ( it->GetVertex(i)->GetBary()[0] == 0.5 && it->GetVertex(i)->GetBary()[1] == 0.0 && it->GetVertex(i)->GetBary()[2] == 0.5){
+        			if (it->HasGhost())
+        				printf("proc nr %d, has ghost is true, level: %d\n", DROPS::ProcCL::MyRank(), it->GetLevel());
+        			else
+        				printf("proc nr %d, has ghost is false, level: %d\n", DROPS::ProcCL::MyRank(), it->GetLevel());
+        		}
+        	}
+        }
+*/
+
+
+        std::cout << "Check accumulation and inner products for four cases:\n"
                   << " 1) P1_FE\n"
                   << " 2) P2_FE\n"
                   << " 3) vecP2_FE\n"
