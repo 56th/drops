@@ -1338,9 +1338,9 @@ Check for:
  <li> Master exists, if I am Ghost</li>
  <li> all children are masters</li>
  <li> If a ghost exists on another process, no children must exist <li>
- <li> Master copy exists on another process, if this is a ghost.</li>
  <li> ghost tetras must have children</li>
  <li> At most two copies exists </li>
+ <li> Only Ma/Gh pairs allowed </li>
  <li> Pointer to parent exists (if master copy and level!=0)</li>
  <li> neighbor-connections are right </li>
  <li> whether the ordering of the vertices in each edge is induced by the ordering of the vertices in the tetra</li>
@@ -1396,6 +1396,11 @@ Check for:
     if ( GetNumDist()>2){
         sane= false;
         os << "Too many copies exist. ";
+    }
+    // Check that only Ma/Gh pairs are present
+    if ( GetNumDist()==2 && GetPrio()==(++GetRemoteData().GetProcListBegin())->prio){
+        sane= false;
+        os << "Copies should not have same priorities. ";
     }
     // Check if parent exists for a master copy
     if ( IsMaster() && GetLevel()!=0 && !GetParent() ){
