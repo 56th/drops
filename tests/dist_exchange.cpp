@@ -149,6 +149,7 @@ bool CheckAccumulation( MultiGridCL& mg)
 std::valarray<double> getReferenceValue( const MultiGridCL& mg, IdxDescCL* idxDesc)
 {
     std::valarray<double> result(3);
+    result = 0.0;
     const Uint idx= idxDesc->GetIdx();
     DROPS_FOR_TRIANG_CONST_VERTEX( mg, mg.GetLastLevel(), it){
         if ( it->Unknowns.Exist() && it->Unknowns.Exist(idx)){
@@ -310,7 +311,7 @@ bool CheckInnerProducts( MultiGridCL& mg)
     for ( size_t i=0; i<num_idx; ++i){
         std::cout << " - Check case " << (i+1) << std::endl;
 
-        idx_desc[i]->CreateNumbering( 0, mg);
+        idx_desc[i]->CreateNumbering( mg.GetLastLevel(), mg);
         vec_desc[i]= new VecDescCL( idx_desc[i]);
         vec_desc[i]->Data= 1.0;
         VectorCL x( vec_desc[i]->Data), y( x);
@@ -437,14 +438,21 @@ int main( int argc, char **argv)
         mg->SizeInfo( std::cout);
         lb.DoMigration();
         mg->SizeInfo( std::cout);
-/*
-        for (DROPS::MultiGridCL::VertexIterator it = mg->GetAllVertexBegin(); it != mg->GetAllVertexEnd(); ++it){
+
+/*        for (DROPS::MultiGridCL::VertexIterator it = mg->GetAllVertexBegin(); it != mg->GetAllVertexEnd(); ++it){
       		if ( it->GetBary()[0] == 0.5 && it->GetBary()[1] == 0.0 && it->GetBary()[2] == 0.5){
-  				printf("vertex is on proc nr %d, level: %d, prio: %d\n", DROPS::ProcCL::MyRank(), it->GetLevel(), it->GetPrio());
+  				if (it->AmIOwner())
+  					printf("vertex is on proc nr %d, level: %d, prio: %d and AmIOwner is true with coord %f %f %f\n",
+  							DROPS::ProcCL::MyRank(), it->GetLevel(), it->GetPrio(),
+  							it->GetBary()[0], it->GetBary()[1], it->GetBary()[2]);
+  				else
+  					printf("vertex is on proc nr %d, level: %d, prio: %d and AmIOwner is false with coord %f %f %f\n",
+  							DROPS::ProcCL::MyRank(), it->GetLevel(), it->GetPrio(),
+  							it->GetBary()[0], it->GetBary()[1], it->GetBary()[2]);
         	}
         }
-
-        for (DROPS::MultiGridCL::TetraIterator it = mg->GetAllTetraBegin(); it != mg->GetAllTetraEnd(); ++it){
+*/
+/*        for (DROPS::MultiGridCL::TetraIterator it = mg->GetAllTetraBegin(); it != mg->GetAllTetraEnd(); ++it){
         	for (DROPS::Uint i=0; i<4; ++i) {
         		if ( it->GetVertex(i)->GetBary()[0] == 0.5 && it->GetVertex(i)->GetBary()[1] == 0.0 && it->GetVertex(i)->GetBary()[2] == 0.5){
         			if (it->HasGhost())
