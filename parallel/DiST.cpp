@@ -236,6 +236,18 @@ RecvStreamCL& operator>> ( RecvStreamCL& is, RemoteDataCL::ProcListT& pl)
     return is;
 }
 
+Uint RemoteDataCL::GetNumProcs( Priority prio) const
+{
+	if (prio == NoPrio)
+		return procList_.size();
+    Uint num= 0;
+    for (ProcList_const_iterator it=GetProcListBegin(); it!=GetProcListEnd(); ++it){
+        if ( it->prio>=prio)
+        	++num;
+    }
+    return num;
+}
+
 
 // R E M O T E  D A T A  L I S T  C L
 //-----------------------------------
