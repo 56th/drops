@@ -1348,8 +1348,9 @@ Check for:
  <li> vertices, edges and faces have the right priority </li>
  <li> refinement rule matchs to refinement of edges </li>
  <li> not unsubscribed from DDD</li>
- <li> if the hash is computed correctly </li>
+ <li> if the geometric id is computed correctly </li>
  <li> if this simplex is known to the RemoteDataListCL </li>
+ <li> if the remote data points to the right simplex </li>
 </ol>
 /// \todo Needs an update for the non-DDD interface
 */
@@ -1511,16 +1512,22 @@ Check for:
 
 #ifdef _PAR
     // Check if the hash is computed correctly
-    DiST::Helper::GeomIdCL hash( GetLevel(), *this);
-    if ( hash!=GetGID()){
+    DiST::Helper::GeomIdCL gid( GetLevel(), *this);
+    if ( gid!=GetGID()){
         sane= false;
-        os << "Hash does not match. ";
+        os << "Geometric Id does not match. ";
     }
 
     // Check if the tetra is known to a remote data list
-    if ( DiST::InfoCL::Instance().GetRemoteList<TetraCL>().find( GetGID())==DiST::InfoCL::Instance().GetRemoteList<TetraCL>().end()){
+    if ( !DiST::InfoCL::Instance().Exists( GetGID())){
         sane= false;
         os << "Tetra is not known to a remote data list. ";
+    }
+    // Check if the local object pointer in the remote data links to me
+    else if (DiST::InfoCL::Instance().GetTetra( GetGID()) != this)
+    {
+        sane= false;
+        os << "Inconsistent local object in remote data. ";
     }
 #endif
 

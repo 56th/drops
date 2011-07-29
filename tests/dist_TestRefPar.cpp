@@ -103,11 +103,12 @@ void PrintGEO(const DROPS::ParMultiGridCL& pmg)
 ****************************************************************************/
 void CheckParMultiGrid(DROPS::ParMultiGridCL& pmg, int type)
 {
+    if (type==DROPS::MIG && !C.get<int>("Misc.CheckAfterMig")) return;
+    if (type==DROPS::REF && !C.get<int>("Misc.CheckAfterRef")) return;
+
     DROPS::ParTimerCL time;
     double duration;
 
-    if (type==DROPS::MIG && !C.get<int>("Misc.CheckAfterMig")) return;
-    if (type==DROPS::REF && !C.get<int>("Misc.CheckAfterRef")) return;
     std::cout << "  - Check of parallel MultiGrid... ";
 
     char dat[30];
@@ -115,12 +116,15 @@ void CheckParMultiGrid(DROPS::ParMultiGridCL& pmg, int type)
     ofstream check(dat);
     time.Reset();
 
+    check << "\n======== DiST check ========\n";
     if ( DROPS::ProcCL::Check( DROPS::DiST::InfoCL::Instance().IsSane( check)))
         std::cout << " DiST-module seems to be alright!" << std::endl;
     else
         std::cout << " DiST-module seems to be broken!" << std::endl;
-    bool pmg_sane = pmg.IsSane(check),
-         mg_sane  = pmg.GetMG().IsSane(check);
+    check << "\n======== ParMultiGrid check ========\n";
+    bool pmg_sane = pmg.IsSane(check);
+    check << "\n======== MultiGrid check ========\n";
+    bool mg_sane  = pmg.GetMG().IsSane(check);
 
     std::cout << "  - Check of parallel MultiGrid... ";
     if (DROPS::ProcCL::Check(pmg_sane && mg_sane)){
@@ -138,9 +142,8 @@ void CheckParMultiGrid(DROPS::ParMultiGridCL& pmg, int type)
     if (C.get<int>("Misc.PrintTime")) std::cout << "       --> "<<duration<<" sec\n";
     check.close();
 
-    DROPS::DiST::Helper::GeomIdCL gid(1,DROPS::MakePoint3D(0.3125, 0.09375, 0.28125),3);
-if (DROPS::DiST::InfoCL::Instance().Exists(gid))
-    DROPS::DiST::InfoCL::Instance().GetTetra(gid)->DebugInfo(cdebug);
+    DROPS::DiST::Helper::GeomIdCL gid(1,DROPS::MakePoint3D(0.40625, 0.46875, 0.4375),3); // T1 (0.40625 0.46875 0.4375 )
+    DROPS::DiST::InfoCL::Instance().ShowSimplex( gid, cdebug);
 }
 
 /****************************************************************************
@@ -522,8 +525,7 @@ int main(int argc, char* argv[])
                 cout << " OK\n";
             }
 
-            if (C.get<int>("Misc.CheckAfterRef"))
-                CheckParMultiGrid(pmg,REF);
+            CheckParMultiGrid(pmg,REF);
 
 //            DynamicDataInterfaceCL::ConsCheck();
             DoMigration( LoadBal,C.get<int>("LoadBalancing.RefineStrategy"));
@@ -544,8 +546,7 @@ int main(int argc, char* argv[])
                 mg.SizeInfo(cout);
             }
 
-            if (C.get<int>("Misc.CheckAfterMig"))
-                CheckParMultiGrid(pmg,MIG);
+            CheckParMultiGrid(pmg,MIG);
 
             if (ref!=markall+markdrop+markcorner-1) cout << line << endl;
         }
