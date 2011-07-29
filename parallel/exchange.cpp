@@ -1667,7 +1667,7 @@ bool ExchangeBuilderCL::HandlerDOIndexCL::Gather(
 
         send << ProcCL::MyRank() << dof << extdof;
         // Additionally, remember this dof as an "owner dof."
-        if ( t.AmIOwner()){
+        if ( t.AmIOwner() && t.GetNumDist(PrioGhost)!=1){
             for ( Uint j=0; j<numUnk; ++j)
                 ownerDistrIndex_.push_back( dof+j);
             if ( isExtended)
