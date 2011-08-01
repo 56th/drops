@@ -341,15 +341,22 @@ bool RemoteDataListCL::IsSane( std::ostream& os) const
 // S I M P L E X  T R A N S F E R  I N F O  C L
 //---------------------------------------------
 
-void SimplexTransferInfoCL::AddProc( int p, Priority prio, bool changeLocalPrio)
+void SimplexTransferInfoCL::AddProc( int p, Priority prio, UpdatePolicyE changeLocalPrio)
 {
     ProcSetT::iterator it= postProcs_.find(p);
     if (it == postProcs_.end()) // not in proc list, yet
         postProcs_[p]= prio;
-    else if (p == ProcCL::MyRank() && changeLocalPrio) // set prio
-        it->second= prio;
     else if (p != ProcCL::MyRank()) // merge prios
         it->second= merge_prio( it->second, prio);
+    else { // p == me
+        switch (changeLocalPrio) {
+            case overwrite: // set prio
+                it->second= prio; break;
+            case merge: // merge with present prio
+                it->second= merge_prio( it->second, prio); break;
+            default:; // do nothing
+        }
+    }
 }
 
 void SimplexTransferInfoCL::AddProcSet( const ProcSetT& procs)
@@ -673,7 +680,7 @@ class ModifyCL::MergeProcListHandlerCL
             Helper::RemoteDataCL::ProcListT proclist;
             r >> proclist;
             for (Helper::RemoteDataCL::ProcListT::const_iterator pit= proclist.begin(), pend= proclist.end(); pit!=pend; ++pit)
-                it->second.AddProc( pit->proc, pit->prio);
+                it->second.AddProc( pit->proc, pit->prio, Helper::SimplexTransferInfoCL::merge);
         }
         return true;
     }
@@ -734,8 +741,8 @@ class ModifyCL::CommToUpdateHandlerCL
             ModifyCL::UpdateIterator it= ul.find( &t);
             if (it==ul.end()) { // not already in update list
             	it= mod_.AddSimplexToUpdate( dim, &t, updateSubs);
-            	if (!transferHere) // add (local proc,local prio) to update list, otherwise local Ma/Gh copy will be lost
-            		it->second.AddProc( ProcCL::MyRank(), t.GetPrio());
+            	// add (local proc,local prio) to update list, otherwise local Ma/Gh copy will be lost
+          	    it->second.AddProc( ProcCL::MyRank(), t.GetPrio());
             }
         } else // non-tetra
         	mod_.AddSimplexToUpdate( dim, &t, false);
@@ -788,7 +795,7 @@ void ModifyCL::ChangePrio( const TransferableCL& t, Priority prio)
     Assert( modifiable_, DROPSErrCL("ModifyCL::ChangePrio: Class is not in the modifiable mode, call Init() first!"), DebugDiSTC);
 
     UpdateIterator it= AddSimplexToUpdate( t.GetDim(), &t, false);
-    it->second.AddProc( ProcCL::MyRank(), prio, /*changeLocalPrio*/true);
+    it->second.AddProc( ProcCL::MyRank(), prio, /*changeLocalPrio*/Helper::SimplexTransferInfoCL::overwrite);
 }
 
 void ModifyCL::Delete( const TransferableCL& t)

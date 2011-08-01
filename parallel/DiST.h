@@ -545,7 +545,10 @@ class SimplexTransferInfoCL
 {
   public:
     typedef std::map<int,Priority> ProcSetT;
-
+    /// enum to control how local priority entries are changed by AddProc
+    enum UpdatePolicyE {
+        keep, overwrite, merge
+    };
   private:
     Helper::RemoteDataCL& rd_;       ///< remote data of simplex on local proc
     ProcSetT postProcs_;             ///< set of procs/prios where object will be after transfer
@@ -565,7 +568,7 @@ class SimplexTransferInfoCL
 
     /// \brief add/merge new \a proc/\a prio entry into set of post procs.
     /// If \a proc is the current process, the priority of an existing entry will not be changed unless \a changeLocalPrio==true.
-    void AddProc( int proc, Priority prio, bool changeLocalPrio=false);
+    void AddProc( int proc, Priority prio, UpdatePolicyE changeLocalPrio=keep);
     /// \brief Adds new proc/prio entries without changing existing entries.
     void AddProcSet( const ProcSetT& procs);
     /// \brief Remove \a proc entry from set of post procs

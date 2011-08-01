@@ -1389,7 +1389,7 @@ class ParMultiGridCL::AdaptMidVertexCL
 {
   public:
     AdaptMidVertexCL() {}
-    /** \brief Delete mid-vertex of PrioVGhost edges and set mid-vertex of the other edges, if necessary.*/
+    /** \brief Delete mid-vertex of PrioVGhost edges and set mid-vertex of the other edges, if necessary. Set MFR of local edges, if necessary. */
     void operator() ( EdgeCL& e)
     {
         if (e.GetPrio()==PrioVGhost)
@@ -1398,13 +1398,8 @@ class ParMultiGridCL::AdaptMidVertexCL
             const DiST::Helper::GeomIdCL midVertGID( e.GetLevel()+1, e.GetGID().bary, DiST::GetDim<VertexCL>());
         	e.SetMidVertex( DiST::InfoCL::Instance().GetVertex(midVertGID));
         }
-        if (e.IsLocal() && e.GetMFR() != e.GetAccMFR()) { // set local MFR = AccMFR
-//        	e.SetAccMFR(e.GetMFR());
-            const int accMFR= e.GetAccMFR();
-        	e.ResetMarkForRef();
-        	for (int i=0; i<accMFR; ++i)
-        	    e.IncMarkForRef();
-        }
+        if (e.IsLocal() && e.GetMFR() != e.GetAccMFR()) // set local MFR = AccMFR
+            e.MFR_= e.AccMFR_;
     }
 };
 
@@ -1510,13 +1505,13 @@ void ParMultiGridCL::TransferEnd()
 //            modify_->Delete( *sit);
     ModifyEnd();
 
-    // Adapt midvertex pointers on VGhost-Edges
-    Comment("  * Adapting Midvertex on Edges"<<std::endl,DebugParallelC);
-    AdaptMidVertex();
-
     // Accumulate Ref-counter on edges
     Comment("  * Accumulate MFR"<<std::endl,DebugParallelC);
     AccumulateMFR();
+
+    // Adapt midvertex pointers on edges
+    Comment("  * Adapting Midvertex on Edges"<<std::endl,DebugParallelC);
+    AdaptMidVertex();
 
     // Rescue unknowns on edges, that are deleted and midvertex stays on processor
     /// \todo DiST: Implement rescue of dof!

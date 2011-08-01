@@ -598,19 +598,14 @@ void LoadBalCL::Migrate()
         }
         else
         { // E2-Xfer: parent transfer with children (M1/M2-Xfer)
-            Priority asPrio=PrioGhost,
-                destPrio= DiST::InfoCL::Instance().GetRemoteData( *it).GetPrio(dest);
-            if ( destPrio!=NoPrio && destPrio >= PrioMaster)
-                asPrio= PrioMaster;
 #if DROPSDebugC
 /*
             if ( it->GetGID()==observe1 || it->GetGID()==observe2 || it->GetGID()==observe3)
                 std::cerr << "E2-Xfer mit delete ="<< (it->GetPrio()==PrioGhost)
-                        << " und Prio"<<(asPrio==PrioMaster?"Master":"Ghost")<<" Unrefined=" << it->IsUnrefined()
-                        << std::endl;
+                        << " und PrioGhost" << std::endl;
 */
 #endif
-            pmg.Transfer( *it, dest, asPrio, it->GetPrio()==PrioGhost);
+            pmg.Transfer( *it, dest, PrioGhost, it->GetPrio()==PrioGhost);
         }
 
         it->DelLbNr();
