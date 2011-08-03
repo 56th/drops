@@ -365,12 +365,6 @@ class RemoteDataCL
     //@}
 };
 
-/// \brief Use operator << to put a RemoteDataCL object on a stream
-SendStreamCL& operator<< ( SendStreamCL&, const GeomIdCL&);
-
-/// \brief Use operator >> to get a RemoteDataCL object out of stream
-RecvStreamCL& operator>> ( RecvStreamCL&, GeomIdCL&);
-
 /// \brief Container to store a RemoteDataCL object for each distributed geometric entity of type SimplexT.
 /** This constitutes the main data structure for the DiST module. However, this is not designed to act as an
     interface to drops. Each access should be done via the functions in the DiST namespace.

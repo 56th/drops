@@ -332,7 +332,7 @@ void ParMultiGridCL::HandleNewIdx(IdxDescCL* oldIdxDesc, VecDescCL* newVecDesc)
 }
 
 /// \brief Send interpolated values from processers that can interpolate a value to processors that could not interpolate a value
-void ParMultiGridCL::CompleteRepair(VecDescCL* newVec)
+void ParMultiGridCL::CompleteRepair(VecDescCL* /*newVec*/)
 /** After RepairAfterRefine[P1|P2] call this function to exchange interpolated
     values.
     \todo DiST: Implement me
@@ -995,10 +995,10 @@ class ParMultiGridCL::SanityCheckCL
     //@}
 };
 
-/// \brief Check for sanity
-/** Check if the edges and faces have the same subsimpilces (check with GID).
-    Interface-function, calls Gather-, ScatterEdgeSane (EdgeIF)
-    and Gather- ScatterFaceSane (FaceIF) and check multigrid for sanity.*/
+/// \brief Check for sanity on a given level or on all levels (\a Level = -1)
+/** Check if the edges and faces have the same subsimplices (check with GID).
+    Check multigrid for sanity.
+    Check local MFR counter on edges. */
 bool ParMultiGridCL::IsSane(std::ostream& os, int Level) const
 {
     bool sane= true;
@@ -1022,19 +1022,46 @@ bool ParMultiGridCL::IsSane(std::ostream& os, int Level) const
     else
     {
         Comment("Checking level " << Level << std::endl,DebugParallelC);
-
         sane= mg_->IsSane( os, Level);
-
         Comment("Checking inter-processor dependencies on level " << Level << std::endl, DebugParallelC);
-
         SanityCheckCL sanitycheck( Level, os);
-
         sane= sanitycheck.Call() && sane;
+        Comment("Checking edge MFR counters on level " << Level << std::endl,DebugParallelC);
+        sane= CheckMFR( Level, os) && sane;
     }
     return sane;
 }
 
+/// \brief Check local MFR counters of edges on a given level or on all levels (\a Level = -1)
+bool ParMultiGridCL::CheckMFR( int Level, std::ostream& os) const
+{
+    bool sane= true;
+    if (Level==-1) { // all levels
+        for (Uint lvl=0; lvl<=mg_->GetLastLevel();++lvl)
+            sane= ParMultiGridCL::CheckMFR( lvl, os) && sane;
+    }
+    else {
+        DROPS_STD_UNORDERED_MAP<DiST::Helper::GeomIdCL,short int,DiST::Helper::Hashing> edgeMFR;
 
+        for (MultiGridCL::const_TetraIterator it= mg_->GetTetrasBegin(Level), end= mg_->GetTetrasEnd(); it!=end; ++it)
+            if (it->IsRegularlyRef() && it->IsMaster()) {
+                // has marked its edges' MFR, so do the same here
+                for (int e=0; e<6; ++e)
+                    edgeMFR[ it->GetEdge(e)->GetGID()]++;
+            }
+        // now compare with edges' local MFRs
+        for (MultiGridCL::const_EdgeIterator it= mg_->GetEdgesBegin(Level), end= mg_->GetEdgesEnd(); it!=end; ++it) {
+            const DiST::Helper::GeomIdCL gid= it->GetGID();
+            if (it->GetMFR() != edgeMFR[gid]) {
+                sane= false;
+                os << "Wrong MFR on edge " << gid << ": local MFR = " << it->GetMFR() << ", but should be " << edgeMFR[gid] << std::endl;
+                it->DebugInfo(os);
+            }
+
+        }
+    }
+    return sane;
+}
 
 /****************************************************************************
 * F U N C T I O N S   F O R   I N T E R F A C E S                           *
@@ -1043,9 +1070,7 @@ bool ParMultiGridCL::IsSane(std::ostream& os, int Level) const
 ****************************************************************************/
 
 /// \brief accumulate the marks for refinement on Edges on Level (-1==all levels)
-/** Interface-function (EdgeIF) calls Gather- and ScatterEdgeMFR
-    In the case, a tetra has changed its prio from ghost to master, local edges may
-    have inconsistent MFR. This MFR on edges are repaired here, too.
+/** Provides Gather/Scatter for DiST::InterfaceCL
 */
 class ParMultiGridCL::HandlerAccMFRCL
 {
@@ -1094,19 +1119,10 @@ class ParMultiGridCL::HandlerAccMFRCL
 };
 
 /// \brief accumulate the marks for refinement on Edges on Level (-1==all levels)
-/** Interface-function (EdgeIF) calls Gather- and ScatterEdgeMFR
-    In the case, a tetra has changed its prio from ghost to master, local edges may
-    have inconsistent MFR. This MFR on edges are repaired here, too.*/
 void ParMultiGridCL::AccumulateMFR( int Level)
 {
     HandlerAccMFRCL handlerMFR( Level);
     handlerMFR.Call();
-
-    for (TetraPCT::iterator it(ToHandleTetra_.begin()); it!=ToHandleTetra_.end(); ++it)
-        for (TetraCL::const_EdgePIterator epiter((*it)->GetEdgesBegin()); epiter!=(*it)->GetEdgesEnd(); ++epiter)
-            if ((*epiter)->IsLocal() && (*epiter)->GetAccMFR()!=(*epiter)->GetMFR())
-                (*epiter)->AccMFR_=(*epiter)->MFR_;
-    ToHandleTetra_.clear();
 }
 
 class ParMultiGridCL::HandlerRefMarkCL
@@ -1421,15 +1437,6 @@ template<>
              DebugParallelC
           );
     modify_->ChangePrio( *Tp, Prio);
-    if (Prio==PrioMaster && Tp->GetPrio()==PrioGhost && Tp->IsRegularlyRef())
-    {   // It may happen, that this routine increases the MFR on a ghost edge, that will be after the transfer
-        // not distributed any more. So remember this tetra and repair the MFR on local edges of this tetra
-        // within ParMultiGridCL::AccumulateMFR()
-    	cdebug << "@@@@ PrioChange<TetraCL> for " << Tp->GetGID() << ": " << PriorityToString(Tp->GetPrio()) << " => " << PriorityToString(Prio) << std::endl;
-    	for (int i=0; i<6; ++i) cdebug << Tp->GetEdge(i)->GetGID() << "  "; cdebug << std::endl;
-        Tp->CommitRegRefMark();
-        ToHandleTetra_.push_back(Tp);
-    }
 }
 
 /****************************************************************************
@@ -1446,7 +1453,6 @@ void ParMultiGridCL::TransferBegin(int Level)
     Assert( !transfer_, DROPSErrCL("ParMultiGridCL::TransferBegin: already called TransferBegin"), DebugParallelC);
     Assert( !modify_, DROPSErrCL("ParMultiGridCL::TransferBegin: cannot use Transfer module inside Modify module, call ModifyEnd() before"), DebugParallelC);
     modify_= transfer_= new DiST::TransferCL( *mg_, true, true);
-    ToHandleTetra_.clear();     // There is no tetra that has changed prio from ghost to master within transfer so far
 
     // all procs should have the same number of levels!
     AdjustLevel();

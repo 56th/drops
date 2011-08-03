@@ -1020,19 +1020,17 @@ void TransferCL::UpdateSendRemoteData( const TransferableCL& t, Helper::SimplexT
     Helper::RemoteDataCL& rd= sti.GetRemoteData();
     // update remote data
     Helper::RemoteDataCL::ProcListT proclist( sti.GetPostProcs().begin(), sti.GetPostProcs().end());
-    if (!sti.WillBeRemoved()) {
-        const Priority oldPrio= rd.GetLocalPrio();
-        rd.SetProcList( proclist);
-        const Priority newPrio= rd.GetLocalPrio();
-//        if (oldPrio != newPrio)
-//            InfoCL::Instance().Observe().OnPrioChange( t, oldPrio, newPrio);
-    }
-    if (sti.GetBroadcaster()==ProcCL::MyRank() || t.GetDim()==GetDim<TetraCL>()) {
+    const bool isTetra= t.GetDim()==GetDim<TetraCL>();
+    if (sti.GetBroadcaster()==ProcCL::MyRank() || isTetra) {
     	// write simplex and remote data to all procs in SendToProcs
         for (ProcSetT::const_iterator sit= sti.GetSendToProcs().begin(), send= sti.GetSendToProcs().end(); sit!=send; ++sit) {
             (*sendBuffer_[sit->first]) << t << proclist;
+            if (isTetra)
+                (*sendBuffer_[sit->first]) << int(rd.GetLocalPrio());
         }
     }
+    if (!sti.WillBeRemoved())
+        rd.SetProcList( proclist);
 }
 
 void TransferCL::UpdateOwners()
@@ -1163,17 +1161,23 @@ void DiST::TransferCL::ReceiveSimplices<TetraCL>( DiST::Helper::RecvStreamCL& re
         Assert( stmp.GetDim()==GetDim<TetraCL>(), DROPSErrCL("Mismatch in dimension of a received simplex!"), DebugDiSTC);
         // receive proc/prio list
         recvstream >> procList;
+        int formerPrio;
+        recvstream >> formerPrio;
+        bool modMFR= true;
         TetraCL* tp= 0;
-        bool formerMaster= false;
-        if (!InfoCL::Instance().Exists(stmp.GetGID()))
+        if (!InfoCL::Instance().Exists(stmp.GetGID())) {
         	tp= &CreateSimplex<TetraCL>( stmp, procList); // creates simplex and remote data list entry
-        else { // merge with existing tetra
+        	if (formerPrio==PrioGhost && procList.size()==1) // there will be a merge afterwards by master received from another proc who will take care of the edge MFRs
+        	    modMFR= false;
+        } else { // merge with existing tetra
         	tp= InfoCL::Instance().GetTetra( stmp.GetGID());
-            formerMaster= tp->Merge(stmp);
+            tp->Merge(stmp);
+            modMFR= formerPrio==PrioMaster;
         }
 
         // TODO: hier experimentell, sollte per Handler ausgelagert werden (aus ParMultiGridCL::HandlerTObjMkCons).
-        if (tp->IsRegularlyRef() && tp->IsMaster() && !formerMaster)
+        // Note: tetra can be received twice (Ma/Gh copy merged on a third proc), avoid double increment of edge MFRs.
+        if (tp->IsRegularlyRef() && tp->IsMaster() && modMFR)
         {
             tp->CommitRegRefMark();
             // nun wird auf allen Edges _AccMFR:=_MFR gesetzt, um Unkonsistenzen bei vorher verteilt

@@ -640,7 +640,7 @@ class TetraCL
     /// \brief Generate tetra from a stream
     void UnPack( DiST::Helper::RecvStreamCL&);
     /// \brief Merge tetra with given tetra. Needed by DiST::TransferCL.
-    bool Merge( const TetraCL&);
+    void Merge( const TetraCL&);
 
     /// \brief Check if simplex is exclusive
     bool IsExclusive( const Priority=PrioMaster) const;

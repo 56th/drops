@@ -893,7 +893,6 @@ if the child cannot be found, create it.
 
 /**
     \todo DiST: Pack Unknowns!
-    \todo DiST: Pack GID of children into the message
 */
 void TetraCL::Pack( DiST::Helper::SendStreamCL& ostrstream) const
 {
@@ -968,18 +967,16 @@ void TetraCL::UnPack( DiST::Helper::RecvStreamCL& istrstream)
 }
 
 /**
- * - For former HasGhost, set children array and midvertex pointers properly and return true.
- * - For former Ghost, set parent pointer properly and return false.
+ * - For former HasGhost, set children array and midvertex pointers properly.
+ * - For former Ghost, set parent pointer properly.
  */
-bool TetraCL::Merge( const TetraCL& t)
+void TetraCL::Merge( const TetraCL& t)
 {
 	if (!Children_) { // former HasGhost: set children array properly. Midvertex pointers will be set by ParMultiGridCL::AdaptMidVertex().
 		Children_= new SArrayCL<TetraCL*, MaxChildrenC>;
 		std::copy( t.Children_->begin(), t.Children_->end(), Children_->begin());
-		return true;
 	} else if (!Parent_) // former ghost: set parent pointer properly
 		Parent_= t.Parent_;
-	return false;
 }
 
 #endif

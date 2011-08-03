@@ -98,7 +98,6 @@ class ParMultiGridCL
     DiST::ModifyCL*  modify_;            ///< Pointer to the DiST::ModifyCL, used for Modify environment
     DiST::TransferCL*transfer_;          ///< Pointer to the DiST::TransferCL, used for Transfer environment
     int              level_;             ///< triangulation level considered for transfer
-    TetraPCT         ToHandleTetra_;     ///< Remember tetras that have changed prio from ghost to master within transfer.
     VecDescPCT       _VecDesc;           ///< Vector of Pointers to the vector describers, where the unknowns are stored
     BufferCT         _RecvBuf;           ///< Buffer for the received numerical data (used for refinement and migration)!
     ScalBndCT        _ScalBnd;           ///< Store scalar boundary conditions
@@ -244,7 +243,7 @@ class ParMultiGridCL
     /// \name Checking and debug functions
     // @{
     bool IsSane(std::ostream&, int Level= -1) const;                 // Check if distributed edges and faces have the same subsimplices
-
+    bool CheckMFR( int Level, std::ostream& os) const;                    // Check local MFR on edges.
 
     void DebugInfo(std::ostream&) const;                             // writes usefull infos onto outputstream
     void Show(const DiST::Helper::GeomIdCL& gid, char *mesg, int proc= -1);                // Show the simplex with a given GID
