@@ -996,9 +996,15 @@ class ParMultiGridCL::SanityCheckCL
 };
 
 /// \brief Check for sanity on a given level or on all levels (\a Level = -1)
-/** Check if the edges and faces have the same subsimplices (check with GID).
-    Check multigrid for sanity.
-    Check local MFR counter on edges. */
+/** For a given level \a Level,
+ *  - check if the edges and faces have the same subsimplices (check with GID).
+    - check multigrid for sanity.
+    - check local MFR counter on edges.
+    For \a Level = -1, check above items on each level, and additionally
+    - check that all procs have the same number of levels.
+    - check that the number of simplicies in the multigrid and those registered by DiST are the same.
+    */
+
 bool ParMultiGridCL::IsSane(std::ostream& os, int Level) const
 {
     bool sane= true;
@@ -1006,6 +1012,7 @@ bool ParMultiGridCL::IsSane(std::ostream& os, int Level) const
     // Checking all levels
     if (Level==-1)
     {
+        Comment("Checking number of levels and simplices in multigrid and DiST" << std::endl,DebugParallelC);
         Uint maxLevel= ProcCL::GlobalMax( mg_->GetLastLevel());
         if (maxLevel != mg_->GetLastLevel() )
         {
@@ -1013,6 +1020,22 @@ bool ParMultiGridCL::IsSane(std::ostream& os, int Level) const
             os << "Local MultiGrid has too few levels: " << mg_->GetLastLevel()
                     << " instead of " << maxLevel <<std::endl;
         }
+        // check that number of simplices in the multigrid and those registered by DiST are the same.
+        DiST::InfoCL& info= DiST::InfoCL::Instance();
+        std::vector<size_t> numMG(4);
+        std::string simplex[4]= {"vert", "edge", "face", "tetra"};
+        numMG[0]= mg_->GetVertices().size();
+        numMG[1]= mg_->GetEdges().size();
+        numMG[2]= mg_->GetFaces().size();
+        numMG[3]= mg_->GetTetras().size();
+        for (int dim=0; dim<4; ++dim)
+            if (numMG[dim] != info.GetRemoteList(dim).size())
+            {
+                sane= false;
+                os << "Inconsistent number of " << simplex[dim] << "s:\t" << numMG[dim] << " in multigrid != "
+                   << info.GetRemoteList(dim).size() << " registered by DiST" << std::endl;
+            }
+        // make checks on each level
         for (Uint lvl=0; lvl<=maxLevel; ++lvl)
         {
             sane= ParMultiGridCL::IsSane( os, lvl) && sane;
