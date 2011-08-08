@@ -229,6 +229,23 @@ void MultiGridCL::UnrefineGrid (Uint Level)
     Comment("Unrefining grid " << Level << " done." << std::endl, DebugRefineEasyC);
 }
 #else
+
+/// \brief Adaptor to rescue simplices on level 0. Needed by MultiGridCL::UnrefineGrid().
+template<class SimplexT>
+class KeepLevel0_fun {
+  private:
+    ParMultiGridCL& pmg_;
+  public:
+    KeepLevel0_fun() : pmg_(ParMultiGridCL::Instance()) {}
+    void operator() (SimplexT* sp)
+    {
+        if (sp->GetLevel()==0) {
+            sp->ClearRemoveMark();
+            pmg_.Keep( sp);
+        }
+    }
+};
+
 void MultiGridCL::UnrefineGrid (Uint Level)
 {
     ParMultiGridCL& pmg= ParMultiGridCL::Instance();
@@ -290,18 +307,10 @@ void MultiGridCL::UnrefineGrid (Uint Level)
     {
         if ( tIt->IsGhost() ? !tIt->IsMarkedForNoRef() : !tIt->IsMarkedForRemovement() )
         {
-            // Maybe some sub simplices on level 0 have to be rescued, so get rid of all RemoveMarks on the sub simplices!
-            std::for_each( tIt->GetVertBegin(), tIt->GetVertEnd(), std::mem_fun( &VertexCL::ClearRemoveMark) );
-            std::for_each( tIt->GetEdgesBegin(), tIt->GetEdgesEnd(), std::mem_fun( &EdgeCL::ClearRemoveMark) );
-            std::for_each( tIt->GetFacesBegin(), tIt->GetFacesEnd(), std::mem_fun( &FaceCL::ClearRemoveMark) );
-            // Take care that the sub simplices are not unregistered by DiST::ModifyCL
-            // TODO: should we do this only for subs on level 0 ?
-            for (Uint i=0; i<4; ++i) {
-                pmg.Keep( tIt->GetVertex(i));
-                pmg.Keep( tIt->GetFace(i));
-            }
-            for (Uint i=0; i<6; ++i)
-                pmg.Keep( tIt->GetEdge(i));
+            // Maybe some sub simplices on level 0 have to be rescued, so get rid of their RemoveMarks and keep them during Modify
+            std::for_each( tIt->GetVertBegin(), tIt->GetVertEnd(),   KeepLevel0_fun<VertexCL>());
+            std::for_each( tIt->GetEdgesBegin(), tIt->GetEdgesEnd(), KeepLevel0_fun<EdgeCL>());
+            std::for_each( tIt->GetFacesBegin(), tIt->GetFacesEnd(), KeepLevel0_fun<FaceCL>());
         }
         if (tIt->HasGhost()){
             ++tIt;
