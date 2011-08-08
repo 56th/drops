@@ -1238,7 +1238,7 @@ public:
     {
         DiST::PrioListCL prioGhost; prioGhost.push_back( PrioGhost);
         DiST::InterfaceCL::DimListT dimlist; dimlist.push_back( DiST::GetDim<TetraCL>());
-        // Vertices on  <level> can only owned by ghost tetras on  <Level> to <LastLevel-1>.
+        // Vertices on  <level> can only be owned by ghost tetras on  <Level> to <LastLevel-1>.
         DiST::LevelListCL Lvls;
         for ( Uint lvl= level_; lvl<lastLevel_; ++lvl)
             Lvls.push_back( lvl);
@@ -1248,9 +1248,9 @@ public:
 };
 
 /// \brief Treat Ghost-Vertices, so they are not deleted
-/** Vertices has to be treated special for removement, because they can be found in other
-    levels than the ghost tetra (which is deleted). <p>
-    Interface-function (TetraIF) ExecGhVertRescue */
+/** Vertices have to be treated in a special way for removement, because they can be found in other
+    levels than the ghost tetra (which is deleted).
+*/
 void ParMultiGridCL::RescueGhostVerts( Uint Level)
 {
     RescueGhostVertsCL rescueGhostVerts( Level, mg_->GetLastLevel());

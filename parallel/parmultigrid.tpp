@@ -67,6 +67,17 @@ template<class SimplexT>
     modify_->ChangePrio( *Tp, Prio);
 }
 
+template<>
+  void ParMultiGridCL::Keep<TetraCL>(TetraCL* const Tp); // not defined, as Keep() should not be called for a tetra
+
+
+template<class SimplexT>
+  void ParMultiGridCL::Keep(SimplexT* const Tp)
+{
+    Assert( modify_, DROPSErrCL("ParMultiGridCL::PrioChange: There must be an active Transfer or Modify module to run this procedure"), DebugParallelC);
+    modify_->Keep( *Tp);
+}
+
 /// \brief Delete simplex from distributed multigrid
 template<class SimplexT>
   void ParMultiGridCL::Delete(SimplexT* const Tp)

@@ -261,28 +261,12 @@ void MultiGridCL::UnrefineGrid (Uint Level)
         }
         if ( !tIt->IsUnrefined() )
         {
-            if ( tIt->IsMarkEqRule() )
-                tIt->ClearAllRemoveMarks();
-            else
+            if ( !tIt->IsMarkEqRule() )
             {
-                std::for_each(tIt->GetChildBegin(), tIt->GetChildEnd(), std::mem_fun(&TetraCL::SetRemoveMark));
-
                 // if tetra is ghost and will have no children on this proc after unref, we can delete this tetra
                 if ( tIt->IsGhost() && tIt->IsMarkedForNoRef())
                 {
                     tIt->UnlinkFromFaces();
-                    if (Level==0){  //mark subs for removement (are rescued after this loop)
-                        std::for_each( tIt->GetVertBegin(), tIt->GetVertEnd(), std::mem_fun( &VertexCL::SetRemoveMark) );
-                        std::for_each( tIt->GetEdgesBegin(), tIt->GetEdgesEnd(), std::mem_fun( &EdgeCL::SetRemoveMark) );
-                        std::for_each( tIt->GetFacesBegin(), tIt->GetFacesEnd(), std::mem_fun( &FaceCL::SetRemoveMark) );
-                    }
-                    else{           // mark verts on level 0 for removement
-                        for (TetraCL::const_VertexPIterator vert= tIt->GetVertBegin(), end= tIt->GetVertEnd(); vert!=end; ++vert){
-                            if ((*vert)->GetLevel()==0 && !(*vert)->IsMaster()){
-                                (*vert)->SetRemoveMark();
-                            }
-                        }
-                    }
                     // remember tetra, that should be deleted
                     // !!! do not delete it now, because DDD needs still access to this tetra!!!
                     // But Prio is set to PrioKilledGhost, so HasGhost works still correct
@@ -304,37 +288,37 @@ void MultiGridCL::UnrefineGrid (Uint Level)
     // now all remove marks are set. Now put simplices into recycle bin and clear remove marks of still used tetras
     for (TetraIterator tIt(Tetras_[Level].begin()), tEnd(Tetras_[Level].end()); tIt!=tEnd; )
     {
+        if ( tIt->IsGhost() ? !tIt->IsMarkedForNoRef() : !tIt->IsMarkedForRemovement() )
+        {
+            // Maybe some sub simplices on level 0 have to be rescued, so get rid of all RemoveMarks on the sub simplices!
+            std::for_each( tIt->GetVertBegin(), tIt->GetVertEnd(), std::mem_fun( &VertexCL::ClearRemoveMark) );
+            std::for_each( tIt->GetEdgesBegin(), tIt->GetEdgesEnd(), std::mem_fun( &EdgeCL::ClearRemoveMark) );
+            std::for_each( tIt->GetFacesBegin(), tIt->GetFacesEnd(), std::mem_fun( &FaceCL::ClearRemoveMark) );
+            // Take care that the sub simplices are not unregistered by DiST::ModifyCL
+            // TODO: should we do this only for subs on level 0 ?
+            for (Uint i=0; i<4; ++i) {
+                pmg.Keep( tIt->GetVertex(i));
+                pmg.Keep( tIt->GetFace(i));
+            }
+            for (Uint i=0; i<6; ++i)
+                pmg.Keep( tIt->GetEdge(i));
+        }
         if (tIt->HasGhost()){
             ++tIt;
             continue;
         }
-        if ( (!tIt->IsUnrefined() || tIt->GetLevel()==0)
-               && !tIt->IsMarkEqRule()
-               && !tIt->IsMarkedForNoRef()
-               && !tIt->IsMarkedForRemovement() )
-        {
-            // Maybe some subsimplices of Ghost-Tetras are marked for removement, so delete all RemoveMarks on the subs!
-            if (tIt->GetRefRule()!=0)
-                tIt->RecycleReusables();
-            std::for_each( tIt->GetVertBegin(), tIt->GetVertEnd(), std::mem_fun( &VertexCL::ClearRemoveMark) );
-            std::for_each( tIt->GetEdgesBegin(), tIt->GetEdgesEnd(), std::mem_fun( &EdgeCL::ClearRemoveMark) );
-            std::for_each( tIt->GetFacesBegin(), tIt->GetFacesEnd(), std::mem_fun( &FaceCL::ClearRemoveMark) );
+        if ( !tIt->IsUnrefined() ){
+            if ( tIt->IsMarkEqRule() )
+                tIt->ClearAllRemoveMarks();
+            else
+            {
+                std::for_each(tIt->GetChildBegin(), tIt->GetChildEnd(), std::mem_fun(&TetraCL::SetRemoveMark));
+                if ( !tIt->IsMarkedForNoRef() )
+                    tIt->RecycleReusables();
+            }
         }
 
         ++tIt;
-    }
-
-    // rescue subs of level 0
-    if (killedGhost)
-    {
-        for (TetraIterator tIt= Tetras_[0].begin(), tEnd= Tetras_[0].end(); tIt!=tEnd; ++tIt){
-            if( tIt->IsGhost() ? !tIt->IsMarkedForNoRef() : !tIt->IsMarkedForRemovement() )
-            { // rescue subs
-                std::for_each( tIt->GetVertBegin(), tIt->GetVertEnd(), std::mem_fun( &VertexCL::ClearRemoveMark) );
-                std::for_each( tIt->GetEdgesBegin(), tIt->GetEdgesEnd(), std::mem_fun( &EdgeCL::ClearRemoveMark) );
-                std::for_each( tIt->GetFacesBegin(), tIt->GetFacesEnd(), std::mem_fun( &FaceCL::ClearRemoveMark) );
-            }
-        }
     }
 
     // rescue subs that are owned by ghost tetras on next level
@@ -351,7 +335,7 @@ void MultiGridCL::UnrefineGrid (Uint Level)
     // unsubscribed from the DiST module
 
     if (killedGhostTetra_ && Level==GetLastLevel()-1)
-    {
+    { // if ghost tetras were killed during the refinement algorithm, remove simplices on Level 0 once in the last call of UnrefineGrid().
         for_each_if( Faces_[0].begin(), Faces_[0].end(),
                 Delete_fun<FaceCL>(), std::mem_fun_ref(&FaceCL::IsMarkedForRemovement) );
         for_each_if( Edges_[0].begin(), Edges_[0].end(),
@@ -407,7 +391,7 @@ void MultiGridCL::UnrefineGrid (Uint Level)
     /// \todo (of): Wieso hat Sven hier geschrieben, dass PrioVGhost-Kanten nicht die Referenz auf den MidVertex loeschen duerfen?
     Comment("Now adapting midvertex pointers on level " << Level << ". " << std::endl, DebugRefineEasyC);
     for (EdgeIterator eIt= Edges_[Level].begin(), eEnd= Edges_[Level].end(); eIt!=eEnd; ++eIt){
-        if ( (eIt->IsRefined() /*&& eIt->GetHdr()->prio!=PrioVGhost*/ && eIt->GetMidVertex()->IsMarkedForRemovement()) ){
+        if ( (eIt->IsRefined() /*&& eIt->GetHdr()->prio!=PrioVGhost*/ && !eIt->IsMarkedForRef()) ){
             eIt->RemoveMidVertex();
         }
     }

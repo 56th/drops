@@ -185,6 +185,8 @@ class ParMultiGridCL
     inline void PrioChange(SimplexT* const, Priority Prio);              // Change prio of a simplex
     template<class SimplexT>
     inline void Delete(SimplexT* const);                                 // Delete simplex from distributed multigrid.
+    template<class SimplexT>
+    inline void Keep(SimplexT* const);                                   // Keep simplex in distributed multigrid (even though all adjacent tetras call "Delete()")
     // @}
 
     /// \name Transfer environment

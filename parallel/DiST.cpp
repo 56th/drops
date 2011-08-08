@@ -805,6 +805,16 @@ void ModifyCL::Delete( const TransferableCL& t)
     AddSimplexToUpdate( t.GetDim(), &t, false);
 }
 
+void ModifyCL::Keep( const TransferableCL& t)
+{
+    Assert( modifiable_, DROPSErrCL("ModifyCL::Keep: Class is not in the modifiable mode, call Init() first!"), DebugDiSTC);
+
+    UpdateIterator it= AddSimplexToUpdate( t.GetDim(), &t, false);
+    Helper::RemoteDataCL& rd= it->second.GetRemoteData();
+    for (Helper::RemoteDataCL::ProcList_const_iterator pit= rd.GetProcListBegin(), pend= rd.GetProcListEnd(); pit!= pend; ++pit)
+        it->second.AddProc( pit->proc, pit->prio, /*changeLocalPrio*/Helper::SimplexTransferInfoCL::keep);
+}
+
 ModifyCL::UpdateIterator ModifyCL::AddSimplexToUpdate( int dim, const TransferableCL* t, bool updateSubs)
 {
     UpdateListT& simplices= entsToUpdt_[dim];

@@ -589,6 +589,9 @@ It recycles and rescues simplices, that will be reused:
                           std::back_inserter(commonChildren) );
 
     Assert(Children_, DiST::Helper::ErrorCL( "TetraCL::RecycleReusables: no children array", this->GetGID()), DebugDiSTC);
+#ifdef _PAR
+    ParMultiGridCL& pmg= ParMultiGridCL::Instance();
+#endif
     for (Uint ch=0; ch<myRule.ChildNum; ++ch)
     {
         const ChildDataCL childdat= GetChildData(myRule.Children[ch]);
@@ -600,6 +603,12 @@ It recycles and rescues simplices, that will be reused:
             SetIterT it= std::lower_bound( commonEdges.begin(), commonEdges.end(), childdat.Edges[edge]);
             if (it != commonEdges.end() && *it == childdat.Edges[edge])
             {
+#ifdef _PAR
+                // take care that sub simplices are not unregistered by DiST::ModifyCL
+                pmg.Keep( child->Vertices_[VertOfEdge(edge,0)]);
+                pmg.Keep( child->Vertices_[VertOfEdge(edge,1)]);
+                pmg.Keep( child->Edges_[edge]);
+#endif
                 child->Vertices_[VertOfEdge(edge,0)]->ClearRemoveMark();
                 child->Vertices_[VertOfEdge(edge,1)]->ClearRemoveMark();
                 child->Edges_[edge]->ClearRemoveMark();
@@ -618,6 +627,10 @@ It recycles and rescues simplices, that will be reused:
                 VertexCL* const vp1= child->Vertices_[VertOfFace(face, 1)];
                 VertexCL* const vp2= child->Vertices_[VertOfFace(face, 2)];
 
+#ifdef _PAR
+                // take care that sub simplices are not unregistered by DiST::ModifyCL
+                pmg.Keep(child->Faces_[face]);
+#endif
                 child->Faces_[face]->ClearRemoveMark();
                 child->Faces_[face]->RecycleMe(vp0,vp1,vp2);
                 commonFaces.erase(it);  // because face is now already recycled

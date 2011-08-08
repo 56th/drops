@@ -832,6 +832,8 @@ class ModifyCL
     void ChangePrio( const TransferableCL&, Priority);
     /// \brief Consider a local simplex for deletion.
     void Delete( const TransferableCL&);
+    /// \brief Keep a local simplex (even though all adjacent tetras have called "Delete()").
+    void Keep( const TransferableCL&);
 };
 
 /// \brief Enables transfer of objects.
