@@ -76,6 +76,7 @@ namespace DiST{
 class PrioListCL: public std::vector<Priority>
 {
   public:
+    PrioListCL() : std::vector<Priority>() {}
     bool contains( const Priority prio) const { return empty() || is_in( begin(), end(), prio); }
 };
 
