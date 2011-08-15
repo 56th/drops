@@ -53,6 +53,9 @@
     <Filter Include="surfactant\param-files">
       <UniqueIdentifier>{1a1b53c4-3d2a-442f-9a25-c7796d4476e6}</UniqueIdentifier>
     </Filter>
+    <Filter Include="target\DiST">
+      <UniqueIdentifier>{564ee22f-e106-4773-a692-94166ce8cf52}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\geom\boundary.cpp">
@@ -280,38 +283,41 @@
     <ClCompile Include="..\..\..\partests\TestInterpolPar.cpp">
       <Filter>target</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\tests\dist_streamtest.cpp">
-      <Filter>target</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\parallel\DiST.cpp">
       <Filter>parallel</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\tests\dist_remotedatatest.cpp">
-      <Filter>target</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\tests\dist_sendtetraofbrick.cpp">
-      <Filter>target</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\tests\dist_simplexsend.cpp">
-      <Filter>target</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\tests\dist_interface.cpp">
-      <Filter>target</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\tests\dist_exchange.cpp">
-      <Filter>target</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\tests\dist_poisson.cpp">
-      <Filter>target</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\tests\dist_sdropsP2.cpp">
-      <Filter>target</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\parallel\parref.cpp">
       <Filter>parallel</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\tests\dist_exchange.cpp">
+      <Filter>target\DiST</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tests\dist_streamtest.cpp">
+      <Filter>target\DiST</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tests\dist_interface.cpp">
+      <Filter>target\DiST</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tests\dist_poisson.cpp">
+      <Filter>target\DiST</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\tests\dist_ref.cpp">
-      <Filter>target</Filter>
+      <Filter>target\DiST</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tests\dist_remotedatatest.cpp">
+      <Filter>target\DiST</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tests\dist_sdropsP2.cpp">
+      <Filter>target\DiST</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tests\dist_sendtetraofbrick.cpp">
+      <Filter>target\DiST</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tests\dist_simplexsend.cpp">
+      <Filter>target\DiST</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tests\dist_ref_rising_drop.cpp">
+      <Filter>target\DiST</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

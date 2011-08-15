@@ -868,6 +868,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\..\..\tests\dist_ref.cpp" />
+    <ClCompile Include="..\..\..\tests\dist_ref_rising_drop.cpp" />
     <ClCompile Include="..\..\..\tests\dist_remotedatatest.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
