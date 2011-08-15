@@ -14,7 +14,7 @@ EXEC =  ip1test ip2test mattest prolongationp2test reftest testfe \
         extendP1onChild principallattice quad_extra dist_streamtest dist_remotedatatest \
         dist_sendtetraofbrick dist_simplexsend dist_interface dist_exchange \
         dist_poisson dist_sdropsP2 dist_twophasedrops dist_ref dist_modify \
-        dist_TestRefPar
+        dist_TestRefPar dist_ref_rising_drop
 
 DELETE = $(EXEC) *.out *.diff *.off *.mg *.dat
 
@@ -310,6 +310,15 @@ dist_TestRefPar: \
     ../num/fe.o ../num/interfacePatch.o ../levelset/levelset.o ../levelset/fastmarch.o ../levelset/surfacetension.o \
     ../misc/params.o ../out/output.o ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
+
+dist_ref_rising_drop: \
+    ../tests/dist_ref_rising_drop.o \
+    ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
+    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o ../out/vtkOut.o ../parallel/parmultigrid.o \
+    ../num/fe.o ../num/interfacePatch.o ../levelset/levelset.o ../levelset/fastmarch.o ../levelset/surfacetension.o \
+    ../misc/params.o ../out/output.o ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o $(PAR_OBJ)
+	$(CXX) -o $@ $^ $(LFLAGS)
+
 
 dist_exchange: \
     ../tests/dist_exchange.o  \

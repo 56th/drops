@@ -1468,7 +1468,8 @@ bool ExchangeBuilderCL::HandlerDOFFromOwnerCL::Scatter( DiST::TransferableCL& t,
         DebugParallelNumC);
 
     // temporaries for receiving
-    int receiver= -1,    dummyreceiver=-1,
+    __UNUSED__ int receiver= -1;
+    int dummyreceiver=-1,
         sendpos_dof= -1, dummy1= -1,
         sendpos_ext= -1, dummy2= -1;
 
@@ -1597,7 +1598,8 @@ bool ExchangeBuilderCL::HandlerDOFDirectCommCL::Scatter( DiST::TransferableCL& t
         DebugParallelNumC);
 
     // temporaries for receiving
-    int receiver= -1,    dummyreceiver=-1,
+    __UNUSED__ int receiver= -1;
+    int dummyreceiver=-1,
         sendpos_dof= -1, dummy1= -1,
         sendpos_ext= -1, dummy2= -1,
         sender= -1;

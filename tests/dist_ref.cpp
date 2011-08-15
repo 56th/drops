@@ -1,6 +1,6 @@
 /// \file dist_ref.cpp
 /// \brief test of refinement
-/// \author LNM RWTH Aachen: Patrick Esser; SC RWTH Aachen: Oliver Fortmeier
+/// \author LNM RWTH Aachen: Patrick Esser, Sven Gross; SC RWTH Aachen: Oliver Fortmeier
 
 /*
  * This file is part of DROPS.

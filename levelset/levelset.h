@@ -254,7 +254,7 @@ public:
 
 
 /// marks all tetrahedra in the band |\p DistFct(x)| < \p width for refinement
-void MarkInterface (scalar_fun_ptr DistFct, double width, MultiGridCL&);
+bool MarkInterface (scalar_fun_ptr DistFct, double width, MultiGridCL&, Uint f_level=(Uint)(-1), Uint c_level=(Uint)(-1));
 /// marks all tetrahedra in the band |\p lset(x)| < \p width for refinement
 void MarkInterface ( const LevelsetP2CL::const_DiscSolCL& lset, double width, MultiGridCL& mg);
 

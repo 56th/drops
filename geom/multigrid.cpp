@@ -956,13 +956,15 @@ void MultiGridCL::SizeInfo(std::ostream& os)
             numTetrasRef += recvbuf[i*5+4];
         }
 
-        for (int i=0; i<ProcCL::Size(); ++i){
-            os << "     On Proc "<<i<<" are: "
-               << recvbuf[i*5+0] << " Verts, "
-               << recvbuf[i*5+1] << " Edges, "
-               << recvbuf[i*5+2] << " Faces, "
-               << recvbuf[i*5+3] << " Tetras"
-               << '\n';
+        if ( ProcCL::Size()<8){
+            for (int i=0; i<ProcCL::Size(); ++i){
+                os << "     On Proc "<<i<<" are: "
+                   << recvbuf[i*5+0] << " Verts, "
+                   << recvbuf[i*5+1] << " Edges, "
+                   << recvbuf[i*5+2] << " Faces, "
+                   << recvbuf[i*5+3] << " Tetras"
+                   << '\n';
+            }
         }
         os << "  Accumulated: "
            << numVerts << " Verts, "

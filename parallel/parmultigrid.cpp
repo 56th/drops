@@ -1166,7 +1166,7 @@ public:
     }
     /// \brief This is called by the master copy. The corresponding ghost copy definitely put in the
     ///     message, whether the tetrahedron is marked for regular refinement
-    bool Scatter( DiST::TransferableCL& t, const size_t& numData, DiST::Helper::RecvStreamCL& recv)
+    bool Scatter( DiST::TransferableCL& t, __UNUSED__ const size_t& numData, DiST::Helper::RecvStreamCL& recv)
     {
         TetraCL* tp; simplex_cast( t, tp);
 

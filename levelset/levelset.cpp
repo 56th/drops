@@ -433,8 +433,9 @@ void SF_ImprovedLaplBeltrami( const MultiGridCL& MG, const VecDescCL& SmPhi, con
     }
 }
 
-void MarkInterface ( scalar_fun_ptr DistFct, double width, MultiGridCL& mg)
+bool MarkInterface ( scalar_fun_ptr DistFct, double width, MultiGridCL& mg, Uint f_level, Uint c_level)
 {
+    bool marked= false;
     DROPS_FOR_TRIANG_TETRA( mg, /*default-level*/-1, it)
     {
         double d= 1e99;
@@ -448,9 +449,28 @@ void MarkInterface ( scalar_fun_ptr DistFct, double width, MultiGridCL& mg)
         }
 
         const bool vzw= num_pos!=0 && num_pos!=10; // change of sign
-        if (d<=width || vzw)
-            it->SetRegRefMark();
+        if ( f_level==(Uint)(-1) || c_level==(Uint)(-1)){
+            if (d<=width || vzw){
+                marked= true;
+                it->SetRegRefMark();
+            }
+        }
+        else{
+            const Uint l= it->GetLevel();
+            // In the shell:      level should be f_level_.
+            // Outside the shell: level should be c_level_.
+            const Uint soll_level= (d<=width || vzw) ? f_level : c_level;
+            if (l !=  soll_level || (l == soll_level && !it->IsRegular()) )
+            { // tetra will be marked for refinement/removement
+                if (l <= soll_level)
+                    it->SetRegRefMark();
+                else // l > soll_level
+                    it->SetRemoveMark();
+                marked= true;
+            }
+        }
     }
+    return ProcCL::GlobalOr(marked);
 }
 
 void MarkInterface ( const LevelsetP2CL::const_DiscSolCL& lset, double width, MultiGridCL& mg)
