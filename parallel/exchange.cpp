@@ -1827,7 +1827,7 @@ MatrixCL ExchangeMatrixCL::Accumulate(const MatrixCL& mat)
     std::vector<ProcCL::RequestT> send_req( ExList_.size());
     std::vector<ProcCL::RequestT> recv_req( ExList_.size());
     for (size_t ex=0; ex<ExList_.size(); ++ex){
-        send_req[ex]= ExList_[ex].Isend( mat.val(), 2213, 0);
+        send_req[ex]= ExList_[ex].Isend( mat.raw_val(), 2213, 0);
         recv_req[ex]= ProcCL::Irecv( RecvBuf_[ex], ExList_[ex].GetReceiver(), 2213);
     }
 
@@ -1838,7 +1838,7 @@ MatrixCL ExchangeMatrixCL::Accumulate(const MatrixCL& mat)
         // add received non-zeros
         for ( size_t nz=0; nz<RecvBuf_[ex].size(); ++nz){
             if (Coupl_[ex][nz]!=NoIdx_)
-                result.val()[Coupl_[ex][nz]]+= RecvBuf_[ex][nz];
+                result.raw_val()[Coupl_[ex][nz]]+= RecvBuf_[ex][nz];
         }
     }
 

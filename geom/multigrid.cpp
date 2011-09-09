@@ -1,6 +1,6 @@
 /// \file multigrid.cpp
 /// \brief classes that constitute the multigrid
-/// \author LNM RWTH Aachen: Sven Gross, Eva Loch, Joerg Peters, Volker Reichelt; SC RWTH Aachen: Oliver Fortmeier
+/// \author LNM RWTH Aachen: Patrick Esser, Joerg Grande, Sven Gross, Eva Loch, Volker Reichelt; SC RWTH Aachen: Oliver Fortmeier
 
 /*
  * This file is part of DROPS.
@@ -162,6 +162,17 @@ MultiGridCL::MultiGridCL (const MGBuilderCL& Builder)
     FinalizeModify();
 }
 
+void MultiGridCL::ClearTriangCache ()
+{
+    TriangVertex_.clear();
+    TriangEdge_.clear();
+    TriangFace_.clear();
+    TriangTetra_.clear();
+
+    for (std::map<int, ColorClassesCL*>::iterator it= colors_.begin(), end= colors_.end(); it != end; ++it)
+        delete it->second;
+    colors_.clear();
+}
 
 void MultiGridCL::CloseGrid(Uint Level)
 {
@@ -1281,5 +1292,115 @@ void MultiGridCL::test()
         std::cout << "DiST module reports errors!" << std::endl;
 }
 
+void ColorClassesCL::compute_neighbors (MultiGridCL::const_TriangTetraIteratorCL begin,
+                                        MultiGridCL::const_TriangTetraIteratorCL end,
+                                        std::vector<TetraNumVecT>& neighbors)
+{
+    const size_t num_tetra= std::distance( begin, end);
+
+    typedef std::set<size_t> TetraNumSetT;
+    typedef std::tr1::unordered_map<const VertexCL*, TetraNumSetT> VertexMapT;
+    VertexMapT vertexMap;
+    // Collect all tetras, that have vertex v in vertexMap[v].
+    for (MultiGridCL::const_TriangTetraIteratorCL sit= begin; sit != end; ++sit)
+        for (int i= 0; i < 4; ++i)
+            vertexMap[sit->GetVertex( i)].insert( sit - begin);
+
+    // For every tetra j, store all neighboring tetras in neighbors[j].
+    std::vector<TetraNumSetT> neighborsets( num_tetra);
+#   pragma omp parallel
+    {
+#       pragma omp for
+        for (size_t j= 0; j < num_tetra; ++j)
+            for (int i= 0; i < 4; ++i) {
+                const TetraNumSetT& tetra_nums= vertexMap[(begin + j)->GetVertex( i)];
+                neighborsets[j].insert( tetra_nums.begin(), tetra_nums.end());
+            }
+#       pragma omp for
+        for (size_t j= 0; j < num_tetra; ++j) {
+            neighbors[j].resize( neighborsets[j].size());
+            std::copy( neighborsets[j].begin(), neighborsets[j].end(), neighbors[j].begin());
+        }
+    }
+}
+
+void ColorClassesCL::fill_pointer_arrays (
+    const std::vector<size_t>& color_sizes, const std::vector<int>& color,
+    MultiGridCL::const_TriangTetraIteratorCL begin, MultiGridCL::const_TriangTetraIteratorCL end)
+{
+    colors_.resize( color_sizes.size());
+    for (size_t j= 0; j < num_colors(); ++j)
+        colors_[j].reserve( color_sizes[j]);
+    const size_t num_tetra= std::distance( begin, end);
+    for (size_t j= 0; j < num_tetra; ++j)
+        colors_[color[j]].push_back( &*(begin + j));
+
+    // tetra sorting for better memory access pattern
+    #pragma omp parallel for
+    for (size_t j= 0; j < num_colors(); ++j)
+        sort( colors_[j].begin(), colors_[j].end());
+}
+
+void ColorClassesCL::compute_color_classes (MultiGridCL::const_TriangTetraIteratorCL begin,
+                                            MultiGridCL::const_TriangTetraIteratorCL end)
+{
+#   ifdef _PAR
+        ParTimerCL timer;
+#   else
+        TimerCL timer;
+#   endif
+        timer.Start();
+
+    const size_t num_tetra= std::distance( begin, end);
+
+    // Build the adjacency lists (a vector of neighbors for each tetra).
+    std::vector<TetraNumVecT> neighbors( num_tetra);
+    compute_neighbors( begin, end, neighbors);
+
+    // Color the tetras
+    std::vector<int> color( num_tetra, -1);
+    std::vector<size_t> size_of_color_partition;
+    std::vector<int> used_colors;
+    for (size_t j= 0; j < num_tetra; ++j) {
+        for (TetraNumVecT::iterator neigh_it= neighbors[j].begin(); neigh_it != neighbors[j].end(); ++neigh_it)
+            used_colors.push_back( color[*neigh_it]);
+        size_t c= 0; // Note that the undefined color -1 is ignored.
+        while (find( used_colors.begin(), used_colors.end(), c) != used_colors.end())
+            ++c;
+        if (c < size_of_color_partition.size()) {
+            color[j]= c;
+            ++size_of_color_partition[c];
+        }
+        else {
+            size_of_color_partition.push_back( 1); // Add new color with one use
+            color[j]= size_of_color_partition.size() - 1;
+        }
+        used_colors.clear();
+    }
+    neighbors.clear();
+
+    // Build arrays of pointers for the colors
+    fill_pointer_arrays( size_of_color_partition, color, begin, end);
+    color.clear();
+
+    // for (size_t j= 0; j < num_colors(); ++j)
+    //     std::cout << "Color " << j << " has " << colors_[j].size() << " tetras." << std::endl;
+    // std::cout << std::endl;
+
+    timer.Stop();
+    const double duration= timer.GetTime();
+    std::cout << "Creation of the tetra-coloring took " << duration << " seconds, " << num_colors() << " colors used." << '\n';
+}
+
+const ColorClassesCL& MultiGridCL::GetColorClasses (int Level) const
+{
+    if (Level < 0)
+        Level+= GetNumLevel();
+
+    if (colors_.find( Level) == colors_.end())
+        colors_[Level]= new ColorClassesCL( GetTriangTetraBegin( Level), GetTriangTetraEnd( Level));
+
+    return *colors_[Level];
+}
 
 } // end of namespace DROPS

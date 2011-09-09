@@ -8,7 +8,7 @@ VS_DIRS= ReleaseSerial Release x64 DebugSerial Debug \
          drops/ReleaseSerial drops/Release drops/x64 drops/DebugSerial drops/Debug
 
 
-clean:
+distclean:
 	/bin/rm -rf $(VS_DIRS) DropsPackage.suo
 
 distclean: clean

@@ -39,6 +39,8 @@
 #  include <windows.h>
 #  undef max
 #  undef min
+#  include <unordered_map>
+#  define DROPS_STD_UNORDERED_MAP std::unordered_map
 #else
 #  include <sys/time.h>
 #  include <sys/resource.h>
@@ -468,37 +470,6 @@ PermutationT
 invert_permutation (const PermutationT& p);
 
 
-/// \brief Return the first iterator i from [begin, end) where l(*j, *i) == false for all j in [begin, end) excluding i.
-/// For an empty sequence end is returned.
-/// \todo (merge) What is the difference to std::min_element?
-template <class Iterator, class Cmp>
-  Iterator
-  arg_min (Iterator begin, Iterator end, Cmp l= std::less<typename std::iterator_traits<Iterator>::value_type>())
-{
-    if (begin == end) return end;
-
-    typename std::iterator_traits<Iterator>::value_type m= *begin;
-    Iterator am= begin;
-    while (++begin != end)
-        if ( l( *begin, m)) {
-            m= *begin;
-            am= begin;
-        }
-    return am;
-}
-
-
-/// \brief Return the first iterator i from [begin, end) where *i<=*j for all j in [begin, end).
-/// For an empty sequence end is returned.
-/// \todo (merge) What is the difference to std::min_element?
-template <class Iterator>
-  Iterator
-  arg_min (Iterator begin, Iterator end)
-{
-    return arg_min( begin, end,
-        std::less<typename std::iterator_traits<Iterator>::value_type>());
-}
-
 /// \brief Output [begin, end) to out, separated by newline.
 template <class Iterator>
 void
@@ -702,8 +673,6 @@ template <class ContainerT>
   sequence_begin (const ContainerT& c) { return SequenceTraitCL<ContainerT>::const_begin( c); }
 ///@}
 
-
-
 /// \brief Create a directory
 int CreateDirectory(std::string path);
 
@@ -799,10 +768,21 @@ inline byte sign (double d)
     return d > 0. ? 1 : (d < 0. ? -1 : 0);
 }
 
-
 } // end of namespace DROPS
 
 
+#ifdef DROPS_WIN
+///\brief Assignement of slice array is missing in VS Compi
+template<typename T>
+inline std::slice_array<T>&
+std::slice_array<T>::operator=(const slice_array<T>& a)
+{
+    for (size_t i = 0; i < a.size(); ++i){
+        this->_Myptr[i * this->stride()] = a._Myptr[i *a.stride()];
+	}
+	return *this;
+}
+#endif
 
 #ifdef _PAR
 #  ifndef _MPICXX_INTERFACE
@@ -819,9 +799,12 @@ inline byte sign (double d)
 #  endif
 #endif
 
-#pragma GCC system_header // Suppress warnings from boost
+#ifndef DROPS_WIN
+#  pragma GCC system_header // Suppress warnings from boost
+#endif
 # include <boost/property_tree/ptree.hpp>
 # include <boost/property_tree/exceptions.hpp>
 # include <boost/property_tree/json_parser.hpp>
+
 
 #endif

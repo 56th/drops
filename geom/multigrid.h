@@ -1,6 +1,6 @@
 /// \file multigrid.h
 /// \brief classes that constitute the multigrid
-/// \author LNM RWTH Aachen: Sven Gross, Eva Loch, Joerg Peters, Volker Reichelt; SC RWTH Aachen: Oliver Fortmeier
+/// \author LNM RWTH Aachen: Patrick Esser, Joerg Grande, Sven Gross, Eva Loch, Volker Reichelt; SC RWTH Aachen: Oliver Fortmeier
 
 /*
  * This file is part of DROPS.
@@ -150,6 +150,8 @@ class InfoCL;
 }
 #endif
 
+class ColorClassesCL; ///< forward declaration of the partitioning of the tetras in a triangulation into color classes
+
 class MultiGridCL
 {
 
@@ -203,6 +205,8 @@ class MultiGridCL
 
     size_t     version_;                            // each modification of the multigrid increments this number
     SimplexFactoryCL factory_;                      ///< generating simplices
+    
+    mutable std::map<int, ColorClassesCL*> colors_; // map: level -> Color-classes of the tetra for that level
 
 #ifdef _PAR
     bool killedGhostTetra_;                         // are there ghost tetras, that are marked for removement, but have not been removed so far
@@ -217,7 +221,7 @@ class MultiGridCL
     void AppendLevel     () { Vertices_.AppendLevel(); Edges_.AppendLevel(); Faces_.AppendLevel(); Tetras_.AppendLevel(); }
     void RemoveLastLevel () { Vertices_.RemoveLastLevel(); Edges_.RemoveLastLevel(); Faces_.RemoveLastLevel(); Tetras_.RemoveLastLevel(); }
 
-    void ClearTriangCache () { TriangVertex_.clear(); TriangEdge_.clear(); TriangFace_.clear(); TriangTetra_.clear(); }
+    void ClearTriangCache ();
 
     void RestrictMarks (Uint Level) { std::for_each( Tetras_[Level].begin(), Tetras_[Level].end(), std::mem_fun_ref(&TetraCL::RestrictMark)); }
     void CloseGrid     (Uint);
@@ -323,6 +327,8 @@ class MultiGridCL
     SimplexFactoryCL& GetSimplexFactory() { return factory_; }
 #endif
 
+    const ColorClassesCL& GetColorClasses (int Level=-1) const;
+
     bool IsSane (std::ostream&, int Level=-1) const;
 
 
@@ -361,6 +367,39 @@ class PeriodicEdgesCL
     void AccumulateMFR( int lvl);
     /// print out list of identified edges for debugging
     void DebugInfo(std::ostream&);
+};
+
+/// \brief Storage of independend set of tetrahedra for assembling
+class ColorClassesCL
+{
+  public:
+    typedef std::vector<const TetraCL*> ColorClassT;
+    typedef std::vector<ColorClassT>::const_iterator const_iterator;
+
+  private:
+    std::vector<ColorClassT> colors_;
+
+    typedef std::vector<size_t> TetraNumVecT;
+
+    void compute_neighbors (MultiGridCL::const_TriangTetraIteratorCL begin,
+                            MultiGridCL::const_TriangTetraIteratorCL end,
+                            std::vector<TetraNumVecT>& neighbors);
+    void fill_pointer_arrays (const std::vector<size_t>& color_sizes,
+        const std::vector<int>& color,
+        MultiGridCL::const_TriangTetraIteratorCL begin,
+        MultiGridCL::const_TriangTetraIteratorCL end);
+
+  public:
+    ColorClassesCL (MultiGridCL::const_TriangTetraIteratorCL begin,
+                    MultiGridCL::const_TriangTetraIteratorCL end)
+    { compute_color_classes( begin, end); }
+
+    void compute_color_classes (MultiGridCL::const_TriangTetraIteratorCL begin,
+                                MultiGridCL::const_TriangTetraIteratorCL end);
+
+    size_t num_colors () const { return colors_.size(); }
+    const_iterator begin () const { return colors_.begin(); }
+    const_iterator end   () const { return colors_.end(); }
 };
 
 

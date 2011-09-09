@@ -77,6 +77,8 @@ class SendNumDataCL
     /// \brief Send the data (nonblocking, asynchronous)
     template <typename VectorT>
     inline ProcCL::RequestT Isend(const VectorT&, int tag, Ulint offset) const;
+     // Send data to "toProc_" (nonblocking, asynchronous)
+    inline ProcCL::RequestT Isend(const double*, int tag, Ulint offset) const;   
 };
 
 /******************************************************************************

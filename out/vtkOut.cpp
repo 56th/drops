@@ -36,6 +36,7 @@ VTKOutCL::VTKOutCL(const MultiGridCL& mg, const std::string& dataname, Uint nums
 \param numsteps  number of time steps
 \param filename  prefix of all files (e.g. vtk/output)
 \param binary    Write out files in binary format.
+\param lvl       Multigrid level
 */
     : mg_(mg), timestep_(0), numsteps_(numsteps), descstr_(dataname),
         filename_(filename), binary_(binary), geomwritten_(false),
@@ -61,9 +62,9 @@ void VTKOutCL::Register (VTKVariableCL& var)
         vars_[var.varName()]= &var;
 }
 
-void VTKOutCL::Write ( __UNUSED__ double time, bool writeDistribution)
+void VTKOutCL::Write ( double time, bool writeDistribution)
 {
-    PutGeom( writeDistribution);
+    PutGeom( time, writeDistribution);
     for( std::map<std::string, VTKVariableCL*>::iterator it= vars_.begin(); it != vars_.end(); ++it) {
         it->second->put( *this);
     }
@@ -87,19 +88,53 @@ void VTKOutCL::CheckFile( const std::ofstream& os) const
         throw DROPSErrCL( "VTKOutCL: error while opening file!");
 }
 
-void VTKOutCL::NewFile(__UNUSED__ bool writeDistribution)
+void VTKOutCL::NewFile(double time, __UNUSED__ bool writeDistribution)
 /** Each process opens a new file and writes header into it*/
 {
+
+    
     std::string filename(filename_);
+    const char dir_delim= '/';
+    int length_dirname= filename.rfind( dir_delim);
 #ifdef _PAR
-   const char dir_delim= '/';
-   int length_dirname= filename.rfind( dir_delim);
    ProcCL::AppendProcNum(filename);
    filename+="_";
 #endif
 
     AppendTimecode(filename);
     filename+= ".vtu";
+    std::string filenamewithoutdirectory=filename;
+    filenamewithoutdirectory.erase(0,length_dirname+1);
+#ifndef _PAR    
+    std::string timefilename(filename_);
+    timefilename+=".pvd";
+    if(timestep_==0)
+    {
+        std::ofstream timefile(timefilename.c_str());
+        timefile << "<?xml version=\"1.0\"?>\n" 
+                 << "<VTKFile type=\"Collection\" version=\"0.1\" byte_order=\"LittleEndian\">\n"
+                 << "<Collection>\n"
+                 << "\t<DataSet timestep=\""<< time <<"\" group=\"\" part=\"0\" file=\""<< filenamewithoutdirectory <<"\"/>\n"
+                 << "</Collection>\n"
+                 << "</VTKFile>";
+        timefile.close();
+    }
+    else
+    {
+        std::ofstream timefile;
+        timefile.open(timefilename.c_str(),std::ios_base::in);
+        if(timefile.is_open())
+        {
+            timefile.seekp(-24,std::ios_base::end);
+            timefile << "\t<DataSet timestep=\""<< time <<"\" group=\"\" part=\"0\" file=\""<< filenamewithoutdirectory <<"\"/>\n"
+                     << "</Collection>\n"
+                     << "</VTKFile>";
+            timefile.close();
+        }
+        else std::cerr << "Could not open VTK Timefile!" << std::endl;
+    }
+#endif    
+    
     file_.open(filename.c_str());
     CheckFile( file_);
     PutHeader();
@@ -138,12 +173,12 @@ void VTKOutCL::NewFile(__UNUSED__ bool writeDistribution)
         {
             std::string parfilename;
             std::stringstream helper;
-            helper << filename_ << "." << std::setfill('0') << std::setw( int( log10( ProcCL::Size()))+1) << p << "_";
+            helper << filename_ << "." << std::setfill('0') << std::setw( int( log10( (float)ProcCL::Size()))+1) << p << "_";
 
             parfilename=helper.str();
             AppendTimecode( parfilename);
             parfilename+= ".vtu";
-	    parfilename.erase(0,length_dirname+1);
+            parfilename.erase(0,length_dirname+1);
             masterfile << "<Piece Source=\"" << parfilename << "\"/>\n";
         }
         masterfile << "</PUnstructuredGrid>\n"
@@ -469,14 +504,13 @@ void VTKOutCL::WriteValues( const VectorBaseCL<float>& allData, const std::strin
     }
 }
 
-void VTKOutCL::PutGeom( bool writeDistribution)
+void VTKOutCL::PutGeom(double time, bool writeDistribution)
 /** At first the geometry is put into the VTK file. Therefore this procedure
     opens the file and writes description into the file.
-    \param time simulation time
     \param writeDistribution Flag indicator whether distribution-data should be written in the file (as CellData)
 */
 {
-    NewFile(writeDistribution);
+    NewFile(time,writeDistribution);
     Clear();
     GatherCoord();
     GatherTetra();

@@ -524,20 +524,6 @@ void LevelsetP2CL::CreateNumbering( Uint level, IdxDescCL* idx, match_fun match)
 }
 
 
-bool LevelsetP2CL::Intersects( const TetraCL& t) const
-{
-    const Uint idx= Phi.RowIdx->GetIdx();
-    double PhiV0= Phi.Data[t.GetVertex(0)->Unknowns(idx)];
-
-    for (int i=1; i<4; ++i)
-        if( PhiV0*Phi.Data[t.GetVertex(i)->Unknowns(idx)] <= 0) return true;
-    for (int i=0; i<6; ++i)
-        if( PhiV0*Phi.Data[t.GetEdge(i)->Unknowns(idx)] <= 0) return true;
-
-    return false;
-}
-
-
 void LevelsetP2CL::Reparam( int method, bool Periodic)
 /** \param method How to perform the reparametrization (see description of ReparamFactoryCL for details)
     \param Periodic: If true, a special variant of the algorithm for periodic boundaries is used.
@@ -600,16 +586,17 @@ double LevelsetP2CL::GetVolume_Extrapolation( double translation, int l) const
 
 double LevelsetP2CL::GetVolume_Composite( double translation, int l) const
 {
+    const PrincipalLatticeCL& lat= PrincipalLatticeCL::instance ( l);
     double vol = 0.; 
-    std::valarray<double> ls_values (PrincipalLatticeCL::instance (l).vertex_size());
+    std::valarray<double> ls_values (lat.vertex_size());
     QuadDomainCL qdom;
     LocalP2CL<> loc_phi;
     TetraPartitionCL partition;
     DROPS_FOR_TRIANG_TETRA( MG_, idx.TriangLevel(), it) {
         loc_phi.assign(*it,Phi,GetBndData());
         loc_phi+= translation;
-        evaluate_on_vertexes (loc_phi, PrincipalLatticeCL::instance (l), Addr(ls_values));
-        partition.make_partition< SortedVertexPolicyCL,MergeCutPolicyCL>(l, ls_values);
+        evaluate_on_vertexes (loc_phi, lat, Addr(ls_values));
+        partition.make_partition< SortedVertexPolicyCL,MergeCutPolicyCL>(lat, ls_values);
         make_CompositeQuad5Domain( qdom, partition);
         DROPS::GridFunctionCL<> integrand( 1., qdom.vertex_size());
         vol+=quad( integrand, it->GetVolume()*6., qdom, NegTetraC);

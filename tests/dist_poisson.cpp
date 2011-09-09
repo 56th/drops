@@ -1,6 +1,6 @@
 /// \file dist_poisson.cpp
 /// \brief Solver for Poisson problem with P2 functions
-/// \author LNM RWTH Aachen: Patrick Esser, Joerg Grande, Sven Gross, Eva Loch, Volker Reichelt, Yuanjun Zhang, Thorolf Schulte; SC RWTH Aachen: Oliver Fortmeier
+/// \author LNM RWTH Aachen: Patrick Esser, Joerg Grande, Sven Gross, Eva Loch, Volker Reichelt, Yuanjun Zhang, Thorolf Schulte, Liang Zhang; SC RWTH Aachen: Oliver Fortmeier
 /*
  * This file is part of DROPS.
  *
@@ -140,7 +140,7 @@ void Strategy( PoissonP2CL<CoeffCL>& Poisson)
     timer.Reset();
     
     if(P.get<int>("Time.NumSteps") !=0)
-        Poisson.SetupInstatSystem(Poisson.A, Poisson.M);    //IntationarySystem
+        Poisson.SetupInstatSystem(Poisson.A, Poisson.M, 0., P.get<int>("PoissonCoeff.Stabilization"));    //IntationarySystem
     else
     {
         Poisson.SetupSystem( Poisson.A, Poisson.b);         //StationarySystem
@@ -199,11 +199,17 @@ void Strategy( PoissonP2CL<CoeffCL>& Poisson)
         }
     }
 
-    //write for vtk-format
-    VTKOutCL vtkwriter(mg, "DROPS data", P.get<int>("Time.NumSteps")+1, std:: string(P.get<std::string>("VTK.VTKDir")+"/"+P.get<std::string>("VTK.VTKName")), P.get<int>("VTK.Binary") );//??
-    if (P.get<int>("VTK.VTKOut")){
-        vtkwriter.Register( make_VTKScalar( Poisson.GetSolution(), "ConcenT"));
-        vtkwriter.Write( Poisson.x.t);
+
+
+    // Output-Registrations:
+    VTKOutCL * vtkwriter = NULL;
+    if (P.get<int>("VTK.VTKOut",0)){
+        vtkwriter = new VTKOutCL(mg, "DROPS data", 
+                                 P.get<int>("Time.NumSteps")+1, 
+                                 std:: string(P.get<std::string>("VTK.VTKDir")+"/"+P.get<std::string>("VTK.VTKName")), 
+                                 P.get<int>("VTK.Binary") );
+        vtkwriter->Register( make_VTKScalar( Poisson.GetSolution(), "ConcenT"));
+        vtkwriter->Write( Poisson.x.t);
     }
 
     if (P.get<int>("Time.NumSteps") != 0){
@@ -231,10 +237,12 @@ void Strategy( PoissonP2CL<CoeffCL>& Poisson)
                 Poisson.CheckSolution( Poisson.x, CoeffCL::Solution, Poisson.x.t);
             }
 
-            if ( P.get<int>("VTK.VTKOut") && step%P.get<int>("VTK.VTKOut")==0)
-                vtkwriter.Write( Poisson.x.t);
+            if (vtkwriter && step%P.get<int>("VTK.VTKOut", 0)==0)
+                vtkwriter->Write( Poisson.x.t);
         }
     }
+
+    if (vtkwriter) delete vtkwriter;
     delete solver;
 }
 

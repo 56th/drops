@@ -64,6 +64,12 @@ ip1test: \
     ../num/fe.o ../geom/boundary.o ../misc/utils.o
 	$(CXX) -o $@ $^ $(LFLAGS)
 
+interfacepatch_doublecut: \
+    ../tests/interfacepatch_doublecut.o ../misc/utils.o ../geom/builder.o ../geom/simplex.o \
+    ../geom/multigrid.o ../geom/boundary.o ../geom/topo.o ../num/unknowns.o ../misc/problem.o \
+    ../num/fe.o ../num/discretize.o ../num/interfacePatch.o
+	$(CXX) -o $@ $^ $(LFLAGS)
+
 ip1check: ip1test
 	@ ./ip1test > /dev/null 2>&1 || echo "WARNING: P1-repair failed."
 
@@ -341,7 +347,7 @@ dist_sdropsP2: \
     ../tests/dist_sdropsP2.o ../geom/boundary.o ../geom/builder.o ../geom/simplex.o ../geom/multigrid.o \
     ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o \
     ../misc/utils.o ../num/discretize.o ../num/interfacePatch.o ../num/stokessolver.o \
-    ../num/fe.o ../stokes/integrTime.o \
+    ../num/fe.o ../stokes/integrTime.o ../geom/reftetracut.o ../geom/principallattice.o \
     $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 

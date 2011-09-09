@@ -78,6 +78,27 @@ inline ProcCL::RequestT SendNumDataCL<T>::Isend(
     return ProcCL::Isend( Addr(v)+offset, 1, mpidatatype_, toproc_, tag);
 }
 
+template <typename T>
+inline ProcCL::RequestT SendNumDataCL<T>::Isend(
+     const double* v, int tag, Ulint offset) const
+/** Call the MPI Isend routine via the ProcCL. A request handler is return
+    for asking if the vector \a v can be overwritten. This function uses the
+    internal MPI datatype mpidatattype_ for sending.
+    \param v data to be send
+    \param tag a message tag
+    \param offset start sending form the offset element in \a v. Used for 
+                  blocked vectors.
+*/
+{
+/*    if ((int)v.size()-(int)offset<minlengthvec_){
+        printf("Proc %d, v should contain at least %d elements to be sent to %d\n", 
+            ProcCL::MyRank(), minlengthvec_, toproc_);
+    }
+    Assert( (int)v.size()-(int)offset>=minlengthvec_, 
+        DROPSErrCL("SendNumDataCL::Isend: Given vector does not hold enough entries"), 
+        DebugParallelNumC);*/
+    return ProcCL::Isend( v+offset, 1, mpidatatype_, toproc_, tag);
+}
 
 template <typename T>
 ProcCL::RequestT RecvNumDataCL<T>::Irecv(int tag, VectorBaseCL<T>& recvBuf,

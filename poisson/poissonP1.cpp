@@ -1,6 +1,6 @@
 /// \file poissonP1.cpp
 /// \brief Solver for Poisson problem with P1 functions
-/// \author LNM RWTH Aachen: Patrick Esser, Joerg Grande, Sven Gross, Eva Loch, Volker Reichelt, Yuanjun Zhang, Thorolf Schulte; SC RWTH Aachen: Oliver Fortmeier
+/// \author LNM RWTH Aachen: Patrick Esser, Joerg Grande, Sven Gross, Eva Loch, Volker Reichelt, Yuanjun Zhang, Thorolf Schulte, Liang Zhang; SC RWTH Aachen: Oliver Fortmeier
 
 /*
  * This file is part of DROPS.
@@ -94,13 +94,18 @@ void SolveStatProblem( PoissonP1CL<CoeffCL>& Poisson, SolverT& solver, ParamCL& 
 #endif
 
     if ( !doErrorEstimate) {
-        Poisson.SetupSystem( Poisson.A, Poisson.b);
+        Poisson.SetupSystem( Poisson.A, Poisson.b, P.get<int>("PoissonCoeff.Stabilization"));
         if(P.get<int>("Time.Convection"))
         {
             Poisson.vU.SetIdx( &Poisson.idx);
             Poisson.SetupConvection(Poisson.U, Poisson.vU, 0.0);
             Poisson.A.Data.LinComb(1., Poisson.A.Data, 1., Poisson.U.Data);
             Poisson.b.Data+=Poisson.vU.Data;
+        }
+        if(P.get<int>("PoissonCoeff.Stabilization"))
+        {
+            CoeffCL::Show_Pec();
+            std::cout << line << "The SUPG stabilization has been added ...\n"<<line;           
         }
         timer.Reset();
         solver.Solve( Poisson.A.Data, Poisson.x.Data, Poisson.b.Data);
@@ -260,7 +265,7 @@ void Strategy( PoissonP1CL<CoeffCL>& Poisson)
 
     timer.Reset();
     if (P.get<int>("Time.NumSteps") != 0)
-        Poisson.SetupInstatSystem( Poisson.A, Poisson.M);
+        Poisson.SetupInstatSystem( Poisson.A, Poisson.M, Poisson.x.t, P.get<int>("PoissonCoeff.Stabilization") );
     timer.Stop();
     std::cout << " o time " << timer.GetTime() << " s" << std::endl;
 
@@ -277,58 +282,67 @@ void Strategy( PoissonP1CL<CoeffCL>& Poisson)
         SetupP1ProlongationMatrix( mg, *(factory.GetProlongation()), &Poisson.idx, &Poisson.idx);
 
     // Solve the linear equation system
-    Poisson.Init( Poisson.x, CoeffCL::InitialCondition, 0.0);
-    InstatPoissonThetaSchemeCL<PoissonP1CL<CoeffCL>, PoissonSolverBaseCL>
-        ThetaScheme( Poisson, *solver, P.get<double>("Time.Theta"), P.get<bool>("Time.Convection"));
-    ThetaScheme.SetTimeStep(P.get<double>("Time.StepSize"));
-
-    if (P.get<int>("Time.NumSteps") == 0) {
+    if(P.get<int>("Time.NumSteps") !=0)
+        Poisson.Init( Poisson.x, CoeffCL::InitialCondition, 0.0);
+    else
         SolveStatProblem( Poisson, *solver, P);
-    }
 
-    Ensight6OutCL  ens(P.get<std::string>("Ensight.EnsCase")+".case", P.get<int>("Time.NumSteps")+1, P.get<int>("Ensight.Binary"), P.get<int>("Ensight.MasterOut"));
-    if ( P.get<int>("Ensight.EnsightOut")){
+    // Output-Registrations:
+    Ensight6OutCL* ensight = NULL;
+    if (P.get<int>("Ensight.EnsightOut",0)){
+        // Initialize Ensight6 output
         const std::string filename= P.get<std::string>("Ensight.EnsDir") + "/" + P.get<std::string>("Ensight.EnsCase");
-        ens.Register( make_Ensight6Geom  ( mg, mg.GetLastLevel(), P.get<std::string>("Ensight.GeomName"),       filename + ".geo"));
-        ens.Register( make_Ensight6Scalar( Poisson.GetSolution(), "Temperatur", filename + ".tp", true));
-        ens.Write();
+        ensight = new Ensight6OutCL(P.get<std::string>("Ensight.EnsCase")+".case", P.get<int>("Time.NumSteps")+1, 
+                                    P.get<int>("Ensight.Binary"), P.get<int>("Ensight.MasterOut"));
+        ensight->Register( make_Ensight6Geom  ( mg, mg.GetLastLevel(), 
+                                                P.get<std::string>("Ensight.GeomName"), filename + ".geo"));
+        ensight->Register( make_Ensight6Scalar( Poisson.GetSolution(), "Temperatur", filename + ".tp", true));
+        ensight->Write();
     }
 
 
-    //write for vtk-format
-    VTKOutCL vtkwriter(mg, "DROPS data", P.get<int>("Time.NumSteps")+1, std:: string(P.get<std::string>("VTK.VTKDir")+"/"+P.get<std::string>("VTK.VTKName")), P.get<int>("VTK.Binary") );//??
-    if (P.get<int>("VTK.VTKOut")){
-        vtkwriter.Register( make_VTKScalar( Poisson.GetSolution(), "ConcenT"));
-        vtkwriter.Write( Poisson.x.t);
+    VTKOutCL * vtkwriter = NULL;
+    if (P.get<int>("VTK.VTKOut",0)){
+        vtkwriter = new VTKOutCL(mg, "DROPS data", 
+                                 P.get<int>("Time.NumSteps")+1, 
+                                 std:: string(P.get<std::string>("VTK.VTKDir")+"/"+P.get<std::string>("VTK.VTKName")), 
+                                 P.get<int>("VTK.Binary") );
+        vtkwriter->Register( make_VTKScalar( Poisson.GetSolution(), "ConcenT"));
+        vtkwriter->Write( Poisson.x.t);
     }
-
-    for ( int step = 1; step <= P.get<int>("Time.NumSteps"); ++step)
+        
+    if(P.get<int>("Time.NumSteps")!=0)
     {
-        timer.Reset();
+        //CoeffCL::Show_Pec();
+        InstatPoissonThetaSchemeCL<PoissonP1CL<CoeffCL>, PoissonSolverBaseCL>
+        ThetaScheme( Poisson, *solver, P.get<double>("Time.Theta") , P.get<int>("Time.Convection"), P.get<int>("PoissonCoeff.Stabilization"));
+        ThetaScheme.SetTimeStep(P.get<double>("Time.StepSize") );
+        for ( int step = 1; step <= P.get<int>("Time.NumSteps") ; ++step) {
+            timer.Reset();
+            std::cout << line << "Step: " << step << std::endl;
+            ThetaScheme.DoStep( Poisson.x);
 
-        std::cout << line << "Step: " << step << std::endl;
-        ThetaScheme.DoStep( Poisson.x);
+            timer.Stop();
+            std::cout << " o Solved system with:\n"
+                      << "   - time          " << timer.GetTime()    << " s\n"
+                      << "   - iterations    " << solver->GetIter()  << '\n'
+                      << "   - residuum      " << solver->GetResid() << '\n';
 
-        timer.Stop();
-        std::cout << " o Solved system with:\n"
-                << "   - time          " << timer.GetTime()    << " s\n"
-                << "   - iterations    " << solver->GetIter()  << '\n'
-                << "   - residuum      " << solver->GetResid() << '\n';
+            if (P.get("Poisson.SolutionIsKnown", 0)) {
+                std::cout << line << "Check result against known solution ...\n";
+                Poisson.CheckSolution( Poisson.x, CoeffCL::Solution, Poisson.x.t);
+            }
 
-        // check the result
-        // -------------------------------------------------------------------------
-        if (P.get("Time.SolutionIsKnown", 0)) {
-            std::cout << line << "Check result against known solution ...\n";
-            Poisson.CheckSolution( Poisson.x, CoeffCL::Solution, Poisson.x.t);
+            if (ensight && step%P.get<int>("Ensight.EnsightOut", 0)==0)
+                ensight->Write( Poisson.x.t);
+            if (vtkwriter && step%P.get<int>("VTK.VTKOut", 0)==0)
+                vtkwriter->Write( Poisson.x.t);
         }
-
-        if ( P.get<int>("VTK.VTKOut") && step%P.get<int>("VTK.VTKOut")==0)
-            vtkwriter.Write( Poisson.x.t);
     }
 
+    if (vtkwriter) delete vtkwriter;
+    if (ensight) delete ensight;
     delete solver;
-
-
 }
 
 } // end of namespace DROPS
@@ -398,7 +412,6 @@ int main (int argc, char** argv)
         // ---------------------------------------------------------------------
         std::cout << "Refine the grid " << P.get<int>("DomainCond.RefineSteps") << " times regulary ...\n";
         timer.Reset();
-        std::cout << "VORHER\n";
         // Create new tetrahedra
         for ( int ref=1; ref <= P.get<int>("DomainCond.RefineSteps"); ++ref){
             std::cout << " refine (" << ref << ")\n";

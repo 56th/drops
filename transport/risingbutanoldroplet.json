@@ -1,210 +1,178 @@
+//=============================================================
+//    DROPS parameter file for twophasedrops
+//    simulation of two-phase flow:
+//    butanol droplet in water
+//=============================================================
 {
-	"_comment":
-"#=============================================================
-#    DROPS parameter file for twophasedrops
-#    simulation of two-phase flow:
-#    droplet in brick
-#=============================================================
-# time stepping",
+        // time stepping:
+        "Time":
+        {
+                "NumSteps":             2000,
+                "StepSize":             0.0005,
+                "Scheme":               1
+        },
+    
+        //stokes solver parameters:
+        "Stokes":
+        {
+                "StokesMethod":     10101,
+                "InnerIter":        1000,
+                "OuterIter":        200,
+                "InnerTol":         0.6,
+                "OuterTol":         1e-10,
+                "PcAIter":          500,
+                "PcATol":           0.01,
+                "PcSTol":           0.01,
+                "XFEMStab":         0.01,
+                "Theta":            1
+        },
 
-	"Time":
-	{
-		"NumSteps":		2000,
-		"StepSize":		0.0005,
-		"Scheme":		1
-	},
+        //navier stokes solver parameters:
+        "NavStokes":
+        {
+                "Nonlinear":            1,
+                "Tol":                  1e-10,
+                "Iter":                 20,
+                "Reduction":            0.1
+        },
 
-	"Stokes":
-	{
-		"_comment":
-"# flow solver",
+        //level set solver parameters:
+        "Levelset":
+        {
+                "Tol":                  1e-10,
+                "Iter":                 1000,
+                "SD":                   0.1,
+                "CurvDiff":             -1,
+                "VolCorrection":        1,
+                "Theta":                1
+        },
 
-		"StokesMethod":		10101,
-		"InnerIter":		1000,
-		"OuterIter":		200,
-		"InnerTol":		0.6,
-		"OuterTol":		1e-10,
-		"PcAIter":		500,
-		"PcATol":		0.01,
-		"PcSTol":		0.01,
-		"XFEMStab":		0.01,
-		"Theta":		1
-	},
+        "Coupling":
+        {
+                "Tol":                  1e-10,
+                "Iter":                 10,
+                "Stab":                 0.1,
+                "Projection":           0
+        },
 
-	"NavStokes":
-	{
-		"Nonlinear":		1,
-		"Tol":		1e-10,
-		"Iter":		20,
-		"Reduction":		0.1
-	},
+        //re-initialization of levelset function:
+        "Reparam":
+        {
 
-	"Levelset":
-	{
-		"_comment":
-"# levelset solver",
+                "Freq":                 1,
+                "Method":               1,
+                "MinGrad":              0.1,
+                "MaxGrad":              10,
+                "NarrowBand":           -1
+        },
 
-		"Tol":		1e-10,
-		"Iter":		1000,
-		"SD":		0.1,
-		"CurvDiff":		-1,
-		"VolCorrection":		1,
-		"Theta":		1
-	},
+        //adaptive refinement:
+        "AdaptRef":
+        {
+                "Freq":                 1,
+                "FinestLevel":          3,
+                "CoarsestLevel":        0,
+                "Width":                0.00045,
+                "RefineStrategy":       1,
+                "LoadBalStrategy":      1,
+                "Partitioner":          1
+        },
 
-	"Coupling":
-	{
-		"Tol":		1e-10,
-		"Iter":		10,
-		"Stab":		0.1,
-		"Projection":		0
-	},
+        // material data, all units are SI",
+        "Mat":
+        {
+                "DensDrop":             845.442,
+                "ViscDrop":             0.003281,
+                "DensFluid":            986.506,
+                "ViscFluid":            0.001388,
+                "SmoothZone":           0.0001
+        },
 
-	"Reparam":
-	{
-		"_comment":
-"# re-initialization of levelset function",
+        // experimental conditions
+        "Exp":
+        {
+                "RadDrop":              [1e-3, 1e-3, 1e-3 ],
+                "PosDrop":              [10e-3, 10e-3, 10e-3 ],
+                "Gravity":              [0, -9.81, 0 ],
+                "FlowDir":              1,
+                "InflowVel":            0,
+                "RadInlet":             0.005,
+                "InflowFreq":           0,
+                "InflowAmpl":           0
+        },
 
-		"Freq":		1,
-		"Method":		1,
-		"MinGrad":		0.1,
-		"MaxGrad":		10,
-		"NarrowBand":		-1
-	},
+        //surface tension
+        "SurfTens":
+        {
+                "VarTension":           1,
+                "SurfTension":          0.00163,
+                "JumpWidth":            0.00045,
+                "RelPos":               1.5,
+                "DirtFactor":           0.8
+        },
 
-	"AdaptRef":
-	{
-		"_comment":
-"# adaptive refinement",
+        "Transp":
+        {
+                "UseNSSol":             1,
+                "DoTransp":             1,
+                "Theta":                1,
+                "Iter":                 200,
+                "Tol":                  1e-15,
+                "DiffPos":              5.8345e-05,
+                "DiffNeg":              2.29e-05,
+                "HPos":                 1.2143,
+                "HNeg":                 1,
+                "IniCPos":              0.01,
+                "IniCNeg":              0,
+                "NitschePenalty":       100,
+                "SDStabilization":      1,
+                "NitscheXFEMStab":      0.01,
+                "Levelset":             "Ellipsoid",             //Only active if UseNSSol == 0
+                "Flow":                 "ZeroVel",               //Only active if UseNSSol == 0
+                "BoundaryType":         "2!2!2!2!2!2",
+                "BoundaryFncs":         "Dirichlet!Dirichlet!Dirichlet!Dirichlet!Dirichlet!Dirichlet",
+                "BoundaryFncst":        "Dirichlett!Dirichlett!Dirichlett!Dirichlett!Dirichlett!Dirichlett"
+        },
 
-		"Freq":		1,
-		"FinestLevel":		3,
-		"CoarsestLevel":		0,
-		"Width":		0.00045,
-		"RefineStrategy":		1,
-		"LoadBalStrategy":		1,
-		"Partitioner":		1
-	},
+        "SurfTransp":
+        {
+                "SDStabilization":      0,
+                "DoTransp":             0,
+                "Theta":                0.5,
+                "Iter":                 1000,
+                "Tol":                  1e-10,
+                "OmitBound":            -1,
+                "Visc":                 1e-05
+        },
 
-	"Mat":
-	{
-		"_comment":
-"# material data, all units are SI",
+        "VTK":
+        {
 
-		"DensDrop":		845.442,
-		"ViscDrop":		0.003281,
-		"DensFluid":		986.506,
-		"ViscFluid":		0.001388,
-		"SmoothZone":		0.0001
-	},
+                "VTKOut":               5,
+                "VTKDir":               "vtk",
+                "VTKName":              "risingbubble_butanol",
+                "Binary":               0
+        },
 
-	"Exp":
-	{
-		"_comment":
-"# experimental conditions",
+        //Write out results:
+        "Restart":
+        {
+                "Serialization":        0,
+                "Overwrite":            0,
+                "Inputfile":            "none",
+                "Outputfile":           "./geometry/",
+                "Binary":               0
+        },
 
-		"RadDrop":		[1e-3, 1e-3, 1e-3 ],
-		"PosDrop":		[10e-3, 10e-3, 10e-3 ],
-		"Gravity":		[0, -9.81, 0 ],
-		"FlowDir":		1,
-		"InflowVel":		0,
-		"RadInlet":		0.005,
-		"InflowFreq":		0,
-		"InflowAmpl":		0
-	},
-
-	"SurfTens":
-	{
-		"_comment":
-"# surface tension",
-
-		"VarTension":		1,
-		"SurfTension":		0.00163,
-		"JumpWidth":		0.00045,
-		"RelPos":		1.5,
-		"DirtFactor":		0.8
-	},
-
-	"Transp":
-	{
-		"_comment":
-"# mass transport",
-
-		"DoTransp":		1,
-		"Theta":		1,
-		"Iter":		200,
-		"Tol":		1e-15,
-		"DiffPos":		5.8345e-05,
-		"DiffNeg":		2.29e-05,
-		"HPos":		1.2143,
-		"HNeg":		1,
-		"IniCPos":		0.01,
-		"IniCNeg":		0,
-		"NitschePenalty":		100,
-		"NitscheXFEMStab":		0.01
-	},
-
-	"SurfTransp":
-	{
-		"_comment":
-"# surfactant transport",
-
-		"SDStabilization":	0,
-		"DoTransp":		0,
-		"Theta":		0.5,
-		"Iter":		1000,
-		"Tol":		1e-10,
-		"OmitBound":		-1,
-		"Visc":		1e-05
-	},
-
-	"Ensight":
-	{
-		"_comment":
-"# Ensight settings",
-
-		"EnsightOut":		0,
-		"EnsCase":		"risingbubble_butanol",
-		"EnsDir":		"ensight",
-		"Binary":		0,
-		"MasterOut":		1,
-		"GeomName":		"Brick"
-	},
-
-	"VTK":
-	{
-		"_comment":
-"#VTK output",
-
-		"VTKOut":		5,
-		"VTKDir":		"vtk",
-		"VTKName":		"risingbubble_butanol",
-		"Binary":		0
-	},
-
-	"Restart":
-	{
-		"_comment":
-"# Write out results",
-
-		"Serialization":		0,
-		"Overwrite":		0,
-		"Inputfile":		"none",
-		"Outputfile":		"./geometry/",
-		"Binary":		0
-	},
-
-	"DomainCond":
-	{
-		"_comment":
-"# domain, bnd/ini conditions",
-
-		"InitialCond":		0,
-		"GeomType":		1,
-		"InitialFile":		"none",
-		"MeshFile":		"20e-3x40e-3x20e-3@10x20x10",
-		"BoundaryType":		"2!2!2!2!2!2!",
-		"BoundaryFncs":		"ZeroVel!ZeroVel!ZeroVel!ZeroVel!ZeroVel!ZeroVel"
-	}
+        // Domain boundary and initial condition
+        "DomainCond":
+        {
+                "InitialCond":          0,
+                "GeomType":             1,
+                "InitialFile":          "none",
+                "MeshFile":             "20e-3x40e-3x20e-3@10x20x10",
+                "BoundaryType":         "2!2!2!2!2!2!",
+                "BoundaryFncs":         "ZeroVel!ZeroVel!ZeroVel!ZeroVel!ZeroVel!ZeroVel"
+        }
 
 }

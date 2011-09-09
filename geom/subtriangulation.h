@@ -31,7 +31,7 @@
 
 #include <vector>
 #include <valarray>
-#include <tr1/unordered_map>
+//#include <tr1/unordered_map>
 
 
 namespace DROPS {
@@ -52,13 +52,13 @@ typedef VertexContT::const_iterator const_vertex_iterator;
 
 } // end of namespace DROPS::LatticePartitionTypesNS
 
-///\brief sums the signs and returns fabs(sum) == #dof. If true is returned, the interface does not intersect the domain of f up to subgrid-resolution.
+///\brief sums the signs and returns fabs(sum) == \# dof. If true is returned, the interface does not intersect the domain of f up to subgrid-resolution.
 template <class GridFunT>
   inline bool
   equal_signs (const GridFunT& f);
 
 
-class TetraPartitionCL; ///< forward declaratino for output-routines
+class TetraPartitionCL; ///< forward declaration for output-routines
 
 ///\brief declaration of debug output (neccessary due to friend declaration in TetraPartitionCL)
 std::ostream&
@@ -112,7 +112,7 @@ class TetraPartitionCL
     ///\brief Computes the partition of the principal lattice with num_intervals on each edge of the reference-tetra given the level set values in ls.
     template <class VertexPartitionPolicyT,
               class VertexCutMergingPolicyT>
-    void make_partition (Uint num_intervals, const std::valarray<double>& ls);
+    void make_partition (const PrincipalLatticeCL& lat, const std::valarray<double>& ls);
 
     Uint tetra_size  (TetraSignEnum s= AllTetraC) const ///< number of tetras with given sign
          { return tetra_end( s) - tetra_begin( s); }
@@ -180,7 +180,7 @@ class SurfacePatchCL
 
     ///\brief Computes the piecewise triangular interface for the principal lattice with num_intervals on each edge of the reference-tetra given the level set values in ls.
     template <class VertexCutMergingPolicyT>
-    void make_patch (Uint num_intervals, const std::valarray<double>& ls);
+    void make_patch (const PrincipalLatticeCL& lat, const std::valarray<double>& ls);
 
     /// True, iff the triangle is a face of one of the tetras of the principal lattice.
     ///@{
@@ -302,7 +302,7 @@ class MergeCutPolicyCL
     };
 
     typedef std::pair<Uint, Uint> EdgeT;
-    typedef std::tr1::unordered_map<EdgeT, Uint, UintPairHasherCL> EdgeToCutMapT;
+    typedef DROPS_STD_UNORDERED_MAP<EdgeT, Uint, UintPairHasherCL> EdgeToCutMapT;
 
     const PrincipalLatticeCL::const_vertex_iterator lattice_vertexes_;
     VertexContT vertexes_;
