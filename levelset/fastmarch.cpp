@@ -1541,7 +1541,7 @@ bool ParDirectDistanceCL::CommunicateFrontierCL::Scatter( DiST::TransferableCL& 
         return false;
     TransferST tmp;
     IdxT dof= t.Unknowns( actualData_->phi.RowIdx->GetIdx());
-    
+
     for (size_t i = 0; i< numData; ++i) {
         r >> tmp.value >> tmp.perp >> tmp.procID;
         if ( tmp.procID>=0)
@@ -1556,9 +1556,9 @@ void ParDirectDistanceCL::CommunicateFrontierCL::Call()
     DiST::InterfaceCL::DimListT dimlist; dimlist.push_back( 0); dimlist.push_back( 1);
     DiST::PrioListT Prios; Prios.push_back(PrioMaster);
     DiST::LevelListCL Levels( maxlvl_);
-    
+
     DiST::InterfaceCL comm( Levels, Prios, Prios, dimlist);
-    comm.PerformInterfaceComm( *this);
+    comm.Communicate( *this);
 }
 
 void ParDirectDistanceCL::CommunicateFrontierSetOnProcBnd()

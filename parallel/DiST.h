@@ -452,7 +452,7 @@ class RemoteDataListIteratorCL
         : pos_(it), levels_(LevelListCL()), prios_(PrioListT()), distributed_(false) {}
 
     /// \brief Standard constructor, it receives a pointer to the container and the level and priority list.
-    inline RemoteDataListIteratorCL( RemoteDataListCL*, const LevelListCL&, const PrioListT&, bool);
+    inline RemoteDataListIteratorCL( RemoteDataListCL*, const LevelListCL&, const PrioListT&, bool dist);
 
     /// \brief Copy constructor
     inline RemoteDataListIteratorCL(const RemoteDataListIteratorCL& Lit)
@@ -715,7 +715,7 @@ class InterfaceCL
     template <typename HandlerT>
     bool ScatterData( HandlerT&);
     /// \brief Handles the communication between the processes
-    void Communicate( CommPhase phase);
+    void ExchangeData( CommPhase phase);
     /// \brief set up the ownerRecvFrom_ and IRecvFromOwners_
     void SetupCommunicationStructure();
     /// \brief do the specified communication
@@ -758,7 +758,6 @@ class InterfaceCL
     bool ExecuteLocal( ExecuteHandlerT& handler, const IteratorT& begin, const IteratorT& end);
     //@}
 
-
     /// \name Do The interface communication
     /// \param HandlerT A handler h is used to gather and scatter data on
     ///     TransferableCL's. Therefore, the handler must provide the members
@@ -768,7 +767,7 @@ class InterfaceCL
     /// \brief Do the interface communication on the interface specified by the
     ///   the constructor
     template <typename HandlerT>
-    bool PerformInterfaceComm( HandlerT&);
+    bool Communicate( HandlerT&);
 
     /// \brief Do the interface communication from non-owners to owners
     template <typename HandlerT>
@@ -884,7 +883,7 @@ class TransferCL : public ModifyCL
     /// \brief To be called after marking tetrahedra for transfer (initiates the communication)
     void Finalize();
     /// \brief Mark a tetrahedron for transfer
-    void MarkForTransfer( const TetraCL&, int toProc, Priority prio, bool del= true);
+    void Transfer( const TetraCL&, int toProc, Priority prio, bool del= true);
 };
 
 

@@ -55,8 +55,8 @@ int main( int argc, char **argv)
             DiST::TransferCL transfer( *mg, true, true);
 
             transfer.Init();
-            transfer.MarkForTransfer( *mg->GetTetrasBegin(), 1, PrioMaster, false);
-            transfer.MarkForTransfer( *mg->GetTetrasBegin(), 2, PrioMaster, false);
+            transfer.Transfer( *mg->GetTetrasBegin(), 1, PrioMaster, false);
+            transfer.Transfer( *mg->GetTetrasBegin(), 2, PrioMaster, false);
             transfer.Finalize();
         }
         else{

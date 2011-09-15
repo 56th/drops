@@ -591,7 +591,7 @@ void ExtIdxDescCL::CommunicateXFEMNumbCL::Call()
     DiST::LevelListCL Levels(max_lvl);
 
     DiST::InterfaceCL comm( Levels, Prios, Prios, dimlist);
-    comm.PerformInterfaceComm( *this);
+    comm.Communicate( *this);
 }
 #endif
 

@@ -305,7 +305,7 @@ class RemoteDataListCL::DebugHandlerCL
         const LevelListCL allLvls;
         // communicate over all objects
         InterfaceCL comm( allLvls, allPrios, allPrios, dimlist);
-        return comm.PerformInterfaceComm( *this);
+        return comm.Communicate( *this);
     }
 };
 
@@ -473,7 +473,7 @@ void InterfaceCL::SetupCommunicationStructure()
 //    std::cout << "[" << ProcCL::MyRank() << "] IRecvFromOwner = "; Print(IRecvFromOwners_, std::cout);
 }
 
-void InterfaceCL::Communicate( CommPhase phase)
+void InterfaceCL::ExchangeData( CommPhase phase)
 /** The interface communication has four phases.
     (1) The data collected by the gather routine is sent to processes which are owner of
     at least one entity. Let p denote a process who is owner of an entity.
@@ -696,7 +696,7 @@ class ModifyCL::MergeProcListHandlerCL
                 updateVec.push_back( it->first->GetGID());
 
         InterfaceCL comm( updateVec.begin(), updateVec.end(), mod_.binary_);
-        comm.PerformInterfaceComm( *this);
+        comm.Communicate( *this);
     }
 };
 
@@ -760,7 +760,7 @@ class ModifyCL::CommToUpdateHandlerCL
         const LevelListCL allLvls;
         // communicate over all objects
         InterfaceCL comm( allLvls, allPrios, allPrios, dimlist, /*dist*/ true, mod_.binary_);
-        comm.PerformInterfaceComm( *this);
+        comm.Communicate( *this);
     }
 };
 
@@ -989,7 +989,7 @@ void TransferCL::Finalize()
     modifiable_= false;
 }
 
-void TransferCL::MarkForTransfer( const TetraCL& t, int toProc, Priority prio, bool del)
+void TransferCL::Transfer( const TetraCL& t, int toProc, Priority prio, bool del)
 {
     Assert( modifiable_, DROPSErrCL("TransferCL::MarkForTransfer: Class is not in the modifiable mode, call Init() first!"), DebugDiSTC);
 
