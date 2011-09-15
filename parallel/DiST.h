@@ -185,31 +185,44 @@ union ToBinary
     char binary[sizeof(T)];
 };
 
+/// \brief Output-streambuf based on std::stringbuf.
+class MPIostringbufCL : public std::stringbuf
+{
+  public:
+    typedef std::stringbuf base_type;
+
+    /// \brief Non-blocking send to process 'dest'.
+    inline ProcCL::RequestT Isend(int dest, int tag);
+    /// \brief Reset the buffer to the empty default-state. This releases the memory of the buffer.
+    void clearbuffer () { str( std::string()); }
+};
+
 /// \brief Outgoing stream.
-class SendStreamCL : public std::ostringstream
+class SendStreamCL : public std::ostream
 /** This stream is employed as a mean of transport for sending data (integers,
     vertices, elements, etc.) out of the process towards other processes. <p>
-    It is derived from the ostringstream class of the Standard IOstream Library
+    It is derived from the ostream class of the Standard IOstream Library
     and it is characterized by saving all kind of data as a string. <p>
-    It's counterpart is the class RecvStreamCL.
-    \todo Is there a way to get rid of the copy sendbuf_?
+    It's counterpart is the class RecvStreamCL. <p>
 */
 {
-public:
-    typedef std::ostringstream base;
+  public:
+    typedef std::ostream base_type;
 
   private:
-    bool binary_;           ///< flag for binary sending/receiving
-    std::string sendbuf_;   ///< buffering the sending data
+    bool binary_;         ///< flag for binary sending/receiving
+    MPIostringbufCL buf_; ///< string based output-buffer
 
   public:
-    SendStreamCL( const bool binary=true) : std::ostringstream(), binary_(binary) {}
+    SendStreamCL( const bool binary= true) : base_type( &buf_), binary_( binary) {}
+
     inline bool isBinary() const {return binary_;}
     /// \brief Non-blocking send to process 'dest'.
-    inline ProcCL::RequestT Isend(int dest, int tag=5);
-    /// \brief Clear buffer.
-    /** We do not really clear the buffer, we just move the inserting pointer (put pointer) to the beginning. */
-    void clearbuffer() { seekp(0); sendbuf_.clear(); }
+    inline ProcCL::RequestT Isend(int dest, int tag= 5) { return buf_.Isend( dest, tag); }
+    /// \brief Return a copy of the string
+    inline std::string str () const { return buf_.str(); }
+    /// \brief Reset the buffer to the empty default-state. This releases the memory of the buffer.
+    void clearbuffer () { buf_.clearbuffer(); }
 };
 
 /// \brief Incoming stream.
@@ -251,7 +264,7 @@ SendStreamCL& operator<<( SendStreamCL& os, const T& t)
         bin.value= t;
         os.write( bin.binary, sizeof(T));
     } else {
-        SendStreamCL::base& oss= dynamic_cast<SendStreamCL::base&>(os);
+        SendStreamCL::base_type& oss= dynamic_cast<SendStreamCL::base_type&>(os);
         oss << t << ' ';
     }
     return os;

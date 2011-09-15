@@ -67,16 +67,11 @@ ErrorCL::ErrorCL(const std::string& mesg, const T& data, const GeomIdCL& gid)
 /** This member function is just a mask of the already in DROPS implemented
     non-blocking send, the only difference is that we always send objects
     of datatype MPI_CHAR.
-    \todo dm: Declare a static member tag_ and use this as a tag for sending and receiving
 */
-ProcCL::RequestT SendStreamCL::Isend(int dest, int tag)
+ProcCL::RequestT MPIostringbufCL::Isend(int dest, int tag)
 {
-    // copy the content into a buffer which is continuous in the memory
-    // for sending the data with MPI
-    sendbuf_.clear(); sendbuf_= this->str();
-    // now, we don't need the internal buffer of ostringstream any more.
-    this->clear(); this->seekp(0);
-    return ProcCL::Isend( sendbuf_.data(), sendbuf_.size(), dest, tag);
+    const std::streamsize size= pptr() - eback();
+    return ProcCL::Isend( eback(), size, dest, tag);
 }
 
 
