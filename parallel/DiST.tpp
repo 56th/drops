@@ -64,16 +64,6 @@ ErrorCL::ErrorCL(const std::string& mesg, const T& data, const GeomIdCL& gid)
     _ErrMesg+= oss.str();
 }
 
-/** This member function is just a mask of the already in DROPS implemented
-    non-blocking send, the only difference is that we always send objects
-    of datatype MPI_CHAR.
-*/
-ProcCL::RequestT MPIostringbufCL::Isend(int dest, int tag)
-{
-    const std::streamsize size= pptr() - eback();
-    return ProcCL::Isend( eback(), size, dest, tag);
-}
-
 
 // R E M O T E  D A T A  C L A S S
 //--------------------------------

@@ -29,6 +29,8 @@
 #include "misc/container.h"
 #include "misc/utils.h"
 #include "num/unknowns.h"
+#include "parallel/mpistream.h"
+
 #include <list>
 #include <set>
 #include <vector>
@@ -175,126 +177,6 @@ class ErrorCL: public DROPSErrCL
     std::ostream& what  (std::ostream&) const;
     void handle() const;
 };
-
-/// \brief Helper union for writing and reading numbers in streams
-/** \todo Maybe we need a memcopy and this is not save?*/
-template <typename T>
-union ToBinary
-{
-    T    value;
-    char binary[sizeof(T)];
-};
-
-/// \brief Output-streambuf based on std::stringbuf.
-class MPIostringbufCL : public std::stringbuf
-{
-  public:
-    typedef std::stringbuf base_type;
-
-    /// \brief Non-blocking send to process 'dest'.
-    inline ProcCL::RequestT Isend(int dest, int tag);
-    /// \brief Reset the buffer to the empty default-state. This releases the memory of the buffer.
-    void clearbuffer () { str( std::string()); }
-};
-
-/// \brief Outgoing stream.
-class SendStreamCL : public std::ostream
-/** This stream is employed as a mean of transport for sending data (integers,
-    vertices, elements, etc.) out of the process towards other processes. <p>
-    It is derived from the ostream class of the Standard IOstream Library
-    and it is characterized by saving all kind of data as a string. <p>
-    It's counterpart is the class RecvStreamCL. <p>
-*/
-{
-  public:
-    typedef std::ostream base_type;
-
-  private:
-    bool binary_;         ///< flag for binary sending/receiving
-    MPIostringbufCL buf_; ///< string based output-buffer
-
-  public:
-    SendStreamCL( const bool binary= true) : base_type( &buf_), binary_( binary) {}
-
-    inline bool isBinary() const {return binary_;}
-    /// \brief Non-blocking send to process 'dest'.
-    inline ProcCL::RequestT Isend(int dest, int tag= 5) { return buf_.Isend( dest, tag); }
-    /// \brief Return a copy of the string
-    inline std::string str () const { return buf_.str(); }
-    /// \brief Reset the buffer to the empty default-state. This releases the memory of the buffer.
-    void clearbuffer () { buf_.clearbuffer(); }
-};
-
-/// \brief Incoming stream.
-class RecvStreamCL : public std::istringstream
-/** This stream is employed as a mean of transport for receiving incoming data
-    (integers, vertices, elements, etc.) sent from other process. <p>
-    It is derived from the istringstream class of the Standard IOstream Library
-    and it is characterized by saving all kind of data as a string. <p>
-    It's counterpart is the class SendStreamCL.
-*/
-{
-public:
-    typedef std::istringstream base;
-
-  private:
-    bool binary_;   ///< flag for binary sending/receiving
-
-  public:
-    /// @param[in] binary is true if the stream store the data in binary; in ASCII otherwise.
-    RecvStreamCL( const bool binary=true)
-        : std::istringstream( binary ? std::ios_base::binary : std::ios_base::in), binary_(binary) {}
-    RecvStreamCL( const SendStreamCL& s)
-        : std::istringstream( s.str()), binary_(s.isBinary()) {}
-    /// \brief Gives back how many bytes of data contains our stream at the time.
-    inline int getbufsize() const { return ((int) const_cast<RecvStreamCL*>(this)->tellg())+1; }
-    inline bool isBinary() const {return binary_;}
-    /// \brief Blocking receive from process 'source'.
-    void Recv(int source, int tag=5);
-    /// \brief Go back to the beginning of the stream.
-    inline void resetbuffer() { this->seekg(0); }
-};
-
-/// \brief operator << for SendStreamCL
-template<typename T>
-SendStreamCL& operator<<( SendStreamCL& os, const T& t)
-{
-    if (os.isBinary()) {
-        ToBinary<T> bin;
-        bin.value= t;
-        os.write( bin.binary, sizeof(T));
-    } else {
-        SendStreamCL::base_type& oss= dynamic_cast<SendStreamCL::base_type&>(os);
-        oss << t << ' ';
-    }
-    return os;
-}
-
-/// \brief operator >> for RecvStreamCL
-template<typename T>
-RecvStreamCL& operator>>( RecvStreamCL& is, T& t)
-{
-    if (is.isBinary()) {
-        ToBinary<T> bin;
-        is.read( bin.binary, sizeof(T));
-        t= bin.value;
-    } else {
-        RecvStreamCL::base& iss= dynamic_cast<RecvStreamCL::base&>(is);
-        iss >> t;
-    }
-    return is;
-}
-
-/// \brief Use operator << to put a GeomIdCL object on a stream
-SendStreamCL& operator<< ( SendStreamCL&, const GeomIdCL&);
-/// \brief Use operator << to put a Point3DCL object on a stream
-SendStreamCL& operator<< ( SendStreamCL&, const Point3DCL&);
-
-/// \brief Use operator >> to get a GeomIdCL object out of stream
-RecvStreamCL& operator>> ( RecvStreamCL&, GeomIdCL&);
-/// \brief Use operator >> to get a Point3DCL object out of stream
-RecvStreamCL& operator>> ( RecvStreamCL&, Point3DCL&);
-
 
 /// \brief For each distributed entity, a list of process ranks (and corresponding priority) is stored.
 class RemoteDataCL

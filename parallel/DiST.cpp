@@ -75,46 +75,6 @@ void ErrorCL::handle() const
     std::abort();
 }
 
-// S T R E A M  C L A S S E S
-//---------------------------
-
-/** This member function is just a mask of the already in DROPS implemented
-    blocking receive, the only difference is that we always receive objects
-    of datatype MPI_CHAR.
-    \param source from whom should I receive
-    \param tag    the tag which has been used to send the message
-*/
-void RecvStreamCL::Recv(int source, int tag)
-{
-    int bufsize = ProcCL::GetMessageLength<char>( source, tag);
-    std::string temp(bufsize,' ');
-    ProcCL::Recv(&temp[0], bufsize, source, tag);
-    this->str( str() + temp);
-}
-
-SendStreamCL& operator<< ( SendStreamCL& os, const GeomIdCL& h)
-{
-    os << h.level << h.bary[0] << h.bary[1] << h.bary[2] << h.dim;
-    return os;
-}
-
-SendStreamCL& operator<< ( SendStreamCL& os, const Point3DCL& h)
-{
-    os << h[0] << h[1] << h[2];
-    return os;
-}
-
-RecvStreamCL& operator>> ( RecvStreamCL& is, GeomIdCL& h)
-{
-    is >> h.level >> h.bary[0] >> h.bary[1] >> h.bary[2] >> h.dim;
-    return is;
-}
-
-RecvStreamCL& operator>> ( RecvStreamCL& is, Point3DCL& h)
-{
-    is >> h[0] >> h[1] >> h[2];
-    return is;
-}
 
 // R E M O T E  D A T A  C L
 //--------------------------
