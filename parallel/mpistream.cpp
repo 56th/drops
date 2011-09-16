@@ -30,18 +30,22 @@ namespace DROPS{
 namespace DiST{
 namespace Helper{
 
-/** This member function is just a mask of the already in DROPS implemented
-    blocking receive, the only difference is that we always receive objects
-    of datatype MPI_CHAR.
-    \param source from whom should I receive
-    \param tag    the tag which has been used to send the message
-*/
-void RecvStreamCL::Recv(int source, int tag)
+
+
+ProcCL::RequestT MPIstringbufCL::Isend (int dest, int tag)
 {
-    int bufsize = ProcCL::GetMessageLength<char>( source, tag);
-    std::string temp(bufsize,' ');
-    ProcCL::Recv(&temp[0], bufsize, source, tag);
-    this->str( str() + temp);
+    const std::streamsize size= pptr() - pbase();
+    return ProcCL::Isend( pbase(), size, dest, tag);
+}
+
+void MPIstringbufCL::Recv (int source, int tag)
+{
+    if (!str().empty())
+        throw ErrorCL( "MPIstringbufCL::Recv: Not cleared before reuse.\n");
+
+    const int bufsize= ProcCL::GetMessageLength<char_type>( source, tag);
+    str( std::string( bufsize, SendRecvStreamAsciiTerminatorC));
+    ProcCL::Recv( eback(), bufsize, source, tag);
 }
 
 

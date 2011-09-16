@@ -1,5 +1,5 @@
 /// \file mpistream.h
-/// \brief SendStreamCL and ReicStreamCL for transfering objects (simplexes + data) as byte-messages.
+/// \brief SendStreamCL and RecvStreamCL for transfering objects (simplexes + data) as byte-messages.
 /// \author LNM RWTH Aachen: Patrick Esser, Joerg Grande, Sven Gross, Yuanjun Zhang; SC RWTH Aachen: Oliver Fortmeier, Daniel Medina Cardona.
 
 /*
@@ -23,6 +23,7 @@
 */
 
 #include "misc/container.h"
+#include "misc/utils.h"
 #include "parallel/parallel.h"
 
 #ifndef DROPS_MPISTREAM_H
@@ -35,41 +36,49 @@ namespace Helper {
 
 class GeomIdCL; ///< forward declaration for operator>>/<<
 
-/// \brief Output-streambuf based on std::stringbuf.
-class MPIostringbufCL : public std::stringbuf
+/// \brief Streambuf for MPI-messages based on std::stringbuf.
+/// The MPI operations are forwarded to ProcCL.
+/// The messages are buffered in a std::stringbuf.
+class MPIstringbufCL : public std::stringbuf
 {
   public:
     typedef std::stringbuf base_type;
 
-    /// \brief Non-blocking send to process 'dest'.
-    ProcCL::RequestT Isend(int dest, int tag) {
-        const std::streamsize size= pptr() - eback();
-        return ProcCL::Isend( eback(), size, dest, tag);
-    }
+    explicit MPIstringbufCL (std::ios_base::openmode which= std::ios_base::in | std::ios_base::out)
+        : base_type( which) {}
+    explicit MPIstringbufCL (const std::string& s, std::ios_base::openmode which= std::ios_base::in | std::ios_base::out)
+        : base_type( s, which) {}
+
+    /// \brief Non-blocking send to process 'dest'. The buffer may not be modified, until the send is completed.
+    ProcCL::RequestT Isend (int dest, int tag);
+    /// \brief Blocking receive from process 'source'. The buffer is reset before new data is filled in.
+    void Recv (int source, int tag);
     /// \brief Reset the buffer to the empty default-state. This releases the memory of the buffer.
     void clearbuffer () { str( std::string()); }
 };
 
-/// \brief Outgoing stream.
+/// \brief Output-stream.
+/// This stream is employed for sending data (integers, vertices, elements, etc.)
+/// out of the process towards other processes.<p>
+/// It is derived from the ostream class of the Standard IOstream Library.
+/// The data is interpreted as char-array in memory (isBinary()==true) or via its stream-defined ascii-representation. In ascii, items are terminated by the value of SendRecvStreamAsciiTerminatorC.<p>
+/// In ascii, FP-values are written with 17 significant decimal digits. This suffices for 8-byte doubles.
+/// It's counterpart is the class RecvStreamCL.<p>
 class SendStreamCL : public std::ostream
-/** This stream is employed as a means of transport for sending data (integers,
-    vertices, elements, etc.) out of the process towards other processes. <p>
-    It is derived from the ostream class of the Standard IOstream Library
-    and it is characterized by saving all kind of data as a string. <p>
-    It's counterpart is the class RecvStreamCL. <p>
-*/
 {
   public:
     typedef std::ostream base_type;
 
   private:
-    bool binary_;         ///< flag for binary sending/receiving
-    MPIostringbufCL buf_; ///< string based output-buffer
+    bool binary_;        ///< flag for binary sending/receiving
+    MPIstringbufCL buf_; ///< string based output-buffer
 
   public:
-    SendStreamCL( const bool binary= true) : base_type( &buf_), binary_( binary) {}
+    SendStreamCL (const bool binary= true)
+        : base_type( &buf_), binary_( binary), buf_( std::ios_base::out)
+    { precision( 17); }
 
-    inline bool isBinary() const {return binary_;}
+    inline bool isBinary() const { return binary_; }
     /// \brief Non-blocking send to process 'dest'.
     inline ProcCL::RequestT Isend(int dest, int tag= 5) { return buf_.Isend( dest, tag); }
     /// \brief Return a copy of the string
@@ -78,39 +87,42 @@ class SendStreamCL : public std::ostream
     void clearbuffer () { buf_.clearbuffer(); }
 };
 
-/// \brief Incoming stream.
-class RecvStreamCL : public std::istringstream
-/** This stream is employed as a mean of transport for receiving incoming data
-    (integers, vertices, elements, etc.) sent from other process. <p>
-    It is derived from the istringstream class of the Standard IOstream Library
-    and it is characterized by saving all kind of data as a string. <p>
-    It's counterpart is the class SendStreamCL.
-*/
+/// \brief Input stream.
+/// This stream is employed for receiving data (integers, vertices, elements, etc.)
+/// from other processes.<p>
+/// It is derived from the istream class of the Standard IOstream Library.
+/// The data is interpreted as char-array in memory (isBinary()==true) or via its stream-defined ascii-representation. In ascii, items are terminated by the value of SendRecvStreamAsciiTerminatorC.<p>
+/// It's counterpart is the class SendStreamCL. <p>
+class RecvStreamCL : public std::istream
 {
-public:
-    typedef std::istringstream base;
+  public:
+    typedef std::istream base_type;
 
   private:
-    bool binary_;   ///< flag for binary sending/receiving
+    bool binary_;        ///< flag for binary sending/receiving
+    MPIstringbufCL buf_; ///< string based output-buffer
 
   public:
     /// @param[in] binary is true if the stream store the data in binary; in ASCII otherwise.
-    RecvStreamCL( const bool binary=true)
-        : std::istringstream( binary ? std::ios_base::binary : std::ios_base::in), binary_(binary) {}
+    RecvStreamCL (const bool binary= true)
+        : base_type( &buf_), binary_( binary), buf_( std::ios_base::in)
+    { unsetf( std::ios_base::skipws); }
+
     RecvStreamCL( const SendStreamCL& s)
-        : std::istringstream( s.str()), binary_(s.isBinary()) {}
-    /// \brief Gives back how many bytes of data contains our stream at the time.
-    inline int getbufsize() const { return ((int) const_cast<RecvStreamCL*>(this)->tellg())+1; }
-    inline bool isBinary() const {return binary_;}
-    /// \brief Blocking receive from process 'source'.
-    void Recv(int source, int tag=5);
-    /// \brief Go back to the beginning of the stream.
-    inline void resetbuffer() { this->seekg(0); }
+        : base_type( &buf_), binary_( s.isBinary()), buf_( s.str(), std::ios_base::in) {}
+
+    inline bool isBinary() const { return binary_; }
+    /// \brief Blocking receive from process 'source'. Removes any prior content of the buffer.
+    void Recv(int source, int tag= 5) { buf_.Recv( source, tag); }
+    /// \brief Reset the buffer to the empty default-state. This releases the memory of the buffer.
+    void clearbuffer () { buf_.clearbuffer(); }
 };
 
+/// \brief The data-item-terminator used in ascii-mode.
+const char SendRecvStreamAsciiTerminatorC= ' ';
 
 /// \brief Helper union for writing and reading numbers in streams
-/** Technically, this is undefined behavior (reading another member of the union as was previously written). All major compilers recognize this as idiom for type-punning. Alternatively, casting the address of *any* object to char* is save by the standard. Maybe go for that.*/
+/** Technically, this is undefined behavior (reading another member of the union as was previously written). However, all major compilers recognize this as idiom for type-punning. Alternatively, casting the address of *any* object to char* is save by the standard. Maybe go for that.*/
 template <typename T>
 union ToBinary
 {
@@ -121,30 +133,34 @@ union ToBinary
 
 /// \brief operator << for SendStreamCL
 template<typename T>
-SendStreamCL& operator<<( SendStreamCL& os, const T& t)
+SendStreamCL& operator<< (SendStreamCL& os, const T& t)
 {
     if (os.isBinary()) {
         ToBinary<T> bin;
         bin.value= t;
         os.write( bin.binary, sizeof(T));
     } else {
-        SendStreamCL::base_type& oss= dynamic_cast<SendStreamCL::base_type&>(os);
-        oss << t << ' ';
+        SendStreamCL::base_type& ostr= static_cast<SendStreamCL::base_type&>( os);
+        ostr << t << SendRecvStreamAsciiTerminatorC;
     }
     return os;
 }
 
 /// \brief operator >> for RecvStreamCL
 template<typename T>
-RecvStreamCL& operator>>( RecvStreamCL& is, T& t)
+RecvStreamCL& operator>> (RecvStreamCL& is, T& t)
 {
     if (is.isBinary()) {
         ToBinary<T> bin;
         is.read( bin.binary, sizeof(T));
         t= bin.value;
     } else {
-        RecvStreamCL::base& iss= dynamic_cast<RecvStreamCL::base&>(is);
-        iss >> t;
+        RecvStreamCL::base_type& istr= static_cast<RecvStreamCL::base_type&>( is);
+        istr >> t;
+        RecvStreamCL::char_type c;
+        istr.get( c);
+        if (c != SendRecvStreamAsciiTerminatorC)
+            throw DROPSErrCL( "RecvStreamCL& operator>>( RecvStreamCL& is, T& t): Ascii item-terminator not found.\n");
     }
     return is;
 }
