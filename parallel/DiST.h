@@ -276,12 +276,15 @@ RecvStreamCL& operator>>( RecvStreamCL& is, T& t)
 SendStreamCL& operator<< ( SendStreamCL&, const GeomIdCL&);
 /// \brief Use operator << to put a Point3DCL object on a stream
 SendStreamCL& operator<< ( SendStreamCL&, const Point3DCL&);
+/// \brief Use operator << to put a UnknownHandleCL object on a stream
+SendStreamCL& operator<< ( SendStreamCL&, const UnknownHandleCL&);
 
 /// \brief Use operator >> to get a GeomIdCL object out of stream
 RecvStreamCL& operator>> ( RecvStreamCL&, GeomIdCL&);
 /// \brief Use operator >> to get a Point3DCL object out of stream
 RecvStreamCL& operator>> ( RecvStreamCL&, Point3DCL&);
-
+/// \brief Use operator >> to get a UnknownHandleCL object out of stream
+RecvStreamCL& operator<< ( RecvStreamCL&, UnknownHandleCL&);
 
 /// \brief For each distributed entity, a list of process ranks (and corresponding priority) is stored.
 class RemoteDataCL

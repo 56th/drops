@@ -34,6 +34,16 @@
 namespace DROPS
 {
 
+#ifdef _PAR
+// fwd declaration
+namespace DiST{ 
+    namespace Helper{
+        class SendStreamCL;
+        class RecvStreamCL;
+    }
+}
+#endif
+
 /// The type of indices used to access the components of vectors,
 /// matrices, etc.
 typedef Ulint IdxT;
@@ -52,10 +62,11 @@ class UnknownIdxCL
   private:
     std::vector<IdxT> _Idx;
 #ifdef _PAR
-    // This flag array is used for remembering if an unknowns has just been received
-    // or if the unknown has been exist before the refinement and migration
-    // algorithm has been performed. (sorry for the missleading name giving)
-    mutable std::vector<bool> UnkRecieved_;
+    /// If a vertex or an edge is transfered during the migration algorithm, a temporary
+    /// copy of the DOFs is stored in a receive buffer. To decide where the DOF on the
+    /// simplex is stored (receive buffer or in the regular vector), we make use of the
+    /// flags in the vector received_.
+    mutable std::vector<bool> received_;
 #endif
 
   public:
@@ -65,16 +76,21 @@ class UnknownIdxCL
     ~UnknownIdxCL() {}
     UnknownIdxCL& operator=( const UnknownIdxCL&);
 
+    /// get the position in the vecor of the DOF of the system number sysnum (writing access)
     IdxT& GetIdx( Uint sysnum)
     {
         Assert( sysnum<GetNumSystems(), DROPSErrCL("UnknownIdxCL: Sysnum out of range"), DebugUnknownsC);
         return _Idx[sysnum];
     }
+
+    /// get the position in the vecor of the DOF of the system number sysnum (reading access)
     IdxT  GetIdx( Uint sysnum) const
     {
         Assert( sysnum<GetNumSystems(), DROPSErrCL("UnknownIdxCL: Sysnum out of range"), DebugUnknownsC);
         return _Idx[sysnum];
     }
+
+    /// get the maximal number of system numbers
     Uint GetNumSystems()            const { return _Idx.size(); }
 
     void resize( Uint size, const IdxT defaultIdx= NoIdx)
@@ -82,45 +98,51 @@ class UnknownIdxCL
         _Idx.resize(size, defaultIdx);
     }
 
+    /// DOF to a new system number
     void push_back(IdxT idx= NoIdx) { _Idx.push_back( idx); }
 
 #ifdef _PAR
-    void SetUnkRecv(IdxT i) const
+    /// mark a DOF of the system number sysnum as received
+    void SetUnkRecv( Uint sysnum) const
     {
-        if (UnkRecieved_.size()<=i)
-            UnkRecieved_.resize(i+1,false);
-        UnkRecieved_[i]=true;
+        if ( received_.size()<=sysnum)
+            received_.resize( sysnum+1,false);
+        received_[sysnum]=true;
     }
 
-    bool GetUnkRecv(IdxT i) const
+    /// check if a DOF of the system number sysnum has been received
+    bool GetUnkRecv( Uint sysnum) const
     {
-        if (UnkRecieved_.size()<=i)
+        if ( received_.size()<=sysnum)
             return false;
         else
-            return UnkRecieved_[i];
+            return received_[ sysnum];
     }
+    
+    /// mark all DOF as not received, i.e., forget about receive information
+    void ResetUnkRecv() { received_.resize(0); }
 
-    void ResetUnkRecv()
+    /// mark a DOF of the system number sysnum as not received
+    void ResetUnkRecv( Uint sysnum)
     {
-        for (Uint i=0; i<UnkRecieved_.size(); ++i)
-            ResetUnkRecv(i);
-        UnkRecieved_.resize(0);
+        if ( sysnum < received_.size())
+            received_[ sysnum]= false;
     }
 
-    void ResetUnkRecv( IdxT i )
-    {
-        if (UnkRecieved_.size()<=i)
-            return;
-        UnkRecieved_[i]=false;
-    }
-
+    /// check if any DOF has been received
     bool HasUnkRecv() const
     {
-        for (Uint i=0; i<UnkRecieved_.size(); ++i)
-            if (UnkRecieved_[i])
+        for ( Uint sysnum=0; sysnum<received_.size(); ++sysnum)
+            if ( received_[sysnum])
                 return true;
         return false;
     }
+
+    /// Put all DOFs onto the stream
+    void Pack( DiST::Helper::SendStreamCL&) const;
+
+    /// Get all information about DOF from a stream
+    void UnPack( DiST::Helper::RecvStreamCL&);
 #endif
 };
 
@@ -189,29 +211,30 @@ class UnknownHandleCL
     }
 
 #ifdef _PAR
-    /// Remember if an unknown of an index is just recieved
-    void SetUnkRecieved( IdxT i ) const
+    /// Remember that the DOF of the system number sysnum has been received
+    void SetUnkRecieved( Uint sysnum) const
     {
         Assert(_unk!=0, DROPSErrCL("UnknownHandleCL: Cannot set UnkRecieved before this class is init"), DebugUnknownsC | DebugParallelC);
-        _unk->SetUnkRecv(i);
+        _unk->SetUnkRecv( sysnum);
     }
-    /// Get information if the unknown of the index is recieved
-    bool UnkRecieved( IdxT i ) const
-    {
-        return _unk && _unk->GetUnkRecv(i);
-    }
-    /// Forget about the recieved information about all unknowns
+
+    /// Check if the DOF of the system number sysnum has been received
+    bool UnkRecieved( Uint sysnum) const { return _unk && _unk->GetUnkRecv( sysnum); }
+
+    /// Mark DOF of all system numbers as not received
     void ResetUnkRecieved() const
     {
         if (_unk!=0)
             _unk->ResetUnkRecv();
     }
-    /// Forget about the recieved information about one index
-    void ResetUnkRecieved( IdxT i) const
+
+    /// Mark DOF of the system number sysnum as not received
+    void ResetUnkRecieved( Uint sysnum) const
     {
         if (_unk!=0)
-            _unk->ResetUnkRecv(i);
+            _unk->ResetUnkRecv( sysnum);
     }
+
     /// For Debugging Purpose: Check if there is an UnkRecv-Flag
     bool HasUnkRecieved() const
     {
@@ -220,6 +243,12 @@ class UnknownHandleCL
         else
             return _unk->HasUnkRecv();
     }
+
+    /// Put all DOFs handled by this handler onto the stream
+    void Pack( DiST::Helper::SendStreamCL&) const;
+
+    /// Get all information about DOF from a stream
+    void UnPack( DiST::Helper::RecvStreamCL&);
 #endif
 };
 

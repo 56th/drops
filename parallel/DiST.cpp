@@ -104,6 +104,12 @@ SendStreamCL& operator<< ( SendStreamCL& os, const Point3DCL& h)
     return os;
 }
 
+SendStreamCL& operator<< ( SendStreamCL& sendstream, const UnknownHandleCL& unk)
+{
+    unk.Pack( sendstream);
+    return sendstream;
+}
+
 RecvStreamCL& operator>> ( RecvStreamCL& is, GeomIdCL& h)
 {
     is >> h.level >> h.bary[0] >> h.bary[1] >> h.bary[2] >> h.dim;
@@ -114,6 +120,12 @@ RecvStreamCL& operator>> ( RecvStreamCL& is, Point3DCL& h)
 {
     is >> h[0] >> h[1] >> h[2];
     return is;
+}
+
+RecvStreamCL& operator<< ( RecvStreamCL& recvstream, UnknownHandleCL& unk)
+{
+    unk.UnPack( recvstream);
+    return recvstream;
 }
 
 // R E M O T E  D A T A  C L
