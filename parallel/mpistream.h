@@ -32,6 +32,11 @@
 namespace DROPS {
 
 namespace DiST {
+
+/// \brief Default for the MPI-message format used by DiST.
+/// True on program startup. Can be reassigned.
+extern bool use_binaryMPIstreams;
+
 namespace Helper {
 
 class GeomIdCL; ///< forward declaration for operator>>/<<
@@ -93,7 +98,8 @@ class MPIostreamCL : public std::ostream
     MPIostreamCL (std::streambuf* buf, bool binary)
         : base_type( buf), binary_( binary) { if (!isBinary()) precision( 17); }
 
-    inline bool isBinary() const { return binary_; }
+    inline bool isBinary ()             const { return binary_; }
+    inline void setBinary (bool binary)       { binary_= binary; }
 };
 
 /// \brief Input stream.
@@ -113,7 +119,8 @@ class MPIistreamCL : public std::istream
     MPIistreamCL (std::streambuf* buf, bool binary)
         : base_type( buf), binary_( binary) { if (!isBinary()) unsetf( std::ios_base::skipws); }
 
-    inline bool isBinary() const { return binary_; }
+    inline bool isBinary ()             const { return binary_; }
+    inline void setBinary (bool binary)       { binary_= binary; }
 };
 
 
@@ -128,7 +135,7 @@ class SendStreamCL : public MPIostreamCL
     MPIstringbufCL buf_; ///< string based output-buffer
 
   public:
-    explicit SendStreamCL (const bool binary= true)
+    explicit SendStreamCL (bool binary= use_binaryMPIstreams)
         : base_type( &buf_, binary), buf_( std::ios_base::out) {}
 
     /// \brief Non-blocking send to process 'dest'.
@@ -162,7 +169,7 @@ class RecvStreamCL : public MPIistreamCL
 
   public:
     /// @param[in] binary is true if the stream store the data in binary; in ASCII otherwise.
-    explicit RecvStreamCL (const bool binary= true)
+    explicit RecvStreamCL (bool binary= use_binaryMPIstreams)
         : base_type( &buf_, binary), buf_( std::ios_base::in) {}
 
     RecvStreamCL( const SendStreamCL& s)
@@ -244,7 +251,7 @@ class RefMPIostreamCL : public MPIostreamCL
     MPIrefbufCL buf_; ///< reference output-buffer
 
   public:
-    RefMPIostreamCL (char_type* p, std::streamsize n, const bool binary= true)
+    RefMPIostreamCL (char_type* p, std::streamsize n, bool binary= use_binaryMPIstreams)
         : base_type( &buf_, binary), buf_( p, n, std::ios_base::out) {}
 
     ///\brief access the input/output area (an array of char_type); cur is the current i/o-position.
@@ -271,7 +278,7 @@ class RefMPIistreamCL : public MPIistreamCL
 
   public:
     /// @param[in] binary is true if the stream store the data in binary; in ASCII otherwise.
-    RefMPIistreamCL (char_type* p, std::streamsize n, const bool binary= true)
+    RefMPIistreamCL (char_type* p, std::streamsize n, bool binary= use_binaryMPIstreams)
         : base_type( &buf_, binary), buf_( p, n, std::ios_base::in) {}
 
     MPIrefbufCL* setbuf( char_type* p, std::streamsize n) { return buf_.pubsetbuf( p, n); }

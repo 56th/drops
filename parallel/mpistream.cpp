@@ -29,9 +29,10 @@
 
 namespace DROPS{
 namespace DiST{
+
+bool use_binaryMPIstreams= true;
+
 namespace Helper{
-
-
 
 ProcCL::RequestT MPIstringbufCL::Isend (int dest, int tag)
 {
