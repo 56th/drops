@@ -174,36 +174,36 @@ bool RemoteDataCL::IsSane( std::ostream& os) const
     return sane;
 }
 
-SendStreamCL& operator<< ( SendStreamCL& os, const RemoteDataCL::ProcListT& pl)
+MPIostreamCL& operator<< (MPIostreamCL& os, const RemoteDataCL::ProcListT& pl)
 {
     os << pl.size();
-    for (RemoteDataCL::ProcListT::const_iterator it= pl.begin(), end= pl.end(); it!=end; ++it)
-        os << int(it->proc) << int(it->prio);
+    for (RemoteDataCL::ProcListT::const_iterator it= pl.begin(), end= pl.end(); it != end; ++it)
+        os << static_cast<int>( it->proc) << static_cast<int>( it->prio);
     return os;
 }
 
-RecvStreamCL& operator>> ( RecvStreamCL& is, RemoteDataCL::ProcListT& pl)
+MPIistreamCL& operator>> (MPIistreamCL& is, RemoteDataCL::ProcListT& pl)
 {
     size_t num;
     int proc, prio;
     is >> num;
     pl.clear();
-    pl.reserve(num);
-    for (size_t i=0; i<num; ++i) {
+    pl.reserve( num);
+    for (size_t i= 0; i < num; ++i) {
         is >> proc >> prio;
-        pl.push_back( RemoteDataCL::ProcListEntryCL( proc, Priority(prio)));
+        pl.push_back( RemoteDataCL::ProcListEntryCL( proc, Priority( prio)));
     }
     return is;
 }
 
 Uint RemoteDataCL::GetNumProcs( Priority prio) const
 {
-	if (prio == NoPrio)
-		return procList_.size();
+    if (prio == NoPrio)
+        return procList_.size();
     Uint num= 0;
     for (ProcList_const_iterator it=GetProcListBegin(); it!=GetProcListEnd(); ++it){
         if ( it->prio>=prio)
-        	++num;
+        ++num;
     }
     return num;
 }

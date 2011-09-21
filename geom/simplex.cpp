@@ -54,7 +54,7 @@ SArrayCL<FaceCL*, NumAllFacesC> TetraCL::fPtrs_(static_cast<FaceCL*>(0));
 /** Puts the hash, mark for removement, and boundary information onto the stream.
     \todo DiST: Pack Unknowns!
 */
-void VertexCL::Pack( DiST::Helper::SendStreamCL& ostrstream) const
+void VertexCL::Pack( DiST::Helper::MPIostreamCL& ostrstream) const
 {
     ostrstream << GetGID() << RemoveMark_;
     if ( IsOnBoundary()) {
@@ -71,7 +71,7 @@ void VertexCL::Pack( DiST::Helper::SendStreamCL& ostrstream) const
 /** Reads the hash, mark for removement, and boundary information from the stream.
     \todo DiST: Unpack Unknowns!
 */
-void VertexCL::UnPack( DiST::Helper::RecvStreamCL& istrstream)
+void VertexCL::UnPack( DiST::Helper::MPIistreamCL& istrstream)
 {
     size_t numBnd=0;
     istrstream >> gid_ >> RemoveMark_ >> numBnd;
@@ -152,7 +152,7 @@ Point3DCL GetBaryCenter(const EdgeCL& e)
     onto the stream
     \todo DiST: Pack Unknowns!
 */
-void EdgeCL::Pack( DiST::Helper::SendStreamCL& ostrstream) const
+void EdgeCL::Pack( DiST::Helper::MPIostreamCL& ostrstream) const
 {
     ostrstream << GetGID()
                << GetVertex(0)->GetGID()
@@ -165,7 +165,7 @@ void EdgeCL::Pack( DiST::Helper::SendStreamCL& ostrstream) const
     from the stream
     \todo DiST: UnPack Unknowns!
 */
-void EdgeCL::UnPack( DiST::Helper::RecvStreamCL& istrstream)
+void EdgeCL::UnPack( DiST::Helper::MPIistreamCL& istrstream)
 {
     DiST::Helper::GeomIdCL vertex0, vertex1, midVertex;
     istrstream >> gid_ >> vertex0 >> vertex1 >> midVertex;
@@ -279,7 +279,7 @@ const TetraCL* FaceCL::GetNeighInTriang(const TetraCL* tp, Uint TriLevel) const
 /** Puts the hash, all neighbors, boundary information, and mark for removement onto the stream
     \todo DiST: Pack Unknowns!
 */
-void FaceCL::Pack( DiST::Helper::SendStreamCL& ostrstream) const
+void FaceCL::Pack( DiST::Helper::MPIostreamCL& ostrstream) const
 {
     ostrstream << GetGID();
     for ( Uint i=0; i<4; ++i){
@@ -291,7 +291,7 @@ void FaceCL::Pack( DiST::Helper::SendStreamCL& ostrstream) const
 /** Reads the hash, all neighbors, boundary information, and mark for removement from the stream
     \todo DiST: UnPack Unknowns!
 */
-void FaceCL::UnPack( DiST::Helper::RecvStreamCL& istrstream)
+void FaceCL::UnPack( DiST::Helper::MPIistreamCL& istrstream)
 {
     DiST::Helper::GeomIdCL tmpNeigh;
     istrstream >> gid_;
@@ -907,7 +907,7 @@ if the child cannot be found, create it.
 /**
     \todo DiST: Pack Unknowns!
 */
-void TetraCL::Pack( DiST::Helper::SendStreamCL& ostrstream) const
+void TetraCL::Pack( DiST::Helper::MPIostreamCL& ostrstream) const
 {
     ostrstream << GetGID()
                << RefRule_ << RefMark_;
@@ -935,7 +935,7 @@ void TetraCL::Pack( DiST::Helper::SendStreamCL& ostrstream) const
     \todo DiST: Make MFR on edges consistent, see HandlerTObjMkCons, HandlerTSetPrio
     \todo DiST: Eventually, change priority of a master tetrahedra to PrioGhost, see HandlerTUpdate
 */
-void TetraCL::UnPack( DiST::Helper::RecvStreamCL& istrstream)
+void TetraCL::UnPack( DiST::Helper::MPIistreamCL& istrstream)
 {
     DiST::Helper::GeomIdCL tmp;
 

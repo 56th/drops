@@ -22,6 +22,7 @@
  * Copyright 2009 LNM/SC RWTH Aachen, Germany
 */
 
+#include "parallel/mpistream.h"
 #include "parallel/DiST.h"
 #include "geom/simplex.h"
 #include "geom/multigrid.h"
@@ -49,29 +50,168 @@ void MPIstringbufCL::Recv (int source, int tag)
 }
 
 
-SendStreamCL& operator<< (SendStreamCL& os, const GeomIdCL& h)
+MPIrefbufCL* MPIrefbufCL::setbuf (char_type* b, std::streamsize s)
+{
+    if (mode_ & std::ios_base::in)
+        setg( b, b, b + s);
+    if (mode_ & std::ios_base::out)
+        setp( b, b + s);
+    return this;
+}
+
+MPIrefbufCL::pos_type MPIrefbufCL::seekoff (off_type off,
+    std::ios_base::seekdir base, std::ios_base::openmode m)
+{
+    pos_type ret=  pos_type( off_type( -1));
+    const bool testin=  (std::ios_base::in  & mode_ & m) != 0;
+    const bool testout= (std::ios_base::out & mode_ & m) != 0;
+    pos_type new_g_pos, new_p_pos;
+    bool ok= true;
+    if (testin) {
+        if (base == std::ios_base::beg)
+            new_g_pos= off;
+        else if (base == std::ios_base::cur)
+            new_g_pos=  (gptr() - eback()) + off;
+        else
+            new_g_pos= (egptr() - eback()) + off;
+        char_type* const new_gptr= eback() + new_g_pos;
+        if (new_gptr < eback() || new_gptr > egptr())
+            ok= false;
+    }
+    if (testout) {
+        if (base == std::ios_base::beg)
+            new_p_pos= off;
+        else if (base == std::ios_base::cur)
+            new_p_pos= ( pptr() - pbase()) + off;
+        else
+            new_p_pos= (epptr() - pbase()) + off;
+        char_type* const new_pptr= pbase() + new_p_pos;
+        if (new_pptr < pbase() || new_pptr > epptr())
+            ok= false;
+    }
+    if (ok) {
+        if (testin) {
+            ret= new_g_pos;
+            setg( eback(), eback() + new_g_pos, egptr());
+        }
+        if (testout) {
+            ret= new_p_pos;
+            setp( pbase(), epptr());
+            pbump( new_p_pos);
+        }
+    }
+    return ret;
+}
+
+std::streamsize MPIrefbufCL::xsgetn (char_type* p, std::streamsize n)
+{
+    const std::streamsize m= std::min( n, egptr() - gptr());
+    std::memcpy( p, gptr(), m*sizeof(char_type));
+    gbump( m);
+    // if ( gptr() == egptr())
+    //     uflow();
+    return m;
+}
+
+std::streamsize MPIrefbufCL::xsputnb(const char_type* p, std::streamsize n)
+{
+    const std::streamsize m= std::min( n, epptr() - pptr());
+    std::memcpy( pptr(), p, m*sizeof(char_type));
+    pbump( m);
+    // if (pptr() == epptr())
+    //     overflow();
+    return m;
+}
+
+MPIostreamCL& operator<< (MPIostreamCL& os, const GeomIdCL& h)
 {
     os << h.level << h.bary[0] << h.bary[1] << h.bary[2] << h.dim;
     return os;
 }
 
-RecvStreamCL& operator>> (RecvStreamCL& is, GeomIdCL& h)
+MPIistreamCL& operator>> (MPIistreamCL& is, GeomIdCL& h)
 {
     is >> h.level >> h.bary[0] >> h.bary[1] >> h.bary[2] >> h.dim;
     return is;
 }
 
-SendStreamCL& operator<< (SendStreamCL& os, const Point3DCL& h)
+
+inline std::streamsize terminated_header_size ()
 {
-    os << h[0] << h[1] << h[2];
+    return std::numeric_limits<std::streamsize>::digits10 + 2;
+}
+
+std::string terminated_array_header( std::streamsize n)
+{
+    std::ostringstream s;
+    s.width( terminated_header_size() - 1);
+    s.fill( '0');
+    s << n << SendRecvStreamAsciiTerminatorC;
+    return s.str();
+}
+
+MPIostreamCL& write_array_header (MPIostreamCL& os, std::streamsize n)
+{
+    if (os.isBinary())
+        os << n;
+    else {
+        const std::string& s= terminated_array_header( n);
+        os.write( &s[0], s.size());
+    }
     return os;
 }
 
-RecvStreamCL& operator>> ( RecvStreamCL& is, Point3DCL& h)
+MPIostreamCL& write_char_array (MPIostreamCL& os,
+    const MPIostreamCL::char_type* p, std::streamsize n)
 {
-    is >> h[0] >> h[1] >> h[2];
+    write_array_header( os, n);
+    os.write( p, n);
+    return os;
+}
+
+MPIostreamCL& operator<< (MPIostreamCL& os, const SendStreamCL& sub)
+{
+    return write_char_array( os, sub.begin(), sub.cur() - sub.begin());
+}
+
+MPIostreamCL& operator<< (MPIostreamCL& os, const RecvStreamCL& sub)
+{
+    return write_char_array( os, sub.begin(), sub.cur() - sub.begin());
+}
+
+MPIistreamCL& operator>> (MPIistreamCL& is, RecvStreamCL& sub)
+{
+    std::streamsize n;
+    is >> n;
+    sub.buf_.str( std::string( n, SendRecvStreamAsciiTerminatorC));
+    is.read( sub.begin(), n);
     return is;
 }
+
+MPIostreamCL& operator<< (MPIostreamCL& os, const RefMPIostreamCL& sub)
+{
+    return write_char_array( os, sub.begin(), sub.cur() - sub.begin());
+}
+
+
+RecvStreamCL& operator>> (RecvStreamCL& is, RefMPIistreamCL& sub)
+{
+    std::streamsize n;
+    is >> n;
+    sub.setbuf( is.cur(), n);
+    is.seekg( n, std::ios_base::cur);
+    return is;
+}
+
+RefMPIistreamCL& operator>> (RefMPIistreamCL& is, RefMPIistreamCL& sub)
+{
+    std::streamsize n;
+    is >> n;
+    sub.setbuf( is.cur(), n);
+    is.seekg( n, std::ios_base::cur);
+    return is;
+}
+
 
 } // end of namespace Helper
 } // end of namespace DiST

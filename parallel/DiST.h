@@ -512,9 +512,9 @@ class TransferableCL
     virtual ~TransferableCL() {}
 
     /// \brief Put the simplex on an outgoing stream
-    virtual void Pack( Helper::SendStreamCL&) const = 0;
+    virtual void Pack (Helper::MPIostreamCL&) const = 0;
     /// \brief Init the simplex by an incoming stream
-    virtual void UnPack( Helper::RecvStreamCL&) = 0;
+    virtual void UnPack (Helper::MPIistreamCL&) = 0;
 
     //// \name Information each simplex provides concerning distributed computing
     //@{
@@ -549,14 +549,14 @@ class TransferableCL
 };
 
 /// \brief Use operator << to put data on a stream
-inline Helper::SendStreamCL& operator<< ( Helper::SendStreamCL& os, const TransferableCL& t)
+inline Helper::MPIostreamCL& operator<< (Helper::MPIostreamCL& os, const TransferableCL& t)
 {
     t.Pack( os);
     return os;
 }
 
 /// \brief Use operator >> to get data out of stream
-inline Helper::RecvStreamCL& operator>> ( Helper::RecvStreamCL& is, TransferableCL& t)
+inline Helper::MPIistreamCL& operator>> (Helper::MPIistreamCL& is, TransferableCL& t)
 {
     t.UnPack( is);
     return is;
