@@ -64,8 +64,8 @@ class MPIstringbufCL : public std::stringbuf
     ProcCL::RequestT Isend (int dest, int tag);
     /// \brief Blocking receive from process 'source'. The buffer is reset before new data is filled in.
     void Recv (int source, int tag);
-    /// \brief Reset the buffer to the empty default-state. This releases the memory of the buffer.
-    void clearbuffer () { str( std::string()); }
+    /// \brief Reset the buffer to contain a copy of s. The prior memory is released.
+    void clearbuffer (const std::string& s= std::string()) { str( s); }
 
     ///\brief access the input/output area (an array of char_type); cur is the current i/o-position.
     ///@{
@@ -143,7 +143,7 @@ class SendStreamCL : public MPIostreamCL
     /// \brief Return a copy of the string
     inline std::string str () const { return buf_.str(); }
     /// \brief Reset the buffer to the empty default-state. This releases the memory of the buffer.
-    void clearbuffer () { buf_.clearbuffer(); }
+    void clearbuffer (const std::string& s= std::string()) { buf_.clearbuffer( s); }
 
     ///\brief access the input/output area (an array of char_type); cur is the current i/o-position.
     ///@{
@@ -178,7 +178,7 @@ class RecvStreamCL : public MPIistreamCL
     /// \brief Blocking receive from process 'source'. Removes any prior content of the buffer.
     void Recv(int source, int tag= 5) { buf_.Recv( source, tag); }
     /// \brief Reset the buffer to the empty default-state. This releases the memory of the buffer.
-    void clearbuffer () { buf_.clearbuffer(); }
+    void clearbuffer (const std::string& s= std::string()) { buf_.clearbuffer( s); }
 
     ///\brief access the input/output area (an array of char_type); cur is the current i/o-position.
     ///@{
