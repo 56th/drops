@@ -511,9 +511,6 @@ void InterfaceCL::ExchangeData( CommPhase phase)
             locrecvbuf->read( Addr(tmpBuf), numData);
             // ... putting the data to the corresponding GID and ...
             collect[tmpGID].insert( collect[tmpGID].end(), tmpBuf.begin(), tmpBuf.end());
-            if (!binary_){ /// \todo wieso das?
-                collect[tmpGID].push_back(' ');
-            }
             // ... remembering how many data has been sent.
             ++collectNum[tmpGID];
             // get the GID of the next element
