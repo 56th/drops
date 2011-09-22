@@ -493,10 +493,6 @@ void InterfaceCL::ExchangeData( CommPhase phase)
           are given so far.
 */
 {
-    // Type for collecting the data, i.e., phase (3)
-    typedef DROPS_STD_UNORDERED_MAP< Helper::GeomIdCL, std::vector<char>, Helper::Hashing > CollectDataT;
-    typedef DROPS_STD_UNORDERED_MAP< Helper::GeomIdCL, size_t, Helper::Hashing >            CollectNumDataT;
-
     // Phase (1): Send data to owning processes
     //-----------------------------------------
     for (SendListT::iterator it= sendbuf_.begin(); it != sendbuf_.end(); ++it) {
@@ -566,10 +562,8 @@ void InterfaceCL::ExchangeData( CommPhase phase)
         }
     }
     else {
-        if (phase==bothPhases || phase==fromowner) {
-            for (ProcSetT::const_iterator pit= ownerSendTo_.begin(); pit != ownerSendTo_.end(); ++pit)
-                sendstreams[*pit]= new Helper::SendStreamCL(binary_);
-        }
+        for (ProcSetT::const_iterator pit= ownerSendTo_.begin(); pit != ownerSendTo_.end(); ++pit)
+            sendstreams[*pit]= new Helper::SendStreamCL(binary_);
         for (CollectDataT::iterator it(collect.begin()); it!= collect.end(); ++it, ++itNum){
             Helper::RemoteDataCL& rd= InfoCL::Instance().GetRemoteData( it->first);
             Helper::RemoteDataCL::ProcList_const_iterator pit=rd.GetProcListBegin();
@@ -604,15 +598,23 @@ void InterfaceCL::ExchangeData( CommPhase phase)
 
     // Phase (4b): Receive data from owning processes
     // ----------------------------------------------
-    for ( std::set<int>::const_iterator pit=IRecvFromOwners_.begin(); pit!=IRecvFromOwners_.end(); ++pit){
-        if ( *pit!=ProcCL::MyRank()){
-            if (phase == fromowner || phase == bothPhases) {
-                recvbuf_[*pit]= new Helper::RecvStreamCL(binary_);
+    if (phase == fromowner || phase == bothPhases) {
+        for (ProcSetT::const_iterator pit= IRecvFromOwners_.begin(); pit != IRecvFromOwners_.end(); ++pit) {
+            if (*pit != ProcCL::MyRank()) {
+                recvbuf_[*pit]= new Helper::RecvStreamCL(binary_); // At most one message is received (from the owner).
                 recvbuf_[*pit]->Recv( *pit, secondSendTag);
             }
+            else { // Copy the sendbuffer to the receive stream
+                recvbuf_[ProcCL::MyRank()]= new Helper::RecvStreamCL( *sendstreams[*pit]);
+            }
         }
-        else {       // Copy the sendbuffer to the receive stream
-            recvbuf_[*pit]= new Helper::RecvStreamCL( *sendstreams[*pit]);
+    }
+    else {
+        for (ProcSetT::const_iterator pit= IRecvFromOwners_.begin(); pit != IRecvFromOwners_.end(); ++pit) {
+            if (*pit == ProcCL::MyRank()) {
+                // Copy the sendbuffer to the receive stream
+                recvbuf_[ProcCL::MyRank()]= new Helper::RecvStreamCL( *sendstreams[*pit]);
+            }
         }
     }
 
