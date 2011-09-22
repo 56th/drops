@@ -606,6 +606,9 @@ class InterfaceCL
     /// \brief Call the gather handler for each entity covered by the iterators [begin, end).
     template <typename HandlerT>
     void GatherData( HandlerT&, const iterator& begin, const iterator& end, CommPhase phase);
+    /// \brief For a stream [GID, tail), call handler(GID, numData, tail).
+    template <typename HandlerT, typename IStreamT>
+    bool ScatterData( HandlerT& handler, IStreamT& recv);
     /// \brief Call the scatter handler for each entity whose GID is given in the istream_.
     template <typename HandlerT>
     bool ScatterData( HandlerT&);

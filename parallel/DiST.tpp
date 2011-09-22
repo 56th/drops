@@ -347,31 +347,38 @@ bool InterfaceCL::ScatterData( HandlerT& handler)
 /// \return local accumulated AND of all scatter calls
 {
     bool result=true;
-    Helper::GeomIdCL tmp;
-    size_t numData;
-    for ( RecvListT::iterator it( recvbuf_.begin()); it!=recvbuf_.end(); ++it) {
-        Helper::RecvStreamCL& recv= *it->second;
-        recv >> tmp;
-        while ( tmp!=Helper::NoGID){
-            recv >> numData;
-            if ( !recv){
-            	cdebug << "error while reading object " << tmp << std::endl;
-                throw DROPSErrCL("InterfaceCL::ScatterData: Receive stream is broken!");
-            }
-            Helper::RemoteDataCL& rd= InfoCL::Instance().GetRemoteData(tmp);
-            const bool scatter_result= handler.Scatter( rd.GetLocalObject(), numData, (*it->second));
-            result= result && scatter_result;
-#if DROPSDebugC & DebugDiSTC
-            // check for delimiter
-            char delim;
-            recv >> delim;
-            Assert( delim=='|', Helper::ErrorCL("InterfaceCL::ScatterData: incomplete receive while reading object ", tmp), DebugDiSTC);
-#endif
-            recv >> tmp;
-        }
-    }
+    for ( RecvListT::iterator it( recvbuf_.begin()); it != recvbuf_.end(); ++it)
+        result= result && ScatterData( handler, *it->second);
     return result;
 }
+
+template <typename HandlerT, typename IStreamT>
+bool InterfaceCL::ScatterData( HandlerT& handler, IStreamT& recv)
+{
+    bool result= true;
+    Helper::GeomIdCL tmp;
+    size_t numData;
+    recv >> tmp;
+    while (tmp != Helper::NoGID) {
+        recv >> numData;
+        if (!recv) {
+            cdebug << "error while reading object " << tmp << std::endl;
+            throw DROPSErrCL("InterfaceCL::ScatterData: Receive stream is broken!");
+        }
+        Helper::RemoteDataCL& rd= InfoCL::Instance().GetRemoteData( tmp);
+        const bool scatter_result= handler.Scatter( rd.GetLocalObject(), numData, recv);
+        result= result && scatter_result;
+#if DROPSDebugC & DebugDiSTC
+        // check for delimiter
+        char delim;
+        recv >> delim;
+        Assert( delim=='|', Helper::ErrorCL("InterfaceCL::ScatterData: incomplete receive while reading object ", tmp), DebugDiSTC);
+#endif
+        recv >> tmp;
+     }
+     return result;
+}
+
 
 template <typename HandlerT>
 bool InterfaceCL::Perform( HandlerT& handler, CommPhase phase)
