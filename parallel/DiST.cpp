@@ -439,8 +439,7 @@ void InterfaceCL::SendData (SendListT& sendbuf, std::vector<ProcCL::RequestT>& r
     req.reserve( sendbuf.size());
     for (SendListT::iterator it= sendbuf.begin(); it != sendbuf.end(); ++it) {
         if ( it->first != ProcCL::MyRank()) {
-            // initiate the MPI call for sending the data (in all other cases,
-            // the data are just copied)
+            // initiate the MPI call for sending the data (in all other cases, the data are just copied)
             req.push_back( it->second->Isend( it->first, tag));
         }
     }
@@ -542,43 +541,57 @@ void InterfaceCL::ExchangeData( CommPhase phase)
 
     // Phase (3): Generate the send buffers
     //-------------------------------------
-    SendListT sendstreams;
-    CollectNumDataT::const_iterator itNum(collectNum.begin());
-    // Generate for each receiver a buffer. So at least NoGID is sent to all receivers
-    // which are waiting for some stuff. (receivers == ownerSendTo_)
-    sendstreams[ProcCL::MyRank()]= 0;
-    if (  phase==bothPhases || phase==fromowner){
-        std::set<int>::const_iterator pit;
-        for ( pit=ownerSendTo_.begin(); pit!=ownerSendTo_.end(); ++pit)
-            sendstreams[*pit]= new Helper::SendStreamCL(binary_);
-    }
-    if ( !sendstreams[ProcCL::MyRank()])
-        sendstreams[ProcCL::MyRank()]= new Helper::SendStreamCL(binary_);
-
     // for each collected GID, put the GID, number of copies where gather was called, and
     // the gathered data into a stream buffer.
-    for ( CollectDataT::iterator it(collect.begin()); it!= collect.end(); ++it, ++itNum){
-        Helper::RemoteDataCL& rd= InfoCL::Instance().GetRemoteData( it->first);
-        Helper::RemoteDataCL::ProcList_const_iterator pit=rd.GetProcListBegin();
-        for ( ; pit!=rd.GetProcListEnd(); ++pit){
-            if ( to_.contains( pit->prio)) {
-                if ( phase==toowner && pit->proc!=ProcCL::MyRank())
-                    continue;
-                Assert( sendstreams[pit->proc],
-                    DROPSErrCL("InterfaceCL::Communicate: Missing sendbuffer"),
-                    DebugDiSTC);
-                (*sendstreams[pit->proc]) << it->first << itNum->second;
-                sendstreams[pit->proc]->write( Addr(it->second), it->second.size());
+    // Generate for each receiver a buffer. So at least NoGID is sent to all receivers
+    // which are waiting for some stuff. (receivers == ownerSendTo_)
+    SendListT sendstreams;
+    CollectNumDataT::const_iterator itNum(collectNum.begin());
+    if (phase==toowner) {
+        sendstreams[ProcCL::MyRank()]= new Helper::SendStreamCL(binary_);
+        for ( CollectDataT::iterator it(collect.begin()); it!= collect.end(); ++it, ++itNum){
+            Helper::RemoteDataCL& rd= InfoCL::Instance().GetRemoteData( it->first);
+            Helper::RemoteDataCL::ProcList_const_iterator pit=rd.GetProcListBegin();
+            for ( ; pit!=rd.GetProcListEnd(); ++pit){
+                if ( pit->proc == ProcCL::MyRank() && to_.contains( pit->prio)) {
+                    (*sendstreams[ProcCL::MyRank()]) << it->first << itNum->second;
+                    sendstreams[ProcCL::MyRank()]->write( Addr(it->second), it->second.size());
 #if DROPSDebugC & DebugDiSTC
-                // append delimiting char to find inconsistent gather/scatter routines
-                const char delim= '|';
-                (*sendstreams[pit->proc]) << delim;
+                    // append delimiting char to find inconsistent gather/scatter routines
+                    const char delim= '|';
+                    (*sendstreams[ProcCL::MyRank()]) << delim;
 #endif
+                }
             }
         }
     }
+    else {
+        if (phase==bothPhases || phase==fromowner) {
+            for (ProcSetT::const_iterator pit= ownerSendTo_.begin(); pit != ownerSendTo_.end(); ++pit)
+                sendstreams[*pit]= new Helper::SendStreamCL(binary_);
+        }
+        for (CollectDataT::iterator it(collect.begin()); it!= collect.end(); ++it, ++itNum){
+            Helper::RemoteDataCL& rd= InfoCL::Instance().GetRemoteData( it->first);
+            Helper::RemoteDataCL::ProcList_const_iterator pit=rd.GetProcListBegin();
+            for ( ; pit!=rd.GetProcListEnd(); ++pit){
+                if ( to_.contains( pit->prio)) {
+                    Assert( sendstreams[pit->proc],
+                        DROPSErrCL("InterfaceCL::Communicate: Missing sendbuffer"),
+                        DebugDiSTC);
+                    (*sendstreams[pit->proc]) << it->first << itNum->second;
+                    sendstreams[pit->proc]->write( Addr(it->second), it->second.size());
+#if DROPSDebugC & DebugDiSTC
+                    // append delimiting char to find inconsistent gather/scatter routines
+                    const char delim= '|';
+                    (*sendstreams[pit->proc]) << delim;
+#endif
+                }
+            }
+        }
+    }
+
     // Append each stream with NoGID as a tag that the stream contains no more data
-    for ( SendListT::iterator it=sendstreams.begin(); it!=sendstreams.end(); ++it){
+    for (SendListT::iterator it= sendstreams.begin(); it != sendstreams.end(); ++it) {
         (*it->second) << Helper::NoGID;
     }
 
@@ -586,14 +599,14 @@ void InterfaceCL::ExchangeData( CommPhase phase)
     // --------------------------------------------
     const int secondSendTag= 6; // tag for sending in phase (4a)
     std::vector<ProcCL::RequestT> reqSecondSend;
-    if (phase != toowner)
+    if (phase == fromowner || phase == bothPhases)
         SendData( sendstreams, reqSecondSend, secondSendTag);
 
     // Phase (4b): Receive data from owning processes
     // ----------------------------------------------
     for ( std::set<int>::const_iterator pit=IRecvFromOwners_.begin(); pit!=IRecvFromOwners_.end(); ++pit){
         if ( *pit!=ProcCL::MyRank()){
-            if ( phase!=toowner){
+            if (phase == fromowner || phase == bothPhases) {
                 recvbuf_[*pit]= new Helper::RecvStreamCL(binary_);
                 recvbuf_[*pit]->Recv( *pit, secondSendTag);
             }
