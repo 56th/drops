@@ -446,6 +446,31 @@ void InterfaceCL::SendData (SendListT& sendbuf, std::vector<ProcCL::RequestT>& r
     }
 }
 
+void InterfaceCL::collect_streams (Helper::RecvStreamCL& recv, CollectDataT& collect, CollectNumDataT& collectNum)
+{
+    Helper::GeomIdCL gid;
+    size_t num_char;
+    std::vector<char> tmpBuf;
+
+    // read the GID from the stream
+    recv >> gid;
+    // as long as the stream contains data
+    while (gid != Helper::NoGID) {
+        recv >> num_char;
+        if (!recv) {
+            throw DROPSErrCL("InterfaceCL::collect_streams Receive stream is broken!");
+        }
+        tmpBuf.resize( num_char);
+        recv.read( Addr( tmpBuf), num_char);
+        // ... put the data to the corresponding GID, ...
+        collect[gid].insert( collect[gid].end(), tmpBuf.begin(), tmpBuf.end());
+        // ... remembering how many data has been sent.
+        ++collectNum[gid];
+        // get the GID of the next element
+        recv >> gid;
+    }
+}
+
 void InterfaceCL::ExchangeData( CommPhase phase)
 /** The interface communication has four phases.
     (1) The data collected by the gather routine is sent to processes which are owner of
@@ -489,44 +514,31 @@ void InterfaceCL::ExchangeData( CommPhase phase)
     // temporary variables for receiving and collecting the data
     CollectDataT      collect;      // Collect data for one GID from each sender
     CollectNumDataT   collectNum;   // Collect number of bytes from each sender for each GID
-    Helper::GeomIdCL  tmpGID;       // GID on the stream from the gather routine
-    std::vector<char> tmpBuf;       // data of the stream from the gather routine
-    size_t            numData;      // number of gathered bytes
 
     // if I am the owner of some entity, I have to receive something
-    for ( std::set<int>::const_iterator pit=ownerRecvFrom_.begin(); pit!=ownerRecvFrom_.end(); ++pit){
-        /// Receive data from the copies or use the sendstream to myself as receive buffer
-        Helper::RecvStreamCL* locrecvbuf=0;
-        if ( phase==fromowner && ProcCL::MyRank()!=*pit)
-            continue;
-        if ( *pit!=ProcCL::MyRank()){
-            locrecvbuf= new Helper::RecvStreamCL( binary_);
-            locrecvbuf->Recv( *pit, firstSendTag);
+    if (phase == fromowner) {
+        for (ProcSetT::const_iterator sender_it= ownerRecvFrom_.begin(); sender_it != ownerRecvFrom_.end(); ++sender_it) {
+            /// Receive data from the copies or use the sendstream to myself as receive buffer
+            if (ProcCL::MyRank() != *sender_it)
+                continue;
+            Helper::RecvStreamCL locrecvbuf( *sendbuf_[ProcCL::MyRank()]);
+            collect_streams( locrecvbuf, collect, collectNum);
         }
-        else{
-            locrecvbuf= new Helper::RecvStreamCL( *sendbuf_[ ProcCL::MyRank()]);
-        }
-        // read the GID from the stream
-        (*locrecvbuf) >> tmpGID;
-        // as long as the stream containing data
-        while ( tmpGID!=Helper::NoGID){
-            (*locrecvbuf) >> numData;
-            if ( !(*locrecvbuf)){
-                throw DROPSErrCL("InterfaceCL::Communicate: Receive stream is broken!");
-            }
-            tmpBuf.resize( numData);
-            locrecvbuf->read( Addr(tmpBuf), numData);
-            // ... putting the data to the corresponding GID and ...
-            collect[tmpGID].insert( collect[tmpGID].end(), tmpBuf.begin(), tmpBuf.end());
-            // ... remembering how many data has been sent.
-            ++collectNum[tmpGID];
-            // get the GID of the next element
-            (*locrecvbuf) >> tmpGID;
-        }
-        // free memory of the receive buffer
-        delete locrecvbuf; locrecvbuf=0;
     }
-
+    else {
+        for (ProcSetT::const_iterator sender_it= ownerRecvFrom_.begin(); sender_it != ownerRecvFrom_.end(); ++sender_it) {
+            /// Receive data from the copies or use the sendstream to myself as receive buffer
+            Helper::RecvStreamCL* locrecvbuf=0;
+            if ( *sender_it!=ProcCL::MyRank()){
+                locrecvbuf= new Helper::RecvStreamCL( binary_);
+                locrecvbuf->Recv( *sender_it, firstSendTag);
+            }
+            else{
+                locrecvbuf= new Helper::RecvStreamCL( *sendbuf_[ProcCL::MyRank()]);
+            }
+            collect_streams( *locrecvbuf, collect, collectNum);
+        }
+    }
 
     // Phase (3): Generate the send buffers
     //-------------------------------------
