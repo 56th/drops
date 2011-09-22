@@ -433,6 +433,19 @@ void InterfaceCL::SetupCommunicationStructure()
 //    std::cout << "[" << ProcCL::MyRank() << "] IRecvFromOwner = "; Print(IRecvFromOwners_, std::cout);
 }
 
+
+void InterfaceCL::SendData (SendListT& sendbuf, std::vector<ProcCL::RequestT>& req, int tag)
+{
+    req.reserve( sendbuf.size());
+    for (SendListT::iterator it= sendbuf.begin(); it != sendbuf.end(); ++it) {
+        if ( it->first != ProcCL::MyRank()) {
+            // initiate the MPI call for sending the data (in all other cases,
+            // the data are just copied)
+            req.push_back( it->second->Isend( it->first, tag));
+        }
+    }
+}
+
 void InterfaceCL::ExchangeData( CommPhase phase)
 /** The interface communication has four phases.
     (1) The data collected by the gather routine is sent to processes which are owner of
@@ -460,22 +473,16 @@ void InterfaceCL::ExchangeData( CommPhase phase)
     typedef DROPS_STD_UNORDERED_MAP< Helper::GeomIdCL, std::vector<char>, Helper::Hashing > CollectDataT;
     typedef DROPS_STD_UNORDERED_MAP< Helper::GeomIdCL, size_t, Helper::Hashing >            CollectNumDataT;
 
-    int firstSendTag=5, secondSendTag=6; // tags for sending (phase (1) and (4a))
-
     // Phase (1): Send data to owning processes
     //-----------------------------------------
-    std::vector<ProcCL::RequestT> reqFirstSend; reqFirstSend.reserve(sendbuf_.size());
-    for ( SendListT::iterator it=sendbuf_.begin(); it!=sendbuf_.end(); ++it){
+    for (SendListT::iterator it= sendbuf_.begin(); it != sendbuf_.end(); ++it) {
         // Append NoGID as tag, that there is no more data on the stream
-        (*it->second) << Helper::NoGID;
-        if ( phase==bothPhases || phase==toowner){
-            if ( it->first!=ProcCL::MyRank()){
-                // initiate the MPI call for sending the data (in all other cases,
-                // the data are just copied)
-                reqFirstSend.push_back( it->second->Isend( it->first, firstSendTag));
-            }
-        }
+        *it->second << Helper::NoGID;
     }
+    const int firstSendTag= 5; // tag for sending in phase (1) 
+    std::vector<ProcCL::RequestT> reqFirstSend;
+    if (phase==bothPhases || phase==toowner)
+        SendData( sendbuf_, reqFirstSend, firstSendTag);
 
     // Phase (2): Owning process receives data
     //----------------------------------------
@@ -565,15 +572,10 @@ void InterfaceCL::ExchangeData( CommPhase phase)
 
     // Phase (4a): send buffers to non-owner copies
     // --------------------------------------------
-    std::vector<ProcCL::RequestT> reqSecondSend; reqSecondSend.reserve(sendbuf_.size());
-    if ( phase!=toowner){
-        for ( SendListT::iterator it=sendstreams.begin(); it!=sendstreams.end(); ++it){
-            // If receiver is not me, send the stream
-            if ( it->first!=ProcCL::MyRank()){
-                reqSecondSend.push_back( it->second->Isend( it->first, secondSendTag));
-            }
-        }
-    }
+    const int secondSendTag= 6; // tag for sending in phase (4a)
+    std::vector<ProcCL::RequestT> reqSecondSend;
+    if (phase != toowner)
+        SendData( sendstreams, reqSecondSend, secondSendTag);
 
     // Phase (4b): Receive data from owning processes
     // ----------------------------------------------

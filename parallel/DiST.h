@@ -603,6 +603,8 @@ class InterfaceCL
                    begin_,
                    end_;
 
+    /// \brief MPI Isend of the streams in sendbuf.
+    void SendData (SendListT& sendbuf, std::vector<ProcCL::RequestT>& req, int tag);
     /// \brief Call the gather handler for each entity covered by the iterators [begin, end).
     template <typename HandlerT>
     void GatherData( HandlerT&, const iterator& begin, const iterator& end, CommPhase phase);
