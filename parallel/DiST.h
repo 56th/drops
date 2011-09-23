@@ -585,10 +585,10 @@ class InterfaceCL
     typedef std::map<int, Helper::RecvStreamCL*> RecvListT;     ///< type for receiving data (proc -> data)
     typedef std::set<int> ProcSetT;                             ///< type for a set of proccessor numbers
 
-  private:
     typedef DROPS_STD_UNORDERED_MAP< Helper::GeomIdCL, std::vector<char>, Helper::Hashing > CollectDataT;
     typedef DROPS_STD_UNORDERED_MAP< Helper::GeomIdCL, size_t, Helper::Hashing >            CollectNumDataT;
 
+  private:
     enum CommPhase {                ///< Communication phases
         bothPhases,                 ///< owner and copies gather and scatter data, i.e., copies -> owner -> copies
         toowner,                    ///< copies send to owners, i.e., copies -> owner
@@ -609,8 +609,6 @@ class InterfaceCL
 
     /// \brief MPI Isend of the streams in sendbuf.
     void SendData (SendListT& sendbuf, std::vector<ProcCL::RequestT>& req, int tag);
-    /// \brief Processes the messages (gid1 numdata1, data1, gid2, numdata2, data2, ..., NoGID).
-    void collect_streams (Helper::RecvStreamCL& recv, CollectDataT& collect, CollectNumDataT& collectNum);
     /// \brief Call the gather handler for each entity covered by the iterators [begin, end).
     template <typename HandlerT>
     void GatherData( HandlerT&, const iterator& begin, const iterator& end, CommPhase phase);

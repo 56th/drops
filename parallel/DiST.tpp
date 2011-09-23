@@ -335,7 +335,7 @@ void InterfaceCL::GatherData( HandlerT& handler, const iterator& begin,
         // stream
         Helper::SendStreamCL tmp_buf( binary_);
         if (handler.Gather( it->second.GetLocalObject(), tmp_buf)){
-            const std::string buf_str=tmp_buf.str();
+            const std::string& buf_str=tmp_buf.str();
             (*sendbuf_[owner]) << it->first << static_cast<size_t>(buf_str.size());
             sendbuf_[owner]->write( buf_str.data(), buf_str.size());
         }
