@@ -340,6 +340,10 @@ void InterfaceCL::GatherData( HandlerT& handler, const iterator& begin,
             sendbuf_[owner]->write( buf_str.data(), buf_str.size());
         }
     }
+    // Append NoGID as tag, that there is no more data on the stream
+    for (SendListT::iterator it= sendbuf_.begin(); it != sendbuf_.end(); ++it) {
+        *it->second << Helper::NoGID;
+    }
 }
 
 template <typename HandlerT>

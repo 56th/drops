@@ -495,10 +495,6 @@ void InterfaceCL::ExchangeData( CommPhase phase)
 {
     // Phase (1): Send data to owning processes
     //-----------------------------------------
-    for (SendListT::iterator it= sendbuf_.begin(); it != sendbuf_.end(); ++it) {
-        // Append NoGID as tag, that there is no more data on the stream
-        *it->second << Helper::NoGID;
-    }
     const int firstSendTag= 5; // tag for sending in phase (1) 
     std::vector<ProcCL::RequestT> reqFirstSend;
     if (phase==bothPhases || phase==toowner)
@@ -511,27 +507,24 @@ void InterfaceCL::ExchangeData( CommPhase phase)
     CollectNumDataT   collectNum;   // Collect number of bytes from each sender for each GID
 
     // if I am the owner of some entity, I have to receive something
-    if (phase == fromowner) {
+    if (phase==bothPhases || phase==toowner) {
         for (ProcSetT::const_iterator sender_it= ownerRecvFrom_.begin(); sender_it != ownerRecvFrom_.end(); ++sender_it) {
             /// Receive data from the copies or use the sendstream to myself as receive buffer
-            if (ProcCL::MyRank() != *sender_it)
-                continue;
-            Helper::RecvStreamCL locrecvbuf( *sendbuf_[ProcCL::MyRank()]);
+            Helper::RecvStreamCL locrecvbuf( binary_);
+            if ( *sender_it!=ProcCL::MyRank())
+                locrecvbuf.Recv( *sender_it, firstSendTag);
+            else
+                locrecvbuf.clearbuffer( sendbuf_[ProcCL::MyRank()]->str());
             collect_streams( locrecvbuf, collect, collectNum);
         }
     }
     else {
         for (ProcSetT::const_iterator sender_it= ownerRecvFrom_.begin(); sender_it != ownerRecvFrom_.end(); ++sender_it) {
             /// Receive data from the copies or use the sendstream to myself as receive buffer
-            Helper::RecvStreamCL* locrecvbuf=0;
-            if ( *sender_it!=ProcCL::MyRank()){
-                locrecvbuf= new Helper::RecvStreamCL( binary_);
-                locrecvbuf->Recv( *sender_it, firstSendTag);
-            }
-            else{
-                locrecvbuf= new Helper::RecvStreamCL( *sendbuf_[ProcCL::MyRank()]);
-            }
-            collect_streams( *locrecvbuf, collect, collectNum);
+            if (ProcCL::MyRank() != *sender_it)
+                continue;
+            Helper::RecvStreamCL locrecvbuf( *sendbuf_[ProcCL::MyRank()]);
+            collect_streams( locrecvbuf, collect, collectNum);
         }
     }
 
@@ -610,15 +603,16 @@ void InterfaceCL::ExchangeData( CommPhase phase)
         }
     }
     else {
-        for (ProcSetT::const_iterator pit= IRecvFromOwners_.begin(); pit != IRecvFromOwners_.end(); ++pit) {
-            if (*pit == ProcCL::MyRank()) {
-                // Copy the sendbuffer to the receive stream
-                recvbuf_[ProcCL::MyRank()]= new Helper::RecvStreamCL( *sendstreams[*pit]);
-            }
+        if (IRecvFromOwners_.count( ProcCL::MyRank()) > 0) {
+            // Copy the sendbuffer to the receive stream
+            recvbuf_[ProcCL::MyRank()]= new Helper::RecvStreamCL( *sendstreams[ProcCL::MyRank()]);
         }
+/*        else
+            if (phase == toowner) // Die Kommunikation haette man komplett sparen koennen. Das kommt in dist_interface.cpp vor.
+                throw DROPSErrCL( "InterfaceCL::ExchangeData: Phase 4b, toowner: Throwing away all data.\n");*/
     }
 
-    // Wait until all messages has left me before deleting the buffers
+    // Wait until all messages have left me before deleting the buffers
     if ( !reqFirstSend.empty())
         ProcCL::WaitAll( reqFirstSend);
     if ( !reqSecondSend.empty())
