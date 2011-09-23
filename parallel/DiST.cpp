@@ -433,7 +433,6 @@ void InterfaceCL::SetupCommunicationStructure()
 //    std::cout << "[" << ProcCL::MyRank() << "] IRecvFromOwner = "; Print(IRecvFromOwners_, std::cout);
 }
 
-
 void InterfaceCL::SendData (SendListT& sendbuf, std::vector<ProcCL::RequestT>& req, int tag)
 {
     req.reserve( sendbuf.size());
@@ -445,6 +444,9 @@ void InterfaceCL::SendData (SendListT& sendbuf, std::vector<ProcCL::RequestT>& r
     }
 }
 
+/// \brief Reads a stream (gid1, numdata1, data1, gid2, numdata2, data2, ..., NoGID).
+/// The data is put in collect[gid], numdata is put in collectNum[gid]; The terminating
+/// NoGID is consumed.
 void collect_streams (Helper::RecvStreamCL& recv, InterfaceCL::CollectDataT& collect, InterfaceCL::CollectNumDataT& collectNum)
 {
     Helper::GeomIdCL gid;
@@ -470,10 +472,8 @@ void collect_streams (Helper::RecvStreamCL& recv, InterfaceCL::CollectDataT& col
     }
 }
 
-///phase 2 && (bothPhases || toowner): receive+collect
-///phase 2 && fromowner: collect only my sendbuf -- inline
-///phase 4 && (bothPhases || fromowner): receive in buffers
-///phase 4 && toowner: copy my sendbuf to my recvbuf -- inline
+/// Phase 2 of ExchangeData for (bothPhases || toowner): Receive data and put
+/// it into collect and collectNum. The operator() is called for every sender.
 class ReceiveCollectCL
 {
   private:
@@ -497,6 +497,8 @@ class ReceiveCollectCL
     }
 };
 
+/// Phase 4b of ExchangeData for (bothPhases || fromowner): Receive the streams
+/// and put them in recvbf_[sender]. The operator() is called for every sender.
 class ReceiveCL
 {
   private:
@@ -575,48 +577,47 @@ void InterfaceCL::ExchangeData( CommPhase phase)
     // Generate for each receiver a buffer. So at least NoGID is sent to all receivers
     // which are waiting for some stuff. (receivers == ownerSendTo_)
     SendListT sendstreams;
-    CollectNumDataT::const_iterator itNum(collectNum.begin());
-    if (phase==toowner) {
-        sendstreams[ProcCL::MyRank()]= new Helper::SendStreamCL(binary_);
-        for ( CollectDataT::iterator it(collect.begin()); it!= collect.end(); ++it, ++itNum){
-            Helper::RemoteDataCL& rd= InfoCL::Instance().GetRemoteData( it->first);
-            Helper::RemoteDataCL::ProcList_const_iterator pit=rd.GetProcListBegin();
-            for ( ; pit!=rd.GetProcListEnd(); ++pit){
-                if ( pit->proc == ProcCL::MyRank() && to_.contains( pit->prio)) {
-                    (*sendstreams[ProcCL::MyRank()]) << it->first << itNum->second;
-                    sendstreams[ProcCL::MyRank()]->write( Addr(it->second), it->second.size());
-#if DROPSDebugC & DebugDiSTC
-                    // append delimiting char to find inconsistent gather/scatter routines
-                    const char delim= '|';
-                    (*sendstreams[ProcCL::MyRank()]) << delim;
-#endif
-                }
-            }
-        }
-    }
+    // Create the streambuffers
+    if (phase==toowner)
+        sendstreams[myrank]= new Helper::SendStreamCL(binary_);
     else {
         for (ProcSetT::const_iterator pit= ownerSendTo_.begin(); pit != ownerSendTo_.end(); ++pit)
             sendstreams[*pit]= new Helper::SendStreamCL(binary_);
-        for (CollectDataT::iterator it(collect.begin()); it!= collect.end(); ++it, ++itNum){
-            Helper::RemoteDataCL& rd= InfoCL::Instance().GetRemoteData( it->first);
-            Helper::RemoteDataCL::ProcList_const_iterator pit=rd.GetProcListBegin();
-            for ( ; pit!=rd.GetProcListEnd(); ++pit){
-                if ( to_.contains( pit->prio)) {
-                    Assert( sendstreams[pit->proc],
+    }
+    typedef Helper::RemoteDataCL::ProcList_const_iterator PL_IterT;
+    CollectNumDataT::const_iterator itNum( collectNum.begin());
+    // Fill the streambuffers
+    for (CollectDataT::iterator it= collect.begin(); it != collect.end(); ++it, ++itNum) {
+        Helper::RemoteDataCL& rd= InfoCL::Instance().GetRemoteData( it->first);
+        for (PL_IterT pit= rd.GetProcListBegin(); pit != rd.GetProcListEnd(); ++pit) {
+            if (to_.contains( pit->prio)) {
+                const int receiver= pit->proc;
+                if (phase==toowner) {
+                    if (receiver == myrank) {
+                        *sendstreams[myrank] << it->first << itNum->second;
+                        sendstreams[myrank]->write( Addr(it->second), it->second.size());
+#                       if DROPSDebugC & DebugDiSTC
+                            // append delimiting char to find inconsistent gather/scatter routines
+                            const char delim= '|';
+                            *sendstreams[receiver] << delim;
+#                       endif
+                    }
+                }
+                else {
+                    Assert( sendstreams[receiver],
                         DROPSErrCL("InterfaceCL::Communicate: Missing sendbuffer"),
                         DebugDiSTC);
-                    (*sendstreams[pit->proc]) << it->first << itNum->second;
-                    sendstreams[pit->proc]->write( Addr(it->second), it->second.size());
-#if DROPSDebugC & DebugDiSTC
-                    // append delimiting char to find inconsistent gather/scatter routines
-                    const char delim= '|';
-                    (*sendstreams[pit->proc]) << delim;
-#endif
+                    *sendstreams[receiver] << it->first << itNum->second;
+                    sendstreams[receiver]->write( Addr(it->second), it->second.size());
+#                   if DROPSDebugC & DebugDiSTC
+                        // append delimiting char to find inconsistent gather/scatter routines
+                        const char delim= '|';
+                        *sendstreams[receiver] << delim;
+#                   endif
                 }
             }
         }
     }
-
     // Append each stream with NoGID as a tag that the stream contains no more data
     for (SendListT::iterator it= sendstreams.begin(); it != sendstreams.end(); ++it) {
         (*it->second) << Helper::NoGID;
@@ -644,17 +645,17 @@ void InterfaceCL::ExchangeData( CommPhase phase)
     }
 
     // Wait until all messages have left me before deleting the buffers
-    if ( !reqFirstSend.empty())
+    if (!reqFirstSend.empty())
         ProcCL::WaitAll( reqFirstSend);
-    if ( !reqSecondSend.empty())
+    if (!reqSecondSend.empty())
         ProcCL::WaitAll( reqSecondSend);
     // delete all send streams
-    for ( SendListT::iterator sit=sendbuf_.begin(); sit!=sendbuf_.end(); ++sit){
-        delete sit->second; sit->second=0;
+    for (SendListT::iterator sit=sendbuf_.begin(); sit!=sendbuf_.end(); ++sit){
+        delete sit->second; sit->second= 0;
     }
     sendbuf_.clear();
-    for ( SendListT::iterator sit=sendstreams.begin(); sit!=sendstreams.end(); ++sit){
-        delete sit->second; sit->second=0;
+    for (SendListT::iterator sit=sendstreams.begin(); sit!=sendstreams.end(); ++sit){
+        delete sit->second; sit->second= 0;
     }
     sendstreams.clear();
 }

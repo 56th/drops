@@ -585,8 +585,11 @@ class InterfaceCL
     typedef std::map<int, Helper::RecvStreamCL*> RecvListT;     ///< type for receiving data (proc -> data)
     typedef std::set<int> ProcSetT;                             ///< type for a set of proccessor numbers
 
+    /// \brief Helper types for ExchangeData and the function collect_streams in Dist.cpp
+    ///@{
     typedef DROPS_STD_UNORDERED_MAP< Helper::GeomIdCL, std::vector<char>, Helper::Hashing > CollectDataT;
     typedef DROPS_STD_UNORDERED_MAP< Helper::GeomIdCL, size_t, Helper::Hashing >            CollectNumDataT;
+    ///@}
 
   private:
     enum CommPhase {                ///< Communication phases
