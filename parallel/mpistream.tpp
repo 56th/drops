@@ -47,7 +47,7 @@ MPIistreamCL& operator>> (MPIistreamCL& is, T& t)
     else {
         MPIistreamCL::base_type& istr= static_cast<MPIistreamCL::base_type&>( is);
         istr >> t;
-        MPIistreamCL::char_type c;
+        MPIistreamCL::char_type c= SendRecvStreamAsciiTerminatorC; // Initialisation: If the stream is not good(), nothing is read. Do not fail due to not reading at all. For extra credit: Check, if !good() is due to the previous read.
         istr.get( c);
         if (c != SendRecvStreamAsciiTerminatorC)
             throw DROPSErrCL( "MPIistreamCL& operator>>( MPIistreamCL& is, T& t):"

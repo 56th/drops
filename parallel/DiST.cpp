@@ -451,23 +451,14 @@ template <class IStreamT>
 void collect_streams (IStreamT& recv, InterfaceCL::CollectDataT& collect, InterfaceCL::CollectNumDataT& collectNum)
 {
     Helper::GeomIdCL gid;
-    std::vector<char> tmpBuf;
 
-    // read the GID from the stream
-    recv >> gid;
-    // as long as the stream contains data
-    while (gid != Helper::NoGID) {
-        if (!recv) {
-            throw DROPSErrCL("InterfaceCL::collect_streams Receive stream is broken!");
-        }
+    while (recv >> gid) {
         Helper::RefMPIistreamCL gid_data( 0, 0, recv.isBinary());
         recv >> gid_data;
         // ... put the data to the corresponding GID, ...
         collect[gid].insert( collect[gid].end(), gid_data.begin(), gid_data.end());
         // ... remembering how many data has been sent.
         ++collectNum[gid];
-        // get the GID of the next element
-        recv >> gid;
     }
 }
 
@@ -569,17 +560,18 @@ void InterfaceCL::ExchangeData( CommPhase phase)
     else {
         if (ownerRecvFrom_.count( myrank) > 0) {
             Helper::RefMPIistreamCL locrecvbuf( sendbuf_[myrank]->begin(),
-                sendbuf_[myrank]->end() - sendbuf_[myrank]->begin(), binary_) ;
+                sendbuf_[myrank]->cur() - sendbuf_[myrank]->begin(), binary_) ;
             collect_streams( locrecvbuf, collect, collectNum);
         }
     }
 
     // Phase (3): Generate the send buffers
     //-------------------------------------
-    // for each collected GID, put the GID, number of copies where gather was called, and
-    // the gathered data into a stream buffer.
-    // Generate for each receiver a buffer. So at least NoGID is sent to all receivers
-    // which are waiting for some stuff. (receivers == ownerSendTo_)
+    // for each collected GID, put the GID, number of copies where gather was
+    // called, and the gathered data into a stream buffer.
+    // Generate for each receiver a buffer. Some receivers
+    // which are waiting for some stuff might receive an empty message, which
+    // MPI permits. (receivers == ownerSendTo_)
     SendListT sendstreams;
     // Create the streambuffers
     if (phase==toowner)
@@ -621,10 +613,6 @@ void InterfaceCL::ExchangeData( CommPhase phase)
                 }
             }
         }
-    }
-    // Append each stream with NoGID as a tag that the stream contains no more data
-    for (SendListT::iterator it= sendstreams.begin(); it != sendstreams.end(); ++it) {
-        (*it->second) << Helper::NoGID;
     }
 
     // Phase (4a): send buffers to non-owner copies
