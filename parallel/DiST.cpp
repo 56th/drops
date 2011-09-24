@@ -447,24 +447,23 @@ void InterfaceCL::SendData (SendListT& sendbuf, std::vector<ProcCL::RequestT>& r
 /// \brief Reads a stream (gid1, numdata1, data1, gid2, numdata2, data2, ..., NoGID).
 /// The data is put in collect[gid], numdata is put in collectNum[gid]; The terminating
 /// NoGID is consumed.
-void collect_streams (Helper::RecvStreamCL& recv, InterfaceCL::CollectDataT& collect, InterfaceCL::CollectNumDataT& collectNum)
+template <class IStreamT>
+void collect_streams (IStreamT& recv, InterfaceCL::CollectDataT& collect, InterfaceCL::CollectNumDataT& collectNum)
 {
     Helper::GeomIdCL gid;
-    size_t num_char;
     std::vector<char> tmpBuf;
 
     // read the GID from the stream
     recv >> gid;
     // as long as the stream contains data
     while (gid != Helper::NoGID) {
-        recv >> num_char;
         if (!recv) {
             throw DROPSErrCL("InterfaceCL::collect_streams Receive stream is broken!");
         }
-        tmpBuf.resize( num_char);
-        recv.read( Addr( tmpBuf), num_char);
+        Helper::RefMPIistreamCL gid_data( 0, 0, recv.isBinary());
+        recv >> gid_data;
         // ... put the data to the corresponding GID, ...
-        collect[gid].insert( collect[gid].end(), tmpBuf.begin(), tmpBuf.end());
+        collect[gid].insert( collect[gid].end(), gid_data.begin(), gid_data.end());
         // ... remembering how many data has been sent.
         ++collectNum[gid];
         // get the GID of the next element
@@ -488,12 +487,15 @@ class ReceiveCollectCL
         : mysendbuf_( mysendbuf), collect( c), collectNum( cNum), tag( t), binary_( binary) {}
 
     void operator() (int sender) {
-            Helper::RecvStreamCL locrecvbuf( binary_);
-            if (sender != ProcCL::MyRank())
-                locrecvbuf.Recv( sender);
-            else
-                locrecvbuf.clearbuffer( mysendbuf_->str());
-            collect_streams( locrecvbuf, collect, collectNum);
+            if (sender != ProcCL::MyRank()) {
+                Helper::RecvStreamCL locrecvbuf( binary_);
+                collect_streams( locrecvbuf.Recv( sender), collect, collectNum);
+            }
+            else {
+                Helper::RefMPIistreamCL locrecvbuf( mysendbuf_->begin(),
+                    mysendbuf_->cur() - mysendbuf_->begin(), binary_);
+                collect_streams( locrecvbuf, collect, collectNum);
+            }
     }
 };
 
@@ -542,6 +544,7 @@ void InterfaceCL::ExchangeData( CommPhase phase)
           to make it easier to read
     \todo Test for one-way communication is missing since no other priorities as master
           are given so far.
+    \todo Instead of numData_i data_i, one should simply write data_i as substream with: sendbuf << data_i.
 */
 {
     const int myrank= ProcCL::MyRank();
@@ -565,7 +568,8 @@ void InterfaceCL::ExchangeData( CommPhase phase)
     }
     else {
         if (ownerRecvFrom_.count( myrank) > 0) {
-            Helper::RecvStreamCL locrecvbuf( *sendbuf_[myrank]) ;
+            Helper::RefMPIistreamCL locrecvbuf( sendbuf_[myrank]->begin(),
+                sendbuf_[myrank]->end() - sendbuf_[myrank]->begin(), binary_) ;
             collect_streams( locrecvbuf, collect, collectNum);
         }
     }

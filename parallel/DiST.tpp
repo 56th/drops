@@ -334,11 +334,8 @@ void InterfaceCL::GatherData( HandlerT& handler, const iterator& begin,
         // the GeomIdCL, the size of data, and the corresponding data on the
         // stream
         Helper::SendStreamCL tmp_buf( binary_);
-        if (handler.Gather( it->second.GetLocalObject(), tmp_buf)){
-            const std::string& buf_str=tmp_buf.str();
-            (*sendbuf_[owner]) << it->first << static_cast<size_t>(buf_str.size());
-            sendbuf_[owner]->write( buf_str.data(), buf_str.size());
-        }
+        if (handler.Gather( it->second.GetLocalObject(), tmp_buf))
+            *sendbuf_[owner] << it->first << tmp_buf;
     }
     // Append NoGID as tag, that there is no more data on the stream
     for (SendListT::iterator it= sendbuf_.begin(); it != sendbuf_.end(); ++it) {
