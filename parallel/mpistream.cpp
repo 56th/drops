@@ -213,6 +213,49 @@ RefMPIistreamCL& operator>> (RefMPIistreamCL& is, RefMPIistreamCL& sub)
     return is;
 }
 
+SendStreamCL::SendStreamCL (const SendStreamCL& s)
+    : std::ios(), base_type( &buf_, binary), buf_( s.buf_.str(), std::ios_base::out)
+{
+    seekp( const_cast<SendStreamCL&>( s).tellp());
+    copyfmt( s);
+    clear( s.rdstate());
+}
+
+SendStreamCL& SendStreamCL::operator= (const SendStreamCL& s)
+{
+    if (&s == this)
+        return *this;
+    setBinary( s.isBinary());
+    clear();
+    clearbuffer( s.buf_.str());
+    seekp( const_cast<SendStreamCL&>( s).tellp());
+    copyfmt( s);
+    clear( s.rdstate());
+    return *this;
+}
+
+RecvStreamCL::RecvStreamCL (const RecvStreamCL& s)
+    : std::ios(), base_type( &buf_, binary), buf_( s.buf_.str(), std::ios_base::in)
+{
+    seekg( const_cast<RecvStreamCL&>( s).tellg());
+    copyfmt( s);
+    clear( s.rdstate());
+
+}
+
+RecvStreamCL& RecvStreamCL::operator= (const RecvStreamCL& s)
+{
+    if (&s == this)
+        return *this;
+    setBinary( s.isBinary());
+    clear();
+    clearbuffer( s.buf_.str());
+    seekg( const_cast<RecvStreamCL&>( s).tellg());
+    copyfmt( s);
+    clear( s.rdstate());
+    return *this;
+}
+
 
 } // end of namespace Helper
 } // end of namespace DiST

@@ -335,18 +335,16 @@ void InterfaceCL::GatherData( HandlerT& handler, const iterator& begin,
 
     for ( iterator it( begin); it != end; ++it) {
         const int owner= it->second.GetOwnerProc();
-        // Generate a new SendStreamCL object
-        if ( sendbuf_[owner]==0){
-            sendbuf_[owner]= new Helper::SendStreamCL( binary_);
-        }
-        // Check, if this process has to gather data
-        if ( phase==fromowner && !it->second.AmIOwner())
+        // Generates the sendbuf_ for owner, if not already there.
+        // Needed for correctness, because the owner expects a (n empty) message.
+        Helper::SendStreamCL& buf= sendbuf_[owner];
+        if (phase==fromowner && !it->second.AmIOwner()) // Check, if this process has to gather data.
             continue;
         // Check if gather wants to put something on the send stream and write
         // the GeomIdCL, and the associated sub-sendstream on the stream.
         Helper::SendStreamCL tmp_buf( binary_);
         if (handler.Gather( it->second.GetLocalObject(), tmp_buf))
-            *sendbuf_[owner] << it->first << tmp_buf;
+            buf << it->first << tmp_buf;
     }
 }
 
@@ -354,9 +352,9 @@ template <typename HandlerT>
 bool InterfaceCL::ScatterData( HandlerT& handler)
 /// \return local accumulated AND of all scatter calls
 {
-    bool result=true;
-    for ( RecvListT::iterator it( recvbuf_.begin()); it != recvbuf_.end(); ++it)
-        result= result && ScatterData( handler, *it->second);
+    bool result= true;
+    for (RecvListT::iterator it( recvbuf_.begin()); it != recvbuf_.end(); ++it)
+        result= result && ScatterData( handler, it->second);
     return result;
 }
 
@@ -401,9 +399,6 @@ bool InterfaceCL::Perform( HandlerT& handler, CommPhase phase)
     // scatter the data
     const bool result= ScatterData( handler);
     // clear receive buffer
-    for (RecvListT::iterator it= recvbuf_.begin(); it != recvbuf_.end(); ++it) {
-        delete it->second;
-    }
     recvbuf_.clear();
 
     return result;

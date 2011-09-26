@@ -439,7 +439,7 @@ void InterfaceCL::SendData (SendListT& sendbuf, std::vector<ProcCL::RequestT>& r
     for (SendListT::iterator it= sendbuf.begin(); it != sendbuf.end(); ++it) {
         if ( it->first != ProcCL::MyRank()) {
             // initiate the MPI call for sending the data (in all other cases, the data are just copied)
-            req.push_back( it->second->Isend( it->first, tag));
+            req.push_back( it->second.Isend( it->first, tag));
         }
     }
 }
@@ -500,12 +500,12 @@ class ReceiveCL
         : mysendbuf_( mysendbuf), recvbuf_( recvbuf), tag_( t), binary_( binary) {}
 
     void operator() (int sender) {
-        if (sender != ProcCL::MyRank()) {
-            recvbuf_[sender]= new Helper::RecvStreamCL( binary_); // At most one message is received (from the owner).
-            recvbuf_[sender]->Recv( sender, tag_);
-        }
-        else // Copy the sendbuffer to the receive stream
-            recvbuf_[ProcCL::MyRank()]= new Helper::RecvStreamCL( *mysendbuf_);
+        // At most one message is received (from the owner).
+        // Thus, one can simply assign to the recvbuf instead of append to it.
+        if (sender != ProcCL::MyRank())
+            recvbuf_[sender].Recv( sender, tag_);
+        else
+            recvbuf_[ProcCL::MyRank()].clearbuffer( mysendbuf_->str());
     }
 };
 
@@ -546,14 +546,14 @@ void InterfaceCL::ExchangeData (CommPhase phase)
     //----------------------------------------
     CollectDataT collect; // Collect the data for one GID from each sender
     if (phase==bothPhases || phase==toowner) {
-        ReceiveCollectCL recv_collect( sendbuf_.count( myrank) > 0 ? sendbuf_[myrank] : 0,
+        ReceiveCollectCL recv_collect( sendbuf_.count( myrank) > 0 ? &sendbuf_[myrank] : 0,
                          collect, firstSendTag, binary_);
         std::for_each( ownerRecvFrom_.begin(), ownerRecvFrom_.end(), recv_collect);
     }
     else {
         if (ownerRecvFrom_.count( myrank) > 0) {
-            Helper::RefMPIistreamCL locrecvbuf( sendbuf_[myrank]->begin(),
-                sendbuf_[myrank]->cur() - sendbuf_[myrank]->begin(), binary_) ;
+            Helper::RefMPIistreamCL locrecvbuf( sendbuf_[myrank].begin(),
+                sendbuf_[myrank].cur() - sendbuf_[myrank].begin(), binary_) ;
             collect_streams( locrecvbuf, collect);
         }
     }
@@ -563,14 +563,14 @@ void InterfaceCL::ExchangeData (CommPhase phase)
     // Generate a SendStream for each receiver. Some receivers,
     // which are waiting for a message, might receive an empty message.
     // MPI permits this. (receivers == ownerSendTo_)
+    // Note, that the message must be sent nonetheless, as the receiver posts a Recv.
     SendListT sendstreams;
-    // Create the streambuffers
     if (phase==toowner)
-        sendstreams[myrank]= new Helper::SendStreamCL(binary_);
-    else {
+        sendstreams[myrank]= Helper::SendStreamCL( binary_);
+    else
         for (ProcSetT::const_iterator pit= ownerSendTo_.begin(); pit != ownerSendTo_.end(); ++pit)
-            sendstreams[*pit]= new Helper::SendStreamCL(binary_);
-    }
+            sendstreams[*pit]= Helper::SendStreamCL( binary_);
+
     // For each collected GID, put the GID, number of copies, where gather was
     // called, and the gathered data into a stream buffer.
     typedef Helper::RemoteDataCL::ProcList_const_iterator PL_IterT;
@@ -581,13 +581,13 @@ void InterfaceCL::ExchangeData (CommPhase phase)
                 const int receiver= pit->proc;
                 if (phase==toowner) {
                     if (receiver == myrank)
-                        *sendstreams[myrank] << it->first << it->second;
+                        sendstreams[myrank] << it->first << it->second;
                 }
                 else {
-                    Assert( sendstreams[receiver],
+                    Assert( sendstreams.count( receiver) > 0,
                         DROPSErrCL("InterfaceCL::Communicate: Missing sendbuffer"),
                         DebugDiSTC);
-                    *sendstreams[receiver] << it->first << it->second;
+                    sendstreams[receiver] << it->first << it->second;
                 }
             }
         }
@@ -604,14 +604,14 @@ void InterfaceCL::ExchangeData (CommPhase phase)
     // Phase (5): Receive data from owning processes
     // ----------------------------------------------
     if (phase == fromowner || phase == bothPhases) {
-        ReceiveCL receive( sendstreams.count( myrank) > 0 ? sendstreams[myrank] : 0,
+        ReceiveCL receive( sendstreams.count( myrank) > 0 ? &sendstreams[myrank] : 0,
                            recvbuf_, secondSendTag, binary_);
         std::for_each( IRecvFromOwners_.begin(), IRecvFromOwners_.end(), receive);
     }
     else {
         if (IRecvFromOwners_.count( ProcCL::MyRank()) > 0) {
             // Copy the sendbuffer to the receive stream
-            recvbuf_[myrank]= new Helper::RecvStreamCL( *sendstreams[myrank]);
+            recvbuf_[myrank].clearbuffer( sendstreams[myrank].str());
         }
     }
 
@@ -620,14 +620,8 @@ void InterfaceCL::ExchangeData (CommPhase phase)
         ProcCL::WaitAll( reqFirstSend);
     if (!reqSecondSend.empty())
         ProcCL::WaitAll( reqSecondSend);
-    // delete all send streams
-    for (SendListT::iterator sit=sendbuf_.begin(); sit!=sendbuf_.end(); ++sit){
-        delete sit->second; sit->second= 0;
-    }
+    // clear all send streams
     sendbuf_.clear();
-    for (SendListT::iterator sit=sendstreams.begin(); sit!=sendstreams.end(); ++sit) {
-        delete sit->second; sit->second= 0;
-    }
     sendstreams.clear();
 }
 

@@ -578,12 +578,12 @@ class InterfaceCL
 ///   Maybe, an observer pattern would be nice here.
 {
   public:
-    typedef Helper::WholeRemoteDataIteratorCL iterator;         ///< type for iterator over elements in the interface
-    typedef iterator::DimListT DimListT;                        ///< type for storing the involved simplices
-    typedef iterator::GIDIteratorT GIDIteratorT;                ///< type for iterator over GID's
-    typedef std::map<int, Helper::SendStreamCL*> SendListT;     ///< type for storing data to be sent (proc -> data)
-    typedef std::map<int, Helper::RecvStreamCL*> RecvListT;     ///< type for receiving data (proc -> data)
-    typedef std::set<int> ProcSetT;                             ///< type for a set of proccessor numbers
+    typedef Helper::WholeRemoteDataIteratorCL iterator;    ///< type for iterator over elements in the interface
+    typedef iterator::DimListT DimListT;                   ///< type for storing the involved simplices
+    typedef iterator::GIDIteratorT GIDIteratorT;           ///< type for iterator over GID's
+    typedef std::map<int, Helper::SendStreamCL> SendListT; ///< type for storing data to be sent (proc -> data)
+    typedef std::map<int, Helper::RecvStreamCL> RecvListT; ///< type for receiving data (proc -> data)
+    typedef std::set<int> ProcSetT;                        ///< type for a set of proccessor numbers
 
     /// \brief Helper types for ExchangeData and the function collect_streams in Dist.cpp
     ///@{
@@ -602,23 +602,23 @@ class InterfaceCL
     ///@}
 
   private:
-    enum CommPhase {                ///< Communication phases
-        bothPhases,                 ///< owner and copies gather and scatter data, i.e., copies -> owner -> copies
-        toowner,                    ///< copies send to owners, i.e., copies -> owner
-        fromowner                   ///< owner send to copies, i.e., owner -> copies
+    enum CommPhase {            ///< Communication phases
+        bothPhases,             ///< owner and copies gather and scatter data, i.e., copies -> owner -> copies
+        toowner,                ///< copies send to owners, i.e., copies -> owner
+        fromowner               ///< owner send to copies, i.e., owner -> copies
     };
-    RecvListT      recvbuf_;        ///< received data (after call of function Communicate())
-    SendListT      sendbuf_;        ///< data to be sent
-    PrioListT      from_;           ///< list of priority on sender side, the interface operates on
-    PrioListT      to_;             ///< list of priority on receiver side, the interface operates on
-    bool           binary_;         ///< transfer data binary or in ASCII
-    ProcSetT       ownerRecvFrom_;  ///< list of processes, the owner receives data from
-    ProcSetT       ownerSendTo_;    ///< list of processes, the owner sends data to
-    ProcSetT       IRecvFromOwners_;///< list of owner processes, I have to receive data from
-    iterator       begin_from_,     ///< iterators defining sequence of interface elements
-                   begin_to_,
-                   begin_,
-                   end_;
+    RecvListT recvbuf_;         ///< received data (after call of function Communicate())
+    SendListT sendbuf_;         ///< data to be sent
+    PrioListT from_;            ///< list of priority on sender side, the interface operates on
+    PrioListT to_;              ///< list of priority on receiver side, the interface operates on
+    bool      binary_;          ///< transfer data binary or in ASCII
+    ProcSetT  ownerRecvFrom_;   ///< list of processes, the owner receives data from
+    ProcSetT  ownerSendTo_;     ///< list of processes, the owner sends data to
+    ProcSetT  IRecvFromOwners_; ///< list of owner processes, I have to receive data from
+    iterator  begin_from_,      ///< iterators defining sequence of interface elements
+              begin_to_,
+              begin_,
+              end_;
 
     /// \brief MPI Isend of the streams in sendbuf.
     void SendData (SendListT& sendbuf, std::vector<ProcCL::RequestT>& req, int tag);

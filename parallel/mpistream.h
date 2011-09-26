@@ -124,8 +124,9 @@ class MPIistreamCL : public std::istream
 };
 
 
-/// \brief MPI-output-stream with buffer
+/// \brief MPI-output-stream with MPIstringbufCL-buffer
 /// This stream is employed for formatting and buffering outgoing MPI-streams.
+/// Copy and assignment have value-semantics, i.e., the buffer contents are copied/assigned.
 class SendStreamCL : public MPIostreamCL
 {
   public:
@@ -137,6 +138,8 @@ class SendStreamCL : public MPIostreamCL
   public:
     explicit SendStreamCL (bool binary= use_binaryMPIstreams)
         : base_type( &buf_, binary), buf_( std::ios_base::out) {}
+    SendStreamCL (const SendStreamCL& s);
+    SendStreamCL& operator= (const SendStreamCL& s);
 
     /// \brief Non-blocking send to process 'dest'.
     inline ProcCL::RequestT Isend(int dest, int tag= 5) { return buf_.Isend( dest, tag); }
@@ -159,6 +162,7 @@ class SendStreamCL : public MPIostreamCL
 
 /// \brief Input stream.
 /// This stream is employed for formatting and buffering outgoing MPI-streams.
+/// Copy and assignment have value-semantics, i.e., the buffer contents are copied/assigned.
 class RecvStreamCL : public MPIistreamCL
 {
   public:
@@ -171,6 +175,8 @@ class RecvStreamCL : public MPIistreamCL
     /// @param[in] binary is true if the stream store the data in binary; in ASCII otherwise.
     explicit RecvStreamCL (bool binary= use_binaryMPIstreams)
         : base_type( &buf_, binary), buf_( std::ios_base::in) {}
+    RecvStreamCL (const RecvStreamCL& s);
+    RecvStreamCL& operator= (const RecvStreamCL& s);
 
     RecvStreamCL( const SendStreamCL& s)
         : base_type( &buf_, s.isBinary()), buf_( s.str(), std::ios_base::in) {}
