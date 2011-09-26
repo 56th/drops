@@ -314,6 +314,18 @@ inline Helper::RemoteDataCL& TransferableCL::GetRemoteData()
 // I N T E R F A C E  C L
 // ----------------------
 
+inline Helper::MPIostreamCL& operator<< (Helper::MPIostreamCL& os,
+    const InterfaceCL::MessagesCL& m)
+{
+    os << m.numData;
+    os.write( Addr( m.messages), m.messages.size());
+#   if DROPSDebugC & DebugDiSTC
+        // append delimiting char to find inconsistent gather/scatter routines
+        os << '|';
+#   endif
+    return os;
+}
+
 template <typename HandlerT>
 void InterfaceCL::GatherData( HandlerT& handler, const iterator& begin,
     const iterator& end, CommPhase phase)
@@ -331,8 +343,7 @@ void InterfaceCL::GatherData( HandlerT& handler, const iterator& begin,
         if ( phase==fromowner && !it->second.AmIOwner())
             continue;
         // Check if gather wants to put something on the send stream and write
-        // the GeomIdCL, the size of data, and the corresponding data on the
-        // stream
+        // the GeomIdCL, and the associated sub-sendstream on the stream.
         Helper::SendStreamCL tmp_buf( binary_);
         if (handler.Gather( it->second.GetLocalObject(), tmp_buf))
             *sendbuf_[owner] << it->first << tmp_buf;
@@ -357,7 +368,7 @@ bool InterfaceCL::ScatterData( HandlerT& handler, IStreamT& recv)
     size_t numData;
     while (recv >> gid) {
         recv >> numData;
-        if (!recv) {
+        if (DROPSDebugC & DebugDiSTC && !recv) {
             cdebug << "error while reading object " << gid << std::endl;
             throw DROPSErrCL("InterfaceCL::ScatterData: Receive stream is broken!");
         }
@@ -366,7 +377,7 @@ bool InterfaceCL::ScatterData( HandlerT& handler, IStreamT& recv)
         result= result && scatter_result;
 #       if DROPSDebugC & DebugDiSTC
             // check for delimiter
-            char delim;
+            char delim= '|';
             recv >> delim;
             Assert( delim=='|', Helper::ErrorCL("InterfaceCL::ScatterData: "
                 "incomplete receive while reading object ", gid), DebugDiSTC);
@@ -390,7 +401,7 @@ bool InterfaceCL::Perform( HandlerT& handler, CommPhase phase)
     // scatter the data
     const bool result= ScatterData( handler);
     // clear receive buffer
-    for ( RecvListT::iterator it( recvbuf_.begin()); it!=recvbuf_.end(); ++it){
+    for (RecvListT::iterator it= recvbuf_.begin(); it != recvbuf_.end(); ++it) {
         delete it->second;
     }
     recvbuf_.clear();
@@ -435,8 +446,8 @@ bool InterfaceCL::ExecuteLocal( ExecuteHandlerT& handler, const IteratorT& begin
 {
     bool result=true;
     for (IteratorT it(begin); it!=end; ++it) {
-        const bool execute_result=handler( it->second.GetLocalObject());
-        result = result && execute_result;
+        const bool execute_result= handler( it->second.GetLocalObject());
+        result= result && execute_result;
     }
     return result;
 }

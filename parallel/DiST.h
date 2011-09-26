@@ -587,8 +587,18 @@ class InterfaceCL
 
     /// \brief Helper types for ExchangeData and the function collect_streams in Dist.cpp
     ///@{
-    typedef DROPS_STD_UNORDERED_MAP< Helper::GeomIdCL, std::vector<char>, Helper::Hashing > CollectDataT;
-    typedef DROPS_STD_UNORDERED_MAP< Helper::GeomIdCL, size_t, Helper::Hashing >            CollectNumDataT;
+    class MessagesCL {
+      private:
+        size_t            numData;  ///< number of messages
+        std::vector<char> messages; ///< concatenation of the messages as sequence of char
+
+      public:
+        MessagesCL () : numData( 0) {}
+        void append (const char* begin, const char* end)
+            { messages.insert( messages.end(), begin, end); ++numData; }
+        friend Helper::MPIostreamCL& operator<< (Helper::MPIostreamCL& os, const InterfaceCL::MessagesCL& msg);
+    };
+    typedef DROPS_STD_UNORDERED_MAP<Helper::GeomIdCL, MessagesCL, Helper::Hashing > CollectDataT;
     ///@}
 
   private:
@@ -602,9 +612,9 @@ class InterfaceCL
     PrioListT      from_;           ///< list of priority on sender side, the interface operates on
     PrioListT      to_;             ///< list of priority on receiver side, the interface operates on
     bool           binary_;         ///< transfer data binary or in ASCII
-    std::set<int>  ownerRecvFrom_;  ///< list of processes, the owner receives data from
-    std::set<int>  ownerSendTo_;    ///< list of processes, the owner sends data to
-    std::set<int>  IRecvFromOwners_;///< list of owner processes, I have to receive data from
+    ProcSetT       ownerRecvFrom_;  ///< list of processes, the owner receives data from
+    ProcSetT       ownerSendTo_;    ///< list of processes, the owner sends data to
+    ProcSetT       IRecvFromOwners_;///< list of owner processes, I have to receive data from
     iterator       begin_from_,     ///< iterators defining sequence of interface elements
                    begin_to_,
                    begin_,
