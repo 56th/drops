@@ -620,11 +620,15 @@ class InterfaceCL
               begin_,
               end_;
 
-    /// \brief MPI Isend of the streams in sendbuf.
-    void SendData (SendListT& sendbuf, std::vector<ProcCL::RequestT>& req, int tag);
     /// \brief Call the gather handler for each entity covered by the iterators [begin, end).
     template <typename HandlerT>
     void GatherData( HandlerT&, const iterator& begin, const iterator& end, CommPhase phase);
+    /// \brief MPI Isend of the streams in sendbuf.
+    void SendData (SendListT& sendbuf, std::vector<ProcCL::RequestT>& req, int tag);
+    /// \brief Phase (1) and (2) of ExchangeData: The owner acquires the information.
+    void to_owner (std::vector<ProcCL::RequestT>&, CollectDataT&);
+    /// \brief Phase (4) and (5) of ExchangeData: The owner distributes the accumulated information.
+    void from_owner (std::vector<ProcCL::RequestT>&, SendListT&);
     /// \brief For a stream [GID, tail), call handler(GID, numData, tail).
     template <typename HandlerT, typename IStreamT>
     bool ScatterData( HandlerT& handler, IStreamT& recv);
