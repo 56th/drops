@@ -232,9 +232,9 @@ class VertexCL
     /// \name Functions for parallel computing demanded by the base class
     //@{
     /// \brief Put vertex on a stream
-    void Pack( DiST::Helper::SendStreamCL&) const;
+    void Pack( DiST::Helper::MPIostreamCL&) const;
     /// \brief Generate vertex from a stream
-    void UnPack( DiST::Helper::RecvStreamCL&);
+    void UnPack( DiST::Helper::MPIistreamCL&);
     /// \brief Check if simplex is exclusive
     bool IsExclusive( const Priority=PrioMaster) const;
     //{ return GetPrio()>=Priority; }// /*throw DROPSErrCL("VertexCL::IsExclusive: Not implemented yet, sorry");*/ }
@@ -351,9 +351,9 @@ class EdgeCL
     /// \name Functions for parallel computing demanded by the base class
     //@{
     /// \brief Put edge on a stream
-    void Pack( DiST::Helper::SendStreamCL&) const;
+    void Pack( DiST::Helper::MPIostreamCL&) const;
     /// \brief Generate edge from a stream
-    void UnPack( DiST::Helper::RecvStreamCL&);
+    void UnPack( DiST::Helper::MPIistreamCL&);
     /// \brief Check if simplex is exclusive
     bool IsExclusive( const Priority=PrioMaster) const;
         //{ throw DROPSErrCL("EdgeCL::IsExclusive: Not implemented yet, sorry"); }
@@ -451,9 +451,9 @@ class FaceCL
     /// \name Functions for parallel computing demanded by the base class
     //@{
     /// \brief Put face on a stream
-    void Pack( DiST::Helper::SendStreamCL&) const;
+    void Pack( DiST::Helper::MPIostreamCL&) const;
     /// \brief Generate face from a stream
-    void UnPack( DiST::Helper::RecvStreamCL&);
+    void UnPack( DiST::Helper::MPIistreamCL&);
 
     /// \brief Check if face is exclusive
     bool IsExclusive( const Priority=PrioMaster) const;
@@ -636,9 +636,9 @@ class TetraCL
     /// \name Functions for parallel computing demanded by the base class
     //@{
     /// \brief Put tetra on a stream
-    void Pack( DiST::Helper::SendStreamCL&) const;
+    void Pack( DiST::Helper::MPIostreamCL&) const;
     /// \brief Generate tetra from a stream
-    void UnPack( DiST::Helper::RecvStreamCL&);
+    void UnPack( DiST::Helper::MPIistreamCL&);
     /// \brief Merge tetra with given tetra. Needed by DiST::TransferCL.
     void Merge( const TetraCL&);
 

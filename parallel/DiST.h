@@ -512,9 +512,9 @@ class TransferableCL
     virtual ~TransferableCL() {}
 
     /// \brief Put the simplex on an outgoing stream
-    virtual void Pack( Helper::SendStreamCL&) const = 0;
+    virtual void Pack (Helper::MPIostreamCL&) const = 0;
     /// \brief Init the simplex by an incoming stream
-    virtual void UnPack( Helper::RecvStreamCL&) = 0;
+    virtual void UnPack (Helper::MPIistreamCL&) = 0;
 
     //// \name Information each simplex provides concerning distributed computing
     //@{
@@ -549,14 +549,14 @@ class TransferableCL
 };
 
 /// \brief Use operator << to put data on a stream
-inline Helper::SendStreamCL& operator<< ( Helper::SendStreamCL& os, const TransferableCL& t)
+inline Helper::MPIostreamCL& operator<< (Helper::MPIostreamCL& os, const TransferableCL& t)
 {
     t.Pack( os);
     return os;
 }
 
 /// \brief Use operator >> to get data out of stream
-inline Helper::RecvStreamCL& operator>> ( Helper::RecvStreamCL& is, TransferableCL& t)
+inline Helper::MPIistreamCL& operator>> (Helper::MPIistreamCL& is, TransferableCL& t)
 {
     t.UnPack( is);
     return is;
@@ -627,12 +627,12 @@ class InterfaceCL
         \param binary transfer of data in binary or ASCII mode
     */
     InterfaceCL( const LevelListCL& lvl, const PrioListT& from, const PrioListT& to,
-                 const DimListT& dims, const bool dist=true, const bool binary=true)
+                 const DimListT& dims, const bool dist=true, bool binary= use_binaryMPIstreams)
         : from_(from), to_(to), binary_(binary),
           begin_from_( dims, lvl, from, dist),
           begin_to_( dims, lvl, to, dist), begin_( dims, lvl, /*all prios*/PrioListT(), dist), end_( begin_from_.GetEnd()) {}
 
-    InterfaceCL( GIDIteratorT begin, GIDIteratorT end, const bool binary=true)
+    InterfaceCL( GIDIteratorT begin, GIDIteratorT end, bool binary= use_binaryMPIstreams)
         : binary_(binary), begin_from_( begin, end), begin_to_( begin_from_), begin_(begin_from_), end_( begin_from_.GetEnd()) {}
 
     /// \name ExecuteLocal, functions for calling an execute handler for all
@@ -716,7 +716,7 @@ class ModifyCL
   public:
     /// \brief Constructor with a given multigrid (\a mg) and decision if communication should be done \a binary.
     /// For \a del = true all unused simplices are removed from the multigrid, otherwise the RemoveMark is set and the simplex is unregistered from the DiST module.
-    ModifyCL( MultiGridCL& mg, bool del= true, bool binary=true)
+    ModifyCL( MultiGridCL& mg, bool del= true, bool binary= use_binaryMPIstreams)
         : modifiable_(false), del_(del), binary_( binary), mg_(mg), entsToUpdt_(0) {}
 
     /// \brief Call Init() before any modifications
@@ -771,7 +771,7 @@ class TransferCL : public ModifyCL
   public:
     /// \brief Constructor with a given multigrid (\a mg) and decision if the transfer should be done \a binary.
     /// For \a del = true all unused simplices are removed from the multigrid, otherwise the RemoveMark is set and the simplex is unregistered from the DiST module.
-    TransferCL( MultiGridCL& mg, bool del= true, bool binary=true)
+    TransferCL( MultiGridCL& mg, bool del= true, bool binary= use_binaryMPIstreams)
         : base( mg, del, binary) {}
     /// \brief To be called before marking tetrahedra for transfer
     void Init();
