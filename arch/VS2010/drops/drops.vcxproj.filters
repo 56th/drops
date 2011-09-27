@@ -319,6 +319,9 @@
     <ClCompile Include="..\..\..\tests\dist_ref_rising_drop.cpp">
       <Filter>target\DiST</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\parallel\mpistream.cpp">
+      <Filter>parallel</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\geom\boundary.h">
@@ -538,6 +541,9 @@
       <Filter>parallel</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\parallel\parref.h">
+      <Filter>parallel</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\parallel\mpistream.h">
       <Filter>parallel</Filter>
     </ClInclude>
   </ItemGroup>

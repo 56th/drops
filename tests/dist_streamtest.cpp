@@ -89,6 +89,10 @@ int main( int argc, char **argv)
         debugOutputInsert << "+ a signed char (" << byteValue << ")\n";
         tosend << byteValue;
 
+        char sepValue= DROPS::DiST::Helper::SendRecvStreamAsciiTerminatorC;
+        debugOutputInsert << "+ the ascii item-terminator (" << sepValue << ")\n";
+        tosend << sepValue;
+
         DROPS::Ubyte UbyteValue='x';
         debugOutputInsert << "+ an unsigned char (" << UbyteValue << ")\n";
         tosend << UbyteValue;
@@ -143,6 +147,9 @@ int main( int argc, char **argv)
         torecv >> byteValue;
         myReceivedData << "+ a signed char (" << byteValue << ")\n";
 
+        torecv >> sepValue;
+        myReceivedData << "+ the ascii item-terminator (" << sepValue << ")\n";
+
         torecv >> UbyteValue;
         myReceivedData << "+ an unsigned char (" << UbyteValue << ")\n";
 
@@ -166,6 +173,7 @@ int main( int argc, char **argv)
         DROPS::Ulint expectedUlint = 2442342+(size+myrank-1)%size;
         DROPS::Usint expectedUsint = 242+(size+myrank-1)%size;
         DROPS::byte  expectedByte = -24+(size+myrank-1)%size;
+        char expectedsepValue= DROPS::DiST::Helper::SendRecvStreamAsciiTerminatorC;
         DROPS::Ubyte  expectedUbyte = 'x';
         size_t expectedSizet = 8+(size+myrank-1)%size;
 
@@ -185,6 +193,8 @@ int main( int argc, char **argv)
             myVerifiedData << "\nI'm PROCESS " << myrank << ". The received unsigned short integer and the expected unsigned short integer don't match." << endl;
         }else if (byteValue!=expectedByte) {
             myVerifiedData << "\nI'm PROCESS " << myrank << ". The received signed char and the expected signed char don't match." << endl;
+        }else if (sepValue!=expectedsepValue) {
+            myVerifiedData << "\nI'm PROCESS " << myrank << ". The received ascii item-terminator and the expected ascii item-terminator don't match." << endl;
         }else if (UbyteValue!=expectedUbyte) {
             myVerifiedData << "\nI'm PROCESS " << myrank << ". The received unsigned char and the expected unsigned char don't match." << endl;
         }else if (SizetValue!=expectedSizet) {

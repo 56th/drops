@@ -990,7 +990,7 @@ class ParMultiGridCL::SanityCheckCL
         DiST::LevelListCL Lvls; Lvls.push_back( level_);
         // communicate over all objects
         DiST::InterfaceCL comm( Lvls, allPrios, allPrios, dimlist);
-        return comm.PerformInterfaceComm( *this);
+        return comm.Communicate( *this);
     }
     //@}
 };
@@ -1136,7 +1136,7 @@ class ParMultiGridCL::HandlerAccMFRCL
             Lvls.push_back( level_);
         DiST::InterfaceCL::DimListT dimlist; dimlist.push_back( DiST::GetDim<EdgeCL>());
         DiST::InterfaceCL interf( Lvls, allPrios, allPrios, dimlist);
-        if ( !interf.PerformInterfaceComm( *this))
+        if ( !interf.Communicate( *this))
             throw DROPSErrCL("HandlerAccMFRCL::Call: Interface communication is broken");
     }
 };
@@ -1204,7 +1204,7 @@ public:
         if ( level_!=-1)
             Lvls.push_back( level_);
         DiST::InterfaceCL interf( Lvls, prioGhost, prioMaster, dimlist);
-        if ( !interf.PerformInterfaceComm( *this))
+        if ( !interf.Communicate( *this))
             throw DROPSErrCL("HandlerRefMarkCL::Call: Interface communication is broken");
     }
 };
@@ -1831,7 +1831,7 @@ void ParMultiGridCL::FXfer(FaceCL &f, PROCT dest, PrioT prio, bool del)
 /// \brief Send a Tetra
 void ParMultiGridCL::Transfer(TetraCL &t, int dest, Priority prio, bool del)
 {
-    transfer_->MarkForTransfer( t, dest, prio, del);
+    transfer_->Transfer( t, dest, prio, del);
     if (t.IsRegularlyRef() && t.IsMaster() && prio==PrioMaster)
         t.UnCommitRegRefMark();
 }

@@ -62,7 +62,7 @@ void SendTetras( MultiGridCL& mg, const bool binary=true)
         const Priority prio  = PrioMaster;
         const bool     todel = true;
         for ( MultiGridCL::const_TetraIterator sit( mg.GetTetrasBegin()); sit!=mg.GetTetrasEnd(); ++sit){
-            transfer.MarkForTransfer( *sit, toProc, prio, todel);
+            transfer.Transfer( *sit, toProc, prio, todel);
             toProc= (toProc+1)%ProcCL::Size();
         }
     }
@@ -190,7 +190,7 @@ void CheckInterface( const MultiGridCL&, const bool binary=true)
         std::cout << "LocalExecute returns true" << std::endl;
     }
     BaryHandlerCL BaryHandler;
-    if ( !ProcCL::Check(interf.PerformInterfaceComm( BaryHandler))){
+    if ( !ProcCL::Check(interf.Communicate( BaryHandler))){
         std::cout << "In interface communication: Scatter returns false" << std::endl;
     }
     else{

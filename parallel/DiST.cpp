@@ -75,58 +75,6 @@ void ErrorCL::handle() const
     std::abort();
 }
 
-// S T R E A M  C L A S S E S
-//---------------------------
-
-/** This member function is just a mask of the already in DROPS implemented
-    blocking receive, the only difference is that we always receive objects
-    of datatype MPI_CHAR.
-    \param source from whom should I receive
-    \param tag    the tag which has been used to send the message
-*/
-void RecvStreamCL::Recv(int source, int tag)
-{
-    int bufsize = ProcCL::GetMessageLength<char>( source, tag);
-    std::string temp(bufsize,' ');
-    ProcCL::Recv(&temp[0], bufsize, source, tag);
-    this->str( str() + temp);
-}
-
-SendStreamCL& operator<< ( SendStreamCL& os, const GeomIdCL& h)
-{
-    os << h.level << h.bary[0] << h.bary[1] << h.bary[2] << h.dim;
-    return os;
-}
-
-SendStreamCL& operator<< ( SendStreamCL& os, const Point3DCL& h)
-{
-    os << h[0] << h[1] << h[2];
-    return os;
-}
-
-SendStreamCL& operator<< ( SendStreamCL& sendstream, const UnknownHandleCL& unk)
-{
-    unk.Pack( sendstream);
-    return sendstream;
-}
-
-RecvStreamCL& operator>> ( RecvStreamCL& is, GeomIdCL& h)
-{
-    is >> h.level >> h.bary[0] >> h.bary[1] >> h.bary[2] >> h.dim;
-    return is;
-}
-
-RecvStreamCL& operator>> ( RecvStreamCL& is, Point3DCL& h)
-{
-    is >> h[0] >> h[1] >> h[2];
-    return is;
-}
-
-RecvStreamCL& operator<< ( RecvStreamCL& recvstream, UnknownHandleCL& unk)
-{
-    unk.UnPack( recvstream);
-    return recvstream;
-}
 
 // R E M O T E  D A T A  C L
 //--------------------------
@@ -317,7 +265,7 @@ class RemoteDataListCL::DebugHandlerCL
         const LevelListCL allLvls;
         // communicate over all objects
         InterfaceCL comm( allLvls, allPrios, allPrios, dimlist);
-        return comm.PerformInterfaceComm( *this);
+        return comm.Communicate( *this);
     }
 };
 
@@ -485,7 +433,7 @@ void InterfaceCL::SetupCommunicationStructure()
 //    std::cout << "[" << ProcCL::MyRank() << "] IRecvFromOwner = "; Print(IRecvFromOwners_, std::cout);
 }
 
-void InterfaceCL::Communicate( CommPhase phase)
+void InterfaceCL::ExchangeData( CommPhase phase)
 /** The interface communication has four phases.
     (1) The data collected by the gather routine is sent to processes which are owner of
     at least one entity. Let p denote a process who is owner of an entity.
@@ -708,7 +656,7 @@ class ModifyCL::MergeProcListHandlerCL
                 updateVec.push_back( it->first->GetGID());
 
         InterfaceCL comm( updateVec.begin(), updateVec.end(), mod_.binary_);
-        comm.PerformInterfaceComm( *this);
+        comm.Communicate( *this);
     }
 };
 
@@ -772,7 +720,7 @@ class ModifyCL::CommToUpdateHandlerCL
         const LevelListCL allLvls;
         // communicate over all objects
         InterfaceCL comm( allLvls, allPrios, allPrios, dimlist, /*dist*/ true, mod_.binary_);
-        comm.PerformInterfaceComm( *this);
+        comm.Communicate( *this);
     }
 };
 
@@ -1001,7 +949,7 @@ void TransferCL::Finalize()
     modifiable_= false;
 }
 
-void TransferCL::MarkForTransfer( const TetraCL& t, int toProc, Priority prio, bool del)
+void TransferCL::Transfer( const TetraCL& t, int toProc, Priority prio, bool del)
 {
     Assert( modifiable_, DROPSErrCL("TransferCL::MarkForTransfer: Class is not in the modifiable mode, call Init() first!"), DebugDiSTC);
 

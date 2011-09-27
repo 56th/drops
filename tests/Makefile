@@ -27,7 +27,7 @@ include ../Make.common
 
 PAR_OBJ_ = ../parallel/parallel.o ../parallel/partime.o  \
            ../parallel/exchange.o  ../parallel/parmultigrid.o \
-           ../parallel/logger.o ../parallel/DiST.o ../parallel/loadbal.o ../parallel/partitioner.o
+           ../parallel/logger.o ../parallel/DiST.o ../parallel/mpistream.o ../parallel/loadbal.o ../parallel/partitioner.o
 
 PAR_OBJ = $(if $(PAR_BUILD),$(PAR_OBJ_),)
 

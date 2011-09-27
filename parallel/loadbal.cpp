@@ -117,7 +117,7 @@ void LoadBalCL::CommunicateAdjacencyCL::Call()
     const DiST::LevelListCL allLevels;
 
     DiST::InterfaceCL comm( allLevels, Prios, Prios, dimlist);
-    comm.PerformInterfaceComm( *this);
+    comm.Communicate( *this);
 }
 
 

@@ -64,21 +64,6 @@ ErrorCL::ErrorCL(const std::string& mesg, const T& data, const GeomIdCL& gid)
     _ErrMesg+= oss.str();
 }
 
-/** This member function is just a mask of the already in DROPS implemented
-    non-blocking send, the only difference is that we always send objects
-    of datatype MPI_CHAR.
-    \todo dm: Declare a static member tag_ and use this as a tag for sending and receiving
-*/
-ProcCL::RequestT SendStreamCL::Isend(int dest, int tag)
-{
-    // copy the content into a buffer which is continuous in the memory
-    // for sending the data with MPI
-    sendbuf_.clear(); sendbuf_= this->str();
-    // now, we don't need the internal buffer of ostringstream any more.
-    this->clear(); this->seekp(0);
-    return ProcCL::Isend( sendbuf_.data(), sendbuf_.size(), dest, tag);
-}
-
 
 // R E M O T E  D A T A  C L A S S
 //--------------------------------
@@ -397,7 +382,7 @@ bool InterfaceCL::Perform( HandlerT& handler, CommPhase phase)
     GatherData( handler, begin_from_, end_, phase);
 
     // communicate data
-    Communicate( phase);
+    ExchangeData( phase);
 
     // scatter the data
     const bool result= ScatterData( handler);
@@ -412,10 +397,11 @@ bool InterfaceCL::Perform( HandlerT& handler, CommPhase phase)
 
 
 template <typename HandlerT>
-bool InterfaceCL::PerformInterfaceComm( HandlerT& handler)
+bool InterfaceCL::Communicate( HandlerT& handler)
 /** Basically, call the Gather function of the handler for all entities covered by the interface
-    and having the from priority. Then transfer the data to the copies having the to priority,
-    and call the Scatter function on the copies.
+    and having the \a from priority. Then transfer the data to the respective owners which bundle
+    the data and send the data bundles to the copies having the \a to priority. After receiving
+    the data, call the Scatter function on the copies.
     \return Local accumulated AND of all Scatter calls (without reduction).
 */
 {

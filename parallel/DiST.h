@@ -29,6 +29,8 @@
 #include "misc/container.h"
 #include "misc/utils.h"
 #include "num/unknowns.h"
+#include "parallel/mpistream.h"
+
 #include <list>
 #include <set>
 #include <vector>
@@ -175,116 +177,6 @@ class ErrorCL: public DROPSErrCL
     std::ostream& what  (std::ostream&) const;
     void handle() const;
 };
-
-/// \brief Helper union for writing and reading numbers in streams
-/** \todo Maybe we need a memcopy and this is not save?*/
-template <typename T>
-union ToBinary
-{
-    T    value;
-    char binary[sizeof(T)];
-};
-
-/// \brief Outgoing stream.
-class SendStreamCL : public std::ostringstream
-/** This stream is employed as a mean of transport for sending data (integers,
-    vertices, elements, etc.) out of the process towards other processes. <p>
-    It is derived from the ostringstream class of the Standard IOstream Library
-    and it is characterized by saving all kind of data as a string. <p>
-    It's counterpart is the class RecvStreamCL.
-    \todo Is there a way to get rid of the copy sendbuf_?
-*/
-{
-public:
-    typedef std::ostringstream base;
-
-  private:
-    bool binary_;           ///< flag for binary sending/receiving
-    std::string sendbuf_;   ///< buffering the sending data
-
-  public:
-    SendStreamCL( const bool binary=true) : std::ostringstream(), binary_(binary) {}
-    inline bool isBinary() const {return binary_;}
-    /// \brief Non-blocking send to process 'dest'.
-    inline ProcCL::RequestT Isend(int dest, int tag=5);
-    /// \brief Clear buffer.
-    /** We do not really clear the buffer, we just move the inserting pointer (put pointer) to the beginning. */
-    void clearbuffer() { seekp(0); sendbuf_.clear(); }
-};
-
-/// \brief Incoming stream.
-class RecvStreamCL : public std::istringstream
-/** This stream is employed as a mean of transport for receiving incoming data
-    (integers, vertices, elements, etc.) sent from other process. <p>
-    It is derived from the istringstream class of the Standard IOstream Library
-    and it is characterized by saving all kind of data as a string. <p>
-    It's counterpart is the class SendStreamCL.
-*/
-{
-public:
-    typedef std::istringstream base;
-
-  private:
-    bool binary_;   ///< flag for binary sending/receiving
-
-  public:
-    /// @param[in] binary is true if the stream store the data in binary; in ASCII otherwise.
-    RecvStreamCL( const bool binary=true)
-        : std::istringstream( binary ? std::ios_base::binary : std::ios_base::in), binary_(binary) {}
-    RecvStreamCL( const SendStreamCL& s)
-        : std::istringstream( s.str()), binary_(s.isBinary()) {}
-    /// \brief Gives back how many bytes of data contains our stream at the time.
-    inline int getbufsize() const { return ((int) const_cast<RecvStreamCL*>(this)->tellg())+1; }
-    inline bool isBinary() const {return binary_;}
-    /// \brief Blocking receive from process 'source'.
-    void Recv(int source, int tag=5);
-    /// \brief Go back to the beginning of the stream.
-    inline void resetbuffer() { this->seekg(0); }
-};
-
-/// \brief operator << for SendStreamCL
-template<typename T>
-SendStreamCL& operator<<( SendStreamCL& os, const T& t)
-{
-    if (os.isBinary()) {
-        ToBinary<T> bin;
-        bin.value= t;
-        os.write( bin.binary, sizeof(T));
-    } else {
-        SendStreamCL::base& oss= dynamic_cast<SendStreamCL::base&>(os);
-        oss << t << ' ';
-    }
-    return os;
-}
-
-/// \brief operator >> for RecvStreamCL
-template<typename T>
-RecvStreamCL& operator>>( RecvStreamCL& is, T& t)
-{
-    if (is.isBinary()) {
-        ToBinary<T> bin;
-        is.read( bin.binary, sizeof(T));
-        t= bin.value;
-    } else {
-        RecvStreamCL::base& iss= dynamic_cast<RecvStreamCL::base&>(is);
-        iss >> t;
-    }
-    return is;
-}
-
-/// \brief Use operator << to put a GeomIdCL object on a stream
-SendStreamCL& operator<< ( SendStreamCL&, const GeomIdCL&);
-/// \brief Use operator << to put a Point3DCL object on a stream
-SendStreamCL& operator<< ( SendStreamCL&, const Point3DCL&);
-/// \brief Use operator << to put a UnknownHandleCL object on a stream
-SendStreamCL& operator<< ( SendStreamCL&, const UnknownHandleCL&);
-
-/// \brief Use operator >> to get a GeomIdCL object out of stream
-RecvStreamCL& operator>> ( RecvStreamCL&, GeomIdCL&);
-/// \brief Use operator >> to get a Point3DCL object out of stream
-RecvStreamCL& operator>> ( RecvStreamCL&, Point3DCL&);
-/// \brief Use operator >> to get a UnknownHandleCL object out of stream
-RecvStreamCL& operator<< ( RecvStreamCL&, UnknownHandleCL&);
 
 /// \brief For each distributed entity, a list of process ranks (and corresponding priority) is stored.
 class RemoteDataCL
@@ -455,7 +347,7 @@ class RemoteDataListIteratorCL
         : pos_(it), levels_(LevelListCL()), prios_(PrioListT()), distributed_(false) {}
 
     /// \brief Standard constructor, it receives a pointer to the container and the level and priority list.
-    inline RemoteDataListIteratorCL( RemoteDataListCL*, const LevelListCL&, const PrioListT&, bool);
+    inline RemoteDataListIteratorCL( RemoteDataListCL*, const LevelListCL&, const PrioListT&, bool dist);
 
     /// \brief Copy constructor
     inline RemoteDataListIteratorCL(const RemoteDataListIteratorCL& Lit)
@@ -718,7 +610,7 @@ class InterfaceCL
     template <typename HandlerT>
     bool ScatterData( HandlerT&);
     /// \brief Handles the communication between the processes
-    void Communicate( CommPhase phase);
+    void ExchangeData( CommPhase phase);
     /// \brief set up the ownerRecvFrom_ and IRecvFromOwners_
     void SetupCommunicationStructure();
     /// \brief do the specified communication
@@ -761,7 +653,6 @@ class InterfaceCL
     bool ExecuteLocal( ExecuteHandlerT& handler, const IteratorT& begin, const IteratorT& end);
     //@}
 
-
     /// \name Do The interface communication
     /// \param HandlerT A handler h is used to gather and scatter data on
     ///     TransferableCL's. Therefore, the handler must provide the members
@@ -771,7 +662,7 @@ class InterfaceCL
     /// \brief Do the interface communication on the interface specified by the
     ///   the constructor
     template <typename HandlerT>
-    bool PerformInterfaceComm( HandlerT&);
+    bool Communicate( HandlerT&);
 
     /// \brief Do the interface communication from non-owners to owners
     template <typename HandlerT>
@@ -887,7 +778,7 @@ class TransferCL : public ModifyCL
     /// \brief To be called after marking tetrahedra for transfer (initiates the communication)
     void Finalize();
     /// \brief Mark a tetrahedron for transfer
-    void MarkForTransfer( const TetraCL&, int toProc, Priority prio, bool del= true);
+    void Transfer( const TetraCL&, int toProc, Priority prio, bool del= true);
 };
 
 

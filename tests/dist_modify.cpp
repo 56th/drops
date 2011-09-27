@@ -65,7 +65,7 @@ void SendTetras( MultiGridCL& mg, int sender, const bool binary=true)
         const Priority prio  = PrioMaster;
         const bool     todel = true;
         for ( MultiGridCL::const_TetraIterator sit( mg.GetTetrasBegin()); sit!=mg.GetTetrasEnd(); ++sit) {
-            transfer.MarkForTransfer( *sit, toProc, prio, todel);
+            transfer.Transfer( *sit, toProc, prio, todel);
             toProc= (toProc+1)%P;
         }
     }

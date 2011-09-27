@@ -1094,7 +1094,7 @@ void ExchangeBuilderCL::BuildIndexLists()
     // Communicate dof positions via process boundaries, after the
     // call, OwnerDistrIndex and dofProcList_ is set up.
     HandlerDOIndexCL handlerIndex( ex_, rowidx_);
-    interf_->PerformInterfaceComm( handlerIndex);
+    interf_->Communicate( handlerIndex);
 
     // sort the list of OwnerDistrIndex for better memory access pattern
     std::sort( ex_.OwnerDistrIndex.begin(), ex_.OwnerDistrIndex.end());
@@ -1179,7 +1179,7 @@ void ExchangeBuilderCL::buildDirectComm()
 
     // determine communication structure
     HandlerDOFDirectCommCL handerDOFDirect( rowidx_, mg_);
-    interf_->PerformInterfaceComm( handerDOFDirect);
+    interf_->Communicate( handerDOFDirect);
     handerDOFDirect.buildSendStructures( ex_.sendListPhase1_);
     handerDOFDirect.buildRecvStructures( ex_.recvListPhase1_);
 
