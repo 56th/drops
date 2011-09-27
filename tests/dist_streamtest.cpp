@@ -101,6 +101,16 @@ int main( int argc, char **argv)
         debugOutputInsert << "+ a size_t value (" << SizetValue << ")\n";
         tosend << SizetValue;
 
+        if (!binary && myrank == 0) {
+            cerr << " Orig is: " << tosend.str()     << " position: " << tosend.tellp()     << " state: " << tosend.rdstate()     << '\n';
+            // tosend.setstate( ios_base::failbit);
+            DROPS::DiST::Helper::SendStreamCL tosendcopy= tosend;
+            cerr << " Copy is: " << tosendcopy.str() << " position: " << tosendcopy.tellp() << " state: " << tosendcopy.rdstate() << '\n';
+            DROPS::DiST::Helper::SendStreamCL tosendassg;
+            tosendassg= tosend;
+            cerr << " assg is: " << tosendassg.str() << " position: " << tosendassg.tellp() << " state: " << tosendassg.rdstate() << '\n';
+        }
+
         DROPS::ProcCL::Barrier();
         cerr << debugOutputInsert.str();
         DROPS::ProcCL::Barrier();

@@ -349,7 +349,7 @@ void InterfaceCL::GatherData( HandlerT& handler, const iterator& begin,
 }
 
 template <typename HandlerT>
-bool InterfaceCL::ScatterData( HandlerT& handler)
+bool InterfaceCL::ScatterData (HandlerT& handler)
 /// \return local accumulated AND of all scatter calls
 {
     bool result= true;
@@ -394,10 +394,21 @@ bool InterfaceCL::Perform( HandlerT& handler, CommPhase phase)
     GatherData( handler, begin_from_, end_, phase);
 
     // communicate data
+    if (phase == toowner) {
+        loc_recv_toowner_.setBinary( binary_);
+        loc_send_toowner_.setBinary( binary_);
+    }
     ExchangeData( phase);
 
     // scatter the data
-    const bool result= ScatterData( handler);
+    bool result= ScatterData( handler);
+    if (phase == toowner) {
+        result= result && ScatterData( handler, loc_recv_toowner_);
+        loc_recv_toowner_.clear();
+        loc_recv_toowner_.setbuf( 0, 0);
+        loc_send_toowner_.clear();
+        loc_send_toowner_.clearbuffer();
+    }
     // clear receive buffer
     recvbuf_.clear();
 

@@ -937,7 +937,7 @@ class ParMultiGridCL::SanityCheckCL
         return true;
     }
 
-    bool Scatter( DiST::TransferableCL& t, const size_t& numData, DiST::Helper::RecvStreamCL& recv)
+    bool Scatter( DiST::TransferableCL& t, const size_t& numData, DiST::Helper::MPIistreamCL& recv)
     {
         DiST::Helper::GeomIdCL gid;
         bool sane= true;
@@ -1116,7 +1116,7 @@ class ParMultiGridCL::HandlerAccMFRCL
 
     }
     /// \brief Add received MFR to the accumulated MFR
-    bool Scatter( DiST::TransferableCL& t, const size_t& numData, DiST::Helper::RecvStreamCL& recv)
+    bool Scatter( DiST::TransferableCL& t, const size_t& numData, DiST::Helper::MPIistreamCL& recv)
     {
         EdgeCL* ep; simplex_cast( t, ep);
         ep->AccMFR_= 0;
@@ -1166,7 +1166,7 @@ public:
     }
     /// \brief This is called by the master copy. The corresponding ghost copy definitely put in the
     ///     message, whether the tetrahedron is marked for regular refinement
-    bool Scatter( DiST::TransferableCL& t, __UNUSED__ const size_t& numData, DiST::Helper::RecvStreamCL& recv)
+    bool Scatter( DiST::TransferableCL& t, __UNUSED__ const size_t& numData, DiST::Helper::MPIistreamCL& recv)
     {
         TetraCL* tp; simplex_cast( t, tp);
 

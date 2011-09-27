@@ -199,7 +199,7 @@ bool ExchangeCL::SysnumHandlerCL::Gather( DiST::TransferableCL& t, DiST::Helper:
     return true;
 }
 
-bool ExchangeCL::SysnumHandlerCL::Scatter( DiST::TransferableCL& t, size_t numData, DiST::Helper::RecvStreamCL& recv)
+bool ExchangeCL::SysnumHandlerCL::Scatter( DiST::TransferableCL& t, size_t numData, DiST::Helper::MPIistreamCL& recv)
 /// Scatter sendposition on receiver-side. Therefore iterate over the
 /// content of the buffer and check for the right content for this processor.
 /// The content of the message is described detailed in the documentation of

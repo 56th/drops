@@ -1328,7 +1328,7 @@ bool ExchangeBuilderCL::HandlerDOFtoOwnerCL::Gather( DiST::TransferableCL& t,
 }
 
 bool ExchangeBuilderCL::HandlerDOFtoOwnerCL::Scatter( DiST::TransferableCL& t,
-    const size_t& numData, DiST::Helper::RecvStreamCL& recv)
+    const size_t& numData, DiST::Helper::MPIistreamCL& recv)
 /** Owners have to create a mapping from the sendposition to the local dofs.*/
 {
     const Uint idx= rowidx_.GetIdx();
@@ -1451,7 +1451,7 @@ bool ExchangeBuilderCL::HandlerDOFFromOwnerCL::Gather( DiST::TransferableCL& t,
 }
 
 bool ExchangeBuilderCL::HandlerDOFFromOwnerCL::Scatter( DiST::TransferableCL& t,
-    __UNUSED__ const size_t& numData, DiST::Helper::RecvStreamCL& recv)
+    __UNUSED__ const size_t& numData, DiST::Helper::MPIistreamCL& recv)
 {
     // local dof
     const Uint idx= rowidx_.GetIdx();
@@ -1584,7 +1584,7 @@ bool ExchangeBuilderCL::HandlerDOFDirectCommCL::Gather( DiST::TransferableCL& t,
 }
 
 bool ExchangeBuilderCL::HandlerDOFDirectCommCL::Scatter( DiST::TransferableCL& t,
-    const size_t& numData, DiST::Helper::RecvStreamCL& recv)
+    const size_t& numData, DiST::Helper::MPIistreamCL& recv)
 {
     // local dof
     const Uint idx= rowidx_.GetIdx();
@@ -1683,7 +1683,7 @@ bool ExchangeBuilderCL::HandlerDOIndexCL::Gather(
 
 bool ExchangeBuilderCL::HandlerDOIndexCL::Scatter(
     DiST::TransferableCL& t, const size_t& numData,
-    DiST::Helper::RecvStreamCL& recv)
+    DiST::Helper::MPIistreamCL& recv)
 /** Store dof information on other processes in the dofProcList_. */
 {
     const Uint idx= rowidx_.GetIdx();

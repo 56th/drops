@@ -607,14 +607,20 @@ class InterfaceCL
         toowner,                ///< copies send to owners, i.e., copies -> owner
         fromowner               ///< owner send to copies, i.e., owner -> copies
     };
+
     RecvListT recvbuf_;         ///< received data (after call of function Communicate())
-    SendListT sendbuf_;         ///< data to be sent
+    SendListT sendbuf_;         ///< data to be sent (filled in GatherData)
+    Helper::SendStreamCL    loc_send_toowner_; ///< used in Perform, phase==toowner, to avoid a copy of the local message
+    Helper::RefMPIistreamCL loc_recv_toowner_; ///< used in Perform, phase==toowner, to avoid a copy of the local message
+
     PrioListT from_;            ///< list of priority on sender side, the interface operates on
     PrioListT to_;              ///< list of priority on receiver side, the interface operates on
+
     bool      binary_;          ///< transfer data binary or in ASCII
     ProcSetT  ownerRecvFrom_;   ///< list of processes, the owner receives data from
     ProcSetT  ownerSendTo_;     ///< list of processes, the owner sends data to
     ProcSetT  IRecvFromOwners_; ///< list of owner processes, I have to receive data from
+
     iterator  begin_from_,      ///< iterators defining sequence of interface elements
               begin_to_,
               begin_,

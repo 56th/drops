@@ -228,7 +228,7 @@ class RemoteDataListCL::DebugHandlerCL
         return true;
     }
 
-    bool Scatter( TransferableCL& t, const size_t numData, Helper::RecvStreamCL& r)
+    bool Scatter( TransferableCL& t, const size_t numData, Helper::MPIistreamCL& r)
     { // read proc/prio lists and compare with own
         Helper::RemoteDataCL::ProcListT myplist( t.GetProcListBegin(), t.GetProcListEnd());
         for (size_t i=0; i<numData; ++i) {
@@ -532,10 +532,10 @@ void InterfaceCL::ExchangeData (CommPhase phase)
     // Phase (2): Owning process receives data
     //----------------------------------------
     std::vector<ProcCL::RequestT> reqFirstSend;
-    CollectDataT collect; // Collect the data for one GID from each sender
+    CollectDataT collect; // Collect the data for one GID from all senders
     if (phase==bothPhases || phase==toowner)
         to_owner( reqFirstSend, collect);
-    else {
+    else { // Local operation
         if (ownerRecvFrom_.count( myrank) > 0) {
             Helper::SendStreamCL& locsendbuf= sendbuf_[myrank];
             Helper::RefMPIistreamCL locrecvbuf( locsendbuf.begin(), locsendbuf.cur() - locsendbuf.begin(), binary_) ;
@@ -550,9 +550,7 @@ void InterfaceCL::ExchangeData (CommPhase phase)
     // MPI permits this. (receivers == ownerSendTo_)
     // Note, that the message must be sent nonetheless, as the receiver posts a Recv.
     SendListT sendstreams;
-    if (phase == toowner)
-        sendstreams[myrank].setBinary( binary_);
-    else
+    if (phase == fromowner || phase == bothPhases)
         for (ProcSetT::const_iterator receiver= ownerSendTo_.begin(); receiver != ownerSendTo_.end(); ++receiver)
             sendstreams[*receiver].setBinary( binary_);
 
@@ -564,9 +562,9 @@ void InterfaceCL::ExchangeData (CommPhase phase)
         for (PL_IterT pit= rd.GetProcListBegin(); pit != rd.GetProcListEnd(); ++pit) {
             if (to_.contains( pit->prio)) {
                 const int receiver= pit->proc;
-                if (phase==toowner) { // Data will be copied to recvbuf_[myrank] in Phase (4) and (5).
+                if (phase==toowner) { // Data will be referenced by loc_recv_toowner_ in Phase (4) and (5) and ScatterData.
                     if (receiver == myrank)
-                        sendstreams[myrank] << it->first << it->second;
+                        loc_send_toowner_ << it->first << it->second;
                 }
                 else {
                     Assert( sendstreams.count( receiver) > 0,
@@ -587,7 +585,7 @@ void InterfaceCL::ExchangeData (CommPhase phase)
         from_owner( reqSecondSend, sendstreams);
     else
         if (IRecvFromOwners_.count( ProcCL::MyRank()) > 0)
-            recvbuf_[myrank].clearbuffer( sendstreams[myrank].str());
+            loc_recv_toowner_.setbuf( loc_send_toowner_.begin(), loc_send_toowner_.cur() - loc_send_toowner_.begin());
 
     // Wait until all messages have left me before deleting the buffers
     if (!reqFirstSend.empty())
@@ -622,7 +620,7 @@ class ModifyCL::MergeProcListHandlerCL
         return true;
     }
 
-    bool Scatter( TransferableCL& t, const size_t numData, Helper::RecvStreamCL& r){
+    bool Scatter( TransferableCL& t, const size_t numData, Helper::MPIistreamCL& r){
         ModifyCL::UpdateListT& ul= mod_.entsToUpdt_[t.GetDim()];
         ModifyCL::UpdateIterator it= ul.find( &t);
         if (it==ul.end())
@@ -677,7 +675,7 @@ class ModifyCL::CommToUpdateHandlerCL
         return true;
     }
 
-    bool Scatter( TransferableCL& t, const size_t numData, Helper::RecvStreamCL& is)
+    bool Scatter( TransferableCL& t, const size_t numData, Helper::MPIistreamCL& is)
     {
         const Usint dim= t.GetDim();
         if (dim==GetDim<TetraCL>()) { // tetra

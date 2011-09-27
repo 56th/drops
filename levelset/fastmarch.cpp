@@ -1535,7 +1535,7 @@ bool ParDirectDistanceCL::CommunicateFrontierCL::Gather( const DiST::Transferabl
     return true;
 }
 
-bool ParDirectDistanceCL::CommunicateFrontierCL::Scatter( DiST::TransferableCL& t, const size_t numData, DiST::Helper::RecvStreamCL& r)
+bool ParDirectDistanceCL::CommunicateFrontierCL::Scatter( DiST::TransferableCL& t, const size_t numData, DiST::Helper::MPIistreamCL& r)
 {
     if (!t.Unknowns.Exist() || t.Unknowns.Exist(actualData_->phi.RowIdx->GetIdx()))
         return false;

@@ -107,7 +107,7 @@ struct BaryHandlerCL
         return true;
     }
 
-    bool Scatter( DiST::TransferableCL& t, size_t numData, DiST::Helper::RecvStreamCL& recv)
+    bool Scatter( DiST::TransferableCL& t, size_t numData, DiST::Helper::MPIistreamCL& recv)
     {
         Point3DCL bary;
         const DiST::Helper::RemoteDataCL& rd= DiST::InfoCL::Instance().GetRemoteData(t);
@@ -135,7 +135,7 @@ struct ProcRankToOwnerHandlerCL
         return true;
     }
 
-    bool Scatter( DiST::TransferableCL& t, size_t numData, DiST::Helper::RecvStreamCL& recv)
+    bool Scatter( DiST::TransferableCL& t, size_t numData, DiST::Helper::MPIistreamCL& recv)
     {
         std::vector<int> ranks( numData, -1);
         for ( size_t i=0; i<numData; ++i){
@@ -160,7 +160,7 @@ struct ProcRankFromOwnerHandlerCL
         return true;
     }
 
-    bool Scatter( DiST::TransferableCL& t, size_t numData, DiST::Helper::RecvStreamCL& recv)
+    bool Scatter( DiST::TransferableCL& t, size_t numData, DiST::Helper::MPIistreamCL& recv)
     {
         bool correct=true;
         std::vector<int> ranks( numData, -1);
