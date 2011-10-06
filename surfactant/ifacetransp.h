@@ -190,7 +190,7 @@ class SurfactantcGP1CL
     const VelBndDataT&  Bnd_v_;  ///< Boundary condition for the velocity
     VecDescCL*          v_;      ///< velocity at current time step
     VecDescCL&          lset_vd_;///< levelset at current time step
-    
+
     const BndDataCL<>&  lsetbnd_; ///< level set boundary
 
     IdxDescCL           oldidx_; ///< idx that corresponds to old time (and oldls_)
@@ -271,6 +271,8 @@ class InterfaceP1RepairCL : public MGObserverCL
     void pre_refine_sequence  ();
     void post_refine_sequence ();
     const IdxDescCL* GetIdxDesc() const { return u_.RowIdx; }
+    const VectorCL*  GetVector()  const { return &u_.Data; }
+    void swap( IdxDescCL& idx, VectorCL& v) { u_.RowIdx->swap(idx); u_.Data.swap(v); }
 };
 
 ///\brief Represents a scalar P1 function on the interface as Ensight6 variable by extension to the

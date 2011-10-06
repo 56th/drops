@@ -73,6 +73,8 @@ class VectorBaseCL: public std::valarray<T>
 
 DROPS_DEFINE_VALARRAY_DERIVATIVE( VectorBaseCL, T, base_type)
 
+    void swap( VectorBaseCL<T>& v) { std::swap( *this, v); }
+
     const T* raw() const { return Addr( *this); }
     T*       raw()       { return &(*this)[0]; }
 
@@ -195,8 +197,8 @@ inline VectorBaseCL<T>& add_to_global_vector (VectorBaseCL<T>& v, const Point3DC
     return v;
 }
 
-/// \brief Use Kahan's algorithm to sum up elements 
-/** This algorithm accumulates the error made by the floting point 
+/// \brief Use Kahan's algorithm to sum up elements
+/** This algorithm accumulates the error made by the floting point
     arithmetics and addes this error to the sum.
     \param first iterator to the first element
     \param end   iterator behind the last element
@@ -467,7 +469,7 @@ public:
         {
             Comment("SparseMatBuilderCL: Creating NEW matrix" << std::endl, DebugNumericC);
             _coupl= new couplT[_rows/BlockTraitT::num_rows];
-            for (size_t i=0; i< _rows/BlockTraitT::num_rows; ++i) 
+            for (size_t i=0; i< _rows/BlockTraitT::num_rows; ++i)
                 _coupl[i].rehash(100);
         }
     }
@@ -509,7 +511,7 @@ void SparseMatBuilderCL<T, BlockT>::Build()
 #       pragma omp for
         for (size_t i= 0; i < block_rows; ++i)
             BlockTraitT::row_nnz( rb + 1, i, _coupl[i].size());
-        inplace_parallel_partial_sum( rb, rb + _mat->num_rows() + 1, t_sum); 
+        inplace_parallel_partial_sum( rb, rb + _mat->num_rows() + 1, t_sum);
 #       pragma omp barrier
 #       pragma omp master
         _mat->num_nonzeros( rb[_rows]);
@@ -1147,7 +1149,7 @@ SparseMatBaseCL<T>& SparseMatBaseCL<T>::LinComb (double coeffA, const SparseMatB
             _rowbeg[row + 1]= i + (rAend - rA) + (rBend - rB);
         }
 
-        inplace_parallel_partial_sum( _rowbeg, _rowbeg + num_rows() + 1, t_sum); 
+        inplace_parallel_partial_sum( _rowbeg, _rowbeg + num_rows() + 1, t_sum);
 #       pragma omp barrier
 #       pragma omp master
             num_nonzeros( row_beg( num_rows()));

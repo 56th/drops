@@ -40,42 +40,42 @@
 
 namespace DROPS
 {
-  
+
 class VelocityContainer
 {
   typedef BndDataCL<Point3DCL>                              VelBndDataT;
-  typedef P2EvalCL<SVectorCL<3>, const VelBndDataT, const VecDescCL> const_DiscVelSolCL;  
+  typedef P2EvalCL<SVectorCL<3>, const VelBndDataT, const VecDescCL> const_DiscVelSolCL;
   private:
-    VecDescCL *v_;   
-    const VelBndDataT*    Bnd_v_;     
-    MultiGridCL*   MG_;  
-    instat_vector_fun_ptr vfptr_; 
+    VecDescCL *v_;
+    const VelBndDataT*    Bnd_v_;
+    MultiGridCL*   MG_;
+    instat_vector_fun_ptr vfptr_;
     const_DiscVelSolCL * asp2;
   public:
     VelocityContainer(VecDescCL & v,const VelBndDataT& Bnd_v,MultiGridCL& MG):v_(&v),Bnd_v_(&Bnd_v), MG_(&MG),vfptr_(0)
     {
       asp2 = new const_DiscVelSolCL( v_, Bnd_v_, MG_);
     };
-    
+
     VelocityContainer(instat_vector_fun_ptr v):v_(0),Bnd_v_(0),MG_(0),vfptr_(v),asp2(0){};
-    
+
     ~VelocityContainer()
     {
       if (asp2) delete asp2;
     }
-    
+
     const_DiscVelSolCL & GetVelocityAsP2() const
-        { 
+        {
           if (!(v_ && Bnd_v_))
             throw DROPSErrCL("velocity not prescribed as a const_DiscVelSolCL");
-          return *asp2; 
+          return *asp2;
         }
-        
+
     const_DiscVelSolCL GetVelocityAsP2(const VecDescCL& vel) const
-        { 
+        {
           if (!(v_ && Bnd_v_))
             throw DROPSErrCL("velocity not prescribed as a const_DiscVelSolCL");
-          return const_DiscVelSolCL( &vel, Bnd_v_, MG_); 
+          return const_DiscVelSolCL( &vel, Bnd_v_, MG_);
         }
 
     instat_vector_fun_ptr GetVelocityAsFunctionPointer() const
@@ -84,17 +84,17 @@ class VelocityContainer
         throw DROPSErrCL("velocity not prescribed as a function(pointer)");
       return vfptr_;
     }
-    
+
     bool VelocityAsP2() const {
       return (v_ && Bnd_v_);
     }
-     
+
     bool VelocityAsFunctionPointer() const {
       return (vfptr_);
     }
- 
+
 };
-  
+
 class TransportP1XCL
 {
   public:
@@ -111,9 +111,9 @@ class TransportP1XCL
     MLMatDescCL A,         ///< diffusion matrix
                 M,         ///< mass matrix
                 C,        ///< convection matrix
-                NA;       ///< Nitsche term 
-    VecDescCL cplA, cplM, cplC, b; 
-    
+                NA;       ///< Nitsche term
+    VecDescCL cplA, cplM, cplC, b;
+
   private:
     MLMatrixCL     L_;              ///< sum of matrices
     MultiGridCL&   MG_;
@@ -121,10 +121,10 @@ class TransportP1XCL
     VelocityContainer v_;
     LsetBndDataCL& Bnd_ls_;          ///< Boundary condition for the level set function
     double         theta_,          ///< time scheme parameter
-                   dt_,             ///< time step 
+                   dt_,             ///< time step
                    lambda_,         ///< Nitsche's parameter
                    D_[2],           ///< diffusion constants
-                   H_; 
+                   H_;
     VecDescCL &lset_,  &oldlset_;  ///< levelset at current time step and previous step
     GSPcCL                  pc_;
     GMResSolverCL<GSPcCL>   gm_;
@@ -146,14 +146,14 @@ class TransportP1XCL
         double theta, double D[2], double H, VecDescCL* v, VecDescCL* oldv, VecDescCL& lset, VecDescCL& oldlset,
         double dt, instat_scalar_fun_ptr rhs=0, int iter= 1000, double tol= 1e-7,
         double XFEMstab=0.1, double lambda=0.)
-        : oldt_(v->t), t_( v->t), 
-        idx( P1X_FE, 1, Bndt, 0, XFEMstab), oldidx( P1X_FE, 1, Bndt, 0, XFEMstab), 
-        MG_( mg), Bnd_( Bnd), Bndt_( Bndt), Bnd_v_( &Bnd_v), Bnd_ls_(Bnd_ls), 
-        theta_( theta), dt_( dt), 
-        lambda_(lambda), H_( H), v_( v), oldv_(oldv), 
-        lset_( lset), oldlset_(oldlset), 
+        : oldt_(v->t), t_( v->t),
+        idx( P1X_FE, 1, Bndt, 0, XFEMstab), oldidx( P1X_FE, 1, Bndt, 0, XFEMstab),
+        MG_( mg), Bnd_( Bnd), Bndt_( Bndt), Bnd_v_( &Bnd_v), Bnd_ls_(Bnd_ls),
+        theta_( theta), dt_( dt),
+        lambda_(lambda), H_( H), v_( v), oldv_(oldv),
+        lset_( lset), oldlset_(oldlset),
         gm_( pc_, 20, iter, tol, false, false, RightPreconditioning),
-        f_(rhs) 
+        f_(rhs)
     {
         std::memcpy( D_, D, 2*sizeof( double));
         if (theta_!=1.0) std::cerr<< "TransportP1XCL::TransportP1XCL: Sorry. Cannot deal with theta != 1.0. Overwriting: Using implicit Euler now! \n";
@@ -162,12 +162,12 @@ class TransportP1XCL
     TransportP1XCL( MultiGridCL& mg, BndDataT& Bnd, BndDataT& Bndt, VelocityContainer& v, LsetBndDataCL& Bnd_ls,
         VecDescCL& lset, VecDescCL& oldlset,
         DROPS::ParamCL& P, double initialtime=0, instat_scalar_fun_ptr reac=0, instat_scalar_fun_ptr rhs=0)
-        : oldt_(initialtime), t_( initialtime), 
+        : oldt_(initialtime), t_( initialtime),
         idx( P1X_FE, 1, Bndt, mg.GetBnd().GetMatchFun(), P.get<double>("Transp.NitscheXFEMStab")), oldidx( P1X_FE, 1, Bndt, mg.GetBnd().GetMatchFun(), P.get<double>("Transp.NitscheXFEMStab")),
-        MG_( mg), Bnd_( Bnd), Bndt_( Bndt), v_ (v), Bnd_ls_(Bnd_ls), 
+        MG_( mg), Bnd_( Bnd), Bndt_( Bndt), v_ (v), Bnd_ls_(Bnd_ls),
         theta_( P.get<double>("Transp.Theta")), dt_( P.get<double>("Time.StepSize")),
         lambda_(P.get<double>("Transp.NitschePenalty")), H_( P.get<double>("Transp.HNeg")/P.get<double>("Transp.HPos")),
-        lset_( lset), oldlset_(oldlset), 
+        lset_( lset), oldlset_(oldlset),
         gm_( pc_, 20, P.get<int>("Transp.Iter"), P.get<double>("Transp.Tol"), false, false, RightPreconditioning),
         f_(rhs), c_(reac), omit_bound_( P.get<double>("Transp.NitscheXFEMStab")), sdstab_(P.get<double>("Transp.SDStabilization"))
     {
@@ -182,7 +182,7 @@ class TransportP1XCL
     const MultiGridCL& GetMG() const   { return MG_; }
     GMResSolverCL<GSPcCL>& GetSolver() { return gm_; }
     const BndDataT& GetBndData() const { return Bndt_; }
-    
+
     /// \brief Only used for XFEM
     void UpdateXNumbering( const VecDescCL& lset, bool= false, bool NewSolution=true) {
          if (NewSolution)
@@ -219,9 +219,9 @@ class TransportP1XCL
     const_DiscSolCL GetSolution( const VecDescCL& Myc, bool Is_ct) const
         { return (Is_ct) ? const_DiscSolCL( &Myc, &Bndt_, &MG_)
                          : const_DiscSolCL( &Myc, &Bnd_, &MG_); }
-                         
- 
-   
+
+
+
     /// \name For internal use only
     /// The following member functions are added to enable an easier implementation
     /// of the locling navstokes-levelset. They should not be called by a common user.
@@ -270,9 +270,11 @@ class TransportXRepairCL : public MGObserverCL
     void pre_refine  () {}
     void post_refine ();
 
-    void pre_refine_sequence  (); 
-    void post_refine_sequence (); 
+    void pre_refine_sequence  ();
+    void post_refine_sequence ();
     const IdxDescCL* GetIdxDesc() const;
+    const VectorCL*  GetVector()  const;
+    void swap( IdxDescCL&, VectorCL&);
 };
 
 class VelTranspRepairCL : public MGObserverCL
@@ -300,6 +302,8 @@ class VelTranspRepairCL : public MGObserverCL
     void post_refine_sequence () {}
     void SetTime(double t) {time_=t;}
     const IdxDescCL* GetIdxDesc() const;
+    const VectorCL*  GetVector()  const;
+    void swap( IdxDescCL&, VectorCL&);
 };
 
 
@@ -314,7 +318,7 @@ class P1FEGridfunctions{
     LocalP2CL<> pipj[4][4];
   public:
     static void SetupPiPj(LocalP2CL<>pipj[4][4])
-    {    
+    {
         for(int i= 0; i < 4; ++i) {
             for(int j= 0; j < i; ++j) {
                 pipj[j][i][EdgeByVert( i, j) + 4]= 0.25;
@@ -333,9 +337,9 @@ class P1FEGridfunctions{
           q5_p[i].assign(p1[i]);
           p2[i].assign(p1[i]);
        }
-      SetupPiPj(pipj);  
+      SetupPiPj(pipj);
     }
-    
+
     LocalP1CL<>& GetShapeAsLocalP1(int i) {return p1[i];}
     LocalP2CL<>& GetShapeAsLocalP2(int i) {return p2[i];}
     LocalP2CL<>& GetProductShapeAsLocalP2(int i, int j) {return pipj[i][j];}
@@ -362,48 +366,48 @@ class TransformedP1FiniteElement{
     Quad3CL<> q3_baseshape[4];
   public:
     TransformedP1FiniteElement(P1FEGridfunctions& ap1fegfs, TetraCL* atet = NULL):tet(atet), p1fegfs(ap1fegfs){
-      has_trafo_base=false;    
-      has_Gram=false;    
-      oninterface = false; 
+      has_trafo_base=false;
+      has_Gram=false;
+      oninterface = false;
       nodes = NULL;
     }
-    
+
     ~TransformedP1FiniteElement(){
       if (nodes) delete nodes;
     }
-    
+
     P1FEGridfunctions& GetGridfunctions(){
       return p1fegfs;
     }
-    
+
     void SetTetra(TetraCL& atet){
       tet = &atet;
-      has_trafo_base=false;    
-      has_Gram=false;    
-      oninterface = false;    
+      has_trafo_base=false;
+      has_Gram=false;
+      oninterface = false;
     }
-    
-    virtual void SetLocal(TetraCL& atet, LocalConvDiffReacCoefficients& , bool ){    
+
+    virtual void SetLocal(TetraCL& atet, LocalConvDiffReacCoefficients& , bool ){
       SetTetra(atet);
     }
 
     void SetSubTetra(const SArrayCL<BaryCoordCL,4>& cutT){
-      
+
       vol = VolFrac(cutT) * tetravol;
       if (nodes) delete nodes;
       nodes = Quad3CL<>::TransformNodes(cutT);
       oninterface = true;
-      
+
       for (int i = 0; i < 4; i ++){
-        q3_baseshape[i] = Quad3CL<>(p1fegfs.GetShapeAsLocalP2(i), nodes);      
-      }      
+        q3_baseshape[i] = Quad3CL<>(p1fegfs.GetShapeAsLocalP2(i), nodes);
+      }
     }
 
     TetraCL& GetTetra() const{
       if(tet == NULL) throw DROPSErrCL("TransformedP1FiniteElement::GetTetra - No TetraCL object given!");
       return *tet;
     }
-    
+
     void CalcTrafoBase(){
       P1DiscCL::GetGradients(G, det, GetTetra());
       absdet = std::fabs( det);
@@ -411,14 +415,14 @@ class TransformedP1FiniteElement{
       tetravol = vol;
       has_trafo_base = true;
     }
-    
+
     BaryCoordCL* GetNodes() const{
       if (!oninterface)
         throw DROPSErrCL("GetNodes should only be called if a tetra is subdivided!");
       else
         return nodes;
     }
-    
+
     double GetDeterminant(){
       if (!has_trafo_base) CalcTrafoBase();
       return det;
@@ -449,7 +453,7 @@ class TransformedP1FiniteElement{
         if (!has_trafo_base) CalcTrafoBase();
         GTG = GramMatrix(G);
         has_Gram = true;
-      } 
+      }
       return GTG;
     }
 
@@ -463,17 +467,17 @@ class TransformedP1FiniteElement{
     virtual bool stabilized() const{
       return false;
     }
-  
+
 };
 
 class GlobalConvDiffReacCoefficients{
   friend class LocalConvDiffReacCoefficients;
   private:
     typedef BndDataCL<Point3DCL> VelBndDataT;
-    typedef P2EvalCL<SVectorCL<3>, const VelBndDataT, const VecDescCL> const_DiscVelSolCL;  
+    typedef P2EvalCL<SVectorCL<3>, const VelBndDataT, const VecDescCL> const_DiscVelSolCL;
     double D_[2];
     double H_;
-    double time;    
+    double time;
     const VelocityContainer& vel;
     instat_scalar_fun_ptr source;
     instat_scalar_fun_ptr mass;
@@ -498,22 +502,22 @@ class GlobalConvDiffReacCoefficients{
       else
         return D_[1];
     }
-	
+
 	instat_scalar_fun_ptr GetSourceAsFuntionPointer(){return source;}
 	instat_scalar_fun_ptr GetMassAsFuntionPointer(){return mass;}
 };
 
 class LocalConvDiffReacCoefficients{
   private:
-    GlobalConvDiffReacCoefficients& gcdcoefs;  
+    GlobalConvDiffReacCoefficients& gcdcoefs;
     Quad5CL<> q5_source;
     Quad3CL<> q3_source;
     Quad5CL<> q5_mass;
     Quad3CL<> q3_mass;
     Quad3CL<Point3DCL> *q3_velocity;
-    LocalP2CL<Point3DCL> *lp2_velocity;  
+    LocalP2CL<Point3DCL> *lp2_velocity;
   public:
-    LocalConvDiffReacCoefficients(GlobalConvDiffReacCoefficients& agcdcoefs, TetraCL& tet):gcdcoefs(agcdcoefs), 
+    LocalConvDiffReacCoefficients(GlobalConvDiffReacCoefficients& agcdcoefs, TetraCL& tet):gcdcoefs(agcdcoefs),
         q5_source(tet,gcdcoefs.source,gcdcoefs.time), q3_source(tet,gcdcoefs.source,gcdcoefs.time),
         q5_mass(tet,gcdcoefs.mass,gcdcoefs.time), q3_mass(tet,gcdcoefs.mass,gcdcoefs.time)
     {
@@ -527,7 +531,7 @@ class LocalConvDiffReacCoefficients{
         lp2_velocity = new LocalP2CL<Point3DCL>(tet, gcdcoefs.vel.GetVelocityAsFunctionPointer(),gcdcoefs.time);
       }
     }
-    
+
     ~LocalConvDiffReacCoefficients(){
       delete q3_velocity;
       delete lp2_velocity;
@@ -538,8 +542,8 @@ class LocalConvDiffReacCoefficients{
 
     double GetDiffusionCoef(bool pospart){
       return gcdcoefs.GetDiffusionCoef(pospart);
-    }    
-	
+    }
+
 	instat_scalar_fun_ptr GetSourceAsFuntionPointer(){
 	  return gcdcoefs.GetSourceAsFuntionPointer();
 	}
@@ -558,28 +562,28 @@ class StabilizedTransformedP1FiniteElement : public TransformedP1FiniteElement{
   protected:
     LocalConvDiffReacCoefficients* lcdcoefs;
     double h;
-    
+
     double delta_T; ///element-wise constant stabilization parameter
-    
+
     Quad3CL<> q3_stabbgradv[4];
     Quad3CL<> q3_testshape[4];
 //    Quad3CL<> q3_baseshape[4];
 //    Quad5CL<> q5_stabbgradv[4];
     double stabfactor_;
   public:
-    typedef TransformedP1FiniteElement base_;  
+    typedef TransformedP1FiniteElement base_;
     StabilizedTransformedP1FiniteElement(P1FEGridfunctions& ap1fegfs, double stabfactor = 1.0, LocalConvDiffReacCoefficients* alcdcoefs= NULL, TetraCL* atet = NULL): base_(ap1fegfs,atet),lcdcoefs(alcdcoefs){
       stabfactor_ = stabfactor;
       std::cout << "stabfactor_ = " << stabfactor_ << std::endl;
-      has_trafo_base=false;    
-      has_Gram=false;  
+      has_trafo_base=false;
+      has_Gram=false;
       delta_T = 0.0;
     }
-    
+
     double GetStabilizationParameter() const{
       return delta_T;
     }
-    
+
     double stabfunc(double diffusion, double velocity, double meshsize) const {
       double meshPeclet = meshsize * 0.5 * velocity / diffusion;
       double res = 0;
@@ -590,12 +594,12 @@ class StabilizedTransformedP1FiniteElement : public TransformedP1FiniteElement{
       //return 0.;
       return res;
     }
-    
+
     void CalcStabilizationOnePhase(bool pospart){
       CalcTrafoBase(); //s.t. gradients, etc.. are known.
       //l2-average of velocity
       double ul2 = /*1.0/lcdcoefs->GetHenryWeighting(pospart) * */ std::sqrt( (Quad3CL<>(dot( lcdcoefs->GetVelocityAsQuad3(), lcdcoefs->GetVelocityAsQuad3()))).quad(6.0));
-      double h = cbrt(6.0*GetTetraVolume()); 
+      double h = cbrt(6.0*GetTetraVolume());
       delta_T = stabfactor_ * stabfunc(lcdcoefs->GetDiffusionCoef(pospart),ul2,h);
       Point3DCL stabtimesgradv;
       SMatrixCL<3,4> & dshape = GetDShape();
@@ -606,17 +610,17 @@ class StabilizedTransformedP1FiniteElement : public TransformedP1FiniteElement{
         q3_testshape[i] = delta_T * q3_stabbgradv[i] + base_::GetGridfunctions().GetShapeAsQuad3(i);
       }
     }
-    
+
     void CalcStabilizationTwoPhase(bool pospart){
       //l2-average of velocity
-      Quad3CL<Point3DCL> q3_n_vel(lcdcoefs->GetVelocityAsLocalP2(), nodes);      
+      Quad3CL<Point3DCL> q3_n_vel(lcdcoefs->GetVelocityAsLocalP2(), nodes);
       double ul2 =  /*1.0/lcdcoefs->GetHenryWeighting(pospart) * */ std::sqrt( (Quad3CL<>(dot( q3_n_vel, q3_n_vel))).quad(6.0));
       double h = cbrt(6.0*GetTetraVolume());
       delta_T = stabfactor_ * stabfunc(lcdcoefs->GetDiffusionCoef(pospart),ul2,h);
       Point3DCL stabtimesgradv;
       SMatrixCL<3,4> & dshape = GetDShape();
       for (int i = 0; i < 4; i ++){
-        Quad3CL<> q3_n_test(base_::GetGridfunctions().GetShapeAsLocalP2(i), nodes);      
+        Quad3CL<> q3_n_test(base_::GetGridfunctions().GetShapeAsLocalP2(i), nodes);
         for (int j = 0; j < 3; j ++)
           stabtimesgradv[j] = dshape(j,i);
         q3_stabbgradv[i] = dot(stabtimesgradv, q3_n_vel);
@@ -624,22 +628,22 @@ class StabilizedTransformedP1FiniteElement : public TransformedP1FiniteElement{
         q3_testshape[i] = delta_T * q3_stabbgradv[i] + q3_baseshape[i];
       }
     }
-     
+
     P1FEGridfunctions& GetGridfunctions() {
       return base_::GetGridfunctions();
     }
-    
+
     virtual void SetLocal(TetraCL& atet, LocalConvDiffReacCoefficients& alcdcoefs, bool pospart){
       base_::SetTetra(atet);
       lcdcoefs = &alcdcoefs;
       oninterface = false;
       CalcStabilizationOnePhase(pospart);
     }
-    
+
     void CalcStabilization(bool pospart){
       if(oninterface)
         CalcStabilizationTwoPhase(pospart);
-      else 
+      else
         CalcStabilizationOnePhase(pospart);
     };
 
@@ -650,7 +654,7 @@ class StabilizedTransformedP1FiniteElement : public TransformedP1FiniteElement{
     Quad3CL<> & GetTestShapeAsQuad3CL(int i) {
       return q3_testshape[i];
     }
-    
+
 
     virtual bool stabilized() const{
 //      return false;
@@ -679,17 +683,17 @@ class ConvDiffElementVectors{
     void ResetUnsigned(){
       std::memset( f,0, 4*sizeof(double));
     }
-    
+
     void ResetSigned(){
       std::memset( f_p,0, 4*sizeof(double));
-      std::memset( f_n,0, 4*sizeof(double));  
+      std::memset( f_n,0, 4*sizeof(double));
     }
 
     void ResetAll(){
       ResetUnsigned();
       ResetSigned();
     }
-    
+
     ConvDiffElementVectors(){
       ResetAll();
     }
@@ -717,7 +721,7 @@ class ConvDiffElementMatrices{
       std::memset( Mr,0, 4*4*sizeof(double));
       std::memset( C,0, 4*4*sizeof(double));
     }
-    
+
     void ResetSigned(){
       std::memset( A_p,0, 4*4*sizeof(double));
       std::memset( M_p,0, 4*4*sizeof(double));
@@ -733,7 +737,7 @@ class ConvDiffElementMatrices{
       ResetUnsigned();
       ResetSigned();
     }
-    
+
     void SetUnsignedAsSumOfSigned(){
       for(int i= 0; i < 4; ++i){
         for(int j= 0; j < 4; ++j){
@@ -744,7 +748,7 @@ class ConvDiffElementMatrices{
         }
       }
     }
-    
+
     ConvDiffElementMatrices(){
       ResetAll();
     }

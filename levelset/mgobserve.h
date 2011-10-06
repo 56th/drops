@@ -69,9 +69,74 @@ class MGObserverCL
     /// Called at the end of AdapTriangCL::UpdateTriang().
     virtual void post_refine_sequence ()= 0;
 #ifdef _PAR
-    /// Get a pointer to the index describer which can be used for loadbalancing
+    /// \name Used for migration handling. Observer is skipped if GetVector() returns null_ptr.
+    // @{
+    /// Get a pointer to the FE space.
     virtual const IdxDescCL* GetIdxDesc() const= 0;
+    /// Get a pointer to an (accumulated) vector. Return value null_ptr indicates that this observer should be skipped for migration handling.
+    virtual const VectorCL* GetVector() const= 0;
+    /// Swap FE space and vector.
+    virtual void swap( IdxDescCL& idx, VectorCL& v)= 0;
+    // @}
 #endif
+};
+
+///\brief Container for MGObserverCL objects, e.g., solution vectors which should be adapted after refinement or (in the parallel case) migration
+class ObservedVectorsCL: public std::vector<MGObserverCL*>
+{
+  public:
+    /// \name Call handlers (MGObserverCL) to manipulate FE-functions
+    // @{
+    /// \brief Tell Observer, that MG will be refined (and migration will be performed)
+    void notify_pre_refine () {
+        for (iterator obs= begin(); obs != end(); ++obs)
+            (*obs)->pre_refine();
+    }
+
+    /// \brief Tell Observer, that MG has been refined (and migration has been performed)
+    void notify_post_refine () {
+        for (iterator obs= begin(); obs != end(); ++obs)
+            (*obs)->post_refine();
+    }
+
+    /// \brief Tell Observer, that MG will be refined (and migration will be performed)
+    void notify_pre_migrate (LoadBalHandlerCL& lb) {
+#ifdef _PAR
+        if (!empty()){
+            throw DROPSErrCL ("ObservedSolVectorsCL:notify_pre_refine does not work\n");
+//            pmg_->DeleteVecDesc();
+            for (iterator obs= begin(); obs != end(); ++obs){
+                if ( lb.GetLB().GetWeightFnct()&2)
+                    lb.GetLB().Append( (*obs)->GetIdxDesc());
+            }
+        }
+#endif
+    }
+
+    /// \brief Tell Observer, that MG has been refined (and migration has been performed)
+    void notify_post_migrate (LoadBalHandlerCL& lb) {
+#ifdef _PAR
+        if ( !empty() ){
+            throw DROPSErrCL ("ObservedSolVectorsCL:notify_post_refine does not work\n");
+//            pmg_->DelAllUnkRecv();
+//            pmg_->DeleteRecvBuffer();
+        }
+        lb.GetLB().RemoveIdx();
+#endif
+    }
+
+    /// \brief Tell Observer, that a sequence of refinements (and migrations) will take place
+    void notify_pre_refmig_sequence() {
+        for (iterator obs= begin(); obs != end(); ++obs)
+            (*obs)->pre_refine_sequence();
+    }
+
+    /// \brief Tell Observer, that a sequence of refinements (and migrations) has taken place
+    void notify_post_refmig_sequence() {
+        for (iterator obs= begin(); obs != end(); ++obs)
+            (*obs)->post_refine_sequence();
+    }
+    //@}
 };
 
 } // end of namespace DROPS

@@ -79,7 +79,7 @@ void SetupLumpedMass (const MultiGridCL& MG, VectorCL& M, const IdxDescCL& RowId
 
 
 
-		    
+
 // rho*du/dt - mu*laplace u + Dp = f + rho*g - okn
 //                        -div u = 0
 //                             u = u0, t=t0
@@ -268,6 +268,8 @@ class VelocityRepairCL : public MGObserverCL
     void pre_refine_sequence  () {}
     void post_refine_sequence ();
     const IdxDescCL* GetIdxDesc() const { return stokes_.v.RowIdx; }
+    const VectorCL*  GetVector()  const { return &stokes_.v.Data; }
+    void swap( IdxDescCL& idx, VectorCL& v) { stokes_.v.RowIdx->swap(idx); stokes_.v.Data.swap(v); }
 };
 
 /// \brief Observes the MultiGridCL-changes by AdapTriangCL to repair the Function stokes_.pr.
@@ -281,7 +283,7 @@ class PressureRepairCL : public MGObserverCL
 {
   private:
     InstatStokes2PhaseP2P1CL& stokes_;
-    std::auto_ptr<P1XRepairCL> p1xrepair_;
+    std::auto_ptr<P1XRepairCL> p1xrepair_; /// \todo XFEM behavior for ref/mig should maybe changed by assuming two P1 vectors instead
     const LevelsetP2CL& ls_;
 
   public:
@@ -292,6 +294,8 @@ class PressureRepairCL : public MGObserverCL
     void pre_refine_sequence  ();
     void post_refine_sequence ();
     const IdxDescCL* GetIdxDesc() const { return stokes_.p.RowIdx; }
+    const VectorCL*  GetVector()  const { return &stokes_.p.Data; }
+    void swap( IdxDescCL& idx, VectorCL& v) { stokes_.p.RowIdx->swap(idx); stokes_.p.Data.swap(v); }
 };
 
 } // end of namespace DROPS

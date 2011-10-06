@@ -54,8 +54,8 @@ class AdapTriangCL
     int c_level_, f_level_;                                 ///< coarsest and finest level of the grid
     bool modified_;                                         ///< flag if the grid has been modified
 
-    typedef std::vector<MGObserverCL*> ObserverContT;       ///< type for observing the multigird dependent FE functions
-    ObserverContT observer_;                                ///< handler for manipulate FE-functions to due grid changes
+    typedef ObservedVectorsCL ObserverContT;                ///< type for observing the multigrid dependent FE functions
+    ObserverContT observer_;                                ///< stores handlers to manipulate FE-functions due to grid changes (refinement, migration)
 
     /// \name Evaluate a function on a simplex
     //@{
@@ -73,53 +73,6 @@ class AdapTriangCL
     /// \brief On step of the grid change
     template <class DistFctT>
     bool ModifyGridStep( DistFctT&, bool lb=true);
-
-    /// \name Call handlers (MGObserverCL) to manipulate FE-functions
-    // @{
-    /// \brief Tell Observer, that MG will be refined (and migration will be performed)
-    void notify_pre_refine () {
-#ifndef _PAR
-        for (ObserverContT::iterator obs= observer_.begin(); obs != observer_.end(); ++obs)
-            (*obs)->pre_refine();
-#else
-        if (!observer_.empty()){
-            throw DROPSErrCL ("AdapTriangCL:notify_pre_refine does not work\n");
-//            pmg_->DeleteVecDesc();
-            for (ObserverContT::iterator obs= observer_.begin(); obs != observer_.end(); ++obs){
-                (*obs)->pre_refine();
-                if ( GetLb().GetLB().GetWeightFnct()&2)
-                    GetLb().GetLB().Append( (*obs)->GetIdxDesc());
-            }
-        }
-#endif
-    }
-
-    /// \brief Tell Observer, that MG has been refined (and migration was performed)
-    void notify_post_refine () {
-        for (ObserverContT::iterator obs= observer_.begin(); obs != observer_.end(); ++obs)
-            (*obs)->post_refine();
-#ifdef _PAR
-        if ( !observer_.empty() ){
-            throw DROPSErrCL ("AdapTriangCL:notify_post_refine does not work\n");
-//            pmg_->DelAllUnkRecv();
-//            pmg_->DeleteRecvBuffer();
-        }
-        GetLb().GetLB().RemoveIdx();
-#endif
-    }
-
-    /// \brief Tell Observer, that a sequence of refinements (and migrations) will take place
-    void notify_pre_refine_sequence() {
-        for (ObserverContT::iterator obs= observer_.begin(); obs != observer_.end(); ++obs)
-            (*obs)->pre_refine_sequence();
-    }
-
-    /// \brief Tell Observer, that a sequence of refinements (and migrations) has taken place
-    void notify_post_refine_sequence() {
-        for (ObserverContT::iterator obs= observer_.begin(); obs != observer_.end(); ++obs)
-            (*obs)->post_refine_sequence();
-    }
-    //@}
 
   public:
     AdapTriangCL(  MultiGridCL& mg, double width, int c_level, int f_level, __UNUSED__ int lbStrategy = 1, __UNUSED__ int partitioner=1)
