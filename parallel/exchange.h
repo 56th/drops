@@ -517,7 +517,7 @@ class ExchangeBuilderCL
         ///\name Handler for DiST::InterfaceCL
         //@{
         bool Gather( DiST::TransferableCL&, DiST::Helper::SendStreamCL&);
-        bool Scatter( DiST::TransferableCL&, const size_t&, DiST::Helper::RecvStreamCL&);
+        bool Scatter( DiST::TransferableCL&, const size_t&, DiST::Helper::MPIistreamCL&);
         //@}
     };
 
@@ -536,7 +536,7 @@ class ExchangeBuilderCL
         ///\name Handler for DiST::InterfaceCL
         //@{
         bool Gather( DiST::TransferableCL&, DiST::Helper::SendStreamCL&);
-        bool Scatter( DiST::TransferableCL&, const size_t&, DiST::Helper::RecvStreamCL&);
+        bool Scatter( DiST::TransferableCL&, const size_t&, DiST::Helper::MPIistreamCL&);
         //@}
     };
 
@@ -555,7 +555,7 @@ class ExchangeBuilderCL
         ///\name Handler for DiST::InterfaceCL
         //@{
         bool Gather( DiST::TransferableCL&, DiST::Helper::SendStreamCL&);
-        bool Scatter( DiST::TransferableCL&, const size_t&, DiST::Helper::RecvStreamCL&);
+        bool Scatter( DiST::TransferableCL&, const size_t&, DiST::Helper::MPIistreamCL&);
         //@}
     };
 
@@ -576,7 +576,7 @@ class ExchangeBuilderCL
         /// \brief Gather information about distributed dof on sender proc
         bool Gather( DiST::TransferableCL&, DiST::Helper::SendStreamCL&);
         /// \brief Scatter information about distributed dof on sender proc
-        bool Scatter( DiST::TransferableCL&, const size_t&, DiST::Helper::RecvStreamCL&);
+        bool Scatter( DiST::TransferableCL&, const size_t&, DiST::Helper::MPIistreamCL&);
     };
 
   public:

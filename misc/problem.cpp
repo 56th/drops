@@ -563,7 +563,7 @@ bool ExtIdxDescCL::CommunicateXFEMNumbCL::Gather( const DiST::TransferableCL& t,
     return true;
 }
 
-bool ExtIdxDescCL::CommunicateXFEMNumbCL::Scatter( DiST::TransferableCL& t, const size_t numData, DiST::Helper::RecvStreamCL& r)
+bool ExtIdxDescCL::CommunicateXFEMNumbCL::Scatter( DiST::TransferableCL& t, const size_t numData, DiST::Helper::MPIistreamCL& r)
 {
     VertexCL* sp= 0;
     simplex_cast( t, sp);

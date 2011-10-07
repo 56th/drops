@@ -53,7 +53,7 @@ void AdapTriangCL::MakeInitialTriang( DistFctT& Dist)
 
 template <class DistFctT>
   bool AdapTriangCL::ModifyGridStep( DistFctT& Dist, bool lb)
-/** One step of grid change 
+/** One step of grid change
     \param lb Do a load-balancing?
     \return true if modifications were necessary,
     false, if nothing changed. */
@@ -97,15 +97,18 @@ template <class DistFctT>
     modified= ProcCL::GlobalOr(modified);
 #endif
     if (modified || lb) {
-        notify_pre_refine();
+        observer_.notify_pre_refine();
         mg_.Refine();
+        observer_.notify_post_refine();
 #ifdef _PAR
         throw DROPSErrCL ("AdapTriangCL::ModifyGridStep uses DDD\n");
         //pmg_->HandleUnknownsAfterRefine();
-        if (lb)
+        if (lb) {
+            observer_.notify_pre_migrate( lb_);
             lb_.DoMigration();
+            observer_.notify_post_migrate( lb_);
+        }
 #endif
-        notify_post_refine();
 #ifdef _PAR
         throw DROPSErrCL ("AdapTriangCL::ModifyGridStep uses DDD\n");
         /*
@@ -136,14 +139,14 @@ void AdapTriangCL::UpdateTriang (const LevelsetP2CL& lset)
     int i;
     LevelsetP2CL::const_DiscSolCL sol( lset.GetSolution());
 
-    notify_pre_refine_sequence();
+    observer_.notify_pre_refmig_sequence();
     for (i= 0; i < 2*min_ref_num; ++i) {
         if (!ModifyGridStep(sol, true)){
             break;
         }
         modified_= true;
     }
-    notify_post_refine_sequence();
+    observer_.notify_post_refmig_sequence();
 
     time.Stop();
     duration= time.GetTime();
@@ -151,7 +154,7 @@ void AdapTriangCL::UpdateTriang (const LevelsetP2CL& lset)
               << " refinements/interpolations in " << duration << " seconds\n"
               << "last level: " << mg_.GetLastLevel() << '\n';
 #ifdef _PAR
-    std::cout << "Last partitioning by " << lb_.GetLB().GetPartitioner()->GetName() 
+    std::cout << "Last partitioning by " << lb_.GetLB().GetPartitioner()->GetName()
               << " took " << lb_.GetLB().GetPartitioner()->GetTime() << " seconds\n";
 #endif
     mg_.SizeInfo( std::cout);

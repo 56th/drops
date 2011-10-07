@@ -314,6 +314,18 @@ inline Helper::RemoteDataCL& TransferableCL::GetRemoteData()
 // I N T E R F A C E  C L
 // ----------------------
 
+inline Helper::MPIostreamCL& operator<< (Helper::MPIostreamCL& os,
+    const InterfaceCL::MessagesCL& m)
+{
+    os << m.numData;
+    os.write( Addr( m.messages), m.messages.size());
+#   if DROPSDebugC & DebugDiSTC
+        // append delimiting char to find inconsistent gather/scatter routines
+        os << '|';
+#   endif
+    return os;
+}
+
 template <typename HandlerT>
 void InterfaceCL::GatherData( HandlerT& handler, const iterator& begin,
     const iterator& end, CommPhase phase)
@@ -321,57 +333,57 @@ void InterfaceCL::GatherData( HandlerT& handler, const iterator& begin,
 {
     typedef Helper::RemoteDataCL::ProcList_const_iterator ProcList_const_iterator;
 
-    for ( iterator it( begin); it!=end; ++it) {
+    for ( iterator it( begin); it != end; ++it) {
         const int owner= it->second.GetOwnerProc();
-        // Generate a new SendStreamCL object
-        if ( sendbuf_[owner]==0){
-            sendbuf_[owner]= new Helper::SendStreamCL( binary_);
-        }
-        // Check, if this process has to gather data
-        if ( phase==fromowner && !it->second.AmIOwner())
+        // Generates the sendbuf_ for owner, if not already there.
+        // Needed for correctness, because the owner expects a (n empty) message.
+        Helper::SendStreamCL& buf= sendbuf_[owner];
+        if (phase==fromowner && !it->second.AmIOwner()) // Check, if this process has to gather data.
             continue;
         // Check if gather wants to put something on the send stream and write
-        // the GeomIdCL, the size of data, and the corresponding data on the
-        // stream
+        // the GeomIdCL, and the associated sub-sendstream on the stream.
         Helper::SendStreamCL tmp_buf( binary_);
-        if (handler.Gather( it->second.GetLocalObject(), tmp_buf)){
-            const std::string buf_str=tmp_buf.str();
-            (*sendbuf_[owner]) << it->first << static_cast<size_t>(buf_str.size());
-            sendbuf_[owner]->write( buf_str.data(), buf_str.size());
-        }
+        if (handler.Gather( it->second.GetLocalObject(), tmp_buf))
+            buf << it->first << tmp_buf;
     }
 }
 
 template <typename HandlerT>
-bool InterfaceCL::ScatterData( HandlerT& handler)
+bool InterfaceCL::ScatterData (HandlerT& handler)
 /// \return local accumulated AND of all scatter calls
 {
-    bool result=true;
-    Helper::GeomIdCL tmp;
-    size_t numData;
-    for ( RecvListT::iterator it( recvbuf_.begin()); it!=recvbuf_.end(); ++it) {
-        Helper::RecvStreamCL& recv= *it->second;
-        recv >> tmp;
-        while ( tmp!=Helper::NoGID){
-            recv >> numData;
-            if ( !recv){
-            	cdebug << "error while reading object " << tmp << std::endl;
-                throw DROPSErrCL("InterfaceCL::ScatterData: Receive stream is broken!");
-            }
-            Helper::RemoteDataCL& rd= InfoCL::Instance().GetRemoteData(tmp);
-            const bool scatter_result= handler.Scatter( rd.GetLocalObject(), numData, (*it->second));
-            result= result && scatter_result;
-#if DROPSDebugC & DebugDiSTC
-            // check for delimiter
-            char delim;
-            recv >> delim;
-            Assert( delim=='|', Helper::ErrorCL("InterfaceCL::ScatterData: incomplete receive while reading object ", tmp), DebugDiSTC);
-#endif
-            recv >> tmp;
-        }
-    }
+    bool result= true;
+    for (RecvListT::iterator it( recvbuf_.begin()); it != recvbuf_.end(); ++it)
+        result= result && ScatterData( handler, it->second);
     return result;
 }
+
+template <typename HandlerT, typename IStreamT>
+bool InterfaceCL::ScatterData( HandlerT& handler, IStreamT& recv)
+{
+    bool result= true;
+    Helper::GeomIdCL gid;
+    size_t numData;
+    while (recv >> gid) {
+        recv >> numData;
+        if (DROPSDebugC & DebugDiSTC && !recv) {
+            cdebug << "error while reading object " << gid << std::endl;
+            throw DROPSErrCL("InterfaceCL::ScatterData: Receive stream is broken!");
+        }
+        Helper::RemoteDataCL& rd= InfoCL::Instance().GetRemoteData( gid);
+        const bool scatter_result= handler.Scatter( rd.GetLocalObject(), numData, recv);
+        result= result && scatter_result;
+#       if DROPSDebugC & DebugDiSTC
+            // check for delimiter
+            char delim= '|';
+            recv >> delim;
+            Assert( delim=='|', Helper::ErrorCL("InterfaceCL::ScatterData: "
+                "incomplete receive while reading object ", gid), DebugDiSTC);
+#       endif
+     }
+     return result;
+}
+
 
 template <typename HandlerT>
 bool InterfaceCL::Perform( HandlerT& handler, CommPhase phase)
@@ -382,14 +394,22 @@ bool InterfaceCL::Perform( HandlerT& handler, CommPhase phase)
     GatherData( handler, begin_from_, end_, phase);
 
     // communicate data
+    if (phase == toowner) {
+        loc_recv_toowner_.setBinary( binary_);
+        loc_send_toowner_.setBinary( binary_);
+    }
     ExchangeData( phase);
 
     // scatter the data
-    const bool result= ScatterData( handler);
-    // clear receive buffer
-    for ( RecvListT::iterator it( recvbuf_.begin()); it!=recvbuf_.end(); ++it){
-        delete it->second;
+    bool result= ScatterData( handler);
+    if (phase == toowner) {
+        result= result && ScatterData( handler, loc_recv_toowner_);
+        loc_recv_toowner_.clear();
+        loc_recv_toowner_.setbuf( 0, 0);
+        loc_send_toowner_.clear();
+        loc_send_toowner_.clearbuffer();
     }
+    // clear receive buffer
     recvbuf_.clear();
 
     return result;
@@ -432,8 +452,8 @@ bool InterfaceCL::ExecuteLocal( ExecuteHandlerT& handler, const IteratorT& begin
 {
     bool result=true;
     for (IteratorT it(begin); it!=end; ++it) {
-        const bool execute_result=handler( it->second.GetLocalObject());
-        result = result && execute_result;
+        const bool execute_result= handler( it->second.GetLocalObject());
+        result= result && execute_result;
     }
     return result;
 }

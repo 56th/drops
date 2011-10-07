@@ -91,7 +91,7 @@ bool LoadBalCL::CommunicateAdjacencyCL::Gather( const DiST::TransferableCL& t,
     return true;
 }
 
-bool LoadBalCL::CommunicateAdjacencyCL::Scatter( DiST::TransferableCL& t, const size_t numData, DiST::Helper::RecvStreamCL& r)
+bool LoadBalCL::CommunicateAdjacencyCL::Scatter( DiST::TransferableCL& t, const size_t numData, DiST::Helper::MPIistreamCL& r)
 {
     FaceCL* fp;
     simplex_cast( t, fp);

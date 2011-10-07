@@ -228,7 +228,7 @@ class RemoteDataListCL::DebugHandlerCL
         return true;
     }
 
-    bool Scatter( TransferableCL& t, const size_t numData, Helper::RecvStreamCL& r)
+    bool Scatter( TransferableCL& t, const size_t numData, Helper::MPIistreamCL& r)
     { // read proc/prio lists and compare with own
         Helper::RemoteDataCL::ProcListT myplist( t.GetProcListBegin(), t.GetProcListEnd());
         for (size_t i=0; i<numData; ++i) {
@@ -433,7 +433,76 @@ void InterfaceCL::SetupCommunicationStructure()
 //    std::cout << "[" << ProcCL::MyRank() << "] IRecvFromOwner = "; Print(IRecvFromOwners_, std::cout);
 }
 
-void InterfaceCL::ExchangeData( CommPhase phase)
+void InterfaceCL::SendData (SendListT& sendbuf, std::vector<ProcCL::RequestT>& req, int tag)
+{
+    req.reserve( sendbuf.size());
+    for (SendListT::iterator it= sendbuf.begin(); it != sendbuf.end(); ++it) {
+        if ( it->first != ProcCL::MyRank()) {
+            // initiate the MPI call for sending the data (in all other cases, the data are just copied)
+            req.push_back( it->second.Isend( it->first, tag));
+        }
+    }
+}
+
+/// \brief Reads a stream (gid1, numdata1, data1, gid2, numdata2, data2, ...) until the stream fail()s.
+/// The data is put in collect[gid].
+template <class IStreamT>
+void collect_streams (IStreamT& recv, InterfaceCL::CollectDataT& collect)
+{
+    Helper::GeomIdCL gid;
+
+    while (recv >> gid) {
+        Helper::RefMPIistreamCL gid_data( 0, 0, recv.isBinary());
+        recv >> gid_data;
+        collect[gid].append( gid_data.begin(), gid_data.end());
+    }
+}
+
+void InterfaceCL::to_owner (std::vector<ProcCL::RequestT>& reqFirstSend, CollectDataT& collect)
+{
+    const int myrank= ProcCL::MyRank();
+    const int firstSendTag= 5; // tag for sending in phase (1) 
+
+    // Phase (1): Send data to owning processes
+    //-----------------------------------------
+    SendData( sendbuf_, reqFirstSend, firstSendTag);
+
+    // Phase (2): Owning process receives data
+    //----------------------------------------
+    for (InterfaceCL::ProcSetT::const_iterator sender= ownerRecvFrom_.begin(); sender != ownerRecvFrom_.end(); ++sender) {
+        if (*sender != myrank) {
+            Helper::RecvStreamCL locrecvbuf( binary_);
+            collect_streams( locrecvbuf.Recv( *sender, firstSendTag), collect);
+        }
+        else {
+            Helper::SendStreamCL& locsendbuf= sendbuf_[myrank];
+            Helper::RefMPIistreamCL locrecvbuf( locsendbuf.begin(),
+                locsendbuf.cur() - locsendbuf.begin(), binary_);
+            collect_streams( locrecvbuf, collect);
+        }
+    }
+}
+
+void InterfaceCL::from_owner (std::vector<ProcCL::RequestT>& reqSecondSend, SendListT& sendstreams)
+{
+    const int myrank= ProcCL::MyRank();
+    const int secondSendTag= 6; // tag for sending in phase (4)
+
+    // Phase (4): send buffers to non-owner copies
+    // --------------------------------------------
+    SendData( sendstreams, reqSecondSend, secondSendTag);
+
+    // Phase (5): Receive data from owning processes
+    // ----------------------------------------------
+    for (InterfaceCL::ProcSetT::const_iterator sender= IRecvFromOwners_.begin();
+        sender != IRecvFromOwners_.end(); ++sender)
+        if (*sender != myrank)
+            recvbuf_[*sender].Recv( *sender, secondSendTag);
+        else
+            recvbuf_[myrank].clearbuffer( sendstreams[myrank].str());
+}
+
+void InterfaceCL::ExchangeData (CommPhase phase)
 /** The interface communication has four phases.
     (1) The data collected by the gather routine is sent to processes which are owner of
     at least one entity. Let p denote a process who is owner of an entity.
@@ -444,164 +513,87 @@ void InterfaceCL::ExchangeData( CommPhase phase)
     GID_1 numData_1 data_1, GID_2 numData_2 data_2, ..., GID_n numData_n data_n NoGID.
     Here, numData_i describes the number of copies of the entity with GID_i which have
     sent some data to the owner.
-    (4a) The data which are collected in phase (3) is sent to the processes who own
+    (4) The data which are collected in phase (3) is sent to the processes who own
     at least one entity covered by the "to"-interface.
-    (4b) For receiving the data, each process receives data from the previously computed
+    (5) For receiving the data, each process receives data from the previously computed
     list IRecvFromOwners_.
-    \param phase How to communicate, i.e., copies -> owner -> copies, copies -> owner, owner -> copies
+    \param phase How to communicate: bothPhases: copies -> owner -> copies; toowner: copies -> owner; fromowner: owner -> copies
 
     \todo Split up the function to control the communication better and
           to make it easier to read
     \todo Test for one-way communication is missing since no other priorities as master
           are given so far.
+    \todo Instead of numData_i data_i, one should simply write data_i as substream with: sendbuf << data_i.
 */
 {
-    // Type for collecting the data, i.e., phase (3)
-    typedef DROPS_STD_UNORDERED_MAP< Helper::GeomIdCL, std::vector<char>, Helper::Hashing > CollectDataT;
-    typedef DROPS_STD_UNORDERED_MAP< Helper::GeomIdCL, size_t, Helper::Hashing >            CollectNumDataT;
-
-    int firstSendTag=5, secondSendTag=6; // tags for sending (phase (1) and (4a))
+    const int myrank= ProcCL::MyRank();
 
     // Phase (1): Send data to owning processes
-    //-----------------------------------------
-    std::vector<ProcCL::RequestT> reqFirstSend; reqFirstSend.reserve(sendbuf_.size());
-    for ( SendListT::iterator it=sendbuf_.begin(); it!=sendbuf_.end(); ++it){
-        // Append NoGID as tag, that there is no more data on the stream
-        (*it->second) << Helper::NoGID;
-        if ( phase==bothPhases || phase==toowner){
-            if ( it->first!=ProcCL::MyRank()){
-                // initiate the MPI call for sending the data (in all other cases,
-                // the data are just copied)
-                reqFirstSend.push_back( it->second->Isend( it->first, firstSendTag));
-            }
-        }
-    }
-
     // Phase (2): Owning process receives data
     //----------------------------------------
-    // temporary variables for receiving and collecting the data
-    CollectDataT      collect;      // Collect data for one GID from each sender
-    CollectNumDataT   collectNum;   // Collect number of bytes from each sender for each GID
-    Helper::GeomIdCL  tmpGID;       // GID on the stream from the gather routine
-    std::vector<char> tmpBuf;       // data of the stream from the gather routine
-    size_t            numData;      // number of gathered bytes
-
-    // if I am the owner of some entity, I have to receive something
-    for ( std::set<int>::const_iterator pit=ownerRecvFrom_.begin(); pit!=ownerRecvFrom_.end(); ++pit){
-        /// Receive data from the copies or use the sendstream to myself as receive buffer
-        Helper::RecvStreamCL* locrecvbuf=0;
-        if ( phase==fromowner && ProcCL::MyRank()!=*pit)
-            continue;
-        if ( *pit!=ProcCL::MyRank()){
-            locrecvbuf= new Helper::RecvStreamCL( binary_);
-            locrecvbuf->Recv( *pit, firstSendTag);
+    std::vector<ProcCL::RequestT> reqFirstSend;
+    CollectDataT collect; // Collect the data for one GID from all senders
+    if (phase==bothPhases || phase==toowner)
+        to_owner( reqFirstSend, collect);
+    else { // Local operation
+        if (ownerRecvFrom_.count( myrank) > 0) {
+            Helper::SendStreamCL& locsendbuf= sendbuf_[myrank];
+            Helper::RefMPIistreamCL locrecvbuf( locsendbuf.begin(), locsendbuf.cur() - locsendbuf.begin(), binary_) ;
+            collect_streams( locrecvbuf, collect);
         }
-        else{
-            locrecvbuf= new Helper::RecvStreamCL( *sendbuf_[ ProcCL::MyRank()]);
-        }
-        // read the GID from the stream
-        (*locrecvbuf) >> tmpGID;
-        // as long as the stream containing data
-        while ( tmpGID!=Helper::NoGID){
-            (*locrecvbuf) >> numData;
-            if ( !(*locrecvbuf)){
-                throw DROPSErrCL("InterfaceCL::Communicate: Receive stream is broken!");
-            }
-            tmpBuf.resize( numData);
-            locrecvbuf->read( Addr(tmpBuf), numData);
-            // ... putting the data to the corresponding GID and ...
-            collect[tmpGID].insert( collect[tmpGID].end(), tmpBuf.begin(), tmpBuf.end());
-            // ... remembering how many data has been sent.
-            ++collectNum[tmpGID];
-            // get the GID of the next element
-            (*locrecvbuf) >> tmpGID;
-        }
-        // free memory of the receive buffer
-        delete locrecvbuf; locrecvbuf=0;
     }
 
-
-    // Phase (3): Generate the send buffers
+    // Phase (3): Generate and fill the send buffers
     //-------------------------------------
+    // Generate a SendStream for each receiver. Some receivers,
+    // which are waiting for a message, might receive an empty message.
+    // MPI permits this. (receivers == ownerSendTo_)
+    // Note, that the message must be sent nonetheless, as the receiver posts a Recv.
     SendListT sendstreams;
-    CollectNumDataT::const_iterator itNum(collectNum.begin());
-    // Generate for each receiver a buffer. So at least NoGID is sent to all receivers
-    // which are waiting for some stuff. (receivers == ownerSendTo_)
-    sendstreams[ProcCL::MyRank()]= 0;
-    if (  phase==bothPhases || phase==fromowner){
-        std::set<int>::const_iterator pit;
-        for ( pit=ownerSendTo_.begin(); pit!=ownerSendTo_.end(); ++pit)
-            sendstreams[*pit]= new Helper::SendStreamCL(binary_);
-    }
-    if ( !sendstreams[ProcCL::MyRank()])
-        sendstreams[ProcCL::MyRank()]= new Helper::SendStreamCL(binary_);
+    if (phase == fromowner || phase == bothPhases)
+        for (ProcSetT::const_iterator receiver= ownerSendTo_.begin(); receiver != ownerSendTo_.end(); ++receiver)
+            sendstreams[*receiver].setBinary( binary_);
 
-    // for each collected GID, put the GID, number of copies where gather was called, and
-    // the gathered data into a stream buffer.
-    for ( CollectDataT::iterator it(collect.begin()); it!= collect.end(); ++it, ++itNum){
+    // For each collected GID, put the GID, number of copies, where gather was
+    // called, and the gathered data into a stream buffer.
+    typedef Helper::RemoteDataCL::ProcList_const_iterator PL_IterT;
+    for (CollectDataT::iterator it= collect.begin(); it != collect.end(); ++it) {
         Helper::RemoteDataCL& rd= InfoCL::Instance().GetRemoteData( it->first);
-        Helper::RemoteDataCL::ProcList_const_iterator pit=rd.GetProcListBegin();
-        for ( ; pit!=rd.GetProcListEnd(); ++pit){
-            if ( to_.contains( pit->prio)) {
-                if ( phase==toowner && pit->proc!=ProcCL::MyRank())
-                    continue;
-                Assert( sendstreams[pit->proc],
-                    DROPSErrCL("InterfaceCL::Communicate: Missing sendbuffer"),
-                    DebugDiSTC);
-                (*sendstreams[pit->proc]) << it->first << itNum->second;
-                sendstreams[pit->proc]->write( Addr(it->second), it->second.size());
-#if DROPSDebugC & DebugDiSTC
-                // append delimiting char to find inconsistent gather/scatter routines
-                const char delim= '|';
-                (*sendstreams[pit->proc]) << delim;
-#endif
+        for (PL_IterT pit= rd.GetProcListBegin(); pit != rd.GetProcListEnd(); ++pit) {
+            if (to_.contains( pit->prio)) {
+                const int receiver= pit->proc;
+                if (phase==toowner) { // Data will be referenced by loc_recv_toowner_ in Phase (4) and (5) and ScatterData.
+                    if (receiver == myrank)
+                        loc_send_toowner_ << it->first << it->second;
+                }
+                else {
+                    Assert( sendstreams.count( receiver) > 0,
+                        DROPSErrCL("InterfaceCL::Communicate: Missing sendbuffer"),
+                        DebugDiSTC);
+                    sendstreams[receiver] << it->first << it->second;
+                }
             }
         }
     }
-    // Append each stream with NoGID as a tag that the stream contains no more data
-    for ( SendListT::iterator it=sendstreams.begin(); it!=sendstreams.end(); ++it){
-        (*it->second) << Helper::NoGID;
-    }
+    collect.clear();
 
-    // Phase (4a): send buffers to non-owner copies
-    // --------------------------------------------
-    std::vector<ProcCL::RequestT> reqSecondSend; reqSecondSend.reserve(sendbuf_.size());
-    if ( phase!=toowner){
-        for ( SendListT::iterator it=sendstreams.begin(); it!=sendstreams.end(); ++it){
-            // If receiver is not me, send the stream
-            if ( it->first!=ProcCL::MyRank()){
-                reqSecondSend.push_back( it->second->Isend( it->first, secondSendTag));
-            }
-        }
-    }
-
-    // Phase (4b): Receive data from owning processes
+    // Phase (4): Send buffers to non-owner copies
+    // Phase (5): Receive data from owning processes
     // ----------------------------------------------
-    for ( std::set<int>::const_iterator pit=IRecvFromOwners_.begin(); pit!=IRecvFromOwners_.end(); ++pit){
-        if ( *pit!=ProcCL::MyRank()){
-            if ( phase!=toowner){
-                recvbuf_[*pit]= new Helper::RecvStreamCL(binary_);
-                recvbuf_[*pit]->Recv( *pit, secondSendTag);
-            }
-        }
-        else {       // Copy the sendbuffer to the receive stream
-            recvbuf_[*pit]= new Helper::RecvStreamCL( *sendstreams[*pit]);
-        }
-    }
+    std::vector<ProcCL::RequestT> reqSecondSend;
+    if (phase == fromowner || phase == bothPhases)
+        from_owner( reqSecondSend, sendstreams);
+    else
+        if (IRecvFromOwners_.count( ProcCL::MyRank()) > 0)
+            loc_recv_toowner_.setbuf( loc_send_toowner_.begin(), loc_send_toowner_.cur() - loc_send_toowner_.begin());
 
-    // Wait until all messages has left me before deleting the buffers
-    if ( !reqFirstSend.empty())
+    // Wait until all messages have left me before deleting the buffers
+    if (!reqFirstSend.empty())
         ProcCL::WaitAll( reqFirstSend);
-    if ( !reqSecondSend.empty())
+    if (!reqSecondSend.empty())
         ProcCL::WaitAll( reqSecondSend);
-    // delete all send streams
-    for ( SendListT::iterator sit=sendbuf_.begin(); sit!=sendbuf_.end(); ++sit){
-        delete sit->second; sit->second=0;
-    }
+    // clear all send streams
     sendbuf_.clear();
-    for ( SendListT::iterator sit=sendstreams.begin(); sit!=sendstreams.end(); ++sit){
-        delete sit->second; sit->second=0;
-    }
     sendstreams.clear();
 }
 
@@ -628,7 +620,7 @@ class ModifyCL::MergeProcListHandlerCL
         return true;
     }
 
-    bool Scatter( TransferableCL& t, const size_t numData, Helper::RecvStreamCL& r){
+    bool Scatter( TransferableCL& t, const size_t numData, Helper::MPIistreamCL& r){
         ModifyCL::UpdateListT& ul= mod_.entsToUpdt_[t.GetDim()];
         ModifyCL::UpdateIterator it= ul.find( &t);
         if (it==ul.end())
@@ -683,7 +675,7 @@ class ModifyCL::CommToUpdateHandlerCL
         return true;
     }
 
-    bool Scatter( TransferableCL& t, const size_t numData, Helper::RecvStreamCL& is)
+    bool Scatter( TransferableCL& t, const size_t numData, Helper::MPIistreamCL& is)
     {
         const Usint dim= t.GetDim();
         if (dim==GetDim<TetraCL>()) { // tetra

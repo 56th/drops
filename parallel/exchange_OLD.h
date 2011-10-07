@@ -206,7 +206,7 @@ class ExchangeCL
         /// \name Handler for DiST:InterfaceCL
         //@{
         bool Gather ( DiST::TransferableCL& t, DiST::Helper::SendStreamCL& sendstream);
-        bool Scatter( DiST::TransferableCL& t, size_t numData, DiST::Helper::RecvStreamCL& recv);
+        bool Scatter( DiST::TransferableCL& t, size_t numData, DiST::Helper::MPIistreamCL& recv);
         //@}
         void CreateList(const MultiGridCL& mg, bool CreateMap=true, bool CreateAccDist=true);       // create communication lists to an index
     };

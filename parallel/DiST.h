@@ -578,34 +578,66 @@ class InterfaceCL
 ///   Maybe, an observer pattern would be nice here.
 {
   public:
-    typedef Helper::WholeRemoteDataIteratorCL iterator;         ///< type for iterator over elements in the interface
-    typedef iterator::DimListT DimListT;                        ///< type for storing the involved simplices
-    typedef iterator::GIDIteratorT GIDIteratorT;                ///< type for iterator over GID's
-    typedef std::map<int, Helper::SendStreamCL*> SendListT;     ///< type for storing data to be sent (proc -> data)
-    typedef std::map<int, Helper::RecvStreamCL*> RecvListT;     ///< type for receiving data (proc -> data)
+    typedef Helper::WholeRemoteDataIteratorCL iterator;    ///< type for iterator over elements in the interface
+    typedef iterator::DimListT DimListT;                   ///< type for storing the involved simplices
+    typedef iterator::GIDIteratorT GIDIteratorT;           ///< type for iterator over GID's
+    typedef std::map<int, Helper::SendStreamCL> SendListT; ///< type for storing data to be sent (proc -> data)
+    typedef std::map<int, Helper::RecvStreamCL> RecvListT; ///< type for receiving data (proc -> data)
+    typedef std::set<int> ProcSetT;                        ///< type for a set of proccessor numbers
+
+    /// \brief Helper types for ExchangeData and the function collect_streams in Dist.cpp
+    ///@{
+    class MessagesCL {
+      private:
+        size_t            numData;  ///< number of messages
+        std::vector<char> messages; ///< concatenation of the messages as sequence of char
+
+      public:
+        MessagesCL () : numData( 0) {}
+        void append (const char* begin, const char* end)
+            { messages.insert( messages.end(), begin, end); ++numData; }
+        friend Helper::MPIostreamCL& operator<< (Helper::MPIostreamCL& os, const InterfaceCL::MessagesCL& msg);
+    };
+    typedef DROPS_STD_UNORDERED_MAP<Helper::GeomIdCL, MessagesCL, Helper::Hashing > CollectDataT;
+    ///@}
 
   private:
-    enum CommPhase {                ///< Communication phases
-        bothPhases,                 ///< owner and copies gather and scatter data, i.e., copies -> owner -> copies
-        toowner,                    ///< copies send to owners, i.e., copies -> owner
-        fromowner                   ///< owner send to copies, i.e., owner -> copies
+    enum CommPhase {            ///< Communication phases
+        bothPhases,             ///< owner and copies gather and scatter data, i.e., copies -> owner -> copies
+        toowner,                ///< copies send to owners, i.e., copies -> owner
+        fromowner               ///< owner send to copies, i.e., owner -> copies
     };
-    RecvListT      recvbuf_;        ///< received data (after call of function Communicate())
-    SendListT      sendbuf_;        ///< data to be sent
-    PrioListT      from_;           ///< list of priority on sender side, the interface operates on
-    PrioListT      to_;             ///< list of priority on receiver side, the interface operates on
-    bool           binary_;         ///< transfer data binary or in ASCII
-    std::set<int>  ownerRecvFrom_;  ///< list of processes, the owner receives data from
-    std::set<int>  ownerSendTo_;    ///< list of processes, the owner sends data to
-    std::set<int>  IRecvFromOwners_;///< list of owner processes, I have to receive data from
-    iterator       begin_from_,     ///< iterators defining sequence of interface elements
-                   begin_to_,
-                   begin_,
-                   end_;
+
+    RecvListT recvbuf_;         ///< received data (after call of function Communicate())
+    SendListT sendbuf_;         ///< data to be sent (filled in GatherData)
+    Helper::SendStreamCL    loc_send_toowner_; ///< used in Perform, phase==toowner, to avoid a copy of the local message
+    Helper::RefMPIistreamCL loc_recv_toowner_; ///< used in Perform, phase==toowner, to avoid a copy of the local message
+
+    PrioListT from_;            ///< list of priority on sender side, the interface operates on
+    PrioListT to_;              ///< list of priority on receiver side, the interface operates on
+
+    bool      binary_;          ///< transfer data binary or in ASCII
+    ProcSetT  ownerRecvFrom_;   ///< list of processes, the owner receives data from
+    ProcSetT  ownerSendTo_;     ///< list of processes, the owner sends data to
+    ProcSetT  IRecvFromOwners_; ///< list of owner processes, I have to receive data from
+
+    iterator  begin_from_,      ///< iterators defining sequence of interface elements
+              begin_to_,
+              begin_,
+              end_;
 
     /// \brief Call the gather handler for each entity covered by the iterators [begin, end).
     template <typename HandlerT>
     void GatherData( HandlerT&, const iterator& begin, const iterator& end, CommPhase phase);
+    /// \brief MPI Isend of the streams in sendbuf.
+    void SendData (SendListT& sendbuf, std::vector<ProcCL::RequestT>& req, int tag);
+    /// \brief Phase (1) and (2) of ExchangeData: The owner acquires the information.
+    void to_owner (std::vector<ProcCL::RequestT>&, CollectDataT&);
+    /// \brief Phase (4) and (5) of ExchangeData: The owner distributes the accumulated information.
+    void from_owner (std::vector<ProcCL::RequestT>&, SendListT&);
+    /// \brief For a stream [GID, tail), call handler(GID, numData, tail).
+    template <typename HandlerT, typename IStreamT>
+    bool ScatterData( HandlerT& handler, IStreamT& recv);
     /// \brief Call the scatter handler for each entity whose GID is given in the istream_.
     template <typename HandlerT>
     bool ScatterData( HandlerT&);

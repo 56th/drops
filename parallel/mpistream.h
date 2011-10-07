@@ -124,8 +124,9 @@ class MPIistreamCL : public std::istream
 };
 
 
-/// \brief MPI-output-stream with buffer
+/// \brief MPI-output-stream with MPIstringbufCL-buffer
 /// This stream is employed for formatting and buffering outgoing MPI-streams.
+/// Copy and assignment have value-semantics, i.e., the buffer contents are copied/assigned.
 class SendStreamCL : public MPIostreamCL
 {
   public:
@@ -137,6 +138,8 @@ class SendStreamCL : public MPIostreamCL
   public:
     explicit SendStreamCL (bool binary= use_binaryMPIstreams)
         : base_type( &buf_, binary), buf_( std::ios_base::out) {}
+    SendStreamCL (const SendStreamCL& s);
+    SendStreamCL& operator= (const SendStreamCL& s);
 
     /// \brief Non-blocking send to process 'dest'.
     inline ProcCL::RequestT Isend(int dest, int tag= 5) { return buf_.Isend( dest, tag); }
@@ -159,6 +162,7 @@ class SendStreamCL : public MPIostreamCL
 
 /// \brief Input stream.
 /// This stream is employed for formatting and buffering outgoing MPI-streams.
+/// Copy and assignment have value-semantics, i.e., the buffer contents are copied/assigned.
 class RecvStreamCL : public MPIistreamCL
 {
   public:
@@ -171,12 +175,15 @@ class RecvStreamCL : public MPIistreamCL
     /// @param[in] binary is true if the stream store the data in binary; in ASCII otherwise.
     explicit RecvStreamCL (bool binary= use_binaryMPIstreams)
         : base_type( &buf_, binary), buf_( std::ios_base::in) {}
+    RecvStreamCL (const RecvStreamCL& s);
+    RecvStreamCL& operator= (const RecvStreamCL& s);
 
     RecvStreamCL( const SendStreamCL& s)
         : base_type( &buf_, s.isBinary()), buf_( s.str(), std::ios_base::in) {}
 
     /// \brief Blocking receive from process 'source'. Removes any prior content of the buffer.
-    void Recv(int source, int tag= 5) { buf_.Recv( source, tag); }
+    RecvStreamCL& Recv(int source, int tag= 5)
+        { buf_.Recv( source, tag); return *this; }
     /// \brief Reset the buffer to the empty default-state. This releases the memory of the buffer.
     void clearbuffer (const std::string& s= std::string()) { buf_.clearbuffer( s); }
 
@@ -251,7 +258,8 @@ class RefMPIostreamCL : public MPIostreamCL
     MPIrefbufCL buf_; ///< reference output-buffer
 
   public:
-    RefMPIostreamCL (char_type* p, std::streamsize n, bool binary= use_binaryMPIstreams)
+    explicit RefMPIostreamCL (char_type* p= 0, std::streamsize n= 0,
+                              bool binary= use_binaryMPIstreams)
         : base_type( &buf_, binary), buf_( p, n, std::ios_base::out) {}
 
     ///\brief access the input/output area (an array of char_type); cur is the current i/o-position.
@@ -278,7 +286,8 @@ class RefMPIistreamCL : public MPIistreamCL
 
   public:
     /// @param[in] binary is true if the stream store the data in binary; in ASCII otherwise.
-    RefMPIistreamCL (char_type* p, std::streamsize n, bool binary= use_binaryMPIstreams)
+    explicit RefMPIistreamCL (char_type* p= 0, std::streamsize n= 0,
+                              bool binary= use_binaryMPIstreams)
         : base_type( &buf_, binary), buf_( p, n, std::ios_base::in) {}
 
     MPIrefbufCL* setbuf( char_type* p, std::streamsize n) { return buf_.pubsetbuf( p, n); }
