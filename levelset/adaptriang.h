@@ -55,7 +55,7 @@ class AdapTriangCL
     bool modified_;                                         ///< flag if the grid has been modified
 
     typedef ObservedVectorsCL ObserverContT;                ///< type for observing the multigrid dependent FE functions
-    ObserverContT observer_;                                ///< stores handlers to manipulate FE-functions due to grid changes (refinement, migration)
+    ObserverContT& observer_;                               ///< stores handlers to manipulate FE-functions due to grid changes (refinement, migration)
 
     /// \name Evaluate a function on a simplex
     //@{
@@ -80,7 +80,7 @@ class AdapTriangCL
 #ifdef _PAR
       pmg_( ParMultiGridCL::InstancePtr()), lb_( mg_, Partitioner(partitioner)),
 #endif
-      width_(width), c_level_(c_level), f_level_(f_level), modified_(false)
+      width_(width), c_level_(c_level), f_level_(f_level), modified_(false), observer_(ObserverContT::Instance())
       {
         Assert( 0<=c_level && c_level<=f_level, "AdapTriangCL: Levels are cheesy.\n", ~0);
 #ifdef _PAR

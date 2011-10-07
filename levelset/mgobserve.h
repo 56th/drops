@@ -84,7 +84,21 @@ class MGObserverCL
 ///\brief Container for MGObserverCL objects, e.g., solution vectors which should be adapted after refinement or (in the parallel case) migration
 class ObservedVectorsCL: public std::vector<MGObserverCL*>
 {
+  private:
+    typedef std::vector<MGObserverCL*> base;
+    // Singleton: make std ctr's and assignment operator private
+    ObservedVectorsCL() : base() {}
+    ObservedVectorsCL( const ObservedVectorsCL&);            // copy ctr not defined
+    ObservedVectorsCL& operator=( const ObservedVectorsCL);  // assignment operator not defined
+
   public:
+    /// Get instance of Singleton
+    static ObservedVectorsCL& Instance()
+    {
+        static ObservedVectorsCL instance;
+        return instance;
+    }
+
     /// \name Call handlers (MGObserverCL) to manipulate FE-functions
     // @{
     /// \brief Tell Observer, that MG will be refined (and migration will be performed)
@@ -103,7 +117,7 @@ class ObservedVectorsCL: public std::vector<MGObserverCL*>
     void notify_pre_migrate (LoadBalHandlerCL& lb) {
 #ifdef _PAR
         if (!empty()){
-            throw DROPSErrCL ("ObservedSolVectorsCL:notify_pre_refine does not work\n");
+            throw DROPSErrCL ("ObservedVectorsCL:notify_pre_refine does not work\n");
 //            pmg_->DeleteVecDesc();
             for (iterator obs= begin(); obs != end(); ++obs){
                 if ( lb.GetLB().GetWeightFnct()&2)
@@ -117,7 +131,7 @@ class ObservedVectorsCL: public std::vector<MGObserverCL*>
     void notify_post_migrate (LoadBalHandlerCL& lb) {
 #ifdef _PAR
         if ( !empty() ){
-            throw DROPSErrCL ("ObservedSolVectorsCL:notify_post_refine does not work\n");
+            throw DROPSErrCL ("ObservedVectorsCL:notify_post_refine does not work\n");
 //            pmg_->DelAllUnkRecv();
 //            pmg_->DeleteRecvBuffer();
         }
