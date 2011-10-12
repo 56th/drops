@@ -30,16 +30,16 @@
 #include <limits>
 #include <vector>
 
-
 namespace DROPS
 {
 
 #ifdef _PAR
 // fwd declaration
-namespace DiST{ 
+namespace DiST{
+    class TransferableCL;
     namespace Helper{
-        class SendStreamCL;
-        class RecvStreamCL;
+        class MPIostreamCL;
+        class MPIistreamCL;
     }
 }
 #endif
@@ -137,12 +137,6 @@ class UnknownIdxCL
                 return true;
         return false;
     }
-
-    /// Put all DOFs onto the stream
-    void Pack( DiST::Helper::SendStreamCL&) const;
-
-    /// Get all information about DOF from a stream
-    void UnPack( DiST::Helper::RecvStreamCL&);
 #endif
 };
 
@@ -245,10 +239,10 @@ class UnknownHandleCL
     }
 
     /// Put all DOFs handled by this handler onto the stream
-    void Pack( DiST::Helper::SendStreamCL&) const;
+    void Pack( DiST::Helper::MPIostreamCL&, const DiST::TransferableCL&) const;
 
     /// Get all information about DOF from a stream
-    void UnPack( DiST::Helper::RecvStreamCL&);
+    void UnPack( DiST::Helper::MPIistreamCL&, const DiST::TransferableCL&);
 #endif
 };
 

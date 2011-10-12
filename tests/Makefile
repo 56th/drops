@@ -14,7 +14,7 @@ EXEC =  ip1test ip2test mattest prolongationp2test reftest testfe \
         extendP1onChild principallattice quad_extra dist_streamtest dist_remotedatatest \
         dist_sendtetraofbrick dist_simplexsend dist_interface dist_exchange \
         dist_poisson dist_sdropsP2 dist_twophasedrops dist_ref dist_modify \
-        dist_TestRefPar dist_ref_rising_drop
+        dist_TestRefPar dist_ref_rising_drop dist_migration
 
 DELETE = $(EXEC) *.out *.diff *.off *.mg *.dat
 
@@ -43,7 +43,7 @@ TESTNAME = drivencavity-adaptiv-schur drivencavity-adaptiv-uzawa \
 default: ClrScr
 
 dist: dist_streamtest dist_remotedatatest dist_sendtetraofbrick dist_modify dist_simplexsend dist_interface dist_exchange dist_poisson dist_sdropsP2 dist_twophasedrops \
-    dist_ref dist_TestRefPar
+    dist_ref dist_TestRefPar dist_migration
 
 check: $(TESTNAME:%=check_%) ip1check
 	@echo "--> All testcases have been executed!"
@@ -307,6 +307,16 @@ dist_ref: \
     ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o ../out/vtkOut.o ../parallel/parmultigrid.o \
     ../num/fe.o ../num/interfacePatch.o ../levelset/levelset.o ../levelset/fastmarch.o ../levelset/surfacetension.o \
     ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o $(PAR_OBJ)
+	$(CXX) -o $@ $^ $(LFLAGS)
+
+dist_migration: \
+    ../tests/dist_migration.o \
+    ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
+    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o ../out/vtkOut.o ../parallel/parmultigrid.o \
+    ../num/fe.o ../num/interfacePatch.o ../levelset/levelset.o ../levelset/fastmarch.o ../levelset/surfacetension.o \
+    ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o $(PAR_OBJ) \
+    ../levelset/mgobserve.o ../misc/bndmap.o ../geom/bndVelFunctions.o ../geom/bndScalarFunctions.o \
+    ../stokes/instatstokes2phase.o
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 dist_TestRefPar: \

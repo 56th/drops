@@ -301,6 +301,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\geom\bndScalarFunctions.cpp" />
+    <ClCompile Include="..\..\..\geom\bndVelFunctions.cpp" />
     <ClCompile Include="..\..\..\geom\boundary.cpp" />
     <ClCompile Include="..\..\..\geom\builder.cpp" />
     <ClCompile Include="..\..\..\geom\geomselect.cpp">
@@ -376,6 +378,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="..\..\..\levelset\mgobserve.cpp" />
     <ClCompile Include="..\..\..\levelset\params.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugSerial|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugSerial|x64'">true</ExcludedFromBuild>
@@ -438,6 +441,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="..\..\..\misc\bndmap.cpp" />
     <ClCompile Include="..\..\..\misc\compensight.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugSerial|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugSerial|x64'">true</ExcludedFromBuild>
@@ -862,6 +866,8 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="..\..\..\tests\dist_migration.cpp" />
+    <ClCompile Include="..\..\..\tests\dist_modify.cpp" />
     <ClCompile Include="..\..\..\tests\dist_poisson.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugSerial|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
@@ -914,6 +920,8 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugSerial|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='ReleaseSerial|x64'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="..\..\..\tests\dist_TestRefPar.cpp" />
+    <ClCompile Include="..\..\..\tests\dist_twophasedrops.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\geom\boundary.h" />
@@ -931,6 +939,7 @@
     <ClInclude Include="..\..\..\levelset\params.h" />
     <ClInclude Include="..\..\..\levelset\surfacetension.h" />
     <ClInclude Include="..\..\..\levelset\twophaseutils.h" />
+    <ClInclude Include="..\..\..\misc\bndmap.h" />
     <ClInclude Include="..\..\..\misc\container.h" />
     <ClInclude Include="..\..\..\misc\KDtree.h" />
     <ClInclude Include="..\..\..\misc\params.h" />

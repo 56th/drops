@@ -26,6 +26,8 @@
 #include "num/unknowns.h"
 #ifdef _PAR
 #  include "parallel/DiST.h"
+#  include "parallel/mpistream.h"
+#  include "levelset/mgobserve.h"
 #endif
 #include <algorithm>
 
@@ -35,7 +37,7 @@ namespace DROPS
 
 
 UnknownIdxCL::UnknownIdxCL( const UnknownIdxCL& orig)
-    : _Idx( orig._Idx) {}
+    : _Idx( orig._Idx), received_(orig.received_) {}
 
 
 UnknownIdxCL& UnknownIdxCL::operator=( const UnknownIdxCL& rhs)
@@ -47,91 +49,94 @@ UnknownIdxCL& UnknownIdxCL::operator=( const UnknownIdxCL& rhs)
 
 #ifdef _PAR
 
-/** For all system numbers available in _unk, put the system number and the 
-    value of the DOF onto the stream sendstream. If there are no DOFs of a 
-    system number, then std::numeric_limits<Uint>::max() is written 
-    onto the stream.
-    \param sendstream where to put all information
-*/
-void UnknownIdxCL::Pack( DiST::Helper::SendStreamCL& sendstream) const
-{
-    for ( Uint sysnum=0; sysnum<GetNumSystems(); ++sysnum){
-        if ( _Idx[sysnum]!=NoIdx)
-            sendstream << sysnum; /// \TODO: Write DOF values on the stream
-        else
-            sendstream << std::numeric_limits<Uint>::max();
-    }
-}
-
-/** Get all DOF from the recvstream and store them in the receive buffer.
-    Furthermore, all DOF values are marked as received.
-    \param recvstream the stream where all information can be found
-*/
-void UnknownIdxCL::UnPack( DiST::Helper::RecvStreamCL& recvstream)
-{
-    Uint recv_sysnum;       // received system number
-    double recv_DOFvalue;   // received DOF value
-    // Allocate memory for receive flags
-    received_.resize( GetNumSystems(), false);
-
-    // Get all information from the stream
-    for ( Uint sysnum=0; sysnum<GetNumSystems(); ++sysnum){
-        recvstream >> recv_sysnum;
-        // there are some information about DOF, so unpack them
-        if ( recv_sysnum!=std::numeric_limits<Uint>::max()){
-            Assert( recv_sysnum==sysnum /* && sysnum= XXX.GetIdx() */, 
-                DROPSErrCL("UnknownHandleCL::UnPack: Missing information about a system number"), 
-                DebugUnknownsC | DebugParallelC);
-            /// \TODO: Receive DOF values and store them!
-            recvstream >> recv_DOFvalue;
-            SetUnkRecv( sysnum);
-        }
-    }
-}
-
-/// \brief Write UnknownIdxCL onto a send stream
-inline DiST::Helper::SendStreamCL& operator<< ( DiST::Helper::SendStreamCL& sendstream, const UnknownIdxCL& unk)
-{
-    unk.Pack( sendstream);
-    return sendstream;
-}
-
-/// \brief Read UnknownIdxCL from a receive stream
-inline DiST::Helper::RecvStreamCL& operator>> ( DiST::Helper::RecvStreamCL& recvstream, UnknownIdxCL& unk)
-{
-    unk.UnPack( recvstream);
-    return recvstream;
-}
-
-/** If there are any DOF information available, then put this onto the
-    the send stream.
+/** This function put information---if existent---onto the sendstream. Therefore,
+    it used the singleton ObservedVectorsCL. This function assumes the following
+    two conditions:
+    \cond it is assumed, that all processes store the "same" observers, i.e.,
+          same ordering of the vectors and indices
     \param sendstream where to put the data
+    \param t          the transferable object which is used to determine the number of unknowns
 */
-void UnknownHandleCL::Pack( DiST::Helper::SendStreamCL& sendstream) const
+void UnknownHandleCL::Pack( DiST::Helper::MPIostreamCL& sendstream, const DiST::TransferableCL& t) const
 {
-    if ( Exist()){  // There are DOF values available
-        sendstream << _unk->GetNumSystems() << *_unk;
+    if ( Exist()){
+        sendstream << true;
+        const ObservedVectorsCL& observers= ObservedVectorsCL::Instance();
+        // write value of dofs onto the stream for all observed vectors
+        for ( ObservedVectorsCL::const_iterator it( observers.begin()); it!=observers.end(); ++it){
+            IdxDescCL const *  idx_desc= (*it)->GetIdxDesc();
+            VectorCL  const *  vec     = (*it)->GetVector();
+            // The vector and the index description is available (assume that this is true
+            // on receiving process, too).
+            if ( vec && idx_desc){
+                const Uint idx= idx_desc->GetIdx();
+                // check if there are unknowns
+                if ( Exist( idx)){
+                    const IdxT dof= (*this)(idx);
+                    sendstream << idx;
+                    for ( Uint i=0; i<idx_desc->NumUnknownsSimplex( t); ++i){  // edges must have the same number of unknowns than vertices!
+                        sendstream << (*vec)[dof+i];
+                    }
+                }
+                else{
+                    sendstream << (Uint)(-1);    // flag, that the proc does not have a dof for that idx
+                }
+            }   // end of (vec && idx_desc)
+        }   // end of observer loop
     }
     else{           // There are no DOF values available
-        sendstream << Uint(0);
+        sendstream << false;
     }
 }
 
-/** If any DOF information are received, handle these DOFs.
-    \param recvstream the stream where all information can be found    
-*/
-void UnknownHandleCL::UnPack( DiST::Helper::RecvStreamCL& recvstream)
-{
-    // get the number of system numbers written onto stream by Pack
-    Uint num_sysnums;
-    recvstream >> num_sysnums;
+/** If any DOF information are received, handle these DOFs. That is, put a copy of the
+    DoF value into the corresponding receive buffer in the \see MGObserverCL. Furthermore,
+    mark that DoFs have been received.
 
-    // if there are any DOF information, receive them.
-    if ( num_sysnums){
-        Assert( _unk==0, DROPSErrCL("UnknownHandleCL::UnPack: UnknownIdxCL already constructed"), DebugUnknownsC | DebugParallelC);
-        // Allocate memory for storing all 
-        _unk= new UnknownIdxCL( num_sysnums);
-        recvstream >> *_unk;
+    \cond no DoFs of respectivly each type are known before the migration takes place.
+
+    \param recvstream the stream where all information can be found
+    \param t          the transferable object which is used to determine the number of unknowns
+*/
+void UnknownHandleCL::UnPack( DiST::Helper::MPIistreamCL& recvstream, const DiST::TransferableCL& t)
+{
+    bool unk_recv= false;
+    Uint idx_recv= (Uint)(-1);      // buffer for receiving a index
+    double val_recv;                // buffer for receiving a DoF value
+    recvstream >> unk_recv;
+
+    if ( unk_recv){
+        ObservedVectorsCL& observers= ObservedVectorsCL::Instance();
+        for ( ObservedVectorsCL::const_iterator it( observers.begin()); it!=observers.end(); ++it){
+            IdxDescCL const *    idx_desc= (*it)->GetIdxDesc();
+            std::vector<double>& recvbuf = (*it)->GetRecvBuffer();
+            // The vector and the index description is available
+            if ( (*it)->GetVector() && idx_desc){
+                const Uint idx= idx_desc->GetIdx();
+                recvstream >> idx_recv;     // receive the index number
+                if ( idx_recv!=(Uint)(-1)){
+                    // check for errors
+                    Assert( idx==idx_recv, 
+                        DROPSErrCL("UnknownHandleCL::UnPack: Mismatch in received data!"), 
+                        DebugParallelNumC);
+                    Assert( !Exist(idx),
+                        DROPSErrCL("UnknownHandleCL::UnPack: Merging of received dof is not possible"),
+                        DebugParallelNumC);
+
+                    // Now, prepare for receiving data ...
+                    Prepare( idx);
+                    // ... remember that this is a received unknown
+                    SetUnkRecieved( idx);
+                    // ... remember where the dofs are put
+                    (*this)(idx)= recvbuf.size();
+                    // ... and the store the received dofs in the buffer
+                    for ( Uint i=0; i<idx_desc->NumUnknownsSimplex( t); ++i){
+                        recvstream >> val_recv;
+                        recvbuf.push_back( val_recv);
+                    }
+                }   // end of receiving the index idx
+            }   // end if (vec && idx_desc)
+        }   // end of the observer loop
     }
 }
 #endif

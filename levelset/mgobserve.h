@@ -44,6 +44,12 @@ class MGObserverCL
 {
 #ifdef _PAR
   protected:
+    std::vector<double> recvBuf_;   ///< during migration, buffer the received values here
+    
+    /// \brief Copy vector elements from the old describer and receive buffer into the new vector
+    void CopyVecElements( VecDescCL& new_vec_desc, const std::vector<Usint>& dims);
+
+      /// \todo OF: Do we need still the ParMultiGridCL?
     ParMultiGridCL* pmg_;       ///< All parallel Observers need the ParMultiGridCL
 #endif
 
@@ -71,12 +77,20 @@ class MGObserverCL
 #ifdef _PAR
     /// \name Used for migration handling. Observer is skipped if GetVector() returns null_ptr.
     // @{
+    /// \name gatter and setter for the receive buffer and exteded indices
+    //@{
+    const std::vector<double>& GetRecvBuffer() const { return recvBuf_; }
+          std::vector<double>& GetRecvBuffer()       { return recvBuf_; }
+    //@}
     /// Get a pointer to the FE space.
     virtual const IdxDescCL* GetIdxDesc() const= 0;
     /// Get a pointer to an (accumulated) vector. Return value null_ptr indicates that this observer should be skipped for migration handling.
     virtual const VectorCL* GetVector() const= 0;
     /// Swap FE space and vector.
     virtual void swap( IdxDescCL& idx, VectorCL& v)= 0;
+
+    virtual void pre_migrate () = 0;
+    virtual void post_migrate() = 0;
     // @}
 #endif
 };
@@ -114,29 +128,17 @@ class ObservedVectorsCL: public std::vector<MGObserverCL*>
     }
 
     /// \brief Tell Observer, that MG will be refined (and migration will be performed)
-    void notify_pre_migrate (LoadBalHandlerCL& lb) {
-#ifdef _PAR
-        if (!empty()){
-            throw DROPSErrCL ("ObservedVectorsCL:notify_pre_refine does not work\n");
-//            pmg_->DeleteVecDesc();
-            for (iterator obs= begin(); obs != end(); ++obs){
-                if ( lb.GetLB().GetWeightFnct()&2)
-                    lb.GetLB().Append( (*obs)->GetIdxDesc());
-            }
+    void notify_pre_migrate () {
+        for (iterator obs= begin(); obs != end(); ++obs){
+            (*obs)->pre_migrate();
         }
-#endif
     }
 
     /// \brief Tell Observer, that MG has been refined (and migration has been performed)
-    void notify_post_migrate (LoadBalHandlerCL& lb) {
-#ifdef _PAR
-        if ( !empty() ){
-            throw DROPSErrCL ("ObservedVectorsCL:notify_post_refine does not work\n");
-//            pmg_->DelAllUnkRecv();
-//            pmg_->DeleteRecvBuffer();
+    void notify_post_migrate () {
+        for (iterator obs= begin(); obs != end(); ++obs){
+            (*obs)->post_migrate();
         }
-        lb.GetLB().RemoveIdx();
-#endif
     }
 
     /// \brief Tell Observer, that a sequence of refinements (and migrations) will take place
@@ -149,6 +151,9 @@ class ObservedVectorsCL: public std::vector<MGObserverCL*>
     void notify_post_refmig_sequence() {
         for (iterator obs= begin(); obs != end(); ++obs)
             (*obs)->post_refine_sequence();
+#ifdef _PAR
+        ParMultiGridCL::Instance().DelAllUnkRecv();
+#endif
     }
     //@}
 };

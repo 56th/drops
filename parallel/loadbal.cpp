@@ -851,7 +851,7 @@ LoadBalHandlerCL::LoadBalHandlerCL(const MGBuilderCL &builder, int master, Parti
 }
 
 
-void LoadBalHandlerCL::DoMigration()
+void LoadBalHandlerCL::DoMigration( int* dest_array)
 /** This function encapsulates all necessary steps to perform a load balancing
     step. So it creates the graph, calls ParMetis to compute the partitioning
     and finally does the migration.
@@ -872,28 +872,32 @@ void LoadBalHandlerCL::DoMigration()
     if (debugMode_ && ProcCL::IamMaster()) std::cout << "  - Create dual reduced graph ... \n";
 
     if (debugMode_) timer.Reset();
-    lb_->CreateDualRedGraph();
+    if (!dest_array){
+        lb_->CreateDualRedGraph();
 
-    if (debugMode_){
-        timer.Stop();
-        duration = timer.GetMaxTime();
-        if (ProcCL::IamMaster()) std::cout << "       --> "<<duration<<" sec\n";
+        if (debugMode_){
+            timer.Stop();
+            duration = timer.GetMaxTime();
+            if (ProcCL::IamMaster()) std::cout << "       --> "<<duration<<" sec\n";
+        }
+
+        int allAdjacencies= ProcCL::GlobalSum(lb_->GetNumLocalAdjacencies());
+
+        if (debugMode_ && ProcCL::IamMaster()) std::cout << "  - Compute graph partitioning ... \n";
+
+        if (debugMode_) timer.Reset();
+
+        lb_->PartitionPar();
+
+        if (debugMode_){
+            timer.Stop();
+            duration = timer.GetMaxTime();
+            if (ProcCL::IamMaster()) std::cout << "       --> "<<duration<<" sec for "<<lb_->GetNumAllVerts()<<" vertices and "<<allAdjacencies<<" adjacencies\n";
+        }
     }
-
-    int allAdjacencies= ProcCL::GlobalSum(lb_->GetNumLocalAdjacencies());
-
-    if (debugMode_ && ProcCL::IamMaster()) std::cout << "  - Compute graph partitioning ... \n";
-
-    if (debugMode_) timer.Reset();
-
-    lb_->PartitionPar();
-
-    if (debugMode_){
-        timer.Stop();
-        duration = timer.GetMaxTime();
-        if (ProcCL::IamMaster()) std::cout << "       --> "<<duration<<" sec for "<<lb_->GetNumAllVerts()<<" vertices and "<<allAdjacencies<<" adjacencies\n";
+    else{
+        lb_->GetPartitioner()->GetGraph().part= dest_array;
     }
-
 
     if (debugMode_ && ProcCL::IamMaster()) std::cout << "  - Migration ... \n";
     if (debugMode_) timer.Reset();
@@ -918,7 +922,12 @@ void LoadBalHandlerCL::DoMigration()
             std::cout << "       --> "<<GetEdgeCut()<<" edge cut\n";
         }
     }
-    lb_->DeleteGraph();
+    if ( dest_array){
+        lb_->GetPartitioner()->GetGraph().part= 0;
+    }
+    else {
+        lb_->DeleteGraph();
+    }
     lb_->RemoveLbNr();
 }
 

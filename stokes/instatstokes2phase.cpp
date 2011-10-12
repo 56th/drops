@@ -2606,6 +2606,56 @@ void P1XRepairCL::operator() ()
 //               << "\t#copied extended-dof: " << ci << '\n';
 }
 
+#ifdef _PAR
+/** After the migration has take place, build the local vector of 
+    accumulated vector indices.
+    \post a new index is created for the level set function
+*/
+void VelocityRepairCL::post_migrate()
+{
+    // Create a new numbering
+    VecDescCL loc_v;
+    IdxDescCL loc_vidx( stokes_.GetVelFE());
+    Uint      LastLevel= stokes_.GetMG().GetLastLevel();
+    match_fun match    = stokes_.GetMG().GetBnd().GetMatchFun();
+    loc_vidx.CreateNumbering( LastLevel, stokes_.GetMG(), stokes_.GetBndData().Vel, match);
+
+    // Assign the new index (and allocate memory for the new vector)
+    loc_v.SetIdx( &loc_vidx);
+
+    // Copy the DoF values into the new vector
+    DiST::Helper::WholeRemoteDataIteratorCL::DimListT dims; dims.push_back(0); dims.push_back(1); 
+    this->CopyVecElements( loc_v, dims);
+
+    this->swap( loc_vidx, loc_v.Data);
+    recvBuf_.clear();
+}
+
+/** After the migration has take place, build the local vector of 
+    accumulated vector indices.
+    \post a new index is created for the level set function
+*/
+void PressureRepairCL::post_migrate()
+{
+    // Create a new numbering
+    VecDescCL loc_p;
+    IdxDescCL loc_pidx(  stokes_.GetPrFE());
+    Uint      LastLevel= stokes_.GetMG().GetLastLevel();
+    match_fun match    = stokes_.GetMG().GetBnd().GetMatchFun();
+    loc_pidx.CreateNumbering( LastLevel, stokes_.GetMG(), stokes_.GetBndData().Pr, match, &ls_.Phi, &ls_.GetBndData());
+
+    // Assign the new index (and allocate memory for the new vector)
+    loc_p.SetIdx( &loc_pidx);
+
+    // Copy the DoF values into the new vector
+    DiST::Helper::WholeRemoteDataIteratorCL::DimListT dims; dims.push_back(0); 
+    this->CopyVecElements( loc_p, dims);
+
+    this->swap( loc_pidx, loc_p.Data);
+    recvBuf_.clear();
+}
+#endif
+
 
 void SetupMassDiag_P1(const MultiGridCL& MG, VectorCL& M, const IdxDescCL& RowIdx, const BndCondCL& bnd)
 {

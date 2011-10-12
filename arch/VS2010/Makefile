@@ -11,5 +11,4 @@ VS_DIRS= ReleaseSerial Release x64 DebugSerial Debug \
 distclean:
 	/bin/rm -rf $(VS_DIRS) DropsPackage.suo
 
-distclean: clean
 

@@ -322,6 +322,30 @@
     <ClCompile Include="..\..\..\parallel\mpistream.cpp">
       <Filter>parallel</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\levelset\mgobserve.cpp">
+      <Filter>levelset</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tests\dist_migration.cpp">
+      <Filter>target\DiST</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tests\dist_modify.cpp">
+      <Filter>target\DiST</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tests\dist_TestRefPar.cpp">
+      <Filter>target\DiST</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tests\dist_twophasedrops.cpp">
+      <Filter>target\DiST</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\misc\bndmap.cpp">
+      <Filter>misc</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\geom\bndScalarFunctions.cpp">
+      <Filter>geom</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\geom\bndVelFunctions.cpp">
+      <Filter>geom</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\geom\boundary.h">
@@ -545,6 +569,9 @@
     </ClInclude>
     <ClInclude Include="..\..\..\parallel\mpistream.h">
       <Filter>parallel</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\misc\bndmap.h">
+      <Filter>misc</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -52,7 +52,6 @@ SArrayCL<FaceCL*, NumAllFacesC> TetraCL::fPtrs_(static_cast<FaceCL*>(0));
 #ifdef _PAR
 
 /** Puts the hash, mark for removement, and boundary information onto the stream.
-    \todo DiST: Pack Unknowns!
 */
 void VertexCL::Pack( DiST::Helper::MPIostreamCL& ostrstream) const
 {
@@ -66,10 +65,10 @@ void VertexCL::Pack( DiST::Helper::MPIostreamCL& ostrstream) const
     else {
         ostrstream << size_t(0);
     }
+    Unknowns.Pack( ostrstream, *this);
 }
 
 /** Reads the hash, mark for removement, and boundary information from the stream.
-    \todo DiST: Unpack Unknowns!
 */
 void VertexCL::UnPack( DiST::Helper::MPIistreamCL& istrstream)
 {
@@ -86,6 +85,7 @@ void VertexCL::UnPack( DiST::Helper::MPIistreamCL& istrstream)
         istrstream >> bidx >> p2d[0] >> p2d[1];
         AddBnd( BndPointCL(bidx, p2d));
     }
+    Unknowns.UnPack( istrstream, *this);
 }
 
 #endif
@@ -150,7 +150,6 @@ Point3DCL GetBaryCenter(const EdgeCL& e)
 
 /** Put the hash, both vertices, boundary information, accumulated MFR, and mark for removement
     onto the stream
-    \todo DiST: Pack Unknowns!
 */
 void EdgeCL::Pack( DiST::Helper::MPIostreamCL& ostrstream) const
 {
@@ -159,11 +158,11 @@ void EdgeCL::Pack( DiST::Helper::MPIostreamCL& ostrstream) const
                << GetVertex(1)->GetGID()
                << (GetMidVertex()==0 ? DiST::Helper::NoGID : GetMidVertex()->GetGID())
                << Bnd_[0] << Bnd_[1] << AccMFR_ << RemoveMark_;
+    Unknowns.Pack( ostrstream, *this);
 }
 
 /** Reads the hash, both vertices, boundary information, accumulated MFR, and mark for removement
     from the stream
-    \todo DiST: UnPack Unknowns!
 */
 void EdgeCL::UnPack( DiST::Helper::MPIistreamCL& istrstream)
 {
@@ -174,6 +173,7 @@ void EdgeCL::UnPack( DiST::Helper::MPIistreamCL& istrstream)
     Vertices_[1]= DiST::InfoCL::Instance().GetVertex(vertex1);
     if ( DiST::InfoCL::Instance().Exists(midVertex))
         MidVertex_= DiST::InfoCL::Instance().GetVertex(midVertex);
+    Unknowns.UnPack( istrstream, *this);
 }
 
 #endif
@@ -277,7 +277,6 @@ const TetraCL* FaceCL::GetNeighInTriang(const TetraCL* tp, Uint TriLevel) const
 // ----------------------------
 
 /** Puts the hash, all neighbors, boundary information, and mark for removement onto the stream
-    \todo DiST: Pack Unknowns!
 */
 void FaceCL::Pack( DiST::Helper::MPIostreamCL& ostrstream) const
 {
@@ -286,10 +285,10 @@ void FaceCL::Pack( DiST::Helper::MPIostreamCL& ostrstream) const
         ostrstream << ( GetNeighbor(i)==0 ? DiST::Helper::NoGID : GetNeighbor(i)->GetGID());
     }
     ostrstream << Bnd_ << RemoveMark_;
+    Unknowns.Pack( ostrstream, *this);
 }
 
 /** Reads the hash, all neighbors, boundary information, and mark for removement from the stream
-    \todo DiST: UnPack Unknowns!
 */
 void FaceCL::UnPack( DiST::Helper::MPIistreamCL& istrstream)
 {
@@ -299,6 +298,7 @@ void FaceCL::UnPack( DiST::Helper::MPIistreamCL& istrstream)
         istrstream >> tmpNeigh;
     // neighboring tetras are linked later by TransferCL::CreateSimplex<TetraCL>(...)
     istrstream >> Bnd_ >> RemoveMark_;
+    Unknowns.UnPack( istrstream, *this);
 }
 
 #endif
@@ -905,7 +905,6 @@ if the child cannot be found, create it.
 #ifdef _PAR
 
 /**
-    \todo DiST: Pack Unknowns!
 */
 void TetraCL::Pack( DiST::Helper::MPIostreamCL& ostrstream) const
 {
@@ -927,10 +926,10 @@ void TetraCL::Pack( DiST::Helper::MPIostreamCL& ostrstream) const
     for ( const_ChildPIterator chp(GetChildBegin()); chp!=GetChildEnd(); ++chp){
         ostrstream << (*chp)->GetGID();
     }
+    Unknowns.Pack( ostrstream, *this);
 }
 
 /**
-    \todo DiST: UnPack Unknowns!
     \todo DiST: UnPack children (they need to be received in before!)
     \todo DiST: Make MFR on edges consistent, see HandlerTObjMkCons, HandlerTSetPrio
     \todo DiST: Eventually, change priority of a master tetrahedra to PrioGhost, see HandlerTUpdate
@@ -977,6 +976,7 @@ void TetraCL::UnPack( DiST::Helper::MPIistreamCL& istrstream)
 				(*Children_)[ch]= 0;
         }
     }
+    Unknowns.UnPack( istrstream, *this);
 }
 
 /**
@@ -1090,6 +1090,7 @@ void VertexCL::DebugInfo(std::ostream& os) const
     else{
         os << "\n no recycle bin found\n";
     }
+    os << "Has Unknowns " << Unknowns.Exist() << ", received any Unknowns " << Unknowns.HasUnkRecieved() << std::endl;
 #ifdef _PAR
     base::DebugInfo( os);
 #endif

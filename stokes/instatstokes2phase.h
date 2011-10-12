@@ -267,6 +267,13 @@ class VelocityRepairCL : public MGObserverCL
     void post_refine ();
     void pre_refine_sequence  () {}
     void post_refine_sequence ();
+#ifdef _PAR
+    /// \brief Reserve memory for receiving elements. This is just a brief estimation ...
+    /// \todo Reserve some memory
+    void pre_migrate () {}
+    /// \brief Megre the received and known DoF velocity values into the new vector
+    void post_migrate();
+#endif
     const IdxDescCL* GetIdxDesc() const { return stokes_.v.RowIdx; }
     const VectorCL*  GetVector()  const { return &stokes_.v.Data; }
     void swap( IdxDescCL& idx, VectorCL& v) { stokes_.v.RowIdx->swap(idx); stokes_.v.Data.swap(v); }
@@ -293,6 +300,13 @@ class PressureRepairCL : public MGObserverCL
     void post_refine ();
     void pre_refine_sequence  ();
     void post_refine_sequence ();
+#ifdef _PAR
+    /// \brief Reserve memory for receiving elements. This is just a brief estimation ...
+    /// \todo Reserve some memory
+    void pre_migrate () {}
+    /// \brief Megre the received and known DoF pressure values into the new vector
+    void post_migrate();
+#endif
     const IdxDescCL* GetIdxDesc() const { return stokes_.p.RowIdx; }
     const VectorCL*  GetVector()  const { return &stokes_.p.Data; }
     void swap( IdxDescCL& idx, VectorCL& v) { stokes_.p.RowIdx->swap(idx); stokes_.p.Data.swap(v); }

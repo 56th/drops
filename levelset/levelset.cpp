@@ -26,6 +26,9 @@
 #include "levelset/fastmarch.h"
 #include "num/lattice-eval.h"
 #include "num/quadrature.h"
+#ifdef _PAR
+#  include "parallel/DiST.h"
+#endif
 #include <fstream>
 
 namespace DROPS
@@ -751,19 +754,6 @@ void LevelsetP2CL::GetMaxMinGradPhi(double& maxGradPhi, double& minGradPhi) cons
 //                               LevelsetRepairCL
 //*****************************************************************************
 
-#ifndef _PAR
-void LevelsetRepairCL::pre_refine()
-/// do nothing
-{
-}
-#else
-void LevelsetRepairCL::pre_refine()
-/// Tell parallel multigrid about the location of the DOF
-{
-    GetPMG().AttachTo( &ls_.Phi, &ls_.GetBndData());
-}
-#endif
-
 void
 LevelsetRepairCL::post_refine ()
 /// Do all things to complete the repairing of the FE level-set function
@@ -775,13 +765,7 @@ LevelsetRepairCL::post_refine ()
 
     ls_.CreateNumbering( ls_.GetMG().GetLastLevel(), &loc_lidx, match);
     loc_phi.SetIdx( &loc_lidx);
-#ifdef _PAR
-    GetPMG().HandleNewIdx(&ls_.idx, &loc_phi);
-#endif
     RepairAfterRefineP2( ls_.GetSolution( phi), loc_phi);
-#ifdef _PAR
-    GetPMG().CompleteRepair( &loc_phi);
-#endif
 
     phi.Clear( phi.t);
     ls_.DeleteNumbering( phi.RowIdx);
@@ -790,5 +774,29 @@ LevelsetRepairCL::post_refine ()
     phi.Data= loc_phi.Data;
 }
 
-} // end of namespace DROPS
+#ifdef _PAR
+/** After the migration has take place, build the local vector of 
+    accumulated vector indices.
+    \post a new index is created for the level set function
+*/
+void LevelsetRepairCL::post_migrate()
+{
+    // Create a new numbering
+    VecDescCL loc_phi;
+    IdxDescCL loc_lidx( P2_FE);
+    match_fun match= ls_.GetMG().GetBnd().GetMatchFun();
+    ls_.CreateNumbering( ls_.GetMG().GetLastLevel(), &loc_lidx, match);
 
+    // Assign the new index (and allocate memory for the new vector)
+    loc_phi.SetIdx( &loc_lidx);
+
+    // Copy the DoF values into the new vector
+    DiST::Helper::WholeRemoteDataIteratorCL::DimListT dims; dims.push_back(0); dims.push_back(1); 
+    this->CopyVecElements( loc_phi, dims);
+
+    this->swap( loc_lidx, loc_phi.Data);
+    this->recvBuf_.clear();
+}
+#endif
+
+} // end of namespace DROPS

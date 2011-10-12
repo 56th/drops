@@ -238,7 +238,7 @@ class LoadBalHandlerCL
     ~LoadBalHandlerCL();
 
     /// \brief Do a complete migration
-    void DoMigration();
+    void DoMigration( int* dest_array=0);
     /// \brief Distribute a multigrid, that is stored on a single processor
     void DoInitDistribution(int master=Drops_MasterC);
 
