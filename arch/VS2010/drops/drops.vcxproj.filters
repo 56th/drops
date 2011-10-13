@@ -322,9 +322,6 @@
     <ClCompile Include="..\..\..\parallel\mpistream.cpp">
       <Filter>parallel</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\levelset\mgobserve.cpp">
-      <Filter>levelset</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\tests\dist_migration.cpp">
       <Filter>target\DiST</Filter>
     </ClCompile>

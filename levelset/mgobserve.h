@@ -72,19 +72,8 @@ class ObservedVectorsCL: public std::vector<MGObserverCL*>
 {
   private:
     typedef std::vector<MGObserverCL*> base;
-    // Singleton: make std ctr's and assignment operator private
-    ObservedVectorsCL() : base() {}
-    ObservedVectorsCL( const ObservedVectorsCL&);            // copy ctr not defined
-    ObservedVectorsCL& operator=( const ObservedVectorsCL);  // assignment operator not defined
 
   public:
-    /// Get instance of Singleton
-    static ObservedVectorsCL& Instance()
-    {
-        static ObservedVectorsCL instance;
-        return instance;
-    }
-
     /// \name Call handlers (MGObserverCL) to manipulate FE-functions
     // @{
     /// \brief Tell Observer, that MG will be refined (and migration will be performed)

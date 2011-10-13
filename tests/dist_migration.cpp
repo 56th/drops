@@ -129,7 +129,7 @@ void SetDOFStokes( const MultiGridCL& mg, InstatStokes2PhaseP2P1CL& stokes)
     }
 }
 
-void Migrate( LoadBalHandlerCL& lb)
+void Migrate( LoadBalHandlerCL& lb, ObservedVectorsCL& obs)
 {
     MultiGridCL& mg= lb.GetMG();
 
@@ -154,7 +154,6 @@ void Migrate( LoadBalHandlerCL& lb)
     }
 
     // Do the migration process (including the unknowns)
-    ObservedVectorsCL& obs= ObservedVectorsCL::Instance();
     obs.notify_pre_refmig_sequence( lb.GetMG());
     obs.notify_pre_migrate();
     lb.DoMigration( Addr(destination));
@@ -305,9 +304,10 @@ void CheckMigration( LoadBalHandlerCL& lb)
     PressureRepairCL prrepair( Stokes, lset);
 
     // let the level set, velocity and pressure FE function be observed
-    ObservedVectorsCL::Instance().push_back( &lset_repair);
-    ObservedVectorsCL::Instance().push_back( &velrepair);
-    ObservedVectorsCL::Instance().push_back( &prrepair);
+    ObservedVectorsCL obs;
+    obs.push_back( &lset_repair);
+    obs.push_back( &velrepair);
+    obs.push_back( &prrepair);
 
     std::cout << "Set values for the pressure, the velocity and the level set function" << std::endl;
     SetDOFLset( mg, lset);
@@ -319,7 +319,7 @@ void CheckMigration( LoadBalHandlerCL& lb)
               << " velocity " << Stokes.v.RowIdx->GetIdx() << '\n'
               << " pressure " << Stokes.p.RowIdx->GetIdx() << '\n'
               << std::endl;
-    Migrate( lb);
+    Migrate( lb, obs);
 
     // Check for correctness
     CheckDOFLset( mg, lset);
