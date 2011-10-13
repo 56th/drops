@@ -135,9 +135,6 @@ class AdapTriangCL
     void push_back (MGObserverCL* o)
     {
         observer_.push_back( o);
-#ifdef _PAR
-        observer_.back()->SetPMG( *pmg_);
-#endif
     }
 };
 

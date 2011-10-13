@@ -263,7 +263,7 @@ class VelocityRepairCL : public MGObserverCL
   public:
     VelocityRepairCL ( InstatStokes2PhaseP2P1CL& stokes)
         : stokes_( stokes) {}
-    void pre_refine  ();
+    void pre_refine  () {}
     void post_refine ();
     void pre_refine_sequence  () {}
     void post_refine_sequence ();

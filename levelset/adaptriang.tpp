@@ -104,9 +104,9 @@ template <class DistFctT>
         throw DROPSErrCL ("AdapTriangCL::ModifyGridStep uses DDD\n");
         //pmg_->HandleUnknownsAfterRefine();
         if (lb) {
-            observer_.notify_pre_migrate( lb_);
+            observer_.notify_pre_migrate( );
             lb_.DoMigration();
-            observer_.notify_post_migrate( lb_);
+            observer_.notify_post_migrate( );
         }
 #endif
 #ifdef _PAR

@@ -103,17 +103,6 @@ void SetupPrStiff_P1D( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
 //*****************************************************************************
 //                               VelocityRepairCL
 //*****************************************************************************
-#ifndef _PAR
-inline void VelocityRepairCL::pre_refine()
-  /// do nothing
-{ }
-#else
-inline void VelocityRepairCL::pre_refine()
-  /// tell parallel multigrid about velocities
-{
-    GetPMG().AttachTo( &stokes_.v, &stokes_.GetBndData().Vel);
-}
-#endif
 
 inline void
   VelocityRepairCL::post_refine ()
@@ -132,11 +121,11 @@ inline void
     }
     loc_v.SetIdx( &loc_vidx);
 #ifdef _PAR
-    GetPMG().HandleNewIdx(&stokes_.vel_idx, &loc_v);
+    // GetPMG().HandleNewIdx(&stokes_.vel_idx, &loc_v);
 #endif
     RepairAfterRefineP2( stokes_.GetVelSolution( v), loc_v);
 #ifdef _PAR
-    GetPMG().CompleteRepair( &loc_v);
+    // GetPMG().CompleteRepair( &loc_v);
 #endif
     v.Clear( v.t);
     v.RowIdx->DeleteNumbering( stokes_.GetMG());
@@ -166,11 +155,14 @@ inline void PressureRepairCL::pre_refine()
 #else
 inline void PressureRepairCL::pre_refine()
   /// tell parallel multigrid about (extended) finite element function
+  /// \todo Handling of xtended finite elements ...
 {
+/*
     GetPMG().AttachTo( &stokes_.p, &stokes_.GetBndData().Pr);
     if ( stokes_.UsesXFEM()){
         GetPMG().AttachTo( p1xrepair_->GetExt(), &stokes_.GetBndData().Pr);
     }
+*/
 }
 #endif
 
@@ -185,10 +177,11 @@ inline void
     loc_pidx.CreateNumbering( stokes_.GetMG().GetLastLevel(), stokes_.GetMG(), stokes_.GetBndData().Pr, match, &ls_.Phi, &ls_.GetBndData());
     loc_p.SetIdx( &loc_pidx);
 #ifdef _PAR
-    GetPMG().HandleNewIdx(&stokes_.pr_idx, &loc_p);
+    //GetPMG().HandleNewIdx(&stokes_.pr_idx, &loc_p);
 #endif
     RepairAfterRefineP1( stokes_.GetPrSolution( p), loc_p);
 #ifdef _PAR
+    /*
     GetPMG().CompleteRepair( &loc_p);
     if ( stokes_.UsesXFEM()){
         IdxDescCL loc_xpr_idx( P1_FE);
@@ -202,6 +195,7 @@ inline void
         // delete this numbering
         loc_xpr_idx.DeleteNumbering( stokes_.GetMG());
     }
+    */
 #endif
     p.Clear( p.t);
     p.RowIdx->DeleteNumbering( stokes_.GetMG());
