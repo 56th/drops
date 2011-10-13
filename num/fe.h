@@ -1218,9 +1218,13 @@ class UpdateProlongationCL : public MGObserverCL
                 throw DROPSErrCL("UpdateProlongationCL: FE type not supported, yet");
         }
     }
+#ifdef _PAR
     const IdxDescCL* GetIdxDesc() const { return (const IdxDescCL*)0; }
     const VectorCL*  GetVector()  const { return 0; }
     void swap( IdxDescCL&, VectorCL&) {}
+    void pre_migrate () { throw DROPSErrCL("UpdateProlongationCL: Not parallelized, so far :-("); }
+    void post_migrate() {throw DROPSErrCL("UpdateProlongationCL: Not parallelized, so far :-("); };
+#endif
 };
 
 //**************************************************************************
