@@ -346,6 +346,9 @@
     <ClCompile Include="..\..\..\geom\bndVelFunctions.cpp">
       <Filter>geom</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\parallel\migrateunknowns.cpp">
+      <Filter>parallel</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\geom\boundary.h">
@@ -572,6 +575,9 @@
     </ClInclude>
     <ClInclude Include="..\..\..\misc\bndmap.h">
       <Filter>misc</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\parallel\migrateunknowns.h">
+      <Filter>parallel</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
