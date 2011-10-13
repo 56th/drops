@@ -27,7 +27,7 @@
 #ifdef _PAR
 #  include "parallel/DiST.h"
 #  include "parallel/mpistream.h"
-#  include "levelset/mgobserve.h"
+#  include "parallel/migrateunknowns.h"
 #endif
 #include <algorithm>
 
@@ -62,26 +62,22 @@ void UnknownHandleCL::Pack( DiST::Helper::MPIostreamCL& sendstream, const DiST::
     const double NoDataC= std::numeric_limits<double>::quiet_NaN();
     if ( Exist()){
         sendstream << true;
-        const ObservedVectorsCL& observers= ObservedVectorsCL::Instance();
+        const ObservedMigrateFECL& observers= ObservedMigrateFECL::Instance();
         // write value of dofs onto the stream for all observed vectors
-        for ( ObservedVectorsCL::const_iterator it( observers.begin()); it!=observers.end(); ++it){
-            IdxDescCL const *  idx_desc= (*it)->GetIdxDesc();
-            VectorCL  const *  vec     = (*it)->GetVector();
-            // The vector and the index description is available (assume that this is true
-            // on receiving process, too).
-            if ( vec && idx_desc){
-                const Uint idx= idx_desc->GetIdx();
-                // check if there are unknowns
-                if ( Exist( idx)){
-                    const IdxT dof= (*this)(idx);
-                    for ( Uint i=0; i<idx_desc->NumUnknownsSimplex( t); ++i){  // edges must have the same number of unknowns than vertices!
-                        sendstream << (*vec)[dof+i];
-                    }
+        for ( ObservedMigrateFECL::const_iterator it( observers.begin()); it!=observers.end(); ++it){
+            IdxDescCL const *  idx_desc= it->GetIdxDesc();
+            VectorCL  const *  vec     = it->GetVector();
+            const Uint idx             = idx_desc->GetIdx();
+            // if there are unknowns, transfer them, otherwise, send NoDataC
+            if ( Exist( idx)){
+                const IdxT dof= (*this)(idx);
+                for ( Uint i=0; i<idx_desc->NumUnknownsSimplex( t); ++i){  // edges must have the same number of unknowns than vertices!
+                    sendstream << (*vec)[dof+i];
                 }
-                else{
-                    sendstream << NoDataC;    // flag, that the proc does not have a dof for that idx
-                }
-            }   // end of (vec && idx_desc)
+            }
+            else{
+                sendstream << NoDataC;    // flag, that the proc does not have a dof for that idx
+            }
         }   // end of observer loop
     }
     else{           // There are no DOF values available
@@ -106,34 +102,32 @@ void UnknownHandleCL::UnPack( DiST::Helper::MPIistreamCL& recvstream, const DiST
     recvstream >> unk_recv;
 
     if ( unk_recv){
-        ObservedVectorsCL& observers= ObservedVectorsCL::Instance();
-        for ( ObservedVectorsCL::const_iterator it( observers.begin()); it!=observers.end(); ++it){
-            IdxDescCL const *    idx_desc= (*it)->GetIdxDesc();
-            std::vector<double>& recvbuf = (*it)->GetRecvBuffer();
-            // The vector and the index description is available
-            if ( (*it)->GetVector() && idx_desc){
-                const Uint idx= idx_desc->GetIdx();
-                recvstream >> val_recv;
-                if ( val_recv!=NoDataC){    // OK, we are receiving 'good' data
-                    // check for errors
-                    Assert( !Exist(idx),
-                        DROPSErrCL("UnknownHandleCL::UnPack: Merging of received dof is not possible"),
-                        DebugParallelNumC);
+        ObservedMigrateFECL& observers= ObservedMigrateFECL::Instance();
+        for ( ObservedMigrateFECL::iterator it( observers.begin()); it!=observers.end(); ++it){
+            IdxDescCL const *    idx_desc= it->GetIdxDesc();
+            std::vector<double>& recvbuf = it->GetRecvBuffer();
+            const Uint idx               = idx_desc->GetIdx();
+            // Read the data ...
+            recvstream >> val_recv;
+            if ( val_recv!=NoDataC){    // OK, we are receiving 'good' data
+                // check for errors
+                Assert( !Exist(idx),
+                    DROPSErrCL("UnknownHandleCL::UnPack: Merging of received dof is not possible"),
+                    DebugParallelNumC);
 
-                    // Now, prepare for receiving data ...
-                    Prepare( idx);
-                    // ... remember that this is a received unknown
-                    SetUnkRecieved( idx);
-                    // ... remember where the dofs are put
-                    (*this)(idx)= recvbuf.size();
-                    // ... and the store the received dofs in the buffer
-                    recvbuf.push_back( val_recv);   // first value has already been received
-                    for ( int i=0; i<(int)idx_desc->NumUnknownsSimplex( t)-1; ++i){
-                        recvstream >> val_recv;
-                        recvbuf.push_back( val_recv);
-                    }
-                }   // end of receiving the index idx
-            }   // end if (vec && idx_desc)
+                // Now, prepare for receiving data ...
+                Prepare( idx);
+                // ... remember that this is a received unknown
+                SetUnkRecieved( idx);
+                // ... remember where the dofs are put
+                (*this)(idx)= recvbuf.size();
+                // ... and the store the received dofs in the buffer
+                recvbuf.push_back( val_recv);   // first value has already been received
+                for ( int i=0; i<(int)idx_desc->NumUnknownsSimplex( t)-1; ++i){
+                    recvstream >> val_recv;
+                    recvbuf.push_back( val_recv);
+                }
+            }   // end of receiving the index idx
         }   // end of the observer loop
     }
 }

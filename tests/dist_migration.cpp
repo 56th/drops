@@ -129,7 +129,6 @@ void SetDOFStokes( const MultiGridCL& mg, InstatStokes2PhaseP2P1CL& stokes)
     }
 }
 
-
 void Migrate( LoadBalHandlerCL& lb)
 {
     MultiGridCL& mg= lb.GetMG();
@@ -148,15 +147,15 @@ void Migrate( LoadBalHandlerCL& lb)
     std::vector<int> destination;
     i=0;
 
-    // Determine a destination process for all tetrahedra
+    // Determine a destination process for all tetrahedra (this -- most propably -- won't
+    // result in a good partitioning ;-) )
     for ( ; it!=end; ++it, ++i){
         destination.push_back( i%ProcCL::Size());
     }
 
-
-    // Do the migration process
+    // Do the migration process (including the unknowns)
     ObservedVectorsCL& obs= ObservedVectorsCL::Instance();
-    obs.notify_pre_refmig_sequence();
+    obs.notify_pre_refmig_sequence( lb.GetMG());
     obs.notify_pre_migrate();
     lb.DoMigration( Addr(destination));
     obs.notify_post_migrate();
@@ -305,6 +304,7 @@ void CheckMigration( LoadBalHandlerCL& lb)
     VelocityRepairCL velrepair( Stokes);
     PressureRepairCL prrepair( Stokes, lset);
 
+    // let the level set, velocity and pressure FE function be observed
     ObservedVectorsCL::Instance().push_back( &lset_repair);
     ObservedVectorsCL::Instance().push_back( &velrepair);
     ObservedVectorsCL::Instance().push_back( &prrepair);
@@ -313,6 +313,7 @@ void CheckMigration( LoadBalHandlerCL& lb)
     SetDOFLset( mg, lset);
     SetDOFStokes( mg, Stokes);
 
+    // do the migration
     std::cout << "Migrate the tetrahedra with the following DOF information\n" 
               << " level set " << lidx->GetIdx() << '\n'
               << " velocity " << Stokes.v.RowIdx->GetIdx() << '\n'
@@ -320,9 +321,12 @@ void CheckMigration( LoadBalHandlerCL& lb)
               << std::endl;
     Migrate( lb);
 
+    // Check for correctness
     CheckDOFLset( mg, lset);
     CheckDOFStokes( mg, Stokes);
     delete lsetbnddata; lsetbnddata=0;
+    delete velbnddata; velbnddata=0;
+    delete prbnddata; prbnddata=0;
 
     std::cout << "Check migration with unknowns performed" << std::endl;
 }

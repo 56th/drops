@@ -27,7 +27,7 @@
 
 #include "misc/utils.h"
 #ifdef _PAR
-#  include "parallel/parmultigrid.h"
+#  include "parallel/migrateunknowns.h"
 #endif
 
 namespace DROPS
@@ -41,15 +41,6 @@ namespace DROPS
 /// \todo (merge) Put a reference on MultiGridCL (or ParMultiGridCL as member?) to this class?
 class MGObserverCL
 {
-#ifdef _PAR
-  protected:
-    std::vector<double> recvBuf_;   ///< during migration, buffer the received values here
-    
-    /// \brief Copy vector elements from the old describer and receive buffer into the new vector
-    void CopyVecElements( VecDescCL& new_vec_desc, const std::vector<Usint>& dims);
-
-#endif
-
   public:
     virtual ~MGObserverCL () {};
 
@@ -62,23 +53,16 @@ class MGObserverCL
     virtual void pre_refine_sequence  ()= 0;
     /// Called at the end of AdapTriangCL::UpdateTriang().
     virtual void post_refine_sequence ()= 0;
+
 #ifdef _PAR
     /// \name Used for migration handling. Observer is skipped if GetVector() returns null_ptr.
     // @{
-    /// \name gatter and setter for the receive buffer and exteded indices
-    //@{
-    const std::vector<double>& GetRecvBuffer() const { return recvBuf_; }
-          std::vector<double>& GetRecvBuffer()       { return recvBuf_; }
-    //@}
     /// Get a pointer to the FE space.
     virtual const IdxDescCL* GetIdxDesc() const= 0;
     /// Get a pointer to an (accumulated) vector. Return value null_ptr indicates that this observer should be skipped for migration handling.
     virtual const VectorCL* GetVector() const= 0;
     /// Swap FE space and vector.
     virtual void swap( IdxDescCL& idx, VectorCL& v)= 0;
-
-    virtual void pre_migrate () = 0;
-    virtual void post_migrate() = 0;
     // @}
 #endif
 };
@@ -109,36 +93,35 @@ class ObservedVectorsCL: public std::vector<MGObserverCL*>
             (*obs)->pre_refine();
     }
 
+    /// \brief Tell Observer that a migration will be performed
+    void notify_pre_migrate() {
+        ObservedMigrateFECL::Instance().notify_pre_migrate();
+    }
+
+    /// \brief Tell Observer that a migration has beed performed
+    void notify_post_migrate() {
+        ObservedMigrateFECL::Instance().notify_post_migrate();
+    }
+
     /// \brief Tell Observer, that MG has been refined (and migration has been performed)
     void notify_post_refine () {
         for (iterator obs= begin(); obs != end(); ++obs)
             (*obs)->post_refine();
     }
 
-    /// \brief Tell Observer, that MG will be refined (and migration will be performed)
-    void notify_pre_migrate () {
-        for (iterator obs= begin(); obs != end(); ++obs){
-            (*obs)->pre_migrate();
-        }
-    }
-
-    /// \brief Tell Observer, that MG has been refined (and migration has been performed)
-    void notify_post_migrate () {
-        for (iterator obs= begin(); obs != end(); ++obs){
-            (*obs)->post_migrate();
-        }
-    }
-
     /// \brief Tell Observer, that a sequence of refinements (and migrations) will take place
-    void notify_pre_refmig_sequence() {
-        for (iterator obs= begin(); obs != end(); ++obs)
+    void notify_pre_refmig_sequence( MultiGridCL& mg) {
+        for (iterator obs= begin(); obs != end(); ++obs){
             (*obs)->pre_refine_sequence();
+        }
+        ObservedMigrateFECL::Instance().Init( *this, mg);
     }
 
     /// \brief Tell Observer, that a sequence of refinements (and migrations) has taken place
     void notify_post_refmig_sequence() {
         for (iterator obs= begin(); obs != end(); ++obs)
             (*obs)->post_refine_sequence();
+        ObservedMigrateFECL::Instance().clear();
     }
     //@}
 };

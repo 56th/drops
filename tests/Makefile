@@ -27,7 +27,8 @@ include ../Make.common
 
 PAR_OBJ_ = ../parallel/parallel.o ../parallel/partime.o  \
            ../parallel/exchange.o  ../parallel/parmultigrid.o \
-           ../parallel/logger.o ../parallel/DiST.o ../parallel/mpistream.o ../parallel/loadbal.o ../parallel/partitioner.o
+           ../parallel/logger.o ../parallel/DiST.o ../parallel/mpistream.o \
+           ../parallel/loadbal.o ../parallel/partitioner.o ../parallel/migrateunknowns.o
 
 PAR_OBJ = $(if $(PAR_BUILD),$(PAR_OBJ_),)
 
@@ -306,7 +307,7 @@ dist_ref: \
     ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
     ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o ../out/vtkOut.o ../parallel/parmultigrid.o \
     ../num/fe.o ../num/interfacePatch.o ../levelset/levelset.o ../levelset/fastmarch.o ../levelset/surfacetension.o \
-    ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o ../levelset/mgobserve.o \
+    ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o \
     $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
@@ -316,7 +317,7 @@ dist_migration: \
     ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o ../out/vtkOut.o ../parallel/parmultigrid.o \
     ../num/fe.o ../num/interfacePatch.o ../levelset/levelset.o ../levelset/fastmarch.o ../levelset/surfacetension.o \
     ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o $(PAR_OBJ) \
-    ../levelset/mgobserve.o ../misc/bndmap.o ../geom/bndVelFunctions.o ../geom/bndScalarFunctions.o \
+    ../misc/bndmap.o ../geom/bndVelFunctions.o ../geom/bndScalarFunctions.o \
     ../stokes/instatstokes2phase.o
 	$(CXX) -o $@ $^ $(LFLAGS)
 
@@ -326,7 +327,7 @@ dist_TestRefPar: \
     ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o ../out/vtkOut.o ../parallel/parmultigrid.o \
     ../num/fe.o ../num/interfacePatch.o ../levelset/levelset.o ../levelset/fastmarch.o ../levelset/surfacetension.o \
     ../misc/params.o ../out/output.o ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o \
-    ../levelset/mgobserve.o ../num/quadrature.o $(PAR_OBJ)
+    ../num/quadrature.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 dist_ref_rising_drop: \
@@ -335,7 +336,7 @@ dist_ref_rising_drop: \
     ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o ../out/vtkOut.o ../parallel/parmultigrid.o \
     ../num/fe.o ../num/interfacePatch.o ../levelset/levelset.o ../levelset/fastmarch.o ../levelset/surfacetension.o \
     ../misc/params.o ../out/output.o ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o \
-    ../levelset/mgobserve.o $(PAR_OBJ)
+    $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 
@@ -369,10 +370,9 @@ dist_twophasedrops: \
     ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o ../levelset/levelset.o \
     ../misc/utils.o ../out/output.o ../num/discretize.o ../navstokes/instatnavstokes2phase.o \
     ../misc/params.o ../levelset/fastmarch.o ../stokes/instatstokes2phase.o ../num/MGsolver.o \
-    ../num/fe.o ../stokes/integrTime.o  \
-    ../num/interfacePatch.o ../out/vtkOut.o ../levelset/surfacetension.o \
+    ../num/fe.o ../stokes/integrTime.o  ../num/interfacePatch.o ../out/vtkOut.o ../levelset/surfacetension.o \
     ../geom/geomselect.o  ../levelset/twophaseutils.o ../num/hypre.o ../levelset/coupling.o ../geom/bndVelFunctions.o \
-    ../geom/bndScalarFunctions.o ../misc/bndmap.o ../levelset/twophaseCoeff.o ../levelset/mgobserve.o \
+    ../geom/bndScalarFunctions.o ../misc/bndmap.o ../levelset/twophaseCoeff.o  \
     ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o \
     $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)

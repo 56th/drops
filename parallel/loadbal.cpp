@@ -24,6 +24,7 @@
 
 #include "parallel/loadbal.h"
 #include "parallel/parallel.h"
+#include "parallel/migrateunknowns.h"
 #include "num/interfacePatch.h"
 #include <iomanip>
 

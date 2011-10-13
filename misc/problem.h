@@ -260,6 +260,8 @@ class IdxDescCL: public FE_InfoCL
             " Probably using copy instead of original IdxDescCL-object.");
         return Idx_;
     }
+    /// \brief Returns the matching function for periodic boundaries
+    match_fun GetMatchFun() const { return match_; }
     /// \brief Returns boundary condition
     BndCondCL GetBndInfo() const {return Bnd_;}
     /// \brief Returns extended index. Only makes sense for XFEM.

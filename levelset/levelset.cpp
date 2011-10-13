@@ -774,29 +774,4 @@ LevelsetRepairCL::post_refine ()
     phi.Data= loc_phi.Data;
 }
 
-#ifdef _PAR
-/** After the migration has take place, build the local vector of 
-    accumulated vector indices.
-    \post a new index is created for the level set function
-*/
-void LevelsetRepairCL::post_migrate()
-{
-    // Create a new numbering
-    VecDescCL loc_phi;
-    IdxDescCL loc_lidx( P2_FE);
-    match_fun match= ls_.GetMG().GetBnd().GetMatchFun();
-    ls_.CreateNumbering( ls_.GetMG().GetLastLevel(), &loc_lidx, match);
-
-    // Assign the new index (and allocate memory for the new vector)
-    loc_phi.SetIdx( &loc_lidx);
-
-    // Copy the DoF values into the new vector
-    DiST::Helper::WholeRemoteDataIteratorCL::DimListT dims; dims.push_back(0); dims.push_back(1); 
-    this->CopyVecElements( loc_phi, dims);
-
-    this->swap( loc_lidx, loc_phi.Data);
-    this->recvBuf_.clear();
-}
-#endif
-
 } // end of namespace DROPS

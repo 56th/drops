@@ -180,17 +180,10 @@ class LevelsetRepairCL : public MGObserverCL
     void post_refine_sequence () {}
 
 #ifdef _PAR
-    /// \brief Reserve memory for receiving elements. This is just a brief estimation ...
-    /// \todo Check if this leads to a performance improvement
-    void pre_migrate () { this->GetRecvBuffer().reserve( ls_.idx.NumUnknowns()); }
-    /// \brief Megre the received and known DoF level set values into the new vector
-    void post_migrate();
-#endif
-
-
     const IdxDescCL* GetIdxDesc() const { return ls_.Phi.RowIdx; }
     const VectorCL*  GetVector()  const { return &ls_.Phi.Data; }
     void swap( IdxDescCL& idx, VectorCL& v) { ls_.Phi.RowIdx->swap(idx); ls_.Phi.Data.swap(v); }
+#endif
 };
 
 /// \brief volume correction and reparametrization of level set function phi

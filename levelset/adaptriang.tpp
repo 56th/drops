@@ -104,9 +104,9 @@ template <class DistFctT>
         throw DROPSErrCL ("AdapTriangCL::ModifyGridStep uses DDD\n");
         //pmg_->HandleUnknownsAfterRefine();
         if (lb) {
-            observer_.notify_pre_migrate( );
+            observer_.notify_pre_migrate();
             lb_.DoMigration();
-            observer_.notify_post_migrate( );
+            observer_.notify_post_migrate();
         }
 #endif
 #ifdef _PAR
@@ -139,7 +139,7 @@ void AdapTriangCL::UpdateTriang (const LevelsetP2CL& lset)
     int i;
     LevelsetP2CL::const_DiscSolCL sol( lset.GetSolution());
 
-    observer_.notify_pre_refmig_sequence();
+    observer_.notify_pre_refmig_sequence( GetMG());
     for (i= 0; i < 2*min_ref_num; ++i) {
         if (!ModifyGridStep(sol, true)){
             break;
