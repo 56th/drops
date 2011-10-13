@@ -39,7 +39,6 @@ namespace DROPS
 /// to save information prior to grid changes or to repair functions on a multigrid
 /// after such changes. Specific behavior must be added through subclassing.
 /// \todo (merge) Put a reference on MultiGridCL (or ParMultiGridCL as member?) to this class?
-/// \todo Number of index (velocity, pressure, levelset) for the ParMultiGridCL should be more comfortable.
 class MGObserverCL
 {
 #ifdef _PAR
@@ -49,20 +48,9 @@ class MGObserverCL
     /// \brief Copy vector elements from the old describer and receive buffer into the new vector
     void CopyVecElements( VecDescCL& new_vec_desc, const std::vector<Usint>& dims);
 
-      /// \todo OF: Do we need still the ParMultiGridCL?
-    ParMultiGridCL* pmg_;       ///< All parallel Observers need the ParMultiGridCL
 #endif
 
   public:
-#ifdef _PAR
-    MGObserverCL(ParMultiGridCL& pmg) : pmg_(&pmg) {}
-    MGObserverCL() : pmg_(0) {}
-
-    /// Get parallel multigrid.
-    ParMultiGridCL& GetPMG() { return *pmg_; }
-    /// Set parallel multigrid.
-    void SetPMG( ParMultiGridCL& pmg) { pmg_= &pmg; }
-#endif
     virtual ~MGObserverCL () {};
 
     /// Called immediately before MultiGridCL::Refine() in AdapTriangCL::ModifyGridStep.
@@ -151,9 +139,6 @@ class ObservedVectorsCL: public std::vector<MGObserverCL*>
     void notify_post_refmig_sequence() {
         for (iterator obs= begin(); obs != end(); ++obs)
             (*obs)->post_refine_sequence();
-#ifdef _PAR
-        ParMultiGridCL::Instance().DelAllUnkRecv();
-#endif
     }
     //@}
 };

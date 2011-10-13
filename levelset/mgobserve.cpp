@@ -63,6 +63,8 @@ void MGObserverCL::CopyVecElements( VecDescCL& new_vec_desc, const std::vector<U
             // ... into the new vector
             double * out = Addr(new_vec)+Unknowns(new_idx);
             std::copy( in, in + new_vec_desc.RowIdx->NumUnknownsSimplex( simplex), out);
+            // .. this unknown has been handled, so forget about the received-status
+            Unknowns.ResetUnkRecieved( old_idx);
         }
     }
 }
