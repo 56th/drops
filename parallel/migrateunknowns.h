@@ -45,14 +45,16 @@ class MigrateFECL
   private:
     std::vector<double> recvBuf_;   ///< during migration, buffer the received values here
     MGObserverCL*       obs_;       ///< the corresponding MGObserverCL (for getting the index, the data and the swap function)
-    MultiGridCL*        mg_;        ///< MultiGridCL for Creating a numbering
-    
+    const IdxDescCL*    old_idx_;   ///< index from MGObserverCL (to avoid frequent virtual function calls)
+    const VectorCL*     old_vec_;   ///< vector from MGObserverCL (to avoid frequent virtual function calls)
+    MultiGridCL*        mg_;        ///< MultiGridCL for creating a numbering
+
+
     /// \brief Copy vector elements from the old describer and receive buffer into the new vector
     void CopyVecElements( VecDescCL& new_vec_desc, const std::vector<Usint>& dims);
 
 public:
-    MigrateFECL( MGObserverCL* obs, MultiGridCL& mg) 
-        : obs_(obs), mg_(&mg) {}
+    MigrateFECL( MGObserverCL* obs, MultiGridCL& mg);
 
     /// \brief reserve memory for the receive buffer
     void pre_migrate();
@@ -62,8 +64,8 @@ public:
 
     /// \name getters
     // @{
-    const IdxDescCL* GetIdxDesc() const;
-    const VectorCL*  GetVector() const;
+    const IdxDescCL* GetIdxDesc() const  { return old_idx_; }
+    const VectorCL*  GetVector() const   { return old_vec_; }
     std::vector<double>& GetRecvBuffer() { return recvBuf_; }
     // @}
 

@@ -27,23 +27,8 @@
 
 namespace DROPS{
 
-/** Get the index description provided by the observer. 
-    \todo If this function is called very often, e.g. by the UnknownHandlerCL::Pack,
-          it would be nice to have it inlined. (Store a local copy of the index description?)
-*/
-const IdxDescCL* MigrateFECL::GetIdxDesc() const
-{
-    return obs_->GetIdxDesc();
-}
-
-/** Get the vector of the old data by the corresponding observer.
-    \todo If this function is called very often, e.g. by the UnknownHandlerCL::Pack,
-          it would be nice to have it inlined. (Store a local copy of the vector?)
-*/
-const VectorCL* MigrateFECL::GetVector() const
-{
-    return obs_->GetVector();
-}
+MigrateFECL::MigrateFECL( MGObserverCL* obs, MultiGridCL& mg)
+    : obs_(obs), old_idx_(obs->GetIdxDesc()), old_vec_(obs->GetVector()), mg_(&mg) {}
 
 /** Merge the known and received DoF values into the new vector new_vec_desc.
     \todo Do we need the priority PrioHasUnk?
@@ -51,13 +36,12 @@ const VectorCL* MigrateFECL::GetVector() const
 void MigrateFECL::CopyVecElements( VecDescCL& new_vec_desc, const std::vector<Usint>& dims)
 {
     const Uint       new_idx = new_vec_desc.RowIdx->GetIdx();   // new index
-    const Uint       old_idx = GetIdxDesc()->GetIdx();          // old index
+    const Uint       old_idx = old_idx_->GetIdx();               // old index
           VectorCL&  new_vec = new_vec_desc.Data;               // new vector
-    const VectorCL&  old_vec = *GetVector();                    // old vector
 
     // Create a WholeRemoteDataIteratorCL
     DiST::LevelListCL lvls;
-    DiST::PrioListCL prios; prios.push_back( PrioMaster); 
+    DiST::PrioListCL prios; prios.push_back( PrioMaster);
     prios.push_back( PrioHasUnk);   // do we need this?
     DiST::Helper::WholeRemoteDataIteratorCL it( dims, lvls, prios, false);
 
@@ -66,13 +50,13 @@ void MigrateFECL::CopyVecElements( VecDescCL& new_vec_desc, const std::vector<Us
         DiST::TransferableCL& simplex= it->second.GetLocalObject();
         UnknownHandleCL& Unknowns= simplex.Unknowns;
         if ( Unknowns.Exist( new_idx)){
-            Assert( Unknowns.Exist( old_idx), 
+            Assert( Unknowns.Exist( old_idx),
                 DROPSErrCL("LevelsetRepairCL::post_migrate: Unknowns do not exist before migration"),
                 DebugParallelNumC);
 
             // copy data from known DoF values or from the receive buffer
-            double const * in= !Unknowns.UnkRecieved( old_idx) 
-                                ? Addr(old_vec)  + Unknowns(old_idx)
+            double const * in= !Unknowns.UnkRecieved( old_idx)
+                                ? Addr(*old_vec_)+ Unknowns(old_idx)
                                 : Addr(recvBuf_) + Unknowns(old_idx);
             // ... into the new vector
             double * out = Addr(new_vec)+Unknowns(new_idx);
@@ -83,49 +67,49 @@ void MigrateFECL::CopyVecElements( VecDescCL& new_vec_desc, const std::vector<Us
     }
 }
 
-/** Clear all entries which are given in the receive buffer and reserve 
+/** Clear all entries which are given in the receive buffer and reserve
     some memory.
 */
 void MigrateFECL::pre_migrate()
 {
-    Assert( obs_->GetVector(), 
-        DROPSErrCL("MigrateFECL::pre_migrate: Vector data not set"), 
+    Assert( obs_->GetVector(),
+        DROPSErrCL("MigrateFECL::pre_migrate: Vector data not set"),
         DebugParallelNumC);
     recvBuf_.clear();
-    recvBuf_.reserve( GetIdxDesc()->NumUnknowns());
+    recvBuf_.reserve( old_idx_->NumUnknowns());
 }
 
-/** After the migration has take place, build the local vector of 
+/** After the migration has take place, build the local vector of
     accumulated vector indices. Afterwards, fill this vector by all the
     DoF which are either already known or just received.
     \post a new index number is created for the FE function.
 */
 void MigrateFECL::post_migrate()
 {
-    // Abbrevations
-    const IdxDescCL& old_idx= *GetIdxDesc();
-
     // Create a new numbering
     VecDescCL loc_vec;
-    IdxDescCL loc_idx( old_idx.GetFE());
-    const Uint lvl = old_idx.TriangLevel();
+    IdxDescCL loc_idx( old_idx_->GetFE());
+    const Uint lvl = old_idx_->TriangLevel();
 
-    loc_idx.CreateNumbering( lvl, *mg_, old_idx);
+    loc_idx.CreateNumbering( lvl, *mg_, *old_idx_);
 
     // Assign the new index (and allocate memory for the new vector)
     loc_vec.SetIdx( &loc_idx);
 
     // Copy the DoF values into the new vector
-    DiST::Helper::WholeRemoteDataIteratorCL::DimListT dims; 
-    if ( old_idx.NumUnknownsVertex())  dims.push_back( 0);
-    if ( old_idx.NumUnknownsEdge())    dims.push_back( 1);
-    if ( old_idx.NumUnknownsFace())    dims.push_back( 2);
-    if ( old_idx.NumUnknownsTetra())   dims.push_back( 3);
-    
+    DiST::Helper::WholeRemoteDataIteratorCL::DimListT dims;
+    if ( old_idx_->NumUnknownsVertex())  dims.push_back( 0);
+    if ( old_idx_->NumUnknownsEdge())    dims.push_back( 1);
+    if ( old_idx_->NumUnknownsFace())    dims.push_back( 2);
+    if ( old_idx_->NumUnknownsTetra())   dims.push_back( 3);
+
     CopyVecElements( loc_vec, dims);
 
     obs_->swap( loc_idx, loc_vec.Data);
     recvBuf_.clear();
+    // update FE space and vector
+    old_idx_= obs_->GetIdxDesc();
+    old_vec_= obs_->GetVector();
 }
 
 
