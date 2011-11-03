@@ -52,7 +52,7 @@ typedef Ulint IdxT;
 ///
 /// \note If we ever have as many unknowns, there will of course be a
 /// problem -- but probably there would be still one more index and the
-/// wraparound would kill us anyways.
+/// wrap around would kill us anyways.
 const IdxT NoIdx= std::numeric_limits<IdxT>::max();
 
 
@@ -76,14 +76,14 @@ class UnknownIdxCL
     ~UnknownIdxCL() {}
     UnknownIdxCL& operator=( const UnknownIdxCL&);
 
-    /// get the position in the vecor of the DOF of the system number sysnum (writing access)
+    /// get the position in the vector of the DOF of the system number sysnum (writing access)
     IdxT& GetIdx( Uint sysnum)
     {
         Assert( sysnum<GetNumSystems(), DROPSErrCL("UnknownIdxCL: Sysnum out of range"), DebugUnknownsC);
         return _Idx[sysnum];
     }
 
-    /// get the position in the vecor of the DOF of the system number sysnum (reading access)
+    /// get the position in the vector of the DOF of the system number sysnum (reading access)
     IdxT  GetIdx( Uint sysnum) const
     {
         Assert( sysnum<GetNumSystems(), DROPSErrCL("UnknownIdxCL: Sysnum out of range"), DebugUnknownsC);

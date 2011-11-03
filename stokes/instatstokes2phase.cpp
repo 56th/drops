@@ -162,13 +162,13 @@ System2Accumulator_P2P1XCL::System2Accumulator_P2P1XCL (const TwoPhaseFlowCoeffC
 
 void System2Accumulator_P2P1XCL::begin_accumulation ()
 {
-	base_::begin_accumulation();
+    base_::begin_accumulation();
     Xidx_ = &RowIdx.GetXidx();
 }
 
 void System2Accumulator_P2P1XCL::finalize_accumulation ()
 {
-	base_::finalize_accumulation();
+    base_::finalize_accumulation();
 }
 
 void System2Accumulator_P2P1XCL::visit (const TetraCL& tet)
@@ -185,7 +185,7 @@ void System2Accumulator_P2P1XCL::visit (const TetraCL& tet)
 
 void System2Accumulator_P2P1XCL::local_setup ()
 {
-	P2DiscCL::GetGradients( GradLP1_, GradRefLP1_, T);
+    P2DiscCL::GetGradients( GradLP1_, GradRefLP1_, T);
     for (int i= 0; i < 10; ++i) // Gradients of the velocity hat-functions
         resize_and_evaluate_on_vertexes(  GradLP1_[i], q2dom_, qgrad_[i]);
     for (int i= 0; i < 4; ++i) // sign of the level-set function in the vertices
