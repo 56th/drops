@@ -23,6 +23,7 @@
 */
 
 #include "navstokes/instatnavstokes2phase.h"
+#include "num/renumber.h"
 
 namespace DROPS
 {
@@ -180,7 +181,7 @@ class NonlConvSystemAccumulator_P2CL : public TetraAccumulatorCL
     const MultiGridCL& MG;
     const VelVecDescCL & vel;
     const LevelsetP2CL& lset;
-   
+
     double t;
 
     IdxDescCL& RowIdx;
@@ -322,10 +323,7 @@ void InstatNavierStokes2PhaseP2P1CL::SetupNonlinear_P2(MatrixCL& N, const VelVec
     NonlConvSystemAccumulator_P2CL accu( Coeff_, MG_, BndData_, *vel, lset, RowIdx, N, cplN, t);
     TetraAccumulatorTupleCL accus;
     accus.push_back( &accu);
-    if ( omp_get_max_threads() > 1)
-        accus( MG_.GetColorClasses( RowIdx.TriangLevel()));
-    else
-        accus( MG_.GetTriangTetraBegin( RowIdx.TriangLevel()), MG_.GetTriangTetraEnd( RowIdx.TriangLevel()));
+    accumulate( accus, MG_, RowIdx.TriangLevel());
     // time.Stop();
     // std::cout << "setup: " << time.GetTime() << std::endl;
 }
@@ -341,6 +339,35 @@ void InstatNavierStokes2PhaseP2P1CL::SetupNonlinear
     MLIdxDescCL::iterator it  = N->RowIdx->begin();
     for (size_t lvl=0; lvl < N->Data.size(); ++lvl, ++itN, ++it)
         SetupNonlinear_P2( *itN, vel, lvl == N->Data.size()-1 ? cplN : 0, lset,*it, t);
+}
+
+MLTetraAccumulatorTupleCL&
+InstatNavierStokes2PhaseP2P1CL::nonlinear_accu (MLTetraAccumulatorTupleCL& accus, MLMatDescCL* N, const VelVecDescCL* vel, VelVecDescCL* cplN, const LevelsetP2CL& lset, double t) const
+{
+    MLMatrixCL::iterator                itN    = N->Data.begin();
+    MLIdxDescCL::iterator               it     = N->RowIdx->begin();
+    MLTetraAccumulatorTupleCL::iterator it_accu= accus.begin();
+    for (size_t lvl=0; lvl < N->Data.size(); ++lvl, ++itN, ++it, ++it_accu)
+        it_accu->push_back_acquire( new NonlConvSystemAccumulator_P2CL( Coeff_, MG_, BndData_, *vel, lset, *it, *itN, lvl == N->Data.size()-1 ? cplN : 0, t));
+    return accus;
+}
+
+PermutationT InstatNavierStokes2PhaseP2P1CL::downwind_numbering (const LevelsetP2CL&, IteratedDownwindCL dw)
+{
+    std::cout << "InstatNavierStokes2PhaseP2P1CL::downwind_numbering:\n";
+    // std::cout << "...Setting indices...\n";
+    MatrixCL C;
+    DownwindAccu_P2CL accu( this->GetBndData().Vel, this->v, this->vel_idx.GetFinest(), C);
+    TetraAccumulatorTupleCL accus;
+    accus.push_back( &accu);
+    accumulate( accus, this->GetMG(), vel_idx.TriangLevel());
+
+    const PermutationT& p= dw.downwind_numbering( C);
+    permute_fe_basis( GetMG(), vel_idx.GetFinest(), p);
+    permute_Vector( v.Data, p, /*blocksize*/ 3);
+    // std::cout << "...downwind numbering finished.\n";
+
+    return p;
 }
 
 } // end of namespace DROPS

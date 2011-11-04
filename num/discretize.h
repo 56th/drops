@@ -62,9 +62,9 @@ class JumpCL
 class SmoothedJumpCL
 {
   private:
-    const JumpCL     jc;
-    const SmoothFunT smf;
-    const double     eps;
+    JumpCL     jc;
+    SmoothFunT smf;
+    double     eps;
 
   public:
     SmoothedJumpCL (const JumpCL& myjc, const SmoothFunT f, double myeps)
@@ -373,6 +373,9 @@ DROPS_DEFINE_VALARRAY_DERIVATIVE(LocalP2CL, T, base_type)
     template<class BndDataT>
       inline self_&
       assign(const TetraCL&, const VecDescCL&, const BndDataT&);
+    template<class BndDataT>
+      inline self_&
+      assign_on_tetra(const TetraCL&, const VecDescCL&, const BndDataT&);
     template <class P2FunT>
       inline self_&
       assign(const TetraCL&, const P2FunT&);

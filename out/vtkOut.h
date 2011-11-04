@@ -63,6 +63,7 @@ class VTKOutCL
     char               decDigits_;                  ///< number of digits for encoding time in filename
     Uint               timestep_, numsteps_;        ///< actual timestep and number of timesteps
     std::string        descstr_;                    ///< stores description info
+    std::string        dirname_; 
     std::string        filename_;                   ///< filenames
     std::ofstream      file_;                       ///< actual file where to put data
     VTKvarMapT         vars_;                       ///< The variables stored by varName.
@@ -86,6 +87,8 @@ class VTKOutCL
     void CheckFile( const std::ofstream&) const;
     /// Creates new file; writes timestep-info and (for parallel version only) writes a masterfile with distribution information
     void NewFile( double time , bool writeDistribution=true);
+    /// Creates the file which collects all the consecutively written data-files and adds the corresponding timestep information
+    void GenerateTimeFile( double time, const std::string & name) const;
     /// Puts the description header into the file
     void PutHeader();
     /// Puts the footer into the file
@@ -130,7 +133,7 @@ class VTKOutCL
   public:
     /// \brief Constructor of this class
     VTKOutCL(const MultiGridCL& mg, const std::string& dataname, Uint numsteps,
-             const std::string& filename, bool binary, Uint lvl=-1);
+             const std::string& dirname, const std::string& filename , bool binary, Uint lvl=(Uint)-1);
     ~VTKOutCL();
 
     /// \brief Register a variable or the geometry for output with Write().
@@ -205,6 +208,57 @@ template <class DiscScalarT>
 {
     return *new VTKScalarCL<DiscScalarT>( f, varName);
 }
+
+///\brief Represents a scalar XFEM Drops-function (P1EvalCL) as VTK variable.
+class VTKP1XScalarCL : public VTKVariableCL
+{
+  private:
+    const VecDescCL& v_;
+
+    mutable IdxDescCL p1idx_;
+    mutable VecDescCL vneg_,
+                      vpos_;
+
+    const VecDescCL& lset_;
+    BndDataCL<double> bnd_;
+    MultiGridCL& mg_;
+
+  public:
+    VTKP1XScalarCL(MultiGridCL& mg, const VecDescCL& lset, const VecDescCL& v, const BndDataCL<>& bnd,
+                   std::string varName)
+        : VTKVariableCL( varName), v_( v), vneg_( &p1idx_), vpos_( &p1idx_), 
+        lset_( lset), bnd_( bnd), mg_( mg) {}
+    ~VTKP1XScalarCL() { if (p1idx_.NumUnknowns() != 0) p1idx_.DeleteNumbering( mg_); }
+    void put( VTKOutCL& cf) const {
+        if (p1idx_.NumUnknowns() != 0)
+            p1idx_.DeleteNumbering( mg_);
+        p1idx_.CreateNumbering( v_.RowIdx->TriangLevel(), mg_, *v_.RowIdx);
+        P1XtoP1 ( *v_.RowIdx, v_.Data, p1idx_, vpos_.Data, vneg_.Data, lset_, mg_);
+        cf.PutScalar( P1EvalCL<double, const BndDataCL<>, const VecDescCL>(&vneg_, &bnd_, &mg_), varName()+ "_neg"); 
+        cf.PutScalar( P1EvalCL<double, const BndDataCL<>, const VecDescCL>(&vpos_, &bnd_, &mg_), varName()+ "_pos"); 
+    }
+    Uint GetDim() const { return 1; }
+};
+
+///\brief Create an VTKP1XScalarCL with operator new.
+///
+/// This is just for uniform code; the analoguous functions for scalars and vectors are more useful because
+/// they help to avoid template parameters in user code.
+inline  VTKP1XScalarCL&
+    make_VTKP1XScalar(MultiGridCL& mg, const VecDescCL& lset, const VecDescCL& v, const BndDataCL<>& bnd,
+                   std::string varName)
+{
+    return *new VTKP1XScalarCL( mg,lset,v,bnd,varName);
+}
+
+inline  VTKP1XScalarCL&
+    make_VTKP1XScalar(MultiGridCL& mg, const VecDescCL& lset, const VecDescCL& v,
+                   std::string varName)
+{
+    return *new VTKP1XScalarCL( mg,lset,v,BndDataCL<>( 0),varName);
+}
+
+
 
 ///\brief Represents a vector Drops-function (P1 or P2, given as PXEvalCL) as VTK variable.
 template <class DiscVectorT>

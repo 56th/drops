@@ -181,23 +181,19 @@ IdxT IdxDescCL::GetExclusiveNumUnknowns(const MultiGridCL &mg, int lvl) const
 {
     IdxT ret=0;
     // If there are unknowns on vertices, the proc with the smallest proc-id
-    // who owns a master copy of the vertex counts the unknowns of the chosen
-    // vertex.
+    // who owns a PrioHasUnk copy of the vertex/edge/tetra counts the unknowns.
     if (NumUnknownsVertex())
         for (MultiGridCL::const_TriangVertexIteratorCL it(mg.GetTriangVertexBegin(lvl)), end(mg.GetTriangVertexEnd(lvl)); it != end; ++it)
-            if ( it->Unknowns.Exist() && it->Unknowns.Exist(GetIdx()))
-                if ( it->AmIOwner())
-                    ret += NumUnknownsVertex();
+            if ( it->Unknowns.Exist() && it->Unknowns.Exist(GetIdx()) && it->IsExclusive( PrioHasUnk))
+                ret += NumUnknownsVertex();
     if (NumUnknownsEdge())
         for (MultiGridCL::const_TriangEdgeIteratorCL it(mg.GetTriangEdgeBegin(lvl)), end(mg.GetTriangEdgeEnd(lvl)); it != end; ++it)
-            if ( it->Unknowns.Exist() && it->Unknowns.Exist(GetIdx()))
-                if (it->AmIOwner())
-                    ret += NumUnknownsEdge();
+            if ( it->Unknowns.Exist() && it->Unknowns.Exist(GetIdx()) && it->IsExclusive( PrioHasUnk))
+                ret += NumUnknownsEdge();
     if (NumUnknownsTetra())
         for (MultiGridCL::const_TriangTetraIteratorCL it(mg.GetTriangTetraBegin(lvl)), end(mg.GetTriangTetraEnd(lvl)); it != end; ++it)
-            if ( it->Unknowns.Exist() && it->Unknowns.Exist(GetIdx()))
-                if (it->AmIOwner())
-                    ret += NumUnknownsTetra();
+            if ( it->Unknowns.Exist() && it->Unknowns.Exist(GetIdx()) && it->IsExclusive( PrioHasUnk))
+                ret += NumUnknownsTetra();
     return ret;
 }
 
@@ -639,6 +635,78 @@ void ExtIdxDescCL::Old2New(VecDescCL* v)
               << "\t#copied extended-dof: " << ci
               << '\n';
 #endif
+}
+
+void permute_fe_basis (MultiGridCL& mg, IdxDescCL& idx, const PermutationT& p)
+{
+    const Uint sys= idx.GetIdx();
+    const Uint lvl= idx.TriangLevel();
+    const Uint num_components= idx.NumUnknownsVertex();
+
+   if (idx.IsExtended())
+        permute_fe_basis_extended_part( idx.GetXidx(), p, num_components);
+
+    switch (idx.GetFE()) {
+      case P0_FE:
+        DROPS_FOR_TRIANG_TETRA( mg, lvl, it)
+            if (it->Unknowns.Exist( sys))
+                it->Unknowns( sys)= num_components*p[it->Unknowns( sys)/num_components];
+        break;
+
+      case P1_FE:  // fall through
+      case P1X_FE: // fall through
+      case P1IF_FE:
+        DROPS_FOR_TRIANG_VERTEX( mg, lvl, it)
+            if (it->Unknowns.Exist( sys) && it->Unknowns( sys) != NoIdx)
+                it->Unknowns( sys)= num_components*p[it->Unknowns( sys)/num_components];
+        break;
+
+      case vecP1Bubble_FE: // fall through
+      case P1Bubble_FE:
+        DROPS_FOR_TRIANG_VERTEX( mg, lvl, it)
+            if (it->Unknowns.Exist( sys))
+                it->Unknowns( sys)= num_components*p[it->Unknowns( sys)/num_components];
+        DROPS_FOR_TRIANG_TETRA( mg, lvl, it)
+            if (it->Unknowns.Exist( sys))
+                it->Unknowns( sys)= num_components*p[it->Unknowns( sys)/num_components];
+        break;
+
+      case P1D_FE:
+        DROPS_FOR_TRIANG_FACE( mg, lvl, it)
+            if (it->Unknowns.Exist( sys))
+                it->Unknowns( sys)= num_components*p[it->Unknowns( sys)/num_components];
+        break;
+
+      case vecP2R_FE: // fall through
+      case vecP2_FE:  // fall through
+      case P2R_FE:    // fall through
+      case P2_FE:
+        DROPS_FOR_TRIANG_VERTEX( mg, lvl, it)
+            if (it->Unknowns.Exist( sys))
+                it->Unknowns( sys)= num_components*p[it->Unknowns( sys)/num_components];
+        DROPS_FOR_TRIANG_EDGE( mg, lvl, it)
+            if (it->Unknowns.Exist( sys))
+                it->Unknowns( sys)= num_components*p[it->Unknowns( sys)/num_components];
+        break;
+      default: throw DROPSErrCL("permute_fe_basis: unknown FE type\n");
+    }
+}
+
+void
+LocalNumbP2CL::assign_indices_only (const TetraCL& s, const IdxDescCL& idx)
+{
+    const Uint sys= idx.GetIdx();
+    for (Uint i= 0; i < 4; ++i)
+        num[i]= s.GetVertex( i)->Unknowns.Exist( sys) ? s.GetVertex( i)->Unknowns( sys) : NoIdx;
+    for(Uint i= 0; i < 6; ++i)
+        num[i+4]= s.GetEdge( i)->Unknowns.Exist( sys) ? s.GetEdge( i)->Unknowns( sys)   : NoIdx;
+}
+
+LocalNumbP2CL::LocalNumbP2CL(const TetraCL& s, const IdxDescCL& idx)
+/// \param s The tet, from which index-numbers are read.
+/// \param idx The IdxDescCL-object to be used.
+{
+    this->assign_indices_only( s, idx);
 }
 
 } // end of namespace DROPS

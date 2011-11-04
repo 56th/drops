@@ -200,6 +200,15 @@ class ExtIdxDescCL
     const VecDescCL& GetLevelset() const { return *lset_; }
 };
 
+/// \brief Apply the permutation p to the extended part of a finite element basis
+inline void
+permute_fe_basis_extended_part (ExtIdxDescCL& ext, const PermutationT& p, Uint num_components)
+{
+    for (size_t i= 0; i < ext.GetNumUnknownsStdFE(); ++i)
+        if (ext[i] != NoIdx)
+            ext[i]= num_components*p[ext[i]/num_components];
+}
+
 #ifdef _PAR
 class ExchangeCL;
 #endif
@@ -432,6 +441,9 @@ void P1XtoP1 ( const IdxDescCL& xidx, const VectorCL& p1x, const IdxDescCL& idx,
 /// extracts component from vector valued FE vector
 void ExtractComponent( const VectorCL& vecFE, VectorCL& scalarFE, Uint comp, Uint stride=3);
 
+/// \brief Applies the permutation p to the unknown numbers in idx.
+void permute_fe_basis (MultiGridCL& mg, IdxDescCL& idx, const PermutationT& p);
+
 inline void
 GetLocalNumbP1NoBnd(IdxT* Numb, const TetraCL& s, const IdxDescCL& idx)
 /// Copies P1-unknown-indices from idx on s into Numb; assumes that all
@@ -516,18 +528,26 @@ class LocalNumbP2CL
     /// \brief The relevant BndCondT, NoBC in the interior dofs.
     BndCondT bc    [10];
 
-    /// \brief The default constructors leaves everything uninitialized.
+    /// \brief The default constructor leaves everything uninitialized.
     LocalNumbP2CL() {}
     /// \brief Read indices, boundary-segment numbers and boundary conditions
-    ///     from a tetrahedron and a BndDataCL-like object.
+    /// from a tetrahedron and a BndDataCL-like object.
     template<class BndDataT>
       LocalNumbP2CL(const TetraCL&, const IdxDescCL&, const BndDataT&);
+
+    /// \brief Read indices only
+    /// from a tetrahedron.
+    LocalNumbP2CL(const TetraCL&, const IdxDescCL&);
 
     /// \brief Read indices, boundary-segment numbers and boundary conditions
     ///     from a tetrahedron and a BndDataCL-like object.
     template<class BndDataT>
       void
       assign(const TetraCL& s, const IdxDescCL& idx, const BndDataT& bnd);
+
+    /// \brief Compute the indices only.
+    /// Only num is set up.
+    void assign_indices_only (const TetraCL& s, const IdxDescCL& idx);
 
     /// \brief True, iff index i has a dof associated with it.
     bool WithUnknowns(IdxT i) const { return num[i] != NoIdx; }

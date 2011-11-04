@@ -93,6 +93,37 @@ Point3DCL EllipsoidCL::Radius_;
 
 static DROPS::RegisterScalarFunction regsca_ellipsoid("Ellipsoid", DROPS::EllipsoidCL::DistanceFct);
 
+/// \brief Represents a cylinder with ellipsoidal cross section
+class CylinderCL
+{
+  private:
+    static Point3DCL Mitte_;
+    static Point3DCL Radius_;  ///< stores radii of ellipse and axis length (latter stored in entry given by axisDir_)
+    static Usint     axisDir_; ///< direction of axis (one of 0,1,2)
+
+  public:
+    CylinderCL( const Point3DCL& Mitte, const Point3DCL& RadiusLength, Usint axisDir)
+    { Init( Mitte, RadiusLength, axisDir); }
+    static void Init( const Point3DCL& Mitte, const Point3DCL& RadiusLength, Usint axisDir)
+    { Mitte_= Mitte;    Radius_= RadiusLength;    axisDir_= axisDir; }
+    static double DistanceFct( const Point3DCL& p)
+    {
+        Point3DCL d= p - Mitte_;
+        const double avgRad= std::sqrt(Radius_[0]*Radius_[1]*Radius_[2]/Radius_[axisDir_]);
+        d/= Radius_;
+        d[axisDir_]= 0;
+        return std::abs( avgRad)*d.norm() - avgRad;
+    }
+    static double GetVolume() { return M_PI*Radius_[0]*Radius_[1]*Radius_[2]; }
+    static Point3DCL& GetCenter() { return Mitte_; }
+};
+
+Point3DCL CylinderCL::Mitte_;
+Point3DCL CylinderCL::Radius_;
+Usint     CylinderCL::axisDir_;
+
+static DROPS::RegisterScalarFunction regsca_cylinder("Cylinder", DROPS::CylinderCL::DistanceFct);
+
 // collision setting (rising butanol droplet in water)
 //  RadDrop1 =  1.50e-3  1.500e-3  1.50e-3
 //  PosDrop1 =  6.00e-3  3.000e-3  6.00e-3
@@ -132,6 +163,8 @@ Point3DCL TwoEllipsoidCL::Mitte1_;
 Point3DCL TwoEllipsoidCL::Radius1_;
 Point3DCL TwoEllipsoidCL::Mitte2_;
 Point3DCL TwoEllipsoidCL::Radius2_;
+
+static DROPS::RegisterScalarFunction regsca_twoellipsoid("TwoEllipsoid", DROPS::TwoEllipsoidCL::DistanceFct);
 
 class InterfaceInfoCL
 {
@@ -263,19 +296,19 @@ TimeDisc2PhaseCL* CreateTimeDisc( InstatNavierStokes2PhaseP2P1CL& Stokes, Levels
         break;
         case 11 :
             return (new FracStepScheme2PhaseCL<RecThetaScheme2PhaseCL, LevelSetSolverT >
-                        (Stokes, lset, *stokessolver, *lsetsolver, lsetmod, P.get<double>("Time.StepSize"), P.get<double>("Coupling.Tol"), P.get<double>("NavStokes.Nonlinear"), P.get<int>("Coupling.Projection"), P.get<double>("Coupling.Stab"), -1));
+                        (Stokes, lset, *stokessolver, *lsetsolver, lsetmod, P.get<double>("Time.StepSize"), P.get<double>("Coupling.Tol"), P.get<double>("NavStokes.Nonlinear"), P.get<int>("Coupling.Projection"), P.get<double>("Coupling.Stab")));
         break;
         case 12 :
             return (new FracStepScheme2PhaseCL<SpaceTimeDiscTheta2PhaseCL, LevelSetSolverT >
-                        (Stokes, lset, *stokessolver, *lsetsolver, lsetmod, P.get<double>("Time.StepSize"), P.get<double>("Coupling.Tol"), P.get<double>("NavStokes.Nonlinear"), P.get<int>("Coupling.Projection"), P.get<double>("Coupling.Stab"), -1));
+                        (Stokes, lset, *stokessolver, *lsetsolver, lsetmod, P.get<double>("Time.StepSize"), P.get<double>("Coupling.Tol"), P.get<double>("NavStokes.Nonlinear"), P.get<int>("Coupling.Projection"), P.get<double>("Coupling.Stab")));
         break;
         case 13 :
             return (new Frac2StepScheme2PhaseCL<RecThetaScheme2PhaseCL, LevelSetSolverT >
-                        (Stokes, lset, *stokessolver, *lsetsolver, lsetmod, P.get<double>("Time.StepSize"), P.get<double>("Coupling.Tol"), P.get<double>("NavStokes.Nonlinear"), P.get<int>("Coupling.Projection"), P.get<double>("Coupling.Stab"), -1));
+                        (Stokes, lset, *stokessolver, *lsetsolver, lsetmod, P.get<double>("Time.StepSize"), P.get<double>("Coupling.Tol"), P.get<double>("NavStokes.Nonlinear"), P.get<int>("Coupling.Projection"), P.get<double>("Coupling.Stab")));
         break;
         case 14 :
             return (new Frac2StepScheme2PhaseCL<SpaceTimeDiscTheta2PhaseCL, LevelSetSolverT >
-                        (Stokes, lset, *stokessolver, *lsetsolver, lsetmod, P.get<double>("Time.StepSize"), P.get<double>("Coupling.Tol"), P.get<double>("NavStokes.Nonlinear"), P.get<int>("Coupling.Projection"), P.get<double>("Coupling.Stab"), -1));
+                        (Stokes, lset, *stokessolver, *lsetsolver, lsetmod, P.get<double>("Time.StepSize"), P.get<double>("Coupling.Tol"), P.get<double>("NavStokes.Nonlinear"), P.get<int>("Coupling.Projection"), P.get<double>("Coupling.Stab")));
         break;
         default : throw DROPSErrCL("Unknown TimeDiscMethod");
     }
@@ -425,6 +458,8 @@ class TwoPhaseStoreCL
     Uint                 numRecoverySteps_;
     Uint                 recoveryStep_;
     bool                 binary_;
+    const PermutationT&  vel_downwind_;
+    const PermutationT&  lset_downwind_;
 
     /// \brief Write time info
     void WriteTime( std::string filename)
@@ -441,23 +476,24 @@ class TwoPhaseStoreCL
        *  the geometric as well as the numerical data.
        *  \param recoverySteps number of backup steps before overwriting files
        *  \param mg Multigrid
-       *  \param Stokes Stokes flow field 
+       *  \param Stokes Stokes flow field
        *  \param lset Level Set field
        *  \param transp mass transport concentration field
        *  \param path location for storing output
        *  \param binary save output  binary?
        *  */
     TwoPhaseStoreCL(MultiGridCL& mg, const StokesT& Stokes, const LevelsetP2CL& lset, const TransportP1CL* transp,
-                    const std::string& path, Uint recoverySteps=2, bool binary= false)
+                    const std::string& path, Uint recoverySteps=2, bool binary= false, const PermutationT& vel_downwind= PermutationT(), const PermutationT& lset_downwind= PermutationT())
       : mg_(mg), Stokes_(Stokes), lset_(lset), transp_(transp), path_(path), numRecoverySteps_(recoverySteps),
-        recoveryStep_(0), binary_( binary) {}
+        recoveryStep_(0), binary_( binary), vel_downwind_( vel_downwind), lset_downwind_( lset_downwind){}
 
     /// \brief Write all information in a file
     void Write()
     {
         // Create filename
         std::stringstream filename;
-        filename << path_ << ((recoveryStep_++)%numRecoverySteps_);
+        const size_t postfix= numRecoverySteps_==0 ? recoveryStep_++ : (recoveryStep_++)%numRecoverySteps_;
+        filename << path_ << postfix;
         // first master writes time info
         IF_MASTER
             WriteTime( filename.str() + "time");
@@ -467,8 +503,12 @@ class TwoPhaseStoreCL
 //        ser.WriteMG();
 
         // write numerical data
-        WriteFEToFile(Stokes_.v, mg_, filename.str() + "velocity", binary_);
-        WriteFEToFile(lset_.Phi, mg_, filename.str() + "levelset", binary_);
+        VecDescCL vel= Stokes_.v;
+        permute_Vector( vel.Data, invert_permutation( vel_downwind_), 3);
+        WriteFEToFile( vel, mg_, filename.str() + "velocity", binary_);
+        VecDescCL ls= lset_.Phi;
+        permute_Vector( ls.Data, invert_permutation( lset_downwind_));
+        WriteFEToFile( ls, mg_, filename.str() + "levelset", binary_);
         WriteFEToFile(Stokes_.p, mg_, filename.str() + "pressure", binary_, &lset_.Phi); // pass also level set, as p may be extended
         if (transp_) WriteFEToFile(transp_->ct, mg_, filename.str() + "concentrationTransf", binary_);
     }

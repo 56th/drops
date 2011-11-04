@@ -27,6 +27,7 @@
 
 #include "stokes/instatstokes2phase.h"
 #include "levelset/levelset.h"
+#include "num/renumber.h"
 
 
 namespace DROPS
@@ -55,6 +56,7 @@ class InstatNavierStokes2PhaseP2P1CL : public InstatStokes2PhaseP2P1CL
     //@{
     /// \brief Set up matrix for nonlinearity
     void SetupNonlinear(MLMatDescCL* matN, const VelVecDescCL* vel, VelVecDescCL* cplN, const LevelsetP2CL& lset, double t) const;
+    MLTetraAccumulatorTupleCL& nonlinear_accu (MLTetraAccumulatorTupleCL& accus, MLMatDescCL* matN, const VelVecDescCL* vel, VelVecDescCL* cplN, const LevelsetP2CL& lset, double t) const;
     /// \brief Set up matrix for nonlinearity at the time in the base-class using the registered Levelset-object.
     void SetupNonlinear(MLMatDescCL* matN, const VelVecDescCL* vel, VelVecDescCL* cplN) const {
         this->SetupNonlinear( matN, vel, cplN, *ls_, vel->t);
@@ -70,6 +72,9 @@ class InstatNavierStokes2PhaseP2P1CL : public InstatStokes2PhaseP2P1CL
     void ClearMat() { base_::ClearMat(); N.Data.clear(); }
     void SetIdx()   { base_::SetIdx(); N.SetIdx(&vel_idx, &vel_idx); }
     void SetNumVelLvl( size_t n) { base_::SetNumVelLvl( n); N.Data.resize (vel_idx.size()); }
+
+    /// \brief Perform downwind numbering for the velocity FE-space. The permutation is returned.
+    PermutationT downwind_numbering (const LevelsetP2CL& lset, IteratedDownwindCL dw);
 };
 
 } // end of namespace DROPS

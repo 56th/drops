@@ -26,6 +26,7 @@
 #include <iostream>
 
 #ifdef DROPS_WIN
+#include <direct.h>
 double cbrt(double arg)
 {
     return pow(arg, 1.0/3);
@@ -63,6 +64,22 @@ invert_permutation (const PermutationT& p)
     return pi;
 }
 
+PermutationT
+compose_permutations (const PermutationT& p, const PermutationT& q)
+{
+    if (q.empty())
+        return p;
+    if (p.empty())
+        return q;
+
+    PermutationT ret( p.size());
+    for (size_t i= 0; i < p.size(); ++i)
+        ret[i]= p[q[i]];
+
+    return ret;
+}
+
+
 int CreateDirectory(std::string path)
 /** Used to create directories
     \param path path of new directory
@@ -71,7 +88,7 @@ int CreateDirectory(std::string path)
 {
 #ifdef DROPS_WIN
     throw DROPSErrCL("Creating directories is not implemented for Windows OS");
-    return 0;
+    return _mkdir( path.c_str());
 #else
     return mkdir(path.c_str(), 0777);
 #endif

@@ -346,7 +346,7 @@ int main( int argc, char **argv)
         lb.DoInitDistribution( DROPS::ProcCL::Master());    // distribute initial grid
         const int num_ref= 3;
         // writer for vtk-format
-        DROPS::VTKOutCL vtkwriter( *mg, "dist_ref", num_ref+1, "vtk/dist_ref", true);
+        DROPS::VTKOutCL vtkwriter( *mg, "dist_ref", num_ref+1, "vtk", "dist_ref", true);
         vtkwriter.Write(0);
         // refinement
         std::string filename("sane.chk");

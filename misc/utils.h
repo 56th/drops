@@ -463,11 +463,18 @@ class TimerCL
 
 
 /// \brief Represents the permutation i-->p[i] on [0, ..., p.size()).
+/// By convention, the empty permutation is the identity.
 typedef std::vector<size_t> PermutationT;
 
 /// \brief Compute the inverse permutation of p, id est pi[p[i]] == i for all i.
+/// By convention, the empty permutation is the identity.
 PermutationT
 invert_permutation (const PermutationT& p);
+
+/// \brief Compute the composition p(q(.))
+/// By convention, the empty permutation is the identity.
+PermutationT
+compose_permutations (const PermutationT& p, const PermutationT& q);
 
 
 /// \brief Output [begin, end) to out, separated by newline.
@@ -512,13 +519,22 @@ struct select2nd : public std::unary_function<Pair, typename Pair::second_type>
   }
 };
 
-/// \brief Predicate that compares a std::pair-like type by its first
+/// \brief Predicate, that compares a std::pair-like type by its first
 ///     component only.
 template <class Pair>
 struct less1st: public std::binary_function<Pair, Pair, bool>
 {
   bool operator() (const Pair& x, const Pair& y) const {
     return x.first < y.first;
+  }
+};
+
+/// \brief Predicate, that compares a pointers by the values, to which they point.
+template <class PtrT>
+struct less_by_ptr: public std::binary_function<PtrT, PtrT, bool>
+{
+  bool operator() (PtrT x, PtrT y) const {
+    return *x < *y;
   }
 };
 

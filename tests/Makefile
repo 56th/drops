@@ -77,7 +77,7 @@ ip1check: ip1test
 ip2test: \
     ../tests/interp2.o ../geom/simplex.o ../geom/multigrid.o ../geom/topo.o ../out/output.o \
     ../num/unknowns.o ../geom/builder.o ../misc/problem.o ../num/interfacePatch.o \
-    ../num/fe.o ../geom/boundary.o ../misc/utils.o
+    ../num/fe.o ../geom/boundary.o ../misc/utils.o ../num/discretize.o
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 prolongationp2test: \
@@ -374,6 +374,7 @@ dist_twophasedrops: \
     ../geom/geomselect.o  ../levelset/twophaseutils.o ../num/hypre.o ../levelset/coupling.o ../geom/bndVelFunctions.o \
     ../geom/bndScalarFunctions.o ../misc/bndmap.o ../levelset/twophaseCoeff.o  \
     ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o \
+    ../num/renumber.o \
     $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 

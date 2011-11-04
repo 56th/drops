@@ -32,6 +32,7 @@
 #include "levelset/mgobserve.h"
 #include "misc/params.h"
 #include "num/MGsolver.h"
+#include "num/fe_repair.h"
 #include "misc/bndmap.h"
 
 namespace DROPS
@@ -195,12 +196,14 @@ class InstatStokes2PhaseP2P1CL : public ProblemCL<TwoPhaseFlowCoeffCL, StokesBnd
     bool UsesXFEM() const { return pr_idx.GetFinest().IsExtended(); }
     /// Set up matrices A, M and rhs b (depending on phase bnd)
     void SetupSystem1( MLMatDescCL* A, MLMatDescCL* M, VecDescCL* b, VecDescCL* cplA, VecDescCL* cplM, const LevelsetP2CL& lset, double t) const;
+    MLTetraAccumulatorTupleCL& system1_accu (MLTetraAccumulatorTupleCL& accus, MLMatDescCL* A, MLMatDescCL* M, VecDescCL* b, VecDescCL* cplA, VecDescCL* cplM, const LevelsetP2CL& lset, double t) const;
     /// Set up rhs b (depending on phase bnd)
     void SetupRhs1( VecDescCL* b, const LevelsetP2CL& lset, double t) const;
     /// Set up the Laplace-Beltrami-Operator
     void SetupLB( MLMatDescCL* A, VecDescCL* cplA, const LevelsetP2CL& lset, double t) const;
     /// Set up matrix B and rhs c
     void SetupSystem2( MLMatDescCL* B, VecDescCL* c, const LevelsetP2CL& lset, double t) const;
+    MLTetraAccumulatorTupleCL& system2_accu (MLTetraAccumulatorTupleCL& accus, MLMatDescCL* B, VecDescCL* c, const LevelsetP2CL& lset, double t) const;
     /// Set up rhs c
     void SetupRhs2( VecDescCL* c, const LevelsetP2CL& lset, double t) const;
     /// Set up the time-derivative of B times velocity
@@ -259,17 +262,17 @@ class VelocityRepairCL : public MGObserverCL
 {
   private:
     InstatStokes2PhaseP2P1CL& stokes_;
+    std::auto_ptr<RepairP2CL<Point3DCL> > p2repair_;
 
   public:
-    VelocityRepairCL ( InstatStokes2PhaseP2P1CL& stokes)
+    VelocityRepairCL (InstatStokes2PhaseP2P1CL& stokes)
         : stokes_( stokes) {}
-    void pre_refine  () {}
+    void pre_refine  ();
     void post_refine ();
     void pre_refine_sequence  () {}
     void post_refine_sequence ();
-
-#ifdef _PAR
     const IdxDescCL* GetIdxDesc() const { return stokes_.v.RowIdx; }
+#ifdef _PAR
     const VectorCL*  GetVector()  const { return &stokes_.v.Data; }
     void swap( IdxDescCL& idx, VectorCL& v) { stokes_.v.RowIdx->swap(idx); stokes_.v.Data.swap(v); }
 #endif
@@ -296,8 +299,8 @@ class PressureRepairCL : public MGObserverCL
     void post_refine ();
     void pre_refine_sequence  ();
     void post_refine_sequence ();
-#ifdef _PAR
     const IdxDescCL* GetIdxDesc() const { return stokes_.p.RowIdx; }
+#ifdef _PAR
     const VectorCL*  GetVector()  const { return &stokes_.p.Data; }
     void swap( IdxDescCL& idx, VectorCL& v) { stokes_.p.RowIdx->swap(idx); stokes_.p.Data.swap(v); }
 #endif

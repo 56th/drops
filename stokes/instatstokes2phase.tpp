@@ -103,6 +103,17 @@ void SetupPrStiff_P1D( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
 //*****************************************************************************
 //                               VelocityRepairCL
 //*****************************************************************************
+inline void VelocityRepairCL::pre_refine()
+{
+#ifndef _PAR
+    p2repair_= std::auto_ptr<RepairP2CL<Point3DCL> >(
+        new RepairP2CL<Point3DCL>( stokes_.GetMG(), stokes_.v, stokes_.GetBndData().Vel));
+#else
+    throw DROPSErrCL( "VelocityRepairCL::pre_refine: Sorry, not yet implemented.");
+        /// tell parallel multigrid about velocities
+    //GetPMG().AttachTo( &stokes_.v, &stokes_.GetBndData().Vel);
+#endif
+}
 
 inline void
   VelocityRepairCL::post_refine ()
@@ -120,12 +131,14 @@ inline void
         throw DROPSErrCL( "VelocityRepairCL::post_refine: Sorry, not yet implemented.");
     }
     loc_v.SetIdx( &loc_vidx);
-#ifdef _PAR
-    // GetPMG().HandleNewIdx(&stokes_.vel_idx, &loc_v);
-#endif
-    RepairAfterRefineP2( stokes_.GetVelSolution( v), loc_v);
-#ifdef _PAR
-    // GetPMG().CompleteRepair( &loc_v);
+#ifndef _PAR
+    p2repair_->repair( loc_v);
+#else
+throw DROPSErrCL( "VelocityRepairCL::post_refine: Sorry, not yet implemented.");
+
+//    GetPMG().HandleNewIdx(&stokes_.vel_idx, &loc_v);
+//    RepairAfterRefineP2( stokes_.GetVelSolution( v), loc_v);
+//    GetPMG().CompleteRepair( &loc_v);
 #endif
     v.Clear( v.t);
     v.RowIdx->DeleteNumbering( stokes_.GetMG());

@@ -53,12 +53,12 @@ class MGObserverCL
     virtual void pre_refine_sequence  ()= 0;
     /// Called at the end of AdapTriangCL::UpdateTriang().
     virtual void post_refine_sequence ()= 0;
+    /// Get a pointer to the FE space.
+    virtual const IdxDescCL* GetIdxDesc() const= 0;
 
 #ifdef _PAR
     /// \name Used for migration handling. Observer is skipped if GetVector() returns null_ptr.
     // @{
-    /// Get a pointer to the FE space.
-    virtual const IdxDescCL* GetIdxDesc() const= 0;
     /// Get a pointer to an (accumulated) vector. Return value null_ptr indicates that this observer should be skipped for migration handling.
     virtual const VectorCL* GetVector() const= 0;
     /// Swap FE space and vector.

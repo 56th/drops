@@ -28,7 +28,11 @@
 #include "out/output.h"
 #include "geom/builder.h"
 #include "num/fe.h"
+#include "num/fe_repair.h"
 #include "misc/problem.h"
+#include "num/discretize.h"
+#include <tr1/unordered_set>
+
 
 using namespace DROPS;
 
@@ -94,7 +98,7 @@ void SetFun(VecDescBaseCL<VectorCL>& vd, MultiGridCL& mg, fun_ptr f)
 
 
 int CheckResult(DROPS::P2EvalCL<double, BndCL,
-                const DROPS::VecDescCL>& fun, fun_ptr f, OutputModeT om)
+                const DROPS::VecDescCL>& fun, fun_ptr f, OutputModeT om, double eps= 0.)
 {
     int ret= 0;
     const VertexCL* v= 0;
@@ -102,22 +106,34 @@ int CheckResult(DROPS::P2EvalCL<double, BndCL,
     const DROPS::MultiGridCL& mg= fun.GetMG();
     const DROPS::Uint trilevel= fun.GetLevel();
     if (om!=SILENT) std::cout << "Verts:" << std::endl;
-    double diff, emaxdiff= 0., vmaxdiff= 0.;
+    double diff, emaxdiff= 0., vmaxdiff= 0., vval= 1., eval= 1.;
     for (MultiGridCL::const_TriangVertexIteratorCL sit=mg.GetTriangVertexBegin( trilevel),
          theend= mg.GetTriangVertexEnd( trilevel); sit!=theend; ++sit) {
         diff= fun.val( *sit) - f( sit->GetCoord());
-        if ( std::abs(diff) > vmaxdiff) { ++ret; vmaxdiff= std::abs(diff); v= &*sit; }
+        if (std::abs( diff) > eps && std::abs(diff) > vmaxdiff) {
+            ++ret;
+            vmaxdiff= std::abs(diff);
+            v= &*sit;
+            vval= fun.val( *sit);
+        }
     }
     if (om!=SILENT) std::cout << "\n\nEdges:" << std::endl;
     for (MultiGridCL::const_TriangEdgeIteratorCL sit=mg.GetTriangEdgeBegin( trilevel),
          theend= mg.GetTriangEdgeEnd( trilevel); sit!=theend; ++sit) {
         diff = fun.val( *sit, .5) - f( (sit->GetVertex( 0)->GetCoord() + sit->GetVertex( 1)->GetCoord())*0.5);
-        if ( std::abs(diff) > emaxdiff) { ++ret; emaxdiff= std::abs(diff); e= &*sit; }
+        if (std::abs( diff) > eps && std::abs(diff) > emaxdiff) {
+            ++ret;
+            emaxdiff= std::abs(diff);
+            e= &*sit;
+            eval= fun.val( *sit);
+        }
     }
     if (om!=SILENT) {
-        std::cout << "maximale Differenz Vertices: " << vmaxdiff << " auf\n";
+        if (vval == 0.) vval= 1.;
+        std::cout << "maximale Differenz Vertices: " << vmaxdiff << " (exakter Wert: " << vval << ") auf\n";
         if (v) v->DebugInfo( std::cout);
-        std::cout << "maximale Differenz Edges: " << emaxdiff << " auf\n";
+        if (eval == 0.) eval= 1.;
+        std::cout << "maximale Differenz Edges: " << emaxdiff << " (exakter Wert: " << eval << ") auf\n";
         if (e) e->DebugInfo( std::cout);
         std::cout << std::endl;
     }
@@ -140,13 +156,14 @@ bool SubSuperPattern(DROPS::Uint p, DROPS::Uint q)
 // Checks every possible tetra-modification.
 int TestReMark()
 {
+    BndDataCL<> bnd( 4);
     std::cout << "\n-----------------------------------------------------------------"
                  "\nTesting repair on single tetra-combinations:\n";
     int ttt, ret= 0;
     for (DROPS::Uint i= 0; i<=64; ++i) {
         for (DROPS::Uint j= 0; j<=64; ++j) {
             DROPS::IdCL<DROPS::VertexCL>::ResetCounter();
-//            std::cout << Rule( i) << "\t-->\t" << Rule( j) << " ";
+            // std::cout << Rule( i) << "\t-->\t" << Rule( j) << " ";
             DROPS::TetraBuilderCL tet( Rule( i), DROPS::std_basis<3>( 1),
                                                  DROPS::std_basis<3>( 2),
                                                  DROPS::std_basis<3>( 3),
@@ -157,18 +174,18 @@ int TestReMark()
             DROPS::VecDescCL v0, v1;
             v0.SetIdx( &i0);
             SetFun( v0, mg, f);
-//            SetFun( v0, mg, g2);
+            // SetFun( v0, mg, g2);
+            RepairP2CL<double> repairp2( mg, v0, bnd);
             tet.BogoReMark( mg, Rule( j));
 
             const Uint i1_Level= i0.TriangLevel() <= mg.GetLastLevel() ? i0.TriangLevel()
                                                                        : mg.GetLastLevel();
             i1.CreateNumbering( i1_Level, mg);
             v1.SetIdx( &i1);
-            DROPS::P2EvalCL<double, BndCL, const VecDescCL > fun0( &v0, &Bnd, &mg);
-            DROPS::RepairAfterRefineP2( fun0, v1);
+            repairp2.repair( v1);
             DROPS::P2EvalCL<double, BndCL, const VecDescCL > fun1( &v1, &Bnd, &mg);
-            ttt= CheckResult( fun1, f, SILENT);
-//            ttt= CheckResult( fun1, g2, NOISY);
+//            ttt= CheckResult( fun1, f, SILENT);
+            ttt= CheckResult( fun1, f, SILENT, 1e-10);
             ret+= ttt;
             if (ttt != 0 && SubSuperPattern( Rule( i) & 63, Rule( j) & 63))
                 std::cout << "Aerger: " << Rule( i) << "\t-->\t" << Rule( j) << " " << std::endl;
@@ -180,6 +197,7 @@ int TestReMark()
 
 int TestRepairUniform()
 {
+    BndDataCL<> bnd( 6);
     int ret= 0;
     DROPS::BrickBuilderCL brick( DROPS::std_basis<3>( 0), DROPS::std_basis<3>( 1),
                                  DROPS::std_basis<3>( 2), DROPS::std_basis<3>( 3),
@@ -193,25 +211,26 @@ int TestRepairUniform()
         DROPS::VecDescCL v0, v1;
         v0.SetIdx( &i0);
         SetFun( v0, mg, f);
+        RepairP2CL<double> repairp2( mg, v0, bnd);
         MarkAll( mg);
         mg.Refine();
         i1.CreateNumbering( i0.TriangLevel(), mg);
         v1.SetIdx( &i1);
-        DROPS::P2EvalCL<double, BndCL, const VecDescCL > fun0( &v0, &Bnd, &mg);
-        DROPS::RepairAfterRefineP2( fun0, v1);
+        repairp2.repair( v1);
         DROPS::P2EvalCL<double, BndCL, const VecDescCL > fun1( &v1, &Bnd, &mg);
-        ret+= CheckResult( fun1, f, NOISY);
+        ret+= CheckResult( fun1, f, NOISY, 1e-10);
         i0.DeleteNumbering( mg);
         i1.DeleteNumbering( mg);
     }
 
     std::cout << "\n-----------------------------------------------------------------"
-                 "\nTesting repair for uniform coarsening with linear function:\n";
+                 "\nTesting repair for uniform coarsening with quadratic function:\n";
     for (DROPS::Uint i=0; i<5; ++i) {
         i0.CreateNumbering( mg.GetLastLevel(), mg);
         DROPS::VecDescCL v0, v1;
         v0.SetIdx(&i0);
-        SetFun(v0, mg, g);
+        SetFun(v0, mg, f);
+        RepairP2CL<double> repairp2( mg, v0, bnd);
         UnMarkAll( mg);
         mg.Refine();
         Uint i1_Level= i0.TriangLevel();
@@ -224,10 +243,9 @@ int TestRepairUniform()
         }
         i1.CreateNumbering( i1_Level, mg);
         v1.SetIdx( &i1);
-        DROPS::P2EvalCL<double, BndCL, const VecDescCL > fun0( &v0, &Bnd, &mg);
-        DROPS::RepairAfterRefineP2( fun0, v1);
+        repairp2.repair( v1);
         DROPS::P2EvalCL<double, BndCL, const VecDescCL > fun1( &v1, &Bnd, &mg);
-        ret+= CheckResult( fun1, g, NOISY);
+        ret+= CheckResult( fun1, f, NOISY, 1e-10);
         if (mg.GetLastLevel() < i0.TriangLevel()) {
             Uint level= mg.GetLastLevel();
             DROPS::DeleteNumbOnSimplex( i0.GetIdx(), mg.GetAllVertexBegin( level),
@@ -245,6 +263,7 @@ int TestRepairUniform()
 
 int TestRepair()
 {
+    BndDataCL<> bnd( 6);
     int ret= 0;
     DROPS::BrickBuilderCL brick( DROPS::std_basis<3>( 0), DROPS::std_basis<3>( 1),
                                  DROPS::std_basis<3>( 2), DROPS::std_basis<3>( 3),
@@ -253,31 +272,37 @@ int TestRepair()
     DROPS::MultiGridCL mg(brick);
     DROPS::IdxDescCL i0( P2_FE, Bnd), i1( P2_FE, Bnd);
     std::cout << "\n-----------------------------------------------------------------"
-                 "\nTesting repair for drop refinement with linear function:\n";
+                 "\nTesting repair for drop refinement with quadratic function:\n";
     for (DROPS::Uint i=0; i<8; ++i) {
+        std::cout << "i: " << i;
         i0.CreateNumbering( mg.GetLastLevel(), mg);
+        std::cout << " i0.TriangLevel(): " << i0.TriangLevel();
         DROPS::VecDescCL v0, v1;
         v0.SetIdx( &i0);
-        SetFun( v0, mg, g);
+        SetFun( v0, mg, f);
+        RepairP2CL<double> repairp2( mg, v0, bnd);
         MarkDrop( mg, mg.GetLastLevel());
         mg.Refine();
+        std::cout << " mg.GetLastLevel() after refine: " << mg.GetLastLevel();
         i1.CreateNumbering( i0.TriangLevel(), mg);
+        std::cout << " i1.TriangLevel(): " << i1.TriangLevel();
         v1.SetIdx( &i1);
-        DROPS::P2EvalCL<double, BndCL, const VecDescCL > fun0( &v0, &Bnd, &mg);
-        DROPS::RepairAfterRefineP2( fun0, v1);
+        repairp2.repair( v1);
         DROPS::P2EvalCL<double, BndCL, const VecDescCL > fun1( &v1, &Bnd, &mg);
-        ret+= CheckResult( fun1, g, NOISY);
+        ret+= CheckResult( fun1, f, NOISY, 1e-10);
         i0.DeleteNumbering( mg);
         i1.DeleteNumbering( mg);
+        std::cout << '\n';
     }
 
     std::cout << "\n-----------------------------------------------------------------"
-                 "\nTesting repair for drop coarsening with linear function:\n";
+                 "\nTesting repair for drop coarsening with quadratic function:\n";
     for (DROPS::Uint i=0; i<8; ++i) {
         i0.CreateNumbering( mg.GetLastLevel(), mg);
         DROPS::VecDescCL v0, v1;
         v0.SetIdx(&i0);
-        SetFun(v0, mg, g);
+        SetFun(v0, mg, f);
+        RepairP2CL<double> repairp2( mg, v0, bnd);
         UnMarkDrop( mg, mg.GetLastLevel());
         mg.Refine();
         Uint i1_Level= i0.TriangLevel();
@@ -290,10 +315,9 @@ int TestRepair()
         }
         i1.CreateNumbering( i1_Level, mg);
         v1.SetIdx( &i1);
-        DROPS::P2EvalCL<double, BndCL, const VecDescCL > fun0( &v0, &Bnd, &mg);
-        DROPS::RepairAfterRefineP2( fun0, v1);
+        repairp2.repair( v1);
         DROPS::P2EvalCL<double, BndCL, const VecDescCL > fun1( &v1, &Bnd, &mg);
-        ret+= CheckResult( fun1, g, NOISY);
+        ret+= CheckResult( fun1, f, NOISY, 1e-10);
         if (mg.GetLastLevel() < i0.TriangLevel())
             i0.DeleteNumbering( mg);
         i1.DeleteNumbering( mg);
@@ -356,9 +380,17 @@ int TestInterpolateOld()
 int main ()
 {
   try {
+// //Show the trafos and their inverses
+// for (Uint i=0; i < NumAllChildrenC; ++i) {
+//     const SMatrixCL<4,4>& S= child_to_parent_bary( i);
+//     const SMatrixCL<4,4>& T= parent_to_child_bary( i);
+//     std::cout << i << ' ' << T*S << '\n';
+// }
+// return 0;
+
     int ret= TestRepairUniform();
     ret+= TestRepair();
-    ret+= TestInterpolateOld();
+    // ret+= TestInterpolateOld();
     return ret + TestReMark();
   }
   catch (DROPS::DROPSErrCL err) { err.handle(); }
