@@ -174,7 +174,7 @@ class ParMultiGridCL
     void Refine();                                      // Refine the MultiGrid
     void AdjustLevel();                                 // Apply all the same number of levels to all procs
     void MarkAll();                                     // All Tetras of last level are marked
-    void MarkSimplicesForUnknowns(int Level=-1);        // Set prio PrioHasUnk on all simplices that are able to store unknowns
+    void MarkSimplicesForUnknowns();                    // Set flag "MayHaveUnknowns in the UnknownsHandleCL on all simplices that are able to store unknowns
     // @}
 
     /// \name Modify environment

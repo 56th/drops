@@ -155,7 +155,7 @@ MultiGridCL::MultiGridCL (const MGBuilderCL& Builder)
     DiST::InfoCL::Instance( this);  // tell InfoCL about the multigrid before(!) building the grid
     ParMultiGridCL::Instance().AttachTo( *this);
 //#ifdef _DDD
-//    ParMultiGridCL::MarkSimplicesForUnknowns();
+  //  ParMultiGridCL::Instance().MarkSimplicesForUnknowns();
 //#endif
 #endif
     Builder.build(this);

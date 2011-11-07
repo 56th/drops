@@ -158,7 +158,8 @@ class ExtIdxDescCL
     ExtendedIdxT Xidx_;       ///< vector entries store index of extended DoF (or NoIdx if FE node is not extended)
     ExtendedIdxT Xidx_old_;   ///< old extended index, used by member function Old2New(...)
     const VecDescCL* lset_;
-#ifdef _PAR
+/*
+    #ifdef _PAR
     class CommunicateXFEMNumbCL
     {
     private:
@@ -170,7 +171,7 @@ class ExtIdxDescCL
         void Call();
     };
 #endif
-
+*/
     ExtIdxDescCL( double omit_bound= 1./32. ) : omit_bound_( omit_bound ), lset_(0) {}
 
     /// \brief Update numbering of extended DoFs and return dimension of XFEM space (= # DoF + # extended DoF)
@@ -856,12 +857,12 @@ template<class SimplexT>
 void CreateNumbOnSimplex( const Uint idx, IdxT& counter, Uint stride,
                          const ptr_iter<SimplexT>& begin,
                          const ptr_iter<SimplexT>& end,
-                         const BndCondCL& Bnd)
+                         const BndCondCL& Bnd, const Uint level)
 {
     if (stride == 0) return;
     for (ptr_iter<SimplexT> it= begin; it != end; ++it)
     {
-        if ( !Bnd.IsOnDirBnd( *it) )
+        if ( !Bnd.IsOnDirBnd( *it) && it->Unknowns.MayHaveUnknowns(level) )
         {
 #ifdef _PAR
             if (it->IsMarkedForRemovement())
@@ -925,7 +926,7 @@ template<class SimplexT>
 void CreatePeriodicNumbOnSimplex( const Uint idx, IdxT& counter, Uint stride, match_fun match,
                         const ptr_iter<SimplexT>& begin,
                         const ptr_iter<SimplexT>& end,
-                        const BndCondCL& Bnd)
+                        const BndCondCL& Bnd, const Uint level)
 {
     if (stride == 0) return;
 
@@ -936,7 +937,7 @@ void CreatePeriodicNumbOnSimplex( const Uint idx, IdxT& counter, Uint stride, ma
     // collect all objects on Per1/Per2 bnds in s1, s2 resp.
     for (ptr_iter<SimplexT> it= begin; it!=end; ++it)
     {
-        if ( Bnd.IsOnDirBnd( *it) ) continue;
+        if ( Bnd.IsOnDirBnd( *it) && it->Unknowns.MayHaveUnknowns(level)) continue;
         it->Unknowns.Prepare( idx);
         if (Bnd.IsOnPerBnd( *it))
         {

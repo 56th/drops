@@ -1577,8 +1577,43 @@ void ParMultiGridCL::TransferEnd()
     Comment("- Transfer finished"<<std::endl,DebugParallelC);
 }
 
-void ParMultiGridCL::MarkSimplicesForUnknowns(int lvl)
+void ParMultiGridCL::MarkSimplicesForUnknowns()
 {
+	for (MultiGridCL::VertexIterator it= mg_->GetAllVertexBegin(); it != mg_->GetAllVertexEnd(); ++it)
+		it->Unknowns.MayHaveUnknownsPrepare( mg_->GetNumLevel());
+
+	for (MultiGridCL::EdgeIterator it= mg_->GetAllEdgeBegin(); it != mg_->GetAllEdgeEnd(); ++it)
+		it->Unknowns.MayHaveUnknownsPrepare( mg_->GetNumLevel());
+
+	for (MultiGridCL::FaceIterator it= mg_->GetAllFaceBegin(); it != mg_->GetAllFaceEnd(); ++it)
+		it->Unknowns.MayHaveUnknownsPrepare( mg_->GetNumLevel());
+
+	for (MultiGridCL::TetraIterator it= mg_->GetAllTetraBegin(); it != mg_->GetAllTetraEnd(); ++it)
+		it->Unknowns.MayHaveUnknownsPrepare( mg_->GetNumLevel());
+
+	for (Uint lvl= 0; lvl <= mg_->GetLastLevel(); ++lvl)
+	{
+	    for (MultiGridCL::TriangTetraIteratorCL tit(mg_->GetTriangTetraBegin(lvl));
+	         tit!=mg_->GetTriangTetraEnd(lvl); ++tit)
+	    {
+	        // master tetras in last triang level are able to store unknowns the rest isn't
+	        for (TetraCL::const_VertexPIterator it(tit->GetVertBegin()); it!=tit->GetVertEnd(); ++it)
+	        {
+	        	(**it).Unknowns.MayHaveUnknowns(lvl, true);
+	        }
+	        for (TetraCL::const_EdgePIterator it(tit->GetEdgesBegin()); it!=tit->GetEdgesEnd(); ++it)
+	        {
+	        	(**it).Unknowns.MayHaveUnknowns(lvl, true);
+	        }
+	        for (TetraCL::const_FacePIterator it(tit->GetFacesBegin()); it!=tit->GetFacesEnd(); ++it)
+	        {
+	        	(**it).Unknowns.MayHaveUnknowns(lvl, true);
+	        }
+	        tit->Unknowns.MayHaveUnknowns(lvl, true);
+	    }
+	}
+
+	/*
 	ModifyBegin();
     for (MultiGridCL::TriangTetraIteratorCL tit(mg_->GetTriangTetraBegin(lvl));
          tit!=mg_->GetTriangTetraEnd(lvl); ++tit)
@@ -1601,6 +1636,7 @@ void ParMultiGridCL::MarkSimplicesForUnknowns(int lvl)
         }
     }
     ModifyEnd();
+    */
 }
 
 /// \brief Destroy unknowns on non-master vertices, edges and tetras if there are information about them

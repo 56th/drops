@@ -909,7 +909,7 @@ void LoadBalHandlerCL::DoMigration( int* dest_array)
 //     if (xferUnknowns_){
 //         ParMultiGridCL::DeleteUnksOnGhosts();
 //     }
-//    ParMultiGridCL::MarkSimplicesForUnknowns();
+    ParMultiGridCL::Instance().MarkSimplicesForUnknowns();
 
     movedNodes_ = lb_->GetMovedMultiNodes();
     edgeCut_    = lb_->GetEdgeCut();
@@ -963,7 +963,7 @@ void LoadBalHandlerCL::DoInitDistribution(int)
         std::cout << "       --> "<<GetMovedMultiNodes()<<" moved multinodes\n";
         std::cout << "       --> "<<GetEdgeCut()<<" edge cut\n";
     }
-//    ParMultiGridCL::MarkSimplicesForUnknowns();
+    ParMultiGridCL::Instance().MarkSimplicesForUnknowns();
     lb_->DeleteGraph();
 }
 }   // end of namespace DROPS

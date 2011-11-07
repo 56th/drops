@@ -528,9 +528,16 @@ int main (int argc, char** argv)
     // otherwise the pde-solutions from the ensight files might not fit.
 //    if (P.get("Restart.Inputfile", std::string("none")) == "none")
 //        adap.MakeInitialTriang( * DROPS::ScaMap::getInstance()[InitialLSet]);
-
+    mg->SizeInfo(std::cout);
+    std::cout << DROPS::SanityMGOutCL(*mg) << std::endl;
+    for (int i = 0; i<P.get<int>("AdaptRef.FinestLevel"); ++i) {
+        MarkAll( *mg);
+        mg->Refine();
+    }
+    mg->SizeInfo(std::cout);
     std::cout << DROPS::SanityMGOutCL(*mg) << std::endl;
 #ifdef _PAR
+
     adap.GetLb().GetLB().SetWeightFnct(1);
     adap.GetLb().DoMigration();
     mg->SizeInfo(std::cout);

@@ -152,6 +152,7 @@ class UnknownHandleCL
 {
   private:
     UnknownIdxCL* _unk;
+    std::vector<bool>  unknownsexists_;
 
   public:
     UnknownHandleCL() : _unk(0) {}
@@ -203,6 +204,23 @@ class UnknownHandleCL
         else if ( !(sysnum < _unk->GetNumSystems()) )
             _unk->resize( sysnum+1, NoIdx);
     }
+
+    bool MayHaveUnknowns( Uint lvl)
+    {
+    	return unknownsexists_[lvl];
+    }
+
+    void MayHaveUnknowns( Uint lvl, bool mayhaveunknowns)
+    {
+    	unknownsexists_[lvl] = mayhaveunknowns;
+    }
+
+    void MayHaveUnknownsPrepare( int maxlevel)
+    {
+    	unknownsexists_.clear();
+    	unknownsexists_.resize(maxlevel, false);
+    }
+
 
 #ifdef _PAR
     /// Remember that the DOF of the system number sysnum has been received

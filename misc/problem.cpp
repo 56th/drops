@@ -274,11 +274,12 @@ void ExtractComponent( const VectorCL& vecFE, VectorCL& scalarFE, Uint comp, Uin
 
 void CreateNumbOnTetra( const Uint idx, IdxT& counter, Uint stride,
                         const MultiGridCL::TriangTetraIteratorCL& begin,
-                        const MultiGridCL::TriangTetraIteratorCL& end)
+                        const MultiGridCL::TriangTetraIteratorCL& end, const Uint level)
 {
     if (stride == 0) return;
     for (MultiGridCL::TriangTetraIteratorCL it=begin; it!=end; ++it)
     {
+    	if (!it->Unknowns.MayHaveUnknowns(level)) continue;
         it->Unknowns.Prepare( idx);
         it->Unknowns(idx)= counter;
         counter+= stride;
@@ -383,31 +384,31 @@ void IdxDescCL::CreateNumbStdFE( Uint level, MultiGridCL& mg)
     {
         if (NumUnknownsVertex())
             CreatePeriodicNumbOnSimplex( idxnum, NumUnknowns_, NumUnknownsVertex(), match_,
-                mg.GetTriangVertexBegin(level), mg.GetTriangVertexEnd(level), Bnd_);
+                mg.GetTriangVertexBegin(level), mg.GetTriangVertexEnd(level), Bnd_, level);
         if (NumUnknownsEdge())
             CreatePeriodicNumbOnSimplex( idxnum, NumUnknowns_, NumUnknownsEdge(), match_,
-                mg.GetTriangEdgeBegin(level), mg.GetTriangEdgeEnd(level), Bnd_);
+                mg.GetTriangEdgeBegin(level), mg.GetTriangEdgeEnd(level), Bnd_, level);
         if (NumUnknownsFace())
             CreatePeriodicNumbOnSimplex( idxnum, NumUnknowns_, NumUnknownsFace(), match_,
-                mg.GetTriangFaceBegin(level), mg.GetTriangFaceEnd(level), Bnd_);
+                mg.GetTriangFaceBegin(level), mg.GetTriangFaceEnd(level), Bnd_, level);
         if (NumUnknownsTetra())
             CreateNumbOnTetra( idxnum, NumUnknowns_, NumUnknownsTetra(),
-                mg.GetTriangTetraBegin(level), mg.GetTriangTetraEnd(level));
+                mg.GetTriangTetraBegin(level), mg.GetTriangTetraEnd(level), level);
     }
     else
     {
         if (NumUnknownsVertex())
             CreateNumbOnSimplex( idxnum, NumUnknowns_, NumUnknownsVertex(),
-                mg.GetTriangVertexBegin(level), mg.GetTriangVertexEnd(level), Bnd_);
+                mg.GetTriangVertexBegin(level), mg.GetTriangVertexEnd(level), Bnd_, level);
         if (NumUnknownsEdge())
             CreateNumbOnSimplex( idxnum, NumUnknowns_, NumUnknownsEdge(),
-                mg.GetTriangEdgeBegin(level), mg.GetTriangEdgeEnd(level), Bnd_);
+                mg.GetTriangEdgeBegin(level), mg.GetTriangEdgeEnd(level), Bnd_, level);
         if (NumUnknownsFace())
             CreateNumbOnSimplex( idxnum, NumUnknowns_, NumUnknownsFace(),
-                mg.GetTriangFaceBegin(level), mg.GetTriangFaceEnd(level), Bnd_);
+                mg.GetTriangFaceBegin(level), mg.GetTriangFaceEnd(level), Bnd_, level);
         if (NumUnknownsTetra())
             CreateNumbOnTetra( idxnum, NumUnknowns_, NumUnknownsTetra(),
-                mg.GetTriangTetraBegin(level), mg.GetTriangTetraEnd(level));
+                mg.GetTriangTetraBegin(level), mg.GetTriangTetraEnd(level), level);
     }
 }
 
@@ -533,6 +534,7 @@ IdxT ExtIdxDescCL::UpdateXNumbering( IdxDescCL* Idx, const MultiGridCL& mg, cons
                 }
         }
     }
+/*
 #ifdef _PAR
     // communicate extended dofs on vertices
     CommunicateXFEMNumbCL comm( Idx);
@@ -543,9 +545,10 @@ IdxT ExtIdxDescCL::UpdateXNumbering( IdxDescCL* Idx, const MultiGridCL& mg, cons
         if (Xidx_[i] == NoIdx-1)
             Xidx_[i]= extIdx++;
 #endif
+*/
     return extIdx;
 }
-
+/*
 #ifdef _PAR
 bool ExtIdxDescCL::CommunicateXFEMNumbCL::Gather( const DiST::TransferableCL& t, DiST::Helper::SendStreamCL& s)
 {
@@ -590,7 +593,7 @@ void ExtIdxDescCL::CommunicateXFEMNumbCL::Call()
     comm.Communicate( *this);
 }
 #endif
-
+*/
 void ExtIdxDescCL::Old2New(VecDescCL* v)
 {
     VectorCL tmp( v->Data);
