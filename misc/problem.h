@@ -937,7 +937,8 @@ void CreatePeriodicNumbOnSimplex( const Uint idx, IdxT& counter, Uint stride, ma
     // collect all objects on Per1/Per2 bnds in s1, s2 resp.
     for (ptr_iter<SimplexT> it= begin; it!=end; ++it)
     {
-        if ( Bnd.IsOnDirBnd( *it) && it->Unknowns.InTriangLevel(level)) continue;
+        if ( Bnd.IsOnDirBnd( *it) || !it->Unknowns.InTriangLevel(level))
+            continue;
         it->Unknowns.Prepare( idx);
         if (Bnd.IsOnPerBnd( *it))
         {
