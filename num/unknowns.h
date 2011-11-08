@@ -118,7 +118,7 @@ class UnknownIdxCL
         else
             return received_[ sysnum];
     }
-    
+
     /// mark all DOF as not received, i.e., forget about receive information
     void ResetUnkRecv() { received_.resize(0); }
 
@@ -151,8 +151,10 @@ class UnknownIdxCL
 class UnknownHandleCL
 {
   private:
-    UnknownIdxCL* _unk;
-    std::vector<bool>  unknownsexists_;
+    UnknownIdxCL* _unk;              ///< stores the indices of DoF for different FE spaces
+#ifdef _PAR
+    std::vector<bool>  mayHaveUnk_;  ///< stores for each triangulation level, whether this DoF may belong to a FE space of this level (important in parallel case)
+#endif
 
   public:
     UnknownHandleCL() : _unk(0) {}
@@ -205,50 +207,53 @@ class UnknownHandleCL
             _unk->resize( sysnum+1, NoIdx);
     }
 
-    bool MayHaveUnknowns( Uint lvl)
-    {
-    	return unknownsexists_[lvl];
-    }
-
-    void MayHaveUnknowns( Uint lvl, bool mayhaveunknowns)
-    {
-    	unknownsexists_[lvl] = mayhaveunknowns;
-    }
-
-    void MayHaveUnknownsPrepare( int maxlevel)
-    {
-    	unknownsexists_.clear();
-    	unknownsexists_.resize(maxlevel, false);
-    }
-
-
 #ifdef _PAR
-    /// Remember that the DOF of the system number sysnum has been received
-    void SetUnkRecieved( Uint sysnum) const
+    /// \brief Returns whether a FE space on triangulation level \a lvl may contain current DoF.
+    ///
+    /// In the parallel case, only DoF of a master tetra may have unknowns on a certain triangulation level the master tetra belongs to.
+    /// Thus, e.g., DoFs on a vertex may contribute to FE spaces on level 0, 2, but not on level 1.
+    bool InTriangLevel( Uint lvl) const
     {
-        Assert(_unk!=0, DROPSErrCL("UnknownHandleCL: Cannot set UnkRecieved before this class is init"), DebugUnknownsC | DebugParallelC);
+    	return mayHaveUnk_[lvl];
+    }
+    /// Commit that a FE space on triangulation level \a lvl may contain current DoF
+    void EnableUnknowns( Uint lvl)
+    {
+    	mayHaveUnk_[lvl] = true;
+    }
+    /// Allocates memory for \a maxlevel levels. Initially, InTriangLevel() is false for all levels.
+    void DisableAllUnknowns( int maxlevel)
+    {
+    	mayHaveUnk_.clear();
+    	mayHaveUnk_.resize(maxlevel, false);
+    }
+
+    /// Remember that the DOF of the system number sysnum has been received
+    void SetUnkReceived( Uint sysnum) const
+    {
+        Assert(_unk!=0, DROPSErrCL("UnknownHandleCL::SetUnkReceived: missing Prepare()"), DebugUnknownsC | DebugParallelC);
         _unk->SetUnkRecv( sysnum);
     }
 
     /// Check if the DOF of the system number sysnum has been received
-    bool UnkRecieved( Uint sysnum) const { return _unk && _unk->GetUnkRecv( sysnum); }
+    bool UnkReceived( Uint sysnum) const { return _unk && _unk->GetUnkRecv( sysnum); }
 
     /// Mark DOF of all system numbers as not received
-    void ResetUnkRecieved() const
+    void ResetUnkReceived() const
     {
         if (_unk!=0)
             _unk->ResetUnkRecv();
     }
 
     /// Mark DOF of the system number sysnum as not received
-    void ResetUnkRecieved( Uint sysnum) const
+    void ResetUnkReceived( Uint sysnum) const
     {
         if (_unk!=0)
             _unk->ResetUnkRecv( sysnum);
     }
 
     /// For Debugging Purpose: Check if there is an UnkRecv-Flag
-    bool HasUnkRecieved() const
+    bool HasUnkReceived() const
     {
         if (_unk==0)
             return false;

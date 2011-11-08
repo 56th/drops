@@ -118,7 +118,7 @@ void UnknownHandleCL::UnPack( DiST::Helper::MPIistreamCL& recvstream, const DiST
                 // Now, prepare for receiving data ...
                 Prepare( idx);
                 // ... remember that this is a received unknown
-                SetUnkRecieved( idx);
+                SetUnkReceived( idx);
                 // ... remember where the dofs are put
                 (*this)(idx)= recvbuf.size();
                 // ... and the store the received dofs in the buffer

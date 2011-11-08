@@ -279,7 +279,7 @@ void CreateNumbOnTetra( const Uint idx, IdxT& counter, Uint stride,
     if (stride == 0) return;
     for (MultiGridCL::TriangTetraIteratorCL it=begin; it!=end; ++it)
     {
-    	if (!it->Unknowns.MayHaveUnknowns(level)) continue;
+    	if (!it->Unknowns.InTriangLevel(level)) continue;
         it->Unknowns.Prepare( idx);
         it->Unknowns(idx)= counter;
         counter+= stride;

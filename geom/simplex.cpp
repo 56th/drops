@@ -1090,7 +1090,7 @@ void VertexCL::DebugInfo(std::ostream& os) const
     else{
         os << "\n no recycle bin found\n";
     }
-    os << "Has Unknowns " << Unknowns.Exist() << ", received any Unknowns " << Unknowns.HasUnkRecieved() << std::endl;
+    os << "Has Unknowns " << Unknowns.Exist() << ", received any Unknowns " << Unknowns.HasUnkReceived() << std::endl;
 #ifdef _PAR
     base::DebugInfo( os);
 #endif

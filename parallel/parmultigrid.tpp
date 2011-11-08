@@ -86,7 +86,7 @@ template<class SimplexT>
     modify_->Delete( *Tp);
 }
 
-/// \brief Recieve Information, if all Vector-Describers are recieved
+/// \brief Receive information, if all Vector-Describers are received
 bool ParMultiGridCL::VecDescRecv()
 {
     return !_VecDesc.empty();
@@ -153,7 +153,7 @@ int ParMultiGridCL::GatherInterpolValues (OBJT obj, void* buf)
 
     // if there are unknowns to the new index on the vertex, and this is an old
     // value, then put it into the buffer. Else mark the the unknown as invalide
-    if (sp->Unknowns.Exist() && sp->Unknowns.Exist(idx) && sp->Unknowns.UnkRecieved(idx)){
+    if (sp->Unknowns.Exist() && sp->Unknowns.Exist(idx) && sp->Unknowns.UnkReceivedd(idx)){
         for (Uint i=0; i<numUnk; ++i){
             buffer[i].mark= true;
             buffer[i].idx = idx;
@@ -180,12 +180,12 @@ int ParMultiGridCL::ScatterInterpolValues(OBJT obj, void* buf)
     Uint numUnk= _actualVec->RowIdx->NumUnknownsVertex();         // unknowns on edges and vertices are the same
 
     // if there is an unknown to the new index on this vertex, that do not store
-    // an old value and the recieved value is valide, then set this value and
+    // an old value and the received value is valide, then set this value and
     // mark the value as an old value
-    if (sp->Unknowns.Exist() && sp->Unknowns.Exist(idx) && !sp->Unknowns.UnkRecieved(idx) && buffer->mark && buffer->idx==idx){
+    if (sp->Unknowns.Exist() && sp->Unknowns.Exist(idx) && !sp->Unknowns.UnkReceived(idx) && buffer->mark && buffer->idx==idx){
         for (Uint i=0; i<numUnk; ++i)
             _actualVec->Data[sp->Unknowns(idx)]= buffer[i].val;
-        sp->Unknowns.SetUnkRecieved(idx);
+        sp->Unknowns.SetUnkReceived(idx);
     }
 
     return 0;
@@ -199,7 +199,7 @@ int ParMultiGridCL::ScatterInterpolValues(OBJT obj, void* buf)
 *   will be given to DDD and send to the recieving proc.                    *
 *                                                                           *
 *   The unknowns can be stored at two different places. If the unknown has  *
-*   been recieved due to a killed ghost teraeder, the unknown can be found  *
+*   been received due to a killed ghost teraeder, the unknown can be found  *
 *   in the buffer _RecvBuf. Otherwise it is stored in the vector, which has *
 *   been given to the ParMultiGridCL before the refinement has been started.*
 *                                                                           *
@@ -233,7 +233,7 @@ template<class SimplexT>
                     continue;
 
                 const IdxT sysnum= sp->Unknowns(idx);                       // systemnumber
-                const double data= !sp->Unknowns.UnkRecieved(idx) ?         // value of the unknown
+                const double data= !sp->Unknowns.UnkReceived(idx) ?         // value of the unknown
                                     (_VecDesc[i])->Data[ sysnum] :
                                     _RecvBuf[sysnum];
                 buffer[counter].SetData(data);                              // put data into message
@@ -260,7 +260,7 @@ template<class SimplexT>
 
                 const IdxT sysnum= sp->Unknowns(idx);
                 Point3DCL data;
-                if (!sp->Unknowns.UnkRecieved(idx))
+                if (!sp->Unknowns.UnkReceived(idx))
                 {
                     data[0]=(_VecDesc[i])->Data[sysnum+0];
                     data[1]=(_VecDesc[i])->Data[sysnum+1];
@@ -285,31 +285,31 @@ template<class SimplexT>
 /****************************************************************************
 * R E C V  U N K N O W N S                                                  *
 *****************************************************************************
-*   If a simplex is recieved, this procedure is called in order to put the  *
-*   recieved data into the recieve buffer, if the unknowns have not been    *
-*   exists before this simplex is recieved.                                 *
+*   If a simplex is received, this procedure is called in order to put the  *
+*   received data into the receive buffer, if the unknowns have not been    *
+*   exists before this simplex is received.                                 *
 ****************************************************************************/
 template<class SimplexT>
   void ParMultiGridCL::RecvUnknowns(SimplexT *sp, TypeT type, void *buf, int cnt)
 {
-    if (cnt==0) return;                                                     // nothing to recieved so skipp
-    if (type == AddedScalCL::GetType())                                     // recieve scalar values
+    if (cnt==0) return;                                                     // nothing to received so skip
+    if (type == AddedScalCL::GetType())                                     // receive scalar values
     {
         AddedScalCL* buffer = static_cast<AddedScalCL*>(buf);               // cast to AddedScalCL*
 
-        // put all new recieved data into the _RecvBuf
-        for (int i=0; i<cnt; ++i)                                           // go over all incomming messages
+        // put all new received data into the _RecvBuf
+        for (int i=0; i<cnt; ++i)                                           // go over all incoming messages
         {
-            const Uint idxVecDesc = buffer[i].GetIdx(),                     // under which index from _VecDesc the datas should be stored
+            const Uint idxVecDesc = buffer[i].GetIdx(),                     // under which index from _VecDesc the data should be stored
                   idx= (_VecDesc[idxVecDesc])->RowIdx->GetIdx();            // get the index of the unknown (e.g. pressure, levelset,...)
 
-            if (!sp->Unknowns.Exist(idx) && !sp->Unknowns.UnkRecieved(idx)) // if this unknown is not known on this simplex
+            if (!sp->Unknowns.Exist(idx) && !sp->Unknowns.UnkReceived(idx)) // if this unknown is not known on this simplex
             {
-                if(_RecvBufPos>=_RecvBuf.size())                            // check if recieve buffer is big enough
-                    EnlargeRecieveBuffer();
+                if(_RecvBufPos>=_RecvBuf.size())                            // check if receive buffer is big enough
+                    EnlargeReceiveBuffer();
                 sp->Unknowns.Prepare(idx);                                  // create the UnknownIdxCL
-                sp->Unknowns(idx)=_RecvBufPos;                              // remeber, where unknown has been put
-                sp->Unknowns.SetUnkRecieved(idx);                           // remeber, this unknown is recieved
+                sp->Unknowns(idx)=_RecvBufPos;                              // remember, where unknown has been put
+                sp->Unknowns.SetUnkReceived(idx);                           // remember, this unknown is received
                 _RecvBuf[_RecvBufPos]=buffer[i].GetData();                  // put data into the _RecvBuf
                 _RecvBufPos+=1;
             }
@@ -325,13 +325,13 @@ template<class SimplexT>
                   idx= (_VecDesc[idxVecDesc])->RowIdx->GetIdx();
             Point3DCL recv( buffer[i].GetData() );
 
-            if (!sp->Unknowns.Exist(idx) && !sp->Unknowns.UnkRecieved(idx))
+            if (!sp->Unknowns.Exist(idx) && !sp->Unknowns.UnkReceived(idx))
             {
                 if(_RecvBufPos+3>_RecvBuf.size())
-                    EnlargeRecieveBuffer();
+                    EnlargeReceiveBuffer();
                 sp->Unknowns.Prepare(idx);
                 sp->Unknowns(idx)=_RecvBufPos;
-                sp->Unknowns.SetUnkRecieved(idx);
+                sp->Unknowns.SetUnkReceived(idx);
                 _RecvBuf[_RecvBufPos+0]= recv[0];
                 _RecvBuf[_RecvBufPos+1]= recv[1];
                 _RecvBuf[_RecvBufPos+2]= recv[2];
@@ -362,7 +362,7 @@ bool ParMultiGridCL::LinearInterpolation(const EdgeCL& e, Uint idx, const BndT* 
     // gather dof0 on vertex 0
     if (bnd->IsOnDirBnd(*vp0))                          // vertex lies on a dirichlet boundary
         dof0= bnd->GetDirBndValue(*vp0);
-    else if (vp0->Unknowns.UnkRecieved(idx))            // unknowns has been recieved, so we can find them in the recieve buffer
+    else if (vp0->Unknowns.UnkReceived(idx))            // unknowns has been received, so we can find them in the receive buffer
         dof0= GetDofOutOfVector<VertexCL, BufferCT, DataT>()(*vp0, idx, _RecvBuf);
     else                                                // value cann be get out of the given source
         dof0= GetDofOutOfVector<VertexCL, VectorCL, DataT>()(*vp0, idx, data);
@@ -370,7 +370,7 @@ bool ParMultiGridCL::LinearInterpolation(const EdgeCL& e, Uint idx, const BndT* 
     // gather dof1 on vertex 1
     if (bnd->IsOnDirBnd(*vp1))                          // vertex lies on a dirichlet boundary
         dof1= bnd->GetDirBndValue(*vp1);
-    else if (vp1->Unknowns.UnkRecieved(idx))            // unknowns has been recieved, so we can find them in the recieve buffer
+    else if (vp1->Unknowns.UnkReceived(idx))            // unknowns has been received, so we can find them in the receive buffer
         dof1= GetDofOutOfVector<VertexCL, BufferCT, DataT>()(*vp1, idx, _RecvBuf);
     else                                                // value cann be get out of the given source
         dof1= GetDofOutOfVector<VertexCL, VectorCL, DataT>()(*vp1, idx, data);
@@ -397,7 +397,7 @@ template<typename SimplexT>
            DebugParallelNumC);
 
     Point3DCL dof;
-    if (s.Unknowns.UnkRecieved(idx)){               // unknowns are stored within recieve buffer
+    if (s.Unknowns.UnkReceived(idx)){               // unknowns are stored within receive buffer
         for (int i=0; i<3; ++i)
             dof[i]= ParMultiGridCL::Instance()._RecvBuf[s.Unknowns(idx)+i];
     }
@@ -438,7 +438,7 @@ template<typename SimplexT>
            DebugParallelNumC);
 
     double dof;
-    if (s.Unknowns.UnkRecieved(idx))    // unknown can be found within recieve buffer
+    if (s.Unknowns.UnkReceived(idx))    // unknown can be found within receive buffer
         dof= ParMultiGridCL::Instance()._RecvBuf[s.Unknowns(idx)];
     else{                               // unknown can be found in VecDesc
         // find index in _VecDesc
@@ -462,7 +462,7 @@ template<typename SimplexT>
 /// \brief Put vectorial data into a given vector
 template<typename SimplexT>
   void ParMultiGridCL::SetDof(const SimplexT& s, Uint idx, VectorCL& data, const Point3DCL& dof)
-/** In order to easyly put data into a given vector, this function can be used
+/** In order to easily put data into a given vector, this function can be used
     \param s    Vertex or edge, the unknown is living on
     \param idx  index type
     \param data vector of the unknowns
@@ -479,7 +479,7 @@ template<typename SimplexT>
 /// \brief Put scalar data into a given vector
 template<typename SimplexT>
   void ParMultiGridCL::SetDof(const SimplexT& s, Uint idx, VectorCL& data, const double& dof)
-/** In order to easyly put data into a given vector, this function can be used
+/** In order to easily put data into a given vector, this function can be used
     \param s    Vertex or edge, the unknown is living on
     \param idx  index type
     \param data vector of the unknowns
@@ -491,11 +491,11 @@ template<typename SimplexT>
     data[s.Unknowns(idx)]=dof;
 }
 
-/// \brief Get a vectorial unknown out of the recieve buffer
+/// \brief Get a vectorial unknown out of the receive buffer
 template<typename SimplexT, typename ContainerT>
   Point3DCL ParMultiGridCL::GetDofOutOfVector<SimplexT, ContainerT, Point3DCL>::operator()
           (const SimplexT& s, Uint idx, const ContainerT& data)
-/** Easyly access of values stored in a vector
+/** Easily access of values stored in a vector
     \param s   simplex on which the unknown lies
     \param idx index of the unknown
     \return dof out of the given vector*/
@@ -506,12 +506,12 @@ template<typename SimplexT, typename ContainerT>
     return MakePoint3D(data[s.Unknowns(idx)+0], data[s.Unknowns(idx)+1], data[s.Unknowns(idx)+2]);
 }
 
-/// \brief Get a scalar unknown out of the recieve buffer
+/// \brief Get a scalar unknown out of the receive buffer
 template<typename SimplexT, typename ContainerT>
   double ParMultiGridCL::GetDofOutOfVector<SimplexT, ContainerT, double>::operator()
               (const SimplexT& s, Uint idx, const ContainerT& data)
 /** Within transfer and refinement operation, some unknowns are put into a
-    recieve buffer, which can be accessed by this funktion easily
+    receive buffer, which can be accessed by this function easily
     \param s   simplex on which the unknown lies
     \param idx index of the unknown
     \param dof at exit value of the unknown*/
@@ -522,13 +522,13 @@ template<typename SimplexT, typename ContainerT>
     return data[s.Unknowns(idx)];
 }
 
-/// \brief Put a value of vectorial unknown into the Recieve Buffer
+/// \brief Put a value of vectorial unknown into the receive buffer
 template<typename SimplexT>
   void ParMultiGridCL::PutDofIntoRecvBuffer(SimplexT&s, Uint idx, const Point3DCL& dof)
 {
     if (!s.Unknowns.Exist(idx)){
         if (_RecvBufPos+3>_RecvBuf.size())
-            EnlargeRecieveBuffer();
+            EnlargeReceiveBuffer();
         s.Unknowns.Prepare(idx);
         s.Unknowns(idx)=_RecvBufPos;
         _RecvBuf[_RecvBufPos+0]= dof[0];
@@ -538,13 +538,13 @@ template<typename SimplexT>
     }
 }
 
-/// \brief Put a value of scalar unknown into the Recieve Buffer
+/// \brief Put a value of scalar unknown into the receive buffer
 template<typename SimplexT>
   void ParMultiGridCL::PutDofIntoRecvBuffer(SimplexT& s, Uint idx, const double& dof)
 {
     if (!s.Unknowns.Exist(idx)){
         if (_RecvBufPos >= _RecvBuf.size() )
-            EnlargeRecieveBuffer();
+            EnlargeReceiveBuffer();
         s.Unknowns.Prepare(idx);
         s.Unknowns(idx)=_RecvBufPos;
         _RecvBuf[_RecvBufPos]= dof;
@@ -553,14 +553,14 @@ template<typename SimplexT>
 }
 
 
-/// \brief Put datas on an edae from the old vector onto a vertex into a new vector
+/// \brief Put data on an edge from the old vector onto a vertex into a new vector
 template<typename BndT>
   void ParMultiGridCL::PutData(MultiGridCL::const_EdgeIterator& sit,
                                const VectorCL* const old_data, VectorCL* new_data,
                                const Uint old_idx, const Uint new_idx,
                                const IdxDescCL* idxDesc, const BndT* bnd)
 /** This routine puts the unknowns on a simplex according to an index into
-    a new data vector. Therefore datas are taken from the recieve buffer, if the
+    a new data vector. Therefore data are taken from the receive buffer, if the
     data has been stored on another proc before the refinement and migration, or
     out of the "old" vector, if the calling proc has already owned these data
     before the refinement. <br>
@@ -588,12 +588,12 @@ template<typename BndT>
             && sit->Unknowns.Exist(new_idx)
             && sit->Unknowns.Exist(old_idx) )
         {
-            if (sit->Unknowns.UnkRecieved(old_idx))                         // this is a recieved unknown
+            if (sit->Unknowns.UnkReceived(old_idx))                         // this is a received unknown
                 new_dof= GetDofOutOfVector<EdgeCL, BufferCT, DataT>()(*sit, old_idx, _RecvBuf);
             else
                 new_dof= GetDofOutOfVector<EdgeCL, VectorCL, DataT>()(*sit, old_idx, *old_data);
             SetDof(*sit, new_idx, *new_data, new_dof);
-            sit->Unknowns.SetUnkRecieved(new_idx);
+            sit->Unknowns.SetUnkReceived(new_idx);
         }
 
         // This is the special case for edges.
@@ -605,13 +605,13 @@ template<typename BndT>
             && sit->GetMidVertex()->Unknowns.Exist(new_idx)
         )
         {
-            if (sit->Unknowns.UnkRecieved(old_idx))                         // this is a recieved unknown
+            if (sit->Unknowns.UnkReceived(old_idx))                         // this is a received unknown
                 new_dof= GetDofOutOfVector<EdgeCL, BufferCT, DataT>()(*sit, old_idx, _RecvBuf);
             else
                 new_dof= GetDofOutOfVector<EdgeCL, VectorCL, DataT>()(*sit, old_idx, *old_data);
             SetDof(*sit->GetMidVertex(), new_idx, *new_data, new_dof);
-            sit->GetMidVertex()->Unknowns.SetUnkRecieved(new_idx);          // set recieved flag as a flag, that this unknown is allready set
-        // Unfortunally we cannot adapt the unknown of a midvertex, that should be deleted,
+            sit->GetMidVertex()->Unknowns.SetUnkReceived(new_idx);          // set received flag as a flag, that this unknown is already set
+        // Unfortunately we cannot adapt the unknown of a midvertex, that should be deleted,
         // because the reference to the midvertex has been deleted
         }
     }
@@ -624,13 +624,13 @@ template<typename BndT>
         // works.
         if ( sit->IsRefined()
              && sit->GetMidVertex()->Unknowns.Exist(new_idx)
-             && !sit->GetMidVertex()->Unknowns.UnkRecieved(new_idx)
+             && !sit->GetMidVertex()->Unknowns.UnkReceived(new_idx)
              && ( !sit->GetVertex(0)->Unknowns.Exist(new_idx) || !sit->GetVertex(1)->Unknowns.Exist(new_idx) )
            )
         {
             LinearInterpolation(*sit, old_idx, bnd, *old_data, new_dof);
             SetDof(*sit->GetMidVertex(), new_idx, *new_data, new_dof);
-            sit->GetMidVertex()->Unknowns.SetUnkRecieved(new_idx);
+            sit->GetMidVertex()->Unknowns.SetUnkReceived(new_idx);
         }
     }
 }

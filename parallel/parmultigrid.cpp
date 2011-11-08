@@ -211,19 +211,19 @@ void ParMultiGridCL::HandleUnknownsAfterRefine(/*const std::vector<VecDescCL*> &
      <li>Delete all subsimplices, that are marked for removement by the refinement algorithm</li>
      <li>Unsubscribe the killed ghost tetras from the DDD-System</li>
      <li>Delete ghost tetras that are not needed any more</li>
-     <li>Copy recieved values into the recieve buffer</li>
+     <li>Copy received values into the receive buffer</li>
     </ol>
     \pre  The VecDescCL's, that describes the unknowns before the refinement algorithm has been performed,
           has to be attached to the ParMultiGridCL by the procedure 'AttachTo'.
     \post All subsimplices, that stores unknowns has an accumulated value of its unknowns
 */
 {
-    Assert(_RecvBuf.size()==0, DROPSErrCL("ParMultiGridCL::HandleUnknownsAfterRefine: Recieve Buffer is not empty!"), DebugParallelNumC);
+    Assert(_RecvBuf.size()==0, DROPSErrCL("ParMultiGridCL::HandleUnknownsAfterRefine: receive Buffer is not empty!"), DebugParallelNumC);
     if (!mg_->UnknownsForRefine())
         return;
     Assert(VecDescRecv(), DROPSErrCL("ParMultiGridCL::HandleUnknownsAfterRefine: missing vector describers"), DebugParallelNumC);
 
-    // Allocate mem for recieve buffer
+    // Allocate mem for receive buffer
     IdxT numKnownUnknowns=0;
     for (size_t i=0; i<_VecDesc.size(); ++i)
         numKnownUnknowns+=_VecDesc[i]->Data.size();
@@ -278,13 +278,13 @@ void ParMultiGridCL::HandleUnknownsAfterRefine(/*const std::vector<VecDescCL*> &
 void ParMultiGridCL::HandleNewIdx(IdxDescCL* oldIdxDesc, VecDescCL* newVecDesc)
 /** Within the refinement or migration algorithm a single processor
     can get new unknowns and give other unknowns to other processors. So each
-    processor put the recieved unknowns in a buffer. In order to get a fully filled
+    processor put the received unknowns in a buffer. In order to get a fully filled
     data vector, this routine builds this vector by taking values out of the
-    recieve buffer or the "old" vector.*/
+    receive buffer or the "old" vector.*/
 /*  This routine iterates over all vertices, edges and tetras and calls the routine PutData.
     PutData collects the data and put it into the new vector at the right position.*/
 {
-    Assert(VecDescRecv(), DROPSErrCL("ParMultiGridCL::HandleNewIdx: No Indices recieved before transfer"), DebugParallelNumC);
+    Assert(VecDescRecv(), DROPSErrCL("ParMultiGridCL::HandleNewIdx: No Indices received before transfer"), DebugParallelNumC);
 
     // old and new index
     const Uint old_idx= oldIdxDesc->GetIdx(),
@@ -372,7 +372,7 @@ void ParMultiGridCL::PutData(MultiGridCL::const_VertexIterator& sit,
                              const Uint old_idx, const Uint new_idx,
                              const IdxDescCL* idxDesc)
 /** This routine puts the unknowns on a vertex according to an index into
-    a new data vector. Therefore datas are taken from the recieve buffer, if the
+    a new data vector. Therefore datas are taken from the receive buffer, if the
     data has been stored on another proc before the refinement and migration, or
     out of the "old" vector, if the calling proc has already owned these data
     before the refinement.
@@ -392,17 +392,17 @@ void ParMultiGridCL::PutData(MultiGridCL::const_VertexIterator& sit,
     {
         const IdxT new_sysnum = sit->Unknowns(new_idx),                 // position, where to find the new unknown(s)
                    old_sysnum = sit->Unknowns(old_idx);                 // position, where to find the old unknown(s)
-        if (sit->Unknowns.UnkRecieved(old_idx))                         // this is an "new" unknown
+        if (sit->Unknowns.UnkReceived(old_idx))                         // this is an "new" unknown
         {
             for (Uint i=0; i<numUnknowns; ++i)
                 (*new_data)[new_sysnum+i]= _RecvBuf[old_sysnum+i];
-            sit->Unknowns.SetUnkRecieved(new_idx);                      // set recieved flag as a flag, that this unknown is an old one
+            sit->Unknowns.SetUnkReceived(new_idx);                      // set received flag as a flag, that this unknown is an old one
         }
         else
         {
             for (Uint i=0; i<numUnknowns; ++i)
                 (*new_data)[new_sysnum+i]=  (*old_data)[old_sysnum+i];
-            sit->Unknowns.SetUnkRecieved(new_idx);                      // set recieved flag as a flag, that this unknown is an old one
+            sit->Unknowns.SetUnkReceived(new_idx);                      // set received flag as a flag, that this unknown is an old one
         }
     }
 }
@@ -454,7 +454,7 @@ void ParMultiGridCL::RescueUnknownsOnEdges()
                             if(!bnd->IsOnDirBnd(*sit->GetMidVertex()) ){
                                 if ( LinearInterpolation(*sit, idx, bnd, sol->Data, new_dof) ){
                                     PutDofIntoRecvBuffer(*sit->GetMidVertex(), idx, new_dof);
-                                    sit->GetMidVertex()->Unknowns.SetUnkRecieved(idx);
+                                    sit->GetMidVertex()->Unknowns.SetUnkreceived(idx);
                                 }
                                 else
                                     throw DROPSErrCL("ParMultiGridCL::RescueUnknownsOnEdges: Cannot interpolate onto midvertex");
@@ -466,7 +466,7 @@ void ParMultiGridCL::RescueUnknownsOnEdges()
                             if(!bnd->IsOnDirBnd(*sit->GetMidVertex()) ){
                                 if ( LinearInterpolation(*sit, idx, bnd, sol->Data, new_dof) ){
                                     PutDofIntoRecvBuffer(*sit->GetMidVertex(), idx, new_dof);
-                                    sit->GetMidVertex()->Unknowns.SetUnkRecieved(idx);
+                                    sit->GetMidVertex()->Unknowns.SetUnkreceived(idx);
                                 }
                                 else
                                     throw DROPSErrCL("ParMultiGridCL::RescueUnknownsOnEdges: Cannot interpolate onto midvertex");
@@ -481,7 +481,7 @@ void ParMultiGridCL::RescueUnknownsOnEdges()
                             else
                                 PutDofIntoRecvBuffer(*sit->GetMidVertex(), idx,
                                     GetDofOutOfVector<EdgeCL, VectorCL, Point3DCL>()(*sit, idx, sol->Data));
-                            sit->GetMidVertex()->Unknowns.SetUnkRecieved(idx);
+                            sit->GetMidVertex()->Unknowns.SetUnkreceived(idx);
                         }
                     }
                 }
@@ -491,8 +491,8 @@ void ParMultiGridCL::RescueUnknownsOnEdges()
 */
 }
 
-/// \brief Delete recieve Buffer
-/** After a refinement and a miragtion the recieve buffer is not needed any more */
+/// \brief Delete receive Buffer
+/** After a refinement and a miragtion the receive buffer is not needed any more */
 void ParMultiGridCL::DeleteRecvBuffer()
 {
     _RecvBuf.resize(0);
@@ -530,18 +530,18 @@ Uint ParMultiGridCL::NumberOfUnknownsOnEdge()
     return result;
 }
 
-/// \brief Enlarge the Recieve Buffer
-void ParMultiGridCL::EnlargeRecieveBuffer()
+/// \brief Enlarge the receive buffer
+void ParMultiGridCL::EnlargeReceiveBuffer()
 {
     if (_RecvBuf.size()>0){
         BufferCT tmpBuf(_RecvBuf);
         _RecvBuf.resize(2*_RecvBuf.size());
         std::copy(tmpBuf.begin(), tmpBuf.end(), _RecvBuf.begin());
-        Comment("["<<ProcCL::MyRank()<<"]===> Enlarge recieve buffer from "<<tmpBuf.size()<<" to "<<_RecvBuf.size()<<"!"<<std::endl, DebugParallelC);
+        Comment("["<<ProcCL::MyRank()<<"]===> Enlarge receive buffer from "<<tmpBuf.size()<<" to "<<_RecvBuf.size()<<"!"<<std::endl, DebugParallelC);
     }
     else{
         _RecvBuf.resize(1024);
-        Comment("["<<ProcCL::MyRank()<<"]===> Create recieve buffer of size "<<_RecvBuf.size()<<"!"<<std::endl, DebugParallelC);
+        Comment("["<<ProcCL::MyRank()<<"]===> Create receive buffer of size "<<_RecvBuf.size()<<"!"<<std::endl, DebugParallelC);
     }
 }
 
@@ -623,7 +623,7 @@ int ParMultiGridCL::GatherUnknownsRef (OBJT obj, void* buf)
 /// \brief Scatter unknowns on master tetras, which have been send from killed ghost tetra
 int ParMultiGridCL::ScatterUnknownsRef(OBJT obj, void* buf)
 /** This procedure puts all unknowns that can live on subsimplices or the tetrahedron itselfe
-    into a recieve buffer, if the unknowns are not known so far
+    into a receive buffer, if the unknowns are not known so far
 */
 {
     TetraCL* const tp= ddd_cast<TetraCL*>(obj);
@@ -643,22 +643,22 @@ int ParMultiGridCL::ScatterUnknownsRef(OBJT obj, void* buf)
                    numUnkOnEdge = _VecDesc[index_type]->RowIdx->NumUnknownsEdge(),
                    numUnkOnTetra= _VecDesc[index_type]->RowIdx->NumUnknownsTetra();
 
-        // Check if there are unknowns on vertices and recieve them
+        // Check if there are unknowns on vertices and receive them
         if (numUnkOnVert)
         {
             // iterate over all vertices of this tetra
             for (TetraCL::const_VertexPIterator sit(tp->GetVertBegin()); sit!=tp->GetVertEnd(); ++sit)
             {
-                // put the recieved unknowns into _RecvBuf, if this vertex should store unknowns (i.e. is master)
+                // put the received unknowns into _RecvBuf, if this vertex should store unknowns (i.e. is master)
                 // and if the unknown is not known so far.
                 if (!(*sit)->Unknowns.Exist(idx)                        // this vert stores no "old" unknown
-                     && !(*sit)->Unknowns.UnkRecieved(idx)              // this vert has no unknowns recieved yet
+                     && !(*sit)->Unknowns.UnkReceived(idx)              // this vert has no unknowns received yet
                      && buffer[buffer_pos].mark                         // there have been unknowns on sender side
                      && buffer[buffer_pos].idx==idx                     // and right index
                    )
                 {
                     if (_RecvBufPos+numUnkOnVert>_RecvBuf.size())
-                        EnlargeRecieveBuffer();
+                        EnlargeReceiveBuffer();
                     (*sit)->Unknowns.Prepare(idx);                      // create UnknownIdxCL
                     (*sit)->Unknowns(idx)= _RecvBufPos;                 // remeber position, where the unknowns has been put
 
@@ -666,7 +666,7 @@ int ParMultiGridCL::ScatterUnknownsRef(OBJT obj, void* buf)
                         _RecvBuf[_RecvBufPos+i]=buffer[buffer_pos+i].val;
                     _RecvBufPos+=numUnkOnVert;
 
-                    (*sit)->Unknowns.SetUnkRecieved(idx);               // this vertex has recieved unknowns
+                    (*sit)->Unknowns.SetUnkReceived(idx);               // this vertex has received unknowns
                 }
                 buffer_pos+=numUnkOnVert;                               // unknowns on vertices has been handled
             }
@@ -679,13 +679,13 @@ int ParMultiGridCL::ScatterUnknownsRef(OBJT obj, void* buf)
             {
                 if ((*sit)->MayStoreUnk()
                      && !(*sit)->Unknowns.Exist(idx)
-                     && !(*sit)->Unknowns.UnkRecieved(idx)
+                     && !(*sit)->Unknowns.UnkReceived(idx)
                      && buffer[buffer_pos].mark
                      && buffer[buffer_pos].idx==idx
                    )
                 {
                     if (_RecvBufPos + numUnkOnEdge>_RecvBuf.size())
-                        EnlargeRecieveBuffer();
+                        EnlargeReceiveBuffer();
                     (*sit)->Unknowns.Prepare(idx);
                     (*sit)->Unknowns(idx)= _RecvBufPos;
 
@@ -693,24 +693,24 @@ int ParMultiGridCL::ScatterUnknownsRef(OBJT obj, void* buf)
                         _RecvBuf[_RecvBufPos+i]=buffer[buffer_pos+i].val;
                     _RecvBufPos+=numUnkOnEdge;
 
-                    (*sit)->Unknowns.SetUnkRecieved(idx);
+                    (*sit)->Unknowns.SetUnkReceived(idx);
                 }
                 buffer_pos+=numUnkOnEdge;
             }
         }
 
-        // Recieve unknowns on tetra itselfe
+        // receive unknowns on tetra itselfe
         if (numUnkOnTetra)
         {
             if (tp->MayStoreUnk()
                     && !tp->Unknowns.Exist(idx)
-                    && !tp->Unknowns.UnkRecieved(idx)
+                    && !tp->Unknowns.UnkReceived(idx)
                     && buffer[buffer_pos].mark
                     && buffer[buffer_pos].idx==idx
                )
             {
                 if (_RecvBufPos + numUnkOnTetra>_RecvBuf.size())
-                    EnlargeRecieveBuffer();
+                    EnlargeReceiveBuffer();
 
                 tp->Unknowns.Prepare(idx);
                 tp->Unknowns(idx)= _RecvBufPos;
@@ -719,7 +719,7 @@ int ParMultiGridCL::ScatterUnknownsRef(OBJT obj, void* buf)
                     _RecvBuf[_RecvBufPos+i] = buffer[buffer_pos+i].val;
                 _RecvBufPos+=numUnkOnTetra;
 
-                tp->Unknowns.SetUnkRecieved(idx);
+                tp->Unknowns.SetUnkReceived(idx);
             }
             buffer_pos+=numUnkOnTetra;
         }
@@ -746,10 +746,10 @@ int ParMultiGridCL::GatherUnknownsMigV (OBJT obj, void* buf)
             buffer[bufferpos].mark=true;
             buffer[bufferpos].idx=idx;
             const Uint sysnum= sp->Unknowns(idx);
-            if (!sp->Unknowns.UnkRecieved(idx))
+            if (!sp->Unknowns.UnkReceived(idx))
                 for (Uint i=0; i<numUnkOnVert; ++i)
                     buffer[bufferpos++].val= _VecDesc[index_type]->Data[sysnum+i];
-            else //sp->Unknowns.UnkRecieved(idx)
+            else //sp->Unknowns.Unkreceived(idx)
                 for (Uint i=0; i<numUnkOnVert; ++i)
                     buffer[bufferpos++].val= _RecvBuf[sysnum+i];
         }
@@ -777,7 +777,7 @@ int ParMultiGridCL::ScatterUnknownsMigV(OBJT obj, void* buf)
         else if (buffer[bufferpos].mark && buffer[bufferpos].idx==idx)    // new unknowns has been sent to right index
         {
             if (numUnkOnVert+_RecvBufPos>_RecvBuf.size())
-                EnlargeRecieveBuffer();
+                EnlargeReceiveBuffer();
 
             sp->Unknowns.Prepare(idx);
             sp->Unknowns(idx)=_RecvBufPos;
@@ -786,9 +786,9 @@ int ParMultiGridCL::ScatterUnknownsMigV(OBJT obj, void* buf)
                 _RecvBuf[_RecvBufPos+i]=buffer[bufferpos++].val;
             _RecvBufPos+=numUnkOnVert;
 
-            sp->Unknowns.SetUnkRecieved(idx);
+            sp->Unknowns.SetUnkReceived(idx);
         }
-        else                                // not known unknowns and no information recieved
+        else                                // not known unknowns and no information received
             bufferpos+=numUnkOnVert;
     }
     return 0;
@@ -810,10 +810,10 @@ int ParMultiGridCL::GatherUnknownsMigE (OBJT obj, void* buf)
             buffer[bufferpos].mark=true;
             buffer[bufferpos].idx=idx;
             const Uint sysnum= sp->Unknowns(idx);
-            if (!sp->Unknowns.UnkRecieved(idx))
+            if (!sp->Unknowns.UnkReceived(idx))
                 for (Uint i=0; i<numUnkOnEdge; ++i)
                     buffer[bufferpos++].val= _VecDesc[index_type]->Data[sysnum+i];
-            else //sp->Unknowns.UnkRecieved(idx)
+            else //sp->Unknowns.Unkreceived(idx)
                 for (Uint i=0; i<numUnkOnEdge; ++i)
                     buffer[bufferpos++].val= _RecvBuf[sysnum+i];
         }
@@ -844,16 +844,16 @@ int ParMultiGridCL::ScatterUnknownsMigE(OBJT obj, void* buf)
         else if (buffer[bufferpos].mark && buffer[bufferpos].idx==idx)    // new unknowns has been sent to right index
         {
             if (numUnkOnEdge+_RecvBufPos>_RecvBuf.size())
-                EnlargeRecieveBuffer();
+                EnlargeReceiveBuffer();
             sp->Unknowns.Prepare(idx);
             sp->Unknowns(idx)=_RecvBufPos;
-            sp->Unknowns.SetUnkRecieved(idx);
+            sp->Unknowns.SetUnkReceived(idx);
 
             for (Uint i=0; i<numUnkOnEdge; ++i)
                 _RecvBuf[_RecvBufPos+i]=buffer[bufferpos++].val;
             _RecvBufPos+=numUnkOnEdge;
         }
-        else                                // not known unknowns and no information recieved
+        else                                // not known unknowns and no information received
             bufferpos+=numUnkOnEdge;
     }
     return 0;
@@ -864,13 +864,13 @@ int ParMultiGridCL::ScatterUnknownsMigE(OBJT obj, void* buf)
 void ParMultiGridCL::DelAllUnkRecv()
 {
     for (MultiGridCL::const_VertexIterator sit=mg_->GetAllVertexBegin(); sit!=mg_->GetAllVertexEnd(); ++sit){
-        sit->Unknowns.ResetUnkRecieved();
+        sit->Unknowns.ResetUnkReceived();
     }
     for (MultiGridCL::const_EdgeIterator sit=mg_->GetAllEdgeBegin(); sit!=mg_->GetAllEdgeEnd(); ++sit){
-        sit->Unknowns.ResetUnkRecieved();
+        sit->Unknowns.ResetUnkReceived();
     }
     for (MultiGridCL::const_TetraIterator sit=mg_->GetAllTetraBegin(); sit!=mg_->GetAllTetraEnd(); ++sit){
-        sit->Unknowns.ResetUnkRecieved();
+        sit->Unknowns.ResetUnkReceived();
     }
 }
 
@@ -1580,63 +1580,35 @@ void ParMultiGridCL::TransferEnd()
 void ParMultiGridCL::MarkSimplicesForUnknowns()
 {
 	for (MultiGridCL::VertexIterator it= mg_->GetAllVertexBegin(); it != mg_->GetAllVertexEnd(); ++it)
-		it->Unknowns.MayHaveUnknownsPrepare( mg_->GetNumLevel());
+		it->Unknowns.DisableAllUnknowns( mg_->GetNumLevel());
 
 	for (MultiGridCL::EdgeIterator it= mg_->GetAllEdgeBegin(); it != mg_->GetAllEdgeEnd(); ++it)
-		it->Unknowns.MayHaveUnknownsPrepare( mg_->GetNumLevel());
+		it->Unknowns.DisableAllUnknowns( mg_->GetNumLevel());
 
 	for (MultiGridCL::FaceIterator it= mg_->GetAllFaceBegin(); it != mg_->GetAllFaceEnd(); ++it)
-		it->Unknowns.MayHaveUnknownsPrepare( mg_->GetNumLevel());
+		it->Unknowns.DisableAllUnknowns( mg_->GetNumLevel());
 
 	for (MultiGridCL::TetraIterator it= mg_->GetAllTetraBegin(); it != mg_->GetAllTetraEnd(); ++it)
-		it->Unknowns.MayHaveUnknownsPrepare( mg_->GetNumLevel());
+		it->Unknowns.DisableAllUnknowns( mg_->GetNumLevel());
 
 	for (Uint lvl= 0; lvl <= mg_->GetLastLevel(); ++lvl)
 	{
 	    for (MultiGridCL::TriangTetraIteratorCL tit(mg_->GetTriangTetraBegin(lvl));
 	         tit!=mg_->GetTriangTetraEnd(lvl); ++tit)
 	    {
-	        // master tetras in last triang level are able to store unknowns the rest isn't
+	        // master tetras in current triang level are able to store unknowns on their sub-simplices
 	        for (TetraCL::const_VertexPIterator it(tit->GetVertBegin()); it!=tit->GetVertEnd(); ++it)
-	        {
-	        	(**it).Unknowns.MayHaveUnknowns(lvl, true);
-	        }
+	        	(**it).Unknowns.EnableUnknowns(lvl);
+
 	        for (TetraCL::const_EdgePIterator it(tit->GetEdgesBegin()); it!=tit->GetEdgesEnd(); ++it)
-	        {
-	        	(**it).Unknowns.MayHaveUnknowns(lvl, true);
-	        }
+	        	(**it).Unknowns.EnableUnknowns(lvl);
+
 	        for (TetraCL::const_FacePIterator it(tit->GetFacesBegin()); it!=tit->GetFacesEnd(); ++it)
-	        {
-	        	(**it).Unknowns.MayHaveUnknowns(lvl, true);
-	        }
-	        tit->Unknowns.MayHaveUnknowns(lvl, true);
+	        	(**it).Unknowns.EnableUnknowns(lvl);
+
+	        tit->Unknowns.EnableUnknowns(lvl);
 	    }
 	}
-
-	/*
-	ModifyBegin();
-    for (MultiGridCL::TriangTetraIteratorCL tit(mg_->GetTriangTetraBegin(lvl));
-         tit!=mg_->GetTriangTetraEnd(lvl); ++tit)
-    {
-        // master tetras in last triang level are able to store unknowns the rest isn't
-        for (TetraCL::const_VertexPIterator it(tit->GetVertBegin()); it!=tit->GetVertEnd(); ++it)
-        {
-            Assert((*it)->GetPrio()!=PrioVGhost, DROPSErrCL("ParMultiGridCL::MarkSimplicesForUnknowns: Marking PrioVGhost as PrioHasUnk"), DebugParallelNumC);
-            modify_->ChangePrio( **it, PrioHasUnk);
-        }
-        for (TetraCL::const_EdgePIterator it(tit->GetEdgesBegin()); it!=tit->GetEdgesEnd(); ++it)
-        {
-            Assert((*it)->GetPrio()!=PrioVGhost, DROPSErrCL("ParMultiGridCL::MarkSimplicesForUnknowns: Marking PrioVGhost as PrioHasUnk"), DebugParallelNumC);
-            modify_->ChangePrio( **it, PrioHasUnk);
-        }
-        for (TetraCL::const_FacePIterator it(tit->GetFacesBegin()); it!=tit->GetFacesEnd(); ++it)
-        {
-            Assert((*it)->GetPrio()!=PrioVGhost, DROPSErrCL("ParMultiGridCL::MarkSimplicesForUnknowns: Marking PrioVGhost as PrioHasUnk"), DebugParallelNumC);
-            modify_->ChangePrio( **it, PrioHasUnk);
-        }
-    }
-    ModifyEnd();
-    */
 }
 
 /// \brief Destroy unknowns on non-master vertices, edges and tetras if there are information about them
@@ -2073,7 +2045,7 @@ void ParMultiGridCL::HandlerTXfer(OBJT obj, PROCT proc, PrioT prio)
 //-----------------------------
 
 /// \brief Send additional data with the simplices
-/** These procedures put additional data to a message or recieve this data.
+/** These procedures put additional data to a message or receive this data.
     This data might be geometrical or numerical, like boundary-information or children-information,
     or the numerical values onto the simplex. */
 /*
@@ -2105,7 +2077,7 @@ void ParMultiGridCL::HandlerVScatter( OBJT obj, int cnt, TypeT type, void* buf, 
     VertexCL* const vp= ddd_cast<VertexCL*>(obj);
     Assert(type==AddedScalCL::GetType() || type==AddedVecCL::GetType() || type==_BndPtT ,
            DROPSErrCL("ParMultiGridCL: HandlerVScatter: Cannot handle this type!"), DebugParallelC);
-    // if boundary information are recieved
+    // if boundary information are received
     if ( type == _BndPtT )
     {
         const BndPointCL* const buffer= static_cast<BndPointCL*>(buf);
@@ -2113,10 +2085,10 @@ void ParMultiGridCL::HandlerVScatter( OBJT obj, int cnt, TypeT type, void* buf, 
         for( int i=0; i<cnt; ++i)
             if (!vp->HasBnd(buffer[i]))
                 vp->AddBnd(buffer[i]);
-//             vp->_BndVerts->push_back( buffer[i]);           // store the recieved boundary-points
+//             vp->_BndVerts->push_back( buffer[i]);           // store the received boundary-points
     }
 
-    // if numerical data are recieved
+    // if numerical data are received
     else if ( VecDescRecv() && (type == AddedScalCL::GetType() || type==AddedVecCL::GetType()) )
         RecvUnknowns(vp,type,buf,cnt);
 }
@@ -2165,7 +2137,7 @@ void ParMultiGridCL::HandlerTGather( OBJT obj, int cnt, TypeT type, void* buf)
 }
 */
 
-/// \brief Recieve additional data for a tetra transfer
+/// \brief receive additional data for a tetra transfer
 /*
 void ParMultiGridCL::HandlerTScatter( OBJT obj, int cnt, TypeT type, void* buf, int newness)
 {
@@ -2194,7 +2166,7 @@ void ParMultiGridCL::HandlerTScatter( OBJT obj, int cnt, TypeT type, void* buf, 
         // Create new children-container if necessary
         if (!tp->_Children)
             tp->_Children= new SArrayCL<TetraCL*, MaxChildrenC>;
-        // put recieved children into children-container!
+        // put received children into children-container!
         for( int i=0; i<cnt; ++i)
             (*(tp->_Children))[i]= buffer[i];
     }
@@ -2275,7 +2247,7 @@ void ParMultiGridCL::HandlerTUpdate( OBJT obj)
         //     Proc A has a master copy of a tetra that should be moved to another proc (tetra is
         //         marked for removement on this Proc A)
         //     Proc B moves a ghost copy of the tetra to proc A.
-        // Now proc A does not delete the tetrahedron, because it should be recieved by proc B. The both priorities
+        // Now proc A does not delete the tetrahedron, because it should be received by proc B. The both priorities
         // (Ghost and Master) are merged. And Master is wrongly the winner. This is corrected here!
 //         AllComment("["<<ProcCL::MyRank()<<"] ====> Set Prio of Tetra " << tp->GetGID() <<" to Ghost, because this tetra has no parent on this proc! (of: This should be OK!)"<<std::endl, ~0);
     }
@@ -2361,7 +2333,7 @@ void ParMultiGridCL::SetAllHandler()
 /****************************************************************************
 * G E T  M G                                                                *
 ****************************************************************************/
-/// \brief Recieve a reference to the stored MultiGrid
+/// \brief receive a reference to the stored MultiGrid
 MultiGridCL& ParMultiGridCL::GetMG()
 {
     Assert(mg_!=0, DROPSErrCL("ParMultiGridCL: GetMG: No MultiGrid is assigned"), DebugParallelC);
@@ -2426,7 +2398,7 @@ void ParMultiGridCL::DebugInfo(std::ostream &) const
 //                 if (vit->Unknowns.Exist(idx))
 //                 {
 //                     IdxT sysnum=vit->Unknowns(idx);
-//                     if (!vit->Unknowns.UnkRecieved(idx))
+//                     if (!vit->Unknowns.Unkreceived(idx))
 //                         os << " Unknowns of idx "<<idx<<" at pos "<<sysnum<<" out of Vector: "<< _VecDesc[i]->Data[sysnum]<<std::endl;
 //                 }
 //                 else
@@ -2448,7 +2420,7 @@ void ParMultiGridCL::DebugInfo(std::ostream &) const
 //                 if (eit->Unknowns.Exist(idx))
 //                 {
 //                     IdxT sysnum=eit->Unknowns(idx);
-//                     if (!eit->Unknowns.UnkRecieved(idx))
+//                     if (!eit->Unknowns.Unkreceived(idx))
 //                         os << " Unknowns of idx "<<idx<<" out of Vector: "<< _VecDesc[i]->Data[sysnum]<<std::endl;
 //                 }
 //                 else
@@ -2509,8 +2481,8 @@ void ParMultiGridCL::ShowInterfaces() const
 }
 */
 
-/// \brief DDD-Consisty-Check
-/// \todo DiST: Implement a consisty check!
+/// \brief DDD-Consistency-Check
+/// \todo DiST: Implement a consistency check!
 /*
 void ParMultiGridCL::ConsCheck()
 {
@@ -2518,7 +2490,7 @@ void ParMultiGridCL::ConsCheck()
 }
 */
 
-/// \brief Get the size of the recieve buffer
+/// \brief Get the size of the receive buffer
 size_t ParMultiGridCL::GetRecvBufferSize()
 {
     return _RecvBuf.size();

@@ -68,7 +68,7 @@ VertexCL::VertexCL (const Point3DCL& Coord, Uint FirstLevel, IdCL<VertexCL> id) 
 {}
 
 /** Copy a vertex.
-    <p><b>Danger!!! Copying simplices might corrupt the multigrid structure!!!<b>
+    <p><b>Danger!!! Copying simplices might corrupt the multigrid structure!!!</b></p>
 */
 VertexCL::VertexCL (const VertexCL& v) :
 #ifndef _PAR

@@ -55,14 +55,14 @@ void MigrateFECL::CopyVecElements( VecDescCL& new_vec_desc, const std::vector<Us
                 DebugParallelNumC);
 
             // copy data from known DoF values or from the receive buffer
-            double const * in= !Unknowns.UnkRecieved( old_idx)
+            double const * in= !Unknowns.UnkReceived( old_idx)
                                 ? Addr(*old_vec_)+ Unknowns(old_idx)
                                 : Addr(recvBuf_) + Unknowns(old_idx);
             // ... into the new vector
             double * out = Addr(new_vec)+Unknowns(new_idx);
             std::copy( in, in + new_vec_desc.RowIdx->NumUnknownsSimplex( simplex), out);
             // .. this unknown has been handled, so forget about the received-status
-            Unknowns.ResetUnkRecieved( old_idx);
+            Unknowns.ResetUnkReceived( old_idx);
         }
     }
 }

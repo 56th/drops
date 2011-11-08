@@ -9,16 +9,16 @@
  * it under the terms of the GNU Lesser General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * DROPS is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public License
  * along with DROPS. If not, see <http://www.gnu.org/licenses/>.
- * 
- * 
+ *
+ *
  * Copyright 2009 LNM/SC RWTH Aachen, Germany
 */
 
@@ -806,7 +806,7 @@ template <class PT>
 
     for (Uint i=0; i<2; ++i){
         const VertexCL* vp=edge.GetVertex(i);
-        if (bnd->IsOnDirBnd( *vp) || (vp->Unknowns.Exist() && vp->Unknowns.Exist(new_idx) && vp->Unknowns.UnkRecieved(new_idx)) )
+        if (bnd->IsOnDirBnd( *vp) || (vp->Unknowns.Exist() && vp->Unknowns.Exist(new_idx) && vp->Unknowns.UnkReceived(new_idx)) )
             (i==0 ? dof0 : dof1 ) = new_f.val( *vp);
         else if (vp->Unknowns.Exist() && vp->Unknowns.Exist( old_idx))
             (i==0 ? dof0 : dof1 ) = ParMultiGridCL::GetDof<VertexCL, typename PT::DataT>()(*vp, old_idx);
@@ -903,13 +903,13 @@ template <class P1T, class VecDesc>
             if ( sit->IsRefined()
                  && sit->GetMidVertex()->Unknowns.Exist()
                  && sit->GetMidVertex()->Unknowns.Exist( idx)
-                 && !sit->GetMidVertex()->Unknowns.UnkRecieved(idx)
+                 && !sit->GetMidVertex()->Unknowns.UnkReceived(idx)
                  && !bnd->IsOnDirBnd( *sit->GetMidVertex())
                  && TryGetValuesOnEdge(old_idx, f, *sit, dof0, dof1)
                )
             {
                 f.SetDoF( *sit->GetMidVertex(), ( dof0 + dof1)*0.5);
-                sit->GetMidVertex()->Unknowns.SetUnkRecieved(idx);
+                sit->GetMidVertex()->Unknowns.SetUnkReceived(idx);
                 ++counter2;
             }
 #endif
@@ -1159,7 +1159,7 @@ template <class P2T>
         else return false;
 #else
         if (bnd->IsOnDirBnd( *vp)
-           || (vp->Unknowns.Exist() && vp->Unknowns.Exist(new_idx) && vp->Unknowns.UnkRecieved(new_idx)) )
+           || (vp->Unknowns.Exist() && vp->Unknowns.Exist(new_idx) && vp->Unknowns.UnkReceived(new_idx)) )
             v[i]= new_f.val( *vp);
         else if (vp->Unknowns.Exist() && vp->Unknowns.Exist( old_idx))
             v[i]= ParMultiGridCL::GetDof<VertexCL, typename P2T::DataT>()(*vp, old_idx);
@@ -1183,7 +1183,7 @@ template <class P2T>
         }
 #else
         if (bnd->IsOnDirBnd( *ep)
-            || (ep->Unknowns.Exist() && ep->Unknowns.Exist( new_idx) && ep->Unknowns.UnkRecieved(new_idx) ) )
+            || (ep->Unknowns.Exist() && ep->Unknowns.Exist( new_idx) && ep->Unknowns.UnkReceived(new_idx) ) )
             v[i+3]= new_f.val( *ep);
         else if (ep->Unknowns.Exist() && ep->Unknowns.Exist( old_idx))        // unknowns are still known to the ParMultiGridCL
             v[i+3]= ParMultiGridCL::GetDof<EdgeCL, typename P2T::DataT>() (*ep, old_idx);
@@ -1191,7 +1191,7 @@ template <class P2T>
             if (ep->IsRefined()
                 && ep->GetMidVertex()->Unknowns.Exist()
                 && ep->GetMidVertex()->Unknowns.Exist( new_idx)
-                && ep->GetMidVertex()->Unknowns.UnkRecieved(new_idx))
+                && ep->GetMidVertex()->Unknowns.UnkReceived(new_idx))
                 v[i+3]= new_f.val( *ep->GetMidVertex());
             else if (ep->IsRefined()
                      && ep->Unknowns.Exist()
@@ -1233,7 +1233,7 @@ template <class P2T>
         else return false;
 #else
         if (bnd->IsOnDirBnd( *vp)
-            || (vp->Unknowns.Exist() && vp->Unknowns.Exist(new_idx) && vp->Unknowns.UnkRecieved(new_idx)) )
+            || (vp->Unknowns.Exist() && vp->Unknowns.Exist(new_idx) && vp->Unknowns.UnkReceived(new_idx)) )
             v[i]= new_f.val( *vp);
         else if (vp->Unknowns.Exist() && vp->Unknowns.Exist( old_idx))
             v[i]= ParMultiGridCL::GetDof<VertexCL, typename P2T::DataT>()(*vp, old_idx);
@@ -1256,7 +1256,7 @@ template <class P2T>
             else return false;
         }
 #else
-        if (bnd->IsOnDirBnd( *ep) || (ep->Unknowns.Exist() && ep->Unknowns.Exist( new_idx) && ep->Unknowns.UnkRecieved(new_idx)) )
+        if (bnd->IsOnDirBnd( *ep) || (ep->Unknowns.Exist() && ep->Unknowns.Exist( new_idx) && ep->Unknowns.UnkReceived(new_idx)) )
             v[i+4]= new_f.val( *ep);
         else if (ep->Unknowns.Exist() && ep->Unknowns.Exist( old_idx))
             v[i+4]= ParMultiGridCL::GetDof<EdgeCL, typename P2T::DataT>()(*ep, old_idx);
@@ -1264,7 +1264,7 @@ template <class P2T>
             if (ep->IsRefined()
                 && ep->GetMidVertex()->Unknowns.Exist()
                 && ep->GetMidVertex()->Unknowns.Exist( new_idx)
-                && ep->GetMidVertex()->Unknowns.UnkRecieved(new_idx))
+                && ep->GetMidVertex()->Unknowns.UnkReceived(new_idx))
                 v[i+4]= new_f.val( *ep->GetMidVertex());
             else if (ep->IsRefined()
                      && ep->GetMidVertex()->Unknowns.Exist()
@@ -1294,7 +1294,7 @@ template <class P2T>
     for (Uint i=0; i<2; ++i){
         const VertexCL* vp=paredge.GetVertex(i);
         if (bnd->IsOnDirBnd( *vp)
-            || (vp->Unknowns.Exist() && vp->Unknowns.Exist(new_idx) && vp->Unknowns.UnkRecieved(new_idx)) )
+            || (vp->Unknowns.Exist() && vp->Unknowns.Exist(new_idx) && vp->Unknowns.UnkReceived(new_idx)) )
             v[i]= new_f.val( *vp);
         else if (vp->Unknowns.Exist() && vp->Unknowns.Exist( old_idx))
             v[i]= ParMultiGridCL::GetDof<VertexCL, typename P2T::DataT>()(*vp, old_idx);
@@ -1303,7 +1303,7 @@ template <class P2T>
 
     // Values on edges
     if ( bnd->IsOnDirBnd( paredge)
-         || (paredge.Unknowns.Exist() && paredge.Unknowns.Exist( new_idx) && paredge.Unknowns.UnkRecieved(new_idx)) )
+         || (paredge.Unknowns.Exist() && paredge.Unknowns.Exist( new_idx) && paredge.Unknowns.UnkReceived(new_idx)) )
         v[2]= new_f.val( paredge);
     else if (paredge.Unknowns.Exist() && paredge.Unknowns.Exist( old_idx))
         v[2]= ParMultiGridCL::GetDof<EdgeCL, typename P2T::DataT>()(paredge, old_idx);
@@ -1357,7 +1357,7 @@ RepairOnChildren( const TetraCL& t,  const P2T& old_f, VecDesc& vecdesc)
 #ifndef _PAR
                 && !edgep->Unknowns.Exist( old_idx)
 #else
-                && !edgep->Unknowns.UnkRecieved(idx)
+                && !edgep->Unknowns.UnkReceived(idx)
 #endif
                )
             {
@@ -1382,7 +1382,7 @@ RepairOnChildren( const TetraCL& t,  const P2T& old_f, VecDesc& vecdesc)
 
                         if (TryGetValuesOnParEdge(old_f, f, *paredgep, v)){
                             f.SetDoF( *edgep, old_f.val( v, 0.25+0.5*num) );
-                            edgep->Unknowns.SetUnkRecieved( idx);
+                            edgep->Unknowns.SetUnkReceived( idx);
                         }
 #endif
                     }
@@ -1395,7 +1395,7 @@ RepairOnChildren( const TetraCL& t,  const P2T& old_f, VecDesc& vecdesc)
 #else
                         if (TryGetValuesOnEdge(old_idx,  f, *edgep, dof0, dof1) ){
                             f.SetDoF( *edgep, 0.5*(dof0+dof1));
-                            edgep->Unknowns.SetUnkRecieved( idx);
+                            edgep->Unknowns.SetUnkReceived( idx);
                         }
 #endif
                     }
@@ -1414,7 +1414,7 @@ RepairOnChildren( const TetraCL& t,  const P2T& old_f, VecDesc& vecdesc)
                     {
                         f.SetDoF( *edgep, old_f.val( v, edgebary[pos][0], edgebary[pos][1]));
 #ifdef _PAR
-                        edgep->Unknowns.SetUnkRecieved( idx);
+                        edgep->Unknowns.SetUnkReceived( idx);
 #endif
                     }
                     else { // These are complicated; the parent-face was refined and
@@ -1430,7 +1430,7 @@ RepairOnChildren( const TetraCL& t,  const P2T& old_f, VecDesc& vecdesc)
 
                         if (TryGetValuesOnEdge(old_idx,  f, *edgep, dof0, dof1) ){
                             f.SetDoF( *edgep, 0.5*(dof0+dof1));
-                            edgep->Unknowns.SetUnkRecieved( idx);
+                            edgep->Unknowns.SetUnkReceived( idx);
                         }
 #endif
                     }
@@ -1446,7 +1446,7 @@ RepairOnChildren( const TetraCL& t,  const P2T& old_f, VecDesc& vecdesc)
                     if (TryGetValuesOnTetra( old_f, f, v, t))
                     {
                         f.SetDoF( *edgep, old_f.val( v, 0.25, 0.25, 0.25));
-                        edgep->Unknowns.SetUnkRecieved( idx);
+                        edgep->Unknowns.SetUnkReceived( idx);
                     }
 #endif
                     else {
@@ -1456,7 +1456,7 @@ RepairOnChildren( const TetraCL& t,  const P2T& old_f, VecDesc& vecdesc)
 #else
                         if (TryGetValuesOnEdge(old_idx,  f, *edgep, dof0, dof1) ){
                             f.SetDoF( *edgep, 0.5*(dof0+dof1));
-                            edgep->Unknowns.SetUnkRecieved( idx);
+                            edgep->Unknowns.SetUnkReceived( idx);
                         }
 #endif
                     }
@@ -1562,7 +1562,7 @@ RepairAfterRefineP2( const P2T& old_f, VecDesc& vecdesc)
 #ifndef _PAR
             && !sit->Unknowns.Exist( old_idx)
 #else
-            && !sit->Unknowns.UnkRecieved(idx)
+            && !sit->Unknowns.UnkReceived(idx)
 #endif
             && !bnd->IsOnDirBnd( *sit))
         {
@@ -1582,7 +1582,7 @@ RepairAfterRefineP2( const P2T& old_f, VecDesc& vecdesc)
                 dof1=ParMultiGridCL::GetDof<VertexCL, DataT>()(*sit->GetVertex(1), old_idx);
 
             f.SetDoF( *sit, 0.5*(dof0+dof1));
-            sit->Unknowns.SetUnkRecieved(idx);
+            sit->Unknowns.SetUnkReceived(idx);
 #endif
         }
     }

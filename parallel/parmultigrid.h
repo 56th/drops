@@ -317,7 +317,7 @@ class ParMultiGridCL
     inline void SendUnknowns(SimplexT*, TypeT, void*, int);       // Send Unknwons within the Handler<SimplexT>Gather
     template<class SimplexT>
     inline void RecvUnknowns(SimplexT*, TypeT, void*, int);       // Recieve Unknwons within the Handler<SimplexT>Gather
-    void EnlargeRecieveBuffer();                                     // Enlarge the _RecvBuf
+    void EnlargeReceiveBuffer();                                     // Enlarge the _RecvBuf
     //@}
 
 
