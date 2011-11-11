@@ -26,26 +26,25 @@ namespace DROPS{
 namespace DiST{
 namespace Helper{
 
-/// \brief operator << for SendStreamCL
 template<typename T>
-MPIostreamCL& operator<< (MPIostreamCL& os, const T& t)
+inline MPIostreamCL& MPIostreamCL::write_fundamental_type (const T& t)
 {
-    if (os.isBinary())
-        os.write( reinterpret_cast<const char*>( &t), sizeof( T));
+    if (isBinary())
+        this->write( reinterpret_cast<const char*>( &t), sizeof( T));
     else
-        static_cast<MPIostreamCL::base_type&>( os) << t << SendRecvStreamAsciiTerminatorC;
+        static_cast<MPIostreamCL::base_type&>( *this) << t << SendRecvStreamAsciiTerminatorC;
 
-    return os;
+    return *this;
 }
 
 /// \brief operator >> for RecvStreamCL
 template<typename T>
-MPIistreamCL& operator>> (MPIistreamCL& is, T& t)
+inline MPIistreamCL& MPIistreamCL::read_fundamental_type (T& t)
 {
-    if (is.isBinary())
-        is.read( reinterpret_cast<char*>( &t), sizeof(T));
+    if (isBinary())
+        this->read( reinterpret_cast<char*>( &t), sizeof(T));
     else {
-        MPIistreamCL::base_type& istr= static_cast<MPIistreamCL::base_type&>( is);
+        MPIistreamCL::base_type& istr= static_cast<MPIistreamCL::base_type&>( *this);
         istr >> t;
         MPIistreamCL::char_type c= SendRecvStreamAsciiTerminatorC; // Initialisation: If the stream is not good(), nothing is read. Do not fail due to not reading at all. For extra credit: Check, if !good() is due to the previous read.
         istr.get( c);
@@ -53,7 +52,7 @@ MPIistreamCL& operator>> (MPIistreamCL& is, T& t)
             throw DROPSErrCL( "MPIistreamCL& operator>>( MPIistreamCL& is, T& t):"
                 "Ascii item-terminator not found.\n");
     }
-    return is;
+    return *this;
 }
 
 

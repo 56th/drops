@@ -92,6 +92,9 @@ class MPIostreamCL : public std::ostream
   private:
     bool binary_; ///< flag for binary sending/receiving
 
+    template <class T>
+      inline MPIostreamCL& write_fundamental_type (const T& t);
+
   public:
     typedef std::ostream base_type;
 
@@ -100,6 +103,29 @@ class MPIostreamCL : public std::ostream
 
     inline bool isBinary ()             const { return binary_; }
     inline void setBinary (bool binary)       { binary_= binary; }
+
+    /// \brief Output of C++'s arithmetic types
+    ///@{
+    MPIostreamCL& operator<< (bool val)          { return write_fundamental_type( val); }
+    MPIostreamCL& operator<< (short val)         { return write_fundamental_type( val); }
+    MPIostreamCL& operator<< (unsigned short val){ return write_fundamental_type( val); }
+    MPIostreamCL& operator<< (int val)           { return write_fundamental_type( val); }
+    MPIostreamCL& operator<< (unsigned int val)  { return write_fundamental_type( val); }
+    MPIostreamCL& operator<< (long val)          { return write_fundamental_type( val); }
+    MPIostreamCL& operator<< (unsigned long val) { return write_fundamental_type( val); }
+    MPIostreamCL& operator<< (float val)         { return write_fundamental_type( val); }
+    MPIostreamCL& operator<< (double val)        { return write_fundamental_type( val); }
+    MPIostreamCL& operator<< (long double val)   { return write_fundamental_type( val); }
+    MPIostreamCL& operator<< (const void* val)   { return write_fundamental_type( val); }
+    ///@}
+    /// \brief Output of single char.
+    /// These are global functions for std::ostream. There seems to be no good reason for this.
+    ///@{
+    MPIostreamCL& operator<< (char val)          { return write_fundamental_type( val); }
+    MPIostreamCL& operator<< (signed char val)   { return write_fundamental_type( val); };
+    MPIostreamCL& operator<< (unsigned char val) { return write_fundamental_type( val); }
+    ///@}
+    // MPIostreamCL& operator<< (streambuf* sb); // Implement, if needed.
 };
 
 /// \brief Input stream.
@@ -113,6 +139,9 @@ class MPIistreamCL : public std::istream
   private:
     bool binary_;        ///< flag for binary sending/receiving
 
+    template <class T>
+      inline MPIistreamCL& read_fundamental_type (T& t);
+
   public:
     typedef std::istream base_type;
 
@@ -121,6 +150,29 @@ class MPIistreamCL : public std::istream
 
     inline bool isBinary ()             const { return binary_; }
     inline void setBinary (bool binary)       { binary_= binary; }
+
+    /// \brief Input of C++'s arithmetic types
+    ///@{
+    MPIistreamCL& operator>> (bool& val)          { return read_fundamental_type( val); }
+    MPIistreamCL& operator>> (short& val)         { return read_fundamental_type( val); }
+    MPIistreamCL& operator>> (unsigned short& val){ return read_fundamental_type( val); }
+    MPIistreamCL& operator>> (int& val)           { return read_fundamental_type( val); }
+    MPIistreamCL& operator>> (unsigned int& val)  { return read_fundamental_type( val); }
+    MPIistreamCL& operator>> (long& val)          { return read_fundamental_type( val); }
+    MPIistreamCL& operator>> (unsigned long& val) { return read_fundamental_type( val); }
+    MPIistreamCL& operator>> (float& val)         { return read_fundamental_type( val); }
+    MPIistreamCL& operator>> (double& val)        { return read_fundamental_type( val); }
+    MPIistreamCL& operator>> (long double& val)   { return read_fundamental_type( val); }
+    MPIistreamCL& operator>> (void*& val)         { return read_fundamental_type( val); }
+    ///@}
+    /// \brief Input of single char.
+    /// These are global functions for std::istream. There seems to be no good reason for this.
+    ///@{
+    MPIistreamCL& operator>> (char& val)          { return read_fundamental_type( val); }
+    MPIistreamCL& operator>> (signed char& val)   { return read_fundamental_type( val); };
+    MPIistreamCL& operator>> (unsigned char& val) { return read_fundamental_type( val); }
+    ///@}
+    // MPIistreamCL& operator>> (streambuf* sb); // Implement, if needed.
 };
 
 
