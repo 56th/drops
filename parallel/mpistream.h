@@ -126,6 +126,8 @@ class MPIostreamCL : public std::ostream
     MPIostreamCL& operator<< (unsigned char val) { return write_fundamental_type( val); }
     ///@}
     // MPIostreamCL& operator<< (streambuf* sb); // Implement, if needed.
+
+    MPIostreamCL& write (const char* s , std::streamsize n) { base_type::write( s, n); return *this; }
 };
 
 /// \brief Input stream.
@@ -173,6 +175,9 @@ class MPIistreamCL : public std::istream
     MPIistreamCL& operator>> (unsigned char& val) { return read_fundamental_type( val); }
     ///@}
     // MPIistreamCL& operator>> (streambuf* sb); // Implement, if needed.
+
+    MPIistreamCL& read (char* s, std::streamsize n ) { base_type::read( s, n); return *this; }
+
 };
 
 
@@ -393,6 +398,9 @@ RefMPIistreamCL& operator>> (RefMPIistreamCL& is,       RefMPIistreamCL& sub);
 
 /// \brief input/output of C-strings and std::string.
 /// @{
+MPIostreamCL& write_char_array (MPIostreamCL& os,
+    const MPIostreamCL::char_type* p, std::streamsize n);
+
 inline MPIostreamCL& operator<< (MPIostreamCL& os, const          char* s);
 inline MPIostreamCL& operator<< (MPIostreamCL& os, const signed   char* s);
 inline MPIostreamCL& operator<< (MPIostreamCL& os, const unsigned char* s);

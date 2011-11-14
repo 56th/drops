@@ -176,22 +176,35 @@ bool RemoteDataCL::IsSane( std::ostream& os) const
 
 MPIostreamCL& operator<< (MPIostreamCL& os, const RemoteDataCL::ProcListT& pl)
 {
-    os << pl.size();
-    for (RemoteDataCL::ProcListT::const_iterator it= pl.begin(), end= pl.end(); it != end; ++it)
-        os << static_cast<int>( it->proc) << static_cast<int>( it->prio);
+    if (os.isBinary())
+        write_char_array( os, reinterpret_cast<const char*>( &pl[0]),
+                          pl.size()*sizeof( RemoteDataCL::ProcListEntryCL));
+    else {
+        os << pl.size();
+        for (RemoteDataCL::ProcListT::const_iterator it= pl.begin(), end= pl.end(); it != end; ++it)
+            os << static_cast<int>( it->proc) << static_cast<int>( it->prio);
+    }
     return os;
 }
 
 MPIistreamCL& operator>> (MPIistreamCL& is, RemoteDataCL::ProcListT& pl)
 {
-    size_t num;
-    is >> num;
     pl.clear();
-    pl.reserve( num);
-    int proc, prio;
-    for (size_t i= 0; i < num; ++i) {
-        is >> proc >> prio;
-        pl.push_back( RemoteDataCL::ProcListEntryCL( proc, Priority( prio)));
+    if (is.isBinary()) {
+        std::streamsize num_char;
+        is >> num_char;
+        pl.resize( num_char/sizeof( RemoteDataCL::ProcListEntryCL));
+        is.read( reinterpret_cast<char*>( &pl[0]), num_char);
+    }
+    else {
+        size_t num;
+        is >> num;
+        pl.reserve( num);
+        int proc, prio;
+        for (size_t i= 0; i < num; ++i) {
+            is >> proc >> prio;
+            pl.push_back( RemoteDataCL::ProcListEntryCL( proc, Priority( prio)));
+        }
     }
     return is;
 }

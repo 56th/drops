@@ -80,9 +80,6 @@ template <Uint rows>
 }
 
 
-MPIostreamCL& write_char_array (MPIostreamCL& os,
-    const MPIostreamCL::char_type* p, std::streamsize n);
-
 inline MPIostreamCL& operator<< (MPIostreamCL& os, const char* s)
 {
     return write_char_array( os, s, std::strlen( s));
