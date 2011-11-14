@@ -185,10 +185,10 @@ MPIostreamCL& operator<< (MPIostreamCL& os, const RemoteDataCL::ProcListT& pl)
 MPIistreamCL& operator>> (MPIistreamCL& is, RemoteDataCL::ProcListT& pl)
 {
     size_t num;
-    int proc, prio;
     is >> num;
     pl.clear();
     pl.reserve( num);
+    int proc, prio;
     for (size_t i= 0; i < num; ++i) {
         is >> proc >> prio;
         pl.push_back( RemoteDataCL::ProcListEntryCL( proc, Priority( prio)));

@@ -55,16 +55,27 @@ inline MPIistreamCL& MPIistreamCL::read_fundamental_type (T& t)
     return *this;
 }
 
-
-inline MPIostreamCL& operator<< (MPIostreamCL& os, const Point3DCL& h)
+template <Uint rows>
+  inline MPIostreamCL&
+  operator<< (MPIostreamCL& os, const SVectorCL<rows>& p)
 {
-    os << h[0] << h[1] << h[2];
+    if (os.isBinary())
+        os.write( reinterpret_cast<const char*>( &p), sizeof( SVectorCL<rows>));
+    else
+        for (Uint i= 0; i < rows; ++i)
+            os << p[i];
     return os;
 }
 
-inline MPIistreamCL& operator>> (MPIistreamCL& is, Point3DCL& h)
+template <Uint rows>
+  inline MPIistreamCL&
+  operator>> (MPIistreamCL& is, SVectorCL<rows>& p)
 {
-    is >> h[0] >> h[1] >> h[2];
+    if (is.isBinary())
+        is.read( reinterpret_cast<char*>( &p), sizeof( SVectorCL<rows>));
+    else
+        for (Uint i= 0; i < rows; ++i)
+            is >> p[i];
     return is;
 }
 

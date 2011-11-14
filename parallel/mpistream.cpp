@@ -126,26 +126,22 @@ std::streamsize MPIrefbufCL::xsputnb(const char_type* p, std::streamsize n)
 
 MPIostreamCL& operator<< (MPIostreamCL& os, const GeomIdCL& h)
 {
-    os << h.level << h.bary[0] << h.bary[1] << h.bary[2] << h.dim;
+    os << h.level << h.bary << h.dim;
     return os;
 }
 
 MPIistreamCL& operator>> (MPIistreamCL& is, GeomIdCL& h)
 {
-    is >> h.level >> h.bary[0] >> h.bary[1] >> h.bary[2] >> h.dim;
+    is >> h.level >> h.bary >> h.dim;
     return is;
 }
 
 
-inline std::streamsize terminated_header_size ()
-{
-    return std::numeric_limits<std::streamsize>::digits10 + 2;
-}
-
 std::string terminated_array_header( std::streamsize n)
 {
+    const std::streamsize terminated_header_size= std::numeric_limits<std::streamsize>::digits10 + 2;
     std::ostringstream s;
-    s.width( terminated_header_size() - 1);
+    s.width( terminated_header_size - 1);
     s.fill( '0');
     s << n << SendRecvStreamAsciiTerminatorC;
     return s.str();

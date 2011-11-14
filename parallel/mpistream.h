@@ -122,7 +122,7 @@ class MPIostreamCL : public std::ostream
     /// These are global functions for std::ostream. There seems to be no good reason for this.
     ///@{
     MPIostreamCL& operator<< (char val)          { return write_fundamental_type( val); }
-    MPIostreamCL& operator<< (signed char val)   { return write_fundamental_type( val); };
+    MPIostreamCL& operator<< (signed char val)   { return write_fundamental_type( val); }
     MPIostreamCL& operator<< (unsigned char val) { return write_fundamental_type( val); }
     ///@}
     // MPIostreamCL& operator<< (streambuf* sb); // Implement, if needed.
@@ -169,7 +169,7 @@ class MPIistreamCL : public std::istream
     /// These are global functions for std::istream. There seems to be no good reason for this.
     ///@{
     MPIistreamCL& operator>> (char& val)          { return read_fundamental_type( val); }
-    MPIistreamCL& operator>> (signed char& val)   { return read_fundamental_type( val); };
+    MPIistreamCL& operator>> (signed char& val)   { return read_fundamental_type( val); }
     MPIistreamCL& operator>> (unsigned char& val) { return read_fundamental_type( val); }
     ///@}
     // MPIistreamCL& operator>> (streambuf* sb); // Implement, if needed.
@@ -360,25 +360,21 @@ class RefMPIistreamCL : public MPIistreamCL
 const char SendRecvStreamAsciiTerminatorC= ' ';
 
 
-/// \brief operator << for SendStreamCL
-template<typename T>
-MPIostreamCL& operator<< (MPIostreamCL& os, const T& t);
-
-/// \brief operator >> for RecvStreamCL
-template<typename T>
-MPIistreamCL& operator>> (MPIistreamCL& is, T& t);
-
-
 /// \brief input/output of GeomIdCL
 /// @{
 MPIostreamCL& operator<< (MPIostreamCL&, const GeomIdCL&);
 MPIistreamCL& operator>> (MPIistreamCL&,       GeomIdCL&);
 ///@}
 
-/// \brief input/output of Point3DCL
+/// \brief input/output of SVectorCL (Point2DCL, Point3DCL, BaryCoordCL)
 /// @{
-MPIostreamCL& operator<< (MPIostreamCL&, const Point3DCL&);
-MPIistreamCL& operator>> (MPIistreamCL&,       Point3DCL&);
+template <Uint rows>
+  inline MPIostreamCL&
+  operator<< (MPIostreamCL& os, const SVectorCL<rows>& p);
+
+template <Uint rows>
+  inline MPIistreamCL&
+  operator>> (MPIistreamCL& is, SVectorCL<rows>& p);
 ///@}
 
 ///\brief input/output of MPIstreamCL as a sub-object of an MPIi/ostreamCL.

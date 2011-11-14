@@ -261,6 +261,12 @@ class RemoteDataCL
     //@}
 };
 
+/// \brief MPI-IO of ProcListT
+///@{
+MPIostreamCL& operator<< (MPIostreamCL& os, const RemoteDataCL::ProcListT& pl);
+MPIistreamCL& operator>> (MPIistreamCL& is,       RemoteDataCL::ProcListT& pl);
+///@}
+
 /// \brief Container to store a RemoteDataCL object for each distributed geometric entity of type SimplexT.
 /** This constitutes the main data structure for the DiST module. However, this is not designed to act as an
     interface to drops. Each access should be done via the functions in the DiST namespace.
