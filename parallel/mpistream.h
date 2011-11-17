@@ -361,6 +361,25 @@ class RefMPIistreamCL : public MPIistreamCL
     ///@}
 };
 
+/// \brief MPI-output-stream with MPIstringbufCL-buffer
+/// This stream is employed for formatting and buffering outgoing MPI-streams.
+/// Copy and assignment have value-semantics, i.e., the buffer contents are copied/assigned.
+class SerialOFStreamCL : public MPIostreamCL
+{
+  public:
+    typedef MPIostreamCL base_type;
+
+  private:
+    std::filebuf buf_; ///< string based output-buffer
+
+  public:
+    explicit SerialOFStreamCL (const char * s, bool binary= use_binaryMPIstreams)
+        : base_type( &buf_, binary) { buf_.open(s, std::ios_base::out); }
+    explicit SerialOFStreamCL (const std::string s, bool binary= use_binaryMPIstreams)
+        : base_type( &buf_, binary) { buf_.open( s.c_str(), std::ios_base::out); }
+};
+
+
 /// \brief The data-item-terminator used in ascii-mode.
 const char SendRecvStreamAsciiTerminatorC= ' ';
 
