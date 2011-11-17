@@ -34,6 +34,8 @@
 #include <fstream>
 #include <iomanip>
 #include "geom/builder.h"
+#include "parallel/DiST.h"
+#include "parallel/mpistream.h"
 
 namespace DROPS
 {
@@ -1878,33 +1880,16 @@ void FileBuilderCL::CheckFile( const std::ifstream& is) const
 *   M G S E R I A L I Z A T I O N   C L                           *
 *******************************************************************/
 
-template<class itT, class T>
-void MGSerializationCL::GetAddr (itT b, itT e, std::map<T, size_t> &m)
-{
-    int i=1;
-    for (itT it=b; it != e; ++it, ++i)
-        m[&*it]=i;
-}
-
 void MGSerializationCL::WriteEdges()
 {
     std::string filename= path_+"Edges";
 #ifdef _PAR
     ProcCL::AppendProcNum( filename);
 #endif
-    std::ofstream edge_file( filename.c_str());
+    DiST::Helper::SerialOFStreamCL edge_file( filename);
     CheckFile(edge_file);
-    int i=0;
-    for (MultiGridCL::EdgeIterator p=mg_.GetAllEdgeBegin(); p!=mg_.GetAllEdgeEnd(); ++p, ++i) {
-        if (i!=0) edge_file << '\n';
-        edge_file << vertexAddressMap[p->GetVertex(0)]   << " " << vertexAddressMap[p->GetVertex(1)] << " "
-                  << vertexAddressMap[p->GetMidVertex()] << " " << *p->GetBndIdxBegin()        << " "
-                  << *(p->GetBndIdxBegin() + 1)          << " " << p->GetMFR()                 << " "
-                  << p->GetLevel()                       << " " << p->IsMarkedForRemovement();
-#ifdef _PAR
-        edge_file << ' ' << p->GetAccMFR();
-        WriteParInfo<EdgeCL>( edge_file, *p);
-#endif
+    for (MultiGridCL::EdgeIterator p=mg_.GetAllEdgeBegin(); p!=mg_.GetAllEdgeEnd(); ++p) {
+    	edge_file << *p;
     }
     CheckFile(edge_file);
 }
@@ -1915,116 +1900,65 @@ void MGSerializationCL::WriteFaces()
 #ifdef _PAR
     ProcCL::AppendProcNum( filename);
 #endif
-    std::ofstream face_file( filename.c_str());
+    DiST::Helper::SerialOFStreamCL face_file( filename);
     CheckFile(face_file);
-    int i=0;
-    for (MultiGridCL::FaceIterator p=mg_.GetAllFaceBegin(); p!=mg_.GetAllFaceEnd(); ++p, ++i) {
-        if (i!=0) face_file << '\n';
-        face_file << tetraAddressMap[p->GetNeighbor(0)]   << " " << tetraAddressMap[p->GetNeighbor(1)] << " "
-                  << tetraAddressMap[p->GetNeighbor(2)]   << " " << tetraAddressMap[p->GetNeighbor(3)] << " "
-                  << p->GetBndIdx()                       << " " << p->GetLevel()               << " "
-                  << p->IsMarkedForRemovement();
-#ifdef _PAR
-        WriteParInfo<FaceCL>( face_file, *p);
-#endif
+    for (MultiGridCL::FaceIterator p=mg_.GetAllFaceBegin(); p!=mg_.GetAllFaceEnd(); ++p) {
+        face_file << *p;
     }
     CheckFile(face_file);
 }
 
 void MGSerializationCL::WriteVertices()
 {
-    std::string vertex_filename= path_+"Vertices",
-                bndvtx_filename= path_+"BoundaryVertices";
+    std::string vertex_filename= path_+"Vertices";
 #ifdef _PAR
     ProcCL::AppendProcNum( vertex_filename);
-    ProcCL::AppendProcNum( bndvtx_filename);
 #endif
-    std::ofstream vertex_file( vertex_filename.c_str());
-    std::ofstream bndvtx_file( bndvtx_filename.c_str());
+    DiST::Helper::SerialOFStreamCL vertex_file( vertex_filename);
     CheckFile(vertex_file);
-    CheckFile(bndvtx_file);
-    int i=0, j=0;
-    for (MultiGridCL::VertexIterator p=mg_.GetAllVertexBegin(); p!=mg_.GetAllVertexEnd(); ++p, ++i) {
-        if (i!=0) vertex_file << '\n';
-        vertex_file << p->GetId().GetIdent() << " " << std::scientific << std::setprecision(16)
-                    << p->GetCoord() //<< " "
-                    << p->GetLevel()         << " " << p->IsMarkedForRemovement();// <<'\n';
-        if (p->IsOnBoundary()) {
-            for (VertexCL::const_BndVertIt it= p->GetBndVertBegin(); it != p->GetBndVertEnd(); ++it, ++j) {
-                if (j!=0) bndvtx_file << '\n';
-                bndvtx_file << vertexAddressMap[&*p] << " " << it->GetBndIdx() << " "
-                            << std::scientific << std::setprecision(16) << it->GetCoord2D()[0] << " " << it->GetCoord2D()[1];
-            }
-        }
-#ifdef _PAR
-        WriteParInfo<VertexCL>( vertex_file, *p);
-#endif
+    for (MultiGridCL::VertexIterator p=mg_.GetAllVertexBegin(); p!=mg_.GetAllVertexEnd(); ++p) {
+        vertex_file << *p;
     }
     CheckFile(vertex_file);
-    CheckFile(bndvtx_file);
 }
 
 void MGSerializationCL::WriteTetras()
 {
     std::string tetra_filename= path_+"Tetras";
-    std::string cild_filename = path_+"Children";
 #ifdef _PAR
     ProcCL::AppendProcNum(tetra_filename);
-    ProcCL::AppendProcNum(cild_filename);
 #endif
-    std::ofstream tetra_file (tetra_filename.c_str());
-    std::ofstream child_file (cild_filename.c_str());
+    DiST::Helper::SerialOFStreamCL tetra_file (tetra_filename);
 
     CheckFile(tetra_file);
-    CheckFile(child_file);
-
-    bool start=true, child_start=true;
     for (MultiGridCL::TetraIterator p=mg_.GetAllTetraBegin(); p!=mg_.GetAllTetraEnd(); ++p) {
-        if (!start) tetra_file << '\n';
-        tetra_file << p->GetId().GetIdent()             << " " << p->GetLevel() << " "
-                   << p->GetRefRule()                   << " " << p->GetRefMark() << " "
-                   << vertexAddressMap[p->GetVertex(0)] << " " << vertexAddressMap[p->GetVertex(1)] << " "
-                   << vertexAddressMap[p->GetVertex(2)] << " " << vertexAddressMap[p->GetVertex(3)] << " "
-                   << edgeAddressMap[p->GetEdge(0)]     << " " << edgeAddressMap[p->GetEdge(1)] << " "
-                   << edgeAddressMap[p->GetEdge(2)]     << " " << edgeAddressMap[p->GetEdge(3)] << " "
-                   << edgeAddressMap[p->GetEdge(4)]     << " " << edgeAddressMap[p->GetEdge(5)] << " "
-                   << faceAddressMap[p->GetFace(0)]     << " " << faceAddressMap[p->GetFace(1)] << " "
-                   << faceAddressMap[p->GetFace(2)]     << " " << faceAddressMap[p->GetFace(3)] << " "
-                   << tetraAddressMap[p->GetParent()];
-        if (!p->IsUnrefined()
-#ifdef _PAR
-                && !p->HasGhost()   // if ghost is stored by another proc, then the ghost stores the access to the children
-#endif
-            ) {
-            if (!child_start) child_file << '\n';
-            else child_start=false;
-            child_file << tetraAddressMap[&*p] << " ";
-            for (Uint i=0; i<MaxChildrenC - 1; ++i) {
-                child_file << tetraAddressMap[p->GetChild(i)] << " ";
-            }
-            child_file << tetraAddressMap[p->GetChild(MaxChildrenC - 1)];
-        }
-#ifdef _PAR
-        WriteParInfo<TetraCL>( tetra_file, *p);
-#endif
-        start=false;
+        tetra_file << *p;
     }
     CheckFile(tetra_file);
-    CheckFile(child_file);
 }
 
-void MGSerializationCL::CreateAddrMaps()
+#ifdef _PAR
+void MGSerializationCL::WriteRemoteDataLists()
 {
-    GetAddr (mg_.GetAllEdgeBegin(),   mg_.GetAllEdgeEnd(),     edgeAddressMap);
-    GetAddr (mg_.GetAllVertexBegin(), mg_.GetAllVertexEnd(), vertexAddressMap);
-    GetAddr (mg_.GetAllFaceBegin(),   mg_.GetAllFaceEnd(),     faceAddressMap);
-    GetAddr (mg_.GetAllTetraBegin(),  mg_.GetAllTetraEnd(),   tetraAddressMap);
+    std::string remotedata_filename= path_+"RemoteData";
+#ifdef _PAR
+    ProcCL::AppendProcNum(remotedata_filename);
+#endif
+    DiST::Helper::SerialOFStreamCL remotedata_file( remotedata_filename);
+    for (int i =0; i<4; ++i) {
+        DiST::Helper::RemoteDataListCL& list = DiST::InfoCL::InstancePtr()->GetRemoteList(i);
+        for (DiST::Helper::RemoteDataListCL::const_iterator it = list.begin(); it != list.end(); ++it){
+        	remotedata_file << it->first << it->second.GetLocalObject().GetGID();
+        	for (DiST::Helper::RemoteDataCL::ProcListT::const_iterator rit = it->second.GetProcListBegin(); rit != it->second.GetProcListEnd(); ++rit)
+        		remotedata_file << rit->proc << rit->prio;
+        	remotedata_file << it->second.GetOwnerProc();
+        }
+    }
 }
+#endif
 
 void MGSerializationCL::WriteMG()
 {
-    CreateAddrMaps();
-
     // Write vertices
     std::cout << "Writing Vertices ";
     WriteVertices();
@@ -2044,9 +1978,16 @@ void MGSerializationCL::WriteMG()
     std::cout << "Writing Faces ";
     WriteFaces();
     std::cout << "--> success\n";
+
+#ifdef _PAR
+    // Write RemoteDataLists
+    std::cout << "Writing Information for DiST";
+    WriteRemoteDataLists();
+    std::cout << "--> success\n";
+#endif
 }
 
-void MGSerializationCL::CheckFile( const std::ofstream& os) const
+void MGSerializationCL::CheckFile( const std::ostream& os) const
 {
     if (!os) throw DROPSErrCL( "MGSerializationCL: error while opening file!");
 }

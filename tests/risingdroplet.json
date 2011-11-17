@@ -78,7 +78,7 @@
 "# adaptive refinement",
 
 		"Freq":		0,
-		"FinestLevel":		1,
+		"FinestLevel":		0,
 		"CoarsestLevel":		0,
 		"Width":		0.4e-3,
 		"LoadBalStrategy":		1,
@@ -185,11 +185,11 @@
 		"_comment":
 "# Write out results, read in for restart",
 
-		"Serialization":		0,
+		"Serialization":		1,
 		"Overwrite":		0,
 		"Inputfile":		"none",
-		"Outputfile":		"mg",
-		"Binary":		0
+		"Outputfile":		"mg/data",
+		"Binary":		1
 	},
 
 	"DomainCond":

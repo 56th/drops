@@ -523,29 +523,15 @@ class MGSerializationCL
     // Path or File-Prefix
     std::string  path_;
 
-    // Addr <-> Int
-    std::map<const EdgeCL*,   size_t>   edgeAddressMap;
-    std::map<const VertexCL*, size_t> vertexAddressMap;
-    std::map<const FaceCL*,   size_t>   faceAddressMap;
-    std::map<const TetraCL*,  size_t>  tetraAddressMap;
-
-    template<class itT, class T>
-    void GetAddr (itT b, itT e, std::map<T, size_t> &m);
-
-    void CreateAddrMaps ();
-
-    // Writing-Routines
-#ifdef _PAR
-    /// \brief Write information about distribution
-    template <typename SimplexT>
-    void WriteParInfo(std::ofstream& os, const SimplexT&) const;
-#endif
     void WriteEdges    ();
     void WriteFaces    ();
     void WriteVertices ();
     void WriteTetras   ();
+#ifdef _PAR
+    void WriteRemoteDataLists();
+#endif
 
-    void CheckFile( const std::ofstream& os) const;
+    void CheckFile( const std::ostream& os) const;
 
   public:
     MGSerializationCL (MultiGridCL& mg, std::string path) : mg_(mg), path_(path) {}
@@ -579,23 +565,7 @@ template <typename SimplexT>
             Assert( distProc!=ProcCL::MyRank(), DROPSErrCL("FileBuilderCL::ReadParInfo: Cannot identify with myself"), DebugParallelC);
             DynamicDataInterfaceCL::IdentifyNumber( s.GetHdr(), distProc, oldGid);
         }
-    }
-    */
-}
-
-template <typename SimplexT>
-  void MGSerializationCL::WriteParInfo(std::ofstream& , const SimplexT& ) const
-{
-    throw DROPSErrCL("FileBuilderCL::ReadParInfo: Only DDD conform");
-/*
-    os << ' ' << s.GetPrio() << ' ' << s.GetNumDist()-1;
-    if ( !s.IsLocal()){
-        os << ' ' << s.GetGID();
-        for (const int* proclist= s.GetProcList(); *proclist!=-1; proclist+=2)
-            if ( *proclist!=ProcCL::MyRank())
-                os << ' ' << (*proclist);
-    }
-*/
+    }*/
 }
 #endif
 

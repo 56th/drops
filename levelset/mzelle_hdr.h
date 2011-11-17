@@ -499,8 +499,8 @@ class TwoPhaseStoreCL
             WriteTime( filename.str() + "time");
 
         // write multigrid
-//        MGSerializationCL ser( mg_, filename.str());
-//        ser.WriteMG();
+        MGSerializationCL ser( mg_, filename.str());
+        ser.WriteMG();
 
         // write numerical data
         VecDescCL vel= Stokes_.v;
