@@ -1153,6 +1153,7 @@ void ExchangeBuilderCL::buildViaOwner()
     BuildRecvBuffer();
 }
 
+/// \todo Remember in one loop size of the buffers, then resize the buffers
 void ExchangeBuilderCL::BuildRecvBuffer()
 {
     ex_.xBuf_.resize( std::max( ex_.recvListPhase2_.size(), ex_.recvListPhase1_.size()));
@@ -1220,7 +1221,9 @@ void ExchangeBuilderCL::HandlerDOFExchangeCL::collectDOF()
 
 void ExchangeBuilderCL::HandlerDOFExchangeCL::buildSendStructures(
     ExchangeCL::SendListT& ex_sendlist)
-/** Create the MPI datatype for all neighbors for sending. */
+/** Create the MPI datatype for all neighbors for sending. 
+    \todo NumUnknownsVertex is used to specify number of unknowns!
+*/
 {
     // Create the data types
     SendDOFListT::const_iterator it;
@@ -1229,7 +1232,7 @@ void ExchangeBuilderCL::HandlerDOFExchangeCL::buildSendStructures(
         if ( toproc!=ProcCL::MyRank()){
             ex_sendlist.push_back( SendNumDataCL<double>(toproc));
             const int count= static_cast<int>(it->second.size());
-            const int bl   = static_cast<int>( rowidx_.NumUnknownsVertex());
+            const int bl   = static_cast<int>( rowidx_.NumUnknownsVertex());    // Change Me!
             const int* ad  = Addr( it->second);
             ex_sendlist.back().CreateDataType( count, bl, ad);
         }
