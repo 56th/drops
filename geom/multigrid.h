@@ -66,7 +66,7 @@ class TriangCL
     TriangCL (MultiGridCL& mg);
 
     void clear () { triang_.clear(); }
-    Uint size  (int lvl= -1) const
+    size_t size  (int lvl= -1) const
         { MaybeCreate( lvl); return triang_[StdIndex( lvl)].size() - 1; }
 
     ptr_iterator begin (int lvl= -1)
