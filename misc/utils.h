@@ -39,8 +39,6 @@
 #  include <windows.h>
 #  undef max
 #  undef min
-#  include <unordered_map>
-#  define DROPS_STD_UNORDERED_MAP std::unordered_map
 #else
 #  include <sys/time.h>
 #  include <sys/resource.h>

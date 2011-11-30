@@ -113,8 +113,8 @@ class RepairP2CL
     typedef ValueT value_type;
 
   private:
-    typedef std::tr1::unordered_map<const TetraCL*, RepairP2DataCL<value_type> > RepairMapT;
-    typedef std::tr1::unordered_set<const TetraCL*>                              TetraSetT;
+    typedef DROPS_STD_UNORDERED_MAP<const TetraCL*, RepairP2DataCL<value_type> > RepairMapT;
+    typedef DROPS_STD_UNORDERED_SET<const TetraCL*>                              TetraSetT;
 
     RepairMapT parent_data_;
     TetraSetT  level0_leaves_;

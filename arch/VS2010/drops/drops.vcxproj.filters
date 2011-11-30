@@ -579,6 +579,12 @@
     <ClInclude Include="..\..\..\num\renumber.h">
       <Filter>num</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\num\quadrature.h">
+      <Filter>num</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\num\fe_repair.h">
+      <Filter>num</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\levelset\adaptriang.tpp">
@@ -659,9 +665,6 @@
     <None Include="..\..\..\surfactant\ifacetransp.tpp">
       <Filter>surfactant</Filter>
     </None>
-    <None Include="..\..\..\parallel\DiST.tpp">
-      <Filter>parallel</Filter>
-    </None>
     <None Include="..\..\..\geom\simplex.tpp">
       <Filter>geom</Filter>
     </None>
@@ -694,6 +697,12 @@
     </None>
     <None Include="..\..\..\levelset\toluol.json">
       <Filter>levelset\param-files</Filter>
+    </None>
+    <None Include="..\..\..\num\quadrature.tpp">
+      <Filter>num</Filter>
+    </None>
+    <None Include="..\..\..\num\fe_repair.tpp">
+      <Filter>num</Filter>
     </None>
   </ItemGroup>
 </Project>

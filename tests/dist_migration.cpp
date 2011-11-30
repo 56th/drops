@@ -257,6 +257,8 @@ void CheckMigration( LoadBalHandlerCL& lb)
     std::cout << "Checking migration with unknowns ..." << std::endl;
     MultiGridCL& mg= lb.GetMG();
 
+    ParMultiGridCL::Instance().MarkSimplicesForUnknowns();
+
     // Create boundary conditions
     std::string perbndtypestr;
     std::string zerobndfun, zerovelbndfun;

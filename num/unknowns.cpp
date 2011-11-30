@@ -51,15 +51,16 @@ UnknownIdxCL& UnknownIdxCL::operator=( const UnknownIdxCL& rhs)
 
 /** This function put information---if existent---onto the sendstream. Therefore,
     it used the singleton ObservedVectorsCL. This function assumes the following
-    two conditions:
+    condition:
     \cond it is assumed, that all processes store the "same" observers, i.e.,
           same ordering of the vectors and indices
+    \todo 
     \param sendstream where to put the data
     \param t          the transferable object which is used to determine the number of unknowns
 */
 void UnknownHandleCL::Pack( DiST::Helper::MPIostreamCL& sendstream, const DiST::TransferableCL& t) const
 {
-    const double NoDataC= std::numeric_limits<double>::quiet_NaN();
+    const Uint NoIdxFlag= static_cast<Uint>(-1);                            // flag for sending/receiving no data
     if ( Exist()){
         sendstream << true;
         const ObservedMigrateFECL& observers= ObservedMigrateFECL::Instance();
@@ -71,12 +72,13 @@ void UnknownHandleCL::Pack( DiST::Helper::MPIostreamCL& sendstream, const DiST::
             // if there are unknowns, transfer them, otherwise, send NoDataC
             if ( Exist( idx)){
                 const IdxT dof= (*this)(idx);
+                sendstream << idx;
                 for ( Uint i=0; i<idx_desc->NumUnknownsSimplex( t); ++i){  // edges must have the same number of unknowns than vertices!
                     sendstream << (*vec)[dof+i];
                 }
             }
             else{
-                sendstream << NoDataC;    // flag, that the proc does not have a dof for that idx
+                sendstream << NoIdxFlag;        // flag, that the proc does not have a dof for that idx
             }
         }   // end of observer loop
     }
@@ -97,7 +99,8 @@ void UnknownHandleCL::Pack( DiST::Helper::MPIostreamCL& sendstream, const DiST::
 void UnknownHandleCL::UnPack( DiST::Helper::MPIistreamCL& recvstream, const DiST::TransferableCL& t)
 {
     bool unk_recv= false;
-    const double NoDataC= std::numeric_limits<double>::quiet_NaN(); // flag for sending/receiving no data
+    const Uint NoIdxFlag= static_cast<Uint>(-1);                    // flag for sending/receiving no data
+    Uint idx_recv= NoIdxFlag;
     double val_recv;                                                // buffer for receiving a DoF value
     recvstream >> unk_recv;
 
@@ -108,9 +111,13 @@ void UnknownHandleCL::UnPack( DiST::Helper::MPIistreamCL& recvstream, const DiST
             std::vector<double>& recvbuf = it->GetRecvBuffer();
             const Uint idx               = idx_desc->GetIdx();
             // Read the data ...
-            recvstream >> val_recv;
-            if ( val_recv!=NoDataC){    // OK, we are receiving 'good' data
+            recvstream >> idx_recv;
+            if ( idx_recv!=NoIdxFlag){    // OK, we are receiving 'good' data
                 // check for errors
+                Assert( idx==idx_recv, 
+                    DROPSErrCL("UnknownHandleCL::UnPack: Mismatch in received data!"), 
+                    DebugParallelNumC);
+ 
                 Assert( !Exist(idx),
                     DROPSErrCL("UnknownHandleCL::UnPack: Merging of received dof is not possible"),
                     DebugParallelNumC);
@@ -122,8 +129,7 @@ void UnknownHandleCL::UnPack( DiST::Helper::MPIistreamCL& recvstream, const DiST
                 // ... remember where the dofs are put
                 (*this)(idx)= recvbuf.size();
                 // ... and the store the received dofs in the buffer
-                recvbuf.push_back( val_recv);   // first value has already been received
-                for ( int i=0; i<(int)idx_desc->NumUnknownsSimplex( t)-1; ++i){
+                for ( int i=0; i<(int)idx_desc->NumUnknownsSimplex( t); ++i){
                     recvstream >> val_recv;
                     recvbuf.push_back( val_recv);
                 }
