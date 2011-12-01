@@ -1178,10 +1178,10 @@ void ExchangeBuilderCL::buildDirectComm()
     clearEx();
 
     // determine communication structure
-    HandlerDOFDirectCommCL handerDOFDirect( rowidx_, mg_);
-    interf_->Communicate( handerDOFDirect);
-    handerDOFDirect.buildSendStructures( ex_.sendListPhase1_);
-    handerDOFDirect.buildRecvStructures( ex_.recvListPhase1_);
+    HandlerDOFDirectCommCL handlerDOFDirect( rowidx_, mg_);
+    interf_->Communicate( handlerDOFDirect);
+    handlerDOFDirect.buildSendStructures( ex_.sendListPhase1_);
+    handlerDOFDirect.buildRecvStructures( ex_.recvListPhase1_);
 
     // determine information about distributed dof
     BuildIndexLists();
@@ -1196,7 +1196,7 @@ void ExchangeBuilderCL::buildDirectComm()
 ******************************************************************************/
 
 void ExchangeBuilderCL::HandlerDOFExchangeCL::collectDOF()
-/** Collect all dof which must be send to the owning process and sort them afterwards.
+/** Collect all dof which must be sent to the owning process and sort them afterwards.
     \todo Collect DOFs on Faces
 */
 {
@@ -1269,7 +1269,7 @@ void ExchangeBuilderCL::HandlerDOFExchangeCL::buildRecvStructures(
 ******************************************************************************/
 
 void ExchangeBuilderCL::HandlerDOFtoOwnerCL::collectDOFonSimplex( const DiST::TransferableCL& s)
-/** Collect the dof that need to be send to the owner in the first communication phase,
+/** Collect the dof that need to be sent to the owner in the first communication phase,
     i.e., fill the list sendList_.
 */
 {
@@ -1278,58 +1278,59 @@ void ExchangeBuilderCL::HandlerDOFtoOwnerCL::collectDOFonSimplex( const DiST::Tr
     if ( !s.IsDistributed( PrioMaster))
         return;
     // Only collect data on simplices, where a dof is given
-    if ( s.Unknowns.Exist() && s.Unknowns.Exist(idx)){
+    if ( s.Unknowns.Exist() && s.Unknowns.Exist(idx) && s.Unknowns.InTriangLevel(rowidx_.TriangLevel())) {
 
         // local dof information
         const IdxT dof= s.Unknowns(idx);
         const bool isExtended= (rowidx_.IsExtended() && rowidx_.GetXidx()[dof]!=NoIdx);
-        const IdxT extdof= (isExtended) ? rowidx_.GetXidx()[dof] : NoIdx;
 
         // dof that need to be sent to the owner
         sendList_[ s.GetOwner()].push_back(static_cast<int>(dof));
-        if ( isExtended)
-            sendList_[ s.GetOwner()].push_back(static_cast<int>(extdof));
+        if ( isExtended) // send also extended dof
+            sendList_[ s.GetOwner()].push_back( static_cast<int>(rowidx_.GetXidx()[dof]) );
     }
 }
 
 bool ExchangeBuilderCL::HandlerDOFtoOwnerCL::Gather( DiST::TransferableCL& t,
     DiST::Helper::SendStreamCL& send)
-/** If unknowns on the simplex \a t exists, then put
-      (1) my rank
-      (2) and the send position of the dof
-      (3) the send position of the extended dof
+/** If the simplex \a t is distributed among master copies, then put
+      (1) my rank,
+      (2) the send position of the dof (or NoInt_ if dof not in triang level on local proc),
+      (3) only for extended FE spaces: the send position of the extended dof (or NoInt_ if extended dof == NoIdx on local proc)
       into the send buffer. Return true.
     Else,
-      return false;
+      return false.
 */
 {
     const Uint idx= rowidx_.GetIdx();
-    if ( t.Unknowns.Exist() && t.Unknowns.Exist( idx) && t.IsDistributed(PrioMaster)){
-        send << ProcCL::MyRank();
+    if (t.IsDistributed(PrioMaster)) {
+        send << ProcCL::MyRank(); // (1)
 
-        const IdxT dof= t.Unknowns(idx);
-        const Uint numUnk= rowidx_.NumUnknownsSimplex( t);
-        const int firstPos= getSendPos( static_cast<int>(dof), t.GetOwner())*numUnk;
-        send << firstPos;
-        const bool isExtended= rowidx_.IsExtended() && rowidx_.GetXidx()[dof]!=NoIdx;
-        if ( isExtended){
-            const IdxT exdof= rowidx_.GetXidx()[dof];
-            const int exfirstPos= getSendPos( static_cast<int>(exdof), t.GetOwner())*numUnk;
-            send << exfirstPos;
-        }
-        else{
-            send << NoInt_;
-        }
+        if ( t.Unknowns.Exist() && t.Unknowns.Exist( idx) && t.Unknowns.InTriangLevel(rowidx_.TriangLevel())) {
+            const IdxT dof= t.Unknowns(idx);
+            const Uint numUnk= rowidx_.NumUnknownsSimplex( t);
+            const int firstPos= getSendPos( static_cast<int>(dof), t.GetOwner())*numUnk;
+            send << firstPos; // (2)
+
+            if (rowidx_.IsExtended()) { // write (3)
+                const IdxT exdof= rowidx_.GetXidx()[dof];
+                if (exdof!=NoIdx) {
+                    const int exfirstPos= getSendPos( static_cast<int>(exdof), t.GetOwner())*numUnk;
+                    send << exfirstPos;
+                } else
+                    send << NoInt_;
+            }
+        } else
+            send << NoInt_; // (2)
         return true;
     }
-    else {
+    else
         return false;
-    }
 }
 
 bool ExchangeBuilderCL::HandlerDOFtoOwnerCL::Scatter( DiST::TransferableCL& t,
     const size_t& numData, DiST::Helper::MPIistreamCL& recv)
-/** Owners have to create a mapping from the sendposition to the local dofs.*/
+/** Owners have to create a mapping from the send position to the local dofs.*/
 {
     const Uint idx= rowidx_.GetIdx();
 
@@ -1353,11 +1354,11 @@ bool ExchangeBuilderCL::HandlerDOFtoOwnerCL::Scatter( DiST::TransferableCL& t,
         recv >> sender;
         // receive non-extended dof
         recv >> sendpos;
-
-        recvList_[sender][sendpos]= dof;
+        if ( sendpos!=NoInt_)
+            recvList_[sender][sendpos]= dof;
         // receive extended dof
         recv >> sendpos;
-        if ( sendpos!=NoInt_){
+        if ( sendpos!=NoInt_) {
             Assert( isExtended,
                 DROPSErrCL("ExchangeBuilderCL::ScatterDOFtoOwner: DOF on owner is not extended"),
                 DebugParallelNumC);
@@ -1374,7 +1375,7 @@ bool ExchangeBuilderCL::HandlerDOFtoOwnerCL::Scatter( DiST::TransferableCL& t,
 ******************************************************************************/
 
 void ExchangeBuilderCL::HandlerDOFFromOwnerCL::collectDOFonSimplex( const DiST::TransferableCL& s)
-/** Collect the dof that need to be send from the owner in the second communication phase,
+/** Collect the dof that need to be sent from the owner in the second communication phase,
     i.e., fill the list sendList_.
 */
 {
@@ -1387,7 +1388,6 @@ void ExchangeBuilderCL::HandlerDOFFromOwnerCL::collectDOFonSimplex( const DiST::
         // local dof information
         const IdxT dof= s.Unknowns(idx);
         const bool isExtended= (rowidx_.IsExtended() && rowidx_.GetXidx()[dof]!=NoIdx);
-        const IdxT extdof= (isExtended) ? rowidx_.GetXidx()[dof] : NoIdx;
 
         DiST::TransferableCL::ProcList_const_iterator it;
         for ( it=s.GetProcListBegin(); it!=s.GetProcListEnd(); ++it){
@@ -1395,7 +1395,7 @@ void ExchangeBuilderCL::HandlerDOFFromOwnerCL::collectDOFonSimplex( const DiST::
             if ( it->prio==PrioMaster){   // Unknowns exist on toproc
                 sendList_[toproc].push_back(static_cast<int>(dof));
                 if ( isExtended){
-                    sendList_[toproc].push_back(static_cast<int>(extdof));
+                    sendList_[toproc].push_back( static_cast<int>(rowidx_.GetXidx()[dof]) );
                 }
             }
         }
@@ -1538,8 +1538,8 @@ void ExchangeBuilderCL::HandlerDOFDirectCommCL::collectDOFonSimplex( const DiST:
 
 bool ExchangeBuilderCL::HandlerDOFDirectCommCL::Gather( DiST::TransferableCL& t,
     DiST::Helper::SendStreamCL& send)
-/** The process informs all copies about the sendposition of the dof located at the simplex.
-    Therefore, put the rank of the receiving process, sendposition of the dof and extended
+/** The process informs all copies about the send position of the dof located at the simplex.
+    Therefore, put the rank of the receiving process, send position of the dof and extended
     dof into the send buffer. Finalize the stream by NoInt_
 */
 {
