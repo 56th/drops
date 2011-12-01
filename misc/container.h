@@ -1060,7 +1060,7 @@ class GlobalListCL
     }
 
     // Only useful, if modifiable_ == false, otherwise 0.
-    Uint size () const { return Data_.size(); }
+    size_t size () const { return Data_.size(); }
     // If modifiable_==true, Data_ is empty, thus these accessors are useless.
           iterator begin ()       { return Data_.begin(); }
           iterator end   ()       { return Data_.end(); }

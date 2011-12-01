@@ -68,10 +68,6 @@ inline ProcCL::RequestT SendNumDataCL<T>::Isend(
                   blocked vectors.
 */
 {
-    if ((int)v.size()-(int)offset<minlengthvec_){
-        printf("Proc %d, v should contain at least %d elements to be sent to %d\n", 
-            ProcCL::MyRank(), minlengthvec_, toproc_);
-    }
     Assert( (int)v.size()-(int)offset>=minlengthvec_, 
         DROPSErrCL("SendNumDataCL::Isend: Given vector does not hold enough entries"), 
         DebugParallelNumC);

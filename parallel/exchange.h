@@ -176,10 +176,10 @@ class ExchangeCL
   public:
     typedef std::vector<IdxT>                  IdxVecT;
     // neighbor information
-    typedef DROPS_STD_UNORDERED_SET<int>       NeighListT;
+    typedef DROPS_STD_UNORDERED_SET<int>       NeighListT;      ///< \todo Correct data-type?
     typedef NeighListT::const_iterator         NeighListT_const_iterator;
     // distributed DOF information
-    typedef std::set< std::pair<int,IdxT> >    DOFInfoT;
+    typedef std::set< std::pair<int,IdxT> >    DOFInfoT;        ///< \todo do we need a set here? Maybe, vector or list is enough!
     typedef std::vector< DOFInfoT >            DOFProcListT;
     typedef DOFInfoT::const_iterator           DOFInfoList_const_iterator;
 
@@ -284,6 +284,7 @@ class ExchangeCL
     inline IdxT GetExternalIdxFromProc( const IdxT localdof, int proc) const;   ///< Get dof number of proc
     //@}
 
+    /// \todo Make more efficient?
     bool AmIOwner( IdxT dof) const {
     	if ( GetNumProcs( dof) == 1)
     		return true;
@@ -449,7 +450,7 @@ class ExchangeBuilderCL
     const MultiGridCL&        mg_;      ///< The underlying multigrid
     IdxDescCL&                rowidx_;  ///< corresponding index describer
     DiST::InterfaceCL*        interf_;  ///< used for internal interface communication
-    static int                NoInt_;   ///< flag for undefined send position
+    static int                NoInt_;   ///< flag for undefined send position \todo negative number?
 
     // Copy constructor and assignment is not allowed and not implemented
     ExchangeBuilderCL( const ExchangeBuilderCL&);
