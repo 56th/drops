@@ -41,11 +41,11 @@
 #  include "parallel/distributeddatatypes.h"
 #  include "parallel/DiST.h"
 #  include <map>
-#  include <parmetis.h>   // for indextype
 #endif
 
 namespace DROPS
 {
+
 // fwd decl
 class BoundaryCL;
 class PeriodicEdgesCL;
@@ -406,8 +406,6 @@ class FaceCL
   private:
 #ifndef _PAR
     Uint                       Level_ : 8;      ///< level of the face (=level according to tetras) (in parallel stored in _dddH.attr)
-#else
-    idxtype                    lbNoNeigh_;      ///< If this face has a neighbor tetra on a different proc, this number is stored here!
 #endif
     SArrayCL<const TetraCL*,4> Neighbors_;      ///< neighbor tetras of the face (two on the same level, two on finer level)
     BndIdxT                    Bnd_;            ///< boundary-index of this face
@@ -464,10 +462,6 @@ class FaceCL
     /** Since a (non-VGhost) face is maximal stored by two processes, get the other process*/
     int GetNeighborProc() const
         { return GetPrio()!=PrioVGhost ? (GetRemoteData().GetProcListBegin()+1)->proc : -1; }
-    /// \brief get loadbalance-number of neighbor tetra, if this tetra is stored on a different proc
-    idxtype GetLbNeigh() const { return lbNoNeigh_; }
-    /// \brief Set loadbalance-number
-    void SetLbNeigh( idxtype n) { lbNoNeigh_=n; }
     //@}
 #endif
 
@@ -550,8 +544,6 @@ class TetraCL
 
 #ifndef _PAR
     Uint                             Level_ : 8;
-#else
-    idxtype                          lbNr_;                             ///< number of this Tetra used for LoadBalance with parmetis (typedef in parmetis.h), initialized with -1 as no number
 #endif
     IdCL<TetraCL>                    Id_;                               ///< id-number (locally numbered on one proc)
     Usint                            RefRule_;                          ///< actual refinement of the tetrahedron
@@ -648,11 +640,6 @@ class TetraCL
     bool IsProcBnd (Uint face) const { return Faces_[face]->IsOnProcBnd(); }     ///< check if face of tetra is on processor-boundary
     bool    IsGhost    () const { return GetPrio()<PrioMaster; }                 ///< check if tetra is ghost
     bool    HasGhost   () const;                                                 ///< check if tetra has a ghost-copy somewhere
-
-    idxtype GetLbNr    () const { return lbNr_;}                                 ///< get number for load balance
-    bool    HasLbNr    () const { return lbNr_>=0;}                              ///< check if this tetra got a number for load balance
-    void SetLbNr(idxtype nr)     { lbNr_=nr;}                                    ///< set the number for load balance
-    void DelLbNr()               { lbNr_=-1;}                                    ///< clear the number for load balance
     //@}
 #endif
 

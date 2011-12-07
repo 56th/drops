@@ -190,7 +190,7 @@ FaceCL::FaceCL ( Uint Level, __UNUSED__ const Point3DCL& bary, BndIdxT bnd) :
 #ifndef _PAR
     Level_(Level),
 #else
-    base( Level, bary, /*dim*/ 2), lbNoNeigh_(-1),
+    base( Level, bary, /*dim*/ 2),
 #endif
     Bnd_(bnd), RemoveMark_(false)
 { }
@@ -200,7 +200,7 @@ FaceCL::FaceCL (const FaceCL& f) :
 #ifndef _PAR
     Unknowns(f.Unknowns), Level_(f.Level_),
 #else
-    base( f.GetGID()), lbNoNeigh_(-1),
+    base( f.GetGID()),
 #endif
     Neighbors_(f.Neighbors_), Bnd_(f.Bnd_),RemoveMark_(f.RemoveMark_)
 { }
@@ -210,7 +210,7 @@ FaceCL::FaceCL() :
 #ifndef _PAR
     Level_(-1),
 #else
-    base(), lbNoNeigh_(-1),
+    base(),
 #endif
     Neighbors_(static_cast<const TetraCL*>(0)), Bnd_(NoBndC), RemoveMark_(false)
 { }
@@ -287,7 +287,6 @@ TetraCL::TetraCL (VertexCL* vp0, VertexCL* vp1, VertexCL* vp2, VertexCL* vp3, Te
     Level_(Parent==0 ? 0 : Parent->GetLevel()+1),
 #else
     base(Parent==0 ? 0 : Parent->GetLevel()+1, 0.25*( vp0->GetCoord() + vp1->GetCoord()+ vp2->GetCoord() + vp3->GetCoord()), /*dim*/ 3),
-    lbNr_(-1),
 #endif
     Id_(id), RefRule_(UnRefRuleC), RefMark_(NoRefMarkC),
     Parent_(Parent), Children_(0)
@@ -302,7 +301,7 @@ TetraCL::TetraCL (VertexCL* vp0, VertexCL* vp1, VertexCL* vp2, VertexCL* vp3, Te
     { throw DROPSErrCL("TetraCL::TetraCL: Do not use this constructor in the serial version"); }
 #else
     : base( Parent==0 ? 0 : Parent->GetLevel()+1, 0.25*( vp0->GetCoord() + vp1->GetCoord()+ vp2->GetCoord() + vp3->GetCoord()), /*dim*/ 3),
-       lbNr_(-1), Id_(id), RefRule_(UnRefRuleC), RefMark_(NoRefMarkC),
+      Id_(id), RefRule_(UnRefRuleC), RefMark_(NoRefMarkC),
       Parent_( Parent), Children_(0)
 {
     Assert(!Parent && Parent->GetLevel()!=lvl-1, DROPSErrCL("TetraCL::TetraCL: Parent and given level does not match"), DebugRefineEasyC);
@@ -316,7 +315,7 @@ TetraCL::TetraCL (const TetraCL& T) :
 #ifndef _PAR
     Unknowns(T.Unknowns), Level_(T.Level_),
 #else
-    base( T), lbNr_( T.lbNr_),
+    base( T),
 #endif
     Id_(T.Id_), RefRule_(T.RefRule_), RefMark_(T.RefMark_),
     Vertices_(T.Vertices_), Edges_(T.Edges_),
@@ -329,7 +328,7 @@ TetraCL::TetraCL() :
 #ifndef _PAR
     Level_( -1),
 #else
-    base(), lbNr_(-1),
+    base(),
 #endif
     Id_(), RefRule_(UnRefRuleC),RefMark_(NoRefMarkC),
     Vertices_(static_cast<VertexCL*>(0)),
