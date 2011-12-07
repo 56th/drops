@@ -346,6 +346,12 @@
     <ClCompile Include="..\..\..\parallel\migrateunknowns.cpp">
       <Filter>parallel</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\parallel\decompose.cpp">
+      <Filter>parallel</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\misc\scopetimer.cpp">
+      <Filter>misc</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\geom\boundary.h">
@@ -585,6 +591,12 @@
     <ClInclude Include="..\..\..\num\fe_repair.h">
       <Filter>num</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\parallel\decompose.h">
+      <Filter>parallel</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\misc\scopetimer.h">
+      <Filter>misc</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\levelset\adaptriang.tpp">
@@ -703,6 +715,9 @@
     </None>
     <None Include="..\..\..\num\fe_repair.tpp">
       <Filter>num</Filter>
+    </None>
+    <None Include="..\..\..\parallel\decompose.tpp">
+      <Filter>parallel</Filter>
     </None>
   </ItemGroup>
 </Project>
