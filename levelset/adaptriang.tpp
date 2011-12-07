@@ -153,10 +153,6 @@ void AdapTriangCL::UpdateTriang (const LevelsetP2CL& lset)
     std::cout << "UpdateTriang: " << i
               << " refinements/interpolations in " << duration << " seconds\n"
               << "last level: " << mg_.GetLastLevel() << '\n';
-#ifdef _PAR
-    std::cout << "Last partitioning by " << lb_.GetLB().GetPartitioner()->GetName()
-              << " took " << lb_.GetLB().GetPartitioner()->GetTime() << " seconds\n";
-#endif
     mg_.SizeInfo( std::cout);
 }
 

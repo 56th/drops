@@ -33,7 +33,6 @@
 # include "parallel/parallel.h"
 # include "parallel/parmultigrid.h"
 # include "parallel/loadbal.h"
-# include "parallel/partitioner.h"
 # include "parallel/logger.h"
 #endif
 
@@ -47,7 +46,7 @@ class AdapTriangCL
     MultiGridCL& mg_;
 #ifdef _PAR
     ParMultiGridCL*  pmg_;                                  ///< Reference to the parallel multigrid
-    LoadBalHandlerCL lb_;                                   ///< Reference to the load balancing class
+    LoadBalCL lb_;                                          ///< The load balancing class used to determine a partitioning
 #endif
 
     double width_;                                          ///< width of the refined grid
@@ -75,27 +74,23 @@ class AdapTriangCL
     bool ModifyGridStep( DistFctT&, bool lb=true);
 
   public:
-    AdapTriangCL(  MultiGridCL& mg, double width, int c_level, int f_level, __UNUSED__ int lbStrategy = 1, __UNUSED__ int partitioner=1)
-      : mg_( mg),
+    AdapTriangCL(  MultiGridCL& mg, double width, int c_level, int f_level, __UNUSED__ int lbStrategy = 1011)
+        : mg_( mg),
 #ifdef _PAR
-      pmg_( ParMultiGridCL::InstancePtr()), lb_( mg_, Partitioner(partitioner)),
+          pmg_( ParMultiGridCL::InstancePtr()), lb_( mg_),
 #endif
-      width_(width), c_level_(c_level), f_level_(f_level), modified_(false)
-      {
+          width_(width), c_level_(c_level), f_level_(f_level), modified_(false)
+    {
         Assert( 0<=c_level && c_level<=f_level, "AdapTriangCL: Levels are cheesy.\n", ~0);
 #ifdef _PAR
         pmg_->AttachTo( mg_);
         if (lbStrategy>=0)
-            lb_.DoInitDistribution( ProcCL::Master());
-        else
-            lbStrategy*=-1;
-        switch ( lbStrategy) {
-            case 0 : lb_.SetStrategy( NoMig);     break;
-            case 1 : lb_.SetStrategy( Adaptive);  break;
-            case 2 : lb_.SetStrategy( Recursive); break;
+            lb_.DoMigration();
+        else{
+            lb_.SetMethod( -lbStrategy);
         }
 #endif
-      }
+    }
 
 #ifdef _PAR
     /// \brief Get a reference onto the parallel MultiGrid
@@ -105,10 +100,10 @@ class AdapTriangCL
     const ParMultiGridCL& GetPMG() const { return *pmg_; }
 
     /// \brief Get a reference onto the LoadBalHandlerCL
-    LoadBalHandlerCL& GetLb() { return lb_; }
+    LoadBalCL& GetLb() { return lb_; }
 
     /// \brief Get a constant reference onto the LoadBalHandlerCL
-    const LoadBalHandlerCL& GetLb() const { return lb_; }
+    const LoadBalCL& GetLb() const { return lb_; }
 #endif
 
     void SetWidth       (double width) { width_  = width; }
