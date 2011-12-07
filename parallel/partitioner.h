@@ -25,6 +25,7 @@
  *
  * Copyright 2009 LNM/SC RWTH Aachen, Germany
 */
+#error "parallel/partitioner.h is DEPRECATED! Use parallel/decompose.h instead"
 
 #ifndef DROPS_PARTITIONER_H
 #define DROPS_PARTITIONER_H

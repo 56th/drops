@@ -129,34 +129,12 @@ void SetDOFStokes( const MultiGridCL& mg, InstatStokes2PhaseP2P1CL& stokes)
     }
 }
 
-void Migrate( LoadBalHandlerCL& lb, ObservedVectorsCL& obs)
+void Migrate( LoadBalCL& lb, ObservedVectorsCL& obs)
 {
-    MultiGridCL& mg= lb.GetMG();
-
-    // first non-empty level
-    Uint i=0, lvl=mg.GetLastLevel();
-    while (mg.GetTetras().IsLevelEmpty(i) && i<mg.GetTetras().GetNumLevel()-1)
-        ++i;
-
-    // Make the load balancing iterators
-    LbIteratorCL it(  &mg, mg.GetTetrasBegin(i), i,  lvl), 
-                 end( &mg, mg.GetTetrasEnd(lvl), lvl, lvl);
-    if ( !(mg.GetTetras().IsLevelEmpty(i) && it.IsInLbSet()))
-        ++it;
-
-    std::vector<int> destination;
-    i=0;
-
-    // Determine a destination process for all tetrahedra (this -- most propably -- won't
-    // result in a good partitioning ;-) )
-    for ( ; it!=end; ++it, ++i){
-        destination.push_back( i%ProcCL::Size());
-    }
-
     // Do the migration process (including the unknowns)
     obs.notify_pre_refmig_sequence( lb.GetMG());
     obs.notify_pre_migrate();
-    lb.DoMigration( Addr(destination));
+    lb.DoMigration();
     obs.notify_post_migrate();
     obs.notify_post_refmig_sequence();
 }
@@ -252,7 +230,7 @@ double sigmaf (const Point3DCL&, double) { return 0; }
 /** Assign a value to the DOF and migrate tetrahedra in a 'wild' order.
     Afterwards, check if the DOF are still right.
 */
-void CheckMigration( LoadBalHandlerCL& lb)
+void CheckMigration( LoadBalCL& lb)
 {
     std::cout << "Checking migration with unknowns ..." << std::endl;
     MultiGridCL& mg= lb.GetMG();
@@ -344,8 +322,8 @@ int main( int argc, char **argv)
         DROPS::MultiGridCL* mg= 0;
         DROPS::BuildBrick( mg);
         std::cout << "=====================================\ninitial migration\n";
-        DROPS::LoadBalHandlerCL lb( *mg, DROPS::metis);     // loadbalancing
-        lb.DoInitDistribution( DROPS::ProcCL::Master());    // distribute initial grid
+        DROPS::LoadBalCL lb( *mg);  // loadbalancing
+        lb.DoMigration( );          // distribute initial grid
         const int num_ref= 3;
         // writer for vtk-format
         DROPS::VTKOutCL vtkwriter( *mg, "dist_ref", num_ref+1, "vtk", "dist_ref", true);

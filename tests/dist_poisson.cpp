@@ -304,10 +304,9 @@ int main (int argc, char** argv)
 #ifdef _PAR
         // Set parallel data structures
         DROPS::ParMultiGridCL pmg= DROPS::ParMultiGridCL::Instance();
-        pmg.AttachTo( *mg);                                  // handling of parallel multigrid
-        DROPS::LoadBalHandlerCL lb( *mg, DROPS::metis);                    // loadbalancing
-        lb.DoInitDistribution( DROPS::ProcCL::Master());    // distribute initial grid
-        lb.SetStrategy( DROPS::Recursive);                  // best distribution of data
+        pmg.AttachTo( *mg);             // handling of parallel multigrid
+        DROPS::LoadBalCL lb( *mg);      // loadbalancing
+        lb.DoMigration( );              // distribute initial grid
 #endif
         timer.Stop();
         std::cout << " o time " << timer.GetTime() << " s" << std::endl;

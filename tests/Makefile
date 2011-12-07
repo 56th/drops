@@ -28,7 +28,8 @@ include ../Make.common
 PAR_OBJ_ = ../parallel/parallel.o ../parallel/partime.o  \
            ../parallel/exchange.o  ../parallel/parmultigrid.o \
            ../parallel/logger.o ../parallel/DiST.o ../parallel/mpistream.o \
-           ../parallel/loadbal.o ../parallel/partitioner.o ../parallel/migrateunknowns.o
+           ../parallel/loadbal.o ../parallel/migrateunknowns.o \
+           ../parallel/decompose.o
 
 PAR_OBJ = $(if $(PAR_BUILD),$(PAR_OBJ_),)
 
@@ -264,42 +265,42 @@ dist_streamtest: \
     ../tests/dist_streamtest.o \
     ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
     ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
-    ../num/fe.o ../num/interfacePatch.o $(PAR_OBJ)
+    ../num/fe.o ../num/interfacePatch.o ../misc/scopetimer.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 dist_remotedatatest: \
     ../tests/dist_remotedatatest.o \
     ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
     ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
-    ../num/fe.o ../num/interfacePatch.o $(PAR_OBJ)
+    ../num/fe.o ../num/interfacePatch.o ../misc/scopetimer.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 dist_sendtetraofbrick: \
     ../tests/dist_sendtetraofbrick.o \
     ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
     ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
-    ../num/fe.o ../num/interfacePatch.o $(PAR_OBJ)
+    ../num/fe.o ../num/interfacePatch.o ../misc/scopetimer.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 dist_modify: \
     ../tests/dist_modify.o \
     ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
     ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
-    ../num/fe.o ../num/interfacePatch.o $(PAR_OBJ)
+    ../num/fe.o ../num/interfacePatch.o ../misc/scopetimer.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 dist_simplexsend: \
     ../tests/dist_simplexsend.o  \
     ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
     ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
-    ../num/fe.o ../num/interfacePatch.o $(PAR_OBJ)
+    ../num/fe.o ../num/interfacePatch.o ../misc/scopetimer.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 dist_interface: \
     ../tests/dist_interface.o  \
     ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
     ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
-    ../num/fe.o ../num/interfacePatch.o $(PAR_OBJ)
+    ../num/fe.o ../num/interfacePatch.o ../misc/scopetimer.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 dist_ref: \
@@ -308,7 +309,7 @@ dist_ref: \
     ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o ../out/vtkOut.o ../parallel/parmultigrid.o \
     ../num/fe.o ../num/interfacePatch.o ../levelset/levelset.o ../levelset/fastmarch.o ../levelset/surfacetension.o \
     ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o \
-    $(PAR_OBJ)
+    ../misc/scopetimer.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 dist_migration: \
@@ -318,7 +319,7 @@ dist_migration: \
     ../num/fe.o ../num/interfacePatch.o ../levelset/levelset.o ../levelset/fastmarch.o ../levelset/surfacetension.o \
     ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o $(PAR_OBJ) \
     ../misc/bndmap.o ../geom/bndVelFunctions.o ../geom/bndScalarFunctions.o \
-    ../stokes/instatstokes2phase.o
+    ../stokes/instatstokes2phase.o ../misc/scopetimer.o
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 dist_TestRefPar: \
@@ -327,7 +328,7 @@ dist_TestRefPar: \
     ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o ../out/vtkOut.o ../parallel/parmultigrid.o \
     ../num/fe.o ../num/interfacePatch.o ../levelset/levelset.o ../levelset/fastmarch.o ../levelset/surfacetension.o \
     ../misc/params.o ../out/output.o ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o \
-    ../num/quadrature.o $(PAR_OBJ)
+    ../num/quadrature.o ../misc/scopetimer.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 dist_ref_rising_drop: \
@@ -336,7 +337,7 @@ dist_ref_rising_drop: \
     ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o ../out/vtkOut.o ../parallel/parmultigrid.o \
     ../num/fe.o ../num/interfacePatch.o ../levelset/levelset.o ../levelset/fastmarch.o ../levelset/surfacetension.o \
     ../misc/params.o ../out/output.o ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o \
-    $(PAR_OBJ)
+    ../misc/scopetimer.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 
@@ -344,7 +345,7 @@ dist_exchange: \
     ../tests/dist_exchange.o  \
     ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
     ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
-    ../num/fe.o ../num/interfacePatch.o $(PAR_OBJ)
+    ../num/fe.o ../num/interfacePatch.o ../misc/scopetimer.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 dist_poisson: \
@@ -354,7 +355,7 @@ dist_poisson: \
     ../num/fe.o ../num/discretize.o ../num/interfacePatch.o ../geom/geomselect.o\
     ../misc/params.o ../out/vtkOut.o ../misc/bndmap.o ../geom/bndScalarFunctions.o\
     ../geom/bndVelFunctions.o ../poisson/poissonCoeff.o \
-    ../num/hypre.o $(PAR_OBJ)
+    ../num/hypre.o ../misc/scopetimer.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 dist_sdropsP2: \
@@ -362,7 +363,7 @@ dist_sdropsP2: \
     ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o \
     ../misc/utils.o ../num/discretize.o ../num/interfacePatch.o ../num/stokessolver.o \
     ../num/fe.o ../stokes/integrTime.o ../geom/reftetracut.o ../geom/principallattice.o \
-    $(PAR_OBJ)
+    ../misc/scopetimer.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 dist_twophasedrops: \
@@ -375,7 +376,7 @@ dist_twophasedrops: \
     ../geom/bndScalarFunctions.o ../misc/bndmap.o ../levelset/twophaseCoeff.o  \
     ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o \
     ../num/renumber.o \
-    $(PAR_OBJ)
+    ../misc/scopetimer.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 ../tests/directsolver.o:

@@ -431,8 +431,8 @@ int main( int argc, char **argv)
         }
         DROPS::MultiGridCL* mg= 0;
         DROPS::BuildBrick( mg);
-        DROPS::LoadBalHandlerCL lb( *mg, DROPS::metis);     // loadbalancing
-        lb.DoInitDistribution( DROPS::ProcCL::Master());    // distribute initial grid
+        DROPS::LoadBalCL lb( *mg);      // loadbalancing
+        lb.DoMigration();        // distribute initial grid
         MarkAll( *mg);
         mg->Refine();
         mg->SizeInfo( std::cout);

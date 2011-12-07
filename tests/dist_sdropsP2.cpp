@@ -369,9 +369,8 @@ int main (int argc, char** argv)
 
 #ifdef _PAR
         // Set parallel data structures
-        DROPS::LoadBalHandlerCL lb( mg, DROPS::metis);                    // loadbalancing
-        lb.DoInitDistribution( DROPS::ProcCL::Master());    // distribute initial grid
-        lb.SetStrategy( DROPS::Recursive);                  // best distribution of data
+        DROPS::LoadBalCL lb( mg);   // loadbalancing
+        lb.DoMigration();           // distribute initial grid
 #endif
 
         timer.Stop();

@@ -105,6 +105,9 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     SurfaceTensionCL sf( sigmap);
 
     LevelsetP2CL lset( MG, lsetbnddata, sf, P.get<double>("Levelset.SD"), P.get<double>("Levelset.CurvDiff"));
+#ifdef _PAR
+    adap.GetLb().SetLset( lset.Phi, lsetbnddata, 11);
+#endif
 
     if (is_periodic) //CL: Anyone a better idea? perDirection from ParameterFile?
     {
@@ -522,8 +525,7 @@ int main (int argc, char** argv)
         P.put("Exp.InitialLSet", InitialLSet= "Cylinder");
     }
     DROPS::AdapTriangCL adap( *mg, P.get<double>("AdaptRef.Width"), P.get<int>("AdaptRef.CoarsestLevel"), P.get<int>("AdaptRef.FinestLevel"),
-                              ((P.get<std::string>("Restart.Inputfile") == "none") ? P.get<int>("AdaptRef.LoadBalStrategy") : -P.get<int>("AdaptRef.LoadBalStrategy")),
-                              P.get<int>("AdaptRef.Partitioner"));
+                              ((P.get<std::string>("Restart.Inputfile") == "none") ? P.get<int>("AdaptRef.LoadBalStrategy") : -P.get<int>("AdaptRef.LoadBalStrategy")));
     // If we read the Multigrid, it shouldn't be modified;
     // otherwise the pde-solutions from the ensight files might not fit.
 //    if (P.get("Restart.Inputfile", std::string("none")) == "none")
@@ -538,7 +540,6 @@ int main (int argc, char** argv)
     std::cout << DROPS::SanityMGOutCL(*mg) << std::endl;
 #ifdef _PAR
 
-    adap.GetLb().GetLB().SetWeightFnct(1);
     adap.GetLb().DoMigration();
     mg->SizeInfo(std::cout);
     std::cout << DROPS::SanityMGOutCL(*mg) << std::endl;

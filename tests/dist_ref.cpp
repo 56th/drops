@@ -47,7 +47,7 @@ void BuildBrick( MultiGridCL*& mg)
     Point3DCL origin, e1, e2, e3;
     e1[0]= e2[1]= e3[2]= 1.;
     if ( ProcCL::IamMaster()){
-        Uint ref[3]= { 1, 1, 1};
+        Uint ref[3]= { 2, 2, 2};
         builder = new BrickBuilderCL( origin, e1, e2, e3, ref[0], ref[1], ref[2]);
     }
     else{
@@ -111,8 +111,10 @@ int main( int argc, char **argv)
         DROPS::MultiGridCL* mg= 0;
         DROPS::BuildBrick( mg);
         std::cout << "=====================================\ninitial migration\n";
-        DROPS::LoadBalHandlerCL lb( *mg, DROPS::metis);     // loadbalancing
-        lb.DoInitDistribution( DROPS::ProcCL::Master());    // distribute initial grid
+        DROPS::LoadBalCL lb( *mg);
+        lb.DoMigration();
+        //DROPS::LoadBalHandlerCL lb( *mg, DROPS::metis);     // loadbalancing
+        //lb.DoInitDistribution( DROPS::ProcCL::Master());    // distribute initial grid
         const int num_ref= 5;
         // writer for vtk-format
         DROPS::VTKOutCL vtkwriter( *mg, "dist_ref", num_ref+1, "vtk", "dist_ref", true);

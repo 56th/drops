@@ -26,7 +26,6 @@
 #include "parallel/parmultigrid.h"
 #include "parallel/DiST.h"
 #include "parallel/partime.h"
-#include "parallel/metispartioner.h"
 #include "parallel/loadbal.h"
 #include "parallel/parmgserialization.h"
 
@@ -302,11 +301,11 @@ DROPS::MultiGridCL* CreateInitGrid(int master= 0)
     // now distribute the grid on master to other procs
 //    pmg.AttachTo(*mg);
 
-    LoadBalHandlerCL lb(*mg, metis);
+    LoadBalCL lb(*mg);
     if (size>1)
     {
         time.Reset();
-        lb.DoInitDistribution();
+        lb.DoMigration();
         time.Stop();
         if (C.get<int>("Misc.PrintTime")){
             duration = time.GetMaxTime();
@@ -318,40 +317,16 @@ DROPS::MultiGridCL* CreateInitGrid(int master= 0)
     return mg;
 }
 
-void DoMigration(DROPS::LoadBalCL &LoadBal, int lb)
+void DoMigration( DROPS::LoadBalCL &LoadBal)
 {
-    DROPS::ParTimerCL time;
-    double duration;
-    const int size = DROPS::ProcCL::Size();
-    const bool printTime= C.get<int>("Misc.PrintTime");
-    if (size>0 && lb!=0)
-    {
-        cout << "  - Erstelle Graphen ... \n";
-        LoadBal.DeleteGraph();
-        time.Reset();
-        LoadBal.CreateDualRedGraph();
-        time.Stop(); duration = time.GetMaxTime();
-        Times.AddTime(T_SetupGraph, duration);
-        if (printTime) std::cout << "       --> "<<duration<<" sec\n";
-
-        cout << "  - Erstelle Partitionen ... \n";
-        time.Reset();
-        LoadBal.PartitionPar();
-
-        time.Stop(); duration = time.GetMaxTime();
-        Times.AddTime(T_CalcDist, duration);
-        if (printTime) std::cout << "       --> "<<duration<<" sec\n";
-        cout << "  - Migration ... \n";
-        time.Reset();
-        if (lb!=0){
-            LoadBal.Migrate();
-        }
-        time.Stop(); duration = time.GetMaxTime();
-        Times.AddTime(T_Migration, duration);
-        if (printTime)
-            std::cout << "       --> "<<duration<<" sec, moved MulitNodes " << LoadBal.GetMovedMultiNodes() << "\n";
-        Times.IncCounter(LoadBal.GetMovedMultiNodes());
+    DROPS::ParTimerCL timer;
+    timer.Reset();
+    LoadBal.DoMigration();
+    timer.Stop();
+    if (C.get<int>("Misc.PrintTime")){
+        std::cout << " Migration took "<<timer.GetMaxTime()<<" sec\n";
     }
+    Times.IncCounter(LoadBal.GetMovedMultiNodes());
 }
 
 using namespace DROPS;
@@ -442,7 +417,7 @@ int main(int argc, char* argv[])
             default: throw DROPSErrCL("Specify the refinement strategy!");
         }
 
-        DROPS::LoadBalCL LoadBal(mg, metis);
+        DROPS::LoadBalCL LoadBal(mg);
         for (int ref=0; ref<markall+markdrop+markcorner; ++ref)
         {
             DROPS::Point3DCL e, e1;
@@ -527,8 +502,7 @@ int main(int argc, char* argv[])
 
             CheckParMultiGrid(pmg,REF);
 
-//            DynamicDataInterfaceCL::ConsCheck();
-            DoMigration( LoadBal,C.get<int>("LoadBalancing.RefineStrategy"));
+            DoMigration( LoadBal);
             movedRefNodes += LoadBal.GetMovedMultiNodes();
 
             if (printPMG){
@@ -553,7 +527,7 @@ int main(int argc, char* argv[])
 
         if (C.get<int>("LoadBalancing.MiddleMig")){
             cout <<dline<<endl<< " + Last-Verteilung zwischen dem Verfeinern und Vergroebern ...\n";
-            DoMigration( LoadBal,0);
+            DoMigration( LoadBal);
             movedRefNodes += LoadBal.GetMovedMultiNodes();
             CheckParMultiGrid(pmg,MIG);
         }
@@ -603,7 +577,7 @@ int main(int argc, char* argv[])
 
             CheckParMultiGrid(pmg,REF);
 
-            DoMigration( LoadBal,C.get<int>("LoadBalancing.CoarseStrategy"));
+            DoMigration( LoadBal);
 
             movedCoarseNodes += LoadBal.GetMovedMultiNodes();
 

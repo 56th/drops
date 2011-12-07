@@ -1478,7 +1478,9 @@ void ParMultiGridCL::TransferBegin(int Level)
     modify_= transfer_= new DiST::TransferCL( *mg_, true, true);
 
     // all procs should have the same number of levels!
+    mg_->PrepareModify();
     AdjustLevel();
+    mg_->FinalizeModify();
 
     level_ = (Level==-1) ? mg_->GetLastLevel() : Level;
 
@@ -1492,6 +1494,7 @@ void ParMultiGridCL::TransferEnd()
 {
     Assert( transfer_ , DROPSErrCL("ParMultiGridCL::TransferEnd: not in Transfer mode"), DebugParallelC);
     transfer_->Finalize();
+    
     delete transfer_;    modify_= transfer_= 0;
 
     // All tetras, that are marked for removement, should be removed now!
