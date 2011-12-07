@@ -820,5 +820,12 @@ std::slice_array<T>::operator=(const slice_array<T>& a)
 # include <boost/property_tree/exceptions.hpp>
 # include <boost/property_tree/json_parser.hpp>
 
+#include <metis.h>
+#include <parmetis.h>
+
+/// \brief type for indexing vertices for (Par)METIS
+typedef idx_t graph_index_type;
+/// \brief type for specififying floats for (Par)METIS
+typedef real_t graph_real_type;
 
 #endif
