@@ -55,7 +55,7 @@ class SendNumDataCL
   public:
     typedef T value_type;
 
-  private:    
+  private:
     friend class ExchangeBuilderCL;     ///< for generating the data structures
     friend class ExchangeMatrixCL;      ///< for generating the data structures
     int toproc_;                        ///< to whom the data are send
@@ -78,7 +78,7 @@ class SendNumDataCL
     template <typename VectorT>
     inline ProcCL::RequestT Isend(const VectorT&, int tag, Ulint offset) const;
      // Send data to "toProc_" (nonblocking, asynchronous)
-    inline ProcCL::RequestT Isend(const double*, int tag, Ulint offset) const;   
+    inline ProcCL::RequestT Isend(const double*, int tag, Ulint offset) const;
 };
 
 /******************************************************************************
@@ -119,15 +119,15 @@ class ExchangeBlockCL;
 /******************************************************************************
 * E X C H A N G E  C L                                                        *
 ******************************************************************************/
-/// \brief Accumulate vectors, compute norm, and determine inner product of 
+/// \brief Accumulate vectors, compute norm, and determine inner product of
 ///        parallel distributed vectors
 /** This class is one of the core classes to handle distributed vectors. These
     vectors can be given in two different forms:
 
-    (a) Accumulated form: Each process, storing a dof, knows the complete value 
+    (a) Accumulated form: Each process, storing a dof, knows the complete value
     of the dof.
     (b) Distributed form: Each process, storing a dof, knows only a part of the
-    value of the dof. The global value is then given by the sum over all 
+    value of the dof. The global value is then given by the sum over all
     partial values on the processes.
 
     This class provides three main functionalities:
@@ -136,36 +136,37 @@ class ExchangeBlockCL;
     (2) Performing an inner product of two vectors
     (3) Getting information about the number of a dof on another process.
 
-    (1) Transforming a vector of form (b) to (a) is called "accumulation of a 
-    vector." This task is the main functionality of this class and is 
+    (1) Transforming a vector of form (b) to (a) is called "accumulation of a
+    vector." This task is the main functionality of this class and is
     implemented by the function <b>void Accumulate( VectorCL&) const</b>.
 
-    The accumulation process is two-fold. In the first communication phase, 
-    each process holding a partial value sends this value to the owner of the 
-    corresponding simplex (vertex or edge). Afterwards, the owner computes the 
-    sum. In the second communication phase, the owner informs the copies about 
-    the global value. 
+    The accumulation process is two-fold. In the first communication phase,
+    each process holding a partial value sends this value to the numerical owner of the
+    corresponding simplex (vertex or edge). Afterwards, the owner computes the
+    sum. In the second communication phase, the owner informs the copies about
+    the global value. Note that the numerical owner may be different from the geometric
+    owner used in DiST.
 
-    (2) The second core functionality of this class is determining the inner 
+    (2) The second core functionality of this class is determining the inner
     product of two vectors, given by the function <b>
-    double ParDot( const VectorCL& x, bool isXacc, 
-            const VectorCL& y, bool isYacc, 
-            VectorCL* x_acc=0, VectorCL* y_acc=0) const;
-    </b>. We refer to the description of this function for detailed 
-    information about the function parameters. Note, that the sums are 
+    double ParDot( const VectorCL& x, bool isXacc,
+            const VectorCL& y, bool isYacc,
+            VectorCL* x_acc, VectorCL* y_acc) const</b>.
+    We refer to the description of this function for detailed
+    information about the function parameters. Note, that the sums are
     determined by the Kahan sum formula.
 
     (3) The third functionality of this class is to get information about a
     dof on another process. Therefore, we implemented the function <b>
-    DOFInfoList_const_iterator GetProcListBegin( IdxT localdof) const
-    and
-    DOFInfoList_const_iterator GetProcListEnd( IdxT localdof) const
-    </b>. With these functions, one can access a list over all all processes
+    DOFInfoList_const_iterator GetProcListBegin( IdxT localdof) const</b>
+    and<b>
+    DOFInfoList_const_iterator GetProcListEnd( IdxT localdof) const</b>.
+    With these functions, one can access a list over all all processes
     storing the local dof as well and get information about their local dof.
 
     \todo Right now, if different positive number of unknowns exists for vertices
-    edges, faces or tetrahedra, this class does not work correctly. And, in 
-    particular, if unknowns does not exist on vertices but on another type of
+    edges, faces or tetrahedra, this class does not work correctly. And, in
+    particular, if unknowns do not exist on vertices but on another type of
     simplices, this class breaks down as well.
     \todo Implement communication pattern with a single communication phase
     \todo Test with extended dofs
@@ -231,7 +232,7 @@ class ExchangeCL
 
     /// \brief Factory method. This function calls an ExchangeBuilderCL to build this class
     void CreateList( const MultiGridCL& mg, IdxDescCL*, bool, bool);
-    /// \brief Clear the memory 
+    /// \brief Clear the memory
     void clear();
     /// \brief Get size of the vector this class is responsible for
     size_t GetNum() const { return LocalIndex.size()+DistrIndex.size(); }
@@ -455,7 +456,7 @@ class ExchangeBuilderCL
     ExchangeBuilderCL( const ExchangeBuilderCL&);
     ExchangeBuilderCL& operator=( const ExchangeBuilderCL&);
 
-    /// \brief Build the data structures needed to communicate via the owner 
+    /// \brief Build the data structures needed to communicate via the owner
     ///        process
     void buildViaOwner();
     /// \brief Build the data structures where all processes communicate
@@ -476,26 +477,26 @@ class ExchangeBuilderCL
     {
       protected:
         /// \brief Storing lists of dof with respect to a process id.
-        /** Note that the dof is stored as an int, because we need ints to 
-            generate the MPI datastructures. */
-        typedef std::map<int, std::vector<int> >   SendDOFListT;      ///< list of dof send to another process
+        /** Note that the dof is stored as an int, because we need ints to
+            generate the MPI data structures. */
+        typedef std::map<int, std::vector<int> >   SendDOFListT;      ///< list of dof sent to another process
         typedef std::map<int, std::map<int,IdxT> > RecvDofT;          ///< maps receive position to the local dof
 
       protected:
         IdxDescCL&         rowidx_;     ///< corresponding IdxDescCL
         const MultiGridCL& mg_;         ///< reference of the underlying MultiGridCL
-        SendDOFListT       sendList_;   ///< list of dof which need to be sent
-        RecvDofT           recvList_;   ///< list by sendpositions, where to store the dof
+        SendDOFListT       sendList_;   ///< list of dof which have to be sent
+        RecvDofT           recvList_;   ///< list by send positions, where to store the dof
 
-        /// \brief Collect dof which need to be sent
-        void collectDOF();     
-        /// \brief Collect dof which need to be sent on a single simplex
+        /// \brief Collect dof which have to be sent
+        void collectDOF();
+        /// \brief Collect dof which have to be sent on a single simplex
         virtual void collectDOFonSimplex( const DiST::TransferableCL& s) = 0;
         /// \brief Get the position of a dof which is sent to proc \a p
         inline int getSendPos( const int dof, const int p) const;
 
       public:
-        HandlerDOFExchangeCL( IdxDescCL& rowidx, const MultiGridCL& mg) 
+        HandlerDOFExchangeCL( IdxDescCL& rowidx, const MultiGridCL& mg)
             : rowidx_(rowidx), mg_(mg) { }
         /// \brief Build data structures for sending
         void buildSendStructures( ExchangeCL::SendListT& ex_sendlist);
@@ -512,7 +513,7 @@ class ExchangeBuilderCL
         void collectDOFonSimplex( const DiST::TransferableCL& s);
 
       public:
-        HandlerDOFtoOwnerCL( IdxDescCL& rowidx, const MultiGridCL& mg) 
+        HandlerDOFtoOwnerCL( IdxDescCL& rowidx, const MultiGridCL& mg)
             : base( rowidx, mg) { collectDOF(); }
 
         ///\name Handler for DiST::InterfaceCL
@@ -531,7 +532,7 @@ class ExchangeBuilderCL
         void collectDOFonSimplex( const DiST::TransferableCL& s);
 
       public:
-        HandlerDOFFromOwnerCL( IdxDescCL& rowidx, const MultiGridCL& mg) 
+        HandlerDOFFromOwnerCL( IdxDescCL& rowidx, const MultiGridCL& mg)
             : base( rowidx, mg) { collectDOF(); }
 
         ///\name Handler for DiST::InterfaceCL
@@ -550,7 +551,7 @@ class ExchangeBuilderCL
         void collectDOFonSimplex( const DiST::TransferableCL& s);
 
       public:
-        HandlerDOFDirectCommCL( IdxDescCL& rowidx, const MultiGridCL& mg) 
+        HandlerDOFDirectCommCL( IdxDescCL& rowidx, const MultiGridCL& mg)
             : base( rowidx, mg) { collectDOF(); }
 
         ///\name Handler for DiST::InterfaceCL
