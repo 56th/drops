@@ -1051,150 +1051,53 @@ double ExchangeBlockCL::Norm( const VectorCL& x, bool isXacc, VectorCL* x_acc) c
 
 
 /******************************************************************************
-* E X C H A N G E  B U I L D E R  C L                                         *
-******************************************************************************/
-
-// STATIC MEMBER INITIALIZATION OF EXCHANGE BUILDER CL
-//----------------------------------------------------
-int ExchangeBuilderCL::NoInt_= std::numeric_limits<int>::max();
-
-ExchangeBuilderCL::ExchangeBuilderCL(
-    ExchangeCL& ex, const MultiGridCL& mg, IdxDescCL *RowIdx)
-    : ex_(ex), mg_(mg), rowidx_(*RowIdx), interf_(0)
-{
-    // init the interface
-    DiST::PrioListT priolist;
-    priolist.push_back( PrioMaster);
-    DiST::InterfaceCL::DimListT dimlist;
-    if ( rowidx_.NumUnknownsVertex())
-        dimlist.push_back( DiST::GetDim<VertexCL>());
-    if ( rowidx_.NumUnknownsEdge())
-        dimlist.push_back( DiST::GetDim<EdgeCL>());
-    if ( rowidx_.NumUnknownsFace())
-        dimlist.push_back( DiST::GetDim<FaceCL>());
-    if ( rowidx_.NumUnknownsTetra())
-        dimlist.push_back( DiST::GetDim<TetraCL>());
-    DiST::LevelListCL lvls( rowidx_.TriangLevel()); // levels 0,..,TriangLevel
-
-    interf_ = new DiST::InterfaceCL( lvls, priolist, priolist, dimlist, true);
-}
-
-void ExchangeBuilderCL::clearEx()
-{
-    ex_.clear();
-}
-
-void ExchangeBuilderCL::BuildIndexLists()
-/** This function fills the lists LocalIndex, DistrIndex, OwnerDistrIndex,
-    and dofProcList_ of the ExchangeCL.
-*/
-{
-    ex_.dofProcList_.resize( rowidx_.NumUnknowns());
-
-    // Communicate dof positions via process boundaries, after the
-    // call, OwnerDistrIndex and dofProcList_ is set up.
-    HandlerDOIndexCL handlerIndex( ex_, rowidx_);
-    interf_->Communicate( handlerIndex);
-
-    // sort the list of OwnerDistrIndex for better memory access pattern
-    std::sort( ex_.OwnerDistrIndex.begin(), ex_.OwnerDistrIndex.end());
-
-    // determine the indices of local dof
-    ExchangeCL::IdxVecT& LocalIndex= ex_.LocalIndex;
-    ExchangeCL::IdxVecT& DistrIndex= ex_.DistrIndex;
-    size_t numDistIdx=0;
-    ExchangeCL::DOFProcListT::const_iterator it;
-    for ( it=ex_.dofProcList_.begin(); it!= ex_.dofProcList_.end(); ++it){
-        if ( it->size()>=1)
-            ++numDistIdx;
-    }
-    // reserve memory.
-    LocalIndex.reserve( numDistIdx);
-    DistrIndex.reserve( rowidx_.NumUnknowns()- numDistIdx);
-
-    // fill LocalIndex and DistrIndex
-    for ( IdxT i=0; i<ex_.dofProcList_.size(); ++i){
-        if ( ex_.dofProcList_[i].empty())
-            LocalIndex.push_back(i);
-        else
-            DistrIndex.push_back(i);
-    }
-
-    // determine neighbors
-    for ( size_t i=0; i<DistrIndex.size(); ++i){
-        for ( ExchangeCL::DOFInfoList_const_iterator it=ex_.GetProcListBegin( DistrIndex[i]); it!=ex_.GetProcListEnd( DistrIndex[i]); ++it)
-            ex_.neighs_.insert( it->first);
-    }
-}
-
-void ExchangeBuilderCL::buildViaOwner()
-{
-    // clear all information previously determined
-    clearEx();
-
-    // Fill the lists sendListPhase1_ and sendListPhase2_, i.e., the dofs
-    // that need to be sent in the first and second communication phase
-    HandlerDOFtoOwnerCL handlerToOwner( rowidx_, mg_);
-    interf_->InformOwners( handlerToOwner);
-    handlerToOwner.buildSendStructures( ex_.sendListPhase1_);
-    handlerToOwner.buildRecvStructures( ex_.recvListPhase1_);
-
-    // let the copies know about the send position of all distributed dofs.
-    // That is, determine information for the second communication phase
-    HandlerDOFFromOwnerCL handlerFromOwner( rowidx_, mg_);
-    interf_->InformCopies( handlerFromOwner);
-    handlerFromOwner.buildSendStructures( ex_.sendListPhase2_);
-    handlerFromOwner.buildRecvStructures( ex_.recvListPhase2_);
-
-    // determine information about distributed dof
-    BuildIndexLists();
-
-    // allocate memory for receive buffers
-    BuildRecvBuffer();
-}
-
-/// \todo Remember in one loop size of the buffers, then resize the buffers
-void ExchangeBuilderCL::BuildRecvBuffer()
-{
-    ex_.xBuf_.resize( std::max( ex_.recvListPhase2_.size(), ex_.recvListPhase1_.size()));
-    ex_.yBuf_.resize( ex_.xBuf_.size());
-
-    size_t i=0;
-    ExchangeCL::RecvListT::const_iterator it= ex_.recvListPhase2_.begin();
-    for ( ; it!=ex_.recvListPhase2_.end(); ++it, ++i){
-        ex_.xBuf_[i].resize( it->sysnums_.size());
-        ex_.yBuf_[i].resize( it->sysnums_.size());
-    }
-    i=0;
-    it= ex_.recvListPhase1_.begin();
-    for ( ; it!=ex_.recvListPhase1_.end(); ++it, ++i){
-        ex_.xBuf_[i].resize( std::max( ex_.xBuf_[i].size(), it->sysnums_.size()));
-        ex_.yBuf_[i].resize( std::max( ex_.yBuf_[i].size(), it->sysnums_.size()));
-    }
-}
-
-
-void ExchangeBuilderCL::buildDirectComm()
-{
-    clearEx();
-
-    // determine communication structure
-    HandlerDOFDirectCommCL handlerDOFDirect( rowidx_, mg_);
-    interf_->Communicate( handlerDOFDirect);
-    handlerDOFDirect.buildSendStructures( ex_.sendListPhase1_);
-    handlerDOFDirect.buildRecvStructures( ex_.recvListPhase1_);
-
-    // determine information about distributed dof
-    BuildIndexLists();
-
-    // allocate memory for receive buffers
-    BuildRecvBuffer();
-}
-
-
-/******************************************************************************
 * H A N D L E R  D O F  E X C H A N G E   C L                                 *
 ******************************************************************************/
+
+/// \brief Abstract base class for determine dof to be send and how they are to be received
+class ExchangeBuilderCL::HandlerDOFExchangeCL
+{
+  protected:
+    /// \brief Storing lists of dof with respect to a process id.
+    /** Note that the dof is stored as an int, because we need ints to
+        generate the MPI data structures. */
+    typedef std::map<int, std::vector<int> >   SendDOFListT;      ///< list of dof sent to another process
+    typedef std::map<int, std::map<int,IdxT> > RecvDofT;          ///< maps receive position to the local dof
+
+  protected:
+    IdxDescCL&         rowidx_;     ///< corresponding IdxDescCL
+    const MultiGridCL& mg_;         ///< reference of the underlying MultiGridCL
+    SendDOFListT       sendList_;   ///< list of dof which have to be sent
+    RecvDofT           recvList_;   ///< list by send positions, where to store the dof
+
+    /// \brief Collect dof which have to be sent
+    void collectDOF();
+    /// \brief Collect dof which have to be sent on a single simplex
+    virtual void collectDOFonSimplex( const DiST::TransferableCL& s) = 0;
+    /// \brief Get the position of a dof which is sent to proc \a p
+    inline int getSendPos( const int dof, const int p) const;
+
+  public:
+    HandlerDOFExchangeCL( IdxDescCL& rowidx, const MultiGridCL& mg)
+        : rowidx_(rowidx), mg_(mg) { }
+    /// \brief Build data structures for sending
+    void buildSendStructures( ExchangeCL::SendListT& ex_sendlist);
+    /// \brief Build data structures for receiving
+    void buildRecvStructures( ExchangeCL::RecvListT& ex_recvlist);
+};
+
+inline int ExchangeBuilderCL::HandlerDOFExchangeCL::getSendPos( const int dof, const int p) const
+/** If the element \a dof is not found in \vec, NoInt_ is returned.*/
+{
+    std::vector<int>::const_iterator it,
+        begin=sendList_.find(p)->second.begin(),
+        end=sendList_.find(p)->second.end();
+    it= std::lower_bound( begin, end, dof);
+    if ( it==end){
+        return NoInt_;
+    }
+    return static_cast<IdxT>( std::distance(begin, it));
+}
 
 void ExchangeBuilderCL::HandlerDOFExchangeCL::collectDOF()
 /** Collect all dof which must be sent to the owning process and sort them afterwards.
@@ -1221,7 +1124,7 @@ void ExchangeBuilderCL::HandlerDOFExchangeCL::collectDOF()
 
 void ExchangeBuilderCL::HandlerDOFExchangeCL::buildSendStructures(
     ExchangeCL::SendListT& ex_sendlist)
-/** Create the MPI datatype for all neighbors for sending. 
+/** Create the MPI datatype for all neighbors for sending.
     \todo NumUnknownsVertex is used to specify number of unknowns!
 */
 {
@@ -1270,6 +1173,25 @@ void ExchangeBuilderCL::HandlerDOFExchangeCL::buildRecvStructures(
 /******************************************************************************
 * H A N D L E R  D O F  T O  O W N E R   C L                                  *
 ******************************************************************************/
+
+/// \brief Handler for building the data structures for the first communication phase
+class ExchangeBuilderCL::HandlerDOFtoOwnerCL : public ExchangeBuilderCL::HandlerDOFExchangeCL
+{
+  private:
+    typedef HandlerDOFExchangeCL base;      ///< base class
+    /// \brief Collect all dof on a given simplex \a s
+    void collectDOFonSimplex( const DiST::TransferableCL& s);
+
+  public:
+    HandlerDOFtoOwnerCL( IdxDescCL& rowidx, const MultiGridCL& mg)
+        : base( rowidx, mg) { collectDOF(); }
+
+    ///\name Handler for DiST::InterfaceCL
+    //@{
+    bool Gather( DiST::TransferableCL&, DiST::Helper::SendStreamCL&);
+    bool Scatter( DiST::TransferableCL&, const size_t&, DiST::Helper::MPIistreamCL&);
+    //@}
+};
 
 void ExchangeBuilderCL::HandlerDOFtoOwnerCL::collectDOFonSimplex( const DiST::TransferableCL& s)
 /** Collect the dof that need to be sent to the owner in the first communication phase,
@@ -1376,6 +1298,25 @@ bool ExchangeBuilderCL::HandlerDOFtoOwnerCL::Scatter( DiST::TransferableCL& t,
 /******************************************************************************
 * H A N D L E R  D O F  F R O M  O W N E R   C L                              *
 ******************************************************************************/
+
+/// \brief Handler for building the data structures for the second communication phase
+class ExchangeBuilderCL::HandlerDOFFromOwnerCL : public ExchangeBuilderCL::HandlerDOFExchangeCL
+{
+  private:
+    typedef HandlerDOFExchangeCL base;      ///< base class
+    /// \brief Collect all dof on a given simplex \a s
+    void collectDOFonSimplex( const DiST::TransferableCL& s);
+
+  public:
+    HandlerDOFFromOwnerCL( IdxDescCL& rowidx, const MultiGridCL& mg)
+        : base( rowidx, mg) { collectDOF(); }
+
+    ///\name Handler for DiST::InterfaceCL
+    //@{
+    bool Gather( DiST::TransferableCL&, DiST::Helper::SendStreamCL&);
+    bool Scatter( DiST::TransferableCL&, const size_t&, DiST::Helper::MPIistreamCL&);
+    //@}
+};
 
 void ExchangeBuilderCL::HandlerDOFFromOwnerCL::collectDOFonSimplex( const DiST::TransferableCL& s)
 /** Collect the dof that need to be sent from the owner in the second communication phase,
@@ -1509,6 +1450,25 @@ bool ExchangeBuilderCL::HandlerDOFFromOwnerCL::Scatter( DiST::TransferableCL& t,
 /******************************************************************************
 * H A N D L E R  D O F  D I R E C T  C O M M  C L                             *
 ******************************************************************************/
+
+/// \brief Handler for building the data structures for a single communication phase
+class ExchangeBuilderCL::HandlerDOFDirectCommCL : public HandlerDOFExchangeCL
+{
+  private:
+    typedef HandlerDOFExchangeCL base;      ///< base class
+    /// \brief Collect all dof on a given simplex \a s
+    void collectDOFonSimplex( const DiST::TransferableCL& s);
+
+  public:
+    HandlerDOFDirectCommCL( IdxDescCL& rowidx, const MultiGridCL& mg)
+        : base( rowidx, mg) { collectDOF(); }
+
+    ///\name Handler for DiST::InterfaceCL
+    //@{
+    bool Gather( DiST::TransferableCL&, DiST::Helper::SendStreamCL&);
+    bool Scatter( DiST::TransferableCL&, const size_t&, DiST::Helper::MPIistreamCL&);
+    //@}
+};
 
 void ExchangeBuilderCL::HandlerDOFDirectCommCL::collectDOFonSimplex( const DiST::TransferableCL& s)
 /** Collect the dof that need to be send to processes which store a copy of \a s,
@@ -1651,7 +1611,27 @@ bool ExchangeBuilderCL::HandlerDOFDirectCommCL::Scatter( DiST::TransferableCL& t
 * H A N D L E R  D O F  I N D E X   C L                                       *
 ******************************************************************************/
 
-bool ExchangeBuilderCL::HandlerDOIndexCL::Gather(
+/// \brief Handler for generating information about dof on other processes
+class ExchangeBuilderCL::HandlerDOFIndexCL
+{
+  private:
+    typedef ExchangeCL::IdxVecT      IdxVecT;
+    typedef ExchangeCL::DOFProcListT DOFProcListT;
+    IdxDescCL&    rowidx_;              ///< corresponding index describer
+    IdxVecT&      ownerDistrIndex_;     ///< distributed indices of the owner
+    DOFProcListT& dofProcList_;         ///< where are the dof also stored
+
+  public:
+    HandlerDOFIndexCL( ExchangeCL& ex, IdxDescCL& rowidx)
+        : rowidx_(rowidx), ownerDistrIndex_( ex.OwnerDistrIndex),
+          dofProcList_( ex.dofProcList_) {}
+    /// \brief Gather information about distributed dof on sender proc
+    bool Gather( DiST::TransferableCL&, DiST::Helper::SendStreamCL&);
+    /// \brief Scatter information about distributed dof on sender proc
+    bool Scatter( DiST::TransferableCL&, const size_t&, DiST::Helper::MPIistreamCL&);
+};
+
+bool ExchangeBuilderCL::HandlerDOFIndexCL::Gather(
     DiST::TransferableCL& t, DiST::Helper::SendStreamCL& send)
 /** For generating information about distributed dof, put my rank and the local (extended) dof
     into the buffer. Additionally, if this process is the owner of \a t, remember the dof as
@@ -1684,7 +1664,7 @@ bool ExchangeBuilderCL::HandlerDOIndexCL::Gather(
     return false;
 }
 
-bool ExchangeBuilderCL::HandlerDOIndexCL::Scatter(
+bool ExchangeBuilderCL::HandlerDOFIndexCL::Scatter(
     DiST::TransferableCL& t, const size_t& numData,
     DiST::Helper::MPIistreamCL& recv)
 /** Store dof information on other processes in the dofProcList_. */
@@ -1723,6 +1703,148 @@ bool ExchangeBuilderCL::HandlerDOIndexCL::Scatter(
 
     return true;
 }
+
+/******************************************************************************
+* E X C H A N G E  B U I L D E R  C L                                         *
+******************************************************************************/
+
+// STATIC MEMBER INITIALIZATION OF EXCHANGE BUILDER CL
+//----------------------------------------------------
+int ExchangeBuilderCL::NoInt_= std::numeric_limits<int>::max();
+
+ExchangeBuilderCL::ExchangeBuilderCL(
+    ExchangeCL& ex, const MultiGridCL& mg, IdxDescCL *RowIdx)
+    : ex_(ex), mg_(mg), rowidx_(*RowIdx), interf_(0)
+{
+    // init the interface
+    DiST::PrioListT priolist;
+    priolist.push_back( PrioMaster);
+    DiST::InterfaceCL::DimListT dimlist;
+    if ( rowidx_.NumUnknownsVertex())
+        dimlist.push_back( DiST::GetDim<VertexCL>());
+    if ( rowidx_.NumUnknownsEdge())
+        dimlist.push_back( DiST::GetDim<EdgeCL>());
+    if ( rowidx_.NumUnknownsFace())
+        dimlist.push_back( DiST::GetDim<FaceCL>());
+    if ( rowidx_.NumUnknownsTetra())
+        dimlist.push_back( DiST::GetDim<TetraCL>());
+    DiST::LevelListCL lvls( rowidx_.TriangLevel()); // levels 0,..,TriangLevel
+
+    interf_ = new DiST::InterfaceCL( lvls, priolist, priolist, dimlist, true);
+}
+
+void ExchangeBuilderCL::clearEx()
+{
+    ex_.clear();
+}
+
+void ExchangeBuilderCL::BuildIndexLists()
+/** This function fills the lists LocalIndex, DistrIndex, OwnerDistrIndex,
+    and dofProcList_ of the ExchangeCL.
+*/
+{
+    ex_.dofProcList_.resize( rowidx_.NumUnknowns());
+
+    // Communicate dof positions via process boundaries, after the
+    // call, OwnerDistrIndex and dofProcList_ is set up.
+    HandlerDOFIndexCL handlerIndex( ex_, rowidx_);
+    interf_->Communicate( handlerIndex);
+
+    // sort the list of OwnerDistrIndex for better memory access pattern
+    std::sort( ex_.OwnerDistrIndex.begin(), ex_.OwnerDistrIndex.end());
+
+    // determine the indices of local dof
+    ExchangeCL::IdxVecT& LocalIndex= ex_.LocalIndex;
+    ExchangeCL::IdxVecT& DistrIndex= ex_.DistrIndex;
+    size_t numDistIdx=0;
+    ExchangeCL::DOFProcListT::const_iterator it;
+    for ( it=ex_.dofProcList_.begin(); it!= ex_.dofProcList_.end(); ++it){
+        if ( it->size()>=1)
+            ++numDistIdx;
+    }
+    // reserve memory.
+    LocalIndex.reserve( numDistIdx);
+    DistrIndex.reserve( rowidx_.NumUnknowns()- numDistIdx);
+
+    // fill LocalIndex and DistrIndex
+    for ( IdxT i=0; i<ex_.dofProcList_.size(); ++i){
+        if ( ex_.dofProcList_[i].empty())
+            LocalIndex.push_back(i);
+        else
+            DistrIndex.push_back(i);
+    }
+
+    // determine neighbors
+    for ( size_t i=0; i<DistrIndex.size(); ++i){
+        for ( ExchangeCL::DOFInfoList_const_iterator it=ex_.GetProcListBegin( DistrIndex[i]); it!=ex_.GetProcListEnd( DistrIndex[i]); ++it)
+            ex_.neighs_.insert( it->first);
+    }
+}
+
+void ExchangeBuilderCL::buildViaOwner()
+{
+    // clear all information previously determined
+    clearEx();
+
+    // Fill the lists sendListPhase1_ and sendListPhase2_, i.e., the dofs
+    // that need to be sent in the first and second communication phase
+    HandlerDOFtoOwnerCL handlerToOwner( rowidx_, mg_);
+    interf_->InformOwners( handlerToOwner);
+    handlerToOwner.buildSendStructures( ex_.sendListPhase1_);
+    handlerToOwner.buildRecvStructures( ex_.recvListPhase1_);
+
+    // let the copies know about the send position of all distributed dofs.
+    // That is, determine information for the second communication phase
+    HandlerDOFFromOwnerCL handlerFromOwner( rowidx_, mg_);
+    interf_->InformCopies( handlerFromOwner);
+    handlerFromOwner.buildSendStructures( ex_.sendListPhase2_);
+    handlerFromOwner.buildRecvStructures( ex_.recvListPhase2_);
+
+    // determine information about distributed dof
+    BuildIndexLists();
+
+    // allocate memory for receive buffers
+    BuildRecvBuffer();
+}
+
+/// \todo Remember in one loop size of the buffers, then resize the buffers
+void ExchangeBuilderCL::BuildRecvBuffer()
+{
+    ex_.xBuf_.resize( std::max( ex_.recvListPhase2_.size(), ex_.recvListPhase1_.size()));
+    ex_.yBuf_.resize( ex_.xBuf_.size());
+
+    size_t i=0;
+    ExchangeCL::RecvListT::const_iterator it= ex_.recvListPhase2_.begin();
+    for ( ; it!=ex_.recvListPhase2_.end(); ++it, ++i){
+        ex_.xBuf_[i].resize( it->sysnums_.size());
+        ex_.yBuf_[i].resize( it->sysnums_.size());
+    }
+    i=0;
+    it= ex_.recvListPhase1_.begin();
+    for ( ; it!=ex_.recvListPhase1_.end(); ++it, ++i){
+        ex_.xBuf_[i].resize( std::max( ex_.xBuf_[i].size(), it->sysnums_.size()));
+        ex_.yBuf_[i].resize( std::max( ex_.yBuf_[i].size(), it->sysnums_.size()));
+    }
+}
+
+
+void ExchangeBuilderCL::buildDirectComm()
+{
+    clearEx();
+
+    // determine communication structure
+    HandlerDOFDirectCommCL handlerDOFDirect( rowidx_, mg_);
+    interf_->Communicate( handlerDOFDirect);
+    handlerDOFDirect.buildSendStructures( ex_.sendListPhase1_);
+    handlerDOFDirect.buildRecvStructures( ex_.recvListPhase1_);
+
+    // determine information about distributed dof
+    BuildIndexLists();
+
+    // allocate memory for receive buffers
+    BuildRecvBuffer();
+}
+
 
 // -----------------------------------------
 // E X C H A N G E   M A T R I X   C L A S S

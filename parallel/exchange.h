@@ -472,114 +472,12 @@ class ExchangeBuilderCL
     void BuildRecvBuffer();
     //@}
 
-    /// \brief Abstract base class for determine dof to be send and how they are to be received
-    class HandlerDOFExchangeCL
-    {
-      protected:
-        /// \brief Storing lists of dof with respect to a process id.
-        /** Note that the dof is stored as an int, because we need ints to
-            generate the MPI data structures. */
-        typedef std::map<int, std::vector<int> >   SendDOFListT;      ///< list of dof sent to another process
-        typedef std::map<int, std::map<int,IdxT> > RecvDofT;          ///< maps receive position to the local dof
-
-      protected:
-        IdxDescCL&         rowidx_;     ///< corresponding IdxDescCL
-        const MultiGridCL& mg_;         ///< reference of the underlying MultiGridCL
-        SendDOFListT       sendList_;   ///< list of dof which have to be sent
-        RecvDofT           recvList_;   ///< list by send positions, where to store the dof
-
-        /// \brief Collect dof which have to be sent
-        void collectDOF();
-        /// \brief Collect dof which have to be sent on a single simplex
-        virtual void collectDOFonSimplex( const DiST::TransferableCL& s) = 0;
-        /// \brief Get the position of a dof which is sent to proc \a p
-        inline int getSendPos( const int dof, const int p) const;
-
-      public:
-        HandlerDOFExchangeCL( IdxDescCL& rowidx, const MultiGridCL& mg)
-            : rowidx_(rowidx), mg_(mg) { }
-        /// \brief Build data structures for sending
-        void buildSendStructures( ExchangeCL::SendListT& ex_sendlist);
-        /// \brief Build data structures for receiving
-        void buildRecvStructures( ExchangeCL::RecvListT& ex_recvlist);
-    };
-
-    /// \brief Handler for building the data structures for the first communication phase
-    class HandlerDOFtoOwnerCL : public HandlerDOFExchangeCL
-    {
-      private:
-        typedef HandlerDOFExchangeCL base;      ///< base class
-        /// \brief Collect all dof on a given simplex \a s
-        void collectDOFonSimplex( const DiST::TransferableCL& s);
-
-      public:
-        HandlerDOFtoOwnerCL( IdxDescCL& rowidx, const MultiGridCL& mg)
-            : base( rowidx, mg) { collectDOF(); }
-
-        ///\name Handler for DiST::InterfaceCL
-        //@{
-        bool Gather( DiST::TransferableCL&, DiST::Helper::SendStreamCL&);
-        bool Scatter( DiST::TransferableCL&, const size_t&, DiST::Helper::MPIistreamCL&);
-        //@}
-    };
-
-    /// \brief Handler for building the data structures for the second communication phase
-    class HandlerDOFFromOwnerCL : public HandlerDOFExchangeCL
-    {
-      private:
-        typedef HandlerDOFExchangeCL base;      ///< base class
-        /// \brief Collect all dof on a given simplex \a s
-        void collectDOFonSimplex( const DiST::TransferableCL& s);
-
-      public:
-        HandlerDOFFromOwnerCL( IdxDescCL& rowidx, const MultiGridCL& mg)
-            : base( rowidx, mg) { collectDOF(); }
-
-        ///\name Handler for DiST::InterfaceCL
-        //@{
-        bool Gather( DiST::TransferableCL&, DiST::Helper::SendStreamCL&);
-        bool Scatter( DiST::TransferableCL&, const size_t&, DiST::Helper::MPIistreamCL&);
-        //@}
-    };
-
-    /// \brief Handler for building the data structures for a single communication phase
-    class HandlerDOFDirectCommCL : public HandlerDOFExchangeCL
-    {
-      private:
-        typedef HandlerDOFExchangeCL base;      ///< base class
-        /// \brief Collect all dof on a given simplex \a s
-        void collectDOFonSimplex( const DiST::TransferableCL& s);
-
-      public:
-        HandlerDOFDirectCommCL( IdxDescCL& rowidx, const MultiGridCL& mg)
-            : base( rowidx, mg) { collectDOF(); }
-
-        ///\name Handler for DiST::InterfaceCL
-        //@{
-        bool Gather( DiST::TransferableCL&, DiST::Helper::SendStreamCL&);
-        bool Scatter( DiST::TransferableCL&, const size_t&, DiST::Helper::MPIistreamCL&);
-        //@}
-    };
-
-    /// \brief Handler for generating information about dof on other processes
-    class HandlerDOIndexCL
-    {
-      private:
-        typedef ExchangeCL::IdxVecT      IdxVecT;
-        typedef ExchangeCL::DOFProcListT DOFProcListT;
-        IdxDescCL&    rowidx_;              ///< corresponding index describer
-        IdxVecT&      ownerDistrIndex_;     ///< distributed indices of the owner
-        DOFProcListT& dofProcList_;         ///< where are the dof also stored
-
-      public:
-        HandlerDOIndexCL( ExchangeCL& ex, IdxDescCL& rowidx)
-            : rowidx_(rowidx), ownerDistrIndex_( ex.OwnerDistrIndex),
-              dofProcList_( ex.dofProcList_) {}
-        /// \brief Gather information about distributed dof on sender proc
-        bool Gather( DiST::TransferableCL&, DiST::Helper::SendStreamCL&);
-        /// \brief Scatter information about distributed dof on sender proc
-        bool Scatter( DiST::TransferableCL&, const size_t&, DiST::Helper::MPIistreamCL&);
-    };
+    // handlers
+    class HandlerDOFExchangeCL;
+    class HandlerDOFtoOwnerCL;
+    class HandlerDOFFromOwnerCL;
+    class HandlerDOFDirectCommCL;
+    class HandlerDOFIndexCL;
 
   public:
     ExchangeBuilderCL( ExchangeCL& ex, const MultiGridCL& mg, IdxDescCL *RowIdx);

@@ -26,7 +26,7 @@ namespace DROPS{
 
 template <typename T>
 void SendNumDataCL<T>::freeType()
-/** If the datatype mpidatatype_ has been commited to MPI unregister 
+/** If the datatype mpidatatype_ has been commited to MPI unregister
     this type.
 */
 {
@@ -39,7 +39,7 @@ void SendNumDataCL<T>::freeType()
 /// \brief Create Datatype for sending
 template <typename T>
 void SendNumDataCL<T>::CreateDataType(const int count,
-        const int blocklength, 
+        const int blocklength,
         const int array_of_displacements[])
 /** This function creates a MPI datatype that is responsible for gathering
     the data.
@@ -64,12 +64,12 @@ inline ProcCL::RequestT SendNumDataCL<T>::Isend(
     internal MPI datatype mpidatattype_ for sending.
     \param v data to be send
     \param tag a message tag
-    \param offset start sending form the offset element in \a v. Used for 
+    \param offset start sending form the offset element in \a v. Used for
                   blocked vectors.
 */
 {
-    Assert( (int)v.size()-(int)offset>=minlengthvec_, 
-        DROPSErrCL("SendNumDataCL::Isend: Given vector does not hold enough entries"), 
+    Assert( (int)v.size()-(int)offset>=minlengthvec_,
+        DROPSErrCL("SendNumDataCL::Isend: Given vector does not hold enough entries"),
         DebugParallelNumC);
     return ProcCL::Isend( Addr(v)+offset, 1, mpidatatype_, toproc_, tag);
 }
@@ -82,16 +82,16 @@ inline ProcCL::RequestT SendNumDataCL<T>::Isend(
     internal MPI datatype mpidatattype_ for sending.
     \param v data to be send
     \param tag a message tag
-    \param offset start sending form the offset element in \a v. Used for 
+    \param offset start sending form the offset element in \a v. Used for
                   blocked vectors.
 */
 {
 /*    if ((int)v.size()-(int)offset<minlengthvec_){
-        printf("Proc %d, v should contain at least %d elements to be sent to %d\n", 
+        printf("Proc %d, v should contain at least %d elements to be sent to %d\n",
             ProcCL::MyRank(), minlengthvec_, toproc_);
     }
-    Assert( (int)v.size()-(int)offset>=minlengthvec_, 
-        DROPSErrCL("SendNumDataCL::Isend: Given vector does not hold enough entries"), 
+    Assert( (int)v.size()-(int)offset>=minlengthvec_,
+        DROPSErrCL("SendNumDataCL::Isend: Given vector does not hold enough entries"),
         DebugParallelNumC);*/
     return ProcCL::Isend( v+offset, 1, mpidatatype_, toproc_, tag);
 }
@@ -109,8 +109,8 @@ ProcCL::RequestT RecvNumDataCL<T>::Irecv(int tag, VectorBaseCL<T>& recvBuf,
     \return MPI request handle for this receive
 */
 {
-    Assert( recvBuf.size()+offset>=sysnums_.size(), 
-        DROPSErrCL("RecvNumDataCL::Irecv: Receive buffer is too small"), 
+    Assert( recvBuf.size()+offset>=sysnums_.size(),
+        DROPSErrCL("RecvNumDataCL::Irecv: Receive buffer is too small"),
         DebugParallelNumC);
     return ProcCL::Irecv( Addr(recvBuf)+offset, sysnums_.size(), fromproc_, tag);
 }
@@ -171,20 +171,7 @@ inline IdxT ExchangeCL::GetExternalIdxFromProc( const IdxT localdof, int proc) c
     return NoIdx;
 }
 
-inline int ExchangeBuilderCL::HandlerDOFExchangeCL::getSendPos( const int dof, const int p) const
-/** If the element \a dof is not found in \vec, NoInt_ is returned.*/
-{
-    std::vector<int>::const_iterator it, 
-        begin=sendList_.find(p)->second.begin(), 
-        end=sendList_.find(p)->second.end();
-    it= std::lower_bound( begin, end, dof);
-    if ( it==end){
-        return NoInt_;
-    }
-    return static_cast<IdxT>( std::distance(begin, it));
-}
-
-inline ExchangeMatrixCL::ProcNumCT ExchangeMatrixCL::Intersect( 
+inline ExchangeMatrixCL::ProcNumCT ExchangeMatrixCL::Intersect(
     const ExchangeCL& RowEx, const ExchangeCL& ColEx, const size_t i, const size_t j) const
 {
     ProcNumCT result;
