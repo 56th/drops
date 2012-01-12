@@ -79,7 +79,7 @@ void ExchangeCL::InitComm(
 
 void ExchangeCL::DoAllAccumulations(
     VectorCL& v, const BufferListT& buf, const Ulint offset) const
-/** Owner does all the accumulation with information about all neighbors.
+/** DoF owner does all the accumulation with information about all neighbors.
     \pre Receive for the phase I has to be completed and if v is used as a send
          buffer, the sending has to be completed as well.
     \param v Store the accumulated values in this vector
@@ -96,11 +96,11 @@ void ExchangeCL::DoAllAccumulations(
 
 void ExchangeCL::DoAllAssigning(
     VectorCL& v, const BufferListT& buf, const Ulint offset) const
-/** Copies does the assigning of the values determined by the owner
+/** Copies does the assigning of the values determined by the DoF owner
     \pre Receive for the phase II has to be completed and if v is used as a send
          buffer, the sending has to be completed as well.
     \param v Store the accumulated values in this vector
-    \param buf Receive buffer where the values of the owner can be found
+    \param buf Receive buffer where the values of the DoF owner can be found
     \param offset This offset is used to access elements in the vector \a v.
 */
 {
@@ -158,8 +158,8 @@ double ExchangeCL::LocalDotOneAccumulation(
     // While communicating, do product on local elements
     const double sum1=KahanInnerProd( x, y, LocalIndex.begin(), LocalIndex.end(), double());
 
-    // Do accumulation on owners, therefore, first, wait until all
-    // messages are received by the owner
+    // Do accumulation on DoF owners, therefore, first, wait until all
+    // messages are received by the DoF owner
     ProcCL::WaitAll( recvListPhase1_.size(), Addr(req)+sendListPhase1_.size());
     DoAllAccumulations( *y_acc, yBuf_);
 
@@ -1160,7 +1160,7 @@ void ExchangeBuilderCL::HandlerDOFExchangeCL::buildRecvStructures(
             for ( ; recvposit!=mit->second.end(); ++recvposit, ++i){
                 const IdxT local_dof= recvposit->second;
                 Assert( (int)numUnk*i==recvposit->first,
-                    DROPSErrCL("ExchangeBuilderCL::buildSendRecv1CommPhase: Missing send position"),
+                    DROPSErrCL("ExchangeBuilderCL::HandlerDOFExchangeCL::buildRecvStructures: Missing send position"),
                     DebugParallelNumC);
                 for ( Uint j=0; j<numUnk; ++j)
                     sysnums.push_back( local_dof+j);
@@ -1179,12 +1179,19 @@ class ExchangeBuilderCL::HandlerDOFtoOwnerCL : public ExchangeBuilderCL::Handler
 {
   private:
     typedef HandlerDOFExchangeCL base;      ///< base class
-    /// \brief Collect all dof on a given simplex \a s
-    void collectDOFonSimplex( const DiST::TransferableCL& s);
+    typedef SArrayCL<int,3> int3T;
+    typedef std::vector<int3T> tmpRecvT;    ///< for each process, store (proc, remote dof, remote extended dof)
+    /// \brief Collect all dof on a given simplex \a s. In this case only an empty function, as the send buffers are filled by Scatter(...)
+    /// after a DOF owner has been determined
+    void collectDOFonSimplex( const DiST::TransferableCL&) {}
+    /// \brief Determine DOF owner among all procs, which hold the local dof (as well as the local extended dof, in case of XFEM).
+    int  GetDOFOwner( const tmpRecvT& rcvTmp, bool XFEM);
+
+    std::valarray<int> owner_;    ///< store owner for each non-extended dof (or -1 if dof is not distributed)
 
   public:
     HandlerDOFtoOwnerCL( IdxDescCL& rowidx, const MultiGridCL& mg)
-        : base( rowidx, mg) { collectDOF(); }
+        : base( rowidx, mg), owner_( NoInt_, rowidx.IsExtended() ? rowidx.GetXidx().GetNumUnknownsStdFE() : rowidx.NumUnknowns()) {}
 
     ///\name Handler for DiST::InterfaceCL
     //@{
@@ -1193,35 +1200,32 @@ class ExchangeBuilderCL::HandlerDOFtoOwnerCL : public ExchangeBuilderCL::Handler
     //@}
 };
 
-void ExchangeBuilderCL::HandlerDOFtoOwnerCL::collectDOFonSimplex( const DiST::TransferableCL& s)
-/** Collect the dof that need to be sent to the owner in the first communication phase,
-    i.e., fill the list sendList_.
-*/
+int ExchangeBuilderCL::HandlerDOFtoOwnerCL::GetDOFOwner( const tmpRecvT& rcvTmp, bool XFEM)
+/** Among all procs, which hold the local dof (as well as the local extended dof, in case of XFEM), take the one with minimal load. */
 {
-    const Uint idx= rowidx_.GetIdx();
-    // Only collect data on simplices, where the dof are distributed among processes
-    if ( !s.IsDistributed( PrioMaster))
-        return;
-    // Only collect data on simplices, where a dof is given
-    if ( s.Unknowns.Exist() && s.Unknowns.Exist(idx) && s.Unknowns.InTriangLevel(rowidx_.TriangLevel())) {
-
-        // local dof information
-        const IdxT dof= s.Unknowns(idx);
-        const bool isExtended= (rowidx_.IsExtended() && rowidx_.GetXidx()[dof]!=NoIdx);
-
-        // dof that need to be sent to the owner
-        sendList_[ s.GetOwner()].push_back(static_cast<int>(dof));
-        if ( isExtended) // send also extended dof
-            sendList_[ s.GetOwner()].push_back( static_cast<int>(rowidx_.GetXidx()[dof]) );
+    const DiST::Helper::RemoteDataCL::LoadVecT& load= DiST::InfoCL::Instance().GetLoadVector();
+    double minLoad= std::numeric_limits<double>::max();
+    int owner = -1;
+    for (tmpRecvT::const_iterator it= rcvTmp.begin(), end= rcvTmp.end(); it!=end; ++it) {
+        const int proc= (*it)[0],
+                 exdof= (*it)[2];
+        if (XFEM && exdof==NoInt_)
+            continue;
+        if (load[proc] < minLoad) {
+            minLoad= load[proc];
+            owner= proc;
+        } else if ((load[proc] == minLoad) && (proc < owner))
+            owner= proc;
     }
+    return owner;
 }
 
 bool ExchangeBuilderCL::HandlerDOFtoOwnerCL::Gather( DiST::TransferableCL& t,
     DiST::Helper::SendStreamCL& send)
 /** If the simplex \a t is distributed among master copies, then put
-      (1) my rank,
-      (2) the send position of the dof (or NoInt_ if dof not in triang level on local proc),
-      (3) only for extended FE spaces: the send position of the extended dof (or NoInt_ if extended dof == NoIdx on local proc)
+    - (1) my rank,
+    - (2) the send position of the dof (or NoInt_ if dof not in triang level on local proc),
+    - (3) only for extended FE spaces: the send position of the extended dof (or NoInt_ if extended dof == NoIdx on local proc)
       into the send buffer. Return true.
     Else,
       return false.
@@ -1233,17 +1237,11 @@ bool ExchangeBuilderCL::HandlerDOFtoOwnerCL::Gather( DiST::TransferableCL& t,
 
         if ( t.Unknowns.Exist() && t.Unknowns.Exist( idx) && t.Unknowns.InTriangLevel(rowidx_.TriangLevel())) {
             const IdxT dof= t.Unknowns(idx);
-            const Uint numUnk= rowidx_.NumUnknownsSimplex( t);
-            const int firstPos= getSendPos( static_cast<int>(dof), t.GetOwner())*numUnk;
-            send << firstPos; // (2)
+            send << static_cast<int>(dof); // (2)
 
             if (rowidx_.IsExtended()) { // write (3)
                 const IdxT exdof= rowidx_.GetXidx()[dof];
-                if (exdof!=NoIdx) {
-                    const int exfirstPos= getSendPos( static_cast<int>(exdof), t.GetOwner())*numUnk;
-                    send << exfirstPos;
-                } else
-                    send << NoInt_;
+                send << (exdof!=NoIdx ? static_cast<int>(exdof) : NoInt_);
             }
         } else
             send << NoInt_; // (2)
@@ -1255,41 +1253,68 @@ bool ExchangeBuilderCL::HandlerDOFtoOwnerCL::Gather( DiST::TransferableCL& t,
 
 bool ExchangeBuilderCL::HandlerDOFtoOwnerCL::Scatter( DiST::TransferableCL& t,
     const size_t& numData, DiST::Helper::MPIistreamCL& recv)
-/** Owners have to create a mapping from the send position to the local dofs.*/
+/** DoF owners are determined. After that,
+ *  - (1) send buffers are filled by all procs with distributed dofs,
+ *  - (2) recv buffers are filled by all DoF owners.
+ */
 {
     const Uint idx= rowidx_.GetIdx();
-
-    Assert (t.Unknowns.Exist() && t.Unknowns.Exist(idx),
-        DROPSErrCL("ExchangeBuilderCL::ScatterDOFtoOwner: Unknowns does not exist"),
-        DebugParallelNumC);
-    Assert( t.AmIOwner(),
-        DROPSErrCL("ExchangeBuilderCL::ScatterDOFtoOwner: Only intended to be called by owners"),
-        DebugParallelNumC);
-
-    // local dofs
-    const IdxT dof= t.Unknowns(idx);
-    const bool isExtended= (rowidx_.IsExtended() && rowidx_.GetXidx()[dof]!=NoIdx);
-    const IdxT exdof=  isExtended ? rowidx_.GetXidx()[dof] : NoIdx;
-
     // temporaries for reading the receive stream
-    int sender=-1;
-    int sendpos=NoInt_;
+    int sender= -1, senddof= NoInt_;
 
-    for ( size_t data=0; data<numData; ++data){
-        recv >> sender;
-        // receive non-extended dof
-        recv >> sendpos;
-        if ( sendpos!=NoInt_)
-            recvList_[sender][sendpos]= dof;
-        // receive extended dof
-        recv >> sendpos;
-        if ( sendpos!=NoInt_) {
-            Assert( isExtended,
-                DROPSErrCL("ExchangeBuilderCL::ScatterDOFtoOwner: DOF on owner is not extended"),
-                DebugParallelNumC);
-            recvList_[sender][sendpos]= exdof;
+    if (t.IsDistributed(PrioMaster)) {
+        if ( t.Unknowns.Exist() && t.Unknowns.Exist( idx) && t.Unknowns.InTriangLevel(rowidx_.TriangLevel())) {
+            // local dofs
+            const IdxT dof= t.Unknowns(idx);
+            const bool isExtended= (rowidx_.IsExtended() && rowidx_.GetXidx()[dof]!=NoIdx);
+            const IdxT exdof=  isExtended ? rowidx_.GetXidx()[dof] : NoIdx;
+            const Uint numUnk= rowidx_.NumUnknownsSimplex( t);
+            // read data from stream and store it temporarily
+            tmpRecvT recvTmp;
+            for ( size_t data=0; data<numData; ++data) {
+                recv >> sender;
+                // receive non-extended dof
+                recv >> senddof;
+                // store only data for procs with dof
+                if ( senddof!=NoInt_) {
+                    recvTmp.push_back(int3T());
+                    int3T& cont= recvTmp.back();
+                    cont[0]= sender;
+                    cont[1]= senddof;
+                    if (rowidx_.IsExtended()) {
+                        // receive extended dof
+                        recv >> cont[2];
+                    }
+                }
+            }
+            if (recvTmp.size()<2) { // dof not distributed
+                owner_[dof]= -1;
+                return true;
+            }
+            // determine dof owner
+            const int owner= owner_[dof]= GetDOFOwner(recvTmp, rowidx_.IsExtended());
+            std::vector<int>& ownerSendList= sendList_[owner];
+
+            // Fill send list. Owner also fills receive list.
+            for (tmpRecvT::iterator it= recvTmp.begin(), end= recvTmp.end(); it!=end; ++it) {
+                const int sendpos= ownerSendList.size()*numUnk; // send position of dof
+                ownerSendList.push_back(static_cast<int>(dof));
+                if ( isExtended) // send also extended dof
+                    ownerSendList.push_back( static_cast<int>(exdof) );
+                if (ProcCL::MyRank() != owner)
+                    continue;
+                // owner fills receive list
+                sender= (*it)[0];
+                if ( (*it)[1]!=NoInt_) // remote dof
+                    recvList_[sender][sendpos]= dof;
+                if ( (*it)[2]!=NoInt_) // remote exdof
+                    recvList_[sender][sendpos+numUnk]= exdof;
+            }
+        } else { // I have no dof for this index
+            for ( size_t data=0; data<numData; ++data) { // read my part from stream w/o doing anything with it
+                recv >> sender >> senddof >> senddof;
+            }
         }
-
     }
     return true;
 }
@@ -1789,14 +1814,14 @@ void ExchangeBuilderCL::buildViaOwner()
     // Fill the lists sendListPhase1_ and sendListPhase2_, i.e., the dofs
     // that need to be sent in the first and second communication phase
     HandlerDOFtoOwnerCL handlerToOwner( rowidx_, mg_);
-    interf_->InformOwners( handlerToOwner);
+    interf_->Communicate( handlerToOwner);
     handlerToOwner.buildSendStructures( ex_.sendListPhase1_);
     handlerToOwner.buildRecvStructures( ex_.recvListPhase1_);
 
     // let the copies know about the send position of all distributed dofs.
     // That is, determine information for the second communication phase
     HandlerDOFFromOwnerCL handlerFromOwner( rowidx_, mg_);
-    interf_->InformCopies( handlerFromOwner);
+    interf_->Communicate( handlerFromOwner);
     handlerFromOwner.buildSendStructures( ex_.sendListPhase2_);
     handlerFromOwner.buildRecvStructures( ex_.recvListPhase2_);
 

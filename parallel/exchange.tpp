@@ -139,7 +139,7 @@ void  RecvNumDataCL<T>::Assign(VectorBaseCL<T>& v, Ulint offsetV,
     received.
     \param v          original value, that contains all local unknowns
     \param offsetV    start element of the vector, that contains local unknowns
-    \param recvBuf    vector of accumulated elements (received by owner)
+    \param recvBuf    vector of accumulated elements (received by DoF owner)
     \param offsetRecv first element in receive buffer
     \pre Communication has to be done before entering this procedure
 */

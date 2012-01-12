@@ -132,19 +132,19 @@ class ExchangeBlockCL;
 
     This class provides three main functionalities:
 
-    (1) Transforming a vector of type (b) to type (a).
-    (2) Performing an inner product of two vectors
-    (3) Getting information about the number of a dof on another process.
+    - (1) Transforming a vector of type (b) to type (a).
+    - (2) Performing an inner product of two vectors
+    - (3) Getting information about the number of a dof on another process.
 
     (1) Transforming a vector of form (b) to (a) is called "accumulation of a
     vector." This task is the main functionality of this class and is
     implemented by the function <b>void Accumulate( VectorCL&) const</b>.
 
     The accumulation process is two-fold. In the first communication phase,
-    each process holding a partial value sends this value to the numerical owner of the
-    corresponding simplex (vertex or edge). Afterwards, the owner computes the
-    sum. In the second communication phase, the owner informs the copies about
-    the global value. Note that the numerical owner may be different from the geometric
+    each process holding a partial value sends this value to the DoF owner of the
+    corresponding simplex (vertex or edge). Afterwards, the DoF owner computes the
+    sum. In the second communication phase, the DoF owner informs the copies about
+    the global value. Note that the DoF owner may be different from the geometric
     owner used in DiST.
 
     (2) The second core functionality of this class is determining the inner
@@ -210,7 +210,7 @@ class ExchangeCL
 
     /// \brief Call MPI_Isend and MPI_Irecv
     void InitComm(int Phase, const VectorCL&, ProcCL::RequestT* sendreq, ProcCL::RequestT* recvreq, BufferListT& buf, int tag=1001, Ulint offset=0) const;
-    /// \brief Let the owner do all accumulations
+    /// \brief Let the DoF owner do all accumulations
     void DoAllAccumulations( VectorCL&, const BufferListT& buf, const Ulint offset=0) const;
     /// \brief Let the copies assign the accumulated values
     void DoAllAssigning( VectorCL& v, const BufferListT& buf, const Ulint offset=0) const;
@@ -224,6 +224,7 @@ class ExchangeCL
     //@}
 
   public:
+    /// \todo Replace LocalIndex, DistrIndex, OwnerDistrIndex by Owner vector, storing the DoF owner for distributed dof, or -1 for non-distributed dof.
     IdxVecT LocalIndex;                 ///< list of local dof only locally existing
     IdxVecT DistrIndex;                 ///< list of local dof existing on at least two processes
     IdxVecT OwnerDistrIndex;            ///< list of local dof, this process owns the corresponding simplex
@@ -236,7 +237,7 @@ class ExchangeCL
     void clear();
     /// \brief Get size of the vector this class is responsible for
     size_t GetNum() const { return LocalIndex.size()+DistrIndex.size(); }
-    /// \brief Check if the communication is performed via the owner
+    /// \brief Check if the communication is performed via the DoF owner
     bool CommViaOwner() const { return viaowner_; }
 
     /// \brief Accumulate a vector
@@ -325,7 +326,7 @@ class ExchangeBlockCL
 
     /// \brief Call MPI_Isend and MPI_Irecv
     void InitComm(int Phase, const VectorCL&, RequestListT& sendreq, RequestListT& recvreq, BufferListT& buf, int tag=1001) const;
-    /// \brief Let the owner do all accumulations
+    /// \brief Let the DoF owner do all accumulations
     void DoAllAccumulations( VectorCL&, const BufferListT&) const;
     /// \brief Let the copies assign the accumulated values
     void DoAllAssigning( VectorCL& v, const BufferListT&) const;
@@ -456,7 +457,7 @@ class ExchangeBuilderCL
     ExchangeBuilderCL( const ExchangeBuilderCL&);
     ExchangeBuilderCL& operator=( const ExchangeBuilderCL&);
 
-    /// \brief Build the data structures needed to communicate via the owner
+    /// \brief Build the data structures needed to communicate via the DoF owner
     ///        process
     void buildViaOwner();
     /// \brief Build the data structures where all processes communicate
