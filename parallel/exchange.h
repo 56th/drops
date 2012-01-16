@@ -475,8 +475,8 @@ class ExchangeBuilderCL
 
     // handlers
     class HandlerDOFExchangeCL;
-    class HandlerDOFtoOwnerCL;
-    class HandlerDOFFromOwnerCL;
+    class HandlerDOFSendCL;
+    class HandlerDOFRecvCL;
     class HandlerDOFDirectCommCL;
     class HandlerDOFIndexCL;
 
