@@ -366,10 +366,12 @@ bool InterfaceCL::ScatterData( HandlerT& handler, IStreamT& recv)
     size_t numData;
     while (recv >> gid) {
         recv >> numData;
-        if (DROPSDebugC & DebugDiSTC && !recv) {
+#       if DROPSDebugC & DebugDiSTC
+        if (!recv) {
             cdebug << "error while reading object " << gid << std::endl;
             throw DROPSErrCL("InterfaceCL::ScatterData: Receive stream is broken!");
         }
+#       endif
         Helper::RemoteDataCL& rd= InfoCL::Instance().GetRemoteData( gid);
         const bool scatter_result= handler.Scatter( rd.GetLocalObject(), numData, recv);
         result= result && scatter_result;

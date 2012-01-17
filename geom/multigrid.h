@@ -205,7 +205,7 @@ class MultiGridCL
 
     size_t     version_;                            // each modification of the multigrid increments this number
     SimplexFactoryCL factory_;                      ///< generating simplices
-    
+
     mutable std::map<int, ColorClassesCL*> colors_; // map: level -> Color-classes of the tetra for that level
 
 #ifdef _PAR
@@ -453,8 +453,8 @@ for (DROPS::TriangEdgeCL::const_iterator it( mg.GetTriangEdgeBegin( lvl)), end__
 #define DROPS_FOR_TRIANG_FACE( mg, lvl, it) \
 for (DROPS::TriangFaceCL::iterator it( mg.GetTriangFaceBegin( lvl)), end__( mg.GetTriangFaceEnd( lvl)); it != end__; ++it)
 
-#define DROPS_FOR_ALL_TRIANG_CONST_FACE( mg, lvl, it) \
-for (DROPS::TriangFaceCL::const_iterator FaceCL* it( mg.GetTriangFaceBegin( lvl)), end__( mg.GetTriangFaceEnd( lvl)); it != end__; ++it)
+#define DROPS_FOR_TRIANG_CONST_FACE( mg, lvl, it) \
+for (DROPS::TriangFaceCL::const_iterator it( mg.GetTriangFaceBegin( lvl)), end__( mg.GetTriangFaceEnd( lvl)); it != end__; ++it)
 
 
 #define DROPS_FOR_TRIANG_TETRA( mg, lvl, it) \
