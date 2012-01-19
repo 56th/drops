@@ -57,7 +57,7 @@ void BuildBrick( MultiGridCL*& mg)
 }
 
 /// \brief Check, if accumulation is correct
-/** Use 1 as value for all dof. Hence, the accumulated value must equal the 
+/** Use 1 as value for all dof. Hence, the accumulated value must equal the
     number of copies of the simplex.
 */
 bool CheckAccumulation( MultiGridCL& mg)
@@ -78,7 +78,7 @@ bool CheckAccumulation( MultiGridCL& mg)
     for (size_t i = 0; i< num_idx; ++i) {
         idx_desc[i]->GetEx().Accumulate( vec_desc[i]->Data);
     }
-    
+
     std::cout << " Number of neighbors of process " << ProcCL::Master()
               << ": " << idx_desc[0]->GetEx().GetNumNeighs() << std::endl;
     bool correct=true;
@@ -122,7 +122,7 @@ bool CheckAccumulation( MultiGridCL& mg)
     }
 
     // Check ExchangeBlockCL
-    ExchangeBlockCL exblock; 
+    ExchangeBlockCL exblock;
     exblock.AttachTo( *idx_desc[2]);
     exblock.AttachTo( *idx_desc[1]);
     exblock.AttachTo( *idx_desc[0]);
@@ -183,7 +183,7 @@ std::valarray<double> getReferenceValue( const MultiGridCL& mg, IdxDescCL* idxDe
     return ProcCL::GlobalSum(result);
 }
 
-bool CheckDot( const ExchangeCL& Ex, const VectorCL& x, bool isXacc, 
+bool CheckDot( const ExchangeCL& Ex, const VectorCL& x, bool isXacc,
     const VectorCL& y, bool isYacc, double result)
 {
     VectorCL x_acc(x), y_acc(y), x_acc_ref(x), y_acc_ref(y), x_acc_norm(x);
@@ -227,7 +227,7 @@ bool CheckDot( const ExchangeCL& Ex, const VectorCL& x, bool isXacc,
 }
 
 /** \brief Check if ExchangeBlockCL delivers the same result as all its ExchangeCLs*/
-bool CheckDot( const ExchangeBlockCL& Ex, const VectorCL& x, bool isXacc, 
+bool CheckDot( const ExchangeBlockCL& Ex, const VectorCL& x, bool isXacc,
     const VectorCL& y, bool isYacc)
 {
     VectorCL x_acc(x), y_acc(y), x_acc_ref(x), y_acc_ref(y), x_acc_norm(x);
@@ -295,7 +295,7 @@ bool CheckDot( const ExchangeBlockCL& Ex, const VectorCL& x, bool isXacc,
 
 
 /// \brief Check, if inner product computation is correct
-/** Use 1 as value for all dof. Hence, the accumulated value must equal the 
+/** Use 1 as value for all dof. Hence, the accumulated value must equal the
     number of copies of the simplex.
 */
 bool CheckInnerProducts( MultiGridCL& mg)
@@ -306,7 +306,7 @@ bool CheckInnerProducts( MultiGridCL& mg)
     std::vector<VecDescCL*> vec_desc(num_idx);
     idx_desc[0]= new IdxDescCL( P1_FE);
     idx_desc[1]= new IdxDescCL( P2_FE);
-    idx_desc[2]= new IdxDescCL( vecP2_FE);    
+    idx_desc[2]= new IdxDescCL( vecP2_FE);
 
     for ( size_t i=0; i<num_idx; ++i){
         std::cout << " - Check case " << (i+1) << std::endl;
@@ -332,7 +332,7 @@ bool CheckInnerProducts( MultiGridCL& mg)
         }
 
         if ( !ProcCL::Check(case_correct)) correct=false;
-        else std::cout << "   => Case " << i << " is correct" << std::endl;
+        else std::cout << "   => Case " << (i+1) << " is correct" << std::endl;
     }
 
     ExchangeBlockCL exBlock;
@@ -381,7 +381,7 @@ void MakeTimeMeasurements( MultiGridCL& mg, const size_t num_test)
         std::cout << "    o using communication via owner\n";
     else
         std::cout << "    o using direct communication via neighbors\n";
-    std::cout << "    o vector length: global " << size_global 
+    std::cout << "    o vector length: global " << size_global
               << ", accumulated " << size_acc << std::endl;
 
     double dummy=0;
@@ -486,7 +486,7 @@ int main( int argc, char **argv)
         }
 
         const size_t num_test=1000;
-        std::cout << "Performing time measurements for " << num_test 
+        std::cout << "Performing time measurements for " << num_test
                   << " parallel dots ..." << std::endl;
         MakeTimeMeasurements( *mg, num_test);
 

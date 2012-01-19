@@ -1558,21 +1558,21 @@ void ExchangeBuilderCL::HandlerDOFDirectCommCL::collectDOFonSimplex( const DiST:
     if ( !s.IsDistributed( PrioMaster))
         return;
     // Only collect data on simplices, where a dof is given
-    if ( s.Unknowns.Exist() && s.Unknowns.Exist(idx)){
+    const bool haveDOF= s.Unknowns.Exist() && s.Unknowns.Exist( idx) && s.Unknowns.InTriangLevel(rowidx_.TriangLevel());
+    if (!haveDOF)
+        return;
+    // local dof information
+    const IdxT dof= s.Unknowns(idx);
+    const bool isExtended= (rowidx_.IsExtended() && rowidx_.GetXidx()[dof]!=NoIdx);
+    const IdxT extdof= (isExtended) ? rowidx_.GetXidx()[dof] : NoIdx;
 
-        // local dof information
-        const IdxT dof= s.Unknowns(idx);
-        const bool isExtended= (rowidx_.IsExtended() && rowidx_.GetXidx()[dof]!=NoIdx);
-        const IdxT extdof= (isExtended) ? rowidx_.GetXidx()[dof] : NoIdx;
-
-        // dof that need to be sent to copies (if there is a master copy)
-        DiST::TransferableCL::ProcList_const_iterator it= s.GetProcListBegin();
-        for ( ; it!=s.GetProcListEnd(); ++it){
-            if ( it->prio== PrioMaster){
-                sendList_[ it->proc].push_back(static_cast<int>(dof));
-                if ( isExtended)
-                    sendList_[ it->proc].push_back(static_cast<int>(extdof));
-            }
+    // dof that need to be sent to copies (if there is a master copy)
+    DiST::TransferableCL::ProcList_const_iterator it= s.GetProcListBegin();
+    for ( ; it!=s.GetProcListEnd(); ++it){
+        if ( it->prio== PrioMaster){
+            sendList_[ it->proc].push_back(static_cast<int>(dof));
+            if ( isExtended)
+                sendList_[ it->proc].push_back(static_cast<int>(extdof));
         }
     }
 }
@@ -1585,7 +1585,8 @@ bool ExchangeBuilderCL::HandlerDOFDirectCommCL::Gather( DiST::TransferableCL& t,
 */
 {
     const Uint idx= rowidx_.GetIdx();
-    if ( t.Unknowns.Exist() && t.Unknowns.Exist( idx)){
+    const bool haveDOF= t.Unknowns.Exist() && t.Unknowns.Exist( idx) && t.Unknowns.InTriangLevel(rowidx_.TriangLevel());
+    if (haveDOF){
         // local information
         const IdxT dof= t.Unknowns(idx);
         const bool isExtended= (rowidx_.IsExtended() && rowidx_.GetXidx()[dof]!=NoIdx);
@@ -1598,22 +1599,19 @@ bool ExchangeBuilderCL::HandlerDOFDirectCommCL::Gather( DiST::TransferableCL& t,
         // Inform all (master) neighbors
         DiST::TransferableCL::ProcList_const_iterator it;
         for ( it=t.GetProcListBegin(); it!=t.GetProcListEnd(); ++it){
+            if ( it->prio!=PrioMaster)
+                continue;
             const int toproc= it->proc;
             send << toproc;
-            if ( it->prio==PrioMaster){
-                const int firstPos=getSendPos( sendList_, static_cast<int>(dof), toproc)*numUnk;
-                send << firstPos;
-                if ( isExtended){
-                    const int extFirstPos=
-                        getSendPos( sendList_, static_cast<int>(extdof), toproc)*numUnk;
-                    send << extFirstPos;
-                }
-                else{
-                    send << NoInt_;         // dof is not extended
-                }
+            const int firstPos=getSendPos( sendList_, static_cast<int>(dof), toproc)*numUnk;
+            send << firstPos;
+            if ( isExtended){
+                const int extFirstPos=
+                    getSendPos( sendList_, static_cast<int>(extdof), toproc)*numUnk;
+                send << extFirstPos;
             }
             else{
-                send << NoInt_ << NoInt_;   // the copy does not own any dofs
+                send << NoInt_;         // dof is not extended
             }
         }
         send << NoInt_;                     // finalize stream
@@ -1629,14 +1627,10 @@ bool ExchangeBuilderCL::HandlerDOFDirectCommCL::Scatter( DiST::TransferableCL& t
 {
     // local dof
     const Uint idx= rowidx_.GetIdx();
-    const IdxT dof= t.Unknowns(idx);
-    const bool isExtended= (rowidx_.IsExtended() && rowidx_.GetXidx()[dof]!=NoIdx);
+    const bool haveDOF= t.Unknowns.Exist() && t.Unknowns.Exist( idx) && t.Unknowns.InTriangLevel(rowidx_.TriangLevel());
+    const IdxT dof= haveDOF ? t.Unknowns(idx) : NoIdx;
+    const bool isExtended= haveDOF ? (rowidx_.IsExtended() && rowidx_.GetXidx()[dof]!=NoIdx) : false;
     const IdxT extdof= (isExtended) ? rowidx_.GetXidx()[dof] : NoIdx;
-
-    // Check for wrong calls
-    Assert( t.Unknowns.Exist() && t.Unknowns.Exist( idx),
-        DROPSErrCL("ExchangeBuilderCL::ScatterDOFfromOwner: No dof available."),
-        DebugParallelNumC);
 
     // temporaries for receiving
     __UNUSED__ int receiver= -1;
@@ -1664,6 +1658,8 @@ bool ExchangeBuilderCL::HandlerDOFDirectCommCL::Scatter( DiST::TransferableCL& t
             recv >> dummyreceiver;
         }
 
+        if (!haveDOF)
+            continue;
         // Check, if we have received valid data
         Assert( sendpos_dof>=0 && sendpos_ext>=0,
             DROPSErrCL("ExchangeBuilderCL::ScatterDOFfromOwner: No data received"),
