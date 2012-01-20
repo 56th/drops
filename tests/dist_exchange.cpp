@@ -86,15 +86,18 @@ bool CheckAccumulation( MultiGridCL& mg)
     DROPS_FOR_TRIANG_VERTEX( mg, mg.GetLastLevel(), it){
         if ( it->Unknowns.Exist()){
             for ( size_t i=0; i<num_idx; ++i){
-                const Uint idx=idx_desc[i]->GetIdx();
-                if (it->Unknowns.Exist( idx)){
+                const Uint idx=idx_desc[i]->GetIdx(),
+                        lvl= idx_desc[i]->TriangLevel();
+                if (it->Unknowns.Exist( idx) && it->Unknowns.InTriangLevel(lvl)){
                     const IdxT dof= it->Unknowns( idx);
+                    const double numDist= idx_desc[i]->GetEx().GetNumProcs(dof)+1;
                     for ( Uint j=0; j<idx_desc[i]->NumUnknownsVertex(); ++j){
-                        if ( (double)it->GetNumDist( PrioGhost)!=vec_desc[i]->Data[dof+j]){
+                        if ( numDist!=vec_desc[i]->Data[dof+j]){
                             correct= false;
                             printf("Proc nr %d, testcase %ld: %f should be %f, Prio is %i on level %i with bary: %f %f %f\n",
-                            		ProcCL::MyRank(), i, vec_desc[i]->Data[dof+j], (double)it->GetNumDist( PrioGhost), it->GetPrio(),
+                            		ProcCL::MyRank(), i, vec_desc[i]->Data[dof+j], numDist, it->GetPrio(),
                             		it->GetLevel(), it->GetBary()[0], it->GetBary()[1], it->GetBary()[2]);
+                            it->DebugInfo(cdebug);
                         }
                     }
 
@@ -107,14 +110,16 @@ bool CheckAccumulation( MultiGridCL& mg)
         if ( it->Unknowns.Exist()){
             for ( size_t i=0; i<num_idx; ++i){
                 const Uint idx=idx_desc[i]->GetIdx();
-                if (it->Unknowns.Exist( idx)){
+                if (it->Unknowns.Exist( idx) && it->Unknowns.InTriangLevel(idx_desc[i]->TriangLevel())){
                     const IdxT dof= it->Unknowns( idx);
+                    const double numDist= idx_desc[i]->GetEx().GetNumProcs(dof)+1;
                     for ( Uint j=0; j<idx_desc[i]->NumUnknownsEdge(); ++j)
-                        if ( (double)it->GetNumDist( PrioGhost)!=vec_desc[i]->Data[dof+j]){
+                        if ( numDist!=vec_desc[i]->Data[dof+j]){
                             correct= false;
                             printf("Proc nr %d, testcase %ld: %f should be %f, Prio is %i on level %i with bary: %f %f %f\n",
-                            		ProcCL::MyRank(), i, vec_desc[i]->Data[dof+j], (double)it->GetNumDist( PrioGhost), it->GetPrio(),
+                            		ProcCL::MyRank(), i, vec_desc[i]->Data[dof+j], numDist, it->GetPrio(),
                             		it->GetLevel(), it->GetBary()[0], it->GetBary()[1], it->GetBary()[2]);
+                            it->DebugInfo(cdebug);
                     }
                 }
             }
@@ -150,33 +155,39 @@ std::valarray<double> getReferenceValue( const MultiGridCL& mg, IdxDescCL* idxDe
 {
     std::valarray<double> result(3);
     result = 0.0;
-    const Uint idx= idxDesc->GetIdx();
+    const Uint idx= idxDesc->GetIdx(),
+            numUnksVert= idxDesc->NumUnknownsVertex(),
+            numUnksEdge= idxDesc->NumUnknownsEdge(),
+            lvl= idxDesc->TriangLevel();
+
     DROPS_FOR_TRIANG_CONST_VERTEX( mg, mg.GetLastLevel(), it){
-        if ( it->Unknowns.Exist() && it->Unknowns.Exist(idx)){
+        if ( it->Unknowns.Exist() && it->Unknowns.Exist(idx) && it->Unknowns.InTriangLevel(lvl)){
             if ( it->IsLocal()){
-                result[0] += idxDesc->NumUnknownsVertex();
-                result[1] += idxDesc->NumUnknownsVertex();
-                result[2] += idxDesc->NumUnknownsVertex();
+                result[0] += numUnksVert;
+                result[1] += numUnksVert;
+                result[2] += numUnksVert;
             }
-            else if ( it->AmIOwner()){
-                result[0] += idxDesc->NumUnknownsVertex();
-                result[1] += it->GetNumDist( PrioGhost)*idxDesc->NumUnknownsVertex();
-                result[2] += it->GetNumDist( PrioGhost)*it->GetNumDist( PrioGhost)*idxDesc->NumUnknownsVertex();
+            else if ( idxDesc->GetEx().AmIOwner(it->Unknowns(idx))){
+                const double numDist= idxDesc->GetEx().GetNumProcs(it->Unknowns(idx))+1;
+                result[0] += numUnksVert;
+                result[1] += numDist*numUnksVert;
+                result[2] += numDist*numDist*numUnksVert;
             }
         }
     }
     // Check on edges
     DROPS_FOR_TRIANG_CONST_EDGE( mg, mg.GetLastLevel(), it){
-        if ( it->Unknowns.Exist() && it->Unknowns.Exist(idx)){
+        if ( it->Unknowns.Exist() && it->Unknowns.Exist(idx) && it->Unknowns.InTriangLevel(lvl)){
             if ( it->IsLocal()){
-                result[0] += idxDesc->NumUnknownsEdge();
-                result[1] += idxDesc->NumUnknownsEdge();
-                result[2] += idxDesc->NumUnknownsEdge();
+                result[0] += numUnksEdge;
+                result[1] += numUnksEdge;
+                result[2] += numUnksEdge;
             }
-            else if ( it->AmIOwner()){
-                result[0] += idxDesc->NumUnknownsEdge();
-                result[1] += it->GetNumDist( PrioGhost)*idxDesc->NumUnknownsEdge();
-                result[2] += it->GetNumDist( PrioGhost)*it->GetNumDist( PrioGhost)*idxDesc->NumUnknownsEdge();
+            else if ( idxDesc->GetEx().AmIOwner(it->Unknowns(idx))){
+                const double numDist= idxDesc->GetEx().GetNumProcs(it->Unknowns(idx))+1;
+                result[0] += numUnksEdge;
+                result[1] += numDist*numUnksEdge;
+                result[2] += numDist*numDist*numUnksEdge;
             }
         }
     }
@@ -433,11 +444,13 @@ int main( int argc, char **argv)
         DROPS::BuildBrick( mg);
         DROPS::LoadBalCL lb( *mg);      // loadbalancing
         lb.DoMigration();        // distribute initial grid
-        MarkAll( *mg);
-        mg->Refine();
-        mg->SizeInfo( std::cout);
-        lb.DoMigration();
-        mg->SizeInfo( std::cout);
+        for (int i=0; i<2; ++i) {
+            MarkAll( *mg);
+            mg->Refine();
+            mg->SizeInfo( std::cout);
+            lb.DoMigration();
+            mg->SizeInfo( std::cout);
+        }
 
 /*        for (DROPS::MultiGridCL::VertexIterator it = mg->GetAllVertexBegin(); it != mg->GetAllVertexEnd(); ++it){
       		if ( it->GetBary()[0] == 0.5 && it->GetBary()[1] == 0.0 && it->GetBary()[2] == 0.5){

@@ -287,7 +287,7 @@ class ExchangeCL
 
     /// \todo Make more efficient?
     bool AmIOwner( IdxT dof) const {
-    	if ( GetNumProcs( dof) == 1)
+    	if ( GetNumProcs( dof) == 0)
     		return true;
     	for ( size_t i = 0; i< OwnerDistrIndex.size(); ++i)
     		if (OwnerDistrIndex[i] == dof)
@@ -447,6 +447,9 @@ class ExchangeMatrixCL
 class ExchangeBuilderCL
 {
   private:
+    typedef SArrayCL<int,3> int3T;
+    typedef std::vector<int3T> tmpRecvT;    ///< for each process, store (proc, remote dof, remote extended dof) temporarily
+
     ExchangeCL&               ex_;      ///< ExchangeCL to  be build
     const MultiGridCL&        mg_;      ///< The underlying multigrid
     IdxDescCL&                rowidx_;  ///< corresponding index describer
@@ -465,6 +468,8 @@ class ExchangeBuilderCL
     void buildDirectComm();
     /// \name Helper functions for the build
     //{@
+    /// \brief Determine DOF owner among all procs, which hold the local dof (as well as the local extended dof, in case of XFEM).
+    static int GetDOFOwner( const tmpRecvT& rcvTmp, bool XFEM);
     /// \brief Clear all information in the ExchangeCL
     void clearEx();
     /// \brief Build index lists

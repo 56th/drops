@@ -1083,13 +1083,19 @@ class ExchangeBuilderCL::HandlerDOFExchangeCL
 };
 
 inline int ExchangeBuilderCL::HandlerDOFExchangeCL::getSendPos( const SendDOFListT& sendList, const int dof, const int p) const
-/** If the element \a dof is not found in \vec, NoInt_ is returned.*/
+/** If the element \a dof is not found in \a sendList for process \a p, NoInt_ is returned and exception is thrown.*/
 {
-    std::vector<int>::const_iterator it,
-        begin=sendList.find(p)->second.begin(),
-        end=sendList.find(p)->second.end();
-    it= std::lower_bound( begin, end, dof);
+    const SendDOFListT::const_iterator lit= sendList.find(p);
+    if (lit==sendList.end()) {
+        throw DROPSErrCL( "HandlerDOFExchangeCL::getSendPos: unknown proc!");
+        return NoInt_;
+    }
+    const std::vector<int>::const_iterator
+        begin= lit->second.begin(),
+        end= lit->second.end(),
+        it= std::lower_bound( begin, end, dof);
     if ( it==end){
+        throw DROPSErrCL( "HandlerDOFExchangeCL::getSendPos: unknown dof!");
         return NoInt_;
     }
     return static_cast<IdxT>( std::distance(begin, it));
@@ -1163,11 +1169,6 @@ class ExchangeBuilderCL::HandlerDOFSendCL : public ExchangeBuilderCL::HandlerDOF
     friend class HandlerDOFRecvCL;
     typedef HandlerDOFExchangeCL base;      ///< base class
     SendDOFListT sendList1_, sendList2_;    ///< list of dof which have to be sent in phase 1 and 2
-    typedef SArrayCL<int,3> int3T;
-    typedef std::vector<int3T> tmpRecvT;    ///< for each process, store (proc, remote dof, remote extended dof)
-
-    /// \brief Determine DOF owner among all procs, which hold the local dof (as well as the local extended dof, in case of XFEM).
-    int  GetDOFOwner( const tmpRecvT& rcvTmp, bool XFEM);
 
     std::valarray<int> owner_;    ///< store owner for each non-extended dof (or -1 if dof is not distributed)
 
@@ -1183,26 +1184,6 @@ class ExchangeBuilderCL::HandlerDOFSendCL : public ExchangeBuilderCL::HandlerDOF
     /// \brief Build data structures for sending
     void buildSendStructures( ExchangeCL::SendListT& ex_sendlist1, ExchangeCL::SendListT& ex_sendlist2);
 };
-
-int ExchangeBuilderCL::HandlerDOFSendCL::GetDOFOwner( const tmpRecvT& rcvTmp, bool XFEM)
-/** Among all procs, which hold the local dof (as well as the local extended dof, in case of XFEM), take the one with minimal load. */
-{
-    const DiST::Helper::RemoteDataCL::LoadVecT& load= DiST::InfoCL::Instance().GetLoadVector();
-    double minLoad= std::numeric_limits<double>::max();
-    int owner = -1;
-    for (tmpRecvT::const_iterator it= rcvTmp.begin(), end= rcvTmp.end(); it!=end; ++it) {
-        const int proc= (*it)[0],
-                 exdof= (*it)[2];
-        if (XFEM && exdof==NoInt_)
-            continue;
-        if (load[proc] < minLoad) {
-            minLoad= load[proc];
-            owner= proc;
-        } else if ((load[proc] == minLoad) && (proc < owner))
-            owner= proc;
-    }
-    return owner;
-}
 
 bool ExchangeBuilderCL::HandlerDOFSendCL::Gather( DiST::TransferableCL& t,
     DiST::Helper::SendStreamCL& send)
@@ -1549,7 +1530,7 @@ void ExchangeBuilderCL::HandlerDOFDirectCommCL::collectDOF()
 }
 
 void ExchangeBuilderCL::HandlerDOFDirectCommCL::collectDOFonSimplex( const DiST::TransferableCL& s)
-/** Collect the dof that need to be send to processes which store a copy of \a s,
+/** Collect the dof that need to be sent to processes which store a copy of \a s,
     i.e., fill the list sendList_.
 */
 {
@@ -1649,7 +1630,7 @@ bool ExchangeBuilderCL::HandlerDOFDirectCommCL::Scatter( DiST::TransferableCL& t
             recv >> dummy1 >> dummy2;
             if ( dummyreceiver==ProcCL::MyRank()){
                 Assert(receiver==-1,
-                    DROPSErrCL("ExchangeBuilderCL::ScatterDOFfromOwner: Received multiple information. I am confused."),
+                    DROPSErrCL("ExchangeBuilderCL::ScatterDOFDirectComm: Received multiple information. I am confused."),
                     DebugParallelNumC);
                 receiver= dummyreceiver;
                 sendpos_dof= dummy1;
@@ -1713,26 +1694,14 @@ bool ExchangeBuilderCL::HandlerDOFIndexCL::Gather(
 */
 {
     const Uint idx= rowidx_.GetIdx();
-    Assert( t.GetNumDist()>1,
-        DROPSErrCL("ExchangeBuilderCL::GatherLocalDOF: Handler is called for a non-distributed simplex"),
-        DebugParallelNumC);
 
-    if ( t.Unknowns.Exist() && t.Unknowns.Exist(idx)){
+    if ( t.Unknowns.Exist() && t.Unknowns.Exist(idx) && t.Unknowns.InTriangLevel(rowidx_.TriangLevel())) {
         // local dof information
         const IdxT dof= t.Unknowns(idx);
         const bool isExtended= (rowidx_.IsExtended() && rowidx_.GetXidx()[dof]!=NoIdx);
         const IdxT extdof= (isExtended) ? rowidx_.GetXidx()[dof] : NoIdx;
-        const Uint numUnk= rowidx_.NumUnknownsSimplex(t);
 
         send << ProcCL::MyRank() << dof << extdof;
-        // Additionally, remember this dof as an "owner dof."
-        if ( t.AmIOwner() && t.GetNumDist(PrioGhost)!=1){
-            for ( Uint j=0; j<numUnk; ++j)
-                ownerDistrIndex_.push_back( dof+j);
-            if ( isExtended)
-                for ( Uint j=0; j<numUnk; ++j)
-                    ownerDistrIndex_.push_back( extdof+j);
-        }
         return true;
     }
     return false;
@@ -1744,35 +1713,47 @@ bool ExchangeBuilderCL::HandlerDOFIndexCL::Scatter(
 /** Store dof information on other processes in the dofProcList_. */
 {
     const Uint idx= rowidx_.GetIdx();
-
-    Assert( t.Unknowns.Exist() && t.Unknowns.Exist(idx),
-        DROPSErrCL("ExchangeBuilderCL::ScatterLocalDOF: Received dof, but I do not store any dof"),
-        DebugParallelNumC);
-
-    // local information
-    const IdxT dof= t.Unknowns(idx);
-    const bool isExtended= (rowidx_.IsExtended() && rowidx_.GetXidx()[dof]!=NoIdx);
-    const IdxT extdof= (isExtended) ? rowidx_.GetXidx()[dof] : NoIdx;
-    const Uint numUnk= rowidx_.NumUnknownsSimplex(t);
+    const bool haveDOF= t.Unknowns.Exist() && t.Unknowns.Exist( idx) && t.Unknowns.InTriangLevel(rowidx_.TriangLevel());
 
     // temporaries for reading the stream
     int fromproc=-1;
     IdxT remote_dof, remote_extdof;
 
+    if (!haveDOF) { // read all data w/o doing anything with it
+        for ( size_t i=0; i<numData; ++i)
+            recv >> fromproc >> remote_dof >> remote_extdof;
+        return true;
+    }
+    // local information
+    const IdxT dof= t.Unknowns(idx);
+    const bool isExtended= (rowidx_.IsExtended() && rowidx_.GetXidx()[dof]!=NoIdx);
+    const IdxT extdof= (isExtended) ? rowidx_.GetXidx()[dof] : NoIdx;
+    const Uint numUnk= rowidx_.NumUnknownsSimplex(t);
+    const int me= ProcCL::MyRank();
+
     // read information
+    tmpRecvT tmpRecv(numData);
     for ( size_t i=0; i<numData; ++i){
         recv >> fromproc >> remote_dof >> remote_extdof;
-        if ( fromproc!=ProcCL::MyRank()){
+        tmpRecv[i][0]= fromproc;
+        tmpRecv[i][1]= remote_dof   !=NoIdx ? static_cast<int>(remote_dof) : NoInt_;
+        tmpRecv[i][2]= remote_extdof!=NoIdx ? static_cast<int>(remote_extdof) : NoInt_;
+        if ( fromproc!=me){
             for ( Uint j=0; j<numUnk; ++j)
                 dofProcList_[dof+j].insert( std::make_pair(fromproc, remote_dof+j));
-            if ( isExtended || remote_extdof!=NoIdx){
-                Assert(remote_extdof!=NoIdx && isExtended,
-                    DROPSErrCL("ExchangeBuilderCL::ScatterLocalDOF: Remote process has not extended its local dof"),
-                    DebugParallelNumC);
+            if ( isExtended && remote_extdof!=NoIdx){
                 for ( Uint j=0; j<numUnk; ++j)
                    dofProcList_[extdof+j].insert( std::make_pair(fromproc, remote_extdof+j));
             }
         }
+    }
+    // Additionally, remember this dof as an "owner dof."
+    if ( GetDOFOwner(tmpRecv, rowidx_.IsExtended())==me){
+        for ( Uint j=0; j<numUnk; ++j)
+            ownerDistrIndex_.push_back( dof+j);
+        if ( isExtended)
+            for ( Uint j=0; j<numUnk; ++j)
+                ownerDistrIndex_.push_back( extdof+j);
     }
 
     return true;
@@ -1810,6 +1791,26 @@ ExchangeBuilderCL::ExchangeBuilderCL(
 void ExchangeBuilderCL::clearEx()
 {
     ex_.clear();
+}
+
+int ExchangeBuilderCL::GetDOFOwner( const tmpRecvT& rcvTmp, bool XFEM)
+/** Among all procs, which hold the local dof (as well as the local extended dof, in case of XFEM), take the one with minimal load. */
+{
+    const DiST::Helper::RemoteDataCL::LoadVecT& load= DiST::InfoCL::Instance().GetLoadVector();
+    double minLoad= std::numeric_limits<double>::max();
+    int owner = -1;
+    for (tmpRecvT::const_iterator it= rcvTmp.begin(), end= rcvTmp.end(); it!=end; ++it) {
+        const int proc= (*it)[0],
+                 exdof= (*it)[2];
+        if (XFEM && exdof==NoInt_)
+            continue;
+        if (load[proc] < minLoad) {
+            minLoad= load[proc];
+            owner= proc;
+        } else if ((load[proc] == minLoad) && (proc < owner))
+            owner= proc;
+    }
+    return owner;
 }
 
 void ExchangeBuilderCL::BuildIndexLists()
