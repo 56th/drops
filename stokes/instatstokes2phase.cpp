@@ -2278,6 +2278,247 @@ void InstatStokes2PhaseP2P1CL::SetupLB (MLMatDescCL* A, VecDescCL* cplA, const L
 
 }
 
+// -----------------------------------------------------------------------------
+//                        Routines for Setup Boussinesq-Scriven surface viscous term
+// -----------------------------------------------------------------------------
+
+
+/// \brief Setup of the local "BS" on a tetra intersected by the dividing surface.
+class LocalBSTwoPhase_P2CL
+{
+  private:
+    const PrincipalLatticeCL& lat;
+    LocalP1CL<Point3DCL> GradRefLP1[10], GradLP1[10];
+    GridFunctionCL<Point3DCL> qnormal;
+    GridFunctionCL<Point3DCL> qgrad[10],qsurfgrad[10];
+    GridFunctionCL<Point3DCL> qPhte;
+    GridFunctionCL<double> qPhte_sgradv;
+    Point3DCL qBnsqD, qBnsqS1, qBnsqS2;
+
+    QuadDomain2DCL  q2Ddomain;
+    std::valarray<double> ls_loc;
+    SurfacePatchCL spatch;
+
+
+    double surfshear_, surfdilatation_;
+    void Get_Normals(const LocalP2CL<>& ls, LocalP1CL<Point3DCL>&);
+
+  public:
+    LocalBSTwoPhase_P2CL (double surfshear, double surfdilatation)
+        : lat( PrincipalLatticeCL::instance( 2)), ls_loc( 10), surfshear_( surfshear), surfdilatation_( surfdilatation)
+    { P2DiscCL::GetGradientsOnRef( GradRefLP1); }
+
+    //Setup-Routine of (improved) BS for the tetrahedra tet
+    void setup (const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const TetraCL& tet, double A[10][10][3][3]);
+
+};
+
+// The P2 levelset-function is used to compute the normals which are needed for the (improved) projection onto the interface, GradLP1 has to be set before
+void LocalBSTwoPhase_P2CL::Get_Normals(const LocalP2CL<>& ls, LocalP1CL<Point3DCL>& Normals)
+{
+    for(int i=0; i<10 ; ++i)
+    {
+        Normals+=ls[i]*GradLP1[i];
+    }
+
+}
+
+void LocalBSTwoPhase_P2CL::setup (const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const TetraCL& tet, double A[10][10][3][3])
+{
+    P2DiscCL::GetGradients( GradLP1, GradRefLP1, T);
+    evaluate_on_vertexes( ls, lat, Addr( ls_loc));
+    spatch.make_patch<MergeCutPolicyCL>( lat, ls_loc);
+    // The routine takes the information about the tetrahedra and the cutting surface and generates a two-dimensional triangulation of the cut, including the necessary point-positions and weights for the quadrature
+    make_CompositeQuad5Domain2D ( q2Ddomain, spatch, tet);
+    LocalP1CL<Point3DCL> Normals;
+    Get_Normals(ls, Normals);
+    // Resize and evaluate Normals at all points which are needed for the two-dimensional quadrature-rule
+    resize_and_evaluate_on_vertexes (Normals, q2Ddomain, qnormal);
+    // Scale Normals accordingly to the Euclidean Norm (only consider the ones which make a contribution in the sense of them being big enough... otherwise one has to expect problems with division through small numbers)
+    for(Uint i=0; i<qnormal.size(); ++i) {
+         //if(qnormal[i].norm()> 1e-8)
+         qnormal[i]= qnormal[i]/qnormal[i].norm();
+    }
+    // Resize and evaluate of all the 10 Gradient P1 Functions and apply pointwise projections   (P grad \xi_j  for j=1..10)
+    for(int j=0; j<10 ;++j) {
+        resize_and_evaluate_on_vertexes( GradLP1[j], q2Ddomain, qgrad[j]);
+        qsurfgrad[j].resize(qgrad[j].size());
+        qsurfgrad[j]= qgrad[j] - dot( qgrad[j], qnormal)*qnormal;
+    }
+    // Compute all combinations for (i,j,k,l) i,j=1...10 k,l=1...3 and corresponding quadrature
+    GridFunctionCL<Point3DCL> e[3];  //basis vectors
+    for (int ei=0;ei<3;++ei)
+    {
+        e[ei].resize(qnormal.size());
+        for (Uint i=0; i<e[ei].size(); ++i)
+            e[ei][i] = std_basis<3>( ei+1);
+    }
+
+    qPhte.resize(qnormal.size());
+    qPhte_sgradv.resize(qnormal.size());
+    for (int k=0; k<3; ++k)
+    {
+        qPhte = e[k] - dot(e[k], qnormal)*qnormal;
+        for (int i=0; i<10;++i)
+        {
+            qPhte_sgradv = dot( qPhte, qsurfgrad[i]);
+            for (int j=0; j<10; ++j)
+            {
+                qBnsqD  = (surfdilatation_ - surfshear_)*quad_2D( qsurfgrad[j]*qPhte_sgradv, q2Ddomain);
+                qBnsqS1 = surfshear_*quad_2D( qsurfgrad[i]*dot(qPhte, qgrad[j]), q2Ddomain);
+                qBnsqS2 = surfshear_*quad_2D( dot(qgrad[j], qsurfgrad[i])*qPhte, q2Ddomain);
+                for (int l=0; l<3; ++l)
+                {
+                    A[j][i][l][k] = qBnsqD[l] + qBnsqS1[l] + qBnsqS2[l];
+                }
+            }
+        }
+    }
+}
+
+
+/// \brief Accumulator to set up the matrices A and cplA for Boussinesq-Scriven surface viscous terms.
+class BSAccumulator_P2CL : public TetraAccumulatorCL
+{
+  private:
+    double locA [10][10][3][3];
+    const TwoPhaseFlowCoeffCL& Coeff;
+    const StokesBndDataCL& BndData;
+    const LevelsetP2CL& lset;
+    double t;
+
+    IdxDescCL& RowIdx;
+    MatrixCL& A;
+    VecDescCL* cplA;
+
+    MatrixBuilderCL* mA_;
+
+    LocalBSTwoPhase_P2CL local_twophase; ///< used on intersected tetras
+
+    LocalNumbP2CL n; ///< global numbering of the P2-unknowns
+
+    SMatrixCL<3,3> T;
+    double det, absdet;
+    LocalP2CL<> ls_loc;
+
+    Point3DCL dirichlet_val[10];
+
+    ///\brief Computes the mapping from local to global data "n", the local matrices in loc and, if required, the Dirichlet-values needed to eliminate the boundary-dof from the global system.
+    void local_setup (const TetraCL& tet);
+    ///\brief Update the global system.
+    void update_global_system ();
+
+  public:
+    BSAccumulator_P2CL (const TwoPhaseFlowCoeffCL& Coeff, const StokesBndDataCL& BndData_,
+        const LevelsetP2CL& ls, IdxDescCL& RowIdx_, MatrixCL& A_, VecDescCL* cplA_, double t );
+
+    ///\brief Initializes matrix-builders and load-vectors
+    void begin_accumulation ();
+    ///\brief Builds the matrices
+    void finalize_accumulation();
+
+    void visit (const TetraCL& sit);
+
+    TetraAccumulatorCL* clone (int /*tid*/) { return new BSAccumulator_P2CL ( *this); };
+};
+
+BSAccumulator_P2CL::BSAccumulator_P2CL (const TwoPhaseFlowCoeffCL& Coeff_, const StokesBndDataCL& BndData_,
+    const LevelsetP2CL& lset_arg, IdxDescCL& RowIdx_, MatrixCL& A_, VecDescCL* cplA_, double t_)
+    : Coeff( Coeff_), BndData( BndData_), lset( lset_arg), t( t_),
+      RowIdx( RowIdx_), A( A_), cplA( cplA_), local_twophase( Coeff.ShearVisco, Coeff.DilVisco)
+{}
+
+void BSAccumulator_P2CL::begin_accumulation ()
+{
+    std::cout << "entering SetupBS: ";
+    const size_t num_unks_vel= RowIdx.NumUnknowns();
+    mA_= new MatrixBuilderCL( &A, num_unks_vel, num_unks_vel);
+    if (cplA != 0) {
+        cplA->Clear( t);
+    }
+}
+
+void BSAccumulator_P2CL::finalize_accumulation ()
+{
+    mA_->Build();
+    delete mA_;
+#ifndef _PAR
+    std::cout << A.num_nonzeros() << " nonzeros in A_BS!";
+#endif
+    std::cout << '\n';
+}
+
+void BSAccumulator_P2CL::visit (const TetraCL& tet)
+{
+    ls_loc.assign( tet, lset.Phi, lset.GetBndData());
+
+    if (!equal_signs( ls_loc))
+    {
+        local_setup( tet);
+        update_global_system();
+    }
+
+}
+
+void BSAccumulator_P2CL::local_setup (const TetraCL& tet)
+{
+    GetTrafoTr( T, det, tet);
+
+    n.assign( tet, RowIdx, BndData.Vel);
+    local_twophase.setup( T, ls_loc, tet, locA);
+
+    if(cplA != 0) {
+        for (int i= 0; i < 10; ++i) {
+            if (!n.WithUnknowns( i)) {
+                typedef StokesBndDataCL::VelBndDataCL::bnd_val_fun bnd_val_fun;
+                bnd_val_fun bf= BndData.Vel.GetBndSeg( n.bndnum[i]).GetBndFun();
+                dirichlet_val[i]= i<4 ? bf( tet.GetVertex( i)->GetCoord(), t)
+                    : bf( GetBaryCenter( *tet.GetEdge( i-4)), t);
+            }
+        }
+    }
+}
+
+void BSAccumulator_P2CL::update_global_system ()
+{
+    MatrixBuilderCL& mA= *mA_;
+
+    for(int i= 0; i < 10; ++i)    // assemble row Numb[i]
+        if (n.WithUnknowns( i)) { // dof i is not on a Dirichlet boundary
+            for(int j= 0; j < 10; ++j) {
+                if (n.WithUnknowns( j)) { // dof j is not on a Dirichlet boundary
+                    for(int k=0;k<3;++k)
+                        for(int l=0;l<3;++l)
+                            mA( n.num[i]+k, n.num[j]+l) += locA[j][i][l][k];
+                }
+                else if (cplA != 0) { // right-hand side for eliminated Dirichlet-values
+                    for(int k=0;k<3;++k)
+                        cplA->Data[n.num[i]+k] -= (locA[j][i][0][k] + locA[j][i][1][k] + locA[j][i][2][k])*dirichlet_val[j][k];
+                }
+            }
+        }
+}
+
+void SetupBS_P2( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_, const StokesBndDataCL& BndData_, MatrixCL& A, VelVecDescCL* cplA, const LevelsetP2CL& lset, IdxDescCL& RowIdx, double t)
+/// Set up the Boussinesq-Scriven-matrix
+{
+     BSAccumulator_P2CL accu( Coeff_, BndData_, lset, RowIdx, A, cplA, t);
+     TetraAccumulatorTupleCL accus;
+     accus.push_back( &accu);
+     accumulate( accus, MG_, RowIdx.TriangLevel(), RowIdx.GetMatchingFunction(), RowIdx.GetBndInfo());
+}
+
+void InstatStokes2PhaseP2P1CL::SetupBS (MLMatDescCL* A, VecDescCL* cplA, const LevelsetP2CL& lset, double t) const
+{
+    MLMatrixCL::iterator  itA = A->Data.begin();
+    MLIdxDescCL::iterator it  = A->RowIdx->begin();
+    for (size_t lvl=0; lvl < A->RowIdx->size(); ++lvl, ++itA, ++it)
+    {
+        SetupBS_P2( MG_,  Coeff_, BndData_, *itA, lvl == A->Data.size()-1 ? cplA : 0, lset, *it, t);
+    }
+
+}
+
 
 void InstatStokes2PhaseP2P1CL::SetupSystem2( MLMatDescCL* B, VecDescCL* c, const LevelsetP2CL& lset, double t) const
 // Set up matrix B and rhs c
