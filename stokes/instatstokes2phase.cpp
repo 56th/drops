@@ -1207,14 +1207,14 @@ void InstatStokes2PhaseP2P1CL::InitVel(VelVecDescCL* vec, instat_vector_fun_ptr 
     for (MultiGridCL::const_TriangVertexIteratorCL sit= const_cast<const MultiGridCL&>( MG_).GetTriangVertexBegin( lvl),
          send= const_cast<const MultiGridCL&>( MG_).GetTriangVertexEnd( lvl);
          sit != send; ++sit) {
-        if ( sit->Unknowns.Exist() && sit->Unknowns.Exist( vidx))// (!BndData_.Vel.IsOnDirBnd( *sit) && sit->Unknowns.InTriangLevel(lvl))
+        if ( sit->Unknowns.Exist() && sit->Unknowns.Exist( vidx))
             DoFHelperCL<Point3DCL, VectorCL>::set( lsgvel, sit->Unknowns( vidx),
                 LsgVel(sit->GetCoord(), t0));
     }
     for (MultiGridCL::const_TriangEdgeIteratorCL sit= const_cast<const MultiGridCL&>( MG_).GetTriangEdgeBegin( lvl),
          send= const_cast<const MultiGridCL&>( MG_).GetTriangEdgeEnd( lvl);
          sit != send; ++sit) {
-        if ( sit->Unknowns.Exist() && sit->Unknowns.Exist( vidx))//!BndData_.Vel.IsOnDirBnd( *sit) && sit->Unknowns.InTriangLevel(lvl))
+        if ( sit->Unknowns.Exist() && sit->Unknowns.Exist( vidx))
             DoFHelperCL<Point3DCL, VectorCL>::set( lsgvel, sit->Unknowns( vidx),
                 LsgVel( (sit->GetVertex(0)->GetCoord() + sit->GetVertex(1)->GetCoord())/2., t0));
     }
