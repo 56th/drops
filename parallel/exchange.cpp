@@ -1087,7 +1087,6 @@ inline int ExchangeBuilderCL::HandlerDOFExchangeCL::getSendPos( const SendDOFLis
 {
     const SendDOFListT::const_iterator lit= sendList.find(p);
     if (lit==sendList.end()) {
-        throw DROPSErrCL( "HandlerDOFExchangeCL::getSendPos: unknown proc!");
         return NoInt_;
     }
     const std::vector<int>::const_iterator
@@ -1210,8 +1209,13 @@ bool ExchangeBuilderCL::HandlerDOFSendCL::Gather( DiST::TransferableCL& t,
             const IdxT exdof= rowidx_.GetXidx()[dof];
             send << (exdof!=NoIdx ? static_cast<int>(exdof) : NoInt_);
         }
-    } else
+    } else {
         send << NoInt_; // (2)
+        if (rowidx_.IsExtended()) { // write (3)
+            send << NoInt_; // (3)
+        }
+    }
+
     return true;
 }
 
@@ -1250,6 +1254,9 @@ bool ExchangeBuilderCL::HandlerDOFSendCL::Scatter( DiST::TransferableCL& t,
                 else
                     cont[2]= NoInt_;
             }
+            else if (rowidx_.IsExtended())
+                recv >> senddof;
+
         }
         if (recvTmp.size()<2) { // dof not distributed
             owner_[dof]= -1;
@@ -1330,6 +1337,8 @@ bool ExchangeBuilderCL::HandlerDOFRecvCL::Gather( DiST::TransferableCL& t,
     - (3) only for extended FE spaces: the send position of the extended dof (or NoInt_ if extended dof == NoIdx on local proc)
     into the send buffer.
 
+    NoInt_ finalize the stream
+
     For the second phase, the DoF owner informs all copies about the send position of the dof located at the simplex.
     Therefore, put the rank of the receiving process, send position of the dof and extended
     dof into the send buffer. Finalize the stream by NoInt_
@@ -1337,21 +1346,25 @@ bool ExchangeBuilderCL::HandlerDOFRecvCL::Gather( DiST::TransferableCL& t,
 {
     if (!t.IsDistributed(PrioMaster))
         return false;
-
     const Uint idx= rowidx_.GetIdx();
+    const bool haveDOF= t.Unknowns.Exist() && t.Unknowns.Exist( idx) && t.Unknowns.InTriangLevel(rowidx_.TriangLevel());// && hs_.owner_[t.Unknowns(idx)] != -1;
+
     const Uint numUnk= rowidx_.NumUnknownsSimplex( t);
 
     // send positions for first phase
     const int me= ProcCL::MyRank();
     send << me; // (1)
 
-    const bool haveDOF= t.Unknowns.Exist() && t.Unknowns.Exist( idx) && t.Unknowns.InTriangLevel(rowidx_.TriangLevel());
     if ( !haveDOF) {
         send << NoInt_; // (2)
+        if (rowidx_.IsExtended())
+            send << NoInt_; // (3)
+        send << NoInt_;                     // finalize stream
         return true;
     }
     const IdxT dof= t.Unknowns(idx);
     const int owner= hs_.owner_[dof];
+
     send << getSendPos( hs_.sendList1_, static_cast<int>(dof), owner)*numUnk; // (2)
 
     if (rowidx_.IsExtended()) { // write (3)
@@ -1360,8 +1373,11 @@ bool ExchangeBuilderCL::HandlerDOFRecvCL::Gather( DiST::TransferableCL& t,
     }
 
     // send positions for second phase
-    if (me!=owner)
+    if (me!=owner){
+        send << NoInt_;                     // finalize stream
         return true;
+    }
+
     const bool isExtended= (rowidx_.IsExtended() && rowidx_.GetXidx()[dof]!=NoIdx);
     const IdxT extdof= (isExtended) ? rowidx_.GetXidx()[dof] : NoIdx;
 
@@ -1397,11 +1413,13 @@ bool ExchangeBuilderCL::HandlerDOFRecvCL::Scatter( DiST::TransferableCL& t,
     const bool haveDOF= t.Unknowns.Exist() && t.Unknowns.Exist( idx) && t.Unknowns.InTriangLevel(rowidx_.TriangLevel());
 
     if (!haveDOF) { // receive all data w/o doing anything with it
-        ///\todo How to handle the case that some of the master copies have the DOF while others have not?
-        const size_t N= numData*2;
         int dummy;
-        for ( size_t i=0; i<N; ++i)
-            recv >> dummy;
+        for ( size_t i=0; i<numData; ++i){
+            recv >> dummy >> dummy;
+            if (rowidx_.IsExtended())
+                recv >> dummy;
+            GetDOFPos( recv, -1, dummy, dummy);
+        }
         return true;
     }
     // local dof exists, so collect some data
@@ -1425,8 +1443,11 @@ bool ExchangeBuilderCL::HandlerDOFRecvCL::Scatter( DiST::TransferableCL& t,
                     recvList1_[sender][sendextdof]= extdof;
             }
         }
-        if (owner!=sender)
+        if (owner!=sender){
+            recv >> senddof;  // read final NoInt_
             continue;
+        }
+
         // receive data for phase 2
         GetDOFPos( recv, me, senddof, sendextdof);
         // Check, if we have received valid data

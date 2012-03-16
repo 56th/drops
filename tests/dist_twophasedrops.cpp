@@ -535,18 +535,17 @@ int main (int argc, char** argv)
     for (int i = 0; i<P.get<int>("AdaptRef.FinestLevel"); ++i) {
         MarkAll( *mg);
         mg->Refine();
+#ifdef _PAR
+        adap.GetLb().DoMigration();
+#endif
+        mg->SizeInfo(std::cout);
+        std::cout << DROPS::SanityMGOutCL(*mg) << std::endl;
     }
-    mg->SizeInfo(std::cout);
     std::cout << DROPS::SanityMGOutCL(*mg) << std::endl;
 #ifdef _PAR
-
-    adap.GetLb().DoMigration();
-    mg->SizeInfo(std::cout);
-    std::cout << DROPS::SanityMGOutCL(*mg) << std::endl;
  //   if (DROPS::ProcCL::Check( CheckParMultiGrid( adap.GetPMG())))
  //       std::cout << "As far as I can tell the ParMultigridCl is sane\n";
 #endif
-
     DROPS::InstatNavierStokes2PhaseP2P1CL prob( *mg, DROPS::TwoPhaseFlowCoeffCL(P), bnddata, P.get<double>("Stokes.XFEMStab")<0 ? DROPS::P1_FE : DROPS::P1X_FE, P.get<double>("Stokes.XFEMStab"));
 
     Strategy( prob, *lsetbnddata, adap);    // do all the stuff
@@ -556,7 +555,7 @@ int main (int argc, char** argv)
     delete prbnddata;
     delete lsetbnddata;
   }
-  catch (DROPS::DROPSErrCL err) { err.handle(); }
+  catch (DROPS::DROPSErrCL& err) { err.handle(); }
   return 0;
 }
 
