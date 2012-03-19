@@ -734,7 +734,7 @@ void MetisPartitionerCL::doPartition()
     else if( procs_owning_vertices==ProcCL::Size())
         doParallelPartition();
     else
-        throw DROPSErrCL("MetisPartitionerCL::doPartition: At least one process does not store any vertex!");
+        printf("[%i]: MetisPartitionerCL::doPartition: At least one process does not store any vertex!\n", ProcCL::MyRank());
 }
 
 
