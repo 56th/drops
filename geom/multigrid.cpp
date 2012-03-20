@@ -160,6 +160,7 @@ MultiGridCL::MultiGridCL (const MGBuilderCL& Builder)
 #endif
     Builder.build(this);
     FinalizeModify();
+    ParMultiGridCL::Instance().MarkSimplicesForUnknowns();
 }
 
 void MultiGridCL::ClearTriangCache ()

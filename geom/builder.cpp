@@ -1359,7 +1359,7 @@ ReadMeshBuilderCL::build(MultiGridCL* mgp) const
     mfaces_.Check();
     cells_.Check();
 
-    SimplexFactoryCL factory( this->GetVertices(mgp), this->GetEdges(mgp), this->GetFaces(mgp), this->GetTetras(mgp));
+    factory_ = new SimplexFactoryCL( this->GetVertices(mgp), this->GetEdges(mgp), this->GetFaces(mgp), this->GetTetras(mgp));
 
     AppendLevel( mgp);
 
@@ -1393,7 +1393,7 @@ ReadMeshBuilderCL::build(MultiGridCL* mgp) const
                     +va[section.mface[i][1]]->GetCoord()
                     +va[section.mface[i][2]]->GetCoord())/3.0;
                 factory_->MakeFace( 0, bary); // Default is no boundary segment. (And the face is generated in the container faces)
-                throw DROPSErrCL("Plase check this point and remove this exeption, if this is right!");
+                throw DROPSErrCL("Please check this point and remove this exeption, if this is right!");
 #else
                 factory_->MakeFace( 0); // Default is no boundary segment.
 #endif
@@ -1410,7 +1410,7 @@ ReadMeshBuilderCL::build(MultiGridCL* mgp) const
                     +va[section.mface[i][1]]->GetCoord()
                     +va[section.mface[i][2]]->GetCoord())/3.0;
                 factory_->MakeFace( 0, bary, zone_id2bndidx_[section.headerinfo[0]]); // Default is no boundary segment.
-                throw DROPSErrCL("Plase check this point and remove this exeption, if this is right!");
+                throw DROPSErrCL("Please check this point and remove this exeption, if this is right!");
 #else
                 factory_->MakeFace( 0, zone_id2bndidx_[section.headerinfo[0]]); // Default is no boundary segment.
 #endif
