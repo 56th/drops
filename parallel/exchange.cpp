@@ -1094,7 +1094,6 @@ inline int ExchangeBuilderCL::HandlerDOFExchangeCL::getSendPos( const SendDOFLis
         end= lit->second.end(),
         it= std::lower_bound( begin, end, dof);
     if ( it==end){
-        throw DROPSErrCL( "HandlerDOFExchangeCL::getSendPos: unknown dof!");
         return NoInt_;
     }
     return static_cast<IdxT>( std::distance(begin, it));
@@ -1769,7 +1768,7 @@ bool ExchangeBuilderCL::HandlerDOFIndexCL::Scatter(
         }
     }
     // Additionally, remember this dof as an "owner dof."
-    if ( GetDOFOwner(tmpRecv, rowidx_.IsExtended())==me){
+    if ( GetDOFOwner(tmpRecv, rowidx_.IsExtended())==me && numData != 1){
         for ( Uint j=0; j<numUnk; ++j)
             ownerDistrIndex_.push_back( dof+j);
         if ( isExtended)
