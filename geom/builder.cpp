@@ -1509,6 +1509,279 @@ void EmptyReadMeshBuilderCL::build(MultiGridCL* mgp) const
 /*******************************************************************
 *   F I L E B U I L D E R  C L                                    *
 *******************************************************************/
+#ifndef _PAR
+
+void FileBuilderCL::BuildVerts(MultiGridCL* mgp) const
+{
+    std::string vertex_filename= path_+"Vertices",
+                bndvtx_filename= path_+"BoundaryVertices";
+    std::ifstream vertex_file( vertex_filename.c_str());
+    std::ifstream bndvtx_file( bndvtx_filename.c_str());
+
+    CheckFile( vertex_file);
+    CheckFile( bndvtx_file);
+    MultiGridCL::VertexCont& verts= GetVertices(mgp);
+    size_t idx=0;
+
+    // Input-Variables
+    size_t id=0, max_id= 0;
+    Point3DCL point;
+    Uint level=0, oldlevel=0;
+    bool rmmark;
+
+    // Boundary
+    size_t bndidx=0;
+    bndvtx_file >> std::ws;
+    if (!bndvtx_file.eof())
+        bndvtx_file >> bndidx;
+    Point2DCL p2d;
+    size_t bidx;
+
+    while (!vertex_file.eof())
+    {
+        idx++;
+        vertex_file >> id
+                    >> point[0] >> point[1] >> point[2]
+                    >> level    >> rmmark;
+        if (level>oldlevel) {
+            AppendLevel(mgp);  // append Level in ALL lists
+            oldlevel=level;
+        }
+
+        max_id= std::max( max_id, id);
+        verts[level].push_back( VertexCL ( point, level, IdCL<VertexCL>( id)));
+        if (rmmark) verts[level].back().SetRemoveMark();
+
+        // BndVerts
+        while (idx==bndidx)
+        {
+            bndvtx_file >> bidx
+                        >> p2d[0] >> p2d[1];
+            verts[level].back().AddBnd( BndPointCL(bidx, p2d));
+            if (!bndvtx_file.eof()) bndvtx_file >> bndidx; else bndidx=0;
+        }
+        vertexAddressMap[idx]= &verts[level].back();
+    }
+    IdCL<VertexCL>::ResetCounter( max_id + 1);
+    CheckFile(vertex_file);
+    CheckFile(bndvtx_file);
+}
+
+void FileBuilderCL::BuildEdges(MultiGridCL* mgp) const
+{
+    std::string filename= path_+"Edges";
+    std::ifstream edge_file(filename.c_str());
+    CheckFile(edge_file);
+    MultiGridCL::EdgeCont& edges= GetEdges(mgp);
+    size_t idx=0;
+
+    size_t vert0, vert1, midvert;
+    Uint level=0;
+    BndIdxT bnd0, bnd1;
+    short int mfr=0;
+    bool rmmark;
+
+    while (!edge_file.eof())
+    {
+        idx++;
+        edge_file >> vert0   >> vert1
+                  >> midvert >> bnd0
+                  >> bnd1    >> mfr
+                  >> level   >> rmmark;
+
+        VertexCL* vertex0   (vertexAddressMap[vert0]);
+        VertexCL* vertex1   (vertexAddressMap[vert1]);
+        VertexCL* midvertex (vertexAddressMap[midvert]);
+        Assert(vertex0!=0 && vertex1!=0, DROPSErrCL("FileBuilderCL::BuildEdges: Vertex is missing"), DebugRefineEasyC);
+        edges[level].push_back( EdgeCL (vertex0, vertex1, level, bnd0, bnd1, mfr));
+        edges[level].back().SetMidVertex (midvertex);
+        if (rmmark) edges[level].back().SetRemoveMark();
+        edgeAddressMap[idx]= &edges[level].back();
+
+    }
+    CheckFile(edge_file);
+}
+
+void FileBuilderCL::BuildFacesI(MultiGridCL* mgp) const
+{
+    std::string filename= path_+"Faces";
+    std::ifstream face_file(filename.c_str());
+    CheckFile(face_file);
+    MultiGridCL::FaceCont& faces= GetFaces(mgp);
+    size_t idx=0;
+    size_t tmp;
+
+    Uint level=0;
+    BndIdxT bnd;
+    bool rmmark;
+
+    while (!face_file.eof())
+    {
+        idx++;
+        for (int i=0; i<4; ++i)
+            face_file >> tmp; // 4 Neighbors
+        face_file >> bnd >> level
+                  >> rmmark;
+
+        faces[level].push_back(FaceCL (level, bnd));
+        if (rmmark) faces[level].back().SetRemoveMark();
+        faceAddressMap[idx]= &faces[level].back();
+    }
+    CheckFile(face_file);
+}
+
+void FileBuilderCL::BuildTetras(MultiGridCL* mgp) const
+{
+    std::string filename= path_+"Tetras";
+    std::ifstream tetra_file( filename.c_str());
+    CheckFile(tetra_file);
+    std::string buffer;
+    MultiGridCL::TetraCont& tetras= GetTetras(mgp);
+    size_t idx=0;
+    size_t id=0, max_id=0;
+    Uint refrule, refmark;
+    Uint level=0;
+
+    VertexCL* verts[4];
+    size_t    vertaddr[4];
+    size_t    edgeaddr[6];
+    size_t    faceaddr[4];
+    size_t    parent;
+
+    while (!tetra_file.eof())
+    {
+        idx++;
+        tetra_file >> id          >> level
+                   >> refrule     >> refmark
+                   >> vertaddr[0] >> vertaddr[1]
+                   >> vertaddr[2] >> vertaddr[3]
+                   >> edgeaddr[0] >> edgeaddr[1]
+                   >> edgeaddr[2] >> edgeaddr[3]
+                   >> edgeaddr[4] >> edgeaddr[5]
+                   >> faceaddr[0] >> faceaddr[1]
+                   >> faceaddr[2] >> faceaddr[3]
+                   >> parent;
+
+        max_id= std::max( max_id, id);
+        for (Uint i=0; i<4; ++i) verts[i]=vertexAddressMap[vertaddr[i]];
+        TetraCL* par = tetraAddressMap[parent];
+        tetras[level].push_back( TetraCL (verts[0], verts[1], verts[2], verts[3], par, IdCL<TetraCL>( id)));
+        tetras[level].back().SetRefRule(refrule);
+        tetras[level].back().SetRefMark (refmark);
+
+        for (Uint i=0; i<6; ++i) {
+            tetras[level].back().SetEdge(i, edgeAddressMap[edgeaddr[i]]);
+        }
+
+        for (Uint i=0; i<4; ++i) {
+            tetras[level].back().SetFace(i, faceAddressMap[faceaddr[i]]);
+        }
+
+        tetraAddressMap[idx]= &tetras[level].back();
+
+    }
+    IdCL<TetraCL>::ResetCounter( max_id + 1);
+    CheckFile(tetra_file);
+}
+
+void FileBuilderCL::BuildFacesII(MultiGridCL* mgp) const
+{
+    std::string filename= path_+"Faces";
+    std::ifstream face_file( filename.c_str());
+    CheckFile(face_file);
+    size_t idx=0;
+    size_t neighbor[4];
+
+    Uint level=0;
+    BndIdxT bnd;
+    bool rmmark;
+
+    MultiGridCL::FaceIterator it= mgp->GetAllFaceBegin();
+
+    while (!face_file.eof())
+    {
+        idx++;
+        for (int i=0; i<4; ++i)
+            face_file >> neighbor[i]; // 4 Neighbors
+
+        // Read remaining values of the line
+        face_file >> bnd >> level
+                  >> rmmark;
+        for (Uint i=0; i<4; ++i) {
+            it->SetNeighbor(i, tetraAddressMap[neighbor[i]]);
+        }
+        ++it;
+    }
+    CheckFile(face_file);
+}
+
+void FileBuilderCL::AddChildren() const
+{
+    std::string filename= path_+"Children";
+    std::ifstream child_file( filename.c_str());
+    CheckFile(child_file);
+    child_file >> std::ws;
+    size_t tetra=0;
+    size_t child;
+
+    while (!child_file.eof())
+    {
+        child_file >> tetra;
+        for (Uint i=0; (i<MaxChildrenC) && (tetra!=0); ++i) {
+            child_file >> child;
+            if (child != 0) tetraAddressMap[tetra]->SetChild(i, tetraAddressMap[child]);
+        }
+    }
+    CheckFile(child_file);
+}
+
+void FileBuilderCL::build(MultiGridCL* mgp) const
+{
+    AppendLevel(mgp);
+
+    // Create vertices
+    std::cout << "Building Vertices ";
+    BuildVerts(mgp);
+    std::cout << "--> success\n";
+
+    // Create Edges
+    std::cout << "Building Edges ";
+    BuildEdges(mgp);
+    std::cout << "--> success\n";
+
+    // Create Faces (without Neighbors)
+    std::cout << "Building Faces Part I ";
+    BuildFacesI (mgp);
+    std::cout << "--> success\n";
+
+    // Create Tetras
+    std::cout << "Building Tetras ";
+    BuildTetras (mgp);
+    AddChildren ();
+    std::cout << "--> success\n";
+
+    FinalizeModify(mgp);
+
+    // Link Tetras to Faces
+    std::cout << "Building Faces Part II ";
+    BuildFacesII(mgp);
+    std::cout << "--> success\n";
+
+    // Build Boundary
+    std::cout << "Building Boundary ";
+    buildBoundary(mgp);
+    std::cout << "--> success\n";
+
+    PrepareModify(mgp);     // FinalizeModify(mgp); is called in constructor of MultiGridCL
+}
+
+void FileBuilderCL::CheckFile( const std::ifstream& is) const
+{
+    if (!is)
+        throw DROPSErrCL( "FileBuilderCL: error while opening file!");
+}
+#endif
+
 #ifdef _PAR
 template <>
   void FileBuilderCL::ReadParInfo<EdgeCL>(std::istream&, EdgeCL&) const
@@ -1879,6 +2152,150 @@ void FileBuilderCL::CheckFile( const std::ifstream& is) const
 /*******************************************************************
 *   M G S E R I A L I Z A T I O N   C L                           *
 *******************************************************************/
+
+#ifndef _PAR
+template<class itT, class T>
+void MGSerializationCL::GetAddr (itT b, itT e, std::map<T, size_t> &m)
+{
+    int i=1;
+    for (itT it=b; it != e; ++it, ++i)
+        m[&*it]=i;
+}
+
+void MGSerializationCL::WriteEdges()
+{
+    std::string filename= path_+"Edges";
+    std::ofstream edge_file( filename.c_str());
+    CheckFile(edge_file);
+    int i=0;
+    for (MultiGridCL::EdgeIterator p=mg_.GetAllEdgeBegin(); p!=mg_.GetAllEdgeEnd(); ++p, ++i) {
+        if (i!=0) edge_file << '\n';
+        edge_file << vertexAddressMap[p->GetVertex(0)]   << " " << vertexAddressMap[p->GetVertex(1)] << " "
+                  << vertexAddressMap[p->GetMidVertex()] << " " << *p->GetBndIdxBegin()        << " "
+                  << *(p->GetBndIdxBegin() + 1)          << " " << p->GetMFR()                 << " "
+                  << p->GetLevel()                       << " " << p->IsMarkedForRemovement();
+    }
+    CheckFile(edge_file);
+}
+
+void MGSerializationCL::WriteFaces()
+{
+    std::string filename= path_+"Faces";
+    std::ofstream face_file( filename.c_str());
+    CheckFile(face_file);
+    int i=0;
+    for (MultiGridCL::FaceIterator p=mg_.GetAllFaceBegin(); p!=mg_.GetAllFaceEnd(); ++p, ++i) {
+        if (i!=0) face_file << '\n';
+        face_file << tetraAddressMap[p->GetNeighbor(0)]   << " " << tetraAddressMap[p->GetNeighbor(1)] << " "
+                  << tetraAddressMap[p->GetNeighbor(2)]   << " " << tetraAddressMap[p->GetNeighbor(3)] << " "
+                  << p->GetBndIdx()                       << " " << p->GetLevel()               << " "
+                  << p->IsMarkedForRemovement();
+    }
+    CheckFile(face_file);
+}
+
+void MGSerializationCL::WriteVertices()
+{
+    std::string vertex_filename= path_+"Vertices",
+                bndvtx_filename= path_+"BoundaryVertices";
+    std::ofstream vertex_file( vertex_filename.c_str());
+    std::ofstream bndvtx_file( bndvtx_filename.c_str());
+    CheckFile(vertex_file);
+    CheckFile(bndvtx_file);
+    int i=0, j=0;
+    for (MultiGridCL::VertexIterator p=mg_.GetAllVertexBegin(); p!=mg_.GetAllVertexEnd(); ++p, ++i) {
+        if (i!=0) vertex_file << '\n';
+        vertex_file << p->GetId().GetIdent() << " " << std::scientific << std::setprecision(16)
+                    << p->GetCoord() //<< " "
+                    << p->GetLevel()         << " " << p->IsMarkedForRemovement();// <<'\n';
+        if (p->IsOnBoundary()) {
+            for (VertexCL::const_BndVertIt it= p->GetBndVertBegin(); it != p->GetBndVertEnd(); ++it, ++j) {
+                if (j!=0) bndvtx_file << '\n';
+                bndvtx_file << vertexAddressMap[&*p] << " " << it->GetBndIdx() << " "
+                            << std::scientific << std::setprecision(16) << it->GetCoord2D()[0] << " " << it->GetCoord2D()[1];
+            }
+        }
+    }
+    CheckFile(vertex_file);
+    CheckFile(bndvtx_file);
+}
+
+void MGSerializationCL::WriteTetras()
+{
+    std::string tetra_filename= path_+"Tetras";
+    std::string cild_filename = path_+"Children";
+    std::ofstream tetra_file (tetra_filename.c_str());
+    std::ofstream child_file (cild_filename.c_str());
+
+    CheckFile(tetra_file);
+    CheckFile(child_file);
+
+    bool start=true, child_start=true;
+    for (MultiGridCL::TetraIterator p=mg_.GetAllTetraBegin(); p!=mg_.GetAllTetraEnd(); ++p) {
+        if (!start) tetra_file << '\n';
+        tetra_file << p->GetId().GetIdent()             << " " << p->GetLevel() << " "
+                   << p->GetRefRule()                   << " " << p->GetRefMark() << " "
+                   << vertexAddressMap[p->GetVertex(0)] << " " << vertexAddressMap[p->GetVertex(1)] << " "
+                   << vertexAddressMap[p->GetVertex(2)] << " " << vertexAddressMap[p->GetVertex(3)] << " "
+                   << edgeAddressMap[p->GetEdge(0)]     << " " << edgeAddressMap[p->GetEdge(1)] << " "
+                   << edgeAddressMap[p->GetEdge(2)]     << " " << edgeAddressMap[p->GetEdge(3)] << " "
+                   << edgeAddressMap[p->GetEdge(4)]     << " " << edgeAddressMap[p->GetEdge(5)] << " "
+                   << faceAddressMap[p->GetFace(0)]     << " " << faceAddressMap[p->GetFace(1)] << " "
+                   << faceAddressMap[p->GetFace(2)]     << " " << faceAddressMap[p->GetFace(3)] << " "
+                   << tetraAddressMap[p->GetParent()];
+        if (!p->IsUnrefined()) {
+            if (!child_start) child_file << '\n';
+            else child_start=false;
+            child_file << tetraAddressMap[&*p] << " ";
+            for (Uint i=0; i<MaxChildrenC - 1; ++i) {
+                child_file << tetraAddressMap[p->GetChild(i)] << " ";
+            }
+            child_file << tetraAddressMap[p->GetChild(MaxChildrenC - 1)];
+        }
+        start=false;
+    }
+    CheckFile(tetra_file);
+    CheckFile(child_file);
+}
+
+void MGSerializationCL::CreateAddrMaps()
+{
+    GetAddr (mg_.GetAllEdgeBegin(),   mg_.GetAllEdgeEnd(),     edgeAddressMap);
+    GetAddr (mg_.GetAllVertexBegin(), mg_.GetAllVertexEnd(), vertexAddressMap);
+    GetAddr (mg_.GetAllFaceBegin(),   mg_.GetAllFaceEnd(),     faceAddressMap);
+    GetAddr (mg_.GetAllTetraBegin(),  mg_.GetAllTetraEnd(),   tetraAddressMap);
+}
+
+void MGSerializationCL::WriteMG()
+{
+    CreateAddrMaps();
+
+    // Write vertices
+    std::cout << "Writing Vertices ";
+    WriteVertices();
+    std::cout << "--> success\n";
+
+    // Write Edges
+    std::cout << "Writing Edges ";
+    WriteEdges();
+    std::cout << "--> success\n";
+
+    // Write Tetras
+    std::cout << "Writing Tetras ";
+    WriteTetras();
+    std::cout << "--> success\n";
+
+    // Write Faces
+    std::cout << "Writing Faces ";
+    WriteFaces();
+    std::cout << "--> success\n";
+}
+
+void MGSerializationCL::CheckFile( const std::ofstream& os) const
+{
+    if (!os) throw DROPSErrCL( "MGSerializationCL: error while opening file!");
+}
+#endif
 
 void MGSerializationCL::WriteEdges()
 {

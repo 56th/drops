@@ -474,6 +474,38 @@ class EmptyReadMeshBuilderCL : public ReadMeshBuilderCL
 *   F I L E B U I L D E R  C L                                    *
 *******************************************************************/
 
+#ifndef _PAR
+class FileBuilderCL : public MGBuilderCL
+{
+  private:
+    // Path or File-Prefix
+    std::string path_;
+
+    MGBuilderCL* bndbuilder_;
+
+    // Int <-> Add
+    mutable std::map<size_t, VertexCL*> vertexAddressMap;
+    mutable std::map<size_t, EdgeCL*>     edgeAddressMap;
+    mutable std::map<size_t, FaceCL*>     faceAddressMap;
+    mutable std::map<size_t, TetraCL*>   tetraAddressMap;
+
+    void BuildVerts   (MultiGridCL*) const;
+    void BuildEdges   (MultiGridCL*) const;
+    void BuildFacesI  (MultiGridCL*) const;
+    void BuildTetras  (MultiGridCL*) const;
+    void AddChildren  ()             const;
+    void BuildFacesII (MultiGridCL*) const;
+    void CheckFile( const std::ifstream& is) const;
+
+  protected:
+    void buildBoundary (MultiGridCL* mgp) const {bndbuilder_->buildBoundary(mgp);};
+
+  public:
+    FileBuilderCL (std::string path, MGBuilderCL* bndbuilder) : path_(path), bndbuilder_(bndbuilder) {};
+    virtual void build(MultiGridCL*) const;
+};
+#endif
+
 class FileBuilderCL : public MGBuilderCL
 {
   private:
@@ -514,6 +546,40 @@ class FileBuilderCL : public MGBuilderCL
 /*******************************************************************
 *   M G S E R I A L I Z A T I O N   C L                           *
 *******************************************************************/
+
+#ifndef _PAR
+class MGSerializationCL
+{
+  private:
+    MultiGridCL& mg_;
+
+    // Path or File-Prefix
+    std::string  path_;
+
+    // Addr <-> Int
+    std::map<const EdgeCL*,   size_t>   edgeAddressMap;
+    std::map<const VertexCL*, size_t> vertexAddressMap;
+    std::map<const FaceCL*,   size_t>   faceAddressMap;
+    std::map<const TetraCL*,  size_t>  tetraAddressMap;
+
+    template<class itT, class T>
+    void GetAddr (itT b, itT e, std::map<T, size_t> &m);
+
+    void CreateAddrMaps ();
+
+    // Writing-Routines
+    void WriteEdges    ();
+    void WriteFaces    ();
+    void WriteVertices ();
+    void WriteTetras   ();
+
+    void CheckFile( const std::ofstream& os) const;
+
+  public:
+    MGSerializationCL (MultiGridCL& mg, std::string path) : mg_(mg), path_(path) {}
+    void WriteMG ();
+};
+#endif
 
 class MGSerializationCL
 {
