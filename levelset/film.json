@@ -30,7 +30,7 @@
 // flow solver, Navier-Stokes part
 	"NavStokes":
 	{
-		"Nonlinear":		1,		// coefficient in front of nonlinear convection term
+		"Nonlinear":		0,		// coefficient in front of nonlinear convection term
 		"Tol":		5e-10,			// N-S fixed point iteration: tolerance
 		"Iter":		10,				// N-S fixed point iteration: max. number of iterations
 		"Reduction":		0.1		// N-S fixed point iteration: reduction of resid. in each iteration
@@ -84,17 +84,17 @@
 
 // material data, all units are SI
 		"DensGas":		1.2,			// density of gas
-		"ViscGas":		1.71e-05,		// kinematic viscosity of gas
+		"ViscGas":		1.71e-05,		// dynamic viscosity of gas
 		"DensFluid":		909.3,		// density of liquid film
-		"ViscFluid":		0.005183,	// kinematic viscosity of liquid film
+		"ViscFluid":		0.005183,	// dynamic viscosity of liquid film
 		"SmoothZone":		0.0001,		// inactive
-		"SurfTension":		0.005		// surface tension coefficient
+		"SurfTension":		0.022		// surface tension coefficient
 	},
 
 // experimental conditions
 	"Exp":
 	{
-		"Gravity":		[8.036, -5.627, 0 ], // gravity vector -> inclined film
+		"Gravity":		[8.036, -5.627, 0 ], // gravity vector -> inclined film, 35 degree (0 degree = perpendicular)
 		"PumpAmpl":		0.2, 			// rel. amplitude of initial wave in x direction 
 		"PumpFreq":		10, 
 		"Ampl_zDir":		0.5, 		// rel. amplitude of initial wave in z direction
@@ -107,7 +107,7 @@
 	"InitialCond":		1,					// controls initial condition: 1 = stationary Stokes, 2 = Nusselt solution, -1 = read from file
 	"InitialFile":		"initial/filmNs40", // prefix for initial data files
 	"BndCond":		"12wo12",				// boundary conditions: Per1!Per2!Wall!Outflow!Per1!Per2
-	"EnsightCase":		"filmNsTau5e-3",	// Ensight case
+	"EnsightCase":		"filmStokesDMS-T05",	// Ensight case
 	"EnsightDir":		"ensight",			// directory for Ensight data
 	"SerializationFile":		"filmNs.mg",// write to files
 	"DeserializationFile":		"none"		// read from files
