@@ -129,19 +129,28 @@ template <class PoissonT, class SolverT>
 void InstatPoissonThetaSchemeCL<PoissonT,SolverT>::DoStep( VecDescCL& v)
 {
   _Poisson.x.t+= _dt;
+
+  if(_supg||_ale)
+  {
+     //update stiffness and mass matrix in ale case, since the test functions changes;
+     //update mass matrix in supg case, since the test functions changes;
+    _Poisson.SetupInstatSystem( _Poisson.A, _Poisson.M, _Poisson.x.t);
+  }
+  _Poisson.SetupInstatRhs( *_cplA, *_cplM, _Poisson.x.t, *_b, _Poisson.x.t);
+  
+  if(_supg)
+  //Use old values but new test functions 
+  _Poisson.SetupInstatRhs( *_old_cplA, *_old_cplM, _Poisson.x.t-_dt, *_old_b, _Poisson.x.t);
+  else if(_ale)
+  //Update _old_cplm with new test functions
+  _Poisson.SetupInstatRhs( *_old_cplA, *_old_cplM, _Poisson.x.t-_dt, *_old_b, _Poisson.x.t-_dt);
+  
   _rhs = _Poisson.A.Data * v.Data;
   _rhs*= -_dt*(1.0-_theta); 
 
   _rhs+=  _dt*(1.0-_theta)*(_old_b->Data)
          +_dt*(1.0-_theta)* _old_cplA->Data;
-  //Update rhs
-  if(_supg||_ale) //update stiffness and massmatrix if necessary
-    _Poisson.SetupInstatSystem( _Poisson.A, _Poisson.M, _Poisson.x.t);
-  _Poisson.SetupInstatRhs( *_cplA, *_cplM, _Poisson.x.t, *_b, _Poisson.x.t);
-  
-  if(_supg||_ale) 
-  _Poisson.SetupInstatRhs( *_new_cplA, *_old_cplM, _Poisson.x.t-_dt, *_new_b, _Poisson.x.t-_dt);
-
+         
   _rhs +=_Poisson.M.Data*v.Data
           -_old_cplM->Data
           +_dt*_theta*_b->Data

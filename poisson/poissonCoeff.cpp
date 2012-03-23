@@ -485,6 +485,71 @@ static DROPS::RegisterVectorFunction regvecnus("Nusselt", Nusselt);
     static DROPS::RegisterVectorFunction regscaalev("TestALE_Velocity",  ALEFlowfield);
 }//end of namespace
 
+ namespace ALEBala{
+    //refH, Mag, paraX and paraT are used to change the free surface functions
+    double refH   = 0.2;
+    double Mag    = 0.25;
+    double paraX  = 0.2 * PI;
+    double paraT  = 10. * PI;
+    //Free surface
+    double Interface( const DROPS::Point3DCL& p, double t)
+    {
+
+        double h= refH + refH * Mag * sin ( paraX * p[0]  + paraT * t );
+        return h;
+    }
+    double Inter( const DROPS::Point3DCL&, double)
+    {
+
+        double ret =0.01;
+        return ret;
+    }
+    /// \brief Reaction: no reaction
+    double Reaction(const DROPS::Point3DCL&, double){
+        return 0.0;
+    }
+    double QC( const DROPS::Point3DCL& , double t)
+    {
+        double ret= pow(refH + refH * Mag * sin ( paraT * t ), 3) +  refH * Mag * paraT *sin ( paraT * t )/paraX ;
+        return ret;
+    }
+    double flux(const DROPS::Point3DCL& p, double t)
+    {
+        double ret= QC(p, t) - refH * Mag * paraT *sin ( paraX * p[0] + paraT * t )/paraX;
+        return ret;
+    }
+    
+    double Hx(const DROPS::Point3DCL& p, double t)
+    {
+        double ret= refH * Mag * paraX* cos ( paraX * p[0]  + paraT * t );
+        return ret;
+    }
+    double Qx(const DROPS::Point3DCL& p, double t)
+    {
+        double ret = - refH * Mag * paraT * cos( paraX * p[0] + paraT * t );
+        return ret;
+    }
+    DROPS::Point3DCL Flowfield(const DROPS::Point3DCL& p, double t){ 
+        DROPS::Point3DCL v(0.);
+        double h = Interface(p,t);
+        double q = flux(p, t);
+        double hx =Hx(p,t);
+        double qx =Qx(p,t);
+        v[0] = -0.5*(3.*h*p[1]*p[1] - pow(p[1], 3))*(qx/pow(h, 3) + (-3.)*q*hx/pow(h, 4));
+        v[1] = 3.*q/pow(h, 3)*(h*p[1] - p[1]*p[1]/2.);
+        return v; 
+    }
+    /// \brief Right-hand side
+    double Source(const DROPS::Point3DCL&, double){
+        return 0.;
+    }
+    static DROPS::RegisterScalarFunction regscaq("ALEBala_Reaction",     Reaction    );
+    static DROPS::RegisterScalarFunction regscaf("ALEBala_Source",       Source      );
+    static DROPS::RegisterScalarFunction regscaint("ALEBala_Interface",  Interface   );
+    static DROPS::RegisterScalarFunction regscainter("ALEBala_Inter",   Inter   );
+    static DROPS::RegisterVectorFunction regscav("ALEBala_Velocity",  Flowfield   );
+}//end of namespace
+
  namespace ALE{
     /// \brief Reaction: no reaction
     double Reaction(const DROPS::Point3DCL&, double){

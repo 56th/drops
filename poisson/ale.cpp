@@ -30,7 +30,7 @@
 
 namespace DROPS{
     
-void ALECL::InitGrid()
+void ALECL::InitGrid() const
 {
     Point3DCL New_Coord(0.);
     int lvl= mg_.GetLastLevel();
@@ -46,7 +46,7 @@ void ALECL::InitGrid()
     }
 }
 
-void ALECL::MovGrid(double t)
+void ALECL::MovGrid(double t) const
 {
     Point3DCL New_Coord(0.);
     int lvl= mg_.GetLastLevel();  

@@ -36,11 +36,11 @@ namespace DROPS{
 class ALECL{
 ///A class to handle ALE method for free surface one phase scalar problem;
     private:
-    bool IfALE_;
-    ParamCL Para_;
+    const bool IfALE_;
+    const ParamCL Para_;
     MultiGridCL& mg_;  
-    double dt_;
-    double Ly_;   
+    const double dt_;        //step size of time integration
+    double Ly_;        //Height of the reference iterface
 
   public:
     //free surface function
@@ -61,11 +61,11 @@ class ALECL{
         DROPS::InScaMap & scamap = DROPS::InScaMap::getInstance();
         interface_ = scamap[P.get<std::string>("ALE.Interface")];
     }
-    bool GetALE() {return IfALE_;}
+    bool GetALE() const {return IfALE_;}
     //Initialize the grids
-    void InitGrid();    
+    void InitGrid() const;    
     //Scale the grids according to the free surface functions
-    void MovGrid(double t);
+    void MovGrid(double t) const;
 };
 
 } 
