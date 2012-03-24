@@ -784,7 +784,7 @@ void MultiGridCL::SplitMultiBoundaryTetras()
 
     // std::cerr << "Split " << count << " tetras.\n";
 }
-
+#ifndef _PAR
 class EdgeByVertLessCL : public std::binary_function<const EdgeCL*, const EdgeCL* , bool>
 {
   public:
@@ -794,7 +794,6 @@ class EdgeByVertLessCL : public std::binary_function<const EdgeCL*, const EdgeCL
                  :  e0->GetVertex(1)->GetId() <  e1->GetVertex(1)->GetId(); }
 };
 
-
 class EdgeEqualCL : public std::binary_function<const EdgeCL*, const EdgeCL*, bool>
 {
   public:
@@ -802,7 +801,26 @@ class EdgeEqualCL : public std::binary_function<const EdgeCL*, const EdgeCL*, bo
         { return    e0->GetVertex(1)->GetId() == e1->GetVertex(1)->GetId()
                  && e0->GetVertex(0)->GetId() == e1->GetVertex(0)->GetId(); }
 };
+#else
 
+class EdgeByVertLessCL : public std::binary_function<const EdgeCL*, const EdgeCL* , bool>
+{
+  public:
+    bool operator() (const EdgeCL* e0, const EdgeCL* e1)
+        { return    e0->GetVertex(1)->GetGID() == e1->GetVertex(1)->GetGID()
+                 ?  e0->GetVertex(0)->GetGID() <  e1->GetVertex(0)->GetGID()
+                 :  e0->GetVertex(1)->GetGID() <  e1->GetVertex(1)->GetGID(); }
+};
+
+
+class EdgeEqualCL : public std::binary_function<const EdgeCL*, const EdgeCL*, bool>
+{
+  public:
+    bool operator() (const EdgeCL* e0, const EdgeCL* e1)
+        { return    e0->GetVertex(1)->GetGID() == e1->GetVertex(1)->GetGID()
+                 && e0->GetVertex(0)->GetGID() == e1->GetVertex(0)->GetGID(); }
+};
+#endif
 
 bool MultiGridCL::IsSane (std::ostream& os, int Level) const
 {

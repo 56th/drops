@@ -38,10 +38,6 @@
 #include <istream>
 #include <map>
 
-#ifdef _PAR
-#include "parallel/pardistributeddata.h"
-#endif
-
 namespace DROPS
 {
 
@@ -504,8 +500,9 @@ class FileBuilderCL : public MGBuilderCL
     FileBuilderCL (std::string path, MGBuilderCL* bndbuilder) : path_(path), bndbuilder_(bndbuilder) {};
     virtual void build(MultiGridCL*) const;
 };
-#endif
+#else
 
+//todo Ableiten von TransferCL??
 class FileBuilderCL : public MGBuilderCL
 {
   private:
@@ -514,25 +511,14 @@ class FileBuilderCL : public MGBuilderCL
 
     MGBuilderCL* bndbuilder_;
 
-    // Int <-> Add
-    mutable std::map<size_t, VertexCL*> vertexAddressMap;
-    mutable std::map<size_t, EdgeCL*>     edgeAddressMap;
-    mutable std::map<size_t, FaceCL*>     faceAddressMap;
-    mutable std::map<size_t, TetraCL*>   tetraAddressMap;
     mutable SimplexFactoryCL* factory_;
 
-#ifdef _PAR
-    /// \brief Read parallel information from a stream
-    template <typename SimplexT>
-    void ReadParInfo(std::istream&, SimplexT&) const;
-#endif
     void BuildVerts   (MultiGridCL*) const;
-    void BuildEdges   (MultiGridCL*) const;
-    void BuildFacesI  (MultiGridCL*) const;
-    void BuildTetras  (MultiGridCL*) const;
-    void AddChildren  ()             const;
+    void BuildEdges   () const;
+    void BuildFacesI  () const;
+    void BuildTetras  () const;
     void BuildFacesII (MultiGridCL*) const;
-    void CheckFile( const std::ifstream& is) const;
+    void CheckFile( const std::istream& is) const;
 
   protected:
     void buildBoundary (MultiGridCL* mgp) const {bndbuilder_->buildBoundary(mgp);};
@@ -541,7 +527,7 @@ class FileBuilderCL : public MGBuilderCL
     FileBuilderCL (std::string path, MGBuilderCL* bndbuilder) : path_(path), bndbuilder_(bndbuilder), factory_(0) {};
     virtual void build(MultiGridCL*) const;
 };
-
+#endif
 
 /*******************************************************************
 *   M G S E R I A L I Z A T I O N   C L                           *
@@ -579,7 +565,7 @@ class MGSerializationCL
     MGSerializationCL (MultiGridCL& mg, std::string path) : mg_(mg), path_(path) {}
     void WriteMG ();
 };
-#endif
+#else
 
 class MGSerializationCL
 {
@@ -593,9 +579,6 @@ class MGSerializationCL
     void WriteFaces    ();
     void WriteVertices ();
     void WriteTetras   ();
-#ifdef _PAR
-    void WriteRemoteDataLists();
-#endif
 
     void CheckFile( const std::ostream& os) const;
 
@@ -603,36 +586,6 @@ class MGSerializationCL
     MGSerializationCL (MultiGridCL& mg, std::string path) : mg_(mg), path_(path) {}
     void WriteMG ();
 };
-
-#ifdef _PAR
-
-/// \brief Specialization of ReadParInfo for edges due to accMFR
-template <>
-void FileBuilderCL::ReadParInfo<EdgeCL>(std::istream&, EdgeCL&) const;
-
-template <typename SimplexT>
-  void FileBuilderCL::ReadParInfo(std::istream&, SimplexT& ) const
-/// read information from stream \a is, tell simplex these information. If
-/// the simplex was a distributed object while serialization notify DDD about
-/// the this distributed object
-{
-    throw DROPSErrCL("FileBuilderCL::ReadParInfo: Only DDD conform");
-    /*
-	PrioT prio;
-    int numDist, distProc;
-    GIDT oldGid;
-
-    is >> prio >> numDist;
-    s.SetPrio( prio);
-    if ( numDist){
-        is >> oldGid;
-        for (int i=0; i<numDist; ++i){
-            is >> distProc;
-            Assert( distProc!=ProcCL::MyRank(), DROPSErrCL("FileBuilderCL::ReadParInfo: Cannot identify with myself"), DebugParallelC);
-            DynamicDataInterfaceCL::IdentifyNumber( s.GetHdr(), distProc, oldGid);
-        }
-    }*/
-}
 #endif
 
 } //end of namespace DROPS

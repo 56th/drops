@@ -1780,91 +1780,42 @@ void FileBuilderCL::CheckFile( const std::ifstream& is) const
     if (!is)
         throw DROPSErrCL( "FileBuilderCL: error while opening file!");
 }
-#endif
-
-#ifdef _PAR
-template <>
-  void FileBuilderCL::ReadParInfo<EdgeCL>(std::istream&, EdgeCL&) const
-{
-    throw DROPSErrCL("FileBuilderCL::ReadParInfo: Only conform to DDD!");
-/*
-	  PrioT prio;
-      int numDist, distProc;
-      GIDT oldGid;
-      short accMFR;
-
-      is >> accMFR >> prio >> numDist;
-      s.SetAccMFR( accMFR);
-      s.SetPrio( prio);
-      if ( numDist){
-          is >> oldGid;
-          for (int i=0; i<numDist; ++i){
-              is >> distProc;
-              Assert( distProc!=ProcCL::MyRank(), DROPSErrCL("FileBuilderCL::ReadParInfo: Cannot identify with myself"), DebugParallelC);
-              //DynamicDataInterfaceCL::IdentifyNumber( s.GetHdr(), distProc, oldGid);
-          }
-      }
-*/
-}
-#endif
+#else
 
 void FileBuilderCL::BuildVerts(MultiGridCL* mgp) const
 {
-    std::string vertex_filename= path_+"Vertices",
-                bndvtx_filename= path_+"BoundaryVertices";
+    std::string simplex_filename= path_+"Vertices";
 #ifdef _PAR
-    ProcCL::AppendProcNum( vertex_filename);
-    ProcCL::AppendProcNum( bndvtx_filename);
+    ProcCL::AppendProcNum( simplex_filename);
 #endif
-    std::ifstream vertex_file( vertex_filename.c_str());
-    std::ifstream bndvtx_file( bndvtx_filename.c_str());
+    DiST::Helper::SerialIFStreamCL simplex_file( simplex_filename);
 
-    CheckFile( vertex_file);
-    CheckFile( bndvtx_file);
-    MultiGridCL::VertexCont& verts= GetVertices(mgp);
-    size_t idx=0;
+    CheckFile( simplex_file);
 
     // Input-Variables
-    size_t id=0, max_id= 0;
-    Point3DCL point;
-    Uint level=0, oldlevel=0;
-    bool rmmark;
+    VertexCL tmpvert;
+    Uint level, oldlevel=0, numdist;
+    size_t numverts;
+    int proc;
+    int prio;
+    simplex_file >> numverts;
+    DiST::Helper::RemoteDataCL::ProcListT pl;
 
-    // Boundary
-    size_t bndidx=0;
-    bndvtx_file >> std::ws;
-    if (!bndvtx_file.eof())
-        bndvtx_file >> bndidx;
-    Point2DCL p2d;
-    size_t bidx;
-
-    while (!vertex_file.eof())
+    for (size_t i = 0; i<numverts; ++i)
     {
-        idx++;
-        vertex_file >> id
-                    >> point[0] >> point[1] >> point[2]
-                    >> level    >> rmmark;
-        if (level>oldlevel) {
+        simplex_file >> tmpvert;
+        level = tmpvert.GetLevel();
+        if (level > oldlevel) {
             AppendLevel(mgp);  // append Level in ALL lists
             oldlevel=level;
         }
-
-        max_id= std::max( max_id, id);
-        factory_->MakeVertex( point, level, IdCL<VertexCL>( id));
-        if (rmmark) verts[level].back().SetRemoveMark();
-
-#ifdef _PAR
-        ReadParInfo<VertexCL>( vertex_file, verts[level].back());
-#endif
-        // BndVerts
-        while (idx==bndidx)
-        {
-            bndvtx_file >> bidx
-                        >> p2d[0] >> p2d[1];
-            verts[level].back().AddBnd( BndPointCL(bidx, p2d));
-            if (!bndvtx_file.eof()) bndvtx_file >> bndidx; else bndidx=0;
+        simplex_file >> numdist;
+        for (Uint k=0; k<numdist; ++k){
+            simplex_file >> proc >> prio;
+            pl.push_back( DiST::Helper::RemoteDataCL::ProcListEntryCL( proc, Priority( prio)));
         }
-        vertexAddressMap[idx]= &verts[level].back();
+        factory_->MakeCopy(tmpvert, pl);
+        pl.clear();
     }
 #ifdef _PAR
     /// \todo Make use of function ParMultiGridCL::AdjustLevel
@@ -1874,234 +1825,139 @@ void FileBuilderCL::BuildVerts(MultiGridCL* mgp) const
         AppendLevel(mgp);
     }
 #endif
-
-    IdCL<VertexCL>::ResetCounter( max_id + 1);
-    CheckFile(vertex_file);
-    CheckFile(bndvtx_file);
+    CheckFile(simplex_file);
 }
 
-void FileBuilderCL::BuildEdges(MultiGridCL* mgp) const
+void FileBuilderCL::BuildEdges() const
 {
     std::string filename= path_+"Edges";
 #ifdef _PAR
     ProcCL::AppendProcNum( filename);
 #endif
-    std::ifstream edge_file(filename.c_str());
-    CheckFile(edge_file);
-    MultiGridCL::EdgeCont& edges= GetEdges(mgp);
-    size_t idx=0;
+    DiST::Helper::SerialIFStreamCL simplex_file(filename);
+    CheckFile(simplex_file);
 
-    size_t vert0, vert1, midvert;
-    Uint level=0;
-    BndIdxT bnd0, bnd1;
-    short int mfr=0;
-    bool rmmark;
+    EdgeCL tmpedge;
+    size_t numedges;
 
-    while (!edge_file.eof())
+    Uint numdist;
+    int proc, prio;
+    DiST::Helper::RemoteDataCL::ProcListT pl;
+
+    simplex_file >> numedges;
+
+    for (size_t i = 0; i<numedges; ++i)
     {
-        idx++;
-        edge_file >> vert0   >> vert1
-                  >> midvert >> bnd0
-                  >> bnd1    >> mfr
-                  >> level   >> rmmark;
-
-        VertexCL* vertex0   (vertexAddressMap[vert0]);
-        VertexCL* vertex1   (vertexAddressMap[vert1]);
-        VertexCL* midvertex (vertexAddressMap[midvert]);
-        Assert(vertex0!=0 && vertex1!=0, DROPSErrCL("FileBuilderCL::BuildEdges: Vertex is missing"), DebugRefineEasyC);
-        factory_->MakeEdge(vertex0, vertex1, level, bnd0, bnd1, mfr);
-        edges[level].back().SetMidVertex (midvertex);
-        if (rmmark) edges[level].back().SetRemoveMark();
-        edgeAddressMap[idx]= &edges[level].back();
-
-#ifdef _PAR
-        ReadParInfo<EdgeCL>( edge_file, edges[level].back());
-#endif
+        simplex_file >> tmpedge;
+        simplex_file >> numdist;
+        for (Uint k=0; k<numdist; ++k){
+            simplex_file >> proc >> prio;
+            pl.push_back( DiST::Helper::RemoteDataCL::ProcListEntryCL( proc, Priority( prio)));
+        }
+        factory_->MakeCopy(tmpedge, pl);
+        pl.clear();
     }
-    CheckFile(edge_file);
+
+    CheckFile(simplex_file);
 }
 
-void FileBuilderCL::BuildFacesI(MultiGridCL* mgp) const
+void FileBuilderCL::BuildFacesI() const
 {
     std::string filename= path_+"Faces";
 #ifdef _PAR
     ProcCL::AppendProcNum( filename);
 #endif
-    std::ifstream face_file(filename.c_str());
-    CheckFile(face_file);
-    MultiGridCL::FaceCont& faces= GetFaces(mgp);
-    size_t idx=0;
-    size_t tmp;
+    DiST::Helper::SerialIFStreamCL simplex_file(filename);
+    CheckFile(simplex_file);
 
-    Uint level=0;
-    BndIdxT bnd;
-    bool rmmark;
+    FaceCL tmpface;
 
-    while (!face_file.eof())
-    {
-        idx++;
-        for (int i=0; i<4; ++i)
-            face_file >> tmp; // 4 Neighbors
-        face_file >> bnd >> level
-                  >> rmmark;
+    size_t num;
 
-#ifndef _PAR
-        factory_->MakeFace(level, bnd);
-#else
-        throw DROPSErrCL("Cannot generate a face without barycenter");
-#endif
-        if (rmmark) faces[level].back().SetRemoveMark();
-        faceAddressMap[idx]= &faces[level].back();
-#ifdef _PAR
-        ReadParInfo<FaceCL>( face_file, faces[level].back());
-#endif
+    Uint numdist;
+    int proc, prio;
+    DiST::Helper::RemoteDataCL::ProcListT pl;
+
+    simplex_file >> num;
+
+    for (size_t i = 0; i< num; ++i) {
+        simplex_file >> tmpface;
+        simplex_file >> numdist;
+        for (Uint k=0; k<numdist; ++k){
+            simplex_file >> proc >> prio;
+            pl.push_back( DiST::Helper::RemoteDataCL::ProcListEntryCL( proc, Priority( prio)));
+        }
+        factory_->MakeCopy(tmpface, pl);
+        pl.clear();
     }
-    CheckFile(face_file);
+
+    CheckFile(simplex_file);
 }
 
-void FileBuilderCL::BuildTetras(MultiGridCL* mgp) const
+void FileBuilderCL::BuildTetras() const
 {
     std::string filename= path_+"Tetras";
 #ifdef _PAR
     ProcCL::AppendProcNum( filename);
 #endif
-    std::ifstream tetra_file( filename.c_str());
-    CheckFile(tetra_file);
-    std::string buffer;
-    MultiGridCL::TetraCont& tetras= GetTetras(mgp);
-    size_t idx=0;
-    size_t id=0, max_id=0;
-    Uint refrule, refmark;
-    Uint level=0;
+    DiST::Helper::SerialIFStreamCL simplex_file( filename);
+    CheckFile(simplex_file);
 
-    VertexCL* verts[4];
-    size_t    vertaddr[4];
-    size_t    edgeaddr[6];
-    size_t    faceaddr[4];
-    size_t    parent;
+    TetraCL tmptetra;
 
-    while (!tetra_file.eof())
-    {
-        idx++;
-        tetra_file >> id          >> level
-                   >> refrule     >> refmark
-                   >> vertaddr[0] >> vertaddr[1]
-                   >> vertaddr[2] >> vertaddr[3]
-                   >> edgeaddr[0] >> edgeaddr[1]
-                   >> edgeaddr[2] >> edgeaddr[3]
-                   >> edgeaddr[4] >> edgeaddr[5]
-                   >> faceaddr[0] >> faceaddr[1]
-                   >> faceaddr[2] >> faceaddr[3]
-                   >> parent;
+    size_t num;
 
-        max_id= std::max( max_id, id);
-        for (Uint i=0; i<4; ++i) verts[i]=vertexAddressMap[vertaddr[i]];
-        TetraCL* par = tetraAddressMap[parent];
-#ifdef _PAR
-        if (!parent)
-            factory_->MakeTetra( verts[0], verts[1], verts[2], verts[3], par, level, IdCL<TetraCL>( id));
-        else
-#endif
-            factory_->MakeTetra(verts[0], verts[1], verts[2], verts[3], par, IdCL<TetraCL>( id));
-        tetras[level].back().SetRefRule(refrule);
-        tetras[level].back().SetRefMark (refmark);
+    Uint numdist;
+    int proc, prio;
+    DiST::Helper::RemoteDataCL::ProcListT pl;
 
-        for (Uint i=0; i<6; ++i) {
-            tetras[level].back().SetEdge(i, edgeAddressMap[edgeaddr[i]]);
+    simplex_file >> num;
+
+    for (size_t i = 0; i< num; ++i) {
+        simplex_file >> tmptetra;
+        simplex_file >> numdist;
+        for (Uint k=0; k<numdist; ++k){
+            simplex_file >> proc >> prio;
+            pl.push_back( DiST::Helper::RemoteDataCL::ProcListEntryCL( proc, Priority( prio)));
         }
-
-        for (Uint i=0; i<4; ++i) {
-            tetras[level].back().SetFace(i, faceAddressMap[faceaddr[i]]);
-        }
-
-        tetraAddressMap[idx]= &tetras[level].back();
-
-#ifdef _PAR
-        ReadParInfo<TetraCL>( tetra_file, tetras[level].back());
-#endif
+        factory_->MakeCopy(tmptetra, pl);
+        pl.clear();
     }
-    IdCL<TetraCL>::ResetCounter( max_id + 1);
-    CheckFile(tetra_file);
+    CheckFile(simplex_file);
 }
 
 void FileBuilderCL::BuildFacesII(MultiGridCL* mgp) const
 {
-    std::string filename= path_+"Faces";
-#ifdef _PAR
-    ProcCL::AppendProcNum( filename);
-#endif
-    std::ifstream face_file( filename.c_str());
-    CheckFile(face_file);
-    size_t idx=0;
-    size_t neighbor[4];
-
-    Uint level=0;
-    BndIdxT bnd;
-    bool rmmark;
-#ifdef _PAR
-    PrioT prio;
-    int numDist, distProc;
-    int oldGid;
-#endif
-    MultiGridCL::FaceIterator it= mgp->GetAllFaceBegin();
-
-    while (!face_file.eof())
-    {
-        idx++;
-        for (int i=0; i<4; ++i)
-            face_file >> neighbor[i]; // 4 Neighbors
-
-        // Read remaining values of the line
-        face_file >> bnd >> level
-                  >> rmmark;
-#ifdef _PAR
-        face_file >> prio >> numDist;
-        if ( numDist){
-            face_file >> oldGid;
-            for (int i=0; i<numDist; ++i){
-                face_file >> distProc;
+    short int accmfr[NumEdgesC];
+    for (MultiGridCL::TetraIterator it= mgp->GetAllTetraBegin(); it != mgp->GetAllTetraEnd(); ++it){
+    // now link to faces
+        for ( Uint i=0; i<NumFacesC; ++i){
+            const_cast<FaceCL*>(it->GetFace(i))->LinkTetra(&(*it));
+        }
+        if (it->IsRegularlyRef() && it->IsMaster())
+        {
+            for ( Uint i=0; i<NumEdgesC; ++i){
+                accmfr[i] = it->GetEdge(i)->GetAccMFR();
             }
-        }
-#endif
-        for (Uint i=0; i<4; ++i) {
-            it->SetNeighbor(i, tetraAddressMap[neighbor[i]]);
-        }
-        ++it;
-    }
-    CheckFile(face_file);
-}
+            it->CommitRegRefMark();
 
-void FileBuilderCL::AddChildren() const
-{
-    std::string filename= path_+"Children";
-#ifdef _PAR
-    ProcCL::AppendProcNum( filename);
-#endif
-    std::ifstream child_file( filename.c_str());
-    CheckFile(child_file);
-    child_file >> std::ws;
-    size_t tetra=0;
-    size_t child;
-
-    while (!child_file.eof())
-    {
-        child_file >> tetra;
-        for (Uint i=0; (i<MaxChildrenC) && (tetra!=0); ++i) {
-            child_file >> child;
-            if (child != 0) tetraAddressMap[tetra]->SetChild(i, tetraAddressMap[child]);
+            Uint edge=0;
+            for (TetraCL::const_EdgePIterator et= it->GetEdgesBegin(), end= it->GetEdgesEnd(); et!=end; ++et)
+                (*et)->SetAccMFR(accmfr[edge++]);
         }
     }
-    CheckFile(child_file);
+    const DiST::Helper::RemoteDataCL::LoadVecT& loadOfProc= DiST::InfoCL::Instance().GetLoadVector();
+    DiST::InfoCL& info= DiST::InfoCL::Instance();
+    for (int dim=0; dim<4; ++dim)
+        for (DiST::Helper::RemoteDataListCL::iterator it= info.GetRemoteList(dim).begin(), end= info.GetRemoteList(dim).end(); it!=end; ++it)
+                it->second.UpdateOwner(loadOfProc);
 }
 
 void FileBuilderCL::build(MultiGridCL* mgp) const
 {
     AppendLevel(mgp);
-    SimplexFactoryCL factory( this->GetVertices(mgp), this->GetEdges(mgp), this->GetFaces(mgp), this->GetTetras(mgp));
-#ifdef _PAR
-    throw DROPSErrCL("FileBuilderCL::build: Identify is missing!");
-//    DynamicDataInterfaceCL::IdentifyBegin();
-#endif
+    factory_ = new SimplexFactoryCL( this->GetVertices(mgp), this->GetEdges(mgp), this->GetFaces(mgp), this->GetTetras(mgp));
+
     // Create vertices
     std::cout << "Building Vertices ";
     BuildVerts(mgp);
@@ -2109,18 +1965,17 @@ void FileBuilderCL::build(MultiGridCL* mgp) const
 
     // Create Edges
     std::cout << "Building Edges ";
-    BuildEdges(mgp);
+    BuildEdges();
     std::cout << "--> success\n";
 
     // Create Faces (without Neighbors)
     std::cout << "Building Faces Part I ";
-    BuildFacesI (mgp);
+    BuildFacesI ();
     std::cout << "--> success\n";
 
     // Create Tetras
     std::cout << "Building Tetras ";
-    BuildTetras (mgp);
-    AddChildren ();
+    BuildTetras ();
     std::cout << "--> success\n";
 
     FinalizeModify(mgp);
@@ -2135,20 +1990,17 @@ void FileBuilderCL::build(MultiGridCL* mgp) const
     buildBoundary(mgp);
     std::cout << "--> success\n";
 
-#ifdef _PAR
-    throw DROPSErrCL("FileBuilderCL::build: Identify is missing!");
-    //DynamicDataInterfaceCL::IdentifyEnd();
-#endif
     PrepareModify(mgp);     // FinalizeModify(mgp); is called in constructor of MultiGridCL
+
     delete factory_; factory_=0;
 }
 
-void FileBuilderCL::CheckFile( const std::ifstream& is) const
+void FileBuilderCL::CheckFile( const std::istream& is) const
 {
     if (!is)
         throw DROPSErrCL( "FileBuilderCL: error while opening file!");
 }
-
+#endif
 /*******************************************************************
 *   M G S E R I A L I Z A T I O N   C L                           *
 *******************************************************************/
@@ -2295,7 +2147,7 @@ void MGSerializationCL::CheckFile( const std::ofstream& os) const
 {
     if (!os) throw DROPSErrCL( "MGSerializationCL: error while opening file!");
 }
-#endif
+#else
 
 void MGSerializationCL::WriteEdges()
 {
@@ -2303,12 +2155,18 @@ void MGSerializationCL::WriteEdges()
 #ifdef _PAR
     ProcCL::AppendProcNum( filename);
 #endif
-    DiST::Helper::SerialOFStreamCL edge_file( filename);
-    CheckFile(edge_file);
+    DiST::Helper::SerialOFStreamCL simplex_file( filename);
+    CheckFile(simplex_file);
+    simplex_file << mg_.GetEdges().size();
     for (MultiGridCL::EdgeIterator p=mg_.GetAllEdgeBegin(); p!=mg_.GetAllEdgeEnd(); ++p) {
-    	edge_file << *p;
+        simplex_file << *p;
+#ifdef _PAR
+        simplex_file << p->GetNumDist();
+        for (DiST::TransferableCL::ProcList_const_iterator it = p->GetProcListBegin(); it != p->GetProcListEnd(); ++it)
+            simplex_file << it->proc << it->prio;
+#endif
     }
-    CheckFile(edge_file);
+    CheckFile(simplex_file);
 }
 
 void MGSerializationCL::WriteFaces()
@@ -2317,12 +2175,18 @@ void MGSerializationCL::WriteFaces()
 #ifdef _PAR
     ProcCL::AppendProcNum( filename);
 #endif
-    DiST::Helper::SerialOFStreamCL face_file( filename);
-    CheckFile(face_file);
+    DiST::Helper::SerialOFStreamCL simplex_file( filename);
+    CheckFile(simplex_file);
+    simplex_file << mg_.GetFaces().size();
     for (MultiGridCL::FaceIterator p=mg_.GetAllFaceBegin(); p!=mg_.GetAllFaceEnd(); ++p) {
-        face_file << *p;
+        simplex_file << *p;
+#ifdef _PAR
+        simplex_file << p->GetNumDist();
+        for (DiST::TransferableCL::ProcList_const_iterator it = p->GetProcListBegin(); it != p->GetProcListEnd(); ++it)
+            simplex_file << it->proc << it->prio;
+#endif
     }
-    CheckFile(face_file);
+    CheckFile(simplex_file);
 }
 
 void MGSerializationCL::WriteVertices()
@@ -2331,12 +2195,22 @@ void MGSerializationCL::WriteVertices()
 #ifdef _PAR
     ProcCL::AppendProcNum( vertex_filename);
 #endif
-    DiST::Helper::SerialOFStreamCL vertex_file( vertex_filename);
-    CheckFile(vertex_file);
+    DiST::Helper::SerialOFStreamCL simplex_file( vertex_filename);
+    CheckFile(simplex_file);
+    simplex_file << mg_.GetVertices().size();
+    int k=0;
     for (MultiGridCL::VertexIterator p=mg_.GetAllVertexBegin(); p!=mg_.GetAllVertexEnd(); ++p) {
-        vertex_file << *p;
+        simplex_file << *p;
+        ++k;
+#ifdef _PAR
+        simplex_file << p->GetNumDist();
+        for (DiST::TransferableCL::ProcList_const_iterator it = p->GetProcListBegin(); it != p->GetProcListEnd(); ++it){
+            simplex_file << it->proc << it->prio;
+        }
+
+#endif
     }
-    CheckFile(vertex_file);
+    CheckFile(simplex_file);
 }
 
 void MGSerializationCL::WriteTetras()
@@ -2345,34 +2219,22 @@ void MGSerializationCL::WriteTetras()
 #ifdef _PAR
     ProcCL::AppendProcNum(tetra_filename);
 #endif
-    DiST::Helper::SerialOFStreamCL tetra_file (tetra_filename);
+    DiST::Helper::SerialOFStreamCL simplex_file (tetra_filename);
 
-    CheckFile(tetra_file);
-    for (MultiGridCL::TetraIterator p=mg_.GetAllTetraBegin(); p!=mg_.GetAllTetraEnd(); ++p) {
-        tetra_file << *p;
-    }
-    CheckFile(tetra_file);
-}
-
+    CheckFile(simplex_file);
+    simplex_file << mg_.GetTetras().size();
+    for (int i = mg_.GetLastLevel(); i>=0; --i){
+        for (MultiGridCL::TetraIterator p=mg_.GetTetrasBegin(i); p!=mg_.GetTetrasEnd(i); ++p) {
+            simplex_file << *p;
 #ifdef _PAR
-void MGSerializationCL::WriteRemoteDataLists()
-{
-    std::string remotedata_filename= path_+"RemoteData";
-#ifdef _PAR
-    ProcCL::AppendProcNum(remotedata_filename);
+            simplex_file << p->GetNumDist();
+            for (DiST::TransferableCL::ProcList_const_iterator it = p->GetProcListBegin(); it != p->GetProcListEnd(); ++it)
+                simplex_file << it->proc << it->prio;
 #endif
-    DiST::Helper::SerialOFStreamCL remotedata_file( remotedata_filename);
-    for (int i =0; i<4; ++i) {
-        DiST::Helper::RemoteDataListCL& list = DiST::InfoCL::InstancePtr()->GetRemoteList(i);
-        for (DiST::Helper::RemoteDataListCL::const_iterator it = list.begin(); it != list.end(); ++it){
-        	remotedata_file << it->first << it->second.GetLocalObject().GetGID();
-        	for (DiST::Helper::RemoteDataCL::ProcListT::const_iterator rit = it->second.GetProcListBegin(); rit != it->second.GetProcListEnd(); ++rit)
-        		remotedata_file << rit->proc << rit->prio;
-        	remotedata_file << it->second.GetOwnerProc();
         }
     }
+    CheckFile(simplex_file);
 }
-#endif
 
 void MGSerializationCL::WriteMG()
 {
@@ -2395,18 +2257,11 @@ void MGSerializationCL::WriteMG()
     std::cout << "Writing Faces ";
     WriteFaces();
     std::cout << "--> success\n";
-
-#ifdef _PAR
-    // Write RemoteDataLists
-    std::cout << "Writing Information for DiST";
-    WriteRemoteDataLists();
-    std::cout << "--> success\n";
-#endif
 }
 
 void MGSerializationCL::CheckFile( const std::ostream& os) const
 {
     if (!os) throw DROPSErrCL( "MGSerializationCL: error while opening file!");
 }
-
+#endif
 } //end of namespace DROPS
