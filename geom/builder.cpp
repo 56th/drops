@@ -1379,46 +1379,44 @@ ReadMeshBuilderCL::build(MultiGridCL* mgp) const
     // To obtain correct boundary-descriptions, boundary-edges are created from boundary-faces.
     // We assume that the MFace-Sections are sorted by ascending index, starting at 1. (Calling .Check() does this.)
     IdCL<FaceCL>::ResetCounter( 1);
-    MultiGridCL::FaceLevelCont& faces= GetFaces(mgp)[0];
+
     std::vector<FaceCL*> fa;
+    FaceCL* face;
+
     std::vector<HybridCellCL> thecells( cells_.num_expected);
     for (Uint s= 0; s<mfaces_.section.size(); ++s) {
         MFaceSectionCL& section= mfaces_.section[s];
         switch(section.headerinfo[3]) { // switch on the boundary condition.
           case 2: // Inner faces
-            for (Uint i= 0; i<section.mface.size(); ++i) {
+              for (Uint i= 0; i<section.mface.size(); ++i) {
 #ifdef _PAR
-                const Point3DCL bary=
-                    (va[section.mface[i][0]]->GetCoord()
-                    +va[section.mface[i][1]]->GetCoord()
-                    +va[section.mface[i][2]]->GetCoord())/3.0;
-                factory_->MakeFace( 0, bary); // Default is no boundary segment. (And the face is generated in the container faces)
-                throw DROPSErrCL("Please check this point and remove this exeption, if this is right!");
+                  const Point3DCL bary=
+                      (va[section.mface[i][0]-1]->GetCoord()
+                      +va[section.mface[i][1]-1]->GetCoord()
+                      +va[section.mface[i][2]-1]->GetCoord())/3.0;
+                  face = &factory_->MakeFace( 0, bary); // Default is no boundary segment. (And the face is generated in the container faces)
 #else
-                factory_->MakeFace( 0); // Default is no boundary segment.
+                  face = &factory_->MakeFace( 0); // Default is no boundary segment. (And the face is generated in the container faces)
 #endif
-                fa.push_back( &faces.back());
-                thecells[section.mface[i][3]-1].push_back( &faces.back(), section.mface[i]);
-                thecells[section.mface[i][4]-1].push_back( &faces.back(), section.mface[i]);
-            }
-            break;
+                  thecells[section.mface[i][3]-1].push_back( face, section.mface[i]);
+                  thecells[section.mface[i][4]-1].push_back( face, section.mface[i]);
+              }
+              break;
           default: // boundary-faces
             for (Uint i= 0; i<section.mface.size(); ++i) {
 #ifdef _PAR
                 const Point3DCL bary=
-                    (va[section.mface[i][0]]->GetCoord()
-                    +va[section.mface[i][1]]->GetCoord()
-                    +va[section.mface[i][2]]->GetCoord())/3.0;
-                factory_->MakeFace( 0, bary, zone_id2bndidx_[section.headerinfo[0]]); // Default is no boundary segment.
-                throw DROPSErrCL("Please check this point and remove this exeption, if this is right!");
+                    (va[section.mface[i][0]-1]->GetCoord()
+                    +va[section.mface[i][1]-1]->GetCoord()
+                    +va[section.mface[i][2]-1]->GetCoord())/3.0;
+                face = &factory_->MakeFace( 0, bary, zone_id2bndidx_[section.headerinfo[0]]); // Default is no boundary segment.
 #else
-                factory_->MakeFace( 0, zone_id2bndidx_[section.headerinfo[0]]); // Default is no boundary segment.
+                face = &factory_->MakeFace( 0, zone_id2bndidx_[section.headerinfo[0]]); // Default is no boundary segment.
 #endif
-                fa.push_back( &faces.back());
                 if (section.mface[i][3] != 0) // A cell on the right
-                    thecells[section.mface[i][3]-1].push_back( &faces.back(), section.mface[i]);
+                    thecells[section.mface[i][3]-1].push_back( face, section.mface[i]);
                 if (section.mface[i][4] != 0) // A cell on the left
-                    thecells[section.mface[i][4]-1].push_back( &faces.back(), section.mface[i]);
+                    thecells[section.mface[i][4]-1].push_back( face, section.mface[i]);
                 AddVertexBndDescription( va[section.mface[i][0]-1], zone_id2bndidx_[section.headerinfo[0]]);
                 AddVertexBndDescription( va[section.mface[i][1]-1], zone_id2bndidx_[section.headerinfo[0]]);
                 AddVertexBndDescription( va[section.mface[i][2]-1], zone_id2bndidx_[section.headerinfo[0]]);
@@ -1436,22 +1434,20 @@ ReadMeshBuilderCL::build(MultiGridCL* mgp) const
             break;
         }
     }
-
     // Finally, build the tetras. This step also creates interior edges.
     IdCL<TetraCL>::ResetCounter( 1);
-    MultiGridCL::TetraLevelCont& tetras= GetTetras( mgp)[0];
-    std::vector<TetraCL*> ta;
-    ta.reserve( cells_.num_expected);
+    TetraCL* tetra;
+
     for (Uint i= 0; i<thecells.size(); ++i) {
         thecells[i].Check();
         std::vector<Uint> vi= thecells[i].Vertices();
-        ta.push_back( &factory_->MakeTetra(va[vi[0]-1], va[vi[1]-1], va[vi[2]-1], va[vi[3]-1], 0));
-        tetras.back().BuildEdges( *factory_);
+        tetra = &factory_->MakeTetra(va[vi[0]-1], va[vi[1]-1], va[vi[2]-1], va[vi[3]-1], 0);
+        tetra->BuildEdges( *factory_);
         for (Uint f= 0; f<4; ++f) {
-            thecells[i].face( f)->LinkTetra( &tetras.back());
-            tetras.back().SetFace( f, thecells[i].Face( vi[VertOfFace( f, 0)],
-                                                        vi[VertOfFace( f, 1)],
-                                                        vi[VertOfFace( f, 2)]));
+            thecells[i].face( f)->LinkTetra( tetra);
+            tetra->SetFace( f, thecells[i].Face( vi[VertOfFace( f, 0)],
+                                                 vi[VertOfFace( f, 1)],
+                                                 vi[VertOfFace( f, 2)]));
         }
     }
     // Empty recycle-bins used to build edges.
