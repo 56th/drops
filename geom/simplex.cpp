@@ -1723,7 +1723,7 @@ FaceCL& SimplexFactoryCL::MakeFace ( Uint Level, BndIdxT bnd, __UNUSED__ const b
     faces_[Level].push_back( FaceCL(Level, bnd));
     FaceCL& ret= faces_[Level].back();
 #ifdef _PAR
-    throw DROPSErrCL("SimplexFactoryCL::MakeFace: Contructor only suitable for the serial version");
+    throw DROPSErrCL("SimplexFactoryCL::MakeFace: Constructor only suitable for the serial version");
 #endif
     return ret;
 }
