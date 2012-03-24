@@ -532,7 +532,7 @@ int main (int argc, char** argv)
 //        adap.MakeInitialTriang( * DROPS::ScaMap::getInstance()[InitialLSet]);
     mg->SizeInfo(std::cout);
     std::cout << DROPS::SanityMGOutCL(*mg) << std::endl;
-    for (int i = 0; i<P.get<int>("AdaptRef.FinestLevel"); ++i) {
+    for (int i = 0; i<P.get<int>("AdaptRef.FinestLevel") && P.get<std::string>("Restart.Inputfile") == "none"; ++i) {
         MarkAll( *mg);
         mg->Refine();
 #ifdef _PAR
@@ -545,6 +545,20 @@ int main (int argc, char** argv)
 #ifdef _PAR
  //   if (DROPS::ProcCL::Check( CheckParMultiGrid( adap.GetPMG())))
  //       std::cout << "As far as I can tell the ParMultigridCl is sane\n";
+    std::string filename("sane.chk");
+    DROPS::ProcCL::AppendProcNum(filename);
+    std::ofstream sanityfile( filename.c_str());
+    const DROPS::DiST::InfoCL& info= DROPS::DiST::InfoCL::Instance();
+    info.SizeInfo(sanityfile);
+    info.Instance().DebugInfo(sanityfile);
+    sanityfile << "\n\n===========================\n\n";
+
+    if ( DROPS::ProcCL::Check( DROPS::DiST::InfoCL::Instance().IsSane( sanityfile))){
+        std::cout << " DiST-module seems to be alright!" << std::endl;
+    }
+    else{
+        std::cout << " DiST-module seems to be broken!" << std::endl;
+    }
 #endif
     DROPS::InstatNavierStokes2PhaseP2P1CL prob( *mg, DROPS::TwoPhaseFlowCoeffCL(P), bnddata, P.get<double>("Stokes.XFEMStab")<0 ? DROPS::P1_FE : DROPS::P1X_FE, P.get<double>("Stokes.XFEMStab"));
 
