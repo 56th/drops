@@ -364,10 +364,11 @@ class MassAccumulator_P1CL : public Accumulator_P1CL<Coeff,QuadCL>
     using                           base_::t;
     SUPGCL& supg_;
     bool   ALE_;
+    double tSUPG_;
     public:
     MassAccumulator_P1CL(const MultiGridCL& MG, const BndDataCL<> * BndData, MatrixCL* Amat, VecDescCL* b, 
-                   IdxDescCL& RowIdx, IdxDescCL& ColIdx, SUPGCL& supg, bool ALE, const double t)
-                   :Accumulator_P1CL<Coeff,QuadCL>(MG,BndData,Amat,b,RowIdx,ColIdx,t),supg_(supg), ALE_(ALE){}
+                   IdxDescCL& RowIdx, IdxDescCL& ColIdx, SUPGCL& supg, bool ALE, const double t, const double tSUPG)
+                   :Accumulator_P1CL<Coeff,QuadCL>(MG,BndData,Amat,b,RowIdx,ColIdx,t),supg_(supg), ALE_(ALE), tSUPG_(tSUPG){}
     void local_setup (const TetraCL& sit);
     void visit (const TetraCL& sit);
     virtual TetraAccumulatorCL* clone (int /*tid*/) { return new MassAccumulator_P1CL ( *this); }
@@ -400,7 +401,7 @@ void MassAccumulator_P1CL<Coeff,QuadCL>::local_setup (const TetraCL& sit)
         vel= Coeff::ALEVelocity;
         else
         vel= Coeff::Vel;
-        QuadCL<Point3DCL> u(sit,vel,t);
+        QuadCL<Point3DCL> u(sit,vel,tSUPG_);
         for(int i=0; i<4; i++)
             U_Grad[i]=dot(u, QuadCL<Point3DCL>(G[i]));
     }
@@ -418,7 +419,7 @@ void MassAccumulator_P1CL<Coeff,QuadCL>::local_setup (const TetraCL& sit)
             else
             vel= Coeff::Vel;
             QuadCL<double> StrM(U_Grad[i]*phiQuad[j]);
-            coup[i][j]+=StrM.quad(absdet)*supg_.Sta_Coeff( vel(GetBaryCenter(sit), t), Coeff::alpha);  //SUPG term
+            coup[i][j]+=StrM.quad(absdet)*supg_.Sta_Coeff( vel(GetBaryCenter(sit), tSUPG_), Coeff::alpha);  //SUPG term
         }
       }
       UnknownIdx[i]= sit.GetVertex(i)->Unknowns.Exist(idx) ? sit.GetVertex(i)->Unknowns(idx) : NoIdx;      
