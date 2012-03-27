@@ -1346,7 +1346,7 @@ bool ExchangeBuilderCL::HandlerDOFRecvCL::Gather( DiST::TransferableCL& t,
     if (!t.IsDistributed(PrioMaster))
         return false;
     const Uint idx= rowidx_.GetIdx();
-    const bool haveDOF= t.Unknowns.Exist() && t.Unknowns.Exist( idx) && t.Unknowns.InTriangLevel(rowidx_.TriangLevel());// && hs_.owner_[t.Unknowns(idx)] != -1;
+    const bool haveDOF= t.Unknowns.Exist() && t.Unknowns.Exist( idx) && t.Unknowns.InTriangLevel(rowidx_.TriangLevel());
 
     const Uint numUnk= rowidx_.NumUnknownsSimplex( t);
 
@@ -1433,12 +1433,13 @@ bool ExchangeBuilderCL::HandlerDOFRecvCL::Scatter( DiST::TransferableCL& t,
         // receive data for phase 1, only DoF owner fills receive list 1
         recv >> sender;
         recv >> senddof; // receive non-extended dof
+        if (rowidx_.IsExtended())
+            recv >> sendextdof; // receive extended dof
         if ( senddof!=NoInt_) {
             if (owner==me)
                 recvList1_[sender][senddof]= dof;
             if (rowidx_.IsExtended()) {
-                recv >> sendextdof; // receive extended dof
-                if ( senddof!=NoInt_ && owner==me)
+                if ( sendextdof!=NoInt_ && owner==me)
                     recvList1_[sender][sendextdof]= extdof;
             }
         }
@@ -1819,6 +1820,16 @@ int ExchangeBuilderCL::GetDOFOwner( const tmpRecvT& rcvTmp, bool XFEM)
     const DiST::Helper::RemoteDataCL::LoadVecT& load= DiST::InfoCL::Instance().GetLoadVector();
     double minLoad= std::numeric_limits<double>::max();
     int owner = -1;
+    if (XFEM){                      // is this special dof extended?
+        XFEM = false;
+        for (tmpRecvT::const_iterator it= rcvTmp.begin(), end= rcvTmp.end(); it!=end; ++it) {
+            const int exdof= (*it)[2];
+            if (exdof !=NoInt_){
+                XFEM = true;
+                break;
+            }
+        }
+    }
     for (tmpRecvT::const_iterator it= rcvTmp.begin(), end= rcvTmp.end(); it!=end; ++it) {
         const int proc= (*it)[0],
                  exdof= (*it)[2];
@@ -1830,6 +1841,10 @@ int ExchangeBuilderCL::GetDOFOwner( const tmpRecvT& rcvTmp, bool XFEM)
         } else if ((load[proc] == minLoad) && (proc < owner))
             owner= proc;
     }
+    Assert(owner!=-1,
+        DROPSErrCL("ExchangeBuilderCL::GetDOFOwner: Found no owner for dof"),
+        DebugParallelNumC);
+
     return owner;
 }
 
