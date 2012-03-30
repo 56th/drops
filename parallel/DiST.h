@@ -509,6 +509,7 @@ class TransferableCL
 
     inline const Helper::RemoteDataCL& GetRemoteData() const;                               ///< Access its RemoteDataCL
     inline       Helper::RemoteDataCL& GetRemoteData();                                     ///< Access its RemoteDataCL
+    virtual void UpdateGID() = 0;
 
   public:
     /// \brief Uninitialized object

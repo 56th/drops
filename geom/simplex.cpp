@@ -88,6 +88,14 @@ void VertexCL::UnPack( DiST::Helper::MPIistreamCL& istrstream)
     Unknowns.UnPack( istrstream, *this);
 }
 
+void VertexCL::UpdateGID()
+{
+    if (DiST::InfoCL::Instance().Exists(this->GetGID()))
+        throw DROPSErrCL("VertexCL::UpdateGID(): object is already registered");
+    DiST::Helper::GeomIdCL hash(this->GetLevel(), *this);
+    this->gid_ = hash;
+}
+
 #endif
 
 // E D G E  C L
@@ -175,6 +183,15 @@ void EdgeCL::UnPack( DiST::Helper::MPIistreamCL& istrstream)
         MidVertex_= DiST::InfoCL::Instance().GetVertex(midVertex);
     Unknowns.UnPack( istrstream, *this);
 }
+
+void EdgeCL::UpdateGID()
+{
+    if (DiST::InfoCL::Instance().Exists(this->GetGID()))
+        throw DROPSErrCL("EdgeCL::UpdateGID(): object is already registered");
+    DiST::Helper::GeomIdCL hash(this->GetLevel(), *this);
+    this->gid_ = hash;
+}
+
 
 #endif
 
@@ -300,6 +317,15 @@ void FaceCL::UnPack( DiST::Helper::MPIistreamCL& istrstream)
     istrstream >> Bnd_ >> RemoveMark_;
     Unknowns.UnPack( istrstream, *this);
 }
+
+void FaceCL::UpdateGID()
+{
+    if (DiST::InfoCL::Instance().Exists(this->GetGID()))
+        throw DROPSErrCL("FaceCL::UpdateGID(): object is already registered");
+    DiST::Helper::GeomIdCL hash(this->GetLevel(), *this);
+    this->gid_ = hash;
+}
+
 
 #endif
 
@@ -978,6 +1004,15 @@ void TetraCL::UnPack( DiST::Helper::MPIistreamCL& istrstream)
     }
     Unknowns.UnPack( istrstream, *this);
 }
+
+void TetraCL::UpdateGID()
+{
+    if (DiST::InfoCL::Instance().Exists(this->GetGID()))
+        throw DROPSErrCL("TetraCL::UpdateGID(): object is already registered");
+    DiST::Helper::GeomIdCL hash(this->GetLevel(), *this);
+    this->gid_ = hash;
+}
+
 
 /**
  * - For former HasGhost, set children array and midvertex pointers properly.

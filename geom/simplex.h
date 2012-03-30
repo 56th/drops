@@ -235,6 +235,8 @@ class VertexCL
     void Pack( DiST::Helper::MPIostreamCL&) const;
     /// \brief Generate vertex from a stream
     void UnPack( DiST::Helper::MPIistreamCL&);
+    /// \brief Generate GID
+    void UpdateGID();
     /// \brief Check if simplex is exclusive
     bool IsExclusive( const Priority=PrioMaster) const;
     //{ return GetPrio()>=Priority; }// /*throw DROPSErrCL("VertexCL::IsExclusive: Not implemented yet, sorry");*/ }
@@ -354,6 +356,8 @@ class EdgeCL
     void Pack( DiST::Helper::MPIostreamCL&) const;
     /// \brief Generate edge from a stream
     void UnPack( DiST::Helper::MPIistreamCL&);
+    /// \brief Generate GID
+    void UpdateGID();
     /// \brief Check if simplex is exclusive
     bool IsExclusive( const Priority=PrioMaster) const;
         //{ throw DROPSErrCL("EdgeCL::IsExclusive: Not implemented yet, sorry"); }
@@ -452,6 +456,8 @@ class FaceCL
     void Pack( DiST::Helper::MPIostreamCL&) const;
     /// \brief Generate face from a stream
     void UnPack( DiST::Helper::MPIistreamCL&);
+    /// \brief Generate GID
+    void UpdateGID();
 
     /// \brief Check if face is exclusive
     bool IsExclusive( const Priority=PrioMaster) const;
@@ -631,6 +637,8 @@ class TetraCL
     void Pack( DiST::Helper::MPIostreamCL&) const;
     /// \brief Generate tetra from a stream
     void UnPack( DiST::Helper::MPIistreamCL&);
+    /// \brief Generate GID
+    void UpdateGID();
     /// \brief Merge tetra with given tetra. Needed by DiST::TransferCL.
     void Merge( const TetraCL&);
 

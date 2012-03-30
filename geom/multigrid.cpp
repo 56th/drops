@@ -154,13 +154,12 @@ MultiGridCL::MultiGridCL (const MGBuilderCL& Builder)
 #ifdef _PAR
     DiST::InfoCL::Instance( this);  // tell InfoCL about the multigrid before(!) building the grid
     ParMultiGridCL::Instance().AttachTo( *this);
-//#ifdef _DDD
-  //  ParMultiGridCL::Instance().MarkSimplicesForUnknowns();
-//#endif
 #endif
     Builder.build(this);
     FinalizeModify();
+#ifdef _PAR
     ParMultiGridCL::Instance().MarkSimplicesForUnknowns();
+#endif
 }
 
 void MultiGridCL::ClearTriangCache ()
@@ -611,6 +610,18 @@ class VertPtrLessCL : public std::binary_function<const VertexCL*, const VertexC
 };
 
 
+void MultiGridCL::MakeConsistentHashes()
+{
+    for (FaceIterator sit = GetFacesBegin(0); sit != GetFacesEnd(0); ++sit){
+        sit->UpdateGID();
+        DiST::InfoCL::Instance().GetRemoteList<FaceCL>().Register( *sit);
+    }
+    for (TetraIterator sit = GetTetrasBegin(0); sit != GetTetrasEnd(0); ++sit){
+        sit->UpdateGID();
+        DiST::InfoCL::Instance().GetRemoteList<TetraCL>().Register( *sit);
+    }
+}
+
 void MultiGridCL::MakeConsistentNumbering()
 // Applicable only before the first call to Refine()
 // Rearranges the Vertexorder in Tetras and Edges, so that it is the one induced by
@@ -653,7 +664,7 @@ void MultiGridCL::MakeConsistentNumbering()
         }
     }
 #ifdef _PAR
-    throw DROPSErrCL(" Implement the Recompute Hash-function");
+    MakeConsistentHashes();
 #endif
 }
 
