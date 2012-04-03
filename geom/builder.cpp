@@ -1789,7 +1789,6 @@ void FileBuilderCL::BuildVerts(MultiGridCL* mgp) const
     CheckFile( simplex_file);
 
     // Input-Variables
-    VertexCL tmpvert;
     Uint level, oldlevel=0, numdist;
     size_t numverts;
     int proc;
@@ -1799,6 +1798,7 @@ void FileBuilderCL::BuildVerts(MultiGridCL* mgp) const
 
     for (size_t i = 0; i<numverts; ++i)
     {
+        VertexCL tmpvert;
         simplex_file >> tmpvert;
         level = tmpvert.GetLevel();
         if (level > oldlevel) {
@@ -1833,7 +1833,6 @@ void FileBuilderCL::BuildEdges() const
     DiST::Helper::SerialIFStreamCL simplex_file(filename);
     CheckFile(simplex_file);
 
-    EdgeCL tmpedge;
     size_t numedges;
 
     Uint numdist;
@@ -1844,6 +1843,7 @@ void FileBuilderCL::BuildEdges() const
 
     for (size_t i = 0; i<numedges; ++i)
     {
+        EdgeCL tmpedge;
         simplex_file >> tmpedge;
         simplex_file >> numdist;
         for (Uint k=0; k<numdist; ++k){
@@ -1866,8 +1866,6 @@ void FileBuilderCL::BuildFacesI() const
     DiST::Helper::SerialIFStreamCL simplex_file(filename);
     CheckFile(simplex_file);
 
-    FaceCL tmpface;
-
     size_t num;
 
     Uint numdist;
@@ -1877,6 +1875,7 @@ void FileBuilderCL::BuildFacesI() const
     simplex_file >> num;
 
     for (size_t i = 0; i< num; ++i) {
+        FaceCL tmpface;
         simplex_file >> tmpface;
         simplex_file >> numdist;
         for (Uint k=0; k<numdist; ++k){
@@ -1899,8 +1898,6 @@ void FileBuilderCL::BuildTetras() const
     DiST::Helper::SerialIFStreamCL simplex_file( filename);
     CheckFile(simplex_file);
 
-    TetraCL tmptetra;
-
     size_t num;
 
     Uint numdist;
@@ -1910,6 +1907,7 @@ void FileBuilderCL::BuildTetras() const
     simplex_file >> num;
 
     for (size_t i = 0; i< num; ++i) {
+        TetraCL tmptetra;
         simplex_file >> tmptetra;
         simplex_file >> numdist;
         for (Uint k=0; k<numdist; ++k){
