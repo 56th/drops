@@ -94,7 +94,7 @@ class SUPGCL
         {
             double dx_= lx_/(nx_*std::pow(2, Ref_)); 
             double dy_= ly_/(ny_*std::pow(2, Ref_));
-            double dz_= ly_/(nz_*std::pow(2, Ref_));
+            double dz_= lz_/(nz_*std::pow(2, Ref_));
             double m;
             if(dx_>=dy_)
                 m = dx_;
@@ -190,7 +190,7 @@ class PoissonP1CL : public ProblemCL<Coeff, PoissonBndDataCL>
     /// couplings with bnd unknowns, coefficient f(t)
     /// If the function is called with the same vector for some arguments,
     /// the vector will contain the sum of the results after the call
-    void SetupInstatRhs( VecDescCL& vA, VecDescCL& vM, double tA, VecDescCL& vf, double tf) const;
+    void SetupInstatRhs( VecDescCL& vA, VecDescCL& vM, double t, VecDescCL& vf, double tSUPG= 0.) const;
     /// \brief Setup special source term including the gradient of a given P1 function
     void SetupGradSrc( VecDescCL& src, instat_scalar_fun_ptr T, instat_scalar_fun_ptr dalpha, double t= 0.) const;
 

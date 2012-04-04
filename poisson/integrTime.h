@@ -130,20 +130,17 @@ void InstatPoissonThetaSchemeCL<PoissonT,SolverT>::DoStep( VecDescCL& v)
 {
   _Poisson.x.t+= _dt;
 
+  //For supg and ale method, theta scheme is only correctly implemented in the case theta =1
   if(_supg||_ale)
   {
-     //update stiffness and mass matrix in ale case, since the test functions changes;
-     //update mass matrix in supg case, since the test functions changes;
+     //update mass matrix, since the test functions changes;
     _Poisson.SetupInstatSystem( _Poisson.A, _Poisson.M, _Poisson.x.t);
   }
   _Poisson.SetupInstatRhs( *_cplA, *_cplM, _Poisson.x.t, *_b, _Poisson.x.t);
   
-  if(_supg)
-  //Use old values but new test functions 
+  if(_supg||_ale)
+  //update _old_cplm with respect to new test functions
   _Poisson.SetupInstatRhs( *_old_cplA, *_old_cplM, _Poisson.x.t-_dt, *_old_b, _Poisson.x.t);
-  else if(_ale)
-  //Update _old_cplm with new test functions
-  _Poisson.SetupInstatRhs( *_old_cplA, *_old_cplM, _Poisson.x.t-_dt, *_old_b, _Poisson.x.t-_dt);
   
   _rhs = _Poisson.A.Data * v.Data;
   _rhs*= -_dt*(1.0-_theta); 
@@ -158,8 +155,6 @@ void InstatPoissonThetaSchemeCL<PoissonT,SolverT>::DoStep( VecDescCL& v)
           + _cplM->Data;
   
 
-
-  
   if (_Convection)
   {
       _rhs+= (_dt*(1.0-_theta)) * (_cplU->Data - _Poisson.U.Data * v.Data );
