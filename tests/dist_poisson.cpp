@@ -140,11 +140,11 @@ void Strategy( PoissonP2CL<CoeffCL>& Poisson)
     timer.Reset();
     
     if(P.get<int>("Time.NumSteps") !=0)
-        Poisson.SetupInstatSystem(Poisson.A, Poisson.M, 0., P.get<int>("PoissonCoeff.Stabilization"));    //IntationarySystem
+        Poisson.SetupInstatSystem(Poisson.A, Poisson.M, 0.);    //IntationarySystem
     else
     {
         Poisson.SetupSystem( Poisson.A, Poisson.b);         //StationarySystem
-        if(P.get<int>("Time.Convection"))
+        if(P.get<int>("PoissonCoeff.Convection"))
           {
             Poisson.vU.SetIdx( &Poisson.idx); 
             Poisson.SetupConvection(Poisson.U, Poisson.vU, 0.0);                 //Setupconvection
@@ -214,7 +214,7 @@ void Strategy( PoissonP2CL<CoeffCL>& Poisson)
 
     if (P.get<int>("Time.NumSteps") != 0){
         InstatPoissonThetaSchemeCL<PoissonP2CL<CoeffCL>, PoissonSolverBaseCL>
-           ThetaScheme(Poisson, *solver, P.get<double>("Time.Theta"), P.get<double>("Time.Convection"));
+           ThetaScheme(Poisson, *solver, P);
         ThetaScheme.SetTimeStep(P.get<double>("Time.StepSize"));
 
         for ( int step = 1; step <= P.get<int>("Time.NumSteps"); ++step)
@@ -248,6 +248,16 @@ void Strategy( PoissonP2CL<CoeffCL>& Poisson)
 
 } // end of namespace DROPS
 
+/// \brief Set Default parameters here s.t. they are initialized.
+/// The result can be checked when Param-list is written to the output.
+void SetMissingParameters(DROPS::ParamCL& P){
+    P.put_if_unset<int>("Stabilization.SUPG",0);
+    P.put_if_unset<double>("Stabilization.Magnitude",1.0);
+    P.put_if_unset<int>("Stabilization.Grids",1);
+    P.put_if_unset<int>("ALE.wavy",0);
+    P.put_if_unset<std::string>("ALE.Interface","Zero");
+}
+
 int main (int argc, char** argv)
 {
 #ifdef _PAR
@@ -259,8 +269,8 @@ int main (int argc, char** argv)
 
         std::ifstream param;
         if (argc!=2){
-            std::cout << "Using default parameter file: poissonex1.json\n";
-            param.open( "poissonex1.json");
+            std::cout << "Using default parameter file: statpoissonEx.json\n";
+            param.open( "statpoissonEx.json");
         }
         else
             param.open( argv[1]);
@@ -270,6 +280,8 @@ int main (int argc, char** argv)
         }
         param >> P;
         param.close();
+        //Setup missing parameters
+        SetMissingParameters(P);
         std::cout << P << std::endl;
 
         // time measurement
@@ -299,14 +311,14 @@ int main (int argc, char** argv)
         mg->SizeInfo(cout);
         std::cout << line << "Set up load balancing ...\n";
         // Setup the problem
-        DROPS::PoissonP2CL<DROPS::PoissonCoeffCL<DROPS::ParamCL> > prob( *mg, DROPS::PoissonCoeffCL<DROPS::ParamCL>(P), *bdata);
+        DROPS::PoissonP2CL<DROPS::PoissonCoeffCL> prob( *mg, DROPS::PoissonCoeffCL(P), *bdata);
         timer.Reset();
 #ifdef _PAR
         // Set parallel data structures
         DROPS::ParMultiGridCL pmg= DROPS::ParMultiGridCL::Instance();
-        pmg.AttachTo( *mg);             // handling of parallel multigrid
-        DROPS::LoadBalCL lb( *mg);      // loadbalancing
-        lb.DoMigration( );              // distribute initial grid
+        pmg.AttachTo( *mg);                                  // handling of parallel multigrid
+        DROPS::LoadBalCL lb( *mg);                    // loadbalancing
+        lb.DoMigration();    // distribute initial grid
 #endif
         timer.Stop();
         std::cout << " o time " << timer.GetTime() << " s" << std::endl;
@@ -329,9 +341,9 @@ int main (int argc, char** argv)
         timer.Stop();
         std::cout << " o time " << timer.GetTime() << " s" << std::endl;
         mg->SizeInfo(cout);
-
+        DROPS::SUPGCL supg;
         // Solve the problem
-        DROPS::Strategy( prob);
+        DROPS::Strategy( prob );
         std::cout << DROPS::SanityMGOutCL(*mg) << std::endl;
 
         // maple/geomview-output

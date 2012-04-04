@@ -90,8 +90,6 @@ class EnsightIdxRepairCL: public MGObserverCL
     void pre_refine_sequence  () {}
     void post_refine_sequence () {}
     const IdxDescCL* GetIdxDesc() const { return &idx_; }
-    const VectorCL*  GetVector()  const { return 0; }
-    void swap( IdxDescCL&, VectorCL&) {}
 };
 
 
@@ -99,8 +97,8 @@ template<class StokesProblemT>
 void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, bool is_periodic)
 // flow control
 {
-
-    DROPS::match_fun periodic_match = DROPS::MatchMap::getInstance()[P.get("Exp.PerMatching", std::string("periodicxz"))];
+  
+    DROPS::match_fun periodic_match = DROPS::MatchMap::getInstance()[P.get<std::string>("DomainCond.PeriodicMatching", std::string("periodicxz"))];
     MultiGridCL& MG= Stokes.GetMG();
 
     IdxDescCL* lidx= &lset.idx;
@@ -352,9 +350,9 @@ int main (int argc, char** argv)
     param.close();
     std::cout << P << std::endl;
 
-    //DIDNT FIND A PARAM WITH PerMatching, so I didnt know the type
-    DROPS::match_fun periodic_match = DROPS::MatchMap::getInstance()[P.get("Exp.PerMatching", std::string("periodicxz"))];
-
+    //DIDNT FIND A PARAM WITH PeriodicMatching, so I didnt know the type
+    DROPS::match_fun periodic_match = DROPS::MatchMap::getInstance()[P.get<std::string>("DomainCond.PeriodicMatching", std::string("periodicxz"))];
+    
     typedef DROPS::TwoPhaseFlowCoeffCL            CoeffT;
     typedef DROPS::InstatNavierStokes2PhaseP2P1CL MyStokesCL;
 

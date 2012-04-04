@@ -88,7 +88,7 @@ void SetupSystem2_P2P1( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& coeff,
     System2Accumulator_P2P1CL<TwoPhaseFlowCoeffCL> accu( coeff, BndData, *RowIdx, *ColIdx, *B, c, t);
     TetraAccumulatorTupleCL accus;
     accus.push_back( &accu);
-    accumulate( accus, MG, RowIdx->TriangLevel());
+    accumulate( accus, MG, RowIdx->TriangLevel(), RowIdx->GetMatchingFunction(), RowIdx->GetBndInfo());
 }
 
 
@@ -96,8 +96,8 @@ void SetupSystem2_P2P1( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& coeff,
 class System2Accumulator_P2P1XCL : public System2Accumulator_P2P1CL<TwoPhaseFlowCoeffCL>
 {
   private:
-	typedef System2Accumulator_P2P1CL<TwoPhaseFlowCoeffCL> base_;
-	using base_::coeff;
+    typedef System2Accumulator_P2P1CL<TwoPhaseFlowCoeffCL> base_;
+    using base_::coeff;
     using base_::BndData;
     const LevelsetP2CL&        lset_;
 
@@ -154,7 +154,7 @@ System2Accumulator_P2P1XCL::System2Accumulator_P2P1XCL (const TwoPhaseFlowCoeffC
 	    MatrixCL& B_arg, VecDescCL* c_arg, double t_arg)
     :  base_( coeff_arg, BndData_arg, RowIdx_arg, ColIdx_arg, B_arg, c_arg, t_arg), lset_( lset), ls_loc_( 10)
 {
-	P2DiscCL::GetGradientsOnRef( GradRefLP1_);
+    P2DiscCL::GetGradientsOnRef( GradRefLP1_);
 }
 
 void System2Accumulator_P2P1XCL::begin_accumulation ()
@@ -232,7 +232,7 @@ void SetupSystem2_P2P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& coeff
     System2Accumulator_P2P1XCL p1x_accu( coeff, BndData, lset, *RowIdx, *ColIdx, *B, c, t);
     TetraAccumulatorTupleCL accus;
     accus.push_back( &p1x_accu);
-    accumulate( accus, MG, RowIdx->TriangLevel());
+    accumulate( accus, MG, RowIdx->TriangLevel(), RowIdx->GetMatchingFunction(), RowIdx->GetBndInfo());
 }
 
 inline void ComputePgradV( LocalP2CL<Point3DCL>& PgradV, Uint pr, const Quad2CL<Point3DCL>& gradV)
@@ -742,19 +742,55 @@ void SetupPrMass_P0(const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, Mat
 }
 
 
-void SetupPrMass_P1(const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, MatrixCL& matM, IdxDescCL& RowIdx, const LevelsetP2CL& lset)
+/// \brief Accumulator to set up the pressure matrix for P1/P1-XFEM.
+class PrMassAccumulator_P1CL : public TetraAccumulatorCL
 {
-    const IdxT num_unks_pr=  RowIdx.NumUnknowns();
-    MatrixBuilderCL M_pr(&matM, num_unks_pr,  num_unks_pr);
+  private:
+    const MultiGridCL& MG;
+    const PrincipalLatticeCL& lat;
+    const TwoPhaseFlowCoeffCL& Coeff;
+    MatrixCL& matM;
+    IdxDescCL& RowIdx;
+    const LevelsetP2CL& lset;
 
-    const Uint lvl= RowIdx.TriangLevel();
+    std::valarray<double>     ls_loc_;
+    TetraPartitionCL          partition_;
+
+    const IdxT num_unks_pr;
+    MatrixBuilderCL* M_pr;
+    const Uint lvl;
     IdxT prNumb[4];
-    double coup[4][4];
-    const double nu_inv_p= 1./Coeff.mu( 1.0),
-                 nu_inv_n= 1./Coeff.mu( -1.0);
+    double coup[4][4], coupT2[4][4];
+    const double nu_inv_p, nu_inv_n;
     double integralp, integraln;
     InterfaceTetraCL cut;
     LocalP2CL<> pipj[4][4];
+    LocalP2CL<> loc_phi;
+    
+    bool useXFEM;
+    
+    void local_setup ();
+    void update_global_system ();
+    
+
+  public:
+    PrMassAccumulator_P1CL (const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_, MatrixCL& matM_, IdxDescCL& RowIdx_, const LevelsetP2CL& lset_, bool XFEM=true);
+
+    ///\brief Initializes matrix-builders and load-vectors
+    void begin_accumulation ();
+    ///\brief Builds the matrices
+    void finalize_accumulation();
+
+    void visit (const TetraCL& sit);
+    
+    TetraAccumulatorCL* clone (int /*tid*/){ return new PrMassAccumulator_P1CL ( *this); };
+};
+
+PrMassAccumulator_P1CL::PrMassAccumulator_P1CL (const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_, MatrixCL& matM_, IdxDescCL& RowIdx_, const LevelsetP2CL& lset_, bool XFEM)
+    : MG(MG_), lat( PrincipalLatticeCL::instance( 2)), Coeff(Coeff_), matM(matM_), RowIdx(RowIdx_),
+      lset(lset_), ls_loc_( 10), num_unks_pr(RowIdx_.NumUnknowns()),
+      lvl(RowIdx_.TriangLevel()), nu_inv_p(1./Coeff_.mu( 1.0)), nu_inv_n(1./Coeff_.mu( -1.0)), useXFEM( XFEM)
+{
     for(int i= 0; i < 4; ++i) {
         for(int j= 0; j < i; ++j) {
             pipj[j][i][EdgeByVert( i, j) + 4]= 0.25;
@@ -762,130 +798,99 @@ void SetupPrMass_P1(const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, Mat
         }
         pipj[i][i][i]= 1.;
         for (int vert= 0; vert < 3; ++vert)
-                pipj[i][i][EdgeByVert( i, VertOfFace( i, vert)) + 4]= 0.25;
+            pipj[i][i][EdgeByVert( i, VertOfFace( i, vert)) + 4]= 0.25;
     }
+}
 
-    LocalP2CL<> loc_phi;
-    DROPS_FOR_TRIANG_CONST_TETRA( MG, lvl, sit) {
-        const double absdet= sit->GetVolume()*6.;
-        loc_phi.assign( *sit, lset.Phi, lset.GetBndData());
-        cut.Init( *sit, loc_phi);
-        const bool nocut= !cut.Intersects();
-        GetLocalNumbP1NoBnd( prNumb, *sit, RowIdx);
-        if (nocut) { // nu is constant in tetra
-            const double nu_inv= cut.GetSign( 0) == 1 ? nu_inv_p : nu_inv_n;
-            // write values into matrix
-            for(int i=0; i<4; ++i)
-                for(int j=0; j<4; ++j)
-                    M_pr( prNumb[i], prNumb[j])+= nu_inv*P1DiscCL::GetMass( i, j)*absdet;
-        }
-        else { // nu is discontinuous in tetra
-            for(int i=0; i<4; ++i) {
-                for(int j=0; j<=i; ++j) {
-                    // compute the integrals
-                    // \int_{T_i} p_i p_j dx,    where T_i = T \cap \Omega_i, i=1,2
-                    integralp= integraln= 0.;
-                    for (int ch= 0; ch < 8; ++ch) {
-                        cut.ComputeCutForChild( ch);
-                        integralp+= cut.quad( pipj[i][j], absdet, true);  // integrate on positive part
-                        integraln+= cut.quad( pipj[i][j], absdet, false); // integrate on negative part
-                    }
-                    coup[j][i]= integralp*nu_inv_p + integraln*nu_inv_n;
-                    coup[i][j]= coup[j][i];
+void PrMassAccumulator_P1CL::begin_accumulation ()
+{
+    M_pr = new MatrixBuilderCL(&matM, num_unks_pr,  num_unks_pr);
+}
+
+void PrMassAccumulator_P1CL::finalize_accumulation()
+{
+    M_pr->Build();
+    delete M_pr;
+}
+
+void PrMassAccumulator_P1CL::visit (const TetraCL& sit)
+{
+    const ExtIdxDescCL& Xidx= RowIdx.GetXidx();
+    const double absdet= sit.GetVolume()*6.;
+    loc_phi.assign( sit, lset.Phi, lset.GetBndData());
+    cut.Init( sit, loc_phi);
+    const bool nocut= !cut.Intersects();
+    GetLocalNumbP1NoBnd( prNumb, sit, RowIdx);
+    GridFunctionCL<> pp;
+    QuadDomainCL q2dom_;
+    bool sign[4];
+
+    evaluate_on_vertexes( lset.GetSolution(), sit, lat, Addr( ls_loc_));
+    partition_.make_partition<SortedVertexPolicyCL, MergeCutPolicyCL>( lat, ls_loc_);
+    make_CompositeQuad2Domain( q2dom_, partition_);
+
+    if (nocut) { // nu is constant in tetra
+        const double nu_inv= cut.GetSign( 0) == 1 ? nu_inv_p : nu_inv_n;
+        // write values into matrix
+        for(int i=0; i<4; ++i)
+            for(int j=0; j<4; ++j)
+                (*M_pr)( prNumb[i], prNumb[j])+= nu_inv*P1DiscCL::GetMass( i, j)*absdet;
+    }
+    else { // nu is discontinuous in tetra
+        for(int i=0; i<4; ++i) {
+            sign[i]= cut.GetSign(i) == 1;
+            for(int j=0; j<=i; ++j) {
+                // compute the integrals
+                // \int_{T_i} p_i p_j dx,    where T_i = T \cap \Omega_i, i=1,2
+                integralp= integraln= 0.;
+                resize_and_evaluate_on_vertexes( pipj[i][j], q2dom_, pp);
+                integralp = quad( pp , absdet , q2dom_ , PosTetraC);
+                integraln = quad( pp , absdet , q2dom_ , NegTetraC);
+
+                coup[j][i]= integralp*nu_inv_p + integraln*nu_inv_n;
+                coup[i][j]= coup[j][i];
+                if (useXFEM) {
+                    coupT2[j][i]= integralp*nu_inv_p;
+                    coupT2[i][j]= coupT2[j][i];
                 }
             }
+        }
 
-            // write values into matrix
-            for(int i=0; i<4; ++i)
-                for(int j= 0; j < 4; ++j)
-                    M_pr( prNumb[i], prNumb[j])+= coup[i][j];
+        // write values into matrix
+        for(int i=0; i<4; ++i) {
+            const IdxT xidx_i= (useXFEM ? Xidx[prNumb[i]] : NoIdx);
+            for(int j= 0; j < 4; ++j) {
+                (*M_pr)( prNumb[i], prNumb[j])+= coup[i][j];
+                if (!useXFEM) continue;
+                // tetra intersects Gamma => Xidx defined for all DoFs
+                const IdxT xidx_j= Xidx[prNumb[j]];
+                if (xidx_j!=NoIdx)
+                    (*M_pr)( prNumb[i], xidx_j)+= coupT2[i][j] - sign[j] * coup[i][j];
+                if (xidx_i!=NoIdx)
+                    (*M_pr)( xidx_i, prNumb[j])+= coupT2[i][j] - sign[i] * coup[i][j];
+                if (xidx_i!=NoIdx && xidx_j!=NoIdx && sign[i]==sign[j])
+                    (*M_pr)( xidx_i, xidx_j)+= sign[i] ? coup[i][j] - coupT2[i][j] : coupT2[i][j];
+            }
         }
     }
-    M_pr.Build();
+}
+
+
+void SetupPrMass_P1(const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, MatrixCL& matM, IdxDescCL& RowIdx, const LevelsetP2CL& lset)
+{
+    PrMassAccumulator_P1CL p1_accu( MG, Coeff, matM, RowIdx, lset, false);
+    TetraAccumulatorTupleCL accus;
+    accus.push_back( &p1_accu);
+    accus( MG.GetTriangTetraBegin( RowIdx.TriangLevel()), MG.GetTriangTetraEnd( RowIdx.TriangLevel()));
 }
 
 
 void SetupPrMass_P1X(const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, MatrixCL& matM, IdxDescCL& RowIdx, const LevelsetP2CL& lset)
 {
-    const ExtIdxDescCL& Xidx= RowIdx.GetXidx();
-    const IdxT num_unks_pr=  RowIdx.NumUnknowns();
-    MatrixBuilderCL M_pr(&matM, num_unks_pr,  num_unks_pr);
-
-    const Uint lvl= RowIdx.TriangLevel();
-    IdxT prNumb[4];
-    double coup[4][4], coupT2[4][4];
-
-    const double nu_inv_p= 1./Coeff.mu( 1.0),
-                 nu_inv_n= 1./Coeff.mu( -1.0);
-    double integralp, integraln;
-    InterfaceTetraCL cut;
-    bool sign[4];
-
-    // The 16 products of the P1-shape-functions
-    LocalP2CL<> pipj[4][4];
-    for(int i= 0; i < 4; ++i) {
-        for(int j= 0; j < i; ++j) {
-            pipj[j][i][EdgeByVert( i, j) + 4]= 0.25;
-            pipj[i][j][EdgeByVert( j, i) + 4]= 0.25;
-        }
-        pipj[i][i][i]= 1.;
-        for (int vert= 0; vert < 3; ++vert)
-                pipj[i][i][EdgeByVert( i, VertOfFace( i, vert)) + 4]= 0.25;
-    }
-
-    LocalP2CL<> loc_phi;
-    DROPS_FOR_TRIANG_CONST_TETRA( MG, lvl, sit) {
-        const double absdet= sit->GetVolume()*6.;
-        loc_phi.assign( *sit, lset.Phi, lset.GetBndData());
-        cut.Init( *sit, loc_phi);
-        const bool nocut= !cut.Intersects();
-        GetLocalNumbP1NoBnd( prNumb, *sit, RowIdx);
-        if (nocut) { // nu is constant in tetra
-            const double nu_inv= cut.GetSign( 0) == 1 ? nu_inv_p : nu_inv_n;
-            // write values into matrix
-            for(int i=0; i<4; ++i)
-                for(int j=0; j<4; ++j)
-                    M_pr( prNumb[i], prNumb[j])+= nu_inv*P1DiscCL::GetMass( i, j)*absdet;
-        }
-        else { // extended basis functions have only support on tetra intersecting Gamma!
-            for(int i=0; i<4; ++i) {
-                sign[i]= cut.GetSign(i) == 1;
-                for(int j=0; j<=i; ++j) {
-                    // compute the integrals
-                    // \int_{T_2} p_i p_j dx,    where T_2 = T \cap \Omega_2
-                    integralp= integraln= 0.;
-                    for (int ch= 0; ch < 8; ++ch) {
-                        cut.ComputeCutForChild( ch);
-                        integralp+= cut.quad( pipj[i][j], absdet, true);  // integrate on positive part
-                        integraln+= cut.quad( pipj[i][j], absdet, false); // integrate on negative part
-                    }
-                    coup[j][i]= integralp*nu_inv_p + integraln*nu_inv_n;
-                    coup[i][j]= coup[j][i];
-                    coupT2[j][i]= integralp*nu_inv_p;
-                    coupT2[i][j]= coupT2[j][i];
-                }
-            }
-
-            // write values into matrix
-            for(int i=0; i<4; ++i)
-            {
-                const IdxT xidx_i= Xidx[prNumb[i]];
-                for(int j= 0; j < 4; ++j) {
-                    M_pr( prNumb[i], prNumb[j])+= coup[i][j];
-                    // tetra intersects Gamma => Xidx defined for all DoFs
-                    const IdxT xidx_j= Xidx[prNumb[j]];
-                    if (xidx_j!=NoIdx)
-                        M_pr( prNumb[i], xidx_j)+= coupT2[i][j] - sign[j]*coup[i][j];
-                    if (xidx_i!=NoIdx)
-                        M_pr( xidx_i, prNumb[j])+= coupT2[i][j] - sign[i]*coup[i][j];
-                    if (xidx_i!=NoIdx && xidx_j!=NoIdx && sign[i]==sign[j])
-                        M_pr( xidx_i, xidx_j)+= sign[i] ? coup[i][j] - coupT2[i][j] : coupT2[i][j];
-                }
-            }
-        }
-    }
-
-    M_pr.Build();
+    PrMassAccumulator_P1CL p1_accu( MG, Coeff, matM, RowIdx, lset, true);
+    TetraAccumulatorTupleCL accus;
+    accus.push_back( &p1_accu);
+    accus( MG.GetTriangTetraBegin( RowIdx.TriangLevel()), MG.GetTriangTetraEnd( RowIdx.TriangLevel()));
 }
 
 
@@ -1501,7 +1506,7 @@ void SetupSystem1_P2( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_,
     System1Accumulator_P2CL accu( Coeff_, BndData_, lset, RowIdx, A, M, b, cplA, cplM, t);
     TetraAccumulatorTupleCL accus;
     accus.push_back( &accu);
-    accumulate( accus, MG_, RowIdx.TriangLevel());
+    accumulate( accus, MG_, RowIdx.TriangLevel(), RowIdx.GetMatchingFunction(), RowIdx.GetBndInfo());
     // time.Stop();
     // std::cout << "setup: " << time.GetTime() << " seconds" << std::endl;
 }
@@ -2258,7 +2263,7 @@ void SetupLB_P2( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_, cons
     LBAccumulator_P2CL accu( Coeff_, BndData_, lset, RowIdx, A, cplA, t);
     TetraAccumulatorTupleCL accus;
     accus.push_back( &accu);
-    accumulate( accus, MG_, RowIdx.TriangLevel());
+    accumulate( accus, MG_, RowIdx.TriangLevel(), RowIdx.GetMatchingFunction(), RowIdx.GetBndInfo());
 }
 
 
@@ -2269,6 +2274,247 @@ void InstatStokes2PhaseP2P1CL::SetupLB (MLMatDescCL* A, VecDescCL* cplA, const L
     for (size_t lvl=0; lvl < A->RowIdx->size(); ++lvl, ++itA, ++it)
     {
        SetupLB_P2( MG_,  Coeff_, BndData_, *itA, lvl == A->Data.size()-1 ? cplA : 0, lset, *it, t);
+    }
+
+}
+
+// -----------------------------------------------------------------------------
+//                        Routines for Setup Boussinesq-Scriven surface viscous term
+// -----------------------------------------------------------------------------
+
+
+/// \brief Setup of the local "BS" on a tetra intersected by the dividing surface.
+class LocalBSTwoPhase_P2CL
+{
+  private:
+    const PrincipalLatticeCL& lat;
+    LocalP1CL<Point3DCL> GradRefLP1[10], GradLP1[10];
+    GridFunctionCL<Point3DCL> qnormal;
+    GridFunctionCL<Point3DCL> qgrad[10],qsurfgrad[10];
+    GridFunctionCL<Point3DCL> qPhte;
+    GridFunctionCL<double> qPhte_sgradv;
+    Point3DCL qBnsqD, qBnsqS1, qBnsqS2;
+
+    QuadDomain2DCL  q2Ddomain;
+    std::valarray<double> ls_loc;
+    SurfacePatchCL spatch;
+
+
+    double surfshear_, surfdilatation_;
+    void Get_Normals(const LocalP2CL<>& ls, LocalP1CL<Point3DCL>&);
+
+  public:
+    LocalBSTwoPhase_P2CL (double surfshear, double surfdilatation)
+        : lat( PrincipalLatticeCL::instance( 2)), ls_loc( 10), surfshear_( surfshear), surfdilatation_( surfdilatation)
+    { P2DiscCL::GetGradientsOnRef( GradRefLP1); }
+
+    //Setup-Routine of (improved) BS for the tetrahedra tet
+    void setup (const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const TetraCL& tet, double A[10][10][3][3]);
+
+};
+
+// The P2 levelset-function is used to compute the normals which are needed for the (improved) projection onto the interface, GradLP1 has to be set before
+void LocalBSTwoPhase_P2CL::Get_Normals(const LocalP2CL<>& ls, LocalP1CL<Point3DCL>& Normals)
+{
+    for(int i=0; i<10 ; ++i)
+    {
+        Normals+=ls[i]*GradLP1[i];
+    }
+
+}
+
+void LocalBSTwoPhase_P2CL::setup (const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const TetraCL& tet, double A[10][10][3][3])
+{
+    P2DiscCL::GetGradients( GradLP1, GradRefLP1, T);
+    evaluate_on_vertexes( ls, lat, Addr( ls_loc));
+    spatch.make_patch<MergeCutPolicyCL>( lat, ls_loc);
+    // The routine takes the information about the tetrahedra and the cutting surface and generates a two-dimensional triangulation of the cut, including the necessary point-positions and weights for the quadrature
+    make_CompositeQuad5Domain2D ( q2Ddomain, spatch, tet);
+    LocalP1CL<Point3DCL> Normals;
+    Get_Normals(ls, Normals);
+    // Resize and evaluate Normals at all points which are needed for the two-dimensional quadrature-rule
+    resize_and_evaluate_on_vertexes (Normals, q2Ddomain, qnormal);
+    // Scale Normals accordingly to the Euclidean Norm (only consider the ones which make a contribution in the sense of them being big enough... otherwise one has to expect problems with division through small numbers)
+    for(Uint i=0; i<qnormal.size(); ++i) {
+         //if(qnormal[i].norm()> 1e-8)
+         qnormal[i]= qnormal[i]/qnormal[i].norm();
+    }
+    // Resize and evaluate of all the 10 Gradient P1 Functions and apply pointwise projections   (P grad \xi_j  for j=1..10)
+    for(int j=0; j<10 ;++j) {
+        resize_and_evaluate_on_vertexes( GradLP1[j], q2Ddomain, qgrad[j]);
+        qsurfgrad[j].resize(qgrad[j].size());
+        qsurfgrad[j]= qgrad[j] - dot( qgrad[j], qnormal)*qnormal;
+    }
+    // Compute all combinations for (i,j,k,l) i,j=1...10 k,l=1...3 and corresponding quadrature
+    GridFunctionCL<Point3DCL> e[3];  //basis vectors
+    for (int ei=0;ei<3;++ei)
+    {
+        e[ei].resize(qnormal.size());
+        for (Uint i=0; i<e[ei].size(); ++i)
+            e[ei][i] = std_basis<3>( ei+1);
+    }
+
+    qPhte.resize(qnormal.size());
+    qPhte_sgradv.resize(qnormal.size());
+    for (int k=0; k<3; ++k)
+    {
+        qPhte = e[k] - dot(e[k], qnormal)*qnormal;
+        for (int i=0; i<10;++i)
+        {
+            qPhte_sgradv = dot( qPhte, qsurfgrad[i]);
+            for (int j=0; j<10; ++j)
+            {
+                qBnsqD  = (surfdilatation_ - surfshear_)*quad_2D( qsurfgrad[j]*qPhte_sgradv, q2Ddomain);
+                qBnsqS1 = surfshear_*quad_2D( qsurfgrad[i]*dot(qPhte, qgrad[j]), q2Ddomain);
+                qBnsqS2 = surfshear_*quad_2D( dot(qgrad[j], qsurfgrad[i])*qPhte, q2Ddomain);
+                for (int l=0; l<3; ++l)
+                {
+                    A[j][i][l][k] = qBnsqD[l] + qBnsqS1[l] + qBnsqS2[l];
+                }
+            }
+        }
+    }
+}
+
+
+/// \brief Accumulator to set up the matrices A and cplA for Boussinesq-Scriven surface viscous terms.
+class BSAccumulator_P2CL : public TetraAccumulatorCL
+{
+  private:
+    double locA [10][10][3][3];
+    const TwoPhaseFlowCoeffCL& Coeff;
+    const StokesBndDataCL& BndData;
+    const LevelsetP2CL& lset;
+    double t;
+
+    IdxDescCL& RowIdx;
+    MatrixCL& A;
+    VecDescCL* cplA;
+
+    MatrixBuilderCL* mA_;
+
+    LocalBSTwoPhase_P2CL local_twophase; ///< used on intersected tetras
+
+    LocalNumbP2CL n; ///< global numbering of the P2-unknowns
+
+    SMatrixCL<3,3> T;
+    double det, absdet;
+    LocalP2CL<> ls_loc;
+
+    Point3DCL dirichlet_val[10];
+
+    ///\brief Computes the mapping from local to global data "n", the local matrices in loc and, if required, the Dirichlet-values needed to eliminate the boundary-dof from the global system.
+    void local_setup (const TetraCL& tet);
+    ///\brief Update the global system.
+    void update_global_system ();
+
+  public:
+    BSAccumulator_P2CL (const TwoPhaseFlowCoeffCL& Coeff, const StokesBndDataCL& BndData_,
+        const LevelsetP2CL& ls, IdxDescCL& RowIdx_, MatrixCL& A_, VecDescCL* cplA_, double t );
+
+    ///\brief Initializes matrix-builders and load-vectors
+    void begin_accumulation ();
+    ///\brief Builds the matrices
+    void finalize_accumulation();
+
+    void visit (const TetraCL& sit);
+
+    TetraAccumulatorCL* clone (int /*tid*/) { return new BSAccumulator_P2CL ( *this); };
+};
+
+BSAccumulator_P2CL::BSAccumulator_P2CL (const TwoPhaseFlowCoeffCL& Coeff_, const StokesBndDataCL& BndData_,
+    const LevelsetP2CL& lset_arg, IdxDescCL& RowIdx_, MatrixCL& A_, VecDescCL* cplA_, double t_)
+    : Coeff( Coeff_), BndData( BndData_), lset( lset_arg), t( t_),
+      RowIdx( RowIdx_), A( A_), cplA( cplA_), local_twophase( Coeff.ShearVisco, Coeff.DilVisco)
+{}
+
+void BSAccumulator_P2CL::begin_accumulation ()
+{
+    std::cout << "entering SetupBS: ";
+    const size_t num_unks_vel= RowIdx.NumUnknowns();
+    mA_= new MatrixBuilderCL( &A, num_unks_vel, num_unks_vel);
+    if (cplA != 0) {
+        cplA->Clear( t);
+    }
+}
+
+void BSAccumulator_P2CL::finalize_accumulation ()
+{
+    mA_->Build();
+    delete mA_;
+#ifndef _PAR
+    std::cout << A.num_nonzeros() << " nonzeros in A_BS!";
+#endif
+    std::cout << '\n';
+}
+
+void BSAccumulator_P2CL::visit (const TetraCL& tet)
+{
+    ls_loc.assign( tet, lset.Phi, lset.GetBndData());
+
+    if (!equal_signs( ls_loc))
+    {
+        local_setup( tet);
+        update_global_system();
+    }
+
+}
+
+void BSAccumulator_P2CL::local_setup (const TetraCL& tet)
+{
+    GetTrafoTr( T, det, tet);
+
+    n.assign( tet, RowIdx, BndData.Vel);
+    local_twophase.setup( T, ls_loc, tet, locA);
+
+    if(cplA != 0) {
+        for (int i= 0; i < 10; ++i) {
+            if (!n.WithUnknowns( i)) {
+                typedef StokesBndDataCL::VelBndDataCL::bnd_val_fun bnd_val_fun;
+                bnd_val_fun bf= BndData.Vel.GetBndSeg( n.bndnum[i]).GetBndFun();
+                dirichlet_val[i]= i<4 ? bf( tet.GetVertex( i)->GetCoord(), t)
+                    : bf( GetBaryCenter( *tet.GetEdge( i-4)), t);
+            }
+        }
+    }
+}
+
+void BSAccumulator_P2CL::update_global_system ()
+{
+    MatrixBuilderCL& mA= *mA_;
+
+    for(int i= 0; i < 10; ++i)    // assemble row Numb[i]
+        if (n.WithUnknowns( i)) { // dof i is not on a Dirichlet boundary
+            for(int j= 0; j < 10; ++j) {
+                if (n.WithUnknowns( j)) { // dof j is not on a Dirichlet boundary
+                    for(int k=0;k<3;++k)
+                        for(int l=0;l<3;++l)
+                            mA( n.num[i]+k, n.num[j]+l) += locA[j][i][l][k];
+                }
+                else if (cplA != 0) { // right-hand side for eliminated Dirichlet-values
+                    for(int k=0;k<3;++k)
+                        cplA->Data[n.num[i]+k] -= (locA[j][i][0][k] + locA[j][i][1][k] + locA[j][i][2][k])*dirichlet_val[j][k];
+                }
+            }
+        }
+}
+
+void SetupBS_P2( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_, const StokesBndDataCL& BndData_, MatrixCL& A, VelVecDescCL* cplA, const LevelsetP2CL& lset, IdxDescCL& RowIdx, double t)
+/// Set up the Boussinesq-Scriven-matrix
+{
+     BSAccumulator_P2CL accu( Coeff_, BndData_, lset, RowIdx, A, cplA, t);
+     TetraAccumulatorTupleCL accus;
+     accus.push_back( &accu);
+     accumulate( accus, MG_, RowIdx.TriangLevel(), RowIdx.GetMatchingFunction(), RowIdx.GetBndInfo());
+}
+
+void InstatStokes2PhaseP2P1CL::SetupBS (MLMatDescCL* A, VecDescCL* cplA, const LevelsetP2CL& lset, double t) const
+{
+    MLMatrixCL::iterator  itA = A->Data.begin();
+    MLIdxDescCL::iterator it  = A->RowIdx->begin();
+    for (size_t lvl=0; lvl < A->RowIdx->size(); ++lvl, ++itA, ++it)
+    {
+        SetupBS_P2( MG_,  Coeff_, BndData_, *itA, lvl == A->Data.size()-1 ? cplA : 0, lset, *it, t);
     }
 
 }

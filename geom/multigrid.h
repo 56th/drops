@@ -29,7 +29,7 @@
 #define DROPS_MULTIGRID_H
 
 #include "geom/simplex.h"
-
+#include "num/bndData.h"
 
 namespace DROPS
 {
@@ -328,7 +328,7 @@ class MultiGridCL
     SimplexFactoryCL& GetSimplexFactory() { return factory_; }
 #endif
 
-    const ColorClassesCL& GetColorClasses (int Level=-1) const;
+    const ColorClassesCL& GetColorClasses (int Level, match_fun match, const BndCondCL& Bnd) const;
 
     bool IsSane (std::ostream&, int Level=-1) const;
 
@@ -370,7 +370,7 @@ class PeriodicEdgesCL
     void DebugInfo(std::ostream&);
 };
 
-/// \brief Storage of independend set of tetrahedra for assembling
+/// \brief Storage of independent set of tetrahedra for assembling
 class ColorClassesCL
 {
   public:
@@ -385,7 +385,7 @@ class ColorClassesCL
 
     void compute_neighbors (MultiGridCL::const_TriangTetraIteratorCL begin,
                             MultiGridCL::const_TriangTetraIteratorCL end,
-                            std::vector<TetraNumVecT>& neighbors);
+                            std::vector<TetraNumVecT>& neighbors, match_fun match, const BndCondCL& Bnd);
     void fill_pointer_arrays (const std::list<ColorFreqT>& color_list,
         const std::vector<int>& color,
         MultiGridCL::const_TriangTetraIteratorCL begin,
@@ -393,11 +393,11 @@ class ColorClassesCL
 
   public:
     ColorClassesCL (MultiGridCL::const_TriangTetraIteratorCL begin,
-                    MultiGridCL::const_TriangTetraIteratorCL end)
-    { compute_color_classes( begin, end); }
+                    MultiGridCL::const_TriangTetraIteratorCL end, match_fun match, const BndCondCL& Bnd)
+    { compute_color_classes( begin, end, match, Bnd); }
 
     void compute_color_classes (MultiGridCL::const_TriangTetraIteratorCL begin,
-                                MultiGridCL::const_TriangTetraIteratorCL end);
+                                MultiGridCL::const_TriangTetraIteratorCL end, match_fun match, const BndCondCL& Bnd);
 
     size_t num_colors () const { return colors_.size(); }
     const_iterator begin () const { return colors_.begin(); }
