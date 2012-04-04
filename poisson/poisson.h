@@ -94,7 +94,7 @@ class SUPGCL
         {
             double dx_= lx_/(nx_*std::pow(2, Ref_)); 
             double dy_= ly_/(ny_*std::pow(2, Ref_));
-            double dz_= ly_/(nz_*std::pow(2, Ref_));
+            double dz_= lz_/(nz_*std::pow(2, Ref_));
             double m;
             if(dx_>=dy_)
                 m = dx_;
