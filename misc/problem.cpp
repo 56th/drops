@@ -25,7 +25,6 @@
 #include "misc/problem.h"
 #include "num/interfacePatch.h"
 #ifdef _PAR
-#  include "parallel/interface.h"
 #  include "parallel/exchange.h"
 #endif
 
@@ -175,33 +174,18 @@ bool IdxDescCL::Equal(IdxDescCL& i, IdxDescCL& j, const MultiGridCL* mg)
 
 
 #ifdef _PAR
-/// \brief Count number of exclusive unknowns on this proc
-/** Get number of unknowns that are exclusive (master copy of simplex and proc with smalles proc-id)*/
-IdxT IdxDescCL::GetExclusiveNumUnknowns(const MultiGridCL &mg, int lvl) const
+/// \brief Count number of owned unknowns on this proc
+/** Get number of unknowns that are local or owned by this proc*/
+IdxT IdxDescCL::GetNumOwnedUnknowns() const
 {
-    IdxT ret=0;
-    // If there are unknowns on vertices, the proc with the smallest proc-id
-    // who owns a PrioHasUnk copy of the vertex/edge/tetra counts the unknowns.
-    if (NumUnknownsVertex())
-        for (MultiGridCL::const_TriangVertexIteratorCL it(mg.GetTriangVertexBegin(lvl)), end(mg.GetTriangVertexEnd(lvl)); it != end; ++it)
-            if ( it->Unknowns.Exist() && it->Unknowns.Exist(GetIdx()) && it->IsExclusive( PrioHasUnk))
-                ret += NumUnknownsVertex();
-    if (NumUnknownsEdge())
-        for (MultiGridCL::const_TriangEdgeIteratorCL it(mg.GetTriangEdgeBegin(lvl)), end(mg.GetTriangEdgeEnd(lvl)); it != end; ++it)
-            if ( it->Unknowns.Exist() && it->Unknowns.Exist(GetIdx()) && it->IsExclusive( PrioHasUnk))
-                ret += NumUnknownsEdge();
-    if (NumUnknownsTetra())
-        for (MultiGridCL::const_TriangTetraIteratorCL it(mg.GetTriangTetraBegin(lvl)), end(mg.GetTriangTetraEnd(lvl)); it != end; ++it)
-            if ( it->Unknowns.Exist() && it->Unknowns.Exist(GetIdx()) && it->IsExclusive( PrioHasUnk))
-                ret += NumUnknownsTetra();
-    return ret;
+    return GetEx().GetNumOwned();
 }
 
 /// \brief Count global number of unknowns
 /** Get global number over all procs of unknowns. Each unknown is just count one time*/
-IdxT IdxDescCL::GetGlobalNumUnknowns(const MultiGridCL &mg, int lvl) const
+IdxT IdxDescCL::GetGlobalNumUnknowns() const
 {
-    return ProcCL::GlobalSum(GetExclusiveNumUnknowns(mg,lvl));
+    return ProcCL::GlobalSum(GetNumOwnedUnknowns());
 }
 #endif
 

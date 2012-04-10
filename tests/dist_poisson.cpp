@@ -119,7 +119,7 @@ void Strategy( PoissonP2CL<CoeffCL>& Poisson)
     std::cout << line << "Problem size\n";
 #ifdef _PAR
     std::vector<size_t> UnkOnProc= ProcCL::Gather( Poisson.x.Data.size(), 0);
-    const IdxT numUnk   = Poisson.idx.GetGlobalNumUnknowns( mg),
+    const IdxT numUnk   = Poisson.idx.GetGlobalNumUnknowns(),
                numAccUnk= std::accumulate(UnkOnProc.begin(), UnkOnProc.end(), 0);
 #else
     std::vector<size_t> UnkOnProc( 1);
@@ -138,7 +138,7 @@ void Strategy( PoissonP2CL<CoeffCL>& Poisson)
     std::cout << line << "Discretize (setup linear equation system) ...\n";
 
     timer.Reset();
-    
+
     if(P.get<int>("Time.NumSteps") !=0)
         Poisson.SetupInstatSystem(Poisson.A, Poisson.M, 0.);    //IntationarySystem
     else
@@ -146,7 +146,7 @@ void Strategy( PoissonP2CL<CoeffCL>& Poisson)
         Poisson.SetupSystem( Poisson.A, Poisson.b);         //StationarySystem
         if(P.get<int>("PoissonCoeff.Convection"))
           {
-            Poisson.vU.SetIdx( &Poisson.idx); 
+            Poisson.vU.SetIdx( &Poisson.idx);
             Poisson.SetupConvection(Poisson.U, Poisson.vU, 0.0);                 //Setupconvection
             Poisson.A.Data.LinComb(1., Poisson.A.Data, 1., Poisson.U.Data); //Combination with convection
             Poisson.b.Data+=Poisson.vU.Data;
@@ -204,9 +204,9 @@ void Strategy( PoissonP2CL<CoeffCL>& Poisson)
     // Output-Registrations:
     VTKOutCL * vtkwriter = NULL;
     if (P.get<int>("VTK.VTKOut",0)){
-        vtkwriter = new VTKOutCL(mg, "DROPS data", 
-                                 P.get<int>("Time.NumSteps")+1, 
-                                 P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName"), 
+        vtkwriter = new VTKOutCL(mg, "DROPS data",
+                                 P.get<int>("Time.NumSteps")+1,
+                                 P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName"),
                                  P.get<int>("VTK.Binary") );
         vtkwriter->Register( make_VTKScalar( Poisson.GetSolution(), "ConcenT"));
         vtkwriter->Write( Poisson.x.t);

@@ -36,22 +36,23 @@ MigrateFECL::MigrateFECL( MGObserverCL* obs, MultiGridCL& mg)
 void MigrateFECL::CopyVecElements( VecDescCL& new_vec_desc, const std::vector<Usint>& dims)
 {
     const Uint       new_idx = new_vec_desc.RowIdx->GetIdx();   // new index
-    const Uint       old_idx = old_idx_->GetIdx();               // old index
+    const Uint       old_idx = old_idx_->GetIdx();              // old index
           VectorCL&  new_vec = new_vec_desc.Data;               // new vector
 
     // Create a WholeRemoteDataIteratorCL
     DiST::LevelListCL lvls;
     DiST::PrioListCL prios; prios.push_back( PrioMaster);
-    prios.push_back( PrioHasUnk);   // do we need this?
-    DiST::Helper::WholeRemoteDataIteratorCL it( dims, lvls, prios, false);
+//    prios.push_back( PrioHasUnk);   // do we need this?
+    DiST::Helper::WholeRemoteDataIteratorCL it( dims, lvls, prios, false),
+            end= it.GetEnd();
 
     // iterate over all simplices and copy the DoF values
-    for ( ; it!=it.GetEnd(); ++it){
+    for ( ; it!=end; ++it){
         DiST::TransferableCL& simplex= it->second.GetLocalObject();
         UnknownHandleCL& Unknowns= simplex.Unknowns;
         if ( Unknowns.Exist( new_idx)){
             Assert( Unknowns.Exist( old_idx),
-                DROPSErrCL("LevelsetRepairCL::post_migrate: Unknowns do not exist before migration"),
+                DROPSErrCL("MigrateFECL::CopyVecElements: Unknowns do not exist before migration"),
                 DebugParallelNumC);
 
             // copy data from known DoF values or from the receive buffer

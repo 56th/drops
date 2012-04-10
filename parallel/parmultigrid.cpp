@@ -109,7 +109,6 @@ ParMultiGridCL::ParMultiGridCL()
     // for Identify, we need all priorities except PrioVGhost
     priosId_.push_back(PrioNeutral); priosId_.push_back(PrioKilledGhost);
     priosId_.push_back(PrioGhost);   priosId_.push_back(PrioMaster);
-    priosId_.push_back(PrioHasUnk);
 }
 
 ParMultiGridCL::~ParMultiGridCL()
@@ -1494,7 +1493,7 @@ void ParMultiGridCL::TransferEnd()
 {
     Assert( transfer_ , DROPSErrCL("ParMultiGridCL::TransferEnd: not in Transfer mode"), DebugParallelC);
     transfer_->Finalize();
-    
+
     delete transfer_;    modify_= transfer_= 0;
 
     // All tetras, that are marked for removement, should be removed now!
@@ -1860,16 +1859,16 @@ void ParMultiGridCL::Transfer(TetraCL &t, int dest, Priority prio, bool del)
 ///
 /// Set the remove mark and desctuct the DDD-Hdr. The real delete of the object is done within
 /// the code.
-template<class SimplexT> void ParMultiGridCL::HandlerDelete( OBJT obj)
-{
-
-    SimplexT* const sp= ddd_cast<SimplexT*>(obj);
-    sp->SetRemoveMark();
-    //  Ich denke, dass man hier den Hdr_Destructor nicht braucht, da er automatisch von DDD aufgerufen wird
-    // ---> Doch, den braucht man ganz ganz unbedingt! (siehe Hdr_Destructor bei DDD!)
-    DynamicDataInterfaceCL::HdrDestructor( &sp->_dddH);
-    AllComment("  * Simplex with GID "<<sp->GetGID()<<" deleted on proc "<<ProcCL::MyRank()<<std::endl,DebugParallelHardC);
-}
+//template<class SimplexT> void ParMultiGridCL::HandlerDelete( OBJT obj)
+//{
+//
+//    SimplexT* const sp= ddd_cast<SimplexT*>(obj);
+//    sp->SetRemoveMark();
+//    //  Ich denke, dass man hier den Hdr_Destructor nicht braucht, da er automatisch von DDD aufgerufen wird
+//    // ---> Doch, den braucht man ganz ganz unbedingt! (siehe Hdr_Destructor bei DDD!)
+//    DynamicDataInterfaceCL::HdrDestructor( &sp->_dddH);
+//    AllComment("  * Simplex with GID "<<sp->GetGID()<<" deleted on proc "<<ProcCL::MyRank()<<std::endl,DebugParallelHardC);
+//}
 
 //  Construct an object by DDD
 //-----------------------------
@@ -2274,10 +2273,10 @@ void ParMultiGridCL::HandlerTUpdate( OBJT obj)
 * so we uses function to delete the objects!                                *
 ****************************************************************************/
 /// \brief DDD may use this function to delete a simplex, but this must not be happend!
-void ParMultiGridCL::DeleteObj(void * /* buffer*/, size_t /*size*/, int ddd_typ)
-{
-    std::cout << "Deleting Object of type " << ddd_typ << " is still missing!" << std::endl;
-}
+//void ParMultiGridCL::DeleteObj(void * /* buffer*/, size_t /*size*/, int ddd_typ)
+//{
+//    std::cout << "Deleting Object of type " << ddd_typ << " is still missing!" << std::endl;
+//}
 
 
 

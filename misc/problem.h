@@ -33,7 +33,6 @@
 #ifdef _PAR
 #  include "parallel/DiST.h"
 #  include "parallel/parallel.h"   // for parallel reductions
-#  include "parallel/interface.h"  // for accumulation of vectors
 #endif
 
 namespace DROPS
@@ -314,10 +313,10 @@ class IdxDescCL: public FE_InfoCL
     ExchangeCL& GetEx() { return *ex_; }
     /// \brief Get a constant reference on the ExchangeCL
     const ExchangeCL& GetEx() const { return *ex_; }
-    /// \brief get number of unknowns exclusively stored on this proc
-    IdxT GetExclusiveNumUnknowns(const MultiGridCL&, int lvl=-1) const;
-    /// \brief get global number of exclusive unknowns
-    IdxT GetGlobalNumUnknowns(const MultiGridCL&, int lvl=-1) const;
+    /// \brief get number of unknowns owned by this proc
+    IdxT GetNumOwnedUnknowns() const;
+    /// \brief get global number of owned unknowns
+    IdxT GetGlobalNumUnknowns() const;
 #endif
 };
 
@@ -432,12 +431,12 @@ class MLIdxDescCL : public MLDataCL<IdxDescCL>
     ExchangeCL& GetEx() { return this->GetFinest().GetEx(); }
     /// \brief Get a constant reference on the ExchangeCL (of the finest level)
     const ExchangeCL& GetEx() const { return this->GetFinest().GetEx(); }
-    /// \brief get number of unknowns exclusively stored on this proc
-    IdxT GetExclusiveNumUnknowns(const MultiGridCL& mg, int lvl=-1) const
-    { return this->GetFinest().GetExclusiveNumUnknowns(mg, lvl); }
-    /// \brief get global number of exclusive unknowns
-    IdxT GetGlobalNumUnknowns(const MultiGridCL& mg, int lvl=-1) const
-    { return this->GetFinest().GetGlobalNumUnknowns(mg, lvl); }
+    /// \brief get number of unknowns owned on this proc
+    IdxT GetNumOwnedUnknowns() const
+    { return this->GetFinest().GetNumOwnedUnknowns(); }
+    /// \brief get global number of owned unknowns
+    IdxT GetGlobalNumUnknowns() const
+    { return this->GetFinest().GetGlobalNumUnknowns(); }
 #endif
 };
 

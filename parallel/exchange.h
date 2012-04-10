@@ -237,6 +237,8 @@ class ExchangeCL
     void clear();
     /// \brief Get size of the vector this class is responsible for
     size_t GetNum() const { return LocalIndex.size()+DistrIndex.size(); }
+    /// \brief Get the number of local and owned DoF's
+    size_t GetNumOwned() const { return LocalIndex.size()+OwnerDistrIndex.size(); }
     /// \brief Check if the communication is performed via the DoF owner
     bool CommViaOwner() const { return viaowner_; }
 

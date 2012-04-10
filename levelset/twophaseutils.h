@@ -66,9 +66,9 @@ template <typename StokesT, typename LevelsetT>
     Ulint Lsize      = lidx->NumUnknowns();
 
     // global number of unknowns
-    Ulint GPsize     = pidx->GetGlobalNumUnknowns(MG);
-    Ulint GVsize     = vidx->GetGlobalNumUnknowns(MG);
-    Ulint GLsize     = lidx->GetGlobalNumUnknowns(MG);
+    Ulint GPsize     = pidx->GetGlobalNumUnknowns();
+    Ulint GVsize     = vidx->GetGlobalNumUnknowns();
+    Ulint GLsize     = lidx->GetGlobalNumUnknowns();
 
     // accumulated size of unknowns
     Ulint Psize_acc = ProcCL::GlobalSum(Psize);

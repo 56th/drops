@@ -386,7 +386,7 @@ void MakeTimeMeasurements( MultiGridCL& mg, const size_t num_test)
     ParTimerCL timer;
     VectorCL x( 1., idx.NumUnknowns()), x_acc(x), y(1., idx.NumUnknowns()), y_acc(y);
     const size_t size_acc   = ProcCL::GlobalSum( x.size()),
-                 size_global= idx.GetGlobalNumUnknowns(mg);
+                 size_global= idx.GetGlobalNumUnknowns();
 
     if ( idx.GetEx().CommViaOwner())
         std::cout << "    o using communication via owner\n";

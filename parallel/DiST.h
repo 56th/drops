@@ -64,8 +64,7 @@ enum Priority
     PrioKilledGhost = 1,     ///< prio of ghost tetras marked for removal
     PrioVGhost      = 2,     ///< for subs of overlapping master tetra (don't constitute a proc bnd)
     PrioGhost       = 3,     ///< for ghost tetras and subs only owned by ghost tetras (skipped by the public iterators)
-    PrioMaster      = 4,     ///< master copy of tetras and their subs
-    PrioHasUnk      = 5      ///< simplices having potentially unknowns
+    PrioMaster      = 4      ///< master copy of tetras and their subs
 };
 
 inline std::string PriorityToString( const Priority);

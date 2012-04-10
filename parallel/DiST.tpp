@@ -34,7 +34,6 @@ std::string PriorityToString( const Priority prio)
     case PrioVGhost     : return "vertical ghost";
     case PrioGhost      : return "ghost";
     case PrioMaster     : return "master";
-    case PrioHasUnk     : return "has unknowns";
     }
     std::stringstream ret;
     ret << "undefined" << static_cast<int>(prio);

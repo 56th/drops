@@ -1166,23 +1166,23 @@ void FastmarchingOnMasterCL::CreateGlobNumb()
 
     // If owning an exclusive DoF, put them into list, otherwise this dof is NoIdx
     DROPS_FOR_TRIANG_VERTEX( data_.mg, lvl, it){
-        if ( it->IsExclusive(PrioHasUnk)){
+        if ( it->IsExclusive(PrioMaster)){
             globNumb_[ it->Unknowns(idx)] = numExclusiveDoF++;
         }
     }
     DROPS_FOR_TRIANG_EDGE( data_.mg, lvl, it){
-        if ( it->IsExclusive(PrioHasUnk)){
+        if ( it->IsExclusive(PrioMaster)){
             globNumb_[ it->Unknowns(idx)] = numExclusiveDoF++;
         }
     }
     locNumb_.resize( numExclusiveDoF, NoIdx);
 
     // Get offset for each process
-    exclusive_.resize( ProcCL::Size());
-    ProcCL::Gather( (int)numExclusiveDoF, Addr( exclusive_), -1);
+    owned_.resize( ProcCL::Size());
+    ProcCL::Gather( (int)numExclusiveDoF, Addr( owned_), -1);
     offset_.resize(ProcCL::Size()+1);
     for (int i=0; i<ProcCL::Size(); ++i)
-        offset_[i+1]  = offset_[i] + exclusive_[i];
+        offset_[i+1]  = offset_[i] + owned_[i];
 
     // Append offset to each global number (so it is unique)
     for (IdxT i=0; i<numDoF; ++i){
@@ -1281,7 +1281,7 @@ void FastmarchingOnMasterCL::CollectLocalData(std::vector<byte>& typ, std::vecto
     values.clear();
     locNumb_.clear();
     DROPS_FOR_TRIANG_VERTEX( data_.mg, lvl, it){
-        if ( it->IsExclusive(PrioHasUnk)){
+        if ( it->IsExclusive(PrioMaster)){
             const IdxT dof= it->Unknowns(idx);
             typ.push_back( data_.typ[ dof]);
             for ( int i=0; i<3; ++i)
@@ -1291,7 +1291,7 @@ void FastmarchingOnMasterCL::CollectLocalData(std::vector<byte>& typ, std::vecto
         }
     }
     DROPS_FOR_TRIANG_EDGE( data_.mg, lvl, it){
-        if ( it->IsExclusive(PrioHasUnk)){
+        if ( it->IsExclusive(PrioMaster)){
             const IdxT dof= it->Unknowns(idx);
             typ.push_back( data_.typ[ dof]);
             for ( int i=0; i<3; ++i)
@@ -1374,8 +1374,8 @@ void FastmarchingOnMasterCL::Collect()
 void FastmarchingOnMasterCL::Distribute()
 {
     // Send values back
-    VectorCL recvBuf( exclusive_[ProcCL::MyRank()]);
-    ProcCL::Scatterv( Addr(data_.phi.Data), Addr(exclusive_), Addr(offset_), Addr(recvBuf), size_, master_);
+    VectorCL recvBuf( owned_[ProcCL::MyRank()]);
+    ProcCL::Scatterv( Addr(data_.phi.Data), Addr(owned_), Addr(offset_), Addr(recvBuf), size_, master_);
 
     // Put data back into data_.phi.Data
     data_.phi.Data.resize( size_);

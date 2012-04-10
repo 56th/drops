@@ -1,7 +1,7 @@
 /// \file fastmarch.h
 /// \brief fast marching method for reparametrization
 /// \author LNM RWTH Aachen: Patrick Esser, Joerg Grande, Sven Gross, Volker Reichelt; SC RWTH Aachen: Oliver Fortmeier
-/// \todo Check periodic boundary conditions and reparametrization 
+/// \todo Check periodic boundary conditions and reparametrization
 
 /*
  * This file is part of DROPS.
@@ -33,7 +33,6 @@
 #include "num/interfacePatch.h"
 #include "misc/kd-tree/tree.h"
 #ifdef _PAR
-#  include "parallel/interface.h"
 #  include "parallel/exchange.h"
 #  include "parallel/partime.h"
 #endif
@@ -77,7 +76,7 @@ class ReparamDataCL
     // \brief Allocate memory, store references and init coordinates as well as map periodic boundary dofs
     ReparamDataCL( MultiGridCL& MG, VecDescCL& Phi, bool GatherPerp, bool Periodic=false, const BndDataCL<>* Bnd=0)
         : gatherPerp(GatherPerp), mg( MG), phi( Phi), old( phi.Data),
-          coord( Phi.Data.size()), typ( Far, Phi.Data.size()), 
+          coord( Phi.Data.size()), typ( Far, Phi.Data.size()),
           perpFoot( (Point3DCL*)0, GatherPerp ? Phi.Data.size() : 0),
           per( Periodic), augmIdx( 0), bnd( Bnd), map( 0), perDir( 1, Point3DCL())
     { InitPerMap(); InitCoord(); }
@@ -486,7 +485,7 @@ class FastmarchingOnMasterCL : public FastmarchingCL
     static std::vector<IdxT>   globNumb_;   ///< mapping local DoF on global DoF number
     static std::vector<IdxT>   locNumb_;    ///< mapping global DoF number on local exclusive DoF number
     std::vector<int>           offset_;     ///< offset for each process
-    std::vector<int>           exclusive_;  ///< number of exclusive dof per process
+    std::vector<int>           owned_;      ///< number of owned dof per process
     size_t                     size_;       ///< number of level set dof
     int                        master_;     ///< process that performs the FMM
 

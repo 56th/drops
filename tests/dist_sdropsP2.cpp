@@ -164,7 +164,7 @@ void Solve(const Mat &A, const Mat &B, Vec &u, Vec &p, const Vec &b, const Vec &
 
     // START BLOCK SOLVER
 /*
-    typedef BlockPreCL<APcT, SPcT> OseenPCT; 
+    typedef BlockPreCL<APcT, SPcT> OseenPCT;
     typedef ParPCGSolverCL<OseenPCT> OseenBaseSolT;
     typedef BlockMatrixSolverCL<OseenBaseSolT> SolverT;
 
@@ -244,9 +244,9 @@ void Strategy( StokesP2P1CL<CoeffCL>& Stokes)
 #ifdef _PAR
     std::vector<size_t> VelUnkOnProc= ProcCL::Gather( Stokes.v.Data.size(), 0);
     std::vector<size_t> PrUnkOnProc = ProcCL::Gather( Stokes.p.Data.size(), 0);
-    const IdxT VelNumUnk   = Stokes.vel_idx.GetGlobalNumUnknowns( mg),
+    const IdxT VelNumUnk   = Stokes.vel_idx.GetGlobalNumUnknowns(),
                VelNumAccUnk= std::accumulate( VelUnkOnProc.begin(), VelUnkOnProc.end(), 0),
-               PrNumUnk    = Stokes.pr_idx.GetGlobalNumUnknowns( mg),
+               PrNumUnk    = Stokes.pr_idx.GetGlobalNumUnknowns(),
                PrNumAccUnk = std::accumulate( PrUnkOnProc.begin(), PrUnkOnProc.end(), 0);
 #else
     std::vector<size_t> VelUnkOnProc( 1);

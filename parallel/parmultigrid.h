@@ -34,7 +34,6 @@
 
 #include "parallel/loadbal.h"
 #include "parallel/addeddata.h"
-#include "parallel/interface.h"
 #include "parallel/DiST.h"
 
 #include "misc/utils.h"
@@ -351,8 +350,8 @@ class ParMultiGridCL
   public:
     /// \name DDD-Handler (should be private)
     //@{
-    void DeleteObj(void *buffer, size_t size, int ddd_typ);          // see cpp-File for further information
-    template<class SimplexT> static void HandlerDelete( OBJT);           // DDD-Handler for DynamicDataInterfaceExtraCL::XferDeleteObj
+//    void DeleteObj(void *buffer, size_t size, int ddd_typ);          // see cpp-File for further information
+//    template<class SimplexT> static void HandlerDelete( OBJT);           // DDD-Handler for DynamicDataInterfaceExtraCL::XferDeleteObj
 
     OBJT HandlerVConstructor( size_t, PrioT, ATTRT level);  // how the reciever can construct a VertexCL
     void HandlerVXfer( OBJT , PROCT, PrioT);                // how the sender can send a VertexCL

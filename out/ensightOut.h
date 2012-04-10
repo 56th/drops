@@ -622,7 +622,7 @@ void Ensight6OutCL::putScalar (const DiscScalT& v, std::string varName)
         end= mg.GetTriangVertexEnd(lvl); it!=end; ++it)
     {
         // Write only the vals on exclusive vertices!
-        if (!it->IsExclusive(PrioHasUnk))
+        if (!it->IsExclusive(PrioMaster))
             continue;
 
         if (!masterout_)
@@ -644,7 +644,7 @@ void Ensight6OutCL::putScalar (const DiscScalT& v, std::string varName)
             end= mg.GetTriangEdgeEnd(lvl); it!=end; ++it)
     {
         // Write only the vals on exclusive edges!
-        if (!it->IsExclusive(PrioHasUnk))
+        if (!it->IsExclusive(PrioMaster))
             continue;
 
         if (!masterout_)
@@ -779,7 +779,7 @@ void Ensight6OutCL::putVector( const DiscVecT& v, std::string varName)
         {
 
             // Write only the vals on exclusive vertices!
-            if (!it->IsExclusive(PrioHasUnk))
+            if (!it->IsExclusive(PrioMaster))
                 continue;
             if (masterout_)
             {
@@ -791,7 +791,7 @@ void Ensight6OutCL::putVector( const DiscVecT& v, std::string varName)
             end= mg.GetTriangEdgeEnd(lvl); it!=end; ++it)
         {
             // Write only the vals on exclusive edges!
-            if (!it->IsExclusive(PrioHasUnk))
+            if (!it->IsExclusive(PrioMaster))
                 continue;
 
             if (masterout_)
@@ -884,7 +884,7 @@ void Ensight6OutCL::putVector( const DiscVecT& v, std::string varName)
         {
 
             // Write only the vals on exclusive vertices!
-            if (!it->IsExclusive(PrioHasUnk))
+            if (!it->IsExclusive(PrioMaster))
                 continue;
             if (!masterout_)
             {
@@ -906,7 +906,7 @@ void Ensight6OutCL::putVector( const DiscVecT& v, std::string varName)
             end= mg.GetTriangEdgeEnd(lvl); it!=end; ++it)
         {
             // Write only the vals on exclusive edges!
-            if (!it->IsExclusive(PrioHasUnk))
+            if (!it->IsExclusive(PrioMaster))
                 continue;
 
             if (!masterout_)
@@ -1045,7 +1045,7 @@ void ReadEnsightP2SolCL::ReadScalar( const std::string& file, VecDescCL& v, cons
              end= _MG->GetTriangVertexEnd(lvl); it!=end; ++it)
         {
 #ifdef _PAR
-            if (!it->IsExclusive(PrioHasUnk)) continue;
+            if (!it->IsExclusive(PrioMaster)) continue;
 #endif
 
             is >> d;
@@ -1056,7 +1056,7 @@ void ReadEnsightP2SolCL::ReadScalar( const std::string& file, VecDescCL& v, cons
             end= _MG->GetTriangEdgeEnd(lvl); it!=end; ++it)
         {
 #ifdef _PAR
-            if (!it->IsExclusive(PrioHasUnk)) continue;
+            if (!it->IsExclusive(PrioMaster)) continue;
 #endif
 
             is >> d;
@@ -1138,7 +1138,7 @@ void ReadEnsightP2SolCL::ReadVector( const std::string& file, VecDescCL& v, cons
             end= _MG->GetTriangVertexEnd(lvl); it!=end; ++it)
         {
 #ifdef _PAR
-            if (!it->IsExclusive(PrioHasUnk)) continue;
+            if (!it->IsExclusive(PrioMaster)) continue;
 #endif
             is >> d0 >> d1 >> d2;
             count +=3;
@@ -1152,7 +1152,7 @@ void ReadEnsightP2SolCL::ReadVector( const std::string& file, VecDescCL& v, cons
             end= _MG->GetTriangEdgeEnd(lvl); it!=end; ++it)
         {
 #ifdef _PAR
-            if (!it->IsExclusive(PrioHasUnk)) continue;
+            if (!it->IsExclusive(PrioMaster)) continue;
 #endif
             is >> d0 >> d1 >> d2;
             count +=3;
