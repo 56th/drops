@@ -66,9 +66,9 @@
 "# re-initialization of levelset function",
 
 		"Freq":		1,
-		"Method":		3,
+		"Method":		11,
 		"MinGrad":		0.1,
-		"MaxGrad":		10,
+		"MaxGrad":		0,
 		"NarrowBand":		-1.0
 	},
 
@@ -78,7 +78,7 @@
 "# adaptive refinement",
 
 		"Freq":		0,
-		"FinestLevel":		0,
+		"FinestLevel":		2,
 		"CoarsestLevel":		0,
 		"Width":		0.4e-3,
 		"LoadBalStrategy":		1,
