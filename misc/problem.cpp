@@ -206,6 +206,9 @@ void P1XtoP1 (const IdxDescCL& xidx, const VectorCL& p1x, const IdxDescCL& idx, 
 
     // add extended pressure
     DROPS_FOR_TRIANG_CONST_VERTEX( mg, lvl, it) {
+#ifdef _PAR
+        if (!it->Unknowns.InTriangLevel(lvl)) continue;
+#endif
         const IdxT   nr= it->Unknowns( idxnum);
         if (!it->Unknowns.Exist( idxnum)) continue;
         const IdxT p1nr= it->Unknowns( p1idxnum);
@@ -228,6 +231,9 @@ void P1toP1X (const IdxDescCL& xidx, VectorCL& p1x, const IdxDescCL& idx, const 
     p1x.resize(xidx.NumUnknowns());
     DROPS_FOR_TRIANG_CONST_VERTEX( mg, lvl, it)
     {
+#ifdef _PAR
+        if (!it->Unknowns.InTriangLevel(lvl)) continue;
+#endif
         const IdxT nr= it->Unknowns(idxnum);
         if (!it->Unknowns.Exist( idxnum)) continue;
         const IdxT p1nr= it->Unknowns(p1idxnum);
