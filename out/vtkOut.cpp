@@ -222,6 +222,9 @@ void VTKOutCL::GatherCoord()
     ///\todo instead of v/eAddrMap_, one could use a P2 index instead (cf. EnsightOutCL)
     Uint counter=0;
     for (MultiGridCL::const_TriangVertexIteratorCL it= mg_.GetTriangVertexBegin(lvl_); it!=mg_.GetTriangVertexEnd(lvl_); ++it){
+#ifdef _PAR
+        if (!it->Unknowns.InTriangLevel(lvl_)) continue;
+#endif
         // store a consecutive number for the vertex
         vAddrMap_[&*it]= counter;
 
@@ -232,6 +235,10 @@ void VTKOutCL::GatherCoord()
     }
 
     for (MultiGridCL::const_TriangEdgeIteratorCL it= mg_.GetTriangEdgeBegin(lvl_); it!=mg_.GetTriangEdgeEnd(lvl_); ++it){
+#ifdef _PAR
+        if (!it->Unknowns.InTriangLevel(lvl_)) continue;
+#endif
+
         // store a consecutive number for the edge
         eAddrMap_[&*it]= counter;
 

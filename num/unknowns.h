@@ -212,8 +212,9 @@ class UnknownHandleCL
     ///
     /// In the parallel case, only DoF of a master tetra may have unknowns on a certain triangulation level the master tetra belongs to.
     /// Thus, e.g., DoFs on a vertex may contribute to FE spaces on level 0, 2, but not on level 1.
-    bool InTriangLevel( Uint lvl) const
+    bool InTriangLevel( int lvl) const
     {
+        if (lvl < 0) lvl += mayHaveUnk_.size();
     	return mayHaveUnk_[lvl];
     }
     /// Commit that a FE space on triangulation level \a lvl may contain current DoF
