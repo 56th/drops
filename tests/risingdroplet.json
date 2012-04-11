@@ -68,7 +68,7 @@
 		"Freq":		1,
 		"Method":		11,
 		"MinGrad":		0.1,
-		"MaxGrad":		0,
+		"MaxGrad":		10.0,
 		"NarrowBand":		-1.0
 	},
 
