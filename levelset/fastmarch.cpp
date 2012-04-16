@@ -115,11 +115,17 @@ void ReparamDataCL::InitCoord()
 #pragma omp parallel for
     for ( int i=0; i<std::distance(mg.GetTriangVertexBegin(lvl), mg.GetTriangVertexEnd(lvl)); ++i ){
         MultiGridCL::TriangVertexIteratorCL it= mg.GetTriangVertexBegin(lvl)+i;
+#ifdef _PAR
+        if (!it->Unknowns.InTriangLevel(lvl)) continue;
+#endif
         coord[ it->Unknowns( idx)]= it->GetCoord();
     }
 #pragma omp parallel for
     for ( int i=0; i<std::distance(mg.GetTriangEdgeBegin(lvl), mg.GetTriangEdgeEnd(lvl)); ++i ){
         MultiGridCL::TriangEdgeIteratorCL it= mg.GetTriangEdgeBegin(lvl)+i;
+#ifdef _PAR
+        if (!it->Unknowns.InTriangLevel(lvl)) continue;
+#endif
         coord[ it->Unknowns( idx)]= GetBaryCenter( *it);
     }
 }

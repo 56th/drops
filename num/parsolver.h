@@ -1834,6 +1834,185 @@ ParPCGNE(const Mat& A, Vec& u, const Vec& b, const ExACL& ExAX,  const ExATransp
     return false;
 }
 
+/// \brief (Symmetric) Gauss-Seidel preconditioner (i.e. start-vector 0) for A*A^T (Normal Equations).
+class ParNEGSPcCL
+{
+  private:
+    const ExchangeCL& RowEx_;
+    const ExchangeCL& ColEx_;
+    bool symmetric_;             ///< If true, SGS is performed, else GS.
+    mutable const void*  Aaddr_; ///< only used to validate, that the diagonal is for the correct matrix.
+    mutable size_t Aversion_;
+    mutable VectorCL D_;         ///< diagonal of AA^T
+    mutable VectorCL y_;         ///< temp-variable: A^T*x.
+
+    template <typename Mat>
+    void Update (const Mat& A) const;
+
+    ///\brief Forward Gauss-Seidel-step with start-vector 0 for A*A^T
+    template <typename Mat, typename Vec>
+    void ForwardGS(const Mat& A, Vec& x, const Vec& b) const;
+    ///\brief Backward Gauss-Seidel-step with start-vector 0 for A*A^T
+    template <typename Mat, typename Vec>
+    void BackwardGS(const Mat& A, Vec& x, const Vec& b) const;
+
+    ///\brief Inverse of ForwardGS
+    template <typename Mat, typename Vec>
+    void ForwardMulGS(const Mat& A, Vec& x, const Vec& b) const;
+    ///\brief Inverse of BackwardGS
+    template <typename Mat, typename Vec>
+    void BackwardMulGS(const Mat& A, Vec& x, const Vec& b) const;
+
+  public:
+    ParNEGSPcCL (const ExchangeCL& RowEx, const ExchangeCL& ColEx, bool symmetric= true) : RowEx_(RowEx), ColEx_(ColEx), symmetric_( symmetric), Aaddr_( 0), Aversion_( 0) {}
+
+    ///@{ Note, that A and not A*A^T is the first argument.
+    ///\brief Execute a (symmetric) Gauss-Seidel preconditioning step.
+    template <typename Mat, typename Vec>
+    void Apply(const Mat& A, Vec& x, const Vec& b) const;
+    ///\brief If symmetric == false, this  performs a backward Gauss-Seidel step, else it is identical to Apply.
+    template <typename Mat, typename Vec>
+    void ApplyTranspose(const Mat& A, Vec& x, const Vec& b) const;
+
+    ///\brief Multiply with the preconditioning matrix -- needed for right preconditioning.
+    template <typename Mat, typename Vec>
+    Vec mul (const Mat& A, const Vec& b) const;
+    ///\brief Multiply with the transpose of the preconditioning matrix -- needed for right preconditioning.
+    template <typename Mat, typename Vec>
+    Vec transp_mul(const Mat& A, const Vec& b) const;
+    ///@}
+
+    ///\brief Apply if A*A^T is given as CompositeMatrixCL
+    void Apply(const CompositeMatrixCL& AAT, VectorCL& x, const VectorCL& b) const
+    { Apply( *AAT.GetBlock1(), x, b); }
+};
+
+template <typename Mat>
+void ParNEGSPcCL::Update (const Mat& A) const
+{
+    if (&A == Aaddr_ && Aversion_ == A.Version()) return;
+    Aaddr_= &A;
+    Aversion_= A.Version();
+
+    D_.resize( A.num_rows());
+    // Accumulate matrix
+    ExchangeMatrixCL exMat_;
+    exMat_.BuildCommPattern(A, RowEx_, ColEx_);
+    MatrixCL Aacc(exMat_.Accumulate(A));
+    // Determine diagonal of AA^T
+    D_.resize(Aacc.num_rows());
+    for (size_t i = 0; i < Aacc.num_rows(); ++i)
+        for (size_t nz = Aacc.row_beg(i); nz < Aacc.row_beg(i + 1); ++nz)
+            D_[i] += Aacc.val(nz) * A.val(nz);
+    RowEx_.Accumulate(D_);
+    y_.resize( A.num_cols());
+}
+
+template <typename Mat, typename Vec>
+void ParNEGSPcCL::ForwardGS(const Mat& A, Vec& x, const Vec& b) const
+{
+    // x= 0.; // implied, but superfluous, because we can assign the x-values below, not update.
+    y_= 0.;
+    double t;
+    for (size_t i= 0; i < RowEx_.LocalIndex.size(); ++i) {
+        t= (b[RowEx_.LocalIndex[i]] - mul_row( A, y_, RowEx_.LocalIndex[i]))/D_[RowEx_.LocalIndex[i]];
+        x[RowEx_.LocalIndex[i]]= t;
+        add_row_to_vec( A, t, y_, RowEx_.LocalIndex[i]); // y+= t* (i-th row of A)
+    }
+    for (size_t i= 0; i < RowEx_.DistrIndex.size(); ++i) {
+        t= (b[RowEx_.DistrIndex[i]])/D_[RowEx_.DistrIndex[i]];
+        x[RowEx_.DistrIndex[i]]= t;
+        add_row_to_vec( A, t, y_, RowEx_.DistrIndex[i]); // y+= t* (i-th row of A)
+    }
+}
+
+template <typename Mat, typename Vec>
+void ParNEGSPcCL::BackwardGS(const Mat& A, Vec& x, const Vec& b) const
+{
+    // x= 0.; // implied, but superfluous, because we can assign the x-values below, not update.
+    y_= 0.;
+    for (size_t i= RowEx_.LocalIndex.size() - 1; i < RowEx_.LocalIndex.size(); --i) {
+        x[RowEx_.LocalIndex[i]]= (b[RowEx_.LocalIndex[i]] - mul_row( A, y_, RowEx_.LocalIndex[i]))/D_[RowEx_.LocalIndex[i]];
+        add_row_to_vec( A, x[RowEx_.LocalIndex[i]], y_, RowEx_.LocalIndex[i]); // y+= t* (i-th row of A)
+    }
+    for (size_t i= RowEx_.DistrIndex.size() - 1; i < RowEx_.DistrIndex.size(); --i) {
+        x[RowEx_.DistrIndex[i]]= (b[RowEx_.DistrIndex[i]] )/D_[RowEx_.DistrIndex[i]];
+        add_row_to_vec( A, x[RowEx_.DistrIndex[i]], y_, RowEx_.DistrIndex[i]); // y+= t* (i-th row of A)
+    }
+}
+
+template <typename Mat, typename Vec>
+void ParNEGSPcCL::Apply(const Mat& A, Vec& x, const Vec& b) const
+{
+    Update( A);
+
+    ForwardGS( A, x, b);
+    if (!symmetric_) return;
+
+    BackwardGS( A, x, VectorCL( D_*x));
+}
+
+template <typename Mat, typename Vec>
+void ParNEGSPcCL::ApplyTranspose(const Mat& A, Vec& x, const Vec& b) const
+{
+    Update( A);
+
+    BackwardGS( A, x, b);
+    if (!symmetric_) return;
+    ForwardGS( A, x, VectorCL( D_*x));
+}
+
+template <typename Mat, typename Vec>
+void ParNEGSPcCL::ForwardMulGS(const Mat& A, Vec& x, const Vec& b) const
+{
+    // x= 0.; // implied, but superfluous, because we can assign the x-values below, not update.
+    y_= 0.;
+    for (size_t i= 0 ; i < b.size(); ++i) {
+        add_row_to_vec( A, b[i], y_, i); // y+= b[i]* (i-th row of A)
+        x[i]= mul_row( A, y_, i);
+    }
+}
+
+template <typename Mat, typename Vec>
+void ParNEGSPcCL::BackwardMulGS(const Mat& A, Vec& x, const Vec& b) const
+{
+    // x= 0.; // implied, but superfluous, because we can assign the x-values below, not update.
+    y_= 0.;
+    for (size_t i= b.size() - 1 ; i < b.size(); --i) {
+        add_row_to_vec( A, b[i], y_, i); // y+= b[i]* (i-th row of A)
+        x[i]= mul_row( A, y_, i);
+    }
+}
+
+template <typename Mat, typename Vec>
+Vec ParNEGSPcCL::mul (const Mat& A, const Vec& b) const
+{
+    Update( A);
+
+    Vec x( A.num_rows());
+    VectorCL b2( b);
+    if (symmetric_) {
+        BackwardMulGS( A, x, b);
+        b2= x/D_;
+    }
+    ForwardMulGS( A, x, b2);
+    return x;
+}
+
+template <typename Mat, typename Vec>
+Vec ParNEGSPcCL::transp_mul(const Mat& A, const Vec& b) const
+{
+    Update( A);
+
+    Vec x( A.num_rows());
+    VectorCL b2( b);
+    if (symmetric_) {
+        ForwardMulGS( A, x, b);
+        b2= x/D_;
+    }
+    BackwardMulGS( A, x, b2);
+    return x;
+}
 
 } // end of namespace DROPS
 

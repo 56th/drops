@@ -370,11 +370,17 @@ template <typename DiscScalT>
     // Get values on vertices
     Uint pos= 0;
     for (MultiGridCL::const_TriangVertexIteratorCL it= mg_.GetTriangVertexBegin(lvl_); it!=mg_.GetTriangVertexEnd(lvl_); ++it){
+#ifdef _PAR
+        if (!it->Unknowns.InTriangLevel(lvl_)) continue;
+#endif
         locData[pos++]= (float)f.val( *it);
     }
 
     // Get values on edges
     for (MultiGridCL::const_TriangEdgeIteratorCL it= mg_.GetTriangEdgeBegin(lvl_); it!=mg_.GetTriangEdgeEnd(lvl_); ++it){
+#ifdef _PAR
+        if (!it->Unknowns.InTriangLevel(lvl_)) continue;
+#endif
         locData[pos++]= (float)f.val( *it, 0.5);
     }
 }
@@ -389,6 +395,9 @@ template <typename DiscVecT>
     // Get values of vertices
     Uint pos= 0;
     for (MultiGridCL::const_TriangVertexIteratorCL it= mg_.GetTriangVertexBegin(lvl_); it!=mg_.GetTriangVertexEnd(lvl_); ++it){
+#ifdef _PAR
+        if (!it->Unknowns.InTriangLevel(lvl_)) continue;
+#endif
         const Point3DCL val= f.val( *it);
         for (int j=0; j<3; ++j)
             locData[pos++]= (float)val[j];
@@ -396,6 +405,9 @@ template <typename DiscVecT>
 
     // Get values on edges
     for (MultiGridCL::const_TriangEdgeIteratorCL it= mg_.GetTriangEdgeBegin(lvl_); it!=mg_.GetTriangEdgeEnd(lvl_); ++it){
+#ifdef _PAR
+        if (!it->Unknowns.InTriangLevel(lvl_)) continue;
+#endif
         const Point3DCL val= f.val( *it, 0.5);
         for (int j=0; j<3; ++j)
             locData[pos++]= (float)val[j];

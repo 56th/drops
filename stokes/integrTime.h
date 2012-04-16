@@ -392,11 +392,12 @@ class ISBBTPreCL : public SchurPreBaseCL
     mutable PCGSolverCL<JACPcCL> solver2_;
 #else
     mutable CompositeMatrixCL BBT_;
-    typedef ParJacNEG0CL    PCSolver1T;                         ///< type of the preconditioner for solver 1
+    //typedef ParJacNEG0CL    PCSolver1T;                         ///< type of the preconditioner for solver 1
+    typedef ParNEGSPcCL    PCSolver1T;                         ///< type of the preconditioner for solver 1
     typedef ParJac0CL       PCSolver2T;                         ///< type of the preconditioner for solver 2
     PCSolver1T PCsolver1_;
     PCSolver2T PCsolver2_;
-    mutable ParPCGSolverCL<PCSolver1T> solver_;                 ///< solver for BB^T
+    mutable ParPCGNESolverCL<PCSolver1T> solver_;                 ///< solver for BB^T
     mutable ParPCGSolverCL<PCSolver2T> solver2_;                ///< solver for M
 
     const IdxDescCL* vel_idx_;                                  ///< Accessing ExchangeCL for velocity
@@ -433,8 +434,8 @@ class ISBBTPreCL : public SchurPreBaseCL
         : SchurPreBaseCL( kA, kM), B_( B), Bs_( 0), Bversion_( 0),
           M_( M_pr), Mvel_( Mvel), tolA_(tolA), tolM_(tolM),
           BBT_( 0, TRANSP_MUL, 0, MUL, vel_idx, pr_idx),
-          PCsolver1_( pr_idx), PCsolver2_(pr_idx),
-          solver_( 800, tolA_, pr_idx, PCsolver1_, /*relative*/ true),
+          PCsolver1_( pr_idx.GetEx(), vel_idx.GetEx()), PCsolver2_(pr_idx),
+          solver_( 800, tolA_, vel_idx, pr_idx, PCsolver1_, /*relative*/ true),
           solver2_( 500, tolM_, pr_idx, PCsolver2_, /*relative*/ true),
           vel_idx_( &vel_idx), pr_idx_( &pr_idx), regularize_( regularize) {}
     ISBBTPreCL (const ISBBTPreCL& pc)
@@ -444,8 +445,8 @@ class ISBBTPreCL : public SchurPreBaseCL
           tolA_(pc.tolA_), tolM_(pc.tolM_),
           Dprsqrtinv_( pc.Dprsqrtinv_),
           BBT_( Bs_, TRANSP_MUL, Bs_, MUL, *pc.vel_idx_, *pc.pr_idx_),
-          PCsolver1_( *pc.pr_idx_), PCsolver2_( *pc.pr_idx_),
-          solver_( 800, tolA_, *pc.pr_idx_, PCsolver1_, /*relative*/ true),
+          PCsolver1_( pc.pr_idx_->GetEx(), pc.vel_idx_->GetEx()), PCsolver2_( *pc.pr_idx_),
+          solver_( 800, tolA_, *pc.vel_idx_, *pc.pr_idx_, PCsolver1_, /*relative*/ true),
           solver2_( 500, tolM_, *pc.pr_idx_, PCsolver2_, /*relative*/ true),
           vel_idx_( pc.vel_idx_), pr_idx_( pc.pr_idx_), regularize_( pc.regularize_){}
 
@@ -487,11 +488,11 @@ void ISBBTPreCL::Apply(const Mat&, Vec& p, const Vec& c) const
 
     p= 0.0;
     if (kA_ != 0.0) {
-#ifndef _PAR
+//#ifndef _PAR
         solver_.Solve( *Bs_, p, VectorCL( Dprsqrtinv_*c));
-#else
-        solver_.Solve( BBT_, p, VectorCL( Dprsqrtinv_*c));
-#endif
+//#else
+//        solver_.Solve( BBT_, p, VectorCL( Dprsqrtinv_*c));
+//#endif
 //            std::cout << "ISBBTPreCL p: iterations: " << solver_.GetIter()
 //                       << "\tresidual: " <<  solver_.GetResid();
         if (solver_.GetIter() == solver_.GetMaxIter()){

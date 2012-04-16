@@ -788,6 +788,9 @@ void MultiGridCL::SplitMultiBoundaryTetras()
         // Remove *t (now unused), increment t *before* erasing
         TetraLevelCont::iterator tmp= t;
         ++t;
+#ifdef _PAR
+        DiST::InfoCL::Instance().GetRemoteList<TetraCL>().Unregister(*tmp);
+#endif
         Tetras_[0].erase( tmp);
     }
 
