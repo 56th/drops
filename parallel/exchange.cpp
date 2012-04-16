@@ -1772,7 +1772,7 @@ bool ExchangeBuilderCL::HandlerDOFIndexCL::Scatter(
     if ( GetDOFOwner(tmpRecv, rowidx_.IsExtended())==me && numData != 1){
         for ( Uint j=0; j<numUnk; ++j)
             ownerDistrIndex_.push_back( dof+j);
-        if ( isExtended)
+        if ( isExtended && !dofProcList_[extdof].empty())
             for ( Uint j=0; j<numUnk; ++j)
                 ownerDistrIndex_.push_back( extdof+j);
     }
