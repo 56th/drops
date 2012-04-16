@@ -159,6 +159,9 @@ class UnknownHandleCL
   public:
     UnknownHandleCL() : _unk(0) {}
     UnknownHandleCL( const UnknownHandleCL& orig)
+#ifdef _PAR
+      : mayHaveUnk_(orig.mayHaveUnk_)
+#endif
     {
         _unk= orig._unk ? new UnknownIdxCL( *orig._unk)
                         : 0;
@@ -170,6 +173,9 @@ class UnknownHandleCL
         delete _unk;
         _unk= rhs._unk ? new UnknownIdxCL( *rhs._unk)
                        : 0;
+#ifdef _PAR
+        mayHaveUnk_= rhs.mayHaveUnk_;
+#endif
         return *this;
     }
 
@@ -206,6 +212,9 @@ class UnknownHandleCL
         else if ( !(sysnum < _unk->GetNumSystems()) )
             _unk->resize( sysnum+1, NoIdx);
     }
+
+    /// \brief Write out some debug information
+    void DebugInfo( std::ostream& os) const;
 
 #ifdef _PAR
     /// \brief Returns whether a FE space on triangulation level \a lvl may contain current DoF.

@@ -37,14 +37,36 @@ namespace DROPS
 
 
 UnknownIdxCL::UnknownIdxCL( const UnknownIdxCL& orig)
-    : _Idx( orig._Idx), received_(orig.received_) {}
+    : _Idx( orig._Idx),
+#ifdef _PAR
+      received_(orig.received_)
+#endif
+{}
 
 
 UnknownIdxCL& UnknownIdxCL::operator=( const UnknownIdxCL& rhs)
 {
     if(&rhs == this) return *this;
     _Idx= rhs._Idx;
+#ifdef _PAR
+    received_= rhs.received_;
+#endif
     return *this;
+}
+
+void UnknownHandleCL::DebugInfo( std::ostream& os) const
+{
+    if (!_unk)
+        os << "no DoFs stored.\n";
+    else {
+        os << "(sysnum, dof) = ";
+        for (Uint i=0; i< _unk->GetNumSystems(); ++i)
+            if (Exist(i))
+                os << "( " << i << ", " << _unk->GetIdx(i) << ")   ";
+            else
+                os << "( " << i << ", invalid)   ";
+        os << '\n';
+    }
 }
 
 #ifdef _PAR
@@ -54,14 +76,17 @@ UnknownIdxCL& UnknownIdxCL::operator=( const UnknownIdxCL& rhs)
     condition:
     \cond it is assumed, that all processes store the "same" observers, i.e.,
           same ordering of the vectors and indices
-    \todo 
+    \todo
     \param sendstream where to put the data
     \param t          the transferable object which is used to determine the number of unknowns
 */
 void UnknownHandleCL::Pack( DiST::Helper::MPIostreamCL& sendstream, const DiST::TransferableCL& t) const
 {
     const Uint NoIdxFlag= static_cast<Uint>(-1);                            // flag for sending/receiving no data
+    const DiST::Helper::GeomIdCL gid( 1, Point3DCL(0.5), 0);
+    const bool report= gid==t.GetGID();
     if ( Exist()){
+//if (report) t.DebugInfo(cdebug);
         sendstream << true;
         const ObservedMigrateFECL& observers= ObservedMigrateFECL::Instance();
         // write value of dofs onto the stream for all observed vectors
@@ -73,6 +98,7 @@ void UnknownHandleCL::Pack( DiST::Helper::MPIostreamCL& sendstream, const DiST::
             if ( Exist( idx)){
                 const IdxT dof= (*this)(idx);
                 sendstream << idx;
+if (report) DebugInfo( cdebug << "Pack idx " << idx << ", ");
                 for ( Uint i=0; i<idx_desc->NumUnknownsSimplex( t); ++i){  // edges must have the same number of unknowns than vertices!
                     sendstream << (*vec)[dof+i];
                 }
@@ -103,6 +129,8 @@ void UnknownHandleCL::UnPack( DiST::Helper::MPIistreamCL& recvstream, const DiST
     Uint idx_recv= NoIdxFlag;
     double val_recv;                                                // buffer for receiving a DoF value
     recvstream >> unk_recv;
+    const DiST::Helper::GeomIdCL gid( 1, Point3DCL(0.5), 0);
+    const bool report= gid==t.GetGID();
 
     if ( unk_recv){
         ObservedMigrateFECL& observers= ObservedMigrateFECL::Instance();
@@ -114,10 +142,10 @@ void UnknownHandleCL::UnPack( DiST::Helper::MPIistreamCL& recvstream, const DiST
             recvstream >> idx_recv;
             if ( idx_recv!=NoIdxFlag){    // OK, we are receiving 'good' data
                 // check for errors
-                Assert( idx==idx_recv, 
-                    DROPSErrCL("UnknownHandleCL::UnPack: Mismatch in received data!"), 
+                Assert( idx==idx_recv,
+                    DROPSErrCL("UnknownHandleCL::UnPack: Mismatch in received data!"),
                     DebugParallelNumC);
- 
+
                 Assert( !Exist(idx),
                     DROPSErrCL("UnknownHandleCL::UnPack: Merging of received dof is not possible"),
                     DebugParallelNumC);
@@ -128,7 +156,8 @@ void UnknownHandleCL::UnPack( DiST::Helper::MPIistreamCL& recvstream, const DiST
                 SetUnkReceived( idx);
                 // ... remember where the dofs are put
                 (*this)(idx)= recvbuf.size();
-                // ... and the store the received dofs in the buffer
+if (report) DebugInfo( cdebug << "Unpack idx " << idx << " in dof " << (*this)(idx) << ", ");
+                // ... and store the received dofs in the buffer
                 for ( int i=0; i<(int)idx_desc->NumUnknownsSimplex( t); ++i){
                     recvstream >> val_recv;
                     recvbuf.push_back( val_recv);
