@@ -63,7 +63,7 @@ class VTKOutCL
     char               decDigits_;                  ///< number of digits for encoding time in filename
     Uint               timestep_, numsteps_;        ///< actual timestep and number of timesteps
     std::string        descstr_;                    ///< stores description info
-    std::string        dirname_; 
+    std::string        dirname_;
     std::string        filename_;                   ///< filenames
     std::ofstream      file_;                       ///< actual file where to put data
     VTKvarMapT         vars_;                       ///< The variables stored by varName.
@@ -76,7 +76,7 @@ class VTKOutCL
 
     VectorBaseCL<float>   coords_;                  ///< Coordinates of the points
     TetraVecT             tetras_;                  ///< Connectivities (tetras)
-    Uint                  lvl_;                      ///< Triangulation Level 
+    Uint                  lvl_;                      ///< Triangulation Level
     Uint                  numPoints_;               ///< number of points (only accessible by master process)
     Uint                  numTetras_;               ///< number of tetras (only accessible by master process)
     Uint                  numLocPoints_;            ///< number of local exclusive verts and edges
@@ -227,7 +227,7 @@ class VTKP1XScalarCL : public VTKVariableCL
   public:
     VTKP1XScalarCL(MultiGridCL& mg, const VecDescCL& lset, const VecDescCL& v, const BndDataCL<>& bnd,
                    std::string varName)
-        : VTKVariableCL( varName), v_( v), vneg_( &p1idx_), vpos_( &p1idx_), 
+        : VTKVariableCL( varName), v_( v), vneg_( &p1idx_), vpos_( &p1idx_),
         lset_( lset), bnd_( bnd), mg_( mg) {}
     ~VTKP1XScalarCL() { if (p1idx_.NumUnknowns() != 0) p1idx_.DeleteNumbering( mg_); }
     void put( VTKOutCL& cf) const {
@@ -235,8 +235,8 @@ class VTKP1XScalarCL : public VTKVariableCL
             p1idx_.DeleteNumbering( mg_);
         p1idx_.CreateNumbering( v_.RowIdx->TriangLevel(), mg_, *v_.RowIdx);
         P1XtoP1 ( *v_.RowIdx, v_.Data, p1idx_, vpos_.Data, vneg_.Data, lset_, mg_);
-        cf.PutScalar( P1EvalCL<double, const BndDataCL<>, const VecDescCL>(&vneg_, &bnd_, &mg_), varName()+ "_neg"); 
-        cf.PutScalar( P1EvalCL<double, const BndDataCL<>, const VecDescCL>(&vpos_, &bnd_, &mg_), varName()+ "_pos"); 
+        cf.PutScalar( P1EvalCL<double, const BndDataCL<>, const VecDescCL>(&vneg_, &bnd_, &mg_), varName()+ "_neg");
+        cf.PutScalar( P1EvalCL<double, const BndDataCL<>, const VecDescCL>(&vpos_, &bnd_, &mg_), varName()+ "_pos");
     }
     Uint GetDim() const { return 1; }
 };
@@ -370,17 +370,11 @@ template <typename DiscScalT>
     // Get values on vertices
     Uint pos= 0;
     for (MultiGridCL::const_TriangVertexIteratorCL it= mg_.GetTriangVertexBegin(lvl_); it!=mg_.GetTriangVertexEnd(lvl_); ++it){
-#ifdef _PAR
-        if (!it->Unknowns.InTriangLevel(lvl_)) continue;
-#endif
         locData[pos++]= (float)f.val( *it);
     }
 
     // Get values on edges
     for (MultiGridCL::const_TriangEdgeIteratorCL it= mg_.GetTriangEdgeBegin(lvl_); it!=mg_.GetTriangEdgeEnd(lvl_); ++it){
-#ifdef _PAR
-        if (!it->Unknowns.InTriangLevel(lvl_)) continue;
-#endif
         locData[pos++]= (float)f.val( *it, 0.5);
     }
 }
@@ -395,9 +389,6 @@ template <typename DiscVecT>
     // Get values of vertices
     Uint pos= 0;
     for (MultiGridCL::const_TriangVertexIteratorCL it= mg_.GetTriangVertexBegin(lvl_); it!=mg_.GetTriangVertexEnd(lvl_); ++it){
-#ifdef _PAR
-        if (!it->Unknowns.InTriangLevel(lvl_)) continue;
-#endif
         const Point3DCL val= f.val( *it);
         for (int j=0; j<3; ++j)
             locData[pos++]= (float)val[j];
@@ -405,9 +396,6 @@ template <typename DiscVecT>
 
     // Get values on edges
     for (MultiGridCL::const_TriangEdgeIteratorCL it= mg_.GetTriangEdgeBegin(lvl_); it!=mg_.GetTriangEdgeEnd(lvl_); ++it){
-#ifdef _PAR
-        if (!it->Unknowns.InTriangLevel(lvl_)) continue;
-#endif
         const Point3DCL val= f.val( *it, 0.5);
         for (int j=0; j<3; ++j)
             locData[pos++]= (float)val[j];

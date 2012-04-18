@@ -157,9 +157,6 @@ void LoadBalCL::DoMigration()
 
     Comment( " - Cleaning up\n", DebugLoadBalC);
     detdecomp.clear();
-
-    Comment( " - Mark simplices for unknowns" << std::endl, DebugLoadBalC);
-    ParMultiGridCL::Instance().MarkSimplicesForUnknowns();
 }
 
 

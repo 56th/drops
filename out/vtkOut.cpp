@@ -164,7 +164,7 @@ void VTKOutCL::GenerateTimeFile( double time, const std::string & name) const
     if(timestep_==0)
     {
         std::ofstream timefile(timefilename.c_str());
-        timefile << "<?xml version=\"1.0\"?>\n" 
+        timefile << "<?xml version=\"1.0\"?>\n"
                     "<VTKFile type=\"Collection\" version=\"0.1\" byte_order=\"LittleEndian\">\n"
                     "<Collection>\n"
                     "\t<DataSet timestep=\""<< time <<"\" group=\"\" part=\"0\" file=\"" << name <<"\"/>\n"
@@ -222,9 +222,6 @@ void VTKOutCL::GatherCoord()
     ///\todo instead of v/eAddrMap_, one could use a P2 index instead (cf. EnsightOutCL)
     Uint counter=0;
     for (MultiGridCL::const_TriangVertexIteratorCL it= mg_.GetTriangVertexBegin(lvl_); it!=mg_.GetTriangVertexEnd(lvl_); ++it){
-#ifdef _PAR
-        if (!it->Unknowns.InTriangLevel(lvl_)) continue;
-#endif
         // store a consecutive number for the vertex
         vAddrMap_[&*it]= counter;
 
@@ -235,10 +232,6 @@ void VTKOutCL::GatherCoord()
     }
 
     for (MultiGridCL::const_TriangEdgeIteratorCL it= mg_.GetTriangEdgeBegin(lvl_); it!=mg_.GetTriangEdgeEnd(lvl_); ++it){
-#ifdef _PAR
-        if (!it->Unknowns.InTriangLevel(lvl_)) continue;
-#endif
-
         // store a consecutive number for the edge
         eAddrMap_[&*it]= counter;
 
@@ -375,7 +368,7 @@ void VTKOutCL::GatherTetra()
 {
     numTetras_=std::distance(mg_.GetTriangTetraBegin(lvl_),mg_.GetTriangTetraEnd(lvl_));  // calculates the number of tetrahedra
     tetras_.resize((onlyP1_?4:10)*numTetras_);      // (four vertices) * Number of Tetrahedra respectively (four vertices + six edges) * Number of Tetrahedra
-  
+
     // Gathers connectivities
     Uint counter=0;
     for (MultiGridCL::const_TriangTetraIteratorCL it= mg_.GetTriangTetraBegin(lvl_); it!=mg_.GetTriangTetraEnd(lvl_); ++it){ //loop over all tetrahedra
@@ -385,12 +378,12 @@ void VTKOutCL::GatherTetra()
         {
             for (int eddy=0; eddy<6; ++eddy)
                 tetras_[counter++] = eAddrMap_[it->GetEdge(eddy)];
-            std::swap(tetras_[counter-4],tetras_[counter-5]);    // Permutation needed to make DROPS and VTK compatible (different numeration) 
+            std::swap(tetras_[counter-4],tetras_[counter-5]);    // Permutation needed to make DROPS and VTK compatible (different numeration)
         }
     }
     Assert(counter==(onlyP1_? 4:10)*numTetras_, DROPSErrCL("VTKOutCL::GatherTetra: Mismatching number of tetrahedra"), ~0);
 }
-    
+
 void VTKOutCL::WriteTetra( bool writeDistribution)
 /** Writes the tetrahedra into the VTK file*/
 {
@@ -491,7 +484,7 @@ void VTKOutCL::WriteValues( const VectorBaseCL<float>& allData, const std::strin
 /** Writes out the calculated numerical data*/
 {
     std::ofstream& file= filePtr ? *filePtr : file_;
-    
+
     file << "\n\t\t<" << ( !filePtr ? "" : "P") << "DataArray type=\"Float32\" Name=\"" << name << "\""
             " NumberOfComponents=\"" << numData << "\" format=\""
          << ( binary_ ? "binary\"" : "ascii\"") << ( !filePtr ? "" : "/") << ">";

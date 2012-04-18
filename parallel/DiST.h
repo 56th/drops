@@ -533,7 +533,6 @@ class TransferableCL
     size_t                  GetHashId()   const { Helper::Hashing h; return h(GetGID()); }   ///< Ask for the hash of the GID
     Priority                GetPrio()     const { return GetRemoteData().GetLocalPrio(); }   ///< Ask for the priority
     bool                    IsMaster()    const { return GetPrio()>=PrioMaster; }            ///< Check if simplex is a master copy
-    bool                    MayStoreUnk() const { return GetPrio()==PrioMaster; }            ///< Check for ability of storing unknowns due to priority \todo Is PrioMaster correct?
     bool                    IsLocal()     const { return GetNumDist()==1; }                  ///< Check if the simplex is local
     Uint                    GetNumDist ( Priority prio=NoPrio) const                         ///< Get number of procs on which the simplex with priority >= prio is stored
         { return GetRemoteData().GetNumProcs(prio); }

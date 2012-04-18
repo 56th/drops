@@ -638,6 +638,7 @@ int ParMultiGridCL::ScatterUnknownsRef(OBJT obj, void* buf)
     {
         // index number and unknowns on simplices
         const Uint idx          = _VecDesc[index_type]->RowIdx->GetIdx(),
+                   lvl          = _VecDesc[index_type]->RowIdx->TriangLevel(),
                    numUnkOnVert = _VecDesc[index_type]->RowIdx->NumUnknownsVertex(),
                    numUnkOnEdge = _VecDesc[index_type]->RowIdx->NumUnknownsEdge(),
                    numUnkOnTetra= _VecDesc[index_type]->RowIdx->NumUnknownsTetra();
@@ -676,7 +677,7 @@ int ParMultiGridCL::ScatterUnknownsRef(OBJT obj, void* buf)
         {
             for (TetraCL::const_EdgePIterator sit(tp->GetEdgesBegin()); sit!=tp->GetEdgesEnd(); ++sit)
             {
-                if ((*sit)->MayStoreUnk()
+                if ((*sit)->Unknowns.InTriangLevel(lvl)
                      && !(*sit)->Unknowns.Exist(idx)
                      && !(*sit)->Unknowns.UnkReceived(idx)
                      && buffer[buffer_pos].mark
@@ -701,7 +702,7 @@ int ParMultiGridCL::ScatterUnknownsRef(OBJT obj, void* buf)
         // receive unknowns on tetra itselfe
         if (numUnkOnTetra)
         {
-            if (tp->MayStoreUnk()
+            if (tp->Unknowns.InTriangLevel(lvl)
                     && !tp->Unknowns.Exist(idx)
                     && !tp->Unknowns.UnkReceived(idx)
                     && buffer[buffer_pos].mark

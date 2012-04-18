@@ -168,6 +168,9 @@ void MultiGridCL::ClearTriangCache ()
     TriangEdge_.clear();
     TriangFace_.clear();
     TriangTetra_.clear();
+#ifdef _PAR
+    ParMultiGridCL::Instance().MarkSimplicesForUnknowns();
+#endif
 
     for (std::map<int, ColorClassesCL*>::iterator it= colors_.begin(), end= colors_.end(); it != end; ++it)
         delete it->second;
@@ -1149,7 +1152,7 @@ TriangFillCL<VertexCL>::fill (MultiGridCL& mg, TriangCL<VertexCL>::LevelCont& c,
          theend= mg.GetAllVertexEnd( lvl); it != theend; ++it)
         if (it->IsInTriang( lvl)
 #ifdef _PAR
-            && it->MayStoreUnk()
+            && it->Unknowns.InTriangLevel(lvl)
 #endif
            )
             c.push_back( &*it);
@@ -1164,7 +1167,7 @@ TriangFillCL<EdgeCL>::fill (MultiGridCL& mg, TriangCL<EdgeCL>::LevelCont& c, int
          theend= mg.GetAllEdgeEnd( lvl); it != theend; ++it)
         if (it->IsInTriang( lvl)
   #ifdef _PAR
-            && it->MayStoreUnk()
+            && it->Unknowns.InTriangLevel(lvl)
   #endif
            )
             c.push_back( &*it);
@@ -1179,7 +1182,7 @@ TriangFillCL<FaceCL>::fill (MultiGridCL& mg, TriangCL<FaceCL>::LevelCont& c, int
          theend= mg.GetAllFaceEnd( lvl); it != theend; ++it)
            if (it->IsInTriang( lvl)
   #ifdef _PAR
-            && it->MayStoreUnk()
+               && it->Unknowns.InTriangLevel(lvl)
   #endif
            )
             c.push_back( &*it);
