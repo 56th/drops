@@ -572,8 +572,7 @@ void MultiGridCL::Refine()
 
     pmg.AdjustLevel();
     FinalizeModify();
-//    pmg.MarkSimplicesForUnknowns();
-//    ClearTriangCache();
+    ClearTriangCache();
 
 #else
     while ( Tetras_[GetLastLevel()].empty() ) RemoveLastLevel();
