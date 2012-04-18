@@ -56,6 +56,10 @@ UnknownIdxCL& UnknownIdxCL::operator=( const UnknownIdxCL& rhs)
 
 void UnknownHandleCL::DebugInfo( std::ostream& os) const
 {
+    os << "in triang ";
+    for (size_t i= 0; i<mayHaveUnk_.size(); ++i)
+        if (mayHaveUnk_[i]) os << i << " ";
+    os<< ", ";
     if (!_unk)
         os << "no DoFs stored.\n";
     else {
@@ -83,10 +87,7 @@ void UnknownHandleCL::DebugInfo( std::ostream& os) const
 void UnknownHandleCL::Pack( DiST::Helper::MPIostreamCL& sendstream, const DiST::TransferableCL& t) const
 {
     const Uint NoIdxFlag= static_cast<Uint>(-1);                            // flag for sending/receiving no data
-    const DiST::Helper::GeomIdCL gid( 1, Point3DCL(0.5), 0);
-    const bool report= gid==t.GetGID();
     if ( Exist()){
-//if (report) t.DebugInfo(cdebug);
         sendstream << true;
         const ObservedMigrateFECL& observers= ObservedMigrateFECL::Instance();
         // write value of dofs onto the stream for all observed vectors
@@ -98,7 +99,6 @@ void UnknownHandleCL::Pack( DiST::Helper::MPIostreamCL& sendstream, const DiST::
             if ( Exist( idx)){
                 const IdxT dof= (*this)(idx);
                 sendstream << idx;
-if (report) DebugInfo( cdebug << "Pack idx " << idx << ", ");
                 for ( Uint i=0; i<idx_desc->NumUnknownsSimplex( t); ++i){  // edges must have the same number of unknowns than vertices!
                     sendstream << (*vec)[dof+i];
                 }
@@ -129,8 +129,6 @@ void UnknownHandleCL::UnPack( DiST::Helper::MPIistreamCL& recvstream, const DiST
     Uint idx_recv= NoIdxFlag;
     double val_recv;                                                // buffer for receiving a DoF value
     recvstream >> unk_recv;
-    const DiST::Helper::GeomIdCL gid( 1, Point3DCL(0.5), 0);
-    const bool report= gid==t.GetGID();
 
     if ( unk_recv){
         ObservedMigrateFECL& observers= ObservedMigrateFECL::Instance();
@@ -156,7 +154,6 @@ void UnknownHandleCL::UnPack( DiST::Helper::MPIistreamCL& recvstream, const DiST
                 SetUnkReceived( idx);
                 // ... remember where the dofs are put
                 (*this)(idx)= recvbuf.size();
-if (report) DebugInfo( cdebug << "Unpack idx " << idx << " in dof " << (*this)(idx) << ", ");
                 // ... and store the received dofs in the buffer
                 for ( int i=0; i<(int)idx_desc->NumUnknownsSimplex( t); ++i){
                     recvstream >> val_recv;

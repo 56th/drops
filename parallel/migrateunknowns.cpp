@@ -37,24 +37,25 @@ void MigrateFECL::CopyVecElements( VecDescCL& new_vec_desc, const std::vector<Us
 {
     const Uint       new_idx = new_vec_desc.RowIdx->GetIdx();   // new index
     const Uint       old_idx = old_idx_->GetIdx();              // old index
+    const Uint       lvl= old_idx_->TriangLevel();              // level
           VectorCL&  new_vec = new_vec_desc.Data;               // new vector
 
     // Create a WholeRemoteDataIteratorCL
     DiST::LevelListCL lvls;
     DiST::PrioListCL prios; prios.push_back( PrioMaster);
-//    prios.push_back( PrioHasUnk);   // do we need this?
     DiST::Helper::WholeRemoteDataIteratorCL it( dims, lvls, prios, false),
             end= it.GetEnd();
 
     // iterate over all simplices and copy the DoF values
     for ( ; it!=end; ++it){
         DiST::TransferableCL& simplex= it->second.GetLocalObject();
+        if (!simplex.Unknowns.InTriangLevel(lvl)) continue;
+
         UnknownHandleCL& Unknowns= simplex.Unknowns;
         if ( Unknowns.Exist( new_idx)){
             Assert( Unknowns.Exist( old_idx),
-                DROPSErrCL("MigrateFECL::CopyVecElements: Unknowns do not exist before migration"),
+                DiST::Helper::ErrorCL("MigrateFECL::CopyVecElements: Unknowns do not exist before migration", simplex.GetGID()),
                 DebugParallelNumC);
-
             // copy data from known DoF values or from the receive buffer
             double const * in= !Unknowns.UnkReceived( old_idx)
                                 ? Addr(*old_vec_)+ Unknowns(old_idx)
@@ -80,7 +81,7 @@ void MigrateFECL::pre_migrate()
     recvBuf_.reserve( old_idx_->NumUnknowns());
 }
 
-/** After the migration has take place, build the local vector of
+/** After the migration has taken place, build the local vector of
     accumulated vector indices. Afterwards, fill this vector by all the
     DoF which are either already known or just received.
     \post a new index number is created for the FE function.

@@ -87,7 +87,7 @@ class ObservedVectorsCL: public std::vector<MGObserverCL*>
         ObservedMigrateFECL::Instance().notify_pre_migrate();
     }
 
-    /// \brief Tell Observer that a migration has beed performed
+    /// \brief Tell Observer that a migration has been performed
     void notify_post_migrate() {
         ObservedMigrateFECL::Instance().notify_post_migrate();
     }

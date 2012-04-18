@@ -356,8 +356,8 @@ int SimplexTransferInfoCL::GetPostProc( Priority prio) const
 void SimplexTransferInfoCL::ComputeSendToProcs( bool tetra)
 /// For tetrahedra (\a tetra == true) we have to treat the special case that the object should be sent also to processes which already have a remote copy.
 {
+    const int me= ProcCL::MyRank();
     if (tetra) {
-    	const int me= ProcCL::MyRank();
     	if (postProcs_.size()==2 && rd_.GetNumProcs()==2) { // Ma/Gh before and after transfer: only send to remote post procs with same prio
     		procsToSend_.clear();
     		Priority myprio= rd_.GetLocalPrio();
@@ -370,8 +370,9 @@ void SimplexTransferInfoCL::ComputeSendToProcs( bool tetra)
     	}
     } else { // for all sub-simplices (non-tetra): procsToSend_ = postProcs_ - remote data proc list
         procsToSend_= postProcs_;
-    	for (RemoteDataCL::ProcListT::const_iterator it= rd_.GetProcListBegin(), end= rd_.GetProcListEnd(); it!=end; ++it)
-    		procsToSend_.erase( it->proc);
+        procsToSend_.erase( me);
+//    	for (RemoteDataCL::ProcListT::const_iterator it= rd_.GetProcListBegin(), end= rd_.GetProcListEnd(); it!=end; ++it)
+//    		procsToSend_.erase( it->proc);
     }
 }
 
@@ -474,7 +475,7 @@ void collect_streams (IStreamT& recv, InterfaceCL::CollectDataT& collect)
 void InterfaceCL::to_owner (std::vector<ProcCL::RequestT>& reqFirstSend, CollectDataT& collect)
 {
     const int myrank= ProcCL::MyRank();
-    const int firstSendTag= 5; // tag for sending in phase (1) 
+    const int firstSendTag= 5; // tag for sending in phase (1)
 
     // Phase (1): Send data to owning processes
     //-----------------------------------------
