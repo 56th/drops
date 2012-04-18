@@ -108,23 +108,25 @@ void SetDOFStokes( const MultiGridCL& mg, InstatStokes2PhaseP2P1CL& stokes)
     VectorCL&  pr_data = stokes.p.Data;
 
     DROPS_FOR_TRIANG_CONST_VERTEX( mg, mg.GetLastLevel(), it){
+        const double hash= it->GetHashId();
         if ( it->Unknowns.Exist( vel_idx)){
             const IdxT DOF= it->Unknowns( vel_idx);
-            vel_data[ DOF]  = (double)it->GetHashId()/2e20;
-            vel_data[ DOF+1]= (double)it->GetHashId()/3e20;
-            vel_data[ DOF+2]= (double)it->GetHashId()/4e20;
+            vel_data[ DOF]  = hash/2e20;
+            vel_data[ DOF+1]= hash/3e20;
+            vel_data[ DOF+2]= hash/4e20;
         }
         if ( it->Unknowns.Exist( pr_idx)){
             const IdxT DOF= it->Unknowns( pr_idx);
-            pr_data[ DOF]  = (double)it->GetHashId()/1e19;
+            pr_data[ DOF]  = hash/1e19;
         }
     }
     DROPS_FOR_TRIANG_CONST_EDGE( mg, mg.GetLastLevel(), it){
+        const double hash= it->GetHashId();
         if ( it->Unknowns.Exist( vel_idx)){
             const IdxT DOF= it->Unknowns( vel_idx);
-            vel_data[ DOF]  = (double)it->GetHashId()/2e20;
-            vel_data[ DOF+1]= (double)it->GetHashId()/3e20;
-            vel_data[ DOF+2]= (double)it->GetHashId()/4e20;
+            vel_data[ DOF]  = hash/2e20;
+            vel_data[ DOF+1]= hash/3e20;
+            vel_data[ DOF+2]= hash/4e20;
         }
     }
 }
@@ -179,16 +181,16 @@ void CheckDOFStokes( const MultiGridCL& mg, InstatStokes2PhaseP2P1CL& stokes)
     const Uint pr_idx  = stokes.p.RowIdx->GetIdx();
     VectorCL&  vel_data= stokes.v.Data;
     VectorCL&  pr_data = stokes.p.Data;
-
-    std::vector<DiST::TransferableCL const *> fail_elems_vel;
-    std::vector<DiST::TransferableCL const *> fail_elems_pr;
+    typedef std::vector<DiST::TransferableCL const *> failContT;
+    failContT fail_elems_vel, fail_elems_pr;
     // Check all vertices and edges for correct values
     DROPS_FOR_TRIANG_CONST_VERTEX( mg, mg.GetLastLevel(), it){
+        const double hash= it->GetHashId();
         if ( it->Unknowns.Exist( vel_idx)){
             const IdxT DOF= it->Unknowns( vel_idx);
-            if (   std::abs(vel_data[DOF]-(double)it->GetHashId()/2e20)>DoubleEpsC
-                || std::abs(vel_data[DOF+1]-(double)it->GetHashId()/3e20)>DoubleEpsC
-                || std::abs(vel_data[DOF+2]-(double)it->GetHashId()/4e20)>DoubleEpsC
+            if (   std::abs(vel_data[DOF]   - hash/2e20)>DoubleEpsC
+                || std::abs(vel_data[DOF+1] - hash/3e20)>DoubleEpsC
+                || std::abs(vel_data[DOF+2] - hash/4e20)>DoubleEpsC
                 ){
                 fail_elems_vel.push_back( &*it);
             }
@@ -202,10 +204,11 @@ void CheckDOFStokes( const MultiGridCL& mg, InstatStokes2PhaseP2P1CL& stokes)
     }
     DROPS_FOR_TRIANG_CONST_EDGE( mg, mg.GetLastLevel(), it){
         if ( it->Unknowns.Exist( vel_idx)){
+            const double hash= it->GetHashId();
             const IdxT DOF= it->Unknowns( vel_idx);
-            if (   std::abs(vel_data[DOF]-(double)it->GetHashId()/2e20)>DoubleEpsC
-                || std::abs(vel_data[DOF+1]-(double)it->GetHashId()/3e20)>DoubleEpsC
-                || std::abs(vel_data[DOF+2]-(double)it->GetHashId()/4e20)>DoubleEpsC
+            if (   std::abs(vel_data[DOF]   - hash/2e20)>DoubleEpsC
+                || std::abs(vel_data[DOF+1] - hash/3e20)>DoubleEpsC
+                || std::abs(vel_data[DOF+2] - hash/4e20)>DoubleEpsC
                 ){
                 fail_elems_vel.push_back( &*it);
             }
@@ -217,11 +220,11 @@ void CheckDOFStokes( const MultiGridCL& mg, InstatStokes2PhaseP2P1CL& stokes)
     if ( pr_correct)
         std::cout << "Migration with unknowns is correct for pressure" << std::endl;
     else
-        std::cout << "Migration with unknowns is NOT correct for pressure" << std::endl;
+        std::cout << "Migration with unknowns is NOT correct for pressure, failed on 0 in " << fail_elems_pr.size() << " cases\n";
     if ( vel_correct)
         std::cout << "Migration with unknowns is correct for velocity" << std::endl;
     else
-        std::cout << "Migration with unknowns is NOT correct for velocity" << std::endl;
+        std::cout << "Migration with unknowns is NOT correct for velocity, failed on [0] in " << fail_elems_vel.size() << " cases\n";
 }
 
 
@@ -234,8 +237,6 @@ void CheckMigration( LoadBalCL& lb)
 {
     std::cout << "Checking migration with unknowns ..." << std::endl;
     MultiGridCL& mg= lb.GetMG();
-
-    ParMultiGridCL::Instance().MarkSimplicesForUnknowns();
 
     // Create boundary conditions
     std::string perbndtypestr;
@@ -261,7 +262,7 @@ void CheckMigration( LoadBalCL& lb)
 
     // Create all the stuff which is necessary to make a Stokes class
     typedef BndDataCL<DROPS::Point3DCL> VelBndDataCL;
-    typedef BndDataCL<double>    PrBndDataCL; 
+    typedef BndDataCL<double>    PrBndDataCL;
     VelBndDataCL *velbnddata = 0;
     PrBndDataCL *prbnddata = 0;
     BuildBoundaryData( &mg, prbnddata, perbndtypestr, zerobndfun, periodic_match);
@@ -294,12 +295,22 @@ void CheckMigration( LoadBalCL& lb)
     SetDOFStokes( mg, Stokes);
 
     // do the migration
-    std::cout << "Migrate the tetrahedra with the following DOF information\n" 
+    std::cout << "Migrate the tetrahedra with the following DOF information\n"
               << " level set " << lidx->GetIdx() << '\n'
               << " velocity " << Stokes.v.RowIdx->GetIdx() << '\n'
               << " pressure " << Stokes.p.RowIdx->GetIdx() << '\n'
               << std::endl;
+//    const DiST::Helper::GeomIdCL gid( 3, MakePoint3D(0.75, 0.25, 0.375), 0);
+//    VertexCL *v= DiST::InfoCL::Instance().Exists(gid) ? DiST::InfoCL::Instance().GetVertex(gid) : 0;
+//    IF_MASTER if (v) { v->Unknowns.DebugInfo(cdebug << gid << ": "); v->DebugInfo(cdebug); }
     Migrate( lb, obs);
+    std::cout << "After migration:\n"
+              << " level set " << lidx->GetIdx() << '\n'
+              << " velocity " << Stokes.v.RowIdx->GetIdx() << '\n'
+              << " pressure " << Stokes.p.RowIdx->GetIdx() << '\n'
+              << std::endl;
+//    v= DiST::InfoCL::Instance().Exists(gid) ? DiST::InfoCL::Instance().GetVertex(gid) : 0;
+//    IF_MASTER if (v) { v->Unknowns.DebugInfo(cdebug << gid << ": "); v->DebugInfo(cdebug); }
 
     // Check for correctness
     CheckDOFLset( mg, lset);
@@ -324,7 +335,7 @@ int main( int argc, char **argv)
         std::cout << "=====================================\ninitial migration\n";
         DROPS::LoadBalCL lb( *mg);  // loadbalancing
         lb.DoMigration( );          // distribute initial grid
-        const int num_ref= 3;
+        const int num_ref= 5;
         // writer for vtk-format
         DROPS::VTKOutCL vtkwriter( *mg, "dist_ref", num_ref+1, "vtk", "dist_ref", true);
         vtkwriter.Write(0);
