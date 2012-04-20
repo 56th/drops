@@ -83,7 +83,6 @@ class AdapTriangCL
     {
         Assert( 0<=c_level && c_level<=f_level, "AdapTriangCL: Levels are cheesy.\n", ~0);
 #ifdef _PAR
-        pmg_->AttachTo( mg_);
         if (lbStrategy>=0)
             lb_.DoMigration();
         else{

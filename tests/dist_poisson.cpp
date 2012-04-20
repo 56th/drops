@@ -316,7 +316,6 @@ int main (int argc, char** argv)
 #ifdef _PAR
         // Set parallel data structures
         DROPS::ParMultiGridCL pmg= DROPS::ParMultiGridCL::Instance();
-        pmg.AttachTo( *mg);                                  // handling of parallel multigrid
         DROPS::LoadBalCL lb( *mg);                    // loadbalancing
         lb.DoMigration();    // distribute initial grid
 #endif

@@ -71,6 +71,7 @@ class ParMultiGridInitCL; //forward declaration
 class ParMultiGridCL
 {
     friend class ParMultiGridInitCL;
+    friend class MultiGridCL;
 
   public: // typedefs
       /// \brief Vector of pointers to  Vector-Describer-Classes.
@@ -156,6 +157,18 @@ class ParMultiGridCL
     class AdaptMidVertexCL;           ///< Delete or set mid-vertex of edges
     //@}
 
+    void AttachTo(MultiGridCL&);                        // attach the MultiGrid to the ParMultiGridCL
+    void AdjustLevel();                                 // Apply all the same number of levels to all procs
+    void MarkSimplicesForUnknowns();                    // Set flag "MayHaveUnknowns in the UnknownsHandleCL on all simplices that are able to store unknowns
+
+    void AccumulateMFR(int Level=-1);                                    // accumulate mark for refinements on Edges on Level (-1==all levels!)
+    void CommunicateRefMarks( Uint Level);                               // Tell everybody, if an tetra is marked for refinement
+    void TreatGhosts (int Level= -1);                                    // Rescue all ghosts-subsimplices
+    void RescueGhostVerts(Uint Level);                                   // Vertices are special
+    void TreatHasGhosts (int Level= -1);                                 // Rescue all subsimplices of tetra that has ghosts
+    void AdaptPrioOnSubs();                                              // Set prios of all subsimplices right
+    void RescueSubs(TetraCL&);                                           // All subsimplices of tetra are rescued and get prio PrioMaster
+    void AdaptMidVertex ();                                              // Delete or set mid-vertex for all edges
 
   public:
     /// \brief Get a pointer to the ParMultiGridCL (Singleton-Pattern)
@@ -167,13 +180,10 @@ class ParMultiGridCL
 
     /// \name Functions concerning the MultiGrid
     // @{
-    void AttachTo(MultiGridCL&);                        // attach the MultiGrid to the ParMultiGridCL
     MultiGridCL& GetMG();                               // Get a reference on the MultiGrid
     const MultiGridCL& GetMG() const { return *mg_; }
     void Refine();                                      // Refine the MultiGrid
-    void AdjustLevel();                                 // Apply all the same number of levels to all procs
     void MarkAll();                                     // All Tetras of last level are marked
-    void MarkSimplicesForUnknowns();                    // Set flag "MayHaveUnknowns in the UnknownsHandleCL on all simplices that are able to store unknowns
     // @}
 
     /// \name Modify environment
@@ -254,15 +264,6 @@ class ParMultiGridCL
     size_t GetRecvBufferSize();                                      // Get the size of _RecvBuf
     // @}
 
-
-    void AccumulateMFR(int Level=-1);                                    // accumulate mark for refinements on Edges on Level (-1==all levels!)
-    void CommunicateRefMarks( Uint Level);                               // Tell everybody, if an tetra is marked for refinement
-    void TreatGhosts (int Level= -1);                                    // Rescue all ghosts-subsimplices
-    void RescueGhostVerts(Uint Level);                                   // Vertices are special
-    void TreatHasGhosts (int Level= -1);                                 // Rescue all subsimplices of tetra that has ghosts
-    void AdaptPrioOnSubs();                                              // Set prios of all subsimplices right
-    void RescueSubs(TetraCL&);                                           // All subsimplices of tetra are rescued and get prio PrioMaster
-    void AdaptMidVertex ();                                              // Delete or set mid-vertex for all edges
 
   private:
     // functions concerning the interfaces and handlers
