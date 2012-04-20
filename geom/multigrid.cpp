@@ -494,7 +494,6 @@ void MultiGridCL::Refine()
 #ifndef _PAR
     PeriodicEdgesCL perEdges( *this);
 #endif
-    ClearTriangCache();
     PrepareModify();
 #ifdef _PAR
     ParMultiGridCL& pmg= ParMultiGridCL::Instance();
@@ -571,13 +570,12 @@ void MultiGridCL::Refine()
 
 
     pmg.AdjustLevel();
-    FinalizeModify();
-    ClearTriangCache();
-
 #else
     while ( Tetras_[GetLastLevel()].empty() ) RemoveLastLevel();
-    FinalizeModify();
 #endif
+
+    FinalizeModify();
+    ClearTriangCache();
 
     std::for_each( GetAllVertexBegin(), GetAllVertexEnd(),
         std::mem_fun_ref( &VertexCL::DestroyRecycleBin));

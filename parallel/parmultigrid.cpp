@@ -1575,14 +1575,15 @@ void ParMultiGridCL::TransferEnd()
 //
 //    level_=-1; // invalidate level_
 //    mg_->FinalizeModify();
-//    mg_->ClearTriangCache();
+	// important: clear triang cache, otherwise migration of unknowns not working properly
+    mg_->ClearTriangCache();
 
     Comment("- Transfer finished"<<std::endl,DebugParallelC);
 }
 
 void ParMultiGridCL::MarkSimplicesForUnknowns()
 {
-	for (MultiGridCL::VertexIterator it= mg_->GetAllVertexBegin(); it != mg_->GetAllVertexEnd(); ++it)
+    for (MultiGridCL::VertexIterator it= mg_->GetAllVertexBegin(); it != mg_->GetAllVertexEnd(); ++it)
 		it->Unknowns.DisableAllUnknowns( mg_->GetNumLevel());
 
 	for (MultiGridCL::EdgeIterator it= mg_->GetAllEdgeBegin(); it != mg_->GetAllEdgeEnd(); ++it)
