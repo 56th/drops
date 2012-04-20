@@ -46,7 +46,8 @@ namespace DROPS
 
   std::ostream &operator<<(std::ostream& stream, ParamCL& P)
   {
-    return P.print(stream);
+	  boost::property_tree::write_json(stream, P.pt);
+	  return stream;
   }
 
 
@@ -57,11 +58,11 @@ namespace DROPS
   {
      Point3DCL point;
 
-     typedef boost::property_tree::ptree ptree;
+     using boost::property_tree::ptree;
      int i=0;
 
-     boost::property_tree::ptree curPT = this->pt.get_child(pathInPT);
-     for (boost::property_tree::ptree::const_iterator it = curPT.begin(); it != curPT.end(); ++it) {
+     ptree curPT = this->pt.get_child(pathInPT);
+     for (ptree::const_iterator it = curPT.begin(); it != curPT.end(); ++it) {
          point[i++] = it->second.get_value<double>();
      }
 
@@ -70,7 +71,7 @@ namespace DROPS
 
   std::ostream& ParamCL::print(std::ostream& s)
   {
-    typedef boost::property_tree::ptree ptree;
+    using boost::property_tree::ptree;
 
     for (ptree::const_iterator it = this->pt.begin(); it != this->pt.end(); ++it) {
         s << it->first << ": " << it->second.get_value<std::string>() << "\n";
@@ -82,7 +83,7 @@ namespace DROPS
   void ParamCL::print(boost::property_tree::ptree child, std::string level, std::ostream& s)
   {
 
-    typedef boost::property_tree::ptree ptree;
+    using boost::property_tree::ptree;
 
     for (ptree::const_iterator it = child.begin(); it != child.end(); ++it) {
         s << level << it->first << ": " << it->second.get_value<std::string>() << "\n";
