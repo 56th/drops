@@ -86,6 +86,9 @@ void UnknownHandleCL::DebugInfo( std::ostream& os) const
 */
 void UnknownHandleCL::Pack( DiST::Helper::MPIostreamCL& sendstream, const DiST::TransferableCL& t) const
 {
+//const DiST::Helper::GeomIdCL gid( 1, MakePoint3D(0.5, 0.5, 0.5), 0);
+//bool report= gid == t.GetGID();
+//if (report) DebugInfo( cdebug << ">> Pack " << gid);
     const Uint NoIdxFlag= static_cast<Uint>(-1);                            // flag for sending/receiving no data
     if ( Exist()){
         sendstream << true;
@@ -124,6 +127,9 @@ void UnknownHandleCL::Pack( DiST::Helper::MPIostreamCL& sendstream, const DiST::
 */
 void UnknownHandleCL::UnPack( DiST::Helper::MPIistreamCL& recvstream, const DiST::TransferableCL& t)
 {
+//const DiST::Helper::GeomIdCL gid( 1, MakePoint3D(0.5, 0.5, 0.5), 0);
+//bool report= gid == t.GetGID();
+//if (report) DebugInfo( cdebug << "<< Unpack " << gid);
     bool unk_recv= false;
     const Uint NoIdxFlag= static_cast<Uint>(-1);                    // flag for sending/receiving no data
     Uint idx_recv= NoIdxFlag;
@@ -144,10 +150,11 @@ void UnknownHandleCL::UnPack( DiST::Helper::MPIistreamCL& recvstream, const DiST
                     DROPSErrCL("UnknownHandleCL::UnPack: Mismatch in received data!"),
                     DebugParallelNumC);
 
-                Assert( !Exist(idx),
-                    DROPSErrCL("UnknownHandleCL::UnPack: Merging of received dof is not possible"),
-                    DebugParallelNumC);
-
+                if (Exist(idx)) { // DOF already exists, so we just skip the received data
+                    for ( int i=0; i<(int)idx_desc->NumUnknownsSimplex( t); ++i)
+                        recvstream >> val_recv;
+                    continue;
+                }
                 // Now, prepare for receiving data ...
                 Prepare( idx);
                 // ... remember that this is a received unknown

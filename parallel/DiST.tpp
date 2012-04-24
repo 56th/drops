@@ -482,10 +482,7 @@ void DiST::TransferCL::ReceiveSimplices( DiST::Helper::RecvStreamCL& recvstream,
         Assert( stmp.GetDim()==GetDim<SimplexT>(), DROPSErrCL("Mismatch in dimension of a received simplex!"), DebugDiSTC);
         // receive proc/prio list
         recvstream >> procList;
-        if (!InfoCL::Instance().Exists(stmp.GetGID()))
-            CreateSimplex<SimplexT>( stmp, procList); // creates simplex and remote data list entry
-        else
-            InfoCL::Instance().GetRemoteData(stmp.GetGID()).GetLocalObject().Unknowns= stmp.Unknowns; // copy unknowns
+        CreateSimplex<SimplexT>( stmp, procList); // creates simplex and remote data list entry
     }
 }
 

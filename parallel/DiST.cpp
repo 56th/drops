@@ -370,9 +370,8 @@ void SimplexTransferInfoCL::ComputeSendToProcs( bool tetra)
     	}
     } else { // for all sub-simplices (non-tetra): procsToSend_ = postProcs_ - remote data proc list
         procsToSend_= postProcs_;
-        procsToSend_.erase( me);
-//    	for (RemoteDataCL::ProcListT::const_iterator it= rd_.GetProcListBegin(), end= rd_.GetProcListEnd(); it!=end; ++it)
-//    		procsToSend_.erase( it->proc);
+    	for (RemoteDataCL::ProcListT::const_iterator it= rd_.GetProcListBegin(), end= rd_.GetProcListEnd(); it!=end; ++it)
+    		procsToSend_.erase( it->proc);
     }
 }
 
@@ -995,7 +994,7 @@ void TransferCL::UpdateSendRemoteData( const TransferableCL& t, Helper::SimplexT
     Helper::RemoteDataCL::ProcListT proclist( sti.GetPostProcs().begin(), sti.GetPostProcs().end());
     const bool isTetra= t.GetDim()==GetDim<TetraCL>();
     if (sti.GetBroadcaster()==ProcCL::MyRank() || isTetra) {
-    	// write simplex and remote data to all procs in SendToProcs
+        // write simplex and remote data to all procs in SendToProcs
         for (ProcSetT::const_iterator sit= sti.GetSendToProcs().begin(), send= sti.GetSendToProcs().end(); sit!=send; ++sit) {
             (*sendBuffer_[sit->first]) << t << proclist;
             if (isTetra)
@@ -1004,6 +1003,17 @@ void TransferCL::UpdateSendRemoteData( const TransferableCL& t, Helper::SimplexT
     }
     if (!sti.WillBeRemoved())
         rd.SetProcList( proclist);
+}
+
+void TransferCL::SendAddedData( const TransferableCL& t, Helper::SimplexTransferInfoCL& sti)
+{
+    // send to every proc except me
+    ProcSetT sendTo= sti.GetPostProcs();
+    sendTo.erase( ProcCL::MyRank());
+    // write geom id and DOF data to all procs in sendTo
+    for (ProcSetT::const_iterator sit= sendTo.begin(), send= sendTo.end(); sit!=send; ++sit) {
+        t.Unknowns.Pack( (*sendBuffer_[sit->first]) << t.GetGID(), t);
+    }
 }
 
 void TransferCL::UpdateOwners()
@@ -1021,22 +1031,26 @@ void TransferCL::UpdateOwners()
 void TransferCL::FillSendBuffer()
 {
     int me= ProcCL::MyRank();
-    typedef std::map<int,SArrayCL<size_t,4> > msgCountT;
-    msgCountT numMsg; // number of simplices of dimension 0,..,3 to be sent to certain proc
+    typedef std::map<int,SArrayCL<size_t,5> > msgCountT;
+    msgCountT numMsg; // number of simplices of dimension 0,..,3 and number of added data to be sent to certain proc
     // first count number of messages to be sent
     for (int dim=0; dim<4; ++dim)
-        for (UpdateListT::const_iterator it= entsToUpdt_[dim].begin(), end= entsToUpdt_[dim].end(); it!=end; ++it)
-            if (it->second.GetBroadcaster()==me || dim==GetDim<TetraCL>()) {
-                const Helper::SimplexTransferInfoCL& sti= it->second;
+        for (UpdateListT::const_iterator it= entsToUpdt_[dim].begin(), end= entsToUpdt_[dim].end(); it!=end; ++it) {
+            const Helper::SimplexTransferInfoCL& sti= it->second;
+            if (sti.GetBroadcaster()==me || dim==GetDim<TetraCL>()) {
                 for (ProcSetT::const_iterator pit= sti.GetSendToProcs().begin(), pend= sti.GetSendToProcs().end(); pit!=pend; ++pit)
                     numMsg[pit->first][dim]++;
             }
+            for (ProcSetT::const_iterator pit= sti.GetPostProcs().begin(), pend= sti.GetPostProcs().end(); pit!=pend; ++pit)
+                if (pit->first != me)
+                    numMsg[pit->first][4]++; // count number of added data
+        }
     // allocate send buffers
     for (msgCountT::iterator it= numMsg.begin(), end= numMsg.end(); it!=end; ++it) {
         Helper::SendStreamCL* buf= new Helper::SendStreamCL( binary_);
         sendBuffer_[it->first]= buf;
-        // write number of verts/edges/faces/tetras to be sent
-        for (int dim=0; dim<4; ++dim)
+        // write number of verts/edges/faces/tetras/addedData to be sent
+        for (int dim=0; dim<5; ++dim)
             (*buf) << it->second[dim];
     }
     // sort tetras to update by descending level (so that children are received first to enable parents to set the Children_ array)
@@ -1049,6 +1063,11 @@ void TransferCL::FillSendBuffer()
     for (SortedListT::iterator it= sortedTetras->begin(), end= sortedTetras->end(); it!=end; ++it)
         UpdateSendRemoteData( *it->first, it->second);
     delete sortedTetras;
+
+    // now send added data (e.g., numerical data)
+    for (int dim=0; dim<4; ++dim)
+        for (UpdateListT::iterator it= entsToUpdt_[dim].begin(), end= entsToUpdt_[dim].end(); it!=end; ++it)
+            SendAddedData( *it->first, it->second);
 }
 
 void TransferCL::Receive()
@@ -1067,13 +1086,13 @@ void TransferCL::Receive()
         	++numRecvFrom;
     // receive from other processes
     std::vector<Helper::RecvStreamCL*> recv( numRecvFrom);
-    std::vector<SArrayCL<size_t,4> >   numMsg( numRecvFrom);
+    std::vector<SArrayCL<size_t,5> >   numMsg( numRecvFrom);
     for ( int p=0, i=0; p < ProcCL::Size(); ++p)
         if ( IreceiveFrom[p]>0) {
         	recv[i]= new Helper::RecvStreamCL( binary_);
             recv[i]->Recv( p);
             // receive number of verts/edges/faces/tetras
-            for (int dim=0; dim<4; ++dim)
+            for (int dim=0; dim<5; ++dim)
                 (*recv[i]) >> numMsg[i][dim];
             ++i;
         }
@@ -1087,10 +1106,24 @@ void TransferCL::Receive()
     for (int i=0; i<numRecvFrom; ++i)
     	ReceiveSimplices<FaceCL>  ( *recv[i], numMsg[i][2]);
     // receive tetras
+    for (int i=0; i<numRecvFrom; ++i)
+        ReceiveSimplices<TetraCL> ( *recv[i], numMsg[i][3]);
+    // receive added data
     for (int i=0; i<numRecvFrom; ++i) {
-    	ReceiveSimplices<TetraCL> ( *recv[i], numMsg[i][3]);
-    	// current receive stream not needed anymore
-    	delete recv[i];
+        ReceiveAddedData ( *recv[i], numMsg[i][4]);
+        // current receive stream not needed anymore
+        delete recv[i];
+    }
+}
+
+void TransferCL::ReceiveAddedData( Helper::RecvStreamCL& recvstream, size_t num)
+{
+    Helper::GeomIdCL gid;
+    for (size_t i=0; i<num; ++i) {
+        // read gid and added data
+        recvstream >> gid;
+        TransferableCL& t= InfoCL::Instance().GetRemoteData(gid).GetLocalObject();
+        t.Unknowns.UnPack( recvstream, t);
     }
 }
 

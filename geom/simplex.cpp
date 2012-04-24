@@ -65,7 +65,7 @@ void VertexCL::Pack( DiST::Helper::MPIostreamCL& ostrstream) const
     else {
         ostrstream << size_t(0);
     }
-    Unknowns.Pack( ostrstream, *this);
+//    Unknowns.Pack( ostrstream, *this);
 }
 
 /** Reads the hash, mark for removement, and boundary information from the stream.
@@ -85,7 +85,6 @@ void VertexCL::UnPack( DiST::Helper::MPIistreamCL& istrstream)
         istrstream >> bidx >> p2d[0] >> p2d[1];
         AddBnd( BndPointCL(bidx, p2d));
     }
-    Unknowns.UnPack( istrstream, *this);
 }
 
 void VertexCL::UpdateGID()
@@ -166,7 +165,6 @@ void EdgeCL::Pack( DiST::Helper::MPIostreamCL& ostrstream) const
                << GetVertex(1)->GetGID()
                << (GetMidVertex()==0 ? DiST::Helper::NoGID : GetMidVertex()->GetGID())
                << Bnd_[0] << Bnd_[1] << AccMFR_ << RemoveMark_;
-    Unknowns.Pack( ostrstream, *this);
 }
 
 /** Reads the hash, both vertices, boundary information, accumulated MFR, and mark for removement
@@ -181,7 +179,6 @@ void EdgeCL::UnPack( DiST::Helper::MPIistreamCL& istrstream)
     Vertices_[1]= DiST::InfoCL::Instance().GetVertex(vertex1);
     if ( DiST::InfoCL::Instance().Exists(midVertex))
         MidVertex_= DiST::InfoCL::Instance().GetVertex(midVertex);
-    Unknowns.UnPack( istrstream, *this);
 }
 
 void EdgeCL::UpdateGID()
@@ -302,7 +299,6 @@ void FaceCL::Pack( DiST::Helper::MPIostreamCL& ostrstream) const
         ostrstream << ( GetNeighbor(i)==0 ? DiST::Helper::NoGID : GetNeighbor(i)->GetGID());
     }
     ostrstream << Bnd_ << RemoveMark_;
-    Unknowns.Pack( ostrstream, *this);
 }
 
 /** Reads the hash, all neighbors, boundary information, and mark for removement from the stream
@@ -315,7 +311,6 @@ void FaceCL::UnPack( DiST::Helper::MPIistreamCL& istrstream)
         istrstream >> tmpNeigh;
     // neighboring tetras are linked later by TransferCL::CreateSimplex<TetraCL>(...)
     istrstream >> Bnd_ >> RemoveMark_;
-    Unknowns.UnPack( istrstream, *this);
 }
 
 void FaceCL::UpdateGID()
@@ -952,7 +947,6 @@ void TetraCL::Pack( DiST::Helper::MPIostreamCL& ostrstream) const
     for ( const_ChildPIterator chp(GetChildBegin()); chp!=GetChildEnd(); ++chp){
         ostrstream << (*chp)->GetGID();
     }
-    Unknowns.Pack( ostrstream, *this);
 }
 
 /**
@@ -1002,7 +996,6 @@ void TetraCL::UnPack( DiST::Helper::MPIistreamCL& istrstream)
 				(*Children_)[ch]= 0;
         }
     }
-    Unknowns.UnPack( istrstream, *this);
 }
 
 void TetraCL::UpdateGID()

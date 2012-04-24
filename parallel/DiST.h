@@ -794,15 +794,19 @@ class TransferCL : public ModifyCL
     SortedListT* SortUpdateTetras();
     /// Update and send remote data of a given simplex.
     void UpdateSendRemoteData( const TransferableCL&, Helper::SimplexTransferInfoCL&);
+    /// Send added data of a given simplex.
+    void SendAddedData( const TransferableCL&, Helper::SimplexTransferInfoCL&);
     /// \brief Update ownership (in remote data) for all registered objects
     void UpdateOwners();
     /// \brief allocate and fill send buffers, update remote data
     void FillSendBuffer();
     /// \brief Receive and create simplices and remote data
     void Receive();
-    /// \brief Receive vertices, edges, faces, tetras (helper for Receive()),
+    /// \brief Receive vertices, edges, faces, tetras (helper for Receive())
     template <typename SimplexT>
     void ReceiveSimplices( Helper::RecvStreamCL&, size_t);
+    /// \brief Receive added data
+    void ReceiveAddedData( Helper::RecvStreamCL&, size_t);
     /// \brief Create simplex using the SimplexFactoryCL
     template <typename SimplexT>
     SimplexT& CreateSimplex( const SimplexT&, const Helper::RemoteDataCL::ProcListT&);
