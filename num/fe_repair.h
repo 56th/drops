@@ -138,6 +138,10 @@ class RepairP2CL
     void changed_refinement      (const TetraCL& t, const RepairP2DataCL<ValueT>& p_data);  ///< use repair-data from the parent
     void genuine_refinement      (const TetraCL& t, const RepairP2DataCL<ValueT>& gp_data); ///< use repair-data from the grand-parent
 
+#ifdef _PAR
+    class HandlerParentDataCL;
+#endif
+
   public:
     /// \brief Initializes the data to be repaired on mg and calls pre_refine().
     RepairP2CL (const MultiGridCL& mg, const VecDescCL& old, const BndDataCL<value_type>& bnd);

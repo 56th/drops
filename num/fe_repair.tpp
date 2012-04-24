@@ -91,6 +91,20 @@ template <class ValueT>
             level0_leaves_.insert( &*it);
         }
     }
+#ifdef _PAR
+    HandlerParentDataCL handler( parent_data_);
+    DiST::InterfaceCL* interf;
+    // init the interface
+    DiST::PrioListT from, to;
+    from.push_back( PrioGhost);
+    to.push_back( PrioMaster);
+    DiST::InterfaceCL::DimListT dimlist;
+    dimlist.push_back( DiST::GetDim<TetraCL>());
+    DiST::LevelListCL lvls( lvl); // levels 0,..,TriangLevel
+
+    interf = new DiST::InterfaceCL( lvls, from, to, dimlist, true);
+    interf->Communicate( handler);
+#endif
 }
 
 template <class ValueT>
@@ -224,6 +238,67 @@ template <class ValueT>
             }
         }
     }
+}
+
+/******************************************************************************
+* H A N D L E R  P A R E N T D A T A   C L                                    *
+******************************************************************************/
+
+/// \brief Handler for generating information about parent data on other processes
+template <class ValueT>
+class RepairP2CL<ValueT>::HandlerParentDataCL
+{
+  private:
+    RepairMapT& parent_data_;
+
+  public:
+    HandlerParentDataCL( RepairMapT& data)
+        : parent_data_(data) {}
+    /// \brief Gather information about distributed dof on sender proc
+    bool Gather( DiST::TransferableCL&, DiST::Helper::SendStreamCL&);
+    /// \brief Scatter information about distributed dof on sender proc
+    bool Scatter( DiST::TransferableCL&, const size_t&, DiST::Helper::MPIistreamCL&);
+};
+
+template <class ValueT>
+bool RepairP2CL<ValueT>::HandlerParentDataCL::Gather(
+    DiST::TransferableCL& t, DiST::Helper::SendStreamCL& send)
+{
+    TetraCL* tetra;
+    simplex_cast(t, tetra);
+    if (parent_data_.count( tetra) == 1){
+        const typename RepairP2DataCL<ValueT>::ChildVecT& data = parent_data_[tetra].data;
+        send << data.size();
+        for (size_t i = 0; i<data.size(); ++i){
+            send << data[i].first;
+            for (size_t k=0; k< FE_P2CL::NumDoFC; ++k) // write LocalP2CL
+                send << data[i].second[k];
+        }
+        return true;
+    }
+    return false;
+}
+
+template <class ValueT>
+bool RepairP2CL<ValueT>::HandlerParentDataCL::Scatter(
+    DiST::TransferableCL& t, __UNUSED__ const size_t& numData,
+    DiST::Helper::MPIistreamCL& recv)
+{
+    Assert(numData == 1, DROPSErrCL("HandlerParentDataCL::Scatter: more than one ghost exists"), DebugDiSTC);
+
+    TetraCL* tetra;
+    simplex_cast(t, tetra);
+    Ubyte child;
+    LocalP2CL<ValueT> lp2;
+    size_t num_childs;
+    recv >> num_childs;
+    for (size_t ch =0; ch< num_childs; ++ch){
+        recv >> child;
+        for (size_t k=0; k< FE_P2CL::NumDoFC; ++k) // read LocalP2CL
+            recv >> lp2[k];
+        parent_data_[tetra].data.push_back( std::make_pair( child, lp2));
+    }
+    return true;
 }
 
 } // end of namespace DROPS
