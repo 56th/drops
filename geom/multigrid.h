@@ -203,17 +203,15 @@ class MultiGridCL
     TriangFaceCL   TriangFace_;
     TriangTetraCL  TriangTetra_;
 
-    size_t     version_;                            // each modification of the multigrid increments this number
-    SimplexFactoryCL factory_;                      ///< generating simplices
+    size_t     version_;                            ///< each modification of the multigrid increments this number
+    SimplexFactoryCL factory_;                      ///< factory for generating simplices
 
     mutable std::map<int, ColorClassesCL*> colors_; // map: level -> Color-classes of the tetra for that level
 
 #ifdef _PAR
-    bool killedGhostTetra_;                         // are there ghost tetras, that are marked for removement, but have not been removed so far
-    bool withUnknowns_;                             // are the unknowns on simplices
-    std::list<TetraIterator> toDelGhosts_;
-    bool EmptyLevel(Uint lvl)
-        { return Vertices_[lvl].empty()&&Edges_[lvl].empty()&&Faces_[lvl].empty()&&Tetras_[lvl].empty(); }
+    bool killedGhostTetra_;                         // are there ghost tetras, that are marked for removement
+    bool IsLevelEmpty(Uint lvl)
+        { return Vertices_[lvl].empty() && Edges_[lvl].empty() && Faces_[lvl].empty() && Tetras_[lvl].empty(); }
 #endif
 
     void PrepareModify   () { Vertices_.PrepareModify(); Edges_.PrepareModify(); Faces_.PrepareModify(); Tetras_.PrepareModify(); }
@@ -236,10 +234,6 @@ class MultiGridCL
 #ifdef _PAR
     ~MultiGridCL()
         { DiST::InfoCL::Instance().Destroy(); }
-    bool KilledGhosts()      const              /// Check if there are ghost tetras, that are marked for removement, but has not been removed so far
-        { return killedGhostTetra_; }
-    bool UnknownsForRefine() const              /// Check if there are unknowns on simplices
-        { return withUnknowns_; }
 #endif
 
     const BoundaryCL& GetBnd     () const { return Bnd_; }

@@ -194,56 +194,7 @@ void MultiGridCL::CloseGrid(Uint Level)
     Comment("Closing grid " << Level << " done." << std::endl, DebugRefineEasyC);
 }
 
-#ifndef _PAR
-void MultiGridCL::UnrefineGrid (Uint Level)
-{
-    Comment("Unrefining grid " << Level << "." << std::endl, DebugRefineEasyC);
-
-    const Uint nextLevel(Level+1);
-
-    std::for_each(Vertices_[nextLevel].begin(), Vertices_[nextLevel].end(), std::mem_fun_ref(&VertexCL::SetRemoveMark));
-    std::for_each(Edges_[nextLevel].begin(),    Edges_[nextLevel].end(),    std::mem_fun_ref(&EdgeCL::SetRemoveMark));
-    std::for_each(Faces_[nextLevel].begin(),    Faces_[nextLevel].end(),    std::mem_fun_ref(&FaceCL::SetRemoveMark));
-
-    for (TetraIterator tIt(Tetras_[Level].begin()), tEnd(Tetras_[Level].end()); tIt!=tEnd; ++tIt)
-    {
-        Comment("inspecting children of tetra " << tIt->GetId().GetIdent() << "." << std::endl, DebugRefineHardC);
-
-        if ( !tIt->IsUnrefined() ){
-            if ( tIt->IsMarkEqRule() )
-                tIt->ClearAllRemoveMarks();
-            else
-            {
-                std::for_each(tIt->GetChildBegin(), tIt->GetChildEnd(), std::mem_fun(&TetraCL::SetRemoveMark));
-                if ( !tIt->IsMarkedForNoRef() ) tIt->RecycleReusables();
-            }
-        }
-    }
-
-    Comment("Now physically unlinking and removing superfluous tetras." << std::endl, DebugRefineEasyC);
-    for (TetraIterator it= Tetras_[nextLevel].begin(), end= Tetras_[nextLevel].end(); it!=end; )
-        if ( it->IsMarkedForRemovement() )
-        {
-            it->UnlinkFromFaces();
-            Tetras_[nextLevel].erase(it++);
-        }
-        else
-            ++it;
-
-    Comment("Now adapting midvertex pointers on level " << Level << ". " << std::endl, DebugRefineEasyC);
-    for (EdgeIterator eIt(Edges_[Level].begin()), eEnd(Edges_[Level].end()); eIt!=eEnd; ++eIt)
-        if ( (eIt->IsRefined() && eIt->GetMidVertex()->IsMarkedForRemovement()) )
-            eIt->RemoveMidVertex();
-    Comment("Now removing superfluous faces." << std::endl, DebugRefineEasyC);
-    Faces_[nextLevel].remove_if( std::mem_fun_ref(&FaceCL::IsMarkedForRemovement) );
-    Comment("Now removing superfluous edges." << std::endl, DebugRefineEasyC);
-    Edges_[nextLevel].remove_if( std::mem_fun_ref(&EdgeCL::IsMarkedForRemovement) );
-    Comment("Now physically removing superfluous vertices." << std::endl, DebugRefineEasyC);
-    Vertices_[nextLevel].remove_if( std::mem_fun_ref(&VertexCL::IsMarkedForRemovement) );
-    Comment("Unrefining grid " << Level << " done." << std::endl, DebugRefineEasyC);
-}
-#else
-
+#ifdef _PAR
 /// \brief Adaptor to rescue simplices on level 0. Needed by MultiGridCL::UnrefineGrid().
 template<class SimplexT>
 class KeepLevel0_fun {
@@ -259,106 +210,78 @@ class KeepLevel0_fun {
         }
     }
 };
+#endif
 
 void MultiGridCL::UnrefineGrid (Uint Level)
 {
-    ParMultiGridCL& pmg= ParMultiGridCL::Instance();
     Comment("Unrefining grid " << Level << "." << std::endl, DebugRefineEasyC);
 
-    const Uint nextLevel= Level+1;
-    bool killedGhost= false;
-
+    const Uint nextLevel(Level+1);
+    std::for_each(Vertices_[nextLevel].begin(), Vertices_[nextLevel].end(), std::mem_fun_ref(&VertexCL::SetRemoveMark));
+    std::for_each(Edges_[nextLevel].begin(),    Edges_[nextLevel].end(),    std::mem_fun_ref(&EdgeCL::SetRemoveMark));
+    std::for_each(Faces_[nextLevel].begin(),    Faces_[nextLevel].end(),    std::mem_fun_ref(&FaceCL::SetRemoveMark));
+#ifdef _PAR
     // mark all subsimplices on level 0 for removement. All subsimplices that
-    // are needed any more, will be rescued within the refinement algorithm.
-    if (Level==0)
-    {
+    // are still needed will be rescued within the refinement algorithm.
+    if (Level==0) {
         std::for_each(Vertices_[0].begin(), Vertices_[0].end(), std::mem_fun_ref(&VertexCL::SetRemoveMark));
         std::for_each(Edges_[0].begin(),    Edges_[0].end(),    std::mem_fun_ref(&EdgeCL::SetRemoveMark));
         std::for_each(Faces_[0].begin(),    Faces_[0].end(),    std::mem_fun_ref(&FaceCL::SetRemoveMark));
     }
-
-    std::for_each(Vertices_[nextLevel].begin(), Vertices_[nextLevel].end(), std::mem_fun_ref(&VertexCL::SetRemoveMark));
-    std::for_each(Edges_[nextLevel].begin(),    Edges_[nextLevel].end(),    std::mem_fun_ref(&EdgeCL::SetRemoveMark));
-    std::for_each(Faces_[nextLevel].begin(),    Faces_[nextLevel].end(),    std::mem_fun_ref(&FaceCL::SetRemoveMark));
-
+    ParMultiGridCL& pmg= ParMultiGridCL::Instance();
+    typedef std::vector<TetraIterator> GhostContT;
+    GhostContT killedGhosts;
     pmg.ModifyBegin();
+#endif
 
-    for (TetraIterator tIt(Tetras_[Level].begin()), tEnd(Tetras_[Level].end()); tIt!=tEnd; )
+    for (TetraIterator tIt(Tetras_[Level].begin()), tEnd(Tetras_[Level].end()); tIt!=tEnd; ++tIt)
     {
-        if (tIt->HasGhost() )
-        {
-            ++tIt;
-            continue;
-        }
-        if ( !tIt->IsUnrefined() )
-        {
-            if ( !tIt->IsMarkEqRule() )
-            {
-                // if tetra is ghost and will have no children on this proc after unref, we can delete this tetra
-                if ( tIt->IsGhost() && tIt->IsMarkedForNoRef())
-                {
-                    tIt->UnlinkFromFaces();
-                    // remember tetra, that should be deleted
-                    // !!! do not delete it now, because DDD needs still access to this tetra!!!
-                    // But Prio is set to PrioKilledGhost, so HasGhost works still correct
-                    pmg.PrioChange(&(*tIt), PrioKilledGhost);
-                    toDelGhosts_.push_back(tIt++);
-                    killedGhost= true;
-                    continue;
-                }
-            }
-        }
-        ++tIt;
-    }
-    if (killedGhost)
-        killedGhostTetra_=true;
-    if (ProcCL::GlobalOr(killedGhost)) {
-        pmg.ModifyEnd(); // to set killed ghost prios in the respective remote data
-        pmg.ModifyBegin();
-    }
-    // now all remove marks are set. Now put simplices into recycle bin and clear remove marks of still used tetras
-    for (TetraIterator tIt(Tetras_[Level].begin()), tEnd(Tetras_[Level].end()); tIt!=tEnd; )
-    {
-        if ( tIt->IsGhost() ? !tIt->IsMarkedForNoRef() : !tIt->IsMarkedForRemovement() )
-        {
+#ifndef _PAR
+        Comment("inspecting children of tetra " << tIt->GetId().GetIdent() << "." << std::endl, DebugRefineHardC);
+#else
+        if ( tIt->IsGhost() ? !tIt->IsMarkedForNoRef() : !tIt->IsMarkedForRemovement() ) {
             // Maybe some sub simplices on level 0 have to be rescued, so get rid of their RemoveMarks and keep them during Modify
             std::for_each( tIt->GetVertBegin(), tIt->GetVertEnd(),   KeepLevel0_fun<VertexCL>());
             std::for_each( tIt->GetEdgesBegin(), tIt->GetEdgesEnd(), KeepLevel0_fun<EdgeCL>());
             std::for_each( tIt->GetFacesBegin(), tIt->GetFacesEnd(), KeepLevel0_fun<FaceCL>());
         }
-        if (tIt->HasGhost()){
-            ++tIt;
+        if (tIt->HasGhost())
             continue;
-        }
+#endif
         if ( !tIt->IsUnrefined() ){
             if ( tIt->IsMarkEqRule() )
                 tIt->ClearAllRemoveMarks();
             else
             {
                 std::for_each(tIt->GetChildBegin(), tIt->GetChildEnd(), std::mem_fun(&TetraCL::SetRemoveMark));
-                if ( !tIt->IsMarkedForNoRef() )
-                    tIt->RecycleReusables();
+                if ( !tIt->IsMarkedForNoRef() ) tIt->RecycleReusables();
+                // if tetra is ghost and will have no children on this proc after unref, we can delete this tetra
+                if ( tIt->IsGhost() && tIt->IsMarkedForNoRef())
+                {
+                    killedGhosts.push_back(tIt);
+                    killedGhostTetra_= true;
+                }
             }
         }
-
-        ++tIt;
     }
 
+#ifndef _PAR
+    Comment("Now physically unlinking and removing superfluous tetras." << std::endl, DebugRefineEasyC);
+    factory_.DestroyMarkedTetras(nextLevel);
+    Comment("Now adapting midvertex pointers on level " << Level << ". " << std::endl, DebugRefineEasyC);
+    for (EdgeIterator eIt(Edges_[Level].begin()), eEnd(Edges_[Level].end()); eIt!=eEnd; ++eIt)
+        if ( (eIt->IsRefined() && eIt->GetMidVertex()->IsMarkedForRemovement()) )
+            eIt->RemoveMidVertex();
+    Comment("Now removing superfluous faces, edges and vertices." << std::endl, DebugRefineEasyC);
+    factory_.DestroyMarkedVEFs(nextLevel);
+#else
     // rescue subs that are owned by ghost tetras on next level
     pmg.TreatGhosts( nextLevel);
-    // rescue verts special, because they can be found in different levels
+    // rescue verts in a special way, because they can be found in different levels
     pmg.RescueGhostVerts( 0);
-
-    /// \todo (of): Kann es einen Master aus hoeheren Leveln geben, der noch einen Knoten braucht, der hier im
-    /// Zuge von killedGhost geloescht wird?
-
-    // tell which simplices will be deleted
-    // also if numerical data will be submitted after the refinement algorithm, no parallel information will be
-    // needed on the simplices, because all datas of a tetra will be submitted. Hence this subsimplices can be
-    // unsubscribed from the DiST module
-
-    if (killedGhostTetra_ && Level==GetLastLevel()-1)
-    { // if ghost tetras were killed during the refinement algorithm, remove simplices on Level 0 once in the last call of UnrefineGrid().
+    // if ghost tetras were killed during the refinement algorithm,
+    // remove simplices on Level 0 once in the last call of UnrefineGrid()
+    if (killedGhostTetra_ && Level==GetLastLevel()-1) {
         for_each_if( Faces_[0].begin(), Faces_[0].end(),
                 Delete_fun<FaceCL>(), std::mem_fun_ref(&FaceCL::IsMarkedForRemovement) );
         for_each_if( Edges_[0].begin(), Edges_[0].end(),
@@ -366,69 +289,37 @@ void MultiGridCL::UnrefineGrid (Uint Level)
         for_each_if( Vertices_[0].begin(), Vertices_[0].end(),
                 Delete_fun<VertexCL>(), std::mem_fun_ref(&VertexCL::IsMarkedForRemovement) );
     }
-
-    // tetras on next level can be deleted anyway
+    // delete marked simplices on next level
     for_each_if( Tetras_[nextLevel].begin(), Tetras_[nextLevel].end(),
             Delete_fun<TetraCL>(), std::mem_fun_ref(&TetraCL::IsMarkedForRemovement) );
-    // delete ghost tetras, that aren't needed any more
-    if (!withUnknowns_){
-        Delete_fun<TetraCL> del;
-        for (std::list<TetraIterator>::iterator it=toDelGhosts_.begin(); it!=toDelGhosts_.end(); ++it)
-            del(**it);
-    }
-
-    // parallel information about subsimplices aren't needed any more
     for_each_if( Faces_[nextLevel].begin(), Faces_[nextLevel].end(),
             Delete_fun<FaceCL>(), std::mem_fun_ref(&FaceCL::IsMarkedForRemovement) );
     for_each_if( Edges_[nextLevel].begin(), Edges_[nextLevel].end(),
             Delete_fun<EdgeCL>(), std::mem_fun_ref(&EdgeCL::IsMarkedForRemovement) );
     for_each_if( Vertices_[nextLevel].begin(), Vertices_[nextLevel].end(),
             Delete_fun<VertexCL>(), std::mem_fun_ref(&VertexCL::IsMarkedForRemovement) );
-
+    // delete killed ghosts
+    Delete_fun<TetraCL> del;
+    for (GhostContT::iterator it=killedGhosts.begin(); it!=killedGhosts.end(); ++it)
+        del(**it);
     // now DiST can internally delete references and information!
     pmg.ModifyEnd();
-
-    // kill ghost tetras, that aren't needed any more
-    if (!withUnknowns_){
-        for (std::list<TetraIterator>::iterator it=toDelGhosts_.begin(); it!=toDelGhosts_.end(); ++it)
-            Tetras_[Level].erase(*it);
-        toDelGhosts_.resize(0);
+    GetSimplexFactory().DestroyMarkedTetras(nextLevel); // this is needed, for some reason, even though ModifyCL::Finalize() should do it
+    // remove killed ghosts
+    for (GhostContT::iterator it=killedGhosts.begin(); it!=killedGhosts.end(); ++it) {
+        (*it)->UnlinkFromFaces();
+        Tetras_[Level].erase(*it);
     }
+    killedGhosts.clear();
 
-
-    Comment("Now physically unlinking and removing superfluous tetras." << std::endl, DebugRefineEasyC);
-    for (TetraIterator it= Tetras_[nextLevel].begin(), end= Tetras_[nextLevel].end(); it!=end; )
-    {
-        if ( it->IsMarkedForRemovement() )
-        {
-// sg: we cannot check priority for unregistered objects, so the following code has been removed
-//            if ( it->IsGhost() )
-//                throw DROPSErrCL("MultiGridCL::Unrefine: Ghost will be deleted, this is really strange!");
-            it->UnlinkFromFaces();
-            Tetras_[nextLevel].erase(it++);
-        }
-        else
-            ++it;
-    }
-
-    /// \todo (of): Wieso hat Sven hier geschrieben, dass PrioVGhost-Kanten nicht die Referenz auf den MidVertex loeschen duerfen?
     Comment("Now adapting midvertex pointers on level " << Level << ". " << std::endl, DebugRefineEasyC);
-    for (EdgeIterator eIt= Edges_[Level].begin(), eEnd= Edges_[Level].end(); eIt!=eEnd; ++eIt){
-        if ( (eIt->IsRefined() /*&& eIt->GetHdr()->prio!=PrioVGhost*/ && !eIt->IsMarkedForRef()) ){
+    for (EdgeIterator eIt(Edges_[Level].begin()), eEnd(Edges_[Level].end()); eIt!=eEnd; ++eIt)
+        if ( (eIt->IsRefined() && !eIt->IsMarkedForRef()) )
             eIt->RemoveMidVertex();
-        }
-    }
-
-
-    // in difference to serial version, the edges, faces and vertices are deleted at other positions
-    // all subsimplices will be deleted after the refinement is done. So DiST has (if needed) all the time
-    // access to these unknowns. \todo Is this needed anymore since DiST replaces DDD?
-
-    /// \todo (of) Muessen evtl. auch noch Vertices aus Level Level geloescht werden?
-
+#endif
     Comment("Unrefining grid " << Level << " done." << std::endl, DebugRefineEasyC);
 }
-#endif
+
 
 void MultiGridCL::RefineGrid (Uint Level)
 {
@@ -436,7 +327,6 @@ void MultiGridCL::RefineGrid (Uint Level)
 
 #ifdef _PAR
     ParMultiGridCL::Instance().IdentifyBegin();
-    //DynamicDataInterfaceCL::IdentifyBegin();    // new simplices must be identified by DDD
 #endif
 
     const Uint nextLevel(Level+1);
@@ -481,7 +371,6 @@ void MultiGridCL::RefineGrid (Uint Level)
 
 #ifdef _PAR
     ParMultiGridCL::Instance().IdentifyEnd();
-    //DynamicDataInterfaceCL::IdentifyEnd();
 #endif
 //    DiST::InfoCL::Instance().IsSane( std::cerr);
     Comment("Refinement of grid " << Level << " done." << std::endl, DebugRefineEasyC);
@@ -498,11 +387,6 @@ void MultiGridCL::Refine()
 #ifdef _PAR
     ParMultiGridCL& pmg= ParMultiGridCL::Instance();
     killedGhostTetra_= false;
-    withUnknowns_    = pmg.UnknownsOnSimplices();
-    if (!toDelGhosts_.empty())  // todo (of): als Assert schreiben!
-        throw DROPSErrCL("MultiGridCL::Refine: toDelGhosts_ should be empty!");
-    else
-        toDelGhosts_.resize(0);
     pmg.AdjustLevel();          // all procs must have the same number of levels
 #endif
 
@@ -537,38 +421,16 @@ void MultiGridCL::Refine()
 #ifdef _PAR
     pmg.AdaptPrioOnSubs();
 
-    // make killed ghost to all procs the same
-    killedGhostTetra_= ProcCL::GlobalOr(killedGhostTetra_);
-
-    // if no unknowns will be transfered after the refinement algorithm,
-    // all subsimplices and killed ghosts can be deleted now
-    if (!withUnknowns_)
+    for (Uint l=0; l<GetLastLevel(); ++l)
     {
-        for (Uint l=0; l<GetLastLevel(); ++l)
-        {
-            Vertices_[l].remove_if( std::mem_fun_ref(&VertexCL::IsMarkedForRemovement) );
-            Edges_[l].remove_if( std::mem_fun_ref(&EdgeCL::IsMarkedForRemovement) );
-            Faces_[l].remove_if( std::mem_fun_ref(&FaceCL::IsMarkedForRemovement) );
-        }
-        if (killedGhostTetra_){
-            // todo of: Kann man das DynamicDataInterfaceCL::XferBegin und DDD_XferEnd aus der for-schleife herausziehen?
-        	// DynamicDataInterfaceCL::XferBegin();
-            DiST::ModifyCL modify( *this, /*del*/true);
-            modify.Init();
-            for (std::list<TetraIterator>::iterator it=toDelGhosts_.begin(); it!=toDelGhosts_.end(); ++it)
-                modify.Delete( **it);
-            modify.Finalize();
-//            DynamicDataInterfaceCL::XferEnd();
-//            for (std::list<TetraIterator>::iterator it=toDelGhosts_.begin(); it!=toDelGhosts_.end(); ++it)
-//                Tetras_[(*it)->GetLevel()].erase(*it);
-            toDelGhosts_.resize(0);
-        }
-        killedGhostTetra_= false;
+        Vertices_[l].remove_if( std::mem_fun_ref(&VertexCL::IsMarkedForRemovement) );
+        Edges_[l].remove_if( std::mem_fun_ref(&EdgeCL::IsMarkedForRemovement) );
+        Faces_[l].remove_if( std::mem_fun_ref(&FaceCL::IsMarkedForRemovement) );
     }
-    while ( GetLastLevel()>0 && EmptyLevel(GetLastLevel()))
+    killedGhostTetra_= false;
+
+    while ( GetLastLevel()>0 && IsLevelEmpty(GetLastLevel()))
         RemoveLastLevel();
-
-
     pmg.AdjustLevel();
 #else
     while ( Tetras_[GetLastLevel()].empty() ) RemoveLastLevel();
