@@ -113,10 +113,11 @@ class RepairP2CL
     typedef ValueT value_type;
 
   private:
-    typedef DROPS_STD_UNORDERED_MAP<const TetraCL*, RepairP2DataCL<value_type> > RepairMapT;
-    typedef DROPS_STD_UNORDERED_SET<const TetraCL*>                              TetraSetT;
+    class RepairMapCL;
 
-    RepairMapT parent_data_;
+    typedef DROPS_STD_UNORDERED_SET<const TetraCL*> TetraSetT;
+
+    RepairMapCL parent_data_;
     TetraSetT  level0_leaves_;
 
     BaryCoordCL p2_dof_[10]; ///< The bary-coordinates of the P2-dof.

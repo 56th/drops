@@ -241,6 +241,42 @@ template <class ValueT>
 }
 
 /******************************************************************************
+* R E P A I R  M A P   CL                                                     *
+******************************************************************************/
+
+/// \brief class for storing repair data on master and ghost tetrahedra
+template <class ValueT>
+class RepairP2CL<ValueT>::RepairMapCL {
+  private:
+    typedef DROPS_STD_UNORDERED_MAP<const TetraCL*, RepairP2DataCL<value_type> > RepairMapT;
+    RepairMapT master_data_;
+    RepairMapT ghost_data_;
+
+  public:
+    void clear() { master_data_.clear(); ghost_data_.clear(); }
+    void push_back(const std::pair<const TetraCL*, RepairP2DataCL<value_type> >& e){
+        if (e.first.IsGhost())
+            ghost_data_.push_back(e);
+        else
+            master_data_.push_back(e);
+    }
+    size_t count(const TetraCL* t){
+        if (t->IsGhost())
+            return ghost_data_.count(t);
+        else
+            return master_data_.count(t);
+    }
+    RepairP2DataCL<value_type> & operator[](const TetraCL* t){
+        if (t->IsGhost())
+            return ghost_data_[t];
+        else
+            return master_data_[t];
+    }
+
+};
+
+
+/******************************************************************************
 * H A N D L E R  P A R E N T D A T A   C L                                    *
 ******************************************************************************/
 
@@ -249,10 +285,10 @@ template <class ValueT>
 class RepairP2CL<ValueT>::HandlerParentDataCL
 {
   private:
-    RepairMapT& parent_data_;
+    RepairMapCL& parent_data_;
 
   public:
-    HandlerParentDataCL( RepairMapT& data)
+    HandlerParentDataCL( RepairMapCL& data)
         : parent_data_(data) {}
     /// \brief Gather information about distributed dof on sender proc
     bool Gather( DiST::TransferableCL&, DiST::Helper::SendStreamCL&);
