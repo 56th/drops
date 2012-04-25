@@ -995,8 +995,10 @@ void TransferCL::UpdateSendRemoteData( const TransferableCL& t, Helper::SimplexT
     const bool isTetra= t.GetDim()==GetDim<TetraCL>();
     if (sti.GetBroadcaster()==ProcCL::MyRank() || isTetra) {
         // write simplex and remote data to all procs in SendToProcs
+        Helper::SendStreamCL buf( binary_);
+        buf << t << proclist;
         for (ProcSetT::const_iterator sit= sti.GetSendToProcs().begin(), send= sti.GetSendToProcs().end(); sit!=send; ++sit) {
-            (*sendBuffer_[sit->first]) << t << proclist;
+            (*sendBuffer_[sit->first]).write( buf.begin(), buf.cur() - buf.begin());
             if (isTetra)
                 (*sendBuffer_[sit->first]) << int(rd.GetLocalPrio());
         }
@@ -1011,8 +1013,10 @@ void TransferCL::SendAddedData( const TransferableCL& t, Helper::SimplexTransfer
     ProcSetT sendTo= sti.GetPostProcs();
     sendTo.erase( ProcCL::MyRank());
     // write geom id and DOF data to all procs in sendTo
+    Helper::SendStreamCL buf( binary_);
+    t.Unknowns.Pack( buf << t.GetGID(), t);
     for (ProcSetT::const_iterator sit= sendTo.begin(), send= sendTo.end(); sit!=send; ++sit) {
-        t.Unknowns.Pack( (*sendBuffer_[sit->first]) << t.GetGID(), t);
+        (*sendBuffer_[sit->first]).write( buf.begin(), buf.cur() - buf.begin());
     }
 }
 
