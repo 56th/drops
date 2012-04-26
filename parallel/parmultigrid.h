@@ -22,11 +22,6 @@
  * Copyright 2009 LNM/SC RWTH Aachen, Germany
 */
 
-//******************************************************************************
-// remark:                                                                     *
-//  + no unknown on faces can be transfered. See doxygen!                      *
-//******************************************************************************
-
 #ifndef DROPS_PARMULTIGRID_H
 #define DROPS_PARMULTIGRID_H
 
@@ -55,16 +50,10 @@ class ParMultiGridInitCL; //forward declaration
 ****************************************************************************/
 /// \brief Constitute a multigrid on several procs
 ///
-/// This is the major class to constitute a multigrid on several procs
+/// This is the major class to constitute a multigrid on several procs.
 /// It handles the transfers and the accumulation of numerical and geometric
-/// values. This class makes intensive use of the DDD-Library, which is
-/// developed for UG.
-/// See [],[],[] for more information and how to use this class within DROPS
+/// values. This class makes intensive use of the DiST-Library.
 ///
-/// This class cannot handle unknowns on faces. If you want to use them,
-/// you have to change the MultiGridCL (adding an UnknownHandleCL to the FaceCL)
-/// and this class by writing an HandlerFGather and HandlerFScatter.
-/// \todo(of) AttachTo: fuer VecDesc und Bnd in eine Funktion packen. Geht das?
 /****************************************************************************
 * P A R  M U L T I  G R I D  C L A S S                                      *
 ****************************************************************************/
@@ -73,7 +62,7 @@ class ParMultiGridCL
     friend class ParMultiGridInitCL;
     friend class MultiGridCL;
 
-  public: // typedefs
+  public:
       /// \brief Vector of pointers to  Vector-Describer-Classes.
       ///
       /// Used for storing the received numerical data and creating new numbering on the vertices, edges and tetras
@@ -106,37 +95,6 @@ class ParMultiGridCL
     bool             _UnkOnSimplex[3];   ///< Remember if there are unknowns on (Vertex,Edge,Tetra)
     IdxT             _RecvBufPos;        ///< last position in receive buffer that is not used
     DiST::PrioListCL priosId_;           ///< priorities used for IdentifyVertex/Edge/Face
-    /// \todo _UnkOnSimplex wird nicht mehr unbedingt gebraucht. Besser direkt ueber _VecDesc abfragen.
-
-/*
-    static IFT _EdgeIF;                  // Interface for accumulate the "Marked for Refinement"
-    static IFT _TetraIF;                 // Interface for communicateRefMarks() and TreatGhosts()
-
-    static IFT           _FaceIF;           // |
-    static std::ostream* _os;               //  >  for IsSane()
-    static bool          _sane;             // |
-
-    static TypeT _BndPtT,                // Boundary-Point-Type for Xfer_AddData                 (no header!)
-                 _ChildPtrT;             // Childer-Pointer-Type for Xfer Children of a Tetra    (no header!)
-
-    static IFT       NotMasterIF_;      // Vertices, edges and tetras that are not masters (for destroying unknowns after migration)
-
-    static IFT       _GhToMaTetra_IF;   // Ghost tetras to master-tetras
-
-    static MG_VertexContT*  _VertCont;      // Simplices stored on this proc
-    static MG_EdgeContT*    _EdgeCont;
-    static MG_FaceContT*    _FaceCont;
-    static MG_TetraContT*   _TetraCont;
-
-
-
-    static bool TransferMode,               // If an active DDD-Xfer-Mode is activ
-                PrioChangeMode;             // if we are in a DDD-PrioChange enviroment
-
-    static int _level;                      // all level to _level in XferStart() and XferEnd()
-
-
-*/
     static ParMultiGridCL* instance_;       // only one instance of ParMultiGridCL may exist (Singleton-Pattern)
 
   private:
@@ -175,8 +133,6 @@ class ParMultiGridCL
     static ParMultiGridCL* InstancePtr() { return instance_ ? instance_ : (instance_= new ParMultiGridCL); }
     /// \brief Get a reference to the ParMultiGridCL (Singleton-Pattern)
     static ParMultiGridCL& Instance()    { return *InstancePtr(); }
-    ~ParMultiGridCL();
-
 
     /// \name Functions concerning the MultiGrid
     // @{
@@ -219,18 +175,7 @@ class ParMultiGridCL
     // @{
     template<typename BndT>
     void AttachTo(VecDescCL*, const BndT*);                                 // attach VecDescCL and boundary conditions
-    void DeleteVecDesc();
     inline bool UnknownsOnSimplices();                               // are there unknowns on simplices
-    void HandleUnknownsAfterRefine();                                       // Handle Unknowns after a refine operation
-    void HandleNewIdx(IdxDescCL* old, VecDescCL* newVec);                   // Handle unknowns after migration and refinement
-    /// \brief Handle unknowns after migration and refinement with a MLIdxDescCL. This is just a wrapper for the IdxDescCL
-    void HandleNewIdx(MLIdxDescCL* old, VecDescCL* newVec) {
-        HandleNewIdx( old->GetFinestPtr(), newVec);
-    }
-    void CompleteRepair(VecDescCL* newVec);                                 // After RepairAfterRefine[P1|P2] call this function
-    void DelAllUnkRecv();                                                   // Clear all RecieveUnkowns-Marks
-    void DeleteRecvBuffer();                                                // Delete recieve Buffer
-    void DeleteUnksOnGhosts(int Level=-1);                           // Delete Unknowns on ghosts and vertical ghosts
     // @}
 
 
@@ -258,37 +203,18 @@ class ParMultiGridCL
 
     void DebugInfo(std::ostream&) const;                             // writes usefull infos onto outputstream
     void Show(const DiST::Helper::GeomIdCL& gid, char *mesg, int proc= -1);                // Show the simplex with a given GID
-    void ConsCheck();                                                // DDD-Consisty-Check
+    void ConsCheck();                                                // Dist-Consisty-Check
     double GetBalance();                                             // Calculate Imbalance of triangulation over procs on last triangulation-level --> Communication
-    void ShowVecDesc();
-    size_t GetRecvBufferSize();                                      // Get the size of _RecvBuf
     // @}
 
 
   private:
-    // functions concerning the interfaces and handlers
-    // ------------------------------------------------
-
-    void VXfer(VertexCL&, PROCT, PrioT, bool del);     // transfer a vertex, this can damage the MultiGrid structure
-    void EXfer(EdgeCL&, PROCT, PrioT, bool del);       // transfer an edge, this can damage the MultiGrid structure
-    void FXfer(FaceCL&, PROCT, PrioT, bool del);       // not implemented
-
-    // declare and definetypes from this class
-    void DeclareBndPtT();                                    // Declare BoundaryPointer-Type
-    void DeclareChildPtrT();                                 // Declare ChildPointer-Type
-    void DefineBndPtT();                                     // Define BoundaryPointer-Type
-    void DefineChildPtrT();                                  // Define ChildPointer-Type
-
-
     // functions concerning the internal handling of unknowns
     // ------------------------------------------------------
 
     // checking and size-estimating functions
     //@{
     inline bool VecDescRecv();                               // VecDesc revieved?
-    Uint NumberOfUnknownsOnTetra();                          // Get overall number of unknowns on a tetrahedron
-    Uint NumberOfUnknownsOnVertex();                         // Get number of unknowns on a vertex
-    Uint NumberOfUnknownsOnEdge();                           // Get number of unknowns on an edge
     //@}
 
 
@@ -299,10 +225,6 @@ class ParMultiGridCL
     void AttachTo(const IdxDescCL*, const BndT*);                           // attach boundary conditions
     template<typename BndT>
     inline bool LinearInterpolation(const EdgeCL&, Uint, const BndT*, const VectorCL&, typename BndT::bnd_type& new_dof);
-    void RescueUnknownsOnEdges();                                    // Rescue unknowns on edges, that are deleted
-    void PutData(MultiGridCL::const_VertexIterator&,
-                 const VectorCL* const, VectorCL*, const Uint,
-                 const Uint, const IdxDescCL*);                             // Copy unknowns on a vertex into a new datafield
     template<typename BndT>
     void PutData(MultiGridCL::const_EdgeIterator&,
                  const VectorCL* const, VectorCL*, const Uint,
@@ -349,57 +271,8 @@ class ParMultiGridCL
 
 
   public:
-    /// \name DDD-Handler (should be private)
-    //@{
-//    void DeleteObj(void *buffer, size_t size, int ddd_typ);          // see cpp-File for further information
-//    template<class SimplexT> static void HandlerDelete( OBJT);           // DDD-Handler for DynamicDataInterfaceExtraCL::XferDeleteObj
-
-    OBJT HandlerVConstructor( size_t, PrioT, ATTRT level);  // how the reciever can construct a VertexCL
-    void HandlerVXfer( OBJT , PROCT, PrioT);                // how the sender can send a VertexCL
-    void HandlerVGather( OBJT, int, TypeT, void*);             // how to send the boundary-information and numerical Data
-    void HandlerVScatter( OBJT, int, TypeT, void*, int);       // how to recieve the boundary-information and numerical Data
-
-    OBJT HandlerEConstructor( size_t, PrioT, ATTRT level);  // How to construct an edge,
-    void HandlerEXfer(OBJT, PROCT, PrioT);                  // to send one,
-    void HandlerEGather( OBJT, int, TypeT, void*);             // to pack numerical data to message,
-    void HandlerEScatter( OBJT, int, TypeT, void*, int);       // and to unpack this data
-
-    OBJT HandlerFConstructor( size_t, PrioT, ATTRT level);  // How to construct a face
-    void HandlerFXfer(OBJT, PROCT, PrioT);                  // not implemented
-
-    OBJT HandlerTConstructor( size_t, PrioT, ATTRT level);  // How to construct a tetraeder,
-    void HandlerTXfer(OBJT, PROCT, PrioT);                  // to send one
-    void HandlerTGather( OBJT, int, TypeT, void*);             // to pack numerical data to message,
-    void HandlerTScatter( OBJT, int, TypeT, void*, int);       // to unpack this data
-    void HandlerTUpdate(OBJT);                                    // to link tetra to faces
-    void HandlerTObjMkCons( OBJT, int);                           // to set right MFR values onto the edges
-    void HandlerTSetPrio(OBJT, PrioT);                         // to set the priority
-
-    int GatherEdgeMFR( OBJT, void*);                              // send MFR from Edge
-    int ScatterEdgeMFR( OBJT, void*);                             // collect MFR on Edge
-
-    int GatherTetraRestrictMarks( OBJT, void*);                   // send if a tetra is marked for refinement
-    int ScatterTetraRestrictMarks( OBJT, void*);                  // recieve, if a tetra is marked for refinement
-
-    int ExecGhostRescue( OBJT);                                   // _TetraIF calls this functions with TreatGhosts()
-    int ExecGhVertRescue( OBJT);                                  // Vertices has to be treaten special!
-    int ExecHasGhost( OBJT);                                      // _TetraIF calls this functions with TreatHasGhosts()
-    int ExecAdaptVGhostMidVertex( OBJT);                          // _EdgeIF calls this function with AdaptMidVertex()
-
-    int GatherEdgeSane( OBJT, void*, PROCT, ATTRT);         // Check if Edges are sane
-    int ScatterEdgeSane( OBJT, void*, PROCT, ATTRT);
-    int GatherFaceSane( OBJT, void*, PROCT, ATTRT);         // Check if Faces are sane
-    int ScatterFaceSane( OBJT, void*, PROCT, ATTRT);
-
-    template<class SimplexT> int DestroyUnksOnSimplex(OBJT);      // Destroy Unks on a simplex
-    int GatherUnknownsRef (OBJT, void*);                          // Gather  all unknowns on tetra with subsimplices for RepairAfterRefine
-    int ScatterUnknownsRef(OBJT, void*);                          // Scatter all unknowns on tetra with subsimplices for RepairAfterRefine
-
-    int GatherUnknownsMigV (OBJT, void*);                         // Gather  all unknowns on a vertex for sending unknowns to a vertex that has changed prio from vghos/ghost to PrioHasUnk
-    int ScatterUnknownsMigV(OBJT, void*);                         // Scatter all unknowns on a vertex for sending unknowns on a vertex that has changed prio from vghos/ghost to PrioHasUnk
-    int GatherUnknownsMigE (OBJT, void*);                         // Gather  all unknowns on a edge for sending unknowns to a edge that has changed prio from vghos/ghost to PrioHasUnk
-    int ScatterUnknownsMigE(OBJT, void*);                         // Scatter all unknowns on a egde for sending unknowns on a edge that has changed prio from vghos/ghost to PrioHasUnk
-
+    template<class SimplexT>
+    int DestroyUnksOnSimplex(OBJT);      // Destroy Unks on a simplex
     template<typename SimplexT>
     int GatherInterpolValues (OBJT, void*);                       // Gather  unknowns of an interpolated simplex
     template<typename SimplexT>
