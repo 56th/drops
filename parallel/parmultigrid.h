@@ -95,11 +95,11 @@ class ParMultiGridCL
     bool             _UnkOnSimplex[3];   ///< Remember if there are unknowns on (Vertex,Edge,Tetra)
     IdxT             _RecvBufPos;        ///< last position in receive buffer that is not used
     DiST::PrioListCL priosId_;           ///< priorities used for IdentifyVertex/Edge/Face
-    static ParMultiGridCL* instance_;       // only one instance of ParMultiGridCL may exist (Singleton-Pattern)
 
   private:
     /// \brief Create a ParMultiGridCL, due to the Singleton-Pattern, the constructor is private
     ParMultiGridCL();
+    ParMultiGridCL( const ParMultiGridCL&); // copy ctr not implemented
 
     /// \name Interface communication handler
     class SanityCheckCL;                    ///< checking interprocess dependencies
@@ -129,10 +129,10 @@ class ParMultiGridCL
     void AdaptMidVertex ();                                              // Delete or set mid-vertex for all edges
 
   public:
-    /// \brief Get a pointer to the ParMultiGridCL (Singleton-Pattern)
-    static ParMultiGridCL* InstancePtr() { return instance_ ? instance_ : (instance_= new ParMultiGridCL); }
     /// \brief Get a reference to the ParMultiGridCL (Singleton-Pattern)
-    static ParMultiGridCL& Instance()    { return *InstancePtr(); }
+    static ParMultiGridCL& Instance()    { static ParMultiGridCL instance; return instance; }
+    /// \brief Get a pointer to the ParMultiGridCL (Singleton-Pattern)
+    static ParMultiGridCL* InstancePtr() { return &Instance(); }
 
     /// \name Functions concerning the MultiGrid
     // @{
@@ -280,14 +280,6 @@ class ParMultiGridCL
     //@}
 };
 
-/// \brief Manage construction and destruction of ParMultiGridCL
-class ParMultiGridInitCL
-{
-  public:
-    ParMultiGridInitCL()  { ParMultiGridCL::Instance(); }
-    ~ParMultiGridInitCL() { if (ParMultiGridCL::InstancePtr()) delete ParMultiGridCL::InstancePtr(); }
-};
-
 /// \brief Adaptor to provide access to ParMultiGridCL::Delete. Needed by MultiGridCL.
 template<class SimplexT>
 struct Delete_fun {
@@ -304,16 +296,6 @@ template<>
   const BndDataCL<double>* ParMultiGridCL::GetBndCond<BndDataCL<double> >( const IdxDescCL*);
 template<>
   const BndDataCL<Point3DCL>* ParMultiGridCL::GetBndCond<BndDataCL<Point3DCL> >( const IdxDescCL*);
-
-
-// Declaration of DDD-Handlers used within the template functions
-//---------------------------------------------------------------
-extern "C" int GatherInterpolValuesVC (OBJT o, void* b);
-extern "C" int ScatterInterpolValuesVC(OBJT o, void* b);
-extern "C" int GatherUnknownsMigVC (OBJT o, void* b);
-extern "C" int ScatterUnknownsMigVC(OBJT o, void* b);
-extern "C" int GatherUnknownsMigEC (OBJT o, void* b);
-extern "C" int ScatterUnknownsMigEC(OBJT o, void* b);
 
 
 //  Helper classes and functions

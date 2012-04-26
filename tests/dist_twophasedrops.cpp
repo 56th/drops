@@ -457,7 +457,6 @@ int main (int argc, char** argv)
   try
   {
 #ifdef _PAR
-    DROPS::ParMultiGridInitCL pmginit;
 #endif
     std::ifstream param;
 

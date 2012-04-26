@@ -14,27 +14,16 @@
 namespace DROPS
 {
 /****************************************************************************
-* I N I T I A L   S T A T I C   A S S I G N M E N T                         *
-*****************************************************************************
-* initial assignment of the static members of ParMultiGridCL                *
-****************************************************************************/
-ParMultiGridCL* ParMultiGridCL::instance_ = 0;
-
-
-/****************************************************************************
 * C O N S T R U C T O R S                                                   *
 *****************************************************************************
-* Constructor an Destructor of the parallel multigrid                       *
+* Constructor and Destructor of the parallel multigrid                       *
 * AttachTo: assign the given Multigrid to the parallel mutigrid             *
 *           or tell the Multigrid about a VectorDescriber-Class             *
 ****************************************************************************/
-/// \brief Constructor with number of Vector-Describer-Classes
-///
 /// Init the parallel stuff
 ParMultiGridCL::ParMultiGridCL()
     : mg_(0), modify_(0), transfer_(0)
 {
-    Assert( instance_==0, DROPSErrCL("ParMultiGridCL: Constructor is called twice"), DebugParallelC);
     // for Identify, we need all priorities except PrioVGhost
     priosId_.push_back(PrioNeutral); priosId_.push_back(PrioKilledGhost);
     priosId_.push_back(PrioGhost);   priosId_.push_back(PrioMaster);

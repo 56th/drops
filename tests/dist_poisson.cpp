@@ -262,7 +262,6 @@ int main (int argc, char** argv)
 {
 #ifdef _PAR
     DROPS::ProcInitCL procinit(&argc, &argv);
-    DROPS::ParMultiGridInitCL pmginit;
 #endif
     try
     {
@@ -315,7 +314,6 @@ int main (int argc, char** argv)
         timer.Reset();
 #ifdef _PAR
         // Set parallel data structures
-        DROPS::ParMultiGridCL pmg= DROPS::ParMultiGridCL::Instance();
         DROPS::LoadBalCL lb( *mg);                    // loadbalancing
         lb.DoMigration();    // distribute initial grid
 #endif
