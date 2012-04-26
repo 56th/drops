@@ -1090,25 +1090,6 @@ template<class Data, class _BndData, class _VD>
   Interpolate(P1EvalCL<Data, _BndData, _VD>& sol, const P1EvalCL<Data, _BndData, const _VD>& old_sol);
 
 
-//**************************************************************************
-// RepairAfterRefine: Repairs the P1-function old_f, which is possibly     *
-//     damaged by a grid-refinement. This is done by copying to the new    *
-//     VecDescBaseCL object vecdesc and interpolation of old values.       *
-// Precondition: old_f is a damaged P1-function (through at most one       *
-//     refinement step), vecdesc contains a valid IdxDescCL* to an index on*
-//     the same level as old_f (If this level was deleted, vecdesc shall be*
-//     defined on the next coarser level.); vecdesc.Data has the correct   *
-//     size.                                                               *
-// Postcondition: vecdesc, together with the boundary-data of old_f,       *
-//     represents a P1-function on the triangulation tl. If old_f was      *
-//     defined on the last level before refinement, which is then deleted, *
-//     tl ==  old_f.GetLevel() -1; else tl is the level of old_f.          *
-//**************************************************************************
-template <class P1T, class VecDesc>
-  Uint
-  RepairAfterRefineP1( const P1T& old_f, VecDesc& f);
-
-
 // Adapt a solution on a triangulation of a certain level, that has changed during the refinement.
 // Notation: T = old triang, T' = new triang. Both T and T' are of the same level.
 // This change can be classified in several cases (not complete...): Fot tetra t in T:
@@ -1128,25 +1109,6 @@ void Adapt( P2EvalCL<Data, _BndData, _VD>& sol, const P2EvalCL<Data, _BndData, c
 // Take care, that x and old_x are on successive triangulations.
 template<class Data, class _BndData, class _VD>
 void Interpolate(P2EvalCL<Data, _BndData, _VD>& sol, const P2EvalCL<Data, _BndData, const _VD>& old_sol);
-
-
-//**************************************************************************
-// RepairAfterRefine: Repairs the P2-function old_f, which is possibly     *
-//     damaged by a grid-refinement. This is done by copying to the new    *
-//     VecDescBaseCL object vecdesc and interpolation of old values.       *
-// Precondition: old_f is a damaged P2-function (through at most one       *
-//     refinement step), vecdesc contains a valid IdxDescCL* to an index on*
-//     the same level as old_f (If this level was deleted, vecdesc shall be*
-//     defined on the next coarser level.); vecdesc.Data has the correct   *
-//     size.                                                               *
-// Postcondition: vecdesc, together with the boundary-data of old_f,       *
-//     represents a P2-function on the triangulation tl. If old_f was      *
-//     defined on the last level before refinement, which is then deleted, *
-//     tl ==  old_f.GetLevel() -1; else tl is the level of old_f.          *
-//**************************************************************************
-template <class P2T, class VecDesc>
-Uint
-RepairAfterRefineP2( const P2T& old_f, VecDesc& vecdesc);
 
 
 //**************************************************************************

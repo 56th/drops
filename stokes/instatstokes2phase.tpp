@@ -189,10 +189,8 @@ inline void
 
     loc_pidx.CreateNumbering( stokes_.GetMG().GetLastLevel(), stokes_.GetMG(), stokes_.GetBndData().Pr, match, &ls_.Phi, &ls_.GetBndData());
     loc_p.SetIdx( &loc_pidx);
-#ifdef _PAR
-    //GetPMG().HandleNewIdx(&stokes_.pr_idx, &loc_p);
-#endif
-    RepairAfterRefineP1( stokes_.GetPrSolution( p), loc_p);
+    throw DROPSErrCL("RepairAfterRefineP1 missing, use new RepairP1CL instead!");
+//    RepairAfterRefineP1( stokes_.GetPrSolution( p), loc_p);
 #ifdef _PAR
     /*
     GetPMG().CompleteRepair( &loc_p);

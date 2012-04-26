@@ -171,113 +171,18 @@ class ParMultiGridCL
     void IdentifyFace( FaceCL* Me, const FaceCL* Parent);
     // @}
 
-    /// \name Functions concerning the handling of unknowns
-    // @{
-    template<typename BndT>
-    void AttachTo(VecDescCL*, const BndT*);                                 // attach VecDescCL and boundary conditions
-    inline bool UnknownsOnSimplices();                               // are there unknowns on simplices
-    // @}
-
-
-    /// \name Access to unknowns that are stored in a recieve buffer or an old index
-    // @{
-    template<typename SimplexT, typename DofT>
-    struct GetDof{
-      inline DofT operator() (const SimplexT&, Uint idx, int pos=-1);       // Get dof on a simplex (not implemented, see specializations down)
-    };
-    template<typename SimplexT>
-    struct GetDof<SimplexT, Point3DCL>{
-      inline Point3DCL operator() (const SimplexT&, Uint idx, int pos=-1);  // Spezialisation for vectorial data
-    };
-    template<typename SimplexT>
-    struct GetDof<SimplexT, double>{
-      inline double operator() (const SimplexT&, Uint idx, int pos=-1);     // Spezialisation for scalar data
-    };
-    // @}
 
 
     /// \name Checking and debug functions
     // @{
     bool IsSane(std::ostream&, int Level= -1) const;                 // Check if distributed edges and faces have the same subsimplices
-    bool CheckMFR( int Level, std::ostream& os) const;                    // Check local MFR on edges.
+    bool CheckMFR( int Level, std::ostream& os) const;               // Check local MFR on edges.
 
     void DebugInfo(std::ostream&) const;                             // writes usefull infos onto outputstream
     void Show(const DiST::Helper::GeomIdCL& gid, char *mesg, int proc= -1);                // Show the simplex with a given GID
-    void ConsCheck();                                                // Dist-Consisty-Check
+    void ConsCheck();                                                // DiST-Consisty-Check
     double GetBalance();                                             // Calculate Imbalance of triangulation over procs on last triangulation-level --> Communication
     // @}
-
-
-  private:
-    // functions concerning the internal handling of unknowns
-    // ------------------------------------------------------
-
-    // checking and size-estimating functions
-    //@{
-    inline bool VecDescRecv();                               // VecDesc revieved?
-    //@}
-
-
-    // Copy values and doing linear interpolation after refine/migrate
-    //@{
-    inline Uint GetStorePos(const IdxDescCL*);                       // Get position where the IdxDesc is internally stored
-    template<typename BndT>
-    void AttachTo(const IdxDescCL*, const BndT*);                           // attach boundary conditions
-    template<typename BndT>
-    inline bool LinearInterpolation(const EdgeCL&, Uint, const BndT*, const VectorCL&, typename BndT::bnd_type& new_dof);
-    template<typename BndT>
-    void PutData(MultiGridCL::const_EdgeIterator&,
-                 const VectorCL* const, VectorCL*, const Uint,
-                 const Uint, const IdxDescCL*, const BndT*);                // Copy unknowns on an edge into a new datafield
-    template<typename BndT>
-    inline const BndT* GetBndCond(const IdxDescCL*);                 // Get boundary condition to store VecDesCL
-    //@}
-
-    // Send and receive unknowns
-    //@{
-    template<class SimplexT>
-    inline void SendUnknowns(SimplexT*, TypeT, void*, int);       // Send Unknwons within the Handler<SimplexT>Gather
-    template<class SimplexT>
-    inline void RecvUnknowns(SimplexT*, TypeT, void*, int);       // Recieve Unknwons within the Handler<SimplexT>Gather
-    void EnlargeReceiveBuffer();                                     // Enlarge the _RecvBuf
-    //@}
-
-
-    // set and get functions for vectors
-    //@{
-    template<typename SimplexT>
-    void SetDof(const SimplexT&, Uint, VectorCL&, const Point3DCL&); // Put data into a given vector
-    template<typename SimplexT>
-    void SetDof(const SimplexT&, Uint, VectorCL&, const double&);    // Put data into a given vector
-
-    template<typename SimplexT>
-    void PutDofIntoRecvBuffer(SimplexT&, Uint, const Point3DCL&);    // Put a value of unknown into the Recieve Buffer
-    template<typename SimplexT>
-    void PutDofIntoRecvBuffer(SimplexT&, Uint, const double&);       // Put values of unknown into the Recieve Buffer
-
-    template<typename SimplexT, typename ContainerT, typename DofT>
-    struct GetDofOutOfVector{
-      inline DofT operator() (const SimplexT&, Uint, const ContainerT&);    // Get values of unknown out of a given vector
-    };
-    template<typename SimplexT, typename ContainerT>
-    struct GetDofOutOfVector<SimplexT, ContainerT, Point3DCL>{
-      inline Point3DCL operator() (const SimplexT&, Uint, const ContainerT&);// Get values of unknown out of a given vector
-    };
-    template<typename SimplexT, typename ContainerT>
-    struct GetDofOutOfVector<SimplexT, ContainerT, double>{
-      inline double operator() (const SimplexT&, Uint, const ContainerT&);  // Get values of unknown out of a given vector
-    };
-    //@}
-
-
-  public:
-    template<class SimplexT>
-    int DestroyUnksOnSimplex(OBJT);      // Destroy Unks on a simplex
-    template<typename SimplexT>
-    int GatherInterpolValues (OBJT, void*);                       // Gather  unknowns of an interpolated simplex
-    template<typename SimplexT>
-    int ScatterInterpolValues(OBJT, void*);                       // Scatter unknowns of an interpolated simplex
-    //@}
 };
 
 /// \brief Adaptor to provide access to ParMultiGridCL::Delete. Needed by MultiGridCL.
@@ -286,31 +191,7 @@ struct Delete_fun {
     void operator() (SimplexT& s) { ParMultiGridCL::Instance().Delete( &s); }
 };
 
-// Declaration of specialized template functions
-//----------------------------------------------
-template<>
-void ParMultiGridCL::AttachTo<BndDataCL<double> >(const IdxDescCL*, const  BndDataCL<double>*);
-template<>
-void ParMultiGridCL::AttachTo<BndDataCL<Point3DCL> >(const IdxDescCL*, const  BndDataCL<Point3DCL>*);
-template<>
-  const BndDataCL<double>* ParMultiGridCL::GetBndCond<BndDataCL<double> >( const IdxDescCL*);
-template<>
-  const BndDataCL<Point3DCL>* ParMultiGridCL::GetBndCond<BndDataCL<Point3DCL> >( const IdxDescCL*);
-
-
-//  Helper classes and functions
-//------------------------------
-
-/// \brief For transfering unknowns of a killed ghost a marker has to be sent as well
-///        to distinguish if this is a valid unknown
-struct TransferUnkT
-{
-    double val;         ///< value
-    Uint   idx;         ///< index
-    bool   mark;        ///< marker
-};
-
-const int MIG=0, REF=1;         // constants for choosing the the filename in PrintMG
+enum { MIG=0, REF=1 };
 
 /// \brief Write Debug information into the file output/(proc_id)_MG_(REF|MIG)_(step).mg
 void PrintMG(const ParMultiGridCL&, int type=MIG);
