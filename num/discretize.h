@@ -324,6 +324,9 @@ DROPS_DEFINE_VALARRAY_DERIVATIVE(LocalP1CL, T, base_type)
     template <class P1FunT>
       inline self_&
       assign(const TetraCL&, const P1FunT&);
+    template<class BndDataT>
+      inline self_&
+      assign_on_tetra(const TetraCL&, const VecDescCL&, const BndDataT&);
 
     // pointwise evaluation in barycentric coordinates
     inline value_type operator()(const BaryCoordCL&) const;

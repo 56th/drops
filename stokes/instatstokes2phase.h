@@ -268,7 +268,7 @@ class VelocityRepairCL : public MGObserverCL
 {
   private:
     InstatStokes2PhaseP2P1CL& stokes_;
-    std::auto_ptr<RepairP2CL<Point3DCL> > p2repair_;
+    std::auto_ptr<RepairP2CL<Point3DCL>::type > p2repair_;
 
   public:
     VelocityRepairCL (InstatStokes2PhaseP2P1CL& stokes)
@@ -295,7 +295,8 @@ class PressureRepairCL : public MGObserverCL
 {
   private:
     InstatStokes2PhaseP2P1CL& stokes_;
-    std::auto_ptr<P1XRepairCL> p1xrepair_; /// \todo XFEM behavior for ref/mig should maybe changed by assuming two P1 vectors instead
+    std::auto_ptr<P1XRepairCL> p1xrepair_;
+    std::auto_ptr<RepairP1CL<double>::type> p1repair_;
     const LevelsetP2CL& ls_;
 
   public:

@@ -26,9 +26,6 @@
 #include "levelset/fastmarch.h"
 #include "num/lattice-eval.h"
 #include "num/quadrature.h"
-#ifdef _PAR
-#  include "parallel/DiST.h"
-#endif
 #include <fstream>
 
 namespace DROPS
@@ -820,8 +817,8 @@ void LevelsetP2CL::GetMaxMinGradPhi(double& maxGradPhi, double& minGradPhi) cons
 
 void LevelsetRepairCL::pre_refine()
 {
-    p2repair_= std::auto_ptr<RepairP2CL<double> >(
-        new RepairP2CL<double>( ls_.GetMG(), ls_.Phi, ls_.GetBndData()));
+    p2repair_= std::auto_ptr<RepairP2CL<double>::type >(
+        new RepairP2CL<double>::type( ls_.GetMG(), ls_.Phi, ls_.GetBndData()));
 }
 
 void
@@ -835,14 +832,8 @@ LevelsetRepairCL::post_refine ()
 
     ls_.CreateNumbering( ls_.GetMG().GetLastLevel(), &loc_lidx, match);
     loc_phi.SetIdx( &loc_lidx);
-#ifndef _PAR
+
     p2repair_->repair( loc_phi);
-#else
-    throw DROPSErrCL( "LevelsetRepairCL::post_refine: Sorry, not yet implemented.");
-  //  GetPMG().HandleNewIdx(&ls_.idx, &loc_phi);
-  //  RepairAfterRefineP2( ls_.GetSolution( phi), loc_phi);
-  //  GetPMG().CompleteRepair( &loc_phi);
-#endif
 
     phi.Clear( phi.t);
     ls_.DeleteNumbering( phi.RowIdx);
@@ -852,3 +843,4 @@ LevelsetRepairCL::post_refine ()
 }
 
 } // end of namespace DROPS
+

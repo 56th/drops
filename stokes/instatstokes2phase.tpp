@@ -105,14 +105,8 @@ void SetupPrStiff_P1D( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
 //*****************************************************************************
 inline void VelocityRepairCL::pre_refine()
 {
-#ifndef _PAR
-    p2repair_= std::auto_ptr<RepairP2CL<Point3DCL> >(
-        new RepairP2CL<Point3DCL>( stokes_.GetMG(), stokes_.v, stokes_.GetBndData().Vel));
-#else
-    throw DROPSErrCL( "VelocityRepairCL::pre_refine: Sorry, not yet implemented.");
-        /// tell parallel multigrid about velocities
-    //GetPMG().AttachTo( &stokes_.v, &stokes_.GetBndData().Vel);
-#endif
+    p2repair_= std::auto_ptr<RepairP2CL<Point3DCL>::type >(
+        new RepairP2CL<Point3DCL>::type( stokes_.GetMG(), stokes_.v, stokes_.GetBndData().Vel));
 }
 
 inline void
@@ -131,15 +125,9 @@ inline void
         throw DROPSErrCL( "VelocityRepairCL::post_refine: Sorry, not yet implemented.");
     }
     loc_v.SetIdx( &loc_vidx);
-#ifndef _PAR
-    p2repair_->repair( loc_v);
-#else
-throw DROPSErrCL( "VelocityRepairCL::post_refine: Sorry, not yet implemented.");
 
-//    GetPMG().HandleNewIdx(&stokes_.vel_idx, &loc_v);
-//    RepairAfterRefineP2( stokes_.GetVelSolution( v), loc_v);
-//    GetPMG().CompleteRepair( &loc_v);
-#endif
+    p2repair_->repair( loc_v);
+
     v.Clear( v.t);
     v.RowIdx->DeleteNumbering( stokes_.GetMG());
 
@@ -161,23 +149,11 @@ inline void
 //                               PressureRepairCL
 //*****************************************************************************
 
-#ifndef _PAR
 inline void PressureRepairCL::pre_refine()
-  /// do nothing
-{ }
-#else
-inline void PressureRepairCL::pre_refine()
-  /// tell parallel multigrid about (extended) finite element function
-  /// \todo Handling of xtended finite elements ...
 {
-/*
-    GetPMG().AttachTo( &stokes_.p, &stokes_.GetBndData().Pr);
-    if ( stokes_.UsesXFEM()){
-        GetPMG().AttachTo( p1xrepair_->GetExt(), &stokes_.GetBndData().Pr);
-    }
-*/
+    p1repair_= std::auto_ptr<RepairP1CL<double>::type >(
+        new RepairP1CL<double>::type( stokes_.GetMG(), stokes_.p, stokes_.GetBndData().Pr));
 }
-#endif
 
 inline void
   PressureRepairCL::post_refine ()
@@ -189,25 +165,9 @@ inline void
 
     loc_pidx.CreateNumbering( stokes_.GetMG().GetLastLevel(), stokes_.GetMG(), stokes_.GetBndData().Pr, match, &ls_.Phi, &ls_.GetBndData());
     loc_p.SetIdx( &loc_pidx);
-    throw DROPSErrCL("RepairAfterRefineP1 missing, use new RepairP1CL instead!");
-//    RepairAfterRefineP1( stokes_.GetPrSolution( p), loc_p);
-#ifdef _PAR
-    /*
-    GetPMG().CompleteRepair( &loc_p);
-    if ( stokes_.UsesXFEM()){
-        IdxDescCL loc_xpr_idx( P1_FE);
-        loc_xpr_idx.CreateNumbering( stokes_.GetMG().GetLastLevel(), stokes_.GetMG());
-        VecDescCL loc_xpr( &loc_xpr_idx);
-        GetPMG().HandleNewIdx( p1xrepair_->GetExt()->RowIdx, &loc_xpr);
-        // swap index and data
-        p1xrepair_->GetExt()->RowIdx->swap( loc_xpr_idx);
-        p1xrepair_->GetExt()->Data.resize( loc_xpr.Data.size());
-        p1xrepair_->GetExt()->Data= loc_xpr.Data;
-        // delete this numbering
-        loc_xpr_idx.DeleteNumbering( stokes_.GetMG());
-    }
-    */
-#endif
+
+    p1repair_->repair( loc_p);
+
     p.Clear( p.t);
     p.RowIdx->DeleteNumbering( stokes_.GetMG());
     stokes_.pr_idx.GetFinest().swap( loc_pidx);

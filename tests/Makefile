@@ -14,7 +14,7 @@ EXEC =  ip1test ip2test mattest prolongationp2test reftest testfe \
         extendP1onChild principallattice quad_extra dist_streamtest dist_remotedatatest \
         dist_sendtetraofbrick dist_simplexsend dist_interface dist_exchange \
         dist_poisson dist_sdropsP2 dist_twophasedrops dist_ref dist_modify \
-        dist_TestRefPar dist_ref_rising_drop dist_migration dist_interp2
+        dist_TestRefPar dist_ref_rising_drop dist_migration dist_interp2 dist_interp1
 
 DELETE = $(EXEC) *.out *.diff *.off *.mg *.dat
 
@@ -45,7 +45,7 @@ TESTNAME = drivencavity-adaptiv-schur drivencavity-adaptiv-uzawa \
 default: ClrScr
 
 dist: dist_streamtest dist_remotedatatest dist_sendtetraofbrick dist_modify dist_simplexsend dist_interface dist_exchange dist_poisson dist_sdropsP2 dist_twophasedrops \
-    dist_ref dist_TestRefPar dist_migration dist_interp2
+    dist_ref dist_TestRefPar dist_migration dist_interp2 dist_interp1
 
 check: $(TESTNAME:%=check_%) ip1check
 	@echo "--> All testcases have been executed!"
@@ -381,6 +381,12 @@ dist_twophasedrops: \
 	
 dist_interp2: \
     ../tests/dist_interp2.o ../geom/simplex.o ../geom/multigrid.o ../geom/topo.o ../out/output.o \
+    ../num/unknowns.o ../geom/builder.o ../misc/problem.o ../num/interfacePatch.o \
+    ../num/fe.o ../geom/boundary.o ../misc/utils.o ../num/discretize.o $(PAR_OBJ)
+	$(CXX) -o $@ $^ $(LFLAGS)
+	
+dist_interp1: \
+    ../tests/dist_interp1.o ../geom/simplex.o ../geom/multigrid.o ../geom/topo.o ../out/output.o \
     ../num/unknowns.o ../geom/builder.o ../misc/problem.o ../num/interfacePatch.o \
     ../num/fe.o ../geom/boundary.o ../misc/utils.o ../num/discretize.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)

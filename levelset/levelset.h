@@ -175,7 +175,7 @@ class LevelsetRepairCL : public MGObserverCL
 {
   private:
     LevelsetP2CL& ls_;
-    std::auto_ptr<RepairP2CL<double> > p2repair_;
+    std::auto_ptr<RepairP2CL<double>::type > p2repair_;
 
   public:
     /// \brief Construct a levelset repair class
