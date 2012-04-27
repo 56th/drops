@@ -62,38 +62,11 @@ class ParMultiGridCL
     friend class ParMultiGridInitCL;
     friend class MultiGridCL;
 
-  public:
-      /// \brief Vector of pointers to  Vector-Describer-Classes.
-      ///
-      /// Used for storing the received numerical data and creating new numbering on the vertices, edges and tetras
-      /// Each type of unknown has one VecDescCL* (like pressure or velocity)
-    typedef std::vector<VecDescCL*>             VecDescPCT;
-     /// \brief Buffer for double values
-     ///
-     /// Buffer type for storing double values. Used within refinement and migration
-    typedef std::vector< double >               BufferCT;
-     /// \brief Vector of TetraCL pointer for remembering special tetras
-     ///
-     /// Used for remembering Tetras, that have changed prio from ghost to master, to make MFR
-     /// on edges consistent
-    typedef std::vector<TetraCL*>               TetraPCT;
-    /// \brief Vector of scalar boundary conditions
-    typedef std::vector< const BndDataCL<double>* >    ScalBndCT;
-    /// \brief Vector of vector boundary conditions
-    typedef std::vector< const BndDataCL<Point3DCL>* > VecBndCT;
-
-  private:    // variables
+  private:    // member variables
     MultiGridCL*     mg_;                ///< Pointer to the multigrid
     DiST::ModifyCL*  modify_;            ///< Pointer to the DiST::ModifyCL, used for Modify environment
     DiST::TransferCL*transfer_;          ///< Pointer to the DiST::TransferCL, used for Transfer environment
     int              level_;             ///< triangulation level considered for transfer
-    VecDescPCT       _VecDesc;           ///< Vector of Pointers to the vector describers, where the unknowns are stored
-    BufferCT         _RecvBuf;           ///< Buffer for the received numerical data (used for refinement and migration)!
-    ScalBndCT        _ScalBnd;           ///< Store scalar boundary conditions
-    VecBndCT         _VecBnd;            ///< Store vector boundary conditions
-    VecDescCL*       _actualVec;         ///< actual index within HandleNewIdx (used within DDD-Gather and DDD-Scatter operation)
-    bool             _UnkOnSimplex[3];   ///< Remember if there are unknowns on (Vertex,Edge,Tetra)
-    IdxT             _RecvBufPos;        ///< last position in receive buffer that is not used
     DiST::PrioListCL priosId_;           ///< priorities used for IdentifyVertex/Edge/Face
 
   private:
