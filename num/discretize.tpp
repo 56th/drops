@@ -55,6 +55,23 @@ template<class T>
 }
 
 template<class T>
+  template<class BndDataT>
+    inline LocalP1CL<T>&
+    LocalP1CL<T>::assign_on_tetra(const TetraCL& s,
+        const VecDescCL& vd, const BndDataT& bnd)
+{
+    typedef VecDescCL::DataType VecT;
+    typedef DoFHelperCL<value_type, VecT> DoFT;
+    const VecT& v= vd.Data;
+    const Uint idx= vd.RowIdx->GetIdx();
+    for (Uint i= 0; i< NumVertsC; ++i)
+        (*this)[i]= !bnd.IsOnDirBnd( *s.GetVertex( i))
+            ? DoFT::get( v, s.GetVertex( i)->Unknowns( idx))
+            : bnd.GetDirBndValue( *s.GetVertex( i), vd.t);
+    return *this;
+}
+
+template<class T>
   template<class P1FunT>
     inline LocalP1CL<T>&
     LocalP1CL<T>::assign(const TetraCL& s, const P1FunT& f)

@@ -1,6 +1,6 @@
 /// \file fe_repair.tpp
 /// \brief Repair-classes with respect to multigrid-changes for finite-elements.
-/// \author LNM RWTH Aachen: Joerg Grande; SC RWTH Aachen:
+/// \author LNM RWTH Aachen: Patrick Esser, Joerg Grande; SC RWTH Aachen:
 
 /*
  * This file is part of DROPS.
@@ -19,16 +19,16 @@
  * along with DROPS. If not, see <http://www.gnu.org/licenses/>.
  * 
  * 
- * Copyright 2009 LNM/SC RWTH Aachen, Germany
+ * Copyright 2012 LNM/SC RWTH Aachen, Germany
 */
 
 namespace DROPS
 {
 
-/// RepairP2DataCL
+/// RepairFEDataCL
 
-template <class ValueT>
-void RepairP2DataCL<ValueT>::repair (AugmentedDofVecT& dof, VectorCL& newdata) const
+template <class LocalFEDataT>
+void RepairFEDataCL<LocalFEDataT>::repair (AugmentedDofVecT& dof, VectorCL& newdata) const
 {
     AugmentedDofVecT::iterator d;
     BaryCoordCL tmp( Uninitialized);
@@ -38,7 +38,7 @@ void RepairP2DataCL<ValueT>::repair (AugmentedDofVecT& dof, VectorCL& newdata) c
         while (d != dof.end()) {
             tmp= to_old_child*d->second;
             if (contained_in_reference_tetra( tmp, 8*std::numeric_limits<double>::epsilon())) {
-                DoFHelperCL<value_type, VectorCL>::set( newdata, d->first, old_ch->second( tmp));
+                DoFHelperCL<typename LocalFEDataT::value_type, VectorCL>::set( newdata, d->first, old_ch->second( tmp));
                 d= dof.erase( d);
             }
             else
@@ -46,34 +46,30 @@ void RepairP2DataCL<ValueT>::repair (AugmentedDofVecT& dof, VectorCL& newdata) c
         }
     }
     if (!dof.empty())
-        throw DROPSErrCL("RepairP2DataCL::repair: Could not locate all new dof.\n");
+        throw DROPSErrCL("RepairFEDataCL::repair: Could not locate all new dof.\n");
 }
 
 
-/// RepairP2CL
+/// RepairFECL
 
-template <class ValueT>
-  RepairP2CL<ValueT>::RepairP2CL (const MultiGridCL& mg, const VecDescCL& old, const BndDataCL<value_type>& bnd)
+template <class ValueT, template<class> class LocalFEDataT>
+  RepairFECL<ValueT, LocalFEDataT>::RepairFECL (const MultiGridCL& mg, const VecDescCL& old, const BndDataCL<value_type>& bnd)
         : mg_( mg), old_vd_ ( old), bnd_( bnd)
 {
-    for (Uint i= 0; i < NumVertsC; ++i)
-        p2_dof_[i]= std_basis<4>( i + 1);
-    for (Uint i= 0; i < NumEdgesC; ++i)
-        p2_dof_[i + NumVertsC]= 0.5*(std_basis<4>( VertOfEdge( i, 0) + 1) + std_basis<4>( VertOfEdge( i, 1) + 1));
-
+    localfedata_::Init();
     pre_refine();
 }
 
-template <class ValueT>
+template <class ValueT, template<class> class LocalFEDataT>
   void
-  RepairP2CL<ValueT>::pre_refine ()
+  RepairFECL<ValueT, LocalFEDataT>::pre_refine ()
 {
     parent_data_.clear();
     level0_leaves_.clear();
     repair_needed_.clear();
 
     Uint lvl= old_vd_.RowIdx->TriangLevel();
-    LocalP2CL<value_type> lp2;
+    LocalFECL lp2;
     DROPS_FOR_TRIANG_CONST_TETRA( mg_, lvl, it) {
         if (!it->IsUnrefined())
             continue;
@@ -93,31 +89,31 @@ template <class ValueT>
     }
 }
 
-template <class ValueT>
+template <class ValueT, template<class> class LocalFEDataT>
   AugmentedDofVecT
-  RepairP2CL<ValueT>::collect_unrepaired_dofs (const TetraCL& t)
+  RepairFECL<ValueT, LocalFEDataT>::collect_unrepaired_dofs (const TetraCL& t)
 {
-    LocalNumbP2CL n_new( t, *new_vd_->RowIdx);
+    LocalNumbCL n_new( t, *new_vd_->RowIdx);
     AugmentedDofVecT dof;
-    dof.reserve( 10);
-    for (Uint i= 0; i < 10; ++i)
+    dof.reserve( localfedata_::NumUnknownsOnTetra);
+    for (Uint i= 0; i < localfedata_::NumUnknownsOnTetra; ++i)
         if (n_new.WithUnknowns( i) && repair_needed( n_new.num[i])) {
-            dof.push_back( std::make_pair( n_new.num[i], p2_dof_[i]));
+            dof.push_back( std::make_pair( n_new.num[i], localfedata_::p_dof_[i]));
             mark_as_repaired( n_new.num[i]); // All callers will repair all dofs or else throw an exception.
         }
     return dof;
 }
 
-template <class ValueT>
-void RepairP2CL<ValueT>::unchanged_refinement (const TetraCL& t)
+template <class ValueT, template<class> class LocalFEDataT>
+void RepairFECL<ValueT, LocalFEDataT>::unchanged_refinement (const TetraCL& t)
 {
     const VectorCL& olddata= old_vd_.Data;
           VectorCL& newdata= new_vd_->Data;
-    LocalNumbP2CL n_old( t, *old_vd_.RowIdx);
-    LocalNumbP2CL n_new( t, *new_vd_->RowIdx);
-    for (Uint i= 0; i < 10; ++i)
+    LocalNumbCL n_old( t, *old_vd_.RowIdx);
+    LocalNumbCL n_new( t, *new_vd_->RowIdx);
+    for (Uint i= 0; i < localfedata_::NumUnknownsOnTetra; ++i)
         if (n_new.WithUnknowns( i) && repair_needed( n_new.num[i])) {
-            Assert( n_old.WithUnknowns( i), DROPSErrCL( "TetraRepairP2CL::unchanged_refinement: "
+            Assert( n_old.WithUnknowns( i), DROPSErrCL( "TetraRepairFECL::unchanged_refinement: "
                 "Old and new function must use the same boundary-data-types.\n"), DebugNumericC);
             const value_type& tmp= DoFHelperCL<value_type, VectorCL>::get( olddata, n_old.num[i]);
             DoFHelperCL<value_type, VectorCL>::set( newdata, n_new.num[i], tmp);
@@ -125,8 +121,8 @@ void RepairP2CL<ValueT>::unchanged_refinement (const TetraCL& t)
         }
 }
 
-template <class ValueT>
-void RepairP2CL<ValueT>::regular_leaf_refinement (const TetraCL& t)
+template <class ValueT, template<class> class LocalFEDataT>
+void RepairFECL<ValueT, LocalFEDataT>::regular_leaf_refinement (const TetraCL& t)
 {
     const AugmentedDofVecT& dof= collect_unrepaired_dofs( t);
     if (dof.empty())
@@ -136,14 +132,14 @@ void RepairP2CL<ValueT>::regular_leaf_refinement (const TetraCL& t)
     const Ubyte ch= std::find( p->GetChildBegin(), p->GetChildEnd(), &t) - p->GetChildBegin();
     const SMatrixCL<4,4>& T= child_to_parent_bary( p->GetRefData().Children[ch]);
 
-    LocalP2CL<value_type> oldp2;
+    LocalFECL oldp2;
     oldp2.assign_on_tetra( *p, old_vd_, bnd_);
     for (AugmentedDofVecT::const_iterator d= dof.begin(); d != dof.end(); ++d)
         DoFHelperCL<value_type, VectorCL>::set( new_vd_->Data, d->first, oldp2( T*d->second));
 }
 
-template <class ValueT>
-void RepairP2CL<ValueT>::genuine_refinement (const TetraCL& t, const RepairP2DataCL<ValueT>& repairdata)
+template <class ValueT, template<class> class LocalFEDataT>
+void RepairFECL<ValueT, LocalFEDataT>::genuine_refinement (const TetraCL& t, const RepairFEDataCL<LocalFECL>& repairdata)
 {
     AugmentedDofVecT dof= collect_unrepaired_dofs( t);
     if (dof.empty())
@@ -160,8 +156,8 @@ void RepairP2CL<ValueT>::genuine_refinement (const TetraCL& t, const RepairP2Dat
     repairdata.repair( dof, new_vd_->Data);
 }
 
-template <class ValueT>
-void RepairP2CL<ValueT>::unrefinement (const TetraCL& t, const RepairP2DataCL<ValueT>& repairdata)
+template <class ValueT, template<class> class LocalFEDataT>
+void RepairFECL<ValueT, LocalFEDataT>::unrefinement (const TetraCL& t, const RepairFEDataCL<LocalFECL>& repairdata)
 {
     AugmentedDofVecT dof= collect_unrepaired_dofs( t);
     if (dof.empty())
@@ -169,12 +165,12 @@ void RepairP2CL<ValueT>::unrefinement (const TetraCL& t, const RepairP2DataCL<Va
 
     QRDecompCL<4> T;
     BaryCoordCL tmp;
-    typedef typename RepairP2DataCL<value_type>::ChildVecT ChildVecT;
+    typedef typename RepairFEDataCL<value_type>::ChildVecT ChildVecT;
     repairdata.repair( dof, new_vd_->Data);
 }
 
-template <class ValueT>
-void RepairP2CL<ValueT>::changed_refinement (const TetraCL& t, const RepairP2DataCL<ValueT>& repairdata)
+template <class ValueT, template<class> class LocalFEDataT>
+void RepairFECL<ValueT, LocalFEDataT>::changed_refinement (const TetraCL& t, const RepairFEDataCL<LocalFECL>& repairdata)
 {
     AugmentedDofVecT dof= collect_unrepaired_dofs( t);
     if (dof.empty())
@@ -188,15 +184,15 @@ void RepairP2CL<ValueT>::changed_refinement (const TetraCL& t, const RepairP2Dat
     repairdata.repair( dof, new_vd_->Data);
 }
 
-template <class ValueT>
+template <class ValueT, template<class> class LocalFEDataT>
   void
-  RepairP2CL<ValueT>::repair (VecDescCL& new_vd)
+  RepairFECL<ValueT, LocalFEDataT>::repair (VecDescCL& new_vd)
 {
     new_vd_= &new_vd;
 
     const Uint lvl= new_vd_->RowIdx->TriangLevel();
     Assert( lvl == old_vd_.RowIdx->TriangLevel() || lvl ==  old_vd_.RowIdx->TriangLevel() - 1,
-        DROPSErrCL( "RepairP2CL<ValueT>::repair: Different levels\n"), DebugNumericC);
+        DROPSErrCL( "RepairFECL<ValueT>::repair: Different levels\n"), DebugNumericC);
     if (lvl == old_vd_.RowIdx->TriangLevel() - 1)
         std::cout << "old level: " << old_vd_.RowIdx->TriangLevel() << " mg_.GetLastLevel(): " << mg_.GetLastLevel() << '\n';
 

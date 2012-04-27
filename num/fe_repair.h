@@ -1,6 +1,6 @@
 /// \file fe_repair.h
 /// \brief Repair-classes with respect to multigrid-changes for finite-elements.
-/// \author LNM RWTH Aachen: Joerg Grande; SC RWTH Aachen:
+/// \author LNM RWTH Aachen: Patrick Esser, Joerg Grande; SC RWTH Aachen:
 
 /*
  * This file is part of DROPS.
@@ -19,11 +19,11 @@
  * along with DROPS. If not, see <http://www.gnu.org/licenses/>.
  *
  *
- * Copyright 2009 LNM/SC RWTH Aachen, Germany
+ * Copyright 2012 LNM/SC RWTH Aachen, Germany
 */
 
 /// \todo Remove RepairAfterRefineP2 from num/fe.*
-/// \todo Do the same for the P1-case.
+/// \todo Remove RepairAfterRefineP1 from num/fe.*
 
 #ifndef DROPS_FE_REPAIR_H
 #define DROPS_FE_REPAIR_H
@@ -40,7 +40,7 @@
 namespace DROPS
 {
 
-///\brief A vector of dof with their barycentric position with respect to the parent-tetra of the LocalP2-functions in RepairP2DataCL::data. The first pair-component is the position in the new VecDescCL.
+///\brief A vector of dof with their barycentric position with respect to the parent-tetra of the LocalP2-functions in RepairFEDataCL::data. The first pair-component is the position in the new VecDescCL.
 typedef std::vector<std::pair<size_t,BaryCoordCL> > AugmentedDofVecT;
 
 /// \brief Decide whether a barycentric point is in the closed reference tetra.
@@ -51,12 +51,11 @@ contained_in_reference_tetra (const BaryCoordCL& p, double eps= 0.)
     return p[0] >= -eps  && p[1] >= -eps && p[2] >= -eps && p[3] >= -eps;
 }
 
-/// \brief Repair-data for a P2-FE-function on a tetra, cf. RepairP2CL.
-template <class ValueT>
-struct RepairP2DataCL
+/// \brief Repair-data for a Polynomial-FE-function on a tetra, cf. RepairFECL.
+template <class LocalFEDataT>
+struct RepairFEDataCL
 {
-    typedef ValueT value_type;
-    typedef std::pair<Ubyte, LocalP2CL<value_type> > ChildDataT;
+    typedef std::pair<Ubyte, LocalFEDataT> ChildDataT;
     typedef std::vector<ChildDataT> ChildVecT;
 
     ChildVecT data; ///< tuple of (old child number per topo.h, corresponding numerical P2-data)
@@ -65,7 +64,58 @@ struct RepairP2DataCL
     void repair (AugmentedDofVecT& dof, VectorCL& newdata) const;
 };
 
-/// \brief Repair a P2-FE-function after refinement.
+/// \brief types for a P2-FE-function on a Tetra
+template <class ValueT>
+class RepairP2LocalDataTypeCL
+{
+  public:
+    typedef ValueT            value_type;
+    typedef LocalP2CL<ValueT> LocalFECL;
+    typedef LocalNumbP2CL     LocalNumbCL;
+    static const Uint NumUnknownsOnTetra;
+    static BaryCoordCL p_dof_[10]; ///< The bary-coordinates of the P2-dof.
+    static void Init();
+};
+
+template <class ValueT>
+const Uint RepairP2LocalDataTypeCL<ValueT>::NumUnknownsOnTetra = 10;
+
+template <class ValueT>
+BaryCoordCL RepairP2LocalDataTypeCL<ValueT>::p_dof_[10];
+
+template <class ValueT>
+void RepairP2LocalDataTypeCL<ValueT>::Init() {
+    for (Uint i= 0; i < NumVertsC; ++i)
+        p_dof_[i]= std_basis<4>( i + 1);
+    for (Uint i= 0; i < NumEdgesC; ++i)
+        p_dof_[i + NumVertsC]= 0.5*(std_basis<4>( VertOfEdge( i, 0) + 1) + std_basis<4>( VertOfEdge( i, 1) + 1));
+}
+
+/// \brief types for a P1-FE-function on a Tetra
+template <class ValueT>
+class RepairP1LocalDataTypeCL
+{
+  public:
+    typedef LocalP1CL<ValueT> LocalFECL;
+    typedef LocalNumbP1CL     LocalNumbCL;
+    static const Uint NumUnknownsOnTetra;
+    static BaryCoordCL p_dof_[4]; ///< The bary-coordinates of the P1-dof.
+    static void Init();
+};
+
+template <class ValueT>
+const Uint RepairP1LocalDataTypeCL<ValueT>::NumUnknownsOnTetra = 4;
+
+template <class ValueT>
+BaryCoordCL RepairP1LocalDataTypeCL<ValueT>::p_dof_[4];
+
+template <class ValueT>
+void RepairP1LocalDataTypeCL<ValueT>::Init() {
+    for (Uint i= 0; i < NumVertsC; ++i)
+        p_dof_[i]= std_basis<4>( i + 1);
+}
+
+/// \brief Repair a polynomial-FE-function after refinement.
 ///
 /// The repair works as follows:
 /// Before the refinement-algo, but after all marks for the refinement-algo have
@@ -106,20 +156,22 @@ struct RepairP2DataCL
 /// In principle, this class could use the accumulator-pattern (e.g., as base-class).
 /// As this slightly complicates its use and because repair is performed seldom,
 /// we leave this as future work.
-template <class ValueT>
-class RepairP2CL
+template <class ValueT, template<class> class LocalFEDataT>
+class RepairFECL
 {
   public:
     typedef ValueT value_type;
 
   private:
-    typedef std::tr1::unordered_map<const TetraCL*, RepairP2DataCL<value_type> > RepairMapT;
+    typedef LocalFEDataT<ValueT> localfedata_;
+    typedef typename localfedata_::LocalFECL   LocalFECL;
+    typedef typename localfedata_::LocalNumbCL LocalNumbCL;
+    
+    typedef std::tr1::unordered_map<const TetraCL*, RepairFEDataCL<LocalFECL> > RepairMapT;
     typedef std::tr1::unordered_set<const TetraCL*>                              TetraSetT;
 
     RepairMapT parent_data_;
     TetraSetT  level0_leaves_;
-
-    BaryCoordCL p2_dof_[10]; ///< The bary-coordinates of the P2-dof.
 
     const MultiGridCL& mg_;            ///< Multigrid to operate on
     const VecDescCL& old_vd_;          ///< original data to be repaired
@@ -134,13 +186,13 @@ class RepairP2CL
     AugmentedDofVecT collect_unrepaired_dofs (const TetraCL& t); ///< collect dofs with repair_needed().
     void unchanged_refinement    (const TetraCL& t); ///< use data from t for copying
     void regular_leaf_refinement (const TetraCL& t); ///< use data from t for repair
-    void unrefinement            (const TetraCL& t, const RepairP2DataCL<ValueT>& t_data);  ///< use repair-data from the tetra itself
-    void changed_refinement      (const TetraCL& t, const RepairP2DataCL<ValueT>& p_data);  ///< use repair-data from the parent
-    void genuine_refinement      (const TetraCL& t, const RepairP2DataCL<ValueT>& gp_data); ///< use repair-data from the grand-parent
+    void unrefinement            (const TetraCL& t, const RepairFEDataCL<LocalFECL>& t_data);  ///< use repair-data from the tetra itself
+    void changed_refinement      (const TetraCL& t, const RepairFEDataCL<LocalFECL>& p_data);  ///< use repair-data from the parent
+    void genuine_refinement      (const TetraCL& t, const RepairFEDataCL<LocalFECL>& gp_data); ///< use repair-data from the grand-parent
 
   public:
     /// \brief Initializes the data to be repaired on mg and calls pre_refine().
-    RepairP2CL (const MultiGridCL& mg, const VecDescCL& old, const BndDataCL<value_type>& bnd);
+    RepairFECL (const MultiGridCL& mg, const VecDescCL& old, const BndDataCL<value_type>& bnd);
 
     /// \brief Saves data from possibly deleted tetras in parent_data_ and level0_leaves_.
     void pre_refine ();
@@ -150,6 +202,24 @@ class RepairP2CL
     /// The new numbering must use the same boundary-data as the old one.
     void repair (VecDescCL& new_vd);
 };
+
+
+/* C++0x-Code:
+template <class ValueT>
+using RepairP2CL<ValueT> = RepairFECL<ValueT, RepairP2LocalDataCL<ValueT> >; */
+
+template <class ValueT>
+struct RepairP2CL
+{
+    typedef RepairFECL<ValueT, RepairP2LocalDataTypeCL> type;
+};
+
+template <class ValueT>
+struct RepairP1CL
+{
+    typedef RepairFECL<ValueT, RepairP1LocalDataTypeCL> type;
+};
+
 
 } // end of namespace DROPS
 

@@ -175,7 +175,7 @@ int TestReMark()
             v0.SetIdx( &i0);
             SetFun( v0, mg, f);
             // SetFun( v0, mg, g2);
-            RepairP2CL<double> repairp2( mg, v0, bnd);
+            RepairP2CL<double>::type repairp2( mg, v0, bnd);
             tet.BogoReMark( mg, Rule( j));
 
             const Uint i1_Level= i0.TriangLevel() <= mg.GetLastLevel() ? i0.TriangLevel()
@@ -211,7 +211,7 @@ int TestRepairUniform()
         DROPS::VecDescCL v0, v1;
         v0.SetIdx( &i0);
         SetFun( v0, mg, f);
-        RepairP2CL<double> repairp2( mg, v0, bnd);
+        RepairP2CL<double>::type repairp2( mg, v0, bnd);
         MarkAll( mg);
         mg.Refine();
         i1.CreateNumbering( i0.TriangLevel(), mg);
@@ -230,7 +230,7 @@ int TestRepairUniform()
         DROPS::VecDescCL v0, v1;
         v0.SetIdx(&i0);
         SetFun(v0, mg, f);
-        RepairP2CL<double> repairp2( mg, v0, bnd);
+        RepairP2CL<double>::type repairp2( mg, v0, bnd);
         UnMarkAll( mg);
         mg.Refine();
         Uint i1_Level= i0.TriangLevel();
@@ -280,7 +280,7 @@ int TestRepair()
         DROPS::VecDescCL v0, v1;
         v0.SetIdx( &i0);
         SetFun( v0, mg, f);
-        RepairP2CL<double> repairp2( mg, v0, bnd);
+        RepairP2CL<double>::type repairp2( mg, v0, bnd);
         MarkDrop( mg, mg.GetLastLevel());
         mg.Refine();
         std::cout << " mg.GetLastLevel() after refine: " << mg.GetLastLevel();
@@ -302,7 +302,7 @@ int TestRepair()
         DROPS::VecDescCL v0, v1;
         v0.SetIdx(&i0);
         SetFun(v0, mg, f);
-        RepairP2CL<double> repairp2( mg, v0, bnd);
+        RepairP2CL<double>::type repairp2( mg, v0, bnd);
         UnMarkDrop( mg, mg.GetLastLevel());
         mg.Refine();
         Uint i1_Level= i0.TriangLevel();

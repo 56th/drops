@@ -213,8 +213,6 @@ void P1XtoP1 (const IdxDescCL& xidx, const VectorCL& p1x, const IdxDescCL& idx, 
                lsidxnum= lset.RowIdx->GetIdx();
     const ExtIdxDescCL& extIdx= xidx.GetXidx();
     const size_t p1unknowns = extIdx.GetNumUnknownsStdFE();
-    if (p1unknowns != idx.NumUnknowns())
-        throw DROPSErrCL( "P1XtoP1: inconsistent indices\n");
 
     negPart.resize(p1unknowns);
     posPart.resize(p1unknowns);
@@ -679,6 +677,22 @@ void permute_fe_basis (MultiGridCL& mg, IdxDescCL& idx, const PermutationT& p)
       default: throw DROPSErrCL("permute_fe_basis: unknown FE type\n");
     }
 }
+
+void
+LocalNumbP1CL::assign_indices_only (const TetraCL& s, const IdxDescCL& idx)
+{
+    const Uint sys= idx.GetIdx();
+    for (Uint i= 0; i < 4; ++i)
+        num[i]= s.GetVertex( i)->Unknowns.Exist( sys) ? s.GetVertex( i)->Unknowns( sys) : NoIdx;
+}
+
+LocalNumbP1CL::LocalNumbP1CL(const TetraCL& s, const IdxDescCL& idx)
+/// \param s The tet, from which index-numbers are read.
+/// \param idx The IdxDescCL-object to be used.
+{
+    this->assign_indices_only( s, idx);
+}
+
 
 void
 LocalNumbP2CL::assign_indices_only (const TetraCL& s, const IdxDescCL& idx)

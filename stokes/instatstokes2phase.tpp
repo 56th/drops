@@ -106,8 +106,8 @@ void SetupPrStiff_P1D( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
 inline void VelocityRepairCL::pre_refine()
 {
 #ifndef _PAR
-    p2repair_= std::auto_ptr<RepairP2CL<Point3DCL> >(
-        new RepairP2CL<Point3DCL>( stokes_.GetMG(), stokes_.v, stokes_.GetBndData().Vel));
+    p2repair_= std::auto_ptr<RepairP2CL<Point3DCL>::type >(
+        new RepairP2CL<Point3DCL>::type( stokes_.GetMG(), stokes_.v, stokes_.GetBndData().Vel));
 #else
     /// tell parallel multigrid about velocities
     GetPMG().AttachTo( &stokes_.v, &stokes_.GetBndData().Vel);
@@ -160,8 +160,10 @@ inline void
 
 #ifndef _PAR
 inline void PressureRepairCL::pre_refine()
-  /// do nothing
-{ }
+{
+    p1repair_= std::auto_ptr<RepairP1CL<double>::type >(
+        new RepairP1CL<double>::type( stokes_.GetMG(), stokes_.p, stokes_.GetBndData().Pr));
+}
 #else
 inline void PressureRepairCL::pre_refine()
   /// tell parallel multigrid about (extended) finite element function
@@ -183,11 +185,11 @@ inline void
 
     loc_pidx.CreateNumbering( stokes_.GetMG().GetLastLevel(), stokes_.GetMG(), stokes_.GetBndData().Pr, match, &ls_.Phi, &ls_.GetBndData());
     loc_p.SetIdx( &loc_pidx);
-#ifdef _PAR
+#ifndef _PAR
+    p1repair_->repair( loc_p);
+#else
     GetPMG().HandleNewIdx(&stokes_.pr_idx, &loc_p);
-#endif
     RepairAfterRefineP1( stokes_.GetPrSolution( p), loc_p);
-#ifdef _PAR
     GetPMG().CompleteRepair( &loc_p);
     if ( stokes_.UsesXFEM()){
         IdxDescCL loc_xpr_idx( P1_FE);

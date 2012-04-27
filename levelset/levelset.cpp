@@ -798,8 +798,8 @@ void LevelsetP2CL::GetMaxMinGradPhi(double& maxGradPhi, double& minGradPhi) cons
 void LevelsetRepairCL::pre_refine()
 {
 #ifndef _PAR
-    p2repair_= std::auto_ptr<RepairP2CL<double> >(
-        new RepairP2CL<double>( ls_.GetMG(), ls_.Phi, ls_.GetBndData()));
+    p2repair_= std::auto_ptr<RepairP2CL<double>::type >(
+        new RepairP2CL<double>::type( ls_.GetMG(), ls_.Phi, ls_.GetBndData()));
 #else
     /// Tell parallel multigrid about the location of the DOF
     GetPMG().AttachTo( &ls_.Phi, &ls_.GetBndData());
