@@ -101,20 +101,18 @@ template <class DistFctT>
         mg_.Refine();
         observer_.notify_post_refine();
 #ifdef _PAR
-        throw DROPSErrCL ("AdapTriangCL::ModifyGridStep uses DDD\n");
+       // throw DROPSErrCL ("AdapTriangCL::ModifyGridStep uses DDD\n");
         //pmg_->HandleUnknownsAfterRefine();
         if (lb) {
+            // Do the migration process (including the unknowns)
+//            observer_.notify_pre_refmig_sequence( mg_);
             observer_.notify_pre_migrate();
             lb_.DoMigration();
+            Assert( CheckParMultiGrid(), DROPSErrCL("AdapTriangCL::ModifyGridStep: Failure in DiST ConsCheck"),
+                   DebugParallelC|DebugParallelNumC|DebugLoadBalC);
             observer_.notify_post_migrate();
+//            observer_.notify_post_refmig_sequence();
         }
-#endif
-#ifdef _PAR
-        throw DROPSErrCL ("AdapTriangCL::ModifyGridStep uses DDD\n");
-        /*
-        Assert(!DDD_ConsCheck(), DROPSErrCL("AdapTriangCL::ModifyGridStep: Failure in DDD_ConsCheck"),
-               DebugParallelC|DebugParallelNumC|DebugLoadBalC);
-               */
 #endif
     }
     return modified;
@@ -125,7 +123,7 @@ void AdapTriangCL::UpdateTriang (const LevelsetP2CL& lset)
 /** This function updates the triangulation according to the position of the
     interface provided by the levelset function. Therefore this function marks
     and refines tetras and balance the number of tetras over the processors.
-    Also the numerical datas are interpolated to the new triangulation. */
+    Also the numerical data are interpolated to the new triangulation. */
 {
 #ifndef _PAR
     TimerCL time;

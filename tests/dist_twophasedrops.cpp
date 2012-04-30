@@ -527,23 +527,13 @@ int main (int argc, char** argv)
                               ((P.get<std::string>("Restart.Inputfile") == "none") ? P.get<int>("AdaptRef.LoadBalStrategy") : -P.get<int>("AdaptRef.LoadBalStrategy")));
     // If we read the Multigrid, it shouldn't be modified;
     // otherwise the pde-solutions from the ensight files might not fit.
-//    if (P.get("Restart.Inputfile", std::string("none")) == "none")
-//        adap.MakeInitialTriang( * DROPS::ScaMap::getInstance()[InitialLSet]);
-    mg->SizeInfo(std::cout);
-    std::cout << DROPS::SanityMGOutCL(*mg) << std::endl;
-    for (int i = 0; i<P.get<int>("AdaptRef.FinestLevel") && P.get<std::string>("Restart.Inputfile") == "none"; ++i) {
-        MarkAll( *mg);
-        mg->Refine();
-#ifdef _PAR
-        adap.GetLb().DoMigration();
-#endif
-        mg->SizeInfo(std::cout);
-        std::cout << DROPS::SanityMGOutCL(*mg) << std::endl;
-    }
+    if (P.get("Restart.Inputfile", std::string("none")) == "none")
+        adap.MakeInitialTriang( * DROPS::ScaMap::getInstance()[InitialLSet]);
+
     std::cout << DROPS::SanityMGOutCL(*mg) << std::endl;
 #ifdef _PAR
- //   if (DROPS::ProcCL::Check( CheckParMultiGrid( adap.GetPMG())))
- //       std::cout << "As far as I can tell the ParMultigridCl is sane\n";
+    if ( DROPS::CheckParMultiGrid())
+        std::cout << "As far as I can tell the ParMultigridCL is sane\n";
     std::string filename("sane.chk");
     DROPS::ProcCL::AppendProcNum(filename);
     std::ofstream sanityfile( filename.c_str());
@@ -552,12 +542,10 @@ int main (int argc, char** argv)
     info.Instance().DebugInfo(sanityfile);
     sanityfile << "\n\n===========================\n\n";
 
-    if ( DROPS::ProcCL::Check( DROPS::DiST::InfoCL::Instance().IsSane( sanityfile))){
+    if ( DROPS::ProcCL::Check( DROPS::DiST::InfoCL::Instance().IsSane( sanityfile)))
         std::cout << " DiST-module seems to be alright!" << std::endl;
-    }
-    else{
+    else
         std::cout << " DiST-module seems to be broken!" << std::endl;
-    }
 #endif
     DROPS::InstatNavierStokes2PhaseP2P1CL prob( *mg, DROPS::TwoPhaseFlowCoeffCL(P), bnddata, P.get<double>("Stokes.XFEMStab")<0 ? DROPS::P1_FE : DROPS::P1X_FE, P.get<double>("Stokes.XFEMStab"));
 
