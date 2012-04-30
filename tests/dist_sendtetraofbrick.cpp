@@ -135,8 +135,8 @@ int main( int argc, char **argv)
             }
             sanityfile << "\n\n===========================\n\n";
         }
-        std::cout << "Testing Identify and PrioChange..." << std::endl;
-        mg->test();
+//        std::cout << "Testing Identify and PrioChange..." << std::endl;
+//        mg->test();
         std::cout << "Tests finished." << std::endl;
         info.SizeInfo(sanityfile);
         info.Instance().DebugInfo(sanityfile);

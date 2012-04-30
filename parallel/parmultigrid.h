@@ -150,11 +150,11 @@ class ParMultiGridCL
     // @{
     bool IsSane(std::ostream&, int Level= -1) const;                 // Check if distributed edges and faces have the same subsimplices
     bool CheckMFR( int Level, std::ostream& os) const;               // Check local MFR on edges.
+    bool ConsCheck(std::ostream&) const;                             // DiST consistency check
 
-    void DebugInfo(std::ostream&) const;                             // writes usefull infos onto outputstream
-    void Show(const DiST::Helper::GeomIdCL& gid, char *mesg, int proc= -1);                // Show the simplex with a given GID
-    void ConsCheck();                                                // DiST-Consisty-Check
-    double GetBalance();                                             // Calculate Imbalance of triangulation over procs on last triangulation-level --> Communication
+    void DebugInfo(std::ostream&) const;                             // writes useful infos onto output stream
+    void Show(const DiST::Helper::GeomIdCL& gid, char *mesg, int proc= -1) const; // Show the simplex with a given GID
+    double GetBalance() const;                                       // Calculate Imbalance of triangulation over procs on last triangulation-level --> Communication
     // @}
 };
 
@@ -170,7 +170,7 @@ enum { MIG=0, REF=1 };
 void PrintMG(const ParMultiGridCL&, int type=MIG);
 
 /// \brief Check parallel multigrid and write output into the file output/sane_(proc_id).chk
-bool CheckParMultiGrid(const DROPS::ParMultiGridCL&);
+bool CheckParMultiGrid();
 
 } // end of namespace DROPS
 

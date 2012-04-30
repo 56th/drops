@@ -1161,32 +1161,6 @@ Ulint GetExclusiveEdges(const MultiGridCL &mg, Priority prio, int lvl)
 }
 #endif
 
-void MultiGridCL::test()
-{
-    PrepareModify();
-    AppendLevel();
-    ParMultiGridCL::Instance().IdentifyBegin();
-    for ( EdgeIterator eit( Edges_[0].begin()); eit!=Edges_[0].end(); ++eit){
-        if ( !eit->IsOnBoundary())
-            eit->BuildMidVertex( factory_, Bnd_);
-    }
-    ParMultiGridCL::Instance().IdentifyEnd();
-    FinalizeModify();
-
-    // change priority of vertices on level 1
-    ParMultiGridCL::Instance().ModifyBegin();
-    for ( VertexIterator vit( GetVerticesBegin(1)); vit!=GetVerticesEnd(1); ++vit){
-        ParMultiGridCL::Instance().PrioChange( &*vit, PrioMaster);
-    }
-    ParMultiGridCL::Instance().ModifyEnd();
-
-    // check sanity of DiST
-    if ( DROPS::ProcCL::Check( DiST::InfoCL::Instance().IsSane( std::cerr)))
-        std::cout << "DiST module reports sanity!" << std::endl;
-    else
-        std::cout << "DiST module reports errors!" << std::endl;
-}
-
 void ColorClassesCL::compute_neighbors (MultiGridCL::const_TriangTetraIteratorCL begin,
                                         MultiGridCL::const_TriangTetraIteratorCL end,
                                         std::vector<TetraNumVecT>& neighbors, match_fun match, const BndCondCL& Bnd)

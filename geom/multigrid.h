@@ -325,9 +325,6 @@ class MultiGridCL
     const ColorClassesCL& GetColorClasses (int Level, match_fun match, const BndCondCL& Bnd) const;
 
     bool IsSane (std::ostream&, int Level=-1) const;
-
-
-    void test();
 };
 
 

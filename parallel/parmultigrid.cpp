@@ -775,9 +775,9 @@ MultiGridCL& ParMultiGridCL::GetMG()
 /****************************************************************************
 * D E B U G I N F O                                                         *
 ****************************************************************************/
-/// \brief Show an simplex by GID
+/// \brief Show simplex by GID
 /** Search on proc (or all procs) for a simplex of given GID and show DebugInfo*/
-void ParMultiGridCL::Show( const DiST::Helper::GeomIdCL& gid, char *mesg, int proc)
+void ParMultiGridCL::Show( const DiST::Helper::GeomIdCL& gid, char *mesg, int proc) const
 {
     for (Uint l= 0; l<= mg_->GetLastLevel(); ++l)
     {
@@ -808,14 +808,12 @@ void ParMultiGridCL::Show( const DiST::Helper::GeomIdCL& gid, char *mesg, int pr
 }
 
 
-/// \brief Writes all vertices, edges, faces and tetraeders onto the ostream
-/// \todo DiST: Implement me!
-void ParMultiGridCL::DebugInfo(std::ostream &) const
+/// \brief Writes all vertices, edges, faces and tetrahedra onto the stream
+void ParMultiGridCL::DebugInfo(std::ostream & os) const
 {
-/*
     os << "I have:\n";
-    os << _VertCont->size() << " vertices, " << _EdgeCont->size() << " edges, " << _FaceCont->size() << " faces,"
-            << _TetraCont->size() << " tetras" << std::endl;
+    os << mg_->GetVertices().size() << " vertices, " << mg_->GetEdges().size() << " edges, "
+       << mg_->GetFaces().size() << " faces," << mg_->GetTetras().size() << " tetras" << std::endl;
 
     os << "\nThe Vertices are:\n";
     MultiGridCL::const_VertexIterator vit=mg_->GetAllVertexBegin();
@@ -871,20 +869,29 @@ void ParMultiGridCL::DebugInfo(std::ostream &) const
         sit->DebugInfo(os);
 
     os << "\n";
-*/
 }
 
-/// \brief Calc Balance over procs over tetras in the last triangulation level
+/// \brief Calculate balance of tetras over procs in the last triangulation level
 /** This function compares the largest number of tetras in the last triangulation level
     with the number of the smallest number of tetras and returns the ratio.
     (1 is perfect, 0 is totally unbalanced) */
-double ParMultiGridCL::GetBalance()
+double ParMultiGridCL::GetBalance() const
 {
     int myTetras = mg_->TriangTetra_.size();    // all procs count their tetras
     int maxTetras = ProcCL::GlobalMax(myTetras);
     int minTetras = ProcCL::GlobalMin(myTetras);
 
     return std::fabs(1- (double)(maxTetras)/(double)(minTetras));
+}
+
+bool ParMultiGridCL::ConsCheck( std::ostream& os) const
+{
+    const bool cons= DROPS::ProcCL::Check( DROPS::DiST::InfoCL::Instance().IsSane( os));
+    if ( cons )
+        std::cout << " DiST-module seems to be alright!" << std::endl;
+    else
+        std::cout << " DiST-module seems to be broken!" << std::endl;
+    return cons;
 }
 
 void PrintMG(const DROPS::ParMultiGridCL& pmg, int type)
@@ -911,9 +918,8 @@ void PrintMG(const DROPS::ParMultiGridCL& pmg, int type)
     file.close();
 }
 
-bool CheckParMultiGrid(const ParMultiGridCL& pmg)
+bool CheckParMultiGrid()
 /**  Check parallel and sequential multigrid on each processor
-    \param pmg The parallel multigrid
 */
 {
     char dat[30];
@@ -927,9 +933,11 @@ bool CheckParMultiGrid(const ParMultiGridCL& pmg)
     else{
         output.rdbuf(checkfile.rdbuf());
     }
+    const ParMultiGridCL& pmg= ParMultiGridCL::Instance();
     bool pmg_sane = pmg.IsSane(output),
-         mg_sane  = pmg.GetMG().IsSane(output);
-    bool sane     = ProcCL::Check(pmg_sane && mg_sane);
+         mg_sane  = pmg.GetMG().IsSane(output),
+         dist_sane= pmg.ConsCheck(output);
+    bool sane     = ProcCL::Check(pmg_sane && mg_sane && dist_sane);
     if (!sane)
         throw DROPSErrCL("CheckParMultiGrid: Multigrid is not sane!");
     return sane;
