@@ -108,6 +108,7 @@ void MigrateFECL::post_migrate()
     CopyVecElements( loc_vec, dims);
 
     obs_->swap( loc_idx, loc_vec.Data);
+    loc_idx.DeleteNumbering( *mg_);
     recvBuf_.clear();
     // update FE space and vector
     old_idx_= obs_->GetIdxDesc();
