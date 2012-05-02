@@ -100,6 +100,7 @@ template <class ValueT, template<class> class LocalFEDataT>
 
     interf = new DiST::InterfaceCL( lvls, from, to, dimlist, true);
     interf->Communicate( handler);
+    delete interf;
 #endif
 }
 
