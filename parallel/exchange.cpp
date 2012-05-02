@@ -1423,7 +1423,7 @@ bool ExchangeBuilderCL::HandlerDOFRecvCL::Scatter( DiST::TransferableCL& t,
     const IdxT extdof= (isExtended) ? rowidx_.GetXidx()[dof] : NoIdx;
     const int me= ProcCL::MyRank(),
             owner= hs_.owner_[dof];
-    int sender, senddof, sendextdof;
+    int sender, senddof, sendextdof = NoInt_;
 
     for ( size_t data=0; data<numData; ++data) {
         // receive data for phase 1, only DoF owner fills receive list 1

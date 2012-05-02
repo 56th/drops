@@ -425,6 +425,15 @@ class MLIdxDescCL : public MLDataCL<IdxDescCL>
     /// \brief Returns the matching function for periodic boundaries
     match_fun GetMatchingFunction() const {return this->GetFinest().GetMatchingFunction(); }
 
+    void swap (MLIdxDescCL& obj){
+        if (this->size() != obj.size())
+            throw DROPSErrCL("MLIdxDescCL::swap different size)");
+        MLIdxDescCL::iterator it = this->begin(), sec = obj.begin();
+        for ( ; it!= this->end(); ++it, ++sec)
+            it->swap(*sec);
+
+    }
+
 
 #ifdef _PAR
     /// \brief Get a reference on the ExchangeCL (of the finest level)

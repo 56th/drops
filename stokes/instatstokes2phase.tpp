@@ -116,7 +116,7 @@ inline void
     VelVecDescCL& v= stokes_.v;
     Uint LastLevel= stokes_.GetMG().GetLastLevel();
     match_fun match= stokes_.GetMG().GetBnd().GetMatchFun();
-    IdxDescCL loc_vidx( vecP2_FE);
+    MLIdxDescCL loc_vidx( vecP2_FE, stokes_.vel_idx.size());
 
     loc_vidx.CreateNumbering( LastLevel, stokes_.GetMG(), stokes_.GetBndData().Vel, match);
     if (LastLevel != v.RowIdx->TriangLevel()) {
@@ -129,9 +129,9 @@ inline void
     p2repair_->repair( loc_v);
 
     v.Clear( v.t);
-    v.RowIdx->DeleteNumbering( stokes_.GetMG());
+    stokes_.vel_idx.DeleteNumbering( stokes_.GetMG());
 
-    stokes_.vel_idx.GetFinest().swap( loc_vidx);
+    stokes_.vel_idx.swap( loc_vidx);
     v.SetIdx( &stokes_.vel_idx);
     v.Data= loc_v.Data;
 }
@@ -140,8 +140,8 @@ inline void
   VelocityRepairCL::post_refine_sequence ()
   /// Create numbering for all idx level
 {
-    match_fun match= stokes_.GetMG().GetBnd().GetMatchFun();
-    stokes_.CreateNumberingVel( stokes_.GetMG().GetLastLevel(), &stokes_.vel_idx, *match);
+//    match_fun match= stokes_.GetMG().GetBnd().GetMatchFun();
+//    stokes_.CreateNumberingVel( stokes_.GetMG().GetLastLevel(), &stokes_.vel_idx, *match);
 }
 
 
@@ -159,7 +159,7 @@ inline void
   PressureRepairCL::post_refine ()
 {
     VecDescCL loc_p;
-    IdxDescCL loc_pidx( stokes_.GetPrFE());
+    MLIdxDescCL loc_pidx( stokes_.GetPrFE(), stokes_.pr_idx.size());
     VecDescCL& p= stokes_.p;
     match_fun match= stokes_.GetMG().GetBnd().GetMatchFun();
 
@@ -169,8 +169,8 @@ inline void
     p1repair_->repair( loc_p);
 
     p.Clear( p.t);
-    p.RowIdx->DeleteNumbering( stokes_.GetMG());
-    stokes_.pr_idx.GetFinest().swap( loc_pidx);
+    stokes_.pr_idx.DeleteNumbering( stokes_.GetMG());
+    stokes_.pr_idx.swap( loc_pidx);
     p.SetIdx( &stokes_.pr_idx);
     p.Data= loc_p.Data;
 }
@@ -185,8 +185,9 @@ inline void
   PressureRepairCL::post_refine_sequence ()
   /// Create numbering for all idx level
 {
-    match_fun match= stokes_.GetMG().GetBnd().GetMatchFun();
-    stokes_.CreateNumberingPr( stokes_.GetMG().GetLastLevel(), &stokes_.pr_idx, match, &ls_);
+//    match_fun match= stokes_.GetMG().GetBnd().GetMatchFun();
+//    stokes_.DeleteNumbering(&stokes_.pr_idx);
+//    stokes_.CreateNumberingPr( stokes_.GetMG().GetLastLevel(), &stokes_.pr_idx, match, &ls_);
     (*p1xrepair_)();
     p1xrepair_.reset();
 }
