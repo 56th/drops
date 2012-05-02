@@ -27,7 +27,6 @@
 #include "parallel/DiST.h"
 #include "parallel/partime.h"
 #include "parallel/loadbal.h"
-#include "parallel/parmgserialization.h"
 
 // geometry Header-Files
 #include "geom/builder.h"

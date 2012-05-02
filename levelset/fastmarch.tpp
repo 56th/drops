@@ -220,26 +220,27 @@ void InitZeroP1CL<scale>::Perform()
 /** If level set dof are located on the simplex and distance triangles are associated to
     the corresponding dof, put them into the "tosend"-list for sharing processes
 */
-template<typename SimplexT>
-int ParInitZeroExactCL::ExecGatherDistTriang(OBJT obj)
-{
-    SimplexT* const sp= ddd_cast<SimplexT*>(obj);
-    const Uint idx= actualData_->phi.RowIdx->GetIdx();
-    if ( sp->Unknowns.Exist() && sp->Unknowns.Exist( idx)){
-        const IdxT dof= sp->Unknowns( idx);
-        if ( !(*distTriangs_)[dof].empty()){
-            throw DROPSErrCL( "ParInitZeroExactCL::ExecGatherDistTriang uses old ExchangeCL functions\n");
+
+//template<typename SimplexT>
+//int ParInitZeroExactCL::ExecGatherDistTriang(OBJT obj)
+//{
+//    SimplexT* const sp= ddd_cast<SimplexT*>(obj);
+//    const Uint idx= actualData_->phi.RowIdx->GetIdx();
+//    if ( sp->Unknowns.Exist() && sp->Unknowns.Exist( idx)){
+//        const IdxT dof= sp->Unknowns( idx);
+//        if ( !(*distTriangs_)[dof].empty()){
+//            throw DROPSErrCL( "ParInitZeroExactCL::ExecGatherDistTriang uses old ExchangeCL functions\n");
 /*            const ExchangeCL::ProcNumCT neighs= actualData_->phi.RowIdx->GetEx().GetProcs(dof);
             for ( typename ExchangeCL::ProcNumCT::const_iterator it=neighs.begin(); it!=neighs.end(); ++it)
                 toSend_->insert( (*distTriangs_)[dof].begin(), (*distTriangs_)[dof].end());
             maxTriangsPerDOF_= std::max( maxTriangsPerDOF_, (*distTriangs_)[dof].size());*/
-        }
-    }
-    return 0;
-}
+//        }
+//    }
+//    return 0;
+//}
 
 /** Put send position in the buffer. The first number of the buffer represents the process*/
-template<typename SimplexT>
+/*template<typename SimplexT>
 int ParInitZeroExactCL::HandlerDistTriangGatherPos(OBJT objp, void* buf)
 {
     SimplexT* const sp= ddd_cast<SimplexT*>(objp);
@@ -272,26 +273,26 @@ int ParInitZeroExactCL::HandlerDistTriangScatterPos(OBJT objp, void* buf)
         }
     }
     return 0;
-}
+}*/
 #endif
 
 #ifdef _PAR
-template<typename SimplexT>
-  int FastmarchingOnMasterCL::HandlerGlobDOFGather(OBJT objp, void* buf)
+//template<typename SimplexT>
+//  int FastmarchingOnMasterCL::HandlerGlobDOFGather(OBJT objp, void* buf)
 /** On sender side collect global number of dof on a simplex (if not there send NoIdx)*/
-{
+/*{
     SimplexT* const sp= ddd_cast<SimplexT*>(objp);
     IdxT* buffer      = static_cast<IdxT*>(buf);
     Uint  idx         = actualData_->phi.RowIdx->GetIdx();
     if (sp->Unknowns.Exist() && sp->Unknowns.Exist( idx))
         *buffer= globNumb_[ sp->Unknowns( idx)];      // may be NoIdx if simplex is not exclusive
     return 0;
-}
+}*/
 
-template<typename SimplexT>
-  int FastmarchingOnMasterCL::HandlerGlobDOFScatter(OBJT objp, void* buf)
+//template<typename SimplexT>
+//  int FastmarchingOnMasterCL::HandlerGlobDOFScatter(OBJT objp, void* buf)
 /** On received side collect global number of dof on simplex if sender has send a number*/
-{
+/*{
     SimplexT* const sp = ddd_cast<SimplexT*>(objp);
     const IdxT* buffer = static_cast<IdxT*>(buf);
     Uint  idx          = actualData_->phi.RowIdx->GetIdx();
@@ -302,12 +303,12 @@ template<typename SimplexT>
         }
     }
     return 0;
-}
+}*/
 
-template<typename SimplexT>
-  int FastmarchingOnMasterCL::HandlerFinishedGather(OBJT objp, void* buf)
+//template<typename SimplexT>
+//  int FastmarchingOnMasterCL::HandlerFinishedGather(OBJT objp, void* buf)
 /** On sender-side collect typ and value of distributed DoF*/
-{
+/*{
     SimplexT* const sp= ddd_cast<SimplexT*>(objp);              // pointer to simplex
     CoupMarkValST* buffer = static_cast<CoupMarkValST*>(buf);   // pointer to coupling of mark and value
     Uint idx= actualData_->phi.RowIdx->GetIdx();
@@ -318,12 +319,12 @@ template<typename SimplexT>
     buffer->mark= actualData_->typ[Nr];                        // set typ
     buffer->val=  actualData_->phi.Data[Nr];                   // set value
     return 0;
-}
+}*/
 
-template<typename SimplexT>
-  int FastmarchingOnMasterCL::HandlerFinishedScatter(OBJT objp, void* buf)
+//template<typename SimplexT>
+//  int FastmarchingOnMasterCL::HandlerFinishedScatter(OBJT objp, void* buf)
 /** On receiver side, update value and mark of finished DoFs*/
-{
+/*{
     SimplexT* const sp= ddd_cast<SimplexT*>(objp);
     CoupMarkValST* buffer = static_cast<CoupMarkValST*>(buf);
     Uint idx= actualData_->phi.RowIdx->GetIdx();
@@ -344,7 +345,7 @@ template<typename SimplexT>
     }
 
     return 0;
-}
+}*/
 #endif
 
 InitZeroP2CL::RepTetra::RepTetra( const TetraCL& t, LocalP1CL<Point3DCL>* Gref, const ReparamDataCL& data)

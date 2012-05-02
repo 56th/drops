@@ -28,7 +28,6 @@
 
 
 #include "parallel/loadbal.h"
-#include "parallel/addeddata.h"
 #include "parallel/DiST.h"
 
 #include "misc/utils.h"

@@ -319,17 +319,17 @@ class ParInitZeroExactCL : public InitZeroExactCL
 
     /// \name Handler for DDD
     //@{
-    template<typename SimplexT> static int ExecGatherDistTriang(OBJT);
-    template<typename SimplexT> static int HandlerDistTriangGatherPos(OBJT, void*);
-    template<typename SimplexT> static int HandlerDistTriangScatterPos(OBJT, void*);
+//    template<typename SimplexT> static int ExecGatherDistTriang(OBJT);
+//    template<typename SimplexT> static int HandlerDistTriangGatherPos(OBJT, void*);
+//    template<typename SimplexT> static int HandlerDistTriangScatterPos(OBJT, void*);
     //@}
 };
-extern "C" int ExecGatherDistTriangVertexC(OBJT objp);
-extern "C" int ExecGatherDistTriangEdgeC(OBJT objp);
-extern "C" int HandlerDistTriangGatherPosVertexC(OBJT objp, void* buf);
-extern "C" int HandlerDistTriangGatherPosEdgeC(OBJT objp, void* buf);
-extern "C" int HandlerDistTriangScatterPosVertexC(OBJT objp, void* buf);
-extern "C" int HandlerDistTriangScatterPosEdgeC(OBJT objp, void* buf);
+//extern "C" int ExecGatherDistTriangVertexC(OBJT objp);
+//extern "C" int ExecGatherDistTriangEdgeC(OBJT objp);
+//extern "C" int HandlerDistTriangGatherPosVertexC(OBJT objp, void* buf);
+//extern "C" int HandlerDistTriangGatherPosEdgeC(OBJT objp, void* buf);
+//extern "C" int HandlerDistTriangScatterPosVertexC(OBJT objp, void* buf);
+//extern "C" int HandlerDistTriangScatterPosEdgeC(OBJT objp, void* buf);
 #endif
 
 
@@ -511,24 +511,24 @@ class FastmarchingOnMasterCL : public FastmarchingCL
 
   public:
     /// \brief Gather global number of DoFs
-    template<class SimplexT> static int HandlerGlobDOFGather(OBJT, void*);
+//    template<class SimplexT> static int HandlerGlobDOFGather(OBJT, void*);
     /// \brief Scatter global number of DoFs
-    template<class SimplexT> static int HandlerGlobDOFScatter(OBJT, void*);
+//    template<class SimplexT> static int HandlerGlobDOFScatter(OBJT, void*);
     /// \brief Gather finished DoF
-    template<class SimplexT> static int HandlerFinishedGather(OBJT, void*);
+//    template<class SimplexT> static int HandlerFinishedGather(OBJT, void*);
     /// \brief Scatter finished DoF
-    template<class SimplexT> static int HandlerFinishedScatter(OBJT, void*);
+//    template<class SimplexT> static int HandlerFinishedScatter(OBJT, void*);
 };
 /// \name  Wrapper for DDD
 //@{
-extern "C" int HandlerGlobDOFGatherVertexC(OBJT objp, void* buf);
-extern "C" int HandlerGlobDOFGatherEdgeC(OBJT objp, void* buf);
-extern "C" int HandlerGlobDOFScatterVertexC(OBJT objp, void* buf);
-extern "C" int HandlerGlobDOFScatterEdgeC(OBJT objp, void* buf);
-extern "C" int HandlerFinishedGatherVertexC(OBJT objp, void* buf);
-extern "C" int HandlerFinishedGatherEdgeC(OBJT objp, void* buf);
-extern "C" int HandlerFinishedScatterVertexC(OBJT objp, void* buf);
-extern "C" int HandlerFinishedScatterEdgeC(OBJT objp, void* buf);
+//extern "C" int HandlerGlobDOFGatherVertexC(OBJT objp, void* buf);
+//extern "C" int HandlerGlobDOFGatherEdgeC(OBJT objp, void* buf);
+//extern "C" int HandlerGlobDOFScatterVertexC(OBJT objp, void* buf);
+//extern "C" int HandlerGlobDOFScatterEdgeC(OBJT objp, void* buf);
+//extern "C" int HandlerFinishedGatherVertexC(OBJT objp, void* buf);
+//extern "C" int HandlerFinishedGatherEdgeC(OBJT objp, void* buf);
+//extern "C" int HandlerFinishedScatterVertexC(OBJT objp, void* buf);
+//extern "C" int HandlerFinishedScatterEdgeC(OBJT objp, void* buf);
 //@}
 #endif
 

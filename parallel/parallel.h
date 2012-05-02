@@ -30,20 +30,10 @@
 #include <string>
 #include <numeric>
 #include "misc/utils.h"
-#include "parallel/distributeddatatypes.h"
 
 
 namespace DROPS
 {
-
-/***************************************************************************
-*   C A S T I N G   O F   D D D - P O I N T E R S                          *
-***************************************************************************/
-template<typename T> T ddd_cast (OBJT p)
-  { return reinterpret_cast<T>(p); }
-
-template<typename T> OBJT ddd_cast (T* p)
-  { return reinterpret_cast<OBJT>(p); }
 
 /***************************************************************************
 *   G L O B A L - O P E R A T I O N S                                      *

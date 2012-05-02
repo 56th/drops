@@ -38,7 +38,6 @@
 
 #ifdef _PAR
 #  include "parallel/parallel.h"
-#  include "parallel/distributeddatatypes.h"
 #  include "parallel/DiST.h"
 #  include <map>
 #endif

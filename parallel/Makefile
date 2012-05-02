@@ -16,7 +16,7 @@ default:
 
 all: $(EXEC)
 
-PAR_OBJ = parallel.o parmultigrid.o partime.o addeddata.o loadbal.o exchange.o memmgr_std.o parmgserialization.o logger.o parddd.o
+PAR_OBJ = parallel.o parmultigrid.o partime.o loadbal.o exchange.o logger.o
 
 # include common rules:
 include ../Make.common

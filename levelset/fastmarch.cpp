@@ -728,7 +728,7 @@ ParInitZeroExactCL::ToSendDistTriangMapT* ParInitZeroExactCL::toSend_         = 
 InitZeroExactCL::DofToDistTriangT*        ParInitZeroExactCL::distTriangs_    = 0;
 std::map<int, size_t>*                    ParInitZeroExactCL::actualOffset_   = 0;
 size_t                                    ParInitZeroExactCL::maxTriangsPerDOF_=0;
-
+/*
 extern "C" int ExecGatherDistTriangVertexC(OBJT objp){
     return ParInitZeroExactCL::ExecGatherDistTriang<VertexCL>(objp);
 }
@@ -747,7 +747,7 @@ extern "C" int HandlerDistTriangScatterPosVertexC(OBJT objp, void* buf){
 extern "C" int HandlerDistTriangScatterPosEdgeC(OBJT objp, void* buf){
     return ParInitZeroExactCL::HandlerDistTriangScatterPos<EdgeCL>(objp, buf);
 }
-
+*/
 /** Use the DDD Handler  ExecGatherDistTriang, but we do not distinguish between
     neighbor processes to to lag of DDD functions to whom the data are communicated
  */
@@ -1221,7 +1221,7 @@ void FastmarchingOnMasterCL::CreateGlobNumb()
     }
 #endif
 }
-
+/*
 extern "C" int HandlerGlobDOFGatherVertexC(OBJT objp, void* buf){
     return FastmarchingOnMasterCL::HandlerGlobDOFGather<VertexCL>(objp, buf);
 }
@@ -1234,7 +1234,7 @@ extern "C" int HandlerGlobDOFScatterVertexC(OBJT objp, void* buf){
 extern "C" int HandlerGlobDOFScatterEdgeC(OBJT objp, void* buf){
     return FastmarchingOnMasterCL::HandlerGlobDOFScatter<EdgeCL>(objp,buf);
 }
-
+*/
 /** this function uses the DDD-Interfaces of master vertices and edges */
 void FastmarchingOnMasterCL::DistributeFinished()
 {
@@ -1248,7 +1248,7 @@ void FastmarchingOnMasterCL::DistributeFinished()
                    HandlerFinishedGatherEdgeC,   HandlerFinishedScatterEdgeC );*/
     actualData_=0 ;
 }
-
+/*
 extern "C" int HandlerFinishedGatherVertexC(OBJT objp, void* buf){
     return FastmarchingOnMasterCL::HandlerFinishedGather<VertexCL>(objp,buf);
 }
@@ -1261,7 +1261,7 @@ extern "C" int HandlerFinishedScatterVertexC(OBJT objp, void* buf){
 extern "C" int HandlerFinishedScatterEdgeC(OBJT objp, void* buf){
     return FastmarchingOnMasterCL::HandlerFinishedScatter<EdgeCL>(objp,buf);
 }
-
+*/
 /** Get all local data of types, coordinates, values and tetrahedra
     Here, as well, the mapping "send/receive element -> local number"
     is created
