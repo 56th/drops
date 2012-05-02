@@ -467,7 +467,7 @@ class ExchangeBuilderCL
     void buildViaOwner();
     /// \brief Build the data structures where all processes communicate
     ///        directly with their neighbors
-    void buildDirectComm();
+    void buildNtoN();
     /// \name Helper functions for the build
     //{@
     /// \brief Determine DOF owner among all procs, which hold the local dof (as well as the local extended dof, in case of XFEM).
@@ -484,7 +484,8 @@ class ExchangeBuilderCL
     class HandlerDOFExchangeCL;
     class HandlerDOFSendCL;
     class HandlerDOFRecvCL;
-    class HandlerDOFDirectCommCL;
+    class HandlerDOFNtoNSendCL;
+    class HandlerDOFNtoNRecvCL;
     class HandlerDOFIndexCL;
 
   public:
@@ -492,7 +493,7 @@ class ExchangeBuilderCL
     ~ExchangeBuilderCL() { if (interf_) delete interf_; interf_=0; }
 
     /// \brief Build the ExchangeCL specified in the constructor
-    void build() { ex_.viaowner_ ? buildViaOwner() : buildDirectComm(); }
+    void build() { ex_.viaowner_ ? buildViaOwner() : buildNtoN(); }
 };
 
 

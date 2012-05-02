@@ -1491,24 +1491,19 @@ void ExchangeBuilderCL::HandlerDOFRecvCL::buildRecvStructures( ExchangeCL::RecvL
 }
 
 /******************************************************************************
-* H A N D L E R  D O F  D I R E C T  C O M M  C L                             *
+* H A N D L E R  D O F  N - T O - N  S E N D  C L                             *
 ******************************************************************************/
 
-/// \brief Handler for building the data structures for a single communication phase
-class ExchangeBuilderCL::HandlerDOFDirectCommCL : public HandlerDOFExchangeCL
+/// \brief Handler for collecting the DOF for a single N-to-N communication phase
+class ExchangeBuilderCL::HandlerDOFNtoNSendCL : public HandlerDOFExchangeCL
 {
   private:
+    friend class HandlerDOFNtoNRecvCL;
     typedef HandlerDOFExchangeCL base;      ///< base class
     SendDOFListT                 sendList_; ///< list of dof which have to be sent
-    RecvDofT                     recvList_; ///< list by send positions, where to store the dof
-    /// \brief Collect dof which have to be sent
-    void collectDOF();
-    /// \brief Collect all dof on a given simplex \a s
-    void collectDOFonSimplex( const DiST::TransferableCL& s);
-
   public:
-    HandlerDOFDirectCommCL( IdxDescCL& rowidx, const MultiGridCL& mg)
-        : base( rowidx, mg) { collectDOF(); }
+    HandlerDOFNtoNSendCL( IdxDescCL& rowidx, const MultiGridCL& mg)
+        : base( rowidx, mg) {}
 
     ///\name Handler for DiST::InterfaceCL
     //@{
@@ -1516,63 +1511,109 @@ class ExchangeBuilderCL::HandlerDOFDirectCommCL : public HandlerDOFExchangeCL
     bool Scatter( DiST::TransferableCL&, const size_t&, DiST::Helper::MPIistreamCL&);
     //@}
     /// \brief Build data structures for sending
-    void buildSendStructures( ExchangeCL::SendListT& ex_sendlist) const
-    { base::buildSendStructures( sendList_, ex_sendlist); }
+    void buildSendStructures( ExchangeCL::SendListT& ex_sendlist);
+};
+
+bool ExchangeBuilderCL::HandlerDOFNtoNSendCL::Gather( DiST::TransferableCL& t,
+    DiST::Helper::SendStreamCL& send)
+/** If the simplex \a t is distributed among master copies, then put
+    - (1) my rank,
+    - (2) the dof (or NoInt_ if dof not in triang level on local proc),
+    - (3) only for extended FE spaces: the extended dof (or NoInt_ if extended dof == NoIdx on local proc)
+    into the send buffer. Return true.
+    Else,
+      return false.
+*/
+{ // same code as HanderDOFSendCL::Gather !
+    if (!t.IsDistributed(PrioMaster))
+        return false;
+
+    const Uint idx= rowidx_.GetIdx();
+    send << ProcCL::MyRank(); // (1)
+
+    if ( t.Unknowns.Exist() && t.Unknowns.Exist( idx) && t.Unknowns.InTriangLevel(rowidx_.TriangLevel())) {
+        const IdxT dof= t.Unknowns(idx);
+        send << static_cast<int>(dof); // (2)
+
+        if (rowidx_.IsExtended()) { // XFEM case
+            const IdxT exdof= rowidx_.GetXidx()[dof];
+            send << (exdof!=NoIdx ? static_cast<int>(exdof) : NoInt_); // (3)
+        }
+    } else {
+        send << NoInt_; // (2)
+        if (rowidx_.IsExtended()) { // write (3)
+            send << NoInt_; // (3)
+        }
+    }
+    return true;
+}
+
+bool ExchangeBuilderCL::HandlerDOFNtoNSendCL::Scatter( DiST::TransferableCL& t,
+    const size_t& numData, DiST::Helper::MPIistreamCL& recv)
+/** Send buffers for direct N-to-N communication are filled by all procs with distributed dofs.
+ */
+{
+    const Uint idx= rowidx_.GetIdx();
+    int sender=-1, senddof=-1;
+
+    if ( t.Unknowns.Exist() && t.Unknowns.Exist( idx) && t.Unknowns.InTriangLevel(rowidx_.TriangLevel())) {
+        // local dofs
+        const IdxT dof= t.Unknowns(idx);
+        const bool isExtended= (rowidx_.IsExtended() && rowidx_.GetXidx()[dof]!=NoIdx);
+        const IdxT exdof=  isExtended ? rowidx_.GetXidx()[dof] : NoIdx;
+
+        for (size_t i=0; i<numData; ++i) {
+            recv >> sender >> senddof;
+            if (senddof!=NoInt_)
+                sendList_[sender].push_back(static_cast<int>(dof));
+            if (rowidx_.IsExtended()) {// XFEM case
+                recv >> senddof;
+                if (isExtended && senddof!=NoInt_)
+                    sendList_[sender].push_back(static_cast<int>(exdof));
+            }
+        }
+    } else { // I have no dof for this index
+        const size_t N= numData*(rowidx_.IsExtended() ? 3 : 2);
+        for ( size_t i=0; i<N; ++i) { // read my part from stream w/o doing anything with it
+            recv >> senddof;
+        }
+    }
+    return true;
+}
+
+void ExchangeBuilderCL::HandlerDOFNtoNSendCL::buildSendStructures( ExchangeCL::SendListT& ex_sendlist)
+{
+    sortDOF( sendList_);
+    base::buildSendStructures( sendList_, ex_sendlist);
+}
+
+/******************************************************************************
+* H A N D L E R  D O F  N - T O - N  R E C V  C L                             *
+******************************************************************************/
+
+/// \brief Handler for building the data structures for a single N-to-N communication phase
+class ExchangeBuilderCL::HandlerDOFNtoNRecvCL : public HandlerDOFExchangeCL
+{
+  private:
+    typedef HandlerDOFExchangeCL base;      ///< base class
+    const HandlerDOFNtoNSendCL&  hs_;       ///< corresponding send handler storing the send list
+    RecvDofT                     recvList_; ///< list by send positions, where to store the dof
+
+  public:
+    HandlerDOFNtoNRecvCL( IdxDescCL& rowidx, const MultiGridCL& mg, const HandlerDOFNtoNSendCL& handlerSend)
+        : base( rowidx, mg), hs_(handlerSend) {}
+
+    ///\name Handler for DiST::InterfaceCL
+    //@{
+    bool Gather( DiST::TransferableCL&, DiST::Helper::SendStreamCL&);
+    bool Scatter( DiST::TransferableCL&, const size_t&, DiST::Helper::MPIistreamCL&);
+    //@}
     /// \brief Build data structures for receiving
     void buildRecvStructures( ExchangeCL::RecvListT& ex_recvlist) const
     { base::buildRecvStructures( recvList_, ex_recvlist); }
 };
 
-void ExchangeBuilderCL::HandlerDOFDirectCommCL::collectDOF()
-/** Collect all dof which must be sent to other processes and sort them afterwards.
- */
-{
-    if ( rowidx_.NumUnknownsVertex())
-        DROPS_FOR_TRIANG_CONST_VERTEX( mg_, rowidx_.TriangLevel(), it)
-            collectDOFonSimplex( *it);
-    if ( rowidx_.NumUnknownsEdge())
-        DROPS_FOR_TRIANG_CONST_EDGE( mg_, rowidx_.TriangLevel(), it)
-            collectDOFonSimplex( *it);
-    if ( rowidx_.NumUnknownsFace())
-        DROPS_FOR_TRIANG_CONST_FACE( mg_, rowidx_.TriangLevel(), it)
-            collectDOFonSimplex( *it);
-    if ( rowidx_.NumUnknownsTetra())
-        DROPS_FOR_TRIANG_CONST_TETRA( mg_, rowidx_.TriangLevel(), it)
-            collectDOFonSimplex( *it);
-
-    sortDOF( sendList_);
-}
-
-void ExchangeBuilderCL::HandlerDOFDirectCommCL::collectDOFonSimplex( const DiST::TransferableCL& s)
-/** Collect the dof that need to be sent to processes which store a copy of \a s,
-    i.e., fill the list sendList_.
-*/
-{
-    const Uint idx= rowidx_.GetIdx();
-    // Only collect data on distributed simplices
-    if ( !s.IsDistributed( PrioMaster))
-        return;
-    // Only collect data on simplices, where a dof is given
-    const bool haveDOF= s.Unknowns.Exist() && s.Unknowns.Exist( idx) && s.Unknowns.InTriangLevel(rowidx_.TriangLevel());
-    if (!haveDOF)
-        return;
-    // local dof information
-    const IdxT dof= s.Unknowns(idx);
-    const bool isExtended= (rowidx_.IsExtended() && rowidx_.GetXidx()[dof]!=NoIdx);
-    const IdxT extdof= (isExtended) ? rowidx_.GetXidx()[dof] : NoIdx;
-
-    // dof that need to be sent to copies (if there is a master copy)
-    DiST::TransferableCL::ProcList_const_iterator it= s.GetProcListBegin();
-    for ( ; it!=s.GetProcListEnd(); ++it) {
-        if ( it->prio== PrioMaster) {
-            sendList_[ it->proc].push_back(static_cast<int>(dof));
-            if ( isExtended)
-                sendList_[ it->proc].push_back(static_cast<int>(extdof));
-        }
-    }
-}
-
-bool ExchangeBuilderCL::HandlerDOFDirectCommCL::Gather( DiST::TransferableCL& t,
+bool ExchangeBuilderCL::HandlerDOFNtoNRecvCL::Gather( DiST::TransferableCL& t,
     DiST::Helper::SendStreamCL& send)
 /** The process informs all copies about the send position of the dof located at the simplex.
     Therefore, put once
@@ -1606,11 +1647,11 @@ bool ExchangeBuilderCL::HandlerDOFDirectCommCL::Gather( DiST::TransferableCL& t,
             continue;
         const int toproc= it->proc;
         send << toproc; // (1)
-        const int firstPos=getSendPos( sendList_, static_cast<int>(dof), toproc)*numUnk;
+        const int firstPos= getSendPos( hs_.sendList_, static_cast<int>(dof), toproc)*numUnk;
         send << firstPos; // (2)
         if ( isExtended) {
             const int extFirstPos=
-                getSendPos( sendList_, static_cast<int>(extdof), toproc)*numUnk;
+                getSendPos( hs_.sendList_, static_cast<int>(extdof), toproc)*numUnk;
             send << extFirstPos; // (3)
         }
         else // dof is not extended
@@ -1620,7 +1661,7 @@ bool ExchangeBuilderCL::HandlerDOFDirectCommCL::Gather( DiST::TransferableCL& t,
     return true;
 }
 
-bool ExchangeBuilderCL::HandlerDOFDirectCommCL::Scatter( DiST::TransferableCL& t,
+bool ExchangeBuilderCL::HandlerDOFNtoNRecvCL::Scatter( DiST::TransferableCL& t,
     const size_t& numData, DiST::Helper::MPIistreamCL& recv)
 {
     // local dof
@@ -1659,7 +1700,7 @@ bool ExchangeBuilderCL::HandlerDOFDirectCommCL::Scatter( DiST::TransferableCL& t
         if (haveDOF) {
             // Check that we have received valid data
             Assert( sendpos_dof>=0 && sendpos_ext>=0,
-                DROPSErrCL("ExchangeBuilderCL::ScatterDOFDirectComm: No data received"),
+                DROPSErrCL("ExchangeBuilderCL::ScatterDOFNtoNRecv: No data received"),
                 DebugParallelNumC);
 
             // Remember the position of this dof sent by another process in the corresponding receive list.
@@ -1930,15 +1971,20 @@ void ExchangeBuilderCL::BuildRecvBuffer()
 }
 
 
-void ExchangeBuilderCL::buildDirectComm()
+void ExchangeBuilderCL::buildNtoN()
 {
+    // clear all information previously determined
     clearEx();
 
-    // determine communication structure
-    HandlerDOFDirectCommCL handlerDOFDirect( rowidx_, mg_);
-    interf_->Communicate( handlerDOFDirect);
-    handlerDOFDirect.buildSendStructures( ex_.sendListPhase1_);
-    handlerDOFDirect.buildRecvStructures( ex_.recvListPhase1_);
+    // Fill the send list, i.e., the dofs that need to be sent in the N-to-N communication phase
+    HandlerDOFNtoNSendCL handlerSend( rowidx_, mg_);
+    interf_->Communicate( handlerSend);
+    handlerSend.buildSendStructures( ex_.sendListPhase1_);
+
+    // Fill the receive list, i.e., the dofs that need to be received in the N-to-N communication phase
+    HandlerDOFNtoNRecvCL handlerRecv( rowidx_, mg_, handlerSend);
+    interf_->Communicate( handlerRecv);
+    handlerRecv.buildRecvStructures( ex_.recvListPhase1_);
 
     // determine information about distributed dof
     BuildIndexLists();
