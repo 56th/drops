@@ -60,7 +60,7 @@ void ExchangeCL::InitComm(
         (Phase==1) ? sendListPhase1_.end() : sendListPhase2_.end();
     size_t i=0;
     // init send
-    for ( ; sendit!=sendend; ++sendit, ++i){
+    for ( ; sendit!=sendend; ++sendit, ++i) {
         sendreq[i]= sendit->Isend( v, tag, offset);
     }
 
@@ -72,7 +72,7 @@ void ExchangeCL::InitComm(
     BufferListT::iterator bufit= buf.begin();
     // init recv
     i=0;
-    for ( ; recvit!=recvend; ++recvit, ++bufit, ++i){
+    for ( ; recvit!=recvend; ++recvit, ++bufit, ++i) {
         recvreq[i]= recvit->Irecv( tag, *bufit, 0);
     }
 }
@@ -89,7 +89,7 @@ void ExchangeCL::DoAllAccumulations(
 {
     RecvListT::const_iterator recvit= recvListPhase1_.begin();
     BufferListT::const_iterator bufit= buf.begin();
-    for ( ; recvit!=recvListPhase1_.end(); ++recvit, ++bufit){
+    for ( ; recvit!=recvListPhase1_.end(); ++recvit, ++bufit) {
         recvit->Accumulate( v, offset, *bufit, 0);
     }
 }
@@ -106,7 +106,7 @@ void ExchangeCL::DoAllAssigning(
 {
     RecvListT::const_iterator recvit=  recvListPhase2_.begin();
     BufferListT::const_iterator bufit= buf.begin();
-    for ( ; recvit!=recvListPhase2_.end(); ++recvit, ++bufit){
+    for ( ; recvit!=recvListPhase2_.end(); ++recvit, ++bufit) {
         recvit->Assign( v, offset, *bufit, 0);
     }
 }
@@ -134,7 +134,7 @@ double ExchangeCL::LocalDotOneAccumulation(
     bool y_acc_created=false;
 
     // Check if memory for the accumulated form of y is provided
-    if ( y_acc){
+    if ( y_acc) {
         *y_acc= y;
     }
     else{
@@ -174,13 +174,13 @@ double ExchangeCL::LocalDotOneAccumulation(
     // Before touching the memory of y_acc and returning y, wait
     // until send operation and, eventually, receive operation are completed.
     ProcCL::WaitAll( sendListPhase1_.size(), Addr(req));
-    if ( doSecondComm){
+    if ( doSecondComm) {
         ProcCL::WaitAll( num_sr_2, Addr(req)+num_sr_1);
         DoAllAssigning( *y_acc, yBuf_);
     }
 
     // Free memory, if allocated here
-    if ( y_acc_created){
+    if ( y_acc_created) {
         delete y_acc; y_acc=0;
     }
 
@@ -197,7 +197,7 @@ double ExchangeCL::LocalNormSQAccumulation( const VectorCL& x, VectorCL* x_acc) 
     bool x_acc_created=false;
 
     // Check if memory for the accumulated form of y is provided
-    if ( x_acc){
+    if ( x_acc) {
         *x_acc= x;
     }
     else{
@@ -233,13 +233,13 @@ double ExchangeCL::LocalNormSQAccumulation( const VectorCL& x, VectorCL* x_acc) 
     // Before touching the memory of y_acc and returning y, wait
     // until send and received are done.
     ProcCL::WaitAll( sendListPhase1_.size(), Addr(req));
-    if ( doSecondComm){
+    if ( doSecondComm) {
         ProcCL::WaitAll( num_sr_2, Addr(req)+num_sr_1);
         DoAllAssigning( *x_acc, xBuf_);
     }
 
     // Free memory, if allocated here
-    if ( x_acc_created){
+    if ( x_acc_created) {
         delete x_acc; x_acc=0;
     }
 
@@ -258,7 +258,7 @@ double ExchangeCL::LocalDotTwoAccumulations(
     bool x_acc_created=false, y_acc_created=false;
 
     // Check if memory for the accumulated form of x and/or y is provided
-    if ( x_acc){
+    if ( x_acc) {
         *x_acc= x;
     }
     else{
@@ -266,7 +266,7 @@ double ExchangeCL::LocalDotTwoAccumulations(
         x_acc= new VectorCL(x);
     }
 
-    if ( y_acc){
+    if ( y_acc) {
         *y_acc= y;
     }
     else{
@@ -311,19 +311,19 @@ double ExchangeCL::LocalDotTwoAccumulations(
     // until send and received are done.
     ProcCL::WaitAll( sendListPhase1_.size(), Addr(reqX));
     ProcCL::WaitAll( sendListPhase1_.size(), Addr(reqY));
-    if ( !x_acc_created && viaowner_){
+    if ( !x_acc_created && viaowner_) {
         ProcCL::WaitAll( num_sr_2, Addr(reqX)+num_sr_1);
         DoAllAssigning( *x_acc, xBuf_);
     }
-    if ( !y_acc_created && viaowner_){
+    if ( !y_acc_created && viaowner_) {
         ProcCL::WaitAll( num_sr_2, Addr(reqY)+num_sr_1);
         DoAllAssigning( *y_acc, yBuf_);
     }
     // Free memory of x_acc and y_acc if allocated here
-    if ( x_acc_created){
+    if ( x_acc_created) {
         delete x_acc; x_acc=0;
     }
-    if ( y_acc_created){
+    if ( y_acc_created) {
         delete y_acc; y_acc=0;
     }
 
@@ -354,7 +354,7 @@ void ExchangeCL::Accumulate( VectorCL& v, const Ulint offset) const
     DoAllAccumulations(v, xBuf_, offset);
 
     // second communication phase
-    if ( viaowner_){
+    if ( viaowner_) {
         InitComm( 2, v, Addr(req)+num_sr_1, Addr(req)+num_sr_1+sendListPhase2_.size(), xBuf_, 1002, offset);
         ProcCL::WaitAll( num_sr_2, Addr(req)+num_sr_1);
         DoAllAssigning( v, xBuf_, offset);
@@ -374,28 +374,28 @@ void ExchangeCL::Accumulate( std::vector<VectorCL>& v) const
     std::vector<RequestListT> req( v.size(), RequestListT( num_sr_1+num_sr_2));
 
     // init send and receive for the first phase
-    for ( size_t i=0; i<v.size(); ++i){
+    for ( size_t i=0; i<v.size(); ++i) {
         InitComm( 1, v[i], Addr(req[i]), Addr(req[i])+sendListPhase1_.size(), recvbuf[i], 1001+i);
     }
 
-    for ( size_t i=0; i<v.size(); ++i){
+    for ( size_t i=0; i<v.size(); ++i) {
         ProcCL::WaitAll( num_sr_1, Addr(req[i]));
     }
 
-    for ( size_t i=0; i<v.size(); ++i){
+    for ( size_t i=0; i<v.size(); ++i) {
         DoAllAccumulations( v[i], recvbuf[i]);
     }
 
-    if ( viaowner_){
-        for ( size_t i=0; i<v.size(); ++i){
+    if ( viaowner_) {
+        for ( size_t i=0; i<v.size(); ++i) {
             InitComm( 2, v[i], Addr(req[i])+num_sr_1, Addr(req[i])+num_sr_1+sendListPhase2_.size(), recvbuf[i], 2001+i);
         }
 
-        for ( size_t i=0; i<v.size(); ++i){
+        for ( size_t i=0; i<v.size(); ++i) {
             ProcCL::WaitAll( num_sr_2, Addr(req[i])+num_sr_1);
         }
 
-        for ( size_t i=0; i<v.size(); ++i){
+        for ( size_t i=0; i<v.size(); ++i) {
             DoAllAssigning( v[i], recvbuf[i]);
         }
     }
@@ -427,20 +427,20 @@ double ExchangeCL::LocalDot(
 */
 {
     double result= std::numeric_limits<double>::max();
-    if ( isXacc && isYacc){
+    if ( isXacc && isYacc) {
         result= LocalDotNoAccumulation( x, y);
         if ( x_acc) *x_acc= x;
         if ( y_acc) *y_acc= y;
     }
-    if ( isXacc && !isYacc){
+    if ( isXacc && !isYacc) {
         result= LocalDotOneAccumulation( x, y, y_acc);
         if ( x_acc) *x_acc= x;
     }
-    if ( isYacc && !isXacc){
+    if ( isYacc && !isXacc) {
         result= LocalDotOneAccumulation( y, x, x_acc);
         if ( y_acc) *y_acc= y;
     }
-    if ( !isYacc && !isXacc){
+    if ( !isYacc && !isXacc) {
         result = LocalDotTwoAccumulations( x, y, x_acc, y_acc);
     }
     return result;
@@ -467,7 +467,7 @@ double ExchangeCL::LocalNorm_sq( const VectorCL& x, bool isXacc, VectorCL* x_acc
     to double ExchangeCL::Norm(...). */
 {
     double result= std::numeric_limits<double>::max();
-    if ( isXacc){
+    if ( isXacc) {
         result= LocalDotNoAccumulation( x, x);
         if ( x_acc) *x_acc=x;
     }
@@ -546,21 +546,21 @@ void ExchangeBlockCL::Update()
 
     // fill block offsets
     blockOffset_[0]=0;
-    for (size_t i=1; i<blockOffset_.size(); ++i){
+    for (size_t i=1; i<blockOffset_.size(); ++i) {
         blockOffset_[i]= blockOffset_[i-1] + idxDesc_[i-1]->NumUnknowns();
     }
 
     // Set buffers
     xBuf_.resize( GetNumBlocks());
     yBuf_.resize( GetNumBlocks());
-    for ( size_t i=0; i<GetNumBlocks(); ++i){
+    for ( size_t i=0; i<GetNumBlocks(); ++i) {
         xBuf_[i]= &(idxDesc_[i]->GetEx().xBuf_);
         yBuf_[i]= &(idxDesc_[i]->GetEx().yBuf_);
     }
 
     // Check if all ExchangeCLs have the same communication pattern
     bool comm= idxDesc_[0]->GetEx().CommViaOwner();
-    for ( size_t i=1; i<GetNumBlocks(); ++i){
+    for ( size_t i=1; i<GetNumBlocks(); ++i) {
         if ( comm!=idxDesc_[i]->GetEx().CommViaOwner())
             throw DROPSErrCL("ExchangeBlockCL::Update: All ExchangeCLs must have \
                              the same communication pattern");
@@ -573,7 +573,7 @@ void ExchangeBlockCL::InitComm(
     BufferListT& buf, int tag) const
 /** For a detailed description, see ExchangeCL::InitComm. */
 {
-    for ( size_t j=0; j<GetNumBlocks(); ++j){
+    for ( size_t j=0; j<GetNumBlocks(); ++j) {
         const ExchangeCL& ex= idxDesc_[j]->GetEx();
         // set iterators for sending
         ExchangeCL::SendListT::const_iterator sendit=
@@ -582,7 +582,7 @@ void ExchangeBlockCL::InitComm(
             (Phase==1) ? ex.sendListPhase1_.end() : ex.sendListPhase2_.end();
         size_t i=0;
         // init send
-        for ( ; sendit!=sendend; ++sendit, ++i){
+        for ( ; sendit!=sendend; ++sendit, ++i) {
             sendreq[j][i]= sendit->Isend( v, tag+j, blockOffset_[j]);
         }
 
@@ -594,7 +594,7 @@ void ExchangeBlockCL::InitComm(
         ExchangeCL::BufferListT::iterator bufit= buf[j]->begin();
         // init recv
         i=0;
-        for ( ; recvit!=recvend; ++recvit, ++bufit, ++i){
+        for ( ; recvit!=recvend; ++recvit, ++bufit, ++i) {
             recvreq[j][i]= recvit->Irecv( tag+j, *bufit, 0);
         }
 
@@ -604,7 +604,7 @@ void ExchangeBlockCL::InitComm(
 void ExchangeBlockCL::DoAllAccumulations( VectorCL& v, const BufferListT& buf) const
 /** For a detailed description, see ExchangeCL::DoAllAccumulations. */
 {
-    for ( size_t j=0; j<GetNumBlocks(); ++j){
+    for ( size_t j=0; j<GetNumBlocks(); ++j) {
         const ExchangeCL& ex= idxDesc_[j]->GetEx();
         ex.DoAllAccumulations( v, *buf[j], blockOffset_[j]);
     }
@@ -613,7 +613,7 @@ void ExchangeBlockCL::DoAllAccumulations( VectorCL& v, const BufferListT& buf) c
 void ExchangeBlockCL::DoAllAssigning( VectorCL& v, const BufferListT& buf) const
 /** For a detailed description, see ExchangeCL::DoAllAssigning. */
 {
-    for ( size_t j=0; j<GetNumBlocks(); ++j){
+    for ( size_t j=0; j<GetNumBlocks(); ++j) {
         const ExchangeCL& ex= idxDesc_[j]->GetEx();
         ex.DoAllAssigning( v, *buf[j], blockOffset_[j]);
     }
@@ -622,7 +622,7 @@ void ExchangeBlockCL::DoAllAssigning( VectorCL& v, const BufferListT& buf) const
 double ExchangeBlockCL::LocalDotNoAccumulation(const VectorCL& x, const VectorCL& y) const
 {
     double sum=0.0;
-    for ( size_t j=0; j<GetNumBlocks(); ++j){
+    for ( size_t j=0; j<GetNumBlocks(); ++j) {
         const ExchangeCL& ex= idxDesc_[j]->GetEx();
         sum= KahanInnerProd( x, y, ex.LocalIndex.begin(), ex.LocalIndex.end(),
             sum, blockOffset_[j]);
@@ -642,7 +642,7 @@ double ExchangeBlockCL::LocalDotOneAccumulation(
     bool y_acc_created=false;
 
     // Check if memory for the accumulated form of y is provided
-    if ( y_acc){
+    if ( y_acc) {
         *y_acc= y;
     }
     else{
@@ -653,7 +653,7 @@ double ExchangeBlockCL::LocalDotOneAccumulation(
 
     RequestListT sendreq1( GetNumBlocks()), sendreq2( GetNumBlocks()), recvreq( GetNumBlocks());
     // Send distributed entries to the owners
-    for ( size_t j=0; j<GetNumBlocks(); ++j){
+    for ( size_t j=0; j<GetNumBlocks(); ++j) {
         const ExchangeCL& ex= idxDesc_[j]->GetEx();
         sendreq1[j].resize( ex.sendListPhase1_.size());
         recvreq[j].resize( ex.recvListPhase1_.size());
@@ -661,7 +661,7 @@ double ExchangeBlockCL::LocalDotOneAccumulation(
             1001+j, blockOffset_[j]);
     }
 
-    for ( size_t j=0; j<GetNumBlocks(); ++j){
+    for ( size_t j=0; j<GetNumBlocks(); ++j) {
         const ExchangeCL& ex= idxDesc_[j]->GetEx();
         result= KahanInnerProd( x, y, ex.LocalIndex.begin(),
             ex.LocalIndex.end(), result, blockOffset_[j]);
@@ -669,15 +669,15 @@ double ExchangeBlockCL::LocalDotOneAccumulation(
 
     // Do accumulation on owners, therefore, first, wait until all
     // messages are received by the owner
-    for ( size_t j=0; j<GetNumBlocks(); ++j){
+    for ( size_t j=0; j<GetNumBlocks(); ++j) {
         ProcCL::WaitAll( recvreq[j]);
     }
     DoAllAccumulations( *y_acc, yBuf_);
 
     // Init Second transfer phase only if accumulated version of y is requested.
     // Here, the buffer for y can be re-used.
-    if ( doSecondComm){
-        for ( size_t j=0; j<GetNumBlocks(); ++j){
+    if ( doSecondComm) {
+        for ( size_t j=0; j<GetNumBlocks(); ++j) {
             const ExchangeCL& ex= idxDesc_[j]->GetEx();
             sendreq2[j].resize( ex.sendListPhase2_.size());
             recvreq[j].resize( ex.recvListPhase2_.size());
@@ -687,7 +687,7 @@ double ExchangeBlockCL::LocalDotOneAccumulation(
     }
 
     // While communication accumulated values, do product on distributed elements
-    for ( size_t j=0; j<GetNumBlocks(); ++j){
+    for ( size_t j=0; j<GetNumBlocks(); ++j) {
         const ExchangeCL& ex= idxDesc_[j]->GetEx();
         result= KahanInnerProd( x, *y_acc, ex.OwnerDistrIndex.begin(),
             ex.OwnerDistrIndex.end(), result, blockOffset_[j]);
@@ -695,11 +695,11 @@ double ExchangeBlockCL::LocalDotOneAccumulation(
 
     // Before touching the memory of y_acc and returning y, wait
     // until send operation and, eventually, receive operation are completed.
-    for ( size_t j=0; j<GetNumBlocks(); ++j){
+    for ( size_t j=0; j<GetNumBlocks(); ++j) {
         ProcCL::WaitAll( sendreq1[j]);
     }
-    if ( doSecondComm){
-        for ( size_t j=0; j<GetNumBlocks(); ++j){
+    if ( doSecondComm) {
+        for ( size_t j=0; j<GetNumBlocks(); ++j) {
             ProcCL::WaitAll( sendreq2[j]);
             ProcCL::WaitAll( recvreq[j]);
         }
@@ -707,7 +707,7 @@ double ExchangeBlockCL::LocalDotOneAccumulation(
     }
 
     // Free memory, if allocated here
-    if ( y_acc_created){
+    if ( y_acc_created) {
         delete y_acc; y_acc=0;
     }
 
@@ -721,7 +721,7 @@ double ExchangeBlockCL::LocalNormSQAccumulation( const VectorCL& x, VectorCL* x_
     bool x_acc_created=false;
 
     // Check if memory for the accumulated form of y is provided
-    if ( x_acc){
+    if ( x_acc) {
         *x_acc= x;
     }
     else{
@@ -732,7 +732,7 @@ double ExchangeBlockCL::LocalNormSQAccumulation( const VectorCL& x, VectorCL* x_
 
     RequestListT sendreq1( GetNumBlocks()), sendreq2( GetNumBlocks()), recvreq( GetNumBlocks());
     // Send distributed entries to the owners
-    for ( size_t j=0; j<GetNumBlocks(); ++j){
+    for ( size_t j=0; j<GetNumBlocks(); ++j) {
         const ExchangeCL& ex= idxDesc_[j]->GetEx();
         sendreq1[j].resize( ex.sendListPhase1_.size());
         recvreq[j].resize( ex.recvListPhase1_.size());
@@ -741,21 +741,21 @@ double ExchangeBlockCL::LocalNormSQAccumulation( const VectorCL& x, VectorCL* x_
     }
 
     // While communicating, do product on local elements
-    for ( size_t j=0; j<GetNumBlocks(); ++j){
+    for ( size_t j=0; j<GetNumBlocks(); ++j) {
         const ExchangeCL& ex= idxDesc_[j]->GetEx();
         result= KahanInnerProd( x, x, ex.LocalIndex.begin(),
             ex.LocalIndex.end(), result, blockOffset_[j]);
     }
 
     // Do accumulation on owners
-    for ( size_t j=0; j<GetNumBlocks(); ++j){
+    for ( size_t j=0; j<GetNumBlocks(); ++j) {
         ProcCL::WaitAll( recvreq[j]);
     }
     DoAllAccumulations( *x_acc, xBuf_);
 
     // Init Second transfer phase only if accumulated version of x is requested
-    if ( doSecondComm){
-        for ( size_t j=0; j<GetNumBlocks(); ++j){
+    if ( doSecondComm) {
+        for ( size_t j=0; j<GetNumBlocks(); ++j) {
             const ExchangeCL& ex= idxDesc_[j]->GetEx();
             sendreq2[j].resize( ex.sendListPhase2_.size());
             recvreq[j].resize( ex.recvListPhase2_.size());
@@ -765,7 +765,7 @@ double ExchangeBlockCL::LocalNormSQAccumulation( const VectorCL& x, VectorCL* x_
     }
 
     // While communication accumulated values, do product on distributed elements
-    for ( size_t j=0; j<GetNumBlocks(); ++j){
+    for ( size_t j=0; j<GetNumBlocks(); ++j) {
         const ExchangeCL& ex= idxDesc_[j]->GetEx();
         result= KahanInnerProd( *x_acc, *x_acc, ex.OwnerDistrIndex.begin(),
             ex.OwnerDistrIndex.end(), result, blockOffset_[j]);
@@ -773,12 +773,12 @@ double ExchangeBlockCL::LocalNormSQAccumulation( const VectorCL& x, VectorCL* x_
 
     // Before touching the memory of x_acc, wait
     // until send and received are done.
-    for ( size_t j=0; j<GetNumBlocks(); ++j){
+    for ( size_t j=0; j<GetNumBlocks(); ++j) {
         ProcCL::WaitAll( sendreq1[j]);
     }
 
-    if ( doSecondComm){
-        for ( size_t j=0; j<GetNumBlocks(); ++j){
+    if ( doSecondComm) {
+        for ( size_t j=0; j<GetNumBlocks(); ++j) {
             ProcCL::WaitAll( sendreq2[j]);
             ProcCL::WaitAll( recvreq[j]);
         }
@@ -786,7 +786,7 @@ double ExchangeBlockCL::LocalNormSQAccumulation( const VectorCL& x, VectorCL* x_
     }
 
     // Free memory, if allocated here
-    if ( x_acc_created){
+    if ( x_acc_created) {
         delete x_acc; x_acc=0;
     }
 
@@ -801,7 +801,7 @@ double ExchangeBlockCL::LocalDotTwoAccumulations(
     bool x_acc_created=false, y_acc_created=false;
 
     // Check if memory for the accumulated form of x and/or y is provided
-    if ( x_acc){
+    if ( x_acc) {
         *x_acc= x;
     }
     else{
@@ -809,7 +809,7 @@ double ExchangeBlockCL::LocalDotTwoAccumulations(
         x_acc= new VectorCL(x);
     }
 
-    if ( y_acc){
+    if ( y_acc) {
         *y_acc= y;
     }
     else{
@@ -821,7 +821,7 @@ double ExchangeBlockCL::LocalDotTwoAccumulations(
     RequestListT sendreqY1( GetNumBlocks()), sendreqY2( GetNumBlocks()), recvreqY( GetNumBlocks());
 
     // Initiate the first communication phase for x and y
-    for ( size_t j=0; j<GetNumBlocks(); ++j){
+    for ( size_t j=0; j<GetNumBlocks(); ++j) {
         const ExchangeCL& ex= idxDesc_[j]->GetEx();
         sendreqX1[j].resize( ex.sendListPhase1_.size());
         recvreqX[j].resize( ex.recvListPhase1_.size());
@@ -834,7 +834,7 @@ double ExchangeBlockCL::LocalDotTwoAccumulations(
     }
 
     // While communicating, do product on local elements
-    for ( size_t j=0; j<GetNumBlocks(); ++j){
+    for ( size_t j=0; j<GetNumBlocks(); ++j) {
         const ExchangeCL& ex= idxDesc_[j]->GetEx();
         result=KahanInnerProd( x, y, ex.LocalIndex.begin(),
             ex.LocalIndex.end(), result, blockOffset_[j]);
@@ -843,18 +843,18 @@ double ExchangeBlockCL::LocalDotTwoAccumulations(
     // Do accumulation on owners, check before, if the receive has been performed.
     // Since *x_acc and *y_acc is not used as sendbuffer, we do not have to wait
     // for completing the sending
-    for ( size_t j=0; j<GetNumBlocks(); ++j){
+    for ( size_t j=0; j<GetNumBlocks(); ++j) {
         ProcCL::WaitAll( recvreqX[j]);
     }
     DoAllAccumulations( *x_acc, xBuf_);
-    for ( size_t j=0; j<GetNumBlocks(); ++j){
+    for ( size_t j=0; j<GetNumBlocks(); ++j) {
         ProcCL::WaitAll( recvreqY[j]);
     }
     DoAllAccumulations( *y_acc, yBuf_);
 
     // Init Second transfer phase
-    if ( !x_acc_created && idxDesc_[0]->GetEx().CommViaOwner()){
-        for ( size_t j=0; j<GetNumBlocks(); ++j){
+    if ( !x_acc_created && idxDesc_[0]->GetEx().CommViaOwner()) {
+        for ( size_t j=0; j<GetNumBlocks(); ++j) {
             const ExchangeCL& ex= idxDesc_[j]->GetEx();
             sendreqX2[j].resize( ex.sendListPhase2_.size());
             recvreqX[j].resize( ex.recvListPhase2_.size());
@@ -862,8 +862,8 @@ double ExchangeBlockCL::LocalDotTwoAccumulations(
                 2001+j, blockOffset_[j]);
         }
     }
-    if ( !y_acc_created && idxDesc_[0]->GetEx().CommViaOwner()){
-        for ( size_t j=0; j<GetNumBlocks(); ++j){
+    if ( !y_acc_created && idxDesc_[0]->GetEx().CommViaOwner()) {
+        for ( size_t j=0; j<GetNumBlocks(); ++j) {
             const ExchangeCL& ex= idxDesc_[j]->GetEx();
             sendreqY2[j].resize( ex.sendListPhase2_.size());
             recvreqY[j].resize( ex.recvListPhase2_.size());
@@ -873,7 +873,7 @@ double ExchangeBlockCL::LocalDotTwoAccumulations(
     }
 
     // While communication accumulated values, do product on distributed elements
-    for ( size_t j=0; j<GetNumBlocks(); ++j){
+    for ( size_t j=0; j<GetNumBlocks(); ++j) {
         const ExchangeCL& ex= idxDesc_[j]->GetEx();
         result= KahanInnerProd( *x_acc, *y_acc, ex.OwnerDistrIndex.begin(),
             ex.OwnerDistrIndex.end(), result, blockOffset_[j]);
@@ -881,29 +881,29 @@ double ExchangeBlockCL::LocalDotTwoAccumulations(
 
     // Before touching the memory of x_acc (y_acc) and returning x (y), wait
     // until send and received are done.
-    for ( size_t j=0; j<GetNumBlocks(); ++j){
+    for ( size_t j=0; j<GetNumBlocks(); ++j) {
         ProcCL::WaitAll( sendreqX1[j]);
         ProcCL::WaitAll( sendreqY1[j]);
     }
-    if ( !x_acc_created && idxDesc_[0]->GetEx().CommViaOwner()){
-        for ( size_t j=0; j<GetNumBlocks(); ++j){
+    if ( !x_acc_created && idxDesc_[0]->GetEx().CommViaOwner()) {
+        for ( size_t j=0; j<GetNumBlocks(); ++j) {
             ProcCL::WaitAll( sendreqX2[j]);
             ProcCL::WaitAll( recvreqX[j]);
         }
         DoAllAssigning( *x_acc, xBuf_);
     }
-    if ( !y_acc_created && idxDesc_[0]->GetEx().CommViaOwner()){
-        for ( size_t j=0; j<GetNumBlocks(); ++j){
+    if ( !y_acc_created && idxDesc_[0]->GetEx().CommViaOwner()) {
+        for ( size_t j=0; j<GetNumBlocks(); ++j) {
             ProcCL::WaitAll( sendreqY2[j]);
             ProcCL::WaitAll( recvreqY[j]);
         }
         DoAllAssigning( *y_acc, yBuf_);
     }
     // Free memory of x_acc and y_acc if allocated here
-    if ( x_acc_created){
+    if ( x_acc_created) {
         delete x_acc; x_acc=0;
     }
-    if ( y_acc_created){
+    if ( y_acc_created) {
         delete y_acc; y_acc=0;
     }
 
@@ -915,23 +915,23 @@ void ExchangeBlockCL::Accumulate( VectorCL& v) const
 {
     RequestListT sendreq( GetNumBlocks()), recvreq( GetNumBlocks());
     // Send distributed entries to the owners
-    for ( size_t j=0; j<GetNumBlocks(); ++j){
+    for ( size_t j=0; j<GetNumBlocks(); ++j) {
         const ExchangeCL& ex= idxDesc_[j]->GetEx();
         sendreq[j].resize( ex.sendListPhase1_.size());
         recvreq[j].resize( ex.recvListPhase1_.size());
         ex.InitComm( 1, v, Addr(sendreq[j]), Addr(recvreq[j]), *xBuf_[j], 1001+j, blockOffset_[j]);
     }
     // Wait for all receive and send operations are completed
-    for ( size_t j=0; j<GetNumBlocks(); ++j){
+    for ( size_t j=0; j<GetNumBlocks(); ++j) {
         ProcCL::WaitAll( sendreq[j]);
         ProcCL::WaitAll( recvreq[j]);
     }
     // Do all accumulations
     DoAllAccumulations( v, xBuf_);
 
-    if ( idxDesc_[0]->GetEx().CommViaOwner()){
+    if ( idxDesc_[0]->GetEx().CommViaOwner()) {
         // Send back to copies
-        for ( size_t j=0; j<GetNumBlocks(); ++j){
+        for ( size_t j=0; j<GetNumBlocks(); ++j) {
             const ExchangeCL& ex= idxDesc_[j]->GetEx();
             sendreq[j].resize( ex.sendListPhase2_.size());
             recvreq[j].resize( ex.recvListPhase2_.size());
@@ -940,7 +940,7 @@ void ExchangeBlockCL::Accumulate( VectorCL& v) const
 
         // Wait for all sends receives to be completed
         // Wait for all receive and send operations are completed
-        for ( size_t j=0; j<GetNumBlocks(); ++j){
+        for ( size_t j=0; j<GetNumBlocks(); ++j) {
             ProcCL::WaitAll( sendreq[j]);
             ProcCL::WaitAll( recvreq[j]);
         }
@@ -982,20 +982,20 @@ double ExchangeBlockCL::LocalDot(
 */
 {
     double result= std::numeric_limits<double>::max();
-    if ( isXacc && isYacc){
+    if ( isXacc && isYacc) {
         result= LocalDotNoAccumulation( x, y);
         if ( x_acc) *x_acc= x;
         if ( y_acc) *y_acc= y;
     }
-    if ( isXacc && !isYacc){
+    if ( isXacc && !isYacc) {
         result= LocalDotOneAccumulation( x, y, y_acc);
         if ( x_acc) *x_acc= x;
     }
-    if ( isYacc && !isXacc){
+    if ( isYacc && !isXacc) {
         result= LocalDotOneAccumulation( y, x, x_acc);
         if ( y_acc) *y_acc= y;
     }
-    if ( !isYacc && !isXacc){
+    if ( !isYacc && !isXacc) {
         result = LocalDotTwoAccumulations( x, y, x_acc, y_acc);
     }
     return result;
@@ -1022,7 +1022,7 @@ double ExchangeBlockCL::LocalNorm_sq( const VectorCL& x, bool isXacc, VectorCL* 
     to double ExchangeCL::Norm(...). */
 {
     double result= std::numeric_limits<double>::max();
-    if ( isXacc){
+    if ( isXacc) {
         result= LocalDotNoAccumulation( x, x);
         if ( x_acc) *x_acc=x;
     }
@@ -1093,7 +1093,7 @@ inline int ExchangeBuilderCL::HandlerDOFExchangeCL::getSendPos( const SendDOFLis
         begin= lit->second.begin(),
         end= lit->second.end(),
         it= std::lower_bound( begin, end, dof);
-    if ( it==end){
+    if ( it==end) {
         return NoInt_;
     }
     return static_cast<IdxT>( std::distance(begin, it));
@@ -1116,9 +1116,9 @@ void ExchangeBuilderCL::HandlerDOFExchangeCL::buildSendStructures(
 {
     // Create the data types
     SendDOFListT::const_iterator it;
-    for ( it=sendList.begin(); it!=sendList.end(); ++it){
+    for ( it=sendList.begin(); it!=sendList.end(); ++it) {
         const int toproc= it->first;
-        if ( toproc!=ProcCL::MyRank()){
+        if ( toproc!=ProcCL::MyRank()) {
             ex_sendlist.push_back( SendNumDataCL<double>(toproc));
             const int count= static_cast<int>(it->second.size());
             const int bl   = static_cast<int>( rowidx_.NumUnknownsVertex());    // Change Me!
@@ -1133,17 +1133,17 @@ void ExchangeBuilderCL::HandlerDOFExchangeCL::buildRecvStructures(
 /** Store how to receive data from neighbors. */
 {
     // Create the receive ordering
-    RecvDofT::const_iterator mit;
     const Uint numUnk= rowidx_.NumUnknownsVertex();
-    for ( mit=recvList.begin(); mit!=recvList.end(); ++mit){
+    for (RecvDofT::const_iterator mit=recvList.begin(); mit!=recvList.end(); ++mit) {
         const int fromproc= mit->first;
-        if ( fromproc!=ProcCL::MyRank()){
+        if ( fromproc!=ProcCL::MyRank()) {
             ex_recvlist.push_back( RecvNumDataCL<double>(fromproc));
             std::vector<IdxT>& sysnums= ex_recvlist.back().sysnums_;
             sysnums.reserve( numUnk*mit->second.size());
-            RecvDofT::mapped_type::const_iterator recvposit= mit->second.begin();
+
             int i=0;    // for debugging
-            for ( ; recvposit!=mit->second.end(); ++recvposit, ++i){
+            for (RecvDofT::mapped_type::const_iterator recvposit= mit->second.begin();
+                    recvposit!=mit->second.end(); ++recvposit, ++i) {
                 const IdxT local_dof= recvposit->second;
                 Assert( (int)numUnk*i==recvposit->first,
                     DROPSErrCL("ExchangeBuilderCL::HandlerDOFExchangeCL::buildRecvStructures: Missing send position"),
@@ -1204,9 +1204,9 @@ bool ExchangeBuilderCL::HandlerDOFSendCL::Gather( DiST::TransferableCL& t,
         const IdxT dof= t.Unknowns(idx);
         send << static_cast<int>(dof); // (2)
 
-        if (rowidx_.IsExtended()) { // write (3)
+        if (rowidx_.IsExtended()) { // XFEM case
             const IdxT exdof= rowidx_.GetXidx()[dof];
-            send << (exdof!=NoIdx ? static_cast<int>(exdof) : NoInt_);
+            send << (exdof!=NoIdx ? static_cast<int>(exdof) : NoInt_); // (3)
         }
     } else {
         send << NoInt_; // (2)
@@ -1330,17 +1330,20 @@ bool ExchangeBuilderCL::HandlerDOFRecvCL::Gather( DiST::TransferableCL& t,
 /** If the simplex \a t is distributed among master copies, send positions of (extended) dof have to be communicated
     for both communication phases and true is returned, else false is returned.
 
-    For the first phase, put
-    - (1) my rank,
-    - (2) the send position of the dof (or NoInt_ if dof not in triang level on local proc),
-    - (3) only for extended FE spaces: the send position of the extended dof (or NoInt_ if extended dof == NoIdx on local proc)
+    For the first phase (A), put
+    - (A1) my rank,
+    - (A2) the send position of the dof (or NoInt_ if dof not in triang level on local proc),
+    - (A3) only for extended FE spaces: the send position of the extended dof (or NoInt_ if extended dof == NoIdx on local proc)
     into the send buffer.
 
-    NoInt_ finalize the stream
+    For the second phase (B), the DoF owner informs all copies about the send position of the DoFs located at the simplex.
+    Therefore, the DoF owner puts
+    - (B1) the rank of the receiving process,
+    - (B2) send position of the dof (or NoInt_ if undefined)
+    - (B3) send position of the extended dof (or NoInt_ if undefined)
+    into the send buffer.
 
-    For the second phase, the DoF owner informs all copies about the send position of the dof located at the simplex.
-    Therefore, put the rank of the receiving process, send position of the dof and extended
-    dof into the send buffer. Finalize the stream by NoInt_
+    Finalize the stream by NoInt_.
 */
 {
     if (!t.IsDistributed(PrioMaster))
@@ -1349,31 +1352,30 @@ bool ExchangeBuilderCL::HandlerDOFRecvCL::Gather( DiST::TransferableCL& t,
     const bool haveDOF= t.Unknowns.Exist() && t.Unknowns.Exist( idx) && t.Unknowns.InTriangLevel(rowidx_.TriangLevel());
 
     const Uint numUnk= rowidx_.NumUnknownsSimplex( t);
-
     // send positions for first phase
     const int me= ProcCL::MyRank();
-    send << me; // (1)
+    send << me; // (A1)
 
     if ( !haveDOF) {
-        send << NoInt_; // (2)
+        send << NoInt_; // (A2)
         if (rowidx_.IsExtended())
-            send << NoInt_; // (3)
-        send << NoInt_;                     // finalize stream
+            send << NoInt_; // (A3)
+        send << NoInt_; // finalize stream
         return true;
     }
     const IdxT dof= t.Unknowns(idx);
     const int owner= hs_.owner_[dof];
 
-    send << getSendPos( hs_.sendList1_, static_cast<int>(dof), owner)*numUnk; // (2)
+    send << getSendPos( hs_.sendList1_, static_cast<int>(dof), owner)*numUnk; // (A2)
 
-    if (rowidx_.IsExtended()) { // write (3)
+    if (rowidx_.IsExtended()) { // XFEM case
         const IdxT exdof= rowidx_.GetXidx()[dof];
-        send << (exdof!=NoIdx ? getSendPos( hs_.sendList1_, static_cast<int>(exdof), owner)*numUnk : NoInt_); // (3)
+        send << (exdof!=NoIdx ? getSendPos( hs_.sendList1_, static_cast<int>(exdof), owner)*numUnk : NoInt_); // (A3)
     }
 
     // send positions for second phase
-    if (me!=owner){
-        send << NoInt_;                     // finalize stream
+    if (me!=owner) {
+        send << NoInt_; // finalize stream
         return true;
     }
 
@@ -1382,25 +1384,20 @@ bool ExchangeBuilderCL::HandlerDOFRecvCL::Gather( DiST::TransferableCL& t,
 
     // Inform all (master) neighbors
     DiST::TransferableCL::ProcList_const_iterator it;
-    for ( it=t.GetProcListBegin(); it!=t.GetProcListEnd(); ++it){
+    for ( it=t.GetProcListBegin(); it!=t.GetProcListEnd(); ++it) {
         const int toproc= it->proc;
-        send << toproc; // ToDo: only for Master?
-        if ( it->prio==PrioMaster){
-            const int firstPos=getSendPos( hs_.sendList2_, static_cast<int>(dof), toproc)*numUnk;
-            send << firstPos;
-            if ( isExtended){
-                const int extFirstPos= getSendPos( hs_.sendList2_, static_cast<int>(extdof), toproc)*numUnk;
-                send << extFirstPos;
-            }
-            else{
-                send << NoInt_;         // dof is not extended
-            }
+        send << toproc; // (B1)   ToDo: write (B1)-(B3) only for Master?
+        if ( it->prio==PrioMaster) {
+            const int firstPos=           getSendPos( hs_.sendList2_, static_cast<int>(dof), toproc)*numUnk,
+                extFirstPos= isExtended ? getSendPos( hs_.sendList2_, static_cast<int>(extdof), toproc)*numUnk
+                                        : NoInt_;
+            send << firstPos << extFirstPos; // (B2), (B3)
         }
-        else{
-            send << NoInt_ << NoInt_;   // the copy does not own any dofs
+        else { // the copy does not own any dofs
+            send << NoInt_ << NoInt_; // (B2), (B3)
         }
     }
-    send << NoInt_;                     // finalize stream
+    send << NoInt_; // finalize stream
 
     return true;
 }
@@ -1410,14 +1407,13 @@ bool ExchangeBuilderCL::HandlerDOFRecvCL::Scatter( DiST::TransferableCL& t,
 {
     const Uint idx= rowidx_.GetIdx();
     const bool haveDOF= t.Unknowns.Exist() && t.Unknowns.Exist( idx) && t.Unknowns.InTriangLevel(rowidx_.TriangLevel());
-
     if (!haveDOF) { // receive all data w/o doing anything with it
         int dummy;
-        for ( size_t i=0; i<numData; ++i){
+        for ( size_t i=0; i<numData; ++i) {
             recv >> dummy >> dummy;
             if (rowidx_.IsExtended())
                 recv >> dummy;
-            GetDOFPos( recv, -1, dummy, dummy);
+            GetDOFPos( recv, ProcCL::MyRank(), dummy, dummy);
         }
         return true;
     }
@@ -1435,15 +1431,12 @@ bool ExchangeBuilderCL::HandlerDOFRecvCL::Scatter( DiST::TransferableCL& t,
         recv >> senddof; // receive non-extended dof
         if (rowidx_.IsExtended())
             recv >> sendextdof; // receive extended dof
-        if ( senddof!=NoInt_) {
-            if (owner==me)
-                recvList1_[sender][senddof]= dof;
-            if (rowidx_.IsExtended()) {
-                if ( sendextdof!=NoInt_ && owner==me)
-                    recvList1_[sender][sendextdof]= extdof;
-            }
+        if ( owner==me && senddof!=NoInt_) {
+            recvList1_[sender][senddof]= dof;
+            if (rowidx_.IsExtended() && sendextdof!=NoInt_)
+                recvList1_[sender][sendextdof]= extdof;
         }
-        if (owner!=sender){
+        if (owner!=sender) {
             recv >> senddof;  // read final NoInt_
             continue;
         }
@@ -1457,7 +1450,7 @@ bool ExchangeBuilderCL::HandlerDOFRecvCL::Scatter( DiST::TransferableCL& t,
 
         // Remember the position of this dof in a send operation from the owner (phase II).
         recvList2_[owner][senddof]= dof;
-        if ( isExtended){
+        if ( isExtended) {
             Assert( sendextdof!=NoInt_,
                 DROPSErrCL("ExchangeBuilderCL::ScatterDOFRecv: Owner's dof is not extended"), DebugParallelNumC);
             recvList2_[owner][sendextdof]= extdof;
@@ -1477,9 +1470,9 @@ void ExchangeBuilderCL::HandlerDOFRecvCL::GetDOFPos( DiST::Helper::MPIistreamCL&
 
     // definitively, we have to read the complete receive stream
     recv >> dummyreceiver;
-    while (dummyreceiver!=NoInt_){
+    while (dummyreceiver!=NoInt_) {
         recv >> dummy1 >> dummy2;
-        if ( dummyreceiver==me){
+        if ( dummyreceiver==me) {
             Assert(receiver==-1,
                 DROPSErrCL("ExchangeBuilderCL::ScatterDOFRecv: Received multiple information. I am confused."),
                 DebugParallelNumC);
@@ -1570,8 +1563,8 @@ void ExchangeBuilderCL::HandlerDOFDirectCommCL::collectDOFonSimplex( const DiST:
 
     // dof that need to be sent to copies (if there is a master copy)
     DiST::TransferableCL::ProcList_const_iterator it= s.GetProcListBegin();
-    for ( ; it!=s.GetProcListEnd(); ++it){
-        if ( it->prio== PrioMaster){
+    for ( ; it!=s.GetProcListEnd(); ++it) {
+        if ( it->prio== PrioMaster) {
             sendList_[ it->proc].push_back(static_cast<int>(dof));
             if ( isExtended)
                 sendList_[ it->proc].push_back(static_cast<int>(extdof));
@@ -1582,46 +1575,49 @@ void ExchangeBuilderCL::HandlerDOFDirectCommCL::collectDOFonSimplex( const DiST:
 bool ExchangeBuilderCL::HandlerDOFDirectCommCL::Gather( DiST::TransferableCL& t,
     DiST::Helper::SendStreamCL& send)
 /** The process informs all copies about the send position of the dof located at the simplex.
-    Therefore, put the rank of the receiving process, send position of the dof and extended
-    dof into the send buffer. Finalize the stream by NoInt_
+    Therefore, put once
+    - (0) my rank
+    and after that, put for each master process
+    - (1) the rank of the receiving process,
+    - (2) send position of the dof and
+    - (3) send position of the extended dof
+    into the send buffer. Finalize the stream by NoInt_.
 */
 {
     const Uint idx= rowidx_.GetIdx();
     const bool haveDOF= t.Unknowns.Exist() && t.Unknowns.Exist( idx) && t.Unknowns.InTriangLevel(rowidx_.TriangLevel());
-    if (haveDOF){
-        // local information
-        const IdxT dof= t.Unknowns(idx);
-        const bool isExtended= (rowidx_.IsExtended() && rowidx_.GetXidx()[dof]!=NoIdx);
-        const IdxT extdof= (isExtended) ? rowidx_.GetXidx()[dof] : NoIdx;
-        const Uint numUnk= rowidx_.NumUnknownsSimplex( t);
 
-        // First put my_rank on the stream
-        send << ProcCL::MyRank();
-
-        // Inform all (master) neighbors
-        DiST::TransferableCL::ProcList_const_iterator it;
-        for ( it=t.GetProcListBegin(); it!=t.GetProcListEnd(); ++it){
-            if ( it->prio!=PrioMaster)
-                continue;
-            const int toproc= it->proc;
-            send << toproc;
-            const int firstPos=getSendPos( sendList_, static_cast<int>(dof), toproc)*numUnk;
-            send << firstPos;
-            if ( isExtended){
-                const int extFirstPos=
-                    getSendPos( sendList_, static_cast<int>(extdof), toproc)*numUnk;
-                send << extFirstPos;
-            }
-            else{
-                send << NoInt_;         // dof is not extended
-            }
-        }
-        send << NoInt_;                     // finalize stream
-        return true;
-    }
-    else{
+    if (!haveDOF)
         return false;
+
+    // local information
+    const IdxT dof= t.Unknowns(idx);
+    const bool isExtended= (rowidx_.IsExtended() && rowidx_.GetXidx()[dof]!=NoIdx);
+    const IdxT extdof= (isExtended) ? rowidx_.GetXidx()[dof] : NoIdx;
+    const Uint numUnk= rowidx_.NumUnknownsSimplex( t);
+
+    // First put my_rank on the stream
+    send << ProcCL::MyRank(); // (0)
+
+    // Inform all (master) neighbors
+    DiST::TransferableCL::ProcList_const_iterator it;
+    for ( it=t.GetProcListBegin(); it!=t.GetProcListEnd(); ++it) {
+        if ( it->prio!=PrioMaster)
+            continue;
+        const int toproc= it->proc;
+        send << toproc; // (1)
+        const int firstPos=getSendPos( sendList_, static_cast<int>(dof), toproc)*numUnk;
+        send << firstPos; // (2)
+        if ( isExtended) {
+            const int extFirstPos=
+                getSendPos( sendList_, static_cast<int>(extdof), toproc)*numUnk;
+            send << extFirstPos; // (3)
+        }
+        else // dof is not extended
+            send << NoInt_; // (3)
     }
+    send << NoInt_; // finalize stream
+    return true;
 }
 
 bool ExchangeBuilderCL::HandlerDOFDirectCommCL::Scatter( DiST::TransferableCL& t,
@@ -1641,15 +1637,15 @@ bool ExchangeBuilderCL::HandlerDOFDirectCommCL::Scatter( DiST::TransferableCL& t
         sendpos_ext= -1, dummy2= -1,
         sender= -1;
 
-    for ( size_t i=0; i<numData; ++i){
+    for ( size_t i=0; i<numData; ++i) {
         // First get the sender of the dof information
         recv >> sender;
 
         // definitively, we have to read the complete receive stream
         recv >> dummyreceiver;
-        while (dummyreceiver!=NoInt_){
+        while (dummyreceiver!=NoInt_) {
             recv >> dummy1 >> dummy2;
-            if ( dummyreceiver==ProcCL::MyRank()){
+            if ( dummyreceiver==ProcCL::MyRank()) {
                 Assert(receiver==-1,
                     DROPSErrCL("ExchangeBuilderCL::ScatterDOFDirectComm: Received multiple information. I am confused."),
                     DebugParallelNumC);
@@ -1660,21 +1656,19 @@ bool ExchangeBuilderCL::HandlerDOFDirectCommCL::Scatter( DiST::TransferableCL& t
             recv >> dummyreceiver;
         }
 
-        if (!haveDOF)
-            continue;
-        // Check, if we have received valid data
-        Assert( sendpos_dof>=0 && sendpos_ext>=0,
-            DROPSErrCL("ExchangeBuilderCL::ScatterDOFfromOwner: No data received"),
-            DebugParallelNumC);
+        if (haveDOF) {
+            // Check that we have received valid data
+            Assert( sendpos_dof>=0 && sendpos_ext>=0,
+                DROPSErrCL("ExchangeBuilderCL::ScatterDOFDirectComm: No data received"),
+                DebugParallelNumC);
 
-        // Remember the position of this dof sent by another process.
-        recvList_[sender][sendpos_dof]= dof;
-        if ( isExtended){
-            Assert( sendpos_ext!=NoInt_,
-                DROPSErrCL("ExchangeBuilderCL::ScatterDOFfromOwner: Owner's dof is not extended"), DebugParallelNumC);
-            recvList_[sender][sendpos_ext]= extdof;
+            // Remember the position of this dof sent by another process in the corresponding receive list.
+            recvList_[sender][sendpos_dof]= dof;
+            if ( isExtended) {
+                if (sendpos_ext!=NoInt_)
+                    recvList_[sender][sendpos_ext]= extdof;
+            }
         }
-
         // enable error checking
         receiver= -1; sendpos_dof=-1; sendpos_ext=-1;
     }
@@ -1754,22 +1748,22 @@ bool ExchangeBuilderCL::HandlerDOFIndexCL::Scatter(
 
     // read information
     tmpRecvT tmpRecv(numData);
-    for ( size_t i=0; i<numData; ++i){
+    for ( size_t i=0; i<numData; ++i) {
         recv >> fromproc >> remote_dof >> remote_extdof;
         tmpRecv[i][0]= fromproc;
         tmpRecv[i][1]= remote_dof   !=NoIdx ? static_cast<int>(remote_dof) : NoInt_;
         tmpRecv[i][2]= remote_extdof!=NoIdx ? static_cast<int>(remote_extdof) : NoInt_;
-        if ( fromproc!=me){
+        if ( fromproc!=me) {
             for ( Uint j=0; j<numUnk; ++j)
                 dofProcList_[dof+j].insert( std::make_pair(fromproc, remote_dof+j));
-            if ( isExtended && remote_extdof!=NoIdx){
+            if ( isExtended && remote_extdof!=NoIdx) {
                 for ( Uint j=0; j<numUnk; ++j)
                    dofProcList_[extdof+j].insert( std::make_pair(fromproc, remote_extdof+j));
             }
         }
     }
     // Additionally, remember this dof as an "owner dof."
-    if ( GetDOFOwner(tmpRecv, rowidx_.IsExtended())==me && numData != 1){
+    if ( GetDOFOwner(tmpRecv, rowidx_.IsExtended())==me && numData != 1) {
         for ( Uint j=0; j<numUnk; ++j)
             ownerDistrIndex_.push_back( dof+j);
         if ( isExtended && !dofProcList_[extdof].empty())
@@ -1820,11 +1814,11 @@ int ExchangeBuilderCL::GetDOFOwner( const tmpRecvT& rcvTmp, bool XFEM)
     const DiST::Helper::RemoteDataCL::LoadVecT& load= DiST::InfoCL::Instance().GetLoadVector();
     double minLoad= std::numeric_limits<double>::max();
     int owner = -1;
-    if (XFEM){                      // is this special dof extended?
+    if (XFEM) {                      // is this special dof extended?
         XFEM = false;
         for (tmpRecvT::const_iterator it= rcvTmp.begin(), end= rcvTmp.end(); it!=end; ++it) {
             const int exdof= (*it)[2];
-            if (exdof !=NoInt_){
+            if (exdof !=NoInt_) {
                 XFEM = true;
                 break;
             }
@@ -1868,7 +1862,7 @@ void ExchangeBuilderCL::BuildIndexLists()
     ExchangeCL::IdxVecT& DistrIndex= ex_.DistrIndex;
     size_t numDistIdx=0;
     ExchangeCL::DOFProcListT::const_iterator it;
-    for ( it=ex_.dofProcList_.begin(); it!= ex_.dofProcList_.end(); ++it){
+    for ( it=ex_.dofProcList_.begin(); it!= ex_.dofProcList_.end(); ++it) {
         if ( it->size()>=1)
             ++numDistIdx;
     }
@@ -1877,7 +1871,7 @@ void ExchangeBuilderCL::BuildIndexLists()
     DistrIndex.reserve( rowidx_.NumUnknowns()- numDistIdx);
 
     // fill LocalIndex and DistrIndex
-    for ( IdxT i=0; i<ex_.dofProcList_.size(); ++i){
+    for ( IdxT i=0; i<ex_.dofProcList_.size(); ++i) {
         if ( ex_.dofProcList_[i].empty())
             LocalIndex.push_back(i);
         else
@@ -1885,7 +1879,7 @@ void ExchangeBuilderCL::BuildIndexLists()
     }
 
     // determine neighbors
-    for ( size_t i=0; i<DistrIndex.size(); ++i){
+    for ( size_t i=0; i<DistrIndex.size(); ++i) {
         for ( ExchangeCL::DOFInfoList_const_iterator it=ex_.GetProcListBegin( DistrIndex[i]); it!=ex_.GetProcListEnd( DistrIndex[i]); ++it)
             ex_.neighs_.insert( it->first);
     }
@@ -1923,13 +1917,13 @@ void ExchangeBuilderCL::BuildRecvBuffer()
 
     size_t i=0;
     ExchangeCL::RecvListT::const_iterator it= ex_.recvListPhase2_.begin();
-    for ( ; it!=ex_.recvListPhase2_.end(); ++it, ++i){
+    for ( ; it!=ex_.recvListPhase2_.end(); ++it, ++i) {
         ex_.xBuf_[i].resize( it->sysnums_.size());
         ex_.yBuf_[i].resize( it->sysnums_.size());
     }
     i=0;
     it= ex_.recvListPhase1_.begin();
-    for ( ; it!=ex_.recvListPhase1_.end(); ++it, ++i){
+    for ( ; it!=ex_.recvListPhase1_.end(); ++it, ++i) {
         ex_.xBuf_[i].resize( std::max( ex_.xBuf_[i].size(), it->sysnums_.size()));
         ex_.yBuf_[i].resize( std::max( ex_.yBuf_[i].size(), it->sysnums_.size()));
     }
@@ -1985,14 +1979,14 @@ void ExchangeMatrixCL::BuildCommPattern(const MatrixCL& mat,
 
     ProcNumCT NZonProcs( ProcCL::Size());   // stores the intersection
     for ( size_t i=0; i<mat.num_rows(); ++i) {
-        if ( RowEx.IsDist(i)){
-            for ( size_t nz=mat.row_beg(i); nz<mat.row_beg(i+1); ++nz){
+        if ( RowEx.IsDist(i)) {
+            for ( size_t nz=mat.row_beg(i); nz<mat.row_beg(i+1); ++nz) {
                 const size_t j= mat.col_ind(nz);
-                if ( ColEx.IsDist( j)){     // here, i and j are both distributed
+                if ( ColEx.IsDist( j)) {     // here, i and j are both distributed
                     // determine all neighbor processors, that owns i *and* j as well
                     ProcNumCT NZonProcs= Intersect( RowEx, ColEx, i, j);
 
-                    for (ProcNum_iter proc= NZonProcs.begin(); proc!=NZonProcs.end(); ++proc){
+                    for (ProcNum_iter proc= NZonProcs.begin(); proc!=NZonProcs.end(); ++proc) {
                         // mark the non-zero, that this non-zero should be sent to neighbor *proc
                         aod[*proc].push_back( (int)nz);
                         // determine the dof number on remote processor *proc
@@ -2006,7 +2000,7 @@ void ExchangeMatrixCL::BuildCommPattern(const MatrixCL& mat,
 
     // Create MPI-Type for sending
     ExList_.reserve( aod.size());
-    for (AODMap::const_iterator it= aod.begin(); it!=aod.end(); ++it){
+    for (AODMap::const_iterator it= aod.begin(); it!=aod.end(); ++it) {
         ExList_.push_back( SendNumDataCL<double>(it->first));
         ExList_.back().CreateDataType( it->second.size(), 1, Addr(it->second));
     }
@@ -2024,7 +2018,7 @@ void ExchangeMatrixCL::BuildCommPattern(const MatrixCL& mat,
     std::vector<IdxT> recvBufRowDOF, recvBufColDOF;
     RecvBuf_.resize( ExList_.size());
     Coupl_.resize( ExList_.size());
-    for (size_t ex=0; ex<ExList_.size(); ++ex){
+    for (size_t ex=0; ex<ExList_.size(); ++ex) {
         // receive sequence
         int messagelength= ProcCL::GetMessageLength<IdxT>( ExList_[ex].GetReceiver(), 2211);
         recvBufRowDOF.resize( messagelength);
@@ -2059,17 +2053,17 @@ MatrixCL ExchangeMatrixCL::Accumulate(const MatrixCL& mat)
     // Initialize communication
     std::vector<ProcCL::RequestT> send_req( ExList_.size());
     std::vector<ProcCL::RequestT> recv_req( ExList_.size());
-    for (size_t ex=0; ex<ExList_.size(); ++ex){
+    for (size_t ex=0; ex<ExList_.size(); ++ex) {
         send_req[ex]= ExList_[ex].Isend( mat.raw_val(), 2213, 0);
         recv_req[ex]= ProcCL::Irecv( RecvBuf_[ex], ExList_[ex].GetReceiver(), 2213);
     }
 
     // do accumulation
-    for ( size_t ex=0; ex<ExList_.size(); ++ex){
+    for ( size_t ex=0; ex<ExList_.size(); ++ex) {
         // wait until non-zeros have been received
         ProcCL::Wait( recv_req[ex]);
         // add received non-zeros
-        for ( size_t nz=0; nz<RecvBuf_[ex].size(); ++nz){
+        for ( size_t nz=0; nz<RecvBuf_[ex].size(); ++nz) {
             if (Coupl_[ex][nz]!=NoIdx_)
                 result.raw_val()[Coupl_[ex][nz]]+= RecvBuf_[ex][nz];
         }
