@@ -157,21 +157,9 @@ class ExtIdxDescCL
     ExtendedIdxT Xidx_;       ///< vector entries store index of extended DoF (or NoIdx if FE node is not extended)
     ExtendedIdxT Xidx_old_;   ///< old extended index, used by member function Old2New(...)
     const VecDescCL* lset_;
-/*
-    #ifdef _PAR
-    class CommunicateXFEMNumbCL
-    {
-    private:
-        IdxDescCL* current_Idx_;
-      public:
-        CommunicateXFEMNumbCL( IdxDescCL* idx) : current_Idx_(idx) {}
-        bool Gather( const DiST::TransferableCL& t, DiST::Helper::SendStreamCL& s);
-        bool Scatter( DiST::TransferableCL& t, const size_t numData, DiST::Helper::MPIistreamCL& r);
-        void Call();
-    };
-#endif
-*/
-    ExtIdxDescCL( double omit_bound= 1./32. ) : omit_bound_( omit_bound ), lset_(0) {}
+    const BndDataCL<>* lsetbnd_;
+
+    ExtIdxDescCL( double omit_bound= 1./32. ) : omit_bound_( omit_bound ), lset_(0), lsetbnd_(0) {}
 
     /// \brief Update numbering of extended DoFs and return dimension of XFEM space (= # DoF + # extended DoF)
     ///
@@ -198,6 +186,7 @@ class ExtIdxDescCL
     void Old2New( VecDescCL* );
 
     const VecDescCL& GetLevelset() const { return *lset_; }
+    const BndDataCL<>& GetLevelsetBnd() const { return *lsetbnd_; }
 };
 
 /// \brief Apply the permutation p to the extended part of a finite element basis

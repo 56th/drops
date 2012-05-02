@@ -434,7 +434,7 @@ class ISBBTPreCL : public SchurPreBaseCL
         : SchurPreBaseCL( kA, kM), B_( B), Bs_( 0), Bversion_( 0),
           M_( M_pr), Mvel_( Mvel), tolA_(tolA), tolM_(tolM),
           BBT_( 0, TRANSP_MUL, 0, MUL, vel_idx, pr_idx),
-          PCsolver1_( pr_idx.GetEx(), vel_idx.GetEx()), PCsolver2_(pr_idx),
+          PCsolver1_( pr_idx, vel_idx), PCsolver2_(pr_idx),
           solver_( 800, tolA_, vel_idx, pr_idx, PCsolver1_, /*relative*/ true),
           solver2_( 500, tolM_, pr_idx, PCsolver2_, /*relative*/ true),
           vel_idx_( &vel_idx), pr_idx_( &pr_idx), regularize_( regularize) {}
@@ -445,7 +445,7 @@ class ISBBTPreCL : public SchurPreBaseCL
           tolA_(pc.tolA_), tolM_(pc.tolM_),
           Dprsqrtinv_( pc.Dprsqrtinv_),
           BBT_( Bs_, TRANSP_MUL, Bs_, MUL, *pc.vel_idx_, *pc.pr_idx_),
-          PCsolver1_( pc.pr_idx_->GetEx(), pc.vel_idx_->GetEx()), PCsolver2_( *pc.pr_idx_),
+          PCsolver1_( *pc.pr_idx_, *pc.vel_idx_), PCsolver2_( *pc.pr_idx_),
           solver_( 800, tolA_, *pc.vel_idx_, *pc.pr_idx_, PCsolver1_, /*relative*/ true),
           solver2_( 500, tolM_, *pc.pr_idx_, PCsolver2_, /*relative*/ true),
           vel_idx_( pc.vel_idx_), pr_idx_( pc.pr_idx_), regularize_( pc.regularize_){}

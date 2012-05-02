@@ -138,11 +138,7 @@ inline void
 
 inline void
   VelocityRepairCL::post_refine_sequence ()
-  /// Create numbering for all idx level
-{
-//    match_fun match= stokes_.GetMG().GetBnd().GetMatchFun();
-//    stokes_.CreateNumberingVel( stokes_.GetMG().GetLastLevel(), &stokes_.vel_idx, *match);
-}
+{}
 
 
 //*****************************************************************************
@@ -183,11 +179,7 @@ inline void
 
 inline void
   PressureRepairCL::post_refine_sequence ()
-  /// Create numbering for all idx level
 {
-//    match_fun match= stokes_.GetMG().GetBnd().GetMatchFun();
-//    stokes_.DeleteNumbering(&stokes_.pr_idx);
-//    stokes_.CreateNumberingPr( stokes_.GetMG().GetLastLevel(), &stokes_.pr_idx, match, &ls_);
     (*p1xrepair_)();
     p1xrepair_.reset();
 }

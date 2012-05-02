@@ -77,7 +77,7 @@
 		"_comment":
 "# adaptive refinement",
 
-		"Freq":		0,
+		"Freq":		1,
 		"FinestLevel":		2,
 		"CoarsestLevel":		0,
 		"Width":		0.4e-3,

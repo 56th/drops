@@ -1838,8 +1838,8 @@ ParPCGNE(const Mat& A, Vec& u, const Vec& b, const ExACL& ExAX,  const ExATransp
 class ParNEGSPcCL
 {
   private:
-    const ExchangeCL& RowEx_;
-    const ExchangeCL& ColEx_;
+    const IdxDescCL& RowIdx_;
+    const IdxDescCL& ColIdx_;
     bool symmetric_;             ///< If true, SGS is performed, else GS.
     mutable const void*  Aaddr_; ///< only used to validate, that the diagonal is for the correct matrix.
     mutable size_t Aversion_;
@@ -1864,7 +1864,7 @@ class ParNEGSPcCL
     void BackwardMulGS(const Mat& A, Vec& x, const Vec& b) const;
 
   public:
-    ParNEGSPcCL (const ExchangeCL& RowEx, const ExchangeCL& ColEx, bool symmetric= true) : RowEx_(RowEx), ColEx_(ColEx), symmetric_( symmetric), Aaddr_( 0), Aversion_( 0) {}
+    ParNEGSPcCL (const IdxDescCL& Row, const IdxDescCL& Col, bool symmetric= true) : RowIdx_(Row), ColIdx_(Col), symmetric_( symmetric), Aaddr_( 0), Aversion_( 0) {}
 
     ///@{ Note, that A and not A*A^T is the first argument.
     ///\brief Execute a (symmetric) Gauss-Seidel preconditioning step.
@@ -1897,14 +1897,14 @@ void ParNEGSPcCL::Update (const Mat& A) const
     D_.resize( A.num_rows());
     // Accumulate matrix
     ExchangeMatrixCL exMat_;
-    exMat_.BuildCommPattern(A, RowEx_, ColEx_);
+    exMat_.BuildCommPattern(A, RowIdx_.GetEx(), ColIdx_.GetEx());
     MatrixCL Aacc(exMat_.Accumulate(A));
     // Determine diagonal of AA^T
     D_.resize(Aacc.num_rows());
     for (size_t i = 0; i < Aacc.num_rows(); ++i)
         for (size_t nz = Aacc.row_beg(i); nz < Aacc.row_beg(i + 1); ++nz)
             D_[i] += Aacc.val(nz) * A.val(nz);
-    RowEx_.Accumulate(D_);
+    RowIdx_.GetEx().Accumulate(D_);
     y_.resize( A.num_cols());
 }
 
@@ -1914,6 +1914,8 @@ void ParNEGSPcCL::ForwardGS(const Mat& A, Vec& x, const Vec& b) const
     // x= 0.; // implied, but superfluous, because we can assign the x-values below, not update.
     y_= 0.;
     double t;
+    const ExchangeCL& RowEx_(RowIdx_.GetEx());
+
     for (size_t i= 0; i < RowEx_.LocalIndex.size(); ++i) {
         t= (b[RowEx_.LocalIndex[i]] - mul_row( A, y_, RowEx_.LocalIndex[i]))/D_[RowEx_.LocalIndex[i]];
         x[RowEx_.LocalIndex[i]]= t;
@@ -1931,6 +1933,8 @@ void ParNEGSPcCL::BackwardGS(const Mat& A, Vec& x, const Vec& b) const
 {
     // x= 0.; // implied, but superfluous, because we can assign the x-values below, not update.
     y_= 0.;
+    const ExchangeCL& RowEx_(RowIdx_.GetEx());
+
     for (size_t i= RowEx_.LocalIndex.size() - 1; i < RowEx_.LocalIndex.size(); --i) {
         x[RowEx_.LocalIndex[i]]= (b[RowEx_.LocalIndex[i]] - mul_row( A, y_, RowEx_.LocalIndex[i]))/D_[RowEx_.LocalIndex[i]];
         add_row_to_vec( A, x[RowEx_.LocalIndex[i]], y_, RowEx_.LocalIndex[i]); // y+= t* (i-th row of A)

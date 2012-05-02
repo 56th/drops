@@ -93,7 +93,10 @@ void MigrateFECL::post_migrate()
     IdxDescCL loc_idx( old_idx_->GetFE());
     const Uint lvl = old_idx_->TriangLevel();
 
-    loc_idx.CreateNumbering( lvl, *mg_, *old_idx_);
+    if (loc_idx.IsExtended())
+        loc_idx.CreateNumbering( lvl, *mg_, *old_idx_, &old_idx_->GetXidx().GetLevelset(), &old_idx_->GetXidx().GetLevelsetBnd());
+    else
+        loc_idx.CreateNumbering( lvl, *mg_, *old_idx_);
 
     // Assign the new index (and allocate memory for the new vector)
     loc_vec.SetIdx( &loc_idx);
