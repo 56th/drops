@@ -375,7 +375,7 @@ dist_twophasedrops: \
     ../geom/geomselect.o  ../levelset/twophaseutils.o ../num/hypre.o ../levelset/coupling.o ../geom/bndVelFunctions.o \
     ../geom/bndScalarFunctions.o ../misc/bndmap.o ../levelset/twophaseCoeff.o  \
     ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o \
-    ../num/renumber.o \
+    ../num/renumber.o ../surfactant/ifacetransp.o \
     ../misc/scopetimer.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 	

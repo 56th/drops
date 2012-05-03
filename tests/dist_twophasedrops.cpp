@@ -79,7 +79,7 @@ double GetTimeOffset(){
 void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddata, AdapTriangCL& adap)
 // flow control
 {
-    //DROPS::InScaMap & inscamap = DROPS::InScaMap::getInstance();
+    DROPS::InScaMap & inscamap = DROPS::InScaMap::getInstance();
     //DROPS::ScaMap & scamap = DROPS::ScaMap::getInstance();
     //DROPS::InVecMap & vecmap = DROPS::InVecMap::getInstance();
     DROPS::MatchMap & matchmap = DROPS::MatchMap::getInstance();
@@ -242,6 +242,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         massTransp->Update();
         std::cout << massTransp->c.Data.size() << " concentration unknowns,\n";
     }
+    */
 
     /// \todo rhs beruecksichtigen
     SurfactantcGP1CL surfTransp( MG, Stokes.GetBndData().Vel, P.get<double>("SurfTransp.Theta"), P.get<double>("SurfTransp.Visc"), &Stokes.v, lset.Phi, lset.GetBndData(),
@@ -255,7 +256,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         surfTransp.ic.SetIdx( &surfTransp.idx);
         surfTransp.Init( inscamap["surf_sol"]);
     }
-*/
+
     // Stokes-Solver
     StokesSolverFactoryCL<InstatNavierStokes2PhaseP2P1CL> stokessolverfactory(Stokes, P);
     StokesSolverBaseCL* stokessolver = stokessolverfactory.CreateStokesSolver();
@@ -366,14 +367,14 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         IFInfo.Update( lset, Stokes.GetVelSolution());
         IFInfo.Write(time_old);
 
-//        if (P.get("SurfTransp.DoTransp", 0)) surfTransp.InitOld();
+        if (P.get("SurfTransp.DoTransp", 0)) surfTransp.InitOld();
         timedisc->DoStep( P.get<int>("Coupling.Iter"));
-/*        if (massTransp) massTransp->DoStep( time_new);
+//        if (massTransp) massTransp->DoStep( time_new);
         if (P.get("SurfTransp.DoTransp", 0)) {
             surfTransp.DoStep( time_new);
             BndDataCL<> ifbnd( 0);
             std::cout << "surfactant on \\Gamma: " << Integral_Gamma( MG, lset.Phi, lset.GetBndData(), make_P1Eval(  MG, ifbnd, surfTransp.ic)) << '\n';
-        }*/
+        }
 
         // WriteMatrices( Stokes, step);
 

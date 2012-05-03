@@ -451,6 +451,13 @@ void SurfactantcGP1CL::InitOld ()
     oldt_= ic.t;
 }
 
+void
+InterfaceP1RepairCL::pre_refine ()
+{
+    DROPS::NoBndDataCL<> dummy;
+    p1repair_= std::auto_ptr<RepairP1CL<double, NoBndDataCL>::type >(
+        new RepairP1CL<double, NoBndDataCL>::type( mg_, fullu_, dummy));
+}
 
 void
 InterfaceP1RepairCL::post_refine ()
@@ -466,7 +473,9 @@ InterfaceP1RepairCL::post_refine ()
 //    P1EvalCL<double, DROPS::NoBndDataCL<>, const VecDescCL> oldsol( &fullu_, &dummy, &mg_);
 //    P1EvalCL<double, DROPS::NoBndDataCL<>,       VecDescCL>    sol( &loc_u , &dummy, &mg_);
 //    Interpolate( sol, oldsol);
-    RepairAfterRefineP1( make_P1Eval( mg_, dummy, fullu_), loc_u);
+
+    p1repair_->repair( loc_u);
+    //RepairAfterRefineP1( make_P1Eval( mg_, dummy, fullu_), loc_u);
 
     fullu_.Clear( fullu_.t);
     fullp1idx_.swap( loc_idx);
@@ -495,7 +504,7 @@ InterfaceP1RepairCL::post_refine_sequence ()
     fullp1idx_.DeleteNumbering( mg_);
     fullu_.Clear( u_.t);
 }
-
+#ifndef _PAR
 void
 Ensight6IfaceScalarCL::put (Ensight6OutCL& cf) const
 {
@@ -509,6 +518,7 @@ Ensight6IfaceScalarCL::put (Ensight6OutCL& cf) const
 
     p1idx.DeleteNumbering( mg_);
 }
+#endif
 
 void
 VTKIfaceScalarCL::put (VTKOutCL& cf) const

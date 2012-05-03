@@ -30,6 +30,7 @@
 #include "levelset/mgobserve.h"
 #include "out/ensightOut.h"
 #include "out/vtkOut.h"
+#include "num/fe_repair.h"
 
 #ifndef DROPS_IFACETRANSP_H
 #define DROPS_IFACETRANSP_H
@@ -190,7 +191,7 @@ class SurfactantcGP1CL
     const VelBndDataT&  Bnd_v_;  ///< Boundary condition for the velocity
     VecDescCL*          v_;      ///< velocity at current time step
     VecDescCL&          lset_vd_;///< levelset at current time step
-
+    
     const BndDataCL<>&  lsetbnd_; ///< level set boundary
 
     IdxDescCL           oldidx_; ///< idx that corresponds to old time (and oldls_)
@@ -260,21 +261,25 @@ class InterfaceP1RepairCL : public MGObserverCL
 
     IdxDescCL          fullp1idx_;
     VecDescCL          fullu_;
+    std::auto_ptr<RepairP1CL<double, NoBndDataCL>::type > p1repair_;
 
   public:
     InterfaceP1RepairCL (MultiGridCL& mg, const VecDescCL& lset_vd, const BndDataCL<>& lset_bnd, VecDescCL& u)
         : mg_( mg), lset_vd_( lset_vd), lset_bnd_( lset_bnd), u_( u), fullp1idx_( P1_FE), fullu_( &fullp1idx_) {}
 
-    void pre_refine  () {}
+    void pre_refine  ();
     void post_refine ();
 
     void pre_refine_sequence  ();
     void post_refine_sequence ();
     const IdxDescCL* GetIdxDesc() const { return u_.RowIdx; }
-    const VectorCL*  GetVector()  const { return &u_.Data; }
-    void swap( IdxDescCL& idx, VectorCL& v) { u_.RowIdx->swap(idx); u_.Data.swap(v); }
+#ifdef _PAR
+    const VectorCL*  GetVector()  const { return &fullu_.Data; }
+    void swap( IdxDescCL& idx, VectorCL& v) { fullu_.RowIdx->swap(idx); fullu_.Data.swap(v); }
+#endif
 };
 
+#ifndef _PAR
 ///\brief Represents a scalar P1 function on the interface as Ensight6 variable by extension to the
 ///       whole domain.
 class Ensight6IfaceScalarCL : public Ensight6VariableCL
@@ -301,6 +306,7 @@ make_Ensight6IfaceScalar (MultiGridCL& mg, const VecDescCL& u,
 {
     return *new Ensight6IfaceScalarCL( mg, u, varName, fileName, timedep);
 }
+#endif
 
 ///\brief Represents a scalar P1 function on the interface as VTK variable by extension to the
 ///       whole domain.

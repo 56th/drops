@@ -52,17 +52,17 @@ void RepairFEDataCL<LocalFEDataT>::repair (AugmentedDofVecT& dof, VectorCL& newd
 
 /// RepairFECL
 
-template <class ValueT, template<class> class LocalFEDataT>
-  RepairFECL<ValueT, LocalFEDataT>::RepairFECL (const MultiGridCL& mg, const VecDescCL& old, const BndDataCL<value_type>& bnd)
+template <class ValueT, template<class> class LocalFEDataT, template<class> class BndDataT>
+  RepairFECL<ValueT, LocalFEDataT, BndDataT>::RepairFECL (const MultiGridCL& mg, const VecDescCL& old, const BndDataT<value_type>& bnd)
         : mg_( mg), old_vd_ ( old), bnd_( bnd)
 {
     localfedata_::Init();
     pre_refine();
 }
 
-template <class ValueT, template<class> class LocalFEDataT>
+template <class ValueT, template<class> class LocalFEDataT, template<class> class BndDataT>
   void
-  RepairFECL<ValueT, LocalFEDataT>::pre_refine ()
+  RepairFECL<ValueT, LocalFEDataT, BndDataT>::pre_refine ()
 {
     parent_data_.clear();
     level0_leaves_.clear();
@@ -104,9 +104,9 @@ template <class ValueT, template<class> class LocalFEDataT>
 #endif
 }
 
-template <class ValueT, template<class> class LocalFEDataT>
+template <class ValueT, template<class> class LocalFEDataT, template<class> class BndDataT>
   AugmentedDofVecT
-  RepairFECL<ValueT, LocalFEDataT>::collect_unrepaired_dofs (const TetraCL& t)
+  RepairFECL<ValueT, LocalFEDataT, BndDataT>::collect_unrepaired_dofs (const TetraCL& t)
 {
     LocalNumbCL n_new( t, *new_vd_->RowIdx);
     AugmentedDofVecT dof;
@@ -119,8 +119,8 @@ template <class ValueT, template<class> class LocalFEDataT>
     return dof;
 }
 
-template <class ValueT, template<class> class LocalFEDataT>
-void RepairFECL<ValueT, LocalFEDataT>::unchanged_refinement (const TetraCL& t)
+template <class ValueT, template<class> class LocalFEDataT, template<class> class BndDataT>
+void RepairFECL<ValueT, LocalFEDataT, BndDataT>::unchanged_refinement (const TetraCL& t)
 {
     const VectorCL& olddata= old_vd_.Data;
           VectorCL& newdata= new_vd_->Data;
@@ -136,8 +136,8 @@ void RepairFECL<ValueT, LocalFEDataT>::unchanged_refinement (const TetraCL& t)
         }
 }
 
-template <class ValueT, template<class> class LocalFEDataT>
-void RepairFECL<ValueT, LocalFEDataT>::regular_leaf_refinement (const TetraCL& t)
+template <class ValueT, template<class> class LocalFEDataT, template<class> class BndDataT>
+void RepairFECL<ValueT, LocalFEDataT, BndDataT>::regular_leaf_refinement (const TetraCL& t)
 {
     const AugmentedDofVecT& dof= collect_unrepaired_dofs( t);
     if (dof.empty())
@@ -153,8 +153,8 @@ void RepairFECL<ValueT, LocalFEDataT>::regular_leaf_refinement (const TetraCL& t
         DoFHelperCL<value_type, VectorCL>::set( new_vd_->Data, d->first, oldp2( T*d->second));
 }
 
-template <class ValueT, template<class> class LocalFEDataT>
-void RepairFECL<ValueT, LocalFEDataT>::genuine_refinement (const TetraCL& t, const RepairFEDataCL<LocalFECL>& repairdata)
+template <class ValueT, template<class> class LocalFEDataT, template<class> class BndDataT>
+void RepairFECL<ValueT, LocalFEDataT, BndDataT>::genuine_refinement (const TetraCL& t, const RepairFEDataCL<LocalFECL>& repairdata)
 {
     AugmentedDofVecT dof= collect_unrepaired_dofs( t);
     if (dof.empty())
@@ -171,8 +171,8 @@ void RepairFECL<ValueT, LocalFEDataT>::genuine_refinement (const TetraCL& t, con
     repairdata.repair( dof, new_vd_->Data);
 }
 
-template <class ValueT, template<class> class LocalFEDataT>
-void RepairFECL<ValueT, LocalFEDataT>::unrefinement (const TetraCL& t, const RepairFEDataCL<LocalFECL>& repairdata)
+template <class ValueT, template<class> class LocalFEDataT, template<class> class BndDataT>
+void RepairFECL<ValueT, LocalFEDataT, BndDataT>::unrefinement (const TetraCL& t, const RepairFEDataCL<LocalFECL>& repairdata)
 {
     AugmentedDofVecT dof= collect_unrepaired_dofs( t);
     if (dof.empty())
@@ -184,8 +184,8 @@ void RepairFECL<ValueT, LocalFEDataT>::unrefinement (const TetraCL& t, const Rep
     repairdata.repair( dof, new_vd_->Data);
 }
 
-template <class ValueT, template<class> class LocalFEDataT>
-void RepairFECL<ValueT, LocalFEDataT>::changed_refinement (const TetraCL& t, const RepairFEDataCL<LocalFECL>& repairdata)
+template <class ValueT, template<class> class LocalFEDataT, template<class> class BndDataT>
+void RepairFECL<ValueT, LocalFEDataT, BndDataT>::changed_refinement (const TetraCL& t, const RepairFEDataCL<LocalFECL>& repairdata)
 {
     AugmentedDofVecT dof= collect_unrepaired_dofs( t);
     if (dof.empty())
@@ -199,9 +199,9 @@ void RepairFECL<ValueT, LocalFEDataT>::changed_refinement (const TetraCL& t, con
     repairdata.repair( dof, new_vd_->Data);
 }
 
-template <class ValueT, template<class> class LocalFEDataT>
+template <class ValueT, template<class> class LocalFEDataT, template<class> class BndDataT>
   void
-  RepairFECL<ValueT, LocalFEDataT>::repair (VecDescCL& new_vd)
+  RepairFECL<ValueT, LocalFEDataT, BndDataT>::repair (VecDescCL& new_vd)
 {
     new_vd_= &new_vd;
 
@@ -242,8 +242,8 @@ template <class ValueT, template<class> class LocalFEDataT>
 ******************************************************************************/
 
 /// \brief class for storing repair data on master and ghost tetrahedra
-template <class ValueT, template<class> class LocalFEDataT>
-class RepairFECL<ValueT, LocalFEDataT>::RepairMapCL {
+template <class ValueT, template<class> class LocalFEDataT, template<class> class BndDataT>
+class RepairFECL<ValueT, LocalFEDataT, BndDataT>::RepairMapCL {
   private:
     typedef typename localfedata_::LocalFECL   LocalFECL;
     typedef DROPS_STD_UNORDERED_MAP<const TetraCL*, RepairFEDataCL<LocalFECL> > RepairMapT;
@@ -279,8 +279,8 @@ class RepairFECL<ValueT, LocalFEDataT>::RepairMapCL {
 ******************************************************************************/
 
 /// \brief Handler for generating information about parent data on other processes
-template <class ValueT, template<class> class LocalFEDataT>
-class RepairFECL<ValueT, LocalFEDataT>::HandlerParentDataCL
+template <class ValueT, template<class> class LocalFEDataT, template<class> class BndDataT>
+class RepairFECL<ValueT, LocalFEDataT, BndDataT>::HandlerParentDataCL
 {
   private:
     RepairMapCL& parent_data_;
@@ -294,8 +294,8 @@ class RepairFECL<ValueT, LocalFEDataT>::HandlerParentDataCL
     bool Scatter( DiST::TransferableCL&, const size_t&, DiST::Helper::MPIistreamCL&);
 };
 
-template <class ValueT, template<class> class LocalFEDataT>
-bool RepairFECL<ValueT, LocalFEDataT>::HandlerParentDataCL::Gather(
+template <class ValueT, template<class> class LocalFEDataT, template<class> class BndDataT>
+bool RepairFECL<ValueT, LocalFEDataT, BndDataT>::HandlerParentDataCL::Gather(
     DiST::TransferableCL& t, DiST::Helper::SendStreamCL& send)
 {
     TetraCL* tetra;
@@ -313,8 +313,8 @@ bool RepairFECL<ValueT, LocalFEDataT>::HandlerParentDataCL::Gather(
     return false;
 }
 
-template <class ValueT, template<class> class LocalFEDataT>
-bool RepairFECL<ValueT, LocalFEDataT>::HandlerParentDataCL::Scatter(
+template <class ValueT, template<class> class LocalFEDataT, template<class> class BndDataT>
+bool RepairFECL<ValueT, LocalFEDataT, BndDataT>::HandlerParentDataCL::Scatter(
     DiST::TransferableCL& t, __UNUSED__ const size_t& numData,
     DiST::Helper::MPIistreamCL& recv)
 {

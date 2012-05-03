@@ -153,7 +153,7 @@ void RepairP1LocalDataTypeCL<ValueT>::Init() {
 /// In principle, this class could use the accumulator-pattern (e.g., as base-class).
 /// As this slightly complicates its use and because repair is performed seldom,
 /// we leave this as future work.
-template <class ValueT, template<class> class LocalFEDataT>
+template <class ValueT, template<class> class LocalFEDataT, template<class> class BndDataT>
 class RepairFECL
 {
   public:
@@ -173,7 +173,7 @@ class RepairFECL
 
     const MultiGridCL& mg_;            ///< Multigrid to operate on
     const VecDescCL& old_vd_;          ///< original data to be repaired
-    const BndDataCL<value_type>& bnd_; ///< boundary-data for the old and new VecDescCL
+    const BndDataT<value_type>& bnd_;  ///< boundary-data for the old and new VecDescCL
 
     VecDescCL* new_vd_;                ///< VecDescCL to be repaired; set in repair().
     std::vector<bool> repair_needed_;   ///< Memoize dof that must be repaired. Used only in repair() and its helpers.
@@ -194,7 +194,7 @@ class RepairFECL
 
   public:
     /// \brief Initializes the data to be repaired on mg and calls pre_refine().
-    RepairFECL (const MultiGridCL& mg, const VecDescCL& old, const BndDataCL<value_type>& bnd);
+    RepairFECL (const MultiGridCL& mg, const VecDescCL& old, const BndDataT<value_type>& bnd);
 
     /// \brief Saves data from possibly deleted tetras in parent_data_ and level0_leaves_.
     void pre_refine ();
@@ -210,16 +210,16 @@ class RepairFECL
 template <class ValueT>
 using RepairP2CL<ValueT> = RepairFECL<ValueT, RepairP2LocalDataCL<ValueT> >; */
 
-template <class ValueT>
+template <class ValueT, template<class> class BndDataT = BndDataCL>
 struct RepairP2CL
 {
-    typedef RepairFECL<ValueT, RepairP2LocalDataTypeCL> type;
+    typedef RepairFECL<ValueT, RepairP2LocalDataTypeCL, BndDataT> type;
 };
 
-template <class ValueT>
+template <class ValueT, template<class> class BndDataT = BndDataCL>
 struct RepairP1CL
 {
-    typedef RepairFECL<ValueT, RepairP1LocalDataTypeCL> type;
+    typedef RepairFECL<ValueT, RepairP1LocalDataTypeCL, BndDataT> type;
 };
 
 
