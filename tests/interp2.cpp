@@ -355,7 +355,6 @@ int TestInterpolateOld()
     P2EvalCL<double, BndCL, const VecDescBaseCL<VectorCL> > fun0( &v0, &Bnd, &mg);
     P2EvalCL<double, BndCL,VecDescBaseCL<VectorCL> > fun1( &v1, &Bnd, &mg);
     Interpolate( fun1, fun0);
-//    DROPS::RepairAfterRefineP2( fun0, v1);
     std::cout << "Verts:" << std::endl;
     double diff;
     for (MultiGridCL::TriangVertexIteratorCL sit=mg.GetTriangVertexBegin(1),

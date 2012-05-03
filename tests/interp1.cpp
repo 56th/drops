@@ -120,8 +120,6 @@ int TestReMark()
             i1.CreateNumbering( i1_Level, mg);
             v1.SetIdx( &i1);
             repairp1.repair( v1);
-            DROPS::P1EvalCL<double, BndCL, const VecDescCL > fun0( &v0, &Bnd, &mg);
-            //DROPS::RepairAfterRefineP1( fun0, v1);
             DROPS::P1EvalCL<double, BndCL, VecDescCL >       fun1( &v1, &Bnd, &mg);
             ttt= CheckResult( fun1);
             ret+= ttt;
@@ -153,8 +151,6 @@ int TestRepair()
         i1.CreateNumbering( i0.TriangLevel(), mg);
         v1.SetIdx( &i1);
         repairp1.repair( v1);
-        DROPS::P1EvalCL<double, BndCL, const VecDescCL > fun0( &v0, &Bnd, &mg);
-        //DROPS::RepairAfterRefineP1( fun0, v1);
         DROPS::P1EvalCL<double, BndCL, VecDescCL >       fun1( &v1, &Bnd, &mg);
         ret+= CheckResult( fun1);
     }
@@ -177,8 +173,6 @@ int TestRepair()
         i1.CreateNumbering( i1_Level, mg);
         v1.SetIdx( &i1);
         repairp1.repair( v1);
-        DROPS::P1EvalCL<double, BndCL, const VecDescCL > fun0( &v0, &Bnd, &mg);
-        //DROPS::RepairAfterRefineP1( fun0, v1);
         DROPS::P1EvalCL<double, BndCL, VecDescCL >       fun1( &v1, &Bnd, &mg);
         ret+= CheckResult( fun1);
     }
