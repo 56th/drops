@@ -1,4 +1,4 @@
-/// \file dist_streamtest.cpp
+/// \file dist_simplexsend.cpp
 /// \brief test streaming for DiST
 /// \author LNM RWTH Aachen: ; SC RWTH Aachen: Oliver Fortmeier, Daniel Medina Cardona
 

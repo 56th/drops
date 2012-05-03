@@ -1,4 +1,4 @@
-/// \file dist_remotedatatest.cpp
+/// \file dist_modify.cpp
 /// \brief test remote data for DiST
 /// \author LNM RWTH Aachen: ; SC RWTH Aachen: Oliver Fortmeier, Daniel Medina Cardona
 

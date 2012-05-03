@@ -1,4 +1,4 @@
-/// \file interp1.cpp
+/// \file dist_interp1.cpp
 /// \brief tests implementation of RepairP1CL
 /// \author LNM RWTH Aachen: Patrick Esser, Joerg Grande, Sven Gross, Volker Reichelt; SC RWTH Aachen: Oliver Fortmeier
 

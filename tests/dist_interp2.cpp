@@ -1,4 +1,4 @@
-/// \file interp2.cpp
+/// \file dist_interp2.cpp
 /// \brief tests implementation of RepairP2CL
 /// \author LNM RWTH Aachen: Patrick Esser, Joerg Grande, Sven Gross, Volker Reichelt; SC RWTH Aachen: Oliver Fortmeier
 
