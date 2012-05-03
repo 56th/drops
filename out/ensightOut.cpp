@@ -25,6 +25,7 @@
 #include "out/ensightOut.h"
 #include "num/discretize.h"
 
+#ifndef _PAR
 namespace DROPS{
 
 Ensight6OutCL::Ensight6OutCL (std::string casefileName, Uint numsteps, bool binary, __UNUSED__ bool masterout)
@@ -713,3 +714,4 @@ void ReadEnsightP2SolCL::AppendProccode( std::string &str) const
 #endif          // end of parallel implementations
 
 } // end of namespace DROPS
+#endif

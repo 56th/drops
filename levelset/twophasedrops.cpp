@@ -30,7 +30,9 @@
 #include "stokes/integrTime.h"
 //output
 #include "out/output.h"
+#ifndef _PAR
 #include "out/ensightOut.h"
+#endif
 #include "out/vtkOut.h"
 //levelset
 #include "levelset/coupling.h"
@@ -277,7 +279,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 #else
     ParJac0CL jacparpc( *lidx);
     ParPreGMResSolverCL<ParJac0CL>* gm = new ParPreGMResSolverCL<ParJac0CL>
-           (/*restart*/100, P.get<int>("Levelset.Iter"), P.get<double>("Levelset.Tol"), *lidx, jacparpc,/*rel*/true, /*acc*/ true, /*modGS*/false, LeftPreconditioning, /*parmod*/true);
+           (/*restart*/100, P.get<int>("Levelset.Iter"), P.get<double>("Levelset.Tol"), *lidx, jacparpc,/*rel*/true, /*modGS*/false, LeftPreconditioning, /*parmod*/true);
 #endif
 
     LevelsetModifyCL lsetmod( P.get<int>("Reparam.Freq"), P.get<int>("Reparam.Method"), P.get<double>("Reparam.MaxGrad"), P.get<double>("Reparam.MinGrad"), P.get<int>("Levelset.VolCorrection"), Vol, is_periodic);
@@ -327,6 +329,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
                                                         vel_downwind, lset_downwind);
     Stokes.v.t += GetTimeOffset();
     // Output-Registrations:
+#ifndef _PAR
     Ensight6OutCL* ensight = NULL;
     if (P.get<int>("Ensight.EnsightOut",0)){
         // Initialize Ensight6 output
@@ -350,13 +353,12 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         if (P.get("SurfTransp.DoTransp", 0)) {
             ensight->Register( make_Ensight6IfaceScalar( MG, surfTransp.ic,  "InterfaceSol",  ensf + ".sur", true));
         }
-
-#ifndef _PAR
         if (Stokes.UsesXFEM())
             ensight->Register( make_Ensight6P1XScalar( MG, lset.Phi, Stokes.p, "XPressure",   ensf + ".pr", true));
-#endif
+
         ensight->Write( Stokes.v.t);
     }
+#endif
 
     // writer for vtk-format
     VTKOutCL * vtkwriter = NULL;
@@ -440,8 +442,10 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
                 if (massTransp) massTransp->Update();
         }
 
+#ifndef _PAR
         if (ensight && step%P.get("Ensight.EnsightOut", 0)==0)
             ensight->Write( time_new);
+#endif
         if (vtkwriter && step%P.get("VTK.VTKOut", 0)==0)
             vtkwriter->Write( time_new);
         if (P.get("Restart.Serialization", 0) && step%P.get("Restart.Serialization", 0)==0)
@@ -456,7 +460,9 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     delete gm;
     if (massTransp) delete massTransp;
     if (transprepair) delete transprepair;
+#ifndef _PAR
     if (ensight) delete ensight;
+#endif
     if (vtkwriter) delete vtkwriter;
     if (infofile) delete infofile;
 //     delete stokessolver1;
@@ -487,9 +493,6 @@ int main (int argc, char** argv)
 #endif
   try
   {
-#ifdef _PAR
-    DROPS::ParMultiGridInitCL pmginit;
-#endif
     std::ifstream param;
 
     std::cout << "Boost version: " << BOOST_LIB_VERSION << std::endl;
@@ -556,8 +559,7 @@ int main (int argc, char** argv)
         P.put("Exp.InitialLSet", InitialLSet= "Cylinder");
     }
     DROPS::AdapTriangCL adap( *mg, P.get<double>("AdaptRef.Width"), P.get<int>("AdaptRef.CoarsestLevel"), P.get<int>("AdaptRef.FinestLevel"),
-                              ((P.get<std::string>("Restart.Inputfile") == "none") ? P.get<int>("AdaptRef.LoadBalStrategy") : -P.get<int>("AdaptRef.LoadBalStrategy")),
-                              P.get<int>("AdaptRef.Partitioner"));
+                              ((P.get<std::string>("Restart.Inputfile") == "none") ? P.get<int>("AdaptRef.LoadBalStrategy") : -P.get<int>("AdaptRef.LoadBalStrategy")));
     // If we read the Multigrid, it shouldn't be modified;
     // otherwise the pde-solutions from the ensight files might not fit.
     if (P.get("Restart.Inputfile", std::string("none")) == "none")
@@ -565,9 +567,12 @@ int main (int argc, char** argv)
 
     std::cout << DROPS::SanityMGOutCL(*mg) << std::endl;
 #ifdef _PAR
-    adap.GetLb().GetLB().SetWeightFnct(1);
-    if (DROPS::ProcCL::Check( CheckParMultiGrid( adap.GetPMG())))
-        std::cout << "As far as I can tell the ParMultigridCl is sane\n";
+    if ( DROPS::CheckParMultiGrid())
+        std::cout << "As far as I can tell the ParMultigridCL is sane\n";
+    if ( DROPS::ProcCL::Check( DROPS::DiST::InfoCL::Instance().IsSane( std::cerr)))
+        std::cout << " DiST-module seems to be alright!" << std::endl;
+    else
+        std::cout << " DiST-module seems to be broken!" << std::endl;
 #endif
 
     DROPS::InstatNavierStokes2PhaseP2P1CL prob( *mg, DROPS::TwoPhaseFlowCoeffCL(P), bnddata, P.get<double>("Stokes.XFEMStab")<0 ? DROPS::P1_FE : DROPS::P1X_FE, P.get<double>("Stokes.XFEMStab"));

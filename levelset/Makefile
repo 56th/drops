@@ -19,10 +19,12 @@ SER_EXEC = reparam lsshear surfTens prJump film brick_transp twophasedrops
 PAR_EXEC = twophasedrops film
 EXEC = $(if $(PAR_BUILD),$(PAR_EXEC),$(SER_EXEC))
 
-PAR_OBJ_ = ../parallel/parallel.o ../parallel/parmultigrid.o \
-           ../parallel/partime.o ../parallel/addeddata.o ../parallel/partitioner.o ../parallel/loadbal.o \
-           ../parallel/exchange.o ../parallel/memmgr_std.o ../parallel/parmgserialization.o \
-           ../parallel/logger.o ../parallel/parddd.o 
+PAR_OBJ_ = ../parallel/parallel.o ../parallel/partime.o  \
+           ../parallel/exchange.o  ../parallel/parmultigrid.o \
+           ../parallel/logger.o ../parallel/DiST.o ../parallel/mpistream.o \
+           ../parallel/loadbal.o ../parallel/migrateunknowns.o \
+           ../parallel/decompose.o
+
 PAR_OBJ = $(if $(PAR_BUILD),$(PAR_OBJ_),)
 
 # rules

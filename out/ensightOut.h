@@ -38,13 +38,7 @@
 #include "misc/problem.h"
 #include "num/fe.h"
 
-#ifdef _PAR
-#  include <deque>
-#  include <queue>
-#  include "parallel/parallel.h"
-#  include "parallel/exchange.h"
-#endif
-
+#ifndef _PAR
 namespace DROPS
 {
 
@@ -1172,5 +1166,6 @@ void ReadEnsightP2SolCL::ReadVector( const std::string& file, VecDescCL& v, cons
 }
 
 } // end of namespace DROPS
+#endif
 
 #endif

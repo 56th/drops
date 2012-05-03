@@ -286,6 +286,14 @@ void TransportP1CL::ct2c()
 //*****************************************************************************
 //                               TransportRepairCL
 //*****************************************************************************
+
+void
+TransportRepairCL::pre_refine ()
+{
+    p1repair_= std::auto_ptr<RepairP1CL<double>::type >(
+        new RepairP1CL<double>::type( mg_, c_.ct, c_.GetBndData()));
+}
+
 void
 TransportRepairCL::post_refine ()
 {
@@ -296,7 +304,8 @@ TransportRepairCL::post_refine ()
 
     loc_cidx.CreateNumbering( mg_.GetLastLevel(), mg_, c_.GetBndData(), match);
     loc_ct.SetIdx( &loc_cidx);
-    RepairAfterRefineP1( c_.GetSolution( ct), loc_ct);
+
+    p1repair_->repair( loc_ct);
 
     ct.Clear( c_.c.t);
     ct.RowIdx->DeleteNumbering( mg_);
