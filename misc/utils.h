@@ -153,7 +153,7 @@ const double DoubleEpsC = 1.0e-9; // numeric_limits<double>::epsilon();
 //#define DROPSDebugC 25  //(DROPS::DebugNumericC | DROPS::DebugUnknownsC | DROPS::DebugContainerC )
 //#define DROPSDebugC ~0  // all bits set
 #ifndef DROPSDebugC
-  #define DROPSDebugC ~0
+  #define DROPSDebugC 0
 #endif
 
 /// \brief Throws an error upon a failed assertion.
@@ -820,6 +820,7 @@ std::slice_array<T>::operator=(const slice_array<T>& a)
 # include <boost/property_tree/exceptions.hpp>
 # include <boost/property_tree/json_parser.hpp>
 
+#ifdef _PAR
 #include <metis.h>
 #include <parmetis.h>
 
@@ -827,5 +828,6 @@ std::slice_array<T>::operator=(const slice_array<T>& a)
 typedef idx_t graph_index_type;
 /// \brief type for specififying floats for (Par)METIS
 typedef real_t graph_real_type;
+#endif
 
 #endif

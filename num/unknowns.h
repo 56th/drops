@@ -276,6 +276,8 @@ class UnknownHandleCL
 
     /// Get all information about DOF from a stream
     void UnPack( DiST::Helper::MPIistreamCL&, const DiST::TransferableCL&);
+#else
+    bool InTriangLevel( int) const {return true;}
 #endif
 };
 

@@ -34,13 +34,12 @@
 #include "geom/topo.h"
 #include "num/unknowns.h"
 
-
-
 #ifdef _PAR
-#  include "parallel/parallel.h"
 #  include "parallel/DiST.h"
+#  include "parallel/parallel.h"
 #  include <map>
 #endif
+
 
 namespace DROPS
 {
@@ -112,6 +111,41 @@ class RecycleBinCL
     void DebugInfo(std::ostream&) const;
 };
 
+#ifndef _PAR
+/// \name Ask for the dimension of a simplex
+//@{
+template <typename SimplexT> inline Usint GetDim();
+template <> inline Usint GetDim<VertexCL>() { return 0; }
+template <> inline Usint GetDim<EdgeCL>()   { return 1; }
+template <> inline Usint GetDim<FaceCL>()   { return 2; }
+template <> inline Usint GetDim<FaceCL const>()   { return 2; }
+template <> inline Usint GetDim<TetraCL>()  { return 3; }
+//@}
+
+struct GeomIdCL
+{
+    Uint        level;      ///< level, the simplex occurs first
+    Point3DCL   bary;       ///< barycenter of the simplex
+    Usint       dim;        ///< Dimension of the simplex, i.e., 0 - vertex, 1 - edge, 2 - face, 3 - tetrahedron, 4 - uninitialized
+
+    GeomIdCL() : level((Uint)(-1)), bary(), dim(4) {}
+    GeomIdCL(Uint lvl, const Point3DCL& p, Usint dimension) : level(lvl), bary(p), dim(dimension) {}
+    GeomIdCL( const GeomIdCL& h) : level(h.level), bary(h.bary), dim(h.dim) {}
+    template <typename SimplexT>
+    GeomIdCL(Uint lvl, const SimplexT& s) : level(lvl), bary( GetBaryCenter(s)), dim(GetDim<SimplexT>()) {}
+    bool operator== (const GeomIdCL& h) const { return h.level == level && h.bary == bary;}
+    bool operator!= (const GeomIdCL& h) const { return !(h==*this); }
+    bool operator < (const GeomIdCL& h) const { return level < h.level && dim < h.dim && bary[0] < h.bary[0] && bary[1] < h.bary[1] && bary[2] < h.bary[2];}
+};
+
+inline std::ostream& operator << ( std::ostream& os, const GeomIdCL& h)
+{
+    static char scode[]= "VEFT?"; // simplex code for each dimension
+    os << scode[h.dim] << h.level << " (" << h.bary << ')';
+    return os;
+}
+
+#endif
 
 /*******************************************************************
 *   V E R T E X  C L                                               *
@@ -179,10 +213,15 @@ class VertexCL
     /// \brief get level of vertex (=first appearance in the multigrid)
     /** In the parallel version this function is defined in the base class*/
     Uint GetLevel() const { return Level_; }
+    GeomIdCL GetGID() const { return GeomIdCL(this->GetLevel(), *this);}
 #endif
 
     /// \brief get coordinate of this vertex
     inline const Point3DCL& GetCoord() const;
+#ifndef _PAR
+    /// \brief change the coordinate of the vertex, e.g. ALE method in poisson problem
+    void ChangeCoord     (Point3DCL& p) { Coord_ = p; }
+#endif
     /// \brief Check if the vertex can be found in a triangulation level
     bool IsInTriang( Uint TriLevel) const { return  GetLevel() <= TriLevel; }
 
@@ -348,6 +387,7 @@ class EdgeCL
     /// \brief get level of vertex (=first appearance in the multigrid)
     /** In the parallel version this function is defined in the base class*/
     Uint GetLevel() const { return Level_; }
+    GeomIdCL GetGID() const { return GeomIdCL(this->GetLevel(), *this);}
 #else
     /// \name Functions for parallel computing demanded by the base class
     //@{
@@ -448,6 +488,7 @@ class FaceCL
 
 #ifndef _PAR
     Uint GetLevel() const { return Level_; }                    ///< get level of the face (stored within the class)
+    GeomIdCL GetGID() const { return GeomIdCL(this->GetLevel(), *this);}
 #else
     /// \name Functions for parallel computing demanded by the base class
     //@{
@@ -564,8 +605,10 @@ class TetraCL
 
     /// \brief constructor of verts and parent; FileBuilderCL has to construct the Id_, too, thus it can optionally be set.
     inline TetraCL (VertexCL*, VertexCL*, VertexCL*, VertexCL*, TetraCL*, IdCL<TetraCL> id= IdCL<TetraCL>());
+#ifdef _PAR
     /// \brief constructor of verts and level, if no parent is available; FileBuilderCL has to construct the Id_, too, thus it can optionally be set.
     inline TetraCL (VertexCL*, VertexCL*, VertexCL*, VertexCL*, TetraCL*, Uint, IdCL<TetraCL> id= IdCL<TetraCL>());
+#endif
 
   public:
     /// \brief Copy a tetrahedron
@@ -629,6 +672,8 @@ class TetraCL
 
 #ifndef _PAR
     Uint GetLevel() const { return Level_; }                                     ///< return level of tetra
+    bool IsGhost() const {return false;}
+    GeomIdCL GetGID() const { return GeomIdCL(this->GetLevel(), *this);}
 #else
     /// \name Functions for parallel computing demanded by the base class
     //@{
@@ -715,6 +760,7 @@ class TetraCL
     void DebugInfo (std::ostream&) const;                                                  ///< get debug-information
 };
 
+#ifdef _PAR
 /// \brief Cast a transferable object to a given Simplex type.
 template <typename SimplexT>
 void simplex_cast( const DiST::TransferableCL& t, SimplexT*& s)
@@ -722,7 +768,7 @@ void simplex_cast( const DiST::TransferableCL& t, SimplexT*& s)
     Assert( DiST::GetDim<SimplexT>() == t.GetDim(), DiST::Helper::ErrorCL("simplex_cast: dimension does not match for ", t.GetGID(), DiST::Helper::NoGID), ~0);
     s= dynamic_cast<SimplexT*>(const_cast<DiST::TransferableCL*>(&t));
 }
-
+#endif
 
 /// \brief Factory pattern for generating simplices
 /** This class is responsible for generating the simplices, store them in the
@@ -740,7 +786,9 @@ private:
     //@}
 
 public:
+#ifdef _PAR
     typedef DiST::Helper::RemoteDataCL::ProcListT ProcListT;
+#endif
     /// \brief Constructor
     SimplexFactoryCL( MG_VertexContT& verts, MG_EdgeContT& edges, MG_FaceContT& faces, MG_TetraContT& tetras)
         : vertices_(verts), edges_(edges), faces_(faces), tetras_(tetras) {}
@@ -757,6 +805,7 @@ public:
     FaceCL& MakeFace ( Uint Level, const Point3DCL& bary, BndIdxT bnd= NoBndC, const bool donotRegister=false);
     /// \brief Create a tetrahedron of verts and parent; FileBuilderCL has to construct the Id_, too, thus it can optionally be set.
     TetraCL& MakeTetra( VertexCL*, VertexCL*, VertexCL*, VertexCL*, TetraCL*, IdCL<TetraCL> id= IdCL<TetraCL>(), const bool donotRegister=false);
+#ifdef _PAR
     /// \brief Create a tetrahedron of verts and level, if no parent is available; FileBuilderCL has to construct the Id_, too, thus it can optionally be set.
     TetraCL& MakeTetra( VertexCL*, VertexCL*, VertexCL*, VertexCL*, TetraCL*, Uint, IdCL<TetraCL> id= IdCL<TetraCL>(), const bool donotRegister=false);
 
@@ -764,7 +813,7 @@ public:
     template <typename SimplexT>
     SimplexT& MakeCopy( const SimplexT&, const ProcListT&);
     //@}
-
+#endif
 
     ///\name Factory methods to destroy simplices which are marked for removement. Such a simplex is erased from the MG_Container.
     //{@

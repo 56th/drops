@@ -276,7 +276,7 @@ class VelocityRepairCL : public MGObserverCL
     void pre_refine  ();
     void post_refine ();
     void pre_refine_sequence  () {}
-    void post_refine_sequence ();
+    void post_refine_sequence () {}
     const IdxDescCL* GetIdxDesc() const { return stokes_.v.RowIdx; }
 #ifdef _PAR
     const VectorCL*  GetVector()  const { return &stokes_.v.Data; }

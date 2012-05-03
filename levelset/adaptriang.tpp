@@ -101,17 +101,14 @@ template <class DistFctT>
         mg_.Refine();
         observer_.notify_post_refine();
 #ifdef _PAR
-       // throw DROPSErrCL ("AdapTriangCL::ModifyGridStep uses DDD\n");
-        //pmg_->HandleUnknownsAfterRefine();
+
         if (lb) {
             // Do the migration process (including the unknowns)
-//            observer_.notify_pre_refmig_sequence( mg_);
             observer_.notify_pre_migrate();
             lb_.DoMigration();
             Assert( CheckParMultiGrid(), DROPSErrCL("AdapTriangCL::ModifyGridStep: Failure in DiST ConsCheck"),
                    DebugParallelC|DebugParallelNumC|DebugLoadBalC);
             observer_.notify_post_migrate();
-//            observer_.notify_post_refmig_sequence();
         }
 #endif
     }

@@ -277,7 +277,7 @@ class RepairFECL<ValueT, LocalFEDataT, BndDataT>::RepairMapCL {
 /******************************************************************************
 * H A N D L E R  P A R E N T D A T A   C L                                    *
 ******************************************************************************/
-
+#ifdef _PAR
 /// \brief Handler for generating information about parent data on other processes
 template <class ValueT, template<class> class LocalFEDataT, template<class> class BndDataT>
 class RepairFECL<ValueT, LocalFEDataT, BndDataT>::HandlerParentDataCL
@@ -334,5 +334,5 @@ bool RepairFECL<ValueT, LocalFEDataT, BndDataT>::HandlerParentDataCL::Scatter(
     }
     return true;
 }
-
+#endif
 } // end of namespace DROPS

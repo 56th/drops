@@ -479,16 +479,18 @@ class FileBuilderCL : public MGBuilderCL
 
     MGBuilderCL* bndbuilder_;
 
+    mutable SimplexFactoryCL* factory_;
+
     // Int <-> Add
     mutable std::map<size_t, VertexCL*> vertexAddressMap;
     mutable std::map<size_t, EdgeCL*>     edgeAddressMap;
     mutable std::map<size_t, FaceCL*>     faceAddressMap;
     mutable std::map<size_t, TetraCL*>   tetraAddressMap;
 
-    void BuildVerts   (MultiGridCL*) const;
-    void BuildEdges   (MultiGridCL*) const;
-    void BuildFacesI  (MultiGridCL*) const;
-    void BuildTetras  (MultiGridCL*) const;
+    void BuildVerts   (MultiGridCL* mgp) const;
+    void BuildEdges   () const;
+    void BuildFacesI  () const;
+    void BuildTetras  () const;
     void AddChildren  ()             const;
     void BuildFacesII (MultiGridCL*) const;
     void CheckFile( const std::ifstream& is) const;
@@ -497,7 +499,7 @@ class FileBuilderCL : public MGBuilderCL
     void buildBoundary (MultiGridCL* mgp) const {bndbuilder_->buildBoundary(mgp);};
 
   public:
-    FileBuilderCL (std::string path, MGBuilderCL* bndbuilder) : path_(path), bndbuilder_(bndbuilder) {};
+    FileBuilderCL (std::string path, MGBuilderCL* bndbuilder) : path_(path), bndbuilder_(bndbuilder), factory_(0) {};
     virtual void build(MultiGridCL*) const;
 };
 #else

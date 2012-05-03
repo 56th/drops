@@ -175,9 +175,6 @@ void LevelsetAccumulator_P2CL<DiscVelSolT>::finalize_accumulation ()
     delete bE_;
     bH_->Build();
     delete bH_;
-#ifndef _PAR
-    Comment(E.num_nonzeros() << " nonzeros in E, "<< H.num_nonzeros() << " nonzeros in H! " << std::endl, DebugDiscretizeC);
-#endif
 }
 
 template<class DiscVelSolT>

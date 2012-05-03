@@ -136,10 +136,6 @@ inline void
     v.Data= loc_v.Data;
 }
 
-inline void
-  VelocityRepairCL::post_refine_sequence ()
-{}
-
 
 //*****************************************************************************
 //                               PressureRepairCL

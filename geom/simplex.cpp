@@ -211,11 +211,15 @@ void FaceCL::LinkTetra(const TetraCL* tp)
         } else { // during transfer, the children are unpacked before their parents. Hence, we have to find the position where one of the children is stored on the next level.
         	if (tp->GetChildBegin()==tp->GetChildEnd()) { // no children known to tetra -> use position where no children are linked
         		offset= Neighbors_[2] ? 1 : 0;
+#ifdef _PAR
                 Assert( Neighbors_[offset+2]==0, DiST::Helper::ErrorCL("FaceCL::LinkTetra: Occupied child position ", offset+2, GetGID()), DebugRefineEasyC);
+#endif
         	} else if (!is_in( tp->GetChildBegin(), tp->GetChildEnd(), Neighbors_[2]))
             	if (Neighbors_[3]==0 || is_in( tp->GetChildBegin(), tp->GetChildEnd(), Neighbors_[3]))
             		offset=1;
+#ifdef _PAR
             Assert( Neighbors_[offset+2]==0 || is_in( tp->GetChildBegin(), tp->GetChildEnd(), Neighbors_[offset+2]), DiST::Helper::ErrorCL("FaceCL::LinkTetra: Wrong child at position ", offset+2, GetGID()), DebugRefineEasyC);
+#endif
         }
     }
     else                            // green child of parent
@@ -224,13 +228,19 @@ void FaceCL::LinkTetra(const TetraCL* tp)
         if (tp->GetParent()) {
         // tetra is stored on the same side as the parent
             offset= Neighbors_[0]==tp->GetParent() ? 2 : 3;
+#ifdef _PAR
             Assert( tp->GetParent()==Neighbors_[offset-2], DiST::Helper::ErrorCL("FaceCL::LinkTetra: Wrong parent at position ", offset-2, GetGID()), DebugRefineEasyC);
+#endif
         } else { // during transfer, the children are unpacked before their parents. Hence, we need an empty position without parent.
             offset= (Neighbors_[0]==0 && (Neighbors_[2]==0 || Neighbors_[2]==tp)) ? 2 : 3;
+#ifdef _PAR
             Assert( !Neighbors_[offset-2], DiST::Helper::ErrorCL("FaceCL::LinkTetra: Occupied parent position ", offset-2, GetGID()), DebugRefineEasyC);
+#endif
         }
     }
+#ifdef _PAR
     Assert(!Neighbors_[offset] || Neighbors_[offset]==tp, DiST::Helper::ErrorCL("FaceCL::LinkTetra: Link occupied by another tetra, while linking ", Neighbors_[offset] ? tp->GetGID() : DiST::Helper::NoGID, GetGID()), DebugRefineEasyC);
+#endif
     Neighbors_[offset]= tp;
 }
 
@@ -609,8 +619,8 @@ It recycles and rescues simplices, that will be reused:
                           newRule.Children, newRule.Children + newRule.ChildNum,
                           std::back_inserter(commonChildren) );
 
-    Assert(Children_, DiST::Helper::ErrorCL( "TetraCL::RecycleReusables: no children array", this->GetGID()), DebugDiSTC);
 #ifdef _PAR
+    Assert(Children_, DiST::Helper::ErrorCL( "TetraCL::RecycleReusables: no children array", this->GetGID()), DebugDiSTC);
     ParMultiGridCL& pmg= ParMultiGridCL::Instance();
 #endif
     for (Uint ch=0; ch<myRule.ChildNum; ++ch)
@@ -870,7 +880,7 @@ if the face cannot be found, create it and link boundary, if necessary.
                 if ( IsSubFace(face) )
                 {
 #ifndef _PAR
-                    newFace= &factory.MakeFace( nextLevel, GetFace(ParentFace(face))->GetBndIdx()));
+                    newFace= &factory.MakeFace( nextLevel, GetFace(ParentFace(face))->GetBndIdx());
 #else
                     newFace= &factory.MakeFace( nextLevel, bary, GetFace(ParentFace(face))->GetBndIdx());
                     // if new faces are created on the proc-boundary, identify them
@@ -880,7 +890,7 @@ if the face cannot be found, create it and link boundary, if necessary.
                 }
                 else{
 #ifndef _PAR
-                    newFace= &factory.MakeFace( nextLevel) );
+                    newFace= &factory.MakeFace( nextLevel);
 #else
                     newFace= &factory.MakeFace( nextLevel, bary);
 #endif
@@ -1118,7 +1128,11 @@ void VertexCL::DebugInfo(std::ostream& os) const
     else{
         os << "\n no recycle bin found\n";
     }
-    os << "Has Unknowns " << Unknowns.Exist() << ", received any Unknowns " << Unknowns.HasUnkReceived() << std::endl;
+    os << "Has Unknowns " << Unknowns.Exist()
+#ifdef _PAR
+       << ", received any Unknowns " << Unknowns.HasUnkReceived()
+#endif
+       << std::endl;
 #ifdef _PAR
     base::DebugInfo( os);
 #endif
@@ -1166,7 +1180,7 @@ Check for:
     // check if an edge, that is marked for refinement stores a pointer to the
     // midvertex
 #ifndef _PAR
-    if ( GetMFR()>0 && !GetMidVertex()){
+    if ( GetMFR()>0 && !GetMidVertex())
 #else
     if (GetPrio()>=PrioGhost && GetAccMFR()>0 && !GetMidVertex())
 #endif
@@ -1202,7 +1216,9 @@ Check for:
 void EdgeCL::DebugInfo (std::ostream& os) const
 {
     os << "EdgeCL: " << GetGID() << '\n'
+#ifdef _PAR
        << " level: " << GetLevel() << ", barycenter " << GetBary() << '\n'
+#endif
        << " vertices: " << GetVertex(0)->GetGID() << ", " << GetVertex(1)->GetGID() << '\n'
        << ' ' << ( IsMarkedForRemovement() ? "is" : "is not") << " marked for removement\n"
        << " mark for refinement: "
@@ -1248,6 +1264,7 @@ Check for:
         sane= false;
         os << "No tetra is linked" << std::endl;
     }
+#ifdef _PAR
     if ( (GetNeighbor(1)!=0) == IsOnBoundary() && !IsOnProcBnd() && GetPrio()!=PrioVGhost) {
         sane= false;
         if (IsOnBoundary() )
@@ -1255,6 +1272,7 @@ Check for:
         else
             os << "Second tetra missing eventhough face is not on bnd. ";
     }
+#endif
 //    const bool onBnd= IsOnBoundary() || IsOnProcBnd();
 //    if ( GetNeighbor(1)==0 && !onBnd && GetPrio()!=PrioVGhost){
 //        sane= false;
@@ -1323,7 +1341,9 @@ Check for:
 void FaceCL::DebugInfo(std::ostream& os) const
 {
     os << "FaceCL: " << GetGID() << '\n'
+#ifdef _PAR
        << " level: " << GetLevel() << ", barycenter " << GetBary() << '\n'
+#endif
        << ' ' << ( IsMarkedForRemovement() ? "is" : "is not") << " marked for removement\n";
     if ( IsOnBoundary()){
         os << " is on boundary of index " << GetBndIdx();
@@ -1339,6 +1359,7 @@ void FaceCL::DebugInfo(std::ostream& os) const
     for ( Uint i=0; i<3; ++i){
         os << GetEdge(i)->GetGID() << ' ';
     }
+#ifdef _PAR
     os << "\n neighbor tetras:";
     for ( int neigh=0; neigh<(IsOnNextLevel() ? 4 : 2); ++neigh){
         if ( neigh==0){
@@ -1361,6 +1382,7 @@ void FaceCL::DebugInfo(std::ostream& os) const
                 os << "is missing ";
         }
     }
+#endif
     os << '\n';
 
 #ifdef _PAR
@@ -1578,7 +1600,9 @@ Check for:
 void TetraCL::DebugInfo (std::ostream& os) const
 {
     os << "TetraCL: " << GetGID() << '\n'
+#ifdef _PAR
        << " level: " << GetLevel() << ", barycenter " << GetBary() << '\n'
+#endif
        << " RefRule " << GetRefRule() << ", RefMark " << GetRefMark() << '\n'
        << ' ' << ( IsMarkedForRemovement() ? "is" : "is not") << " marked for removement\n";
     os << " vertices: ";
@@ -1600,8 +1624,10 @@ void TetraCL::DebugInfo (std::ostream& os) const
     else{ // Parent is gone ...
         if ( GetLevel()==0)
             os << "no parent due to level\n";
+#ifdef _PAR
         else if ( IsGhost())
             os << "parent is stored on process " << (++GetRemoteData().GetProcListBegin())->proc << '\n';
+#endif
         else
             os << " the parent is vanished\n";
     }
@@ -1624,8 +1650,10 @@ void TetraCL::DebugInfo (std::ostream& os) const
             os << "  o over face " << GetFace(i)->GetGID() << ": ";
             if ( GetFace(i)->IsOnBoundary())
                 os << "boundary " << GetFace(i)->GetBndIdx() << '\n';
+#ifdef _PAR
             else if ( GetFace(i)->IsOnProcBnd() )
                 os << "process "<<GetFace(i)->GetNeighborProc() << '\n';
+#endif
             else if( IsNeighbor(i))
                 os << GetNeighbor(i)->GetGID() << '\n';
         else
@@ -1710,6 +1738,7 @@ VertexCL& SimplexFactoryCL::MakeVertex( const Point3DCL& Point3D, Uint Level, Id
     return ret;
 }
 
+#ifdef _PAR
 template <>
 VertexCL& SimplexFactoryCL::MakeCopy<VertexCL>( const VertexCL& v, const ProcListT& pl)
 {
@@ -1720,7 +1749,7 @@ VertexCL& SimplexFactoryCL::MakeCopy<VertexCL>( const VertexCL& v, const ProcLis
 #endif
     return ret;
 }
-
+#endif
 
 EdgeCL& SimplexFactoryCL::MakeEdge( VertexCL* vp0, VertexCL* vp1, Uint Level, BndIdxT bnd0, BndIdxT bnd1, short int MFR, __UNUSED__ const bool donotRegister)
 {
@@ -1733,6 +1762,7 @@ EdgeCL& SimplexFactoryCL::MakeEdge( VertexCL* vp0, VertexCL* vp1, Uint Level, Bn
     return ret;
 }
 
+#ifdef _PAR
 template <>
 EdgeCL& SimplexFactoryCL::MakeCopy<EdgeCL>( const EdgeCL& e, const ProcListT& pl)
 {
@@ -1743,7 +1773,7 @@ EdgeCL& SimplexFactoryCL::MakeCopy<EdgeCL>( const EdgeCL& e, const ProcListT& pl
 #endif
     return ret;
 }
-
+#endif
 
 /** Normally used by the serial version*/
 FaceCL& SimplexFactoryCL::MakeFace ( Uint Level, BndIdxT bnd, __UNUSED__ const bool donotRegister)
@@ -1768,6 +1798,7 @@ FaceCL& SimplexFactoryCL::MakeFace ( Uint Level, const Point3DCL& bary, BndIdxT 
     return ret;
 }
 
+#ifdef _PAR
 template <>
 FaceCL& SimplexFactoryCL::MakeCopy<FaceCL>( const FaceCL& f, const ProcListT& pl)
 {
@@ -1778,7 +1809,7 @@ FaceCL& SimplexFactoryCL::MakeCopy<FaceCL>( const FaceCL& f, const ProcListT& pl
 #endif
     return ret;
 }
-
+#endif
 
 /** Normally used by the serial version*/
 TetraCL& SimplexFactoryCL::MakeTetra( VertexCL* vp0, VertexCL* vp1, VertexCL* vp2, VertexCL* vp3, TetraCL* Parent, IdCL<TetraCL> id, __UNUSED__ const bool donotRegister)
@@ -1793,6 +1824,7 @@ TetraCL& SimplexFactoryCL::MakeTetra( VertexCL* vp0, VertexCL* vp1, VertexCL* vp
     return ret;
 }
 
+#ifdef _PAR
 /** Normally used by the parallel version*/
 TetraCL& SimplexFactoryCL::MakeTetra( VertexCL* vp0, VertexCL* vp1, VertexCL* vp2, VertexCL* vp3, TetraCL* Parent, Uint Level, IdCL<TetraCL> id, __UNUSED__ const bool donotRegister)
 {
@@ -1804,7 +1836,9 @@ TetraCL& SimplexFactoryCL::MakeTetra( VertexCL* vp0, VertexCL* vp1, VertexCL* vp
 #endif
     return ret;
 }
+#endif
 
+#ifdef _PAR
 template <>
 TetraCL& SimplexFactoryCL::MakeCopy<TetraCL>( const TetraCL& t, const ProcListT& pl)
 {
@@ -1817,6 +1851,7 @@ TetraCL& SimplexFactoryCL::MakeCopy<TetraCL>( const TetraCL& t, const ProcListT&
         (*chp)->Parent_= &ret;
     return ret;
 }
+#endif
 
 void SimplexFactoryCL::DestroyMarkedTetras( Uint Level)
 {

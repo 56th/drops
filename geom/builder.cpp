@@ -34,8 +34,10 @@
 #include <fstream>
 #include <iomanip>
 #include "geom/builder.h"
+#ifdef _PAR
 #include "parallel/DiST.h"
 #include "parallel/mpistream.h"
+#endif
 
 namespace DROPS
 {
@@ -1516,7 +1518,6 @@ void FileBuilderCL::BuildVerts(MultiGridCL* mgp) const
 
     CheckFile( vertex_file);
     CheckFile( bndvtx_file);
-    MultiGridCL::VertexCont& verts= GetVertices(mgp);
     size_t idx=0;
 
     // Input-Variables
@@ -1545,30 +1546,30 @@ void FileBuilderCL::BuildVerts(MultiGridCL* mgp) const
         }
 
         max_id= std::max( max_id, id);
-        verts[level].push_back( VertexCL ( point, level, IdCL<VertexCL>( id)));
-        if (rmmark) verts[level].back().SetRemoveMark();
+        VertexCL& tmp = factory_->MakeVertex( point, level, IdCL<VertexCL>( id));
+        if (rmmark) tmp.SetRemoveMark();
 
         // BndVerts
         while (idx==bndidx)
         {
             bndvtx_file >> bidx
                         >> p2d[0] >> p2d[1];
-            verts[level].back().AddBnd( BndPointCL(bidx, p2d));
+            tmp.AddBnd( BndPointCL(bidx, p2d));
             if (!bndvtx_file.eof()) bndvtx_file >> bndidx; else bndidx=0;
         }
-        vertexAddressMap[idx]= &verts[level].back();
+        vertexAddressMap[idx]= &tmp;
     }
     IdCL<VertexCL>::ResetCounter( max_id + 1);
     CheckFile(vertex_file);
     CheckFile(bndvtx_file);
 }
 
-void FileBuilderCL::BuildEdges(MultiGridCL* mgp) const
+void FileBuilderCL::BuildEdges() const
 {
     std::string filename= path_+"Edges";
     std::ifstream edge_file(filename.c_str());
     CheckFile(edge_file);
-    MultiGridCL::EdgeCont& edges= GetEdges(mgp);
+
     size_t idx=0;
 
     size_t vert0, vert1, midvert;
@@ -1589,21 +1590,21 @@ void FileBuilderCL::BuildEdges(MultiGridCL* mgp) const
         VertexCL* vertex1   (vertexAddressMap[vert1]);
         VertexCL* midvertex (vertexAddressMap[midvert]);
         Assert(vertex0!=0 && vertex1!=0, DROPSErrCL("FileBuilderCL::BuildEdges: Vertex is missing"), DebugRefineEasyC);
-        edges[level].push_back( EdgeCL (vertex0, vertex1, level, bnd0, bnd1, mfr));
-        edges[level].back().SetMidVertex (midvertex);
-        if (rmmark) edges[level].back().SetRemoveMark();
-        edgeAddressMap[idx]= &edges[level].back();
+        EdgeCL& tmp = factory_->MakeEdge(vertex0, vertex1, level, bnd0, bnd1, mfr);
+        tmp.SetMidVertex (midvertex);
+        if (rmmark) tmp.SetRemoveMark();
+        edgeAddressMap[idx]= &tmp;
 
     }
     CheckFile(edge_file);
 }
 
-void FileBuilderCL::BuildFacesI(MultiGridCL* mgp) const
+void FileBuilderCL::BuildFacesI() const
 {
     std::string filename= path_+"Faces";
     std::ifstream face_file(filename.c_str());
     CheckFile(face_file);
-    MultiGridCL::FaceCont& faces= GetFaces(mgp);
+
     size_t idx=0;
     size_t tmp;
 
@@ -1619,20 +1620,20 @@ void FileBuilderCL::BuildFacesI(MultiGridCL* mgp) const
         face_file >> bnd >> level
                   >> rmmark;
 
-        faces[level].push_back(FaceCL (level, bnd));
-        if (rmmark) faces[level].back().SetRemoveMark();
-        faceAddressMap[idx]= &faces[level].back();
+        FaceCL& tmp = factory_->MakeFace(level, bnd);
+        if (rmmark) tmp.SetRemoveMark();
+        faceAddressMap[idx]= &tmp;
     }
     CheckFile(face_file);
 }
 
-void FileBuilderCL::BuildTetras(MultiGridCL* mgp) const
+void FileBuilderCL::BuildTetras() const
 {
     std::string filename= path_+"Tetras";
     std::ifstream tetra_file( filename.c_str());
     CheckFile(tetra_file);
     std::string buffer;
-    MultiGridCL::TetraCont& tetras= GetTetras(mgp);
+
     size_t idx=0;
     size_t id=0, max_id=0;
     Uint refrule, refmark;
@@ -1661,19 +1662,19 @@ void FileBuilderCL::BuildTetras(MultiGridCL* mgp) const
         max_id= std::max( max_id, id);
         for (Uint i=0; i<4; ++i) verts[i]=vertexAddressMap[vertaddr[i]];
         TetraCL* par = tetraAddressMap[parent];
-        tetras[level].push_back( TetraCL (verts[0], verts[1], verts[2], verts[3], par, IdCL<TetraCL>( id)));
-        tetras[level].back().SetRefRule(refrule);
-        tetras[level].back().SetRefMark (refmark);
+        TetraCL& tmp =factory_->MakeTetra(verts[0], verts[1], verts[2], verts[3], par, IdCL<TetraCL>( id));
+        tmp.SetRefRule(refrule);
+        tmp.SetRefMark (refmark);
 
         for (Uint i=0; i<6; ++i) {
-            tetras[level].back().SetEdge(i, edgeAddressMap[edgeaddr[i]]);
+            tmp.SetEdge(i, edgeAddressMap[edgeaddr[i]]);
         }
 
         for (Uint i=0; i<4; ++i) {
-            tetras[level].back().SetFace(i, faceAddressMap[faceaddr[i]]);
+            tmp.SetFace(i, faceAddressMap[faceaddr[i]]);
         }
 
-        tetraAddressMap[idx]= &tetras[level].back();
+        tetraAddressMap[idx]= &tmp;
 
     }
     IdCL<TetraCL>::ResetCounter( max_id + 1);
@@ -1734,6 +1735,7 @@ void FileBuilderCL::AddChildren() const
 void FileBuilderCL::build(MultiGridCL* mgp) const
 {
     AppendLevel(mgp);
+    factory_ = new SimplexFactoryCL( this->GetVertices(mgp), this->GetEdges(mgp), this->GetFaces(mgp), this->GetTetras(mgp));
 
     // Create vertices
     std::cout << "Building Vertices ";
@@ -1742,17 +1744,17 @@ void FileBuilderCL::build(MultiGridCL* mgp) const
 
     // Create Edges
     std::cout << "Building Edges ";
-    BuildEdges(mgp);
+    BuildEdges();
     std::cout << "--> success\n";
 
     // Create Faces (without Neighbors)
     std::cout << "Building Faces Part I ";
-    BuildFacesI (mgp);
+    BuildFacesI ();
     std::cout << "--> success\n";
 
     // Create Tetras
     std::cout << "Building Tetras ";
-    BuildTetras (mgp);
+    BuildTetras ();
     AddChildren ();
     std::cout << "--> success\n";
 
@@ -1769,6 +1771,8 @@ void FileBuilderCL::build(MultiGridCL* mgp) const
     std::cout << "--> success\n";
 
     PrepareModify(mgp);     // FinalizeModify(mgp); is called in constructor of MultiGridCL
+
+    delete factory_; factory_=0;
 }
 
 void FileBuilderCL::CheckFile( const std::ifstream& is) const

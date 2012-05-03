@@ -531,7 +531,11 @@ bool MarkInterface ( scalar_fun_ptr DistFct, double width, MultiGridCL& mg, Uint
             }
         }
     }
+#ifdef _PAR
     return ProcCL::GlobalOr(marked);
+#else
+    return marked;
+#endif
 }
 
 void MarkInterface ( const LevelsetP2CL::const_DiscSolCL& lset, double width, MultiGridCL& mg)

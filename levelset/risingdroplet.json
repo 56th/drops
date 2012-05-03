@@ -16,7 +16,7 @@
 // flow solver
         "Stokes":
         {
-                "StokesMethod":         10101,  // Stokes solver, cf. num/stokessolverfactory.h
+                "StokesMethod":         10102,  // Stokes solver, cf. num/stokessolverfactory.h
                 "InnerIter":            1000,   // maximum number of iterations for the inner solver
                 "OuterIter":            200,    // maximum number of iterations for the outer solver
                 "InnerTol":             0.6,    // tolerance for the inner solver. (! Attention:

@@ -85,7 +85,7 @@ VertexCL::VertexCL (const VertexCL& v) :
 */
 VertexCL::VertexCL() :
 #ifndef _PAR
-    Coord_(0.0), Level_(-1),
+    Coord_(0.0), Level_(0),
 #else
     base(),
 #endif
@@ -157,7 +157,7 @@ EdgeCL::EdgeCL (const EdgeCL& e) :
 /** Normally, used to receive an edge. */
 EdgeCL::EdgeCL() :
 #ifndef _PAR
-    Level_( -1),
+    Level_(0),
 #else
     base(), AccMFR_(-1),
 #endif
@@ -208,7 +208,7 @@ FaceCL::FaceCL (const FaceCL& f) :
 /** Normally, this constructor is used for receiving a face. */
 FaceCL::FaceCL() :
 #ifndef _PAR
-    Level_(-1),
+    Level_(0),
 #else
     base(),
 #endif
@@ -296,10 +296,8 @@ TetraCL::TetraCL (VertexCL* vp0, VertexCL* vp1, VertexCL* vp2, VertexCL* vp3, Te
 }
 
 /** \todo: do we need lvl? */
+#ifdef _PAR
 TetraCL::TetraCL (VertexCL* vp0, VertexCL* vp1, VertexCL* vp2, VertexCL* vp3, TetraCL* Parent, __UNUSED__ Uint lvl, IdCL<TetraCL> id)
-#ifndef _PAR
-    { throw DROPSErrCL("TetraCL::TetraCL: Do not use this constructor in the serial version"); }
-#else
     : base( Parent==0 ? 0 : Parent->GetLevel()+1, 0.25*( vp0->GetCoord() + vp1->GetCoord()+ vp2->GetCoord() + vp3->GetCoord()), /*dim*/ 3),
       Id_(id), RefRule_(UnRefRuleC), RefMark_(NoRefMarkC),
       Parent_( Parent), Children_(0)
@@ -326,7 +324,7 @@ TetraCL::TetraCL (const TetraCL& T) :
 /** Normally used to receive tetras*/
 TetraCL::TetraCL() :
 #ifndef _PAR
-    Level_( -1),
+    Level_(0),
 #else
     base(),
 #endif
@@ -380,7 +378,7 @@ inline void TetraCL::LinkEdges (const ChildDataCL& childdat)
 {
     for (Uint edge=0; edge<NumEdgesC; ++edge)
     {
-#ifndef _PAR
+#ifdef _PAR
         Assert(!ePtrs_[childdat.Edges[edge]]->IsMarkedForRemovement(), DiST::Helper::ErrorCL("TetraCL::LinkEdges: link edge that is marked for removement", ePtrs_[childdat.Edges[edge]]->GetGID(), GetGID()), ~0);
 #endif
         Edges_[edge]= ePtrs_[childdat.Edges[edge]];

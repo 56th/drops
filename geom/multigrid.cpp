@@ -36,6 +36,7 @@
 #include "geom/multigrid.h"
 #include "num/solver.h"
 #include <iterator>
+#include <set>
 
 namespace DROPS
 {
@@ -255,12 +256,14 @@ void MultiGridCL::UnrefineGrid (Uint Level)
             {
                 std::for_each(tIt->GetChildBegin(), tIt->GetChildEnd(), std::mem_fun(&TetraCL::SetRemoveMark));
                 if ( !tIt->IsMarkedForNoRef() ) tIt->RecycleReusables();
+#ifdef _PAR
                 // if tetra is ghost and will have no children on this proc after unref, we can delete this tetra
                 if ( tIt->IsGhost() && tIt->IsMarkedForNoRef())
                 {
                     killedGhosts.push_back(tIt);
                     killedGhostTetra_= true;
                 }
+#endif
             }
         }
     }
@@ -471,7 +474,7 @@ class VertPtrLessCL : public std::binary_function<const VertexCL*, const VertexC
         { return v0->GetId() < v1->GetId(); }
 };
 
-
+#ifdef _PAR
 void MultiGridCL::MakeConsistentHashes()
 {
     for (FaceIterator sit = GetFacesBegin(0); sit != GetFacesEnd(0); ++sit){
@@ -483,6 +486,7 @@ void MultiGridCL::MakeConsistentHashes()
         DiST::InfoCL::Instance().GetRemoteList<TetraCL>().Register( *sit);
     }
 }
+#endif
 
 void MultiGridCL::MakeConsistentNumbering()
 // Applicable only before the first call to Refine()

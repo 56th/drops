@@ -82,6 +82,7 @@ class ObservedVectorsCL: public std::vector<MGObserverCL*>
             (*obs)->pre_refine();
     }
 
+#ifdef _PAR
     /// \brief Tell Observer that a migration will be performed
     void notify_pre_migrate() {
         ObservedMigrateFECL::Instance().notify_pre_migrate();
@@ -91,7 +92,7 @@ class ObservedVectorsCL: public std::vector<MGObserverCL*>
     void notify_post_migrate() {
         ObservedMigrateFECL::Instance().notify_post_migrate();
     }
-
+#endif
     /// \brief Tell Observer, that MG has been refined (and migration has been performed)
     void notify_post_refine () {
         for (iterator obs= begin(); obs != end(); ++obs)
@@ -99,18 +100,22 @@ class ObservedVectorsCL: public std::vector<MGObserverCL*>
     }
 
     /// \brief Tell Observer, that a sequence of refinements (and migrations) will take place
-    void notify_pre_refmig_sequence( MultiGridCL& mg) {
+    void notify_pre_refmig_sequence( __UNUSED__ MultiGridCL& mg) {
         for (iterator obs= begin(); obs != end(); ++obs){
             (*obs)->pre_refine_sequence();
         }
+#ifdef _PAR
         ObservedMigrateFECL::Instance().Init( *this, mg);
+#endif
     }
 
     /// \brief Tell Observer, that a sequence of refinements (and migrations) has taken place
     void notify_post_refmig_sequence() {
         for (iterator obs= begin(); obs != end(); ++obs)
             (*obs)->post_refine_sequence();
+#ifdef _PAR
         ObservedMigrateFECL::Instance().clear();
+#endif
     }
     //@}
 };

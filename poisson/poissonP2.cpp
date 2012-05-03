@@ -49,6 +49,9 @@
  // include outputs
 #include "out/output.h"
 #include "out/vtkOut.h"
+#ifndef _PAR
+#include "out/ensightOut.h"
+#endif
 
  // include numeric computing!
 #include "num/fe.h"
@@ -200,8 +203,20 @@ void Strategy( PoissonP2CL<CoeffCL>& Poisson)
     }
 
 
-
     // Output-Registrations:
+    Ensight6OutCL* ensight = NULL;
+    if (P.get<int>("Ensight.EnsightOut",0)){
+        // Initialize Ensight6 output
+        const std::string filename= P.get<std::string>("Ensight.EnsDir") + "/" + P.get<std::string>("Ensight.EnsCase");
+        ensight = new Ensight6OutCL(P.get<std::string>("Ensight.EnsCase")+".case", P.get<int>("Time.NumSteps")+1, 
+                                    P.get<int>("Ensight.Binary"), P.get<int>("Ensight.MasterOut"));
+        ensight->Register( make_Ensight6Geom  ( mg, mg.GetLastLevel(), 
+                                                P.get<std::string>("Ensight.GeomName"), filename + ".geo"));
+        ensight->Register( make_Ensight6Scalar( Poisson.GetSolution(), "Temperatur", filename + ".tp", true));
+        ensight->Write();
+    }
+
+
     VTKOutCL * vtkwriter = NULL;
     if (P.get<int>("VTK.VTKOut",0)){
         vtkwriter = new VTKOutCL(mg, "DROPS data", 

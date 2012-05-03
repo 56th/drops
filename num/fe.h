@@ -1180,8 +1180,8 @@ class UpdateProlongationCL : public MGObserverCL
                 throw DROPSErrCL("UpdateProlongationCL: FE type not supported, yet");
         }
     }
-#ifdef _PAR
     const IdxDescCL* GetIdxDesc() const { return (const IdxDescCL*)0; }
+#ifdef _PAR
     const VectorCL*  GetVector()  const { return 0; }
     void swap( IdxDescCL&, VectorCL&) {}
 #endif

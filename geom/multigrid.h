@@ -309,7 +309,6 @@ class MultiGridCL
     void Scale( double);
     void Transform( Point3DCL (*mapping)(const Point3DCL&));
     void MakeConsistentNumbering();
-    void MakeConsistentHashes();
     void SplitMultiBoundaryTetras();                            ///< Tetras adjacent to more than one boundary-segment are subdivided into four tetras using the barycenter. This method must be called prior to Refine or MakeConsistentNumbering.
     void SizeInfo(std::ostream&);                               // all procs have to call this function in parallel mode!
     void ElemInfo(std::ostream&, int Level= -1) const;          // all procs have to call this function in parallel mode
@@ -320,6 +319,7 @@ class MultiGridCL
     Uint GetNumTriangFace(int Level=-1);                        // get number of faces of a given level
     Uint GetNumDistributedFaces(int Level=-1);                  // get number of faces on processor boundary
     SimplexFactoryCL& GetSimplexFactory() { return factory_; }
+    void MakeConsistentHashes();
 #endif
 
     const ColorClassesCL& GetColorClasses (int Level, match_fun match, const BndCondCL& Bnd) const;

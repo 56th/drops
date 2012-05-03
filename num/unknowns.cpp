@@ -37,9 +37,9 @@ namespace DROPS
 
 
 UnknownIdxCL::UnknownIdxCL( const UnknownIdxCL& orig)
-    : _Idx( orig._Idx),
+    : _Idx( orig._Idx)
 #ifdef _PAR
-      received_(orig.received_)
+      , received_(orig.received_)
 #endif
 {}
 
@@ -57,8 +57,10 @@ UnknownIdxCL& UnknownIdxCL::operator=( const UnknownIdxCL& rhs)
 void UnknownHandleCL::DebugInfo( std::ostream& os) const
 {
     os << "in triang ";
+#ifdef _PAR
     for (size_t i= 0; i<mayHaveUnk_.size(); ++i)
         if (mayHaveUnk_[i]) os << i << " ";
+#endif
     os<< ", ";
     if (!_unk)
         os << "no DoFs stored.\n";

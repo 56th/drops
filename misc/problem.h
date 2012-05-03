@@ -107,6 +107,7 @@ class FE_InfoCL
     Uint NumUnknownsEdge()   const { return NumUnknownsEdge_; }
     Uint NumUnknownsFace()   const { return NumUnknownsFace_; }
     Uint NumUnknownsTetra()  const { return NumUnknownsTetra_; }
+#ifdef _PAR
     Uint NumUnknownsSimplex( const DiST::TransferableCL& t) const
     {
         switch (t.GetDim()){
@@ -117,6 +118,7 @@ class FE_InfoCL
         default: throw DROPSErrCL("IdxDescCL::NumUnknownsSimplex: Unknown dimension");
         }
     }
+#endif
     template<class SimplexT> Uint GetNumUnknownsOnSimplex() const
     { throw DROPSErrCL("IdxDescCL::GetNumUnknowns: Unknown Simplex type"); }
     //@}
@@ -353,6 +355,7 @@ class MLIdxDescCL : public MLDataCL<IdxDescCL>
     Uint NumUnknownsEdge()   const { return this->GetFinest().NumUnknownsEdge(); }
     Uint NumUnknownsFace()   const { return this->GetFinest().NumUnknownsFace(); }
     Uint NumUnknownsTetra()  const { return this->GetFinest().NumUnknownsTetra(); }
+#ifdef _PAR
     Uint NumUnknowns( const DiST::TransferableCL& t) const
     {
         switch (t.GetDim()){
@@ -362,6 +365,7 @@ class MLIdxDescCL : public MLDataCL<IdxDescCL>
         case 3: return NumUnknownsTetra();
         }
     }
+#endif
     template<class SimplexT> Uint GetNumUnknownsOnSimplex() const
     { return this->GetFinest().GetNumUnknownsOnSimplex<SimplexT>(); }
     //@}
