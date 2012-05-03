@@ -32,12 +32,41 @@
 #include "geom/builder.h"
 #include "geom/multigrid.h"
 #include "misc/problem.h"
+#include "num/discretize.h"
 #include <iostream>
 #include <sstream>
 
 using namespace std;
 
+double dist_func( const DROPS::Point3DCL& p, double) { return norm(p) - 0.5; }
+double zero_func( const DROPS::Point3DCL&,   double) { return 0; }
+
 namespace DROPS{
+
+void InitP2( const MultiGridCL& mg, VecDescCL& vec, instat_scalar_fun_ptr func)
+{
+    Uint lvl= vec.GetLevel(),
+         idx= vec.RowIdx->GetIdx();
+
+
+    for (MultiGridCL::const_TriangVertexIteratorCL sit= mg.GetTriangVertexBegin(lvl),
+        send= mg.GetTriangVertexEnd(lvl); sit != send; ++sit)  //Vertices
+    {
+        if (sit->Unknowns.Exist(idx))
+        {
+            vec.Data[sit->Unknowns(idx)]= func( sit->GetCoord(), 0);
+        }
+    }
+
+    for (MultiGridCL::const_TriangEdgeIteratorCL sit= mg.GetTriangEdgeBegin(lvl),
+        send= mg.GetTriangEdgeEnd(lvl); sit!=send; ++sit)      //Edges
+    {
+        if ( sit->Unknowns.Exist(idx))
+            vec.Data[sit->Unknowns(idx)]= func( GetBaryCenter( *sit), 0);
+    }
+
+}
+
 
 /// \brief Build a brick and tell parallel info class about the multigrid
 void BuildBrick( MultiGridCL*& mg)
@@ -62,15 +91,25 @@ void BuildBrick( MultiGridCL*& mg)
 */
 bool CheckAccumulation( MultiGridCL& mg)
 {
-    const size_t num_idx=3;
+    const size_t num_idx=4;
     std::vector<IdxDescCL*> idx_desc(num_idx);
     std::vector<VecDescCL*> vec_desc(num_idx);
     idx_desc[0]= new IdxDescCL( P1_FE);
     idx_desc[1]= new IdxDescCL( P2_FE);
     idx_desc[2]= new IdxDescCL( vecP2_FE);
+    idx_desc[3]= new IdxDescCL( P1X_FE);
+
+    IdxDescCL lidx( P2_FE);
+    lidx.CreateNumbering( mg.GetLastLevel(), mg);
+    VecDescCL lset( &lidx);
+    InitP2( mg, lset, dist_func);
+    BndDataCL<> lbnd( mg.GetBnd().GetNumBndSeg());
 
     for ( size_t i=0; i<num_idx; ++i){
-        idx_desc[i]->CreateNumbering( mg.GetLastLevel(), mg);
+        if (idx_desc[i]->IsExtended())
+            idx_desc[i]->CreateNumbering( mg.GetLastLevel(), mg, &lset, &lbnd);
+        else
+            idx_desc[i]->CreateNumbering( mg.GetLastLevel(), mg);
         vec_desc[i]= new VecDescCL( idx_desc[i]);
         vec_desc[i]->Data= 1.0;
     }
@@ -100,7 +139,19 @@ bool CheckAccumulation( MultiGridCL& mg)
                             it->DebugInfo(cdebug);
                         }
                     }
-
+                    if (idx_desc[i]->IsExtended() && idx_desc[i]->IsExtended(dof)) {
+                        const IdxT xdof= idx_desc[i]->GetXidx()[dof];
+                        const double numDistX= idx_desc[i]->GetEx().GetNumProcs(xdof)+1;
+                        for ( Uint j=0; j<idx_desc[i]->NumUnknownsVertex(); ++j){
+                            if ( numDistX!=vec_desc[i]->Data[xdof+j]){
+                                correct= false;
+                                printf("Proc nr %d, testcase %ld (XFEM): %f should be %f, Prio is %i on level %i with bary: %f %f %f\n",
+                                        ProcCL::MyRank(), i, vec_desc[i]->Data[xdof+j], numDistX, it->GetPrio(),
+                                        it->GetLevel(), it->GetBary()[0], it->GetBary()[1], it->GetBary()[2]);
+                                it->DebugInfo(cdebug);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -162,16 +213,24 @@ std::valarray<double> getReferenceValue( const MultiGridCL& mg, IdxDescCL* idxDe
 
     DROPS_FOR_TRIANG_CONST_VERTEX( mg, mg.GetLastLevel(), it){
         if ( it->Unknowns.Exist() && it->Unknowns.Exist(idx) && it->Unknowns.InTriangLevel(lvl)){
+            const bool withXdof= idxDesc->IsExtended() && idxDesc->IsExtended(it->Unknowns(idx));
             if ( it->IsLocal()){
-                result[0] += numUnksVert;
-                result[1] += numUnksVert;
-                result[2] += numUnksVert;
+                const int xmul= withXdof ? 2 : 1;
+                result[0] += numUnksVert*xmul;
+                result[1] += numUnksVert*xmul;
+                result[2] += numUnksVert*xmul;
             }
             else if ( idxDesc->GetEx().AmIOwner(it->Unknowns(idx))){
                 const double numDist= idxDesc->GetEx().GetNumProcs(it->Unknowns(idx))+1;
                 result[0] += numUnksVert;
                 result[1] += numDist*numUnksVert;
                 result[2] += numDist*numDist*numUnksVert;
+                if (withXdof) {
+                    const double numDistX= idxDesc->GetEx().GetNumProcs(idxDesc->GetXidx()[it->Unknowns(idx)])+1;
+                    result[0] += numUnksVert;
+                    result[1] += numDistX*numUnksVert;
+                    result[2] += numDistX*numDistX*numUnksVert;
+                }
             }
         }
     }
@@ -311,18 +370,28 @@ bool CheckDot( const ExchangeBlockCL& Ex, const VectorCL& x, bool isXacc,
 */
 bool CheckInnerProducts( MultiGridCL& mg)
 {
-    const size_t num_idx=3;
+    const size_t num_idx=4;
     bool correct= true;
     std::vector<IdxDescCL*> idx_desc(num_idx);
     std::vector<VecDescCL*> vec_desc(num_idx);
     idx_desc[0]= new IdxDescCL( P1_FE);
     idx_desc[1]= new IdxDescCL( P2_FE);
     idx_desc[2]= new IdxDescCL( vecP2_FE);
+    idx_desc[3]= new IdxDescCL( P1X_FE);
+
+    IdxDescCL lidx( P2_FE);
+    lidx.CreateNumbering( mg.GetLastLevel(), mg);
+    VecDescCL lset( &lidx);
+    InitP2( mg, lset, dist_func);
+    BndDataCL<> lbnd( mg.GetBnd().GetNumBndSeg());
 
     for ( size_t i=0; i<num_idx; ++i){
         std::cout << " - Check case " << (i+1) << std::endl;
 
-        idx_desc[i]->CreateNumbering( mg.GetLastLevel(), mg);
+        if (idx_desc[i]->IsExtended())
+            idx_desc[i]->CreateNumbering( mg.GetLastLevel(), mg, &lset, &lbnd);
+        else
+            idx_desc[i]->CreateNumbering( mg.GetLastLevel(), mg);
         vec_desc[i]= new VecDescCL( idx_desc[i]);
         vec_desc[i]->Data= 1.0;
         VectorCL x( vec_desc[i]->Data), y( x);
@@ -351,7 +420,7 @@ bool CheckInnerProducts( MultiGridCL& mg)
     exBlock.AttachTo( *idx_desc[1]);
     exBlock.AttachTo( *idx_desc[0]);
 
-    std::cout << " - Check case 4" << std::endl;
+    std::cout << " - Check case 5" << std::endl;
     bool case_correct=true;
     VectorCL x( 1.0, exBlock.GetNum());
     VectorCL y( 1.0, exBlock.GetNum());
@@ -368,7 +437,7 @@ bool CheckInnerProducts( MultiGridCL& mg)
         case_correct= false;
     }
     if ( !ProcCL::Check(case_correct)) correct=false;
-    else std::cout << "   => Case 4 is correct" << std::endl;
+    else std::cout << "   => Case 5 is correct" << std::endl;
 
     for ( size_t i=0; i<num_idx; ++i){
         delete idx_desc[i];
@@ -482,7 +551,8 @@ int main( int argc, char **argv)
                   << " 1) P1_FE\n"
                   << " 2) P2_FE\n"
                   << " 3) vecP2_FE\n"
-                  << " 4) Blocked 3), 2), and 1)"
+                  << " 4) P1X_FE\n"
+                  << " 5) Blocked 3), 2), and 1)"
                   << std::endl;
 
         if ( !DROPS::CheckAccumulation( *mg)){
