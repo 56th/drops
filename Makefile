@@ -8,7 +8,7 @@ include drops.conf
 
 # variables:
 
-PARPACKAGES = parallel tests poisson levelset
+PARPACKAGES = parallel levelset tests poisson 
 SERPACKAGES = geom num out misc poisson stokes navstokes tests levelset surfactant transport
 PACKAGES = $(SERPACKAGES) $(PARPACKAGES)
 BUILDPACKAGES = $(if $(PAR_BUILD),$(PARPACKAGES),$(SERPACKAGES))

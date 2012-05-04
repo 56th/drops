@@ -134,14 +134,14 @@ int main( int argc, char **argv)
         DROPS::MultiGridCL* mg= 0;
         DROPS::BuildBrick( mg);
         std::cout << "=====================================\ninitial migration\n";
-        DROPS::LoadBalHandlerCL lb( *mg, DROPS::metis);     // loadbalancing
-        lb.DoInitDistribution( DROPS::ProcCL::Master());    // distribute initial grid
+        DROPS::LoadBalCL lb( *mg);  // loadbalancing
+        lb.DoMigration( );          // distribute initial grid
 
         // writer for vtk-format
         DROPS::VTKOutCL *vtkwriter=0;
         if (P.get("VTK.VTKOut", 0)!=0){
-            vtkwriter= new DROPS::VTKOutCL(*mg, "DROPS data", (P.get("VTK.VTKOut", 0) ? P.get<int>("Exp.NumSteps")/P.get("VTK.VTKOut", 0)+1 : 0),
-                std::string(P.get<std::string>("VTK.VTKDir") + "/" + P.get<std::string>("VTK.VTKName")), P.get<int>("VTK.Binary"));
+            vtkwriter = new DROPS::VTKOutCL(*mg, "DROPS data", P.get<int>("Time.NumSteps")/P.get("VTK.VTKOut", 0)+1,
+                                     P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName"), P.get<int>("VTK.Binary"));
             vtkwriter->Write(0);
         }
         
@@ -207,6 +207,6 @@ int main( int argc, char **argv)
         if (vtkwriter) delete vtkwriter;
         timings << std::endl;
     }
-    catch (DROPS::DROPSErrCL err) {err.handle();}
+    catch (DROPS::DROPSErrCL& err) {err.handle();}
     return 0;
 }
