@@ -34,6 +34,7 @@
 #include "num/bndData.h"
 #include "stokes/instatstokes2phase.h"
 #include "misc/xfem.h"
+#include "num/fe_repair.h"
 #include <iostream>
 #include <numeric>
 #include <cstring>
@@ -262,12 +263,14 @@ class TransportXRepairCL : public MGObserverCL
   private:
     TransportP1XCL& c_;
     std::auto_ptr<P1XRepairCL> oldp1xrepair_;
+    std::auto_ptr<RepairP1CL<double>::type> p1oldctrepair_;
+    std::auto_ptr<RepairP1CL<double>::type> p1ctrepair_;
     Uint mylvl;
   public:
     TransportXRepairCL (TransportP1XCL& c, Uint amylvl)
         : c_( c), mylvl(amylvl) {}
 
-    void pre_refine  () {}
+    void pre_refine  ();
     void post_refine ();
 
     void pre_refine_sequence  ();
@@ -290,12 +293,13 @@ class VelTranspRepairCL : public MGObserverCL
     LsetBndDataCL& Bnd_ls_;
     IdxDescCL& vidx_;
     double& time_;
+    std::auto_ptr<RepairP2CL<Point3DCL>::type> p2repair_;
 
   public:
     VelTranspRepairCL (VecDescCL& v, MultiGridCL& mg, const VelBndDataT& Bnd_v, IdxDescCL& vidx, VecDescCL& lset, LsetBndDataCL& Bnd_ls, double t )
         :  mg_(mg), v_(v), lset_(lset), Bnd_v_(Bnd_v), Bnd_ls_(Bnd_ls), vidx_(vidx) , time_(t){}
 
-    void pre_refine  () {}
+    void pre_refine  ();
     void post_refine ();
 
     void pre_refine_sequence  () {}

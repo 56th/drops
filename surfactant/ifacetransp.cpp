@@ -475,7 +475,6 @@ InterfaceP1RepairCL::post_refine ()
 //    Interpolate( sol, oldsol);
 
     p1repair_->repair( loc_u);
-    //RepairAfterRefineP1( make_P1Eval( mg_, dummy, fullu_), loc_u);
 
     fullu_.Clear( fullu_.t);
     fullp1idx_.swap( loc_idx);
