@@ -34,6 +34,7 @@
 #include "num/MGsolver.h"
 #include "stokes/integrTime.h"
 #include "num/stokessolverfactory.h"
+#include "num/fe_repair.h"
 
  // include problem class
 #include "stokes/stokes.h"
@@ -224,6 +225,8 @@ UpdateTriangulation(DROPS::StokesP2P1CL<Coeff>& NS,
     const StokesBndDataCL& BndData= NS.GetBndData();
     Uint i;
     for(i=0; shell_not_ready || i<min_ref_num; ++i) {
+        RepairP2CL<Point3DCL>::type repairp2( mg, *v1, BndData.Vel);
+        RepairP1CL<double>::type repairp1( mg, *p1, BndData.Pr);
         shell_not_ready= ModifyGridStep( mg, Dist, width, c_level, f_level, t);
         // Repair velocity
         std::swap( v2, v1);
@@ -236,9 +239,8 @@ UpdateTriangulation(DROPS::StokesP2P1CL<Coeff>& NS,
             throw DROPSErrCL( "Strategy: Sorry, not yet implemented.");
         }
         v1->SetIdx( vidx1);
-        P2EvalCL< SVectorCL<3>, const StokesVelBndDataCL,
-                  const VelVecDescCL> funv2( v2, &BndData.Vel, &mg);
-        RepairAfterRefineP2( funv2, *v1);
+
+        repairp2.repair(*v1);
         v2->Clear( time_v);
         vidx2->DeleteNumbering( mg);
 //P2EvalCL< SVectorCL<3>, const StokesVelBndDataCL,
@@ -249,8 +251,7 @@ UpdateTriangulation(DROPS::StokesP2P1CL<Coeff>& NS,
         std::swap( pidx2, pidx1);
         pidx1->CreateNumbering( mg.GetLastLevel(), mg, NS.GetBndData().Pr, match);
         p1->SetIdx( pidx1);
-        typename StokesCL::const_DiscPrSolCL oldfunpr( p2, &BndData.Pr, &mg);
-        RepairAfterRefineP1( oldfunpr, *p1);
+        repairp1.repair(*p1);
         p2->Clear( time_p);
         pidx2->DeleteNumbering( mg);
     }
@@ -367,6 +368,10 @@ void Strategy( StokesProblemT& Stokes)
         if( P.get<double>("Error.MarkLower") != 0)
         	MarkLower( MG, P.get<double>("Error.MarkLower"));
 
+        RepairP2CL<Point3DCL>::type* repairp2 = 0;
+        if (v2->RowIdx)
+            repairp2 = new RepairP2CL<Point3DCL>::type( MG, *v2, Stokes.GetBndData().Vel);
+
         MG.Refine();
 
         if( StokesSolverFactoryHelperCL().VelMGUsed(P) || StokesSolverFactoryObsoleteHelperCL().VelMGUsed(P)){
@@ -417,7 +422,7 @@ void Strategy( StokesProblemT& Stokes)
             loc_vidx.CreateNumbering( vidx2->TriangLevel(), MG, VelBndData);
             std::cout << "vidx2->TriangLevel(): " << vidx2->TriangLevel() << std::endl;
             loc_v.SetIdx( &loc_vidx);
-            RepairAfterRefineP2( oldx, loc_v);
+            repairp2->repair(loc_v);
 
             v1->Clear( 0.0);
             vidx2->DeleteNumbering( MG);
@@ -506,6 +511,7 @@ void Strategy( StokesProblemT& Stokes)
         std::swap(p2, p1);
         std::swap(vidx2, vidx1);
         std::swap(pidx2, pidx1);
+        delete repairp2;
     } while (++step< P.get<int>("Error.NumRef") && new_marks);
 
     // we want the solution to be in Stokes.v, Stokes.pr
@@ -616,5 +622,5 @@ int main ( int argc, char** argv)
         delete bdata;
         return 0;
     }
-    catch (DROPS::DROPSErrCL err) { err.handle(); }
+    catch (DROPS::DROPSErrCL& err) { err.handle(); }
 }

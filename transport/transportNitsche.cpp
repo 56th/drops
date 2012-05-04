@@ -790,6 +790,15 @@ double TransportP1XCL::Interface_L2error() const
 //                               TransportXRepairCL
 //*****************************************************************************
 void
+TransportXRepairCL::pre_refine ()
+{
+    p1oldctrepair_= std::auto_ptr<RepairP1CL<double>::type >(
+        new RepairP1CL<double>::type( c_.GetMG(), c_.oldct, c_.GetBndData()));
+    p1ctrepair_= std::auto_ptr<RepairP1CL<double>::type >(
+        new RepairP1CL<double>::type( c_.GetMG(), c_.ct, c_.GetBndData()));
+}
+
+void
 TransportXRepairCL::post_refine ()
 {
     match_fun match= c_.GetMG().GetBnd().GetMatchFun();
@@ -804,8 +813,8 @@ TransportXRepairCL::post_refine ()
     loc_oldcidx.CreateNumbering( mylvl, c_.GetMG(), c_.GetBndData(),  match, &(c_.GetOldLevelset()),&(c_.GetLevelsetBnd()));
     loc_ct.SetIdx( &loc_cidx);
     loc_oldct.SetIdx( &loc_oldcidx);
-    RepairAfterRefineP1( c_.GetSolution( ct, true), loc_ct);
-    RepairAfterRefineP1( c_.GetSolution( oldct, true), loc_oldct);
+    p1oldctrepair_->repair( loc_oldct);
+    p1oldctrepair_->repair( loc_ct);
     double t = ct.t;
     ct.Clear(t);
     c_.DeleteNumbering( &c_.idx);
@@ -841,14 +850,13 @@ const IdxDescCL* TransportXRepairCL::GetIdxDesc() const {
   return 0;
 }
 
-const IdxDescCL* TransportXRepairCL::GetVector() const {
+const VectorCL* TransportXRepairCL::GetVector() const {
   throw DROPSErrCL( "TransportXRepairCL::GetVector: Sorry, not yet implemented.");
   return 0;
 }
 
 void TransportXRepairCL::swap( IdxDescCL&, VectorCL&) {
   throw DROPSErrCL( "TransportXRepairCL::swap: Sorry, not yet implemented.");
-  return 0;
 }
 
 
@@ -857,14 +865,21 @@ const IdxDescCL* VelTranspRepairCL::GetIdxDesc() const {
   return 0;
 }
 
-const IdxDescCL* VelTranspRepairCL::GetVector() const {
+const VectorCL* VelTranspRepairCL::GetVector() const {
   throw DROPSErrCL( "VelTranspRepairCL::GetVector: Sorry, not yet implemented.");
   return 0;
 }
 
 void VelTranspRepairCL::swap( IdxDescCL&, VectorCL&) {
   throw DROPSErrCL( "VelTranspRepairCL::swap: Sorry, not yet implemented.");
-  return 0;
+}
+
+
+void
+  VelTranspRepairCL::pre_refine ()
+{
+    p2repair_= std::auto_ptr<RepairP2CL<Point3DCL>::type >(
+        new RepairP2CL<Point3DCL>::type( mg_, v_, Bnd_v_));
 }
 
 void
@@ -951,13 +966,7 @@ void
           }
          }
   */
-#ifdef _PAR
-    GetPMG().HandleNewIdx(&v.vel_idx, &loc_v);
-#endif
-    RepairAfterRefineP2( const_DiscVelSolCL( &v, &Bnd_v_, &mg_), loc_v);
-#ifdef _PAR
-    GetPMG().CompleteRepair( &loc_v);
-#endif
+    p2repair_->repair( loc_v);
 
     double t = v.t;
     v.Clear(t);
