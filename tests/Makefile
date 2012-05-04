@@ -6,15 +6,19 @@
 
 DIR = tests
 
-EXEC =  ip1test ip2test mattest prolongationp2test reftest testfe \
-        tetrabuildertest sbuffer minres meshreader restrictp2 vectest \
-        p2local quadbase globallist triang quadCut bicgstab gcr blockmat \
-        mass quad5 downwind quad5_2D interfaceP1FE serialization xfem \
-        directsolver f_Gamma neq splitboundary reparam_init reparam \
-        extendP1onChild principallattice quad_extra dist_streamtest dist_remotedatatest \
-        dist_sendtetraofbrick dist_simplexsend dist_interface dist_exchange \
-        dist_poisson dist_sdropsP2 dist_twophasedrops dist_ref dist_modify \
-        dist_TestRefPar dist_ref_rising_drop dist_migration dist_interp2 dist_interp1
+SER_EXEC =  ip1test ip2test mattest prolongationp2test reftest testfe \
+            tetrabuildertest sbuffer minres meshreader restrictp2 vectest \
+            p2local quadbase globallist triang quadCut bicgstab gcr blockmat \
+            mass quad5 downwind quad5_2D interfaceP1FE serialization xfem \
+            directsolver f_Gamma neq splitboundary reparam_init reparam \
+            extendP1onChild principallattice quad_extra
+            
+PAR_EXEC =  dist_streamtest dist_remotedatatest \
+            dist_sendtetraofbrick dist_simplexsend dist_interface dist_exchange \
+            dist_poisson dist_sdropsP2 dist_twophasedrops dist_ref dist_modify \
+            dist_TestRefPar dist_ref_rising_drop dist_migration dist_interp2 dist_interp1
+            
+EXEC = $(if $(PAR_BUILD),$(PAR_EXEC),$(SER_EXEC))
 
 DELETE = $(EXEC) *.out *.diff *.off *.mg *.dat
 
@@ -41,6 +45,8 @@ TESTNAME = drivencavity-adaptiv-schur drivencavity-adaptiv-uzawa \
     stokes-stationaer-uniform
 
 # rules
+
+all: $(EXEC)
 
 default: ClrScr
 
@@ -97,8 +103,8 @@ mattest: \
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 testfe: \
-    ../tests/testfe.o ../misc/utils.o ../geom/topo.o \
-    ../geom/simplex.o ../geom/multigrid.o ../num/unknowns.o
+    ../tests/testfe.o ../misc/utils.o ../geom/topo.o ../geom/boundary.o\
+    ../geom/simplex.o ../geom/multigrid.o ../num/unknowns.o ../geom/builder.o
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 sbuffer: \

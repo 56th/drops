@@ -194,83 +194,71 @@ void
 UpdateTriangulation(DROPS::StokesP2P1CL<Coeff>& NS,
                     const signed_dist_fun Dist,
                     const double t,
-                    const double width,         // Thickness of refined shell on each side of the interface
-                    const DROPS::Uint c_level,  // Outside the shell, use this level
-                    const DROPS::Uint f_level,  // Inside the shell, use this level
+                    const double width,   // Thickness of refined shell on each side of the interface
+                    const int c_level,    // Outside the shell, use this level
+                    const int f_level,    // Inside the shell, use this level
                     DROPS::VelVecDescCL* v1,
                     DROPS::VecDescCL* p1)
 {
     using namespace DROPS;
     typedef StokesP2P1CL<Coeff> StokesCL;
-    Assert( c_level<=f_level, "UpdateTriangulation: Levels are cheesy.\n", ~0);
+    Assert( 0<=c_level && c_level<=f_level, "UpdateTriangulation: Levels are cheesy.\n", ~0);
     TimerCL time;
 
     time.Reset();
     time.Start();
-    double time_v = v1->t, time_p = p1->t;
     MultiGridCL& mg= NS.GetMG();
     IdxDescCL  loc_vidx, loc_pidx;
     IdxDescCL* vidx1= v1->RowIdx;
-    IdxDescCL* vidx2= &loc_vidx;
     IdxDescCL* pidx1= p1->RowIdx;
-    IdxDescCL* pidx2= &loc_pidx;
     VelVecDescCL  loc_v;
     VecDescCL     loc_p;
-    VelVecDescCL* v2= &loc_v;
-    VecDescCL*    p2= &loc_p;
-    vidx2->SetFE( vecP2_FE);
-    pidx2->SetFE( P1_FE);
+
+    loc_vidx.SetFE( vecP2_FE);
+    loc_pidx.SetFE( P1_FE);
+
     bool shell_not_ready= true;
     const Uint min_ref_num= f_level - c_level;
     const StokesBndDataCL& BndData= NS.GetBndData();
     Uint i;
     for(i=0; shell_not_ready || i<min_ref_num; ++i) {
-        RepairP2CL<Point3DCL>::type repairp2( mg, *v1, BndData.Vel);
-        RepairP1CL<double>::type repairp1( mg, *p1, BndData.Pr);
+        RepairP2CL<Point3DCL>::type p2repair(mg, *v1, BndData.Vel);
+        RepairP1CL<double>::type p1repair(mg, *p1, BndData.Pr);
+
         shell_not_ready= ModifyGridStep( mg, Dist, width, c_level, f_level, t);
+
         // Repair velocity
-        std::swap( v2, v1);
-        std::swap( vidx2, vidx1);
-        match_fun match= mg.GetBnd().GetMatchFun();
-        vidx1->CreateNumbering( mg.GetLastLevel(), mg, NS.GetBndData().Vel, match);
-        if ( mg.GetLastLevel() != vidx2->TriangLevel()) {
+        match_fun match= NS.GetMG().GetBnd().GetMatchFun();
+        loc_vidx.CreateNumbering( mg.GetLastLevel(), mg, NS.GetBndData().Vel, match);
+        if ( mg.GetLastLevel() != vidx1->TriangLevel()) {
             std::cout << "LastLevel: " << mg.GetLastLevel()
-                      << " vidx2->TriangLevel: " << vidx2->TriangLevel() << std::endl;
+                      << " loc_vidx->TriangLevel: " << loc_vidx.TriangLevel() << std::endl;
             throw DROPSErrCL( "Strategy: Sorry, not yet implemented.");
         }
-        v1->SetIdx( vidx1);
+        loc_v.SetIdx( &loc_vidx);
+        p2repair.repair( loc_v);
+        vidx1->DeleteNumbering( mg);
+        vidx1->swap(loc_vidx);
+        v1->Data.swap(loc_v.Data);
+        loc_v.Clear( t);
 
-        repairp2.repair(*v1);
-        v2->Clear( time_v);
-        vidx2->DeleteNumbering( mg);
-//P2EvalCL< SVectorCL<3>, const StokesVelBndDataCL,
-//          VelVecDescCL> funv1( v1, &BndData.Vel, &mg, t);
-//CheckVel( funv1, &MyPdeCL::LsgVel);
         // Repair pressure
-        std::swap( p2, p1);
-        std::swap( pidx2, pidx1);
-        pidx1->CreateNumbering( mg.GetLastLevel(), mg, NS.GetBndData().Pr, match);
-        p1->SetIdx( pidx1);
-        repairp1.repair(*p1);
-        p2->Clear( time_p);
-        pidx2->DeleteNumbering( mg);
+        loc_pidx.CreateNumbering( mg.GetLastLevel(), mg, NS.GetBndData().Pr, match);
+        loc_p.SetIdx( &loc_pidx);
+        p1repair.repair( loc_p);
+        pidx1->DeleteNumbering( mg);
+        pidx1->swap(loc_pidx);
+        p1->Data.swap(loc_p.Data);
+        loc_p.Clear( t);
     }
-    // We want the solution to be where v1, p1 point to.
-    if (v1 == &loc_v) {
-        NS.vel_idx.GetFinest().swap( loc_vidx);
-        NS.pr_idx.GetFinest().swap( loc_pidx);
-        NS.v.SetIdx( &NS.vel_idx);
-        NS.p.SetIdx( &NS.pr_idx);
 
-        NS.v.Data= loc_v.Data;
-        NS.p.Data= loc_p.Data;
-    }
     time.Stop();
     std::cout << "UpdateTriangulation: " << i
               << " refinements in " << time.GetTime() << " seconds\n"
               << "last level: " << mg.GetLastLevel() << '\n';
     mg.SizeInfo( std::cout);
 }
+
 
 void
 MakeInitialTriangulation(DROPS::MultiGridCL& mg,

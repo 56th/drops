@@ -16,7 +16,7 @@ OBJ = $(CPP:%.cpp=%.o)
 include ../Make.common
 
 SER_EXEC = reparam lsshear surfTens prJump film brick_transp twophasedrops
-PAR_EXEC = twophasedrops film
+PAR_EXEC = twophasedrops
 EXEC = $(if $(PAR_BUILD),$(PAR_EXEC),$(SER_EXEC))
 
 PAR_OBJ_ = ../parallel/parallel.o ../parallel/partime.o  \

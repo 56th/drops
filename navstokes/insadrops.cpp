@@ -30,6 +30,7 @@
 #include "num/nssolver.h"
 #include "navstokes/navstokes.h"
 #include "navstokes/integrTime.h"
+#include "num/fe_repair.h"
 #include <fstream>
 #include <sstream>
 
@@ -178,57 +179,48 @@ UpdateTriangulation(DROPS::NavierStokesP2P1CL<Coeff>& NS,
     MultiGridCL& mg= NS.GetMG();
     IdxDescCL  loc_vidx, loc_pidx;
     IdxDescCL* vidx1= v1->RowIdx;
-    IdxDescCL* vidx2= &loc_vidx;
     IdxDescCL* pidx1= p1->RowIdx;
-    IdxDescCL* pidx2= &loc_pidx;
     VelVecDescCL  loc_v;
     VecDescCL     loc_p;
-    VelVecDescCL* v2= &loc_v;
-    VecDescCL*    p2= &loc_p;
-    vidx2->SetFE( vecP2_FE);
-    pidx2->SetFE( P1_FE);
+
+    loc_vidx.SetFE( vecP2_FE);
+    loc_pidx.SetFE( P1_FE);
+
     bool shell_not_ready= true;
     const Uint min_ref_num= f_level - c_level;
     const StokesBndDataCL& BndData= NS.GetBndData();
     Uint i;
     for(i=0; shell_not_ready || i<min_ref_num; ++i) {
+        RepairP2CL<Point3DCL>::type p2repair(mg, *v1, BndData.Vel);
+        RepairP1CL<double>::type p1repair(mg, *p1, BndData.Pr);
+
         shell_not_ready= ModifyGridStep( mg, Dist, width, c_level, f_level, t);
+
         // Repair velocity
-        std::swap( v2, v1);
-        std::swap( vidx2, vidx1);
         match_fun match= NS.GetMG().GetBnd().GetMatchFun();
-        vidx1->CreateNumbering( mg.GetLastLevel(), mg, NS.GetBndData().Vel, match);
-        if ( mg.GetLastLevel() != vidx2->TriangLevel()) {
+        loc_vidx.CreateNumbering( mg.GetLastLevel(), mg, NS.GetBndData().Vel, match);
+        if ( mg.GetLastLevel() != vidx1->TriangLevel()) {
             std::cout << "LastLevel: " << mg.GetLastLevel()
-                      << " vidx2->TriangLevel: " << vidx2->TriangLevel() << std::endl;
+                      << " loc_vidx->TriangLevel: " << loc_vidx.TriangLevel() << std::endl;
             throw DROPSErrCL( "Strategy: Sorry, not yet implemented.");
         }
-        v1->SetIdx( vidx1);
-        P2EvalCL< SVectorCL<3>, const StokesVelBndDataCL,
-                  const VelVecDescCL> funv2( v2, &BndData.Vel, &mg);
-        RepairAfterRefineP2( funv2, *v1);
-        v2->Clear( t);
-        vidx2->DeleteNumbering( mg);
-        // Repair pressure
-        std::swap( p2, p1);
-        std::swap( pidx2, pidx1);
-        pidx1->CreateNumbering( mg.GetLastLevel(), mg, NS.GetBndData().Pr, match);
-        p1->SetIdx( pidx1);
-        typename NavStokesCL::const_DiscPrSolCL oldfunpr( p2, &BndData.Pr, &mg);
-        RepairAfterRefineP1( oldfunpr, *p1);
-        p2->Clear( t);
-        pidx2->DeleteNumbering( mg);
-    }
-    // We want the solution to be where v1, p1 point to.
-    if (v1 == &loc_v) {
-        NS.vel_idx.GetFinest().swap( loc_vidx);
-        NS.pr_idx.GetFinest().swap( loc_pidx);
-        NS.v.SetIdx( &NS.vel_idx);
-        NS.p.SetIdx( &NS.pr_idx);
+        loc_v.SetIdx( &loc_vidx);
+        p2repair.repair( loc_v);
+        vidx1->DeleteNumbering( mg);
+        vidx1->swap(loc_vidx);
+        v1->Data.swap(loc_v.Data);
+        loc_v.Clear( t);
 
-        NS.v.Data= loc_v.Data;
-        NS.p.Data= loc_p.Data;
+        // Repair pressure
+        loc_pidx.CreateNumbering( mg.GetLastLevel(), mg, NS.GetBndData().Pr, match);
+        loc_p.SetIdx( &loc_pidx);
+        p1repair.repair( loc_p);
+        pidx1->DeleteNumbering( mg);
+        pidx1->swap(loc_pidx);
+        p1->Data.swap(loc_p.Data);
+        loc_p.Clear( t);
     }
+
     time.Stop();
     std::cout << "UpdateTriangulation: " << i
               << " refinements in " << time.GetTime() << " seconds\n"
@@ -510,5 +502,5 @@ int main (int argc, char** argv)
     v2d.close();
     return 0;
   }
-  catch (DROPS::DROPSErrCL err) { err.handle(); }
+  catch (DROPS::DROPSErrCL& err) { err.handle(); }
 }

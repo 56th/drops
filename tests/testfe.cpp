@@ -25,6 +25,8 @@
 #include "num/fe.h"
 #include "misc/container.h"
 #include "geom/topo.h"
+#include "geom/multigrid.h"
+#include "geom/builder.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -261,11 +263,12 @@ int main()
         testGrad(i);
         std::cout << std::endl;
     }
-    Point3DCL p0(0.), p1(0.), p2(0.), p3(0.);
-    p1[0]= p2[1]= p3[2]= 1;
-    VertexCL v0(p0,1), v1(p1,1),
-             v2(p2,1), v3(p3,1);
-    TetraCL tetra( &v0, &v1, &v2, &v3, 0);
+
+    // create one tetrahedron
+    TetraBuilderCL builder(0);
+    MultiGridCL mg( builder);
+    const TetraCL& tetra = *mg.GetAllTetraBegin();
+
     for(int i=0; i<10; ++i)
     {
         std::cout << "Checking numeric integration of Hat Fct "<<i<<std::endl;
