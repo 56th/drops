@@ -6,6 +6,14 @@
 
 DIR = tests
 
+DELETE = $(EXEC) *.out *.diff *.off *.mg *.dat
+CPP = $(wildcard *.cpp)
+
+OBJ = $(CPP:%.cpp=%.o)
+
+# include common rules:
+include ../Make.common
+
 SER_EXEC =  ip1test ip2test mattest prolongationp2test reftest testfe \
             tetrabuildertest sbuffer minres meshreader restrictp2 vectest \
             p2local quadbase globallist triang quadCut bicgstab gcr blockmat \
@@ -20,14 +28,6 @@ PAR_EXEC =  dist_streamtest dist_remotedatatest \
             
 EXEC = $(if $(PAR_BUILD),$(PAR_EXEC),$(SER_EXEC))
 
-DELETE = $(EXEC) *.out *.diff *.off *.mg *.dat
-
-CPP = $(wildcard *.cpp)
-
-OBJ = $(CPP:%.cpp=%.o)
-
-# include common rules:
-include ../Make.common
 
 PAR_OBJ_ = ../parallel/parallel.o ../parallel/partime.o  \
            ../parallel/exchange.o  ../parallel/parmultigrid.o \
