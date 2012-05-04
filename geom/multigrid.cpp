@@ -143,7 +143,9 @@ void PeriodicEdgesCL::AccumulateMFR( int lvl)
     Shrink();
     for (int i=0; i<=lvl; ++i)
         Recompute( mg_.GetEdgesBegin(i), mg_.GetEdgesEnd(i));
+//std::cout << " \n>>> After Recompute:\n"; DebugInfo( std::cout);
     Accumulate();
+//std::cout << " \n>>> After Accumulate:\n"; DebugInfo( std::cout);
     Shrink();
 }
 

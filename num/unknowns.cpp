@@ -56,12 +56,12 @@ UnknownIdxCL& UnknownIdxCL::operator=( const UnknownIdxCL& rhs)
 
 void UnknownHandleCL::DebugInfo( std::ostream& os) const
 {
-    os << "in triang ";
 #ifdef _PAR
+    os << "in triang ";
     for (size_t i= 0; i<mayHaveUnk_.size(); ++i)
         if (mayHaveUnk_[i]) os << i << " ";
-#endif
     os<< ", ";
+#endif
     if (!_unk)
         os << "no DoFs stored.\n";
     else {

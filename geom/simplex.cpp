@@ -51,7 +51,7 @@ SArrayCL<FaceCL*, NumAllFacesC> TetraCL::fPtrs_(static_cast<FaceCL*>(0));
 
 #ifdef _PAR
 
-/** Puts the hash, mark for removement, and boundary information onto the stream.
+/** Puts the GID, mark for removement, and boundary information onto the stream.
 */
 void VertexCL::Pack( DiST::Helper::MPIostreamCL& ostrstream) const
 {
@@ -65,10 +65,9 @@ void VertexCL::Pack( DiST::Helper::MPIostreamCL& ostrstream) const
     else {
         ostrstream << size_t(0);
     }
-//    Unknowns.Pack( ostrstream, *this);
 }
 
-/** Reads the hash, mark for removement, and boundary information from the stream.
+/** Reads the GID, mark for removement, and boundary information from the stream.
 */
 void VertexCL::UnPack( DiST::Helper::MPIistreamCL& istrstream)
 {
@@ -81,7 +80,7 @@ void VertexCL::UnPack( DiST::Helper::MPIistreamCL& istrstream)
         delete BndVerts_;
         BndVerts_= 0;
     }
-    for ( size_t i=0; i<numBnd; ++i){
+    for ( size_t i=0; i<numBnd; ++i) {
         istrstream >> bidx >> p2d[0] >> p2d[1];
         AddBnd( BndPointCL(bidx, p2d));
     }
@@ -155,7 +154,7 @@ Point3DCL GetBaryCenter(const EdgeCL& e)
 
 #ifdef _PAR
 
-/** Put the hash, both vertices, boundary information, accumulated MFR, and mark for removement
+/** Put the GID, both vertices, boundary information, accumulated MFR, and mark for removement
     onto the stream
 */
 void EdgeCL::Pack( DiST::Helper::MPIostreamCL& ostrstream) const
@@ -167,7 +166,7 @@ void EdgeCL::Pack( DiST::Helper::MPIostreamCL& ostrstream) const
                << Bnd_[0] << Bnd_[1] << AccMFR_ << RemoveMark_;
 }
 
-/** Reads the hash, both vertices, boundary information, accumulated MFR, and mark for removement
+/** Reads the GID, both vertices, boundary information, accumulated MFR, and mark for removement
     from the stream
 */
 void EdgeCL::UnPack( DiST::Helper::MPIistreamCL& istrstream)
@@ -205,42 +204,46 @@ void FaceCL::LinkTetra(const TetraCL* tp)
 
     if (tp->GetLevel()==GetLevel()) // tetra on same level
     {
+#ifndef _PAR
+        if (Neighbors_[0] && Neighbors_[0]!=tp) // in sequential version:  if _Neighbors[0]!=0 then  _Neighbors[0]!=tp is always true
+            offset=1;
+#else
         if (Neighbors_[2]==0 && Neighbors_[3]==0) {
             if (Neighbors_[0] && Neighbors_[0]!=tp) // in sequential version:  if Neighbors_[0]!=0 then  Neighbors_[0]!=tp is always true
                 offset=1;
-        } else { // during transfer, the children are unpacked before their parents. Hence, we have to find the position where one of the children is stored on the next level.
+        }
+        else { // during transfer, the children are unpacked before their parents. Hence, we have to find the position where one of the children is stored on the next level.
         	if (tp->GetChildBegin()==tp->GetChildEnd()) { // no children known to tetra -> use position where no children are linked
         		offset= Neighbors_[2] ? 1 : 0;
-#ifdef _PAR
                 Assert( Neighbors_[offset+2]==0, DiST::Helper::ErrorCL("FaceCL::LinkTetra: Occupied child position ", offset+2, GetGID()), DebugRefineEasyC);
-#endif
         	} else if (!is_in( tp->GetChildBegin(), tp->GetChildEnd(), Neighbors_[2]))
             	if (Neighbors_[3]==0 || is_in( tp->GetChildBegin(), tp->GetChildEnd(), Neighbors_[3]))
             		offset=1;
-#ifdef _PAR
             Assert( Neighbors_[offset+2]==0 || is_in( tp->GetChildBegin(), tp->GetChildEnd(), Neighbors_[offset+2]), DiST::Helper::ErrorCL("FaceCL::LinkTetra: Wrong child at position ", offset+2, GetGID()), DebugRefineEasyC);
-#endif
         }
+#endif
     }
+#ifndef _PAR
     else                            // green child of parent
     {
+        Assert(tp->GetLevel() == GetLevel()+1, DROPSErrCL("FaceCL::LinkTetra: Illegal level of green tetra"), DebugRefineEasyC);
+        // tetra is stored on the same side as the parent
+        offset= Neighbors_[0]==tp->GetParent() ? 2 : 3;
+    }
+#else
+    else {                          // green child of parent
         Assert(tp->GetLevel() == GetLevel()+1, DROPSErrCL("FaceCL::LinkTetra: Illegal level of green tetra"), DebugRefineEasyC);
         if (tp->GetParent()) {
         // tetra is stored on the same side as the parent
             offset= Neighbors_[0]==tp->GetParent() ? 2 : 3;
-#ifdef _PAR
             Assert( tp->GetParent()==Neighbors_[offset-2], DiST::Helper::ErrorCL("FaceCL::LinkTetra: Wrong parent at position ", offset-2, GetGID()), DebugRefineEasyC);
-#endif
         } else { // during transfer, the children are unpacked before their parents. Hence, we need an empty position without parent.
             offset= (Neighbors_[0]==0 && (Neighbors_[2]==0 || Neighbors_[2]==tp)) ? 2 : 3;
-#ifdef _PAR
             Assert( !Neighbors_[offset-2], DiST::Helper::ErrorCL("FaceCL::LinkTetra: Occupied parent position ", offset-2, GetGID()), DebugRefineEasyC);
-#endif
         }
     }
-#ifdef _PAR
-    Assert(!Neighbors_[offset] || Neighbors_[offset]==tp, DiST::Helper::ErrorCL("FaceCL::LinkTetra: Link occupied by another tetra, while linking ", Neighbors_[offset] ? tp->GetGID() : DiST::Helper::NoGID, GetGID()), DebugRefineEasyC);
 #endif
+    Assert(!Neighbors_[offset] || Neighbors_[offset]==tp, DROPSErrCL("FaceCL::LinkTetra: Link occupied by another tetra!"), DebugRefineEasyC);
     Neighbors_[offset]= tp;
 }
 
@@ -300,18 +303,18 @@ const TetraCL* FaceCL::GetNeighInTriang(const TetraCL* tp, Uint TriLevel) const
 // parallel functions for faces
 // ----------------------------
 
-/** Puts the hash, all neighbors, boundary information, and mark for removement onto the stream
+/** Puts the GID, all neighbors, boundary information, and mark for removement onto the stream
 */
 void FaceCL::Pack( DiST::Helper::MPIostreamCL& ostrstream) const
 {
     ostrstream << GetGID();
-    for ( Uint i=0; i<4; ++i){
+    for ( Uint i=0; i<4; ++i) {
         ostrstream << ( GetNeighbor(i)==0 ? DiST::Helper::NoGID : GetNeighbor(i)->GetGID());
     }
     ostrstream << Bnd_ << RemoveMark_;
 }
 
-/** Reads the hash, all neighbors, boundary information, and mark for removement from the stream
+/** Reads the GID, all neighbors, boundary information, and mark for removement from the stream
 */
 void FaceCL::UnPack( DiST::Helper::MPIistreamCL& istrstream)
 {
@@ -740,7 +743,7 @@ void TetraCL::RestrictMark()
             bool setregrefmark= false;
             for (ChildPIterator chp= GetChildBegin(), end= GetChildEnd(); chp!=end; ++chp)
             {
-                if (!setregrefmark){
+                if (!setregrefmark) {
                     if ( (*chp)->IsMarkedForRef() )
                         setregrefmark= true;
                     else
@@ -941,28 +944,25 @@ void TetraCL::Pack( DiST::Helper::MPIostreamCL& ostrstream) const
 {
     ostrstream << GetGID()
                << RefRule_ << RefMark_;
-    for ( Uint i=0; i<NumVertsC; ++i){
+    for ( Uint i=0; i<NumVertsC; ++i) {
         ostrstream << GetVertex(i)->GetGID();
     }
-    for ( Uint i=0; i<NumEdgesC; ++i){
+    for ( Uint i=0; i<NumEdgesC; ++i) {
         ostrstream << GetEdge(i)->GetGID();
     }
-    for ( Uint i=0; i<NumFacesC; ++i){
+    for ( Uint i=0; i<NumFacesC; ++i) {
         ostrstream << GetFace(i)->GetGID();
     }
     ostrstream << ( GetParent()==0 ? DiST::Helper::NoGID : GetParent()->GetGID());
 
     Uint numChildren= std::distance(GetChildBegin(), GetChildEnd());
     ostrstream << numChildren;
-    for ( const_ChildPIterator chp(GetChildBegin()); chp!=GetChildEnd(); ++chp){
+    for ( const_ChildPIterator chp(GetChildBegin()); chp!=GetChildEnd(); ++chp) {
         ostrstream << (*chp)->GetGID();
     }
 }
 
 /**
-    \todo DiST: UnPack children (they need to be received in before!)
-    \todo DiST: Make MFR on edges consistent, see HandlerTObjMkCons, HandlerTSetPrio
-    \todo DiST: Eventually, change priority of a master tetrahedra to PrioGhost, see HandlerTUpdate
 */
 void TetraCL::UnPack( DiST::Helper::MPIistreamCL& istrstream)
 {
@@ -970,15 +970,15 @@ void TetraCL::UnPack( DiST::Helper::MPIistreamCL& istrstream)
 
     istrstream >> gid_;
     istrstream >> RefRule_ >> RefMark_;
-    for ( Uint i=0; i<NumVertsC; ++i){
+    for ( Uint i=0; i<NumVertsC; ++i) {
         istrstream >> tmp;
         Vertices_[i]= DiST::InfoCL::Instance().GetVertex(tmp);
     }
-    for ( Uint i=0; i<NumEdgesC; ++i){
+    for ( Uint i=0; i<NumEdgesC; ++i) {
         istrstream >> tmp;
         Edges_[i]= DiST::InfoCL::Instance().GetEdge(tmp);
     }
-    for ( Uint i=0; i<NumFacesC; ++i){
+    for ( Uint i=0; i<NumFacesC; ++i) {
         istrstream >> tmp;
         Faces_[i]= DiST::InfoCL::Instance().GetFace(tmp);
     }
@@ -1060,8 +1060,8 @@ Check for:
 <ol>
  <li> boundary descriptions map to the same coordinates</li>
  <li> recycle bin is empty</li>
- <li> removemark must not be set</li>
- <li> if this simplex is known to the RemoteDataListCL </li>
+ <li> removemark not set</li>
+ <li> simplex known to DiST </li>
 </ol>
 */
 {
@@ -1083,19 +1083,19 @@ Check for:
         }
     }
     // Check, that the refinement algorithm did not miss any RecycleBins
-    if ( HasRecycleBin() ){
+    if ( HasRecycleBin() ) {
         sane= false;
         os << "Clear your RecycleBin!";
     }
     // Check if the removemark is not set
-    if (IsMarkedForRemovement()){
+    if (IsMarkedForRemovement()) {
         sane=false;
         os << "Vertex is marked for removement. ";
     }
 
 #ifdef _PAR
     // Check if the vertex is known to a remote data list
-    if ( DiST::InfoCL::Instance().GetRemoteList<VertexCL>().find( GetGID())==DiST::InfoCL::Instance().GetRemoteList<VertexCL>().end()){
+    if ( DiST::InfoCL::Instance().GetRemoteList<VertexCL>().find( GetGID())==DiST::InfoCL::Instance().GetRemoteList<VertexCL>().end()) {
         sane= false;
         os << "Vertex is not known to a remote data list. ";
     }
@@ -1111,7 +1111,7 @@ void VertexCL::DebugInfo(std::ostream& os) const
     os << "VertexCL: "<< GetGID() << '\n'
        << " level " << GetLevel() << ", coord " << GetCoord() << '\n'
        << ' ' << ( IsMarkedForRemovement() ? "is" : "is not") << " marked for removement\n";
-    if ( IsOnBoundary()){
+    if ( IsOnBoundary()) {
         os << " boundary vertices: ";
         for (const_BndVertIt biter(BndVerts_->begin()); biter!=BndVerts_->end(); ++biter)
             os << biter->GetBndIdx()<< "  "
@@ -1144,28 +1144,28 @@ bool EdgeCL::IsSane(std::ostream& os) const
 Check for:
 <ol>
  <li> both vertices are on domain boundary, if the edge lies on it</li>
- <li> removemark must not be set
- <li> if the mark for refinement is greater than zero, a midvertex must exists
- <li> in parallel, if AccMFR is equal to MFR, if the edge is not distributed</li>
- <li> if the hash is computed correctly </li>
- <li> if this simplex is known to the RemoteDataListCL </li>
+ <li> removemark not set
+ <li> if the mark for refinement is greater than zero, a midvertex must exist
+ <li> in parallel, if AccMFR is equal to MFR, the edge shouldn't be distributed</li>
+ <li> correct GID </li>
+ <li> simplex known to DiST </li>
 </ol>
 /// \todo Needs an update for the non-DDD interface
 */
 {
     bool sane= true;
     // Check if the boundary information matches with the vertices
-    if ( IsOnBoundary() && !(GetVertex(0)->IsOnBoundary() && GetVertex(1)->IsOnBoundary())){
+    if ( IsOnBoundary() && !(GetVertex(0)->IsOnBoundary() && GetVertex(1)->IsOnBoundary())) {
         sane= false;
         os << "One of the vertices is on no boundary even though the edge is. ";
     }
-    if (sane){
-        for (const BndIdxT *it= GetBndIdxBegin(), *end= GetBndIdxEnd(); it!=end; ++it){
-            if (!is_in_if( GetVertex(0)->GetBndVertBegin(), GetVertex(0)->GetBndVertEnd(), BndPointSegEqCL(*it) ) ){
+    if (sane) {
+        for (const BndIdxT *it= GetBndIdxBegin(), *end= GetBndIdxEnd(); it!=end; ++it) {
+            if (!is_in_if( GetVertex(0)->GetBndVertBegin(), GetVertex(0)->GetBndVertEnd(), BndPointSegEqCL(*it) ) ) {
                sane= false;
                os << "BndIdx " << *it << " is not among the boundaries of vertex 0. ";
             }
-            if (!is_in_if( GetVertex(1)->GetBndVertBegin(), GetVertex(1)->GetBndVertEnd(), BndPointSegEqCL(*it) ) ){
+            if (!is_in_if( GetVertex(1)->GetBndVertBegin(), GetVertex(1)->GetBndVertEnd(), BndPointSegEqCL(*it) ) ) {
                sane= false;
                os << "BndIdx " << *it << " is not among the boundaries of vertex 1. ";
             }
@@ -1173,7 +1173,7 @@ Check for:
     }
 
     // Check if the remove mark is not set
-    if (IsMarkedForRemovement()){
+    if (IsMarkedForRemovement()) {
         sane=false;
         os << "Edge is marked for removement\n";
     }
@@ -1196,15 +1196,15 @@ Check for:
         os << "Inconsistent MFR for undistributed edge. ";
     }
 
-    // Check if the hash is computed correctly
-    DiST::Helper::GeomIdCL hash( GetLevel(), *this);
-    if ( hash!=GetGID()){
+    // Check if the GID is computed correctly
+    DiST::Helper::GeomIdCL gid( GetLevel(), *this);
+    if ( gid!=GetGID()) {
         sane= false;
-        os << "Hash does not match. ";
+        os << "GID does not match. ";
     }
 
     // Check if the edge is known to a remote data list
-    if ( DiST::InfoCL::Instance().GetRemoteList<EdgeCL>().find( GetGID())==DiST::InfoCL::Instance().GetRemoteList<EdgeCL>().end()){
+    if ( DiST::InfoCL::Instance().GetRemoteList<EdgeCL>().find( GetGID())==DiST::InfoCL::Instance().GetRemoteList<EdgeCL>().end()) {
         sane= false;
         os << "Edge is not known to a remote data list. ";
     }
@@ -1229,7 +1229,7 @@ void EdgeCL::DebugInfo (std::ostream& os) const
     if (IsRefined())
        os << ", midvertex " << GetMidVertex()->GetGID();
     os << '\n';
-    if ( IsOnBoundary() ){
+    if ( IsOnBoundary() ) {
         os << " boundary indices: ";
         for (const BndIdxT *it= GetBndIdxBegin(), *end= GetBndIdxEnd(); it!=end; ++it)
             os << *it << ' ';
@@ -1249,22 +1249,29 @@ bool FaceCL::IsSane(std::ostream& os) const
 Check for:
 <ol>
  <li> both sides of the face point to a tetra, boundary segment or lies on proc boundary</li>
- <li> removemark must not be set</li>
+ <li> removemark not set</li>
  <li> check if neighbor tetras have me as face</li>
  <li> check if levels of neighbor tetras are correct
  <li> check if all three vertices lies on the same boundary as me, if the face lies on a domain boundary</li>
- <li> if the hash is computed correctly </li>
- <li> if this simplex is known to the RemoteDataListCL </li>
+ <li> correct GID </li>
+ <li> simplex known to DiST </li>
 </ol>
 */
 {
     bool sane= true;
     // Check if neighbors exist
-    if ( GetNeighbor(0)==0){
+    if ( GetNeighbor(0)==0) {
         sane= false;
         os << "No tetra is linked" << std::endl;
     }
-#ifdef _PAR
+    // check, that both sides point to a tetra or a BndSeg in my level
+#ifndef _PAR
+    if ((Neighbors_[1]!=0) == IsOnBoundary() )
+    {
+        sane= false;
+        os << "A tetra/boundary is missing/superfluous. ";
+    }
+#else
     if ( (GetNeighbor(1)!=0) == IsOnBoundary() && !IsOnProcBnd() && GetPrio()!=PrioVGhost) {
         sane= false;
         if (IsOnBoundary() )
@@ -1273,34 +1280,25 @@ Check for:
             os << "Second tetra missing eventhough face is not on bnd. ";
     }
 #endif
-//    const bool onBnd= IsOnBoundary() || IsOnProcBnd();
-//    if ( GetNeighbor(1)==0 && !onBnd && GetPrio()!=PrioVGhost){
-//        sane= false;
-//        os << "Missing neighbor on same level";
-//    }
-//    if ( GetNeighbor(1)!=0 && onBnd && GetPrio()!=PrioVGhost){
-//        sane= false;
-//        os << "Two neighbors are linked eventhough face is on boundary" << std::endl;
-//    }
     for (int i=0; i<2; ++i)
     	if (GetNeighbor(i) && GetNeighbor(i+2) && GetNeighbor(i) != GetNeighbor(i+2)->GetParent()/*!is_in( GetNeighbor(i)->GetChildBegin(), GetNeighbor(i)->GetChildEnd(), GetNeighbor(i+2))*/) {
     		sane= false;
     		os << "Unrelated tetra and child at position " << i << ". ";
     	}
-    if (IsMarkedForRemovement()){
+    if (IsMarkedForRemovement()) {
         sane=false;
         os << "Face is marked for removement\n";
     }
 
     // check, that linked neighbor tetras have me as face
-    for(Uint i=0; i<NumFacesC; ++i){
-        if ( GetNeighbor(i)!=0 ){
-            if ( !is_in( GetNeighbor(i)->GetFacesBegin(), GetNeighbor(i)->GetFacesEnd(), this)){
+    for(Uint i=0; i<NumFacesC; ++i) {
+        if ( GetNeighbor(i)!=0 ) {
+            if ( !is_in( GetNeighbor(i)->GetFacesBegin(), GetNeighbor(i)->GetFacesEnd(), this)) {
                 sane= false;
                 os << "Found linked tetra, that lacks me as face:\n";
                 GetNeighbor(i)->DebugInfo(os);
             }
-            if (GetNeighbor(i)->GetLevel() != GetLevel() + i/2){
+            if (GetNeighbor(i)->GetLevel() != GetLevel() + i/2) {
                 sane= false;
                 os << "Found linked tetra on wrong level:\n";
                 GetNeighbor(i)->DebugInfo(os);
@@ -1308,27 +1306,27 @@ Check for:
         }
     }
     // Check boundary information
-    if ( IsOnBoundary()){
-        if (!(GetVertex(0)->IsOnBoundary() && GetVertex(1)->IsOnBoundary() && GetVertex(2)->IsOnBoundary())){
+    if ( IsOnBoundary()) {
+        if (!(GetVertex(0)->IsOnBoundary() && GetVertex(1)->IsOnBoundary() && GetVertex(2)->IsOnBoundary())) {
             sane= false;
             os << "One of the vertices is on no boundary even though the face is. ";
         }
-        else if (GetBndIdx() != GetCommonBndSeg(GetVertex(0), GetVertex(1), GetVertex(2)) ){
+        else if (GetBndIdx() != GetCommonBndSeg(GetVertex(0), GetVertex(1), GetVertex(2)) ) {
             sane= false;
             os << "BndIdx " << GetBndIdx() << " is not among the common boundaries of the face. ";
         }
     }
 
 #ifdef _PAR
-    // Check if the hash is computed correctly
-    DiST::Helper::GeomIdCL hash( GetLevel(), *this);
-    if ( hash!=GetGID()){
+    // Check if the GID is computed correctly
+    DiST::Helper::GeomIdCL gid( GetLevel(), *this);
+    if ( gid!=GetGID()) {
         sane= false;
-        os << "Hash does not match. ";
+        os << "GID does not match. ";
     }
 
     // Check if the face is known to a remote data list
-    if ( DiST::InfoCL::Instance().GetRemoteList<FaceCL>().find( GetGID())==DiST::InfoCL::Instance().GetRemoteList<FaceCL>().end()){
+    if ( DiST::InfoCL::Instance().GetRemoteList<FaceCL>().find( GetGID())==DiST::InfoCL::Instance().GetRemoteList<FaceCL>().end()) {
         sane= false;
         os << "Face is not known to a remote data list. ";
     }
@@ -1345,44 +1343,44 @@ void FaceCL::DebugInfo(std::ostream& os) const
        << " level: " << GetLevel() << ", barycenter " << GetBary() << '\n'
 #endif
        << ' ' << ( IsMarkedForRemovement() ? "is" : "is not") << " marked for removement\n";
-    if ( IsOnBoundary()){
+    if ( IsOnBoundary()) {
         os << " is on boundary of index " << GetBndIdx();
     }
     else{
         os << " is not on a boundary";
     }
     os << "\n vertices: ";
-    for ( Uint i=0; i<3; ++i){
+    for ( Uint i=0; i<3; ++i) {
         os << GetVertex(i)->GetGID() << ' ';
     }
     os << "\n edges: ";
-    for ( Uint i=0; i<3; ++i){
+    for ( Uint i=0; i<3; ++i) {
         os << GetEdge(i)->GetGID() << ' ';
     }
-#ifdef _PAR
     os << "\n neighbor tetras:";
-    for ( int neigh=0; neigh<(IsOnNextLevel() ? 4 : 2); ++neigh){
-        if ( neigh==0){
+    for ( int neigh=0; neigh<(IsOnNextLevel() ? 4 : 2); ++neigh) {
+        if ( neigh==0) {
             os << "\n  o on level " << GetLevel() << ": ";
         }
-        if ( neigh==2){
+        if ( neigh==2) {
             os << "\n  o on level " << GetLevel()+1 << ": ";
         }
-        if ( GetNeighbor(neigh)){
+        if ( GetNeighbor(neigh)) {
             os << GetNeighbor(neigh)->GetGID() << ' ';
         }
-        else{ // Neighbor tetra is not accessible ...
+        else { // Neighbor tetra is not accessible ...
             if ( (neigh==1 || neigh==3) && IsOnBoundary())
                 os << "boundary " << GetBndIdx() << ' ';
+#ifdef _PAR
             else if ( GetPrio()!=PrioVGhost && !IsLocal())
                 os << "on process " << GetNeighborProc() << ' ';
             else if ( GetPrio()==PrioVGhost && !IsLocal())
                 os << "not known due to VGhost priority ";
+#endif
             else
                 os << "is missing ";
         }
     }
-#endif
     os << '\n';
 
 #ifdef _PAR
@@ -1398,9 +1396,9 @@ Check for:
  <li> volume of children sums up to my volume</li>
  <li> Master exists, if I am Ghost</li>
  <li> all children are masters</li>
- <li> If a ghost exists on another process, no children must exist <li>
+ <li> If a ghost exists on another process, I have no children stored <li>
  <li> ghost tetras must have children</li>
- <li> At most two copies exists </li>
+ <li> At most two copies exist </li>
  <li> Only Ma/Gh pairs allowed </li>
  <li> Pointer to parent exists (if master copy and level!=0)</li>
  <li> neighbor-connections are right </li>
@@ -1408,12 +1406,10 @@ Check for:
  <li> whether the vertices of opposing edges contain all four vertices of the tetra </li>
  <li> vertices, edges and faces have the right priority </li>
  <li> refinement rule matchs to refinement of edges </li>
- <li> not unsubscribed from DDD</li>
- <li> if the geometric id is computed correctly </li>
- <li> if this simplex is known to the RemoteDataListCL </li>
- <li> if the remote data points to the right simplex </li>
+ <li> correct GID </li>
+ <li> simplex known to DiST </li>
+ <li> remote data points to the right simplex </li>
 </ol>
-/// \todo Needs an update for the non-DDD interface
 */
 {
     bool sane= true;
@@ -1423,19 +1419,19 @@ Check for:
         double vol = 0.0;
         for ( const_ChildPIterator ch(GetChildBegin()); ch!=GetChildEnd(); ++ch)
             vol += (*ch)->GetVolume();
-        if ( std::fabs(GetVolume()-vol)>DoubleEpsC ){
+        if ( std::fabs(GetVolume() - vol)>DoubleEpsC ) {
             sane= false;
             os << "Volume of children does not sum up to parent's volume. ";
         }
 #ifdef _PAR
         // if a ghost copy exists, no children must be stored on this process
-        if ( HasGhost()){
+        if ( HasGhost()) {
             sane= false;
             os << "Ghost exists, but children are stored locally. ";
         }
         // Check if all children are not ghost
-        for ( Uint ch= 0, numCh= GetRefData().ChildNum; ch<numCh; ++ch){
-            if ( GetChild(ch)->IsGhost() ){
+        for ( Uint ch= 0, numCh= GetRefData().ChildNum; ch<numCh; ++ch) {
+            if ( GetChild(ch)->IsGhost() ) {
                 sane= false;
                 os << "Child " << ch << " should be a Master. ";
             }
@@ -1445,27 +1441,27 @@ Check for:
 
 #ifdef _PAR
     // check if a master copy exists, if this is a ghost
-    if ( IsGhost() && IsLocal()){
+    if ( IsGhost() && IsLocal()) {
         sane= false;
         os << "Found ghost tetra without master. ";
     }
     // Check that a ghost has children
-    if ( IsGhost() && !Children_){
+    if ( IsGhost() && !Children_) {
         sane= false;
         os << "Ghost with no child!\n";
     }
     // Check if at most two copies are generated
-    if ( GetNumDist()>2){
+    if ( GetNumDist()>2) {
         sane= false;
         os << "Too many copies exist. ";
     }
     // Check that only Ma/Gh pairs are present
-    if ( GetNumDist()==2 && GetPrio()==(++GetRemoteData().GetProcListBegin())->prio){
+    if ( GetNumDist()==2 && GetPrio()==(++GetRemoteData().GetProcListBegin())->prio) {
         sane= false;
         os << "Copies should not have same priorities. ";
     }
     // Check if parent exists for a master copy
-    if ( IsMaster() && GetLevel()!=0 && !GetParent() ){
+    if ( IsMaster() && GetLevel()!=0 && !GetParent() ) {
         sane= false;
         os << "Parent is missing!";
     }
@@ -1476,7 +1472,7 @@ Check for:
     // across the face is consistent
     // If it is a boundary-segment, check,
     // if the three vertices belong to this boundary-segment
-    for ( Uint face=0; face<NumFacesC; ++face){
+    for ( Uint face=0; face<NumFacesC; ++face) {
         if ( IsNeighbor(face)
 #ifdef _PAR
                     && !IsProcBnd(face)
@@ -1546,26 +1542,26 @@ Check for:
     }
 #ifdef _PAR
     const Priority prio= HasGhost() ? PrioVGhost : GetPrio();
-    for (Uint i= 0; i<NumVertsC; ++i){
-        if (GetVertex(i)->GetPrio() < prio){
+    for (Uint i= 0; i<NumVertsC; ++i) {
+        if (GetVertex(i)->GetPrio() < prio) {
             sane=  false;
             os << "Vertex has wrong priority " << PriorityToString(GetVertex(i)->GetPrio()) << ". ";
         }
     }
-    for (Uint i= 0; i<NumEdgesC; ++i){
-        if (GetEdge(i)->GetPrio() < prio){
+    for (Uint i= 0; i<NumEdgesC; ++i) {
+        if (GetEdge(i)->GetPrio() < prio) {
             sane=  false;
             os << "Edge has wrong priority " << PriorityToString(GetEdge(i)->GetPrio()) << ". ";
         }
     }
-    for (Uint i= 0; i<NumFacesC; ++i){
-        if (GetFace(i)->GetPrio() < prio){
+    for (Uint i= 0; i<NumFacesC; ++i) {
+        if (GetFace(i)->GetPrio() < prio) {
             sane=  false;
             os << "Face has wrong priority " << PriorityToString(GetFace(i)->GetPrio()) << ". ";
         }
     }
 
-    if (IsMarkedForRemovement() || (IsGhost() && IsMarkedForNoRef())){
+    if (IsMarkedForRemovement() || (IsGhost() && IsMarkedForNoRef())) {
         sane=false;
         os << "Tetra is marked for removement\n";
     }
@@ -1574,13 +1570,13 @@ Check for:
 #ifdef _PAR
     // Check if the hash is computed correctly
     DiST::Helper::GeomIdCL gid( GetLevel(), *this);
-    if ( gid!=GetGID()){
+    if ( gid!=GetGID()) {
         sane= false;
-        os << "Geometric Id does not match. ";
+        os << "GID does not match. ";
     }
 
     // Check if the tetra is known to a remote data list
-    if ( !DiST::InfoCL::Instance().Exists( GetGID())){
+    if ( !DiST::InfoCL::Instance().Exists( GetGID())) {
         sane= false;
         os << "Tetra is not known to a remote data list. ";
     }
@@ -1606,22 +1602,22 @@ void TetraCL::DebugInfo (std::ostream& os) const
        << " RefRule " << GetRefRule() << ", RefMark " << GetRefMark() << '\n'
        << ' ' << ( IsMarkedForRemovement() ? "is" : "is not") << " marked for removement\n";
     os << " vertices: ";
-    for ( Uint i=0; i<NumVertsC; ++i){
+    for ( Uint i=0; i<NumVertsC; ++i) {
         os << GetVertex(i)->GetGID() << ' ';
     }
     os << "\n edges: ";
-    for ( Uint i=0; i<NumEdgesC; ++i){
+    for ( Uint i=0; i<NumEdgesC; ++i) {
         os << GetEdge(i)->GetGID() << ' ';
     }
     os << "\n faces: ";
-    for ( Uint i=0; i<NumFacesC; ++i){
+    for ( Uint i=0; i<NumFacesC; ++i) {
         os << GetFace(i)->GetGID() << ' ';
     }
     os << "\n parent: ";
-    if ( GetParent()){
+    if ( GetParent()) {
         os << GetParent()->GetGID() << '\n';
     }
-    else{ // Parent is gone ...
+    else { // Parent is gone ...
         if ( GetLevel()==0)
             os << "no parent due to level\n";
 #ifdef _PAR
@@ -1632,21 +1628,21 @@ void TetraCL::DebugInfo (std::ostream& os) const
             os << " the parent is vanished\n";
     }
     os << " children: ";
-    if ( IsUnrefined()){
+    if ( IsUnrefined()) {
         os << "tetra is childless";
     }
-    else{
-        for ( const_ChildPIterator ch(GetChildBegin()); ch!=GetChildEnd(); ++ch){
+    else {
+        for ( const_ChildPIterator ch(GetChildBegin()); ch!=GetChildEnd(); ++ch) {
             os << (*ch)->GetGID() << ' ';
-    }
+        }
     }
 
     // Neighbors
     os << "\n neighbors:\n";
     if ( IsGhost())
         os << "  o not known, because tetra is ghost\n";
-    else{
-        for (Uint i=0; i<NumFacesC; ++i){
+    else {
+        for (Uint i=0; i<NumFacesC; ++i) {
             os << "  o over face " << GetFace(i)->GetGID() << ": ";
             if ( GetFace(i)->IsOnBoundary())
                 os << "boundary " << GetFace(i)->GetBndIdx() << '\n';
@@ -1656,7 +1652,7 @@ void TetraCL::DebugInfo (std::ostream& os) const
 #endif
             else if( IsNeighbor(i))
                 os << GetNeighbor(i)->GetGID() << '\n';
-        else
+            else
                 os << " not there.    ";
         }
     }
