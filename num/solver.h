@@ -1529,7 +1529,7 @@ GMRESR( const Mat& A, Vec& x, const Vec& b, const Preconditioner& M,
 template <class Mat, class Vec, class PC>
 bool
 IDRS( const Mat& A, Vec& x, const Vec& rhs, PC& pc, int& max_iter, double& tol, bool measure_relative_tol= false,
-		const int s=4, typename Vec::value_type omega_bound=0.7)
+      const int s=4, typename Vec::value_type omega_bound=0.7)
 {
     typedef typename Vec::value_type ElementTyp;
     int n= x.size(),  it;
@@ -1539,7 +1539,7 @@ IDRS( const Mat& A, Vec& x, const Vec& rhs, PC& pc, int& max_iter, double& tol, 
 
     double normb = norm(rhs);
     if (normb == 0.0 || measure_relative_tol == false)
-    	normb= 1.0;
+    normb= 1.0;
 
     Vec resid( rhs - A*x);
     double normres = norm (resid);

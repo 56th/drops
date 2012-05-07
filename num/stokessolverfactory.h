@@ -592,7 +592,7 @@ StokesSolverBaseCL* StokesSolverFactoryCL<StokesT, ProlongationVelT, Prolongatio
 //                stokessolver= new BlockMatrixSolverCL<GCR_SBlockT>( *GCRSBlock_);
 //            } else {
                 UBlock_= new UpperBlockPcT( *apc_, *spc_);
-                IDRsUBlock_= new IDRs_UBlockT( *UBlock_,  P_.template get<int>("Stokes.OuterIter"), P_.template get<int>("Stokes.OuterTol"), /*rel*/ false);
+                IDRsUBlock_= new IDRs_UBlockT( *UBlock_,  P_.template get<int>("Stokes.OuterIter"), P_.template get<double>("Stokes.OuterTol"), /*rel*/ false);
                 stokessolver= new BlockMatrixSolverCL<IDRs_UBlockT>( *IDRsUBlock_);
 //            }
         }
