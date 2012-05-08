@@ -293,7 +293,7 @@ void inplace_parallel_partial_sum (iterator begin, iterator end,
         std::partial_sum( t_sum, t_sum + num_threads, t_sum);
 
     // Add offset to the first summand for each thread and compute the final partial sums.
-    if (tid > 0)
+    if (tid > 0 && t_end - t_begin > 0) // The 2nd part of the condition is needed, if there are more threads than elements in [begin, end).
         *t_begin+= t_sum[tid - 1];
     std::partial_sum( t_begin, t_end, t_begin);
 }
