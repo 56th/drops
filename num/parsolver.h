@@ -94,11 +94,6 @@ bool ParModGMRES(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, PreCon
 template <typename Mat, typename Vec, typename PreCon, typename ExCL>
 bool ParBiCGSTAB(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, PreCon& M, int& max_iter, double& tol, bool measure_relative_tol=true);
 
-// Preconditioned GCR with truncation with high accuracy
-template <typename Mat, typename Vec, typename PreCon, typename ExCL>
-bool ParPGCR(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, PreCon& M,
-             int m, int& max_iter, double& tol, bool measure_relative_tol =true);
-
 // Preconditioned GCR with truncation and modifications to reduce sync-points
 template <typename Mat, typename Vec, typename PreCon, typename ExCL>
 bool ParModPGCR(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, PreCon& M,
@@ -116,7 +111,7 @@ bool ParQMR(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, Lanczos lan
 
 // Preconditioned GCR
 template <typename Mat, typename Vec, typename PreCon, typename ExCL>
-bool ParGCR(const Mat& A, Vec& x, const Vec& b, const ExCL& ExX, PreCon& M,
+bool ParPGCR(const Mat& A, Vec& x, const Vec& b, const ExCL& ExX, PreCon& M,
     int m, int& max_iter, double& tol, bool measure_relative_tol= true, std::ostream* output=0);
 
 template <typename Mat, typename Vec, typename PreCon, typename ExACL, typename ExATranspCL>
@@ -410,7 +405,7 @@ class ParPreGCRSolverCL : public ParPreSolverBaseCL<PC>
     {
         base::_res  = base::_tol;
         base::_iter = base::_maxiter;
-        ParGCR(A, x, b, base::GetEx(), base::GetPC(), trunc_, base::_iter, base::_res, base::GetRelError(), base::output_);
+        ParPGCR(A, x, b, base::GetEx(), base::GetPC(), trunc_, base::_iter, base::_res, base::GetRelError(), base::output_);
         return;
 
         if (mod_){
@@ -429,7 +424,7 @@ class ParPreGCRSolverCL : public ParPreSolverBaseCL<PC>
     {
         base::_res  = base::_tol;
         base::_iter = base::_maxiter;
-        ParGCR(A, x, b, ex, base::GetPC(), trunc_, base::_iter, base::_res, base::GetRelError(), base::output_);
+        ParPGCR(A, x, b, ex, base::GetPC(), trunc_, base::_iter, base::_res, base::GetRelError(), base::output_);
     }
 
 };
@@ -1450,114 +1445,6 @@ bool ParModAccurPGCR(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, Pr
     return false;
 }
 
-/// \brief Parallel preconditioned general conjugate residual algorithm with truncation and high accuracy
-///        with same strategy as serial version
-template <typename Mat, typename Vec, typename PreCon, typename ExCL>
-bool ParPGCR(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, PreCon& M,
-             int m, int& max_iter, double& tol, bool measure_relative_tol)
-    /// \param[in]     A                    coefficients of the linear equation system
-    /// \param[in,out] x_acc                IN: start vector, OUT: solution of the linear equation system
-    /// \param[in]     b                    rhs of the linear equation system
-    /// \param[in]     ExX                  class for exchanging values for accumulation
-    /// \param[in]     M                    Preconditioner
-    /// \param[in]     m                    truncation parameter
-    /// \param[in,out] max_iter             IN: maximal iterations, OUT: used iterations
-    /// \param[in,out] tol                  IN: tolerance for the residual, OUT: residual
-    /// \param[in]     measure_relative_tol if true stop if |M^(-1)(b-Ax)|/|M^(-1)b| <= tol, else stop if |M^(-1)(b-Ax)|<=tol
-    /// \return                             convergence within max_iter iterations
-{
-    // Check if preconditioner needs diagonal of matrix. The preconditioner
-    // only computes the diagonal new, if the matrix has changed
-    if (M.NeedDiag())
-        M.SetDiag(A);
-
-    m= (m <= max_iter) ? m : max_iter;
-
-    Vec r( b - A*x_acc);
-    Vec sn( b.size()), vn( b.size()), sn_acc(b.size()), vn_acc(b.size());
-    std::vector<Vec> s, v;
-    std::vector<double> a( m);
-
-    // Norm Berechnung der rechten Seite detailliert:
-//         VectorCL b0( b[std::slice( 0, A.num_rows( 0), 1)]);
-//         VectorCL b1( b[std::slice( A.num_rows( 0), A.num_rows( 1), 1)]);
-//         double normb0= ExX.Get(0).Norm( b0, false);
-//         double normb1= ExX.Get(1).Norm( b1, false);
-//         double max_rhs=GlobalMax(supnorm(b));
-    // Norm Berechnung der rechten Seite detailliert:
-
-    double normb= ExX.Norm( b, false);
-//         const double mynorm=normb;
-    if (normb == 0.0 || measure_relative_tol == false) normb= 1.0;
-    double resid= ExX.Norm( r, false)/normb;
-
-//     IF_MASTER
-//       std::cout << "Starting GCR with tol: "<<tol<<",\tnorm_rhs: "<<mynorm<<'\n'
-//                 << "          norm_rhs_up: "<<normb0<<"\tnorm_rhs_low:   "<<normb1<<'\n'
-//                 << "          max_rhs:     "<<max_rhs<<'\n';
-    for (int k= 0; k < max_iter; ++k) {
-        // compute residual for output
-//             VectorCL r0( r[std::slice( 0, A.num_rows( 0), 1)]);
-//             VectorCL r1( r[std::slice( A.num_rows( 0), A.num_rows( 1), 1)]);
-//             double res_0=ExX.Get(0).Norm(r0,false, true);
-//             double res_1=ExX.Get(1).Norm(r1,false, true);
-//             double max_x  = GlobalMax(supnorm(x_acc));
-//             double max_up = GlobalMax(supnorm(Vec(x_acc[std::slice( 0, A.num_rows( 0), 1)])));
-//             double max_low= GlobalMax(supnorm(Vec(x_acc[std::slice( A.num_rows( 0), A.num_rows( 1), 1)])));
-//             IF_MASTER
-//                 std::cout << "GCR: k: " << k << "\tresidual: " << resid<<'\n'
-//                         << "         \tresid_up:   "<<res_0<<'\n'
-//                         << "         \tresid_low:  "<<res_1<<'\n'
-//                         << "         \tsup(x):     "<<max_x<<'\n'
-//                         << "         \tsup(x_up):  "<<max_up<<'\n'
-//                         << "         \tsup(x_low): "<<max_low<<'\n';
-        // end of residual computation for output
-        if (resid < tol) {
-            tol= resid;
-            max_iter= k;
-            return true;
-        }
-        M.Apply( A, sn, r);
-
-        if (!M.RetAcc())
-            ExX.Accumulate(sn);
-        // sn is accumulated
-        vn= A*sn;
-
-        for (int i= 0; i < k && i < m; ++i) {
-            const double alpha= ExX.ParDot( vn, false, v[i], false);
-            a[i]= alpha;
-            vn-= alpha*v[i];
-            sn-= alpha*s[i];
-        }
-        const double beta= ExX.Norm( vn, false);
-        vn/= beta;
-        sn/= beta;
-        const double gamma= ExX.ParDot( r, false, vn, false);
-        x_acc+= gamma*sn;
-
-        r-= gamma*vn;
-        resid= ExX.Norm( r, false)/normb;
-        if (k < m) {
-            s.push_back( sn);
-            v.push_back( vn);
-        }
-        else {
-            int min_idx= 0;
-            double a_min= std::fabs( a[0]); // m >= 1, thus this access is valid.
-            for (int i= 1; i < k && i < m; ++i)
-                if ( std::fabs( a[i]) < a_min) {
-                    min_idx= i;
-                    a_min= std::fabs( a[i]);
-                }
-                s[min_idx]= sn;
-                v[min_idx]= vn;
-        }
-    }
-    tol= resid;
-    return false;
-}
-
 /// \brief Preconditioned QMR-Method
 template <typename Mat, typename Vec, typename Lanczos, typename ExCL>
 bool ParQMR(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, Lanczos lan,
@@ -1668,17 +1555,16 @@ bool ParGCRMod(const Mat& A, Vec& x, const Vec& b, const ExCL& ExX, PreCon& M,
         gamma_glob=ProcCL::GlobalSum( gamma);
         alpha= gamma_glob[0]/gamma_glob[1];
         resid= gamma_glob[2];
+
+        // Update of x and r
+        x_acc += alpha*p_acc[j];
+        r_acc += -alpha*Ap_acc[j];
         if (j%1==0 && output) (*output) << "GCR: j " << j <<": resid "<<resid << std::endl;
         if (resid<tol){
             tol= resid;
             max_iter= j;
             return true;
         }
-
-        // Update of x and r
-        x_acc += alpha*p_acc[j];
-        r_acc += -alpha*Ap_acc[j];
-
         // compute orthogonalization
         Ar_acc= ExX.GetAccumulate( (Vec)(A*r_acc));
         for ( int i=0; i<=j; ++i){
@@ -1698,7 +1584,7 @@ bool ParGCRMod(const Mat& A, Vec& x, const Vec& b, const ExCL& ExX, PreCon& M,
 }
 
 template <typename Mat, typename Vec, typename PreCon, typename ExCL>
-bool ParGCR(const Mat& A, Vec& x, const Vec& b, const ExCL& ExX, PreCon& M,
+bool ParPGCR(const Mat& A, Vec& x, const Vec& b, const ExCL& ExX, PreCon& M,
     int m, int& max_iter, double& tol, bool measure_relative_tol, std::ostream* output)
 {
     if (M.NeedDiag())
@@ -1752,7 +1638,7 @@ bool ParGCR(const Mat& A, Vec& x, const Vec& b, const ExCL& ExX, PreCon& M,
             v.push_back( vn);
         }
         else {
-            throw DROPSErrCL("ParGCR: Sorry, truncation not implemented");
+            throw DROPSErrCL("ParPGCR: Sorry, truncation not implemented");
             int min_idx= 0;
             double a_min= std::fabs( a[0]); // m >= 1, thus this access is valid.
             for (int i= 1; i < k && i < m; ++i)
