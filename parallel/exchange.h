@@ -179,7 +179,7 @@ class ExchangeCL
     typedef DROPS_STD_UNORDERED_SET<int>       NeighListT;      ///< \todo Correct data-type?
     typedef NeighListT::const_iterator         NeighListT_const_iterator;
     // distributed DOF information
-    typedef std::set< std::pair<int,IdxT> >    DOFInfoT;        ///< \todo do we need a set here? Maybe, vector or list is enough!
+    typedef std::map<int,IdxT>                 DOFInfoT;
     typedef std::vector< DOFInfoT >            DOFProcListT;
     typedef DOFInfoT::const_iterator           DOFInfoList_const_iterator;
 
@@ -396,7 +396,7 @@ class ExchangeBlockCL
 class ExchangeMatrixCL
 {
   public:
-    typedef std::list<int>         ProcNumCT;       ///< Container for storing neighbor processes
+    typedef std::vector<int>       ProcNumCT;       ///< Container for storing neighbor processes
     typedef ProcNumCT::iterator    ProcNum_iter;    ///< iterator of ProcNumCT
     typedef std::vector<size_t>    CouplingCT;      ///< Container of distributed matrix elements
 

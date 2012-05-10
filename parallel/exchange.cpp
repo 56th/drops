@@ -2003,11 +2003,10 @@ size_t ExchangeMatrixCL::NoIdx_= std::numeric_limits<size_t>::max();
 /// \brief Determine the communication pattern for accumulating a matrix
 void ExchangeMatrixCL::BuildCommPattern(const MatrixCL& mat,
         const ExchangeCL& RowEx, const ExchangeCL& ColEx)
-/** To accumulate a matrix, the non-zeros which are stored by multiple processors, have to
+/** To accumulate a matrix, the non-zeros which are stored by multiple processors have to be
     communicated among the processors. Therefore, each processor determines the non-zeroes
-    it has to send to neighbors. And second, each processor determines how handle the received
+    it has to send to its neighbors. And second, each processor determines how to handle the received
     non-zeroes from a neighbor processor.
-    \todo Are RowEx.GetProcs( i) and ColEx.GetProcs( j) already sorted?
     \param mat distributed matrix
     \param RowEx ExchangeCL that corresponds to row
     \param ColEx ExchangeCL that corresponds to column
@@ -2021,15 +2020,14 @@ void ExchangeMatrixCL::BuildCommPattern(const MatrixCL& mat,
     typedef std::map<int, std::vector<IdxT> > RemoteDOFMap;
 
     AODMap aod;                              // mapping: proc -> array of displacements
-    RemoteDOFMap remoteRowDOF, remoteColDOF; // mapping: proc -> remote (row|col)DOFs
+    RemoteDOFMap remoteRowDOF, remoteColDOF; // mapping: proc -> remote (row|col) DOFs
 
-    ProcNumCT NZonProcs( ProcCL::Size());   // stores the intersection
     for ( size_t i=0; i<mat.num_rows(); ++i) {
         if ( RowEx.IsDist(i)) {
             for ( size_t nz=mat.row_beg(i); nz<mat.row_beg(i+1); ++nz) {
                 const size_t j= mat.col_ind(nz);
                 if ( ColEx.IsDist( j)) {     // here, i and j are both distributed
-                    // determine all neighbor processors, that owns i *and* j as well
+                    // determine all neighbor processors, that own i *and* j as well
                     ProcNumCT NZonProcs= Intersect( RowEx, ColEx, i, j);
 
                     for (ProcNum_iter proc= NZonProcs.begin(); proc!=NZonProcs.end(); ++proc) {
@@ -2074,13 +2072,13 @@ void ExchangeMatrixCL::BuildCommPattern(const MatrixCL& mat,
 
         // create sequence
         Coupl_[ex].resize( messagelength);
-        for (size_t k=0; k<recvBufRowDOF.size(); ++k)
+        for (int k=0; k<messagelength; ++k)
             Coupl_[ex][k]= GetPosInVal(recvBufRowDOF[k], recvBufColDOF[k], mat);
 
         // reserve memory for receiving
         RecvBuf_[ex].resize( messagelength);
     }
-    // Before cleaning up remoteRowDOF and remoteColDOF, check if all messages has been received
+    // Before cleaning up remoteRowDOF and remoteColDOF, check if all messages have been received
     ProcCL::WaitAll( req);
 }
 
@@ -2115,7 +2113,7 @@ MatrixCL ExchangeMatrixCL::Accumulate(const MatrixCL& mat)
         }
     }
 
-    // wait until send are finished before leaving this routine
+    // wait until all sends are finished before leaving this routine
     ProcCL::WaitAll(send_req);
     return result;
 }

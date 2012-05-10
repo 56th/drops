@@ -152,23 +152,19 @@ void  RecvNumDataCL<T>::Assign(VectorBaseCL<T>& v, Ulint offsetV,
 bool ExchangeCL::IsOnProc( IdxT localdof, int proc) const
 /** Check in dofProcList_, if \a proc owns a copy. */
 {
-    DOFInfoList_const_iterator it;
-    for ( it=GetProcListBegin(localdof); it!=GetProcListEnd(localdof); ++it){
-        if ( it->first==proc)
-            return true;
-    }
-    return false;
+    const DOFInfoT& remoteDOF= dofProcList_[localdof];
+    return remoteDOF.find(proc) != remoteDOF.end();
 }
 
 inline IdxT ExchangeCL::GetExternalIdxFromProc( const IdxT localdof, int proc) const
 /** Get dof number on process \a proc. If the dof is not located on proc, return NoIdx. */
 {
-    DOFInfoList_const_iterator it;
-    for ( it=GetProcListBegin(localdof); it!=GetProcListEnd(localdof); ++it){
-        if ( it->first==proc)
-            return it->second;
-    }
-    return NoIdx;
+    const DOFInfoT& remoteDOF= dofProcList_[localdof];
+    DOFInfoList_const_iterator it= remoteDOF.find( proc);
+    if ( it != remoteDOF.end())
+        return it->second;
+    else
+        return NoIdx;
 }
 
 inline ExchangeMatrixCL::ProcNumCT ExchangeMatrixCL::Intersect(
