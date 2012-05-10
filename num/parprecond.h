@@ -440,6 +440,33 @@ class ParGMResPreCL
 };
 
 
+// ********************************************************************************
+///\brief Apply a diagonal-matrix given as a vector.
+// ********************************************************************************
+class ParDiagPcCL : public ParPreconditioningBaseCL
+{
+  private:
+    typedef ParPreconditioningBaseCL base_;
+    const VectorCL& D_;
+
+  public:
+    ParDiagPcCL (const IdxDescCL& idx, const VectorCL& D) : base_(idx), D_( D) {}
+
+    template <typename Mat, typename Vec>
+    void Apply (const Mat&, Vec& x, const Vec& b) const
+    {
+        Assert( D_.size()==b.size(), DROPSErrCL("DiagPcCL: incompatible dimensions"), DebugNumericC);
+        x= D_*b;
+    }
+
+    inline bool RetAcc() const {return false;}
+    inline bool NeedDiag() const {return false;}
+    /// \brief Set Diag makes nothing, because own matrix is used
+    template<typename Mat>
+    void SetDiag(const Mat&) {}
+};
+
+
 //***************************************************************************
 // Implementations of the methods
 //***************************************************************************

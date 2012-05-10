@@ -24,6 +24,9 @@
 
 #include "stokes/integrTime.h"
 #include "num/stokessolver.h"
+#ifdef _PAR
+#include "num/parstokessolver.h"
+#endif
 
 namespace DROPS
 {
@@ -133,7 +136,7 @@ void MinCommPreCL::Update() const
 #endif
 }
 
-#ifndef _PAR
+
 void BDinvBTPreCL::Update() const
 {
     std::cout << "BDinvBTPreCL::Update: old/new versions: " << Lversion_  << '/' << L_->Version()
@@ -147,29 +150,62 @@ void BDinvBTPreCL::Update() const
     Mvelversion_= Mvel_->Version();
 
     Dvelinv_.resize( Mvel_->num_rows());
+#ifdef _PAR
+    if (lumped_)
+        Dvelinv_ = 1.0/vel_idx_->GetEx().GetAccumulate(VectorCL(LumpInRows(*Mvel_)));
+    else
+        Dvelinv_ = 1.0/vel_idx_->GetEx().GetAccumulate(L_->GetDiag());
+#else
     if (lumped_)
         Dvelinv_= 1.0/LumpInRows(*Mvel_);
     else
         Dvelinv_= 1.0/L_->GetDiag();
+#endif
+
     // The lumped P2-mass-matrix has negative entries. Hence, CGNE cannot be used for solving. However, B Dvelinv_ B^T has only positive diagonal entries
+#ifdef _PAR
+    VectorCL Dprsqrt( std::sqrt( pr_idx_->GetEx().GetAccumulate(M_->GetDiag())));
+#else
     VectorCL Dprsqrt( std::sqrt( M_->GetDiag()));
+#endif
     Dprsqrtinv_.resize( M_->num_rows());
     Dprsqrtinv_= 1.0/Dprsqrt;
 
     ScaleRows( *Bs_, Dprsqrtinv_);
     DSchurinv_.resize( Dprsqrt.size());
+
+#ifndef _PAR
     DSchurinv_= 1.0/Bs_->GetSchurDiag(Dvelinv_);
+#else
+    VectorCL D(DSchurinv_.size());
+    ExchangeMatrixCL exMat_;
+    exMat_.BuildCommPattern(*Bs_, pr_idx_->GetEx(), vel_idx_->GetEx());
+    MatrixCL BSacc(exMat_.Accumulate(*Bs_));
+
+    ScaleCols( BSacc, Dvelinv_);
+    for (size_t i = 0; i < BSacc.num_rows(); ++i)
+        for (size_t nz = BSacc.row_beg(i); nz < BSacc.row_beg(i + 1); ++nz)
+            D[i] += BSacc.val(nz) * Bs_->val(nz);
+    pr_idx_->GetEx().Accumulate(D);
+    DSchurinv_ = 1.0/D;
+#endif
     delete BDinvBT_;
+#ifndef _PAR
     BDinvBT_= new AppSchurComplMatrixT( *L_, diagVelPc_, *Bs_);
+#else
+    BDinvBT_= new AppSchurComplMatrixT( *L_, diagVelPc_, *Bs_, vel_idx_->GetEx());
+#endif
+#ifndef _PAR
     if (regularize_ != 0.) {
         NEGSPcCL spc;
         Regularize( *Bs_, *pr_idx_, Dprsqrt, spc, regularize_);
-        // Add a row to Dvelinv_ coresponding to the new column in Bs.
+        // Add a row to Dvelinv_ corresponding to the new column in Bs.
         VectorCL tmp= Dvelinv_;
         Dvelinv_.resize(Dvelinv_.size() + 1);
         Dvelinv_[std::slice( 0, tmp.size(), 1)]= tmp;
         Dvelinv_[tmp.size()]= 1.;
     }
+#endif
 }
 
 BDinvBTPreCL::~BDinvBTPreCL() 
@@ -177,6 +213,5 @@ BDinvBTPreCL::~BDinvBTPreCL()
     delete Bs_;
     delete BDinvBT_;
 }
-#endif
 
 } // end of namespace DROPS

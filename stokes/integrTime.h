@@ -192,6 +192,12 @@ const double StokesFracStepSchemeCL<BaseMethod, StokesT, SolverT>::theta_[3]
 template<typename, typename>
 class ApproximateSchurComplMatrixCL;
 
+#ifdef _PAR
+/// fwd decl from num/parstokessolver.h
+template<typename, typename, typename>
+class ParApproximateSchurComplMatrixCL;
+#endif
+
 /// base class for Schur complement preconditioners
 class SchurPreBaseCL: public PreBaseCL
 {
@@ -647,7 +653,6 @@ template <typename Mat, typename Vec>
 }
 
 
-#ifndef _PAR
 //**************************************************************************
 // Preconditioner for the instationary (Navier-) Stokes-equations.
 // It uses the approximate Schur complement B diag(L)^{-1} B^T
@@ -662,10 +667,20 @@ class BDinvBTPreCL: public SchurPreBaseCL
     mutable size_t Lversion_, Bversion_, Mvelversion_, Mversion_;
     mutable VectorCL Dprsqrtinv_, Dvelinv_, DSchurinv_;
     double  tol_;
+#ifndef _PAR
     mutable DiagPcCL diagVelPc_, diagSchurPc_;
     typedef ApproximateSchurComplMatrixCL<DiagPcCL,MatrixCL> AppSchurComplMatrixT;
+#else
+    mutable ParDiagPcCL diagVelPc_, diagSchurPc_;
+    typedef ParApproximateSchurComplMatrixCL<ParDiagPcCL,MatrixCL,ExchangeCL> AppSchurComplMatrixT;
+#endif
     mutable AppSchurComplMatrixT *BDinvBT_;
+#ifndef _PAR
     mutable PCGSolverCL<DiagPcCL> solver_;
+#else
+    mutable ParPCGSolverCL<ParDiagPcCL> solver_;
+    const IdxDescCL* vel_idx_;
+#endif
     const IdxDescCL* pr_idx_;                                   ///< Used to determine, how to represent the kernel of BB^T in case of pure Dirichlet-BCs.
     double regularize_;
     bool lumped_;
@@ -673,6 +688,7 @@ class BDinvBTPreCL: public SchurPreBaseCL
     void Update () const;
 
   public:
+#ifndef _PAR
     BDinvBTPreCL (const MatrixCL* L, MatrixCL* B, MatrixCL* M_vel, MatrixCL* M_pr, const IdxDescCL& pr_idx,
                   double tol=1e-2, double regularize= 0.0)
         : SchurPreBaseCL( 0, 0), L_( L), B_( B), Mvel_( M_vel), M_( M_pr), Bs_( 0),
@@ -689,6 +705,37 @@ class BDinvBTPreCL: public SchurPreBaseCL
           diagVelPc_( Dvelinv_), diagSchurPc_( DSchurinv_), BDinvBT_(0),
           solver_( diagSchurPc_, 200, tol_, /*relative*/ true), pr_idx_( pc.pr_idx_),
           regularize_( pc.regularize_), lumped_( pc.lumped_) {}
+#else
+    BDinvBTPreCL (const MatrixCL* L, MatrixCL* B, MatrixCL* M_vel, MatrixCL* M_pr, const IdxDescCL& vel_idx, const IdxDescCL& pr_idx,
+                  double tol=1e-2, double regularize= 0.0)
+        : SchurPreBaseCL( 0, 0), L_( L), B_( B), Mvel_( M_vel), M_( M_pr), Bs_( 0),
+          Lversion_( 0), Bversion_( 0), Mvelversion_( 0), Mversion_( 0), tol_(tol),
+          diagVelPc_(vel_idx, Dvelinv_), diagSchurPc_(pr_idx, DSchurinv_), BDinvBT_(0),
+          solver_( 200, tol_, pr_idx, diagSchurPc_, /*relative*/ true), vel_idx_( &vel_idx), pr_idx_( &pr_idx),
+          regularize_( regularize), lumped_(false) {}
+
+    BDinvBTPreCL (const BDinvBTPreCL & pc)
+        : SchurPreBaseCL( pc.kA_, pc.kM_), L_( pc.L_), B_( pc.B_), Mvel_( pc.Mvel_), M_( pc.M_),
+          Bs_( pc.Bs_ == 0 ? 0 : new MatrixCL( *pc.Bs_)),
+          Lversion_( pc.Lversion_), Bversion_( pc.Bversion_), Mversion_( pc.Mversion_),
+          Dprsqrtinv_( pc.Dprsqrtinv_), Dvelinv_( pc.Dvelinv_), DSchurinv_( pc.DSchurinv_), tol_(pc.tol_),
+          diagVelPc_( *pc.vel_idx_, Dvelinv_), diagSchurPc_( *pc.pr_idx_, DSchurinv_), BDinvBT_(0),
+          solver_( 200, tol_, *pc.pr_idx_, diagSchurPc_, /*relative*/ true), vel_idx_( pc.vel_idx_), pr_idx_( pc.pr_idx_),
+          regularize_( pc.regularize_), lumped_( pc.lumped_) {}
+
+    /// \name Parallel preconditioner setup ...
+    //@{
+    bool NeedDiag() const { return false; }
+    void SetDiag(const VectorCL&) {}        // just for consistency
+    template<typename Mat>
+    void SetDiag(const Mat&) {}             // just for consistency
+    bool RetAcc()   const { return true; }
+    const ExchangeCL& GetEx() const
+    {
+        return pr_idx_->GetEx();
+    }
+    //@}
+#endif
 
     BDinvBTPreCL& operator= (const BDinvBTPreCL&) {
         throw DROPSErrCL( "BDinvBTPreCL::operator= is not permitted.\n");
@@ -737,7 +784,6 @@ template <typename Mat, typename Vec>
                   << '\t' << solver_.GetResid() << '\n';
     x= Dprsqrtinv_*y;
 }
-#endif
 
 //=================================
 //     template definitions

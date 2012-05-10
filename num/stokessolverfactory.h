@@ -703,6 +703,7 @@ class StokesSolverFactoryCL : public StokesSolverFactoryBaseCL<StokesT, Prolonga
 // PC for instat. Schur complement
     ISBBTPreCL      bbtispc_;
     MinCommPreCL    mincomm_;
+    BDinvBTPreCL    bdinvbtispc_;
 
 // PC for A-block
     //JAC-GMRes
@@ -723,10 +724,14 @@ class StokesSolverFactoryCL : public StokesSolverFactoryBaseCL<StokesT, Prolonga
     typedef BlockPreCL<GMResPcT, MinCommPreCL, LowerBlockPreCL> LBlockGMResMinCommOseenPcT;
     LBlockGMResMinCommOseenPcT LBlockGMResMinCommOseenPc_;
 
+    typedef BlockPreCL<GMResPcT, BDinvBTPreCL, SIMPLERBlockPreCL> SIMPLERBlockPcT;
+    SIMPLERBlockPcT SIMPLERBlockPc_;
+
 
 //GCR solver
     ParPreGCRSolverCL<LBlockGMResBBTOseenPcT> GCRGMResBBT_;
     ParPreGCRSolverCL<LBlockGMResMinCommOseenPcT> GCRGMResMinComm_;
+    ParPreGCRSolverCL<SIMPLERBlockPcT> GCRGMResSBlock_;
     
 //GMRes solver
     ParPreGMResSolverCL<LBlockGMResBBTOseenPcT> GMResGMResBBT_;
@@ -745,10 +750,14 @@ class StokesSolverFactoryCL : public StokesSolverFactoryBaseCL<StokesT, Prolonga
     StokesSolverFactoryCL( StokesT& Stokes, ParamCL& P);
     ~StokesSolverFactoryCL() {}
 
-    /// Nothing is to be done in parallel, because special preconditioners does not exist
-    void       SetMatrixA ( const MatrixCL*)  {};
-    /// Nothing is to be done in parallel, because special preconditioners does not exist
-    void       SetMatrices( const MLMatrixCL*, const MLMatrixCL*, const MLMatrixCL*, const MLMatrixCL*, const MLIdxDescCL*){}
+    /// Set the A-block in the minimal commutator
+    void       SetMatrixA ( const MatrixCL* A) { mincomm_.SetMatrixA(A); bdinvbtispc_.SetMatrixA(A); }
+    /// Set all matrices in Schur complement preconditioner (only for StokesMGM)
+    void       SetMatrices( const MLMatrixCL* A, const MLMatrixCL* B, const MLMatrixCL* Mvel, const MLMatrixCL* M, const MLIdxDescCL* pr_idx){
+        mincomm_.SetMatrices(A->GetFinestPtr(), B->GetFinestPtr(), Mvel->GetFinestPtr(), M->GetFinestPtr(), pr_idx->GetFinestPtr());
+        bdinvbtispc_.SetMatrices(A->GetFinestPtr(), B->GetFinestPtr(), Mvel->GetFinestPtr(), M->GetFinestPtr(), pr_idx->GetFinestPtr());
+        bbtispc_.SetMatrices(B->GetFinestPtr(), Mvel->GetFinestPtr(), M->GetFinestPtr(), pr_idx->GetFinestPtr());
+    }
     /// Nothing is to be done in parallel, because special preconditioners does not exist
     ProlongationVelT* GetPVel() { return 0; }
     /// Nothing is to be done in parallel, because special preconditioners does not exist
@@ -770,14 +779,18 @@ template <class StokesT, class ProlongationVelT, class ProlongationPT>
                  Stokes.pr_idx.GetFinest(), Stokes.vel_idx.GetFinest(), kA_, kM_, P.get<double>("Stokes.PcSTol"), P.get<double>("Stokes.PcSTol")),
       mincomm_( Stokes_.A.Data.GetFinestPtr(), Stokes_.B.Data.GetFinestPtr(), Stokes_.M.Data.GetFinestPtr(), Stokes_.prM.Data.GetFinestPtr(),
                  Stokes.pr_idx.GetFinest(), Stokes.vel_idx.GetFinest(), P.get<double>("Stokes.PcSTol")),
+      bdinvbtispc_( 0, &Stokes_.B.Data.GetFinest(), &Stokes_.M.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(),
+                Stokes_.vel_idx.GetFinest(), Stokes_.pr_idx.GetFinest(), P.get<double>("Stokes.PcSTol") /* enable regularization: , 0.707*/),
       GMResSolver_(/*restart*/ 100, P.get<int>("Stokes.PcAIter"), P.get<double>("Stokes.PcATol"), Stokes.vel_idx.GetFinest(), JACVelPc_, /*rel*/ true, /*ModGS*/ false),
       GMResPc_( GMResSolver_),
       PCGSolver_(P.get<int>("Stokes.PcAIter"), P.get<double>("Stokes.PcATol"), Stokes.vel_idx.GetFinest(), JACVelPc_, /*rel*/ true),
       PCGPc_(PCGSolver_),
       LBlockGMResBBTOseenPc_( GMResPc_, bbtispc_),
       LBlockGMResMinCommOseenPc_( GMResPc_, mincomm_),
+      SIMPLERBlockPc_( GMResPc_, bdinvbtispc_),
       GCRGMResBBT_( P.get<int>("Stokes.OuterIter"), P.get<int>("Stokes.OuterIter"), P.get<double>("Stokes.OuterTol"), LBlockGMResBBTOseenPc_, true, false, &std::cout),
       GCRGMResMinComm_( P.get<int>("Stokes.OuterIter"), P.get<int>("Stokes.OuterIter"), P.get<double>("Stokes.OuterTol"), LBlockGMResMinCommOseenPc_, true, false, &std::cout),
+      GCRGMResSBlock_( P.get<int>("Stokes.OuterIter"), P.get<int>("Stokes.OuterIter"), P.get<double>("Stokes.OuterTol"), SIMPLERBlockPc_, true, false, &std::cout),
       GMResGMResBBT_( P.get<int>("Stokes.OuterIter"), P.get<int>("Stokes.OuterIter"), P.get<double>("Stokes.OuterTol"), LBlockGMResBBTOseenPc_, true, false, LeftPreconditioning, true, &std::cout)
 #ifdef _HYPRE
       , hypreAMG_( Stokes.vel_idx.GetFinest(), P.get<int>("Stokes.PcAIter"), P.get<double>("Stokes.PcATol")), AMGPc_(hypreAMG_),
@@ -820,6 +833,14 @@ template <class StokesT, class ProlongationVelT, class ProlongationPT>
             stokessolver = new BlockMatrixSolverCL<ParPreGCRSolverCL<LBlockGMResBBTOseenPcT> >
                         ( GCRGMResBBT_, Stokes_.vel_idx.GetFinest(), Stokes_.pr_idx.GetFinest());
         break;
+        case 10408: {
+            bdinvbtispc_.SetMassLumping( false);
+            stokessolver= new BlockMatrixSolverCL<ParPreGCRSolverCL<SIMPLERBlockPcT> >( GCRGMResSBlock_, Stokes_.vel_idx.GetFinest(), Stokes_.pr_idx.GetFinest());
+        } break;
+        case 10409: {
+            bdinvbtispc_.SetMassLumping( true);
+            stokessolver= new BlockMatrixSolverCL<ParPreGCRSolverCL<SIMPLERBlockPcT> >( GCRGMResSBlock_, Stokes_.vel_idx.GetFinest(), Stokes_.pr_idx.GetFinest());
+        } break;
         case 10402 :
             stokessolver = new BlockMatrixSolverCL<ParPreGCRSolverCL<LBlockGMResMinCommOseenPcT> >
                         ( GCRGMResMinComm_, Stokes_.vel_idx.GetFinest(), Stokes_.pr_idx.GetFinest());

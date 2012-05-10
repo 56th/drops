@@ -416,14 +416,27 @@ struct SIMPLERBlockPreCL
         Vec D( pc2.GetVelDiag()), dp(p);
         
         // find some initial pressure for the SIMPLER preconditioner (initial p=0 would result in SIMPLE)
+#ifdef _PAR
+        pc2.Apply( B, p, Vec(B*Vec(pc1.GetEx().GetAccumulate(b)/D) - c));
+        if (!pc2.RetAcc())
+            pc2.GetEx().Accumulate(p);
+#else
         pc2.Apply( B, p, Vec(B*Vec(b/D) - c));
+#endif
         // from here on it's the SIMPLE preconditioner
         pc1.Apply( A, v, Vec(b - transp_mul( B, p)));
 #ifdef _PAR
-        Assert(pc1.RetAcc(), DROPSErrCL("SIMPLERBlockPreCL::Apply: Accumulation is missing"), DebugParallelNumC);
+        if (!pc1.RetAcc()) pc1.GetEx().Accumulate(v);
 #endif
+
         pc2.Apply( /*dummy*/ B, dp, Vec(B*v - c));
+
+#ifdef _PAR
+        if (!pc2.RetAcc()) pc2.GetEx().Accumulate(dp);
+        v-= pc1.GetEx().GetAccumulate(Vec(transp_mul( B, dp)/D));
+#else
         v-= transp_mul( B, dp)/D;
+#endif
         p+= dp;
    }
 };

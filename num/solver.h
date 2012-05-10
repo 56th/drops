@@ -2088,6 +2088,10 @@ class SolverAsPreCL: public PreBaseCL
     {
         solver_.GetPC().SetDiag(A);
     }
+    const ExchangeCL& GetEx() const
+    {
+        return solver_.GetEx();
+    }
 #endif
 
     template <typename Mat, typename Vec>
