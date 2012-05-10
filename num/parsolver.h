@@ -1707,13 +1707,15 @@ bool ParGCR(const Mat& A, Vec& x, const Vec& b, const ExCL& ExX, PreCon& M,
     m= (m <= max_iter) ? m : max_iter; // m > max_iter only wastes memory.
 
     Vec r( b - A*x);
+    Vec racc( r.size());
     Vec sn( b.size()), vn( b.size());
+    Vec vnacc( b.size());
     std::vector<Vec> s, v;
     std::vector<double> a( m);
 
     double normb= ExX.Norm( b, false);
     if (normb == 0.0 || measure_relative_tol == false) normb= 1.0;
-    double resid= ExX.Norm( r, false)/normb;
+    double resid= ExX.Norm( r, false, &racc)/normb;
     for (int k= 0; k < max_iter; ++k) {
         if (k%1==0 && output)
             (*output) << "GCR: k: " << k << "\tresidual: " << resid << std::endl;
@@ -1733,16 +1735,18 @@ bool ParGCR(const Mat& A, Vec& x, const Vec& b, const ExCL& ExX, PreCon& M,
             vn-= alpha*v[i];
             sn-= alpha*s[i];
         }
-        const double beta= ExX.Norm( vn, false);
+        const double beta= ExX.Norm( vn, false, &vnacc);
         vn/= beta;
+        vnacc/= beta;
         sn/= beta;
-        const double gamma= ExX.ParDot( r, false, vn, false);
+        const double gamma= ExX.ParDot( racc, true, vnacc, true);
         if (!M.RetAcc())
             x+= gamma*ExX.GetAccumulate(sn);
         else
             x+= gamma*sn;
         r-= gamma*vn;
-        resid= ExX.Norm( r, false)/normb;
+        racc -= gamma*vnacc;
+        resid= ExX.Norm( racc, true)/normb;
         if (k < m) {
             s.push_back( sn);
             v.push_back( vn);
