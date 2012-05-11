@@ -94,16 +94,6 @@ bool ParModGMRES(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, PreCon
 template <typename Mat, typename Vec, typename PreCon, typename ExCL>
 bool ParBiCGSTAB(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, PreCon& M, int& max_iter, double& tol, bool measure_relative_tol=true);
 
-// Preconditioned GCR with truncation and modifications to reduce sync-points
-template <typename Mat, typename Vec, typename PreCon, typename ExCL>
-bool ParModPGCR(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, PreCon& M,
-             int m, int& max_iter, double& tol, bool measure_relative_tol =true);
-
-// Preconditioned GCR with truncation with higher accuracy and modifications to reduce sync-points
-template <typename Mat, typename Vec, typename PreCon, typename ExCL>
-bool ParModAccurPGCR(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, PreCon& M,
-                  int m, int& max_iter, double& tol,bool measure_relative_tol /*=true*/);
-
 // QMR-Solver
 template <typename Mat, typename Vec, typename Lanczos, typename ExCL>
 bool ParQMR(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, Lanczos lan,
@@ -406,13 +396,6 @@ class ParPreGCRSolverCL : public ParPreSolverBaseCL<PC>
         base::_res  = base::_tol;
         base::_iter = base::_maxiter;
         ParPGCR(A, x, b, base::GetEx(), base::GetPC(), trunc_, base::_iter, base::_res, base::GetRelError(), base::output_);
-        return;
-
-        if (mod_){
-            ParModAccurPGCR(A, x, b, base::GetEx(), base::GetPC(), trunc_, base::_iter, base::_res, base::GetRelError(), base::output_);
-        }
-        else
-            ParPGCR(A, x, b, base::GetEx(), base::GetPC(), trunc_, base::_iter, base::_res, base::GetRelError());
     }
 
     /// \brief Solve a linear equation system with preconditioned Generalized Conjugate Residuals-Method
@@ -1206,245 +1189,6 @@ template <typename Mat, typename Vec, typename PreCon, typename ExCL>
 }
 
 
-/// \brief Parallel preconditioned general conjugate residual algorithm with truncation
-/** Only the last m (truncation parameter) residual vectors are kept. If m==max_iter,
-    then all residual vectors are stored */
-template <typename Mat, typename Vec, typename PreCon, typename ExCL>
-bool ParModPGCR(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, PreCon& M,
-                int m, int& max_iter, double& tol,bool measure_relative_tol /*=true*/)
-    /// \param[in]     A                    coefficients of the linear equation system
-    /// \param[in,out] x_acc                IN: start vector, OUT: solution of the linear equation system
-    /// \param[in]     b                    rhs of the linear equation system
-    /// \param[in]     ExX                  class for exchanging values for accumulation
-    /// \param[in]     M                    Preconditioner
-    /// \param[in]     m                    truncation parameter
-    /// \param[in,out] max_iter             IN: maximal iterations, OUT: used iterations
-    /// \param[in,out] tol                  IN: tolerance for the residual, OUT: residual
-    /// \param[in]     measure_relative_tol if true stop if |M^(-1)(b-Ax)|/|M^(-1)b| <= tol, else stop if |M^(-1)(b-Ax)|<=tol
-    /// \return                             convergence within max_iter iterations
-{
-    // Check if preconditioner needs diagonal of matrix. The preconditioner
-    // only computes the diagonal new, if the matrix has changed
-    if (M.NeedDiag())
-        M.SetDiag(A);
-
-    if (m>max_iter) m=max_iter;
-
-    // preprocessing and malloc
-    Vec r(b-A*x_acc), r_acc(r), y(b.size()), z_acc(b.size());       // a=A*r
-
-    std::vector<Vec> p_acc, Ap, Ap_acc;
-    VectorCL a_loc(m+1), a(m+1), c(m), gamma_loc(2), gamma(2);  // derived from std::valarray, so all doubles are stored consecutive in memory!
-
-    double normb = ExX.Norm(b);
-    if (normb==0.0 || measure_relative_tol==false) normb=1.0;
-
-    double resid = ExX.Norm(r, false, &r_acc)/normb;
-    if (resid<tol){
-        max_iter=0; tol=resid; return true;
-    }
-    M.Apply(A,z_acc,r_acc);
-
-    p_acc.push_back(z_acc);
-    Ap.push_back(A*z_acc);
-    Ap_acc.push_back(Ap[0]);
-    int last_idx=0, next_idx=1;
-
-    for (int j=0; j<max_iter; ++j)
-    {
-        // Calc of (r,Ap) / (Ap,Ap)
-        gamma_loc[0] = ExX.DotAcc(Ap_acc[last_idx], Ap[last_idx]);  // (Ap,Ap) and accumulation of Ap
-        gamma_loc[1] = dot(r_acc, Ap[last_idx]);                    // (r,Ap)
-        DROPS::ProcCL::GlobalSum(Addr(gamma_loc), Addr(gamma), 2);
-        const double alpha = gamma[1] / gamma[0];
-
-        // update of x and r
-        x_acc += alpha * p_acc[last_idx];      // axpy(alpha,  p_acc[last_idx] , x_acc);
-        r     -= alpha * Ap[last_idx];         // axpy(-alpha, Ap[last_idx]    , r);
-        r_acc -= alpha * Ap_acc[last_idx];     // axpy(-alpha, Ap_acc[last_idx], r_acc);
-
-        // orthogonalization of p
-        M.Apply(A,z_acc,r_acc);
-        y  = A*z_acc;
-        c[last_idx] = gamma[0];
-        int k;
-        for (k=0; k<=j && k<m; ++k)
-            a_loc[k] = dot(y,Ap_acc[k]);
-
-        a_loc[k] = dot(z_acc,r_acc);                // calc of the residual
-
-        ProcCL::GlobalSum(Addr(a_loc), Addr(a), k+1);
-
-        if (a[k]<0)
-            std::cout << "["<<ProcCL::MyRank()<<"]==> negative squared norm of resid in PGCR because of accumulation!" << std::endl;
-
-        resid = std::sqrt(a[k]) / normb;
-        if (true && j%20==0){
-            double realresid = ExX.Norm(static_cast<Vec>(b-A*x_acc), false);
-            if (ProcCL::IamMaster())
-                std::cout << "j: "<<j<<"\tresid="<< resid<<", realresid " <<realresid << std::endl;
-        }
-
-        if (/*a[j+1]*/ resid<tol){
-            max_iter=j; tol=resid; return true;
-        }
-
-        for (int i=0; i<=j && i<m; ++i)
-            a[i] = a[i]/c[i];
-
-        if (j+1<m){
-            p_acc.push_back(z_acc);
-            Ap.push_back(y);
-        }
-        else{
-            p_acc[next_idx] = z_acc;
-            Ap[next_idx]    = y;
-        }
-
-        for (int i=0; i<=j && i<m; ++i){
-            if (i!=next_idx){
-                p_acc[next_idx] -= a[i] * p_acc[i];   // axpy(-a[i],p_acc[i],p_acc[next_idx]);
-                Ap[next_idx]    -= a[i] * Ap[i];      // axpy(-a[i],Ap[i],Ap[next_idx]);
-            }
-        }
-        if (j+1<m)
-            Ap_acc.push_back(Ap[j+1]);
-        else
-            Ap_acc[next_idx] = Ap[next_idx];
-
-        last_idx = next_idx;
-        next_idx = (next_idx+1) % m;
-    }
-    tol = resid;
-    return false;
-}
-
-/// \brief Parallel preconditioned general conjugate residual algorithm with truncation and high accuracy
-/** Only the last m (truncation parameter) residual vectors are kept. If m==max_iter,
-    then all residual vectors are stored */
-template <typename Mat, typename Vec, typename PreCon, typename ExCL>
-bool ParModAccurPGCR(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, PreCon& M,
-                     int m, int& max_iter, double& tol, bool measure_relative_tol /*=true*/,
-                     std::ostream* os)
-    /// \param[in]     A                    coefficients of the linear equation system
-    /// \param[in,out] x_acc                IN: start vector, OUT: solution of the linear equation system
-    /// \param[in]     b                    rhs of the linear equation system
-    /// \param[in]     ExX                  class for exchanging values for accumulation
-    /// \param[in]     M                    Preconditioner
-    /// \param[in]     m                    truncation parameter
-    /// \param[in,out] max_iter             IN: maximal iterations, OUT: used iterations
-    /// \param[in,out] tol                  IN: tolerance for the residual, OUT: residual
-    /// \param[in]     measure_relative_tol if true stop if |M^(-1)(b-Ax)|/|M^(-1)b| <= tol, else stop if |M^(-1)(b-Ax)|<=tol
-    /// \param[in,out] os                   outstream pointer
-    /// \return                             convergence within max_iter iterations
-{
-    // Check if preconditioner needs diagonal of matrix. The preconditioner
-    // only computes the diagonal new, if the matrix has changed
-    if (M.NeedDiag())
-        M.SetDiag(A);
-
-    if (m>max_iter) m=max_iter;
-
-    // preprocessing and malloc
-    Vec r(b-A*x_acc), r_acc(r), y(b.size()), y_acc(b.size()), z_acc(b.size());
-
-    std::vector<Vec> p_acc, Ap, Ap_acc;
-    VectorCL a_loc(m+1), a(m+1), c(m), gamma_loc(2), gamma(2);  // derived from std::valarray, so all doubles are stored consecutive in memory!
-    VectorCL b_acc(b.size());
-
-    double normb = ExX.Norm( b, false, &b_acc);
-    if (normb==0.0 || measure_relative_tol==false)
-        normb=1.0;
-
-    double resid= ExX.Norm(r, false, &r_acc)/normb;
-    if (resid<tol){
-        max_iter=0; tol=resid; return true;
-    }
-    M.Apply(A, z_acc, r_acc);
-
-    p_acc.push_back(z_acc);
-    Ap.push_back(A*z_acc);
-    Ap_acc.push_back(Ap[0]);
-    int last_idx=0, next_idx=1;
-    double a_min=0;
-
-    for (int j=0; j<max_iter; ++j)
-    {
-        // Calc of (r,Ap) / (Ap,Ap)
-        gamma_loc[0]= ExX.LocalNorm_sq( Ap[last_idx], false, &Ap_acc[last_idx]);
-        gamma_loc[1]= ExX.LocalDot( r_acc, true, Ap_acc[last_idx], true);
-        ProcCL::GlobalSum(Addr(gamma_loc), Addr(gamma), 2);
-        const double alpha = gamma[1] / gamma[0];
-
-        // update of x and r
-        x_acc += alpha * p_acc[last_idx];      // axpy(alpha,  p_acc[last_idx] , x_acc);
-        r     -= alpha * Ap[last_idx];         // axpy(-alpha, Ap[last_idx]    , r);
-        r_acc -= alpha * Ap_acc[last_idx];     // axpy(-alpha, Ap_acc[last_idx], r_acc);
-
-        // orthogonalization of p
-        M.Apply(A,z_acc,r_acc);
-        y  = A*z_acc;
-        y_acc = ExX.GetAccumulate(y);
-        c[last_idx] = gamma[0];
-        int k;
-        for (k=0; k<=j && k<m; ++k)
-            a_loc[k]= ExX.LocalDot( y_acc, true, Ap_acc[k], true);
-        a_loc[k]= ExX.LocalDot( z_acc, true, r_acc, true);  // calc of the residual
-
-        ProcCL::GlobalSum(Addr(a_loc), Addr(a), k+1);
-
-        resid = std::sqrt(a[k]) / normb;
-        if (os)
-            IF_MASTER
-                (*os) << "GCR " << j << ": res " << resid << std::endl;
-
-        if (resid<tol){
-            max_iter=j; tol=resid; return true;
-        }
-
-        for (int i=0; i<=j && i<m; ++i)
-            a[i] = a[i]/c[i];
-
-        if (j<m){
-            p_acc.push_back(z_acc);
-            Ap.push_back(y);
-        }
-        else{
-            p_acc[next_idx] = z_acc;
-            Ap[next_idx]    = y;
-        }
-
-        for (int i=0; i<=j && i<m; ++i){
-            if (i!=next_idx){
-                p_acc[next_idx] -= a[i] * p_acc[i];   // axpy(-a[i],p_acc[i],p_acc[next_idx]);
-                Ap[next_idx]    -= a[i] * Ap[i];      // axpy(-a[i],Ap[i],Ap[next_idx]);
-            }
-        }
-        if (j<m)
-            Ap_acc.push_back(Ap[j+1]);
-        else
-            Ap_acc[next_idx] = Ap[next_idx];
-
-        last_idx = next_idx;
-        if (j<m)
-            next_idx = (next_idx+1) % m;
-        else{
-            next_idx = (next_idx+1) % m;
-            int min_idx = 0;
-            a_min= std::fabs( a[0]); // m >= 1, thus this access is valid.
-            for (int i= 1; i < k && i < m; ++i){
-                if ( std::fabs( a[i]) < a_min) {
-                    min_idx= i;
-                    a_min= std::fabs( a[i]);
-                }
-            }
-            next_idx=min_idx;
-        }
-    }
-    tol = resid;
-    return false;
-}
-
 /// \brief Preconditioned QMR-Method
 template <typename Mat, typename Vec, typename Lanczos, typename ExCL>
 bool ParQMR(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, Lanczos lan,
@@ -1520,68 +1264,6 @@ bool ParQMR(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, Lanczos lan
     return false;
 }
 
-template <typename Mat, typename Vec, typename PreCon, typename ExCL>
-bool ParGCRMod(const Mat& A, Vec& x, const Vec& b, const ExCL& ExX, PreCon& M,
-    int m, int& max_iter, double& tol, bool measure_relative_tol= true, std::ostream* output=0)
-/** For more details about this implementation, see "Iterative Methods for Sparse Linear
-    Systems" 2nd edition, Yousef Saad, p. 196
-*/
-{
-    const size_t N= x.size();
-    if (M.NeedDiag())
-        M.SetDiag(A);
-
-    m= (m <= max_iter) ? m : max_iter; // m > max_iter only wastes memory.
-    if (m<max_iter)
-        throw DROPSErrCL("ParGCR: Not truncation strategy implemented for parallel GCR");
-
-    Vec r( b-A*x), r_acc( r), Ar( N), Ar_acc( N);
-    Vec &x_acc= x;
-    std::valarray<double> beta( m),
-        gamma( 3), gamma_glob( 3),  // computing alpha and resid
-        tau( 2*m), tau_glob( 2*m);  // computing beta
-    std::vector<Vec> p_acc( m, Vec(N)), Ap_acc( m, Vec(N));
-    double resid, alpha;
-
-    resid     = ExX.Norm( r, false, &r_acc);
-    p_acc[0]  = r_acc;
-    Ap_acc[0] = ExX.GetAccumulate( Vec(A*p_acc[0]));
-
-    for ( int j=0; j<max_iter; ++j){
-        // compute alpha and resid
-        gamma[0]= ExX.LocalDot(     r_acc,     true, Ap_acc[j], true);
-        gamma[1]= ExX.LocalDot(     Ap_acc[j], true, Ap_acc[j], true);
-        gamma[2]= ExX.LocalNorm_sq( r_acc,   true);
-        gamma_glob=ProcCL::GlobalSum( gamma);
-        alpha= gamma_glob[0]/gamma_glob[1];
-        resid= gamma_glob[2];
-
-        // Update of x and r
-        x_acc += alpha*p_acc[j];
-        r_acc += -alpha*Ap_acc[j];
-        if (j%1==0 && output) (*output) << "GCR: j " << j <<": resid "<<resid << std::endl;
-        if (resid<tol){
-            tol= resid;
-            max_iter= j;
-            return true;
-        }
-        // compute orthogonalization
-        Ar_acc= ExX.GetAccumulate( (Vec)(A*r_acc));
-        for ( int i=0; i<=j; ++i){
-            tau[ 2*i+0]= ExX.LocalDot( Ar_acc,    true, Ap_acc[i], true);
-            tau[ 2*i+1]= ExX.LocalDot( Ap_acc[i], true, Ap_acc[i], true);
-        }
-        ProcCL::GlobalSum( Addr(tau), Addr(tau_glob), 2*(j+1));
-        for ( int i=0; i<=j; ++i) beta[i]= -tau_glob[2*i]/tau_glob[2*i+1];
-
-        // compute next p and Ap
-        p_acc[j+1]= r_acc;
-        for ( int i=0; i<=j; ++i) p_acc[j+1]+= beta[i]*p_acc[i];
-        Ap_acc[j+1]= Ar_acc;
-        for ( int i=0; i<=j; ++i) Ap_acc[j+1]+= beta[i]*Ap_acc[i];
-    }
-    return false;
-}
 
 template <typename Mat, typename Vec, typename PreCon, typename ExCL>
 bool ParPGCR(const Mat& A, Vec& x, const Vec& b, const ExCL& ExX, PreCon& M,
@@ -1597,6 +1279,7 @@ bool ParPGCR(const Mat& A, Vec& x, const Vec& b, const ExCL& ExX, PreCon& M,
     Vec sn( b.size()), vn( b.size());
     Vec vnacc( b.size());
     std::vector<Vec> s, v;
+    std::vector<Vec> vacc;         // memory usage vs communication overhead
     std::vector<double> a( m);
 
     double normb= ExX.Norm( b, false);
@@ -1615,13 +1298,17 @@ bool ParPGCR(const Mat& A, Vec& x, const Vec& b, const ExCL& ExX, PreCon& M,
             vn=A*ExX.GetAccumulate(sn);
         else
             vn= A*sn;
+        vnacc = ExX.GetAccumulate(vn);
         for (int i= 0; i < k && i < m; ++i) {
-            const double alpha= ExX.ParDot( vn, false, v[i], false);
+//            const double alpha= ExX.ParDot( vn, false, v[i], false);
+            const double alpha= ExX.ParDot( vnacc, true, vacc[i], true);
             a[i]= alpha;
             vn-= alpha*v[i];
+            vnacc-= alpha*vacc[i];  // memory usage vs communication overhead
             sn-= alpha*s[i];
         }
-        const double beta= ExX.Norm( vn, false, &vnacc);
+//        const double beta= ExX.Norm( vn, false, &vnacc);
+        const double beta= ExX.Norm( vnacc, true);
         vn/= beta;
         vnacc/= beta;
         sn/= beta;
@@ -1636,6 +1323,7 @@ bool ParPGCR(const Mat& A, Vec& x, const Vec& b, const ExCL& ExX, PreCon& M,
         if (k < m) {
             s.push_back( sn);
             v.push_back( vn);
+            vacc.push_back( vnacc);   // memory usage vs communication overhead
         }
         else {
             throw DROPSErrCL("ParPGCR: Sorry, truncation not implemented");
