@@ -566,7 +566,6 @@ bool HasMultipleBndSegs (const TetraCL& t)
 
 void MultiGridCL::SplitMultiBoundaryTetras()
 {
-    ClearTriangCache();
     PrepareModify();
     // Uint count= 0;
 
@@ -663,6 +662,7 @@ void MultiGridCL::SplitMultiBoundaryTetras()
     }
 
     FinalizeModify();
+    ClearTriangCache();
 
     // std::cerr << "Split " << count << " tetras.\n";
 }
