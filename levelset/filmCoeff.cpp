@@ -34,11 +34,18 @@ namespace filminflow{
 
     DROPS::Point3DCL FilmInflow( const DROPS::Point3DCL& p, double t)
     {
+        static double Ly= P.get<DROPS::Point3DCL>("MeshSize")[1];
+        static double PumpFreq = P.get<double>("Exp.PumpFreq");
+        static double PumpAmpl = P.get<double>("Exp.PumpAmpl");
+        static double Thickness= P.get<double>("Exp.Thickness");
+        static double DensFluid= P.get<double>("Mat.DensFluid");
+        static double ViscFluid= P.get<double>("Mat.ViscFluid");
+        static double GravityX = P.get<DROPS::Point3DCL>("Exp.Gravity")[0];
         DROPS::Point3DCL ret(0.);
-        const double d= p[1]/P.get<double>("Exp.Thickness");
-        static const double u= P.get<double>("Mat.DensFluid")*P.get<DROPS::Point3DCL>("Exp.Gravity")[0]*P.get<double>("Exp.Thickness")*P.get<double>("Exp.Thickness")/P.get<double>("Mat.ViscFluid")/2;
-        ret[0]= d<=1 ? (2*d-d*d)*u * (1 + P.get<double>("Exp.PumpAmpl")*std::sin(2*M_PI*t*P.get<int>("Exp.PumpFreq")))
-                     : (P.get<DROPS::Point3DCL>("MeshSize")[1]-p[1])/(P.get<DROPS::Point3DCL>("MeshSize")[1]-P.get<double>("Exp.Thickness"))*u;
+        const double d= p[1]/Thickness;
+        static const double u= DensFluid*GravityX*Thickness*Thickness/ViscFluid/2;
+        ret[0]= d<=1 ? (2*d-d*d)*u * (1 + PumpAmpl*std::sin(2*M_PI*t*PumpFreq))
+                     : (Ly-p[1])/(Ly-Thickness)*u;
         return ret;
     }
 
@@ -55,12 +62,16 @@ namespace filmdistance{
     double WavyDistanceFct( const DROPS::Point3DCL& p)
     {
         // wave length = 100 x film width
-        const double wave= std::sin(2*M_PI*p[0]/P.get<DROPS::Point3DCL>("MeshSize")[0]),
-            z= p[2]/P.get<DROPS::Point3DCL>("MeshSize")[2]*2; // z \in [-1,1]
+        static DROPS::Point3DCL MeshSize= P.get<DROPS::Point3DCL>("MeshSize");
+        static double Ampl_zDir= P.get<double>("Exp.Ampl_zDir");
+        static double PumpAmpl = P.get<double>("Exp.PumpAmpl");
+        static double Thickness= P.get<double>("Exp.Thickness");
+        const double wave= std::sin(2*M_PI*p[0]/MeshSize[0]),
+            z= p[2]/MeshSize[2]*2; // z \in [-1,1]
     //    return p[1] - P.get<double>("Exp.Thickness") * (1 + P.get<double>("Exp.PumpAmpl")*wave);
     //    return p[1] - P.get<double>("Exp.Thickness") * (1 + P.get<double>("Exp.PumpAmpl")*(wave + P.get<double>("Exp.Ampl_zDir")*std::cos(z*M_PI)));
-        const double z_fac=  (1 + P.get<double>("Exp.Ampl_zDir")/2*std::cos(z*M_PI));  // (z=+-1) 1-P.get<double>("Exp.Ampl_zDir") <= z_fac <= 1+P.get<double>("Exp.Ampl_zDir") (z=0)
-        return p[1] - P.get<double>("Exp.Thickness") * (1 + P.get<double>("Exp.PumpAmpl")*wave) * z_fac;
+        const double z_fac=  (1 + Ampl_zDir/2*std::cos(z*M_PI));  // (z=+-1) 1-P.get<double>("Exp.Ampl_zDir") <= z_fac <= 1+P.get<double>("Exp.Ampl_zDir") (z=0)
+        return p[1] - Thickness * (1 + PumpAmpl*wave) * z_fac;
     }
 
     //========================================================================
@@ -77,10 +88,10 @@ namespace filmdistance{
 namespace filmperiodic{
     template<int A, int B>
     bool periodic_2sides( const DROPS::Point3DCL& p, const DROPS::Point3DCL& q)
-    { 
-        const DROPS::Point3DCL d= fabs(p-q),
-                               L= fabs(P.get<DROPS::Point3DCL>("MeshSize"));
-        
+    {
+        const DROPS::Point3DCL d= fabs(p-q);
+        static DROPS::Point3DCL L= fabs(P.get<DROPS::Point3DCL>("MeshSize"));
+
         const int D = 3 - A - B;
         return (d[B] + d[D] < 1e-12 && std::abs( d[A] - L[A]) < 1e-12)  // dB=dD=0 and dA=LA
           ||   (d[A] + d[D] < 1e-12 && std::abs( d[B] - L[B]) < 1e-12)  // dA=dD=0 and dB=LB
@@ -89,13 +100,14 @@ namespace filmperiodic{
 
     template<int A>
     bool periodic_1side( const DROPS::Point3DCL& p, const DROPS::Point3DCL& q)
-    { 
+    {
         const int B = (A+1)%2;
         const int D = (B+1)%2;
-        const DROPS::Point3DCL d= fabs(p-q), L= fabs(P.get<DROPS::Point3DCL>("MeshSize"));
+        const DROPS::Point3DCL d= fabs(p-q);
+        static DROPS::Point3DCL L= fabs(P.get<DROPS::Point3DCL>("MeshSize"));
         return (d[B] + d[D] < 1e-12 && std::abs( d[A] - L[A]) < 1e-12);
     }
-    
+
     //========================================================================
     //        Registration of the function(s) in the func-container
     //========================================================================
