@@ -658,7 +658,7 @@ void CoupledTimeDisc2PhaseBaseCL<LsetSolverT,RelaxationPolicyT>::DoStep( int max
 #ifndef _PAR
         res_u   = std::sqrt( dot( Stokes_.v.Data, Stokes_.M.Data*Stokes_.v.Data));
 #else
-        res_u   = std::sqrt( ExVel.ParDot( Stokes_.v.Data, true, Stokes_.M.Data*Stokes_.v.Data, true));
+        res_u   = std::sqrt( ExVel.ParDot( Stokes_.v.Data, true, Stokes_.M.Data*Stokes_.v.Data, false));
 #endif
 
         std::cout << "residual of u: " << res_u << std::endl;
@@ -806,7 +806,7 @@ void MidPointTimeDisc2PhaseCL<LsetSolverT,RelaxationPolicyT>::SetupLevelsetSyste
 template <class LsetSolverT, class RelaxationPolicyT>
 SpaceTimeDiscTheta2PhaseCL<LsetSolverT,RelaxationPolicyT>::SpaceTimeDiscTheta2PhaseCL
     ( StokesT& Stokes, LevelsetP2CL& ls, StokesSolverT& solver, LsetSolverT& lsetsolver, LevelsetModifyCL& lsetmod,
-    		double dt, double tol, double stk_theta, double ls_theta, double nonlinear, bool withProjection, double stab, bool implicitpressure)
+          double dt, double tol, double stk_theta, double ls_theta, double nonlinear, bool withProjection, double stab, bool implicitpressure)
   : base_( Stokes, ls, solver, lsetsolver, lsetmod, dt, tol, nonlinear, withProjection, stab),  stk_theta_( stk_theta), ls_theta_( ls_theta),
     implicitpressure_( implicitpressure), Mold_( 0), Eold_( 0)
 {
@@ -939,7 +939,7 @@ void SpaceTimeDiscTheta2PhaseCL<LsetSolverT,RelaxationPolicyT>::SetupLevelsetSys
 template <class LsetSolverT, class RelaxationPolicyT>
 EulerBackwardScheme2PhaseCL<LsetSolverT,RelaxationPolicyT>::EulerBackwardScheme2PhaseCL
     ( StokesT& Stokes, LevelsetP2CL& ls, StokesSolverT& solver, LsetSolverT& lsetsolver, LevelsetModifyCL& lsetmod,
-    		double dt, double tol, double nonlinear, bool withProjection, double stab)
+      double dt, double tol, double nonlinear, bool withProjection, double stab)
   : base_( Stokes, ls, solver, lsetsolver, lsetmod, dt, tol, nonlinear, withProjection, stab)
 {
     Update();
