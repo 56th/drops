@@ -19,7 +19,7 @@
  * along with DROPS. If not, see <http://www.gnu.org/licenses/>.
  *
  *
- * Copyright 2009 LNM/SC RWTH Aachen, Germany
+ * Copyright 2012 LNM/SC RWTH Aachen, Germany
 */
 
 //multigrid
@@ -558,6 +558,11 @@ int main (int argc, char** argv)
         DROPS::CylinderCL::Init( P.get<DROPS::Point3DCL>("Exp.PosDrop"), P.get<DROPS::Point3DCL>("Exp.RadDrop"), InitialLSet[8]-'X');
         P.put("Exp.InitialLSet", InitialLSet= "Cylinder");
     }
+
+    // If we read netgen/gambit meshfiles, multi boundary tetras might exist
+    if (P.get<int>("DomainCond.GeomType") == 0)
+        mg->SplitMultiBoundaryTetras();
+
     DROPS::AdapTriangCL adap( *mg, P.get<double>("AdaptRef.Width"), P.get<int>("AdaptRef.CoarsestLevel"), P.get<int>("AdaptRef.FinestLevel"),
                               ((P.get<std::string>("Restart.Inputfile") == "none") ? P.get<int>("AdaptRef.LoadBalStrategy") : -P.get<int>("AdaptRef.LoadBalStrategy")));
     // If we read the Multigrid, it shouldn't be modified;
@@ -585,6 +590,6 @@ int main (int argc, char** argv)
     delete lsetbnddata;
     return 0;
   }
-  catch (DROPS::DROPSErrCL err) { err.handle(); }
+  catch (DROPS::DROPSErrCL& err) { err.handle(); }
 }
 
