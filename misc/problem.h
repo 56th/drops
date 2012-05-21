@@ -161,6 +161,20 @@ class ExtIdxDescCL
     const VecDescCL* lset_;
     const BndDataCL<>* lsetbnd_;
 
+#ifdef _PAR
+    class CommunicateXFEMNumbCL
+    {
+    private:
+        IdxDescCL* current_Idx_;
+      public:
+        CommunicateXFEMNumbCL( IdxDescCL* idx) : current_Idx_(idx) {}
+        bool Gather( const DiST::TransferableCL& t, DiST::Helper::SendStreamCL& s);
+        bool Scatter( DiST::TransferableCL& t, const size_t numData, DiST::Helper::MPIistreamCL& r);
+        void Call();
+    };
+#endif
+
+
     ExtIdxDescCL( double omit_bound= 1./32. ) : omit_bound_( omit_bound ), lset_(0), lsetbnd_(0) {}
 
     /// \brief Update numbering of extended DoFs and return dimension of XFEM space (= # DoF + # extended DoF)

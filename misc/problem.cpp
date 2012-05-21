@@ -520,8 +520,62 @@ IdxT ExtIdxDescCL::UpdateXNumbering( IdxDescCL* Idx, const MultiGridCL& mg, cons
                 }
         }
     }
+#ifdef _PAR
+    // communicate extended dofs on vertices
+    CommunicateXFEMNumbCL comm( Idx);
+    comm.Call();
+
+    // number all extended dofs from other procs (where extended dof is flagged by NoIdx-1)
+    for (size_t i=0; i<Xidx_.size(); ++i)
+        if (Xidx_[i] == NoIdx-1)
+            Xidx_[i]= extIdx++;
+#endif
     return extIdx;
 }
+
+#ifdef _PAR
+bool ExtIdxDescCL::CommunicateXFEMNumbCL::Gather( const DiST::TransferableCL& t, DiST::Helper::SendStreamCL& s)
+{
+    VertexCL* sp = 0;
+    simplex_cast( t, sp);
+
+    if (sp->Unknowns.Exist(current_Idx_->GetIdx()))
+        s << current_Idx_->IsExtended( sp->Unknowns(current_Idx_->GetIdx()));
+    else
+        s << false;
+    return true;
+}
+
+bool ExtIdxDescCL::CommunicateXFEMNumbCL::Scatter( DiST::TransferableCL& t, const size_t numData, DiST::Helper::MPIistreamCL& r)
+{
+    VertexCL* sp= 0;
+    simplex_cast( t, sp);
+
+    bool RemoteExtended = false, tmp;
+    for (size_t i = 0; i< numData; ++i) {
+        r >> tmp;
+        RemoteExtended = RemoteExtended || tmp;
+    }
+    if (!sp->Unknowns.Exist(current_Idx_->GetIdx()))
+        return true;
+    const IdxT dof= sp->Unknowns(current_Idx_->GetIdx());
+
+    if (!current_Idx_->IsExtended( dof) && RemoteExtended)
+        current_Idx_->GetXidx()[dof]= NoIdx-1;
+    return true;
+}
+
+void ExtIdxDescCL::CommunicateXFEMNumbCL::Call()
+{
+    DiST::InterfaceCL::DimListT dimlist; dimlist.push_back( 0);
+    DiST::PrioListT Prios; Prios.push_back(PrioMaster);
+    const Uint max_lvl= current_Idx_->TriangLevel();
+    DiST::LevelListCL Levels(max_lvl);
+
+    DiST::InterfaceCL comm( Levels, Prios, Prios, dimlist);
+    comm.Communicate( *this);
+}
+#endif
 
 void ExtIdxDescCL::Old2New(VecDescCL* v)
 {
