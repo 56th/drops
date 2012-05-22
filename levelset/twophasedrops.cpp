@@ -559,10 +559,6 @@ int main (int argc, char** argv)
         P.put("Exp.InitialLSet", InitialLSet= "Cylinder");
     }
 
-    // If we read netgen/gambit meshfiles, multi boundary tetras might exist
-    if (P.get<int>("DomainCond.GeomType") == 0)
-        mg->SplitMultiBoundaryTetras();
-
     DROPS::AdapTriangCL adap( *mg, P.get<double>("AdaptRef.Width"), P.get<int>("AdaptRef.CoarsestLevel"), P.get<int>("AdaptRef.FinestLevel"),
                               ((P.get<std::string>("Restart.Inputfile") == "none") ? P.get<int>("AdaptRef.LoadBalStrategy") : -P.get<int>("AdaptRef.LoadBalStrategy")));
     // If we read the Multigrid, it shouldn't be modified;
