@@ -470,8 +470,8 @@ class ExchangeBuilderCL
     void buildNtoN();
     /// \name Helper functions for the build
     //{@
-    /// \brief Determine DOF owner among all procs, which hold the local dof (as well as the local extended dof, in case of XFEM).
-    static int GetDOFOwner( const tmpRecvT& rcvTmp, bool XFEM);
+    /// \brief Determine DOF owner among all procs, which hold the local dof
+    static int GetDOFOwner( const tmpRecvT& rcvTmp);
     /// \brief Clear all information in the ExchangeCL
     void clearEx();
     /// \brief Build index lists

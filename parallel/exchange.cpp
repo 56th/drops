@@ -1262,7 +1262,7 @@ bool ExchangeBuilderCL::HandlerDOFSendCL::Scatter( DiST::TransferableCL& t,
             return true;
         }
         // determine dof owner
-        const int owner= owner_[dof]= GetDOFOwner(recvTmp, rowidx_.IsExtended());
+        const int owner= owner_[dof]= GetDOFOwner(recvTmp);
 
         // Fill send list for phase I.
         std::vector<int>& ownerSendList= sendList1_[owner];
@@ -1433,8 +1433,10 @@ bool ExchangeBuilderCL::HandlerDOFRecvCL::Scatter( DiST::TransferableCL& t,
             recv >> sendextdof; // receive extended dof
         if ( owner==me && senddof!=NoInt_) {
             recvList1_[sender][senddof]= dof;
-            if (rowidx_.IsExtended() && sendextdof!=NoInt_)
+            if (isExtended) {
+                Assert( sendextdof!=NoInt_, DROPSErrCL("ExchangeBuilderCL::ScatterDOFRecv: inconsistent extended DOF"), DebugParallelNumC);
                 recvList1_[sender][sendextdof]= extdof;
+            }
         }
         if (owner!=sender) {
             recv >> senddof;  // read final NoInt_
@@ -1568,8 +1570,10 @@ bool ExchangeBuilderCL::HandlerDOFNtoNSendCL::Scatter( DiST::TransferableCL& t,
                 sendList_[sender].push_back(static_cast<int>(dof));
             if (rowidx_.IsExtended()) {// XFEM case
                 recv >> senddof;
-                if (isExtended && senddof!=NoInt_)
+                if (isExtended) {
+                    Assert( senddof!=NoInt_, DROPSErrCL("ExchangeBuilderCL::ScatterDOFNtoNSend: inconsistent extended DOF"), DebugParallelNumC);
                     sendList_[sender].push_back(static_cast<int>(exdof));
+                }
             }
         }
     } else { // I have no dof for this index
@@ -1688,7 +1692,7 @@ bool ExchangeBuilderCL::HandlerDOFNtoNRecvCL::Scatter( DiST::TransferableCL& t,
             recv >> dummy1 >> dummy2;
             if ( dummyreceiver==ProcCL::MyRank()) {
                 Assert(receiver==-1,
-                    DROPSErrCL("ExchangeBuilderCL::ScatterDOFDirectComm: Received multiple information. I am confused."),
+                    DROPSErrCL("ExchangeBuilderCL::ScatterDOFNtoNRecv: Received multiple information. I am confused."),
                     DebugParallelNumC);
                 receiver= dummyreceiver;
                 sendpos_dof= dummy1;
@@ -1706,8 +1710,8 @@ bool ExchangeBuilderCL::HandlerDOFNtoNRecvCL::Scatter( DiST::TransferableCL& t,
             // Remember the position of this dof sent by another process in the corresponding receive list.
             recvList_[sender][sendpos_dof]= dof;
             if ( isExtended) {
-                if (sendpos_ext!=NoInt_)
-                    recvList_[sender][sendpos_ext]= extdof;
+                Assert (sendpos_ext!=NoInt_, DROPSErrCL("ExchangeBuilderCL::ScatterDOFNtoNRecv: inconsistent extended DOF"), DebugParallelNumC);
+                recvList_[sender][sendpos_ext]= extdof;
             }
         }
         // enable error checking
@@ -1797,14 +1801,15 @@ bool ExchangeBuilderCL::HandlerDOFIndexCL::Scatter(
         if ( fromproc!=me) {
             for ( Uint j=0; j<numUnk; ++j)
                 dofProcList_[dof+j].insert( std::make_pair(fromproc, remote_dof+j));
-            if ( isExtended && remote_extdof!=NoIdx) {
+            if ( isExtended ) {
+                Assert( remote_extdof!=NoIdx, DROPSErrCL("ExchangeBuilderCL::ScatterDOFIndex: inconsistent extended DOF"), DebugParallelNumC);
                 for ( Uint j=0; j<numUnk; ++j)
                    dofProcList_[extdof+j].insert( std::make_pair(fromproc, remote_extdof+j));
             }
         }
     }
     // Additionally, remember this dof as an "owner dof."
-    if ( GetDOFOwner(tmpRecv, rowidx_.IsExtended())==me && numData != 1) {
+    if ( GetDOFOwner(tmpRecv)==me && numData != 1) {
         for ( Uint j=0; j<numUnk; ++j)
             ownerDistrIndex_.push_back( dof+j);
         if ( isExtended && !dofProcList_[extdof].empty())
@@ -1849,27 +1854,14 @@ void ExchangeBuilderCL::clearEx()
     ex_.clear();
 }
 
-int ExchangeBuilderCL::GetDOFOwner( const tmpRecvT& rcvTmp, bool XFEM)
-/** Among all procs, which hold the local dof (as well as the local extended dof, in case of XFEM), take the one with minimal load. */
+int ExchangeBuilderCL::GetDOFOwner( const tmpRecvT& rcvTmp)
+/** Among all procs, which hold the local dof, take the one with minimal load. */
 {
     const DiST::Helper::RemoteDataCL::LoadVecT& load= DiST::InfoCL::Instance().GetLoadVector();
     double minLoad= std::numeric_limits<double>::max();
     int owner = -1;
-    if (XFEM) {                      // is this special dof extended?
-        XFEM = false;
-        for (tmpRecvT::const_iterator it= rcvTmp.begin(), end= rcvTmp.end(); it!=end; ++it) {
-            const int exdof= (*it)[2];
-            if (exdof !=NoInt_) {
-                XFEM = true;
-                break;
-            }
-        }
-    }
     for (tmpRecvT::const_iterator it= rcvTmp.begin(), end= rcvTmp.end(); it!=end; ++it) {
-        const int proc= (*it)[0],
-                 exdof= (*it)[2];
-        if (XFEM && exdof==NoInt_)
-            continue;
+        const int proc= (*it)[0];
         if (load[proc] < minLoad) {
             minLoad= load[proc];
             owner= proc;
