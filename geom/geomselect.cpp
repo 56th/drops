@@ -40,16 +40,16 @@ void BuildDomain( MultiGridCL* &mgp, const std::string& meshfile_name, int GeomT
         ReadMeshBuilderCL *mgb= 0;       // builder of the multigrid
 
         // read geometry information from a file and create the multigrid
-        IF_MASTER {
+        IF_MASTER
             mgb = new ReadMeshBuilderCL( meshfile );
-            // If we read netgen/gambit meshfiles, multi boundary tetras might exist
-            mgp->SplitMultiBoundaryTetras();
-        }
         IF_NOT_MASTER
             mgb = new EmptyReadMeshBuilderCL( meshfile );
         // Create the multigrid
-        if (deserialization_file == "none")
+        if (deserialization_file == "none"){
             mgp= new MultiGridCL( *mgb);
+            // If we read netgen/gambit meshfiles, multi boundary tetras might exist
+            mgp->SplitMultiBoundaryTetras();
+        }
         else {
             FileBuilderCL filebuilder( deserialization_file, mgb);
             mgp= new MultiGridCL( filebuilder);
