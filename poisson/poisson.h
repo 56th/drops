@@ -231,21 +231,23 @@ class PoissonP2CL : public ProblemCL<Coeff, PoissonBndDataCL>
     typedef P2EvalCL<double, const BndDataCL, const VecDescCL> const_DiscSolCL;
     typedef double (*est_fun)(const TetraCL&, const VecDescCL&, const BndDataCL&);
 
-    // new fields for the matrix A, the rhs b and the solution x
+    // new fields for the matrix A, the rhs b and the solution x 
+    bool       ALE_; //ALE_ is introduced because poissonP1CL and poissonP2CL are used in scalar.cpp.  
+                     //Since ALE method is not yet implemented, ALE_ is always set to false 
     MLIdxDescCL idx;
     VecDescCL   x;
     VecDescCL   b;
     MLMatDescCL A;
     
-    MLMatDescCL U;  //Convection matrix
-    MLMatDescCL M;  //Mass matrix
-    VecDescCL   vU; //Coupling with convection matrix
+    MLMatDescCL U;   //Convection matrix
+    MLMatDescCL M;   //Mass matrix
+    VecDescCL   vU;  //Coupling with convection matrix
 
     //create an element of the class
     PoissonP2CL(const MGBuilderCL& mgb, const CoeffCL& coeff,
-                const BndDataCL& bdata) : base_(mgb, coeff, bdata), idx(P2_FE) {}
-    PoissonP2CL(MultiGridCL& mg, const CoeffCL& coeff, const BndDataCL& bdata)
-        : base_( mg, coeff, bdata), idx( P2_FE) {}
+                const BndDataCL& bdata, bool ALE = false) : base_(mgb, coeff, bdata), ALE_(ALE), idx(P2_FE) {}
+    PoissonP2CL(MultiGridCL& mg, const CoeffCL& coeff, const BndDataCL& bdata, bool ALE = false)
+        : base_( mg, coeff, bdata), ALE_(ALE), idx( P2_FE) {}
     // numbering of unknowns
     void CreateNumbering( Uint level, MLIdxDescCL* idx, match_fun match= 0)
         { idx->CreateNumbering( level, MG_, BndData_, match); }

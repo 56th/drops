@@ -17,7 +17,8 @@
 		"SmoothingSteps":   1,
 		"NumLvl":		    -1,
 		"Relax":		    1,
-		"SolutionIsKnown":	1 	 //1 = true, 0 = false
+		"SolutionIsKnown":	1, 	 //1 = true, 0 = false
+        "P1":               1        // 1 = P1 finite element, 0 = P2 finite element
 	},
 
 	// domain, bnd/ini conditions

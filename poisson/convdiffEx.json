@@ -32,10 +32,11 @@
             //           X06 : SOR        + SSOR
             // BUT it exist only the following combinations:
             // 102,103,104,105,106,203,302,303
-        "SmoothingSteps":   1,   //for Multigrid: number of Smoothing steps;
-        "NumLvl":           -1,  //for Multigird: number of used levels (-1 = all)
-        "Relax":            1,   //Relaxation factor
-        "SolutionIsKnown":  1    //Is the solution known/can we measure an exact error? 1 = true, 0 = false
+        "SmoothingSteps":   1,    //for Multigrid: number of Smoothing steps;
+        "NumLvl":           -1,   //for Multigird: number of used levels (-1 = all)
+        "Relax":            1,    //Relaxation factor
+        "SolutionIsKnown":  1,    //Is the solution known/can we measure an exact error? 1 = true, 0 = false
+        "P1":               1     // 1 = P1 finite element, 0 = P2 finite element
     },
 
     //#######################################
