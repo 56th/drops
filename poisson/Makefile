@@ -6,7 +6,7 @@
 
 DIR = poisson
 
-EXEC = poissonP2 poissonP1 scalar
+EXEC = scalar
 
 DELETE = $(EXEC)
 
@@ -35,19 +35,6 @@ ipdropsAD: \
     ../num/fe.o
 	$(CXX) -o $@ $^ $(LFLAGS)
 
-poissonP1:\
-    ../poisson/poissonCoeff.o \
-    ../poisson/ale.o \
-    ../poisson/poissonP1.o ../geom/boundary.o ../geom/builder.o ../out/ensightOut.o\
-    ../geom/simplex.o ../geom/multigrid.o ../num/unknowns.o ../geom/topo.o \
-    ../poisson/poisson.o ../misc/problem.o ../misc/utils.o ../out/output.o \
-    ../num/fe.o ../num/discretize.o ../num/interfacePatch.o ../geom/geomselect.o\
-    ../misc/params.o \
-    ../out/vtkOut.o ../misc/bndmap.o ../geom/bndScalarFunctions.o\
-    ../geom/bndVelFunctions.o\
-    $(PAR_OBJ)
-	$(CXX) -o $@ $^ $(LFLAGS)
-
 scalar:\
     ../poisson/poissonCoeff.o \
     ../poisson/ale.o \
@@ -59,18 +46,6 @@ scalar:\
     ../out/vtkOut.o ../misc/bndmap.o ../geom/bndScalarFunctions.o\
     ../geom/bndVelFunctions.o\
     $(PAR_OBJ)
-	$(CXX) -o $@ $^ $(LFLAGS)
-
-poissonP2:\
-    ../poisson/poissonCoeff.o \
-    ../poisson/poissonP2.o ../geom/boundary.o ../geom/builder.o ../out/ensightOut.o\
-    ../geom/simplex.o ../geom/multigrid.o ../num/unknowns.o ../geom/topo.o \
-    ../poisson/poisson.o ../misc/problem.o ../misc/utils.o ../out/output.o \
-    ../num/fe.o ../num/discretize.o ../num/interfacePatch.o ../geom/geomselect.o\
-    ../misc/params.o \
-    ../out/vtkOut.o ../misc/bndmap.o ../geom/bndScalarFunctions.o\
-    ../geom/bndVelFunctions.o\
-    ../num/hypre.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 matlab/ipdrops:\
