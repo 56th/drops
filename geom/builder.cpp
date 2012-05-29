@@ -1392,11 +1392,9 @@ ReadMeshBuilderCL::build(MultiGridCL* mgp) const
           case 2: // Inner faces
               for (Uint i= 0; i<section.mface.size(); ++i) {
 #ifdef _PAR
-                  const Point3DCL bary =
-                      (va[section.mface[i][0]-1]->GetCoord()
-                      +va[section.mface[i][1]-1]->GetCoord()
-                      +va[section.mface[i][2]-1]->GetCoord())/3.0;
-                  face = &factory_->MakeFace( 0, bary, NoBndC, true); // Default is no boundary segment. (And the face is generated in the container faces)
+                  face = &factory_->MakeFace( 0, va[section.mface[i][0]-1]->GetCoord(),
+                          va[section.mface[i][1]-1]->GetCoord(),
+                          va[section.mface[i][2]-1]->GetCoord(), NoBndC, true); // Default is no boundary segment. (And the face is generated in the container faces)
 #else
                   face = &factory_->MakeFace( 0); // Default is no boundary segment. (And the face is generated in the container faces)
 #endif
@@ -1407,11 +1405,9 @@ ReadMeshBuilderCL::build(MultiGridCL* mgp) const
           default: // boundary-faces
             for (Uint i= 0; i<section.mface.size(); ++i) {
 #ifdef _PAR
-                const Point3DCL bary =
-                    (va[section.mface[i][0]-1]->GetCoord()
-                    +va[section.mface[i][1]-1]->GetCoord()
-                    +va[section.mface[i][2]-1]->GetCoord())/3.0;
-                face = &factory_->MakeFace( 0, bary, zone_id2bndidx_[section.headerinfo[0]], true); // Default is no boundary segment.
+                face = &factory_->MakeFace( 0, va[section.mface[i][0]-1]->GetCoord(),
+                        va[section.mface[i][1]-1]->GetCoord(),
+                        va[section.mface[i][2]-1]->GetCoord(), zone_id2bndidx_[section.headerinfo[0]], true); // Default is no boundary segment.
 #else
                 face = &factory_->MakeFace( 0, zone_id2bndidx_[section.headerinfo[0]]); // Default is no boundary segment.
 #endif

@@ -574,8 +574,7 @@ void TetraCL::BuildAndLinkFaces ( SimplexFactoryCL& factory)  // used by XXXBuil
 #ifndef _PAR
             FaceCL& newFace=factory.MakeFace( GetLevel(), GetCommonBndSeg(vp0, vp1, vp2) );
 #else
-            const Point3DCL bary=(vp0->GetCoord() + vp1->GetCoord() + vp2->GetCoord())/3.0;
-            FaceCL& newFace=factory.MakeFace( GetLevel(), bary, GetCommonBndSeg(vp0, vp1, vp2));
+            FaceCL& newFace=factory.MakeFace( GetLevel(), vp0->GetCoord(), vp1->GetCoord(), vp2->GetCoord(), GetCommonBndSeg(vp0, vp1, vp2));
 #endif
             Faces_[face]= &newFace;
             Faces_[face]->RecycleMe(vp0, vp1, vp2);
@@ -876,16 +875,13 @@ if the face cannot be found, create it and link boundary, if necessary.
             const VertexCL* const vp2= GetVertMidVert(VertOfFace(face, 2));
             if (!(fPtrs_[face]= vp0->FindFace(vp1, vp2) ) )
             {
-#ifdef _PAR
-                const Point3DCL bary=(vp0->GetCoord() + vp1->GetCoord() + vp2->GetCoord())/3.0;
-#endif
                 FaceCL* newFace;
                 if ( IsSubFace(face) )
                 {
 #ifndef _PAR
                     newFace= &factory.MakeFace( nextLevel, GetFace(ParentFace(face))->GetBndIdx());
 #else
-                    newFace= &factory.MakeFace( nextLevel, bary, GetFace(ParentFace(face))->GetBndIdx());
+                    newFace= &factory.MakeFace( nextLevel, vp0->GetCoord(), vp1->GetCoord(), vp2->GetCoord(), GetFace(ParentFace(face))->GetBndIdx());
                     // if new faces are created on the proc-boundary, identify them
                     if ( GetFace(ParentFace(face))->IsOnProcBnd())  //Identify
                         ParMultiGridCL::Instance().IdentifyFace( newFace, GetFace(ParentFace(face)));
@@ -895,7 +891,7 @@ if the face cannot be found, create it and link boundary, if necessary.
 #ifndef _PAR
                     newFace= &factory.MakeFace( nextLevel);
 #else
-                    newFace= &factory.MakeFace( nextLevel, bary);
+                    newFace= &factory.MakeFace( nextLevel, vp0->GetCoord(), vp1->GetCoord(), vp2->GetCoord());
 #endif
                 }
 
@@ -1783,9 +1779,9 @@ FaceCL& SimplexFactoryCL::MakeFace ( Uint Level, BndIdxT bnd, __UNUSED__ const b
 }
 
 /** Normally used by the parallel version*/
-FaceCL& SimplexFactoryCL::MakeFace ( Uint Level, const Point3DCL& bary, BndIdxT bnd, __UNUSED__ const bool donotRegister)
+FaceCL& SimplexFactoryCL::MakeFace ( Uint Level, const Point3DCL& v0, const Point3DCL& v1, const Point3DCL& v2, BndIdxT bnd, __UNUSED__ const bool donotRegister)
 {
-    faces_[Level].push_back( FaceCL( Level, bary, bnd));
+    faces_[Level].push_back( FaceCL( Level, v0, v1, v2, bnd));
     FaceCL& ret= faces_[Level].back();
 #ifdef _PAR
     if (!donotRegister)
@@ -1870,5 +1866,55 @@ void SimplexFactoryCL::DestroyMarkedVEFs( Uint Level)
     edges_   [Level].remove_if( std::mem_fun_ref(   &EdgeCL::IsMarkedForRemovement) );
     faces_   [Level].remove_if( std::mem_fun_ref(   &FaceCL::IsMarkedForRemovement) );
 }
+
+Point3DCL ComputeBaryCenter(const Point3DCL& v0, const Point3DCL& v1)
+{
+    Point3DCL ret;
+    for (int i=0; i<3; ++i)
+        ret[i] = 0.5*(v0[i] + v1[i]);
+    return ret;
+}
+
+Point3DCL ComputeBaryCenter(const Point3DCL& v0, const Point3DCL& v1, const Point3DCL& v2)
+{
+    Point3DCL ret;
+    for (int i=0; i<3; ++i)
+        ret[i] = 1.0/3.0*(v0[i] + v1[i] + v2[i]);
+    return ret;
+}
+
+Point3DCL ComputeBaryCenter(const Point3DCL& v0, const Point3DCL& v1, const Point3DCL& v2, const Point3DCL& v3)
+{
+    Point3DCL ret;
+    for (int i=0; i<3; ++i)
+        ret[i] = 0.25*(v0[i] + v1[i] + v2[i] + v3[i]);
+    return ret;
+}
+
+Point3DCL ComputeBaryCenter(const VertexCL& s)
+{
+    return s.GetCoord();
+}
+
+Point3DCL ComputeBaryCenter(const EdgeCL& s)
+{
+    return ComputeBaryCenter(s.GetVertex(0)->GetCoord(), s.GetVertex(1)->GetCoord());
+}
+
+Point3DCL ComputeBaryCenter(const FaceCL& f)
+{
+    const TetraCL* const tp= f.GetSomeTetra();
+    const Uint face= f.GetFaceNumInTetra(tp);
+
+    return ComputeBaryCenter( tp->GetVertex( VertOfFace(face, 0))->GetCoord(),
+           tp->GetVertex( VertOfFace(face, 1))->GetCoord(),
+           tp->GetVertex( VertOfFace(face, 2))->GetCoord());
+}
+
+Point3DCL ComputeBaryCenter(const TetraCL& s)
+{
+    return ComputeBaryCenter(s.GetVertex(0)->GetCoord(), s.GetVertex(1)->GetCoord(), s.GetVertex(2)->GetCoord(), s.GetVertex(3)->GetCoord());
+}
+
 
 } // end of namespace DROPS

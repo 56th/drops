@@ -457,7 +457,7 @@ class FaceCL
     /// \brief Create a face (serial)
     inline FaceCL (Uint Level, BndIdxT bnd= NoBndC);
     /// \brief Create a face (parallel)
-    inline FaceCL (Uint Level, const Point3DCL& bary, BndIdxT bnd= NoBndC);
+    inline FaceCL (Uint Level, const Point3DCL& v0, const Point3DCL& v1, const Point3DCL& v2, BndIdxT bnd= NoBndC);
 
   public:
     /// \brief Copy a face
@@ -802,7 +802,7 @@ public:
     /// \brief Create a face (normally, the serial version)
     FaceCL& MakeFace ( Uint Level, BndIdxT bnd= NoBndC, const bool donotRegister=false);
     /// \brief Create a face (normally, the parallel version)
-    FaceCL& MakeFace ( Uint Level, const Point3DCL& bary, BndIdxT bnd= NoBndC, const bool donotRegister=false);
+    FaceCL& MakeFace ( Uint Level, const Point3DCL& v0, const Point3DCL& v1, const Point3DCL& v2, BndIdxT bnd= NoBndC, const bool donotRegister=false);
     /// \brief Create a tetrahedron of verts and parent; FileBuilderCL has to construct the Id_, too, thus it can optionally be set.
     TetraCL& MakeTetra( VertexCL*, VertexCL*, VertexCL*, VertexCL*, TetraCL*, IdCL<TetraCL> id= IdCL<TetraCL>(), const bool donotRegister=false);
 #ifdef _PAR
@@ -824,7 +824,7 @@ public:
 };
 
 
-/// \name barycentic center of simplices
+/// \name barycentric center of simplices
 //@{
 inline
 Point3DCL GetBaryCenter(const VertexCL& v) { return v.GetCoord(); }
@@ -833,6 +833,41 @@ Point3DCL GetBaryCenter(const FaceCL&);
 Point3DCL GetBaryCenter(const TetraCL&);
 Point3DCL GetBaryCenter(const TetraCL& t, Uint face);
 //@}
+
+/// \name "safe" calculation of barycentric center of simplices. The compiler attributes/pragmas ensure the correct order of summation
+//@{
+#if _MSC_VER > 1400
+# pragma float_control(push)
+# pragma float_control(precise, on)
+#endif
+
+Point3DCL
+#if GCC_VERSION > 40305
+__attribute__((__optimize__("no-associative-math")))
+#endif
+    ComputeBaryCenter(const Point3DCL& v0, const Point3DCL& v1);
+
+Point3DCL
+#if GCC_VERSION > 40305
+__attribute__((__optimize__("no-associative-math")))
+#endif
+    ComputeBaryCenter(const Point3DCL& v0, const Point3DCL& v1, const Point3DCL& v2);
+
+Point3DCL
+#if GCC_VERSION > 40305
+__attribute__((__optimize__("no-associative-math")))
+#endif
+    ComputeBaryCenter(const Point3DCL& v0, const Point3DCL& v1, const Point3DCL& v2, const Point3DCL& v3);
+
+#if _MSC_VER > 1400
+# pragma float_control(pop)
+#endif
+//@}
+
+Point3DCL ComputeBaryCenter(const VertexCL& s);
+Point3DCL ComputeBaryCenter(const EdgeCL& s);
+Point3DCL ComputeBaryCenter(const FaceCL& s);
+Point3DCL ComputeBaryCenter(const TetraCL& s);
 
 Point3DCL GetWorldCoord(const TetraCL&, const SVectorCL<3>&);
 Point3DCL GetWorldCoord(const TetraCL&, Uint face, const SVectorCL<2>&);

@@ -128,7 +128,7 @@ struct GeomIdCL
     GeomIdCL(Uint lvl, const Point3DCL& p, Usint dimension) : level(lvl), bary(p), dim(dimension) {}
     GeomIdCL( const GeomIdCL& h) : level(h.level), bary(h.bary), dim(h.dim) {}
     template <typename SimplexT>
-    GeomIdCL(Uint lvl, const SimplexT& s) : level(lvl), bary( GetBaryCenter(s)), dim(GetDim<SimplexT>()) {}
+    GeomIdCL(Uint lvl, const SimplexT& s) : level(lvl), bary( ComputeBaryCenter(s)), dim(GetDim<SimplexT>()) {}
     bool operator== (const GeomIdCL& h) const { return h.level == level && h.bary == bary;}
     bool operator!= (const GeomIdCL& h) const { return !(h==*this); }
     bool operator < (const GeomIdCL& h) const { return level < h.level && dim < h.dim && bary[0] < h.bary[0] && bary[1] < h.bary[1] && bary[2] < h.bary[2];}

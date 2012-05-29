@@ -135,7 +135,7 @@ EdgeCL::EdgeCL (VertexCL* vp0, VertexCL* vp1, Uint Level, BndIdxT bnd0, BndIdxT 
 #ifndef _PAR
     Level_( Level),
 #else
-    base( Level, (vp0->GetCoord() + vp1->GetCoord() )*0.5, /*dim*/ 1), AccMFR_(MFR),
+    base( Level, ComputeBaryCenter(vp0->GetCoord(), vp1->GetCoord()), /*dim*/ 1), AccMFR_(MFR),
 #endif
     MidVertex_(0), MFR_(MFR), localMFR_(MFR), RemoveMark_(false)
 {
@@ -186,11 +186,11 @@ FaceCL::FaceCL ( __UNUSED__ Uint Level, __UNUSED__ BndIdxT bnd)
 #endif
 
 /** This constructor is normally used by the parallel version of DROPS */
-FaceCL::FaceCL ( Uint Level, __UNUSED__ const Point3DCL& bary, BndIdxT bnd) :
+FaceCL::FaceCL ( Uint Level, __UNUSED__ const Point3DCL& v0, __UNUSED__ const Point3DCL& v1, __UNUSED__ const Point3DCL& v2, BndIdxT bnd) :
 #ifndef _PAR
     Level_(Level),
 #else
-    base( Level, bary, /*dim*/ 2),
+    base( Level, ComputeBaryCenter(v0, v1, v2), /*dim*/ 2),
 #endif
     Bnd_(bnd), RemoveMark_(false)
 { }
@@ -298,7 +298,7 @@ TetraCL::TetraCL (VertexCL* vp0, VertexCL* vp1, VertexCL* vp2, VertexCL* vp3, Te
 /** \todo: do we need lvl? */
 #ifdef _PAR
 TetraCL::TetraCL (VertexCL* vp0, VertexCL* vp1, VertexCL* vp2, VertexCL* vp3, TetraCL* Parent, __UNUSED__ Uint lvl, IdCL<TetraCL> id)
-    : base( Parent==0 ? 0 : Parent->GetLevel()+1, 0.25*( vp0->GetCoord() + vp1->GetCoord()+ vp2->GetCoord() + vp3->GetCoord()), /*dim*/ 3),
+    : base( Parent==0 ? 0 : Parent->GetLevel()+1, ComputeBaryCenter( vp0->GetCoord(), vp1->GetCoord(), vp2->GetCoord(), vp3->GetCoord()), /*dim*/ 3),
       Id_(id), RefRule_(UnRefRuleC), RefMark_(NoRefMarkC),
       Parent_( Parent), Children_(0)
 {

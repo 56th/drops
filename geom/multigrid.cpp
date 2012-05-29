@@ -601,12 +601,12 @@ void MultiGridCL::SplitMultiBoundaryTetras()
         }
 #else
         VertexCL *v0= t->Vertices_[0], *v1=t->Vertices_[1], *v2=t->Vertices_[2], *v3=t->Vertices_[3];
-        fp[0]= &factory_.MakeFace( 0, (v0->GetCoord()+v1->GetCoord()+bp->GetCoord())/3.0);
-        fp[1]= &factory_.MakeFace( 0, (v0->GetCoord()+v2->GetCoord()+bp->GetCoord())/3.0);
-        fp[2]= &factory_.MakeFace( 0, (v0->GetCoord()+bp->GetCoord()+v3->GetCoord())/3.0);
-        fp[3]= &factory_.MakeFace( 0, (v1->GetCoord()+v2->GetCoord()+bp->GetCoord())/3.0);
-        fp[4]= &factory_.MakeFace( 0, (v1->GetCoord()+bp->GetCoord()+v3->GetCoord())/3.0);
-        fp[5]= &factory_.MakeFace( 0, (v2->GetCoord()+bp->GetCoord()+v3->GetCoord())/3.0);
+        fp[0]= &factory_.MakeFace( 0, v0->GetCoord(), v1->GetCoord(), bp->GetCoord());
+        fp[1]= &factory_.MakeFace( 0, v0->GetCoord(), v2->GetCoord(), bp->GetCoord());
+        fp[2]= &factory_.MakeFace( 0, v0->GetCoord(), bp->GetCoord(), v3->GetCoord());
+        fp[3]= &factory_.MakeFace( 0, v1->GetCoord(), v2->GetCoord(), bp->GetCoord());
+        fp[4]= &factory_.MakeFace( 0, v1->GetCoord(), bp->GetCoord(), v3->GetCoord());
+        fp[5]= &factory_.MakeFace( 0, v2->GetCoord(), bp->GetCoord(), v3->GetCoord());
 #endif
 
         // Four new tetras: (v0 v1 v2 b) (v0 v1 b v3) (v0 v2 b v3) (v1 v2 b v3)
