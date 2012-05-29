@@ -1362,7 +1362,7 @@ bool ParPGCR(const Mat& A, Vec& x, const Vec& b, const ExCL& ExX, PreCon& M,
 template <typename Mat, typename Vec, typename PreCon, typename ExACL, typename ExATranspCL>
 bool
 ParPCGNE(const Mat& A, Vec& u, const Vec& b, const ExACL& ExAX,  const ExATranspCL& ExATranspX, const PreCon& M,
-    int& max_iter, double& tol, bool measure_relative_tol= false, std::ostream* output=0)
+    int& max_iter, double& tol, bool measure_relative_tol, std::ostream* output)
 {
     Vec Atranspu( transp_mul( A, u));
     ExAX.Accumulate( Atranspu);
