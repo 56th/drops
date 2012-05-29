@@ -378,6 +378,7 @@ class MLIdxDescCL : public MLDataCL<IdxDescCL>
         case 2: return NumUnknownsFace();
         case 3: return NumUnknownsTetra();
         }
+        return 0;
     }
 #endif
     template<class SimplexT> Uint GetNumUnknownsOnSimplex() const
