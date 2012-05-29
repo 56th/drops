@@ -208,15 +208,26 @@ inline VectorBaseCL<T>& add_to_global_vector (VectorBaseCL<T>& v, const Point3DC
 }
 
 /// \brief Use Kahan's algorithm to sum up elements
-/** This algorithm accumulates the error made by the floting point
-    arithmetics and addes this error to the sum.
+/** This algorithm accumulates the error made by the floating point
+    arithmetics and adds this error to the sum.
+    Compiler attributes/pragmas ensure the correct order of summation/multiplication.
     \param first iterator to the first element
     \param end   iterator behind the last element
-    \param init  initiali value of the sum
+    \param init  initial value of the sum
     \return init + sum_{i=first}^end *i
 */
+
+#if _MSC_VER > 1400
+# pragma float_control(push)
+# pragma float_control(precise, on)
+#endif
+
 template <typename T, typename Iterator>
-inline T KahanSumm( Iterator first, const Iterator& end, const T init=(T)0)
+inline T
+#if GCC_VERSION > 40305
+    __attribute__((optimize("no-associative-math")))
+#endif
+KahanSumm( Iterator first, const Iterator& end, const T init=(T)0)
 {
     T sum= init, c=T(0), t, y;
     while(first!=end){
@@ -230,7 +241,11 @@ inline T KahanSumm( Iterator first, const Iterator& end, const T init=(T)0)
 
 /// \brief Use Kahan's algorithm to perform an inner product
 template <typename T, typename Iterator>
-inline T KahanInnerProd( Iterator first1, const Iterator& end1, Iterator first2, const T init=(T)0)
+inline T
+#if GCC_VERSION > 40305
+    __attribute__((optimize("no-associative-math")))
+#endif
+KahanInnerProd( Iterator first1, const Iterator& end1, Iterator first2, const T init=(T)0)
 {
     T sum= init, c=T(0), t, y;
     while(first1!=end1){
@@ -244,7 +259,11 @@ inline T KahanInnerProd( Iterator first1, const Iterator& end1, Iterator first2,
 
 /// \brief Use Kahan's algorithm to perform an inner product on given indices
 template <typename T, typename Cont, typename Iterator>
-inline T KahanInnerProd( const Cont& a, const Cont&b, const Iterator& firstIdx, const Iterator& endIdx, const T init=(T)0, const size_t offset=0)
+inline T
+#if GCC_VERSION > 40305
+    __attribute__((optimize("no-associative-math")))
+#endif
+KahanInnerProd( const Cont& a, const Cont&b, const Iterator& firstIdx, const Iterator& endIdx, const T init=(T)0, const size_t offset=0)
 {
     Iterator first=firstIdx;
     T sum= init, c=T(0), t, y;
@@ -257,6 +276,10 @@ inline T KahanInnerProd( const Cont& a, const Cont&b, const Iterator& firstIdx, 
     }
     return sum;
 }
+
+#if _MSC_VER > 1400
+# pragma float_control(pop)
+#endif
 
 /// \brief Performs the std::partial_sum in parallel
 /// Can be used with any number of threads in a surrounding parallel region.
