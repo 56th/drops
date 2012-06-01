@@ -119,7 +119,7 @@ void cplBroydenPolicyCL::Update( VecDescCL& v)
     }
     sigma0_ = sigma_;
 
-    VectorCL w1( deltaF1_.back());
+    const VectorCL& w1( deltaF1_.back());
 #ifndef _PAR
     gamma_.push_back( norm_sq( w1));
 #else
