@@ -205,12 +205,21 @@ public:
         { std::fill( graph().part(), graph().part()+graph().get_num_verts(), ProcCL::MyRank()); }
 };
 
-
 /// \brief Using (Par)Metis for partitioning a graph
+/**
+ * possible parameters for method:
+ *   1: adaptive re-computation of graph partitioning (adaptive)
+ *   2: multilevel method (KWay)
+ *   3: bisection (recursive)
+ *  -1: default (parallel: method 1, serial: method 2
+ */
 class MetisPartitionerCL : public BasePartitionerCL
 {
 private:
     GraphCL& graph_;       // the corresponding graph
+
+    int method_;           // tells which method should be used to compute graph partition problem
+
     /// \brief Get the graph
     GraphCL& graph() { return graph_; }
 
@@ -220,9 +229,9 @@ private:
     void doSerialPartition();
 
 public:
-    MetisPartitionerCL( GraphCL& graph) 
-        : BasePartitionerCL(), graph_(graph) {}
-    /// \brief Use (Par)Metis function ParMETIS_V3_AdaptiveRepart to partition the given \a graph
+    MetisPartitionerCL( GraphCL& graph, int method = -1)
+        : BasePartitionerCL(), graph_(graph), method_(method) {}
+    /// \brief Use (Par)Metis functions to partition the given \a graph
     void doPartition();
 };
 

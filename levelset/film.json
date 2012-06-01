@@ -68,8 +68,7 @@
 		"FinestLevel":		2,		// refinement level inside shell
 		"CoarsestLevel":		0,	// refinement level outside shell
 		"Width":		0.0005,		// width of refinement shell around interface
-		"LoadBalStrategy":		1,	// inactive
-		"Partitioner":		1		// inactive
+		"LoadBalStrategy":  1011    // inactive
 	},
 
 	"Mat":

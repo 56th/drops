@@ -106,14 +106,7 @@
                                                 // close to the phase boundary.
                 "CoarsestLevel":        0,      // label of coarsest level close to the phase boundary.
                 "Width":                0.0004, // domain of refinement.
-                "LoadBalStrategy":      1,      // load balancing algorithm to determine the load balancing graph:
-                                                // 0 - No Migration,
-                                                // 1 - Adaptive,
-                                                // 2 - Recursive
-                "Partitioner":          1       // partitioner used:
-                                                // 1 - Metis
-                                                // 2 - Zoltan
-                                                // 3 - Scotch
+                "LoadBalStrategy":      1011    // load balancing method, see decompose.h for details
         },
 
 // material data (all units are SI)

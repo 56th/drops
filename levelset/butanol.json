@@ -81,8 +81,7 @@
 		"FinestLevel":		3,
 		"CoarsestLevel":		0,
 		"Width":		0.00025,
-		"LoadBalStrategy":		1,
-		"Partitioner":		1
+		"LoadBalStrategy":		1011
 	},
 
 	"Mat":

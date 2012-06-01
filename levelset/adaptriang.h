@@ -83,11 +83,12 @@ class AdapTriangCL
     {
         Assert( 0<=c_level && c_level<=f_level, "AdapTriangCL: Levels are cheesy.\n", ~0);
 #ifdef _PAR
-        if (lbStrategy>=0)
+        if (lbStrategy>=0){
             lb_.DoMigration();
-        else{
-            lb_.SetMethod( -lbStrategy);
+            lb_.SetMethod( lbStrategy);
         }
+        else // negative lbStrategy avoids initial load balancing
+            lb_.SetMethod( -lbStrategy);
 #endif
     }
 

@@ -678,15 +678,24 @@ void MetisPartitionerCL::doParallelPartition()
     std::valarray<graph_real_type> tpwgts( 1.f/(graph_real_type)nparts, ProcCL::Size());
     MPI_Comm comm = MPI_COMM_WORLD;
 
-    int result= ParMETIS_V3_AdaptiveRepart(
-                    Addr(graph().vtxdist()), Addr(graph().xadj()), Addr(graph().adjncy()), 
-                    Addr(graph().vwght()), Addr(graph().vwght()), Addr(graph().adjwgt()),  
-                    &wgtflag, &numflag, &ncon, &nparts, Addr(tpwgts),
-                    &ubvec, &itr, options, &objective_, graph().part(), &comm);
+    int result= 0;
+
+    switch (method_) {
+        case  3: std::cout << "bisection method of graph partitioning is not implemented, yet, using default instead" << std::endl;
+        case -1: case 1: result = ParMETIS_V3_AdaptiveRepart(
+                Addr(graph().vtxdist()), Addr(graph().xadj()), Addr(graph().adjncy()),
+                Addr(graph().vwght()), Addr(graph().vwght()), Addr(graph().adjwgt()),
+                &wgtflag, &numflag, &ncon, &nparts, Addr(tpwgts),
+                &ubvec, &itr, options, &objective_, graph().part(), &comm); break;
+        case  2: result = ParMETIS_V3_PartKway(
+                Addr(graph().vtxdist()), Addr(graph().xadj()), Addr(graph().adjncy()),
+                Addr(graph().vwght()), Addr(graph().adjwgt()),
+                &wgtflag, &numflag, &ncon, &nparts, Addr(tpwgts),
+                &ubvec, options, &objective_, graph().part(), &comm); break;
+    }
     if ( result != METIS_OK){
         throw DROPSErrCL("Error in ParMETIS-function ParMETIS_V3_AdaptiveRepart");
     }
-
 }
 
 /** Graph is given on a single process. */
@@ -705,25 +714,28 @@ void MetisPartitionerCL::doSerialPartition()
     graph_real_type    ubvec= 1.01;
     std::valarray<graph_real_type> tpwgts( 1.f/(graph_real_type)nparts, ProcCL::Size()*ncon);
 
+    int result = 0;
 
-    int result= METIS_PartGraphKway(
-                    &n, &ncon, Addr(graph().xadj()), Addr(graph().adjncy()), 
-                    Addr(graph().vwght()), vsize, Addr(graph().adjwgt()), &nparts, Addr(tpwgts), &ubvec, options,
-                    &objective_, graph().part());
+    switch (method_) {
+      case  1: std::cout << "adaptive re-computation of graph partitioning is not implemented, yet, using default instead" << std::endl;
+      case -1: case 2: result= METIS_PartGraphKway(
+              &n, &ncon, Addr(graph().xadj()), Addr(graph().adjncy()),
+              Addr(graph().vwght()), vsize, Addr(graph().adjwgt()), &nparts, Addr(tpwgts), &ubvec, options,
+              &objective_, graph().part()); break;
+      case  3: result = METIS_PartGraphRecursive(
+              &n, &ncon, Addr(graph().xadj()), Addr(graph().adjncy()),
+              Addr(graph().vwght()), vsize, Addr(graph().adjwgt()), &nparts, Addr(tpwgts), &ubvec, options,
+              &objective_, graph().part()); break;
+    }
     if ( result != METIS_OK){
         throw DROPSErrCL("Error in METIS-function METIS_PartGraphKway");
     }
-
-//    METIS_PartGraphRecursive( 
-//        &n, &ncon, Addr(graph().xadj()), Addr(graph().adjncy()), 
-//        Addr(graph().vwght()), vsize, Addr(graph().adjwgt()), &nparts, Addr(tpwgts), &ubvec, options,
-//        &objective_, graph().part());
 }
 
 /** Perform the graph partitioning. */
 void MetisPartitionerCL::doPartition()
 {
-    // Check if all processes store a part of the graph or only a master processess
+    // Check if all processes store a part of the graph or only a master processes
     int procs_owning_vertices=0;
     for ( int p=0; p<ProcCL::Size(); ++p){
         if ( graph().vtxdist()[p+1]-graph().vtxdist()[p] != 0)
