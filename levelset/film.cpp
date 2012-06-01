@@ -97,7 +97,7 @@ template<class StokesProblemT>
 void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, bool is_periodic)
 // flow control
 {
-  
+
     DROPS::match_fun periodic_match = DROPS::MatchMap::getInstance()[P.get<std::string>("DomainCond.PeriodicMatching", std::string("periodicxz"))];
     MultiGridCL& MG= Stokes.GetMG();
 
@@ -204,6 +204,13 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
 
     ensight.Write();
 
+    std::ofstream* infofile = 0;
+    IF_MASTER {
+        infofile = new std::ofstream ((P.get<std::string>("EnsightCase","film")+".info").c_str());
+    }
+    IFInfo.Init(infofile);
+    IFInfo.WriteHeader();
+
     Stokes.SetupPrMass(  &Stokes.prM, lset);
     Stokes.SetupPrStiff( &Stokes.prA, lset);
 
@@ -260,6 +267,8 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
     for (int step= 1; step<=P.get<int>("Time.NumSteps"); ++step)
     {
         std::cout << "======================================================== Schritt " << step << ":\n";
+        IFInfo.Update( lset, Stokes.GetVelSolution());
+        IFInfo.Write(Stokes.v.t);
         cpl.DoStep( P.get<int>("Coupling.Iter"));
         std::cout << "rel. Volume: " << lset.GetVolume()/Vol << std::endl;
 
@@ -287,6 +296,8 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
             ensight.Write( step*P.get<double>("Time.StepSize"));
     }
 
+    IFInfo.Update( lset, Stokes.GetVelSolution());
+    IFInfo.Write(Stokes.v.t);
     std::cout << std::endl;
     delete stokessolver;
     delete navstokessolver;
@@ -352,7 +363,7 @@ int main (int argc, char** argv)
 
     //DIDNT FIND A PARAM WITH PeriodicMatching, so I didnt know the type
     DROPS::match_fun periodic_match = DROPS::MatchMap::getInstance()[P.get<std::string>("DomainCond.PeriodicMatching", std::string("periodicxz"))];
-    
+
     typedef DROPS::TwoPhaseFlowCoeffCL            CoeffT;
     typedef DROPS::InstatNavierStokes2PhaseP2P1CL MyStokesCL;
 
