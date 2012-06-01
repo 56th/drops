@@ -117,7 +117,11 @@ class AdapTriangCL
     void UpdateTriang (const LevelsetP2CL& ls);
 
     /// \brief Check if the triangulation has been modified within last update
-    bool WasModified () const { return modified_; }
+#ifdef _PAR
+    bool WasModified () const { return modified_ || lb_.GetMovedMultiNodes() > 0; }
+#else
+    bool WasModified () const { return modified_;}
+#endif
 
     /// \name Get a reference onto the MultiGrid
     //@{
