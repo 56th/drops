@@ -4,188 +4,141 @@
 
 # variables:
 
-DIR = partests
-EXEC = TestRefPar TestExchangePar TestInterpolPar
-#       TestStokesPar TestInstatStokesPar TestPoissonPar TestSedPar\
-#       TestMzellePar TestMzelleAdaptPar MzelleNMRParamEst TestBrickflowPar \
-#       TestFilmPar
-       
-# compile errors; not converted to Ensight6OutCL:       TestLevelsetPar
-# out of date: TestSedPar TestNavStokesPar TwoPhaseFlowPar
+DIR = parpartests
 
-DELETE = $(EXEC)
+DELETE = $(EXEC) *.out *.diff *.off *.mg *.dat
 CPP = $(wildcard *.cpp)
+
 OBJ = $(CPP:%.cpp=%.o)
 
 # include common rules:
 include ../Make.common
 
-# rules:
-
-default:
-
-all: $(EXEC)
-
-PAR_OBJ_ = ../parallel/parallel.o ../parallel/parmultigrid.o \
-          ../parallel/partime.o ../parallel/addeddata.o ../parallel/partitioner.o ../parallel/loadbal.o \
-          ../parallel/exchange.o ../parallel/memmgr_std.o ../parallel/parmgserialization.o \
-          ../parallel/logger.o ../parallel/parddd.o
+EXEC =  dist_streamtest dist_remotedatatest dist_sendtetraofbrick dist_simplexsend \
+        dist_interface dist_exchange dist_sdropsP2 dist_ref dist_modify \
+        dist_TestRefPar dist_ref_rising_drop dist_migration dist_interp2 dist_interp1
+            
+PAR_OBJ_ = ../parallel/parallel.o ../parallel/partime.o  \
+           ../parallel/exchange.o  ../parallel/parmultigrid.o \
+           ../parallel/logger.o ../parallel/DiST.o ../parallel/mpistream.o \
+           ../parallel/loadbal.o ../parallel/migrateunknowns.o \
+           ../parallel/decompose.o
 
 PAR_OBJ = $(if $(PAR_BUILD),$(PAR_OBJ_),)
 
-TestRefPar: \
-   $(PAR_OBJ) \
-   ../partests/TestRefPar.o ../geom/simplex.o ../geom/multigrid.o ../geom/boundary.o ../geom/topo.o \
-   ../geom/builder.o ../misc/utils.o ../misc/problem.o ../misc/params.o \
-   ../num/fe.o ../num/interfacePatch.o ../num/unknowns.o ../out/output.o 
+# rules
+
+all: $(EXEC)
+
+default: ClrScr
+
+dist: dist_streamtest dist_remotedatatest dist_sendtetraofbrick dist_modify dist_simplexsend dist_interface dist_exchange dist_poisson dist_sdropsP2 dist_twophasedrops \
+    dist_ref dist_TestRefPar dist_migration dist_interp2 dist_interp1 dist_ref_rising_drop
+
+
+dist_streamtest: \
+    ../partests/dist_streamtest.o \
+    ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
+    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
+    ../num/fe.o ../num/interfacePatch.o ../misc/scopetimer.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
-TestExchangePar: \
-   $(PAR_OBJ) \
-   ../partests/TestExchangePar.o ../geom/simplex.o ../geom/multigrid.o ../geom/boundary.o ../geom/topo.o \
-   ../geom/builder.o ../misc/utils.o ../misc/problem.o ../misc/params.o \
-   ../num/unknowns.o ../num/fe.o ../num/interfacePatch.o ../levelset/fastmarch.o \
-   ../levelset/levelset.o ../num/discretize.o ../levelset/surfacetension.o ../geom/principallattice.o \
-   ../geom/reftetracut.o ../num/quadrature.o ../geom/subtriangulation.o
+dist_remotedatatest: \
+    ../partests/dist_remotedatatest.o \
+    ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
+    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
+    ../num/fe.o ../num/interfacePatch.o ../misc/scopetimer.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
-TestPoissonPar: \
-   $(PAR_OBJ) \
-   ../partests/TestPoissonPar.o ../geom/simplex.o ../geom/multigrid.o ../geom/boundary.o ../geom/topo.o \
-   ../geom/builder.o ../misc/utils.o ../misc/problem.o ../misc/params.o \
-   ../num/unknowns.o ../num/discretize.o ../num/fe.o ../num/interfacePatch.o \
-   ../out/output.o ../out/ensightOut.o ../partests/params.o ../levelset/lsetparams.o ../levelset/surfacetension.o
+dist_sendtetraofbrick: \
+    ../partests/dist_sendtetraofbrick.o \
+    ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
+    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
+    ../num/fe.o ../num/interfacePatch.o ../misc/scopetimer.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
-TestInterpolPar: \
-    $(PAR_OBJ) \
-    ../partests/TestInterpolPar.o ../geom/simplex.o ../geom/multigrid.o ../geom/boundary.o ../geom/topo.o \
-    ../geom/builder.o ../misc/utils.o ../levelset/levelset.o \
-    ../misc/params.o ../misc/problem.o ../num/discretize.o ../num/unknowns.o \
-    ../num/fe.o ../num/interfacePatch.o ../out/output.o ../out/ensightOut.o \
-    ../levelset/fastmarch.o ../levelset/surfacetension.o ../geom/principallattice.o ../geom/reftetracut.o \
-    ../num/quadrature.o ../geom/subtriangulation.o
+dist_modify: \
+    ../partests/dist_modify.o \
+    ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
+    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
+    ../num/fe.o ../num/interfacePatch.o ../misc/scopetimer.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
-TestSedPar: \
-    ../partests/TestSedPar.o ../geom/boundary.o ../geom/builder.o ../geom/simplex.o ../geom/multigrid.o \
-    ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o ../levelset/levelset.o \
-    ../misc/utils.o ../out/output.o ../num/discretize.o ../levelset/lsetparams.o ../geom/geomselect.o \
-    ../misc/params.o ../levelset/fastmarch.o ../stokes/instatstokes2phase.o ../num/MGsolver.o\
-    ../num/fe.o ../out/ensightOut.o ../stokes/integrTime.o ../poisson/transport2phase.o ../levelset/twophaseutils.o\
-    ../num/interfacePatch.o ../out/vtkOut.o ../surfactant/ifacetransp.o ../levelset/surfacetension.o ../geom/simplex.o \
-    ../geom/principallattice.o ../geom/reftetracut.o ../num/quadrature.o ../geom/subtriangulation.o \
-    ../num/hypre.o ../levelset/coupling.o ../navstokes/instatnavstokes2phase.o ../misc/bndmap.o ../geom/bndVelFunctions.o $(PAR_OBJ)
+dist_simplexsend: \
+    ../partests/dist_simplexsend.o  \
+    ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
+    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
+    ../num/fe.o ../num/interfacePatch.o ../misc/scopetimer.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
-# perform tests
-###############
-
-test_all: test_exchange test_poisson test_ref test_interpol test_sed
-	echo "All tests performed"
-
-test_exchange: TestExchangePar
-	echo "Testing ExchangeCL ..."
-	$(ARCH_RUN) -np 4 ./TestExchangePar param-files/Exchange.param > ex_tmp.txt
-	diff ex_tmp.txt ref-out/Exchange_P004.txt ; rm -f ex_tmp.txt
-
-test_poisson: TestPoissonPar
-	echo "Testing Poisson ..."
-	$(ARCH_RUN) -np 4 ./TestPoissonPar param-files/Poisson.param > poisson_tmp.txt
-	diff poisson_tmp.txt ref-out/Poisson_P004.txt ; rm -f poisson_tmp.txt
-
-test_ref: TestRefPar
-	echo "Testing Refinement ... "
-	$(ARCH_RUN) -np 4 ./TestRefPar param-files/Ref.param > ref_tmp.txt
-	diff ref_tmp.txt ref-out/Ref_P004.txt ; rm -f ref_tmp.txt
-
-test_interpol: TestInterpolPar
-	echo "Testing Interpolation ... "
-	$(ARCH_RUN) -np 4 ./TestInterpolPar > interpol_tmp.txt
-	diff interpol_tmp.txt ref-out/Interpol_P004.txt  ; rm -f interpol_tmp.txt
-
-test_sed: TestSedPar
-	echo "Testing sedimenting droplet ..."
-	$(ARCH_RUN) -np 4 ./TestSedPar param-files/Sed.param | sed -re "s/(.* )([0-9\.]+)( seconds| sec\.)/\1XXX\3/" > sed_tmp.txt
-	diff sed_tmp.txt ref-out/Sed_P004.txt ; rm -f sed_tmp.txt
-
-
-# deprecated:
-#############
-
-TestStokesPar: \
-   $(PAR_OBJ) \
-   ../partests/TestStokesPar.o ../geom/simplex.o ../geom/multigrid.o ../geom/boundary.o ../geom/topo.o \
-   ../geom/builder.o ../misc/utils.o ../misc/problem.o ../misc/params.o \
-   ../num/unknowns.o ../num/discretize.o ../num/fe.o ../num/interfacePatch.o \
-   ../num/stokessolver.o ../out/output.o ../out/ensightOut.o ../out/vtkOut.o\
-   ../partests/params.o ../levelset/lsetparams.o ../levelset/surfacetension.o
+dist_interface: \
+    ../partests/dist_interface.o  \
+    ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
+    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
+    ../num/fe.o ../num/interfacePatch.o ../misc/scopetimer.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
-TestInstatStokesPar: \
-   $(PAR_OBJ) \
-   ../partests/TestInstatStokesPar.o ../geom/simplex.o ../geom/multigrid.o ../geom/boundary.o ../geom/topo.o \
-   ../geom/builder.o ../misc/utils.o ../misc/problem.o ../misc/params.o \
-   ../num/unknowns.o ../num/discretize.o ../num/fe.o ../num/interfacePatch.o \
-   ../num/stokessolver.o ../out/output.o ../out/ensightOut.o ../out/vtkOut.o\
-   ../partests/params.o ../levelset/lsetparams.o ../levelset/surfacetension.o
+dist_ref: \
+    ../partests/dist_ref.o \
+    ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
+    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o ../out/vtkOut.o ../parallel/parmultigrid.o \
+    ../num/fe.o ../num/interfacePatch.o ../levelset/levelset.o ../levelset/fastmarch.o ../levelset/surfacetension.o \
+    ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o \
+    ../misc/scopetimer.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
-TestNavStokesPar: \
-   $(PAR_OBJ) \
-   ../partests/TestNavStokesPar.o ../geom/simplex.o ../geom/multigrid.o ../geom/boundary.o ../geom/topo.o \
-   ../geom/builder.o ../levelset/levelset.o ../misc/utils.o ../misc/problem.o ../misc/params.o\
-   ../num/unknowns.o ../num/discretize.o ../num/fe.o ../num/interfacePatch.o \
-   ../num/stokessolver.o ../out/output.o ../out/ensightOut.o \
-   ../partests/params.o  ../levelset/surfacetension.o
+dist_migration: \
+    ../partests/dist_migration.o \
+    ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
+    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o ../out/vtkOut.o ../parallel/parmultigrid.o \
+    ../num/fe.o ../num/interfacePatch.o ../levelset/levelset.o ../levelset/fastmarch.o ../levelset/surfacetension.o \
+    ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o $(PAR_OBJ) \
+    ../misc/bndmap.o ../geom/bndVelFunctions.o ../geom/bndScalarFunctions.o \
+    ../stokes/instatstokes2phase.o ../misc/scopetimer.o
 	$(CXX) -o $@ $^ $(LFLAGS)
 
-TestMzellePar: \
-   $(PAR_OBJ) \
-   ../partests/TestMzellePar.o ../geom/simplex.o ../geom/multigrid.o ../geom/boundary.o ../geom/topo.o \
-   ../geom/builder.o ../levelset/levelset.o ../levelset/fastmarch.o ../levelset/lsetparams.o \
-   ../misc/utils.o ../misc/params.o ../misc/problem.o ../num/discretize.o ../num/unknowns.o \
-   ../num/fe.o ../num/stokessolver.o ../num/interfacePatch.o ../out/output.o  \
-   ../out/ensightOut.o ../partests/params.o ../stokes/instatstokes2phase.o ../stokes/integrTime.o \
-   ../levelset/surfacetension.o
+dist_TestRefPar: \
+    ../partests/dist_TestRefPar.o \
+    ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
+    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o ../out/vtkOut.o ../parallel/parmultigrid.o \
+    ../num/fe.o ../num/interfacePatch.o ../levelset/levelset.o ../levelset/fastmarch.o ../levelset/surfacetension.o \
+    ../misc/params.o ../out/output.o ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o \
+    ../num/quadrature.o ../misc/scopetimer.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
-TestMzelleAdaptPar: \
-   $(PAR_OBJ) \
-   ../partests/TestMzelleAdaptPar.o ../geom/simplex.o ../geom/multigrid.o ../geom/boundary.o ../geom/topo.o \
-   ../geom/builder.o ../levelset/levelset.o ../levelset/fastmarch.o ../levelset/lsetparams.o \
-   ../misc/utils.o ../misc/params.o ../misc/problem.o ../num/discretize.o ../num/unknowns.o \
-   ../num/fe.o ../num/stokessolver.o ../num/interfacePatch.o ../out/output.o \
-   ../out/ensightOut.o ../out/vtkOut.o ../partests/params.o ../stokes/instatstokes2phase.o \
-   ../stokes/integrTime.o ../misc/xfem.o ../levelset/surfacetension.o
-	$(CXX) -o $@ $^ $(LFLAGS)
-
-MzelleNMRParamEst: \
-   $(PAR_OBJ) \
-   ../partests/MzelleNMRParamEst.o ../geom/simplex.o ../geom/multigrid.o ../geom/boundary.o ../geom/topo.o \
-   ../geom/builder.o ../levelset/levelset.o ../levelset/fastmarch.o ../levelset/lsetparams.o \
-   ../misc/utils.o ../misc/params.o ../misc/problem.o ../num/discretize.o ../num/unknowns.o \
-   ../num/fe.o ../num/stokessolver.o ../num/interfacePatch.o ../out/output.o  \
-   ../out/ensightOut.o ../out/vtkOut.o ../partests/params.o ../stokes/instatstokes2phase.o \
-   ../stokes/integrTime.o ../misc/xfem.o ../levelset/surfacetension.o
-	$(CXX) -o $@ $^ $(LFLAGS)
-
-TestBrickflowPar: \
-   $(PAR_OBJ) \
-   ../partests/TestBrickflowPar.o ../geom/simplex.o ../geom/multigrid.o ../geom/boundary.o ../geom/topo.o \
-   ../geom/builder.o ../levelset/levelset.o ../levelset/fastmarch.o ../levelset/lsetparams.o \
-   ../misc/utils.o ../misc/params.o ../misc/problem.o ../num/discretize.o ../num/unknowns.o \
-   ../num/fe.o ../num/stokessolver.o ../num/interfacePatch.o ../out/output.o  \
-   ../out/ensightOut.o ../out/vtkOut.o ../partests/params.o ../stokes/instatstokes2phase.o \
-   ../stokes/integrTime.o ../misc/xfem.o ../levelset/surfacetension.o
-	$(CXX) -o $@ $^ $(LFLAGS)
-
-TestFilmPar: \
-   $(PAR_OBJ) \
-   ../partests/TestFilmPar.o ../geom/simplex.o ../geom/multigrid.o ../geom/boundary.o ../geom/topo.o \
-   ../geom/builder.o ../misc/utils.o ../misc/problem.o ../misc/params.o \
-   ../num/unknowns.o ../num/discretize.o ../num/fe.o ../num/interfacePatch.o \
-   ../out/output.o ../out/ensightOut.o ../partests/params.o ../levelset/surfacetension.o
+dist_ref_rising_drop: \
+    ../partests/dist_ref_rising_drop.o \
+    ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
+    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o ../out/vtkOut.o ../parallel/parmultigrid.o \
+    ../num/fe.o ../num/interfacePatch.o ../levelset/levelset.o ../levelset/fastmarch.o ../levelset/surfacetension.o \
+    ../misc/params.o ../out/output.o ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o \
+    ../misc/scopetimer.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 
+dist_exchange: \
+    ../partests/dist_exchange.o  \
+    ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
+    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
+    ../num/fe.o ../num/interfacePatch.o ../misc/scopetimer.o $(PAR_OBJ)
+	$(CXX) -o $@ $^ $(LFLAGS)
+
+dist_sdropsP2: \
+    ../partests/dist_sdropsP2.o ../geom/boundary.o ../geom/builder.o ../geom/simplex.o ../geom/multigrid.o \
+    ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o \
+    ../misc/utils.o ../num/discretize.o ../num/interfacePatch.o \
+    ../num/fe.o ../stokes/integrTime.o ../geom/reftetracut.o ../geom/principallattice.o \
+    ../misc/scopetimer.o $(PAR_OBJ)
+	$(CXX) -o $@ $^ $(LFLAGS)
+
+dist_interp2: \
+    ../partests/dist_interp2.o ../geom/simplex.o ../geom/multigrid.o ../geom/topo.o ../out/output.o \
+    ../num/unknowns.o ../geom/builder.o ../misc/problem.o ../num/interfacePatch.o \
+    ../num/fe.o ../geom/boundary.o ../misc/utils.o ../num/discretize.o $(PAR_OBJ)
+	$(CXX) -o $@ $^ $(LFLAGS)
+	
+dist_interp1: \
+    ../partests/dist_interp1.o ../geom/simplex.o ../geom/multigrid.o ../geom/topo.o ../out/output.o \
+    ../num/unknowns.o ../geom/builder.o ../misc/problem.o ../num/interfacePatch.o \
+    ../num/fe.o ../geom/boundary.o ../misc/utils.o ../num/discretize.o $(PAR_OBJ)
+	$(CXX) -o $@ $^ $(LFLAGS)

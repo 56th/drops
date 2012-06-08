@@ -14,51 +14,18 @@ OBJ = $(CPP:%.cpp=%.o)
 # include common rules:
 include ../Make.common
 
-SER_EXEC =  ip1test ip2test mattest prolongationp2test reftest testfe \
-            tetrabuildertest sbuffer minres meshreader restrictp2 vectest \
-            p2local quadbase globallist triang quadCut bicgstab gcr blockmat \
-            mass quad5 downwind quad5_2D interfaceP1FE serialization xfem \
-            directsolver f_Gamma neq splitboundary reparam_init reparam \
-            extendP1onChild principallattice quad_extra
-            
-PAR_EXEC =  dist_streamtest dist_remotedatatest \
-            dist_sendtetraofbrick dist_simplexsend dist_interface dist_exchange \
-            dist_poisson dist_sdropsP2 dist_twophasedrops dist_ref dist_modify \
-            dist_TestRefPar dist_ref_rising_drop dist_migration dist_interp2 dist_interp1
-            
-EXEC = $(if $(PAR_BUILD),$(PAR_EXEC),$(SER_EXEC))
-
-
-PAR_OBJ_ = ../parallel/parallel.o ../parallel/partime.o  \
-           ../parallel/exchange.o  ../parallel/parmultigrid.o \
-           ../parallel/logger.o ../parallel/DiST.o ../parallel/mpistream.o \
-           ../parallel/loadbal.o ../parallel/migrateunknowns.o \
-           ../parallel/decompose.o
-
-PAR_OBJ = $(if $(PAR_BUILD),$(PAR_OBJ_),)
-
-TESTNAME = drivencavity-adaptiv-schur drivencavity-adaptiv-uzawa \
-    navierstokes-stationaer-uniform \
-    poisson-instationaer-uniform poisson-stationaer-adaptiv \
-    poisson-stationaer-multigrid poisson-stationaer-neumann \
-    poisson-stationaer-uniform stokes-instationaer-uniform \
-    stokes-stationaer-uniform
+EXEC =  ip1test ip2test mattest prolongationp2test reftest testfe \
+        tetrabuildertest sbuffer minres meshreader restrictp2 vectest \
+        p2local quadbase globallist triang quadCut bicgstab gcr blockmat \
+        mass quad5 downwind quad5_2D interfaceP1FE serialization xfem \
+        directsolver f_Gamma neq splitboundary reparam_init reparam \
+        extendP1onChild principallattice quad_extra
 
 # rules
 
 all: $(EXEC)
 
 default: ClrScr
-
-dist: dist_streamtest dist_remotedatatest dist_sendtetraofbrick dist_modify dist_simplexsend dist_interface dist_exchange dist_poisson dist_sdropsP2 dist_twophasedrops \
-    dist_ref dist_TestRefPar dist_migration dist_interp2 dist_interp1 dist_ref_rising_drop
-
-check: $(TESTNAME:%=check_%) ip1check
-	@echo "--> All testcases have been executed!"
-
-check_%:
-	cd ../$$(./testinfo "makedir" $*) && $(MAKE) $$(../${DIR}/testinfo "maketarget" $*)
-	./runtest $*
 
 reftest: \
     ../tests/reftest.o ../geom/boundary.o ../geom/builder.o ../geom/simplex.o ../geom/multigrid.o \
@@ -265,136 +232,6 @@ quad_extra: \
     ../geom/boundary.o ../geom/topo.o ../num/unknowns.o ../misc/problem.o \
     ../num/fe.o ../num/discretize.o ../num/interfacePatch.o\
     ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o
-	$(CXX) -o $@ $^ $(LFLAGS)
-
-dist_streamtest: \
-    ../tests/dist_streamtest.o \
-    ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
-    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
-    ../num/fe.o ../num/interfacePatch.o ../misc/scopetimer.o $(PAR_OBJ)
-	$(CXX) -o $@ $^ $(LFLAGS)
-
-dist_remotedatatest: \
-    ../tests/dist_remotedatatest.o \
-    ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
-    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
-    ../num/fe.o ../num/interfacePatch.o ../misc/scopetimer.o $(PAR_OBJ)
-	$(CXX) -o $@ $^ $(LFLAGS)
-
-dist_sendtetraofbrick: \
-    ../tests/dist_sendtetraofbrick.o \
-    ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
-    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
-    ../num/fe.o ../num/interfacePatch.o ../misc/scopetimer.o $(PAR_OBJ)
-	$(CXX) -o $@ $^ $(LFLAGS)
-
-dist_modify: \
-    ../tests/dist_modify.o \
-    ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
-    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
-    ../num/fe.o ../num/interfacePatch.o ../misc/scopetimer.o $(PAR_OBJ)
-	$(CXX) -o $@ $^ $(LFLAGS)
-
-dist_simplexsend: \
-    ../tests/dist_simplexsend.o  \
-    ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
-    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
-    ../num/fe.o ../num/interfacePatch.o ../misc/scopetimer.o $(PAR_OBJ)
-	$(CXX) -o $@ $^ $(LFLAGS)
-
-dist_interface: \
-    ../tests/dist_interface.o  \
-    ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
-    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
-    ../num/fe.o ../num/interfacePatch.o ../misc/scopetimer.o $(PAR_OBJ)
-	$(CXX) -o $@ $^ $(LFLAGS)
-
-dist_ref: \
-    ../tests/dist_ref.o \
-    ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
-    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o ../out/vtkOut.o ../parallel/parmultigrid.o \
-    ../num/fe.o ../num/interfacePatch.o ../levelset/levelset.o ../levelset/fastmarch.o ../levelset/surfacetension.o \
-    ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o \
-    ../misc/scopetimer.o $(PAR_OBJ)
-	$(CXX) -o $@ $^ $(LFLAGS)
-
-dist_migration: \
-    ../tests/dist_migration.o \
-    ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
-    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o ../out/vtkOut.o ../parallel/parmultigrid.o \
-    ../num/fe.o ../num/interfacePatch.o ../levelset/levelset.o ../levelset/fastmarch.o ../levelset/surfacetension.o \
-    ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o $(PAR_OBJ) \
-    ../misc/bndmap.o ../geom/bndVelFunctions.o ../geom/bndScalarFunctions.o \
-    ../stokes/instatstokes2phase.o ../misc/scopetimer.o
-	$(CXX) -o $@ $^ $(LFLAGS)
-
-dist_TestRefPar: \
-    ../tests/dist_TestRefPar.o \
-    ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
-    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o ../out/vtkOut.o ../parallel/parmultigrid.o \
-    ../num/fe.o ../num/interfacePatch.o ../levelset/levelset.o ../levelset/fastmarch.o ../levelset/surfacetension.o \
-    ../misc/params.o ../out/output.o ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o \
-    ../num/quadrature.o ../misc/scopetimer.o $(PAR_OBJ)
-	$(CXX) -o $@ $^ $(LFLAGS)
-
-dist_ref_rising_drop: \
-    ../tests/dist_ref_rising_drop.o \
-    ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
-    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o ../out/vtkOut.o ../parallel/parmultigrid.o \
-    ../num/fe.o ../num/interfacePatch.o ../levelset/levelset.o ../levelset/fastmarch.o ../levelset/surfacetension.o \
-    ../misc/params.o ../out/output.o ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o \
-    ../misc/scopetimer.o $(PAR_OBJ)
-	$(CXX) -o $@ $^ $(LFLAGS)
-
-
-dist_exchange: \
-    ../tests/dist_exchange.o  \
-    ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
-    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
-    ../num/fe.o ../num/interfacePatch.o ../misc/scopetimer.o $(PAR_OBJ)
-	$(CXX) -o $@ $^ $(LFLAGS)
-
-dist_poisson: \
-    ../tests/dist_poisson.o ../geom/boundary.o ../geom/builder.o\
-    ../geom/simplex.o ../geom/multigrid.o ../num/unknowns.o ../geom/topo.o \
-    ../poisson/poisson.o ../misc/problem.o ../misc/utils.o ../out/output.o \
-    ../num/fe.o ../num/discretize.o ../num/interfacePatch.o ../geom/geomselect.o\
-    ../misc/params.o ../out/vtkOut.o ../misc/bndmap.o ../geom/bndScalarFunctions.o\
-    ../geom/bndVelFunctions.o ../poisson/poissonCoeff.o \
-    ../num/hypre.o ../misc/scopetimer.o $(PAR_OBJ)
-	$(CXX) -o $@ $^ $(LFLAGS)
-
-dist_sdropsP2: \
-    ../tests/dist_sdropsP2.o ../geom/boundary.o ../geom/builder.o ../geom/simplex.o ../geom/multigrid.o \
-    ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o \
-    ../misc/utils.o ../num/discretize.o ../num/interfacePatch.o \
-    ../num/fe.o ../stokes/integrTime.o ../geom/reftetracut.o ../geom/principallattice.o \
-    ../misc/scopetimer.o $(PAR_OBJ)
-	$(CXX) -o $@ $^ $(LFLAGS)
-
-dist_twophasedrops: \
-    ../tests/dist_twophasedrops.o ../geom/boundary.o ../geom/builder.o ../geom/simplex.o ../geom/multigrid.o \
-    ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o ../levelset/levelset.o \
-    ../misc/utils.o ../out/output.o ../num/discretize.o ../navstokes/instatnavstokes2phase.o \
-    ../misc/params.o ../levelset/fastmarch.o ../stokes/instatstokes2phase.o ../num/MGsolver.o \
-    ../num/fe.o ../stokes/integrTime.o  ../num/interfacePatch.o ../out/vtkOut.o ../levelset/surfacetension.o \
-    ../geom/geomselect.o  ../levelset/twophaseutils.o ../num/hypre.o ../levelset/coupling.o ../geom/bndVelFunctions.o \
-    ../geom/bndScalarFunctions.o ../misc/bndmap.o ../levelset/twophaseCoeff.o  \
-    ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o \
-    ../num/renumber.o ../surfactant/ifacetransp.o \
-    ../misc/scopetimer.o $(PAR_OBJ)
-	$(CXX) -o $@ $^ $(LFLAGS)
-	
-dist_interp2: \
-    ../tests/dist_interp2.o ../geom/simplex.o ../geom/multigrid.o ../geom/topo.o ../out/output.o \
-    ../num/unknowns.o ../geom/builder.o ../misc/problem.o ../num/interfacePatch.o \
-    ../num/fe.o ../geom/boundary.o ../misc/utils.o ../num/discretize.o $(PAR_OBJ)
-	$(CXX) -o $@ $^ $(LFLAGS)
-	
-dist_interp1: \
-    ../tests/dist_interp1.o ../geom/simplex.o ../geom/multigrid.o ../geom/topo.o ../out/output.o \
-    ../num/unknowns.o ../geom/builder.o ../misc/problem.o ../num/interfacePatch.o \
-    ../num/fe.o ../geom/boundary.o ../misc/utils.o ../num/discretize.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 ../tests/directsolver.o:

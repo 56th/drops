@@ -8,7 +8,7 @@ include drops.conf
 
 # variables:
 
-PARPACKAGES = parallel levelset tests poisson 
+PARPACKAGES = parallel levelset partests poisson
 SERPACKAGES = geom num out misc poisson stokes navstokes tests levelset surfactant transport
 PACKAGES = $(SERPACKAGES) $(PARPACKAGES)
 BUILDPACKAGES = $(if $(PAR_BUILD),$(PARPACKAGES),$(SERPACKAGES))
@@ -31,9 +31,6 @@ distclean: $(PACKAGES:%=distclean_%) distclean_dox
 
 dep: deldepend $(PACKAGES:%=depend_%)
 	@echo "--> Actual dependencies generated in $(DEPFILE)!"
-
-check:
-	cd ./tests && $(MAKE) check
 
 doc:
 	doxygen dox.cfg
@@ -59,12 +56,6 @@ distclean_%:
 distclean_dox:
 	cd ./doc && rm -rf dox
 
-clean_DDD:
-	cd $(DDD_HOME) && gmake clean && cd $(DROPS_ROOT)
-
-clean_ParMetis:
-	cd $(PARMETIS_HOME) && gmake clean && cd $(DROPS_ROOT)
-
 clean_HYPRE:
 	cd $(HYPRE_HOME) && gmake clean && cd $(DROPS_ROOT)
 
@@ -82,18 +73,6 @@ depend_%:
 
 prog_%:
 	cd $(@D) && $(MAKE) $(*F)
-
-libs: DDD ParMetis
-
-clean_libs: clean_DDD clean_ParMetis
-
-DDD:
-	cd $(DDD_HOME) && ./install && gmake clean && \
-	gmake -j ARCH_CFLAGS="$(OPTFLAGS)" ARCH_TYPE="__PC__" ARCH_CC="$(ARCH_CC)" ARCH_LINK="$(ARCH_CC)"
-
-ParMetis:
-	cd $(PARMETIS_HOME) && gmake clean && \
-	gmake COPTIONS="$(OPTFLAGS)" CC="$(ARCH_CC)" LD="$(ARCH_CC)"
 
 HYPRE:	
 	cd $(HYPRE_HOME) && gmake install
