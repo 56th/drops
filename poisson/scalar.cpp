@@ -1,6 +1,6 @@
 /// \file  scalar.cpp
 /// \brief Solver for scalar problems with P1 functions or P2 functions
-/// \author LNM RWTH Aachen: Patrick Esser, Joerg Grande, Sven Gross, Eva Loch, Volker Reichelt, Yuanjun Zhang, Thorolf Schulte, Liang Zhang; SC RWTH Aachen: Oliver Fortmeier
+/// \author LNM RWTH Aachen: Patrick Esser, Joerg Grande, Sven Gross, Eva Loch, Volker Reichelt, Thorolf Schulte, Liang Zhang, Yuanjun Zhang; SC RWTH Aachen: Oliver Fortmeier
 
 /*
  * This file is part of DROPS.
@@ -256,10 +256,11 @@ void Strategy(PoissonCL& Poisson)
     std::cout << " o time " << timer.GetTime() << " s" << std::endl;
 
     // display problem size
+    // -------------------------------------------------------------------------
     std::cout << line << "Problem size\n";
 #ifdef _PAR
     std::vector<size_t> UnkOnProc= ProcCL::Gather( Poisson.x.Data.size(), 0);
-    const IdxT numUnk   = Poisson.idx.GetGlobalNumUnknowns( mg),
+    const IdxT numUnk   = Poisson.idx.GetGlobalNumUnknowns(),
                numAccUnk= std::accumulate(UnkOnProc.begin(), UnkOnProc.end(), 0);
 #else
     std::vector<size_t> UnkOnProc( 1);
@@ -310,6 +311,7 @@ void Strategy(PoissonCL& Poisson)
     }
 
     // Output-Registrations:
+#ifndef _PAR
     //Ensight format
     Ensight6OutCL* ensight = NULL;
     if (P.get<int>("Ensight.EnsightOut",0)){
@@ -322,6 +324,7 @@ void Strategy(PoissonCL& Poisson)
         ensight->Register( make_Ensight6Scalar( Poisson.GetSolution(), "Temperatur", filename + ".tp", true));
         ensight->Write();
     }
+#endif
     //VTK format
     VTKOutCL * vtkwriter = NULL;
     if (P.get<int>("VTK.VTKOut",0)){
@@ -361,6 +364,7 @@ void Strategy(PoissonCL& Poisson)
                 std::cout << " o -time " << timer.GetTime() << " s" << std::endl;
             }
 
+#ifndef _PAR
             if (ensight && step%P.get<int>("Ensight.EnsightOut", 0)==0){
                 std::cout << " o Ensight output ...\n";
                 timer.Reset();                
@@ -368,6 +372,7 @@ void Strategy(PoissonCL& Poisson)
                 timer.Stop();
                 std::cout << " o -time " << timer.GetTime() << " s" << std::endl;                
             }
+#endif
             if (vtkwriter && step%P.get<int>("VTK.VTKOut", 0)==0){
                 std::cout << " o VTK output ...\n";
                 timer.Reset();                  
@@ -379,7 +384,9 @@ void Strategy(PoissonCL& Poisson)
     }
 
     if (vtkwriter) delete vtkwriter;
+#ifndef _PAR
     if (ensight) delete ensight;
+#endif
     delete solver;
 }
 
@@ -399,7 +406,6 @@ int main (int argc, char** argv)
 {
 #ifdef _PAR
     DROPS::ProcInitCL procinit(&argc, &argv);
-    DROPS::ParMultiGridInitCL pmginit;
 #endif
     try
     {
@@ -471,11 +477,8 @@ int main (int argc, char** argv)
 
 #ifdef _PAR
         // Set parallel data structures
-        DROPS::ParMultiGridCL pmg= DROPS::ParMultiGridCL::Instance();
-        pmg.AttachTo( *mg);                                  // handling of parallel multigrid
-        DROPS::LoadBalHandlerCL lb( *mg, DROPS::metis);      // loadbalancing
-        lb.DoInitDistribution( DROPS::ProcCL::Master());     // distribute initial grid
-        lb.SetStrategy( DROPS::Recursive);                   // best distribution of data
+        DROPS::LoadBalCL lb( *mg);                    // loadbalancing
+        lb.DoMigration();    // distribute initial grid
 #endif
 
         timer.Stop();
@@ -489,11 +492,11 @@ int main (int argc, char** argv)
             std::cout << " refine (" << ref << ")\n";
             DROPS::MarkAll( *mg);
             mg->Refine();
+            // do loadbalancing
+    #ifdef _PAR
+            lb.DoMigration();
+    #endif
         }
-        // do loadbalancing
-#ifdef _PAR
-        lb.DoMigration();
-#endif
 
         timer.Stop();
         std::cout << " o time " << timer.GetTime() << " s" << std::endl;
@@ -520,5 +523,5 @@ int main (int argc, char** argv)
         delete probP2;
         return 0;
     }
-    catch (DROPS::DROPSErrCL err) { err.handle(); }
+    catch (DROPS::DROPSErrCL& err) { err.handle(); }
 }

@@ -268,7 +268,7 @@ double PoissonP1CL<Coeff>::CheckSolution(const VecDescCL& lsg,
   {
     if (sit->Unknowns.Exist(Idx))
 #ifdef _PAR
-      if (sit->IsExclusive())
+      if (sit->AmIOwner())
 #endif
       {
         diff= std::fabs( Lsg(sit->GetCoord(),t) - lsg.Data[sit->Unknowns(Idx)] );
@@ -282,7 +282,7 @@ double PoissonP1CL<Coeff>::CheckSolution(const VecDescCL& lsg,
 
   int Lsize = lsg.Data.size();
 #ifdef _PAR
-  Lsize   = lsg.RowIdx->GetGlobalNumUnknowns(MG_);
+  Lsize   = lsg.RowIdx->GetGlobalNumUnknowns();
   norm2   = ProcCL::GlobalSum(norm2, Drops_MasterC);
   maxdiff = ProcCL::GlobalMax(maxdiff, Drops_MasterC);
 #endif
@@ -1180,7 +1180,7 @@ double PoissonP2CL<Coeff>::CheckSolution(const VecDescCL& lsg, instat_scalar_fun
   {
     if (sit->Unknowns.Exist(Idx))
 #ifdef _PAR
-      if (sit->IsExclusive())
+      if (sit->AmIOwner())
 #endif
       {
         diff= std::fabs( Lsg(sit->GetCoord(),t) - lsg.Data[sit->Unknowns(Idx)] );

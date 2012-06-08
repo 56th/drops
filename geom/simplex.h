@@ -218,10 +218,10 @@ class VertexCL
 
     /// \brief get coordinate of this vertex
     inline const Point3DCL& GetCoord() const;
-#ifndef _PAR
+
     /// \brief change the coordinate of the vertex, e.g. ALE method in poisson problem
-    void ChangeCoord     (Point3DCL& p) { Coord_ = p; }
-#endif
+    void ChangeCoord     (Point3DCL& p);
+
     /// \brief Check if the vertex can be found in a triangulation level
     bool IsInTriang( Uint TriLevel) const { return  GetLevel() <= TriLevel; }
 

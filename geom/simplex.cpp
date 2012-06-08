@@ -96,6 +96,15 @@ void VertexCL::UpdateGID()
 
 #endif
 
+void VertexCL::ChangeCoord (__UNUSED__ Point3DCL& p)
+{
+#ifdef _PAR
+    throw DROPSErrCL("VertexCL::ChangeCoord in parallel not implemented, yet");
+#else
+    Coord_ = p;
+#endif
+}
+
 // E D G E  C L
 // ------------
 
