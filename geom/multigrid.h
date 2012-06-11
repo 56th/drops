@@ -624,11 +624,6 @@ inline void GetTrafoTr( SMatrixCL<3,3>& T, double& det, const TetraCL& t)
 void MarkAll (MultiGridCL&);
 void UnMarkAll (MultiGridCL&);
 
-#ifdef _PAR
-Ulint GetExclusiveVerts (const MultiGridCL&, Priority prio=PrioMaster, int lvl=-1);
-Ulint GetExclusiveEdges (const MultiGridCL&, Priority prio=PrioMaster, int lvl=-1);
-#endif
-
 } // end of namespace DROPS
 
 #endif

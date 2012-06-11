@@ -1,6 +1,6 @@
 /// \file simplex.cpp
 /// \brief classes that constitute the simplex
-/// \author LNM RWTH Aachen: Sven Gross, Eva Loch, Joerg Peters, Volker Reichelt; SC RWTH Aachen: Oliver Fortmeier
+/// \author LNM RWTH Aachen: Patrick Esser, Joerg Grande, Sven Gross, Eva Loch, Volker Reichelt; SC RWTH Aachen: Oliver Fortmeier
 
 /*
  * This file is part of DROPS.

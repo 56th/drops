@@ -68,7 +68,7 @@ namespace DROPS // for Strategy
 double GetTimeOffset(){
     double timeoffset = 0.0;
     const std::string restartfilename = P.get<std::string>("DomainCond.InitialFile");
-    if (P.get<std::int>("DomainCond.InitialCond") == -1){
+    if (P.get<int>("DomainCond.InitialCond") == -1){
         const std::string timefilename = restartfilename + "time";
         std::ifstream f_(timefilename.c_str());
         f_ >> timeoffset;

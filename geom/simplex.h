@@ -1,6 +1,6 @@
 /// \file simplex.h
 /// \brief classes that constitute the simplex
-/// \author LNM RWTH Aachen:Patrick Esser, Joerg Grande, Sven Gross, Eva Loch; SC RWTH Aachen: Oliver Fortmeier
+/// \author LNM RWTH Aachen: Patrick Esser, Joerg Grande, Sven Gross, Eva Loch, Volker Reichelt; SC RWTH Aachen: Oliver Fortmeier
 
 /*
  * This file is part of DROPS.
@@ -275,9 +275,6 @@ class VertexCL
     void UnPack( DiST::Helper::MPIistreamCL&);
     /// \brief Generate GID
     void UpdateGID();
-    /// \brief Check if simplex is exclusive
-    bool IsExclusive( const Priority=PrioMaster) const;
-    //{ return GetPrio()>=Priority; }// /*throw DROPSErrCL("VertexCL::IsExclusive: Not implemented yet, sorry");*/ }
     //@}
 #endif
 
@@ -397,9 +394,6 @@ class EdgeCL
     void UnPack( DiST::Helper::MPIistreamCL&);
     /// \brief Generate GID
     void UpdateGID();
-    /// \brief Check if simplex is exclusive
-    bool IsExclusive( const Priority=PrioMaster) const;
-        //{ throw DROPSErrCL("EdgeCL::IsExclusive: Not implemented yet, sorry"); }
     //@}
 #endif
 
@@ -499,9 +493,6 @@ class FaceCL
     /// \brief Generate GID
     void UpdateGID();
 
-    /// \brief Check if face is exclusive
-    bool IsExclusive( const Priority=PrioMaster) const;
-        //{ throw DROPSErrCL("FaceCL::IsExclusive: Not implemented yet, sorry"); }
     /// \brief Check if face is ghost
     bool IsGhost() const { return GetPrio()<PrioMaster; }
     /// \brief Get neighbor proc over the face
@@ -686,12 +677,9 @@ class TetraCL
     /// \brief Merge tetra with given tetra. Needed by DiST::TransferCL.
     void Merge( const TetraCL&);
 
-    /// \brief Check if simplex is exclusive
-    bool IsExclusive( const Priority=PrioMaster) const;
-
     bool IsProcBnd (Uint face) const { return Faces_[face]->IsOnProcBnd(); }     ///< check if face of tetra is on processor-boundary
-    bool    IsGhost    () const { return GetPrio()<PrioMaster; }                 ///< check if tetra is ghost
-    bool    HasGhost   () const;                                                 ///< check if tetra has a ghost-copy somewhere
+    bool IsGhost    () const { return GetPrio()<PrioMaster; }                    ///< check if tetra is ghost
+    bool HasGhost   () const;                                                    ///< check if tetra has a ghost-copy somewhere
     //@}
 #endif
 

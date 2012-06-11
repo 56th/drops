@@ -1158,14 +1158,14 @@ void FastmarchingOnMasterCL::CreateGlobNumb()
 {
     Comment("Create global numbering\n", DebugParallelNumC);
     const IdxT numDoF   = data_.phi.RowIdx->NumUnknowns();
-    const IdxT idx      = data_.phi.RowIdx->GetIdx();
-    const Uint lvl      = data_.phi.GetLevel();
+//    const IdxT idx      = data_.phi.RowIdx->GetIdx();
+//    const Uint lvl      = data_.phi.GetLevel();
     IdxT numExclusiveDoF= 0;
     globNumb_.resize(0); globNumb_.resize(numDoF, NoIdx);
     size_= numDoF;
 
     // If owning an exclusive DoF, put them into list, otherwise this dof is NoIdx
-    DROPS_FOR_TRIANG_VERTEX( data_.mg, lvl, it){
+/*    DROPS_FOR_TRIANG_VERTEX( data_.mg, lvl, it){
         if ( it->IsExclusive(PrioMaster)){
             globNumb_[ it->Unknowns(idx)] = numExclusiveDoF++;
         }
@@ -1174,7 +1174,7 @@ void FastmarchingOnMasterCL::CreateGlobNumb()
         if ( it->IsExclusive(PrioMaster)){
             globNumb_[ it->Unknowns(idx)] = numExclusiveDoF++;
         }
-    }
+    }*/
     locNumb_.resize( numExclusiveDoF, NoIdx);
 
     // Get offset for each process
@@ -1281,24 +1281,24 @@ void FastmarchingOnMasterCL::CollectLocalData(std::vector<byte>& typ, std::vecto
     values.clear();
     locNumb_.clear();
     DROPS_FOR_TRIANG_VERTEX( data_.mg, lvl, it){
-        if ( it->IsExclusive(PrioMaster)){
+//        if ( it->IsExclusive(PrioMaster)){
             const IdxT dof= it->Unknowns(idx);
             typ.push_back( data_.typ[ dof]);
             for ( int i=0; i<3; ++i)
                 coord.push_back( data_.coord[ dof][i]);
             values.push_back( data_.phi.Data[ dof]);
             locNumb_.push_back( dof);
-        }
+//        }
     }
     DROPS_FOR_TRIANG_EDGE( data_.mg, lvl, it){
-        if ( it->IsExclusive(PrioMaster)){
+//        if ( it->IsExclusive(PrioMaster)){
             const IdxT dof= it->Unknowns(idx);
             typ.push_back( data_.typ[ dof]);
             for ( int i=0; i<3; ++i)
                 coord.push_back( data_.coord[ dof][i]);
             values.push_back( data_.phi.Data[ dof]);
             locNumb_.push_back( dof);
-        }
+//        }
     }
 
     // collect all tetrahedra

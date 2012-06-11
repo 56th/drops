@@ -541,7 +541,6 @@ class TransferableCL
     int                     GetOwner()    const { return GetRemoteData().GetOwnerProc(); }   ///< Get the process rank of the owning process
     bool                    AmIOwner()    const { return GetRemoteData().AmIOwner(); }       ///< Check if I am the owner
     virtual bool            IsOnProcBnd() const { return GetRemoteData().IsOnProcBnd(); }    ///< Check if the simplex is located at a process boundary (overloaded by tetras)
-    virtual bool            IsExclusive( const Priority) const = 0;                          ///< Check if simplex is exclusive
     ProcList_const_iterator GetProcListBegin() const { return GetRemoteData().GetProcListBegin(); }
     ProcList_const_iterator GetProcListEnd()   const { return GetRemoteData().GetProcListEnd(); }
     //@}

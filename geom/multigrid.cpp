@@ -1143,29 +1143,9 @@ void UnMarkAll (DROPS::MultiGridCL& mg)
 #ifdef _PAR
          if (!It->IsMaster()) std::cerr <<"Marking non-master tetra for removement!!!\n";
 #endif
-            It->SetRemoveMark();
+         It->SetRemoveMark();
      }
 }
-
-#ifdef _PAR
-Ulint GetExclusiveVerts (const MultiGridCL &mg, Priority prio, int lvl)
-{
-    Ulint ret=0;
-    for (MultiGridCL::const_TriangVertexIteratorCL it(mg.GetTriangVertexBegin(lvl)), end(mg.GetTriangVertexEnd(lvl)); it != end; ++it)
-            if (it->IsExclusive(prio))
-                ++ret;
-    return ret;
-}
-
-Ulint GetExclusiveEdges(const MultiGridCL &mg, Priority prio, int lvl)
-{
-    Ulint ret=0;
-    for (MultiGridCL::const_TriangEdgeIteratorCL it(mg.GetTriangEdgeBegin(lvl)), end(mg.GetTriangEdgeEnd(lvl)); it != end; ++it)
-            if (it->IsExclusive(prio))
-                ++ret;
-    return ret;
-}
-#endif
 
 void ColorClassesCL::compute_neighbors (MultiGridCL::const_TriangTetraIteratorCL begin,
                                         MultiGridCL::const_TriangTetraIteratorCL end,

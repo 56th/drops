@@ -408,29 +408,5 @@ inline bool TetraCL::HasGhost () const
     return true;
 }
 
-inline bool TetraCL::IsExclusive( const Priority prio) const
-/** A tetrahedron is exclusive, if it is the master copy*/
-{
-    return GetPrio()>=prio;
-}
-
-inline bool VertexCL::IsExclusive( const Priority prio) const
-/** A tetrahedron is exclusive, if it is the master copy*/
-{
-    return GetPrio()>=prio;
-}
-
-inline bool EdgeCL::IsExclusive( const Priority prio) const
-/** A tetrahedron is exclusive, if it is the master copy*/
-{
-    return GetPrio()>=prio;
-}
-
-inline bool FaceCL::IsExclusive( const Priority prio) const
-/** A tetrahedron is exclusive, if it is the master copy*/
-{
-    return GetPrio()>=prio;
-}
-
 #endif
 }
