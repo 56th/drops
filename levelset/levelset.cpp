@@ -23,6 +23,8 @@
 */
 
 #include "levelset/levelset.h"
+#include "num/krylovsolver.h"
+#include "num/precond.h"
 #include "levelset/fastmarch.h"
 #include "num/lattice-eval.h"
 #include "num/quadrature.h"
@@ -714,7 +716,7 @@ void LevelsetP2CL::SmoothPhi( VectorCL& SmPhi, double diff) const
     C.LinComb( 1, M, diff, A);
 #ifndef _PAR
     SSORPcCL pc;
-    PCG_SsorCL pcg( pc, 500, 1e-10);
+    PCGSolverCL<SSORPcCL> pcg( pc, 500, 1e-10);
     pcg.Solve( C, SmPhi, M*Phi.Data);
     __UNUSED__ double inf_norm= supnorm( SmPhi-Phi.Data);
 #else

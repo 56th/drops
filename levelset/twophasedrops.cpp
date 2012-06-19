@@ -45,10 +45,8 @@
 #include "misc/bndmap.h"
 //solver factory for stokes
 #include "num/stokessolverfactory.h"
-#ifndef _PAR
-#include "num/stokessolver.h"
-#else
-#include "num/parstokessolver.h"
+#include "num/oseensolver.h"
+#ifdef _PAR
 #include "parallel/loadbal.h"
 #include "parallel/parmultigrid.h"
 #endif

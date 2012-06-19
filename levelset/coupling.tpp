@@ -1136,7 +1136,7 @@ void RecThetaScheme2PhaseCL<LsetSolverT,RelaxationPolicyT>::ComputePressure ()
     VectorCL b3( b2.size());
 
 #ifndef _PAR
-    SchurComplMatrixCL<PCG_SsorCL, MLMatrixCL> S( Msolver_, Stokes_.M.Data, Stokes_.B.Data);
+    SchurComplMatrixCL<PCGSolverCL<SSORPcCL>, MLMatrixCL> S( Msolver_, Stokes_.M.Data, Stokes_.B.Data);
 #else
     ParSchurComplMatrixCL<MsolverT, MLMatrixCL, ExchangeCL> S(Msolver_, Stokes_.M.Data, Stokes_.B.Data, Stokes_.vel_idx.GetEx());
 #endif

@@ -98,6 +98,7 @@ namespace DROPS // for Strategy
 {
 
 using ::MyPdeCL;
+typedef PCGSolverCL<SSORPcCL>     PCG_SsorCL;
 
 class Uzawa_PCG_CL : public UzawaSolverCL<PCG_SsorCL>
 {

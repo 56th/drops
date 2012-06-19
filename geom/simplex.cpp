@@ -34,7 +34,7 @@
 #endif
 
 #include "geom/multigrid.h"
-#include "num/solver.h"
+#include "num/gauss.h"
 #include <iterator>
 
 namespace DROPS

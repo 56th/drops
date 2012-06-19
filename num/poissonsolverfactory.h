@@ -34,7 +34,8 @@
 #ifndef POISSONSOLVERFACTORY_H_
 #define POISSONSOLVERFACTORY_H_
 
-#include "num/solver.h"
+#include "num/krylovsolver.h"
+#include "num/precond.h"
 #include "misc/params.h"
 #ifdef _HYPRE
 #include "num/hypre.h"
@@ -121,6 +122,7 @@ class PoissonSolverFactoryCL
     SGSsmoothCL  sgssmoother_;   // symmetric Gauss-Seidel
     SORsmoothCL  sorsmoother_;   // Gauss-Seidel with over-relaxation
     SSORsmoothCL ssorsmoother_;  // symmetric Gauss-Seidel with over-relaxation
+    typedef PCGSolverCL<SSORPcCL>     PCG_SsorCL;
     PCG_SsorCL   coarsesolversymm_;
     typedef MGSolverCL<JORsmoothCL, PCG_SsorCL, ProlongationT> MGSolversymmJORT;
     MGSolversymmJORT MGSolversymmJOR_;

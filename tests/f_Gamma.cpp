@@ -26,8 +26,8 @@
 #include "out/output.h"
 #include "geom/builder.h"
 #include "stokes/instatstokes2phase.h"
-#include "stokes/integrTime.h"
-#include "num/stokessolver.h"
+#include "num/krylovsolver.h"
+#include "num/precond.h"
 #include "levelset/coupling.h"
 #include "misc/params.h"
 #include "levelset/surfacetension.h"
@@ -310,6 +310,7 @@ void Compare_LaplBeltramiSF_ConstSF( InstatStokes2PhaseP2P1CL& Stokes, const Lse
     std::cout << "|d| = \t\t" << norm(d) << std::endl;
     VectorCL A_inv_d( d.size());
     SSORPcCL pc;
+    typedef PCGSolverCL<SSORPcCL>     PCG_SsorCL;
     PCG_SsorCL cg( pc, 1000, 1e-18);
     std::cout << "Solving system with stiffness matrix:\t";
     cg.Solve( Stokes.A.Data, A_inv_d, d);
@@ -432,6 +433,6 @@ int main (int argc, char** argv)
     Compare_LaplBeltramiSF_ConstSF( prob, lsbnd);
     return 0;
   }
-  catch (DROPS::DROPSErrCL err) { err.handle(); }
+  catch (DROPS::DROPSErrCL& err) { err.handle(); }
 }
 

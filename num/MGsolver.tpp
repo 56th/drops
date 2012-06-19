@@ -22,6 +22,8 @@
  * Copyright 2009 LNM/SC RWTH Aachen, Germany
 */
 
+#include "num/gauss.h"
+
 namespace DROPS {
 
 template <class SmootherCL, class DirectSolverCL, class ProlongationIteratorT>

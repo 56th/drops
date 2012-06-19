@@ -127,7 +127,7 @@ dist_sdropsP2: \
     ../partests/dist_sdropsP2.o ../geom/boundary.o ../geom/builder.o ../geom/simplex.o ../geom/multigrid.o \
     ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o \
     ../misc/utils.o ../num/discretize.o ../num/interfacePatch.o \
-    ../num/fe.o ../stokes/integrTime.o ../geom/reftetracut.o ../geom/principallattice.o \
+    ../num/fe.o ../geom/reftetracut.o ../geom/principallattice.o \
     ../misc/scopetimer.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 

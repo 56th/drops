@@ -25,7 +25,7 @@
 #include "out/output.h"
 #include "geom/builder.h"
 #include "stokes/stokes.h"
-#include "num/stokessolver.h"
+#include "num/oseensolver.h"
 #include "num/nssolver.h"
 #include "navstokes/navstokes.h"
 #include <fstream>
@@ -94,14 +94,14 @@ namespace DROPS // for Strategy
 
 using ::MyStokesCL;
 
-class Uzawa_PCG_CL : public UzawaSolverCL<PCG_SsorCL>
+class Uzawa_PCG_CL : public UzawaSolverCL<PCGSolverCL<SSORPcCL> >
 {
   private:
     SSORPcCL   _ssor;
-    PCG_SsorCL _PCGsolver;
+    PCGSolverCL<SSORPcCL> _PCGsolver;
   public:
     Uzawa_PCG_CL( MatrixCL& M, int outer_iter, double outer_tol, int inner_iter, double inner_tol, double tau= 1., double omega=1.)
-        : UzawaSolverCL<PCG_SsorCL>( _PCGsolver, M, outer_iter, outer_tol, tau),
+        : UzawaSolverCL<PCGSolverCL<SSORPcCL> >( _PCGsolver, M, outer_iter, outer_tol, tau),
           _ssor( omega), _PCGsolver(_ssor, inner_iter, inner_tol)
         {}
 };

@@ -26,7 +26,7 @@
 #include "geom/multigrid.h"
 #include "geom/builder.h"
 #include "navstokes/instatnavstokes2phase.h"
-#include "stokes/integrTime.h"
+//#include "stokes/integrTime.h"
 #include "out/output.h"
 #include "out/ensightOut.h"
 #include "out/vtkOut.h"
@@ -41,9 +41,7 @@
 #include "misc/bndmap.h"
 
 #include "num/stokessolverfactory.h"
-#ifndef _PAR
-#include "num/stokessolver.h"
-#else
+#ifdef _PAR
 #include "num/parstokessolver.h"
 #include "parallel/loadbal.h"
 #include "parallel/parmultigrid.h"

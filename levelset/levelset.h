@@ -27,7 +27,6 @@
 
 #include "num/spmat.h"
 #include "num/discretize.h"
-#include "num/solver.h"
 #include "num/bndData.h"
 #include "num/fe.h"
 #include "num/fe_repair.h"
@@ -39,8 +38,6 @@
 
 #ifdef _PAR
 # include "parallel/exchange.h"
-# include "num/parsolver.h"
-# include "num/parprecond.h"
 # include "misc/container.h"
 #endif
 

@@ -1,5 +1,5 @@
 /// \file parlanczos.tpp
-/// \brief Parallel lanczos algorithms for QMR itartive solver
+/// \brief Parallel lanczos algorithms for QMR iterative solver
 /// \author LNM RWTH Aachen: Sven Gross, Joerg Peters, Volker Reichelt; SC RWTH Aachen: Oliver Fortmeier
 
 /*

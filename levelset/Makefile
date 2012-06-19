@@ -54,7 +54,7 @@ surfTens: \
     ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o ../levelset/levelset.o \
     ../misc/utils.o ../out/output.o ../num/discretize.o \
     ../misc/params.o ../levelset/fastmarch.o ../stokes/instatstokes2phase.o ../navstokes/instatnavstokes2phase.o \
-    ../num/fe.o ../out/ensightOut.o ../stokes/integrTime.o ../num/MGsolver.o ../misc/bndmap.o \
+    ../num/fe.o ../out/ensightOut.o ../num/oseenprecond.o ../num/MGsolver.o ../misc/bndmap.o \
     ../num/interfacePatch.o ../levelset/surfacetension.o ../levelset/coupling.o ../geom/bndVelFunctions.o \
     ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o \
     ../geom/bndScalarFunctions.o ../num/renumber.o
@@ -65,7 +65,7 @@ prJump: \
     ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o ../levelset/levelset.o \
     ../misc/utils.o ../out/output.o ../num/discretize.o \
     ../misc/params.o ../levelset/fastmarch.o ../stokes/instatstokes2phase.o ../num/MGsolver.o \
-    ../num/fe.o  ../out/ensightOut.o ../stokes/integrTime.o ../num/interfacePatch.o \
+    ../num/fe.o  ../out/ensightOut.o ../num/oseenprecond.o ../num/interfacePatch.o \
     ../levelset/surfacetension.o ../levelset/coupling.o ../geom/bndVelFunctions.o ../misc/bndmap.o \
     ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o \
     ../geom/bndScalarFunctions.o ../num/renumber.o
@@ -76,7 +76,7 @@ film: \
     ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o ../levelset/levelset.o \
     ../misc/utils.o ../out/output.o ../num/discretize.o ../navstokes/instatnavstokes2phase.o \
     ../misc/params.o ../levelset/fastmarch.o ../stokes/instatstokes2phase.o ../num/MGsolver.o\
-    ../num/fe.o ../out/ensightOut.o ../stokes/integrTime.o ../num/interfacePatch.o \
+    ../num/fe.o ../out/ensightOut.o ../num/oseenprecond.o ../num/interfacePatch.o \
     ../levelset/surfacetension.o ../levelset/coupling.o ../geom/bndVelFunctions.o ../misc/bndmap.o \
     ../levelset/filmCoeff.o ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o \
     ../geom/bndScalarFunctions.o ../num/renumber.o $(PAR_OBJ)
@@ -98,7 +98,7 @@ twophasedrops: \
     ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o ../levelset/levelset.o \
     ../misc/utils.o ../out/output.o ../num/discretize.o ../navstokes/instatnavstokes2phase.o \
     ../misc/params.o ../levelset/fastmarch.o ../stokes/instatstokes2phase.o ../num/MGsolver.o \
-    ../num/fe.o ../out/ensightOut.o ../stokes/integrTime.o ../poisson/transport2phase.o \
+    ../num/fe.o ../out/ensightOut.o ../num/oseenprecond.o ../poisson/transport2phase.o \
     ../num/interfacePatch.o ../out/vtkOut.o ../surfactant/ifacetransp.o ../levelset/surfacetension.o \
     ../geom/geomselect.o  ../levelset/twophaseutils.o ../num/hypre.o ../levelset/coupling.o ../geom/bndVelFunctions.o \
     ../geom/bndScalarFunctions.o ../misc/bndmap.o ../levelset/twophaseCoeff.o \

@@ -26,8 +26,8 @@
 #include "out/output.h"
 #include "geom/builder.h"
 #include "navstokes/instatnavstokes2phase.h"
-#include "stokes/integrTime.h"
-#include "num/stokessolver.h"
+#include "num/krylovsolver.h"
+#include "num/precond.h"
 #include "num/nssolver.h"
 #include "out/output.h"
 #include "out/ensightOut.h"
@@ -47,6 +47,8 @@ DROPS::ParamCL P;
 
 namespace DROPS // for Strategy
 {
+
+typedef PCGSolverCL<SSORPcCL>     PCG_SsorCL;
 
 class PSchur_PCG_CL: public PSchurSolverCL<PCG_SsorCL>
 {

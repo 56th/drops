@@ -1,5 +1,5 @@
-/// \file stolessolver.cpp
-/// \brief solvers for the Stokes problem
+/// \file oseensolver.cpp
+/// \brief solvers for the Oseen problem
 /// \author LNM RWTH Aachen: Sven Gross, Joerg Peters, Volker Reichelt; SC RWTH Aachen:
 
 /*
@@ -22,7 +22,7 @@
  * Copyright 2009 LNM/SC RWTH Aachen, Germany
 */
 
-#include "num/stokessolver.h"
+#include "num/oseensolver.h"
 
 namespace DROPS
 {

@@ -35,6 +35,8 @@
 #include "stokes/instatstokes2phase.h"
 #include "out/output.h"
 #include "out/ensightOut.h"
+#include "num/krylovsolver.h"
+#include "num/precond.h"
 #include <fstream>
 #include <iomanip>
 

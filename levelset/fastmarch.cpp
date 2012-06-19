@@ -27,7 +27,6 @@
 #include "levelset/fastmarch.h"
 #include "misc/kd-tree/tree_builder.h"
 #include "misc/kd-tree/search.h"
-#include "num/solver.h"
 #include <fstream>
 #include <cstring>
 #ifdef _OPENMP

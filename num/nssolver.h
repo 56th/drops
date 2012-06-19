@@ -22,7 +22,7 @@
  * Copyright 2009 LNM/SC RWTH Aachen, Germany
 */
 
-#include "num/stokessolver.h"
+#include "num/oseensolver.h"
 #include "misc/problem.h"
 #ifdef _PAR
 #  include "parallel/exchange.h"

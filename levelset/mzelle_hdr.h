@@ -426,8 +426,8 @@ void SetInitialConditions(StokesT& Stokes, const LevelsetP2CL& lset, MultiGridCL
                                                                            P.get<int>("Stokes.OuterIter"), P.get<double>("Stokes.OuterTol"), 0.6, 50, &std::cout);
 #else
         SSORPcCL ssorpc;
-        PCG_SsorCL PCGsolver( ssorpc, 200, 1e-2, true);
-        typedef SolverAsPreCL<PCG_SsorCL> PCGPcT;
+        PCGSolverCL<SSORPcCL> PCGsolver( ssorpc, 200, 1e-2, true);
+        typedef SolverAsPreCL<PCGSolverCL<SSORPcCL> > PCGPcT;
         PCGPcT apc( PCGsolver);
         ISBBTPreCL bbtispc( &Stokes.B.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.M.Data.GetFinest(), Stokes.pr_idx.GetFinest(), 0.0, 1.0, 1e-4, 1e-4);
         InexactUzawaCL<PCGPcT, ISBBTPreCL, APC_SYM> inexactuzawasolver( apc, bbtispc, P.get<int>("Stokes.OuterIter"), P.get<double>("Stokes.OuterTol"), 0.6, 50);

@@ -26,7 +26,7 @@
 #define DROPS_MGSOLVER_H
 
 #include "misc/problem.h"
-#include "num/solver.h"
+#include "num/krylovsolver.h" // for SolverBaseCL
 
 #include <list>
 #include <cstring>

@@ -26,7 +26,7 @@
 #include "out/output.h"
 #include "geom/builder.h"
 #include "stokes/stokes.h"
-#include "num/stokessolver.h"
+#include "num/oseensolver.h"
 #include <fstream>
 
 
@@ -81,6 +81,8 @@ class StokesCoeffCL
 namespace DROPS // for Strategy
 {
 using ::MyStokesCL;
+typedef PCGSolverCL<SSORPcCL>     PCG_SsorCL;
+
 
 class Uzawa_PCG_CL : public UzawaSolverCL<PCG_SsorCL>
 {

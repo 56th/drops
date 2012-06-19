@@ -26,8 +26,8 @@
 #include "out/output.h"
 #include "geom/builder.h"
 #include "navstokes/instatnavstokes2phase.h"
-#include "stokes/integrTime.h"
-#include "num/stokessolver.h"
+#include "num/krylovsolver.h"
+#include "num/precond.h"
 #include "out/output.h"
 #include "out/ensightOut.h"
 #include "levelset/coupling.h"
@@ -74,6 +74,9 @@ double sigmaf (const DROPS::Point3DCL&, double) { return sigma; }
 
 namespace DROPS // for Strategy
 {
+
+typedef PCGSolverCL<SGSPcCL>      PCG_SgsCL;
+typedef PCGSolverCL<SSORPcCL>     PCG_SsorCL;
 
 class Uzawa_PCG_CL : public UzawaSolverCL<PCG_SsorCL>
 {

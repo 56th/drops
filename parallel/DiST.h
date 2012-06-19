@@ -1,6 +1,5 @@
 /// \file DiST.h
 /// \brief The DiST (short for distributed simplex type) module is responsible for the distributed geometric data structure on a parallel machine.
-/// It should replace the DDD library in the near future.
 /// \author LNM RWTH Aachen: Patrick Esser, Joerg Grande, Sven Gross, Yuanjun Zhang; SC RWTH Aachen: Oliver Fortmeier, Daniel Medina Cardona.
 
 /*
@@ -20,7 +19,7 @@
  * along with DROPS. If not, see <http://www.gnu.org/licenses/>.
  *
  *
- * Copyright 2009 LNM/SC RWTH Aachen, Germany
+ * Copyright 2012 LNM/SC RWTH Aachen, Germany
 */
 
 #ifndef DROPS_DIST_H

@@ -32,7 +32,7 @@ sdropsP2: \
     ../misc/utils.o ../out/output.o ../num/discretize.o ../num/MGsolver.o ../misc/params.o \
     ../out/ensightOut.o ../out/vtkOut.o ../stokes/integrTime.o ../geom/geomselect.o \
     ../misc/bndmap.o ../geom/bndVelFunctions.o ../stokes/stokesCoeff.o ../geom/principallattice.o \
-    ../geom/reftetracut.o
+    ../geom/reftetracut.o ../num/oseenprecond.o
 	$(CXX) -o $@ $^ $(LFLAGS)
 	
 errorestimator: \
@@ -41,7 +41,7 @@ errorestimator: \
     ../misc/utils.o ../num/discretize.o ../num/MGsolver.o ../misc/params.o \
     ../stokes/integrTime.o  ../geom/geomselect.o ../out/output.o \
     ../misc/bndmap.o ../geom/bndVelFunctions.o  ../stokes/stokesCoeff.o \
-    ../geom/principallattice.o ../geom/reftetracut.o
+    ../geom/principallattice.o ../geom/reftetracut.o ../num/oseenprecond.o
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 # include common rules:

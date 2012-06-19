@@ -27,7 +27,6 @@
 
 #include <vector>
 #include "misc/problem.h"
-#include "num/solver.h"
 #include "num/fe.h"
 #include "num/discretize.h"
 

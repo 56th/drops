@@ -27,12 +27,8 @@
 
 #include "navstokes/instatnavstokes2phase.h"
 #include "levelset/levelset.h"
-#include "num/MGsolver.h"
 #include "num/nssolver.h"
 #include <vector>
-#ifdef _PAR
-#include "num/parstokessolver.h"
-#endif
 
 namespace DROPS
 {
@@ -408,7 +404,7 @@ class RecThetaScheme2PhaseCL: public CoupledTimeDisc2PhaseBaseCL<LsetSolverT, Re
 
 #ifndef _PAR
     SSORPcCL ssorpc_;
-    PCG_SsorCL Msolver_;
+    PCGSolverCL<SSORPcCL> Msolver_;
     ISBBTPreCL ispc_;
     GCRSolverCL<ISBBTPreCL> Ssolver_;
 #else

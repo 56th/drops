@@ -22,13 +22,10 @@
  * Copyright 2009 LNM/SC RWTH Aachen, Germany
 */
 
-#ifndef _PAR
-#include "num/stokessolver.h"
-#else
-#include "num/parstokessolver.h"
+
+#include "num/oseensolver.h"
 #ifdef _HYPRE
 #include "num/hypre.h"
-#endif
 #endif
 
 #include "misc/params.h"
@@ -210,7 +207,7 @@ class StokesSolverFactoryCL : public StokesSolverFactoryBaseCL<StokesT, Prolonga
     VankaSchurPreCL vankaschurpc_;
     ISPreCL         isprepc_;
     ISMGPreCL       ismgpre_;
-    
+    typedef PCGSolverCL<SSORPcCL>     PCG_SsorCL;
     PCG_SsorCL isnonlinearprepc_;
     ISNonlinearPreCL<PCG_SsorCL> isnonlinearpc_;
 
@@ -944,9 +941,11 @@ class StokesSolverFactoryObsoleteCL : public StokesSolverFactoryBaseCL<StokesT, 
 
     //solver
     SSORPcCL   ssor_;
+    typedef PCGSolverCL<SSORPcCL>     PCG_SsorCL;
     PCG_SsorCL PCGsolver_;
     CGSolverCL CGsolver_;
     SGSPcCL    sgs_;
+    typedef PCGSolverCL<SGSPcCL>      PCG_SgsCL;
     PCG_SgsCL  PCGsgssolver_;
 
     //Minres

@@ -24,7 +24,8 @@
 
 #include "misc/utils.h"
 #include "num/spmat.h"
-#include "num/solver.h"
+#include "num/krylovsolver.h"
+#include "num/precond.h"
 
 using namespace DROPS;
 

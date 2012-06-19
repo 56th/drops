@@ -32,7 +32,7 @@
 
 // include numeric computing!
 #include "num/fe.h"
-#include "num/solver.h"
+#include "num/krylovsolver.h"
 #include "num/MGsolver.h"
 #include "poisson/integrTime.h"
 
@@ -60,8 +60,6 @@
 #include "parallel/partime.h"           // parallel time-messurement
 #include "parallel/parmultigrid.h"      // handle multigrid over different procs
 #include "parallel/loadbal.h"           // distribute multigrid
-#include "num/parsolver.h"              // various parallel solvers
-#include "num/parprecond.h"             // various parallel preconditioners
 #endif
 
 // include function container

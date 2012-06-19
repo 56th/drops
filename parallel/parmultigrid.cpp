@@ -4,7 +4,6 @@
 
 #include "parallel/parallel.h"
 #include "parallel/parmultigrid.h"
-#include "num/solver.h"
 #include <iostream>
 #include <limits>
 #include <iomanip>

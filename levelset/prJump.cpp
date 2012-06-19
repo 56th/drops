@@ -25,10 +25,8 @@
 #include "geom/multigrid.h"
 #include "geom/builder.h"
 #include "stokes/instatstokes2phase.h"
-#include "stokes/integrTime.h"
-#include "num/stokessolver.h"
-#include "num/MGsolver.h"
-#include "num/solver.h"
+#include "num/krylovsolver.h"
+#include "num/precond.h"
 #include "out/output.h"
 #include "out/ensightOut.h"
 #include "levelset/coupling.h"
@@ -288,7 +286,7 @@ void Strategy( InstatStokes2PhaseP2P1CL& Stokes, const LsetBndDataCL& lsbnd, Ada
     Stokes.SetupPrStiff( &Stokes.prA, lset); // makes no sense for P0
 
     SSORPcCL ssor;
-    PCG_SsorCL PCG( ssor, P.get<int>("Stokes.InnerIter"), P.get<double>("Stokes.InnerTol")); // for computing curvature force
+    PCGSolverCL<SSORPcCL> PCG( ssor, P.get<int>("Stokes.InnerIter"), P.get<double>("Stokes.InnerTol")); // for computing curvature force
 
     VelVecDescCL curv( vidx);
     VelVecDescCL curvForce( vidx);

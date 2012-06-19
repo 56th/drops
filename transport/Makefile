@@ -35,12 +35,12 @@ ns_transp: \
     ../navstokes/instatnavstokes2phase.o ../geom/bndScalarFunctions.o \
     ../geom/bndVelFunctions.o ../misc/bndmap.o ../misc/params.o \
     ../levelset/fastmarch.o ../stokes/instatstokes2phase.o ../num/MGsolver.o\
-    ../num/fe.o ../out/ensightOut.o ../stokes/integrTime.o ../transport/transportNitsche.o \
+    ../num/fe.o ../out/ensightOut.o ../transport/transportNitsche.o \
     ../num/interfacePatch.o ../levelset/fastmarch.o ../num/fe.o \
     ../out/vtkOut.o ../levelset/surfacetension.o ../geom/simplex.o ../surfactant/ifacetransp.o\
     ../geom/geomselect.o  ../levelset/twophaseutils.o ../num/hypre.o ../levelset/coupling.o \
     ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o \
-    ../num/quadrature.o ../num/renumber.o  $(PAR_OBJ)
+    ../num/quadrature.o ../num/renumber.o ../num/oseenprecond.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 

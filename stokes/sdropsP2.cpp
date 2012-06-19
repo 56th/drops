@@ -34,7 +34,7 @@
 
  // include numeric computing!
 #include "num/fe.h"
-#include "num/solver.h"
+#include "num/krylovsolver.h"
 #include "num/MGsolver.h"
 #include "stokes/integrTime.h"
 #include "num/stokessolverfactory.h"

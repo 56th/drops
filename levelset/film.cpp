@@ -27,7 +27,6 @@
 #include "geom/builder.h"
 //time integration
 #include "navstokes/instatnavstokes2phase.h"
-#include "stokes/integrTime.h"
 //output
 #include "out/output.h"
 #include "out/ensightOut.h"
@@ -44,7 +43,8 @@
 //solver factory for stokes
 #include "num/stokessolverfactory.h"
 #ifndef _PAR
-#include "num/stokessolver.h"
+#include "num/krylovsolver.h"
+#include "num/precond.h"
 #else
 #include "num/parstokessolver.h"
 #include "parallel/loadbal.h"
@@ -163,6 +163,7 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
 
         time.Reset();
         SSORPcCL ssorpc;
+        typedef PCGSolverCL<SSORPcCL>     PCG_SsorCL;
         PCG_SsorCL PCGsolver( ssorpc, P.get<int>("Stokes.InnerIter"), P.get<double>("Stokes.InnerTol"));
         PSchurSolverCL<PCG_SsorCL> schurSolver( PCGsolver, Stokes.prM.Data, P.get<int>("Stokes.OuterIter"), P.get<double>("Stokes.OuterTol"));
 

@@ -22,7 +22,8 @@
  * Copyright 2009 LNM/SC RWTH Aachen, Germany
 */
 
-#include "num/solver.h"
+#include "num/krylovsolver.h"
+#include "num/precond.h"
 #include <iostream>
 
 

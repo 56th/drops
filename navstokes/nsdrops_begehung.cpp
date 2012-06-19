@@ -26,7 +26,7 @@
 #include "out/output.h"
 #include "geom/builder.h"
 #include "stokes/stokes.h"
-#include "num/stokessolver.h"
+#include "num/oseensolver.h"
 #include "navstokes/navstokes.h"
 #include <fstream>
 
@@ -95,6 +95,8 @@ namespace DROPS // for Strategy
 {
 
 using ::MyStokesCL;
+
+typedef PCGSolverCL<SGSPcCL>      PCG_SgsCL;
 
 class PSchur_GSPCG_CL: public PSchurSolverCL<PCG_SgsCL>
 {

@@ -30,7 +30,8 @@
 #include "misc/problem.h"
 #include "num/fe.h"
 #include "num/discretize.h"
-#include "num/solver.h"
+#include "num/precond.h"
+#include "num/krylovsolver.h"
 #include "num/bndData.h"
 #include <iostream>
 #include <numeric>

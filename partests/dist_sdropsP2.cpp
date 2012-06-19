@@ -21,9 +21,9 @@
 #include "parallel/partime.h"           // parallel time-messurement
 #include "parallel/parmultigrid.h"      // handle multigrid over different procs
 #include "parallel/loadbal.h"           // distribute multigrid
-#include "num/parsolver.h"              // various parallel solvers
-#include "num/parprecond.h"             // various parallel preconditioners
-#include "num/parstokessolver.h"        // various parallel stokes solvers
+#include "num/krylovsolver.h"           // various parallel solvers
+#include "num/precond.h"                // various parallel preconditioners
+#include "num/oseensolver.h"            // various parallel stokes solvers
 #endif
 
  // include geometric computing
@@ -32,11 +32,9 @@
 
  // include numeric computing!
 #include "num/fe.h"
-#include "num/solver.h"
-#include "num/stokessolver.h"
 
  // include problem class
-#include "stokes/stokes.h"      // setting up the Poisson problem
+#include "stokes/stokes.h"      // setting up the Stokes problem
 #include "num/bndData.h"
 
  // include standards

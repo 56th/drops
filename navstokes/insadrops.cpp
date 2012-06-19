@@ -282,6 +282,9 @@ ResetSystem(DROPS::NavierStokesP2P1CL<Coeff>& NS)
 }
 
 namespace DROPS{
+
+typedef PCGSolverCL<SSORPcCL>     PCG_SsorCL;
+
 class Uzawa_PCG_CL : public UzawaSolverCL<PCG_SsorCL>
 {
   private:

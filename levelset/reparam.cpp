@@ -26,6 +26,8 @@
 #include "stokes/stokes.h"
 #include "levelset/levelset.h"
 #include "levelset/surfacetension.h"
+#include "num/krylovsolver.h"
+#include "num/precond.h"
 #include "out/ensightOut.h"
 
 double SmoothedSign( double x, double alpha)

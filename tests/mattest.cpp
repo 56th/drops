@@ -23,7 +23,7 @@
 */
 
 #include "misc/container.h"
-#include "num/solver.h"
+#include "num/gauss.h"
 
 const double dat[]= { 0., 1., 1., 2. };
 const double dat2[]= { 1., 0. };
