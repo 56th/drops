@@ -379,7 +379,7 @@ inline void TetraCL::LinkEdges (const ChildDataCL& childdat)
     for (Uint edge=0; edge<NumEdgesC; ++edge)
     {
 #ifdef _PAR
-        Assert(!ePtrs_[childdat.Edges[edge]]->IsMarkedForRemovement(), DiST::Helper::ErrorCL("TetraCL::LinkEdges: link edge that is marked for removement", ePtrs_[childdat.Edges[edge]]->GetGID(), GetGID()), ~0);
+        Assert(!ePtrs_[childdat.Edges[edge]]->IsMarkedForRemovement(), DiST::ErrorCL("TetraCL::LinkEdges: link edge that is marked for removement", ePtrs_[childdat.Edges[edge]]->GetGID(), GetGID()), ~0);
 #endif
         Edges_[edge]= ePtrs_[childdat.Edges[edge]];
     }

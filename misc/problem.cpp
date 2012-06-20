@@ -534,7 +534,7 @@ IdxT ExtIdxDescCL::UpdateXNumbering( IdxDescCL* Idx, const MultiGridCL& mg, cons
 }
 
 #ifdef _PAR
-bool ExtIdxDescCL::CommunicateXFEMNumbCL::Gather( const DiST::TransferableCL& t, DiST::Helper::SendStreamCL& s)
+bool ExtIdxDescCL::CommunicateXFEMNumbCL::Gather( const DiST::TransferableCL& t, DiST::SendStreamCL& s)
 {
     VertexCL* sp = 0;
     simplex_cast( t, sp);
@@ -546,7 +546,7 @@ bool ExtIdxDescCL::CommunicateXFEMNumbCL::Gather( const DiST::TransferableCL& t,
     return true;
 }
 
-bool ExtIdxDescCL::CommunicateXFEMNumbCL::Scatter( DiST::TransferableCL& t, const size_t numData, DiST::Helper::MPIistreamCL& r)
+bool ExtIdxDescCL::CommunicateXFEMNumbCL::Scatter( DiST::TransferableCL& t, const size_t numData, DiST::MPIistreamCL& r)
 {
     VertexCL* sp= 0;
     simplex_cast( t, sp);

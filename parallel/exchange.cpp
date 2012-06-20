@@ -1176,15 +1176,15 @@ class ExchangeBuilderCL::HandlerDOFSendCL : public ExchangeBuilderCL::HandlerDOF
 
     ///\name Handler for DiST::InterfaceCL
     //@{
-    bool Gather( DiST::TransferableCL&, DiST::Helper::SendStreamCL&);
-    bool Scatter( DiST::TransferableCL&, const size_t&, DiST::Helper::MPIistreamCL&);
+    bool Gather( DiST::TransferableCL&, DiST::SendStreamCL&);
+    bool Scatter( DiST::TransferableCL&, const size_t&, DiST::MPIistreamCL&);
     //@}
     /// \brief Build data structures for sending
     void buildSendStructures( ExchangeCL::SendListT& ex_sendlist1, ExchangeCL::SendListT& ex_sendlist2);
 };
 
 bool ExchangeBuilderCL::HandlerDOFSendCL::Gather( DiST::TransferableCL& t,
-    DiST::Helper::SendStreamCL& send)
+    DiST::SendStreamCL& send)
 /** If the simplex \a t is distributed among master copies, then put
     - (1) my rank,
     - (2) the dof (or NoInt_ if dof not in triang level on local proc),
@@ -1219,7 +1219,7 @@ bool ExchangeBuilderCL::HandlerDOFSendCL::Gather( DiST::TransferableCL& t,
 }
 
 bool ExchangeBuilderCL::HandlerDOFSendCL::Scatter( DiST::TransferableCL& t,
-    const size_t& numData, DiST::Helper::MPIistreamCL& recv)
+    const size_t& numData, DiST::MPIistreamCL& recv)
 /** DoF owners are determined. After that,
  *  - (1) send buffers for phase I are filled by all procs with distributed dofs,
  *  - (2) send buffers for phase II are filled by all DoF owners.
@@ -1310,7 +1310,7 @@ class ExchangeBuilderCL::HandlerDOFRecvCL : public ExchangeBuilderCL::HandlerDOF
     RecvDofT recvList1_, recvList2_;        ///< list by send positions, where to store the dof during phase 1 and 2
 
     /// \brief Read all information for phase 2 from stream \a recv and return data relevant for \a me in \a sendpos_dof and \a sendpos_ext.
-    void GetDOFPos( DiST::Helper::MPIistreamCL& recv, int me, int& sendpos_dof, int& sendpos_ext) const;
+    void GetDOFPos( DiST::MPIistreamCL& recv, int me, int& sendpos_dof, int& sendpos_ext) const;
 
   public:
     HandlerDOFRecvCL( IdxDescCL& rowidx, const MultiGridCL& mg, const HandlerDOFSendCL& handlerSend)
@@ -1318,15 +1318,15 @@ class ExchangeBuilderCL::HandlerDOFRecvCL : public ExchangeBuilderCL::HandlerDOF
 
     ///\name Handler for DiST::InterfaceCL
     //@{
-    bool Gather( DiST::TransferableCL&, DiST::Helper::SendStreamCL&);
-    bool Scatter( DiST::TransferableCL&, const size_t&, DiST::Helper::MPIistreamCL&);
+    bool Gather( DiST::TransferableCL&, DiST::SendStreamCL&);
+    bool Scatter( DiST::TransferableCL&, const size_t&, DiST::MPIistreamCL&);
     //@}
     /// \brief Build data structures for receiving
     void buildRecvStructures( ExchangeCL::RecvListT& ex_recvlist1, ExchangeCL::RecvListT& ex_recvlist2) const;
 };
 
 bool ExchangeBuilderCL::HandlerDOFRecvCL::Gather( DiST::TransferableCL& t,
-    DiST::Helper::SendStreamCL& send)
+    DiST::SendStreamCL& send)
 /** If the simplex \a t is distributed among master copies, send positions of (extended) dof have to be communicated
     for both communication phases and true is returned, else false is returned.
 
@@ -1403,7 +1403,7 @@ bool ExchangeBuilderCL::HandlerDOFRecvCL::Gather( DiST::TransferableCL& t,
 }
 
 bool ExchangeBuilderCL::HandlerDOFRecvCL::Scatter( DiST::TransferableCL& t,
-    const size_t& numData, DiST::Helper::MPIistreamCL& recv)
+    const size_t& numData, DiST::MPIistreamCL& recv)
 {
     const Uint idx= rowidx_.GetIdx();
     const bool haveDOF= t.Unknowns.Exist() && t.Unknowns.Exist( idx) && t.Unknowns.InTriangLevel(rowidx_.TriangLevel());
@@ -1461,7 +1461,7 @@ bool ExchangeBuilderCL::HandlerDOFRecvCL::Scatter( DiST::TransferableCL& t,
     return true;
 }
 
-void ExchangeBuilderCL::HandlerDOFRecvCL::GetDOFPos( DiST::Helper::MPIistreamCL& recv, int me,
+void ExchangeBuilderCL::HandlerDOFRecvCL::GetDOFPos( DiST::MPIistreamCL& recv, int me,
         int& sendpos_dof, int& sendpos_ext) const
 {
     // temporaries for receiving
@@ -1509,15 +1509,15 @@ class ExchangeBuilderCL::HandlerDOFNtoNSendCL : public HandlerDOFExchangeCL
 
     ///\name Handler for DiST::InterfaceCL
     //@{
-    bool Gather( DiST::TransferableCL&, DiST::Helper::SendStreamCL&);
-    bool Scatter( DiST::TransferableCL&, const size_t&, DiST::Helper::MPIistreamCL&);
+    bool Gather( DiST::TransferableCL&, DiST::SendStreamCL&);
+    bool Scatter( DiST::TransferableCL&, const size_t&, DiST::MPIistreamCL&);
     //@}
     /// \brief Build data structures for sending
     void buildSendStructures( ExchangeCL::SendListT& ex_sendlist);
 };
 
 bool ExchangeBuilderCL::HandlerDOFNtoNSendCL::Gather( DiST::TransferableCL& t,
-    DiST::Helper::SendStreamCL& send)
+    DiST::SendStreamCL& send)
 /** If the simplex \a t is distributed among master copies, then put
     - (1) my rank,
     - (2) the dof (or NoInt_ if dof not in triang level on local proc),
@@ -1551,7 +1551,7 @@ bool ExchangeBuilderCL::HandlerDOFNtoNSendCL::Gather( DiST::TransferableCL& t,
 }
 
 bool ExchangeBuilderCL::HandlerDOFNtoNSendCL::Scatter( DiST::TransferableCL& t,
-    const size_t& numData, DiST::Helper::MPIistreamCL& recv)
+    const size_t& numData, DiST::MPIistreamCL& recv)
 /** Send buffers for direct N-to-N communication are filled by all procs with distributed dofs.
  */
 {
@@ -1609,8 +1609,8 @@ class ExchangeBuilderCL::HandlerDOFNtoNRecvCL : public HandlerDOFExchangeCL
 
     ///\name Handler for DiST::InterfaceCL
     //@{
-    bool Gather( DiST::TransferableCL&, DiST::Helper::SendStreamCL&);
-    bool Scatter( DiST::TransferableCL&, const size_t&, DiST::Helper::MPIistreamCL&);
+    bool Gather( DiST::TransferableCL&, DiST::SendStreamCL&);
+    bool Scatter( DiST::TransferableCL&, const size_t&, DiST::MPIistreamCL&);
     //@}
     /// \brief Build data structures for receiving
     void buildRecvStructures( ExchangeCL::RecvListT& ex_recvlist) const
@@ -1618,7 +1618,7 @@ class ExchangeBuilderCL::HandlerDOFNtoNRecvCL : public HandlerDOFExchangeCL
 };
 
 bool ExchangeBuilderCL::HandlerDOFNtoNRecvCL::Gather( DiST::TransferableCL& t,
-    DiST::Helper::SendStreamCL& send)
+    DiST::SendStreamCL& send)
 /** The process informs all copies about the send position of the dof located at the simplex.
     Therefore, put once
     - (0) my rank
@@ -1666,7 +1666,7 @@ bool ExchangeBuilderCL::HandlerDOFNtoNRecvCL::Gather( DiST::TransferableCL& t,
 }
 
 bool ExchangeBuilderCL::HandlerDOFNtoNRecvCL::Scatter( DiST::TransferableCL& t,
-    const size_t& numData, DiST::Helper::MPIistreamCL& recv)
+    const size_t& numData, DiST::MPIistreamCL& recv)
 {
     // local dof
     const Uint idx= rowidx_.GetIdx();
@@ -1741,13 +1741,13 @@ class ExchangeBuilderCL::HandlerDOFIndexCL
         : rowidx_(rowidx), ownerDistrIndex_( ex.OwnerDistrIndex),
           dofProcList_( ex.dofProcList_) {}
     /// \brief Gather information about distributed dof on sender proc
-    bool Gather( DiST::TransferableCL&, DiST::Helper::SendStreamCL&);
+    bool Gather( DiST::TransferableCL&, DiST::SendStreamCL&);
     /// \brief Scatter information about distributed dof on sender proc
-    bool Scatter( DiST::TransferableCL&, const size_t&, DiST::Helper::MPIistreamCL&);
+    bool Scatter( DiST::TransferableCL&, const size_t&, DiST::MPIistreamCL&);
 };
 
 bool ExchangeBuilderCL::HandlerDOFIndexCL::Gather(
-    DiST::TransferableCL& t, DiST::Helper::SendStreamCL& send)
+    DiST::TransferableCL& t, DiST::SendStreamCL& send)
 /** For generating information about distributed dof, put my rank and the local (extended) dof
     into the buffer. Additionally, if this process is the owner of \a t, remember the dof as
     "owner dof."
@@ -1769,7 +1769,7 @@ bool ExchangeBuilderCL::HandlerDOFIndexCL::Gather(
 
 bool ExchangeBuilderCL::HandlerDOFIndexCL::Scatter(
     DiST::TransferableCL& t, const size_t& numData,
-    DiST::Helper::MPIistreamCL& recv)
+    DiST::MPIistreamCL& recv)
 /** Store dof information on other processes in the dofProcList_. */
 {
     const Uint idx= rowidx_.GetIdx();
@@ -1857,7 +1857,7 @@ void ExchangeBuilderCL::clearEx()
 int ExchangeBuilderCL::GetDOFOwner( const tmpRecvT& rcvTmp)
 /** Among all procs, which hold the local dof, take the one with minimal load. */
 {
-    const DiST::Helper::RemoteDataCL::LoadVecT& load= DiST::InfoCL::Instance().GetLoadVector();
+    const DiST::RemoteDataCL::LoadVecT& load= DiST::InfoCL::Instance().GetLoadVector();
     double minLoad= std::numeric_limits<double>::max();
     int owner = -1;
     for (tmpRecvT::const_iterator it= rcvTmp.begin(), end= rcvTmp.end(); it!=end; ++it) {

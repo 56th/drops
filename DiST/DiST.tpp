@@ -1,6 +1,5 @@
 /// \file DiST.tpp
 /// \brief The DiST (short for distributed simplex type) module is responsible for the distributed geometric data structure on a parallel machine.
-/// It should replace the DDD library in the near future.
 /// \author LNM RWTH Aachen: Patrick Esser, Joerg Grande, Sven Gross, Yuanjun Zhang; SC RWTH Aachen: Oliver Fortmeier, Daniel Medina Cardona.
 
 /*
@@ -20,7 +19,7 @@
  * along with DROPS. If not, see <http://www.gnu.org/licenses/>.
  *
  *
- * Copyright 2009 LNM/SC RWTH Aachen, Germany
+ * Copyright 2012 LNM/SC RWTH Aachen, Germany
 */
 
 namespace DROPS {
@@ -52,7 +51,6 @@ LevelListCL::LevelListCL( Uint max_level)
         push_back( lvl);
 }
 
-namespace Helper{
 
 template<class T>
 ErrorCL::ErrorCL(const std::string& mesg, const T& data, const GeomIdCL& gid)
@@ -295,17 +293,16 @@ inline WholeRemoteDataIteratorCL& WholeRemoteDataIteratorCL::operator= ( const W
     return *this;
 }
 
-}   // end of namespace Helper
 
 // T R A N S F E R A B L E  C L
 // ----------------------------
 
-inline const Helper::RemoteDataCL& TransferableCL::GetRemoteData() const
+inline const RemoteDataCL& TransferableCL::GetRemoteData() const
 {
     return InfoCL::Instance().GetRemoteData( *this);
 }
 
-inline Helper::RemoteDataCL& TransferableCL::GetRemoteData()
+inline RemoteDataCL& TransferableCL::GetRemoteData()
 {
     return InfoCL::Instance().GetRemoteData( *this);
 }
@@ -313,7 +310,7 @@ inline Helper::RemoteDataCL& TransferableCL::GetRemoteData()
 // I N T E R F A C E  C L
 // ----------------------
 
-inline Helper::MPIostreamCL& operator<< (Helper::MPIostreamCL& os,
+inline MPIostreamCL& operator<< (MPIostreamCL& os,
     const InterfaceCL::MessagesCL& m)
 {
     os << m.numData;
@@ -330,18 +327,18 @@ void InterfaceCL::GatherData( HandlerT& handler, const iterator& begin,
     const iterator& end, CommPhase phase)
 /** This function also allocates the memory for sending data to the owner processes. */
 {
-    typedef Helper::RemoteDataCL::ProcList_const_iterator ProcList_const_iterator;
+    typedef RemoteDataCL::ProcList_const_iterator ProcList_const_iterator;
 
     for ( iterator it( begin); it != end; ++it) {
         const int owner= it->second.GetOwnerProc();
         // Generates the sendbuf_ for owner, if not already there.
         // Needed for correctness, because the owner expects a (n empty) message.
-        Helper::SendStreamCL& buf= sendbuf_[owner];
+        SendStreamCL& buf= sendbuf_[owner];
         if (phase==fromowner && !it->second.AmIOwner()) // Check, if this process has to gather data.
             continue;
         // Check if gather wants to put something on the send stream and write
         // the GeomIdCL, and the associated sub-sendstream on the stream.
-        Helper::SendStreamCL tmp_buf( binary_);
+        SendStreamCL tmp_buf( binary_);
         if (handler.Gather( it->second.GetLocalObject(), tmp_buf))
             buf << it->first << tmp_buf;
     }
@@ -361,7 +358,7 @@ template <typename HandlerT, typename IStreamT>
 bool InterfaceCL::ScatterData( HandlerT& handler, IStreamT& recv)
 {
     bool result= true;
-    Helper::GeomIdCL gid;
+    GeomIdCL gid;
     size_t numData;
     while (recv >> gid) {
         recv >> numData;
@@ -371,14 +368,14 @@ bool InterfaceCL::ScatterData( HandlerT& handler, IStreamT& recv)
             throw DROPSErrCL("InterfaceCL::ScatterData: Receive stream is broken!");
         }
 #       endif
-        Helper::RemoteDataCL& rd= InfoCL::Instance().GetRemoteData( gid);
+        RemoteDataCL& rd= InfoCL::Instance().GetRemoteData( gid);
         const bool scatter_result= handler.Scatter( rd.GetLocalObject(), numData, recv);
         result= result && scatter_result;
 #       if DROPSDebugC & DebugDiSTC
             // check for delimiter
             char delim= '|';
             recv >> delim;
-            Assert( delim=='|', Helper::ErrorCL("InterfaceCL::ScatterData: "
+            Assert( delim=='|', ErrorCL("InterfaceCL::ScatterData: "
                 "incomplete receive while reading object ", gid), DebugDiSTC);
 #       endif
      }
@@ -465,17 +462,17 @@ bool InterfaceCL::ExecuteLocal( ExecuteHandlerT& handler, const IteratorT& begin
 
 // template specialization for tetras
 template <>
-void DiST::TransferCL::ReceiveSimplices<TetraCL>( DiST::Helper::RecvStreamCL& recvstream, size_t num);
+void DiST::TransferCL::ReceiveSimplices<TetraCL>( DiST::RecvStreamCL& recvstream, size_t num);
 
 /** Receive \a num simplices of type SimplexT from the \a recvstream and update the
     corresponding remote data list
 */
 template <typename SimplexT>
-void DiST::TransferCL::ReceiveSimplices( DiST::Helper::RecvStreamCL& recvstream, size_t num)
+void DiST::TransferCL::ReceiveSimplices( DiST::RecvStreamCL& recvstream, size_t num)
 {
     for ( size_t i=0; i<num; ++i) {
         SimplexT stmp;                                  // temporary to receive a single simplex
-        DiST::Helper::RemoteDataCL::ProcListT procList; // temporary to receive process list
+        DiST::RemoteDataCL::ProcListT procList; // temporary to receive process list
 
         // receive simplex
         stmp.UnPack( recvstream);
@@ -489,17 +486,17 @@ void DiST::TransferCL::ReceiveSimplices( DiST::Helper::RecvStreamCL& recvstream,
 // I N F O  C L A S S
 // ------------------
 
-const Helper::RemoteDataCL& InfoCL::GetRemoteData( const Helper::GeomIdCL& h) const
+const RemoteDataCL& InfoCL::GetRemoteData( const GeomIdCL& h) const
 {
-    Helper::RemoteDataListCL::const_iterator it= remoteData_[h.dim].find( h);
-    Assert( it!=remoteData_[h.dim].end(), Helper::ErrorCL( "InfoCL::GetRemoteData (const): Simplex not registered: ", h, Helper::NoGID), DebugDiSTC);
+    RemoteDataListCL::const_iterator it= remoteData_[h.dim].find( h);
+    Assert( it!=remoteData_[h.dim].end(), ErrorCL( "InfoCL::GetRemoteData (const): Simplex not registered: ", h, NoGID), DebugDiSTC);
     return it->second;
 }
 
-Helper::RemoteDataCL& InfoCL::GetRemoteData( const Helper::GeomIdCL& h)
+RemoteDataCL& InfoCL::GetRemoteData( const GeomIdCL& h)
 {
-    Helper::RemoteDataListCL::iterator it= remoteData_[h.dim].find( h);
-    Assert( it!=remoteData_[h.dim].end(), Helper::ErrorCL( "InfoCL::GetRemoteData: Simplex not registered: ", h, Helper::NoGID), DebugDiSTC);
+    RemoteDataListCL::iterator it= remoteData_[h.dim].find( h);
+    Assert( it!=remoteData_[h.dim].end(), ErrorCL( "InfoCL::GetRemoteData: Simplex not registered: ", h, NoGID), DebugDiSTC);
     return it->second;
 }
 

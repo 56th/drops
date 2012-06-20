@@ -37,10 +37,8 @@ namespace DROPS
 // fwd declaration
 namespace DiST{
     class TransferableCL;
-    namespace Helper{
-        class MPIostreamCL;
-        class MPIistreamCL;
-    }
+    class MPIostreamCL;
+    class MPIistreamCL;
 }
 #endif
 
@@ -272,10 +270,10 @@ class UnknownHandleCL
     }
 
     /// Put all DOFs handled by this handler onto the stream
-    void Pack( DiST::Helper::MPIostreamCL&, const DiST::TransferableCL&) const;
+    void Pack( DiST::MPIostreamCL&, const DiST::TransferableCL&) const;
 
     /// Get all information about DOF from a stream
-    void UnPack( DiST::Helper::MPIistreamCL&, const DiST::TransferableCL&);
+    void UnPack( DiST::MPIistreamCL&, const DiST::TransferableCL&);
 #else
     bool InTriangLevel( int) const {return true;}
 #endif

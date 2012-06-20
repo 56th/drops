@@ -140,7 +140,7 @@ void CheckParMultiGrid(DROPS::ParMultiGridCL& pmg, int type)
     if (C.get<int>("Misc.PrintTime")) std::cout << "       --> "<<duration<<" sec\n";
     check.close();
 
-    DROPS::DiST::Helper::GeomIdCL gid(1,DROPS::MakePoint3D(0.40625, 0.46875, 0.4375),3); // T1 (0.40625 0.46875 0.4375 )
+    DROPS::DiST::GeomIdCL gid(1,DROPS::MakePoint3D(0.40625, 0.46875, 0.4375),3); // T1 (0.40625 0.46875 0.4375 )
     DROPS::DiST::InfoCL::Instance().ShowSimplex( gid, cdebug);
 }
 

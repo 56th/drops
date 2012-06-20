@@ -37,11 +37,11 @@ int main( int argc, char **argv)
     DROPS::ProcInitCL procinit(&argc, &argv);
 #endif
     try {
-        using DROPS::DiST::Helper::GeomIdCL;
+        using DROPS::DiST::GeomIdCL;
         using DROPS::VertexCL;
-        using DROPS::DiST::Helper::RemoteDataCL;
-        using DROPS::DiST::Helper::RemoteDataListCL;
-        using DROPS::DiST::Helper::RemoteDataListIteratorCL;
+        using DROPS::DiST::RemoteDataCL;
+        using DROPS::DiST::RemoteDataListCL;
+        using DROPS::DiST::RemoteDataListIteratorCL;
         typedef RemoteDataCL::ProcListEntryCL ProcEntryT;
 
         ProcEntryT p0(0,DROPS::PrioNeutral);

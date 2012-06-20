@@ -25,7 +25,7 @@
 namespace DROPS{
 
 template<class IterT>
-void ShowSimplex( IterT begin, IterT end, const DiST::Helper::GeomIdCL& gid, char *mesg, int proc= -1)
+void ShowSimplex( IterT begin, IterT end, const DiST::GeomIdCL& gid, char *mesg, int proc= -1)
 {
     if (proc!=ProcCL::MyRank() && proc!=-1)
         return;

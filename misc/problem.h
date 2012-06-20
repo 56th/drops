@@ -168,8 +168,8 @@ class ExtIdxDescCL
         IdxDescCL* current_Idx_;
       public:
         CommunicateXFEMNumbCL( IdxDescCL* idx) : current_Idx_(idx) {}
-        bool Gather( const DiST::TransferableCL& t, DiST::Helper::SendStreamCL& s);
-        bool Scatter( DiST::TransferableCL& t, const size_t numData, DiST::Helper::MPIistreamCL& r);
+        bool Gather( const DiST::TransferableCL& t, DiST::SendStreamCL& s);
+        bool Scatter( DiST::TransferableCL& t, const size_t numData, DiST::MPIistreamCL& r);
         void Call();
     };
 #endif

@@ -1,6 +1,5 @@
 /// \file DiST.cpp
 /// \brief The DiST (short for distributed simplex type) module is responsible for the distributed geometric data structure on a parallel machine.
-/// It should replace the DDD library in the near future.
 /// \author LNM RWTH Aachen: Patrick Esser, Joerg Grande, Sven Gross, Yuanjun Zhang; SC RWTH Aachen: Oliver Fortmeier, Daniel Medina Cardona.
 
 /*
@@ -20,7 +19,7 @@
  * along with DROPS. If not, see <http://www.gnu.org/licenses/>.
  *
  *
- * Copyright 2009 LNM/SC RWTH Aachen, Germany
+ * Copyright 2012 LNM/SC RWTH Aachen, Germany
 */
 
 #include "DiST/DiST.h"
@@ -32,10 +31,10 @@
 namespace DROPS{
 namespace DiST{
 
-std::ostream& operator<< ( std::ostream& os, const Helper::SimplexTransferInfoCL::ProcSetT& pl)
+std::ostream& operator<< ( std::ostream& os, const SimplexTransferInfoCL::ProcSetT& pl)
 // for debugging
 {
-	Helper::SimplexTransferInfoCL::ProcSetT::const_iterator it( pl.begin());
+	SimplexTransferInfoCL::ProcSetT::const_iterator it( pl.begin());
     if (it!=pl.end()) {
     	os << '(' << it->first << ',' << PriorityToString( it->second) << ')';
     	++it;
@@ -45,8 +44,6 @@ std::ostream& operator<< ( std::ostream& os, const Helper::SimplexTransferInfoCL
     }
     return os;
 }
-
-namespace Helper{
 
 // E R R O R   C L A S S
 //-----------------------
@@ -234,18 +231,18 @@ class RemoteDataListCL::DebugHandlerCL
   public:
     DebugHandlerCL( std::ostream& os) : os_(os) {}
 
-    bool Gather( const TransferableCL& t, Helper::SendStreamCL& s)
+    bool Gather( const TransferableCL& t, SendStreamCL& s)
     { // write proc/prio list
-        Helper::RemoteDataCL::ProcListT proclist( t.GetProcListBegin(), t.GetProcListEnd());
+        RemoteDataCL::ProcListT proclist( t.GetProcListBegin(), t.GetProcListEnd());
         s << proclist << t.GetOwner();
         return true;
     }
 
-    bool Scatter( TransferableCL& t, const size_t numData, Helper::MPIistreamCL& r)
+    bool Scatter( TransferableCL& t, const size_t numData, MPIistreamCL& r)
     { // read proc/prio lists and compare with own
-        Helper::RemoteDataCL::ProcListT myplist( t.GetProcListBegin(), t.GetProcListEnd());
+        RemoteDataCL::ProcListT myplist( t.GetProcListBegin(), t.GetProcListEnd());
         for (size_t i=0; i<numData; ++i) {
-            Helper::RemoteDataCL::ProcListT plist;
+            RemoteDataCL::ProcListT plist;
             int owner;
             r >> plist >> owner;
             if (owner != t.GetOwner()) {
@@ -258,7 +255,7 @@ class RemoteDataListCL::DebugHandlerCL
                 t.DebugInfo( os_);
                 return false;
             }
-            for (Helper::RemoteDataCL::ProcListT::const_iterator pit= plist.begin(), pend= plist.end(); pit!=pend; ++pit)
+            for (RemoteDataCL::ProcListT::const_iterator pit= plist.begin(), pend= plist.end(); pit!=pend; ++pit)
                 if (!is_in( myplist.begin(), myplist.end(), *pit)) {
                     os_ << "Missing remote data entry ( " << pit->proc << ", " << pit->prio << " ) for simplex " << t.GetGID() << std::endl;
                     t.DebugInfo( os_);
@@ -375,8 +372,6 @@ void SimplexTransferInfoCL::ComputeSendToProcs( bool tetra)
     }
 }
 
-}   // end of namespace Helper
-
 
 // T R A N S F E R  A B L E  C L
 //------------------------------
@@ -391,7 +386,7 @@ void TransferableCL::DebugInfo( std::ostream& os) const
         os << " o " << (IsOnProcBnd() ? "is" : "is not") << " located at a process boundary\n"
            << " o owner: " << GetRemoteData().GetOwnerProc() << '\n'
            << " o processes: ";
-        for ( DiST::Helper::RemoteDataCL::ProcList_const_iterator p(GetRemoteData().GetProcListBegin());
+        for ( DiST::RemoteDataCL::ProcList_const_iterator p(GetRemoteData().GetProcListBegin());
               p!= GetRemoteData().GetProcListEnd(); ++p){
                   os << p->proc << " (" << PriorityToString( p->prio) << ") ";
         }
@@ -419,7 +414,7 @@ void InterfaceCL::SetupCommunicationStructure()
     IRecvFromOwners_.clear();
     // note: ISendToOwner is not needed, created on the fly in GatherData(...)
 
-    typedef Helper::RemoteDataCL::ProcList_const_iterator ProcList_const_iterator;
+    typedef RemoteDataCL::ProcList_const_iterator ProcList_const_iterator;
 
     // fill ownerRecvFrom_ and ownerSendTo_:
     // each owner has to determine the process ranks to receive data from and send data to
@@ -462,10 +457,10 @@ void InterfaceCL::SendData (SendListT& sendbuf, std::vector<ProcCL::RequestT>& r
 template <class IStreamT>
 void collect_streams (IStreamT& recv, InterfaceCL::CollectDataT& collect)
 {
-    Helper::GeomIdCL gid;
+    GeomIdCL gid;
 
     while (recv >> gid) {
-        Helper::RefMPIistreamCL gid_data( 0, 0, recv.isBinary());
+        RefMPIistreamCL gid_data( 0, 0, recv.isBinary());
         recv >> gid_data;
         collect[gid].append( gid_data.begin(), gid_data.end());
     }
@@ -484,12 +479,12 @@ void InterfaceCL::to_owner (std::vector<ProcCL::RequestT>& reqFirstSend, Collect
     //----------------------------------------
     for (InterfaceCL::ProcSetT::const_iterator sender= ownerRecvFrom_.begin(); sender != ownerRecvFrom_.end(); ++sender) {
         if (*sender != myrank) {
-            Helper::RecvStreamCL locrecvbuf( binary_);
+            RecvStreamCL locrecvbuf( binary_);
             collect_streams( locrecvbuf.Recv( *sender, firstSendTag), collect);
         }
         else {
-            Helper::SendStreamCL& locsendbuf= sendbuf_[myrank];
-            Helper::RefMPIistreamCL locrecvbuf( locsendbuf.begin(),
+            SendStreamCL& locsendbuf= sendbuf_[myrank];
+            RefMPIistreamCL locrecvbuf( locsendbuf.begin(),
                 locsendbuf.cur() - locsendbuf.begin(), binary_);
             collect_streams( locrecvbuf, collect);
         }
@@ -550,8 +545,8 @@ void InterfaceCL::ExchangeData (CommPhase phase)
         to_owner( reqFirstSend, collect);
     else { // Local operation
         if (ownerRecvFrom_.count( myrank) > 0) {
-            Helper::SendStreamCL& locsendbuf= sendbuf_[myrank];
-            Helper::RefMPIistreamCL locrecvbuf( locsendbuf.begin(), locsendbuf.cur() - locsendbuf.begin(), binary_) ;
+            SendStreamCL& locsendbuf= sendbuf_[myrank];
+            RefMPIistreamCL locrecvbuf( locsendbuf.begin(), locsendbuf.cur() - locsendbuf.begin(), binary_) ;
             collect_streams( locrecvbuf, collect);
         }
     }
@@ -569,9 +564,9 @@ void InterfaceCL::ExchangeData (CommPhase phase)
 
     // For each collected GID, put the GID, number of copies, where gather was
     // called, and the gathered data into a stream buffer.
-    typedef Helper::RemoteDataCL::ProcList_const_iterator PL_IterT;
+    typedef RemoteDataCL::ProcList_const_iterator PL_IterT;
     for (CollectDataT::iterator it= collect.begin(); it != collect.end(); ++it) {
-        Helper::RemoteDataCL& rd= InfoCL::Instance().GetRemoteData( it->first);
+        RemoteDataCL& rd= InfoCL::Instance().GetRemoteData( it->first);
         for (PL_IterT pit= rd.GetProcListBegin(); pit != rd.GetProcListEnd(); ++pit) {
             if (to_.contains( pit->prio)) {
                 const int receiver= pit->proc;
@@ -622,27 +617,27 @@ class ModifyCL::MergeProcListHandlerCL
   public:
     MergeProcListHandlerCL( ModifyCL& mod) : mod_(mod) {}
 
-    bool Gather( const TransferableCL& t, Helper::SendStreamCL& s)
+    bool Gather( const TransferableCL& t, SendStreamCL& s)
     {
         ModifyCL::UpdateListT& ul= mod_.entsToUpdt_[t.GetDim()];
         ModifyCL::UpdateIterator it= ul.find( &t);
         if (it==ul.end())
             return false;
-        const Helper::RemoteDataCL::ProcListT proclist( it->second.GetPostProcs().begin(), it->second.GetPostProcs().end());
+        const RemoteDataCL::ProcListT proclist( it->second.GetPostProcs().begin(), it->second.GetPostProcs().end());
         s << proclist;
         return true;
     }
 
-    bool Scatter( TransferableCL& t, const size_t numData, Helper::MPIistreamCL& r){
+    bool Scatter( TransferableCL& t, const size_t numData, MPIistreamCL& r){
         ModifyCL::UpdateListT& ul= mod_.entsToUpdt_[t.GetDim()];
         ModifyCL::UpdateIterator it= ul.find( &t);
         if (it==ul.end())
             return false;
         for (size_t i=0; i<numData; ++i) {
-            Helper::RemoteDataCL::ProcListT proclist;
+            RemoteDataCL::ProcListT proclist;
             r >> proclist;
-            for (Helper::RemoteDataCL::ProcListT::const_iterator pit= proclist.begin(), pend= proclist.end(); pit!=pend; ++pit)
-                it->second.AddProc( pit->proc, pit->prio, Helper::SimplexTransferInfoCL::merge);
+            for (RemoteDataCL::ProcListT::const_iterator pit= proclist.begin(), pend= proclist.end(); pit!=pend; ++pit)
+                it->second.AddProc( pit->proc, pit->prio, SimplexTransferInfoCL::merge);
         }
         return true;
     }
@@ -650,7 +645,7 @@ class ModifyCL::MergeProcListHandlerCL
     void Call()
     // do interface comm
     {
-        std::vector<Helper::GeomIdCL> updateVec;
+        std::vector<GeomIdCL> updateVec;
 
         // collect all objects to communicate
         for (int dim=0; dim<4; ++dim)
@@ -671,7 +666,7 @@ class ModifyCL::CommToUpdateHandlerCL
   public:
     CommToUpdateHandlerCL( ModifyCL& mod) : mod_(mod) {}
 
-    bool Gather( const TransferableCL& t, Helper::SendStreamCL& os)
+    bool Gather( const TransferableCL& t, SendStreamCL& os)
     {
         const Usint dim= t.GetDim();
         ModifyCL::UpdateListT& ul= mod_.entsToUpdt_[dim];
@@ -688,7 +683,7 @@ class ModifyCL::CommToUpdateHandlerCL
         return true;
     }
 
-    bool Scatter( TransferableCL& t, const size_t numData, Helper::MPIistreamCL& is)
+    bool Scatter( TransferableCL& t, const size_t numData, MPIistreamCL& is)
     {
         const Usint dim= t.GetDim();
         if (dim==GetDim<TetraCL>()) { // tetra
@@ -757,7 +752,7 @@ void ModifyCL::ChangePrio( const TransferableCL& t, Priority prio)
     Assert( modifiable_, DROPSErrCL("ModifyCL::ChangePrio: Class is not in the modifiable mode, call Init() first!"), DebugDiSTC);
 
     UpdateIterator it= AddSimplexToUpdate( t.GetDim(), &t, false);
-    it->second.AddProc( ProcCL::MyRank(), prio, /*changeLocalPrio*/Helper::SimplexTransferInfoCL::overwrite);
+    it->second.AddProc( ProcCL::MyRank(), prio, /*changeLocalPrio*/SimplexTransferInfoCL::overwrite);
 }
 
 void ModifyCL::Delete( const TransferableCL& t)
@@ -772,16 +767,16 @@ void ModifyCL::Keep( const TransferableCL& t)
     Assert( modifiable_, DROPSErrCL("ModifyCL::Keep: Class is not in the modifiable mode, call Init() first!"), DebugDiSTC);
 
     UpdateIterator it= AddSimplexToUpdate( t.GetDim(), &t, false);
-    Helper::RemoteDataCL& rd= it->second.GetRemoteData();
-    for (Helper::RemoteDataCL::ProcList_const_iterator pit= rd.GetProcListBegin(), pend= rd.GetProcListEnd(); pit!= pend; ++pit)
-        it->second.AddProc( pit->proc, pit->prio, /*changeLocalPrio*/Helper::SimplexTransferInfoCL::keep);
+    RemoteDataCL& rd= it->second.GetRemoteData();
+    for (RemoteDataCL::ProcList_const_iterator pit= rd.GetProcListBegin(), pend= rd.GetProcListEnd(); pit!= pend; ++pit)
+        it->second.AddProc( pit->proc, pit->prio, /*changeLocalPrio*/SimplexTransferInfoCL::keep);
 }
 
 ModifyCL::UpdateIterator ModifyCL::AddSimplexToUpdate( int dim, const TransferableCL* t, bool updateSubs)
 {
     UpdateListT& simplices= entsToUpdt_[dim];
     // map::insert only inserts, if key is not found in the map, otherwise iterator of the found element is returned
-    return simplices.insert( std::make_pair( t, Helper::SimplexTransferInfoCL( InfoCL::Instance().GetRemoteData( *t), updateSubs))).first;
+    return simplices.insert( std::make_pair( t, SimplexTransferInfoCL( InfoCL::Instance().GetRemoteData( *t), updateSubs))).first;
 }
 
 void ModifyCL::CreateUpdateList()
@@ -814,9 +809,9 @@ bool ModifyCL::AssignPostProcs()
         &faces= entsToUpdt_[2],
         &tetras= entsToUpdt_[3];
     int me= ProcCL::MyRank();
-    Helper::RemoteDataListCL& remoteTetras= InfoCL::Instance().GetRemoteList<TetraCL>();
+    RemoteDataListCL& remoteTetras= InfoCL::Instance().GetRemoteList<TetraCL>();
 
-    for (Helper::RemoteDataListCL::iterator it= remoteTetras.begin(), end= remoteTetras.end(); it!=end; ++it) {
+    for (RemoteDataListCL::iterator it= remoteTetras.begin(), end= remoteTetras.end(); it!=end; ++it) {
         TetraCL* t;
         simplex_cast<TetraCL>( it->second.GetLocalObject(), t);
         const UpdateIterator tit= tetras.find( it->second.GetLocalObjectPtr()),
@@ -859,7 +854,7 @@ bool ModifyCL::AssignPostProcs()
     bool foundDel= false; // is there any entity to be deleted?
     for (int dim=0; dim<4; ++dim)
         for (UpdateIterator it= UpdateBegin(dim), end= UpdateEnd(dim); it!=end; ++it) {
-            Helper::SimplexTransferInfoCL& info= it->second;
+            SimplexTransferInfoCL& info= it->second;
             if (!info.WillBeOnProc(me)) {
                 foundDel= true;
                 info.SetRemoveMark();
@@ -871,13 +866,13 @@ bool ModifyCL::AssignPostProcs()
 
 void ModifyCL::UpdateRemoteData()
 {
-    const Helper::RemoteDataCL::LoadVecT& loadOfProc= InfoCL::Instance().GetLoadVector();
+    const RemoteDataCL::LoadVecT& loadOfProc= InfoCL::Instance().GetLoadVector();
     for (int dim=0; dim<4; ++dim)
         for (UpdateListT::iterator it= entsToUpdt_[dim].begin(), end= entsToUpdt_[dim].end(); it!=end; ++it) {
-            Helper::SimplexTransferInfoCL& sti= it->second;
+            SimplexTransferInfoCL& sti= it->second;
             if (!sti.WillBeRemoved()) {
                 // update remote data
-                Helper::RemoteDataCL::ProcListT proclist( sti.GetPostProcs().begin(), sti.GetPostProcs().end());
+                RemoteDataCL::ProcListT proclist( sti.GetPostProcs().begin(), sti.GetPostProcs().end());
                 sti.GetRemoteData().SetProcList( proclist);
                 sti.GetRemoteData().UpdateOwner(loadOfProc);
             }
@@ -888,7 +883,7 @@ void ModifyCL::DeleteUnusedSimplices( bool del)
 {
     // remove entries from remote data list
     for (int dim=3; dim>=0; --dim) {
-        Helper::RemoteDataListCL& rdl= InfoCL::Instance().GetRemoteList( dim);
+        RemoteDataListCL& rdl= InfoCL::Instance().GetRemoteList( dim);
         for (UpdateListT::iterator it= entsToUpdt_[dim].begin(), end= entsToUpdt_[dim].end(); it!=end; ++it)
             if (it->second.WillBeRemoved()) {
                 TransferableCL& t= it->second.GetRemoteData().GetLocalObject();
@@ -956,7 +951,7 @@ void TransferCL::Transfer( const TetraCL& t, int toProc, Priority prio, bool del
     Assert( modifiable_, DROPSErrCL("TransferCL::MarkForTransfer: Class is not in the modifiable mode, call Init() first!"), DebugDiSTC);
 
     UpdateIterator it= AddSimplexToUpdate( 3, &t, /*updateSubs*/true);
-    Helper::SimplexTransferInfoCL& info= it->second;
+    SimplexTransferInfoCL& info= it->second;
     /// add/merge proc/prio
     info.AddProc( toProc, prio);
     if (!del) { // keep local object, if not already there
@@ -987,15 +982,15 @@ TransferCL::SortedListT* TransferCL::SortUpdateTetras()
     return sortedTetras;
 }
 
-void TransferCL::UpdateSendRemoteData( const TransferableCL& t, Helper::SimplexTransferInfoCL& sti)
+void TransferCL::UpdateSendRemoteData( const TransferableCL& t, SimplexTransferInfoCL& sti)
 {
-    Helper::RemoteDataCL& rd= sti.GetRemoteData();
+    RemoteDataCL& rd= sti.GetRemoteData();
     // update remote data
-    Helper::RemoteDataCL::ProcListT proclist( sti.GetPostProcs().begin(), sti.GetPostProcs().end());
+    RemoteDataCL::ProcListT proclist( sti.GetPostProcs().begin(), sti.GetPostProcs().end());
     const bool isTetra= t.GetDim()==GetDim<TetraCL>();
     if (sti.GetBroadcaster()==ProcCL::MyRank() || isTetra) {
         // write simplex and remote data to all procs in SendToProcs
-        Helper::SendStreamCL buf( binary_);
+        SendStreamCL buf( binary_);
         buf << t << proclist;
         for (ProcSetT::const_iterator sit= sti.GetSendToProcs().begin(), send= sti.GetSendToProcs().end(); sit!=send; ++sit) {
             (*sendBuffer_[sit->first]).write( buf.begin(), buf.cur() - buf.begin());
@@ -1007,13 +1002,13 @@ void TransferCL::UpdateSendRemoteData( const TransferableCL& t, Helper::SimplexT
         rd.SetProcList( proclist);
 }
 
-void TransferCL::SendAddedData( const TransferableCL& t, Helper::SimplexTransferInfoCL& sti)
+void TransferCL::SendAddedData( const TransferableCL& t, SimplexTransferInfoCL& sti)
 {
     // send to every proc except me
     ProcSetT sendTo= sti.GetPostProcs();
     sendTo.erase( ProcCL::MyRank());
     // write geom id and DOF data to all procs in sendTo
-    Helper::SendStreamCL buf( binary_);
+    SendStreamCL buf( binary_);
     t.Unknowns.Pack( buf << t.GetGID(), t);
     for (ProcSetT::const_iterator sit= sendTo.begin(), send= sendTo.end(); sit!=send; ++sit) {
         (*sendBuffer_[sit->first]).write( buf.begin(), buf.cur() - buf.begin());
@@ -1022,10 +1017,10 @@ void TransferCL::SendAddedData( const TransferableCL& t, Helper::SimplexTransfer
 
 void TransferCL::UpdateOwners()
 {
-    const Helper::RemoteDataCL::LoadVecT& loadOfProc= InfoCL::Instance().GetLoadVector();
+    const RemoteDataCL::LoadVecT& loadOfProc= InfoCL::Instance().GetLoadVector();
     InfoCL& info= InfoCL::Instance();
     for (int dim=0; dim<4; ++dim)
-        for (Helper::RemoteDataListCL::iterator it= info.GetRemoteList(dim).begin(), end= info.GetRemoteList(dim).end(); it!=end; ++it)
+        for (RemoteDataListCL::iterator it= info.GetRemoteList(dim).begin(), end= info.GetRemoteList(dim).end(); it!=end; ++it)
                 it->second.UpdateOwner(loadOfProc);
 }
 
@@ -1040,7 +1035,7 @@ void TransferCL::FillSendBuffer()
     // first count number of messages to be sent
     for (int dim=0; dim<4; ++dim)
         for (UpdateListT::const_iterator it= entsToUpdt_[dim].begin(), end= entsToUpdt_[dim].end(); it!=end; ++it) {
-            const Helper::SimplexTransferInfoCL& sti= it->second;
+            const SimplexTransferInfoCL& sti= it->second;
             if (sti.GetBroadcaster()==me || dim==GetDim<TetraCL>()) {
                 for (ProcSetT::const_iterator pit= sti.GetSendToProcs().begin(), pend= sti.GetSendToProcs().end(); pit!=pend; ++pit)
                     numMsg[pit->first][dim]++;
@@ -1051,7 +1046,7 @@ void TransferCL::FillSendBuffer()
         }
     // allocate send buffers
     for (msgCountT::iterator it= numMsg.begin(), end= numMsg.end(); it!=end; ++it) {
-        Helper::SendStreamCL* buf= new Helper::SendStreamCL( binary_);
+        SendStreamCL* buf= new SendStreamCL( binary_);
         sendBuffer_[it->first]= buf;
         // write number of verts/edges/faces/tetras/addedData to be sent
         for (int dim=0; dim<5; ++dim)
@@ -1089,11 +1084,11 @@ void TransferCL::Receive()
         if ( IreceiveFrom[p]>0)
         	++numRecvFrom;
     // receive from other processes
-    std::vector<Helper::RecvStreamCL*> recv( numRecvFrom);
+    std::vector<RecvStreamCL*> recv( numRecvFrom);
     std::vector<SArrayCL<size_t,5> >   numMsg( numRecvFrom);
     for ( int p=0, i=0; p < ProcCL::Size(); ++p)
         if ( IreceiveFrom[p]>0) {
-        	recv[i]= new Helper::RecvStreamCL( binary_);
+        	recv[i]= new RecvStreamCL( binary_);
             recv[i]->Recv( p);
             // receive number of verts/edges/faces/tetras
             for (int dim=0; dim<5; ++dim)
@@ -1120,9 +1115,9 @@ void TransferCL::Receive()
     }
 }
 
-void TransferCL::ReceiveAddedData( Helper::RecvStreamCL& recvstream, size_t num)
+void TransferCL::ReceiveAddedData( RecvStreamCL& recvstream, size_t num)
 {
-    Helper::GeomIdCL gid;
+    GeomIdCL gid;
     for (size_t i=0; i<num; ++i) {
         // read gid and added data
         recvstream >> gid;
@@ -1132,25 +1127,25 @@ void TransferCL::ReceiveAddedData( Helper::RecvStreamCL& recvstream, size_t num)
 }
 
 template <>
-VertexCL& TransferCL::CreateSimplex<VertexCL>( const VertexCL& s, const Helper::RemoteDataCL::ProcListT& pl)
+VertexCL& TransferCL::CreateSimplex<VertexCL>( const VertexCL& s, const RemoteDataCL::ProcListT& pl)
 {
     return mg_.GetSimplexFactory().MakeCopy( s, pl);
 }
 
 template <>
-EdgeCL& TransferCL::CreateSimplex<EdgeCL>    ( const EdgeCL& s,   const Helper::RemoteDataCL::ProcListT& pl)
+EdgeCL& TransferCL::CreateSimplex<EdgeCL>    ( const EdgeCL& s,   const RemoteDataCL::ProcListT& pl)
 {
     return mg_.GetSimplexFactory().MakeCopy( s, pl);
 }
 
 template <>
-FaceCL& TransferCL::CreateSimplex<FaceCL>    ( const FaceCL& s,   const Helper::RemoteDataCL::ProcListT& pl)
+FaceCL& TransferCL::CreateSimplex<FaceCL>    ( const FaceCL& s,   const RemoteDataCL::ProcListT& pl)
 {
     return mg_.GetSimplexFactory().MakeCopy( s, pl);
 }
 
 template <>
-TetraCL& TransferCL::CreateSimplex<TetraCL>  ( const TetraCL& s,  const Helper::RemoteDataCL::ProcListT& pl)
+TetraCL& TransferCL::CreateSimplex<TetraCL>  ( const TetraCL& s,  const RemoteDataCL::ProcListT& pl)
 {
     TetraCL& t= mg_.GetSimplexFactory().MakeCopy( s, pl);
     // now link to faces
@@ -1160,11 +1155,11 @@ TetraCL& TransferCL::CreateSimplex<TetraCL>  ( const TetraCL& s,  const Helper::
 }
 
 template <>
-void DiST::TransferCL::ReceiveSimplices<TetraCL>( DiST::Helper::RecvStreamCL& recvstream, size_t num)
+void DiST::TransferCL::ReceiveSimplices<TetraCL>( DiST::RecvStreamCL& recvstream, size_t num)
 {
     for ( size_t i=0; i<num; ++i) {
         TetraCL stmp;                                   // temporary to receive a single simplex
-        DiST::Helper::RemoteDataCL::ProcListT procList; // temporary to receive process list
+        DiST::RemoteDataCL::ProcListT procList; // temporary to receive process list
 
         // receive simplex
         stmp.UnPack( recvstream);
@@ -1218,28 +1213,28 @@ void InfoCL::PostMultiGridMod()
     mg_->ClearTriangCache();
 }
 
-VertexCL* InfoCL::GetVertex( const Helper::GeomIdCL& gid) const
+VertexCL* InfoCL::GetVertex( const GeomIdCL& gid) const
 {
     VertexCL* v=0;
     simplex_cast<VertexCL>( GetRemoteData(gid).GetLocalObject(), v);
     return v;
 }
 
-EdgeCL* InfoCL::GetEdge(   const Helper::GeomIdCL& gid) const
+EdgeCL* InfoCL::GetEdge(   const GeomIdCL& gid) const
 {
     EdgeCL* v=0;
     simplex_cast<EdgeCL>( GetRemoteData(gid).GetLocalObject(), v);
     return v;
 }
 
-FaceCL* InfoCL::GetFace(   const Helper::GeomIdCL& gid) const
+FaceCL* InfoCL::GetFace(   const GeomIdCL& gid) const
 {
     FaceCL* v=0;
     simplex_cast<FaceCL>( GetRemoteData(gid).GetLocalObject(), v);
     return v;
 }
 
-TetraCL* InfoCL::GetTetra(  const Helper::GeomIdCL& gid) const
+TetraCL* InfoCL::GetTetra(  const GeomIdCL& gid) const
 {
     TetraCL* v=0;
     simplex_cast<TetraCL>( GetRemoteData(gid).GetLocalObject(), v);
@@ -1279,7 +1274,7 @@ void InfoCL::SizeInfo( std::ostream& os) const
     \param gid geometric id of simplex
     \param os output stream
 */
-void InfoCL::ShowSimplex( const Helper::GeomIdCL& gid, std::ostream& os) const
+void InfoCL::ShowSimplex( const GeomIdCL& gid, std::ostream& os) const
 {
     if (Exists(gid)) {
         GetRemoteData(gid).GetLocalObject().DebugInfo( os);

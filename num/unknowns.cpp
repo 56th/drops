@@ -86,9 +86,9 @@ void UnknownHandleCL::DebugInfo( std::ostream& os) const
     \param sendstream where to put the data
     \param t          the transferable object which is used to determine the number of unknowns
 */
-void UnknownHandleCL::Pack( DiST::Helper::MPIostreamCL& sendstream, const DiST::TransferableCL& t) const
+void UnknownHandleCL::Pack( DiST::MPIostreamCL& sendstream, const DiST::TransferableCL& t) const
 {
-//const DiST::Helper::GeomIdCL gid( 1, MakePoint3D(0.5, 0.5, 0.5), 0);
+//const DiST::GeomIdCL gid( 1, MakePoint3D(0.5, 0.5, 0.5), 0);
 //bool report= gid == t.GetGID();
 //if (report) DebugInfo( cdebug << ">> Pack " << gid);
     const Uint NoIdxFlag= static_cast<Uint>(-1);                            // flag for sending/receiving no data
@@ -127,9 +127,9 @@ void UnknownHandleCL::Pack( DiST::Helper::MPIostreamCL& sendstream, const DiST::
     \param recvstream the stream where all information can be found
     \param t          the transferable object which is used to determine the number of unknowns
 */
-void UnknownHandleCL::UnPack( DiST::Helper::MPIistreamCL& recvstream, const DiST::TransferableCL& t)
+void UnknownHandleCL::UnPack( DiST::MPIistreamCL& recvstream, const DiST::TransferableCL& t)
 {
-//const DiST::Helper::GeomIdCL gid( 1, MakePoint3D(0.5, 0.5, 0.5), 0);
+//const DiST::GeomIdCL gid( 1, MakePoint3D(0.5, 0.5, 0.5), 0);
 //bool report= gid == t.GetGID();
 //if (report) DebugInfo( cdebug << "<< Unpack " << gid);
     bool unk_recv= false;

@@ -42,13 +42,13 @@ int main( int argc, char **argv)
         if (argc>1)
             binary= atoi( argv[1]);
         if(myrank==0) cerr << "**************************************************************************\n";
-        if(myrank==0) cerr << "***  This program tests the classes DROPS::DiST::Helper::SendStreamCL  ***\n";
-        if(myrank==0) cerr << "***  and DROPS::DiST::Helper::RecvStreamCL which represent a           ***\n";
+        if(myrank==0) cerr << "***  This program tests the classes DROPS::DiST::SendStreamCL  ***\n";
+        if(myrank==0) cerr << "***  and DROPS::DiST::RecvStreamCL which represent a           ***\n";
         if(myrank==0) cerr << "***  data-sending stream and a data-receiving stream respectively.     ***\n";
         if(myrank==0) cerr << "**************************************************************************\n";
 
-        DROPS::DiST::Helper::SendStreamCL tosend(binary); //My sending stream
-        DROPS::DiST::Helper::RecvStreamCL torecv(binary); //My receiving stream
+        DROPS::DiST::SendStreamCL tosend(binary); //My sending stream
+        DROPS::DiST::RecvStreamCL torecv(binary); //My receiving stream
 
 
 //******************** I N S E R T I O N  P H A S E **********************
@@ -89,7 +89,7 @@ int main( int argc, char **argv)
         debugOutputInsert << "+ a signed char (" << byteValue << ")\n";
         tosend << byteValue;
 
-        char sepValue= DROPS::DiST::Helper::SendRecvStreamAsciiTerminatorC;
+        char sepValue= DROPS::DiST::SendRecvStreamAsciiTerminatorC;
         debugOutputInsert << "+ the ascii item-terminator (" << sepValue << ")\n";
         tosend << sepValue;
 
@@ -104,9 +104,9 @@ int main( int argc, char **argv)
         if (!binary && myrank == 0) {
             cerr << " Orig is: " << tosend.str()     << " position: " << tosend.tellp()     << " state: " << tosend.rdstate()     << '\n';
             // tosend.setstate( ios_base::failbit);
-            DROPS::DiST::Helper::SendStreamCL tosendcopy= tosend;
+            DROPS::DiST::SendStreamCL tosendcopy= tosend;
             cerr << " Copy is: " << tosendcopy.str() << " position: " << tosendcopy.tellp() << " state: " << tosendcopy.rdstate() << '\n';
-            DROPS::DiST::Helper::SendStreamCL tosendassg;
+            DROPS::DiST::SendStreamCL tosendassg;
             tosendassg= tosend;
             cerr << " assg is: " << tosendassg.str() << " position: " << tosendassg.tellp() << " state: " << tosendassg.rdstate() << '\n';
         }
@@ -183,7 +183,7 @@ int main( int argc, char **argv)
         DROPS::Ulint expectedUlint = 2442342+(size+myrank-1)%size;
         DROPS::Usint expectedUsint = 242+(size+myrank-1)%size;
         DROPS::byte  expectedByte = -24+(size+myrank-1)%size;
-        char expectedsepValue= DROPS::DiST::Helper::SendRecvStreamAsciiTerminatorC;
+        char expectedsepValue= DROPS::DiST::SendRecvStreamAsciiTerminatorC;
         DROPS::Ubyte  expectedUbyte = 'x';
         size_t expectedSizet = 8+(size+myrank-1)%size;
 

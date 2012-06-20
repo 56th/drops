@@ -1784,7 +1784,7 @@ void FileBuilderCL::BuildVerts(MultiGridCL* mgp) const
 #ifdef _PAR
     ProcCL::AppendProcNum( simplex_filename);
 #endif
-    DiST::Helper::SerialIFStreamCL simplex_file( simplex_filename);
+    DiST::SerialIFStreamCL simplex_file( simplex_filename);
 
     CheckFile( simplex_file);
 
@@ -1794,7 +1794,7 @@ void FileBuilderCL::BuildVerts(MultiGridCL* mgp) const
     int proc;
     int prio;
     simplex_file >> numverts;
-    DiST::Helper::RemoteDataCL::ProcListT pl;
+    DiST::RemoteDataCL::ProcListT pl;
 
     for (size_t i = 0; i<numverts; ++i)
     {
@@ -1808,7 +1808,7 @@ void FileBuilderCL::BuildVerts(MultiGridCL* mgp) const
         simplex_file >> numdist;
         for (Uint k=0; k<numdist; ++k){
             simplex_file >> proc >> prio;
-            pl.push_back( DiST::Helper::RemoteDataCL::ProcListEntryCL( proc, Priority( prio)));
+            pl.push_back( DiST::RemoteDataCL::ProcListEntryCL( proc, Priority( prio)));
         }
         factory_->MakeCopy(tmpvert, pl);
         pl.clear();
@@ -1830,14 +1830,14 @@ void FileBuilderCL::BuildEdges() const
 #ifdef _PAR
     ProcCL::AppendProcNum( filename);
 #endif
-    DiST::Helper::SerialIFStreamCL simplex_file(filename);
+    DiST::SerialIFStreamCL simplex_file(filename);
     CheckFile(simplex_file);
 
     size_t numedges;
 
     Uint numdist;
     int proc, prio;
-    DiST::Helper::RemoteDataCL::ProcListT pl;
+    DiST::RemoteDataCL::ProcListT pl;
 
     simplex_file >> numedges;
 
@@ -1848,7 +1848,7 @@ void FileBuilderCL::BuildEdges() const
         simplex_file >> numdist;
         for (Uint k=0; k<numdist; ++k){
             simplex_file >> proc >> prio;
-            pl.push_back( DiST::Helper::RemoteDataCL::ProcListEntryCL( proc, Priority( prio)));
+            pl.push_back( DiST::RemoteDataCL::ProcListEntryCL( proc, Priority( prio)));
         }
         factory_->MakeCopy(tmpedge, pl);
         pl.clear();
@@ -1863,14 +1863,14 @@ void FileBuilderCL::BuildFacesI() const
 #ifdef _PAR
     ProcCL::AppendProcNum( filename);
 #endif
-    DiST::Helper::SerialIFStreamCL simplex_file(filename);
+    DiST::SerialIFStreamCL simplex_file(filename);
     CheckFile(simplex_file);
 
     size_t num;
 
     Uint numdist;
     int proc, prio;
-    DiST::Helper::RemoteDataCL::ProcListT pl;
+    DiST::RemoteDataCL::ProcListT pl;
 
     simplex_file >> num;
 
@@ -1880,7 +1880,7 @@ void FileBuilderCL::BuildFacesI() const
         simplex_file >> numdist;
         for (Uint k=0; k<numdist; ++k){
             simplex_file >> proc >> prio;
-            pl.push_back( DiST::Helper::RemoteDataCL::ProcListEntryCL( proc, Priority( prio)));
+            pl.push_back( DiST::RemoteDataCL::ProcListEntryCL( proc, Priority( prio)));
         }
         factory_->MakeCopy(tmpface, pl);
         pl.clear();
@@ -1895,14 +1895,14 @@ void FileBuilderCL::BuildTetras() const
 #ifdef _PAR
     ProcCL::AppendProcNum( filename);
 #endif
-    DiST::Helper::SerialIFStreamCL simplex_file( filename);
+    DiST::SerialIFStreamCL simplex_file( filename);
     CheckFile(simplex_file);
 
     size_t num;
 
     Uint numdist;
     int proc, prio;
-    DiST::Helper::RemoteDataCL::ProcListT pl;
+    DiST::RemoteDataCL::ProcListT pl;
 
     simplex_file >> num;
 
@@ -1912,7 +1912,7 @@ void FileBuilderCL::BuildTetras() const
         simplex_file >> numdist;
         for (Uint k=0; k<numdist; ++k){
             simplex_file >> proc >> prio;
-            pl.push_back( DiST::Helper::RemoteDataCL::ProcListEntryCL( proc, Priority( prio)));
+            pl.push_back( DiST::RemoteDataCL::ProcListEntryCL( proc, Priority( prio)));
         }
         factory_->MakeCopy(tmptetra, pl);
         pl.clear();
@@ -1940,10 +1940,10 @@ void FileBuilderCL::BuildFacesII(MultiGridCL* mgp) const
                 (*et)->SetAccMFR(accmfr[edge++]);
         }
     }
-    const DiST::Helper::RemoteDataCL::LoadVecT& loadOfProc= DiST::InfoCL::Instance().GetLoadVector();
+    const DiST::RemoteDataCL::LoadVecT& loadOfProc= DiST::InfoCL::Instance().GetLoadVector();
     DiST::InfoCL& info= DiST::InfoCL::Instance();
     for (int dim=0; dim<4; ++dim)
-        for (DiST::Helper::RemoteDataListCL::iterator it= info.GetRemoteList(dim).begin(), end= info.GetRemoteList(dim).end(); it!=end; ++it)
+        for (DiST::RemoteDataListCL::iterator it= info.GetRemoteList(dim).begin(), end= info.GetRemoteList(dim).end(); it!=end; ++it)
                 it->second.UpdateOwner(loadOfProc);
 }
 
@@ -2149,7 +2149,7 @@ void MGSerializationCL::WriteEdges()
 #ifdef _PAR
     ProcCL::AppendProcNum( filename);
 #endif
-    DiST::Helper::SerialOFStreamCL simplex_file( filename);
+    DiST::SerialOFStreamCL simplex_file( filename);
     CheckFile(simplex_file);
     simplex_file << mg_.GetEdges().size();
     for (MultiGridCL::EdgeIterator p=mg_.GetAllEdgeBegin(); p!=mg_.GetAllEdgeEnd(); ++p) {
@@ -2169,7 +2169,7 @@ void MGSerializationCL::WriteFaces()
 #ifdef _PAR
     ProcCL::AppendProcNum( filename);
 #endif
-    DiST::Helper::SerialOFStreamCL simplex_file( filename);
+    DiST::SerialOFStreamCL simplex_file( filename);
     CheckFile(simplex_file);
     simplex_file << mg_.GetFaces().size();
     for (MultiGridCL::FaceIterator p=mg_.GetAllFaceBegin(); p!=mg_.GetAllFaceEnd(); ++p) {
@@ -2189,7 +2189,7 @@ void MGSerializationCL::WriteVertices()
 #ifdef _PAR
     ProcCL::AppendProcNum( vertex_filename);
 #endif
-    DiST::Helper::SerialOFStreamCL simplex_file( vertex_filename);
+    DiST::SerialOFStreamCL simplex_file( vertex_filename);
     CheckFile(simplex_file);
     simplex_file << mg_.GetVertices().size();
     int k=0;
@@ -2213,7 +2213,7 @@ void MGSerializationCL::WriteTetras()
 #ifdef _PAR
     ProcCL::AppendProcNum(tetra_filename);
 #endif
-    DiST::Helper::SerialOFStreamCL simplex_file (tetra_filename);
+    DiST::SerialOFStreamCL simplex_file (tetra_filename);
 
     CheckFile(simplex_file);
     simplex_file << mg_.GetTetras().size();

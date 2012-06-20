@@ -53,7 +53,7 @@ SArrayCL<FaceCL*, NumAllFacesC> TetraCL::fPtrs_(static_cast<FaceCL*>(0));
 
 /** Puts the GID, mark for removement, and boundary information onto the stream.
 */
-void VertexCL::Pack( DiST::Helper::MPIostreamCL& ostrstream) const
+void VertexCL::Pack( DiST::MPIostreamCL& ostrstream) const
 {
     ostrstream << GetGID() << RemoveMark_;
     if ( IsOnBoundary()) {
@@ -69,7 +69,7 @@ void VertexCL::Pack( DiST::Helper::MPIostreamCL& ostrstream) const
 
 /** Reads the GID, mark for removement, and boundary information from the stream.
 */
-void VertexCL::UnPack( DiST::Helper::MPIistreamCL& istrstream)
+void VertexCL::UnPack( DiST::MPIistreamCL& istrstream)
 {
     size_t numBnd=0;
     istrstream >> gid_ >> RemoveMark_ >> numBnd;
@@ -90,7 +90,7 @@ void VertexCL::UpdateGID()
 {
     if (DiST::InfoCL::Instance().Exists(this->GetGID()))
         throw DROPSErrCL("VertexCL::UpdateGID(): object is already registered");
-    DiST::Helper::GeomIdCL hash(this->GetLevel(), *this);
+    DiST::GeomIdCL hash(this->GetLevel(), *this);
     this->gid_ = hash;
 }
 
@@ -166,21 +166,21 @@ Point3DCL GetBaryCenter(const EdgeCL& e)
 /** Put the GID, both vertices, boundary information, accumulated MFR, and mark for removement
     onto the stream
 */
-void EdgeCL::Pack( DiST::Helper::MPIostreamCL& ostrstream) const
+void EdgeCL::Pack( DiST::MPIostreamCL& ostrstream) const
 {
     ostrstream << GetGID()
                << GetVertex(0)->GetGID()
                << GetVertex(1)->GetGID()
-               << (GetMidVertex()==0 ? DiST::Helper::NoGID : GetMidVertex()->GetGID())
+               << (GetMidVertex()==0 ? DiST::NoGID : GetMidVertex()->GetGID())
                << Bnd_[0] << Bnd_[1] << AccMFR_ << RemoveMark_;
 }
 
 /** Reads the GID, both vertices, boundary information, accumulated MFR, and mark for removement
     from the stream
 */
-void EdgeCL::UnPack( DiST::Helper::MPIistreamCL& istrstream)
+void EdgeCL::UnPack( DiST::MPIistreamCL& istrstream)
 {
-    DiST::Helper::GeomIdCL vertex0, vertex1, midVertex;
+    DiST::GeomIdCL vertex0, vertex1, midVertex;
     istrstream >> gid_ >> vertex0 >> vertex1 >> midVertex;
     istrstream >>  Bnd_[0] >>  Bnd_[1] >> AccMFR_ >> RemoveMark_;
     Vertices_[0]= DiST::InfoCL::Instance().GetVertex(vertex0);
@@ -193,7 +193,7 @@ void EdgeCL::UpdateGID()
 {
     if (DiST::InfoCL::Instance().Exists(this->GetGID()))
         throw DROPSErrCL("EdgeCL::UpdateGID(): object is already registered");
-    DiST::Helper::GeomIdCL hash(this->GetLevel(), *this);
+    DiST::GeomIdCL hash(this->GetLevel(), *this);
     this->gid_ = hash;
 }
 
@@ -224,11 +224,11 @@ void FaceCL::LinkTetra(const TetraCL* tp)
         else { // during transfer, the children are unpacked before their parents. Hence, we have to find the position where one of the children is stored on the next level.
         	if (tp->GetChildBegin()==tp->GetChildEnd()) { // no children known to tetra -> use position where no children are linked
         		offset= Neighbors_[2] ? 1 : 0;
-                Assert( Neighbors_[offset+2]==0, DiST::Helper::ErrorCL("FaceCL::LinkTetra: Occupied child position ", offset+2, GetGID()), DebugRefineEasyC);
+                Assert( Neighbors_[offset+2]==0, DiST::ErrorCL("FaceCL::LinkTetra: Occupied child position ", offset+2, GetGID()), DebugRefineEasyC);
         	} else if (!is_in( tp->GetChildBegin(), tp->GetChildEnd(), Neighbors_[2]))
             	if (Neighbors_[3]==0 || is_in( tp->GetChildBegin(), tp->GetChildEnd(), Neighbors_[3]))
             		offset=1;
-            Assert( Neighbors_[offset+2]==0 || is_in( tp->GetChildBegin(), tp->GetChildEnd(), Neighbors_[offset+2]), DiST::Helper::ErrorCL("FaceCL::LinkTetra: Wrong child at position ", offset+2, GetGID()), DebugRefineEasyC);
+            Assert( Neighbors_[offset+2]==0 || is_in( tp->GetChildBegin(), tp->GetChildEnd(), Neighbors_[offset+2]), DiST::ErrorCL("FaceCL::LinkTetra: Wrong child at position ", offset+2, GetGID()), DebugRefineEasyC);
         }
 #endif
     }
@@ -245,10 +245,10 @@ void FaceCL::LinkTetra(const TetraCL* tp)
         if (tp->GetParent()) {
         // tetra is stored on the same side as the parent
             offset= Neighbors_[0]==tp->GetParent() ? 2 : 3;
-            Assert( tp->GetParent()==Neighbors_[offset-2], DiST::Helper::ErrorCL("FaceCL::LinkTetra: Wrong parent at position ", offset-2, GetGID()), DebugRefineEasyC);
+            Assert( tp->GetParent()==Neighbors_[offset-2], DiST::ErrorCL("FaceCL::LinkTetra: Wrong parent at position ", offset-2, GetGID()), DebugRefineEasyC);
         } else { // during transfer, the children are unpacked before their parents. Hence, we need an empty position without parent.
             offset= (Neighbors_[0]==0 && (Neighbors_[2]==0 || Neighbors_[2]==tp)) ? 2 : 3;
-            Assert( !Neighbors_[offset-2], DiST::Helper::ErrorCL("FaceCL::LinkTetra: Occupied parent position ", offset-2, GetGID()), DebugRefineEasyC);
+            Assert( !Neighbors_[offset-2], DiST::ErrorCL("FaceCL::LinkTetra: Occupied parent position ", offset-2, GetGID()), DebugRefineEasyC);
         }
     }
 #endif
@@ -314,20 +314,20 @@ const TetraCL* FaceCL::GetNeighInTriang(const TetraCL* tp, Uint TriLevel) const
 
 /** Puts the GID, all neighbors, boundary information, and mark for removement onto the stream
 */
-void FaceCL::Pack( DiST::Helper::MPIostreamCL& ostrstream) const
+void FaceCL::Pack( DiST::MPIostreamCL& ostrstream) const
 {
     ostrstream << GetGID();
     for ( Uint i=0; i<4; ++i) {
-        ostrstream << ( GetNeighbor(i)==0 ? DiST::Helper::NoGID : GetNeighbor(i)->GetGID());
+        ostrstream << ( GetNeighbor(i)==0 ? DiST::NoGID : GetNeighbor(i)->GetGID());
     }
     ostrstream << Bnd_ << RemoveMark_;
 }
 
 /** Reads the GID, all neighbors, boundary information, and mark for removement from the stream
 */
-void FaceCL::UnPack( DiST::Helper::MPIistreamCL& istrstream)
+void FaceCL::UnPack( DiST::MPIistreamCL& istrstream)
 {
-    DiST::Helper::GeomIdCL tmpNeigh;
+    DiST::GeomIdCL tmpNeigh;
     istrstream >> gid_;
     for ( size_t i=0; i<4; ++i)
         istrstream >> tmpNeigh;
@@ -339,7 +339,7 @@ void FaceCL::UpdateGID()
 {
     if (DiST::InfoCL::Instance().Exists(this->GetGID()))
         throw DROPSErrCL("FaceCL::UpdateGID(): object is already registered");
-    DiST::Helper::GeomIdCL hash(this->GetLevel(), *this);
+    DiST::GeomIdCL hash(this->GetLevel(), *this);
     this->gid_ = hash;
 }
 
@@ -631,7 +631,7 @@ It recycles and rescues simplices, that will be reused:
                           std::back_inserter(commonChildren) );
 
 #ifdef _PAR
-    Assert(Children_, DiST::Helper::ErrorCL( "TetraCL::RecycleReusables: no children array", this->GetGID()), DebugDiSTC);
+    Assert(Children_, DiST::ErrorCL( "TetraCL::RecycleReusables: no children array", this->GetGID()), DebugDiSTC);
     ParMultiGridCL& pmg= ParMultiGridCL::Instance();
 #endif
     for (Uint ch=0; ch<myRule.ChildNum; ++ch)
@@ -945,7 +945,7 @@ if the child cannot be found, create it.
 
 /**
 */
-void TetraCL::Pack( DiST::Helper::MPIostreamCL& ostrstream) const
+void TetraCL::Pack( DiST::MPIostreamCL& ostrstream) const
 {
     ostrstream << GetGID()
                << RefRule_ << RefMark_;
@@ -958,7 +958,7 @@ void TetraCL::Pack( DiST::Helper::MPIostreamCL& ostrstream) const
     for ( Uint i=0; i<NumFacesC; ++i) {
         ostrstream << GetFace(i)->GetGID();
     }
-    ostrstream << ( GetParent()==0 ? DiST::Helper::NoGID : GetParent()->GetGID());
+    ostrstream << ( GetParent()==0 ? DiST::NoGID : GetParent()->GetGID());
 
     Uint numChildren= std::distance(GetChildBegin(), GetChildEnd());
     ostrstream << numChildren;
@@ -969,9 +969,9 @@ void TetraCL::Pack( DiST::Helper::MPIostreamCL& ostrstream) const
 
 /**
 */
-void TetraCL::UnPack( DiST::Helper::MPIistreamCL& istrstream)
+void TetraCL::UnPack( DiST::MPIistreamCL& istrstream)
 {
-    DiST::Helper::GeomIdCL tmp;
+    DiST::GeomIdCL tmp;
 
     istrstream >> gid_;
     istrstream >> RefRule_ >> RefMark_;
@@ -1017,7 +1017,7 @@ void TetraCL::UpdateGID()
 {
     if (DiST::InfoCL::Instance().Exists(this->GetGID()))
         throw DROPSErrCL("TetraCL::UpdateGID(): object is already registered");
-    DiST::Helper::GeomIdCL hash(this->GetLevel(), *this);
+    DiST::GeomIdCL hash(this->GetLevel(), *this);
     this->gid_ = hash;
 }
 
@@ -1202,7 +1202,7 @@ Check for:
     }
 
     // Check if the GID is computed correctly
-    DiST::Helper::GeomIdCL gid( GetLevel(), *this);
+    DiST::GeomIdCL gid( GetLevel(), *this);
     if ( gid!=GetGID()) {
         sane= false;
         os << "GID does not match. ";
@@ -1324,7 +1324,7 @@ Check for:
 
 #ifdef _PAR
     // Check if the GID is computed correctly
-    DiST::Helper::GeomIdCL gid( GetLevel(), *this);
+    DiST::GeomIdCL gid( GetLevel(), *this);
     if ( gid!=GetGID()) {
         sane= false;
         os << "GID does not match. ";
@@ -1574,7 +1574,7 @@ Check for:
 
 #ifdef _PAR
     // Check if the hash is computed correctly
-    DiST::Helper::GeomIdCL gid( GetLevel(), *this);
+    DiST::GeomIdCL gid( GetLevel(), *this);
     if ( gid!=GetGID()) {
         sane= false;
         os << "GID does not match. ";

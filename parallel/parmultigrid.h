@@ -152,7 +152,7 @@ class ParMultiGridCL
     bool ConsCheck(std::ostream&) const;                             // DiST consistency check
 
     void DebugInfo(std::ostream&) const;                             // writes useful infos onto output stream
-    void Show(const DiST::Helper::GeomIdCL& gid, char *mesg, int proc= -1) const; // Show the simplex with a given GID
+    void Show(const DiST::GeomIdCL& gid, char *mesg, int proc= -1) const; // Show the simplex with a given GID
     double GetBalance() const;                                       // Calculate Imbalance of triangulation over procs on last triangulation-level --> Communication
     // @}
 };

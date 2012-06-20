@@ -1,5 +1,5 @@
 /// \file mpistream.tpp
-/// \brief SendStreamCL and ReicStreamCL for transfering objects (simplexes + data) as byte-messages.
+/// \brief SendStreamCL and RecStreamCL for transferring objects (simplexes + data) as byte-messages.
 /// \author LNM RWTH Aachen: Patrick Esser, Joerg Grande, Sven Gross, Yuanjun Zhang; SC RWTH Aachen: Oliver Fortmeier, Daniel Medina Cardona.
 
 /*
@@ -19,12 +19,11 @@
  * along with DROPS. If not, see <http://www.gnu.org/licenses/>.
  *
  *
- * Copyright 2009 LNM/SC RWTH Aachen, Germany
+ * Copyright 2012 LNM/SC RWTH Aachen, Germany
 */
 
 namespace DROPS{
 namespace DiST{
-namespace Helper{
 
 template<typename T>
 inline MPIostreamCL& MPIostreamCL::write_fundamental_type (const T& t)
@@ -113,6 +112,5 @@ inline MPIistreamCL& operator>> (MPIistreamCL& is, std::string& s)
 }
 
 
-} // end of namespace Helper
-} // end of namespace DiSt
+} // end of namespace DiST
 } // end of namespace DROPS

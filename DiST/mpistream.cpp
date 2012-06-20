@@ -1,5 +1,5 @@
 /// \file mpistream.cpp
-/// \brief SendStreamCL and ReicStreamCL for transfering objects (simplexes + data) as byte-messages.
+/// \brief SendStreamCL and RecStreamCL for transferring objects (simplexes + data) as byte-messages.
 /// \author LNM RWTH Aachen: Patrick Esser, Joerg Grande, Sven Gross, Yuanjun Zhang; SC RWTH Aachen: Oliver Fortmeier, Daniel Medina Cardona.
 
 /*
@@ -19,7 +19,7 @@
  * along with DROPS. If not, see <http://www.gnu.org/licenses/>.
  *
  *
- * Copyright 2009 LNM/SC RWTH Aachen, Germany
+ * Copyright 2012 LNM/SC RWTH Aachen, Germany
 */
 
 #include "DiST/mpistream.h"
@@ -32,7 +32,6 @@ namespace DiST{
 
 bool use_binaryMPIstreams= true;
 
-namespace Helper{
 
 ProcCL::RequestT MPIstringbufCL::Isend (int dest, int tag)
 {
@@ -253,6 +252,5 @@ RecvStreamCL& RecvStreamCL::operator= (const RecvStreamCL& s)
 }
 
 
-} // end of namespace Helper
 } // end of namespace DiST
 } // end of namespace DROPS

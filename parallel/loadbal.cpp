@@ -46,7 +46,7 @@ void LoadBalCL::Migrate( const DetermineDecompositionCL& detdecomp)
 	Point3DCL p= MakePoint3D( 0.6875, 0.625, 0.0625),
 	    q= MakePoint3D( 0.5, 0.75, 0.25),
 	    r= MakePoint3D( 0.8125, 0.9375, 0.375);
-	DiST::Helper::GeomIdCL observe1(2,p,3), observe2(0,q,3), observe3(2,r,3);
+	DiST::GeomIdCL observe1(2,p,3), observe2(0,q,3), observe3(2,r,3);
 */
 #endif
     Comment("- Start Migrating"<<std::endl, DebugLoadBalC);

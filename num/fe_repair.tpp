@@ -289,14 +289,14 @@ class RepairFECL<ValueT, LocalFEDataT, BndDataT>::HandlerParentDataCL
     HandlerParentDataCL( RepairMapCL& data)
         : parent_data_(data) {}
     /// \brief Gather information about distributed dof on sender proc
-    bool Gather( DiST::TransferableCL&, DiST::Helper::SendStreamCL&);
+    bool Gather( DiST::TransferableCL&, DiST::SendStreamCL&);
     /// \brief Scatter information about distributed dof on sender proc
-    bool Scatter( DiST::TransferableCL&, const size_t&, DiST::Helper::MPIistreamCL&);
+    bool Scatter( DiST::TransferableCL&, const size_t&, DiST::MPIistreamCL&);
 };
 
 template <class ValueT, template<class> class LocalFEDataT, template<class> class BndDataT>
 bool RepairFECL<ValueT, LocalFEDataT, BndDataT>::HandlerParentDataCL::Gather(
-    DiST::TransferableCL& t, DiST::Helper::SendStreamCL& send)
+    DiST::TransferableCL& t, DiST::SendStreamCL& send)
 {
     TetraCL* tetra;
     simplex_cast(t, tetra);
@@ -316,7 +316,7 @@ bool RepairFECL<ValueT, LocalFEDataT, BndDataT>::HandlerParentDataCL::Gather(
 template <class ValueT, template<class> class LocalFEDataT, template<class> class BndDataT>
 bool RepairFECL<ValueT, LocalFEDataT, BndDataT>::HandlerParentDataCL::Scatter(
     DiST::TransferableCL& t, __UNUSED__ const size_t& numData,
-    DiST::Helper::MPIistreamCL& recv)
+    DiST::MPIistreamCL& recv)
 {
     Assert(numData == 1, DROPSErrCL("HandlerParentDataCL::Scatter: more than one ghost exists"), DebugDiSTC);
 

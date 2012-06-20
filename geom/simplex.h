@@ -33,6 +33,7 @@
 #include "geom/boundary.h"
 #include "geom/topo.h"
 #include "num/unknowns.h"
+#include "DiST/geomid.h"
 
 #ifdef _PAR
 #  include "DiST/DiST.h"
@@ -111,42 +112,6 @@ class RecycleBinCL
     void DebugInfo(std::ostream&) const;
 };
 
-#ifndef _PAR
-/// \name Ask for the dimension of a simplex
-//@{
-template <typename SimplexT> inline Usint GetDim();
-template <> inline Usint GetDim<VertexCL>() { return 0; }
-template <> inline Usint GetDim<EdgeCL>()   { return 1; }
-template <> inline Usint GetDim<FaceCL>()   { return 2; }
-template <> inline Usint GetDim<FaceCL const>()   { return 2; }
-template <> inline Usint GetDim<TetraCL>()  { return 3; }
-//@}
-
-struct GeomIdCL
-{
-    Uint        level;      ///< level, the simplex occurs first
-    Point3DCL   bary;       ///< barycenter of the simplex
-    Usint       dim;        ///< Dimension of the simplex, i.e., 0 - vertex, 1 - edge, 2 - face, 3 - tetrahedron, 4 - uninitialized
-
-    GeomIdCL() : level((Uint)(-1)), bary(), dim(4) {}
-    GeomIdCL(Uint lvl, const Point3DCL& p, Usint dimension) : level(lvl), bary(p), dim(dimension) {}
-    GeomIdCL( const GeomIdCL& h) : level(h.level), bary(h.bary), dim(h.dim) {}
-    template <typename SimplexT>
-    GeomIdCL(Uint lvl, const SimplexT& s) : level(lvl), bary( GetBaryCenter(s)), dim(GetDim<SimplexT>()) {}
-    bool operator== (const GeomIdCL& h) const { return h.level == level && h.bary == bary;}
-    bool operator!= (const GeomIdCL& h) const { return !(h==*this); }
-    bool operator < (const GeomIdCL& h) const { return level < h.level && dim < h.dim && bary[0] < h.bary[0] && bary[1] < h.bary[1] && bary[2] < h.bary[2];}
-};
-
-inline std::ostream& operator << ( std::ostream& os, const GeomIdCL& h)
-{
-    static char scode[]= "VEFT?"; // simplex code for each dimension
-    os << scode[h.dim] << h.level << " (" << h.bary << ')';
-    return os;
-}
-
-#endif
-
 /*******************************************************************
 *   V E R T E X  C L                                               *
 *******************************************************************/
@@ -213,7 +178,7 @@ class VertexCL
     /// \brief get level of vertex (=first appearance in the multigrid)
     /** In the parallel version this function is defined in the base class*/
     Uint GetLevel() const { return Level_; }
-    GeomIdCL GetGID() const { return GeomIdCL(this->GetLevel(), *this);}
+    DiST::GeomIdCL GetGID() const { return DiST::GeomIdCL(this->GetLevel(), *this);}
 #endif
 
     /// \brief get coordinate of this vertex
@@ -270,9 +235,9 @@ class VertexCL
     /// \name Functions for parallel computing demanded by the base class
     //@{
     /// \brief Put vertex on a stream
-    void Pack( DiST::Helper::MPIostreamCL&) const;
+    void Pack( DiST::MPIostreamCL&) const;
     /// \brief Generate vertex from a stream
-    void UnPack( DiST::Helper::MPIistreamCL&);
+    void UnPack( DiST::MPIistreamCL&);
     /// \brief Generate GID
     void UpdateGID();
     //@}
@@ -384,14 +349,14 @@ class EdgeCL
     /// \brief get level of vertex (=first appearance in the multigrid)
     /** In the parallel version this function is defined in the base class*/
     Uint GetLevel() const { return Level_; }
-    GeomIdCL GetGID() const { return GeomIdCL(this->GetLevel(), *this);}
+    DiST::GeomIdCL GetGID() const { return DiST::GeomIdCL(this->GetLevel(), *this);}
 #else
     /// \name Functions for parallel computing demanded by the base class
     //@{
     /// \brief Put edge on a stream
-    void Pack( DiST::Helper::MPIostreamCL&) const;
+    void Pack( DiST::MPIostreamCL&) const;
     /// \brief Generate edge from a stream
-    void UnPack( DiST::Helper::MPIistreamCL&);
+    void UnPack( DiST::MPIistreamCL&);
     /// \brief Generate GID
     void UpdateGID();
     //@}
@@ -482,14 +447,14 @@ class FaceCL
 
 #ifndef _PAR
     Uint GetLevel() const { return Level_; }                    ///< get level of the face (stored within the class)
-    GeomIdCL GetGID() const { return GeomIdCL(this->GetLevel(), *this);}
+    DiST::GeomIdCL GetGID() const { return DiST::GeomIdCL(this->GetLevel(), *this);}
 #else
     /// \name Functions for parallel computing demanded by the base class
     //@{
     /// \brief Put face on a stream
-    void Pack( DiST::Helper::MPIostreamCL&) const;
+    void Pack( DiST::MPIostreamCL&) const;
     /// \brief Generate face from a stream
-    void UnPack( DiST::Helper::MPIistreamCL&);
+    void UnPack( DiST::MPIistreamCL&);
     /// \brief Generate GID
     void UpdateGID();
 
@@ -664,14 +629,14 @@ class TetraCL
 #ifndef _PAR
     Uint GetLevel() const { return Level_; }                                     ///< return level of tetra
     bool IsGhost() const {return false;}
-    GeomIdCL GetGID() const { return GeomIdCL(this->GetLevel(), *this);}
+    DiST::GeomIdCL GetGID() const { return DiST::GeomIdCL(this->GetLevel(), *this);}
 #else
     /// \name Functions for parallel computing demanded by the base class
     //@{
     /// \brief Put tetra on a stream
-    void Pack( DiST::Helper::MPIostreamCL&) const;
+    void Pack( DiST::MPIostreamCL&) const;
     /// \brief Generate tetra from a stream
-    void UnPack( DiST::Helper::MPIistreamCL&);
+    void UnPack( DiST::MPIistreamCL&);
     /// \brief Generate GID
     void UpdateGID();
     /// \brief Merge tetra with given tetra. Needed by DiST::TransferCL.
@@ -753,7 +718,7 @@ class TetraCL
 template <typename SimplexT>
 void simplex_cast( const DiST::TransferableCL& t, SimplexT*& s)
 {
-    Assert( DiST::GetDim<SimplexT>() == t.GetDim(), DiST::Helper::ErrorCL("simplex_cast: dimension does not match for ", t.GetGID(), DiST::Helper::NoGID), ~0);
+    Assert( DiST::GetDim<SimplexT>() == t.GetDim(), DiST::ErrorCL("simplex_cast: dimension does not match for ", t.GetGID(), DiST::NoGID), ~0);
     s= dynamic_cast<SimplexT*>(const_cast<DiST::TransferableCL*>(&t));
 }
 #endif
@@ -775,7 +740,7 @@ private:
 
 public:
 #ifdef _PAR
-    typedef DiST::Helper::RemoteDataCL::ProcListT ProcListT;
+    typedef DiST::RemoteDataCL::ProcListT ProcListT;
 #endif
     /// \brief Constructor
     SimplexFactoryCL( MG_VertexContT& verts, MG_EdgeContT& edges, MG_FaceContT& faces, MG_TetraContT& tetras)

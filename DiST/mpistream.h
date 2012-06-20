@@ -1,5 +1,5 @@
 /// \file mpistream.h
-/// \brief SendStreamCL and RecvStreamCL for transfering objects (simplexes + data) as byte-messages.
+/// \brief SendStreamCL and RecvStreamCL for transferring objects (simplexes + data) as byte-messages.
 /// \author LNM RWTH Aachen: Patrick Esser, Joerg Grande, Sven Gross, Yuanjun Zhang; SC RWTH Aachen: Oliver Fortmeier, Daniel Medina Cardona.
 
 /*
@@ -19,7 +19,7 @@
  * along with DROPS. If not, see <http://www.gnu.org/licenses/>.
  *
  *
- * Copyright 2009 LNM/SC RWTH Aachen, Germany
+ * Copyright 2012 LNM/SC RWTH Aachen, Germany
 */
 
 #include "misc/container.h"
@@ -36,8 +36,6 @@ namespace DiST {
 /// \brief Default for the MPI-message format used by DiST.
 /// True on program startup. Can be reassigned.
 extern bool use_binaryMPIstreams;
-
-namespace Helper {
 
 class GeomIdCL; ///< forward declaration for operator>>/<<
 
@@ -487,7 +485,6 @@ class SubostreamBuilderCL
     }
 };
 
-} // end of namespace Helper
 } // end of namespace DiST
 } // end of namespace DROPS
 

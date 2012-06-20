@@ -300,7 +300,7 @@ void CheckMigration( LoadBalCL& lb)
               << " velocity " << Stokes.v.RowIdx->GetIdx() << '\n'
               << " pressure " << Stokes.p.RowIdx->GetIdx() << '\n'
               << std::endl;
-//    const DiST::Helper::GeomIdCL gid( 3, MakePoint3D(0.75, 0.25, 0.375), 0);
+//    const DiST::GeomIdCL gid( 3, MakePoint3D(0.75, 0.25, 0.375), 0);
 //    VertexCL *v= DiST::InfoCL::Instance().Exists(gid) ? DiST::InfoCL::Instance().GetVertex(gid) : 0;
 //    IF_MASTER if (v) { v->Unknowns.DebugInfo(cdebug << gid << ": "); v->DebugInfo(cdebug); }
     Migrate( lb, obs);

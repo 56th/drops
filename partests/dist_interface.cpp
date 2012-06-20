@@ -101,18 +101,18 @@ bool Executer( DiST::TransferableCL& t)
 
 struct BaryHandlerCL
 {
-    bool Gather( DiST::TransferableCL& t, DiST::Helper::SendStreamCL& send)
+    bool Gather( DiST::TransferableCL& t, DiST::SendStreamCL& send)
     {
         send << t.GetBary()[0] << t.GetBary()[1] << t.GetBary()[2];
         return true;
     }
 
-    bool Scatter( DiST::TransferableCL& t, size_t numData, DiST::Helper::MPIistreamCL& recv)
+    bool Scatter( DiST::TransferableCL& t, size_t numData, DiST::MPIistreamCL& recv)
     {
         Point3DCL bary;
-        const DiST::Helper::RemoteDataCL& rd= DiST::InfoCL::Instance().GetRemoteData(t);
+        const DiST::RemoteDataCL& rd= DiST::InfoCL::Instance().GetRemoteData(t);
         size_t numFrom= 0;
-        for (DiST::Helper::RemoteDataCL::ProcList_const_iterator it= rd.GetProcListBegin(), end= rd.GetProcListEnd(); it!=end; ++it)
+        for (DiST::RemoteDataCL::ProcList_const_iterator it= rd.GetProcListBegin(), end= rd.GetProcListEnd(); it!=end; ++it)
             if (prioFrom.contains(it->prio))
                 numFrom++;
         bool correct= numData==numFrom;
@@ -129,13 +129,13 @@ struct BaryHandlerCL
 
 struct ProcRankToOwnerHandlerCL
 {
-    bool Gather( DiST::TransferableCL&, DiST::Helper::SendStreamCL& send)
+    bool Gather( DiST::TransferableCL&, DiST::SendStreamCL& send)
     {
         send << ProcCL::MyRank();
         return true;
     }
 
-    bool Scatter( DiST::TransferableCL& t, size_t numData, DiST::Helper::MPIistreamCL& recv)
+    bool Scatter( DiST::TransferableCL& t, size_t numData, DiST::MPIistreamCL& recv)
     {
         std::vector<int> ranks( numData, -1);
         for ( size_t i=0; i<numData; ++i){
@@ -150,7 +150,7 @@ struct ProcRankToOwnerHandlerCL
 
 struct ProcRankFromOwnerHandlerCL
 {
-    bool Gather( DiST::TransferableCL& t, DiST::Helper::SendStreamCL& send)
+    bool Gather( DiST::TransferableCL& t, DiST::SendStreamCL& send)
     {
         if ( !t.AmIOwner()){
             printf("Proc %d, called GatherProcRankFromOwner for a non-owning simplex\n",
@@ -160,7 +160,7 @@ struct ProcRankFromOwnerHandlerCL
         return true;
     }
 
-    bool Scatter( DiST::TransferableCL& t, size_t numData, DiST::Helper::MPIistreamCL& recv)
+    bool Scatter( DiST::TransferableCL& t, size_t numData, DiST::MPIistreamCL& recv)
     {
         bool correct=true;
         std::vector<int> ranks( numData, -1);

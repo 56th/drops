@@ -79,7 +79,7 @@ class ParMultiGridCL::SanityCheckCL
 
     ///\name Handler for DiST::InterfaceCL
     //@{
-    bool Gather( DiST::TransferableCL& t, DiST::Helper::SendStreamCL& send)
+    bool Gather( DiST::TransferableCL& t, DiST::SendStreamCL& send)
     {
         if ( t.GetDim()==1){        // edge
             EdgeCL* ep= 0;
@@ -98,9 +98,9 @@ class ParMultiGridCL::SanityCheckCL
         return true;
     }
 
-    bool Scatter( DiST::TransferableCL& t, const size_t& numData, DiST::Helper::MPIistreamCL& recv)
+    bool Scatter( DiST::TransferableCL& t, const size_t& numData, DiST::MPIistreamCL& recv)
     {
-        DiST::Helper::GeomIdCL gid;
+        DiST::GeomIdCL gid;
         bool sane= true;
         if ( t.GetDim()==1){        // edge
             EdgeCL* ep= 0;
@@ -225,7 +225,7 @@ bool ParMultiGridCL::CheckMFR( int Level, std::ostream& os) const
             sane= ParMultiGridCL::CheckMFR( lvl, os) && sane;
     }
     else {
-        DROPS_STD_UNORDERED_MAP<DiST::Helper::GeomIdCL,short int,DiST::Helper::Hashing> edgeMFR;
+        DROPS_STD_UNORDERED_MAP<DiST::GeomIdCL,short int,DiST::Hashing> edgeMFR;
 
         for (MultiGridCL::const_TetraIterator it= mg_->GetTetrasBegin(Level), end= mg_->GetTetrasEnd(); it!=end; ++it)
             if (it->IsRegularlyRef() && it->IsMaster()) {
@@ -235,7 +235,7 @@ bool ParMultiGridCL::CheckMFR( int Level, std::ostream& os) const
             }
         // now compare with edges' local MFRs
         for (MultiGridCL::const_EdgeIterator it= mg_->GetEdgesBegin(Level), end= mg_->GetEdgesEnd(); it!=end; ++it) {
-            const DiST::Helper::GeomIdCL gid= it->GetGID();
+            const DiST::GeomIdCL gid= it->GetGID();
             if (it->GetMFR() != edgeMFR[gid]) {
                 sane= false;
                 os << "Wrong MFR on edge " << gid << ": local MFR = " << it->GetMFR() << ", but should be " << edgeMFR[gid] << std::endl;
@@ -264,7 +264,7 @@ class ParMultiGridCL::HandlerAccMFRCL
   public:
     HandlerAccMFRCL( int level) : level_(level) {}
     /// \brief Set AccMFR to zero and put my MFR into the message
-    bool Gather( DiST::TransferableCL& t, DiST::Helper::SendStreamCL& send)
+    bool Gather( DiST::TransferableCL& t, DiST::SendStreamCL& send)
     {
         EdgeCL* ep; simplex_cast( t, ep);
         if ( !ep->IsMarkedForRemovement()){
@@ -277,7 +277,7 @@ class ParMultiGridCL::HandlerAccMFRCL
 
     }
     /// \brief Add received MFR to the accumulated MFR
-    bool Scatter( DiST::TransferableCL& t, const size_t& numData, DiST::Helper::MPIistreamCL& recv)
+    bool Scatter( DiST::TransferableCL& t, const size_t& numData, DiST::MPIistreamCL& recv)
     {
         EdgeCL* ep; simplex_cast( t, ep);
         ep->AccMFR_= 0;
@@ -317,7 +317,7 @@ public:
     HandlerRefMarkCL( int level) : level_(level) {}
     /// \brief For tetra on proc bnd, only the ghost copy called the function TetraCL::RestrictMark. Therefore,
     ///     send the mark to the master copy.
-    bool Gather( DiST::TransferableCL& t, DiST::Helper::SendStreamCL& send)
+    bool Gather( DiST::TransferableCL& t, DiST::SendStreamCL& send)
     {
         TetraCL* tp; simplex_cast( t, tp);
 
@@ -327,7 +327,7 @@ public:
     }
     /// \brief This is called by the master copy. The corresponding ghost copy definitely put in the
     ///     message, whether the tetrahedron is marked for regular refinement
-    bool Scatter( DiST::TransferableCL& t, __UNUSED__ const size_t& numData, DiST::Helper::MPIistreamCL& recv)
+    bool Scatter( DiST::TransferableCL& t, __UNUSED__ const size_t& numData, DiST::MPIistreamCL& recv)
     {
         TetraCL* tp; simplex_cast( t, tp);
 
@@ -595,7 +595,7 @@ class ParMultiGridCL::AdaptMidVertexCL
         if (e.GetPrio()==PrioVGhost)
             e.RemoveMidVertex();
         else if ( !e.GetMidVertex() && e.IsMarkedForRef()) {
-            const DiST::Helper::GeomIdCL midVertGID( e.GetLevel()+1, e.GetGID().bary, DiST::GetDim<VertexCL>());
+            const DiST::GeomIdCL midVertGID( e.GetLevel()+1, e.GetGID().bary, DiST::GetDim<VertexCL>());
         	e.SetMidVertex( DiST::InfoCL::Instance().GetVertex(midVertGID));
         }
         if (e.IsLocal() && e.GetMFR() != e.GetAccMFR()) // set local MFR = AccMFR
@@ -776,7 +776,7 @@ MultiGridCL& ParMultiGridCL::GetMG()
 ****************************************************************************/
 /// \brief Show simplex by GID
 /** Search on proc (or all procs) for a simplex of given GID and show DebugInfo*/
-void ParMultiGridCL::Show( const DiST::Helper::GeomIdCL& gid, char *mesg, int proc) const
+void ParMultiGridCL::Show( const DiST::GeomIdCL& gid, char *mesg, int proc) const
 {
     for (Uint l= 0; l<= mg_->GetLastLevel(); ++l)
     {
@@ -788,14 +788,14 @@ void ParMultiGridCL::Show( const DiST::Helper::GeomIdCL& gid, char *mesg, int pr
 
     if (proc != -1 && proc == ProcCL::MyRank() )
     {
-        const DiST::Helper::RemoteDataListCL& rdl=
+        const DiST::RemoteDataListCL& rdl=
             DiST::InfoCL::Instance().GetRemoteList( gid.dim);
-        DiST::Helper::RemoteDataListCL::const_iterator it= rdl.find( gid);
+        DiST::RemoteDataListCL::const_iterator it= rdl.find( gid);
         if ( it==rdl.end()){
             std::cerr << "...stored only locally." << std::endl;
         }
         else{
-            DiST::Helper::RemoteDataCL::ProcList_const_iterator pit=
+            DiST::RemoteDataCL::ProcList_const_iterator pit=
                 it->second.GetProcListBegin();
             for ( ; pit!=it->second.GetProcListEnd(); ++pit){
                 std::cerr << "...stored on proc " << pit->proc

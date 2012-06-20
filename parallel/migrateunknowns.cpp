@@ -43,7 +43,7 @@ void MigrateFECL::CopyVecElements( VecDescCL& new_vec_desc, const std::vector<Us
     // Create a WholeRemoteDataIteratorCL
     DiST::LevelListCL lvls;
     DiST::PrioListCL prios; prios.push_back( PrioMaster);
-    DiST::Helper::WholeRemoteDataIteratorCL it( dims, lvls, prios, false),
+    DiST::WholeRemoteDataIteratorCL it( dims, lvls, prios, false),
             end= it.GetEnd();
 
     // iterate over all simplices and copy the DoF values
@@ -54,7 +54,7 @@ void MigrateFECL::CopyVecElements( VecDescCL& new_vec_desc, const std::vector<Us
         UnknownHandleCL& Unknowns= simplex.Unknowns;
         if ( Unknowns.Exist( new_idx)){
             Assert( Unknowns.Exist( old_idx),
-                DiST::Helper::ErrorCL("MigrateFECL::CopyVecElements: Unknowns do not exist before migration", simplex.GetGID()),
+                DiST::ErrorCL("MigrateFECL::CopyVecElements: Unknowns do not exist before migration", simplex.GetGID()),
                 DebugParallelNumC);
             // copy data from known DoF values or from the receive buffer
             double const * in= !Unknowns.UnkReceived( old_idx)
@@ -102,7 +102,7 @@ void MigrateFECL::post_migrate()
     loc_vec.SetIdx( &loc_idx);
 
     // Copy the DoF values into the new vector
-    DiST::Helper::WholeRemoteDataIteratorCL::DimListT dims;
+    DiST::WholeRemoteDataIteratorCL::DimListT dims;
     if ( old_idx_->NumUnknownsVertex())  dims.push_back( 0);
     if ( old_idx_->NumUnknownsEdge())    dims.push_back( 1);
     if ( old_idx_->NumUnknownsFace())    dims.push_back( 2);

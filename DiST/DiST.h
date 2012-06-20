@@ -29,6 +29,7 @@
 #include "misc/utils.h"
 #include "num/unknowns.h"
 #include "DiST/mpistream.h"
+#include "DiST/geomid.h"
 
 #include <list>
 #include <set>
@@ -98,66 +99,12 @@ class TransferableCL;
 class ModifyCL;
 class TransferCL;
 
-/// \name Ask for the dimension of a simplex
-//@{
-template <typename SimplexT> inline Usint GetDim();
-template <> inline Usint GetDim<VertexCL>() { return 0; }
-template <> inline Usint GetDim<EdgeCL>()   { return 1; }
-template <> inline Usint GetDim<FaceCL>()   { return 2; }
-template <> inline Usint GetDim<FaceCL const>()   { return 2; }
-template <> inline Usint GetDim<TetraCL>()  { return 3; }
-//@}
-
 /// \brief Helper functions for constituting the parallel multigrid
 /** Everything in this namespace should not act as an interface to DROPS. */
-namespace Helper{
 
 // fwd declaration
 class RemoteDataListCL;
 class RemoteDataListIteratorCL;
-
-/// \brief Assign each simplex an unique geometric id
-struct GeomIdCL
-{
-    Uint        level;      ///< level, the simplex occurs first
-    Point3DCL   bary;       ///< barycenter of the simplex
-    Usint       dim;        ///< Dimension of the simplex, i.e., 0 - vertex, 1 - edge, 2 - face, 3 - tetrahedron, 4 - uninitialized
-
-    GeomIdCL() : level((Uint)(-1)), bary(), dim(4) {}
-    GeomIdCL(Uint lvl, const Point3DCL& p, Usint dimension) : level(lvl), bary(p), dim(dimension) {}
-    GeomIdCL( const GeomIdCL& h) : level(h.level), bary(h.bary), dim(h.dim) {}
-    template <typename SimplexT>
-    GeomIdCL(Uint lvl, const SimplexT& s) : level(lvl), bary( ComputeBaryCenter(s)), dim(GetDim<SimplexT>()) {}
-    bool operator== (const GeomIdCL& h) const { return h.level == level && h.bary == bary;}
-    bool operator!= (const GeomIdCL& h) const { return !(h==*this); }
-    bool operator < (const GeomIdCL& h) const { return level < h.level && dim < h.dim && bary[0] < h.bary[0] && bary[1] < h.bary[1] && bary[2] < h.bary[2];}
-};
-
-inline std::ostream& operator << ( std::ostream& os, const GeomIdCL& h)
-{
-    static char scode[]= "VEFT?"; // simplex code for each dimension
-    os << scode[h.dim] << h.level << " (" << h.bary << ')';
-    return os;
-}
-const GeomIdCL NoGID= GeomIdCL( (Uint)(-1), Point3DCL(), 4);  // Dummy id, if simplex does not exist
-
-#if __GNUC__ >= 4 || DROPS_WIN
-struct Hashing : std::unary_function<GeomIdCL, size_t>
-{
-    size_t operator()(const GeomIdCL& h) const
-    {
-        size_t seed = 0;
-        DROPS_STD_HASH<int> inthasher;
-        DROPS_STD_HASH<double> doublehasher;
-        // see boost::hash_combine
-        seed ^= inthasher(h.level) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-        seed ^= doublehasher(h.bary[0]) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-        seed ^= doublehasher(h.bary[1]) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-        seed ^= doublehasher(h.bary[2]) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-        return seed;
-    }
-};
-#endif
 
 /// error class for exception handling
 class ErrorCL: public DROPSErrCL
@@ -446,7 +393,7 @@ class SimplexTransferInfoCL
         keep, overwrite, merge
     };
   private:
-    Helper::RemoteDataCL& rd_;       ///< remote data of simplex on local proc
+    RemoteDataCL& rd_;       ///< remote data of simplex on local proc
     ProcSetT postProcs_;             ///< set of procs/prios where object will be after transfer
     ProcSetT procsToSend_;           ///< set of procs/prios where object has to be newly created
     bool RemoveMark_;                ///< whether simplex should be deleted locally after transfer
@@ -488,48 +435,47 @@ class SimplexTransferInfoCL
     /// return rank of broadcaster
     int  GetBroadcaster() const { return proc_bc_; }
     /// return simplex' remote data
-    const Helper::RemoteDataCL& GetRemoteData() const { return rd_; }
+    const RemoteDataCL& GetRemoteData() const { return rd_; }
     /// return simplex' remote data
-    Helper::RemoteDataCL&       GetRemoteData()       { return rd_; }
+    RemoteDataCL&       GetRemoteData()       { return rd_; }
 };
 
-}   // end of namespace Helper
 
 
 /// \brief base class for all distributed data managed by the DiST module, i.e., all simplex classes
 class TransferableCL
 {
   public:
-    typedef Helper::RemoteDataCL::ProcList_const_iterator ProcList_const_iterator;
+    typedef RemoteDataCL::ProcList_const_iterator ProcList_const_iterator;
 
   protected:
-    Helper::GeomIdCL gid_;           ///< Each entity stores a geometric id
+    GeomIdCL gid_;           ///< Each entity stores a geometric id
 
-    inline const Helper::RemoteDataCL& GetRemoteData() const;                               ///< Access its RemoteDataCL
-    inline       Helper::RemoteDataCL& GetRemoteData();                                     ///< Access its RemoteDataCL
+    inline const RemoteDataCL& GetRemoteData() const;                               ///< Access its RemoteDataCL
+    inline       RemoteDataCL& GetRemoteData();                                     ///< Access its RemoteDataCL
     virtual void UpdateGID() = 0;
 
   public:
     /// \brief Uninitialized object
-    TransferableCL() : gid_( Helper::NoGID) {}
+    TransferableCL() : gid_( NoGID) {}
     /// \brief Copy a transferable object
     TransferableCL( const TransferableCL& t) : gid_(t.gid_), Unknowns(t.Unknowns) {}
-    TransferableCL( const Helper::GeomIdCL& h) : gid_(h) {}
+    TransferableCL( const GeomIdCL& h) : gid_(h) {}
     TransferableCL( Uint lvl, const Point3DCL& p, const Usint dim) : gid_( lvl, p, dim) {}
     virtual ~TransferableCL() {}
 
     /// \brief Put the simplex on an outgoing stream
-    virtual void Pack (Helper::MPIostreamCL&) const = 0;
+    virtual void Pack (MPIostreamCL&) const = 0;
     /// \brief Init the simplex by an incoming stream
-    virtual void UnPack (Helper::MPIistreamCL&) = 0;
+    virtual void UnPack (MPIistreamCL&) = 0;
 
     //// \name Information each simplex provides concerning distributed computing
     //@{
-    const Helper::GeomIdCL& GetGID()      const { return gid_; }                             ///< Ask for the geometric id
+    const GeomIdCL& GetGID()      const { return gid_; }                             ///< Ask for the geometric id
     const Point3DCL&        GetBary()     const { return gid_.bary; }                        ///< Ask for the barycenter of the simplex
     Usint                   GetDim()      const { return gid_.dim; }                         ///< Ask for the dimension of the simplex
     Uint                    GetLevel()    const { return gid_.level; }                       ///< Ask for the level
-    size_t                  GetHashId()   const { Helper::Hashing h; return h(GetGID()); }   ///< Ask for the hash of the GID
+    size_t                  GetHashId()   const { Hashing h; return h(GetGID()); }   ///< Ask for the hash of the GID
     Priority                GetPrio()     const { return GetRemoteData().GetLocalPrio(); }   ///< Ask for the priority
     bool                    IsMaster()    const { return GetPrio()>=PrioMaster; }            ///< Check if simplex is a master copy
     bool                    IsLocal()     const { return GetNumDist()==1; }                  ///< Check if the simplex is local
@@ -554,14 +500,14 @@ class TransferableCL
 };
 
 /// \brief Use operator << to put data on a stream
-inline Helper::MPIostreamCL& operator<< (Helper::MPIostreamCL& os, const TransferableCL& t)
+inline MPIostreamCL& operator<< (MPIostreamCL& os, const TransferableCL& t)
 {
     t.Pack( os);
     return os;
 }
 
 /// \brief Use operator >> to get data out of stream
-inline Helper::MPIistreamCL& operator>> (Helper::MPIistreamCL& is, TransferableCL& t)
+inline MPIistreamCL& operator>> (MPIistreamCL& is, TransferableCL& t)
 {
     t.UnPack( is);
     return is;
@@ -583,11 +529,11 @@ class InterfaceCL
 ///   Maybe, an observer pattern would be nice here.
 {
   public:
-    typedef Helper::WholeRemoteDataIteratorCL iterator;    ///< type for iterator over elements in the interface
+    typedef WholeRemoteDataIteratorCL iterator;    ///< type for iterator over elements in the interface
     typedef iterator::DimListT DimListT;                   ///< type for storing the involved simplices
     typedef iterator::GIDIteratorT GIDIteratorT;           ///< type for iterator over GID's
-    typedef std::map<int, Helper::SendStreamCL> SendListT; ///< type for storing data to be sent (proc -> data)
-    typedef std::map<int, Helper::RecvStreamCL> RecvListT; ///< type for receiving data (proc -> data)
+    typedef std::map<int, SendStreamCL> SendListT; ///< type for storing data to be sent (proc -> data)
+    typedef std::map<int, RecvStreamCL> RecvListT; ///< type for receiving data (proc -> data)
     typedef std::set<int> ProcSetT;                        ///< type for a set of proccessor numbers
 
     /// \brief Helper types for ExchangeData and the function collect_streams in Dist.cpp
@@ -601,9 +547,9 @@ class InterfaceCL
         MessagesCL () : numData( 0) {}
         void append (const char* begin, const char* end)
             { messages.insert( messages.end(), begin, end); ++numData; }
-        friend Helper::MPIostreamCL& operator<< (Helper::MPIostreamCL& os, const InterfaceCL::MessagesCL& msg);
+        friend MPIostreamCL& operator<< (MPIostreamCL& os, const InterfaceCL::MessagesCL& msg);
     };
-    typedef DROPS_STD_UNORDERED_MAP<Helper::GeomIdCL, MessagesCL, Helper::Hashing > CollectDataT;
+    typedef DROPS_STD_UNORDERED_MAP<GeomIdCL, MessagesCL, Hashing > CollectDataT;
     ///@}
 
   private:
@@ -615,8 +561,8 @@ class InterfaceCL
 
     RecvListT recvbuf_;         ///< received data (after call of function Communicate())
     SendListT sendbuf_;         ///< data to be sent (filled in GatherData)
-    Helper::SendStreamCL    loc_send_toowner_; ///< used in Perform, phase==toowner, to avoid a copy of the local message
-    Helper::RefMPIistreamCL loc_recv_toowner_; ///< used in Perform, phase==toowner, to avoid a copy of the local message
+    SendStreamCL    loc_send_toowner_; ///< used in Perform, phase==toowner, to avoid a copy of the local message
+    RefMPIistreamCL loc_recv_toowner_; ///< used in Perform, phase==toowner, to avoid a copy of the local message
 
     PrioListT from_;            ///< list of priority on sender side, the interface operates on
     PrioListT to_;              ///< list of priority on receiver side, the interface operates on
@@ -693,8 +639,8 @@ class InterfaceCL
     /// \name Do The interface communication
     /// \param HandlerT A handler h is used to gather and scatter data on
     ///     TransferableCL's. Therefore, the handler must provide the members
-    ///    Gather( DiST::TransferableCL&, DiST::Helper::SendStreamCL&)
-    ///    Scatter( DiST::TransferableCL&, const size_t&, DiST::Helper::RecvStreamCL&);
+    ///    Gather( DiST::TransferableCL&, DiST::SendStreamCL&)
+    ///    Scatter( DiST::TransferableCL&, const size_t&, DiST::RecvStreamCL&);
     //@{
     /// \brief Do the interface communication on the interface specified by the
     ///   the constructor
@@ -722,10 +668,10 @@ class ModifyCL
     class MergeProcListHandlerCL;
     class CommToUpdateHandlerCL;
     /// \brief type for remembering which simplices need to be updated, plus for each some temporary information needed for the transfer
-    typedef std::map<const TransferableCL*, Helper::SimplexTransferInfoCL> UpdateListT;
-    typedef std::pair<const TransferableCL*,Helper::SimplexTransferInfoCL> UpdateEntryT;
+    typedef std::map<const TransferableCL*, SimplexTransferInfoCL> UpdateListT;
+    typedef std::pair<const TransferableCL*,SimplexTransferInfoCL> UpdateEntryT;
     typedef UpdateListT::iterator                                          UpdateIterator;
-    typedef Helper::SimplexTransferInfoCL::ProcSetT                        ProcSetT;
+    typedef SimplexTransferInfoCL::ProcSetT                        ProcSetT;
 
     bool          modifiable_;        ///< for checking if Init and Finalize are called
     bool          del_;               ///< physically remove simplices
@@ -779,7 +725,7 @@ class TransferCL : public ModifyCL
 
   private:
     /// \brief type for sending information to other processes
-    typedef std::map<int, Helper::SendStreamCL*> SendBufT;
+    typedef std::map<int, SendStreamCL*> SendBufT;
     /// \brief type for sorted tetras to update
     typedef std::list<UpdateEntryT>              SortedListT;
     // comparison functor to sort by descending level
@@ -791,9 +737,9 @@ class TransferCL : public ModifyCL
     /// create list of tetras to update, sorted by descending order
     SortedListT* SortUpdateTetras();
     /// Update and send remote data of a given simplex.
-    void UpdateSendRemoteData( const TransferableCL&, Helper::SimplexTransferInfoCL&);
+    void UpdateSendRemoteData( const TransferableCL&, SimplexTransferInfoCL&);
     /// Send added data of a given simplex.
-    void SendAddedData( const TransferableCL&, Helper::SimplexTransferInfoCL&);
+    void SendAddedData( const TransferableCL&, SimplexTransferInfoCL&);
     /// \brief Update ownership (in remote data) for all registered objects
     void UpdateOwners();
     /// \brief allocate and fill send buffers, update remote data
@@ -802,12 +748,12 @@ class TransferCL : public ModifyCL
     void Receive();
     /// \brief Receive vertices, edges, faces, tetras (helper for Receive())
     template <typename SimplexT>
-    void ReceiveSimplices( Helper::RecvStreamCL&, size_t);
+    void ReceiveSimplices( RecvStreamCL&, size_t);
     /// \brief Receive added data
-    void ReceiveAddedData( Helper::RecvStreamCL&, size_t);
+    void ReceiveAddedData( RecvStreamCL&, size_t);
     /// \brief Create simplex using the SimplexFactoryCL
     template <typename SimplexT>
-    SimplexT& CreateSimplex( const SimplexT&, const Helper::RemoteDataCL::ProcListT&);
+    SimplexT& CreateSimplex( const SimplexT&, const RemoteDataCL::ProcListT&);
 
   public:
     /// \brief Constructor with a given multigrid (\a mg) and decision if the transfer should be done \a binary.
@@ -843,8 +789,8 @@ private:
   private:
     /// \brief RemoteDataListCL
     /** For each simplex type, a single list is stored where list i contains all simplices of dimension i. */
-	Helper::RemoteDataListCL remoteData_[4];
-    Helper::RemoteDataCL::LoadVecT loadOfProc_;
+	RemoteDataListCL remoteData_[4];
+    RemoteDataCL::LoadVecT loadOfProc_;
 
 	MultiGridCL* mg_; // do we need it?
 
@@ -869,36 +815,36 @@ private:
     //@}
 
     /// \brief Access the RemoteDataCL of a given simplex
-    const Helper::RemoteDataCL& GetRemoteData( const TransferableCL& t) const { return GetRemoteData( t.GetGID()); }
+    const RemoteDataCL& GetRemoteData( const TransferableCL& t) const { return GetRemoteData( t.GetGID()); }
     /// \brief Access the RemoteDataCL of a given simplex (private?)
-    Helper::RemoteDataCL& GetRemoteData( const TransferableCL& t) { return GetRemoteData( t.GetGID()); }
-    inline const Helper::RemoteDataCL& GetRemoteData( const Helper::GeomIdCL&) const; ///< Get remote data by GID
-    inline       Helper::RemoteDataCL& GetRemoteData( const Helper::GeomIdCL&);       ///< Get remote data by GID
+    RemoteDataCL& GetRemoteData( const TransferableCL& t) { return GetRemoteData( t.GetGID()); }
+    inline const RemoteDataCL& GetRemoteData( const GeomIdCL&) const; ///< Get remote data by GID
+    inline       RemoteDataCL& GetRemoteData( const GeomIdCL&);       ///< Get remote data by GID
 
     /// \brief Access the RemoteDataListCL of a given dimension
-    const Helper::RemoteDataListCL& GetRemoteList( int dim) const { return remoteData_[dim]; }
+    const RemoteDataListCL& GetRemoteList( int dim) const { return remoteData_[dim]; }
     /// \brief Access the RemoteDataListCL of a given dimension
-    Helper::RemoteDataListCL& GetRemoteList( int dim) { return remoteData_[dim]; }
+    RemoteDataListCL& GetRemoteList( int dim) { return remoteData_[dim]; }
     /// \brief Access the RemoteDataListCL of a given simplex type
     template <typename SimplexT>
-    const Helper::RemoteDataListCL& GetRemoteList() const { return remoteData_[GetDim<SimplexT>()]; }
+    const RemoteDataListCL& GetRemoteList() const { return remoteData_[GetDim<SimplexT>()]; }
     /// \brief Access the RemoteDataListCL of a given simplex type (private?)
     template <typename SimplexT>
-    Helper::RemoteDataListCL& GetRemoteList() { return remoteData_[GetDim<SimplexT>()]; }
+    RemoteDataListCL& GetRemoteList() { return remoteData_[GetDim<SimplexT>()]; }
 
     /// \brief Access loads of processes used to determine the ownership in the remote data.
-    const Helper::RemoteDataCL::LoadVecT& GetLoadVector() const { return loadOfProc_; }
+    const RemoteDataCL::LoadVecT& GetLoadVector() const { return loadOfProc_; }
 
     /// \brief Is this GID registered?
-    inline bool Exists( const Helper::GeomIdCL& gid) const { return gid.dim < 4 ? remoteData_[gid.dim].Exists(gid) : false; }
+    inline bool Exists( const GeomIdCL& gid) const { return gid.dim < 4 ? remoteData_[gid.dim].Exists(gid) : false; }
 
     /// \name Direct access to a simplex by its GID
     /// \todo Make these functions inline
     //@{
-    VertexCL* GetVertex( const Helper::GeomIdCL&) const;
-    EdgeCL*   GetEdge  ( const Helper::GeomIdCL&) const;
-    FaceCL*   GetFace  ( const Helper::GeomIdCL&) const;
-    TetraCL*  GetTetra ( const Helper::GeomIdCL&) const;
+    VertexCL* GetVertex( const GeomIdCL&) const;
+    EdgeCL*   GetEdge  ( const GeomIdCL&) const;
+    FaceCL*   GetFace  ( const GeomIdCL&) const;
+    TetraCL*  GetTetra ( const GeomIdCL&) const;
     //@}
 
     /// \name Debugging
@@ -906,7 +852,7 @@ private:
     bool IsSane( std::ostream&) const;
     void DebugInfo( std::ostream&) const;
     void SizeInfo( std::ostream&) const;
-    void ShowSimplex( const Helper::GeomIdCL&, std::ostream&) const;     ///< Show the debug information of a simplex given by its geometric id
+    void ShowSimplex( const GeomIdCL&, std::ostream&) const;     ///< Show the debug information of a simplex given by its geometric id
     //@}
 };
 

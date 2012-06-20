@@ -459,7 +459,7 @@ public:
     ~CommunicateAdjacencyCL() {}
     
     /// \brief Collect the adjacent vertex number on the sender side
-    bool Gather( const DiST::TransferableCL& t, DiST::Helper::SendStreamCL& s)
+    bool Gather( const DiST::TransferableCL& t, DiST::SendStreamCL& s)
     {
         FaceCL const * fp; simplex_cast( t, fp);   // transform t to a face
         if ( !fp->IsInTriang( gb_.getTriangLevel())){ 
@@ -474,7 +474,7 @@ public:
     }
 
     /// \brief Assign the adjacent vertex number from the sender to the face
-    bool Scatter( DiST::TransferableCL& t, const size_t numData, DiST::Helper::MPIistreamCL& r)
+    bool Scatter( DiST::TransferableCL& t, const size_t numData, DiST::MPIistreamCL& r)
     {
         FaceCL * fp; simplex_cast( t, fp);   // transform t to a face
         graph_index_type remote_neigh;
