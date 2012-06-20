@@ -18,9 +18,9 @@ EXEC =  dist_streamtest dist_remotedatatest dist_sendtetraofbrick dist_simplexse
         dist_interface dist_exchange dist_sdropsP2 dist_ref dist_modify \
         dist_TestRefPar dist_ref_rising_drop dist_migration dist_interp2 dist_interp1
             
-PAR_OBJ_ = ../parallel/parallel.o ../parallel/partime.o  \
-           ../parallel/exchange.o  ../parallel/parmultigrid.o \
-           ../parallel/logger.o ../DiST/DiST.o ../DiST/mpistream.o \
+PAR_OBJ_ = ../DiST/DiST.o ../DiST/mpistream.o ../DiST/remotedata.o \
+           ../parallel/parallel.o ../parallel/partime.o \
+           ../parallel/exchange.o ../parallel/parmultigrid.o \
            ../parallel/loadbal.o ../parallel/migrateunknowns.o \
            ../parallel/decompose.o
 

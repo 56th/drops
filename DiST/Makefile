@@ -16,7 +16,7 @@ default:
 
 all: $(EXEC)
 
-PAR_OBJ = DiST.o mpistream.o
+PAR_OBJ = DiST.o mpistream.o remotedata.o
 
 # include common rules:
 include ../Make.common

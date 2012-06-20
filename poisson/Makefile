@@ -17,9 +17,9 @@ OBJ = $(CPP:%.cpp=%.o)
 # include common rules:
 include ../Make.common
 
-PAR_OBJ_ = ../parallel/parallel.o ../parallel/partime.o  \
-           ../parallel/exchange.o  ../parallel/parmultigrid.o \
-           ../parallel/logger.o ../DiST/DiST.o ../DiST/mpistream.o \
+PAR_OBJ_ = ../DiST/DiST.o ../DiST/mpistream.o ../DiST/remotedata.o \
+           ../parallel/parallel.o ../parallel/partime.o \
+           ../parallel/exchange.o ../parallel/parmultigrid.o \
            ../parallel/loadbal.o ../parallel/migrateunknowns.o \
            ../parallel/decompose.o
 

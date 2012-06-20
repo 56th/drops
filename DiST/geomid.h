@@ -25,6 +25,8 @@
 #ifndef GEOMID_H_
 #define GEOMID_H_
 
+#include "misc/container.h"
+
 namespace DROPS
 {
 
@@ -41,7 +43,6 @@ template <typename SimplexT> inline Usint GetDim();
 template <> inline Usint GetDim<VertexCL>() { return 0; }
 template <> inline Usint GetDim<EdgeCL>()   { return 1; }
 template <> inline Usint GetDim<FaceCL>()   { return 2; }
-template <> inline Usint GetDim<FaceCL const>()   { return 2; }
 template <> inline Usint GetDim<TetraCL>()  { return 3; }
 //@}
 
