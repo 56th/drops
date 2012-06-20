@@ -31,7 +31,7 @@
 #include "num/spmat.h"
 
 #ifdef _PAR
-#  include "parallel/DiST.h"
+#  include "DiST/DiST.h"
 #  include "parallel/parallel.h"   // for parallel reductions
 #endif
 

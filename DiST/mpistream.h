@@ -488,9 +488,9 @@ class SubostreamBuilderCL
 };
 
 } // end of namespace Helper
-} // end of namespace DiSt
+} // end of namespace DiST
 } // end of namespace DROPS
 
-#include "parallel/mpistream.tpp"
+#include "DiST/mpistream.tpp"
 
 #endif

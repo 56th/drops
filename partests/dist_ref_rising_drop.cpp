@@ -25,7 +25,7 @@
 
 #include "parallel/parallel.h"
 #include "misc/container.h"
-#include "parallel/DiST.h"
+#include "DiST/DiST.h"
 #include "parallel/partime.h"
 #include "parallel/loadbal.h"
 #include "geom/simplex.h"

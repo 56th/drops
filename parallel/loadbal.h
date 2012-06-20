@@ -29,7 +29,7 @@
 #include "parallel/parmultigrid.h"
 #include "geom/multigrid.h"
 #include "misc/problem.h"
-#include "parallel/DiST.h"
+#include "DiST/DiST.h"
 #include "parallel/decompose.h"
 #include <map>
 #include <set>

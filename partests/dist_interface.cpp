@@ -24,7 +24,7 @@
 
 #include "parallel/parallel.h"
 #include "misc/container.h"
-#include "parallel/DiST.h"
+#include "DiST/DiST.h"
 #include "geom/simplex.h"
 #include "geom/builder.h"
 #include "geom/multigrid.h"

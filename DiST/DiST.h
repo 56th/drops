@@ -28,7 +28,7 @@
 #include "misc/container.h"
 #include "misc/utils.h"
 #include "num/unknowns.h"
-#include "parallel/mpistream.h"
+#include "DiST/mpistream.h"
 
 #include <list>
 #include <set>
@@ -913,5 +913,5 @@ private:
 }   // end of namespace DiST
 }   // end of namespace DROPS
 
-#include "parallel/DiST.tpp"
+#include "DiST/DiST.tpp"
 #endif

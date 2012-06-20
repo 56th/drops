@@ -20,7 +20,7 @@ EXEC =  dist_streamtest dist_remotedatatest dist_sendtetraofbrick dist_simplexse
             
 PAR_OBJ_ = ../parallel/parallel.o ../parallel/partime.o  \
            ../parallel/exchange.o  ../parallel/parmultigrid.o \
-           ../parallel/logger.o ../parallel/DiST.o ../parallel/mpistream.o \
+           ../parallel/logger.o ../DiST/DiST.o ../DiST/mpistream.o \
            ../parallel/loadbal.o ../parallel/migrateunknowns.o \
            ../parallel/decompose.o
 

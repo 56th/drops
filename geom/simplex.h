@@ -35,7 +35,7 @@
 #include "num/unknowns.h"
 
 #ifdef _PAR
-#  include "parallel/DiST.h"
+#  include "DiST/DiST.h"
 #  include "parallel/parallel.h"
 #  include <map>
 #endif

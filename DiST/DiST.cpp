@@ -23,7 +23,7 @@
  * Copyright 2009 LNM/SC RWTH Aachen, Germany
 */
 
-#include "parallel/DiST.h"
+#include "DiST/DiST.h"
 #include "geom/simplex.h"
 #include "geom/multigrid.h"
 

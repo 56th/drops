@@ -23,7 +23,7 @@
 */
 
 #include "parallel/parallel.h"
-#include "parallel/DiST.h"
+#include "DiST/DiST.h"
 #include <iostream>
 #include <sstream>
 

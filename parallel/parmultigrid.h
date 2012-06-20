@@ -28,7 +28,7 @@
 
 
 #include "parallel/loadbal.h"
-#include "parallel/DiST.h"
+#include "DiST/DiST.h"
 
 #include "misc/utils.h"
 #include "misc/problem.h"

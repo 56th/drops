@@ -24,7 +24,7 @@
 
 // "parallel" Header-Files
 #include "parallel/parmultigrid.h"
-#include "parallel/DiST.h"
+#include "DiST/DiST.h"
 #include "parallel/partime.h"
 #include "parallel/loadbal.h"
 

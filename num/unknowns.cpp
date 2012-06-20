@@ -25,8 +25,8 @@
 
 #include "num/unknowns.h"
 #ifdef _PAR
-#  include "parallel/DiST.h"
-#  include "parallel/mpistream.h"
+#  include "DiST/DiST.h"
+#  include "DiST/mpistream.h"
 #  include "parallel/migrateunknowns.h"
 #endif
 #include <algorithm>

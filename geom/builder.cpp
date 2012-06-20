@@ -35,8 +35,8 @@
 #include <iomanip>
 #include "geom/builder.h"
 #ifdef _PAR
-#include "parallel/DiST.h"
-#include "parallel/mpistream.h"
+#include "DiST/DiST.h"
+#include "DiST/mpistream.h"
 #endif
 
 namespace DROPS
