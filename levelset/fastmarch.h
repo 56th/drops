@@ -591,8 +591,8 @@ class ParDirectDistanceCL : public DirectDistanceCL
         int maxlvl_;
       public:
         CommunicateFrontierCL( int lvl) : maxlvl_(lvl) {}
-        bool Gather( const DiST::TransferableCL& t, DiST::Helper::SendStreamCL& s);
-        bool Scatter( DiST::TransferableCL& t, const size_t numData, DiST::Helper::MPIistreamCL& r);
+        bool Gather( const DiST::TransferableCL& t, DiST::SendStreamCL& s);
+        bool Scatter( DiST::TransferableCL& t, const size_t numData, DiST::MPIistreamCL& r);
         void Call();
     };
 

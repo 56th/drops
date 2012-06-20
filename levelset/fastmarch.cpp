@@ -1524,7 +1524,7 @@ ParDirectDistanceCL::MultiFrontT ParDirectDistanceCL::onProc_=
     std::map<IdxT, std::list<ParDirectDistanceCL::TransferST> >();
 ReparamDataCL* ParDirectDistanceCL::actualData_=0;
 
-bool ParDirectDistanceCL::CommunicateFrontierCL::Gather( const DiST::TransferableCL& t, DiST::Helper::SendStreamCL& s)
+bool ParDirectDistanceCL::CommunicateFrontierCL::Gather( const DiST::TransferableCL& t, DiST::SendStreamCL& s)
 {
     if (!t.Unknowns.Exist() || t.Unknowns.Exist(actualData_->phi.RowIdx->GetIdx()))
         return false;
@@ -1536,7 +1536,7 @@ bool ParDirectDistanceCL::CommunicateFrontierCL::Gather( const DiST::Transferabl
     return true;
 }
 
-bool ParDirectDistanceCL::CommunicateFrontierCL::Scatter( DiST::TransferableCL& t, const size_t numData, DiST::Helper::MPIistreamCL& r)
+bool ParDirectDistanceCL::CommunicateFrontierCL::Scatter( DiST::TransferableCL& t, const size_t numData, DiST::MPIistreamCL& r)
 {
     if (!t.Unknowns.Exist() || t.Unknowns.Exist(actualData_->phi.RowIdx->GetIdx()))
         return false;
