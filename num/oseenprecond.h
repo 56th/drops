@@ -630,6 +630,151 @@ template <typename Mat, typename Vec>
     x= Dprsqrtinv_*y;
 }
 
+/// Upper block-triangular preconditioning strategy in BlockPreCL
+struct UpperBlockPreCL
+{
+    template <class PC1T, class PC2T, class Mat, class Vec>
+    static void
+    Apply (const PC1T& pc1, const PC2T& pc2, const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c) {
+        pc2.Apply( /*dummy*/ B, p, c);
+        p*= -1.;
+        Vec b2( b);
+        b2-= transp_mul( B, p);
+        pc1.Apply( A, v, b2);
+    }
+};
+
+/// Block-diagonal preconditioning strategy in BlockPreCL
+struct DiagBlockPreCL
+{
+    template <class PC1T, class PC2T, class Mat, class Vec>
+    static void
+    Apply (const PC1T& pc1, const PC2T& pc2, const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c) {
+        pc1.Apply( A, v, b);
+        pc2.Apply( /*dummy*/ B, p, c);
+        p*= -1.;
+   }
+};
+
+/// Block-diagonal preconditioning strategy in BlockPreCL if an spd preconditioner is required
+struct DiagSpdBlockPreCL
+{
+    template <class PC1T, class PC2T, class Mat, class Vec>
+    static void
+    Apply (const PC1T& pc1, const PC2T& pc2, const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c) {
+        pc1.Apply( A, v, b);
+        pc2.Apply( /*dummy*/ B, p, c);
+   }
+};
+
+/// Lower block-triangular preconditioning strategy in BlockPreCL
+struct LowerBlockPreCL
+{
+    template <class PC1T, class PC2T, class Mat, class Vec>
+    static void
+    Apply (const PC1T& pc1, const PC2T& pc2, const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c) {
+        pc1.Apply( A, v, b);
+#ifdef _PAR
+        Assert(pc1.RetAcc(), DROPSErrCL("LowerBlockPreCL::Apply: Accumulation is missing"), DebugParallelNumC);
+#endif
+        Vec c2( B*v - c);
+        pc2.Apply( /*dummy*/ B, p, c2);
+    }
+};
+
+/// SIMPLER type preconditioning strategy in BlockPreCL
+struct SIMPLERBlockPreCL
+{
+    template <class PC1T, class PC2T, class Mat, class Vec>
+    static void
+    Apply (PC1T& pc1, PC2T& pc2, const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c) {
+        Vec D( pc2.GetVelDiag()), dp(p);
+
+        // find some initial pressure for the SIMPLER preconditioner (initial p=0 would result in SIMPLE)
+#ifdef _PAR
+        pc2.Apply( B, p, Vec(B*Vec(pc1.GetEx().GetAccumulate(b)/D) - c));
+        if (!pc2.RetAcc())
+            pc2.GetEx().Accumulate(p);
+#else
+        pc2.Apply( B, p, Vec(B*Vec(b/D) - c));
+#endif
+        // from here on it's the SIMPLE preconditioner
+        pc1.Apply( A, v, Vec(b - transp_mul( B, p)));
+#ifdef _PAR
+        if (!pc1.RetAcc()) pc1.GetEx().Accumulate(v);
+#endif
+
+        pc2.Apply( /*dummy*/ B, dp, Vec(B*v - c));
+
+#ifdef _PAR
+        if (!pc2.RetAcc()) pc2.GetEx().Accumulate(dp);
+        v-= pc1.GetEx().GetAccumulate(Vec(transp_mul( B, dp)/D));
+#else
+        v-= transp_mul( B, dp)/D;
+#endif
+        p+= dp;
+   }
+};
+
+// With BlockShapeT= DiagBlockPreCL, this is the diagonal PC ( pc1^(-1) 0 \\ 0 pc2^(-1) ),
+// else it is block-triangular:
+// Upper... ( pc1^(-1) B^T \\ 0 pc2^(-1) ), resp. lower: ( pc1^(-1) 0 \\ B pc2^(-1) )
+template <class PC1T, class PC2T, class BlockShapeT= DiagBlockPreCL>
+class BlockPreCL
+{
+  private:
+    PC1T& pc1_; // Preconditioner for A.
+    PC2T& pc2_; // Preconditioner for S.
+
+  public:
+    BlockPreCL (PC1T& pc1, PC2T& pc2)
+        : pc1_( pc1), pc2_( pc2) {}
+
+    template <typename Mat, typename Vec>
+    void
+    Apply(const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c) const {
+        BlockShapeT::Apply( pc1_, pc2_, A, B, v, p, b, c);
+    }
+
+    template <typename Mat, typename Vec>
+    void
+    Apply(const BlockMatrixBaseCL<Mat>& A, Vec& x, const Vec& b) const {
+        VectorCL b0( b[std::slice( 0, A.num_rows( 0), 1)]);
+        VectorCL b1( b[std::slice( A.num_rows( 0), A.num_rows( 1), 1)]);
+        VectorCL x0( A.num_cols( 0));
+        VectorCL x1( A.num_cols( 1));
+        BlockShapeT::Apply( pc1_, pc2_, *A.GetBlock( 0), *A.GetBlock( 2), x0, x1, b0, b1);
+        x[std::slice( 0, A.num_cols( 0), 1)]= x0;
+        x[std::slice( A.num_cols( 0), A.num_cols( 1), 1)]= x1;
+    }
+
+#ifdef _PAR
+    /// \brief Check if the preconditioned vector is accumulated
+    bool RetAcc() const {
+        Assert( pc1_.RetAcc()==pc2_.RetAcc(), DROPSErrCL("BlockPreCL::RetAcc: Preconditioners do not match"),
+                DebugNumericC);
+        return pc1_.RetAcc();
+    }
+
+    /// \brief Check if the diagonal of the matrix needs to be computed
+    bool NeedDiag() const { return pc1_.NeedDiag() || pc2_.NeedDiag(); }
+
+    /// \brief Set accumulated diagonal of a matrix, that is needed by most of the preconditioners
+    template<typename Mat>
+    void SetDiag(const Mat& A)
+    {
+        pc1_.SetDiag(*A.GetBlock( 0));
+        pc2_.SetDiag(/*dummy*/ *(A.GetBlock( 3)!=0 ? A.GetBlock( 3) : A.GetBlock( 1)));
+    }
+    const PC1T& GetPC1() const { return pc1_; }
+          PC1T& GetPC1()       { return pc1_; }
+    const PC2T& GetPC2() const { return pc2_; }
+          PC2T& GetPC2()       { return pc2_; }
+
+#endif
+};
+
+
 template <typename Mat, typename Vec>
 void ISPreCL::Apply(const Mat&, Vec& p, const Vec& c) const
 {
