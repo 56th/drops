@@ -49,15 +49,15 @@ class StripTimeCL
 // useful where one wants to use all the stuff written for the stationary problems
 {
   private:
-    static instat_scalar_fun_ptr _func;
-    static double                _t;
+    static instat_scalar_fun_ptr func_;
+    static double                t_;
   public:
     StripTimeCL( instat_scalar_fun_ptr func, double t)
-      { _func= func; _t= t; }
-    void SetTime( double t) { _t= t; }
+      { func_= func; t_= t; }
+    void SetTime( double t) { t_= t; }
 
     static double GetFunc( const Point3DCL& x)
-      { return _func( x, _t); }
+      { return func_( x, t_); }
 };
 
 //Streamline diffusion stabilization class which can compute difference stabilization coefficient according to the grids type.
@@ -66,16 +66,13 @@ class SUPGCL
   private:
     double magnitude_;
     int    grids_;      // decide how to compute characteristic length to approximate the longest length in flow direction
-    double longedge_;   // the longest edge for regular grids; 
-    bool    SUPG_;
-    public:
+    double longedge_;   // the longest edge for regular grids;
+    bool   SUPG_;
+
+  public:
     SUPGCL()
-    {magnitude_=0.;
-     grids_ = 1;
-     longedge_=0.;
-     SUPG_= false;}
-    SUPGCL(ParamCL para)
-    { init(para);}
+        : magnitude_(0), grids_(1), longedge_(0), SUPG_(false) {}
+    SUPGCL(ParamCL para) { init(para); }
     void init(ParamCL para)
     {
         double lx_, ly_, lz_;
@@ -88,11 +85,11 @@ class SUPGCL
         brick_info >> lx_ >> ly_ >> lz_ >> nx_ >> ny_ >> nz_;
         int Ref_=para.get<int>("DomainCond.RefineSteps");
         magnitude_ =para.get<double>("Stabilization.Magnitude");
-        grids_      =para.get<double>("Stabilization.Grids");
+        grids_     =para.get<double>("Stabilization.Grids");
         //pick up the longest edge
         if(grids_==1)
         {
-            double dx_= lx_/(nx_*std::pow(2, Ref_)); 
+            double dx_= lx_/(nx_*std::pow(2, Ref_));
             double dy_= ly_/(ny_*std::pow(2, Ref_));
             double dz_= lz_/(nz_*std::pow(2, Ref_));
             double m;
@@ -104,30 +101,29 @@ class SUPGCL
                 longedge_=m;
             else
                 longedge_=dz_;
-                
         }
         else
-        {   longedge_ = 0;} 
-        SUPG_ = para.get<int>("Stabilization.SUPG");   
+            longedge_ = 0;
+        SUPG_ = para.get<int>("Stabilization.SUPG");
     }
-    
-    bool GetSUPG(){return SUPG_;}
-    
-    double GetCharaLength(int grids)
+
+    bool GetSUPG() const { return SUPG_; }
+
+    double GetCharaLength(int grids) const
     {
         double h=0.;
         if(grids==1)
             h=longedge_;
         else
             std::cout<<"WARNING: The geometry type has not been implemented!\n";
-        return h;    
+        return h;
     }
-        
-    double Sta_Coeff(const DROPS::Point3DCL& Vel, double alpha) 
-    {//Stabilization coefficient
+
+    double Sta_Coeff(const DROPS::Point3DCL& Vel, double alpha) const
+    { //Stabilization coefficient
         double Pec=0.;
         double h  =GetCharaLength(grids_);
-        Pec=Vel.norm()*h/(2.*alpha);  //compute mesh Peclet number  
+        Pec=Vel.norm()*h/(2.*alpha);  //compute mesh Peclet number
         if (Pec<=1)
             return 0.0;
         else
@@ -139,7 +135,7 @@ template <class Coeff>
 class PoissonP1CL : public ProblemCL<Coeff, PoissonBndDataCL>
 {
   private:
-    bool adjoint_;
+    bool    adjoint_;
     SUPGCL& supg_;
 
   public:
@@ -156,7 +152,7 @@ class PoissonP1CL : public ProblemCL<Coeff, PoissonBndDataCL>
     typedef P1EvalCL<double, const BndDataCL, const VecDescCL> const_DiscSolCL;
     typedef double (*est_fun)(const TetraCL&, const VecDescCL&, const BndDataCL&);
 
-    bool       ALE_;           //ALE method
+    bool        ALE_;           //ALE method
     MLIdxDescCL idx;
     VecDescCL   x;
     VecDescCL   b;
@@ -231,14 +227,14 @@ class PoissonP2CL : public ProblemCL<Coeff, PoissonBndDataCL>
     typedef P2EvalCL<double, const BndDataCL, const VecDescCL> const_DiscSolCL;
     typedef double (*est_fun)(const TetraCL&, const VecDescCL&, const BndDataCL&);
 
-    // new fields for the matrix A, the rhs b and the solution x 
-    bool       ALE_; //ALE_ is introduced because poissonP1CL and poissonP2CL are used in scalar.cpp.  
-                     //Since ALE method is not yet implemented, ALE_ is always set to false 
+    // new fields for the matrix A, the rhs b and the solution x
+    bool        ALE_; //ALE_ is introduced because poissonP1CL and poissonP2CL are used in scalar.cpp.
+                      //Since ALE method is not yet implemented, ALE_ is always set to false
     MLIdxDescCL idx;
     VecDescCL   x;
     VecDescCL   b;
     MLMatDescCL A;
-    
+
     MLMatDescCL U;   //Convection matrix
     MLMatDescCL M;   //Mass matrix
     VecDescCL   vU;  //Coupling with convection matrix
@@ -257,15 +253,15 @@ class PoissonP2CL : public ProblemCL<Coeff, PoissonBndDataCL>
 
     // set up matrices and rhs
     void SetupSystem         ( MLMatDescCL&, VecDescCL&) const;
-    
+
     ///  \brief set up matrices for instatProblem
     void SetupInstatSystem( MLMatDescCL& A, MLMatDescCL& M, double t) const;
-    
+
     void SetupInstatRhs( VecDescCL& vA, VecDescCL& vM, double tA, VecDescCL& vf, double tf) const;
-    
+
     //Set up convection
-    void SetupConvection( MLMatDescCL&, VecDescCL&, double) const; 
-    
+    void SetupConvection( MLMatDescCL&, VecDescCL&, double) const;
+
     //Set up initial value
     void Init( VecDescCL&, instat_scalar_fun_ptr, double t0= 0.) const;
 
@@ -286,62 +282,62 @@ double SimpleGradEstimator ( const TetraCL& t, const VecDescCL& lsg, const Poiss
 //                  Marker classes
 //==============================================================
 
-template <class _TetraEst, class _ProblemCL>
+template <class TetraEstT, class ProblemT>
 class PoissonErrEstCL
 {
   private:
-    double    _InitGlobErr;
-    double    _RelReduction;
-    double    _ConvExponent;
-    double    _Meas;
-    double    _ActGlobErr;
-    _TetraEst _Estimator;
-    _ProblemCL& _Problem;
-    Uint      _NumLastMarkedForRef;
-    Uint      _NumLastMarkedForDel;
-    bool      _DoMark;
-    std::ostream*  _outp;
+    double    InitGlobErr_;
+    double    RelReduction_;
+    double    ConvExponent_;
+    double    Meas_;
+    double    ActGlobErr_;
+    TetraEstT Estimator_;
+    ProblemT& Problem_;
+    Uint      NumLastMarkedForRef_;
+    Uint      NumLastMarkedForDel_;
+    bool      DoMark_;
+    std::ostream*  outp_;
 
   public:
-      PoissonErrEstCL(double RelReduction, double ConvExp, double Meas, bool DoMark, _TetraEst est,
-                      _ProblemCL& problem, std::ostream* osp= &std::cout)
-        : _InitGlobErr(0), _RelReduction(RelReduction), _ConvExponent(ConvExp), _Meas(Meas), _ActGlobErr(-1), _Estimator(est),
-          _Problem(problem), _NumLastMarkedForRef(0), _NumLastMarkedForDel(0), _DoMark(DoMark), _outp(osp)
+      PoissonErrEstCL(double RelReduction, double ConvExp, double Meas, bool DoMark, TetraEstT est,
+                      ProblemT& problem, std::ostream* osp= &std::cout)
+        : InitGlobErr_(0), RelReduction_(RelReduction), ConvExponent_(ConvExp), Meas_(Meas), ActGlobErr_(-1), Estimator_(est),
+          Problem_(problem), NumLastMarkedForRef_(0), NumLastMarkedForDel_(0), DoMark_(DoMark), outp_(osp)
         {
 #ifdef _PAR
-            throw DROPSErrCL("This class has not been parallelized yes, sorry");
+            throw DROPSErrCL("This class has not been parallelized yet, sorry");
 #endif
         }
     // default assignment-op, copy-ctor, dtor
 
-    template <class BndData_, class _VD>
-      void Init(const P1EvalCL<double, BndData_, _VD>&);
+    template <class BndData_, class VD_>
+    void Init(const P1EvalCL<double, BndData_, VD_>&);
 
-    double GetRelRed() { return _RelReduction; }
-    void SetRelRed(double newred) { _RelReduction= newred; }
-    bool DoesMark() { return _DoMark; }
-    void SwitchMark() { _DoMark= _DoMark ? false : true; }
-    template <class BndData_, class _VD>
-      bool Estimate(const P1EvalCL<double, BndData_, const _VD>&);
+    double GetRelRed() const { return RelReduction_; }
+    void SetRelRed(double newred) { RelReduction_= newred; }
+    bool DoesMark() const { return DoMark_; }
+    void SwitchMark() { DoMark_= DoMark_ ? false : true; }
+    template <class BndData_, class VD_>
+    bool Estimate(const P1EvalCL<double, BndData_, const VD_>&);
 };
 
 
-template <class _TetraEst, class _ProblemCL>
+template <class TetraEstT, class ProblemT>
 class DoerflerMarkCL
 {
   private:
-    double        _InitGlobErr;
-    double        _RelReduction;
-    double        _min_tetra_ratio;
-    double        _Threshold;
-    double        _Meas;
-    double        _ActGlobErr;
-    _TetraEst     _Estimator;
-    _ProblemCL&   _Problem;
-    Uint          _NumLastMarkedForRef;
-    Uint          _NumLastMarkedForDel;
-    bool          _DoMark;
-    std::ostream* _outp;
+    double        InitGlobErr_;
+    double        RelReduction_;
+    double        min_tetra_ratio_;
+    double        Threshold_;
+    double        Meas_;
+    double        ActGlobErr_;
+    TetraEstT     Estimator_;
+    ProblemT&     Problem_;
+    Uint          NumLastMarkedForRef_;
+    Uint          NumLastMarkedForDel_;
+    bool          DoMark_;
+    std::ostream* outp_;
 
   public:
   // the tetras are sorted: T_1 with biggest error, last T_n with smallest
@@ -349,28 +345,28 @@ class DoerflerMarkCL
   // (a) it is among "min_ratio" % of the tetras with biggest errors,
   // (b) the sum err_1+..+err_i accounts for less than "Threshold" % of the global error
 
-      DoerflerMarkCL(double RelReduction, double min_ratio, double Threshold, double Meas, bool DoMark, _TetraEst est,
-                     _ProblemCL& problem, std::ostream* osp= &std::cout)
-        : _InitGlobErr(0), _RelReduction(RelReduction), _min_tetra_ratio(min_ratio), _Threshold(Threshold), _Meas(Meas), _ActGlobErr(-1), _Estimator(est),
-          _Problem(problem), _NumLastMarkedForRef(0), _NumLastMarkedForDel(0), _DoMark(DoMark), _outp(osp)
+      DoerflerMarkCL(double RelReduction, double min_ratio, double Threshold, double Meas, bool DoMark, TetraEstT est,
+                     ProblemT& problem, std::ostream* osp= &std::cout)
+        : InitGlobErr_(0), RelReduction_(RelReduction), min_tetra_ratio_(min_ratio), Threshold_(Threshold), Meas_(Meas), ActGlobErr_(-1), Estimator_(est),
+          Problem_(problem), NumLastMarkedForRef_(0), NumLastMarkedForDel_(0), DoMark_(DoMark), outp_(osp)
         {
 #ifdef _PAR
-            throw DROPSErrCL("This class has not been parallelized yes, sorry");
+            throw DROPSErrCL("This class has not been parallelized yet, sorry");
 #endif
         }
     // default assignment-op, copy-ctor, dtor
 
-    template <class BndData_, class _VD>
-      void Init(const P1EvalCL<double, BndData_, _VD>&);
+    template <class BndData_, class VD_>
+    void Init(const P1EvalCL<double, BndData_, VD_>&);
 
-    double GetRelRed() { return _RelReduction; }
-    void   SetRelRed(double newred) { _RelReduction= newred; }
-    double GetThreshold() { return _Threshold; }
-    void   SetThreshold(double newThreshold) { _Threshold= newThreshold; }
-    bool   DoesMark() { return _DoMark; }
-    void   SwitchMark() { _DoMark= _DoMark ? false : true; }
-    template <class BndData_, class _VD>
-      bool Estimate(const P1EvalCL<double, BndData_, const _VD>&);
+    double GetRelRed() const { return RelReduction_; }
+    void   SetRelRed(double newred) { RelReduction_= newred; }
+    double GetThreshold() const { return Threshold_; }
+    void   SetThreshold(double newThreshold) { Threshold_= newThreshold; }
+    bool   DoesMark() const { return DoMark_; }
+    void   SwitchMark() { DoMark_= DoMark_ ? false : true; }
+    template <class BndData_, class VD_>
+    bool Estimate(const P1EvalCL<double, BndData_, const VD_>&);
 };
 
 

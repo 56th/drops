@@ -172,52 +172,52 @@ template <class Coeff>
 void PoissonP1CL<Coeff>::SetupGradSrc(VecDescCL& src, instat_scalar_fun_ptr T, instat_scalar_fun_ptr dalpha, double t) const
 ///Special rhs for IA2 sensitivity problem
 {
-  src.Clear( t);
-  const Uint lvl = src.GetLevel(),
-             idx = src.RowIdx->GetIdx();
-  Point3DCL G[4];
+    src.Clear( t);
+    const Uint lvl = src.GetLevel(),
+            idx = src.RowIdx->GetIdx();
+    Point3DCL G[4];
 
-  double det;
-  double absdet;
-  IdxT UnknownIdx[4];
-  Quad2CL<> rhs, quad_a;
+    double det;
+    double absdet;
+    IdxT UnknownIdx[4];
+    Quad2CL<> rhs, quad_a;
 
-  for (MultiGridCL::const_TriangTetraIteratorCL
-    sit=const_cast<const MultiGridCL&>(MG_).GetTriangTetraBegin(lvl),
-    send=const_cast<const MultiGridCL&>(MG_).GetTriangTetraEnd(lvl);
-    sit != send; ++sit)
-  {
-    P1DiscCL::GetGradients(G,det,*sit);
-    absdet= std::fabs(det);
-
-    quad_a.assign( *sit, dalpha, t);
-    const double int_a= quad_a.quad( absdet);
-    Point3DCL gradT;
-
-    for(int i=0; i<4; ++i)
+    for (MultiGridCL::const_TriangTetraIteratorCL
+            sit=const_cast<const MultiGridCL&>(MG_).GetTriangTetraBegin(lvl),
+            send=const_cast<const MultiGridCL&>(MG_).GetTriangTetraEnd(lvl);
+            sit != send; ++sit)
     {
-      gradT+= G[i]*T(sit->GetVertex(i)->GetCoord(), t);
-      UnknownIdx[i]= sit->GetVertex(i)->Unknowns.Exist(idx) ? sit->GetVertex(i)->Unknowns(idx)
-                                                            : NoIdx;
-    }
+        P1DiscCL::GetGradients(G,det,*sit);
+        absdet= std::fabs(det);
 
-    for(int i=0; i<4;++i)    // assemble row i
-    {
-      if (sit->GetVertex(i)->Unknowns.Exist(idx)) // vertex i is not on a Dirichlet boundary
-      {
-        src.Data[UnknownIdx[i]]-= int_a*inner_prod( gradT, G[i]);
-        if ( BndData_.IsOnNatBnd(*sit->GetVertex(i)) )
-          for (int f=0; f < 3; ++f)
-            if ( sit->IsBndSeg(FaceOfVert(i, f)) )
+        quad_a.assign( *sit, dalpha, t);
+        const double int_a= quad_a.quad( absdet);
+        Point3DCL gradT;
+
+        for(int i=0; i<4; ++i)
+        {
+            gradT+= G[i]*T(sit->GetVertex(i)->GetCoord(), t);
+            UnknownIdx[i]= sit->GetVertex(i)->Unknowns.Exist(idx) ? sit->GetVertex(i)->Unknowns(idx)
+                    : NoIdx;
+        }
+
+        for(int i=0; i<4;++i)    // assemble row i
+        {
+            if (sit->GetVertex(i)->Unknowns.Exist(idx)) // vertex i is not on a Dirichlet boundary
             {
-              Point3DCL n;
-              sit->GetOuterNormal(FaceOfVert(i, f), n);
-              src.Data[UnknownIdx[i]]+=
-                P1DiscCL::Quad2D(*sit, FaceOfVert(i, f), dalpha, i,  t) * inner_prod( gradT, n);
+                src.Data[UnknownIdx[i]]-= int_a*inner_prod( gradT, G[i]);
+                if ( BndData_.IsOnNatBnd(*sit->GetVertex(i)) )
+                    for (int f=0; f < 3; ++f)
+                        if ( sit->IsBndSeg(FaceOfVert(i, f)) )
+                        {
+                            Point3DCL n;
+                            sit->GetOuterNormal(FaceOfVert(i, f), n);
+                            src.Data[UnknownIdx[i]]+=
+                                    P1DiscCL::Quad2D(*sit, FaceOfVert(i, f), dalpha, i,  t) * inner_prod( gradT, n);
+                        }
             }
-      }
+        }
     }
-  }
 }
 
 
@@ -230,67 +230,67 @@ template <class Coeff>
 double PoissonP1CL<Coeff>::CheckSolution(const VecDescCL& lsg,
   instat_scalar_fun_ptr Lsg, double t) const
 {
-  double diff, maxdiff=0, norm2= 0, L2=0;
-  Uint lvl=lsg.GetLevel(),
-       Idx=lsg.RowIdx->GetIdx();
+    double diff, maxdiff=0, norm2= 0, L2=0;
+    Uint lvl=lsg.GetLevel(),
+            Idx=lsg.RowIdx->GetIdx();
 
-  const_DiscSolCL sol(&lsg, &GetBndData(), &GetMG());
+    const_DiscSolCL sol(&lsg, &GetBndData(), &GetMG());
 
-  std::cout << "Difference to exact solution:" << std::endl;
+    std::cout << "Difference to exact solution:" << std::endl;
 
-  for (MultiGridCL::const_TriangTetraIteratorCL
-    sit=const_cast<const MultiGridCL&>(MG_).GetTriangTetraBegin(lvl),
-    send=const_cast<const MultiGridCL&>(MG_).GetTriangTetraEnd(lvl);
-    sit != send; ++sit)
-  {
-    double absdet= sit->GetVolume()*6.,
-           sum= 0;
-
-    for(Uint i=0; i<4; ++i)
+    for (MultiGridCL::const_TriangTetraIteratorCL
+            sit=const_cast<const MultiGridCL&>(MG_).GetTriangTetraBegin(lvl),
+            send=const_cast<const MultiGridCL&>(MG_).GetTriangTetraEnd(lvl);
+            sit != send; ++sit)
     {
-      diff= (sol.val(*sit->GetVertex(i)) - Lsg(sit->GetVertex(i)->GetCoord(),t));
-      sum+= diff*diff;
-    }
-    sum/= 120;
-    diff= sol.val(*sit, 0.25, 0.25, 0.25) - Lsg(GetBaryCenter(*sit),t);
-    sum+= 2./15. * diff*diff;
-    L2+= sum*absdet;
-  }
-#ifdef _PAR
-  L2= ProcCL::GlobalSum(L2);
-#endif
-  L2= std::sqrt(L2);
+        double absdet= sit->GetVolume()*6.,
+                sum= 0;
 
-  for (MultiGridCL::const_TriangVertexIteratorCL
-    sit=const_cast<const MultiGridCL&>(MG_).GetTriangVertexBegin(lvl),
-    send=const_cast<const MultiGridCL&>(MG_).GetTriangVertexEnd(lvl);
-    sit != send; ++sit)
-  {
-    if (sit->Unknowns.Exist(Idx))
-#ifdef _PAR
-      if (sit->AmIOwner())
-#endif
-      {
-        diff= std::fabs( Lsg(sit->GetCoord(),t) - lsg.Data[sit->Unknowns(Idx)] );
-        norm2+= diff*diff;
-        if (diff>maxdiff)
+        for(Uint i=0; i<4; ++i)
         {
-          maxdiff= diff;
+            diff= (sol.val(*sit->GetVertex(i)) - Lsg(sit->GetVertex(i)->GetCoord(),t));
+            sum+= diff*diff;
         }
-      }
-  }
-
-  int Lsize = lsg.Data.size();
+        sum/= 120;
+        diff= sol.val(*sit, 0.25, 0.25, 0.25) - Lsg(GetBaryCenter(*sit),t);
+        sum+= 2./15. * diff*diff;
+        L2+= sum*absdet;
+    }
 #ifdef _PAR
-  Lsize   = lsg.RowIdx->GetGlobalNumUnknowns();
-  norm2   = ProcCL::GlobalSum(norm2, Drops_MasterC);
-  maxdiff = ProcCL::GlobalMax(maxdiff, Drops_MasterC);
+    L2= ProcCL::GlobalSum(L2);
 #endif
-  std::cout << "  2-Norm= " << std::sqrt(norm2)
-            << "\nw-2-Norm= " << std::sqrt(norm2/Lsize)
-            << "\nmax-Norm= " << maxdiff
-            << "\n L2-Norm= " << L2 << std::endl;
-  return L2;
+    L2= std::sqrt(L2);
+
+    for (MultiGridCL::const_TriangVertexIteratorCL
+            sit=const_cast<const MultiGridCL&>(MG_).GetTriangVertexBegin(lvl),
+            send=const_cast<const MultiGridCL&>(MG_).GetTriangVertexEnd(lvl);
+            sit != send; ++sit)
+    {
+        if (sit->Unknowns.Exist(Idx))
+#ifdef _PAR
+            if (sit->AmIOwner())
+#endif
+            {
+                diff= std::fabs( Lsg(sit->GetCoord(),t) - lsg.Data[sit->Unknowns(Idx)] );
+                norm2+= diff*diff;
+                if (diff>maxdiff)
+                {
+                    maxdiff= diff;
+                }
+            }
+    }
+
+    int Lsize = lsg.Data.size();
+#ifdef _PAR
+    Lsize   = lsg.RowIdx->GetGlobalNumUnknowns();
+    norm2   = ProcCL::GlobalSum(norm2, Drops_MasterC);
+    maxdiff = ProcCL::GlobalMax(maxdiff, Drops_MasterC);
+#endif
+    std::cout << "  2-Norm= " << std::sqrt(norm2)
+    << "\nw-2-Norm= " << std::sqrt(norm2/Lsize)
+    << "\nmax-Norm= " << maxdiff
+    << "\n L2-Norm= " << L2 << std::endl;
+    return L2;
 }
 
 //=======================================================================================================
@@ -1141,68 +1141,68 @@ void PoissonP2CL<Coeff>::SetupInstatSystem( MLMatDescCL& matA, MLMatDescCL& matM
 template <class Coeff>
 double PoissonP2CL<Coeff>::CheckSolution(const VecDescCL& lsg, instat_scalar_fun_ptr Lsg, double t) const
 {
-  double diff, maxdiff=0, norm2= 0, L2=0;
-  Uint lvl=lsg.GetLevel(),
-       Idx=lsg.RowIdx->GetIdx();
+    double diff, maxdiff=0, norm2= 0, L2=0;
+    Uint lvl=lsg.GetLevel(),
+            Idx=lsg.RowIdx->GetIdx();
 
-  const_DiscSolCL sol(&lsg, &GetBndData(), &GetMG());
+    const_DiscSolCL sol(&lsg, &GetBndData(), &GetMG());
 
-  std::cout << "Difference to exact solution:" << std::endl;
+    std::cout << "Difference to exact solution:" << std::endl;
 
-  for (MultiGridCL::const_TriangTetraIteratorCL
-    sit=const_cast<const MultiGridCL&>(MG_).GetTriangTetraBegin(lvl),
-    send=const_cast<const MultiGridCL&>(MG_).GetTriangTetraEnd(lvl);
-    sit != send; ++sit)
-  {
-    double absdet= sit->GetVolume()*6.,
-           sum= 0;
-
-    for(Uint i=0; i<4; ++i)
+    for (MultiGridCL::const_TriangTetraIteratorCL
+            sit=const_cast<const MultiGridCL&>(MG_).GetTriangTetraBegin(lvl),
+            send=const_cast<const MultiGridCL&>(MG_).GetTriangTetraEnd(lvl);
+            sit != send; ++sit)
     {
-      diff= (sol.val(*sit->GetVertex(i)) - Lsg(sit->GetVertex(i)->GetCoord(),t));
-      sum+= diff*diff;
-    }
-    sum/= 120;
-    diff= sol.val(*sit, 0.25, 0.25, 0.25) - Lsg(GetBaryCenter(*sit),t);
-    sum+= 2./15. * diff*diff;
-    L2+= sum*absdet;
-  }
-#ifdef _PAR
-  L2= ProcCL::GlobalSum(L2);
-#endif
+        double absdet= sit->GetVolume()*6.,
+                sum= 0;
 
-  L2= std::sqrt(L2);
-
-  for (MultiGridCL::const_TriangVertexIteratorCL
-    sit=const_cast<const MultiGridCL&>(MG_).GetTriangVertexBegin(lvl),
-    send=const_cast<const MultiGridCL&>(MG_).GetTriangVertexEnd(lvl);
-    sit != send; ++sit)
-  {
-    if (sit->Unknowns.Exist(Idx))
-#ifdef _PAR
-      if (sit->AmIOwner())
-#endif
-      {
-        diff= std::fabs( Lsg(sit->GetCoord(),t) - lsg.Data[sit->Unknowns(Idx)] );
-        norm2+= diff*diff;
-        if (diff>maxdiff)
+        for(Uint i=0; i<4; ++i)
         {
-          maxdiff= diff;
+            diff= (sol.val(*sit->GetVertex(i)) - Lsg(sit->GetVertex(i)->GetCoord(),t));
+            sum+= diff*diff;
         }
-      }
-  }
-
-  int Lsize = lsg.Data.size();
+        sum/= 120;
+        diff= sol.val(*sit, 0.25, 0.25, 0.25) - Lsg(GetBaryCenter(*sit),t);
+        sum+= 2./15. * diff*diff;
+        L2+= sum*absdet;
+    }
 #ifdef _PAR
-  Lsize   = lsg.RowIdx->GetGlobalNumUnknowns();
-  norm2   = ProcCL::GlobalSum(norm2, Drops_MasterC);
-  maxdiff = ProcCL::GlobalMax(maxdiff, Drops_MasterC);
+    L2= ProcCL::GlobalSum(L2);
 #endif
-  std::cout << "  2-Norm= " << std::sqrt(norm2)
-            << "\nw-2-Norm= " << std::sqrt(norm2/Lsize)
-            << "\nmax-Norm= " << maxdiff
-            << "\n L2-Norm= " << L2 << std::endl;
-  return L2;
+
+    L2= std::sqrt(L2);
+
+    for (MultiGridCL::const_TriangVertexIteratorCL
+            sit=const_cast<const MultiGridCL&>(MG_).GetTriangVertexBegin(lvl),
+            send=const_cast<const MultiGridCL&>(MG_).GetTriangVertexEnd(lvl);
+            sit != send; ++sit)
+    {
+        if (sit->Unknowns.Exist(Idx))
+#ifdef _PAR
+            if (sit->AmIOwner())
+#endif
+            {
+                diff= std::fabs( Lsg(sit->GetCoord(),t) - lsg.Data[sit->Unknowns(Idx)] );
+                norm2+= diff*diff;
+                if (diff>maxdiff)
+                {
+                    maxdiff= diff;
+                }
+            }
+    }
+
+    int Lsize = lsg.Data.size();
+#ifdef _PAR
+    Lsize   = lsg.RowIdx->GetGlobalNumUnknowns();
+    norm2   = ProcCL::GlobalSum(norm2, Drops_MasterC);
+    maxdiff = ProcCL::GlobalMax(maxdiff, Drops_MasterC);
+#endif
+    std::cout << "  2-Norm= " << std::sqrt(norm2)
+    << "\nw-2-Norm= " << std::sqrt(norm2/Lsize)
+    << "\nmax-Norm= " << maxdiff
+    << "\n L2-Norm= " << L2 << std::endl;
+    return L2;
 }
 
 template<class Coeff>
@@ -1224,150 +1224,150 @@ void PoissonP2CL<Coeff>::SetNumLvl( size_t n)
 //========================================================================================================
 
 
-template <class _TetraEst, class _ProblemCL>
-template <class BndData_, class _VD>
-void PoissonErrEstCL<_TetraEst, _ProblemCL>::Init(const P1EvalCL<double, BndData_, _VD>& sol)
+template <class TetraEstT, class ProblemT>
+template <class BndData_, class VD_>
+void PoissonErrEstCL<TetraEstT, ProblemT>::Init(const P1EvalCL<double, BndData_, VD_>& sol)
 {
-    MultiGridCL& mg= _Problem.GetMG();
+    MultiGridCL& mg= Problem_.GetMG();
     const Uint lvl= sol.GetLevel();
-    const typename _ProblemCL::BndDataCL& bnd= _Problem.GetBndData();
+    const typename ProblemT::BndDataCL& bnd= Problem_.GetBndData();
 
     double tmp;
-    _InitGlobErr= 0;
+    InitGlobErr_= 0;
     for (MultiGridCL::TriangTetraIteratorCL sit=mg.GetTriangTetraBegin(lvl), send=mg.GetTriangTetraEnd(lvl);
          sit != send; ++sit)
     {
         tmp= _Estimator( *sit, *sol.GetSolution(), bnd);
-        _InitGlobErr+= tmp*tmp;
+        InitGlobErr_+= tmp*tmp;
     }
-    _InitGlobErr= std::sqrt(_InitGlobErr);
-    _ActGlobErr= _InitGlobErr;
-    if (_outp)
-        *_outp << "ErrorEstimator is initialized now; initial error: " << _InitGlobErr
-               << " We try to reduce by a factor of " << _RelReduction
+    InitGlobErr_= std::sqrt(InitGlobErr_);
+    ActGlobErr_= InitGlobErr_;
+    if (outp_)
+        *outp_ << "ErrorEstimator is initialized now; initial error: " << InitGlobErr_
+               << " We try to reduce by a factor of " << RelReduction_
                << "." << std::endl;
 }
 
-template <class _TetraEst, class _ProblemCL>
-template <class BndData_, class _VD>
-bool PoissonErrEstCL<_TetraEst, _ProblemCL>::Estimate(const P1EvalCL<double, BndData_, const _VD>& sol)
+template <class TetraEstT, class ProblemT>
+template <class BndData_, class VD_>
+bool PoissonErrEstCL<TetraEstT, ProblemT>::Estimate(const P1EvalCL<double, BndData_, const VD_>& sol)
 {
-    const MultiGridCL& mg= _Problem.GetMG();
-    const typename _ProblemCL::BndDataCL& bnd= _Problem.GetBndData();
+    const MultiGridCL& mg= Problem_.GetMG();
+    const typename ProblemT::BndDataCL& bnd= Problem_.GetBndData();
     const Uint lvl= sol.GetLevel();
     const VecDescCL& lsg= *sol.GetSolution();
-    const double exp_err= _InitGlobErr*_RelReduction/std::sqrt(_Meas);
-    const double unref_bnd= exp_err/2./std::pow(2, _ConvExponent);
+    const double exp_err= InitGlobErr_*RelReduction_/std::sqrt(Meas_);
+    const double unref_bnd= exp_err/2./std::pow(2, ConvExponent_);
     double globalerr= 0;
     double localerr;
     double localerr_dist;
     Uint num_tetra= 0;
 
-    _NumLastMarkedForRef= 0;
-    _NumLastMarkedForDel= 0;
+    NumLastMarkedForRef_= 0;
+    NumLastMarkedForDel_= 0;
     for (MultiGridCL::const_TriangTetraIteratorCL sit=mg.GetTriangTetraBegin(lvl), send=mg.GetTriangTetraEnd(lvl);
          sit != send; ++sit)
     {
         ++num_tetra;
-        localerr= _Estimator(*sit, lsg, bnd);
+        localerr= Estimator_(*sit, lsg, bnd);
         localerr_dist= localerr/std::sqrt(sit->GetVolume());
         globalerr+= localerr*localerr;
         if ( sit->IsUnrefined() ) {
             if (localerr_dist>exp_err)
             {
                 sit->SetRegRefMark();
-                ++_NumLastMarkedForRef;
+                ++NumLastMarkedForRef_;
             }
             else if (localerr_dist<unref_bnd)
                 {
                     sit->SetRemoveMark();
-                    ++_NumLastMarkedForDel;
+                    ++NumLastMarkedForDel_;
                 }
         }
     }
     globalerr= std::sqrt(globalerr);
-    if (globalerr<_InitGlobErr*_RelReduction)
+    if (globalerr<InitGlobErr_*RelReduction_)
     {
         for (MultiGridCL::const_TriangTetraIteratorCL sit=mg.GetTriangTetraBegin(lvl), send=mg.GetTriangTetraEnd(lvl);
              sit != send; ++sit)
             if (sit->IsUnrefined()) sit->SetNoRefMark();
-        _NumLastMarkedForDel= _NumLastMarkedForRef= 0;
+        NumLastMarkedForDel_= NumLastMarkedForRef_= 0;
     }
-    if (_outp)
-        *_outp << "Estimated global W1_2-error: " << globalerr << ". This is a reduction of " << globalerr/_ActGlobErr
-               << " compared to the last estimation. Marked " << _NumLastMarkedForRef
-               << ", unmarked " << _NumLastMarkedForDel << " out of " << num_tetra << " tetrahedrons."
+    if (outp_)
+        *outp_ << "Estimated global W1_2-error: " << globalerr << ". This is a reduction of " << globalerr/ActGlobErr_
+               << " compared to the last estimation. Marked " << NumLastMarkedForRef_
+               << ", unmarked " << NumLastMarkedForDel_ << " out of " << num_tetra << " tetrahedrons."
                << std::endl;
-    _ActGlobErr= globalerr;
-    return _NumLastMarkedForRef || _NumLastMarkedForDel;
+    ActGlobErr_= globalerr;
+    return NumLastMarkedForRef_ || NumLastMarkedForDel_;
 }
 
-template <class _TetraEst, class _ProblemCL>
-template <class BndData_, class _VD>
-void DoerflerMarkCL<_TetraEst, _ProblemCL>::Init(const P1EvalCL<double, BndData_, _VD>& sol)
+template <class TetraEstT, class ProblemT>
+template <class BndData_, class VD_>
+void DoerflerMarkCL<TetraEstT, ProblemT>::Init(const P1EvalCL<double, BndData_, VD_>& sol)
 {
-    MultiGridCL& mg= _Problem.GetMG();
+    MultiGridCL& mg= Problem_.GetMG();
     const Uint lvl= sol.GetLevel();
-    const typename _ProblemCL::BndDataCL& bnd= _Problem.GetBndData();
+    const typename ProblemT::BndDataCL& bnd= Problem_.GetBndData();
 
-    _InitGlobErr= 0;
+    InitGlobErr_= 0;
     for (MultiGridCL::TriangTetraIteratorCL sit=mg.GetTriangTetraBegin(lvl), send=mg.GetTriangTetraEnd(lvl);
          sit != send; ++sit)
     {
-        _InitGlobErr+= _Estimator( *sit, *sol.GetSolution(), bnd);
+        InitGlobErr_+= Estimator_( *sit, *sol.GetSolution(), bnd);
     }
-    _InitGlobErr= std::sqrt(_InitGlobErr);
-    _ActGlobErr= _InitGlobErr;
-    if (_outp)
-        *_outp << "ErrorEstimator is initialized now; initial error: " << _InitGlobErr
-               << " We try to reduce by a factor of " << _RelReduction
-               << " by marking the tetrahedrons with largest error-estimates, until the error marked"
-               << " is at least " << _Threshold << " of the actual global error." << std::endl;
+    InitGlobErr_= std::sqrt(InitGlobErr_);
+    ActGlobErr_= InitGlobErr_;
+    if (outp_)
+        *outp_ << "ErrorEstimator is initialized now; initial error: " << InitGlobErr_
+               << " We try to reduce by a factor of " << RelReduction_
+               << " by marking the tetrahedra with largest error-estimates, until the error marked"
+               << " is at least " << Threshold_ << " of the actual global error." << std::endl;
 }
 
-template <class _TetraEst, class _ProblemCL>
-template <class BndData_, class _VD>
-bool DoerflerMarkCL<_TetraEst, _ProblemCL>::Estimate(const P1EvalCL<double, BndData_, const _VD>& sol)
+template <class TetraEstT, class ProblemT>
+template <class BndData_, class VD_>
+bool DoerflerMarkCL<TetraEstT, ProblemT>::Estimate(const P1EvalCL<double, BndData_, const VD_>& sol)
 {
     Err_ContCL err_est;
-    const MultiGridCL& mg= _Problem.GetMG();
+    const MultiGridCL& mg= Problem_.GetMG();
     const Uint lvl= sol.GetLevel();
     const VecDescCL& lsg= *sol.GetSolution();
-    const typename _ProblemCL::BndDataCL& bnd= _Problem.GetBndData();
+    const typename ProblemT::BndDataCL& bnd= Problem_.GetBndData();
 
-    _NumLastMarkedForRef= 0;
-    _NumLastMarkedForDel= 0;
+    NumLastMarkedForRef_= 0;
+    NumLastMarkedForDel_= 0;
     for (MultiGridCL::const_TriangTetraIteratorCL sit=mg.GetTriangTetraBegin(lvl), send=mg.GetTriangTetraEnd(lvl);
          sit != send; ++sit)
     {
-        const double localerr= _Estimator(*sit, lsg, bnd);
+        const double localerr= Estimator_(*sit, lsg, bnd);
         err_est.push_back( std::make_pair(&*sit, localerr) );
     }
     const double globalerr_sq= std::accumulate(err_est.begin(), err_est.end(), 0.0, AccErrCL() );
     const double globalerr= std::sqrt(globalerr_sq);
-    const double ref_threshold_sq= globalerr_sq*_Threshold*_Threshold;
-    if (globalerr>=_InitGlobErr*_RelReduction && _DoMark)
+    const double ref_threshold_sq= globalerr_sq*Threshold_*Threshold_;
+    if (globalerr>=InitGlobErr_*RelReduction_ && DoMark_)
     {
         std::sort( err_est.begin(), err_est.end(), Err_Pair_GTCL() );
         double akt_ref_err_sq= 0;
-        const Uint min_tetra= static_cast<Uint>(err_est.size()*_min_tetra_ratio);
+        const Uint min_tetra= static_cast<Uint>(err_est.size()*min_tetra_ratio_);
         for (Err_ContCL::iterator it= err_est.begin(), theend= err_est.end();
-             it != theend && (akt_ref_err_sq < ref_threshold_sq || _NumLastMarkedForRef < min_tetra); ++it)
+             it != theend && (akt_ref_err_sq < ref_threshold_sq || NumLastMarkedForRef_ < min_tetra); ++it)
             if ( it->first->IsUnrefined() )
             {
                 it->first->SetRegRefMark();
                 akt_ref_err_sq+= it->second;
-                ++_NumLastMarkedForRef;
+                ++NumLastMarkedForRef_;
             }
     }
-    if (_outp)
-        *_outp << "Estimated global W1_2-error: " << globalerr << ". This is a reduction of " << globalerr/_ActGlobErr
-               << " compared to the last estimation. Marked " << _NumLastMarkedForRef
-               << ", unmarked " << _NumLastMarkedForDel << " out of " << err_est.size() << " tetrahedrons, "
-               << "which account for " << _Threshold << " of the global error."
+    if (outp_)
+        *outp_ << "Estimated global W1_2-error: " << globalerr << ". This is a reduction of " << globalerr/ActGlobErr_
+               << " compared to the last estimation. Marked " << NumLastMarkedForRef_
+               << ", unmarked " << NumLastMarkedForDel_ << " out of " << err_est.size() << " tetrahedra, "
+               << "which account for " << Threshold_ << " of the global error."
                << std::endl;
-    _ActGlobErr= globalerr;
-    return _NumLastMarkedForRef || _NumLastMarkedForDel;
+    ActGlobErr_= globalerr;
+    return NumLastMarkedForRef_ || NumLastMarkedForDel_;
 }
 
 
