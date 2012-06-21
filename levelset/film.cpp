@@ -194,20 +194,47 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
 
     const double Vol= lset.GetVolume(); // approx. P.get<double>("Exp.Thickness") * P.get<DROPS::Point3DCL>("MeshSize")[0] * P.get<DROPS::Point3DCL>("MeshSize")[2];
     std::cout << "rel. Volume: " << lset.GetVolume()/Vol << std::endl;
+   
+   // Output-Registrations:
+#ifndef _PAR
+    Ensight6OutCL* ensight = NULL;
+    if (P.get<int>("Ensight.EnsightOut",0)){
+        // Initialize Ensight6 output
+        std::string ensf( P.get<std::string>("Ensight.EnsDir") + "/" + P.get<std::string>("Ensight.EnsCase"));
+        ensight = new Ensight6OutCL( P.get<std::string>("Ensight.EnsCase") + ".case",
+                                     P.get<int>("Time.NumSteps")/P.get("Ensight.EnsightOut", 0)+1,
+                                     P.get<int>("Ensight.Binary"));
+        ensight->Register( make_Ensight6Geom      ( MG, MG.GetLastLevel(), P.get<std::string>("Ensight.GeomName"),
+                                                    ensf + ".geo", true));
+        ensight->Register( make_Ensight6Scalar    ( lset.GetSolution(),      "Levelset",      ensf + ".scl", true));
+        ensight->Register( make_Ensight6Scalar    ( Stokes.GetPrSolution(),  "Pressure",      ensf + ".pr",  true));
+        ensight->Register( make_Ensight6Vector    ( Stokes.GetVelSolution(), "Velocity",      ensf + ".vel", true));
+        if (Stokes.UsesXFEM())
+            ensight->Register( make_Ensight6P1XScalar( MG, lset.Phi, Stokes.p, "XPressure",   ensf + ".pr", true));
 
-    // Initialize Ensight6 output
-    std::string ensf( P.get<std::string>("EnsightDir") + "/" + P.get<std::string>("EnsightCase"));
-    Ensight6OutCL ensight( P.get<std::string>("EnsightCase") + ".case", P.get<int>("Time.NumSteps") + 1);
-    ensight.Register( make_Ensight6Geom  ( MG, MG.GetLastLevel(),   "falling film", ensf + ".geo", true));
-    ensight.Register( make_Ensight6Scalar( lset.GetSolution(),      "Levelset",     ensf + ".scl", true));
-    ensight.Register( make_Ensight6Scalar( Stokes.GetPrSolution(),  "Pressure",     ensf + ".pr",  true));
-    ensight.Register( make_Ensight6Vector( Stokes.GetVelSolution(), "Velocity",     ensf + ".vel", true));
+        ensight->Write( Stokes.v.t);
+    }
+#endif
+    
+    // writer for vtk-format
+    VTKOutCL * vtkwriter = NULL;
+    if (P.get<int>("VTK.VTKOut",0)){
+        vtkwriter = new VTKOutCL(adap.GetMG(), "DROPS data",
+                                 P.get<int>("Time.NumSteps")/P.get("VTK.VTKOut", 0)+1,
+                                 P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName"),
+                                 P.get<int>("VTK.Binary"));
+        vtkwriter->Register( make_VTKVector( Stokes.GetVelSolution(), "velocity") );
+        vtkwriter->Register( make_VTKScalar( Stokes.GetPrSolution(), "pressure") );
+        if (P.get<int>("VTK.AddP1XPressure",0) && Stokes.UsesXFEM())
+            vtkwriter->Register( make_VTKP1XScalar( MG, lset.Phi, Stokes.p, "xpressure"));
+        vtkwriter->Register( make_VTKScalar( lset.GetSolution(), "level-set") );
 
-    ensight.Write();
+        vtkwriter->Write(Stokes.v.t);
+    }
 
     std::ofstream* infofile = 0;
     IF_MASTER {
-        infofile = new std::ofstream ((P.get<std::string>("EnsightCase","film")+".info").c_str());
+        infofile = new std::ofstream ((P.get<std::string>("Ensight.EnsCase","film")+".info").c_str());
     }
     IFInfo.Init(infofile);
     IFInfo.WriteHeader();
@@ -293,13 +320,17 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
             }
         }
 
-        if (step%10==0)
-            ensight.Write( step*P.get<double>("Time.StepSize"));
+        if (ensight && step%10==0)
+            ensight->Write( step*P.get<double>("Time.StepSize"));
+        if (vtkwriter && step%10==0)
+            vtkwriter->Write( step*P.get<double>("Time.StepSize"));
     }
 
     IFInfo.Update( lset, Stokes.GetVelSolution());
     IFInfo.Write(Stokes.v.t);
     std::cout << std::endl;
+    if (ensight ) delete ensight;
+    if (vtkwriter) delete vtkwriter;
     delete stokessolver;
     delete navstokessolver;
 }

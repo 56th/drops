@@ -76,7 +76,7 @@ film: \
     ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o ../levelset/levelset.o \
     ../misc/utils.o ../out/output.o ../num/discretize.o ../navstokes/instatnavstokes2phase.o \
     ../misc/params.o ../levelset/fastmarch.o ../stokes/instatstokes2phase.o ../num/MGsolver.o\
-    ../num/fe.o ../out/ensightOut.o ../num/oseenprecond.o ../num/interfacePatch.o \
+    ../num/fe.o ../out/ensightOut.o ../out/vtkOut.o ../num/oseenprecond.o ../num/interfacePatch.o \
     ../levelset/surfacetension.o ../levelset/coupling.o ../geom/bndVelFunctions.o ../misc/bndmap.o \
     ../levelset/filmCoeff.o ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o \
     ../geom/bndScalarFunctions.o ../num/renumber.o $(PAR_OBJ)
