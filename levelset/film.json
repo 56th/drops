@@ -8,7 +8,7 @@
 // time stepping
 	"Time":
 	{
-		"NumSteps":		10,		// number of time steps
+		"NumSteps":		10000,		// number of time steps
 		"StepSize":		0.0001		// time step size
 	},
 
@@ -102,20 +102,20 @@
 // Visualization Toolkit output format settings
         "VTK":
         {
-                "VTKOut":               1,                 // VTK output (0 = off, 1 = on).
-                "VTKDir":               "vtk",             // local directory for VTK files.
-                "VTKName":              "testfilm",   // name of VTK files
-                "AddP1XPressure":       1,                 // pressure output as p1 on neg. and p1 on pos. part      
-                "Binary":               1                  // write out VTK files in binary format.
+                "VTKOut":               1,                   // VTK output (0 = off, 1 = on).
+                "VTKDir":               "vtk",               // local directory for VTK files.
+                "VTKName":              "filmStokesDMS-T05", // name of VTK files
+                "AddP1XPressure":       1,                   // pressure output as p1 on neg. and p1 on pos. part      
+                "Binary":               1                    // write out VTK files in binary format.
         },
 // Ensight output
         "Ensight":
         {
-                "EnsightOut":               0,                     // ensight output (0 = off, 1 = on).
-                "EnsDir":                   "ensight",             // local directory for ensight files.
-                "EnsCase":                  "filmStokesDMS-T05",   // name of ensight case file
-                "GeomName":                 "brick",               //
-                "Binary":                   1                      // write out ensight files in binary format.
+                "EnsightOut":               0,                     // Ensight output (0 = off, 1 = on).
+                "EnsDir":                   "ensight",             // local directory for Ensight files.
+                "EnsCase":                  "filmStokesDMS-T05",   // name of Ensight case file
+                "GeomName":                 "film",                // name of geometry part
+                "Binary":                   1                      // write out Ensight files in binary format.
         },
 // misc parameters	
 	"MeshResolution":		[20, 6, 2 ],	// number of sub-intervals per dimension
@@ -123,8 +123,6 @@
 	"InitialCond":		1,					// controls initial condition: 1 = stationary Stokes, 2 = Nusselt solution, -1 = read from file
 	"InitialFile":		"initial/filmNs40", // prefix for initial data files
 	"BndCond":		"12wo12",				// boundary conditions: Per1!Per2!Wall!Outflow!Per1!Per2
-	//"EnsightCase":		"testfilmStokesDMS-T05",	// Ensight case
-	//"EnsightDir":		"ensight",			// directory for Ensight data
 	"SerializationFile":		"filmNs.mg",// write to files
 	"DeserializationFile":		"none"		// read from files
 

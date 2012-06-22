@@ -193,7 +193,7 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
 
     const double Vol= lset.GetVolume(); // approx. P.get<double>("Exp.Thickness") * P.get<DROPS::Point3DCL>("MeshSize")[0] * P.get<DROPS::Point3DCL>("MeshSize")[2];
     std::cout << "rel. Volume: " << lset.GetVolume()/Vol << std::endl;
-   
+
    // Output-Registrations:
 #ifndef _PAR
     Ensight6OutCL* ensight = NULL;
@@ -214,7 +214,7 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
         ensight->Write( Stokes.v.t);
     }
 #endif
-    
+
     // writer for vtk-format
     VTKOutCL * vtkwriter = NULL;
     if (P.get<int>("VTK.VTKOut",0)){
@@ -233,7 +233,7 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
 
     std::ofstream* infofile = 0;
     IF_MASTER {
-        infofile = new std::ofstream ((P.get<std::string>("Ensight.EnsCase","film")+".info").c_str());
+        infofile = new std::ofstream ((P.get<std::string>("VTK.VTKName","film")+".info").c_str());
     }
     IFInfo.Init(infofile);
     IFInfo.WriteHeader();
