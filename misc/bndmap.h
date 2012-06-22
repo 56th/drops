@@ -45,7 +45,6 @@ class SingletonMapCL : public std::map<std::string, T>
 
 typedef SingletonMapCL<DROPS::instat_vector_fun_ptr> InVecMap;
 typedef SingletonMapCL<DROPS::instat_scalar_fun_ptr> InScaMap;
-typedef SingletonMapCL<DROPS::scalar_fun_ptr> ScaMap;
 typedef SingletonMapCL<DROPS::match_fun> MatchMap;
 typedef SingletonMapCL<DROPS::instat_matrix_fun_ptr> InMatMap;
 
@@ -62,7 +61,6 @@ class RegisterScalarFunction
 {
   public:
     RegisterScalarFunction(std::string, instat_scalar_fun_ptr);
-    RegisterScalarFunction(std::string, scalar_fun_ptr);
 };
 
 class RegisterMatchingFunction

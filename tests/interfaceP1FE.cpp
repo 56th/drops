@@ -59,17 +59,17 @@ TestSingleTetra()
 }
 
 
-double plane(const Point3DCL& p)
+double plane(const Point3DCL& p, double)
 {
     return p[0] - 0.41;
 }
 
-double plane2(const Point3DCL& p)
+double plane2(const Point3DCL& p, double)
 {
     return p[0] - 0.4;
 }
 
-double sphere_1(const Point3DCL& p)
+double sphere_1(const Point3DCL& p, double)
 {
     Point3DCL c( 0.47);
     Point3DCL x= fabs( p - c);
@@ -77,7 +77,7 @@ double sphere_1(const Point3DCL& p)
     return x[0] + 1.11*x[1] + 1.111*x[2] - 0.31;
 }
 
-double sphere_2(const Point3DCL& p)
+double sphere_2(const Point3DCL& p, double)
 {
     Point3DCL c( 0.5);
     Point3DCL x= p - c;
@@ -85,7 +85,7 @@ double sphere_2(const Point3DCL& p)
     return x.norm() - 0.31;
 }
 
-double sphere_max(const Point3DCL& p)
+double sphere_max(const Point3DCL& p, double)
 {
     Point3DCL c( 0.47);
     Point3DCL x= fabs( p - c);

@@ -78,7 +78,7 @@ double DistanceFct( const DROPS::Point3DCL& p)
 }
 */
 
-double DistanceFct( const DROPS::Point3DCL& p)
+double DistanceFct( const DROPS::Point3DCL& p, double)
 { // ball
     const DROPS::Point3DCL d= P.get<DROPS::Point3DCL>("Exp.PosDrop")-p;
 //    return d.norm_sq()-C.Radius*C.Radius; // exakte Darstellung mit P2-FE, aber keine Abstandsfunktion
@@ -351,11 +351,11 @@ void MarkDrop (DROPS::MultiGridCL& mg, int maxLevel= -1)
             int neg= 0, zero= 0;
             for (int i=0; i<4; ++i)
             {
-                const double val= DistanceFct( It->GetVertex(i)->GetCoord() );
+                const double val= DistanceFct( It->GetVertex(i)->GetCoord(), 0.);
                 neg+= val<0;
                 zero+= fabs(val)<1e-8;
             }
-            const double val= DistanceFct( GetBaryCenter(*It));
+            const double val= DistanceFct( GetBaryCenter(*It), 0.);
             neg+= val<0;
             zero+= fabs(val)<1e-8;
 

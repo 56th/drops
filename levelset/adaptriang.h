@@ -64,9 +64,9 @@ class AdapTriangCL
     double GetValue( const DistFctT& dist, const EdgeCL& e)   { return dist.val( e); }
     template <class DistFctT>
     double GetValue( const DistFctT& dist, const TetraCL& t)  { return dist.val( t, 0.25, 0.25, 0.25); }
-    double GetValue( scalar_fun_ptr dist, const VertexCL& v)  { return dist( v.GetCoord() ); }
-    double GetValue( scalar_fun_ptr dist, const EdgeCL& e)    { return dist( GetBaryCenter( e) ); }
-    double GetValue( scalar_fun_ptr dist, const TetraCL& t)   { return dist( GetBaryCenter( t) ); }
+    double GetValue( instat_scalar_fun_ptr dist, const VertexCL& v, double t=0.)  { return dist( v.GetCoord(), t); }
+    double GetValue( instat_scalar_fun_ptr dist, const EdgeCL& e, double t=0.)    { return dist( GetBaryCenter( e), t); }
+    double GetValue( instat_scalar_fun_ptr dist, const TetraCL& tet, double t=0.) { return dist( GetBaryCenter( tet), t); }
     //@}
 
     /// \brief On step of the grid change

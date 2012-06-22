@@ -44,7 +44,7 @@ double sphere2 (const Point3DCL& p, double)
     return (p - orig).norm_sq() - r*r;
 }
 
-double sphere2_stat (const Point3DCL& p)
+double sphere2_stat (const Point3DCL& p, double)
 {
     return sphere2( p, 0.);
 }
@@ -54,7 +54,7 @@ double sphere_dist (const Point3DCL& p, double)
     return (p - orig).norm() - r;
 }
 
-double sphere_dist_stat (const Point3DCL& p)
+double sphere_dist_stat (const Point3DCL& p, double)
 {
     return sphere_dist( p, 0.);
 }
@@ -143,7 +143,7 @@ void CheckSigns (MultiGridCL& mg, const VecDescCL& Phi, const VecDescCL* Phi2= 0
     for (MultiGridCL::TriangVertexIteratorCL it= mg.GetTriangVertexBegin(lvl),
         end= mg.GetTriangVertexEnd(lvl); it!=end; ++it)
     {
-        if ( Phi.Data[it->Unknowns(idx)]*sphere_dist_stat( it->GetCoord()) <= 0.) {
+        if ( Phi.Data[it->Unknowns(idx)]*sphere_dist_stat( it->GetCoord(), 0.) <= 0.) {
             std::cout << "Different signs on vertex." << std::endl;
          }
         if (Phi2) {
@@ -155,7 +155,7 @@ void CheckSigns (MultiGridCL& mg, const VecDescCL& Phi, const VecDescCL* Phi2= 0
     for (MultiGridCL::TriangEdgeIteratorCL it= mg.GetTriangEdgeBegin(lvl),
         end= mg.GetTriangEdgeEnd(lvl); it!=end; ++it)
     {
-        if ( Phi.Data[it->Unknowns(idx)]*sphere_dist_stat( GetBaryCenter( *it)) <= 0.) {
+        if ( Phi.Data[it->Unknowns(idx)]*sphere_dist_stat( GetBaryCenter( *it), 0.) <= 0.) {
             std::cout << "Different signs on edge." << std::endl;
         }
         if (Phi2) {

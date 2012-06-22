@@ -933,7 +933,7 @@ void StokesP2P1CL<Coeff>::CheckSolution(const VelVecDescCL* lsgvel, const VecDes
 	     Frob_Dvel += Quad5CL<> (frobenius_norm_sq(q5_dvel_diff)).quad(absdet);
 	     L2_div += Quad5CL<> (trace(q5_dvel)).quad(absdet);
 	 }
-         
+
      }
      L2_pr = std::sqrt(L2_pr);
      if( DLsgVel != NULL)
@@ -942,7 +942,7 @@ void StokesP2P1CL<Coeff>::CheckSolution(const VelVecDescCL* lsgvel, const VecDes
          Frob_Dvel = std::sqrt(Frob_Dvel);     //Frob_Dvel is the true value.
 	 L2_div = std::sqrt(std::fabs(L2_div));
      }
-     L2_vel = std::sqrt(L2_vel);               //L2_vel is the true value.  
+     L2_vel = std::sqrt(L2_vel);               //L2_vel is the true value.
 
 
      if( DLsgVel != NULL)
@@ -951,7 +951,7 @@ void StokesP2P1CL<Coeff>::CheckSolution(const VelVecDescCL* lsgvel, const VecDes
                    << ", || p_h - p ||_L2 = " << L2_pr
                    << "\n|| div x ||_L2 = " << L2_div << '\n' << std::endl;
      else
-         std::cout << ", || u_h - u ||_L2 = " <<  L2_vel 
+         std::cout << ", || u_h - u ||_L2 = " <<  L2_vel
                    << ", || p_h - p ||_L2 = " << L2_pr << '\n' << std::endl;
 }
 
@@ -1114,7 +1114,7 @@ void StokesP2P1CL<Coeff>::SetIdx()
 #ifndef _PAR
 //
 template <class Coeff>
-void StokesP1BubbleP1CL<Coeff>::GetDiscError(instat_vector_fun_ptr LsgVel, scalar_fun_ptr LsgPr) const
+void StokesP1BubbleP1CL<Coeff>::GetDiscError(instat_vector_fun_ptr LsgVel, instat_scalar_fun_ptr LsgPr, double t) const
 {
     Uint lvl= A.GetRowLevel(),
         vidx= A.RowIdx->GetIdx(),
@@ -1128,7 +1128,7 @@ void StokesP1BubbleP1CL<Coeff>::GetDiscError(instat_vector_fun_ptr LsgVel, scala
         if (!BndData_.Vel.IsOnDirBnd(*sit))
         {
            for(int i=0; i<3; ++i)
-               lsgvel[sit->Unknowns(vidx)+i]= LsgVel(sit->GetCoord(), 0.)[i];
+               lsgvel[sit->Unknowns(vidx)+i]= LsgVel(sit->GetCoord(), t)[i];
         }
     }
 
@@ -1137,19 +1137,19 @@ void StokesP1BubbleP1CL<Coeff>::GetDiscError(instat_vector_fun_ptr LsgVel, scala
     {  // Tetras are never on the boundary.
        for(int i=0; i<3; ++i)
        {
-            lsgvel[sit->Unknowns(vidx)+i]= LsgVel( GetBaryCenter(*sit), 0. )[i];
+            lsgvel[sit->Unknowns(vidx)+i]= LsgVel( GetBaryCenter(*sit), t)[i];
             // The coefficient of the bubble-function is not the value of the solution
             // in the barycenter, as the linear shape-functions contribute to the value
             // there.
-            lsgvel[sit->Unknowns(vidx)+i]-= .25*LsgVel( sit->GetVertex(0)->GetCoord(), 0. )[i];
-            lsgvel[sit->Unknowns(vidx)+i]-= .25*LsgVel( sit->GetVertex(1)->GetCoord(), 0. )[i];
-            lsgvel[sit->Unknowns(vidx)+i]-= .25*LsgVel( sit->GetVertex(2)->GetCoord(), 0. )[i];
-            lsgvel[sit->Unknowns(vidx)+i]-= .25*LsgVel( sit->GetVertex(3)->GetCoord(), 0. )[i];
+            lsgvel[sit->Unknowns(vidx)+i]-= .25*LsgVel( sit->GetVertex(0)->GetCoord(), t)[i];
+            lsgvel[sit->Unknowns(vidx)+i]-= .25*LsgVel( sit->GetVertex(1)->GetCoord(), t)[i];
+            lsgvel[sit->Unknowns(vidx)+i]-= .25*LsgVel( sit->GetVertex(2)->GetCoord(), t)[i];
+            lsgvel[sit->Unknowns(vidx)+i]-= .25*LsgVel( sit->GetVertex(3)->GetCoord(), t)[i];
        }
     }
     for (MultiGridCL::const_TriangVertexIteratorCL sit=const_cast<const MultiGridCL&>(MG_).GetTriangVertexBegin(lvl), send=const_cast<const MultiGridCL&>(MG_).GetTriangVertexEnd(lvl);
          sit != send; ++sit)
-        lsgpr[sit->Unknowns(pidx)]= LsgPr(sit->GetCoord());
+        lsgpr[sit->Unknowns(pidx)]= LsgPr(sit->GetCoord(), t);
 
     std::cout << "discretization error to check the system (x,y = continuous solution): "<<std::endl;
     VectorCL res( A.Data*lsgvel + transp_mul(B.Data,lsgpr)-b.Data);
@@ -1414,7 +1414,7 @@ void StokesP1BubbleP1CL<Coeff>::SetNumPrLvl( size_t n)
 template <class Coeff>
   double
   StokesP1BubbleP1CL<Coeff>::ResidualErrEstimator(const TetraCL& t,
-      const const_DiscPrSolCL& pr, const const_DiscVelSolCL& vel, double)
+      const const_DiscPrSolCL& pr, const const_DiscVelSolCL& vel, double tt)
 {
     Uint lvl= vel.GetLevel();
     double err_sq= 0.0;
@@ -1434,7 +1434,7 @@ template <class Coeff>
         }
 
     // || P_0(f) - grad(p_h) ||_L2 squared * Vol(T)
-    const SVectorCL<3> P0f= Quad3PosWeightsCL::Quad(t, &Coeff::f)*absdet/std::sqrt(vol); // == *absdet/std::sqrt(vol)....
+    const SVectorCL<3> P0f= Quad3PosWeightsCL::Quad(t, &Coeff::f, tt)*absdet/std::sqrt(vol); // == *absdet/std::sqrt(vol)....
     const SVectorCL<3> gp= pr.val(t.GetVertex(0)->GetCoord())*M*FE_P1CL::DH0Ref()
                           +pr.val(t.GetVertex(1)->GetCoord())*M*FE_P1CL::DH1Ref()
                           +pr.val(t.GetVertex(2)->GetCoord())*M*FE_P1CL::DH2Ref()
@@ -1560,7 +1560,7 @@ bool StokesDoerflerMarkCL<_TetraEst, _ProblemCL>::Estimate(const const_DiscPrSol
 
 template <class Coeff>
 void StokesP1BubbleP1CL<Coeff>::CheckSolution(const VelVecDescCL* lsgvel, const VecDescCL* lsgpr,
-    instat_vector_fun_ptr LsgVel, scalar_fun_ptr LsgPr) const
+    instat_vector_fun_ptr LsgVel, instat_scalar_fun_ptr LsgPr, double t) const
 {
     double diff, maxdiff=0, norm2= 0;
     Uint lvl=lsgvel->GetLevel(),
@@ -1612,7 +1612,7 @@ void StokesP1BubbleP1CL<Coeff>::CheckSolution(const VelVecDescCL* lsgvel, const 
            ++countverts;
            for(int i=0; i<3; ++i)
            {
-               diff= std::fabs( LsgVel(sit->GetCoord(), 0.)[i] - lsgvel->Data[sit->Unknowns(vidx)+i] );
+               diff= std::fabs( LsgVel(sit->GetCoord(), t)[i] - lsgvel->Data[sit->Unknowns(vidx)+i] );
                norm2+= diff*diff;
                if (diff>maxdiff)
                {
@@ -1634,8 +1634,8 @@ void StokesP1BubbleP1CL<Coeff>::CheckSolution(const VelVecDescCL* lsgvel, const 
 //        Point3DCL sum(0.0), diff, Diff[5];
         for (Uint i=0; i<Quad3PosWeightsCL::GetNumPoints(); ++i)
         {
-            const Point3DCL& pt= Quad3PosWeightsCL::GetPoints()[i];
-            vvals[i]= fabs(LsgVel(GetWorldCoord(*sit, pt), 0.) - vel.lin_val(*sit, pt[0], pt[1], pt[2]));
+            const BaryCoordCL& pt= Quad3PosWeightsCL::GetPoints()[i];
+            vvals[i]= fabs(LsgVel(GetWorldCoord(*sit, pt), t) - vel.lin_val(*sit, pt[1], pt[2], pt[3]));
             vvals_sq[i]= vvals[i]*vvals[i];
         }
         L1_vel+= Quad3PosWeightsCL::Quad(vvals)*absdet;
@@ -1660,9 +1660,9 @@ void StokesP1BubbleP1CL<Coeff>::CheckSolution(const VelVecDescCL* lsgvel, const 
     {
         double sum= 0;
         for(int i=0; i<4; ++i)
-            sum+= pr.val(*sit->GetVertex(i)) - LsgPr(sit->GetVertex(i)->GetCoord());
+            sum+= pr.val(*sit->GetVertex(i)) - LsgPr(sit->GetVertex(i)->GetCoord(), t);
         sum/= 120;
-        sum+= 2./15.* (pr.val(*sit, .25, .25, .25) - LsgPr(GetBaryCenter(*sit)));
+        sum+= 2./15.* (pr.val(*sit, .25, .25, .25) - LsgPr(GetBaryCenter(*sit), t));
         MW_pr+= sum * sit->GetVolume()*6.;
         vol+= sit->GetVolume();
     }
@@ -1672,7 +1672,7 @@ void StokesP1BubbleP1CL<Coeff>::CheckSolution(const VelVecDescCL* lsgvel, const 
     for (MultiGridCL::const_TriangVertexIteratorCL sit=const_cast<const MultiGridCL&>(MG_).GetTriangVertexBegin(lvl), send=const_cast<const MultiGridCL&>(MG_).GetTriangVertexEnd(lvl);
          sit != send; ++sit)
     {
-        diff= std::fabs( c_pr + LsgPr(sit->GetCoord()) - pr.val(*sit));
+        diff= std::fabs( c_pr + LsgPr(sit->GetCoord(), t) - pr.val(*sit));
         norm2+= diff*diff;
         if (diff>maxdiff)
             maxdiff= diff;
@@ -1687,11 +1687,11 @@ void StokesP1BubbleP1CL<Coeff>::CheckSolution(const VelVecDescCL* lsgvel, const 
         double sum= 0, sum1= 0;
         for(int i=0; i<4; ++i)
         {
-            diff= c_pr + LsgPr(sit->GetVertex(i)->GetCoord()) - pr.val(*sit->GetVertex(i));
+            diff= c_pr + LsgPr(sit->GetVertex(i)->GetCoord(), t) - pr.val(*sit->GetVertex(i));
             sum+= diff*diff; sum1+= std::fabs(diff);
         }
         sum/= 120;   sum1/= 120;
-        diff= c_pr + LsgPr(GetBaryCenter(*sit)) - pr.val(*sit, .25, .25, .25);
+        diff= c_pr + LsgPr(GetBaryCenter(*sit), t) - pr.val(*sit, .25, .25, .25);
         sum+= 2./15.*diff*diff;   sum1+= 2./15.*std::fabs(diff);
         L2_pr+= sum * sit->GetVolume()*6.;
         L1_pr+= sum1 * sit->GetVolume()*6.;

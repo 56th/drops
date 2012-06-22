@@ -57,7 +57,7 @@ void BuildBrick( MultiGridCL*& mg)
     delete builder;
 }
 
-double DistToSphere( const Point3DCL& p)
+double DistToSphere( const Point3DCL& p, double)
 {
     Point3DCL origin( 0.5);
     return (origin-p).norm() - 0.25;

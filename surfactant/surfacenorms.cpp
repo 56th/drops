@@ -39,7 +39,7 @@ DROPS::Point3DCL u_func (const DROPS::Point3DCL&, double)
     return P.get<DROPS::Point3DCL>("Exp.Velocity");
 }
 
-double sphere_2 (const DROPS::Point3DCL& p)
+double sphere_2 (const DROPS::Point3DCL& p, double)
 {
     DROPS::Point3DCL x( p - P.get<DROPS::Point3DCL>("Exp.PosDrop"));
 

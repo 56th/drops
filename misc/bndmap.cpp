@@ -52,14 +52,10 @@ namespace DROPS
         InScaMap::getInstance().insert(std::make_pair(name,fptr));
     }
 
-    RegisterScalarFunction::RegisterScalarFunction(std::string name, scalar_fun_ptr fptr){
-        ScaMap::getInstance().insert(std::make_pair(name,fptr));
-    }
-    
     RegisterMatchingFunction::RegisterMatchingFunction(std::string name, match_fun fptr){
         MatchMap::getInstance().insert(std::make_pair(name,fptr));
     }
-    
+
     RegisterMatrixFunction::RegisterMatrixFunction(std::string name, instat_matrix_fun_ptr fptr){
         InMatMap::getInstance().insert(std::make_pair(name,fptr));
     }
@@ -68,7 +64,6 @@ namespace DROPS
 
     template class SingletonMapCL<DROPS::instat_scalar_fun_ptr>;
     template class SingletonMapCL<DROPS::instat_vector_fun_ptr>;
-    template class SingletonMapCL<DROPS::scalar_fun_ptr>;
     template class SingletonMapCL<DROPS::instat_matrix_fun_ptr>;
     template class SingletonMapCL<DROPS::match_fun>;
 

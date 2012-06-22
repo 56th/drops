@@ -109,7 +109,7 @@ class LevelsetP2CL : public ProblemCL< LevelsetCoeffCL, LsetBndDataCL>
     ///@}
 
     /// initialize level set function
-    void Init( scalar_fun_ptr);
+    void Init( instat_scalar_fun_ptr, double =0.);
 
     /// \remarks call SetupSystem \em before calling SetTimeStep!
     template<class DiscVelSolT>
@@ -262,7 +262,7 @@ public:
 
 
 /// marks all tetrahedra in the band |\p DistFct(x)| < \p width for refinement
-bool MarkInterface (scalar_fun_ptr DistFct, double width, MultiGridCL&, Uint f_level=(Uint)(-1), Uint c_level=(Uint)(-1));
+bool MarkInterface (instat_scalar_fun_ptr DistFct, double width, MultiGridCL&, Uint f_level=(Uint)(-1), Uint c_level=(Uint)(-1), double t=0.);
 /// marks all tetrahedra in the band |\p lset(x)| < \p width for refinement
 void MarkInterface ( const LevelsetP2CL::const_DiscSolCL& lset, double width, MultiGridCL& mg);
 

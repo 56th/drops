@@ -83,7 +83,7 @@ void InitPr( VecDescCL& p, double delta_p, const MultiGridCL& mg, const FiniteEl
         for( MultiGridCL::const_TriangTetraIteratorCL it= mg.GetTriangTetraBegin(lvl),
             end= mg.GetTriangTetraEnd(lvl); it != end; ++it)
         {
-            const double dist= EllipsoidCL::DistanceFct( GetBaryCenter( *it));
+            const double dist= EllipsoidCL::DistanceFct( GetBaryCenter( *it), 0);
             p.Data[it->Unknowns(idxnum)]= dist > 0 ? -delta_p : delta_p;
         }
         break;
@@ -99,7 +99,7 @@ void InitPr( VecDescCL& p, double delta_p, const MultiGridCL& mg, const FiniteEl
         for( MultiGridCL::const_TriangVertexIteratorCL it= mg.GetTriangVertexBegin(lvl),
             end= mg.GetTriangVertexEnd(lvl); it != end; ++it)
         {
-            const double dist= EllipsoidCL::DistanceFct( it->GetCoord());
+            const double dist= EllipsoidCL::DistanceFct( it->GetCoord(), 0.);
             p.Data[it->Unknowns(idxnum)]= InterfacePatchCL::Sign(dist)==1 ? -delta_p : delta_p;
         }
         break;
@@ -167,7 +167,7 @@ void L2ErrorPr( const VecDescCL& p, const LevelsetP2CL& lset, const MatrixCL& pr
         if (nocut)
         {
             Quad2CL<> diff( p0);
-            diff-= (EllipsoidCL::DistanceFct( GetBaryCenter(*sit)) >0 ? -delta_p/2 : delta_p/2) - p_ex_avg;
+            diff-= (EllipsoidCL::DistanceFct( GetBaryCenter(*sit), 0.) >0 ? -delta_p/2 : delta_p/2) - p_ex_avg;
             L2+= Quad2CL<>( diff*diff).quad( absdet);
             diff.apply( my_abs);
             L1+= diff.quad( absdet);

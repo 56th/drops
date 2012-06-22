@@ -300,7 +300,7 @@ double PoissonP1CL<Coeff>::CheckSolution(const VecDescCL& lsg,
 //========================================================================================================
 
 template<class Coeff>
-void PoissonP1CL<Coeff>::GetDiscError(const MLMatDescCL& A, instat_scalar_fun_ptr Lsg) const
+void PoissonP1CL<Coeff>::GetDiscError(const MLMatDescCL& A, instat_scalar_fun_ptr Lsg, double t) const
 {
     Uint lvl= A.GetColLevel(),
          idx= A.ColIdx->GetIdx();
@@ -311,7 +311,7 @@ void PoissonP1CL<Coeff>::GetDiscError(const MLMatDescCL& A, instat_scalar_fun_pt
     {
         if (sit->Unknowns.Exist(idx))
         {
-            lsg[sit->Unknowns(idx)]= Lsg(sit->GetCoord(), 0.0);
+            lsg[sit->Unknowns(idx)]= Lsg(sit->GetCoord(), t);
         }
     }
 
@@ -671,6 +671,36 @@ inline double Quad( const TetraCL& s, instat_scalar_fun_ptr coeff, int i, double
         double sum= vs * coeff( GetBaryCenter(s), t );
         for(int k=0; k<4; ++k)
             sum+= a[k] * coeff( s.GetVertex(k)->GetCoord(), t );
+
+        return sum;
+    }
+}
+
+inline double Quad( const TetraCL& s, scalar_tetra_function coeff, int i, double t= 0.0)
+{
+    double f[5];
+    const BaryCoordCL* const b= Quad2DataCL::Node;
+
+    if (i<4) // hat function on vert
+    {
+        f[0]= coeff( s, b[i], t);
+        for (int k=0, l=1; k<4; ++k)
+            if (k!=i) f[l++]= coeff( s, b[k], t );
+        f[4]= coeff( s, b[4], t);
+        return f[0]/504. - (f[1] + f[2] + f[3])/1260. - f[4]/126.;
+    }
+    else  // hat function on edge
+    {
+        const double ve= 4./945.,  // coeff for verts of edge
+                     vn= -1./756.,  // coeff for other verts
+                     vs= 26./945.;   // coeff for barycenter
+        double a[4];
+        a[VertOfEdge(i-4,0)]= a[VertOfEdge(i-4,1)]= ve;
+        a[VertOfEdge(OppEdge(i-4),0)]= a[VertOfEdge(OppEdge(i-4),1)]= vn;
+
+        double sum= vs * coeff( s, b[4], t );
+        for(int k=0; k<4; ++k)
+            sum+= a[k] * coeff( s, b[k], t );
 
         return sum;
     }

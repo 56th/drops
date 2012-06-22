@@ -496,7 +496,7 @@ void VarImprovedLaplaceBeltramiAccuCL::visit( const TetraCL& t)
     } // Ende der for-Schleife ueber die Kinder
 }
 
-bool MarkInterface ( scalar_fun_ptr DistFct, double width, MultiGridCL& mg, Uint f_level, Uint c_level)
+bool MarkInterface ( instat_scalar_fun_ptr DistFct, double width, MultiGridCL& mg, Uint f_level, Uint c_level, double t)
 {
     bool marked= false;
     DROPS_FOR_TRIANG_TETRA( mg, /*default-level*/-1, it)
@@ -505,8 +505,8 @@ bool MarkInterface ( scalar_fun_ptr DistFct, double width, MultiGridCL& mg, Uint
         int num_pos= 0;
         for (Uint j=0; j<10; ++j)
         {
-            const double dist= j<4 ? DistFct( it->GetVertex( j)->GetCoord())
-                                   : DistFct( GetBaryCenter( *it->GetEdge(j-4)));
+            const double dist= j<4 ? DistFct( it->GetVertex( j)->GetCoord(), t)
+                                   : DistFct( GetBaryCenter( *it->GetEdge(j-4)), t);
             if (dist>=0) ++num_pos;
             d= std::min( d, std::abs( dist));
         }
@@ -565,7 +565,7 @@ void MarkInterface ( const LevelsetP2CL::const_DiscSolCL& lset, double width, Mu
 //                               LevelsetP2CL
 //*****************************************************************************
 
-void LevelsetP2CL::Init( scalar_fun_ptr phi0)
+void LevelsetP2CL::Init( instat_scalar_fun_ptr phi0, double t)
 {
     const Uint lvl= Phi.GetLevel(),
                idx= Phi.RowIdx->GetIdx();
@@ -574,13 +574,13 @@ void LevelsetP2CL::Init( scalar_fun_ptr phi0)
         end= MG_.GetTriangVertexEnd(lvl); it!=end; ++it)
     {
         if ( it->Unknowns.Exist(idx))
-        Phi.Data[it->Unknowns(idx)]= phi0( it->GetCoord());
+            Phi.Data[it->Unknowns(idx)]= phi0( it->GetCoord(), t);
     }
     for (MultiGridCL::TriangEdgeIteratorCL it= MG_.GetTriangEdgeBegin(lvl),
         end= MG_.GetTriangEdgeEnd(lvl); it!=end; ++it)
     {
         if ( it->Unknowns.Exist(idx))
-        Phi.Data[it->Unknowns(idx)]= phi0( GetBaryCenter( *it));
+            Phi.Data[it->Unknowns(idx)]= phi0( GetBaryCenter( *it), t);
     }
 }
 

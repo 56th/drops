@@ -101,7 +101,7 @@ namespace tpd_volforce{
     {
         DROPS::SVectorCL<3> ret(0.);
         ret[D] = -P.get<DROPS::Point3DCL>("Exp.Gravity")[D];
-        
+
         static bool first = true;
         static DROPS::Point3DCL dx;
         //dirty hack
@@ -113,8 +113,8 @@ namespace tpd_volforce{
             std::istringstream brick_info( mesh);
             brick_info >> dx[0] >> dx[1] >> dx[2] ;
             first = false;
-        }      
-        
+        }
+
         static double voldrop = 4./3.*M_PI* P.get<DROPS::Point3DCL>("Exp.RadDrop")[0]*P.get<DROPS::Point3DCL>("Exp.RadDrop")[1]*P.get<DROPS::Point3DCL>("Exp.RadDrop")[2] ;
         static double brickvol = dx[0]* dx[1]* dx[2];
         static double volforce = P.get<double>("Mat.DensFluid") * brickvol - (P.get<double>("Mat.DensFluid") - P.get<double>("Mat.DensDrop")) * voldrop;
@@ -137,7 +137,7 @@ namespace tpd_volforce{
 namespace levelsetdistance{
 
     ///mzelle_ns_adap.cpp + mzelle_instat.cpp
-    double CubeDistance( const DROPS::Point3DCL& p)
+    double CubeDistance( const DROPS::Point3DCL& p, double)
     {
         double maxd = - P.get<DROPS::Point3DCL>("Exp.RadDrop")[0] - P.get<DROPS::Point3DCL>("Exp.RadDrop")[1]- P.get<DROPS::Point3DCL>("Exp.RadDrop")[2];
         for (int i=0;i<3;i++){
@@ -149,10 +149,10 @@ namespace levelsetdistance{
 
 
     ///mzelle_ns_adap.cpp + mzelle_instat.cpp
-    template<int i>    
-    double PeriodicEllipsoidDistance( const DROPS::Point3DCL& p)
+    template<int i>
+    double PeriodicEllipsoidDistance( const DROPS::Point3DCL& p, double)
     {
-      
+
         static bool first = true;
         static DROPS::Point3DCL dx;
         //dirty hack
@@ -164,8 +164,8 @@ namespace levelsetdistance{
             std::istringstream brick_info( mesh);
             brick_info >> dx[0] >> dx[1] >> dx[2] ;
             first = false;
-        }      
-              
+        }
+
         DROPS::Point3DCL dp;
         dp[i] = dx[i];
         DROPS::Point3DCL ExpRadDrop = P.get<DROPS::Point3DCL>("Exp.RadDrop");
@@ -178,11 +178,11 @@ namespace levelsetdistance{
         d1/= ExpRadDrop;
         d2/= ExpRadDrop;
         double dd = std::min(std::min(d.norm(),d1.norm()),d2.norm());
-        return std::abs( avgRad)*dd - avgRad;        
+        return std::abs( avgRad)*dd - avgRad;
     }
 
     template<int i>
-    double planedistance( const DROPS::Point3DCL& p)
+    double planedistance( const DROPS::Point3DCL& p, double)
     {
         double x=p[i]-P.get<DROPS::Point3DCL>("Exp.PosDrop")[i];
         return x;
@@ -231,7 +231,7 @@ namespace surffunctions{
     }
     //@}
     static DROPS::RegisterScalarFunction regscasurfrhs("surf_rhs", surf_rhs);
-    static DROPS::RegisterScalarFunction regscasurfsol("surf_sol", surf_sol);  
+    static DROPS::RegisterScalarFunction regscasurfsol("surf_sol", surf_sol);
 }
 
 //TODO: unification with filmCoeff stoff
@@ -241,7 +241,7 @@ namespace surffunctions{
 namespace filmperiodic{
     template<int A, int B>
     bool periodic_2sides( const DROPS::Point3DCL& p, const DROPS::Point3DCL& q)
-    { 
+    {
 
         static bool first = true;
         static DROPS::Point3DCL dx;
@@ -254,11 +254,11 @@ namespace filmperiodic{
             std::istringstream brick_info( mesh);
             brick_info >> dx[0] >> dx[1] >> dx[2] ;
             first = false;
-        }      
-        
+        }
+
         const DROPS::Point3DCL d= fabs(p-q),
                                L= fabs(dx);
-        
+
         const int D = 3 - A - B;
         return (d[B] + d[D] < 1e-12 && std::abs( d[A] - L[A]) < 1e-12)  // dB=dD=0 and dA=LA
           ||   (d[A] + d[D] < 1e-12 && std::abs( d[B] - L[B]) < 1e-12)  // dA=dD=0 and dB=LB
@@ -267,7 +267,7 @@ namespace filmperiodic{
 
     template<int A>
     bool periodic_1side( const DROPS::Point3DCL& p, const DROPS::Point3DCL& q)
-    { 
+    {
 
         static bool first = true;
         static DROPS::Point3DCL dx;
@@ -280,14 +280,14 @@ namespace filmperiodic{
             std::istringstream brick_info( mesh);
             brick_info >> dx[0] >> dx[1] >> dx[2] ;
             first = false;
-        }      
+        }
         const int B = (A+1)%3;
         const int D = (B+1)%3;
         const DROPS::Point3DCL d= fabs(p-q), L= fabs(dx);
-        
+
         return (d[B] + d[D] < 1e-12 && std::abs( d[A] - L[A]) < 1e-12);
     }
-    
+
     //========================================================================
     //        Registration of the function(s) in the func-container
     //========================================================================

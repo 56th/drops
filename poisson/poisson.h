@@ -197,8 +197,8 @@ class PoissonP1CL : public ProblemCL<Coeff, PoissonBndDataCL>
     double CheckSolution( const VecDescCL&, instat_scalar_fun_ptr, double t=0.) const;
     double CheckSolution( instat_scalar_fun_ptr Lsg, double t=0.) const { return CheckSolution(x, Lsg, t); }
 
-    void GetDiscError   ( const MLMatDescCL&, instat_scalar_fun_ptr) const;
-    void GetDiscError   ( scalar_fun_ptr Lsg) const { GetDiscError(A, Lsg); }
+    void GetDiscError   ( const MLMatDescCL&, instat_scalar_fun_ptr, double =0.) const;
+    void GetDiscError   ( instat_scalar_fun_ptr Lsg, double t=0.) const { GetDiscError(A, Lsg, t); }
 
     bool          EstimateError         ( const VecDescCL&, const double, double&, est_fun);
     static double ResidualErrEstimator  ( const TetraCL&, const VecDescCL&, const BndDataCL&);

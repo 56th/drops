@@ -46,7 +46,6 @@
 #include "num/krylovsolver.h"
 #include "num/precond.h"
 #else
-#include "num/parstokessolver.h"
 #include "parallel/loadbal.h"
 #include "parallel/parmultigrid.h"
 #endif
@@ -117,7 +116,7 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
 
     lset.CreateNumbering(      MG.GetLastLevel(), lidx, periodic_match);
     lset.Phi.SetIdx( lidx);
-    DROPS::scalar_fun_ptr DistanceFct = DROPS::ScaMap::getInstance()[P.get("Exp.InitialLSet", std::string("WavyFilm"))];
+    DROPS::instat_scalar_fun_ptr DistanceFct = DROPS::InScaMap::getInstance()[P.get("Exp.InitialLSet", std::string("WavyFilm"))];
     lset.Init( DistanceFct);
     if ( StokesSolverFactoryHelperCL().VelMGUsed(P))
         Stokes.SetNumVelLvl ( Stokes.GetMG().GetNumLevel());
@@ -338,7 +337,7 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
 } // end of namespace DROPS
 
 
-void MarkFilm (DROPS::MultiGridCL& mg, DROPS::scalar_fun_ptr distanceFct, DROPS::Uint maxLevel= ~0)
+void MarkFilm (DROPS::MultiGridCL& mg, DROPS::instat_scalar_fun_ptr distanceFct, DROPS::Uint maxLevel= ~0, double t=0.)
 {
     for (DROPS::MultiGridCL::TriangTetraIteratorCL It(mg.GetTriangTetraBegin(maxLevel)),
              ItEnd(mg.GetTriangTetraEnd(maxLevel)); It!=ItEnd; ++It)
@@ -347,12 +346,12 @@ void MarkFilm (DROPS::MultiGridCL& mg, DROPS::scalar_fun_ptr distanceFct, DROPS:
         int num_pos= 0;
         for (int i=0; i<4; ++i)
         {
-            const double d= distanceFct( It->GetVertex(i)->GetCoord());
+            const double d= distanceFct( It->GetVertex(i)->GetCoord(), t);
             if (d<1e-4)
                 ref= true;
             num_pos+= d>0;
         }
-        if ( distanceFct( GetBaryCenter(*It))<1e-4 )
+        if ( distanceFct( GetBaryCenter(*It), t)<1e-4 )
             ref= true;
         if (num_pos!=4 && num_pos!=0)
             ref= true;
@@ -467,7 +466,7 @@ int main (int argc, char** argv)
     // If we read the Multigrid, it shouldn't be modified;
     // otherwise the pde-solutions from the ensight files might not fit.
     if (P.get<std::string>("DeserializationFile") == "none"){
-        DROPS::scalar_fun_ptr DistanceFct = DROPS::ScaMap::getInstance()[P.get("Exp.InitialLSet", std::string("WavyFilm"))];
+        DROPS::instat_scalar_fun_ptr DistanceFct = DROPS::InScaMap::getInstance()[P.get("Exp.InitialLSet", std::string("WavyFilm"))];
         adap.MakeInitialTriang( DistanceFct);
     }
 

@@ -9,16 +9,16 @@
  * it under the terms of the GNU Lesser General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * DROPS is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public License
  * along with DROPS. If not, see <http://www.gnu.org/licenses/>.
- * 
- * 
+ *
+ *
  * Copyright 2009 LNM/SC RWTH Aachen, Germany
 */
 
@@ -555,7 +555,16 @@ template<class T>
 
 template<class T>
   inline Quad5CL<T>&
-  Quad5CL<T>::assign(const TetraCL& s, instat_fun_ptr f , double t, const BaryCoordCL* const node)
+  Quad5CL<T>::assign(const TetraCL& s, tetra_function f, double t, const BaryCoordCL* const node)
+{
+    for (Uint i= 0; i < Quad5DataCL::NumNodesC; ++i)
+        (*this)[i]= f( s, node[i], t);
+    return *this;
+}
+
+template<class T>
+  inline Quad5CL<T>&
+  Quad5CL<T>::assign(const TetraCL& s, instat_fun_ptr f, double t, const BaryCoordCL* const node)
 {
     for (Uint i= 0; i < Quad5DataCL::NumNodesC; ++i)
         (*this)[i]= f( GetWorldCoord( s, node[i]), t);

@@ -39,7 +39,7 @@ inline DROPS::SVectorCL<3> LsgVel(const DROPS::Point3DCL& p, double)
     return ret/3.;
 }
 
-inline double LsgPr(const DROPS::Point3DCL& p)
+inline double LsgPr(const DROPS::Point3DCL& p, double)
 {
     return std::cos(p[0])*std::sin(p[1])*std::sin(p[2]);
 //     return 1.;
@@ -56,10 +56,16 @@ inline double LsgPr(const DROPS::Point3DCL& p)
 class StokesCoeffCL
 {
   public:
-    static double q(const DROPS::Point3DCL&) { return 0.0; }
-    static DROPS::SVectorCL<3> f(const DROPS::Point3DCL& p)
-        { DROPS::SVectorCL<3> ret(0.0); ret[2]= 3.*std::cos(p[0])*std::sin(p[1])*std::cos(p[2]); return ret; }
+    static double q(const DROPS::TetraCL&, const DROPS::BaryCoordCL&, double) { return 0.0; }
+    static DROPS::SVectorCL<3> f(const DROPS::TetraCL& t, const DROPS::BaryCoordCL& b, double)
+    {
+        const DROPS::Point3DCL p= DROPS::GetWorldCoord( t, b);
+        DROPS::SVectorCL<3> ret(0.0);
+        ret[2]= 3.*std::cos(p[0])*std::sin(p[1])*std::cos(p[2]);
+        return ret;
+    }
 /*    {
+        const DROPS::Point3DCL p= DROPS::GetWorldCoord( t, b);
         SVectorCL<3> ret;
         ret[0]=    std::sin(p[0])*std::sin(p[1])*std::sin(p[2]);
         ret[1]=  - std::cos(p[0])*std::cos(p[1])*std::sin(p[2]);

@@ -48,7 +48,7 @@ inline int iSign( double x)
 }
 
 // \Omega_1 is the domain with phasebnd < 0.
-double phasebnd (const Point3DCL& p)
+double phasebnd (const Point3DCL& p, double)
 {
     return p[1] + p[2] - 0.05;
 //    return p[1] + p[2] - 0.55;

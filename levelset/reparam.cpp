@@ -35,31 +35,31 @@ double SmoothedSign( double x, double alpha)
     return x/std::sqrt(x*x+alpha*alpha);
 }
 
-double DistFct( const DROPS::Point3DCL& p)
+double DistFct( const DROPS::Point3DCL& p, double)
 {
     DROPS::Point3DCL midpt( 0.5);
     midpt[1]= 0.25;
     return (midpt-p).norm()-0.2;
 }
 
-double Phi0( const DROPS::Point3DCL& p)
+double Phi0( const DROPS::Point3DCL& p, double t)
 {
-    double dist= DistFct( p);
+    double dist= DistFct( p, t);
     return SmoothedSign( dist, 0.1);
 }
 
-double Phi1( const DROPS::Point3DCL& p)
+double Phi1( const DROPS::Point3DCL& p, double t)
 {
-    return 6*DistFct( p);
+    return 6*DistFct( p, t);
 }
 
-double Phi2( const DROPS::Point3DCL& p)
+double Phi2( const DROPS::Point3DCL& p, double t)
 {
     const double depth= 0.8-p[1],
                  alpha= 0.1;
 
     if (depth>0)
-        return SmoothedSign( DistFct( p), alpha);
+        return SmoothedSign( DistFct( p, t), alpha);
     else
         return SmoothedSign( depth, alpha);
 }

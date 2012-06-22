@@ -73,7 +73,7 @@ Point3DCL drop_vel;
 double radius;
 //@}
 
-double DistToSphere( const Point3DCL& p)
+double DistToSphere( const Point3DCL& p, double)
 {
     return (origin-p).norm() - 0.25;
 }
@@ -144,7 +144,7 @@ int main( int argc, char **argv)
                                      P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName"), P.get<int>("VTK.Binary"));
             vtkwriter->Write(0);
         }
-        
+
         // file for sanity
         std::ofstream* sanityfile=0;
         if ( P.get<int>("Exp.CheckSanity", 1)!=0){
@@ -153,7 +153,7 @@ int main( int argc, char **argv)
             sanityfile= new std::ofstream( filename.c_str());
         }
         // file for timings
-        std::ostringstream oss; 
+        std::ostringstream oss;
         oss << "timings" << DROPS::ProcCL::Size() << ".txt";
         std::ofstream timings( oss.str().c_str());
 

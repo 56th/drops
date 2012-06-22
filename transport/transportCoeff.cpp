@@ -43,17 +43,12 @@ double Reaction (const DROPS::Point3DCL& , double )
 }
 
 double ZeroFct (const DROPS::Point3DCL& ,  double )
-{  
-    return 0.;
-}
-
-double tid_ZeroFct (const DROPS::Point3DCL&)
-{  
+{
     return 0.;
 }
 
 double Rhs (const DROPS::Point3DCL& ,  double )
-{  
+{
     return 0.;
 }
 
@@ -63,8 +58,8 @@ double Dirichlet (const DROPS::Point3DCL& p, double )
   static double y0 = P.get<DROPS::Point3DCL>("Exp.PosDrop")[1];
   static double R = P.get<DROPS::Point3DCL>("Exp.RadDrop")[0];  */
 //  double x = p[0];
-  double y = p[1];  
-  
+  double y = p[1];
+
   int c= (int) (y * 2.0);
   switch(c)
   {
@@ -74,10 +69,10 @@ double Dirichlet (const DROPS::Point3DCL& p, double )
 /*    case 1:
     case 2:
             return (y-0.5)*(1.5-y);
-*/    case 3: 
+*/    case 3:
     default:
         return 0;
-        break; 
+        break;
   }
 }
 
@@ -108,7 +103,7 @@ double DirichletConstt (const DROPS::Point3DCL& p, double )
 }
 
 DROPS::SVectorCL<3> PotentialFlowfield (const DROPS::Point3DCL& p, double )
-{  
+{
     extern DROPS::ParamCL P;
     DROPS::SVectorCL<3> ret(0.);
     double x=p[0]-P.get<DROPS::Point3DCL>("Exp.PosDrop")[0]; double y=p[1]-P.get<DROPS::Point3DCL>("Exp.PosDrop")[1];
@@ -130,14 +125,14 @@ DROPS::SVectorCL<3> PotentialFlowfield (const DROPS::Point3DCL& p, double )
 
 template<int i>
 DROPS::SVectorCL<3> StraightFlowfield (const DROPS::Point3DCL&, double )
-{  
+{
     DROPS::SVectorCL<3> ret(0.);
     ret[i] = 1.0;
     return ret;
 }
 
 
-double cylinderdistance( const DROPS::Point3DCL& p)
+double cylinderdistance( const DROPS::Point3DCL& p, double)
 {
     extern DROPS::ParamCL P;
     double x=p[0]-P.get<DROPS::Point3DCL>("Exp.PosDrop")[0]; double y=p[1]-P.get<DROPS::Point3DCL>("Exp.PosDrop")[1];
@@ -148,7 +143,7 @@ double cylinderdistance( const DROPS::Point3DCL& p)
 }
 
 template<int i>
-double planedistance( const DROPS::Point3DCL& p)
+double planedistance( const DROPS::Point3DCL& p, double)
 {
     extern DROPS::ParamCL P;
     double x=p[i]-P.get<DROPS::Point3DCL>("Exp.PosDrop")[i];
@@ -160,7 +155,6 @@ static DROPS::RegisterScalarFunction regsca_inicneg("IniCnegFct", Initialcneg);
 static DROPS::RegisterScalarFunction regsca_inicpos("IniCposFct", Initialcpos);
 static DROPS::RegisterScalarFunction regsca_reaction("ReactionFct", Reaction);
 static DROPS::RegisterScalarFunction regsca_zero("ZeroFct", ZeroFct);
-static DROPS::RegisterScalarFunction regsca_tidzero("ZeroFct", tid_ZeroFct);
 static DROPS::RegisterScalarFunction regsca_Rhs("Rhs", Rhs);
 static DROPS::RegisterScalarFunction regsca_dir("Dirichlet", DirichletPos);
 static DROPS::RegisterScalarFunction regsca_dirt("Dirichlett", DirichletPos);

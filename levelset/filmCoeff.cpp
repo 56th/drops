@@ -59,7 +59,7 @@ namespace filminflow{
 //                        Functions for the levelset function
 //========================================================================
 namespace filmdistance{
-    double WavyDistanceFct( const DROPS::Point3DCL& p)
+    double WavyDistanceFct( const DROPS::Point3DCL& p, double)
     {
         // wave length = 100 x film width
         static DROPS::Point3DCL MeshSize= P.get<DROPS::Point3DCL>("MeshSize");

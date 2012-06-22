@@ -64,7 +64,7 @@ DROPS::SVectorCL<3> Parabol( const DROPS::Point3DCL& p, double)
     return ret;
 }
 
-double DistanceFct( const DROPS::Point3DCL& p)
+double DistanceFct( const DROPS::Point3DCL& p, double)
 {
     return (Mitte-p).norm()-Radius;
 }

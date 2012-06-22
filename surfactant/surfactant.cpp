@@ -54,7 +54,7 @@ bnd_val_fun bf[6]= {
     &u_func, &u_func, &u_func, &u_func, &u_func, &u_func
 };
 
-double sphere_2 (const DROPS::Point3DCL& p)
+double sphere_2 (const DROPS::Point3DCL& p, double)
 {
     DROPS::Point3DCL x( p - P.get<DROPS::Point3DCL>("Exp.PosDrop"));
 
@@ -142,13 +142,13 @@ double L2_norm (const DROPS::MultiGridCL& mg, const DROPS::VecDescCL& ls, const 
     return std::sqrt( d);
 }
 
-void LinearLSInit (const DROPS::MultiGridCL& mg, DROPS::VecDescCL& ls, DROPS::scalar_fun_ptr d)
+void LinearLSInit (const DROPS::MultiGridCL& mg, DROPS::VecDescCL& ls, DROPS::instat_scalar_fun_ptr d, double t=0.)
 {
     const DROPS::Uint lvl= ls.GetLevel(),
                       idx= ls.RowIdx->GetIdx();
 
     DROPS_FOR_TRIANG_CONST_VERTEX( mg, lvl, it)
-        ls.Data[it->Unknowns( idx)]= d( it->GetCoord());
+        ls.Data[it->Unknowns( idx)]= d( it->GetCoord(), t);
 
     DROPS_FOR_TRIANG_CONST_EDGE( mg, lvl, it)
         ls.Data[it->Unknowns( idx)]= ls.Data[it->Unknowns( idx)]=

@@ -30,7 +30,6 @@
 #include "num/discretize.h"
 #include "stokes/instatstokes2phase.h"
 #include "poisson/transport2phase.h"
-//#include "poisson/poisson.h"
 #include "geom/geomselect.h"
 #include "num/nssolver.h"
 #include "levelset/coupling.h"
@@ -46,12 +45,6 @@ double zitrus (const Point3DCL& p, double)
 {
     return 0.2*(std::pow( p[0], 2) + std::pow( p[2], 2)) + std::pow( p[1], 3)*std::pow( p[1] - 1., 3);
 }
-double tid_zitrus (const Point3DCL& p)
-{
-    return zitrus(p,0);
-}
-
-static DROPS::RegisterScalarFunction regsca_zitrus("zitrus", tid_zitrus);
 static DROPS::RegisterScalarFunction regsca_zitrus2("zitrus", zitrus);
 
 /// The level set is a torus, wrapped around p[2]-axis, that touches itself in the origin; contained in \f$(-1,1)\times(-1,1)\times(-0.5,0.5)\f$.
@@ -76,7 +69,7 @@ class EllipsoidCL
     { Init( Mitte, Radius); }
     static void Init( const Point3DCL& Mitte, const Point3DCL& Radius)
     { Mitte_= Mitte;    Radius_= Radius; }
-    static double DistanceFct( const Point3DCL& p)
+    static double DistanceFct( const Point3DCL& p, double)
     {
         Point3DCL d= p - Mitte_;
         const double avgRad= cbrt(Radius_[0]*Radius_[1]*Radius_[2]);
@@ -106,7 +99,7 @@ class CylinderCL
     { Init( Mitte, RadiusLength, axisDir); }
     static void Init( const Point3DCL& Mitte, const Point3DCL& RadiusLength, Usint axisDir)
     { Mitte_= Mitte;    Radius_= RadiusLength;    axisDir_= axisDir; }
-    static double DistanceFct( const Point3DCL& p)
+    static double DistanceFct( const Point3DCL& p, double)
     {
         Point3DCL d= p - Mitte_;
         const double avgRad= std::sqrt(Radius_[0]*Radius_[1]*Radius_[2]/Radius_[axisDir_]);
@@ -145,7 +138,7 @@ class TwoEllipsoidCL
                       const Point3DCL& Mitte2, const Point3DCL& Radius2)
     { Mitte1_= Mitte1;    Radius1_= Radius1;
       Mitte2_= Mitte2;    Radius2_= Radius2;}
-    static double DistanceFct( const Point3DCL& p)
+    static double DistanceFct( const Point3DCL& p, double)
     {
         Point3DCL d1= p - Mitte1_;
         const double avgRad1= cbrt(Radius1_[0]*Radius1_[1]*Radius1_[2]);
@@ -246,10 +239,6 @@ Point3DCL gsigma (const Point3DCL&, double) { return Point3DCL(); }
 
 double sigma_step(const Point3DCL& p, double) { return sm_step( p); }
 Point3DCL gsigma_step (const Point3DCL& p, double) { return grad_sm_step( p); }
-
-/// \brief Timedepending zero function as a helper function
-SVectorCL<3> Null( const Point3DCL&, double) { return SVectorCL<3>(0.); }
-double       One ( const Point3DCL&)         { return 1.; }
 
 
 /// \brief factory for the time discretization schemes
@@ -367,10 +356,10 @@ void SetInitialLevelsetConditions( LevelsetP2CL& lset, MultiGridCL& MG, ParamCL&
       } break;
       case 0: case 1:
           //lset.Init( EllipsoidCL::DistanceFct);
-          lset.Init( DROPS::ScaMap::getInstance()[P.get("Exp.InitialLSet", std::string("Ellipsoid"))]);
+          lset.Init( DROPS::InScaMap::getInstance()[P.get("Exp.InitialLSet", std::string("Ellipsoid"))]);
         break;
       case  2: //flow without droplet
-          lset.Init( &One);
+          lset.Init( DROPS::InScaMap::getInstance()["One"]);
       break;
       default : throw DROPSErrCL("Unknown initial condition");
     }

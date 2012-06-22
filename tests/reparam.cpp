@@ -48,7 +48,7 @@ class EllipsoidCL
         { Init( Mitte, Radius); }
     static void Init( const Point3DCL& Mitte, const Point3DCL& Radius)
         { Mitte_= Mitte;    Radius_= Radius; }
-    static double DistanceFct( const Point3DCL& p)
+    static double DistanceFct( const Point3DCL& p, double)
     {
         Point3DCL d= p - Mitte_;
         const double avgRad= cbrt(Radius_[0]*Radius_[1]*Radius_[2]);
@@ -74,7 +74,7 @@ class HorizontalSlicesCL
         { Init( numSlices, yBottom, yTop); }
     static void Init( int numSlices, double yBottom, double yTop)
         { numSlices_=numSlices; yBottom_=yBottom; yTop_=yTop; }
-    static double DistanceFct( const Point3DCL& p)
+    static double DistanceFct( const Point3DCL& p, double)
     {
         const double sizeOfSlice= (yTop_-yBottom_)/(numSlices_+1);
         double distance= std::numeric_limits<double>::max();
@@ -107,7 +107,7 @@ public:
         { Init(r,R); }
     static void Init( double r, double R)
         { r_=r; R_=R; }
-    static double DistanceFct( const Point3DCL& p)
+    static double DistanceFct( const Point3DCL& p, double)
     {
         return std::sqrt( p[2]*p[2] + std::pow( std::sqrt( p[0]*p[0] + p[1]*p[1]) - R_, 2) ) - r_;
     }
@@ -267,15 +267,15 @@ void Strategy( DROPS::AdapTriangCL& adap, DROPS::BndDataCL<>& lsbnd)
     std::cout << numLsetUnk << " (accumulated) levelset unknowns.\n\n";
 
     switch ( P.get<int>("Reparam.Freq")){
-        case -1 : 
+        case -1 :
             std::cout << "Taking torus of radi (" << P.get<DROPS::Point3DCL>("Exp.RadDrop")[0] << ',' << P.get<DROPS::Point3DCL>("Exp.RadDrop")[1] << ") as level set function\n" << std::endl;
-            lset.Init( TorusCL::DistanceFct); 
+            lset.Init( TorusCL::DistanceFct);
             break;
-        case  0 : 
+        case  0 :
             std::cout << "Taking ellipsoid at " << P.get<DROPS::Point3DCL>("Exp.PosDrop") << " and radi " << P.get<DROPS::Point3DCL>("Exp.RadDrop") << " as level set function\n" << std::endl;
-            lset.Init( EllipsoidCL::DistanceFct); 
+            lset.Init( EllipsoidCL::DistanceFct);
             break;
-        default:  
+        default:
             std::cout << "Taking " << P.get<int>("Reparam.Freq") << " horizontal sclices as level set function" << std::endl;
             lset.Init( HorizontalSlicesCL::DistanceFct);
     }
@@ -362,8 +362,7 @@ int main( int argc, char **argv)
         DROPS::EllipsoidCL::Init( P.get<DROPS::Point3DCL>("Exp.PosDrop"), P.get<DROPS::Point3DCL>("Exp.RadDrop"));
         DROPS::HorizontalSlicesCL::Init( P.get<int>("Reparam.Freq"), P.get<DROPS::Point3DCL>("Brick.orig")[1], P.get<DROPS::Point3DCL>("Brick.orig")[1]+P.get<DROPS::Point3DCL>("Brick.dim")[1] );
         DROPS::TorusCL::Init( P.get<DROPS::Point3DCL>("Exp.RadDrop")[0], P.get<DROPS::Point3DCL>("Exp.RadDrop")[1]);
-        typedef double (*distance_fct)(const DROPS::Point3DCL&);
-        distance_fct distance= P.get<int>("Reparam.Freq")>0 ? DROPS::HorizontalSlicesCL::DistanceFct : DROPS::EllipsoidCL::DistanceFct;
+        DROPS::instat_scalar_fun_ptr distance= P.get<int>("Reparam.Freq")>0 ? DROPS::HorizontalSlicesCL::DistanceFct : DROPS::EllipsoidCL::DistanceFct;
         adap.MakeInitialTriang( distance);
 
         const DROPS::BndCondT bcls[6]= { DROPS::NoBC, DROPS::NoBC, DROPS::NoBC, DROPS::NoBC, DROPS::NoBC, DROPS::NoBC };

@@ -34,21 +34,15 @@ namespace DROPS
 //========================================================================
 /// returning zero
 double Zero( const Point3DCL&, double) { return 0.; }
-/// time independent function return zero
-double tid_Zero( const Point3DCL&) { return 0.; }
 /// returning one
 double One( const Point3DCL&, double) { return 1.; }
-/// time independent function return one
-double tid_One( const Point3DCL&) { return 1.; }
 
 
 //========================================================================
 //                   Registrierung der Funktionen
 //========================================================================
 static RegisterScalarFunction regscazero("Zero", Zero);
-static RegisterScalarFunction regtidscazero("Zero", tid_Zero);
 static RegisterScalarFunction regscaone("One", One);
-static RegisterScalarFunction regtidscaone("One", tid_One);
 
 }//end namespace DROPS
 #endif /* BNDSCALARFUNCTIONS_H_ */
