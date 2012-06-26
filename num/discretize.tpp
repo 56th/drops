@@ -435,6 +435,15 @@ template<class T>
 
 template<class T>
   inline Quad3CL<T>&
+  Quad3CL<T>::assign(const TetraCL& s, tetra_function f , double t, const BaryCoordCL* const node)
+{
+    for (Uint i= 0; i < Quad3DataCL::NumNodesC; ++i)
+        (*this)[i]= f( s, node[i], t);
+    return *this;
+}
+
+template<class T>
+  inline Quad3CL<T>&
   Quad3CL<T>::assign(const LocalP1CL<value_type>& f, const BaryCoordCL* const node)
 {
     for (size_t i= 0; i < Quad3DataCL::NumNodesC; ++i)
@@ -488,6 +497,14 @@ template<class T>
 template<class T>
   Quad3CL<T>::Quad3CL(const TetraCL& s,
                       instat_fun_ptr f, double t, const BaryCoordCL* const node)
+  : base_type( value_type(), Quad3DataCL::NumNodesC)
+{
+    this->assign( s, f, t, node);
+}
+
+template<class T>
+  Quad3CL<T>::Quad3CL(const TetraCL& s,
+                      tetra_function f, double t, const BaryCoordCL* const node)
   : base_type( value_type(), Quad3DataCL::NumNodesC)
 {
     this->assign( s, f, t, node);
@@ -621,6 +638,14 @@ template<class T>
     for (size_t i= 0; i < Quad5DataCL::NumNodesC; ++i)
         (*this)[i]= f.val( s, Quad5DataCL::Node[i]);
     return *this;
+}
+
+template<class T>
+  Quad5CL<T>::Quad5CL(const TetraCL& s,
+                      tetra_function f, double t, const BaryCoordCL* const node)
+  : base_type( value_type(), Quad5DataCL::NumNodesC)
+{
+    this->assign( s, f, t, node);
 }
 
 template<class T>

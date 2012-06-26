@@ -38,7 +38,7 @@ namespace DROPS
     T& SingletonMapCL<T>::operator[](std::string s){
         if (this->find(s) == this->end()){
             std::ostringstream os;
-            os << "function with the name \"" << s << "\" not found in container!";
+            os << "SingletonMapCL::operator[]: function with the name \"" << s << "\" not found in container!";
             throw DROPSErrCL(os.str());
         }
         return this->find(s)->second;
@@ -48,8 +48,16 @@ namespace DROPS
         InVecMap::getInstance().insert(std::make_pair(name,fptr));
     }
 
+    RegisterVectorFunction::RegisterVectorFunction(std::string name, vector_tetra_function fptr){
+        VecTetMap::getInstance().insert(std::make_pair(name,fptr));
+    }
+
     RegisterScalarFunction::RegisterScalarFunction(std::string name, instat_scalar_fun_ptr fptr){
         InScaMap::getInstance().insert(std::make_pair(name,fptr));
+    }
+
+    RegisterScalarFunction::RegisterScalarFunction(std::string name, scalar_tetra_function fptr){
+        ScaTetMap::getInstance().insert(std::make_pair(name,fptr));
     }
 
     RegisterMatchingFunction::RegisterMatchingFunction(std::string name, match_fun fptr){
@@ -64,6 +72,8 @@ namespace DROPS
 
     template class SingletonMapCL<DROPS::instat_scalar_fun_ptr>;
     template class SingletonMapCL<DROPS::instat_vector_fun_ptr>;
+    template class SingletonMapCL<DROPS::scalar_tetra_function>;
+    template class SingletonMapCL<DROPS::vector_tetra_function>;
     template class SingletonMapCL<DROPS::instat_matrix_fun_ptr>;
     template class SingletonMapCL<DROPS::match_fun>;
 

@@ -585,6 +585,7 @@ class Quad3CL: public GridFunctionCL<T>
     typedef GridFunctionCL<T> base_type;
     typedef typename base_type::value_type value_type;
     typedef typename base_type::instat_fun_ptr instat_fun_ptr;
+    typedef typename base_type::tetra_function tetra_function;
 
   protected:
     typedef Quad3CL<T> self_;
@@ -594,6 +595,7 @@ class Quad3CL: public GridFunctionCL<T>
     Quad3CL(const value_type& t): base_type( t, Quad3DataCL::NumNodesC) {}
 
     Quad3CL(const TetraCL&, instat_fun_ptr, double= 0.0, const BaryCoordCL* const= Quad3DataCL::Node);
+    Quad3CL(const TetraCL&, tetra_function, double= 0.0, const BaryCoordCL* const= Quad3DataCL::Node);
     Quad3CL(const LocalP1CL<value_type>&, const BaryCoordCL* const= Quad3DataCL::Node);
     Quad3CL(const LocalP2CL<value_type>&);
     Quad3CL(const LocalP2CL<value_type>&, const BaryCoordCL* const);
@@ -606,6 +608,8 @@ DROPS_DEFINE_VALARRAY_DERIVATIVE(Quad3CL, T, base_type)
 
     inline self_&
     assign(const TetraCL&, instat_fun_ptr , double= 0.0, const BaryCoordCL* const= Quad3DataCL::Node);
+    inline self_&
+    assign(const TetraCL&, tetra_function , double= 0.0, const BaryCoordCL* const= Quad3DataCL::Node);
     inline self_&
     assign(const LocalP1CL<value_type>&, const BaryCoordCL* const= Quad3DataCL::Node);
     inline self_&
@@ -678,6 +682,7 @@ class Quad5CL: public GridFunctionCL<T>
     Quad5CL(): base_type( value_type(), Quad5DataCL::NumNodesC) {}
     Quad5CL(const value_type& t): base_type( t, Quad5DataCL::NumNodesC) {}
 
+    Quad5CL(const TetraCL&, tetra_function, double= 0.0, const BaryCoordCL* const= Quad5DataCL::Node);
     Quad5CL(const TetraCL&, instat_fun_ptr, double= 0.0, const BaryCoordCL* const= Quad5DataCL::Node);
     Quad5CL(const LocalP1CL<value_type>&, const BaryCoordCL* const= Quad5DataCL::Node);
     Quad5CL(const LocalP2CL<value_type>&);
@@ -946,6 +951,8 @@ class P1DiscCL
     static inline double Quad(const TetraCL&, instat_scalar_fun_ptr, Uint, double= 0.0);
     // cubatur formula for int f(x)*phi_i*phi_j dx, exact up to degree 1
     static inline double Quad(const TetraCL&, instat_scalar_fun_ptr, Uint, Uint, double= 0.0);
+    // cubatur formula for int f(x)*phi_i*phi_j dx, exact up to degree 1
+    static inline double Quad(const TetraCL&, scalar_tetra_function, Uint, Uint, double= 0.0);
     // cubatur formula for int f(x)*phi_i over face, exact up to degree 1
     static inline double Quad2D(const TetraCL&, Uint face, instat_scalar_fun_ptr, Uint, double= 0.0);
     static inline SVectorCL<3> Quad2D(const TetraCL&, Uint face, instat_vector_fun_ptr, Uint, double= 0.0);
@@ -1185,6 +1192,27 @@ inline double P1DiscCL::Quad( const TetraCL& s, instat_scalar_fun_ptr coeff, Uin
         f_Vert_ij+= coeff( s.GetVertex(j)->GetCoord(), t );
         for (Uint k=0; k<4; ++k)
             if (k!=i && k!=j) f_Other+= coeff( s.GetVertex(k)->GetCoord(), t );
+        return 11./7560.*f_Vert_ij + f_Other/15120. + f_Bary/189.;
+    }
+}
+
+inline double P1DiscCL::Quad( const TetraCL& s, scalar_tetra_function coeff, Uint i, Uint j, double t)
+{
+    double f_Vert_ij= coeff( s, Quad2DataCL::Node[i], t ),
+           f_Bary  = coeff( s, Quad2DataCL::Node[4], t ),
+           f_Other = 0;
+
+    if (i==j)
+    {
+        for (Uint k=0; k<4; ++k)
+            if (k!=i) f_Other+= coeff( s, Quad2DataCL::Node[k], t );
+        return 43./7560.*f_Vert_ij + f_Other/7560. + 2./189.*f_Bary;
+    }
+    else
+    {
+        f_Vert_ij+= coeff( s, Quad2DataCL::Node[j], t );
+        for (Uint k=0; k<4; ++k)
+            if (k!=i && k!=j) f_Other+= coeff(  s, Quad2DataCL::Node[k], t );
         return 11./7560.*f_Vert_ij + f_Other/15120. + f_Bary/189.;
     }
 }

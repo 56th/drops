@@ -34,8 +34,12 @@ namespace DROPS
 //========================================================================
 /// returning zero
 double Zero( const Point3DCL&, double) { return 0.; }
+/// returning zero (as scalar_tetra_function)
+double ZeroTet( const DROPS::TetraCL&, const DROPS::BaryCoordCL&, double) { return 0.; }
 /// returning one
 double One( const Point3DCL&, double) { return 1.; }
+/// returning one (as scalar_tetra_function)
+double OneTet( const DROPS::TetraCL&, const DROPS::BaryCoordCL&, double) { return 1.; }
 
 
 //========================================================================
@@ -43,6 +47,8 @@ double One( const Point3DCL&, double) { return 1.; }
 //========================================================================
 static RegisterScalarFunction regscazero("Zero", Zero);
 static RegisterScalarFunction regscaone("One", One);
+static RegisterScalarFunction regscazerotet("Zero", ZeroTet);
+static RegisterScalarFunction regscaonetet("One", OneTet);
 
 }//end namespace DROPS
 #endif /* BNDSCALARFUNCTIONS_H_ */

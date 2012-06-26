@@ -46,22 +46,22 @@ class PoissonCoeffCL
 
   public:
     //reaction
-    static instat_scalar_fun_ptr q;
+    static scalar_tetra_function q;
     //diffusion
     static double alpha;
     //source
-    static instat_scalar_fun_ptr f;
+    static scalar_tetra_function f;
     //initial condition
     static instat_scalar_fun_ptr InitialCondition;
     //solution
     static instat_scalar_fun_ptr Solution;
     //velocity
-    static instat_vector_fun_ptr Vel;
+    static vector_tetra_function Vel;
     //Free interface function
-    static instat_scalar_fun_ptr interface;  
-    
+    static instat_scalar_fun_ptr interface;
 
-  
+
+
     PoissonCoeffCL( ParamCL& P){
         C_=P;
         int nz_;
@@ -74,23 +74,24 @@ class PoissonCoeffCL
         brick_info >> dx_ >> dy_ >> dz_ >> nx_ >> ny_ >> nz_;
         dt_=P.get<double>("Time.StepSize");  //step size used in ALEVelocity
         DROPS::InScaMap & scamap = DROPS::InScaMap::getInstance();
-        q = scamap[P.get<std::string>("PoissonCoeff.Reaction")];
+        DROPS::ScaTetMap & scatet = DROPS::ScaTetMap::getInstance();
+        q = scatet[P.get<std::string>("PoissonCoeff.Reaction")];
         alpha = P.get<double>("PoissonCoeff.Diffusion");
-        f = scamap[P.get<std::string>("PoissonCoeff.Source")];
+        f = scatet[P.get<std::string>("PoissonCoeff.Source")];
         Solution = scamap[P.get<std::string>("PoissonCoeff.Solution")];
         InitialCondition = scamap[P.get<std::string>("PoissonCoeff.InitialVal")];
-        DROPS::InVecMap & vecmap = DROPS::InVecMap::getInstance();
-        Vel = vecmap[P.get<std::string>("PoissonCoeff.Flowfield")];
+        DROPS::VecTetMap & vectet = DROPS::VecTetMap::getInstance();
+        Vel = vectet[P.get<std::string>("PoissonCoeff.Flowfield")];
 
         interface = scamap[P.get<std::string>("ALE.Interface")];
 
     }
-    
-    static Point3DCL ALEVelocity(const DROPS::Point3DCL& p, double t)
+
+    static Point3DCL ALEVelocity(const DROPS::TetraCL& tet, const DROPS::BaryCoordCL& b, double t)
     {
         double eps =1.0e-7;
-        DROPS::Point3DCL ret;
-        ret  = Vel(p, t);
+        DROPS::Point3DCL ret= Vel(tet, b, t);
+        const DROPS::Point3DCL& p= DROPS::GetWorldCoord(tet,b);
         ret[1] -= p[1]/interface(p, t)*(interface(p, t+eps)-interface(p, t))/eps;  //y/h(p,t)*h_p'(t)
         return ret;
     }

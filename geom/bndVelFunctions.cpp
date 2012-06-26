@@ -26,11 +26,17 @@
 //========================================================================
 //                         General Functions
 //========================================================================
-///brief returns vector of zero velocities
+/// returns vector of zero velocities
 DROPS::Point3DCL ZeroVel( const DROPS::Point3DCL&, double) { return DROPS::Point3DCL(0.); }
+/// returns vector of zero velocities (as vector_tetra_function)
+DROPS::Point3DCL ZeroVelTet( const DROPS::TetraCL&, const DROPS::BaryCoordCL&, double) { return DROPS::Point3DCL(0.); }
 
+/// returns unity vector in direction \a D
 template <int D>
 DROPS::Point3DCL UnitVel( const DROPS::Point3DCL&, double) { DROPS::Point3DCL p(0.); p[D]=1.0; return p; }
+/// returns unity vector in direction \a D (as vector_tetra_function)
+template <int D>
+DROPS::Point3DCL UnitVelTet( const DROPS::TetraCL&, const DROPS::BaryCoordCL&, double) { DROPS::Point3DCL p(0.); p[D]=1.0; return p; }
 
 //========================================================================
 //            Registration of functions in the func-container
@@ -39,5 +45,9 @@ static DROPS::RegisterVectorFunction regvelzerovel("ZeroVel", ZeroVel);
 static DROPS::RegisterVectorFunction regvelunitvelx("UnitVelx", UnitVel<0>);
 static DROPS::RegisterVectorFunction regvelunitvely("UnitVely", UnitVel<1>);
 static DROPS::RegisterVectorFunction regvelunitvelz("UnitVelz", UnitVel<2>);
+static DROPS::RegisterVectorFunction regvelzeroveltet("ZeroVel", ZeroVelTet);
+static DROPS::RegisterVectorFunction regvelunitvelxtet("UnitVelx", UnitVelTet<0>);
+static DROPS::RegisterVectorFunction regvelunitvelytet("UnitVely", UnitVelTet<1>);
+static DROPS::RegisterVectorFunction regvelunitvelztet("UnitVelz", UnitVelTet<2>);
 
 
