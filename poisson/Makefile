@@ -6,7 +6,7 @@
 
 DIR = poisson
 
-EXEC = scalar
+EXEC = cdrdrops
 
 DELETE = $(EXEC)
 
@@ -27,7 +27,7 @@ PAR_OBJ = $(if $(PAR_BUILD),$(PAR_OBJ_),)
 
 # rules
 
-default: ClrScr dropsrep
+default: ClrScr
 
 ipdropsAD: \
     ../poisson/poissonCoeff.o \
@@ -37,16 +37,16 @@ ipdropsAD: \
     ../num/fe.o
 	$(CXX) -o $@ $^ $(LFLAGS)
 
-scalar:\
+cdrdrops:\
     ../poisson/poissonCoeff.o \
     ../poisson/ale.o \
-    ../poisson/scalar.o ../geom/boundary.o ../geom/builder.o ../out/ensightOut.o\
+    ../poisson/cdrdrops.o ../geom/boundary.o ../geom/builder.o ../out/ensightOut.o\
     ../geom/simplex.o ../geom/multigrid.o ../num/unknowns.o ../geom/topo.o \
     ../poisson/poisson.o ../misc/problem.o ../misc/utils.o ../out/output.o \
     ../num/fe.o ../num/discretize.o ../num/interfacePatch.o ../geom/geomselect.o\
     ../misc/params.o \
-    ../out/vtkOut.o ../misc/bndmap.o ../geom/bndScalarFunctions.o\
-    ../geom/bndVelFunctions.o\
+    ../out/vtkOut.o ../misc/bndmap.o ../misc/bndScalarFunctions.o\
+    ../misc/bndVelFunctions.o\
     $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 

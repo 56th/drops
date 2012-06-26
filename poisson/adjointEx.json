@@ -1,6 +1,6 @@
 {
     //=========================================================================
-    //    DROPS parameter file for poissonP{1,2}
+    //    DROPS parameter file for cdrdrops
     //    simulation of poisson problem:
     //      The problem is quasi-1D.
     //=========================================================================
@@ -33,7 +33,8 @@
         "SmoothingSteps":   1,   //for Multigrid: number of Smoothing steps;
         "NumLvl":           -1,  //for Multigird: number of used levels (-1 = all)
         "Relax":            1,   //Relaxation factor
-        "SolutionIsKnown":  1    //Is the solution known/can we measure an exact error? 1 = true, 0 = false
+        "SolutionIsKnown":  1,   //Is the solution known/can we measure an exact error? 1 = true, 0 = false
+		"P1":               1        // 1 = P1 finite element, 0 = P2 finite element
     },
 
     //#######################################

@@ -1,7 +1,7 @@
 {
 	//#################################
 	//=============================================================
-	//    DROPS parameter file for ipfilm.cpp
+	//    DROPS parameter file for cdrdrops.cpp
 	//    simulation of poisson problem
 	//=============================================================
 	//poisson solver
@@ -18,7 +18,7 @@
 		"NumLvl":		    -1,
 		"Relax":		    1,
 		"SolutionIsKnown":	1, 	 //1 = true, 0 = false
-        "P1":               1        // 1 = P1 finite element, 0 = P2 finite element
+		"P1":               1        // 1 = P1 finite element, 0 = P2 finite element
 	},
 
 	// domain, bnd/ini conditions
