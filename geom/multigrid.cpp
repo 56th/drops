@@ -1153,6 +1153,9 @@ void ColorClassesCL::compute_neighbors (MultiGridCL::const_TriangTetraIteratorCL
 {
     const size_t num_tetra= std::distance( begin, end);
 
+    typedef std::tr1::unordered_map<const VertexCL*, std::vector<const VertexCL*> > Per1MapT;
+    Per1MapT per1Map;
+
     typedef std::tr1::unordered_map<const VertexCL*, TetraNumVecT> VertexMapT;
     VertexMapT vertexMap;
     // Collect all tetras, that have vertex v in vertexMap[v].
@@ -1162,7 +1165,7 @@ void ColorClassesCL::compute_neighbors (MultiGridCL::const_TriangTetraIteratorCL
 
     // in case of periodic boundaries: merge neighbors
     if (match) {
-        typedef std::list<const VertexCL*> VertexListT;
+        typedef std::vector<const VertexCL*> VertexListT;
         VertexListT listper1, listper2;
         // collect vertices with boundary type Per1BC or Per2BC
         for (VertexMapT::iterator it = vertexMap.begin(); it != vertexMap.end(); ++it) {
@@ -1174,19 +1177,21 @@ void ColorClassesCL::compute_neighbors (MultiGridCL::const_TriangTetraIteratorCL
         }
         // match vertices in listper1 and listper2 and merge vertexMap entries
         for (VertexListT::iterator it1 = listper1.begin(); it1 != listper1.end(); ++it1) {
-            for (VertexListT::iterator it2 = listper2.begin(); it2 != listper2.end(); ) {
+            for (VertexListT::iterator it2 = listper2.begin(); it2 != listper2.end(); ++it2)
                 if (match( GetBaryCenter( **it1), GetBaryCenter( **it2)))
-                {
-                    vertexMap[*it1].insert(vertexMap[*it1].end(), vertexMap[*it2].begin(),vertexMap[*it2].end());
-                    vertexMap[*it2].clear();
-                    vertexMap[*it2]= vertexMap[*it1];
-                    // remove it2 from listper2
-                    listper2.erase( it2++);
-                }
-                else it2++;
+                    per1Map[*it1].push_back(*it2);
+        }
+        for (Per1MapT::iterator it=per1Map.begin(); it!=per1Map.end(); ++it)
+        {
+            TetraNumVecT& per2Vertices = vertexMap[it->first];
+            for (std::vector<const VertexCL*>::const_iterator itper2 = it->second.begin(); itper2 != it->second.end(); ++itper2)
+                per2Vertices.insert(per2Vertices.end(), vertexMap[*itper2].begin(), vertexMap[*itper2].end());
+            for (std::vector<const VertexCL*>::const_iterator itper2 = it->second.begin(); itper2 != it->second.end(); ++itper2)
+            {
+                vertexMap[*itper2].clear();
+                vertexMap[*itper2]= per2Vertices;
             }
         }
-        if (!listper2.empty()) throw DROPSErrCL ( "ColorClassesCL::compute_neighbors : Periodic boundaries do not match!");
     }
 
     // For every tetra j, store all neighboring tetras in neighbors[j].
