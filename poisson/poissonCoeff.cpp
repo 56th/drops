@@ -488,6 +488,315 @@ static DROPS::RegisterVectorFunction regvecnus("Nusselt", Nusselt);
     static DROPS::RegisterVectorFunction regscaalev("TestALE_Velocity",  ALEFlowfield);
 } //end of namespace
 
+/****************************************
+ *  Example 8:                        \n*
+ *   - instationary setup             \n*
+ *   - constant diffusion             \n*
+ *   - convection                     \n*
+ *   - no reaction                    \n*
+ ****************************************/
+ namespace ALEExample2{
+    //refH, Mag, paraX and paraT are used to change the free surface functions
+    double refH   = 0.2;
+    double Mag    = 0.25;
+    double paraT  = 10. * PI;
+    //Free surface
+    double Interface( const DROPS::Point3DCL&, double t)
+    {
+
+        double h= refH + refH * Mag * sin (paraT * t );
+        return h;
+    }
+    //Transform the physical to coordinates to reference coordinates
+    DROPS::Point3DCL TransBack(const DROPS::Point3DCL &p, double t)
+    {
+        DROPS::Point3DCL ref(0.);
+        ref[0] = p[0];
+        ref[1] = refH * p[1]/Interface(p, t);
+        ref[2] = p[2];        
+        return ref;
+    }
+    //Grady
+    double Grady( const DROPS::Point3DCL&, double t)   //b=h_y
+    {
+        return 1. + Mag * sin( paraT * t);
+    } 
+    /// \brief Reaction: no reaction
+    double Reaction(const DROPS::TetraCL&, const DROPS::BaryCoordCL&, double) {
+        return 0.0;
+    }
+    DROPS::Point3DCL Flowfield(const DROPS::TetraCL& tet, const DROPS::BaryCoordCL& b, double t) {
+        DROPS::Point3DCL ref = TransBack(DROPS::GetWorldCoord( tet, b), t);
+        DROPS::Point3DCL v(0.);
+        v[0] = 1.0;
+        v[1] = ref[1] * Mag * paraT * cos( paraT * t);
+        return v; 
+    }
+
+    /// \brief Solution
+    double Solution( const DROPS::Point3DCL& p, double t)
+    {
+        DROPS::Point3DCL ref = TransBack(p, t);
+        return 100. * exp(10*t) * (ref[0] - ref[0] * ref [0] ) * (0.2 * ref[1] - ref[1]* ref[1]) * (0.2 * ref[2] - ref[2] * ref[2]);
+    }
+    ///ALL partial derivatives are based on ALE coordinates
+    double Solx( const DROPS::Point3DCL& ref, double t)
+    {
+        return 100. * exp(10*t) * (1. -2. * ref[0]) * (0.2 * ref[1] - ref[1] * ref[1]) * (0.2 * ref[2] - ref[2]* ref[2]);
+    }
+    double Solxx( const DROPS::Point3DCL& ref, double t)
+    {
+        return 100. * exp(10*t) * (-2.) * (0.2 * ref[1] - ref[1] * ref[1]) * (0.2 * ref[2] - ref[2]* ref[2]);
+    }
+    double Solyy( const DROPS::Point3DCL& ref, double t)
+    {
+        return 100. * exp(10*t) * (ref[0] - ref[0]* ref [0]) * ( -2.) * (0.2 * ref[2] - ref[2]* ref[2]);
+    }
+    double Solzz( const DROPS::Point3DCL& ref, double t)
+    {
+        return 100. * exp(10*t) * (ref[0] - ref[0]* ref [0]) * (0.2 * ref[1] - ref[1]* ref[1]) * ( -2.);
+    }
+    /// \brief Right-hand side
+    double Source(const DROPS::TetraCL& tet, const DROPS::BaryCoordCL& bary, double t) {
+        static bool first = true;
+        //alpha to control diffusion parameter, you could change a small number to make problem convection-dominated
+        static double alpha;
+        if (first) {
+            alpha= P.get<double>("PoissonCoeff.Diffusion");
+            first= false;
+        }
+        const DROPS::Point3DCL p= DROPS::GetWorldCoord( tet, bary);
+        DROPS::Point3DCL ref = TransBack(p, t);
+        double b= Grady(ref,t);
+        double sol= Solution(p, t);
+        double timederiv = 10. * sol;
+        double conv      =  Solx(ref, t); 
+        double diff1     = -alpha* Solxx(ref, t);
+        double diff2     = -alpha/(b*b)*Solyy(ref, t);
+        double diff3     = -alpha*Solzz(ref, t);
+        return timederiv + conv + diff1 +diff2 +diff3; 
+    }
+    static DROPS::RegisterScalarFunction regscaq("ALEEx2_Reaction",     Reaction    );
+    static DROPS::RegisterScalarFunction regscaf("ALEEx2_Source",       Source      );
+    static DROPS::RegisterScalarFunction regscaint("ALEEx2_Interface",  Interface   );
+    static DROPS::RegisterScalarFunction regscas("ALEEx2_Solution",     Solution   );
+    static DROPS::RegisterVectorFunction regscav("ALEEx2_Velocity",    Flowfield   );
+}//end of namespace
+
+/****************************************
+ *  Example 9:                        \n*
+ *   - instationary setup             \n*
+ *   - constant diffusion             \n*
+ *   - convection                     \n*
+ *   - no reaction                    \n*
+ ****************************************/
+ namespace ALEExample3{
+    //refH, Mag, paraX and paraT are used to change the free surface functions
+    double refH   = 0.2;
+    double Mag    = 0.25;
+    double paraX  = 6. * PI;
+    double paraT  = 10. * PI;
+    //Free surface
+    double Interface( const DROPS::Point3DCL& p, double t)
+    {
+
+        double h= refH + refH * Mag * sin (paraX * p[0] - paraT * t );
+        return h;
+    }
+    //Transform the physical to coordinates to reference coordinates
+    DROPS::Point3DCL TransBack(const DROPS::Point3DCL &p, double t)
+    {
+        DROPS::Point3DCL ref(0.);
+        ref[0] = p[0];
+        ref[1] = refH * p[1]/Interface(p, t);
+        ref[2] = p[2];        
+        return ref;
+    }
+    //Gradx, Grady, Grad1 and Grad2 are used for source term
+    double Gradx( const DROPS::Point3DCL& ref, double t)   //a=h_x
+    {
+        return ref[1]* paraX * Mag * cos(paraX * ref[0]  + paraT * t);
+    }
+    double Grady( const DROPS::Point3DCL& ref, double t)   //b=h_y
+    {
+        return 1. + Mag * sin(paraX * ref[0]  + paraT * t);
+    } 
+    double Grad1( const DROPS::Point3DCL& ref, double t)   //\nabla_y(a/b)
+    {
+        double ay=paraX * Mag * cos(paraX * ref[0]  + paraT * t);
+        return ay/Grady(ref, t);
+    }
+    double Grad2( const DROPS::Point3DCL& ref, double t)    //\nabla_x(a/b)
+    {
+        double ax     = -ref[1]* paraX * paraX * Mag * sin(paraX * ref[0]  + paraT * t);
+        double bx     = paraX * Mag * cos(paraX * ref[0]  + paraT * t);
+        return (ax*Grady(ref, t) - Gradx(ref, t)*bx)/(Grady(ref,t)*Grady(ref, t));
+    }
+    /// \brief Reaction: no reaction
+    double Reaction(const DROPS::TetraCL&, const DROPS::BaryCoordCL&, double) {
+        return 0.0;
+    }
+    DROPS::Point3DCL Flowfield(const DROPS::TetraCL& tet, const DROPS::BaryCoordCL& b, double t) {
+        DROPS::Point3DCL ref = TransBack(DROPS::GetWorldCoord( tet, b), t);
+        DROPS::Point3DCL v(0.);
+        v[0] = 1.;
+        v[1] = ref[1] * Mag * paraT * cos( paraX * ref[0]  + paraT * t);
+        return v; 
+    }
+    /// \brief Solution
+    double Solution( const DROPS::Point3DCL& p, double t)
+    {
+        DROPS::Point3DCL ref = TransBack(p, t);
+        return 100. * exp(10*t) * (ref[0] - ref[0] * ref [0] ) * (0.2 * ref[1] - ref[1]* ref[1]) * (0.2 * ref[2] - ref[2] * ref[2]);
+    }
+    ///ALL partial derivatives are based on ALE coordinates
+    double Solx( const DROPS::Point3DCL& ref, double t)
+    {
+        return 100. * exp(10*t) * (1. -2. * ref[0]) * (0.2 * ref[1] - ref[1] * ref[1]) * (0.2 * ref[2] - ref[2]* ref[2]);
+    }
+    double Solxx( const DROPS::Point3DCL& ref, double t)
+    {
+        return 100. * exp(10*t) * (-2.) * (0.2 * ref[1] - ref[1] * ref[1]) * (0.2 * ref[2] - ref[2]* ref[2]);
+    }
+    double Soly( const DROPS::Point3DCL& ref, double t)
+    {
+        return 100. * exp(10*t) * (ref[0] - ref[0]* ref [0]) * (0.2 - 2.* ref[1]) * (0.2 * ref[2] - ref[2]* ref[2]);
+    }
+    double Solyy( const DROPS::Point3DCL& ref, double t)
+    {
+        return 100. * exp(10*t) * (ref[0] - ref[0]* ref [0]) * ( -2.) * (0.2 * ref[2] - ref[2]* ref[2]);
+    }
+    double Solzz( const DROPS::Point3DCL& ref, double t)
+    {
+        return 100. * exp(10*t) * (ref[0] - ref[0]* ref [0]) * (0.2 * ref[1] - ref[1]* ref[1]) * ( -2.);
+    }
+    double Solxy( const DROPS::Point3DCL& ref, double t)
+    {
+        return 100. * exp(10*t) * (1. -2. * ref[0]) * (0.2  - 2. * ref[1]) * (0.2 * ref[2] - ref[2]* ref[2]);
+    }
+    /// \brief Right-hand side
+    double Source(const DROPS::TetraCL& tet, const DROPS::BaryCoordCL& bary, double t) {
+        static bool first = true;
+        //alpha to control diffusion parameter, you could change a small number to make problem convection-dominated
+        static double alpha;
+        if(first){
+        alpha = P.get<double>("PoissonCoeff.Diffusion");
+        first=false;                                    
+        }
+        const DROPS::Point3DCL p= DROPS::GetWorldCoord( tet, bary);
+        DROPS::Point3DCL ref = TransBack(p, t);
+        double a= Gradx(ref,t);
+        double b= Grady(ref,t);
+        double c= Grad1(ref,t);
+        double d= Grad2(ref,t);        
+        double sol= Solution(p, t);
+        double timederiv = 10. * sol;
+        double conv      =  1. * (Solx(ref, t) - a/b * Soly(ref, t)); 
+        double diff1     = -alpha* (Solxx(ref, t) - 2 * a/b * Solxy(ref,t ) - d * Soly(ref, t) + a/b * c * Soly(ref, t) + a * a /b/b *Solyy(ref, t));
+        double diff2     = -alpha/(b*b)*Solyy(ref, t);
+        double diff3     = -alpha*Solzz(ref, t);
+        return timederiv + conv + diff1 +diff2 +diff3; 
+    }
+    static DROPS::RegisterScalarFunction regscaq("ALEEx3_Reaction",     Reaction    );
+    static DROPS::RegisterScalarFunction regscaf("ALEEx3_Source",       Source      );
+    static DROPS::RegisterScalarFunction regscaint("ALEEx3_Interface",  Interface   );
+    static DROPS::RegisterScalarFunction regscas("ALEEx3_Solution",     Solution   );
+    static DROPS::RegisterVectorFunction regscav("ALEEx3_Velocity",    Flowfield   );
+}//end of namespace
+
+/****************************************
+ *  Example 10:                        \n*
+ *   - instationary setup             \n*
+ *   - constant diffusion             \n*
+ *   - convection                     \n*
+ *   - no reaction                    \n*
+ ****************************************/
+ namespace ALEExample4{
+    //refH, Mag, paraX and paraT are used to change the free surface functions
+    double refH   = 0.2;
+    double Mag    = 0.25;
+    double paraT  = 10. * PI;
+    //Free surface
+    double Interface( const DROPS::Point3DCL&, double t)
+    {
+
+        double h= refH + refH * Mag * sin (paraT * t );
+        return h;
+    }
+    //Transform the physical to coordinates to reference coordinates
+    DROPS::Point3DCL TransBack(const DROPS::Point3DCL &p, double t)
+    {
+        DROPS::Point3DCL ref(0.);
+        ref[0] = p[0];
+        ref[1] = refH * p[1]/Interface(p, t);
+        ref[2] = p[2];        
+        return ref;
+    }
+    //Grady
+    double Grady( const DROPS::Point3DCL&, double t)   //b=h_y
+    {
+        return 1. + Mag * sin( paraT * t);
+    } 
+    /// \brief Reaction: no reaction
+    double Reaction(const DROPS::TetraCL&, const DROPS::BaryCoordCL&, double) {
+        return 0.0;
+    }
+    DROPS::Point3DCL Flowfield(const DROPS::TetraCL& tet, const DROPS::BaryCoordCL& b, double t) {
+        DROPS::Point3DCL ref = TransBack(DROPS::GetWorldCoord( tet, b), t);
+        DROPS::Point3DCL v(0.);
+        v[0] = exp(5.* t);
+        v[1] = ref[1] * Mag * paraT * cos( paraT * t);
+        return v; 
+    }
+    /// \brief Solution
+    double Solution( const DROPS::Point3DCL& p, double t)
+    {
+        DROPS::Point3DCL ref = TransBack(p, t);
+        return 100. * exp(10*t) * (ref[0] - ref[0] * ref [0] ) * (0.2 * ref[1] - ref[1]* ref[1]) * (0.2 * ref[2] - ref[2] * ref[2]);
+    }
+    ///ALL partial derivatives are based on ALE coordinates
+    double Solx( const DROPS::Point3DCL& ref, double t)
+    {
+        return 100. * exp(10*t) * (1. -2. * ref[0]) * (0.2 * ref[1] - ref[1] * ref[1]) * (0.2 * ref[2] - ref[2]* ref[2]);
+    }
+    double Solxx( const DROPS::Point3DCL& ref, double t)
+    {
+        return 100. * exp(10*t) * (-2.) * (0.2 * ref[1] - ref[1] * ref[1]) * (0.2 * ref[2] - ref[2]* ref[2]);
+    }
+    double Solyy( const DROPS::Point3DCL& ref, double t)
+    {
+        return 100. * exp(10*t) * (ref[0] - ref[0]* ref [0]) * ( -2.) * (0.2 * ref[2] - ref[2]* ref[2]);
+    }
+    double Solzz( const DROPS::Point3DCL& ref, double t)
+    {
+        return 100. * exp(10*t) * (ref[0] - ref[0]* ref [0]) * (0.2 * ref[1] - ref[1]* ref[1]) * ( -2.);
+    }
+    /// \brief Right-hand side
+    double Source(const DROPS::TetraCL& tet, const DROPS::BaryCoordCL& bary, double t) {
+        static bool first = true;
+        //alpha to control diffusion parameter, you could change a small number to make problem convection-dominated
+        static double alpha;
+        if(first){
+        alpha = P.get<double>("PoissonCoeff.Diffusion");
+        first=false;                                    
+        }
+        const DROPS::Point3DCL p= DROPS::GetWorldCoord( tet, bary);
+        DROPS::Point3DCL ref = TransBack(p, t);
+        double b= Grady(ref,t);
+        double sol= Solution(p, t);
+        double timederiv = 10. * sol;
+        double conv      =  exp(5.* t) * Solx(ref, t); 
+        double diff1     = -alpha* Solxx(ref, t);
+        double diff2     = -alpha/(b*b)*Solyy(ref, t);
+        double diff3     = -alpha*Solzz(ref, t);
+        return timederiv + conv + diff1 +diff2 +diff3; 
+    }
+    static DROPS::RegisterScalarFunction regscaq("ALEEx4_Reaction",     Reaction    );
+    static DROPS::RegisterScalarFunction regscaf("ALEEx4_Source",       Source      );
+    static DROPS::RegisterScalarFunction regscaint("ALEEx4_Interface",  Interface   );
+    static DROPS::RegisterScalarFunction regscas("ALEEx4_Solution",     Solution   );
+    static DROPS::RegisterVectorFunction regscav("ALEEx4_Velocity",    Flowfield   );
+}//end of namespace
  namespace ALEBala {
     //refH, Mag, paraX and paraT are used to change the free surface functions
     double refH   = 0.2;
