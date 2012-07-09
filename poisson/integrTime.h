@@ -25,6 +25,7 @@
 #ifndef DROPS_POI_INTEGRTIME_H
 #define DROPS_POI_INTEGRTIME_H
 
+#include "num/poissonsolverfactory.h"
 #include "misc/problem.h"
 #include "poisson/poisson.h"
 

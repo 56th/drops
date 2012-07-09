@@ -600,7 +600,7 @@ static DROPS::RegisterVectorFunction regvecnus("Nusselt", Nusselt);
     double Interface( const DROPS::Point3DCL& p, double t)
     {
 
-        double h= refH + refH * Mag * sin (paraX * p[0] - paraT * t );
+        double h= refH + refH * Mag * sin (paraX * p[0] + paraT * t );
         return h;
     }
     //Transform the physical to coordinates to reference coordinates
