@@ -176,6 +176,71 @@ void BuildDomain( MultiGridCL* &mgp, const std::string& meshfile_name, int GeomT
             }
             delete mgb;
         }
+    if (GeomType == 10) { //Read Mesh + second order curvature
+        std::ifstream meshfile( meshfile_name.c_str());
+        std::string meshfile_name2 = meshfile_name + ".2nd";
+        std::ifstream meshfile2nd( meshfile_name2.c_str());
+        
+        if (!meshfile)
+            throw DROPSErrCL ("error while opening mesh file\n");
+
+        ReadMeshBuilderCL *mgb= 0;       // builder of the multigrid
+
+        // read geometry information from a file and create the multigrid
+        IF_MASTER
+            mgb = new ReadMeshBuilderCL( meshfile );
+        IF_NOT_MASTER
+            mgb = new EmptyReadMeshBuilderCL( meshfile );
+        // Create the multigrid
+        if (deserialization_file == "none")
+            mgp= new MultiGridCL( *mgb);
+        else {
+            FileBuilderCL filebuilder( deserialization_file, mgb);
+            mgp= new MultiGridCL( filebuilder);
+        }
+        //mgb->GetBC( BC);
+        
+        if (!meshfile2nd)
+          std::cout << "no 2nd order mesh file\n" << std::endl;
+        else{
+          std::cout << "WARNING: 2nd order mesh is highly experimental. Please do not combine with refinements!\n" << std::endl;
+          std::cout << "WARNING: The search for corresponding elements is very inefficient (brute force over ALL elements (not necessary)).\n" << std::endl;
+          Point3DCL p[6];
+          Ulint id[4];
+          // brute force (very inefficient!)
+          while ( !meshfile2nd.eof() ){
+            for (int j = 0; j < 4 ; j++) //vertex ids
+              meshfile2nd >> id[j];    
+            for (int i = 0; i < 6 ; i++) //coordinates of the 6 additional points
+              for (int j = 0; j < 3 ; j++) 
+                meshfile2nd >> p[i][j]; 
+            for (MultiGridCL::TriangTetraIteratorCL sit= mgp->GetTriangTetraBegin(), send=mgp->GetTriangTetraEnd();
+                sit != send; ++sit)
+            {
+              Uint fits=0;
+              bool atleastonematch=false;
+              for(int i=0; i<4; ++i){
+                Uint myid = sit->GetVertex(i)->GetId().GetIdent();                 
+                for(int j=0; j<4; ++j)
+                    if (id[j] == myid){
+                        atleastonematch = true;
+                        fits++;
+                    }
+                if (!atleastonematch) break;
+              }
+              if (!atleastonematch) continue;
+              if (fits==4){
+                  std::cout << " creating a curved " << std::endl;
+                  sit->CreateCurvedTetra(p);
+                  break;
+              }
+            }
+          }
+        }
+        delete mgb;
+    }   
+
+
 #endif
 }
 

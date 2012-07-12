@@ -32,6 +32,7 @@
 #include "misc/utils.h"
 #include "geom/boundary.h"
 #include "geom/topo.h"
+#include "geom/isoparamP2.h"
 #include "num/unknowns.h"
 #include "DiST/geomid.h"
 
@@ -40,7 +41,6 @@
 #  include "parallel/parallel.h"
 #  include <map>
 #endif
-
 
 namespace DROPS
 {
@@ -498,7 +498,6 @@ class FaceCL
     //@}
 };
 
-
 /*******************************************************************
 *   T E T R A  C L                                                 *
 *******************************************************************/
@@ -566,13 +565,15 @@ class TetraCL
     inline TetraCL (VertexCL*, VertexCL*, VertexCL*, VertexCL*, TetraCL*, Uint, IdCL<TetraCL> id= IdCL<TetraCL>());
 #endif
 
+    CurvedTetraCL * curvedtet_;
+
   public:
     /// \brief Copy a tetrahedron
     inline TetraCL (const TetraCL&);
     /// \brief Constructor of an uninitialized tetrahedron
     inline TetraCL();
     /// \brief Delete a tetrahedron
-    ~TetraCL() { if (Children_) delete Children_; }
+    ~TetraCL() { if (Children_) delete Children_; if (curvedtet_) delete curvedtet_;}
 
     /// \name Interface for the refinement algorithm
     //@{
@@ -711,6 +712,13 @@ class TetraCL
 
     bool IsSane    (std::ostream&) const;                                                  ///< check for sanity
     void DebugInfo (std::ostream&) const;                                                  ///< get debug-information
+
+    CurvedTetraCL* GetCurvedTetra() const {return curvedtet_;}
+    void CreateCurvedTetra( Point3DCL* p) 
+    {
+        if (curvedtet_) delete curvedtet_;
+        curvedtet_ = new CurvedTetraCL(*this, p);
+    }
 };
 
 #ifdef _PAR
