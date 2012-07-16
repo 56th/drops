@@ -179,12 +179,22 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
 
       case -1: // read from file
       {
-        ReadEnsightP2SolCL reader( MG);
-        reader.ReadVector( P.get<std::string>("InitialFile")+".vel", Stokes.v, Stokes.GetBndData().Vel);
-        reader.ReadScalar( P.get<std::string>("InitialFile")+".scl", lset.Phi, lset.GetBndData());
-        Stokes.UpdateXNumbering( pidx, lset);
-        Stokes.p.SetIdx( pidx); // Zero-vector for now.
-        reader.ReadScalar( P.get<std::string>("InitialFile")+".pr",  Stokes.p, Stokes.GetBndData().Pr); // reads the P1-part of the pressure
+        if(P.get<int>("Ensight.EnsightOut",0))
+        {
+            ReadEnsightP2SolCL reader( MG);
+            reader.ReadVector( P.get<std::string>("InitialFile")+".vel", Stokes.v, Stokes.GetBndData().Vel);
+            reader.ReadScalar( P.get<std::string>("InitialFile")+".scl", lset.Phi, lset.GetBndData());
+            Stokes.UpdateXNumbering( pidx, lset);
+            Stokes.p.SetIdx( pidx); // Zero-vector for now.
+            reader.ReadScalar( P.get<std::string>("InitialFile")+".pr",  Stokes.p, Stokes.GetBndData().Pr); // reads the P1-part of the pressure
+        }
+        else
+        {
+            ReadFEFromFile( Stokes.v, MG, P.get<std::string>("DomainCond.InitialFile")+"velocity", P.get<int>("Restart.Binary"));
+            Stokes.UpdateXNumbering( pidx, lset);
+            Stokes.p.SetIdx( pidx);
+            ReadFEFromFile( Stokes.p, MG, P.get<std::string>("DomainCond.InitialFile")+"pressure", P.get<int>("Restart.Binary"), &lset.Phi); // pass also level set, as p may be extended
+        }  
       } break;
 
       default:
@@ -287,10 +297,15 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
     adap.push_back( &PVel);
     UpdateProlongationCL PPr ( Stokes.GetMG(), stokessolverfactory.GetPPr(), &Stokes.pr_idx, &Stokes.pr_idx);
     adap.push_back( &PPr);
+    
+    TwoPhaseStoreCL<InstatNavierStokes2PhaseP2P1CL> ser(MG, Stokes, lset, NULL,
+                                                        P.get<std::string>("Restart.Outputfile"),
+                                                        P.get<int>("Restart.Overwrite"),
+                                                        P.get<int>("Restart.Binary"));
 
 //    stokessolverfactory.GetVankaSmoother().SetRelaxation( 0.8);
 
-    bool secondSerial= false;
+//    bool secondSerial= false;
     for (int step= 1; step<=P.get<int>("Time.NumSteps"); ++step)
     {
         std::cout << "======================================================== Schritt " << step << ":\n";
@@ -305,7 +320,7 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
         if (doGridMod) {
             adap.UpdateTriang( lset);
             cpl.Update();
-            if (P.get<std::string>("SerializationFile") != "none") {
+/*            if (P.get<std::string>("SerializationFile") != "none") {
                 std::stringstream filename;
                 filename << P.get<std::string>("SerializationFile");
                 if (secondSerial) filename << "0";
@@ -316,13 +331,15 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
                 std::ofstream serTime( filename.str().c_str());
                 serTime << "Serialization info:\ntime step = " << step << "\t\tt = " << step*P.get<double>("Time.StepSize") << "\n";
                 serTime.close();
-            }
+            }*/
         }
 
         if (ensight && step%10==0)
             ensight->Write( step*P.get<double>("Time.StepSize"));
         if (vtkwriter && step%10==0)
             vtkwriter->Write( step*P.get<double>("Time.StepSize"));
+        if (P.get("Restart.Serialization", 0) && step%P.get("Restart.Serialization", 0)==0)
+            ser.Write();
     }
 
     IFInfo.Update( lset, Stokes.GetVelSolution());
