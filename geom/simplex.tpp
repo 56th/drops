@@ -289,8 +289,7 @@ TetraCL::TetraCL (VertexCL* vp0, VertexCL* vp1, VertexCL* vp2, VertexCL* vp3, Te
     base(Parent==0 ? 0 : Parent->GetLevel()+1, 0.25*( vp0->GetCoord() + vp1->GetCoord()+ vp2->GetCoord() + vp3->GetCoord()), /*dim*/ 3),
 #endif
     Id_(id), RefRule_(UnRefRuleC), RefMark_(NoRefMarkC),
-    Parent_(Parent), Children_(0),
-    curvedtet_(0)
+    Parent_(Parent), Children_(0)
 {
     Vertices_[0] = vp0; Vertices_[1] = vp1;
     Vertices_[2] = vp2; Vertices_[3] = vp3;
@@ -301,8 +300,7 @@ TetraCL::TetraCL (VertexCL* vp0, VertexCL* vp1, VertexCL* vp2, VertexCL* vp3, Te
 TetraCL::TetraCL (VertexCL* vp0, VertexCL* vp1, VertexCL* vp2, VertexCL* vp3, TetraCL* Parent, __UNUSED__ Uint lvl, IdCL<TetraCL> id)
     : base( Parent==0 ? 0 : Parent->GetLevel()+1, ComputeBaryCenter( vp0->GetCoord(), vp1->GetCoord(), vp2->GetCoord(), vp3->GetCoord()), /*dim*/ 3),
       Id_(id), RefRule_(UnRefRuleC), RefMark_(NoRefMarkC),
-      Parent_( Parent), Children_(0),
-      curvedtet_(0)
+      Parent_( Parent), Children_(0)
 {
     Assert(!Parent && Parent->GetLevel()!=lvl-1, DROPSErrCL("TetraCL::TetraCL: Parent and given level does not match"), DebugRefineEasyC);
     Vertices_[0] = vp0; Vertices_[1] = vp1;
@@ -320,8 +318,7 @@ TetraCL::TetraCL (const TetraCL& T) :
     Id_(T.Id_), RefRule_(T.RefRule_), RefMark_(T.RefMark_),
     Vertices_(T.Vertices_), Edges_(T.Edges_),
     Faces_(T.Faces_), Parent_(T.Parent_),
-    Children_(T.Children_ ? new SArrayCL<TetraCL*,MaxChildrenC> (*T.Children_) : 0),
-    curvedtet_(0)
+    Children_(T.Children_ ? new SArrayCL<TetraCL*,MaxChildrenC> (*T.Children_) : 0)
 { }
 
 /** Normally used to receive tetras*/
@@ -334,7 +331,7 @@ TetraCL::TetraCL() :
     Id_(), RefRule_(UnRefRuleC),RefMark_(NoRefMarkC),
     Vertices_(static_cast<VertexCL*>(0)),
     Edges_(static_cast<EdgeCL*>(0)),Faces_(static_cast<FaceCL*>(0)),
-    Parent_(0), Children_(0), curvedtet_(0)
+    Parent_(0), Children_(0)
 { }
 
 

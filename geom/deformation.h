@@ -30,9 +30,11 @@
 #include "misc/problem.h"
 #include "num/bndData.h"
 #include "num/discretize.h"
+#include "geom/multigrid.h"
 
 namespace DROPS
 {
+
 
 class MeshDeformationCL
 {
@@ -41,21 +43,62 @@ private:
     MLIdxDescCL * mlidx_; // perhaps MultiLevel Idx just for future use...
     VecDescCL * pointsol_;
     BndDataCL<Point3DCL> * bnd_;
-    MeshDeformationCL() : mg_(0),mlidx_(0),pointsol_(0),bnd_(0){};
+    std::map<const TetraCL*, bool> tet_is_curved;
+    MeshDeformationCL() : mg_(0),mlidx_(0),pointsol_(0),bnd_(0){tet_is_curved.clear();};
     virtual ~MeshDeformationCL(){
-        if (mg_) delete mg_;
         if (mlidx_) delete mlidx_;
         if (pointsol_) delete pointsol_;
         if (bnd_) delete bnd_;
     };
+
+    static Point3DCL instat_Identity3D (const Point3DCL & a, const double)
+    {  return a;  }
+
 public:
     static MeshDeformationCL& getInstance();
 
-    void Initialize( MultiGridCL* mg);
+    void SetMeshIdentity();
+    void SetMeshTransformation(instat_vector_fun_ptr f, const double t);
 
+    void CheckForCurved();
+    void Initialize( MultiGridCL* mg);
+    bool IsTetraCurved(const TetraCL& tet);
     LocalP2CL<Point3DCL> GetLocalP2Deformation( const TetraCL&);
-    // LocalP1CL<Point3DCL> GetLocalP1Deformation( const TetraCL&);
+    LocalP1CL<Point3DCL> GetLocalP1Deformation( const TetraCL&);
+    Point3DCL GetTransformedVertexCoord( const VertexCL &);
+    Point3DCL GetTransformedEdgeBaryCenter( const EdgeCL &);
 };
+
+
+
+/** calculates the transpose of the transformation  Tetra -> RefTetra
+ *  if \f$ \Phi \f$ denotes the trafo from \f$ T_ref \f$ to \f$ T \f$
+ *  then the result is \f$ T = (\nabla \Phi)^{-T} \f$ and 
+ *  det \f$ = det(\nabla \Phi) \f$
+ *  Inputs are p the point on the reference triangle and pt, the four points 
+ *  of the transformed tetraeder.  */
+inline void GetTrafoTr( SMatrixCL<3,3>& T, double& det, const LocalP1CL<Point3DCL>& pt)
+{
+    double M[3][3];
+    const Point3DCL& pt0= pt[0];
+    for(int i=0; i<3; ++i)
+        for(int j=0; j<3; ++j)
+            M[j][i]= pt[i+1][j] - pt0[j];
+    det=   M[0][0] * (M[1][1]*M[2][2] - M[1][2]*M[2][1])
+         - M[0][1] * (M[1][0]*M[2][2] - M[1][2]*M[2][0])
+         + M[0][2] * (M[1][0]*M[2][1] - M[1][1]*M[2][0]);
+
+    T(0,0)= (M[1][1]*M[2][2] - M[1][2]*M[2][1])/det;
+    T(0,1)= (M[2][0]*M[1][2] - M[1][0]*M[2][2])/det;
+    T(0,2)= (M[1][0]*M[2][1] - M[2][0]*M[1][1])/det;
+    T(1,0)= (M[2][1]*M[0][2] - M[0][1]*M[2][2])/det;
+    T(1,1)= (M[0][0]*M[2][2] - M[2][0]*M[0][2])/det;
+    T(1,2)= (M[2][0]*M[0][1] - M[0][0]*M[2][1])/det;
+    T(2,0)= (M[0][1]*M[1][2] - M[1][1]*M[0][2])/det;
+    T(2,1)= (M[1][0]*M[0][2] - M[0][0]*M[1][2])/det;
+    T(2,2)= (M[0][0]*M[1][1] - M[1][0]*M[0][1])/det;
+}
+
 
 } // end of namespace DROPS
 

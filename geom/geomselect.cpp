@@ -231,7 +231,8 @@ void BuildDomain( MultiGridCL* &mgp, const std::string& meshfile_name, int GeomT
               if (!atleastonematch) continue;
               if (fits==4){
                   std::cout << " creating a curved " << std::endl;
-                  sit->CreateCurvedTetra(p);
+                  throw DROPSErrCL(" --- not working right now --- ");
+                  //sit->CreateCurvedTetra(p);
                   break;
               }
             }

@@ -74,7 +74,7 @@
         "RefineSteps":      0,
             //initial refinement: how often is the mesh refined
             // -> Here: two times refinement
-        "GeomType":         10,
+        "GeomType":         1,
             //specifies the used geometry:
             // 0=ReadMeshBuilder (from file)
             // 1=BrickBuilder (a cuboid)
@@ -85,8 +85,8 @@
         "InitialFile":      "none",
             //file prefix when reading data for initial condition
             // -> Here: no initial data is read from outside
-//        "MeshFile":         "1x1x1@4x4x4",
-        "MeshFile":         "test.msh",
+        "MeshFile":         "1x1x1@4x4x4",
+//        "MeshFile":         "test.msh",
             //mesh file (created by GAMBIT or NETGEN, FLUENT/UNS format)
             // or (in case of the BrickBuilder:)
             // dimensions of a cuboid (e.g. AxBxC@DxExF) with edge

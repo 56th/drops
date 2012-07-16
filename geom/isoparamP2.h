@@ -1,5 +1,5 @@
 /// \file isoparamP2.h
-/// \brief classes and helper function for isoparametrically(P2) curved tets
+/// \brief just (inlined) helper function for isoparametrically(P2) curved tets
 /// \author LNM RWTH Aachen: Christoph Lehrenfeld, Liang Zhang
 
 /*
@@ -27,26 +27,10 @@
 
 //#include "geom/simplex.h"
 #include "misc/container.h"
+#include "num/discretize.h"
 
 namespace DROPS
 {
-
-class TetraCL;
-
-// Description of a isoparametrically curved tetrahedra. 
-// Stores reference to uncurved tetrahedra and (6) additional
-// points.
-class CurvedTetraCL
-{
-  public:
-    const TetraCL& uncurved_;   // < original tetrahedra
-    Point3DCL* extrapoint_;
-    ~CurvedTetraCL();
-    ///puts tetra (uncurved) and additional points together and (important) 
-    ///makes the ordering fitting to the standard local numbering (see static int between)
-    CurvedTetraCL(const TetraCL& tetra, Point3DCL* new_extrapoints);    
-    const Point3DCL& GetPoint(int i) const;    
-};
 
 /** calculates the transpose of the transformation  Tetra -> RefTetra at
  *  each point (important for isoparametric elements).
@@ -54,30 +38,62 @@ class CurvedTetraCL
  *  then the result is \f$ T = (\nabla \Phi)^{-T} \f$ and 
  *  det \f$ = det(\nabla \Phi) \f$
  *  Inputs are p the point on the reference triangle and pt, the TEN points 
- *  of the second order curved tetraeder as a CurvedTetraCL. Note that the
- *  points are ordered such that
- *        4 lies in between 0 and 1
- *        5                 0     2
- *        6                 1     2
- *        7                 0     3
- *        8                 1     3
- *        9                 2     3
- */
-void GetTrafoTrAtPoint( SMatrixCL<3,3>& T, double& det, const Point3DCL& p, const CurvedTetraCL & ct);
+ *  of the second order curved tetraeder as a CurvedTetraCL.  */
+inline void GetTrafoTrAtPoint( SMatrixCL<3,3>& T, double& det, const Point3DCL& p, const LocalP2CL<Point3DCL> & ct)
+{
+    double M[3][3];  
+    for (int j=0; j<3; j++)  
+        for (int k=0; k<3; k++)  
+            M[j][k] = 0.;
+    Point3DCL point(0.);
+    Point3DCL gradphi(0.);
+    for (int i=0; i<10; i++){
+        gradphi = FE_P2CL::DHRef(i,p[0],p[1],p[2]);
+        point = ct[i];
+        for (int j=0; j<3; j++)  
+            for (int k=0; k<3; k++)  
+                M[j][k] += point[j] * gradphi[k];
+    }
+    
+    det=   M[0][0] * (M[1][1]*M[2][2] - M[1][2]*M[2][1])
+        - M[0][1] * (M[1][0]*M[2][2] - M[1][2]*M[2][0])
+        + M[0][2] * (M[1][0]*M[2][1] - M[1][1]*M[2][0]);
 
-/** calculates the physical coord of a reference point of a curved tetra
- *  It is important the the points in pt have the right numbering, i.e.
- *  they have to be planar-consistent, which means that for planar elements the
- *  following must hold:
- *  point 4 lies in between 0 and 1
- *        5                 0     2
- *        6                 1     2
- *        7                 0     3
- *        8                 1     3
- *        9                 2     3
- */
-Point3DCL GetWorldCoord( const CurvedTetraCL & ct, const Point3DCL& p);
-Point3DCL GetWorldCoord( const CurvedTetraCL & ct, const BaryCoordCL& p);
+    T(0,0)= (M[1][1]*M[2][2] - M[1][2]*M[2][1])/det;
+    T(0,1)= (M[2][0]*M[1][2] - M[1][0]*M[2][2])/det;
+    T(0,2)= (M[1][0]*M[2][1] - M[2][0]*M[1][1])/det;
+    T(1,0)= (M[2][1]*M[0][2] - M[0][1]*M[2][2])/det;
+    T(1,1)= (M[0][0]*M[2][2] - M[2][0]*M[0][2])/det;
+    T(1,2)= (M[2][0]*M[0][1] - M[0][0]*M[2][1])/det;
+    T(2,0)= (M[0][1]*M[1][2] - M[1][1]*M[0][2])/det;
+    T(2,1)= (M[1][0]*M[0][2] - M[0][0]*M[1][2])/det;
+    T(2,2)= (M[0][0]*M[1][1] - M[1][0]*M[0][1])/det;      
+}
+
+/** calculates the physical coord of a reference point of a curved tetra */
+inline Point3DCL GetWorldCoord( const LocalP2CL<Point3DCL> & ct, const Point3DCL& p)
+{
+    Point3DCL point(0.);
+    double val;
+    for (int i=0; i<10; i++){
+        val = FE_P2CL::H(i,p[0],p[1],p[2]);
+        point += val * ct[i];
+    }
+    return point;
+}
+
+inline Point3DCL GetWorldCoord( const LocalP2CL<Point3DCL> & ct, const BaryCoordCL& p)
+{
+    std::cout << " here " << std::endl;
+    Point3DCL point(0.);
+    double val;
+    for (int i=0; i<10; i++){
+        val = FE_P2CL::H(i,p[1],p[2],p[3]);
+        point += val * ct[i];
+    }
+    return point;
+}
+
 
 } // end of namespace DROPS
 
