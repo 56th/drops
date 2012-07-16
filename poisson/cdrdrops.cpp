@@ -30,6 +30,8 @@
 #include "geom/geomselect.h"
 #include "misc/bndmap.h"
 
+#include "geom/deformation.h"
+
 // include numeric computing!
 #include "num/fe.h"
 #include "num/krylovsolver.h"
@@ -229,6 +231,11 @@ void Strategy(PoissonCL& Poisson)
 
     // the triangulation
     MultiGridCL& mg= Poisson.GetMG();
+
+	/*    
+	MeshDeformationCL& md = MeshDeformationCL::getInstance();
+    md.Initialize(&mg);
+    */
     ALECL ALE(P, mg);
     // connection triangulation and vectors
     // -------------------------------------------------------------------------
