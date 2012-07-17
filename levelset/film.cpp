@@ -244,7 +244,11 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
         vtkwriter = new VTKOutCL(adap.GetMG(), "DROPS data",
                                  P.get<int>("Time.NumSteps")/P.get("VTK.VTKOut", 0)+1,
                                  P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName"),
-                                 P.get<int>("VTK.Binary"));
+                                 P.get<std::string>("VTK.TimeFileName"),
+                                 P.get<int>("VTK.Binary"), 
+                                 P.get<int>("VTK.UseOnlyP1"),
+                                 -1,  /* <- level */
+                                 P.get<int>("VTK.ReUseTimeFile") );
         vtkwriter->Register( make_VTKVector( Stokes.GetVelSolution(), "velocity") );
         vtkwriter->Register( make_VTKScalar( Stokes.GetPrSolution(), "pressure") );
         if (P.get<int>("VTK.AddP1XPressure",0) && Stokes.UsesXFEM())
@@ -394,6 +398,14 @@ void MarkLower (DROPS::MultiGridCL& mg, double y_max, DROPS::Uint maxLevel= ~0)
     }
 }
 
+/// \brief Set Default parameters here s.t. they are initialized.
+/// The result can be checked when Param-list is written to the output.
+void SetMissingParameters(DROPS::ParamCL& P){
+    P.put_if_unset<std::string>("VTK.TimeFileName",P.get<std::string>("VTK.VTKName"));
+    P.put_if_unset<int>("VTK.ReUseTimeFile",0);
+    P.put_if_unset<int>("VTK.UseOnlyP1",0);
+}
+
 
 int main (int argc, char** argv)
 {
@@ -413,6 +425,9 @@ int main (int argc, char** argv)
     }
     param >> P;
     param.close();
+
+    SetMissingParameters(P);
+
     std::cout << P << std::endl;
 
     //DIDNT FIND A PARAM WITH PeriodicMatching, so I didnt know the type

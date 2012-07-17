@@ -28,7 +28,9 @@ namespace DROPS
 {
 
 VTKOutCL::VTKOutCL(const MultiGridCL& mg, const std::string& dataname, Uint numsteps,
-            const std::string& dirname, const std::string& filename, bool binary, bool onlyP1, Uint lvl)
+                   const std::string& dirname, const std::string& filename, 
+                   const std::string& pvdfilename, bool binary, bool onlyP1, 
+                   Uint lvl, bool reusepvd)
 /** Beside constructing the VTKOutCL, this function computes the number of
     digits, that are used to decode the time steps in the filename.
 \param mg        MultiGridCL that contains the geometry
@@ -39,9 +41,10 @@ VTKOutCL::VTKOutCL(const MultiGridCL& mg, const std::string& dataname, Uint nums
 \param lvl       Multigrid level
 */
     : mg_(mg), timestep_(0), numsteps_(numsteps), descstr_(dataname),
-        dirname_(dirname), filename_(filename), binary_(binary), onlyP1_(onlyP1), geomwritten_(false),
-        vAddrMap_(), eAddrMap_(), coords_(), tetras_(), lvl_(lvl),
-        numPoints_(0), numTetras_(0)
+      dirname_(dirname), filename_(filename), pvdfilename_(pvdfilename), 
+      binary_(binary), onlyP1_(onlyP1), geomwritten_(false),
+      vAddrMap_(), eAddrMap_(), coords_(), tetras_(), lvl_(lvl),
+      numPoints_(0), numTetras_(0), reusepvd_(reusepvd)
 {
     if (!dirname.empty() && *dirname.rbegin()!='/' )
         dirname_+= '/';
@@ -158,10 +161,10 @@ void VTKOutCL::NewFile(double time, __UNUSED__ bool writeDistribution)
 
 void VTKOutCL::GenerateTimeFile( double time, const std::string & name) const
 {
-    std::string timefilename(filename_);
+    std::string timefilename(pvdfilename_);
     timefilename+=".pvd";
     timefilename=dirname_+timefilename;
-    if(timestep_==0)
+    if(timestep_==0 && !reusepvd_)
     {
         std::ofstream timefile(timefilename.c_str());
         timefile << "<?xml version=\"1.0\"?>\n"
