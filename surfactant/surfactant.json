@@ -77,13 +77,23 @@
 		"Theta":		1
 	},
 
+	"VTK":
+	{
+		"_comment":		"#VTK output",
+		"VTKOut":		1,
+		"VTKDir":		"vtk",
+		"VTKName":		"surfactant",
+		"TimeFileName":		"surfactant",
+		"Binary":		1,
+		"UseOnlyP1":		false,
+		"ReUseTimeFile":	false
+	},
+
 	"SolutionOutput":
 	{
 		"_comment":	"#Interface-solution",
 		"Freq":		1,
-		"Path":		"ensight/iface_sol",
+		"Path":		"vtk/iface_sol",
 		"Binary":	true
-	},
-	"EnsightCase":		"none",
-	"EnsightDir":		"ensight"
+	}
 }

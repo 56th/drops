@@ -29,7 +29,7 @@
 #include "levelset/adaptriang.h"
 #include "levelset/surfacetension.h"
 #include "out/output.h"
-#include "out/ensightOut.h"
+#include "out/vtkOut.h"
 #include "misc/bndmap.h"
 
 #include <fstream>
@@ -38,8 +38,8 @@
 using namespace DROPS;
 
 DROPS::ParamCL P;
-std::string ensf; // basename of the ensight files
 
+std::auto_ptr<VTKOutCL> vtkwriter;
 
 DROPS::InVecMap& invecmap= DROPS::InVecMap::getInstance();
 DROPS::InScaMap& inscamap= DROPS::InScaMap::getInstance();
@@ -296,9 +296,7 @@ void InitVel ( const MultiGridCL& mg, VecDescCL* vec, BndDataCL<Point3DCL>& Bnd,
     vec->t= t;
 }
 
-
-void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::LevelsetP2CL& lset,
-    DROPS::Ensight6OutCL& ensight)
+void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::LevelsetP2CL& lset)
 {
     using namespace DROPS;
 
@@ -344,12 +342,18 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     timedisc.ic.SetIdx( &timedisc.idx);
     timedisc.SetInitialValue( the_sol_fun, 0.);
 
-    // Additional Ensight6-variables
-    ensight.Register( make_Ensight6IfaceScalar( mg, timedisc.ic,                 "InterfaceSol", ensf + ".sur", true));
-    ensight.Register( make_Ensight6Vector(      make_P2Eval( mg, Bnd_v, v),      "Velocity",     ensf + ".vel",  true));
-//    ensight.Register( make_Ensight6Scalar(      lset2.GetSolution(),             "Levelset2",    ensf + ".scl2", true));
-    ensight.Register( make_Ensight6Scalar( ScalarFunAsP2EvalCL( sol0t, 0., &mg), "TrueSol",      ensf + ".sol", true));
-    ensight.Write( 0.);
+    ScalarFunAsP2EvalCL the_sol_eval( the_sol_fun, 0., &mg);
+    if (vtkwriter.get() != 0) {
+        vtkwriter->Register( make_VTKScalar( lset.GetSolution(), "Levelset") );
+        vtkwriter->Register( make_VTKIfaceScalar( mg, timedisc.ic,  "InterfaceSol"));
+        vtkwriter->Register( make_VTKVector(      make_P2Eval( mg, Bnd_v, v),      "Velocity"));
+        //vtkwriter->Register( make_VTKScalar(      lset2.GetSolution(),             "Levelset2"));
+        vtkwriter->Register( make_VTKScalar( the_sol_eval, "TrueSol"));
+        //vtkwriter->Register( make_VTKScalar( ScalarFunAsP2EvalCL( the_sol_fun, 0., &mg), "TrueSol"));
+        vtkwriter->Write( 0.);
+    }
+    //if (P.get<int>( "SolutionOutput.Freq") > 0)
+    //    DROPS::WriteFEToFile( timedisc.ic, mg, P.get<std::string>( "SolutionOutput.Path"), P.get<bool>( "SolutionOutput.Binary"));
 
     double L_2x_err= L2_error( lset.Phi, lset.GetBndData(), timedisc.GetSolution(), the_sol_fun);
     std::cout << "L_2x-error: " << L_2x_err
@@ -378,6 +382,10 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
                   << std::endl;
         L_inftL_2x_err= std::max( L_inftL_2x_err, L_2x_err);
         std::cout << "L_inftL_2x-error: " << L_inftL_2x_err << std::endl;
+        if (vtkwriter.get() != 0 && step % P.get<int>( "VTK.VTKOut") == 0) {
+            the_sol_eval.SetTime( cur_time);
+            vtkwriter->Write( cur_time);
+        }
         if (P.get<int>( "SolutionOutput.Freq") > 0 && step % P.get<int>( "SolutionOutput.Freq") == 0)
             DROPS::WriteFEToFile( timedisc.ic, mg, P.get<std::string>( "SolutionOutput.Path"), P.get<bool>( "SolutionOutput.Binary"));
 
@@ -418,10 +426,6 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
                 std::cout << "new rel. Volume: " << lset.GetVolume()/Vol << std::endl;
             }
         }
-        ensight.Write( step*P.get<double>("Time.StepSize"));
-//        std::cout << "L_2-error: " << L2_error( mg, lset.Phi, timedisc.GetSolution(), &sol0t, step*P.get<double>("Time.StepSize"))
-//                  << " norm of true solution: " << L2_norm( mg, lset.Phi, &sol0t, step*P.get<double>("Time.StepSize"))
-//                  << std::endl;
     }
     std::cout << std::endl;
 }
@@ -445,8 +449,6 @@ int main (int argc, char* argv[])
     param.close();
     std::cout << P << std::endl;
  
-    ensf= P.get<std::string>("EnsightDir") + "/" + P.get<std::string>("EnsightCase"); // basename of the ensight files
-    std::cout << "Setting up interface-PDE.\n";
     WindVelocity= P.get<DROPS::Point3DCL>("Exp.Velocity");
     RadDrop=      P.get<DROPS::Point3DCL>("Exp.RadDrop");
     PosDrop=      P.get<DROPS::Point3DCL>("Exp.PosDrop");
@@ -464,16 +466,22 @@ int main (int argc, char* argv[])
                               P.get<int>("AdaptRef.CoarsestLevel"), P.get<int>("AdaptRef.FinestLevel"));
 
     DROPS::LevelsetP2CL lset( mg, lsbnd, sf);
-
-    // Initialize Ensight6 output
-    std::string ensf( P.get<std::string>("EnsightDir") + "/" + P.get<std::string>("EnsightCase"));
-    Ensight6OutCL ensight( P.get<std::string>("EnsightCase") + ".case", P.get<int>("Time.NumSteps") + 1);
-    // ensight.Register( make_Ensight6Geom      ( mg, mg.GetLastLevel(),   "Geometrie",     ensf + ".geo", true));
-    ensight.Register( make_Ensight6Geom      ( mg, mg.GetLastLevel(),   "Geometrie",     ensf + ".geo", false));
-    ensight.Register( make_Ensight6Scalar    ( lset.GetSolution(),      "Levelset",      ensf + ".scl", true));
+ 
+   if (P.get<int>("VTK.VTKOut",0))
+        vtkwriter= std::auto_ptr<VTKOutCL>( new VTKOutCL(
+            adap.GetMG(),
+            "DROPS data",
+            P.get<int>("Time.NumSteps")/P.get<int>("VTK.VTKOut") + 1,
+            P.get<std::string>("VTK.VTKDir"),
+            P.get<std::string>("VTK.VTKName"),
+            P.get<std::string>("VTK.TimeFileName"),
+            P.get<int>("VTK.Binary"), 
+            P.get<bool>("VTK.UseOnlyP1"),
+            -1,  /* <- level */
+            P.get<bool>("VTK.ReUseTimeFile")));
 
     if (P.get<bool>("Exp.StationaryPDE") == false) { // Time dependent tests in Strategy
-        Strategy( mg, adap, lset, ensight);
+        Strategy( mg, adap, lset);
         return 0;
     }
     adap.MakeInitialTriang( sphere_dist);
@@ -519,8 +527,11 @@ int main (int argc, char* argv[])
     DROPS::VecDescCL xext( &ifacefullidx);
     DROPS::Extend( mg, x, xext);
     DROPS::NoBndDataCL<> nobnd;
-    ensight.Register( make_Ensight6Scalar( make_P1Eval( mg, nobnd, xext), "InterfaceSol", ensf + ".sur"));
-    ensight.Write();
+    if (vtkwriter.get() != 0) {
+        vtkwriter->Register( make_VTKScalar( lset.GetSolution(), "Levelset") );
+        vtkwriter->Register( make_VTKIfaceScalar( mg, x, "InterfaceSol"));
+        vtkwriter->Write( 0.);
+    }
 
     double L2_err( L2_error( lset.Phi, lset.GetBndData(), make_P1Eval( mg, nobnd, xext), &laplace_beltrami_0_sol));
     std::cout << "L_2-error: " << L2_err << std::endl;
