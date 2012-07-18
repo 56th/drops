@@ -23,6 +23,7 @@
 */
 
 #include "geom/geomselect.h"
+#include "geom/deformation.h"
 #include <sstream>
 
 namespace DROPS {
@@ -199,46 +200,38 @@ void BuildDomain( MultiGridCL* &mgp, const std::string& meshfile_name, int GeomT
             mgp= new MultiGridCL( filebuilder);
         }
         //mgb->GetBC( BC);
-        
-        if (!meshfile2nd)
-          std::cout << "no 2nd order mesh file\n" << std::endl;
-        else{
-          std::cout << "WARNING: 2nd order mesh is highly experimental. Please do not combine with refinements!\n" << std::endl;
-          std::cout << "WARNING: The search for corresponding elements is very inefficient (brute force over ALL elements (not necessary)).\n" << std::endl;
-          Point3DCL p[6];
-          Ulint id[4];
-          // brute force (very inefficient!)
-          while ( !meshfile2nd.eof() ){
-            for (int j = 0; j < 4 ; j++) //vertex ids
-              meshfile2nd >> id[j];    
-            for (int i = 0; i < 6 ; i++) //coordinates of the 6 additional points
-              for (int j = 0; j < 3 ; j++) 
-                meshfile2nd >> p[i][j]; 
-            for (MultiGridCL::TriangTetraIteratorCL sit= mgp->GetTriangTetraBegin(), send=mgp->GetTriangTetraEnd();
-                sit != send; ++sit)
-            {
-              Uint fits=0;
-              bool atleastonematch=false;
-              for(int i=0; i<4; ++i){
-                Uint myid = sit->GetVertex(i)->GetId().GetIdent();                 
-                for(int j=0; j<4; ++j)
-                    if (id[j] == myid){
-                        atleastonematch = true;
-                        fits++;
-                    }
-                if (!atleastonematch) break;
-              }
-              if (!atleastonematch) continue;
-              if (fits==4){
-                  std::cout << " creating a curved " << std::endl;
-                  throw DROPSErrCL(" --- not working right now --- ");
-                  //sit->CreateCurvedTetra(p);
-                  break;
-              }
-            }
-          }
-        }
         delete mgb;
+
+        if (!meshfile2nd)
+            std::cout << "no 2nd order mesh file\n" << std::endl;
+        else{
+            MeshDeformationCL & md = MeshDeformationCL::getInstance();
+            md.Initialize(mgp);
+            std::map<std::pair<Ulint,Ulint>, Point3DCL> curvededgetopoint;
+            
+            Point3DCL p;
+            std::pair<Ulint,Ulint> id;
+            // fill map 
+            while ( !meshfile2nd.eof() ){
+                meshfile2nd >> id.first;    
+                meshfile2nd >> id.second;    
+                for (int j = 0; j < 3 ; j++) 
+                    meshfile2nd >> p[j];
+                curvededgetopoint[id]=p;
+            }
+
+            // use map to fill 2nd order deformation information
+            DROPS_FOR_TRIANG_EDGE( (*mgp), mgp->GetLastLevel(), it) {
+                id.first  = it->GetVertex(0)->GetId().GetIdent();                 
+                id.second = it->GetVertex(1)->GetId().GetIdent();                 
+
+                if (curvededgetopoint.find(id) != curvededgetopoint.end())
+                    md.SetEdgeDeformation(*it, curvededgetopoint[id]);
+            }
+
+            md.CheckForCurved();
+
+        }
     }   
 
 
