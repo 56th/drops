@@ -430,60 +430,8 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     std::cout << std::endl;
 }
 
-
-int main (int argc, char* argv[])
+void StationaryStrategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::LevelsetP2CL& lset)
 {
-  try {
-    std::ifstream param;
-    if (argc!=2) {
-        std::cout << "Using default parameter file: surfactant.json\n";
-        param.open( "surfactant.json");
-    }
-    else
-        param.open( argv[1]);
-    if (!param) {
-        std::cout << "error while opening parameter file\n";
-        return 1;
-    }
-    param >> P;
-    param.close();
-    std::cout << P << std::endl;
- 
-    WindVelocity= P.get<DROPS::Point3DCL>("Exp.Velocity");
-    RadDrop=      P.get<DROPS::Point3DCL>("Exp.RadDrop");
-    PosDrop=      P.get<DROPS::Point3DCL>("Exp.PosDrop");
-    the_wind_fun= invecmap[P.get<std::string>("Exp.Wind")];
-    the_lset_fun= inscamap[P.get<std::string>("Exp.Levelset")];
-    the_rhs_fun=  inscamap[P.get<std::string>("Exp.Rhs")];
-    the_sol_fun=  inscamap[P.get<std::string>("Exp.Solution")];
-    for (Uint i= 0; i < 6; ++i)
-        bf_wind[i]= the_wind_fun;
-
-    std::cout << "Setting up domain:\n";
-    std::auto_ptr<MGBuilderCL> builder( make_MGBuilder( P.get_child( "Domain")));
-    DROPS::MultiGridCL mg( *builder);
-    DROPS::AdapTriangCL adap( mg, P.get<double>("AdaptRef.Width"),
-                              P.get<int>("AdaptRef.CoarsestLevel"), P.get<int>("AdaptRef.FinestLevel"));
-
-    DROPS::LevelsetP2CL lset( mg, lsbnd, sf);
- 
-   if (P.get<int>("VTK.VTKOut",0))
-        vtkwriter= std::auto_ptr<VTKOutCL>( new VTKOutCL(
-            adap.GetMG(),
-            "DROPS data",
-            P.get<int>("Time.NumSteps")/P.get<int>("VTK.VTKOut") + 1,
-            P.get<std::string>("VTK.VTKDir"),
-            P.get<std::string>("VTK.VTKName"),
-            P.get<std::string>("VTK.TimeFileName"),
-            P.get<int>("VTK.Binary"), 
-            P.get<bool>("VTK.UseOnlyP1"),
-            -1,  /* <- level */
-            P.get<bool>("VTK.ReUseTimeFile")));
-
-    if (P.get<bool>("Exp.StationaryPDE") == false) { // Time dependent tests in Strategy
-        Strategy( mg, adap, lset);
-        return 0;
-    }
     adap.MakeInitialTriang( sphere_dist);
 
     lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
@@ -535,6 +483,60 @@ int main (int argc, char* argv[])
 
     double L2_err( L2_error( lset.Phi, lset.GetBndData(), make_P1Eval( mg, nobnd, xext), &laplace_beltrami_0_sol));
     std::cout << "L_2-error: " << L2_err << std::endl;
+}
+
+int main (int argc, char* argv[])
+{
+  try {
+    std::ifstream param;
+    if (argc != 2) {
+        std::cout << "Using default parameter file: surfactant.json\n";
+        param.open( "surfactant.json");
+    }
+    else
+        param.open( argv[1]);
+    if (!param)
+        throw DROPS::DROPSErrCL( "main: error while opening parameter file\n");
+    param >> P;
+    param.close();
+    std::cout << P << std::endl;
+
+    std::cout << "Setting up interface-PDE.\n";
+    WindVelocity= P.get<DROPS::Point3DCL>("Exp.Velocity");
+    RadDrop=      P.get<DROPS::Point3DCL>("Exp.RadDrop");
+    PosDrop=      P.get<DROPS::Point3DCL>("Exp.PosDrop");
+    the_wind_fun= invecmap[P.get<std::string>("Exp.Wind")];
+    the_lset_fun= inscamap[P.get<std::string>("Exp.Levelset")];
+    the_rhs_fun=  inscamap[P.get<std::string>("Exp.Rhs")];
+    the_sol_fun=  inscamap[P.get<std::string>("Exp.Solution")];
+    for (Uint i= 0; i < 6; ++i)
+        bf_wind[i]= the_wind_fun;
+
+    std::cout << "Setting up domain:\n";
+    std::auto_ptr<MGBuilderCL> builder( make_MGBuilder( P.get_child( "Domain")));
+    DROPS::MultiGridCL mg( *builder);
+    DROPS::AdapTriangCL adap( mg, P.get<double>("AdaptRef.Width"),
+                              P.get<int>("AdaptRef.CoarsestLevel"), P.get<int>("AdaptRef.FinestLevel"));
+
+    DROPS::LevelsetP2CL lset( mg, lsbnd, sf);
+
+    if (P.get<int>("VTK.VTKOut",0))
+        vtkwriter= std::auto_ptr<VTKOutCL>( new VTKOutCL(
+            adap.GetMG(),
+            "DROPS data",
+            P.get<int>("Time.NumSteps")/P.get<int>("VTK.VTKOut") + 1,
+            P.get<std::string>("VTK.VTKDir"),
+            P.get<std::string>("VTK.VTKName"),
+            P.get<std::string>("VTK.TimeFileName"),
+            P.get<int>("VTK.Binary"), 
+            P.get<bool>("VTK.UseOnlyP1"),
+            -1,  /* <- level */
+            P.get<bool>("VTK.ReUseTimeFile")));
+
+    if (P.get<bool>( "Exp.StationaryPDE"))
+        StationaryStrategy( mg, adap, lset);
+    else
+        Strategy( mg, adap, lset);
 
     return 0;
   }
