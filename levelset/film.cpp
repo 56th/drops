@@ -204,6 +204,7 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
         else
         {
             ReadFEFromFile( Stokes.v, MG, P.get<std::string>("InitialFile")+"velocity", P.get<int>("Restart.Binary"));
+            ReadFEFromFile( lset.Phi, MG, P.get<std::string>("InitialFile")+"levelset", P.get<int>("Restart.Binary"));
             Stokes.UpdateXNumbering( pidx, lset);
             Stokes.p.SetIdx( pidx);
             ReadFEFromFile( Stokes.p, MG, P.get<std::string>("InitialFile")+"pressure", P.get<int>("Restart.Binary"), &lset.Phi); // pass also level set, as p may be extended
@@ -500,7 +501,8 @@ int main (int argc, char** argv)
         std::cout << "Bnd " << i << ": "; BndCondInfo( bc[i], std::cout);
     }
 
-    DROPS::AdapTriangCL adap( *mgp, P.get<double>("AdaptRef.Width"), P.get<int>("AdaptRef.CoarsestLevel"), P.get<int>("AdaptRef.FinestLevel"));
+    DROPS::AdapTriangCL adap( *mgp, P.get<double>("AdaptRef.Width"), P.get<int>("AdaptRef.CoarsestLevel"), P.get<int>("AdaptRef.FinestLevel"),
+      ((P.get<std::string>("Restart.Inputfile") == "none") ? P.get<int>("AdaptRef.LoadBalStrategy") : -P.get<int>("AdaptRef.LoadBalStrategy")));
     // If we read the Multigrid, it shouldn't be modified;
     // otherwise the pde-solutions from the ensight files might not fit.
     if (P.get<std::string>("Restart.Inputfile") == "none"){
