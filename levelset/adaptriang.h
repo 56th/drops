@@ -115,14 +115,24 @@ class AdapTriangCL
       void MakeInitialTriang (DistFctT&);
 
     /// \brief Coupling of all necessary steps update the triangulation according to a levelset function
-    void UpdateTriang (const LevelsetP2CL& ls);
+    /** This function updates the triangulation according to the position of the
+    interface provided by the levelset function. Therefore this function marks
+    and refines tetras and balance the number of tetras over the processors.
+    Also the numerical data are interpolated to the new triangulation.
+    \return WasModified() */
+    template <class DistFctT>
+      bool UpdateTriang (const DistFctT&);
+    bool UpdateTriang (const LevelsetP2CL& ls);
 
     /// \brief Check if the triangulation has been modified within last update
+    bool WasModified () const { 
+        return
 #ifdef _PAR
-    bool WasModified () const { return modified_ || lb_.GetMovedMultiNodes() > 0; }
+            modified_ || lb_.GetMovedMultiNodes() > 0;
 #else
-    bool WasModified () const { return modified_;}
+            modified_;
 #endif
+    }
 
     /// \name Get a reference onto the MultiGrid
     //@{
