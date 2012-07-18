@@ -192,7 +192,7 @@ class SurfactantcGP1CL
     const VelBndDataT&  Bnd_v_;  ///< Boundary condition for the velocity
     VecDescCL*          v_;      ///< velocity at current time step
     VecDescCL&          lset_vd_;///< levelset at current time step
-    
+
     const BndDataCL<>&  lsetbnd_; ///< level set boundary
 
     IdxDescCL           oldidx_; ///< idx that corresponds to old time (and oldls_)
@@ -206,10 +206,10 @@ class SurfactantcGP1CL
     double omit_bound_;
 
   public:
-    SurfactantcGP1CL (MultiGridCL& mg, const VelBndDataT& Bnd_v,
-        double theta, double D, VecDescCL* v, VecDescCL& lset_vd, const BndDataCL<>& lsetbnd,
-        double dt, int iter= 1000, double tol= 1e-7, double omit_bound= -1.)
-    : idx( P1IF_FE), MG_( mg), D_( D), theta_( theta), dt_( dt),
+    SurfactantcGP1CL (MultiGridCL& mg,
+        double theta, double D, VecDescCL* v, const VelBndDataT& Bnd_v, VecDescCL& lset_vd, const BndDataCL<>& lsetbnd,
+        int iter= 1000, double tol= 1e-7, double omit_bound= -1.)
+    : idx( P1IF_FE), MG_( mg), D_( D), theta_( theta), dt_( 0.),
         Bnd_v_( Bnd_v), v_( v), lset_vd_( lset_vd), lsetbnd_( lsetbnd), oldidx_( P1IF_FE), gm_( pc_, 100, iter, tol, true),
         omit_bound_( omit_bound)
     { idx.GetXidx().SetBound( omit_bound); }
@@ -218,10 +218,10 @@ class SurfactantcGP1CL
     GMResSolverCL<GSPcCL>& GetSolver() { return gm_; }
 
      /// initialize the interface concentration
-    void Init (instat_scalar_fun_ptr);
+    void SetInitialValue (instat_scalar_fun_ptr, double t= 0.);
 
-    /// \remarks call SetupSystem \em before calling SetTimeStep!
-    void SetTimeStep( double dt, double theta=-1);
+    /// set the parameter of the theta-scheme for time stepping
+    void SetTheta (double theta);
 
     /// save a copy of the old level-set; must be called before DoStep.
     void InitOld ();
@@ -240,7 +240,7 @@ class SurfactantcGP1CL
     /// of the coupling navstokes-levelset. They should not be called by a common user.
     /// Use DoStep() instead.
     ///@{
-    VectorCL InitStep ();
+    VectorCL InitStep (double new_t);
     void DoStep (const VectorCL&);
     void CommitStep ();
     void Update ();

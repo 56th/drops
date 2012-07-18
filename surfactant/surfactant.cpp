@@ -94,20 +94,23 @@ double sol0t (const DROPS::Point3DCL& p, double t)
     return 1. + q.norm_sq()/(12. + q.norm_sq())*val;
 }
 
+
 template<class DiscP1FunType>
-double L2_error (const DROPS::MultiGridCL& mg, const DROPS::VecDescCL& ls, const BndDataCL<>& lsbnd,
-    const DiscP1FunType& discsol, DROPS::instat_scalar_fun_ptr extsol, double t= 0.)
+double L2_error (const DROPS::VecDescCL& ls, const BndDataCL<>& lsbnd,
+    const DiscP1FunType& discsol, DROPS::instat_scalar_fun_ptr extsol)
 {
     double d( 0.);
     const DROPS::Uint lvl = ls.GetLevel();
+    const double t= discsol.GetTime();
+    const DROPS::MultiGridCL& mg= discsol.GetMG();
     DROPS::InterfaceTriangleCL triangle;
     DROPS::Quad5_2DCL<> qsol, qdiscsol;
 
     DROPS_FOR_TRIANG_CONST_TETRA( mg, lvl, it) {
-    	triangle.Init( *it, ls, lsbnd);
+        triangle.Init( *it, ls, lsbnd);
         if (triangle.Intersects()) { // We are at the phase boundary.
             for (int ch= 0; ch < 8; ++ch) {
-            	triangle.ComputeForChild( ch);
+                triangle.ComputeForChild( ch);
                 for (int tri= 0; tri < triangle.GetNumTriangles(); ++tri) {
                     qsol.assign( *it, &triangle.GetBary( tri), extsol, t);
                     qdiscsol.assign(  *it, &triangle.GetBary( tri), discsol);
@@ -120,18 +123,19 @@ double L2_error (const DROPS::MultiGridCL& mg, const DROPS::VecDescCL& ls, const
 }
 
 double L2_norm (const DROPS::MultiGridCL& mg, const DROPS::VecDescCL& ls, const BndDataCL<>& lsbnd,
-    DROPS::instat_scalar_fun_ptr extsol, double t= 0.)
+    DROPS::instat_scalar_fun_ptr extsol)
 {
     double d( 0.);
-    const DROPS::Uint lvl = ls.GetLevel();
+    const DROPS::Uint lvl= ls.GetLevel();
+    const double        t= ls.t;
     DROPS::InterfaceTriangleCL triangle;
     DROPS::Quad5_2DCL<> qsol;
 
     DROPS_FOR_TRIANG_CONST_TETRA( mg, lvl, it) {
-    	triangle.Init( *it, ls, lsbnd);
+        triangle.Init( *it, ls, lsbnd);
         if (triangle.Intersects()) { // We are at the phase boundary.
             for (int ch= 0; ch < 8; ++ch) {
-            	triangle.ComputeForChild( ch);
+                triangle.ComputeForChild( ch);
                 for (int tri= 0; tri < triangle.GetNumTriangles(); ++tri) {
                     qsol.assign( *it, &triangle.GetBary( tri), extsol, t);
                     d+= DROPS::Quad5_2DCL<>( qsol*qsol).quad( triangle.GetAbsDet( tri));
@@ -142,7 +146,7 @@ double L2_norm (const DROPS::MultiGridCL& mg, const DROPS::VecDescCL& ls, const 
     return std::sqrt( d);
 }
 
-void LinearLSInit (const DROPS::MultiGridCL& mg, DROPS::VecDescCL& ls, DROPS::instat_scalar_fun_ptr d, double t=0.)
+void LinearLSInit (const DROPS::MultiGridCL& mg, DROPS::VecDescCL& ls, DROPS::instat_scalar_fun_ptr d, double t= 0.)
 {
     const DROPS::Uint lvl= ls.GetLevel(),
                       idx= ls.RowIdx->GetIdx();
@@ -153,9 +157,10 @@ void LinearLSInit (const DROPS::MultiGridCL& mg, DROPS::VecDescCL& ls, DROPS::in
     DROPS_FOR_TRIANG_CONST_EDGE( mg, lvl, it)
         ls.Data[it->Unknowns( idx)]= ls.Data[it->Unknowns( idx)]=
             0.5*(ls.Data[it->GetVertex( 0)->Unknowns( idx)] + ls.Data[it->GetVertex( 1)->Unknowns( idx)]);
+    ls.t= t;
 }
 
-void LSInit (const DROPS::MultiGridCL& mg, DROPS::VecDescCL& ls, dist_funT d, double t)
+void LSInit (const DROPS::MultiGridCL& mg, DROPS::VecDescCL& ls, dist_funT d, double t= 0.)
 {
     const DROPS::Uint lvl= ls.GetLevel(),
                       idx= ls.RowIdx->GetIdx();
@@ -165,9 +170,10 @@ void LSInit (const DROPS::MultiGridCL& mg, DROPS::VecDescCL& ls, dist_funT d, do
 
     DROPS_FOR_TRIANG_CONST_EDGE( mg, lvl, it)
         ls.Data[it->Unknowns( idx)]= d( 0.5*(it->GetVertex( 0)->GetCoord() + it->GetVertex( 1)->GetCoord()), t);
+    ls.t= t;
 }
 
-void InitVel ( const MultiGridCL& mg, VecDescCL* vec, BndDataCL<Point3DCL>& Bnd, instat_vector_fun_ptr LsgVel, double t)
+void InitVel ( const MultiGridCL& mg, VecDescCL* vec, BndDataCL<Point3DCL>& Bnd, instat_vector_fun_ptr LsgVel, double t= 0.)
 {
     VectorCL& lsgvel= vec->Data;
     const Uint lvl  = vec->GetLevel(),
@@ -183,18 +189,7 @@ void InitVel ( const MultiGridCL& mg, VecDescCL* vec, BndDataCL<Point3DCL>& Bnd,
             DoFHelperCL<Point3DCL, VectorCL>::set( lsgvel, sit->Unknowns( vidx),
                 LsgVel( (sit->GetVertex(0)->GetCoord() + sit->GetVertex(1)->GetCoord())/2., t));
     }
-    vec->t = t;
-}
-
-void P1Init (instat_scalar_fun_ptr icf, VecDescCL& ic, MultiGridCL& mg, double t)
-{
-    const Uint lvl= ic.GetLevel(),
-               idx= ic.RowIdx->GetIdx();
-
-    DROPS_FOR_TRIANG_VERTEX( mg, lvl, it) {
-        if (it->Unknowns.Exist( idx))
-            ic.Data[it->Unknowns( idx)]= icf( it->GetCoord(), t);
-    }
+    vec->t= t;
 }
 
 
@@ -224,7 +219,11 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
 
     lset2.SetupSystem( make_P2Eval( mg, Bnd_v, v), P.get<double>("Time.StepSize"));
 
-    SurfactantcGP1CL timedisc( mg, Bnd_v, P.get<double>("SurfTransp.Theta"), P.get<double>("SurfTransp.Visc"), &v, lset.Phi, lset.GetBndData(), P.get<double>("Time.StepSize"), P.get<int>("SurfTransp.Iter"), P.get<double>("SurfTransp.Tol"), P.get<double>("SurfTransp.OmitBound"));
+    SurfactantcGP1CL timedisc( mg,
+        P.get<double>("SurfTransp.Theta"), P.get<double>("SurfTransp.Visc"),
+        &v, Bnd_v, lset.Phi, lset.GetBndData(),
+        P.get<int>("SurfTransp.Iter"), P.get<double>("SurfTransp.Tol"),
+        P.get<double>("SurfTransp.OmitBound"));
 
     LevelsetRepairCL lsetrepair( lset);
     adap.push_back( &lsetrepair);
@@ -237,8 +236,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     timedisc.idx.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
     std::cout << "NumUnknowns: " << timedisc.idx.NumUnknowns() << std::endl;
     timedisc.ic.SetIdx( &timedisc.idx);
-    timedisc.Init( &sol0);
-    // timedisc.Update();
+    timedisc.SetInitialValue( &sol0, 0.);
 
     // Additional Ensight6-variables
     ensight.Register( make_Ensight6IfaceScalar( mg, timedisc.ic,                 "InterfaceSol", ensf + ".sur", true));
@@ -247,7 +245,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     ensight.Register( make_Ensight6Scalar( ScalarFunAsP2EvalCL( sol0t, 0., &mg), "TrueSol",      ensf + ".sol", true));
     ensight.Write( 0.);
 
-    // timedisc.SetTimeStep( P.get<double>("Time.StepSize"), P.get<double>("SurfTransp.Theta"));
+    // timedisc.SetTheta( P.get<double>("SurfTransp.Theta"));
 //    std::cout << "L_2-error: " << L2_error( mg, lset.Phi, timedisc.GetSolution(), &sol0t, 0.)
 //              << " norm of true solution: " << L2_norm( mg, lset.Phi, &sol0t, 0.)
 //              << std::endl;
@@ -398,7 +396,7 @@ int main (int argc, char* argv[])
     ensight.Register( make_Ensight6Scalar( make_P1Eval( mg, nobnd, xext), "InterfaceSol", ensf + ".sur"));
     ensight.Write();
 
-    double L2_err( L2_error( mg, lset.Phi, lset.GetBndData(), make_P1Eval( mg, nobnd, xext), &sol0));
+    double L2_err( L2_error( lset.Phi, lset.GetBndData(), make_P1Eval( mg, nobnd, xext), &sol0));
     std::cout << "L_2-error: " << L2_err << std::endl;
 
     return 0;

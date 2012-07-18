@@ -250,7 +250,7 @@ void SetupMixedMassP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& l
     const Uint lvl= mat->GetRowLevel();
     IdxT rownum[4], colnum[4];
 
-    std::cerr << "entering SetupMixedMassP1: " << rows << " rows, " << cols << " cols. ";
+    std::cout << "entering SetupMixedMassP1: " << rows << " rows, " << cols << " cols. ";
 
     LocalP1CL<> p1[4];
     p1[0][0]= p1[1][1]= p1[2][2]= p1[3][3]= 1.; // P1-Basis-Functions
@@ -282,7 +282,7 @@ void SetupMixedMassP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& l
         }
     }
     m.Build();
-    std::cerr << mat->Data.num_nonzeros() << " nonzeros in mixed mass-divergence matrix!" << std::endl;
+    std::cout << mat->Data.num_nonzeros() << " nonzeros in mixed mass-divergence matrix!" << std::endl;
 }
 
 void SetupInterfaceRhsP1 (const MultiGridCL& mg, VecDescCL* v,
@@ -327,17 +327,18 @@ void P1Init (instat_scalar_fun_ptr icf, VecDescCL& ic, MultiGridCL& mg, double t
         if (it->Unknowns.Exist( idx))
             ic.Data[it->Unknowns( idx)]= icf( it->GetCoord(), t);
     }
+    ic.t= t;
 }
 
-void SurfactantcGP1CL::Init (instat_scalar_fun_ptr icf)
+void SurfactantcGP1CL::SetInitialValue (instat_scalar_fun_ptr icf, double t)
 {
-    P1Init ( icf, ic, MG_, 0.);
+    P1Init ( icf, ic, MG_, t);
 }
 
-void SurfactantcGP1CL::SetTimeStep (double dt, double theta)
+void SurfactantcGP1CL::SetTheta (double theta)
 {
-    dt_= dt;
-    if (theta >= 0. && theta <= 1.) theta_= theta;
+    if (theta >= 0. && theta <= 1.)
+        theta_= theta;
 }
 
 void SurfactantcGP1CL::Update()
@@ -371,10 +372,12 @@ void SurfactantcGP1CL::Update()
     std::cout << "SurfactantP1CL::Update: Finished\n";
 }
 
-VectorCL SurfactantcGP1CL::InitStep ()
+VectorCL SurfactantcGP1CL::InitStep (double new_t)
 {
 
     // std::cout << "SurfactantcGP1CL::InitStep:\n";
+    ic.t= new_t;
+    dt_= ic.t - oldt_;
     idx.CreateNumbering( oldidx_.TriangLevel(), MG_, &lset_vd_, &lsetbnd_); // InitOld deletes oldidx_ and swaps idx and oldidx_.
     std::cout << "new NumUnknowns: " << idx.NumUnknowns() << std::endl;
     ic.SetIdx( &idx);
@@ -430,8 +433,7 @@ void SurfactantcGP1CL::CommitStep ()
 
 void SurfactantcGP1CL::DoStep (double new_t)
 {
-    VectorCL rhs( InitStep());
-    ic.t= new_t;
+    VectorCL rhs( InitStep( new_t));
     DoStep( rhs);
     CommitStep();
 }
@@ -443,12 +445,14 @@ void SurfactantcGP1CL::InitOld ()
     oldidx_.swap( idx);
     oldic_.resize( ic.Data.size());
     oldic_= ic.Data;
+    oldt_= ic.t;
+
     oldls_.RowIdx= lset_vd_.RowIdx;
     oldls_.Data.resize( lset_vd_.Data.size());
     oldls_.Data= lset_vd_.Data;
+
     oldv_.SetIdx( v_->RowIdx);
     oldv_.Data= v_->Data;
-    oldt_= ic.t;
 }
 
 void
