@@ -187,6 +187,7 @@ class SurfactantcGP1CL
     MultiGridCL&  MG_;
     double        D_,              ///< diffusion coefficient
                   theta_, dt_;     ///< time scheme parameter and time step
+    instat_scalar_fun_ptr rhs_fun_;///< function for a right-hand side
 
     BndDataT            Bnd_;
     const VelBndDataT&  Bnd_v_;  ///< Boundary condition for the velocity
@@ -209,7 +210,7 @@ class SurfactantcGP1CL
     SurfactantcGP1CL (MultiGridCL& mg,
         double theta, double D, VecDescCL* v, const VelBndDataT& Bnd_v, VecDescCL& lset_vd, const BndDataCL<>& lsetbnd,
         int iter= 1000, double tol= 1e-7, double omit_bound= -1.)
-    : idx( P1IF_FE), MG_( mg), D_( D), theta_( theta), dt_( 0.),
+    : idx( P1IF_FE), MG_( mg), D_( D), theta_( theta), dt_( 0.), rhs_fun_( 0),
         Bnd_v_( Bnd_v), v_( v), lset_vd_( lset_vd), lsetbnd_( lsetbnd), oldidx_( P1IF_FE), gm_( pc_, 100, iter, tol, true),
         omit_bound_( omit_bound)
     { idx.GetXidx().SetBound( omit_bound); }
@@ -219,6 +220,9 @@ class SurfactantcGP1CL
 
      /// initialize the interface concentration
     void SetInitialValue (instat_scalar_fun_ptr, double t= 0.);
+
+    /// set the parameter of the theta-scheme for time stepping
+    void SetRhs (instat_scalar_fun_ptr);
 
     /// set the parameter of the theta-scheme for time stepping
     void SetTheta (double theta);

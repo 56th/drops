@@ -211,11 +211,11 @@ void SetupMassDivP1OnTriangle (const BaryCoordCL triangle[3], double det,
 void SetupInterfaceRhsP1OnTriangle (const LocalP1CL<> p1[4],
     Quad5_2DCL<> q[4],VectorCL& v, const IdxT Numb[4],
     const TetraCL& t, const BaryCoordCL triangle[3], double det,
-    instat_scalar_fun_ptr f)
+    instat_scalar_fun_ptr f, double time)
 {
     for (int i= 0; i < 4; ++i)
         q[i].assign( p1[i], triangle);
-    Quad5_2DCL<> qf( t, triangle, f), r;
+    Quad5_2DCL<> qf( t, triangle, f, time), r;
 
     for (int i= 0; i < 4; ++i) {
         if (Numb[i] == NoIdx) continue;
@@ -290,6 +290,7 @@ void SetupInterfaceRhsP1 (const MultiGridCL& mg, VecDescCL* v,
 {
     const IdxT num_unks= v->RowIdx->NumUnknowns();
     const Uint lvl = v->GetLevel();
+    const double t= v->t;
 
     IdxT num[4];
 
@@ -310,7 +311,7 @@ void SetupInterfaceRhsP1 (const MultiGridCL& mg, VecDescCL* v,
                 triangle.ComputeForChild( ch);
                 for (int tri= 0; tri < triangle.GetNumTriangles(); ++tri)
                     SetupInterfaceRhsP1OnTriangle( p1, q, v->Data, num,
-                        *it, &triangle.GetBary( tri), triangle.GetAbsDet( tri), f);
+                        *it, &triangle.GetBary( tri), triangle.GetAbsDet( tri), f, t);
             }
         }
     }
@@ -333,6 +334,11 @@ void P1Init (instat_scalar_fun_ptr icf, VecDescCL& ic, MultiGridCL& mg, double t
 void SurfactantcGP1CL::SetInitialValue (instat_scalar_fun_ptr icf, double t)
 {
     P1Init ( icf, ic, MG_, t);
+}
+
+void SurfactantcGP1CL::SetRhs (instat_scalar_fun_ptr rhs)
+{
+    rhs_fun_= rhs;
 }
 
 void SurfactantcGP1CL::SetTheta (double theta)
@@ -387,6 +393,13 @@ VectorCL SurfactantcGP1CL::InitStep (double new_t)
     // std::cout << "mixed M on new interface is set up.\n";
     VectorCL rhs( theta_*(m.Data*oldic_));
 
+    if (rhs_fun_) {
+        VecDescCL load( &idx);
+        load.t= new_t;
+        DROPS::SetupInterfaceRhsP1 (MG_, &load, lset_vd_, lsetbnd_, rhs_fun_);
+        rhs+= theta_*dt_*load.Data;
+    }
+
     if (theta_ == 1.0) return rhs;
 
     m.Data.clear();
@@ -406,6 +419,12 @@ VectorCL SurfactantcGP1CL::InitStep (double new_t)
     DROPS::SetupMassDivP1( MG_, &m, oldls_, lsetbnd_, make_P2Eval( MG_, Bnd_v_, oldv_));
     // std::cout << "mixed Md on old interface is set up.\n";
     rhs2+= m.Data*oldic_;
+    if (rhs_fun_) {
+        VecDescCL load( &idx);
+        load.t= new_t - dt_;
+        DROPS::SetupInterfaceRhsP1( MG_, &load, oldls_, lsetbnd_, rhs_fun_);
+        rhs+= (1. - theta_)*dt_*load.Data;
+    }
 
     return VectorCL( rhs - ((1. - theta_)*dt_)*rhs2);
 }

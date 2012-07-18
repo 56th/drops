@@ -328,6 +328,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
         &v, Bnd_v, lset.Phi, lset.GetBndData(),
         P.get<int>("SurfTransp.Iter"), P.get<double>("SurfTransp.Tol"),
         P.get<double>("SurfTransp.OmitBound"));
+    timedisc.SetRhs( the_rhs_fun);
 
     LevelsetRepairCL lsetrepair( lset);
     adap.push_back( &lsetrepair);
