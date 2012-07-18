@@ -331,20 +331,37 @@ void P1Init (instat_scalar_fun_ptr icf, VecDescCL& ic, MultiGridCL& mg, double t
     ic.t= t;
 }
 
-void SurfactantcGP1CL::SetInitialValue (instat_scalar_fun_ptr icf, double t)
+void SurfactantP1BaseCL::SetInitialValue (instat_scalar_fun_ptr icf, double t)
 {
     P1Init ( icf, ic, MG_, t);
 }
 
-void SurfactantcGP1CL::SetRhs (instat_scalar_fun_ptr rhs)
+void SurfactantP1BaseCL::SetRhs (instat_scalar_fun_ptr rhs)
 {
     rhs_fun_= rhs;
 }
 
-void SurfactantcGP1CL::SetTheta (double theta)
+void SurfactantP1BaseCL::SetTheta (double theta)
 {
     if (theta >= 0. && theta <= 1.)
         theta_= theta;
+}
+
+void SurfactantP1BaseCL::InitTimeStep ()
+{
+    if (oldidx_.NumUnknowns() > 0)
+        oldidx_.DeleteNumbering( MG_);
+    oldidx_.swap( idx);
+    oldic_.resize( ic.Data.size());
+    oldic_= ic.Data;
+    oldt_= ic.t;
+
+    oldls_.RowIdx= lset_vd_.RowIdx;
+    oldls_.Data.resize( lset_vd_.Data.size());
+    oldls_.Data= lset_vd_.Data;
+
+    oldv_.SetIdx( v_->RowIdx);
+    oldv_.Data= v_->Data;
 }
 
 void SurfactantcGP1CL::Update()
@@ -455,23 +472,6 @@ void SurfactantcGP1CL::DoStep (double new_t)
     VectorCL rhs( InitStep( new_t));
     DoStep( rhs);
     CommitStep();
-}
-
-void SurfactantcGP1CL::InitOld ()
-{
-    if (oldidx_.NumUnknowns() > 0)
-        oldidx_.DeleteNumbering( MG_);
-    oldidx_.swap( idx);
-    oldic_.resize( ic.Data.size());
-    oldic_= ic.Data;
-    oldt_= ic.t;
-
-    oldls_.RowIdx= lset_vd_.RowIdx;
-    oldls_.Data.resize( lset_vd_.Data.size());
-    oldls_.Data= lset_vd_.Data;
-
-    oldv_.SetIdx( v_->RowIdx);
-    oldv_.Data= v_->Data;
 }
 
 void

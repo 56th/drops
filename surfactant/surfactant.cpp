@@ -372,7 +372,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
         // Assumes (as the rest of Drops), that the current triangulation is acceptable to perform the time-step.
         // If dt is large and AdapRef.Width is small, this may not be true.
         // Watch for large differences in numbers of old and new dof.
-        timedisc.InitOld();
+        timedisc.InitTimeStep();
         LSInit( mg, lset.Phi, the_lset_fun, cur_time);
         InitVel( mg, &v, Bnd_v, the_wind_fun, cur_time);
         timedisc.DoStep( cur_time);

@@ -166,7 +166,7 @@ double Integral_Gamma_Extrapolate (const DROPS::MultiGridCL& mg, const DROPS::Ve
 
 
 /// \brief P1-discretization and solution of the transport equation on the interface
-class SurfactantcGP1CL
+class SurfactantP1BaseCL
 {
   public:
     typedef BndDataCL<Point3DCL>                              VelBndDataT;
@@ -174,27 +174,22 @@ class SurfactantcGP1CL
     typedef P1EvalCL<double, const BndDataT, VecDescCL>       DiscSolCL;
     typedef P1EvalCL<double, const BndDataT, const VecDescCL> const_DiscSolCL;
 
-    IdxDescCL idx;
-    VecDescCL ic; ///< concentration on the interface
-    MatDescCL A,  ///< diffusion matrix
-              M,  ///< mass matrix
-              C,  ///< convection matrix
-              Md, ///< mass matrix with interface-divergence of velocity
-              M2; ///< mass matrix: new trial- and test- functions on old interface
+    IdxDescCL idx; ///< index desctription for concentration at current time
+    VecDescCL ic;  ///< concentration on the interface at current time
 
-  private:
-    MatrixCL      L_;              ///< sum of matrices
+  protected:
     MultiGridCL&  MG_;
-    double        D_,              ///< diffusion coefficient
-                  theta_, dt_;     ///< time scheme parameter and time step
-    instat_scalar_fun_ptr rhs_fun_;///< function for a right-hand side
+    double        D_,     ///< diffusion coefficient
+                  theta_, ///< time scheme parameter
+                  dt_;    ///< time step size
+    instat_scalar_fun_ptr rhs_fun_; ///< function for a right-hand side
 
-    BndDataT            Bnd_;
+    BndDataT            Bnd_;    ///< Dummy boundary data for interface solution
+
     const VelBndDataT&  Bnd_v_;  ///< Boundary condition for the velocity
     VecDescCL*          v_;      ///< velocity at current time step
     VecDescCL&          lset_vd_;///< levelset at current time step
-
-    const BndDataCL<>&  lsetbnd_; ///< level set boundary
+    const BndDataCL<>&  lsetbnd_;///< level set boundary
 
     IdxDescCL           oldidx_; ///< idx that corresponds to old time (and oldls_)
     VectorCL            oldic_;  ///< interface concentration at old time
@@ -207,7 +202,7 @@ class SurfactantcGP1CL
     double omit_bound_;
 
   public:
-    SurfactantcGP1CL (MultiGridCL& mg,
+    SurfactantP1BaseCL (MultiGridCL& mg,
         double theta, double D, VecDescCL* v, const VelBndDataT& Bnd_v, VecDescCL& lset_vd, const BndDataCL<>& lsetbnd,
         int iter= 1000, double tol= 1e-7, double omit_bound= -1.)
     : idx( P1IF_FE), MG_( mg), D_( D), theta_( theta), dt_( 0.), rhs_fun_( 0),
@@ -218,7 +213,12 @@ class SurfactantcGP1CL
     const MultiGridCL& GetMG() const { return MG_; }
     GMResSolverCL<GSPcCL>& GetSolver() { return gm_; }
 
-     /// initialize the interface concentration
+    const_DiscSolCL GetSolution() const
+        { return const_DiscSolCL( &ic, &Bnd_, &MG_); }
+    const_DiscSolCL GetSolution( const VecDescCL& Myic) const
+        { return const_DiscSolCL( &Myic, &Bnd_, &MG_); }
+
+    /// initialize the interface concentration
     void SetInitialValue (instat_scalar_fun_ptr, double t= 0.);
 
     /// set the parameter of the theta-scheme for time stepping
@@ -227,17 +227,39 @@ class SurfactantcGP1CL
     /// set the parameter of the theta-scheme for time stepping
     void SetTheta (double theta);
 
-    /// save a copy of the old level-set; must be called before DoStep.
-    void InitOld ();
+    /// save a copy of the old level-set and velocity; moves ic to oldic; must be called before DoStep.
+    virtual void InitTimeStep ();
+
+    /// perform one time step to new_t.
+    virtual void DoStep (double /*new_t*/) {}
+};
+
+
+/// \brief P1-discretization and solution of the transport equation on the interface
+class SurfactantcGP1CL : public SurfactantP1BaseCL
+{
+  public:
+    MatDescCL A,  ///< diffusion matrix
+              M,  ///< mass matrix
+              C,  ///< convection matrix
+              Md, ///< mass matrix with interface-divergence of velocity
+              M2; ///< mass matrix: new trial- and test- functions on old interface
+
+  private:
+    MatrixCL      L_; ///< sum of matrices
+
+  public:
+    SurfactantcGP1CL (MultiGridCL& mg,
+        double theta, double D, VecDescCL* v, const VelBndDataT& Bnd_v, VecDescCL& lset_vd, const BndDataCL<>& lsetbnd,
+        int iter= 1000, double tol= 1e-7, double omit_bound= -1.)
+    : SurfactantP1BaseCL( mg, theta, D, v, Bnd_v, lset_vd, lsetbnd, iter, tol, omit_bound)
+    {}
+
+    /// save a copy of the old level-set and velocity; moves ic to oldic; must be called before DoStep.
+    // void InitTimeStep (); // as in the base
 
     /// perform one time step
-    void DoStep (double new_t);
-
-    const_DiscSolCL GetSolution() const
-        { return const_DiscSolCL( &ic, &Bnd_, &MG_); }
-    const_DiscSolCL GetSolution( const VecDescCL& Myic) const
-        { return const_DiscSolCL( &Myic, &Bnd_, &MG_); }
-    ///@}
+    virtual void DoStep (double new_t);
 
     /// \name For internal use only
     /// The following member functions are added to enable an easier implementation
