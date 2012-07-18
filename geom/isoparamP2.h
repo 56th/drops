@@ -84,7 +84,6 @@ inline Point3DCL GetWorldCoord( const LocalP2CL<Point3DCL> & ct, const Point3DCL
 
 inline Point3DCL GetWorldCoord( const LocalP2CL<Point3DCL> & ct, const BaryCoordCL& p)
 {
-    std::cout << " here " << std::endl;
     Point3DCL point(0.);
     double val;
     for (int i=0; i<10; i++){

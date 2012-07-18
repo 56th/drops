@@ -47,7 +47,6 @@ cdrdrops:\
     ../misc/params.o \
     ../out/vtkOut.o ../misc/bndmap.o ../misc/bndScalarFunctions.o\
     ../misc/bndVelFunctions.o\
-	../geom/isoparamP2.o \
 	../geom/deformation.o \
     $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)

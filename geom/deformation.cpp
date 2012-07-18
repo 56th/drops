@@ -36,7 +36,13 @@ MeshDeformationCL& MeshDeformationCL::getInstance()
     return instance;
 }
 
-void MeshDeformationCL::SetMeshTransformation(instat_vector_fun_ptr f, const double t){
+
+/// Apply a transformation to the reference mesh and fill the (P2)deformation vector 
+/// accordingly. The flag "only_bnd_edges_curved" allows to basically reduce the number
+/// of curved edges (and thus tetrahedra) by removing curvature information at inner edges
+/// and replacing them with the mean of the vertex values.
+void MeshDeformationCL::SetMeshTransformation(instat_vector_fun_ptr f, const double t, 
+                                              bool only_bnd_edges_curved){
     if (mg_==NULL)
         throw DROPSErrCL("MeshDeformationCL::SetMeshIdentity: No MultiGridCL* given!");
 
@@ -50,28 +56,118 @@ void MeshDeformationCL::SetMeshTransformation(instat_vector_fun_ptr f, const dou
 
     DROPS_FOR_TRIANG_EDGE( (*mg_), mg_->GetLastLevel(), it) {
         if (!it->Unknowns.Exist( pidx)) continue;
-        const Point3DCL val(f(GetBaryCenter(*it),t));
-        for (Uint k = 0; k < 3; ++k)
-            (*pointsol_).Data[it->Unknowns(pidx)+k] = val[k];
+        if (!only_bnd_edges_curved || it->IsOnBoundary()) // potentially curved elements
+        {
+            const Point3DCL val(f(GetBaryCenter(*it),t));
+            for (Uint k = 0; k < 3; ++k)
+                (*pointsol_).Data[it->Unknowns(pidx)+k] = val[k];
+        }
+        else // planar values, i.e. average of vertex values
+        {
+            const Uint pidx = mlidx_->GetIdx();
+            const VertexCL& vt1 (*it->GetVertex(0));
+            const VertexCL& vt2 (*it->GetVertex(1));
+            if (!vt1.Unknowns.Exist( pidx)) continue;
+            if (!vt2.Unknowns.Exist( pidx)) continue;
+            if (!it->Unknowns.Exist( pidx)) continue;
+            Point3DCL a,b;
+            for (Uint k = 0; k < 3; ++k)
+            {
+                (*pointsol_).Data[it->Unknowns(pidx)+k] = 
+                    0.5 * (*pointsol_).Data[vt1.Unknowns(pidx)+k]
+                    + 0.5 * (*pointsol_).Data[vt2.Unknowns(pidx)+k];
+            }
+        }
     }
-    std::cout << " (*pointsol_).Data = \n " << (*pointsol_).Data << std::endl;
 }
 
+
+// Fill the Deformation vector with the coordinates of the reference mesh
 void MeshDeformationCL::SetMeshIdentity(){
     SetMeshTransformation(&instat_Identity3D,0.0);
 }
 
-void MeshDeformationCL::CheckForCurved(){
+
+// For inner edges curved elements are typically not necessary. For ease for implementation
+// it might still be that an applied transformation lead to curved edges inside the domain.
+// This function replaces the curved values on the edges with the average of the vertex values
+// leading to a non-curved situation for all inner edges and thus for all inner elements
+void MeshDeformationCL::SetInnerEdgesPlanar(){
     if (mg_==NULL)
         throw DROPSErrCL("MeshDeformationCL::CheckForCurved: No MultiGridCL* given!");
+    DROPS_FOR_TRIANG_EDGE( (*mg_), mg_->GetLastLevel(), it) {
+        if (it->IsOnBoundary()) continue; // the remainder is only done for inner edges!
 
-    std::cout << " MeshDeformationCL::CheckForCurved : not implemented yet" << std::endl;
-    DROPS_FOR_TRIANG_TETRA( (*mg_), mg_->GetLastLevel(), it) {
-        // check if Tetra has a curved Edge...
-        tet_is_curved[&(*it)] = false;
+        const Uint pidx = mlidx_->GetIdx();
+        const VertexCL& vt1 (*it->GetVertex(0));
+        const VertexCL& vt2 (*it->GetVertex(1));
+        if (!vt1.Unknowns.Exist( pidx)) continue;
+        if (!vt2.Unknowns.Exist( pidx)) continue;
+        if (!it->Unknowns.Exist( pidx)) continue;
+        
+        Point3DCL a,b;
+        for (Uint k = 0; k < 3; ++k)
+        {
+            (*pointsol_).Data[it->Unknowns(pidx)+k] = 
+                0.5 * (*pointsol_).Data[vt1.Unknowns(pidx)+k]
+                + 0.5 * (*pointsol_).Data[vt2.Unknowns(pidx)+k];
+        }
     }
 }
 
+/// Runs of all tetrahedra, checks if any aligned edge is curved and stores this in the mapping 
+/// tet_is_curved. Note that an edge is considerd as curved if the angle is larger than a given 
+/// threshold, here 1e-8.
+void MeshDeformationCL::CheckForCurved(){
+    if (mg_==NULL)
+        throw DROPSErrCL("MeshDeformationCL::CheckForCurved: No MultiGridCL* given!");
+    Ulint curvedels = 0;
+    Ulint els = 0;
+    DROPS_FOR_TRIANG_TETRA( (*mg_), mg_->GetLastLevel(), it) {
+        const Uint pidx = mlidx_->GetIdx();
+        bool curved = false;
+        for (Uint i = 0; i < 6; ++i)
+        {
+            const EdgeCL& edge (*it->GetEdge(i));
+            const VertexCL& vt1 (*edge.GetVertex(0));
+            const VertexCL& vt2 (*edge.GetVertex(1));
+            if (!vt1.Unknowns.Exist( pidx)) continue;
+            if (!vt2.Unknowns.Exist( pidx)) continue;
+            Point3DCL a,b;
+            for (Uint k = 0; k < 3; ++k)
+            {
+                a[k] = (*pointsol_).Data[vt1.Unknowns(pidx)+k];
+                b[k] = (*pointsol_).Data[vt2.Unknowns(pidx)+k];
+            }
+            const Point3DCL c = 0.5 * a + 0.5 * b; // edge midpoint (uncurved)
+            const Point3DCL d = b - a; // difference of vert coords
+            const double edgelength = d.norm();
+            if (!edge.Unknowns.Exist( pidx)) continue;
+            Point3DCL dc;
+            for (Uint k = 0; k < 3; ++k)
+                dc[k] = (*pointsol_).Data[edge.Unknowns(pidx)+k] - c[k];
+            //std::cout << " dc.norm = " << dc.norm() << std::endl;
+            if (dc.norm() > 2e-8 * edgelength) // angle is larger than approx. 1e-8
+            {
+                curved = true;
+                break;
+            }
+        }
+        tet_is_curved[&(*it)] = curved;
+        els ++;
+        if (curved)
+            curvedels ++;
+    }
+    std::cout << curvedels << " out of " << els << " tetrahedra are curved." << std::endl;
+}
+
+// Manipulate the deformation of a single edge midpoint
+void MeshDeformationCL::SetEdgeDeformation(const EdgeCL& edge, const Point3DCL & p){
+    const Uint pidx = mlidx_->GetIdx();
+    if (!edge.Unknowns.Exist( pidx)) return;
+    for (Uint k = 0; k < 3; ++k)
+        (*pointsol_).Data[edge.Unknowns(pidx)+k] = p[k];
+}
 
 bool MeshDeformationCL::IsTetraCurved(const TetraCL& tet){
     return tet_is_curved[&tet];

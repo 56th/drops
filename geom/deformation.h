@@ -58,15 +58,18 @@ public:
     static MeshDeformationCL& getInstance();
 
     void SetMeshIdentity();
-    void SetMeshTransformation(instat_vector_fun_ptr f, const double t);
+    void SetMeshTransformation(instat_vector_fun_ptr f, const double t, bool only_bnd_edges_curved = false);
 
     void CheckForCurved();
     void Initialize( MultiGridCL* mg);
     bool IsTetraCurved(const TetraCL& tet);
     LocalP2CL<Point3DCL> GetLocalP2Deformation( const TetraCL&);
     LocalP1CL<Point3DCL> GetLocalP1Deformation( const TetraCL&);
+    void SetEdgeDeformation(const EdgeCL& edge, const Point3DCL & p);
+    void SetInnerEdgesPlanar();
     Point3DCL GetTransformedVertexCoord( const VertexCL &);
     Point3DCL GetTransformedEdgeBaryCenter( const EdgeCL &);
+
 };
 
 
