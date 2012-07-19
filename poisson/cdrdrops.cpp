@@ -336,7 +336,12 @@ void Strategy(PoissonCL& Poisson)
         vtkwriter = new VTKOutCL(mg, "DROPS data", 
                                  P.get<int>("Time.NumSteps")+1, 
                                  P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName"), 
-                                 P.get<int>("VTK.Binary") );
+                                 P.get<std::string>("VTK.TimeFileName"),
+                                 P.get<int>("VTK.Binary"), 
+                                 P.get<int>("VTK.UseOnlyP1"),
+                                 -1,  /* <- level */
+                                 P.get<int>("VTK.ReUseTimeFile"),
+                                 P.get<int>("VTK.UseDeformation"));
         vtkwriter->Register( make_VTKScalar( Poisson.GetSolution(), "ConcenT"));
         vtkwriter->Write( Poisson.x.t);
     }
@@ -400,6 +405,10 @@ void Strategy(PoissonCL& Poisson)
 /// \brief Set Default parameters here s.t. they are initialized.
 /// The result can be checked when Param-list is written to the output.
 void SetMissingParameters(DROPS::ParamCL& P){
+    P.put_if_unset<std::string>("VTK.TimeFileName",P.get<std::string>("VTK.VTKName"));
+    P.put_if_unset<int>("VTK.ReUseTimeFile",0);
+    P.put_if_unset<int>("VTK.UseDeformation",0);
+    P.put_if_unset<int>("VTK.UseOnlyP1",0);
     P.put_if_unset<int>("Stabilization.SUPG",0);
     P.put_if_unset<double>("Stabilization.Magnitude",1.0);
     P.put_if_unset<int>("Stabilization.Grids",1);

@@ -364,7 +364,12 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         vtkwriter = new VTKOutCL(adap.GetMG(), "DROPS data",
                                  P.get<int>("Time.NumSteps")/P.get("VTK.VTKOut", 0)+1,
                                  P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName"),
-                                 P.get<int>("VTK.Binary"));
+                                 P.get<std::string>("VTK.TimeFileName"),
+                                 P.get<int>("VTK.Binary"), 
+                                 P.get<int>("VTK.UseOnlyP1"),
+                                 -1,  /* <- level */
+                                 P.get<int>("VTK.ReUseTimeFile"),
+                                 P.get<int>("VTK.UseDeformation"));
         vtkwriter->Register( make_VTKVector( Stokes.GetVelSolution(), "velocity") );
         vtkwriter->Register( make_VTKScalar( Stokes.GetPrSolution(), "pressure") );
         if (P.get<int>("VTK.AddP1XPressure",0) && Stokes.UsesXFEM())
@@ -472,6 +477,10 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 /// \brief Set Default parameters here s.t. they are initialized.
 /// The result can be checked when Param-list is written to the output.
 void SetMissingParameters(DROPS::ParamCL& P){
+    P.put_if_unset<std::string>("VTK.TimeFileName",P.get<std::string>("VTK.VTKName"));
+    P.put_if_unset<int>("VTK.ReUseTimeFile",0);
+    P.put_if_unset<int>("VTK.UseDeformation",0);
+    P.put_if_unset<int>("VTK.UseOnlyP1",0);
     P.put_if_unset<int>("Transp.DoTransp",0);
     P.put_if_unset<std::string>("Restart.Inputfile","none");
     P.put_if_unset<int>("NavStokes.Downwind.Frequency", 0);

@@ -33,6 +33,7 @@ default: ClrScr all
 
 reparam: \
     ../levelset/reparam.o ../levelset/fastmarch.o ../levelset/levelset.o \
+    ../geom/deformation.o \
     ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
     ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
     ../num/fe.o ../out/ensightOut.o ../num/interfacePatch.o ../levelset/surfacetension.o \
@@ -41,6 +42,7 @@ reparam: \
 
 lsshear: \
     ../levelset/lsshear.o ../geom/boundary.o ../geom/builder.o ../geom/simplex.o ../geom/multigrid.o \
+    ../geom/deformation.o \
     ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o ../levelset/levelset.o \
     ../misc/utils.o ../out/output.o ../num/discretize.o ../levelset/fastmarch.o \
     ../num/fe.o ../out/ensightOut.o ../stokes/instatstokes2phase.o ../navstokes/instatnavstokes2phase.o \
@@ -51,6 +53,7 @@ lsshear: \
 
 surfTens: \
     ../levelset/surfTens.o ../geom/boundary.o ../geom/builder.o ../geom/simplex.o ../geom/multigrid.o \
+    ../geom/deformation.o \
     ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o ../levelset/levelset.o \
     ../misc/utils.o ../out/output.o ../num/discretize.o \
     ../misc/params.o ../levelset/fastmarch.o ../stokes/instatstokes2phase.o ../navstokes/instatnavstokes2phase.o \
@@ -62,6 +65,7 @@ surfTens: \
 
 prJump: \
     ../levelset/prJump.o ../geom/boundary.o ../geom/builder.o ../geom/simplex.o ../geom/multigrid.o \
+    ../geom/deformation.o \
     ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o ../levelset/levelset.o \
     ../misc/utils.o ../out/output.o ../num/discretize.o \
     ../misc/params.o ../levelset/fastmarch.o ../stokes/instatstokes2phase.o ../num/MGsolver.o \
@@ -72,8 +76,8 @@ prJump: \
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 film: \
-    ../levelset/film.o ../geom/boundary.o ../geom/builder.o ../geom/simplex.o ../geom/multigrid.o \
-    ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o ../levelset/levelset.o \
+    ../levelset/film.o ../geom/boundary.o ../geom/builder.o  ../geom/deformation.o ../geom/simplex.o \
+	../geom/multigrid.o ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o ../levelset/levelset.o \
     ../misc/utils.o ../out/output.o ../num/discretize.o ../navstokes/instatnavstokes2phase.o \
     ../misc/params.o ../levelset/fastmarch.o ../stokes/instatstokes2phase.o ../num/MGsolver.o\
     ../num/fe.o ../out/ensightOut.o ../out/vtkOut.o ../num/oseenprecond.o ../num/interfacePatch.o \
@@ -84,6 +88,7 @@ film: \
 
 brick_transp: \
     ../levelset/brick_transp.o ../geom/boundary.o ../geom/builder.o ../geom/simplex.o ../geom/multigrid.o \
+    ../geom/deformation.o \
     ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o ../levelset/levelset.o \
     ../misc/utils.o ../out/output.o ../num/discretize.o \
     ../misc/params.o ../levelset/fastmarch.o ../num/fe.o \
@@ -94,8 +99,8 @@ brick_transp: \
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 twophasedrops: \
-    ../levelset/twophasedrops.o ../geom/boundary.o ../geom/builder.o ../geom/simplex.o ../geom/multigrid.o \
-    ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o ../levelset/levelset.o \
+    ../levelset/twophasedrops.o ../geom/boundary.o ../geom/builder.o  ../geom/deformation.o ../geom/simplex.o \
+	 ../geom/multigrid.o ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o ../levelset/levelset.o \
     ../misc/utils.o ../out/output.o ../num/discretize.o ../navstokes/instatnavstokes2phase.o \
     ../misc/params.o ../levelset/fastmarch.o ../stokes/instatstokes2phase.o ../num/MGsolver.o \
     ../num/fe.o ../out/ensightOut.o ../num/oseenprecond.o ../poisson/transport2phase.o \

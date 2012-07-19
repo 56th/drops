@@ -30,6 +30,7 @@ default: ClrScr all
 ns_transp: \
     ../transport/transportCoeff.o \
     ../transport/ns_transp.o ../geom/boundary.o ../geom/builder.o ../geom/multigrid.o \
+    ../geom/deformation.o \
     ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o ../levelset/levelset.o \
     ../misc/utils.o ../out/output.o ../num/discretize.o \
     ../navstokes/instatnavstokes2phase.o ../misc/bndScalarFunctions.o \
