@@ -323,8 +323,12 @@ void Strategy( StokesProblemT& Stokes)
     if (P.get<int>("VTK.VTKOut",0)){
         vtkwriter = new VTKOutCL(MG, "DROPS data", 
                                  P.get<int>("Time.NumSteps")/P.get("VTK.VTKOut", 0)+1,
-                                 P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName"), 
-                                 P.get<int>("VTK.Binary"));
+                                 P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName"),
+                                 P.get<std::string>("VTK.TimeFileName"),
+                                 P.get<int>("VTK.Binary"), 
+                                 P.get<int>("VTK.UseOnlyP1"),
+                                 -1,  /* <- level */
+                                 P.get<int>("VTK.ReUseTimeFile") );
         vtkwriter->Register( make_VTKVector( Stokes.GetVelSolution(), "velocity") );
         vtkwriter->Register( make_VTKScalar( Stokes.GetPrSolution(), "pressure") );
         vtkwriter->Write(Stokes.v.t);
@@ -361,6 +365,12 @@ void Strategy( StokesProblemT& Stokes)
 
 } // end of namespace DROPS
 
+void SetMissingParameters(DROPS::ParamCL& P){
+    P.put_if_unset<std::string>("VTK.TimeFileName",P.get<std::string>("VTK.VTKName"));
+    P.put_if_unset<int>("VTK.ReUseTimeFile",0);
+    P.put_if_unset<int>("VTK.UseOnlyP1",0);
+}
+
 int main ( int argc, char** argv)
 {
     try
@@ -380,6 +390,9 @@ int main ( int argc, char** argv)
         }
         param >> P;
         param.close();
+
+        SetMissingParameters(P);
+
         std::cout << P << std::endl;
 
         // Check MarkLower value

@@ -216,7 +216,11 @@ void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTr
         vtkwriter = new VTKOutCL(adap.GetMG(), "DROPS data",
                                  P.get<int>("Time.NumSteps")/P.get<int>("VTK.VTKOut")+1,
                                  P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName"),
-                                 P.get<int>("VTK.Binary"));
+                                 P.get<std::string>("VTK.TimeFileName"),
+                                 P.get<int>("VTK.Binary"), 
+                                 P.get<int>("VTK.UseOnlyP1"),
+                                 -1,  /* <- level */
+                                 P.get<int>("VTK.ReUseTimeFile") );
 
         vtkwriter->Register( make_VTKScalar( lset.GetSolution(), "level-set") );
 
@@ -563,7 +567,11 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbndda
         vtkwriter = new VTKOutCL(adap.GetMG(), "DROPS data",
                                  P.get<int>("Time.NumSteps")/P.get<int>("VTK.VTKOut")+1,
                                  P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName"),
-                                 P.get<int>("VTK.Binary"));
+                                 P.get<std::string>("VTK.TimeFileName"),
+                                 P.get<int>("VTK.Binary"), 
+                                 P.get<int>("VTK.UseOnlyP1"),
+                                 -1,  /* <- level */
+                                 P.get<int>("VTK.ReUseTimeFile") );
         vtkwriter->Register( make_VTKVector( Stokes.GetVelSolution(), "velocity") );
         vtkwriter->Register( make_VTKScalar( Stokes.GetPrSolution(), "pressure") );
         vtkwriter->Register( make_VTKScalar( lset.GetSolution(), "level-set") );
@@ -663,6 +671,10 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbndda
 /// \brief Set Default parameters here s.t. they are initialized.
 /// The result can be checked when Param-list is written to the output.
 void SetMissingParameters(DROPS::ParamCL& P){
+    P.put_if_unset<std::string>("VTK.TimeFileName",P.get<std::string>("VTK.VTKName"));
+    P.put_if_unset<int>("VTK.ReUseTimeFile",0);
+    P.put_if_unset<int>("VTK.UseOnlyP1",0);
+
     P.put_if_unset<int>("Transp.DoTransp",0);
     P.put_if_unset<std::string>("Transp.Levelset","Ellipsoid");
     P.put_if_unset<std::string>("Transp.Flow","ZeroVel");
