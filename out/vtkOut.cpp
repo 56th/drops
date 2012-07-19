@@ -23,6 +23,7 @@
 */
 
 #include "out/vtkOut.h"
+#include "geom/deformation.h"
 
 namespace DROPS
 {
@@ -219,6 +220,8 @@ void VTKOutCL::GatherCoord()
     numPoints_= numLocPoints_= numVertices + numEdges;
     coords_.resize(3*numLocPoints_);
 
+
+    MeshDeformationCL & md = MeshDeformationCL::getInstance();
     ///\todo instead of v/eAddrMap_, one could use a P2 index instead (cf. EnsightOutCL)
     Uint counter=0;
     for (MultiGridCL::const_TriangVertexIteratorCL it= mg_.GetTriangVertexBegin(lvl_); it!=mg_.GetTriangVertexEnd(lvl_); ++it){
@@ -227,7 +230,7 @@ void VTKOutCL::GatherCoord()
 
         // Put coordinate of the vertex into the field of coordinates
         for (int i=0; i<3; ++i)
-            coords_[3*counter+i]= (float)it->GetCoord()[i];
+            coords_[3*counter+i]= (float)md.GetTransformedVertexCoord(*it)[i]; // (float)it->GetCoord()[i];
         ++counter;
     }
 
@@ -236,9 +239,9 @@ void VTKOutCL::GatherCoord()
         eAddrMap_[&*it]= counter;
 
         // Put coordinate of the barycenter of the edge into the field of coordinates
-        const Point3DCL baryCenter= GetBaryCenter(*it);
+        // const Point3DCL baryCenter= GetBaryCenter(*it);
         for (int i=0; i<3; ++i)
-            coords_[3*counter+i]= (float)baryCenter[i];
+            coords_[3*counter+i]= (float)md.GetTransformedEdgeBaryCenter(*it)[i]; // (float)baryCenter[i];
         ++counter;
     }
 }
