@@ -58,7 +58,7 @@ void LevelsetP2CL::GetInfo( double& maxGradPhi, double& Volume, Point3DCL& bary,
     LocalP2CL<double> ones( 1.);
     LocalP2CL<Point3DCL> Coord, Vel;
 
-    for (MultiGridCL::const_TriangTetraIteratorCL it=const_cast<const MultiGridCL&>(MG_).GetTriangTetraBegin(), end=const_cast<const MultiGridCL&>(MG_).GetTriangTetraEnd();
+    for (MultiGridCL::const_TriangTetraIteratorCL it=const_cast<const MultiGridCL&>(MG_).GetTriangTetraBegin(idx.TriangLevel()), end=const_cast<const MultiGridCL&>(MG_).GetTriangTetraEnd(idx.TriangLevel());
         it!=end; ++it)
     {
         GetTrafoTr( T, det, *it);
