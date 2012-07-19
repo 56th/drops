@@ -83,7 +83,7 @@ class VTKOutCL
     Uint                  numLocPoints_;            ///< number of local exclusive verts and edges
     bool                  wrotePointDataLine_;      ///< flag if description line for point data has been written
     bool                  reusepvd_;                ///< should the pvd-output be reused (appends data sets)?
-
+    bool                  usedeformed_;             ///< should the multigrid-coords be replaced by the deformed coords?
     /// Puts time-code as a post-fix to the filename
     void AppendTimecode( std::string&) const;
     /// Checks whether the file is open
@@ -137,7 +137,7 @@ class VTKOutCL
     /// \brief Constructor of this class
     VTKOutCL(const MultiGridCL& mg, const std::string& dataname, Uint numsteps,
              const std::string& dirname, const std::string& filename, const std::string& pvdfilename,
-             bool binary, bool onlyP1=false, Uint lvl=(Uint)-1, bool reusepvd=false);
+             bool binary, bool onlyP1=false, Uint lvl=(Uint)-1, bool reusepvd=false, bool usedeformed=false);
     ~VTKOutCL();
 
     /// \brief Register a variable or the geometry for output with Write().

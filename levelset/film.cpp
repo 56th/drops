@@ -225,7 +225,8 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
                                  P.get<int>("VTK.Binary"), 
                                  P.get<int>("VTK.UseOnlyP1"),
                                  -1,  /* <- level */
-                                 P.get<int>("VTK.ReUseTimeFile") );
+                                 P.get<int>("VTK.ReUseTimeFile"),
+                                 P.get<int>("VTK.UseDeformation"));
         vtkwriter->Register( make_VTKVector( Stokes.GetVelSolution(), "velocity") );
         vtkwriter->Register( make_VTKScalar( Stokes.GetPrSolution(), "pressure") );
         if (P.get<int>("VTK.AddP1XPressure",0) && Stokes.UsesXFEM())
@@ -380,6 +381,7 @@ void MarkLower (DROPS::MultiGridCL& mg, double y_max, DROPS::Uint maxLevel= ~0)
 void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<std::string>("VTK.TimeFileName",P.get<std::string>("VTK.VTKName"));
     P.put_if_unset<int>("VTK.ReUseTimeFile",0);
+    P.put_if_unset<int>("VTK.UseDeformation",0);
     P.put_if_unset<int>("VTK.UseOnlyP1",0);
 }
 
