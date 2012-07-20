@@ -35,7 +35,7 @@
 #include <numeric>
 
 #include "poisson/ale.h"
-
+#include "geom/deformation.h"
 
 namespace DROPS
 {
@@ -130,6 +130,29 @@ class SUPGCL
             return magnitude_*h/(2.*Vel.norm())*(1.-1./Pec);
     }
 };
+
+/*class PoissonDeformationHelperCL
+{
+    private:
+      bool ALE_;
+      MultiGridCL& mg_;
+    public:
+      PoissonDeformationHelperCL(MultiGridCL& mg, bool ALE): mg_(mg), ALE_(ALE) {}
+      Point3DCL GetVertexCoord(const VertexCL& vert) 
+      {   
+          if(ALE_)
+            return mg_.GetMeshDeformation().GetTransformedVertexCoord(vert);
+          else
+            return vert.GetCoord();
+      }
+      Point3DCL GetEdgeBaryCenter(const EdgeCL& edge) 
+      {   
+          if(ALE_)
+            return mg_.GetMeshDeformation().GetTransformedEdgeBaryCenter(edge);
+          else
+            return GetBaryCenter(edge);
+      }    
+}*/
 
 template <class Coeff>
 class PoissonP1CL : public ProblemCL<Coeff, PoissonBndDataCL>

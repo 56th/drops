@@ -153,14 +153,17 @@ void PoissonP1CL<Coeff>::Init( VecDescCL& vec, instat_scalar_fun_ptr func, doubl
 {
     Uint lvl= vec.GetLevel(),
          idx= vec.RowIdx->GetIdx();
-
-
     for (MultiGridCL::const_TriangVertexIteratorCL sit= const_cast<const MultiGridCL&>(MG_).GetTriangVertexBegin(lvl), send= const_cast<const MultiGridCL&>(MG_).GetTriangVertexEnd(lvl);
          sit != send; ++sit)
     {
         if (sit->Unknowns.Exist(idx))
         {
-            vec.Data[sit->Unknowns(idx)]= func( sit->GetCoord(), t0);
+            if(ALE_)
+            {
+                vec.Data[sit->Unknowns(idx)]= func( MG_.GetMeshDeformation().GetTransformedVertexCoord(*sit), t0);
+            }   
+            else
+                vec.Data[sit->Unknowns(idx)]= func( sit->GetCoord(), t0);
         }
     }
 
@@ -243,12 +246,20 @@ double PoissonP1CL<Coeff>::CheckSolution(const VecDescCL& lsg,
             send=const_cast<const MultiGridCL&>(MG_).GetTriangTetraEnd(lvl);
             sit != send; ++sit)
     {
-        double absdet= sit->GetVolume()*6.,
-                sum= 0;
-
+        double absdet= 0., det= 0., sum = 0.;
+        if(ALE_)
+        {   
+           GetTrafoTrDet(det, MG_.GetMeshDeformation().GetLocalP1Deformation(*sit));
+           absdet = std::fabs(det);
+        }
+        else
+           absdet = sit->GetVolume()*6.;
         for(Uint i=0; i<4; ++i)
         {
-            diff= (sol.val(*sit->GetVertex(i)) - Lsg(sit->GetVertex(i)->GetCoord(),t));
+            if(ALE_)
+                diff= (sol.val(*sit->GetVertex(i)) - Lsg(sit->GetVertex(i)->GetCoord(),t));
+            else
+                diff= (sol.val(*sit->GetVertex(i)) - Lsg(MG_.GetMeshDeformation().GetTransformedVertexCoord(*sit->GetVertex(i)),t));
             sum+= diff*diff;
         }
         sum/= 120;
@@ -271,7 +282,10 @@ double PoissonP1CL<Coeff>::CheckSolution(const VecDescCL& lsg,
             if (sit->AmIOwner())
 #endif
             {
-                diff= std::fabs( Lsg(sit->GetCoord(),t) - lsg.Data[sit->Unknowns(Idx)] );
+                if(ALE_)
+                    diff= std::fabs( Lsg(MG_.GetMeshDeformation().GetTransformedVertexCoord(*sit), t) - lsg.Data[sit->Unknowns(Idx)] );
+                else
+                    diff= std::fabs( Lsg(sit->GetCoord(),t) - lsg.Data[sit->Unknowns(Idx)] );
                 norm2+= diff*diff;
                 if (diff>maxdiff)
                 {
@@ -993,15 +1007,28 @@ void PoissonP2CL<Coeff>::Init( VecDescCL& vec, instat_scalar_fun_ptr func, doubl
     {
         if (sit->Unknowns.Exist(idx))
         {
-            vec.Data[sit->Unknowns(idx)]= func( sit->GetCoord(), t0);
+            if(ALE_)
+            {
+                vec.Data[sit->Unknowns(idx)]= func( MG_.GetMeshDeformation().GetTransformedVertexCoord(*sit), t0);
+            }   
+            else
+                vec.Data[sit->Unknowns(idx)]= func( sit->GetCoord(), t0);
         }
     }
 
     for (MultiGridCL::const_TriangEdgeIteratorCL sit= const_cast<const MultiGridCL&>(MG_).GetTriangEdgeBegin(lvl),
         send= const_cast<const MultiGridCL&>(MG_).GetTriangEdgeEnd(lvl); sit!=send; ++sit)      //Edges
     {
-        if ( sit->Unknowns.Exist(idx))
-            vec.Data[sit->Unknowns(idx)]= func( GetBaryCenter( *sit), t0);
+        
+        if (sit->Unknowns.Exist(idx))
+        {
+            if(ALE_)
+            {
+                vec.Data[sit->Unknowns(idx)]= func( MG_.GetMeshDeformation().GetTransformedEdgeBaryCenter(*sit), t0);
+            }   
+            else
+                vec.Data[sit->Unknowns(idx)]= func( GetBaryCenter( *sit), t0);
+        }
     }
 
 }

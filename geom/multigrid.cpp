@@ -152,7 +152,7 @@ void PeriodicEdgesCL::AccumulateMFR( int lvl)
 
 MultiGridCL::MultiGridCL (const MGBuilderCL& Builder)
     : TriangVertex_( *this), TriangEdge_( *this), TriangFace_( *this), TriangTetra_( *this), version_(0),
-    factory_( Vertices_, Edges_, Faces_, Tetras_)
+    factory_( Vertices_, Edges_, Faces_, Tetras_), MeshDeform_(0)
 {
 #ifdef _PAR
     DiST::InfoCL::Instance( this);  // tell InfoCL about the multigrid before(!) building the grid

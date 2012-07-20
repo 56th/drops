@@ -40,6 +40,7 @@ namespace DROPS
 
 class MultiGridCL;
 class MGBuilderCL;
+class MeshDeformationCL;
 
 template <class SimplexT>
 struct TriangFillCL;
@@ -205,6 +206,7 @@ class MultiGridCL
 
     size_t     version_;                            ///< each modification of the multigrid increments this number
     SimplexFactoryCL factory_;                      ///< factory for generating simplices
+    MeshDeformationCL* MeshDeform_;
 
     mutable std::map<int, ColorClassesCL*> colors_; // map: level -> Color-classes of the tetra for that level
 
@@ -231,10 +233,14 @@ class MultiGridCL
     MultiGridCL (const MultiGridCL&); // Dummy
     // default ctor
 
-#ifdef _PAR
+
     ~MultiGridCL()
-        { DiST::InfoCL::Instance().Destroy(); }
-#endif
+    { 
+#ifdef _PAR            
+        DiST::InfoCL::Instance().Destroy();
+#endif 
+        //if (MeshDeform_) delete MeshDeform_; 
+    }
 
     const BoundaryCL& GetBnd     () const { return Bnd_; }
     const VertexCont& GetVertices() const { return Vertices_; }
@@ -313,6 +319,8 @@ class MultiGridCL
     void SizeInfo(std::ostream&);                               // all procs have to call this function in parallel mode!
     void ElemInfo(std::ostream&, int Level= -1) const;          // all procs have to call this function in parallel mode
     void DebugInfo(std::ostream&, int Level=-1) const;          ///< Put all vertices, edges, faces, and tetras on the stream
+    void SetMeshDeformation(MeshDeformationCL& MeshDeform) { MeshDeform_= &MeshDeform;}
+    MeshDeformationCL& GetMeshDeformation() { return *MeshDeform_;}
 #ifdef _PAR
     Uint GetNumDistributedObjects() const;                      // get number of distributed objects
     Uint GetNumTriangTetra(int Level=-1);                       // get number of tetras of a given level

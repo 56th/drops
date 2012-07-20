@@ -235,6 +235,7 @@ void Strategy(PoissonCL& Poisson)
 
 	MeshDeformationCL& md = MeshDeformationCL::getInstance();
     md.Initialize(&mg);
+    mg.SetMeshDeformation(md);
 
     //ALECL ALE(P, mg);
     // connection triangulation and vectors
@@ -304,7 +305,7 @@ void Strategy(PoissonCL& Poisson)
         timer.Reset();
         if(Poisson.ALE_)
             //ALE.InitGrid();
-            md.SetMeshTransformation(PoissonCoeffCL::ALEDeform, 0, true, false);
+            mg.GetMeshDeformation().SetMeshTransformation(PoissonCoeffCL::ALEDeform, 0, true, false);
         Poisson.SetupInstatSystem( Poisson.A, Poisson.M, Poisson.x.t);
         Poisson.Init( Poisson.x, Poisson.Coeff_.InitialCondition, 0.0);
         timer.Stop();
@@ -359,7 +360,7 @@ void Strategy(PoissonCL& Poisson)
             std::cout << line << "Step: " << step << std::endl;
             if(Poisson.ALE_)
                 //ALE.MovGrid(Poisson.x.t);
-                md.SetMeshTransformation(PoissonCoeffCL::ALEDeform, Poisson.x.t, true, false);
+                mg.GetMeshDeformation().SetMeshTransformation(PoissonCoeffCL::ALEDeform, Poisson.x.t, true, false);
             ThetaScheme.DoStep( Poisson.x);
 
             timer.Stop();
