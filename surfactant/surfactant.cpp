@@ -226,6 +226,37 @@ double L2_error (const DROPS::VecDescCL& ls, const BndDataCL<>& lsbnd,
     return std::sqrt( d);
 }
 
+template<class DiscP1FunType>
+double H1_error (const DROPS::VecDescCL& ls, const BndDataCL<>& lsbnd,
+    const DiscP1FunType& discsol, DROPS::instat_scalar_fun_ptr extsol)
+{
+
+return 0.;
+
+    double d( 0.);
+    const DROPS::Uint lvl = ls.GetLevel();
+    const double t= discsol.GetTime();
+    const DROPS::MultiGridCL& mg= discsol.GetMG();
+    DROPS::InterfaceTriangleCL triangle;
+    DROPS::Quad5_2DCL<> qsol, qdiscsol;
+
+    DROPS_FOR_TRIANG_CONST_TETRA( mg, lvl, it) {
+        triangle.Init( *it, ls, lsbnd);
+        if (triangle.Intersects()) { // We are at the phase boundary.
+            for (int ch= 0; ch < 8; ++ch) {
+                triangle.ComputeForChild( ch);
+                for (int tri= 0; tri < triangle.GetNumTriangles(); ++tri) {
+                    qsol.assign( *it, &triangle.GetBary( tri), extsol, t);
+                    qdiscsol.assign(  *it, &triangle.GetBary( tri), discsol);
+                    d+= DROPS::Quad5_2DCL<>( std::pow( qdiscsol - qsol, 2)).quad( triangle.GetAbsDet( tri));
+                }
+            }
+        }
+    }
+    return std::sqrt( d);
+
+}
+
 double L2_norm (const DROPS::MultiGridCL& mg, const DROPS::VecDescCL& ls, const BndDataCL<>& lsbnd,
     DROPS::instat_scalar_fun_ptr extsol)
 {
@@ -356,16 +387,19 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     //if (P.get<int>( "SolutionOutput.Freq") > 0)
     //    DROPS::WriteFEToFile( timedisc.ic, mg, P.get<std::string>( "SolutionOutput.Path"), P.get<bool>( "SolutionOutput.Binary"));
 
+    const double dt= P.get<double>("Time.StepSize");
     double L_2x_err= L2_error( lset.Phi, lset.GetBndData(), timedisc.GetSolution(), the_sol_fun);
     std::cout << "L_2x-error: " << L_2x_err
               << "\nnorm of true solution: " << L2_norm( mg, lset.Phi, lset.GetBndData(), the_sol_fun)
               << std::endl;
     double L_inftL_2x_err= L_2x_err;
     std::cout << "L_inftL_2x-error: " <<  L_inftL_2x_err << std::endl;
+    double H_1x_err= H1_error( lset.Phi, lset.GetBndData(), timedisc.GetSolution(), the_sol_fun);
+    std::cout << "H_1x-error: " << H_1x_err << std::endl;
+    double L_2tH_1x_err_sq= 0.5*dt*std::pow( H_1x_err, 2);
     BndDataCL<> ifbnd( 0);
     std::cerr << "initial surfactant on \\Gamma: " << Integral_Gamma( mg, lset.Phi, lset.GetBndData(), make_P1Eval(  mg, ifbnd, timedisc.ic)) << '\n';
 
-    const double dt= P.get<double>("Time.StepSize");
     for (int step= 1; step <= P.get<int>("Time.NumSteps"); ++step) {
         std::cout << "======================================================== step " << step << ":\n";
         const double cur_time= step*dt;
@@ -383,6 +417,11 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
                   << std::endl;
         L_inftL_2x_err= std::max( L_inftL_2x_err, L_2x_err);
         std::cout << "L_inftL_2x-error: " << L_inftL_2x_err << std::endl;
+        L_2tH_1x_err_sq+= (step > 1 ? 0.5 : 0.)*dt*std::pow( H_1x_err, 2);
+        H_1x_err= H1_error( lset.Phi, lset.GetBndData(), timedisc.GetSolution(), the_sol_fun);
+        std::cout << "H_1x-error: " << H_1x_err << std::endl;
+        L_2tH_1x_err_sq+= 0.5*dt*std::pow( H_1x_err, 2);
+        std::cout << "L_2tH_1x-error: " << std::sqrt( L_2tH_1x_err_sq) << std::endl;
         if (vtkwriter.get() != 0 && step % P.get<int>( "VTK.VTKOut") == 0) {
             the_sol_eval.SetTime( cur_time);
             vtkwriter->Write( cur_time);
