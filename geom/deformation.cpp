@@ -42,7 +42,7 @@ MeshDeformationCL& MeshDeformationCL::getInstance()
 /// of curved edges (and thus tetrahedra) by removing curvature information at inner edges
 /// and replacing them with the mean of the vertex values.
 void MeshDeformationCL::SetMeshTransformation(instat_vector_fun_ptr f, const double t, 
-                                              bool only_bnd_edges_curved){
+                                              bool only_bnd_edges_curved, bool P2){
     if (mg_==NULL)
         throw DROPSErrCL("MeshDeformationCL::SetMeshIdentity: No MultiGridCL* given!");
 
@@ -56,13 +56,32 @@ void MeshDeformationCL::SetMeshTransformation(instat_vector_fun_ptr f, const dou
 
     DROPS_FOR_TRIANG_EDGE( (*mg_), mg_->GetLastLevel(), it) {
         if (!it->Unknowns.Exist( pidx)) continue;
-        if (!only_bnd_edges_curved || it->IsOnBoundary()) // potentially curved elements
-        {
-            const Point3DCL val(f(GetBaryCenter(*it),t));
-            for (Uint k = 0; k < 3; ++k)
-                (*pointsol_).Data[it->Unknowns(pidx)+k] = val[k];
+        if(P2)
+        {    
+            if (!only_bnd_edges_curved || it->IsOnBoundary()) // potentially curved elements
+            {
+                const Point3DCL val(f(GetBaryCenter(*it),t));
+                for (Uint k = 0; k < 3; ++k)
+                    (*pointsol_).Data[it->Unknowns(pidx)+k] = val[k];
+            }
+            else // planar values, i.e. average of vertex values
+            {
+                const Uint pidx = mlidx_->GetIdx();
+                const VertexCL& vt1 (*it->GetVertex(0));
+                const VertexCL& vt2 (*it->GetVertex(1));
+                if (!vt1.Unknowns.Exist( pidx)) continue;
+                if (!vt2.Unknowns.Exist( pidx)) continue;
+                if (!it->Unknowns.Exist( pidx)) continue;
+                Point3DCL a,b;
+                for (Uint k = 0; k < 3; ++k)
+                {
+                    (*pointsol_).Data[it->Unknowns(pidx)+k] = 
+                        0.5 * (*pointsol_).Data[vt1.Unknowns(pidx)+k]
+                        + 0.5 * (*pointsol_).Data[vt2.Unknowns(pidx)+k];
+                }
+            }
         }
-        else // planar values, i.e. average of vertex values
+        else
         {
             const Uint pidx = mlidx_->GetIdx();
             const VertexCL& vt1 (*it->GetVertex(0));

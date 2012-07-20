@@ -232,11 +232,11 @@ void Strategy(PoissonCL& Poisson)
     // the triangulation
     MultiGridCL& mg= Poisson.GetMG();
 
-	/*    
+
 	MeshDeformationCL& md = MeshDeformationCL::getInstance();
     md.Initialize(&mg);
-    */
-    ALECL ALE(P, mg);
+
+    //ALECL ALE(P, mg);
     // connection triangulation and vectors
     // -------------------------------------------------------------------------
     std::cout << line << "Connecting triangulation and matrices/vectors ...\n";
@@ -303,7 +303,8 @@ void Strategy(PoissonCL& Poisson)
         std::cout << line << "Discretize (setup linear equation system) for instationary problem...\n";
         timer.Reset();
         if(Poisson.ALE_)
-            ALE.InitGrid();
+            //ALE.InitGrid();
+            md.SetMeshTransformation(PoissonCoeffCL::ALEDeform, 0, true, false);
         Poisson.SetupInstatSystem( Poisson.A, Poisson.M, Poisson.x.t);
         Poisson.Init( Poisson.x, Poisson.Coeff_.InitialCondition, 0.0);
         timer.Stop();
@@ -357,7 +358,8 @@ void Strategy(PoissonCL& Poisson)
             timer.Reset();
             std::cout << line << "Step: " << step << std::endl;
             if(Poisson.ALE_)
-                ALE.MovGrid(Poisson.x.t);
+                //ALE.MovGrid(Poisson.x.t);
+                md.SetMeshTransformation(PoissonCoeffCL::ALEDeform, Poisson.x.t, true, false);
             ThetaScheme.DoStep( Poisson.x);
 
             timer.Stop();

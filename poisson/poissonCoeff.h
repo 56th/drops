@@ -87,6 +87,24 @@ class PoissonCoeffCL
 
     }
 
+    static Point3DCL ALEDeform(const Point3DCL& p, double t)
+    {
+
+       DROPS::Point3DCL ret= Point3DCL(0.);
+       if(t == 0)
+       { 
+        ret[0] = p[0];
+        ret[1] = p[1] *  interface(p, 0.)/dy_;
+        ret[2] = p[2];
+       }
+       else
+       {
+        ret[0] = p[0];
+        ret[1] = p[1] * interface(p, t + dt_)/interface(p, t);
+        ret[2] = p[2];   
+       }
+       return ret;
+    }
     static Point3DCL ALEVelocity(const DROPS::TetraCL& tet, const DROPS::BaryCoordCL& b, double t)
     {
         double eps =1.0e-7;
@@ -95,6 +113,8 @@ class PoissonCoeffCL
         ret[1] -= p[1]/interface(p, t)*(interface(p, t+eps)-interface(p, t))/eps;  //y/h(p,t)*h_p'(t)
         return ret;
     }
+    
+
 };
 
 }//end of namespace
