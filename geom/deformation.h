@@ -39,12 +39,14 @@ namespace DROPS
 class MeshDeformationCL
 {
 private:
+
     MultiGridCL * mg_;
     MLIdxDescCL * mlidx_; // perhaps MultiLevel Idx just for future use...
     VecDescCL * pointsol_;
     BndDataCL<Point3DCL> * bnd_;
     std::map<const TetraCL*, bool> tet_is_curved;
-    MeshDeformationCL() : mg_(0),mlidx_(0),pointsol_(0),bnd_(0){tet_is_curved.clear();};
+    bool isused_;
+    MeshDeformationCL() : mg_(0),mlidx_(0),pointsol_(0),bnd_(0){tet_is_curved.clear(); isused_=false;};
     virtual ~MeshDeformationCL(){
         if (mlidx_) delete mlidx_;
         if (pointsol_) delete pointsol_;
@@ -62,6 +64,7 @@ public:
 
     void CheckForCurved();
     void Initialize( MultiGridCL* mg);
+    bool IsUsed(){ return isused_;}
     bool IsTetraCurved(const TetraCL& tet);
     LocalP2CL<Point3DCL> GetLocalP2Deformation( const TetraCL&);
     LocalP1CL<Point3DCL> GetLocalP1Deformation( const TetraCL&);

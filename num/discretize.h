@@ -297,7 +297,7 @@ class LocalP1CL: public GridFunctionCL<T>
     typedef GridFunctionCL<T> base_type;
     typedef typename base_type::value_type value_type;
     typedef typename base_type::instat_fun_ptr instat_fun_ptr;
-
+    typedef FE_P1CL FETYPE;
   protected:
     typedef LocalP1CL<T> self_;
 
@@ -350,6 +350,7 @@ class LocalP2CL: public GridFunctionCL<T>
     typedef GridFunctionCL<T> base_type;
     typedef typename base_type::value_type value_type;
     typedef typename base_type::instat_fun_ptr instat_fun_ptr;
+    typedef FE_P2CL FETYPE;
 
   protected:
     typedef LocalP2CL<T> self_;

@@ -379,36 +379,51 @@ Point3DCL GetBaryCenter(const TetraCL& t, Uint face)
 Point3DCL GetWorldCoord(const TetraCL& t, const SVectorCL<3>& c)
 {
     static MeshDeformationCL & m = MeshDeformationCL::getInstance();
-    if (!m.IsTetraCurved(t))
+    if (m.IsUsed())
+    {
+        if (!m.IsTetraCurved(t))
+            return GetWorldCoord(m.GetLocalP1Deformation(t),c);
+        else    
+            return GetWorldCoord(m.GetLocalP2Deformation(t),c);
+    }
+    else
         return (1. -c[0] -c[1] -c[2])*t.GetVertex(0)->GetCoord()
             +c[0]*t.GetVertex(1)->GetCoord()
             +c[1]*t.GetVertex(2)->GetCoord()
             +c[2]*t.GetVertex(3)->GetCoord();
-    else
-        return GetWorldCoord(m.GetLocalP2Deformation(t),c);
 }
 
 Point3DCL GetWorldCoord(const TetraCL& t, const SVectorCL<4>& c)
 {
     static MeshDeformationCL & m = MeshDeformationCL::getInstance();
-    if (!m.IsTetraCurved(t))
+    if (m.IsUsed())
+    {
+        if (!m.IsTetraCurved(t))
+            return GetWorldCoord(m.GetLocalP1Deformation(t),c);
+        else    
+            return GetWorldCoord(m.GetLocalP2Deformation(t),c);
+    }
+    else
         return c[0]*t.GetVertex(0)->GetCoord()
             +c[1]*t.GetVertex(1)->GetCoord()
             +c[2]*t.GetVertex(2)->GetCoord()
             +c[3]*t.GetVertex(3)->GetCoord();
-    else
-        return GetWorldCoord(m.GetLocalP2Deformation(t),c);
 }
 
 Point3DCL GetWorldCoord(const TetraCL& t, Uint face, const SVectorCL<2>& c)
 {
     static MeshDeformationCL & m = MeshDeformationCL::getInstance();
-    if (!m.IsTetraCurved(t))
+    if (m.IsUsed())
+    {
+        if (!m.IsTetraCurved(t))
+            return GetWorldCoord(m.GetLocalP1Deformation(t),FaceToTetraCoord(t,face,c));
+        else    
+            return GetWorldCoord(m.GetLocalP2Deformation(t),FaceToTetraCoord(t,face,c));
+    }
+    else
         return (1. -c[0] -c[1])*t.GetVertex(VertOfFace(face, 0))->GetCoord()
             +c[0]*t.GetVertex(VertOfFace(face, 1))->GetCoord()
             +c[1]*t.GetVertex(VertOfFace(face, 2))->GetCoord();
-    else
-        return GetWorldCoord(m.GetLocalP2Deformation(t),FaceToTetraCoord(t,face,c));
 }
 
 SVectorCL<3> FaceToTetraCoord(__UNUSED__ const TetraCL& t, Uint f, SVectorCL<2> c)

@@ -71,23 +71,25 @@ inline void GetTrafoTrAtPoint( SMatrixCL<3,3>& T, double& det, const Point3DCL& 
 }
 
 /** calculates the physical coord of a reference point of a curved tetra */
-inline Point3DCL GetWorldCoord( const LocalP2CL<Point3DCL> & ct, const Point3DCL& p)
+template<class LocalFE >
+inline Point3DCL GetWorldCoord( const LocalFE & ct, const Point3DCL& p)
 {
     Point3DCL point(0.);
     double val;
-    for (int i=0; i<10; i++){
-        val = FE_P2CL::H(i,p[0],p[1],p[2]);
+    for (Uint i=0; i<LocalFE::FETYPE::NumDoFC; i++){
+        val = LocalFE::FETYPE::H(i,p[0],p[1],p[2]);
         point += val * ct[i];
     }
     return point;
 }
 
-inline Point3DCL GetWorldCoord( const LocalP2CL<Point3DCL> & ct, const BaryCoordCL& p)
+template<class LocalFE >
+inline Point3DCL GetWorldCoord( const LocalFE & ct, const BaryCoordCL& p)
 {
     Point3DCL point(0.);
     double val;
-    for (int i=0; i<10; i++){
-        val = FE_P2CL::H(i,p[1],p[2],p[3]);
+    for (Uint i=0; i<LocalFE::FETYPE::NumDoFC; i++){
+        val = LocalFE::FETYPE::H(i,p[1],p[2],p[3]);
         point += val * ct[i];
     }
     return point;
