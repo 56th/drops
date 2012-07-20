@@ -792,7 +792,7 @@ void LevelsetP2CL::GetMaxMinGradPhi(double& maxGradPhi, double& minGradPhi) cons
     double maxNorm;
     double minNorm;
 
-    DROPS_FOR_TRIANG_TETRA( MG_, MG_.GetLastLevel(), it)
+    DROPS_FOR_TRIANG_TETRA( MG_, idx.TriangLevel(), it)
     {
         GetTrafoTr( T, det, *it);
         P2DiscCL::GetGradients( Grad, GradRef, T); // Gradienten auf aktuellem Tetraeder
