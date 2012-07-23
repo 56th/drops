@@ -77,6 +77,7 @@ prog_%:
 HYPRE:	
 	cd $(HYPRE_HOME) && gmake install
 
-.PHONY: all clean distclean distclean_dox default dep deldepend doc stat topo check
+ctagsdb:
+	ctags -R --c++-types=+px --excmd=pattern --exclude=Makefile --exclude=. --langmap=c++:+.tpp -f ctagsdb
 
-	
+.PHONY: all clean distclean distclean_dox default dep deldepend doc stat topo check ctagsdb
