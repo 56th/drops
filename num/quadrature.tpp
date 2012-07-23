@@ -277,6 +277,18 @@ template <class QuadDataT>
 }
 
 inline const QuadDomain2DCL&
+make_CompositeQuad1Domain2D (QuadDomain2DCL& q, const SurfacePatchCL& p, const TetraCL& t)
+{
+    return make_CompositeQuadDomain2D<Quad1_2DDataCL>( q, p, t);
+}
+
+inline const QuadDomain2DCL&
+make_CompositeQuad2Domain2D (QuadDomain2DCL& q, const SurfacePatchCL& p, const TetraCL& t)
+{
+    return make_CompositeQuadDomain2D<Quad2_2DDataCL>( q, p, t);
+}
+
+inline const QuadDomain2DCL&
 make_CompositeQuad5Domain2D (QuadDomain2DCL& q, const SurfacePatchCL& p, const TetraCL& t)
 {
     return make_CompositeQuadDomain2D<Quad5_2DDataCL>( q, p, t);

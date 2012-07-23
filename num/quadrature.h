@@ -225,6 +225,14 @@ template <class QuadDataT>
   const QuadDomain2DCL&
   make_CompositeQuadDomain2D (QuadDomain2DCL& q, const SurfacePatchCL& p, const TetraCL& t);
 
+///\brief Initialize q as a composite Quad0_2DDataCL-quadrature-rule.
+inline const QuadDomain2DCL&
+make_CompositeQuad1Domain2D (QuadDomain2DCL& q, const SurfacePatchCL& p, const TetraCL& t);
+
+///\brief Initialize q as a composite Quad2_2DDataCL-quadrature-rule.
+inline const QuadDomain2DCL&
+make_CompositeQuad2Domain2D (QuadDomain2DCL& q, const SurfacePatchCL& p, const TetraCL& t);
+
 ///\brief Initialize q as a composite Quad5_2DDataCL-quadrature-rule.
 inline const QuadDomain2DCL&
 make_CompositeQuad5Domain2D (QuadDomain2DCL& q, const SurfacePatchCL& p, const TetraCL& t);
