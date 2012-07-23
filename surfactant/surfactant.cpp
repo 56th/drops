@@ -120,9 +120,9 @@ double axis_scaling (double t)
     return 1. + 0.25*std::sin( t);
 }
 
-DROPS::Point3DCL axis_scaling_wind (const DROPS::Point3DCL&, double t)
+DROPS::Point3DCL axis_scaling_wind (const DROPS::Point3DCL& p, double t)
 {
-    return MakePoint3D( 0.25*std::cos( t)/axis_scaling( t), 0., 0.);
+    return MakePoint3D( 0.25*std::cos( t)/axis_scaling( t)*p[0], 0., 0.);
 }
 static RegisterVectorFunction regvec_axis_scaling_wind( "AxisScalingWind", axis_scaling_wind);
 
