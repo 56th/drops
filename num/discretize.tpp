@@ -719,10 +719,10 @@ template<class T>
 
 
 template <class RAIterT>
-  void
-  Quad5_2DDataCL::SetInterface (const BaryCoordCL*const p, RAIterT NodeInTetra)
+  inline void
+  SetInterface (const BaryCoordCL*const p, Uint NumNodes, RAIterT NodeInTetra, const Point3DCL* const Node)
 {
-    for (Uint i= 0; i < NumNodesC; ++i)
+    for (Uint i= 0; i < NumNodes; ++i)
         NodeInTetra[i]= Node[i][0]*p[0] + Node[i][1]*p[1] + Node[i][2]*p[2];
 }
 

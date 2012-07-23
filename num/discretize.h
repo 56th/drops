@@ -749,6 +749,51 @@ DROPS_DEFINE_VALARRAY_DERIVATIVE(Quad5CL, T, base_type)
     inline T quadP2 (int i, double absdet) const;
 };
 
+/// Calculates the barycentric coordinates of the quadrature points in Node
+/// of the triangle given by p with respect to the
+/// tetrahedron and stores them in the NodesInTetra.
+/// RAIterT is a random-access-iterator to a sequence of BaryCoordCL
+template <class RAIterT>
+inline void SetInterface (const BaryCoordCL* const p, Uint NumNodes, RAIterT NodeInTetra, const Point3DCL* const Node);
+
+/// \brief Contains the nodes and weights of a positive quadrature rule on the reference triangle. It uses 1 node an is exact up to degree 1.
+class Quad1_2DDataCL
+{
+  public:
+    enum { NumNodesC= 1 };
+
+    static const Point3DCL Node[NumNodesC];   ///< quadrature nodes
+    static const double    Wght[1];           ///< quadrature weights
+    static const double    Weight[NumNodesC]; ///< quadrature weights for each node
+
+    /// Calculates the barycentric coordinates of the quadrature points
+    /// of the triangle given by the 1st argument with respect to the
+    /// tetrahedron and stores them in the 2nd argument.
+    /// RAIterT is a random-access-iterator to a sequence of BaryCoordCL
+    template <class RAIterT>
+    static void SetInterface (const BaryCoordCL* const p, RAIterT NodeInTetra)
+    { DROPS::SetInterface( p, NumNodesC, NodeInTetra, Node); }
+};
+
+/// \brief Contains the nodes and weights of a positive quadrature rule on the reference triangle. It uses 4 nodes an is exact up to degree 2.
+class Quad2_2DDataCL
+{
+  public:
+    enum { NumNodesC= 4 };
+
+    static const Point3DCL Node[NumNodesC];   ///< quadrature nodes
+    static const double    Wght[2];           ///< quadrature weights
+    static const double    Weight[NumNodesC]; ///< quadrature weights for each node
+
+    /// Calculates the barycentric coordinates of the quadrature points
+    /// of the triangle given by the 1st argument with respect to the
+    /// tetrahedron and stores them in the 2nd argument.
+    /// RAIterT is a random-access-iterator to a sequence of BaryCoordCL
+    template <class RAIterT>
+    static void SetInterface (const BaryCoordCL* const p, RAIterT NodeInTetra)
+    { DROPS::SetInterface( p, NumNodesC, NodeInTetra, Node); }
+};
+
 /// \brief Contains the nodes and weights of a positive quadrature rule on the reference triangle. It uses 7 nodes an is exact up to degree 5.
 ///
 /// The data is initialized exactly once on program-startup by the global object in num/discretize.cpp.
@@ -768,7 +813,8 @@ class Quad5_2DDataCL
     /// tetrahedron and stores them in the 2nd argument.
     /// RAIterT is a random-access-iterator to a sequence of BaryCoordCL
     template <class RAIterT>
-    static void SetInterface (const BaryCoordCL* const, RAIterT);
+    static void SetInterface (const BaryCoordCL* const p, RAIterT NodeInTetra)
+    { DROPS::SetInterface( p, NumNodesC, NodeInTetra, Node); }
 };
 
 template<class T=double>

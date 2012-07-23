@@ -220,6 +220,24 @@ namespace {
 } // end of anonymous namespace
 
 //**************************************************************************
+// Class: Quad1_2DDataCL                                                   *
+//**************************************************************************
+const Point3DCL Quad1_2DDataCL::Node[NumNodesC]= {  // Barycentric coord for 2D
+    Point3DCL( 1./3.)
+};
+const double Quad1_2DDataCL::Wght[1]= { 0.5 };
+const double Quad1_2DDataCL::Weight[1]= { 0.5 };
+
+//**************************************************************************
+// Class: Quad2_2DDataCL                                                   *
+//**************************************************************************
+const Point3DCL Quad2_2DDataCL::Node[NumNodesC]= {  // Barycentric coord for 2D
+    MakePoint3D( 1., 0., 0.), MakePoint3D( 0., 1., 0.), MakePoint3D( 0., 0., 1.), MakePoint3D( 1./3., 1./3., 1./3.)
+};
+const double Quad2_2DDataCL::Wght[2]= { 1./24., 0.375 };
+const double Quad2_2DDataCL::Weight[NumNodesC]= { 1./24., 1./24., 1./24., 0.375 };
+
+//**************************************************************************
 // Class: Quad5_2DDataCL                                                   *
 //**************************************************************************
 Point3DCL Quad5_2DDataCL::Node[NumNodesC];  // Barycentric coord for 2D
