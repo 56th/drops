@@ -320,7 +320,7 @@ class MultiGridCL
     void ElemInfo(std::ostream&, int Level= -1) const;          // all procs have to call this function in parallel mode
     void DebugInfo(std::ostream&, int Level=-1) const;          ///< Put all vertices, edges, faces, and tetras on the stream
     void SetMeshDeformation(MeshDeformationCL& MeshDeform) { MeshDeform_= &MeshDeform;}
-    MeshDeformationCL& GetMeshDeformation() { return *MeshDeform_;}
+    MeshDeformationCL& GetMeshDeformation() const { return *MeshDeform_;}
 #ifdef _PAR
     Uint GetNumDistributedObjects() const;                      // get number of distributed objects
     Uint GetNumTriangTetra(int Level=-1);                       // get number of tetras of a given level

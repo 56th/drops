@@ -91,7 +91,7 @@ class PoissonCoeffCL
     {
 
        DROPS::Point3DCL ret= Point3DCL(0.);
-       if(t == 0)
+       if(t == -1)
        { 
         ret[0] = p[0];
         ret[1] = p[1] *  interface(p, 0.)/dy_;
@@ -100,7 +100,7 @@ class PoissonCoeffCL
        else
        {
         ret[0] = p[0];
-        ret[1] = p[1] * interface(p, t + dt_)/interface(p, t);
+        ret[1] = p[1] * interface(p, t + dt_)/dy_;
         ret[2] = p[2];   
        }
        return ret;

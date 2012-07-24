@@ -161,7 +161,7 @@ void PoissonP1CL<Coeff>::Init( VecDescCL& vec, instat_scalar_fun_ptr func, doubl
             if(ALE_)
             {
                 vec.Data[sit->Unknowns(idx)]= func( MG_.GetMeshDeformation().GetTransformedVertexCoord(*sit), t0);
-            }   
+            }  
             else
                 vec.Data[sit->Unknowns(idx)]= func( sit->GetCoord(), t0);
         }
@@ -257,13 +257,20 @@ double PoissonP1CL<Coeff>::CheckSolution(const VecDescCL& lsg,
         for(Uint i=0; i<4; ++i)
         {
             if(ALE_)
-                diff= (sol.val(*sit->GetVertex(i)) - Lsg(sit->GetVertex(i)->GetCoord(),t));
-            else
+            {
                 diff= (sol.val(*sit->GetVertex(i)) - Lsg(MG_.GetMeshDeformation().GetTransformedVertexCoord(*sit->GetVertex(i)),t));
+            }
+            else
+                diff= (sol.val(*sit->GetVertex(i)) - Lsg(sit->GetVertex(i)->GetCoord(),t));
             sum+= diff*diff;
         }
         sum/= 120;
-        diff= sol.val(*sit, 0.25, 0.25, 0.25) - Lsg(GetBaryCenter(*sit),t);
+        if(ALE_)
+        {
+            diff= (sol.val(*sit, 0.25, 0.25, 0.25)- Lsg(MG_.GetMeshDeformation().GetTransformedTetraBaryCenter(*sit),t));
+        }
+        else
+            diff= sol.val(*sit, 0.25, 0.25, 0.25) - Lsg(GetBaryCenter(*sit),t);
         sum+= 2./15. * diff*diff;
         L2+= sum*absdet;
     }

@@ -223,8 +223,27 @@ Point3DCL MeshDeformationCL::GetTransformedEdgeBaryCenter( const EdgeCL &v)
 {
     Point3DCL ret;
     const Uint pidx( mlidx_->GetIdx());
+    const VertexCL& vt1 (*v.GetVertex(0));
+    const VertexCL& vt2 (*v.GetVertex(1));
     for (Uint k = 0; k < 3; ++k)
-        ret[k] = (*pointsol_).Data[v.Unknowns(pidx)+k];
+        ret[k] =   0.5 * (*pointsol_).Data[vt1.Unknowns(pidx)+k] 
+                 + 0.5 * (*pointsol_).Data[vt2.Unknowns(pidx)+k];
+    return ret;
+}
+
+Point3DCL MeshDeformationCL::GetTransformedTetraBaryCenter( const TetraCL & v)
+{
+    Point3DCL ret;
+    const VertexCL& vt1 (*v.GetVertex(0));
+    const VertexCL& vt2 (*v.GetVertex(1));
+    const VertexCL& vt3 (*v.GetVertex(2));
+    const VertexCL& vt4 (*v.GetVertex(3));
+    const Uint pidx( mlidx_->GetIdx());
+    for (Uint k = 0; k < 3; ++k)
+        ret[k] =   0.25 * (*pointsol_).Data[vt1.Unknowns(pidx)+k]
+                 + 0.25 * (*pointsol_).Data[vt2.Unknowns(pidx)+k]
+                 + 0.25 * (*pointsol_).Data[vt3.Unknowns(pidx)+k]
+                 + 0.25 * (*pointsol_).Data[vt4.Unknowns(pidx)+k];
     return ret;
 }
 

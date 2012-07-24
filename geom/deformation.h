@@ -72,6 +72,7 @@ public:
     void SetInnerEdgesPlanar();
     Point3DCL GetTransformedVertexCoord( const VertexCL &);
     Point3DCL GetTransformedEdgeBaryCenter( const EdgeCL &);
+    Point3DCL GetTransformedTetraBaryCenter( const TetraCL &);
 
 };
 

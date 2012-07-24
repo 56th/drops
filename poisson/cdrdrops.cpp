@@ -304,8 +304,11 @@ void Strategy(PoissonCL& Poisson)
         std::cout << line << "Discretize (setup linear equation system) for instationary problem...\n";
         timer.Reset();
         if(Poisson.ALE_)
+        {
+            mg.GetMeshDeformation().SetMeshTransformation(PoissonCoeffCL::ALEDeform, -1, false, false);
             //ALE.InitGrid();
-            mg.GetMeshDeformation().SetMeshTransformation(PoissonCoeffCL::ALEDeform, 0, true, false);
+
+        }
         Poisson.SetupInstatSystem( Poisson.A, Poisson.M, Poisson.x.t);
         Poisson.Init( Poisson.x, Poisson.Coeff_.InitialCondition, 0.0);
         timer.Stop();
@@ -359,8 +362,10 @@ void Strategy(PoissonCL& Poisson)
             timer.Reset();
             std::cout << line << "Step: " << step << std::endl;
             if(Poisson.ALE_)
+            {
+                mg.GetMeshDeformation().SetMeshTransformation(PoissonCoeffCL::ALEDeform, Poisson.x.t, false, false);   
                 //ALE.MovGrid(Poisson.x.t);
-                mg.GetMeshDeformation().SetMeshTransformation(PoissonCoeffCL::ALEDeform, Poisson.x.t, true, false);
+            }
             ThetaScheme.DoStep( Poisson.x);
 
             timer.Stop();
@@ -410,7 +415,7 @@ void Strategy(PoissonCL& Poisson)
 void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<std::string>("VTK.TimeFileName",P.get<std::string>("VTK.VTKName"));
     P.put_if_unset<int>("VTK.ReUseTimeFile",0);
-    P.put_if_unset<int>("VTK.UseDeformation",0);
+    P.put_if_unset<int>("VTK.UseDeformation",1);
     P.put_if_unset<int>("VTK.UseOnlyP1",0);
     P.put_if_unset<int>("Stabilization.SUPG",0);
     P.put_if_unset<double>("Stabilization.Magnitude",1.0);
