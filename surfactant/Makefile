@@ -25,7 +25,8 @@ surfactant: \
     ../misc/utils.o ../out/output.o ../num/discretize.o ../misc/params.o ../num/interfacePatch.o \
     ../levelset/fastmarch.o ../surfactant/ifacetransp.o \
     ../num/fe.o ../out/ensightOut.o ../levelset/surfacetension.o ../out/vtkOut.o \
-    ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o ../misc/bndmap.o
+    ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o ../misc/bndmap.o \
+    ../misc/scopetimer.o
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 surfacenorms: \

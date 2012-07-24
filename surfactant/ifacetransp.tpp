@@ -23,9 +23,35 @@
 */
 
 #include "levelset/levelset.h"
+#include "misc/scopetimer.h"
 #include <cstring>
 
 namespace DROPS {
+
+template <class ResultContainerT>
+  void
+  resize_and_evaluate_piecewise_normal (const SurfacePatchCL& p, const TetraCL& t, ResultContainerT& n, std::valarray<double>* absdet)
+{
+    n.resize( p.triangle_size());
+    if (absdet)
+        absdet->resize( p.triangle_size());
+
+    const typename SurfacePatchCL::const_vertex_iterator verts= p.vertex_begin();
+    typename SequenceTraitCL<ResultContainerT>::iterator n_it= sequence_begin( n);
+    double* a_it= absdet ? Addr( *absdet) : 0;
+
+    Point3DCL tmp( Uninitialized);
+    double tmp_norm;
+    for (SurfacePatchCL::const_triangle_iterator it= p.triangle_begin(); it != p.triangle_end(); ++it) {
+        const Point3DCL& v0= GetWorldCoord( t, verts[(*it)[0]]);
+        cross_product( tmp, GetWorldCoord( t, verts[(*it)[1]]) - v0,
+                            GetWorldCoord( t, verts[(*it)[2]]) - v0);
+        tmp_norm= tmp.norm();
+        *n_it++= tmp/tmp_norm;
+        if (absdet)
+            *a_it++= tmp_norm;
+    }
+}
 
 template <class DiscVelSolT>
 void SetupConvectionP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls, const BndDataCL<>& lsetbnd, const DiscVelSolT& u)

@@ -27,6 +27,7 @@
 #include "surfactant/ifacetransp.h"
 #include "levelset/levelset.h"
 #include "num/spmat.h"
+#include "misc/scopetimer.h"
 #include <cstring>
 #include <cmath>
 
@@ -56,6 +57,15 @@ void Restrict (const MultiGridCL& mg, const VecDescCL& xext, VecDescCL& x)
         if (it->Unknowns.Exist( xidx) && it->Unknowns.Exist( xextidx))
             x.Data[it->Unknowns( xidx)]= xext.Data[it->Unknowns( xextidx)];
     }
+}
+
+void update_global_matrix_P1 (MatrixBuilderCL& M, const double coup[4][4], const IdxT numr[4], const IdxT numc[4])
+{
+    for (int i= 0; i < 4; ++i)
+        if (numr[i] != NoIdx)
+            for (int j= 0; j < 4; ++j)
+                if (numc[j] != NoIdx)
+                    M( numr[i], numc[j])+= coup[i][j];
 }
 
 void SetupInterfaceMassP1OnTriangle (const LocalP1CL<> p1[4],

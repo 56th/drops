@@ -28,10 +28,12 @@
 #include "num/precond.h"
 #include "num/krylovsolver.h"
 #include "num/interfacePatch.h"
+#include "num/accumulator.h"
 #include "levelset/mgobserve.h"
 #include "out/ensightOut.h"
 #include "out/vtkOut.h"
 #include "num/fe_repair.h"
+#include "num/quadrature.h"
 
 #ifndef DROPS_IFACETRANSP_H
 #define DROPS_IFACETRANSP_H
@@ -45,6 +47,15 @@ void Extend (const MultiGridCL& mg, const VecDescCL& x, VecDescCL& xext);
 /// \brief Given a P1-vecdesc on the interface x and a P1-vecdesc xext on mg, the values of xext
 ///        are copied to x, where x has an unknown.
 void Restrict (const MultiGridCL& mg, const VecDescCL& xext, VecDescCL& x);
+
+/// \brief Helper for the accumulators: inserts the local matrix coup into M.
+void update_global_matrix_P1 (MatrixBuilderCL& M, const double coup[4][4], const IdxT numr[4], const IdxT numc[4]);
+
+/// \brief Writes a normal to each triangle of p to n. The normal is the normalized cross-product of two of the edges. Absdet is its norm.
+template <class ResultContainerT>
+  void
+  resize_and_evaluate_piecewise_normal (const SurfacePatchCL& p, const TetraCL& t, ResultContainerT& n, std::valarray<double>* absdet= 0);
+
 
 /// \brief The routine sets up the mass-matrix in matM on the interface defined by ls.
 ///        It belongs to the FE induced by standard P1-elements.
