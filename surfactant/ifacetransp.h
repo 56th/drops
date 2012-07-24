@@ -59,13 +59,98 @@ template <class ResultContainerT>
 
 /// \brief The routine sets up the mass-matrix in matM on the interface defined by ls.
 ///        It belongs to the FE induced by standard P1-elements.
-void SetupInterfaceMassP1 (const MultiGridCL& MG, MatDescCL* matM, const VecDescCL& ls, const BndDataCL<>& lsetbnd);
+void SetupInterfaceMassP1 (const MultiGridCL& mg, MatDescCL* matM, const VecDescCL& ls, const BndDataCL<>& lsetbnd);
+
+/// \brief The routine sets up the mixed mass-matrix on the interface given by ls: The rows belong
+///        to the new timestep, the columns to the old timestep. It belongs to the FE induced by
+///        standard P1-elements. Actually only an alias for SetupInterfaceMassP1 with RowIdx != ColIdx
+void SetupMixedMassP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls, const BndDataCL<>& lsbnd);
+
+class InterfaceMassAccuP1CL : public TetraAccumulatorCL
+{
+  private:
+    MatDescCL* mat_; // the matrix
+    const VecDescCL& ls_; // P2-level-set
+    const BndDataCL<>& lsetbnd_; // boundary data for the level set function
+
+    MatrixBuilderCL* M;
+
+    Uint lvl;
+    IdxT numr[4],
+         numc[4];
+    double coup[4][4];
+    LocalP1CL<> p1[4];
+    std::valarray<double> q[4];
+
+    const PrincipalLatticeCL& lat;
+    LocalP2CL<> locp2_ls;
+    std::valarray<double> ls_loc;
+    SurfacePatchCL surf;
+    QuadDomain2DCL qdom;
+
+    void setup_local_matrix (const TetraCL& t);
+
+  public:
+    InterfaceMassAccuP1CL (MatDescCL* Mmat, const VecDescCL& ls, const BndDataCL<>& lsetbnd)
+        : mat_( Mmat), ls_( ls), lsetbnd_( lsetbnd), M( 0), lat( PrincipalLatticeCL::instance( 2)), ls_loc( lat.vertex_size())
+    { p1[0][0]= p1[1][1]= p1[2][2]= p1[3][3]= 1.; } // P1-Basis-Functions
+
+    virtual ~InterfaceMassAccuP1CL () {}
+
+    virtual void begin_accumulation   ();
+    virtual void finalize_accumulation();
+    virtual void visit (const TetraCL& t);
+
+    virtual InterfaceMassAccuP1CL* clone (int /*clone_id*/) { return new InterfaceMassAccuP1CL( *this); }
+
+};
+
 
 /// \brief The routine sets up the Laplace-Beltrami-matrix in mat on the interface defined by ls.
 ///        It belongs to the FE induced by standard P1-elements.
 ///
 /// D is the diffusion-coefficient
 void SetupLBP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls, const BndDataCL<>& lsbnd, double D);
+
+class LaplaceBeltramiAccuP1CL : public TetraAccumulatorCL
+{
+  private:
+    MatDescCL* mat_; // the matrix
+    const VecDescCL& ls_; // P2-level-set
+    const BndDataCL<>& lsetbnd_; // boundary data for the level set function
+    double D_; // diffusion coefficient
+
+    MatrixBuilderCL* A;
+
+    Uint lvl;
+    IdxT numr[4],
+         numc[4];
+    Point3DCL grad[4];
+    double coup[4][4];
+    double dummy;
+    GridFunctionCL<Point3DCL> n,
+                              q[4];
+    std::valarray<double> absdet;
+
+    const PrincipalLatticeCL& lat;
+    LocalP2CL<> locp2_ls;
+    std::valarray<double> ls_loc;
+    SurfacePatchCL surf;
+
+    void setup_local_matrix (const TetraCL& t);
+
+  public:
+    LaplaceBeltramiAccuP1CL (MatDescCL* Amat, const VecDescCL& ls, const BndDataCL<>& lsetbnd, double D)
+        : mat_( Amat), ls_( ls), lsetbnd_( lsetbnd), D_( D), A( 0), lat( PrincipalLatticeCL::instance( 2)), ls_loc( lat.vertex_size()) {}
+    virtual ~LaplaceBeltramiAccuP1CL () {}
+
+    virtual void begin_accumulation   ();
+    virtual void finalize_accumulation();
+    virtual void visit (const TetraCL& t);
+
+    virtual LaplaceBeltramiAccuP1CL* clone (int /*clone_id*/) { return new LaplaceBeltramiAccuP1CL( *this); }
+
+};
 
 /// \brief The routine sets up the convection-matrix in mat on the interface defined by ls.
 ///        It belongs to the FE induced by standard P1-elements.
@@ -75,10 +160,50 @@ void SetupLBP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls, cons
 template <class DiscVelSolT>
 void SetupConvectionP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls, const BndDataCL<>& lsbnd, const DiscVelSolT& v);
 
-/// \brief Helper of SetupConvectionP1
-void SetupConvectionP1OnTriangle (const BaryCoordCL triangle[3], double det,
-    const LocalP1CL<> p1[4], Quad5_2DCL<> qp1[4],
-    const LocalP2CL<Point3DCL>& u, Point3DCL grad[4], double coup[4][4]);
+template <class DiscVelSolT>
+class InterfaceConvectionAccuP1CL : public TetraAccumulatorCL
+{
+  private:
+    MatDescCL* mat_; // the matrix
+    const VecDescCL& ls_; // P2-level-set
+    const BndDataCL<>& lsetbnd_; // boundary data for the level set function
+    const DiscVelSolT& w_; // wind
+
+    MatrixBuilderCL* M;
+
+    Uint lvl;
+    IdxT numr[4],
+         numc[4];
+    Point3DCL grad[4];
+    double coup[4][4];
+    LocalP1CL<> p1[4];
+    double dummy;
+    std::valarray<double> q[4];
+    LocalP2CL<Point3DCL> w_loc;
+    GridFunctionCL<Point3DCL> qw;
+
+    const PrincipalLatticeCL& lat;
+    LocalP2CL<> locp2_ls;
+    std::valarray<double> ls_loc;
+    SurfacePatchCL surf;
+    QuadDomain2DCL qdom;
+
+    void setup_local_matrix (const TetraCL& t);
+
+  public:
+    InterfaceConvectionAccuP1CL (MatDescCL* Amat, const VecDescCL& ls, const BndDataCL<>& lsetbnd, const DiscVelSolT& w)
+        : mat_( Amat), ls_( ls), lsetbnd_( lsetbnd), w_( w), M( 0), lat( PrincipalLatticeCL::instance( 2)), ls_loc( lat.vertex_size())
+    { p1[0][0]= p1[1][1]= p1[2][2]= p1[3][3]= 1.; }
+
+    virtual ~InterfaceConvectionAccuP1CL () {}
+
+    virtual void begin_accumulation   ();
+    virtual void finalize_accumulation();
+    virtual void visit (const TetraCL& t);
+
+    virtual InterfaceConvectionAccuP1CL* clone (int /*clone_id*/) { return new InterfaceConvectionAccuP1CL( *this); }
+
+};
 
 /// \brief The routine sets up the mass-matrix scaled with \f$ div_\Gamma v \f$ in mat on the interface
 ///        defined by ls. It belongs to the FE induced by standard P1-elements.
@@ -86,17 +211,57 @@ void SetupConvectionP1OnTriangle (const BaryCoordCL triangle[3], double det,
 /// The template-parameter is only used to circumvent the exact type of the discrete
 /// velocity solution in the Stokes classes.
 template <class DiscVelSolT>
-void SetupMassDivP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls, const BndDataCL<>& lsbnd, const DiscVelSolT& v);
+void SetupMassDivP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls, const BndDataCL<>& lsbnd, const DiscVelSolT& w);
 
-/// \brief Helper of SetupMassDivP1
-void SetupMassDivP1OnTriangle (const BaryCoordCL triangle[3], double det,
-    const LocalP1CL<> p1[4], Quad5_2DCL<> qp1[4],
-    const LocalP2CL<Point3DCL>& u, LocalP1CL<Point3DCL> gradp2[10], const Point3DCL& n, double coup[4][4]);
+template <typename DiscVelSolT>
+class InterfaceMassDivAccuP1CL : public TetraAccumulatorCL
+{
+  private:
+    MatDescCL* mat_; // the matrix
+    const VecDescCL& ls_; // P2-level-set
+    const BndDataCL<>& lsetbnd_; // boundary data for the level set function
+    const DiscVelSolT& w_;
 
-/// \brief The routine sets up the mixed mass-matrix on the interface given by ls: The rows belong
-///        to the new timestep, the columns to the old timestep. It belongs to the FE induced by
-///        standard P1-elements.
-void SetupMixedMassP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls, const BndDataCL<>& lsbnd);
+    MatrixBuilderCL* M;
+
+    Uint lvl;
+    IdxT numr[4],
+         numc[4];
+    double coup[4][4];
+    LocalP1CL<> p1[4];
+
+    LocalP2CL<Point3DCL> w_loc;
+    std::valarray<double> q[4];
+    double dummy;
+    SMatrixCL<3,3> T;
+    GridFunctionCL<Point3DCL> n_tri,
+                              n,
+                              qgradp2i;
+    std::valarray<double> qdivgamma_w;
+    LocalP1CL<Point3DCL> gradrefp2[10],
+                         gradp2[10];
+
+    const PrincipalLatticeCL& lat;
+    LocalP2CL<> locp2_ls;
+    std::valarray<double> ls_loc;
+    SurfacePatchCL surf;
+    QuadDomain2DCL qdom;
+
+    void setup_local_matrix (const TetraCL& t);
+
+  public:
+    InterfaceMassDivAccuP1CL (MatDescCL* Mmat, const VecDescCL& ls, const BndDataCL<>& lsetbnd, const DiscVelSolT& w)
+        : mat_( Mmat), ls_( ls), lsetbnd_( lsetbnd), w_( w), M( 0), lat( PrincipalLatticeCL::instance( 2)), ls_loc( lat.vertex_size())
+    { p1[0][0]= p1[1][1]= p1[2][2]= p1[3][3]= 1.; P2DiscCL::GetGradientsOnRef( gradrefp2); }
+
+    virtual ~InterfaceMassDivAccuP1CL () {}
+
+    virtual void begin_accumulation   ();
+    virtual void finalize_accumulation();
+    virtual void visit (const TetraCL& t);
+
+    virtual InterfaceMassDivAccuP1CL* clone (int /*clone_id*/) { return new InterfaceMassDivAccuP1CL( *this); }
+};
 
 /// \brief The routine sets up the load-vector in v on the interface defined by ls.
 ///        It belongs to the FE induced by standard P1-elements.

@@ -54,111 +54,146 @@ template <class ResultContainerT>
 }
 
 template <class DiscVelSolT>
-void SetupConvectionP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls, const BndDataCL<>& lsetbnd, const DiscVelSolT& u)
+void InterfaceConvectionAccuP1CL<DiscVelSolT>::setup_local_matrix (const TetraCL& t)
 {
-    const IdxT num_rows= mat->RowIdx->NumUnknowns();
-    const IdxT num_cols= mat->ColIdx->NumUnknowns();
-    MatrixBuilderCL m( &mat->Data, num_rows, num_cols);
-    const Uint lvl= mat->GetRowLevel();
-    IdxT numr[4], numc[4];
+    surf.make_patch<MergeCutPolicyCL>( lat, ls_loc);
+    make_CompositeQuad5Domain2D( qdom, surf, t);
 
-    std::cout << "entering SetupConvectionP1: " << num_rows << " rows, " << num_cols << " cols. ";
+    w_loc.assign( t, w_);
+    resize_and_evaluate_on_vertexes( w_loc, qdom, qw);
 
-    LocalP1CL<> p1[4];
-    p1[0][0]= p1[1][1]= p1[2][2]= p1[3][3]= 1.; // P1-Basis-Functions
-    Quad5_2DCL<double> qp1[4];
+    P1DiscCL::GetGradients( grad, dummy, t);
+    for (int i= 0; i < 4; ++i)
+        resize_and_evaluate_on_vertexes( p1[i], qdom, q[i]);
 
-    LocalP2CL<Point3DCL> u_loc;
-    Point3DCL grad[4];
+    for (int i= 0; i < 4; ++i)
+        for(int j= 0; j < 4; ++j)
+            coup[i][j]= quad_2D( dot( grad[j], qw)*q[i], qdom);
+}
 
-    double coup[4][4];
-    double dummy;
+template <class DiscVelSolT>
+void InterfaceConvectionAccuP1CL<DiscVelSolT>::begin_accumulation ()
+{
+    const IdxT num_rows= mat_->RowIdx->NumUnknowns();
+    const IdxT num_cols= mat_->ColIdx->NumUnknowns();
+    std::cout << "entering InterfaceConvectionAccuP1CL::begin_accumulation: " << num_rows << " rows, " << num_cols << " cols, ";
+    lvl = mat_->GetRowLevel();
+    M= new MatrixBuilderCL( &mat_->Data, num_rows, num_cols);
+}
 
-    InterfaceTriangleCL triangle;
+template <class DiscVelSolT>
+void InterfaceConvectionAccuP1CL<DiscVelSolT>::finalize_accumulation ()
+{
+    M->Build();
+    delete M;
+    M= 0;
+    std::cout << mat_->Data.num_nonzeros() << " nonzeros." << std::endl;
+}
 
-    DROPS_FOR_TRIANG_CONST_TETRA( mg, lvl, it) {
-        triangle.Init( *it, ls, lsetbnd);
-        if (triangle.Intersects()) { // We are at the phase boundary.
-            GetLocalNumbP1NoBnd( numr, *it, *mat->RowIdx);
-            GetLocalNumbP1NoBnd( numc, *it, *mat->ColIdx);
-            P1DiscCL::GetGradients( grad, dummy, *it);
-            u_loc.assign( *it, u);
-            std::memset( coup, 0, 4*4*sizeof( double));
+template <class DiscVelSolT>
+void InterfaceConvectionAccuP1CL<DiscVelSolT>::visit (const TetraCL& t)
+{
+    locp2_ls.assign( t, ls_, lsetbnd_);
+    evaluate_on_vertexes( locp2_ls, lat, Addr( ls_loc));
+    if (equal_signs( ls_loc))
+        return;
 
-            for (int ch= 0; ch < 8; ++ch) {
-                triangle.ComputeForChild( ch);
-                for (int tri= 0; tri < triangle.GetNumTriangles(); ++tri)
-                    SetupConvectionP1OnTriangle( &triangle.GetBary( tri), triangle.GetAbsDet( tri),
-                        p1, qp1, u_loc, grad, coup);
-            }
+    setup_local_matrix ( t);
 
-            for(int i= 0; i < 4; ++i) {// assemble row Numb[i]
-                if (numr[i] == NoIdx) continue;
-                for(int j= 0; j < 4; ++j) {
-                    if (numc[j] == NoIdx) continue;
-                    m( numr[i], numc[j])+= coup[i][j]; // Order of indices is correct as the assemply of coup is adapted.
-                }
-            }
-        }
-    }
-    m.Build();
-    std::cout << mat->Data.num_nonzeros() << " nonzeros in interface convection matrix!" << std::endl;
+    GetLocalNumbP1NoBnd( numr, t, *mat_->RowIdx);
+    GetLocalNumbP1NoBnd( numc, t, *mat_->ColIdx);
+    update_global_matrix_P1( *M, coup, numr, numc);
+}
+
+template <class DiscVelSolT>
+void SetupConvectionP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls, const BndDataCL<>& lsetbnd, const DiscVelSolT& w)
+{
+    ScopeTimerCL timer( "SetupConvectionP1");
+
+    InterfaceConvectionAccuP1CL<DiscVelSolT> accu( mat, ls, lsetbnd, w);
+    TetraAccumulatorTupleCL accus;
+    accus.push_back( &accu);
+    const IdxDescCL* RowIdx= mat->RowIdx;
+    accumulate( accus, mg, RowIdx->TriangLevel(), RowIdx->GetMatchingFunction(), RowIdx->GetBndInfo());
 }
 
 
 template <class DiscVelSolT>
-void SetupMassDivP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls, const BndDataCL<>& lsetbnd, const DiscVelSolT& u)
+void InterfaceMassDivAccuP1CL<DiscVelSolT>::setup_local_matrix (const TetraCL& t)
 {
-    const IdxT num_rows= mat->RowIdx->NumUnknowns();
-    const IdxT num_cols= mat->ColIdx->NumUnknowns();
-    MatrixBuilderCL m( &mat->Data, num_rows, num_cols);
-    const Uint lvl= mat->GetRowLevel();
-    IdxT numr[4], numc[4];
+    surf.make_patch<MergeCutPolicyCL>( lat, ls_loc);
+    make_CompositeQuad5Domain2D ( qdom, surf, t);
 
-    std::cout << "entering SetupMassDivP1: " << num_rows << " rows, " << num_cols << " cols. ";
+    resize_and_evaluate_piecewise_normal( surf, t, n_tri);
+    n.resize( qdom.vertex_size());
+    for (Uint i= 0; i < surf.triangle_size(); ++i)
+        n[std::slice(i*7, 7, 1)]= n_tri[i];
 
-    LocalP1CL<> p1[4];
-    p1[0][0]= p1[1][1]= p1[2][2]= p1[3][3]= 1.; // P1-Basis-Functions
-    Quad5_2DCL<double> qp1[4];
-
-    LocalP2CL<Point3DCL> u_loc;
-    SMatrixCL<3,3> T;
-    LocalP1CL<Point3DCL> gradrefp2[10], gradp2[10];
-    P2DiscCL::GetGradientsOnRef( gradrefp2);
-
-    double coup[4][4];
-    double dummy;
-
-    InterfaceTriangleCL triangle;
-
-    DROPS_FOR_TRIANG_CONST_TETRA( mg, lvl, it) {
-        triangle.Init( *it, ls, lsetbnd);
-        if (triangle.Intersects()) { // We are at the phase boundary.
-            GetLocalNumbP1NoBnd( numr, *it, *mat->RowIdx);
-            GetLocalNumbP1NoBnd( numc, *it, *mat->ColIdx);
-            GetTrafoTr( T, dummy, *it);
-            P2DiscCL::GetGradients( gradp2, gradrefp2, T);
-            u_loc.assign( *it, u);
-            std::memset( coup, 0, 4*4*sizeof( double));
-
-            for (int ch= 0; ch < 8; ++ch) {
-                triangle.ComputeForChild( ch);
-                 for (int tri= 0; tri < triangle.GetNumTriangles(); ++tri)
-                    SetupMassDivP1OnTriangle( &triangle.GetBary( tri), triangle.GetAbsDet( tri),
-                        p1, qp1, u_loc, gradp2, triangle.GetNormal(), coup);
-            }
-
-            for(int i= 0; i < 4; ++i) {// assemble row Numb[i]
-                if (numr[i] == NoIdx) continue;
-                for(int j= 0; j < 4; ++j) {
-                    if (numc[j] == NoIdx) continue;
-                    m( numr[i], numc[j])+= coup[i][j];
-                }
-            }
-        }
+    GetTrafoTr( T, dummy, t);
+    P2DiscCL::GetGradients( gradp2, gradrefp2, T);
+    w_loc.assign( t, w_);
+    qgradp2i.resize( qdom.vertex_size());
+    qdivgamma_w.resize( qdom.vertex_size());
+    qdivgamma_w= 0.;
+    for (int i= 0; i < 10; ++i) {
+        evaluate_on_vertexes( gradp2[i], qdom, Addr( qgradp2i));
+        qdivgamma_w+= dot(w_loc[i], qgradp2i) - dot( w_loc[i], n)*dot( n, qgradp2i);
     }
-    m.Build();
-    std::cout << mat->Data.num_nonzeros() << " nonzeros in mass-divergence matrix!" << std::endl;
+
+    for (int i= 0; i < 4; ++i)
+        resize_and_evaluate_on_vertexes (p1[i], qdom, q[i]);
+
+    for (int i= 0; i < 4; ++i) {
+        coup[i][i]= quad_2D( qdivgamma_w*q[i]*q[i], qdom);
+        for(int j= 0; j < i; ++j)
+            coup[i][j]= coup[j][i]= quad_2D( qdivgamma_w*q[j]*q[i], qdom);
+    }
+}
+
+template <class DiscVelSolT>
+void InterfaceMassDivAccuP1CL<DiscVelSolT>::begin_accumulation ()
+{
+    const IdxT num_rows= mat_->RowIdx->NumUnknowns();
+    const IdxT num_cols= mat_->ColIdx->NumUnknowns();
+    std::cout << "entering InterfaceMassDivAccuP1CL::begin_accumulation: " << num_rows << " rows, " << num_cols << " cols, ";
+    lvl = mat_->GetRowLevel();
+    M= new MatrixBuilderCL( &mat_->Data, num_rows, num_cols);
+}
+
+template <class DiscVelSolT>
+void InterfaceMassDivAccuP1CL<DiscVelSolT>::finalize_accumulation ()
+{
+    M->Build();
+    delete M;
+    M= 0;
+    std::cout << mat_->Data.num_nonzeros() << " nonzeros." << std::endl;
+}
+
+template <class DiscVelSolT>
+void InterfaceMassDivAccuP1CL<DiscVelSolT>::visit (const TetraCL& t)
+{
+    locp2_ls.assign( t, ls_, lsetbnd_);
+    evaluate_on_vertexes( locp2_ls, lat, Addr( ls_loc));
+    if (equal_signs( ls_loc))
+        return;
+
+    setup_local_matrix ( t);
+
+    GetLocalNumbP1NoBnd( numr, t, *mat_->RowIdx);
+    GetLocalNumbP1NoBnd( numc, t, *mat_->ColIdx);
+    update_global_matrix_P1( *M, coup, numr, numc);
+}
+
+template <class DiscVelSolT>
+void SetupMassDivP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls, const BndDataCL<>& lsetbnd, const DiscVelSolT& w)
+{
+    ScopeTimerCL timer( "SetupMassDivP1");
+
+    InterfaceMassDivAccuP1CL<DiscVelSolT> accu( mat, ls, lsetbnd, w);
+    TetraAccumulatorTupleCL accus;
+    accus.push_back( &accu);
+    const IdxDescCL* RowIdx= mat->RowIdx;
+    accumulate( accus, mg, RowIdx->TriangLevel(), RowIdx->GetMatchingFunction(), RowIdx->GetBndInfo());
 }
 
 } // end of namespace DROPS
