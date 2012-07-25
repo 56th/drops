@@ -23,58 +23,14 @@
 
 #include<map>
 #include "misc/bndmap.h"
+#include "misc/singletonmap.h"
 
 namespace DROPS
 {
-
-    template<class T>
-    SingletonMapCL<T>& SingletonMapCL<T>::getInstance()
-    {
-       static SingletonMapCL instance;
-       return instance;
-    }
-
-    template<class T>
-    T& SingletonMapCL<T>::operator[](std::string s){
-        if (this->find(s) == this->end()){
-            std::ostringstream os;
-            os << "SingletonMapCL::operator[]: function with the name \"" << s << "\" not found in container!";
-            throw DROPSErrCL(os.str());
-        }
-        return this->find(s)->second;
-    }
-
-    RegisterVectorFunction::RegisterVectorFunction(std::string name, instat_vector_fun_ptr fptr){
-        InVecMap::getInstance().insert(std::make_pair(name,fptr));
-    }
-
-    RegisterVectorFunction::RegisterVectorFunction(std::string name, vector_tetra_function fptr){
-        VecTetMap::getInstance().insert(std::make_pair(name,fptr));
-    }
-
-    RegisterScalarFunction::RegisterScalarFunction(std::string name, instat_scalar_fun_ptr fptr){
-        InScaMap::getInstance().insert(std::make_pair(name,fptr));
-    }
-
-    RegisterScalarFunction::RegisterScalarFunction(std::string name, scalar_tetra_function fptr){
-        ScaTetMap::getInstance().insert(std::make_pair(name,fptr));
-    }
-
-    RegisterMatchingFunction::RegisterMatchingFunction(std::string name, match_fun fptr){
-        MatchMap::getInstance().insert(std::make_pair(name,fptr));
-    }
-
-    RegisterMatrixFunction::RegisterMatrixFunction(std::string name, instat_matrix_fun_ptr fptr){
-        InMatMap::getInstance().insert(std::make_pair(name,fptr));
-    }
-
-
-
     template class SingletonMapCL<DROPS::instat_scalar_fun_ptr>;
     template class SingletonMapCL<DROPS::instat_vector_fun_ptr>;
     template class SingletonMapCL<DROPS::scalar_tetra_function>;
     template class SingletonMapCL<DROPS::vector_tetra_function>;
     template class SingletonMapCL<DROPS::instat_matrix_fun_ptr>;
     template class SingletonMapCL<DROPS::match_fun>;
-
 } //end of namespace DROPS

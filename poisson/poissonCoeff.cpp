@@ -108,7 +108,7 @@ static DROPS::RegisterScalarFunction regscaconstneg("NeuConstNeg", NeuConst<1>);
 static DROPS::RegisterScalarFunction regscaexppos("NeuExpPos", NeuExp<0>);
 static DROPS::RegisterScalarFunction regscaexpneg("NeuExpNeg", NeuExp<1>);
 static DROPS::RegisterScalarFunction regscapoly("NeuPoly", NeuPoly);
-static DROPS::RegisterVectorFunction regvecnus("Nusselt", Nusselt);
+static DROPS::RegisterVectorTetraFunction regvecnus("Nusselt", Nusselt);
 
 //======================================================================================================================
 //
@@ -157,12 +157,12 @@ static DROPS::RegisterVectorFunction regvecnus("Nusselt", Nusselt);
         return 1.;
     }
 
-    static DROPS::RegisterScalarFunction regscaq("Example1_Reaction",     Reaction    );
-    static DROPS::RegisterScalarFunction regscaf("Example1_Source",       Source      );
+    static DROPS::RegisterScalarTetraFunction regscaq("Example1_Reaction",     Reaction    );
+    static DROPS::RegisterScalarTetraFunction regscaf("Example1_Source",       Source      );
     static DROPS::RegisterScalarFunction regscas("Example1_Solution",     Solution    );
-    static DROPS::RegisterScalarFunction regscaa("Example1_Diffusion",    Diffusion   );
+    static DROPS::RegisterScalarTetraFunction regscaa("Example1_Diffusion",    Diffusion   );
     static DROPS::RegisterScalarFunction regscan("Example1_Neumann",      Neumann     );
-    static DROPS::RegisterVectorFunction regscav("Example1_Flowfield",    Flowfield   );
+    static DROPS::RegisterVectorTetraFunction regscav("Example1_Flowfield",    Flowfield   );
     static DROPS::RegisterScalarFunction regscai("Example1_InitialValue", InitialValue);
 
 } //end of namespace
@@ -199,11 +199,11 @@ static DROPS::RegisterVectorFunction regvecnus("Nusselt", Nusselt);
         return (std::exp(t)*std::exp(p[0]+p[1]+p[2]));
     }
 
-    static DROPS::RegisterScalarFunction regscaq("Example2_Reaction",     Reaction    );
-    static DROPS::RegisterScalarFunction regscaf("Example2_Source",       Source      );
+    static DROPS::RegisterScalarTetraFunction regscaq("Example2_Reaction",     Reaction    );
+    static DROPS::RegisterScalarTetraFunction regscaf("Example2_Source",       Source      );
     static DROPS::RegisterScalarFunction regscas("Example2_Solution",     Solution    );
-    static DROPS::RegisterScalarFunction regscaa("Example2_Diffusion",    Diffusion   );
-    static DROPS::RegisterVectorFunction regscav("Example2_Flowfield",    Flowfield   );
+    static DROPS::RegisterScalarTetraFunction regscaa("Example2_Diffusion",    Diffusion   );
+    static DROPS::RegisterVectorTetraFunction regscav("Example2_Flowfield",    Flowfield   );
 
 } //end of namespace
 
@@ -246,11 +246,11 @@ static DROPS::RegisterVectorFunction regvecnus("Nusselt", Nusselt);
         return 1.0;
     }
 
-    static DROPS::RegisterScalarFunction regscaq("Example3_Reaction",     Reaction    );
-    static DROPS::RegisterScalarFunction regscaf("Example3_Source",       Source      );
+    static DROPS::RegisterScalarTetraFunction regscaq("Example3_Reaction",     Reaction    );
+    static DROPS::RegisterScalarTetraFunction regscaf("Example3_Source",       Source      );
     static DROPS::RegisterScalarFunction regscas("Example3_Solution",     Solution    );
-    static DROPS::RegisterScalarFunction regscaa("Example3_Diffusion",    Diffusion   );
-    static DROPS::RegisterVectorFunction regscav("Example3_Flowfield",    Flowfield   );
+    static DROPS::RegisterScalarTetraFunction regscaa("Example3_Diffusion",    Diffusion   );
+    static DROPS::RegisterVectorTetraFunction regscav("Example3_Flowfield",    Flowfield   );
     static DROPS::RegisterScalarFunction regscai("Example3_InitialValue", InitialValue);
 
 } //end of namespace
@@ -288,11 +288,11 @@ static DROPS::RegisterVectorFunction regvecnus("Nusselt", Nusselt);
         double D = P.get<double>("PoissonCoeff.Diffusion");
         return p[0] - (1 - exp(p[0]/D))/(1 - exp(1./D));
     }
-    static DROPS::RegisterScalarFunction regscaq("SUPG_Reaction",     Reaction    );
-    static DROPS::RegisterScalarFunction regscaf("SUPG_Source",       Source      );
+    static DROPS::RegisterScalarTetraFunction regscaq("SUPG_Reaction",     Reaction    );
+    static DROPS::RegisterScalarTetraFunction regscaf("SUPG_Source",       Source      );
     static DROPS::RegisterScalarFunction regscas("SUPG_Solution",     Solution    );
-    static DROPS::RegisterScalarFunction regscaa("SUPG_Diffusion",    Diffusion   );
-    static DROPS::RegisterVectorFunction regscav("SUPG_Flowfield",    Flowfield   );
+    static DROPS::RegisterScalarTetraFunction regscaa("SUPG_Diffusion",    Diffusion   );
+    static DROPS::RegisterVectorTetraFunction regscav("SUPG_Flowfield",    Flowfield   );
 } //end of namespace
 
 /****************************************
@@ -341,10 +341,10 @@ static DROPS::RegisterVectorFunction regvecnus("Nusselt", Nusselt);
         }
         return exp(-t-p[1]) + p[0] - (1 - exp(p[0]/alpha))/(1 - exp(1./alpha));
     }
-    static DROPS::RegisterScalarFunction regscaq("instatSUPG_Reaction",     Reaction    );
-    static DROPS::RegisterScalarFunction regscaf("instatSUPG_Source",       Source      );
+    static DROPS::RegisterScalarTetraFunction regscaq("instatSUPG_Reaction",     Reaction    );
+    static DROPS::RegisterScalarTetraFunction regscaf("instatSUPG_Source",       Source      );
     static DROPS::RegisterScalarFunction regscas("instatSUPG_Solution",     Solution    );
-    static DROPS::RegisterVectorFunction regscav("instatSUPG_Flowfield",    Flowfield   );
+    static DROPS::RegisterVectorTetraFunction regscav("instatSUPG_Flowfield",    Flowfield   );
 } //end of namespace
 
 /****************************************
@@ -379,11 +379,11 @@ static DROPS::RegisterVectorFunction regvecnus("Nusselt", Nusselt);
     {
         return exp(-t)*exp(-p[0]);
     }
-    static DROPS::RegisterScalarFunction regscaq("Adjoint_Reaction",     Reaction    );
-    static DROPS::RegisterScalarFunction regscaf("Adjoint_Source",       Source      );
+    static DROPS::RegisterScalarTetraFunction regscaq("Adjoint_Reaction",     Reaction    );
+    static DROPS::RegisterScalarTetraFunction regscaf("Adjoint_Source",       Source      );
     static DROPS::RegisterScalarFunction regscas("Adjoint_Solution",     Solution    );
-    static DROPS::RegisterScalarFunction regscaa("Adjoint_Diffusion",    Diffusion   );
-    static DROPS::RegisterVectorFunction regscav("Adjoint_Flowfield",    Flowfield   );
+    static DROPS::RegisterScalarTetraFunction regscaa("Adjoint_Diffusion",    Diffusion   );
+    static DROPS::RegisterVectorTetraFunction regscav("Adjoint_Flowfield",    Flowfield   );
 } //end of namespace
 
 /****************************************
@@ -480,12 +480,12 @@ static DROPS::RegisterVectorFunction regvecnus("Nusselt", Nusselt);
         double diff3     = -alpha*sol;
         return timederiv + conv + diff1 +diff2 +diff3;
     }
-    static DROPS::RegisterScalarFunction regscaq("TestALE_Reaction",     Reaction    );
-    static DROPS::RegisterScalarFunction regscaf("TestALE_Source",       Source      );
+    static DROPS::RegisterScalarTetraFunction regscaq("TestALE_Reaction",     Reaction    );
+    static DROPS::RegisterScalarTetraFunction regscaf("TestALE_Source",       Source      );
     static DROPS::RegisterScalarFunction regscaint("TestALE_Interface",  Interface   );
     static DROPS::RegisterScalarFunction regscas("TestALE_Solution",     Solution    );
-    static DROPS::RegisterVectorFunction regscav("TestOrigin_Velocity",  Flowfield   );
-    static DROPS::RegisterVectorFunction regscaalev("TestALE_Velocity",  ALEFlowfield);
+    static DROPS::RegisterVectorTetraFunction regscav("TestOrigin_Velocity",  Flowfield   );
+    static DROPS::RegisterVectorTetraFunction regscaalev("TestALE_Velocity",  ALEFlowfield);
 } //end of namespace
 
 /****************************************
@@ -576,11 +576,11 @@ static DROPS::RegisterVectorFunction regvecnus("Nusselt", Nusselt);
         double diff3     = -alpha*Solzz(ref, t);
         return timederiv + conv + diff1 +diff2 +diff3; 
     }
-    static DROPS::RegisterScalarFunction regscaq("ALEEx2_Reaction",     Reaction    );
-    static DROPS::RegisterScalarFunction regscaf("ALEEx2_Source",       Source      );
+    static DROPS::RegisterScalarTetraFunction regscaq("ALEEx2_Reaction",     Reaction    );
+    static DROPS::RegisterScalarTetraFunction regscaf("ALEEx2_Source",       Source      );
     static DROPS::RegisterScalarFunction regscaint("ALEEx2_Interface",  Interface   );
     static DROPS::RegisterScalarFunction regscas("ALEEx2_Solution",     Solution   );
-    static DROPS::RegisterVectorFunction regscav("ALEEx2_Velocity",    Flowfield   );
+    static DROPS::RegisterVectorTetraFunction regscav("ALEEx2_Velocity",    Flowfield   );
 }//end of namespace
 
 /****************************************
@@ -697,11 +697,11 @@ static DROPS::RegisterVectorFunction regvecnus("Nusselt", Nusselt);
         double diff3     = -alpha*Solzz(ref, t);
         return timederiv + conv + diff1 +diff2 +diff3; 
     }
-    static DROPS::RegisterScalarFunction regscaq("ALEEx3_Reaction",     Reaction    );
-    static DROPS::RegisterScalarFunction regscaf("ALEEx3_Source",       Source      );
+    static DROPS::RegisterScalarTetraFunction regscaq("ALEEx3_Reaction",     Reaction    );
+    static DROPS::RegisterScalarTetraFunction regscaf("ALEEx3_Source",       Source      );
     static DROPS::RegisterScalarFunction regscaint("ALEEx3_Interface",  Interface   );
     static DROPS::RegisterScalarFunction regscas("ALEEx3_Solution",     Solution   );
-    static DROPS::RegisterVectorFunction regscav("ALEEx3_Velocity",    Flowfield   );
+    static DROPS::RegisterVectorTetraFunction regscav("ALEEx3_Velocity",    Flowfield   );
 }//end of namespace
 
 /****************************************
@@ -791,11 +791,11 @@ static DROPS::RegisterVectorFunction regvecnus("Nusselt", Nusselt);
         double diff3     = -alpha*Solzz(ref, t);
         return timederiv + conv + diff1 +diff2 +diff3; 
     }
-    static DROPS::RegisterScalarFunction regscaq("ALEEx4_Reaction",     Reaction    );
-    static DROPS::RegisterScalarFunction regscaf("ALEEx4_Source",       Source      );
+    static DROPS::RegisterScalarTetraFunction regscaq("ALEEx4_Reaction",     Reaction    );
+    static DROPS::RegisterScalarTetraFunction regscaf("ALEEx4_Source",       Source      );
     static DROPS::RegisterScalarFunction regscaint("ALEEx4_Interface",  Interface   );
     static DROPS::RegisterScalarFunction regscas("ALEEx4_Solution",     Solution   );
-    static DROPS::RegisterVectorFunction regscav("ALEEx4_Velocity",    Flowfield   );
+    static DROPS::RegisterVectorTetraFunction regscav("ALEEx4_Velocity",    Flowfield   );
 }//end of namespace
  namespace ALEBala {
     //refH, Mag, paraX and paraT are used to change the free surface functions
@@ -854,11 +854,11 @@ static DROPS::RegisterVectorFunction regvecnus("Nusselt", Nusselt);
     double Source(const DROPS::TetraCL&, const DROPS::BaryCoordCL&, double) {
         return 0.;
     }
-    static DROPS::RegisterScalarFunction regscaq("ALEBala_Reaction",     Reaction    );
-    static DROPS::RegisterScalarFunction regscaf("ALEBala_Source",       Source      );
+    static DROPS::RegisterScalarTetraFunction regscaq("ALEBala_Reaction",     Reaction    );
+    static DROPS::RegisterScalarTetraFunction regscaf("ALEBala_Source",       Source      );
     static DROPS::RegisterScalarFunction regscaint("ALEBala_Interface",  Interface   );
     static DROPS::RegisterScalarFunction regscainter("ALEBala_Inter",    Inter       );
-    static DROPS::RegisterVectorFunction regscav("ALEBala_Velocity",     Flowfield   );
+    static DROPS::RegisterVectorTetraFunction regscav("ALEBala_Velocity",     Flowfield   );
 } //end of namespace
 
  namespace ALE {
@@ -898,9 +898,9 @@ static DROPS::RegisterVectorFunction regvecnus("Nusselt", Nusselt);
     }
     /// \brief Solution ====================================careful
 
-    static DROPS::RegisterScalarFunction regscaq("ALE_Reaction",     Reaction    );
-    static DROPS::RegisterScalarFunction regscaf("ALE_Source",       Source      );
+    static DROPS::RegisterScalarTetraFunction regscaq("ALE_Reaction",     Reaction    );
+    static DROPS::RegisterScalarTetraFunction regscaf("ALE_Source",       Source      );
     static DROPS::RegisterScalarFunction regscaint("ALE_Interface",  Interface   );
-    static DROPS::RegisterVectorFunction regscav("ALE_Velocity",     Flowfield   );
+    static DROPS::RegisterVectorTetraFunction regscav("ALE_Velocity",     Flowfield   );
     static DROPS::RegisterScalarFunction regscas("ALE_Inter",        BInter      );
 } //end of namespace

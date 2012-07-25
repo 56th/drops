@@ -47,8 +47,8 @@ double OneTet( const DROPS::TetraCL&, const DROPS::BaryCoordCL&, double) { retur
 //========================================================================
 static RegisterScalarFunction regscazero("Zero", Zero);
 static RegisterScalarFunction regscaone("One", One);
-static RegisterScalarFunction regscazerotet("Zero", ZeroTet);
-static RegisterScalarFunction regscaonetet("One", OneTet);
+static RegisterScalarTetraFunction regscazerotet("Zero", ZeroTet);
+static RegisterScalarTetraFunction regscaonetet("One", OneTet);
 
 }//end namespace DROPS
 #endif /* BNDSCALARFUNCTIONS_H_ */

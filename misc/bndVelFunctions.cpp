@@ -45,9 +45,9 @@ static DROPS::RegisterVectorFunction regvelzerovel("ZeroVel", ZeroVel);
 static DROPS::RegisterVectorFunction regvelunitvelx("UnitVelx", UnitVel<0>);
 static DROPS::RegisterVectorFunction regvelunitvely("UnitVely", UnitVel<1>);
 static DROPS::RegisterVectorFunction regvelunitvelz("UnitVelz", UnitVel<2>);
-static DROPS::RegisterVectorFunction regvelzeroveltet("ZeroVel", ZeroVelTet);
-static DROPS::RegisterVectorFunction regvelunitvelxtet("UnitVelx", UnitVelTet<0>);
-static DROPS::RegisterVectorFunction regvelunitvelytet("UnitVely", UnitVelTet<1>);
-static DROPS::RegisterVectorFunction regvelunitvelztet("UnitVelz", UnitVelTet<2>);
+static DROPS::RegisterVectorTetraFunction regvelzeroveltet("ZeroVel", ZeroVelTet);
+static DROPS::RegisterVectorTetraFunction regvelunitvelxtet("UnitVelx", UnitVelTet<0>);
+static DROPS::RegisterVectorTetraFunction regvelunitvelytet("UnitVely", UnitVelTet<1>);
+static DROPS::RegisterVectorTetraFunction regvelunitvelztet("UnitVelz", UnitVelTet<2>);
 
 
