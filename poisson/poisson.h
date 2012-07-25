@@ -251,8 +251,7 @@ class PoissonP2CL : public ProblemCL<Coeff, PoissonBndDataCL>
     typedef double (*est_fun)(const TetraCL&, const VecDescCL&, const BndDataCL&);
 
     // new fields for the matrix A, the rhs b and the solution x
-    bool        ALE_; //ALE_ is introduced because poissonP1CL and poissonP2CL are used in scalar.cpp.
-                      //Since ALE method is not yet implemented, ALE_ is always set to false
+    bool        ALE_; 
     MLIdxDescCL idx;
     VecDescCL   x;
     VecDescCL   b;

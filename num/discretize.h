@@ -204,6 +204,15 @@ operator*( const GridFunctionCL<double>& a, const Point3DCL& b)
     return b*a;
 }
 
+inline GridFunctionCL<Point3DCL>
+operator*(GridFunctionCL< SMatrixCL<3, 3> >& a, GridFunctionCL<Point3DCL>& b)
+{
+    GridFunctionCL<SVectorCL<3> > ret( b.size());
+    for (size_t i= 0; i < b.size(); ++i)
+        ret[i]=a[i] * b[i];
+    return ret;
+}
+
 inline GridFunctionCL<double>
 dot(const GridFunctionCL<Point3DCL>& a, const GridFunctionCL<Point3DCL>& b)
 {
@@ -480,6 +489,8 @@ class Quad2CL: public GridFunctionCL<T>
     typedef GridFunctionCL<T> base_type;
     typedef typename base_type::value_type value_type;
     typedef typename base_type::instat_fun_ptr instat_fun_ptr;
+    typedef Quad2DataCL DataClass;
+    
 
     static const double Node[5][4]; // Stuetzstellen (NumNodesC*4 doubles)
     static const double Wght[5];    // Gewichte      (NumNodesC   doubles)
@@ -587,6 +598,7 @@ class Quad3CL: public GridFunctionCL<T>
     typedef typename base_type::value_type value_type;
     typedef typename base_type::instat_fun_ptr instat_fun_ptr;
     typedef typename base_type::tetra_function tetra_function;
+    typedef Quad3DataCL DataClass;
 
   protected:
     typedef Quad3CL<T> self_;
@@ -675,6 +687,7 @@ class Quad5CL: public GridFunctionCL<T>
     typedef typename base_type::value_type value_type;
     typedef typename base_type::tetra_function tetra_function;
     typedef typename base_type::instat_fun_ptr instat_fun_ptr;
+    typedef Quad5DataCL DataClass;
 
   protected:
     typedef Quad5CL<T> self_;

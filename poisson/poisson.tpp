@@ -25,6 +25,7 @@
 #include "num/discretize.h"
 #include "num/accumulator.h"
 #include "poisson/poissonaccus.tpp"
+#include "geom/isoparamP2.h"
 namespace DROPS
 {
 
@@ -911,7 +912,7 @@ void PoissonP2CL<Coeff>::SetupSystem(MLMatDescCL& matA, VecDescCL& b) const
 //Set up P2-convection
 template<class Coeff>
 void SetupConvection_P2(const MultiGridCL& MG_, const Coeff& Coeff_, const BndDataCL<> BndData_, MatrixCL& Umat,
-                        VecDescCL* vU, IdxDescCL& RowIdx, IdxDescCL& ColIdx, double tU)
+                        VecDescCL* vU, IdxDescCL& RowIdx, IdxDescCL& ColIdx, double tU, bool ALE_)
 {
   if(vU!=0) vU->Clear(tU);
   MatrixBuilderCL U(&Umat, RowIdx.NumUnknowns(), ColIdx.NumUnknowns());
@@ -928,17 +929,25 @@ void SetupConvection_P2(const MultiGridCL& MG_, const Coeff& Coeff_, const BndDa
   double det;
   double absdet;
   double tmp; //tell the vert points and the edge points
-
-
+  Quad3CL<double> adet;
+  Quad3CL< SMatrixCL<3, 3> > Tq;
 
   for(MultiGridCL::const_TriangTetraIteratorCL sit=MG_.GetTriangTetraBegin(lvl), send=MG_.GetTriangTetraEnd(lvl);
       sit!=send; ++sit)
   {
-      GetTrafoTr(T, det, *sit);
-      absdet=std::fabs(det);
+
+      if(false && ALE_)
+        GetTrafoAsQuad(MG_.GetMeshDeformation().GetLocalP2Deformation(*sit), adet, Tq);
+      else
+      {
+          GetTrafoTr(T, det, *sit);
+          absdet=std::fabs(det);
+          adet = det;  
+          Tq = T;  
+      }
 
       P2DiscCL::GetGradientsOnRef(GradRef);
-      P2DiscCL::GetGradients(Grad, GradRef, T);
+      //P2DiscCL::GetGradients(Grad, GradRef, T);
 
       Quad3CL<Point3DCL> u(*sit,Coeff_.Vel,tU);
       for(int i=0; i<4; ++i)
@@ -958,7 +967,9 @@ void SetupConvection_P2(const MultiGridCL& MG_, const Coeff& Coeff_, const BndDa
         //Assemble
         for(int j=0; j<10; ++j)
         {
-          const Quad3CL<double> u_Gradj( dot(u, Quad3CL<Point3DCL>(Grad[j], Quad3DataCL::Node))); //??
+          Quad3CL<Point3DCL> GradRefj(GradRef[j]);
+          Quad3CL<Point3DCL> Gradj(Tq * GradRefj * adet);
+          const Quad3CL<double> u_Gradj( dot(u,Gradj) ); //??
           if(!IsOnDirBnd[j])
           {
             for(int i=0; i<10; ++i)
@@ -997,7 +1008,7 @@ void PoissonP2CL<Coeff>::SetupConvection(MLMatDescCL& matU, VecDescCL& vU, doubl
 
   for (size_t lvl=0; lvl < matU.Data.size(); ++lvl, ++itRow, ++itCol, ++itU)
      {
-     SetupConvection_P2(MG_, Coeff_, BndData_, *itU, (lvl==matU.Data.size()-1) ? &vU:0, *itRow, *itCol, tU);
+     SetupConvection_P2(MG_, Coeff_, BndData_, *itU, (lvl==matU.Data.size()-1) ? &vU:0, *itRow, *itCol, tU, ALE_);
      }
 }
 
@@ -1138,7 +1149,7 @@ void PoissonP2CL<Coeff>::SetupInstatRhs(VecDescCL& vA, VecDescCL& vM, double tA,
 }
 //Setup Instat P2 problem
 template<class Coeff>
-void SetupInstatSystem_P2( const MultiGridCL& MG, const Coeff&, const BndDataCL<> BndData_, MatrixCL& Amat, MatrixCL& Mmat, IdxDescCL& RowIdx, IdxDescCL& ColIdx)
+void SetupInstatSystem_P2( const MultiGridCL& MG, const Coeff&, const BndDataCL<> BndData_, MatrixCL& Amat, MatrixCL& Mmat, IdxDescCL& RowIdx, IdxDescCL& ColIdx, bool ALE_)
 { //Setup stiffness and mass matrices
 
     const Uint lvl = RowIdx.TriangLevel(),
@@ -1215,7 +1226,7 @@ void PoissonP2CL<Coeff>::SetupInstatSystem( MLMatDescCL& matA, MLMatDescCL& matM
     MLIdxDescCL::iterator itCol  = matA.ColIdx->begin();
     MLMatrixCL::iterator  itM    = matM.Data.begin();
     for ( MLMatrixCL::iterator itA= matA.Data.begin(); itA != matA.Data.end(); ++itA, ++itM, ++itRow, ++itCol)
-        SetupInstatSystem_P2( MG_, Coeff_, BndData_, *itA, *itM, *itRow, *itCol);
+        SetupInstatSystem_P2( MG_, Coeff_, BndData_, *itA, *itM, *itRow, *itCol, ALE_);
 }
 
 /// \todo CheckSolution checks 2-norm and max-norm just on vertices and not on edges
@@ -1235,16 +1246,31 @@ double PoissonP2CL<Coeff>::CheckSolution(const VecDescCL& lsg, instat_scalar_fun
             send=const_cast<const MultiGridCL&>(MG_).GetTriangTetraEnd(lvl);
             sit != send; ++sit)
     {
-        double absdet= sit->GetVolume()*6.,
-                sum= 0;
-
+        double absdet, det,sum= 0;
+        if(ALE_)
+        {   
+           GetTrafoTrDet(det, MG_.GetMeshDeformation().GetLocalP1Deformation(*sit));
+           absdet = std::fabs(det);
+        }
+        else
+           absdet = sit->GetVolume()*6.;
         for(Uint i=0; i<4; ++i)
         {
-            diff= (sol.val(*sit->GetVertex(i)) - Lsg(sit->GetVertex(i)->GetCoord(),t));
+            if(ALE_)
+            {
+                diff= (sol.val(*sit->GetVertex(i)) - Lsg(MG_.GetMeshDeformation().GetTransformedVertexCoord(*sit->GetVertex(i)),t));
+            }
+            else
+                diff= (sol.val(*sit->GetVertex(i)) - Lsg(sit->GetVertex(i)->GetCoord(),t));
             sum+= diff*diff;
         }
         sum/= 120;
-        diff= sol.val(*sit, 0.25, 0.25, 0.25) - Lsg(GetBaryCenter(*sit),t);
+        if(ALE_)
+        {
+            diff= (sol.val(*sit, 0.25, 0.25, 0.25)- Lsg(MG_.GetMeshDeformation().GetTransformedTetraBaryCenter(*sit),t));
+        }
+        else
+            diff= sol.val(*sit, 0.25, 0.25, 0.25) - Lsg(GetBaryCenter(*sit),t);
         sum+= 2./15. * diff*diff;
         L2+= sum*absdet;
     }
@@ -1264,7 +1290,10 @@ double PoissonP2CL<Coeff>::CheckSolution(const VecDescCL& lsg, instat_scalar_fun
             if (sit->AmIOwner())
 #endif
             {
-                diff= std::fabs( Lsg(sit->GetCoord(),t) - lsg.Data[sit->Unknowns(Idx)] );
+                if(ALE_)
+                    diff= std::fabs( Lsg(MG_.GetMeshDeformation().GetTransformedVertexCoord(*sit), t) - lsg.Data[sit->Unknowns(Idx)] );
+                else
+                    diff= std::fabs( Lsg(sit->GetCoord(),t) - lsg.Data[sit->Unknowns(Idx)] );
                 norm2+= diff*diff;
                 if (diff>maxdiff)
                 {

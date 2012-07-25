@@ -494,7 +494,7 @@ int main (int argc, char** argv)
             probP1 = new DROPS::PoissonP1CL<DROPS::PoissonCoeffCL>( *mg, tmp, *bdata, supg, P.get<int>("ALE.wavy"));
         else
         {
-            probP2 = new DROPS::PoissonP2CL<DROPS::PoissonCoeffCL>( *mg, tmp, *bdata);            
+            probP2 = new DROPS::PoissonP2CL<DROPS::PoissonCoeffCL>( *mg, tmp, *bdata, P.get<int>("ALE.wavy"));            
         }
 
 #ifdef _PAR

@@ -70,6 +70,37 @@ inline void GetTrafoTrAtPoint( SMatrixCL<3,3>& T, double& det, const Point3DCL& 
     T(2,2)= (M[0][0]*M[1][1] - M[1][0]*M[0][1])/det;      
 }
 
+inline void GetTrafoTrAtPoint( SMatrixCL<3,3>& T, double& det, const BaryCoordCL& p, const LocalP2CL<Point3DCL> & ct)
+{
+    double M[3][3];  
+    for (int j=0; j<3; j++)  
+        for (int k=0; k<3; k++)  
+            M[j][k] = 0.;
+    Point3DCL point(0.);
+    Point3DCL gradphi(0.);
+    for (int i=0; i<10; i++){
+        gradphi = FE_P2CL::DHRef(i,p[1],p[2],p[3]);
+        point = ct[i];
+        for (int j=0; j<3; j++)  
+            for (int k=0; k<3; k++)  
+                M[j][k] += point[j] * gradphi[k];
+    }
+    
+    det=   M[0][0] * (M[1][1]*M[2][2] - M[1][2]*M[2][1])
+        - M[0][1] * (M[1][0]*M[2][2] - M[1][2]*M[2][0])
+        + M[0][2] * (M[1][0]*M[2][1] - M[1][1]*M[2][0]);
+
+    T(0,0)= (M[1][1]*M[2][2] - M[1][2]*M[2][1])/det;
+    T(0,1)= (M[2][0]*M[1][2] - M[1][0]*M[2][2])/det;
+    T(0,2)= (M[1][0]*M[2][1] - M[2][0]*M[1][1])/det;
+    T(1,0)= (M[2][1]*M[0][2] - M[0][1]*M[2][2])/det;
+    T(1,1)= (M[0][0]*M[2][2] - M[2][0]*M[0][2])/det;
+    T(1,2)= (M[2][0]*M[0][1] - M[0][0]*M[2][1])/det;
+    T(2,0)= (M[0][1]*M[1][2] - M[1][1]*M[0][2])/det;
+    T(2,1)= (M[1][0]*M[0][2] - M[0][0]*M[1][2])/det;
+    T(2,2)= (M[0][0]*M[1][1] - M[1][0]*M[0][1])/det;      
+}
+
 /** calculates the physical coord of a reference point of a curved tetra */
 template<class LocalFE >
 inline Point3DCL GetWorldCoord( const LocalFE & ct, const Point3DCL& p)
@@ -93,6 +124,16 @@ inline Point3DCL GetWorldCoord( const LocalFE & ct, const BaryCoordCL& p)
         point += val * ct[i];
     }
     return point;
+}
+
+template<class LocalFE, class QuadCL_double, class QuadCL_mat>
+inline void GetTrafoAsQuad( const LocalFE & ct, QuadCL_double & adet, QuadCL_mat & T)
+{
+    for (Uint i=0; i<QuadCL_double::DataClass::NumNodesC; i++){
+        const BaryCoordCL & b(QuadCL_double::DataClass::Node[i]);
+        GetTrafoTrAtPoint( T[i], adet[i], b, ct);
+        adet[i] = std::abs(adet[i]);
+    }
 }
 
 
