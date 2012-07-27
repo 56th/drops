@@ -22,7 +22,7 @@
  * Copyright 2009 LNM/SC RWTH Aachen, Germany
 */
 
-#include "misc/bndmap.h"
+#include "misc/funcmap.h"
 #include "misc/params.h"
 #include "poisson/poissonCoeff.h"
 #define PI 3.14159265
@@ -513,14 +513,14 @@ static DROPS::RegisterVectorTetraFunction regvecnus("Nusselt", Nusselt);
         DROPS::Point3DCL ref(0.);
         ref[0] = p[0];
         ref[1] = refH * p[1]/Interface(p, t);
-        ref[2] = p[2];        
+        ref[2] = p[2];
         return ref;
     }
     //Grady
     double Grady( const DROPS::Point3DCL&, double t)   //b=h_y
     {
         return 1. + Mag * sin( paraT * t);
-    } 
+    }
     /// \brief Reaction: no reaction
     double Reaction(const DROPS::TetraCL&, const DROPS::BaryCoordCL&, double) {
         return 0.0;
@@ -530,7 +530,7 @@ static DROPS::RegisterVectorTetraFunction regvecnus("Nusselt", Nusselt);
         DROPS::Point3DCL v(0.);
         v[0] = 1.0;
         v[1] = ref[1] * Mag * paraT * cos( paraT * t);
-        return v; 
+        return v;
     }
 
     /// \brief Solution
@@ -570,11 +570,11 @@ static DROPS::RegisterVectorTetraFunction regvecnus("Nusselt", Nusselt);
         double b= Grady(ref,t);
         double sol= Solution(p, t);
         double timederiv = 10. * sol;
-        double conv      =  Solx(ref, t); 
+        double conv      =  Solx(ref, t);
         double diff1     = -alpha* Solxx(ref, t);
         double diff2     = -alpha/(b*b)*Solyy(ref, t);
         double diff3     = -alpha*Solzz(ref, t);
-        return timederiv + conv + diff1 +diff2 +diff3; 
+        return timederiv + conv + diff1 +diff2 +diff3;
     }
     static DROPS::RegisterScalarTetraFunction regscaq("ALEEx2_Reaction",     Reaction    );
     static DROPS::RegisterScalarTetraFunction regscaf("ALEEx2_Source",       Source      );
@@ -609,7 +609,7 @@ static DROPS::RegisterVectorTetraFunction regvecnus("Nusselt", Nusselt);
         DROPS::Point3DCL ref(0.);
         ref[0] = p[0];
         ref[1] = refH * p[1]/Interface(p, t);
-        ref[2] = p[2];        
+        ref[2] = p[2];
         return ref;
     }
     //Gradx, Grady, Grad1 and Grad2 are used for source term
@@ -620,7 +620,7 @@ static DROPS::RegisterVectorTetraFunction regvecnus("Nusselt", Nusselt);
     double Grady( const DROPS::Point3DCL& ref, double t)   //b=h_y
     {
         return 1. + Mag * sin(paraX * ref[0]  + paraT * t);
-    } 
+    }
     double Grad1( const DROPS::Point3DCL& ref, double t)   //\nabla_y(a/b)
     {
         double ay=paraX * Mag * cos(paraX * ref[0]  + paraT * t);
@@ -641,7 +641,7 @@ static DROPS::RegisterVectorTetraFunction regvecnus("Nusselt", Nusselt);
         DROPS::Point3DCL v(0.);
         v[0] = 1.;
         v[1] = ref[1] * Mag * paraT * cos( paraX * ref[0]  + paraT * t);
-        return v; 
+        return v;
     }
     /// \brief Solution
     double Solution( const DROPS::Point3DCL& p, double t)
@@ -681,21 +681,21 @@ static DROPS::RegisterVectorTetraFunction regvecnus("Nusselt", Nusselt);
         static double alpha;
         if(first){
         alpha = P.get<double>("PoissonCoeff.Diffusion");
-        first=false;                                    
+        first=false;
         }
         const DROPS::Point3DCL p= DROPS::GetWorldCoord( tet, bary);
         DROPS::Point3DCL ref = TransBack(p, t);
         double a= Gradx(ref,t);
         double b= Grady(ref,t);
         double c= Grad1(ref,t);
-        double d= Grad2(ref,t);        
+        double d= Grad2(ref,t);
         double sol= Solution(p, t);
         double timederiv = 10. * sol;
-        double conv      =  1. * (Solx(ref, t) - a/b * Soly(ref, t)); 
+        double conv      =  1. * (Solx(ref, t) - a/b * Soly(ref, t));
         double diff1     = -alpha* (Solxx(ref, t) - 2 * a/b * Solxy(ref,t ) - d * Soly(ref, t) + a/b * c * Soly(ref, t) + a * a /b/b *Solyy(ref, t));
         double diff2     = -alpha/(b*b)*Solyy(ref, t);
         double diff3     = -alpha*Solzz(ref, t);
-        return timederiv + conv + diff1 +diff2 +diff3; 
+        return timederiv + conv + diff1 +diff2 +diff3;
     }
     static DROPS::RegisterScalarTetraFunction regscaq("ALEEx3_Reaction",     Reaction    );
     static DROPS::RegisterScalarTetraFunction regscaf("ALEEx3_Source",       Source      );
@@ -729,14 +729,14 @@ static DROPS::RegisterVectorTetraFunction regvecnus("Nusselt", Nusselt);
         DROPS::Point3DCL ref(0.);
         ref[0] = p[0];
         ref[1] = refH * p[1]/Interface(p, t);
-        ref[2] = p[2];        
+        ref[2] = p[2];
         return ref;
     }
     //Grady
     double Grady( const DROPS::Point3DCL&, double t)   //b=h_y
     {
         return 1. + Mag * sin( paraT * t);
-    } 
+    }
     /// \brief Reaction: no reaction
     double Reaction(const DROPS::TetraCL&, const DROPS::BaryCoordCL&, double) {
         return 0.0;
@@ -746,7 +746,7 @@ static DROPS::RegisterVectorTetraFunction regvecnus("Nusselt", Nusselt);
         DROPS::Point3DCL v(0.);
         v[0] = exp(5.* t);
         v[1] = ref[1] * Mag * paraT * cos( paraT * t);
-        return v; 
+        return v;
     }
     /// \brief Solution
     double Solution( const DROPS::Point3DCL& p, double t)
@@ -778,18 +778,18 @@ static DROPS::RegisterVectorTetraFunction regvecnus("Nusselt", Nusselt);
         static double alpha;
         if(first){
         alpha = P.get<double>("PoissonCoeff.Diffusion");
-        first=false;                                    
+        first=false;
         }
         const DROPS::Point3DCL p= DROPS::GetWorldCoord( tet, bary);
         DROPS::Point3DCL ref = TransBack(p, t);
         double b= Grady(ref,t);
         double sol= Solution(p, t);
         double timederiv = 10. * sol;
-        double conv      =  exp(5.* t) * Solx(ref, t); 
+        double conv      =  exp(5.* t) * Solx(ref, t);
         double diff1     = -alpha* Solxx(ref, t);
         double diff2     = -alpha/(b*b)*Solyy(ref, t);
         double diff3     = -alpha*Solzz(ref, t);
-        return timederiv + conv + diff1 +diff2 +diff3; 
+        return timederiv + conv + diff1 +diff2 +diff3;
     }
     static DROPS::RegisterScalarTetraFunction regscaq("ALEEx4_Reaction",     Reaction    );
     static DROPS::RegisterScalarTetraFunction regscaf("ALEEx4_Source",       Source      );

@@ -1,4 +1,4 @@
-/// \file bndVelFunctions.cpp
+/// \file velFunctions.cpp
 /// \brief collections of general vector functions (like zero, one, etc..). No problem-specific functions!
 /// \author LNM RWTH Aachen: Martin Horsky; SC RWTH Aachen:
 /*
@@ -21,7 +21,10 @@
  * Copyright 2009 LNM/SC RWTH Aachen, Germany
 */
 #include "misc/container.h"
-#include "misc/bndmap.h"
+#include "misc/funcmap.h"
+
+#ifndef VECTORFUNCTIONS_H_
+#define VECTORFUNCTIONS_H_
 
 //========================================================================
 //                         General Functions
@@ -50,4 +53,4 @@ static DROPS::RegisterVectorTetraFunction regvelunitvelxtet("UnitVelx", UnitVelT
 static DROPS::RegisterVectorTetraFunction regvelunitvelytet("UnitVely", UnitVelTet<1>);
 static DROPS::RegisterVectorTetraFunction regvelunitvelztet("UnitVelz", UnitVelTet<2>);
 
-
+#endif /* VECTORFUNCTIONS_H_ */

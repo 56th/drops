@@ -42,7 +42,7 @@
 //surfactants
 #include "surfactant/ifacetransp.h"
 //function map
-#include "misc/bndmap.h"
+#include "misc/funcmap.h"
 //solver factory for stokes
 #include "num/stokessolverfactory.h"
 #include "num/oseensolver.h"
@@ -365,7 +365,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
                                  P.get<int>("Time.NumSteps")/P.get("VTK.VTKOut", 0)+1,
                                  P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName"),
                                  P.get<std::string>("VTK.TimeFileName"),
-                                 P.get<int>("VTK.Binary"), 
+                                 P.get<int>("VTK.Binary"),
                                  P.get<int>("VTK.UseOnlyP1"),
                                  -1,  /* <- level */
                                  P.get<int>("VTK.ReUseTimeFile") );

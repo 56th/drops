@@ -34,7 +34,7 @@
 #include "num/nssolver.h"
 #include "levelset/coupling.h"
 
-#include "misc/bndmap.h"
+#include "misc/funcmap.h"
 
 namespace DROPS
 {

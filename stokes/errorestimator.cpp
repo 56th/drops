@@ -51,7 +51,7 @@
 #include <string>
 #include <sstream>
 
-#include "misc/bndmap.h"
+#include "misc/funcmap.h"
 
 using namespace std;
 

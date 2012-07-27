@@ -56,7 +56,7 @@
 
 #include "misc/params.h"
 #include "out/ensightOut.h"
-#include "misc/bndmap.h"
+#include "misc/funcmap.h"
 
 using namespace std;
 
@@ -307,7 +307,7 @@ void Strategy( StokesProblemT& Stokes)
     if (P.get<int>("Ensight.EnsightOut",0)){
         // Initialize Ensight6 output
         const std::string ensf = P.get<string>("Ensight.EnsDir") + "/" + P.get<string>("Ensight.EnsCase");
-        ensight = new Ensight6OutCL (P.get<string>("Ensight.EnsCase")+".case", 
+        ensight = new Ensight6OutCL (P.get<string>("Ensight.EnsCase")+".case",
                                      P.get<int>("Time.NumSteps")/P.get("Ensight.EnsightOut", 0)+1,
                                      P.get<int>("Ensight.Binary"), P.get<int>("Ensight.MasterOut"));
 
@@ -321,11 +321,11 @@ void Strategy( StokesProblemT& Stokes)
 
     VTKOutCL * vtkwriter = NULL;
     if (P.get<int>("VTK.VTKOut",0)){
-        vtkwriter = new VTKOutCL(MG, "DROPS data", 
+        vtkwriter = new VTKOutCL(MG, "DROPS data",
                                  P.get<int>("Time.NumSteps")/P.get("VTK.VTKOut", 0)+1,
                                  P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName"),
                                  P.get<std::string>("VTK.TimeFileName"),
-                                 P.get<int>("VTK.Binary"), 
+                                 P.get<int>("VTK.Binary"),
                                  P.get<int>("VTK.UseOnlyP1"),
                                  -1,  /* <- level */
                                  P.get<int>("VTK.ReUseTimeFile") );

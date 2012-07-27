@@ -33,7 +33,7 @@
 #include "misc/params.h"
 #include "num/MGsolver.h"
 #include "num/fe_repair.h"
-#include "misc/bndmap.h"
+#include "misc/funcmap.h"
 
 namespace DROPS
 {

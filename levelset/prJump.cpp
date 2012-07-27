@@ -34,7 +34,7 @@
 #include "levelset/mzelle_hdr.h"
 #include "levelset/surfacetension.h"
 #include "num/stokessolverfactory.h"
-#include "misc/bndmap.h"
+#include "misc/funcmap.h"
 #include <fstream>
 #include <iomanip>
 #include <vector>

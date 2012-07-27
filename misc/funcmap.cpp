@@ -1,5 +1,5 @@
-/// \file bndmap.cpp
-/// \brief global map for boundary functions
+/// \file funcmap.cpp
+/// \brief global map for boundary and coefficient functions
 /// \author LNM RWTH Aachen: Martin Horsky; SC RWTH Aachen:
 /*
  * This file is part of DROPS.
@@ -22,7 +22,7 @@
 */
 
 #include<map>
-#include "misc/bndmap.h"
+#include "misc/funcmap.h"
 #include "misc/singletonmap.h"
 
 namespace DROPS

@@ -1,5 +1,5 @@
-/// \file bndmap.h
-/// \brief global map for boundary functions
+/// \file funcmap.h
+/// \brief global map for boundary and coefficient functions
 /// \author LNM RWTH Aachen: Martin Horsky; SC RWTH Aachen:
 /*
  * This file is part of DROPS.
@@ -21,8 +21,8 @@
  * Copyright 2009 LNM/SC RWTH Aachen, Germany
 */
 
-#ifndef BNDMAP_H
-#define BNDMAP_H
+#ifndef FUNCMAP_H
+#define FUNCMAP_H
 
 #include <map>
 #include <string>

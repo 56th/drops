@@ -1,4 +1,4 @@
-/// \file bndScalarFunctions.cpp
+/// \file scalarFunctions.cpp
 /// \brief collections of general scalar functions (like zero, one, etc..). No problem-specific functions!
 /// \author LNM RWTH Aachen: Martin Horsky; SC RWTH Aachen:
 /*
@@ -21,10 +21,10 @@
  * Copyright 2009 LNM/SC RWTH Aachen, Germany
 */
 #include "misc/container.h"
-#include "misc/bndmap.h"
+#include "misc/funcmap.h"
 
-#ifndef BNDSCALARFUNCTIONS_H_
-#define BNDSCALARFUNCTIONS_H_
+#ifndef SCALARFUNCTIONS_H_
+#define SCALARFUNCTIONS_H_
 
 namespace DROPS
 {
@@ -51,4 +51,4 @@ static RegisterScalarTetraFunction regscazerotet("Zero", ZeroTet);
 static RegisterScalarTetraFunction regscaonetet("One", OneTet);
 
 }//end namespace DROPS
-#endif /* BNDSCALARFUNCTIONS_H_ */
+#endif /* SCALARFUNCTIONS_H_ */

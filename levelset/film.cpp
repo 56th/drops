@@ -39,7 +39,7 @@
 //surfactants
 #include "surfactant/ifacetransp.h"
 //function map
-#include "misc/bndmap.h"
+#include "misc/funcmap.h"
 //solver factory for stokes
 #include "num/stokessolverfactory.h"
 #ifndef _PAR
@@ -208,7 +208,7 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
             Stokes.UpdateXNumbering( pidx, lset);
             Stokes.p.SetIdx( pidx);
             ReadFEFromFile( Stokes.p, MG, P.get<std::string>("InitialFile")+"pressure", P.get<int>("Restart.Binary"), &lset.Phi); // pass also level set, as p may be extended
-        }  
+        }
       } break;
 
       default:
@@ -246,7 +246,7 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
                                  P.get<int>("Time.NumSteps")/P.get("VTK.VTKOut", 0)+1,
                                  P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName"),
                                  P.get<std::string>("VTK.TimeFileName"),
-                                 P.get<int>("VTK.Binary"), 
+                                 P.get<int>("VTK.Binary"),
                                  P.get<int>("VTK.UseOnlyP1"),
                                  -1,  /* <- level */
                                  P.get<int>("VTK.ReUseTimeFile") );
@@ -315,7 +315,7 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
     adap.push_back( &PVel);
     UpdateProlongationCL PPr ( Stokes.GetMG(), stokessolverfactory.GetPPr(), &Stokes.pr_idx, &Stokes.pr_idx);
     adap.push_back( &PPr);
-    
+
     TwoPhaseStoreCL<InstatNavierStokes2PhaseP2P1CL> ser(MG, Stokes, lset, NULL,
                                                         P.get<std::string>("Restart.Outputfile"),
                                                         P.get<int>("Restart.Overwrite"),

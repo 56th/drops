@@ -27,24 +27,24 @@
 
 #include "misc/container.h"
 #include "misc/params.h"
-#include "misc/bndmap.h"
+#include "misc/funcmap.h"
 #include "poisson/poissonCoeff.h"
 #include <sstream>
 
 namespace DROPS{
-    
+
 class ALECL{
 ///A class to handle ALE method for free surface one phase scalar problem;
     private:
     const bool IfALE_;
     const ParamCL Para_;
-    MultiGridCL& mg_;  
+    MultiGridCL& mg_;
     const double dt_;        //step size of time integration
     double Ly_;        //Height of the reference iterface
 
   public:
     //free surface function
-    instat_scalar_fun_ptr interface_;  
+    instat_scalar_fun_ptr interface_;
 
     ALECL(ParamCL P, MultiGridCL& mg):
     IfALE_(P.get<int>("ALE.wavy")),
@@ -63,10 +63,10 @@ class ALECL{
     }
     bool GetALE() const {return IfALE_;}
     //Initialize the grids
-    void InitGrid() const;    
+    void InitGrid() const;
     //Scale the grids according to the free surface functions
     void MovGrid(double t) const;
 };
 
-} 
+}
 #endif
