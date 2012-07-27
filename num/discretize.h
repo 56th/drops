@@ -489,7 +489,9 @@ class Quad2CL: public GridFunctionCL<T>
     typedef GridFunctionCL<T> base_type;
     typedef typename base_type::value_type value_type;
     typedef typename base_type::instat_fun_ptr instat_fun_ptr;
+    typedef typename base_type::tetra_function tetra_function;
     typedef Quad2DataCL DataClass;
+
     
 
     static const double Node[5][4]; // Stuetzstellen (NumNodesC*4 doubles)
@@ -518,6 +520,8 @@ DROPS_DEFINE_VALARRAY_DERIVATIVE(Quad2CL, T, base_type)
 
     inline self_&
     assign(const TetraCL&, instat_fun_ptr, double= 0.0);
+    inline self_&
+    assign(const TetraCL&, tetra_function, double= 0.0, const BaryCoordCL* const= Quad2DataCL::Node);
     inline self_&
     assign(const LocalP1CL<value_type>&);
     inline self_&

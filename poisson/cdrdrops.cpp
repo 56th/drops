@@ -305,7 +305,7 @@ void Strategy(PoissonCL& Poisson)
         timer.Reset();
         if(Poisson.ALE_)
         {
-            mg.GetMeshDeformation().SetMeshTransformation(PoissonCoeffCL::ALEDeform, -1, false, false);
+            mg.GetMeshDeformation().SetMeshTransformation(PoissonCoeffCL::ALEDeform, -1, P.get<int>("ALE.OnlyBndCurved"), P.get<int>("ALE.P1")==0);
             //ALE.InitGrid();
 
         }
@@ -363,7 +363,7 @@ void Strategy(PoissonCL& Poisson)
             std::cout << line << "Step: " << step << std::endl;
             if(Poisson.ALE_)
             {
-                mg.GetMeshDeformation().SetMeshTransformation(PoissonCoeffCL::ALEDeform, Poisson.x.t, false, false);   
+                mg.GetMeshDeformation().SetMeshTransformation(PoissonCoeffCL::ALEDeform, Poisson.x.t, P.get<int>("ALE.OnlyBndCurved"), P.get<int>("ALE.P1", 0)==0 );   
                 //ALE.MovGrid(Poisson.x.t);
             }
             ThetaScheme.DoStep( Poisson.x);
@@ -415,12 +415,14 @@ void Strategy(PoissonCL& Poisson)
 void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<std::string>("VTK.TimeFileName",P.get<std::string>("VTK.VTKName"));
     P.put_if_unset<int>("VTK.ReUseTimeFile",0);
-    P.put_if_unset<int>("VTK.UseDeformation",1);
+    P.put_if_unset<int>("VTK.UseDeformation",0);
     P.put_if_unset<int>("VTK.UseOnlyP1",0);
     P.put_if_unset<int>("Stabilization.SUPG",0);
     P.put_if_unset<double>("Stabilization.Magnitude",1.0);
     P.put_if_unset<int>("Stabilization.Grids",1);
     P.put_if_unset<int>("ALE.wavy",0);
+    P.put_if_unset<int>("ALE.P1", 1);
+    P.put_if_unset<int>("ALE.OnlyBndCurved", 1);
     P.put_if_unset<std::string>("ALE.Interface","Zero");
 }
 
@@ -477,8 +479,7 @@ int main (int argc, char** argv)
         //SUPG stabilization, ALE method  and error estimation are not yet implemented for P2 case!   
         if(!P.get<int>("Poisson.P1"))
         {
-              P.put<int>("Stabilization.SUPG",0);
-              P.put<int>("ALE.wavy",0);   
+              P.put<int>("Stabilization.SUPG",0);   
               P.put<int>("Err.DoErrorEstimate",0);
         }
         if(P.get<int>("Stabilization.SUPG"))

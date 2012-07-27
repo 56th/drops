@@ -328,6 +328,15 @@ template<class T>
 
 template<class T>
   inline Quad2CL<T>&
+  Quad2CL<T>::assign(const TetraCL& s, tetra_function f , double t, const BaryCoordCL* const node)
+{
+    for (Uint i= 0; i < Quad2DataCL::NumNodesC; ++i)
+        (*this)[i]= f( s, node[i], t);
+    return *this;
+}
+
+template<class T>
+  inline Quad2CL<T>&
   Quad2CL<T>::assign(const LocalP1CL<value_type>& f)
 {
     (*this)[std::slice( 0, 4, 1)]= f;
