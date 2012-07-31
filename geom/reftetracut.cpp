@@ -43,9 +43,6 @@ SignPatternTraitCL::compute_cuts ()
     std::memcpy( cut_simplex_rep_, cut_simplex_, 4*sizeof(byte));
     for (int i= num_root_vert_; i < num_root_; ++i)
         cut_simplex_rep_[i]+= NumVertsC;
-
-    if (is_3d())
-        throw DROPSErrCL( "SignPatternTraitCL::compute_cuts: found 3-dim. zero level set, grid is too coarse!");
 }
 
 void

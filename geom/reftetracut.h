@@ -39,18 +39,18 @@ class SignPatternTraitCL
     Ubyte cut_simplex_[4]; ///< local number with respect to the reference tetra of the object on the cut: [0,num_root_vert): vertex numbers in (0..3); [num_root_vert, num_root): edge numbers in (0..5). Both parts are sorted in increasing order.
     Ubyte cut_simplex_rep_[4]; ///< local number of the object on the cut: (0..9)
 
-    bool is_3d () const { return num_root_vert_ == 4; }
     void compute_cuts ();
 
   public:
     SignPatternTraitCL () : num_root_vert_( 4), num_root_( 4) {} ///< Uninitialized default state
-    SignPatternTraitCL (const byte   ls[4]) { assign( ls); } ///< Assign the sign pattern on the vertices; throws if ls is identically 0.
-    SignPatternTraitCL (const double ls[4]) { assign( ls); } ///< Assign a sign pattern on the vertices; throws if ls is identically 0.
-    void assign (const byte   ls[4]); ///< Assign a sign pattern on the vertices; throws if ls is identically 0.
-    void assign (const double ls[4]); ///< Assign a sign pattern on the vertices; throws if ls is identically 0.
+    SignPatternTraitCL (const byte   ls[4]) { assign( ls); } ///< Assign the sign pattern on the vertices.
+    SignPatternTraitCL (const double ls[4]) { assign( ls); } ///< Assign a sign pattern on the vertices.
+    void assign (const byte   ls[4]); ///< Assign a sign pattern on the vertices.
+    void assign (const double ls[4]); ///< Assign a sign pattern on the vertices.
 
     bool empty () const { return num_root_ == 0; } ///< True, iff there is no intersection.
     bool is_2d () const { return num_root_ > 2; }  ///< True, iff the intersection has positive area.
+    bool is_3d () const { return num_root_vert_ == 4; }
     bool no_zero_vertex () const { return num_root_vert_ == 0; } ///< True, iff there is no vertex, in which ls vanishes.
 
     Ubyte num_cut_simplexes () const { return num_root_; } ///< Number of edges and vertices with a root of ls.
@@ -105,7 +105,7 @@ class RefTetraPatchCL
 
     bool  is_initialized () const { return size_ <= 2; } ///< True after assign(...)
 
-    ///@{ Recommended access to the triangles for a given sign-pattern; memoizes the result.
+    ///@{ Recommended access to the triangles for a given sign-pattern; memoizes the result. The functions throw an error for the 0-sign-pattern.
     static inline const RefTetraPatchCL& instance (const byte   ls[4]);
     static inline const RefTetraPatchCL& instance (const double ls[4]);
     ///@}
@@ -135,7 +135,7 @@ inline byte instance_idx (const byte ls[4])
 
 ///\brief Return a signed array-index for the possible 3^4 sign-patterns on the vertices of a tetra.
 /// The index ranges from [-40..40].
-inline Ubyte instance_idx (const double ls[4])
+inline byte instance_idx (const double ls[4])
 {
     return  27*sign( ls[0]) + 9*sign( ls[1]) + 3*sign( ls[2]) + sign( ls[3]);
 }
@@ -143,8 +143,11 @@ inline Ubyte instance_idx (const double ls[4])
 inline const RefTetraPatchCL&
 RefTetraPatchCL::instance (const byte ls[4])
 {
-    RefTetraPatchCL& instance= instance_array_[instance_idx ( ls) + 40];
-    if ( !instance.is_initialized())
+    const byte idx= instance_idx ( ls);
+    if (idx == 0)
+        throw DROPSErrCL( "RefTetraPatchCL::instance: found 3-dim. zero level set, grid is too coarse!");
+    RefTetraPatchCL& instance= instance_array_[idx + 40];
+    if (!instance.is_initialized())
         instance.assign( SignPatternTraitCL( ls));
     return instance;
 }
@@ -209,7 +212,7 @@ class RefTetraPartitionCL
     bool assign (const SignPatternTraitCL& cut); ///< Assign a sign pattern on the vertices; returns the value of is_uncut()
     bool is_initialized () const { return begin_ < end_; } ///< True after assign(...)
 
-    ///@{ Recommended access to the triangles for a given sign-pattern; memoizes the result.
+    ///@{ Recommended access to the triangles for a given sign-pattern; memoizes the result. The functions throw an error for the 0-sign-pattern.
     static inline const RefTetraPartitionCL& instance (const byte   ls[4]);
     static inline const RefTetraPartitionCL& instance (const double ls[4]);
     ///@}
@@ -238,8 +241,11 @@ RefTetraPartitionCL::InitializerCL RefTetraPartition_initializer_;
 inline const RefTetraPartitionCL&
 RefTetraPartitionCL::instance (const byte ls[4])
 {
-    RefTetraPartitionCL& instance= instance_array_[instance_idx ( ls) + 40];
-    if ( !instance.is_initialized())
+    const byte idx= instance_idx ( ls);
+    if (idx == 0)
+        throw DROPSErrCL( "RefTetraPartitionCL::instance: found 3-dim. zero level set, grid is too coarse!");
+    RefTetraPartitionCL& instance= instance_array_[idx + 40];
+    if (!instance.is_initialized())
         instance.assign( SignPatternTraitCL( ls));
     return instance;
 }
