@@ -1,6 +1,6 @@
 /// \file reftetracut.h
 /// \brief Triangulation of the reference tetraeder adapted to a linear level-set function.
-/// \author LNM RWTH Aachen: Joerg Grande; SC RWTH Aachen:
+/// \author LNM RWTH Aachen: Joerg Grande;
 
 /*
  * This file is part of DROPS.
@@ -19,13 +19,14 @@
  * along with DROPS. If not, see <http://www.gnu.org/licenses/>.
  *
  *
- * Copyright 2011 LNM/SC RWTH Aachen, Germany
+ * Copyright 2011,2012 LNM, RWTH Aachen, Germany
 */
 
 #ifndef DROPS_REFTETRACUT_H
 #define DROPS_REFTETRACUT_H
 
 #include "misc/container.h"
+#include "misc/staticinit.h"
 
 namespace DROPS {
 
@@ -83,15 +84,9 @@ class RefTetraPatchCL
     typedef const TriangleT* const_triangle_iterator;
     typedef       TriangleT*       triangle_iterator;
 
-    /// \brief Initializes RefTetraPatchCL::instance_array_ below in the constructor by calling RefTetraPatchCL::instance() for all legal sign patterns.
-    class InitializerCL
-    {
-      private:
-        static int init_count_;
-
-      public:
-        InitializerCL ();
-    };
+    /// \brief Initializes RefTetraPatchCL::instance_array_ (see below)  by calling RefTetraPatchCL::assign() for all non-zero sign patterns.
+    static void StaticInit ();
+    static void StaticDestruct () {}
 
   private:
     TriangleT triangle_[2];      ///< at most two triangles
@@ -125,11 +120,6 @@ class RefTetraPatchCL
     ///@}
 };
 
-namespace {
-RefTetraPatchCL::InitializerCL RefTetraPatch_initializer_;
-
-} // end of anonymous namespace
-
 ///\brief Return a signed array-index for the possible 3^4 sign-patterns on the vertices of a tetra.
 /// The index ranges from [-40..40].
 inline byte instance_idx (const byte ls[4])
@@ -150,10 +140,7 @@ RefTetraPatchCL::instance (const byte ls[4])
     const byte idx= instance_idx ( ls);
     if (idx == 0)
         throw DROPSErrCL( "RefTetraPatchCL::instance: found 3-dim. zero level set, grid is too coarse!");
-    RefTetraPatchCL& instance= instance_array_[idx + 40];
-    if (!instance.is_initialized())
-        instance.assign( SignPatternTraitCL( ls));
-    return instance;
+    return instance_array_[idx + 40];
 }
 
 inline const RefTetraPatchCL&
@@ -178,15 +165,9 @@ class RefTetraPartitionCL
     typedef const TetraT* const_tetra_iterator;
     typedef       TetraT*       tetra_iterator;
 
-    /// \brief Initializes RefTetraPartitionCL::instance_array_ below in the constructor by calling RefTetraPartitionCL::instance() for all legal sign patterns.
-    class InitializerCL
-    {
-      private:
-        static int init_count_;
-
-      public:
-        InitializerCL ();
-    };
+    /// \brief Initializes RefTetraPatchCL::instance_array_ (see below)  by calling RefTetraPartitionCL::assign() for all non-zero sign patterns.
+    static void StaticInit ();
+    static void StaticDestruct () {}
 
   private:
     TetraT tetras_[6]; ///< at most six tetras
@@ -237,21 +218,13 @@ class RefTetraPartitionCL
     friend std::ostream& operator<< (std::ostream&, const RefTetraPartitionCL&); ///< Debug-output to a stream (dumps all members)
 };
 
-namespace {
-RefTetraPartitionCL::InitializerCL RefTetraPartition_initializer_;
-
-} // end of anonymous namespace
-
 inline const RefTetraPartitionCL&
 RefTetraPartitionCL::instance (const byte ls[4])
 {
     const byte idx= instance_idx ( ls);
     if (idx == 0)
         throw DROPSErrCL( "RefTetraPartitionCL::instance: found 3-dim. zero level set, grid is too coarse!");
-    RefTetraPartitionCL& instance= instance_array_[idx + 40];
-    if (!instance.is_initialized())
-        instance.assign( SignPatternTraitCL( ls));
-    return instance;
+    return instance_array_[idx + 40];
 }
 
 inline const RefTetraPartitionCL&

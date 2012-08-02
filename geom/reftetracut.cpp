@@ -91,13 +91,8 @@ operator<< (std::ostream& out, const SignPatternTraitCL& c)
 
 RefTetraPatchCL RefTetraPatchCL::instance_array_[81];
 
-int RefTetraPatchCL::InitializerCL::init_count_= 0;
-
-RefTetraPatchCL::InitializerCL::InitializerCL ()
+void RefTetraPatchCL::StaticInit ()
 {
-    if (init_count_++ > 0)
-        return;
-
     byte ls[4];
     for (ls[0]= -1; ls[0] < 2; ++ls[0])
         for (ls[1]= -1; ls[1] < 2; ++ls[1])
@@ -105,9 +100,14 @@ RefTetraPatchCL::InitializerCL::InitializerCL ()
                 for (ls[3]= -1; ls[3] < 2; ++ls[3]) {
                     if ( ls[0] == 0 && ls[1] == 0 && ls[2] == 0 && ls[3] == 0)
                         continue;
-                    RefTetraPatchCL::instance( ls);
+                    RefTetraPatchCL::instance_array_[instance_idx( ls) + 40].assign( ls);
                 }
 }
+
+namespace {
+StaticInitializerCL<RefTetraPatchCL> RefTetraPatch_initializer_;
+
+} // end of anonymous namespace
 
 bool
 RefTetraPatchCL::assign (const SignPatternTraitCL& cut)
@@ -121,13 +121,8 @@ RefTetraPatchCL::assign (const SignPatternTraitCL& cut)
 
 RefTetraPartitionCL RefTetraPartitionCL::instance_array_[81];
 
-int RefTetraPartitionCL::InitializerCL::init_count_= 0;
-
-RefTetraPartitionCL::InitializerCL::InitializerCL ()
+void RefTetraPartitionCL::StaticInit ()
 {
-    if (init_count_++ > 0)
-        return;
-
     byte ls[4];
     for (ls[0]= -1; ls[0] < 2; ++ls[0])
         for (ls[1]= -1; ls[1] < 2; ++ls[1])
@@ -135,9 +130,14 @@ RefTetraPartitionCL::InitializerCL::InitializerCL ()
                 for (ls[3]= -1; ls[3] < 2; ++ls[3]) {
                     if ( ls[0] == 0 && ls[1] == 0 && ls[2] == 0 && ls[3] == 0)
                         continue;
-                    RefTetraPartitionCL::instance( ls);
+                    RefTetraPartitionCL::instance_array_[instance_idx( ls) + 40].assign( ls);
                 }
 }
+
+namespace {
+StaticInitializerCL<RefTetraPartitionCL> RefTetraPartition_initializer_;
+
+} // end of anonymous namespace
 
 Ubyte
 RefTetraPartitionCL::some_non_zero_vertex (const SignPatternTraitCL& cut) const
