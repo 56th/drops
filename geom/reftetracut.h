@@ -94,13 +94,6 @@ inline byte instance_idx (const byte ls[4])
     return  27*ls[0] + 9*ls[1] + 3*ls[2] + ls[3];
 }
 
-///\brief Return a signed array-index for the possible 3^4 sign-patterns on the vertices of a tetra.
-/// The index ranges from [-40..40].
-inline byte instance_idx (const double ls[4])
-{
-    return  27*sign( ls[0]) + 9*sign( ls[1]) + 3*sign( ls[2]) + sign( ls[3]);
-}
-
 inline const RefTetraPatchCL&
 RefTetraPatchCL::instance (const byte ls[4])
 {
