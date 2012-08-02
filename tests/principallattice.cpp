@@ -1,4 +1,4 @@
-/// \file combinatorialcut.cpp
+/// \file principallattice.cpp
 /// \brief tests the PrincipalLattice-class
 /// \author LNM RWTH Aachen: Joerg Grande; SC RWTH Aachen:
 
@@ -35,107 +35,6 @@
 #include <sstream>
 #include <tr1/unordered_map>
 
-namespace DROPS {
-
-///\brief Represents the reference tetra, which is cut by a linear level set function ls. The values of the latter are prescribed on the vertices.
-class OldSignPatternTraitCL
-{
-  private:
-    Ubyte num_root_vert_;  ///< number of vertices, where the level set function is zero.
-    Ubyte num_root_;       ///< number of roots of the level set function; invariant: num_root_vert <= num_root
-    byte sign_[4];         ///< Sign of the level set function of the vertices; \f$\in\{-1,0,1\}\f$
-    Ubyte cut_simplex_[4]; ///< local number with respect to the reference tetra of the object on the cut: [0,num_root_vert): vertex numbers in (0..3); [num_root_vert, num_root): edge numbers in (0..5). Both parts are sorted in increasing order.
-    Ubyte cut_simplex_rep_[4]; ///< local number of the object on the cut: (0..9)
-
-    void compute_cuts ();
-
-  public:
-    OldSignPatternTraitCL () : num_root_vert_( 4), num_root_( 4) {} ///< Uninitialized default state
-    OldSignPatternTraitCL (const byte   ls[4]) { assign( ls); } ///< Assign the sign pattern on the vertices.
-    OldSignPatternTraitCL (const double ls[4]) { assign( ls); } ///< Assign a sign pattern on the vertices.
-    void assign (const byte   ls[4]); ///< Assign a sign pattern on the vertices.
-    void assign (const double ls[4]); ///< Assign a sign pattern on the vertices.
-
-    bool empty () const { return num_root_ == 0; } ///< True, iff there is no intersection.
-    bool is_2d () const { return num_root_ > 2; }  ///< True, iff the intersection has positive area.
-    bool is_3d () const { return num_root_vert_ == 4; }
-    bool no_zero_vertex () const { return num_root_vert_ == 0; } ///< True, iff there is no vertex, in which ls vanishes.
-
-    Ubyte num_cut_simplexes () const { return num_root_; } ///< Number of edges and vertices with a root of ls.
-    Ubyte num_zero_vertexes () const { return num_root_vert_; } ///< Number of vertices of the tetra that are roots of ls.
-
-    byte sign (int i) const { return sign_[i]; } ///< -1,0,1; sign of vertex i.
-
-    /// Return local number of edges/verts with a root of ls. For edges, [] returns a edge number in 0..5, and () returns an extended vertex number in 4..9.
-    ///@{
-    Ubyte operator[] (int i) const { return cut_simplex_[i]; }
-    Ubyte operator() (int i) const { return cut_simplex_rep_[i]; }
-    ///@}
-
-    friend std::ostream& operator<< (std::ostream&, const OldSignPatternTraitCL&); ///< Debug-output to a stream (dumps all members)
-};
-
-void
-OldSignPatternTraitCL::compute_cuts ()
-{
-    for (Ubyte i= 0; i < NumVertsC; ++i)
-        if (sign( i) == 0)
-            cut_simplex_[num_root_vert_++]= i;
-    num_root_= num_root_vert_;
-    for (Ubyte i= 0; i < NumEdgesC; ++i)
-        if (sign( VertOfEdge( i, 0))*sign( VertOfEdge( i, 1)) == -1)
-            cut_simplex_[num_root_++]= i;
-    std::memcpy( cut_simplex_rep_, cut_simplex_, 4*sizeof(byte));
-    for (int i= num_root_vert_; i < num_root_; ++i)
-        cut_simplex_rep_[i]+= NumVertsC;
-}
-
-void
-OldSignPatternTraitCL::assign (const byte ls[4])
-{
-    num_root_vert_= num_root_= 0;
-
-    byte sum= 0;
-    for (Ubyte i= 0; i < NumVertsC; ++i)
-        sum+= (sign_[i]= ls[i]);
-    if (sum == 4 || sum == -4) // optimize the case of uncut tetras
-        return;
-
-    compute_cuts ();
-}
-
-void
-OldSignPatternTraitCL::assign (const double ls[4])
-{
-    num_root_vert_= num_root_= 0;
-
-    byte sum= 0;
-    for (Ubyte i= 0; i < NumVertsC; ++i)
-        sum+= (sign_[i]= sign( ls[i]));
-    if (sum == 4 || sum == -4) // optimize the case of uncut tetras
-        return;
-
-    compute_cuts ();
-}
-
-std::ostream&
-operator<< (std::ostream& out, const OldSignPatternTraitCL& c)
-{
-    out << static_cast<int>( c.num_root_vert_) << ' ' << static_cast<int>( c.num_root_) << '\n';
-    for (int i= 0; i < 4; ++i)
-        out << static_cast<int>( c.sign_[i]) << ' ';
-    out << '\n';
-    for (int i= 0; i < 4; ++i)
-        out << static_cast<int>( c.cut_simplex_[i]) << ' ';
-    out << '\n';
-    for (int i= 0; i < 4; ++i)
-        out << static_cast<int>( c.cut_simplex_rep_[i]) << ' ';
-    return out << '\n';
-}
-
-} // end of namespace DROPS
-
-
 template <DROPS::Uint Dim>
 void
 write_sign_trait (const DROPS::SignTraitsCL<Dim>& c, std::ostream& os)
@@ -145,21 +44,6 @@ write_sign_trait (const DROPS::SignTraitsCL<Dim>& c, std::ostream& os)
         os << (int) c.sign( i) << ' ';
     os << '\n';
     os << (int) c.empty() << ' ' << (int) c.has_codim_le_1() << ' ' << (int) c.has_codim_0() << ' '
-       << (int) c.no_zero_vertex() << ' ' <<  (int) c.num_cut_simplexes()  << ' ' << (int) c.num_zero_vertexes () << '\n';
-    os << "cut_simplexes: ";
-    for (DROPS::Uint i= 0; i < c.num_cut_simplexes(); ++i)
-        os << (int) c[i] << ' ' << (int) c(i) << "  ";
-    os << '\n';
-}
-
-void
-write_sign_pattern_trait (const DROPS::OldSignPatternTraitCL& c, std::ostream& os)
-{
-    os << "signs: ";
-    for (DROPS::Uint i= 0; i < 4; ++i)
-        os << (int) c.sign( i) << ' ';
-    os << '\n';
-    os << (int) c.empty() << ' ' << (int) c.is_2d() << ' ' << (int) c.is_3d() << ' '
        << (int) c.no_zero_vertex() << ' ' <<  (int) c.num_cut_simplexes()  << ' ' << (int) c.num_zero_vertexes () << '\n';
     os << "cut_simplexes: ";
     for (DROPS::Uint i= 0; i < c.num_cut_simplexes(); ++i)
@@ -192,22 +76,6 @@ void write_sign_traits_1_2_3_4 ()
       }
     }
 
-}
-void test_sign_traits_cut ()
-{
-    std::ofstream f0( "sign_pattern_trait.txt");
-    std::ofstream f1( "sign_trait_3.txt");
-    DROPS::byte ls[4];
-    int c= 0;
-    for (int i= -1; i <= 1; ++i)
-      for (int j= -1; j <= 1; ++j)
-        for (int k= -1; k <= 1; ++k)
-          for (int l= -1; l <= 1; ++l, ++c) {
-              ls[0]= i; ls[1]= j; ls[2]= k; ls[3]= l;
-              std::cout << "c: " << c << " ls: " << (int) ls[0] << ' ' << (int) ls[1] << ' ' << (int) ls[2] << ' ' << (int) ls[3] << std::endl;
-              write_sign_pattern_trait( DROPS::OldSignPatternTraitCL( ls), f0);
-              write_sign_trait(         DROPS::SignTraitsCL<3>(     ls), f1);
-          }
 }
 
 void test_tetra_cut ()
@@ -455,7 +323,6 @@ int main()
         // test_extrapolated_sphere_integral();
         // test_sphere_surface_integral();
         // test_extrapolated_sphere_surface_integral();
-        test_sign_traits_cut();
         write_sign_traits_1_2_3_4();
     }
     catch (DROPS::DROPSErrCL err) { err.handle(); }
