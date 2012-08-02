@@ -30,65 +30,6 @@
 
 namespace DROPS {
 
-void
-SignPatternTraitCL::compute_cuts ()
-{
-    for (Ubyte i= 0; i < NumVertsC; ++i)
-        if (sign( i) == 0)
-            cut_simplex_[num_root_vert_++]= i;
-    num_root_= num_root_vert_;
-    for (Ubyte i= 0; i < NumEdgesC; ++i)
-        if (sign( VertOfEdge( i, 0))*sign( VertOfEdge( i, 1)) == -1)
-            cut_simplex_[num_root_++]= i;
-    std::memcpy( cut_simplex_rep_, cut_simplex_, 4*sizeof(byte));
-    for (int i= num_root_vert_; i < num_root_; ++i)
-        cut_simplex_rep_[i]+= NumVertsC;
-}
-
-void
-SignPatternTraitCL::assign (const byte ls[4])
-{
-    num_root_vert_= num_root_= 0;
-
-    byte sum= 0;
-    for (Ubyte i= 0; i < NumVertsC; ++i)
-        sum+= (sign_[i]= ls[i]);
-    if (sum == 4 || sum == -4) // optimize the case of uncut tetras
-        return;
-
-    compute_cuts ();
-}
-
-void
-SignPatternTraitCL::assign (const double ls[4])
-{
-    num_root_vert_= num_root_= 0;
-
-    byte sum= 0;
-    for (Ubyte i= 0; i < NumVertsC; ++i)
-        sum+= (sign_[i]= sign( ls[i]));
-    if (sum == 4 || sum == -4) // optimize the case of uncut tetras
-        return;
-
-    compute_cuts ();
-}
-
-std::ostream&
-operator<< (std::ostream& out, const SignPatternTraitCL& c)
-{
-    out << static_cast<int>( c.num_root_vert_) << ' ' << static_cast<int>( c.num_root_) << '\n';
-    for (int i= 0; i < 4; ++i)
-        out << static_cast<int>( c.sign_[i]) << ' ';
-    out << '\n';
-    for (int i= 0; i < 4; ++i)
-        out << static_cast<int>( c.cut_simplex_[i]) << ' ';
-    out << '\n';
-    for (int i= 0; i < 4; ++i)
-        out << static_cast<int>( c.cut_simplex_rep_[i]) << ' ';
-    return out << '\n';
-}
-
-
 RefTetraPatchCL RefTetraPatchCL::instance_array_[81];
 
 void RefTetraPatchCL::StaticInit ()

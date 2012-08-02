@@ -23,6 +23,7 @@
 */
 
 #include "geom/principallattice.h"
+#include "geom/signtraits.h"
 #include "geom/subtriangulation.h"
 #include "num/quadrature.h"
 #include "misc/container.h"
@@ -36,209 +37,108 @@
 
 namespace DROPS {
 
-namespace RefEdge {
-
-const Uint NumVertsC= 2;
-
-/// Vertices of a given edge
-inline Ubyte VertOfEdge (Ubyte, Ubyte num) { return num; }
-
-/// Vertex opposing a given vertex
-/// Note, that this is different from the n-dimensional cases, n > 2, as vertexes and facets are the same in 1d. Therefore, they should not be numbered differently. This is a natural ordering, which also could have been used for tetras. However, changing this now would be painful.
-inline Ubyte OppVert (Ubyte vert) { return 1 - vert; }
-
-} // end of namespace DROPS::RefEdge
-
-namespace RefTri {
-
-const Uint NumVertsC= 3;
-const Uint NumEdgesC= 3;
-
-/// Vertices of a given edge
-const Ubyte vert_of_edge_ar[NumEdgesC][2]= {
-    {0,1}, {0,2}, {1,2}
-};
-inline Ubyte VertOfEdge (Ubyte edge, Ubyte num) { return vert_of_edge_ar[edge][num]; }
-
-/// Edge opposing a given vertex
-/// Note, that this is different from the higher-dimensional cases as edges and facets are the same in 2d. Therefore, they should not be numbered differently. This is a natural ordering, which also could have been used for tetras. However, changing this now would be painful.
-inline Ubyte OppEdge (Ubyte vert) { return 2 - vert; }
-
-} // end of namespace DROPS::RefTri
-
-namespace RefPenta {
-
-const Uint NumVertsC= 5;
-const Uint NumEdgesC= 10;
-const Uint NumTrisC=  10;
-const Uint NumTetrasC= 5;
-
-/// Vertices of a given edge
-const Ubyte vert_of_edge_ar[NumEdgesC][2]= {
-    {0,1}, {0,2}, {1,2}, {0,3}, {1,3}, {2,3}, // The first six edges are from the reference-tetra
-    {0,4}, {1,4}, {2,4}, {3,4}
-};
-inline Ubyte VertOfEdge (Ubyte edge, Ubyte num) { return vert_of_edge_ar[edge][num]; }
-
-/// Vertices of a given tetra
-const Ubyte vert_of_tetra_ar[NumVertsC][4]= {
-    {1,2,3,4}, {0,2,3,4}, {0,1,3,4}, {0,1,2,4}, {0,1,2,3}
-};
-inline Ubyte VertOfTetra (Ubyte tetra, Ubyte num) { return vert_of_tetra_ar[tetra][num]; }
-
-/// Tetra opposing a given vertex
-inline Ubyte OppTetra (Ubyte vert) { return vert; }
-
-} // end of namespace DROPS::RefPenta
-
-template <Uint Dim>
-inline Ubyte VertOfEdge (Ubyte edge, Ubyte num); // not defined, but full specializations for Dim=1..4 are.
-
-template <>
-inline Ubyte VertOfEdge<1> (Ubyte, Ubyte num)
-{ return RefEdge::VertOfEdge( 0, num); }
-
-template <>
-inline Ubyte VertOfEdge<2> (Ubyte edge, Ubyte num)
-{ return RefTri::VertOfEdge( edge, num); }
-
-template <>
-inline Ubyte VertOfEdge<3> (Ubyte edge, Ubyte num)
-{ return VertOfEdge( edge, num); }
-
-template <>
-inline Ubyte VertOfEdge<4> (Ubyte edge, Ubyte num)
-{ return RefPenta::VertOfEdge( edge, num); }
-
-
-template <Uint Dim= 3>
-class SignTraitCL;
-
-template <Uint Dim>
-std::ostream&
-operator<< (std::ostream& out, const SignTraitCL<Dim>& c);
-
-template <Uint Dim>
-class SignTraitCL
+///\brief Represents the reference tetra, which is cut by a linear level set function ls. The values of the latter are prescribed on the vertices.
+class OldSignPatternTraitCL
 {
   private:
-    enum { NumVerts= Dim + 1,
-           NumEdges= (Dim*(Dim + 1))/2,
-// dimension vs. max. number of roots:
-// 1 2, the 0-pattern
-// 2 3, the 0-pattern
-// 3 4, 2 vertexes on each side (and 0-pattern)
-// 4 6, 2 verts on one side, three on the other: 10 - 1 - 3
-// in general:
-// d < 3: see above,
-// else: distribute vertexes as evenly as possible on both sides:
-//       d odd:  (d+1 over 2) - 2*((d+1)/2 over 2)              = ((d+1)/2)^2
-//       d even: (d+1 over 2) - (d/2 over 2) - (d/2 + 1 over 2) = d*(d+2)/4
-           max_num_root= Dim < 4 ? Dim + 1 : (Dim & 1u ? NumVerts*NumVerts : Dim*(Dim + 2))/4
-    };
-
-    Ubyte num_root_vert_; ///< number of vertices, where the level set function is zero.
-    Ubyte num_root_;      ///< number of roots of the level set function; invariant: num_root_vert <= num_root <= max_num_root.
-    byte sign_[NumVerts]; ///< Sign of the level set function of the vertices; \f$\in\{-1,0,1\}\f$
-
-    ///\brief local number with respect to the reference simplex of the object on the cut: [0,num_root_vert): vertex numbers in (0..NumVerts-1); [num_root_vert, num_root): edge numbers in (0..NumEdges-1). Both parts are sorted in increasing order.
-    Ubyte cut_simplex_    [max_num_root];
-    Ubyte cut_simplex_rep_[max_num_root]; ///< local number of the object on the cut: (0..NumVerts+NumEdges-1)
+    Ubyte num_root_vert_;  ///< number of vertices, where the level set function is zero.
+    Ubyte num_root_;       ///< number of roots of the level set function; invariant: num_root_vert <= num_root
+    byte sign_[4];         ///< Sign of the level set function of the vertices; \f$\in\{-1,0,1\}\f$
+    Ubyte cut_simplex_[4]; ///< local number with respect to the reference tetra of the object on the cut: [0,num_root_vert): vertex numbers in (0..3); [num_root_vert, num_root): edge numbers in (0..5). Both parts are sorted in increasing order.
+    Ubyte cut_simplex_rep_[4]; ///< local number of the object on the cut: (0..9)
 
     void compute_cuts ();
 
   public:
-    SignTraitCL () : num_root_vert_( NumVerts), num_root_( NumVerts) {} ///< Uninitialized default state
-    SignTraitCL (const byte   ls[NumVerts]) { assign( ls); }            ///< Assign the sign pattern on the vertices.
-    SignTraitCL (const double ls[NumVerts]) { assign( ls); }            ///< Assign the sign pattern on the vertices.
-    void assign (const byte   ls[NumVerts]); ///< Assign a sign pattern on the vertices.
-    void assign (const double ls[NumVerts]); ///< Assign a sign pattern on the vertices.
+    OldSignPatternTraitCL () : num_root_vert_( 4), num_root_( 4) {} ///< Uninitialized default state
+    OldSignPatternTraitCL (const byte   ls[4]) { assign( ls); } ///< Assign the sign pattern on the vertices.
+    OldSignPatternTraitCL (const double ls[4]) { assign( ls); } ///< Assign a sign pattern on the vertices.
+    void assign (const byte   ls[4]); ///< Assign a sign pattern on the vertices.
+    void assign (const double ls[4]); ///< Assign a sign pattern on the vertices.
 
     bool empty () const { return num_root_ == 0; } ///< True, iff there is no intersection.
+    bool is_2d () const { return num_root_ > 2; }  ///< True, iff the intersection has positive area.
+    bool is_3d () const { return num_root_vert_ == 4; }
+    bool no_zero_vertex () const { return num_root_vert_ == 0; } ///< True, iff there is no vertex, in which ls vanishes.
 
-    bool has_codim_le_1 () const { return num_root_ >= Dim; }        ///< True, iff the intersection has non-zero (Dim-1)-dimensional measure.
-    bool has_codim_0 () const { return num_root_vert_ == NumVerts; } ///< True, exactly for the zero-pattern.
-    bool no_zero_vertex () const { return num_root_vert_ == 0; }     ///< True, iff there is no vertex, in which ls vanishes.
-
-    Ubyte num_cut_simplexes () const { return num_root_; }      ///< Number of edges and vertices with a root of ls.
-    Ubyte num_zero_vertexes () const { return num_root_vert_; } ///< Number of vertices of the simplex that are roots of ls.
+    Ubyte num_cut_simplexes () const { return num_root_; } ///< Number of edges and vertices with a root of ls.
+    Ubyte num_zero_vertexes () const { return num_root_vert_; } ///< Number of vertices of the tetra that are roots of ls.
 
     byte sign (int i) const { return sign_[i]; } ///< -1,0,1; sign of vertex i.
 
-    /// Return local number of edges/verts with a root of ls. For edges, [] returns a edge number in 0..NumEdges-1, and () returns an extended vertex number in NumVerts..NumVerts+NumEdges-1.
+    /// Return local number of edges/verts with a root of ls. For edges, [] returns a edge number in 0..5, and () returns an extended vertex number in 4..9.
     ///@{
     Ubyte operator[] (int i) const { return cut_simplex_[i]; }
     Ubyte operator() (int i) const { return cut_simplex_rep_[i]; }
     ///@}
-    friend std::ostream& operator<< <Dim>(std::ostream&, const SignTraitCL<Dim>&); ///< Debug-output to a stream (dumps all members)
+
+    friend std::ostream& operator<< (std::ostream&, const OldSignPatternTraitCL&); ///< Debug-output to a stream (dumps all members)
 };
 
-template <Uint Dim>
 void
-SignTraitCL<Dim>::compute_cuts ()
+OldSignPatternTraitCL::compute_cuts ()
 {
-    for (Ubyte i= 0; i < NumVerts; ++i)
+    for (Ubyte i= 0; i < NumVertsC; ++i)
         if (sign( i) == 0)
             cut_simplex_[num_root_vert_++]= i;
     num_root_= num_root_vert_;
-    for (Ubyte i= 0; i < NumEdges; ++i)
-        if (sign( VertOfEdge<Dim>( i, 0))*sign( VertOfEdge<Dim>( i, 1)) == -1)
+    for (Ubyte i= 0; i < NumEdgesC; ++i)
+        if (sign( VertOfEdge( i, 0))*sign( VertOfEdge( i, 1)) == -1)
             cut_simplex_[num_root_++]= i;
-    std::memcpy( cut_simplex_rep_, cut_simplex_, num_root_*sizeof(byte));
+    std::memcpy( cut_simplex_rep_, cut_simplex_, 4*sizeof(byte));
     for (int i= num_root_vert_; i < num_root_; ++i)
-        cut_simplex_rep_[i]+= NumVerts;
+        cut_simplex_rep_[i]+= NumVertsC;
 }
 
-template <Uint Dim>
 void
-SignTraitCL<Dim>::assign (const byte ls[NumVerts])
+OldSignPatternTraitCL::assign (const byte ls[4])
 {
     num_root_vert_= num_root_= 0;
 
     byte sum= 0;
-    for (Ubyte i= 0; i < NumVerts; ++i)
+    for (Ubyte i= 0; i < NumVertsC; ++i)
         sum+= (sign_[i]= ls[i]);
-    if (std::abs( sum) == static_cast<int>( NumVerts)) // optimize the case of uncut tetras
+    if (sum == 4 || sum == -4) // optimize the case of uncut tetras
         return;
 
     compute_cuts ();
 }
 
-template <Uint Dim>
-inline void
-SignTraitCL<Dim>::assign (const double ls[NumVerts])
+void
+OldSignPatternTraitCL::assign (const double ls[4])
 {
-    byte ls_byte[NumVerts];
-    std::transform( ls + 0, ls + NumVerts, ls_byte + 0, DROPS::sign);
-    this->assign( ls_byte);
+    num_root_vert_= num_root_= 0;
 
+    byte sum= 0;
+    for (Ubyte i= 0; i < NumVertsC; ++i)
+        sum+= (sign_[i]= sign( ls[i]));
+    if (sum == 4 || sum == -4) // optimize the case of uncut tetras
+        return;
+
+    compute_cuts ();
 }
 
-template <Uint Dim>
 std::ostream&
-operator<< (std::ostream& out, const SignTraitCL<Dim>& c)
+operator<< (std::ostream& out, const OldSignPatternTraitCL& c)
 {
-    const int NumVerts= Dim + 1;
     out << static_cast<int>( c.num_root_vert_) << ' ' << static_cast<int>( c.num_root_) << '\n';
-    for (int i= 0; i < NumVerts; ++i)
+    for (int i= 0; i < 4; ++i)
         out << static_cast<int>( c.sign_[i]) << ' ';
     out << '\n';
-    for (int i= 0; i < NumVerts; ++i)
+    for (int i= 0; i < 4; ++i)
         out << static_cast<int>( c.cut_simplex_[i]) << ' ';
     out << '\n';
-    for (int i= 0; i < NumVerts; ++i)
+    for (int i= 0; i < 4; ++i)
         out << static_cast<int>( c.cut_simplex_rep_[i]) << ' ';
     return out << '\n';
 }
-
-typedef SignTraitCL<3> TetraSignTraitCL;
 
 } // end of namespace DROPS
 
 
 template <DROPS::Uint Dim>
 void
-write_sign_trait (const DROPS::SignTraitCL<Dim>& c, std::ostream& os)
+write_sign_trait (const DROPS::SignTraitsCL<Dim>& c, std::ostream& os)
 {
     os << "signs: ";
     for (DROPS::Uint i= 0; i < Dim+1; ++i)
@@ -253,7 +153,7 @@ write_sign_trait (const DROPS::SignTraitCL<Dim>& c, std::ostream& os)
 }
 
 void
-write_sign_pattern_trait (const DROPS::SignPatternTraitCL& c, std::ostream& os)
+write_sign_pattern_trait (const DROPS::OldSignPatternTraitCL& c, std::ostream& os)
 {
     os << "signs: ";
     for (DROPS::Uint i= 0; i < 4; ++i)
@@ -277,15 +177,15 @@ void write_sign_traits_1_2_3_4 ()
     int c= 0;
     for (ls[0]= -1; ls[0] <= 1; ++ls[0]) {
       for (ls[1]= -1; ls[1] <= 1; ++ls[1]) {
-        write_sign_trait( DROPS::SignTraitCL<1>( ls), f1);
+        write_sign_trait( DROPS::SignTraitsCL<1>( ls), f1);
         for (ls[2]= -1; ls[2] <= 1; ++ls[2]) {
-          write_sign_trait( DROPS::SignTraitCL<2>( ls), f2);
+          write_sign_trait( DROPS::SignTraitsCL<2>( ls), f2);
           for (ls[3]= -1; ls[3] <= 1; ++ls[3]) {
-            write_sign_trait( DROPS::SignTraitCL<3>( ls), f3);
+            write_sign_trait( DROPS::SignTraitsCL<3>( ls), f3);
             for (ls[4]= -1; ls[4] <= 1; ++ls[4], c++) {
                 std::cout << "c: " << c << " ls: " << (int) ls[0] << ' ' << (int) ls[1]
                           << ' ' << (int) ls[2] << ' ' << (int) ls[3]  << ' ' << (int) ls[4]<< std::endl;
-                write_sign_trait( DROPS::SignTraitCL<4>( ls), f4);
+                write_sign_trait( DROPS::SignTraitsCL<4>( ls), f4);
             }
           }
         }
@@ -305,8 +205,8 @@ void test_sign_traits_cut ()
           for (int l= -1; l <= 1; ++l, ++c) {
               ls[0]= i; ls[1]= j; ls[2]= k; ls[3]= l;
               std::cout << "c: " << c << " ls: " << (int) ls[0] << ' ' << (int) ls[1] << ' ' << (int) ls[2] << ' ' << (int) ls[3] << std::endl;
-              write_sign_pattern_trait( DROPS::SignPatternTraitCL( ls), f0);
-              write_sign_trait(         DROPS::SignTraitCL<3>(     ls), f1);
+              write_sign_pattern_trait( DROPS::OldSignPatternTraitCL( ls), f0);
+              write_sign_trait(         DROPS::SignTraitsCL<3>(     ls), f1);
           }
 }
 

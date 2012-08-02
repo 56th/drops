@@ -27,52 +27,19 @@
 
 #include "misc/container.h"
 #include "misc/staticinit.h"
+#include "geom/signtraits.h"
 
 namespace DROPS {
 
-///\brief Represents the reference tetra, which is cut by a linear level set function ls. The values of the latter are prescribed on the vertices.
-class SignPatternTraitCL
-{
-  private:
-    Ubyte num_root_vert_;  ///< number of vertices, where the level set function is zero.
-    Ubyte num_root_;       ///< number of roots of the level set function; invariant: num_root_vert <= num_root
-    byte sign_[4];         ///< Sign of the level set function of the vertices; \f$\in\{-1,0,1\}\f$
-    Ubyte cut_simplex_[4]; ///< local number with respect to the reference tetra of the object on the cut: [0,num_root_vert): vertex numbers in (0..3); [num_root_vert, num_root): edge numbers in (0..5). Both parts are sorted in increasing order.
-    Ubyte cut_simplex_rep_[4]; ///< local number of the object on the cut: (0..9)
+typedef SignTraitsCL<3> SignPatternTraitCL;
 
-    void compute_cuts ();
-
-  public:
-    SignPatternTraitCL () : num_root_vert_( 4), num_root_( 4) {} ///< Uninitialized default state
-    SignPatternTraitCL (const byte   ls[4]) { assign( ls); } ///< Assign the sign pattern on the vertices.
-    SignPatternTraitCL (const double ls[4]) { assign( ls); } ///< Assign a sign pattern on the vertices.
-    void assign (const byte   ls[4]); ///< Assign a sign pattern on the vertices.
-    void assign (const double ls[4]); ///< Assign a sign pattern on the vertices.
-
-    bool empty () const { return num_root_ == 0; } ///< True, iff there is no intersection.
-    bool is_2d () const { return num_root_ > 2; }  ///< True, iff the intersection has positive area.
-    bool is_3d () const { return num_root_vert_ == 4; }
-    bool no_zero_vertex () const { return num_root_vert_ == 0; } ///< True, iff there is no vertex, in which ls vanishes.
-
-    Ubyte num_cut_simplexes () const { return num_root_; } ///< Number of edges and vertices with a root of ls.
-    Ubyte num_zero_vertexes () const { return num_root_vert_; } ///< Number of vertices of the tetra that are roots of ls.
-
-    byte sign (int i) const { return sign_[i]; } ///< -1,0,1; sign of vertex i.
-
-    /// Return local number of edges/verts with a root of ls. For edges, [] returns a edge number in 0..5, and () returns an extended vertex number in 4..9.
-    ///@{
-    Ubyte operator[] (int i) const { return cut_simplex_[i]; }
-    Ubyte operator() (int i) const { return cut_simplex_rep_[i]; }
-    ///@}
-
-    friend std::ostream& operator<< (std::ostream&, const SignPatternTraitCL&); ///< Debug-output to a stream (dumps all members)
-};
 
 inline Ubyte
 num_triangles (const SignPatternTraitCL& cut)
 {
-    return cut.is_2d() ? cut.num_cut_simplexes() - 2 : 0;
+    return cut.has_codim_le_1() ? cut.num_cut_simplexes() - 2 : 0;
 }
+
 
 ///\brief The triangles of the intersection of the reference-tetra with a linear levelset-function.
 ///
