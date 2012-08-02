@@ -114,6 +114,7 @@ RefTetraPatchCL::assign (const SignPatternTraitCL& cut)
 {
     for (size_= 0; size_ < num_triangles( cut); ++size_)
         triangle_[size_]= MakeTriangle( cut(size_), cut(size_ + 1), cut(size_ + 2));
+    is_boundary_triangle_= cut.num_zero_vertexes() == 3 ? 1 : 0;
     return empty();
 }
 

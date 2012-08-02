@@ -67,6 +67,11 @@ class SignPatternTraitCL
     friend std::ostream& operator<< (std::ostream&, const SignPatternTraitCL&); ///< Debug-output to a stream (dumps all members)
 };
 
+inline Ubyte
+num_triangles (const SignPatternTraitCL& cut)
+{
+    return cut.is_2d() ? cut.num_cut_simplexes() - 2 : 0;
+}
 
 ///\brief The triangles of the intersection of the reference-tetra with a linear levelset-function.
 ///
@@ -93,7 +98,6 @@ class RefTetraPatchCL
     Ubyte size_;                 ///< number of triangles
     Ubyte is_boundary_triangle_; ///< true if the triangle is one of the tetra's faces.
 
-    Ubyte num_triangles (const SignPatternTraitCL& cut) const { return cut.is_2d() ? cut.num_cut_simplexes() - 2 : 0; }
     TriangleT MakeTriangle (Ubyte v0, Ubyte v1, Ubyte v2) const { return MakeSArray( v0, v1, v2); }
 
     static RefTetraPatchCL instance_array_[81]; // 81 = 3^4 = all possible sign-patterns on the vertices
