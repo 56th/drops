@@ -30,7 +30,7 @@
 #include "levelset/surfacetension.h"
 #include "out/output.h"
 #include "out/vtkOut.h"
-#include "misc/bndmap.h"
+#include "misc/funcmap.h"
 
 #include <fstream>
 #include <string>

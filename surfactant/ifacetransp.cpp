@@ -116,7 +116,7 @@ void InterfaceMassAccuP1CL::visit (const TetraCL& t)
 
 void SetupInterfaceMassP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls, const BndDataCL<>& lsetbnd)
 {
-    ScopeTimerCL timer( "SetupInterfaceMassP1");
+    //ScopeTimerCL timer( "SetupInterfaceMassP1");
 
     InterfaceMassAccuP1CL accu( mat, ls, lsetbnd);
     TetraAccumulatorTupleCL accus;
@@ -183,7 +183,7 @@ void LaplaceBeltramiAccuP1CL::visit (const TetraCL& t)
 
 void SetupLBP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls, const BndDataCL<>& lsetbnd, double D)
 {
-    ScopeTimerCL timer( "SetuLBP1");
+    //ScopeTimerCL timer( "SetuLBP1");
 
     LaplaceBeltramiAccuP1CL accu( mat, ls, lsetbnd, D);
     TetraAccumulatorTupleCL accus;

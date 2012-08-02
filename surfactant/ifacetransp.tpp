@@ -108,7 +108,7 @@ void InterfaceConvectionAccuP1CL<DiscVelSolT>::visit (const TetraCL& t)
 template <class DiscVelSolT>
 void SetupConvectionP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls, const BndDataCL<>& lsetbnd, const DiscVelSolT& w)
 {
-    ScopeTimerCL timer( "SetupConvectionP1");
+    //ScopeTimerCL timer( "SetupConvectionP1");
 
     InterfaceConvectionAccuP1CL<DiscVelSolT> accu( mat, ls, lsetbnd, w);
     TetraAccumulatorTupleCL accus;
@@ -187,7 +187,7 @@ void InterfaceMassDivAccuP1CL<DiscVelSolT>::visit (const TetraCL& t)
 template <class DiscVelSolT>
 void SetupMassDivP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls, const BndDataCL<>& lsetbnd, const DiscVelSolT& w)
 {
-    ScopeTimerCL timer( "SetupMassDivP1");
+    //ScopeTimerCL timer( "SetupMassDivP1");
 
     InterfaceMassDivAccuP1CL<DiscVelSolT> accu( mat, ls, lsetbnd, w);
     TetraAccumulatorTupleCL accus;
