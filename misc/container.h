@@ -92,6 +92,12 @@ typedef SVectorCL<3> Point3DCL;
 /// Stores barycentric coordinates
 typedef SVectorCL<4> BaryCoordCL;
 
+/// Stores 4D coordinates
+typedef SVectorCL<4> Point4DCL;
+
+/// By convention x[0]..x[3] are barycentric coordinates with respect to a tetra; x[4] is a time with respect to the (reference-) interval (0, 1);
+typedef SVectorCL<5> STCoordCL;
+
 enum InitStateT { Uninitialized, Initialized };
 
 
@@ -475,12 +481,25 @@ inline SVectorCL<_Size> std_basis(Uint i)
     return ret;
 }
 
+inline STCoordCL MakeSTCoord (const BaryCoordCL& b, double t)
+{
+    STCoordCL ret( b.begin(), b.end()); // sets the first four components
+    ret[4]= t;
+    return ret;
+}
+
 inline BaryCoordCL
 MakeBaryCoord(double a, double b, double c, double d)
 {
     BaryCoordCL ret( Uninitialized);
     ret[0]= a; ret[1]= b; ret[2]= c; ret[3]= d;
     return ret;
+}
+
+inline Point4DCL
+MakePoint4D (double a, double b, double c, double d)
+{
+    return MakeBaryCoord(a, b, c, d);
 }
 
 inline Point3DCL
@@ -523,6 +542,15 @@ MakeSArray(T a, T b, T c, T d)
 {
     SArrayCL<T, 4> ret( Uninitialized);
     ret[0]= a; ret[1]= b; ret[2]= c; ret[3]= d;
+    return ret;
+}
+
+template<class T>
+SArrayCL<T, 5>
+MakeSArray(T a, T b, T c, T d, T e)
+{
+    SArrayCL<T, 5> ret( Uninitialized);
+    ret[0]= a; ret[1]= b; ret[2]= c; ret[3]= d; ret[4]= e;
     return ret;
 }
 
