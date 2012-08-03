@@ -19,7 +19,7 @@
  * along with DROPS. If not, see <http://www.gnu.org/licenses/>.
  *
  *
- * Copyright 2011 LNM/SC RWTH Aachen, Germany
+ * Copyright 2011,2012 LNM/SC RWTH Aachen, Germany
 */
 
 #include "geom/principallattice.h"
@@ -101,5 +101,78 @@ const size_t p2_dof_on_lattice_2[10]= {
     0, 4, 7, 9,      // vertexes
     1, 2, 5, 3, 6, 8 // edges
 };
+
+
+TetraPrismLatticeCL::TetraPrismLatticeCacheCL TetraPrismLatticeCL::cache_;
+
+TetraPrismLatticeCL::TetraPrismLatticeCL (Uint n, Uint m)
+    : m_( m), pl_( PrincipalLatticeCL::instance( n))
+{
+    vertex_.reserve( vertex_size());
+    // Compute vertices
+    for (Uint t= 0; t <= num_time_intervals(); ++t)
+        for (PrincipalLatticeCL::const_vertex_iterator x= pl_.vertex_begin(); x != pl_.vertex_end(); ++x)
+            vertex_.push_back( MakeSTCoord( *x, static_cast<double>( t)/num_time_intervals()));
+
+    penta_.reserve( penta_size());
+    for (Uint t= 0; t < num_time_intervals(); ++t)
+        for (PrincipalLatticeCL::const_tetra_iterator tet= pl_.tetra_begin(); tet != pl_.tetra_end(); ++tet)
+            AddPrism( *tet, t);
+}
+
+void TetraPrismLatticeCL::AddPrism (const TetraT& tet, Uint t)
+{
+/// This is the iterated one construction.
+/// First, v=(tet0, t2) is chosen as tip. There are two facets of the tetrahedral prism not containing v: f0 is the tetra (tet0..tet3) x t; f1 is the triangular prism tp=(tet1, tet2, tet3)x(t, t2).
+/// tp is tetrahedralized with the cone construction with tip v2=(tet1, t2). The facets of tp not containing v2 are the triangle ff=(tet1..tet3) x t and the quadrilateral q=(tet2, tet3) x (t, t2), which is triangulated by connecting (tet2, t2) with (tet3,t).
+/// v           v2        (tet2,t2) (tet3,t2)
+/// |           |         |         |
+/// (tet0,  t)  (tet1,t)  (tet2,t)  (tet3,t)
+
+    const Uint t2= t + 1;
+    penta_.push_back( // v, f0
+        MakeSArray( vertex_index( tet[0], t),
+                    vertex_index( tet[1], t),
+                    vertex_index( tet[2], t),
+                    vertex_index( tet[3], t),
+                    vertex_index( tet[0], t2)));
+    penta_.push_back( // v, v2, ff
+        MakeSArray( vertex_index( tet[1], t),
+                    vertex_index( tet[2], t),
+                    vertex_index( tet[3], t),
+                    vertex_index( tet[0], t2),
+                    vertex_index( tet[1], t2)));
+    penta_.push_back( // v, v2, (tet2,t), (tet3,t), (tet2,t2)
+        MakeSArray( vertex_index( tet[2], t),
+                    vertex_index( tet[3], t),
+                    vertex_index( tet[0], t2),
+                    vertex_index( tet[1], t2),
+                    vertex_index( tet[2], t2)));
+    penta_.push_back( // v, v2, (tet3,t), (tet2,t2), (tet3,t2)
+        MakeSArray( vertex_index( tet[3], t),
+                    vertex_index( tet[0], t2),
+                    vertex_index( tet[1], t2),
+                    vertex_index( tet[2], t2),
+                    vertex_index( tet[3], t2)));
+///\todo The above sequence of indices allows a more compact storage scheme, as the penta-indices overlap perfectly: instead of storing 4*5 indices we get away with the 8-tuple (tet0..tet3) x t, (tet0..tet3) x t2.
+}
+
+const TetraPrismLatticeCL* TetraPrismLatticeCL::memoize (Uint n, Uint m)
+{
+    if (n-1 >= cache_.size())
+        cache_.resize( n);
+    std::vector<const TetraPrismLatticeCL*>& v( cache_[n-1]);
+    if (m-1 >= v.size())
+        v.resize( m);
+    return v[m-1]= new TetraPrismLatticeCL( n, m);
+}
+
+const TetraPrismLatticeCL& TetraPrismLatticeCL::instance (Uint n, Uint m)
+{
+    const TetraPrismLatticeCL* tmp;
+//#   pragma omp critical
+    tmp= is_memoized( n, m) ? read_cache( n, m) : memoize( n, m);
+    return *tmp;
+}
 
 } // end of namespace DROPS

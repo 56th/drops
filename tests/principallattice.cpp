@@ -148,6 +148,22 @@ void test_principal_lattice ()
     }
 }
 
+void test_tetra_prism_lattice ()
+{
+    for (int t= 1; t <= 2; ++t) 
+        for (int x= 1; x <= 2; ++x) {
+            const DROPS::TetraPrismLatticeCL& tpl= DROPS::TetraPrismLatticeCL::instance( x, t);
+            std::cout << "=======================================" << tpl.num_intervals() << ' '<< tpl.num_time_intervals() << ' ' << tpl.vertex_size() << " " << tpl.penta_size() << std::endl;
+        for (DROPS::TetraPrismLatticeCL::const_vertex_iterator v= tpl.vertex_begin(), end= tpl.vertex_end(); v != end; ++v) {
+            std::cout << (*v) << std::endl;
+        }
+        std:: cout << "++++++++++++++++++++++++++++++++++++++" << std::endl;
+        for (DROPS::TetraPrismLatticeCL::const_penta_iterator v= tpl.penta_begin(), end= tpl.penta_end(); v != end; ++v) {
+            std::cout << (*v)[0] << ' '  << (*v)[1] << ' ' << (*v)[2] << ' ' << (*v)[3] << ' ' << (*v)[4] << std::endl;
+        }
+    }
+}
+
 inline double sphere (const DROPS::Point3DCL& p)
 {
     return p.norm() - 0.5;
@@ -323,7 +339,8 @@ int main()
         // test_extrapolated_sphere_integral();
         // test_sphere_surface_integral();
         // test_extrapolated_sphere_surface_integral();
-        write_sign_traits_1_2_3_4();
+        // write_sign_traits_1_2_3_4();
+        test_tetra_prism_lattice();
     }
     catch (DROPS::DROPSErrCL err) { err.handle(); }
     return 0;

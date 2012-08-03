@@ -50,7 +50,7 @@ class PrincipalLatticeCL
     class PrincipalLatticeCacheCL : public std::vector<const PrincipalLatticeCL*>
     {
       public:
-    	~PrincipalLatticeCacheCL() { for ( size_t i = 0; i< this->size(); ++i) if ((*this)[i]) delete (*this)[i];; }
+    	~PrincipalLatticeCacheCL() { for ( size_t i = 0; i < this->size(); ++i) if ((*this)[i]) delete (*this)[i]; }
     };
 
     static PrincipalLatticeCacheCL cache_;
@@ -103,6 +103,83 @@ class PrincipalLatticeCL
 
 extern const size_t p1_dof_on_lattice_2[4];  ///< For vertex i (in 0..3) as counted in topo.h, p1_dof_on_lattice_2[i] is the number of the vertex in the principal lattice of order 2.
 extern const size_t p2_dof_on_lattice_2[10]; ///< For a P2-dof i (numbered from 0..9: vertexes, then edges) as counted in topo.h, p2_dof_on_lattice_2[i] is the number of the vertex in the principal lattice of order 2.
+
+
+/// \brief The reference space-time tetrahedral prism.
+///
+/// The tetrahedral base is subdivided using PrincipalLatticeCL. Each tetrahedral prism is divided into four pentatopes.
+/// The space-time coordinates of the vertices are computed as barycentric in space and a time coordinate in (0, 1). The pentas are computed as 5-tuples to the container of vertices.
+/// Access to the concrete objects via instance( n, m), where n is the number of intervals used to subdivide the edges of the reference tetra and m is the number of time sub-intervals.
+class TetraPrismLatticeCL
+{
+  public:
+    typedef SArrayCL<Uint, 5> PentaT; ///< Represents a penta as indices in the vertex-container.
+    typedef PrincipalLatticeCL::TetraT TetraT; ///< Represents a tetra as indices int the vertex-container of pl_.
+
+    typedef std::vector<STCoordCL> VertexContT;
+    typedef VertexContT::const_iterator const_vertex_iterator;
+    typedef std::vector<PentaT> PentaContT;
+    typedef PentaContT::const_iterator const_penta_iterator;
+    typedef PentaContT::const_iterator const_simplex_iterator;
+
+  private:
+    /// \brief cache for computed lattices. The first index denotes the number of spatial subdivisions, the second the number of time-intervals.
+    ///@{
+    class TetraPrismLatticeCacheCL : public std::vector< std::vector<const TetraPrismLatticeCL*> >
+    {
+      public:
+        ~TetraPrismLatticeCacheCL() {
+            for (size_t i = 0; i < this->size(); ++i)
+                for (size_t j= 0; j < (*this)[i].size(); ++j)
+                    if ((*this)[i][j]) delete (*this)[i][j];
+        }
+    };
+
+    static TetraPrismLatticeCacheCL cache_;
+    static bool is_memoized (Uint n, Uint m)
+        { return n-1 < cache_.size() && m-1 < cache_[n-1].size() && cache_[n-1][m-1]; }
+    static const TetraPrismLatticeCL* read_cache (Uint n, Uint m) { return cache_[n-1][m-1]; }
+    static const TetraPrismLatticeCL* memoize (Uint n, Uint m);
+    ///@}
+
+    ///\brief Enumerates the lattice points in the prism: xidx is the spatial index from PrincipalLatticeCL, tidx ist the time index.
+    inline Uint vertex_index (Uint xidx, Uint tidx) { return xidx + tidx*pl_.vertex_size(); }
+    ///\brief Adds four pentas for a tetrahedral prism
+    void AddPrism (const TetraT& tet, Uint t);
+
+    Uint m_; ///< number of intervals in time
+    PentaContT  penta_;  ///< All pentas of the triangulation as tuple of indices to vertex_.
+    VertexContT vertex_; ///< All vertices of the lattice as STCoordCL.
+    const PrincipalLatticeCL& pl_; ///< The principal lattice for the reference tetra.
+
+    TetraPrismLatticeCL (Uint n, Uint m);
+
+  public:
+    ///\brief number of intervals on each spatial edge
+    Uint num_intervals () const { return pl_.num_intervals(); }
+    ///\brief number of intervals in time
+    Uint num_time_intervals () const { return m_; }
+    ///\brief number of vertices in the lattice
+    Uint vertex_size () const { return (m_ + 1)*pl_.vertex_size(); }
+    ///\brief number of pentas in the triangulation
+    Uint penta_size  () const { return 4*m_*pl_.tetra_size(); }
+
+    ///\brief the principal lattice used for the reference tetra
+    const PrincipalLatticeCL& principal_lattice () const { return pl_; }
+
+    ///\brief Access to vertexes and pentas as sequences (random access iterators)
+    ///@{
+    const_vertex_iterator vertex_begin ()  const { return vertex_.begin(); }
+    const_vertex_iterator vertex_end   ()  const { return vertex_.end(); }
+    const_penta_iterator penta_begin ()  const { return penta_.begin(); }
+    const_penta_iterator penta_end   ()  const { return penta_.end(); }
+    const_body_iterator body_begin ()  const { return penta_begin(); }
+    const_body_iterator body_end   ()  const { return penta_end(); }
+    ///@}
+
+    ///\brief Access the lattice with n intervals on each spatial edge and m time intervals (singleton pattern)
+    static const TetraPrismLatticeCL& instance (Uint n, Uint m);
+};
 
 } // end of namespace DROPS
 
