@@ -30,6 +30,36 @@
 
 namespace DROPS {
 
+void RefPatchBuilderCL<3>::StaticInit (RefPatchCL<3> instance_array[SignTraitsCL<3>::num_pattern])
+{
+    byte ls[4];
+    for (ls[0]= -1; ls[0] < 2; ++ls[0])
+        for (ls[1]= -1; ls[1] < 2; ++ls[1])
+            for (ls[2]= -1; ls[2] < 2; ++ls[2])
+                for (ls[3]= -1; ls[3] < 2; ++ls[3]) {
+                    if ( ls[0] == 0 && ls[1] == 0 && ls[2] == 0 && ls[3] == 0)
+                        continue;
+                    instance_array[SignTraitsCL<3>::pattern_idx( ls) + (SignTraitsCL<3>::num_pattern - 1)/2].assign( ls);
+                }
+}
+
+bool
+RefPatchBuilderCL<3>::assign (const SignTraitsCL<3>& cut, RefPatchCL<3>& p)
+{
+    for (p.size_= 0; p.size_ < num_triangles( cut); ++p.size_)
+        p.facet_[p.size_]= RefPatchBuilderCL<3>::MakeTriangle( cut(p.size_), cut(p.size_ + 1), cut(p.size_ + 2));
+    p.is_boundary_facet_= cut.num_zero_vertexes() == 3 ? 1 : 0;
+    return p.empty();
+}
+
+template class RefPatchCL<3>;
+
+namespace {
+StaticInitializerCL<RefPatchCL<3> > RefPatch3_initializer_;
+
+} // end of anonymous namespace
+
+
 RefTetraPatchCL RefTetraPatchCL::instance_array_[81];
 
 void RefTetraPatchCL::StaticInit ()

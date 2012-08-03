@@ -51,12 +51,39 @@ write_sign_trait (const DROPS::SignTraitsCL<Dim>& c, std::ostream& os)
     os << '\n';
 }
 
+template <DROPS::Uint Dim>
+void
+write_refpatch (const DROPS::RefPatchCL<Dim>& p, std::ostream& os)
+{
+    os << "is:initialized: " << p.is_initialized () << " is_boundary_facet: " << p.is_boundary_facet ()
+       << " empty: " << p.empty () << " size: " << p.size () << "\nfacets:\n";
+    for (DROPS::Uint i= 0; i < p.size(); ++i) {
+        for (DROPS::Uint j= 0; j < Dim; ++j)
+            os << (int) p.facet_begin()[i][j] << ' ';
+    }
+    os << '\n';
+}
+
+void
+write_reftetrapatch (const DROPS::RefTetraPatchCL& p, std::ostream& os)
+{
+    os << "is:initialized: " << p.is_initialized () << " is_boundary_facet: " << p.is_boundary_triangle ()
+       << " empty: " << p.empty () << " size: " << p.size () << "\nfacets:\n";
+    for (DROPS::Uint i= 0; i < p.size(); ++i) {
+        for (DROPS::Uint j= 0; j < 3; ++j)
+            os << (int) p.triangle_begin()[i][j] << ' ';
+    }
+    os << '\n';
+}
+
 void write_sign_traits_1_2_3_4 ()
 {
     std::ofstream f1( "sign_trait1.txt");
     std::ofstream f2( "sign_trait2.txt");
     std::ofstream f3( "sign_trait3.txt");
     std::ofstream f4( "sign_trait4.txt");
+    std::ofstream frefpatch( "refpatch3.txt");
+    std::ofstream freftetrapatch( "reftetrapatch.txt");
     DROPS::byte ls[5];
     int c= 0;
     for (ls[0]= -1; ls[0] <= 1; ++ls[0]) {
@@ -66,6 +93,14 @@ void write_sign_traits_1_2_3_4 ()
           write_sign_trait( DROPS::SignTraitsCL<2>( ls), f2);
           for (ls[3]= -1; ls[3] <= 1; ++ls[3]) {
             write_sign_trait( DROPS::SignTraitsCL<3>( ls), f3);
+            if (DROPS::SignTraitsCL<3>::pattern_idx( ls) != 0) {
+                write_refpatch( DROPS::RefPatchCL<3>::instance( ls), frefpatch);
+                write_reftetrapatch( DROPS::RefTetraPatchCL::instance( ls), freftetrapatch);
+            }
+            else {
+                frefpatch << "Skipping the zero-pattern for RefPatchCL.\n";
+                freftetrapatch << "Skipping the zero-pattern for RefPatchCL.\n";
+            }
             for (ls[4]= -1; ls[4] <= 1; ++ls[4], c++) {
                 std::cout << "c: " << c << " ls: " << (int) ls[0] << ' ' << (int) ls[1]
                           << ' ' << (int) ls[2] << ' ' << (int) ls[3]  << ' ' << (int) ls[4]<< std::endl;
@@ -339,8 +374,8 @@ int main()
         // test_extrapolated_sphere_integral();
         // test_sphere_surface_integral();
         // test_extrapolated_sphere_surface_integral();
-        // write_sign_traits_1_2_3_4();
-        test_tetra_prism_lattice();
+        write_sign_traits_1_2_3_4();
+        // test_tetra_prism_lattice();
     }
     catch (DROPS::DROPSErrCL err) { err.handle(); }
     return 0;

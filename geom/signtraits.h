@@ -41,7 +41,7 @@ operator<< (std::ostream& out, const SignTraitsCL<Dim>& c);
 template <Uint Dim>
 class SignTraitsCL
 {
-  private:
+  public:
     enum { NumVerts= Dim + 1,
            NumEdges= (Dim*(Dim + 1))/2,
 // dimension vs. max. number of roots:
@@ -54,8 +54,23 @@ class SignTraitsCL
 // else: distribute vertexes as evenly as possible on both sides:
 //       d odd:  (d+1 over 2) - 2*((d+1)/2 over 2)              = ((d+1)/2)^2
 //       d even: (d+1 over 2) - (d/2 over 2) - (d/2 + 1 over 2) = d*(d+2)/4
-           max_num_root= Dim < 4 ? Dim + 1 : (Dim & 1u ? NumVerts*NumVerts : Dim*(Dim + 2))/4
+           max_num_root= Dim < 4 ? Dim + 1 : (Dim & 1u ? NumVerts*NumVerts : Dim*(Dim + 2))/4,
+
+           num_pattern= Dim== 1 ? 9 : Dim == 2 ? 27 : Dim == 3 ? 81 : Dim == 4 ? 243 : 0, // 3^(Dim+1) sign patterns.
+           zero_pattern_offset= (num_pattern - 1)/2
     };
+
+    /// \brief enumerate all sign patterns: returns an index in [-(num_pattern-1)/2..num_pattern-1)/2]. The zero pattern is at index 0.
+    /// Dimensions > 4 are currently not supported (byte --> short)
+    static byte pattern_idx (const byte ls[Dim + 1]) {
+        return  Dim == 1 ? ls[0] + 3*ls[1] :
+                Dim == 2 ? ls[0] + 3*ls[1] + 9*ls[2] :
+                Dim == 3 ? ls[0] + 3*ls[1] + 9*ls[2] + 27*ls[3] :
+                Dim == 4 ? ls[0] + 3*ls[1] + 9*ls[2] + 27*ls[3] + 81*ls[4]:
+                0;
+    }
+
+  private:
 
     Ubyte num_root_vert_; ///< number of vertices, where the level set function is zero.
     Ubyte num_root_;      ///< number of roots of the level set function; invariant: num_root_vert <= num_root <= max_num_root.

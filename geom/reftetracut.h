@@ -40,6 +40,110 @@ num_triangles (const SignPatternTraitCL& cut)
     return cut.has_codim_le_1() ? cut.num_cut_simplexes() - 2 : 0;
 }
 
+template <Uint Dim>
+class RefPatchCL; ///< forward declaration for RefPatchBuilderCL.
+
+template <Uint Dim>
+class RefPatchBuilderCL
+{
+  public:
+    typedef SArrayCL<Ubyte, Dim> FacetT; ///< the vertices of a facet of the cut: the body's vertices are denoted by 0..Dim, the edge-cuts by edge-num + Dim + 1.
+
+    /// \brief Called by generic StaticInit in RefPatchCL.
+    static void StaticInit (RefPatchCL<Dim> instances[SignTraitsCL<Dim>::num_pattern]); ///< undefined
+
+    enum { max_num_facets= 0 };
+
+    bool assign (const SignTraitsCL<Dim>&, RefPatchCL<Dim>&); ///< undefined
+};
+
+template <>
+class RefPatchBuilderCL<3>
+{
+  public:
+    typedef SArrayCL<Ubyte, 3> FacetT;
+
+    enum { max_num_facets= 2 }; // Number of facets: 0, 1, or 2
+
+  private:
+    static FacetT MakeTriangle (Ubyte v0, Ubyte v1, Ubyte v2) { return MakeSArray( v0, v1, v2); }
+
+  public:
+    static void StaticInit ( RefPatchCL<3> instances[SignTraitsCL<3>::num_pattern]);
+    static bool assign (const SignTraitsCL<3>&, RefPatchCL<3>&);
+};
+
+///\brief The facets of the intersection of the reference-tetra with a linear levelset-function.
+///
+/// The class memoizes used sign-patterns if the triangulations are accessed via the instance( ls)-function. Individual instances may still be constructed (useful for debugging).
+template <Uint Dim>
+class RefPatchCL
+{
+  public:
+    typedef RefPatchBuilderCL<Dim> BuilderT;
+    typedef typename BuilderT::FacetT FacetT;
+    typedef const FacetT*             const_facet_iterator;
+    typedef       FacetT*             facet_iterator;
+
+    enum { max_num_facets= BuilderT::max_num_facets };
+
+    friend class RefPatchBuilderCL<Dim>;
+
+    /// \brief Initializes RefPatchCL::instance_array_ (see below)  by calling RefPatchCL::assign() for all non-zero sign patterns.
+    static void StaticInit () { BuilderT::StaticInit( RefPatchCL<Dim>::instance_array_); }
+    static void StaticDestruct () {}
+
+  private:
+    FacetT facet_[max_num_facets]; ///< the facets
+    Ubyte size_;                   ///< number of facets
+    Ubyte is_boundary_facet_;      ///< true if the facet is one of the body's facets.
+
+    static RefPatchCL instance_array_[SignTraitsCL<Dim>::num_pattern];
+
+  public:
+    RefPatchCL () : size_( static_cast<Ubyte>( -1)), is_boundary_facet_( 0) {} ///< Uninitialized default state
+    RefPatchCL (const SignTraitsCL<Dim>& cut) { assign( cut); } ///< Initialize with sign pattern on the vertices
+    bool assign (const SignTraitsCL<Dim>& cut) { return BuilderT::assign( cut, *this); } ///< Assign a sign pattern on the vertices; returns the value of empty(). The assignment is delegated to the builder, which ensures the right actions depending on Dim.
+
+    bool  is_initialized () const { return size_ <= max_num_facets; } ///< True after assign(...)
+
+    ///@{ Recommended access to the facets for a given sign-pattern; memoizes the result. The functions throw an error for the 0-sign-pattern.
+    static inline const RefPatchCL& instance (const byte   ls[Dim + 1]);
+    static inline const RefPatchCL& instance (const double ls[Dim + 1]);
+    ///@}
+
+    bool is_boundary_facet () const { return is_boundary_facet_ == 1; } ///< true, iff the facet is one of the tetra's faces.
+
+    bool  empty () const { return size_ == 0; } ///< true, iff the area of the intersection is 0.
+    size_t size () const { return size_; }      ///< Number of facets in 0..max_num_facets
+
+    ///@{ Random-access to the facets
+    const_facet_iterator facet_begin () const { return facet_; }
+    const_facet_iterator facet_end   () const { return facet_ + size_; }
+    ///@}
+};
+
+template <Uint Dim>
+RefPatchCL<Dim> RefPatchCL<Dim>::instance_array_[SignTraitsCL<Dim>::num_pattern];
+
+template <Uint Dim>
+inline const RefPatchCL<Dim>&
+RefPatchCL<Dim>::instance (const byte ls[Dim + 1])
+{
+    const byte idx= SignTraitsCL<Dim>::pattern_idx ( ls);
+    if (idx == 0)
+        throw DROPSErrCL( "RefPatchCL::instance: found a full body in the zero level set, grid is too coarse!");
+    return RefPatchCL<Dim>::instance_array_[idx + SignTraitsCL<Dim>::zero_pattern_offset];
+}
+
+template <Uint Dim>
+inline const RefPatchCL<Dim>&
+RefPatchCL<Dim>::instance (const double ls[Dim + 1])
+{
+    byte ls_byte[Dim + 1];
+    std::transform( ls + 0, ls + Dim + 1, ls_byte + 0, DROPS::sign);
+    return RefPatchCL<Dim>::instance( ls_byte);
+}
 
 ///\brief The triangles of the intersection of the reference-tetra with a linear levelset-function.
 ///

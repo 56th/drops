@@ -120,7 +120,7 @@ class TetraPrismLatticeCL
     typedef VertexContT::const_iterator const_vertex_iterator;
     typedef std::vector<PentaT> PentaContT;
     typedef PentaContT::const_iterator const_penta_iterator;
-    typedef PentaContT::const_iterator const_simplex_iterator;
+    typedef PentaContT::const_iterator const_body_iterator;
 
   private:
     /// \brief cache for computed lattices. The first index denotes the number of spatial subdivisions, the second the number of time-intervals.
