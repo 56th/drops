@@ -64,18 +64,6 @@ write_refpatch (const DROPS::RefPatchCL<Dim>& p, std::ostream& os)
     os << '\n';
 }
 
-void
-write_reftetrapatch (const DROPS::RefTetraPatchCL& p, std::ostream& os)
-{
-    os << "is:initialized: " << p.is_initialized () << " is_boundary_facet: " << p.is_boundary_triangle ()
-       << " empty: " << p.empty () << " size: " << p.size () << "\nfacets:\n";
-    for (DROPS::Uint i= 0; i < p.size(); ++i) {
-        for (DROPS::Uint j= 0; j < 3; ++j)
-            os << (int) p.triangle_begin()[i][j] << ' ';
-    }
-    os << '\n';
-}
-
 void write_sign_traits_1_2_3_4 ()
 {
     std::ofstream f1( "sign_trait1.txt");
@@ -83,7 +71,6 @@ void write_sign_traits_1_2_3_4 ()
     std::ofstream f3( "sign_trait3.txt");
     std::ofstream f4( "sign_trait4.txt");
     std::ofstream frefpatch( "refpatch3.txt");
-    std::ofstream freftetrapatch( "reftetrapatch.txt");
     DROPS::byte ls[5];
     int c= 0;
     for (ls[0]= -1; ls[0] <= 1; ++ls[0]) {
@@ -95,11 +82,9 @@ void write_sign_traits_1_2_3_4 ()
             write_sign_trait( DROPS::SignTraitsCL<3>( ls), f3);
             if (DROPS::SignTraitsCL<3>::pattern_idx( ls) != 0) {
                 write_refpatch( DROPS::RefPatchCL<3>::instance( ls), frefpatch);
-                write_reftetrapatch( DROPS::RefTetraPatchCL::instance( ls), freftetrapatch);
             }
             else {
                 frefpatch << "Skipping the zero-pattern for RefPatchCL.\n";
-                freftetrapatch << "Skipping the zero-pattern for RefPatchCL.\n";
             }
             for (ls[4]= -1; ls[4] <= 1; ++ls[4], c++) {
                 std::cout << "c: " << c << " ls: " << (int) ls[0] << ' ' << (int) ls[1]

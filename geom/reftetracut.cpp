@@ -39,7 +39,7 @@ void RefPatchBuilderCL<3>::StaticInit (RefPatchCL<3> instance_array[SignTraitsCL
                 for (ls[3]= -1; ls[3] < 2; ++ls[3]) {
                     if ( ls[0] == 0 && ls[1] == 0 && ls[2] == 0 && ls[3] == 0)
                         continue;
-                    instance_array[SignTraitsCL<3>::pattern_idx( ls) + (SignTraitsCL<3>::num_pattern - 1)/2].assign( ls);
+                    instance_array[SignTraitsCL<3>::pattern_idx( ls) + SignTraitsCL<3>::zero_pattern_offset].assign( ls);
                 }
 }
 
@@ -60,37 +60,7 @@ StaticInitializerCL<RefPatchCL<3> > RefPatch3_initializer_;
 } // end of anonymous namespace
 
 
-RefTetraPatchCL RefTetraPatchCL::instance_array_[81];
-
-void RefTetraPatchCL::StaticInit ()
-{
-    byte ls[4];
-    for (ls[0]= -1; ls[0] < 2; ++ls[0])
-        for (ls[1]= -1; ls[1] < 2; ++ls[1])
-            for (ls[2]= -1; ls[2] < 2; ++ls[2])
-                for (ls[3]= -1; ls[3] < 2; ++ls[3]) {
-                    if ( ls[0] == 0 && ls[1] == 0 && ls[2] == 0 && ls[3] == 0)
-                        continue;
-                    RefTetraPatchCL::instance_array_[instance_idx( ls) + 40].assign( ls);
-                }
-}
-
-namespace {
-StaticInitializerCL<RefTetraPatchCL> RefTetraPatch_initializer_;
-
-} // end of anonymous namespace
-
-bool
-RefTetraPatchCL::assign (const SignPatternTraitCL& cut)
-{
-    for (size_= 0; size_ < num_triangles( cut); ++size_)
-        triangle_[size_]= MakeTriangle( cut(size_), cut(size_ + 1), cut(size_ + 2));
-    is_boundary_triangle_= cut.num_zero_vertexes() == 3 ? 1 : 0;
-    return empty();
-}
-
-
-RefTetraPartitionCL RefTetraPartitionCL::instance_array_[81];
+RefTetraPartitionCL RefTetraPartitionCL::instance_array_[SignTraitsCL<3>::num_pattern];
 
 void RefTetraPartitionCL::StaticInit ()
 {
@@ -101,7 +71,7 @@ void RefTetraPartitionCL::StaticInit ()
                 for (ls[3]= -1; ls[3] < 2; ++ls[3]) {
                     if ( ls[0] == 0 && ls[1] == 0 && ls[2] == 0 && ls[3] == 0)
                         continue;
-                    RefTetraPartitionCL::instance_array_[instance_idx( ls) + 40].assign( ls);
+                    RefTetraPartitionCL::instance_array_[SignTraitsCL<3>::pattern_idx( ls) + SignTraitsCL<3>::zero_pattern_offset].assign( ls);
                 }
 }
 

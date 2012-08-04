@@ -170,7 +170,7 @@ class SurfacePatchCL
 
     template <class VertexCutMergingPolicyT>
       const TriangleT ///< Create a single sub-triangle and its vertexes
-      make_sub_triangle (const RefTetraPatchCL::TriangleT& ref_tri, const PrincipalLatticeCL::TetraT& lattice_tet,
+      make_sub_triangle (const RefTetraPatchCL::FacetT& ref_tri, const PrincipalLatticeCL::TetraT& lattice_tet,
         const PrincipalLatticeCL& lattice, const double lset[4],
         std::vector<Uint>& copied_vertexes, std::vector<RenumberVertexPairT>& renumber_zero_verts,
         VertexCutMergingPolicyT& edgecut);

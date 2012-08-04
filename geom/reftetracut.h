@@ -145,75 +145,8 @@ RefPatchCL<Dim>::instance (const double ls[Dim + 1])
     return RefPatchCL<Dim>::instance( ls_byte);
 }
 
-///\brief The triangles of the intersection of the reference-tetra with a linear levelset-function.
-///
-/// The class memoizes used sign-patterns if the triangulations are accessed via the instance( ls)-function. Individual instances may still be constructed (useful for debugging).
-class RefTetraPatchCL
-{
-  public:
-    typedef SArrayCL<Ubyte, 3> TriangleT; ///< the vertices of a triangle of the cut: the tetra's vertices are denoted by 0..3, the edge-cuts by edge-num + 4, which is in 4..9.
-    typedef const TriangleT* const_triangle_iterator;
-    typedef       TriangleT*       triangle_iterator;
+typedef RefPatchCL<3> RefTetraPatchCL;
 
-    /// \brief Initializes RefTetraPatchCL::instance_array_ (see below)  by calling RefTetraPatchCL::assign() for all non-zero sign patterns.
-    static void StaticInit ();
-    static void StaticDestruct () {}
-
-  private:
-    TriangleT triangle_[2];      ///< at most two triangles
-    Ubyte size_;                 ///< number of triangles
-    Ubyte is_boundary_triangle_; ///< true if the triangle is one of the tetra's faces.
-
-    TriangleT MakeTriangle (Ubyte v0, Ubyte v1, Ubyte v2) const { return MakeSArray( v0, v1, v2); }
-
-    static RefTetraPatchCL instance_array_[81]; // 81 = 3^4 = all possible sign-patterns on the vertices
-
-  public:
-    RefTetraPatchCL () : size_( static_cast<Ubyte>( -1)), is_boundary_triangle_( 0) {} ///< Uninitialized default state
-    RefTetraPatchCL (const SignPatternTraitCL& cut) { assign( cut); } ///< Initialize with sign pattern on the vertices
-    bool assign (const SignPatternTraitCL& cut); ///< Assign a sign pattern on the vertices; returns the value of empty()
-
-    bool  is_initialized () const { return size_ <= 2; } ///< True after assign(...)
-
-    ///@{ Recommended access to the triangles for a given sign-pattern; memoizes the result. The functions throw an error for the 0-sign-pattern.
-    static inline const RefTetraPatchCL& instance (const byte   ls[4]);
-    static inline const RefTetraPatchCL& instance (const double ls[4]);
-    ///@}
-
-    bool is_boundary_triangle () const { return is_boundary_triangle_ == 1; } ///< true, iff the triangle is one of the tetra's faces.
-
-    bool  empty () const { return size_ == 0; } ///< true, iff the area of the intersection is 0.
-    size_t size () const { return size_; }      ///< Number of triangles, 0, 1, or 2
-
-    ///@{ Random-access to the triangles
-    const_triangle_iterator triangle_begin () const { return triangle_; }
-    const_triangle_iterator triangle_end   () const { return triangle_ + size_; }
-    ///@}
-};
-
-///\brief Return a signed array-index for the possible 3^4 sign-patterns on the vertices of a tetra.
-/// The index ranges from [-40..40].
-inline byte instance_idx (const byte ls[4])
-{
-    return  27*ls[0] + 9*ls[1] + 3*ls[2] + ls[3];
-}
-
-inline const RefTetraPatchCL&
-RefTetraPatchCL::instance (const byte ls[4])
-{
-    const byte idx= instance_idx ( ls);
-    if (idx == 0)
-        throw DROPSErrCL( "RefTetraPatchCL::instance: found 3-dim. zero level set, grid is too coarse!");
-    return instance_array_[idx + 40];
-}
-
-inline const RefTetraPatchCL&
-RefTetraPatchCL::instance (const double ls[4])
-{
-    byte ls_byte[4];
-    std::transform( ls + 0, ls + 4, ls_byte + 0, DROPS::sign);
-    return instance( ls_byte);
-}
 
 ///\brief The tetras partition the positive and negative part of the reference-tetra with respect to a linear levelset-function ls.
 ///
@@ -285,7 +218,7 @@ class RefTetraPartitionCL
 inline const RefTetraPartitionCL&
 RefTetraPartitionCL::instance (const byte ls[4])
 {
-    const byte idx= instance_idx ( ls);
+    const byte idx= SignTraitsCL<3>::pattern_idx ( ls);
     if (idx == 0)
         throw DROPSErrCL( "RefTetraPartitionCL::instance: found 3-dim. zero level set, grid is too coarse!");
     return instance_array_[idx + 40];

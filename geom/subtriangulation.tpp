@@ -118,7 +118,7 @@ template <class VertexPartitionPolicyT,
 
 template <class VertexCutMergingPolicyT>
   const SurfacePatchCL::TriangleT
-  SurfacePatchCL::make_sub_triangle (const RefTetraPatchCL::TriangleT& ref_tri, const PrincipalLatticeCL::TetraT& lattice_tet,
+  SurfacePatchCL::make_sub_triangle (const RefTetraPatchCL::FacetT& ref_tri, const PrincipalLatticeCL::TetraT& lattice_tet,
     const PrincipalLatticeCL& lattice, const double lset[4],
     std::vector<Uint>& copied_vertexes, std::vector<RenumberVertexPairT>& zero_vertex_uses,
     VertexCutMergingPolicyT& edgecut)
@@ -172,10 +172,10 @@ template <class VertexCutMergingPolicyT>
         copy_local_level_set_values( ls, ls_sign, *lattice_tet, loc_ls, loc_ls_sign);
         const RefTetraPatchCL& cut= RefTetraPatchCL::instance( loc_ls_sign);
         if (cut.empty()) continue;
-        for (RefTetraPatchCL::const_triangle_iterator it= cut.triangle_begin(), end= cut.triangle_end(); it != end; ++it) {
+        for (RefTetraPatchCL::const_facet_iterator it= cut.facet_begin(), end= cut.facet_end(); it != end; ++it) {
             triangles_.push_back( make_sub_triangle(
                 *it, *lattice_tet, lat, loc_ls, copied_vertexes, zero_vertex_uses, edgecut));
-            is_boundary_triangle_.push_back( cut.is_boundary_triangle());
+            is_boundary_triangle_.push_back( cut.is_boundary_facet());
         }
     }
 
