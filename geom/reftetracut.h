@@ -31,15 +31,6 @@
 
 namespace DROPS {
 
-typedef SignTraitsCL<3> SignPatternTraitCL;
-
-
-inline Ubyte
-num_triangles (const SignPatternTraitCL& cut)
-{
-    return cut.has_codim_le_1() ? cut.num_cut_simplexes() - 2 : 0;
-}
-
 template <Uint Dim>
 class RefPatchCL; ///< forward declaration for RefPatchBuilderCL.
 
@@ -52,9 +43,11 @@ class RefPatchBuilderCL
     /// \brief Called by generic StaticInit in RefPatchCL.
     static void StaticInit (RefPatchCL<Dim> instances[SignTraitsCL<Dim>::num_pattern]); ///< undefined
 
+    ///\brief maximal number of facets in any RefPatchCL.
     enum { max_num_facets= 0 };
 
-    bool assign (const SignTraitsCL<Dim>&, RefPatchCL<Dim>&); ///< undefined
+    ///\brief Assign a sign pattern on the vertices; returns the value of RefPatchCL<Dim>::empty(). The generic version is undefined.
+    static bool assign (const SignTraitsCL<Dim>&, RefPatchCL<Dim>&);
 };
 
 template <>
@@ -63,7 +56,7 @@ class RefPatchBuilderCL<3>
   public:
     typedef SArrayCL<Ubyte, 3> FacetT;
 
-    enum { max_num_facets= 2 }; // Number of facets: 0, 1, or 2
+    enum { max_num_facets= 2 }; // Number of facets: 0, 1, or 2. The maximum comes from a quadrilateral.
 
   private:
     static FacetT MakeTriangle (Ubyte v0, Ubyte v1, Ubyte v2) { return MakeSArray( v0, v1, v2); }
@@ -71,6 +64,28 @@ class RefPatchBuilderCL<3>
   public:
     static void StaticInit ( RefPatchCL<3> instances[SignTraitsCL<3>::num_pattern]);
     static bool assign (const SignTraitsCL<3>&, RefPatchCL<3>&);
+};
+
+template <>
+class RefPatchBuilderCL<4>
+{
+  public:
+    typedef SArrayCL<Ubyte, 4> FacetT;
+
+    enum { max_num_facets= 3 }; // Number of facets: 0, 1, 2 or 3. The maximum comes from a triangular prism.
+
+  private:
+    ///\brief The extended vertex-number (see SignTraitsCL) on the reference-penta, given the extended vertex-number n (in 0..9) on the facet tetra.
+    static Ubyte PentaCutByTetraCut (Ubyte tetra, Ubyte n) {
+        return n < 4 ? RefPenta::VertByTetraVert( tetra, n)
+                     : RefPenta::EdgeByTetraEdge( tetra, n - 4) + 5;
+    }
+    static FacetT MakeTetra (Ubyte v0, Ubyte v1, Ubyte v2, Ubyte v3) { return MakeSArray( v0, v1, v2, v3); }
+    static bool cone_construction (const SignTraitsCL<4>& cut, RefPatchCL<4>& p, Ubyte f); ///< produce tetras as the convex hulls of v=cut( 0) and the cut of the facet-tetra f. Returns, whether the cut with f is on the boundary of the f.
+
+  public:
+    static void StaticInit ( RefPatchCL<4> instances[SignTraitsCL<4>::num_pattern]);
+    static bool assign (const SignTraitsCL<4>&, RefPatchCL<4>&);
 };
 
 ///\brief The facets of the intersection of the reference-tetra with a linear levelset-function.
@@ -146,6 +161,10 @@ RefPatchCL<Dim>::instance (const double ls[Dim + 1])
 }
 
 typedef RefPatchCL<3> RefTetraPatchCL;
+typedef RefPatchCL<4> RefPentaPatchCL;
+
+
+typedef SignTraitsCL<3> SignPatternTraitCL;
 
 
 ///\brief The tetras partition the positive and negative part of the reference-tetra with respect to a linear levelset-function ls.

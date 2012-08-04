@@ -70,7 +70,8 @@ void write_sign_traits_1_2_3_4 ()
     std::ofstream f2( "sign_trait2.txt");
     std::ofstream f3( "sign_trait3.txt");
     std::ofstream f4( "sign_trait4.txt");
-    std::ofstream frefpatch( "refpatch3.txt");
+    std::ofstream frefpatch3( "refpatch3.txt");
+    std::ofstream frefpatch4( "refpatch4.txt");
     DROPS::byte ls[5];
     int c= 0;
     for (ls[0]= -1; ls[0] <= 1; ++ls[0]) {
@@ -81,15 +82,21 @@ void write_sign_traits_1_2_3_4 ()
           for (ls[3]= -1; ls[3] <= 1; ++ls[3]) {
             write_sign_trait( DROPS::SignTraitsCL<3>( ls), f3);
             if (DROPS::SignTraitsCL<3>::pattern_idx( ls) != 0) {
-                write_refpatch( DROPS::RefPatchCL<3>::instance( ls), frefpatch);
+                write_refpatch( DROPS::RefPatchCL<3>::instance( ls), frefpatch3);
             }
             else {
-                frefpatch << "Skipping the zero-pattern for RefPatchCL.\n";
+                frefpatch3 << "Skipping the zero-pattern for RefPatchCL.\n";
             }
             for (ls[4]= -1; ls[4] <= 1; ++ls[4], c++) {
                 std::cout << "c: " << c << " ls: " << (int) ls[0] << ' ' << (int) ls[1]
                           << ' ' << (int) ls[2] << ' ' << (int) ls[3]  << ' ' << (int) ls[4]<< std::endl;
                 write_sign_trait( DROPS::SignTraitsCL<4>( ls), f4);
+                if (DROPS::SignTraitsCL<4>::pattern_idx( ls) != 0) {
+                    write_refpatch( DROPS::RefPatchCL<4>::instance( ls), frefpatch4);
+                }
+                else {
+                    frefpatch4 << "Skipping the zero-pattern for RefPatchCL.\n";
+            }
             }
           }
         }

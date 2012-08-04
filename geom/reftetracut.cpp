@@ -30,6 +30,13 @@
 
 namespace DROPS {
 
+inline Ubyte
+num_triangles (const SignTraitsCL<3>& cut)
+{
+    return cut.has_codim_le_1() ? cut.num_cut_simplexes() - 2 : 0;
+}
+
+
 void RefPatchBuilderCL<3>::StaticInit (RefPatchCL<3> instance_array[SignTraitsCL<3>::num_pattern])
 {
     byte ls[4];
@@ -56,6 +63,72 @@ template class RefPatchCL<3>;
 
 namespace {
 StaticInitializerCL<RefPatchCL<3> > RefPatch3_initializer_;
+
+} // end of anonymous namespace
+
+
+void RefPatchBuilderCL<4>::StaticInit (RefPatchCL<4> instance_array[SignTraitsCL<4>::num_pattern])
+{
+    byte ls[5];
+    for (ls[0]= -1; ls[0] < 2; ++ls[0])
+        for (ls[1]= -1; ls[1] < 2; ++ls[1])
+            for (ls[2]= -1; ls[2] < 2; ++ls[2])
+                for (ls[3]= -1; ls[3] < 2; ++ls[3])
+                    for (ls[4]= -1; ls[4] < 2; ++ls[4]) {
+                        if ( ls[0] == 0 && ls[1] == 0 && ls[2] == 0 && ls[3] == 0 && ls[4] == 0)
+                            continue;
+                        instance_array[SignTraitsCL<4>::pattern_idx( ls) + SignTraitsCL<4>::zero_pattern_offset].assign( ls);
+                    }
+}
+
+inline bool
+RefPatchBuilderCL<4>::cone_construction (const SignTraitsCL<4>& cut, RefPatchCL<4>& p, Ubyte f)
+{
+    const Ubyte v= cut( 0); // The tip of the cones.
+    byte f_ls[4]; // level set signs on the facet f of the penta.
+    for (Uint i= 0; i < 4; ++i)
+        f_ls[i]= cut.sign( RefPenta::VertOfTetra( f, i));
+//     const RefTetraPatchCL& pp= RefTetraPatchCL::instance( f_ls);
+//     for (RefTetraPatchCL::const_triangle_iterator it= pp.triangle_begin(), end= pp.triangle_end(); it != end; ++it) {
+//         tetra_[size_++]= MakeTetra( v,
+//                                     PentaCutByTetraCut( f, it[0][0]),
+//                                     PentaCutByTetraCut( f, it[0][1])),
+//                                     PentaCutByTetraCut( f, it[0][2]));
+//     return p.is_boundary_triangle();
+    SignPatternTraitCL f_cut( f_ls);
+    for (Uint i= 0; i < num_triangles( f_cut); ++i)
+        p.facet_[p.size_++]= MakeTetra( v,
+                                        PentaCutByTetraCut( f, f_cut( i)),
+                                        PentaCutByTetraCut( f, f_cut( i + 1)),
+                                        PentaCutByTetraCut( f, f_cut( i + 2)));
+    return f_cut.num_zero_vertexes() == 3 ? 1 : 0;
+}
+
+bool
+RefPatchBuilderCL<4>::assign (const SignTraitsCL<4>& cut, RefPatchCL<4>& p)
+{
+    p.size_= 0;
+    p.is_boundary_facet_= 0;
+
+    if (cut.empty() || !cut.has_codim_le_1())
+        return p.empty();
+    // From here on, there are at least 4 roots of the level set function.
+
+    if (cut.no_zero_vertex()) { //cut(0) is an edge, there are two facets f0, f1 of the penta not containing it.
+        // is_on_boundary_ is false (otherwise, at least four zero-vertexes are needed).
+        for (Uint v= 0; v < 2; ++v)
+            cone_construction( cut, p, RefPenta::OppTetra( RefPenta::VertOfEdge( cut[0], v)));
+    }
+    else //cut(0) is a vertex, there is one facet f of the penta not containing it.
+        p.is_boundary_facet_= cone_construction( cut, p, RefPenta::OppTetra( cut[0]));
+
+    return p.empty();
+}
+
+template class RefPatchCL<4>;
+
+namespace {
+StaticInitializerCL<RefPatchCL<4> > RefPatch4_initializer_;
 
 } // end of anonymous namespace
 
