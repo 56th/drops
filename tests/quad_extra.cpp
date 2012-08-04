@@ -142,8 +142,8 @@ void TestExactness_extrapolation2D(int num_extrapolation)
                 exactint_surf[it] *= 1./(degy+1);
                 resize_and_evaluate_on_vertexes (f, s, qdom, 0., integrand);
                 std::cout << "degz: " << degz << "\tdegy: " << degy << "\tdegx: " << degx
-                          << "\t\tI-Q_h: " << exactint_surf[it] - quad_2D(integrand, qdom)//q.quad( 1.)
-                          << "\tIntegral: " << quad_2D(integrand,  qdom) <<  "             ";//q.quad( 1.)
+                          << "\t\tI-Q_h: " << exactint_surf[it] - 2*quad_2D(integrand, qdom)//q.quad( 1.)
+                          << "\tIntegral: " << 2*quad_2D(integrand,  qdom) <<  "             ";//q.quad( 1.)
                 /*for (size_t i= 0; i < q.size(); ++i)
                     std::cout << '\t' << q[i];*/
                 std::cout << std::endl;
