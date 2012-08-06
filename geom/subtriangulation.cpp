@@ -78,16 +78,16 @@ operator<< (std::ostream& out, const TetraPartitionCL& t)
 
 
 void
-write_paraview_vtu (std::ostream& file_, const SurfacePatchCL& t)
+write_paraview_vtu (std::ostream& file_, const SPatchCL<3>& t)
 {
     file_ << "<?xml version=\"1.0\"?>"  << '\n'
           << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" byte_order=\"LittleEndian\">"   << '\n'
           << "<UnstructuredGrid>"   << '\n';
 
-    file_<< "<Piece NumberOfPoints=\""<< t.vertexes_.size() <<"\" NumberOfCells=\""<< t.triangles_.size() << "\">";
+    file_<< "<Piece NumberOfPoints=\""<< t.vertexes_.size() <<"\" NumberOfCells=\""<< t.facets_.size() << "\">";
     file_<< "\n\t<Points>"
          << "\n\t\t<DataArray type=\"Float32\" NumberOfComponents=\"3\" format=\"" << "ascii\">\n\t\t";
-    for(SurfacePatchCL::const_vertex_iterator it= t.vertexes_.begin(), end= t.vertexes_.end(); it != end; ++it) {
+    for(SPatchCL<3>::const_vertex_iterator it= t.vertexes_.begin(), end= t.vertexes_.end(); it != end; ++it) {
         file_ << it[0][1] << ' ' << it[0][2] << ' ' << it[0][3] << ' ';
     }
     file_<< "\n\t\t</DataArray> \n"
@@ -96,16 +96,16 @@ write_paraview_vtu (std::ostream& file_, const SurfacePatchCL& t)
     file_   << "\t<Cells>\n"
             << "\t\t<DataArray type=\"Int32\" Name=\"connectivity\" format=\""
             <<"ascii\">\n\t\t";
-    std::copy( t.triangles_.begin(), t.triangles_.end(), std::ostream_iterator<LatticePartitionTypesNS::TriangleT>( file_));
+    std::copy( t.facets_.begin(), t.facets_.end(), std::ostream_iterator<LatticePartitionTypesNS::TriangleT>( file_));
     file_ << "\n\t\t</DataArray>\n";
     file_ << "\t\t<DataArray type=\"Int32\" Name=\"offsets\" format=\"ascii\">\n\t\t";
-    for(Uint i= 1; i <= t.triangles_.size(); ++i) {
+    for(Uint i= 1; i <= t.facets_.size(); ++i) {
         file_ << i*3 << " ";
     }
     file_ << "\n\t\t</DataArray>";
     file_ << "\n\t\t<DataArray type=\"UInt8\" Name=\"types\" format=\"ascii\">\n\t\t";
     const int Type= 5; // Triangles
-    for(Uint i= 1; i <= t.triangles_.size(); ++i) {
+    for(Uint i= 1; i <= t.facets_.size(); ++i) {
             file_ << Type<<" ";
     }
     file_<<"\n\t\t</DataArray>"

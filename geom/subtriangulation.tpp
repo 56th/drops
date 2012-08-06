@@ -49,22 +49,23 @@ copy_levelset_sign (const std::valarray<double>& src, std::valarray<byte>& dst)
 }
 
 ///\brief Copies the level set values and the corresponding signs from the global vectors to an array specific to the given lattice-tetra
+template <Uint Dim>
 inline void
 copy_local_level_set_values( const std::valarray<double>& ls, const std::valarray<byte>& ls_sign, const PrincipalLatticeCL::TetraT& lattice_tet,
-    double loc_ls[4], byte loc_ls_sign[4])
+    double loc_ls[Dim + 1], byte loc_ls_sign[Dim + 1])
 {
-    for (Uint i= 0; i < 4; ++i) {
+    for (Uint i= 0; i < Dim + 1; ++i) {
         loc_ls_sign[i]= ls_sign[lattice_tet[i]];
         loc_ls     [i]= ls     [lattice_tet[i]];
     }
 }
 
-template <class VertexCutMergingPolicyT>
+template <template <Uint Dim> class VertexCutMergingPolicyT>
   const TetraPartitionCL::TetraT
   TetraPartitionCL::make_sub_tetra (
     const RefTetraPartitionCL::TetraT& ref_tet, const PrincipalLatticeCL::TetraT& lattice_tet,
     const double lset[4], Uint lattice_num_vertexes,
-    VertexCutMergingPolicyT& edgecut)
+    VertexCutMergingPolicyT<3>& edgecut)
 {
     Uint loc_vert_num;
     TetraT tet;
@@ -83,7 +84,7 @@ template <class VertexCutMergingPolicyT>
 }
 
 template <class VertexPartitionPolicyT,
-          class VertexCutMergingPolicyT>
+          template <Uint Dim> class VertexCutMergingPolicyT>
   void
   TetraPartitionCL::make_partition (const PrincipalLatticeCL& lat, const std::valarray<double>& ls)
 {
@@ -96,13 +97,13 @@ template <class VertexPartitionPolicyT,
     std::valarray<byte> ls_sign;
     copy_levelset_sign( ls, ls_sign);
 
-    VertexCutMergingPolicyT edgecut( lat.vertex_begin()); // Stores the genuine cuts.
+    VertexCutMergingPolicyT<3> edgecut( lat.vertex_begin()); // Stores the genuine cuts.
 
     TetraContT loc_tetras; // temporary container for the positive tetras.
     double loc_ls[4];
     byte   loc_ls_sign[4];
     for (PrincipalLatticeCL::const_tetra_iterator lattice_tet= lat.tetra_begin(), lattice_end= lat.tetra_end(); lattice_tet != lattice_end; ++lattice_tet) {
-        copy_local_level_set_values( ls, ls_sign, *lattice_tet, loc_ls, loc_ls_sign);
+        copy_local_level_set_values<3>( ls, ls_sign, *lattice_tet, loc_ls, loc_ls_sign);
         const RefTetraPartitionCL& cut= RefTetraPartitionCL::instance( loc_ls_sign);
         for (RefTetraPartitionCL::const_tetra_iterator it= cut.tetra_begin(), end= cut.tetra_end(); it != end; ++it)
             (cut.sign( it) == -1 ? tetras_ : loc_tetras).push_back( make_sub_tetra(
@@ -115,21 +116,21 @@ template <class VertexPartitionPolicyT,
     vertex_order_policy.sort_vertexes( vertexes_, edgecut.cut_vertex_container(), pos_vertex_begin_, neg_vertex_end_);
 }
 
-
-template <class VertexCutMergingPolicyT>
-  const SurfacePatchCL::TriangleT
-  SurfacePatchCL::make_sub_triangle (const RefTetraPatchCL::FacetT& ref_tri, const PrincipalLatticeCL::TetraT& lattice_tet,
-    const PrincipalLatticeCL& lattice, const double lset[4],
+template <Uint Dim>
+template <template <Uint> class VertexCutMergingPolicyT>
+  const typename SPatchCL<Dim>::FacetT
+  SPatchCL<Dim>::make_sub_facet (const RefPatchFacetT& ref_tri, const LatticeSimplexT& lattice_tet,
+    const LatticeT& lattice, const double lset[Dim+1],
     std::vector<Uint>& copied_vertexes, std::vector<RenumberVertexPairT>& zero_vertex_uses,
-    VertexCutMergingPolicyT& edgecut)
+    VertexCutMergingPolicyT<Dim>& edgecut)
 {
     const Uint NotCopiedC= static_cast<Uint>( -1);
-    TriangleT tri;
+    FacetT tri;
     Uint loc_vert_num;
 
-    for (Uint j= 0; j < 3; ++j) {
+    for (Uint j= 0; j < Dim; ++j) {
         loc_vert_num= ref_tri[j];
-        if (loc_vert_num < 4) { // zero vertex
+        if (loc_vert_num < Dim + 1) { // zero vertex
             if (copied_vertexes.empty()) // lazy initialization of the lookup-table for copied zero-vertexes
                 copied_vertexes.resize( lattice.vertex_size(), NotCopiedC);
             const Uint lattice_vert_num= lattice_tet[loc_vert_num];
@@ -138,51 +139,52 @@ template <class VertexCutMergingPolicyT>
                 vertexes_.push_back( lattice.vertex_begin()[lattice_vert_num]);
             }
             tri[j]= copied_vertexes[lattice_vert_num];
-            zero_vertex_uses.push_back( std::make_pair( triangles_.size(), j));
+            zero_vertex_uses.push_back( std::make_pair( facets_.size(), j));
         }
         else { // genuine edge vertex
-            const Ubyte v0= VertOfEdge( loc_vert_num - 4, 0),
-                        v1= VertOfEdge( loc_vert_num - 4, 1);
+            const Ubyte v0= VertOfEdge<Dim>( loc_vert_num - (Dim + 1), 0),
+                        v1= VertOfEdge<Dim>( loc_vert_num - (Dim + 1), 1);
             tri[j]= edgecut( lattice_tet[v0], lattice_tet[v1], lset[v0], lset[v1]);
         }
     }
     return tri;
 }
 
-template <class VertexCutMergingPolicyT>
+template <Uint Dim>
+template <template <Uint> class VertexCutMergingPolicyT>
   void
-  SurfacePatchCL::make_patch (const PrincipalLatticeCL& lat, const std::valarray<double>& ls)
+  SPatchCL<Dim>::make_patch (const LatticeT& lat, const std::valarray<double>& ls)
 {
-    triangles_.clear();
-    is_boundary_triangle_.clear();
+    facets_.clear();
+    is_boundary_facet_.clear();
     vertexes_.clear();
 
     std::valarray<byte> ls_sign;
     copy_levelset_sign( ls, ls_sign);
 
-    VertexCutMergingPolicyT edgecut( lat.vertex_begin());
+    VertexCutMergingPolicyT<Dim> edgecut( lat.vertex_begin());
 
     std::vector<Uint> copied_vertexes; // lookup-table for copied zero-vertexes from the lattice
     std::vector<RenumberVertexPairT> zero_vertex_uses; // used to renumber the zero_vertexes
 
-    double loc_ls[4];
-    byte   loc_ls_sign[4];
-    for (PrincipalLatticeCL::const_tetra_iterator lattice_tet= lat.tetra_begin(), lattice_end= lat.tetra_end();
+    double loc_ls[Dim + 1];
+    byte   loc_ls_sign[Dim + 1];
+    for (typename LatticeT::const_body_iterator lattice_tet= lat.body_begin(), lattice_end= lat.body_end();
         lattice_tet != lattice_end; ++lattice_tet) {
-        copy_local_level_set_values( ls, ls_sign, *lattice_tet, loc_ls, loc_ls_sign);
-        const RefTetraPatchCL& cut= RefTetraPatchCL::instance( loc_ls_sign);
+        copy_local_level_set_values<Dim>( ls, ls_sign, *lattice_tet, loc_ls, loc_ls_sign);
+        const RefPatchT& cut= RefPatchT::instance( loc_ls_sign);
         if (cut.empty()) continue;
-        for (RefTetraPatchCL::const_facet_iterator it= cut.facet_begin(), end= cut.facet_end(); it != end; ++it) {
-            triangles_.push_back( make_sub_triangle(
+        for (typename RefPatchT::const_facet_iterator it= cut.facet_begin(), end= cut.facet_end(); it != end; ++it) {
+            facets_.push_back( make_sub_facet(
                 *it, *lattice_tet, lat, loc_ls, copied_vertexes, zero_vertex_uses, edgecut));
-            is_boundary_triangle_.push_back( cut.is_boundary_facet());
+            is_boundary_facet_.push_back( cut.is_boundary_facet());
         }
     }
 
     // Renumber the zero vertexes in the triangles, as they will be at offset #edge-cuts in vertexes_.
     const Uint num_genuine_cuts= edgecut.cut_vertex_container().size();
     for (std::vector<RenumberVertexPairT>::const_iterator it= zero_vertex_uses.begin(); it != zero_vertex_uses.end(); ++it)
-        triangles_[it->first][it->second]+= num_genuine_cuts;
+        facets_[it->first][it->second]+= num_genuine_cuts;
     // Prepend the edge-cuts to vertexes_
     std::copy( vertexes_.begin(), vertexes_.end(), std::back_inserter( edgecut.cut_vertex_container()));
     vertexes_.swap( edgecut.cut_vertex_container());

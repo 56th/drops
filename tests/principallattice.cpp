@@ -96,13 +96,12 @@ void write_sign_traits_1_2_3_4 ()
                 }
                 else {
                     frefpatch4 << "Skipping the zero-pattern for RefPatchCL.\n";
-            }
+                }
             }
           }
         }
       }
     }
-
 }
 
 void test_tetra_cut ()
@@ -139,7 +138,7 @@ void test_cut_surface ()
 {
     DROPS::GridFunctionCL<> ls( 4);
     ls[0]= -1.; ls[1]= 0.; ls[2]= 0.; ls[3]= 0.;
-    DROPS::SurfacePatchCL tet;
+    DROPS::SPatchCL<3> tet;
     // tet.partition_principal_lattice ( 1, ls);
     // std::cerr << tet;
     int c= 0;
@@ -359,14 +358,14 @@ int main()
 {
     try {
         // test_tetra_cut();
-        // test_cut_surface();
+        test_cut_surface();
         // test_principal_lattice();
         // test_sphere_cut();
         // test_sphere_integral();
         // test_extrapolated_sphere_integral();
         // test_sphere_surface_integral();
         // test_extrapolated_sphere_surface_integral();
-        write_sign_traits_1_2_3_4();
+        // write_sign_traits_1_2_3_4();
         // test_tetra_prism_lattice();
     }
     catch (DROPS::DROPSErrCL err) { err.handle(); }
