@@ -410,6 +410,14 @@ Point3DCL GetWorldCoord(const TetraCL& t, const SVectorCL<4>& c)
             +c[3]*t.GetVertex(3)->GetCoord();
 }
 
+Point3DCL GetRefCoord(const TetraCL& t, const SVectorCL<4>& c)
+{
+        return c[0]*t.GetVertex(0)->GetCoord()
+            +c[1]*t.GetVertex(1)->GetCoord()
+            +c[2]*t.GetVertex(2)->GetCoord()
+            +c[3]*t.GetVertex(3)->GetCoord();
+}
+
 Point3DCL GetWorldCoord(const TetraCL& t, Uint face, const SVectorCL<2>& c)
 {
     static MeshDeformationCL & m = MeshDeformationCL::getInstance();
