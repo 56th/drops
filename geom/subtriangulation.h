@@ -39,6 +39,10 @@ namespace DROPS {
 /// \brief Common types used by TetraPartitionCL, SPatchCL and their helpers
 namespace LatticePartitionTypesNS {
 
+typedef SArrayCL<Uint, 5>          PentaT; ///< representation of a penta of the partition via its vertices: index in the vertex_-array
+typedef std::vector<PentaT>        PentaContT;
+typedef PentaContT::const_iterator const_penta_iterator;
+
 typedef SArrayCL<Uint, 4>          TetraT; ///< representation of a tetra of the partition via its vertices: index in the vertex_-array
 typedef std::vector<TetraT>        TetraContT;
 typedef TetraContT::const_iterator const_tetra_iterator;
@@ -49,6 +53,9 @@ typedef TriangleContT::const_iterator const_triangle_iterator;
 
 typedef std::vector<BaryCoordCL>    VertexContT;
 typedef VertexContT::const_iterator const_vertex_iterator;
+
+typedef std::vector<STCoordCL>        STVertexContT;
+typedef STVertexContT::const_iterator const_stvertex_iterator;
 
 } // end of namespace DROPS::LatticePartitionTypesNS
 
@@ -165,6 +172,24 @@ struct DimensionTraitsCL<3>
     typedef RefPatchCL<3>::FacetT RefPatchFacetT;
 };
 
+template <>
+struct DimensionTraitsCL<4>
+{
+
+    typedef LatticePartitionTypesNS::TetraT               FacetT;
+    typedef LatticePartitionTypesNS::TriangleContT        FacetContT;
+    typedef LatticePartitionTypesNS::const_tetra_iterator const_facet_iterator;
+
+    typedef STCoordCL                                        VertexT;
+    typedef LatticePartitionTypesNS::STVertexContT           VertexContT;
+    typedef LatticePartitionTypesNS::const_stvertex_iterator const_vertex_iterator;
+
+    typedef TetraPrismLatticeCL         LatticeT;
+    typedef TetraPrismLatticeCL::PentaT LatticeSimplexT;
+
+    typedef RefPatchCL<4>         RefPatchT;
+    typedef RefPatchCL<4>::FacetT RefPatchFacetT;
+};
 
 template <Uint Dim>
 class SPatchCL; ///< forward declaration
