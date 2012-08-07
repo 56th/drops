@@ -262,7 +262,7 @@ template <class QuadDataT>
     Uint beg= 0;
     BaryCoordCL tri_bary[3];
     Point3DCL   tri[3];
-    for (SurfacePatchCL::const_triangle_iterator it= p.triangle_begin(); it != p.triangle_end();
+    for (SurfacePatchCL::const_facet_iterator it= p.facet_begin(); it != p.facet_end();
         ++it, beg+= num_nodes) {
         for (int i= 0; i < 3; ++i) {
             tri_bary[i]= partition_vertexes[(*it)[i]];

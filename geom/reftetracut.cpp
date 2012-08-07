@@ -89,7 +89,7 @@ RefPatchBuilderCL<4>::cone_construction (const SignTraitsCL<4>& cut, RefPatchCL<
     for (Uint i= 0; i < 4; ++i)
         f_ls[i]= cut.sign( RefPenta::VertOfTetra( f, i));
 //     const RefTetraPatchCL& pp= RefTetraPatchCL::instance( f_ls);
-//     for (RefTetraPatchCL::const_triangle_iterator it= pp.triangle_begin(), end= pp.triangle_end(); it != end; ++it) {
+//     for (RefTetraPatchCL::const_facet_iterator it= pp.facet_begin(), end= pp.facet_end(); it != end; ++it) {
 //         tetra_[size_++]= MakeTetra( v,
 //                                     PentaCutByTetraCut( f, it[0][0]),
 //                                     PentaCutByTetraCut( f, it[0][1])),

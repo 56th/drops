@@ -42,7 +42,7 @@ template <class ResultContainerT>
 
     Point3DCL tmp( Uninitialized);
     double tmp_norm;
-    for (SurfacePatchCL::const_triangle_iterator it= p.triangle_begin(); it != p.triangle_end(); ++it) {
+    for (SurfacePatchCL::const_facet_iterator it= p.facet_begin(); it != p.facet_end(); ++it) {
         const Point3DCL& v0= GetWorldCoord( t, verts[(*it)[0]]);
         cross_product( tmp, GetWorldCoord( t, verts[(*it)[1]]) - v0,
                             GetWorldCoord( t, verts[(*it)[2]]) - v0);

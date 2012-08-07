@@ -211,9 +211,6 @@ class SPatchCL
     typedef typename DimTraitsT::FacetContT           FacetContT;
     typedef typename DimTraitsT::const_facet_iterator const_facet_iterator;
 
-    /// \todo remove
-    typedef typename DimTraitsT::const_facet_iterator const_triangle_iterator;
-
     typedef typename DimTraitsT::VertexT               VertexT;
     typedef typename DimTraitsT::VertexContT           VertexContT;
     typedef typename DimTraitsT::const_vertex_iterator const_vertex_iterator;
@@ -259,9 +256,6 @@ class SPatchCL
 
     /// Random-access to the tetras and vertices.
     ///@{
-    const_triangle_iterator triangle_begin () const { return facets_.begin(); }
-    const_triangle_iterator triangle_end   () const { return facets_.end(); }
-
     const_facet_iterator facet_begin () const { return facets_.begin(); }
     const_facet_iterator facet_end   () const { return facets_.end(); }
     const_vertex_iterator vertex_begin () const { return vertexes_.begin(); }
