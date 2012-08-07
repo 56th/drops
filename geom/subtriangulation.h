@@ -233,7 +233,7 @@ class SPatchCL
     VertexContT vertexes_;
 
     template <template <Uint> class VertexCutMergingPolicyT>
-      const FacetT ///< Create a single sub-triangle and its vertexes
+      const FacetT ///< Create a single sub-facet and its vertexes
       make_sub_facet (const RefPatchFacetT& ref_tri, const LatticeSimplexT& lattice_tet,
         const LatticeT& lattice, const double lset[Dim],
         std::vector<Uint>& copied_vertexes, std::vector<RenumberVertexPairT>& renumber_zero_verts,
@@ -246,13 +246,13 @@ class SPatchCL
     template <template <Uint> class VertexCutMergingPolicyT>
     void make_patch (const LatticeT& lat, const std::valarray<double>& ls);
 
-    /// True, iff the triangle is a face of one of the tetras of the principal lattice.
+    /// True, iff the facet is a facet of one of the bodies of the principal lattice.
     ///@{
-    bool is_boundary_triangle (Uint i) const { return is_boundary_facet_[i]; }
-    bool is_boundary_triangle (const_facet_iterator it) const { return is_boundary_facet_[it - facets_.begin()]; }
+    bool is_boundary_facet (Uint i) const { return is_boundary_facet_[i]; }
+    bool is_boundary_facet (const_facet_iterator it) const { return is_boundary_facet_[it - facets_.begin()]; }
     ///@}
 
-    Uint triangle_size  () const ///< number of triangles
+    Uint facet_size  () const ///< number of triangles
          { return facets_.size(); }
     Uint vertex_size () const ///< number of vertexes
          { return facets_.size(); }

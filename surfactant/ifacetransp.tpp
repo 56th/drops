@@ -32,9 +32,9 @@ template <class ResultContainerT>
   void
   resize_and_evaluate_piecewise_normal (const SurfacePatchCL& p, const TetraCL& t, ResultContainerT& n, std::valarray<double>* absdet)
 {
-    n.resize( p.triangle_size());
+    n.resize( p.facet_size());
     if (absdet)
-        absdet->resize( p.triangle_size());
+        absdet->resize( p.facet_size());
 
     const typename SurfacePatchCL::const_vertex_iterator verts= p.vertex_begin();
     typename SequenceTraitCL<ResultContainerT>::iterator n_it= sequence_begin( n);
@@ -126,7 +126,7 @@ void InterfaceMassDivAccuP1CL<DiscVelSolT>::setup_local_matrix (const TetraCL& t
 
     resize_and_evaluate_piecewise_normal( surf, t, n_tri);
     n.resize( qdom.vertex_size());
-    for (Uint i= 0; i < surf.triangle_size(); ++i)
+    for (Uint i= 0; i < surf.facet_size(); ++i)
         n[std::slice(i*7, 7, 1)]= n_tri[i];
 
     GetTrafoTr( T, dummy, t);

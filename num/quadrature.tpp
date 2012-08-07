@@ -254,8 +254,8 @@ template <class QuadDataT>
     const Uint num_nodes= QuadDataT::NumNodesC;
 
     q.vertexes_.resize( 0);
-    q.vertexes_.resize( num_nodes*p.triangle_size());
-    q.weights_.resize( num_nodes*p.triangle_size());
+    q.vertexes_.resize( num_nodes*p.facet_size());
+    q.weights_.resize( num_nodes*p.facet_size());
 
     const typename SurfacePatchCL::const_vertex_iterator partition_vertexes= p.vertex_begin();
     const typename QuadDomainCL::WeightContT triangle_weights( QuadDataT::Weight, num_nodes);
@@ -269,7 +269,7 @@ template <class QuadDataT>
             tri[i]= GetWorldCoord( t, tri_bary[i]);
         }
         QuadDataT::SetInterface( tri_bary, q.vertexes_.begin() + beg);
-        const double absdet= (p.is_boundary_triangle (it) ? 0.5 : 1.)*FuncDet2D( tri[1] - tri[0], tri[2] - tri[0]);
+        const double absdet= (p.is_boundary_facet( it) ? 0.5 : 1.)*FuncDet2D( tri[1] - tri[0], tri[2] - tri[0]);
         q.weights_[std::slice( beg, num_nodes, 1)]= absdet*triangle_weights;
     }
 

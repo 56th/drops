@@ -94,7 +94,7 @@ RefPatchBuilderCL<4>::cone_construction (const SignTraitsCL<4>& cut, RefPatchCL<
 //                                     PentaCutByTetraCut( f, it[0][0]),
 //                                     PentaCutByTetraCut( f, it[0][1])),
 //                                     PentaCutByTetraCut( f, it[0][2]));
-//     return p.is_boundary_triangle();
+//     return p.is_boundary_facet();
     SignPatternTraitCL f_cut( f_ls);
     for (Uint i= 0; i < num_triangles( f_cut); ++i)
         p.facet_[p.size_++]= MakeTetra( v,

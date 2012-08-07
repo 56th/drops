@@ -137,7 +137,7 @@ void LaplaceBeltramiAccuP1CL::setup_local_matrix (const TetraCL& t)
     resize_and_evaluate_piecewise_normal( surf, t, n, &absdet);
     P1DiscCL::GetGradients( grad, dummy, t);
     for(int i= 0; i < 4; ++i) {
-        q[i].resize( surf.triangle_size());
+        q[i].resize( surf.facet_size());
         q[i]= grad[i] - dot( grad[i], n)*n;
     }
 
