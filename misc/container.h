@@ -890,13 +890,15 @@ class QRDecompCL
   public:
     QRDecompCL () : a_( Uninitialized) {}
     template <class MatT>
-      QRDecompCL (MatT m)
-        : a_( m) { prepare_solve (); }
+      QRDecompCL (MatT m, bool assume_full_rank= true)
+        : a_( m) { prepare_solve ( assume_full_rank); }
 
     SMatrixCL<Rows_,Cols_>&       GetMatrix ()       { return a_; }
     const SMatrixCL<Rows_,Cols_>& GetMatrix () const { return a_; }
 
-    void prepare_solve (); ///< Computes the factorization.
+    ///\brief Computes the factorization. By default, Throws if the matrix is numerically ranc-deficient.
+    ///\return rank A < Rows_.
+    bool prepare_solve (bool assume_full_rank= true);
     ///@{ Call only after prepare_solve; solves are inplace. For least-squares, the first Cols_ entries are the least squares solution, the remaining components of b are the residual-vector.
     void Solve (SVectorCL<Rows_>& b) const;
     void Solve (size_t n, SVectorCL<Rows_>* b) const;
@@ -905,7 +907,13 @@ class QRDecompCL
     template <Uint Size>
     void Solve (SArrayCL<SVectorCL<Rows_>, Size>& b) const;
 
-    double Determinant_R () const; ///< Computes the determinant of R (stable). For Rows_ > Cols_, the determinant of the upper Cols_ x Cols_ block of R is returned.
+    ///@{ Apply (parts of) Q or Q^T
+    void apply_reflection  (Uint j, SVectorCL<Rows_>& b) const;
+    void apply_Q_transpose (SVectorCL<Rows_>& b) const;
+    void apply_Q           (SVectorCL<Rows_>& b) const;
+    ///@}
+    ///\brief Computes the determinant of R (stable). For Rows_ > Cols_, the determinant of the upper Cols_ x Cols_ block of R is returned.
+    double Determinant_R () const;
     ///@}
 
     ///@{ Serialize and Deserialize a QR decomposition
@@ -913,6 +921,35 @@ class QRDecompCL
     void Deserialize(const double*);
     ///@}
 };
+
+template <Uint Rows_, Uint Cols_>
+  inline void
+    QRDecompCL<Rows_, Cols_>::apply_reflection (Uint j, SVectorCL<Rows_>& b) const
+{
+    double sp= 0.;
+    for(Uint i= j; i < Rows_; ++i)
+        sp+= a_(i, j) * b[i];
+    sp*= beta_[j];
+    for(Uint i= j; i < Rows_; ++i)
+    b[i]+= a_(i, j)*sp;
+}
+
+template <Uint Rows_, Uint Cols_>
+  inline void
+    QRDecompCL<Rows_, Cols_>::apply_Q_transpose (SVectorCL<Rows_>& b) const
+{
+    for (Uint j= 0; j < Cols_; ++j)
+        apply_reflection( j, b);
+}
+
+template <Uint Rows_, Uint Cols_>
+  inline void
+    QRDecompCL<Rows_, Cols_>::apply_Q (SVectorCL<Rows_>& b) const
+{
+    // The Q_j are symmetric, so to transpose Q^T one just has to reverse the order of application.
+    for (Uint j= Cols_ - 1; j < Cols_; --j)
+        apply_reflection( j, b);
+}
 
 template <Uint Rows_, Uint Cols_>
   double
@@ -924,10 +961,9 @@ template <Uint Rows_, Uint Cols_>
     return tmp;
 }
 
-
 template <Uint Rows_, Uint Cols_>
-  void
-  QRDecompCL<Rows_, Cols_>::prepare_solve ()
+  bool
+  QRDecompCL<Rows_, Cols_>::prepare_solve (bool assume_full_rank)
 {
     // inplace Householder
     double sigma, sp;
@@ -935,8 +971,12 @@ template <Uint Rows_, Uint Cols_>
         sigma = 0.;
         for(Uint i= j; i < Rows_; ++i)
             sigma+= std::pow( a_(i, j), 2);
-        if(sigma == 0.)
-            throw DROPSErrCL( "QRDecompCL::prepare_solve: rank-deficient matrix\n");
+        if(sigma == 0.) {
+            if (assume_full_rank)
+                throw DROPSErrCL( "QRDecompCL::prepare_solve: rank-deficient matrix\n");
+            else
+                return true;
+        }
         d_[j]= (a_(j, j) < 0 ? 1. : -1.) * std::sqrt( sigma);
         beta_[j]= 1./(d_[j]*a_(j, j) - sigma);
         a_(j, j)-= d_[j];
@@ -949,6 +989,7 @@ template <Uint Rows_, Uint Cols_>
                 a_(i, k)+= a_(i, j)*sp;
         }
     }
+    return false;
 }
 
 template <Uint Rows_, Uint Cols_>
@@ -963,15 +1004,7 @@ template <Uint Rows_, Uint Cols_>
   void
   QRDecompCL<Rows_, Cols_>::Solve (SVectorCL<Rows_>& b) const
 {
-    double sp;
-    for(Uint j= 0; j < Cols_; ++j) { // Apply reflection in column j
-        sp= 0.;
-        for(Uint i= j; i < Rows_; ++i)
-            sp+= a_(i, j) * b[i];
-        sp*= beta_[j];
-        for(Uint i= j; i < Rows_; ++i)
-            b[i]+= a_(i, j)*sp;
-    }
+    apply_Q_transpose( b);
     for (Uint i= Cols_ - 1; i < Cols_; --i) { // backsolve
         for (Uint j= i + 1; j < Cols_; ++j)
             b[i]-= a_(i, j)*b[j];
@@ -998,22 +1031,22 @@ template <Uint Rows_, Uint Cols_>
 }
 
 /** Put the values of a_, d_ and beta_ in buffer. Note that buffer must be of size
-    (Rows_+2)*Cols_
+    (Rows_ + 2)*Cols_
  */
 template <Uint Rows_, Uint Cols_>
   void QRDecompCL<Rows_, Cols_>::Serialize(double* buffer) const
 {
     std::copy( a_.begin(), a_.end(), buffer);
-    std::copy( d_, d_+Cols_, buffer+a_.size());
-    std::copy( beta_, beta_+Cols_, buffer+a_.size()+Cols_);
+    std::copy( d_, d_ + Cols_, buffer + a_.size());
+    std::copy( beta_, beta_ + Cols_, buffer + a_.size() + Cols_);
 }
 
 template <Uint Rows_, Uint Cols_>
   void QRDecompCL<Rows_, Cols_>::Deserialize( const double* buffer)
 {
-    std::copy( buffer, buffer+a_.size(), a_.begin());
-    std::copy( buffer+a_.size(), buffer+a_.size()+Cols_, d_);
-    std::copy(buffer+a_.size()+Cols_, buffer+a_.size()+Cols_+Cols_, beta_);
+    std::copy( buffer, buffer + a_.size(), a_.begin());
+    std::copy( buffer + a_.size(), buffer + a_.size() + Cols_, d_);
+    std::copy( buffer + a_.size() + Cols_, buffer + a_.size() + 2*Cols_, beta_);
 }
 
 //**************************************************************************
