@@ -717,11 +717,22 @@ template<class T>
     );
 }
 
+template <Uint Dim, class VertexT, class RAIterT, class BaryT>
+  inline void
+  SetInterface (const VertexT* const facet, Uint NumNodes, RAIterT NodeInBody, const BaryT* const Node)
+{
+    for (Uint i= 0; i < NumNodes; ++i) { // NodeInTetra[i]= p*Node[i]
+        NodeInBody[i]= facet[0]*Node[i][0];
+        for (Uint j= 1; j < Dim; ++j)
+            NodeInBody[i]+= facet[j]*Node[i][j];
+    }
+}
 
 template <class RAIterT>
   inline void
   SetInterface (const BaryCoordCL*const p, Uint NumNodes, RAIterT NodeInTetra, const Point3DCL* const Node)
 {
+    /// \todo Benchmark: replace by call to SetInterface<3>( p, NumNodes, NodeInTetra, Node);
     for (Uint i= 0; i < NumNodes; ++i)
         NodeInTetra[i]= Node[i][0]*p[0] + Node[i][1]*p[1] + Node[i][2]*p[2];
 }

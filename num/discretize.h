@@ -749,10 +749,18 @@ DROPS_DEFINE_VALARRAY_DERIVATIVE(Quad5CL, T, base_type)
     inline T quadP2 (int i, double absdet) const;
 };
 
+/// Compute the coordinates of the NumNodes quadrature-points in Node
+/// (which are given in barycentric coordinates of the (Dim-1)-simplex facet)
+/// in the coordinates used in facet. The result is written to NodeInBody.
+template <Uint Dim, class VertexT, class RAIterT, class BaryT>
+  inline void
+  SetInterface (const VertexT* const facet, Uint NumNodes, RAIterT NodeInBody, const BaryT* const Node);
+
 /// Calculates the barycentric coordinates of the quadrature points in Node
 /// of the triangle given by p with respect to the
 /// tetrahedron and stores them in the NodesInTetra.
 /// RAIterT is a random-access-iterator to a sequence of BaryCoordCL
+/// This is a special case of the above function for Dim==3.
 template <class RAIterT>
 inline void SetInterface (const BaryCoordCL* const p, Uint NumNodes, RAIterT NodeInTetra, const Point3DCL* const Node);
 
