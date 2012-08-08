@@ -148,6 +148,20 @@ class TetraPartitionCL
 };
 
 
+class TetraCL; ///< forward declaration
+
+///\brief A spatial tetra and a time interval t0<t1.
+struct TetraPrismCL
+{
+    const TetraCL& t;
+    double t0,
+           t1;
+
+    TetraPrismCL (const TetraCL& targ, double t0arg, double t1arg)
+        : t( targ), t0( t0arg), t1( t1arg) {}
+};
+
+
 template <Uint Dim>
 struct DimensionTraitsCL
 {
@@ -156,7 +170,6 @@ struct DimensionTraitsCL
 template <>
 struct DimensionTraitsCL<3>
 {
-
     typedef LatticePartitionTypesNS::TriangleT               FacetT;
     typedef LatticePartitionTypesNS::TriangleContT           FacetContT;
     typedef LatticePartitionTypesNS::const_triangle_iterator const_facet_iterator;
@@ -170,12 +183,14 @@ struct DimensionTraitsCL<3>
 
     typedef RefPatchCL<3>         RefPatchT;
     typedef RefPatchCL<3>::FacetT RefPatchFacetT;
+
+    typedef Point3DCL WorldCoordT;
+    typedef TetraCL   WorldBodyT;
 };
 
 template <>
 struct DimensionTraitsCL<4>
 {
-
     typedef LatticePartitionTypesNS::TetraT               FacetT;
     typedef LatticePartitionTypesNS::TriangleContT        FacetContT;
     typedef LatticePartitionTypesNS::const_tetra_iterator const_facet_iterator;
@@ -189,6 +204,9 @@ struct DimensionTraitsCL<4>
 
     typedef RefPatchCL<4>         RefPatchT;
     typedef RefPatchCL<4>::FacetT RefPatchFacetT;
+
+    typedef Point4DCL    WorldCoordT;
+    typedef TetraPrismCL WorldBodyT;
 };
 
 template <Uint Dim>
