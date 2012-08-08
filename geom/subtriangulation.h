@@ -192,7 +192,7 @@ template <>
 struct DimensionTraitsCL<4>
 {
     typedef LatticePartitionTypesNS::TetraT               FacetT;
-    typedef LatticePartitionTypesNS::TriangleContT        FacetContT;
+    typedef LatticePartitionTypesNS::TetraContT           FacetContT;
     typedef LatticePartitionTypesNS::const_tetra_iterator const_facet_iterator;
 
     typedef STCoordCL                                        VertexT;
