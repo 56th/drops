@@ -51,7 +51,7 @@
             // -> Here: a = 1
         "Reaction":             "SUPG_Reaction",               //Reaction term [q] with the name "Example1_Reaction"
             // -> Here: q = 0
-        "Solution":             "SUPG_Solution",               //Solution of poisson problem [u] has the name "Example1_Solution"
+        "Solution":             "SUPG_tetraSolution",               //Solution of poisson problem [u] has the name "Example1_Solution"
         "Source":               "SUPG_Source",                 //Right hand side of PDE [f]
         "Flowfield":            "SUPG_Flowfield",              //Convection velocity of PDE [b]
         "InitialVal":           "Zero",                        //Initial value of the pde [u(t=0)]

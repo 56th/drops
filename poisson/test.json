@@ -1,7 +1,7 @@
 {
 	//#################################
 	//=============================================================
-	//    DROPS parameter file for cdrdrops.cpp
+	//    DROPS parameter file for ipfilm.cpp
 	//    simulation of poisson problem
 	//=============================================================
 	//poisson solver
@@ -18,13 +18,13 @@
 		"NumLvl":		    -1,
 		"Relax":		    1,
 		"SolutionIsKnown":	1, 	 //1 = true, 0 = false
-		"P1":               1        // 1 = P1 finite element, 0 = P2 finite element
+        "P1":               1        // 1 = P1 finite element, 0 = P2 finite element
 	},
 
 	// domain, bnd/ini conditions
 	"DomainCond":
 	{
-		"RefineSteps":	    4, 	 //initial refinement
+		"RefineSteps":	    5, 	 //initial refinement
 		"GeomType":		    1, 	 //specifies the used geometry (0=ReadMeshBuilder, 1=BrickBuilder, 2=CavityBuilder, 3=LBuilder, 4=BBuilder)
 		"InitialFile":		"none", 	 //file prefix when reading data for initial condition
 		"MeshFile":		    "1x0.2x0.2@5x1x1", 	 //mesh file (created by GAMBIT, FLUENT/UNS format) or dimensions of a cuboid (e.g. 2x3x4\@5x6x7)
@@ -34,34 +34,34 @@
 
 	"PoissonCoeff":
 	{
-		"Diffusion":		1.0e-3,
+		"Diffusion":		1.0,
 		"Reaction":		    "Zero",
-		"Solution":		    "ALEEx4_Solution",
-		"Source":	 	    "ALEEx4_Source",
-		"Flowfield":		"ALEEx4_Velocity",
-		"InitialVal":		"ALEEx4_Init",
+		"Solution":		    "Test_Solution",
+		"Source":	 	    "Test_Source",
+		"Flowfield":		"Test_Velocity",
+		"InitialVal":		"Test_Solution",
 		"Convection":       1
 	},
     
     "Stabilization":
     {
-        "SUPG":              1,
+        "SUPG":              0,
         "Magnitude":         1.0,
         "Grids":             1
     },
 
 	"ALE":
 	{
-		      "wavy":		1,                          //true =1; false =0;
-		 "Interface":		"ALEEx4_Interface"
+		      "wavy":		0,                          //true =1; false =0;
+		 "Interface":		"ALEEx2_Interface"
 	},
 
 	// time stepping
 	"Time":
 	{
-		"StepSize":		0.025, 	      //time step size
-		"NumSteps":		16, 	      //number of timesteps
-		"Theta":		1,
+		"StepSize":		0.4, 	      //time step size
+		"NumSteps":		1, 	      //number of timesteps
+		"Theta":		0.5,
 		"Scheme":		1  	          //1= theta scheme, 2=fractional step
 	},
 
@@ -101,9 +101,9 @@
 	//VTK output
 	"VTK":
 	{
-		"VTKOut":		1, 	 //VTK output
+		"VTKOut":		0, 	 //VTK output
 		"VTKDir":		"vtk", 	 //local directory for vtk files
-		"VTKName":		"ALE_303_RR2_", 	 //name of vtk files
+		"VTKName":		"ALE_303_RR4_", 	 //name of vtk files
 		"Binary":		0 	 //write out VTK files in binary format
 	}
 

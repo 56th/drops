@@ -18,7 +18,7 @@
             // many vectors to construct the new krylov space
         "RelativeErr":      0,      //use relative tolerances (otherwise absolute) 1 = true, 0 = false
         "Tol":              1e-10,  //(relative/absolute) tolerance of iterative method
-        "Method":           103,    //Methods describes Solver (first digit) + Preconditioner (last two digits)
+        "Method":           303,    //Methods describes Solver (first digit) + Preconditioner (last two digits)
             // First digit:
             //           1XX : Multigrid
             //           2XX : Prec. CG
@@ -71,7 +71,7 @@
     //###################################################
     "DomainCond":
     {
-        "RefineSteps":      0,
+        "RefineSteps":      2,
             //initial refinement: how often is the mesh refined
             // -> Here: two times refinement
         "GeomType":         1,

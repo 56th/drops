@@ -55,6 +55,7 @@ class PoissonCoeffCL
     static instat_scalar_fun_ptr InitialCondition;
     //solution
     static scalar_tetra_function Solution;
+    //static instat_scalar_fun_ptr Solution;
     //velocity
     static vector_tetra_function Vel;
     //Free interface function
@@ -79,6 +80,7 @@ class PoissonCoeffCL
         alpha = P.get<double>("PoissonCoeff.Diffusion");
         f = scatet[P.get<std::string>("PoissonCoeff.Source")];
         Solution = scatet[P.get<std::string>("PoissonCoeff.Solution")];
+        //Solution = scamp[P.get<std::string>("PoissonCoeff.Solution")];
         InitialCondition = scamap[P.get<std::string>("PoissonCoeff.InitialVal")];
         DROPS::VecTetMap & vectet = DROPS::VecTetMap::getInstance();
         Vel = vectet[P.get<std::string>("PoissonCoeff.Flowfield")];
