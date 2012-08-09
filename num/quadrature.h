@@ -244,9 +244,11 @@ inline const QuadDomain2DCL&
 make_CompositeQuad2Domain2D (QuadDomain2DCL& q, const SurfacePatchCL& p, const TetraCL& t);
 
 ///\brief Initialize q as a composite Quad5_2DDataCL-quadrature-rule.
-template <Uint Dim>
-inline const QuadDomainCodim1CL<Dim>&
-make_CompositeQuad5Domain2D (QuadDomainCodim1CL<Dim>& q, const SPatchCL<Dim>& p, const typename DimensionTraitsCL<Dim>::WorldBodyT& t);
+inline const QuadDomain2DCL&
+make_CompositeQuad5Domain2D (QuadDomain2DCL& q, const SurfacePatchCL& p, const TetraCL& t);
+
+inline const QuadDomainCodim1CL<4>&
+make_CompositeQuad5DomainSTCodim1 (QuadDomainCodim1CL<4>& q, const SPatchCL<4>& p, const TetraPrismCL& t);
 
 /// \brief Create an extrapolated quadrature rule.
 /// No sharing of quadrature points is performed.
