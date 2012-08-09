@@ -219,7 +219,8 @@ class PoissonP1CL : public ProblemCL<Coeff, PoissonBndDataCL>
     /// \brief check computed solution etc.
     double CheckSolution( const VecDescCL&, instat_scalar_fun_ptr, double t=0.) const;
     double CheckSolution( instat_scalar_fun_ptr Lsg, double t=0.) const { return CheckSolution(x, Lsg, t); }
-
+    double CheckSolution( const VecDescCL&, scalar_tetra_function, double t=0.) const;
+    
     void GetDiscError   ( const MLMatDescCL&, instat_scalar_fun_ptr, double =0.) const;
     void GetDiscError   ( instat_scalar_fun_ptr Lsg, double t=0.) const { GetDiscError(A, Lsg, t); }
 
@@ -290,6 +291,7 @@ class PoissonP2CL : public ProblemCL<Coeff, PoissonBndDataCL>
     // check computed solution, etc.
     double CheckSolution( const VecDescCL&, instat_scalar_fun_ptr, double t=0.) const;
     double CheckSolution( instat_scalar_fun_ptr Lsg, double t=0.) const { return CheckSolution(x, Lsg, t); }
+    double CheckSolution( const VecDescCL&, scalar_tetra_function, double t=0.) const;
 
     DiscSolCL GetSolution()
         { return DiscSolCL(&x, &GetBndData(), &GetMG()); }

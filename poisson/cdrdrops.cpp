@@ -81,7 +81,7 @@ namespace DROPS
 {
     
 template<class PoissonCL, class SolverT>
-void SolveStatProblem( PoissonCL& Poisson, SolverT& solver, ParamCL& P)
+void SolveStatProblem( PoissonCL& Poisson, SolverT& solver, ParamCL& Param)
 {
     // time measurements
 #ifndef _PAR
@@ -89,7 +89,7 @@ void SolveStatProblem( PoissonCL& Poisson, SolverT& solver, ParamCL& P)
     const bool doErrorEstimate= P.get<int>("Err.DoErrorEstimate");
 #else
     const bool doErrorEstimate= false;
-    if (P.get<int>("Err.DoErrorEstimate"))
+    if (Param.get<int>("Err.DoErrorEstimate"))
         std::cout << "Skipping Error-Estimation ..." << std::endl;
     ParTimerCL timer;
 #endif
@@ -103,7 +103,7 @@ void SolveStatProblem( PoissonCL& Poisson, SolverT& solver, ParamCL& P)
         std::cout << " o time " << timer.GetTime() << " s" << std::endl;
         
         //If we need to add convection
-        if(P.get<int>("PoissonCoeff.Convection"))
+        if(Param.get<int>("PoissonCoeff.Convection"))
         {
             std::cout << line << "Setup convection...\n";
             timer.Reset();
@@ -363,7 +363,7 @@ void Strategy(PoissonCL& Poisson)
             std::cout << line << "Step: " << step << std::endl;
             if(Poisson.ALE_)
             {
-                mg.GetMeshDeformation().SetMeshTransformation(PoissonCoeffCL::ALEDeform, Poisson.x.t, P.get<int>("ALE.OnlyBndCurved"), P.get<int>("ALE.P1", 0)==0 );   
+                mg.GetMeshDeformation().SetMeshTransformation(PoissonCoeffCL::ALEDeform, Poisson.x.t, P.get<int>("ALE.OnlyBndCurved"), P.get<int>("ALE.P1")==0 );   
                 //ALE.MovGrid(Poisson.x.t);
             }
             ThetaScheme.DoStep( Poisson.x);

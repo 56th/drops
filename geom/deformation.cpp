@@ -79,6 +79,7 @@ void MeshDeformationCL::SetMeshTransformation(instat_vector_fun_ptr f, const dou
             }
         }
     }
+    CheckForCurved();
 }
 
 
@@ -170,7 +171,7 @@ void MeshDeformationCL::SetEdgeDeformation(const EdgeCL& edge, const Point3DCL &
 }
 
 bool MeshDeformationCL::IsTetraCurved(const TetraCL& tet){
-    return tet_is_curved[&tet];
+     return tet_is_curved[&tet];
 }
 
 void MeshDeformationCL::Initialize( MultiGridCL* mg){
@@ -198,7 +199,8 @@ LocalP2CL<Point3DCL> MeshDeformationCL::GetLocalP2Deformation( const TetraCL& te
 }
 
 LocalP1CL<Point3DCL> MeshDeformationCL::GetLocalP1Deformation( const TetraCL& tet){
-    LocalP1CL<Point3DCL> ret;
+    return LocalP1CL<Point3DCL>(tet, *pointsol_, *bnd_);
+/*    LocalP1CL<Point3DCL> ret;
     const Uint pidx( mlidx_->GetIdx());
     for (Uint i = 0; i < 4; ++i)
     {
@@ -207,7 +209,7 @@ LocalP1CL<Point3DCL> MeshDeformationCL::GetLocalP1Deformation( const TetraCL& te
         for (Uint k = 0; k < 3; ++k)
             ret[i][k] = (*pointsol_).Data[v.Unknowns(pidx)+k];
     }
-    return ret;
+    return ret;*/
 }
 
 Point3DCL MeshDeformationCL::GetTransformedVertexCoord( const VertexCL &v)
