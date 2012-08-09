@@ -179,7 +179,7 @@ struct DimensionTraitsCL<3>
     typedef LatticePartitionTypesNS::const_vertex_iterator const_vertex_iterator;
 
     typedef PrincipalLatticeCL         LatticeT;
-    typedef PrincipalLatticeCL::TetraT LatticeSimplexT;
+    typedef PrincipalLatticeCL::TetraT LatticeBodyT;
 
     typedef RefPatchCL<3>         RefPatchT;
     typedef RefPatchCL<3>::FacetT RefPatchFacetT;
@@ -200,7 +200,7 @@ struct DimensionTraitsCL<4>
     typedef LatticePartitionTypesNS::const_stvertex_iterator const_vertex_iterator;
 
     typedef TetraPrismLatticeCL         LatticeT;
-    typedef TetraPrismLatticeCL::PentaT LatticeSimplexT;
+    typedef TetraPrismLatticeCL::PentaT LatticeBodyT;
 
     typedef RefPatchCL<4>         RefPatchT;
     typedef RefPatchCL<4>::FacetT RefPatchFacetT;
@@ -234,7 +234,7 @@ class SPatchCL
     typedef typename DimTraitsT::const_vertex_iterator const_vertex_iterator;
 
     typedef typename DimTraitsT::LatticeT        LatticeT;
-    typedef typename DimTraitsT::LatticeSimplexT LatticeSimplexT;
+    typedef typename DimTraitsT::LatticeBodyT LatticeBodyT;
 
     typedef typename DimTraitsT::RefPatchT      RefPatchT;
     typedef typename DimTraitsT::RefPatchFacetT RefPatchFacetT;
@@ -249,7 +249,7 @@ class SPatchCL
 
     template <template <Uint> class VertexCutMergingPolicyT>
       const FacetT ///< Create a single sub-facet and its vertexes
-      make_sub_facet (const RefPatchFacetT& ref_tri, const LatticeSimplexT& lattice_tet,
+      make_sub_facet (const RefPatchFacetT& ref_tri, const LatticeBodyT& lattice_tet,
         const LatticeT& lattice, const double lset[Dim],
         std::vector<Uint>& copied_vertexes, std::vector<RenumberVertexPairT>& renumber_zero_verts,
         VertexCutMergingPolicyT<Dim>& edgecut);

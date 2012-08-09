@@ -51,8 +51,11 @@ copy_levelset_sign (const std::valarray<double>& src, std::valarray<byte>& dst)
 ///\brief Copies the level set values and the corresponding signs from the global vectors to an array specific to the given lattice-tetra
 template <Uint Dim>
 inline void
-copy_local_level_set_values( const std::valarray<double>& ls, const std::valarray<byte>& ls_sign, const PrincipalLatticeCL::TetraT& lattice_tet,
-    double loc_ls[Dim + 1], byte loc_ls_sign[Dim + 1])
+copy_local_level_set_values (const std::valarray<double>& ls,
+                             const std::valarray<byte>&   ls_sign,
+                             const typename DimensionTraitsCL<Dim>::LatticeBodyT& lattice_tet,
+                             double loc_ls[Dim + 1],
+                             byte   loc_ls_sign[Dim + 1])
 {
     for (Uint i= 0; i < Dim + 1; ++i) {
         loc_ls_sign[i]= ls_sign[lattice_tet[i]];
@@ -119,7 +122,7 @@ template <class VertexPartitionPolicyT,
 template <Uint Dim>
 template <template <Uint> class VertexCutMergingPolicyT>
   const typename SPatchCL<Dim>::FacetT
-  SPatchCL<Dim>::make_sub_facet (const RefPatchFacetT& ref_tri, const LatticeSimplexT& lattice_tet,
+  SPatchCL<Dim>::make_sub_facet (const RefPatchFacetT& ref_tri, const LatticeBodyT& lattice_tet,
     const LatticeT& lattice, const double lset[Dim+1],
     std::vector<Uint>& copied_vertexes, std::vector<RenumberVertexPairT>& zero_vertex_uses,
     VertexCutMergingPolicyT<Dim>& edgecut)
