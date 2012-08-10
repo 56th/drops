@@ -278,17 +278,22 @@ codim1_absdet (const TetraCL& t, const BaryCoordCL face_vert[3])
                       GetWorldCoord( t, face_vert[2]) - f0);
 }
 
+
+inline Point4DCL GetWorldCoord (const TetraPrismCL& p, const STCoordCL& c)
+{
+    const Point3DCL& x= GetWorldCoord( p.t, c.x_bary);
+    return MakePoint4D( x[0], x[1], x[2], (1. - c.t_ref)*p.t0 + c.t_ref*p.t1);
+}
+
 inline double
 codim1_absdet (const TetraPrismCL& prism, const STCoordCL face_vert[4])
 {
-    const double dt= prism.t1 - prism.t0;
     QRDecompCL<4,3> qr;
     SMatrixCL<4,3>& M= qr.GetMatrix();
-    const Point3DCL&   v0= GetWorldCoord( prism.t, BaryCoordCL( face_vert[0].begin()));
-    for (Uint i= 1; i < 4; ++i) {
-        const Point3DCL&   e= GetWorldCoord( prism.t, BaryCoordCL( face_vert[i].begin())) - v0;
-        M.col( i - 1, MakePoint4D( e[0], e[1], e[2], dt*(face_vert[i][4] - face_vert[0][4])));
-    }
+    const Point4DCL& v0= GetWorldCoord( prism, face_vert[0]);
+    for (Uint i= 1; i < 4; ++i)
+        M.col( i - 1, GetWorldCoord( prism, face_vert[i]) - v0);
+
     const bool is_rank_deficient= qr.prepare_solve( /*assume_full_rank*/ false);
     return !is_rank_deficient ? std::fabs( qr.Determinant_R()) : 0.;
 }

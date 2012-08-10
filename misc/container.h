@@ -95,8 +95,6 @@ typedef SVectorCL<4> BaryCoordCL;
 /// Stores 4D coordinates
 typedef SVectorCL<4> Point4DCL;
 
-/// By convention x[0]..x[3] are barycentric coordinates with respect to a tetra; x[4] is a time with respect to the (reference-) interval (0, 1);
-typedef SVectorCL<5> STCoordCL;
 
 enum InitStateT { Uninitialized, Initialized };
 
@@ -481,12 +479,54 @@ inline SVectorCL<_Size> std_basis(Uint i)
     return ret;
 }
 
+/// By convention x_bary are barycentric coordinates with respect to a tetra; t_bary is a time in the (reference-) interval (0, 1);
+struct STCoordCL
+{
+    BaryCoordCL x_bary;
+    double      t_ref;
+
+    STCoordCL () : x_bary(), t_ref( 0.) {} ///< Default init to 0.
+    STCoordCL (const BaryCoordCL& b, double t)
+        : x_bary( b), t_ref( t) {}
+
+    STCoordCL& operator+= (const STCoordCL& v);
+};
+
+inline STCoordCL& STCoordCL::operator+= (const STCoordCL& v)
+{
+    x_bary+= v.x_bary;
+    t_ref += v.t_ref;
+    return *this;
+}
+
+inline STCoordCL operator+(const STCoordCL& v1,
+                           const STCoordCL& v2)
+{
+    return STCoordCL( v1.x_bary + v2.x_bary, v1.t_ref + v2.t_ref);
+}
+
+inline STCoordCL operator*(double d, const STCoordCL& v)
+{
+    return STCoordCL( d*v.x_bary, d*v.t_ref);
+}
+
+inline STCoordCL operator*(const STCoordCL& v, double d)
+{
+    return STCoordCL( d*v.x_bary, d*v.t_ref);
+}
+
+inline STCoordCL ConvexComb (double a,
+                               const STCoordCL& v1,
+                               const STCoordCL& v2)
+{
+    return STCoordCL( ConvexComb( a, v1.x_bary, v2.x_bary), (1.0-a)*v1.t_ref + a*v2.t_ref);
+}
+
 inline STCoordCL MakeSTCoord (const BaryCoordCL& b, double t)
 {
-    STCoordCL ret( b.begin(), b.end()); // sets the first four components
-    ret[4]= t;
-    return ret;
+    return STCoordCL( b, t);
 }
+
 
 inline BaryCoordCL
 MakeBaryCoord(double a, double b, double c, double d)
