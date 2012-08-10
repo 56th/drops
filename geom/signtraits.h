@@ -71,7 +71,6 @@ class SignTraitsCL
     }
 
   private:
-
     Ubyte num_root_vert_; ///< number of vertices, where the level set function is zero.
     Ubyte num_root_;      ///< number of roots of the level set function; invariant: num_root_vert <= num_root <= max_num_root.
     byte sign_[NumVerts]; ///< Sign of the level set function of the vertices; \f$\in\{-1,0,1\}\f$
