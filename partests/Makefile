@@ -4,7 +4,7 @@
 
 # variables:
 
-DIR = parpartests
+DIR = partests
 
 DELETE = $(EXEC) *.out *.diff *.off *.mg *.dat
 CPP = $(wildcard *.cpp)
