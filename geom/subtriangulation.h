@@ -270,7 +270,7 @@ class SPatchCL
     Uint facet_size  () const ///< number of triangles
          { return facets_.size(); }
     Uint vertex_size () const ///< number of vertexes
-         { return facets_.size(); }
+         { return vertexes_.size(); }
 
     /// Random-access to the tetras and vertices.
     ///@{
