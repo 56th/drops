@@ -160,7 +160,8 @@ downwind: \
 quad5_2D: \
     ../tests/quad5_2D.o ../misc/utils.o ../geom/builder.o ../geom/simplex.o ../geom/multigrid.o \
     ../geom/boundary.o ../geom/topo.o ../num/unknowns.o ../misc/problem.o \
-    ../num/fe.o ../num/discretize.o ../num/interfacePatch.o
+    ../num/fe.o ../num/discretize.o ../num/interfacePatch.o ../geom/reftetracut.o \
+    ../geom/subtriangulation.o ../num/quadrature.o ../geom/principallattice.o
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 interfaceP1FE: \
