@@ -527,6 +527,10 @@ inline STCoordCL MakeSTCoord (const BaryCoordCL& b, double t)
     return STCoordCL( b, t);
 }
 
+inline std::ostream& operator<< (std::ostream& os, const STCoordCL& st)
+{
+    return os << st.x_bary << st.t_ref;
+}
 
 inline BaryCoordCL
 MakeBaryCoord(double a, double b, double c, double d)
