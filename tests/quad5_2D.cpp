@@ -150,8 +150,7 @@ class STCoord2WorldCoordCL
     }
 };
 
-///\brief Evaluates a function expecting world-coordinates and time as arguments in barycentric coordinates on a tetra.
-/// This gives the function the interface of the LocalFE-classes.
+///\brief Evaluates a function expecting world-coordinates and time as arguments in STCoord-coordinates on a tetra-prism.
 template <class T= double>
 class STCoordEvalCL
 {
@@ -175,6 +174,15 @@ template <class T, class DomainT, class ResultIterT>
   evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const TetraPrismCL& prism, const DomainT& dom, ResultIterT result_iterator)
 {
     return std::transform( dom.vertex_begin(), dom.vertex_end(), result_iterator, STCoordEvalCL<T>( prism, f));
+}
+
+template <class T, class DomainT, class ResultContT>
+  inline const ResultContT&
+  resize_and_evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const TetraPrismCL& prism, const DomainT& dom, ResultContT& result_container)
+{
+    result_container.resize( dom.vertex_size());
+    evaluate_on_vertexes( f, prism, dom, sequence_begin( result_container));
+    return result_container;
 }
 
 template <DROPS::Uint Dim>
