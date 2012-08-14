@@ -53,6 +53,44 @@ template <class ResultContainerT>
     }
 }
 
+template <class ResultContainerT>
+  void
+  resize_and_evaluate_piecewise_normal (const SPatchCL<4>& p, const TetraPrismCL& prism, ResultContainerT& n, std::valarray<double>* absdet)
+{
+    n.resize( p.facet_size());
+    if (absdet)
+        absdet->resize( p.facet_size());
+
+    const typename SPatchCL<4>::const_vertex_iterator verts= p.vertex_begin();
+    typename SequenceTraitCL<ResultContainerT>::iterator n_it= sequence_begin( n);
+    double* a_it= absdet ? Addr( *absdet) : 0;
+
+    QRDecompCL<4,3> qr;
+    SMatrixCL<4,3>& M= qr.GetMatrix();
+    Point4DCL tmp( Uninitialized);
+    double tmp_norm;
+    for (SPatchCL<4>::const_facet_iterator it= p.facet_begin(); it != p.facet_end(); ++it) {
+        const Point4DCL& v0= GetWorldCoord( prism, verts[(*it)[0]]);
+        for (Uint i= 1; i < 4; ++i)
+            M.col( i - 1, GetWorldCoord( prism, verts[(*it)[i]]) - v0);
+        const bool is_rank_deficient= qr.prepare_solve( /*assume_full_rank*/ false);
+        tmp= 0.;
+        if (is_rank_deficient) {
+            *n_it++= tmp;
+            if (absdet)
+                a_it++= 0.;
+        }
+        else {
+            tmp[3]= 1.;
+            qr.apply_Q( tmp);
+            tmp_norm= tmp.norm();
+            *n_it++= tmp/tmp_norm;
+            if (absdet)
+                *a_it++= tmp_norm;
+        }
+    }
+}
+
 template <class DiscVelSolT>
 void InterfaceConvectionAccuP1CL<DiscVelSolT>::setup_local_matrix (const TetraCL& t)
 {
