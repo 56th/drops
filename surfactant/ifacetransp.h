@@ -112,8 +112,11 @@ class InterfaceCommonDataP1CL : public TetraAccumulatorCL
         delete[] the_clones;
     }
     virtual void visit (const TetraCL& t) {
+        surf.clear();
         locp2_ls.assign( t, *ls, *lsetbnd);
         evaluate_on_vertexes( locp2_ls, lat, Addr( ls_loc));
+        if (equal_signs( ls_loc))
+            return;
         surf.make_patch<MergeCutPolicyCL>( lat, ls_loc);
     }
     virtual InterfaceCommonDataP1CL* clone (int clone_id) {
