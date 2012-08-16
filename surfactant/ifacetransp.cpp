@@ -103,53 +103,43 @@ void SetupLBP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls, cons
     // WriteToFile( mat->Data, "lb.txt", "lb");
 }
 
-void SetupInterfaceRhsP1OnTriangle (const LocalP1CL<> p1[4],
-    Quad5_2DCL<> q[4],VectorCL& v, const IdxT Numb[4],
-    const TetraCL& t, const BaryCoordCL triangle[3], double det,
-    instat_scalar_fun_ptr f, double time)
-{
-    for (int i= 0; i < 4; ++i)
-        q[i].assign( p1[i], triangle);
-    Quad5_2DCL<> qf( t, triangle, f, time), r;
-
-    for (int i= 0; i < 4; ++i) {
-        if (Numb[i] == NoIdx) continue;
-        r= qf*q[i];
-        v[Numb[i]]+= r.quad( det);
-    }
-}
-
 void SetupInterfaceRhsP1 (const MultiGridCL& mg, VecDescCL* v,
     const VecDescCL& ls, const BndDataCL<>& lsetbnd, instat_scalar_fun_ptr f)
 {
-    const IdxT num_unks= v->RowIdx->NumUnknowns();
-    const Uint lvl = v->GetLevel();
-    const double t= v->t;
+    std::cout << "entering SetupInterfaceRhsP1: " << v->RowIdx->NumUnknowns() << " dof... ";
 
+    const PrincipalLatticeCL& lat= PrincipalLatticeCL::instance( 2);
+    LocalP2CL<> locp2_ls;
+    std::valarray<double> ls_loc( lat.vertex_size());
+    SurfacePatchCL surf;
+    QuadDomain2DCL qdom;
     IdxT num[4];
-
-    std::cout << "entering SetupInterfaceRhsP1: " << num_unks << " dof... ";
 
     LocalP1CL<> p1[4];
     p1[0][0]= p1[1][1]= p1[2][2]= p1[3][3]= 1.; // P1-Basis-Functions
-    Quad5_2DCL<double> q[4], m;
+    std::valarray<double> qp1,
+                          qf;
 
-    InterfaceTriangleCL triangle;
+    DROPS_FOR_TRIANG_CONST_TETRA( mg, v->GetLevel(), it) {
+        locp2_ls.assign( *it, ls, lsetbnd);
+        evaluate_on_vertexes( locp2_ls, lat, Addr( ls_loc));
+        if (equal_signs( ls_loc))
+            continue;
 
-    DROPS_FOR_TRIANG_CONST_TETRA( mg, lvl, it) {
-        triangle.Init( *it, ls, lsetbnd);
-        if (triangle.Intersects()) { // We are at the phase boundary.
-            GetLocalNumbP1NoBnd( num, *it, *v->RowIdx);
-
-            for (int ch= 0; ch < 8; ++ch) {
-                triangle.ComputeForChild( ch);
-                for (int tri= 0; tri < triangle.GetNumTriangles(); ++tri)
-                    SetupInterfaceRhsP1OnTriangle( p1, q, v->Data, num,
-                        *it, &triangle.GetBary( tri), triangle.GetAbsDet( tri), f, t);
+        GetLocalNumbP1NoBnd( num, *it, *v->RowIdx);
+        surf.make_patch<MergeCutPolicyCL>( lat, ls_loc);
+        make_CompositeQuad5Domain2D ( qdom, surf, *it);
+        resize_and_evaluate_on_vertexes( f, *it, qdom, v->t, qf);
+        qp1.resize( qdom.vertex_size());
+        for (Uint i= 0; i < 4; ++i)
+            if (num[i] != NoIdx) {
+                evaluate_on_vertexes( p1[i], qdom, Addr( qp1));
+                v->Data[num[i]]+= quad_2D( qf*qp1, qdom);
             }
-        }
     }
     std::cout << " Rhs set up." << std::endl;
+
+    // WriteToFile( v->Data, "rhs.txt", "Rhs");
 }
 
 /// \todo This should be a generic function somewhere in num or misc.
