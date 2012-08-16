@@ -219,27 +219,21 @@ double L2_error (const DROPS::VecDescCL& ls, const BndDataCL<>& lsbnd,
     return std::sqrt( d);
 }
 
+/// The nodal interpolant of extsol on the interface-FE-space ist computed first.
+/// The H1-error is then computed between the interpolant and the numerical solution.
 template<class DiscP1FunType>
 double H1_error (const DROPS::VecDescCL& ls, const BndDataCL<>& lsbnd,
     const DiscP1FunType& discsol, DROPS::instat_scalar_fun_ptr extsol)
 {
-
-return 0.;
-
-    const PrincipalLatticeCL& lat= PrincipalLatticeCL::instance( 2);
-    const double t= discsol.GetTime();
-    QuadDomain2DCL qdom;
-    std::valarray<double> qsol,
-                          qdiscsol;
-
-    double d( 0.);
-    DROPS_FOR_TRIANG_CONST_TETRA( discsol.GetMG(), ls.GetLevel(), it) {
-        make_CompositeQuad5Domain2D (qdom, *it, lat, ls, lsbnd);
-        resize_and_evaluate_on_vertexes ( discsol, *it, qdom, qdiscsol);
-        resize_and_evaluate_on_vertexes ( extsol,  *it, qdom, t, qsol);
-        d+= quad_2D( std::pow( qdiscsol - qsol, 2), qdom);
-    }
-    return std::sqrt( d);
+    IdxDescCL* idx= const_cast<IdxDescCL*>( discsol.GetSolution()->RowIdx);
+    MatDescCL A( idx, idx);
+    SetupLBP1( discsol.GetMG(), &A, ls, lsbnd, 1.);
+    VecDescCL sol_vec( idx);
+    P1Init (extsol, sol_vec, discsol.GetMG(), discsol.GetTime());
+    // sol_vec.t= discsol.GetTime();
+    // SetupInterfaceRhsP1( discsol.GetMG(), &sol_vec, ls, lsbnd, extsol);
+    const VectorCL diff( discsol.GetSolution()->Data - sol_vec.Data);
+    return std::sqrt( dot(A.Data*diff, diff));
 }
 
 double L2_norm (const DROPS::MultiGridCL& mg, const DROPS::VecDescCL& ls, const BndDataCL<>& lsbnd,
