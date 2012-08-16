@@ -77,6 +77,22 @@ double sol0t (const DROPS::Point3DCL& p, double t)
     return q.norm_sq()/(12. + q.norm_sq())*val;
 }
 
+/// \brief Short-hand for simple loops over the interface.
+/// \param t  - Reference to a tetra
+/// \param ls - Levelset-reference: Something that can be handed to InterfacePatchCL::Init as 2nd argument.
+/// \param bnd  - ???
+/// \param p  - The InterfacePatchCL that should be used.
+/// \param n  - Name of the integer to reference the interface-triangles
+#define DROPS_FOR_TETRA_INTERFACE_BEGIN( t, ls, bnd, p, n) \
+    (p).Init( (t), (ls), (bnd)); \
+    if ((p).Intersects()) { /*We are at the phase boundary.*/ \
+        for (int ch__= 0; ch__ < 8; ++ch__) { \
+            (p).ComputeForChild( ch__); \
+            for (int n= 0; n < (p).GetNumTriangles(); ++n) \
+
+#define DROPS_FOR_TETRA_INTERFACE_END }}
+
+
 template <typename DiscP1FunT>
 double Integral_Gamma (const DROPS::MultiGridCL& mg, const DROPS::VecDescCL& ls, const DROPS::BndDataCL<>& lsbnd,
     const DiscP1FunT& discsol)

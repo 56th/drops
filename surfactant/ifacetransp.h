@@ -307,66 +307,38 @@ class LocalInterfaceMassDivP1CL
 void SetupInterfaceRhsP1 (const MultiGridCL& mg, VecDescCL* v,
     const VecDescCL& ls, const BndDataCL<>& lsbnd, instat_scalar_fun_ptr f);
 
-/// \brief Short-hand for simple loops over the interface.
-/// \param t  - Reference to a tetra
-/// \param ls - Levelset-reference: Something that can be handed to InterfacePatchCL::Init as 2nd argument.
-/// \param bnd  - ???
-/// \param p  - The InterfacePatchCL that should be used.
-/// \param n  - Name of the integer to reference the interface-triangles
-#define DROPS_FOR_TETRA_INTERFACE_BEGIN( t, ls, bnd, p, n) \
-    (p).Init( (t), (ls), (bnd)); \
-    if ((p).Intersects()) { /*We are at the phase boundary.*/ \
-        for (int ch__= 0; ch__ < 8; ++ch__) { \
-            (p).ComputeForChild( ch__); \
-            for (int n= 0; n < (p).GetNumTriangles(); ++n) \
 
-#define DROPS_FOR_TETRA_INTERFACE_END }}
-
-#define DROPS_FOR_TETRA_INTERFACE_COARSE_BEGIN( t, ls, bnd, p, n) \
-    (p).Init( (t), (ls), (bnd)); \
-    if ((p).IntersectsChild( 8)) { /*We are at the phase boundary.*/ \
-        (p).ComputeForChild( 8); \
-        for (int n= 0; n < (p).GetNumTriangles(); ++n) \
-
-#define DROPS_FOR_TETRA_INTERFACE_COARSE_END }
-
+///\brief Initialize the QuadDomain2DCL-object qdom for quadratue with Quad5_2DCL on the lattice lat of t, given the level set in ls and bnd.
+inline const QuadDomain2DCL&
+make_CompositeQuad5Domain2D (QuadDomain2DCL& qdom, const TetraCL& t, const PrincipalLatticeCL& lat, const DROPS::VecDescCL& ls, const DROPS::BndDataCL<>& bnd)
+{
+    LocalP2CL<> locp2_ls( t, ls, bnd);
+    std::valarray<double> ls_loc( lat.vertex_size());
+    evaluate_on_vertexes( locp2_ls, lat, Addr( ls_loc));
+    if (equal_signs( ls_loc)) {
+        qdom.clear();
+        return qdom;
+    }
+    SurfacePatchCL surf;
+    surf.make_patch<MergeCutPolicyCL>( lat, ls_loc);
+    return make_CompositeQuad5Domain2D ( qdom, surf, t);
+}
 
 /// \brief Short-hand for integral on the interface.
 template <typename DiscP1FunT>
 double Integral_Gamma (const DROPS::MultiGridCL& mg, const DROPS::VecDescCL& ls, const DROPS::BndDataCL<>& bnd,
-    const DiscP1FunT& discsol)
+    const DiscP1FunT& discsol, Uint lattice_num_intervals= 2)
 {
-    double d( 0.);
     const DROPS::Uint lvl = ls.GetLevel();
-    DROPS::InterfaceTriangleCL triangle;
-    DROPS::Quad5_2DCL<> qdiscsol;
+    const PrincipalLatticeCL& lat= PrincipalLatticeCL::instance( lattice_num_intervals);
 
-    DROPS_FOR_TRIANG_CONST_TETRA( mg, lvl, it) {
-        DROPS_FOR_TETRA_INTERFACE_BEGIN( *it, ls, bnd, triangle, tri) {
-            qdiscsol.assign(  *it, &triangle.GetBary( tri), discsol);
-            d+= qdiscsol.quad( triangle.GetAbsDet( tri));
-        }
-        DROPS_FOR_TETRA_INTERFACE_END
-    }
-    return d;
-}
-
-/// \brief Short-hand for integral on the interface, computed on the coarse interface.
-template <typename DiscP1FunT>
-double Integral_Gamma_Coarse (const DROPS::MultiGridCL& mg, const DROPS::VecDescCL& ls, const DROPS::BndDataCL<>& bnd,
-    const DiscP1FunT& discsol)
-{
+    std::valarray<double> q;
+    QuadDomain2DCL qdom;
     double d( 0.);
-    const DROPS::Uint lvl = ls.GetLevel();
-    DROPS::InterfaceTriangleCL triangle;
-    DROPS::Quad5_2DCL<> qdiscsol;
-
     DROPS_FOR_TRIANG_CONST_TETRA( mg, lvl, it) {
-        DROPS_FOR_TETRA_INTERFACE_COARSE_BEGIN( *it, ls, bnd, triangle, tri) {
-            qdiscsol.assign(  *it, &triangle.GetBary( tri), discsol);
-            d+= qdiscsol.quad( triangle.GetAbsDet( tri));
-        }
-        DROPS_FOR_TETRA_INTERFACE_COARSE_END
+        make_CompositeQuad5Domain2D( qdom, *it, lat, ls, bnd);
+        resize_and_evaluate_on_vertexes( discsol, *it, qdom, q);
+        d+= quad_2D( q, qdom);
     }
     return d;
 }
@@ -376,7 +348,7 @@ template <typename DiscP1FunT>
 double Integral_Gamma_Extrapolate (const DROPS::MultiGridCL& mg, const DROPS::VecDescCL& ls, const DROPS::BndDataCL<>& bnd,
     const DiscP1FunT& discsol)
 {
-    return (4.*Integral_Gamma( mg, ls, bnd,discsol) - Integral_Gamma_Coarse( mg, ls, bnd,discsol))/3.;
+    return (4.*Integral_Gamma( mg, ls, bnd, discsol, 2) - Integral_Gamma_Coarse( mg, ls, bnd, discsol, 1))/3.;
 }
 
 

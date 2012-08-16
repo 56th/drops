@@ -203,25 +203,18 @@ template<class DiscP1FunType>
 double L2_error (const DROPS::VecDescCL& ls, const BndDataCL<>& lsbnd,
     const DiscP1FunType& discsol, DROPS::instat_scalar_fun_ptr extsol)
 {
-    double d( 0.);
-    const DROPS::Uint lvl = ls.GetLevel();
+    const PrincipalLatticeCL& lat= PrincipalLatticeCL::instance( 2);
     const double t= discsol.GetTime();
-    const DROPS::MultiGridCL& mg= discsol.GetMG();
-    DROPS::InterfaceTriangleCL triangle;
-    DROPS::Quad5_2DCL<> qsol, qdiscsol;
+    QuadDomain2DCL qdom;
+    std::valarray<double> qsol,
+                          qdiscsol;
 
-    DROPS_FOR_TRIANG_CONST_TETRA( mg, lvl, it) {
-        triangle.Init( *it, ls, lsbnd);
-        if (triangle.Intersects()) { // We are at the phase boundary.
-            for (int ch= 0; ch < 8; ++ch) {
-                triangle.ComputeForChild( ch);
-                for (int tri= 0; tri < triangle.GetNumTriangles(); ++tri) {
-                    qsol.assign( *it, &triangle.GetBary( tri), extsol, t);
-                    qdiscsol.assign(  *it, &triangle.GetBary( tri), discsol);
-                    d+= DROPS::Quad5_2DCL<>( std::pow( qdiscsol - qsol, 2)).quad( triangle.GetAbsDet( tri));
-                }
-            }
-        }
+    double d( 0.);
+    DROPS_FOR_TRIANG_CONST_TETRA( discsol.GetMG(), ls.GetLevel(), it) {
+        make_CompositeQuad5Domain2D (qdom, *it, lat, ls, lsbnd);
+        resize_and_evaluate_on_vertexes ( discsol, *it, qdom, qdiscsol);
+        resize_and_evaluate_on_vertexes ( extsol,  *it, qdom, t, qsol);
+        d+= quad_2D( std::pow( qdiscsol - qsol, 2), qdom);
     }
     return std::sqrt( d);
 }
@@ -233,50 +226,35 @@ double H1_error (const DROPS::VecDescCL& ls, const BndDataCL<>& lsbnd,
 
 return 0.;
 
-    double d( 0.);
-    const DROPS::Uint lvl = ls.GetLevel();
+    const PrincipalLatticeCL& lat= PrincipalLatticeCL::instance( 2);
     const double t= discsol.GetTime();
-    const DROPS::MultiGridCL& mg= discsol.GetMG();
-    DROPS::InterfaceTriangleCL triangle;
-    DROPS::Quad5_2DCL<> qsol, qdiscsol;
+    QuadDomain2DCL qdom;
+    std::valarray<double> qsol,
+                          qdiscsol;
 
-    DROPS_FOR_TRIANG_CONST_TETRA( mg, lvl, it) {
-        triangle.Init( *it, ls, lsbnd);
-        if (triangle.Intersects()) { // We are at the phase boundary.
-            for (int ch= 0; ch < 8; ++ch) {
-                triangle.ComputeForChild( ch);
-                for (int tri= 0; tri < triangle.GetNumTriangles(); ++tri) {
-                    qsol.assign( *it, &triangle.GetBary( tri), extsol, t);
-                    qdiscsol.assign(  *it, &triangle.GetBary( tri), discsol);
-                    d+= DROPS::Quad5_2DCL<>( std::pow( qdiscsol - qsol, 2)).quad( triangle.GetAbsDet( tri));
-                }
-            }
-        }
+    double d( 0.);
+    DROPS_FOR_TRIANG_CONST_TETRA( discsol.GetMG(), ls.GetLevel(), it) {
+        make_CompositeQuad5Domain2D (qdom, *it, lat, ls, lsbnd);
+        resize_and_evaluate_on_vertexes ( discsol, *it, qdom, qdiscsol);
+        resize_and_evaluate_on_vertexes ( extsol,  *it, qdom, t, qsol);
+        d+= quad_2D( std::pow( qdiscsol - qsol, 2), qdom);
     }
     return std::sqrt( d);
-
 }
 
 double L2_norm (const DROPS::MultiGridCL& mg, const DROPS::VecDescCL& ls, const BndDataCL<>& lsbnd,
     DROPS::instat_scalar_fun_ptr extsol)
 {
-    double d( 0.);
-    const DROPS::Uint lvl= ls.GetLevel();
-    const double        t= ls.t;
-    DROPS::InterfaceTriangleCL triangle;
-    DROPS::Quad5_2DCL<> qsol;
+    const PrincipalLatticeCL& lat= PrincipalLatticeCL::instance( 2);
+    const double t= ls.t;
+    QuadDomain2DCL qdom;
+    std::valarray<double> qsol;
 
-    DROPS_FOR_TRIANG_CONST_TETRA( mg, lvl, it) {
-        triangle.Init( *it, ls, lsbnd);
-        if (triangle.Intersects()) { // We are at the phase boundary.
-            for (int ch= 0; ch < 8; ++ch) {
-                triangle.ComputeForChild( ch);
-                for (int tri= 0; tri < triangle.GetNumTriangles(); ++tri) {
-                    qsol.assign( *it, &triangle.GetBary( tri), extsol, t);
-                    d+= DROPS::Quad5_2DCL<>( qsol*qsol).quad( triangle.GetAbsDet( tri));
-                }
-            }
-        }
+    double d( 0.);
+    DROPS_FOR_TRIANG_CONST_TETRA( mg, ls.GetLevel(), it) {
+        make_CompositeQuad5Domain2D (qdom, *it, lat, ls, lsbnd);
+        resize_and_evaluate_on_vertexes ( extsol,  *it, qdom, t, qsol);
+        d+= quad_2D( qsol*qsol, qdom);
     }
     return std::sqrt( d);
 }
