@@ -154,13 +154,20 @@ template <template <Uint> class VertexCutMergingPolicyT>
 }
 
 template <Uint Dim>
-template <template <Uint> class VertexCutMergingPolicyT>
   void
-  SPatchCL<Dim>::make_patch (const LatticeT& lat, const std::valarray<double>& ls)
+  SPatchCL<Dim>::clear ()
 {
     facets_.clear();
     is_boundary_facet_.clear();
     vertexes_.clear();
+}
+
+template <Uint Dim>
+template <template <Uint> class VertexCutMergingPolicyT>
+  void
+  SPatchCL<Dim>::make_patch (const LatticeT& lat, const std::valarray<double>& ls)
+{
+    this->clear();
 
     std::valarray<byte> ls_sign;
     copy_levelset_sign( ls, ls_sign);

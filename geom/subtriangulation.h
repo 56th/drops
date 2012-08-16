@@ -271,6 +271,8 @@ class SPatchCL
          { return facets_.size(); }
     Uint vertex_size () const ///< number of vertexes
          { return vertexes_.size(); }
+    bool empty () const { return facets_.empty(); } ///< True, iff there is no surface patch
+    void clear (); ///< reset to empty default-state
 
     /// Random-access to the tetras and vertices.
     ///@{
