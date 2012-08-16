@@ -308,6 +308,9 @@ class QuadDomainCodim1CL
     /// \brief copy assignment: resize the valarray for weights to make it behave like a container
     QuadDomainCodim1CL& operator= (const QuadDomainCodim1CL&);
 
+    bool empty () const { return vertexes_.empty(); } ///< True, iff there are no quadrature-points
+    void clear () { vertexes_.clear(); weights_.resize( 0); } ///< reset to empty default-state
+
     /// \brief sequence of the indices of the vertexes (quadrature points)
     ///@{
     Uint dof_begin () const { return 0; }
