@@ -142,13 +142,12 @@ void SetupInterfaceRhsP1 (const MultiGridCL& mg, VecDescCL* v,
     // WriteToFile( v->Data, "rhs.txt", "Rhs");
 }
 
-/// \todo This should be a generic function somewhere in num or misc.
-void P1Init (instat_scalar_fun_ptr icf, VecDescCL& ic, MultiGridCL& mg, double t)
+void P1Init (instat_scalar_fun_ptr icf, VecDescCL& ic, const MultiGridCL& mg, double t)
 {
     const Uint lvl= ic.GetLevel(),
                idx= ic.RowIdx->GetIdx();
 
-    DROPS_FOR_TRIANG_VERTEX( mg, lvl, it) {
+    DROPS_FOR_TRIANG_CONST_VERTEX( mg, lvl, it) {
         if (it->Unknowns.Exist( idx))
             ic.Data[it->Unknowns( idx)]= icf( it->GetCoord(), t);
     }

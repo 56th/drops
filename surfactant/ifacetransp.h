@@ -61,6 +61,9 @@ template <class ResultContainerT>
   void
   resize_and_evaluate_piecewise_normal (const SPatchCL<4>& p, const TetraPrismCL& prism, ResultContainerT& n, std::valarray<double>* absdet= 0);
 
+/// \todo This should be a generic function somewhere in num or misc.
+void P1Init (instat_scalar_fun_ptr icf, VecDescCL& ic, const MultiGridCL& mg, double t);
+
 
 /// \brief The routine sets up the mass-matrix in matM on the interface defined by ls.
 ///        It belongs to the FE induced by standard P1-elements.
