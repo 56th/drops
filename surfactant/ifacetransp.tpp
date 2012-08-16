@@ -92,79 +92,48 @@ template <class ResultContainerT>
 }
 
 template <class DiscVelSolT>
-void InterfaceConvectionAccuP1CL<DiscVelSolT>::setup_local_matrix (const TetraCL& t)
+void LocalInterfaceConvectionP1CL<DiscVelSolT>::setup (const TetraCL& t, const InterfaceCommonDataP1CL& cdata)
 {
-    surf.make_patch<MergeCutPolicyCL>( lat, ls_loc);
-    make_CompositeQuad5Domain2D( qdom, surf, t);
+    make_CompositeQuad5Domain2D( qdom, cdata.surf, t);
 
     w_loc.assign( t, w_);
     resize_and_evaluate_on_vertexes( w_loc, qdom, qw);
 
     P1DiscCL::GetGradients( grad, dummy, t);
     for (int i= 0; i < 4; ++i)
-        resize_and_evaluate_on_vertexes( p1[i], qdom, q[i]);
+        resize_and_evaluate_on_vertexes( cdata.p1[i], qdom, q[i]);
 
     for (int i= 0; i < 4; ++i)
         for(int j= 0; j < 4; ++j)
             coup[i][j]= quad_2D( dot( grad[j], qw)*q[i], qdom);
 }
 
-template <class DiscVelSolT>
-void InterfaceConvectionAccuP1CL<DiscVelSolT>::begin_accumulation ()
-{
-    const IdxT num_rows= mat_->RowIdx->NumUnknowns();
-    const IdxT num_cols= mat_->ColIdx->NumUnknowns();
-    std::cout << "entering InterfaceConvectionAccuP1CL::begin_accumulation: " << num_rows << " rows, " << num_cols << " cols, ";
-    lvl = mat_->GetRowLevel();
-    M= new MatrixBuilderCL( &mat_->Data, num_rows, num_cols);
-}
-
-template <class DiscVelSolT>
-void InterfaceConvectionAccuP1CL<DiscVelSolT>::finalize_accumulation ()
-{
-    M->Build();
-    delete M;
-    M= 0;
-    std::cout << mat_->Data.num_nonzeros() << " nonzeros." << std::endl;
-}
-
-template <class DiscVelSolT>
-void InterfaceConvectionAccuP1CL<DiscVelSolT>::visit (const TetraCL& t)
-{
-    locp2_ls.assign( t, ls_, lsetbnd_);
-    evaluate_on_vertexes( locp2_ls, lat, Addr( ls_loc));
-    if (equal_signs( ls_loc))
-        return;
-
-    setup_local_matrix ( t);
-
-    GetLocalNumbP1NoBnd( numr, t, *mat_->RowIdx);
-    GetLocalNumbP1NoBnd( numc, t, *mat_->ColIdx);
-    update_global_matrix_P1( *M, coup, numr, numc);
-}
 
 template <class DiscVelSolT>
 void SetupConvectionP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls, const BndDataCL<>& lsetbnd, const DiscVelSolT& w)
 {
     //ScopeTimerCL timer( "SetupConvectionP1");
 
-    InterfaceConvectionAccuP1CL<DiscVelSolT> accu( mat, ls, lsetbnd, w);
     TetraAccumulatorTupleCL accus;
+    InterfaceCommonDataP1CL cdata( ls, lsetbnd);
+    accus.push_back( &cdata);
+    InterfaceMatrixAccuP1CL<LocalInterfaceConvectionP1CL<DiscVelSolT> > accu( mat, LocalInterfaceConvectionP1CL<DiscVelSolT>( w), cdata);
     accus.push_back( &accu);
     const IdxDescCL* RowIdx= mat->RowIdx;
     accumulate( accus, mg, RowIdx->TriangLevel(), RowIdx->GetMatchingFunction(), RowIdx->GetBndInfo());
+
+    // WriteToFile( mat->Data, "convection.txt", "convection");
 }
 
 
 template <class DiscVelSolT>
-void InterfaceMassDivAccuP1CL<DiscVelSolT>::setup_local_matrix (const TetraCL& t)
+void LocalInterfaceMassDivP1CL<DiscVelSolT>::setup (const TetraCL& t, const InterfaceCommonDataP1CL& cdata)
 {
-    surf.make_patch<MergeCutPolicyCL>( lat, ls_loc);
-    make_CompositeQuad5Domain2D ( qdom, surf, t);
+    make_CompositeQuad5Domain2D ( qdom, cdata.surf, t);
 
-    resize_and_evaluate_piecewise_normal( surf, t, n_tri);
+    resize_and_evaluate_piecewise_normal( cdata.surf, t, n_tri);
     n.resize( qdom.vertex_size());
-    for (Uint i= 0; i < surf.facet_size(); ++i)
+    for (Uint i= 0; i < cdata.surf.facet_size(); ++i)
         n[std::slice(i*7, 7, 1)]= n_tri[i];
 
     GetTrafoTr( T, dummy, t);
@@ -179,7 +148,7 @@ void InterfaceMassDivAccuP1CL<DiscVelSolT>::setup_local_matrix (const TetraCL& t
     }
 
     for (int i= 0; i < 4; ++i)
-        resize_and_evaluate_on_vertexes (p1[i], qdom, q[i]);
+        resize_and_evaluate_on_vertexes (cdata.p1[i], qdom, q[i]);
 
     for (int i= 0; i < 4; ++i) {
         coup[i][i]= quad_2D( qdivgamma_w*q[i]*q[i], qdom);
@@ -189,49 +158,19 @@ void InterfaceMassDivAccuP1CL<DiscVelSolT>::setup_local_matrix (const TetraCL& t
 }
 
 template <class DiscVelSolT>
-void InterfaceMassDivAccuP1CL<DiscVelSolT>::begin_accumulation ()
-{
-    const IdxT num_rows= mat_->RowIdx->NumUnknowns();
-    const IdxT num_cols= mat_->ColIdx->NumUnknowns();
-    std::cout << "entering InterfaceMassDivAccuP1CL::begin_accumulation: " << num_rows << " rows, " << num_cols << " cols, ";
-    lvl = mat_->GetRowLevel();
-    M= new MatrixBuilderCL( &mat_->Data, num_rows, num_cols);
-}
-
-template <class DiscVelSolT>
-void InterfaceMassDivAccuP1CL<DiscVelSolT>::finalize_accumulation ()
-{
-    M->Build();
-    delete M;
-    M= 0;
-    std::cout << mat_->Data.num_nonzeros() << " nonzeros." << std::endl;
-}
-
-template <class DiscVelSolT>
-void InterfaceMassDivAccuP1CL<DiscVelSolT>::visit (const TetraCL& t)
-{
-    locp2_ls.assign( t, ls_, lsetbnd_);
-    evaluate_on_vertexes( locp2_ls, lat, Addr( ls_loc));
-    if (equal_signs( ls_loc))
-        return;
-
-    setup_local_matrix ( t);
-
-    GetLocalNumbP1NoBnd( numr, t, *mat_->RowIdx);
-    GetLocalNumbP1NoBnd( numc, t, *mat_->ColIdx);
-    update_global_matrix_P1( *M, coup, numr, numc);
-}
-
-template <class DiscVelSolT>
 void SetupMassDivP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls, const BndDataCL<>& lsetbnd, const DiscVelSolT& w)
 {
     //ScopeTimerCL timer( "SetupMassDivP1");
 
-    InterfaceMassDivAccuP1CL<DiscVelSolT> accu( mat, ls, lsetbnd, w);
     TetraAccumulatorTupleCL accus;
+    InterfaceCommonDataP1CL cdata( ls, lsetbnd);
+    accus.push_back( &cdata);
+    InterfaceMatrixAccuP1CL<LocalInterfaceMassDivP1CL<DiscVelSolT> > accu( mat, LocalInterfaceMassDivP1CL<DiscVelSolT>( w), cdata);
     accus.push_back( &accu);
     const IdxDescCL* RowIdx= mat->RowIdx;
     accumulate( accus, mg, RowIdx->TriangLevel(), RowIdx->GetMatchingFunction(), RowIdx->GetBndInfo());
+
+    // WriteToFile( mat->Data, "massdiv.txt", "massdiv");
 }
 
 } // end of namespace DROPS

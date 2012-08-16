@@ -68,62 +68,19 @@ void update_global_matrix_P1 (MatrixBuilderCL& M, const double coup[4][4], const
                     M( numr[i], numc[j])+= coup[i][j];
 }
 
-void InterfaceMassAccuP1CL::setup_local_matrix (const TetraCL& t)
-{
-    surf.make_patch<MergeCutPolicyCL>( lat, ls_loc);
-    make_CompositeQuad2Domain2D ( qdom, surf, t);
-
-    for (int i= 0; i < 4; ++i)
-        resize_and_evaluate_on_vertexes (p1[i], qdom, q[i]);
-
-    for (int i= 0; i < 4; ++i) {
-        coup[i][i]= quad_2D( q[i]*q[i], qdom);
-        for(int j= 0; j < i; ++j)
-            coup[i][j]= coup[j][i]= quad_2D( q[j]*q[i], qdom);
-    }
-}
-
-void InterfaceMassAccuP1CL::begin_accumulation ()
-{
-    const IdxT num_rows= mat_->RowIdx->NumUnknowns();
-    const IdxT num_cols= mat_->ColIdx->NumUnknowns();
-    std::cout << "entering InterfaceMassAccuP1CL::begin_accumulation: " << num_rows << " rows, " << num_cols << " cols, ";
-    lvl = mat_->GetRowLevel();
-    M= new MatrixBuilderCL( &mat_->Data, num_rows, num_cols);
-}
-
-void InterfaceMassAccuP1CL::finalize_accumulation ()
-{
-    M->Build();
-    delete M;
-    M= 0;
-    std::cout << mat_->Data.num_nonzeros() << " nonzeros." << std::endl;
-}
-
-void InterfaceMassAccuP1CL::visit (const TetraCL& t)
-{
-    locp2_ls.assign( t, ls_, lsetbnd_);
-    evaluate_on_vertexes( locp2_ls, lat, Addr( ls_loc));
-    if (equal_signs( ls_loc))
-        return;
-
-    setup_local_matrix ( t);
-
-    GetLocalNumbP1NoBnd( numr, t, *mat_->RowIdx);
-    GetLocalNumbP1NoBnd( numc, t, *mat_->ColIdx);
-    update_global_matrix_P1( *M, coup, numr, numc);
-}
-
 void SetupInterfaceMassP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls, const BndDataCL<>& lsetbnd)
 {
     //ScopeTimerCL timer( "SetupInterfaceMassP1");
 
-    InterfaceMassAccuP1CL accu( mat, ls, lsetbnd);
     TetraAccumulatorTupleCL accus;
+    InterfaceCommonDataP1CL cdata( ls, lsetbnd);
+    accus.push_back( &cdata);
+    InterfaceMatrixAccuP1CL<LocalInterfaceMassP1CL> accu( mat, LocalInterfaceMassP1CL(), cdata);
     accus.push_back( &accu);
     const IdxDescCL* RowIdx= mat->RowIdx;
     accumulate( accus, mg, RowIdx->TriangLevel(), RowIdx->GetMatchingFunction(), RowIdx->GetBndInfo());
 
+    // WriteToFile( mat->Data, "mass.txt", "mass");
 }
 
 void SetupMixedMassP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls, const BndDataCL<>& lsetbnd)
@@ -131,65 +88,19 @@ void SetupMixedMassP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& l
     SetupInterfaceMassP1( mg, mat, ls, lsetbnd);
 }
 
-void LaplaceBeltramiAccuP1CL::setup_local_matrix (const TetraCL& t)
-{
-    surf.make_patch<MergeCutPolicyCL>( lat, ls_loc);
-    resize_and_evaluate_piecewise_normal( surf, t, n, &absdet);
-    P1DiscCL::GetGradients( grad, dummy, t);
-    for(int i= 0; i < 4; ++i) {
-        q[i].resize( surf.facet_size());
-        q[i]= grad[i] - dot( grad[i], n)*n;
-    }
-
-    for (int i= 0; i < 4; ++i) {
-        coup[i][i]= /*area of reference triangle*/ 0.5*(dot(q[i], q[i])*absdet).sum();
-        for(int j= 0; j < i; ++j)
-            coup[i][j]= coup[j][i]= /*area of reference triangle*/ 0.5*(dot(q[i], q[j])*absdet).sum();
-    }
-}
-
-void LaplaceBeltramiAccuP1CL::begin_accumulation ()
-{
-    const IdxT num_rows= mat_->RowIdx->NumUnknowns();
-    const IdxT num_cols= mat_->ColIdx->NumUnknowns();
-    std::cout << "entering LaplaceBeltramiAccuP1CL::begin_accumulation: " << num_rows << " rows, " << num_cols << " cols, ";
-    lvl = mat_->GetRowLevel();
-    A= new MatrixBuilderCL( &mat_->Data, num_rows, num_cols);
-}
-
-void LaplaceBeltramiAccuP1CL::finalize_accumulation ()
-{
-    A->Build();
-    delete A;
-    A= 0;
-    mat_->Data*= D_; // diffusion coefficient
-    std::cout << mat_->Data.num_nonzeros() << " nonzeros." << std::endl;
-}
-
-void LaplaceBeltramiAccuP1CL::visit (const TetraCL& t)
-{
-    locp2_ls.assign( t, ls_, lsetbnd_);
-    if (equal_signs( locp2_ls))
-        return;
-
-    evaluate_on_vertexes( locp2_ls, lat, Addr( ls_loc));
-
-    setup_local_matrix( t);
-
-    GetLocalNumbP1NoBnd( numr, t, *mat_->RowIdx);
-    GetLocalNumbP1NoBnd( numc, t, *mat_->ColIdx);
-    update_global_matrix_P1( *A, coup, numr, numc);
-}
-
 void SetupLBP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls, const BndDataCL<>& lsetbnd, double D)
 {
     //ScopeTimerCL timer( "SetuLBP1");
 
-    LaplaceBeltramiAccuP1CL accu( mat, ls, lsetbnd, D);
     TetraAccumulatorTupleCL accus;
+    InterfaceCommonDataP1CL cdata( ls, lsetbnd);
+    accus.push_back( &cdata);
+    InterfaceMatrixAccuP1CL<LocalLaplaceBeltramiP1CL> accu( mat, LocalLaplaceBeltramiP1CL( D), cdata);
     accus.push_back( &accu);
     const IdxDescCL* RowIdx= mat->RowIdx;
     accumulate( accus, mg, RowIdx->TriangLevel(), RowIdx->GetMatchingFunction(), RowIdx->GetBndInfo());
+
+    // WriteToFile( mat->Data, "lb.txt", "lb");
 }
 
 void SetupInterfaceRhsP1OnTriangle (const LocalP1CL<> p1[4],
