@@ -885,6 +885,17 @@ assign_transpose (SMatrixCL<_Rows, _Rows>& out, const SMatrixCL<_Rows,_Rows>& in
     return out;
 }
 
+template <Uint _Rows, Uint _Cols>
+inline SMatrixCL<_Rows, _Cols> eye ()
+{
+    SMatrixCL<_Rows, _Cols> ret;
+
+    const Uint m= std::min( _Rows, _Cols);
+    for (Uint i= 0; i < m; ++i)
+        ret( i, i)= 1.;
+    return ret;
+}
+
 /// \brief \f$full_local+= (scalar_local^T) \operatorname{kroneckerproduct} Id_{3\times 3}\f$
 ///
 /// This is the operation that distributes a scalar-valued operator over the block-diagonal of a vector-valued operator.
