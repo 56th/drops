@@ -41,6 +41,7 @@
 
 		"RadDrop":	[1, 1, 1],
 		"PosDrop":	[0, 0, 0],
+		"RadTorus":	[1, 0.7],
 		"Velocity":	[0, 0, 0],
 
 		"StationaryPDE":	false,
@@ -48,10 +49,14 @@
 //		"Levelset":		"Ellipsoid",
 //		"Rhs":			"HeatConductionRhs",
 //		"Solution":		"HeatConductionSol"
-		"Wind":			"AxisScalingWind",
-		"Levelset":		"AxisScalingLset",
-		"Rhs":			"AxisScalingRhs",
-		"Solution":		"AxisScalingSol"
+		"Wind":			"ToroidalFlowWind",
+		"Levelset":		"Torus",
+		"Rhs":			"ToroidalFlowRhs",
+		"Solution":		"ToroidalFlowSol"
+//		"Wind":			"AxisScalingWind",
+//		"Levelset":		"AxisScalingLset",
+//		"Rhs":			"AxisScalingRhs",
+//		"Solution":		"AxisScalingSol"
 	},
 
 	"SurfTransp":

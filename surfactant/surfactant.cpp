@@ -75,6 +75,28 @@ DROPS::MGBuilderCL* make_MGBuilder (const DROPS::ParamCL& P)
     return new BrickBuilderCL( orig, e1, e2, e3, n1, n2, n3);
 }
 
+// Surface divergence of a vector field w
+inline double div_gamma_wind (const Point3DCL& n, const SMatrixCL<3,3>& dn,
+                              const Point3DCL& w, const SMatrixCL<3,3>& dw)
+{
+    const double tr_Pdw= trace( dw) - inner_prod( n, dw*n),
+                 tr_dn_nw= trace( dn)*inner_prod( n, w),
+                 wT_dn_n= inner_prod( w, dn*n);
+    return tr_Pdw - tr_dn_nw - wT_dn_n;
+}
+
+// laplace-beltrami of a function u
+inline double laplace_beltrami_u (const Point3DCL& n,      const SMatrixCL<3,3>& dn,
+                                  const Point3DCL& grad_u, const SMatrixCL<3,3>& Hess_u)
+{
+    return div_gamma_wind( n, dn, grad_u, Hess_u);
+//     const double tr_PHessu= trace( Hess_u) - inner_prod( n, Hess_u*n),
+//                  tr_dn_ngradu= trace( dn)*inner_prod( n, grad_u),
+//                  graduT_dn_n= iner_prod( grad_u, dn*n);
+//     return tr_PHessu - tr_dn_ngradu - graduT_dn_n;
+}
+
+
 DROPS::Point3DCL WindVelocity;
 DROPS::Point3DCL constant_wind (const DROPS::Point3DCL&, double)
 {
@@ -90,6 +112,14 @@ double ellipsoid (const DROPS::Point3DCL& p, double)
     return x.norm_sq() - 1.;
 }
 static RegisterScalarFunction regsca_ellipsoid_lset( "Ellipsoid", ellipsoid);
+
+
+DROPS::Point2DCL RadTorus; // R= RadTorus[0], r= RadTorus[1]; R > r for tori with a hole.
+double torus (const Point3DCL& p, double)
+{
+    return std::sqrt( std::pow( RadTorus[0] - std::sqrt(p[0]*p[0] + p[1]*p[1]), 2) + std::pow( p[2], 2)) - RadTorus[1];
+}
+static RegisterScalarFunction regsca_torus_lset( "Torus", torus);
 
 // ==non-stationary test case "HeatConduction"
 // "ConstantWind" 0
@@ -111,6 +141,88 @@ double heat_conduction_sol (const Point3DCL& p, double t)
     return std::exp( -6.*t)*heat_conduction_u0( p);
 }
 static RegisterScalarFunction regsca_heat_conduction_sol( "HeatConductionSol", heat_conduction_sol);
+
+
+// ==non-stationary test-case "ToroidalFlow"==
+// Level set: "torus" with RadTorus
+
+double angular_velocity (const Point3DCL& p, double)
+{
+    return 1. + p[2];
+}
+
+DROPS::SMatrixCL<3,3> rotation_matrix (const DROPS::Point3DCL& p, double t)
+{
+    const double omega= angular_velocity( p, 0.);
+    SMatrixCL<3,3> m;
+    m(0,0)= std::cos(omega*t); m(0,1)= -std::sin(omega*t);
+    m(1,0)= std::sin(omega*t); m(1,1)=  std::cos(omega*t);
+    m(2,2)= 1.;
+    return m;
+}
+
+DROPS::Point3DCL toroidal_flow (const DROPS::Point3DCL& p, double t)
+{
+    return rotation_matrix( p, t)*p;
+}
+
+DROPS::Point3DCL toroidal_flow_wind (const DROPS::Point3DCL& p, double)
+{
+    const double omega= angular_velocity( p, 0.);
+    return MakePoint3D( -p[1]*omega, p[0]*omega, 0.);
+}
+static RegisterVectorFunction regvec_toroidal_flow_wind( "ToroidalFlowWind", toroidal_flow_wind);
+
+double toroidal_flow_sol (const Point3DCL& p, double t)
+{
+    const Point3DCL q( toroidal_flow( p, -t));
+    return std::exp( -t)*q[0]*q[1];
+}
+static RegisterScalarFunction regsca_toroidal_flow_sol( "ToroidalFlowSol", toroidal_flow_sol);
+
+double toroidal_flow_rhs (const Point3DCL& p, double t)
+{
+    const Point3DCL w( toroidal_flow_wind( p, t));
+    const double omega= angular_velocity( p, 0.);
+    SMatrixCL<3,3> dw;
+    dw(0,1)= -omega; dw(0,2)= -p[1];
+    dw(1,0)=  omega; dw(1,2)=  p[0];
+
+    const Point2DCL xhat( MakePoint2D( p[0], p[1]));
+    const double norm_xhat= xhat.norm();
+    const double l= torus( p, t) + RadTorus[1];
+    const Point2DCL tt= (norm_xhat - RadTorus[0])/(l*norm_xhat)*xhat;
+    const Point3DCL n( MakePoint3D( tt[0], tt[1], p[2]/l));
+    SMatrixCL<3,3> dn;
+    dn= eye<3,3>() - outer_product( n, n);
+    SMatrixCL<2,2> dnhat= RadTorus[0]/norm_xhat*(eye<2,2>() - outer_product( xhat/norm_xhat, xhat/norm_xhat));
+    dn(0,0)-= dnhat(0,0); dn(0,1)-= dnhat(0,1);
+    dn(1,0)-= dnhat(1,0); dn(1,1)-= dnhat(1,1);
+    dn*= 1./l;
+
+    const double c= std::cos( omega*t),
+                 s= std::sin( omega*t);
+    const Point3DCL z( toroidal_flow( p, -t));
+    const Point3DCL dz0( MakePoint3D(  c, s, t*(-s*p[0] + c*p[1]))),
+                    dz1( MakePoint3D( -s, c, t*(-c*p[0] - s*p[1])));
+    const Point3DCL grad_u= std::exp( -t)*(z[1]*dz0 + z[0]*dz1);
+    SMatrixCL<3,3> Hess_u;
+    Hess_u(0,2)= -c*z[0] - s*z[1];
+    Hess_u(1,2)= -s*z[0] + c*z[1];
+    Hess_u(2,0)= -c*z[0] - s*z[1];
+    Hess_u(2,1)= -s*z[0] + c*z[1];
+    Hess_u(2,2)= t*(z[0]*(s*p[0] - c*p[1]) + z[1]*(-c*p[0] - s*p[1]));
+    Hess_u*= t;
+    Hess_u+= outer_product( dz0, dz1) + outer_product( dz1, dz0);
+
+    const double u= toroidal_flow_sol( p, t),
+                 mat_der=  -u,
+                 reaction= div_gamma_wind( n, dn, w, dw)*u,
+                 diffusion= -laplace_beltrami_u( n, dn, grad_u, Hess_u);
+
+    return mat_der + reaction + diffusion;
+}
+static RegisterScalarFunction regsca_toroidal_flow_rhs( "ToroidalFlowRhs", toroidal_flow_rhs);
 
 
 // ==non-stationary test case "AxisScaling"==
@@ -286,7 +398,7 @@ void InitVel ( const MultiGridCL& mg, VecDescCL* vec, BndDataCL<Point3DCL>& Bnd,
     const Uint lvl  = vec->GetLevel(),
                vidx = vec->RowIdx->GetIdx();
 
-   DROPS_FOR_TRIANG_CONST_VERTEX( mg, lvl, sit) {
+    DROPS_FOR_TRIANG_CONST_VERTEX( mg, lvl, sit) {
         if (!Bnd.IsOnDirBnd( *sit))
             DoFHelperCL<Point3DCL, VectorCL>::set( lsgvel, sit->Unknowns( vidx),
                 LsgVel(sit->GetCoord(), t));
@@ -517,6 +629,7 @@ int main (int argc, char* argv[])
     WindVelocity= P.get<DROPS::Point3DCL>("Exp.Velocity");
     RadDrop=      P.get<DROPS::Point3DCL>("Exp.RadDrop");
     PosDrop=      P.get<DROPS::Point3DCL>("Exp.PosDrop");
+    RadTorus=     P.get<DROPS::Point2DCL>("Exp.RadTorus");
     the_wind_fun= invecmap[P.get<std::string>("Exp.Wind")];
     the_lset_fun= inscamap[P.get<std::string>("Exp.Levelset")];
     the_rhs_fun=  inscamap[P.get<std::string>("Exp.Rhs")];
