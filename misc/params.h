@@ -31,8 +31,6 @@
 #include <map>
 #include <fstream>
 
-//#define PARAMDEBUG
-
 namespace DROPS
 {
 
@@ -64,24 +62,21 @@ class ParamCL
     /// \returns value stored in node
     /// \exception BadTreePath if node does not exists
     template <typename OutType>
-    OutType get(const std::string & pathInPT) const
+    OutType get(const std::string& pathInPT) const
     {
-#ifdef PARAMDEBUG
       try {
-          OutType tmp = this->pt.get<OutType>(pathInPT);
+        return this->pt.get<OutType>(pathInPT);
       }
-      catch(boost::property_tree::ptree_error & e) {
-        std::cout << "Trying to get '" << pathInPT << "' failed.\n";
+      catch(boost::property_tree::ptree_error& e) {
+        throw DROPSErrCL( std::string( "ParamCL::get: Trying to get '") + pathInPT + std::string( "' failed.\n"));
       }
-#endif
-      return this->pt.get<OutType>(pathInPT);
     }
 
-    template <typename OutType>
-    OutType get(const char* pathInPT) const
-    {
-      return get<OutType>(std::string(pathInPT));
-    }
+//     template <typename OutType>
+//     OutType get(const char* pathInPT) const
+//     {
+//       return get<OutType>(std::string(pathInPT));
+//     }
 
     /// \brief get routine with default value
     /// \param pathInPT Path in tree hierarchy
@@ -93,15 +88,6 @@ class ParamCL
     template <typename OutType>
     OutType get(const std::string & pathInPT, OutType default_val)
     {
-#ifdef PARAMDEBUG
-      try {
-          OutType tmp = this->pt.get(pathInPT, default_val);
-      }
-      catch(boost::property_tree::ptree_error & e) {
-        std::cout << "Trying to get '" << pathInPT << "' failed.\n";
-      }
-#endif
-
       //value in container?
       try {
           return get<OutType>(pathInPT);
@@ -136,7 +122,7 @@ class ParamCL
           return true;
       }
       //no? then add for next time
-      catch (boost::property_tree::ptree_error & e) {
+      catch (boost::property_tree::ptree_error& e) {
           this->pt.put(pathToNode, value);
           return false;
       }
@@ -160,6 +146,10 @@ class ParamCL
 template<>
 DROPS::Point3DCL ParamCL::get<DROPS::Point3DCL>(const std::string & pathInPT) const;
 
+/// \brief specialisation of standard get routine for Point2DCL
+template<>
+DROPS::Point2DCL ParamCL::get<DROPS::Point2DCL>(const std::string & pathInPT) const;
+
 
 //DELETE ReadParamsCL?
 ///   \brief Parser for parameter files used by ParamBaseCL.
@@ -180,7 +170,7 @@ class ReadParamsCL
     std::map<std::string,double*>      dparam_;
     std::map<std::string,Point3DCL*>   cparam_;
     std::map<std::string,std::string*> sparam_;
-    
+
     std::map<std::string,int>       iparam_def_;
     std::map<std::string,double>    dparam_def_;
     std::map<std::string,Point3DCL> cparam_def_;
@@ -189,11 +179,11 @@ class ReadParamsCL
     bool IsKnown( const std::string& s) { return info_.find( s) != info_.end(); }
     void ReadEntry( std::istream&);
     void ReadData ( std::istream&);
-    
+
     void SetInfo( std::string&, char);
-    
+
     void UseDefaults();
-    
+
     void PrintWarning() const;
 
   public:

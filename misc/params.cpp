@@ -40,33 +40,43 @@ namespace DROPS
   std::istream &operator>>(std::istream& stream, ParamCL& P)
   {
     boost::property_tree::read_json(stream, P.pt);
-
     return stream;
   }
 
   std::ostream &operator<<(std::ostream& stream, ParamCL& P)
   {
-	  boost::property_tree::write_json(stream, P.pt);
-	  return stream;
+    boost::property_tree::write_json(stream, P.pt);
+    return stream;
   }
 
 
+template <typename T, Uint Size>
+   SArrayCL<T, Size>& get_SArray (const ParamCL& p, const std::string& path, SArrayCL<T, Size>& a)
+  {
+    using boost::property_tree::ptree;
+    Uint i= 0;
+    const ptree& node= p.get_child( path);
+    for (ptree::const_iterator it= node.begin(); it != node.end(); ++it)
+        a[i++]= it->second.get_value<T>();
+    Assert( i == Size, DROPSErrCL( "get_SArray: Wrong number of components in parameter.\n"), ~0);
 
-  //explicit implementation of get for Point3DCL due to lacking support of this by PropertyTree
+    return a;
+  }
+
   template<>
   Point3DCL ParamCL::get<Point3DCL>(const std::string & pathInPT) const
   {
-     Point3DCL point;
+    Point3DCL ret( Uninitialized);
+    get_SArray( *this, pathInPT, ret);
+    return ret;
+  }
 
-     using boost::property_tree::ptree;
-     int i=0;
-
-     ptree curPT = this->pt.get_child(pathInPT);
-     for (ptree::const_iterator it = curPT.begin(); it != curPT.end(); ++it) {
-         point[i++] = it->second.get_value<double>();
-     }
-
-     return point;
+  template<>
+  Point2DCL ParamCL::get<Point2DCL>(const std::string & pathInPT) const
+  {
+    Point2DCL ret( Uninitialized);
+    get_SArray( *this, pathInPT, ret);
+    return ret;
   }
 
   std::ostream& ParamCL::print(std::ostream& s)
