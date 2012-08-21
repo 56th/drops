@@ -214,6 +214,7 @@ double toroidal_flow_rhs (const Point3DCL& p, double t)
     Hess_u(2,2)= t*(z[0]*(s*p[0] - c*p[1]) + z[1]*(-c*p[0] - s*p[1]));
     Hess_u*= t;
     Hess_u+= outer_product( dz0, dz1) + outer_product( dz1, dz0);
+    Hess_u*= std::exp( -t);
 
     const double u= toroidal_flow_sol( p, t),
                  mat_der=  -u,
@@ -246,7 +247,7 @@ static RegisterScalarFunction regsca_axis_scaling_lset( "AxisScalingLset", axis_
 
 double axis_scaling_sol (const Point3DCL& p, double t)
 {
-    return std::exp( -6.*t)*heat_conduction_u0( p); // The same as for heat conduction test case.
+    return std::exp( -0.5*t)*heat_conduction_u0( p); // The same as for heat conduction test case.
 }
 static RegisterScalarFunction regsca_axis_scaling_sol( "AxisScalingSol", axis_scaling_sol);
 
@@ -256,10 +257,34 @@ double axis_scaling_rhs (const Point3DCL& p, double t)
     const double bf4= (p/MakePoint3D( std::pow( a, 2), 1., 1.)).norm_sq();
     const double bf6= (p/MakePoint3D( std::pow( a, 3), 1., 1.)).norm_sq();
 
-    const double mat_der=  0.25*std::cos( t)/a - 6.;
+    const double mat_der=  0.25*std::cos( t)/a - 0.5;
     const double reaction= 0.25*std::cos( t)/a/bf4*( std::pow( p[1], 2) + std::pow( p[2], 2)
         - 2.*std::pow( p[0]/a, 2)*(1. + 1./std::pow( a, 2) - bf6/bf4));
-    const double diffusion= (1. + 1./std::pow( a, 2))/bf4*(1. + 2./std::pow( a, 2) + 2.*bf6/bf4);
+    const double diffusion= (1. + 1./std::pow( a, 2))/bf4*(-3. - 2./std::pow( a, 2) + 2.*bf6/bf4);
+
+//     const Point3DCL tt( p/MakePoint3D( std::pow( a, 2), 1., 1.));
+//     const double l= tt.norm();
+//     const Point3DCL n( tt/l);
+//     SMatrixCL<3,3> dn( (eye<3,3>() - outer_product( n, n))/l );
+//     dn(0,0)/= std::pow( a, 2); dn(1,0)/= std::pow( a, 2); dn(2,0)/= std::pow( a, 2);
+// 
+//     const Point3DCL w( MakePoint3D( 0.25*p[0]*std::cos( t)/a, 0., 0.));
+//     SMatrixCL<3,3> dw;
+//     dw(0,0)= 0.25*std::cos( t)/a;
+// 
+//     const Point3DCL grad_u( std::exp( -0.5*t)*MakePoint3D( p[1], p[0], 0.));
+//     SMatrixCL<3,3> Hess_u;
+//     Hess_u(0,1)= 1.;
+//     Hess_u(1,0)= 1.;
+//     Hess_u*= std::exp( -0.5*t);
+// 
+//     const double err= div_gamma_wind( n, dn, w, dw) - reaction,
+//                errlb= laplace_beltrami_u( n, dn, grad_u, Hess_u) - diffusion*axis_scaling_sol( p, t);
+//     if (std::fabs( err) > 1e-12 || std::fabs( errlb) > 1e-12) {
+//         std::cerr << err   << " " << div_gamma_wind( n, dn, w, dw) << " " << reaction << "\n"
+//                   << errlb << " " << laplace_beltrami_u( n, dn, grad_u, Hess_u) << " " << diffusion*axis_scaling_sol( p, t) << "\n";
+//         exit( 1);
+//     }
 
     return (mat_der + reaction - diffusion)*axis_scaling_sol( p, t);
 }
