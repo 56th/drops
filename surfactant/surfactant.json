@@ -78,7 +78,7 @@
 		"Iter":			500,
 		"SD":			0.1,
 		"CurvDiff":		-1,
-		"VolCorrection":	1,
+		"VolCorrection":	0,
 		"Theta":		1
 	},
 
