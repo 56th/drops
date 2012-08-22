@@ -402,6 +402,14 @@ void MarkLower (DROPS::MultiGridCL& mg, double y_max, DROPS::Uint maxLevel= ~0)
 /// \brief Set Default parameters here s.t. they are initialized.
 /// The result can be checked when Param-list is written to the output.
 void SetMissingParameters(DROPS::ParamCL& P){
+
+    P.put_if_unset<std::string>("Exp.VolForce", "ZeroVel");
+    P.put_if_unset<double>("Mat.DensDrop", 0.0);
+    P.put_if_unset<double>("Mat.ShearVisco", 0.0);
+    P.put_if_unset<double>("Mat.DilatationalVisco", 0.0);
+    P.put_if_unset<double>("SurfTens.ShearVisco", 0.0);
+    P.put_if_unset<double>("SurfTens.DilatationalVisco", 0.0);
+
     P.put_if_unset<std::string>("VTK.TimeFileName",P.get<std::string>("VTK.VTKName"));
     P.put_if_unset<int>("VTK.ReUseTimeFile",0);
     P.put_if_unset<int>("VTK.UseOnlyP1",0);

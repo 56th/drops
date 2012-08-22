@@ -489,6 +489,13 @@ void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<double>("Levelset.Downwind.MaxRelComponentSize", 0.05);
     P.put_if_unset<double>("Levelset.Downwind.WeakEdgeRatio", 0.2);
     P.put_if_unset<double>("Levelset.Downwind.CrosswindLimit", std::cos( M_PI/6.));
+
+    P.put_if_unset<std::string>("Exp.VolForce", "ZeroVel");
+    P.put_if_unset<double>("Mat.DensDrop", 0.0);
+    P.put_if_unset<double>("Mat.ShearVisco", 0.0);
+    P.put_if_unset<double>("Mat.DilatationalVisco", 0.0);
+    P.put_if_unset<double>("SurfTens.ShearVisco", 0.0);
+    P.put_if_unset<double>("SurfTens.DilatationalVisco", 0.0);
 }
 
 int main (int argc, char** argv)

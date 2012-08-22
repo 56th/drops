@@ -146,7 +146,7 @@
                 "InflowAmpl":           0,                         // inflow amplitude.
                 "InitialLSet":          "Ellipsoid",               // choose a LevelSet function you want 
                                                                    // to start with (default: 'Ellipsoid')
-                "VolumeForce":          "ZeroVel"                  // r.h.s. force of navier stokes
+                "VolForce":             "ZeroVel"                  // r.h.s. force of navier stokes
                                                                    // equations (default: 'ZeroVel')
         },
 
