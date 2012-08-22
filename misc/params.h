@@ -72,12 +72,6 @@ class ParamCL
       }
     }
 
-//     template <typename OutType>
-//     OutType get(const char* pathInPT) const
-//     {
-//       return get<OutType>(std::string(pathInPT));
-//     }
-
     /// \brief get routine with default value
     /// \param pathInPT Path in tree hierarchy
     /// \param default_value value returned if node does not exist
@@ -93,7 +87,7 @@ class ParamCL
           return get<OutType>(pathInPT);
       }
       //no? then add for next time
-      catch (boost::property_tree::ptree_error & e) {
+      catch (DROPSErrCL& e) {
           this->pt.put(pathInPT, default_val);
           return default_val;
       }
@@ -122,7 +116,7 @@ class ParamCL
           return true;
       }
       //no? then add for next time
-      catch (boost::property_tree::ptree_error& e) {
+      catch (DROPSErrCL& e) {
           this->pt.put(pathToNode, value);
           return false;
       }
