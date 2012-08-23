@@ -62,6 +62,7 @@
 	"SurfTransp":
 	{
 		"_comment":	"# surfactant transport",
+		"Method":	"cGcG", // "spacetime-cGcG" "spacetime-cGdG" "characeristic-transport"
 
 		"Theta":	0.5,
 		"Iter":		1000,

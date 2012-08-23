@@ -399,6 +399,7 @@ class SurfactantP1BaseCL
         Bnd_v_( Bnd_v), v_( v), lset_vd_( lset_vd), lsetbnd_( lsetbnd), oldidx_( P1IF_FE), gm_( pc_, 100, iter, tol, true),
         omit_bound_( omit_bound)
     { idx.GetXidx().SetBound( omit_bound); }
+    virtual ~SurfactantP1BaseCL () {}
 
     const MultiGridCL& GetMG() const { return MG_; }
     GMResSolverCL<GSPcCL>& GetSolver() { return gm_; }

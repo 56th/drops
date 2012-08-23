@@ -412,6 +412,27 @@ void InitVel ( const MultiGridCL& mg, VecDescCL* vec, BndDataCL<Point3DCL>& Bnd,
     vec->t= t;
 }
 
+
+SurfactantP1BaseCL* make_surfactant_timedisc( MultiGridCL& mg, LevelsetP2CL& lset,
+                                              VecDescCL& v, const BndDataCL<Point3DCL>& Bnd_v,
+                                              const ParamCL& P)
+{
+    SurfactantP1BaseCL* ret= 0;
+    const std::string method= P.get<std::string>( "SurfTransp.Method");
+
+    if (method == std::string( "cGcG"))
+        ret= new SurfactantcGP1CL( mg,
+            P.get<double>("SurfTransp.Theta"), P.get<double>("SurfTransp.Visc"),
+            &v, Bnd_v, lset.Phi, lset.GetBndData(),
+            P.get<int>("SurfTransp.Iter"), P.get<double>("SurfTransp.Tol"),
+            P.get<double>("SurfTransp.OmitBound"));
+    else // if (method == std::string( "spacetime-cGcG"))
+        throw DROPSErrCL( std::string( "make_surfactant_timedisc: Unknown method '") + method + std::string( "'.\n"));
+
+    return ret;
+}
+
+
 void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::LevelsetP2CL& lset)
 {
     using namespace DROPS;
@@ -439,11 +460,8 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
 
     //lset2.SetupSystem( make_P2Eval( mg, Bnd_v, v), P.get<double>("Time.StepSize"));
 
-    SurfactantcGP1CL timedisc( mg,
-        P.get<double>("SurfTransp.Theta"), P.get<double>("SurfTransp.Visc"),
-        &v, Bnd_v, lset.Phi, lset.GetBndData(),
-        P.get<int>("SurfTransp.Iter"), P.get<double>("SurfTransp.Tol"),
-        P.get<double>("SurfTransp.OmitBound"));
+    std::auto_ptr<SurfactantP1BaseCL> timediscp( make_surfactant_timedisc( mg, lset, v, Bnd_v, P));
+    SurfactantP1BaseCL& timedisc= *timediscp;
     timedisc.SetRhs( the_rhs_fun);
 
     LevelsetRepairCL lsetrepair( lset);
