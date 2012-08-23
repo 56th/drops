@@ -413,6 +413,105 @@ void InitVel ( const MultiGridCL& mg, VecDescCL* vec, BndDataCL<Point3DCL>& Bnd,
 }
 
 
+///\brief Bilinear space-time FE-function on a single TetraPrismCL.
+template <typename T= double>
+class LocalSTP1P1CL
+{
+  public:
+    typedef T value_type;
+    typedef T (*instat_fun_ptr) (const Point3DCL&, double);
+    typedef LocalP1CL<T> spatial_localfe_type;
+
+  protected:
+    typedef LocalSTP1P1CL<T> self_;
+
+  private:
+    LocalP1CL<T> v0_,
+                 v1_;
+
+  public:
+    LocalSTP1P1CL() : v0_(), v1_() {}
+    LocalSTP1P1CL(const value_type& t) : v0_( t), v1_( t) {}
+    // Initialize from a given function
+    LocalSTP1P1CL(const TetraPrismCL& prism, instat_fun_ptr f)
+        : v0_( prism.t, f, prism.t0), v1_( prism.t, f, prism.t1) {}
+
+    // These "assignment-operators" correspond to the constructors
+    // with multiple arguments
+    inline self_&
+    assign(const TetraPrismCL& prism, instat_fun_ptr f) {
+        v0_.assign( prism.t, f, prism.t0);
+        v1_.assign( prism.t, f, prism.t1);
+        return *this;
+    }
+
+    // pointwise evaluation in STCoordCL-coordinates
+    inline value_type operator() (const STCoordCL& p) const {
+        return (1. - p.t_ref)*v0_( p.x_bary) + p.t_ref*v1_( p.x_bary);
+    }
+
+    // The LocalP1-function at t0
+    spatial_localfe_type& at_t0 () { return v0_; }
+    const spatial_localfe_type& at_t0 () const { return v0_; }
+    // The LocalP1-function at t1
+    spatial_localfe_type& at_t1 () { return v1_; }
+    const spatial_localfe_type& at_t1 () const { return v1_; }
+};
+
+class STP1P1DiscCL
+{
+  public:
+    static LocalSTP1P1CL<>                 ref_val[8];
+    static LocalSTP1P1CL<Point4DCL>        ref_grad[8];
+    static LocalSTP1P1CL<Point3DCL>        ref_gradx[8];
+    // static LocalSTP1P1CL< SMatrixCL<4,4> > ref_Hess[8];
+
+    static void StaticInit();
+    static void StaticDestruct() {}
+
+    static void GetGradients (const TetraPrismCL& prism, LocalSTP1P1CL<Point4DCL> grad[8]) {
+        SMatrixCL<3,3> M( Uninitialized);
+        double det= 0.; // dummy
+        GetTrafoTr( M, det, prism.t);
+        const double dt_inv= 1./(prism.t1 - prism.t0);
+        for (Uint i= 0; i < 4; ++i) {
+            const Point3DCL p1grad( M*FE_P1CL::DHRef( i));
+            for (Uint j= 0; j < 4; ++j) {
+                grad[i    ].at_t0()[j]= MakePoint4D( p1grad[0], p1grad[1], p1grad[2], j == i ? -dt_inv : 0.);
+                grad[i + 4].at_t1()[j]= MakePoint4D( p1grad[0], p1grad[1], p1grad[2], j == i ?  dt_inv : 0.);
+                // gradx[i    ].at_t0()[j]= p1grad;
+                // gradx[i + 4].at_t1()[j]= p1grad;
+            }
+        }
+    }
+};
+
+LocalSTP1P1CL<> STP1P1DiscCL::ref_val[8];
+LocalSTP1P1CL<Point4DCL> STP1P1DiscCL::ref_grad[8];
+LocalSTP1P1CL<Point3DCL> STP1P1DiscCL::ref_gradx[8];
+// LocalSTP1P1CL< SMatrixCL<4,4> > STP1P1DiscCL::ref_Hess[8];
+
+void STP1P1DiscCL::StaticInit()
+{
+    for (Uint i= 0; i < 4; ++i) {
+        ref_val[i    ].at_t0()[i]= 1.;
+        ref_val[i + 4].at_t1()[i]= 1.;
+
+        const Point3DCL p1grad( FE_P1CL::DHRef( i));
+        for (Uint j= 0; j < 4; ++j) {
+            ref_grad[i    ].at_t0()[j]= MakePoint4D( p1grad[0], p1grad[1], p1grad[2], j == i ? -1. : 0.);
+            ref_grad[i + 4].at_t1()[j]= MakePoint4D( p1grad[0], p1grad[1], p1grad[2], j == i ?  1. : 0.);
+            ref_gradx[i    ].at_t0()[j]= p1grad;
+            ref_gradx[i + 4].at_t1()[j]= p1grad;
+        }
+    }
+}
+
+namespace {
+StaticInitializerCL<STP1P1DiscCL> the_STP1P1DiscCL_initializer_;
+} // end of unnamed namespace
+
+
 SurfactantP1BaseCL* make_surfactant_timedisc( MultiGridCL& mg, LevelsetP2CL& lset,
                                               VecDescCL& v, const BndDataCL<Point3DCL>& Bnd_v,
                                               const ParamCL& P)
