@@ -679,14 +679,18 @@ class STP1P1IdxDescCL
   public:
     STP1P1IdxDescCL () : idx0_( P1IF_FE), idx1_( P1IF_FE) {}
 
+    /// \brief Returns the number of the index. This can be used to access
+    ///     the numbering on the simplices.
+    Uint GetIdx (Uint i) const { return i == 0 ? idx0_.GetIdx() : idx1_.GetIdx(); }
+
     /// \brief Triangulation of the index.
-    Uint TriangLevel() const { return TriangLevel_; }
+    Uint TriangLevel () const { return TriangLevel_; }
     /// \brief total number of unknowns on the triangulation
-    IdxT NumUnknowns() const { return NumUnknowns_; }
+    IdxT NumUnknowns () const { return NumUnknowns_; }
     /// \brief The first NumIniUnknowns shape-functions do not vanish on the old interface.
-    IdxT NumIniUnknowns() const { return NumIniUnknowns_; }
+    IdxT NumIniUnknowns () const { return NumIniUnknowns_; }
     /// \brief The unknowns in [NumIniUnknowns, NumFiniUnknowns + NumIniUnknowns)  do not vanish on the new interface.
-    IdxT NumFiniUnknowns() const { return NumFiniUnknowns_; }
+    IdxT NumFiniUnknowns () const { return NumFiniUnknowns_; }
 
     void CreateNumbering (Uint level, MultiGridCL& mg, const VecDescCL& oldls, const VecDescCL& newls, const BndDataCL<>& lsetbnd, double t0, double t1);
 
@@ -696,6 +700,50 @@ class STP1P1IdxDescCL
         TriangLevel_= static_cast<Uint>( -1);
         NumUnknowns_= NumIniUnknowns_= NumFiniUnknowns_= 0;
     }
+};
+
+
+/// \brief Collect indices of unknowns
+///
+/// This is convenient for discretisation of operators in the Setup-routines.
+class LocalNumbSTP1P1CL
+{
+  private:
+    size_t NumIniUnknowns_,
+           NumFiniUnknowns_;
+
+  public:
+    /// \brief Field of unknown-indices; NoIdx, iff the degree of freedom lies
+    /// on a boundary without unknowns.
+    IdxT num[8];
+
+    /// \brief The default constructors leaves everything uninitialized.
+    LocalNumbSTP1P1CL() {}
+
+    /// \brief Read indices only from a tetrahedron.
+    LocalNumbSTP1P1CL(const TetraCL& s, const STP1P1IdxDescCL& idx)
+        { assign_indices_only( s, idx); }
+
+    /// \brief Compute the indices only.
+    /// Only num is set up.
+    void assign_indices_only (const TetraCL& s, const STP1P1IdxDescCL& idx) {
+        const Uint sys0= idx.GetIdx( 0),
+                   sys1= idx.GetIdx( 1);
+        for (Uint i= 0; i < 4; ++i) {
+            num[i]=   s.GetVertex( i)->Unknowns.Exist( sys0) ? s.GetVertex( i)->Unknowns( sys0) : NoIdx;
+            num[i+4]= s.GetVertex( i)->Unknowns.Exist( sys1) ? s.GetVertex( i)->Unknowns( sys1) : NoIdx;
+        }
+        NumIniUnknowns_=  idx.NumIniUnknowns();
+        NumFiniUnknowns_= idx.NumFiniUnknowns();
+    }
+
+    /// \brief True, iff index i has a dof associated with it.
+    bool WithUnknowns (IdxT i) const { return num[i] != NoIdx; }
+
+    /// \brief True, iff the shape function exists on the old interface.
+    bool IsIni  (IdxT i) const { return num[i] < NumIniUnknowns_; }
+    /// \briref True, iff the shape function exists on the new interface.
+    bool IsFini (IdxT i) const { return num[i] >= NumIniUnknowns_ && num[i] < NumIniUnknowns_ + NumFiniUnknowns_; }
 };
 
 } // end of namespace DROPS
