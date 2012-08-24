@@ -182,9 +182,11 @@ void SurfactantP1BaseCL::InitTimeStep ()
     oldls_.RowIdx= lset_vd_.RowIdx;
     oldls_.Data.resize( lset_vd_.Data.size());
     oldls_.Data= lset_vd_.Data;
+    oldls_.t= lset_vd_.t;
 
     oldv_.SetIdx( v_->RowIdx);
     oldv_.Data= v_->Data;
+    oldv_.t= v_->t;
 }
 
 void SurfactantcGP1CL::Update()

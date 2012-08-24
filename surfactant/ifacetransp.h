@@ -311,7 +311,7 @@ void SetupInterfaceRhsP1 (const MultiGridCL& mg, VecDescCL* v,
     const VecDescCL& ls, const BndDataCL<>& lsbnd, instat_scalar_fun_ptr f);
 
 
-///\brief Initialize the QuadDomain2DCL-object qdom for quadratue with Quad5_2DCL on the lattice lat of t, given the level set in ls and bnd.
+///\brief Initialize the QuadDomain2DCL-object qdom for quadrature with Quad5_2DCL on the lattice lat of t, given the level set in ls and bnd.
 inline const QuadDomain2DCL&
 make_CompositeQuad5Domain2D (QuadDomain2DCL& qdom, const TetraCL& t, const PrincipalLatticeCL& lat, const DROPS::VecDescCL& ls, const DROPS::BndDataCL<>& bnd)
 {
