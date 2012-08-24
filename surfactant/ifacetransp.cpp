@@ -381,4 +381,34 @@ VTKIfaceScalarCL::put (VTKOutCL& cf) const
     p1idx.DeleteNumbering( mg_);
 }
 
+
+/// ==Space-Time-methods==
+/// \todo Maybe introduce a new file
+///\brief Bilinear space-time FE-function on a single TetraPrismCL.
+
+LocalSTP1P1CL<> STP1P1DiscCL::ref_val[8];
+LocalSTP1P1CL<Point4DCL> STP1P1DiscCL::ref_grad[8];
+LocalSTP1P1CL<Point3DCL> STP1P1DiscCL::ref_gradx[8];
+// LocalSTP1P1CL< SMatrixCL<4,4> > STP1P1DiscCL::ref_Hess[8];
+
+void STP1P1DiscCL::StaticInit()
+{
+    for (Uint i= 0; i < 4; ++i) {
+        ref_val[i    ].at_t0()[i]= 1.;
+        ref_val[i + 4].at_t1()[i]= 1.;
+
+        const Point3DCL p1grad( FE_P1CL::DHRef( i));
+        for (Uint j= 0; j < 4; ++j) {
+            ref_grad[i    ].at_t0()[j]= MakePoint4D( p1grad[0], p1grad[1], p1grad[2], j == i ? -1. : 0.);
+            ref_grad[i + 4].at_t1()[j]= MakePoint4D( p1grad[0], p1grad[1], p1grad[2], j == i ?  1. : 0.);
+            ref_gradx[i    ].at_t0()[j]= p1grad;
+            ref_gradx[i + 4].at_t1()[j]= p1grad;
+        }
+    }
+}
+
+namespace {
+StaticInitializerCL<STP1P1DiscCL> the_STP1P1DiscCL_initializer_;
+} // end of unnamed namespace
+
 } // end of namespace DROPS
