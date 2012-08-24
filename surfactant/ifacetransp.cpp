@@ -412,6 +412,7 @@ StaticInitializerCL<STP1P1DiscCL> the_STP1P1DiscCL_initializer_;
 } // end of unnamed namespace
 
 
+
 void STP1P1IdxDescCL::CreateNumbering (Uint level, MultiGridCL& mg, const VecDescCL& oldls, const VecDescCL& newls, const BndDataCL<>& lsetbnd, double t0, double t1)
 {
     TriangLevel_= level;
@@ -484,6 +485,18 @@ VectorCL SurfactantcGdGP1CL::InitStep (double new_t)
     st_ic_.resize( 0);
     st_ic_.resize( st_idx_.NumUnknowns());
 
+    st_oldic_.resize( 0);
+    st_oldic_.resize( st_idx_.NumUnknowns());
+    // Copy dofs on the old interface from  old solution into st_oldic_.
+    DROPS_FOR_TRIANG_VERTEX( MG_, oldidx_.TriangLevel(), it) {
+        if (it->Unknowns.Exist( st_idx_.GetIdx( 0))) {
+            const IdxT dof= it->Unknowns( st_idx_.GetIdx( 0));
+            if (dof < st_idx_.NumIniUnknowns())
+                st_oldic_[dof]= oldic_[dof];
+        }
+    }
+
+
     return VectorCL( st_idx_.NumUnknowns());
 }
 
@@ -508,8 +521,8 @@ void SurfactantcGdGP1CL::CommitStep ()
 {
     idx.CreateNumbering( oldidx_.TriangLevel(), MG_, &lset_vd_, &lsetbnd_);
     std::cout << "new NumUnknowns at t1: " << idx.NumUnknowns() << std::endl;
-    ic.SetIdx( &idx);
 
+    ic.SetIdx( &idx);
     // Copy dofs on the new interface from space-time-solution into ic.
     DROPS_FOR_TRIANG_VERTEX( MG_, oldidx_.TriangLevel(), it) {
         if (it->Unknowns.Exist( st_idx_.GetIdx( 1))) {
@@ -519,6 +532,9 @@ void SurfactantcGdGP1CL::CommitStep ()
         }
     }
 
+    L_.clear();
+    st_ic_.resize( 0);
+    st_oldic_.resize( 0);
     st_idx_.DeleteNumbering( MG_);
 }
 

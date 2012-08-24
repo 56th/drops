@@ -751,14 +751,15 @@ class LocalNumbSTP1P1CL
 class SurfactantcGdGP1CL : public SurfactantP1BaseCL
 {
   public:
-    MatrixCL A,    ///< diffusion matrix
-             Mder, ///< material-derivative matrix
-             Mdiv, ///< mass matrix with interface-divergence of velocity
-             Mold; ///< mass matrix on old interface: all space-time trial- and test- functions on old interface
+    MatrixCL A,    ///< ST-diffusion matrix
+             Mder, ///< ST-material-derivative matrix
+             Mdiv, ///< ST-mass-matrix with interface-divergence of velocity
+             Mold; ///< mass matrix on old spatial interface.
 
   private:
     STP1P1IdxDescCL st_idx_;
-    VectorCL st_ic_;
+    VectorCL st_oldic_, ///< the old solution represented in the space-time-FE-basis.
+             st_ic_;    ///< the new solution represented in the space-time-FE-basis.
     MatrixCL L_; ///< sum of matrices
 
   public:
