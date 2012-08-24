@@ -662,6 +662,42 @@ class STP1P1DiscCL
     }
 };
 
+
+//idx_ini: oldls, oldt, IFP1_FE (0.. N_ini-1)
+//idx0, idx1: ST-P1P1: 2x IFP1_FE: idxi for dof at ti; idx0 agrees with idx_ini, where the latter is defined (well-posed, see lemma 1)
+class STP1P1IdxDescCL
+{
+  private:
+    IdxDescCL idx0_,
+              idx1_;
+
+    Uint TriangLevel_;
+    IdxT NumUnknowns_;
+    IdxT NumIniUnknowns_,
+         NumFiniUnknowns_;
+
+  public:
+    STP1P1IdxDescCL () : idx0_( P1IF_FE), idx1_( P1IF_FE) {}
+
+    /// \brief Triangulation of the index.
+    Uint TriangLevel() const { return TriangLevel_; }
+    /// \brief total number of unknowns on the triangulation
+    IdxT NumUnknowns() const { return NumUnknowns_; }
+    /// \brief The first NumIniUnknowns shape-functions do not vanish on the old interface.
+    IdxT NumIniUnknowns() const { return NumIniUnknowns_; }
+    /// \brief The unknowns in [NumIniUnknowns, NumFiniUnknowns + NumIniUnknowns)  do not vanish on the new interface.
+    IdxT NumFiniUnknowns() const { return NumFiniUnknowns_; }
+
+    void CreateNumbering (Uint level, MultiGridCL& mg, const VecDescCL& oldls, const VecDescCL& newls, const BndDataCL<>& lsetbnd, double t0, double t1);
+
+    void DeleteNumbering (MultiGridCL& mg) {
+        DeleteNumbOnSimplex( idx0_.GetIdx(), mg.GetAllVertexBegin( TriangLevel()), mg.GetAllVertexEnd( TriangLevel()));
+        DeleteNumbOnSimplex( idx1_.GetIdx(), mg.GetAllVertexBegin( TriangLevel()), mg.GetAllVertexEnd( TriangLevel()));
+        TriangLevel_= static_cast<Uint>( -1);
+        NumUnknowns_= NumIniUnknowns_= NumFiniUnknowns_= 0;
+    }
+};
+
 } // end of namespace DROPS
 
 #include "surfactant/ifacetransp.tpp"

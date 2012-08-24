@@ -411,4 +411,64 @@ namespace {
 StaticInitializerCL<STP1P1DiscCL> the_STP1P1DiscCL_initializer_;
 } // end of unnamed namespace
 
+
+void STP1P1IdxDescCL::CreateNumbering (Uint level, MultiGridCL& mg, const VecDescCL& oldls, const VecDescCL& newls, const BndDataCL<>& lsetbnd, double t0, double t1)
+{
+    TriangLevel_= level;
+
+    IdxDescCL idx_ini( P1IF_FE);
+    idx_ini.CreateNumbering( level, mg, &oldls, &lsetbnd);
+    NumIniUnknowns_= idx_ini.NumUnknowns();
+
+    IdxDescCL idx_fini( P1IF_FE);
+    idx_fini.CreateNumbering( level, mg, &newls, &lsetbnd);
+    NumFiniUnknowns_= idx_fini.NumUnknowns();
+
+    NumUnknowns_= NumIniUnknowns() + NumFiniUnknowns();
+    IdxT inicounter= 0, finicounter= 0;
+
+    const TetraPrismLatticeCL& lat= TetraPrismLatticeCL::instance( 2, 1);
+    std::valarray<double> ls_loc( lat.vertex_size());
+    LocalP2CL<> oldlocp2_ls, locp2_ls;
+    LocalSTP2P1ProxyCL<> local_st_lset( oldlocp2_ls, locp2_ls);
+    SPatchCL<4> patch;
+    QuadDomainCodim1CL<4> qdom;
+    std::valarray<double> shape; // STP1P1-shape-function as integrand
+    DROPS_FOR_TRIANG_TETRA ( mg, level, it) {
+        oldlocp2_ls.assign( *it, oldls, lsetbnd);
+        locp2_ls.assign(    *it, newls, lsetbnd);
+        evaluate_on_vertexes( local_st_lset, lat, Addr( ls_loc));
+        if (equal_signs( ls_loc))
+            continue;
+
+        patch.make_patch<MergeCutPolicyCL>( lat, ls_loc);
+        make_CompositeQuad5DomainSTCodim1( qdom, patch, TetraPrismCL( *it, t0, t1));
+        for (Uint i= 0; i < 8; ++i) {
+            const IdxDescCL& idx= i < 4 ? idx0_ : idx1_;
+            const IdxDescCL& spatial_idx= i < 4 ? idx_ini : idx_fini;
+            UnknownHandleCL& unknowns= const_cast<VertexCL*>( it->GetVertex( i%4))->Unknowns;
+            if (unknowns.Exist( idx.GetIdx()))
+                continue;
+
+            resize_and_evaluate_on_vertexes( STP1P1DiscCL::ref_val[i], qdom, shape);
+            if (quad_codim1( shape*shape, qdom) > 0.) {
+                unknowns.Prepare( idx.GetIdx());
+                if (unknowns.Exist( spatial_idx.GetIdx())) {
+                    unknowns( idx.GetIdx())= unknowns( spatial_idx.GetIdx()) + (i < 4 ? 0 : NumIniUnknowns());
+                    ++(i < 4 ? inicounter : finicounter);
+                }
+                else
+                    unknowns( idx.GetIdx())= NumUnknowns_++;
+            }
+        }
+    }
+    if (inicounter != NumIniUnknowns())
+        throw DROPSErrCL( "STP1P1IdxDescCL::CreateNumbering: Wrong count of the unknowns on the old interface.\n");
+    if (finicounter != NumFiniUnknowns())
+        throw DROPSErrCL( "STP1P1IdxDescCL::CreateNumbering: Wrong count of the unknowns on the new interface.\n");
+    idx_ini.DeleteNumbering( mg);
+    idx_fini.DeleteNumbering( mg);
+}
+
+
 } // end of namespace DROPS
