@@ -746,6 +746,48 @@ class LocalNumbSTP1P1CL
     bool IsFini (IdxT i) const { return num[i] >= NumIniUnknowns_ && num[i] < NumIniUnknowns_ + NumFiniUnknowns_; }
 };
 
+
+/// \brief P1-discretization and solution of the transport equation on the interface
+class SurfactantcGdGP1CL : public SurfactantP1BaseCL
+{
+  public:
+    MatrixCL A,    ///< diffusion matrix
+             Mder, ///< material-derivative matrix
+             Mdiv, ///< mass matrix with interface-divergence of velocity
+             Mold; ///< mass matrix on old interface: all space-time trial- and test- functions on old interface
+
+  private:
+    STP1P1IdxDescCL st_idx_;
+    VectorCL st_ic_;
+    MatrixCL L_; ///< sum of matrices
+
+  public:
+    SurfactantcGdGP1CL (MultiGridCL& mg,
+        double theta, double D, VecDescCL* v, const VelBndDataT& Bnd_v, VecDescCL& lset_vd, const BndDataCL<>& lsetbnd,
+        int iter= 1000, double tol= 1e-7, double omit_bound= -1.)
+    : SurfactantP1BaseCL( mg, theta, D, v, Bnd_v, lset_vd, lsetbnd, iter, tol, omit_bound)
+    {}
+
+    /// save a copy of the old level-set and velocity; moves ic to oldic; must be called before DoStep.
+    virtual void InitTimeStep () {
+        SurfactantP1BaseCL::InitTimeStep();
+    }
+
+    /// perform one time step
+    virtual void DoStep (double new_t);
+
+    /// \name For internal use only
+    /// The following member functions are added to enable an easier implementation
+    /// of the coupling navstokes-levelset. They should not be called by a common user.
+    /// Use DoStep() instead.
+    ///@{
+    VectorCL InitStep (double new_t);
+    void DoStep (const VectorCL&);
+    void CommitStep ();
+    void Update ();
+    ///@}
+};
+
 } // end of namespace DROPS
 
 #include "surfactant/ifacetransp.tpp"
