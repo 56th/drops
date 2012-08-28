@@ -165,33 +165,39 @@ void SurfactantP1BaseCL::InitTimeStep ()
 
 void SurfactantcGP1CL::Update()
 {
+    // ScopeTimerCL timer( "SurfactantcGP1CL::Update");
     // std::cout << "SurfactantcGP1CL::Update:\n";
-    IdxDescCL* cidx= ic.RowIdx;
 
+    IdxDescCL* cidx= ic.RowIdx;
     M.Data.clear();
     M.SetIdx( cidx, cidx);
-    DROPS::SetupInterfaceMassP1( MG_, &M, lset_vd_, lsetbnd_);
-    // std::cout << "M is set up.\n";
     A.Data.clear();
     A.SetIdx( cidx, cidx);
-    DROPS::SetupLBP1( MG_, &A, lset_vd_, lsetbnd_, D_);
-    // std::cout << "A is set up.\n";
     C.Data.clear();
     C.SetIdx( cidx, cidx);
-    DROPS::SetupConvectionP1( MG_, &C, lset_vd_, lsetbnd_, make_P2Eval( MG_, Bnd_v_, *v_));
-    // std::cout << "C is set up.\n";
     Md.Data.clear();
     Md.SetIdx( cidx, cidx);
-    DROPS::SetupMassDivP1( MG_, &Md, lset_vd_, lsetbnd_, make_P2Eval( MG_, Bnd_v_, *v_));
-    // std::cout << "Md is set up.\n";
+
+    TetraAccumulatorTupleCL accus;
+    InterfaceCommonDataP1CL cdata( lset_vd_, lsetbnd_);
+    accus.push_back( &cdata);
+    InterfaceMatrixAccuP1CL<LocalInterfaceMassP1CL> mass_accu( &M, LocalInterfaceMassP1CL(), cdata, "mass");
+    accus.push_back( &mass_accu);
+    InterfaceMatrixAccuP1CL<LocalLaplaceBeltramiP1CL> lb_accu( &A, LocalLaplaceBeltramiP1CL( D_), cdata, "Laplace-Beltrami");
+    accus.push_back( &lb_accu);
+    accus.push_back_acquire( make_convectionP1_accu( &C,  cdata,  make_P2Eval( MG_, Bnd_v_, *v_), "convection"));
+    accus.push_back_acquire( make_massdivP1_accu   ( &Md, cdata,  make_P2Eval( MG_, Bnd_v_, *v_), "massdiv"));
 
     if (theta_ != 1.0) {
         M2.Data.clear();
         M2.SetIdx( cidx, cidx);
-        DROPS::SetupInterfaceMassP1( MG_, &M2, oldls_, lsetbnd_);
-        // std::cout << "M2 is set up.\n";
+        InterfaceCommonDataP1CL* oldcdata= new InterfaceCommonDataP1CL( oldls_, lsetbnd_);
+        accus.push_back_acquire( oldcdata);
+        accus.push_back_acquire( new InterfaceMatrixAccuP1CL<LocalInterfaceMassP1CL>( &M2, LocalInterfaceMassP1CL(), *oldcdata, "old mass"));
     }
-    std::cout << "SurfactantP1CL::Update: Finished\n";
+    accumulate( accus, MG_, cidx->TriangLevel(), cidx->GetMatchingFunction(), cidx->GetBndInfo());
+
+    // std::cout << "SurfactantP1CL::Update: Finished\n";
 }
 
 VectorCL SurfactantcGP1CL::InitStep (double new_t)
