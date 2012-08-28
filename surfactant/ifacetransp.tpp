@@ -125,6 +125,14 @@ void SetupConvectionP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& 
     // WriteToFile( mat->Data, "convection.txt", "convection");
 }
 
+template <class DiscVelSolT>
+  inline InterfaceMatrixAccuP1CL<LocalInterfaceConvectionP1CL<DiscVelSolT> >*
+  make_convectionP1_accu (MatDescCL* mat, const InterfaceCommonDataP1CL& cdata, const DiscVelSolT& w, std::string name= std::string())
+{
+    return new InterfaceMatrixAccuP1CL<LocalInterfaceConvectionP1CL<DiscVelSolT> >( mat,
+                   LocalInterfaceConvectionP1CL<DiscVelSolT>( w), cdata, name);
+}
+
 
 template <class DiscVelSolT>
 void LocalInterfaceMassDivP1CL<DiscVelSolT>::setup (const TetraCL& t, const InterfaceCommonDataP1CL& cdata)
@@ -171,6 +179,14 @@ void SetupMassDivP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls,
     accumulate( accus, mg, RowIdx->TriangLevel(), RowIdx->GetMatchingFunction(), RowIdx->GetBndInfo());
 
     // WriteToFile( mat->Data, "massdiv.txt", "massdiv");
+}
+
+template <class DiscVelSolT>
+  inline InterfaceMatrixAccuP1CL<LocalInterfaceMassDivP1CL<DiscVelSolT> >*
+  make_massdivP1_accu (MatDescCL* mat, const InterfaceCommonDataP1CL& cdata, const DiscVelSolT& w, std::string name= std::string())
+{
+    return new InterfaceMatrixAccuP1CL<LocalInterfaceMassDivP1CL<DiscVelSolT> >( mat,
+                   LocalInterfaceMassDivP1CL<DiscVelSolT>( w), cdata, name);
 }
 
 } // end of namespace DROPS
