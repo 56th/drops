@@ -185,6 +185,78 @@ class InterfaceMatrixAccuP1CL : public TetraAccumulatorCL
     virtual InterfaceMatrixAccuP1CL* clone (int /*clone_id*/) { return new InterfaceMatrixAccuP1CL( *this); }
 };
 
+/// \brief Accumulate an interface-vector.
+template <class LocalVectorT>
+class InterfaceVectorAccuP1CL : public TetraAccumulatorCL
+{
+  private:
+    const InterfaceCommonDataP1CL& cdata_;
+    std::string name_;
+
+    VecDescCL* y_;
+    LocalVectorT local_vec;
+    IdxT numry[4];
+
+  public:
+    InterfaceVectorAccuP1CL (VecDescCL* y, const LocalVectorT& loc_vec, const InterfaceCommonDataP1CL& cdata,
+                             std::string name= std::string())
+        : cdata_( cdata), name_( name), y_( y), local_vec( loc_vec) {}
+    virtual ~InterfaceVectorAccuP1CL () {}
+
+    void set_name (const std::string& n) { name_= n; }
+
+    virtual void begin_accumulation () {
+        std::cout << "InterfaceVectorAccuP1CL::begin_accumulation";
+        if (name_ != std::string())
+            std::cout << " for \"" << name_ << "\"";
+        std::cout  << ": " << y_->RowIdx->NumUnknowns() << " rows.\n";
+    }
+
+    virtual void finalize_accumulation() {}
+
+    virtual void visit (const TetraCL& t) {
+        const InterfaceCommonDataP1CL& cdata= cdata_.get_clone();
+        if (cdata.empty())
+            return;
+        GetLocalNumbP1NoBnd( numry, t, *y_->RowIdx);
+        local_vec.setup( t, cdata, numry);
+        for (int i= 0; i < 4; ++i)
+            if (numry[i] != NoIdx)
+                y_->Data[numry[i]]+= local_vec.vec[i];
+    }
+
+    virtual InterfaceVectorAccuP1CL* clone (int /*clone_id*/) { return new InterfaceVectorAccuP1CL( *this); }
+};
+
+class LocalVectorP1CL
+{
+  private:
+    instat_scalar_fun_ptr f_;
+    double time_;
+
+    LocalP1CL<> p1[4];
+    std::valarray<double> qp1,
+                          qf;
+    QuadDomain2DCL qdom;
+
+  public:
+    double vec[4];
+
+    LocalVectorP1CL (instat_scalar_fun_ptr f, double time) : f_( f), time_( time) { p1[0][0]= p1[1][1]= p1[2][2]= p1[3][3]= 1.; }
+
+    void setup (const TetraCL& t, const InterfaceCommonDataP1CL& cdata, const IdxT numr[4]) {
+        make_CompositeQuad5Domain2D ( qdom, cdata.surf, t);
+        resize_and_evaluate_on_vertexes( f_, t, qdom, time_, qf);
+        qp1.resize( qdom.vertex_size());
+        for (Uint i= 0; i < 4; ++i) {
+                if (numr[i] == NoIdx)
+                    continue;
+                evaluate_on_vertexes( p1[i], qdom, Addr( qp1));
+                vec[i]= quad_2D( qf*qp1, qdom);
+        }
+    }
+};
+
 
 class LocalInterfaceMassP1CL
 {

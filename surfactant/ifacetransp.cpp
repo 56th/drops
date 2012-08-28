@@ -106,38 +106,12 @@ void SetupLBP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls, cons
 void SetupInterfaceRhsP1 (const MultiGridCL& mg, VecDescCL* v,
     const VecDescCL& ls, const BndDataCL<>& lsetbnd, instat_scalar_fun_ptr f)
 {
-    std::cout << "entering SetupInterfaceRhsP1: " << v->RowIdx->NumUnknowns() << " dof... ";
-
-    const PrincipalLatticeCL& lat= PrincipalLatticeCL::instance( 2);
-    LocalP2CL<> locp2_ls;
-    std::valarray<double> ls_loc( lat.vertex_size());
-    SurfacePatchCL surf;
-    QuadDomain2DCL qdom;
-    IdxT num[4];
-
-    LocalP1CL<> p1[4];
-    p1[0][0]= p1[1][1]= p1[2][2]= p1[3][3]= 1.; // P1-Basis-Functions
-    std::valarray<double> qp1,
-                          qf;
-
-    DROPS_FOR_TRIANG_CONST_TETRA( mg, v->GetLevel(), it) {
-        locp2_ls.assign( *it, ls, lsetbnd);
-        evaluate_on_vertexes( locp2_ls, lat, Addr( ls_loc));
-        if (equal_signs( ls_loc))
-            continue;
-
-        GetLocalNumbP1NoBnd( num, *it, *v->RowIdx);
-        surf.make_patch<MergeCutPolicyCL>( lat, ls_loc);
-        make_CompositeQuad5Domain2D ( qdom, surf, *it);
-        resize_and_evaluate_on_vertexes( f, *it, qdom, v->t, qf);
-        qp1.resize( qdom.vertex_size());
-        for (Uint i= 0; i < 4; ++i)
-            if (num[i] != NoIdx) {
-                evaluate_on_vertexes( p1[i], qdom, Addr( qp1));
-                v->Data[num[i]]+= quad_2D( qf*qp1, qdom);
-            }
-    }
-    std::cout << " Rhs set up." << std::endl;
+    TetraAccumulatorTupleCL accus;
+    InterfaceCommonDataP1CL cdata( ls, lsetbnd);
+    accus.push_back( &cdata);
+    InterfaceVectorAccuP1CL<LocalVectorP1CL> loadaccu( v, LocalVectorP1CL( f, v->t), cdata);
+    accus.push_back( &loadaccu);
+    accumulate( accus, mg, v->RowIdx->TriangLevel(), v->RowIdx->GetMatchingFunction(), v->RowIdx->GetBndInfo());
 
     // WriteToFile( v->Data, "rhs.txt", "Rhs");
 }
