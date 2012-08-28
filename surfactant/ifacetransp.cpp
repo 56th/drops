@@ -185,8 +185,8 @@ void SurfactantcGP1CL::Update()
     accus.push_back( &mass_accu);
     InterfaceMatrixAccuP1CL<LocalLaplaceBeltramiP1CL> lb_accu( &A, LocalLaplaceBeltramiP1CL( D_), cdata, "Laplace-Beltrami");
     accus.push_back( &lb_accu);
-    accus.push_back_acquire( make_convectionP1_accu( &C,  cdata,  make_P2Eval( MG_, Bnd_v_, *v_), "convection"));
-    accus.push_back_acquire( make_massdivP1_accu   ( &Md, cdata,  make_P2Eval( MG_, Bnd_v_, *v_), "massdiv"));
+    accus.push_back_acquire( make_wind_dependent_matrixP1_accu<LocalInterfaceConvectionP1CL>( &C,  cdata,  make_P2Eval( MG_, Bnd_v_, *v_), "convection"));
+    accus.push_back_acquire( make_wind_dependent_matrixP1_accu<LocalInterfaceMassDivP1CL>   ( &Md, cdata,  make_P2Eval( MG_, Bnd_v_, *v_), "massdiv"));
 
     if (theta_ != 1.0) {
         M2.Data.clear();

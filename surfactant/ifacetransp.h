@@ -228,6 +228,8 @@ class InterfaceVectorAccuP1CL : public TetraAccumulatorCL
     virtual InterfaceVectorAccuP1CL* clone (int /*clone_id*/) { return new InterfaceVectorAccuP1CL( *this); }
 };
 
+
+/// \brief Compute the load-vector corresponding to the function f on a single tetra.
 class LocalVectorP1CL
 {
   private:
@@ -256,6 +258,16 @@ class LocalVectorP1CL
         }
     }
 };
+
+
+/// \brief Convenience-function to reduce the number of explicit template-parameters for the massdiv- and the convection-matrix.
+template <template <class> class LocalMatrixT, class DiscVelSolT>
+  inline InterfaceMatrixAccuP1CL< LocalMatrixT<DiscVelSolT> >*
+  make_wind_dependent_matrixP1_accu (MatDescCL* mat, const InterfaceCommonDataP1CL& cdata, const DiscVelSolT& wind, std::string name= std::string())
+{
+    return new InterfaceMatrixAccuP1CL< LocalMatrixT<DiscVelSolT> >( mat,
+        LocalMatrixT<DiscVelSolT>( wind), cdata, name);
+}
 
 
 class LocalInterfaceMassP1CL
