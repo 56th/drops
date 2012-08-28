@@ -259,6 +259,42 @@ class LocalVectorP1CL
     }
 };
 
+/// \brief Compute local_mat_*x_ on a single tetra.
+template <class  LocalMatrixT>
+class LocalMatVecP1CL
+{
+  private:
+    LocalMatrixT local_mat_;
+    IdxT numx_[4];
+    const VecDescCL& x_;
+
+  public:
+    double vec[4];
+
+    LocalMatVecP1CL (const LocalMatrixT& local_mat, const VecDescCL* x) : local_mat_( local_mat), x_( *x) {}
+
+    void setup (const TetraCL& t, const InterfaceCommonDataP1CL& cdata, const IdxT numr[4]) {
+        local_mat_.setup( t, cdata);
+        GetLocalNumbP1NoBnd( numx_, t, *x_.RowIdx);
+        for (int i= 0; i < 4; ++i) {
+            vec[i]= 0.;
+            if (numr[i] != NoIdx)
+                for (int j= 0; j < 4; ++j)
+                    if (numx_[j] != NoIdx)
+                        vec[i]+= local_mat_.coup[i][j]*x_.Data[numx_[j]];
+        }
+    }
+};
+
+
+/// \brief Convenience-function to reduce the number of explicit template-parameters for the massdiv- and the convection-rhs.
+template <template <class> class LocalMatrixT, class DiscVelSolT>
+  inline InterfaceVectorAccuP1CL<LocalMatVecP1CL< LocalMatrixT<DiscVelSolT> > >*
+  make_wind_dependent_vectorP1_accu (VecDescCL* y, const VecDescCL* x, const InterfaceCommonDataP1CL& cdata, const DiscVelSolT& wind, std::string name= std::string())
+{
+    return new InterfaceVectorAccuP1CL<LocalMatVecP1CL< LocalMatrixT<DiscVelSolT> > >( y,
+        LocalMatVecP1CL< LocalMatrixT<DiscVelSolT> >( LocalMatrixT<DiscVelSolT>( wind), x), cdata, name);
+}
 
 /// \brief Convenience-function to reduce the number of explicit template-parameters for the massdiv- and the convection-matrix.
 template <template <class> class LocalMatrixT, class DiscVelSolT>

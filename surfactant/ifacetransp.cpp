@@ -202,53 +202,57 @@ void SurfactantcGP1CL::Update()
 
 VectorCL SurfactantcGP1CL::InitStep (double new_t)
 {
-
+    // ScopeTimerCL timer( "SurfactantcGP1CL::InitStep");
     // std::cout << "SurfactantcGP1CL::InitStep:\n";
+
     ic.t= new_t;
-    dt_= ic.t - oldt_;
+    dt_= new_t - oldt_;
     idx.CreateNumbering( oldidx_.TriangLevel(), MG_, &lset_vd_, &lsetbnd_); // InitOld deletes oldidx_ and swaps idx and oldidx_.
     std::cout << "new NumUnknowns: " << idx.NumUnknowns() << std::endl;
     ic.SetIdx( &idx);
 
-    MatDescCL m( &idx, &oldidx_);
-    DROPS::SetupMixedMassP1( MG_, &m, lset_vd_, lsetbnd_);
-    // std::cout << "mixed M on new interface is set up.\n";
-    VectorCL rhs( theta_*(m.Data*oldic_));
+    VecDescCL vd_timeder( &idx),    // right-hand sides from integrals over the old/new interface
+              vd_oldtimeder( &idx),
+              vd_load( &idx),
+              vd_oldres( &idx),
+              vd_oldload( &idx),
+              vd_oldic( &oldidx_);  // the initial data.
+    vd_oldic.Data= oldic_;
+    vd_oldic.t= oldt_;
 
-    if (rhs_fun_) {
-        VecDescCL load( &idx);
-        load.t= new_t;
-        DROPS::SetupInterfaceRhsP1 (MG_, &load, lset_vd_, lsetbnd_, rhs_fun_);
-        rhs+= theta_*dt_*load.Data;
+    TetraAccumulatorTupleCL accus;
+    InterfaceCommonDataP1CL cdata( lset_vd_, lsetbnd_);
+    accus.push_back( &cdata);
+    InterfaceVectorAccuP1CL< LocalMatVecP1CL<LocalInterfaceMassP1CL> > mass_accu( &vd_timeder,
+        LocalMatVecP1CL<LocalInterfaceMassP1CL>( LocalInterfaceMassP1CL(), &vd_oldic), cdata, "mixed-mass");
+    accus.push_back( &mass_accu);
+
+    if (rhs_fun_)
+        accus.push_back_acquire( new InterfaceVectorAccuP1CL<LocalVectorP1CL>( &vd_load, LocalVectorP1CL( rhs_fun_, new_t), cdata, "load"));
+
+    if (theta_ == 1.0) {
+        accumulate( accus, MG_, idx.TriangLevel(), idx.GetMatchingFunction(), idx.GetBndInfo());
+        return VectorCL( theta_*(vd_timeder.Data + dt_*vd_load.Data));
     }
 
-    if (theta_ == 1.0) return rhs;
+    InterfaceCommonDataP1CL oldcdata( oldls_, lsetbnd_);
+    accus.push_back( &oldcdata);
 
-    m.Data.clear();
-    DROPS::SetupMixedMassP1( MG_, &m, oldls_, lsetbnd_);
-    // std::cout << "mixed M on old interface is set up.\n";
-    rhs+= (1. - theta_)*(m.Data*oldic_);
+    if (rhs_fun_)
+        accus.push_back_acquire( new InterfaceVectorAccuP1CL<LocalVectorP1CL>( &vd_oldload, LocalVectorP1CL( rhs_fun_, oldt_), oldcdata, "load on old iface"));
 
-    m.Data.clear();
-    DROPS::SetupLBP1( MG_, &m, oldls_, lsetbnd_, D_);
-    // std::cout << "mixed A on old interface is set up.\n";
-    VectorCL rhs2( m.Data*oldic_);
-    m.Data.clear();
-    DROPS::SetupConvectionP1( MG_, &m, oldls_, lsetbnd_, make_P2Eval( MG_, Bnd_v_, oldv_));
-    // std::cout << "mixed C on old interface is set up.\n";
-    rhs2+= m.Data*oldic_;
-    m.Data.clear();
-    DROPS::SetupMassDivP1( MG_, &m, oldls_, lsetbnd_, make_P2Eval( MG_, Bnd_v_, oldv_));
-    // std::cout << "mixed Md on old interface is set up.\n";
-    rhs2+= m.Data*oldic_;
-    if (rhs_fun_) {
-        VecDescCL load( &idx);
-        load.t= new_t - dt_;
-        DROPS::SetupInterfaceRhsP1( MG_, &load, oldls_, lsetbnd_, rhs_fun_);
-        rhs+= (1. - theta_)*dt_*load.Data;
-    }
+    InterfaceVectorAccuP1CL< LocalMatVecP1CL<LocalInterfaceMassP1CL> > old_mass_accu( &vd_oldtimeder,
+        LocalMatVecP1CL<LocalInterfaceMassP1CL>( LocalInterfaceMassP1CL(), &vd_oldic), oldcdata, "mixed-mass on old iface");
+    accus.push_back( &old_mass_accu);
+    InterfaceVectorAccuP1CL< LocalMatVecP1CL<LocalLaplaceBeltramiP1CL> > old_lb_accu( &vd_oldres,
+        LocalMatVecP1CL<LocalLaplaceBeltramiP1CL>( LocalLaplaceBeltramiP1CL( D_), &vd_oldic), oldcdata, "Laplace-Beltrami on old iface");
+    accus.push_back( &old_lb_accu);
+    accus.push_back_acquire( make_wind_dependent_vectorP1_accu<LocalInterfaceConvectionP1CL>( &vd_oldres, &vd_oldic,  oldcdata,  make_P2Eval( MG_, Bnd_v_, oldv_), "convection on old iface"));
+    accus.push_back_acquire( make_wind_dependent_vectorP1_accu<LocalInterfaceMassDivP1CL>   ( &vd_oldres, &vd_oldic,  oldcdata,  make_P2Eval( MG_, Bnd_v_, oldv_), "mass-div on old iface"));
 
-    return VectorCL( rhs - ((1. - theta_)*dt_)*rhs2);
+    accumulate( accus, MG_, idx.TriangLevel(), idx.GetMatchingFunction(), idx.GetBndInfo());
+    return VectorCL( theta_*vd_timeder.Data + (1. - theta_)*vd_oldtimeder.Data
+                   + dt_*(theta_*vd_load.Data + (1. - theta_)*(vd_oldload.Data - vd_oldres.Data)));
 }
 
 void SurfactantcGP1CL::DoStep (const VectorCL& rhs)
