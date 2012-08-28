@@ -132,7 +132,7 @@ class InterfaceMatrixAccuP1CL : public TetraAccumulatorCL
 {
   private:
     const InterfaceCommonDataP1CL& cdata_;
-    std::string name;
+    std::string name_;
 
     MatDescCL* mat_; // the matrix
     MatrixBuilderCL* M;
@@ -144,25 +144,32 @@ class InterfaceMatrixAccuP1CL : public TetraAccumulatorCL
          numc[4];
 
   public:
-    InterfaceMatrixAccuP1CL (MatDescCL* Mmat, const LocalMatrixT& loc_mat, const InterfaceCommonDataP1CL& cdata)
-        : cdata_( cdata), mat_( Mmat), M( 0), local_mat( loc_mat) {}
+    InterfaceMatrixAccuP1CL (MatDescCL* Mmat, const LocalMatrixT& loc_mat, const InterfaceCommonDataP1CL& cdata,
+                             std::string name= std::string())
+        : cdata_( cdata), name_( name), mat_( Mmat), M( 0), local_mat( loc_mat) {}
     virtual ~InterfaceMatrixAccuP1CL () {}
 
-    void set_name (const std::string& n) { name= n; }
+    void set_name (const std::string& n) { name_= n; }
 
-    virtual void begin_accumulation   () {
+    virtual void begin_accumulation () {
         const IdxT num_rows= mat_->RowIdx->NumUnknowns();
         const IdxT num_cols= mat_->ColIdx->NumUnknowns();
-        std::cout << "entering InterfaceMatrixAccuP1CL::begin_accumulation for " << name << ": " << num_rows << " rows, " << num_cols << " cols, ";
+        std::cout << "InterfaceMatrixAccuP1CL::begin_accumulation";
+        if (name_ != std::string())
+            std::cout << " for \"" << name_ << "\"";
+        std::cout  << ": " << num_rows << " rows, " << num_cols << " cols.\n";
         lvl = mat_->GetRowLevel();
         M= new MatrixBuilderCL( &mat_->Data, num_rows, num_cols);
     }
 
-    virtual void finalize_accumulation() {
+    virtual void finalize_accumulation () {
         M->Build();
         delete M;
         M= 0;
-        std::cout << mat_->Data.num_nonzeros() << " nonzeros." << std::endl;
+        std::cout << "InterfaceMatrixAccuP1CL::finalize_accumulation";
+        if (name_ != std::string())
+            std::cout << " for \"" << name_ << "\"";
+        std::cout << ": " << mat_->Data.num_nonzeros() << " nonzeros." << std::endl;
     }
 
     virtual void visit (const TetraCL& t) {
