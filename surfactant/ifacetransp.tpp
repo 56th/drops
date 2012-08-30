@@ -67,18 +67,17 @@ template <class ResultContainerT>
 
     QRDecompCL<4,3> qr;
     SMatrixCL<4,3>& M= qr.GetMatrix();
-    Point4DCL tmp( Uninitialized);
     double tmp_norm;
     for (SPatchCL<4>::const_facet_iterator it= p.facet_begin(); it != p.facet_end(); ++it) {
         const Point4DCL& v0= GetWorldCoord( prism, verts[(*it)[0]]);
         for (Uint i= 1; i < 4; ++i)
             M.col( i - 1, GetWorldCoord( prism, verts[(*it)[i]]) - v0);
         const bool is_rank_deficient= qr.prepare_solve( /*assume_full_rank*/ false);
-        tmp= 0.;
+        Point4DCL tmp;
         if (is_rank_deficient) {
             *n_it++= tmp;
             if (absdet)
-                a_it++= 0.;
+                *a_it++= 0.;
         }
         else {
             tmp[3]= 1.;
