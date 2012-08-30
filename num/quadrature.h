@@ -230,8 +230,9 @@ class QuadDomainCL
 /// \brief Create a composite quadrature rule for a surface-patch.
 /// No sharing of quadrature points is performed.
 /// The template-parameter QuadDataT must be given explicitly.
+/// The Policy-Template AbsdetPolicyT depends on the dimension Dim; choices are Codim1AbsdetCL for the standard absdet and TrivialAbsdetCL for absdet==1. The latter is actually useful, because on the spacetime, the iterated integral \int_t \int_{\Gamma(t)} equals (approximately) the spacetime-integral \int_\mathcal{G}, where one uses TrivialAbsdetCL.
 /// Helpers for common QuadData_2DCL are given below.
-template <class QuadDataT, Uint Dim>
+template <class QuadDataT,  template <Uint> class AbsdetPolicyT, Uint Dim>
   const QuadDomainCodim1CL<Dim>&
   make_CompositeQuadDomainCodim1 (QuadDomainCodim1CL<Dim>& q, const SPatchCL<Dim>& p, const  typename DimensionTraitsCL<Dim>::WorldBodyT& t);
 
@@ -249,6 +250,12 @@ make_CompositeQuad5Domain2D (QuadDomain2DCL& q, const SurfacePatchCL& p, const T
 
 inline const QuadDomainCodim1CL<4>&
 make_CompositeQuad5DomainSTCodim1 (QuadDomainCodim1CL<4>& q, const SPatchCL<4>& p, const TetraPrismCL& t);
+
+inline const QuadDomainCodim1CL<4>&
+make_CompositeQuad5DomainSTCodim1WithoutAbsdet (QuadDomainCodim1CL<4>& q, const SPatchCL<4>& p, const TetraPrismCL& t);
+
+inline const QuadDomainCodim1CL<4>&
+make_CompositeQuad2DomainSTCodim1WithoutAbsdet (QuadDomainCodim1CL<4>& q, const SPatchCL<4>& p, const TetraPrismCL& t);
 
 /// \brief Create an extrapolated quadrature rule.
 /// No sharing of quadrature points is performed.
@@ -285,7 +292,7 @@ class QuadDomainCodim1CL
 
     /// Friend declaration for the factory methods; if their number becomes to big, a more elaborate factory-design is in order.
     ///@{
-    template <class QuadDataT, Uint D>
+    template <class QuadDataT,  template <Uint> class AbsdetPolicyT, Uint D>
       friend const QuadDomainCodim1CL<D>&
       make_CompositeQuadDomainCodim1 (QuadDomainCodim1CL<D>& q,
                                   const SPatchCL<D>& p,
