@@ -692,6 +692,8 @@ class LocalSTP1P1CL
     typedef T (*instat_fun_ptr) (const Point3DCL&, double);
     typedef LocalP1CL<T> spatial_localfe_type;
 
+    enum { Dim= 8 }; ///< local number of unknowns
+
   protected:
     typedef LocalSTP1P1CL<T> self_;
 
@@ -840,9 +842,12 @@ class LocalNumbSTP1P1CL
            NumFiniUnknowns_;
 
   public:
+    enum { Dim= 8 }; ///< local number of unknowns (max.)
+
     /// \brief Field of unknown-indices; NoIdx, iff the degree of freedom lies
     /// on a boundary without unknowns.
-    IdxT num[8];
+    IdxT num[Dim];
+
 
     /// \brief The default constructors leaves everything uninitialized.
     LocalNumbSTP1P1CL() {}
@@ -872,6 +877,161 @@ class LocalNumbSTP1P1CL
     /// \briref True, iff the shape function exists on the new interface.
     bool IsFini (IdxT i) const { return num[i] >= NumIniUnknowns_ && num[i] < NumIniUnknowns_ + NumFiniUnknowns_; }
 };
+
+
+template <typename LocalRowNumbT, typename LocalColNumbT>
+  inline void
+  update_global_matrix (MatrixBuilderCL& M, const double coup[LocalRowNumbT::Dim][LocalColNumbT::Dim], const LocalRowNumbT& r, const LocalColNumbT& c)
+{
+    for (Uint i= 0; i < LocalRowNumbT::Dim; ++i)
+        if (r.num[i] != NoIdx)
+            for (Uint j= 0; j < LocalColNumbT::Dim; ++j)
+                if (c.num[j] != NoIdx)
+                    M( r.num[i], c.num[j])+= coup[i][j];
+}
+
+
+class STInterfaceCommonDataCL : public TetraAccumulatorCL
+{
+  private:
+    STInterfaceCommonDataCL** the_clones;
+
+    LocalP2CL<> oldlocp2_ls,
+                newlocp2_ls;
+    LocalSTP2P1ProxyCL<> st_local_ls;
+
+    const VecDescCL*   old_ls;  // P2-level-set at t0
+    const VecDescCL*   new_ls;  // P2-level-set at t1
+    const BndDataCL<>* lsetbnd; // boundary data for the level set function
+
+  public:
+    const TetraPrismLatticeCL& lat;
+
+    std::valarray<double> ls_loc;
+    SPatchCL<4> surf;
+    GridFunctionCL<Point4DCL> n;
+
+    const double t0,
+                 t1;
+
+    const STInterfaceCommonDataCL& get_clone () const {
+        const int tid= omp_get_thread_num();
+        return tid == 0 ? *this : the_clones[tid][0];
+    }
+    bool empty () const { return surf.empty(); }
+
+    STInterfaceCommonDataCL (double t0arg, double t1arg, const VecDescCL& oldls_arg, const VecDescCL& newls_arg, const BndDataCL<>& lsetbnd_arg)
+        : st_local_ls( oldlocp2_ls, newlocp2_ls), old_ls( &oldls_arg), new_ls( &newls_arg), lsetbnd( &lsetbnd_arg), lat( TetraPrismLatticeCL::instance( 2, 1)), ls_loc( lat.vertex_size()), t0( t0arg), t1( t1arg)
+    {}
+
+    virtual ~STInterfaceCommonDataCL () {}
+
+    virtual void begin_accumulation   () {
+        the_clones= new STInterfaceCommonDataCL*[omp_get_max_threads()];
+        the_clones[0]= this;
+    }
+    virtual void finalize_accumulation() {
+        delete[] the_clones;
+    }
+    virtual void visit (const TetraCL& t) {
+        surf.clear();
+        n.resize( 0);
+        oldlocp2_ls.assign( t, *old_ls, *lsetbnd);
+        newlocp2_ls.assign( t, *new_ls, *lsetbnd);
+        evaluate_on_vertexes( st_local_ls, lat, Addr( ls_loc));
+        if (equal_signs( ls_loc))
+            return;
+        surf.make_patch<MergeCutPolicyCL>( lat, ls_loc);
+        resize_and_evaluate_piecewise_normal( surf, TetraPrismCL( t, t0, t1), n);
+    }
+    virtual STInterfaceCommonDataCL* clone (int clone_id) {
+        return the_clones[clone_id]= new STInterfaceCommonDataCL( *this);
+    }
+};
+
+template <class LocalMatrixT>
+class InterfaceMatrixSTP1P1AccuCL : public TetraAccumulatorCL
+{
+  private:
+    const STInterfaceCommonDataCL& cdata_;
+    std::string name_;
+
+    MatrixCL* mat_; // the matrix
+    const STP1P1IdxDescCL* rowidx_;
+    const STP1P1IdxDescCL* colidx_;
+
+    MatrixBuilderCL* M;
+
+    LocalMatrixT local_mat;
+
+    LocalNumbSTP1P1CL locrow,
+                      loccol;
+
+  public:
+    InterfaceMatrixSTP1P1AccuCL (MatrixCL* mat, const STP1P1IdxDescCL* rowidx, const STP1P1IdxDescCL* colidx,
+                                 const LocalMatrixT& loc_mat, const STInterfaceCommonDataCL& cdata, std::string name= std::string())
+        : cdata_( cdata), name_( name), mat_( mat), rowidx_( rowidx), colidx_( colidx), M( 0), local_mat( loc_mat) {}
+    virtual ~InterfaceMatrixSTP1P1AccuCL () {}
+
+    void set_name (const std::string& n) { name_= n; }
+
+    virtual void begin_accumulation () {
+        const IdxT num_rows= rowidx_->NumUnknowns();
+        const IdxT num_cols= colidx_->NumUnknowns();
+        std::cout << "STInterfaceMatrixAccuP1CL::begin_accumulation";
+        if (name_ != std::string())
+            std::cout << " for \"" << name_ << "\"";
+        std::cout  << ": " << num_rows << " rows, " << num_cols << " cols.\n";
+        M= new MatrixBuilderCL( mat_, num_rows, num_cols);
+    }
+
+    virtual void finalize_accumulation () {
+        M->Build();
+        delete M;
+        M= 0;
+        std::cout << "STInterfaceMatrixAccuP1CL::finalize_accumulation";
+        if (name_ != std::string())
+            std::cout << " for \"" << name_ << "\"";
+        std::cout << ": " << mat_->num_nonzeros() << " nonzeros." << std::endl;
+    }
+
+    virtual void visit (const TetraCL& t) {
+        const STInterfaceCommonDataCL& cdata= cdata_.get_clone();
+        if (cdata.empty())
+            return;
+        local_mat.setup( TetraPrismCL( t, cdata.t0, cdata.t1), cdata);
+        locrow.assign_indices_only( t, *rowidx_);
+        loccol.assign_indices_only( t, *colidx_);
+        update_global_matrix( *M, local_mat.coup, locrow, loccol);
+    }
+
+    virtual InterfaceMatrixSTP1P1AccuCL* clone (int /*clone_id*/) { return new InterfaceMatrixSTP1P1AccuCL( *this); }
+};
+
+
+class LocalSpatialInterfaceMassSTP1P1CL
+{
+  private:
+    const InterfaceCommonDataP1CL& spatialcdata_;
+    LocalInterfaceMassP1CL spatial_mass_;
+
+  public:
+    double coup[8][8];
+
+    LocalSpatialInterfaceMassSTP1P1CL (const InterfaceCommonDataP1CL& spatialcdata)
+        : spatialcdata_( spatialcdata) { std::memset( coup, 0, 8*8*sizeof(double)); }
+
+    void setup (const TetraPrismCL& p, const STInterfaceCommonDataCL&) {
+        spatial_mass_.setup( p.t, spatialcdata_);
+        // The basis functions for t1 are all zero on the interface at t0 --> zero-init in the constructor.
+        for (int i= 0; i < 4; ++i) {
+            coup[i][i]= spatial_mass_.coup[i][i];
+            for(int j= 0; j < i; ++j)
+                coup[i][j]= coup[j][i]= spatial_mass_.coup[i][j];
+        }
+    }
+};
+
 
 
 /// \brief P1-discretization and solution of the transport equation on the interface

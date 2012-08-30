@@ -487,6 +487,31 @@ VectorCL SurfactantcGdGP1CL::InitStep (double new_t)
 void SurfactantcGdGP1CL::Update()
 {
     std::cout << "SurfactantcGP1CL::Update:\n";
+    TetraAccumulatorTupleCL accus;
+    InterfaceCommonDataP1CL oldspatialcdata( oldls_, lsetbnd_);
+    accus.push_back( &oldspatialcdata);
+    STInterfaceCommonDataCL cdata( oldt_, ic.t,  oldls_, lset_vd_, lsetbnd_);
+    accus.push_back( &cdata);
+    InterfaceMatrixSTP1P1AccuCL<LocalSpatialInterfaceMassSTP1P1CL> oldmass_accu( &Mold, &st_idx_, &st_idx_,
+        LocalSpatialInterfaceMassSTP1P1CL( oldspatialcdata), cdata, "mass on old iface");
+    accus.push_back( &oldmass_accu);
+    IdxDescCL idx_ini( P1IF_FE);
+    MatDescCL vd_old( &oldidx_, &oldidx_); // The old index is exactly the ini-index.
+    InterfaceMatrixAccuP1CL<LocalInterfaceMassP1CL> oldmass2_accu( &vd_old,
+        LocalInterfaceMassP1CL(), oldspatialcdata, "mixed-mass on old iface");
+    accus.push_back( &oldmass2_accu);
+
+    accumulate( accus, MG_, st_idx_.TriangLevel(), idx.GetMatchingFunction(), idx.GetBndInfo());
+
+    WriteToFile( vd_old.Data, "Moldsmall.txt", "mass on old iface");
+    MatrixCL Mold2( st_idx_.NumUnknowns(), st_idx_.NumUnknowns(), vd_old.Data.num_nonzeros());
+    std::copy( vd_old.Data.raw_col(), vd_old.Data.raw_col() + vd_old.Data.num_nonzeros(), Mold2.raw_col());
+    std::copy( vd_old.Data.raw_val(), vd_old.Data.raw_val() + vd_old.Data.num_nonzeros(), Mold2.raw_val());
+    std::copy( vd_old.Data.raw_row(), vd_old.Data.raw_row() + vd_old.Data.num_rows(), Mold2.raw_row());
+    for (Uint i= vd_old.Data.num_rows(); i <= Mold2.num_rows(); ++i)
+        Mold2.raw_row()[i]= vd_old.Data.raw_row()[vd_old.Data.num_rows()];
+    WriteToFile( Mold2, "Mold2.txt", "mass on old iface");
+    WriteToFile( Mold, "Mold.txt", "mass on old iface");
 
     std::cout << "SurfactantcGdGP1CL::Update: Finished\n";
 }
