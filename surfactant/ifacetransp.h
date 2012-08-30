@@ -80,14 +80,14 @@ class InterfaceCommonDataP1CL : public TetraAccumulatorCL
   private:
     InterfaceCommonDataP1CL** the_clones;
 
+    const VecDescCL*   ls;      // P2-level-set
+    const BndDataCL<>* lsetbnd; // boundary data for the level set function
+    LocalP2CL<> locp2_ls;
+
   public:
     const PrincipalLatticeCL& lat;
     LocalP1CL<> p1[4];
 
-    const VecDescCL*   ls;      // P2-level-set
-    const BndDataCL<>* lsetbnd; // boundary data for the level set function
-
-    LocalP2CL<> locp2_ls;
     std::valarray<double> ls_loc;
     SurfacePatchCL surf;
 
@@ -99,10 +99,10 @@ class InterfaceCommonDataP1CL : public TetraAccumulatorCL
     bool empty () const { return surf.empty(); }
 
     InterfaceCommonDataP1CL (const VecDescCL& ls_arg, const BndDataCL<>& lsetbnd_arg)
-        : lat( PrincipalLatticeCL::instance( 2)), ls( &ls_arg), lsetbnd( &lsetbnd_arg), ls_loc( lat.vertex_size())
+        : ls( &ls_arg), lsetbnd( &lsetbnd_arg), lat( PrincipalLatticeCL::instance( 2)), ls_loc( lat.vertex_size())
     { p1[0][0]= p1[1][1]= p1[2][2]= p1[3][3]= 1.; } // P1-Basis-Functions
     InterfaceCommonDataP1CL ()
-        : lat( PrincipalLatticeCL::instance( 2)), ls( 0), lsetbnd( 0)
+        : ls( 0), lsetbnd( 0), lat( PrincipalLatticeCL::instance( 2))
     { p1[0][0]= p1[1][1]= p1[2][2]= p1[3][3]= 1.; } // P1-Basis-Functions
 
     virtual ~InterfaceCommonDataP1CL () {}
