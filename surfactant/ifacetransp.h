@@ -1103,6 +1103,45 @@ class LocalSpatialInterfaceMassSTP1P1CL
     }
 };
 
+void
+resize_and_scatter_piecewise_spatial_normal (const GridFunctionCL<Point4DCL>& n, const QuadDomainCodim1CL<4>& qdom, std::valarray<Point3DCL>& spatial_normal);
+
+class LocalLaplaceBeltramiSTP1P1CL
+{
+  private:
+    double D_; // diffusion coefficient
+
+    LocalSTP1P1CL<Point3DCL> gradx[8];
+    double dummy;
+    GridFunctionCL<Point3DCL> qgradx[8],
+                              q[8],
+                              spatial_n;
+    QuadDomainCodim1CL<4> qdom;
+
+  public:
+    double coup[8][8];
+
+    void setup (const TetraPrismCL& prism, const STInterfaceCommonDataCL& cdata) {
+        make_CompositeQuad2DomainSTCodim1SpatialAbsdet( qdom, cdata.surf, prism);
+        resize_and_scatter_piecewise_spatial_normal( cdata.n, qdom, spatial_n);
+
+        STP1P1DiscCL::GetSpatialGradients( prism, gradx);
+        for (int i= 0; i < 8; ++i) {
+            resize_and_evaluate_on_vertexes( gradx[i], qdom, qgradx[i]);
+            q[i].resize( qdom.vertex_size());
+            q[i]= qgradx[i] - dot( qgradx[i], spatial_n)*spatial_n;
+        }
+
+        for (int i= 0; i < 8; ++i) {
+            coup[i][i]= D_* quad_codim1( dot( q[i], q[i]), qdom);
+            for(int j= 0; j < i; ++j)
+                coup[i][j]= coup[j][i]= D_* quad_codim1( dot( q[i], q[j]), qdom);
+        }
+    }
+
+    LocalLaplaceBeltramiSTP1P1CL (double D)
+        :D_( D) {}
+};
 
 
 /// \brief P1-discretization and solution of the transport equation on the interface

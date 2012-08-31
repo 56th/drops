@@ -456,6 +456,26 @@ void STP1P1IdxDescCL::CreateNumbering (Uint level, MultiGridCL& mg, const VecDes
 }
 
 
+void
+resize_and_scatter_piecewise_spatial_normal (const GridFunctionCL<Point4DCL>& n, const QuadDomainCodim1CL<4>& qdom, std::valarray<Point3DCL>& spatial_normal)
+{
+    spatial_normal.resize( qdom.vertex_size());
+    if (spatial_normal.size() == 0)
+        return;
+
+    const Uint NodesPerFacet= qdom.vertex_size()/n.size();
+    if (qdom.vertex_size()%n.size() != 0)
+        throw DROPSErrCL( "resize_and_scatter_piecewise_spatial_normal: qdom.vertex_size is not a multiple of n.size.\n");
+
+    for (Uint i= 0; i < n.size(); ++i) {
+        const Point3DCL& tmp= MakePoint3D( n[i][0], n[i][1], n[i][2]);
+        const Point3DCL& unittmp= tmp/tmp.norm();
+        for (Uint j= 0; j < NodesPerFacet; ++j)
+            spatial_normal[i*NodesPerFacet + j]= unittmp;
+    }
+}
+
+
 VectorCL SurfactantcGdGP1CL::InitStep (double new_t)
 {
     std::cout << "SurfactantcGdGP1CL::InitStep:\n";
@@ -496,6 +516,9 @@ void SurfactantcGdGP1CL::Update()
     accus.push_back( &oldmass_accu);
     STInterfaceCommonDataCL cdata( oldt_, ic.t,  oldls_, lset_vd_, lsetbnd_);
     accus.push_back( &cdata);
+    InterfaceMatrixSTP1P1AccuCL<LocalLaplaceBeltramiSTP1P1CL> lb_accu( &A, &st_idx_, &st_idx_,
+        LocalLaplaceBeltramiSTP1P1CL( D_), cdata, "Laplace-Beltrami on ST-iface");
+    accus.push_back( &lb_accu);
 
     accumulate( accus, MG_, st_idx_.TriangLevel(), idx.GetMatchingFunction(), idx.GetBndInfo());
 
@@ -507,6 +530,7 @@ void SurfactantcGdGP1CL::Update()
     for (Uint i= vd_old.Data.num_rows(); i <= Mold.num_rows(); ++i)
         Mold.raw_row()[i]= vd_old.Data.raw_row()[vd_old.Data.num_rows()];
     // WriteToFile( Mold, "Mold.txt", "mass on old iface");
+    // WriteToFile( A,    "A.txt",    "Laplace-Beltrami on ST-iface");
 
     std::cout << "SurfactantcGdGP1CL::Update: Finished\n";
 }
