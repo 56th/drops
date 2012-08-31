@@ -780,7 +780,7 @@ class STP1P1DiscCL
         GetTrafoTr( M, det, prism.t);
         const double dt_inv= 1./(prism.t1 - prism.t0);
         for (Uint i= 0; i < 4; ++i) {
-            const Point3DCL p1grad( M*FE_P1CL::DHRef( i));
+            const Point3DCL& p1grad= M*FE_P1CL::DHRef( i);
             for (Uint j= 0; j < 4; ++j) {
                 grad[i    ].at_t0()[j]= MakePoint4D( p1grad[0], p1grad[1], p1grad[2], j == i ? -dt_inv : 0.);
                 grad[i + 4].at_t1()[j]= MakePoint4D( p1grad[0], p1grad[1], p1grad[2], j == i ?  dt_inv : 0.);
@@ -789,7 +789,78 @@ class STP1P1DiscCL
             }
         }
     }
+    static void GetSpatialGradients (const TetraPrismCL& prism, LocalSTP1P1CL<Point3DCL> grad[8]) {
+        SMatrixCL<3,3> M( Uninitialized);
+        double det= 0.; // dummy
+        GetTrafoTr( M, det, prism.t);
+        for (Uint i= 0; i < 4; ++i) {
+            const Point3DCL& p1grad= M*FE_P1CL::DHRef( i);
+            for (Uint j= 0; j < 4; ++j) {
+                grad[i    ].at_t0()[j]= p1grad;
+                grad[i + 4].at_t1()[j]= p1grad;
+            }
+        }
+    }
 };
+
+
+///\brief Compute (space-time) world-coordinates from a tetra-prism and STCoord-coordinates.
+/// This class is suited for many consecutive evaluations. It can be used in std-algorithms.
+class STCoord2WorldCoordCL
+{
+  private:
+    const Bary2WorldCoordCL space_mapper_;
+    const double t0_,
+                 dt_;
+
+  public:
+    typedef Point4DCL value_type;
+
+    STCoord2WorldCoordCL (const TetraPrismCL& prism)
+        : space_mapper_( prism.t), t0_( prism.t0), dt_( prism.t1 - prism.t0) {}
+
+    Point3DCL space (const STCoordCL& b) const { return space_mapper_( b.x_bary); }
+    double    time  (const STCoordCL& b) const { return t0_ + dt_*b.t_ref; }
+    Point4DCL operator() (const STCoordCL& b) const {
+        const Point3DCL& x( space( b));
+        return MakePoint4D( x[0], x[1], x[2], time( b));
+    }
+};
+
+///\brief Evaluates a function expecting world-coordinates and time as arguments in STCoord-coordinates on a tetra-prism.
+template <class T= double>
+class STCoordEvalCL
+{
+  public:
+    typedef T (*fun_type)(const Point3DCL&, double);
+    typedef T value_type;
+
+  private:
+    STCoord2WorldCoordCL mapper_;
+    fun_type f_;
+
+  public:
+    STCoordEvalCL (const TetraPrismCL& prism, fun_type f)
+        : mapper_( prism), f_(f) {}
+
+    value_type operator() (const STCoordCL& b) const { return f_( mapper_.space( b), mapper_.time( b)); }
+};
+
+template <class T, class DomainT, class ResultIterT>
+  inline ResultIterT
+  evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const TetraPrismCL& prism, const DomainT& dom, ResultIterT result_iterator)
+{
+    return std::transform( dom.vertex_begin(), dom.vertex_end(), result_iterator, STCoordEvalCL<T>( prism, f));
+}
+
+template <class T, class DomainT, class ResultContT>
+  inline const ResultContT&
+  resize_and_evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const TetraPrismCL& prism, const DomainT& dom, ResultContT& result_container)
+{
+    result_container.resize( dom.vertex_size());
+    evaluate_on_vertexes( f, prism, dom, sequence_begin( result_container));
+    return result_container;
+}
 
 
 //idx_ini: oldls, oldt, IFP1_FE (0.. N_ini-1)
