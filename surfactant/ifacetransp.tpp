@@ -67,7 +67,6 @@ template <class ResultContainerT>
 
     QRDecompCL<4,3> qr;
     SMatrixCL<4,3>& M= qr.GetMatrix();
-    double tmp_norm;
     for (SPatchCL<4>::const_facet_iterator it= p.facet_begin(); it != p.facet_end(); ++it) {
         const Point4DCL& v0= GetWorldCoord( prism, verts[(*it)[0]]);
         for (Uint i= 1; i < 4; ++i)
@@ -81,11 +80,10 @@ template <class ResultContainerT>
         }
         else {
             tmp[3]= 1.;
-            qr.apply_Q( tmp);
-            tmp_norm= tmp.norm();
-            *n_it++= tmp/tmp_norm;
+            qr.apply_Q( tmp); // tmp has unit length.
+            *n_it++= tmp;
             if (absdet)
-                *a_it++= tmp_norm;
+                *a_it++= std::fabs( qr.Determinant_R());
         }
     }
 }
