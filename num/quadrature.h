@@ -230,7 +230,7 @@ class QuadDomainCL
 /// \brief Create a composite quadrature rule for a surface-patch.
 /// No sharing of quadrature points is performed.
 /// The template-parameter QuadDataT must be given explicitly.
-/// The Policy-Template AbsdetPolicyT depends on the dimension Dim; choices are Codim1AbsdetCL for the standard absdet and TrivialAbsdetCL for absdet==1. The latter is actually useful, because on the spacetime, the iterated integral \int_t \int_{\Gamma(t)} equals (approximately) the spacetime-integral \int_\mathcal{G}, where one uses TrivialAbsdetCL.
+/// The Policy-Template AbsdetPolicyT depends on the dimension Dim; choices are Codim1AbsdetCL for the standard absdet and TrivialAbsdetCL for absdet==1, SpatialAbsdetCL for the standard absdet divided by \sqrt(1 + (w*n)^2). The latter is actually useful, because on the spacetime, the iterated integral \int_t \int_{\Gamma(t)} equals (approximately) the spacetime-integral \int_\mathcal{G}, where one uses SpatialAbsdetCL.
 /// Helpers for common QuadData_2DCL are given below.
 template <class QuadDataT,  template <Uint> class AbsdetPolicyT, Uint Dim>
   const QuadDomainCodim1CL<Dim>&
@@ -249,6 +249,9 @@ inline const QuadDomain2DCL&
 make_CompositeQuad5Domain2D (QuadDomain2DCL& q, const SurfacePatchCL& p, const TetraCL& t);
 
 inline const QuadDomainCodim1CL<4>&
+make_CompositeQuad2DomainSTCodim1 (QuadDomainCodim1CL<4>& q, const SPatchCL<4>& p, const TetraPrismCL& t);
+
+inline const QuadDomainCodim1CL<4>&
 make_CompositeQuad5DomainSTCodim1 (QuadDomainCodim1CL<4>& q, const SPatchCL<4>& p, const TetraPrismCL& t);
 
 inline const QuadDomainCodim1CL<4>&
@@ -256,6 +259,9 @@ make_CompositeQuad5DomainSTCodim1WithoutAbsdet (QuadDomainCodim1CL<4>& q, const 
 
 inline const QuadDomainCodim1CL<4>&
 make_CompositeQuad2DomainSTCodim1WithoutAbsdet (QuadDomainCodim1CL<4>& q, const SPatchCL<4>& p, const TetraPrismCL& t);
+
+inline const QuadDomainCodim1CL<4>&
+make_CompositeQuad2DomainSTCodim1SpatialAbsdet (QuadDomainCodim1CL<4>& q, const SPatchCL<4>& p, const TetraPrismCL& t);
 
 /// \brief Create an extrapolated quadrature rule.
 /// No sharing of quadrature points is performed.
