@@ -156,8 +156,8 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
 
     DROPS::InVecMap & vecmap =  DROPS::InVecMap::getInstance();
     DROPS::StokesVelBndDataCL::bnd_val_fun ZeroVel = vecmap["ZeroVel"];
-    DROPS::StokesVelBndDataCL::bnd_val_fun Inflow = vecmap["FilmInflow"];
-
+    //DROPS::StokesVelBndDataCL::bnd_val_fun Inflow = vecmap["FilmInflow"];
+    DROPS::instat_vector_fun_ptr Nusselt = vecmap["NusseltFilm"];
     switch (P.get<int>("InitialCond"))
     {
       case 1: // stationary flow
@@ -187,7 +187,9 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
 
       case 2: // Nusselt solution
       {
-        Stokes.InitVel( &Stokes.v, Inflow);
+        std::cout<<"Here"<<std::endl;
+        //Stokes.InitVel( &Stokes.v, Inflow);
+        Stokes.InitVel( &Stokes.v, Nusselt);
       } break;
 
       case -1: // read from file
