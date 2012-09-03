@@ -774,8 +774,10 @@ class LocalSTP2P1CL
 
     // The LocalP1-function at t0
     const spatial_localfe_type& at_t0 () const { return v0_; }
+          spatial_localfe_type& at_t0 ()       { return v0_; }
     // The LocalP1-function at t1
     const spatial_localfe_type& at_t1 () const { return v1_; }
+          spatial_localfe_type& at_t1 ()       { return v1_; }
 };
 
 class STWindProxyCL
@@ -1258,6 +1260,69 @@ class LocalMaterialDerivativeSTP1P1CL
 
     LocalMaterialDerivativeSTP1P1CL (const DiscVelSolT& w)
         :w_( w) {}
+};
+
+template <class DiscVelSolT>
+class LocalMassdivSTP1P1CL
+{
+  private:
+    const DiscVelSolT&        w_; // wind
+    LocalSTP2P1CL<Point3DCL>  loc_w_;
+    GridFunctionCL<Point3DCL> qw;
+
+    GridFunctionCL<Point3DCL> spatial_n;
+
+    std::valarray<double> qdivgamma_w;
+    double dummy;
+    SMatrixCL<3,3> T;
+    LocalP1CL<Point3DCL>  gradrefp2[10],
+                          gradp2[10];
+    LocalSTP1P1CL<Point3DCL>  gradp2t0,
+                              gradp2t1;
+    GridFunctionCL<Point3DCL> qgradp2t0,
+                              qgradp2t1;
+
+    std::valarray<double> q[8];
+
+    QuadDomainCodim1CL<4> qdom;
+
+  public:
+    double coup[8][8];
+
+    void setup (const TetraPrismCL& prism, const STInterfaceCommonDataCL& cdata) {
+        make_CompositeQuad5DomainSTCodim1SpatialAbsdet( qdom, cdata.surf, prism);
+        resize_and_scatter_piecewise_spatial_normal( cdata.n, qdom, spatial_n);
+
+        loc_w_.assign( prism.t, w_);
+        resize_and_evaluate_on_vertexes( loc_w_, qdom, qw);
+
+        GetTrafoTr( T, dummy, prism.t);
+        P2DiscCL::GetGradients( gradp2, gradrefp2, T);
+
+        qgradp2t0.resize( qdom.vertex_size());
+        qgradp2t1.resize( qdom.vertex_size());
+        qdivgamma_w.resize( qdom.vertex_size());
+        qdivgamma_w= 0.;
+        for (int i= 0; i < 10; ++i) {
+            gradp2t0.at_t0()= gradp2[i];
+            evaluate_on_vertexes( gradp2t0, qdom, Addr( qgradp2t0));
+            gradp2t1.at_t1()= gradp2[i];
+            evaluate_on_vertexes( gradp2t1, qdom, Addr( qgradp2t1));
+            qdivgamma_w+= dot(loc_w_.at_t0()[i], qgradp2t0) - dot( loc_w_.at_t0()[i], spatial_n)*dot( spatial_n, qgradp2t0)
+                        + dot(loc_w_.at_t1()[i], qgradp2t1) - dot( loc_w_.at_t1()[i], spatial_n)*dot( spatial_n, qgradp2t1);
+        }
+        for (int i= 0; i < 8; ++i)
+            resize_and_evaluate_on_vertexes( STP1P1DiscCL::ref_val[i], qdom, q[i]);
+
+        for (int i= 0; i < 8; ++i) {
+            coup[i][i]= quad_codim1( qdivgamma_w*q[i]*q[i], qdom);
+            for(int j= 0; j < i; ++j)
+                coup[j][i]= coup[i][j]= quad_codim1( qdivgamma_w*q[i]*q[j], qdom);
+        }
+    }
+
+    LocalMassdivSTP1P1CL (const DiscVelSolT& w)
+        :w_( w) { P2DiscCL::GetGradientsOnRef( gradrefp2); }
 };
 
 /// \brief Convenience-function to reduce the number of explicit template-parameters for the spacetime-massdiv- and the -convection-matrix.
