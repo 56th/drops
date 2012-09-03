@@ -778,6 +778,20 @@ class LocalSTP2P1CL
     const spatial_localfe_type& at_t1 () const { return v1_; }
 };
 
+class STWindProxyCL
+{
+  private:
+    const LocalSTP2P1CL<Point3DCL>& w_;
+
+  public:
+    STWindProxyCL (const LocalSTP2P1CL<Point3DCL>& w) : w_( w) {}
+
+    // pointwise evaluation in STCoordCL-coordinates
+    inline Point4DCL operator() (const STCoordCL& p) const {
+        const Point3DCL tmp( w_( p));
+        return MakePoint4D( tmp[0], tmp[1], tmp[2], 1.);
+    }
+};
 
 class STP1P1DiscCL
 {
@@ -1208,6 +1222,53 @@ class LocalLaplaceBeltramiSTP1P1CL
     LocalLaplaceBeltramiSTP1P1CL (double D)
         :D_( D) {}
 };
+
+template <class DiscVelSolT>
+class LocalMaterialDerivativeSTP1P1CL
+{
+  private:
+    const DiscVelSolT& w_; // wind
+    LocalSTP2P1CL<Point3DCL> loc_w_;
+
+    LocalSTP1P1CL<Point4DCL> grad[8];
+    double dummy;
+    GridFunctionCL<Point4DCL> qw,
+                              qgrad[8];
+    std::valarray<double>     q[8];
+    QuadDomainCodim1CL<4> qdom;
+
+  public:
+    double coup[8][8];
+
+    void setup (const TetraPrismCL& prism, const STInterfaceCommonDataCL& cdata) {
+        make_CompositeQuad5DomainSTCodim1SpatialAbsdet( qdom, cdata.surf, prism);
+        loc_w_.assign( prism.t, w_);
+        resize_and_evaluate_on_vertexes( STWindProxyCL( loc_w_), qdom, qw);
+        STP1P1DiscCL::GetGradients( prism, grad);
+        for (int i= 0; i < 8; ++i) {
+            resize_and_evaluate_on_vertexes( grad[i], qdom, qgrad[i]);
+            resize_and_evaluate_on_vertexes( STP1P1DiscCL::ref_val[i], qdom, q[i]);
+        }
+
+        for (int i= 0; i < 8; ++i) {
+            for(int j= 0; j < 8; ++j)
+                coup[i][j]= quad_codim1( dot( qw, qgrad[j])*q[i], qdom);
+        }
+    }
+
+    LocalMaterialDerivativeSTP1P1CL (const DiscVelSolT& w)
+        :w_( w) {}
+};
+
+/// \brief Convenience-function to reduce the number of explicit template-parameters for the spacetime-massdiv- and the -convection-matrix.
+template <template <class> class LocalMatrixT, class DiscVelSolT>
+  inline InterfaceMatrixSTP1P1AccuCL< LocalMatrixT<DiscVelSolT> >*
+  make_wind_dependent_matrixSTP1P1_accu (MatrixCL* mat, const STP1P1IdxDescCL* rowidx, const STP1P1IdxDescCL* colidx,
+                                         const STInterfaceCommonDataCL& cdata, const DiscVelSolT& wind, std::string name= std::string())
+{
+    return new InterfaceMatrixSTP1P1AccuCL< LocalMatrixT<DiscVelSolT> >( mat, rowidx, colidx,
+        LocalMatrixT<DiscVelSolT>( wind), cdata, name);
+}
 
 
 /// \brief P1-discretization and solution of the transport equation on the interface

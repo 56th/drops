@@ -518,6 +518,7 @@ void SurfactantcGdGP1CL::Update()
     InterfaceMatrixSTP1P1AccuCL<LocalLaplaceBeltramiSTP1P1CL> lb_accu( &A, &st_idx_, &st_idx_,
         LocalLaplaceBeltramiSTP1P1CL( D_), cdata, "Laplace-Beltrami on ST-iface");
     accus.push_back( &lb_accu);
+    accus.push_back_acquire( make_wind_dependent_matrixSTP1P1_accu<LocalMaterialDerivativeSTP1P1CL>( &Mder, &st_idx_, &st_idx_, cdata,  make_STP2P1Eval( MG_, Bnd_v_, oldv_, *v_), "material derivative"));
 
     accumulate( accus, MG_, st_idx_.TriangLevel(), idx.GetMatchingFunction(), idx.GetBndInfo());
 
@@ -530,6 +531,7 @@ void SurfactantcGdGP1CL::Update()
         Mold.raw_row()[i]= vd_old.Data.raw_row()[vd_old.Data.num_rows()];
     // WriteToFile( Mold, "Mold.txt", "mass on old iface");
     // WriteToFile( A,    "A.txt",    "Laplace-Beltrami on ST-iface");
+    WriteToFile( Mder,    "Mder.txt",    "material derivative on ST-iface");
 
     std::cout << "SurfactantcGdGP1CL::Update: Finished\n";
 }
