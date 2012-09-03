@@ -418,6 +418,12 @@ make_CompositeQuad2DomainSTCodim1SpatialAbsdet (QuadDomainCodim1CL<4>& q, const 
     return make_CompositeQuadDomainCodim1<Quad2DataCL, SpatialAbsdetCL, 4>( q, p, t);
 }
 
+inline const QuadDomainCodim1CL<4>&
+make_CompositeQuad5DomainSTCodim1SpatialAbsdet (QuadDomainCodim1CL<4>& q, const SPatchCL<4>& p, const TetraPrismCL& t)
+{
+    return make_CompositeQuadDomainCodim1<Quad5DataCL, SpatialAbsdetCL, 4>( q, p, t);
+}
+
 /// \brief Multiply the weight for each level with the extrapolation factor and copy it to weights.
 void
 copy_weights_surface (const std::vector<CompositeQuadratureTypesNS::WeightContT>& w_vec,

@@ -263,6 +263,9 @@ make_CompositeQuad2DomainSTCodim1WithoutAbsdet (QuadDomainCodim1CL<4>& q, const 
 inline const QuadDomainCodim1CL<4>&
 make_CompositeQuad2DomainSTCodim1SpatialAbsdet (QuadDomainCodim1CL<4>& q, const SPatchCL<4>& p, const TetraPrismCL& t);
 
+inline const QuadDomainCodim1CL<4>&
+make_CompositeQuad5DomainSTCodim1SpatialAbsdet (QuadDomainCodim1CL<4>& q, const SPatchCL<4>& p, const TetraPrismCL& t);
+
 /// \brief Create an extrapolated quadrature rule.
 /// No sharing of quadrature points is performed.
 /// The extrapolation method is determined by extra.
