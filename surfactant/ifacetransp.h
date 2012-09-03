@@ -733,7 +733,7 @@ class LocalSTP1P1CL
 ///\brief Quadratic in space and linear in time space-time FE-function on a single TetraPrismCL.
 /// The class holds references to two LocalP2CL-objects.
 template <typename T= double>
-class LocalSTP2P1ProxyCL
+class LocalSTP2P1CL
 {
   public:
     typedef T value_type;
@@ -741,15 +741,31 @@ class LocalSTP2P1ProxyCL
     typedef LocalP2CL<T> spatial_localfe_type;
 
   protected:
-    typedef LocalSTP2P1ProxyCL<T> self_;
+    typedef LocalSTP2P1CL<T> self_;
 
   private:
-    const LocalP2CL<T>& v0_;
-    const LocalP2CL<T>& v1_;
+    LocalP2CL<T> v0_,
+                 v1_;
 
   public:
-    LocalSTP2P1ProxyCL(const spatial_localfe_type& v0, const spatial_localfe_type& v1)
+    LocalSTP2P1CL() {}
+    LocalSTP2P1CL(const spatial_localfe_type& v0, const spatial_localfe_type& v1)
         : v0_( v0), v1_( v1) {}
+
+    template<class BndDataT>
+      self_&
+      assign (const TetraCL& t, const VecDescCL& v0, const VecDescCL& v1, const BndDataT& bnd) {
+        v0_.assign( t, v0, bnd);
+        v1_.assign( t, v1, bnd);
+        return *this;
+    }
+    template <class STP2P1FunT>
+      self_&
+      assign(const TetraCL& t, const STP2P1FunT& f) {
+        v0_.assign( t, *f.GetSolution( 0), *f.GetBndData());
+        v1_.assign( t, *f.GetSolution( 1), *f.GetBndData());
+        return *this;
+    }
 
     // pointwise evaluation in STCoordCL-coordinates
     inline value_type operator() (const STCoordCL& p) const {
@@ -784,8 +800,6 @@ class STP1P1DiscCL
             for (Uint j= 0; j < 4; ++j) {
                 grad[i    ].at_t0()[j]= MakePoint4D( p1grad[0], p1grad[1], p1grad[2], j == i ? -dt_inv : 0.);
                 grad[i + 4].at_t1()[j]= MakePoint4D( p1grad[0], p1grad[1], p1grad[2], j == i ?  dt_inv : 0.);
-                // gradx[i    ].at_t0()[j]= p1grad;
-                // gradx[i + 4].at_t1()[j]= p1grad;
             }
         }
     }
@@ -949,6 +963,61 @@ class LocalNumbSTP1P1CL
     bool IsFini (IdxT i) const { return num[i] >= NumIniUnknowns_ && num[i] < NumIniUnknowns_ + NumFiniUnknowns_; }
 };
 
+template<class Data, class BndData_, class VD_>
+class STP2P1EvalCL
+{
+public:
+    typedef Data     DataT;
+    typedef BndData_ BndDataCL;
+    typedef VD_      VecDescT;
+
+    typedef LocalSTP2P1CL<DataT> LocalFET;
+
+protected:
+    // numerical data
+    VecDescT*          v0_;
+    VecDescT*          v1_;
+    // boundary-data
+    BndDataCL*         bnd_;
+    // the multigrid
+    const MultiGridCL* MG_;
+
+public:
+    STP2P1EvalCL() :v0_( 0), v1_( 0), bnd_( 0), MG_( 0) {}
+    STP2P1EvalCL(VecDescT* v0, VecDescT* v1, BndDataCL* bnd, const MultiGridCL* MG)
+        : v0_( v0), v1_( v1), bnd_( bnd), MG_( MG) {}
+    //default copy-ctor, dtor, assignment-op
+    // copying is safe - it is a flat copy, which is fine,
+    // as STP2P1EvalCL does not take possession of the pointed to.
+
+    void // set / get the container of numerical data
+    SetSolution(Uint i, VecDescT* v) { (i== 0 ? v0_ : v1_)= v; }
+    const VecDescT*
+    GetSolution(Uint i) const { return i == 0 ? v0_: v1_; }
+    VecDescT*
+    GetSolution(Uint i) { return i == 0 ? v0_: v1_; }
+    void // set / get the container of boundary-data
+    SetBndData(BndDataCL* bnd) { bnd_= bnd; }
+    BndDataCL*
+    GetBndData() { return bnd_; }
+    const BndDataCL*
+    GetBndData() const { return bnd_; }
+    const MultiGridCL& // the multigrid we refer to
+    GetMG() const { return *MG_; }
+    Uint // Triangulation level of this function
+    GetLevel() const { return v0_->GetLevel(); }
+    // The time at which data is evaluated.
+    double GetTime(Uint i) const { return i == 0 ? v0_->t : v1_->t; }
+
+};
+
+// Create a STP2P1EvalCL without the agonizing template-pain.
+template<class BndData_, class VD_>
+  STP2P1EvalCL<typename BndData_::bnd_type, BndData_, VD_>
+    make_STP2P1Eval (const MultiGridCL& mg, BndData_& bnd, VD_& vd0, VD_& vd1)
+{
+    return STP2P1EvalCL<typename BndData_::bnd_type, BndData_, VD_>( &vd0, &vd1, &bnd, &mg);
+}
 
 template <typename LocalRowNumbT, typename LocalColNumbT>
   inline void
@@ -967,9 +1036,7 @@ class STInterfaceCommonDataCL : public TetraAccumulatorCL
   private:
     STInterfaceCommonDataCL** the_clones;
 
-    LocalP2CL<> oldlocp2_ls,
-                newlocp2_ls;
-    LocalSTP2P1ProxyCL<> st_local_ls;
+    LocalSTP2P1CL<> st_local_ls;
 
     const VecDescCL*   old_ls;  // P2-level-set at t0
     const VecDescCL*   new_ls;  // P2-level-set at t1
@@ -992,7 +1059,7 @@ class STInterfaceCommonDataCL : public TetraAccumulatorCL
     bool empty () const { return surf.empty(); }
 
     STInterfaceCommonDataCL (double t0arg, double t1arg, const VecDescCL& oldls_arg, const VecDescCL& newls_arg, const BndDataCL<>& lsetbnd_arg)
-        : st_local_ls( oldlocp2_ls, newlocp2_ls), old_ls( &oldls_arg), new_ls( &newls_arg), lsetbnd( &lsetbnd_arg), lat( TetraPrismLatticeCL::instance( 2, 1)), ls_loc( lat.vertex_size()), t0( t0arg), t1( t1arg)
+        : old_ls( &oldls_arg), new_ls( &newls_arg), lsetbnd( &lsetbnd_arg), lat( TetraPrismLatticeCL::instance( 2, 1)), ls_loc( lat.vertex_size()), t0( t0arg), t1( t1arg)
     {}
 
     virtual ~STInterfaceCommonDataCL () {}
@@ -1007,8 +1074,7 @@ class STInterfaceCommonDataCL : public TetraAccumulatorCL
     virtual void visit (const TetraCL& t) {
         surf.clear();
         n.resize( 0);
-        oldlocp2_ls.assign( t, *old_ls, *lsetbnd);
-        newlocp2_ls.assign( t, *new_ls, *lsetbnd);
+        st_local_ls.assign( t, *old_ls, *new_ls, *lsetbnd);
         evaluate_on_vertexes( st_local_ls, lat, Addr( ls_loc));
         if (equal_signs( ls_loc))
             return;

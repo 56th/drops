@@ -415,13 +415,12 @@ void STP1P1IdxDescCL::CreateNumbering (Uint level, MultiGridCL& mg, const VecDes
     const TetraPrismLatticeCL& lat= TetraPrismLatticeCL::instance( 2, 1);
     std::valarray<double> ls_loc( lat.vertex_size());
     LocalP2CL<> oldlocp2_ls, locp2_ls;
-    LocalSTP2P1ProxyCL<> local_st_lset( oldlocp2_ls, locp2_ls);
+    LocalSTP2P1CL<> local_st_lset;
     SPatchCL<4> patch;
     QuadDomainCodim1CL<4> qdom;
     std::valarray<double> shape; // STP1P1-shape-function as integrand
     DROPS_FOR_TRIANG_TETRA ( mg, level, it) {
-        oldlocp2_ls.assign( *it, oldls, lsetbnd);
-        locp2_ls.assign(    *it, newls, lsetbnd);
+        local_st_lset.assign( *it, oldls, newls, lsetbnd);
         evaluate_on_vertexes( local_st_lset, lat, Addr( ls_loc));
         if (equal_signs( ls_loc))
             continue;
