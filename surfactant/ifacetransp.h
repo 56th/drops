@@ -1378,8 +1378,8 @@ class SurfactantcGdGP1CL : public SurfactantP1BaseCL
     /// of the coupling navstokes-levelset. They should not be called by a common user.
     /// Use DoStep() instead.
     ///@{
-    VectorCL InitStep (double new_t);
-    void DoStep (const VectorCL&);
+    void InitStep (double new_t);
+    void DoStep ();
     void CommitStep ();
     void Update ();
     ///@}

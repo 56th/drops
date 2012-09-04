@@ -475,7 +475,7 @@ resize_and_scatter_piecewise_spatial_normal (const GridFunctionCL<Point4DCL>& n,
 }
 
 
-VectorCL SurfactantcGdGP1CL::InitStep (double new_t)
+void SurfactantcGdGP1CL::InitStep (double new_t)
 {
     std::cout << "SurfactantcGdGP1CL::InitStep:\n";
     ic.t= new_t;
@@ -498,9 +498,6 @@ VectorCL SurfactantcGdGP1CL::InitStep (double new_t)
                 st_oldic_[dof]= oldic_[dof];
         }
     }
-
-
-    return VectorCL( st_idx_.NumUnknowns());
 }
 
 void SurfactantcGdGP1CL::Update()
@@ -530,12 +527,12 @@ void SurfactantcGdGP1CL::Update()
     std::cout << "SurfactantcGdGP1CL::Update: Finished\n";
 }
 
-void SurfactantcGdGP1CL::DoStep (const VectorCL& rhs)
+void SurfactantcGdGP1CL::DoStep ()
 {
     Update();
 
     // L_.LinComb( 1., Mder, 1., Mdiv, 1., A, 1., Mold);
-    std::cout << "Before solve: res = " << norm( L_*st_ic_ - rhs) << std::endl;
+    // std::cout << "Before solve: res = " << norm( L_*st_ic_ - rhs) << std::endl;
     //gm_.Solve( L_, ic_st_, rhs);
     std::cout << "res = " << gm_.GetResid() << ", iter = " << gm_.GetIter() << std::endl;
 }
@@ -563,8 +560,8 @@ void SurfactantcGdGP1CL::CommitStep ()
 
 void SurfactantcGdGP1CL::DoStep (double new_t)
 {
-    VectorCL rhs( InitStep( new_t));
-    DoStep( rhs);
+    InitStep( new_t);
+    DoStep();
     CommitStep();
 }
 
