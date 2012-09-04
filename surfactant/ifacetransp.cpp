@@ -509,12 +509,11 @@ void SurfactantcGdGP1CL::Update()
     TetraAccumulatorTupleCL accus;
     InterfaceCommonDataP1CL oldspatialcdata( oldls_, lsetbnd_);
     accus.push_back( &oldspatialcdata);
-    MatDescCL vd_old( &oldidx_, &oldidx_); // The old index is exactly the ini-index.
-    InterfaceMatrixAccuP1CL<LocalInterfaceMassP1CL> oldmass_accu( &vd_old,
-        LocalInterfaceMassP1CL(), oldspatialcdata, "mixed-mass on old iface");
-    accus.push_back( &oldmass_accu);
     STInterfaceCommonDataCL cdata( oldt_, ic.t,  oldls_, lset_vd_, lsetbnd_);
     accus.push_back( &cdata);
+    InterfaceMatrixSTP1P1AccuCL<LocalSpatialInterfaceMassSTP1P1CL> oldmass_accu( &Mold, &st_idx_, &st_idx_,
+        LocalSpatialInterfaceMassSTP1P1CL(oldspatialcdata), cdata, "mixed-mass on old iface");
+    accus.push_back( &oldmass_accu);
     InterfaceMatrixSTP1P1AccuCL<LocalLaplaceBeltramiSTP1P1CL> lb_accu( &A, &st_idx_, &st_idx_,
         LocalLaplaceBeltramiSTP1P1CL( D_), cdata, "Laplace-Beltrami on ST-iface");
     accus.push_back( &lb_accu);
@@ -523,17 +522,10 @@ void SurfactantcGdGP1CL::Update()
 
     accumulate( accus, MG_, st_idx_.TriangLevel(), idx.GetMatchingFunction(), idx.GetBndInfo());
 
-    // This saves many structural zeros in Mold.
-    Mold.resize( st_idx_.NumUnknowns(), st_idx_.NumUnknowns(), vd_old.Data.num_nonzeros());
-    std::copy( vd_old.Data.raw_col(), vd_old.Data.raw_col() + vd_old.Data.num_nonzeros(), Mold.raw_col());
-    std::copy( vd_old.Data.raw_val(), vd_old.Data.raw_val() + vd_old.Data.num_nonzeros(), Mold.raw_val());
-    std::copy( vd_old.Data.raw_row(), vd_old.Data.raw_row() + vd_old.Data.num_rows(), Mold.raw_row());
-    for (Uint i= vd_old.Data.num_rows(); i <= Mold.num_rows(); ++i)
-        Mold.raw_row()[i]= vd_old.Data.raw_row()[vd_old.Data.num_rows()];
     // WriteToFile( Mold, "Mold.txt", "mass on old iface");
     // WriteToFile( A,    "A.txt",    "Laplace-Beltrami on ST-iface");
     // WriteToFile( Mder,    "Mder.txt",    "material derivative on ST-iface");
-    WriteToFile( Mdiv,    "Mdiv.txt",    "mass-div on ST-iface");
+    // WriteToFile( Mdiv,    "Mdiv.txt",    "mass-div on ST-iface");
 
     std::cout << "SurfactantcGdGP1CL::Update: Finished\n";
 }

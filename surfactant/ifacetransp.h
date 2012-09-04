@@ -1035,7 +1035,9 @@ template<class BndData_, class VD_>
     return STP2P1EvalCL<typename BndData_::bnd_type, BndData_, VD_>( &vd0, &vd1, &bnd, &mg);
 }
 
-template <typename LocalRowNumbT, typename LocalColNumbT>
+enum ZeroPolicyEnum { KeepLocalZeros, RemoveExactLocalZeros };
+
+template <ZeroPolicyEnum ZeroPolicy, typename LocalRowNumbT, typename LocalColNumbT>
   inline void
   update_global_matrix (MatrixBuilderCL& M, const double coup[LocalRowNumbT::Dim][LocalColNumbT::Dim], const LocalRowNumbT& r, const LocalColNumbT& c)
 {
@@ -1043,7 +1045,8 @@ template <typename LocalRowNumbT, typename LocalColNumbT>
         if (r.num[i] != NoIdx)
             for (Uint j= 0; j < LocalColNumbT::Dim; ++j)
                 if (c.num[j] != NoIdx)
-                    M( r.num[i], c.num[j])+= coup[i][j];
+                    if (ZeroPolicy == KeepLocalZeros || (ZeroPolicy == RemoveExactLocalZeros && coup[i][j] != 0.))
+                        M( r.num[i], c.num[j])+= coup[i][j];
 }
 
 
@@ -1155,7 +1158,7 @@ class InterfaceMatrixSTP1P1AccuCL : public TetraAccumulatorCL
         local_mat.setup( TetraPrismCL( t, cdata.t0, cdata.t1), cdata);
         locrow.assign_indices_only( t, *rowidx_);
         loccol.assign_indices_only( t, *colidx_);
-        update_global_matrix( *M, local_mat.coup, locrow, loccol);
+        update_global_matrix<LocalMatrixT::ZeroPolicy>( *M, local_mat.coup, locrow, loccol);
     }
 
     virtual InterfaceMatrixSTP1P1AccuCL* clone (int /*clone_id*/) { return new InterfaceMatrixSTP1P1AccuCL( *this); }
@@ -1170,6 +1173,7 @@ class LocalSpatialInterfaceMassSTP1P1CL
 
   public:
     double coup[8][8];
+    static const ZeroPolicyEnum ZeroPolicy= RemoveExactLocalZeros;
 
     LocalSpatialInterfaceMassSTP1P1CL (const InterfaceCommonDataP1CL& spatialcdata)
         : spatialcdata_( spatialcdata) { std::memset( coup, 0, 8*8*sizeof(double)); }
@@ -1202,6 +1206,7 @@ class LocalLaplaceBeltramiSTP1P1CL
 
   public:
     double coup[8][8];
+    static const ZeroPolicyEnum ZeroPolicy= KeepLocalZeros;
 
     void setup (const TetraPrismCL& prism, const STInterfaceCommonDataCL& cdata) {
         make_CompositeQuad2DomainSTCodim1SpatialAbsdet( qdom, cdata.surf, prism);
@@ -1241,6 +1246,7 @@ class LocalMaterialDerivativeSTP1P1CL
 
   public:
     double coup[8][8];
+    static const ZeroPolicyEnum ZeroPolicy= KeepLocalZeros;
 
     void setup (const TetraPrismCL& prism, const STInterfaceCommonDataCL& cdata) {
         make_CompositeQuad5DomainSTCodim1SpatialAbsdet( qdom, cdata.surf, prism);
@@ -1288,6 +1294,7 @@ class LocalMassdivSTP1P1CL
 
   public:
     double coup[8][8];
+    static const ZeroPolicyEnum ZeroPolicy= KeepLocalZeros;
 
     void setup (const TetraPrismCL& prism, const STInterfaceCommonDataCL& cdata) {
         make_CompositeQuad5DomainSTCodim1SpatialAbsdet( qdom, cdata.surf, prism);
