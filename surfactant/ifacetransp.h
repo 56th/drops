@@ -834,29 +834,6 @@ class STP1P1DiscCL
 };
 
 
-///\brief Compute (space-time) world-coordinates from a tetra-prism and STCoord-coordinates.
-/// This class is suited for many consecutive evaluations. It can be used in std-algorithms.
-class STCoord2WorldCoordCL
-{
-  private:
-    const Bary2WorldCoordCL space_mapper_;
-    const double t0_,
-                 dt_;
-
-  public:
-    typedef Point4DCL value_type;
-
-    STCoord2WorldCoordCL (const TetraPrismCL& prism)
-        : space_mapper_( prism.t), t0_( prism.t0), dt_( prism.t1 - prism.t0) {}
-
-    Point3DCL space (const STCoordCL& b) const { return space_mapper_( b.x_bary); }
-    double    time  (const STCoordCL& b) const { return t0_ + dt_*b.t_ref; }
-    Point4DCL operator() (const STCoordCL& b) const {
-        const Point3DCL& x( space( b));
-        return MakePoint4D( x[0], x[1], x[2], time( b));
-    }
-};
-
 ///\brief Evaluates a function expecting world-coordinates and time as arguments in STCoord-coordinates on a tetra-prism.
 template <class T= double>
 class STCoordEvalCL

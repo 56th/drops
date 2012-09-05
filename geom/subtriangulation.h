@@ -148,18 +148,12 @@ class TetraPartitionCL
 };
 
 
-class TetraCL; ///< forward declaration
-
-///\brief A spatial tetra and a time interval t0<t1.
-struct TetraPrismCL
-{
-    const TetraCL& t;
-    double t0,
-           t1;
-
-    TetraPrismCL (const TetraCL& targ, double t0arg, double t1arg)
-        : t( targ), t0( t0arg), t1( t1arg) {}
-};
+/// @{ forward declarations from simplex.h, which is only included in subtriangulation.cpp.
+class TetraCL;
+struct TetraPrismCL;
+class Bary2WorldCoordCL;
+class STCoord2WorldCoordCL;
+/// @}
 
 
 template <Uint Dim>
