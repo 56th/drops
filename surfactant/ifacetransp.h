@@ -812,6 +812,8 @@ class STP1P1DiscCL
         const double dt_inv= 1./(prism.t1 - prism.t0);
         for (Uint i= 0; i < 4; ++i) {
             const Point3DCL& p1grad= M*FE_P1CL::DHRef( i);
+            grad[i    ].at_t1()[i]= MakePoint4D( 0., 0., 0., -dt_inv);
+            grad[i + 4].at_t0()[i]= MakePoint4D( 0., 0., 0.,  dt_inv);
             for (Uint j= 0; j < 4; ++j) {
                 grad[i    ].at_t0()[j]= MakePoint4D( p1grad[0], p1grad[1], p1grad[2], j == i ? -dt_inv : 0.);
                 grad[i + 4].at_t1()[j]= MakePoint4D( p1grad[0], p1grad[1], p1grad[2], j == i ?  dt_inv : 0.);
