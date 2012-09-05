@@ -227,12 +227,14 @@ class QuadDomainCL
 };
 
 
+enum AbsdetPolicyEnum { TrivialAbsdet, Codim1Absdet, SpaceProjectedCodim1Absdet };
+
 /// \brief Create a composite quadrature rule for a surface-patch.
 /// No sharing of quadrature points is performed.
 /// The template-parameter QuadDataT must be given explicitly.
 /// The Policy-Template AbsdetPolicyT depends on the dimension Dim; choices are Codim1AbsdetCL for the standard absdet and TrivialAbsdetCL for absdet==1, SpatialAbsdetCL for the standard absdet divided by \sqrt(1 + (w*n)^2). The latter is actually useful, because on the spacetime, the iterated integral \int_t \int_{\Gamma(t)} equals (approximately) the spacetime-integral \int_\mathcal{G}, where one uses SpatialAbsdetCL.
 /// Helpers for common QuadData_2DCL are given below.
-template <class QuadDataT,  template <Uint> class AbsdetPolicyT, Uint Dim>
+template <class QuadDataT,  AbsdetPolicyEnum AbsdetPolicy, Uint Dim>
   const QuadDomainCodim1CL<Dim>&
   make_CompositeQuadDomainCodim1 (QuadDomainCodim1CL<Dim>& q, const SPatchCL<Dim>& p, const  typename DimensionTraitsCL<Dim>::WorldBodyT& t);
 
@@ -301,7 +303,7 @@ class QuadDomainCodim1CL
 
     /// Friend declaration for the factory methods; if their number becomes to big, a more elaborate factory-design is in order.
     ///@{
-    template <class QuadDataT,  template <Uint> class AbsdetPolicyT, Uint D>
+    template <class QuadDataT,  AbsdetPolicyEnum AbsdetPolicy, Uint D>
       friend const QuadDomainCodim1CL<D>&
       make_CompositeQuadDomainCodim1 (QuadDomainCodim1CL<D>& q,
                                   const SPatchCL<D>& p,
