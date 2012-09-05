@@ -1044,6 +1044,7 @@ class STInterfaceCommonDataCL : public TetraAccumulatorCL
 
     std::valarray<double> ls_loc;
     SPatchCL<4> surf;
+    QuadDomainCodim1CL<4> q5dom;
 
     const double t0,
                  t1;
@@ -1069,12 +1070,14 @@ class STInterfaceCommonDataCL : public TetraAccumulatorCL
     }
     virtual void visit (const TetraCL& t) {
         surf.clear();
+        q5dom.clear();
         st_local_ls.assign( t, *old_ls, *new_ls, *lsetbnd);
         evaluate_on_vertexes( st_local_ls, lat, Addr( ls_loc));
         if (equal_signs( ls_loc))
             return;
         surf.make_patch<MergeCutPolicyCL>( lat, ls_loc);
         surf.compute_normals( TetraPrismCL( t, t0, t1));
+        make_CompositeQuad5DomainSTCodim1SpatialAbsdet( q5dom, surf, TetraPrismCL( t, t0, t1));
     }
     virtual STInterfaceCommonDataCL* clone (int clone_id) {
         return the_clones[clone_id]= new STInterfaceCommonDataCL( *this);
@@ -1193,7 +1196,6 @@ class LocalVectorSTP1P1CL
 
     std::valarray<double> qp1,
                           qf;
-    QuadDomainCodim1CL<4> qdom;
 
   public:
     double vec[8];
@@ -1201,14 +1203,13 @@ class LocalVectorSTP1P1CL
     LocalVectorSTP1P1CL (instat_scalar_fun_ptr f) : f_( f) {}
 
     void setup (const TetraPrismCL& prism, const STInterfaceCommonDataCL& cdata, const IdxT numr[8]) {
-        make_CompositeQuad5DomainSTCodim1SpatialAbsdet ( qdom, cdata.surf, prism);
-        resize_and_evaluate_on_vertexes( f_, prism, qdom, qf);
-        qp1.resize( qdom.vertex_size());
+        resize_and_evaluate_on_vertexes( f_, prism, cdata.q5dom, qf);
+        qp1.resize( cdata.q5dom.vertex_size());
         for (Uint i= 0; i < 8; ++i) {
                 if (numr[i] == NoIdx)
                     continue;
-                evaluate_on_vertexes( STP1P1DiscCL::ref_val[i], qdom, Addr( qp1));
-                vec[i]= quad_codim1( qf*qp1, qdom);
+                evaluate_on_vertexes( STP1P1DiscCL::ref_val[i], cdata.q5dom, Addr( qp1));
+                vec[i]= quad_codim1( qf*qp1, cdata.q5dom);
         }
     }
 };
@@ -1288,27 +1289,29 @@ class LocalMaterialDerivativeSTP1P1CL
     LocalSTP1P1CL<Point4DCL> grad[8];
     double dummy;
     GridFunctionCL<Point4DCL> qw,
-                              qgrad[8];
-    std::valarray<double>     q[8];
-    QuadDomainCodim1CL<4> qdom;
+                              qgrad;
+    std::valarray<double>     q[8],
+                              qwdotgrad[8];
 
   public:
     double coup[8][8];
     static const ZeroPolicyEnum ZeroPolicy= KeepLocalZeros;
 
     void setup (const TetraPrismCL& prism, const STInterfaceCommonDataCL& cdata) {
-        make_CompositeQuad5DomainSTCodim1SpatialAbsdet( qdom, cdata.surf, prism);
         loc_w_.assign( prism.t, w_);
-        resize_and_evaluate_on_vertexes( STWindProxyCL( loc_w_), qdom, qw);
+        resize_and_evaluate_on_vertexes( STWindProxyCL( loc_w_), cdata.q5dom, qw);
+        qgrad.resize( cdata.q5dom.vertex_size());
         STP1P1DiscCL::GetGradients( prism, grad);
         for (int i= 0; i < 8; ++i) {
-            resize_and_evaluate_on_vertexes( grad[i], qdom, qgrad[i]);
-            resize_and_evaluate_on_vertexes( STP1P1DiscCL::ref_val[i], qdom, q[i]);
+            evaluate_on_vertexes( grad[i], cdata.q5dom, Addr( qgrad));
+            qwdotgrad[i].resize( cdata.q5dom.vertex_size());
+            qwdotgrad[i]= dot( qw, qgrad);
+            resize_and_evaluate_on_vertexes( STP1P1DiscCL::ref_val[i], cdata.q5dom, q[i]);
         }
 
         for (int i= 0; i < 8; ++i) {
             for(int j= 0; j < 8; ++j)
-                coup[i][j]= quad_codim1( dot( qw, qgrad[j])*q[i], qdom);
+                coup[i][j]= quad_codim1( qwdotgrad[j]*q[i], cdata.q5dom);
         }
     }
 
@@ -1321,7 +1324,6 @@ class LocalMassdivSTP1P1CL
   private:
     const DiscVelSolT&        w_; // wind
     LocalSTP2P1CL<Point3DCL>  loc_w_;
-    GridFunctionCL<Point3DCL> qw;
 
     GridFunctionCL<Point3DCL> spatial_n;
 
@@ -1337,41 +1339,35 @@ class LocalMassdivSTP1P1CL
 
     std::valarray<double> q[8];
 
-    QuadDomainCodim1CL<4> qdom;
-
   public:
     double coup[8][8];
     static const ZeroPolicyEnum ZeroPolicy= KeepLocalZeros;
 
     void setup (const TetraPrismCL& prism, const STInterfaceCommonDataCL& cdata) {
-        make_CompositeQuad5DomainSTCodim1SpatialAbsdet( qdom, cdata.surf, prism);
-        resize_and_scatter_piecewise_spatial_normal( cdata.surf, qdom, spatial_n);
-
+        resize_and_scatter_piecewise_spatial_normal( cdata.surf, cdata.q5dom, spatial_n);
         loc_w_.assign( prism.t, w_);
-        resize_and_evaluate_on_vertexes( loc_w_, qdom, qw);
-
         GetTrafoTr( T, dummy, prism.t);
         P2DiscCL::GetGradients( gradp2, gradrefp2, T);
 
-        qgradp2t0.resize( qdom.vertex_size());
-        qgradp2t1.resize( qdom.vertex_size());
-        qdivgamma_w.resize( qdom.vertex_size());
-        qdivgamma_w= 0.;
+        qgradp2t0.resize( cdata.q5dom.vertex_size());
+        qgradp2t1.resize( cdata.q5dom.vertex_size());
+        /// \todo qdivgamma_w= trace( qdw) - qn^T*qdw*qn mit qdw= Auswertung von dw= outer_product(w_i, gradp2_i)
+        qdivgamma_w.resize( cdata.q5dom.vertex_size(), 0.);
         for (int i= 0; i < 10; ++i) {
             gradp2t0.at_t0()= gradp2[i];
-            evaluate_on_vertexes( gradp2t0, qdom, Addr( qgradp2t0));
+            evaluate_on_vertexes( gradp2t0, cdata.q5dom, Addr( qgradp2t0));
             gradp2t1.at_t1()= gradp2[i];
-            evaluate_on_vertexes( gradp2t1, qdom, Addr( qgradp2t1));
+            evaluate_on_vertexes( gradp2t1, cdata.q5dom, Addr( qgradp2t1));
             qdivgamma_w+= dot(loc_w_.at_t0()[i], qgradp2t0) - dot( loc_w_.at_t0()[i], spatial_n)*dot( spatial_n, qgradp2t0)
                         + dot(loc_w_.at_t1()[i], qgradp2t1) - dot( loc_w_.at_t1()[i], spatial_n)*dot( spatial_n, qgradp2t1);
         }
         for (int i= 0; i < 8; ++i)
-            resize_and_evaluate_on_vertexes( STP1P1DiscCL::ref_val[i], qdom, q[i]);
+            resize_and_evaluate_on_vertexes( STP1P1DiscCL::ref_val[i], cdata.q5dom, q[i]);
 
         for (int i= 0; i < 8; ++i) {
-            coup[i][i]= quad_codim1( qdivgamma_w*q[i]*q[i], qdom);
+            coup[i][i]= quad_codim1( qdivgamma_w*q[i]*q[i], cdata.q5dom);
             for(int j= 0; j < i; ++j)
-                coup[j][i]= coup[i][j]= quad_codim1( qdivgamma_w*q[i]*q[j], qdom);
+                coup[j][i]= coup[i][j]= quad_codim1( qdivgamma_w*q[i]*q[j], cdata.q5dom);
         }
     }
 
