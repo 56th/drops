@@ -178,8 +178,12 @@ struct DimensionTraitsCL<3>
     typedef RefPatchCL<3>         RefPatchT;
     typedef RefPatchCL<3>::FacetT RefPatchFacetT;
 
-    typedef Point3DCL WorldCoordT;
-    typedef TetraCL   WorldBodyT;
+    typedef TetraCL WorldBodyT;
+
+    typedef Point3DCL                        WorldVertexT;
+    typedef std::vector<Point3DCL>           WorldVertexContT;
+    typedef WorldVertexContT::const_iterator const_world_vertex_iterator;
+
 };
 
 template <>
@@ -199,8 +203,12 @@ struct DimensionTraitsCL<4>
     typedef RefPatchCL<4>         RefPatchT;
     typedef RefPatchCL<4>::FacetT RefPatchFacetT;
 
-    typedef Point4DCL    WorldCoordT;
     typedef TetraPrismCL WorldBodyT;
+
+    typedef Point4DCL                        WorldVertexT;
+    typedef std::vector<Point4DCL>           WorldVertexContT;
+    typedef WorldVertexContT::const_iterator const_world_vertex_iterator;
+
 };
 
 template <Uint Dim>
