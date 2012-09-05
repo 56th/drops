@@ -510,6 +510,7 @@ void SurfactantcGdGP1CL::InitStep (double new_t)
 
 void SurfactantcGdGP1CL::Update()
 {
+    // ScopeTimerCL timer( "SurfactantcGdGP1CL::Update");
     std::cout << "SurfactantcGP1CL::Update:\n";
     TetraAccumulatorTupleCL accus;
     InterfaceCommonDataP1CL oldspatialcdata( oldls_, lsetbnd_);
