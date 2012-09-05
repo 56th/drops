@@ -197,6 +197,11 @@ void SurfactantcGP1CL::Update()
     }
     accumulate( accus, MG_, cidx->TriangLevel(), cidx->GetMatchingFunction(), cidx->GetBndInfo());
 
+//     WriteToFile( M.Data, "cGcGM.txt", "mass");
+//     WriteToFile( A.Data, "cGcGA.txt", "Laplace-Beltrami");
+//     WriteToFile( C.Data, "cGcGC.txt", "material derivative");
+//     WriteToFile( Md.Data,"cGcGMd.txt","mass-div");
+
     // std::cout << "SurfactantP1CL::Update: Finished\n";
 }
 
@@ -520,12 +525,19 @@ void SurfactantcGdGP1CL::Update()
     accus.push_back_acquire( make_wind_dependent_matrixSTP1P1_accu<LocalMaterialDerivativeSTP1P1CL>( &Mder, &st_idx_, &st_idx_, cdata,  make_STP2P1Eval( MG_, Bnd_v_, oldv_, *v_), "material derivative on ST-iface"));
     accus.push_back_acquire( make_wind_dependent_matrixSTP1P1_accu<LocalMassdivSTP1P1CL>( &Mdiv, &st_idx_, &st_idx_, cdata,  make_STP2P1Eval( MG_, Bnd_v_, oldv_, *v_), "mass-div on ST-iface"));
 
+    if (rhs_fun_) {
+        load.resize( st_idx_.NumUnknowns());
+        load= 0.;
+        accus.push_back_acquire( new InterfaceVectorSTP1P1AccuCL<LocalVectorSTP1P1CL>( &load, &st_idx_, LocalVectorSTP1P1CL( rhs_fun_), cdata, "load on ST-iface"));
+    }
+
     accumulate( accus, MG_, st_idx_.TriangLevel(), idx.GetMatchingFunction(), idx.GetBndInfo());
 
-    // WriteToFile( Mold, "Mold.txt", "mass on old iface");
-    // WriteToFile( A,    "A.txt",    "Laplace-Beltrami on ST-iface");
-    // WriteToFile( Mder,    "Mder.txt",    "material derivative on ST-iface");
-    // WriteToFile( Mdiv,    "Mdiv.txt",    "mass-div on ST-iface");
+//     WriteToFile( Mold, "Mold.txt", "mass on old iface");
+//     WriteToFile( A,    "A.txt",    "Laplace-Beltrami on ST-iface");
+//     WriteToFile( Mder, "Mder.txt", "material derivative on ST-iface");
+//     WriteToFile( Mdiv, "Mdiv.txt", "mass-div on ST-iface");
+//     WriteToFile( load, "load.txt", "load on ST-iface");
 
     std::cout << "SurfactantcGdGP1CL::Update: Finished\n";
 }
@@ -534,9 +546,12 @@ void SurfactantcGdGP1CL::DoStep ()
 {
     Update();
 
-    // L_.LinComb( 1., Mder, 1., Mdiv, 1., A, 1., Mold);
-    // std::cout << "Before solve: res = " << norm( L_*st_ic_ - rhs) << std::endl;
-    //gm_.Solve( L_, ic_st_, rhs);
+    L_.LinComb( 1., Mder, 1., Mdiv, 1., A, 1., Mold);
+    VectorCL rhs( Mold*st_oldic_);
+    if (rhs_fun_ != 0)
+        rhs+= load;
+    std::cout << "Before solve: res = " << norm( L_*st_ic_ - rhs) << std::endl;
+    gm_.Solve( L_, st_ic_, rhs);
     std::cout << "res = " << gm_.GetResid() << ", iter = " << gm_.GetIter() << std::endl;
 }
 

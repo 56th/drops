@@ -1138,6 +1138,78 @@ class InterfaceMatrixSTP1P1AccuCL : public TetraAccumulatorCL
     virtual InterfaceMatrixSTP1P1AccuCL* clone (int /*clone_id*/) { return new InterfaceMatrixSTP1P1AccuCL( *this); }
 };
 
+template <class LocalVectorT>
+class InterfaceVectorSTP1P1AccuCL : public TetraAccumulatorCL
+{
+  private:
+    const STInterfaceCommonDataCL& cdata_;
+    std::string name_;
+
+    VectorCL* vec_; // the vector
+    const STP1P1IdxDescCL* rowidx_;
+
+    LocalVectorT local_vec;
+    LocalNumbSTP1P1CL locrow;
+
+  public:
+    InterfaceVectorSTP1P1AccuCL (VectorCL* vec, const STP1P1IdxDescCL* rowidx,
+                                 const LocalVectorT& loc_vec, const STInterfaceCommonDataCL& cdata, std::string name= std::string())
+        : cdata_( cdata), name_( name), vec_( vec), rowidx_( rowidx), local_vec( loc_vec) {}
+    virtual ~InterfaceVectorSTP1P1AccuCL () {}
+
+    void set_name (const std::string& n) { name_= n; }
+
+    virtual void begin_accumulation () {
+        const IdxT num_rows= rowidx_->NumUnknowns();
+        std::cout << "STInterfaceVectorSTP1P1AccuCL::begin_accumulation";
+        if (name_ != std::string())
+            std::cout << " for \"" << name_ << "\"";
+        std::cout  << ": " << num_rows << " rows.\n";
+    }
+
+    virtual void finalize_accumulation () {}
+
+    virtual void visit (const TetraCL& t) {
+        const STInterfaceCommonDataCL& cdata= cdata_.get_clone();
+        if (cdata.empty())
+            return;
+        locrow.assign_indices_only( t, *rowidx_);
+        local_vec.setup( TetraPrismCL( t, cdata.t0, cdata.t1), cdata, locrow.num);
+        for (int i= 0; i < 8; ++i)
+            if (locrow.num[i] != NoIdx)
+                vec_[0][locrow.num[i]]+= local_vec.vec[i];
+    }
+
+    virtual InterfaceVectorSTP1P1AccuCL* clone (int /*clone_id*/) { return new InterfaceVectorSTP1P1AccuCL( *this); }
+};
+
+/// \brief Compute the load-vector corresponding to the function f on a single tetra-prism.
+class LocalVectorSTP1P1CL
+{
+  private:
+    instat_scalar_fun_ptr f_;
+
+    std::valarray<double> qp1,
+                          qf;
+    QuadDomainCodim1CL<4> qdom;
+
+  public:
+    double vec[8];
+
+    LocalVectorSTP1P1CL (instat_scalar_fun_ptr f) : f_( f) {}
+
+    void setup (const TetraPrismCL& prism, const STInterfaceCommonDataCL& cdata, const IdxT numr[8]) {
+        make_CompositeQuad5DomainSTCodim1SpatialAbsdet ( qdom, cdata.surf, prism);
+        resize_and_evaluate_on_vertexes( f_, prism, qdom, qf);
+        qp1.resize( qdom.vertex_size());
+        for (Uint i= 0; i < 8; ++i) {
+                if (numr[i] == NoIdx)
+                    continue;
+                evaluate_on_vertexes( STP1P1DiscCL::ref_val[i], qdom, Addr( qp1));
+                vec[i]= quad_codim1( qf*qp1, qdom);
+        }
+    }
+};
 
 class LocalSpatialInterfaceMassSTP1P1CL
 {
@@ -1324,6 +1396,7 @@ class SurfactantcGdGP1CL : public SurfactantP1BaseCL
              Mder, ///< ST-material-derivative matrix
              Mdiv, ///< ST-mass-matrix with interface-divergence of velocity
              Mold; ///< mass matrix on old spatial interface.
+    VectorCL load; ///< load-vector
 
   private:
     STP1P1IdxDescCL st_idx_;
