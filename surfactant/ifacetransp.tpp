@@ -28,65 +28,24 @@
 
 namespace DROPS {
 
-template <class ResultContainerT>
+template <Uint Dim>
   void
-  resize_and_evaluate_piecewise_normal (const SurfacePatchCL& p, const TetraCL& t, ResultContainerT& n, std::valarray<double>* absdet)
+  resize_and_scatter_piecewise_normal (const SPatchCL<Dim>& surf, const QuadDomainCodim1CL<Dim>& qdom, std::valarray<typename SPatchCL<Dim>::WorldVertexT>& normal)
 {
-    n.resize( p.facet_size());
-    if (absdet)
-        absdet->resize( p.facet_size());
+    normal.resize( qdom.vertex_size());
+    if (normal.size() == 0)
+        return;
+    if (surf.normal_empty()) // As qdom has vertexes, the must be facets, i.e. normals.
+        throw DROPSErrCL( "resize_and_scatter_piecewise_normal: normals were not precomputed.\n");
 
-    const typename SurfacePatchCL::const_vertex_iterator verts= p.vertex_begin();
-    typename SequenceTraitCL<ResultContainerT>::iterator n_it= sequence_begin( n);
-    double* a_it= absdet ? Addr( *absdet) : 0;
+    const Uint NodesPerFacet= qdom.vertex_size()/surf.facet_size();
+    if (qdom.vertex_size()%surf.facet_size() != 0)
+        throw DROPSErrCL( "resize_and_scatter_piecewise_normal: qdom.vertex_size is not a multiple of surf.facet_size.\n");
 
-    Point3DCL tmp( Uninitialized);
-    double tmp_norm;
-    for (SurfacePatchCL::const_facet_iterator it= p.facet_begin(); it != p.facet_end(); ++it) {
-        const Point3DCL& v0= GetWorldCoord( t, verts[(*it)[0]]);
-        cross_product( tmp, GetWorldCoord( t, verts[(*it)[1]]) - v0,
-                            GetWorldCoord( t, verts[(*it)[2]]) - v0);
-        tmp_norm= tmp.norm();
-        *n_it++= tmp/tmp_norm;
-        if (absdet)
-            *a_it++= tmp_norm;
-    }
+    for (Uint i= 0; i < surf.facet_size(); ++i)
+        std::fill_n( &normal[i*NodesPerFacet], NodesPerFacet, surf.normal_begin()[i]);
 }
 
-template <class ResultContainerT>
-  void
-  resize_and_evaluate_piecewise_normal (const SPatchCL<4>& p, const TetraPrismCL& prism, ResultContainerT& n, std::valarray<double>* absdet)
-{
-    n.resize( p.facet_size());
-    if (absdet)
-        absdet->resize( p.facet_size());
-
-    const typename SPatchCL<4>::const_vertex_iterator verts= p.vertex_begin();
-    typename SequenceTraitCL<ResultContainerT>::iterator n_it= sequence_begin( n);
-    double* a_it= absdet ? Addr( *absdet) : 0;
-
-    QRDecompCL<4,3> qr;
-    SMatrixCL<4,3>& M= qr.GetMatrix();
-    for (SPatchCL<4>::const_facet_iterator it= p.facet_begin(); it != p.facet_end(); ++it) {
-        const Point4DCL& v0= GetWorldCoord( prism, verts[(*it)[0]]);
-        for (Uint i= 1; i < 4; ++i)
-            M.col( i - 1, GetWorldCoord( prism, verts[(*it)[i]]) - v0);
-        const bool is_rank_deficient= qr.prepare_solve( /*assume_full_rank*/ false);
-        Point4DCL tmp;
-        if (is_rank_deficient) {
-            *n_it++= tmp;
-            if (absdet)
-                *a_it++= 0.;
-        }
-        else {
-            tmp[3]= 1.;
-            qr.apply_Q( tmp); // tmp has unit length.
-            *n_it++= tmp;
-            if (absdet)
-                *a_it++= std::fabs( qr.Determinant_R());
-        }
-    }
-}
 
 template <class DiscVelSolT>
 void LocalInterfaceConvectionP1CL<DiscVelSolT>::setup (const TetraCL& t, const InterfaceCommonDataP1CL& cdata)
@@ -127,11 +86,7 @@ template <class DiscVelSolT>
 void LocalInterfaceMassDivP1CL<DiscVelSolT>::setup (const TetraCL& t, const InterfaceCommonDataP1CL& cdata)
 {
     make_CompositeQuad5Domain2D ( qdom, cdata.surf, t);
-
-    resize_and_evaluate_piecewise_normal( cdata.surf, t, n_tri);
-    n.resize( qdom.vertex_size());
-    for (Uint i= 0; i < cdata.surf.facet_size(); ++i)
-        n[std::slice(i*7, 7, 1)]= n_tri[i];
+    resize_and_scatter_piecewise_normal( cdata.surf, qdom, n);
 
     GetTrafoTr( T, dummy, t);
     P2DiscCL::GetGradients( gradp2, gradrefp2, T);

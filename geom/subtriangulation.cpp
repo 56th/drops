@@ -23,6 +23,7 @@
 */
 
 #include "geom/subtriangulation.h"
+#include "geom/simplex.h"
 
 namespace DROPS
 {
@@ -115,6 +116,56 @@ write_paraview_vtu (std::ostream& file_, const SPatchCL<3>& t)
           <<"\n</UnstructuredGrid>"
           <<"\n</VTKFile>";
 }
+
+
+/// \brief Defined in the cpp-file to avoid a dependency on geom/simplex.h of the header subtriangulation.h.
+template <Uint Dim>
+void
+SPatchCL<Dim>::compute_world_vertexes (const WorldBodyT& wb) const
+{
+    world_vertexes_.clear();
+    VertexToWorldVertexMapperT mapper( wb);
+    std::transform( vertexes_.begin(), vertexes_.end(), std::back_inserter<WorldVertexContT>( world_vertexes_), mapper);
+}
+
+///\brief explicit instantiations for 3D and 4D
+template void SPatchCL<3>::compute_world_vertexes (const WorldBodyT& wb) const;
+template void SPatchCL<4>::compute_world_vertexes (const WorldBodyT& wb) const;
+
+
+/// \brief Defined in the cpp-file to avoid a dependency on geom/simplex.h of the header subtriangulation.h.
+template <Uint Dim>
+void
+SPatchCL<Dim>::compute_normals (const WorldBodyT& wb) const
+{
+    normals_.clear();
+    absdets_.clear();
+    if (world_vertex_empty())
+        compute_world_vertexes( wb);
+
+    QRDecompCL<Dim, Dim - 1> qr;
+    SMatrixCL<Dim, Dim - 1>& M= qr.GetMatrix();
+    WorldVertexT tmp( Uninitialized);
+    for (const_facet_iterator fit= facet_begin(); fit != facet_end(); ++fit) {
+        for (Uint i= 1; i < Dim; ++i)
+            M.col( i - 1, world_vertexes_[fit[0][i]] - world_vertexes_[fit[0][0]]);
+        if (!qr.prepare_solve( /*assume_full_rank*/ false)) { // prepare_solve returns true, iff M is rank-deficient.
+            absdets_.push_back( std::fabs( qr.Determinant_R()));
+            tmp= std_basis<Dim>( Dim);
+            qr.apply_Q( tmp); // tmp has unit length.
+            normals_.push_back( tmp);
+
+        }
+        else {
+            absdets_.push_back( 0.);
+            normals_.push_back( std_basis<Dim>( 0)); // zero-vector
+        }
+    }
+}
+
+///\brief explicit instantiations for 3D and 4D
+template void SPatchCL<3>::compute_normals (const WorldBodyT& wb) const;
+template void SPatchCL<4>::compute_normals (const WorldBodyT& wb) const;
 
 
 void

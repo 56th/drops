@@ -184,6 +184,10 @@ struct DimensionTraitsCL<3>
     typedef std::vector<Point3DCL>           WorldVertexContT;
     typedef WorldVertexContT::const_iterator const_world_vertex_iterator;
 
+    typedef Bary2WorldCoordCL VertexToWorldVertexMapperT;
+
+    typedef WorldVertexContT NormalContT;
+    typedef NormalContT::const_iterator const_normal_iterator;
 };
 
 template <>
@@ -209,6 +213,10 @@ struct DimensionTraitsCL<4>
     typedef std::vector<Point4DCL>           WorldVertexContT;
     typedef WorldVertexContT::const_iterator const_world_vertex_iterator;
 
+    typedef STCoord2WorldCoordCL VertexToWorldVertexMapperT;
+
+    typedef WorldVertexContT NormalContT;
+    typedef NormalContT::const_iterator const_normal_iterator;
 };
 
 template <Uint Dim>
@@ -241,13 +249,30 @@ class SPatchCL
     typedef typename DimTraitsT::RefPatchT      RefPatchT;
     typedef typename DimTraitsT::RefPatchFacetT RefPatchFacetT;
 
+    typedef typename DimTraitsT::WorldBodyT WorldBodyT;
+
+    typedef typename DimTraitsT::WorldVertexT                WorldVertexT;
+    typedef typename DimTraitsT::WorldVertexContT            WorldVertexContT;
+    typedef typename DimTraitsT::const_world_vertex_iterator const_world_vertex_iterator;
+
+    typedef typename DimTraitsT::VertexToWorldVertexMapperT VertexToWorldVertexMapperT;
+
+    typedef typename DimTraitsT::NormalContT NormalContT;
+    typedef typename DimTraitsT::const_normal_iterator const_normal_iterator;
+
+    typedef std::vector<double>::const_iterator const_absdet_iterator;
+
   private:
     typedef std::pair<Uint, Uint> RenumberVertexPairT; ///< Helper type to handle zero-vertexes
 
-    FacetContT     facets_;               ///< All facets of the interface.
+    FacetContT        facets_;            ///< All facets of the interface.
     std::vector<bool> is_boundary_facet_; ///< True, iff the facet is a facet of one of the simplexes of the principal lattice.
 
-    VertexContT vertexes_;
+    VertexContT      vertexes_;
+    mutable WorldVertexContT world_vertexes_;
+
+    mutable NormalContT         normals_;
+    mutable std::vector<double> absdets_;
 
     template <template <Uint> class VertexCutMergingPolicyT>
       const FacetT ///< Create a single sub-facet and its vertexes
@@ -283,6 +308,18 @@ class SPatchCL
     const_vertex_iterator vertex_begin () const { return vertexes_.begin(); }
     const_vertex_iterator vertex_end   () const { return vertexes_.end(); }
     ///@}
+
+    bool world_vertex_empty () const { return world_vertexes_.empty(); }
+    void compute_world_vertexes (const WorldBodyT& wb) const;
+    const_world_vertex_iterator world_vertex_begin () const { return world_vertexes_.begin(); }
+    const_world_vertex_iterator world_vertex_end   () const { return world_vertexes_.end(); }
+
+    bool normal_empty () const { return normals_.empty(); }
+    void compute_normals (const WorldBodyT& wb) const;
+    const_normal_iterator normal_begin () const { return normals_.begin(); }
+    const_normal_iterator normal_end   () const { return normals_.end(); }
+    const_absdet_iterator absdet_begin () const { return absdets_.begin(); }
+    const_absdet_iterator absdet_end   () const { return absdets_.end(); }
 
 #   pragma GCC diagnostic ignored "-Wnon-template-friend"
     friend void write_paraview_vtu (std::ostream&, const SPatchCL<Dim>&);

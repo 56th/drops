@@ -160,6 +160,10 @@ template <Uint Dim>
     facets_.clear();
     is_boundary_facet_.clear();
     vertexes_.clear();
+    world_vertexes_.clear();
+    normals_.clear();
+    absdets_.clear();
+
 }
 
 template <Uint Dim>

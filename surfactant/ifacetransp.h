@@ -51,18 +51,13 @@ void Restrict (const MultiGridCL& mg, const VecDescCL& xext, VecDescCL& x);
 /// \brief Helper for the accumulators: inserts the local matrix coup into M.
 void update_global_matrix_P1 (MatrixBuilderCL& M, const double coup[4][4], const IdxT numr[4], const IdxT numc[4]);
 
-/// \brief Writes a normal to each triangle of p to n. The normal is the normalized cross-product of two of the edges. Absdet is its norm.
-template <class ResultContainerT>
-  void
-  resize_and_evaluate_piecewise_normal (const SurfacePatchCL& p, const TetraCL& t, ResultContainerT& n, std::valarray<double>* absdet= 0);
-
-/// \brief Writes a normal to each facet of p to n. The normal has unit length. Absdet is the scaling of the volume from the reference tetra.
-template <class ResultContainerT>
-  void
-  resize_and_evaluate_piecewise_normal (const SPatchCL<4>& p, const TetraPrismCL& prism, ResultContainerT& n, std::valarray<double>* absdet= 0);
-
 /// \todo This should be a generic function somewhere in num or misc.
 void P1Init (instat_scalar_fun_ptr icf, VecDescCL& ic, const MultiGridCL& mg, double t);
+
+/// \brief Resize normal according to qdom and fill in surf.normal. The normal must be precomputed.
+template <Uint Dim>
+  void
+  resize_and_scatter_piecewise_normal (const SPatchCL<Dim>& surf, const QuadDomainCodim1CL<Dim>& qdom, std::valarray<typename SPatchCL<Dim>::WorldVertexT>& normal);
 
 
 /// \brief The routine sets up the mass-matrix in matM on the interface defined by ls.
@@ -349,7 +344,12 @@ class LocalLaplaceBeltramiP1CL
     double coup[4][4];
 
     void setup (const TetraCL& t, const InterfaceCommonDataP1CL& cdata) {
-        resize_and_evaluate_piecewise_normal( cdata.surf, t, n, &absdet);
+        n.resize( cdata.surf.facet_size());
+        absdet.resize( cdata.surf.facet_size());
+        if (cdata.surf.normal_empty())
+            cdata.surf.compute_normals( t);
+        std::copy( cdata.surf.normal_begin(), cdata.surf.normal_end(), sequence_begin( n));
+        std::copy( cdata.surf.absdet_begin(), cdata.surf.absdet_end(), sequence_begin( absdet));
         P1DiscCL::GetGradients( grad, dummy, t);
         for(int i= 0; i < 4; ++i) {
             q[i].resize( cdata.surf.facet_size());
@@ -415,8 +415,7 @@ class LocalInterfaceMassDivP1CL
     std::valarray<double> q[4];
     double dummy;
     SMatrixCL<3,3> T;
-    GridFunctionCL<Point3DCL> n_tri,
-                              n,
+    GridFunctionCL<Point3DCL> n,
                               qgradp2i;
     std::valarray<double> qdivgamma_w;
     LocalP1CL<Point3DCL> gradrefp2[10],
@@ -1043,7 +1042,6 @@ class STInterfaceCommonDataCL : public TetraAccumulatorCL
 
     std::valarray<double> ls_loc;
     SPatchCL<4> surf;
-    GridFunctionCL<Point4DCL> n;
 
     const double t0,
                  t1;
@@ -1069,13 +1067,12 @@ class STInterfaceCommonDataCL : public TetraAccumulatorCL
     }
     virtual void visit (const TetraCL& t) {
         surf.clear();
-        n.resize( 0);
         st_local_ls.assign( t, *old_ls, *new_ls, *lsetbnd);
         evaluate_on_vertexes( st_local_ls, lat, Addr( ls_loc));
         if (equal_signs( ls_loc))
             return;
         surf.make_patch<MergeCutPolicyCL>( lat, ls_loc);
-        resize_and_evaluate_piecewise_normal( surf, TetraPrismCL( t, t0, t1), n);
+        surf.compute_normals( TetraPrismCL( t, t0, t1));
     }
     virtual STInterfaceCommonDataCL* clone (int clone_id) {
         return the_clones[clone_id]= new STInterfaceCommonDataCL( *this);
@@ -1167,7 +1164,7 @@ class LocalSpatialInterfaceMassSTP1P1CL
 };
 
 void
-resize_and_scatter_piecewise_spatial_normal (const GridFunctionCL<Point4DCL>& n, const QuadDomainCodim1CL<4>& qdom, std::valarray<Point3DCL>& spatial_normal);
+resize_and_scatter_piecewise_spatial_normal (const SPatchCL<4>& surf, const QuadDomainCodim1CL<4>& qdom, std::valarray<Point3DCL>& spatial_normal);
 
 class LocalLaplaceBeltramiSTP1P1CL
 {
@@ -1187,7 +1184,7 @@ class LocalLaplaceBeltramiSTP1P1CL
 
     void setup (const TetraPrismCL& prism, const STInterfaceCommonDataCL& cdata) {
         make_CompositeQuad2DomainSTCodim1SpatialAbsdet( qdom, cdata.surf, prism);
-        resize_and_scatter_piecewise_spatial_normal( cdata.n, qdom, spatial_n);
+        resize_and_scatter_piecewise_spatial_normal( cdata.surf, qdom, spatial_n);
 
         STP1P1DiscCL::GetSpatialGradients( prism, gradx);
         for (int i= 0; i < 8; ++i) {
@@ -1244,7 +1241,6 @@ class LocalMaterialDerivativeSTP1P1CL
     LocalMaterialDerivativeSTP1P1CL (const DiscVelSolT& w)
         :w_( w) {}
 };
-
 template <class DiscVelSolT>
 class LocalMassdivSTP1P1CL
 {
@@ -1275,7 +1271,7 @@ class LocalMassdivSTP1P1CL
 
     void setup (const TetraPrismCL& prism, const STInterfaceCommonDataCL& cdata) {
         make_CompositeQuad5DomainSTCodim1SpatialAbsdet( qdom, cdata.surf, prism);
-        resize_and_scatter_piecewise_spatial_normal( cdata.n, qdom, spatial_n);
+        resize_and_scatter_piecewise_spatial_normal( cdata.surf, qdom, spatial_n);
 
         loc_w_.assign( prism.t, w_);
         resize_and_evaluate_on_vertexes( loc_w_, qdom, qw);

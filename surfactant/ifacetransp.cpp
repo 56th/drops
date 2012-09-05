@@ -456,17 +456,20 @@ void STP1P1IdxDescCL::CreateNumbering (Uint level, MultiGridCL& mg, const VecDes
 
 
 void
-resize_and_scatter_piecewise_spatial_normal (const GridFunctionCL<Point4DCL>& n, const QuadDomainCodim1CL<4>& qdom, std::valarray<Point3DCL>& spatial_normal)
+resize_and_scatter_piecewise_spatial_normal (const SPatchCL<4>& surf, const QuadDomainCodim1CL<4>& qdom, std::valarray<Point3DCL>& spatial_normal)
 {
     spatial_normal.resize( qdom.vertex_size());
     if (spatial_normal.size() == 0)
         return;
+    if (surf.normal_empty()) // As qdom has vertexes, the must be facets, i.e. normals.
+        throw DROPSErrCL( "resize_and_scatter_piecewise_spatial_normal: normals were not precomputed.\n");
 
-    const Uint NodesPerFacet= qdom.vertex_size()/n.size();
-    if (qdom.vertex_size()%n.size() != 0)
-        throw DROPSErrCL( "resize_and_scatter_piecewise_spatial_normal: qdom.vertex_size is not a multiple of n.size.\n");
+    const Uint NodesPerFacet= qdom.vertex_size()/surf.facet_size();
+    if (qdom.vertex_size()%surf.facet_size() != 0)
+        throw DROPSErrCL( "resize_and_scatter_piecewise_spatial_normal: qdom.vertex_size is not a multiple of surf.facet_size.\n");
 
-    for (Uint i= 0; i < n.size(); ++i) {
+    const typename SPatchCL<4>::const_normal_iterator n= surf.normal_begin();
+    for (Uint i= 0; i < surf.facet_size(); ++i) {
         const Point3DCL& tmp= MakePoint3D( n[i][0], n[i][1], n[i][2]);
         const Point3DCL& unittmp= tmp/tmp.norm();
         for (Uint j= 0; j < NodesPerFacet; ++j)
