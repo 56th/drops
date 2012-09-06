@@ -373,8 +373,8 @@ VTKIfaceScalarCL::put (VTKOutCL& cf) const
 
 /// ==Space-Time-methods==
 /// \todo Maybe introduce a new file
-///\brief Bilinear space-time FE-function on a single TetraPrismCL.
 
+///\brief Bilinear space-time FE-function on a single TetraPrismCL.
 LocalSTP1P1CL<> STP1P1DiscCL::ref_val[8];
 LocalSTP1P1CL<Point4DCL> STP1P1DiscCL::ref_grad[8];
 LocalSTP1P1CL<Point3DCL> STP1P1DiscCL::ref_gradx[8];
@@ -387,6 +387,8 @@ void STP1P1DiscCL::StaticInit()
         ref_val[i + 4].at_t1()[i]= 1.;
 
         const Point3DCL p1grad( FE_P1CL::DHRef( i));
+        ref_grad[i    ].at_t1()[i]= MakePoint4D( 0., 0., 0., -1.);
+        ref_grad[i + 4].at_t0()[i]= MakePoint4D( 0., 0., 0.,  1.);
         for (Uint j= 0; j < 4; ++j) {
             ref_grad[i    ].at_t0()[j]= MakePoint4D( p1grad[0], p1grad[1], p1grad[2], j == i ? -1. : 0.);
             ref_grad[i + 4].at_t1()[j]= MakePoint4D( p1grad[0], p1grad[1], p1grad[2], j == i ?  1. : 0.);
@@ -473,7 +475,7 @@ resize_and_scatter_piecewise_spatial_normal (const SPatchCL<4>& surf, const Quad
     if (qdom.vertex_size()%surf.facet_size() != 0)
         throw DROPSErrCL( "resize_and_scatter_piecewise_spatial_normal: qdom.vertex_size is not a multiple of surf.facet_size.\n");
 
-    const typename SPatchCL<4>::const_normal_iterator n= surf.normal_begin();
+    const SPatchCL<4>::const_normal_iterator n= surf.normal_begin();
     for (Uint i= 0; i < surf.facet_size(); ++i) {
         const Point3DCL& tmp= MakePoint3D( n[i][0], n[i][1], n[i][2]);
         const Point3DCL& unittmp= tmp/tmp.norm();
