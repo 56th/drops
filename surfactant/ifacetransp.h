@@ -1228,7 +1228,7 @@ class LocalSpatialInterfaceMassSTP1P1CL
         : spatialcdata_( spatialcdata) { std::memset( coup, 0, 8*8*sizeof(double)); }
 
     void setup (const TetraPrismCL& p, const STInterfaceCommonDataCL&) {
-        spatial_mass_.setup( p.t, spatialcdata_);
+        spatial_mass_.setup( p.t, spatialcdata_.get_clone());
         // The basis functions for t1 are all zero on the interface at t0 --> zero-init in the constructor.
         for (int i= 0; i < 4; ++i) {
             coup[i][i]= spatial_mass_.coup[i][i];
