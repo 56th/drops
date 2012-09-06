@@ -1322,20 +1322,18 @@ template <class DiscVelSolT>
 class LocalMassdivSTP1P1CL
 {
   private:
-    const DiscVelSolT&        w_; // wind
-    LocalSTP2P1CL<Point3DCL>  loc_w_;
+    const DiscVelSolT&               w_; // wind
+    LocalSTP2P1CL<Point3DCL>         loc_w_;
+    LocalSTP1P1CL< SMatrixCL<3,3> >  dw;
+    GridFunctionCL< SMatrixCL<3,3> > qdw;
+    std::valarray<double> qdivgamma_w;
 
     GridFunctionCL<Point3DCL> spatial_n;
 
-    std::valarray<double> qdivgamma_w;
     double dummy;
     SMatrixCL<3,3> T;
-    LocalP1CL<Point3DCL>  gradrefp2[10],
-                          gradp2[10];
-    LocalSTP1P1CL<Point3DCL>  gradp2t0,
-                              gradp2t1;
-    GridFunctionCL<Point3DCL> qgradp2t0,
-                              qgradp2t1;
+    LocalP1CL<Point3DCL> gradrefp2[10],
+                         gradp2[10];
 
     std::valarray<double> q[8];
 
@@ -1349,18 +1347,15 @@ class LocalMassdivSTP1P1CL
         GetTrafoTr( T, dummy, prism.t);
         P2DiscCL::GetGradients( gradp2, gradrefp2, T);
 
-        qgradp2t0.resize( cdata.q5dom.vertex_size());
-        qgradp2t1.resize( cdata.q5dom.vertex_size());
-        /// \todo qdivgamma_w= trace( qdw) - qn^T*qdw*qn mit qdw= Auswertung von dw= outer_product(w_i, gradp2_i)
-        qdivgamma_w.resize( cdata.q5dom.vertex_size(), 0.);
+        dw= LocalSTP1P1CL< SMatrixCL<3,3> >();
         for (int i= 0; i < 10; ++i) {
-            gradp2t0.at_t0()= gradp2[i];
-            evaluate_on_vertexes( gradp2t0, cdata.q5dom, Addr( qgradp2t0));
-            gradp2t1.at_t1()= gradp2[i];
-            evaluate_on_vertexes( gradp2t1, cdata.q5dom, Addr( qgradp2t1));
-            qdivgamma_w+= dot(loc_w_.at_t0()[i], qgradp2t0) - dot( loc_w_.at_t0()[i], spatial_n)*dot( spatial_n, qgradp2t0)
-                        + dot(loc_w_.at_t1()[i], qgradp2t1) - dot( loc_w_.at_t1()[i], spatial_n)*dot( spatial_n, qgradp2t1);
+            dw.at_t0()+= outer_product(loc_w_.at_t0()[i], gradp2[i]);
+            dw.at_t1()+= outer_product(loc_w_.at_t1()[i], gradp2[i]);
         }
+        resize_and_evaluate_on_vertexes( dw, cdata.q5dom, qdw);
+        qdivgamma_w.resize( cdata.q5dom.vertex_size());
+        qdivgamma_w= trace( qdw) - dot( spatial_n, qdw, spatial_n);
+
         for (int i= 0; i < 8; ++i)
             resize_and_evaluate_on_vertexes( STP1P1DiscCL::ref_val[i], cdata.q5dom, q[i]);
 
