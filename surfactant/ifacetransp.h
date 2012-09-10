@@ -729,6 +729,37 @@ class LocalSTP1P1CL
     const spatial_localfe_type& at_t1 () const { return v1_; }
 };
 
+///\brief Finear space-time FE-function on a single TetraPrismCL.
+/// The values on the penta are defined as those on the tetra at t0 and the value in the vertex (v0, t1).
+template <typename T= double>
+class LocalSTP1CL : public GridFunctionCL<T>
+{
+  public:
+    typedef GridFunctionCL<T> base_type;
+    typedef typename base_type::value_type value_type;
+    typedef typename base_type::instat_fun_ptr instat_fun_ptr;
+
+    enum { Dim= 5 }; ///< local number of unknowns
+
+  protected:
+    typedef LocalSTP1CL<T> self_;
+
+  public:
+    LocalSTP1CL() : base_type( value_type(), Dim) {}
+    LocalSTP1CL(const value_type& t): base_type( t, Dim) {}
+
+DROPS_DEFINE_VALARRAY_DERIVATIVE(LocalSTP1CL, T, base_type)
+
+    // pointwise evaluation in STCoords.
+    value_type operator() (const STCoordCL& p) const {
+        return LinearCombinationCL<self_, value_type>::do_it( *this, p.x_bary[0] - p.t_ref,
+                                                                     p.x_bary[1],
+                                                                     p.x_bary[2],
+                                                                     p.x_bary[3],
+                                                                     p.t_ref);
+    }
+};
+
 ///\brief Quadratic in space and linear in time space-time FE-function on a single TetraPrismCL.
 /// The class holds references to two LocalP2CL-objects.
 template <typename T= double>
@@ -797,39 +828,43 @@ class STWindProxyCL
 class STP1P1DiscCL
 {
   public:
-    static LocalSTP1P1CL<>                 ref_val[8];
-    static LocalSTP1P1CL<Point4DCL>        ref_grad[8];
-    static LocalSTP1P1CL<Point3DCL>        ref_gradx[8];
-    // static LocalSTP1P1CL< SMatrixCL<4,4> > ref_Hess[8];
+    static LocalSTP1P1CL<>        ref_val[8];
+    static LocalSTP1CL<Point4DCL> ref_grad[8];
+    static LocalSTP1CL<Point3DCL> ref_gradx[8];
 
     static void StaticInit();
     static void StaticDestruct() {}
 
-    static void GetGradients (const TetraPrismCL& prism, LocalSTP1P1CL<Point4DCL> grad[8]) {
+    static void GetGradients (const TetraPrismCL& prism, LocalSTP1CL<Point4DCL> grad[8]) {
         SMatrixCL<3,3> M( Uninitialized);
         double det= 0.; // dummy
         GetTrafoTr( M, det, prism.t);
         const double dt_inv= 1./(prism.t1 - prism.t0);
         for (Uint i= 0; i < 4; ++i) {
             const Point3DCL& p1grad= M*FE_P1CL::DHRef( i);
-            grad[i    ].at_t1()[i]= MakePoint4D( 0., 0., 0., -dt_inv);
-            grad[i + 4].at_t0()[i]= MakePoint4D( 0., 0., 0.,  dt_inv);
+            const Point4DCL& p1grad4d= MakePoint4D( p1grad[0], p1grad[1], p1grad[2], 0.);
+            // grad[i]= Point4DCL();
             for (Uint j= 0; j < 4; ++j) {
-                grad[i    ].at_t0()[j]= MakePoint4D( p1grad[0], p1grad[1], p1grad[2], j == i ? -dt_inv : 0.);
-                grad[i + 4].at_t1()[j]= MakePoint4D( p1grad[0], p1grad[1], p1grad[2], j == i ?  dt_inv : 0.);
+                grad[i][j]= p1grad4d;
+                grad[i][j][3]= j == i ? -dt_inv : 0.;
             }
+            grad[i][4][3]= i == 0 ? -dt_inv : 0.;
+            // grad[i + 4]= Point4DCL();
+            grad[i + 4][i][3]=  dt_inv;
+            grad[i + 4][4]= p1grad4d;
+            grad[i + 4][4][3]= i == 0 ? dt_inv : 0.;
+
         }
     }
-    static void GetSpatialGradients (const TetraPrismCL& prism, LocalSTP1P1CL<Point3DCL> grad[8]) {
+    static void GetSpatialGradients (const TetraPrismCL& prism, LocalSTP1CL<Point3DCL> grad[8]) {
         SMatrixCL<3,3> M( Uninitialized);
         double det= 0.; // dummy
         GetTrafoTr( M, det, prism.t);
         for (Uint i= 0; i < 4; ++i) {
             const Point3DCL& p1grad= M*FE_P1CL::DHRef( i);
-            for (Uint j= 0; j < 4; ++j) {
-                grad[i    ].at_t0()[j]= p1grad;
-                grad[i + 4].at_t1()[j]= p1grad;
-            }
+            for (Uint j= 0; j < 4; ++j)
+                grad[i][j]= p1grad;
+            grad[i + 4][4]= p1grad;
         }
     }
 };
@@ -1246,9 +1281,9 @@ class LocalLaplaceBeltramiSTP1P1CL
   private:
     double D_; // diffusion coefficient
 
-    LocalSTP1P1CL<Point3DCL> gradx[8];
+    LocalSTP1CL<Point3DCL> gradx[8];
     double dummy;
-    GridFunctionCL<Point3DCL> qgradx[8],
+    GridFunctionCL<Point3DCL> qgradx,
                               q[8],
                               spatial_n;
     QuadDomainCodim1CL<4> qdom;
@@ -1262,10 +1297,11 @@ class LocalLaplaceBeltramiSTP1P1CL
         resize_and_scatter_piecewise_spatial_normal( cdata.surf, qdom, spatial_n);
 
         STP1P1DiscCL::GetSpatialGradients( prism, gradx);
+        qgradx.resize( qdom.vertex_size());
         for (int i= 0; i < 8; ++i) {
-            resize_and_evaluate_on_vertexes( gradx[i], qdom, qgradx[i]);
+            evaluate_on_vertexes( gradx[i], qdom, Addr( qgradx));
             q[i].resize( qdom.vertex_size());
-            q[i]= qgradx[i] - dot( qgradx[i], spatial_n)*spatial_n;
+            q[i]= qgradx - dot( qgradx, spatial_n)*spatial_n;
         }
 
         for (int i= 0; i < 8; ++i) {
@@ -1286,7 +1322,7 @@ class LocalMaterialDerivativeSTP1P1CL
     const DiscVelSolT& w_; // wind
     LocalSTP2P1CL<Point3DCL> loc_w_;
 
-    LocalSTP1P1CL<Point4DCL> grad[8];
+    LocalSTP1CL<Point4DCL> grad[8];
     double dummy;
     GridFunctionCL<Point4DCL> qw,
                               qgrad;

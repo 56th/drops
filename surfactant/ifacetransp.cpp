@@ -376,9 +376,8 @@ VTKIfaceScalarCL::put (VTKOutCL& cf) const
 
 ///\brief Bilinear space-time FE-function on a single TetraPrismCL.
 LocalSTP1P1CL<> STP1P1DiscCL::ref_val[8];
-LocalSTP1P1CL<Point4DCL> STP1P1DiscCL::ref_grad[8];
-LocalSTP1P1CL<Point3DCL> STP1P1DiscCL::ref_gradx[8];
-// LocalSTP1P1CL< SMatrixCL<4,4> > STP1P1DiscCL::ref_Hess[8];
+LocalSTP1CL<Point4DCL> STP1P1DiscCL::ref_grad[8];
+LocalSTP1CL<Point3DCL> STP1P1DiscCL::ref_gradx[8];
 
 void STP1P1DiscCL::StaticInit()
 {
@@ -387,14 +386,18 @@ void STP1P1DiscCL::StaticInit()
         ref_val[i + 4].at_t1()[i]= 1.;
 
         const Point3DCL p1grad( FE_P1CL::DHRef( i));
-        ref_grad[i    ].at_t1()[i]= MakePoint4D( 0., 0., 0., -1.);
-        ref_grad[i + 4].at_t0()[i]= MakePoint4D( 0., 0., 0.,  1.);
-        for (Uint j= 0; j < 4; ++j) {
-            ref_grad[i    ].at_t0()[j]= MakePoint4D( p1grad[0], p1grad[1], p1grad[2], j == i ? -1. : 0.);
-            ref_grad[i + 4].at_t1()[j]= MakePoint4D( p1grad[0], p1grad[1], p1grad[2], j == i ?  1. : 0.);
-            ref_gradx[i    ].at_t0()[j]= p1grad;
-            ref_gradx[i + 4].at_t1()[j]= p1grad;
-        }
+        const Point4DCL& p1grad4d= MakePoint4D( p1grad[0], p1grad[1], p1grad[2], 0.);
+        for (Uint j= 0; j < 4; ++j)
+            ref_grad[i][j]= p1grad4d;
+        ref_grad[i][i][3]= -1.;
+        ref_grad[i][4][3]= i == 0 ? -1. : 0.;
+        ref_grad[i + 4][i][3]=  1.;
+        ref_grad[i + 4][4]= p1grad4d;
+        ref_grad[i + 4][4][3]= i == 0 ? 1. : 0.;
+
+        for (Uint j= 0; j < 4; ++j)
+            ref_gradx[i][j]= p1grad;
+        ref_gradx[i + 4][4]= p1grad;
     }
 }
 
