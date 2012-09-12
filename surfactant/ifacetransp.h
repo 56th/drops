@@ -1158,6 +1158,10 @@ class InterfaceMatrixSTP1AccuCL : public TetraAccumulatorCL
     InterfaceMatrixSTP1AccuCL (MatrixCL* mat, const STP1P1IdxDescCL* idx,
                                  const LocalMatrixT& loc_mat, const STInterfaceCommonDataCL& cdata, std::string name= std::string())
         : cdata_( cdata), name_( name), mat_( mat), cpl_( 0), idx_( idx), u_( 0), M( 0), local_mat( loc_mat) {}
+    ///\brief For cG in time; uses cpl_, u_ and changes the test-space.
+    InterfaceMatrixSTP1AccuCL (MatrixCL* mat, VectorCL* cpl, const STP1P1IdxDescCL* idx,
+                                   const LocalMatrixT& loc_mat, const STInterfaceCommonDataCL& cdata, const VectorCL* u, std::string name= std::string())
+        : cdata_( cdata), name_( name), mat_( mat), cpl_( cpl), idx_( idx), u_( u), M( 0), local_mat( loc_mat) {}
     virtual ~InterfaceMatrixSTP1AccuCL () {}
 
     void set_name (const std::string& n) { name_= n; }
@@ -1187,7 +1191,15 @@ class InterfaceMatrixSTP1AccuCL : public TetraAccumulatorCL
             return;
         local_mat.setup( TetraPrismCL( t, cdata.t0, cdata.t1), cdata);
         local_idx.assign_indices_only( t, *idx_);
-        update_global_matrix<LocalMatrixT::ZeroPolicy>( *M, local_mat.coup, local_idx, local_idx);
+        if (cpl_) {
+            for (Uint i= 0; i < 4; ++i) // The first four test-functions remain as they are, the last four are made constant in time.
+                for (Uint j= 0; j < 8; ++j)
+                    local_mat.coup[i + 4][j]+= local_mat.coup[i][j];
+            update_global_matrix_and_coupling<LocalMatrixT::ZeroPolicy>( *M, local_mat.coup, local_idx, local_idx, cpl_, u_);
+
+        }
+        else
+            update_global_matrix<LocalMatrixT::ZeroPolicy>( *M, local_mat.coup, local_idx, local_idx);
     }
 
     virtual InterfaceMatrixSTP1AccuCL* clone (int /*clone_id*/) { return new InterfaceMatrixSTP1AccuCL( *this); }
@@ -1232,9 +1244,18 @@ class InterfaceVectorSTP1AccuCL : public TetraAccumulatorCL
             return;
         local_row.assign_indices_only( t, *rowidx_);
         local_vec.setup( TetraPrismCL( t, cdata.t0, cdata.t1), cdata, local_row.num);
-        for (int i= 0; i < 8; ++i)
-            if (local_row.WithUnknowns( i))
-                vec_[0][local_row.num[i]]+= local_vec.vec[i];
+        if (cG_in_t_) {
+            for (Uint i= 0; i < 4; ++i)
+                if (local_row.WithUnknowns( i) && local_row.WithUnknowns( i + 4)) // The last four components are made constant in time.
+                    local_vec.vec[i + 4]+= local_vec.vec[i];
+            for (int i= 0; i < 8; ++i)
+                if (local_row.WithUnknowns( i) && !local_row.IsIni( i))
+                    vec_[0][local_row.num[i] - local_row.NumIniUnknowns()]+= local_vec.vec[i];
+        }
+        else
+            for (int i= 0; i < 8; ++i)
+                if (local_row.WithUnknowns( i))
+                    vec_[0][local_row.num[i]]+= local_vec.vec[i];
     }
 
     virtual InterfaceVectorSTP1AccuCL* clone (int /*clone_id*/) { return new InterfaceVectorSTP1AccuCL( *this); }
@@ -1433,8 +1454,21 @@ template <template <class> class LocalMatrixT, class DiscVelSolT>
         LocalMatrixT<DiscVelSolT>( wind), cdata, name);
 }
 
+/// \brief Convenience-function to reduce the number of explicit template-parameters for the spacetime-massdiv- and the -convection-matrix.
+template <template <class> class LocalMatrixT, class DiscVelSolT>
+  inline InterfaceMatrixSTP1AccuCL< LocalMatrixT<DiscVelSolT> >*
+  make_wind_dependent_matrixSTP1P0_1_accu (MatrixCL* mat, VectorCL* cpl, const STP1P1IdxDescCL* idx,
+                                           const STInterfaceCommonDataCL& cdata, const VectorCL* u_ini, const DiscVelSolT& wind, std::string name= std::string())
+{
+    return new InterfaceMatrixSTP1AccuCL< LocalMatrixT<DiscVelSolT> >( mat, cpl, idx,
+        LocalMatrixT<DiscVelSolT>( wind), cdata, u_ini, name);
+}
 
-/// \brief P1-discretization and solution of the transport equation on the interface
+
+/// \brief Space-time P1-discretization and solution of the transport equation on the interface
+/// Two methods are implemented:
+///     * cG_in_t_ == false: dG-coupling in time; both, the trial- and the test-space, are the full STP1P1 FE-space.
+///     * cG_in_t_ == true: The initial values are eliminated; additionally, the test space is changed: for Ini-Unknowns, there remains only a test-function, which is constant in time.
 class SurfactantSTP1CL : public SurfactantP1BaseCL
 {
   public:
@@ -1442,22 +1476,29 @@ class SurfactantSTP1CL : public SurfactantP1BaseCL
              Mder, ///< ST-material-derivative matrix
              Mdiv, ///< ST-mass-matrix with interface-divergence of velocity
              Mold; ///< mass matrix on old spatial interface.
-    VectorCL load; ///< load-vector
+
+    VectorCL load, ///< load-vector
+             cpl_A_,   ///< The cpl-Vectors are used only for cG_in_t_==true.
+             cpl_der_,
+             cpl_div_;
 
     size_t dim; ///< Dimension of the linear system.
 
   private:
-    STP1P1IdxDescCL st_idx_;
-    VectorCL st_oldic_, ///< the old solution represented in the space-time-FE-basis.
-             st_ic_;    ///< the new solution represented in the space-time-FE-basis.
+    bool cG_in_t_;
 
+    STP1P1IdxDescCL st_idx_;
+    VectorCL st_oldic_, ///< the old solution represented in the full space-time-FE-basis.
+             st_ic_;    ///< the new solution represented in the space-time-FE-basis with eliminated initial values.
+
+    void Update_cG();
     void Update_dG();
 
   public:
     SurfactantSTP1CL (MultiGridCL& mg,
-        double theta, double D, VecDescCL* v, const VelBndDataT& Bnd_v, VecDescCL& lset_vd, const BndDataCL<>& lsetbnd,
+        double theta, double D, VecDescCL* v, const VelBndDataT& Bnd_v, VecDescCL& lset_vd, const BndDataCL<>& lsetbnd, bool cG_in_t,
         int iter= 1000, double tol= 1e-7, double omit_bound= -1.)
-    : SurfactantP1BaseCL( mg, theta, D, v, Bnd_v, lset_vd, lsetbnd, iter, tol, omit_bound)
+    : SurfactantP1BaseCL( mg, theta, D, v, Bnd_v, lset_vd, lsetbnd, iter, tol, omit_bound), cG_in_t_( cG_in_t)
     {}
 
     /// save a copy of the old level-set and velocity; moves ic to oldic; must be called before DoStep.

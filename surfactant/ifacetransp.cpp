@@ -495,7 +495,7 @@ void SurfactantSTP1CL::InitStep (double new_t)
     dt_= ic.t - oldt_;
 
     st_idx_.CreateNumbering( oldidx_.TriangLevel(), MG_, oldls_, lset_vd_, lsetbnd_, oldt_, new_t);
-    dim= st_idx_.NumUnknowns();
+    dim= st_idx_.NumUnknowns() - (cG_in_t_ ? st_idx_.NumIniUnknowns() : 0);
     std::cout << "space-time Unknowns: " << st_idx_.NumUnknowns()
               << " ini: " << st_idx_.NumIniUnknowns() << " fini: " << st_idx_.NumFiniUnknowns()
               << " interior: " << st_idx_.NumUnknowns() - st_idx_.NumIniUnknowns() - st_idx_.NumFiniUnknowns()
@@ -511,6 +511,29 @@ void SurfactantSTP1CL::InitStep (double new_t)
                 st_oldic_[dof]= oldic_[dof];
         }
     }
+}
+
+void SurfactantSTP1CL::Update_cG()
+{
+    TetraAccumulatorTupleCL accus;
+    STInterfaceCommonDataCL cdata( oldt_, ic.t,  oldls_, lset_vd_, lsetbnd_);
+    accus.push_back( &cdata);
+    InterfaceMatrixSTP1AccuCL<LocalLaplaceBeltramiSTP1P1CL> lb_accu( &A, &cpl_A_, &st_idx_,
+        LocalLaplaceBeltramiSTP1P1CL( D_), cdata, &st_oldic_, "Laplace-Beltrami on ST-iface");
+    accus.push_back( &lb_accu);
+    accus.push_back_acquire( make_wind_dependent_matrixSTP1P0_1_accu<LocalMaterialDerivativeSTP1P1CL>( &Mder, &cpl_der_, &st_idx_, cdata, &st_oldic_, make_STP2P1Eval( MG_, Bnd_v_, oldv_, *v_), "material derivative on ST-iface"));
+    accus.push_back_acquire( make_wind_dependent_matrixSTP1P0_1_accu<LocalMassdivSTP1P1CL>( &Mdiv, &cpl_div_, &st_idx_, cdata, &st_oldic_, make_STP2P1Eval( MG_, Bnd_v_, oldv_, *v_), "mass-div on ST-iface"));
+
+    cpl_A_.resize( dim);
+    cpl_der_.resize( dim);
+    cpl_div_.resize( dim);
+
+    if (rhs_fun_) {
+        load.resize( dim);
+        accus.push_back_acquire( new InterfaceVectorSTP1AccuCL<LocalVectorSTP1P1CL>( &load, &st_idx_, LocalVectorSTP1P1CL( rhs_fun_), cdata, /* cG_in_t*/ cG_in_t_, "load on ST-iface"));
+    }
+
+    accumulate( accus, MG_, st_idx_.TriangLevel(), idx.GetMatchingFunction(), idx.GetBndInfo());
 }
 
 void SurfactantSTP1CL::Update_dG()
@@ -531,7 +554,7 @@ void SurfactantSTP1CL::Update_dG()
 
     if (rhs_fun_) {
         load.resize( dim);
-        accus.push_back_acquire( new InterfaceVectorSTP1AccuCL<LocalVectorSTP1P1CL>( &load, &st_idx_, LocalVectorSTP1P1CL( rhs_fun_), cdata, /* cG_in_t*/ false, "load on ST-iface"));
+        accus.push_back_acquire( new InterfaceVectorSTP1AccuCL<LocalVectorSTP1P1CL>( &load, &st_idx_, LocalVectorSTP1P1CL( rhs_fun_), cdata, /* cG_in_t*/ cG_in_t_, "load on ST-iface"));
     }
 
     accumulate( accus, MG_, st_idx_.TriangLevel(), idx.GetMatchingFunction(), idx.GetBndInfo());
@@ -541,13 +564,19 @@ void SurfactantSTP1CL::Update()
 {
     // ScopeTimerCL timer( "SurfactantSTP1CL::Update");
     std::cout << "SurfactantSTP1CL::Update:\n";
-    Update_dG();
+    if (cG_in_t_)
+        Update_cG();
+    else
+        Update_dG();
 
 //     WriteToFile( Mold, "Mold.txt", "mass on old iface");
 //     WriteToFile( A,    "A.txt",    "Laplace-Beltrami on ST-iface");
 //     WriteToFile( Mder, "Mder.txt", "material derivative on ST-iface");
 //     WriteToFile( Mdiv, "Mdiv.txt", "mass-div on ST-iface");
 //     WriteToFile( load, "load.txt", "load on ST-iface");
+//     WriteToFile( cpl_A_,   "cpl_A.txt",   "coupling for Laplace-Beltrami on ST-iface");
+//     WriteToFile( cpl_der_, "cpl_der.txt", "coupling for material derivative on ST-iface");
+//     WriteToFile( cpl_div_, "cpl_div.txt", "coupling for mass-div on ST-iface");
 
     std::cout << "SurfactantSTP1CL::Update: Finished\n";
 }
@@ -557,8 +586,15 @@ void SurfactantSTP1CL::DoStep ()
     Update();
 
     MatrixCL L;
-    L.LinComb( 1., Mder, 1., Mdiv, 1., A, 1., Mold);
-    VectorCL rhs( Mold*st_oldic_);
+    VectorCL rhs( dim);
+    if (cG_in_t_) {
+        L.LinComb( 1., Mder, 1., Mdiv, 1., A);
+        rhs= cpl_der_ + cpl_div_ + cpl_A_;
+    }
+    else {
+        L.LinComb( 1., Mder, 1., Mdiv, 1., A, 1., Mold);
+        rhs= Mold*st_oldic_;
+    }
     if (rhs_fun_ != 0)
         rhs+= load;
 
@@ -578,7 +614,7 @@ void SurfactantSTP1CL::CommitStep ()
         if (it->Unknowns.Exist( st_idx_.GetIdx( 1))) {
             const IdxT dof= it->Unknowns( st_idx_.GetIdx( 1));
             if (dof >= st_idx_.NumIniUnknowns() && dof < st_idx_.NumIniUnknowns() + st_idx_.NumFiniUnknowns())
-                ic.Data[dof - st_idx_.NumIniUnknowns()]= st_ic_[dof];
+                ic.Data[dof - st_idx_.NumIniUnknowns()]= st_ic_[dof - (cG_in_t_ ? st_idx_.NumIniUnknowns() : 0)];
         }
     }
 
