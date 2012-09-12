@@ -488,9 +488,9 @@ resize_and_scatter_piecewise_spatial_normal (const SPatchCL<4>& surf, const Quad
 }
 
 
-void SurfactantcGdGP1CL::InitStep (double new_t)
+void SurfactantSTP1CL::InitStep (double new_t)
 {
-    std::cout << "SurfactantcGdGP1CL::InitStep:\n";
+    std::cout << "SurfactantSTP1CL::InitStep:\n";
     ic.t= new_t;
     dt_= ic.t - oldt_;
 
@@ -498,10 +498,8 @@ void SurfactantcGdGP1CL::InitStep (double new_t)
     std::cout << "space-time Unknowns: " << st_idx_.NumUnknowns()
               << " ini: " << st_idx_.NumIniUnknowns() << " fini: " << st_idx_.NumFiniUnknowns()
               << " interior: " << st_idx_.NumUnknowns() - st_idx_.NumIniUnknowns() - st_idx_.NumFiniUnknowns() << std::endl;
-    st_ic_.resize( 0);
     st_ic_.resize( st_idx_.NumUnknowns());
 
-    st_oldic_.resize( 0);
     st_oldic_.resize( st_idx_.NumUnknowns());
     // Copy dofs on the old interface from  old solution into st_oldic_.
     DROPS_FOR_TRIANG_VERTEX( MG_, oldidx_.TriangLevel(), it) {
@@ -513,19 +511,19 @@ void SurfactantcGdGP1CL::InitStep (double new_t)
     }
 }
 
-void SurfactantcGdGP1CL::Update()
+void SurfactantSTP1CL::Update()
 {
-    // ScopeTimerCL timer( "SurfactantcGdGP1CL::Update");
+    // ScopeTimerCL timer( "SurfactantSTP1CL::Update");
     std::cout << "SurfactantcGP1CL::Update:\n";
     TetraAccumulatorTupleCL accus;
     InterfaceCommonDataP1CL oldspatialcdata( oldls_, lsetbnd_);
     accus.push_back( &oldspatialcdata);
     STInterfaceCommonDataCL cdata( oldt_, ic.t,  oldls_, lset_vd_, lsetbnd_);
     accus.push_back( &cdata);
-    InterfaceMatrixSTP1P1AccuCL<LocalSpatialInterfaceMassSTP1P1CL> oldmass_accu( &Mold, &st_idx_, &st_idx_,
+    InterfaceMatrixSTP1AccuCL<LocalSpatialInterfaceMassSTP1P1CL> oldmass_accu( &Mold, &st_idx_, &st_idx_,
         LocalSpatialInterfaceMassSTP1P1CL(oldspatialcdata), cdata, "mixed-mass on old iface");
     accus.push_back( &oldmass_accu);
-    InterfaceMatrixSTP1P1AccuCL<LocalLaplaceBeltramiSTP1P1CL> lb_accu( &A, &st_idx_, &st_idx_,
+    InterfaceMatrixSTP1AccuCL<LocalLaplaceBeltramiSTP1P1CL> lb_accu( &A, &st_idx_, &st_idx_,
         LocalLaplaceBeltramiSTP1P1CL( D_), cdata, "Laplace-Beltrami on ST-iface");
     accus.push_back( &lb_accu);
     accus.push_back_acquire( make_wind_dependent_matrixSTP1P1_accu<LocalMaterialDerivativeSTP1P1CL>( &Mder, &st_idx_, &st_idx_, cdata,  make_STP2P1Eval( MG_, Bnd_v_, oldv_, *v_), "material derivative on ST-iface"));
@@ -533,8 +531,7 @@ void SurfactantcGdGP1CL::Update()
 
     if (rhs_fun_) {
         load.resize( st_idx_.NumUnknowns());
-        load= 0.;
-        accus.push_back_acquire( new InterfaceVectorSTP1P1AccuCL<LocalVectorSTP1P1CL>( &load, &st_idx_, LocalVectorSTP1P1CL( rhs_fun_), cdata, "load on ST-iface"));
+        accus.push_back_acquire( new InterfaceVectorSTP1AccuCL<LocalVectorSTP1P1CL>( &load, &st_idx_, LocalVectorSTP1P1CL( rhs_fun_), cdata, "load on ST-iface"));
     }
 
     accumulate( accus, MG_, st_idx_.TriangLevel(), idx.GetMatchingFunction(), idx.GetBndInfo());
@@ -545,10 +542,10 @@ void SurfactantcGdGP1CL::Update()
 //     WriteToFile( Mdiv, "Mdiv.txt", "mass-div on ST-iface");
 //     WriteToFile( load, "load.txt", "load on ST-iface");
 
-    std::cout << "SurfactantcGdGP1CL::Update: Finished\n";
+    std::cout << "SurfactantSTP1CL::Update: Finished\n";
 }
 
-void SurfactantcGdGP1CL::DoStep ()
+void SurfactantSTP1CL::DoStep ()
 {
     Update();
 
@@ -561,7 +558,7 @@ void SurfactantcGdGP1CL::DoStep ()
     std::cout << "res = " << gm_.GetResid() << ", iter = " << gm_.GetIter() << std::endl;
 }
 
-void SurfactantcGdGP1CL::CommitStep ()
+void SurfactantSTP1CL::CommitStep ()
 {
     idx.CreateNumbering( oldidx_.TriangLevel(), MG_, &lset_vd_, &lsetbnd_);
     std::cout << "new NumUnknowns at t1: " << idx.NumUnknowns() << std::endl;
@@ -582,7 +579,7 @@ void SurfactantcGdGP1CL::CommitStep ()
     st_idx_.DeleteNumbering( MG_);
 }
 
-void SurfactantcGdGP1CL::DoStep (double new_t)
+void SurfactantSTP1CL::DoStep (double new_t)
 {
     InitStep( new_t);
     DoStep();

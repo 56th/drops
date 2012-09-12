@@ -427,7 +427,7 @@ SurfactantP1BaseCL* make_surfactant_timedisc( MultiGridCL& mg, LevelsetP2CL& lse
             P.get<int>("SurfTransp.Iter"), P.get<double>("SurfTransp.Tol"),
             P.get<double>("SurfTransp.OmitBound"));
     else if (method == std::string( "spacetime-cGdG"))
-        ret= new SurfactantcGdGP1CL( mg,
+        ret= new SurfactantSTP1CL( mg,
             P.get<double>("SurfTransp.Theta"), P.get<double>("SurfTransp.Visc"),
             &v, Bnd_v, lset.Phi, lset.GetBndData(),
             P.get<int>("SurfTransp.Iter"), P.get<double>("SurfTransp.Tol"),

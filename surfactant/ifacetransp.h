@@ -946,7 +946,7 @@ class STP1P1IdxDescCL
 };
 
 
-/// \brief Collect indices of unknowns
+/// \brief Collect indices of unknowns -- bilinear space-time FE with standard Lagrange-basis in space and time
 ///
 /// This is convenient for discretisation of operators in the Setup-routines.
 class LocalNumbSTP1P1CL
@@ -988,8 +988,11 @@ class LocalNumbSTP1P1CL
 
     /// \brief True, iff the shape function exists on the old interface.
     bool IsIni  (IdxT i) const { return num[i] < NumIniUnknowns_; }
-    /// \briref True, iff the shape function exists on the new interface.
+    /// \brief True, iff the shape function exists on the new interface.
     bool IsFini (IdxT i) const { return num[i] >= NumIniUnknowns_ && num[i] < NumIniUnknowns_ + NumFiniUnknowns_; }
+
+    /// \brief The first NumIniUnknowns shape-functions do not vanish on the old interface.
+    IdxT NumIniUnknowns () const { return NumIniUnknowns_; }
 };
 
 template<class Data, class BndData_, class VD_>
@@ -1062,6 +1065,20 @@ template <ZeroPolicyEnum ZeroPolicy, typename LocalRowNumbT, typename LocalColNu
                         M( r.num[i], c.num[j])+= coup[i][j];
 }
 
+template <ZeroPolicyEnum ZeroPolicy, typename LocalRowNumbT, typename LocalColNumbT>
+  inline void
+  update_global_matrix_and_coupling (MatrixBuilderCL& M, const double coup[LocalRowNumbT::Dim][LocalColNumbT::Dim], const LocalRowNumbT& r, const LocalColNumbT& c, VectorCL* ini_cpl, const VectorCL* ini_data)
+{
+    for (Uint i= 0; i < LocalRowNumbT::Dim; ++i)
+        if (r.WithUnknowns( i) && !r.IsIni( i))
+            for (Uint j= 0; j < LocalColNumbT::Dim; ++j)
+                if (c.WithUnknowns( j)) {
+                    if (c.IsIni( j)) // Put initial data into coupling vector on the rhs.
+                        ini_cpl[0][r.num[i] - r.NumIniUnknowns()]-= coup[i][j]*ini_data[0][c.num[j]];
+                    else  if (ZeroPolicy == KeepLocalZeros || (ZeroPolicy == RemoveExactLocalZeros && coup[i][j] != 0.))
+                        M( r.num[i] - r.NumIniUnknowns(), c.num[j] - c.NumIniUnknowns())+= coup[i][j];
+                }
+}
 
 class STInterfaceCommonDataCL : public TetraAccumulatorCL
 {
@@ -1120,7 +1137,7 @@ class STInterfaceCommonDataCL : public TetraAccumulatorCL
 };
 
 template <class LocalMatrixT>
-class InterfaceMatrixSTP1P1AccuCL : public TetraAccumulatorCL
+class InterfaceMatrixSTP1AccuCL : public TetraAccumulatorCL
 {
   private:
     const STInterfaceCommonDataCL& cdata_;
@@ -1138,10 +1155,10 @@ class InterfaceMatrixSTP1P1AccuCL : public TetraAccumulatorCL
                       loccol;
 
   public:
-    InterfaceMatrixSTP1P1AccuCL (MatrixCL* mat, const STP1P1IdxDescCL* rowidx, const STP1P1IdxDescCL* colidx,
+    InterfaceMatrixSTP1AccuCL (MatrixCL* mat, const STP1P1IdxDescCL* rowidx, const STP1P1IdxDescCL* colidx,
                                  const LocalMatrixT& loc_mat, const STInterfaceCommonDataCL& cdata, std::string name= std::string())
         : cdata_( cdata), name_( name), mat_( mat), rowidx_( rowidx), colidx_( colidx), M( 0), local_mat( loc_mat) {}
-    virtual ~InterfaceMatrixSTP1P1AccuCL () {}
+    virtual ~InterfaceMatrixSTP1AccuCL () {}
 
     void set_name (const std::string& n) { name_= n; }
 
@@ -1175,11 +1192,11 @@ class InterfaceMatrixSTP1P1AccuCL : public TetraAccumulatorCL
         update_global_matrix<LocalMatrixT::ZeroPolicy>( *M, local_mat.coup, locrow, loccol);
     }
 
-    virtual InterfaceMatrixSTP1P1AccuCL* clone (int /*clone_id*/) { return new InterfaceMatrixSTP1P1AccuCL( *this); }
+    virtual InterfaceMatrixSTP1AccuCL* clone (int /*clone_id*/) { return new InterfaceMatrixSTP1AccuCL( *this); }
 };
 
 template <class LocalVectorT>
-class InterfaceVectorSTP1P1AccuCL : public TetraAccumulatorCL
+class InterfaceVectorSTP1AccuCL : public TetraAccumulatorCL
 {
   private:
     const STInterfaceCommonDataCL& cdata_;
@@ -1192,16 +1209,16 @@ class InterfaceVectorSTP1P1AccuCL : public TetraAccumulatorCL
     LocalNumbSTP1P1CL locrow;
 
   public:
-    InterfaceVectorSTP1P1AccuCL (VectorCL* vec, const STP1P1IdxDescCL* rowidx,
+    InterfaceVectorSTP1AccuCL (VectorCL* vec, const STP1P1IdxDescCL* rowidx,
                                  const LocalVectorT& loc_vec, const STInterfaceCommonDataCL& cdata, std::string name= std::string())
         : cdata_( cdata), name_( name), vec_( vec), rowidx_( rowidx), local_vec( loc_vec) {}
-    virtual ~InterfaceVectorSTP1P1AccuCL () {}
+    virtual ~InterfaceVectorSTP1AccuCL () {}
 
     void set_name (const std::string& n) { name_= n; }
 
     virtual void begin_accumulation () {
         const IdxT num_rows= rowidx_->NumUnknowns();
-        std::cout << "STInterfaceVectorSTP1P1AccuCL::begin_accumulation";
+        std::cout << "STInterfaceVectorSTP1AccuCL::begin_accumulation";
         if (name_ != std::string())
             std::cout << " for \"" << name_ << "\"";
         std::cout  << ": " << num_rows << " rows.\n";
@@ -1220,7 +1237,7 @@ class InterfaceVectorSTP1P1AccuCL : public TetraAccumulatorCL
                 vec_[0][locrow.num[i]]+= local_vec.vec[i];
     }
 
-    virtual InterfaceVectorSTP1P1AccuCL* clone (int /*clone_id*/) { return new InterfaceVectorSTP1P1AccuCL( *this); }
+    virtual InterfaceVectorSTP1AccuCL* clone (int /*clone_id*/) { return new InterfaceVectorSTP1AccuCL( *this); }
 };
 
 /// \brief Compute the load-vector corresponding to the function f on a single tetra-prism.
@@ -1408,17 +1425,17 @@ class LocalMassdivSTP1P1CL
 
 /// \brief Convenience-function to reduce the number of explicit template-parameters for the spacetime-massdiv- and the -convection-matrix.
 template <template <class> class LocalMatrixT, class DiscVelSolT>
-  inline InterfaceMatrixSTP1P1AccuCL< LocalMatrixT<DiscVelSolT> >*
+  inline InterfaceMatrixSTP1AccuCL< LocalMatrixT<DiscVelSolT> >*
   make_wind_dependent_matrixSTP1P1_accu (MatrixCL* mat, const STP1P1IdxDescCL* rowidx, const STP1P1IdxDescCL* colidx,
                                          const STInterfaceCommonDataCL& cdata, const DiscVelSolT& wind, std::string name= std::string())
 {
-    return new InterfaceMatrixSTP1P1AccuCL< LocalMatrixT<DiscVelSolT> >( mat, rowidx, colidx,
+    return new InterfaceMatrixSTP1AccuCL< LocalMatrixT<DiscVelSolT> >( mat, rowidx, colidx,
         LocalMatrixT<DiscVelSolT>( wind), cdata, name);
 }
 
 
 /// \brief P1-discretization and solution of the transport equation on the interface
-class SurfactantcGdGP1CL : public SurfactantP1BaseCL
+class SurfactantSTP1CL : public SurfactantP1BaseCL
 {
   public:
     MatrixCL A,    ///< ST-diffusion matrix
@@ -1434,7 +1451,7 @@ class SurfactantcGdGP1CL : public SurfactantP1BaseCL
     MatrixCL L_; ///< sum of matrices
 
   public:
-    SurfactantcGdGP1CL (MultiGridCL& mg,
+    SurfactantSTP1CL (MultiGridCL& mg,
         double theta, double D, VecDescCL* v, const VelBndDataT& Bnd_v, VecDescCL& lset_vd, const BndDataCL<>& lsetbnd,
         int iter= 1000, double tol= 1e-7, double omit_bound= -1.)
     : SurfactantP1BaseCL( mg, theta, D, v, Bnd_v, lset_vd, lsetbnd, iter, tol, omit_bound)
