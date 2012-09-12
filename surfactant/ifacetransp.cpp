@@ -495,10 +495,12 @@ void SurfactantSTP1CL::InitStep (double new_t)
     dt_= ic.t - oldt_;
 
     st_idx_.CreateNumbering( oldidx_.TriangLevel(), MG_, oldls_, lset_vd_, lsetbnd_, oldt_, new_t);
+    dim= st_idx_.NumUnknowns();
     std::cout << "space-time Unknowns: " << st_idx_.NumUnknowns()
               << " ini: " << st_idx_.NumIniUnknowns() << " fini: " << st_idx_.NumFiniUnknowns()
-              << " interior: " << st_idx_.NumUnknowns() - st_idx_.NumIniUnknowns() - st_idx_.NumFiniUnknowns() << std::endl;
-    st_ic_.resize( st_idx_.NumUnknowns());
+              << " interior: " << st_idx_.NumUnknowns() - st_idx_.NumIniUnknowns() - st_idx_.NumFiniUnknowns()
+              << " Dimension of the linear system: " << dim << std::endl;
+    st_ic_.resize( dim);
 
     st_oldic_.resize( st_idx_.NumUnknowns());
     // Copy dofs on the old interface from  old solution into st_oldic_.
@@ -511,30 +513,35 @@ void SurfactantSTP1CL::InitStep (double new_t)
     }
 }
 
-void SurfactantSTP1CL::Update()
+void SurfactantSTP1CL::Update_dG()
 {
-    // ScopeTimerCL timer( "SurfactantSTP1CL::Update");
-    std::cout << "SurfactantcGP1CL::Update:\n";
     TetraAccumulatorTupleCL accus;
     InterfaceCommonDataP1CL oldspatialcdata( oldls_, lsetbnd_);
     accus.push_back( &oldspatialcdata);
     STInterfaceCommonDataCL cdata( oldt_, ic.t,  oldls_, lset_vd_, lsetbnd_);
     accus.push_back( &cdata);
-    InterfaceMatrixSTP1AccuCL<LocalSpatialInterfaceMassSTP1P1CL> oldmass_accu( &Mold, &st_idx_, &st_idx_,
+    InterfaceMatrixSTP1AccuCL<LocalSpatialInterfaceMassSTP1P1CL> oldmass_accu( &Mold, &st_idx_,
         LocalSpatialInterfaceMassSTP1P1CL(oldspatialcdata), cdata, "mixed-mass on old iface");
     accus.push_back( &oldmass_accu);
-    InterfaceMatrixSTP1AccuCL<LocalLaplaceBeltramiSTP1P1CL> lb_accu( &A, &st_idx_, &st_idx_,
+    InterfaceMatrixSTP1AccuCL<LocalLaplaceBeltramiSTP1P1CL> lb_accu( &A, &st_idx_,
         LocalLaplaceBeltramiSTP1P1CL( D_), cdata, "Laplace-Beltrami on ST-iface");
     accus.push_back( &lb_accu);
-    accus.push_back_acquire( make_wind_dependent_matrixSTP1P1_accu<LocalMaterialDerivativeSTP1P1CL>( &Mder, &st_idx_, &st_idx_, cdata,  make_STP2P1Eval( MG_, Bnd_v_, oldv_, *v_), "material derivative on ST-iface"));
-    accus.push_back_acquire( make_wind_dependent_matrixSTP1P1_accu<LocalMassdivSTP1P1CL>( &Mdiv, &st_idx_, &st_idx_, cdata,  make_STP2P1Eval( MG_, Bnd_v_, oldv_, *v_), "mass-div on ST-iface"));
+    accus.push_back_acquire( make_wind_dependent_matrixSTP1P1_accu<LocalMaterialDerivativeSTP1P1CL>( &Mder, &st_idx_, cdata,  make_STP2P1Eval( MG_, Bnd_v_, oldv_, *v_), "material derivative on ST-iface"));
+    accus.push_back_acquire( make_wind_dependent_matrixSTP1P1_accu<LocalMassdivSTP1P1CL>( &Mdiv, &st_idx_, cdata,  make_STP2P1Eval( MG_, Bnd_v_, oldv_, *v_), "mass-div on ST-iface"));
 
     if (rhs_fun_) {
-        load.resize( st_idx_.NumUnknowns());
-        accus.push_back_acquire( new InterfaceVectorSTP1AccuCL<LocalVectorSTP1P1CL>( &load, &st_idx_, LocalVectorSTP1P1CL( rhs_fun_), cdata, "load on ST-iface"));
+        load.resize( dim);
+        accus.push_back_acquire( new InterfaceVectorSTP1AccuCL<LocalVectorSTP1P1CL>( &load, &st_idx_, LocalVectorSTP1P1CL( rhs_fun_), cdata, /* cG_in_t*/ false, "load on ST-iface"));
     }
 
     accumulate( accus, MG_, st_idx_.TriangLevel(), idx.GetMatchingFunction(), idx.GetBndInfo());
+}
+
+void SurfactantSTP1CL::Update()
+{
+    // ScopeTimerCL timer( "SurfactantSTP1CL::Update");
+    std::cout << "SurfactantSTP1CL::Update:\n";
+    Update_dG();
 
 //     WriteToFile( Mold, "Mold.txt", "mass on old iface");
 //     WriteToFile( A,    "A.txt",    "Laplace-Beltrami on ST-iface");
@@ -549,12 +556,14 @@ void SurfactantSTP1CL::DoStep ()
 {
     Update();
 
-    L_.LinComb( 1., Mder, 1., Mdiv, 1., A, 1., Mold);
+    MatrixCL L;
+    L.LinComb( 1., Mder, 1., Mdiv, 1., A, 1., Mold);
     VectorCL rhs( Mold*st_oldic_);
     if (rhs_fun_ != 0)
         rhs+= load;
-    std::cout << "Before solve: res = " << norm( L_*st_ic_ - rhs) << std::endl;
-    gm_.Solve( L_, st_ic_, rhs);
+
+    std::cout << "Before solve: res = " << norm( L*st_ic_ - rhs) << std::endl;
+    gm_.Solve( L, st_ic_, rhs);
     std::cout << "res = " << gm_.GetResid() << ", iter = " << gm_.GetIter() << std::endl;
 }
 
@@ -573,7 +582,6 @@ void SurfactantSTP1CL::CommitStep ()
         }
     }
 
-    L_.clear();
     st_ic_.resize( 0);
     st_oldic_.resize( 0);
     st_idx_.DeleteNumbering( MG_);

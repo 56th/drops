@@ -1144,39 +1144,38 @@ class InterfaceMatrixSTP1AccuCL : public TetraAccumulatorCL
     std::string name_;
 
     MatrixCL* mat_; // the matrix
-    const STP1P1IdxDescCL* rowidx_;
-    const STP1P1IdxDescCL* colidx_;
+    VectorCL* cpl_; // vector of eliminated initial data
+    const STP1P1IdxDescCL* idx_;
+    const VectorCL* u_; // the initial data as STP1P1-function
 
     MatrixBuilderCL* M;
 
-    LocalMatrixT local_mat;
-
-    LocalNumbSTP1P1CL locrow,
-                      loccol;
+    LocalMatrixT      local_mat;
+    LocalNumbSTP1P1CL local_idx;
 
   public:
-    InterfaceMatrixSTP1AccuCL (MatrixCL* mat, const STP1P1IdxDescCL* rowidx, const STP1P1IdxDescCL* colidx,
+    ///\brief For dG in time; does not use cpl_ and u_.
+    InterfaceMatrixSTP1AccuCL (MatrixCL* mat, const STP1P1IdxDescCL* idx,
                                  const LocalMatrixT& loc_mat, const STInterfaceCommonDataCL& cdata, std::string name= std::string())
-        : cdata_( cdata), name_( name), mat_( mat), rowidx_( rowidx), colidx_( colidx), M( 0), local_mat( loc_mat) {}
+        : cdata_( cdata), name_( name), mat_( mat), cpl_( 0), idx_( idx), u_( 0), M( 0), local_mat( loc_mat) {}
     virtual ~InterfaceMatrixSTP1AccuCL () {}
 
     void set_name (const std::string& n) { name_= n; }
 
     virtual void begin_accumulation () {
-        const IdxT num_rows= rowidx_->NumUnknowns();
-        const IdxT num_cols= colidx_->NumUnknowns();
-        std::cout << "STInterfaceMatrixAccuP1CL::begin_accumulation";
+        const IdxT dim= idx_->NumUnknowns() - (cpl_ ? idx_->NumIniUnknowns() : 0);
+        std::cout << "InterfaceMatrixSTP1AccuCL::begin_accumulation";
         if (name_ != std::string())
             std::cout << " for \"" << name_ << "\"";
-        std::cout  << ": " << num_rows << " rows, " << num_cols << " cols.\n";
-        M= new MatrixBuilderCL( mat_, num_rows, num_cols);
+        std::cout  << ": " << dim << " rows and cols.\n";
+        M= new MatrixBuilderCL( mat_, dim, dim);
     }
 
     virtual void finalize_accumulation () {
         M->Build();
         delete M;
         M= 0;
-        std::cout << "STInterfaceMatrixAccuP1CL::finalize_accumulation";
+        std::cout << "InterfaceMatrixSTP1AccuCL::finalize_accumulation";
         if (name_ != std::string())
             std::cout << " for \"" << name_ << "\"";
         std::cout << ": " << mat_->num_nonzeros() << " nonzeros." << std::endl;
@@ -1187,9 +1186,8 @@ class InterfaceMatrixSTP1AccuCL : public TetraAccumulatorCL
         if (cdata.empty())
             return;
         local_mat.setup( TetraPrismCL( t, cdata.t0, cdata.t1), cdata);
-        locrow.assign_indices_only( t, *rowidx_);
-        loccol.assign_indices_only( t, *colidx_);
-        update_global_matrix<LocalMatrixT::ZeroPolicy>( *M, local_mat.coup, locrow, loccol);
+        local_idx.assign_indices_only( t, *idx_);
+        update_global_matrix<LocalMatrixT::ZeroPolicy>( *M, local_mat.coup, local_idx, local_idx);
     }
 
     virtual InterfaceMatrixSTP1AccuCL* clone (int /*clone_id*/) { return new InterfaceMatrixSTP1AccuCL( *this); }
@@ -1202,22 +1200,24 @@ class InterfaceVectorSTP1AccuCL : public TetraAccumulatorCL
     const STInterfaceCommonDataCL& cdata_;
     std::string name_;
 
+    bool cG_in_t_;
+
     VectorCL* vec_; // the vector
     const STP1P1IdxDescCL* rowidx_;
 
     LocalVectorT local_vec;
-    LocalNumbSTP1P1CL locrow;
+    LocalNumbSTP1P1CL local_row;
 
   public:
     InterfaceVectorSTP1AccuCL (VectorCL* vec, const STP1P1IdxDescCL* rowidx,
-                                 const LocalVectorT& loc_vec, const STInterfaceCommonDataCL& cdata, std::string name= std::string())
-        : cdata_( cdata), name_( name), vec_( vec), rowidx_( rowidx), local_vec( loc_vec) {}
+                               const LocalVectorT& loc_vec, const STInterfaceCommonDataCL& cdata, bool cG_in_t, std::string name= std::string())
+        : cdata_( cdata), name_( name), cG_in_t_( cG_in_t), vec_( vec), rowidx_( rowidx), local_vec( loc_vec) {}
     virtual ~InterfaceVectorSTP1AccuCL () {}
 
     void set_name (const std::string& n) { name_= n; }
 
     virtual void begin_accumulation () {
-        const IdxT num_rows= rowidx_->NumUnknowns();
+        const IdxT num_rows= rowidx_->NumUnknowns() - ( cG_in_t_ ? rowidx_->NumIniUnknowns() : 0);
         std::cout << "STInterfaceVectorSTP1AccuCL::begin_accumulation";
         if (name_ != std::string())
             std::cout << " for \"" << name_ << "\"";
@@ -1230,11 +1230,11 @@ class InterfaceVectorSTP1AccuCL : public TetraAccumulatorCL
         const STInterfaceCommonDataCL& cdata= cdata_.get_clone();
         if (cdata.empty())
             return;
-        locrow.assign_indices_only( t, *rowidx_);
-        local_vec.setup( TetraPrismCL( t, cdata.t0, cdata.t1), cdata, locrow.num);
+        local_row.assign_indices_only( t, *rowidx_);
+        local_vec.setup( TetraPrismCL( t, cdata.t0, cdata.t1), cdata, local_row.num);
         for (int i= 0; i < 8; ++i)
-            if (locrow.num[i] != NoIdx)
-                vec_[0][locrow.num[i]]+= local_vec.vec[i];
+            if (local_row.WithUnknowns( i))
+                vec_[0][local_row.num[i]]+= local_vec.vec[i];
     }
 
     virtual InterfaceVectorSTP1AccuCL* clone (int /*clone_id*/) { return new InterfaceVectorSTP1AccuCL( *this); }
@@ -1426,10 +1426,10 @@ class LocalMassdivSTP1P1CL
 /// \brief Convenience-function to reduce the number of explicit template-parameters for the spacetime-massdiv- and the -convection-matrix.
 template <template <class> class LocalMatrixT, class DiscVelSolT>
   inline InterfaceMatrixSTP1AccuCL< LocalMatrixT<DiscVelSolT> >*
-  make_wind_dependent_matrixSTP1P1_accu (MatrixCL* mat, const STP1P1IdxDescCL* rowidx, const STP1P1IdxDescCL* colidx,
+  make_wind_dependent_matrixSTP1P1_accu (MatrixCL* mat, const STP1P1IdxDescCL* idx,
                                          const STInterfaceCommonDataCL& cdata, const DiscVelSolT& wind, std::string name= std::string())
 {
-    return new InterfaceMatrixSTP1AccuCL< LocalMatrixT<DiscVelSolT> >( mat, rowidx, colidx,
+    return new InterfaceMatrixSTP1AccuCL< LocalMatrixT<DiscVelSolT> >( mat, idx,
         LocalMatrixT<DiscVelSolT>( wind), cdata, name);
 }
 
@@ -1444,11 +1444,14 @@ class SurfactantSTP1CL : public SurfactantP1BaseCL
              Mold; ///< mass matrix on old spatial interface.
     VectorCL load; ///< load-vector
 
+    size_t dim; ///< Dimension of the linear system.
+
   private:
     STP1P1IdxDescCL st_idx_;
     VectorCL st_oldic_, ///< the old solution represented in the space-time-FE-basis.
              st_ic_;    ///< the new solution represented in the space-time-FE-basis.
-    MatrixCL L_; ///< sum of matrices
+
+    void Update_dG();
 
   public:
     SurfactantSTP1CL (MultiGridCL& mg,
