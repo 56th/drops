@@ -437,6 +437,7 @@ void STP1P1IdxDescCL::CreateNumbering (Uint level, MultiGridCL& mg, const VecDes
 
         patch.make_patch<MergeCutPolicyCL>( lat, ls_loc);
         make_CompositeQuad5DomainSTCodim1( qdom, patch, TetraPrismCL( *it, t0, t1));
+        shape.resize( qdom.vertex_size());
         for (Uint i= 0; i < 8; ++i) {
             const IdxDescCL& idx= i < 4 ? idx0_ : idx1_;
             const IdxDescCL& spatial_idx= i < 4 ? idx_ini : idx_fini;
@@ -444,7 +445,7 @@ void STP1P1IdxDescCL::CreateNumbering (Uint level, MultiGridCL& mg, const VecDes
             if (unknowns.Exist( idx.GetIdx()))
                 continue;
 
-            resize_and_evaluate_on_vertexes( STP1P1DiscCL::ref_val[i], qdom, shape);
+            evaluate_on_vertexes( STP1P1DiscCL::ref_val[i], qdom, Addr( shape));
             if (quad_codim1( shape*shape, qdom) > 0.) {
                 unknowns.Prepare( idx.GetIdx());
                 if (unknowns.Exist( spatial_idx.GetIdx())) {
@@ -481,9 +482,7 @@ resize_and_scatter_piecewise_spatial_normal (const SPatchCL<4>& surf, const Quad
     const SPatchCL<4>::const_normal_iterator n= surf.normal_begin();
     for (Uint i= 0; i < surf.facet_size(); ++i) {
         const Point3DCL& tmp= MakePoint3D( n[i][0], n[i][1], n[i][2]);
-        const Point3DCL& unittmp= tmp/tmp.norm();
-        for (Uint j= 0; j < NodesPerFacet; ++j)
-            spatial_normal[i*NodesPerFacet + j]= unittmp;
+        std::fill_n( &spatial_normal[i*NodesPerFacet], NodesPerFacet, tmp/tmp.norm());
     }
 }
 
@@ -499,7 +498,7 @@ void SurfactantSTP1CL::InitStep (double new_t)
     std::cout << "space-time Unknowns: " << st_idx_.NumUnknowns()
               << " ini: " << st_idx_.NumIniUnknowns() << " fini: " << st_idx_.NumFiniUnknowns()
               << " interior: " << st_idx_.NumUnknowns() - st_idx_.NumIniUnknowns() - st_idx_.NumFiniUnknowns()
-              << " Dimension of the linear system: " << dim << std::endl;
+              << " dimension of the linear system: " << dim << std::endl;
     st_ic_.resize( dim);
 
     st_oldic_.resize( st_idx_.NumUnknowns());
@@ -563,7 +562,7 @@ void SurfactantSTP1CL::Update_dG()
 void SurfactantSTP1CL::Update()
 {
     // ScopeTimerCL timer( "SurfactantSTP1CL::Update");
-    std::cout << "SurfactantSTP1CL::Update:\n";
+    // std::cout << "SurfactantSTP1CL::Update:\n";
     if (cG_in_t_)
         Update_cG();
     else
@@ -578,7 +577,7 @@ void SurfactantSTP1CL::Update()
 //     WriteToFile( cpl_der_, "cpl_der.txt", "coupling for material derivative on ST-iface");
 //     WriteToFile( cpl_div_, "cpl_div.txt", "coupling for mass-div on ST-iface");
 
-    std::cout << "SurfactantSTP1CL::Update: Finished\n";
+    // std::cout << "SurfactantSTP1CL::Update: Finished\n";
 }
 
 void SurfactantSTP1CL::DoStep ()

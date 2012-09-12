@@ -1475,10 +1475,10 @@ class SurfactantSTP1CL : public SurfactantP1BaseCL
     MatrixCL A,    ///< ST-diffusion matrix
              Mder, ///< ST-material-derivative matrix
              Mdiv, ///< ST-mass-matrix with interface-divergence of velocity
-             Mold; ///< mass matrix on old spatial interface.
+             Mold; ///< mass matrix on old spatial interface; only used for cG_in_t_ == false.
 
     VectorCL load, ///< load-vector
-             cpl_A_,   ///< The cpl-Vectors are used only for cG_in_t_==true.
+             cpl_A_,   ///< The cpl-Vectors are used only for cG_in_t_ == true.
              cpl_der_,
              cpl_div_;
 
