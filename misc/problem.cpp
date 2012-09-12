@@ -24,6 +24,8 @@
 
 #include "misc/problem.h"
 #include "num/interfacePatch.h"
+#include "num/quadrature.h"
+#include "num/lattice-eval.h"
 #ifdef _PAR
 #  include "parallel/exchange.h"
 #endif
@@ -294,9 +296,9 @@ void CreateNumbOnInterfaceVertex (const Uint idx, IdxT& counter, Uint stride,
 
     LocalP2CL<> hat_sq[4]; // values of phi_i*phi_i
     for (int i= 0; i < 4; ++i)  {
-        hat_sq[i][i]=1.;
+        hat_sq[i][i]= 1.;
         for (int j = 0; j < 4; ++j)
-            if (i != j) hat_sq[i][EdgeByVert(i,j)+4]= 0.25;
+            if (i != j) hat_sq[i][EdgeByVert( i, j) + 4]= 0.25;
     }
     // first set NoIdx in all vertices
     for (MultiGridCL::TriangVertexIteratorCL vit= vbegin; vit != vend; ++vit) {
@@ -304,31 +306,31 @@ void CreateNumbOnInterfaceVertex (const Uint idx, IdxT& counter, Uint stride,
         vit->Unknowns.Invalidate(idx);
     }
     // then create numbering of vertices at the interface
-    InterfaceTriangleCL p;
+    const PrincipalLatticeCL& lat= PrincipalLatticeCL::instance( 2);
+    std::valarray<double> ls_loc( lat.vertex_size());
+    LocalP2CL<> locp2_ls;
+    SPatchCL<3> patch;
+    QuadDomainCodim1CL<3> qdom;
+    std::valarray<double> shape_sq; // square of a P1-shape-function as integrand
     for (MultiGridCL::TriangTetraIteratorCL it= begin; it != end; ++it) {
-        p.Init( *it, ls, lsetbnd);
-        if (!p.Intersects()) continue;
+        locp2_ls.assign( *it, ls, lsetbnd);
+        evaluate_on_vertexes( locp2_ls, lat, Addr( ls_loc));
+        if (equal_signs( ls_loc))
+            continue;
 
-        const double h3= it->GetVolume()*6, h= cbrt( h3), h4= h*h3, limit= h4*omit_bound;
-        SVectorCL<4> loc_int; // stores integrals \int_{\Gamma_T} p^2 dx, with p1-dof p.
-        for (int ch= 0; ch < 8; ++ch) {
-            if (!p.ComputeForChild( ch)) continue;// no patch for this child
-            for (int tri= 0; tri < p.GetNumTriangles(); ++tri) {
-                for (int i= 0; i < 4; ++i) {
-                    loc_int[i]+= p.quad2D( hat_sq[i], tri);
-                }
-            }
-        }
-
-        const bool innercut( p.IntersectsInterior());
+        const double limit= omit_bound < 0. ? 0. : omit_bound*std::pow( it->GetVolume()*6, 4./3.);
+        patch.make_patch<MergeCutPolicyCL>( lat, ls_loc);
+        make_CompositeQuad2Domain2D( qdom, patch, *it);
+        shape_sq.resize( qdom.vertex_size());
         for (Uint i= 0; i < NumVertsC; ++i) {
-            UnknownHandleCL& u= const_cast<VertexCL*>( it->GetVertex( i))->Unknowns;
-            if (innercut || p.GetSign( i) == 0) {
-                if ( u( idx) == NoIdx) {
-                    if (loc_int[i] < limit) continue; // omit DoFs of minor importance
-                    u( idx)= counter;
-                    counter+= stride;
-                }
+            UnknownHandleCL& unknowns= const_cast<VertexCL*>( it->GetVertex( i))->Unknowns;
+            if (unknowns.Exist( idx))
+                continue;
+
+            evaluate_on_vertexes( hat_sq[i], qdom, Addr( shape_sq));
+            if (quad_codim1( shape_sq, qdom) > limit) {
+                unknowns( idx)= counter;
+                counter+= stride;
             }
         }
     }

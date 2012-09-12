@@ -30,13 +30,15 @@ default: ClrScr
 reftest: \
     ../tests/reftest.o ../geom/boundary.o ../geom/builder.o ../geom/simplex.o ../geom/multigrid.o \
     ../num/unknowns.o ../misc/utils.o ../geom/topo.o ../out/output.o ../misc/problem.o \
-    ../num/interfacePatch.o ../num/fe.o 
+    ../num/interfacePatch.o ../num/fe.o  ../num/discretize.o \
+    ../geom/principallattice.o ../geom/subtriangulation.o 
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 ip1test: \
     ../tests/interp1.o ../geom/simplex.o ../geom/multigrid.o ../geom/topo.o ../out/output.o \
     ../num/unknowns.o ../geom/builder.o ../misc/problem.o ../num/interfacePatch.o \
-    ../num/fe.o ../geom/boundary.o ../misc/utils.o
+    ../num/fe.o ../geom/boundary.o ../misc/utils.o ../geom/principallattice.o ../geom/subtriangulation.o \
+    ../num/discretize.o
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 interfacepatch_doublecut: \
@@ -51,13 +53,15 @@ ip1check: ip1test
 ip2test: \
     ../tests/interp2.o ../geom/simplex.o ../geom/multigrid.o ../geom/topo.o ../out/output.o \
     ../num/unknowns.o ../geom/builder.o ../misc/problem.o ../num/interfacePatch.o \
-    ../num/fe.o ../geom/boundary.o ../misc/utils.o ../num/discretize.o
+    ../num/fe.o ../geom/boundary.o ../misc/utils.o ../num/discretize.o \
+    ../geom/principallattice.o ../geom/subtriangulation.o 
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 prolongationp2test: \
     ../tests/prolongationp2test.o ../geom/simplex.o ../geom/multigrid.o ../geom/topo.o \
     ../num/unknowns.o ../geom/builder.o ../misc/problem.o ../num/interfacePatch.o \
-    ../num/fe.o ../geom/boundary.o ../misc/utils.o
+    ../num/fe.o ../geom/boundary.o ../misc/utils.o  ../num/discretize.o \
+    ../geom/principallattice.o ../geom/subtriangulation.o 
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 tetrabuildertest: \
@@ -85,13 +89,15 @@ minres: \
 meshreader: \
     ../tests/meshreader.o ../geom/simplex.o ../geom/multigrid.o ../geom/topo.o \
     ../num/unknowns.o ../geom/builder.o ../geom/boundary.o ../misc/utils.o \
-    ../out/output.o ../misc/problem.o ../num/interfacePatch.o ../num/fe.o 
+    ../out/output.o ../misc/problem.o ../num/interfacePatch.o ../num/fe.o  ../num/discretize.o \
+    ../geom/principallattice.o ../geom/subtriangulation.o 
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 restrictp2: \
     ../tests/restrictp2.o ../geom/simplex.o ../geom/multigrid.o ../geom/topo.o ../out/output.o \
     ../num/unknowns.o ../geom/builder.o ../misc/problem.o ../num/interfacePatch.o \
-    ../num/fe.o ../geom/boundary.o ../misc/utils.o
+    ../num/fe.o ../geom/boundary.o ../misc/utils.o ../num/discretize.o \
+    ../geom/principallattice.o ../geom/subtriangulation.o 
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 vectest: \
@@ -101,13 +107,13 @@ vectest: \
 p2local: ../tests/p2local.o ../misc/utils.o \
   ../geom/simplex.o ../geom/multigrid.o ../geom/boundary.o ../geom/topo.o ../num/unknowns.o \
   ../out/output.o  ../misc/problem.o ../geom/builder.o ../num/interfacePatch.o \
-  ../num/discretize.o ../num/fe.o
+  ../num/discretize.o ../num/fe.o ../geom/principallattice.o ../geom/subtriangulation.o 
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 quadbase: \
     ../tests/quadbase.o ../misc/utils.o ../geom/builder.o ../geom/simplex.o ../geom/multigrid.o \
     ../geom/boundary.o ../geom/topo.o ../num/unknowns.o ../misc/problem.o \
-    ../num/fe.o ../num/discretize.o ../num/interfacePatch.o
+    ../num/fe.o ../num/discretize.o ../num/interfacePatch.o ../geom/principallattice.o ../geom/subtriangulation.o 
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 globallist: \
@@ -116,7 +122,8 @@ globallist: \
 
 serialization: \
     ../tests/serialization.o  ../misc/utils.o  ../misc/utils.o ../geom/builder.o ../geom/simplex.o ../geom/multigrid.o \
-    ../geom/boundary.o ../geom/topo.o ../num/unknowns.o ../out/output.o ../num/fe.o ../misc/problem.o ../num/interfacePatch.o
+    ../geom/boundary.o ../geom/topo.o ../num/unknowns.o ../out/output.o ../num/fe.o ../misc/problem.o ../num/interfacePatch.o \
+    ../num/discretize.o ../geom/principallattice.o ../geom/subtriangulation.o 
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 triang: \
@@ -195,12 +202,14 @@ neq: \
 
 extendP1onChild: \
 	../tests/extendP1onChild.o ../num/discretize.o ../misc/utils.o ../geom/topo.o ../num/fe.o ../misc/problem.o \
-	../geom/simplex.o ../geom/multigrid.o ../num/unknowns.o ../num/interfacePatch.o
+	../geom/simplex.o ../geom/multigrid.o ../num/unknowns.o ../num/interfacePatch.o ../num/discretize.o \
+    ../geom/principallattice.o ../geom/subtriangulation.o 
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 splitboundary: \
     ../tests/splitboundary.o ../geom/boundary.o ../geom/builder.o ../geom/simplex.o ../geom/multigrid.o \
-    ../num/unknowns.o ../misc/utils.o ../geom/topo.o ../out/output.o ../num/fe.o ../misc/problem.o ../num/interfacePatch.o
+    ../num/unknowns.o ../misc/utils.o ../geom/topo.o ../out/output.o ../num/fe.o ../misc/problem.o ../num/interfacePatch.o \
+    ../num/discretize.o ../geom/principallattice.o ../geom/subtriangulation.o 
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 reparam_init: \

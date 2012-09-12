@@ -44,7 +44,7 @@ cdrdrops:\
     ../geom/simplex.o ../geom/multigrid.o ../num/unknowns.o ../geom/topo.o \
     ../poisson/poisson.o ../misc/problem.o ../misc/utils.o ../out/output.o \
     ../num/fe.o ../num/discretize.o ../num/interfacePatch.o ../geom/geomselect.o\
-    ../misc/params.o \
+    ../misc/params.o ../geom/principallattice.o ../geom/subtriangulation.o\
     ../out/vtkOut.o ../misc/funcmap.o ../misc/scalarFunctions.o\
     ../misc/vectorFunctions.o\
     $(PAR_OBJ)
