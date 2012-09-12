@@ -391,7 +391,7 @@ template <class QuadDataT, class LocalFET>
         const PrincipalLatticeCL& lat= extra.lattice( i);
         resize_and_evaluate_on_vertexes( ls, lat, ls_val);
         partition.make_patch<MergeCutPolicyCL>( lat, ls_val);
-        make_CompositeQuadDomainCodim1<QuadDataT, 3>( qdom, partition, t);
+        make_CompositeQuadDomainCodim1<QuadDataT, Codim1Absdet, 3>( qdom, partition, t);
         std::copy( qdom.vertex_begin(), qdom.vertex_end(), std::back_inserter( q.vertexes_));
         w_vec.push_back( QuadDomain2DCL::WeightContT( qdom.weight_begin(), qdom.vertex_size()));
     }
