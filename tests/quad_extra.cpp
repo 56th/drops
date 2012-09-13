@@ -52,7 +52,7 @@ double exactint[56] = { // with maple
 };
 
 void TestExactness_extrapolation(int num_extrapolation)
-{   
+{
     DROPS::TetraBuilderCL tet( 0);
     DROPS::MultiGridCL mg( tet);
     TetraCL& s= *mg.GetAllTetraBegin();
@@ -67,9 +67,9 @@ void TestExactness_extrapolation(int num_extrapolation)
     //TetraPartitionCL partition;
     //partition.make_partition< SortedVertexPolicyCL,MergeCutPolicyCL>(2, ones);
     //make_CompositeQuad5Domain( qdom, partition);
-    
+
     DROPS::GridFunctionCL<> integrand;
-    
+
     Quad5CL<> q;
     size_t c= 0;
     for (degz= 0; degz <= 5; ++degz) {
@@ -87,6 +87,7 @@ void TestExactness_extrapolation(int num_extrapolation)
         }
     }
 }
+
 inline double tetracut (const DROPS::Point3DCL& p)
 {
     double s = 1.;
@@ -113,11 +114,11 @@ int binomi (int n, int k)
 {
     return fakultaet(n)/(fakultaet(k)*fakultaet(n-k));
 }
-   
+
 
 void TestExactness_extrapolation2D(int num_extrapolation)
-{  
-    double exactint_surf[21];     
+{
+    double exactint_surf[21];
     DROPS::TetraBuilderCL tet( 0);
     DROPS::MultiGridCL mg( tet);
     TetraCL& s= *mg.GetAllTetraBegin();
@@ -132,22 +133,22 @@ void TestExactness_extrapolation2D(int num_extrapolation)
         DROPS::GridFunctionCL<> integrand;
         Quad5CL<> q;
         degz = 0;
-        int it =0.;
+        int i =0.;
         for (degy= 0; degy <= 5; ++degy) {
             for (degx= 0; degx + degy <= 5; ++degx) {
-                exactint_surf[it] = 0.;
+                exactint_surf[i] = 0.;
                 for (int k = 0; k<= degy+1; ++k) {
-                    exactint_surf[it] += std::pow(-1,k)*binomi(degy+1,k)/(degx+k+1);
-                }    
-                exactint_surf[it] *= 1./(degy+1);
+                    exactint_surf[i] += std::pow(-1,k)*binomi(degy+1,k)/(degx+k+1);
+                }
+                exactint_surf[i] *= 1./(degy+1);
                 resize_and_evaluate_on_vertexes (f, s, qdom, 0., integrand);
                 std::cout << "degz: " << degz << "\tdegy: " << degy << "\tdegx: " << degx
-                          << "\t\tI-Q_h: " << exactint_surf[it] - 2*quad_2D(integrand, qdom)//q.quad( 1.)
+                          << "\t\tI-Q_h: " << exactint_surf[i] - 2*quad_2D(integrand, qdom)//q.quad( 1.)
                           << "\tIntegral: " << 2*quad_2D(integrand,  qdom) <<  "             ";//q.quad( 1.)
                 /*for (size_t i= 0; i < q.size(); ++i)
                     std::cout << '\t' << q[i];*/
                 std::cout << std::endl;
-                ++it;
+                ++i;
              }
         }
     }

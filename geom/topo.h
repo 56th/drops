@@ -288,14 +288,14 @@ const Ubyte vert_of_edge_ar[NumEdgesC][2]= {
 inline Ubyte VertOfEdge (Ubyte edge, Ubyte num) { return vert_of_edge_ar[edge][num]; }
 
 /// Edge given by two vertices
-const Ubyte edge_by_vert_ar[NumVertsC][NumVertsC]= {
+const byte edge_by_vert_ar[NumVertsC][NumVertsC]= {
     {-1,  0,  1,  3,  6},
     { 0, -1,  2,  4,  7},
     { 1,  2, -1,  5,  8},
     { 3,  4,  5, -1,  9},
     { 6,  7,  8,  9, -1}
 };
-inline Ubyte EdgeByVert (Ubyte v0, Ubyte v1) { return edge_by_vert_ar[v0][v1]; }
+inline byte EdgeByVert (Ubyte v0, Ubyte v1) { return edge_by_vert_ar[v0][v1]; }
 
 /// Vertices of a given tetra
 const Ubyte vert_of_tetra_ar[NumVertsC][4]= {
