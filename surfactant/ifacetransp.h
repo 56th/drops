@@ -1502,9 +1502,7 @@ class SurfactantSTP1CL : public SurfactantP1BaseCL
     {}
 
     /// save a copy of the old level-set and velocity; moves ic to oldic; must be called before DoStep.
-    virtual void InitTimeStep () {
-        SurfactantP1BaseCL::InitTimeStep();
-    }
+    // virtual void InitTimeStep (); // as in the base
 
     /// perform one time step
     virtual void DoStep (double new_t);

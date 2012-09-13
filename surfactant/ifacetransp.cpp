@@ -212,7 +212,7 @@ VectorCL SurfactantcGP1CL::InitStep (double new_t)
 
     ic.t= new_t;
     dt_= new_t - oldt_;
-    idx.CreateNumbering( oldidx_.TriangLevel(), MG_, &lset_vd_, &lsetbnd_); // InitOld deletes oldidx_ and swaps idx and oldidx_.
+    idx.CreateNumbering( oldidx_.TriangLevel(), MG_, &lset_vd_, &lsetbnd_); // InitTimeStep deletes oldidx_ and swaps idx and oldidx_.
     std::cout << "new NumUnknowns: " << idx.NumUnknowns() << std::endl;
     ic.SetIdx( &idx);
 

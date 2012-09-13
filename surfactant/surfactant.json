@@ -1,14 +1,9 @@
+//    =DROPS parameter file for surfactant.cpp=
+//    tests of the surfactant model implementation:
+//    droplet in brick
 {
-	"_comment":	"
-#=============================================================
-#    DROPS parameter file for surfactant.cpp
-#    tests of the surfactant model implementation:
-#    droplet in brick
-#=============================================================",
-
-	"Time":
+	"Time": // time stepping
 	{
-		"_comment":	"# time stepping",
 		"NumSteps":	16,
 		"StepSize":	0.25
 	},
@@ -25,20 +20,16 @@
 		"N3":		2
 	},
 
-	"AdaptRef":
+	"AdaptRef": // adaptive refinement
 	{
-		"_comment":		"# adaptive refinement",
-
 		"Freq":			0,
 		"Width":		10,
 		"CoarsestLevel":	0,
 		"FinestLevel":		3
 	},
 
-	"Exp":
+	"Exp": // experimental conditions
 	{
-		"_comment":	"# experimental conditions",
-
 		"RadDrop":	[1, 1, 1],
 		"PosDrop":	[0, 0, 0],
 		"RadTorus":	[1, 0.7],
@@ -49,20 +40,19 @@
 //		"Levelset":		"Ellipsoid",
 //		"Rhs":			"HeatConductionRhs",
 //		"Solution":		"HeatConductionSol"
-		"Wind":			"ToroidalFlowWind",
-		"Levelset":		"Torus",
-		"Rhs":			"ToroidalFlowRhs",
-		"Solution":		"ToroidalFlowSol"
-//		"Wind":			"AxisScalingWind",
-//		"Levelset":		"AxisScalingLset",
-//		"Rhs":			"AxisScalingRhs",
-//		"Solution":		"AxisScalingSol"
+//		"Wind":			"ToroidalFlowWind",
+//		"Levelset":		"Torus",
+//		"Rhs":			"ToroidalFlowRhs",
+//		"Solution":		"ToroidalFlowSol"
+		"Wind":			"AxisScalingWind",
+		"Levelset":		"AxisScalingLset",
+		"Rhs":			"AxisScalingRhs",
+		"Solution":		"AxisScalingSol"
 	},
 
-	"SurfTransp":
+	"SurfTransp": // surfactant transport
 	{
-		"_comment":	"# surfactant transport",
-		"Method":	"cGcG", // "spacetime-cGcG" "spacetime-cGdG" "characeristic-transport"
+		"Method":	"cGcG", // "spacetime-cGcG" "spacetime-cGdG" "characteristic-transport"
 
 		"Theta":	0.5,
 		"Iter":		1000,
@@ -71,10 +61,8 @@
 		"Visc":		1 // 0.05
 	},
 
-	"Levelset":
+	"Levelset": // levelset solver
 	{
-		"_comment":		"# levelset solver",
-
 		"Tol":			1e-14,
 		"Iter":			500,
 		"SD":			0.1,
@@ -83,9 +71,8 @@
 		"Theta":		1
 	},
 
-	"VTK":
+	"VTK": // VTK output
 	{
-		"_comment":		"#VTK output",
 		"VTKOut":		1,
 		"VTKDir":		"vtk",
 		"VTKName":		"surfactant",
@@ -95,9 +82,8 @@
 		"ReUseTimeFile":	false
 	},
 
-	"SolutionOutput":
+	"SolutionOutput": // Machine readable output of the surfactant-solution
 	{
-		"_comment":	"#Interface-solution",
 		"Freq":		1,
 		"Path":		"vtk/iface_sol",
 		"Binary":	true
