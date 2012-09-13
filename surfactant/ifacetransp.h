@@ -1519,6 +1519,61 @@ class SurfactantSTP1CL : public SurfactantP1BaseCL
     ///@}
 };
 
+
+/// =Methods with transport on the domain=
+
+class TransportP1FunctionCL; ///< forward declaration
+
+
+/// \brief P1-discretization and solution of the transport equation on the interface
+class SurfactantCharTransportP1CL: public SurfactantP1BaseCL
+{
+  public:
+    IdxDescCL full_idx;
+    MatDescCL A,  ///< diffusion matrix
+              M,  ///< mass matrix
+              C,  ///< convection matrix
+              Md; ///< mass matrix with interface-divergence of velocity
+
+    VectorCL load, ///< for a load-function
+             rhs_; ///< for the transported initial data
+
+  private:
+    MatrixCL      L_; ///< sum of matrices
+    TransportP1FunctionCL* fulltransport_;
+
+  public:
+    SurfactantCharTransportP1CL (MultiGridCL& mg,
+        double theta, double D, VecDescCL* v, const VelBndDataT& Bnd_v, VecDescCL& lset_vd, const BndDataCL<>& lsetbnd,
+        int iter= 1000, double tol= 1e-7, double omit_bound= -1.)
+        : SurfactantP1BaseCL( mg, theta, D, v, Bnd_v, lset_vd, lsetbnd, iter, tol, omit_bound),
+          full_idx( P1_FE), fulltransport_( 0)
+    {}
+
+    /// \remarks call SetupSystem \em before calling SetTimeStep!
+    void SetTimeStep( double dt, double theta=-1);
+
+    /// perform one time step
+    void DoStep (double new_t);
+
+    const_DiscSolCL GetSolution() const
+        { return const_DiscSolCL( &ic, &Bnd_, &MG_); }
+    const_DiscSolCL GetSolution( const VecDescCL& Myic) const
+        { return const_DiscSolCL( &Myic, &Bnd_, &MG_); }
+    ///@}
+
+    /// \name For internal use only
+    /// The following member functions are added to enable an easier implementation
+    /// of the coupling navstokes-levelset. They should not be called by a common user.
+    /// Use DoStep() instead.
+    ///@{
+    void InitStep (double new_t);
+    void DoStep ();
+    void CommitStep ();
+    void Update ();
+    ///@}
+};
+
 } // end of namespace DROPS
 
 #include "surfactant/ifacetransp.tpp"

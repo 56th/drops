@@ -440,6 +440,12 @@ SurfactantP1BaseCL* make_surfactant_timedisc( MultiGridCL& mg, LevelsetP2CL& lse
             /* cG_in_t_ */ true,
             P.get<int>("SurfTransp.Iter"), P.get<double>("SurfTransp.Tol"),
             P.get<double>("SurfTransp.OmitBound"));
+    else if (method == std::string( "characteristic-transport"))
+        ret= new SurfactantCharTransportP1CL ( mg,
+            P.get<double>("SurfTransp.Theta"), P.get<double>("SurfTransp.Visc"),
+            &v, Bnd_v, lset.Phi, lset.GetBndData(),
+            P.get<int>("SurfTransp.Iter"), P.get<double>("SurfTransp.Tol"),
+            P.get<double>("SurfTransp.OmitBound"));
     else
         throw DROPSErrCL( std::string( "make_surfactant_timedisc: Unknown method '") + method + std::string( "'.\n"));
 
