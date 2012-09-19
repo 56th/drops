@@ -525,6 +525,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
 
     for (int step= 1; step <= P.get<int>("Time.NumSteps"); ++step) {
         std::cout << "======================================================== step " << step << ":\n";
+        ScopeTimerCL timer( "Strategy: Time-loop");
         const double cur_time= step*dt;
         // Assumes (as the rest of Drops), that the current triangulation is acceptable to perform the time-step.
         // If dt is large and AdapRef.Width is small, this may not be true.
@@ -549,9 +550,13 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
             the_sol_eval.SetTime( cur_time);
             vtkwriter->Write( cur_time);
         }
-        if (P.get<int>( "SolutionOutput.Freq") > 0 && step % P.get<int>( "SolutionOutput.Freq") == 0)
-            DROPS::WriteFEToFile( timedisc.ic, mg, P.get<std::string>( "SolutionOutput.Path"), P.get<bool>( "SolutionOutput.Binary"));
-
+        if (P.get<int>( "SolutionOutput.Freq") > 0 && step % P.get<int>( "SolutionOutput.Freq") == 0) {
+            std::ostringstream os1,
+                               os2;
+            os1 << P.get<int>( "Time.NumSteps");
+            os2 << P.get<std::string>( "SolutionOutput.Path") << std::setw( os1.str().size()) << step;
+            DROPS::WriteFEToFile( timedisc.ic, mg, os2.str(), P.get<bool>( "SolutionOutput.Binary"));
+        }
 //        lset2.DoStep();
 //        VectorCL rhs( lset2.Phi.Data.size());
 //        lset2.ComputeRhs( rhs);
@@ -651,6 +656,8 @@ void StationaryStrategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROP
 int main (int argc, char* argv[])
 {
   try {
+    ScopeTimerCL timer( "main");
+
     std::ifstream param;
     if (argc != 2) {
         std::cout << "Using default parameter file: surfactant.json\n";

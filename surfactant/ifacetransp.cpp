@@ -272,8 +272,11 @@ void SurfactantcGP1CL::DoStep (const VectorCL& rhs)
         L_.LinComb( 1., m, 1. - theta_, M2.Data);
     }
     std::cout << "Before solve: res = " << norm( L_*ic.Data - rhs) << std::endl;
-    gm_.Solve( L_, ic.Data, rhs);
-    std::cout << "res = " << gm_.GetResid() << ", iter = " << gm_.GetIter() << std::endl;
+    {
+        ScopeTimerCL timer( "SurfactantcGP1CL::DoStep: Solve");
+        gm_.Solve( L_, ic.Data, rhs);
+    }
+    std::cout << "SurfactantcGP1CL::DoStep: res = " << gm_.GetResid() << ", iter = " << gm_.GetIter() << std::endl;
 }
 
 void SurfactantcGP1CL::CommitStep ()
@@ -283,6 +286,8 @@ void SurfactantcGP1CL::CommitStep ()
 
 void SurfactantcGP1CL::DoStep (double new_t)
 {
+    ScopeTimerCL timer( "SurfactantcGP1CL::DoStep");
+
     VectorCL rhs( InitStep( new_t));
     DoStep( rhs);
     CommitStep();
@@ -489,13 +494,13 @@ resize_and_scatter_piecewise_spatial_normal (const SPatchCL<4>& surf, const Quad
 
 void SurfactantSTP1CL::InitStep (double new_t)
 {
-    std::cout << "SurfactantSTP1CL::InitStep:\n";
+    // std::cout << "SurfactantSTP1CL::InitStep:\n";
     ic.t= new_t;
     dt_= ic.t - oldt_;
 
     st_idx_.CreateNumbering( oldidx_.TriangLevel(), MG_, oldls_, lset_vd_, lsetbnd_, oldt_, new_t);
     dim= st_idx_.NumUnknowns() - (cG_in_t_ ? st_idx_.NumIniUnknowns() : 0);
-    std::cout << "space-time Unknowns: " << st_idx_.NumUnknowns()
+    std::cout << "SurfactantSTP1CL::InitStep: space-time Unknowns: " << st_idx_.NumUnknowns()
               << " ini: " << st_idx_.NumIniUnknowns() << " fini: " << st_idx_.NumFiniUnknowns()
               << " interior: " << st_idx_.NumUnknowns() - st_idx_.NumIniUnknowns() - st_idx_.NumFiniUnknowns()
               << " dimension of the linear system: " << dim << std::endl;
@@ -561,7 +566,7 @@ void SurfactantSTP1CL::Update_dG()
 
 void SurfactantSTP1CL::Update()
 {
-    // ScopeTimerCL timer( "SurfactantSTP1CL::Update");
+    ScopeTimerCL timer( "SurfactantSTP1CL::Update");
     // std::cout << "SurfactantSTP1CL::Update:\n";
     if (cG_in_t_)
         Update_cG();
@@ -598,8 +603,12 @@ void SurfactantSTP1CL::DoStep ()
         rhs+= load;
 
     std::cout << "Before solve: res = " << norm( L*st_ic_ - rhs) << std::endl;
-    gm_.Solve( L, st_ic_, rhs);
-    std::cout << "res = " << gm_.GetResid() << ", iter = " << gm_.GetIter() << std::endl;
+
+    {
+        ScopeTimerCL timer( "SurfactantSTP1CL::DoStep: Solve");
+        gm_.Solve( L, st_ic_, rhs);
+    }
+    std::cout << "SurfactantSTP1CL::DoStep: res = " << gm_.GetResid() << ", iter = " << gm_.GetIter() << std::endl;
 }
 
 void SurfactantSTP1CL::CommitStep ()
@@ -624,6 +633,8 @@ void SurfactantSTP1CL::CommitStep ()
 
 void SurfactantSTP1CL::DoStep (double new_t)
 {
+    ScopeTimerCL timer( "SurfactantSTP1CL::DoStep");
+
     InitStep( new_t);
     DoStep();
     CommitStep();
@@ -690,8 +701,8 @@ void TransportP1FunctionCL::SetupSystem (const DiscVelSolT& vel, MatrixCL& E, Ma
                                bH(&H, num_unks, num_unks);
     IdxT Numb[4];
 
-    std::cerr << "entering TransportP1Function::SetupSystem: " << num_unks << "  unknowns. ";
-    std::cerr << "SD_: " << SD_ << " dt_: " << dt_ << " theta_ : " << theta_ << "\n";
+    std::cout << "entering TransportP1Function::SetupSystem: " << num_unks << "  unknowns. ";
+    // std::cout << "SD_: " << SD_ << " dt_: " << dt_ << " theta_ : " << theta_ << "\n";
 
     // fill value part of matrices
     Quad5CL<Point3DCL>  u_loc;
@@ -733,7 +744,7 @@ void TransportP1FunctionCL::SetupSystem (const DiscVelSolT& vel, MatrixCL& E, Ma
     }
     bE.Build();
     bH.Build();
-    std::cerr << E.num_nonzeros() << " nonzeros in E, "
+    std::cout << E.num_nonzeros() << " nonzeros in E, "
               << H.num_nonzeros() << " nonzeros in H! " << std::endl;
 }
 
@@ -749,12 +760,12 @@ void TransportP1FunctionCL::DoStep (VectorCL& u, const DiscVelSolT& vel)
         GMResSolverCL<GSPcCL> gm( gm_);
         VectorCL tmp( rhs.size());
         gm.Solve( E_old, tmp, VectorCL( H_old*u));
-        std::cerr << "TransportP1FunctionCL::DoStep rhs: res = " << gm.GetResid() << ", iter = " << gm.GetIter() << std::endl;
+        std::cout << "TransportP1FunctionCL::DoStep rhs: res = " << gm.GetResid() << ", iter = " << gm.GetIter() << std::endl;
         rhs-= (1. - theta_)*tmp;
     }
     gm_.Solve( L_, u, VectorCL(E_*rhs));
 
-    std::cerr << "TransportP1FunctionCL::DoStep: res = " << gm_.GetResid() << ", iter = " << gm_.GetIter() << std::endl;
+    std::cout << "TransportP1FunctionCL::DoStep: res = " << gm_.GetResid() << ", iter = " << gm_.GetIter() << std::endl;
 }
 
 
@@ -816,7 +827,7 @@ void SurfactantCharTransportP1CL::InitStep (double new_t)
 //         GMResSolverCL<GSPcCL> gm( gm_);
 //         VectorCL tmp( rhs.Data.size());
 //         gm.Solve( M.Data, tmp, VectorCL( A.Data*ic.Data + Md.Data*ic.Data));
-//         std::cerr << "SurfactantP1CL::InitStep: rhs: res = " << gm.GetResid() << ", iter = " << gm.GetIter() << std::endl;
+//         std::cout << "SurfactantP1CL::InitStep: rhs: res = " << gm.GetResid() << ", iter = " << gm.GetIter() << std::endl;
 //         rhs.Data-= (1. - theta_)*tmp;
 //     }
     DROPS::VecDescCL rhsext( &full_idx);
@@ -838,9 +849,12 @@ void SurfactantCharTransportP1CL::DoStep ()
     // L_.LinComb( 1./dt_, M.Data, theta_, A.Data, theta_, Md.Data);
     L_.LinComb( 1./dt_, M.Data, 1., A.Data, 1., Md.Data);
     const VectorCL therhs( M.Data*transp_rhs.Data + load);
-    std::cerr << "Before solve: res = " << norm( L_*ic.Data - therhs) << std::endl;
-    gm_.Solve( L_, ic.Data, therhs);
-    std::cerr << "res = " << gm_.GetResid() << ", iter = " << gm_.GetIter() << std::endl;
+    std::cout << "Before solve: res = " << norm( L_*ic.Data - therhs) << std::endl;
+    {
+        ScopeTimerCL timer( "SurfactantCharTransportP1CL::DoStep: Solve");
+        gm_.Solve( L_, ic.Data, therhs);
+    }
+    std::cout << "SurfactantCharTransportP1CL::DoStep: res = " << gm_.GetResid() << ", iter = " << gm_.GetIter() << std::endl;
 }
 
 void SurfactantCharTransportP1CL::CommitStep ()
@@ -851,6 +865,8 @@ void SurfactantCharTransportP1CL::CommitStep ()
 
 void SurfactantCharTransportP1CL::DoStep (double new_t)
 {
+    ScopeTimerCL timer( "SurfactantCharTransportP1CL::::DoStep");
+
     InitStep( new_t);
     DoStep();
     CommitStep();
