@@ -25,11 +25,13 @@ def readspecification( path):
     #Read all the specification files in the folder and fill up List with the data
     okCounter = 0               #Counter used for correctlly filling up the variable list
     okStringCounter = 0         #Counter used for correctlly filling up the string list. Counter is increased when reading a string value and a find flag
+    lineCounter = 0
     for file in glob.glob( os.path.join(path, '*.ref') ):
         f = open(file,'r')
         linesOfFile = f.readlines() # lines of the specification file
         f.close()
         for line in linesOfFile:
+            lineCounter= lineCounter + 1
             #Eliminating the comments from the specification file
             validLine = re.sub("#.*","",line)
             #Collect test-information and read all the data needed for a test
@@ -120,13 +122,11 @@ def readspecification( path):
             if okStringCounter == 2:          #if counter is 2 it means that we read a value and a find flag.
                 stringList.append(string)#append the new string to the list
                 okStringCounter = 0           #reset the counter
-            else:
-                print("Incomplete string specification in " +path+file+ " ignored.")
             if okCounter == 4:          #if counter is 4 it means that we read a name a value and an error.
                 varList.append(variable)#append the new variable to the list
                 okCounter = 0           #reset the counter
-            else:
-                print("Incomplete variable specification in " +path+file+ " ignored.")
+            if (okStringCounter > 0 and okCounter > 0):
+	      print(file + ":" + str(lineCounter) + ": Incomplete variable or string specification above ignored, before reading '" +keyword+ "'.")
         testName = file.split("/")[3].split(".")[0]
         List.append(classes.TestCL(authorName, testType, execFileName, testName, pathExec, pathParam, numProcs, varList, stringList, -1))#because we haven't compiled or run the test yet status is 0
         #Empty the intermediate lists of variables and strings

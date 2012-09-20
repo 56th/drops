@@ -36,8 +36,8 @@ class VariableCL:
         self.varValue        = varValue              #value of variable
         self.varAbsError     = varAbsError           #absolute error of the variable
         self.varRelError     = varRelError           #relative error of the variable in %
-        sefl.varMinValue  = varMinValue         # maximal value
-        sefl.varMaxValue   = varMaxValue          # minimal value
+        self.varMinValue  = varMinValue         # maximal value
+        self.varMaxValue   = varMaxValue          # minimal value
     #Constructor
     def __init__(self):
         self.varName         = None                  #name of variable

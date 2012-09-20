@@ -25,6 +25,7 @@ def runtest(Test):
     else:
         command = command + "mpirun -np " + str(Test.numProcs) + " "
     command = command + Test.execFileName + " " + Test.pathParam +" &> ../tests/output/" + Test.testName +".out"
+    print("Running test " +Test.testName+ "...")
     retCode = os.system(command)
     if (retCode != 0):
         Test.status = 2
