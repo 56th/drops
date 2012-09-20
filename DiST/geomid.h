@@ -44,6 +44,10 @@ template <> inline Usint GetDim<VertexCL>() { return 0; }
 template <> inline Usint GetDim<EdgeCL>()   { return 1; }
 template <> inline Usint GetDim<FaceCL>()   { return 2; }
 template <> inline Usint GetDim<TetraCL>()  { return 3; }
+template <> inline Usint GetDim<const VertexCL>() { return 0; }
+template <> inline Usint GetDim<const EdgeCL>()   { return 1; }
+template <> inline Usint GetDim<const FaceCL>()   { return 2; }
+template <> inline Usint GetDim<const TetraCL>()  { return 3; }
 //@}
 
 /// \brief Assign each simplex an unique geometric id
