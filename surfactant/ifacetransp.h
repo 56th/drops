@@ -1292,21 +1292,26 @@ class LocalSpatialInterfaceMassSTP1P1CL
   private:
     const InterfaceCommonDataP1CL& spatialcdata_;
     LocalInterfaceMassP1CL spatial_mass_;
+    const bool on_old_iface_;
 
   public:
     double coup[8][8];
     static const ZeroPolicyEnum ZeroPolicy= RemoveExactLocalZeros;
 
-    LocalSpatialInterfaceMassSTP1P1CL (const InterfaceCommonDataP1CL& spatialcdata)
-        : spatialcdata_( spatialcdata) { std::memset( coup, 0, 8*8*sizeof(double)); }
+    LocalSpatialInterfaceMassSTP1P1CL (const InterfaceCommonDataP1CL& spatialcdata, bool on_old_iface= true)
+        : spatialcdata_( spatialcdata), on_old_iface_( on_old_iface)
+    { std::memset( coup, 0, 8*8*sizeof(double)); }
 
     void setup (const TetraPrismCL& p, const STInterfaceCommonDataCL&) {
         spatial_mass_.setup( p.t, spatialcdata_.get_clone());
-        // The basis functions for t1 are all zero on the interface at t0 --> zero-init in the constructor.
-        for (int i= 0; i < 4; ++i) {
-            coup[i][i]= spatial_mass_.coup[i][i];
-            for(int j= 0; j < i; ++j)
-                coup[i][j]= coup[j][i]= spatial_mass_.coup[i][j];
+        // on_old_iface_==true: The basis functions for t1 are all zero on the interface at t0
+        //                      --> zero-init in the constructor.
+        // else: The basis functions for t0 are all zero on the interface at t1.
+        const Uint offset= on_old_iface_ ? 0 : 4;
+        for (Uint i= 0; i < 4 ; ++i) {
+            coup[i + offset][i + offset]= spatial_mass_.coup[i][i];
+            for(Uint j= 0; j < i; ++j)
+                coup[i + offset][j + offset]= coup[j + offset][i + offset]= spatial_mass_.coup[i][j];
         }
     }
 };
@@ -1360,6 +1365,8 @@ class LocalMaterialDerivativeSTP1P1CL
     const DiscVelSolT& w_; // wind
     LocalSTP2P1CL<Point3DCL> loc_w_;
 
+    const bool transpose_local_matrix_;
+
     LocalSTP1CL<Point4DCL> grad[8];
     double dummy;
     GridFunctionCL<Point4DCL> qw,
@@ -1385,13 +1392,14 @@ class LocalMaterialDerivativeSTP1P1CL
 
         for (int i= 0; i < 8; ++i) {
             for(int j= 0; j < 8; ++j)
-                coup[i][j]= quad_codim1( qwdotgrad[j]*q[i], cdata.q5dom);
+                (transpose_local_matrix_ ? coup[j][i] : coup[i][j])= quad_codim1( qwdotgrad[j]*q[i], cdata.q5dom);
         }
     }
 
-    LocalMaterialDerivativeSTP1P1CL (const DiscVelSolT& w)
-        :w_( w) {}
+    LocalMaterialDerivativeSTP1P1CL (const DiscVelSolT& w, const bool transpose_local_matrix= false)
+        :w_( w), transpose_local_matrix_( transpose_local_matrix) {}
 };
+
 template <class DiscVelSolT>
 class LocalMassdivSTP1P1CL
 {
@@ -1457,6 +1465,16 @@ template <template <class> class LocalMatrixT, class DiscVelSolT>
 /// \brief Convenience-function to reduce the number of explicit template-parameters for the spacetime-massdiv- and the -convection-matrix.
 template <template <class> class LocalMatrixT, class DiscVelSolT>
   inline InterfaceMatrixSTP1AccuCL< LocalMatrixT<DiscVelSolT> >*
+  make_wind_dependent_local_transpose_matrixSTP1P1_accu (MatrixCL* mat, const STP1P1IdxDescCL* idx,
+                                         const STInterfaceCommonDataCL& cdata, const DiscVelSolT& wind, std::string name= std::string())
+{
+    return new InterfaceMatrixSTP1AccuCL< LocalMatrixT<DiscVelSolT> >( mat, idx,
+        LocalMatrixT<DiscVelSolT>( wind, true), cdata, name);
+}
+
+/// \brief Convenience-function to reduce the number of explicit template-parameters for the spacetime-massdiv- and the -convection-matrix.
+template <template <class> class LocalMatrixT, class DiscVelSolT>
+  inline InterfaceMatrixSTP1AccuCL< LocalMatrixT<DiscVelSolT> >*
   make_wind_dependent_matrixSTP1P0_1_accu (MatrixCL* mat, VectorCL* cpl, const STP1P1IdxDescCL* idx,
                                            const STInterfaceCommonDataCL& cdata, const VectorCL* u_ini, const DiscVelSolT& wind, std::string name= std::string())
 {
@@ -1475,7 +1493,8 @@ class SurfactantSTP1CL : public SurfactantP1BaseCL
     MatrixCL A,    ///< ST-diffusion matrix
              Mder, ///< ST-material-derivative matrix
              Mdiv, ///< ST-mass-matrix with interface-divergence of velocity
-             Mold; ///< mass matrix on old spatial interface; only used for cG_in_t_ == false.
+             Mold, ///< mass matrix on the old spatial interface; only used for cG_in_t_ == false.
+             Mnew; ///< mass matrix on the new spatial interface; only used for cG_in_t_ == false and use_mass_div_ == false.
 
     VectorCL load, ///< load-vector
              cpl_A_,   ///< The cpl-Vectors are used only for cG_in_t_ == true.
@@ -1485,7 +1504,8 @@ class SurfactantSTP1CL : public SurfactantP1BaseCL
     size_t dim; ///< Dimension of the linear system.
 
   private:
-    bool cG_in_t_;
+    bool cG_in_t_,
+         use_mass_div_;
 
     STP1P1IdxDescCL st_idx_;
     VectorCL st_oldic_, ///< the old solution represented in the full space-time-FE-basis.
@@ -1496,9 +1516,9 @@ class SurfactantSTP1CL : public SurfactantP1BaseCL
 
   public:
     SurfactantSTP1CL (MultiGridCL& mg,
-        double theta, double D, VecDescCL* v, const VelBndDataT& Bnd_v, VecDescCL& lset_vd, const BndDataCL<>& lsetbnd, bool cG_in_t,
+        double theta, double D, VecDescCL* v, const VelBndDataT& Bnd_v, VecDescCL& lset_vd, const BndDataCL<>& lsetbnd, bool cG_in_t, bool use_mass_div,
         int iter= 1000, double tol= 1e-7, double omit_bound= -1.)
-    : SurfactantP1BaseCL( mg, theta, D, v, Bnd_v, lset_vd, lsetbnd, iter, tol, omit_bound), cG_in_t_( cG_in_t)
+    : SurfactantP1BaseCL( mg, theta, D, v, Bnd_v, lset_vd, lsetbnd, iter, tol, omit_bound), cG_in_t_( cG_in_t), use_mass_div_( use_mass_div)
     {}
 
     /// save a copy of the old level-set and velocity; moves ic to oldic; must be called before DoStep.

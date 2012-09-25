@@ -553,8 +553,19 @@ void SurfactantSTP1CL::Update_dG()
     InterfaceMatrixSTP1AccuCL<LocalLaplaceBeltramiSTP1P1CL> lb_accu( &A, &st_idx_,
         LocalLaplaceBeltramiSTP1P1CL( D_), cdata, "Laplace-Beltrami on ST-iface");
     accus.push_back( &lb_accu);
-    accus.push_back_acquire( make_wind_dependent_matrixSTP1P1_accu<LocalMaterialDerivativeSTP1P1CL>( &Mder, &st_idx_, cdata,  make_STP2P1Eval( MG_, Bnd_v_, oldv_, *v_), "material derivative on ST-iface"));
-    accus.push_back_acquire( make_wind_dependent_matrixSTP1P1_accu<LocalMassdivSTP1P1CL>( &Mdiv, &st_idx_, cdata,  make_STP2P1Eval( MG_, Bnd_v_, oldv_, *v_), "mass-div on ST-iface"));
+
+    InterfaceCommonDataP1CL newspatialcdata( lset_vd_, lsetbnd_);
+    InterfaceMatrixSTP1AccuCL<LocalSpatialInterfaceMassSTP1P1CL> newmass_accu( &Mnew, &st_idx_,
+        LocalSpatialInterfaceMassSTP1P1CL( newspatialcdata, false), cdata, "mixed-mass on new iface");
+    if (use_mass_div_) {
+        accus.push_back_acquire( make_wind_dependent_matrixSTP1P1_accu<LocalMaterialDerivativeSTP1P1CL>( &Mder, &st_idx_, cdata,  make_STP2P1Eval( MG_, Bnd_v_, oldv_, *v_), "material derivative on ST-iface"));
+        accus.push_back_acquire( make_wind_dependent_matrixSTP1P1_accu<LocalMassdivSTP1P1CL>( &Mdiv, &st_idx_, cdata,  make_STP2P1Eval( MG_, Bnd_v_, oldv_, *v_), "mass-div on ST-iface"));
+    }
+    else {
+        accus.push_back_acquire( make_wind_dependent_local_transpose_matrixSTP1P1_accu<LocalMaterialDerivativeSTP1P1CL>( &Mder, &st_idx_, cdata,  make_STP2P1Eval( MG_, Bnd_v_, oldv_, *v_), "material derivative on ST-iface"));
+        accus.push_back( &newspatialcdata);
+        accus.push_back( &newmass_accu);
+    }
 
     if (rhs_fun_) {
         load.resize( dim);
@@ -596,8 +607,14 @@ void SurfactantSTP1CL::DoStep ()
         rhs= cpl_der_ + cpl_div_ + cpl_A_;
     }
     else {
-        L.LinComb( 1., Mder, 1., Mdiv, 1., A, 1., Mold);
-        rhs= Mold*st_oldic_;
+        if (use_mass_div_) {
+            L.LinComb( 1., Mder, 1., Mdiv, 1., A, 1., Mold);
+            rhs= Mold*st_oldic_;
+        }
+        else {
+            L.LinComb( -1., Mder, 1., A, 1., Mnew);
+            rhs= Mold*st_oldic_;
+        }
     }
     if (rhs_fun_ != 0)
         rhs+= load;

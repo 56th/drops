@@ -53,6 +53,7 @@
 	"SurfTransp": // surfactant transport
 	{
 		"Method":	"cGcG", // "spacetime-cGcG" "spacetime-cGdG" "characteristic-transport"
+		"UseMassDiv":	false, // only implemented for "spacetime-cGdG"
 
 		"Theta":	0.5,
 		"Iter":		1000,
