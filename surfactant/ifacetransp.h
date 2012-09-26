@@ -1307,6 +1307,8 @@ class LocalSpatialInterfaceMassSTP1P1CL
         // on_old_iface_==true: The basis functions for t1 are all zero on the interface at t0
         //                      --> zero-init in the constructor.
         // else: The basis functions for t0 are all zero on the interface at t1.
+        // For use_cG_in_time_ == true && use_massdiv_ == false: The rows [4..7) are modified, thus:
+        std::memset( coup, 0, 8*8*sizeof(double));
         const Uint offset= on_old_iface_ ? 0 : 4;
         for (Uint i= 0; i < 4 ; ++i) {
             coup[i + offset][i + offset]= spatial_mass_.coup[i][i];
@@ -1482,6 +1484,16 @@ template <template <class> class LocalMatrixT, class DiscVelSolT>
         LocalMatrixT<DiscVelSolT>( wind), cdata, u_ini, name);
 }
 
+/// \brief Convenience-function to reduce the number of explicit template-parameters for the spacetime-massdiv- and the -convection-matrix.
+template <template <class> class LocalMatrixT, class DiscVelSolT>
+  inline InterfaceMatrixSTP1AccuCL< LocalMatrixT<DiscVelSolT> >*
+  make_wind_dependent_local_transpose_matrixSTP1P0_1_accu (MatrixCL* mat, VectorCL* cpl, const STP1P1IdxDescCL* idx,
+                                           const STInterfaceCommonDataCL& cdata, const VectorCL* u_ini, const DiscVelSolT& wind, std::string name= std::string())
+{
+    return new InterfaceMatrixSTP1AccuCL< LocalMatrixT<DiscVelSolT> >( mat, cpl, idx,
+        LocalMatrixT<DiscVelSolT>( wind, true), cdata, u_ini, name);
+}
+
 
 /// \brief Space-time P1-discretization and solution of the transport equation on the interface
 /// Two methods are implemented:
@@ -1499,7 +1511,8 @@ class SurfactantSTP1CL : public SurfactantP1BaseCL
     VectorCL load, ///< load-vector
              cpl_A_,   ///< The cpl-Vectors are used only for cG_in_t_ == true.
              cpl_der_,
-             cpl_div_;
+             cpl_div_,
+             cpl_old_;
 
     size_t dim; ///< Dimension of the linear system.
 

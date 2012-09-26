@@ -525,12 +525,32 @@ void SurfactantSTP1CL::Update_cG()
     InterfaceMatrixSTP1AccuCL<LocalLaplaceBeltramiSTP1P1CL> lb_accu( &A, &cpl_A_, &st_idx_,
         LocalLaplaceBeltramiSTP1P1CL( D_), cdata, &st_oldic_, "Laplace-Beltrami on ST-iface");
     accus.push_back( &lb_accu);
-    accus.push_back_acquire( make_wind_dependent_matrixSTP1P0_1_accu<LocalMaterialDerivativeSTP1P1CL>( &Mder, &cpl_der_, &st_idx_, cdata, &st_oldic_, make_STP2P1Eval( MG_, Bnd_v_, oldv_, *v_), "material derivative on ST-iface"));
-    accus.push_back_acquire( make_wind_dependent_matrixSTP1P0_1_accu<LocalMassdivSTP1P1CL>( &Mdiv, &cpl_div_, &st_idx_, cdata, &st_oldic_, make_STP2P1Eval( MG_, Bnd_v_, oldv_, *v_), "mass-div on ST-iface"));
 
     cpl_A_.resize( dim);
     cpl_der_.resize( dim);
-    cpl_div_.resize( dim);
+
+    VectorCL cpl_new_dummy;
+    InterfaceCommonDataP1CL oldspatialcdata( oldls_, lsetbnd_);
+    InterfaceMatrixSTP1AccuCL<LocalSpatialInterfaceMassSTP1P1CL> oldmass_accu( &Mold, &cpl_old_, &st_idx_,
+        LocalSpatialInterfaceMassSTP1P1CL( oldspatialcdata), cdata, &st_oldic_, "mixed-mass on old iface");
+    InterfaceCommonDataP1CL newspatialcdata( lset_vd_, lsetbnd_);
+    InterfaceMatrixSTP1AccuCL<LocalSpatialInterfaceMassSTP1P1CL> newmass_accu( &Mnew, /*dummy*/ &cpl_new_dummy, &st_idx_,
+        LocalSpatialInterfaceMassSTP1P1CL( newspatialcdata, false), cdata, &st_oldic_, "mixed-mass on new iface");
+
+    if (use_mass_div_) {
+        cpl_div_.resize( dim);
+        accus.push_back_acquire( make_wind_dependent_matrixSTP1P0_1_accu<LocalMassdivSTP1P1CL>( &Mdiv, &cpl_div_, &st_idx_, cdata, &st_oldic_, make_STP2P1Eval( MG_, Bnd_v_, oldv_, *v_), "mass-div on ST-iface"));
+        accus.push_back_acquire( make_wind_dependent_matrixSTP1P0_1_accu<LocalMaterialDerivativeSTP1P1CL>( &Mder, &cpl_der_, &st_idx_, cdata, &st_oldic_, make_STP2P1Eval( MG_, Bnd_v_, oldv_, *v_), "material derivative on ST-iface"));
+    }
+    else {
+        cpl_old_.resize( dim);
+        cpl_new_dummy.resize( dim);
+        accus.push_back_acquire( make_wind_dependent_local_transpose_matrixSTP1P0_1_accu<LocalMaterialDerivativeSTP1P1CL>( &Mder, &cpl_der_, &st_idx_, cdata, &st_oldic_, make_STP2P1Eval( MG_, Bnd_v_, oldv_, *v_), "material derivative on ST-iface"));
+        accus.push_back( &oldspatialcdata);
+        accus.push_back( &oldmass_accu);
+        accus.push_back( &newspatialcdata);
+        accus.push_back( &newmass_accu);
+    }
 
     if (rhs_fun_) {
         load.resize( dim);
@@ -538,6 +558,8 @@ void SurfactantSTP1CL::Update_cG()
     }
 
     accumulate( accus, MG_, st_idx_.TriangLevel(), idx.GetMatchingFunction(), idx.GetBndInfo());
+
+    // WriteToFile( cpl_new_dummy, "cpl_new_dummy.txt", "coupling on new interface -- always zero.");
 }
 
 void SurfactantSTP1CL::Update_dG()
@@ -585,6 +607,7 @@ void SurfactantSTP1CL::Update()
         Update_dG();
 
 //     WriteToFile( Mold, "Mold.txt", "mass on old iface");
+//     WriteToFile( Mnew, "Mnew.txt", "mass on new iface");
 //     WriteToFile( A,    "A.txt",    "Laplace-Beltrami on ST-iface");
 //     WriteToFile( Mder, "Mder.txt", "material derivative on ST-iface");
 //     WriteToFile( Mdiv, "Mdiv.txt", "mass-div on ST-iface");
@@ -592,6 +615,7 @@ void SurfactantSTP1CL::Update()
 //     WriteToFile( cpl_A_,   "cpl_A.txt",   "coupling for Laplace-Beltrami on ST-iface");
 //     WriteToFile( cpl_der_, "cpl_der.txt", "coupling for material derivative on ST-iface");
 //     WriteToFile( cpl_div_, "cpl_div.txt", "coupling for mass-div on ST-iface");
+//     WriteToFile( cpl_old_, "cpl_old.txt", "coupling ini-values on old iface");
 
     // std::cout << "SurfactantSTP1CL::Update: Finished\n";
 }
@@ -603,8 +627,14 @@ void SurfactantSTP1CL::DoStep ()
     MatrixCL L;
     VectorCL rhs( dim);
     if (cG_in_t_) {
-        L.LinComb( 1., Mder, 1., Mdiv, 1., A);
-        rhs= cpl_der_ + cpl_div_ + cpl_A_;
+        if (use_mass_div_) {
+            L.LinComb( 1., Mder, 1., Mdiv, 1., A);
+            rhs= cpl_der_ + cpl_div_ + cpl_A_;
+        }
+        else {
+            L.LinComb( -1., Mder, 1., A, 1., Mnew);
+            rhs= -cpl_der_ + cpl_A_ - cpl_old_;
+        }
     }
     else {
         if (use_mass_div_) {

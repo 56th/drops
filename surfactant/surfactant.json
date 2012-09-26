@@ -53,7 +53,7 @@
 	"SurfTransp": // surfactant transport
 	{
 		"Method":	"cGcG", // "spacetime-cGcG" "spacetime-cGdG" "characteristic-transport"
-		"UseMassDiv":	false, // only implemented for "spacetime-cGdG"
+		"UseMassDiv":	true, // only implemented for "spacetime-*"
 
 		"Theta":	0.5,
 		"Iter":		1000,
@@ -86,7 +86,7 @@
 	"SolutionOutput": // Machine readable output of the surfactant-solution
 	{
 		"Freq":		1,
-		"Path":		"vtk/iface_sol",
+		"Path":		"solutions/iface_sol",
 		"Binary":	true
 	}
 }
