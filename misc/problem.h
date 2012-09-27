@@ -613,6 +613,8 @@ class VecDescBaseCL
     /// \brief Use a new index for accessing the components.
     void SetIdx(IdxDescCL*);
     void SetIdx(MLIdxDescCL* idx) {SetIdx( &( idx->GetFinest()) );}
+    void SetIdx(const IdxDescCL*);
+    void SetIdx(const MLIdxDescCL* idx) {SetIdx( &( idx->GetFinest()) );}
     /// \brief Resize a vector according to RowIdx.
     void Clear( double time);
     /// \brief Empty Data and set RowIdx to 0.
@@ -653,6 +655,7 @@ class MatDescBaseCL
 
     /// \brief Use a new index for accessing the components.
     void SetIdx( IdxDescT*, IdxDescT*);
+    void SetIdx( const IdxDescT*, const IdxDescT*);
     /// \brief Empty Data and set the index-pointers to 0.
     void Reset();
 };
@@ -785,6 +788,17 @@ void VecDescBaseCL<T>::SetIdx(IdxDescCL* idx)
 }
 
 template<class T>
+void VecDescBaseCL<T>::SetIdx(const IdxDescCL* idx)
+/// Prepares the vector for usage with a new index-object for
+/// its components. The vector is resized to size 0 and
+/// then to the new size.
+{
+    RowIdx = const_cast<IdxDescCL*>(idx);
+    Data.resize(0);
+    Data.resize(idx->NumUnknowns());
+}
+
+template<class T>
 void VecDescBaseCL<T>::Clear( double time)
 /// The vector is resized to size 0 and then resized to the size given
 /// by RowIdx.
@@ -862,6 +876,17 @@ void MatDescBaseCL<MatT, IdxDescT>::SetIdx( IdxDescT* row, IdxDescT* col)
 {
     RowIdx= row;
     ColIdx= col;
+}
+
+template<typename MatT, typename IdxDescT>
+void MatDescBaseCL<MatT, IdxDescT>::SetIdx( const IdxDescT* row, const IdxDescT* col)
+/// Prepares the matrix for usage with new index-objects for
+/// its components. As constructing sparse matrices is fairly involved,
+/// this routine does not modify Data. SparseMatBuilderCL should be used
+/// to do this.
+{
+    RowIdx= const_cast<IdxDescT*>(row);
+    ColIdx= const_cast<IdxDescT*>(col);
 }
 
 template<typename MatT, typename IdxDescT>
