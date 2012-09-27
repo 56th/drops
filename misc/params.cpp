@@ -55,9 +55,14 @@ template <typename T, Uint Size>
   {
     using boost::property_tree::ptree;
     Uint i= 0;
-    const ptree& node= p.get_child( path);
-    for (ptree::const_iterator it= node.begin(); it != node.end(); ++it)
-        a[i++]= it->second.get_value<T>();
+    try {
+        const ptree& node= p.get_child( path);
+        for (ptree::const_iterator it= node.begin(); it != node.end(); ++it)
+            a[i++]= it->second.get_value<T>();
+    }
+    catch (boost::property_tree::ptree_error& e) {
+        throw DROPSErrCL( std::string( "get_SArray: Trying to get '") + path + std::string( "' failed.\n"));
+    }
     Assert( i == Size, DROPSErrCL( "get_SArray: Wrong number of components in parameter.\n"), ~0);
 
     return a;
