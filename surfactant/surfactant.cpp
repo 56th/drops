@@ -709,6 +709,9 @@ int main (int argc, char* argv[])
     else
         Strategy( mg, adap, lset);
 
+    rusage usage;
+    getrusage( RUSAGE_SELF, &usage);
+    std::cout << "ru_maxrss: " << usage.ru_maxrss << " kB.\n";
     return 0;
   }
   catch (DROPS::DROPSErrCL err) { err.handle(); }
