@@ -245,6 +245,18 @@ double axis_scaling_lset (const Point3DCL& p, double t)
 }
 static RegisterScalarFunction regsca_axis_scaling_lset( "AxisScalingLset", axis_scaling_lset);
 
+double axis_scaling_lset_ini (const Point3DCL& p, double)
+{
+    static const double t_end= P.get<Uint>( "Time.NumSteps")*P.get<double>( "Time.StepSize");
+    const double tout= t_end <= M_PI/2. ? t_end : M_PI/2.,
+                 tin= t_end >= M_PI*3./2. ? M_PI*3./2. : (t_end >= M_PI ? t_end : 0.),
+                 lout= axis_scaling_lset( p, tout),
+                 lin= axis_scaling_lset( p, tin);
+    return lout >= 0. ? lout :
+           lin  <= 0. ? lin  :
+                        0.;
+}
+
 double axis_scaling_sol (const Point3DCL& p, double t)
 {
     return std::exp( -0.5*t)*heat_conduction_u0( p);
@@ -457,7 +469,10 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
 {
     using namespace DROPS;
 
-    adap.MakeInitialTriang( the_lset_fun);
+    if (P.get<std::string>("Exp.Levelset") == std::string( "AxisScalingLset"))
+        adap.MakeInitialTriang( axis_scaling_lset_ini);
+    else
+        adap.MakeInitialTriang( the_lset_fun);
 
     lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
     lset.Phi.SetIdx( &lset.idx);
