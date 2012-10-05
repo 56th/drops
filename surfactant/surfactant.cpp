@@ -76,24 +76,19 @@ DROPS::MGBuilderCL* make_MGBuilder (const DROPS::ParamCL& P)
 }
 
 // Surface divergence of a vector field w
-inline double div_gamma_wind (const Point3DCL& n, const SMatrixCL<3,3>& dn,
-                              const Point3DCL& w, const SMatrixCL<3,3>& dw)
+inline double div_gamma_wind (const Point3DCL& n, const SMatrixCL<3,3>& dw)
 {
-    const double tr_Pdw= trace( dw) - inner_prod( n, dw*n),
-                 tr_dn_nw= trace( dn)*inner_prod( n, w),
-                 wT_dn_n= inner_prod( w, dn*n);
-    return tr_Pdw - tr_dn_nw - wT_dn_n;
+   return trace( dw) - inner_prod( n, dw*n);
 }
 
 // laplace-beltrami of a function u
 inline double laplace_beltrami_u (const Point3DCL& n,      const SMatrixCL<3,3>& dn,
                                   const Point3DCL& grad_u, const SMatrixCL<3,3>& Hess_u)
 {
-    return div_gamma_wind( n, dn, grad_u, Hess_u);
-//     const double tr_PHessu= trace( Hess_u) - inner_prod( n, Hess_u*n),
-//                  tr_dn_ngradu= trace( dn)*inner_prod( n, grad_u),
-//                  graduT_dn_n= iner_prod( grad_u, dn*n);
-//     return tr_PHessu - tr_dn_ngradu - graduT_dn_n;
+     const double tr_PHessu= trace( Hess_u) - inner_prod( n, Hess_u*n),
+                  tr_Pdn= trace( dn) - inner_prod( n, dn*n),
+                  ngradu= inner_prod( n, grad_u);
+     return tr_PHessu - tr_Pdn*ngradu;
 }
 
 
@@ -218,7 +213,7 @@ double toroidal_flow_rhs (const Point3DCL& p, double t)
 
     const double u= toroidal_flow_sol( p, t),
                  mat_der=  -u,
-                 reaction= div_gamma_wind( n, dn, w, dw)*u,
+                 reaction= div_gamma_wind( n, dw)*u,
                  diffusion= -laplace_beltrami_u( n, dn, grad_u, Hess_u);
 
     return mat_der + reaction + diffusion;
@@ -270,9 +265,33 @@ double axis_scaling_rhs (const Point3DCL& p, double t)
     const double bf6= (p/MakePoint3D( std::pow( a, 3), 1., 1.)).norm_sq();
 
     const double mat_der=  0.25*std::cos( t)/a - 0.5;
-    const double reaction= 0.25*std::cos( t)/a/bf4*( std::pow( p[1], 2) + std::pow( p[2], 2)
-        - 2.*std::pow( p[0]/a, 2)*(1. + 1./std::pow( a, 2) - bf6/bf4));
-    const double diffusion= (1. + 1./std::pow( a, 2))/bf4*(-3. - 2./std::pow( a, 2) + 2.*bf6/bf4);
+    const double reaction= 0.25*std::cos( t)/a/bf4*( std::pow( p[1], 2) + std::pow( p[2], 2));
+    const double diffusion= (-2./std::pow( a, 2) - (1. + 1./std::pow( a, 2))*( 2. + 1./std::pow( a, 2) - bf6/bf4))/bf4;
+
+//     const Point3DCL tt( p/MakePoint3D( std::pow( a, 2), 1., 1.));
+//     const double l= tt.norm();
+//     const Point3DCL n( tt/l);
+//     SMatrixCL<3,3> dn( (eye<3,3>() - outer_product( n, n))/l );
+//     dn(0,0)/= std::pow( a, 2); dn(1,0)/= std::pow( a, 2); dn(2,0)/= std::pow( a, 2);
+// 
+//     const Point3DCL w( MakePoint3D( 0.25*p[0]*std::cos( t)/a, 0., 0.));
+//     SMatrixCL<3,3> dw;
+//     dw(0,0)= 0.25*std::cos( t)/a;
+// 
+//     const Point3DCL grad_u( std::exp( -0.5*t)*MakePoint3D( p[1], p[0], 0.));
+//     SMatrixCL<3,3> Hess_u;
+//     Hess_u(0,1)= 1.;
+//     Hess_u(1,0)= 1.;
+//     Hess_u*= std::exp( -0.5*t);
+// 
+//     const double err= div_gamma_wind( n, dw) - reaction,
+//                errlb= laplace_beltrami_u( n, dn, grad_u, Hess_u) - diffusion*axis_scaling_sol( p, t);
+//     if (std::fabs( err) > 1e-12 || std::fabs( errlb) > 1e-12) {
+//         std::cerr << err   << " " << div_gamma_wind( n, dw) << " " << reaction << "\n"
+//                   << errlb << " " << laplace_beltrami_u( n, dn, grad_u, Hess_u) << " " << diffusion*axis_scaling_sol( p, t) << "\n";
+//         exit( 1);
+//     }
+//     return (mat_der + div_gamma_wind( n, dw))*axis_scaling_sol( p, t) - laplace_beltrami_u( n, dn, grad_u, Hess_u);
 
     return (mat_der + reaction - diffusion)*axis_scaling_sol( p, t);
 }
