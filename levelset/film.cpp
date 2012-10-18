@@ -265,8 +265,9 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
     IF_MASTER {
         infofile = new std::ofstream ((P.get<std::string>("VTK.VTKName","film")+".info").c_str());
     }
-    IFInfo.Init(infofile);
-    IFInfo.WriteHeader();
+    //IFInfo.Init(infofile);
+	FilmInfo.Init(infofile, P.get<DROPS::Point3DCL>("MeshSize")[0]/2., 0.);
+    FilmInfo.WriteHeader();
 
     Stokes.SetupPrMass(  &Stokes.prM, lset);
     Stokes.SetupPrStiff( &Stokes.prA, lset);
@@ -334,8 +335,8 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
         std::cout << "======================================================== Schritt " << step << ":\n";
         const double time_old = Stokes.v.t;
         const double time_new = Stokes.v.t + dt;
-        IFInfo.Update( lset, Stokes.GetVelSolution());
-        IFInfo.Write(time_old);
+        FilmInfo.Update( lset, Stokes.GetVelSolution());
+        FilmInfo.Write(time_old);
         cpl.DoStep( P.get<int>("Coupling.Iter"));
         std::cout << "rel. Volume: " << lset.GetVolume()/Vol << std::endl;
 
@@ -355,8 +356,8 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
             ser.Write();
     }
 
-    IFInfo.Update( lset, Stokes.GetVelSolution());
-    IFInfo.Write(Stokes.v.t);
+    FilmInfo.Update( lset, Stokes.GetVelSolution());
+    FilmInfo.Write(Stokes.v.t);
     std::cout << std::endl;
     if (ensight ) delete ensight;
     if (vtkwriter) delete vtkwriter;
