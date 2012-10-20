@@ -95,7 +95,6 @@ endfunction(target_link_libraries_par)
 function(exec f)
 	libs(${f})
 	add_executable(${f} ${f})
-	message(STATUS "${HOME}-${f}")
 	target_link_libraries_par(${f} ${HOME}-${f} ${ARGN})
 endfunction(exec)
 
