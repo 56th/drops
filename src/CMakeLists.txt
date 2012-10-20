@@ -70,11 +70,9 @@ function(libs_par)
 	endif(${MPI})
 endfunction(libs_par)
 
-function(exec)
-	foreach(exec ${ARGN})
-		add_executable(${exec} ${exec})
-	endforeach(lib)
-endfunction(exec)
+function(target_link_libraries_par)
+	target_link_libraries(${ARGN} ${PAR_OBJ} ${MPI_CXX_LIBRARIES})
+endfunction(target_link_libraries_par)
 
 set(PACKAGES parallel levelset poisson DiST geom num out misc stokes navstokes surfactant transport partests)
 

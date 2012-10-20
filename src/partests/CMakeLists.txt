@@ -7,8 +7,11 @@ if(${MPI})
 		parallel-loadbal parallel-migrateunknowns
 		parallel-decompose)
 		
-	libs_par(dist_streamtest)
+	libs_par(dist_streamtest dist_remotedatatest)
 
 	add_executable(dist_streamtest dist_streamtest)
-	target_link_libraries(dist_streamtest partests-dist_streamtest geom-simplex geom-multigrid geom-builder geom-topo geom-boundary num-unknowns misc-utils misc-problem num-discretize num-fe num-interfacePatch misc-scopetimer ${PAR_OBJ} ${MPI_CXX_LIBRARIES})
+	target_link_libraries_par(dist_streamtest partests-dist_streamtest geom-simplex geom-multigrid geom-builder geom-topo geom-boundary num-unknowns misc-utils misc-problem num-discretize num-fe num-interfacePatch misc-scopetimer)
+	
+	add_executable(dist_remotedatatest dist_remotedatatest)
+	target_link_libraries_par(dist_remotedatatest partests-dist_remotedatatest geom-simplex geom-multigrid geom-builder geom-topo geom-boundary num-unknowns misc-utils misc-problem num-discretize num-fe num-interfacePatch misc-scopetimer)
 endif(${MPI})
