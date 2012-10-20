@@ -48,6 +48,27 @@ elseif(CMAKE_COMPILER_IS_GNUCXX)
 	set(CMAKE_CXX_FLAGS_RELEASE "-O2 -finline-limit=600")
 endif(CMAKE_CXX_COMPILER MATCHES icpc)
 
+function(lib)
+	foreach(lib ${ARGN})
+		add_library(${HOME}-${lib} ${lib})
+	endforeach(${ARGN})
+endfunction(lib)
+
+function(lib_ser)
+	if(NOT ${MPI})
+		foreach(lib ${ARGN})
+			add_library(${HOME}-${lib} ${lib})
+		endforeach(${ARGN})
+	endif(NOT ${MPI})
+endfunction(lib_ser)
+
+function(lib_par)
+	if(${MPI})
+		foreach(lib ${ARGN})
+			add_library(${HOME}-${lib} ${lib})
+		endforeach(${ARGN})
+	endif(${MPI})
+endfunction(lib_par)
 
 set(PACKAGES parallel levelset poisson DiST geom num out misc stokes navstokes surfactant transport partests)
 
