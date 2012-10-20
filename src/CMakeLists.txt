@@ -59,6 +59,11 @@ endif(TESTS)
 
 foreach(package ${PACKAGES})
 	add_subdirectory(${package})
+	file(GLOB jsonfiles ${package}/*.json)
+	foreach(file ${jsonfiles})
+		  configure_file(${file} ${package}/)
+		  #message(STATUS "copying ${file} ${package}/")
+	endforeach(file)
 endforeach(${package})
 
 message(STATUS "### GLOBAL COMPILE FLAGS: ${CMAKE_CXX_FLAGS} ###")
