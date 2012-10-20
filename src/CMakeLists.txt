@@ -30,7 +30,8 @@ if(MPI)
 	execute_process(COMMAND mpicxx --showme:link OUTPUT_VARIABLE MPI_LD OUTPUT_STRIP_TRAILING_WHITESPACE)
 	
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MPI_CXX} -I${PARMETIS_HOME}/include -I${METIS_HOME}/include -I${ZOLTAN_HOME} -I${SCOTCH_HOME}/include -I${HYPRE_HOME}/src/hypre/include -DMPICH_IGNORE_CXX_SEEK")
-	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${MPI_LD} -L${PARMETIS_HOME}/build/Linux-x86_64/libparmetis -L${METIS_HOME}/build/Linux-x86_64/libmetis -lm -lparmetis -lmetis")
+	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${MPI_LD} -L${PARMETIS_HOME}/build/Linux-x86_64/libparmetis -L${METIS_HOME}/build/Linux-x86_64/libmetis")
+	set(PARMETIS_LIBRARIES "-lm -lparmetis -lmetis")
 	add_definitions("-D_PAR=1")
 else(MPI)
 	message(STATUS "### MPI disabled ###")
@@ -81,7 +82,7 @@ endfunction(libs_par)
 # of target_link_libraries
 
 function(target_link_libraries_par)
-	target_link_libraries(${ARGN} ${PAR_OBJ} ${MPI_CXX_LIBRARIES})
+	target_link_libraries(${ARGN} ${PAR_OBJ} ${MPI_CXX_LIBRARIES} ${PARMETIS_LIBRARIES})
 endfunction(target_link_libraries_par)
 
 ###############################################################################
@@ -89,11 +90,12 @@ endfunction(target_link_libraries_par)
 # Arguments: filename <link_objects...>
 # First a library and an executable target with suitable names are created.
 # Afterwards we add <link_objects...> as a requirement of the executable 
-# THIS FUNCTION REQUIRES ${HOME}
+# THIS FUNCTION REQUIRES ${HOME} and ${PAR_OBJ}
 
 function(exec f)
-	libs_par(${f})
+	libs(${f})
 	add_executable(${f} ${f})
+	message(STATUS "${HOME}-${f}")
 	target_link_libraries_par(${f} ${HOME}-${f} ${ARGN})
 endfunction(exec)
 
