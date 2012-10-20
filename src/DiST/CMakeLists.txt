@@ -1,10 +1,7 @@
-#CMakeLists.txt for DiST package
+set(HOME DiST)
+libs_par(DiST mpistream remotedata)
 
-
-#LIBRARIES
-if(MPI)
-	add_library(DiST-DiST SHARED DiST)
-	add_library(DiST-mpistream SHARED mpistream)
-	add_library(DiST-remotedata SHARED remotedata)
-endif(MPI)
-#EXECUTABLES
+if(${MPI})
+	target_link_libraries(DiST-remotedata DiST-DiST)
+	target_link_libraries(DiST-DiST geom-simplex num-unknowns)
+endif(${MPI})

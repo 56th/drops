@@ -1,10 +1,3 @@
-#CMakeLists.txt for out package
+set(HOME out)
 
-
-#LIBRARIES
-
-add_library(out-ensightOut SHARED ensightOut)
-add_library(out-output SHARED output)
-add_library(out-vtkOut SHARED vtkOut)
-
-#EXECUTABLES
+libs(ensightOut output vtkOut)
