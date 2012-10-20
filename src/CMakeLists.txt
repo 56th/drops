@@ -48,6 +48,12 @@ elseif(CMAKE_COMPILER_IS_GNUCXX)
 	set(CMAKE_CXX_FLAGS_RELEASE "-O2 -finline-limit=600")
 endif(CMAKE_CXX_COMPILER MATCHES icpc)
 
+###############################################################################
+# libs* functions are specializations of add_library, which allow us to add
+# multiple files in a single line. The ${HOME} directory is automatically 
+# prepended.
+# THESE FUNCTIONS REQUIRE ${HOME}
+
 function(libs)
 	foreach(lib ${ARGN})
 		add_library(${HOME}-${lib} SHARED ${lib})
@@ -70,9 +76,26 @@ function(libs_par)
 	endif(${MPI})
 endfunction(libs_par)
 
+###############################################################################
+# target_link_libraries_par appends ${PAR_OBJ} ${MPI_CXX_LIBRARIES} to a call
+# of target_link_libraries
+
 function(target_link_libraries_par)
 	target_link_libraries(${ARGN} ${PAR_OBJ} ${MPI_CXX_LIBRARIES})
 endfunction(target_link_libraries_par)
+
+###############################################################################
+# the exec command can be used to conveniently add an executable. 
+# Arguments: filename <link_objects...>
+# First a library and an executable target with suitable names are created.
+# Afterwards we add <link_objects...> as a requirement of the executable 
+# THIS FUNCTION REQUIRES ${HOME}
+
+function(exec f)
+	libs_par(${f})
+	add_executable(${f} ${f})
+	target_link_libraries_par(${f} ${HOME}-${f} ${ARGN})
+endfunction(exec)
 
 set(PACKAGES parallel levelset poisson DiST geom num out misc stokes navstokes surfactant transport partests)
 
