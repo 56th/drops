@@ -24,13 +24,15 @@ option(MPI "use MPI" OFF)
 if(MPI)
 	message(STATUS "###  MPI active ###")
 	find_package(MPI REQUIRED)
-	include_directories(${MPI_INCLUDE_PATH})
 	
 	execute_process(COMMAND mpicxx --showme:compile OUTPUT_VARIABLE MPI_CXX OUTPUT_STRIP_TRAILING_WHITESPACE)
 	execute_process(COMMAND mpicxx --showme:link OUTPUT_VARIABLE MPI_LD OUTPUT_STRIP_TRAILING_WHITESPACE)
 	
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MPI_CXX} -I${PARMETIS_HOME}/include -I${METIS_HOME}/include -I${ZOLTAN_HOME} -I${SCOTCH_HOME}/include -I${HYPRE_HOME}/src/hypre/include -DMPICH_IGNORE_CXX_SEEK")
-	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${MPI_LD} -L${PARMETIS_HOME}/build/Linux-x86_64/libparmetis -L${METIS_HOME}/build/Linux-x86_64/libmetis")
+	include_directories(${MPI_INCLUDE_PATH} ${PARMETIS_HOME}/include ${METIS_HOME}/include ${ZOLTAN_HOME} ${SCOTCH_HOME}/include ${HYPRE_HOME}/src/hypre/include)
+	link_directories(${PARMETIS_HOME}/build/Linux-x86_64/libparmetis ${METIS_HOME}/build/Linux-x86_64/libmetis)
+	
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MPI_CXX} -DMPICH_IGNORE_CXX_SEEK")
+	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${MPI_LD}")
 	set(PARMETIS_LIBRARIES "-lm -lparmetis -lmetis")
 	add_definitions("-D_PAR=1")
 else(MPI)
