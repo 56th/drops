@@ -10,6 +10,7 @@ project(Drops)
 #		FORCE)
 #endif()
 
+cmake_policy(SET CMP0015 NEW) #allows us to give relative paths in ${PARMETIS_HOME} and ${METIS_HOME} (when given relative paths in librarys these will be interpreted as relative to the root source directory)
 include(CMakeSettings.txt)
 
 #tell cmake to always include the home dir
@@ -25,15 +26,26 @@ if(MPI)
 	message(STATUS "###  MPI active ###")
 	find_package(MPI REQUIRED)
 	
-	execute_process(COMMAND mpicxx --showme:compile OUTPUT_VARIABLE MPI_CXX OUTPUT_STRIP_TRAILING_WHITESPACE)
-	execute_process(COMMAND mpicxx --showme:link OUTPUT_VARIABLE MPI_LD OUTPUT_STRIP_TRAILING_WHITESPACE)
+	find_path(PARMETIS_INCLUDE parmetis.h
+		${PARMETIS_HOME}/include
+	)
+
+	find_library(PARMETIS_LIBRARY parmetis
+		${PARMETIS_HOME}/build/Linux-x86_64/libparmetis
+	)
+
+	find_path(METIS_INCLUDE metis.h
+		${METIS_HOME}/include
+	)
+
+	find_library(METIS_LIBRARY metis
+		${METIS_HOME}/build/Linux-x86_64/libmetis
+	)
+
+	include_directories(${MPI_INCLUDE_PATH} ${PARMETIS_INCLUDE} ${METIS_INCLUDE})
 	
-	include_directories(${MPI_INCLUDE_PATH} ${PARMETIS_HOME}/include ${METIS_HOME}/include ${ZOLTAN_HOME} ${SCOTCH_HOME}/include ${HYPRE_HOME}/src/hypre/include)
-	link_directories(${PARMETIS_HOME}/build/Linux-x86_64/libparmetis ${METIS_HOME}/build/Linux-x86_64/libmetis)
-	
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MPI_CXX} -DMPICH_IGNORE_CXX_SEEK")
-	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${MPI_LD}")
-	set(PARMETIS_LIBRARIES "-lm -lparmetis -lmetis")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MPI_CXX_FLAGS} -DMPICH_IGNORE_CXX_SEEK")
+	set(PARMETIS_LIBRARIES ${MPI_CXX_LIBRARIES} ${METIS_LIBRARY} ${PARMETIS_LIBRARY} m)
 	add_definitions("-D_PAR=1")
 else(MPI)
 	message(STATUS "### MPI disabled ###")
