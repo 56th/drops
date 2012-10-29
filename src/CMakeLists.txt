@@ -21,36 +21,23 @@ find_package(OpenMP REQUIRED)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 
 #use MPI
-option(MPI "use MPI" OFF)
-if(MPI)
+if(${MPI})
 	message(STATUS "###  MPI active ###")
 	find_package(MPI REQUIRED)
 	
-	find_path(PARMETIS_INCLUDE parmetis.h
-		${PARMETIS_HOME}/include
-	)
-
-	find_library(PARMETIS_LIBRARY parmetis
-		${PARMETIS_HOME}/build/Linux-x86_64/libparmetis
-	)
-
-	find_path(METIS_INCLUDE metis.h
-		${METIS_HOME}/include
-	)
-
-	find_library(METIS_LIBRARY metis
-		${METIS_HOME}/build/Linux-x86_64/libmetis
-	)
+	set(METIS_INCLUDE ${METIS_HOME}/include)
+	set(METIS_LIBRARY ${METIS_HOME}/build/Linux-x86_64/libmetis/libmetis.a)
+	set(PARMETIS_INCLUDE ${PARMETIS_HOME}/include)
+	set(PARMETIS_LIBRARY ${PARMETIS_HOME}/build/Linux-x86_64/libparmetis/libparmetis.a)
 
 	include_directories(${MPI_INCLUDE_PATH} ${PARMETIS_INCLUDE} ${METIS_INCLUDE})
 	
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MPI_CXX_FLAGS} -DMPICH_IGNORE_CXX_SEEK")
 	set(PARMETIS_LIBRARIES ${MPI_CXX_LIBRARIES} ${METIS_LIBRARY} ${PARMETIS_LIBRARY} m)
 	add_definitions("-D_PAR=1")
-else(MPI)
+else(${MPI})
 	message(STATUS "### MPI disabled ###")
-endif(MPI)
-
+endif(${MPI})
 
 #compiler specific options
 if(CMAKE_CXX_COMPILER MATCHES icpc)
