@@ -21,7 +21,7 @@ find_package(OpenMP REQUIRED)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 
 #use MPI
-if(${MPI})
+if(MPI)
 	message(STATUS "###  MPI active ###")
 	find_package(MPI REQUIRED)
 	
@@ -35,9 +35,9 @@ if(${MPI})
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MPI_CXX_FLAGS} -DMPICH_IGNORE_CXX_SEEK")
 	set(PARMETIS_LIBRARIES ${MPI_CXX_LIBRARIES} ${METIS_LIBRARY} ${PARMETIS_LIBRARY} m)
 	add_definitions("-D_PAR=1")
-else(${MPI})
+else(MPI)
 	message(STATUS "### MPI disabled ###")
-endif(${MPI})
+endif(MPI)
 
 #compiler specific options
 if(CMAKE_CXX_COMPILER MATCHES icpc)
@@ -63,19 +63,19 @@ function(libs)
 endfunction(libs)
 
 function(libs_ser)
-	if(NOT ${MPI})
+	if(NOT MPI)
 		foreach(lib ${ARGN})
 			add_library(${HOME}-${lib} SHARED ${lib})
 		endforeach(lib)
-	endif(NOT ${MPI})
+	endif(NOT MPI)
 endfunction(libs_ser)
 
 function(libs_par)
-	if(${MPI})
+	if(MPI)
 		foreach(lib ${ARGN})
 			add_library(${HOME}-${lib} SHARED ${lib})
 		endforeach(lib)
-	endif(${MPI})
+	endif(MPI)
 endfunction(libs_par)
 
 ###############################################################################
