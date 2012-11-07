@@ -17,7 +17,7 @@ clean:
 	rm -f *.o $(DELETE)
 
 distclean: clean
-	rm -f $(DISTDELETE)
+	rm -rf $(DISTDELETE)
 
 dep:
 	cd $(DROPS_ROOT) && $(MAKE) dep

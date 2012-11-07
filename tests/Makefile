@@ -14,6 +14,8 @@ OBJ = $(CPP:%.cpp=%.o)
 # include common rules:
 include ../Make.common
 
+DISTDELETE += output report
+
 EXEC =  ip1test ip2test mattest prolongationp2test reftest testfe \
         tetrabuildertest sbuffer minres meshreader restrictp2 vectest \
         p2local quadbase globallist triang quadCut bicgstab gcr blockmat \
