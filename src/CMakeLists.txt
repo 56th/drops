@@ -101,6 +101,22 @@ function(exec f)
 	target_link_libraries_par(${f} ${HOME}-${f} ${ARGN})
 endfunction(exec)
 
+function(exec_ser f)
+	if(NOT MPI)
+		libs_ser(${f})
+		add_executable(${f} ${f})
+		target_link_libraries_par(${f} ${HOME}-${f} ${ARGN})
+	endif(NOT MPI)
+endfunction(exec_ser)
+
+function(exec_par f)
+	if(MPI)
+		libs_par(${f})
+		add_executable(${f} ${f})
+		target_link_libraries_par(${f} ${HOME}-${f} ${ARGN})
+	endif(MPI)
+endfunction(exec_par)
+
 set(PACKAGES parallel levelset poisson DiST geom num out misc stokes navstokes surfactant transport partests)
 
 option(TESTS "compile tests" OFF)
