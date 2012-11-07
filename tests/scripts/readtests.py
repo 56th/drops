@@ -17,7 +17,8 @@ Version :1.0
 __author__ = "Oliver Fortmeier, Alin Bastea and Eva Loch"
 
 #path to the specification files
-def readspecification( path): 
+def readspecification( path):
+    DBG= False
     List               = []        
     varList          = []        #intermediate list for the variables in the specification files
     stringList      = []        #intermediate list for the strings in the specification files
@@ -30,6 +31,8 @@ def readspecification( path):
         f = open(file,'r')
         linesOfFile = f.readlines() # lines of the specification file
         f.close()
+        if (DBG):
+            print("=== Parsing file " + file + " ===")
         for line in linesOfFile:
             lineCounter= lineCounter + 1
             #Eliminating the comments from the specification file
@@ -40,6 +43,8 @@ def readspecification( path):
                 keywordmatch =re.match('^(.*?):', validLine)
                 keyword= keywordmatch.group(1)
                 value= validLine[keywordmatch.end():].strip()
+                if (DBG):
+                    print( str(lineCounter) + ": [" + keyword + "] = <" + value +">" )
             else:
                 keyword = ""
             # test keyword    
@@ -67,41 +72,43 @@ def readspecification( path):
                 string = classes.StringCL()
             if keyword== "Name of variable":
                 variable.varName = re.match('"(.*)"', value).group(1)
+                if (DBG):
+                    print("- Reading specifications for variable " + variable.varName)
                 okCounter = okCounter + 1
             elif keyword== "Prefix of variable":
                 variable.varPrefix = re.match('"(.*)"', value).group(1)
                 okCounter = okCounter + 1
             # value may be empty
             elif keyword== "Value of variable":
-                if (len(validLine.split(": ")) == 2):
-                  ValueOfVar = float(value)
-                  okCounter = okCounter + 1
+                if (len(value) > 0):
+                    ValueOfVar = float(value)
+                    okCounter = okCounter + 1
                 else:
                     ValueOfVar = None
                 variable.varValue = ValueOfVar
             elif keyword== "Relative error":
-                if (len(validLine.split(": ")) == 2):
+                if (len(value) > 0):
                     relativeError = float(value)
                     okCounter = okCounter + 1
                 else:
                     relativeError = None
                 variable.varRelError = relativeError
             elif keyword== "Absolute error":
-                if (len(validLine.split(": ")) == 2):
+                if (len(value) > 0):
                     absoluteError = float(value)
                     okCounter = okCounter + 1
                 else:
                     absoluteError = None
                 variable.varAbsError = absoluteError
             elif keyword=="Minimal value":
-                if (len(validLine.split(": ")) == 2):
+                if (len(value) > 0):
                     minValue = float(value)
                     okCounter = okCounter + 1
                 else:
                     minValue = None
                 variable.varMinValue = minValue
             elif keyword=="Maximal value":
-                if (len(validLine.split(": ")) == 2):
+                if (len(value) > 0):
                     maxValue = float(value)
                     okCounter = okCounter + 1
                 else:

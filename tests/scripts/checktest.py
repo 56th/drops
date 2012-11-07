@@ -33,6 +33,7 @@ def checkNumbers(Test,  linesOutput):
               tmpline =  outputline[(re.match(var.varPrefix,  outputline)).end():]
               helpstring = tmpline.strip()
               actualValue = findNumber(helpstring)
+              var.testValue= actualValue
               if (var.varRelError != None):
                     #we deal with a relative error logic
                   Err = abs(actualValue-var.varValue)

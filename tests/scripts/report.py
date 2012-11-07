@@ -28,7 +28,7 @@ def main(Test, resultOfTest):
     if (Test.status == 0):
         if len(resultOfTest[0]) > 0:
             for result in resultOfTest[0]:
-                line = 'THE VARIABLE : | ' + result.varName + ' | FAILED!\n'
+                line = 'THE VARIABLE : | ' + result.varName + ' | FAILED!\nvalue in test run = ' + str(result.testValue) + ', \tshould be ' + str(result.varValue)
                 reportFile.writelines(line)
         if len(resultOfTest[1]) > 0:
             for result in resultOfTest[1]:

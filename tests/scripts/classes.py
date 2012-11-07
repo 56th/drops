@@ -30,10 +30,11 @@ class TestCL:
 #Class that contains the variable information inside the tests
 class VariableCL:
     #Constructor
-    def __init__(self, varName, varPrefix,  varValue, varAbsError, varRelError,  varMaxValue,  varMinValue):
+    def __init__(self, varName, varPrefix,  varValue, testValue, varAbsError, varRelError,  varMaxValue,  varMinValue):
         self.varName         = varName               #name of variable
         self.varPrefix        = varPrefix                # prefix of variable
         self.varValue        = varValue              #value of variable
+        self.testValue       = testValue             # value of variable in test run
         self.varAbsError     = varAbsError           #absolute error of the variable
         self.varRelError     = varRelError           #relative error of the variable in %
         self.varMinValue  = varMinValue         # maximal value
@@ -42,7 +43,8 @@ class VariableCL:
     def __init__(self):
         self.varName         = None                  #name of variable
         self.varPrefix         = None                  # prefix of variable
-        self.varValue        = None                  #value of variable
+        self.varValue        = None                  # target value of variable
+        self.testValue       = None                  # value of variable in test run
         self.varAbsError     = None                  #absolute error of the variable
         self.varRelError     = None                  #relative error of the variable in %
         self.varMinValue  = None                    # maximal value
