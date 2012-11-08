@@ -1,0 +1,23 @@
+#---------------------SPECIFICATION FILE----------------------------------------
+Type of test: serial
+Name of executable: vectest
+#The path to the folder where the executable is located must be relative to the
+#/drops folder
+Folder of executable: tests
+#The path to the folder where the parameter-file is located must be relative to
+#the folder where the executable is situated
+Path of parameter-file:
+Name of test: testvectest
+Name of author: Liang
+#-------------------------------------------------------------------------------
+#------------------------------NUMBERS------------------------------------------
+Name of variable: "Difference"
+Prefix of variable: "Differenz:"
+Value of variable: 0
+Relative error:
+Absolute error: 1E-16
+Minimal value:
+Maximal value:
+#-------------------------------------------------------------------------------
+#------------------------------STRINGS-------------------------------------------
+#-------------------------------------------------------------------------------
