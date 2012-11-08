@@ -117,7 +117,7 @@ function(exec_par f)
 	endif(MPI)
 endfunction(exec_par)
 
-set(PACKAGES parallel levelset poisson DiST geom num out misc stokes navstokes surfactant transport partests)
+set(PACKAGES parallel levelset poisson DiST geom num out misc stokes navstokes surfactant transport partests tests)
 
 option(TESTS "compile tests" OFF)
 if(TESTS)
