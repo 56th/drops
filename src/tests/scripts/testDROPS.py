@@ -25,6 +25,7 @@ def runtest(Test):
     else:
         command = command + "mpirun -np " + str(Test.numProcs) + " "
     command = command + Test.execFileName + " " + Test.pathParam +" &> ../tests/output/" + Test.testName +".out"
+    print("Running test " +Test.testName+ "...")
     retCode = os.system(command)
     if (retCode != 0):
         Test.status = 2
@@ -55,18 +56,36 @@ def main(argv=sys.argv):
     reportFile.writelines(line)
     reportFile.close()
     #generate the lists of objects containing the tests ----> see Test class in classtest.py
-    parallelList = readtests.parallel()
-    serialList = readtests.serial()
+
+
+    pattern = '*.ref' # default
+    nondefaultpattern = False
+    for arg in sys.argv:
+        if re.match('--select=',arg):
+            [patstr,pattern] = arg.split('=',1)
+            nondefaultpattern = True
+    print "chosen pattern is ", pattern
+            
+    
+    parallelList = readtests.parallel(pattern)
+    serialList = readtests.serial(pattern)
+
     if ('parallel' in sys.argv or ('parallel' not in sys.argv and 'serial' not in sys.argv)):
-        #Set up DROPS for parallel testing
-        setup.parallel()
-        #Compile the parallel tests
-        failedTests = failedTests + runtests(parallelList)
+        if nondefaultpattern:
+            print "parallelList =", parallelList
+        if (parallelList != []):
+            #Set up DROPS for parallel testing
+            setup.parallel()
+            #Compile the parallel tests
+            failedTests = failedTests + runtests(parallelList)
     if ('serial' in sys.argv or ('parallel' not in sys.argv and 'serial' not in sys.argv)):
-        #Set up DROPS for serial testing
-        setup.serial()
-        #Compile the serial tests
-        failedTests = failedTests + runtests(serialList)
+        if nondefaultpattern:
+            print "serialList =", serialList
+        if (serialList != []):
+            #Set up DROPS for serial testing
+            setup.serial()
+            #Compile the serial tests
+            failedTests = failedTests + runtests(serialList)
     reportFile = open(reportfile, "a")
     line = '#=========================FAILED TESTS==============================\n'
     reportFile.writelines(line)

@@ -528,6 +528,12 @@ int main (int argc, char** argv)
 
     std::cout << P << std::endl;
 
+    //!check paramterfile
+    if (P.get<double>("SurfTens.DilatationalVisco")< P.get<double>("SurfTens.ShearVisco"))
+    {
+        throw DROPS::DROPSErrCL("Parameter error : Dilatational viscosity must be larger than surface shear viscosity");
+    }
+
     DROPS::MatchMap & matchmap = DROPS::MatchMap::getInstance();
     bool is_periodic = P.get<std::string>("DomainCond.PeriodicMatching", "none") != "none";
     DROPS::match_fun periodic_match = is_periodic ? matchmap[P.get<std::string>("DomainCond.PeriodicMatching", "periodicx")] : 0;

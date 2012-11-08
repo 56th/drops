@@ -740,6 +740,16 @@ operator*(const SMatrixCL<3, 3>& m, const SVectorCL<3>& v)
     return ret;
 }
 
+template <Uint Rows, Uint Cols>
+double inner_prod(const SVectorCL<Rows>& v1, const SMatrixCL<Rows, Cols>& m, const SVectorCL<Cols>& v2)
+{
+    double ret= 0.0;
+    for (Uint i= 0; i < Rows; ++i)
+        for (Uint j= 0; j < Cols; ++j)
+            ret+= v1[i]*m( i, j)*v2[j];
+    return ret;
+}
+
 template <Uint _Rows, Uint _Cols>
 std::ostream& operator << (std::ostream& os, const SMatrixCL<_Rows, _Cols>& m)
 {

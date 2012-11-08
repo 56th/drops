@@ -204,8 +204,19 @@ operator*( const GridFunctionCL<double>& a, const Point3DCL& b)
     return b*a;
 }
 
+template <Uint Rows, Uint Cols>
+inline GridFunctionCL< SVectorCL<Rows> >
+operator* (const GridFunctionCL< SMatrixCL<Rows, Cols> >& a, const GridFunctionCL< SVectorCL<Cols> >& b)
+{
+    GridFunctionCL< SVectorCL<Rows> > ret( SVectorCL<Rows>(), a.size());
+    for (size_t i= 0; i<a.size(); ++i)
+        ret[i]= a[i]*b[i];
+    return ret;
+}
+
+template <Uint Dim>
 inline GridFunctionCL<double>
-dot(const GridFunctionCL<Point3DCL>& a, const GridFunctionCL<Point3DCL>& b)
+dot(const GridFunctionCL< SVectorCL<Dim> >& a, const GridFunctionCL< SVectorCL<Dim> >& b)
 {
     GridFunctionCL<double> ret( 0.0, a.size());
     for (size_t i= 0; i<a.size(); ++i)
@@ -219,6 +230,16 @@ dot(const Point3DCL& a, const GridFunctionCL<Point3DCL>& b)
     GridFunctionCL<double> ret( 0.0, b.size());
     for (size_t i= 0; i<b.size(); ++i)
         ret[i]= inner_prod( a, b[i]);
+    return ret;
+}
+
+template <Uint Rows, Uint Cols>
+inline GridFunctionCL<double>
+dot(const GridFunctionCL< SVectorCL<Rows> >& a, const GridFunctionCL< SMatrixCL<Rows, Cols> >& b, const GridFunctionCL< SVectorCL<Cols> >& c)
+{
+    GridFunctionCL<double> ret( 0.0, a.size());
+    for (size_t i= 0; i<a.size(); ++i)
+        ret[i]= inner_prod( a[i], b[i], c[i]);
     return ret;
 }
 

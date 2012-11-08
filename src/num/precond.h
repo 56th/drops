@@ -681,6 +681,8 @@ class ParNEGSPcCL
     ///\brief Apply if A*A^T is given as CompositeMatrixCL
     void Apply(const CompositeMatrixCL& AAT, VectorCL& x, const VectorCL& b) const
     { Apply( *AAT.GetBlock1(), x, b); }
+    
+    bool RetAcc() const {return false;}
 };
 
 template <typename Mat>

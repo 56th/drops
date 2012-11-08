@@ -17,22 +17,33 @@ __author__ = "Oliver Fortmeier, Alin Bastea and Eva Loch"
 # line is a string in which the number should be found
 # see python-docs for module re for this regex
 def findNumber(line):
-    number = float((re.match('[-+]?(\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?', line)).group(0))
+    rem = re.match('[-+]?(\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?', line)
+    if rem == None:
+        return None
+    else:
+        number = float(rem.group(0))
     return number
 
 #Test - parameter of type TestCL
 def checkNumbers(Test,  linesOutput):
     failedNumbersList = []
     for var in Test.varList:
+        var.varAppear = 0
         found = False           #we presume that the variable will not be found and we search for it and its value
         fail  = False           #we presume that the variable will pass the test
         for outputline in linesOutput:
-            # compare output to  variable.varPrefix 
-            if re.match(var.varPrefix,  outputline):
+            # compare output to  variable.varPrefix
+            if re.search(var.varPrefix,  outputline) != None:
               found = True
-              tmpline =  outputline[(re.match(var.varPrefix,  outputline)).end():]
+              tmpline =  outputline[(re.search(var.varPrefix,  outputline)).end():]
               helpstring = tmpline.strip()
               actualValue = findNumber(helpstring)
+              if actualValue == None: #false alarm
+                  found = False
+                  continue
+              
+              var.varAppear = var.varAppear + 1
+              var.testValue = actualValue
               if (var.varRelError != None):
                     #we deal with a relative error logic
                   Err = abs(actualValue-var.varValue)
@@ -48,8 +59,9 @@ def checkNumbers(Test,  linesOutput):
                         fail = True
                   if actualValue > var.varMaxValue:
                         fail = True
-                  
-        if fail == True:
+            if fail:
+                break
+        if fail:
             failedNumbersList.append(var)
         if found == False:
             failedNumbersList.append(var)

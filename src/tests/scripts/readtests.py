@@ -17,7 +17,8 @@ Version :1.0
 __author__ = "Oliver Fortmeier, Alin Bastea and Eva Loch"
 
 #path to the specification files
-def readspecification( path): 
+def readspecification( path, pattern='*.ref'):
+    DBG= False
     List               = []        
     varList          = []        #intermediate list for the variables in the specification files
     stringList      = []        #intermediate list for the strings in the specification files
@@ -25,11 +26,15 @@ def readspecification( path):
     #Read all the specification files in the folder and fill up List with the data
     okCounter = 0               #Counter used for correctlly filling up the variable list
     okStringCounter = 0         #Counter used for correctlly filling up the string list. Counter is increased when reading a string value and a find flag
-    for file in glob.glob( os.path.join(path, '*.ref') ):
+    lineCounter = 0
+    for file in glob.glob( os.path.join(path, pattern) ):
         f = open(file,'r')
         linesOfFile = f.readlines() # lines of the specification file
         f.close()
+        if (DBG):
+            print("=== Parsing file " + file + " ===")
         for line in linesOfFile:
+            lineCounter= lineCounter + 1
             #Eliminating the comments from the specification file
             validLine = re.sub("#.*","",line)
             #Collect test-information and read all the data needed for a test
@@ -38,6 +43,8 @@ def readspecification( path):
                 keywordmatch =re.match('^(.*?):', validLine)
                 keyword= keywordmatch.group(1)
                 value= validLine[keywordmatch.end():].strip()
+                if (DBG):
+                    print( str(lineCounter) + ": [" + keyword + "] = <" + value +">" )
             else:
                 keyword = ""
             # test keyword    
@@ -65,41 +72,43 @@ def readspecification( path):
                 string = classes.StringCL()
             if keyword== "Name of variable":
                 variable.varName = re.match('"(.*)"', value).group(1)
+                if (DBG):
+                    print("- Reading specifications for variable " + variable.varName)
                 okCounter = okCounter + 1
             elif keyword== "Prefix of variable":
                 variable.varPrefix = re.match('"(.*)"', value).group(1)
                 okCounter = okCounter + 1
             # value may be empty
             elif keyword== "Value of variable":
-                if (len(validLine.split(": ")) == 2):
-                  ValueOfVar = float(value)
-                  okCounter = okCounter + 1
+                if (len(value) > 0):
+                    ValueOfVar = float(value)
+                    okCounter = okCounter + 1
                 else:
                     ValueOfVar = None
                 variable.varValue = ValueOfVar
             elif keyword== "Relative error":
-                if (len(validLine.split(": ")) == 2):
+                if (len(value) > 0):
                     relativeError = float(value)
                     okCounter = okCounter + 1
                 else:
                     relativeError = None
                 variable.varRelError = relativeError
             elif keyword== "Absolute error":
-                if (len(validLine.split(": ")) == 2):
+                if (len(value) > 0):
                     absoluteError = float(value)
                     okCounter = okCounter + 1
                 else:
                     absoluteError = None
                 variable.varAbsError = absoluteError
             elif keyword=="Minimal value":
-                if (len(validLine.split(": ")) == 2):
+                if (len(value) > 0):
                     minValue = float(value)
                     okCounter = okCounter + 1
                 else:
                     minValue = None
                 variable.varMinValue = minValue
             elif keyword=="Maximal value":
-                if (len(validLine.split(": ")) == 2):
+                if (len(value) > 0):
                     maxValue = float(value)
                     okCounter = okCounter + 1
                 else:
@@ -120,13 +129,11 @@ def readspecification( path):
             if okStringCounter == 2:          #if counter is 2 it means that we read a value and a find flag.
                 stringList.append(string)#append the new string to the list
                 okStringCounter = 0           #reset the counter
-            else:
-                print("Incomplete string specification in " +path+file+ " ignored.")
             if okCounter == 4:          #if counter is 4 it means that we read a name a value and an error.
                 varList.append(variable)#append the new variable to the list
                 okCounter = 0           #reset the counter
-            else:
-                print("Incomplete variable specification in " +path+file+ " ignored.")
+            if (okStringCounter > 0 and okCounter > 0):
+	      print(file + ":" + str(lineCounter) + ": Incomplete variable or string specification above ignored, before reading '" +keyword+ "'.")
         testName = file.split("/")[3].split(".")[0]
         List.append(classes.TestCL(authorName, testType, execFileName, testName, pathExec, pathParam, numProcs, varList, stringList, -1))#because we haven't compiled or run the test yet status is 0
         #Empty the intermediate lists of variables and strings
@@ -134,9 +141,9 @@ def readspecification( path):
         stringList=[]
     return List
     
-def serial():
-    return readspecification('../specifications/serial/')
+def serial(pattern='*.ref'):
+    return readspecification('../specifications/serial/',pattern)
     
-def parallel():
-    return readspecification('../specifications/parallel/')
+def parallel(pattern='*.ref'):
+    return readspecification('../specifications/parallel/',pattern)
     
