@@ -1,0 +1,21 @@
+#---------------------SPECIFICATION FILE----------------------------------------
+Type of test: serial
+Name of executable: quad5_2D
+#The path to the folder where the executable is located must be relative to the
+#/drops folder
+Folder of executable: tests
+#The path to the folder where the parameter-file is located must be relative to
+#the folder where the executable is situated
+Path of parameter-file: 
+Name of test: testQuad5_2D
+Name of author: lehrenfeld
+#-------------------------------------------------------------------------------
+#------------------------------NUMBERS------------------------------------------
+Name of variable: "Quadrature error"
+Prefix of variable: "I-Q_h: "
+Value of variable: 0.0
+Relative error: 
+Absolute error: 1e-16
+#-------------------------------------------------------------------------------
+#------------------------------STRINGS-------------------------------------------
+#-------------------------------------------------------------------------------

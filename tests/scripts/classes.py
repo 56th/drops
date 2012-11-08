@@ -32,7 +32,8 @@ class VariableCL:
     #Constructor
     def __init__(self, varName, varPrefix,  varValue, testValue, varAbsError, varRelError,  varMaxValue,  varMinValue):
         self.varName         = varName               #name of variable
-        self.varPrefix        = varPrefix                # prefix of variable
+        self.varAppear       = varAppear             #counter for appearance
+        self.varPrefix       = varPrefix                # prefix of variable
         self.varValue        = varValue              #value of variable
         self.testValue       = testValue             # value of variable in test run
         self.varAbsError     = varAbsError           #absolute error of the variable
@@ -42,7 +43,8 @@ class VariableCL:
     #Constructor
     def __init__(self):
         self.varName         = None                  #name of variable
-        self.varPrefix         = None                  # prefix of variable
+        self.varAppear       = None                  # counter for appearance
+        self.varPrefix       = None                  # prefix of variable
         self.varValue        = None                  # target value of variable
         self.testValue       = None                  # value of variable in test run
         self.varAbsError     = None                  #absolute error of the variable
@@ -52,6 +54,9 @@ class VariableCL:
     #Setter method for the name of the variable
     def setName(self, varName):
         self.varName = varName
+    #Setter method for the counter of appearance
+    def setAppear(self, varAppear):
+        self.varAppear = varAppear
     #Setter method for the prefix of the variable
     def setPrefix(self, varPrefix):
         self.varPrefix = varPrefix   
@@ -73,7 +78,10 @@ class VariableCL:
     #Getter method for the name of the variable
     def getName(self):
         return self.varName
-        #Getter method for the name of the variable
+    #Getter method for the counter of appearances
+    def getAppear(self):
+        return self.varAppear
+    #Getter method for the name of the variable
     def getPrefix(self):
         return self.varPrefix
     #Getter method for the value of the variable
