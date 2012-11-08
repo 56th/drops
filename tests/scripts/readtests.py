@@ -17,7 +17,7 @@ Version :1.0
 __author__ = "Oliver Fortmeier, Alin Bastea and Eva Loch"
 
 #path to the specification files
-def readspecification( path):
+def readspecification( path, pattern='*.ref'):
     DBG= False
     List               = []        
     varList          = []        #intermediate list for the variables in the specification files
@@ -27,7 +27,7 @@ def readspecification( path):
     okCounter = 0               #Counter used for correctlly filling up the variable list
     okStringCounter = 0         #Counter used for correctlly filling up the string list. Counter is increased when reading a string value and a find flag
     lineCounter = 0
-    for file in glob.glob( os.path.join(path, '*.ref') ):
+    for file in glob.glob( os.path.join(path, pattern) ):
         f = open(file,'r')
         linesOfFile = f.readlines() # lines of the specification file
         f.close()
@@ -141,9 +141,9 @@ def readspecification( path):
         stringList=[]
     return List
     
-def serial():
-    return readspecification('../specifications/serial/')
+def serial(pattern='*.ref'):
+    return readspecification('../specifications/serial/',pattern)
     
-def parallel():
-    return readspecification('../specifications/parallel/')
+def parallel(pattern='*.ref'):
+    return readspecification('../specifications/parallel/',pattern)
     
