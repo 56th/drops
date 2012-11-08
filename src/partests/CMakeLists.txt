@@ -1,6 +1,6 @@
 set(HOME partests)
 
-if(${MPI})
+if(MPI)
 	SET(PAR_OBJ DiST-DiST DiST-mpistream DiST-remotedata
 		parallel-parallel parallel-partime
 		parallel-exchange parallel-parmultigrid
@@ -34,4 +34,4 @@ if(${MPI})
 	exec(dist_interp2 partests-dist_interp2 geom-simplex geom-multigrid geom-topo out-output num-unknowns geom-builder misc-problem num-interfacePatch num-fe geom-boundary misc-utils num-discretize)
 	
 	exec(dist_interp1 geom-simplex geom-multigrid geom-topo out-output num-unknowns geom-builder misc-problem num-interfacePatch num-fe geom-boundary misc-utils num-discretize)
-endif(${MPI})
+endif(MPI)
