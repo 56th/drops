@@ -22,7 +22,7 @@
  * Copyright 2009 LNM/SC RWTH Aachen, Germany
 */
 
-#include "misc/bndmap.h"
+#include "misc/funcmap.h"
 #include "misc/params.h"
 
 double Initialcneg (const DROPS::Point3DCL& , double )

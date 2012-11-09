@@ -26,7 +26,7 @@
 #define GEOMSELECT_H_
 
 #include "geom/multigrid.h"
-#include "misc/bndmap.h"
+#include "misc/funcmap.h"
 
 namespace DROPS
 {

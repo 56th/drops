@@ -33,7 +33,7 @@ sdropsP2: \
     ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o ../num/interfacePatch.o \
     ../misc/utils.o ../out/output.o ../num/discretize.o ../num/MGsolver.o ../misc/params.o \
     ../out/ensightOut.o ../out/vtkOut.o ../stokes/integrTime.o ../geom/geomselect.o \
-    ../misc/bndmap.o ../misc/bndVelFunctions.o ../stokes/stokesCoeff.o ../geom/principallattice.o \
+    ../misc/funcmap.o ../misc/vectorFunctions.o ../stokes/stokesCoeff.o ../geom/principallattice.o \
     ../geom/reftetracut.o ../num/oseenprecond.o
 	$(CXX) -o $@ $^ $(LFLAGS)
 
@@ -43,7 +43,7 @@ errorestimator: \
     ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o  ../num/interfacePatch.o \
     ../misc/utils.o ../num/discretize.o ../num/MGsolver.o ../misc/params.o \
     ../stokes/integrTime.o  ../geom/geomselect.o ../out/output.o \
-    ../misc/bndmap.o ../misc/bndVelFunctions.o  ../stokes/stokesCoeff.o \
+    ../misc/funcmap.o ../misc/vectorFunctions.o  ../stokes/stokesCoeff.o \
     ../geom/principallattice.o ../geom/reftetracut.o ../num/oseenprecond.o
 	$(CXX) -o $@ $^ $(LFLAGS)
 

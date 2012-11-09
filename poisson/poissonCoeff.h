@@ -26,7 +26,7 @@
 
 #include "misc/container.h"
 #include "misc/params.h"
-#include "misc/bndmap.h"
+#include "misc/funcmap.h"
 #include <sstream>
 
 namespace DROPS{

@@ -33,7 +33,7 @@
 #include "misc/params.h"
 #include "num/MGsolver.h"
 #include "num/fe_repair.h"
-#include "misc/bndmap.h"
+#include "misc/funcmap.h"
 
 namespace DROPS
 {
@@ -105,7 +105,7 @@ class TwoPhaseFlowCoeffCL
 
     TwoPhaseFlowCoeffCL( ParamCL& P, bool dimless = false)
       //big question: film or measurecell? 1: measure, 2: film
-      : film( (P.get("Mat.DensDrop", 0.0) == 0.0) ),
+        : film( (P.get<double>("Mat.DensDrop") == 0.0) ),
         surfTens( film ? P.get<double>("Mat.SurfTension") : P.get<double>("SurfTens.SurfTension")),
         rho_koeff1( film ? P.get<double>("Mat.DensGas") : P.get<double>("Mat.DensFluid")),
         rho_koeff2( film ? P.get<double>("Mat.DensFluid") : P.get<double>("Mat.DensDrop")),
@@ -117,11 +117,11 @@ class TwoPhaseFlowCoeffCL
         mu( dimless ? JumpCL( 1., mu_koeff1/mu_koeff2)
           : JumpCL( mu_koeff2, mu_koeff1), H_sm, P.get<double>("Mat.SmoothZone")),
         SurfTens (dimless ? surfTens/rho_koeff2 : surfTens),
-        DilVisco( film ? P.get<double>("Mat.DilatationalVisco", 0.0) : P.get<double>("SurfTens.DilatationalVisco", 0.0)),
-        ShearVisco( film ? P.get<double>("Mat.ShearVisco", 0.0) : P.get<double>("SurfTens.ShearVisco", 0.0)),
+        DilVisco( film ? P.get<double>("Mat.DilatationalVisco") : P.get<double>("SurfTens.DilatationalVisco")),
+        ShearVisco( film ? P.get<double>("Mat.ShearVisco") : P.get<double>("SurfTens.ShearVisco")),
         g( P.get<DROPS::Point3DCL>("Exp.Gravity"))
         {
-        volforce = InVecMap::getInstance()[P.get("Exp.VolForce", std::string("ZeroVel"))];
+        volforce = InVecMap::getInstance()[P.get<std::string>("Exp.VolForce")];
     }
 
     TwoPhaseFlowCoeffCL( double rho1, double rho2, double mu1, double mu2, double surftension, Point3DCL gravity, bool dimless = false, double dilatationalvisco = 0.0, double shearvisco = 0.0)

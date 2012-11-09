@@ -30,6 +30,8 @@
 namespace DROPS
 {
 
+/// Connectivity of the reference tetrahedron and its refinements.
+
 // Constants
 const Uint NumVertsC      = 4;
 const Uint NumFacesC      = 4;
@@ -91,52 +93,6 @@ const Ubyte FaceOfEdgeAr[NumEdgesC][2] = { {2,3}, {1,3}, {0,3}, {1,2}, {0,2}, {0
 
 /// Orientation of cross-product when iterating over VertOfFace for a given face; 1 stands for outer normal
 const byte OrientOfFaceAr[NumFacesC] = { 1, -1, 1, -1 };
-
-// Indices into the byte-array of refrules
-//extern const Uint RefRuleIndex[63];
-
-/// All refinement-rules
-extern const byte RefRuleAr[];
-extern const byte ChildDataAr[];
-
-/// Data for the transformation matrices of barycentric coordinates from parent to child.
-/// The accessor function SMatrixCL<4,4> parent_to_child_bary (Ubyte ch) is provided in geom/simplex.h.
-extern const byte parent_to_child_bary_ar[];
-
-/// Data for the transformation matrices of barycentric coordinates from child to parent.
-/// Note, that the values must be scaled by 0.5.
-/// The accessor function SMatrixCL<4,4> child_to_parent_bary (Ubyte ch) is provided in geom/simplex.h.
-extern const byte child_to_parent_bary_ar[];
-
-/// Describes a child in a refinement rule
-struct ChildDataCL
-{
-    /// Number of each vertex
-    Ubyte Vertices[NumVertsC];
-    /// Number of each edge
-    Ubyte Edges[NumEdgesC];
-    /// Number of each face
-    Ubyte Faces[NumFacesC];
-};
-
-/// Describes neighbourhood relations of children and faces in a refinement rule
-struct RefRuleCL
-{
-    /// How many edges are used for the children (parent edges inclusive)
-    Ubyte EdgeNum;
-    /// VertIndices of the edges
-    byte  Edges[MaxEdgesC];
-
-    /// How many faces are used for the children (parent faces inclusive)
-    Ubyte FaceNum;
-    /// VertIndices of the faces
-    byte  Faces[MaxFacesC];
-
-    /// How many children does this rule generate
-    Ubyte ChildNum;
-    /// ChildData index of the children
-    byte  Children[MaxChildrenC];
-};
 
 
 /// Vertices of a given edge
@@ -222,12 +178,61 @@ inline bool RefinesFace(Ubyte refpat, Ubyte face)
            || (refpat>>EdgeOfFace(face, 2) & 1);
 }
 
+
+/// Refinement-rules
+
+/// Describes a child in a refinement rule
+struct ChildDataCL
+{
+    /// Number of each vertex
+    Ubyte Vertices[NumVertsC];
+    /// Number of each edge
+    Ubyte Edges[NumEdgesC];
+    /// Number of each face
+    Ubyte Faces[NumFacesC];
+};
+
+/// Describes neighbourhood relations of children and faces in a refinement rule
+struct RefRuleCL
+{
+    /// How many edges are used for the children (parent edges inclusive)
+    Ubyte EdgeNum;
+    /// VertIndices of the edges
+    byte  Edges[MaxEdgesC];
+
+    /// How many faces are used for the children (parent faces inclusive)
+    Ubyte FaceNum;
+    /// VertIndices of the faces
+    byte  Faces[MaxFacesC];
+
+    /// How many children does this rule generate
+    Ubyte ChildNum;
+    /// ChildData index of the children
+    byte  Children[MaxChildrenC];
+};
+
+/// All refinement-rules
+extern const byte RefRuleAr[];
+extern const byte ChildDataAr[];
+
 /// Obtain a refinement-rule for the edge-pattern 'refpattern'
 inline const RefRuleCL& GetRefRule(Ubyte refpattern)
     { return *reinterpret_cast<const RefRuleCL*>( RefRuleAr + sizeof( RefRuleCL)*refpattern); }
 
 inline const ChildDataCL& GetChildData(Ubyte VertIndex)
     { return *reinterpret_cast<const ChildDataCL*>( ChildDataAr + sizeof( ChildDataCL)*VertIndex); }
+
+
+/// Transformation of barycentric coordinates (children <-> parent)
+
+/// Data for the transformation matrices of barycentric coordinates from parent to child.
+/// The accessor function SMatrixCL<4,4> parent_to_child_bary (Ubyte ch) is provided in geom/simplex.h.
+extern const byte parent_to_child_bary_ar[];
+
+/// Data for the transformation matrices of barycentric coordinates from child to parent.
+/// Note, that the values must be scaled by 0.5.
+/// The accessor function SMatrixCL<4,4> child_to_parent_bary (Ubyte ch) is provided in geom/simplex.h.
+extern const byte child_to_parent_bary_ar[];
 
 } // end  of namespace DROPS
 #endif

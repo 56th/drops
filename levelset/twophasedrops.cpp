@@ -42,7 +42,7 @@
 //surfactants
 #include "surfactant/ifacetransp.h"
 //function map
-#include "misc/bndmap.h"
+#include "misc/funcmap.h"
 //solver factory for stokes
 #include "num/stokessolverfactory.h"
 #include "num/oseensolver.h"
@@ -365,7 +365,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
                                  P.get<int>("Time.NumSteps")/P.get("VTK.VTKOut", 0)+1,
                                  P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName"),
                                  P.get<std::string>("VTK.TimeFileName"),
-                                 P.get<int>("VTK.Binary"), 
+                                 P.get<int>("VTK.Binary"),
                                  P.get<int>("VTK.UseOnlyP1"),
                                  -1,  /* <- level */
                                  P.get<int>("VTK.ReUseTimeFile"),
@@ -491,6 +491,13 @@ void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<double>("Levelset.Downwind.MaxRelComponentSize", 0.05);
     P.put_if_unset<double>("Levelset.Downwind.WeakEdgeRatio", 0.2);
     P.put_if_unset<double>("Levelset.Downwind.CrosswindLimit", std::cos( M_PI/6.));
+
+    P.put_if_unset<std::string>("Exp.VolForce", "ZeroVel");
+    P.put_if_unset<double>("Mat.DensDrop", 0.0);
+    P.put_if_unset<double>("Mat.ShearVisco", 0.0);
+    P.put_if_unset<double>("Mat.DilatationalVisco", 0.0);
+    P.put_if_unset<double>("SurfTens.ShearVisco", 0.0);
+    P.put_if_unset<double>("SurfTens.DilatationalVisco", 0.0);
 }
 
 int main (int argc, char** argv)
@@ -522,6 +529,12 @@ int main (int argc, char** argv)
     SetMissingParameters(P);
 
     std::cout << P << std::endl;
+
+    //!check paramterfile
+    if (P.get<double>("SurfTens.DilatationalVisco")< P.get<double>("SurfTens.ShearVisco"))
+    {
+        throw DROPS::DROPSErrCL("Parameter error : Dilatational viscosity must be larger than surface shear viscosity");
+    }
 
     DROPS::MatchMap & matchmap = DROPS::MatchMap::getInstance();
     bool is_periodic = P.get<std::string>("DomainCond.PeriodicMatching", "none") != "none";

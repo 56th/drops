@@ -1,5 +1,5 @@
-/// \file bndmap.h
-/// \brief global map for boundary functions
+/// \file funcmap.h
+/// \brief global map for boundary and coefficient functions
 /// \author LNM RWTH Aachen: Martin Horsky; SC RWTH Aachen:
 /*
  * This file is part of DROPS.
@@ -21,27 +21,18 @@
  * Copyright 2009 LNM/SC RWTH Aachen, Germany
 */
 
-#ifndef BNDMAP_H
-#define BNDMAP_H
+#ifndef FUNCMAP_H
+#define FUNCMAP_H
 
 #include <map>
 #include <string>
+#include "misc/singletonmap.h"
 #include "num/discretize.h"
-#include <sstream>
+
 
 namespace DROPS
 {
-template<class T>
-class SingletonMapCL : public std::map<std::string, T>
-{
-  private:
-    SingletonMapCL() {}                         // von aussen keine Instanzen erzeugbar
-    SingletonMapCL(const SingletonMapCL&) : std::map<std::string, T>() { }  // nicht kopierbar
-    ~SingletonMapCL() {}
-  public:
-    static SingletonMapCL& getInstance();
-    T& operator[](std::string s);
-};
+
 
 typedef SingletonMapCL<DROPS::instat_vector_fun_ptr> InVecMap;
 typedef SingletonMapCL<DROPS::instat_scalar_fun_ptr> InScaMap;
@@ -53,31 +44,17 @@ typedef SingletonMapCL<DROPS::instat_matrix_fun_ptr> InMatMap;
 
 Point3DCL TestFunction(const Point3DCL& , double);
 
-class RegisterVectorFunction
-{
-  public:
-    RegisterVectorFunction(std::string, instat_vector_fun_ptr);
-    RegisterVectorFunction(std::string, vector_tetra_function);
-};
+typedef MapRegisterCL< instat_vector_fun_ptr> RegisterVectorFunction;
+typedef MapRegisterCL< vector_tetra_function> RegisterVectorTetraFunction;
 
-class RegisterScalarFunction
-{
-  public:
-    RegisterScalarFunction(std::string, instat_scalar_fun_ptr);
-    RegisterScalarFunction(std::string, scalar_tetra_function);
-};
+typedef MapRegisterCL< instat_scalar_fun_ptr> RegisterScalarFunction;
+typedef MapRegisterCL< scalar_tetra_function> RegisterScalarTetraFunction;
 
-class RegisterMatchingFunction
-{
-  public:
-    RegisterMatchingFunction(std::string, match_fun);
-};
 
-class RegisterMatrixFunction
-{
-  public:
-    RegisterMatrixFunction(std::string, instat_matrix_fun_ptr);
-};
+typedef MapRegisterCL< match_fun> RegisterMatchingFunction;
+
+typedef MapRegisterCL< instat_matrix_fun_ptr> RegisterMatrixFunction;
+
 
 } //end of namespace DROPS
 

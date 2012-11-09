@@ -14,6 +14,8 @@ OBJ = $(CPP:%.cpp=%.o)
 # include common rules:
 include ../Make.common
 
+DISTDELETE += output report
+
 EXEC =  ip1test ip2test mattest prolongationp2test reftest testfe \
         tetrabuildertest sbuffer minres meshreader restrictp2 vectest \
         p2local quadbase globallist triang quadCut bicgstab gcr blockmat \
@@ -184,7 +186,7 @@ xfem: \
     ../geom/boundary.o ../geom/topo.o ../num/unknowns.o ../misc/problem.o ../num/interfacePatch.o \
     ../num/fe.o ../num/discretize.o ../levelset/levelset.o ../levelset/fastmarch.o \
     ../stokes/instatstokes2phase.o ../out/ensightOut.o ../levelset/surfacetension.o \
-    ../misc/bndmap.o ../misc/bndVelFunctions.o \
+    ../misc/funcmap.o ../misc/vectorFunctions.o \
     ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o 
 	$(CXX) -o $@ $^ $(LFLAGS)
 
@@ -194,7 +196,7 @@ f_Gamma: \
     ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o ../levelset/levelset.o \
     ../misc/utils.o ../out/output.o ../num/discretize.o ../num/interfacePatch.o \
     ../misc/params.o ../levelset/fastmarch.o ../stokes/instatstokes2phase.o \
-    ../levelset/surfacetension.o ../misc/bndmap.o ../misc/bndVelFunctions.o \
+    ../levelset/surfacetension.o ../misc/funcmap.o ../misc/vectorFunctions.o \
     ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o 
 	$(CXX) -o $@ $^ $(LFLAGS)
 

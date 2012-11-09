@@ -26,6 +26,7 @@
 #include "num/accumulator.h"
 #include "poisson/poissonaccus.tpp"
 #include "geom/isoparamP2.h"
+#include "misc/scopetimer.h"
 namespace DROPS
 {
 
@@ -99,6 +100,7 @@ template<class Coeff>
 void PoissonP1CL<Coeff>::SetupSystem(MLMatDescCL& matA, VecDescCL& b) const
 ///Go throught every level to Setup system in P1
 {
+    ScopeTimerCL scope("PoissonP1CL::SetupSystem");
     MLMatrixCL::iterator  itA    = matA.Data.begin();
     MLIdxDescCL::iterator itRow  = matA.RowIdx->begin();
     MLIdxDescCL::iterator itCol  = matA.ColIdx->begin();
@@ -112,6 +114,7 @@ template<class Coeff>
 void PoissonP1CL<Coeff>::SetupInstatSystem( MLMatDescCL& matA, MLMatDescCL& matM, double t) const
 ///Go throught every multigrid level to Setup left hand side of instationary system in P1
 {
+    ScopeTimerCL scope("PoissonP1CL::SetupInstatSystem");
     MLIdxDescCL::iterator itRow  = matA.RowIdx->begin();
     MLIdxDescCL::iterator itCol  = matA.ColIdx->begin();
     MLMatrixCL::iterator  itM    = matM.Data.begin();
@@ -123,6 +126,7 @@ template<class Coeff>
 void PoissonP1CL<Coeff>::SetupConvection( MLMatDescCL& matU, VecDescCL& vU, double t) const
 ///Go throught every multigrid level to setup convection
 {
+    ScopeTimerCL scope("PoissonP1CL::SetupConvection");
     MLMatrixCL::iterator  itU    = matU.Data.begin();
     MLIdxDescCL::iterator itRow  = matU.RowIdx->begin();
     MLIdxDescCL::iterator itCol  = matU.ColIdx->begin();
@@ -135,7 +139,8 @@ template<class Coeff>
 void PoissonP1CL<Coeff>::SetupInstatRhs(VecDescCL& vA, VecDescCL& vM, double t, VecDescCL& vf, double tSUPG) const
 ///Setup right hand side of instationary system in P1 only last level
 {
-  SetupPartialSystem_P1(MG_,Coeff_,0,0,0,&vA,&vM,0,&vf,&BndData_,*vA.RowIdx,*vA.RowIdx, t ,supg_, ALE_, false, tSUPG);
+    ScopeTimerCL scope("PoissonP1CL::SetupInstatRhs");
+    SetupPartialSystem_P1(MG_,Coeff_,0,0,0,&vA,&vM,0,&vf,&BndData_,*vA.RowIdx,*vA.RowIdx, t ,supg_, ALE_, false, tSUPG);
 }
 
 template<class Coeff>
@@ -176,6 +181,8 @@ template <class Coeff>
 void PoissonP1CL<Coeff>::SetupGradSrc(VecDescCL& src, instat_scalar_fun_ptr T, instat_scalar_fun_ptr dalpha, double t) const
 ///Special rhs for IA2 sensitivity problem
 {
+    ScopeTimerCL scope("PoissonP1CL::SetupGradSrc");
+
     src.Clear( t);
     const Uint lvl = src.GetLevel(),
             idx = src.RowIdx->GetIdx();
@@ -843,6 +850,7 @@ template<class Coeff>
 void SetupSystem_P2( const MultiGridCL& MG, const Coeff&, const BndDataCL<> BndData_, MatrixCL& Amat, VecDescCL* b, IdxDescCL& RowIdx, IdxDescCL& ColIdx)
 // Sets up the stiffness matrix and right hand side
 {
+    ScopeTimerCL scope("SetupSystem_P2");
     if (b!=0) b->Clear( 0.0);
 
     const Uint lvl    = RowIdx.TriangLevel(),
@@ -948,6 +956,7 @@ void SetupSystem_P2( const MultiGridCL& MG, const Coeff&, const BndDataCL<> BndD
 template<class Coeff>
 void PoissonP2CL<Coeff>::SetupSystem(MLMatDescCL& matA, VecDescCL& b) const
 {
+  ScopeTimerCL scope("PoissonP2CL::SetupSystem");
     MLMatrixCL::iterator  itA    = matA.Data.begin();
     MLIdxDescCL::iterator itRow  = matA.RowIdx->begin();
     MLIdxDescCL::iterator itCol  = matA.ColIdx->begin();
@@ -960,6 +969,8 @@ template<class Coeff>
 void SetupConvection_P2(const MultiGridCL& MG_, const Coeff& Coeff_, const BndDataCL<> BndData_, MatrixCL& Umat,
                         VecDescCL* vU, IdxDescCL& RowIdx, IdxDescCL& ColIdx, double tU, bool ALE_)
 {
+  ScopeTimerCL scope("SetupConvection_P2");
+
   if(vU!=0) vU->Clear(tU);
   MatrixBuilderCL U(&Umat, RowIdx.NumUnknowns(), ColIdx.NumUnknowns());
 
@@ -1049,6 +1060,7 @@ void SetupConvection_P2(const MultiGridCL& MG_, const Coeff& Coeff_, const BndDa
 template<class Coeff>
 void PoissonP2CL<Coeff>::SetupConvection(MLMatDescCL& matU, VecDescCL& vU, double tU) const
 {
+  ScopeTimerCL scope("PoissonP2CL::SetupConvection");
   MLMatrixCL ::iterator itU  = matU.Data.begin();
   MLIdxDescCL::iterator itRow= matU.RowIdx->begin();
   MLIdxDescCL::iterator itCol= matU.ColIdx->begin();
@@ -1102,6 +1114,7 @@ void PoissonP2CL<Coeff>::Init( VecDescCL& vec, instat_scalar_fun_ptr func, doubl
 template<class Coeff>
 void PoissonP2CL<Coeff>::SetupInstatRhs(VecDescCL& vA, VecDescCL& vM, double tA, VecDescCL& vf, double tf) const
 {
+    ScopeTimerCL scope("PoissonP2CL::SetupInstatRhs");
     vA.Clear(tA);
     vM.Clear(tA);
     vf.Clear(tf);
@@ -1325,6 +1338,8 @@ void SetupInstatSystem_P2( const MultiGridCL& MG, const Coeff&, const BndDataCL<
 template<class Coeff>
 void PoissonP2CL<Coeff>::SetupInstatSystem( MLMatDescCL& matA, MLMatDescCL& matM, double) const
 {
+    ScopeTimerCL scope("PoissonP2CL::SetupInstatSystem");
+
     MLIdxDescCL::iterator itRow  = matA.RowIdx->begin();
     MLIdxDescCL::iterator itCol  = matA.ColIdx->begin();
     MLMatrixCL::iterator  itM    = matM.Data.begin();

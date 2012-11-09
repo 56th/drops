@@ -33,8 +33,8 @@ ns_transp: \
     ../geom/deformation.o \
     ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o ../levelset/levelset.o \
     ../misc/utils.o ../out/output.o ../num/discretize.o \
-    ../navstokes/instatnavstokes2phase.o ../misc/bndScalarFunctions.o \
-    ../misc/bndVelFunctions.o ../misc/bndmap.o ../misc/params.o \
+    ../navstokes/instatnavstokes2phase.o ../misc/scalarFunctions.o \
+    ../misc/vectorFunctions.o ../misc/funcmap.o ../misc/params.o \
     ../levelset/fastmarch.o ../stokes/instatstokes2phase.o ../num/MGsolver.o\
     ../num/fe.o ../out/ensightOut.o ../transport/transportNitsche.o \
     ../num/interfacePatch.o ../levelset/fastmarch.o ../num/fe.o \

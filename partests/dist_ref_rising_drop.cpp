@@ -141,7 +141,8 @@ int main( int argc, char **argv)
         DROPS::VTKOutCL *vtkwriter=0;
         if (P.get("VTK.VTKOut", 0)!=0){
             vtkwriter = new DROPS::VTKOutCL(*mg, "DROPS data", P.get<int>("Time.NumSteps")/P.get("VTK.VTKOut", 0)+1,
-                                     P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName"), P.get<int>("VTK.Binary"));
+                                P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName"), P.get<std::string>("VTK.VTKName"),
+                                P.get<int>("VTK.Binary"));
             vtkwriter->Write(0);
         }
 

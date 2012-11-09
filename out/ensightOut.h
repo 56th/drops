@@ -197,7 +197,7 @@ template <class DiscScalarT>
 class Ensight6ScalarCL : public Ensight6VariableCL
 {
   private:
-    const DiscScalarT f_;
+    const DiscScalarT& f_;
 
   public:
     Ensight6ScalarCL (const DiscScalarT& f, std::string varName, std::string fileName, bool timedep= false)
@@ -222,7 +222,7 @@ template <class DiscVectorT>
 class Ensight6VectorCL : public Ensight6VariableCL
 {
   private:
-    const DiscVectorT f_;
+    const DiscVectorT& f_;
 
   public:
     Ensight6VectorCL (const DiscVectorT& f, std::string varName, std::string fileName, bool timedep= false)

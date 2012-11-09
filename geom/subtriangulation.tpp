@@ -89,9 +89,9 @@ template <class VertexPartitionPolicyT,
 {
     const Uint lattice_num_vertexes= lat.vertex_size();
 
-    tetras_.resize( 0);
+    tetras_.clear();
     pos_tetra_begin_= 0;
-    vertexes_.resize( 0);
+    vertexes_.clear();
 
     std::valarray<byte> ls_sign;
     copy_levelset_sign( ls, ls_sign);
@@ -153,8 +153,9 @@ template <class VertexCutMergingPolicyT>
   void
   SurfacePatchCL::make_patch (const PrincipalLatticeCL& lat, const std::valarray<double>& ls)
 {
-    triangles_.resize( 0);
-    is_boundary_triangle_.resize( 0);
+    triangles_.clear();
+    is_boundary_triangle_.clear();
+    vertexes_.clear();
 
     std::valarray<byte> ls_sign;
     copy_levelset_sign( ls, ls_sign);

@@ -28,7 +28,7 @@
 #include "geom/builder.h"               // construct the initial multigrid
 #include "out/output.h"
 #include "geom/geomselect.h"
-#include "misc/bndmap.h"
+#include "misc/funcmap.h"
 
 #include "geom/deformation.h"
 
@@ -65,13 +65,9 @@
 #endif
 
 // include function container
-#include "misc/bndmap.h"
-
+#include "misc/funcmap.h"
 #include "num/poissonsolverfactory.h"
-
 #include "poisson/ale.h"
-
-using namespace std;
 
 const char line[] ="----------------------------------------------------------------------------------\n";
 
@@ -79,7 +75,7 @@ DROPS::ParamCL P;   //Parameter class, read in json file in main function
 
 namespace DROPS
 {
-    
+
 template<class PoissonCL, class SolverT>
 void SolveStatProblem( PoissonCL& Poisson, SolverT& solver, ParamCL& Param)
 {
@@ -101,7 +97,7 @@ void SolveStatProblem( PoissonCL& Poisson, SolverT& solver, ParamCL& Param)
         Poisson.SetupSystem( Poisson.A, Poisson.b);
         timer.Stop();
         std::cout << " o time " << timer.GetTime() << " s" << std::endl;
-        
+
         //If we need to add convection
         if(Param.get<int>("PoissonCoeff.Convection"))
         {
@@ -117,7 +113,7 @@ void SolveStatProblem( PoissonCL& Poisson, SolverT& solver, ParamCL& Param)
         timer.Reset();
         solver.Solve( Poisson.A.Data, Poisson.x.Data, Poisson.b.Data);
         timer.Stop();
-        
+
 #ifndef _PAR
         double realresid = norm( VectorCL(Poisson.A.Data*Poisson.x.Data-Poisson.b.Data));
 #else
@@ -128,7 +124,7 @@ void SolveStatProblem( PoissonCL& Poisson, SolverT& solver, ParamCL& Param)
                   << "   - iterations    " << solver.GetIter()  << '\n'
                   << "   - residuum      " << solver.GetResid() << '\n'
                   << "   - real residuum " << realresid         << std::endl;
-                  
+
         if (P.get<int>("Poisson.SolutionIsKnown")) {
             std::cout << line << "Check result against known solution ...\n";
             timer.Reset();
@@ -242,11 +238,11 @@ void Strategy(PoissonCL& Poisson)
     // -------------------------------------------------------------------------
     std::cout << line << "Connecting triangulation and matrices/vectors ...\n";
     timer.Reset();
-    
+
     if(P.get<int>("Poisson.P1"))
-        Poisson.idx.SetFE( P1_FE);   
+        Poisson.idx.SetFE( P1_FE);
     else
-        Poisson.idx.SetFE( P2_FE);  
+        Poisson.idx.SetFE( P2_FE);
     // set quadratic finite elements
     //see class for explanation: template didnt work
     if ( PoissonSolverFactoryHelperCL().MGUsed(P))
@@ -287,13 +283,13 @@ void Strategy(PoissonCL& Poisson)
     PoissonSolverBaseCL* solver = factory.CreatePoissonSolver();
 
     if ( factory.GetProlongation() != 0)
-    {    
+    {
         if(P.get<int>("Poisson.P1"))
             SetupP1ProlongationMatrix( mg, *(factory.GetProlongation()), &Poisson.idx, &Poisson.idx);
         else
             SetupP2ProlongationMatrix( mg, *(factory.GetProlongation()), &Poisson.idx, &Poisson.idx);
     }
-        
+
     timer.Stop();
     std::cout << " o time " << timer.GetTime() << " s" << std::endl;
 
@@ -327,9 +323,9 @@ void Strategy(PoissonCL& Poisson)
     if (P.get<int>("Ensight.EnsightOut",0)){
         // Initialize Ensight6 output
         const std::string filename= P.get<std::string>("Ensight.EnsDir") + "/" + P.get<std::string>("Ensight.EnsCase");
-        ensight = new Ensight6OutCL(P.get<std::string>("Ensight.EnsCase")+".case", P.get<int>("Time.NumSteps")+1, 
+        ensight = new Ensight6OutCL(P.get<std::string>("Ensight.EnsCase")+".case", P.get<int>("Time.NumSteps")+1,
                                     P.get<int>("Ensight.Binary"), P.get<int>("Ensight.MasterOut"));
-        ensight->Register( make_Ensight6Geom  ( mg, mg.GetLastLevel(), 
+        ensight->Register( make_Ensight6Geom  ( mg, mg.GetLastLevel(),
                                                 P.get<std::string>("Ensight.GeomName"), filename + ".geo"));
         ensight->Register( make_Ensight6Scalar( Poisson.GetSolution(), "Temperatur", filename + ".tp", true));
         ensight->Write();
@@ -338,11 +334,11 @@ void Strategy(PoissonCL& Poisson)
     //VTK format
     VTKOutCL * vtkwriter = NULL;
     if (P.get<int>("VTK.VTKOut",0)){
-        vtkwriter = new VTKOutCL(mg, "DROPS data", 
-                                 P.get<int>("Time.NumSteps")+1, 
-                                 P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName"), 
+        vtkwriter = new VTKOutCL(mg, "DROPS data",
+                                 P.get<int>("Time.NumSteps")+1,
+                                 P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName"),
                                  P.get<std::string>("VTK.TimeFileName"),
-                                 P.get<int>("VTK.Binary"), 
+                                 P.get<int>("VTK.Binary"),
                                  P.get<int>("VTK.UseOnlyP1"),
                                  -1,  /* <- level */
                                  P.get<int>("VTK.ReUseTimeFile"),
@@ -385,18 +381,18 @@ void Strategy(PoissonCL& Poisson)
 #ifndef _PAR
             if (ensight && step%P.get<int>("Ensight.EnsightOut", 0)==0){
                 std::cout << " o Ensight output ...\n";
-                timer.Reset();                
+                timer.Reset();
                 ensight->Write( Poisson.x.t);
                 timer.Stop();
-                std::cout << " o -time " << timer.GetTime() << " s" << std::endl;                
+                std::cout << " o -time " << timer.GetTime() << " s" << std::endl;
             }
 #endif
             if (vtkwriter && step%P.get<int>("VTK.VTKOut", 0)==0){
                 std::cout << " o VTK output ...\n";
-                timer.Reset();                  
+                timer.Reset();
                 vtkwriter->Write( Poisson.x.t);
                 timer.Stop();
-                std::cout << " o -time " << timer.GetTime() << " s" << std::endl; 
+                std::cout << " o -time " << timer.GetTime() << " s" << std::endl;
             }
         }
     }
@@ -476,16 +472,16 @@ int main (int argc, char** argv)
         DROPS::BuildBoundaryData( mg, bdata, P.get<std::string>("DomainCond.BoundaryType"), P.get<std::string>("DomainCond.BoundaryFncs"));
         //Initialize SUPGCL class
         DROPS::SUPGCL supg;
-        //SUPG stabilization, ALE method  and error estimation are not yet implemented for P2 case!   
+        //SUPG stabilization, ALE method  and error estimation are not yet implemented for P2 case!
         if(!P.get<int>("Poisson.P1"))
         {
-              P.put<int>("Stabilization.SUPG",0);   
+              P.put<int>("Stabilization.SUPG",0);
               P.put<int>("Err.DoErrorEstimate",0);
         }
         if(P.get<int>("Stabilization.SUPG"))
         {
             supg.init(P);
-            std::cout << line << "The SUPG stabilization will be added ...\n"<<line;           
+            std::cout << line << "The SUPG stabilization will be added ...\n"<<line;
         }
         // Setup the problem
         DROPS::PoissonCoeffCL tmp = DROPS::PoissonCoeffCL( P);
@@ -523,13 +519,13 @@ int main (int argc, char** argv)
 
         timer.Stop();
         std::cout << " o time " << timer.GetTime() << " s" << std::endl;
-        mg->SizeInfo(cout);
+        mg->SizeInfo( std::cout);
 
         // Solve the problem
         if(P.get<int>("Poisson.P1"))
            DROPS::Strategy<DROPS::PoissonP1CL<DROPS::PoissonCoeffCL> >(*probP1);
         else
-           DROPS::Strategy<DROPS::PoissonP2CL<DROPS::PoissonCoeffCL> >(*probP2);           
+           DROPS::Strategy<DROPS::PoissonP2CL<DROPS::PoissonCoeffCL> >(*probP2);
         //Check if Multigrid is sane
         std::cout << line << "Check if multigrid works properly...\n";
         timer.Reset();

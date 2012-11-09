@@ -4,7 +4,7 @@
 
 # variables:
 
-DIR = parpartests
+DIR = partests
 
 DELETE = $(EXEC) *.out *.diff *.off *.mg *.dat
 CPP = $(wildcard *.cpp)
@@ -93,7 +93,7 @@ dist_migration: \
     ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o ../out/vtkOut.o ../parallel/parmultigrid.o \
     ../num/fe.o ../num/interfacePatch.o ../levelset/levelset.o ../levelset/fastmarch.o ../levelset/surfacetension.o \
     ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o $(PAR_OBJ) \
-    ../misc/bndmap.o ../misc/bndVelFunctions.o ../misc/bndScalarFunctions.o \
+    ../misc/funcmap.o ../misc/vectorFunctions.o ../misc/scalarFunctions.o \
     ../stokes/instatstokes2phase.o ../misc/scopetimer.o
 	$(CXX) -o $@ $^ $(LFLAGS)
 

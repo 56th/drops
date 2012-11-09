@@ -1,5 +1,5 @@
 /// \file topo.cpp.in
-/// \brief constains automatically generated refinement rules
+/// \brief contains automatically generated refinement rules
 /// \author LNM RWTH Aachen: Sven Gross, Joerg Peters, Volker Reichelt; SC RWTH Aachen:
 
 /*
@@ -69,6 +69,7 @@ const byte VertByEdgeAr[NumEdgesC][NumEdgesC] = {
     { -1, -1, -1, -1, -1,  3 },
     { -1, -1, -1, -1, -1, -1 } };
 
+//@@@ 'maketopo' will replace this line!! @@@
 
 // The arrays parent_to_child_bary_ar and child_to_parent_bary_ar were generated
 // with the following code and manual formatting of the output (including rounding
@@ -307,6 +308,4 @@ const byte child_to_parent_bary_ar[]= {
     0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 1, 1, 2
 };
 
-
-//@@@ 'maketopo' will replace this line!! @@@
 } // end of namespace DROPS

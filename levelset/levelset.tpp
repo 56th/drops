@@ -58,7 +58,7 @@ void LevelsetP2CL::GetInfo( double& maxGradPhi, double& Volume, Point3DCL& bary,
     LocalP2CL<double> ones( 1.);
     LocalP2CL<Point3DCL> Coord, Vel;
 
-    for (MultiGridCL::const_TriangTetraIteratorCL it=const_cast<const MultiGridCL&>(MG_).GetTriangTetraBegin(), end=const_cast<const MultiGridCL&>(MG_).GetTriangTetraEnd();
+    for (MultiGridCL::const_TriangTetraIteratorCL it=const_cast<const MultiGridCL&>(MG_).GetTriangTetraBegin(idx.TriangLevel()), end=const_cast<const MultiGridCL&>(MG_).GetTriangTetraEnd(idx.TriangLevel());
         it!=end; ++it)
     {
         GetTrafoTr( T, det, *it);
@@ -122,6 +122,116 @@ void LevelsetP2CL::GetInfo( double& maxGradPhi, double& Volume, Point3DCL& bary,
     bary/= Volume;
     vel/= Volume;
     surfArea*= 0.5;
+}
+
+template<class DiscVelSolT>
+void LevelsetP2CL::GetFilmInfo( double& maxGradPhi, double& Volume, Point3DCL& vel, const DiscVelSolT& velsol,  double& x, double& z, double& h) const
+/*
+ */
+{
+    Quad2CL<Point3DCL> Grad[10], GradRef[10];
+    SMatrixCL<3,3> T;
+    double det, absdet;
+    InterfaceTetraCL tetra;
+    InterfaceTriangleCL triangle;
+    double lamda[3];
+    bool   triangle_found = false;
+
+    P2DiscCL::GetGradientsOnRef( GradRef);
+    maxGradPhi= -1.;
+    Volume= 0.;
+    vel[0]= vel[1]= vel[2]= 0;
+    LocalP2CL<double> ones( 1.);
+    LocalP2CL<Point3DCL> Coord, Vel;
+
+    for (MultiGridCL::const_TriangTetraIteratorCL it=const_cast<const MultiGridCL&>(MG_).GetTriangTetraBegin(idx.TriangLevel()), end=const_cast<const MultiGridCL&>(MG_).GetTriangTetraEnd(idx.TriangLevel());
+        it!=end; ++it)
+    {
+        GetTrafoTr( T, det, *it);
+        absdet= std::abs( det);
+        P2DiscCL::GetGradients( Grad, GradRef, T); // Gradienten auf aktuellem Tetraeder
+
+        tetra.Init( *it, Phi, BndData_);
+        triangle.Init( *it, Phi, BndData_);
+
+        // compute maximal norm of grad Phi
+        Quad2CL<Point3DCL> gradPhi;
+        for (int v=0; v<10; ++v) // init gradPhi, Coord
+        {
+            gradPhi+= tetra.GetPhi(v)*Grad[v];
+            Coord[v]= v<4 ? it->GetVertex(v)->GetCoord() : GetBaryCenter( *it->GetEdge(v-4));
+        }
+        Vel.assign( *it, velsol);
+        VectorCL normGrad( 5);
+        for (int v=0; v<5; ++v) // init normGrad
+            normGrad[v]= norm( gradPhi[v]);
+        const double maxNorm= normGrad.max();
+        if (maxNorm > maxGradPhi) maxGradPhi= maxNorm;
+
+        for (int ch=0; ch<8; ++ch)
+        {
+            // compute volume, barycenter and velocity
+            tetra.ComputeCutForChild(ch);
+            Volume+= tetra.quad( ones, absdet, false);
+            vel+= tetra.quad( Vel, absdet, false);
+
+            // find minimal/maximal coordinates of interface
+            if (!triangle.ComputeForChild(ch)) // no patch for this child
+                continue;
+            if(!triangle_found)
+            {
+                Point3DCL p1= triangle.GetPoint(0);
+                Point3DCL p2= triangle.GetPoint(1);
+                Point3DCL p3= triangle.GetPoint(2);
+                double det = (p1[0] - p3[0]) * (p2[2] - p3[2]) - (p2[0] - p3[0]) * (p1[2] - p3[2]);
+                 //compute the barycentric coordinates for x, z in the projection of the triangle p1p2p3 to xz plane
+                lamda[0] = (p2[2] - p3[2]) * (x - p3[0]) + (p3[0] - p2[0]) * (z - p3[2]);
+                lamda[0]/= det;
+                lamda[1] = (p3[2] - p1[2]) * (x - p3[0]) + (p1[0] - p3[0]) * (z - p3[2]);
+                lamda[1]/= det;
+                lamda[2]= 1. - lamda[0] - lamda[1];
+                //To see if point ( x, z ) in the projected triangle
+                if( !(lamda[0]< 0) && !(lamda[1]< 0) &&!(lamda[2]< 0))
+                    triangle_found = true;
+                if( (!triangle_found)&&triangle.GetNumPoints() == 4)
+                {
+                    p1= triangle.GetPoint(1);
+                    p2= triangle.GetPoint(2);
+                    p3= triangle.GetPoint(3);
+                    double det = (p1[0] - p3[0]) * (p2[2] - p3[2]) - (p2[0] - p3[0]) * (p1[2] - p3[2]);
+                    lamda[0] = (p2[2] - p3[2]) * (x - p3[0]) + (p3[0] - p2[0]) * (z - p3[2]);
+                    lamda[0]/= det;
+                    lamda[1] = (p3[2] - p1[2]) * (x - p3[0]) + (p1[0] - p3[0]) * (z - p3[2]);
+                    lamda[1]/= det;
+                    lamda[2]= 1. - lamda[0] - lamda[1];
+                    if( !(lamda[0]< 0) && !(lamda[1]< 0) &&!(lamda[2]< 0))
+                        triangle_found = true;
+                }
+                //if the triangle founded, compute the y;
+                if(triangle_found)
+                {
+                   //std::cout<<"Here"<<std::endl;
+                   Point3DCL n(0.);
+                   Point3DCL a = p2 -p1;
+                   Point3DCL b = p3 -p1;
+                   n[0] = a[1] * b[2] - a[2] * b[1];
+                   n[1] = a[2] * b[0] - a[0] * b[2];
+                   n[2] = a[0] * b[1] - a[1] * b[0];
+                   h = p1[0] * n[0] + p1[1] * n[1] + p1[2] * n[2] - n[0] * x - n[2] * z;
+                   h /= n[1];
+                }
+            }
+        }
+    }
+#ifdef _PAR
+    // Globalization of  data
+    // -----
+    const Point3DCL local_vel(vel);
+    maxGradPhi= ProcCL::GlobalMax(maxGradPhi);
+    Volume    = ProcCL::GlobalSum(Volume);
+    ProcCL::GlobalSum(Addr(local_vel), Addr(vel), 3);
+#endif
+    vel/= Volume;
 }
 
 /// \brief Accumulator to set up the matrices E and H for the level set equation.

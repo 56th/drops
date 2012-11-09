@@ -54,7 +54,7 @@
             // -> Here: a = 1
         "Reaction":         "Adjoint_Reaction",             //Reaction term [q] with the name              "Adjoint_Reaction"
             // -> Here: q = 0
-        "Solution":         "Adjoint_tetraSolution",             //Solution of poisson problem [u] has the name "Adjoint_Solution"
+        "Solution":         "Adjoint_Solution",             //Solution of poisson problem [u] has the name "Adjoint_Solution"
             // -> Here: u = exp(-t)exp(-x)
         "Source":           "Adjoint_Source",               //Right hand side of PDE [f]
             // -> Here: f = -exp(-t)exp(-x)

@@ -38,7 +38,7 @@
 #include "transport/transportNitsche.h"
 #include "surfactant/ifacetransp.h"
 #include "levelset/twophaseutils.h"
-#include "misc/bndmap.h"
+#include "misc/funcmap.h"
 
 #include "num/stokessolverfactory.h"
 #ifdef _PAR
@@ -217,7 +217,7 @@ void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTr
                                  P.get<int>("Time.NumSteps")/P.get<int>("VTK.VTKOut")+1,
                                  P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName"),
                                  P.get<std::string>("VTK.TimeFileName"),
-                                 P.get<int>("VTK.Binary"), 
+                                 P.get<int>("VTK.Binary"),
                                  P.get<int>("VTK.UseOnlyP1"),
                                  -1,  /* <- level */
                                  P.get<int>("VTK.ReUseTimeFile") );
@@ -568,7 +568,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbndda
                                  P.get<int>("Time.NumSteps")/P.get<int>("VTK.VTKOut")+1,
                                  P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName"),
                                  P.get<std::string>("VTK.TimeFileName"),
-                                 P.get<int>("VTK.Binary"), 
+                                 P.get<int>("VTK.Binary"),
                                  P.get<int>("VTK.UseOnlyP1"),
                                  -1,  /* <- level */
                                  P.get<int>("VTK.ReUseTimeFile") );

@@ -115,12 +115,9 @@ template <class DistFctT>
     return modified;
 }
 
+template <class DistFctT>
 inline
-void AdapTriangCL::UpdateTriang (const LevelsetP2CL& lset)
-/** This function updates the triangulation according to the position of the
-    interface provided by the levelset function. Therefore this function marks
-    and refines tetras and balance the number of tetras over the processors.
-    Also the numerical data are interpolated to the new triangulation. */
+bool AdapTriangCL::UpdateTriang (const DistFctT& d)
 {
 #ifndef _PAR
     TimerCL time;
@@ -132,11 +129,10 @@ void AdapTriangCL::UpdateTriang (const LevelsetP2CL& lset)
     modified_= false;
     const int min_ref_num= f_level_ - c_level_;
     int i;
-    LevelsetP2CL::const_DiscSolCL sol( lset.GetSolution());
 
     observer_.notify_pre_refmig_sequence( GetMG());
     for (i= 0; i < 2*min_ref_num; ++i) {
-        if (!ModifyGridStep(sol, true)){
+        if (!ModifyGridStep(d, true)){
             break;
         }
         modified_= true;
@@ -149,6 +145,13 @@ void AdapTriangCL::UpdateTriang (const LevelsetP2CL& lset)
               << " refinements/interpolations in " << duration << " seconds\n"
               << "last level: " << mg_.GetLastLevel() << '\n';
     mg_.SizeInfo( std::cout);
+    return this->WasModified();
+}
+
+inline
+bool AdapTriangCL::UpdateTriang (const LevelsetP2CL& lset)
+{
+    return this->UpdateTriang( lset.GetSolution());
 }
 
 } // end of namespace DROPS

@@ -23,7 +23,8 @@
 */
 
 #include "poisson/poisson.h"
-#include "num/solver.h"
+#include "num/krylovsolver.h"
+#include "num/precond.h"
 #include "poisson/integrTime.h"
 #include "out/output.h"
 #include <fstream>
@@ -393,13 +394,14 @@ void Strategy(PoissonP1CL<Coeff>& Poisson, DROPS::VectorCL& sol2D, MatConnect& M
 
   // PCG-Verfahren mit SSOR-Vorkonditionierer
   SSORPcCL pc(1.0);
+  typedef PCGSolverCL<SSORPcCL> PCG_SsorCL;
   PCG_SsorCL pcg_solver(pc, C.cgiter, C.cgtol);
 
   // Zeitdiskretisierung mit one-step-theta-scheme
   // theta=1 -> impl. Euler
   // theta=0.5 -> Crank-Nicholson
   InstatPoissonThetaSchemeCL<PoissonP1CL<Coeff>, PCG_SsorCL>
-    ThetaScheme(Poisson, pcg_solver, C.theta);
+      ThetaScheme(Poisson, pcg_solver, C.theta);
   ThetaScheme.SetTimeStep(C.dt, C.nu);
   MatCon.setNodeMap(x, MG);
   MatCon.getInitialData();
@@ -465,7 +467,7 @@ void ipdrops(DROPS::VectorCL& sol2D, MatConnect& MatCon)
         &DROPS::getIsolatedBndVal, &DROPS::getIsolatedBndVal };
 
     DROPS::PoissonBndDataCL bdata(6, isneumann, bnd_fun);
-    MyPoissonCL prob(brick, PoissonCoeffCL(), bdata);
+    MyPoissonCL prob(brick, PoissonCoeffCL(), bdata, DROPS::SUPGCL(), false);
 
     // mg.SizeInfo();
     DROPS::Strategy(prob, sol2D, MatCon);

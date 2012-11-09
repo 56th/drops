@@ -43,9 +43,6 @@ SignPatternTraitCL::compute_cuts ()
     std::memcpy( cut_simplex_rep_, cut_simplex_, 4*sizeof(byte));
     for (int i= num_root_vert_; i < num_root_; ++i)
         cut_simplex_rep_[i]+= NumVertsC;
-
-    if (is_3d())
-        throw DROPSErrCL( "SignPatternTraitCL::compute_cuts: found 3-dim. zero level set, grid is too coarse!");
 }
 
 void
@@ -94,13 +91,8 @@ operator<< (std::ostream& out, const SignPatternTraitCL& c)
 
 RefTetraPatchCL RefTetraPatchCL::instance_array_[81];
 
-int RefTetraPatchCL::InitializerCL::init_count_= 0;
-
-RefTetraPatchCL::InitializerCL::InitializerCL ()
+void RefTetraPatchCL::StaticInit ()
 {
-    if (init_count_++ > 0)
-        return;
-
     byte ls[4];
     for (ls[0]= -1; ls[0] < 2; ++ls[0])
         for (ls[1]= -1; ls[1] < 2; ++ls[1])
@@ -108,28 +100,29 @@ RefTetraPatchCL::InitializerCL::InitializerCL ()
                 for (ls[3]= -1; ls[3] < 2; ++ls[3]) {
                     if ( ls[0] == 0 && ls[1] == 0 && ls[2] == 0 && ls[3] == 0)
                         continue;
-                    RefTetraPatchCL::instance( ls);
+                    RefTetraPatchCL::instance_array_[instance_idx( ls) + 40].assign( ls);
                 }
 }
+
+namespace {
+StaticInitializerCL<RefTetraPatchCL> RefTetraPatch_initializer_;
+
+} // end of anonymous namespace
 
 bool
 RefTetraPatchCL::assign (const SignPatternTraitCL& cut)
 {
     for (size_= 0; size_ < num_triangles( cut); ++size_)
         triangle_[size_]= MakeTriangle( cut(size_), cut(size_ + 1), cut(size_ + 2));
+    is_boundary_triangle_= cut.num_zero_vertexes() == 3 ? 1 : 0;
     return empty();
 }
 
 
 RefTetraPartitionCL RefTetraPartitionCL::instance_array_[81];
 
-int RefTetraPartitionCL::InitializerCL::init_count_= 0;
-
-RefTetraPartitionCL::InitializerCL::InitializerCL ()
+void RefTetraPartitionCL::StaticInit ()
 {
-    if (init_count_++ > 0)
-        return;
-
     byte ls[4];
     for (ls[0]= -1; ls[0] < 2; ++ls[0])
         for (ls[1]= -1; ls[1] < 2; ++ls[1])
@@ -137,9 +130,14 @@ RefTetraPartitionCL::InitializerCL::InitializerCL ()
                 for (ls[3]= -1; ls[3] < 2; ++ls[3]) {
                     if ( ls[0] == 0 && ls[1] == 0 && ls[2] == 0 && ls[3] == 0)
                         continue;
-                    RefTetraPartitionCL::instance( ls);
+                    RefTetraPartitionCL::instance_array_[instance_idx( ls) + 40].assign( ls);
                 }
 }
+
+namespace {
+StaticInitializerCL<RefTetraPartitionCL> RefTetraPartition_initializer_;
+
+} // end of anonymous namespace
 
 Ubyte
 RefTetraPartitionCL::some_non_zero_vertex (const SignPatternTraitCL& cut) const

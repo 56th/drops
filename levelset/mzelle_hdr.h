@@ -34,7 +34,7 @@
 #include "num/nssolver.h"
 #include "levelset/coupling.h"
 
-#include "misc/bndmap.h"
+#include "misc/funcmap.h"
 
 namespace DROPS
 {
@@ -188,6 +188,34 @@ class InterfaceInfoCL
     /// \brief Set file for writing
     void Init(std::ofstream* file) { file_= file; }
 } IFInfo;
+
+class FilmInfoCL
+{
+  private:
+    std::ofstream* file_;    ///< write information, to this file
+    double x_, z_;
+  public:
+    Point3DCL vel;
+    double maxGrad, Vol, h_min, h_max, point_h;
+
+
+    template<class DiscVelSolT>
+    void Update (const LevelsetP2CL& ls, const DiscVelSolT& u) {
+        ls.GetFilmInfo( maxGrad, Vol, vel, u, x_, z_, point_h);
+        std::pair<double, double> h= h_interface( ls.GetMG().GetTriangEdgeBegin( ls.Phi.RowIdx->TriangLevel()), ls.GetMG().GetTriangEdgeEnd( ls.Phi.RowIdx->TriangLevel()), ls.Phi);
+        h_min= h.first; h_max= h.second;
+    }
+    void WriteHeader() {
+        if (file_)
+          (*file_) << "# time maxGradPhi volume vel_drop h_min h_max point_x point_z point_h" << std::endl;
+    }
+    void Write (double time) {
+        if (file_)
+          (*file_) << time << " " << maxGrad << " " << Vol << " " << vel << " " << h_min << " " << h_max << " " << x_ << " " << z_<< " " << point_h << std::endl;
+    }
+    /// \brief Set file for writing
+    void Init(std::ofstream* file, double x, double z) { file_= file; x_=x; z_=z;}
+} FilmInfo;
 
 double eps=5e-4, // halbe Sprungbreite
     lambda=1.5, // Position des Sprungs zwischen Oberkante (lambda=0) und Schwerpunkt (lambda=1)

@@ -398,14 +398,15 @@ PCGNE(const Mat& A, Vec& u, const Vec& b, const ExACL& ExAX,  const ExATranspCL&
     Vec pt( num_cols);
     Vec qtacc( z), ptacc( pt), racc(r), zacc(z);
 
-    double rho= ExATranspX.ParDot( z, false, r, false, &qtacc), rho_1; // M returns non accumulated vector ???
+
+    double rho= ExATranspX.ParDot( z, M.RetAcc(), r, false, &qtacc), rho_1;
 
     for (int i= 1; i <= max_iter; ++i) {
         pt= transp_mul( A, qtacc);
         const double alpha= rho/ExAX.Norm_sq( pt, false, &ptacc);
         u+= alpha*qtacc;
         r-= alpha*(A*ptacc);
-        M.Apply( A, z, r); // M returns non accumulated vector ???
+        M.Apply( A, z, r);
 
         resid= ExATranspX.Norm( r, false, &racc)/normb;
         if ( output && i%10 == 0) (*output) << "PCGNE: iter: " << i << " resid: " << resid <<'\n';
@@ -415,7 +416,7 @@ PCGNE(const Mat& A, Vec& u, const Vec& b, const ExACL& ExAX,  const ExATranspCL&
             return true;
         }
         rho_1= rho;
-        rho= ExATranspX.ParDot( z, false, racc, true, &zacc);
+        rho= ExATranspX.ParDot( z, M.RetAcc(), racc, true, &zacc);
         qtacc= zacc + (rho/rho_1)*qtacc;
     }
     tol= resid;

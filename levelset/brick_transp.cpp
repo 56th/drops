@@ -31,7 +31,7 @@
 #include "levelset/surfacetension.h"
 #include "num/bndData.h"
 #include "poisson/transport2phase.h"
-#include "misc/bndmap.h"
+#include "misc/funcmap.h"
 #include <fstream>
 
 DROPS::ParamCL P;

@@ -1823,6 +1823,22 @@ void InstatStokes2PhaseP2P1CL::SetupSystem1( MLMatDescCL* A, MLMatDescCL* M, Vec
             SetupSystem1_P2R( MG_, Coeff_, BndData_, *itA, *itM, lvl == A->Data.size()-1 ? b : 0, cplA, cplM, lset, *it, t);
         else
             throw DROPSErrCL("InstatStokes2PhaseP2P1CL<Coeff>::SetupSystem1 not implemented for this FE type");
+    if ( Coeff_.DilVisco>0 || Coeff_.ShearVisco>0)
+    {
+        VecDescCL    cplBS;
+        MLMatDescCL  BS;
+
+        BS.Data.resize( vel_idx.size());
+        cplBS.SetIdx( &vel_idx);
+        BS.SetIdx( &vel_idx, &vel_idx);
+        BS.Data.clear();
+        SetupBS( &BS, &cplBS, lset, t);
+        std::cout<<"Gathering BS terms on the LHS"<<std::endl;
+        MLMatrixCL mat( A->Data );
+        A->Data.clear();
+        A->Data.LinComb( 1.0, mat, 1.0, BS.Data);
+    }
+
 }
 
 MLTetraAccumulatorTupleCL&

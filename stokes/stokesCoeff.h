@@ -25,7 +25,7 @@
 #ifndef STOKESCOEFF_H_
 #define STOKESCOEFF_H_
 
-#include "misc/bndmap.h"
+#include "misc/funcmap.h"
 #include "misc/container.h"
 #include <sstream>
 #include "misc/params.h"

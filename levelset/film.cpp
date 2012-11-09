@@ -39,7 +39,7 @@
 //surfactants
 #include "surfactant/ifacetransp.h"
 //function map
-#include "misc/bndmap.h"
+#include "misc/funcmap.h"
 //solver factory for stokes
 #include "num/stokessolverfactory.h"
 #ifndef _PAR
@@ -69,6 +69,19 @@ double sigmaf (const DROPS::Point3DCL&, double) { return sigma; }
 
 namespace DROPS // for Strategy
 {
+
+double GetTimeOffset(){
+    double timeoffset = 0.0;
+    const std::string restartfilename = P.get<std::string>("InitialFile");
+    if (P.get<int>("InitialCond") == -1){
+        const std::string timefilename = restartfilename + "time";
+        std::ifstream f_(timefilename.c_str());
+        f_ >> timeoffset;
+        std::cout << "used time offset file is " << timefilename << std::endl;
+        std::cout << "time offset is " << timeoffset << std::endl;
+    }
+    return timeoffset;
+}
 
 /// \brief Observes the MultiGridCL-changes by AdapTriangCL to repair the Ensight index.
 ///
@@ -143,8 +156,8 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
 
     DROPS::InVecMap & vecmap =  DROPS::InVecMap::getInstance();
     DROPS::StokesVelBndDataCL::bnd_val_fun ZeroVel = vecmap["ZeroVel"];
-    DROPS::StokesVelBndDataCL::bnd_val_fun Inflow = vecmap["FilmInflow"];
-
+    //DROPS::StokesVelBndDataCL::bnd_val_fun Inflow = vecmap["FilmInflow"];
+    DROPS::instat_vector_fun_ptr Nusselt = vecmap["NusseltFilm"];
     switch (P.get<int>("InitialCond"))
     {
       case 1: // stationary flow
@@ -174,17 +187,30 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
 
       case 2: // Nusselt solution
       {
-        Stokes.InitVel( &Stokes.v, Inflow);
+        std::cout<<"Here"<<std::endl;
+        //Stokes.InitVel( &Stokes.v, Inflow);
+        Stokes.InitVel( &Stokes.v, Nusselt);
       } break;
 
       case -1: // read from file
       {
-        ReadEnsightP2SolCL reader( MG);
-        reader.ReadVector( P.get<std::string>("InitialFile")+".vel", Stokes.v, Stokes.GetBndData().Vel);
-        reader.ReadScalar( P.get<std::string>("InitialFile")+".scl", lset.Phi, lset.GetBndData());
-        Stokes.UpdateXNumbering( pidx, lset);
-        Stokes.p.SetIdx( pidx); // Zero-vector for now.
-        reader.ReadScalar( P.get<std::string>("InitialFile")+".pr",  Stokes.p, Stokes.GetBndData().Pr); // reads the P1-part of the pressure
+        if(P.get<int>("Ensight.EnsightOut",0))
+        {
+            ReadEnsightP2SolCL reader( MG);
+            reader.ReadVector( P.get<std::string>("InitialFile")+".vel", Stokes.v, Stokes.GetBndData().Vel);
+            reader.ReadScalar( P.get<std::string>("InitialFile")+".scl", lset.Phi, lset.GetBndData());
+            Stokes.UpdateXNumbering( pidx, lset);
+            Stokes.p.SetIdx( pidx); // Zero-vector for now.
+            reader.ReadScalar( P.get<std::string>("InitialFile")+".pr",  Stokes.p, Stokes.GetBndData().Pr); // reads the P1-part of the pressure
+        }
+        else
+        {
+            ReadFEFromFile( Stokes.v, MG, P.get<std::string>("InitialFile")+"velocity", P.get<int>("Restart.Binary"));
+            ReadFEFromFile( lset.Phi, MG, P.get<std::string>("InitialFile")+"levelset", P.get<int>("Restart.Binary"));
+            Stokes.UpdateXNumbering( pidx, lset);
+            Stokes.p.SetIdx( pidx);
+            ReadFEFromFile( Stokes.p, MG, P.get<std::string>("InitialFile")+"pressure", P.get<int>("Restart.Binary"), &lset.Phi); // pass also level set, as p may be extended
+        }
       } break;
 
       default:
@@ -222,7 +248,7 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
                                  P.get<int>("Time.NumSteps")/P.get("VTK.VTKOut", 0)+1,
                                  P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName"),
                                  P.get<std::string>("VTK.TimeFileName"),
-                                 P.get<int>("VTK.Binary"), 
+                                 P.get<int>("VTK.Binary"),
                                  P.get<int>("VTK.UseOnlyP1"),
                                  -1,  /* <- level */
                                  P.get<int>("VTK.ReUseTimeFile"),
@@ -240,8 +266,9 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
     IF_MASTER {
         infofile = new std::ofstream ((P.get<std::string>("VTK.VTKName","film")+".info").c_str());
     }
-    IFInfo.Init(infofile);
-    IFInfo.WriteHeader();
+    //IFInfo.Init(infofile);
+	FilmInfo.Init(infofile, P.get<DROPS::Point3DCL>("MeshSize")[0]/2., 0.);
+    FilmInfo.WriteHeader();
 
     Stokes.SetupPrMass(  &Stokes.prM, lset);
     Stokes.SetupPrStiff( &Stokes.prA, lset);
@@ -293,14 +320,24 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
     UpdateProlongationCL PPr ( Stokes.GetMG(), stokessolverfactory.GetPPr(), &Stokes.pr_idx, &Stokes.pr_idx);
     adap.push_back( &PPr);
 
+    TwoPhaseStoreCL<InstatNavierStokes2PhaseP2P1CL> ser(MG, Stokes, lset, NULL,
+                                                        P.get<std::string>("Restart.Outputfile"),
+                                                        P.get<int>("Restart.Overwrite"),
+                                                        P.get<int>("Restart.Binary"));
+
+    Stokes.v.t += GetTimeOffset();
+
 //    stokessolverfactory.GetVankaSmoother().SetRelaxation( 0.8);
 
-    bool secondSerial= false;
-    for (int step= 1; step<=P.get<int>("Time.NumSteps"); ++step)
+    const int nsteps = P.get<int>("Time.NumSteps");
+    const double dt = P.get<double>("Time.StepSize");
+    for (int step= 1; step<=nsteps; ++step)
     {
         std::cout << "======================================================== Schritt " << step << ":\n";
-        IFInfo.Update( lset, Stokes.GetVelSolution());
-        IFInfo.Write(Stokes.v.t);
+        const double time_old = Stokes.v.t;
+        const double time_new = Stokes.v.t + dt;
+        FilmInfo.Update( lset, Stokes.GetVelSolution());
+        FilmInfo.Write(time_old);
         cpl.DoStep( P.get<int>("Coupling.Iter"));
         std::cout << "rel. Volume: " << lset.GetVolume()/Vol << std::endl;
 
@@ -310,28 +347,18 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
         if (doGridMod) {
             adap.UpdateTriang( lset);
             cpl.Update();
-            if (P.get<std::string>("SerializationFile") != "none") {
-                std::stringstream filename;
-                filename << P.get<std::string>("SerializationFile");
-                if (secondSerial) filename << "0";
-                secondSerial = !secondSerial;
-                MGSerializationCL ser( MG, filename.str().c_str());
-                ser.WriteMG();
-                filename << ".time";
-                std::ofstream serTime( filename.str().c_str());
-                serTime << "Serialization info:\ntime step = " << step << "\t\tt = " << step*P.get<double>("Time.StepSize") << "\n";
-                serTime.close();
-            }
         }
 
         if (ensight && step%10==0)
-            ensight->Write( step*P.get<double>("Time.StepSize"));
+            ensight->Write(time_new);
         if (vtkwriter && step%10==0)
-            vtkwriter->Write( step*P.get<double>("Time.StepSize"));
+            vtkwriter->Write(time_new);
+        if (P.get("Restart.Serialization", 0) && step%P.get("Restart.Serialization", 0)==0)
+            ser.Write();
     }
 
-    IFInfo.Update( lset, Stokes.GetVelSolution());
-    IFInfo.Write(Stokes.v.t);
+    FilmInfo.Update( lset, Stokes.GetVelSolution());
+    FilmInfo.Write(Stokes.v.t);
     std::cout << std::endl;
     if (ensight ) delete ensight;
     if (vtkwriter) delete vtkwriter;
@@ -379,6 +406,14 @@ void MarkLower (DROPS::MultiGridCL& mg, double y_max, DROPS::Uint maxLevel= ~0)
 /// \brief Set Default parameters here s.t. they are initialized.
 /// The result can be checked when Param-list is written to the output.
 void SetMissingParameters(DROPS::ParamCL& P){
+
+    P.put_if_unset<std::string>("Exp.VolForce", "ZeroVel");
+    P.put_if_unset<double>("Mat.DensDrop", 0.0);
+    P.put_if_unset<double>("Mat.ShearVisco", 0.0);
+    P.put_if_unset<double>("Mat.DilatationalVisco", 0.0);
+    P.put_if_unset<double>("SurfTens.ShearVisco", 0.0);
+    P.put_if_unset<double>("SurfTens.DilatationalVisco", 0.0);
+
     P.put_if_unset<std::string>("VTK.TimeFileName",P.get<std::string>("VTK.VTKName"));
     P.put_if_unset<int>("VTK.ReUseTimeFile",0);
     P.put_if_unset<int>("VTK.UseDeformation",0);
@@ -422,10 +457,10 @@ int main (int argc, char** argv)
     e3[2]= P.get<DROPS::Point3DCL>("MeshSize")[2];
     DROPS::BrickBuilderCL builder( orig, e1, e2, e3, int( P.get<DROPS::Point3DCL>("MeshResolution")[0]), int( P.get<DROPS::Point3DCL>("MeshResolution")[1]), int( P.get<DROPS::Point3DCL>("MeshResolution")[2]) );
     DROPS::MultiGridCL* mgp;
-    if (P.get<std::string>("DeserializationFile") == "none")
+    if (P.get<std::string>("Restart.Inputfile") == "none")
         mgp= new DROPS::MultiGridCL( builder);
     else {
-        DROPS::FileBuilderCL filebuilder( P.get<std::string>("DeserializationFile"), &builder);
+        DROPS::FileBuilderCL filebuilder( P.get<std::string>("Restart.Inputfile"), &builder);
         mgp= new DROPS::MultiGridCL( filebuilder);
     }
 
@@ -479,10 +514,11 @@ int main (int argc, char** argv)
         std::cout << "Bnd " << i << ": "; BndCondInfo( bc[i], std::cout);
     }
 
-    DROPS::AdapTriangCL adap( *mgp, P.get<double>("AdaptRef.Width"), P.get<int>("AdaptRef.CoarsestLevel"), P.get<int>("AdaptRef.FinestLevel"));
+    DROPS::AdapTriangCL adap( *mgp, P.get<double>("AdaptRef.Width"), P.get<int>("AdaptRef.CoarsestLevel"), P.get<int>("AdaptRef.FinestLevel"),
+      ((P.get<std::string>("Restart.Inputfile") == "none") ? P.get<int>("AdaptRef.LoadBalStrategy") : -P.get<int>("AdaptRef.LoadBalStrategy")));
     // If we read the Multigrid, it shouldn't be modified;
     // otherwise the pde-solutions from the ensight files might not fit.
-    if (P.get<std::string>("DeserializationFile") == "none"){
+    if (P.get<std::string>("Restart.Inputfile") == "none"){
         DROPS::instat_scalar_fun_ptr DistanceFct = DROPS::InScaMap::getInstance()[P.get("Exp.InitialLSet", std::string("WavyFilm"))];
         adap.MakeInitialTriang( DistanceFct);
     }
