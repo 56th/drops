@@ -407,6 +407,30 @@ void Strategy( InstatStokes2PhaseP2P1CL& Stokes, const LsetBndDataCL& lsbnd, Ada
 
 } // end of namespace DROPS
 
+/// \brief Set Default parameters here s.t. they are initialized.
+/// The result can be checked when Param-list is written to the output.
+void SetMissingParameters(DROPS::ParamCL& P){
+    P.put_if_unset<std::string>("VTK.TimeFileName",P.get<std::string>("VTK.VTKName"));
+    P.put_if_unset<int>("VTK.ReUseTimeFile",0);
+    P.put_if_unset<int>("VTK.UseOnlyP1",0);
+    P.put_if_unset<int>("Transp.DoTransp",0);
+    P.put_if_unset<std::string>("Restart.Inputfile","none");
+    P.put_if_unset<int>("NavStokes.Downwind.Frequency", 0);
+    P.put_if_unset<double>("NavStokes.Downwind.MaxRelComponentSize", 0.05);
+    P.put_if_unset<double>("NavStokes.Downwind.WeakEdgeRatio", 0.2);
+    P.put_if_unset<double>("NavStokes.Downwind.CrosswindLimit", std::cos( M_PI/6.));
+    P.put_if_unset<int>("Levelset.Downwind.Frequency", 0);
+    P.put_if_unset<double>("Levelset.Downwind.MaxRelComponentSize", 0.05);
+    P.put_if_unset<double>("Levelset.Downwind.WeakEdgeRatio", 0.2);
+    P.put_if_unset<double>("Levelset.Downwind.CrosswindLimit", std::cos( M_PI/6.));
+
+    P.put_if_unset<std::string>("Exp.VolForce", "ZeroVel");
+    P.put_if_unset<double>("Mat.DensDrop", 0.0);
+    P.put_if_unset<double>("Mat.ShearVisco", 0.0);
+    P.put_if_unset<double>("Mat.DilatationalVisco", 0.0);
+    P.put_if_unset<double>("SurfTens.ShearVisco", 0.0);
+    P.put_if_unset<double>("SurfTens.DilatationalVisco", 0.0);
+}
 
 int main (int argc, char** argv)
 {
@@ -430,6 +454,7 @@ int main (int argc, char** argv)
     }
     param >> P;
     param.close();
+    SetMissingParameters(P);
     std::cout << P << std::endl;
 
     typedef DROPS::InstatStokes2PhaseP2P1CL   MyStokesCL;
