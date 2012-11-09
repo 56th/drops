@@ -377,7 +377,7 @@ void SF_ImprovedLaplBeltramiOnTriangle( const TetraCL& t, const BaryCoordCL * co
                                         instat_scalar_fun_ptr sigma, const Quad5_2DCL<Point3DCL> e[3],
                                         double det, VectorCL& f)
 {
-    static Quad5_2DCL<Point3DCL> Grad[10]; // Gradients of the P2-basis-functions
+    Quad5_2DCL<Point3DCL> Grad[10]; // Gradients of the P2-basis-functions
     Quad5_2DCL<Point3DCL> n;
 
     for (int v=0; v<10; ++v)
