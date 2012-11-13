@@ -40,34 +40,34 @@ dist_streamtest: \
     ../partests/dist_streamtest.o \
     ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
     ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
-    ../num/fe.o ../num/interfacePatch.o ../misc/scopetimer.o $(PAR_OBJ)
+    ../num/fe.o ../num/interfacePatch.o ../misc/scopetimer.o ../geom/deformation.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 dist_remotedatatest: \
     ../partests/dist_remotedatatest.o \
     ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
-    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
+    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o ../geom/deformation.o\
     ../num/fe.o ../num/interfacePatch.o ../misc/scopetimer.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 dist_sendtetraofbrick: \
     ../partests/dist_sendtetraofbrick.o \
     ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
-    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
+    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o ../geom/deformation.o\
     ../num/fe.o ../num/interfacePatch.o ../misc/scopetimer.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 dist_modify: \
     ../partests/dist_modify.o \
     ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
-    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
+    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o ../geom/deformation.o\
     ../num/fe.o ../num/interfacePatch.o ../misc/scopetimer.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 dist_simplexsend: \
     ../partests/dist_simplexsend.o  \
     ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
-    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
+    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o ../geom/deformation.o\
     ../num/fe.o ../num/interfacePatch.o ../misc/scopetimer.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
@@ -75,7 +75,7 @@ dist_interface: \
     ../partests/dist_interface.o  \
     ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
     ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
-    ../num/fe.o ../num/interfacePatch.o ../misc/scopetimer.o $(PAR_OBJ)
+    ../num/fe.o ../num/interfacePatch.o ../misc/scopetimer.o ../geom/deformation.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 dist_ref: \
@@ -84,7 +84,7 @@ dist_ref: \
     ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o ../out/vtkOut.o ../parallel/parmultigrid.o \
     ../num/fe.o ../num/interfacePatch.o ../levelset/levelset.o ../levelset/fastmarch.o ../levelset/surfacetension.o \
     ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o \
-    ../misc/scopetimer.o $(PAR_OBJ)
+    ../misc/scopetimer.o ../geom/deformation.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 dist_migration: \
@@ -94,7 +94,7 @@ dist_migration: \
     ../num/fe.o ../num/interfacePatch.o ../levelset/levelset.o ../levelset/fastmarch.o ../levelset/surfacetension.o \
     ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o $(PAR_OBJ) \
     ../misc/funcmap.o ../misc/vectorFunctions.o ../misc/scalarFunctions.o \
-    ../stokes/instatstokes2phase.o ../misc/scopetimer.o
+    ../stokes/instatstokes2phase.o ../misc/scopetimer.o ../geom/deformation.o
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 dist_TestRefPar: \
@@ -103,7 +103,7 @@ dist_TestRefPar: \
     ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o ../out/vtkOut.o ../parallel/parmultigrid.o \
     ../num/fe.o ../num/interfacePatch.o ../levelset/levelset.o ../levelset/fastmarch.o ../levelset/surfacetension.o \
     ../misc/params.o ../out/output.o ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o \
-    ../num/quadrature.o ../misc/scopetimer.o $(PAR_OBJ)
+    ../num/quadrature.o ../misc/scopetimer.o ../geom/deformation.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 dist_ref_rising_drop: \
@@ -112,7 +112,7 @@ dist_ref_rising_drop: \
     ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o ../out/vtkOut.o ../parallel/parmultigrid.o \
     ../num/fe.o ../num/interfacePatch.o ../levelset/levelset.o ../levelset/fastmarch.o ../levelset/surfacetension.o \
     ../misc/params.o ../out/output.o ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o \
-    ../misc/scopetimer.o $(PAR_OBJ)
+    ../misc/scopetimer.o ../geom/deformation.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 
@@ -120,7 +120,7 @@ dist_exchange: \
     ../partests/dist_exchange.o  \
     ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
     ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
-    ../num/fe.o ../num/interfacePatch.o ../misc/scopetimer.o $(PAR_OBJ)
+    ../num/fe.o ../num/interfacePatch.o ../misc/scopetimer.o ../geom/deformation.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 dist_sdropsP2: \
@@ -128,17 +128,17 @@ dist_sdropsP2: \
     ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o \
     ../misc/utils.o ../num/discretize.o ../num/interfacePatch.o \
     ../num/fe.o ../geom/reftetracut.o ../geom/principallattice.o \
-    ../misc/scopetimer.o $(PAR_OBJ)
+    ../misc/scopetimer.o ../geom/deformation.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 dist_interp2: \
     ../partests/dist_interp2.o ../geom/simplex.o ../geom/multigrid.o ../geom/topo.o ../out/output.o \
     ../num/unknowns.o ../geom/builder.o ../misc/problem.o ../num/interfacePatch.o \
-    ../num/fe.o ../geom/boundary.o ../misc/utils.o ../num/discretize.o $(PAR_OBJ)
+    ../num/fe.o ../geom/boundary.o ../misc/utils.o ../num/discretize.o ../geom/deformation.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
 	
 dist_interp1: \
     ../partests/dist_interp1.o ../geom/simplex.o ../geom/multigrid.o ../geom/topo.o ../out/output.o \
     ../num/unknowns.o ../geom/builder.o ../misc/problem.o ../num/interfacePatch.o \
-    ../num/fe.o ../geom/boundary.o ../misc/utils.o ../num/discretize.o $(PAR_OBJ)
+    ../num/fe.o ../geom/boundary.o ../misc/utils.o ../num/discretize.o ../geom/deformation.o $(PAR_OBJ)
 	$(CXX) -o $@ $^ $(LFLAGS)
