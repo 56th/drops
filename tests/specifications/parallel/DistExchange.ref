@@ -1,28 +1,21 @@
 #---------------------SPECIFICATION FILE----------------------------------------
-Type of test: parallel interpolation refinement
-Name of executable: dist_ref_rising_drop
+Type of test: parallel calculation of dot-products
+Name of executable: dist_exchange
 #The path to the folder where the executable is located must be relative to the
 #/drops folder
 Folder of executable: partests
 #The path to the folder where the parameter-file is located must be relative to
 #the folder where the executable is situated
-Path of parameter-file: ref_rising_drop.json
-Name of test: dist_ref_rising_drop
+Path of parameter-file:
+Name of test: dist_exchange
 Number of processes: 4
-Name of author: Eva
-#-------------------------------------------------------------------------------
-#------------------------------NUMBERS------------------------------------------
-Name of variable: "memory for geometry"
-Prefix of variable: "Memory used for geometry:"
-Value of variable: 50
-Relative error: 10
-Absolute error:
-Minimal value:
-Maximal value:
+Name of author: Patrick
 #-------------------------------------------------------------------------------
 #------------------------------STRINGS------------------------------------------
-String value: "Mark interface for"
+String value: "Accumulation seems to be alright"
 String find: 1
-String value: "Don't find me!"
-String find: 0
+String value: "Computing inner products seems to be alright"
+String find: 1
+String value: " DiST-module seems to be alright!"
+String find: 1
 #-------------------------------------------------------------------------------
