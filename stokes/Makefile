@@ -22,6 +22,7 @@ default: ClrScr
 sdrops: \
     ../geom/boundary.o ../geom/builder.o ../geom/deformation.o ../stokes/sdrops.o ../geom/simplex.o \
 	../geom/multigrid.o \
+	../misc/scopetimer.o ../misc/progressaccu.o ../misc/params.o \
     ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o ../num/interfacePatch.o \
     ../misc/utils.o ../num/discretize.o ../out/output.o ../geom/principallattice.o \
     ../geom/reftetracut.o
@@ -30,6 +31,7 @@ sdrops: \
 sdropsP2: \
     ../stokes/sdropsP2.o ../geom/boundary.o ../geom/builder.o  ../geom/deformation.o \
 	../geom/simplex.o ../geom/multigrid.o \
+	../misc/scopetimer.o ../misc/progressaccu.o ../misc/params.o \
     ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o ../num/interfacePatch.o \
     ../misc/utils.o ../out/output.o ../num/discretize.o ../num/MGsolver.o ../misc/params.o \
     ../out/ensightOut.o ../out/vtkOut.o ../stokes/integrTime.o ../geom/geomselect.o \
@@ -40,6 +42,7 @@ sdropsP2: \
 errorestimator: \
     ../stokes/errorestimator.o ../geom/boundary.o ../geom/builder.o ../geom/deformation.o \
 	../geom/simplex.o ../geom/multigrid.o \
+	../misc/scopetimer.o ../misc/progressaccu.o ../misc/params.o \
     ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o  ../num/interfacePatch.o \
     ../misc/utils.o ../num/discretize.o ../num/MGsolver.o ../misc/params.o \
     ../stokes/integrTime.o  ../geom/geomselect.o ../out/output.o \

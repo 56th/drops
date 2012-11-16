@@ -74,7 +74,7 @@ mattest: \
 
 testfe: \
     ../tests/testfe.o ../misc/utils.o ../geom/topo.o ../geom/boundary.o\
-	../geom/deformation.o ../misc/problem.o ../num/interfacePatch.o ../num/fe.o\
+    ../geom/deformation.o ../misc/problem.o ../num/interfacePatch.o ../num/fe.o\
     ../geom/simplex.o ../geom/multigrid.o ../num/unknowns.o ../geom/builder.o
 	$(CXX) -o $@ $^ $(LFLAGS)
 
@@ -103,14 +103,14 @@ vectest: \
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 p2local: ../tests/p2local.o ../misc/utils.o ../geom/deformation.o \
-  ../geom/simplex.o ../geom/multigrid.o ../geom/boundary.o ../geom/topo.o ../num/unknowns.o \
-  ../out/output.o  ../misc/problem.o ../geom/builder.o ../num/interfacePatch.o \
-  ../num/discretize.o ../num/fe.o
+    ../geom/simplex.o ../geom/multigrid.o ../geom/boundary.o ../geom/topo.o ../num/unknowns.o \
+    ../out/output.o  ../misc/problem.o ../geom/builder.o ../num/interfacePatch.o \
+    ../num/discretize.o ../num/fe.o
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 quadbase: \
     ../tests/quadbase.o ../misc/utils.o ../geom/builder.o  ../geom/deformation.o ../geom/simplex.o \
-	../geom/multigrid.o \
+    ../geom/multigrid.o \
     ../geom/boundary.o ../geom/topo.o ../num/unknowns.o ../misc/problem.o \
     ../num/fe.o ../num/discretize.o ../num/interfacePatch.o
 	$(CXX) -o $@ $^ $(LFLAGS)
@@ -132,7 +132,9 @@ triang: \
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 quadCut: \
-    ../tests/quadCut.o  ../misc/utils.o ../geom/builder.o ../geom/deformation.o ../geom/simplex.o ../geom/multigrid.o \
+    ../tests/quadCut.o  ../misc/utils.o ../geom/builder.o ../geom/deformation.o ../geom/simplex.o \
+    ../geom/multigrid.o \
+    ../misc/scopetimer.o ../misc/progressaccu.o \
     ../geom/boundary.o ../geom/topo.o ../num/unknowns.o ../misc/problem.o ../num/interfacePatch.o \
     ../levelset/levelset.o ../levelset/fastmarch.o ../num/discretize.o ../num/fe.o ../levelset/surfacetension.o \
     ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o
@@ -175,6 +177,7 @@ quad5_2D: \
 interfaceP1FE: \
     ../tests/interfaceP1FE.o  ../misc/utils.o ../geom/builder.o ../geom/simplex.o ../geom/multigrid.o \
     ../geom/deformation.o \
+    ../misc/scopetimer.o ../misc/progressaccu.o \
     ../geom/boundary.o ../geom/topo.o ../num/unknowns.o ../misc/problem.o ../num/interfacePatch.o \
     ../levelset/levelset.o ../levelset/fastmarch.o ../num/discretize.o ../num/fe.o ../levelset/surfacetension.o \
     ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o
@@ -183,6 +186,7 @@ interfaceP1FE: \
 xfem: \
     ../tests/xfem.o ../misc/utils.o ../geom/builder.o ../geom/simplex.o ../geom/multigrid.o \
     ../geom/deformation.o \
+    ../misc/scopetimer.o ../misc/progressaccu.o \
     ../geom/boundary.o ../geom/topo.o ../num/unknowns.o ../misc/problem.o ../num/interfacePatch.o \
     ../num/fe.o ../num/discretize.o ../levelset/levelset.o ../levelset/fastmarch.o \
     ../stokes/instatstokes2phase.o ../out/ensightOut.o ../levelset/surfacetension.o \
@@ -193,6 +197,7 @@ xfem: \
 f_Gamma: \
     ../tests/f_Gamma.o ../geom/boundary.o ../geom/builder.o ../geom/simplex.o ../geom/multigrid.o \
     ../geom/deformation.o \
+    ../misc/scopetimer.o ../misc/progressaccu.o \
     ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o ../levelset/levelset.o \
     ../misc/utils.o ../out/output.o ../num/discretize.o ../num/interfacePatch.o \
     ../misc/params.o ../levelset/fastmarch.o ../stokes/instatstokes2phase.o \
@@ -205,9 +210,9 @@ neq: \
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 extendP1onChild: \
-	../tests/extendP1onChild.o ../num/discretize.o ../misc/utils.o ../geom/topo.o ../num/fe.o ../misc/problem.o \
+    ../tests/extendP1onChild.o ../num/discretize.o ../misc/utils.o ../geom/topo.o ../num/fe.o ../misc/problem.o \
     ../geom/deformation.o \
-	../geom/simplex.o ../geom/multigrid.o ../num/unknowns.o ../num/interfacePatch.o
+    ../geom/simplex.o ../geom/multigrid.o ../num/unknowns.o ../num/interfacePatch.o
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 splitboundary: \
@@ -219,6 +224,7 @@ splitboundary: \
 reparam_init: \
     ../tests/reparam_init.o ../geom/boundary.o ../geom/builder.o ../geom/simplex.o ../geom/multigrid.o \
     ../geom/deformation.o \
+    ../misc/scopetimer.o ../misc/progressaccu.o \
     ../num/unknowns.o ../misc/utils.o ../geom/topo.o ../out/output.o \
     ../misc/problem.o ../levelset/levelset.o ../num/fe.o \
     ../misc/utils.o ../num/discretize.o ../num/interfacePatch.o \
@@ -229,6 +235,7 @@ reparam_init: \
 reparam: \
     ../tests/reparam.o ../levelset/fastmarch.o ../levelset/levelset.o \
     ../geom/deformation.o \
+    ../misc/scopetimer.o ../misc/progressaccu.o \
     ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
     ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
     ../num/fe.o ../out/ensightOut.o ../num/interfacePatch.o ../levelset/surfacetension.o \

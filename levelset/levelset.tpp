@@ -24,6 +24,8 @@
 
 #include <fstream>
 #include "num/accumulator.h"
+#include "misc/progressaccu.h"
+#include "misc/scopetimer.h"
 
 namespace DROPS
 {
@@ -337,8 +339,10 @@ template<class DiscVelSolT>
 void LevelsetP2CL::SetupSystem( const DiscVelSolT& vel, __UNUSED__ const double dt)
 /// Setup level set matrices E, H
 {
+    ScopeTimerCL scope("Levelset SetupSystem");
     LevelsetAccumulator_P2CL<DiscVelSolT> accu( *this, vel, SD_, dt);
     TetraAccumulatorTupleCL accus;
+    MaybeAddProgressBar(MG_, "Levelset Setup", accus, Phi.RowIdx->TriangLevel());
     accus.push_back( &accu);
     accumulate( accus, MG_, Phi.RowIdx->TriangLevel(), Phi.RowIdx->GetMatchingFunction(), Phi.RowIdx->GetBndInfo());
 }
@@ -346,11 +350,13 @@ void LevelsetP2CL::SetupSystem( const DiscVelSolT& vel, __UNUSED__ const double 
 template <class DiscVelSolT>
 PermutationT LevelsetP2CL::downwind_numbering (const DiscVelSolT& vel, IteratedDownwindCL dw)
 {
+    ScopeTimerCL scope("Downwind Numbering");
     std::cout << "LevelsetP2CL::downwind_numbering:\n";
     std::cout << "...accumulating convection matrix...\n";
     MatrixCL C;
     DownwindAccu_P2CL accu( *vel.GetBndData(), *vel.GetSolution(), idx, C);
     TetraAccumulatorTupleCL accus;
+    MaybeAddProgressBar(MG_, "Downwind Numbering", accus, Phi.RowIdx->TriangLevel());
     accus.push_back( &accu);
     accumulate( accus, this->GetMG(), idx.TriangLevel(), idx.GetMatchingFunction(), idx.GetBndInfo());
 

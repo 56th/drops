@@ -23,7 +23,7 @@
 */
 
 #include "num/nssolver.h"
-
+#include "misc/scopetimer.h"
 namespace DROPS
 {
 
@@ -61,9 +61,13 @@ void LinThetaScheme2PhaseCL<LsetSolverT>::SolveLsNs()
     time.Reset();
 
     // operators are computed for old level set
-    MLTetraAccumulatorTupleCL accus( Stokes_.A.Data.size());
-    accumulate( Stokes_.system1_accu( accus, &Stokes_.A, &Stokes_.M, old_b_, cplA_, cplM_, LvlSet_, Stokes_.v.t),
-                Stokes_.GetMG(), Stokes_.vel_idx.TriangLevel(), Stokes_.vel_idx.GetMatchingFunction(), Stokes_.vel_idx.GetBndInfo());
+    {
+        ScopeTimerCL scope("System1 within SolveLsNs");
+        MLTetraAccumulatorTupleCL accus( Stokes_.A.Data.size());
+        MaybeAddMLProgressbar( Stokes_.GetMG(), "System1(P2)", accus, Stokes_.vel_idx.TriangLevel() );
+        accumulate( Stokes_.system1_accu( accus, &Stokes_.A, &Stokes_.M, old_b_, cplA_, cplM_, LvlSet_, Stokes_.v.t),
+                    Stokes_.GetMG(), Stokes_.vel_idx.TriangLevel(), Stokes_.vel_idx.GetMatchingFunction(), Stokes_.vel_idx.GetBndInfo());
+    }
     Stokes_.SetupPrStiff( &Stokes_.prA, LvlSet_);
     Stokes_.SetupPrMass( &Stokes_.prM, LvlSet_);
 
@@ -155,9 +159,14 @@ void LinThetaScheme2PhaseCL<LsetSolverT>::CommitStep()
         Stokes_.B.Data.clear();
         Stokes_.prA.Data.clear();
         Stokes_.prM.Data.clear();
-        MLTetraAccumulatorTupleCL accus( Stokes_.B.Data.size());
-        accumulate( Stokes_.system2_accu( accus, &Stokes_.B, &Stokes_.c, LvlSet_, Stokes_.v.t),
-                    Stokes_.GetMG(), Stokes_.vel_idx.TriangLevel(), Stokes_.vel_idx.GetMatchingFunction(), Stokes_.vel_idx.GetBndInfo());
+        {
+            ScopeTimerCL scope("System2 within CommitStep");
+            MLTetraAccumulatorTupleCL accus( Stokes_.B.Data.size());
+            MaybeAddMLProgressbar( Stokes_.GetMG(), "System2", accus, Stokes_.vel_idx.TriangLevel() );
+            Stokes_.system2_accu( accus, &Stokes_.B, &Stokes_.c, LvlSet_, Stokes_.v.t);
+            accumulate( accus,
+                        Stokes_.GetMG(), Stokes_.vel_idx.TriangLevel(), Stokes_.vel_idx.GetMatchingFunction(), Stokes_.vel_idx.GetBndInfo());
+        }
     }
     else
         Stokes_.SetupRhs2( &Stokes_.c, LvlSet_, Stokes_.v.t);
@@ -220,11 +229,14 @@ void LinThetaScheme2PhaseCL<LsetSolverT>::Update()
     LvlSet_.AccumulateBndIntegral( *old_curv_);
     LvlSet_.SetupSystem( Stokes_.GetVelSolution(), dt_);
 
-    MLTetraAccumulatorTupleCL updates( Stokes_.A.Data.size());
-    Stokes_.system2_accu( updates, &Stokes_.B, &Stokes_.c, LvlSet_, Stokes_.v.t);
-    Stokes_.nonlinear_accu( updates, &Stokes_.N, &Stokes_.v, old_cplN_, LvlSet_, Stokes_.v.t);
-    accumulate( updates, Stokes_.GetMG(), Stokes_.vel_idx.TriangLevel(), Stokes_.vel_idx.GetMatchingFunction(), Stokes_.vel_idx.GetBndInfo());
-
+    {
+        ScopeTimerCL scope("System2+Nonl");
+        MLTetraAccumulatorTupleCL updates( Stokes_.A.Data.size());
+        MaybeAddMLProgressbar( Stokes_.GetMG(), "System2+Nonl", updates, Stokes_.vel_idx.TriangLevel());
+        Stokes_.system2_accu( updates, &Stokes_.B, &Stokes_.c, LvlSet_, Stokes_.v.t);
+        Stokes_.nonlinear_accu( updates, &Stokes_.N, &Stokes_.v, old_cplN_, LvlSet_, Stokes_.v.t);
+        accumulate( updates, Stokes_.GetMG(), Stokes_.vel_idx.TriangLevel(), Stokes_.vel_idx.GetMatchingFunction(), Stokes_.vel_idx.GetBndInfo());
+    }
     time.Stop();
     duration=time.GetTime();
     std::cout << "Discretizing took " << duration << " sec.\n";

@@ -26,6 +26,8 @@
 #include "num/accumulator.h"
 #include "num/quadrature.h"
 #include "num/lattice-eval.h"
+#include "misc/progressaccu.h"
+#include "misc/scopetimer.h"
 
 extern DROPS::ParamCL P;
 
@@ -40,6 +42,8 @@ void SetupSystem2_P2P0( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL&, const
                         MatrixCL* B, VecDescCL* c, IdxDescCL* RowIdx, IdxDescCL* ColIdx, double t)
 // P2 / P0 FEs for vel/pr
 {
+    ScopeTimerCL scope("SetupSystem2_P2P0");
+
     SparseMatBuilderCL<double, SMatrixCL<1,3> >  mB( B, RowIdx->NumUnknowns(), ColIdx->NumUnknowns());
     if (c != 0) c->Clear( t);
     const Uint lvl= RowIdx->TriangLevel();
@@ -85,8 +89,10 @@ void SetupSystem2_P2P1( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& coeff,
         IdxDescCL* RowIdx, IdxDescCL* ColIdx, double t)
 /// Set up matrices B and rhs c
 {
+    ScopeTimerCL scope("SetupSystem2_P2P1");
     System2Accumulator_P2P1CL<TwoPhaseFlowCoeffCL> accu( coeff, BndData, *RowIdx, *ColIdx, *B, c, t);
     TetraAccumulatorTupleCL accus;
+    MaybeAddProgressBar(MG, "System2(P2P1) Setup", accus, RowIdx->TriangLevel());
     accus.push_back( &accu);
     accumulate( accus, MG, RowIdx->TriangLevel(), RowIdx->GetMatchingFunction(), RowIdx->GetBndInfo());
 }
@@ -229,8 +235,10 @@ void System2Accumulator_P2P1XCL::update_global_system ()
 void SetupSystem2_P2P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& coeff, const StokesBndDataCL& BndData, MatrixCL* B, VecDescCL* c, const LevelsetP2CL& lset, IdxDescCL* RowIdx, IdxDescCL* ColIdx, double t)
 // P2 / P1X FEs (X=extended) for vel/pr
 {
+    ScopeTimerCL scope("SetupSystem2_P2P1X");
     System2Accumulator_P2P1XCL p1x_accu( coeff, BndData, lset, *RowIdx, *ColIdx, *B, c, t);
     TetraAccumulatorTupleCL accus;
+    MaybeAddProgressBar(MG, "System2(P2P1X) Setup", accus, RowIdx->TriangLevel());
     accus.push_back( &p1x_accu);
     accumulate( accus, MG, RowIdx->TriangLevel(), RowIdx->GetMatchingFunction(), RowIdx->GetBndInfo());
 }
@@ -248,6 +256,8 @@ inline void ComputePgradV( LocalP2CL<Point3DCL>& PgradV, Uint pr, const Quad2CL<
 void SetupSystem2_P2RP1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL&, const StokesBndDataCL& BndData, MatrixCL* B, VecDescCL* c, const LevelsetP2CL& lset, IdxDescCL* RowIdx, IdxDescCL* ColIdx, double t)
 // P2X / P1X FEs (X=extended) for vel/pr
 {
+    ScopeTimerCL scope("SetupSystem2_P2RP1X");
+
     const ExtIdxDescCL& prXidx=    RowIdx->GetXidx();
     const ExtIdxDescCL& velXidx= ColIdx->GetXidx();
     SparseMatBuilderCL<double, SMatrixCL<1,3> >  mB( B, RowIdx->NumUnknowns(), ColIdx->NumUnknowns());
@@ -368,6 +378,8 @@ void SetupSystem2_P2RP1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL&, con
 void SetupSystem2_P2RP1( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL&, const StokesBndDataCL& BndData, MatrixCL* B, VecDescCL* c, const LevelsetP2CL& lset, IdxDescCL* RowIdx, IdxDescCL* ColIdx, double t)
 // P2X / P1 FEs (X=extended) for vel/pr
 {
+    ScopeTimerCL scope("SetupSystem2_P2RP1");
+
     const ExtIdxDescCL& velXidx= ColIdx->GetXidx();
     SparseMatBuilderCL<double, SMatrixCL<1,3> > mB( B, RowIdx->NumUnknowns(), ColIdx->NumUnknowns());
     if (c != 0) c->Clear( t);
@@ -457,6 +469,8 @@ void SetupSystem2_P2P1D( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL&, cons
                          IdxDescCL* RowIdx, IdxDescCL* ColIdx, double t)
 // P2 / P1D FEs for vel/pr
 {
+    ScopeTimerCL scope("SetupSystem2_P2P1D");
+
     SparseMatBuilderCL<double, SMatrixCL<1,3> > mB( B, RowIdx->NumUnknowns(), ColIdx->NumUnknowns());
     if (c != 0) c->Clear( t);
     const Uint lvl= RowIdx->TriangLevel();
@@ -504,6 +518,8 @@ void SetupSystem2_P2P1D( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL&, cons
 
 void SetupRhs2_P2P0( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL&, const StokesBndDataCL& BndData, VecDescCL* c, double t)
 {
+    ScopeTimerCL scope("SetupSystem2_P2P0");
+
     c->Clear( t);
     const Uint lvl= c->GetLevel();
     const Uint pidx= c->RowIdx->GetIdx();
@@ -544,6 +560,8 @@ void SetupRhs2_P2P0( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL&, const St
 
 void SetupRhs2_P2P1( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL&, const StokesBndDataCL& BndData, VecDescCL* c, double t)
 {
+    ScopeTimerCL scope("SetupRhs2_P2P1");
+
     c->Clear( t);
 
     const Uint lvl = c->GetLevel();
@@ -592,6 +610,8 @@ void SetupRhs2_P2P1( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL&, const St
 void SetupRhs2_P2P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL&, const StokesBndDataCL& BndData, VecDescCL* c, const LevelsetP2CL& lset, double t)
 // P2 / P1X FEs (X=extended) for vel/pr
 {
+    ScopeTimerCL scope("SetupRhs2_P2P1X");
+
     c->Clear( t);
     const Uint lvl=  c->GetLevel();
     const Uint pidx= c->RowIdx->GetIdx();
@@ -659,6 +679,8 @@ void SetupRhs2_P2P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL&, const S
 
 void SetupRhs2_P2P1D( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL&, const StokesBndDataCL& BndData, VecDescCL* c, double t)
 {
+    ScopeTimerCL scope("SetupRhs2_P2P1D");
+
     c->Clear( t);
 
     const Uint lvl         = c->GetLevel();
@@ -711,6 +733,8 @@ void SetupRhs2_P2P1D( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL&, const S
 
 void SetupPrMass_P0(const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, MatrixCL& matM, IdxDescCL& RowIdx, const LevelsetP2CL& lset)
 {
+    ScopeTimerCL scope("SetupPrMass_P0");
+
     const IdxT num_unks_pr=  RowIdx.NumUnknowns();
     MatrixBuilderCL M_pr(&matM, num_unks_pr,  num_unks_pr);
 
@@ -878,8 +902,10 @@ void PrMassAccumulator_P1CL::visit (const TetraCL& sit)
 
 void SetupPrMass_P1(const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, MatrixCL& matM, IdxDescCL& RowIdx, const LevelsetP2CL& lset)
 {
+    ScopeTimerCL scope("SetupPrMass_P1");
     PrMassAccumulator_P1CL p1_accu( MG, Coeff, matM, RowIdx, lset, false);
     TetraAccumulatorTupleCL accus;
+    MaybeAddProgressBar(MG, "PrMass(P1) Setup", accus, RowIdx.TriangLevel());
     accus.push_back( &p1_accu);
     accus( MG.GetTriangTetraBegin( RowIdx.TriangLevel()), MG.GetTriangTetraEnd( RowIdx.TriangLevel()));
 }
@@ -887,8 +913,10 @@ void SetupPrMass_P1(const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, Mat
 
 void SetupPrMass_P1X(const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, MatrixCL& matM, IdxDescCL& RowIdx, const LevelsetP2CL& lset)
 {
+    ScopeTimerCL scope("SetupPrMass_P1X");
     PrMassAccumulator_P1CL p1_accu( MG, Coeff, matM, RowIdx, lset, true);
     TetraAccumulatorTupleCL accus;
+    MaybeAddProgressBar(MG, "PrMass(P1X) Setup", accus, RowIdx.TriangLevel());
     accus.push_back( &p1_accu);
     accus( MG.GetTriangTetraBegin( RowIdx.TriangLevel()), MG.GetTriangTetraEnd( RowIdx.TriangLevel()));
 }
@@ -896,6 +924,8 @@ void SetupPrMass_P1X(const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, Ma
 
 void SetupPrMass_P1D(const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, MatrixCL& matM, IdxDescCL& RowIdx, const LevelsetP2CL& lset)
 {
+    ScopeTimerCL scope("SetupPrMass_P1D");
+
     const IdxT num_unks_pr=  RowIdx.NumUnknowns();
     MatrixBuilderCL M_pr(&matM, num_unks_pr,  num_unks_pr);
 
@@ -936,6 +966,8 @@ void SetupPrMass_P1D(const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, Ma
 
 void SetupPrStiff_P1( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, MatrixCL& A_pr, IdxDescCL& RowIdx, IdxDescCL& ColIdx, const LevelsetP2CL& lset)
 {
+    ScopeTimerCL scope("SetupPrStiff_P1");
+
     MatrixBuilderCL A( &A_pr, RowIdx.NumUnknowns(), ColIdx.NumUnknowns());
     const Uint lvl= RowIdx.TriangLevel();
     const Uint idx= RowIdx.GetIdx();
@@ -989,6 +1021,8 @@ void SetupPrStiff_P1( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, M
 ///        over the inner and outer part.
 void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, MatrixCL& A_pr, IdxDescCL& RowIdx, IdxDescCL& ColIdx, const LevelsetP2CL& lset)
 {
+    ScopeTimerCL scope("SetupPrStiff_P1X");
+
     const ExtIdxDescCL& Xidx= RowIdx.GetXidx();
     MatrixBuilderCL A( &A_pr, RowIdx.NumUnknowns(), ColIdx.NumUnknowns());
     const Uint lvl= RowIdx.TriangLevel();
@@ -1079,6 +1113,8 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
 
 void SetupPrStiff_P1D( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, MatrixCL& A_pr, IdxDescCL& RowIdx, IdxDescCL& ColIdx, const LevelsetP2CL& lset)
 {
+    ScopeTimerCL scope("SetupPrStiff_P1D");
+
     MatrixBuilderCL A( &A_pr,RowIdx.NumUnknowns(), ColIdx.NumUnknowns());
     const Uint lvl= RowIdx.TriangLevel();
     const Uint idx= RowIdx.GetIdx();
@@ -1412,7 +1448,7 @@ System1Accumulator_P2CL::System1Accumulator_P2CL (const TwoPhaseFlowCoeffCL& Coe
 
 void System1Accumulator_P2CL::begin_accumulation ()
 {
-    std::cout << "entering SetupSystem1_P2CL: ";
+    std::cout << "entering SetupSystem1_P2CL:\n";
     const size_t num_unks_vel= RowIdx.NumUnknowns();
     mA_= new SparseMatBuilderCL<double, SMatrixCL<3,3> >( &A, num_unks_vel, num_unks_vel);
     mM_= new SparseMatBuilderCL<double, SDiagMatrixCL<3> >( &M, num_unks_vel, num_unks_vel);
@@ -1502,9 +1538,10 @@ void SetupSystem1_P2( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_,
 {
     // TimerCL time;
     // time.Start();
-
+    ScopeTimerCL scope("SetupSystem1_P2");
     System1Accumulator_P2CL accu( Coeff_, BndData_, lset, RowIdx, A, M, b, cplA, cplM, t);
     TetraAccumulatorTupleCL accus;
+    MaybeAddProgressBar(MG_, "System1(P2) Setup", accus, RowIdx.TriangLevel());
     accus.push_back( &accu);
     accumulate( accus, MG_, RowIdx.TriangLevel(), RowIdx.GetMatchingFunction(), RowIdx.GetBndInfo());
     // time.Stop();
@@ -1516,6 +1553,8 @@ void SetupSystem1_P2R( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_
                          VecDescCL* b, VecDescCL* cplA, VecDescCL* cplM, const LevelsetP2CL& lset, IdxDescCL& RowIdx, double t)
 /// Set up matrices A, M and rhs b (depending on phase bnd)
 {
+    ScopeTimerCL scope("SetupSystem1_P2R");
+
     const IdxT num_unks_vel= RowIdx.NumUnknowns();
     const ExtIdxDescCL xidx= RowIdx.GetXidx();
 
@@ -1533,7 +1572,7 @@ void SetupSystem1_P2R( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_
     LocalNumbP2CL n;
     IdxT num[14];
 #ifndef _PAR
-    std::cout << "entering SetupSystem1: " << num_unks_vel << " vels. ";
+    std::cout << "entering SetupSystem1: " << num_unks_vel << " vels.\n";
 #endif
 
     Quad2CL<Point3DCL> Grad[10], GradRef[10], rhs;
@@ -1813,6 +1852,8 @@ void SetupSystem1_P2R( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_
 
 void InstatStokes2PhaseP2P1CL::SetupSystem1( MLMatDescCL* A, MLMatDescCL* M, VecDescCL* b, VecDescCL* cplA, VecDescCL* cplM, const LevelsetP2CL& lset, double t) const
 {
+    ScopeTimerCL scope("SetupSystem1 (incl. SetupBS)");
+
     MLMatrixCL::iterator itA = A->Data.begin();
     MLMatrixCL::iterator itM = M->Data.begin();
     MLIdxDescCL::iterator it = A->RowIdx->begin();
@@ -1863,6 +1904,8 @@ InstatStokes2PhaseP2P1CL::system1_accu (MLTetraAccumulatorTupleCL& accus, MLMatD
 
 void SetupRhs1_P2( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_, const StokesBndDataCL& BndData_, VecDescCL* b, const LevelsetP2CL& lset, double t)
 {
+    ScopeTimerCL scope("SetupRhs1_P2");
+
     const Uint lvl = b->GetLevel();
 
     b->Clear( t);
@@ -1934,6 +1977,8 @@ void SetupRhs1_P2R( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_, c
 /// \todo proper implementation missing, yet
 {
     throw DROPSErrCL("SetupRhs1_P2R(...) is buggy, aborting.");
+    ScopeTimerCL scope("SetupRhs1_P2R");
+
     const Uint lvl = b->GetLevel();
 
     b->Clear( t);
@@ -2207,7 +2252,7 @@ LBAccumulator_P2CL::LBAccumulator_P2CL (const TwoPhaseFlowCoeffCL& Coeff_, const
 
 void LBAccumulator_P2CL::begin_accumulation ()
 {
-    std::cout << "entering SetupLB: ";
+    std::cout << "entering SetupLB: \n";
     const size_t num_unks_vel= RowIdx.NumUnknowns();
     mA_= new SparseMatBuilderCL<double, SDiagMatrixCL<3> >( &A, num_unks_vel, num_unks_vel);
     if (cplA != 0) {
@@ -2220,9 +2265,9 @@ void LBAccumulator_P2CL::finalize_accumulation ()
     mA_->Build();
     delete mA_;
 #ifndef _PAR
-    std::cout << A.num_nonzeros() << " nonzeros in A_LB!";
+    std::cout << A.num_nonzeros() << " nonzeros in A_LB!\n";
 #endif
-    std::cout << '\n';
+    // std::cout << '\n';
 }
 
 void LBAccumulator_P2CL::visit (const TetraCL& tet)
@@ -2276,8 +2321,10 @@ void LBAccumulator_P2CL::update_global_system ()
 void SetupLB_P2( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_, const StokesBndDataCL& BndData_, MatrixCL& A, VelVecDescCL* cplA, const LevelsetP2CL& lset, IdxDescCL& RowIdx, double t)
 /// Set up the Laplace-Beltrami-matrix
 {
+    ScopeTimerCL scope("SetupLB_P2");
     LBAccumulator_P2CL accu( Coeff_, BndData_, lset, RowIdx, A, cplA, t);
     TetraAccumulatorTupleCL accus;
+    MaybeAddProgressBar(MG_, "LapBeltr(P2) Setup", accus, RowIdx.TriangLevel());
     accus.push_back( &accu);
     accumulate( accus, MG_, RowIdx.TriangLevel(), RowIdx.GetMatchingFunction(), RowIdx.GetBndInfo());
 }
@@ -2446,7 +2493,7 @@ BSAccumulator_P2CL::BSAccumulator_P2CL (const TwoPhaseFlowCoeffCL& Coeff_, const
 
 void BSAccumulator_P2CL::begin_accumulation ()
 {
-    std::cout << "entering SetupBS: ";
+    std::cout << "entering SetupBS: \n";
     const size_t num_unks_vel= RowIdx.NumUnknowns();
     mA_= new MatrixBuilderCL( &A, num_unks_vel, num_unks_vel);
     if (cplA != 0) {
@@ -2459,9 +2506,9 @@ void BSAccumulator_P2CL::finalize_accumulation ()
     mA_->Build();
     delete mA_;
 #ifndef _PAR
-    std::cout << A.num_nonzeros() << " nonzeros in A_BS!";
+    std::cout << A.num_nonzeros() << " nonzeros in A_BS!\n";
 #endif
-    std::cout << '\n';
+    // std::cout << '\n';
 }
 
 void BSAccumulator_P2CL::visit (const TetraCL& tet)
@@ -2518,8 +2565,10 @@ void BSAccumulator_P2CL::update_global_system ()
 void SetupBS_P2( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_, const StokesBndDataCL& BndData_, MatrixCL& A, VelVecDescCL* cplA, const LevelsetP2CL& lset, IdxDescCL& RowIdx, double t)
 /// Set up the Boussinesq-Scriven-matrix
 {
+     ScopeTimerCL scope("SetupBS_P2");
      BSAccumulator_P2CL accu( Coeff_, BndData_, lset, RowIdx, A, cplA, t);
      TetraAccumulatorTupleCL accus;
+     MaybeAddProgressBar(MG_, "BousScri(P2) Setup", accus, RowIdx.TriangLevel());
      accus.push_back( &accu);
      accumulate( accus, MG_, RowIdx.TriangLevel(), RowIdx.GetMatchingFunction(), RowIdx.GetBndInfo());
 }
@@ -2551,7 +2600,7 @@ void InstatStokes2PhaseP2P1CL::SetupSystem2( MLMatDescCL* B, VecDescCL* c, const
     for (; itB!=B->Data.end() && itRow!=B->RowIdx->end() && itCol!=B->ColIdx->end(); ++itB, ++itRow, ++itCol)
     {
 #ifndef _PAR
-        std::cout << "entering SetupSystem2: " << itRow->NumUnknowns() << " prs, " << itCol->NumUnknowns() << " vels. ";
+        std::cout << "entering SetupSystem2: " << itRow->NumUnknowns() << " prs, " << itCol->NumUnknowns() << " vels. \n";
 #endif
         VecDescCL* rhsPtr= itB==B->Data.GetFinestIter() ? c : 0; // setup rhs only on finest level
         if (itCol->GetFE()==vecP2_FE)
@@ -2605,7 +2654,7 @@ InstatStokes2PhaseP2P1CL::system2_accu (MLTetraAccumulatorTupleCL& accus, MLMatD
     for (; itB!=B->Data.end() && itRow!=B->RowIdx->end() && itCol!=B->ColIdx->end(); ++itB, ++itRow, ++itCol, ++itaccu)
     {
 #ifndef _PAR
-        std::cout << "entering SetupSystem2: " << itRow->NumUnknowns() << " prs, " << itCol->NumUnknowns() << " vels. ";
+        std::cout << "entering SetupSystem2: " << itRow->NumUnknowns() << " prs, " << itCol->NumUnknowns() << " vels. \n";
 #endif
         VecDescCL* rhsPtr= itB==B->Data.GetFinestIter() ? c : 0; // setup rhs only on finest level
         if (itCol->GetFE()==vecP2_FE)
@@ -2665,6 +2714,7 @@ void InstatStokes2PhaseP2P1CL::SetupRhs2( VecDescCL* c, const LevelsetP2CL& lset
 void InstatStokes2PhaseP2P1CL::SetupBdotv (VecDescCL* Bdotv, const VelVecDescCL* vel,
     const LevelsetP2CL& lset, double t) const
 {
+    ScopeTimerCL scope("SetupBdotv");
     Bdotv->Clear( t);
     const Uint lvl= Bdotv->GetLevel();
     IdxT prNumb[4];
@@ -2917,6 +2967,8 @@ void P1XRepairCL::operator() ()
 
 void SetupMassDiag_P1(const MultiGridCL& MG, VectorCL& M, const IdxDescCL& RowIdx, const BndCondCL& bnd)
 {
+    ScopeTimerCL scope("SetupMassDiag_P1");
+
     M.resize( RowIdx.NumUnknowns());
 
     const Uint lvl= RowIdx.TriangLevel();
@@ -2934,6 +2986,8 @@ void SetupMassDiag_P1(const MultiGridCL& MG, VectorCL& M, const IdxDescCL& RowId
 void SetupMassDiag_P1X (const MultiGridCL& MG, VectorCL& M, const IdxDescCL& RowIdx, const VecDescCL& lset,
                         const BndDataCL<>& lsetbnd, const BndCondCL& bnd)
 {
+    ScopeTimerCL scope("SetupMassDiag_P1X");
+
     const ExtIdxDescCL& Xidx= RowIdx.GetXidx();
     M.resize( RowIdx.NumUnknowns());
 
@@ -2993,6 +3047,8 @@ void SetupMassDiag_P1X (const MultiGridCL& MG, VectorCL& M, const IdxDescCL& Row
 
 void SetupMassDiag_vecP2(const MultiGridCL& MG, VectorCL& M, const IdxDescCL& RowIdx, const BndCondCL& bnd)
 {
+    ScopeTimerCL scope("SetupMassDiag_vecP2");
+
     M.resize( RowIdx.NumUnknowns());
 
     const Uint lvl= RowIdx.TriangLevel();
@@ -3030,6 +3086,7 @@ void SetupMassDiag (const MultiGridCL& MG, VectorCL& M, const IdxDescCL& RowIdx,
 
 void SetupLumpedMass_P1(const MultiGridCL& MG, VectorCL& M, const IdxDescCL& RowIdx, const BndCondCL& bnd)
 {
+    ScopeTimerCL scope("SetupLumpedMass_P1");
     M.resize( RowIdx.NumUnknowns());
 
     const Uint lvl= RowIdx.TriangLevel();
@@ -3046,6 +3103,8 @@ void SetupLumpedMass_P1(const MultiGridCL& MG, VectorCL& M, const IdxDescCL& Row
 
 void SetupLumpedMass_P1X (const MultiGridCL& MG, VectorCL& M, const IdxDescCL& RowIdx, const VecDescCL& lset, const BndDataCL<>& lsetbnd, const BndCondCL& bnd)
 {
+    ScopeTimerCL scope("SetupLumpedMass_P1X");
+
     const ExtIdxDescCL& Xidx= RowIdx.GetXidx();
     M.resize( RowIdx.NumUnknowns());
 
@@ -3105,6 +3164,8 @@ void SetupLumpedMass_P1X (const MultiGridCL& MG, VectorCL& M, const IdxDescCL& R
 
 void SetupLumpedMass_vecP2(const MultiGridCL& MG, VectorCL& M, const IdxDescCL& RowIdx, const BndCondCL& bnd)
 {
+    ScopeTimerCL scope("SetupLumpedMass_vecP2");
+
     M.resize( RowIdx.NumUnknowns());
 
     const Uint lvl= RowIdx.TriangLevel();
@@ -3125,6 +3186,8 @@ void SetupLumpedMass_vecP2(const MultiGridCL& MG, VectorCL& M, const IdxDescCL& 
 
 void SetupLumpedMass_vecP2R (const MultiGridCL& MG, VectorCL& M, const IdxDescCL& RowIdx, const VecDescCL& lset, const BndDataCL<>& lsetbnd, const BndCondCL& bnd)
 {
+    ScopeTimerCL scope("SetupLumpedMass_vecP2R");
+
     const ExtIdxDescCL& Xidx= RowIdx.GetXidx();
     M.resize( RowIdx.NumUnknowns());
 

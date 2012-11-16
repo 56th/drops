@@ -602,6 +602,7 @@ void LevelsetP2CL::Reparam( int method, bool Periodic)
 
 void LevelsetP2CL::AccumulateBndIntegral( VecDescCL& f) const
 {
+    ScopeTimerCL scope("AccumulateBndIntegral");
     SurfTensAccumulatorCL* accu;
 
     switch (SF_)
@@ -618,6 +619,8 @@ void LevelsetP2CL::AccumulateBndIntegral( VecDescCL& f) const
         throw DROPSErrCL("LevelsetP2CL::AccumulateBndIntegral not implemented for this SurfaceForceT");
     }
     TetraAccumulatorTupleCL accus;
+    ProgressBarTetraAccumulatorCL accup(MG_, "SurfTension Setup", Phi.RowIdx->TriangLevel());
+    accus.push_back( &accup);
     accus.push_back( accu);
     accumulate( accus, MG_, Phi.RowIdx->TriangLevel(), Phi.RowIdx->GetMatchingFunction(), Phi.RowIdx->GetBndInfo());
 

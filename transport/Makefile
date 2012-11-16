@@ -32,6 +32,7 @@ ns_transp: \
     ../transport/ns_transp.o ../geom/boundary.o ../geom/builder.o ../geom/multigrid.o \
     ../geom/deformation.o \
     ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o ../levelset/levelset.o \
+	../misc/scopetimer.o ../misc/progressaccu.o \
     ../misc/utils.o ../out/output.o ../num/discretize.o \
     ../navstokes/instatnavstokes2phase.o ../misc/scalarFunctions.o \
     ../misc/vectorFunctions.o ../misc/funcmap.o ../misc/params.o \

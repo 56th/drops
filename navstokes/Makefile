@@ -21,6 +21,7 @@ default: ClrScr
 
 nsdrops: \
     ../geom/boundary.o ../geom/builder.o ../geom/deformation.o ../navstokes/nsdrops.o \
+	../misc/scopetimer.o ../misc/progressaccu.o \
     ../geom/simplex.o ../geom/multigrid.o ../num/unknowns.o ../geom/topo.o ../num/fe.o ../num/interfacePatch.o \
     ../misc/problem.o ../misc/utils.o ../out/output.o ../num/discretize.o ../geom/principallattice.o \
     ../geom/reftetracut.o
@@ -35,6 +36,7 @@ nsdrops_begehung: \
 
 insdrops: \
     ../geom/boundary.o ../geom/builder.o  ../geom/deformation.o ../navstokes/insdrops.o \
+	../misc/scopetimer.o ../misc/progressaccu.o \
     ../geom/simplex.o ../geom/multigrid.o ../num/unknowns.o ../geom/topo.o ../num/fe.o ../num/interfacePatch.o \
     ../misc/problem.o ../misc/utils.o ../out/output.o ../num/discretize.o \
     ../out/ensightOut.o ../geom/principallattice.o ../geom/reftetracut.o
@@ -42,6 +44,7 @@ insdrops: \
 
 insadrops: \
     ../geom/boundary.o ../geom/builder.o  ../geom/deformation.o ../navstokes/insadrops.o \
+	../misc/scopetimer.o ../misc/progressaccu.o \
     ../geom/simplex.o ../geom/multigrid.o ../num/unknowns.o ../geom/topo.o ../num/fe.o ../num/interfacePatch.o \
     ../misc/problem.o ../misc/utils.o ../out/output.o ../num/discretize.o \
     ../out/ensightOut.o ../geom/principallattice.o ../geom/reftetracut.o

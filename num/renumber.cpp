@@ -31,7 +31,7 @@ namespace DROPS
 
 void DownwindAccu_P2CL::begin_accumulation ()
 {
-    std::cout << "entering DownwindAccu_P2CL::begin_accumulation";
+    std::cout << "entering DownwindAccu_P2CL\n";
     const size_t num_unks= idx.NumUnknowns()/idx.NumUnknownsVertex();
     mC= new SparseMatBuilderCL<double>( &C, num_unks, num_unks);
 }
@@ -88,7 +88,7 @@ void DownwindAccu_P2CL::update_global_system (const LocalNumbP2CL& n, const SMat
 
 void MassAccu_P2CL::begin_accumulation ()
 {
-    std::cout << "entering MassAccu_P2CL::begin_accumulation";
+    std::cout << "entering MassAccu_P2CL\n";
     const size_t num_unks= idx.NumUnknowns()/idx.NumUnknownsVertex();
     Mb= new SparseMatBuilderCL<double>( &M, num_unks, num_unks);
 }

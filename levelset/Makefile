@@ -33,6 +33,7 @@ default: ClrScr all
 
 reparam: \
     ../levelset/reparam.o ../levelset/fastmarch.o ../levelset/levelset.o \
+	../misc/progressaccu.o ../misc/scopetimer.o \
     ../geom/deformation.o \
     ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
     ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
@@ -44,6 +45,7 @@ lsshear: \
     ../levelset/lsshear.o ../geom/boundary.o ../geom/builder.o ../geom/simplex.o ../geom/multigrid.o \
     ../geom/deformation.o \
     ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o ../levelset/levelset.o \
+	../misc/progressaccu.o ../misc/scopetimer.o \
     ../misc/utils.o ../out/output.o ../num/discretize.o ../levelset/fastmarch.o \
     ../num/fe.o ../out/ensightOut.o ../stokes/instatstokes2phase.o ../navstokes/instatnavstokes2phase.o \
     ../num/MGsolver.o ../num/interfacePatch.o ../levelset/surfacetension.o ../levelset/coupling.o \
@@ -55,6 +57,7 @@ surfTens: \
     ../levelset/surfTens.o ../geom/boundary.o ../geom/builder.o ../geom/simplex.o ../geom/multigrid.o \
     ../geom/deformation.o \
     ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o ../levelset/levelset.o \
+	../misc/progressaccu.o ../misc/scopetimer.o \
     ../misc/utils.o ../out/output.o ../num/discretize.o \
     ../misc/params.o ../levelset/fastmarch.o ../stokes/instatstokes2phase.o ../navstokes/instatnavstokes2phase.o \
     ../num/fe.o ../out/ensightOut.o ../num/oseenprecond.o ../num/MGsolver.o ../misc/funcmap.o \
@@ -67,6 +70,7 @@ prJump: \
     ../levelset/prJump.o ../geom/boundary.o ../geom/builder.o ../geom/simplex.o ../geom/multigrid.o \
     ../geom/deformation.o \
     ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o ../levelset/levelset.o \
+	../misc/progressaccu.o ../misc/scopetimer.o \
     ../misc/utils.o ../out/output.o ../num/discretize.o \
     ../misc/params.o ../levelset/fastmarch.o ../stokes/instatstokes2phase.o ../num/MGsolver.o \
     ../num/fe.o  ../out/ensightOut.o ../num/oseenprecond.o ../num/interfacePatch.o \
@@ -78,6 +82,7 @@ prJump: \
 film: \
     ../levelset/film.o ../geom/boundary.o ../geom/builder.o  ../geom/deformation.o ../geom/simplex.o \
 	../geom/multigrid.o ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o ../levelset/levelset.o \
+	../misc/progressaccu.o ../misc/scopetimer.o \
     ../misc/utils.o ../out/output.o ../num/discretize.o ../navstokes/instatnavstokes2phase.o \
     ../misc/params.o ../levelset/fastmarch.o ../stokes/instatstokes2phase.o ../num/MGsolver.o\
     ../num/fe.o ../out/ensightOut.o ../out/vtkOut.o ../num/oseenprecond.o ../num/interfacePatch.o \
@@ -90,6 +95,7 @@ brick_transp: \
     ../levelset/brick_transp.o ../geom/boundary.o ../geom/builder.o ../geom/simplex.o ../geom/multigrid.o \
     ../geom/deformation.o \
     ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o ../levelset/levelset.o \
+	../misc/progressaccu.o ../misc/scopetimer.o \
     ../misc/utils.o ../out/output.o ../num/discretize.o \
     ../misc/params.o ../levelset/fastmarch.o ../num/fe.o \
     ../poisson/transport2phase.o ../out/ensightOut.o ../out/vtkOut.o ../num/interfacePatch.o \
@@ -100,12 +106,14 @@ brick_transp: \
 
 twophasedrops: \
     ../levelset/twophasedrops.o ../geom/boundary.o ../geom/builder.o  ../geom/deformation.o ../geom/simplex.o \
-	 ../geom/multigrid.o ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o ../levelset/levelset.o \
+	../geom/multigrid.o ../num/unknowns.o ../geom/topo.o ../num/fe.o ../misc/problem.o \
+	../levelset/levelset.o ../misc/progressaccu.o ../misc/scopetimer.o \
     ../misc/utils.o ../out/output.o ../num/discretize.o ../navstokes/instatnavstokes2phase.o \
     ../misc/params.o ../levelset/fastmarch.o ../stokes/instatstokes2phase.o ../num/MGsolver.o \
     ../num/fe.o ../out/ensightOut.o ../num/oseenprecond.o ../poisson/transport2phase.o \
     ../num/interfacePatch.o ../out/vtkOut.o ../surfactant/ifacetransp.o ../levelset/surfacetension.o \
-    ../geom/geomselect.o  ../levelset/twophaseutils.o ../num/hypre.o ../levelset/coupling.o ../misc/vectorFunctions.o \
+    ../geom/geomselect.o  ../levelset/twophaseutils.o ../num/hypre.o ../levelset/coupling.o \
+	../misc/vectorFunctions.o \
     ../misc/scalarFunctions.o ../misc/funcmap.o ../levelset/twophaseCoeff.o \
     ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o \
     ../num/renumber.o ../num/quadrature.o $(PAR_OBJ)

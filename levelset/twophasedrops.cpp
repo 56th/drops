@@ -54,6 +54,8 @@
 #include <fstream>
 #include <sstream>
 
+#include "misc/progressaccu.h"
+
 DROPS::ParamCL P;
 
 // rho*du/dt - mu*laplace u + Dp = f + rho*g - okn
@@ -498,6 +500,8 @@ void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<double>("Mat.DilatationalVisco", 0.0);
     P.put_if_unset<double>("SurfTens.ShearVisco", 0.0);
     P.put_if_unset<double>("SurfTens.DilatationalVisco", 0.0);
+
+    P.put_if_unset<int>("General.ProgressBar", 0);
 }
 
 int main (int argc, char** argv)
@@ -529,6 +533,9 @@ int main (int argc, char** argv)
     SetMissingParameters(P);
 
     std::cout << P << std::endl;
+
+    if (P.get<int>("General.ProgressBar"))
+        DROPS::ProgressBarTetraAccumulatorCL::Activate();
 
     //!check paramterfile
     if (P.get<double>("SurfTens.DilatationalVisco")< P.get<double>("SurfTens.ShearVisco"))

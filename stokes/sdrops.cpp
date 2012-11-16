@@ -29,7 +29,9 @@
 #include "num/oseensolver.h"
 #include <fstream>
 
+#include "misc/params.h"
 
+DROPS::ParamCL P;
 inline DROPS::SVectorCL<3> LsgVel(const DROPS::Point3DCL& p, double)
 {
     DROPS::SVectorCL<3> ret;
