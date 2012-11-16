@@ -67,7 +67,7 @@ def main(argv=sys.argv):
     print "chosen pattern is ", pattern
             
     
-    compileproc = 1
+    compileproc = "1"
     for arg in sys.argv:
         if re.match('--compileproc=',arg):
             [dummy,compileproc] = arg.split('=',1)
