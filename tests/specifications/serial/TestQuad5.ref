@@ -1,0 +1,51 @@
+#---------------------SPECIFICATION FILE----------------------------------------
+Type of test: serial
+Name of executable: quad5
+#The path to the folder where the executable is located must be relative to the
+#/drops folder
+Folder of executable: tests
+#The path to the folder where the parameter-file is located must be relative to
+#the folder where the executable is situated
+Path of parameter-file: 
+Name of test: testQuad5
+Name of author: lehrenfeld
+#-------------------------------------------------------------------------------
+#------------------------------NUMBERS------------------------------------------
+Name of variable: "Quadrature error 1"
+Prefix of variable: "I-Q_h: "
+Value of variable: 0.0
+Relative error: 
+Absolute error: 1e-16
+Name of variable: "Quadrature difference m1m2"
+Prefix of variable: "m1-m2: "
+Value of variable: 0.0
+Relative error: 
+Absolute error: 1e-16
+Name of variable: "Quadrature difference m1m3"
+Prefix of variable: "m1-m3: "
+Value of variable: 0.0
+Relative error: 
+Absolute error: 1e-16
+Name of variable: "Test integral 0"
+Prefix of variable: "integral: "
+Value of variable: 28244.3833333333314
+Relative error: 1e-15
+Absolute error:
+Name of variable: "Test integral 1"
+Prefix of variable: "Integral1: "
+Value of variable: 0.05
+Relative error: 1e-15
+Absolute error:
+Name of variable: "Test integral 2"
+Prefix of variable: "Integral2: "
+Value of variable: 1.6
+Relative error: 1e-15
+Absolute error:
+Name of variable: "Dot"
+Prefix of variable: "dot: "
+Value of variable: 0
+Relative error:
+Absolute error: 1e-15
+#-------------------------------------------------------------------------------
+#------------------------------STRINGS-------------------------------------------
+#-------------------------------------------------------------------------------
