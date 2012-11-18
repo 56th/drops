@@ -58,26 +58,24 @@ endif(CMAKE_CXX_COMPILER MATCHES icpc)
 # prepended.
 # THESE FUNCTIONS REQUIRE ${HOME}
 
+function(libs_ when)
+	if((${when} STREQUAL "ALL") OR (${when} STREQUAL "PAR" AND MPI) OR (${when} STREQUAL "SER" AND NOT MPI))
+		foreach(lib ${ARGN})
+			add_library(${HOME}-${lib} SHARED ${lib})
+		endforeach(lib)
+	endif()
+endfunction(libs_)
+
 function(libs)
-	foreach(lib ${ARGN})
-		add_library(${HOME}-${lib} SHARED ${lib})
-	endforeach(lib)
+	libs_("ALL" ${ARGN})
 endfunction(libs)
 
 function(libs_ser)
-	if(NOT MPI)
-		foreach(lib ${ARGN})
-			add_library(${HOME}-${lib} SHARED ${lib})
-		endforeach(lib)
-	endif(NOT MPI)
+	libs_("SER" ${ARGN})
 endfunction(libs_ser)
 
 function(libs_par)
-	if(MPI)
-		foreach(lib ${ARGN})
-			add_library(${HOME}-${lib} SHARED ${lib})
-		endforeach(lib)
-	endif(MPI)
+	libs_("PAR" ${ARGN})
 endfunction(libs_par)
 
 ###############################################################################
@@ -95,29 +93,28 @@ endfunction(target_link_libraries_par)
 # Afterwards we add <link_objects...> as a requirement of the executable 
 # THIS FUNCTION REQUIRES ${HOME} and ${PAR_OBJ}
 
+function(exec_ when f)
+	if((${when} STREQUAL "ALL") OR (${when} STREQUAL "PAR" AND MPI) OR (${when} STREQUAL "SER" AND NOT MPI))
+		libs_(${when} ${f})
+		add_executable(${f} ${f})
+		target_link_libraries_par(${f} ${HOME}-${f} ${ARGN})
+	endif()
+endfunction(exec_)
+
 function(exec f)
-	libs(${f})
-	add_executable(${f} ${f})
-	target_link_libraries_par(${f} ${HOME}-${f} ${ARGN})
+	exec_("ALL" ${f} ${ARGN})
 endfunction(exec)
 
 function(exec_ser f)
-	if(NOT MPI)
-		libs_ser(${f})
-		add_executable(${f} ${f})
-		target_link_libraries_par(${f} ${HOME}-${f} ${ARGN})
-	endif(NOT MPI)
+	exec_("SER" ${f} ${ARGN})
 endfunction(exec_ser)
 
 function(exec_par f)
-	if(MPI)
-		libs_par(${f})
-		add_executable(${f} ${f})
-		target_link_libraries_par(${f} ${HOME}-${f} ${ARGN})
-	endif(MPI)
+	exec_("PAR" ${f} ${ARGN})
 endfunction(exec_par)
 
 set(PACKAGES parallel levelset poisson DiST geom num out misc stokes navstokes surfactant transport partests tests)
+string(REPLACE ";" " " PACKAGES_STRING "${PACKAGES}")
 
 option(TESTS "compile tests" OFF)
 if(TESTS)
