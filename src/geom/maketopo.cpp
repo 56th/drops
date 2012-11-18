@@ -365,8 +365,10 @@ void WriteRules(const std::vector<RefRuleCL>& refrules, std::ostream& os)
 }
 
 
-int main()
+int main(int argc, char** argv)
 {
+  if(argc != 3){std::cout << "usage: " << argv[0] << " input output,\nwhere usually:\n\tinput = path/to/drops/src/topo.cpp.in and\n\toutput = path/to/drops/topo.cpp" << std::endl; return -1; }
+
   try{
     std::vector<RawTriangCL> rawrules(64);
     std::vector<RefRuleCL> refrules(64);
@@ -380,10 +382,10 @@ int main()
         SetEdges(rawrules[i], refrules[i]);
     }
     std::string   TextLine;
-    std::ifstream FileIn  ("topo.cpp.in");
-    std::ofstream FileOut ("topo.cpp");
-    if (!FileIn)  { std::cout << "Couldn't open file 'topo.cpp.in' for reading!" << std::endl; return -1; }
-    if (!FileOut) { std::cout << "Couldn't open file 'topo.cpp' for writing!" << std::endl; return -1; }
+    std::ifstream FileIn  (argv[1]);
+    std::ofstream FileOut (argv[2]);
+    if (!FileIn)  { std::cout << "Couldn't open file '" << argv[1] << "' for reading!" << std::endl; return -1; }
+    if (!FileOut) { std::cout << "Couldn't open file '" << argv[2] << "' for writing!" << std::endl; return -1; }
 
     while (std::getline(FileIn,TextLine))
         if (TextLine.size()>=3 && TextLine.substr(0,3)==std::string("//@"))
@@ -391,8 +393,8 @@ int main()
         else
             FileOut << TextLine << '\n';
 
-    if (!FileIn.eof()) { std::cout << "Error reading 'topo.cpp.in'!" << std::endl; return -1; }
-    if (!FileOut)      { std::cout << "Error writing 'topo.cpp'!" << std::endl; return -1; }
+    if (!FileIn.eof()) { std::cout << "Error reading '" << argv[1] << "'!" << std::endl; return -1; }
+    if (!FileOut)      { std::cout << "Error writing '" << argv[2] << "'!" << std::endl; return -1; }
     FileIn.close();
     FileOut.close();
     return 0;
