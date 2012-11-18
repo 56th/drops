@@ -131,5 +131,23 @@ foreach(package ${PACKAGES})
 	endforeach(file)
 endforeach(${package})
 
+add_custom_target(stat COMMAND ls */*.cpp */*.tpp */*.h | xargs wc -l WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
+#find_package(Doxygen)
+#if(DOXYGEN_FOUND)
+#	add_custom_target(doc COMMAND ${DOXYGEN_EXECUTABLE} dox.cfg WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} COMMENT "Generating API documentation with Doxygen" VERBATIM)
+#endif(DOXYGEN_FOUND)
+
+find_package(Doxygen)
+if(DOXYGEN_FOUND)
+	FILE(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/doxygen)
+	configure_file(${CMAKE_CURRENT_SOURCE_DIR}/dox.cfg ${CMAKE_CURRENT_BINARY_DIR}/doxygen/dox.cfg)
+	add_custom_target(doc
+		${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/doxygen/dox.cfg
+		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+		COMMENT "Generating API documentation with Doxygen" VERBATIM
+	)
+endif()
+
 message(STATUS "### GLOBAL COMPILER FLAGS: ${CMAKE_CXX_FLAGS} ###")
 message(STATUS "### GLOBAL LINKER FLAGS: ${CMAKE_EXE_LINKER_FLAGS} ###")	
