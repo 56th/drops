@@ -131,5 +131,5 @@ foreach(package ${PACKAGES})
 	endforeach(file)
 endforeach(${package})
 
-message(STATUS "### GLOBAL COMPILE FLAGS: ${CMAKE_CXX_FLAGS} ###")
+message(STATUS "### GLOBAL COMPILER FLAGS: ${CMAKE_CXX_FLAGS} ###")
 message(STATUS "### GLOBAL LINKER FLAGS: ${CMAKE_EXE_LINKER_FLAGS} ###")	
