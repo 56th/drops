@@ -37,10 +37,10 @@ class ProgressBarTetraAccumulatorCL : public TetraAccumulatorCL
 {
     protected:   
     Uint * tetprog;
-    Uint * prog;
+    int * prog;
     Uint ntet;
     const std::string name;
-
+    bool isterm;
 public: 
 
     static bool active;

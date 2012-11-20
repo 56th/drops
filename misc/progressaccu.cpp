@@ -25,6 +25,8 @@
 #include "misc/progressaccu.h"
 #include "misc/scopetimer.h"
 
+#include <unistd.h>
+
 namespace DROPS
 {
 
@@ -37,7 +39,7 @@ void ProgressBarTetraAccumulatorCL::begin_accumulation ()
     //            // << std::setw(20) 
     //            << name << ": ";
     tetprog = new Uint(0);
-    prog = new Uint(0);
+    prog = new int(-1);
   }
 }
 
@@ -45,12 +47,17 @@ void ProgressBarTetraAccumulatorCL::finalize_accumulation ()
 {
   if (active)
   {
-    std::cout                     
-      << "\r"
-      // << std::setw(20) 
-      << name << ": " << std::setw(3) << 100 << "% [ "
-      << std::setw(8) << ntet << " / " << std::setw(8) << ntet << " ]"
-      << " - [ finished ]" << std::endl;
+    if (isterm)
+    {
+      std::cout                     
+        << "\r"
+        // << std::setw(20) 
+        << name << ": " << std::setw(3) << 100 << "% [ "
+        << std::setw(8) << ntet << " / " << std::setw(8) << ntet << " ]"
+        << " - [ finished ]" << std::endl;
+    }
+    else
+      std::cout << "] - [ finished ]" << std::endl;
     delete tetprog;
     delete prog;
   }
@@ -62,7 +69,7 @@ void ProgressBarTetraAccumulatorCL::visit (const TetraCL& )
   if (active)
   {
     bool doout = false; //default: keine ausgabe
-    Uint newprog = 0; //local copy of prog
+    int newprog = 0; //local copy of prog
     Uint mytetprog = 0; //local copy of tetprog
 
 #pragma omp critical(tetprog)
@@ -70,27 +77,37 @@ void ProgressBarTetraAccumulatorCL::visit (const TetraCL& )
 
     newprog = (Uint) ( (100.0 * mytetprog) / (double)ntet);
 
-    if (newprog != *prog){
 #pragma omp critical(prog)
+    if (newprog > *prog){
       *prog=newprog;
 
-      doout = true;
+      if (isterm || newprog%5==0)
+        doout = true;
     }
 
     if (doout) //output of (possibly outdated [who cares?!] ) local copies...
     {
 #pragma omp critical(doout)
       {
-        std::cout // << "\r                          "
-          << "\r"
-          // << std::setw(20) 
-          << name << ": " << std::setw(3) << newprog << "% [ "
-          << std::setw(8) << mytetprog << " / " << std::setw(8) << ntet << " ]" << " - [";
-        for (Uint i = 0; i < newprog/10; ++i)
-          std::cout << "#";
-        for (Uint i = newprog/10; i < 10; ++i)
-          std::cout << " ";
-        std::cout << "]" << std::flush;
+        if (isterm){
+          std::cout // << "\r                          "
+            << "\r"
+            // << std::setw(20) 
+            << name << ": " << std::setw(3) << newprog << "% [ "
+            << std::setw(8) << mytetprog << " / " << std::setw(8) << ntet << " ]" << " - [";
+          for (int i = 0; i < newprog/10; ++i)
+            std::cout << "#";
+          for (int i = newprog/10; i < 10; ++i)
+            std::cout << " ";
+          std::cout << "]" << std::flush;
+        }
+        else //poor mans output (compatible to output files)
+        {
+          if (newprog==0) 
+            std::cout << name << ": ["<< std::flush;
+          else
+            std::cout << "#" << std::flush;
+        }
       }
     }
   }
@@ -99,6 +116,7 @@ void ProgressBarTetraAccumulatorCL::visit (const TetraCL& )
 ProgressBarTetraAccumulatorCL::ProgressBarTetraAccumulatorCL(const MultiGridCL& MG, const std::string aname, int lvl)
   :name(aname)
 {
+    isterm = isatty(fileno(stdout));
     if (active)
     {
       ntet=0;
