@@ -96,8 +96,6 @@ class TwoPhaseFlowCoeffCL
     double rho_koeff1, rho_koeff2, mu_koeff1, mu_koeff2;
 
   public:
-    static Point3DCL f(const Point3DCL&, double)
-        { Point3DCL ret(0.0); return ret; }
     DROPS::instat_vector_fun_ptr volforce;
     const SmoothedJumpCL rho, mu;
     const double SurfTens, DilVisco, ShearVisco;
