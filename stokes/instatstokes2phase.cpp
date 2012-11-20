@@ -1321,12 +1321,13 @@ void LocalSystem1OnePhase_P2CL::setup (const SMatrixCL<3,3>& T, double absdet, L
 }
 
 /// \brief Place to store P2 integrals on positive/negative part of tetrahedron
-/// to be shared by LocalSystem1TwoPhase_P2CL and LocalSystem1TwoPhase_P2CL
+/// to be shared by LocalSystem1TwoPhase_P2CL and LocalSystem1TwoPhase_P2XCL
 struct LocalIntegrals_P2CL
 {
-    double         phi_pos[10],      phi_neg[10];
-    double         mass_pos[10][10], mass_neg[10][10];
-    SMatrixCL<3,3> cAk_pos[10][10],  cAk_neg[10][10];
+    double         phi[10];
+    Point3DCL      rhs[10];
+    double         mass[10][10];
+    SMatrixCL<3,3> cAk[10][10];
 };
 
 /// \brief Setup of the local P2 "system 1" on a tetra intersected by the dividing surface.
@@ -1337,6 +1338,7 @@ class LocalSystem1TwoPhase_P2CL
 
     const double mu_p, mu_n;
     const double rho_p, rho_n;
+    instat_vector_fun_ptr rhs_func;
 
     LocalP1CL<Point3DCL> GradRefLP1[10], GradLP1[10];
     LocalP2CL<> p2;
@@ -1345,21 +1347,22 @@ class LocalSystem1TwoPhase_P2CL
     TetraPartitionCL partition;
     QuadDomainCL q2dom;
     QuadDomainCL q5dom;
-    std::valarray<double> q[10];
+    GridFunctionCL<double>    q[10];
     GridFunctionCL<Point3DCL> qA[10];
+    GridFunctionCL<Point3DCL> rhs;
 
   public:
-    LocalSystem1TwoPhase_P2CL (double mup, double mun, double rhop, double rhon)
-        : lat( PrincipalLatticeCL::instance( 2)), mu_p( mup), mu_n( mun), rho_p( rhop), rho_n( rhon), ls_loc( 10)
+    LocalSystem1TwoPhase_P2CL (double mup, double mun, double rhop, double rhon, instat_vector_fun_ptr rhsFunc)
+        : lat( PrincipalLatticeCL::instance( 2)), mu_p( mup), mu_n( mun), rho_p( rhop), rho_n( rhon), rhs_func(rhsFunc), ls_loc( 10)
     { P2DiscCL::GetGradientsOnRef( GradRefLP1); }
 
     double mu  (int sign) const { return sign > 0 ? mu_p  : mu_n; }
     double rho (int sign) const { return sign > 0 ? rho_p : rho_n; }
 
-    void setup (const SMatrixCL<3,3>& T, double absdet, const LocalP2CL<>& ls, LocalIntegrals_P2CL&, LocalSystem1DataCL& loc);
+    void setup (const SMatrixCL<3,3>& T, double absdet, const TetraCL& tet, const LocalP2CL<>& ls, LocalIntegrals_P2CL[2], LocalSystem1DataCL& loc);
 };
 
-void LocalSystem1TwoPhase_P2CL::setup (const SMatrixCL<3,3>& T, double absdet, const LocalP2CL<>& ls, LocalIntegrals_P2CL& locInt, LocalSystem1DataCL& loc)
+void LocalSystem1TwoPhase_P2CL::setup (const SMatrixCL<3,3>& T, double absdet, const TetraCL& tet, const LocalP2CL<>& ls, LocalIntegrals_P2CL locInt[2], LocalSystem1DataCL& loc)
 {
     P2DiscCL::GetGradients( GradLP1, GradRefLP1, T);
 
@@ -1367,19 +1370,22 @@ void LocalSystem1TwoPhase_P2CL::setup (const SMatrixCL<3,3>& T, double absdet, c
     partition.make_partition<SortedVertexPolicyCL, MergeCutPolicyCL>( lat, ls_loc);
     make_CompositeQuad5Domain( q5dom, partition);
     make_CompositeQuad2Domain( q2dom, partition);
+    resize_and_evaluate_on_vertexes( rhs_func, tet, q5dom, /*time*/ 0., rhs);
+
     for (int i= 0; i < 10; ++i) {
         p2[i]= 1.; p2[i==0 ? 9 : i - 1]= 0.;
         resize_and_evaluate_on_vertexes( p2,         q5dom, q[i]); // for M
         resize_and_evaluate_on_vertexes( GradLP1[i], q2dom, qA[i]); // for A
-        quad( q[i], absdet, q5dom, locInt.phi_neg[i], locInt.phi_pos[i]); // for rho
-        loc.rho_phi[i]= rho_n*locInt.phi_neg[i] + rho_p*locInt.phi_pos[i];
+        quad( q[i]*rhs, absdet, q5dom, locInt[0].rhs[i], locInt[1].rhs[i]); // for rhs
+        quad( q[i], absdet, q5dom, locInt[0].phi[i], locInt[1].phi[i]); // for rho_phi
+        loc.rho_phi[i]= rho_n*locInt[0].phi[i] + rho_p*locInt[1].phi[i];
     }
     for (int i= 0; i < 10; ++i) {
         for (int j= 0; j <= i; ++j) {
-            quad( q[i]*q[j], absdet, q5dom, locInt.mass_neg[i][j], locInt.mass_pos[i][j]);
-            quad( OuterProductExpressionCL( qA[i], qA[j]), absdet, q2dom, locInt.cAk_neg[i][j], locInt.cAk_pos[i][j]);
-            loc.M[j][i]= rho_p*locInt.mass_pos[i][j] + rho_n*locInt.mass_neg[i][j];
-            loc.Ak[j][i]= mu_p*locInt.cAk_pos[i][j] + mu_n*locInt.cAk_neg[i][j];
+            quad( q[i]*q[j], absdet, q5dom, locInt[0].mass[i][j], locInt[1].mass[i][j]);
+            quad( OuterProductExpressionCL( qA[i], qA[j]), absdet, q2dom, locInt[0].cAk[i][j], locInt[1].cAk[i][j]);
+            loc.M[j][i]= rho_n*locInt[0].mass[i][j] + rho_p*locInt[1].mass[i][j];
+            loc.Ak[j][i]= mu_n*locInt[0].cAk[i][j]  +  mu_p*locInt[1].cAk[i][j];
             // dot-product of the gradients
             loc.A[j][i]= trace( loc.Ak[j][i]);
             if (i != j) { // The local stiffness matrices coupM, coupA, coupAk are symmetric.
@@ -1395,19 +1401,17 @@ void LocalSystem1TwoPhase_P2CL::setup (const SMatrixCL<3,3>& T, double absdet, c
 class LocalSystem1TwoPhase_P2XCL
 {
   private:
-//    const LocalSystem1TwoPhase_P2CL& locSysP2_;
-    const double mu_p, mu_n;
-    const double rho_p, rho_n;
-
-    bool supp_pos[10];      ///< store whether extended basis function has support on positive part
+    double mu[2], rho[2]; ///< viscosity/density on neg./pos. part
 
   public:
-    LocalSystem1TwoPhase_P2XCL ( /*const LocalSystem1TwoPhase_P2CL& locP2,*/ double mup, double mun, double rhop, double rhon)
-        : /*locSysP2_(locP2),*/ mu_p( mup), mu_n( mun), rho_p( rhop), rho_n( rhon) {}
-    void setup (const SMatrixCL<3,3>& T, double absdet, const LocalP2CL<>& ls, const LocalIntegrals_P2CL&, LocalSystem1DataCL& locX);
+    bool supp_pos[10];          ///< store whether extended basis function has support on positive part
+
+    LocalSystem1TwoPhase_P2XCL ( double mup, double mun, double rhop, double rhon)
+        { mu[0]= mun; mu[1]= mup; rho[0]= rhon; rho[1]= rhop; }
+    void setup (const LocalP2CL<>& ls, const LocalIntegrals_P2CL[2], LocalSystem1DataCL locX[2]);
 };
 
-void LocalSystem1TwoPhase_P2XCL::setup (const SMatrixCL<3,3>& T, double absdet, const LocalP2CL<>& ls, const LocalIntegrals_P2CL& locInt, LocalSystem1DataCL& locX)
+void LocalSystem1TwoPhase_P2XCL::setup (const LocalP2CL<>& ls, const LocalIntegrals_P2CL locInt[2], LocalSystem1DataCL locX[2])
 /** Assemble standard x extended part of system 1 (A, M).
  *
  *  We assume that LocalSystem1TwoPhase_P2CL::setup(...) has been called before
@@ -1416,22 +1420,27 @@ void LocalSystem1TwoPhase_P2XCL::setup (const SMatrixCL<3,3>& T, double absdet, 
 {
     for (int i= 0; i < 10; ++i) {
         supp_pos[i]= ls[i] < 0;
-        locX.rho_phi[i]= supp_pos[i] ? rho_p*locInt.phi_pos[i] : rho_n*locInt.phi_neg[i];
+        for (int sgn=0; sgn<2; ++sgn) // loop over neg/pos part
+            locX[sgn].rho_phi[i]= rho[sgn]*locInt[sgn].phi[i];
     }
     for (int i= 0; i < 10; ++i) {
         for (int j= 0; j <= i; ++j) {
-            locX.M[j][i]= rho_p*locInt.mass_pos[i][j]+ rho_n*locInt.mass_neg[i][j];
-            locX.Ak[j][i]= mu_p*locInt.cAk_pos[i][j] + mu_n*locInt.cAk_neg[i][j];
+            for (int sgn=0; sgn<2; ++sgn) { // loop over neg/pos part
+                locX[sgn].M[j][i]= rho[sgn]*locInt[sgn].mass[i][j];
+                locX[sgn].Ak[j][i]= mu[sgn]*locInt[sgn].cAk[i][j];
+            }
         }
     }
-    for (int i= 0; i < 14; ++i) {
+    for (int i= 0; i < 10; ++i) {
         for (int j= 0; j <= i; ++j) {
-            // dot-product of the gradients
-            locX.A[j][i]= trace( locX.Ak[j][i]);
-            if (i != j) { // The local stiffness matrices coupM, coupA, coupAk are symmetric.
-                locX.M[i][j]= locX.M[j][i];
-                locX.A[i][j]= locX.A[j][i];
-                assign_transpose( locX.Ak[i][j], locX.Ak[j][i]);
+            for (int sgn=0; sgn<2; ++sgn) { // loop over neg/pos part
+                // dot-product of the gradients
+                locX[sgn].A[j][i]= trace( locX[sgn].Ak[j][i]);
+                if (i != j) { // the local stiffness matrices M, A, Ak are symmetric.
+                    locX[sgn].M[i][j]= locX[sgn].M[j][i];
+                    locX[sgn].A[i][j]= locX[sgn].A[j][i];
+                    assign_transpose( locX[sgn].Ak[i][j], locX[sgn].Ak[j][i]);
+                }
             }
         }
     }
@@ -1459,7 +1468,7 @@ class System1Accumulator_P2CL : public TetraAccumulatorCL
     LocalSystem1OnePhase_P2CL local_onephase; ///< used on tetras in a single phase
     LocalSystem1TwoPhase_P2CL local_twophase; ///< used on intersected tetras
     LocalSystem1DataCL loc;                   ///< Contains the memory, in which the local operators are set up; former coupM, coupA, coupAk, rho_phi.
-    LocalIntegrals_P2CL locInt;               ///< stores computed integrals to be used by P2X discretization
+    LocalIntegrals_P2CL locInt[2];            ///< stores computed integrals on neg./pos. part to be used by P2X discretization
 
     LocalNumbP2CL n; ///< global numbering of the P2-unknowns
 
@@ -1495,7 +1504,7 @@ System1Accumulator_P2CL::System1Accumulator_P2CL (const TwoPhaseFlowCoeffCL& Coe
     VecDescCL* b_, VecDescCL* cplA_, VecDescCL* cplM_, double t_)
     : Coeff( Coeff_), BndData( BndData_), lset( lset_arg), t( t_),
       RowIdx( RowIdx_), A( A_), M( M_), cplA( cplA_), cplM( cplM_), b( b_),
-      local_twophase( Coeff.mu( 1.0), Coeff.mu( -1.0), Coeff.rho( 1.0), Coeff.rho( -1.0))
+      local_twophase( Coeff.mu( 1.0), Coeff.mu( -1.0), Coeff.rho( 1.0), Coeff.rho( -1.0), Coeff.volforce)
 {}
 
 void System1Accumulator_P2CL::begin_accumulation ()
@@ -1535,20 +1544,22 @@ void System1Accumulator_P2CL::local_setup (const TetraCL& tet)
     GetTrafoTr( T, det, tet);
     absdet= std::fabs( det);
 
-    rhs.assign( tet, Coeff.volforce, t);
     n.assign( tet, RowIdx, BndData.Vel);
 
     ls_loc.assign( tet, lset.Phi, lset.GetBndData());
-    if (equal_signs( ls_loc)) {
+    const bool noCut= equal_signs( ls_loc);
+    if (noCut) {
         local_onephase.mu(  local_twophase.mu(  sign( ls_loc[0])));
         local_onephase.rho( local_twophase.rho( sign( ls_loc[0])));
         local_onephase.setup( T, absdet, loc);
     }
     else
-        local_twophase.setup( T, absdet, ls_loc, locInt, loc);
+        local_twophase.setup( T, absdet, tet, ls_loc, locInt, loc);
     add_transpose_kronecker_id( loc.Ak, loc.A);
 
     if (b != 0) {
+        if (noCut)
+            rhs.assign( tet, Coeff.volforce, t);
         for (int i= 0; i < 10; ++i) {
             if (!n.WithUnknowns( i)) {
                 typedef StokesBndDataCL::VelBndDataCL::bnd_val_fun bnd_val_fun;
@@ -1556,8 +1567,13 @@ void System1Accumulator_P2CL::local_setup (const TetraCL& tet)
                 dirichlet_val[i]= i<4 ? bf( tet.GetVertex( i)->GetCoord(), t)
                     : bf( GetBaryCenter( *tet.GetEdge( i-4)), t);
             }
-            else
-                loc_b[i]= rhs.quadP2( i, absdet) + loc.rho_phi[i]*Coeff.g;
+            else { // setup b
+                loc_b[i]= loc.rho_phi[i]*Coeff.g;
+                if (noCut)
+                    loc_b[i]+= rhs.quadP2( i, absdet);
+                else
+                    loc_b[i]+= locInt[0].rhs[i] + locInt[1].rhs[i];
+            }
         }
     }
 }
@@ -1592,7 +1608,7 @@ class System1Accumulator_P2XCL : public System1Accumulator_P2CL
 
     LocalNumbP2CL               nx;              ///< extended numbering of P2 dofs
     Point3DCL                   locX_b[10];      ///< storing the extended local part of b
-    LocalSystem1DataCL          locX;            ///< storing the (extended x non-extended) local part of matrices
+    LocalSystem1DataCL          locX[2];         ///< storing the (extended x non-extended) local part of matrices on pos/neg part of tetra
     LocalSystem1TwoPhase_P2XCL  localX_twophase; ///< set up extended part
 
     ///\brief Computes the mapping from local to global data "nx" and the local matrices in locX.
@@ -1628,16 +1644,19 @@ void System1Accumulator_P2XCL::local_setup (const TetraCL& tet)
     base::local_setup( tet);
     // ls_loc already set in base::local_setup(...)
     if (!equal_signs( ls_loc))
-        localX_twophase.setup( T, absdet, ls_loc, locInt, locX);
-    add_transpose_kronecker_id( locX.Ak, locX.A);
+        localX_twophase.setup( ls_loc, locInt, locX);
+    for (int sgn=0; sgn<2; ++sgn) // loop over neg/pos part
+        add_transpose_kronecker_id( locX[sgn].Ak, locX[sgn].A);
 
-    if (b != 0)
+    if (b != 0) {
+        std::valarray<double> rhs5;
         for (int i= 0; i < 10; ++i)
-            if (n.WithUnknowns( i)) {
+            if (nx.WithUnknowns( i)) {
                 // setup b for extended dofs
-                throw DROPSErrCL("needs to be implemented!");
-                locX_b[i]= rhs.quadP2( i, absdet) + locX.rho_phi[i]*Coeff.g;
+                const bool supp= localX_twophase.supp_pos[i]; // support on neg. or pos. part
+                locX_b[i]= locInt[supp].rhs[i] + locX[supp].rho_phi[i]*Coeff.g;
             }
+    }
 }
 
 void System1Accumulator_P2XCL::update_global_system ()
@@ -1648,14 +1667,15 @@ void System1Accumulator_P2XCL::update_global_system ()
     base::update_global_system();
     SparseMatBuilderCL<double, SMatrixCL<3,3> >& mA= *mA_;
     SparseMatBuilderCL<double, SDiagMatrixCL<3> >& mM= *mM_;
+    const bool *supp_pos= localX_twophase.supp_pos; // store whether extended basis function has support on positive part
 
     for(int i= 0; i < 10; ++i) {  // assemble row n.num[i] and nx.num[i]
         if (n.WithUnknowns( i)) { // dof i is not on a Dirichlet boundary
             // assemble std x ext
             for(int j= 0; j < 10; ++j) {
                 if (nx.WithUnknowns( j)) { // dof j is extended
-                    mA( n.num[i], nx.num[j])+= locX.Ak[i][j];
-                    mM( n.num[i], nx.num[j])+= SDiagMatrixCL<3>( locX.M[j][i]);
+                    mA( n.num[i], nx.num[j])+= locX[supp_pos[j]].Ak[i][j];
+                    mM( n.num[i], nx.num[j])+= SDiagMatrixCL<3>( locX[supp_pos[j]].M[j][i]);
                 }
             }
         }
@@ -1663,13 +1683,13 @@ void System1Accumulator_P2XCL::update_global_system ()
             for(int j= 0; j < 10; ++j) {
                 if (n.WithUnknowns( j)) { // dof j is not on a Dirichlet boundary
                     // assemble ext x std
-                    mA( nx.num[i], n.num[j])+= locX.Ak[i][j];
-                    mM( nx.num[i], n.num[j])+= SDiagMatrixCL<3>( locX.M[j][i]);
+                    mA( nx.num[i], n.num[j])+= locX[supp_pos[i]].Ak[i][j];
+                    mM( nx.num[i], n.num[j])+= SDiagMatrixCL<3>( locX[supp_pos[i]].M[j][i]);
                 }
-                if (nx.WithUnknowns( j) && overlap(i,j)) { // dof j is extended and shares support with extended dof i
+                if (nx.WithUnknowns( j) && supp_pos[i]==supp_pos[j]) { // dof j is extended and shares support with extended dof i
                     // assemble ext x ext
-                    mA( nx.num[i], nx.num[j])+= locX.Ak[i][j];
-                    mM( nx.num[i], nx.num[j])+= SDiagMatrixCL<3>( locX.M[j][i]);
+                    mA( nx.num[i], nx.num[j])+= locX[supp_pos[j]].Ak[i][j];
+                    mM( nx.num[i], nx.num[j])+= SDiagMatrixCL<3>( locX[supp_pos[j]].M[j][i]);
                 }
             }
             if (b != 0) // assemble the extended right-hand side
@@ -1688,7 +1708,7 @@ void SetupSystem1_P2( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_,
     ScopeTimerCL scope("SetupSystem1_P2");
     System1Accumulator_P2CL accu( Coeff_, BndData_, lset, RowIdx, A, M, b, cplA, cplM, t);
     TetraAccumulatorTupleCL accus;
-    accus.push_back( &accu);
+    MaybeAddProgressBar(MG_, "System1(P2) Setup", accus, RowIdx.TriangLevel());    accus.push_back( &accu);
     accumulate( accus, MG_, RowIdx.TriangLevel(), RowIdx.GetMatchingFunction(), RowIdx.GetBndInfo());
     // time.Stop();
     // std::cout << "setup: " << time.GetTime() << " seconds" << std::endl;
@@ -1704,7 +1724,7 @@ void SetupSystem1_P2X( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_
 
     System1Accumulator_P2XCL accu( Coeff_, BndData_, lset, RowIdx, A, M, b, cplA, cplM, t);
     TetraAccumulatorTupleCL accus;
-    MaybeAddProgressBar(MG_, "System1(P2) Setup", accus, RowIdx.TriangLevel());
+    MaybeAddProgressBar(MG_, "System1(P2X) Setup", accus, RowIdx.TriangLevel());
     accus.push_back( &accu);
     accumulate( accus, MG_, RowIdx.TriangLevel(), RowIdx.GetMatchingFunction(), RowIdx.GetBndInfo());
     // time.Stop();
@@ -1800,7 +1820,6 @@ void SetupSystem1_P2R( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_
             for (int i=0; i<10; ++i)
             {
                 rho_phi[i]= rho_const*Ones.quadP2( i, absdet);
-                intRhs[i]= rhs.quadP2(i, absdet);
                 for (int j=0; j<=i; ++j)
                 {
                     // dot-product of the gradients
@@ -1920,21 +1939,17 @@ void SetupSystem1_P2R( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_
                             intpos += Quad5CL<>(qi_p[k]*qj_p[k]).quad(absdet*VolFrac(patch.GetTetra(k)));
                     coupM[i][j]= rho_p*intpos + rho_n*intneg;
                 }
-                if (b != 0) {
-                    if (i<10)
-                        intRhs[i]= rhs.quadP2(i, absdet);
-                    else {
-                        intRhs[i]= Point3DCL();
-                        for (Uint k=0; k<patch.GetNumTetra(); k++) {
-                            nodes= Quad5CL<>::TransformNodes(patch.GetTetra(k));
-                            Quad5CL<Point3DCL> rhs5( *sit, Coeff_.volforce, t, nodes);
+                if (b != 0) { // setup rhs
+                    intRhs[i]= Point3DCL();
+                    for (Uint k=0; k<patch.GetNumTetra(); k++) {
+                        nodes= Quad5CL<>::TransformNodes(patch.GetTetra(k));
+                        Quad5CL<Point3DCL> rhs5( *sit, Coeff_.volforce, t, nodes);
 
-                            if (k<patch.GetNumNegTetra())
-                                intRhs[i] += Quad5CL<Point3DCL>(qi_n[k]*rhs5).quad(absdet*VolFrac(patch.GetTetra(k)));
-                            else
-                                intRhs[i] += Quad5CL<Point3DCL>(qi_p[k]*rhs5).quad(absdet*VolFrac(patch.GetTetra(k)));
-                            delete[] nodes;
-                        }
+                        if (k<patch.GetNumNegTetra())
+                            intRhs[i] += Quad5CL<Point3DCL>(qi_n[k]*rhs5).quad(absdet*VolFrac(patch.GetTetra(k)));
+                        else
+                            intRhs[i] += Quad5CL<Point3DCL>(qi_p[k]*rhs5).quad(absdet*VolFrac(patch.GetTetra(k)));
+                        delete[] nodes;
                     }
                 }
             }
