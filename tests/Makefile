@@ -21,7 +21,7 @@ EXEC =  ip1test ip2test mattest prolongationp2test reftest testfe \
         p2local quadbase globallist triang quadCut bicgstab gcr blockmat \
         mass quad5 downwind quad5_2D interfaceP1FE serialization xfem \
         directsolver f_Gamma neq splitboundary reparam_init reparam \
-        extendP1onChild principallattice quad_extra
+        extendP1onChild principallattice quad_extra csgtest
 
 # rules
 
@@ -257,6 +257,17 @@ quad_extra: \
     ../geom/boundary.o ../geom/topo.o ../num/unknowns.o ../misc/problem.o \
     ../num/fe.o ../num/discretize.o ../num/interfacePatch.o\
     ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o ../num/quadrature.o
+	$(CXX) -o $@ $^ $(LFLAGS)
+
+csgtest: \
+    ../tests/csgtest.o ../levelset/levelset.o ../levelset/fastmarch.o \
+    ../geom/deformation.o \
+    ../misc/scopetimer.o ../misc/progressaccu.o \
+    ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
+    ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \
+    ../num/fe.o ../num/interfacePatch.o ../levelset/surfacetension.o \
+    ../misc/params.o ../out/vtkOut.o ../geom/principallattice.o ../geom/reftetracut.o ../geom/subtriangulation.o \
+    ../num/quadrature.o ../geom/csg.o
 	$(CXX) -o $@ $^ $(LFLAGS)
 
 ../tests/directsolver.o:
