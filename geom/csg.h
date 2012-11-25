@@ -61,6 +61,13 @@ namespace CSG {
 ///             * "Union"
 ///             * Json-object with key: "Type": string, required; optional further key-value pairs.
 
+///{ "Type": "CreateReference", "Name": "XXX" } /// Memoizes s.top() as XXX.
+///{ "Type": "PushReference", "Name": "XXX" }   /// Push the reference to XXX on s.
+/// *Do not* create cycles or you get, what you deserve.
+/// Use these sparingly. They are appropriate for very complex objects to reuse already complex subobjects. E.g., name the result of a module-load.
+/// { "Type": "LoadFromModule", "Path": "path/to/json" } /// calls body_builder on path/to/json; the result is pushed to s; s.top owns the so-constructed CSG-object.
+/// { "Type": "LoadFromModule", "Path": "path/to/json", "Name": "XXX" } /// calls body_builder on the child with name XXX in path/to/json; the result is pushed to s; s.top owns the so-constructed CSG-object.
+/// { "Type": "ApplySimilarityToDomain", "Translation": [], "RotationAxis": [], "RotationAngle": a, "Scaling" s } all parts are optional, but the Rotation-Stuff must be present or absent as a whole.
 
 class BodyCL; ///< Base-type of all CSG-Objects: Evaluation, memory-management.
 

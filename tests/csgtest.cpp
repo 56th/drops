@@ -63,8 +63,8 @@ int Test (MultiGridCL& mg)
 
     // writer for vtk-format
     VTKOutCL vtkwriter( mg, "DROPS data", 1,
-                        ".", "ttt", 
-                        "ttt", /* <- time file name */
+                        ".", "nnn", 
+                        "nnn", /* <- time file name */
                         true, 0, -1, 0);
     vtkwriter.Register( make_VTKScalar( lset.GetSolution(), "level-set") );
     vtkwriter.Write( 0.);
@@ -76,7 +76,7 @@ int Test (MultiGridCL& mg)
 int main ()
 {
   try {
-    BrickBuilderCL mgb( Point3DCL( -1.), 2*std_basis<3>( 1), 2*std_basis<3>( 2), 2*std_basis<3>( 3), 16, 16, 16);
+    BrickBuilderCL mgb( Point3DCL( -1.), 2*std_basis<3>( 1), 2*std_basis<3>( 2), 2*std_basis<3>( 3), 8, 8, 8);
     MultiGridCL mg( mgb);
     return  Test( mg);
   }

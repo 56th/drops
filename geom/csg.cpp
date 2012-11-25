@@ -66,6 +66,7 @@ class IntersectionBodyCL : public BodyCL
     double operator() (const Point3DCL& x, double t) const {
         const double v0= (*b0_)( x, t), v1= (*b1_)( x, t);
         return std::max( v0, v1);
+        // return v0 + v1 + hypot(v0, v1);
     }
 };
 
@@ -86,6 +87,7 @@ class UnionBodyCL : public BodyCL
     double operator() (const Point3DCL& x, double t) const {
         const double v0= (*b0_)( x, t), v1= (*b1_)( x, t);
         return std::min( v0, v1);
+        // return v0 + v1 - hypot(v0, v1);
     }
 };
 
@@ -136,7 +138,7 @@ class LevelsetBodyCL : public BodyCL
     double (*ls_)(const Point3DCL&, double);
 
   public:
-    LevelsetBodyCL (BodyStackT& s, const ParamCL& p)
+    LevelsetBodyCL (BodyStackT&, const ParamCL& p)
         : ls_( InScaMap::getInstance()[p.get<std::string>( "Function")]) {}
 
     double operator() (const Point3DCL& x, double t) const {
@@ -144,6 +146,82 @@ class LevelsetBodyCL : public BodyCL
     }
 };
 
+class ModuleBodyCL : public BodyCL
+{
+  private:
+    const BodyCL* b_;
+
+  public:
+    ModuleBodyCL (BodyStackT&, const ParamCL& p) {
+        std::ifstream is( p.get<std::string>( "Path").c_str());
+        ParamCL pm;
+        is >> pm;
+        std::string name;
+        try {
+            name= p.get<std::string>( "Name");
+        } catch (DROPSErrCL) {}
+        b_= name == std::string( "") ? body_builder( pm)
+                                     : body_builder( pm.get_child( name));
+    }
+
+    double operator() (const Point3DCL& x, double t) const { return (*b_)( x, t); }
+};
+
+class SimilarityTransformBodyCL : public BodyCL
+{
+  private:
+    const BodyCL* b_;
+
+    double s_;
+    bool do_rotate_;
+    SMatrixCL<3,3> r_;
+    Point3DCL t_;
+
+  public:
+    SimilarityTransformBodyCL (BodyStackT& s, const ParamCL& p) 
+        : s_(1.), do_rotate_( false), t_( 0.) {
+        try {
+            s_= p.get<double>( "Scaling");
+        } catch (DROPSErrCL) {}
+        bool haveangle= false;
+        double a;
+        try {
+            a= p.get<double>( "RotationAngle");
+            haveangle= true;
+        } catch (DROPSErrCL) {}
+        bool haveaxis= false;
+        Point3DCL axis;
+        try {
+            axis= p.get<Point3DCL>( "RotationAxis");
+            haveaxis= true;
+        } catch (DROPSErrCL) {}
+        if (haveaxis != haveangle)
+            throw DROPSErrCL( "SimilarityTransformBodyCL: A rotation must have a \"RotationAxis\" and a \"RotationAngle\".\n");
+        if (haveangle) { // Precompute the rotation-matrix.
+            axis/=axis.norm();
+            SMatrixCL<3,3> o;
+            o(1,0)= -(o(0,1)= -axis[2]); // Matrix-rep of cross-product with axis.
+            o(2,0)= -(o(0,2)=  axis[1]);
+            o(2,1)= -(o(1,2)= -axis[0]);
+            r_(0,0)= r_(1,1)= r_(2,2)= 1.;
+            r_+= std::sin( a)*o + (1. - std::cos(a))*(o*o);
+            do_rotate_= true;
+        }
+        try {
+            t_= p.get<Point3DCL>( "Translation");
+        } catch (DROPSErrCL) {}
+
+        b_= s.top();
+        s.pop();
+    }
+
+    double operator() (const Point3DCL& x, double t) const {
+        Point3DCL y= s_*x;
+        if (do_rotate_)
+            y= r_*y;
+        y+= t_;
+        return (*b_)( y, t); }
+};
 
 /// \brief Free-standing builder for a BodyCL-specialization.
 /// Pops its arguments from s and pushes its product on s.
@@ -174,15 +252,18 @@ RegisterSimpleBuilder sreg00("Complement",   &simple_make_new<ComplementBodyCL>)
 RegisterSimpleBuilder sreg01("Intersection", &simple_make_new<IntersectionBodyCL>);
 RegisterSimpleBuilder sreg02("Union",        &simple_make_new<UnionBodyCL>);
 
-RegisterBuilder reg00("Halfspace", &make_new<HalfspaceBodyCL>);
-RegisterBuilder reg01("Sphere",    &make_new<SphereBodyCL>);
-RegisterBuilder reg02("Levelset",  &make_new<LevelsetBodyCL>);
+RegisterBuilder reg00("Halfspace",               &make_new<HalfspaceBodyCL>);
+RegisterBuilder reg01("Sphere",                  &make_new<SphereBodyCL>);
+RegisterBuilder reg02("Levelset",                &make_new<LevelsetBodyCL>);
+RegisterBuilder reg03("LoadFromModule",          &make_new<ModuleBodyCL>);
+RegisterBuilder reg04("ApplySimilarityToDomain", &make_new<SimilarityTransformBodyCL>);
 
 
 const BodyCL* body_builder (const ParamCL& p) // :-)
 {
     BodyStackT s;
     BodyVectorT refs;
+    std::map<std::string, const BodyCL*> named_refs;
 
     if (p.get<std::string>( "Type") != std::string( "CSG-body (v0)"))
         throw DROPSErrCL( "body_builder: Unknown CSG-specification.\n");
@@ -194,7 +275,16 @@ const BodyCL* body_builder (const ParamCL& p) // :-)
             SimpleBuilderMap::getInstance()[op]( s);
         else {
             op= i->second.get<std::string>( "Type");
-            BuilderMap::getInstance()[op]( s, i->second);
+            if      (op == std::string( "CreateReference")) {
+                named_refs[i->second.get<std::string>( "Name")]= s.top();
+                continue; // The object is already in refs.
+            }
+            else if (op == std::string( "PushReference")) {
+                s.push( named_refs[i->second.get<std::string>( "Name")]);
+                continue; // The object is already in refs.
+            }
+            else
+                BuilderMap::getInstance()[op]( s, i->second);
         }
         refs.push_back( s.top());
     }
@@ -211,3 +301,8 @@ const BodyCL* body_builder (const ParamCL& p) // :-)
 
 } // end of namespace DROPS::CSG
 } // end of namespace DROPS
+
+
+// { "Type": "ProjectivityTransform", "Matrix": [4x4-Matrix as array; entries in row-major order]}
+// { "Type": "InfiniteCylinder", "Axis": [], "Radius": r}
+// 
