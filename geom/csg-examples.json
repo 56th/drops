@@ -1,0 +1,81 @@
+{
+  "Unit ball":
+  {
+    "Type": "CSG-body (v0)",
+    "Instructions" : [
+        { "Type": "Sphere", "Center": [0, 0, 0], "Radius": 1 } // both args are optional
+    ]
+  },
+
+  "Left half space":
+  {
+    "Type": "CSG-body (v0)",
+    "Instructions" : [
+        { "Type": "Halfspace", "Normal": [1, 0, 0]}
+    ]
+  },
+
+  "Suess":
+  {
+    "Type": "CSG-body (v0)",
+    "Instructions" : [
+        { "Type": "Levelset", "Function": "suess" }
+    ]
+  },
+
+  "Unit cube":
+  {
+    "Type": "CSG-body (v0)",
+    "Instructions" : [
+        { "Type": "Halfspace", "Normal": [ 1, 0, 0], "ValueAtOrigin": -0.6 }, // optional "MakeUnitNormal": true
+        { "Type": "Halfspace", "Normal": [-1, 0, 0] },
+        { "Type": "Halfspace", "Normal": [ 0, 1, 0], "ValueAtOrigin": -0.6 },
+        { "Type": "Halfspace", "Normal": [ 0,-1, 0] },
+        { "Type": "Halfspace", "Normal": [ 0, 0, 1], "ValueAtOrigin": -0.6 },
+        { "Type": "Halfspace", "Normal": [ 0, 0,-1] },
+        "Intersection",
+        "Intersection",
+        "Intersection",
+        "Intersection",
+        "Intersection"
+    ]
+  },
+
+  "Two spheres with reference":
+  {
+    "Type": "CSG-body (v0)",
+    "Instructions" : [
+        { "Type": "Sphere", "Center": [0, 0, 0], "Radius": 1 },
+        { "Type": "CreateReference", "Name": "s0" },
+        { "Type": "ApplySimilarityToDomain", "Translation": [0.5, 0,0], "Scaling": 1.2 }, // optional RotationAxis, RotationAngle
+        { "Type": "PushReference", "Name": "s0" },
+        "SmoothUnion" // A close relative of "Union"
+    ]
+  },
+
+  "Unit cube with Suess (loaded)":
+  {
+    "Type": "CSG-body (v0)",
+    "Instructions" : [
+        { "Type": "LoadFromModule", "Path": "../geom/csg-examples.json", "Name": "Unit cube" }, // Name is optional, if the file directly contains a CSG-object.
+        { "Type": "LoadFromModule", "Path": "../geom/csg-examples.json", "Name": "Suess" },
+        { "Type": "ApplySimilarityToDomain", "Translation": [0.5, 0,0], "Scaling": 3 },
+        "Union"
+    ]
+  },
+
+  "Notched unit ball":
+  {
+    "Type": "CSG-body (v0)",
+    "Instructions" : [
+        { "Type": "Halfspace", "Normal": [  1, 0, 0], "ValueAtOrigin": -0.2 },
+        { "Type": "Halfspace", "Normal": [ -1, 0, 0], "ValueAtOrigin": -0.2, "MakeUnitNormal": true },
+        { "Type": "Halfspace", "Normal": [  0, 1, 0], "ValueAtOrigin": -0.2, "MakeUnitNormal": false },
+        "Intersection",
+        "Intersection",
+        "Complement",
+        { "Type": "Sphere", "Center": [0, 0, 0], "Radius": 1 },
+        "Intersection"
+    ]
+  }
+}

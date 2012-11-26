@@ -28,22 +28,14 @@
 namespace DROPS {
 namespace CSG {
 
-/// \brief Stack-type for the stack-machine.
-typedef std::stack<const BodyCL*>  BodyStackT;
-
-
 class ComplementBodyCL : public BodyCL
 {
   private:
     const BodyCL* b_;
 
   public:
-    ComplementBodyCL (BodyStackT& s) {
-        if (s.empty())
-            throw DROPSErrCL("ComplementBodyCL: Nothing to complement.\n");
-        b_= s.top();
-        s.pop();
-    }
+    ComplementBodyCL (BodyStackT& s, const std::string& /*instruction*/)
+        { b_= pop_and_take_ownership( s); }
 
     double operator() (const Point3DCL& x, double t) const
         { return -(*b_)( x, t); }
@@ -54,19 +46,18 @@ class IntersectionBodyCL : public BodyCL
   private:
     const BodyCL* b0_;
     const BodyCL* b1_;
+    bool  use_smooth_op_;
 
   public:
-    IntersectionBodyCL (BodyStackT& s) {
-        if (s.size() < 2)
-            throw DROPSErrCL("IntersectionBodyCL: Less than 2 bodies on the stack.\n");
-         b0_= s.top(); s.pop();
-         b1_= s.top(); s.pop();
+    IntersectionBodyCL (BodyStackT& s, const std::string& instruction) {
+         use_smooth_op_= instruction == std::string( "SmoothIntersection");
+         b0_= pop_and_take_ownership( s);
+         b1_= pop_and_take_ownership( s);
     }
 
     double operator() (const Point3DCL& x, double t) const {
         const double v0= (*b0_)( x, t), v1= (*b1_)( x, t);
-        return std::max( v0, v1);
-        // return v0 + v1 + hypot(v0, v1);
+        return use_smooth_op_ ? v0 + v1 + hypot(v0, v1) : std::max( v0, v1);
     }
 };
 
@@ -75,13 +66,13 @@ class UnionBodyCL : public BodyCL
   private:
     const BodyCL* b0_;
     const BodyCL* b1_;
+    bool  use_smooth_op_;
 
   public:
-    UnionBodyCL (BodyStackT& s) {
-        if (s.size() < 2)
-            throw DROPSErrCL("UnionBodyCL: Less than 2 bodies on the stack.\n");
-         b0_= s.top(); s.pop();
-         b1_= s.top(); s.pop();
+    UnionBodyCL (BodyStackT& s, const std::string& instruction) {
+         use_smooth_op_= instruction == std::string( "SmoothUnion");
+         b0_= pop_and_take_ownership( s);
+         b1_= pop_and_take_ownership( s);
     }
 
     double operator() (const Point3DCL& x, double t) const {
@@ -97,11 +88,14 @@ class HalfspaceBodyCL : public BodyCL
 {
   private:
     Point3DCL n_;
-    const double a_;
+    double a_;
 
   public:
     HalfspaceBodyCL (BodyStackT&, const ParamCL& p)
-        : n_( p.get<Point3DCL>( "Normal")), a_( p.get<double>( "ValueAtOrigin")) {
+        : n_( p.get<Point3DCL>( "Normal")), a_( 0.) {
+        try {
+            a_= p.get<double>( "ValueAtOrigin");
+        } catch (DROPSErrCL) {}
         bool normalize= false;
         try {
             normalize= p.get<bool>( "MakeUnitNormal");
@@ -110,25 +104,30 @@ class HalfspaceBodyCL : public BodyCL
             n_/= n_.norm();
     }
 
-    double operator() (const Point3DCL& x, double) const {
-        return inner_prod( n_, x) + a_;
-    }
+    double operator() (const Point3DCL& x, double) const
+        { return inner_prod( n_, x) + a_; }
 };
 
 /// \|x -c_\| - r_
 class SphereBodyCL : public BodyCL
 {
   private:
-    const Point3DCL c_;
-    const double r_;
+    Point3DCL c_;
+    double r_;
 
   public:
     SphereBodyCL (BodyStackT&, const ParamCL& p)
-        : c_( p.get<Point3DCL>( "Center")), r_( p.get<double>( "Radius")) {}
-
-    double operator() (const Point3DCL& x, double) const {
-        return (x - c_).norm() - r_;
+        : r_( 0.) {
+        try {
+            r_= p.get<double>( "Radius");
+        } catch (DROPSErrCL) {}
+        try {
+            c_= p.get<Point3DCL>( "Center");
+        } catch (DROPSErrCL) {}
     }
+
+    double operator() (const Point3DCL& x, double) const
+        { return (x - c_).norm() - r_; }
 };
 
 /// Levelset
@@ -141,18 +140,20 @@ class LevelsetBodyCL : public BodyCL
     LevelsetBodyCL (BodyStackT&, const ParamCL& p)
         : ls_( InScaMap::getInstance()[p.get<std::string>( "Function")]) {}
 
-    double operator() (const Point3DCL& x, double t) const {
-        return (*ls_)( x, t);
-    }
+    double operator() (const Point3DCL& x, double t) const
+        { return (*ls_)( x, t); }
 };
 
+
+///\brief Load a body from another json-file.
+/// It is constructed by a call to body_builder.
 class ModuleBodyCL : public BodyCL
 {
   private:
     const BodyCL* b_;
 
   public:
-    ModuleBodyCL (BodyStackT&, const ParamCL& p) {
+    ModuleBodyCL (BodyStackT& s, const ParamCL& p) {
         std::ifstream is( p.get<std::string>( "Path").c_str());
         ParamCL pm;
         is >> pm;
@@ -160,11 +161,13 @@ class ModuleBodyCL : public BodyCL
         try {
             name= p.get<std::string>( "Name");
         } catch (DROPSErrCL) {}
-        b_= name == std::string( "") ? body_builder( pm)
-                                     : body_builder( pm.get_child( name));
+        s.push( name == std::string( "") ? body_builder( pm)
+                                         : body_builder( pm.get_child( name)));
+        b_= pop_and_take_ownership( s);
     }
 
-    double operator() (const Point3DCL& x, double t) const { return (*b_)( x, t); }
+    double operator() (const Point3DCL& x, double t) const
+        { return (*b_)( x, t); }
 };
 
 class SimilarityTransformBodyCL : public BodyCL
@@ -210,9 +213,7 @@ class SimilarityTransformBodyCL : public BodyCL
         try {
             t_= p.get<Point3DCL>( "Translation");
         } catch (DROPSErrCL) {}
-
-        b_= s.top();
-        s.pop();
+        b_= pop_and_take_ownership( s);
     }
 
     double operator() (const Point3DCL& x, double t) const {
@@ -220,12 +221,30 @@ class SimilarityTransformBodyCL : public BodyCL
         if (do_rotate_)
             y= r_*y;
         y+= t_;
-        return (*b_)( y, t); }
+        return (*b_)( y, t)/s_; }
 };
+
+///\brief Refer to an already existing body. Therefore, do not take ownership of it.
+/// This is an extension of a stack-machine.
+/// By allowing references, one can construct a DAG instead of a tree. This
+/// allows for smaller representations of complex geometries, as copies of
+/// existing branches can be avoided.
+class ReferenceBodyCL : public BodyCL
+{
+  private:
+    const BodyCL* b_;
+
+  public:
+    ReferenceBodyCL (const BodyCL* b) : b_( b) {}
+
+    double operator() (const Point3DCL& x, double t) const
+        { return (*b_)( x, t); }
+};
+
 
 /// \brief Free-standing builder for a BodyCL-specialization.
 /// Pops its arguments from s and pushes its product on s.
-typedef void (*SimpleBodyBuilderT)(BodyStackT& s);
+typedef void (*SimpleBodyBuilderT)(BodyStackT& s, const std::string& instruction);
 typedef SingletonMapCL<SimpleBodyBuilderT> SimpleBuilderMap;
 typedef MapRegisterCL<SimpleBodyBuilderT>  RegisterSimpleBuilder;
 
@@ -239,8 +258,8 @@ typedef MapRegisterCL<BodyBuilderT>  RegisterBuilder;
 ///@{
 template <class T>
 inline void
-simple_make_new (BodyStackT& s)
-{ s.push( new T( s)); }
+make_new (BodyStackT& s, const std::string& instruction)
+{ s.push( new T( s, instruction)); }
 
 template <class T>
 inline void
@@ -248,9 +267,12 @@ make_new (BodyStackT& s, const ParamCL& p)
 { s.push( new T( s, p)); }
 ///@}
 
-RegisterSimpleBuilder sreg00("Complement",   &simple_make_new<ComplementBodyCL>);
-RegisterSimpleBuilder sreg01("Intersection", &simple_make_new<IntersectionBodyCL>);
-RegisterSimpleBuilder sreg02("Union",        &simple_make_new<UnionBodyCL>);
+// Note how C++ selects the right overload of make_new by the type of the MapRegisterCL<T>.
+RegisterSimpleBuilder sreg00("Complement",         &make_new<ComplementBodyCL>);
+RegisterSimpleBuilder sreg01("Intersection",       &make_new<IntersectionBodyCL>);
+RegisterSimpleBuilder sreg02("Union",              &make_new<UnionBodyCL>);
+RegisterSimpleBuilder sreg03("SmoothIntersection", &make_new<IntersectionBodyCL>);
+RegisterSimpleBuilder sreg04("SmoothUnion",        &make_new<UnionBodyCL>);
 
 RegisterBuilder reg00("Halfspace",               &make_new<HalfspaceBodyCL>);
 RegisterBuilder reg01("Sphere",                  &make_new<SphereBodyCL>);
@@ -262,36 +284,34 @@ RegisterBuilder reg04("ApplySimilarityToDomain", &make_new<SimilarityTransformBo
 const BodyCL* body_builder (const ParamCL& p) // :-)
 {
     BodyStackT s;
-    BodyVectorT refs;
     std::map<std::string, const BodyCL*> named_refs;
 
     if (p.get<std::string>( "Type") != std::string( "CSG-body (v0)"))
         throw DROPSErrCL( "body_builder: Unknown CSG-specification.\n");
 
+    size_t ic= 0; // Instruction counter for debugging.
     using boost::property_tree::ptree;
-    for (ptree::const_iterator i= p.get_child( "Instructions").begin(); i != p.get_child( "Instructions").end(); ++i) {
-        std::string op= i->second.get_value<std::string>(); // Operations without parameters (other than S) are represented by bare strings.
-        if (!op.empty())
-            SimpleBuilderMap::getInstance()[op]( s);
-        else {
-            op= i->second.get<std::string>( "Type");
-            if      (op == std::string( "CreateReference")) {
-                named_refs[i->second.get<std::string>( "Name")]= s.top();
-                continue; // The object is already in refs.
+    try {
+        for (ptree::const_iterator i= p.get_child( "Instructions").begin(); i != p.get_child( "Instructions").end(); ++i, ++ic) {
+            std::string op= i->second.get_value<std::string>(); // Operations without parameters (other than s) are represented by bare strings.
+            if (!op.empty())
+                SimpleBuilderMap::getInstance()[op]( s, op);
+            else {
+                op= i->second.get<std::string>( "Type");
+                if      (op == std::string( "CreateReference"))
+                    named_refs[i->second.get<std::string>( "Name")]= s.top();
+                else if (op == std::string( "PushReference"))
+                    s.push( new ReferenceBodyCL( named_refs[i->second.get<std::string>( "Name")]));
+                else
+                    BuilderMap::getInstance()[op]( s, i->second);
             }
-            else if (op == std::string( "PushReference")) {
-                s.push( named_refs[i->second.get<std::string>( "Name")]);
-                continue; // The object is already in refs.
-            }
-            else
-                BuilderMap::getInstance()[op]( s, i->second);
         }
-        refs.push_back( s.top());
+    } catch (...) {
+        std::cerr << "body_builder: Error while proccessing instruction " << ic << ".\n";
+        throw;
     }
 
-    refs.pop_back(); // If ret owns a pointer to itself, it will delete itself again...
     const BodyCL* ret= s.top();
-    ret->make_owner_of( refs);
     if (s.size() != 1) {
         delete ret;
         throw DROPSErrCL( "body_builder: Stack not empty after popping the final product.\n");

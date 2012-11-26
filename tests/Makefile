@@ -261,7 +261,7 @@ quad_extra: \
 
 csgtest: \
     ../tests/csgtest.o ../levelset/levelset.o ../levelset/fastmarch.o \
-    ../geom/deformation.o \
+    ../geom/deformation.o ../misc/funcmap.o \
     ../misc/scopetimer.o ../misc/progressaccu.o \
     ../geom/simplex.o ../geom/multigrid.o ../geom/builder.o ../geom/topo.o ../geom/boundary.o \
     ../num/unknowns.o ../misc/utils.o ../misc/problem.o ../num/discretize.o \

@@ -33,59 +33,178 @@
 namespace DROPS {
 namespace CSG {
 
-/// A CSG-object is a directed acyclic graph of bodies (BodyCL-objects):
-///    * Leave-nodes:
+/// A CSG-object is a directed acyclic graph (DAG) of BodyCL-objects (bodies):
+///    * Leave-nodes (do not refer to other nodes):
 ///         * Halfspace
 ///         * Sphere
 ///         * Levelset
-///    * inner nodes: Operators:
+
+///    * inner nodes: Operators (refer to at least one node):
 ///         * Complement (Body b)
 ///         * Intersection (Body b0, Body b1)
 ///         * Union (Body b0, Body b1)
+///         * ApplySimilarityToDomain( Body b)
+///         * Reference (Body b)
+///         * Module -- refers to the Body created by loading the module.
 
-/// Description of the CSG-object in json-file as stack-machine:
-/// Start with empty stack S.
-/// Consume a sequence of instructions:
-///    * Leave-instructions create a new object and push a reference to it on S.
-///    * Operator-instructions pop the required number of pointers from S, create the new operator-object and push a reference to it on S.
-/// After the last instruction, the top of S is popped and returned as final body. It is an error if S is not empty after that.
+/// All bodies support
+///     virtual double operator() (const Point3DCL& x, double t) const
+/// to evaluate the level set function at (x,t).
+
+/// From am mathematical perspective, it might seem odd to use the same class for
+/// the operators and the geometric primitives. However, it is convenient for
+/// implementation in C++, if the data-structure is homogeneous.
+
+/// All inner nodes take ownership of the bodies they refer to. This means, that
+/// an inner node will delete the bodies it refers to, when it is destroyed itself.
+///
+/// The only exception is the Reference-body. It does not destroy the body it
+/// refers to.
+/// References allow for smaller CSG-objects, if many instances of the
+/// same CSG-sub-object are used in a CSG-object. They can instead all refer
+/// to the same one.
+
+/// The sequential description of the CSG-object uses a stack-machine with a stack s.
+/// All bodies are passed via s.
+/// Inner nodes pop the required bodies from s. New bodies are pushed to s.
+///    * Start with empty stack s.
+///    * Consume the sequence of instructions.
+///    * After the last instruction, the top of S is popped and returned as
+///      the desired CSG-object ret.
+/// It is an error, if s is not empty after popping ret.
+
+/// Every instruction is mapped to the constructor of a body.
+/// Instructions are classified, on whether they accept additional arguments, which
+/// are not passed on the stack.
+///    * SimpleInstructions only pass the current stack and the name, with which
+///      they were invoked to the body-constructor.
+///    * ComplexInstructions pass the current stack a ParamCL-reference to the body-constructor.
+
+/// The ComplexInstruction "CreateReference" is not mapped to a body-constructor.
+/// It only memoizes a name for s.top().
+
+/// Without references, one can describe arbitrary trees with a stack machine (postorder traversal).
+/// The Reference-operator allows the description of arbitrary directed graphs.
+/// *Do not* create cycles -- or you will get what you deserve.
 
 /// Description of a CSG-object in json:
-///    * As a json object; keys:
-///             * "Type": "CSG-body (v0)", required
-///             * "Instructions": array of InstructionType, required
-///             * "Name": string, optional
-///        * InstructionType:
-///             * "Complement"
-///             * "Intersection"
-///             * "Union"
-///             * Json-object with key: "Type": string, required; optional further key-value pairs.
+///    * A json-object with the following entries:
+///             * key "Type", value "CSG-body (v0)", required
+///             * key "Instructions" [json-array of InstructionType],
+///               must be non-empty, required
+///             * key "Name" [string], optional
+///    * InstructionType:
+///         * SimpleInstruction": a string
+///         * ComplexInstruction": A json-object with the following entries:
+///             * key "Type" [string], required
+///             * optional further key-value pairs.
 
-///{ "Type": "CreateReference", "Name": "XXX" } /// Memoizes s.top() as XXX.
-///{ "Type": "PushReference", "Name": "XXX" }   /// Push the reference to XXX on s.
-/// *Do not* create cycles or you get, what you deserve.
-/// Use these sparingly. They are appropriate for very complex objects to reuse already complex subobjects. E.g., name the result of a module-load.
-/// { "Type": "LoadFromModule", "Path": "path/to/json" } /// calls body_builder on path/to/json; the result is pushed to s; s.top owns the so-constructed CSG-object.
-/// { "Type": "LoadFromModule", "Path": "path/to/json", "Name": "XXX" } /// calls body_builder on the child with name XXX in path/to/json; the result is pushed to s; s.top owns the so-constructed CSG-object.
-/// { "Type": "ApplySimilarityToDomain", "Translation": [], "RotationAxis": [], "RotationAngle": a, "Scaling" s } all parts are optional, but the Rotation-Stuff must be present or absent as a whole.
+/// =The following SimpleInstructions exist=
+/// ==Complement: set-theoretic complement==
+/// -ls;
+/// Pops one arg from s, pushes one result.
+/// ComplementBodyCL
+
+/// ==Intersection: set-theoretic intersection==
+/// max(ls0, ls1);
+/// Pops two args from s, pushes one result.
+/// IntersectionBodyCL
+
+/// ==Union: set-theoretic union==
+/// min(ls0, ls1);
+/// Pops two args from s, pushes one result.
+/// UnionBodyCL
+
+/// ==SmoothIntersection: set-theoretic intersection==
+/// smooth, distance-like R-function instead of max; preserves the level-set
+/// exactly; otherwise as Intersection.
+/// IntersectionBodyCL
+
+/// ==SmoothUnion: set-theoretic union==
+/// smooth, distance-like R-function instead of min; preserves the level-set
+/// exactly; otherwise as Union.
+/// UnionBodyCL
+
+
+/// =The following ComplexInstructions exist=
+/// ==HalfSpace: Linear level set function for a plane==
+///    * key "Normal" [Point3DCL], required;
+///    * key "ValueAtOrigin" [double], optional, defaults to 0.0;
+///    * key "MakeUnitNormal" [bool]; optional, defaults to false;
+/// Pushes one body on the stack;
+/// HalfspaceBodyCL
+
+/// ==Sphere: Distance function for a sphere==
+///    * key "Center" [Point3DCL]; optional, defaults to (0,0,0)^T;
+///    * key "Radius", [double]; optional, defaults to 0.0;
+/// Pushes one body on the stack;
+/// SphereBodyCL
+
+/// ==Levelset: Use level set function from InScaMap==
+///    * key "Function", value of type string, required;
+/// Pushes one body on the stack;
+/// LevelsetBodyCL
+
+/// ==CreateReference: Create and memoize a name for current s.top()==
+///    * key "Name" [string], required;
+/// Does not alter the stack.
+/// Implemented in body_builder.
+
+/// ==PushReference: Push a reference to the named body on the stack.
+///    * key "Name" [string], required;
+/// The value of Name must have been created by CreateReference.
+/// Pushes one ReferenceBodyCL on the stack.
+/// ReferenceBodyCL
+
+/// ==LoadFromModule: create a CSG-object from a file by calling body_builder==
+///    * key "Path" [string], required; path to a json-file.
+///    * key "Name" [string], optional
+/// If Name is not present the file at Path must contain a valid CSG-object.
+/// If Name is present, the json file must have a child of this name, which
+/// is a valid CSG-object.
+/// Pushes one body on the stack;
+/// ModuleBodyCL
+
+/// ==ApplySimilarityToDomain: Apply a similarity-transformation==
+/// y= s*r*x + t is applied to the domain and  v= u/s to the image of the level set function.
+///    * key "Scaling" [double], optional, defaults to s=1.0;
+///    * key "Translation" [Point3DCL], optional, defaults to t=(0, 0, 0)^T;
+///    * key "RotationAxis", [Point3DCL]; optional, the axis of the rotation;
+///    * key "RotationAngle" [double]; optional;
+/// The rotation-parameters must either both be present or none of them. In
+/// the latter case, no rotation is performed.
+/// Pops one arg from the stack, pushes one body on the stack.
+/// SimilarityTransformBodyCL
 
 class BodyCL; ///< Base-type of all CSG-Objects: Evaluation, memory-management.
 
 /// \brief Type to store references to BodyCL for memory menagement.
 typedef std::vector<const BodyCL*> BodyVectorT;
 
+/// \brief Stack-type for the stack-machine.
+typedef std::stack<const BodyCL*>  BodyStackT;
+
 class BodyCL
 {
   private:
     mutable BodyVectorT owned_ptrs_; ///< All bodies in this container are destroyed in the destructor.
+
+  protected:
+    ///\brief Register s.top() for deletion, pop it from s, and return it.
+    const BodyCL* pop_and_take_ownership (BodyStackT& s) const {
+        if (s.empty())
+            throw DROPSErrCL("pop_and_take_ownership: Cannot pop an empty stack.\n");
+        const BodyCL* ref= s.top();
+        s.pop();
+        owned_ptrs_.push_back( ref);
+        return ref;
+    }
 
   public:
     virtual ~BodyCL () {
         for (BodyVectorT::iterator it= owned_ptrs_.begin(); it != owned_ptrs_.end(); ++it)
             delete *it;
     }
-    ///\brief Transfer ownership of the bodies in refs to this object.
-    void make_owner_of (const BodyVectorT& refs) const { owned_ptrs_= refs; }
 
     ///\brief Evaluation of the level set function.
     virtual double operator() (const Point3DCL& x, double t) const= 0;
@@ -93,7 +212,8 @@ class BodyCL
 
 
 /// \brief Reads the json object in p an returns the corresponding body.
-/// The returned body owns all referenced subobjects.
+/// The returned body recursively owns all referenced subobjects.
+/// Destroy with delete.
 const BodyCL* body_builder (const ParamCL& p); // :-)
 
 } // end of namespace DROPS::CSG
