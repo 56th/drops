@@ -77,13 +77,11 @@ class UnionBodyCL : public BodyCL
 
     double operator() (const Point3DCL& x, double t) const {
         const double v0= (*b0_)( x, t), v1= (*b1_)( x, t);
-        return std::min( v0, v1);
-        // return v0 + v1 - hypot(v0, v1);
+        return use_smooth_op_ ? v0 + v1 - hypot(v0, v1) : std::min( v0, v1);
     }
 };
 
 /// n_^Tx + a_
-/// Normalizes n.
 class HalfspaceBodyCL : public BodyCL
 {
   private:

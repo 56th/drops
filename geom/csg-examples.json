@@ -59,7 +59,7 @@
     "Instructions" : [
         { "Type": "LoadFromModule", "Path": "../geom/csg-examples.json", "Name": "Unit cube" }, // Name is optional, if the file directly contains a CSG-object.
         { "Type": "LoadFromModule", "Path": "../geom/csg-examples.json", "Name": "Suess" },
-        { "Type": "ApplySimilarityToDomain", "Translation": [0.5, 0,0], "Scaling": 3 },
+        { "Type": "ApplySimilarityToDomain", "Translation": [0.5, 0,0], "Scaling": 2 },
         "Union"
     ]
   },
