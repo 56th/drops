@@ -15,6 +15,22 @@
     ]
   },
 
+  "Infinite cone":
+  {
+    "Type": "CSG-body (v0)",
+    "Instructions" : [
+        { "Type": "InfiniteCone", "Apex": [0, 0, 0], "Axis": [1,0,0], "SemiAperture": 0.5 } //  all args are optional.
+    ]
+  },
+
+  "Infinite cylinder":
+  {
+    "Type": "CSG-body (v0)",
+    "Instructions" : [
+        { "Type": "InfiniteCylinder", "Origin": [0, 0, 0], "Axis": [1,0,0], "Radius": 0.6 } //  all args are optional.
+    ]
+  },
+
   "Suess":
   {
     "Type": "CSG-body (v0)",
@@ -76,6 +92,60 @@
         "Complement",
         { "Type": "Sphere", "Center": [0, 0, 0], "Radius": 1 },
         "Intersection"
+    ]
+  },
+
+  "Notched unit ball (smooth intersection)":
+  {
+    "Type": "CSG-body (v0)",
+    "Instructions" : [
+        { "Type": "Halfspace", "Normal": [  1, 0, 0], "ValueAtOrigin": -0.2 },
+        { "Type": "Halfspace", "Normal": [ -1, 0, 0], "ValueAtOrigin": -0.2, "MakeUnitNormal": true },
+        { "Type": "Halfspace", "Normal": [  0, 1, 0], "ValueAtOrigin": -0.2, "MakeUnitNormal": false },
+        "Intersection",
+        "Intersection",
+        "Complement",
+        { "Type": "Sphere", "Center": [0, 0, 0], "Radius": 1 },
+        "SmoothIntersection"
+    ]
+  },
+
+  "Birthday cake (7 connected components)":
+  {
+    "Type": "CSG-body (v0)",
+    "Instructions" : [
+        { "Type": "InfiniteCylinder", "Origin": [-1, 0, 0], "Radius": 0.95 },
+        { "Type": "Halfspace", "Normal": [1, 0, 0], "ValueAtOrigin": 0.3},
+        "Intersection", // The cake
+        { "Type": "InfiniteCylinder", "Origin": [0, 0, 0], "Radius": 0.07 },
+        { "Type": "Halfspace", "Normal": [1, 0, 0], "ValueAtOrigin": -0.4},
+        "Intersection", // The candle body
+        { "Type": "Sphere", "Center": [0.5, 0, 0], "Radius": 0.09 },
+        { "Type": "Halfspace", "Normal": [1, 0, 0], "ValueAtOrigin": -0.56},
+        "Intersection",
+        { "Type": "InfiniteCone", "Apex": [0.82, 0, 0], "Axis": [-1,0,0], "SemiAperture": 0.27 },
+        { "Type": "Halfspace", "Normal": [-1, 0, 0], "ValueAtOrigin": 0.56},
+        "Intersection",
+        "Union", // The flame
+        "Union", // The candle
+        { "Type": "ApplySimilarityToDomain", "Translation": [0,0.7,0] },
+        { "Type": "CreateReference", "Name": "candle0" }, // reference to translated candle
+        "Union",
+        { "Type": "PushReference", "Name": "candle0" },
+        { "Type": "ApplySimilarityToDomain", "RotationAxis": [1,0,0], "RotationAngle": 1.047 },
+        "Union",
+        { "Type": "PushReference", "Name": "candle0" },
+        { "Type": "ApplySimilarityToDomain", "RotationAxis": [1,0,0], "RotationAngle": 2.094 },
+        "Union",
+        { "Type": "PushReference", "Name": "candle0" },
+        { "Type": "ApplySimilarityToDomain", "RotationAxis": [1,0,0], "RotationAngle": 3.142 },
+        "Union",
+        { "Type": "PushReference", "Name": "candle0" },
+        { "Type": "ApplySimilarityToDomain", "RotationAxis": [1,0,0], "RotationAngle": -1.047 },
+        "Union",
+        { "Type": "PushReference", "Name": "candle0" },
+        { "Type": "ApplySimilarityToDomain", "RotationAxis": [1,0,0], "RotationAngle": -2.094 },
+        "Union"
     ]
   }
 }

@@ -102,6 +102,16 @@ class HalfspaceBodyCL : public BodyCL
             n_/= n_.norm();
     }
 
+    const VecOfStringT& known_keys () const {
+        static std::string keys[] = {
+            std::string( "Type"),
+            std::string( "Normal"),
+            std::string( "ValueAtOrigin"),
+            std::string( "MakeUnitNormal") };
+        static const VecOfStringT k( keys, keys + 4);
+        return k;
+    }
+
     double operator() (const Point3DCL& x, double) const
         { return inner_prod( n_, x) + a_; }
 };
@@ -124,8 +134,91 @@ class SphereBodyCL : public BodyCL
         } catch (DROPSErrCL) {}
     }
 
+    const VecOfStringT& known_keys () const {
+        static std::string keys[] = {
+            std::string( "Type"),
+            std::string( "Radius"),
+            std::string( "Center")};
+        static const VecOfStringT k( keys, keys + 3);
+        return k;
+    }
+
     double operator() (const Point3DCL& x, double) const
         { return (x - c_).norm() - r_; }
+};
+
+class InfiniteConeBodyCL : public BodyCL
+{
+  private:
+    Point3DCL apex_,
+              axis_;
+    double c_; // cos(aperture/2)
+
+  public:
+    InfiniteConeBodyCL (BodyStackT&, const ParamCL& p)
+        : axis_( std_basis<3>( 1)) {
+        double a= M_PI/4.;
+        try {
+            a= p.get<double>( "SemiAperture");
+        } catch (DROPSErrCL) {}
+        c_= std::cos( a);
+        try {
+            apex_= p.get<Point3DCL>( "Apex");
+        } catch (DROPSErrCL) {}
+        try {
+            axis_= p.get<Point3DCL>( "Axis");
+        } catch (DROPSErrCL) {}
+        axis_/=axis_.norm();
+    }
+ 
+   const VecOfStringT& known_keys () const {
+        static std::string keys[] = {
+            std::string( "Type"),
+            std::string( "SemiAperture"),
+            std::string( "Apex"),
+            std::string( "Axis") };
+        static const VecOfStringT k( keys, keys + 4);
+        return k;
+    }
+
+    double operator() (const Point3DCL& x, double) const
+        { return  c_*(x - apex_).norm() - inner_prod(x - apex_, axis_); }
+};
+
+class InfiniteCylinderBodyCL : public BodyCL
+{
+  private:
+    Point3DCL origin_,
+              axis_;
+    double r_;
+
+  public:
+    InfiniteCylinderBodyCL (BodyStackT&, const ParamCL& p)
+        : axis_( std_basis<3>( 1)), r_( 1.0) {
+        try {
+            r_= p.get<double>( "Radius");
+        } catch (DROPSErrCL) {}
+        try {
+            origin_= p.get<Point3DCL>( "Origin");
+        } catch (DROPSErrCL) {}
+        try {
+            axis_= p.get<Point3DCL>( "Axis");
+        } catch (DROPSErrCL) {}
+        axis_/=axis_.norm();
+    }
+
+    const VecOfStringT& known_keys () const {
+        static std::string keys[] = {
+            std::string( "Type"),
+            std::string( "Radius"),
+            std::string( "Origin"),
+            std::string( "Axis") };
+        static const VecOfStringT k( keys, keys + 4);
+        return k;
+    }
+
+    double operator() (const Point3DCL& x, double) const
+        { return  (x - origin_ - inner_prod(x - origin_, axis_)*axis_).norm() - r_; }
 };
 
 /// Levelset
@@ -138,10 +231,17 @@ class LevelsetBodyCL : public BodyCL
     LevelsetBodyCL (BodyStackT&, const ParamCL& p)
         : ls_( InScaMap::getInstance()[p.get<std::string>( "Function")]) {}
 
+    const VecOfStringT& known_keys () const {
+        static std::string keys[] = {
+            std::string( "Type"),
+            std::string( "Function")};
+        static const VecOfStringT k( keys, keys + 2);
+        return k;
+    }
+
     double operator() (const Point3DCL& x, double t) const
         { return (*ls_)( x, t); }
 };
-
 
 ///\brief Load a body from another json-file.
 /// It is constructed by a call to body_builder.
@@ -162,6 +262,15 @@ class ModuleBodyCL : public BodyCL
         s.push( name == std::string( "") ? body_builder( pm)
                                          : body_builder( pm.get_child( name)));
         b_= pop_and_take_ownership( s);
+    }
+
+    const VecOfStringT& known_keys () const {
+        static std::string keys[] = {
+            std::string( "Type"),
+            std::string( "Path"),
+            std::string( "Name")};
+        static const VecOfStringT k( keys, keys + 3);
+        return k;
     }
 
     double operator() (const Point3DCL& x, double t) const
@@ -214,6 +323,17 @@ class SimilarityTransformBodyCL : public BodyCL
         b_= pop_and_take_ownership( s);
     }
 
+    const VecOfStringT& known_keys () const {
+        static std::string keys[] = {
+            std::string( "Type"),
+            std::string( "Scaling"),
+            std::string( "RotationAngle"),
+            std::string( "RotationAxis"),
+            std::string( "Translation")  };
+        static const VecOfStringT k( keys, keys + 5);
+        return k;
+    }
+
     double operator() (const Point3DCL& x, double t) const {
         Point3DCL y= s_*x;
         if (do_rotate_)
@@ -238,7 +358,6 @@ class ReferenceBodyCL : public BodyCL
     double operator() (const Point3DCL& x, double t) const
         { return (*b_)( x, t); }
 };
-
 
 /// \brief Free-standing builder for a BodyCL-specialization.
 /// Pops its arguments from s and pushes its product on s.
@@ -274,10 +393,22 @@ RegisterSimpleBuilder sreg04("SmoothUnion",        &make_new<UnionBodyCL>);
 
 RegisterBuilder reg00("Halfspace",               &make_new<HalfspaceBodyCL>);
 RegisterBuilder reg01("Sphere",                  &make_new<SphereBodyCL>);
-RegisterBuilder reg02("Levelset",                &make_new<LevelsetBodyCL>);
-RegisterBuilder reg03("LoadFromModule",          &make_new<ModuleBodyCL>);
-RegisterBuilder reg04("ApplySimilarityToDomain", &make_new<SimilarityTransformBodyCL>);
+RegisterBuilder reg02("InfiniteCone",            &make_new<InfiniteConeBodyCL>);
+RegisterBuilder reg03("InfiniteCylinder",        &make_new<InfiniteCylinderBodyCL>);
+RegisterBuilder reg04("Levelset",                &make_new<LevelsetBodyCL>);
+RegisterBuilder reg05("LoadFromModule",          &make_new<ModuleBodyCL>);
+RegisterBuilder reg06("ApplySimilarityToDomain", &make_new<SimilarityTransformBodyCL>);
 
+
+std::string unknown_keys (const ParamCL& p, const VecOfStringT& known_keys)
+{
+    std::string uk;
+    using boost::property_tree::ptree;
+    for (ptree::const_iterator i= p.begin(); i != p.end(); ++i)
+        if (std::find( known_keys.begin(), known_keys.end(), i->first) == known_keys.end())
+            uk+= (uk != std::string() ? std::string( " ") : std::string()) + i->first;
+    return uk;
+}
 
 const BodyCL* body_builder (const ParamCL& p) // :-)
 {
@@ -300,8 +431,13 @@ const BodyCL* body_builder (const ParamCL& p) // :-)
                     named_refs[i->second.get<std::string>( "Name")]= s.top();
                 else if (op == std::string( "PushReference"))
                     s.push( new ReferenceBodyCL( named_refs[i->second.get<std::string>( "Name")]));
-                else
+                else {
                     BuilderMap::getInstance()[op]( s, i->second);
+                    std::string uk= unknown_keys( i->second, s.top()->known_keys());
+                    if (uk != std::string())
+                        std::cerr << "body_builder: Warning: Ignoring unknown key(s) \"" << uk
+                                  << "\" while proccessing instruction " << ic << ".\n";
+                }
             }
         }
     } catch (...) {
@@ -319,8 +455,3 @@ const BodyCL* body_builder (const ParamCL& p) // :-)
 
 } // end of namespace DROPS::CSG
 } // end of namespace DROPS
-
-
-// { "Type": "ProjectivityTransform", "Matrix": [4x4-Matrix as array; entries in row-major order]}
-// { "Type": "InfiniteCylinder", "Axis": [], "Radius": r}
-// 

@@ -27,6 +27,7 @@
 
 #include <vector>
 #include <stack>
+#include <string>
 #include "misc/params.h"
 #include "misc/singletonmap.h"
 
@@ -87,6 +88,11 @@ namespace CSG {
 /// The Reference-operator allows the description of arbitrary directed graphs.
 /// *Do not* create cycles -- or you will get what you deserve.
 
+/// All bodies have the function known_keys (), although it is only used for
+/// ComplexInstructions.
+/// The body_builder uses the returned vector of strings to verify, that only
+/// known keys were supplied to the instruction. This guards against misspellings.
+
 /// Description of a CSG-object in json:
 ///    * A json-object with the following entries:
 ///             * key "Type", value "CSG-body (v0)", required
@@ -140,6 +146,23 @@ namespace CSG {
 /// Pushes one body on the stack;
 /// SphereBodyCL
 
+/// ==InfiniteCone: Level set function function for an infinite cone==
+///    * key "Apex" [Point3DCL]; optional, defaults to (0,0,0)^T;
+///    * key "Axis", [Point3DCL]; optional, defaults to (1,0,0)^T;
+///    * key "SemiAperture", [double]; optional, defaults to M_PI/4.;
+/// The semi-aperture is the angle between the axis and the straight lines in the
+/// hull of the cone. The Axis points from the Apex into the cone.
+/// Pushes one body on the stack;
+/// InfiniteConeBodyCL
+
+/// ==InfiniteCylinder: Level set function function for an infinite cylinder==
+///    * key "Origin" [Point3DCL]; optional, defaults to (0,0,0)^T;
+///    * key "Axis", [Point3DCL]; optional, defaults to (1,0,0)^T;
+///    * key "Radius", [double]; optional, defaults to 1.;
+/// The Origin defines a point on the Axis.
+/// Pushes one body on the stack;
+/// InfiniteCylinderBodyCL
+
 /// ==Levelset: Use level set function from InScaMap==
 ///    * key "Function", value of type string, required;
 /// Pushes one body on the stack;
@@ -184,6 +207,9 @@ typedef std::vector<const BodyCL*> BodyVectorT;
 /// \brief Stack-type for the stack-machine.
 typedef std::stack<const BodyCL*>  BodyStackT;
 
+/// \brief Type to store known keys of complex instructions.
+typedef std::vector<std::string> VecOfStringT;
+
 class BodyCL
 {
   private:
@@ -204,6 +230,12 @@ class BodyCL
     virtual ~BodyCL () {
         for (BodyVectorT::iterator it= owned_ptrs_.begin(); it != owned_ptrs_.end(); ++it)
             delete *it;
+    }
+
+    ///\brief Return a vector of known keys in ParamCL.
+    virtual const VecOfStringT& known_keys () const {
+        static const VecOfStringT k;
+        return k;
     }
 
     ///\brief Evaluation of the level set function.
