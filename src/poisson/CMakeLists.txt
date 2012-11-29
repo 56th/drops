@@ -1,11 +1,7 @@
 set(HOME poisson)
 
 if(MPI)
-	SET(PAR_OBJ DiST-DiST DiST-mpistream DiST-remotedata
-			parallel-parallel parallel-partime
-			parallel-exchange parallel-parmultigrid
-			parallel-loadbal parallel-migrateunknowns
-			parallel-decompose)
+set(PAR_OBJ DiST-DiST DiST-mpistream DiST-remotedata parallel-parallel parallel-partime parallel-exchange parallel-parmultigrid parallel-loadbal parallel-migrateunknowns parallel-decompose)
 endif(MPI)
 
 libs(ale poissonCoeff poisson transport2phase)

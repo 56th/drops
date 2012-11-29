@@ -2,9 +2,7 @@ set(HOME stokes)
 libs(instatstokes2phase)
 libs_ser(integrTime stokesCoeff)
 
-if(MPI)
-	target_link_libraries_par(stokes-instatstokes2phase num-discretize)
-endif(MPI)
+target_link_libraries_par(stokes-instatstokes2phase num-discretize)
 
 exec_ser(sdrops geom-boundary geom-builder stokes-sdrops geom-simplex geom-multigrid num-unknowns geom-topo num-fe misc-problem num-interfacePatch misc-utils num-discretize out-output geom-principallattice geom-reftetracut)
   

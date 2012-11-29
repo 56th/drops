@@ -42,15 +42,27 @@ endif(MPI)
 #compiler specific options
 if(CMAKE_CXX_COMPILER MATCHES icpc)
 	message(STATUS "### setting flags for INTEL compiler ###")
-	set(CMAKE_CXX_FLAGS_DEBUG "-DVALARRAY_BUG -wd1572")
-	set(CMAKE_CXX_FLAGS_RELEASE "-O3 -ip -xhost -fp-model fast=2")
+	set(DROPS_CXX_FLAGS_DEBUG "-DVALARRAY_BUG -wd1572")
+	set(DROPS_CXX_FLAGS_RELEASE "-O3 -ip -xhost -fp-model fast=2")
 elseif(CMAKE_COMPILER_IS_GNUCXX)
 	message(STATUS "### setting flags for GCC compiler ###")
 	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--no-as-needed")
 	set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--no-as-needed")
-	set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
-	set(CMAKE_CXX_FLAGS_RELEASE "-O2 -finline-limit=600")
+	set(DROPS_CXX_FLAGS_DEBUG "-g -O0")
+	set(DROPS_CXX_FLAGS_RELEASE "-O2 -finline-limit=600")
 endif(CMAKE_CXX_COMPILER MATCHES icpc)
+
+#apply build type specific options
+if(DROPS_BUILD_TYPE STREQUAL "RELEASE")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${DROPS_CXX_FLAGS_RELEASE}")
+elseif(DROPS_BUILD_TYPE STREQUAL "DEBUG")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${DROPS_CXX_FLAGS_DEBUG}")
+endif()
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${DROPS_CXX_FLAGS}")
+
+message(STATUS "### GLOBAL COMPILER FLAGS:       ${CMAKE_CXX_FLAGS} ###")
+message(STATUS "### GLOBAL SHARED LINKER FLAGS: ${CMAKE_SHARED_LINKER_FLAGS} ###")	
+message(STATUS "### GLOBAL EXE LINKER FLAGS:    ${CMAKE_EXE_LINKER_FLAGS} ###")	
 
 ###############################################################################
 # libs* functions are specializations of add_library, which allow us to add
@@ -59,7 +71,7 @@ endif(CMAKE_CXX_COMPILER MATCHES icpc)
 # THESE FUNCTIONS REQUIRE ${HOME}
 
 function(libs_ when)
-	if((${when} STREQUAL "ALL") OR (${when} STREQUAL "PAR" AND MPI) OR (${when} STREQUAL "SER" AND NOT MPI))
+	if((when STREQUAL "ALL") OR (${when} STREQUAL "PAR" AND MPI) OR (${when} STREQUAL "SER" AND NOT MPI))
 		foreach(lib ${ARGN})
 			add_library(${HOME}-${lib} SHARED ${lib})
 		endforeach(lib)
@@ -82,9 +94,36 @@ endfunction(libs_par)
 # target_link_libraries_par appends ${PAR_OBJ} ${MPI_CXX_LIBRARIES} to a call
 # of target_link_libraries
 
+function(target_link_libraries_ when)
+	if((${when} STREQUAL "ALL" OR ${when} STREQUAL "PAR") AND MPI)
+		target_link_libraries(${ARGN} ${PAR_OBJ} ${MPI_CXX_LIBRARIES} ${PARMETIS_LIBRARIES})
+	elseif((${when} STREQUAL "ALL" OR ${when} STREQUAL "SER") AND NOT MPI)
+		target_link_libraries(${ARGN})
+	endif()
+endfunction(target_link_libraries_)
+
 function(target_link_libraries_par)
-	target_link_libraries(${ARGN} ${PAR_OBJ} ${MPI_CXX_LIBRARIES} ${PARMETIS_LIBRARIES})
+	target_link_libraries_("PAR" ${ARGN})
 endfunction(target_link_libraries_par)
+
+function(target_link_libraries_ser)
+	target_link_libraries_("SER" ${ARGN})
+endfunction(target_link_libraries_ser)
+
+function(set_ when)
+    if((${when} STREQUAL "ALL") OR (${when} STREQUAL "PAR" AND MPI) OR (${when} STREQUAL "SER" AND NOT MPI))
+	    message("SET ${HOME} ${when} ${ARGN}")
+	    set(${ARGN})
+    endif()
+endfunction(set_)
+
+function(set_par)
+	set_("PAR" ${ARGN})
+endfunction(set_par)
+
+function(set_ser)
+	set_("SER" ${ARGN})
+endfunction(set_ser)
 
 ###############################################################################
 # the exec command can be used to conveniently add an executable. 
@@ -97,7 +136,7 @@ function(exec_ when f)
 	if((${when} STREQUAL "ALL") OR (${when} STREQUAL "PAR" AND MPI) OR (${when} STREQUAL "SER" AND NOT MPI))
 		libs_(${when} ${f})
 		add_executable(${f} ${f})
-		target_link_libraries_par(${f} ${HOME}-${f} ${ARGN})
+		target_link_libraries_(${when} ${f} ${HOME}-${f} ${ARGN})
 	endif()
 endfunction(exec_)
 
@@ -148,6 +187,3 @@ if(DOXYGEN_FOUND)
 		COMMENT "Generating API documentation with Doxygen" VERBATIM
 	)
 endif()
-
-message(STATUS "### GLOBAL COMPILER FLAGS: ${CMAKE_CXX_FLAGS} ###")
-message(STATUS "### GLOBAL LINKER FLAGS: ${CMAKE_EXE_LINKER_FLAGS} ###")	

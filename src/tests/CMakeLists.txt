@@ -71,6 +71,10 @@ exec_ser(reparamtest levelset-fastmarch levelset-levelset geom-simplex geom-mult
 
 exec_ser(principallattice tests-principallattice misc-utils geom-principallattice num-discretize geom-topo num-fe num-interfacePatch misc-problem num-unknowns geom-simplex geom-multigrid geom-builder geom-boundary num-unknowns geom-reftetracut geom-subtriangulation num-quadrature)
 
+if(EXISTS ${UMFPACK_HOME})
+    
+endif()
+
 ######################## MISSING ############################
 # directsolver
 
