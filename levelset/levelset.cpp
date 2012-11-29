@@ -416,8 +416,8 @@ void SF_ImprovedLaplBeltramiOnTriangle( const TetraCL& t, const BaryCoordCL * co
         SF_ImprovedLaplBeltramiOnTriangle( t, p, triangle, Grad_f, Numb, sf.GetSigma(), e, det, f);
         return;
     }
-    static Quad5_2DCL<>          p2[10];   // P2-Hat-Functions...
-    static Quad5_2DCL<Point3DCL> Grad[10]; // and their gradients
+    Quad5_2DCL<>          p2[10];   // P2-Hat-Functions...
+    Quad5_2DCL<Point3DCL> Grad[10]; // and their gradients
     Quad5_2DCL<Point3DCL> n;
     P2DiscCL::GetP2Basis( p2, p);
     for (int v=0; v<10; ++v)
