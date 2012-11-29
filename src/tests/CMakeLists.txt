@@ -71,12 +71,11 @@ exec_ser(reparamtest levelset-fastmarch levelset-levelset geom-simplex geom-mult
 
 exec_ser(principallattice tests-principallattice misc-utils geom-principallattice num-discretize geom-topo num-fe num-interfacePatch misc-problem num-unknowns geom-simplex geom-multigrid geom-builder geom-boundary num-unknowns geom-reftetracut geom-subtriangulation num-quadrature)
 
-if(EXISTS ${UMFPACK_HOME})
-    
+if(EXISTS ${SUITSPARSE_HOME})
+	lib_ser(directsolver)
+	target_link_libraries_ser(tests-directsolver ${SUITESPARSE_HOME}/UMFPACK/Lib/libumfpack.a ${SUITESPARSE_HOME}/CHOLMOD/Lib/libcholmod.a ${SUITESPARSE_HOME}/AMD/Lib/libamd.a ${SUITESPARSE_HOME}/COLAMD/Lib/libcolamd.a ${SUITESPARSE_HOME}/CCOLAMD/Lib/libccolamd.a ${SUITESPARSE_HOME}/CAMD/Lib/libcamd.a ${SUITESPARSE_HOME}/metis-4.0/libmetis.a blas lapack)
+	set_target_properties(tests-directsolver PROPERTIES COMPILE_FLAGS -I${SUITESPARSE_HOME}/CHOLMOD/Include -I${SUITESPARSE_HOME}/UFconfig -I${SUITESPARSE_HOME}/UMFPACK/Include -I${SUITESPARSE_HOME}/AMD/Include)
 endif()
-
-######################## MISSING ############################
-# directsolver
 
 ############### TEST FAILS TO COMPILE ####################### 
 #exec_ser(quad_extra misc-utils geom-builder geom-simplex geom-multigrid 
