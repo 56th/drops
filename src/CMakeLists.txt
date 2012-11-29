@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8)
+
 
 project(Drops)
 
@@ -42,14 +42,14 @@ endif(MPI)
 #compiler specific options
 if(CMAKE_CXX_COMPILER MATCHES icpc)
 	message(STATUS "### setting flags for INTEL compiler ###")
-	set(DROPS_CXX_FLAGS_DEBUG "-DVALARRAY_BUG -wd1572")
-	set(DROPS_CXX_FLAGS_RELEASE "-O3 -ip -xhost -fp-model fast=2")
+	set(DROPS_CXX_FLAGS_DEBUG "${IPC_CXX_FLAGS_DEBUG}")
+	set(DROPS_CXX_FLAGS_RELEASE "${IPC_CXX_FLAGS_RELEASE}")
 elseif(CMAKE_COMPILER_IS_GNUCXX)
 	message(STATUS "### setting flags for GCC compiler ###")
 	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--no-as-needed")
 	set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--no-as-needed")
-	set(DROPS_CXX_FLAGS_DEBUG "-g -O0")
-	set(DROPS_CXX_FLAGS_RELEASE "-O2 -finline-limit=600")
+	set(DROPS_CXX_FLAGS_DEBUG "${GCC_CXX_FLAGS_DEBUG}")
+	set(DROPS_CXX_FLAGS_RELEASE "${GCC_CXX_FLAGS_RELEASE}")
 endif(CMAKE_CXX_COMPILER MATCHES icpc)
 
 #apply build type specific options
