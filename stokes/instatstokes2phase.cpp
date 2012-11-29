@@ -122,6 +122,7 @@ class System2Accumulator_P2P1XCL : public System2Accumulator_P2P1CL<TwoPhaseFlow
     using base_::T;
     using base_::absdet;
 
+    LocalP2CL<double>         local_p2_lset;
     std::valarray<double>     ls_loc_;
     int                       ls_sign_[4];
     TetraPartitionCL          partition_;
@@ -158,7 +159,7 @@ class System2Accumulator_P2P1XCL : public System2Accumulator_P2P1CL<TwoPhaseFlow
 System2Accumulator_P2P1XCL::System2Accumulator_P2P1XCL (const TwoPhaseFlowCoeffCL& coeff_arg, const StokesBndDataCL& BndData_arg,
 		const LevelsetP2CL& lset, const IdxDescCL& RowIdx_arg, const IdxDescCL& ColIdx_arg,
 	    MatrixCL& B_arg, VecDescCL* c_arg, double t_arg)
-    :  base_( coeff_arg, BndData_arg, RowIdx_arg, ColIdx_arg, B_arg, c_arg, t_arg), lset_( lset), ls_loc_( 10)
+    :  base_( coeff_arg, BndData_arg, RowIdx_arg, ColIdx_arg, B_arg, c_arg, t_arg), lset_( lset), ls_loc_( lat.vertex_size())
 {
     P2DiscCL::GetGradientsOnRef( GradRefLP1_);
 }
@@ -182,6 +183,8 @@ void System2Accumulator_P2P1XCL::visit (const TetraCL& tet)
 
     partition_.make_partition<SortedVertexPolicyCL, MergeCutPolicyCL>( lat, ls_loc_);
     make_CompositeQuad2Domain( q2dom_, partition_);
+    local_p2_lset.assign(tet, lset_.Phi, lset_.GetBndData());
+
     local_setup();
     update_global_system();
 }
@@ -191,8 +194,9 @@ void System2Accumulator_P2P1XCL::local_setup ()
     P2DiscCL::GetGradients( GradLP1_, GradRefLP1_, T);
     for (int i= 0; i < 10; ++i) // Gradients of the velocity hat-functions
         resize_and_evaluate_on_vertexes(  GradLP1_[i], q2dom_, qgrad_[i]);
+
     for (int i= 0; i < 4; ++i) // sign of the level-set function in the vertices
-        ls_sign_[i]= sign( ls_loc_[p1_dof_on_lattice_2[i]]);
+        ls_sign_[i]= sign(local_p2_lset[i]);
 
     GridFunctionCL<> qpr;
     LocalP1CL<> p1;
@@ -812,7 +816,7 @@ class PrMassAccumulator_P1CL : public TetraAccumulatorCL
 
 PrMassAccumulator_P1CL::PrMassAccumulator_P1CL (const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_, MatrixCL& matM_, IdxDescCL& RowIdx_, const LevelsetP2CL& lset_, bool XFEM)
     : MG(MG_), lat( PrincipalLatticeCL::instance( 2)), Coeff(Coeff_), matM(matM_), RowIdx(RowIdx_),
-      lset(lset_), ls_loc_( 10), num_unks_pr(RowIdx_.NumUnknowns()),
+      lset(lset_), ls_loc_( lat.vertex_size()), num_unks_pr(RowIdx_.NumUnknowns()),
       lvl(RowIdx_.TriangLevel()), nu_inv_p(1./Coeff_.mu( 1.0)), nu_inv_n(1./Coeff_.mu( -1.0)), useXFEM( XFEM)
 {
     for(int i= 0; i < 4; ++i) {
@@ -1353,7 +1357,7 @@ class LocalSystem1TwoPhase_P2CL
 
   public:
     LocalSystem1TwoPhase_P2CL (double mup, double mun, double rhop, double rhon, instat_vector_fun_ptr rhsFunc)
-        : lat( PrincipalLatticeCL::instance( 2)), mu_p( mup), mu_n( mun), rho_p( rhop), rho_n( rhon), rhs_func(rhsFunc), ls_loc( 10)
+        : lat( PrincipalLatticeCL::instance( 2)), mu_p( mup), mu_n( mun), rho_p( rhop), rho_n( rhon), rhs_func(rhsFunc), ls_loc( lat.vertex_size())
     { P2DiscCL::GetGradientsOnRef( GradRefLP1); }
 
     double mu  (int sign) const { return sign > 0 ? mu_p  : mu_n; }
@@ -2335,7 +2339,7 @@ class LocalLBTwoPhase_P2CL
 
   public:
     LocalLBTwoPhase_P2CL (double surfTension)
-        : lat( PrincipalLatticeCL::instance( 2)), ls_loc( 10), surfTension_( surfTension)
+        : lat( PrincipalLatticeCL::instance( 2)), ls_loc( lat.vertex_size()), surfTension_( surfTension)
     { P2DiscCL::GetGradientsOnRef( GradRefLP1); }
 
     //Setup-Routine of (improved) LB for the tetrahedra tet
@@ -2553,7 +2557,7 @@ class LocalBSTwoPhase_P2CL
 
   public:
     LocalBSTwoPhase_P2CL (double surfshear, double surfdilatation)
-        : lat( PrincipalLatticeCL::instance( 2)), ls_loc( 10), surfshear_( surfshear), surfdilatation_( surfdilatation)
+        : lat( PrincipalLatticeCL::instance( 2)), ls_loc( lat.vertex_size()), surfshear_( surfshear), surfdilatation_( surfdilatation)
     { P2DiscCL::GetGradientsOnRef( GradRefLP1); }
 
     //Setup-Routine of (improved) BS for the tetrahedra tet

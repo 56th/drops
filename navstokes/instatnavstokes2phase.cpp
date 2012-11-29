@@ -143,7 +143,7 @@ class LocalNonlConvSystemTwoPhase_P2CL
 
   public:
     LocalNonlConvSystemTwoPhase_P2CL (double rhop, double rhon)
-        : lat( PrincipalLatticeCL::instance( 2)), rho_p( rhop), rho_n( rhon), ls_loc( 10)
+        : lat( PrincipalLatticeCL::instance( 2)), rho_p( rhop), rho_n( rhon), ls_loc( lat.vertex_size())
     { P2DiscCL::GetGradientsOnRef( GradRef); }
 
     double rho (int sign) const                   { return sign > 0 ? rho_p : rho_n; }
