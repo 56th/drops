@@ -364,6 +364,13 @@ void MarkDrop (DROPS::MultiGridCL& mg, int maxLevel= -1)
     }
 }
 
+/// \brief Set Default parameters here s.t. they are initialized.
+/// The result can be checked when Param-list is written to the output.
+void SetMissingParameters(DROPS::ParamCL& P){
+    P.put_if_unset<std::string>("Exp.VolForce", "ZeroVel");
+    P.put_if_unset<double>("SurfTens.ShearVisco", 0.0);
+    P.put_if_unset<double>("SurfTens.DilatationalVisco", 0.0);
+}
 
 int main (int argc, char** argv)
 {
@@ -387,6 +394,9 @@ int main (int argc, char** argv)
     }
     param >> P;
     param.close();
+
+    SetMissingParameters(P);
+
     std::cout << P << std::endl;
 
     typedef DROPS::InstatStokes2PhaseP2P1CL    MyStokesCL;
