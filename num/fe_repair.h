@@ -25,8 +25,10 @@
 #ifndef DROPS_FE_REPAIR_H
 #define DROPS_FE_REPAIR_H
 
+#ifndef DROPS_WIN
 #include <tr1/unordered_map>
 #include <tr1/unordered_set>
+#endif
 
 #include "misc/container.h"
 #include "geom/topo.h"
