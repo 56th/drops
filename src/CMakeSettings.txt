@@ -1,0 +1,16 @@
+# edit ARCH to set your architecture to one of
+#     default GCC  INTEL  SGI  SUN LINUX_MPI INTEL_MPI SOLARIS_MPI
+set(ARCH "GCC")
+
+set(PARMETIS_HOME "${CMAKE_SOURCE_DIR}/../parmetis-4.0.2")
+set(METIS_HOME "${CMAKE_SOURCE_DIR}/../metis-5.0.2")
+set(ZOLTAN_HOME "${CMAKE_SOURCE_DIR}/../Zoltan_v3.2")
+set(HYPRE_HOME "${CMAKE_SOURCE_DIR}/../hypre-2.0.0")
+set(SCOTCH_HOME "${CMAKE_SOURCE_DIR}/../scotch_5.1.8a")
+set(SUITESPARSE_HOME "${CMAKE_SOURCE_DIR}/../SuiteSpare/")
+
+set(IPC_CXX_FLAGS_DEBUG "-DVALARRAY_DEBUG -wd1572")
+set(IPC_CXX_FLAGS_RELEASE "-O3 -ip -xhost -fp-model fast=2")
+
+set(GCC_CXX_FLAGS_DEBUG "-g -O0")
+set(GCC_CXX_FLAGS_RELEASE "-O3 --fast-math")
