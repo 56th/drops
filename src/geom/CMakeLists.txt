@@ -1,11 +1,18 @@
 set(HOME geom)
 libs(boundary builder geomselect multigrid principallattice reftetracut simplex subtriangulation maketopo_helper deformation csg)
 
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/topo.cpp) #otherwise it is impossible to build topo
+    libs(topo)
+else()
+    message(STATUS "topo.cpp does not exist. Please build it using `make topo` on a serial build. Building anything else before may fail.")
+endif()
+
 target_link_libraries_par(geom-simplex parallel-parmultigrid geom-topo)
 target_link_libraries_par(geom-multigrid parallel-partime)
 
-exec(maketopo geom-maketopo_helper misc-utils)
-add_custom_command(OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/topo.cpp COMMAND ${CMAKE_CURRENT_BINARY_DIR}/maketopo ${CMAKE_CURRENT_SOURCE_DIR}/maketopo_helper.cpp ${CMAKE_CURRENT_SOURCE_DIR}/topo.cpp DEPENDS maketopo)
-add_library(geom-topo SHARED topo.cpp)
+if(NOT MPI)
+    exec(maketopo geom-maketopo_helper misc-utils)
+    set_target_properties(maketopo PROPERTIES EXCLUDE_FROM_ALL 1)
 
-set_directory_properties(PROPERTY ADDITIONAL_MAKE_CLEAN_FILES topo.cpp)
+    add_custom_target(topo COMMAND ${CMAKE_CURRENT_BINARY_DIR}/maketopo ${CMAKE_CURRENT_SOURCE_DIR}/maketopo_helper.cpp ${CMAKE_CURRENT_SOURCE_DIR}/topo.cpp DEPENDS maketopo)
+endif()
