@@ -164,6 +164,8 @@ endforeach(${package})
 
 add_custom_target(stat COMMAND ls */*.cpp */*.tpp */*.h | xargs wc -l WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
+add_custom_target(distclean COMMAND rm -rf ${CMAKE_CURRENT_BINARY_DIR}/*)
+
 find_package(Doxygen)
 if(DOXYGEN_FOUND)
     FILE(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/doxygen)
