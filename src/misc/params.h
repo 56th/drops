@@ -45,6 +45,8 @@ class ParamCL
 {
   public:
     typedef boost::property_tree::ptree ptree_type;
+    typedef ptree_type::iterator        ptree_iterator_type;
+    typedef ptree_type::const_iterator  ptree_const_iterator_type;
     typedef ptree_type::path_type       path_type;
     typedef ParamCL                     self_type;
 
@@ -121,6 +123,9 @@ class ParamCL
           return false;
       }
     }
+
+    ptree_const_iterator_type begin () const { return pt.begin(); }
+    ptree_const_iterator_type end () const { return pt.end(); }
 
     friend std::istream &operator>>(std::istream& stream, ParamCL& P);
     friend std::ostream &operator<<(std::ostream& stream, ParamCL& P);

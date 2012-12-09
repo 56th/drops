@@ -5,6 +5,11 @@
 //    droplet in a cuboid
 //=============================================================
 
+        "General":
+        {
+                "ProgressBar":  1
+        },      
+
 // time stepping
         "Time":
         {

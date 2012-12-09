@@ -24,6 +24,8 @@
 
 #include "navstokes/instatnavstokes2phase.h"
 #include "num/renumber.h"
+#include "misc/scopetimer.h"
+#include "misc/progressaccu.h"
 
 namespace DROPS
 {
@@ -141,7 +143,7 @@ class LocalNonlConvSystemTwoPhase_P2CL
 
   public:
     LocalNonlConvSystemTwoPhase_P2CL (double rhop, double rhon)
-        : lat( PrincipalLatticeCL::instance( 2)), rho_p( rhop), rho_n( rhon), ls_loc( 10)
+        : lat( PrincipalLatticeCL::instance( 2)), rho_p( rhop), rho_n( rhon), ls_loc( lat.vertex_size())
     { P2DiscCL::GetGradientsOnRef( GradRef); }
 
     double rho (int sign) const                   { return sign > 0 ? rho_p : rho_n; }
@@ -239,6 +241,7 @@ void NonlConvSystemAccumulator_P2CL::begin_accumulation ()
     std::cout << "entering NonlConvSystemP2CL";
     if (smoothed)
         std::cout << " [smoothed]";
+	std::cout << "\n";
     const size_t num_unks_vel= RowIdx.NumUnknowns();
     mN_= new SparseMatBuilderCL<double, SDiagMatrixCL<3> >( &N, num_unks_vel, num_unks_vel);
     if (cplN != 0) {
@@ -251,9 +254,8 @@ void NonlConvSystemAccumulator_P2CL::finalize_accumulation ()
     mN_->Build();
     delete mN_;
 #ifndef _PAR
-    std::cout << ": " << N.num_nonzeros() << " nonzeros in N, ";
+    std::cout << N.num_nonzeros() << " nonzeros in N, \n";
 #endif
-    std::cout << '\n';
 }
 
 void NonlConvSystemAccumulator_P2CL::visit (const TetraCL& tet)
@@ -318,14 +320,13 @@ void NonlConvSystemAccumulator_P2CL::update_global_system ()
 void InstatNavierStokes2PhaseP2P1CL::SetupNonlinear_P2(MatrixCL& N, const VelVecDescCL* vel, VelVecDescCL* cplN, const LevelsetP2CL& lset, IdxDescCL& RowIdx, double t) const
 /// Set up matrix N
 {
-    // TimerCL time;
-    // time.Start();
+    ScopeTimerCL scope("SetupNonlinear_P2");
     NonlConvSystemAccumulator_P2CL accu( Coeff_, MG_, BndData_, *vel, lset, RowIdx, N, cplN, t);
     TetraAccumulatorTupleCL accus;
+    ProgressBarTetraAccumulatorCL accup(MG_,"NonlConvSystem(P2) Setup",RowIdx.TriangLevel());
+    accus.push_back( &accup);
     accus.push_back( &accu);
     accumulate( accus, MG_, RowIdx.TriangLevel(), RowIdx.GetMatchingFunction(), RowIdx.GetBndInfo());
-    // time.Stop();
-    // std::cout << "setup: " << time.GetTime() << std::endl;
 }
 
 

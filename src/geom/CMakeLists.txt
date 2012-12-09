@@ -1,5 +1,5 @@
 set(HOME geom)
-libs(boundary builder geomselect multigrid principallattice reftetracut simplex subtriangulation maketopo_helper)
+libs(boundary builder geomselect multigrid principallattice reftetracut simplex subtriangulation maketopo_helper deformation csg)
 
 target_link_libraries_par(geom-simplex parallel-parmultigrid geom-topo)
 target_link_libraries_par(geom-multigrid parallel-partime)

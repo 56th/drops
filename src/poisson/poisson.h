@@ -35,7 +35,7 @@
 #include <numeric>
 
 #include "poisson/ale.h"
-
+#include "geom/deformation.h"
 
 namespace DROPS
 {
@@ -131,6 +131,29 @@ class SUPGCL
     }
 };
 
+/*class PoissonDeformationHelperCL
+{
+    private:
+      bool ALE_;
+      MultiGridCL& mg_;
+    public:
+      PoissonDeformationHelperCL(MultiGridCL& mg, bool ALE): mg_(mg), ALE_(ALE) {}
+      Point3DCL GetVertexCoord(const VertexCL& vert) 
+      {   
+          if(ALE_)
+            return mg_.GetMeshDeformation().GetTransformedVertexCoord(vert);
+          else
+            return vert.GetCoord();
+      }
+      Point3DCL GetEdgeBaryCenter(const EdgeCL& edge) 
+      {   
+          if(ALE_)
+            return mg_.GetMeshDeformation().GetTransformedEdgeBaryCenter(edge);
+          else
+            return GetBaryCenter(edge);
+      }    
+}*/
+
 template <class Coeff>
 class PoissonP1CL : public ProblemCL<Coeff, PoissonBndDataCL>
 {
@@ -196,7 +219,8 @@ class PoissonP1CL : public ProblemCL<Coeff, PoissonBndDataCL>
     /// \brief check computed solution etc.
     double CheckSolution( const VecDescCL&, instat_scalar_fun_ptr, double t=0.) const;
     double CheckSolution( instat_scalar_fun_ptr Lsg, double t=0.) const { return CheckSolution(x, Lsg, t); }
-
+    double CheckSolution( const VecDescCL&, scalar_tetra_function, double t=0.) const;
+    
     void GetDiscError   ( const MLMatDescCL&, instat_scalar_fun_ptr, double =0.) const;
     void GetDiscError   ( instat_scalar_fun_ptr Lsg, double t=0.) const { GetDiscError(A, Lsg, t); }
 
@@ -228,8 +252,7 @@ class PoissonP2CL : public ProblemCL<Coeff, PoissonBndDataCL>
     typedef double (*est_fun)(const TetraCL&, const VecDescCL&, const BndDataCL&);
 
     // new fields for the matrix A, the rhs b and the solution x
-    bool        ALE_; //ALE_ is introduced because poissonP1CL and poissonP2CL are used in scalar.cpp.
-                      //Since ALE method is not yet implemented, ALE_ is always set to false
+    bool        ALE_; 
     MLIdxDescCL idx;
     VecDescCL   x;
     VecDescCL   b;
@@ -268,6 +291,7 @@ class PoissonP2CL : public ProblemCL<Coeff, PoissonBndDataCL>
     // check computed solution, etc.
     double CheckSolution( const VecDescCL&, instat_scalar_fun_ptr, double t=0.) const;
     double CheckSolution( instat_scalar_fun_ptr Lsg, double t=0.) const { return CheckSolution(x, Lsg, t); }
+    double CheckSolution( const VecDescCL&, scalar_tetra_function, double t=0.) const;
 
     DiscSolCL GetSolution()
         { return DiscSolCL(&x, &GetBndData(), &GetMG()); }

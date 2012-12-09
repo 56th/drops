@@ -23,6 +23,7 @@
 */
 
 #include "geom/geomselect.h"
+#include "geom/deformation.h"
 #include <sstream>
 
 namespace DROPS {
@@ -176,6 +177,64 @@ void BuildDomain( MultiGridCL* &mgp, const std::string& meshfile_name, int GeomT
             }
             delete mgb;
         }
+    if (GeomType == 10) { //Read Mesh + second order curvature
+        std::ifstream meshfile( meshfile_name.c_str());
+        std::string meshfile_name2 = meshfile_name + ".2nd";
+        std::ifstream meshfile2nd( meshfile_name2.c_str());
+        
+        if (!meshfile)
+            throw DROPSErrCL ("error while opening mesh file\n");
+
+        ReadMeshBuilderCL *mgb= 0;       // builder of the multigrid
+
+        // read geometry information from a file and create the multigrid
+        IF_MASTER
+            mgb = new ReadMeshBuilderCL( meshfile );
+        IF_NOT_MASTER
+            mgb = new EmptyReadMeshBuilderCL( meshfile );
+        // Create the multigrid
+        if (deserialization_file == "none")
+            mgp= new MultiGridCL( *mgb);
+        else {
+            FileBuilderCL filebuilder( deserialization_file, mgb);
+            mgp= new MultiGridCL( filebuilder);
+        }
+        //mgb->GetBC( BC);
+        delete mgb;
+
+        if (!meshfile2nd)
+            std::cout << "no 2nd order mesh file\n" << std::endl;
+        else{
+            MeshDeformationCL & md = MeshDeformationCL::getInstance();
+            md.Initialize(mgp);
+            std::map<std::pair<Ulint,Ulint>, Point3DCL> curvededgetopoint;
+            
+            Point3DCL p;
+            std::pair<Ulint,Ulint> id;
+            // fill map 
+            while ( !meshfile2nd.eof() ){
+                meshfile2nd >> id.first;    
+                meshfile2nd >> id.second;    
+                for (int j = 0; j < 3 ; j++) 
+                    meshfile2nd >> p[j];
+                curvededgetopoint[id]=p;
+            }
+
+            // use map to fill 2nd order deformation information
+            DROPS_FOR_TRIANG_EDGE( (*mgp), mgp->GetLastLevel(), it) {
+                id.first  = it->GetVertex(0)->GetId().GetIdent();                 
+                id.second = it->GetVertex(1)->GetId().GetIdent();                 
+
+                if (curvededgetopoint.find(id) != curvededgetopoint.end())
+                    md.SetEdgeDeformation(*it, curvededgetopoint[id]);
+            }
+
+            md.CheckForCurved();
+
+        }
+    }   
+
+
 #endif
 }
 

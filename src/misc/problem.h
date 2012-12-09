@@ -50,8 +50,8 @@ enum FiniteElementT
 ///   the difference to the scalar FE counterpart should be 128
 {
     P0_FE=0, P1_FE=1, P2_FE=2, P1Bubble_FE=3,         // for scalars
-    P1D_FE=4, P1X_FE=5, P1IF_FE=6, P2R_FE=7,
-    vecP2_FE=130, vecP1Bubble_FE=131, vecP2R_FE=135 , // for vectors
+    P1D_FE=4, P1X_FE=5, P1IF_FE=6, P2R_FE=7, P2X_FE=8,
+    vecP2_FE=130, vecP1Bubble_FE=131, vecP2R_FE=135, vecP2X_FE=136, // for vectors
     UnknownFE_=-1
 };
 
@@ -84,8 +84,10 @@ class FE_InfoCL
             case P1Bubble_FE:    NumUnknownsVertex_= NumUnknownsTetra_= 1; break;
             case vecP1Bubble_FE: NumUnknownsVertex_= NumUnknownsTetra_= 3; break;
             case P1D_FE:         NumUnknownsFace_= 1; break;
+            case P2X_FE:
             case P2R_FE:
             case P2_FE:          NumUnknownsVertex_= NumUnknownsEdge_= 1; break;
+            case vecP2X_FE:
             case vecP2R_FE:
             case vecP2_FE:       NumUnknownsVertex_= NumUnknownsEdge_= 3; break;
             default:             throw DROPSErrCL("FE_InfoCL: unknown FE type");
@@ -97,7 +99,7 @@ class FE_InfoCL
     /// \brief Returns true for scalar FEM, false for vector-valued FEM
     bool IsScalar() const { return fe_ < 128; }
     /// \brief Returns true for XFEM
-    bool IsExtended() const { return fe_==P1X_FE || fe_==P2R_FE || fe_==vecP2R_FE; }
+    bool IsExtended() const { return fe_==P1X_FE || fe_==P2R_FE || fe_==vecP2R_FE  || fe_==P2X_FE || fe_==vecP2X_FE; }
     /// \brief Returns true for interface FE
     bool IsOnInterface() const { return fe_==P1IF_FE; }
 

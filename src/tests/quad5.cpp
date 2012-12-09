@@ -277,7 +277,7 @@ void TestTransform()
         qf.assign( *sit, &hsq);
         intval+= qf.quad( absdet);
         }
-    std::cout << std::setprecision(10) <<  "Integral: " << intval << '\n';
+    std::cout << std::setprecision(10) <<  "Integral1: " << intval << '\n';
 
     SArrayCL<BaryCoordCL,4> M;
     for (Uint i=0; i<4; ++i)
@@ -299,7 +299,7 @@ void TestTransform()
         qf.assign( *sit, &hsq, 0.0, nodes);
         intval+= qf.quad( absdet);
     }
-    std::cout << "Integral: " << intval << '\n';
+    std::cout << "Integral2: " << intval << '\n';
     delete[] nodes;
 }
 

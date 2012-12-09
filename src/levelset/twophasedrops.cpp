@@ -54,6 +54,8 @@
 #include <fstream>
 #include <sstream>
 
+#include "misc/progressaccu.h"
+
 DROPS::ParamCL P;
 
 // rho*du/dt - mu*laplace u + Dp = f + rho*g - okn
@@ -368,7 +370,8 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
                                  P.get<int>("VTK.Binary"),
                                  P.get<int>("VTK.UseOnlyP1"),
                                  -1,  /* <- level */
-                                 P.get<int>("VTK.ReUseTimeFile") );
+                                 P.get<int>("VTK.ReUseTimeFile"),
+                                 P.get<int>("VTK.UseDeformation"));
         vtkwriter->Register( make_VTKVector( Stokes.GetVelSolution(), "velocity") );
         vtkwriter->Register( make_VTKScalar( Stokes.GetPrSolution(), "pressure") );
         if (P.get<int>("VTK.AddP1XPressure",0) && Stokes.UsesXFEM())
@@ -478,6 +481,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<std::string>("VTK.TimeFileName",P.get<std::string>("VTK.VTKName"));
     P.put_if_unset<int>("VTK.ReUseTimeFile",0);
+    P.put_if_unset<int>("VTK.UseDeformation",0);
     P.put_if_unset<int>("VTK.UseOnlyP1",0);
     P.put_if_unset<int>("Transp.DoTransp",0);
     P.put_if_unset<std::string>("Restart.Inputfile","none");
@@ -496,6 +500,8 @@ void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<double>("Mat.DilatationalVisco", 0.0);
     P.put_if_unset<double>("SurfTens.ShearVisco", 0.0);
     P.put_if_unset<double>("SurfTens.DilatationalVisco", 0.0);
+
+    P.put_if_unset<int>("General.ProgressBar", 0);
 }
 
 int main (int argc, char** argv)
@@ -527,6 +533,9 @@ int main (int argc, char** argv)
     SetMissingParameters(P);
 
     std::cout << P << std::endl;
+
+    if (P.get<int>("General.ProgressBar"))
+        DROPS::ProgressBarTetraAccumulatorCL::Activate();
 
     //!check paramterfile
     if (P.get<double>("SurfTens.DilatationalVisco")< P.get<double>("SurfTens.ShearVisco"))
@@ -582,7 +591,7 @@ int main (int argc, char** argv)
     // If we read the Multigrid, it shouldn't be modified;
     // otherwise the pde-solutions from the ensight files might not fit.
     if (P.get("Restart.Inputfile", std::string("none")) == "none")
-        adap.MakeInitialTriang( * DROPS::InScaMap::getInstance()[InitialLSet]);
+        adap.MakeInitialTriang( DROPS::InScaMap::getInstance()[InitialLSet]);
 
     std::cout << DROPS::SanityMGOutCL(*mg) << std::endl;
 #ifdef _PAR

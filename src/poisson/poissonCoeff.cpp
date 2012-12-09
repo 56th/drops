@@ -41,7 +41,7 @@ double PoissonCoeffCL::dt_;
 scalar_tetra_function PoissonCoeffCL::q;
 double PoissonCoeffCL::alpha;
 scalar_tetra_function PoissonCoeffCL::f;
-instat_scalar_fun_ptr PoissonCoeffCL::Solution;
+scalar_tetra_function PoissonCoeffCL::Solution;
 instat_scalar_fun_ptr PoissonCoeffCL::InitialCondition;
 vector_tetra_function PoissonCoeffCL::Vel;
 instat_scalar_fun_ptr PoissonCoeffCL::interface;
@@ -149,7 +149,8 @@ static DROPS::RegisterVectorTetraFunction regvecnus("Nusselt", Nusselt);
         return -64.*p[0]*p[1]*p[2]*(1-p[1])*(1-p[2]);
     }
     /// \brief Solution
-    double Solution( const DROPS::Point3DCL& p, double) {
+    double Solution(const DROPS::TetraCL& tet, const DROPS::BaryCoordCL& b, double) {
+        const DROPS::Point3DCL p= DROPS::GetWorldCoord( tet, b);
         return 1 + 64.*p[0]*p[1]*p[2]*(1-p[0])*(1-p[1])*(1-p[2]);
     }
     /// \brief Initial value
@@ -159,7 +160,7 @@ static DROPS::RegisterVectorTetraFunction regvecnus("Nusselt", Nusselt);
 
     static DROPS::RegisterScalarTetraFunction regscaq("Example1_Reaction",     Reaction    );
     static DROPS::RegisterScalarTetraFunction regscaf("Example1_Source",       Source      );
-    static DROPS::RegisterScalarFunction regscas("Example1_Solution",     Solution    );
+    static DROPS::RegisterScalarTetraFunction regscas("Example1_Solution",     Solution    );
     static DROPS::RegisterScalarTetraFunction regscaa("Example1_Diffusion",    Diffusion   );
     static DROPS::RegisterScalarFunction regscan("Example1_Neumann",      Neumann     );
     static DROPS::RegisterVectorTetraFunction regscav("Example1_Flowfield",    Flowfield   );
@@ -198,10 +199,15 @@ static DROPS::RegisterVectorTetraFunction regvecnus("Nusselt", Nusselt);
     double Solution( const DROPS::Point3DCL& p, double t) {
         return (std::exp(t)*std::exp(p[0]+p[1]+p[2]));
     }
+    double tetraSolution(const DROPS::TetraCL& tet, const DROPS::BaryCoordCL& b, double t) {
+        const DROPS::Point3DCL p= DROPS::GetWorldCoord( tet, b);
+        return (std::exp(t)*std::exp(p[0]+p[1]+p[2]));
+    }
 
     static DROPS::RegisterScalarTetraFunction regscaq("Example2_Reaction",     Reaction    );
     static DROPS::RegisterScalarTetraFunction regscaf("Example2_Source",       Source      );
     static DROPS::RegisterScalarFunction regscas("Example2_Solution",     Solution    );
+    static DROPS::RegisterScalarTetraFunction regscatetras("Example2_tetraSolution",     tetraSolution    );
     static DROPS::RegisterScalarTetraFunction regscaa("Example2_Diffusion",    Diffusion   );
     static DROPS::RegisterVectorTetraFunction regscav("Example2_Flowfield",    Flowfield   );
 
@@ -238,7 +244,8 @@ static DROPS::RegisterVectorTetraFunction regvecnus("Nusselt", Nusselt);
         return 1.0;
     }
     /// \brief Solution
-    double Solution( const DROPS::Point3DCL& p, double) {
+    double Solution(const DROPS::TetraCL& tet, const DROPS::BaryCoordCL& b, double) {
+        const DROPS::Point3DCL p= DROPS::GetWorldCoord( tet, b);
         return 1.0 + p[0] + (1-exp(p[0]))/exp(1.0);
     }
     /// \brief Initial value
@@ -248,7 +255,7 @@ static DROPS::RegisterVectorTetraFunction regvecnus("Nusselt", Nusselt);
 
     static DROPS::RegisterScalarTetraFunction regscaq("Example3_Reaction",     Reaction    );
     static DROPS::RegisterScalarTetraFunction regscaf("Example3_Source",       Source      );
-    static DROPS::RegisterScalarFunction regscas("Example3_Solution",     Solution    );
+    static DROPS::RegisterScalarTetraFunction regscas("Example3_Solution",     Solution    );
     static DROPS::RegisterScalarTetraFunction regscaa("Example3_Diffusion",    Diffusion   );
     static DROPS::RegisterVectorTetraFunction regscav("Example3_Flowfield",    Flowfield   );
     static DROPS::RegisterScalarFunction regscai("Example3_InitialValue", InitialValue);
@@ -288,9 +295,15 @@ static DROPS::RegisterVectorTetraFunction regvecnus("Nusselt", Nusselt);
         double D = P.get<double>("PoissonCoeff.Diffusion");
         return p[0] - (1 - exp(p[0]/D))/(1 - exp(1./D));
     }
+    double tetraSolution(const DROPS::TetraCL& tet, const DROPS::BaryCoordCL& b, double) {
+        const DROPS::Point3DCL p= DROPS::GetWorldCoord( tet, b);
+        double D = P.get<double>("PoissonCoeff.Diffusion");
+        return p[0] - (1 - exp(p[0]/D))/(1 - exp(1./D));
+    }
     static DROPS::RegisterScalarTetraFunction regscaq("SUPG_Reaction",     Reaction    );
     static DROPS::RegisterScalarTetraFunction regscaf("SUPG_Source",       Source      );
     static DROPS::RegisterScalarFunction regscas("SUPG_Solution",     Solution    );
+    static DROPS::RegisterScalarTetraFunction regscatetras("SUPG_tetraSolution",     tetraSolution  );
     static DROPS::RegisterScalarTetraFunction regscaa("SUPG_Diffusion",    Diffusion   );
     static DROPS::RegisterVectorTetraFunction regscav("SUPG_Flowfield",    Flowfield   );
 } //end of namespace
@@ -341,9 +354,21 @@ static DROPS::RegisterVectorTetraFunction regvecnus("Nusselt", Nusselt);
         }
         return exp(-t-p[1]) + p[0] - (1 - exp(p[0]/alpha))/(1 - exp(1./alpha));
     }
+    double tetraSolution(const DROPS::TetraCL& tet, const DROPS::BaryCoordCL& b, double t) {
+        const DROPS::Point3DCL p= DROPS::GetWorldCoord( tet, b);
+        static bool first = true;
+        //alpha to control diffusion parameter
+        static double alpha;
+        if (first) {
+            alpha = P.get<double>("PoissonCoeff.Diffusion");
+            first=false;
+        }
+        return exp(-t-p[1]) + p[0] - (1 - exp(p[0]/alpha))/(1 - exp(1./alpha));
+    }
     static DROPS::RegisterScalarTetraFunction regscaq("instatSUPG_Reaction",     Reaction    );
     static DROPS::RegisterScalarTetraFunction regscaf("instatSUPG_Source",       Source      );
     static DROPS::RegisterScalarFunction regscas("instatSUPG_Solution",     Solution    );
+    static DROPS::RegisterScalarTetraFunction regscatetras("instatSUPG_tetraSolution",     tetraSolution  );
     static DROPS::RegisterVectorTetraFunction regscav("instatSUPG_Flowfield",    Flowfield   );
 } //end of namespace
 
@@ -379,117 +404,20 @@ static DROPS::RegisterVectorTetraFunction regvecnus("Nusselt", Nusselt);
     {
         return exp(-t)*exp(-p[0]);
     }
+    double tetraSolution(const DROPS::TetraCL& tet, const DROPS::BaryCoordCL& b, double t) {
+        const DROPS::Point3DCL p= DROPS::GetWorldCoord( tet, b);
+        return exp(-t)*exp(-p[0]);
+    }
     static DROPS::RegisterScalarTetraFunction regscaq("Adjoint_Reaction",     Reaction    );
     static DROPS::RegisterScalarTetraFunction regscaf("Adjoint_Source",       Source      );
     static DROPS::RegisterScalarFunction regscas("Adjoint_Solution",     Solution    );
+    static DROPS::RegisterScalarTetraFunction regscatetras("Adjoint_Solution",     tetraSolution    );
     static DROPS::RegisterScalarTetraFunction regscaa("Adjoint_Diffusion",    Diffusion   );
     static DROPS::RegisterVectorTetraFunction regscav("Adjoint_Flowfield",    Flowfield   );
 } //end of namespace
 
 /****************************************
  *  Example 7:                        \n*
- *   - instationary setup             \n*
- *   - constant diffusion             \n*
- *   - convection                     \n*
- *   - no reaction                    \n*
- ****************************************/
- namespace ALEExample1 {
-    //refH, Mag, paraX and paraT are used to change the free surface functions
-    double refH   = 0.2;
-    double Mag    = 0.25;
-    double paraX  = 6. * PI;
-    double paraT  = 10. * PI;
-    //Free surface
-    double Interface( const DROPS::Point3DCL& p, double t)
-    {
-
-        double h= refH + refH * Mag * sin ( paraX * p[0]  + paraT * t );
-        return h;
-    }
-    //Transform the physical to coordinates to reference coordinates
-    DROPS::Point3DCL TransBack(const DROPS::Point3DCL& p, double t)
-    {
-        DROPS::Point3DCL ref(p);
-        ref[1]*= refH/Interface(p, t);
-        return ref;
-    }
-    //Gradx, Grady, Grad1 and Grad2 are used for source term
-    double Gradx( const DROPS::Point3DCL& ref, double t)   //a=h_x
-    {
-        return ref[1]* paraX * Mag * cos(paraX * ref[0]  + paraT * t);
-    }
-    double Grady( const DROPS::Point3DCL& ref, double t)   //b=h_y
-    {
-        return 1. + Mag * sin(paraX * ref[0]  + paraT * t);
-    }
-    double Grad1( const DROPS::Point3DCL& ref, double t)   //\nabla_y(a/b)
-    {
-        double ay=paraX * Mag * cos(paraX * ref[0]  + paraT * t);
-        return ay/Grady(ref, t);
-    }
-    double Grad2( const DROPS::Point3DCL& ref, double t)    //\nabla_x(a/b)
-    {
-        double ax     = -ref[1]* paraX * paraX * Mag * sin(paraX * ref[0]  + paraT * t);
-        double bx     = paraX * Mag * cos(paraX * ref[0]  + paraT * t);
-        return (ax*Grady(ref, t) - Gradx(ref, t)*bx)/(Grady(ref,t)*Grady(ref, t));
-    }
-    /// \brief Reaction: no reaction
-    double Reaction(const DROPS::TetraCL&, const DROPS::BaryCoordCL&, double) {
-        return 0.0;
-    }
-    DROPS::Point3DCL Flowfield(const DROPS::TetraCL& tet, const DROPS::BaryCoordCL& b, double t) {
-        DROPS::Point3DCL ref = TransBack(DROPS::GetWorldCoord( tet, b), t);
-        DROPS::Point3DCL v(0.);
-        v[0] = 1.0;
-        v[1] = ref[1] * Mag * paraT * cos(paraX * ref[0]  + paraT * t);
-        return v;
-    }
-    DROPS::Point3DCL ALEFlowfield(const DROPS::TetraCL&, const DROPS::BaryCoordCL&, double) {
-        DROPS::Point3DCL v(0.);
-        v[0] = 1.;
-        v[1] = 0.;
-        return v;
-    }
-
-    /// \brief Solution
-    double Solution( const DROPS::Point3DCL& p, double t)
-    {
-        DROPS::Point3DCL ref = TransBack(p, t);
-        return exp(t)*exp(ref[0] + ref[1] + ref[2]);
-    }
-    /// \brief Right-hand side
-    double Source(const DROPS::TetraCL& tet, const DROPS::BaryCoordCL& bary, double t) {
-        static bool first = true;
-        //alpha to control diffusion parameter, you could change a small number to make problem convection-dominated
-        static double alpha;
-        if (first) {
-            alpha= P.get<double>("PoissonCoeff.Diffusion");
-            first= false;
-        }
-        const DROPS::Point3DCL p= DROPS::GetWorldCoord( tet, bary);
-        DROPS::Point3DCL ref = TransBack( p, t);
-        double a= Gradx(ref,t);
-        double b= Grady(ref,t);
-        double c= Grad1(ref,t);
-        double d= Grad2(ref,t);
-        double sol= Solution(p, t);
-        double timederiv = sol;
-        double conv      = (1. - a/b)*sol;
-        double diff1     = -alpha*(1.-d - 2.*a/b + a/b*c + a*a/b/b)*sol;
-        double diff2     = -alpha/(b*b)*sol;
-        double diff3     = -alpha*sol;
-        return timederiv + conv + diff1 +diff2 +diff3;
-    }
-    static DROPS::RegisterScalarTetraFunction regscaq("TestALE_Reaction",     Reaction    );
-    static DROPS::RegisterScalarTetraFunction regscaf("TestALE_Source",       Source      );
-    static DROPS::RegisterScalarFunction regscaint("TestALE_Interface",  Interface   );
-    static DROPS::RegisterScalarFunction regscas("TestALE_Solution",     Solution    );
-    static DROPS::RegisterVectorTetraFunction regscav("TestOrigin_Velocity",  Flowfield   );
-    static DROPS::RegisterVectorTetraFunction regscaalev("TestALE_Velocity",  ALEFlowfield);
-} //end of namespace
-
-/****************************************
- *  Example 8:                        \n*
  *   - instationary setup             \n*
  *   - constant diffusion             \n*
  *   - convection                     \n*
@@ -515,8 +443,7 @@ static DROPS::RegisterVectorTetraFunction regvecnus("Nusselt", Nusselt);
         ref[1] = refH * p[1]/Interface(p, t);
         ref[2] = p[2];
         return ref;
-    }
-    //Grady
+    }    //Grady
     double Grady( const DROPS::Point3DCL&, double t)   //b=h_y
     {
         return 1. + Mag * sin( paraT * t);
@@ -526,17 +453,20 @@ static DROPS::RegisterVectorTetraFunction regvecnus("Nusselt", Nusselt);
         return 0.0;
     }
     DROPS::Point3DCL Flowfield(const DROPS::TetraCL& tet, const DROPS::BaryCoordCL& b, double t) {
-        DROPS::Point3DCL ref = TransBack(DROPS::GetWorldCoord( tet, b), t);
+        DROPS::Point3DCL ref = DROPS::GetRefCoord( tet, b);
         DROPS::Point3DCL v(0.);
         v[0] = 1.0;
         v[1] = ref[1] * Mag * paraT * cos( paraT * t);
         return v;
     }
-
-    /// \brief Solution
-    double Solution( const DROPS::Point3DCL& p, double t)
+    double Init( const DROPS::Point3DCL& p, double )
     {
-        DROPS::Point3DCL ref = TransBack(p, t);
+        DROPS::Point3DCL ref= TransBack(p, 0.);        
+        return 100. * (ref[0] - ref[0] * ref [0] ) * (0.2 * ref[1] - ref[1]* ref[1]) * (0.2 * ref[2] - ref[2] * ref[2]);
+    }
+    /// \brief Solution
+    double Solution(const DROPS::TetraCL& tet, const DROPS::BaryCoordCL& b, double t) {
+        DROPS::Point3DCL ref = DROPS::GetRefCoord(tet, b);
         return 100. * exp(10*t) * (ref[0] - ref[0] * ref [0] ) * (0.2 * ref[1] - ref[1]* ref[1]) * (0.2 * ref[2] - ref[2] * ref[2]);
     }
     ///ALL partial derivatives are based on ALE coordinates
@@ -565,10 +495,10 @@ static DROPS::RegisterVectorTetraFunction regvecnus("Nusselt", Nusselt);
             alpha= P.get<double>("PoissonCoeff.Diffusion");
             first= false;
         }
-        const DROPS::Point3DCL p= DROPS::GetWorldCoord( tet, bary);
+        DROPS::Point3DCL p = DROPS::GetWorldCoord( tet, bary);
         DROPS::Point3DCL ref = TransBack(p, t);
         double b= Grady(ref,t);
-        double sol= Solution(p, t);
+        double sol= Solution(tet, bary, t);
         double timederiv = 10. * sol;
         double conv      =  Solx(ref, t);
         double diff1     = -alpha* Solxx(ref, t);
@@ -579,12 +509,13 @@ static DROPS::RegisterVectorTetraFunction regvecnus("Nusselt", Nusselt);
     static DROPS::RegisterScalarTetraFunction regscaq("ALEEx2_Reaction",     Reaction    );
     static DROPS::RegisterScalarTetraFunction regscaf("ALEEx2_Source",       Source      );
     static DROPS::RegisterScalarFunction regscaint("ALEEx2_Interface",  Interface   );
-    static DROPS::RegisterScalarFunction regscas("ALEEx2_Solution",     Solution   );
+    static DROPS::RegisterScalarTetraFunction regscas("ALEEx2_Solution",     Solution   );
+    static DROPS::RegisterScalarFunction regscainit("ALEEx2_Init",      Init   );
     static DROPS::RegisterVectorTetraFunction regscav("ALEEx2_Velocity",    Flowfield   );
 }//end of namespace
 
 /****************************************
- *  Example 9:                        \n*
+ *  Example 8:                        \n*
  *   - instationary setup             \n*
  *   - constant diffusion             \n*
  *   - convection                     \n*
@@ -637,16 +568,20 @@ static DROPS::RegisterVectorTetraFunction regvecnus("Nusselt", Nusselt);
         return 0.0;
     }
     DROPS::Point3DCL Flowfield(const DROPS::TetraCL& tet, const DROPS::BaryCoordCL& b, double t) {
-        DROPS::Point3DCL ref = TransBack(DROPS::GetWorldCoord( tet, b), t);
+        DROPS::Point3DCL ref = DROPS::GetRefCoord(tet, b);
         DROPS::Point3DCL v(0.);
         v[0] = 1.;
         v[1] = ref[1] * Mag * paraT * cos( paraX * ref[0]  + paraT * t);
         return v;
     }
-    /// \brief Solution
-    double Solution( const DROPS::Point3DCL& p, double t)
+    double Init( const DROPS::Point3DCL& p, double )
     {
-        DROPS::Point3DCL ref = TransBack(p, t);
+        DROPS::Point3DCL ref= TransBack(p, 0.);        
+        return 100. * (ref[0] - ref[0] * ref [0] ) * (0.2 * ref[1] - ref[1]* ref[1]) * (0.2 * ref[2] - ref[2] * ref[2]);
+    }
+    /// \brief Solution
+    double Solution(const DROPS::TetraCL& tet, const DROPS::BaryCoordCL& b, double t) {
+        DROPS::Point3DCL ref = DROPS::GetRefCoord(tet, b);
         return 100. * exp(10*t) * (ref[0] - ref[0] * ref [0] ) * (0.2 * ref[1] - ref[1]* ref[1]) * (0.2 * ref[2] - ref[2] * ref[2]);
     }
     ///ALL partial derivatives are based on ALE coordinates
@@ -683,29 +618,29 @@ static DROPS::RegisterVectorTetraFunction regvecnus("Nusselt", Nusselt);
         alpha = P.get<double>("PoissonCoeff.Diffusion");
         first=false;
         }
-        const DROPS::Point3DCL p= DROPS::GetWorldCoord( tet, bary);
-        DROPS::Point3DCL ref = TransBack(p, t);
+        DROPS::Point3DCL ref = DROPS::GetRefCoord(tet, bary);
         double a= Gradx(ref,t);
         double b= Grady(ref,t);
         double c= Grad1(ref,t);
-        double d= Grad2(ref,t);
-        double sol= Solution(p, t);
+        double d= Grad2(ref,t);        
+        double sol= Solution(tet, bary, t);
         double timederiv = 10. * sol;
         double conv      =  1. * (Solx(ref, t) - a/b * Soly(ref, t));
         double diff1     = -alpha* (Solxx(ref, t) - 2 * a/b * Solxy(ref,t ) - d * Soly(ref, t) + a/b * c * Soly(ref, t) + a * a /b/b *Solyy(ref, t));
         double diff2     = -alpha/(b*b)*Solyy(ref, t);
         double diff3     = -alpha*Solzz(ref, t);
-        return timederiv + conv + diff1 +diff2 +diff3;
+        return timederiv + conv + diff1 +diff2 +diff3; 
     }
     static DROPS::RegisterScalarTetraFunction regscaq("ALEEx3_Reaction",     Reaction    );
     static DROPS::RegisterScalarTetraFunction regscaf("ALEEx3_Source",       Source      );
     static DROPS::RegisterScalarFunction regscaint("ALEEx3_Interface",  Interface   );
-    static DROPS::RegisterScalarFunction regscas("ALEEx3_Solution",     Solution   );
+    static DROPS::RegisterScalarTetraFunction regscas("ALEEx3_Solution",     Solution   );
+    static DROPS::RegisterScalarFunction regscainit("ALEEx3_Init",      Init   );
     static DROPS::RegisterVectorTetraFunction regscav("ALEEx3_Velocity",    Flowfield   );
 }//end of namespace
 
 /****************************************
- *  Example 10:                        \n*
+ *  Example 9:                        \n*
  *   - instationary setup             \n*
  *   - constant diffusion             \n*
  *   - convection                     \n*
@@ -742,16 +677,20 @@ static DROPS::RegisterVectorTetraFunction regvecnus("Nusselt", Nusselt);
         return 0.0;
     }
     DROPS::Point3DCL Flowfield(const DROPS::TetraCL& tet, const DROPS::BaryCoordCL& b, double t) {
-        DROPS::Point3DCL ref = TransBack(DROPS::GetWorldCoord( tet, b), t);
+        DROPS::Point3DCL ref = DROPS::GetRefCoord(tet, b);
         DROPS::Point3DCL v(0.);
         v[0] = exp(5.* t);
         v[1] = ref[1] * Mag * paraT * cos( paraT * t);
         return v;
     }
-    /// \brief Solution
-    double Solution( const DROPS::Point3DCL& p, double t)
+    double Init( const DROPS::Point3DCL& p, double )
     {
-        DROPS::Point3DCL ref = TransBack(p, t);
+        DROPS::Point3DCL ref= TransBack(p, 0.);        
+        return 100. * (ref[0] - ref[0] * ref [0] ) * (0.2 * ref[1] - ref[1]* ref[1]) * (0.2 * ref[2] - ref[2] * ref[2]);
+    }
+    /// \brief Solution
+    double Solution(const DROPS::TetraCL& tet, const DROPS::BaryCoordCL& b, double t) {
+        DROPS::Point3DCL ref = DROPS::GetRefCoord(tet, b);
         return 100. * exp(10*t) * (ref[0] - ref[0] * ref [0] ) * (0.2 * ref[1] - ref[1]* ref[1]) * (0.2 * ref[2] - ref[2] * ref[2]);
     }
     ///ALL partial derivatives are based on ALE coordinates
@@ -780,10 +719,10 @@ static DROPS::RegisterVectorTetraFunction regvecnus("Nusselt", Nusselt);
         alpha = P.get<double>("PoissonCoeff.Diffusion");
         first=false;
         }
-        const DROPS::Point3DCL p= DROPS::GetWorldCoord( tet, bary);
+        DROPS::Point3DCL p = DROPS::GetWorldCoord( tet, bary);
         DROPS::Point3DCL ref = TransBack(p, t);
         double b= Grady(ref,t);
-        double sol= Solution(p, t);
+        double sol= Solution(tet, bary, t);
         double timederiv = 10. * sol;
         double conv      =  exp(5.* t) * Solx(ref, t);
         double diff1     = -alpha* Solxx(ref, t);
@@ -794,113 +733,7 @@ static DROPS::RegisterVectorTetraFunction regvecnus("Nusselt", Nusselt);
     static DROPS::RegisterScalarTetraFunction regscaq("ALEEx4_Reaction",     Reaction    );
     static DROPS::RegisterScalarTetraFunction regscaf("ALEEx4_Source",       Source      );
     static DROPS::RegisterScalarFunction regscaint("ALEEx4_Interface",  Interface   );
-    static DROPS::RegisterScalarFunction regscas("ALEEx4_Solution",     Solution   );
+    static DROPS::RegisterScalarTetraFunction regscas("ALEEx4_Solution",     Solution   );
+    static DROPS::RegisterScalarFunction regscainit("ALEEx4_Init",      Init   );
     static DROPS::RegisterVectorTetraFunction regscav("ALEEx4_Velocity",    Flowfield   );
 }//end of namespace
- namespace ALEBala {
-    //refH, Mag, paraX and paraT are used to change the free surface functions
-    double refH   = 0.2;
-    double Mag    = 0.25;
-    double paraX  = 0.2 * PI;
-    double paraT  = 10. * PI;
-    //Free surface
-    double Interface( const DROPS::Point3DCL& p, double t)
-    {
-        double h= refH + refH * Mag * sin ( paraX * p[0]  + paraT * t );
-        return h;
-    }
-    double Inter( const DROPS::Point3DCL&, double)
-    {
-        double ret =0.01;
-        return ret;
-    }
-    /// \brief Reaction: no reaction
-    double Reaction(const DROPS::TetraCL&, const DROPS::BaryCoordCL&, double) {
-        return 0.0;
-    }
-    double QC( const DROPS::Point3DCL& , double t)
-    {
-        double ret= pow(refH + refH * Mag * sin ( paraT * t ), 3) +  refH * Mag * paraT *sin ( paraT * t )/paraX ;
-        return ret;
-    }
-    double flux(const DROPS::Point3DCL& p, double t)
-    {
-        double ret= QC(p, t) - refH * Mag * paraT *sin ( paraX * p[0] + paraT * t )/paraX;
-        return ret;
-    }
-
-    double Hx(const DROPS::Point3DCL& p, double t)
-    {
-        double ret= refH * Mag * paraX* cos ( paraX * p[0]  + paraT * t );
-        return ret;
-    }
-    double Qx(const DROPS::Point3DCL& p, double t)
-    {
-        double ret = - refH * Mag * paraT * cos( paraX * p[0] + paraT * t );
-        return ret;
-    }
-    DROPS::Point3DCL Flowfield(const DROPS::TetraCL& tet, const DROPS::BaryCoordCL& b, double t) {
-        const DROPS::Point3DCL p= DROPS::GetWorldCoord( tet, b);
-        DROPS::Point3DCL v(0.);
-        double h = Interface(p,t);
-        double q = flux(p, t);
-        double hx =Hx(p,t);
-        double qx =Qx(p,t);
-        v[0] = -0.5*(3.*h*p[1]*p[1] - pow(p[1], 3))*(qx/pow(h, 3) + (-3.)*q*hx/pow(h, 4));
-        v[1] = 3.*q/pow(h, 3)*(h*p[1] - p[1]*p[1]/2.);
-        return v;
-    }
-    /// \brief Right-hand side
-    double Source(const DROPS::TetraCL&, const DROPS::BaryCoordCL&, double) {
-        return 0.;
-    }
-    static DROPS::RegisterScalarTetraFunction regscaq("ALEBala_Reaction",     Reaction    );
-    static DROPS::RegisterScalarTetraFunction regscaf("ALEBala_Source",       Source      );
-    static DROPS::RegisterScalarFunction regscaint("ALEBala_Interface",  Interface   );
-    static DROPS::RegisterScalarFunction regscainter("ALEBala_Inter",    Inter       );
-    static DROPS::RegisterVectorTetraFunction regscav("ALEBala_Velocity",     Flowfield   );
-} //end of namespace
-
- namespace ALE {
-    /// \brief Reaction: no reaction
-    double Reaction(const DROPS::TetraCL&, const DROPS::BaryCoordCL&, double) {
-        return 0.0;
-    }
-    double Interface( const DROPS::Point3DCL& p, double t)
-    {
-        double h;
-        h = 0.2 + 0.05 * sin ( p[0] * 0.1 * PI - 20. * PI * t );
-        return h;
-    }
-    DROPS::Point3DCL TransBack(const DROPS::Point3DCL &p, double t)
-    {
-        DROPS::Point3DCL ref(p);
-        ref[1]*= 0.2/Interface(p, t);
-        return ref;
-    }
-    /// \brief Convection: constant flow in x direction
-    DROPS::Point3DCL Flowfield(const DROPS::TetraCL& tet, const DROPS::BaryCoordCL& b, double t) {
-        DROPS::Point3DCL ref = TransBack( DROPS::GetWorldCoord( tet, b), t);
-        DROPS::Point3DCL ret;
-        const double d= ref[1]/0.2,
-            U= 200.;  //U=gh^2/(2*nu)
-        ret[0]= U*(2-d)*d;
-        ret[1]=0.;
-        ret[2]=0.;
-        return ret;
-    }
-    /// \brief Right-hand side
-    double Source(const DROPS::TetraCL&, const DROPS::BaryCoordCL&, double) {
-        return 0.0;
-    }
-    double BInter(const DROPS::Point3DCL&, double) {
-        return 0.01;
-    }
-    /// \brief Solution ====================================careful
-
-    static DROPS::RegisterScalarTetraFunction regscaq("ALE_Reaction",     Reaction    );
-    static DROPS::RegisterScalarTetraFunction regscaf("ALE_Source",       Source      );
-    static DROPS::RegisterScalarFunction regscaint("ALE_Interface",  Interface   );
-    static DROPS::RegisterVectorTetraFunction regscav("ALE_Velocity",     Flowfield   );
-    static DROPS::RegisterScalarFunction regscas("ALE_Inter",        BInter      );
-} //end of namespace

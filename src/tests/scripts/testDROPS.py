@@ -33,10 +33,10 @@ def runtest(Test):
         Test.status = 0
     return 0
 
-def runtests(testlist):
+def runtests(testlist, compileproc=1):
     for test in testlist:
         failedtests= []
-        setup.compile(test)
+        setup.compile(test, compileproc)
         #Run and gather the output of the tests
         runtest(test)
         #perform the testing logic
@@ -62,11 +62,17 @@ def main(argv=sys.argv):
     nondefaultpattern = False
     for arg in sys.argv:
         if re.match('--select=',arg):
-            [patstr,pattern] = arg.split('=',1)
+            [dummy,pattern] = arg.split('=',1)
             nondefaultpattern = True
     print "chosen pattern is ", pattern
             
     
+    compileproc = "1"
+    for arg in sys.argv:
+        if re.match('--compileproc=',arg):
+            [dummy,compileproc] = arg.split('=',1)
+    print "number of processes for compilation ", compileproc
+
     parallelList = readtests.parallel(pattern)
     serialList = readtests.serial(pattern)
 
@@ -77,7 +83,7 @@ def main(argv=sys.argv):
             #Set up DROPS for parallel testing
             setup.parallel()
             #Compile the parallel tests
-            failedTests = failedTests + runtests(parallelList)
+            failedTests = failedTests + runtests(parallelList,compileproc)
     if ('serial' in sys.argv or ('parallel' not in sys.argv and 'serial' not in sys.argv)):
         if nondefaultpattern:
             print "serialList =", serialList
@@ -85,7 +91,7 @@ def main(argv=sys.argv):
             #Set up DROPS for serial testing
             setup.serial()
             #Compile the serial tests
-            failedTests = failedTests + runtests(serialList)
+            failedTests = failedTests + runtests(serialList,compileproc)
     reportFile = open(reportfile, "a")
     line = '#=========================FAILED TESTS==============================\n'
     reportFile.writelines(line)

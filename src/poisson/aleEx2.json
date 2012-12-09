@@ -18,7 +18,7 @@
 		"NumLvl":		    -1,
 		"Relax":		    1,
 		"SolutionIsKnown":	1, 	 //1 = true, 0 = false
-		"P1":               1        // 1 = P1 finite element, 0 = P2 finite element
+		"P1":               0       // 1 = P1 finite element, 0 = P2 finite element
 	},
 
 	// domain, bnd/ini conditions
@@ -39,7 +39,7 @@
 		"Solution":		    "ALEEx2_Solution",
 		"Source":	 	    "ALEEx2_Source",
 		"Flowfield":		"ALEEx2_Velocity",
-		"InitialVal":		"ALEEx2_Solution",
+		"InitialVal":		"ALEEx2_Init",
 		"Convection":       1
 	},
     
@@ -52,8 +52,10 @@
 
 	"ALE":
 	{
-		      "wavy":		1,                          //true =1; false =0;
-		 "Interface":		"ALEEx2_Interface"
+         "wavy":		     1,       //true =1; false =0;
+         "OnlyBndCurved":    1,
+		 "Interface":		 "ALEEx3_Interface",
+         "P1":               1       // 1 = P1 finite element, 0 = P2 finite element
 	},
 
 	// time stepping
@@ -101,10 +103,11 @@
 	//VTK output
 	"VTK":
 	{
-		"VTKOut":		0, 	 //VTK output
-		"VTKDir":		"vtk", 	 //local directory for vtk files
-		"VTKName":		"ALE_303_RR4_", 	 //name of vtk files
-		"Binary":		0 	 //write out VTK files in binary format
+		"VTKOut":		  1, 	 //VTK output
+		"VTKDir":		  "vtk", 	 //local directory for vtk files
+        "UseDeformation": 1,
+		"VTKName":		  "ALE_303_2", 	 //name of vtk files
+		"Binary":		  0 	 //write out VTK files in binary format
 	}
 
 }

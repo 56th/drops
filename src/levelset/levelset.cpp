@@ -377,7 +377,7 @@ void SF_ImprovedLaplBeltramiOnTriangle( const TetraCL& t, const BaryCoordCL * co
                                         instat_scalar_fun_ptr sigma, const Quad5_2DCL<Point3DCL> e[3],
                                         double det, VectorCL& f)
 {
-    static Quad5_2DCL<Point3DCL> Grad[10]; // Gradients of the P2-basis-functions
+    Quad5_2DCL<Point3DCL> Grad[10]; // Gradients of the P2-basis-functions
     Quad5_2DCL<Point3DCL> n;
 
     for (int v=0; v<10; ++v)
@@ -416,8 +416,8 @@ void SF_ImprovedLaplBeltramiOnTriangle( const TetraCL& t, const BaryCoordCL * co
         SF_ImprovedLaplBeltramiOnTriangle( t, p, triangle, Grad_f, Numb, sf.GetSigma(), e, det, f);
         return;
     }
-    static Quad5_2DCL<>          p2[10];   // P2-Hat-Functions...
-    static Quad5_2DCL<Point3DCL> Grad[10]; // and their gradients
+    Quad5_2DCL<>          p2[10];   // P2-Hat-Functions...
+    Quad5_2DCL<Point3DCL> Grad[10]; // and their gradients
     Quad5_2DCL<Point3DCL> n;
     P2DiscCL::GetP2Basis( p2, p);
     for (int v=0; v<10; ++v)
@@ -602,6 +602,7 @@ void LevelsetP2CL::Reparam( int method, bool Periodic)
 
 void LevelsetP2CL::AccumulateBndIntegral( VecDescCL& f) const
 {
+    ScopeTimerCL scope("AccumulateBndIntegral");
     SurfTensAccumulatorCL* accu;
 
     switch (SF_)
@@ -618,6 +619,8 @@ void LevelsetP2CL::AccumulateBndIntegral( VecDescCL& f) const
         throw DROPSErrCL("LevelsetP2CL::AccumulateBndIntegral not implemented for this SurfaceForceT");
     }
     TetraAccumulatorTupleCL accus;
+    ProgressBarTetraAccumulatorCL accup(MG_, "SurfTension Setup", Phi.RowIdx->TriangLevel());
+    accus.push_back( &accup);
     accus.push_back( accu);
     accumulate( accus, MG_, Phi.RowIdx->TriangLevel(), Phi.RowIdx->GetMatchingFunction(), Phi.RowIdx->GetBndInfo());
 

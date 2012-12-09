@@ -18,7 +18,7 @@
             // many vectors to construct the new krylov space
         "RelativeErr":      0,      //use relative tolerances (otherwise absolute) 1 = true, 0 = false
         "Tol":              1e-10,  //(relative/absolute) tolerance of iterative method
-        "Method":           103,    //Methods describes Solver (first digit) + Preconditioner (last two digits)
+        "Method":           303,    //Methods describes Solver (first digit) + Preconditioner (last two digits)
             // First digit:
             //           1XX : Multigrid
             //           2XX : Prec. CG
@@ -86,6 +86,7 @@
             //file prefix when reading data for initial condition
             // -> Here: no initial data is read from outside
         "MeshFile":         "1x1x1@4x4x4",
+//        "MeshFile":         "test.msh",
             //mesh file (created by GAMBIT or NETGEN, FLUENT/UNS format)
             // or (in case of the BrickBuilder:)
             // dimensions of a cuboid (e.g. AxBxC@DxExF) with edge

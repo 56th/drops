@@ -389,7 +389,7 @@ void StokesP2P1CL<CoeffT>::SetupSystem1( MLMatDescCL* A, MLMatDescCL* M, VecDesc
     MLIdxDescCL::iterator it = A->RowIdx->begin();
     for (size_t lvl=0; lvl < A->Data.size(); ++lvl, ++itA, ++itM, ++it) {
 #ifndef _PAR
-        std::cout << "entering SetupSystem1: " << it->NumUnknowns() << " unknowns ";
+        std::cout << "entering SetupSystem1: " << it->NumUnknowns() << " unknowns \n";
 #endif
         SetupSystem1_P2 ( MG_, Coeff_, BndData_, *itA, *itM, lvl == A->Data.size()-1 ? b : 0, cplA, cplM, *it, t);
 #ifndef _PAR
@@ -550,7 +550,7 @@ void StokesP2P1CL<CoeffT>::SetupSystem2( MLMatDescCL* B, VecDescCL* c, double t)
     for (; itB!=B->Data.end() && itRow!=B->RowIdx->end() && itCol!=B->ColIdx->end(); ++itB, ++itRow, ++itCol)
     {
 #ifndef _PAR
-        std::cout << "entering SetupSystem2: " << itRow->NumUnknowns() << " prs, " << itCol->NumUnknowns() << " vels. ";
+        std::cout << "entering SetupSystem2: " << itRow->NumUnknowns() << " prs, " << itCol->NumUnknowns() << " vels. \n ";
 #endif
         VecDescCL* rhsPtr= itB==B->Data.GetFinestIter() ? c : 0; // setup rhs only on finest level
         SetupSystem2_P2P1 ( MG_, Coeff_, BndData_, &(*itB), rhsPtr, &(*itRow), &(*itCol), t);

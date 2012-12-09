@@ -214,9 +214,8 @@ operator* (const GridFunctionCL< SMatrixCL<Rows, Cols> >& a, const GridFunctionC
     return ret;
 }
 
-template <Uint Dim>
 inline GridFunctionCL<double>
-dot(const GridFunctionCL< SVectorCL<Dim> >& a, const GridFunctionCL< SVectorCL<Dim> >& b)
+dot(const GridFunctionCL<Point3DCL>& a, const GridFunctionCL<Point3DCL>& b)
 {
     GridFunctionCL<double> ret( 0.0, a.size());
     for (size_t i= 0; i<a.size(); ++i)
@@ -318,7 +317,7 @@ class LocalP1CL: public GridFunctionCL<T>
     typedef GridFunctionCL<T> base_type;
     typedef typename base_type::value_type value_type;
     typedef typename base_type::instat_fun_ptr instat_fun_ptr;
-
+    typedef FE_P1CL FETYPE;
   protected:
     typedef LocalP1CL<T> self_;
 
@@ -371,6 +370,7 @@ class LocalP2CL: public GridFunctionCL<T>
     typedef GridFunctionCL<T> base_type;
     typedef typename base_type::value_type value_type;
     typedef typename base_type::instat_fun_ptr instat_fun_ptr;
+    typedef FE_P2CL FETYPE;
 
   protected:
     typedef LocalP2CL<T> self_;
@@ -500,6 +500,10 @@ class Quad2CL: public GridFunctionCL<T>
     typedef GridFunctionCL<T> base_type;
     typedef typename base_type::value_type value_type;
     typedef typename base_type::instat_fun_ptr instat_fun_ptr;
+    typedef typename base_type::tetra_function tetra_function;
+    typedef Quad2DataCL DataClass;
+
+    
 
     static const double Node[5][4]; // Stuetzstellen (NumNodesC*4 doubles)
     static const double Wght[5];    // Gewichte      (NumNodesC   doubles)
@@ -527,6 +531,8 @@ DROPS_DEFINE_VALARRAY_DERIVATIVE(Quad2CL, T, base_type)
 
     inline self_&
     assign(const TetraCL&, instat_fun_ptr, double= 0.0);
+    inline self_&
+    assign(const TetraCL&, tetra_function, double= 0.0, const BaryCoordCL* const= Quad2DataCL::Node);
     inline self_&
     assign(const LocalP1CL<value_type>&);
     inline self_&
@@ -607,6 +613,7 @@ class Quad3CL: public GridFunctionCL<T>
     typedef typename base_type::value_type value_type;
     typedef typename base_type::instat_fun_ptr instat_fun_ptr;
     typedef typename base_type::tetra_function tetra_function;
+    typedef Quad3DataCL DataClass;
 
   protected:
     typedef Quad3CL<T> self_;
@@ -695,6 +702,7 @@ class Quad5CL: public GridFunctionCL<T>
     typedef typename base_type::value_type value_type;
     typedef typename base_type::tetra_function tetra_function;
     typedef typename base_type::instat_fun_ptr instat_fun_ptr;
+    typedef Quad5DataCL DataClass;
 
   protected:
     typedef Quad5CL<T> self_;

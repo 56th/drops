@@ -1,0 +1,151 @@
+{
+  "Unit ball":
+  {
+    "Type": "CSG-body (v0)",
+    "Instructions" : [
+        { "Type": "Sphere", "Center": [0, 0, 0], "Radius": 1 } // both args are optional
+    ]
+  },
+
+  "Left half space":
+  {
+    "Type": "CSG-body (v0)",
+    "Instructions" : [
+        { "Type": "Halfspace", "Normal": [1, 0, 0]}
+    ]
+  },
+
+  "Infinite cone":
+  {
+    "Type": "CSG-body (v0)",
+    "Instructions" : [
+        { "Type": "InfiniteCone", "Apex": [0, 0, 0], "Axis": [1,0,0], "SemiAperture": 0.5 } //  all args are optional.
+    ]
+  },
+
+  "Infinite cylinder":
+  {
+    "Type": "CSG-body (v0)",
+    "Instructions" : [
+        { "Type": "InfiniteCylinder", "Origin": [0, 0, 0], "Axis": [1,0,0], "Radius": 0.6 } //  all args are optional.
+    ]
+  },
+
+  "Suess":
+  {
+    "Type": "CSG-body (v0)",
+    "Instructions" : [
+        { "Type": "Levelset", "Function": "suess" }
+    ]
+  },
+
+  "Unit cube":
+  {
+    "Type": "CSG-body (v0)",
+    "Instructions" : [
+        { "Type": "Halfspace", "Normal": [ 1, 0, 0], "ValueAtOrigin": -0.6 }, // optional "MakeUnitNormal": true
+        { "Type": "Halfspace", "Normal": [-1, 0, 0] },
+        { "Type": "Halfspace", "Normal": [ 0, 1, 0], "ValueAtOrigin": -0.6 },
+        { "Type": "Halfspace", "Normal": [ 0,-1, 0] },
+        { "Type": "Halfspace", "Normal": [ 0, 0, 1], "ValueAtOrigin": -0.6 },
+        { "Type": "Halfspace", "Normal": [ 0, 0,-1] },
+        "Intersection",
+        "Intersection",
+        "Intersection",
+        "Intersection",
+        "Intersection"
+    ]
+  },
+
+  "Two spheres with reference":
+  {
+    "Type": "CSG-body (v0)",
+    "Instructions" : [
+        { "Type": "Sphere", "Center": [0, 0, 0], "Radius": 1 },
+        { "Type": "CreateReference", "Name": "s0" },
+        { "Type": "ApplySimilarityToDomain", "Translation": [0.5, 0,0], "Scaling": 1.2 }, // optional RotationAxis, RotationAngle
+        { "Type": "PushReference", "Name": "s0" },
+        "SmoothUnion" // A close relative of "Union"
+    ]
+  },
+
+  "Unit cube with Suess (loaded)":
+  {
+    "Type": "CSG-body (v0)",
+    "Instructions" : [
+        { "Type": "LoadFromModule", "Path": "../geom/csg-examples.json", "Name": "Unit cube" }, // Name is optional, if the file directly contains a CSG-object.
+        { "Type": "LoadFromModule", "Path": "../geom/csg-examples.json", "Name": "Suess" },
+        { "Type": "ApplySimilarityToDomain", "Translation": [0.5, 0,0], "Scaling": 2 },
+        "Union"
+    ]
+  },
+
+  "Notched unit ball":
+  {
+    "Type": "CSG-body (v0)",
+    "Instructions" : [
+        { "Type": "Halfspace", "Normal": [  1, 0, 0], "ValueAtOrigin": -0.2 },
+        { "Type": "Halfspace", "Normal": [ -1, 0, 0], "ValueAtOrigin": -0.2, "MakeUnitNormal": true },
+        { "Type": "Halfspace", "Normal": [  0, 1, 0], "ValueAtOrigin": -0.2, "MakeUnitNormal": false },
+        "Intersection",
+        "Intersection",
+        "Complement",
+        { "Type": "Sphere", "Center": [0, 0, 0], "Radius": 1 },
+        "Intersection"
+    ]
+  },
+
+  "Notched unit ball (smooth intersection)":
+  {
+    "Type": "CSG-body (v0)",
+    "Instructions" : [
+        { "Type": "Halfspace", "Normal": [  1, 0, 0], "ValueAtOrigin": -0.2 },
+        { "Type": "Halfspace", "Normal": [ -1, 0, 0], "ValueAtOrigin": -0.2, "MakeUnitNormal": true },
+        { "Type": "Halfspace", "Normal": [  0, 1, 0], "ValueAtOrigin": -0.2, "MakeUnitNormal": false },
+        "Intersection",
+        "Intersection",
+        "Complement",
+        { "Type": "Sphere", "Center": [0, 0, 0], "Radius": 1 },
+        "SmoothIntersection"
+    ]
+  },
+
+  "Birthday cake (7 connected components)":
+  {
+    "Type": "CSG-body (v0)",
+    "Instructions" : [
+        { "Type": "InfiniteCylinder", "Origin": [-1, 0, 0], "Radius": 0.95 },
+        { "Type": "Halfspace", "Normal": [1, 0, 0], "ValueAtOrigin": 0.3},
+        "Intersection", // The cake
+        { "Type": "InfiniteCylinder", "Origin": [0, 0, 0], "Radius": 0.07 },
+        { "Type": "Halfspace", "Normal": [1, 0, 0], "ValueAtOrigin": -0.4},
+        "Intersection", // The candle body
+        { "Type": "Sphere", "Center": [0.5, 0, 0], "Radius": 0.09 },
+        { "Type": "Halfspace", "Normal": [1, 0, 0], "ValueAtOrigin": -0.56},
+        "Intersection",
+        { "Type": "InfiniteCone", "Apex": [0.82, 0, 0], "Axis": [-1,0,0], "SemiAperture": 0.27 },
+        { "Type": "Halfspace", "Normal": [-1, 0, 0], "ValueAtOrigin": 0.56},
+        "Intersection",
+        "Union", // The flame
+        "Union", // The candle
+        { "Type": "ApplySimilarityToDomain", "Translation": [0,0.7,0] },
+        { "Type": "CreateReference", "Name": "candle0" }, // reference to translated candle
+        "Union",
+        { "Type": "PushReference", "Name": "candle0" },
+        { "Type": "ApplySimilarityToDomain", "RotationAxis": [1,0,0], "RotationAngle": 1.047 },
+        "Union",
+        { "Type": "PushReference", "Name": "candle0" },
+        { "Type": "ApplySimilarityToDomain", "RotationAxis": [1,0,0], "RotationAngle": 2.094 },
+        "Union",
+        { "Type": "PushReference", "Name": "candle0" },
+        { "Type": "ApplySimilarityToDomain", "RotationAxis": [1,0,0], "RotationAngle": 3.142 },
+        "Union",
+        { "Type": "PushReference", "Name": "candle0" },
+        { "Type": "ApplySimilarityToDomain", "RotationAxis": [1,0,0], "RotationAngle": -1.047 },
+        "Union",
+        { "Type": "PushReference", "Name": "candle0" },
+        { "Type": "ApplySimilarityToDomain", "RotationAxis": [1,0,0], "RotationAngle": -2.094 },
+        "Union"
+    ]
+  }
+}

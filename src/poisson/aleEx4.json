@@ -39,7 +39,7 @@
 		"Solution":		    "ALEEx4_Solution",
 		"Source":	 	    "ALEEx4_Source",
 		"Flowfield":		"ALEEx4_Velocity",
-		"InitialVal":		"ALEEx4_Solution",
+		"InitialVal":		"ALEEx4_Init",
 		"Convection":       1
 	},
     

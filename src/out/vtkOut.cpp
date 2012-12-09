@@ -23,6 +23,7 @@
 */
 
 #include "out/vtkOut.h"
+#include "geom/deformation.h"
 
 namespace DROPS
 {
@@ -30,7 +31,7 @@ namespace DROPS
 VTKOutCL::VTKOutCL(const MultiGridCL& mg, const std::string& dataname, Uint numsteps,
                    const std::string& dirname, const std::string& filename, 
                    const std::string& pvdfilename, bool binary, bool onlyP1, 
-                   Uint lvl, bool reusepvd)
+                   Uint lvl, bool reusepvd, bool usedeformed)
 /** Beside constructing the VTKOutCL, this function computes the number of
     digits, that are used to decode the time steps in the filename.
 \param mg        MultiGridCL that contains the geometry
@@ -44,7 +45,7 @@ VTKOutCL::VTKOutCL(const MultiGridCL& mg, const std::string& dataname, Uint nums
       dirname_(dirname), filename_(filename), pvdfilename_(pvdfilename), 
       binary_(binary), onlyP1_(onlyP1), geomwritten_(false),
       vAddrMap_(), eAddrMap_(), coords_(), tetras_(), lvl_(lvl),
-      numPoints_(0), numTetras_(0), reusepvd_(reusepvd)
+      numPoints_(0), numTetras_(0), reusepvd_(reusepvd), usedeformed_(usedeformed)
 {
     if (!dirname.empty() && *dirname.rbegin()!='/' )
         dirname_+= '/';
@@ -222,27 +223,56 @@ void VTKOutCL::GatherCoord()
     numPoints_= numLocPoints_= numVertices + numEdges;
     coords_.resize(3*numLocPoints_);
 
-    ///\todo instead of v/eAddrMap_, one could use a P2 index instead (cf. EnsightOutCL)
-    Uint counter=0;
-    for (MultiGridCL::const_TriangVertexIteratorCL it= mg_.GetTriangVertexBegin(lvl_); it!=mg_.GetTriangVertexEnd(lvl_); ++it){
-        // store a consecutive number for the vertex
-        vAddrMap_[&*it]= counter;
+    if (usedeformed_)
+    {
+        MeshDeformationCL & md = MeshDeformationCL::getInstance();
+        ///\todo instead of v/eAddrMap_, one could use a P2 index instead (cf. EnsightOutCL)
+        Uint counter=0;
+        for (MultiGridCL::const_TriangVertexIteratorCL it= mg_.GetTriangVertexBegin(lvl_); it!=mg_.GetTriangVertexEnd(lvl_); ++it){
+            // store a consecutive number for the vertex
+            vAddrMap_[&*it]= counter;
 
-        // Put coordinate of the vertex into the field of coordinates
-        for (int i=0; i<3; ++i)
-            coords_[3*counter+i]= (float)it->GetCoord()[i];
-        ++counter;
+            // Put coordinate of the vertex into the field of coordinates
+            for (int i=0; i<3; ++i)
+                coords_[3*counter+i]= (float)md.GetTransformedVertexCoord(*it)[i]; // (float)it->GetCoord()[i];
+            ++counter;
+        }
+
+        for (MultiGridCL::const_TriangEdgeIteratorCL it= mg_.GetTriangEdgeBegin(lvl_); it!=mg_.GetTriangEdgeEnd(lvl_); ++it){
+            // store a consecutive number for the edge
+            eAddrMap_[&*it]= counter;
+
+            // Put coordinate of the barycenter of the edge into the field of coordinates
+            // const Point3DCL baryCenter= GetBaryCenter(*it);
+            for (int i=0; i<3; ++i)
+                coords_[3*counter+i]= (float)md.GetTransformedEdgeBaryCenter(*it)[i]; // (float)baryCenter[i];
+            ++counter;
+        }
     }
+    else
+    {
+        ///\todo instead of v/eAddrMap_, one could use a P2 index instead (cf. EnsightOutCL)
+        Uint counter=0;
+        for (MultiGridCL::const_TriangVertexIteratorCL it= mg_.GetTriangVertexBegin(lvl_); it!=mg_.GetTriangVertexEnd(lvl_); ++it){
+            // store a consecutive number for the vertex
+            vAddrMap_[&*it]= counter;
 
-    for (MultiGridCL::const_TriangEdgeIteratorCL it= mg_.GetTriangEdgeBegin(lvl_); it!=mg_.GetTriangEdgeEnd(lvl_); ++it){
-        // store a consecutive number for the edge
-        eAddrMap_[&*it]= counter;
+            // Put coordinate of the vertex into the field of coordinates
+            for (int i=0; i<3; ++i)
+                coords_[3*counter+i]= (float)it->GetCoord()[i];
+            ++counter;
+        }
 
-        // Put coordinate of the barycenter of the edge into the field of coordinates
-        const Point3DCL baryCenter= GetBaryCenter(*it);
-        for (int i=0; i<3; ++i)
-            coords_[3*counter+i]= (float)baryCenter[i];
-        ++counter;
+        for (MultiGridCL::const_TriangEdgeIteratorCL it= mg_.GetTriangEdgeBegin(lvl_); it!=mg_.GetTriangEdgeEnd(lvl_); ++it){
+            // store a consecutive number for the edge
+            eAddrMap_[&*it]= counter;
+
+            // Put coordinate of the barycenter of the edge into the field of coordinates
+            const Point3DCL baryCenter= GetBaryCenter(*it);
+            for (int i=0; i<3; ++i)
+                coords_[3*counter+i]= (float)baryCenter[i];
+            ++counter;
+        }
     }
 }
 

@@ -328,7 +328,8 @@ void Strategy( StokesProblemT& Stokes)
                                  P.get<int>("VTK.Binary"),
                                  P.get<int>("VTK.UseOnlyP1"),
                                  -1,  /* <- level */
-                                 P.get<int>("VTK.ReUseTimeFile") );
+                                 P.get<int>("VTK.ReUseTimeFile"),
+                                 P.get<int>("VTK.UseDeformation"));
         vtkwriter->Register( make_VTKVector( Stokes.GetVelSolution(), "velocity") );
         vtkwriter->Register( make_VTKScalar( Stokes.GetPrSolution(), "pressure") );
         vtkwriter->Write(Stokes.v.t);
@@ -368,6 +369,7 @@ void Strategy( StokesProblemT& Stokes)
 void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<std::string>("VTK.TimeFileName",P.get<std::string>("VTK.VTKName"));
     P.put_if_unset<int>("VTK.ReUseTimeFile",0);
+    P.put_if_unset<int>("VTK.UseDeformation",0);
     P.put_if_unset<int>("VTK.UseOnlyP1",0);
 }
 

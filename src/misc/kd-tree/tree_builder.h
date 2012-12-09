@@ -188,7 +188,7 @@ namespace KDTree{
         */
         BuildTask( size_t f, size_t l, node_type*& n, const node_type* parnode, const bool le) 
             : first(f), last(l), node(n), parent_node(parnode), left(le) {}
-        BuildTask& operator=(const BuildTask&);
+        BuildTask& operator=(const BuildTask&){throw DROPSErrCL("operator= in BuildTask called");}
     };
 
 

@@ -102,6 +102,7 @@ void Accumulator_P1CL<Coeff,QuadCL>::update_coupling(const TetraCL& tet)
             {
                 if (UnknownIdx[j]== NoIdx) // vertex j is on a Dirichlet boundary
                 {
+                    //to do: in ale case, it only works in homogenous Dirichlet bndcond.
                     b_->Data[UnknownIdx[i]]-= coup[i][j] * BndData_->GetDirBndValue(*tet.GetVertex(j), t);
                 }
             }
@@ -203,6 +204,14 @@ void SourceAccumulator_P1CL<Coeff,QuadCL>::local_setup (const TetraCL& tet)
     }
 
     P1DiscCL::GetGradients(G,det,tet);
+
+    if(ALE_)
+    {
+        SMatrixCL<3,3> T;
+        GetTrafoTr(T, det, MG_.GetMeshDeformation().GetLocalP1Deformation(tet));
+        P1DiscCL::GetGradients(G, T);
+    }
+    
     absdet= std::fabs(det);
 
     if(supg_.GetSUPG())
@@ -219,7 +228,7 @@ void SourceAccumulator_P1CL<Coeff,QuadCL>::update_rhsintegrals(const TetraCL& te
 {
     vector_tetra_function vel= ALE_ ? Coeff::ALEVelocity : Coeff::Vel;
 
-    for(int i=0; i<4; ++i)    // assemble row i
+    for(int i=0; i<4; ++i)          // assemble row i
         if (UnknownIdx[i]!= NoIdx)  // vertex i is not on a Dirichlet boundary
         {
             QuadCL<double> fp1(rhs*phiQuad[i]);
@@ -289,8 +298,16 @@ void StiffnessAccumulator_P1CL<Coeff,QuadCL>::local_setup (const TetraCL& tet)
 {
     vector_tetra_function vel= ALE_ ? Coeff::ALEVelocity : Coeff::Vel;
     P1DiscCL::GetGradients(G,det,tet);
+    
+    if(ALE_)
+    {
+        SMatrixCL<3,3> T;
+        GetTrafoTr(T, det, MG_.GetMeshDeformation().GetLocalP1Deformation(tet));
+        P1DiscCL::GetGradients(G, T);
+    }
+   
     absdet= std::fabs(det);
-    //quad_a.assign( tet, &Coeff::DiffusionCoeff, 0.0);                  //for variable diffusion coefficient
+    //quad_a.assign( tet, &Coeff::DiffusionCoeff, 0.0);                      //for variable diffusion coefficient
     //const double int_a= quad_a.quad( absdet);
     if(supg_.GetSUPG())
     {
@@ -372,6 +389,14 @@ void MassAccumulator_P1CL<Coeff,QuadCL>::local_setup (const TetraCL& tet)
 {
     vector_tetra_function vel= ALE_ ? Coeff::ALEVelocity : Coeff::Vel;
     P1DiscCL::GetGradients(G,det,tet);
+
+    if(ALE_)
+    {
+        SMatrixCL<3,3> T;
+        GetTrafoTr(T, det, MG_.GetMeshDeformation().GetLocalP1Deformation(tet));
+        P1DiscCL::GetGradients(G, T);
+    }
+
     absdet= std::fabs(det);
 
     if(supg_.GetSUPG())
@@ -448,6 +473,14 @@ template<class Coeff,template <class T=double> class QuadCL>
 void ConvectionAccumulator_P1CL<Coeff,QuadCL>::local_setup (const TetraCL& sit)
 {
     P1DiscCL::GetGradients(G,det,sit);
+    
+    if(ALE_)
+    {
+        SMatrixCL<3,3> T;
+        GetTrafoTr(T, det, MG_.GetMeshDeformation().GetLocalP1Deformation(sit));
+        P1DiscCL::GetGradients(G, T);
+    }
+    
     absdet= std::fabs(det);
 
     for(int i=0; i<4; ++i)
