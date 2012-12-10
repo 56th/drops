@@ -80,7 +80,7 @@ double RealTimerCL::timestamp()
          printf("QueryPerformanceFrequency() failed with error %d: %s\n", err, buf);
          exit(1);
       }
-      return = Li2Double(time) / Li2Double(freq);
+      return Li2Double(time) / Li2Double(freq);
 #else
       struct timeval tv;
       gettimeofday(&tv, (struct timezone*)0);

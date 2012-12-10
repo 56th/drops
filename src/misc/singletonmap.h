@@ -30,6 +30,7 @@ class MapRegisterCL
 {
   public:
     MapRegisterCL(std::string name, T t){
+        std::cout << " Added function " << name << " to container " << std::endl;
         SingletonMapCL<T>::getInstance().insert(std::make_pair(name, t));
     }
 };
