@@ -65,7 +65,7 @@ message(STATUS "### GLOBAL EXE LINKER FLAGS:    ${CMAKE_EXE_LINKER_FLAGS} ###")
 function(libs_ when)
     if((when STREQUAL "ALL") OR (${when} STREQUAL "PAR" AND MPI) OR (${when} STREQUAL "SER" AND NOT MPI))
         foreach(lib ${ARGN})
-            add_library(${HOME}-${lib} SHARED ${lib})
+            add_library(${HOME}-${lib} STATIC ${lib})
         endforeach(lib)
     endif()
 endfunction(libs_)
@@ -117,6 +117,9 @@ function(set_ser)
     set_("SER" ${ARGN})
 endfunction(set_ser)
 
+set(BEGIN_STATIC_LIBS -Wl,--whole-archive)
+set(END_STATIC_LIBS  -Wl,--no-whole-archive)
+
 ###############################################################################
 # the exec command can be used to conveniently add an executable. 
 # Arguments: filename <link_objects...>
@@ -128,7 +131,7 @@ function(exec_ when f)
     if((${when} STREQUAL "ALL") OR (${when} STREQUAL "PAR" AND MPI) OR (${when} STREQUAL "SER" AND NOT MPI))
         libs_(${when} ${f})
         add_executable(${f} ${f})
-        target_link_libraries_(${when} ${f} ${HOME}-${f} ${ARGN})
+        target_link_libraries_(${when} ${f} ${HOME}-${f} ${ARGN} ${${f}-staticlibs})
     endif()
 endfunction(exec_)
 
@@ -176,3 +179,4 @@ if(DOXYGEN_FOUND)
         COMMENT "Generating API documentation with Doxygen" VERBATIM
     )
 endif()
+
