@@ -371,8 +371,8 @@ void ReadFEFromFile( VecDescCL& v, MultiGridCL& mg, std::string filename, bool b
         IdxDescCL p1( P1_FE);
         p1.CreateNumbering( v.RowIdx->TriangLevel(), mg, *v.RowIdx);
         VecDescCL vpos(&p1), vneg(&p1);
-        ReadFEFromFile(vneg, mg, filename + "Neg");
-        ReadFEFromFile(vpos, mg, filename + "Pos");
+        ReadFEFromFile(vneg, mg, filename + "Neg", binary);
+        ReadFEFromFile(vpos, mg, filename + "Pos", binary);
         P1toP1X ( *v.RowIdx, v.Data, p1, vpos.Data, vneg.Data, *lsetp, mg);
         p1.DeleteNumbering(mg);
     }
