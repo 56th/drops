@@ -25,7 +25,11 @@
 #include "misc/progressaccu.h"
 #include "misc/scopetimer.h"
 
-#include <unistd.h>
+#ifndef DROPS_WIN
+  #include <unistd.h>
+#else
+  #include <io.h>
+#endif
 
 namespace DROPS
 {
@@ -116,7 +120,11 @@ void ProgressBarTetraAccumulatorCL::visit (const TetraCL& )
 ProgressBarTetraAccumulatorCL::ProgressBarTetraAccumulatorCL(const MultiGridCL& MG, const std::string aname, int lvl)
   :name(aname)
 {
+#ifndef DROPS_WIN
     isterm = isatty(fileno(stdout));
+#else
+    isterm = _isatty( _fileno(stdout));
+#endif
     if (active)
     {
       ntet=0;
