@@ -31,6 +31,9 @@ else(MPI)
     message(STATUS "### MPI disabled ###")
 endif(MPI)
 
+if(WIN32)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /DDROPS_WIN"}
+endif(WIN32)
 #compiler specific options
 if(CMAKE_CXX_COMPILER MATCHES icpc)
     message(STATUS "### setting flags for INTEL compiler ###")
