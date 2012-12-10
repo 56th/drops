@@ -347,8 +347,8 @@ void WriteFEToFile( const VecDescCL& v, MultiGridCL& mg, std::string filename, b
         p1.CreateNumbering( v.RowIdx->TriangLevel(), mg, *v.RowIdx);
         VecDescCL vpos(&p1), vneg(&p1);
         P1XtoP1 ( *v.RowIdx, v.Data, p1, vpos.Data, vneg.Data, *lsetp, mg);
-        WriteFEToFile(vneg, mg, filename + "Neg");
-        WriteFEToFile(vpos, mg, filename + "Pos");
+        WriteFEToFile(vneg, mg, filename + "Neg", binary);
+        WriteFEToFile(vpos, mg, filename + "Pos", binary);
         p1.DeleteNumbering(mg);
     }
 }
