@@ -8,6 +8,8 @@ include(CMakeSettings.txt)
 #tell cmake to always include the home dir
 include_directories(${CMAKE_SOURCE_DIR})
 
+option(MPI FALSE)
+
 #use openMP
 find_package(OpenMP REQUIRED)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
@@ -52,7 +54,8 @@ elseif(DROPS_BUILD_TYPE STREQUAL "DEBUG")
 endif()
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${DROPS_CXX_FLAGS}")
 
-message(STATUS "### GLOBAL COMPILER FLAGS:       ${CMAKE_CXX_FLAGS} ###")
+message(STATUS "### CXX_COMPIER IS:             ${CMAKE_CXX_COMPILER}")
+message(STATUS "### GLOBAL COMPILER FLAGS:      ${CMAKE_CXX_FLAGS} ###")
 message(STATUS "### GLOBAL SHARED LINKER FLAGS: ${CMAKE_SHARED_LINKER_FLAGS} ###")	
 message(STATUS "### GLOBAL EXE LINKER FLAGS:    ${CMAKE_EXE_LINKER_FLAGS} ###")	
 

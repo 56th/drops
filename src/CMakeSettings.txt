@@ -1,5 +1,3 @@
-set(ARCH "GCC")
-
 set(PARMETIS_HOME "${CMAKE_SOURCE_DIR}/../parmetis-4.0.2" CACHE PATH "")
 set(METIS_HOME "${CMAKE_SOURCE_DIR}/../metis-5.0.2" CACHE PATH "")
 set(ZOLTAN_HOME "${CMAKE_SOURCE_DIR}/../Zoltan_v3.2" CACHE PATH "")
@@ -12,4 +10,3 @@ set(IPC_CXX_FLAGS_RELEASE "-O3 -ip -xhost -fp-model fast=2")
 
 set(GCC_CXX_FLAGS_DEBUG "-g -O0")
 set(GCC_CXX_FLAGS_RELEASE "-O3 --fast-math")
-option(MPI FALSE)
