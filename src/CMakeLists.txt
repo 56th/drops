@@ -117,8 +117,13 @@ function(set_ser)
     set_("SER" ${ARGN})
 endfunction(set_ser)
 
-set(BEGIN_STATIC_LIBS -Wl,--whole-archive)
-set(END_STATIC_LIBS  -Wl,--no-whole-archive)
+if (WIN32)
+  set(BEGIN_STATIC_LIBS /OPT:NOREF)
+  set(END_STATIC_LIBS  /OPT:REF)
+else(WIN32)
+  set(BEGIN_STATIC_LIBS -Wl,--whole-archive)
+  set(END_STATIC_LIBS  -Wl,--no-whole-archive)
+endif(WIN32)
 
 ###############################################################################
 # the exec command can be used to conveniently add an executable. 
