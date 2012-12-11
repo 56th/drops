@@ -22,7 +22,7 @@ if(MPI)
     set(PARMETIS_INCLUDE ${PARMETIS_HOME}/include)
     set(PARMETIS_LIBRARY ${PARMETIS_HOME}/build/Linux-x86_64/libparmetis/libparmetis.a)
 
-    include_directories(${MPI_INCLUDE_PATH} ${PARMETIS_INCLUDE} ${METIS_INCLUDE} ${BOOST_INCLUDE})
+    include_directories(${MPI_INCLUDE_PATH} ${PARMETIS_INCLUDE} ${METIS_INCLUDE})
     
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MPI_CXX_FLAGS} -DMPICH_IGNORE_CXX_SEEK")
     set(PARMETIS_LIBRARIES ${MPI_CXX_LIBRARIES} ${METIS_LIBRARY} ${PARMETIS_LIBRARY} m)
@@ -32,8 +32,11 @@ else(MPI)
 endif(MPI)
 
 if(WIN32)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /DDROPS_WIN"}
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /DDROPS_WIN  /I${BOOST_INCLUDE}")
+else(WIN32)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I${BOOST_INCLUDE}")
 endif(WIN32)
+
 #compiler specific options
 if(CMAKE_CXX_COMPILER MATCHES icpc)
     message(STATUS "### setting flags for INTEL compiler ###")
@@ -121,8 +124,8 @@ function(set_ser)
 endfunction(set_ser)
 
 if (WIN32)
-  set(BEGIN_STATIC_LIBS /OPT:NOREF)
-  set(END_STATIC_LIBS  /OPT:REF)
+#  set(BEGIN_STATIC_LIBS -OPT:NOREF)
+#  set(END_STATIC_LIBS  -OPT:REF)
 else(WIN32)
   set(BEGIN_STATIC_LIBS -Wl,--whole-archive)
   set(END_STATIC_LIBS  -Wl,--no-whole-archive)
