@@ -217,7 +217,7 @@ template <class DiscScalarT>
 class VTKP1XScalarCL : public VTKVariableCL
 {
   private:
-    const VecDescCL& v_;
+    const VecDescCL v_;
 
     mutable IdxDescCL p1idx_;
     mutable VecDescCL vneg_,
@@ -269,7 +269,7 @@ template <class DiscVectorT>
 class VTKVectorCL : public VTKVariableCL
 {
   private:
-    const DiscVectorT& f_;
+    const DiscVectorT f_;
 
   public:
     VTKVectorCL( const DiscVectorT& f, std::string varName)
