@@ -217,7 +217,7 @@ template <class DiscScalarT>
 class VTKP1XScalarCL : public VTKVariableCL
 {
   private:
-    const VecDescCL v_;
+    const VecDescCL& v_;
 
     mutable IdxDescCL p1idx_;
     mutable VecDescCL vneg_,
