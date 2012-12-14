@@ -69,9 +69,6 @@ void ProlongationCL<ValueT>::Create(IdxDescCL* coarse, IdxDescCL* fine)
         throw DROPSErrCL("P1-prolongation not yet implemented in parallel");
 #endif
         SetupP1ProlongationMatrix(mg_, prolongation_, *coarse, *fine);
-        std::stringstream tmp;
-        tmp << "p" << coarse->TriangLevel();
-        WriteToFile(prolongation_, tmp.str().c_str(), tmp.str().c_str());
         return;
     }
 
