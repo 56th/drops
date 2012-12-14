@@ -14,9 +14,6 @@ exec_ser(reparam levelset-fastmarch levelset-levelset misc-progressaccu misc-sco
 set(lsshear-staticlibs ${BEGIN_STATIC_LIBS} misc-scalarFunctions ${END_STATIC_LIBS})
 exec_ser(lsshear geom-boundary geom-builder geom-simplex geom-multigrid geom-deformation num-unknowns geom-topo num-fe misc-problem levelset-levelset misc-progressaccu misc-scopetimer misc-utils out-output num-discretize levelset-fastmarch num-fe out-ensightOut stokes-instatstokes2phase navstokes-instatnavstokes2phase num-MGsolver num-interfacePatch levelset-surfacetension levelset-coupling misc-funcmap geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature num-renumber)
 
-set(surfTens-staticlibs ${BEGIN_STATIC_LIBS} misc-scalarFunctions misc-vectorFunctions ${END_STATIC_LIBS})
-exec_ser(surfTens geom-boundary geom-builder geom-simplex geom-multigrid geom-deformation num-unknowns geom-topo num-fe misc-problem levelset-levelset misc-progressaccu misc-scopetimer misc-utils out-output num-discretize misc-params levelset-fastmarch stokes-instatstokes2phase navstokes-instatnavstokes2phase num-fe out-ensightOut num-oseenprecond num-MGsolver misc-funcmap num-interfacePatch levelset-surfacetension levelset-coupling geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature num-renumber)
-
 set(prJump-staticlibs ${BEGIN_STATIC_LIBS} misc-scalarFunctions misc-vectorFunctions ${END_STATIC_LIBS})
 exec_ser(prJump geom-boundary geom-builder geom-simplex geom-multigrid geom-deformation num-unknowns geom-topo num-fe misc-problem levelset-levelset misc-progressaccu misc-scopetimer misc-utils out-output num-discretize misc-params levelset-fastmarch stokes-instatstokes2phase num-MGsolver num-fe  out-ensightOut num-oseenprecond num-interfacePatch levelset-surfacetension levelset-coupling misc-funcmap geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature num-renumber)
 
