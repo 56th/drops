@@ -248,19 +248,18 @@ void Strategy( StokesProblemT& Stokes)
 
     if( StokesSolverFactoryHelperCL().VelMGUsed(P) || StokesSolverFactoryObsoleteHelperCL().VelMGUsed(P))
     {
-        MLMatrixCL* PVel = ( P.get<int>("Stokes.StokesMethod") < 500000) ? factory.GetPVel() : obsoletefactory.GetPVel();
-        SetupP2ProlongationMatrix( MG, *PVel, &Stokes.vel_idx, &Stokes.vel_idx);
-
-        std::cout << "Check MG-Data..." << std::endl;
-        std::cout << "                begin     " << Stokes.vel_idx.GetCoarsest().NumUnknowns() << std::endl;
-        std::cout << "                end       " << Stokes.vel_idx.GetFinest().NumUnknowns() << std::endl;
-        CheckMGData( Stokes.A.Data, *PVel);
+        if (P.get<int>("Stokes.StokesMethod")< 500000)
+            SetupProlongationMatrix( MG, *factory.GetPVel(), &Stokes.vel_idx, &Stokes.vel_idx);
+        else
+            SetupProlongationMatrix( MG, *obsoletefactory.GetPVel(), &Stokes.vel_idx, &Stokes.vel_idx);
     }
 
     if( StokesSolverFactoryHelperCL().PrMGUsed(P) || StokesSolverFactoryObsoleteHelperCL().PrMGUsed(P))
     {
-        MLMatrixCL* PPr = ( P.get<int>("Stokes.StokesMethod") < 500000) ? factory.GetPPr() : obsoletefactory.GetPPr();
-        SetupP1ProlongationMatrix( MG, *PPr, &Stokes.pr_idx, &Stokes.pr_idx);
+        if (P.get<int>("Stokes.StokesMethod")< 500000)
+            SetupProlongationMatrix( MG, *factory.GetPPr(), &Stokes.pr_idx, &Stokes.pr_idx);
+        else
+            SetupProlongationMatrix( MG, *obsoletefactory.GetPPr(), &Stokes.pr_idx, &Stokes.pr_idx);
     }
 
     // choose time discretization scheme

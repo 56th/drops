@@ -40,6 +40,7 @@
 #ifdef _HYPRE
 #include "num/hypre.h"
 #endif
+#include "num/prolongation.h"
 
 namespace DROPS
 {
@@ -104,7 +105,7 @@ class PoissonSolverCL : public PoissonSolverBaseCL
     <tr><td>  7 </td><td>                     </td><td>                      </td></tr>
     </table>*/
 #ifndef _PAR
-template <class ProlongationT= MLMatrixCL>
+template <class ProlongationT= MLDataCL<ProlongationCL<double> > >
 class PoissonSolverFactoryCL
 {
   private:
@@ -213,12 +214,14 @@ ProlongationT* PoissonSolverFactoryCL<ProlongationT>::GetProlongation()
 }
 
 #else
-template <class ProlongationT= MLMatrixCL>
+template <class ProlongationT= MLDataCL<ProlongationCL<double> > >
 class PoissonSolverFactoryCL
 {
   private:
     MLIdxDescCL & idx_;
     ParamCL& P_;
+
+    ProlongationT* prolongptr_;
 
     // generic preconditioners
     ParJac0CL  JACPc_;
@@ -238,6 +241,15 @@ class PoissonSolverFactoryCL
     typedef ParPreGMResSolverCL<ParDummyPcCL> DummyGMResSolverT;
     DummyGMResSolverT DummyGMResSolver_;
 
+    // MultiGrid
+    typedef MLSmootherCL<ParJacCL> SmootherT;
+    SmootherT jorsmoother_;   // Jacobi
+    ParJac0CL  coarsepc_;
+
+    JacPCGSolverT coarsesolversymm_;
+    typedef ParMGSolverCL<SmootherT, JacPCGSolverT, ProlongationT> MGSolverT;
+    MGSolverT MGSolversymm_;
+
 #ifdef _HYPRE
      //Algebraic MG solver
     typedef HypreAMGSolverCL AMGSolverT;
@@ -249,7 +261,7 @@ class PoissonSolverFactoryCL
     ~PoissonSolverFactoryCL() {}
 
     /// Returns pointer to prolongation for velocity
-    ProlongationT* GetProlongation() {return 0;}
+    ProlongationT* GetProlongation() {return prolongptr_;}
     PoissonSolverBaseCL* CreatePoissonSolver();
 
 };
@@ -257,11 +269,14 @@ class PoissonSolverFactoryCL
 template <class ProlongationT>
 PoissonSolverFactoryCL<ProlongationT>::
     PoissonSolverFactoryCL(ParamCL& P, MLIdxDescCL& idx)
-    : idx_(idx), P_(P), JACPc_( idx_.GetFinest(), P.get<double>("Poisson.Relax")), DummyPC_(idx_.GetFinest()),
+    : idx_(idx), P_(P), prolongptr_( 0), JACPc_( idx_.GetFinest(), P.get<double>("Poisson.Relax")), DummyPC_(idx_.GetFinest()),
       JacPCGSolver_( P.get<int>("Poisson.Iter"), P.get<double>("Poisson.Tol"), idx_.GetFinest(), JACPc_, P.get<double>("Poisson.RelativeErr")),
       CGSolver_( P.get<int>("Poisson.Iter"), P.get<double>("Poisson.Tol"), idx_.GetFinest(), P.get<double>("Poisson.RelativeErr")),
       JacGMResSolver_( P.get<int>("Poisson.Restart"), P.get<int>("Poisson.Iter"), P.get<double>("Poisson.Tol"), idx_.GetFinest(), JACPc_, P.get<double>("Poisson.RelativeErr")),
-      DummyGMResSolver_( P.get<int>("Poisson.Restart"), P.get<int>("Poisson.Iter"), P.get<double>("Poisson.Tol"), idx_.GetFinest(), DummyPC_, P.get<double>("Poisson.RelativeErr"))
+      DummyGMResSolver_( P.get<int>("Poisson.Restart"), P.get<int>("Poisson.Iter"), P.get<double>("Poisson.Tol"), idx_.GetFinest(), DummyPC_, P.get<double>("Poisson.RelativeErr")),
+      jorsmoother_(idx, P.get<double>("Poisson.Relax")), coarsepc_( idx.GetCoarsest()),
+      coarsesolversymm_( 500, 1e-6, idx.GetCoarsest(), coarsepc_, true),
+      MGSolversymm_( jorsmoother_, coarsesolversymm_, P.get<int>("Poisson.Iter"), P.get<double>("Poisson.Tol"), idx_.GetFinest(), false, P.get<int>("Poisson.SmoothingSteps"), P.get<int>("Poisson.NumLvl"))
 #ifdef _HYPRE
       , hypreAMG_( idx.getFinest(), P.get<int>("Poisson.Iter"), P.get<double>("Poisson.Tol"))
 #endif
@@ -273,6 +288,10 @@ PoissonSolverBaseCL* PoissonSolverFactoryCL<ProlongationT>::CreatePoissonSolver(
     PoissonSolverBaseCL* Poissonsolver = 0;
     switch (P_.get<int>("Poisson.Method"))
     {
+        case 102 : {
+            Poissonsolver = new PoissonSolverCL<MGSolverT>(MGSolversymm_);
+            prolongptr_ = MGSolversymm_.GetProlongation();
+        } break;
         case 200 : Poissonsolver = new PoissonSolverCL<CGSolverT>( CGSolver_); break;
         case 202 : Poissonsolver = new PoissonSolverCL<JacPCGSolverT>( JacPCGSolver_); break;
         case 300 : Poissonsolver = new PoissonSolverCL<DummyGMResSolverT>( DummyGMResSolver_); break;

@@ -1067,10 +1067,6 @@ template <class Coeff>
 template <class Coeff>
 void StokesP2P1CL<Coeff>::SetNumVelLvl( size_t n)
 {
-#ifdef _PAR
-    if (n>1)
-        throw DROPSErrCL("StokesP2P1CL::SetNumVelLvl: Multilevel not implemented in parallel DROPS, yet, sorry");
-#endif
     match_fun match= MG_.GetBnd().GetMatchFun();
     vel_idx.resize( n, vecP2_FE, BndData_.Vel, match);
     A.Data.resize ( vel_idx.size());
@@ -1080,10 +1076,6 @@ void StokesP2P1CL<Coeff>::SetNumVelLvl( size_t n)
 template <class Coeff>
 void StokesP2P1CL<Coeff>::SetNumPrLvl( size_t n)
 {
-#ifdef _PAR
-    if (n>1)
-        throw DROPSErrCL("StokesP2P1CL::SetNumVelLvl: Multilevel not implemented in parallel DROPS, yet, sorry");
-#endif
     match_fun match= MG_.GetBnd().GetMatchFun();
     pr_idx.resize( n, P1_FE,  BndData_.Pr, match);
     B.Data.resize( pr_idx.size());

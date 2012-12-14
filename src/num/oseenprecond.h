@@ -180,6 +180,7 @@ class ISNonlinearPreCL : public SchurPreBaseCL
 // preconditioner uses multigrid-solvers.
 //
 //**************************************************************************
+template< class ProlongationT>
 class ISMGPreCL : public SchurPreBaseCL
 {
   private:
@@ -192,7 +193,7 @@ class ISMGPreCL : public SchurPreBaseCL
 
     DROPS::MLMatrixCL& Apr_;
     DROPS::MLMatrixCL& Mpr_;
-    DROPS::MLMatrixCL  P_;
+    ProlongationT      P_;
     DROPS::Uint iter_prA_;
     DROPS::Uint iter_prM_;
     mutable std::vector<DROPS::VectorCL> ones_;
@@ -213,7 +214,7 @@ class ISMGPreCL : public SchurPreBaseCL
     void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b) const { Apply<>( A, x, b); }
     void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b) const { Apply<>( A, x, b); }
 
-    MLMatrixCL* GetProlongation() { return &P_; }
+    ProlongationT* GetProlongation() { return &P_; }
 };
 
 
@@ -866,11 +867,11 @@ std::cout << "norm( p2): " << norm( p2_);
 }
 */
 
-template<class SmootherCL, class DirectSolverCL>
+template<class SmootherCL, class DirectSolverCL, class ProlongationIterT>
 void
 MGMPr(const std::vector<VectorCL>::const_iterator& ones,
       const MLMatrixCL::const_iterator& begin, const MLMatrixCL::const_iterator& fine,
-      MLMatrixCL::const_iterator P, VectorCL& x, const VectorCL& b,
+      ProlongationIterT P, VectorCL& x, const VectorCL& b,
       const SmootherCL& Smoother, const Uint smoothSteps,
       DirectSolverCL& Solver, const int numLevel, const int numUnknDirect)
 // Multigrid method, V-cycle. If numLevel==0 or #Unknowns <= numUnknDirect,
@@ -882,7 +883,7 @@ MGMPr(const std::vector<VectorCL>::const_iterator& ones,
 // the coarse-grid correction.
 {
     MLMatrixCL::const_iterator coarse = fine;
-    MLMatrixCL::const_iterator coarseP= P;
+    ProlongationIterT coarseP= P;
     if(  ( numLevel==-1      ? false : numLevel==0 )
        ||( numUnknDirect==-1 ? false : x.size() <= static_cast<Uint>(numUnknDirect) )
        || fine==begin)
@@ -910,15 +911,28 @@ MGMPr(const std::vector<VectorCL>::const_iterator& ones,
     x-= dot( *ones, x);
 }
 
+template<class ProlongationT>
+void ISMGPreCL<ProlongationT>::MaybeInitOnes() const
+{
+    if (Mpr_.size() == ones_.size()) return;
+    // Compute projection on constant pressure function only once.
+    Uint i= 0;
+    ones_.resize(0); // clear all
+    ones_.resize(Mpr_.size());
+    for (MLMatrixCL::const_iterator it= Mpr_.begin(); it != Mpr_.end(); ++it, ++i) {
+        ones_[i].resize( it->num_cols(), 1.0/it->num_cols());
+    }
+}
 
+template<class ProlongationT>
 template <typename Mat, typename Vec>
 void
-ISMGPreCL::Apply(const Mat& /*A*/, Vec& p, const Vec& c) const
+ISMGPreCL<ProlongationT>::Apply(const Mat& /*A*/, Vec& p, const Vec& c) const
 {
     MaybeInitOnes();
     p= 0.0;
     const Vec c2_( c - dot( ones_.back(), c));
-    MLMatrixCL::const_iterator finestP = --P_.end();
+    typename ProlongationT::const_iterator finestP = --P_.end();
 //    double new_res= (Apr_.back().A.Data*p - c).norm();
 //    double old_res;
 //    std::cout << "Pressure: iterations: " << iter_prA_ <<'\t';

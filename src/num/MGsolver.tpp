@@ -97,6 +97,80 @@ void MG(const MLMatrixCL& MGData, const ProlongationT& Prolong, const SmootherCL
     tol= resid;
 }
 
+template <class SmootherIteratorT, class DirectSolverCL, class ProlongationIteratorT>
+void
+ParMGM(const MLMatrixCL::const_iterator& begin, const MLMatrixCL::const_iterator& fine,
+     const ProlongationIteratorT& P, VectorCL& x, const VectorCL& b,
+     SmootherIteratorT& Smoother, Uint smoothSteps,
+     DirectSolverCL& Solver, int numLevel, int numUnknDirect)
+{
+    MLMatrixCL::const_iterator coarse= fine;
+    ProlongationIteratorT      coarseP= P;
+
+    if(  ( numLevel==-1      ? false : numLevel==0 )
+       ||( numUnknDirect==-1 ? false : x.size() <= static_cast<Uint>(numUnknDirect) )
+       || fine==begin)
+    { // use direct solver
+        Solver.Solve( *fine, x, b);
+        //std::cout << "MGM: direct solver: iterations: " << Solver.GetIter()
+        //          << "\tresiduum: " << Solver.GetResid() << '\n';
+        return;
+    }
+    --coarse;
+    --coarseP;
+    VectorCL d( coarse->num_cols()), e( coarse->num_cols());
+    // presmoothing
+    for (Uint i=0; i<smoothSteps; ++i) (*Smoother).Apply( *fine, x, b);
+    // restriction of defect
+    d= transp_mul( *P, VectorCL( b - *fine*x)); // the result is distributed
+    // calculate coarse grid correction
+    ParMGM( begin, coarse, coarseP, e, d, --Smoother, smoothSteps, Solver, (numLevel==-1 ? -1 : numLevel-1), numUnknDirect);
+    // add coarse grid correction
+    x+= (*P) * e; // the result is already accumulated!!!
+    // postsmoothing
+    ++Smoother;
+    for (Uint i=0; i<smoothSteps; ++i) (*Smoother).Apply( *fine, x, b);
+}
+
+template<class SmootherCL, class DirectSolverCL, class ProlongationT, class ExT>
+void ParMG(const MLMatrixCL& MGData, const ProlongationT& Prolong, const SmootherCL& smoother,
+        DirectSolverCL& solver, VectorCL& x, const VectorCL& b, int& maxiter, double& tol,
+        const ExT& ex, const bool residerr, Uint sm, int lvl)
+{
+    MLMatrixCL::const_iterator finest= MGData.GetFinestIter();
+    typename ProlongationT::const_iterator finestProlong= Prolong.GetFinestIter();
+    double resid= -1;
+    double old_resid;
+    VectorCL tmp;
+    if (residerr == true) {
+        resid= ex.Norm( VectorCL(b - *finest * x), false);
+        std::cout << "initial residual: " << resid << '\n';
+    }
+    else
+        tmp.resize( x.size());
+
+    int it;
+    for (it= 0; it<maxiter; ++it) {
+        if (residerr == true) {
+            if (resid <= tol) break;
+        }
+        else tmp= x;
+        typename SmootherCL::const_iterator smootherit = smoother.end();
+        --smootherit;
+        ParMGM( MGData.begin(), finest, finestProlong, x, b, smootherit, sm, solver, lvl, -1);
+        if (residerr == true) {
+            old_resid= resid;
+            resid= ex.Norm( VectorCL(b - *finest * x), false);
+            std::cout << "iteration: " << it  << "\tresidual: " << resid;
+            std::cout << "\treduction: " << resid/old_resid;
+            std::cout << '\n';
+        }
+        else if ((resid= ex.Norm( VectorCL(tmp - x), true)) <= tol) break;
+    }
+    maxiter= it;
+    tol= resid;
+}
+
 template<class StokesSmootherCL, class StokesDirectSolverCL, class ProlongItT1, class ProlongItT2>
 void StokesMGM( const MLMatrixCL::const_iterator& beginA,  const MLMatrixCL::const_iterator& fineA,
                 const MLMatrixCL::const_iterator& fineB,   const MLMatrixCL::const_iterator& fineBT, 

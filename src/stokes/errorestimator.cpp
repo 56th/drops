@@ -385,14 +385,18 @@ void Strategy( StokesProblemT& Stokes)
 
         if( StokesSolverFactoryHelperCL().VelMGUsed(P) || StokesSolverFactoryObsoleteHelperCL().VelMGUsed(P))
         {
-            MLMatrixCL* PVel = (P.get<int>("Stokes.StokesMethod")< 500000) ? factory.GetPVel() : obsoletefactory.GetPVel();
-            SetupP2ProlongationMatrix( MG, *PVel, vidx1, vidx1);
+            if (P.get<int>("Stokes.StokesMethod")< 500000)
+                SetupProlongationMatrix( MG, *factory.GetPVel(), vidx1, vidx1);
+            else
+                SetupProlongationMatrix( MG, *obsoletefactory.GetPVel(), vidx1, vidx1);
         }
 
         if( StokesSolverFactoryHelperCL().PrMGUsed(P) || StokesSolverFactoryObsoleteHelperCL().PrMGUsed(P))
         {
-            MLMatrixCL* PPr = (P.get<int>("Stokes.StokesMethod") < 500000) ? factory.GetPPr() : obsoletefactory.GetPPr();
-            SetupP1ProlongationMatrix( MG, *PPr, pidx1, pidx1);
+            if (P.get<int>("Stokes.StokesMethod")< 500000)
+                SetupProlongationMatrix( MG, *factory.GetPPr(), pidx1, pidx1);
+            else
+                SetupProlongationMatrix( MG, *obsoletefactory.GetPPr(), pidx1, pidx1);
         }
 
         if (P.get<int>("Stokes.StokesMethod") < 500000) {

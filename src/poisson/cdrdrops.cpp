@@ -37,6 +37,7 @@
 #include "num/krylovsolver.h"
 #include "num/MGsolver.h"
 #include "poisson/integrTime.h"
+#include "num/prolongation.h"
 
  // include problem class
 #include "misc/params.h"
@@ -228,8 +229,7 @@ void Strategy(PoissonCL& Poisson)
     // the triangulation
     MultiGridCL& mg= Poisson.GetMG();
 
-
-	MeshDeformationCL& md = MeshDeformationCL::getInstance();
+    MeshDeformationCL& md = MeshDeformationCL::getInstance();
     md.Initialize(&mg);
     mg.SetMeshDeformation(md);
 
@@ -283,12 +283,7 @@ void Strategy(PoissonCL& Poisson)
     PoissonSolverBaseCL* solver = factory.CreatePoissonSolver();
 
     if ( factory.GetProlongation() != 0)
-    {
-        if(P.get<int>("Poisson.P1"))
-            SetupP1ProlongationMatrix( mg, *(factory.GetProlongation()), &Poisson.idx, &Poisson.idx);
-        else
-            SetupP2ProlongationMatrix( mg, *(factory.GetProlongation()), &Poisson.idx, &Poisson.idx);
-    }
+        SetupProlongationMatrix( mg, *(factory.GetProlongation()), &Poisson.idx, &Poisson.idx);
 
     timer.Stop();
     std::cout << " o time " << timer.GetTime() << " s" << std::endl;

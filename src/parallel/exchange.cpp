@@ -1194,9 +1194,6 @@ bool ExchangeBuilderCL::HandlerDOFSendCL::Gather( DiST::TransferableCL& t,
       return false.
 */
 {
-    if (!t.IsDistributed(PrioMaster))
-        return false;
-
     const Uint idx= rowidx_.GetIdx();
     send << ProcCL::MyRank(); // (1)
 
@@ -1346,8 +1343,6 @@ bool ExchangeBuilderCL::HandlerDOFRecvCL::Gather( DiST::TransferableCL& t,
     Finalize the stream by NoInt_.
 */
 {
-    if (!t.IsDistributed(PrioMaster))
-        return false;
     const Uint idx= rowidx_.GetIdx();
     const bool haveDOF= t.Unknowns.Exist() && t.Unknowns.Exist( idx) && t.Unknowns.InTriangLevel(rowidx_.TriangLevel());
 
@@ -1387,15 +1382,10 @@ bool ExchangeBuilderCL::HandlerDOFRecvCL::Gather( DiST::TransferableCL& t,
     for ( it=t.GetProcListBegin(); it!=t.GetProcListEnd(); ++it) {
         const int toproc= it->proc;
         send << toproc; // (B1)   ToDo: write (B1)-(B3) only for Master?
-        if ( it->prio==PrioMaster) {
-            const int firstPos=           getSendPos( hs_.sendList2_, static_cast<int>(dof), toproc)*numUnk,
-                extFirstPos= isExtended ? getSendPos( hs_.sendList2_, static_cast<int>(extdof), toproc)*numUnk
-                                        : NoInt_;
-            send << firstPos << extFirstPos; // (B2), (B3)
-        }
-        else { // the copy does not own any dofs
-            send << NoInt_ << NoInt_; // (B2), (B3)
-        }
+        const int firstPos=           getSendPos( hs_.sendList2_, static_cast<int>(dof), toproc)*numUnk,
+            extFirstPos= isExtended ? getSendPos( hs_.sendList2_, static_cast<int>(extdof), toproc)*numUnk
+                                    : NoInt_;
+        send << firstPos << extFirstPos; // (B2), (B3)
     }
     send << NoInt_; // finalize stream
 
@@ -1527,9 +1517,6 @@ bool ExchangeBuilderCL::HandlerDOFNtoNSendCL::Gather( DiST::TransferableCL& t,
       return false.
 */
 { // same code as HanderDOFSendCL::Gather !
-    if (!t.IsDistributed(PrioMaster))
-        return false;
-
     const Uint idx= rowidx_.GetIdx();
     send << ProcCL::MyRank(); // (1)
 
@@ -1647,8 +1634,6 @@ bool ExchangeBuilderCL::HandlerDOFNtoNRecvCL::Gather( DiST::TransferableCL& t,
     // Inform all (master) neighbors
     DiST::TransferableCL::ProcList_const_iterator it;
     for ( it=t.GetProcListBegin(); it!=t.GetProcListEnd(); ++it) {
-        if ( it->prio!=PrioMaster)
-            continue;
         const int toproc= it->proc;
         send << toproc; // (1)
         const int firstPos= getSendPos( hs_.sendList_, static_cast<int>(dof), toproc)*numUnk;
@@ -1834,7 +1819,6 @@ ExchangeBuilderCL::ExchangeBuilderCL(
 {
     // init the interface
     DiST::PrioListT priolist;
-    priolist.push_back( PrioMaster);
     DiST::InterfaceCL::DimListT dimlist;
     if ( rowidx_.NumUnknownsVertex())
         dimlist.push_back( DiST::GetDim<VertexCL>());

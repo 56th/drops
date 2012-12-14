@@ -333,20 +333,12 @@ class MLIdxDescCL : public MLDataCL<IdxDescCL>
   public:
     MLIdxDescCL( FiniteElementT fe= P1_FE, size_t numLvl=1, const BndCondCL& bnd= BndCondCL(0), match_fun match=0, double omit_bound=1./32.)
     {
-#ifdef _PAR
-        if ( numLvl>1 )
-            throw DROPSErrCL("MLIdxDescCL::MLIdxDescCL: No multilevel implemented in parDROPS, yet, sorry");
-#endif
         for (size_t i=0; i< numLvl; ++i)
             this->push_back(IdxDescCL( fe, bnd, match, omit_bound));
     }
 
     void resize( size_t numLvl=1, FiniteElementT fe= P1_FE, const BndCondCL& bnd= BndCondCL(0), match_fun match=0, double omit_bound=1./32.)
     {
-#ifdef _PAR
-        if ( numLvl>1 )
-            throw DROPSErrCL("MLIdxDescCL::resize: No multilevel implemented in parDROPS, yet, sorry");
-#endif
         while (this->size() > numLvl)
             this->pop_back();
         while (this->size() < numLvl)

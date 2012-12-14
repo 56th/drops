@@ -24,6 +24,7 @@
 
 
 #include "num/oseensolver.h"
+#include "num/prolongation.h"
 #ifdef _HYPRE
 #include "num/hypre.h"
 #endif
@@ -125,7 +126,7 @@ struct StokesSolverInfoCL
     <tr><td> 30 </td><td> StokesMGM         </td><td> PVankaSmootherCL                   </td><td> PVankaSmootherCL             </td></tr>
     <tr><td> 31 </td><td>                   </td><td> BSSmootherCL                       </td><td> BSSmootherCL                 </td></tr>
     </table>*/
-template <class StokesT, class ProlongationVelT= MLMatrixCL, class ProlongationPT= MLMatrixCL>
+template <class StokesT, class ProlongationVelT= MLDataCL<ProlongationCL<Point3DCL> >, class ProlongationPT= MLDataCL<ProlongationCL<double> > >
 class StokesSolverFactoryBaseCL
 {
   protected:
@@ -181,7 +182,7 @@ class StokesSolverFactoryHelperCL
 /*******************************************************************
 *   S t o k e s S o l v e r F a c t o r y  C L                     *
 ********************************************************************/
-template <class StokesT, class ProlongationVelT= MLMatrixCL, class ProlongationPT= MLMatrixCL>
+template <class StokesT, class ProlongationVelT= MLDataCL<ProlongationCL<Point3DCL> >, class ProlongationPT= MLDataCL<ProlongationCL<double> > >
 class StokesSolverFactoryCL : public StokesSolverFactoryBaseCL<StokesT, ProlongationVelT, ProlongationPT>
 {
   private:
@@ -206,7 +207,7 @@ class StokesSolverFactoryCL : public StokesSolverFactoryBaseCL<StokesT, Prolonga
     BDinvBTPreCL    bdinvbtispc_;
     VankaSchurPreCL vankaschurpc_;
     ISPreCL         isprepc_;
-    ISMGPreCL       ismgpre_;
+    ISMGPreCL<ProlongationPT> ismgpre_;
     typedef PCGSolverCL<SSORPcCL>     PCG_SsorCL;
     PCG_SsorCL isnonlinearprepc_;
     ISNonlinearPreCL<PCG_SsorCL> isnonlinearpc_;
@@ -679,7 +680,7 @@ ProlongationPT* StokesSolverFactoryCL<StokesT, ProlongationVelT, ProlongationPT>
 *   S t o k e s S o l v e r F a c t o r y  C L               *
 **************************************************************/
 /// \brief Factory for producing parallel stokes solver
-template <class StokesT, class ProlongationVelT= MLMatrixCL, class ProlongationPT= MLMatrixCL>
+template <class StokesT, class ProlongationVelT= MLDataCL<ProlongationCL<Point3DCL> >, class ProlongationPT= MLDataCL<ProlongationCL<double> > >
 class StokesSolverFactoryCL : public StokesSolverFactoryBaseCL<StokesT, ProlongationVelT, ProlongationPT>
 {
   private:
@@ -927,7 +928,7 @@ class StokesSolverFactoryObsoleteHelperCL
 /*******************************************************************
  *   S t o k e s S o l v e r F a c t o r y O b s o l e t e C L     *
  *******************************************************************/
-template <class StokesT, class ProlongationVelT= MLMatrixCL, class ProlongationPT= MLMatrixCL>
+template <class StokesT, class ProlongationVelT= MLDataCL<ProlongationCL<Point3DCL> >, class ProlongationPT= MLDataCL<ProlongationCL<double> > >
 class StokesSolverFactoryObsoleteCL : public StokesSolverFactoryBaseCL<StokesT, ProlongationVelT, ProlongationPT>
 {
   private:
@@ -969,23 +970,23 @@ class StokesSolverFactoryObsoleteCL : public StokesSolverFactoryBaseCL<StokesT, 
     SSORPcCL ssorom_;
     SSORsmoothCL smoother_;
     PCG_SsorCL   coarsesolver_;
-    MGSolverCL<SSORsmoothCL, PCG_SsorCL> MGsolver_;
+    MGSolverCL<SSORsmoothCL, PCG_SsorCL, ProlongationVelT> MGsolver_;
 
     //MG preconditioner
-    typedef SolverAsPreCL<MGSolverCL<SSORsmoothCL, PCG_SsorCL> > MGPCT;
+    typedef SolverAsPreCL<MGSolverCL<SSORsmoothCL, PCG_SsorCL, ProlongationVelT> > MGPCT;
     MGPCT MGpc_;
-    ISMGPreCL ismgpcp_;
+    ISMGPreCL<ProlongationPT> ismgpcp_;
 
-    //Pshur2-MG
-    PCGSolverCL<ISMGPreCL> PCGMGPresolver_;
+    //Pschur2-MG
+    PCGSolverCL<ISMGPreCL<ProlongationPT>  > PCGMGPresolver_;
 
     //Pschur-PCG-Pre
     ISPreCL ispcp_;
     PCGSolverCL<ISPreCL> PCGPresolver_;
 
     //PMinresSP_FullMG
-    typedef SolverAsPreCL<MGSolverCL<SSORsmoothCL, PCG_SsorCL> > APcT;
-    typedef BlockPreCL<APcT, ISMGPreCL,DiagSpdBlockPreCL> PcT;
+    typedef SolverAsPreCL<MGSolverCL<SSORsmoothCL, PCG_SsorCL, ProlongationVelT> > APcT;
+    typedef BlockPreCL<APcT, ISMGPreCL<ProlongationPT> ,DiagSpdBlockPreCL> PcT;
     typedef PMResSolverCL<PLanczosONBCL<DROPS::VectorCL,PcT> > PMinresSP_FullMG;
 
     PMinresSP_FullMG pminresMGsolver_;
@@ -1039,29 +1040,29 @@ StokesSolverBaseCL* StokesSolverFactoryObsoleteCL<StokesT, ProlongationVelT, Pro
             stokessolver = new  UzawaSolverCL<PCG_SsorCL>( PCGsolver_, Stokes_.prM.Data.GetFinest(), P_.template get<int>("Stokes.OuterIter"), P_.template get<double>("Stokes.OuterTol"), P_.template get<double>("Stokes.Tau"));
             break;
         case 500100 :
-            stokessolver = new  UzawaSolver2CL<PCG_SsorCL, MGSolverCL<SSORsmoothCL, PCG_SsorCL> >( PCGsolver_, MGsolver_, Stokes_.prM.Data.GetFinest(),
+            stokessolver = new  UzawaSolver2CL<PCG_SsorCL, MGSolverCL<SSORsmoothCL, PCG_SsorCL, ProlongationVelT> >( PCGsolver_, MGsolver_, Stokes_.prM.Data.GetFinest(),
                 P_.template get<int>("Stokes.OuterIter"), P_.template get<double>("Stokes.OuterTol"), P_.template get<double>("Stokes.Tau"));
             break;
         case 501101 :
-            stokessolver = new  UzawaSolver2ModifiedCL<ISMGPreCL, MGPCT>( ismgpcp_, MGpc_, Stokes_.prM.Data.GetFinest(), P_.template get<int>("Stokes.OuterIter"), P_.template get<double>("Stokes.OuterTol"), P_.template get<double>("Stokes.Tau"));
+            stokessolver = new  UzawaSolver2ModifiedCL<ISMGPreCL<ProlongationPT>, MGPCT>( ismgpcp_, MGpc_, Stokes_.prM.Data.GetFinest(), P_.template get<int>("Stokes.OuterIter"), P_.template get<double>("Stokes.OuterTol"), P_.template get<double>("Stokes.Tau"));
             break;
         case 510000 :
             stokessolver = new  PSchurSolverCL<PCG_SsorCL>( PCGsolver_, Stokes_.prM.Data.GetFinest(), P_.template get<int>("Stokes.OuterIter"), P_.template get<double>("Stokes.OuterTol"));
             break;
         case 510100 :
-            stokessolver = new  PSchurSolverCL<MGSolverCL<SSORsmoothCL, PCG_SsorCL> >( MGsolver_, Stokes_.prM.Data.GetFinest(), P_.template get<int>("Stokes.OuterIter"), P_.template get<double>("Stokes.OuterTol") );
+            stokessolver = new  PSchurSolverCL<MGSolverCL<SSORsmoothCL, PCG_SsorCL, ProlongationVelT> >( MGsolver_, Stokes_.prM.Data.GetFinest(), P_.template get<int>("Stokes.OuterIter"), P_.template get<double>("Stokes.OuterTol") );
             break;
         case 510001 :
             stokessolver = new  PSchurSolverCL<PCG_SgsCL>( PCGsgssolver_, Stokes_.prM.Data.GetFinest(), P_.template get<int>("Stokes.OuterIter"), P_.template get<double>("Stokes.OuterTol"));
             break;
         case 511102 :
-            stokessolver = new  PSchurSolver2CL<MGSolverCL<SSORsmoothCL, PCG_SsorCL>, PCGSolverCL<ISMGPreCL> >( MGsolver_, PCGMGPresolver_, P_.template get<int>("Stokes.OuterIter"), P_.template get<double>("Stokes.OuterTol"));
+            stokessolver = new  PSchurSolver2CL<MGSolverCL<SSORsmoothCL, PCG_SsorCL, ProlongationVelT>, PCGSolverCL<ISMGPreCL<ProlongationPT> > >( MGsolver_, PCGMGPresolver_, P_.template get<int>("Stokes.OuterIter"), P_.template get<double>("Stokes.OuterTol"));
             break;
         case 510003 :
             stokessolver = new  PSchurSolver2CL<PCG_SsorCL, PCGSolverCL<ISPreCL> >( PCGsolver_, PCGPresolver_, P_.template get<int>("Stokes.OuterIter"), P_.template get<double>("Stokes.OuterTol"));
             break;
         case 511004 :
-            stokessolver = new  PSchurSolver2CL<PCG_SsorCL, PCGSolverCL<ISMGPreCL> >( PCGsolver_, PCGMGPresolver_, P_.template get<int>("Stokes.OuterIter"), P_.template get<double>("Stokes.OuterTol"));
+            stokessolver = new  PSchurSolver2CL<PCG_SsorCL, PCGSolverCL<ISMGPreCL<ProlongationPT> > >( PCGsolver_, PCGMGPresolver_, P_.template get<int>("Stokes.OuterIter"), P_.template get<double>("Stokes.OuterTol"));
             break;
         case 520000 :
             stokessolver = new  BlockMatrixSolverCL<MinresSPT>( minressolver_);

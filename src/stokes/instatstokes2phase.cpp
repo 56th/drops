@@ -2983,10 +2983,6 @@ void InstatStokes2PhaseP2P1CL::SetIdx()
 
 void InstatStokes2PhaseP2P1CL::SetNumVelLvl( size_t n)
 {
-#ifdef _PAR
-    if (n>1)
-        throw DROPSErrCL("Multilevel not implemented in parallel DROPS yet, sorry");
-#endif
     match_fun match= MG_.GetBnd().GetMatchFun();
     const double bound = vel_idx.GetFinest().GetXidx().GetBound();
     vel_idx.resize( n, GetVelFE(), BndData_.Vel, match, bound);
@@ -2997,10 +2993,6 @@ void InstatStokes2PhaseP2P1CL::SetNumVelLvl( size_t n)
 
 void InstatStokes2PhaseP2P1CL::SetNumPrLvl( size_t n)
 {
-#ifdef _PAR
-    if (n>1)
-        throw DROPSErrCL("Multilevel not implemented in parallel DROPS yet, sorry");
-#endif
     match_fun match= MG_.GetBnd().GetMatchFun();
     const double bound = pr_idx.GetFinest().GetXidx().GetBound();
     pr_idx.resize( n, GetPrFE(),  BndData_.Pr, match, bound);

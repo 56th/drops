@@ -1035,6 +1035,7 @@ class ParJacCL : public ParPreconditioningBaseCL
     using base_::diag_;
     using base_::mat_version_;
     using base_::check_mat_version_;
+    using base_::idx_;
 
   protected:
     double  omega_;                                 // overrelaxion-parameter
@@ -1043,7 +1044,7 @@ class ParJacCL : public ParPreconditioningBaseCL
     ParJacCL (const IdxDescCL& idx, double omega=1) : base_(idx), omega_(omega) {}
 
     /// \brief Check if return preconditioned vectors are accumulated after calling Apply
-    bool RetAcc() const   { return false; }
+    bool RetAcc() const   { return true; }
     /// \brief Check if the diagonal of the matrix is needed
     bool NeedDiag() const { return true; }
     /// \brief Get overrelaxation parameter
@@ -1056,7 +1057,7 @@ class ParJacCL : public ParPreconditioningBaseCL
         Assert(mat_version_==A.Version() || !check_mat_version_,
                DROPSErrCL("ParJacCL::Apply: Diagonal of actual matrix has not been set"),
                DebugNumericC);
-        Jacobi(A, diag_, x, b, omega_, std::fabs(omega_-1.)>DoubleEpsC);
+        Jacobi(A, diag_, x, b, omega_, std::fabs(omega_-1.)>DoubleEpsC, idx_.GetEx());
     }
 };
 
@@ -1075,6 +1076,9 @@ class ParJac0CL : public ParJacCL
   public:
 
     ParJac0CL (const IdxDescCL& idx, double omega=1) : base_(idx, omega) {}
+
+    /// \brief Check if return preconditioned vectors are accumulated after calling Apply
+    bool RetAcc() const   { return false; }
 
     /// \brief Apply preconditioner: one step of the Jacobi-iteration with start vector 0
     template <typename Mat, typename Vec>
@@ -1342,14 +1346,33 @@ class ParDiagPcCL : public ParPreconditioningBaseCL
     void SetDiag(const Mat&) {}
 };
 
+// ********************************************************************************
+///\brief Multilevel Smoother
+// ********************************************************************************
+
+template <class SmootherT>
+class MLSmootherCL : public MLDataCL<SmootherT> {
+  public:
+    MLSmootherCL( const MLIdxDescCL& idx, const double omega = 1.0) {
+        for ( MLIdxDescCL::const_iterator it = idx.begin(); it != idx.end(); ++it){
+            this->push_back( SmootherT(*it, omega));
+        }
+    }
+    void SetDiag( const MLMatrixCL& A) {
+        Assert( A.size() == this->size(), DROPSErrCL ("MLSmootherCL::SetDiag: dimensions do not fit\n"), DebugNumericC);
+        MLMatrixCL::const_iterator Ait = A.begin();
+        for ( typename MLSmootherCL::iterator Sit = this->begin(); Sit != this->end(); ++Sit, ++Ait)
+            Sit->SetDiag(*Ait);
+    }
+};
 
 //***************************************************************************
 // Implementations of the methods
 //***************************************************************************
 
 /// \brief One step of a Jacobi-iteration
-template <typename Mat, typename Vec>
-void Jacobi(const Mat& A, const Vec& Diag, Vec& x, const Vec& b, const double omega, const bool HasOmega)
+template <typename Mat, typename Vec, typename ExT>
+void Jacobi(const Mat& A, const Vec& Diag, Vec& x, const Vec& b, const double omega, const bool HasOmega, const ExT& ex)
         /// \param[in]     A        local distributed coefficients-matrix of the linear equation system
         /// \param[in]     Diag     accumulated form of the diagonalelements of A
         /// \param[in,out] x        startvector (accumulated) and result (distributed)
@@ -1366,11 +1389,13 @@ void Jacobi(const Mat& A, const Vec& Diag, Vec& x, const Vec& b, const double om
         for (const size_t end= A.row_beg(i+1); nz<end; ++nz)
             if (A.col_ind(nz) != i)
                 sum-= A.val(nz)*x[A.col_ind(nz)];
-        if (HasOmega)
-            y[i]= (1.-omega)*x[i]+omega*sum/Diag[i];
-        else
-            y[i]= sum/Diag[i];
+
+        y[i] = sum/Diag[i];
     }
+    ex.Accumulate(y);
+
+    if (HasOmega)
+        y = (1.-omega)*x+omega*y;
 
     std::swap(x,y);
 }
