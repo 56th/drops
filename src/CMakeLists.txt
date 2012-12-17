@@ -53,6 +53,13 @@ elseif(CMAKE_COMPILER_IS_GNUCXX)
     set(DROPS_CXX_FLAGS_RELEASE "${GCC_CXX_FLAGS_RELEASE}")
 endif(CMAKE_CXX_COMPILER MATCHES icpc)
 
+if(NOT DROPS_BUILD_TYPE)
+    set(DROPS_BUILD_TYPE "DEBUG")
+    message(STATUS "### Setting DEFAULT build type: ${DROPS_BUILD_TYPE} ###")
+else(NOT DROPS_BUILD_TYPE)
+    message(STATUS "### BUILD TYPE:                 ${DROPS_BUILD_TYPE} ###")
+endif(NOT DROPS_BUILD_TYPE)
+
 #apply build type specific options
 if(DROPS_BUILD_TYPE STREQUAL "RELEASE")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${DROPS_CXX_FLAGS_RELEASE}")
@@ -61,10 +68,9 @@ elseif(DROPS_BUILD_TYPE STREQUAL "DEBUG")
 endif()
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${DROPS_CXX_FLAGS}")
 
-message(STATUS "### BUILD TYPE:       ${DROPS_BUILD_TYPE} ###")
-message(STATUS "### GLOBAL COMPILER FLAGS:       ${CMAKE_CXX_FLAGS} ###")
-message(STATUS "### GLOBAL SHARED LINKER FLAGS: ${CMAKE_SHARED_LINKER_FLAGS} ###")	
-message(STATUS "### GLOBAL EXE LINKER FLAGS:    ${CMAKE_EXE_LINKER_FLAGS} ###")	
+message(STATUS "###      GLOBAL COMPILER FLAGS: ${CMAKE_CXX_FLAGS} ###")
+message(STATUS "### GLOBAL SHARED LINKER FLAGS: ${CMAKE_SHARED_LINKER_FLAGS} ###")
+message(STATUS "###    GLOBAL EXE LINKER FLAGS: ${CMAKE_EXE_LINKER_FLAGS} ###")
 
 ###############################################################################
 # libs* functions are specializations of add_library, which allow us to add
@@ -194,4 +200,3 @@ if(DOXYGEN_FOUND)
         COMMENT "Generating API documentation with Doxygen" VERBATIM
     )
 endif()
-
