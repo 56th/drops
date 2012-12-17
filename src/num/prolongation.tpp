@@ -24,42 +24,6 @@
 
 namespace DROPS{
 
-//**************************************************************************
-// P1-Prolongation                                                         *
-//**************************************************************************
-void SetupP1ProlongationMatrix(const MultiGridCL& mg, MatrixCL& P,
-                               IdxDescCL& cIdx, IdxDescCL& fIdx)
-{
-    const Uint c_level= cIdx.TriangLevel();
-    const Uint c_idx= cIdx.GetIdx();
-    const Uint f_idx= fIdx.GetIdx();
-    MatrixBuilderCL mat( &P, fIdx.NumUnknowns(), cIdx.NumUnknowns());
-    IdxT i;
-
-    // setup index part of matrix
-    // Iterate over all edges, interpolate values on new mid vertices
-    for (MultiGridCL::const_EdgeIterator sit= mg.GetAllEdgeBegin( c_level),
-         theend= mg.GetAllEdgeEnd( c_level); sit!=theend; ++sit)
-        if ( sit->IsRefined() && sit->GetMidVertex()->Unknowns.Exist()
-             && !sit->GetMidVertex()->Unknowns.Exist(c_idx) )  {
-            // only new non-boundary vertices are interpolated
-// if(!(*sit->GetMidVertex()->Unknowns.Exist(idx)) std::cout << "no unknown index in mid vertex" << std::endl;
-            i= sit->GetMidVertex()->Unknowns(f_idx);
-            if (sit->GetVertex(0)->Unknowns.Exist())
-                mat(i,sit->GetVertex(0)->Unknowns(c_idx))= 0.5;
-            if (sit->GetVertex(1)->Unknowns.Exist())
-                mat(i,sit->GetVertex(1)->Unknowns(c_idx))= 0.5;
-        }
-    // Iterate over the vertices of the coarse triangulation and copy values
-    for (MultiGridCL::const_TriangVertexIteratorCL sit= mg.GetTriangVertexBegin( c_level),
-         theend= mg.GetTriangVertexEnd( c_level); sit!=theend; ++sit)
-        if ( sit->Unknowns.Exist() && sit->Unknowns.Exist(c_idx) ) {
-            mat( sit->Unknowns(f_idx), sit->Unknowns(c_idx) )= 1.0;
-        }
-
-    mat.Build();
-}
-
 template <class ValueT>
 void ProlongationCL<ValueT>::Create(IdxDescCL* coarse, IdxDescCL* fine)
 {
@@ -68,7 +32,7 @@ void ProlongationCL<ValueT>::Create(IdxDescCL* coarse, IdxDescCL* fine)
 #ifdef _PAR
         throw DROPSErrCL("P1-prolongation not yet implemented in parallel");
 #endif
-        SetupP1ProlongationMatrix(mg_, prolongation_, *coarse, *fine);
+        BuildP1ProlongationMatrix( *coarse, *fine);
         return;
     }
 
@@ -118,7 +82,7 @@ void ProlongationCL<ValueT>::Create(IdxDescCL* coarse, IdxDescCL* fine)
 #endif
 
     scale_ = 1.0/scale_;
-    BuildProlongationMatrix( *coarse_, *fine);
+    BuildP2ProlongationMatrix( *coarse_, *fine);
 }
 
 template <class ValueT>
@@ -348,7 +312,40 @@ void ProlongationCL<ValueT>::Prolong(const TetraCL* sit, const LocalP2CL<ValueT>
 #endif
 
 template <class ValueT>
-void ProlongationCL<ValueT>::BuildProlongationMatrix( const IdxDescCL& cIdx, const IdxDescCL& fIdx)
+void ProlongationCL<ValueT>::BuildP1ProlongationMatrix( const IdxDescCL& cIdx, const IdxDescCL& fIdx)
+{
+    const Uint c_level= cIdx.TriangLevel();
+    const Uint c_idx= cIdx.GetIdx();
+    const Uint f_idx= fIdx.GetIdx();
+    MatrixBuilderCL mat( &prolongation_, fIdx.NumUnknowns(), cIdx.NumUnknowns());
+    IdxT i;
+
+    // setup index part of matrix
+    // Iterate over all edges, interpolate values on new mid vertices
+    for (MultiGridCL::const_EdgeIterator sit= mg_.GetAllEdgeBegin( c_level),
+         theend= mg_.GetAllEdgeEnd( c_level); sit!=theend; ++sit)
+        if ( sit->IsRefined() && sit->GetMidVertex()->Unknowns.Exist()
+             && !sit->GetMidVertex()->Unknowns.Exist(c_idx) )  {
+            // only new non-boundary vertices are interpolated
+// if(!(*sit->GetMidVertex()->Unknowns.Exist(idx)) std::cout << "no unknown index in mid vertex" << std::endl;
+            i= sit->GetMidVertex()->Unknowns(f_idx);
+            if (sit->GetVertex(0)->Unknowns.Exist())
+                mat(i,sit->GetVertex(0)->Unknowns(c_idx))= 0.5;
+            if (sit->GetVertex(1)->Unknowns.Exist())
+                mat(i,sit->GetVertex(1)->Unknowns(c_idx))= 0.5;
+        }
+    // Iterate over the vertices of the coarse triangulation and copy values
+    for (MultiGridCL::const_TriangVertexIteratorCL sit= mg_.GetTriangVertexBegin( c_level),
+         theend= mg_.GetTriangVertexEnd( c_level); sit!=theend; ++sit)
+        if ( sit->Unknowns.Exist() && sit->Unknowns.Exist(c_idx) ) {
+            mat( sit->Unknowns(f_idx), sit->Unknowns(c_idx) )= 1.0;
+        }
+
+    mat.Build();
+}
+
+template <class ValueT>
+void ProlongationCL<ValueT>::BuildP2ProlongationMatrix( const IdxDescCL& cIdx, const IdxDescCL& fIdx)
 {
     const Uint c_level= cIdx.TriangLevel();
     const Uint f_level= fIdx.TriangLevel();

@@ -62,7 +62,8 @@ class ProlongationCL
 
     std::vector<IdxT> CollectChildUnknownsP2(const TetraCL& t, const Uint f_idx) const;
 
-    void BuildProlongationMatrix(const IdxDescCL& coarse, const IdxDescCL& fine);
+    void BuildP2ProlongationMatrix(const IdxDescCL& coarse, const IdxDescCL& fine);
+    void BuildP1ProlongationMatrix(const IdxDescCL& coarse, const IdxDescCL& fine);
 
     MatrixCL prolongation_;
 
