@@ -126,9 +126,9 @@ void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTr
     adap.push_back( &lsetrepair);
     LevelsetRepairCL oldlsetrepair( oldlset);
     adap.push_back( &oldlsetrepair);
-    IdxDescCL* lidx= &lset.idx;
+    MLIdxDescCL* lidx= &lset.idx;
     // index wrt the interface at previous time step
-    IdxDescCL* oldlidx= &oldlset.idx;
+    MLIdxDescCL* oldlidx= &oldlset.idx;
     lset.CreateNumbering( MG.GetLastLevel(), lidx);
     lset.Phi.SetIdx( lidx);
     oldlset.CreateNumbering( MG.GetLastLevel(), oldlidx);
@@ -331,9 +331,9 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbndda
     adap.push_back( &velrepair);
     PressureRepairCL prrepair( Stokes, lset);
     adap.push_back( &prrepair);
-    IdxDescCL* lidx= &lset.idx;
+    MLIdxDescCL* lidx= &lset.idx;
     // index wrt the interface at previous time step
-    IdxDescCL* oldlidx= &oldlset.idx;
+    MLIdxDescCL* oldlidx= &oldlset.idx;
     MLIdxDescCL* vidx= &Stokes.vel_idx;
     IdxDescCL old_vidx(vecP2_FE);
     MLIdxDescCL* pidx= &Stokes.pr_idx;

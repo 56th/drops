@@ -146,7 +146,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     PressureRepairCL prrepair( Stokes, lset);
     adap.push_back( &prrepair);
 
-    IdxDescCL* lidx= &lset.idx;
+    MLIdxDescCL* lidx= &lset.idx;
     MLIdxDescCL* vidx= &Stokes.vel_idx;
     MLIdxDescCL* pidx= &Stokes.pr_idx;
 
@@ -158,10 +158,14 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     else
         lset.SetSurfaceForce( SF_ImprovedLB);
 
-    if ( StokesSolverFactoryHelperCL().VelMGUsed(P))
+    if ( StokesSolverFactoryHelperCL().VelMGUsed(P)){
         Stokes.SetNumVelLvl ( Stokes.GetMG().GetNumLevel());
-    if ( StokesSolverFactoryHelperCL().PrMGUsed(P))
+        lset.SetNumLvl(Stokes.GetMG().GetNumLevel());
+    }
+    if ( StokesSolverFactoryHelperCL().PrMGUsed(P)){
         Stokes.SetNumPrLvl  ( Stokes.GetMG().GetNumLevel());
+        lset.SetNumLvl(Stokes.GetMG().GetNumLevel());
+    }
 
     SetInitialLevelsetConditions( lset, MG, P);
     Stokes.CreateNumberingVel( MG.GetLastLevel(), vidx, periodic_match);

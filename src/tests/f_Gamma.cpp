@@ -176,7 +176,7 @@ void ApplyToTestFct( InstatStokes2PhaseP2P1CL& Stokes, const LsetBndDataCL& lsbn
     LevelsetP2CL lset( MG, lsbnd, sf, P.get<double>("Levelset.SD"), /*CurvDiff*/ -1.);
 //    lset.SetSurfaceForce( SF_Const);
 
-    IdxDescCL* lidx= &lset.idx;
+    MLIdxDescCL* lidx= &lset.idx;
     MLIdxDescCL* vidx= &Stokes.vel_idx;
     MLIdxDescCL* pidx= &Stokes.pr_idx;
 
@@ -267,7 +267,7 @@ void Compare_LaplBeltramiSF_ConstSF( InstatStokes2PhaseP2P1CL& Stokes, const Lse
     SurfaceTensionCL sf( sigmaf, 0);
     LevelsetP2CL lset( MG, lsbnd, sf, P.get<double>("Levelset.SD"), /*CurvDiff*/ -1.);
 
-    IdxDescCL* lidx= &lset.idx;
+    MLIdxDescCL* lidx= &lset.idx;
     MLIdxDescCL* vidx= &Stokes.vel_idx;
     MLIdxDescCL* pidx= &Stokes.pr_idx;
 

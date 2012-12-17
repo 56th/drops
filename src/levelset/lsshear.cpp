@@ -111,7 +111,7 @@ void Strategy( StokesProblemT& Stokes, const BndDataCL<>& lsbnd, double inner_it
     SurfaceTensionCL sf( sigmaf);
     LevelsetP2CL lset( MG, lsbnd, sf, 0.1);
 
-    IdxDescCL* lidx= &lset.idx;
+    MLIdxDescCL* lidx= &lset.idx;
     MLIdxDescCL* vidx= &Stokes.vel_idx;
     MLIdxDescCL* pidx= &Stokes.pr_idx;
     VelVecDescCL* v= &Stokes.v;

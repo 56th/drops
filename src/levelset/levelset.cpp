@@ -585,7 +585,7 @@ void LevelsetP2CL::Init( instat_scalar_fun_ptr phi0, double t)
 }
 
 
-void LevelsetP2CL::CreateNumbering( Uint level, IdxDescCL* idx, match_fun match)
+void LevelsetP2CL::CreateNumbering( Uint level, MLIdxDescCL* idx, match_fun match)
 {
     idx->CreateNumbering( level, MG_, BndData_, match);
 }
@@ -820,6 +820,12 @@ void LevelsetP2CL::GetMaxMinGradPhi(double& maxGradPhi, double& minGradPhi) cons
 #endif
 }
 
+void LevelsetP2CL::SetNumLvl( size_t n)
+{
+    match_fun match= MG_.GetBnd().GetMatchFun();
+    idx.resize( n, P2_FE, BndData_, match);
+}
+
 //*****************************************************************************
 //                               LevelsetRepairCL
 //*****************************************************************************
@@ -835,7 +841,7 @@ LevelsetRepairCL::post_refine ()
 /// Do all things to complete the repairing of the FE level-set function
 {
     VecDescCL loc_phi;
-    IdxDescCL loc_lidx( P2_FE);
+    MLIdxDescCL loc_lidx( P2_FE, ls_.GetMG().GetLastLevel());
     VecDescCL& phi= ls_.Phi;
     match_fun match= ls_.GetMG().GetBnd().GetMatchFun();
 
@@ -845,7 +851,7 @@ LevelsetRepairCL::post_refine ()
     p2repair_->repair( loc_phi);
 
     phi.Clear( phi.t);
-    ls_.DeleteNumbering( phi.RowIdx);
+    ls_.idx.DeleteNumbering( ls_.GetMG());
     ls_.idx.swap( loc_lidx);
     phi.SetIdx( &ls_.idx);
     phi.Data= loc_phi.Data;

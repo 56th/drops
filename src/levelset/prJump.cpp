@@ -256,7 +256,7 @@ void Strategy( InstatStokes2PhaseP2P1CL& Stokes, const LsetBndDataCL& lsbnd, Ada
         avg_ex= prJump/2.*(8./3.*M_PI*P.get<DROPS::Point3DCL>("Exp.RadDrop")[0]*P.get<DROPS::Point3DCL>("Exp.RadDrop")[0]*P.get<DROPS::Point3DCL>("Exp.RadDrop")[0] - Vol)/Vol; // for spherical interface
 //        avg_ex= 0; // for planar interface
 
-    IdxDescCL* lidx= &lset.idx;
+    MLIdxDescCL* lidx= &lset.idx;
     MLIdxDescCL* vidx= &Stokes.vel_idx;
     MLIdxDescCL* pidx= &Stokes.pr_idx;
     if ( StokesSolverFactoryHelperCL().VelMGUsed(P))

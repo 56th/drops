@@ -181,7 +181,7 @@ void Strategy( ProblemT& prob, BndDataCL<>& lsetbnd, double dt, int num_steps, d
     SurfaceTensionCL sf( sigma, 0);
     LevelsetP2CL lset( mg, lsetbnd, sf, 0.5);
 
-    IdxDescCL& lidx= lset.idx;
+    MLIdxDescCL& lidx= lset.idx;
     MLIdxDescCL& vidx= prob.vel_idx;
     VecDescCL& vel=  prob.v;
 

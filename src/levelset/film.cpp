@@ -113,7 +113,7 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
     DROPS::match_fun periodic_match = DROPS::MatchMap::getInstance()[P.get<std::string>("DomainCond.PeriodicMatching", std::string("periodicxz"))];
     MultiGridCL& MG= Stokes.GetMG();
 
-    IdxDescCL* lidx= &lset.idx;
+    MLIdxDescCL* lidx= &lset.idx;
     MLIdxDescCL* vidx= &Stokes.vel_idx;
     MLIdxDescCL* pidx= &Stokes.pr_idx;
     IdxDescCL ens_idx( P2_FE, NoBndDataCL<>());

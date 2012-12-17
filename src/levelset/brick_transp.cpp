@@ -84,7 +84,7 @@ void Strategy (MultiGridCL& MG, const LsetBndDataCL& lsbnd)
 {
     SurfaceTensionCL sf( sigmaf, 0);
     LevelsetP2CL lset( MG, lsbnd, sf, P.get<double>("Levelset.SD"), P.get<double>("Levelset.CurvDiff"));
-    IdxDescCL* lidx= &lset.idx;
+    MLIdxDescCL* lidx= &lset.idx;
     lset.CreateNumbering( MG.GetLastLevel(), lidx);
     lset.Phi.SetIdx( lidx);
     lset.Init( EllipsoidCL::DistanceFct);

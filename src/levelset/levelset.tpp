@@ -354,14 +354,14 @@ PermutationT LevelsetP2CL::downwind_numbering (const DiscVelSolT& vel, IteratedD
     std::cout << "LevelsetP2CL::downwind_numbering:\n";
     std::cout << "...accumulating convection matrix...\n";
     MatrixCL C;
-    DownwindAccu_P2CL accu( *vel.GetBndData(), *vel.GetSolution(), idx, C);
+    DownwindAccu_P2CL accu( *vel.GetBndData(), *vel.GetSolution(), idx.GetFinest(), C);
     TetraAccumulatorTupleCL accus;
     MaybeAddProgressBar(MG_, "Downwind Numbering", accus, Phi.RowIdx->TriangLevel());
     accus.push_back( &accu);
     accumulate( accus, this->GetMG(), idx.TriangLevel(), idx.GetMatchingFunction(), idx.GetBndInfo());
 
     const PermutationT& p= dw.downwind_numbering( C);
-    permute_fe_basis( GetMG(), idx, p);
+    permute_fe_basis( GetMG(), idx.GetFinest(), p);
     permute_Vector( Phi.Data, p);
     std::cout << "...downwind numbering finished.\n";
 
