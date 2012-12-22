@@ -1028,6 +1028,17 @@ void CreatePeriodicNumbOnSimplex( const Uint idx, IdxT& counter, Uint stride, ma
 }
 /// \}
 
+class MLVecDescCL : public MLDataCL<VecDescCL> {
+  public:
+    MLVecDescCL() { this->resize(1);}
+    MLVecDescCL( MLIdxDescCL* idx) { this->resize(idx->size()); SetIdx( idx); }
+    void SetIdx(MLIdxDescCL* idx) {
+        MLIdxDescCL::const_iterator idx_it = idx->begin();
+        for (MLDataCL<VecDescCL>::iterator it = this->begin(); it != this->end(); ++it, ++idx_it)
+            it->SetIdx(&*idx_it);
+    }
+};
+
 } // end of namespace DROPS
 
 

@@ -1201,7 +1201,7 @@ void FastmarchingOnMasterCL::CreateGlobNumb()
 
     // in debug mode, check if everything is right
 #if DROPSDebugC&DebugParallelNumC
-    DROPS_FOR_TRIANG_VERTEX( data_.mg, lvl, it)
+/*    DROPS_FOR_TRIANG_VERTEX( data_.mg, lvl, it)
         if (globNumb_[ it->Unknowns(idx) ]==NoIdx)
             it->DebugInfo(std::cout);
     DROPS_FOR_TRIANG_EDGE( data_.mg, lvl, it)
@@ -1217,7 +1217,7 @@ void FastmarchingOnMasterCL::CreateGlobNumb()
         std::cerr << "["<<ProcCL::MyRank()<<"] max entry is "<<maxEntry<<" but there are only "
                   << offset_[ProcCL::Size()] << " global dof!" << std::endl;
         throw DROPSErrCL("FastMarchCL::CreateGlobNumb: max entry in globNumb is bigger than global size");
-    }
+    }*/
 #endif
 }
 /*

@@ -56,8 +56,8 @@ class ProlongationCL
     mutable DataT data_;
 
     class HandlerParentDataCL;
-    void Restrict(const TetraCL* sit, const VecDescCL& fine, const VectorCL scale) const;
-    void Prolong( const TetraCL* sit, const LocalP2CL<ValueT>& coarse, VecDescCL& fine, const VectorCL scale) const;
+    void Restrict(const TetraCL* sit, const VecDescCL& fine, const bool doinjection=false) const;
+    void Prolong( const TetraCL* sit, const LocalP2CL<ValueT>& coarse, VecDescCL& fine) const;
 #endif
 
     std::vector<IdxT> CollectChildUnknownsP2(const TetraCL& t, const Uint f_idx) const;
@@ -66,6 +66,7 @@ class ProlongationCL
     void BuildP1ProlongationMatrix(const IdxDescCL& coarse, const IdxDescCL& fine);
 
     MatrixCL prolongation_;
+    MatrixCL injection_;
 
   public:
     ProlongationCL(const MultiGridCL& mg) : coarse_(0), fine_(0), mg_(mg){}
@@ -74,7 +75,9 @@ class ProlongationCL
 
     VectorCL operator* (const VectorCL& vec) const;
 
-    VectorCL mytransp_mul(const VectorCL& vec) const;
+    VectorCL mytransp_mul(const VectorCL& vec, const bool doinjection = false) const;
+
+    VectorCL restrict_vec(const VectorCL& vec) const { return mytransp_mul(vec, true);}
 };
 
 

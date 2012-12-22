@@ -1527,10 +1527,6 @@ class MLSparseMatBaseCL : public MLDataCL<SparseMatBaseCL<T> >
   public:
     MLSparseMatBaseCL (size_t lvl= 1)
     {
-#ifdef _PAR
-        if (lvl>1)
-            throw DROPSErrCL("MLSparseMatBaseCL::MLSparseMatBaseCL: No multilevel matrices in the parallel version, yet, sorry");
-#endif
         this->resize(lvl);
     }
     size_t Version      () const { return this->GetFinest().Version();}

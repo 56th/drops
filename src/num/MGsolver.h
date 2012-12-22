@@ -200,6 +200,10 @@ class ParMGSolverCL : public ParSolverBaseCL
     {
         throw DROPSErrCL( "MGSolverCL::Solve: need multilevel data structure\n");
     }
+    SmootherT& GetPC() { return smoother_; }
+    bool NeedDiag()  {return false; } // diag is saved during solve
+    template<typename Mat>
+    void SetDiag(const Mat&) {}
 
 };
 #endif

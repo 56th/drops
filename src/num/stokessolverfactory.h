@@ -647,34 +647,6 @@ ProlongationPT* StokesSolverFactoryCL<StokesT, ProlongationVelT, ProlongationPT>
 
 #else // parallel part
 
-/// \brief Structure that contains all necessary parameter for the
-///     ParStokesSolverFactoryCL
-/** See documentation of parameter classes for detailed information*/
-/*struct StokesSolverParamST
-{
-    int stk_StokesMethod;
-    int tm_NumSteps;
-    double tm_StepSize;
-    int stk_OuterIter;
-    double stk_OuterTol;
-    int stk_InnerIter;
-    double stk_InnerTol;
-    int stk_PcAIter;
-    double stk_PcATol;
-    double stk_PcSTol;
-    double stk_Theta;
-
-    /// \brief Constructor which copies all values out of a parameter class
-    ///   into this parameter class
-    StokesSolverParamST(const ParamCL& P)
-      : stk_StokesMethod(P.get<int>("Stokes.StokesMethod")), tm_NumSteps(C.tm_NumSteps), tm_StepSize(C.tm_StepSize),
-        stk_OuterIter(P.get<int>("Stokes.OuterIter")), stk_OuterTol(P.get<double>("Stokes.OuterTol")),
-        stk_InnerIter(C.stk_InnerIter), stk_InnerTol(C.stk_InnerTol),
-        stk_PcAIter(C.stk_PcAIter), stk_PcATol(C.stk_PcATol), stk_PcSTol(C.stk_PcSTol),
-        stk_Theta(C.stk_Theta)
-    {}
-};*/
-
 
 /*************************************************************
 *   S t o k e s S o l v e r F a c t o r y  C L               *
@@ -725,7 +697,6 @@ class StokesSolverFactoryCL : public StokesSolverFactoryBaseCL<StokesT, Prolonga
     typedef BlockPreCL<GMResPcT, BDinvBTPreCL, SIMPLERBlockPreCL> SIMPLERBlockPcT;
     SIMPLERBlockPcT SIMPLERBlockPc_;
 
-
 //GCR solver
     ParPreGCRSolverCL<LBlockGMResBBTOseenPcT> GCRGMResBBT_;
     ParPreGCRSolverCL<LBlockGMResMinCommOseenPcT> GCRGMResMinComm_;
@@ -733,6 +704,25 @@ class StokesSolverFactoryCL : public StokesSolverFactoryBaseCL<StokesT, Prolonga
     
 //GMRes solver
     ParPreGMResSolverCL<LBlockGMResBBTOseenPcT> GMResGMResBBT_;
+
+    // MultiGrid
+    typedef MLSmootherCL<ParJacCL> SmootherT;
+    SmootherT jorsmoother_;   // Jacobi
+    ParJac0CL  coarsepc_;
+
+    GMResSolverT coarsesolver_;
+    typedef ParMGSolverCL<SmootherT, GMResSolverT, ProlongationVelT> MGSolverT;
+    MGSolverT MGSolver_;
+    typedef SolverAsPreCL<MGSolverT> MGSolverPreT;
+    MGSolverPreT MGSolverPre_;
+
+    typedef BlockPreCL<MGSolverPreT, ISBBTPreCL, LowerBlockPreCL> LBlockMGBBTOseenPcT;
+    LBlockMGBBTOseenPcT LBlockMGBBTOseenPc_;
+    ParPreGCRSolverCL<LBlockMGBBTOseenPcT> GCRMGBBT_;
+
+    typedef BlockPreCL<MGSolverPreT, BDinvBTPreCL, SIMPLERBlockPreCL> MGSIMPLERBlockPcT;
+    MGSIMPLERBlockPcT MGSIMPLERBlockPc_;
+    ParPreGCRSolverCL<MGSIMPLERBlockPcT> GCRMGSBlock_;
 
 #ifdef _HYPRE
      //Algebraic MG solver
@@ -757,7 +747,7 @@ class StokesSolverFactoryCL : public StokesSolverFactoryBaseCL<StokesT, Prolonga
         bbtispc_.SetMatrices(B->GetFinestPtr(), Mvel->GetFinestPtr(), M->GetFinestPtr(), pr_idx->GetFinestPtr());
     }
     /// Nothing is to be done in parallel, because special preconditioners does not exist
-    ProlongationVelT* GetPVel() { return 0; }
+    ProlongationVelT* GetPVel() { /*if (APc_ == MG_APC)*/ return MGSolver_.GetProlongation();/* else return 0;*/ }
     /// Nothing is to be done in parallel, because special preconditioners does not exist
     ProlongationPT*   GetPPr()  { return 0; }
     /// Returns a stokes solver with specifications from ParamsT C
@@ -789,7 +779,15 @@ template <class StokesT, class ProlongationVelT, class ProlongationPT>
       GCRGMResBBT_( P.get<int>("Stokes.OuterIter"), P.get<int>("Stokes.OuterIter"), P.get<double>("Stokes.OuterTol"), LBlockGMResBBTOseenPc_, true, false, &std::cout),
       GCRGMResMinComm_( P.get<int>("Stokes.OuterIter"), P.get<int>("Stokes.OuterIter"), P.get<double>("Stokes.OuterTol"), LBlockGMResMinCommOseenPc_, true, false, &std::cout),
       GCRGMResSBlock_( P.get<int>("Stokes.OuterIter"), P.get<int>("Stokes.OuterIter"), P.get<double>("Stokes.OuterTol"), SIMPLERBlockPc_, true, false, &std::cout),
-      GMResGMResBBT_( P.get<int>("Stokes.OuterIter"), P.get<int>("Stokes.OuterIter"), P.get<double>("Stokes.OuterTol"), LBlockGMResBBTOseenPc_, true, false, LeftPreconditioning, true, &std::cout)
+      GMResGMResBBT_( P.get<int>("Stokes.OuterIter"), P.get<int>("Stokes.OuterIter"), P.get<double>("Stokes.OuterTol"), LBlockGMResBBTOseenPc_, true, false, LeftPreconditioning, true, &std::cout),
+      jorsmoother_(Stokes.vel_idx, 0.5), coarsepc_( Stokes.vel_idx.GetCoarsest()),
+      coarsesolver_( 500, 500, 1e-6, Stokes.vel_idx.GetCoarsest(), coarsepc_, true),
+      MGSolver_( jorsmoother_, coarsesolver_, P.get<int>("Stokes.PcAIter"), P.get<double>("Stokes.PcATol"), Stokes.vel_idx.GetFinest(), false, /*smoothing steps*/ 2, /* num lvl */ -1),
+      MGSolverPre_(MGSolver_),
+      LBlockMGBBTOseenPc_(MGSolverPre_, bbtispc_ ),
+      GCRMGBBT_( P.get<int>("Stokes.OuterIter"), P.get<int>("Stokes.OuterIter"), P.get<double>("Stokes.OuterTol"), LBlockMGBBTOseenPc_, true, false, &std::cout),
+      MGSIMPLERBlockPc_( MGSolverPre_, bdinvbtispc_),
+      GCRMGSBlock_( P.get<int>("Stokes.OuterIter"), P.get<int>("Stokes.OuterIter"), P.get<double>("Stokes.OuterTol"), MGSIMPLERBlockPc_, true, false, &std::cout)
 #ifdef _HYPRE
       , hypreAMG_( Stokes.vel_idx.GetFinest(), P.get<int>("Stokes.PcAIter"), P.get<double>("Stokes.PcATol")), AMGPc_(hypreAMG_),
       LBlockAMGBBTOseenPc_( AMGPc_, bbtispc_),
@@ -847,6 +845,14 @@ template <class StokesT, class ProlongationVelT, class ProlongationPT>
             stokessolver = new BlockMatrixSolverCL<ParPreGMResSolverCL<LBlockGMResBBTOseenPcT> >
                         ( GMResGMResBBT_, Stokes_.vel_idx.GetFinest(), Stokes_.pr_idx.GetFinest());
         break;
+        case 10101 :
+            stokessolver = new BlockMatrixSolverCL<ParPreGCRSolverCL<LBlockMGBBTOseenPcT> >
+                        ( GCRMGBBT_, Stokes_.vel_idx.GetFinest(), Stokes_.pr_idx.GetFinest());
+        break;
+        case 10109: {
+            bdinvbtispc_.SetMassLumping( true);
+            stokessolver= new BlockMatrixSolverCL<ParPreGCRSolverCL<MGSIMPLERBlockPcT> >( GCRMGSBlock_, Stokes_.vel_idx.GetFinest(), Stokes_.pr_idx.GetFinest());
+        } break;
 #ifdef _HYPRE
         case 22001 :
             stokessolver = new ParInexactUzawaCL<AMGPcT, ISBBTPreCL, APC_OTHER>

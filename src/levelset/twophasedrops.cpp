@@ -150,14 +150,6 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     MLIdxDescCL* vidx= &Stokes.vel_idx;
     MLIdxDescCL* pidx= &Stokes.pr_idx;
 
-    lset.CreateNumbering( MG.GetLastLevel(), lidx, periodic_match);
-    lset.Phi.SetIdx( lidx);
-    PermutationT lset_downwind;
-    if (P.get<double>("SurfTens.VarTension"))
-        lset.SetSurfaceForce( SF_ImprovedLBVar);
-    else
-        lset.SetSurfaceForce( SF_ImprovedLB);
-
     if ( StokesSolverFactoryHelperCL().VelMGUsed(P)){
         Stokes.SetNumVelLvl ( Stokes.GetMG().GetNumLevel());
         lset.SetNumLvl(Stokes.GetMG().GetNumLevel());
@@ -166,6 +158,14 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         Stokes.SetNumPrLvl  ( Stokes.GetMG().GetNumLevel());
         lset.SetNumLvl(Stokes.GetMG().GetNumLevel());
     }
+
+    lset.CreateNumbering( MG.GetLastLevel(), lidx, periodic_match);
+    lset.Phi.SetIdx( lidx);
+    PermutationT lset_downwind;
+    if (P.get<double>("SurfTens.VarTension"))
+        lset.SetSurfaceForce( SF_ImprovedLBVar);
+    else
+        lset.SetSurfaceForce( SF_ImprovedLB);
 
     SetInitialLevelsetConditions( lset, MG, P);
     Stokes.CreateNumberingVel( MG.GetLastLevel(), vidx, periodic_match);
@@ -282,12 +282,25 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     // GMResSolverCL<SSORPcCL>* gm = new GMResSolverCL<SSORPcCL>( lset_pc, 100, P.get<int>("Levelset.Iter"), P.get<double>("Levelset.Tol"));
     GMResSolverCL<GSPcCL>* gm = new GMResSolverCL<GSPcCL>( lset_pc, 200, P.get<int>("Levelset.Iter"), P.get<double>("Levelset.Tol"));
 #else
-    ParJac0CL jacparpc( *lidx);
+    ParJac0CL jacparpc( lidx->GetFinest());
     ParPreGMResSolverCL<ParJac0CL>* gm = new ParPreGMResSolverCL<ParJac0CL>
-           (/*restart*/100, P.get<int>("Levelset.Iter"), P.get<double>("Levelset.Tol"), *lidx, jacparpc,/*rel*/true, /*modGS*/false, LeftPreconditioning, /*parmod*/true);
+           (/*restart*/100, P.get<int>("Levelset.Iter"), P.get<double>("Levelset.Tol"), lidx->GetFinest(), jacparpc,/*rel*/true, /*modGS*/false, LeftPreconditioning, /*parmod*/true);
 #endif
 
     LevelsetModifyCL lsetmod( P.get<int>("Reparam.Freq"), P.get<int>("Reparam.Method"), P.get<double>("Reparam.MaxGrad"), P.get<double>("Reparam.MinGrad"), P.get<int>("Levelset.VolCorrection"), Vol, is_periodic);
+
+    UpdateProlongationCL<Point3DCL> PVel( Stokes.GetMG(), stokessolverfactory.GetPVel(), &Stokes.vel_idx, &Stokes.vel_idx);
+    adap.push_back( &PVel);
+    UpdateProlongationCL<double> PPr ( Stokes.GetMG(), stokessolverfactory.GetPPr(), &Stokes.pr_idx, &Stokes.pr_idx);
+    adap.push_back( &PPr);
+    UpdateProlongationCL<double> PLset( lset.GetMG(), lset.GetProlongation(), &lset.idx, &lset.idx);
+    adap.push_back( &PLset);
+    Stokes.P_ = stokessolverfactory.GetPVel();
+
+    // For a two-level MG-solver: P2P1 -- P2P1X;
+//     MakeP1P1XProlongation ( Stokes.vel_idx.NumUnknowns(), Stokes.pr_idx.NumUnknowns(),
+//         Stokes.pr_idx.GetFinest().GetXidx().GetNumUnknownsStdFE(),
+//         stokessolverfactory.GetPVel()->GetFinest(), stokessolverfactory.GetPPr()->GetFinest());
 
     // Time discretisation + coupling
     TimeDisc2PhaseCL* timedisc= CreateTimeDisc(Stokes, lset, navstokessolver, gm, P, lsetmod);
@@ -306,15 +319,6 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         stokessolverfactory.SetMatrices( timedisc->GetUpperLeftBlock(), &Stokes.B.Data,
                                          &Stokes.M.Data, &Stokes.prM.Data, &Stokes.pr_idx);
     }
-
-    UpdateProlongationCL<Point3DCL> PVel( Stokes.GetMG(), stokessolverfactory.GetPVel(), &Stokes.vel_idx, &Stokes.vel_idx);
-    adap.push_back( &PVel);
-    UpdateProlongationCL<double> PPr ( Stokes.GetMG(), stokessolverfactory.GetPPr(), &Stokes.pr_idx, &Stokes.pr_idx);
-    adap.push_back( &PPr);
-    // For a two-level MG-solver: P2P1 -- P2P1X;
-//     MakeP1P1XProlongation ( Stokes.vel_idx.NumUnknowns(), Stokes.pr_idx.NumUnknowns(),
-//         Stokes.pr_idx.GetFinest().GetXidx().GetNumUnknownsStdFE(),
-//         stokessolverfactory.GetPVel()->GetFinest(), stokessolverfactory.GetPPr()->GetFinest());
 
     std::ofstream* infofile = 0;
     IF_MASTER {

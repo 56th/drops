@@ -1364,6 +1364,11 @@ class MLSmootherCL : public MLDataCL<SmootherT> {
         for ( typename MLSmootherCL::iterator Sit = this->begin(); Sit != this->end(); ++Sit, ++Ait)
             Sit->SetDiag(*Ait);
     }
+    inline bool RetAcc() const {return false;}
+    inline bool NeedDiag() const {return false;}
+    /// \brief Set Diag makes nothing, because own matrix is used
+    template<typename Mat>
+    void SetDiag(const Mat&) {}
 };
 
 //***************************************************************************

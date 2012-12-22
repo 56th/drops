@@ -64,6 +64,7 @@ void LinThetaScheme2PhaseCL<LsetSolverT>::SolveLsNs()
     {
         ScopeTimerCL scope("System1 within SolveLsNs");
         MLTetraAccumulatorTupleCL accus( Stokes_.A.Data.size());
+        LvlSet_.UpdateMLPhi();
         MaybeAddMLProgressbar( Stokes_.GetMG(), "System1(P2)", accus, Stokes_.vel_idx.TriangLevel() );
         accumulate( Stokes_.system1_accu( accus, &Stokes_.A, &Stokes_.M, old_b_, cplA_, cplM_, LvlSet_, Stokes_.v.t),
                     Stokes_.GetMG(), Stokes_.vel_idx.TriangLevel(), Stokes_.vel_idx.GetMatchingFunction(), Stokes_.vel_idx.GetBndInfo());
@@ -228,6 +229,7 @@ void LinThetaScheme2PhaseCL<LsetSolverT>::Update()
     // Diskretisierung
     LvlSet_.AccumulateBndIntegral( *old_curv_);
     LvlSet_.SetupSystem( Stokes_.GetVelSolution(), dt_);
+    LvlSet_.UpdateMLPhi();
 
     {
         ScopeTimerCL scope("System2+Nonl");
@@ -608,6 +610,7 @@ void CoupledTimeDisc2PhaseBaseCL<LsetSolverT,RelaxationPolicyT>::SetupStokesMatV
 {
     curv_->Clear( Stokes_.v.t);
     LvlSet_.AccumulateBndIntegral( *curv_);
+    LvlSet_.UpdateMLPhi();
 
     Stokes_.SetupSystem1( &Stokes_.A, &Stokes_.M, b_, b_, cplM_, LvlSet_, Stokes_.v.t);
     if (Stokes_.UsesXFEM()) {
@@ -895,6 +898,7 @@ void SpaceTimeDiscTheta2PhaseCL<LsetSolverT,RelaxationPolicyT>::Update()
     // Diskretisierung
     LvlSet_.AccumulateBndIntegral( *old_curv_);
     LvlSet_.SetupSystem( Stokes_.GetVelSolution(), dt_);
+    LvlSet_.UpdateMLPhi();
     Stokes_.SetupSystem1( &Stokes_.A, &Stokes_.M, old_b_, old_b_, old_cplM_, LvlSet_, Stokes_.v.t);
     Stokes_.SetupSystem2( &Stokes_.B, &Stokes_.c, LvlSet_, Stokes_.v.t);
     Stokes_.SetupNonlinear( &Stokes_.N, &Stokes_.v, old_cplN_, LvlSet_, Stokes_.v.t);
@@ -1121,6 +1125,7 @@ void RecThetaScheme2PhaseCL<LsetSolverT,RelaxationPolicyT>::Update()
     // Diskretisierung
     LvlSet_.AccumulateBndIntegral( *old_curv_);
     LvlSet_.SetupSystem( Stokes_.GetVelSolution(), dt_);
+    LvlSet_.UpdateMLPhi();
     Stokes_.SetupSystem1( &Stokes_.A, &Stokes_.M, old_b_, old_b_, old_cplM_, LvlSet_, Stokes_.v.t);
     Stokes_.SetupSystem2( &Stokes_.B, &Stokes_.c, LvlSet_, Stokes_.v.t);
     Stokes_.SetupNonlinear( &Stokes_.N, &Stokes_.v, old_cplN_, LvlSet_, Stokes_.v.t);

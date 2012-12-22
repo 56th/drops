@@ -723,9 +723,9 @@ void LevelsetP2CL::SmoothPhi( VectorCL& SmPhi, double diff) const
     pcg.Solve( C, SmPhi, M*Phi.Data);
     __UNUSED__ double inf_norm= supnorm( SmPhi-Phi.Data);
 #else
-    ParJac0CL  JACPc (idx);
+    ParJac0CL  JACPc (idx.GetFinest());
     typedef ParPCGSolverCL<ParJac0CL> JacPCGSolverT;
-    JacPCGSolverT cg( 500, 1e-10, idx, JACPc);
+    JacPCGSolverT cg( 500, 1e-10, idx.GetFinest(), JACPc);
     cg.Solve( C, SmPhi, M*Phi.Data);
     __UNUSED__ const double inf_norm= ProcCL::GlobalMax(supnorm( SmPhi-Phi.Data));
 #endif
@@ -824,6 +824,7 @@ void LevelsetP2CL::SetNumLvl( size_t n)
 {
     match_fun match= MG_.GetBnd().GetMatchFun();
     idx.resize( n, P2_FE, BndData_, match);
+    MLPhi.resize(n);
 }
 
 //*****************************************************************************
@@ -841,11 +842,11 @@ LevelsetRepairCL::post_refine ()
 /// Do all things to complete the repairing of the FE level-set function
 {
     VecDescCL loc_phi;
-    MLIdxDescCL loc_lidx( P2_FE, ls_.GetMG().GetLastLevel());
+    MLIdxDescCL loc_lidx( P2_FE, ls_.idx.size());
     VecDescCL& phi= ls_.Phi;
     match_fun match= ls_.GetMG().GetBnd().GetMatchFun();
 
-    ls_.CreateNumbering( ls_.GetMG().GetLastLevel(), &loc_lidx, match);
+    loc_lidx.CreateNumbering( ls_.GetMG().GetLastLevel(), ls_.GetMG(), ls_.GetBndData(), match);
     loc_phi.SetIdx( &loc_lidx);
 
     p2repair_->repair( loc_phi);

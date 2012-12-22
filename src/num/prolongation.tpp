@@ -241,7 +241,7 @@ const double P2_prolongation_coeff[6]= {
 
 #ifdef _PAR
 template <class ValueT>
-void ProlongationCL<ValueT>::Restrict(const TetraCL* sit, const VecDescCL& fine, const VectorCL scale) const
+void ProlongationCL<ValueT>::Restrict(const TetraCL* sit, const VecDescCL& fine, const bool doinjection) const
 {
     LocalP2CL<ValueT> lp2; // for ghost - master communication
 
@@ -268,10 +268,13 @@ void ProlongationCL<ValueT>::Restrict(const TetraCL* sit, const VecDescCL& fine,
             for (Uint j= P2_prolongation_row_beg[row]; // Construct a single row into mat.
                  j != P2_prolongation_row_beg[row+1]; ++j) {
                 const value_type f_val = DoFHelperCL<value_type, VectorCL>::get( fine.Data, thefUnknown);
-                const value_type sca_val = DoFHelperCL<value_type, VectorCL>::get( scale, thefUnknown);
+                const value_type sca_val = DoFHelperCL<value_type, VectorCL>::get( scale_, thefUnknown);
                 const double wheight_val = P2_prolongation_coeff[P2_prolongation_coeff_idx[j]];
 
-                lp2[P2_prolongation_col_ind[j]] += wheight_val * sca_val * f_val;
+                if (doinjection && wheight_val == 1.0)
+                    lp2[P2_prolongation_col_ind[j]] += wheight_val * sca_val * f_val;
+                if (!doinjection)
+                    lp2[P2_prolongation_col_ind[j]] += wheight_val * sca_val * f_val;
 
             }
         }
@@ -280,7 +283,7 @@ void ProlongationCL<ValueT>::Restrict(const TetraCL* sit, const VecDescCL& fine,
 }
 
 template <class ValueT>
-void ProlongationCL<ValueT>::Prolong(const TetraCL* sit, const LocalP2CL<ValueT>& coarse, VecDescCL& fine, const VectorCL scale) const
+void ProlongationCL<ValueT>::Prolong(const TetraCL* sit, const LocalP2CL<ValueT>& coarse, VecDescCL& fine) const
 {
     const IdxDescCL& fIdx = *fine.RowIdx;
     const Uint f_idx= fIdx.GetIdx();
@@ -301,7 +304,7 @@ void ProlongationCL<ValueT>::Prolong(const TetraCL* sit, const LocalP2CL<ValueT>
                  j != P2_prolongation_row_beg[row+1]; ++j) {
                 const IdxT thecUnknown= P2_prolongation_col_ind[j];
                 const value_type f_val = DoFHelperCL<value_type, VectorCL>::get( fine.Data, thefUnknown);
-                const value_type sca_val = DoFHelperCL<value_type, VectorCL>::get( scale, thefUnknown);
+                const value_type sca_val = DoFHelperCL<value_type, VectorCL>::get( scale_, thefUnknown);
                 const double wheight_val = P2_prolongation_coeff[P2_prolongation_coeff_idx[j]];
                 const value_type tmp = f_val + wheight_val * sca_val * coarse[thecUnknown];
                 DoFHelperCL<value_type, VectorCL>::set( fine.Data, thefUnknown, tmp);
@@ -355,6 +358,7 @@ void ProlongationCL<ValueT>::BuildP2ProlongationMatrix( const IdxDescCL& cIdx, c
     const Uint ndofs= fIdx.NumUnknownsVertex();
 
     MatrixBuilderCL mat( &prolongation_, fIdx.NumUnknowns(), cIdx.NumUnknowns());
+    MatrixBuilderCL mat_inj( &injection_, fIdx.NumUnknowns(), cIdx.NumUnknowns());
 
     DROPS_FOR_TRIANG_CONST_TETRA(mg_, c_level, sit){
 
@@ -391,9 +395,13 @@ void ProlongationCL<ValueT>::BuildP2ProlongationMatrix( const IdxDescCL& cIdx, c
                         const double wheight_val = P2_prolongation_coeff[P2_prolongation_coeff_idx[j]];
 
                         const IdxT thecUnknown= cUnknowns[P2_prolongation_col_ind[j]];
-                        if (thecUnknown != NoIdx)
+                        if (thecUnknown != NoIdx){
+                            if (wheight_val ==1)
+                                for (Uint k=0; k<ndofs; k++)
+                                    mat_inj(thefUnknown+k, thecUnknown+k) += wheight_val * scale_[thefUnknown+k];
                             for (Uint k=0; k<ndofs; k++)
                                 mat(thefUnknown+k, thecUnknown+k) += wheight_val * scale_[thefUnknown+k];
+                        }
                     }
                 }
             }
@@ -402,16 +410,21 @@ void ProlongationCL<ValueT>::BuildP2ProlongationMatrix( const IdxDescCL& cIdx, c
             for (Uint i=0; i<4; ++i)
                 if (sit->GetVertex( i)->Unknowns.Exist()
                     && sit->GetVertex( i)->Unknowns.Exist( f_idx))
-                    for (Uint k=0; k<ndofs; k++)
+                    for (Uint k=0; k<ndofs; k++){
                         mat( sit->GetVertex( i)->Unknowns( f_idx)+k, sit->GetVertex( i)->Unknowns( c_idx)+k) += scale_[sit->GetVertex( i)->Unknowns( f_idx)+k];
+                        mat_inj( sit->GetVertex( i)->Unknowns( f_idx)+k, sit->GetVertex( i)->Unknowns( c_idx)+k) += scale_[sit->GetVertex( i)->Unknowns( f_idx)+k];
+                    }
             for (Uint i=0; i<6; ++i)
                 if (sit->GetEdge( i)->Unknowns.Exist()
                     && sit->GetEdge( i)->Unknowns.Exist( f_idx))
-                    for (Uint k=0; k<ndofs; k++)
+                    for (Uint k=0; k<ndofs; k++){
                         mat( sit->GetEdge( i)->Unknowns( f_idx)+k, sit->GetEdge( i)->Unknowns( c_idx)+k) += scale_[sit->GetEdge( i)->Unknowns( f_idx)+k];
+                        mat_inj( sit->GetEdge( i)->Unknowns( f_idx)+k, sit->GetEdge( i)->Unknowns( c_idx)+k) += scale_[sit->GetEdge( i)->Unknowns( f_idx)+k];
+                    }
         }
     }
     mat.Build();
+    mat_inj.Build();
 }
 
 
@@ -519,7 +532,7 @@ VectorCL ProlongationCL<ValueT>::operator* (const VectorCL& vec) const {
     delete interf;
 
     for (typename DataT::const_iterator it = data_.begin(); it != data_.end(); ++it) {
-        Prolong(it->first, it->second, neu, scale_);
+        Prolong(it->first, it->second, neu);
     }
 
     data_.clear();
@@ -535,7 +548,7 @@ VectorCL ProlongationCL<ValueT>::operator* (const VectorCL& vec) const {
 
 #ifdef _PAR
 template <class ValueT>
-VectorCL ProlongationCL<ValueT>::mytransp_mul(const VectorCL& vec) const
+VectorCL ProlongationCL<ValueT>::mytransp_mul(const VectorCL& vec, const bool doinjection) const
 {
 
     VecDescCL old(fine_);
@@ -550,11 +563,17 @@ VectorCL ProlongationCL<ValueT>::mytransp_mul(const VectorCL& vec) const
     for (MultiGridCL::const_TetraIterator sit= mg_.GetAllTetraBegin( lvl),
          theend= mg_.GetAllTetraEnd( lvl); sit != theend; ++sit){
         if (!sit->IsInTriang(lvl)) continue;
-        Restrict(&*sit, old, scale_);
+        Restrict(&*sit, old, doinjection);
     }
 
-    if (prolongation_.num_nonzeros() != 0)
-        neu.Data = transp_mul(prolongation_, old.Data);
+    if (doinjection){
+        if (injection_.num_nonzeros() != 0)
+            neu.Data = transp_mul(injection_, old.Data);
+    }
+    else{
+        if (prolongation_.num_nonzeros() != 0)
+            neu.Data = transp_mul(prolongation_, old.Data);
+    }
 
     HandlerParentDataCL handler( data_);
     DiST::InterfaceCL* interf;
@@ -593,9 +612,12 @@ VectorCL ProlongationCL<ValueT>::mytransp_mul(const VectorCL& vec) const
 }
 #else
 template <class ValueT>
-VectorCL ProlongationCL<ValueT>::mytransp_mul(const VectorCL& vec) const
+VectorCL ProlongationCL<ValueT>::mytransp_mul(const VectorCL& vec, const bool doinjection) const
 {
-    return transp_mul(prolongation_,vec);
+    if (doinjection)
+        return transp_mul(injection_, vec);
+    else
+        return transp_mul(prolongation_,vec);
 }
 #endif
 

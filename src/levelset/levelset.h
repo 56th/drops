@@ -69,8 +69,9 @@ class LevelsetP2CL : public ProblemCL< LevelsetCoeffCL, LsetBndDataCL>
     typedef P2EvalCL<double, const LsetBndDataCL, VecDescCL>       DiscSolCL;
     typedef P2EvalCL<double, const LsetBndDataCL, const VecDescCL> const_DiscSolCL;
     typedef std::vector<Point3DCL> perDirSetT;
-    MLIdxDescCL           idx;
-    VecDescCL             Phi;        ///< level set function
+    MLIdxDescCL idx;
+    MLVecDescCL MLPhi;     ///< level set function on all level (needed in parallel for multigrid)
+    VecDescCL   Phi;       ///< level set function
 
     typedef ProblemCL<LevelsetCoeffCL, LsetBndDataCL> base_;
     using base_::MG_;
@@ -90,12 +91,14 @@ class LevelsetP2CL : public ProblemCL< LevelsetCoeffCL, LsetBndDataCL>
     double GetVolume_Composite( double translation, int l)    const;
     double GetVolume_Extrapolation( double translation, int l) const;
     perDirSetT* perDirections;    ///< periodic directions
+    typedef MLDataCL<ProlongationCL<double> > ProlongationT;
+    ProlongationT P_;
 
   public:
     MatrixCL            E, H;
 
     LevelsetP2CL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, double SD= 0, double curvDiff= -1)
-    : base_( mg, LevelsetCoeffCL(), bnd), idx( P2_FE), curvDiff_( curvDiff), SD_( SD),
+    : base_( mg, LevelsetCoeffCL(), bnd), idx( P2_FE), MLPhi( &idx), curvDiff_( curvDiff), SD_( SD),
         SF_(SF_ImprovedLB), sf_(sf), perDirections(NULL)
     {}
 
@@ -163,6 +166,24 @@ class LevelsetP2CL : public ProblemCL< LevelsetCoeffCL, LsetBndDataCL>
         if (pperDirections != NULL) perDirections = new perDirSetT(pperDirections->size());
         *perDirections = *pperDirections;
     }
+
+    void UpdateMLPhi()
+    {
+        if (idx.size() == 1) return;
+        MLPhi.SetIdx( &idx);
+        ProlongationT::const_iterator prolong = P_.GetFinestIter();
+        MLDataCL<VecDescCL>::iterator mlphi = MLPhi.GetFinestIter();
+        mlphi->Data = Phi.Data;
+        for (size_t lvl = MG_.GetLastLevel(); lvl >= 1; --lvl){
+            const VectorCL tmp (transp_mul(*prolong, mlphi->Data)); // tmp is distributed
+            (--mlphi)->Data = tmp;
+#ifdef _PAR
+            mlphi->RowIdx->GetEx().Accumulate(mlphi->Data);
+#endif
+            --prolong;
+        }
+    }
+    ProlongationT* GetProlongation() { return &P_; }
 };
 
 
