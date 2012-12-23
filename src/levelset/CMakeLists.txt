@@ -5,9 +5,7 @@ libs_ser(filmCoeff)
 
 target_link_libraries(levelset-levelset levelset-fastmarch misc-progressaccu misc-scopetimer)
 
-if(MPI)
-    set(PAR_OBJ DiST-DiST DiST-mpistream DiST-remotedata parallel-parallel parallel-partime parallel-exchange parallel-parmultigrid parallel-loadbal parallel-migrateunknowns parallel-decompose)
-endif(MPI)
+set_par(PAR_OBJ DiST-DiST DiST-mpistream DiST-remotedata parallel-parallel parallel-partime parallel-exchange parallel-parmultigrid parallel-loadbal parallel-migrateunknowns parallel-decompose)
 
 exec_ser(reparam levelset-fastmarch levelset-levelset misc-progressaccu misc-scopetimer geom-deformation geom-simplex geom-multigrid geom-builder geom-topo geom-boundary num-unknowns misc-utils misc-problem num-discretize num-fe out-ensightOut num-interfacePatch levelset-surfacetension geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature)
 

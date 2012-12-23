@@ -16,14 +16,14 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 if(MPI)
     message(STATUS "###  MPI active ###")
     find_package(MPI REQUIRED)
-    
+
     set(METIS_INCLUDE ${METIS_HOME}/include)
     set(METIS_LIBRARY ${METIS_HOME}/build/Linux-x86_64/libmetis/libmetis.a)
     set(PARMETIS_INCLUDE ${PARMETIS_HOME}/include)
     set(PARMETIS_LIBRARY ${PARMETIS_HOME}/build/Linux-x86_64/libparmetis/libparmetis.a)
 
     include_directories(${MPI_INCLUDE_PATH} ${PARMETIS_INCLUDE} ${METIS_INCLUDE})
-    
+
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MPI_CXX_FLAGS} -DMPICH_IGNORE_CXX_SEEK")
     set(PARMETIS_LIBRARIES ${MPI_CXX_LIBRARIES} ${METIS_LIBRARY} ${PARMETIS_LIBRARY} m)
     add_definitions("-D_PAR=1")
@@ -78,59 +78,53 @@ message(STATUS "###    GLOBAL EXE LINKER FLAGS: ${CMAKE_EXE_LINKER_FLAGS} ###")
 # prepended.
 # THESE FUNCTIONS REQUIRE ${HOME}
 
-function(libs_ when)
-    if((when STREQUAL "ALL") OR (${when} STREQUAL "PAR" AND MPI) OR (${when} STREQUAL "SER" AND NOT MPI))
-        foreach(lib ${ARGN})
-            add_library(${HOME}-${lib} STATIC ${lib})
-        endforeach(lib)
-    endif()
-endfunction(libs_)
-
 function(libs)
-    libs_("ALL" ${ARGN})
+    foreach(lib ${ARGN})
+        add_library(${HOME}-${lib} STATIC ${lib})
+    endforeach(lib)
 endfunction(libs)
 
 function(libs_ser)
-    libs_("SER" ${ARGN})
+    if (NOT MPI)
+        libs(${ARGN})
+    endif()
 endfunction(libs_ser)
 
 function(libs_par)
-    libs_("PAR" ${ARGN})
+    if (MPI)
+        libs(${ARGN})
+    endif()
 endfunction(libs_par)
 
 ###############################################################################
-# target_link_libraries_par appends ${PAR_OBJ} ${MPI_CXX_LIBRARIES} to a call
-# of target_link_libraries
-
-function(target_link_libraries_ when)
-    if((${when} STREQUAL "ALL" OR ${when} STREQUAL "PAR") AND MPI)
-        target_link_libraries(${ARGN} ${PAR_OBJ} ${MPI_CXX_LIBRARIES} ${PARMETIS_LIBRARIES})
-    elseif((${when} STREQUAL "ALL" OR ${when} STREQUAL "SER") AND NOT MPI)
-        target_link_libraries(${ARGN})
-    endif()
-endfunction(target_link_libraries_)
-
-function(target_link_libraries_par)
-    target_link_libraries_("PAR" ${ARGN})
-endfunction(target_link_libraries_par)
+# target_link_libraries_par appends ${PAR_OBJ} ${MPI_CXX_LIBRARIES}
+# ${PARMETIS_LIBRARIES} to a call of target_link_libraries
 
 function(target_link_libraries_ser)
-    target_link_libraries_("SER" ${ARGN})
+    if (NOT MPI)
+        target_link_libraries(${ARGN})
+    endif()
 endfunction(target_link_libraries_ser)
 
-function(set_ when)
-    if((${when} STREQUAL "ALL") OR (${when} STREQUAL "PAR" AND MPI) OR (${when} STREQUAL "SER" AND NOT MPI))
-        message("SET ${HOME} ${when} ${ARGN}")
-        set(${ARGN})
+function(target_link_libraries_par)
+    if (MPI)
+        target_link_libraries(${ARGN} ${PAR_OBJ} ${MPI_CXX_LIBRARIES} ${PARMETIS_LIBRARIES})
     endif()
-endfunction(set_)
+endfunction(target_link_libraries_par)
+
+###############################################################################
+# Set a variable depending on MPI
 
 function(set_par)
-    set_("PAR" ${ARGN})
+    if (MPI)
+        set(${ARGN})
+    endif()
 endfunction(set_par)
 
 function(set_ser)
-    set_("SER" ${ARGN})
+    if (NOT MPI)
+        set(${ARGN})
+    endif()
 endfunction(set_ser)
 
 if (WIN32)
@@ -148,25 +142,24 @@ endif(WIN32)
 # Afterwards we add <link_objects...> as a requirement of the executable 
 # THIS FUNCTION REQUIRES ${HOME} and ${PAR_OBJ}
 
-function(exec_ when f)
-    if((${when} STREQUAL "ALL") OR (${when} STREQUAL "PAR" AND MPI) OR (${when} STREQUAL "SER" AND NOT MPI))
-        libs_(${when} ${f})
-        add_executable(${f} ${f})
-        target_link_libraries_(${when} ${f} ${HOME}-${f} ${ARGN} ${${f}-staticlibs})
-    endif()
-endfunction(exec_)
-
 function(exec f)
-    exec_("ALL" ${f} ${ARGN})
+    libs(${f})
+    add_executable(${f} ${f})
+    target_link_libraries(${f} ${HOME}-${f} ${ARGN} ${${f}-staticlibs})
 endfunction(exec)
 
 function(exec_ser f)
-    exec_("SER" ${f} ${ARGN})
+    if(NOT MPI)
+        exec(${f} ${ARGN})
+    endif()
 endfunction(exec_ser)
 
 function(exec_par f)
-    exec_("PAR" ${f} ${ARGN})
+    if(MPI)
+        exec(${f} ${ARGN})
+    endif()
 endfunction(exec_par)
+
 
 set(PACKAGES parallel levelset poisson DiST geom num out misc stokes navstokes surfactant transport partests tests)
 string(REPLACE ";" " " PACKAGES_STRING "${PACKAGES}")
