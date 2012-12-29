@@ -117,22 +117,16 @@ endfunction(target_link_libraries_par)
 
 function(set_par)
     if (MPI)
-        set(${ARGN})
+        set(${ARGN} PARENT_SCOPE)
     endif()
 endfunction(set_par)
-
-function(set_ser)
-    if (NOT MPI)
-        set(${ARGN})
-    endif()
-endfunction(set_ser)
 
 if (WIN32)
 #  set(BEGIN_STATIC_LIBS -OPT:NOREF)
 #  set(END_STATIC_LIBS  -OPT:REF)
 else(WIN32)
-  set(BEGIN_STATIC_LIBS -Wl,--whole-archive)
-  set(END_STATIC_LIBS  -Wl,--no-whole-archive)
+    set(BEGIN_STATIC_LIBS -Wl,--whole-archive)
+    set(END_STATIC_LIBS  -Wl,--no-whole-archive)
 endif(WIN32)
 
 ###############################################################################
@@ -142,23 +136,29 @@ endif(WIN32)
 # Afterwards we add <link_objects...> as a requirement of the executable 
 # THIS FUNCTION REQUIRES ${HOME} and ${PAR_OBJ}
 
-function(exec f)
+function(exec_ f)
     libs(${f})
     add_executable(${f} ${f})
-    target_link_libraries(${f} ${HOME}-${f} ${ARGN} ${${f}-staticlibs})
-endfunction(exec)
+endfunction(exec_)
 
 function(exec_ser f)
     if(NOT MPI)
-        exec(${f} ${ARGN})
+        exec_(${f})
+        target_link_libraries(${f} ${HOME}-${f} ${ARGN} ${${f}-staticlibs})
     endif()
 endfunction(exec_ser)
 
 function(exec_par f)
     if(MPI)
-        exec(${f} ${ARGN})
+        exec_(${f})
+        target_link_libraries_par(${f} ${HOME}-${f} ${ARGN} ${${f}-staticlibs})
     endif()
 endfunction(exec_par)
+
+function(exec f)
+    exec_ser(${f} ${ARGN})
+    exec_par(${f} ${ARGN})
+endfunction(exec)
 
 
 set(PACKAGES parallel levelset poisson DiST geom num out misc stokes navstokes surfactant transport partests tests)
