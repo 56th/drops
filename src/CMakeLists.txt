@@ -177,7 +177,33 @@ foreach(package ${PACKAGES})
           configure_file(${file} ${package}/)
           #message(STATUS "copying ${file} ${package}/")
     endforeach(file)
+
 endforeach(${package})
+
+#### BEGIN HACKY VERSION OF TEST SUITE ###
+
+add_subdirectory(tests/scripts)
+file(GLOB pyfiles tests/scripts/*.py)
+foreach(file ${pyfiles})
+      configure_file(${file} tests/scripts/)
+      message(STATUS "copying ${file} tests/scripts/")
+endforeach(file)
+
+add_subdirectory(tests/specifications/serial)
+file(GLOB pyfiles tests/specifications/serial/*.ref)
+foreach(file ${pyfiles})
+      configure_file(${file} tests/specifications/serial/)
+      message(STATUS "copying ${file} tests/specifications/serial/")
+endforeach(file)
+
+add_subdirectory(tests/specifications/parallel)
+file(GLOB pyfiles tests/specifications/parallel/*.ref)
+foreach(file ${pyfiles})
+      configure_file(${file} tests/specifications/parallel/)
+      message(STATUS "copying ${file} tests/specifications/parallel/")
+endforeach(file)
+
+#### END HACKY VERSION OF TEST SUITE ###
 
 add_custom_target(stat COMMAND ls */*.cpp */*.tpp */*.h | xargs wc -l WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
