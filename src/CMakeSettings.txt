@@ -9,6 +9,8 @@ set(SUITESPARSE_HOME "${CMAKE_SOURCE_DIR}/../SuiteSpare/" CACHE PATH "")
 
 set(BOOST_HOME "" CACHE PATH "")
 
+set(DROPS_BUILD_TYPE "" CACHE PATH "")
+
 set(IPC_CXX_FLAGS_DEBUG "-DVALARRAY_DEBUG -wd1572 -g")
 set(IPC_CXX_FLAGS_RELEASE "-O3 -ip -fp-model fast=2")
 
