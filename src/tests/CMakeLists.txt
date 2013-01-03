@@ -91,3 +91,10 @@ endif()
 # geom-boundary geom-topo num-unknowns misc-problem 
 # num-fe num-discretize num-interfacePatch
 # geom-principallattice geom-reftetracut geom-subtriangulation num-#quadrature)
+
+#### BEGIN HACKY VERSION OF TEST SUITE ###
+
+add_subdirectory(scripts)
+add_subdirectory(specifications)
+
+#### END HACKY VERSION OF TEST SUITE ###

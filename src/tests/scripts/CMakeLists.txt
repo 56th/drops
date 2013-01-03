@@ -1,0 +1,5 @@
+file(GLOB pyfiles *.py)
+foreach(file ${pyfiles})
+      configure_file(${file} .)
+      #message(STATUS "copying ${file} tests/scripts/")
+endforeach(file)
