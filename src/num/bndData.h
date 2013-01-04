@@ -1,6 +1,6 @@
 /// \file bndData.h
 /// \brief Classes for storing and handling boundary data.
-/// \author LNM RWTH Aachen: Sven Gross, Joerg Peters, Volker Reichelt; SC RWTH Aachen: Oliver Fortmeier
+/// \author LNM RWTH Aachen: Sven Gross, Joerg Peters, Volker Reichelt, Liang Zhang; SC RWTH Aachen: Oliver Fortmeier
 
 /*
  * This file is part of DROPS.
@@ -46,12 +46,13 @@ enum BndCondT
     DirBC= 2,                    ///< inhom. Dirichlet boundary conditions
     Per1BC= 13,                  ///< periodic boundary conditions, where
     Per2BC= 11,                  ///< Per1BC and Per2BC denote corresponding boundaries
+	SlipBC= 18,                  ///< Navier-Slip boundary conditions
+	SymmBC= 19,                  ///< Symmetric boundary conditions
     Nat0BC= 21,                  ///< hom.   natural   boundary condition
     NatBC= 23,                   ///< inhom. natural   boundary conditions
     OutflowBC= 21,               ///< same as Nat0BC, for convenience
-	SlipBC= 31,                  ///< Navier-Slip boundary conditions
-	SymmBC= 33,                   ///< Symmetric boundary conditions
     WallBC= 0,                   ///< same as Dir0BC, for convenience
+	
     NoBC= 98,                    ///< interior simplices
     UndefinedBC_= 99,            ///< ReadMeshBuilderCL: error, unknown bc
     MaxBC_= 100                  ///< upper bound for valid bc's
@@ -90,11 +91,11 @@ void inline BndCondInfo (BndCondT bc, std::ostream& os)
       case DirBC:        os << "inhom. Dirichlet BC / inflow\n"; break;
       case Per1BC:       os << "periodic BC\n"; break;
       case Per2BC:       os << "periodic BC, correspondent\n"; break;
+	  case SlipBC:       os << "Slip BC\n"; break;
+	  case SymmBC:       os << "Symmetric BC\n"; break;
       case Nat0BC: /* OutflowBC has the same number */
                          os << "hom. Natural BC / outflow\n"; break;
       case NatBC:        os << "inhom. Natural BC\n"; break;
-	  case SlipBC:       os << "Slip BC\n"; break;
-	  case SymmBC:       os << "Symmetric BC\n"; break;
       case NoBC:         os << "no boundary\n"; break;
       case UndefinedBC_: os << "WARNING! unknown BC from ReadMeshBuilderCL\n"; break;
       default:           os << "WARNING! unknown BC\n";
@@ -259,6 +260,10 @@ class NoBndCondCL: public BndCondCL
     static inline bool IsOnNatBnd (const SimplexT&) { return false; }
     template<class SimplexT>
     static inline bool IsOnPerBnd (const SimplexT&) { return false; }
+    template<class SimplexT>
+    static inline bool IsOnSliBnd (const SimplexT&) { return false; }
+    template<class SimplexT>
+    static inline bool IsOnSymBnd (const SimplexT&) { return false; }
 };
 
 
@@ -346,21 +351,23 @@ inline bool BndCondCL::IsOnPerBnd( const VertexCL& v) const
 }
 
 inline bool BndCondCL::IsOnSliBnd( const VertexCL& v) const
-{ //
+{ // 
     if ( !v.IsOnBoundary() || !BndCond_.size()) return false;
-    for (VertexCL::const_BndVertIt it= v.GetBndVertBegin(), end= v.GetBndVertEnd(); it!=end; ++it)
-        if ( !BndCond_[it->GetBndIdx()].IsSlip() )
-            return false;
-    return true;
+    const BndCondT bc= GetBC(v);
+    if (bc==SlipBC)
+		return true;
+	else
+		return false;
 }
 
 inline bool BndCondCL::IsOnSymBnd( const VertexCL& v) const
 { //
     if ( !v.IsOnBoundary() || !BndCond_.size()) return false;
-    for (VertexCL::const_BndVertIt it= v.GetBndVertBegin(), end= v.GetBndVertEnd(); it!=end; ++it)
-        if ( !BndCond_[it->GetBndIdx()].IsSymmetric() )
-            return false;
-    return true;
+    const BndCondT bc= GetBC(v);
+    if (bc==SymmBC)
+		return true;
+	else
+		return false;
 }
 
 inline BndCondT BndCondCL::GetBC( const VertexCL& v) const
@@ -451,18 +458,22 @@ inline bool BndCondCL::IsOnPerBnd( const EdgeCL& e) const
 inline bool BndCondCL::IsOnSliBnd( const EdgeCL& e) const
 {
     if ( !e.IsOnBoundary() || !BndCond_.size()) return false;
-    for (const BndIdxT *it= e.GetBndIdxBegin(), *end= e.GetBndIdxEnd(); it!=end; ++it)
-        if ( !BndCond_[*it].IsSlip() )
-            return false;
+    const BndCondT bc= GetBC(e);
+    if (bc==SlipBC)
+		return true;
+	else
+		return false;
     return true;
 }
 
 inline bool BndCondCL::IsOnSymBnd( const EdgeCL& e) const
 {
     if ( !e.IsOnBoundary() || !BndCond_.size()) return false;
-    for (const BndIdxT *it= e.GetBndIdxBegin(), *end= e.GetBndIdxEnd(); it!=end; ++it)
-        if ( !BndCond_[*it].IsSymmetric() )
-            return false;
+    const BndCondT bc= GetBC(e);
+    if (bc==SymmBC)
+		return true;
+	else
+		return false;
     return true;
 }
 
