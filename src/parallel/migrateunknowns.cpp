@@ -42,14 +42,17 @@ void MigrateFECL::CopyVecElements( VecDescCL& new_vec_desc, const std::vector<Us
 
     // Create a WholeRemoteDataIteratorCL
     DiST::LevelListCL lvls;
-    DiST::PrioListCL prios; prios.push_back( PrioMaster);
+    DiST::PrioListCL prios; //prios.push_back( PrioMaster);
     DiST::WholeRemoteDataIteratorCL it( dims, lvls, prios, false),
             end= it.GetEnd();
 
     // iterate over all simplices and copy the DoF values
     for ( ; it!=end; ++it){
         DiST::TransferableCL& simplex= it->second.GetLocalObject();
-        if (!simplex.Unknowns.InTriangLevel(lvl)) continue;
+        if (!simplex.Unknowns.InTriangLevel(lvl)) {
+	    simplex.Unknowns.ResetUnkReceived( old_idx);
+	    continue;
+	}
 
         UnknownHandleCL& Unknowns= simplex.Unknowns;
         if ( Unknowns.Exist( new_idx)){
