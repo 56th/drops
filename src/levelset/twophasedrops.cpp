@@ -57,6 +57,8 @@
 
 #include "misc/progressaccu.h"
 
+#include <sys/resource.h>
+
 DROPS::ParamCL P;
 
 // rho*du/dt - mu*laplace u + Dp = f + rho*g - okn
@@ -620,6 +622,15 @@ int main (int argc, char** argv)
     delete velbnddata;
     delete prbnddata;
     delete lsetbnddata;
+
+    rusage usage;
+    getrusage( RUSAGE_SELF, &usage);
+
+#ifdef _PAR
+    printf( "[%i]: ru_maxrss: %li kB.\n", DROPS::ProcCL::MyRank(), usage.ru_maxrss);
+#else
+    printf( "ru_maxrss: %li kB.\n", usage.ru_maxrss);
+#endif
     return 0;
   }
   catch (DROPS::DROPSErrCL& err) { err.handle(); }

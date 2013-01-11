@@ -72,14 +72,10 @@ MuteStdOstreamCL* ProcCL::mute_=0;
 ProcCL::ProcCL(int* argc, char*** argv)
 {
     Assert(size_==0, DROPSErrCL("ProcCL instanciated multiple times"), DebugParallelC);
-#ifdef _DDD
-    DynamicDataInterfaceCL::Init(argc, argv);               // DDD Initialisieren und die Informationen beziehen
-#else
-# ifdef _MPICXX_INTERFACE
+#ifdef _MPICXX_INTERFACE
     MPI::Init( *argc, *argv);
-# else
+#else
     MPI_Init( argc, argv);
-# endif
 #endif
 
     int rank=-1, size=-1;
@@ -103,9 +99,6 @@ ProcCL::ProcCL(int* argc, char*** argv)
 
 ProcCL::~ProcCL()
 {
-#ifdef _DDD
-	DynamicDataInterfaceCL::Exit();             // Logoff from DDD
-#endif
     MPI_Finalize();
     size_=0;                // Now, this class can be initialized again...
     RecoverStdOstreams();

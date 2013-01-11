@@ -59,8 +59,10 @@ exec_ser(quad5_2D tests-quad5_2D misc-utils geom-builder geom-simplex geom-multi
 
 exec_ser(interfaceP1FE misc-utils geom-builder geom-simplex geom-multigrid geom-deformation misc-scopetimer misc-progressaccu geom-boundary geom-topo num-unknowns misc-problem num-interfacePatch levelset-levelset levelset-fastmarch num-discretize num-fe levelset-surfacetension geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature)
 
+set(xfem-staticlibs ${BEGIN_STATIC_LIBS} misc-vectorFunctions ${END_STATIC_LIBS})
 exec_ser(xfem misc-utils geom-builder geom-simplex geom-multigrid geom-deformation misc-scopetimer misc-progressaccu geom-boundary geom-topo num-unknowns misc-problem num-interfacePatch num-fe num-discretize levelset-levelset levelset-fastmarch stokes-instatstokes2phase out-ensightOut levelset-surfacetension misc-funcmap misc-vectorFunctions geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature)
 
+set(f_Gamma-staticlibs ${BEGIN_STATIC_LIBS} misc-scalarFunctions misc-vectorFunctions ${END_STATIC_LIBS})
 exec_ser(f_Gamma geom-boundary geom-builder geom-simplex geom-multigrid geom-deformation misc-scopetimer misc-progressaccu num-unknowns geom-topo num-fe misc-problem levelset-levelset misc-utils out-output num-discretize num-interfacePatch misc-params levelset-fastmarch stokes-instatstokes2phase levelset-surfacetension misc-funcmap misc-vectorFunctions geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature )
 
 exec_ser(neq misc-utils) 

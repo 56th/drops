@@ -42,7 +42,7 @@ int Test()
     int mi= 10;
     double tol= 1e-10;
     DROPS::BICGSTAB( A, x, b, DROPS::DummyPcCL(), mi, tol);
-    std::cout << x << DROPS::VectorCL( A*x - b) << '\n' << mi << '\n' << tol << std::endl;
+    std::cout << x << DROPS::VectorCL( A*x - b) << '\n' << mi << '\n' << "Case 1 Residual:  "<< tol << std::endl;
     return 0;
 }
 
@@ -82,7 +82,7 @@ int Test2()
     int mi= 10;
     double tol= 1e-10;
     DROPS::BICGSTAB( A, x, b, DROPS::DummyPcCL(), mi, tol);
-    std::cout << x << DROPS::VectorCL( A*x - b) << '\n' << mi << '\n' << tol << std::endl;
+    std::cout << x << DROPS::VectorCL( A*x - b) << '\n' << mi << '\n' <<"Case 2 Residual:  "<< tol << std::endl;
     return 0;
 }
 
