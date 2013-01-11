@@ -1,0 +1,26 @@
+#---------------------SPECIFICATION FILE----------------------------------------
+Type of test: serial
+Name of executable: bicgstab
+#The path to the folder where the executable is located must be relative to the
+#/drops folder
+Folder of executable: tests
+#The path to the folder where the parameter-file is located must be relative to
+#the folder where the executable is situated
+Path of parameter-file:
+Name of test: testBiCGStab
+Name of author: Yuanjun Zhang
+#-------------------------------------------------------------------------------
+#------------------------------NUMBERS------------------------------------------
+Name of variable: "Residual 1"
+Prefix of variable: "Case 1 Residual: "
+Value of variable: 0
+Relative error:
+Absolute error: 1e-10
+Name of variable: "Residual 2"
+Prefix of variable: "Case 2 Residual: "
+Value of variable: 0
+Relative error:
+Absolute error: 1e-10
+#-------------------------------------------------------------------------------
+#------------------------------STRINGS-------------------------------------------
+#-------------------------------------------------------------------------------
