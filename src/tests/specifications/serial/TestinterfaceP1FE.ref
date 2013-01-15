@@ -1,0 +1,51 @@
+#---------------------SPECIFICATION FILE----------------------------------------
+Type of test: serial
+Name of executable: interfaceP1FE
+#The path to the folder where the executable is located must be relative to the
+#/drops folder
+Folder of executable: tests
+#The path to the folder where the parameter-file is located must be relative to
+#the folder where the executable is situated
+Path of parameter-file: 
+Name of test: testinterfaceP1FE
+Name of author: Yuanjun Zhang
+#-------------------------------------------------------------------------------
+#------------------------------NUMBERS------------------------------------------
+Name of variable: "Single tetra without interface"
+Prefix of variable: "\(S. no int.\) NumUnknowns: "
+Value of variable: 0
+Relative error:
+Absolute error: 0
+Name of variable: "Single tetra interface"
+Prefix of variable: "\(S. int.\) NumUnknowns: "
+Value of variable: 4
+Relative error: 
+Absolute error: 0
+Name of variable: "Planar interface"
+Prefix of variable: "\(P.\) NumUnknowns: "
+Value of variable: 8
+Relative error: 
+Absolute error: 0
+Name of variable: "Planar Interface with vertices"
+Prefix of variable: "\(P. with vert.\) NumUnknowns: "
+Value of variable: 4
+Relative error: 
+Absolute error: 0
+Name of variable: "A sphere problem"
+Prefix of variable: "\(sphere\) NumUnknowns: "
+Value of variable: 1156
+Relative error: 
+Absolute error: 0
+Name of variable: "Sup Norm"
+Prefix of variable: "\|\| M-Mnew \|\|_sup  / \|\| M \|\|_sup  ="
+Value of variable: 0
+Relative error: 
+Absolute error: 1e-12
+Name of variable: "Frobenius Norm"
+Prefix of variable: "\|\| M-Mnew \|\|_frob / \|\| M \|\|_frob ="
+Value of variable: 0
+Relative error: 
+Absolute error: 1e-12
+#-------------------------------------------------------------------------------
+#------------------------------STRINGS-------------------------------------------
+#------------------------------------------------------------------------------- 
