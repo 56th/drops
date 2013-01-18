@@ -127,13 +127,13 @@ void TestVolumeOnRefTetra()
         controlvol2 += subvol;
     }  
 
-    std::cout << "ACCUMULATED    subtet volume = " << controlvol1 << " (should be 1.0) " << std::endl;
-    std::cout << "ACCUMULATED subsubtet volume = " << controlvol2 << " (should be 1.0) " << std::endl;
+    std::cout << "ACCUMULATED    subtet volume = " << controlvol1 << /*" (should be 1.0) " << */std::endl;
+    std::cout << "ACCUMULATED subsubtet volume = " << controlvol2 << /*" (should be 1.0) " << */std::endl;
 
-    std::cout << "ACCUMULATED    subtet volume (plus ) = " << controlvol1_p << " (should be ...) " << std::endl;
-    std::cout << "ACCUMULATED subsubtet volume (plus ) = " << controlvol2_p << " (should be ...) " << std::endl;
-    std::cout << "ACCUMULATED    subtet volume (minus) = " << controlvol1_m << " (should be ...) " << std::endl;
-    std::cout << "ACCUMULATED subsubtet volume (minus) = " << controlvol2_m << " (should be ...) " << std::endl;
+    std::cout << "ACCUMULATED    subtet volume plus  = " << controlvol1_p /*<< " (should be ...) "*/ << std::endl;
+    std::cout << "ACCUMULATED subsubtet volume plus  = " << controlvol2_p /*<< " (should be ...) "*/ << std::endl;
+    std::cout << "ACCUMULATED    subtet volume minus = " << controlvol1_m /*<< " (should be ...) "*/ << std::endl;
+    std::cout << "ACCUMULATED subsubtet volume minus = " << controlvol2_m /*<< " (should be ...) "*/ << std::endl;
 
 }
 
