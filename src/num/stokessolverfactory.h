@@ -297,8 +297,11 @@ class StokesSolverFactoryCL : public StokesSolverFactoryBaseCL<StokesT, Prolonga
     MinResT *MinRes_;
 
 // IDR(s) solver
-    typedef IDRsSolverCL<UpperBlockPcT> IDRs_UBlockT;
-    IDRs_UBlockT *IDRsUBlock_;
+    typedef IDRsSolverCL<LowerBlockPcT> IDRs_LBlockT;
+    typedef IDRsSolverCL<VankaPreCL>    IDRs_VankaT;
+
+    IDRs_LBlockT *IDRsLBlock_;
+    IDRs_VankaT  *IDRsVanka_;
 
 // coarse grid solver
     DiagBlockPcT DiagPCGBBTOseenPc_, DiagGMResMinCommPc_;
@@ -385,7 +388,8 @@ StokesSolverFactoryCL<StokesT, ProlongationVelT, ProlongationPT>::
         // PMinRes solver
         MinRes_(0),
         // IDRs solver
-        IDRsUBlock_(0),
+        IDRsLBlock_(0),
+        IDRsVanka_(0),
         // coarse grid/direct solver for StokesMGM
         DiagPCGBBTOseenPc_( PCGPc_, bbtispc_), DiagGMResMinCommPc_( GMResPc_, mincommispc_), lanczosPCGBBT_ (DiagPCGBBTOseenPc_),
         minressolver_( lanczosPCGBBT_, 500, 1e-6, true), coarse_blockminressolver_(minressolver_),
@@ -404,7 +408,8 @@ StokesSolverFactoryCL<StokesT, ProlongationVelT, ProlongationPT>::
     delete GMResRVanka_; delete GMResRLBlock_;
     delete GMResVanka_; delete GMResLBlock_;
     delete GCRVanka_; delete GCRLBlock_; delete GCRSBlock_;
-    delete SBlock_; delete LBlock_; delete DBlock_; delete IDRsUBlock_;
+    delete SBlock_; delete LBlock_; delete DBlock_;
+    delete IDRsVanka_; delete IDRsLBlock_;
 }
 
 template <class StokesT, class ProlongationVelT, class ProlongationPT>
@@ -576,19 +581,14 @@ StokesSolverBaseCL* StokesSolverFactoryCL<StokesT, ProlongationVelT, Prolongatio
         break;
 
         case IDRs_OS: {
-//            if (APc_==VankaBlock_APC) {
-//                GCRVanka_= new GCR_VankaT( vankapc_,  C_.stk_OuterIter, C_.stk_OuterIter, C_.stk_OuterTol, /*rel*/ false);
-//                stokessolver= new BlockMatrixSolverCL<GCR_VankaT> ( *GCRVanka_);
-//            } else if (SPc_==SIMPLER_SPC || SPc_==MSIMPLER_SPC) {
-//                bdinvbtispc_.SetMassLumping( SPc_==MSIMPLER_SPC);
- //               SBlock_= new SIMPLERBlockPcT( *apc_, bdinvbtispc_);
-  //              GCRSBlock_= new GCR_SBlockT( *SBlock_,  C_.stk_OuterIter, C_.stk_OuterIter, C_.stk_OuterTol, /*rel*/ false);
-//                stokessolver= new BlockMatrixSolverCL<GCR_SBlockT>( *GCRSBlock_);
-//            } else {
-                UBlock_= new UpperBlockPcT( *apc_, *spc_);
-                IDRsUBlock_= new IDRs_UBlockT( *UBlock_,  P_.template get<int>("Stokes.OuterIter"), P_.template get<double>("Stokes.OuterTol"), /*rel*/ false);
-                stokessolver= new BlockMatrixSolverCL<IDRs_UBlockT>( *IDRsUBlock_);
-//            }
+            if (APc_==VankaBlock_APC) {
+                IDRsVanka_= new IDRs_VankaT( vankapc_,  P_.template get<int>("Stokes.OuterIter"), P_.template get<double>("Stokes.OuterTol"), /*rel*/ false, false, RightPreconditioning);
+                stokessolver= new BlockMatrixSolverCL<IDRs_VankaT> ( *IDRsVanka_);
+            } else {
+                LBlock_= new LowerBlockPcT( *apc_, *spc_);
+                IDRsLBlock_= new IDRs_LBlockT( *LBlock_,  P_.template get<int>("Stokes.OuterIter"), P_.template get<double>("Stokes.OuterTol"), /*rel*/ false, false, RightPreconditioning);
+                stokessolver= new BlockMatrixSolverCL<IDRs_LBlockT>( *IDRsLBlock_);
+            }
         }
         break;
 
