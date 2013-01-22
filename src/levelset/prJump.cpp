@@ -311,7 +311,7 @@ void Strategy( InstatStokes2PhaseP2P1CL& Stokes, const LsetBndDataCL& lsbnd, Ada
         PrintNorm( "BT p", BTp);
         PrintNorm( "Diff.", VectorCL(curv.Data - BTp));
         std::cout << "Solving velocity for exact pressure given...\n";
-        PCG.Solve( Stokes.A.Data, Stokes.v.Data, VectorCL( curv.Data - transp_mul( Stokes.B.Data, Stokes.p.Data)) );
+        PCG.Solve( Stokes.A.Data, Stokes.v.Data, VectorCL( curv.Data - transp_mul( Stokes.B.Data, Stokes.p.Data)), Stokes.v.RowIdx->GetEx() );
       } break;
 
     case 1:
@@ -345,7 +345,7 @@ void Strategy( InstatStokes2PhaseP2P1CL& Stokes, const LsetBndDataCL& lsbnd, Ada
                                          &Stokes.M.Data, &Stokes.prM.Data, &Stokes.pr_idx);
 
         solver->Solve( Stokes.A.Data, Stokes.B.Data, Stokes.v.Data, Stokes.p.Data,
-                       curv.Data, Stokes.c.Data);
+                       curv.Data, Stokes.c.Data, Stokes.v.RowIdx->GetEx(), Stokes.p.RowIdx->GetEx());
         std::cout << "iter: " << solver->GetIter()
                   << "\tresid: " << solver->GetResid() << std::endl;
         time.Stop();

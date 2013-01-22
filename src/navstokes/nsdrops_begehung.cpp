@@ -98,6 +98,78 @@ using ::MyStokesCL;
 
 typedef PCGSolverCL<SGSPcCL>      PCG_SgsCL;
 
+template <typename PoissonSolverT>
+class PSchurSolverCL : public StokesSolverBaseCL
+{
+  private:
+    PoissonSolverT&        _poissonSolver;
+    PreGSOwnMatCL<P_SSOR0> _schurPc;
+
+    template <typename Mat, typename Vec>
+    void doSolve( const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c);
+
+  public:
+    PSchurSolverCL (PoissonSolverT& solver, MatrixCL& M, int maxiter, double tol)
+        : StokesSolverBaseCL(maxiter,tol), _poissonSolver(solver), _schurPc(M) {}
+    PSchurSolverCL (PoissonSolverT& solver, MLMatrixCL& M, int maxiter, double tol)
+    : StokesSolverBaseCL(maxiter,tol), _poissonSolver(solver), _schurPc( M.GetFinest()) {}
+
+    void Solve( const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p,
+                const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&);
+    void Solve( const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p,
+                const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&);
+};
+
+template <class PoissonSolverT>
+template <typename Mat, typename Vec>
+void PSchurSolverCL<PoissonSolverT>::doSolve(const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c)
+// solve:       S*p = B*(A^-1)*b - c   with SchurCompl. S = B A^(-1) BT
+//              A*u = b - BT*p
+{
+    Vec _tmp;
+    Vec rhs( -c);
+    if (_tmp.size() != v.size())
+        _tmp.resize( v.size());
+    _poissonSolver.Solve( A, _tmp, b, DummyExchangeCL());
+    std::cout << "iterations: " << _poissonSolver.GetIter()
+              << "\tresidual: " << _poissonSolver.GetResid() << std::endl;
+    rhs+= B*_tmp;
+
+    std::cout << "rhs has been set! Now solving pressure..." << std::endl;
+    int iter= _maxiter;
+    double tol= _tol;
+    PCG( SchurComplMatrixCL<PoissonSolverT, Mat, DummyExchangeCL>( _poissonSolver, A, B, DummyExchangeCL()), p, rhs, DummyExchangeCL(), _schurPc, iter, tol);
+    std::cout << "iterations: " << iter << "\tresidual: " << tol << std::endl;
+    std::cout << "pressure has been solved! Now solving velocities..." << std::endl;
+
+    _poissonSolver.Solve( A, v, Vec( b - transp_mul(B, p)), DummyExchangeCL());
+    std::cout << "iterations: " << _poissonSolver.GetIter()
+              << "\tresidual: " << _poissonSolver.GetResid() << std::endl;
+
+    _iter= iter+_poissonSolver.GetIter();
+    _res= std::sqrt( tol*tol + _poissonSolver.GetResid()*_poissonSolver.GetResid());
+    std::cout << "-----------------------------------------------------" << std::endl;
+}
+
+template <class PoissonSolverT>
+void PSchurSolverCL<PoissonSolverT>::Solve(
+    const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&)
+// solve:       S*p = B*(A^-1)*b - c   with SchurCompl. S = B A^(-1) BT
+//              A*u = b - BT*p
+{
+    doSolve( A, B, v, p, b, c);
+}
+
+template <class PoissonSolverT>
+void PSchurSolverCL<PoissonSolverT>::Solve(
+    const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&)
+// solve:       S*p = B*(A^-1)*b - c   with SchurCompl. S = B A^(-1) BT
+//              A*u = b - BT*p
+{
+    doSolve( A, B, v, p, b, c);
+}
+
+
 class PSchur_GSPCG_CL: public PSchurSolverCL<PCG_SgsCL>
 {
   private:
@@ -110,6 +182,90 @@ class PSchur_GSPCG_CL: public PSchurSolverCL<PCG_SgsCL>
         {}
     PCG_SgsCL& GetPoissonSolver() { return _PCGsolver; }
 };
+
+class Uzawa_IPCG_CL : public StokesSolverBaseCL
+{
+  private:
+    SSORDiagPcCL   _ssordiagpc;
+    PCGSolverCL<SSORDiagPcCL> _M_IPCGsolver;
+    PCGSolverCL<SSORDiagPcCL> _A_IPCGsolver;
+    MatrixCL&      _M;
+    double         _tau;
+
+    template <typename Mat, typename Vec>
+    void doSolve( const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c);
+
+  public:
+    Uzawa_IPCG_CL(MatrixCL& M, int outer_iter, double outer_tol, int inner_iter, double inner_tol, double tau= 1.)
+        : StokesSolverBaseCL(outer_iter,outer_tol),
+          _M_IPCGsolver( _ssordiagpc, inner_iter, inner_tol ),
+          _A_IPCGsolver( _ssordiagpc, inner_iter, inner_tol ),
+          _M(M), _tau(tau)
+        { _M_IPCGsolver.GetPc().Init(_M); }
+
+    // Always call this when A has changed, before Solve()!
+    void Init_A_Pc(MatrixCL& A) { _A_IPCGsolver.GetPc().Init(A); }
+
+    inline void Solve( const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p,
+                       const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&);
+    inline void Solve( const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p,
+                const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&);
+};
+
+template <typename Mat, typename Vec>
+inline void Uzawa_IPCG_CL::doSolve(
+    const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c)
+
+{
+    Vec v_corr(v.size()),
+        p_corr(p.size()),
+        res1(v.size()),
+        res2(p.size());
+    double tol= _tol;
+    tol*= tol;
+    Uint output= 50;//max_iter/20;  // nur 20 Ausgaben pro Lauf
+
+    double res1_norm= 0., res2_norm= 0.;
+    for( _iter=0; _iter<_maxiter; ++_iter)
+    {
+//        _poissonSolver.Solve( _M, p_corr, res2= B*v - c);
+        z_xpay(res2, B*v, -1.0, c);
+        _M_IPCGsolver.Solve(_M, p_corr, res2, DummyExchangeCL());
+//        p+= _tau * p_corr;
+        axpy(_tau, p_corr, p);
+//        res1= A*v + transp_mul(B,p) - b;
+        z_xpaypby2(res1, A*v, 1.0, transp_mul(B,p), -1.0, b);
+        res1_norm= norm_sq( res1);
+        res2_norm= norm_sq( res2);
+
+        if (res1_norm + res2_norm < tol)
+        {
+            _res= std::sqrt( res1_norm + res2_norm );
+            return;
+        }
+
+        if( (_iter%output)==0 )
+            std::cout << "step " << _iter << ": norm of 1st eq= " << std::sqrt( res1_norm)
+                      << ", norm of 2nd eq= " << std::sqrt( res2_norm) << std::endl;
+
+        _A_IPCGsolver.Solve( A, v_corr, res1, DummyExchangeCL());
+//        v-= v_corr;
+        axpy(-1.0, v_corr, v);
+    }
+    _res= std::sqrt( res1_norm + res2_norm );
+}
+
+inline void Uzawa_IPCG_CL::Solve(
+    const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&)
+{
+    doSolve( A, B, v, p, b, c);
+}
+
+inline void Uzawa_IPCG_CL::Solve(
+    const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&)
+{
+    doSolve( A, B, v, p, b, c);
+}
 
 template <class DiscSol>
 class GeomSolOutReport1CL : public MGOutCL
@@ -343,7 +499,7 @@ void Strategy(StokesP2P1CL<Coeff>& Stokes, double inner_iter_tol, double tol,
 //            PSchur_PCG_CL schurSolver( M.Data, 200, outer_tol, 200, inner_iter_tol);
             PSchur_GSPCG_CL schurSolver( Stokes.prM.Data.GetFinest(), 200, outer_tol, 200, inner_iter_tol);
             time.Start();
-            schurSolver.Solve( A->Data, B->Data, v1->Data, p1->Data, b->Data, c->Data);
+            schurSolver.Solve( A->Data, B->Data, v1->Data, p1->Data, b->Data, c->Data, v1->RowIdx->GetEx(), p1->RowIdx->GetEx());
             time.Stop();
         }
         else // Uzawa
@@ -352,7 +508,7 @@ void Strategy(StokesP2P1CL<Coeff>& Stokes, double inner_iter_tol, double tol,
             Uzawa_IPCG_CL uzawaSolver( Stokes.prM.Data.GetFinest(), 5000, outer_tol, uzawa_inner_iter, inner_iter_tol, tau);
             uzawaSolver.Init_A_Pc(A->Data.GetFinest()); // only for Uzawa_IPCG_CL.
             time.Start();
-            uzawaSolver.Solve( A->Data, B->Data, v1->Data, p1->Data, b->Data, c->Data);
+            uzawaSolver.Solve( A->Data, B->Data, v1->Data, p1->Data, b->Data, c->Data, v1->RowIdx->GetEx(), p1->RowIdx->GetEx());
             time.Stop();
             std::cout << "Iterationen: " << uzawaSolver.GetIter()
                       << "\tNorm des Res.: " << uzawaSolver.GetResid() << std::endl;
@@ -511,7 +667,7 @@ void StrategyNavSt(NavierStokesP2P1CL<Coeff>& NS, int maxStep, double fp_tol, in
             if (uzawa_tol < fp_tol) uzawa_tol= fp_tol;
             uzawaSolver.SetTol(uzawa_tol);
             uzawaSolver.Init_A_Pc(AN.GetFinest()); // only for Uzawa_IPCG_CL.
-            uzawaSolver.Solve(AN, B->Data, w, q, d, e);
+            uzawaSolver.Solve(AN, B->Data, w, q, d, e, vidx1->GetEx(), pidx1->GetEx());
             std::cout << "iteration stopped after step " << uzawaSolver.GetIter()
                       << " with res = " << uzawaSolver.GetResid() << std::endl;
 

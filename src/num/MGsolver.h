@@ -138,19 +138,22 @@ class MGSolverCL : public SolverBaseCL
 
     ProlongationT* GetProlongation() { return &P; }
     /// solve function: calls the MultiGrid-routine
-    void Solve(const MLMatrixCL& A, VectorCL& x, const VectorCL& b)
+    template <typename ExT>
+    void Solve(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const ExT&)
     {
         _res=  _tol;
         _iter= _maxiter;
         MG( A, P, smoother_, directSolver_, x, b, _iter, _res, residerr_, smoothSteps_, usedLevels_);
     }
-    void Solve(const MatrixCL&, VectorCL&, const VectorCL&)
+    template <typename ExT>
+    void Solve(const MatrixCL&, VectorCL&, const VectorCL&, const ExT&)
     {
         throw DROPSErrCL( "MGSolverCL::Solve: need multilevel data structure\n");
     }
+    const SmootherT& GetPc      () const { return smoother_; }
 
 };
-#ifdef _PAR
+#ifdef _PAR_
 /*******************************************************************
 *   P A R M G S o l v e r  C L                                     *
 *******************************************************************/
@@ -165,7 +168,7 @@ class ParMGSolverCL : public ParSolverBaseCL
 {
   private:
     ProlongationT     P;                 ///< prolongation
-    SmootherT&  smoother_;         ///< multigrid smoother
+    SmootherT&        smoother_;         ///< multigrid smoother
     DirectSolverT&    directSolver_;     ///< coarse grid solver with relative residual measurement
     const bool        residerr_;         ///< controls the error measuring: false : two-norm of dx, true: two-norm of residual
     Uint              smoothSteps_;      ///< number of smoothing steps
@@ -292,9 +295,9 @@ class PVankaSmootherCL
  \param idx          optional extended index for 2x2-systems with pressure & extended pressure */
     PVankaSmootherCL(int vanka_method=0, double tau=1.0, const MLIdxDescCL* idx= 0)
         : vanka_method_(vanka_method), tau_(tau), idx_( idx) {}
-    template <typename Mat, typename Vec>
+    template <typename Mat, typename Vec, typename ExT>
     void Apply( const Mat& A, const Mat& B, const Mat& BT, const Mat&,
-                Vec& u, Vec& p, const Vec& f, const Vec& g ) const;
+                Vec& u, Vec& p, const Vec& f, const Vec& g, const ExT& vel_ex, const ExT& p_ex ) const;
     void SetRelaxation (double tau) { tau_= tau; }
     void SetVankaMethod( int method) {vanka_method_ = method;}  ///< change the method for solving the local problems
     int  GetVankaMethod()            {return vanka_method_;}    ///< get the number of the method for solving the local problems
@@ -324,9 +327,9 @@ class BSSmootherCL
  \param red    stopping criterion for the inner CG method
  \param omega  scaling parameter for the diagonal of A */
     BSSmootherCL( int maxit = 20, double red = 2e-1, double omega = 2.0) : maxit_(maxit), red_(red), omega_(omega) {};
-    template <typename Mat, typename Vec>
+    template <typename Mat, typename Vec, typename ExT>
     void Apply( const Mat& A, const Mat& B, const Mat&, const Mat& M,
-                Vec& u, Vec& p, const Vec& f, const Vec& g ) const;
+                Vec& u, Vec& p, const Vec& f, const Vec& g, const ExT& vel_ex, const ExT& p_ex ) const;
 };
 
 //===================================

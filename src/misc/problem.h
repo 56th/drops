@@ -218,6 +218,8 @@ permute_fe_basis_extended_part (ExtIdxDescCL& ext, const PermutationT& p, Uint n
 
 #ifdef _PAR
 class ExchangeCL;
+#else
+class DummyExchangeCL;
 #endif
 
 /// \brief Mapping from the simplices in a triangulation to the components
@@ -239,8 +241,11 @@ class IdxDescCL: public FE_InfoCL
     BndCondCL                Bnd_;         ///< boundary conditions
     match_fun                match_;       ///< matching function for periodic boundaries
     ExtIdxDescCL             extIdx_;      ///< extended index for XFEM
+
 #ifdef _PAR
     ExchangeCL*              ex_;          ///< exchanging numerical data
+#else
+    DummyExchangeCL*         ex_;          ///< exchanging numerical data
 #endif
 
     /// \brief Returns the lowest index that was not used and reserves it.
@@ -324,6 +329,11 @@ class IdxDescCL: public FE_InfoCL
     IdxT GetNumOwnedUnknowns() const;
     /// \brief get global number of owned unknowns
     IdxT GetGlobalNumUnknowns() const;
+#else
+    /// \brief Get a reference on the ExchangeCL
+    DummyExchangeCL& GetEx() { return *ex_; }
+    /// \brief Get a constant reference on the ExchangeCL
+    const DummyExchangeCL& GetEx() const { return *ex_; }
 #endif
 };
 
@@ -435,8 +445,6 @@ class MLIdxDescCL : public MLDataCL<IdxDescCL>
             it->swap(*sec);
 
     }
-
-
 #ifdef _PAR
     /// \brief Get a reference on the ExchangeCL (of the finest level)
     ExchangeCL& GetEx() { return this->GetFinest().GetEx(); }
@@ -448,6 +456,11 @@ class MLIdxDescCL : public MLDataCL<IdxDescCL>
     /// \brief get global number of owned unknowns
     IdxT GetGlobalNumUnknowns() const
     { return this->GetFinest().GetGlobalNumUnknowns(); }
+#else
+    /// \brief Get a reference on the ExchangeCL (of the finest level)
+    DummyExchangeCL& GetEx() { return this->GetFinest().GetEx(); }
+    /// \brief Get a constant reference on the ExchangeCL (of the finest level)
+    const DummyExchangeCL& GetEx() const { return this->GetFinest().GetEx(); }
 #endif
 };
 

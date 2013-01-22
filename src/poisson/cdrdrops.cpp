@@ -112,7 +112,7 @@ void SolveStatProblem( PoissonCL& Poisson, SolverT& solver, ParamCL& Param)
             std::cout << " o time " << timer.GetTime() << " s" << std::endl;
         }
         timer.Reset();
-        solver.Solve( Poisson.A.Data, Poisson.x.Data, Poisson.b.Data);
+        solver.Solve( Poisson.A.Data, Poisson.x.Data, Poisson.b.Data, Poisson.x.RowIdx->GetEx());
         timer.Stop();
 
 #ifndef _PAR
@@ -184,7 +184,7 @@ void SolveStatProblem( PoissonCL& Poisson, SolverT& solver, ParamCL& Param)
             Poisson.SetupSystem( Poisson.A, Poisson.b);
             timer.Stop();
             timer.Reset();
-            solver.Solve( Poisson.A.Data, new_x->Data, Poisson.b.Data);
+            solver.Solve( Poisson.A.Data, new_x->Data, Poisson.b.Data, new_x->RowIdx->GetEx());
             timer.Stop();
             double realresid = norm( VectorCL(Poisson.A.Data*new_x->Data-Poisson.b.Data));
             std::cout << " o Solved system with:\n"

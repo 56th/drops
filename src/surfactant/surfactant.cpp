@@ -385,7 +385,7 @@ int main (int argc, char* argv[])
     SurfSolverT surfsolver( surfpc, P.get<int>("SurfTransp.Iter"), P.get<double>("SurfTransp.Tol"), true);
 
     DROPS::VecDescCL x( &ifaceidx);
-    surfsolver.Solve( L, x.Data, b.Data);
+    surfsolver.Solve( L, x.Data, b.Data, x.RowIdx->GetEx());
     std::cout << "Iter: " << surfsolver.GetIter() << "\tres: " << surfsolver.GetResid() << '\n';
 
     DROPS::WriteToFile( x.Data, "x_iface.txt", "solution");

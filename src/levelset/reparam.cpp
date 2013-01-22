@@ -165,7 +165,7 @@ void Reparam( LevelsetP2CL& lset, Uint steps, double dt, double theta, double di
         typedef GMResSolverCL<SSORPcCL> LsetSolverT;
         SSORPcCL ssorpc;
         GMResSolverCL<SSORPcCL> gm( ssorpc, 100, 1000, 1e-7);
-        gm.Solve( L, Psi, b);
+        gm.Solve( L, Psi, b, lset.idx.GetEx());
         std::cout << "Reparam: res = " << gm.GetResid() << ", iter = " << gm.GetIter() << std::endl;
     }
 

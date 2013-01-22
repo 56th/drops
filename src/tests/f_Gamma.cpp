@@ -313,7 +313,7 @@ void Compare_LaplBeltramiSF_ConstSF( InstatStokes2PhaseP2P1CL& Stokes, const Lse
     typedef PCGSolverCL<SSORPcCL>     PCG_SsorCL;
     PCG_SsorCL cg( pc, 1000, 1e-18);
     std::cout << "Solving system with stiffness matrix:\t";
-    cg.Solve( Stokes.A.Data, A_inv_d, d);
+    cg.Solve( Stokes.A.Data, A_inv_d, d, vidx->GetEx());
     std::cout << cg.GetIter() << " iter,\tresid = " << cg.GetResid();
     const double sup= std::sqrt(dot( A_inv_d, d));
 
@@ -323,7 +323,7 @@ void Compare_LaplBeltramiSF_ConstSF( InstatStokes2PhaseP2P1CL& Stokes, const Lse
     MA.LinComb( 1, Stokes.M.Data, 1, Stokes.A.Data);
     VectorCL MA_inv_d( A_inv_d);
     std::cout << "Solving system with MA matrix:\t";
-    cg.Solve( MA, MA_inv_d, d);
+    cg.Solve( MA, MA_inv_d, d, vidx->GetEx());
     std::cout << cg.GetIter() << " iter,\tresid = " << cg.GetResid();
     const double sup2= std::sqrt(dot( MA_inv_d, d));
     std::cout << "\n\nsup |f1(v)-f2(v)|/||v||_1 = \t\t" << sup2

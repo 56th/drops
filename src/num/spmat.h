@@ -262,6 +262,23 @@ KahanInnerProd( Iterator first1, const Iterator& end1, Iterator first2, const T 
     }
     return sum;
 }
+template <class ValueT, template<class> class VecT>
+inline ValueT
+#if GCC_VERSION > 40305
+    __attribute__((optimize("no-associative-math")))
+#endif
+KahanInnerProd( const VecT<ValueT>& first, const VecT<ValueT>& second, const ValueT init=(ValueT)0)
+{
+    Assert(first.size() == second.size(), "KahanInnerProd: sizes don't match", DebugNumericC);
+    ValueT sum= init, c=ValueT(0), t, y;
+    for (size_t i = 0; i<first.size(); ++i) {
+        y  = first[i]*second[i] - c;
+        t  = sum + y;
+        c  = (t-sum)-y;
+        sum= t;
+    }
+    return sum;
+}
 
 /// \brief Use Kahan's algorithm to perform an inner product on given indices
 template <typename T, typename Cont, typename Iterator>

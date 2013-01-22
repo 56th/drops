@@ -175,12 +175,14 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
 
         time.Reset();
         SSORPcCL ssorpc;
-        typedef PCGSolverCL<SSORPcCL>     PCG_SsorCL;
-        PCG_SsorCL PCGsolver( ssorpc, P.get<int>("Stokes.InnerIter"), P.get<double>("Stokes.InnerTol"));
-        PSchurSolverCL<PCG_SsorCL> schurSolver( PCGsolver, Stokes.prM.Data, P.get<int>("Stokes.OuterIter"), P.get<double>("Stokes.OuterTol"));
+        PCGSolverCL<SSORPcCL> PCGsolver( ssorpc, 200, 1e-2, true);
+        typedef SolverAsPreCL<PCGSolverCL<SSORPcCL> > PCGPcT;
+        PCGPcT apc( PCGsolver);
+        ISBBTPreCL bbtispc( &Stokes.B.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.M.Data.GetFinest(), Stokes.pr_idx.GetFinest(), 0.0, 1.0, 1e-4, 1e-4);
+        InexactUzawaCL<PCGPcT, ISBBTPreCL, APC_SYM> inexactuzawasolver( apc, bbtispc, P.get<int>("Stokes.OuterIter"), P.get<double>("Stokes.OuterTol"), 0.6, 50);
 
-        schurSolver.Solve( Stokes.A.Data, Stokes.B.Data,
-            Stokes.v.Data, Stokes.p.Data, Stokes.b.Data, Stokes.c.Data);
+        inexactuzawasolver.Solve( Stokes.A.Data, Stokes.B.Data,
+            Stokes.v.Data, Stokes.p.Data, Stokes.b.Data, Stokes.c.Data, Stokes.vel_idx.GetEx(), Stokes.pr_idx.GetEx());
         time.Stop();
         std::cout << "Solving Stokes for initial velocities took "<<time.GetTime()<<" sec.\n";
       } break;

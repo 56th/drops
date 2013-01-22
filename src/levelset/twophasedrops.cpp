@@ -280,14 +280,12 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     // Level-Set-Solver
 #ifndef _PAR
     // SSORPcCL lset_pc;
-    GSPcCL lset_pc;
-    // GMResSolverCL<SSORPcCL>* gm = new GMResSolverCL<SSORPcCL>( lset_pc, 100, P.get<int>("Levelset.Iter"), P.get<double>("Levelset.Tol"));
-    GMResSolverCL<GSPcCL>* gm = new GMResSolverCL<GSPcCL>( lset_pc, 200, P.get<int>("Levelset.Iter"), P.get<double>("Levelset.Tol"));
+    typedef GSPcCL LsetPcT;
 #else
-    ParJac0CL jacparpc( lidx->GetFinest());
-    ParPreGMResSolverCL<ParJac0CL>* gm = new ParPreGMResSolverCL<ParJac0CL>
-           (/*restart*/100, P.get<int>("Levelset.Iter"), P.get<double>("Levelset.Tol"), lidx->GetFinest(), jacparpc,/*rel*/true, /*modGS*/false, LeftPreconditioning, /*parmod*/true);
+    typedef JACPcCL LsetPcT;
 #endif
+    LsetPcT lset_pc;
+    GMResSolverCL<LsetPcT>* gm = new GMResSolverCL<LsetPcT>( lset_pc, 200, P.get<int>("Levelset.Iter"), P.get<double>("Levelset.Tol"));
 
     LevelsetModifyCL lsetmod( P.get<int>("Reparam.Freq"), P.get<int>("Reparam.Method"), P.get<double>("Reparam.MaxGrad"), P.get<double>("Reparam.MinGrad"), P.get<int>("Levelset.VolCorrection"), Vol, is_periodic);
 
@@ -339,6 +337,9 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
                                                         P.get<int>("Restart.Binary"),
                                                         vel_downwind, lset_downwind);
     Stokes.v.t += GetTimeOffset();
+
+    DummyExchangeCL dummy;
+    std::cout << dummy.LocalDot(Stokes.v.Data, true, Stokes.v.Data, true);
     // Output-Registrations:
 #ifndef _PAR
     Ensight6OutCL* ensight = NULL;

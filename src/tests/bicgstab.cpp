@@ -41,7 +41,8 @@ int Test()
     std::cout << "A\n" << A << "b\n" << b << std::endl;
     int mi= 10;
     double tol= 1e-10;
-    DROPS::BICGSTAB( A, x, b, DROPS::DummyPcCL(), mi, tol);
+    DROPS::DummyPcCL pc;
+    DROPS::BICGSTAB( A, x, b, DROPS::DummyExchangeCL(), pc, mi, tol);
     std::cout << x << DROPS::VectorCL( A*x - b) << '\n' << mi << '\n' << "Case 1 Residual:  "<< tol << std::endl;
     return 0;
 }
@@ -81,7 +82,8 @@ int Test2()
     std::cout << "A\n" << A << "b\n" << b << std::endl;
     int mi= 10;
     double tol= 1e-10;
-    DROPS::BICGSTAB( A, x, b, DROPS::DummyPcCL(), mi, tol);
+    DROPS::DummyPcCL pc;
+    DROPS::BICGSTAB( A, x, b, DROPS::DummyExchangeCL(), pc, mi, tol);
     std::cout << x << DROPS::VectorCL( A*x - b) << '\n' << mi << '\n' <<"Case 2 Residual:  "<< tol << std::endl;
     return 0;
 }

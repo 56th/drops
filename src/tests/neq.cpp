@@ -54,7 +54,7 @@ int main ()
     ker0/= std::sqrt( dot( ker0, ker0));
     typedef NEGSPcCL SPcT;
     SPcT spc( true);
-    VectorCL ker( spc.mul( m, ker0));
+    VectorCL ker( spc.mul( m, ker0, DummyExchangeCL(), DummyExchangeCL()));
     ker/= std::sqrt( dot( ker, ker0)); // ker is now an spc-unit-norm vector.
     std::cout << "Kernel: rel. residual norm: " << dot( M*ker, ker)/norm_sq( ker) << " norm ker: " << norm(ker) << '\n';
     double alpha= std::sqrt( 1.); // std::sqrt( BBTDiag( m).min());
@@ -77,7 +77,7 @@ int main ()
 
     VectorCL x( M.num_cols());
     TimerCL t;
-    solver.Solve( m, x, b);
+    solver.Solve( m, x, b, DummyExchangeCL(), DummyExchangeCL());
     //solver.Solve( M, x, b);
     t.Stop();
     std::cout << "Time: " << t.GetTime() << "Iter: " << solver.GetIter()

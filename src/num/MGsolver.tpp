@@ -26,6 +26,8 @@
 
 namespace DROPS {
 
+class DummyExchangeCL;
+
 template <class SmootherCL, class DirectSolverCL, class ProlongationIteratorT>
 void
 MGM(const MLMatrixCL::const_iterator& begin, const MLMatrixCL::const_iterator& fine,
@@ -40,7 +42,7 @@ MGM(const MLMatrixCL::const_iterator& begin, const MLMatrixCL::const_iterator& f
        ||( numUnknDirect==-1 ? false : x.size() <= static_cast<Uint>(numUnknDirect) )
        || fine==begin)
     { // use direct solver
-        Solver.Solve( *fine, x, b);
+        Solver.Solve( *fine, x, b, DummyExchangeCL());
 /*        std::cout << "MGM: direct solver: iterations: " << Solver.GetIter()
                   << "\tresiduum: " << Solver.GetResid() << '\n';*/
         return;
@@ -49,7 +51,7 @@ MGM(const MLMatrixCL::const_iterator& begin, const MLMatrixCL::const_iterator& f
     --coarseP;
     VectorCL d( coarse->num_cols()), e( coarse->num_cols());
     // presmoothing
-    for (Uint i=0; i<smoothSteps; ++i) Smoother.Apply( *fine, x, b);
+    for (Uint i=0; i<smoothSteps; ++i) Smoother.Apply( *fine, x, b, DummyExchangeCL());
     // restriction of defect
     d= transp_mul( *P, VectorCL( b - *fine*x));
     // calculate coarse grid correction
@@ -57,7 +59,7 @@ MGM(const MLMatrixCL::const_iterator& begin, const MLMatrixCL::const_iterator& f
     // add coarse grid correction
     x+= (*P) * e;
     // postsmoothing
-    for (Uint i=0; i<smoothSteps; ++i) Smoother.Apply( *fine, x, b);
+    for (Uint i=0; i<smoothSteps; ++i) Smoother.Apply( *fine, x, b, DummyExchangeCL());
 }
 
 template<class SmootherCL, class DirectSolverCL, class ProlongationT>
@@ -111,7 +113,7 @@ ParMGM(const MLMatrixCL::const_iterator& begin, const MLMatrixCL::const_iterator
        ||( numUnknDirect==-1 ? false : x.size() <= static_cast<Uint>(numUnknDirect) )
        || fine==begin)
     { // use direct solver
-        Solver.Solve( *fine, x, b);
+        Solver.Solve( *fine, x, b, DummyExchangeCL());
         //std::cout << "MGM: direct solver: iterations: " << Solver.GetIter()
         //          << "\tresiduum: " << Solver.GetResid() << '\n';
         return;
@@ -120,7 +122,7 @@ ParMGM(const MLMatrixCL::const_iterator& begin, const MLMatrixCL::const_iterator
     --coarseP;
     VectorCL d( coarse->num_cols()), e( coarse->num_cols());
     // presmoothing
-    for (Uint i=0; i<smoothSteps; ++i) (*Smoother).Apply( *fine, x, b);
+    for (Uint i=0; i<smoothSteps; ++i) (*Smoother).Apply( *fine, x, b, DummyExchangeCL());
     // restriction of defect
     d= transp_mul( *P, VectorCL( b - *fine*x)); // the result is distributed
     // calculate coarse grid correction
@@ -129,7 +131,7 @@ ParMGM(const MLMatrixCL::const_iterator& begin, const MLMatrixCL::const_iterator
     x+= (*P) * e; // the result is already accumulated!!!
     // postsmoothing
     ++Smoother;
-    for (Uint i=0; i<smoothSteps; ++i) (*Smoother).Apply( *fine, x, b);
+    for (Uint i=0; i<smoothSteps; ++i) (*Smoother).Apply( *fine, x, b, DummyExchangeCL());
 }
 
 template<class SmootherCL, class DirectSolverCL, class ProlongationT, class ExT>
@@ -192,7 +194,7 @@ void StokesMGM( const MLMatrixCL::const_iterator& beginA,  const MLMatrixCL::con
     {
         // use direct solver
         std::cout << "P2P1:StokesMGM: use direct solver " << std::endl;
-        Solver.Solve( *fineA, *fineB, u, p, b, c);
+        Solver.Solve( *fineA, *fineB, u, p, b, c, DummyExchangeCL(), DummyExchangeCL());
         //std::cout << "P2P1:StokesMGM: direct solver: iter: " << Solver.GetIter() << "\tresid: " << Solver.GetResid() << std::endl;
         return;
     }
@@ -206,7 +208,7 @@ void StokesMGM( const MLMatrixCL::const_iterator& beginA,  const MLMatrixCL::con
     // presmoothing
 //    std::cout << "P2P1:StokesMGM: presmoothing " << smoothSteps << " steps " << std::endl;
     for (Uint i=0; i<smoothSteps; ++i) {
-        Smoother.Apply( *fineA, *fineB, *fineBT, *fineprM, u, p, b, c );
+        Smoother.Apply( *fineA, *fineB, *fineBT, *fineprM, u, p, b, c, DummyExchangeCL(), DummyExchangeCL() );
     }
     // restriction of defect
     //std::cout << "P2P1:StokesMGM: restriction of defect " << std::endl;
@@ -229,7 +231,7 @@ void StokesMGM( const MLMatrixCL::const_iterator& beginA,  const MLMatrixCL::con
     // postsmoothing
 //    std::cout << "P2P1:StokesMGM: postsmoothing " << smoothSteps << " steps " << std::endl;
     for (Uint i=0; i<smoothSteps; ++i) {
-        Smoother.Apply( *fineA, *fineB, *fineBT, *fineprM, u, p, b, c );
+        Smoother.Apply( *fineA, *fineB, *fineBT, *fineprM, u, p, b, c, DummyExchangeCL(), DummyExchangeCL() );
     }
 }
 
@@ -419,9 +421,9 @@ void PVankaSmootherCL::LRSmoother(Uint id, NodeListVelT& NodeListVel, const Mat&
     gauss_pivot (M, v);
 }
 
-template <typename Mat, typename Vec>
+template <typename Mat, typename Vec, typename ExT>
 void
-PVankaSmootherCL::Apply(const Mat& A, const Mat& B, const Mat& BT, const Mat&, Vec& x, Vec& y, const Vec& f, const Vec& g) const
+PVankaSmootherCL::Apply(const Mat& A, const Mat& B, const Mat& BT, const Mat&, Vec& x, Vec& y, const Vec& f, const Vec& g, const ExT&, const ExT&) const
 {
     NodeListVelT NodeListVel;
     NodeListVel.reserve(200);
@@ -476,8 +478,8 @@ PVankaSmootherCL::Apply(const Mat& A, const Mat& B, const Mat& BT, const Mat&, V
     }
 }
 
-template <typename Mat, typename Vec>
-void BSSmootherCL::Apply( const Mat& A, const Mat& B, const Mat&, const Mat& M, Vec& u, Vec& p, const Vec& f, const Vec& g ) const
+template <typename Mat, typename Vec, typename ExT>
+void BSSmootherCL::Apply( const Mat& A, const Mat& B, const Mat&, const Mat& M, Vec& u, Vec& p, const Vec& f, const Vec& g, const ExT&, const ExT& ) const
 {
      const size_t n= f.size();
      const size_t m= g.size();

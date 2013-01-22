@@ -31,7 +31,9 @@
 #ifndef DROPS_EXCHANGE_H
 #define DROPS_EXCHANGE_H
 
+#ifdef _PAR
 #include "parallel/parallel.h"
+#endif
 #include <list>
 #include <vector>
 #include "num/spmat.h"
@@ -39,6 +41,74 @@
 #include "misc/problem.h"
 
 namespace DROPS{
+
+class DummyExchangeCL
+{
+  public:
+    /// \brief Accumulate a vector
+    void Accumulate( VectorCL&, const Ulint= 0) const {}
+    /// \brief Accumulate a vector of vectors
+    void Accumulate( std::vector<VectorCL>&) const {}
+    /// \brief Get an accumulated copy of a vector
+    VectorCL GetAccumulate (const VectorCL& u) const {return u;}
+    /// \brief Get accumulated version of a vector of vectors
+    std::vector<VectorCL> GetAccumulate( const std::vector<VectorCL>& u) const { return u; }
+
+    /// \brief Parallel inner product without final reduction over all processes
+    double LocalDot( const VectorCL& x, bool, const VectorCL& y, bool, VectorCL* x_acc=0, VectorCL* y_acc=0) const
+    {
+        if (x_acc != 0)
+            *x_acc = x;
+        if (y_acc != 0)
+            *y_acc = y;
+
+        return KahanInnerProd( x, y, double());
+    }
+    /// \brief Parallel inner product of vectors with final reduction over all processes
+    ///        x_acc must not point to x and y_acc must not point to y
+    double ParDot( const VectorCL& x, bool x_is_acc, const VectorCL& y, bool y_is_acc, VectorCL* x_acc=0, VectorCL* y_acc=0) const
+    {
+        return LocalDot(x, x_is_acc, y, y_is_acc, x_acc, y_acc);
+    }
+    /// \brief Parallel squared Euclidian norm without final reduction over all processes
+    double LocalNorm_sq( const VectorCL& x, bool is_acc, VectorCL* x_acc=0) const{
+        return LocalDot(x, is_acc, x, is_acc, x_acc);
+    }
+    /// \brief Parallel squared Euclidian norm with final reduction over all processes
+    double Norm_sq( const VectorCL& x, bool is_acc, VectorCL* x_acc=0) const{
+        return LocalNorm_sq(x, is_acc, x_acc);
+    }
+    /// \brief Parallel Euclidian norm with final reduction over all processes
+    double Norm( const VectorCL& x, bool is_acc, VectorCL* x_acc=0) const{
+        return std::sqrt(LocalNorm_sq(x, is_acc, x_acc));
+    }
+};
+
+class DummyExchangeBlockCL : public DummyExchangeCL
+{
+  public:
+    typedef std::vector<const DummyExchangeCL*>    ExchangeCLCT;    ///< Container for ExchangeCL
+
+  private:
+    ExchangeCLCT         exchange_;     ///< store all index describers to access ExchangeCLs
+
+    /// \brief Update of datastructure, i.e. blockoffset_
+    void Update() {}
+
+  public:
+    DummyExchangeBlockCL() {}
+
+    /// \brief Attach an index describer
+    void AttachTo(const DummyExchangeCL& ex) {
+        exchange_.push_back(&ex);
+    }
+    /// \brief Ask for number of handled blocks
+    size_t GetNumBlocks() const { return exchange_.size(); }
+    /// \brief Ask for an ExchangeCL
+    const DummyExchangeCL& GetEx( size_t i) const { return *exchange_[i]; }
+};
+
+#ifdef _PAR
 
 /// fwd declaration
 class ExchangeBuilderCL;
@@ -315,13 +385,13 @@ class ExchangeCL
 class ExchangeBlockCL
 {
   public:
-    typedef std::vector<const IdxDescCL*>          IdxDescCT;       ///< Container for IdxDescCL
+    typedef std::vector<const ExchangeCL*>         ExchangeCLCT;    ///< Container for IdxDescCL
     typedef std::vector<IdxT>                      BlockOffsetCT;   ///< Container of starting index of block elements
     typedef std::vector<ExchangeCL::RequestListT>  RequestListT;    ///< List of list of MPI requests
     typedef std::vector<ExchangeCL::BufferListT*>  BufferListT;     ///< List of list of buffers for MPI Recv
 
   private:
-    IdxDescCT            idxDesc_;      ///< store all index describers to access ExchangeCLs
+    ExchangeCLCT         exchange_;     ///< store all index describers to access ExchangeCLs
     BlockOffsetCT        blockOffset_;  ///< store the length of vectors
 
     mutable BufferListT xBuf_, yBuf_;
@@ -341,22 +411,22 @@ class ExchangeBlockCL
     double LocalDotTwoAccumulations(const VectorCL& x, const VectorCL& y, VectorCL* x_acc, VectorCL* y_acc) const;
     //@}
 
+    /// \brief Update of datastructure, i.e. blockoffset_
+    void Update();
+
   public:
     ExchangeBlockCL() {}
 
     /// \brief Attach an index describer
-    void AttachTo(const IdxDescCL&);
+    void AttachTo(const ExchangeCL&);
     /// \brief Ask for number of handled blocks
-    size_t GetNumBlocks() const { return idxDesc_.size(); }
+    size_t GetNumBlocks() const { return exchange_.size(); }
     /// \brief Ask for length of vectors, that can be accumulated
     IdxT GetNum() const { return blockOffset_.back(); }
     /// \brief Ask for an ExchangeCL
-    const ExchangeCL& GetEx( size_t i) const { return idxDesc_[i]->GetEx(); }
+    const ExchangeCL& GetEx( size_t i) const { return *exchange_[i]; }
     /// \brief Get the offset for block \a i
     size_t GetOffset( const size_t i) const { return blockOffset_[i]; }
-
-    /// \brief Update of datastructure, i.e. blockoffset_
-    void Update();
 
     /// \brief Accumulate a vector
     void Accumulate( VectorCL&) const;
@@ -496,6 +566,7 @@ class ExchangeBuilderCL
     void build() { ex_.viaowner_ ? buildViaOwner() : buildNtoN(); }
 };
 
+#endif // parallel
 
 } // end of namespace DROPS
 

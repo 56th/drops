@@ -324,9 +324,8 @@ void Strategy( StokesProblemT& Stokes)
     std::cout << line << "Solve the linear equation system ...\n";
 
     // type of preconditioner and solver
-    StokesSolverFactoryCL<StokesProblemT>         factory( Stokes, P);
-    StokesSolverFactoryObsoleteCL<StokesProblemT> obsoletefactory( Stokes, P);
-    StokesSolverBaseCL* solver = (P.get<int>("Stokes.StokesMethod")< 500000) ? factory.CreateStokesSolver() : obsoletefactory.CreateStokesSolver();
+    StokesSolverFactoryCL<StokesProblemT> factory( Stokes, P);
+    StokesSolverBaseCL* solver = factory.CreateStokesSolver();
 
     MLIdxDescCL  loc_vidx, loc_pidx;
     MLIdxDescCL* vidx1= &Stokes.vel_idx;
@@ -361,11 +360,11 @@ void Strategy( StokesProblemT& Stokes)
 
         MG.Refine();
 
-        if( StokesSolverFactoryHelperCL().VelMGUsed(P) || StokesSolverFactoryObsoleteHelperCL().VelMGUsed(P)){
+        if( StokesSolverFactoryHelperCL().VelMGUsed(P)){
             Stokes.SetNumVelLvl( MG.GetNumLevel());
             vidx1->resize( MG.GetNumLevel(), vecP2_FE);
         }
-        if( StokesSolverFactoryHelperCL().PrMGUsed(P) || StokesSolverFactoryObsoleteHelperCL().PrMGUsed(P)){
+        if( StokesSolverFactoryHelperCL().PrMGUsed(P)){
             Stokes.SetNumPrLvl( MG.GetNumLevel());
             pidx1->resize( MG.GetNumLevel(), P1_FE);
         }
@@ -383,21 +382,11 @@ void Strategy( StokesProblemT& Stokes)
         std::cout << "Number of velocity unknowns " << v2->Data.size() << ", "
                   << v1->Data.size() << std::endl;
 
-        if( StokesSolverFactoryHelperCL().VelMGUsed(P) || StokesSolverFactoryObsoleteHelperCL().VelMGUsed(P))
-        {
-            if (P.get<int>("Stokes.StokesMethod")< 500000)
-                SetupProlongationMatrix( MG, *factory.GetPVel(), vidx1, vidx1);
-            else
-                SetupProlongationMatrix( MG, *obsoletefactory.GetPVel(), vidx1, vidx1);
-        }
+        if( StokesSolverFactoryHelperCL().VelMGUsed(P))
+            SetupProlongationMatrix( MG, *factory.GetPVel(), vidx1, vidx1);
 
-        if( StokesSolverFactoryHelperCL().PrMGUsed(P) || StokesSolverFactoryObsoleteHelperCL().PrMGUsed(P))
-        {
-            if (P.get<int>("Stokes.StokesMethod")< 500000)
-                SetupProlongationMatrix( MG, *factory.GetPPr(), pidx1, pidx1);
-            else
-                SetupProlongationMatrix( MG, *obsoletefactory.GetPPr(), pidx1, pidx1);
-        }
+        if( StokesSolverFactoryHelperCL().PrMGUsed(P))
+            SetupProlongationMatrix( MG, *factory.GetPPr(), pidx1, pidx1);
 
         if (P.get<int>("Stokes.StokesMethod") < 500000) {
             factory.SetMatrixA( &Stokes.A.Data.GetFinest());
@@ -469,7 +458,7 @@ void Strategy( StokesProblemT& Stokes)
         std::cout << "000 residual: " << std::sqrt( err0) << std::endl;
 
         timer.Start();
-        solver->Solve( Stokes.A.Data, Stokes.B.Data, v1->Data, p1->Data, Stokes.b.Data, Stokes.c.Data);
+        solver->Solve( Stokes.A.Data, Stokes.B.Data, v1->Data, p1->Data, Stokes.b.Data, Stokes.c.Data, v1->RowIdx->GetEx(), p1->RowIdx->GetEx());
         timer.Stop();
         double err= norm_sq( Stokes.A.Data*v1->Data + transp_mul( Stokes.B.Data, p1->Data) - Stokes.b.Data)
                     +norm_sq( Stokes.B.Data*v1->Data - Stokes.c.Data);
@@ -528,7 +517,7 @@ int main ( int argc, char** argv)
         std::ifstream param;
         if (argc!=2)
         {
-            std::cout << "Using default parameter file: drivcav.json\n";
+            std::cout << "Using default parameter file: MGsdropsP2.json\n";
             param.open( "MGsdropsP2.json");
         }
         else

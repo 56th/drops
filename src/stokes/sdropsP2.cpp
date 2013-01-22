@@ -171,7 +171,7 @@ void SolveStatProblem( StokesProblemT& Stokes, StokesSolverBaseCL& solver)
     timer.Reset();
 
     timer.Start();
-    solver.Solve( Stokes.A.Data, Stokes.B.Data, Stokes.v.Data, Stokes.p.Data, Stokes.b.Data, Stokes.c.Data);
+    solver.Solve( Stokes.A.Data, Stokes.B.Data, Stokes.v.Data, Stokes.p.Data, Stokes.b.Data, Stokes.c.Data, Stokes.v.RowIdx->GetEx(), Stokes.p.RowIdx->GetEx());
     timer.Stop();
     const double duration = timer.GetTime();
     std::cout << "Solving Stokes took "<<  duration << " sec.\n";
@@ -204,9 +204,9 @@ void Strategy( StokesProblemT& Stokes)
     if( P.get("Misc.ModifyGrid", 0) == 1)
         MakeInitialTriangulation( MG, &SignedDistToInterface, P.get<double>("AdaptRef.Width"), P.get<int>("AdaptRef.CoarsestLevel"), P.get<int>("AdaptRef.FinestLevel"));
 
-    if( StokesSolverFactoryHelperCL().VelMGUsed(P) || StokesSolverFactoryObsoleteHelperCL().VelMGUsed(P))
+    if( StokesSolverFactoryHelperCL().VelMGUsed(P))
     	Stokes.SetNumVelLvl( MG.GetNumLevel());
-    if( StokesSolverFactoryHelperCL().PrMGUsed(P) || StokesSolverFactoryObsoleteHelperCL().PrMGUsed(P))
+    if( StokesSolverFactoryHelperCL().PrMGUsed(P))
         Stokes.SetNumPrLvl( MG.GetNumLevel());
 
     Stokes.CreateNumberingVel( MG.GetLastLevel(), &Stokes.vel_idx);
@@ -243,24 +243,13 @@ void Strategy( StokesProblemT& Stokes)
 
     // type of preconditioner and solver
     StokesSolverFactoryCL< StokesProblemT>         factory( Stokes, P);
-    StokesSolverFactoryObsoleteCL< StokesProblemT> obsoletefactory( Stokes, P);
-    StokesSolverBaseCL* stokessolver = (P.get<int>("Stokes.StokesMethod")< 500000) ? factory.CreateStokesSolver() : obsoletefactory.CreateStokesSolver();
+    StokesSolverBaseCL* stokessolver = factory.CreateStokesSolver();
 
-    if( StokesSolverFactoryHelperCL().VelMGUsed(P) || StokesSolverFactoryObsoleteHelperCL().VelMGUsed(P))
-    {
-        if (P.get<int>("Stokes.StokesMethod")< 500000)
-            SetupProlongationMatrix( MG, *factory.GetPVel(), &Stokes.vel_idx, &Stokes.vel_idx);
-        else
-            SetupProlongationMatrix( MG, *obsoletefactory.GetPVel(), &Stokes.vel_idx, &Stokes.vel_idx);
-    }
+    if( StokesSolverFactoryHelperCL().VelMGUsed(P))
+        SetupProlongationMatrix( MG, *factory.GetPVel(), &Stokes.vel_idx, &Stokes.vel_idx);
 
-    if( StokesSolverFactoryHelperCL().PrMGUsed(P) || StokesSolverFactoryObsoleteHelperCL().PrMGUsed(P))
-    {
-        if (P.get<int>("Stokes.StokesMethod")< 500000)
-            SetupProlongationMatrix( MG, *factory.GetPPr(), &Stokes.pr_idx, &Stokes.pr_idx);
-        else
-            SetupProlongationMatrix( MG, *obsoletefactory.GetPPr(), &Stokes.pr_idx, &Stokes.pr_idx);
-    }
+    if( StokesSolverFactoryHelperCL().PrMGUsed(P))
+        SetupProlongationMatrix( MG, *factory.GetPPr(), &Stokes.pr_idx, &Stokes.pr_idx);
 
     // choose time discretization scheme
     TimeDiscStokesCL< StokesProblemT,  StokesSolverBaseCL>* TimeScheme;
