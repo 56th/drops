@@ -77,12 +77,16 @@ class VectorBaseCL: public std::valarray<T>
 
 DROPS_DEFINE_VALARRAY_DERIVATIVE( VectorBaseCL, T, base_type)
 
-    void swap( VectorBaseCL<T>& v) { 
+    void swap( VectorBaseCL<T>& v) {
+#if GCC_VERSION > 40406
+        std::swap(*this, v);
+#else
         VectorBaseCL tmp (v);
         v.resize(this->size());
         v = *this;
         this->resize(tmp.size());
         *this = tmp;
+#endif
     }
 
     const T* raw() const { return Addr( *this); }
