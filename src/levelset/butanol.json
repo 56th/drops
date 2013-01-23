@@ -199,7 +199,7 @@
 		"InitialCond":		0,
 		"GeomType":		0,
 		"InitialFile":		"start/data",
-		"MeshFile":		"gambit/NMR_05.msh",
+		"MeshFile":		"../../meshes/NMR_05.msh",
 		"BoundaryType":		"2!21!0",
 		"BoundaryFncs":		"InflowCell!ZeroVel!ZeroVel"
 	}

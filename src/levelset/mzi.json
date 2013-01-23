@@ -108,7 +108,11 @@
 		"InflowVel":		0.04,
 		"RadInlet":		0.02,
 		"InflowFreq":		0,
-		"InflowAmpl":		0
+		"InflowAmpl":		0,
+        "InitialLSet":          "Ellipsoid",         // choose a LevelSet function you want to start with
+                                                             // (default: 'Ellipsoid')
+        "VolForce":             "ZeroVel"            // r.h.s. force of navier stokes equations.
+                                                             // (default: 'ZeroVel')
 	},
 
 	"SurfTens":
@@ -173,7 +177,7 @@
 		"_comment":
 "#VTK output",
 
-		"VTKOut":		0,
+		"VTKOut":		1,
 		"VTKDir":		"vtk",
 		"VTKName":		"nsmzi",
 		"Binary":		0
@@ -187,7 +191,7 @@
 		"InitialCond":		1,
 		"GeomType":		0,
 		"InitialFile":		"xxx",
-		"MeshFile":		"gambit/messzelle.msh",
+		"MeshFile":		"../../meshes/messzelle.msh",
 		"BoundaryType":		"2!21!0",
 		"BoundaryFncs":		"InflowCell!ZeroVel!ZeroVel"
 	},
