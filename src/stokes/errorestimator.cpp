@@ -52,6 +52,7 @@
 #include <sstream>
 
 #include "misc/funcmap.h"
+#include "misc/dynamicload.h"
 
 using namespace std;
 
@@ -530,6 +531,8 @@ int main ( int argc, char** argv)
         param >> P;
         param.close();
         std::cout << P << std::endl;
+
+        DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
 
         // Check MarkLower value
         if( P.get<int>("DomainCond.GeomType") == 0) P.put("Error.MarkLower", 0);

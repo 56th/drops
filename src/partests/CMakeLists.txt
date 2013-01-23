@@ -16,8 +16,10 @@ exec_par(dist_interface geom-simplex geom-multigrid geom-builder geom-topo geom-
 
 exec_par(dist_ref geom-simplex geom-multigrid geom-builder geom-topo geom-boundary num-unknowns misc-utils misc-problem num-discretize out-vtkOut parallel-parmultigrid num-fe num-interfacePatch levelset-levelset levelset-fastmarch levelset-surfacetension geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature misc-scopetimer geom-deformation)
 
-set(dist_migration-staticlibs ${BEGIN_STATIC_LIBS} misc-scalarFunctions misc-vectorFunctions ${END_STATIC_LIBS})
 exec_par(dist_migration geom-simplex geom-multigrid geom-builder geom-topo geom-boundary num-unknowns misc-utils misc-problem num-discretize out-vtkOut parallel-parmultigrid num-fe num-interfacePatch levelset-levelset levelset-fastmarch levelset-surfacetension geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature misc-funcmap stokes-instatstokes2phase misc-scopetimer geom-deformation)
+if (MPI)
+  add_dependencies(dist_migration misc-scalarFunctions misc-vectorFunctions)
+endif (MPI)
 
 exec_par(dist_TestRefPar geom-simplex geom-multigrid geom-builder geom-topo geom-boundary num-unknowns misc-utils misc-problem num-discretize out-vtkOut parallel-parmultigrid num-fe num-interfacePatch levelset-levelset levelset-fastmarch levelset-surfacetension misc-params out-output geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature misc-scopetimer geom-deformation misc-progressaccu)
 

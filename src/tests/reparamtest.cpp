@@ -31,6 +31,7 @@
 #include "out/ensightOut.h"
 #include "out/vtkOut.h"
 #include "misc/problem.h"
+#include "misc/dynamicload.h"
 
 DROPS::ParamCL P;
 
@@ -345,6 +346,8 @@ int main( int argc, char **argv)
         param.close();
         std::cout << P << std::endl;
 
+        DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
+
         DROPS::MultiGridCL* mg= 0;
         DROPS::BrickBuilderCL *mgb = 0;
         DROPS::Point3DCL a,b,c;
@@ -373,7 +376,7 @@ int main( int argc, char **argv)
 
         DROPS::Strategy( adap, lsbnd);
 
-
+        std::cout << " reparamtest finished regularly" << std::endl;
     } catch (DROPS::DROPSErrCL err) {
         err.handle();
     }

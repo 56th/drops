@@ -62,8 +62,7 @@ exec_ser(interfaceP1FE misc-utils geom-builder geom-simplex geom-multigrid geom-
 set(xfem-staticlibs ${BEGIN_STATIC_LIBS} misc-vectorFunctions ${END_STATIC_LIBS})
 exec_ser(xfem misc-utils geom-builder geom-simplex geom-multigrid geom-deformation misc-scopetimer misc-progressaccu geom-boundary geom-topo num-unknowns misc-problem num-interfacePatch num-fe num-discretize levelset-levelset levelset-fastmarch stokes-instatstokes2phase out-ensightOut levelset-surfacetension misc-funcmap misc-vectorFunctions geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature)
 
-set(f_Gamma-staticlibs ${BEGIN_STATIC_LIBS} misc-scalarFunctions misc-vectorFunctions ${END_STATIC_LIBS})
-exec_ser(f_Gamma geom-boundary geom-builder geom-simplex geom-multigrid geom-deformation misc-scopetimer misc-progressaccu num-unknowns geom-topo num-fe misc-problem levelset-levelset misc-utils out-output num-discretize num-interfacePatch misc-params levelset-fastmarch stokes-instatstokes2phase levelset-surfacetension misc-funcmap misc-vectorFunctions geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature )
+exec_ser(f_Gamma geom-boundary geom-builder geom-simplex geom-multigrid geom-deformation misc-scopetimer misc-progressaccu num-unknowns geom-topo num-fe misc-problem levelset-levelset misc-utils out-output num-discretize num-interfacePatch misc-params levelset-fastmarch stokes-instatstokes2phase levelset-surfacetension misc-funcmap misc-vectorFunctions geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature misc-dynamicload)
 
 exec_ser(neq misc-utils) 
 
@@ -74,13 +73,17 @@ exec_ser(splitboundary geom-boundary geom-builder geom-simplex geom-multigrid ge
 exec_ser(reparam_init geom-boundary geom-builder geom-simplex geom-multigrid geom-deformation misc-scopetimer misc-progressaccu num-unknowns misc-utils geom-topo out-output misc-problem levelset-levelset num-fe misc-utils num-discretize num-interfacePatch levelset-fastmarch levelset-surfacetension out-ensightOut geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature)
 
 #reparam renamed to reparamtest
-exec_ser(reparamtest levelset-fastmarch levelset-levelset geom-deformation misc-scopetimer misc-progressaccu geom-simplex geom-multigrid geom-builder geom-topo geom-boundary num-unknowns misc-utils misc-problem num-discretize num-fe out-ensightOut num-interfacePatch levelset-surfacetension misc-params out-vtkOut geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature) ##${PAR_OBJ}
+exec_ser(reparamtest levelset-fastmarch levelset-levelset geom-deformation misc-scopetimer misc-progressaccu geom-simplex geom-multigrid geom-builder geom-topo geom-boundary num-unknowns misc-utils misc-problem num-discretize num-fe out-ensightOut num-interfacePatch levelset-surfacetension misc-params out-vtkOut geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature misc-dynamicload) ##${PAR_OBJ}
 
 exec_ser(principallattice tests-principallattice misc-utils geom-principallattice num-discretize geom-deformation geom-topo num-fe num-interfacePatch misc-problem num-unknowns geom-simplex geom-multigrid geom-builder geom-boundary num-unknowns geom-reftetracut geom-subtriangulation num-quadrature)
 
 #exec_ser(quad_extra tests-quad_extra misc-utils geom-builder geom-simplex geom-multigrid geom-deformation geom-boundary geom-topo num-unknowns misc-problem num-fe num-discretize num-interfacePatch geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature)
 
 exec_ser(csgtest levelset-levelset levelset-fastmarch geom-deformation misc-funcmap misc-scopetimer misc-progressaccu geom-simplex geom-multigrid geom-builder geom-topo geom-boundary num-unknowns misc-utils misc-problem num-discretize num-fe num-interfacePatch levelset-surfacetension misc-params out-vtkOut geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature geom-csg)
+
+exec(dynload geom-simplex misc-funcmap misc-dynamicload)
+
+add_dependencies(dynload misc-scalarFunctions misc-vectorFunctions)
 
 if(EXISTS ${SUITSPARSE_HOME})
 	lib_ser(directsolver)
