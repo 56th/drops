@@ -94,6 +94,24 @@ template <typename T, Uint Size>
     }
     return s;
   }
+  
+    template <>
+    std::vector<std::string> ParamCL::get<std::vector<std::string> >(const
+    std::string &path) const
+    {
+      std::vector<std::string> v;
+      using boost::property_tree::ptree;
+      try {
+          const ptree& node= this->get_child( path);
+          for (ptree::const_iterator it= node.begin(); it != node.end(); ++it)
+            v.push_back(it->second.get_value<std::string>());
+      }
+      catch (boost::property_tree::ptree_error& e) {
+          throw DROPSErrCL( std::string( "get: Trying to get '") + path + std::string( "' failed.\n"));
+      }
+      return v;
+    }
+
 
   void ParamCL::print(boost::property_tree::ptree child, std::string level, std::ostream& s)
   {
@@ -105,6 +123,7 @@ template <typename T, Uint Size>
         print(it->second, level+"\t", s);
     }
   }
+  
 
 
   // =====================================================
