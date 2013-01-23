@@ -197,3 +197,5 @@ if(DOXYGEN_FOUND)
         COMMENT "Generating API documentation with Doxygen" VERBATIM
     )
 endif()
+
+add_custom_target(coeffs DEPENDS misc-scalarFunctions misc-vectorFunctions levelset-twophaseCoeff levelset-filmCoeff poisson-poissonCoeff stokes-stokesCoeff)
