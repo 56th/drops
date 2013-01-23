@@ -513,7 +513,7 @@ template <typename Mat, typename Vec, typename ExT>
                   << '\t' << solver_.GetResid() << '\n';
     y*= Dprsqrtinv_;
     VectorCL z( Dprsqrtinv_*((*B_)*vel_ex.GetAccumulate(VectorCL( Dvelsqrtinv_*Dvelsqrtinv_*
-        ( (*A_)*VectorCL( Dvelsqrtinv_*Dvelsqrtinv_*transp_mul( *B_, y)) )))));
+        ( (*A_)*vel_ex.GetAccumulate(VectorCL( Dvelsqrtinv_*Dvelsqrtinv_*transp_mul( *B_, y)) ))))));
     VectorCL t( b.size());
     solver_.Solve( *Bs_, t, z, vel_ex, pr_ex);
     if (solver_.GetIter() == solver_.GetMaxIter())
