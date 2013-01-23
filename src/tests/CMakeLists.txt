@@ -82,6 +82,10 @@ exec_ser(principallattice tests-principallattice misc-utils geom-principallattic
 
 exec_ser(csgtest levelset-levelset levelset-fastmarch geom-deformation misc-funcmap misc-scopetimer misc-progressaccu geom-simplex geom-multigrid geom-builder geom-topo geom-boundary num-unknowns misc-utils misc-problem num-discretize num-fe num-interfacePatch levelset-surfacetension misc-params out-vtkOut geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature geom-csg)
 
+exec(dynload geom-simplex misc-funcmap misc-dynamicload)
+
+add_dependencies(dynload misc-scalarFunctions misc-vectorFunctions)
+
 if(EXISTS ${SUITSPARSE_HOME})
 	lib_ser(directsolver)
 	target_link_libraries_ser(tests-directsolver ${SUITESPARSE_HOME}/UMFPACK/Lib/libumfpack.a ${SUITESPARSE_HOME}/CHOLMOD/Lib/libcholmod.a ${SUITESPARSE_HOME}/AMD/Lib/libamd.a ${SUITESPARSE_HOME}/COLAMD/Lib/libcolamd.a ${SUITESPARSE_HOME}/CCOLAMD/Lib/libccolamd.a ${SUITESPARSE_HOME}/CAMD/Lib/libcamd.a ${SUITESPARSE_HOME}/metis-4.0/libmetis.a blas lapack)
