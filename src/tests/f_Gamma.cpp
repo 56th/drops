@@ -31,6 +31,7 @@
 #include "levelset/coupling.h"
 #include "misc/params.h"
 #include "levelset/surfacetension.h"
+#include "misc/dynamicload.h"
 #include <fstream>
 #include <sstream>
 
@@ -398,6 +399,8 @@ int main (int argc, char** argv)
     SetMissingParameters(P);
 
     std::cout << P << std::endl;
+
+    DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
 
     typedef DROPS::InstatStokes2PhaseP2P1CL    MyStokesCL;
 
