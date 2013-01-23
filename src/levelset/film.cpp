@@ -53,6 +53,8 @@
 #include <fstream>
 #include <sstream>
 
+#include "misc/dynamicload.h"
+
 DROPS::ParamCL P;
 
 bool periodic_xz( const DROPS::Point3DCL& p, const DROPS::Point3DCL& q)
@@ -445,6 +447,8 @@ int main (int argc, char** argv)
     SetMissingParameters(P);
 
     std::cout << P << std::endl;
+
+    DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
 
     //DIDNT FIND A PARAM WITH PeriodicMatching, so I didnt know the type
     DROPS::match_fun periodic_match = DROPS::MatchMap::getInstance()[P.get<std::string>("DomainCond.PeriodicMatching", std::string("periodicxz"))];

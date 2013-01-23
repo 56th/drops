@@ -38,7 +38,7 @@
 #include <fstream>
 #include <iomanip>
 #include <vector>
-
+#include "misc/dynamicload.h"
 
 DROPS::ParamCL P;
 
@@ -456,6 +456,8 @@ int main (int argc, char** argv)
     param.close();
     SetMissingParameters(P);
     std::cout << P << std::endl;
+
+    DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
 
     typedef DROPS::InstatStokes2PhaseP2P1CL   MyStokesCL;
     DROPS::StokesVelBndDataCL::bnd_val_fun ZeroVel = DROPS::InVecMap::getInstance().find("ZeroVel")->second;

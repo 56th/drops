@@ -56,6 +56,7 @@
 #include <sstream>
 
 #include "misc/progressaccu.h"
+#include "misc/dynamicload.h"
 
 #include <sys/resource.h>
 
@@ -514,6 +515,7 @@ void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<double>("SurfTens.DilatationalVisco", 0.0);
 
     P.put_if_unset<int>("General.ProgressBar", 0);
+    P.put_if_unset<std::string>("General.DynamicLibsPrefix", "../");
 }
 
 int main (int argc, char** argv)
@@ -545,7 +547,9 @@ int main (int argc, char** argv)
     SetMissingParameters(P);
 
     std::cout << P << std::endl;
-
+    
+    DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
+    
     if (P.get<int>("General.ProgressBar"))
         DROPS::ProgressBarTetraAccumulatorCL::Activate();
 
@@ -632,6 +636,7 @@ int main (int argc, char** argv)
 #else
     printf( "ru_maxrss: %li kB.\n", usage.ru_maxrss);
 #endif
+    std::cout << " twophasedrops finished regularly" << std::endl;
     return 0;
   }
   catch (DROPS::DROPSErrCL& err) { err.handle(); }
