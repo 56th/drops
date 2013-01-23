@@ -242,13 +242,14 @@ class ISMGPreCL : public SchurPreBaseCL
     const Uint sm; // how many smoothing steps?
     const int lvl; // how many levels? (-1=all)
     const double omega; // relaxation parameter for smoother
-    SSORsmoothCL smoother;  // Symmetric-Gauss-Seidel with over-relaxation
+    MLSmootherCL<SSORsmoothCL> smoother;  // Symmetric-Gauss-Seidel with over-relaxation
     SSORPcCL directpc;
     mutable PCGSolverCL<SSORPcCL> solver;
 
     DROPS::MLMatrixCL& Apr_;
     DROPS::MLMatrixCL& Mpr_;
     ProlongationT      P_;
+    const MLIdxDescCL& idx_;
     DROPS::Uint iter_prA_;
     DROPS::Uint iter_prM_;
     mutable std::vector<DROPS::VectorCL> ones_;
@@ -257,11 +258,13 @@ class ISMGPreCL : public SchurPreBaseCL
 
   public:
     ISMGPreCL(DROPS::MLMatrixCL& A_pr, DROPS::MLMatrixCL& M_pr,
-                    double kA, double kM, DROPS::Uint iter_prA=1,
+                    double kA, double kM, const MLIdxDescCL& idx, DROPS::Uint iter_prA=1,
                     DROPS::Uint iter_prM = 1)
         : SchurPreBaseCL( kA, kM), sm( 1), lvl( -1), omega( 1.0), smoother( omega), solver( directpc, 200, 1e-12),
-          Apr_( A_pr), Mpr_( M_pr), iter_prA_( iter_prA), iter_prM_( iter_prM), ones_(0)
-    {}
+          Apr_( A_pr), Mpr_( M_pr), idx_(idx), iter_prA_( iter_prA), iter_prM_( iter_prM), ones_(0)
+    {
+        smoother.resize( idx.size(), SSORsmoothCL(omega));
+    }
 
     /// \brief Apply preconditioner
     template <typename Mat, typename Vec, typename ExT>
@@ -824,50 +827,6 @@ class BlockPreCL
 
 };
 
-template<class SmootherCL, class DirectSolverCL, class ProlongationIterT>
-void
-MGMPr(const std::vector<VectorCL>::const_iterator& ones,
-      const MLMatrixCL::const_iterator& begin, const MLMatrixCL::const_iterator& fine,
-      ProlongationIterT P, VectorCL& x, const VectorCL& b,
-      const SmootherCL& Smoother, const Uint smoothSteps,
-      DirectSolverCL& Solver, const int numLevel, const int numUnknDirect)
-// Multigrid method, V-cycle. If numLevel==0 or #Unknowns <= numUnknDirect,
-// the direct solver Solver is used.
-// If one of the parameters is -1, it will be neglected.
-// If MLMatrixCL.begin() has been reached, the direct solver is used too.
-// Concerning the stabilization see Hackbusch Multigrid-Methods and Applications;
-// Basically we project on the orthogonal complement of the kernel of A before
-// the coarse-grid correction.
-{
-    MLMatrixCL::const_iterator coarse = fine;
-    ProlongationIterT coarseP= P;
-    if(  ( numLevel==-1      ? false : numLevel==0 )
-       ||( numUnknDirect==-1 ? false : x.size() <= static_cast<Uint>(numUnknDirect) )
-       || fine==begin)
-    { // use direct solver
-        Solver.Solve( *fine, x, b, DummyExchangeCL());
-        x-= dot( *ones, x);
-        return;
-    }
-    --coarse;
-    --coarseP;
-    // presmoothing
-    for (Uint i=0; i<smoothSteps; ++i) Smoother.Apply( *fine, x, b, DummyExchangeCL());
-    // restriction of defect
-    VectorCL d( transp_mul( *P, VectorCL( b - (*fine)*x)));
-    d-= dot( *(ones-1), d);
-    VectorCL e( d.size());
-    // calculate coarse grid correction
-    MGMPr( ones-1, begin, coarse, coarseP, e, d, Smoother, smoothSteps, Solver, (numLevel==-1 ? -1 : numLevel-1), numUnknDirect);
-    // add coarse grid correction
-    x+= (*P) * e;
-    // postsmoothing
-    for (Uint i=0; i<smoothSteps; ++i) Smoother.Apply( *fine, x, b, DummyExchangeCL());
-    // This projection could probably be avoided, but it is cheap and with it,
-    // we are on the safe side.
-    x-= dot( *ones, x);
-}
-
 template<class ProlongationT>
 void ISMGPreCL<ProlongationT>::MaybeInitOnes() const
 {
@@ -890,11 +849,13 @@ ISMGPreCL<ProlongationT>::Apply(const Mat& /*A*/, Vec& p, const Vec& c, const Ex
     p= 0.0;
     const Vec c2_( c - dot( ones_.back(), c));
     typename ProlongationT::const_iterator finestP = --P_.end();
+    MLIdxDescCL::const_iterator finestIdx = idx_.GetFinestIter();
+    MLSmootherCL<SSORsmoothCL>::const_iterator smootherit = smoother.GetFinestIter();
 //    double new_res= (Apr_.back().A.Data*p - c).norm();
 //    double old_res;
 //    std::cout << "Pressure: iterations: " << iter_prA_ <<'\t';
     for (DROPS::Uint i=0; i<iter_prA_; ++i) {
-        DROPS::MGMPr( ones_.end()-1, Apr_.begin(), --Apr_.end(), finestP, p, c2_, smoother, sm, solver, lvl, -1);
+        DROPS::MGMPr( ones_.end()-1, Apr_.begin(), --Apr_.end(), finestP, p, c2_, finestIdx, smootherit, sm, solver, lvl, -1);
 //        old_res= new_res;
 //        std::cout << " residual: " <<  (new_res= (Apr_.back().A.Data*p - c).norm()) << '\t';
 //        std::cout << " reduction: " << new_res/old_res << '\n';
@@ -904,7 +865,7 @@ ISMGPreCL<ProlongationT>::Apply(const Mat& /*A*/, Vec& p, const Vec& c, const Ex
 
     Vec p2( p.size());
     for (DROPS::Uint i=0; i<iter_prM_; ++i)
-        DROPS::MGM( Mpr_.begin(), --Mpr_.end(), finestP, p2, c, smoother, sm, solver, lvl, -1);
+        DROPS::MGM( Mpr_.begin(), --Mpr_.end(), finestP, p2, c, finestIdx, smootherit, sm, solver, lvl, -1);
 //    std::cout << "Mass: iterations: " << iter_prM_ << '\t'
 //              << " residual: " <<  (Mpr_.back().A.Data*p2 - c).norm() << '\n';
 

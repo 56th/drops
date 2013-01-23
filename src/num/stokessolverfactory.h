@@ -210,16 +210,21 @@ class StokesSolverFactoryCL : public StokesSolverFactoryBaseCL<StokesT, Prolonga
 // PC for A-block
     ExpensivePreBaseCL *apc_;
     // MultiGrid symm.
-    SSORsmoothCL smoother_;
+#ifdef _PAR
+    typedef MLSmootherCL<JORsmoothCL> SmootherT;
+#else
+    typedef MLSmootherCL<SSORsmoothCL> SmootherT;
+#endif
+    SmootherT smoother_;
     PCG_SsorCL   coarsesolversymm_;
-    MGSolverCL<SSORsmoothCL, PCG_SsorCL, ProlongationVelT> MGSolversymm_;
-    typedef SolverAsPreCL<MGSolverCL<SSORsmoothCL, PCG_SsorCL, ProlongationVelT> > MGsymmPcT;
+    MGSolverCL<SmootherT, PCG_SsorCL, ProlongationVelT> MGSolversymm_;
+    typedef SolverAsPreCL<MGSolverCL<SmootherT, PCG_SsorCL, ProlongationVelT> > MGsymmPcT;
     MGsymmPcT MGPcsymm_;
 
     // Multigrid nonsymm.
     GMResSolverCL<JACPcCL> coarsesolver_;
-    MGSolverCL<SSORsmoothCL, GMResSolverCL<JACPcCL>, ProlongationVelT > MGSolver_;
-    typedef SolverAsPreCL<MGSolverCL<SSORsmoothCL, GMResSolverCL<JACPcCL>, ProlongationVelT> > MGPcT;
+    MGSolverCL<SmootherT, GMResSolverCL<JACPcCL>, ProlongationVelT > MGSolver_;
+    typedef SolverAsPreCL<MGSolverCL<SmootherT, GMResSolverCL<JACPcCL>, ProlongationVelT> > MGPcT;
     MGPcT MGPc_;
 
     //JAC-GMRes
@@ -360,16 +365,21 @@ StokesSolverFactoryCL<StokesT, ProlongationVelT, ProlongationPT>::
         mincommispc_( 0, &Stokes_.B.Data.GetFinest(), &Stokes_.M.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(),Stokes_.pr_idx.GetFinest(), P.get<double>("Stokes.PcSTol") /* enable regularization: , 0.707*/),
         bdinvbtispc_( 0, &Stokes_.B.Data.GetFinest(), &Stokes_.M.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(),Stokes_.pr_idx.GetFinest(), P.get<double>("Stokes.PcSTol") /* enable regularization: , 0.707*/),
         vankaschurpc_( &Stokes.pr_idx), isprepc_( Stokes.prA.Data, Stokes.prM.Data, kA_, kM_),
-        ismgpre_( Stokes.prA.Data, Stokes.prM.Data, kA_, kM_),
+        ismgpre_( Stokes.prA.Data, Stokes.prM.Data, kA_, kM_, Stokes.pr_idx),
         isnonlinearprepc1_( SSORPc_, 100, P.get<double>("Stokes.PcSTol"), true),
         isnonlinearprepc2_( SSORPc_, 100, P.get<double>("Stokes.PcSTol"), true),
         isnonlinearpc_( isnonlinearprepc1_, isnonlinearprepc2_, Stokes_.prA.Data.GetFinest(), Stokes_.prM.Data.GetFinest(), kA_, kM_),
         // preconditioner for A
-        smoother_( 1.0), coarsesolversymm_( SSORPc_, 500, 1e-6, true),
-        MGSolversymm_ ( smoother_, coarsesolversymm_, P.get<int>("Stokes.PcAIter"), P.get<double>("Stokes.PcATol"), false),
+#ifndef _PAR
+        smoother_( 1.0),
+#else
+        smoother_( 0.5),
+#endif
+ coarsesolversymm_( SSORPc_, 500, 1e-6, true),
+        MGSolversymm_ ( smoother_, coarsesolversymm_, P.get<int>("Stokes.PcAIter"), P.get<double>("Stokes.PcATol"), Stokes.vel_idx, false),
         MGPcsymm_( MGSolversymm_),
         coarsesolver_( JACPc_, 500, 500, 1e-6, true),
-        MGSolver_ ( smoother_, coarsesolver_, P.get<int>("Stokes.PcAIter"), P.get<double>("Stokes.PcATol"), false), MGPc_( MGSolver_),
+        MGSolver_ ( smoother_, coarsesolver_, P.get<int>("Stokes.PcAIter"), P.get<double>("Stokes.PcATol"), Stokes.vel_idx, false), MGPc_( MGSolver_),
         GMResSolver_( JACPc_, P.get<int>("Stokes.PcAIter"), /*restart*/ 100, P.get<double>("Stokes.PcATol"), /*rel*/ true), GMResPc_( GMResSolver_),
         GS_GMResSolver_( GSPc_, P.get<int>("Stokes.PcAIter"), /*restart*/ 100, P.get<double>("Stokes.PcATol"), /*rel*/ true), GS_GMResPc_( GS_GMResSolver_),
         BiCGStabSolver_( JACPc_, P.get<int>("Stokes.PcAIter"), P.get<double>("Stokes.PcATol"), /*rel*/ true),BiCGStabPc_( BiCGStabSolver_),
@@ -525,11 +535,11 @@ StokesSolverBaseCL* StokesSolverFactoryCL<StokesT, ProlongationVelT, Prolongatio
                 bdinvbtispc_.SetMassLumping( SPc_==MSIMPLER_SPC);
                 SBlock_= new SIMPLERBlockPcT( *apc_, bdinvbtispc_);
                 GCRSBlock_= new GCR_SBlockT( *SBlock_,  P_.template get<int>("Stokes.OuterIter"), P_.template get<int>("Stokes.OuterIter"), P_.template get<double>("Stokes.OuterTol"), /*rel*/ false);
-                stokessolver= new BlockMatrixSolverCL<GCR_SBlockT>( *GCRSBlock_);      
+                stokessolver= new BlockMatrixSolverCL<GCR_SBlockT>( *GCRSBlock_);
             } else {
                 LBlock_= new LowerBlockPcT( *apc_, *spc_);
                 GCRLBlock_= new GCR_LBlockT( *LBlock_,  P_.template get<int>("Stokes.OuterIter"), P_.template get<int>("Stokes.OuterIter"), P_.template get<double>("Stokes.OuterTol"), /*rel*/ false);
-                stokessolver= new BlockMatrixSolverCL<GCR_LBlockT>( *GCRLBlock_);      
+                stokessolver= new BlockMatrixSolverCL<GCR_LBlockT>( *GCRLBlock_);
             }
         }
         break;

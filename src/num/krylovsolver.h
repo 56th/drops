@@ -775,8 +775,6 @@ template <typename Mat, typename Vec, typename PreCon, typename ExCL>
     /// \return  convergence within max_iter iterations
     /// \pre     the preconditioner should be able to handle a accumulated b
 {
-    Assert(x_acc.size()==b.size() && x_acc.size()==ExX.GetNum(), DROPSErrCL("ParModGMRES: Incompatible dimension"), DebugParallelNumC);
-
     // Check if preconditioner needs diagonal of matrix. The preconditioner
     // only computes the diagonal new, if the matrix has changed
     if (M.NeedDiag())

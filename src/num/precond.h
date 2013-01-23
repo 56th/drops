@@ -1088,15 +1088,15 @@ class MLSmootherCL : public MLDataCL<SmootherT> {
   public:
     MLSmootherCL( const double omega = 1.0) : omega_(omega) {}
 
-    template<typename ExT>
-    void SetDiag( const MLMatrixCL& A, const MLDataCL<ExT>& ex) {
-        Assert( A.size() == ex.size(), DROPSErrCL ("MLSmootherCL::SetDiag: dimensions do not fit\n"), DebugNumericC);
-        this->resize(A.size());
+    void SetDiag( const MLMatrixCL& A, const MLIdxDescCL& idx) {
+        Assert( A.size() == idx.size(), DROPSErrCL ("MLSmootherCL::SetDiag: dimensions do not fit\n"), DebugNumericC);
+        this->resize(A.size(), SmootherT(omega_));
         MLMatrixCL::const_iterator Ait = A.begin();
-        typename MLDataCL<ExT>::const_iterator ExIt = ex.begin();
+        MLIdxDescCL::const_iterator ExIt = idx.begin();
         for ( typename MLSmootherCL::iterator Sit = this->begin(); Sit != this->end(); ++Sit, ++Ait, ++ExIt)
-            Sit->SetDiag(*Ait, *ExIt);
+            Sit->SetDiag(*Ait, ExIt->GetEx());
     }
+    bool NeedDiag() const { return false;}
 };
 
 //***************************************************************************
