@@ -34,6 +34,9 @@
 #include "levelset/surfacetension.h"
 #include <fstream>
 
+#include "misc/scalarFunctions.cpp"
+#include "misc/vectorFunctions.cpp"
+
 const double      delta_t= 0.01;
 const DROPS::Uint num_steps= 50;
 const int         FPsteps= -1;
@@ -48,7 +51,7 @@ const int         FPsteps= -1;
 //            z=1 und x<0.5        Inflow Dirichlet  parabol.
 //            z=1 und x>0.5        Neumann   0   (aus Impl.gruenden: Dir.)
 
-DROPS::Point3DCL ZeroVel( const DROPS::Point3DCL&, double) { return DROPS::Point3DCL(0.); }
+//DROPS::Point3DCL ZeroVel( const DROPS::Point3DCL&, double) { return DROPS::Point3DCL(0.); }
 
 // Tropfendaten:
 DROPS::Point3DCL Mitte(0.5);

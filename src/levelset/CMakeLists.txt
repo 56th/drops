@@ -9,7 +9,6 @@ set_par(PAR_OBJ DiST-DiST DiST-mpistream DiST-remotedata parallel-parallel paral
 
 exec_ser(reparam levelset-fastmarch levelset-levelset misc-progressaccu misc-scopetimer geom-deformation geom-simplex geom-multigrid geom-builder geom-topo geom-boundary num-unknowns misc-utils misc-problem num-discretize num-fe out-ensightOut num-interfacePatch levelset-surfacetension geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature)
 
-set(lsshear-staticlibs ${BEGIN_STATIC_LIBS} misc-scalarFunctions ${END_STATIC_LIBS})
 exec_ser(lsshear geom-boundary geom-builder geom-simplex geom-multigrid geom-deformation num-unknowns geom-topo num-fe misc-problem levelset-levelset misc-progressaccu misc-scopetimer misc-utils out-output num-discretize levelset-fastmarch num-fe out-ensightOut stokes-instatstokes2phase navstokes-instatnavstokes2phase num-MGsolver num-interfacePatch levelset-surfacetension levelset-coupling misc-funcmap geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature num-renumber)
 
 set(prJump-staticlibs ${BEGIN_STATIC_LIBS} misc-scalarFunctions misc-vectorFunctions ${END_STATIC_LIBS})
