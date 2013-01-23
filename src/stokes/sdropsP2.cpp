@@ -58,6 +58,9 @@
 #include "out/ensightOut.h"
 #include "misc/funcmap.h"
 
+#include "misc/progressaccu.h"
+#include "misc/dynamicload.h"
+
 using namespace std;
 
 const char line[] ="----------------------------------------------------------------------------------\n";
@@ -355,10 +358,19 @@ void Strategy( StokesProblemT& Stokes)
 } // end of namespace DROPS
 
 void SetMissingParameters(DROPS::ParamCL& P){
-    P.put_if_unset<std::string>("VTK.TimeFileName",P.get<std::string>("VTK.VTKName"));
-    P.put_if_unset<int>("VTK.ReUseTimeFile",0);
-    P.put_if_unset<int>("VTK.UseDeformation",0);
-    P.put_if_unset<int>("VTK.UseOnlyP1",0);
+
+    P.put_if_unset<int>("VTK.VTKOut",0);
+    if (P.get<int>("VTK.VTKOut") != 0)
+    {
+        P.put_if_unset<std::string>("VTK.TimeFileName",P.get<std::string>("VTK.VTKName"));
+        P.put_if_unset<int>("VTK.ReUseTimeFile",0);
+        P.put_if_unset<int>("VTK.UseDeformation",0);
+        P.put_if_unset<int>("VTK.UseOnlyP1",0);
+    }
+
+    P.put_if_unset<int>("General.ProgressBar", 0);
+    P.put_if_unset<std::string>("General.DynamicLibsPrefix", "../");
+
 }
 
 int main ( int argc, char** argv)
@@ -384,6 +396,10 @@ int main ( int argc, char** argv)
         SetMissingParameters(P);
 
         std::cout << P << std::endl;
+
+        DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
+        if (P.get<int>("General.ProgressBar"))
+            DROPS::ProgressBarTetraAccumulatorCL::Activate();
 
         // Check MarkLower value
         if( P.get<int>("DomainCond.GeomType") == 0) P.put("Misc.MarkLower", 0);
