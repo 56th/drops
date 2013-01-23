@@ -4,6 +4,18 @@
 //    stationary interface (no flow simulation)
 //=============================================================
 {
+
+        "General":
+        {
+                "ProgressBar":  1, //show progress bar
+                "DynamicLibsPrefix": "../", //where should we look for shared objects?
+                "DynamicLibs": [ //select libraries to be loaded after program start
+                        "transport/libtransport-transportCoeff",
+                        "misc/libmisc-scalarFunctions",
+                        "misc/libmisc-vectorFunctions"
+                ]
+        },
+
         // time stepping:
         "Time":
         {
