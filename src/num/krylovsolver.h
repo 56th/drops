@@ -1236,10 +1236,10 @@ BICGSTAB( const Mat& A, Vec& x, const Vec& b, const ExT& ex,
     return false;
 }
 
-/*
-/// \brief Preconditioned BiCGStab-Method with accure inner products
+
+/// \brief Preconditioned BiCGStab-Method with modifications to minimize global communications
 template <typename Mat, typename Vec, typename PreCon, typename ExCL>
-  bool BiCGSTAB(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX,
+  bool ModBICGSTAB(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX,
                    PreCon& M, int& max_iter, double& tol, bool measure_relative_tol=true)
     /// \param[in]     A                    local distributed coefficients-matrix of the linear equation system
     /// \param[in,out] x_acc                start vector and the solution in accumulated form
@@ -1293,8 +1293,11 @@ template <typename Mat, typename Vec, typename PreCon, typename ExCL>
 
         dots[0]= ExX.LocalDot( v, false, r0hat_acc, true, &v_acc);
         dots[1]= ExX.LocalNorm_sq( r_acc, true);
-
+#ifdef _PAR
         ProcCL::GlobalSum(Addr(dots), Addr(glob_dots), 2);
+#else
+        glob_dots = dots;
+#endif
 
         resid = std::sqrt(glob_dots[1])/normb;
         if (resid<tol){
@@ -1332,7 +1335,11 @@ template <typename Mat, typename Vec, typename PreCon, typename ExCL>
         dots[2]= ExX.LocalDot(r0hat_acc, true, s_acc, true);
         dots[3]= ExX.LocalDot( t, false, r0hat_acc, true, &t_acc);
 
+#ifdef _PAR
         ProcCL::GlobalSum(Addr(dots), Addr(glob_dots), 4);
+#else
+        glob_dots = dots;
+#endif
 
         if (glob_dots[1]==0.)
         {
@@ -1352,7 +1359,7 @@ template <typename Mat, typename Vec, typename PreCon, typename ExCL>
     tol = resid;
     return false;
 }
-*/
+
 
 //*****************************************************************
 // GCR
@@ -1986,27 +1993,36 @@ class BiCGStabSolverCL : public SolverBaseCL
 {
   private:
     PC& pc_;
+    bool mod_;
 
   public:
-    BiCGStabSolverCL( PC& pc, int maxiter, double tol, bool relative= true)
-        : SolverBaseCL( maxiter, tol, relative), pc_( pc){}
+    BiCGStabSolverCL( PC& pc, int maxiter, double tol, bool relative= true, bool mod=true)
+        : SolverBaseCL( maxiter, tol, relative), pc_( pc), mod_(mod){}
 
           PC& GetPc ()       { return pc_; }
     const PC& GetPc () const { return pc_; }
 
     template <typename Mat, typename Vec, typename ExT>
-    void Solve(const Mat& A, Vec& x, const Vec& b, __UNUSED__ const ExT& ex)
+    void Solve(const Mat& A, Vec& x, const Vec& b, const ExT& ex)
     {
         _res=  _tol;
         _iter= _maxiter;
+#ifdef _PAR
+        ModBICGSTAB( A, x, b, ex, pc_, _iter, _res, rel_);
+#else
         BICGSTAB( A, x, b, ex, pc_, _iter, _res, rel_);
+#endif
     }
     template <typename Mat, typename Vec, typename ExT>
     void Solve(const Mat& A, Vec& x, const Vec& b, __UNUSED__ const ExT& ex, int& numIter, double& resid) const
     {
         resid=   _tol;
         numIter= _maxiter;
+#ifdef _PAR
+        ModBICGSTAB(A, x, b, ex, pc_, numIter, resid, rel_);
+#else
         BICGSTAB(A, x, b, ex, pc_, numIter, resid, rel_);
+#endif
     }
 };
 
