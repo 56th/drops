@@ -41,7 +41,7 @@
 
  // include problem class
 #include "misc/params.h"
-#include "poisson/poissonCoeff.h"      // Coefficient-Function-Container poissonCoeffCL
+#include "poisson/poissonParam.h"      // poissonCoeffCL
 #include "poisson/poisson.h"           // setting up the Poisson problem
 #include "num/bndData.h"
 

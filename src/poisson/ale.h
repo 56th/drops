@@ -28,7 +28,7 @@
 #include "misc/container.h"
 #include "misc/params.h"
 #include "misc/funcmap.h"
-#include "poisson/poissonCoeff.h"
+#include "poisson/poissonParam.h"
 #include <sstream>
 
 namespace DROPS{
