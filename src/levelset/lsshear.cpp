@@ -97,7 +97,7 @@ void Strategy( StokesProblemT& Stokes, const BndDataCL<>& lsbnd)
     MLMatDescCL* A= &Stokes.A;
     MLMatDescCL* B= &Stokes.B;
     MLMatDescCL* M= &Stokes.M;
-    MLMatDescCL prM;
+    MLMatDescCL* prM = &Stokes.prM;
 
     TimerCL time;
     Stokes.CreateNumberingVel( MG.GetLastLevel(), vidx);
@@ -121,12 +121,12 @@ void Strategy( StokesProblemT& Stokes, const BndDataCL<>& lsbnd)
     B->SetIdx(pidx, vidx);
     M->SetIdx(vidx, vidx);
     Stokes.N.SetIdx(vidx, vidx);
-    prM.SetIdx( pidx, pidx);
+    prM->SetIdx( pidx, pidx);
     time.Reset();
     time.Start();
     Stokes.SetupSystem1( A, M, b, b, &cpl_M, lset, Stokes.v.t);
     Stokes.SetupSystem2( B, c, lset, Stokes.v.t);
-    Stokes.SetupPrMass( &prM, lset);
+    Stokes.SetupPrMass( prM, lset);
     time.Stop();
     std::cout << time.GetTime() << " seconds for setting up all systems!" << std::endl;
 
