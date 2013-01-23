@@ -22,5 +22,6 @@ exec_ser(ns_transp
     geom-principallattice geom-reftetracut geom-subtriangulation
     num-quadrature num-renumber num-oseenprecond
     misc-dynamicload)
-
+if(NOT MPI)
 add_dependencies(ns_transp transport-transportCoeff misc-scalarFunctions misc-vectorFunctions)
+endif(NOT MPI)
