@@ -51,7 +51,7 @@ enum FiniteElementT
 {
     P0_FE=0, P1_FE=1, P2_FE=2, P1Bubble_FE=3,         // for scalars
     P1D_FE=4, P1X_FE=5, P1IF_FE=6, P2R_FE=7, P2X_FE=8,
-    vecP2_FE=130, vecP1Bubble_FE=131, vecP2R_FE=135, vecP2X_FE=136, // for vectors
+    vecP1_FE = 129, vecP2_FE=130, vecP1Bubble_FE=131, vecP2R_FE=135, vecP2X_FE=136,// for vectors
     UnknownFE_=-1
 };
 
@@ -87,6 +87,7 @@ class FE_InfoCL
             case P2X_FE:
             case P2R_FE:
             case P2_FE:          NumUnknownsVertex_= NumUnknownsEdge_= 1; break;
+            case vecP1_FE:		 NumUnknownsVertex_ = 3; break;
             case vecP2X_FE:
             case vecP2R_FE:
             case vecP2_FE:       NumUnknownsVertex_= NumUnknownsEdge_= 3; break;
