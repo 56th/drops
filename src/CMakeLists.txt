@@ -8,9 +8,15 @@ include(CMakeSettings.txt)
 #tell cmake to always include the home dir
 include_directories(${CMAKE_SOURCE_DIR})
 
+
 #use openMP
-find_package(OpenMP REQUIRED)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+message(STATUS "### GENERATOR is ${CMAKE_GENERATOR}")
+if(CMAKE_GENERATOR MATCHES "Visual Studio 10")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /openmp")
+else(CMAKE_GENERATOR MATCHES "Visual Studio 10")
+  find_package(OpenMP REQUIRED)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+endif(CMAKE_GENERATOR MATCHES "Visual Studio 10")
 
 #use MPI
 if(MPI)
