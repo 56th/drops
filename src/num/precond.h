@@ -168,6 +168,33 @@ SolveGSstep(const PreDummyCL<PB_GS0>&, const MatrixCL& A, Vec& x, const Vec& b, 
     }
 }
 
+// One step of the Gauss-Seidel/SOR method with start vector 0
+// Fix for osmosis: Diag 0 entries are ignored
+template <bool HasOmega, typename Vec>
+void
+SolveGSDiag0step(const PreDummyCL<PB_GS0>&, const MatrixCL& A, Vec& x, const Vec& b, double omega)
+{
+    const size_t n= A.num_rows();
+    double aii, sum;
+
+    for (size_t i=0, nz=0; i<n; ++i) {
+        sum= b[i];
+        const size_t end= A.row_beg( i+1);
+        for (; A.col_ind( nz) != i; ++nz) // This is safe: Without diagonal entry, Gauss-Seidel would explode anyway.
+            sum-= A.val( nz)*x[A.col_ind( nz)];
+        aii= A.val( nz);
+        nz= end;
+
+        if (aii == 0.0)
+        	continue;
+
+        if (HasOmega)
+            x[i]= (1.-omega)*x[i]+omega*sum/aii;
+        else
+            x[i]= sum/aii;
+    }
+}
+
 
 // One step of the Symmetric-Gauss-Seidel/SSOR method with start vector x
 template <bool HasOmega, typename Vec>
@@ -285,6 +312,13 @@ SolveGSstep(const PreDummyCL<PBT>& pd, const MLMatrixCL& M, Vec& x, const Vec& b
 
 template <bool HasOmega, typename  Vec, PreBaseGS PBT>
 void
+SolveGSDiag0step(const PreDummyCL<PBT>& pd, const MLMatrixCL& M, Vec& x, const Vec& b, double omega)
+{
+    SolveGSDiag0step<HasOmega, Vec>( pd, M.GetFinest(), x, b, omega);
+}
+
+template <bool HasOmega, typename  Vec, PreBaseGS PBT>
+void
 SolveGSstep(const PreDummyCL<PBT>& pd, const MLMatrixCL& M, Vec& x, const Vec& b)
 {
     SolveGSstep<HasOmega, Vec>( pd, M.GetFinest(), x, b);
@@ -295,6 +329,13 @@ void
 SolveGSstep(const PreDummyCL<PBT>& pd, const MLMatrixCL& A, Vec& x, const Vec& b, const SparseMatDiagCL& diag, double omega)
 {
     SolveGSstep<HasOmega, Vec>( pd, A.GetFinest(), x, b, diag, omega);
+}
+
+template <bool HasOmega, typename  Vec, PreBaseGS PBT>
+void
+SolveGSDiag0step(const PreDummyCL<PBT>& pd, const MLMatrixCL& A, Vec& x, const Vec& b, const SparseMatDiagCL& diag, double omega)
+{
+    SolveGSDiag0step<HasOmega, Vec>( pd, A.GetFinest(), x, b, diag, omega);
 }
 
 template <bool HasOmega, typename  Vec, PreBaseGS PBT>
@@ -311,6 +352,7 @@ SolveGSstep(const PreDummyCL<PBT>& pd, const MLMatrixCL& A, Vec& x, const Vec& b
 
 // Preconditioners without own matrix
 template <PreMethGS PM, bool HasDiag= PreTraitsCL<PM>::HasDiag> class PreGSCL;
+template <PreMethGS PM, bool HasDiag= PreTraitsCL<PM>::HasDiag> class PreGSDiag0CL;
 
 // Simple preconditioners
 template <PreMethGS PM>
@@ -361,12 +403,12 @@ class PreGSCL<PM,true>
     template <typename Vec, typename ExT>
     void Apply(const MatrixCL& A, Vec& x, const Vec& b, const ExT&) const
     {
-        SolveGSstep<PreTraitsCL<PM>::HasOmega,Vec>(PreDummyCL<PreTraitsCL<PM>::BaseMeth>(), A, x, b, *_diag, _omega);
+    	SolveGSstep<PreTraitsCL<PM>::HasOmega,Vec>(PreDummyCL<PreTraitsCL<PM>::BaseMeth>(), A, x, b, *_diag, _omega);
     }
     template <typename Vec, typename ExT>
     void Apply(const MLMatrixCL& A, Vec& x, const Vec& b, const ExT&) const
     {
-        SolveGSstep<PreTraitsCL<PM>::HasOmega,Vec>(PreDummyCL<PreTraitsCL<PM>::BaseMeth>(), A.GetFinest(), x, b, *_diag, _omega);
+    	SolveGSstep<PreTraitsCL<PM>::HasOmega,Vec>(PreDummyCL<PreTraitsCL<PM>::BaseMeth>(), A.GetFinest(), x, b, *_diag, _omega);
     }
     /// \brief Check if return preconditioned vectors are accumulated after calling Apply
     bool RetAcc()   const { return false; }
@@ -380,6 +422,52 @@ class PreGSCL<PM,true>
     //@}
 };
 
+template <PreMethGS PM>
+class PreGSDiag0CL<PM,false>
+{
+  private:
+    double _omega;
+
+  public:
+    PreGSDiag0CL (double om= 1.0) : _omega(om) {}
+
+    template <typename Mat, typename Vec, typename ExT>
+    void Apply(const Mat& A, Vec& x, const Vec& b, const ExT&) const
+    {
+        SolveGSDiag0step<PreTraitsCL<PM>::HasOmega,Vec>(PreDummyCL<PreTraitsCL<PM>::BaseMeth>(), A, x, b, _omega);
+    }
+};
+
+
+// Preconditioner with SparseMatDiagCL
+template <PreMethGS PM>
+class PreGSDiag0CL<PM,true>
+{
+  private:
+    const SparseMatDiagCL* _diag;
+    double                 _omega;
+
+  public:
+    PreGSDiag0CL (double om= 1.0) : _diag(0), _omega(om) {}
+    PreGSDiag0CL (const PreGSDiag0CL& p) : _diag(p._diag ? new SparseMatDiagCL(*(p._diag)) : 0), _omega(p._omega) {}
+    ~PreGSDiag0CL() { delete _diag; }
+
+    void Init(const MatrixCL& A)
+    {
+        delete _diag; _diag=new SparseMatDiagCL(A);
+    }
+
+    template <typename Vec>
+    void Apply(const MatrixCL& A, Vec& x, const Vec& b) const
+    {
+    	SolveGSDiag0step<PreTraitsCL<PM>::HasOmega,Vec>(PreDummyCL<PreTraitsCL<PM>::BaseMeth>(), A, x, b, *_diag, _omega);
+    }
+    template <typename Vec>
+    void Apply(const MLMatrixCL& A, Vec& x, const Vec& b) const
+    {
+    	SolveGSDiag0step<PreTraitsCL<PM>::HasOmega,Vec>(PreDummyCL<PreTraitsCL<PM>::BaseMeth>(), A.GetFinest(), x, b, *_diag, _omega);
+    }
+};
 
 // Preconditioners with own matrix
 template <PreMethGS PM, bool HasDiag= PreTraitsCL<PM>::HasDiag>
@@ -756,6 +844,7 @@ typedef PreGSCL<P_SGS0>    SGSPcCL;
 typedef PreGSCL<P_SSOR0>   SSORPcCL;
 typedef PreGSCL<P_SSOR0_D> SSORDiagPcCL;
 typedef PreGSCL<P_GS0>     GSPcCL;
+typedef PreGSDiag0CL<P_GS0>	GSDiag0PcCL;
 
 /// fwd decl from num/stokessolver.h
 template<typename, typename, typename>
