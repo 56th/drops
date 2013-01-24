@@ -168,7 +168,7 @@ function(exec f)
 endfunction(exec)
 
 
-set(PACKAGES parallel levelset poisson DiST geom num out misc stokes navstokes surfactant transport partests tests)
+set(PACKAGES parallel levelset poisson DiST geom num out misc osmosis stokes navstokes surfactant transport partests tests)
 string(REPLACE ";" " " PACKAGES_STRING "${PACKAGES}")
 
 option(TESTS "compile tests" OFF)
