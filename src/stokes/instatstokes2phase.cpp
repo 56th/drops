@@ -1302,6 +1302,13 @@ class LocalSystem1OnePhase_P2CL
     void setup (const SMatrixCL<3,3>& T, double absdet, LocalSystem1DataCL& loc);
 };
 
+/// \brief Update the local "systme 1 and 2" with respect to special boundary conditions: slip Bnd and symmetric Bnd;
+class SpecialBndHandleCL
+{
+  public:	
+    void updateSystem1(const TetraCL& tet, LocalSystem1DataCL& loc){ return 0;}
+}
+
 void LocalSystem1OnePhase_P2CL::setup (const SMatrixCL<3,3>& T, double absdet, LocalSystem1DataCL& loc)
 {
     P2DiscCL::GetGradients( Grad, GradRef, T);

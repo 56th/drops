@@ -169,7 +169,7 @@ class BndCondCL
     inline BndCondT GetBC( const EdgeCL&, BndIdxT&)   const;
     inline BndCondT GetBC( const FaceCL&, BndIdxT&)   const;
     /// \}
-
+	/// Only used in creating numbering for unknown
     inline bool IsOnDirBnd( const VertexCL&) const;
     inline bool IsOnDirBnd( const EdgeCL&)   const;
     inline bool IsOnDirBnd( const FaceCL&)   const;
