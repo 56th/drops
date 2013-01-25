@@ -19,62 +19,62 @@
 
         "Time":
         {
-                "NumSteps":             50,
-                "StepSize":             0.007,
+                "NumSteps":             100,
+                "StepSize":             0.005,
                 "Scheme":               0.5
         },
-		
-		"Osmosis":
-		{
-        		"Levelset":             "torus",
-                        "ScaleInitialConc":          0,
-                        "InitialConc":          "TransverseLinear",
-				"GrowVelocity":			-1.0,
-				"Diffusivity":			10.1,
-				"alpha":				-1,
-				"beta":					1.0,
-				"RelStationary":		1e-10
-		},		
-		
-		"Exp":
+        
+        "Osmosis":
+        {
+                "Levelset":             "torus",
+                "ScaleInitialConc":     0,
+                "InitialConc":          "TransverseLinear",
+                "GrowVelocity":         -1.0,
+                "Diffusivity":          10.1,
+                "alpha":                -1,
+                "beta":                 0.25,
+                "RelStationary":        1e-10
+        },      
+        
+        "Exp":
         {
                 "RadDrop":              [0.8, 0.8, 0.8 ],
                 "PosDrop":              [2.0, 2.0, 2.0 ],
                 "Gravity":              [0, -9.81, 0 ],
-				"OmitBound":			1e-4
-        },	
-		
-		"Stabilisation":
-		{
-				"Active":				1,
-				"Scaling":				2.0,
-				"Exp":					1.0,
-				"Anisotropic":			1
-		},
+                "OmitBound":            1e-4
+        },  
+        
+        "Stabilisation":
+        {
+                "Active":               1,
+                "Scaling":              20.0,
+                "Exp":                  1.0,
+                "Anisotropic":          1
+        },
 
-		"ZeroVelAtBnd":
-		{
+        "ZeroVelAtBnd":
+        {
                 "Active":               0,
                 "WeightedDiffusion":    1,
                 "WeightedDiffDistance": 0.25,
                 "WeightedDiffFactor":   0.001
-		},
+        },
 
-		"Solver":
-		{
-				"Iter":                 1000,
+        "Solver":
+        {
+                "Iter":                 1000,
                 "Tol":                  1e-16,
-				"Interface":			2
-		},
+                "Interface":            2
+        },
 
-		"Coupling":
-		{
-				"Active":				0,
-				"Damping":				1.0,
-				"maxIter":				10,
-				"Tol":					1e-3
-		},
-		
+        "Coupling":
+        {
+                "Active":               0,
+                "Damping":              1.0,
+                "maxIter":              10,
+                "Tol":                  1e-3
+        },
+        
         "Levelset":
         {
                 "Tol":                  1e-10,
@@ -84,13 +84,13 @@
                 "VolCorrection":        0,
                 "Theta":                1
         },
-		
-		"Reparam":
-		{
-				"Active":				0,
-				"method":				13,
-				"VolCorrection":		0
-		},
+        
+        "Reparam":
+        {
+                "Active":               0,
+                "method":               13,
+                "VolCorrection":        0
+        },
 
         "AdaptRef":
         {
@@ -110,15 +110,15 @@
         {
                 "VTKOut":               1,
                 "VTKDir":               "vtk",
-                "VTKName":              "strongCoup_1",
+                "VTKName":              "torus_weakCoup_1",
                 "Binary":               0
         },
 
-		"GNUPlot":
-		{
-			"Out":						1,
-			"Plotname":					"plot/strongCoup_1.plot"
-		},
+        "GNUPlot":
+        {
+            "Out":                      1,
+            "Plotname":                 "plot/strongCoup_1.plot"
+        },
 
         "DomainCond":
         {
@@ -128,7 +128,7 @@
                 "InitialCond":          0,
                 "GeomType":             1,
                 "InitialFile":          "none",
-                "MeshFile":             "4x4x4@8x8x8",
+                "MeshFile":             "4x4x4@10x10x10",
                 "BoundaryType":         "21!21!21!21!21!21!",
                 "BoundaryFncs":         "ZeroVel!ZeroVel!ZeroVel!ZeroVel!ZeroVel!ZeroVel"
         }

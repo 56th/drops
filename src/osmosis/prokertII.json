@@ -18,8 +18,8 @@
 
         "Time":
         {
-                "NumSteps":             1000,
-                "StepSize":             0.0025,
+                "NumSteps":             100,
+                "StepSize":             0.025,
                 "Scheme":               0.5
         },
 		
@@ -47,7 +47,7 @@
 		"Stabilisation":
 		{
 				"Active":				1,
-				"Scaling":				1.0,
+				"Scaling":				4.0,
 				"Exp":					1.0,
 				"Anisotropic":			1
 		},
@@ -102,7 +102,7 @@
         {
                 "VTKOut":               10,
                 "VTKDir":               "vtk",
-                "VTKName":              "SimpleOsmosis",
+                "VTKName":              "prokertII",
                 "Binary":               0
         },
 
@@ -120,7 +120,7 @@
                 "InitialCond":          0,
                 "GeomType":             1,
                 "InitialFile":          "none",
-                "MeshFile":             "2.5x3x2.5@25x30x25",
+                "MeshFile":             "2.5x3x2.5@15x18x15",
                 "BoundaryType":         "21!21!21!21!21!21!",
                 "BoundaryFncs":         "ZeroVel!ZeroVel!ZeroVel!ZeroVel!ZeroVel!ZeroVel"
         }

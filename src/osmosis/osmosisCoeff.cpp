@@ -106,8 +106,8 @@ double ZeroFct (const DROPS::Point3DCL& ,  double )
 double Torus( const DROPS::Point3DCL& pin, double)
 {
     extern DROPS::ParamCL P;
-    const double R_ = 1.5;
-    const double r_ = 0.5;
+    const double R_ = 1.2;
+    const double r_ = 0.4;
 	static DROPS::Point3DCL center = P.get<DROPS::Point3DCL>("Exp.PosDrop");
     DROPS::Point3DCL p = pin - center;
     return std::sqrt( p[2]*p[2] + std::pow( std::sqrt( p[0]*p[0] + p[1]*p[1]) - R_, 2) ) - r_;

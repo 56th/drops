@@ -8,6 +8,7 @@
                 "DynamicLibs": [ //select libraries to be loaded after program start
                         "misc/libmisc-scalarFunctions",
                         "misc/libmisc-vectorFunctions",
+                        "misc/libmisc-csgFunctions",
                         "osmosis/libosmosis-osmosisCoeff"
                 ]
         },
@@ -18,47 +19,53 @@
                 "StepSize":             0.01,
                 "Scheme":               0.5
         },
-		
-		"Osmosis":
-		{
-        		"Levelset":             "SimpleEllipsoid",
-                        "ScaleInitialConc":          0,
-				"InitialConc":          "linearConc",
-				"Diffusivity":			5.0,
-				"alpha":				1,
-				"beta":					2
-		},		
-		
-		"Exp":
+        
+        "CSG":
         {
-                "RadDrop":         		[1.0, 1.5, 1.0 ],
-				"PosDrop":          	[2.0, 2.0, 2.0 ],
+                "Library":  "osmosisCSG.json",
+                "Geometry":  "interrupted sphere"
+        },
+
+        "Osmosis":
+        {
+                "Levelset":             "csg_fun",
+                "ScaleInitialConc":          0,
+                "InitialConc":          "linearConc",
+                "Diffusivity":          0.25,
+                "alpha":                0.25,
+                "beta":                 1.0
+        },      
+        
+        "Exp":
+        {
+                "RadDrop":              [1.0, 1.5, 1.0 ],
+                "PosDrop":              [2.0, 2.0, 2.0 ],
                 "Gravity":              [0, -9.81, 0 ],
-				"OmitBound":			1e-4
-        },	
-		
-		"Stabilisation":
-		{
-				"Active":				1,
-				"Scaling":				1.0,
-				"Exp":					1.0,
-				"Anisotropic":			1
-		},
-		
-		"Solver":
-		{
-				"Iter":                 1000,
+                "OmitBound":            1e-4
+        },  
+        
+        "Stabilisation":
+        {
+                "Active":               1,
+                "Scaling":              4.0,
+                "Exp":                  1.0,
+                "Anisotropic":          1
+        },
+        
+        "Solver":
+        {
+                "Iter":                 1000,
                 "Tol":                  1e-16,
-				"Interface":			2
-		},
-		
-		"Coupling":
-		{
-				"Active":				1,
-				"Damping":				0.5,
-				"maxIter":				100,
-				"Tol":					1e-6
-		},
+                "Interface":            2
+        },
+        
+        "Coupling":
+        {
+                "Active":               0,
+                "Damping":              0.5,
+                "maxIter":              100,
+                "Tol":                  1e-6
+        },
 
         "Levelset":
         {
@@ -69,13 +76,13 @@
                 "VolCorrection":        0,
                 "Theta":                1
         },
-		
-		"Reparam":
-		{
-				"Active":				0,
-				"method":				13,
-				"VolCorrection":		0
-		},
+        
+        "Reparam":
+        {
+                "Active":               0,
+                "method":               13,
+                "VolCorrection":        0
+        },
 
         "AdaptRef":
         {
@@ -99,11 +106,11 @@
                 "Binary":               0
         },
 
-		"GNUPlot":
-		{
-			"Out":						0,
-			"Plotname":					"TestCase5/plot/CoupLSInth20t10.plot"
-		},
+        "GNUPlot":
+        {
+            "Out":                      0,
+            "Plotname":                 "TestCase5/plot/CoupLSInth20t10.plot"
+        },
 
         "DomainCond":
         {
@@ -113,7 +120,7 @@
                 "InitialCond":          0,
                 "GeomType":             1,
                 "InitialFile":          "none",
-                "MeshFile":             "4x4x4@20x20x20",
+                "MeshFile":             "2x2x2@12x12x12",
                 "BoundaryType":         "21!21!21!21!21!21!",
                 "BoundaryFncs":         "ZeroVel!ZeroVel!ZeroVel!ZeroVel!ZeroVel!ZeroVel"
         }

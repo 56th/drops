@@ -12,5 +12,5 @@ endif(NOT MPI)
 exec_ser(osmosis misc-scopetimer osmosis-osmosis geom-boundary geom-builder geom-multigrid num-unknowns geom-topo num-fe misc-problem levelset-levelset misc-utils out-output num-discretize navstokes-instatnavstokes2phase misc-funcmap misc-funcmap misc-params levelset-fastmarch stokes-instatstokes2phase num-MGsolver num-fe out-ensightOut stokes-integrTime osmosis-osmosisSetup num-interfacePatch levelset-fastmarch num-fe out-vtkOut levelset-surfacetension geom-simplex surfactant-ifacetransp geom-geomselect levelset-twophaseutils num-hypre levelset-coupling geom-principallattice geom-reftetracut geom-subtriangulation num-renumber num-quadrature misc-progressaccu misc-dynamicload dl)
 
 if(NOT MPI)
-    add_dependencies(osmosis misc-scalarFunctions misc-vectorFunctions osmosis-osmosisCoeff)
+    add_dependencies(osmosis misc-scalarFunctions misc-vectorFunctions misc-csgFunctions osmosis-osmosisCoeff)
 endif(NOT MPI)
