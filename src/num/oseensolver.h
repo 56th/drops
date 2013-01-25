@@ -116,9 +116,9 @@ template <class Mat, class Vec, class ExT>
   InexactUzawaCL<ApcT, SpcT, Apcmeth>::Solve( const Mat& A, const Mat& B, Vec& v, Vec& p,
           const Vec& b, const Vec& c, const ExT& vel_ex, const ExT& pr_ex)
 {
-    _res=  _tol;
-    _iter= _maxiter;
-    InexactUzawa( A, B, v, p, b, c, vel_ex, pr_ex, Apc_, Spc_, _iter, _res, Apcmeth, innerreduction_, innermaxiter_, rel_, output_);
+    res_=  tol_;
+    iter_= maxiter_;
+    InexactUzawa( A, B, v, p, b, c, vel_ex, pr_ex, Apc_, Spc_, iter_, res_, Apcmeth, innerreduction_, innermaxiter_, rel_, output_);
 }
 
 template <class ApcT, class SpcT, InexactUzawaApcMethodT Apcmeth>
@@ -436,8 +436,8 @@ template <typename Mat, typename Vec, typename PC1, typename PC2, typename ExVCL
 /// \param[in,out] xp_acc IN:   initial vector for pressure, OUT: pressure result
 /// \param[in]     f            upper rhs
 /// \param[in]     g            lower rhs
-/// \param[in]     exV          Exchange class for velocities
-/// \param[in]     exP          Exchange class for pressures
+/// \param[in]     exV          Exchange class for velocity
+/// \param[in]     exP          Exchange class for pressure
 /// \param[in]     Apc          Preconditioner for A
 /// \param[in]     Spc          Preconditioner for Schur-Complement
 /// \param[in,out] max_iter     IN: maximal iterations, OUT: used iterations
@@ -494,7 +494,7 @@ template <typename Mat, typename Vec, typename PC1, typename PC2, typename ExVCL
         switch (apcmeth) {
              case APC_SYM_LINEAR:         // this case has not been implemented yet!
 #ifdef _PAR
-        throw DROPSErrCL("(PAR)InexactUzawa: Because the exact UzawaAlgorithm has not been implemented the choice \"apcmeth==APC_SYM_LINEAR\" is not valid");
+        throw DROPSErrCL("InexactUzawa: parallel implementation of \"APC_SYM_LINEAR\" is not available");
 #endif
                  zbar= 0.0;
                  zhat= 0.0;
@@ -552,7 +552,7 @@ template <typename Mat, typename Vec, typename PC1, typename PC2, typename ExVCL
     }
     tol= resid;
     if (asc!=0) delete asc;
-    std::cout << "===> Warning, InexactUzawa stoped without reaching tolerance!" << std::endl;
+    std::cout << "===> Warning, InexactUzawa stopped without reaching tolerance!" << std::endl;
     return false;
 }
 
@@ -721,15 +721,15 @@ class UzawaCGSolverEffCL : public StokesSolverBaseCL
 
     void Solve( const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p,
                 const VectorCL& b, const VectorCL& c) {
-        _res=  _tol;
-        _iter= _maxiter;
-        UzawaCGEff( A, B, v, p, b, c, Apc_, Spc_, _iter, _res);
+        res_=  tol_;
+        iter_= maxiter_;
+        UzawaCGEff( A, B, v, p, b, c, Apc_, Spc_, iter_, res_);
     }
     void Solve( const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p,
                 const VectorCL& b, const VectorCL& c) {
-        _res=  _tol;
-        _iter= _maxiter;
-        UzawaCGEff( A, B, v, p, b, c, Apc_, Spc_, _iter, _res);
+        res_=  tol_;
+        iter_= maxiter_;
+        UzawaCGEff( A, B, v, p, b, c, Apc_, Spc_, iter_, res_);
     }
 };
 
@@ -746,15 +746,15 @@ class UzawaCGSolverCL : public StokesSolverBaseCL
 
     void Solve( const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p,
                 const VectorCL& b, const VectorCL& c) {
-        _res=  _tol;
-        _iter= _maxiter;
-        UzawaCG( A, B, v, p, b, c, Apc_, Spc_, _iter, _res);
+        res_=  tol_;
+        iter_= maxiter_;
+        UzawaCG( A, B, v, p, b, c, Apc_, Spc_, iter_, res_);
     }
     void Solve( const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p,
                 const VectorCL& b, const VectorCL& c) {
-        _res=  _tol;
-        _iter= _maxiter;
-        UzawaCG( A, B, v, p, b, c, Apc_, Spc_, _iter, _res);
+        res_=  tol_;
+        iter_= maxiter_;
+        UzawaCG( A, B, v, p, b, c, Apc_, Spc_, iter_, res_);
     }
 };
 
@@ -900,7 +900,7 @@ class StokesMGSolverCL: public StokesSolverBaseCL
     Solve(const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&) {
 // define MG parameters for the first diagonal blockS
         if (B.Version() != BVersion_) UpdateBT( B);
-        int nit=_maxiter;
+        int nit=maxiter_;
         double actualtol = 1;
         Uint   wc   = 1;   // how many W-cycle steps? (1=V-cycle)
 
@@ -916,7 +916,7 @@ class StokesMGSolverCL: public StokesSolverBaseCL
         const double rpnorm0= norm_sq( B * v - c);
         const double resid0= std::sqrt(runorm0+rpnorm0);
         double resid;
-        for (int j=0; j<_maxiter; ++j)
+        for (int j=0; j<maxiter_; ++j)
         {
             StokesMGM( A.begin(), A_end, B_end, BT_end, prM_end, PVel, PPr, v, p, b, c, smoother_, smoothSteps_, wc, directSolver_, usedLevels_, -1);
             const double runorm= norm_sq( A * v + transp_mul(B, p ) - b);
@@ -927,7 +927,7 @@ class StokesMGSolverCL: public StokesSolverBaseCL
             else
                 actualtol= resid;
             std::cout << "P2P1:StokesMGSolverCL: residual = " << actualtol << std::endl;
-            if (actualtol<=_tol)
+            if (actualtol<=tol_)
             {
                 nit= j+1;
                 break;
@@ -935,8 +935,8 @@ class StokesMGSolverCL: public StokesSolverBaseCL
         }
         std::cout << "StokesMGM: actual residual = " << actualtol
                   << "  after " << nit << " iterations " << std::endl;
-        _res = actualtol;
-        _iter= nit;
+        res_ = actualtol;
+        iter_= nit;
    }
 };
 
@@ -982,10 +982,10 @@ class VankaPreCL
     /// \name Parallel preconditioner setup ...
     //@{
     bool NeedDiag() const { return false; }
-    void SetDiag(const VectorCL&) {}        // just for consistency
-    template<typename Mat, typename ExT>
-    void SetDiag(const Mat&, const ExT&) const {}             // just for consistency
     bool RetAcc()   const { return true; }
+    template<typename Mat, typename ExT>
+    void SetDiag( const Mat&, const ExT&) {} // just for consistency
+    void SetDiag( const VectorCL&)        {} // just for consistency
     //@}
 };
 
@@ -1036,10 +1036,10 @@ class VankaSchurPreCL: public SchurPreBaseCL
     /// \name Parallel preconditioner setup ...
     //@{
     bool NeedDiag() const { return false; }
-    void SetDiag(const VectorCL&) {}        // just for consistency
-    template<typename Mat, typename ExT>
-    void SetDiag(const Mat&, const ExT&) {}             // just for consistency
     bool RetAcc()   const { return true; }
+    template<typename Mat, typename ExT>
+    void SetDiag( const Mat&, const ExT&) {} // just for consistency
+    void SetDiag( const VectorCL&)        {} // just for consistency
     //@}
 };
 

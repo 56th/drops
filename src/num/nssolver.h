@@ -42,10 +42,10 @@ class NSSolverBaseCL : public SolverBaseCL
   protected:
     NavStokesT& NS_;
     StokesSolverBaseCL& solver_;
-    using SolverBaseCL::_iter;
-    using SolverBaseCL::_maxiter;
-    using SolverBaseCL::_tol;
-    using SolverBaseCL::_res;
+    using SolverBaseCL::iter_;
+    using SolverBaseCL::maxiter_;
+    using SolverBaseCL::tol_;
+    using SolverBaseCL::res_;
     using SolverBaseCL::rel_;
 
   public:
@@ -107,10 +107,10 @@ class AdaptFixedPtDefectCorrCL : public NSSolverBaseCL<NavStokesT>
     typedef NSSolverBaseCL<NavStokesT> base_;
     using base_::NS_;
     using base_::solver_;
-    using base_::_iter;
-    using base_::_maxiter;
-    using base_::_tol;
-    using base_::_res;
+    using base_::iter_;
+    using base_::maxiter_;
+    using base_::tol_;
+    using base_::res_;
 
     MLMatrixCL* AN_;
 
@@ -125,8 +125,8 @@ class AdaptFixedPtDefectCorrCL : public NSSolverBaseCL<NavStokesT>
     ~AdaptFixedPtDefectCorrCL() { delete AN_; }
 
     void SetReduction( double red) { red_= red; }
-    double   GetResid ()         const { return _res; }
-    int      GetIter  ()         const { return _iter; }
+    double   GetResid ()         const { return res_; }
+    int      GetIter  ()         const { return iter_; }
 
     const MLMatrixCL* GetAN()          { return AN_; }
 
@@ -186,10 +186,8 @@ class LineSearchPolicyCL
 #endif
         {}
 
-    /// \todo (merge) More "const" in Update make it easier to see, that no parameter vectors changes ...
     template<class NavStokesT>
-      void
-      Update (NavStokesT&, const MatrixCL&, const MatrixCL&,
+    void Update (NavStokesT&, const MatrixCL&, const MatrixCL&,
         const VecDescCL&, const VectorCL&, const VectorCL&, VecDescCL&, const VectorCL&,
         const VectorCL&, const VectorCL&, double);
 
@@ -203,8 +201,7 @@ class FixedPolicyCL
     FixedPolicyCL (size_t, size_t) {}
 
     template<class NavStokesT>
-      void
-      Update (NavStokesT&, const MatrixCL&, const MatrixCL&,
+    void Update (NavStokesT&, const MatrixCL&, const MatrixCL&,
         const VecDescCL&, const VectorCL&, const VectorCL&, VecDescCL&, const VectorCL&,
         const VectorCL&, const VectorCL&, double) {}
 
@@ -213,7 +210,7 @@ class FixedPolicyCL
 
 /// \brief Compute the relaxation factor in AdapFixedPtDefectCorrCL by Aitken's delta-squared method.
 ///
-/// This vector version of classical delta-squared concergence-acceleration computes the
+/// This vector version of classical delta-squared convergence-acceleration computes the
 /// relaxation factor in span{ (w, q)^T}.
 class DeltaSquaredPolicyCL
 {
@@ -231,8 +228,7 @@ class DeltaSquaredPolicyCL
           w_diff_( vsize), q_diff_( psize) {}
 
     template<class NavStokesT>
-      void
-      Update (NavStokesT& ns, const MatrixCL& A, const MatrixCL& B,
+    void Update (NavStokesT& ns, const MatrixCL& A, const MatrixCL& B,
         const VecDescCL& v, const VectorCL& p, const VectorCL& b, VecDescCL& cplN, const VectorCL& c,
         const VectorCL& w, const VectorCL& q, double alpha);
 
@@ -243,8 +239,7 @@ class DeltaSquaredPolicyCL
 //     template definitions
 //=================================
 template<class NavStokesT>
-  inline void
-  LineSearchPolicyCL::Update (NavStokesT& ns, const MatrixCL& A, const MatrixCL& B,
+inline void LineSearchPolicyCL::Update (NavStokesT& ns, const MatrixCL& A, const MatrixCL& B,
     const VecDescCL& v, const VectorCL& p, const VectorCL& b, VecDescCL& cplN, const VectorCL& c,
     const VectorCL& w, const VectorCL& q, double alpha)
 // accumulated and non accumulated vectors:
@@ -277,8 +272,7 @@ template<class NavStokesT>
 }
 
 template<class NavStokesT>
-  inline void
-  DeltaSquaredPolicyCL::Update (__UNUSED__ NavStokesT& ns, const MatrixCL&, const MatrixCL&,
+inline void DeltaSquaredPolicyCL::Update (__UNUSED__ NavStokesT& ns, const MatrixCL&, const MatrixCL&,
     const VecDescCL&, const VectorCL&, const VectorCL&, VecDescCL&, const VectorCL&,
     const VectorCL& w, const VectorCL& q, double)
 {
@@ -304,8 +298,7 @@ template<class NavStokesT>
 
 template<class NavStokesT, class RelaxationPolicyT>
 template<typename ExT>
-void
-AdaptFixedPtDefectCorrCL<NavStokesT, RelaxationPolicyT>::Solve(
+void AdaptFixedPtDefectCorrCL<NavStokesT, RelaxationPolicyT>::Solve(
     const MatrixCL& A, const MatrixCL& B, VecDescCL& v, VectorCL& p,
     const VectorCL& b, VecDescCL& cplN, const VectorCL& c, const ExT& ExVel, const ExT& ExPr, double alpha)
 {
@@ -318,7 +311,7 @@ AdaptFixedPtDefectCorrCL<NavStokesT, RelaxationPolicyT>::Solve(
     _iter= 0;
     for(;;++_iter) { // ever
         NS_.SetupNonlinear(&NS_.N, &v, &cplN);
-        //std::cout << "sup_norm : N: " << supnorm( _NS.N.Data) << std::endl;
+        //if (output_) (*output_) << "sup_norm : N: " << supnorm( _NS.N.Data) << std::endl;
         AN_->GetFinest().LinComb( 1., A, alpha, NS_.N.Data.GetFinest());
 
         // calculate defect:
@@ -327,8 +320,7 @@ AdaptFixedPtDefectCorrCL<NavStokesT, RelaxationPolicyT>::Solve(
 
         _res= std::sqrt( ExVel.Norm_sq(d, false) + ExPr.Norm_sq(e, false) );
 
-        /// \todo(merge) Do we need this output? Or should/could we use the (*output_)?
-        std::cout << _iter << ": res = " << _res << " reltol: " << this->GetRelError() << std::endl;
+        if (output_) (*output_) << _iter << ": res = " << _res << " reltol: " << this->GetRelError() << std::endl;
         if (this->GetRelError() == true && _iter == 0)
             res0= _res;
         if (_res < _tol*res0 || _iter>=_maxiter) // if absolute errors are required, res0==1.
@@ -348,17 +340,16 @@ AdaptFixedPtDefectCorrCL<NavStokesT, RelaxationPolicyT>::Solve(
 
         // update solution:
         const double omega( relax.RelaxFactor());
-        std::cout << "omega = " << omega << std::endl;
+        if (output_) (*output_) << "omega = " << omega << std::endl;
         v.Data-= omega*w;
         p     -= omega*q;
     }
-      std::cout << "overall iterations of Oseen solver:\t" << oseenIter << std::endl;
+    if (output_) (*output_) << "overall iterations of Oseen solver:\t" << oseenIter << std::endl;
 }
 
 template<class NavStokesT, class RelaxationPolicyT>
 template<typename ExT>
-void
-AdaptFixedPtDefectCorrCL<NavStokesT, RelaxationPolicyT>::Solve(
+void AdaptFixedPtDefectCorrCL<NavStokesT, RelaxationPolicyT>::Solve(
     const MLMatrixCL& A, const MLMatrixCL& B, VecDescCL& v, VectorCL& p,
     const VectorCL& b, VecDescCL& cplN, const VectorCL& c, const ExT& ExVel, const ExT& ExPr, double alpha)
 {
@@ -369,17 +360,17 @@ AdaptFixedPtDefectCorrCL<NavStokesT, RelaxationPolicyT>::Solve(
     double res0= 1.;
     int oseenIter= 0;
 
-    _iter= 0;
-    for(;;++_iter) { // ever
+    iter_= 0;
+    for(;;++iter_) { // ever
         NS_.SetupNonlinear(&NS_.N, &v, &cplN);
-        //std::cout << "sup_norm : N: " << supnorm( _NS.N.Data) << std::endl;
+        //if (output_) (*output_) << "sup_norm : N: " << supnorm( _NS.N.Data) << std::endl;
         AN_->LinComb( 1., A, alpha, NS_.N.Data);
         // calculate defect:
         d= *AN_*v.Data + transp_mul( B, p) - b - alpha*cplN.Data;
         e= B*v.Data - c;
-        _res= std::sqrt( ExVel.Norm_sq(d, false) + ExPr.Norm_sq(e, false) );
+        res_= std::sqrt( ExVel.Norm_sq(d, false) + ExPr.Norm_sq(e, false) );
 
-        std::cout << _iter << ": res = " << _res << " reltol: " << this->GetRelError() << std::endl;
+        if (output_) (*output_) << _iter << ": res = " << _res << " reltol: " << this->GetRelError() << std::endl;
         if (this->GetRelError() == true && _iter == 0)
             res0= _res;
         if (_res < _tol*res0 || _iter>=_maxiter) // if absolute errors are required, res0==1.
@@ -399,11 +390,11 @@ AdaptFixedPtDefectCorrCL<NavStokesT, RelaxationPolicyT>::Solve(
 
         // update solution:
         const double omega( relax.RelaxFactor());
-        std::cout << "omega = " << omega << std::endl;
+        if (output_) (*output_) << "omega = " << omega << std::endl;
         v.Data-= omega*w;
         p     -= omega*q;
     }
-    std::cout << "overall iterations of Oseen solver:\t" << oseenIter << std::endl;
+    if (output_) (*output_) << "overall iterations of Oseen solver:\t" << oseenIter << std::endl;
 }
 
 }    // end of namespace DROPS

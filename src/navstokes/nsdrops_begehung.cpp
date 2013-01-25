@@ -136,8 +136,8 @@ void PSchurSolverCL<PoissonSolverT>::doSolve(const Mat& A, const Mat& B, Vec& v,
     rhs+= B*_tmp;
 
     std::cout << "rhs has been set! Now solving pressure..." << std::endl;
-    int iter= _maxiter;
-    double tol= _tol;
+    int iter= maxiter_;
+    double tol= tol_;
     PCG( SchurComplMatrixCL<PoissonSolverT, Mat, DummyExchangeCL>( _poissonSolver, A, B, DummyExchangeCL()), p, rhs, DummyExchangeCL(), _schurPc, iter, tol);
     std::cout << "iterations: " << iter << "\tresidual: " << tol << std::endl;
     std::cout << "pressure has been solved! Now solving velocities..." << std::endl;
@@ -146,8 +146,8 @@ void PSchurSolverCL<PoissonSolverT>::doSolve(const Mat& A, const Mat& B, Vec& v,
     std::cout << "iterations: " << _poissonSolver.GetIter()
               << "\tresidual: " << _poissonSolver.GetResid() << std::endl;
 
-    _iter= iter+_poissonSolver.GetIter();
-    _res= std::sqrt( tol*tol + _poissonSolver.GetResid()*_poissonSolver.GetResid());
+    iter_= iter+_poissonSolver.GetIter();
+    res_= std::sqrt( tol*tol + _poissonSolver.GetResid()*_poissonSolver.GetResid());
     std::cout << "-----------------------------------------------------" << std::endl;
 }
 
@@ -221,12 +221,12 @@ inline void Uzawa_IPCG_CL::doSolve(
         p_corr(p.size()),
         res1(v.size()),
         res2(p.size());
-    double tol= _tol;
+    double tol= tol_;
     tol*= tol;
     Uint output= 50;//max_iter/20;  // nur 20 Ausgaben pro Lauf
 
     double res1_norm= 0., res2_norm= 0.;
-    for( _iter=0; _iter<_maxiter; ++_iter)
+    for( iter_=0; iter_<maxiter_; ++iter_)
     {
 //        _poissonSolver.Solve( _M, p_corr, res2= B*v - c);
         z_xpay(res2, B*v, -1.0, c);
@@ -240,19 +240,19 @@ inline void Uzawa_IPCG_CL::doSolve(
 
         if (res1_norm + res2_norm < tol)
         {
-            _res= std::sqrt( res1_norm + res2_norm );
+            res_= std::sqrt( res1_norm + res2_norm );
             return;
         }
 
-        if( (_iter%output)==0 )
-            std::cout << "step " << _iter << ": norm of 1st eq= " << std::sqrt( res1_norm)
+        if( (iter_%output)==0 )
+            std::cout << "step " << iter_ << ": norm of 1st eq= " << std::sqrt( res1_norm)
                       << ", norm of 2nd eq= " << std::sqrt( res2_norm) << std::endl;
 
         _A_IPCGsolver.Solve( A, v_corr, res1, DummyExchangeCL());
 //        v-= v_corr;
         axpy(-1.0, v_corr, v);
     }
-    _res= std::sqrt( res1_norm + res2_norm );
+    res_= std::sqrt( res1_norm + res2_norm );
 }
 
 inline void Uzawa_IPCG_CL::Solve(

@@ -337,9 +337,6 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
                                                         P.get<int>("Restart.Binary"),
                                                         vel_downwind, lset_downwind);
     Stokes.v.t += GetTimeOffset();
-
-    DummyExchangeCL dummy;
-    std::cout << dummy.LocalDot(Stokes.v.Data, true, Stokes.v.Data, true);
     // Output-Registrations:
 #ifndef _PAR
     Ensight6OutCL* ensight = NULL;

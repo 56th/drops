@@ -121,9 +121,9 @@ class MGSolverCL : public SolverBaseCL
     void Solve(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const ExT&)
     {
         smoother_.SetDiag(A, idx_);
-        _res=  _tol;
-        _iter= _maxiter;
-        MG( A, P, smoother_, directSolver_, x, b, idx_, _iter, _res, residerr_, smoothSteps_, usedLevels_);
+        res_=  tol_;
+        iter_= maxiter_;
+        MG( A, P, smoother_, directSolver_, x, b, idx_, iter_, res_, residerr_, smoothSteps_, usedLevels_);
     }
     template<typename ExT>
     void Solve(const MatrixCL&, VectorCL&, const VectorCL&, const ExT&)

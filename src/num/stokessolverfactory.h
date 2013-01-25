@@ -36,7 +36,7 @@ enum OseenSolverE {
 
 /// codes for velocity preconditioners (also including smoothers for the StokesMGM_OS)
 enum APcE {
-    MG_APC= 1, MGsymm_APC= 2, PCG_APC= 3, GMRes_APC= 4, BiCGStab_APC= 5, VankaBlock_APC= 6, IDRs_APC=7, GS_GMRes_APC= 8, AMG_APC= 20, // preconditioners 
+    MG_APC= 1, MGsymm_APC= 2, PCG_APC= 3, GMRes_APC= 4, BiCGStab_APC= 5, VankaBlock_APC= 6, IDRs_APC=7, GS_GMRes_APC= 8, AMG_APC= 20, // preconditioners
     PVanka_SM= 30, BraessSarazin_SM= 31 // smoothers, nevertheless listed here
 };
 
@@ -344,7 +344,7 @@ class StokesSolverFactoryCL : public StokesSolverFactoryBaseCL<StokesT, Prolonga
     ProlongationPT*   GetPPr();
     /// Returns a stokes solver with specifications from ParamsT C
     StokesSolverBaseCL* CreateStokesSolver();
-    
+
     /// Returns a pointer to the used velocity preconditioner for the upper left block (aka A block)
     PreBaseCL*      GetVelPrePtr()   { return apc_; }
     /// Returns a pointer to the used pressure preconditioner for the schur complement
@@ -394,7 +394,7 @@ StokesSolverFactoryCL<StokesT, ProlongationVelT, ProlongationPT>::
         GMResLBlock_(0),  GMResVanka_(0),
         GMResRLBlock_(0), GMResRVanka_(0),
         // lanczos objects
-        lanczos_ (0), 
+        lanczos_ (0),
         // PMinRes solver
         MinRes_(0),
         // IDRs solver
@@ -434,7 +434,7 @@ bool StokesSolverFactoryCL<StokesT, ProlongationVelT, ProlongationPT>::ValidSolv
         msg= "unknown vel preconditioner";
     else if (StokesSolverInfoCL::GetSchurPreName(SPc_)=="unknown")
         msg= "unknown pr preconditioner";
-    else if (OseenSolver_==StokesMGM_OS && (!StokesSolverInfoCL::EqualStokesMGSmoother( APc_, SPc_) || !StokesSolverInfoCL::IsSmoother(APc_) )) 
+    else if (OseenSolver_==StokesMGM_OS && (!StokesSolverInfoCL::EqualStokesMGSmoother( APc_, SPc_) || !StokesSolverInfoCL::IsSmoother(APc_) ))
         msg= "Stokes multigrid method requires smoother";
     else if ((StokesSolverInfoCL::IsSmoother(APc_) || StokesSolverInfoCL::IsSmoother(SPc_)) && OseenSolver_!=StokesMGM_OS)
         msg= "smoother makes no sense without multigrid solver";
@@ -512,7 +512,7 @@ StokesSolverBaseCL* StokesSolverFactoryCL<StokesT, ProlongationVelT, Prolongatio
 
     switch (OseenSolver_) {
         case iUzawa_OS: {
-            if (APc_==MGsymm_APC) // symmetric A preconditionder -> use more efficient version of inexact Uzawa
+            if (APc_==MGsymm_APC) // symmetric A preconditioner -> use more efficient version of inexact Uzawa
                 stokessolver= new InexactUzawaCL<ExpensivePreBaseCL, SchurPreBaseCL, APC_SYM>  ( *apc_, *spc_, P_.template get<int>("Stokes.OuterIter"), P_.template get<double>("Stokes.OuterTol"), P_.template get<double>("Stokes.InnerTol"), P_.template get<int>("Stokes.InnerIter"));
             else
                 stokessolver= new InexactUzawaCL<ExpensivePreBaseCL, SchurPreBaseCL, APC_OTHER>( *apc_, *spc_, P_.template get<int>("Stokes.OuterIter"), P_.template get<double>("Stokes.OuterTol"), P_.template get<double>("Stokes.InnerTol"), P_.template get<int>("Stokes.InnerIter"));
@@ -551,7 +551,7 @@ StokesSolverBaseCL* StokesSolverFactoryCL<StokesT, ProlongationVelT, Prolongatio
             } else {
                 LBlock_= new LowerBlockPcT( *apc_, *spc_);
                 GMResLBlock_= new GMRes_LBlockT( *LBlock_,  P_.template get<int>("Stokes.OuterIter"), P_.template get<int>("Stokes.OuterIter"), P_.template get<double>("Stokes.OuterTol"), /*rel*/ false, false, RightPreconditioning);
-                stokessolver= new BlockMatrixSolverCL<GMRes_LBlockT>( *GMResLBlock_);      
+                stokessolver= new BlockMatrixSolverCL<GMRes_LBlockT>( *GMResLBlock_);
             }
         }
         break;
@@ -563,7 +563,7 @@ StokesSolverBaseCL* StokesSolverFactoryCL<StokesT, ProlongationVelT, Prolongatio
             } else {
                 LBlock_= new LowerBlockPcT( *apc_, *spc_);
                 GMResRLBlock_= new GMResR_LBlockT( *LBlock_,  P_.template get<int>("Stokes.OuterIter"), P_.template get<int>("Stokes.OuterIter"), P_.template get<int>("Stokes.InnerIter"), P_.template get<double>("Stokes.OuterTol"), P_.template get<double>("Stokes.InnerTol"), /*rel*/ false);
-                stokessolver= new BlockMatrixSolverCL<GMResR_LBlockT>( *GMResRLBlock_);      
+                stokessolver= new BlockMatrixSolverCL<GMResR_LBlockT>( *GMResRLBlock_);
             }
         }
         break;
