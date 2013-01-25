@@ -12,11 +12,10 @@ exec_ser(compensight misc-utils)
 
 add_library(misc-scalarFunctions SHARED scalarFunctions)
 add_library(misc-vectorFunctions SHARED vectorFunctions)
-
-#remove suffix from shared libraries for inter-operability of osses.
-#set_property(TARGET misc-scalarFunctions misc-vectorFunctions PROPERTY SUFFIX "")
+add_library(misc-csgFunctions SHARED csgFunctions)
 
 if(NOT WIN32)
     target_link_libraries(misc-scalarFunctions)
     target_link_libraries(misc-vectorFunctions)
+    target_link_libraries(misc-csgFunctions misc-params geom-csg)
 endif(NOT WIN32)
