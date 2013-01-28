@@ -131,12 +131,12 @@ void UzawaSolverCL<PoissonSolverT>::doSolve(
         res1(v.size()),
         res2(p.size());
 
-    double tol= _tol;
+    double tol= tol_;
     tol*= tol;
     Uint output= 50;//max_iter/20;  // nur 20 Ausgaben pro Lauf
 
     double res1_norm= 0., res2_norm= 0.;
-    for( _iter=0; _iter<_maxiter; ++_iter) {
+    for( iter_=0; iter_<maxiter_; ++iter_) {
         z_xpay(res2, B*v, -1.0, c);
         res2_norm= norm_sq( res2);
         _poissonSolver.SetTol( std::sqrt( res2_norm)/20.0);
@@ -147,18 +147,18 @@ void UzawaSolverCL<PoissonSolverT>::doSolve(
         z_xpaypby2(res1, A*v, 1.0, transp_mul(B,p), -1.0, b);
         res1_norm= norm_sq( res1);
         if (res1_norm + res2_norm < tol) {
-            _res= std::sqrt( res1_norm + res2_norm );
+            res_= std::sqrt( res1_norm + res2_norm );
             return;
         }
-        if( (_iter%output)==0)
-            std::cout << "step " << _iter << ": norm of 1st eq= " << std::sqrt( res1_norm)
+        if( (iter_%output)==0)
+            std::cout << "step " << iter_ << ": norm of 1st eq= " << std::sqrt( res1_norm)
                       << ", norm of 2nd eq= " << std::sqrt( res2_norm) << std::endl;
 
         _poissonSolver.SetTol( std::sqrt( res1_norm)/20.0);
         _poissonSolver.Solve( A, v_corr, res1, DummyExchangeCL());
         v-= v_corr;
     }
-    _res= std::sqrt( res1_norm + res2_norm );
+    res_= std::sqrt( res1_norm + res2_norm );
 }
 
 template <class PoissonSolverT>

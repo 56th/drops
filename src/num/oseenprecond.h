@@ -362,7 +362,8 @@ class ISBBTPreCL : public SchurPreBaseCL
 
     using SchurPreBaseCL::Apply;
 
-    void SetMatrices (const MatrixCL* B, const MatrixCL* Mvel, const MatrixCL* M, const IdxDescCL* pr_idx) {
+    void SetMatrices (const MatrixCL* B, const MatrixCL* Mvel, const MatrixCL* M, const IdxDescCL* pr_idx)
+    {
         B_= B;
         Mvel_= Mvel;
         M_= M;
@@ -403,26 +404,26 @@ void ISBBTPreCL::Apply(const Mat&, Vec& p, const Vec& c, const ExT& vel_ex, cons
     p= 0.0;
     if (kA_ != 0.0) {
         solver_.Solve( *Bs_, p, VectorCL( Dprsqrtinv_*c), vel_ex, p_ex);
-        if (output_)
-            *output_ << "ISBBTPreCL p: iterations: " << solver_.GetIter()
-                     << "\tresidual: " <<  solver_.GetResid();
         if (solver_.GetIter() == solver_.GetMaxIter()){
             std::cout << "ISBBTPreCL::Apply: BBT-solve: " << solver_.GetIter()
-                    << '\t' << solver_.GetResid() << '\n';
+                    << " (max)\t" << solver_.GetResid() << '\n';
         }
+        else if (output_)
+            *output_ << "ISBBTPreCL BBT-solve: iterations: " << solver_.GetIter()
+                     << "\tresidual: " <<  solver_.GetResid();
         p= kA_*(Dprsqrtinv_*p);
     }
     if (kM_ != 0.0) {
         Vec p2_( c.size());
         solver2_.Solve( *M_, p2_, c, p_ex);
-        if (output_)
-            *output_ << "\tISBBTPreCL p2: iterations: " << solver2_.GetIter()
-                     << "\tresidual: " <<  solver2_.GetResid()
-                     << '\n';
         if (solver2_.GetIter() == solver2_.GetMaxIter()){
             std::cout << "ISBBTPreCL::Apply: M-solve: " << solver2_.GetIter()
-                    << '\t' << solver2_.GetResid() << '\n';
+                    << " (max)\t" << solver2_.GetResid() << '\n';
         }
+        else if (output_)
+            *output_ << "\tISBBTPreCL M-solve: iterations: " << solver2_.GetIter()
+                     << "\tresidual: " <<  solver2_.GetResid()
+                     << '\n';
 
         p+= kM_*p2_;
     }
@@ -470,9 +471,7 @@ class MinCommPreCL : public SchurPreBaseCL
           spc_( pc.spc_), solver_( spc_, 200, tol_, /*relative*/ true),
           pr_idx_( pc.pr_idx_), regularize_( pc.regularize_) {}
 
-    MinCommPreCL& operator= (const MinCommPreCL&) {
-        throw DROPSErrCL( "MinCommPreCL::operator= is not permitted.\n");
-    }
+    MinCommPreCL& operator= (const MinCommPreCL&)     { throw DROPSErrCL( "MinCommPreCL::operator= is not permitted.\n"); }
 
     ~MinCommPreCL () { delete Bs_; }
 
@@ -488,8 +487,8 @@ class MinCommPreCL : public SchurPreBaseCL
     using SchurPreBaseCL::Apply;
 
     void SetMatrixA  (const MatrixCL* A) { A_= A; }
-    void SetMatrices (const MatrixCL* A, const MatrixCL* B, const MatrixCL* Mvel, const MatrixCL* M,
-                      const IdxDescCL* pr_idx) {
+    void SetMatrices (const MatrixCL* A, const MatrixCL* B, const MatrixCL* Mvel, const MatrixCL* M, const IdxDescCL* pr_idx)
+    {
         A_= A;
         B_= B;
         Mvel_= Mvel;
@@ -500,8 +499,7 @@ class MinCommPreCL : public SchurPreBaseCL
 };
 
 template <typename Mat, typename Vec, typename ExT>
-  void
-  MinCommPreCL::Apply (const Mat&, Vec& x, const Vec& b, const ExT& vel_ex, const ExT& pr_ex) const
+void MinCommPreCL::Apply (const Mat&, Vec& x, const Vec& b, const ExT& vel_ex, const ExT& pr_ex) const
 {
     if ((A_->Version() != Aversion_) || (Mvel_->Version() != Mvelversion_) || (B_->Version() != Bversion_))
         Update(vel_ex, pr_ex);
@@ -510,6 +508,9 @@ template <typename Mat, typename Vec, typename ExT>
     solver_.Solve( *Bs_, y, VectorCL( Dprsqrtinv_*b), vel_ex, pr_ex);
     if (solver_.GetIter() == solver_.GetMaxIter())
         std::cout << "MinCommPreCL::Apply: 1st BBT-solve: " << solver_.GetIter()
+                  << " (max)\t" << solver_.GetResid() << '\n';
+    else if (output_)
+        *output_  << "MinCommPreCL::Apply: 1st BBT-solve: " << solver_.GetIter()
                   << '\t' << solver_.GetResid() << '\n';
     y*= Dprsqrtinv_;
     VectorCL z( Dprsqrtinv_*((*B_)*vel_ex.GetAccumulate(VectorCL( Dvelsqrtinv_*Dvelsqrtinv_*
@@ -518,6 +519,9 @@ template <typename Mat, typename Vec, typename ExT>
     solver_.Solve( *Bs_, t, z, vel_ex, pr_ex);
     if (solver_.GetIter() == solver_.GetMaxIter())
         std::cout << "MinCommPreCL::Apply: 2nd BBT-solve: " << solver_.GetIter()
+                  << " (max)\t" << solver_.GetResid() << '\n';
+    else if (output_)
+        *output_  << "MinCommPreCL::Apply: 2nd BBT-solve: " << solver_.GetIter()
                   << '\t' << solver_.GetResid() << '\n';
     x= Dprsqrtinv_*t;
 }
@@ -659,8 +663,7 @@ class BDinvBTPreCL: public SchurPreBaseCL
 
 #ifdef _PAR
 template <typename Mat, typename Vec>
-  void
-  BDinvBTPreCL::Apply (const Mat&, Vec& x, const Vec& b, const ExchangeCL& vel_ex, const ExchangeCL& pr_ex) const
+void BDinvBTPreCL::Apply (const Mat&, Vec& x, const Vec& b, const ExchangeCL& vel_ex, const ExchangeCL& pr_ex) const
 {
     if ((L_->Version() != Lversion_) || (Mvel_->Version() != Mvelversion_) || (M_->Version() != Mversion_) || (B_->Version() != Bversion_))
         Update( vel_ex, pr_ex);
@@ -675,8 +678,7 @@ template <typename Mat, typename Vec>
 #endif
 
 template <typename Mat, typename Vec>
-  void
-  BDinvBTPreCL::Apply (const Mat&, Vec& x, const Vec& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& pr_ex) const
+  void BDinvBTPreCL::Apply (const Mat&, Vec& x, const Vec& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& pr_ex) const
 {
     if ((L_->Version() != Lversion_) || (Mvel_->Version() != Mvelversion_) || (M_->Version() != Mversion_) || (B_->Version() != Bversion_))
         Update( vel_ex, pr_ex);
@@ -693,8 +695,7 @@ template <typename Mat, typename Vec>
 struct UpperBlockPreCL
 {
     template <class PC1T, class PC2T, class Mat, class Vec, class ExT>
-    static void
-    Apply (const PC1T& pc1, const PC2T& pc2, const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c, const ExT& vel_ex, const ExT& pr_ex) {
+    static void Apply (const PC1T& pc1, const PC2T& pc2, const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c, const ExT& vel_ex, const ExT& pr_ex) {
         pc2.Apply( /*dummy*/ B, p, c, vel_ex, pr_ex);
         p*= -1.;
         Vec b2( b);
@@ -709,8 +710,7 @@ struct UpperBlockPreCL
 struct DiagBlockPreCL
 {
     template <class PC1T, class PC2T, class Mat, class Vec, class ExT>
-    static void
-    Apply (const PC1T& pc1, const PC2T& pc2, const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c, const ExT& vel_ex, const ExT& pr_ex) {
+    static void Apply (const PC1T& pc1, const PC2T& pc2, const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c, const ExT& vel_ex, const ExT& pr_ex) {
         pc1.Apply( A, v, b, vel_ex);
         if (!pc1.RetAcc())
             vel_ex.Accumulate(v);
@@ -723,8 +723,7 @@ struct DiagBlockPreCL
 struct DiagSpdBlockPreCL
 {
     template <class PC1T, class PC2T, class Mat, class Vec, class ExT>
-    static void
-    Apply (const PC1T& pc1, const PC2T& pc2, const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c, const ExT& vel_ex, const ExT& pr_ex) {
+    static void Apply (const PC1T& pc1, const PC2T& pc2, const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c, const ExT& vel_ex, const ExT& pr_ex) {
         pc1.Apply( A, v, b, vel_ex);
         if (!pc1.RetAcc())
             vel_ex.Accumulate(v);
@@ -736,8 +735,7 @@ struct DiagSpdBlockPreCL
 struct LowerBlockPreCL
 {
     template <class PC1T, class PC2T, class Mat, class Vec, class ExT>
-    static void
-    Apply (const PC1T& pc1, const PC2T& pc2, const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c, const ExT& vel_ex, const ExT& pr_ex) {
+    static void Apply (const PC1T& pc1, const PC2T& pc2, const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c, const ExT& vel_ex, const ExT& pr_ex) {
         pc1.Apply( A, v, b, vel_ex);
         if (!pc1.RetAcc())
             vel_ex.Accumulate(v);
@@ -750,8 +748,7 @@ struct LowerBlockPreCL
 struct SIMPLERBlockPreCL
 {
     template <class PC1T, class PC2T, class Mat, class Vec, class ExT>
-    static void
-    Apply (PC1T& pc1, PC2T& pc2, const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c, const ExT& vel_ex, const ExT& pr_ex) {
+    static void Apply (PC1T& pc1, PC2T& pc2, const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c, const ExT& vel_ex, const ExT& pr_ex) {
         Vec D( pc2.GetVelDiag(vel_ex, pr_ex)), dp(p);
 
         // find some initial pressure for the SIMPLER preconditioner (initial p=0 would result in SIMPLE)
@@ -786,14 +783,12 @@ class BlockPreCL
         : pc1_( pc1), pc2_( pc2) {}
 
     template <typename Mat, typename Vec, typename ExT>
-    void
-    Apply(const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c, const ExT& vel_ex, const ExT& pr_ex) const {
+    void Apply(const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c, const ExT& vel_ex, const ExT& pr_ex) const {
         BlockShapeT::Apply( pc1_, pc2_, A, B, v, p, b, c, vel_ex, pr_ex);
     }
 
     template <typename Mat, typename Vec, typename ExT>
-    void
-    Apply(const BlockMatrixBaseCL<Mat>& A, Vec& x, const Vec& b, const ExT& ex) const {
+    void Apply(const BlockMatrixBaseCL<Mat>& A, Vec& x, const Vec& b, const ExT& ex) const {
         VectorCL b0( b[std::slice( 0, A.num_rows( 0), 1)]);
         VectorCL b1( b[std::slice( A.num_rows( 0), A.num_rows( 1), 1)]);
         VectorCL x0( A.num_cols( 0));
@@ -818,7 +813,7 @@ class BlockPreCL
     void SetDiag(const Mat& A, const ExT& ex) const
     {
         pc1_.SetDiag(*A.GetBlock( 0), ex.GetEx(0));
-        pc2_.SetDiag(/*dummy*/ *(A.GetBlock( 3)!=0 ? A.GetBlock( 3) : A.GetBlock( 1)), A.GetBlock( 3)!=0 ? ex.GetEx( 2) : ex.GetEx( 0));
+        pc2_.SetDiag(/*dummy*/ *(A.GetBlock( 3)!=0 ? A.GetBlock( 3) : A.GetBlock( 1)), A.GetBlock( 3)!=0 ? ex.GetEx( 1) : ex.GetEx( 0));
     }
     const PC1T& GetPC1() const { return pc1_; }
           PC1T& GetPC1()       { return pc1_; }
@@ -842,8 +837,7 @@ void ISMGPreCL<ProlongationT>::MaybeInitOnes() const
 
 template<class ProlongationT>
 template <typename Mat, typename Vec, typename ExT>
-void
-ISMGPreCL<ProlongationT>::Apply(const Mat& /*A*/, Vec& p, const Vec& c, const ExT&, const ExT&) const
+void ISMGPreCL<ProlongationT>::Apply(const Mat& /*A*/, Vec& p, const Vec& c, const ExT&, const ExT&) const
 {
     MaybeInitOnes();
     p= 0.0;

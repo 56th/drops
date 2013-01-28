@@ -142,7 +142,7 @@ void Strategy( StokesProblemT& Stokes, const BndDataCL<>& lsbnd)
     typedef SolverAsPreCL<PCGSolverCL<GSPcCL> > PCGPcT;
     PCGPcT apc( PCGsolver);
     ISBBTPreCL bbtispc( &Stokes.B.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.M.Data.GetFinest(), Stokes.pr_idx.GetFinest(), 0.0, 1.0, 1e-4, 1e-4);
-    InexactUzawaCL<PCGPcT, ISBBTPreCL, APC_SYM> inexactuzawasolver( apc, bbtispc, 200, outer_tol, 0.6, 50);
+    InexactUzawaCL<PCGPcT, ISBBTPreCL, APC_OTHER> inexactuzawasolver( apc, bbtispc, 200, outer_tol, 0.6, 50);
 
     {
         std::cout << "Computing initial velocity..." << std::endl;

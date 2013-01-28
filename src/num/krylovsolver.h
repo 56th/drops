@@ -54,6 +54,7 @@ bool CG(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, int& max_iter,
     /// \param[in]     ExX      ExchangeCL corresponding to the RowIdx of x and the ColIdx of A
     /// \param[in,out] max_iter IN: maximal iterations, OUT: used iterations
     /// \param[in,out] tol      IN: tolerance for the residual, OUT: residual
+    /// \param[in]     measure_relative_tol  true: stop if |b - Ax|/|b| <= tol, false: stop if |b - Ax| <= tol.
     /// \return                 convergence within max_iter iterations
 {
     Vec r( b - A*x_acc ), r_acc(r);
@@ -113,7 +114,7 @@ bool PCG(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX,
     /// \param[in,out] M                    Preconditioner
     /// \param[in,out] max_iter             IN: maximal iterations, OUT: used iterations
     /// \param[in,out] tol                  IN: tolerance for the residual, OUT: residual
-    /// \param[in]     measure_relative_tol measure resid relative
+    /// \param[in]     measure_relative_tol measure relative residual
     /// \return                             convergence within max_iter iterations
 {
     // Check if preconditioner needs diagonal of matrix. The preconditioner
@@ -293,6 +294,8 @@ void GMRES_Update(Vec &x, int k, const Mat &H, const Vec &s, const std::vector<V
         x += y[i] * v[i];
 }
 enum PreMethGMRES { RightPreconditioning, LeftPreconditioning};
+
+#ifndef _PAR
 //-----------------------------------------------------------------------------
 // GMRES: The return value indicates convergence within max_iter (input)
 // iterations (true), or no convergence within max_iter iterations (false).
@@ -312,7 +315,6 @@ enum PreMethGMRES { RightPreconditioning, LeftPreconditioning};
 //     if LeftPreconditioning, solve the left-preconditioned GMRES:   M^(-1)*A*x= M^(-1)*b,
 //TODO: bug in RightPreconditioning?
 //-----------------------------------------------------------------------------
-#ifndef _PAR
 template <typename Mat, typename Vec, typename PreCon, typename ExT>
 bool
 GMRES(const Mat& A, Vec& x, const Vec& b, const ExT& ex, PreCon& M,
@@ -516,7 +518,7 @@ template <typename Mat, typename Vec, typename PreCon, typename ExCL>
     /// \param[in]     measure_relative_tol if true stop if |M^(-1)(b-Ax)|/|M^(-1)b| <= tol, else stop if |M^(-1)(b-Ax)|<=tol
     /// \param[in]     method               left or right preconditioning (see solver.h for definition and declaration)
     /// \return  convergence within max_iter iterations
-    /// \pre     the preconditioner should be able to handle a accumulated b
+    /// \pre     the preconditioner should be able to handle an accumulated b
 {
     // Check if preconditioner needs diagonal of matrix. The preconditioner
     // only computes the diagonal new, if the matrix has changed
@@ -770,13 +772,13 @@ template <typename Mat, typename Vec, typename PreCon, typename ExCL>
     /// \param[in,out] max_iter             IN: maximal iterations, OUT: used iterations
     /// \param[in,out] tol                  IN: tolerance for the residual, OUT: residual
     /// \param[in]     measure_relative_tol if true stop if |M^(-1)(b-Ax)|/|M^(-1)b| <= tol, else stop if |M^(-1)(b-Ax)|<=tol
-    /// \param[in]     useMGS               use modified Gram-Schmidt ortogonalization (many more sync-points exists!)
+    /// \param[in]     useMGS               use modified Gram-Schmidt orthogonalization (many more sync-points exists!)
     /// \param[in]     method               left or right preconditioning (see solver.h for definition and declaration)
     /// \return  convergence within max_iter iterations
     /// \pre     the preconditioner should be able to handle a accumulated b
 {
     // Check if preconditioner needs diagonal of matrix. The preconditioner
-    // only computes the diagonal new, if the matrix has changed
+    // only recomputes the diagonal, if the matrix has changed
     if (M.NeedDiag())
         M.SetDiag(A, ExX);
 
@@ -835,7 +837,7 @@ template <typename Mat, typename Vec, typename PreCon, typename ExCL>
                     w_acc = w;
             }
 
-            // Gram-Schmidt ortogonalization without  update of w!
+            // Gram-Schmidt orthogonalization without  update of w!
             if (!useMGS)
                 StandardGramSchmidt(H, w_acc, true, v_acc, true, i, ExX, tmpHCol);
             else
@@ -892,15 +894,15 @@ template <typename Mat, typename Vec, typename PreCon, typename ExCL>
 }
 #endif
 
-// One recursive step of Lanzcos' algorithm for computing an ONB (q1, q2, q3,...)
-// of the Krylovspace of A for a given starting vector r. This is a three term
-// recursion, computing the next q_i from the two previous ones.
-// See Arnold Reusken, "Numerical methods for elliptic partial differential equations",
-// p. 148.
-// Returns false for 'lucky breakdown' (see below), true in the generic case.
+/** One recursive step of Lanzcos' algorithm for computing an ONB (q1, q2, q3,...)
+ * of the Krylovspace of A for a given starting vector r.
+ *
+ * This is a three term recursion, computing the next q_i from the two previous ones.
+ * See Arnold Reusken, "Numerical methods for elliptic partial differential equations", p. 148.
+ * Returns false for 'lucky breakdown' (see below), true in the generic case.
+ */
 template <typename Mat, typename Vec>
-bool
-LanczosStep(const Mat& A,
+bool LanczosStep(const Mat& A,
             const Vec& q0, const Vec& q1, Vec& q2,
             double& a1,
             const double b0, double& b1)
@@ -930,9 +932,10 @@ class LanczosONBCL
     double a0;
     SBufferCL<double, 2> b;
 
+    /// Sets up initial values and computes q0.
     template <typename Mat, typename ExT>
-    void // Sets up initial values and computes q0.
-    new_basis(const Mat& A, const Vec& r0, const ExT&) {
+    void new_basis(const Mat& A, const Vec& r0, const ExT&)
+    {
         q[-1].resize( r0.size(), 0.);
         norm_r0_= norm( r0);
         q[0].resize( r0.size(), 0.); q[0]= r0/norm_r0_;
@@ -941,31 +944,28 @@ class LanczosONBCL
         nobreakdown_= LanczosStep( A, q[-1], q[0], q[1], a0, b[-1], b[0]);
     }
 
-    double norm_r0() const {
-        return norm_r0_; }
-    bool
-    breakdown() const {
-        return !nobreakdown_; }
-    // Computes new q_i, a_i, b_1, q_{i+1} in q0, a0, b0, q1 and moves old
-    // values to qm1, bm1.
+    double norm_r0()   const { return norm_r0_; }
+    bool   breakdown() const { return !nobreakdown_; }
+
+    /// Computes new q_i, a_i, b_1, q_{i+1} in q0, a0, b0, q1 and moves old values to qm1, bm1.
     template <typename Mat, typename ExT>
-    bool
-    next( const Mat& A, const ExT&) {
+    bool next( const Mat& A, const ExT&)
+    {
         q.rotate(); b.rotate();
         return (nobreakdown_= LanczosStep( A, q[-1], q[0], q[1], a0, b[-1], b[0]));
     }
 };
 
 
-// One recursive step of the preconditioned Lanzcos algorithm for computing an ONB of
-// a Krylovspace. This is a three term
-// recursion, computing the next q_i from the two previous ones.
-// See Arnold Reusken, "Numerical methods for elliptic partial differential equations",
-// p. 153.
-// Returns false for 'lucky breakdown' (see below), true in the generic case.
+/** One recursive step of the preconditioned Lanzcos' algorithm for computing an ONB (q1, q2, q3,...)
+ * of the Krylovspace of A for a given starting vector r.
+ *
+ * This is a three term recursion, computing the next q_i from the two previous ones.
+ * See Arnold Reusken, "Numerical methods for elliptic partial differential equations", p. 153.
+ * Returns false for 'lucky breakdown' (see below), true in the generic case.
+ */
 template <typename Mat, typename Vec, typename PreCon, typename ExT>
-bool
-PLanczosStep(const Mat& A,
+bool PLanczosStep(const Mat& A,
              const PreCon& M,
              const Vec& q1, Vec& q2,
              const Vec& t0, const Vec& t1, Vec& t2,
@@ -1003,9 +1003,10 @@ class PLanczosONBCL
     PLanczosONBCL(const PreCon& M_)
       : M( M_) {}
 
+    /// Sets up initial values and computes q0.
     template <typename Mat, typename ExT>
-    void // Sets up initial values and computes q0.
-    new_basis(const Mat& A, const Vec& r0, const ExT& ex) {
+    void new_basis(const Mat& A, const Vec& r0, const ExT& ex)
+    {
         t[-1].resize( r0.size(), 0.);
         q[-1].resize( r0.size(), 0.); M.Apply( A, q[-1], r0, ex);
         norm_r0_= std::sqrt( dot( q[-1], r0));
@@ -1016,16 +1017,13 @@ class PLanczosONBCL
         nobreakdown_= PLanczosStep( A, M, q[0], q[1], t[-1], t[0], t[1], a0, b[-1], b[0], ex);
     }
 
-    double norm_r0() const {
-        return norm_r0_; }
-    bool
-    breakdown() const {
-        return !nobreakdown_; }
-    // Computes new q_i, t_i, a_i, b_1, q_{i+1} in q0, t_0, a0, b0, q1 and moves old
-    // values to qm1, tm1, bm1.
+    double norm_r0()   const { return norm_r0_; }
+    bool   breakdown() const { return !nobreakdown_; }
+
+    /// Computes new q_i, t_i, a_i, b_1, q_{i+1} in q0, t_0, a0, b0, q1 and moves old values to qm1, tm1, bm1.
     template <typename Mat, typename ExT>
-    bool
-    next(const Mat& A, const ExT& ex) {
+    bool next(const Mat& A, const ExT& ex)
+    {
         q.rotate(); t.rotate(); b.rotate();
         return (nobreakdown_= PLanczosStep( A, M, q[0], q[1], t[-1], t[0], t[1], a0, b[-1], b[0], ex));
     }
@@ -1047,9 +1045,7 @@ class PLanczosONBCL
 //     if false, stop if (M^(-1)( b - Ax), b - Ax) <= tol.
 //-----------------------------------------------------------------------------
 template <typename Mat, typename Vec, typename Lanczos, typename ExT>
-bool
-PMINRES(const Mat& A, Vec& x, const Vec&, const ExT& ex, Lanczos& q, int& max_iter, double& tol,
-    bool measure_relative_tol= false)
+bool PMINRES(const Mat& A, Vec& x, const Vec&, const ExT& ex, Lanczos& q, int& max_iter, double& tol, bool measure_relative_tol= false)
 {
     Vec dx( x.size());
     const double norm_r0= q.norm_r0();
@@ -1132,9 +1128,7 @@ PMINRES(const Mat& A, Vec& x, const Vec&, const ExT& ex, Lanczos& q, int& max_it
 
 
 template <typename Mat, typename Vec, typename ExT>
-bool
-MINRES(const Mat& A, Vec& x, const Vec& rhs, const ExT& ex, int& max_iter, double& tol,
-    bool measure_relative_tol= false)
+bool MINRES(const Mat& A, Vec& x, const Vec& rhs, const ExT& ex, int& max_iter, double& tol, bool measure_relative_tol= false)
 {
     LanczosONBCL<Vec> q;
     q.new_basis( A, Vec( rhs - A*x), ex);
@@ -1146,7 +1140,7 @@ MINRES(const Mat& A, Vec& x, const Vec& rhs, const ExT& ex, int& max_iter, doubl
 // BiCGSTAB
 //
 // BiCGSTAB solves the non-symmetric linear system Ax = b
-// using the Preconditioned BiConjugate Gradient Stabilized method
+// using the Preconditioned BiConjugate Gradient Stabilized method.
 //
 // BiCGSTAB follows the algorithm described on p. 27 of the
 // SIAM Templates book.
@@ -1168,10 +1162,8 @@ MINRES(const Mat& A, Vec& x, const Vec& rhs, const ExT& ex, int& max_iter, doubl
 //
 //*****************************************************************
 template <class Mat, class Vec, class Preconditioner, class ExT>
-bool
-BICGSTAB( const Mat& A, Vec& x, const Vec& b, const ExT& ex,
-    Preconditioner& M, int& max_iter, double& tol,
-    bool measure_relative_tol= true)
+bool BICGSTAB( const Mat& A, Vec& x, const Vec& b, const ExT& ex,
+         Preconditioner& M, int& max_iter, double& tol, bool measure_relative_tol= true)
 {
     double rho_1= 0.0, rho_2= 0.0, alpha= 0.0, beta= 0.0, omega= 0.0;
     Vec p( x.size()), phat( x.size()), s( x.size()), shat( x.size()),
@@ -1198,7 +1190,8 @@ BICGSTAB( const Mat& A, Vec& x, const Vec& b, const ExT& ex,
             std::cout << "BiCGSTAB: Breakdown with rho_1 = 0.\n";
             return false;
         }
-        if (i == 1) p= r;
+        if (i == 1)
+            p= r;
         else {
             beta= (rho_1/rho_2)*(alpha/omega);
             p= r + beta*(p - omega*v);
@@ -1448,7 +1441,7 @@ bool GCR(const Mat& A, Vec& x, const Vec& b, const ExCL& ExX, PreCon& M,
         }
         else {
 #ifdef _PAR
-            throw DROPSErrCL("ParPGCR: Sorry, truncation not implemented");
+            throw DROPSErrCL("GCR: Sorry, parallel truncation not implemented");
 #endif
             int min_idx= 0;
             double a_min= std::fabs( a[0]); // m >= 1, thus this access is valid.
@@ -1469,7 +1462,7 @@ bool GCR(const Mat& A, Vec& x, const Vec& b, const ExCL& ExX, PreCon& M,
 //*****************************************************************
 // GMRESR
 //
-// GMRESR solves the unsymmetric linear system Ax = b
+// GMRESR solves the non-symmetric linear system Ax = b
 // using the GMRES Recursive method;
 //
 // The return value indicates convergence within max_iter (input)
@@ -1488,11 +1481,11 @@ bool GCR(const Mat& A, Vec& x, const Vec& b, const ExCL& ExX, PreCon& M,
 //
 //*****************************************************************
 template <class Mat, class Vec, class Preconditioner, class ExT>
-bool
-GMRESR( const Mat& A, Vec& x, const Vec& b, const ExT& ex, Preconditioner& M,
+bool GMRESR( const Mat& A, Vec& x, const Vec& b, const ExT& ex, Preconditioner& M,
     int /*restart parameter m*/ m, int& max_iter, int& inner_max_iter, double& tol, double& inner_tol,
     bool measure_relative_tol= true, PreMethGMRES method = RightPreconditioning)
-{  Vec r( b - A*x);
+{
+    Vec r( b - A*x);
     std::vector<Vec> u(1), c(1); // Positions u[0], c[0] are unused below.
     double normb= norm( b);
     if (normb == 0.0 || measure_relative_tol == false) normb= 1.0;
@@ -1548,7 +1541,7 @@ GMRESR( const Mat& A, Vec& x, const Vec& b, const ExT& ex, Preconditioner& M,
 // An Elegant IDR(s) Variant that Efficiently Exploits
 // Bi-Orthogonality Properties
 // ISSN 1389-6520
-// Departent of Applied Mathematical Analysis,  Report 10-16
+// Department of Applied Mathematical Analysis,  Report 10-16
 // Delft University of Technology, 2010
 //
 // The return value indicates convergence within max_iter (input)
@@ -1563,13 +1556,12 @@ GMRESR( const Mat& A, Vec& x, const Vec& b, const ExT& ex, Preconditioner& M,
 //      tol  --  the residual after the final iteration
 //
 // measure_relative_tol - If true, stop if |b - Ax|/|b| <= tol,
-//     if false, stop if |b - Ax| <= tol. ( |.| is the euclidean norm.)
+//     if false, stop if |b - Ax| <= tol. ( |.| is the Euclidean norm.)
 //
 //*****************************************************************
 template <class Mat, class Vec, class PC, class ExT>
-bool
-IDRS( const Mat& A, Vec& x, const Vec& rhs, const ExT& ex, PC& pc, int& max_iter, double& tol, bool measure_relative_tol= false,
-      const int s=4, typename Vec::value_type omega_bound=0.7)
+bool IDRS( const Mat& A, Vec& x, const Vec& rhs, const ExT& ex, PC& pc, int& max_iter, double& tol,
+        bool measure_relative_tol= false, const int s=4, typename Vec::value_type omega_bound=0.7)
 {
     typedef typename Vec::value_type ElementTyp;
     int n= x.size(),  it;
@@ -1744,7 +1736,7 @@ bool QMR(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, Lanczos lan,
         norm_r  = ExX.Norm(r, false, &r_acc);
 
         if (norm_r<0)
-            std::cout << "["<<ProcCL::MyRank()<<"]==> negative squared norm of resid in QMR because of accumulation!" << std::endl;
+            std::cout << "["<<ProcCL::MyRank()<<"]==> negative squared norm of residual in QMR because of accumulation!" << std::endl;
         if (norm_r/normb<tol)
         {
             tol = std::sqrt(std::fabs(norm_r)/normb);
@@ -1761,38 +1753,38 @@ bool QMR(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, Lanczos lan,
 //  Drivers
 //=============================================================================
 
-// What every iterative solver should have
+/// What every iterative solver should have
 class SolverBaseCL
 {
   protected:
-    int            _maxiter;
-    mutable int    _iter;
-    double         _tol;
-    mutable double _res;
+    int            maxiter_;
+    mutable int    iter_;
+    double         tol_;
+    mutable double res_;
     bool           rel_;
 
     mutable std::ostream* output_;
 
     SolverBaseCL (int maxiter, double tol, bool rel= false, std::ostream* output= 0)
-        : _maxiter( maxiter), _iter( -1), _tol( tol), _res( -1.),
+        : maxiter_( maxiter), iter_( -1), tol_( tol), res_( -1.),
           rel_( rel), output_( output)  {}
     virtual ~SolverBaseCL() {}
 
   public:
-    virtual void   SetTol     (double tol) { _tol= tol; }
-    virtual void   SetMaxIter (int iter)   { _maxiter= iter; }
+    virtual void   SetTol     (double tol) { tol_= tol; }
+    virtual void   SetMaxIter (int iter)   { maxiter_= iter; }
     virtual void   SetRelError(bool rel)   { rel_= rel; }
 
-    virtual double GetTol     () const { return _tol; }
-    virtual int    GetMaxIter () const { return _maxiter; }
-    virtual double GetResid   () const { return _res; }
-    virtual int    GetIter    () const { return _iter; }
+    virtual double GetTol     () const { return tol_; }
+    virtual int    GetMaxIter () const { return maxiter_; }
+    virtual double GetResid   () const { return res_; }
+    virtual int    GetIter    () const { return iter_; }
     virtual bool   GetRelError() const { return rel_; }
 
-    virtual void SetOutput( std::ostream* os) { output_=os; }
+    virtual void   SetOutput( std::ostream* os) { output_=os; }
 };
 
-// Bare CG solver
+/// Bare CG solver
 class CGSolverCL : public SolverBaseCL
 {
   public:
@@ -1802,20 +1794,20 @@ class CGSolverCL : public SolverBaseCL
     template <typename Mat, typename Vec, typename ExT>
     void Solve(const Mat& A, Vec& x, const Vec& b, const ExT& ex)
     {
-        _res=  _tol;
-        _iter= _maxiter;
-        CG(A, x, b, ex, _iter, _res, rel_);
+        res_=  tol_;
+        iter_= maxiter_;
+        CG(A, x, b, ex, iter_, res_, rel_);
     }
     template <typename Mat, typename Vec, typename ExT>
     void Solve(const Mat& A, Vec& x, const Vec& b, const ExT& ex, int& numIter, double& resid) const
     {
-        resid=   _tol;
-        numIter= _maxiter;
+        resid=   tol_;
+        numIter= maxiter_;
         CG(A, x, b, ex, numIter, resid, rel_);
     }
 };
 
-// With preconditioner
+/// CG with preconditioner
 template <typename PC>
 class PCGSolverCL : public SolverBaseCL
 {
@@ -1832,15 +1824,15 @@ class PCGSolverCL : public SolverBaseCL
     template <typename Mat, typename Vec, typename ExT>
     void Solve(const Mat& A, Vec& x, const Vec& b, const ExT& ex)
     {
-        _res=  _tol;
-        _iter= _maxiter;
-        PCG(A, x, b, ex, _pc, _iter, _res, rel_);
+        res_=  tol_;
+        iter_= maxiter_;
+        PCG(A, x, b, ex, _pc, iter_, res_, rel_);
     }
     template <typename Mat, typename Vec, typename ExT>
     void Solve(const Mat& A, Vec& x, const Vec& b, const ExT& ex, int& numIter, double& resid) const
     {
-        resid=   _tol;
-        numIter= _maxiter;
+        resid=   tol_;
+        numIter= maxiter_;
         PCG(A, x, b, ex, _pc, numIter, resid, rel_);
     }
 };
@@ -1865,21 +1857,21 @@ class PCGNESolverCL : public SolverBaseCL
     template <typename Mat, typename Vec, typename ExT>
     void Solve(const Mat& A, Vec& x, const Vec& b, const ExT& ex, const ExT& ex_transp)
     {
-        _res=  _tol;
-        _iter= _maxiter;
-        PCGNE( A, x, b, ex, ex_transp, pc_, _iter, _res, rel_);
+        res_=  tol_;
+        iter_= maxiter_;
+        PCGNE( A, x, b, ex, ex_transp, pc_, iter_, res_, rel_);
     }
     template <typename Mat, typename Vec, typename ExT>
     void Solve(const Mat& A, Vec& x, const Vec& b, const ExT& ex, const ExT& ex_transp, int& numIter, double& resid) const
     {
-        resid=   _tol;
-        numIter= _maxiter;
+        resid=   tol_;
+        numIter= maxiter_;
         PCGNE(A, x, b, ex, ex_transp, pc_, numIter, resid, rel_);
     }
 };
 
 
-// Bare MINRES solver
+/// Bare MINRES solver
 class MResSolverCL : public SolverBaseCL
 {
   public:
@@ -1889,20 +1881,20 @@ class MResSolverCL : public SolverBaseCL
     template <typename Mat, typename Vec, typename ExT>
     void Solve(const Mat& A, Vec& x, const Vec& b, const ExT& ex)
     {
-        _res=  _tol;
-        _iter= _maxiter;
-        MINRES( A, x, b, ex, _iter, _res, rel_);
+        res_=  tol_;
+        iter_= maxiter_;
+        MINRES( A, x, b, ex, iter_, res_, rel_);
     }
     template <typename Mat, typename Vec, typename ExT>
     void Solve(const Mat& A, Vec& x, const Vec& b, const ExT& ex, int& numIter, double& resid) const
     {
-        resid=   _tol;
-        numIter= _maxiter;
+        resid=   tol_;
+        numIter= maxiter_;
         MINRES( A, x, b, ex, numIter, resid, rel_);
     }
 };
 
-// Preconditioned MINRES solver
+/// Preconditioned MINRES solver
 template <typename Lanczos>
 class PMResSolverCL : public SolverBaseCL
 {
@@ -1919,22 +1911,22 @@ class PMResSolverCL : public SolverBaseCL
     template <typename Mat, typename Vec, typename ExT>
     void Solve(const Mat& A, Vec& x, const Vec& b, const ExT& ex)
     {
-        _res=  _tol;
-        _iter= _maxiter;
+        res_=  tol_;
+        iter_= maxiter_;
         q_.new_basis( A, Vec( b - A*x), ex);
-        PMINRES( A, x, b, ex, q_, _iter, _res, rel_);
+        PMINRES( A, x, b, ex, q_, iter_, res_, rel_);
     }
     template <typename Mat, typename Vec, typename ExT>
     void Solve(const Mat& A, Vec& x, const Vec& b, const ExT& ex, int& numIter, double& resid) const
     {
-        resid=   _tol;
-        numIter= _maxiter;
+        resid=   tol_;
+        numIter= maxiter_;
         q_.new_basis( A, Vec( b - A*x), ex);
         PMINRES( A, x, b, ex, q_, numIter, resid, rel_);
     }
 };
 
-// GMRES
+/// GMRES
 template <typename PC>
 class GMResSolverCL : public SolverBaseCL
 {
@@ -1957,24 +1949,24 @@ class GMResSolverCL : public SolverBaseCL
     int       GetRestart () const { return restart_; }
 
     template <typename Mat, typename Vec, typename ExT>
-    void Solve(const Mat& A, Vec& x, const Vec& b, __UNUSED__ const ExT& ex)
+    void Solve(const Mat& A, Vec& x, const Vec& b, const ExT& ex)
     {
-        _res=  _tol;
-        _iter= _maxiter;
+        res_=  tol_;
+        iter_= maxiter_;
 #ifndef _PAR
-        GMRES(A, x, b, ex, pc_, restart_, _iter, _res, rel_, calculate2norm_, method_);
+        GMRES(A, x, b, ex, pc_, restart_, iter_, res_, rel_, calculate2norm_, method_);
 #else
         if (mod_)
-            ModGMRES(A, x, b, ex, pc_, restart_, _iter, _res, rel_, useModGS_, method_, SolverBaseCL::output_);
+            ModGMRES(A, x, b, ex, pc_, restart_, iter_, res_, rel_, useModGS_, method_, SolverBaseCL::output_);
         else
-            GMRES(A, x, b, ex, pc_, restart_, _iter, _res, rel_, method_, SolverBaseCL::output_);
+            GMRES(A, x, b, ex, pc_, restart_, iter_, res_, rel_, method_, SolverBaseCL::output_);
 #endif
     }
     template <typename Mat, typename Vec, typename ExT>
-    void Solve(const Mat& A, Vec& x, const Vec& b, __UNUSED__ const ExT& ex, int& numIter, double& resid) const
+    void Solve(const Mat& A, Vec& x, const Vec& b, const ExT& ex, int& numIter, double& resid) const
     {
-        resid=   _tol;
-        numIter= _maxiter;
+        resid=   tol_;
+        numIter= maxiter_;
 #ifndef _PAR
         GMRES(A, x, b, ex, pc_, restart_, numIter, resid, rel_, calculate2norm_, method_);
 #else
@@ -1987,7 +1979,7 @@ class GMResSolverCL : public SolverBaseCL
 };
 
 
-// BiCGStab
+/// BiCGStab
 template <typename PC>
 class BiCGStabSolverCL : public SolverBaseCL
 {
@@ -2005,19 +1997,19 @@ class BiCGStabSolverCL : public SolverBaseCL
     template <typename Mat, typename Vec, typename ExT>
     void Solve(const Mat& A, Vec& x, const Vec& b, const ExT& ex)
     {
-        _res=  _tol;
-        _iter= _maxiter;
+        res_=  tol_;
+        iter_= maxiter_;
 #ifdef _PAR
-        ModBICGSTAB( A, x, b, ex, pc_, _iter, _res, rel_);
+        ModBICGSTAB( A, x, b, ex, pc_, iter_, res_, rel_);
 #else
-        BICGSTAB( A, x, b, ex, pc_, _iter, _res, rel_);
+        BICGSTAB( A, x, b, ex, pc_, iter_, res_, rel_);
 #endif
     }
     template <typename Mat, typename Vec, typename ExT>
-    void Solve(const Mat& A, Vec& x, const Vec& b, __UNUSED__ const ExT& ex, int& numIter, double& resid) const
+    void Solve(const Mat& A, Vec& x, const Vec& b, const ExT& ex, int& numIter, double& resid) const
     {
-        resid=   _tol;
-        numIter= _maxiter;
+        resid=   tol_;
+        numIter= maxiter_;
 #ifdef _PAR
         ModBICGSTAB(A, x, b, ex, pc_, numIter, resid, rel_);
 #else
@@ -2026,13 +2018,13 @@ class BiCGStabSolverCL : public SolverBaseCL
     }
 };
 
-// GCR
+/// GCR
 template <typename PC>
 class GCRSolverCL : public SolverBaseCL
 {
   private:
     PC& pc_;
-    int truncate_; // no effect atm.
+    int truncate_; // no effect for the parallel version
 
   public:
     GCRSolverCL( PC& pc, int truncate, int maxiter, double tol,
@@ -2047,9 +2039,9 @@ class GCRSolverCL : public SolverBaseCL
     template <typename Mat, typename Vec, typename ExT>
     void Solve(const Mat& A, Vec& x, const Vec& b, const ExT& ex)
     {
-        _res=  _tol;
-        _iter= _maxiter;
-        GCR( A, x, b, ex, pc_, truncate_, _iter, _res, rel_, output_);
+        res_=  tol_;
+        iter_= maxiter_;
+        GCR( A, x, b, ex, pc_, truncate_, iter_, res_, rel_, output_);
         if (output_ != 0)
             *output_ << "GCRSolverCL: iterations: " << GetIter()
                      << "\tresidual: " << GetResid() << std::endl;
@@ -2057,8 +2049,8 @@ class GCRSolverCL : public SolverBaseCL
     template <typename Mat, typename Vec, typename ExT>
     void Solve(const Mat& A, Vec& x, const Vec& b, const ExT& ex, int& numIter, double& resid) const
     {
-        resid=   _tol;
-        numIter= _maxiter;
+        resid=   tol_;
+        numIter= maxiter_;
         GCR(A, x, b, ex, pc_, truncate_, numIter, resid, rel_, output_);
         if (output_ != 0)
             *output_ << "GCRSolverCL: iterations: " << GetIter()
@@ -2066,7 +2058,7 @@ class GCRSolverCL : public SolverBaseCL
     }
 };
 
-// GMRESR
+/// GMRESR
 template <typename PC>
 class GMResRSolverCL : public SolverBaseCL
 {
@@ -2091,9 +2083,9 @@ class GMResRSolverCL : public SolverBaseCL
     template <typename Mat, typename Vec, typename ExT>
     void Solve(const Mat& A, Vec& x, const Vec& b, const ExT& ex)
     {
-        _res=  _tol;
-        _iter= _maxiter;
-        GMRESR(A, x, b, ex, pc_, restart_, _iter, inner_maxiter_, _res, inner_tol_, rel_, method_);
+        res_=  tol_;
+        iter_= maxiter_;
+        GMRESR(A, x, b, ex, pc_, restart_, iter_, inner_maxiter_, res_, inner_tol_, rel_, method_);
         if (output_ != 0)
             *output_ << "GmresRSolverCL: iterations: " << GetIter()
                      << "\tresidual: " << GetResid() << std::endl;
@@ -2103,8 +2095,8 @@ class GMResRSolverCL : public SolverBaseCL
     template <typename Mat, typename Vec, typename ExT>
     void Solve(const Mat& A, Vec& x, const Vec& b, const ExT& ex, int& numIter, double& resid) const
     {
-        resid=   _tol;
-        numIter= _maxiter;
+        resid=   tol_;
+        numIter= maxiter_;
         GMRESR(A, x, b, ex, pc_, restart_, numIter, inner_maxiter_, resid, inner_tol_, rel_, method_);
         if (output_ != 0)
             *output_ << "GmresRSolverCL: iterations: " << GetIter()
@@ -2114,7 +2106,7 @@ class GMResRSolverCL : public SolverBaseCL
     }
 };
 
-// IDR(s)
+/// IDR(s)
 template <typename PC>
 class IDRsSolverCL : public SolverBaseCL
 {
@@ -2133,9 +2125,9 @@ class IDRsSolverCL : public SolverBaseCL
     template <typename Mat, typename Vec, typename ExT>
     void Solve(const Mat& A, Vec& x, const Vec& b, const ExT& ex)
     {
-        _res=  _tol;
-        _iter= _maxiter;
-        IDRS(A, x, b, ex, pc_, _iter, _res, rel_, s_, omega_bound_);
+        res_=  tol_;
+        iter_= maxiter_;
+        IDRS(A, x, b, ex, pc_, iter_, res_, rel_, s_, omega_bound_);
         if (output_ != 0)
             *output_ << "IDRsSolverCL: iterations: " << GetIter()
                      << "\tresidual: " << GetResid() << std::endl;
@@ -2143,9 +2135,9 @@ class IDRsSolverCL : public SolverBaseCL
     template <typename Mat, typename Vec, typename ExT>
     void Solve(const Mat& A, Vec& x, const Vec& b, const ExT& ex, int& numIter, double& resid) const
     {
-        resid=   _tol;
-        numIter= _maxiter;
-        IDRS(A, x, b, ex, pc_, _iter, _res, rel_, s_, omega_bound_);
+        resid=   tol_;
+        numIter= maxiter_;
+        IDRS(A, x, b, ex, pc_, iter_, res_, rel_, s_, omega_bound_);
         if (output_ != 0)
             *output_ << "IDRsSolverCL: iterations: " << GetIter()
                      << "\tresidual: " << GetResid() << std::endl;
@@ -2173,16 +2165,16 @@ class ParQMRSolverCL : public SolverBaseCL
     ParQMRSolverCL(int maxiter, double tol, Lanczos &lan, bool rel=true, std::ostream* output=0) :
         base(maxiter, tol, rel, output), lan_(&lan) {}
 
-    /// \brief Solve a linear equation system with Quasi Minimal Residuals-Method
+    /// \brief Solve a linear equation system with Quasi Minimal Residual Method
     template <typename Mat, typename Vec, typename ExT>
       void Solve(const Mat& A, Vec& x, const Vec &b, const ExT& ex)
     /// Solve the linear equation system with coefficient matrix \a A and rhs \a b iterative with
     /// QMR algorithm, uses \a x as start-vector and result vector.
     /// \post x has accumulated form
     {
-        _res  = _tol;
-        _iter = _maxiter;
-        QMR(A, x, b, ex, *lan_, _iter, _res, rel_);
+        res_  = tol_;
+        iter_ = maxiter_;
+        QMR(A, x, b, ex, *lan_, iter_, res_, rel_);
     }
 };
 #endif

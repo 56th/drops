@@ -385,13 +385,13 @@ class ExchangeCL
 class ExchangeBlockCL
 {
   public:
-    typedef std::vector<const ExchangeCL*>         ExchangeCLCT;    ///< Container for IdxDescCL
+    typedef std::vector<const ExchangeCL*>         ExchangeCLCT;    ///< Container for ExchangeCL
     typedef std::vector<IdxT>                      BlockOffsetCT;   ///< Container of starting index of block elements
     typedef std::vector<ExchangeCL::RequestListT>  RequestListT;    ///< List of list of MPI requests
     typedef std::vector<ExchangeCL::BufferListT*>  BufferListT;     ///< List of list of buffers for MPI Recv
 
   private:
-    ExchangeCLCT         exchange_;     ///< store all index describers to access ExchangeCLs
+    ExchangeCLCT         exchange_;     ///< store all ExchangeCLs
     BlockOffsetCT        blockOffset_;  ///< store the length of vectors
 
     mutable BufferListT xBuf_, yBuf_;
@@ -411,17 +411,17 @@ class ExchangeBlockCL
     double LocalDotTwoAccumulations(const VectorCL& x, const VectorCL& y, VectorCL* x_acc, VectorCL* y_acc) const;
     //@}
 
-    /// \brief Update of datastructure, i.e. blockoffset_
+    /// \brief Update of data structure, i.e. blockoffset_
     void Update();
 
   public:
     ExchangeBlockCL() {}
 
-    /// \brief Attach an index describer
+    /// \brief Attach an ExchangeCL
     void AttachTo(const ExchangeCL&);
     /// \brief Ask for number of handled blocks
     size_t GetNumBlocks() const { return exchange_.size(); }
-    /// \brief Ask for length of vectors, that can be accumulated
+    /// \brief Ask for length of vectors that can be accumulated
     IdxT GetNum() const { return blockOffset_.back(); }
     /// \brief Ask for an ExchangeCL
     const ExchangeCL& GetEx( size_t i) const { return *exchange_[i]; }
@@ -439,7 +439,7 @@ class ExchangeBlockCL
 
     /// \brief Parallel inner product without final reduction over all processes
     double LocalDot( const VectorCL&, bool, const VectorCL&, bool, VectorCL* x_acc=0, VectorCL* y_acc=0) const;
-    /// \brief Parallel inner product of vectors with final reduction over all processes
+    /// \brief Parallel inner product of vectors with final reduction over all processes.
     ///        x_acc must not point to x and y_acc must not point to y
     double ParDot( const VectorCL&, bool, const VectorCL&, bool, VectorCL* x_acc=0, VectorCL* y_acc=0) const;
     /// \brief Parallel squared Euclidian norm without final reduction over all processes
