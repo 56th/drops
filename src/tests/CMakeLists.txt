@@ -81,9 +81,11 @@ exec_ser(principallattice tests-principallattice misc-utils geom-principallattic
 
 exec_ser(csgtest levelset-levelset levelset-fastmarch geom-deformation misc-funcmap misc-scopetimer misc-progressaccu geom-simplex geom-multigrid geom-builder geom-topo geom-boundary num-unknowns misc-utils misc-problem num-discretize num-fe num-interfacePatch levelset-surfacetension misc-params out-vtkOut geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature geom-csg)
 
-exec(dynload geom-simplex misc-funcmap misc-dynamicload)
+exec_ser(dynload geom-simplex misc-funcmap misc-dynamicload)
 
-add_dependencies(dynload misc-scalarFunctions misc-vectorFunctions)
+if(NOT MPI)
+    add_dependencies(dynload misc-scalarFunctions misc-vectorFunctions)
+endif(NOT MPI)
 
 if(EXISTS ${SUITSPARSE_HOME})
 	lib_ser(directsolver)
