@@ -1,5 +1,3 @@
-set(ARCH "GCC")
-
 set(PARMETIS_HOME "${CMAKE_SOURCE_DIR}/../parmetis-4.0.2" CACHE PATH "")
 set(METIS_HOME "${CMAKE_SOURCE_DIR}/../metis-5.0.2" CACHE PATH "")
 set(ZOLTAN_HOME "${CMAKE_SOURCE_DIR}/../Zoltan_v3.2" CACHE PATH "")

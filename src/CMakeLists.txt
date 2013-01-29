@@ -8,7 +8,6 @@ include(CMakeSettings.txt)
 #tell cmake to always include the home dir
 include_directories(${CMAKE_SOURCE_DIR})
 
-
 #use openMP
 message(STATUS "### GENERATOR is ${CMAKE_GENERATOR}")
 if(CMAKE_GENERATOR MATCHES "Visual Studio 10")
@@ -47,17 +46,19 @@ else(WIN32)
 endif(WIN32)
 
 #compiler specific options
-if(CMAKE_CXX_COMPILER MATCHES icpc)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
     message(STATUS "### setting flags for INTEL compiler ###")
     set(DROPS_CXX_FLAGS_DEBUG "${IPC_CXX_FLAGS_DEBUG}")
     set(DROPS_CXX_FLAGS_RELEASE "${IPC_CXX_FLAGS_RELEASE}")
-elseif(CMAKE_COMPILER_IS_GNUCXX)
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     message(STATUS "### setting flags for GCC compiler ###")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--as-needed")
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--as-needed")
     set(DROPS_CXX_FLAGS_DEBUG "${GCC_CXX_FLAGS_DEBUG}")
     set(DROPS_CXX_FLAGS_RELEASE "${GCC_CXX_FLAGS_RELEASE}")
-endif(CMAKE_CXX_COMPILER MATCHES icpc)
+else()
+    message(STATUS "### could not determine compiler it seems to be neither gcc nor intel")
+endif()
 
 if(NOT DROPS_BUILD_TYPE)
     set(DROPS_BUILD_TYPE "DEBUG")
