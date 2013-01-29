@@ -193,7 +193,12 @@ class StokesSolverFactoryCL : public StokesSolverFactoryBaseCL<StokesT, Prolonga
 // generic preconditioners
     JACPcCL  JACPc_;
     GSPcCL   GSPc_;
-    SSORPcCL SSORPc_;
+#ifdef _PAR
+    typedef SSORPcCL SymmPcPcT;
+#else
+    typedef JACPcCL  SymmPcPcT;
+#endif
+    SymmPcPcT symmPcPc_;
 
 // PC for instat. Schur complement
     SchurPreBaseCL  *spc_;
@@ -203,22 +208,19 @@ class StokesSolverFactoryCL : public StokesSolverFactoryBaseCL<StokesT, Prolonga
     VankaSchurPreCL vankaschurpc_;
     ISPreCL         isprepc_;
     ISMGPreCL<ProlongationPT> ismgpre_;
-    typedef PCGSolverCL<SSORPcCL>     PCG_SsorCL;
-    PCG_SsorCL isnonlinearprepc1_, isnonlinearprepc2_;
-    ISNonlinearPreCL<PCG_SsorCL> isnonlinearpc_;
+    typedef PCGSolverCL<SymmPcPcT> PCGSolverT;
+    PCGSolverT isnonlinearprepc1_, isnonlinearprepc2_;
+    ISNonlinearPreCL<PCGSolverT> isnonlinearpc_;
 
 // PC for A-block
     ExpensivePreBaseCL *apc_;
     // MultiGrid symm.
-#ifdef _PAR
-    typedef MLSmootherCL<JORsmoothCL> SmootherT;
-#else
     typedef MLSmootherCL<SSORsmoothCL> SmootherT;
-#endif
+
     SmootherT smoother_;
-    PCG_SsorCL   coarsesolversymm_;
-    MGSolverCL<SmootherT, PCG_SsorCL, ProlongationVelT> MGSolversymm_;
-    typedef SolverAsPreCL<MGSolverCL<SmootherT, PCG_SsorCL, ProlongationVelT> > MGsymmPcT;
+    PCGSolverT   coarsesolversymm_;
+    MGSolverCL<SmootherT, PCGSolverT, ProlongationVelT> MGSolversymm_;
+    typedef SolverAsPreCL<MGSolverCL<SmootherT, PCGSolverT, ProlongationVelT> > MGsymmPcT;
     MGsymmPcT MGPcsymm_;
 
     // Multigrid nonsymm.
@@ -246,13 +248,12 @@ class StokesSolverFactoryCL : public StokesSolverFactoryBaseCL<StokesT, Prolonga
     BiCGStabPcT BiCGStabPc_;
 
     //PCG
-    typedef PCGSolverCL<SSORPcCL> PCGSolverT;
     PCGSolverT PCGSolver_;
     typedef SolverAsPreCL<PCGSolverT> PCGPcT;
     PCGPcT PCGPc_;
 
     //IDR(s)
-    typedef IDRsSolverCL<SSORPcCL> IDRsSolverT;
+    typedef IDRsSolverCL<JACPcCL> IDRsSolverT;
     IDRsSolverT IDRsSolver_;
     typedef SolverAsPreCL<IDRsSolverT> IDRsPcT;
     IDRsPcT IDRsPc_;
@@ -366,16 +367,11 @@ StokesSolverFactoryCL<StokesT, ProlongationVelT, ProlongationPT>::
         bdinvbtispc_( 0, &Stokes_.B.Data.GetFinest(), &Stokes_.M.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(),Stokes_.pr_idx.GetFinest(), P.get<double>("Stokes.PcSTol") /* enable regularization: , 0.707*/),
         vankaschurpc_( &Stokes.pr_idx), isprepc_( Stokes.prA.Data, Stokes.prM.Data, kA_, kM_),
         ismgpre_( Stokes.prA.Data, Stokes.prM.Data, kA_, kM_, Stokes.pr_idx),
-        isnonlinearprepc1_( SSORPc_, 100, P.get<double>("Stokes.PcSTol"), true),
-        isnonlinearprepc2_( SSORPc_, 100, P.get<double>("Stokes.PcSTol"), true),
+        isnonlinearprepc1_( symmPcPc_, 100, P.get<double>("Stokes.PcSTol"), true),
+        isnonlinearprepc2_( symmPcPc_, 100, P.get<double>("Stokes.PcSTol"), true),
         isnonlinearpc_( isnonlinearprepc1_, isnonlinearprepc2_, Stokes_.prA.Data.GetFinest(), Stokes_.prM.Data.GetFinest(), kA_, kM_),
         // preconditioner for A
-#ifndef _PAR
-        smoother_( 1.0),
-#else
-        smoother_( 0.5),
-#endif
- coarsesolversymm_( SSORPc_, 500, 1e-6, true),
+        smoother_( 1.0), coarsesolversymm_( symmPcPc_, 500, 1e-6, true),
         MGSolversymm_ ( smoother_, coarsesolversymm_, P.get<int>("Stokes.PcAIter"), P.get<double>("Stokes.PcATol"), Stokes.vel_idx, false),
         MGPcsymm_( MGSolversymm_),
         coarsesolver_( JACPc_, 500, 500, 1e-6, true),
@@ -383,8 +379,8 @@ StokesSolverFactoryCL<StokesT, ProlongationVelT, ProlongationPT>::
         GMResSolver_( JACPc_, P.get<int>("Stokes.PcAIter"), /*restart*/ 100, P.get<double>("Stokes.PcATol"), /*rel*/ true), GMResPc_( GMResSolver_),
         GS_GMResSolver_( GSPc_, P.get<int>("Stokes.PcAIter"), /*restart*/ 100, P.get<double>("Stokes.PcATol"), /*rel*/ true), GS_GMResPc_( GS_GMResSolver_),
         BiCGStabSolver_( JACPc_, P.get<int>("Stokes.PcAIter"), P.get<double>("Stokes.PcATol"), /*rel*/ true),BiCGStabPc_( BiCGStabSolver_),
-        PCGSolver_( SSORPc_, P.get<int>("Stokes.PcAIter"), P.get<double>("Stokes.PcATol"), true), PCGPc_( PCGSolver_),
-        IDRsSolver_( SSORPc_, P.get<int>("Stokes.PcAIter"), P.get<double>("Stokes.PcATol"), true), IDRsPc_( IDRsSolver_),
+        PCGSolver_( symmPcPc_, P.get<int>("Stokes.PcAIter"), P.get<double>("Stokes.PcATol"), true), PCGPc_( PCGSolver_),
+        IDRsSolver_( JACPc_, P.get<int>("Stokes.PcAIter"), P.get<double>("Stokes.PcATol"), true), IDRsPc_( IDRsSolver_),
         // block precondtioner
         DBlock_(0), LBlock_(0), SBlock_(0),
         vankapc_( &Stokes.pr_idx),
@@ -444,6 +440,10 @@ bool StokesSolverFactoryCL<StokesT, ProlongationVelT, ProlongationPT>::ValidSolv
         msg= "MinRes requires diagonal block preconditioner";
     else if ((StokesSolverInfoCL::IsBlockPre(APc_) || StokesSolverInfoCL::IsBlockPre(SPc_)) && !StokesSolverInfoCL::EqualStokesMGSmoother( APc_, SPc_) && SPc_!=SIMPLER_SPC && SPc_!=MSIMPLER_SPC)
         msg= "block preconditioner should be the same for vel and pr part";
+#ifdef _PAR
+    else if (APc_ == GS_GMRes_APC)
+        msg= "Gauss-Seidel is not available in parallel, yet";
+#endif
     else // all tests passed successfully
         ok= true;
 
