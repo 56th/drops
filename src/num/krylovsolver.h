@@ -1788,22 +1788,22 @@ class SolverBaseCL
 class CGSolverCL : public SolverBaseCL
 {
   public:
-    CGSolverCL(int maxiter, double tol, bool rel= false)
-        : SolverBaseCL(maxiter, tol, rel) {}
+    CGSolverCL(int maxiter, double tol, bool rel= false, std::ostream* output = 0)
+        : SolverBaseCL(maxiter, tol, rel, output) {}
 
     template <typename Mat, typename Vec, typename ExT>
     void Solve(const Mat& A, Vec& x, const Vec& b, const ExT& ex)
     {
         res_=  tol_;
         iter_= maxiter_;
-        CG(A, x, b, ex, iter_, res_, rel_);
+        CG(A, x, b, ex, iter_, res_, rel_, output_);
     }
     template <typename Mat, typename Vec, typename ExT>
     void Solve(const Mat& A, Vec& x, const Vec& b, const ExT& ex, int& numIter, double& resid) const
     {
         resid=   tol_;
         numIter= maxiter_;
-        CG(A, x, b, ex, numIter, resid, rel_);
+        CG(A, x, b, ex, numIter, resid, rel_, output_);
     }
 };
 
@@ -1815,8 +1815,8 @@ class PCGSolverCL : public SolverBaseCL
     PC& _pc;
 
   public:
-    PCGSolverCL(PC& pc, int maxiter, double tol, bool rel= false)
-        : SolverBaseCL(maxiter, tol, rel), _pc(pc) {}
+    PCGSolverCL(PC& pc, int maxiter, double tol, bool rel= false, std::ostream* output = 0)
+        : SolverBaseCL(maxiter, tol, rel, output), _pc(pc) {}
 
     PC&       GetPc ()       { return _pc; }
     const PC& GetPc () const { return _pc; }
@@ -1826,14 +1826,14 @@ class PCGSolverCL : public SolverBaseCL
     {
         res_=  tol_;
         iter_= maxiter_;
-        PCG(A, x, b, ex, _pc, iter_, res_, rel_);
+        PCG(A, x, b, ex, _pc, iter_, res_, rel_, output_);
     }
     template <typename Mat, typename Vec, typename ExT>
     void Solve(const Mat& A, Vec& x, const Vec& b, const ExT& ex, int& numIter, double& resid) const
     {
         resid=   tol_;
         numIter= maxiter_;
-        PCG(A, x, b, ex, _pc, numIter, resid, rel_);
+        PCG(A, x, b, ex, _pc, numIter, resid, rel_, output_);
     }
 };
 
@@ -1848,8 +1848,8 @@ class PCGNESolverCL : public SolverBaseCL
     PC& pc_;
 
   public:
-    PCGNESolverCL(PC& pc, int maxiter, double tol, bool rel= false)
-        : SolverBaseCL( maxiter, tol, rel), pc_( pc) {}
+    PCGNESolverCL(PC& pc, int maxiter, double tol, bool rel= false, std::ostream* output=0)
+        : SolverBaseCL( maxiter, tol, rel, output), pc_( pc) {}
 
     PC&       GetPc ()       { return pc_; }
     const PC& GetPc () const { return pc_; }
@@ -1859,14 +1859,14 @@ class PCGNESolverCL : public SolverBaseCL
     {
         res_=  tol_;
         iter_= maxiter_;
-        PCGNE( A, x, b, ex, ex_transp, pc_, iter_, res_, rel_);
+        PCGNE( A, x, b, ex, ex_transp, pc_, iter_, res_, rel_, output_);
     }
     template <typename Mat, typename Vec, typename ExT>
     void Solve(const Mat& A, Vec& x, const Vec& b, const ExT& ex, const ExT& ex_transp, int& numIter, double& resid) const
     {
         resid=   tol_;
         numIter= maxiter_;
-        PCGNE(A, x, b, ex, ex_transp, pc_, numIter, resid, rel_);
+        PCGNE(A, x, b, ex, ex_transp, pc_, numIter, resid, rel_, output_);
     }
 };
 
@@ -1940,8 +1940,8 @@ class GMResSolverCL : public SolverBaseCL
 
   public:
     GMResSolverCL( PC& pc, int restart, int maxiter, double tol,
-        bool relative= true, bool calculate2norm= false, PreMethGMRES method= LeftPreconditioning, bool mod = true, bool useModGS = false)
-        : SolverBaseCL( maxiter, tol, relative), pc_(pc), restart_(restart),
+        bool relative= true, bool calculate2norm= false, PreMethGMRES method= LeftPreconditioning, bool mod = true, bool useModGS = false, std::ostream* output=0)
+        : SolverBaseCL( maxiter, tol, relative, output), pc_(pc), restart_(restart),
           calculate2norm_(calculate2norm), method_(method), mod_(mod), useModGS_(useModGS){}
 
     PC&       GetPc      ()       { return pc_; }
@@ -1957,9 +1957,9 @@ class GMResSolverCL : public SolverBaseCL
         GMRES(A, x, b, ex, pc_, restart_, iter_, res_, rel_, calculate2norm_, method_);
 #else
         if (mod_)
-            ModGMRES(A, x, b, ex, pc_, restart_, iter_, res_, rel_, useModGS_, method_, SolverBaseCL::output_);
+            ModGMRES(A, x, b, ex, pc_, restart_, iter_, res_, rel_, useModGS_, method_, output_);
         else
-            GMRES(A, x, b, ex, pc_, restart_, iter_, res_, rel_, method_, SolverBaseCL::output_);
+            GMRES(A, x, b, ex, pc_, restart_, iter_, res_, rel_, method_, output_);
 #endif
     }
     template <typename Mat, typename Vec, typename ExT>
@@ -1971,9 +1971,9 @@ class GMResSolverCL : public SolverBaseCL
         GMRES(A, x, b, ex, pc_, restart_, numIter, resid, rel_, calculate2norm_, method_);
 #else
         if (mod_)
-            ModGMRES(A, x, b, ex, pc_, restart_, numIter, resid, rel_, useModGS_, method_, SolverBaseCL::output_);
+            ModGMRES(A, x, b, ex, pc_, restart_, numIter, resid, rel_, useModGS_, method_, output_);
         else
-            GMRES(A, x, b, ex, pc_, restart_, numIter, resid, rel_, method_, SolverBaseCL::output_);
+            GMRES(A, x, b, ex, pc_, restart_, numIter, resid, rel_, method_, output_);
 #endif
     }
 };
