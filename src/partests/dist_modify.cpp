@@ -90,7 +90,7 @@ void ChangePrios( MultiGridCL& mg, int sender, const bool binary=true)
 int main( int argc, char **argv)
 {
 #ifdef _PAR
-    DROPS::ProcInitCL procinit(&argc, &argv);
+    DROPS::ProcCL::Instance(&argc, &argv);
 #endif
     try {
         bool binary=true;

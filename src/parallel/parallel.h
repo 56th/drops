@@ -56,7 +56,6 @@ namespace DROPS
 #endif
 //@}
 
-class ProcInitCL; //forward declaration
 /***************************************************************************
 *   P R O C - C L A S S                                                    *
 ***************************************************************************/
@@ -64,8 +63,6 @@ class ProcInitCL; //forward declaration
 class ProcCL
 /** This class acts as an interface to MPI. */
 {
-    friend class ProcInitCL;
-
   public:
 
 #ifdef _MPICXX_INTERFACE
@@ -103,9 +100,9 @@ class ProcCL
 
   public:
       /// \brief Get a pointer to the ProcCL (Singleton-Pattern)
-    static ProcCL* InstancePtr(int* argc = 0, char*** argv = 0) { return instance_ ? instance_ : (instance_= new ProcCL(argc, argv)); }
+    static ProcCL* InstancePtr(int* argc = 0, char*** argv = 0) { return &Instance(argc, argv); }
       /// \brief Get a reference to the ProcCL (Singleton-Pattern)
-    static ProcCL& Instance(int* argc, char*** argv)    { return *InstancePtr(argc, argv); }
+    static ProcCL& Instance(int* argc, char*** argv)    { static ProcCL proc(argc, argv); return proc;}
       /// \brief Wait for an input of a proc
     static void Prompt(int);
       /// \brief Check if I am Master
@@ -344,14 +341,6 @@ class ProcCL
         return recvData;
     }
     //@}
-};
-
-/// \brief Manage construction and destruction of ProcCL
-class ProcInitCL
-{
-  public:
-    ProcInitCL(int* argc, char*** argv) { ProcCL::Instance( argc, argv); }
-    ~ProcInitCL() { if (ProcCL::InstancePtr()) delete ProcCL::InstancePtr(); }
 };
 
 template<> struct ProcCL::MPI_TT<int>

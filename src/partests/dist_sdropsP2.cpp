@@ -272,7 +272,7 @@ void Strategy( StokesP2P1CL<CoeffCL>& Stokes)
 int main (int argc, char** argv)
 {
 #ifdef _PAR
-    DROPS::ProcInitCL procinit(&argc, &argv);
+    DROPS::ProcCL::Instance(&argc, &argv);
 #endif
     try
     {

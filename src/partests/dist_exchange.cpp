@@ -495,7 +495,7 @@ void MakeTimeMeasurements( MultiGridCL& mg, const size_t num_test)
 int main( int argc, char **argv)
 {
 #ifdef _PAR
-    DROPS::ProcInitCL procinit(&argc, &argv);
+    DROPS::ProcCL::Instance(&argc, &argv);
 #endif
     try {
         bool binary=true;

@@ -334,7 +334,7 @@ using namespace DROPS;
 ****************************************************************************/
 int main(int argc, char* argv[])
 {
-    DROPS::ProcInitCL procinit(&argc, &argv);
+    DROPS::ProcCL::Instance(&argc, &argv);
     try
     {
         const char line[] = "----------------------------------------------------------------------------------";
