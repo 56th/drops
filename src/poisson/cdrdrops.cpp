@@ -37,10 +37,11 @@
 #include "num/krylovsolver.h"
 #include "num/MGsolver.h"
 #include "poisson/integrTime.h"
+#include "num/prolongation.h"
 
  // include problem class
 #include "misc/params.h"
-#include "poisson/poissonCoeff.h"      // Coefficient-Function-Container poissonCoeffCL
+#include "poisson/poissonParam.h"      // poissonCoeffCL
 #include "poisson/poisson.h"           // setting up the Poisson problem
 #include "num/bndData.h"
 
@@ -68,6 +69,9 @@
 #include "misc/funcmap.h"
 #include "num/poissonsolverfactory.h"
 #include "poisson/ale.h"
+
+#include "misc/progressaccu.h"
+#include "misc/dynamicload.h"
 
 const char line[] ="----------------------------------------------------------------------------------\n";
 
@@ -111,7 +115,7 @@ void SolveStatProblem( PoissonCL& Poisson, SolverT& solver, ParamCL& Param)
             std::cout << " o time " << timer.GetTime() << " s" << std::endl;
         }
         timer.Reset();
-        solver.Solve( Poisson.A.Data, Poisson.x.Data, Poisson.b.Data);
+        solver.Solve( Poisson.A.Data, Poisson.x.Data, Poisson.b.Data, Poisson.x.RowIdx->GetEx());
         timer.Stop();
 
 #ifndef _PAR
@@ -183,7 +187,7 @@ void SolveStatProblem( PoissonCL& Poisson, SolverT& solver, ParamCL& Param)
             Poisson.SetupSystem( Poisson.A, Poisson.b);
             timer.Stop();
             timer.Reset();
-            solver.Solve( Poisson.A.Data, new_x->Data, Poisson.b.Data);
+            solver.Solve( Poisson.A.Data, new_x->Data, Poisson.b.Data, new_x->RowIdx->GetEx());
             timer.Stop();
             double realresid = norm( VectorCL(Poisson.A.Data*new_x->Data-Poisson.b.Data));
             std::cout << " o Solved system with:\n"
@@ -228,8 +232,7 @@ void Strategy(PoissonCL& Poisson)
     // the triangulation
     MultiGridCL& mg= Poisson.GetMG();
 
-
-	MeshDeformationCL& md = MeshDeformationCL::getInstance();
+    MeshDeformationCL& md = MeshDeformationCL::getInstance();
     md.Initialize(&mg);
     mg.SetMeshDeformation(md);
 
@@ -283,12 +286,7 @@ void Strategy(PoissonCL& Poisson)
     PoissonSolverBaseCL* solver = factory.CreatePoissonSolver();
 
     if ( factory.GetProlongation() != 0)
-    {
-        if(P.get<int>("Poisson.P1"))
-            SetupP1ProlongationMatrix( mg, *(factory.GetProlongation()), &Poisson.idx, &Poisson.idx);
-        else
-            SetupP2ProlongationMatrix( mg, *(factory.GetProlongation()), &Poisson.idx, &Poisson.idx);
-    }
+        SetupProlongationMatrix( mg, *(factory.GetProlongation()), &Poisson.idx, &Poisson.idx);
 
     timer.Stop();
     std::cout << " o time " << timer.GetTime() << " s" << std::endl;
@@ -425,7 +423,7 @@ void SetMissingParameters(DROPS::ParamCL& P){
 int main (int argc, char** argv)
 {
 #ifdef _PAR
-    DROPS::ProcInitCL procinit(&argc, &argv);
+    DROPS::ProcCL::Instance(&argc, &argv);
 #endif
     try
     {
@@ -454,6 +452,11 @@ int main (int argc, char** argv)
         SetMissingParameters(P);
         std::cout << P << std::endl;
 
+        DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), 
+                           P.get<std::vector<std::string> >("General.DynamicLibs") );
+
+        if (P.get<int>("General.ProgressBar"))
+            DROPS::ProgressBarTetraAccumulatorCL::Activate();
         // set up data structure to represent a poisson problem
         // ---------------------------------------------------------------------
         std::cout << line << "Set up data structure to represent a Poisson problem ...\n";
@@ -485,6 +488,7 @@ int main (int argc, char** argv)
         }
         // Setup the problem
         DROPS::PoissonCoeffCL tmp = DROPS::PoissonCoeffCL( P);
+
         DROPS::PoissonP1CL<DROPS::PoissonCoeffCL> *probP1 = 0;
         DROPS::PoissonP2CL<DROPS::PoissonCoeffCL> *probP2 = 0;
         if(P.get<int>("Poisson.P1"))
@@ -540,6 +544,7 @@ int main (int argc, char** argv)
         delete bdata;
         delete probP1;
         delete probP2;
+        std::cout << "cdrdrops finished regularly" << std::endl;
         return 0;
     }
     catch (DROPS::DROPSErrCL& err) { err.handle(); }

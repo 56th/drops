@@ -1,0 +1,46 @@
+#---------------------SPECIFICATION FILE----------------------------------------
+Type of test: serial
+Name of executable: interfacepatch_doublecut
+#The path to the folder where the executable is located must be relative to the
+#/drops folder
+Folder of executable: tests
+#The path to the folder where the parameter-file is located must be relative to
+#the folder where the executable is situated
+Path of parameter-file: 
+Name of test: InterfacePatch_DoubleCut
+Name of author: lehrenfeld
+#-------------------------------------------------------------------------------
+#------------------------------NUMBERS------------------------------------------
+Name of variable: "Accumulated Volume in subtets"
+Prefix of variable: "ACCUMULATED    subtet volume = "
+Value of variable: 1.0
+Relative error: 
+Absolute error: 1e-14
+Name of variable: "Accumulated Volume in subsubtets"
+Prefix of variable: " subsubtet volume = "
+Value of variable: 1.0
+Relative error: 
+Absolute error: 1e-14
+Name of variable: "pos part in subtet volume"
+Prefix of variable: "ACCUMULATED    subtet volume plus  = "
+Value of variable: 0.998047
+Relative error: 
+Absolute error: 1e-6
+Name of variable: "pos part in subsubtet volume"
+Prefix of variable: "ACCUMULATED subsubtet volume plus  = "
+Value of variable: 0.027
+Relative error: 
+Absolute error: 1e-6
+Name of variable: "neg part in subtet volume"
+Prefix of variable: "ACCUMULATED    subtet volume minus = "
+Value of variable: 0.00195312
+Relative error: 
+Absolute error: 1e-6
+Name of variable: "neg part in subsubtet volume"
+Prefix of variable: "ACCUMULATED subsubtet volume minus = "
+Value of variable: 0.973
+Relative error: 
+Absolute error: 1e-6
+#-------------------------------------------------------------------------------
+#------------------------------STRINGS-------------------------------------------
+#-------------------------------------------------------------------------------

@@ -1,5 +1,17 @@
 {
-	"_comment":
+//General section
+     "General":
+     {
+             "ProgressBar":  1, //show progress bar
+             "DynamicLibsPrefix": "../", //where should we look for shared objects?
+             "DynamicLibs": [ //select libraries to be loaded after program start
+                     "levelset/liblevelset-twophaseCoeff",
+                     "misc/libmisc-scalarFunctions",
+                     "misc/libmisc-vectorFunctions"
+             ]
+     },
+
+    "_comment":
 "#=============================================================
 #    DROPS parameter file
 #    simulation of two-phase flow:

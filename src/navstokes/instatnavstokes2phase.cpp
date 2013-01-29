@@ -182,7 +182,8 @@ class NonlConvSystemAccumulator_P2CL : public TetraAccumulatorCL
     const StokesBndDataCL& BndData;
     const MultiGridCL& MG;
     const VelVecDescCL & vel;
-    const LevelsetP2CL& lset;
+    const VecDescCL& lset;
+    const LsetBndDataCL& lset_bnd;
 
     double t;
 
@@ -213,7 +214,7 @@ class NonlConvSystemAccumulator_P2CL : public TetraAccumulatorCL
 
   public:
     NonlConvSystemAccumulator_P2CL (const TwoPhaseFlowCoeffCL& Coeff, const MultiGridCL& MG_, const StokesBndDataCL& BndData_, 
-                                    const VelVecDescCL& vel_, const LevelsetP2CL& ls, IdxDescCL& RowIdx_, 
+                                    const VelVecDescCL& vel_, const VecDescCL& ls, const LsetBndDataCL& ls_bnd, IdxDescCL& RowIdx_,
                                     MatrixCL& N_, VecDescCL* cplN_, double t, bool smoothed=false);
 
     ///\brief Initializes matrix-builders and load-vectors
@@ -227,10 +228,10 @@ class NonlConvSystemAccumulator_P2CL : public TetraAccumulatorCL
 };
 
 NonlConvSystemAccumulator_P2CL::NonlConvSystemAccumulator_P2CL (const TwoPhaseFlowCoeffCL& Coeff_, const MultiGridCL& MG_, const StokesBndDataCL& BndData_,
-                                                                const VelVecDescCL& vel_, const LevelsetP2CL& lset_arg, IdxDescCL& RowIdx_, 
+                                                                const VelVecDescCL& vel_, const VecDescCL& lset_arg, const LsetBndDataCL& lset_arg_bnd, IdxDescCL& RowIdx_,
                                                                 MatrixCL& N_, VecDescCL* cplN_, double t_, bool smoothed_)
     : smoothed(smoothed_), Coeff( Coeff_), BndData( BndData_), MG(MG_),
-      vel(vel_), lset( lset_arg), t( t_),
+      vel(vel_), lset( lset_arg), lset_bnd(lset_arg_bnd), t( t_),
       RowIdx( RowIdx_), N( N_), cplN( cplN_), 
       local_twophase( Coeff.rho( 1.0), Coeff.rho( -1.0)),
       local_smoothed_twophase( Coeff.rho)
@@ -271,7 +272,7 @@ void NonlConvSystemAccumulator_P2CL::local_setup (const TetraCL& tet)
 
     n.assign( tet, RowIdx, BndData.Vel);
 
-    ls_loc.assign( tet, lset.Phi, lset.GetBndData());
+    ls_loc.assign( tet, lset, lset_bnd);
     vel_loc.assign( tet, vel, BndData.Vel);
     if (equal_signs( ls_loc)) {
         local_onephase.velocity( vel_loc);
@@ -317,11 +318,11 @@ void NonlConvSystemAccumulator_P2CL::update_global_system ()
         }
 }
 
-void InstatNavierStokes2PhaseP2P1CL::SetupNonlinear_P2(MatrixCL& N, const VelVecDescCL* vel, VelVecDescCL* cplN, const LevelsetP2CL& lset, IdxDescCL& RowIdx, double t) const
+void InstatNavierStokes2PhaseP2P1CL::SetupNonlinear_P2(MatrixCL& N, const VelVecDescCL* vel, VelVecDescCL* cplN, const VecDescCL& lset_phi, const LsetBndDataCL& lset_bnd, IdxDescCL& RowIdx, double t) const
 /// Set up matrix N
 {
     ScopeTimerCL scope("SetupNonlinear_P2");
-    NonlConvSystemAccumulator_P2CL accu( Coeff_, MG_, BndData_, *vel, lset, RowIdx, N, cplN, t);
+    NonlConvSystemAccumulator_P2CL accu( Coeff_, MG_, BndData_, *vel, lset_phi, lset_bnd, RowIdx, N, cplN, t);
     TetraAccumulatorTupleCL accus;
     ProgressBarTetraAccumulatorCL accup(MG_,"NonlConvSystem(P2) Setup",RowIdx.TriangLevel());
     accus.push_back( &accup);
@@ -336,20 +337,26 @@ void InstatNavierStokes2PhaseP2P1CL::SetupNonlinear
 /// Couplings with dirichlet BCs are accumulated in cplN,
 /// so call cplN->Clear() before if only couplings are needed.
 {
+    UpdateMLv(vel);
     MLMatrixCL::iterator  itN = N->Data.begin();
     MLIdxDescCL::iterator it  = N->RowIdx->begin();
-    for (size_t lvl=0; lvl < N->Data.size(); ++lvl, ++itN, ++it)
-        SetupNonlinear_P2( *itN, vel, lvl == N->Data.size()-1 ? cplN : 0, lset,*it, t);
+    MLDataCL<VecDescCL>::const_iterator itLset = lset.MLPhi.begin();
+    MLDataCL<VecDescCL>::const_iterator itv = MLv.begin();
+    for (size_t lvl=0; lvl < N->Data.size(); ++lvl, ++itN, ++it, ++itLset, ++itv)
+        SetupNonlinear_P2( *itN, lvl == N->Data.size()-1 ? vel : &*itv, lvl == N->Data.size()-1 ? cplN : 0, lvl == N->Data.size()-1 ? lset.Phi : *itLset, lset.GetBndData(),*it, t);
 }
 
 MLTetraAccumulatorTupleCL&
 InstatNavierStokes2PhaseP2P1CL::nonlinear_accu (MLTetraAccumulatorTupleCL& accus, MLMatDescCL* N, const VelVecDescCL* vel, VelVecDescCL* cplN, const LevelsetP2CL& lset, double t) const
 {
+    UpdateMLv(vel);
     MLMatrixCL::iterator                itN    = N->Data.begin();
     MLIdxDescCL::iterator               it     = N->RowIdx->begin();
     MLTetraAccumulatorTupleCL::iterator it_accu= accus.begin();
-    for (size_t lvl=0; lvl < N->Data.size(); ++lvl, ++itN, ++it, ++it_accu)
-        it_accu->push_back_acquire( new NonlConvSystemAccumulator_P2CL( Coeff_, MG_, BndData_, *vel, lset, *it, *itN, lvl == N->Data.size()-1 ? cplN : 0, t));
+    MLDataCL<VecDescCL>::const_iterator itLset = lset.MLPhi.begin();
+    MLDataCL<VecDescCL>::const_iterator itv = MLv.begin();
+    for (size_t lvl=0; lvl < N->Data.size(); ++lvl, ++itN, ++it, ++it_accu, ++itLset, ++itv)
+        it_accu->push_back_acquire( new NonlConvSystemAccumulator_P2CL( Coeff_, MG_, BndData_, lvl == N->Data.size()-1 ? *vel : *itv, lvl == N->Data.size()-1 ? lset.Phi : *itLset, lset.GetBndData(), *it, *itN, lvl == N->Data.size()-1 ? cplN : 0, t));
     return accus;
 }
 

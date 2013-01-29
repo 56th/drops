@@ -8,24 +8,27 @@ include(CMakeSettings.txt)
 #tell cmake to always include the home dir
 include_directories(${CMAKE_SOURCE_DIR})
 
-option(MPI FALSE)
-
 #use openMP
-find_package(OpenMP REQUIRED)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+message(STATUS "### GENERATOR is ${CMAKE_GENERATOR}")
+if(CMAKE_GENERATOR MATCHES "Visual Studio 10")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /openmp")
+else(CMAKE_GENERATOR MATCHES "Visual Studio 10")
+  find_package(OpenMP REQUIRED)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+endif(CMAKE_GENERATOR MATCHES "Visual Studio 10")
 
 #use MPI
 if(MPI)
     message(STATUS "###  MPI active ###")
     find_package(MPI REQUIRED)
-    
+
     set(METIS_INCLUDE ${METIS_HOME}/include)
     set(METIS_LIBRARY ${METIS_HOME}/build/Linux-x86_64/libmetis/libmetis.a)
     set(PARMETIS_INCLUDE ${PARMETIS_HOME}/include)
     set(PARMETIS_LIBRARY ${PARMETIS_HOME}/build/Linux-x86_64/libparmetis/libparmetis.a)
 
     include_directories(${MPI_INCLUDE_PATH} ${PARMETIS_INCLUDE} ${METIS_INCLUDE})
-    
+
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MPI_CXX_FLAGS} -DMPICH_IGNORE_CXX_SEEK")
     set(PARMETIS_LIBRARIES ${MPI_CXX_LIBRARIES} ${METIS_LIBRARY} ${PARMETIS_LIBRARY} m)
     add_definitions("-D_PAR=1")
@@ -33,18 +36,34 @@ else(MPI)
     message(STATUS "### MPI disabled ###")
 endif(MPI)
 
+if(WIN32)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /DDROPS_WIN  /I${BOOST_HOME}")
+else(WIN32)
+  if (BOOST_HOME STREQUAL "")
+  else (BOOST_HOME STREQUAL "")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I${BOOST_HOME}")
+  endif (BOOST_HOME STREQUAL "")
+endif(WIN32)
+
 #compiler specific options
-if(CMAKE_CXX_COMPILER MATCHES icpc)
+if(CMAKE_CXX_COMPILER_ID EQUAL "Intel")
     message(STATUS "### setting flags for INTEL compiler ###")
     set(DROPS_CXX_FLAGS_DEBUG "${IPC_CXX_FLAGS_DEBUG}")
     set(DROPS_CXX_FLAGS_RELEASE "${IPC_CXX_FLAGS_RELEASE}")
-elseif(CMAKE_COMPILER_IS_GNUCXX)
+elseif(CMAKE_COMPILER_ID EQUAL "GNU")
     message(STATUS "### setting flags for GCC compiler ###")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--no-as-needed")
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--no-as-needed")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--as-needed")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--as-needed")
     set(DROPS_CXX_FLAGS_DEBUG "${GCC_CXX_FLAGS_DEBUG}")
     set(DROPS_CXX_FLAGS_RELEASE "${GCC_CXX_FLAGS_RELEASE}")
 endif(CMAKE_CXX_COMPILER MATCHES icpc)
+
+if(NOT DROPS_BUILD_TYPE)
+    set(DROPS_BUILD_TYPE "DEBUG")
+    message(STATUS "### Setting DEFAULT build type: ${DROPS_BUILD_TYPE} ###")
+else(NOT DROPS_BUILD_TYPE)
+    message(STATUS "### BUILD TYPE:                 ${DROPS_BUILD_TYPE} ###")
+endif(NOT DROPS_BUILD_TYPE)
 
 #apply build type specific options
 if(DROPS_BUILD_TYPE STREQUAL "RELEASE")
@@ -52,12 +71,12 @@ if(DROPS_BUILD_TYPE STREQUAL "RELEASE")
 elseif(DROPS_BUILD_TYPE STREQUAL "DEBUG")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${DROPS_CXX_FLAGS_DEBUG}")
 endif()
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${DROPS_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${DROPS_CXX_FLAGS} -fPIC")
 
 message(STATUS "### CXX_COMPIER IS:             ${CMAKE_CXX_COMPILER}")
 message(STATUS "### GLOBAL COMPILER FLAGS:      ${CMAKE_CXX_FLAGS} ###")
-message(STATUS "### GLOBAL SHARED LINKER FLAGS: ${CMAKE_SHARED_LINKER_FLAGS} ###")	
-message(STATUS "### GLOBAL EXE LINKER FLAGS:    ${CMAKE_EXE_LINKER_FLAGS} ###")	
+message(STATUS "### GLOBAL SHARED LINKER FLAGS: ${CMAKE_SHARED_LINKER_FLAGS} ###")
+message(STATUS "###    GLOBAL EXE LINKER FLAGS: ${CMAKE_EXE_LINKER_FLAGS} ###")
 
 ###############################################################################
 # libs* functions are specializations of add_library, which allow us to add
@@ -65,67 +84,55 @@ message(STATUS "### GLOBAL EXE LINKER FLAGS:    ${CMAKE_EXE_LINKER_FLAGS} ###")
 # prepended.
 # THESE FUNCTIONS REQUIRE ${HOME}
 
-function(libs_ when)
-    if((when STREQUAL "ALL") OR (${when} STREQUAL "PAR" AND MPI) OR (${when} STREQUAL "SER" AND NOT MPI))
-        foreach(lib ${ARGN})
-            add_library(${HOME}-${lib} STATIC ${lib})
-        endforeach(lib)
-    endif()
-endfunction(libs_)
-
 function(libs)
-    libs_("ALL" ${ARGN})
+    foreach(lib ${ARGN})
+        add_library(${HOME}-${lib} STATIC ${lib})
+    endforeach(lib)
 endfunction(libs)
 
 function(libs_ser)
-    libs_("SER" ${ARGN})
+    if (NOT MPI)
+        libs(${ARGN})
+    endif()
 endfunction(libs_ser)
 
 function(libs_par)
-    libs_("PAR" ${ARGN})
+    if (MPI)
+        libs(${ARGN})
+    endif()
 endfunction(libs_par)
 
 ###############################################################################
-# target_link_libraries_par appends ${PAR_OBJ} ${MPI_CXX_LIBRARIES} to a call
-# of target_link_libraries
-
-function(target_link_libraries_ when)
-    if((${when} STREQUAL "ALL" OR ${when} STREQUAL "PAR") AND MPI)
-        target_link_libraries(${ARGN} ${PAR_OBJ} ${MPI_CXX_LIBRARIES} ${PARMETIS_LIBRARIES})
-    elseif((${when} STREQUAL "ALL" OR ${when} STREQUAL "SER") AND NOT MPI)
-        target_link_libraries(${ARGN})
-    endif()
-endfunction(target_link_libraries_)
-
-function(target_link_libraries_par)
-    target_link_libraries_("PAR" ${ARGN})
-endfunction(target_link_libraries_par)
+# target_link_libraries_par appends ${PAR_OBJ} ${MPI_CXX_LIBRARIES}
+# ${PARMETIS_LIBRARIES} to a call of target_link_libraries
 
 function(target_link_libraries_ser)
-    target_link_libraries_("SER" ${ARGN})
+    if (NOT MPI)
+        target_link_libraries(${ARGN})
+    endif()
 endfunction(target_link_libraries_ser)
 
-function(set_ when)
-    if((${when} STREQUAL "ALL") OR (${when} STREQUAL "PAR" AND MPI) OR (${when} STREQUAL "SER" AND NOT MPI))
-        message("SET ${HOME} ${when} ${ARGN}")
-        set(${ARGN})
+function(target_link_libraries_par)
+    if (MPI)
+        target_link_libraries(${ARGN} ${PAR_OBJ} ${MPI_CXX_LIBRARIES} ${PARMETIS_LIBRARIES})
     endif()
-endfunction(set_)
+endfunction(target_link_libraries_par)
+
+###############################################################################
+# Set a variable depending on MPI
 
 function(set_par)
-    set_("PAR" ${ARGN})
+    if (MPI)
+        set(${ARGN} PARENT_SCOPE)
+    endif()
 endfunction(set_par)
 
-function(set_ser)
-    set_("SER" ${ARGN})
-endfunction(set_ser)
-
 if (WIN32)
-  set(BEGIN_STATIC_LIBS /OPT:NOREF)
-  set(END_STATIC_LIBS  /OPT:REF)
+#  set(BEGIN_STATIC_LIBS -OPT:NOREF)
+#  set(END_STATIC_LIBS  -OPT:REF)
 else(WIN32)
-  set(BEGIN_STATIC_LIBS -Wl,--whole-archive)
-  set(END_STATIC_LIBS  -Wl,--no-whole-archive)
+    set(BEGIN_STATIC_LIBS -Wl,--whole-archive)
+    set(END_STATIC_LIBS  -Wl,--no-whole-archive)
 endif(WIN32)
 
 ###############################################################################
@@ -135,27 +142,32 @@ endif(WIN32)
 # Afterwards we add <link_objects...> as a requirement of the executable 
 # THIS FUNCTION REQUIRES ${HOME} and ${PAR_OBJ}
 
-function(exec_ when f)
-    if((${when} STREQUAL "ALL") OR (${when} STREQUAL "PAR" AND MPI) OR (${when} STREQUAL "SER" AND NOT MPI))
-        libs_(${when} ${f})
-        add_executable(${f} ${f})
-        target_link_libraries_(${when} ${f} ${HOME}-${f} ${ARGN} ${${f}-staticlibs})
-    endif()
+function(exec_ f)
+    libs(${f})
+    add_executable(${f} ${f})
 endfunction(exec_)
 
-function(exec f)
-    exec_("ALL" ${f} ${ARGN})
-endfunction(exec)
-
 function(exec_ser f)
-    exec_("SER" ${f} ${ARGN})
+    if(NOT MPI)
+        exec_(${f})
+        target_link_libraries(${f} ${HOME}-${f} ${ARGN} ${${f}-staticlibs})
+    endif()
 endfunction(exec_ser)
 
 function(exec_par f)
-    exec_("PAR" ${f} ${ARGN})
+    if(MPI)
+        exec_(${f})
+        target_link_libraries_par(${f} ${HOME}-${f} ${ARGN} ${${f}-staticlibs})
+    endif()
 endfunction(exec_par)
 
-set(PACKAGES parallel levelset poisson DiST geom num out misc stokes navstokes surfactant transport partests tests)
+function(exec f)
+    exec_ser(${f} ${ARGN})
+    exec_par(${f} ${ARGN})
+endfunction(exec)
+
+
+set(PACKAGES parallel levelset poisson DiST geom num out misc osmosis stokes navstokes surfactant transport partests tests)
 string(REPLACE ";" " " PACKAGES_STRING "${PACKAGES}")
 
 option(TESTS "compile tests" OFF)
@@ -171,11 +183,14 @@ foreach(package ${PACKAGES})
           configure_file(${file} ${package}/)
           #message(STATUS "copying ${file} ${package}/")
     endforeach(file)
+
 endforeach(${package})
 
 add_custom_target(stat COMMAND ls */*.cpp */*.tpp */*.h | xargs wc -l WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_custom_target(distclean COMMAND rm -rf ${CMAKE_CURRENT_BINARY_DIR}/*)
+
+add_custom_target(ctagsdb COMMAND ctags -R --tag-relative=yes --c++-types=+px --excmd=pattern --exclude=Makefile --exclude= --langmap=c++:+.tpp -f ${CMAKE_CURRENT_BINARY_DIR}/ctagsdb WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
 find_package(Doxygen)
 if(DOXYGEN_FOUND)
@@ -188,3 +203,4 @@ if(DOXYGEN_FOUND)
     )
 endif()
 
+add_custom_target(coeffs DEPENDS misc-scalarFunctions misc-vectorFunctions levelset-twophaseCoeff levelset-filmCoeff poisson-poissonCoeff stokes-stokesCoeff)

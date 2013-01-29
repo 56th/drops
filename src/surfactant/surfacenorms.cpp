@@ -29,6 +29,7 @@
 #include "levelset/adaptriang.h"
 #include "levelset/surfacetension.h"
 #include "out/ensightOut.h"
+#include "misc/dynamicload.h"
 
 #include <fstream>
 
@@ -258,6 +259,9 @@ int main (int argc, char** argv)
     param >> P;
     param.close();
     std::cout << P << std::endl;
+
+    DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
+
     std::cout << "Setting up interface-PDE:\n";
     DROPS::BrickBuilderCL brick( DROPS::MakePoint3D( -2., -2., -2.),
                                  4.*DROPS::std_basis<3>( 1),

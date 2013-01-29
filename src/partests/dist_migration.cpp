@@ -256,7 +256,7 @@ void CheckMigration( LoadBalCL& lb)
     BuildBoundaryData( &mg, lsetbnddata, perbndtypestr, zerobndfun, periodic_match);
     SurfaceTensionCL sft( DROPS::sigmaf);
     LevelsetP2CL lset( mg, *lsetbnddata, sft);
-    IdxDescCL* lidx= &lset.idx;
+    MLIdxDescCL* lidx= &lset.idx;
     lset.CreateNumbering( mg.GetLastLevel(), lidx);
     lset.Phi.SetIdx( lidx);
 
@@ -327,7 +327,7 @@ void CheckMigration( LoadBalCL& lb)
 int main( int argc, char **argv)
 {
 #ifdef _PAR
-    DROPS::ProcInitCL procinit(&argc, &argv);
+    DROPS::ProcCL::Instance(&argc, &argv);
 #endif
     try {
         DROPS::MultiGridCL* mg= 0;

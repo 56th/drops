@@ -23,6 +23,13 @@ class SingletonMapCL : public std::map<std::string, T>
   public:
     static SingletonMapCL& getInstance();
     T& operator[](std::string s);
+    void PrintAll(){
+        std::cout << " map contains : \n";
+        for ( typename SingletonMapCL<T>::const_iterator iter = this->begin();
+              iter != this->end(); ++iter )
+            std::cout << iter->first << std::endl;
+
+    }
 };
 
 template <class T>
@@ -30,7 +37,6 @@ class MapRegisterCL
 {
   public:
     MapRegisterCL(std::string name, T t){
-        std::cout << " Added function " << name << " to container " << std::endl;
         SingletonMapCL<T>::getInstance().insert(std::make_pair(name, t));
     }
 };

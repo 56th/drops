@@ -34,6 +34,9 @@
 #include "levelset/surfacetension.h"
 #include <fstream>
 
+#include "misc/scalarFunctions.cpp"
+#include "misc/vectorFunctions.cpp"
+
 const double      delta_t= 0.01;
 const DROPS::Uint num_steps= 50;
 const int         FPsteps= -1;
@@ -48,7 +51,7 @@ const int         FPsteps= -1;
 //            z=1 und x<0.5        Inflow Dirichlet  parabol.
 //            z=1 und x>0.5        Neumann   0   (aus Impl.gruenden: Dir.)
 
-DROPS::Point3DCL ZeroVel( const DROPS::Point3DCL&, double) { return DROPS::Point3DCL(0.); }
+//DROPS::Point3DCL ZeroVel( const DROPS::Point3DCL&, double) { return DROPS::Point3DCL(0.); }
 
 // Tropfendaten:
 DROPS::Point3DCL Mitte(0.5);
@@ -75,43 +78,15 @@ double sigmaf (const DROPS::Point3DCL&, double) { return sigma; }
 namespace DROPS // for Strategy
 {
 
-typedef PCGSolverCL<SGSPcCL>      PCG_SgsCL;
-typedef PCGSolverCL<SSORPcCL>     PCG_SsorCL;
-
-class Uzawa_PCG_CL : public UzawaSolverCL<PCG_SsorCL>
-{
-  private:
-    SSORPcCL   _ssor;
-    PCG_SsorCL _PCGsolver;
-  public:
-    Uzawa_PCG_CL( MLMatrixCL& M, int outer_iter, double outer_tol, int inner_iter, double inner_tol, double tau= 1., double omega=1.)
-        : UzawaSolverCL<PCG_SsorCL>( _PCGsolver, M, outer_iter, outer_tol, tau),
-          _ssor( omega), _PCGsolver(_ssor, inner_iter, inner_tol)
-        {}
-};
-
-class PSchur_GSPCG_CL: public PSchurSolverCL<PCG_SgsCL>
-{
-  private:
-    SGSPcCL   _sgs;
-    PCG_SgsCL _PCGsolver;
-  public:
-    PSchur_GSPCG_CL( MLMatrixCL& M, int outer_iter, double outer_tol, int inner_iter, double inner_tol)
-        : PSchurSolverCL<PCG_SgsCL>( _PCGsolver, M, outer_iter, outer_tol),
-          _PCGsolver( _sgs, inner_iter, inner_tol)
-        {}
-    PCG_SgsCL& GetPoissonSolver() { return _PCGsolver; }
-};
-
 template<class StokesProblemT>
-void Strategy( StokesProblemT& Stokes, const BndDataCL<>& lsbnd, double inner_iter_tol)
+void Strategy( StokesProblemT& Stokes, const BndDataCL<>& lsbnd)
 // flow control
 {
     MultiGridCL& MG= Stokes.GetMG();
     SurfaceTensionCL sf( sigmaf);
     LevelsetP2CL lset( MG, lsbnd, sf, 0.1);
 
-    IdxDescCL* lidx= &lset.idx;
+    MLIdxDescCL* lidx= &lset.idx;
     MLIdxDescCL* vidx= &Stokes.vel_idx;
     MLIdxDescCL* pidx= &Stokes.pr_idx;
     VelVecDescCL* v= &Stokes.v;
@@ -122,7 +97,7 @@ void Strategy( StokesProblemT& Stokes, const BndDataCL<>& lsbnd, double inner_it
     MLMatDescCL* A= &Stokes.A;
     MLMatDescCL* B= &Stokes.B;
     MLMatDescCL* M= &Stokes.M;
-    MLMatDescCL prM;
+    MLMatDescCL* prM = &Stokes.prM;
 
     TimerCL time;
     Stokes.CreateNumberingVel( MG.GetLastLevel(), vidx);
@@ -146,29 +121,33 @@ void Strategy( StokesProblemT& Stokes, const BndDataCL<>& lsbnd, double inner_it
     B->SetIdx(pidx, vidx);
     M->SetIdx(vidx, vidx);
     Stokes.N.SetIdx(vidx, vidx);
-    prM.SetIdx( pidx, pidx);
+    prM->SetIdx( pidx, pidx);
     time.Reset();
     time.Start();
     Stokes.SetupSystem1( A, M, b, b, &cpl_M, lset, Stokes.v.t);
     Stokes.SetupSystem2( B, c, lset, Stokes.v.t);
-    Stokes.SetupPrMass( &prM, lset);
+    Stokes.SetupPrMass( prM, lset);
     time.Stop();
     std::cout << time.GetTime() << " seconds for setting up all systems!" << std::endl;
 
     Stokes.InitVel( v, ZeroVel);
     lset.SetupSystem( Stokes.GetVelSolution(), delta_t);
 
-    Uint meth;
-    std::cout << "\nwhich method? 0=Uzawa, 1=Schur > "; std::cin >> meth;
     time.Reset();
 
     double outer_tol;
     std::cout << "tol = "; std::cin >> outer_tol;
+    GSPcCL pc;
+    PCGSolverCL<GSPcCL> PCGsolver( pc, 200, 1e-2, true);
+    typedef SolverAsPreCL<PCGSolverCL<GSPcCL> > PCGPcT;
+    PCGPcT apc( PCGsolver);
+    ISBBTPreCL bbtispc( &Stokes.B.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.M.Data.GetFinest(), Stokes.pr_idx.GetFinest(), 0.0, 1.0, 1e-4, 1e-4);
+    InexactUzawaCL<PCGPcT, ISBBTPreCL, APC_OTHER> inexactuzawasolver( apc, bbtispc, 200, outer_tol, 0.6, 50);
 
     {
         std::cout << "Computing initial velocity..." << std::endl;
-        PSchur_GSPCG_CL schurSolver( prM.Data, 200, outer_tol, 200, inner_iter_tol);
-        schurSolver.Solve( A->Data, B->Data, v->Data, p->Data, b->Data, c->Data);
+
+        inexactuzawasolver.Solve( A->Data, B->Data, v->Data, p->Data, b->Data, c->Data, v->RowIdx->GetEx(),  p->RowIdx->GetEx());
     }
 
     // Initialize Ensight6 output
@@ -183,46 +162,22 @@ void Strategy( StokesProblemT& Stokes, const BndDataCL<>& lsbnd, double inner_it
     SSORPcCL ssorpc;
     LSetSolver gm( ssorpc, 100, 1000, 1e-7);
     LevelsetModifyCL lsetmod( 0, 0, 0, 0, 0, 0);
-    if (meth)
-    {
-//        typedef PSchur_PCG_CL StokesSolverT;
-        typedef PSchur_GSPCG_CL StokesSolverT;
-        PSchur_GSPCG_CL StokesSolver( prM.Data, 200, outer_tol, 200, inner_iter_tol);
-        typedef NSSolverBaseCL<StokesProblemT> SolverT;
-        SolverT dummyFP( Stokes, StokesSolver);
-        LinThetaScheme2PhaseCL<LSetSolver>
-            cpl( Stokes, lset, dummyFP, gm, lsetmod, delta_t, /*theta*/ 0.5, 0.5, /*nonlinear*/ 0.);
+    typedef NSSolverBaseCL<StokesProblemT> SolverT;
+    SolverT dummyFP( Stokes, inexactuzawasolver);
+    LinThetaScheme2PhaseCL<LSetSolver>
+        cpl( Stokes, lset, dummyFP, gm, lsetmod, /*theta*/ 0.5, 0.5, /*nonlinear*/ 0.);
+    cpl.SetTimeStep( delta_t);
 
-        for (Uint step= 1; step<=num_steps; ++step)
-        {
-            std::cout << "======================================================== Schritt " << step << ":\n";
-            cpl.DoStep( FPsteps);
-            ensight.Write( step*delta_t);
-        }
-    }
-    else // Uzawa
-    {
-        double tau;
-        Uint inner_iter;
-        tau=  0.5*delta_t;
-        std::cout << "#PCG steps = "; std::cin >> inner_iter;
-        typedef Uzawa_PCG_CL StokesSolverT;
-        StokesSolverT uzawaSolver( prM.Data, 5000, outer_tol, inner_iter, inner_iter_tol, tau);
-        typedef NSSolverBaseCL<StokesProblemT> SolverT;
-        SolverT dummyFP( Stokes, uzawaSolver);
-        LinThetaScheme2PhaseCL<LSetSolver>
-            cpl( Stokes, lset, dummyFP, gm, lsetmod, /*theta*/ 0.5, 0.5, /*nonlinear*/ 0.);
-        cpl.SetTimeStep( delta_t);
+    bbtispc.SetWeights(1.0/delta_t, 0.5);
 
-        for (Uint step= 1; step<=num_steps; ++step)
-        {
-            std::cout << "============= Schritt " << step << ":\n";
-            cpl.DoStep( FPsteps);
-            ensight.Write( step*delta_t);
-        }
-        std::cout << "Iterationen: " << uzawaSolver.GetIter()
-                  << "\tNorm des Res.: " << uzawaSolver.GetResid() << std::endl;
+    for (Uint step= 1; step<=num_steps; ++step)
+    {
+        std::cout << "============= Schritt " << step << ":\n";
+        cpl.DoStep( FPsteps);
+        ensight.Write( step*delta_t);
     }
+    std::cout << "Iterationen: " << inexactuzawasolver.GetIter()
+              << "\tNorm des Res.: " << inexactuzawasolver.GetResid() << std::endl;
 
     std::cout << std::endl;
 }
@@ -234,16 +189,14 @@ int main (int argc, char** argv)
 {
   try
   {
-    if (argc!=4)
+    if (argc!=3)
     {
-        std::cout << "You have to specify three parameters:\n\tlsshear <inner_iter_tol> <num_subdiv> <surf.tension>" << std::endl;
+        std::cout << "You have to specify three parameters:\n\tlsshear <num_subdiv> <surf.tension>" << std::endl;
         return 1;
     }
 
-    double inner_iter_tol= std::atof(argv[1]);
-    int sub_div= std::atoi(argv[2]);
-    sigma= std::atof(argv[3]);
-    std::cout << "inner iter tol:  " << inner_iter_tol << std::endl;
+    int sub_div= std::atoi(argv[1]);
+    sigma= std::atof(argv[2]);
     std::cout << "sub divisions:   " << sub_div << std::endl;
     std::cout << "surface tension: " << sigma << std::endl;
     DROPS::Point3DCL null(0.0);
@@ -268,7 +221,7 @@ int main (int argc, char** argv)
 
     MyStokesCL prob(brick, coeff, DROPS::StokesBndDataCL(6, IsNeumann, bnd_fun));
     DROPS::MultiGridCL& mg = prob.GetMG();
-    Strategy(prob, lsbnd, inner_iter_tol);
+    Strategy(prob, lsbnd);
     std::cout << DROPS::SanityMGOutCL(mg) << std::endl;
     double min= prob.p.Data.min(),
            max= prob.p.Data.max();

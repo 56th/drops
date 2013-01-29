@@ -1201,7 +1201,7 @@ void FastmarchingOnMasterCL::CreateGlobNumb()
 
     // in debug mode, check if everything is right
 #if DROPSDebugC&DebugParallelNumC
-    DROPS_FOR_TRIANG_VERTEX( data_.mg, lvl, it)
+/*    DROPS_FOR_TRIANG_VERTEX( data_.mg, lvl, it)
         if (globNumb_[ it->Unknowns(idx) ]==NoIdx)
             it->DebugInfo(std::cout);
     DROPS_FOR_TRIANG_EDGE( data_.mg, lvl, it)
@@ -1217,7 +1217,7 @@ void FastmarchingOnMasterCL::CreateGlobNumb()
         std::cerr << "["<<ProcCL::MyRank()<<"] max entry is "<<maxEntry<<" but there are only "
                   << offset_[ProcCL::Size()] << " global dof!" << std::endl;
         throw DROPSErrCL("FastMarchCL::CreateGlobNumb: max entry in globNumb is bigger than global size");
-    }
+    }*/
 #endif
 }
 /*
@@ -1526,7 +1526,7 @@ ReparamDataCL* ParDirectDistanceCL::actualData_=0;
 
 bool ParDirectDistanceCL::CommunicateFrontierCL::Gather( const DiST::TransferableCL& t, DiST::SendStreamCL& s)
 {
-    if (!t.Unknowns.Exist() || t.Unknowns.Exist(actualData_->phi.RowIdx->GetIdx()))
+    if (!t.Unknowns.Exist() || t.Unknowns.Exist(actualData_->phi.RowIdx->GetIdx()) || !t.Unknowns.InTriangLevel(actualData_->phi.RowIdx->TriangLevel()))
         return false;
 
     IdxT dof= t.Unknowns( actualData_->phi.RowIdx->GetIdx());   // where to find phi
@@ -1538,7 +1538,7 @@ bool ParDirectDistanceCL::CommunicateFrontierCL::Gather( const DiST::Transferabl
 
 bool ParDirectDistanceCL::CommunicateFrontierCL::Scatter( DiST::TransferableCL& t, const size_t numData, DiST::MPIistreamCL& r)
 {
-    if (!t.Unknowns.Exist() || t.Unknowns.Exist(actualData_->phi.RowIdx->GetIdx()))
+    if (!t.Unknowns.Exist() || t.Unknowns.Exist(actualData_->phi.RowIdx->GetIdx())  || !t.Unknowns.InTriangLevel(actualData_->phi.RowIdx->TriangLevel()))
         return false;
     TransferST tmp;
     IdxT dof= t.Unknowns( actualData_->phi.RowIdx->GetIdx());

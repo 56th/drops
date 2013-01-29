@@ -53,6 +53,8 @@
 #include <fstream>
 #include <sstream>
 
+#include "misc/dynamicload.h"
+
 DROPS::ParamCL P;
 
 bool periodic_xz( const DROPS::Point3DCL& p, const DROPS::Point3DCL& q)
@@ -113,7 +115,7 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
     DROPS::match_fun periodic_match = DROPS::MatchMap::getInstance()[P.get<std::string>("DomainCond.PeriodicMatching", std::string("periodicxz"))];
     MultiGridCL& MG= Stokes.GetMG();
 
-    IdxDescCL* lidx= &lset.idx;
+    MLIdxDescCL* lidx= &lset.idx;
     MLIdxDescCL* vidx= &Stokes.vel_idx;
     MLIdxDescCL* pidx= &Stokes.pr_idx;
     IdxDescCL ens_idx( P2_FE, NoBndDataCL<>());
@@ -175,12 +177,14 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
 
         time.Reset();
         SSORPcCL ssorpc;
-        typedef PCGSolverCL<SSORPcCL>     PCG_SsorCL;
-        PCG_SsorCL PCGsolver( ssorpc, P.get<int>("Stokes.InnerIter"), P.get<double>("Stokes.InnerTol"));
-        PSchurSolverCL<PCG_SsorCL> schurSolver( PCGsolver, Stokes.prM.Data, P.get<int>("Stokes.OuterIter"), P.get<double>("Stokes.OuterTol"));
+        PCGSolverCL<SSORPcCL> PCGsolver( ssorpc, P.get<int>("Stokes.PcAIter"), P.get<double>("Stokes.PcATol"), true);
+        typedef SolverAsPreCL<PCGSolverCL<SSORPcCL> > PCGPcT;
+        PCGPcT apc( PCGsolver);
+        ISBBTPreCL bbtispc( &Stokes.B.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.M.Data.GetFinest(), Stokes.pr_idx.GetFinest(), 0.0, 1.0, P.get<double>("Stokes.PcSTol"), P.get<double>("Stokes.PcSTol"));
+        InexactUzawaCL<PCGPcT, ISBBTPreCL, APC_OTHER> inexactuzawasolver( apc, bbtispc, P.get<int>("Stokes.OuterIter"), P.get<double>("Stokes.OuterTol"), 0.6, 50);
 
-        schurSolver.Solve( Stokes.A.Data, Stokes.B.Data,
-            Stokes.v.Data, Stokes.p.Data, Stokes.b.Data, Stokes.c.Data);
+        inexactuzawasolver.Solve( Stokes.A.Data, Stokes.B.Data,
+            Stokes.v.Data, Stokes.p.Data, Stokes.b.Data, Stokes.c.Data, Stokes.vel_idx.GetEx(), Stokes.pr_idx.GetEx());
         time.Stop();
         std::cout << "Solving Stokes for initial velocities took "<<time.GetTime()<<" sec.\n";
       } break;
@@ -315,9 +319,9 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
     }
 
 
-    UpdateProlongationCL PVel( Stokes.GetMG(), stokessolverfactory.GetPVel(), &Stokes.vel_idx, &Stokes.vel_idx);
+    UpdateProlongationCL<Point3DCL> PVel( Stokes.GetMG(), stokessolverfactory.GetPVel(), &Stokes.vel_idx, &Stokes.vel_idx);
     adap.push_back( &PVel);
-    UpdateProlongationCL PPr ( Stokes.GetMG(), stokessolverfactory.GetPPr(), &Stokes.pr_idx, &Stokes.pr_idx);
+    UpdateProlongationCL<double> PPr ( Stokes.GetMG(), stokessolverfactory.GetPPr(), &Stokes.pr_idx, &Stokes.pr_idx);
     adap.push_back( &PPr);
 
     TwoPhaseStoreCL<InstatNavierStokes2PhaseP2P1CL> ser(MG, Stokes, lset, NULL,
@@ -443,6 +447,8 @@ int main (int argc, char** argv)
     SetMissingParameters(P);
 
     std::cout << P << std::endl;
+
+    DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
 
     //DIDNT FIND A PARAM WITH PeriodicMatching, so I didnt know the type
     DROPS::match_fun periodic_match = DROPS::MatchMap::getInstance()[P.get<std::string>("DomainCond.PeriodicMatching", std::string("periodicxz"))];

@@ -54,8 +54,8 @@ template <typename StokesT, typename LevelsetT>
     std::cout << levelset.Phi.Data.size() << " levelset unknowns.\n";
 #else
     const MLIdxDescCL* vidx = &Stokes.vel_idx,
-                     * pidx = &Stokes.pr_idx;
-    const IdxDescCL*   lidx = &levelset.idx;
+                     * pidx = &Stokes.pr_idx,
+                     *lidx = &levelset.idx;
     const ExchangeCL& ExV = Stokes.vel_idx.GetEx(),
                     & ExP = Stokes.pr_idx.GetEx(),
                     & ExL = levelset.idx.GetEx();

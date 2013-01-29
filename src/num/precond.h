@@ -28,9 +28,7 @@
 #include "misc/container.h"
 #include "num/spmat.h"
 #include "num/spblockmat.h"
-#ifdef _PAR
 #include "parallel/exchange.h"
-#endif
 
 namespace DROPS{
 
@@ -170,6 +168,33 @@ SolveGSstep(const PreDummyCL<PB_GS0>&, const MatrixCL& A, Vec& x, const Vec& b, 
     }
 }
 
+// One step of the Gauss-Seidel/SOR method with start vector 0
+// Fix for osmosis: Diag 0 entries are ignored
+template <bool HasOmega, typename Vec>
+void
+SolveGSDiag0step(const PreDummyCL<PB_GS0>&, const MatrixCL& A, Vec& x, const Vec& b, double omega)
+{
+    const size_t n= A.num_rows();
+    double aii, sum;
+
+    for (size_t i=0, nz=0; i<n; ++i) {
+        sum= b[i];
+        const size_t end= A.row_beg( i+1);
+        for (; A.col_ind( nz) != i; ++nz) // This is safe: Without diagonal entry, Gauss-Seidel would explode anyway.
+            sum-= A.val( nz)*x[A.col_ind( nz)];
+        aii= A.val( nz);
+        nz= end;
+
+        if (aii == 0.0)
+        	continue;
+
+        if (HasOmega)
+            x[i]= (1.-omega)*x[i]+omega*sum/aii;
+        else
+            x[i]= sum/aii;
+    }
+}
+
 
 // One step of the Symmetric-Gauss-Seidel/SSOR method with start vector x
 template <bool HasOmega, typename Vec>
@@ -287,6 +312,13 @@ SolveGSstep(const PreDummyCL<PBT>& pd, const MLMatrixCL& M, Vec& x, const Vec& b
 
 template <bool HasOmega, typename  Vec, PreBaseGS PBT>
 void
+SolveGSDiag0step(const PreDummyCL<PBT>& pd, const MLMatrixCL& M, Vec& x, const Vec& b, double omega)
+{
+    SolveGSDiag0step<HasOmega, Vec>( pd, M.GetFinest(), x, b, omega);
+}
+
+template <bool HasOmega, typename  Vec, PreBaseGS PBT>
+void
 SolveGSstep(const PreDummyCL<PBT>& pd, const MLMatrixCL& M, Vec& x, const Vec& b)
 {
     SolveGSstep<HasOmega, Vec>( pd, M.GetFinest(), x, b);
@@ -297,6 +329,13 @@ void
 SolveGSstep(const PreDummyCL<PBT>& pd, const MLMatrixCL& A, Vec& x, const Vec& b, const SparseMatDiagCL& diag, double omega)
 {
     SolveGSstep<HasOmega, Vec>( pd, A.GetFinest(), x, b, diag, omega);
+}
+
+template <bool HasOmega, typename  Vec, PreBaseGS PBT>
+void
+SolveGSDiag0step(const PreDummyCL<PBT>& pd, const MLMatrixCL& A, Vec& x, const Vec& b, const SparseMatDiagCL& diag, double omega)
+{
+    SolveGSDiag0step<HasOmega, Vec>( pd, A.GetFinest(), x, b, diag, omega);
 }
 
 template <bool HasOmega, typename  Vec, PreBaseGS PBT>
@@ -313,6 +352,7 @@ SolveGSstep(const PreDummyCL<PBT>& pd, const MLMatrixCL& A, Vec& x, const Vec& b
 
 // Preconditioners without own matrix
 template <PreMethGS PM, bool HasDiag= PreTraitsCL<PM>::HasDiag> class PreGSCL;
+template <PreMethGS PM, bool HasDiag= PreTraitsCL<PM>::HasDiag> class PreGSDiag0CL;
 
 // Simple preconditioners
 template <PreMethGS PM>
@@ -324,11 +364,21 @@ class PreGSCL<PM,false>
   public:
     PreGSCL (double om= 1.0) : _omega(om) {}
 
-    template <typename Mat, typename Vec>
-    void Apply(const Mat& A, Vec& x, const Vec& b) const
+    template <typename Mat, typename Vec, typename ExT>
+    void Apply(const Mat& A, Vec& x, const Vec& b, const ExT&) const
     {
         SolveGSstep<PreTraitsCL<PM>::HasOmega,Vec>(PreDummyCL<PreTraitsCL<PM>::BaseMeth>(), A, x, b, _omega);
     }
+    /// \brief Check if return preconditioned vectors are accumulated after calling Apply
+    bool RetAcc()   const { return false; }
+    /// \brief Check if the diagonal of the matrix is needed
+    bool NeedDiag() const { return false; }
+    /// \name Set diagonal of the matrix for consistency
+    //@{
+    void SetDiag(const VectorCL&) {}         // just for consistency
+    template<typename Mat, typename ExT>
+    void SetDiag(const Mat&, const ExT&) {}  // just for consistency
+    //@}
 };
 
 
@@ -350,18 +400,74 @@ class PreGSCL<PM,true>
         delete _diag; _diag=new SparseMatDiagCL(A);
     }
 
+    template <typename Vec, typename ExT>
+    void Apply(const MatrixCL& A, Vec& x, const Vec& b, const ExT&) const
+    {
+    	SolveGSstep<PreTraitsCL<PM>::HasOmega,Vec>(PreDummyCL<PreTraitsCL<PM>::BaseMeth>(), A, x, b, *_diag, _omega);
+    }
+    template <typename Vec, typename ExT>
+    void Apply(const MLMatrixCL& A, Vec& x, const Vec& b, const ExT&) const
+    {
+    	SolveGSstep<PreTraitsCL<PM>::HasOmega,Vec>(PreDummyCL<PreTraitsCL<PM>::BaseMeth>(), A.GetFinest(), x, b, *_diag, _omega);
+    }
+    /// \brief Check if return preconditioned vectors are accumulated after calling Apply
+    bool RetAcc()   const { return false; }
+    /// \brief Check if the diagonal of the matrix is needed
+    bool NeedDiag() const { return false; }
+    /// \name Set diagonal of the matrix for consistency
+    //@{
+    void SetDiag(const VectorCL&) {}         // just for consistency
+    template<typename Mat, typename ExT>
+    void SetDiag(const Mat&, const ExT&) {}  // just for consistency
+    //@}
+};
+
+template <PreMethGS PM>
+class PreGSDiag0CL<PM,false>
+{
+  private:
+    double _omega;
+
+  public:
+    PreGSDiag0CL (double om= 1.0) : _omega(om) {}
+
+    template <typename Mat, typename Vec, typename ExT>
+    void Apply(const Mat& A, Vec& x, const Vec& b, const ExT&) const
+    {
+        SolveGSDiag0step<PreTraitsCL<PM>::HasOmega,Vec>(PreDummyCL<PreTraitsCL<PM>::BaseMeth>(), A, x, b, _omega);
+    }
+};
+
+
+// Preconditioner with SparseMatDiagCL
+template <PreMethGS PM>
+class PreGSDiag0CL<PM,true>
+{
+  private:
+    const SparseMatDiagCL* _diag;
+    double                 _omega;
+
+  public:
+    PreGSDiag0CL (double om= 1.0) : _diag(0), _omega(om) {}
+    PreGSDiag0CL (const PreGSDiag0CL& p) : _diag(p._diag ? new SparseMatDiagCL(*(p._diag)) : 0), _omega(p._omega) {}
+    ~PreGSDiag0CL() { delete _diag; }
+
+    void Init(const MatrixCL& A)
+    {
+        delete _diag; _diag=new SparseMatDiagCL(A);
+    }
+
     template <typename Vec>
     void Apply(const MatrixCL& A, Vec& x, const Vec& b) const
     {
-        SolveGSstep<PreTraitsCL<PM>::HasOmega,Vec>(PreDummyCL<PreTraitsCL<PM>::BaseMeth>(), A, x, b, *_diag, _omega);
+    	SolveGSDiag0step<PreTraitsCL<PM>::HasOmega,Vec>(PreDummyCL<PreTraitsCL<PM>::BaseMeth>(), A, x, b, *_diag, _omega);
     }
     template <typename Vec>
     void Apply(const MLMatrixCL& A, Vec& x, const Vec& b) const
     {
-        SolveGSstep<PreTraitsCL<PM>::HasOmega,Vec>(PreDummyCL<PreTraitsCL<PM>::BaseMeth>(), A.GetFinest(), x, b, *_diag, _omega);
+    	SolveGSDiag0step<PreTraitsCL<PM>::HasOmega,Vec>(PreDummyCL<PreTraitsCL<PM>::BaseMeth>(), A.GetFinest(), x, b, *_diag, _omega);
     }
 };
-
 
 // Preconditioners with own matrix
 template <PreMethGS PM, bool HasDiag= PreTraitsCL<PM>::HasDiag>
@@ -378,11 +484,21 @@ class PreGSOwnMatCL<PM,false>
   public:
     PreGSOwnMatCL (const MatrixCL& M, double om= 1.0) : _M(M), _omega(om) {}
 
-    template <typename Mat, typename Vec>
-    void Apply(const Mat&, Vec& x, const Vec& b) const
+    template <typename Mat, typename Vec, typename ExT>
+    void Apply(const Mat&, Vec& x, const Vec& b, const ExT&) const
     {
         SolveGSstep<PreTraitsCL<PM>::HasOmega,Vec>(PreDummyCL<PreTraitsCL<PM>::BaseMeth>(), _M, x, b, _omega);
     }
+    /// \brief Check if return preconditioned vectors are accumulated after calling Apply
+    bool RetAcc()   const { return false; }
+    /// \brief Check if the diagonal of the matrix is needed
+    bool NeedDiag() const { return false; }
+    /// \name Set diagonal of the matrix for consistency
+    //@{
+    void SetDiag(const VectorCL&) {}        // just for consistency
+    template<typename Mat, typename ExT>
+    void SetDiag(const Mat&, const ExT&) {} // just for consistency
+    //@}
 };
 
 
@@ -410,6 +526,16 @@ class PreGSOwnMatCL<PM,true>
     {
         SolveGSstep<PreTraitsCL<PM>::HasOmega,Vec>(PreDummyCL<PreTraitsCL<PM>::BaseMeth>(), _M, x, b, *_diag, _omega);
     }
+    /// \brief Check if return preconditioned vectors are accumulated after calling Apply
+    bool RetAcc()   const { return false; }
+    /// \brief Check if the diagonal of the matrix is needed
+    bool NeedDiag() const { return false; }
+    /// \name Set diagonal of the matrix for consistency
+    //@{
+    void SetDiag(const VectorCL&) {}        // just for consistency
+    template<typename Mat, typename ExT>
+    void SetDiag(const Mat&, const ExT&) {} // just for consistency
+    //@}
 };
 
 class MultiSSORPcCL
@@ -431,26 +557,16 @@ class MultiSSORPcCL
         for (int i=1; i<_num; ++i)
             SolveGSstep<PreTraitsCL<P_SSOR>::HasOmega,Vec>(PreDummyCL<PreTraitsCL<P_SSOR>::BaseMeth>(), A, x, b, _omega);
     }
-};
-
-class DummyPcCL
-{
-  public:
-    template <typename Mat, typename Vec>
-    void Apply(const Mat&, Vec& x, const Vec& b) const
-    {
-        x = b;
-    }
-    template <typename Mat, typename Vec>
-    void ApplyTranspose(const Mat&, Vec& x, const Vec& b) const
-    {
-        x = b;
-    }
-    template <typename Mat, typename Vec>
-    Vec transp_mul(const Mat&, const Vec& b) const
-    {
-        return b;
-    }
+    /// \brief Check if return preconditioned vectors are accumulated after calling Apply
+    bool RetAcc()   const { return false; }
+    /// \brief Check if the diagonal of the matrix is needed
+    bool NeedDiag() const { return false; }
+    /// \name Set diagonal of the matrix for consistency
+    //@{
+    void SetDiag(const VectorCL&) {}        // just for consistency
+    template<typename Mat, typename ExT>
+    void SetDiag(const Mat&, const ExT&) {} // just for consistency
+    //@}
 };
 
 /// \brief Apply a diagonal-matrix given as a vector.
@@ -462,13 +578,24 @@ class DiagPcCL
   public:
     DiagPcCL (const VectorCL& D) : D_( D) {}
 
-    template <typename Mat, typename Vec>
-    void Apply (const Mat&, Vec& x, const Vec& b) const
+    template <typename Mat, typename Vec, typename ExT>
+    void Apply (const Mat&, Vec& x, const Vec& b, const ExT&) const
     {
         Assert( D_.size()==b.size(), DROPSErrCL("DiagPcCL: incompatible dimensions"), DebugNumericC);
         x= D_*b;
     }
+    /// \brief Check if return preconditioned vectors are accumulated after calling Apply
+    bool RetAcc()   const { return false; }
+    /// \brief Check if the diagonal of the matrix is needed
+    bool NeedDiag() const { return false; }
+    /// \name Set diagonal of the matrix for consistency
+    //@{
+    void SetDiag(const VectorCL&) {}            // just for consistency
+    template<typename Mat, typename ExT>
+    void SetDiag(const Mat&, const ExT&) {}     // just for consistency
+    //@}
 };
+
 
 /// \brief (Symmetric) Gauss-Seidel preconditioner (i.e. start-vector 0) for A*A^T (Normal Equations).
 class NEGSPcCL
@@ -481,14 +608,23 @@ class NEGSPcCL
     mutable VectorCL y_;         ///< temp-variable: A^T*x.
 
     template <typename Mat>
-    void Update (const Mat& A) const;
+    void Update (const Mat& A, const DummyExchangeCL& rowex, const DummyExchangeCL& colex) const;
 
     ///\brief Forward Gauss-Seidel-step with start-vector 0 for A*A^T
     template <typename Mat, typename Vec>
-    void ForwardGS(const Mat& A, Vec& x, const Vec& b) const;
+    void ForwardGS(const Mat& A, Vec& x, const Vec& b, const DummyExchangeCL& ex) const;
     ///\brief Backward Gauss-Seidel-step with start-vector 0 for A*A^T
     template <typename Mat, typename Vec>
-    void BackwardGS(const Mat& A, Vec& x, const Vec& b) const;
+    void BackwardGS(const Mat& A, Vec& x, const Vec& b, const DummyExchangeCL& ex) const;
+
+#ifdef _PAR
+    template <typename Mat>
+    void Update (const Mat& A, const ExchangeCL& rowex, const ExchangeCL& colex) const;
+    template <typename Mat, typename Vec>
+    void ForwardGS(const Mat& A, Vec& x, const Vec& b, const ExchangeCL& ex) const;
+    template <typename Mat, typename Vec>
+    void BackwardGS(const Mat& A, Vec& x, const Vec& b, const ExchangeCL& ex) const;
+#endif
 
     ///\brief Inverse of ForwardGS
     template <typename Mat, typename Vec>
@@ -502,27 +638,87 @@ class NEGSPcCL
 
     ///@{ Note, that A and not A*A^T is the first argument.
     ///\brief Execute a (symmetric) Gauss-Seidel preconditioning step.
-    template <typename Mat, typename Vec>
-    void Apply(const Mat& A, Vec& x, const Vec& b) const;
+    template <typename Mat, typename Vec, typename ExT>
+    void Apply(const Mat& A, Vec& x, const Vec& b, const ExT& rowex, const ExT& colex) const;
     ///\brief If symmetric == false, this  performs a backward Gauss-Seidel step, else it is identical to Apply.
-    template <typename Mat, typename Vec>
-    void ApplyTranspose(const Mat& A, Vec& x, const Vec& b) const;
+    template <typename Mat, typename Vec, typename ExT>
+    void ApplyTranspose(const Mat& A, Vec& x, const Vec& b, const ExT& rowex, const ExT& colex) const;
 
     ///\brief Multiply with the preconditioning matrix -- needed for right preconditioning.
-    template <typename Mat, typename Vec>
-    Vec mul (const Mat& A, const Vec& b) const;
+    template <typename Mat, typename Vec, typename ExT>
+    Vec mul (const Mat& A, const Vec& b, const ExT& rowex, const ExT& colex) const;
     ///\brief Multiply with the transpose of the preconditioning matrix -- needed for right preconditioning.
-    template <typename Mat, typename Vec>
-    Vec transp_mul(const Mat& A, const Vec& b) const;
+    template <typename Mat, typename Vec, typename ExT>
+    Vec transp_mul(const Mat& A, const Vec& b, const ExT& rowex, const ExT& colex) const;
     ///@}
 
     ///\brief Apply if A*A^T is given as CompositeMatrixCL
-    void Apply(const CompositeMatrixCL& AAT, VectorCL& x, const VectorCL& b) const
-    { Apply( *AAT.GetBlock1(), x, b); }
+    template <typename ExT>
+    void Apply(const CompositeMatrixCL& AAT, VectorCL& x, const VectorCL& b, const ExT& rowex, const ExT& colex) const
+    { Apply<>( *AAT.GetBlock1(), x, b, rowex, colex); }
+    
+    bool RetAcc() const {return false;}
 };
 
+#ifdef _PAR
 template <typename Mat>
-void NEGSPcCL::Update (const Mat& A) const
+void NEGSPcCL::Update (const Mat& A, const ExchangeCL& rowex, const ExchangeCL& colex) const
+{
+    if (&A == Aaddr_ && Aversion_ == A.Version()) return;
+    Aaddr_= &A;
+    Aversion_= A.Version();
+
+    D_.resize( A.num_rows());
+    // Accumulate matrix
+    ExchangeMatrixCL exMat_;
+    exMat_.BuildCommPattern(A, rowex, colex);
+    MatrixCL Aacc(exMat_.Accumulate(A));
+    // Determine diagonal of AA^T
+    D_.resize(Aacc.num_rows());
+    for (size_t i = 0; i < Aacc.num_rows(); ++i)
+        for (size_t nz = Aacc.row_beg(i); nz < Aacc.row_beg(i + 1); ++nz)
+            D_[i] += Aacc.val(nz) * A.val(nz);
+    rowex.Accumulate(D_);
+    y_.resize( A.num_cols());
+}
+
+template <typename Mat, typename Vec>
+void NEGSPcCL::ForwardGS(const Mat& A, Vec& x, const Vec& b, const ExchangeCL& RowEx) const
+{
+    // x= 0.; // implied, but superfluous, because we can assign the x-values below, not update.
+    y_= 0.;
+    double t;
+
+    for (size_t i= 0; i < RowEx.LocalIndex.size(); ++i) {
+        t= (b[RowEx.LocalIndex[i]] - mul_row( A, y_, RowEx.LocalIndex[i]))/D_[RowEx.LocalIndex[i]];
+        x[RowEx.LocalIndex[i]]= t;
+        add_row_to_vec( A, t, y_, RowEx.LocalIndex[i]); // y+= t* (i-th row of A)
+    }
+    for (size_t i= 0; i < RowEx.DistrIndex.size(); ++i) {
+        t= (b[RowEx.DistrIndex[i]])/D_[RowEx.DistrIndex[i]];
+        x[RowEx.DistrIndex[i]]= t;
+        add_row_to_vec( A, t, y_, RowEx.DistrIndex[i]); // y+= t* (i-th row of A)
+    }
+}
+
+template <typename Mat, typename Vec>
+void NEGSPcCL::BackwardGS(const Mat& A, Vec& x, const Vec& b, const ExchangeCL& RowEx) const
+{
+    // x= 0.; // implied, but superfluous, because we can assign the x-values below, not update.
+    y_= 0.;
+    for (size_t i= RowEx.LocalIndex.size() - 1; i < RowEx.LocalIndex.size(); --i) {
+        x[RowEx.LocalIndex[i]]= (b[RowEx.LocalIndex[i]] - mul_row( A, y_, RowEx.LocalIndex[i]))/D_[RowEx.LocalIndex[i]];
+        add_row_to_vec( A, x[RowEx.LocalIndex[i]], y_, RowEx.LocalIndex[i]); // y+= t* (i-th row of A)
+    }
+    for (size_t i= RowEx.DistrIndex.size() - 1; i < RowEx.DistrIndex.size(); --i) {
+        x[RowEx.DistrIndex[i]]= (b[RowEx.DistrIndex[i]] )/D_[RowEx.DistrIndex[i]];
+        add_row_to_vec( A, x[RowEx.DistrIndex[i]], y_, RowEx.DistrIndex[i]); // y+= t* (i-th row of A)
+    }
+}
+#endif
+
+template <typename Mat>
+void NEGSPcCL::Update (const Mat& A, const DummyExchangeCL&, const DummyExchangeCL&) const
 {
     if (&A == Aaddr_ && Aversion_ == A.Version()) return;
     Aaddr_= &A;
@@ -534,11 +730,12 @@ void NEGSPcCL::Update (const Mat& A) const
 }
 
 template <typename Mat, typename Vec>
-void NEGSPcCL::ForwardGS(const Mat& A, Vec& x, const Vec& b) const
+void NEGSPcCL::ForwardGS(const Mat& A, Vec& x, const Vec& b, const DummyExchangeCL&) const
 {
     // x= 0.; // implied, but superfluous, because we can assign the x-values below, not update.
     y_= 0.;
     double t;
+
     for (size_t i= 0; i < A.num_rows(); ++i) {
         t= (b[i] - mul_row( A, y_, i))/D_[i];
         x[i]= t;
@@ -547,7 +744,7 @@ void NEGSPcCL::ForwardGS(const Mat& A, Vec& x, const Vec& b) const
 }
 
 template <typename Mat, typename Vec>
-void NEGSPcCL::BackwardGS(const Mat& A, Vec& x, const Vec& b) const
+void NEGSPcCL::BackwardGS(const Mat& A, Vec& x, const Vec& b, const DummyExchangeCL&) const
 {
     // x= 0.; // implied, but superfluous, because we can assign the x-values below, not update.
     y_= 0.;
@@ -557,24 +754,25 @@ void NEGSPcCL::BackwardGS(const Mat& A, Vec& x, const Vec& b) const
     }
 }
 
-template <typename Mat, typename Vec>
-void NEGSPcCL::Apply(const Mat& A, Vec& x, const Vec& b) const
+template <typename Mat, typename Vec, typename ExT>
+void NEGSPcCL::Apply(const Mat& A, Vec& x, const Vec& b, const ExT& rowex, const ExT& colex) const
 {
-    Update( A);
+    Update( A, rowex, colex);
 
-    ForwardGS( A, x, b);
+    ForwardGS( A, x, b, rowex);
     if (!symmetric_) return;
-    BackwardGS( A, x, VectorCL( D_*x));
+
+    BackwardGS( A, x, VectorCL( D_*x), rowex);
 }
 
-template <typename Mat, typename Vec>
-void NEGSPcCL::ApplyTranspose(const Mat& A, Vec& x, const Vec& b) const
+template <typename Mat, typename Vec, typename ExT>
+void NEGSPcCL::ApplyTranspose(const Mat& A, Vec& x, const Vec& b, const ExT& rowex, const ExT& colex) const
 {
-    Update( A);
+    Update( A, rowex, colex);
 
-    BackwardGS( A, x, b);
+    BackwardGS( A, x, b, rowex);
     if (!symmetric_) return;
-    ForwardGS( A, x, VectorCL( D_*x));
+    ForwardGS( A, x, VectorCL( D_*x), rowex);
 }
 
 template <typename Mat, typename Vec>
@@ -599,10 +797,10 @@ void NEGSPcCL::BackwardMulGS(const Mat& A, Vec& x, const Vec& b) const
     }
 }
 
-template <typename Mat, typename Vec>
-Vec NEGSPcCL::mul (const Mat& A, const Vec& b) const
+template <typename Mat, typename Vec, typename ExT>
+Vec NEGSPcCL::mul (const Mat& A, const Vec& b, const ExT& rowex, const ExT& colex) const
 {
-    Update( A);
+    Update( A, rowex, colex);
 
     Vec x( A.num_rows());
     VectorCL b2( b);
@@ -614,10 +812,10 @@ Vec NEGSPcCL::mul (const Mat& A, const Vec& b) const
     return x;
 }
 
-template <typename Mat, typename Vec>
-Vec NEGSPcCL::transp_mul(const Mat& A, const Vec& b) const
+template <typename Mat, typename Vec, typename ExT>
+Vec NEGSPcCL::transp_mul(const Mat& A, const Vec& b, const ExT& rowex, const ExT& colex) const
 {
-    Update( A);
+    Update( A, rowex, colex);
 
     Vec x( A.num_rows());
     VectorCL b2( b);
@@ -629,335 +827,50 @@ Vec NEGSPcCL::transp_mul(const Mat& A, const Vec& b) const
     return x;
 }
 
-#ifdef _PAR
-/// \brief (Symmetric) Gauss-Seidel preconditioner (i.e. start-vector 0) for A*A^T (Normal Equations).
-class ParNEGSPcCL
-{
-  private:
-    const IdxDescCL& RowIdx_;
-    const IdxDescCL& ColIdx_;
-    bool symmetric_;             ///< If true, SGS is performed, else GS.
-    mutable const void*  Aaddr_; ///< only used to validate, that the diagonal is for the correct matrix.
-    mutable size_t Aversion_;
-    mutable VectorCL D_;         ///< diagonal of AA^T
-    mutable VectorCL y_;         ///< temp-variable: A^T*x.
-
-    template <typename Mat>
-    void Update (const Mat& A) const;
-
-    ///\brief Forward Gauss-Seidel-step with start-vector 0 for A*A^T
-    template <typename Mat, typename Vec>
-    void ForwardGS(const Mat& A, Vec& x, const Vec& b) const;
-    ///\brief Backward Gauss-Seidel-step with start-vector 0 for A*A^T
-    template <typename Mat, typename Vec>
-    void BackwardGS(const Mat& A, Vec& x, const Vec& b) const;
-
-    ///\brief Inverse of ForwardGS
-    template <typename Mat, typename Vec>
-    void ForwardMulGS(const Mat& A, Vec& x, const Vec& b) const;
-    ///\brief Inverse of BackwardGS
-    template <typename Mat, typename Vec>
-    void BackwardMulGS(const Mat& A, Vec& x, const Vec& b) const;
-
-  public:
-    ParNEGSPcCL (const IdxDescCL& Row, const IdxDescCL& Col, bool symmetric= true) : RowIdx_(Row), ColIdx_(Col), symmetric_( symmetric), Aaddr_( 0), Aversion_( 0) {}
-
-    ///@{ Note, that A and not A*A^T is the first argument.
-    ///\brief Execute a (symmetric) Gauss-Seidel preconditioning step.
-    template <typename Mat, typename Vec>
-    void Apply(const Mat& A, Vec& x, const Vec& b) const;
-    ///\brief If symmetric == false, this  performs a backward Gauss-Seidel step, else it is identical to Apply.
-    template <typename Mat, typename Vec>
-    void ApplyTranspose(const Mat& A, Vec& x, const Vec& b) const;
-
-    ///\brief Multiply with the preconditioning matrix -- needed for right preconditioning.
-    template <typename Mat, typename Vec>
-    Vec mul (const Mat& A, const Vec& b) const;
-    ///\brief Multiply with the transpose of the preconditioning matrix -- needed for right preconditioning.
-    template <typename Mat, typename Vec>
-    Vec transp_mul(const Mat& A, const Vec& b) const;
-    ///@}
-
-    ///\brief Apply if A*A^T is given as CompositeMatrixCL
-    void Apply(const CompositeMatrixCL& AAT, VectorCL& x, const VectorCL& b) const
-    { Apply( *AAT.GetBlock1(), x, b); }
-    
-    bool RetAcc() const {return false;}
-};
-
-template <typename Mat>
-void ParNEGSPcCL::Update (const Mat& A) const
-{
-    if (&A == Aaddr_ && Aversion_ == A.Version()) return;
-    Aaddr_= &A;
-    Aversion_= A.Version();
-
-    D_.resize( A.num_rows());
-    // Accumulate matrix
-    ExchangeMatrixCL exMat_;
-    exMat_.BuildCommPattern(A, RowIdx_.GetEx(), ColIdx_.GetEx());
-    MatrixCL Aacc(exMat_.Accumulate(A));
-    // Determine diagonal of AA^T
-    D_.resize(Aacc.num_rows());
-    for (size_t i = 0; i < Aacc.num_rows(); ++i)
-        for (size_t nz = Aacc.row_beg(i); nz < Aacc.row_beg(i + 1); ++nz)
-            D_[i] += Aacc.val(nz) * A.val(nz);
-    RowIdx_.GetEx().Accumulate(D_);
-    y_.resize( A.num_cols());
-}
-
-template <typename Mat, typename Vec>
-void ParNEGSPcCL::ForwardGS(const Mat& A, Vec& x, const Vec& b) const
-{
-    // x= 0.; // implied, but superfluous, because we can assign the x-values below, not update.
-    y_= 0.;
-    double t;
-    const ExchangeCL& RowEx_(RowIdx_.GetEx());
-
-    for (size_t i= 0; i < RowEx_.LocalIndex.size(); ++i) {
-        t= (b[RowEx_.LocalIndex[i]] - mul_row( A, y_, RowEx_.LocalIndex[i]))/D_[RowEx_.LocalIndex[i]];
-        x[RowEx_.LocalIndex[i]]= t;
-        add_row_to_vec( A, t, y_, RowEx_.LocalIndex[i]); // y+= t* (i-th row of A)
-    }
-    for (size_t i= 0; i < RowEx_.DistrIndex.size(); ++i) {
-        t= (b[RowEx_.DistrIndex[i]])/D_[RowEx_.DistrIndex[i]];
-        x[RowEx_.DistrIndex[i]]= t;
-        add_row_to_vec( A, t, y_, RowEx_.DistrIndex[i]); // y+= t* (i-th row of A)
-    }
-}
-
-template <typename Mat, typename Vec>
-void ParNEGSPcCL::BackwardGS(const Mat& A, Vec& x, const Vec& b) const
-{
-    // x= 0.; // implied, but superfluous, because we can assign the x-values below, not update.
-    y_= 0.;
-    const ExchangeCL& RowEx_(RowIdx_.GetEx());
-
-    for (size_t i= RowEx_.LocalIndex.size() - 1; i < RowEx_.LocalIndex.size(); --i) {
-        x[RowEx_.LocalIndex[i]]= (b[RowEx_.LocalIndex[i]] - mul_row( A, y_, RowEx_.LocalIndex[i]))/D_[RowEx_.LocalIndex[i]];
-        add_row_to_vec( A, x[RowEx_.LocalIndex[i]], y_, RowEx_.LocalIndex[i]); // y+= t* (i-th row of A)
-    }
-    for (size_t i= RowEx_.DistrIndex.size() - 1; i < RowEx_.DistrIndex.size(); --i) {
-        x[RowEx_.DistrIndex[i]]= (b[RowEx_.DistrIndex[i]] )/D_[RowEx_.DistrIndex[i]];
-        add_row_to_vec( A, x[RowEx_.DistrIndex[i]], y_, RowEx_.DistrIndex[i]); // y+= t* (i-th row of A)
-    }
-}
-
-template <typename Mat, typename Vec>
-void ParNEGSPcCL::Apply(const Mat& A, Vec& x, const Vec& b) const
-{
-    Update( A);
-
-    ForwardGS( A, x, b);
-    if (!symmetric_) return;
-
-    BackwardGS( A, x, VectorCL( D_*x));
-}
-
-template <typename Mat, typename Vec>
-void ParNEGSPcCL::ApplyTranspose(const Mat& A, Vec& x, const Vec& b) const
-{
-    Update( A);
-
-    BackwardGS( A, x, b);
-    if (!symmetric_) return;
-    ForwardGS( A, x, VectorCL( D_*x));
-}
-
-template <typename Mat, typename Vec>
-void ParNEGSPcCL::ForwardMulGS(const Mat& A, Vec& x, const Vec& b) const
-{
-    // x= 0.; // implied, but superfluous, because we can assign the x-values below, not update.
-    y_= 0.;
-    for (size_t i= 0 ; i < b.size(); ++i) {
-        add_row_to_vec( A, b[i], y_, i); // y+= b[i]* (i-th row of A)
-        x[i]= mul_row( A, y_, i);
-    }
-}
-
-template <typename Mat, typename Vec>
-void ParNEGSPcCL::BackwardMulGS(const Mat& A, Vec& x, const Vec& b) const
-{
-    // x= 0.; // implied, but superfluous, because we can assign the x-values below, not update.
-    y_= 0.;
-    for (size_t i= b.size() - 1 ; i < b.size(); --i) {
-        add_row_to_vec( A, b[i], y_, i); // y+= b[i]* (i-th row of A)
-        x[i]= mul_row( A, y_, i);
-    }
-}
-
-template <typename Mat, typename Vec>
-Vec ParNEGSPcCL::mul (const Mat& A, const Vec& b) const
-{
-    Update( A);
-
-    Vec x( A.num_rows());
-    VectorCL b2( b);
-    if (symmetric_) {
-        BackwardMulGS( A, x, b);
-        b2= x/D_;
-    }
-    ForwardMulGS( A, x, b2);
-    return x;
-}
-
-template <typename Mat, typename Vec>
-Vec ParNEGSPcCL::transp_mul(const Mat& A, const Vec& b) const
-{
-    Update( A);
-
-    Vec x( A.num_rows());
-    VectorCL b2( b);
-    if (symmetric_) {
-        ForwardMulGS( A, x, b);
-        b2= x/D_;
-    }
-    BackwardMulGS( A, x, b2);
-    return x;
-}
-#endif
 
 //=============================================================================
 //  Typedefs
 //=============================================================================
 
-typedef PreGSCL<P_SSOR>    SSORsmoothCL;
 typedef PreGSCL<P_SOR>     SORsmoothCL;
 typedef PreGSCL<P_SGS>     SGSsmoothCL;
-typedef PreGSCL<P_JOR>     JORsmoothCL;
 typedef PreGSCL<P_GS>      GSsmoothCL;
+#ifndef _PAR
+typedef PreGSCL<P_SSOR>    SSORsmoothCL;
+typedef PreGSCL<P_JOR>     JORsmoothCL;
 typedef PreGSCL<P_JAC0>    JACPcCL;
+#endif
 typedef PreGSCL<P_SGS0>    SGSPcCL;
 typedef PreGSCL<P_SSOR0>   SSORPcCL;
 typedef PreGSCL<P_SSOR0_D> SSORDiagPcCL;
 typedef PreGSCL<P_GS0>     GSPcCL;
+typedef PreGSDiag0CL<P_GS0>	GSDiag0PcCL;
 
+/// fwd decl from num/stokessolver.h
+template<typename, typename, typename>
+class ApproximateSchurComplMatrixCL;
+template<typename, typename, typename>
+class SchurComplMatrixCL;
 
-/// \brief base class for "expensive" preconditioners.
-///
-/// Preconditioner base class for Schur complement preconditioners (see SchurPreBaseCL)
-/// and SolverAsPreCL, as those are computational expensive compared to the additional virtual function call.
-/// Anyway, Jacobi and Gauss-Seidel type preconditioners are not derived from this class to avoid the virtual function overhead.
+/// \brief base class for preconditioners.
 class PreBaseCL
 {
   protected:
     mutable std::ostream* output_;
     mutable Uint iter_;
-
-    PreBaseCL( std::ostream* output= 0)
-      : output_( output), iter_(0) {}
-    virtual ~PreBaseCL() {}
-
-    void AddIter( int iter) const { iter_+= iter; }
-
-  public:
-    virtual void Apply( const MatrixCL& A,   VectorCL& x, const VectorCL& b) const = 0;
-    virtual void Apply( const MLMatrixCL& A, VectorCL& x, const VectorCL& b) const = 0;
-
-    /// reset iteration counter
-    void ResetIter()    const { iter_= 0; }
-    /// return total number of iterations
-    Uint GetTotalIter() const { return iter_; }
-};
-
-
-//=============================================================================
-// Krylov-methods as preconditioner.
-// Needed for, e.g., InexactUzawa.
-//=============================================================================
-/// Wrapper to use a solver as preconditioner. Needed for, e.g., inexact Uzawa.
-template <class SolverT>
-class SolverAsPreCL: public PreBaseCL
-{
-  private:
-    SolverT& solver_;
-
-  public:
-    SolverAsPreCL( SolverT& solver, std::ostream* output= 0)
-        : PreBaseCL( output), solver_( solver) {}
-    /// return solver object
-    SolverT& GetSolver()             { return solver_; }
-    /// return solver object
-    const SolverT& GetSolver() const { return solver_; }
-#ifdef _PAR
-    /// \brief Check if return preconditioned vectors are accumulated after calling Apply
-    bool RetAcc() const   { return true; }
-    /// \brief Check if the diagonal of the matrix is needed
-    bool NeedDiag() const { return solver_.GetPC().NeedDiag(); }
-    /// \brief Set diagonal to the preconditioner of the solver
-    template<typename Mat>
-    void SetDiag(const Mat& A)
-    {
-        solver_.GetPC().SetDiag(A);
-    }
-    const ExchangeCL& GetEx() const
-    {
-        return solver_.GetEx();
-    }
-#endif
-
-    template <typename Mat, typename Vec>
-    void
-    Apply(const Mat& A, Vec& x, const Vec& b) const {
-        x= 0.0;
-        solver_.Solve( A, x, b);
-//         if (solver_.GetIter()==solver_.GetMaxIter())
-//           IF_MASTER
-//             std::cout << "===> Warning: Cannot solve inner system!\n";
-        if (output_ != 0)
-            *output_ << "SolverAsPreCL: iterations: " << solver_.GetIter()
-                     << "\trelative residual: " << solver_.GetResid() << std::endl;
-        AddIter( solver_.GetIter());
-    }
-    void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b) const { Apply<>( A, x, b); }
-    void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b) const { Apply<>( A, x, b); }
-};
-
-#ifdef _PAR
-//***************************************************************************
-// implemented parallel methods for preconditioning
-//***************************************************************************
-template <typename Mat, typename Vec>
-void Jacobi(const Mat& A, const Vec& Diag, Vec& x, const Vec& b, const double omega, const bool HasOmega);
-
-template <typename Mat, typename Vec>
-void Jacobi0(const Mat&, const Vec& Diag, Vec& x, const Vec& b, const double omega, const bool HasOmega);
-
-template <typename Mat, typename Vec>
-void SSOR0(const Mat& A, const Vec& Diag, Vec& x, const Vec& b, const double omega, const bool HasOmega);
-
-
-//***************************************************************************
-// preconditioning-classes
-//***************************************************************************
-
-// ***************************************************************************
-/// \brief Base class for parallel preconditioning classes
-// ***************************************************************************
-class ParPreconditioningBaseCL
-/** This class can be used as a base class for parallel preconditioners.
-    Therefore this class stores a reference to an IdxDescCL to get a reference
-    to the ExchangeCL. Since, the index within the problem classes are lying all
-    the time at the same position in memory, we store a reference to the
-    IdxDescCL instead of storing a reference to the ExchanegCL.
-    This class can create an accumulated diagonal out of a matrix by its own.
-    This diagonal is only created, if the corresponding matrix has been
-    changed.*/
-{
-  protected:
-    const IdxDescCL& idx_;                ///< index for accessing the ExchangeCL
     VectorCL   diag_;                     ///< accumulated diagonal of corresponding matrix
     size_t     mat_version_;              ///< version of the corresponding matrix
     bool       check_mat_version_;        ///< check matrix version before apply preconditioning (only if DebugNumericC is set)
 
-  public:
-    ParPreconditioningBaseCL(const IdxDescCL& idx)
-      : idx_(idx), diag_(0), mat_version_(0), check_mat_version_(true) {}
-    // default c-tor and de-tor
+    void AddIter( int iter) const { iter_+= iter; }
 
+    PreBaseCL( std::ostream* output= 0)
+      : output_( output), iter_(0), diag_(0), mat_version_(0), check_mat_version_(true) {}
+
+  public:
     /// \brief Set accumulated diagonal of a matrix, that is needed by most of the preconditioners
-    template<typename Mat>
-    void SetDiag(const Mat& A)
+    template<typename Mat, typename ExT>
+    void SetDiag(const Mat& A, const ExT& ex)
     {
         Comment( (A.Version() == mat_version_ ? "SetDiag, Reusing OLD diagonal\n" : "SetDiag: Creating NEW diagonal\n"), DebugNumericC);
         // Just set diagonal, if the diagonal has changed
@@ -967,9 +880,19 @@ class ParPreconditioningBaseCL
             diag_.resize(A.num_rows());
         // accumulate diagonal of the matrix
         diag_= A.GetDiag();
-        GetEx().Accumulate(diag_);
-        // remeber version of the matrix
+        ex.Accumulate(diag_);
+        // remember version of the matrix
         mat_version_= A.Version();
+    }
+
+    template<typename PcT, typename Mat, typename ExT>
+    void SetDiag( const ApproximateSchurComplMatrixCL<PcT, Mat, ExT>&, const ExT&){
+        throw DROPSErrCL("SetDiag: Not defined for that matrix type.");
+    }
+
+    template<typename PcT, typename Mat, typename ExT>
+    void SetDiag( const SchurComplMatrixCL<PcT, Mat, ExT>&, const ExT&){
+        throw DROPSErrCL("SetDiag: Not defined for that matrix type.");
     }
 
     /// \brief Set accumulated diagonal of a matry by the given accumulated diagonal
@@ -980,25 +903,102 @@ class ParPreconditioningBaseCL
     const VectorCL& GetDiag() const { return diag_; }
     /// \brief Get reference on accumulated diagonal of corresponding matrix
     VectorCL&       GetDiag()       { return diag_; }
-    /// \brief Get constant reference on exchange class
-    const ExchangeCL& GetEx() const { return idx_.GetEx(); }
     /// \brief Check matrix version before apply preconditioner in Debug-Mode (DebugNumericC) default
     void CheckMatVersion() { check_mat_version_=true; }
     /// \brief Don't check matrix version before apply preconditioner
     void DoNotCheckMatVersion() { check_mat_version_=false; }
+
+    /// reset iteration counter
+    void ResetIter()    const { iter_= 0; }
+    /// return total number of iterations
+    Uint GetTotalIter() const { return iter_; }
 };
+
+class ExpensivePreBaseCL : public PreBaseCL
+{
+  protected:
+    ExpensivePreBaseCL( std::ostream* output= 0)
+      : PreBaseCL( output) {}
+    virtual ~ExpensivePreBaseCL() {}
+
+  public:
+#ifdef _PAR
+    virtual void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const ExchangeCL& ex) const = 0;
+    virtual void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const ExchangeCL& ex) const = 0;
+#endif
+    virtual void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const DummyExchangeCL& ex) const = 0;
+    virtual void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const DummyExchangeCL& ex) const = 0;
+
+    virtual bool RetAcc() const = 0;
+    virtual bool NeedDiag() const = 0;
+};
+
+//fwd declaration
+class ExchangeCL;
+class DummyExchangeCL;
+
+
+//=============================================================================
+// Krylov-methods as preconditioner.
+// Needed for, e.g., InexactUzawa.
+//=============================================================================
+/// Wrapper to use a solver as preconditioner. Needed for, e.g., inexact Uzawa.
+template <class SolverT>
+class SolverAsPreCL: public ExpensivePreBaseCL
+{
+  private:
+    SolverT& solver_;
+
+  public:
+    SolverAsPreCL( SolverT& solver, std::ostream* output= 0)
+        : ExpensivePreBaseCL( output), solver_( solver) {}
+    /// return solver object
+    SolverT& GetSolver()             { return solver_; }
+    /// return solver object
+    const SolverT& GetSolver() const { return solver_; }
+    /// \brief Check if return preconditioned vectors are accumulated after calling Apply
+    bool RetAcc() const   { return true; }
+    /// \brief Check if the diagonal of the matrix is needed
+    bool NeedDiag() const { return solver_.GetPc().NeedDiag(); }
+    /// \brief Set diagonal to the preconditioner of the solver
+    template<typename Mat, typename ExT>
+    void SetDiag(const Mat& A, const ExT& ex) { solver_.GetPc().SetDiag(A, ex); }
+
+    template <typename Mat, typename Vec, typename ExT>
+    void
+    Apply(const Mat& A, Vec& x, const Vec& b, const ExT& ex) const {
+        x= 0.0;
+        solver_.Solve( A, x, b, ex);
+        if (output_ != 0)
+            *output_ << "SolverAsPreCL: iterations: " << solver_.GetIter()
+                     << "\trelative residual: " << solver_.GetResid() << std::endl;
+        AddIter( solver_.GetIter());
+    }
+#ifdef _PAR
+    void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const ExchangeCL& ex) const { Apply<>( A, x, b, ex); }
+    void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const ExchangeCL& ex) const { Apply<>( A, x, b, ex); }
+#endif
+    void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const DummyExchangeCL& ex) const { Apply<>( A, x, b, ex); }
+    void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const DummyExchangeCL& ex) const { Apply<>( A, x, b, ex); }
+};
+
+
+//***************************************************************************
+// implemented parallel methods for preconditioning
+//***************************************************************************
+template <typename Mat, typename Vec, typename ExT>
+void Jacobi(const Mat& A, const Vec& Diag, Vec& x, const Vec& b, const ExT& ex, const double omega, const bool HasOmega);
+
+template <typename Mat, typename Vec>
+void Jacobi0(const Mat&, const Vec& Diag, Vec& x, const Vec& b, const double omega, const bool HasOmega);
+
 
 // ***************************************************************************
 /// \brief Class for performing a preconditioning step with the identity matrix
 // ***************************************************************************
-class ParDummyPcCL : public ParPreconditioningBaseCL
+class DummyPcCL
 {
-  private:
-    typedef ParPreconditioningBaseCL base_;
-
   public:
-    ParDummyPcCL(const IdxDescCL& idx) : base_(idx) {}
-
     /// \brief Check if return preconditioned vectors are accumulated after calling Apply
     bool RetAcc()   const { return false; }
     /// \brief Check if the diagonal of the matrix is needed
@@ -1006,113 +1006,154 @@ class ParDummyPcCL : public ParPreconditioningBaseCL
     /// \name Set diagonal of the matrix for consistency
     //@{
     void SetDiag(const VectorCL&) {}        // just for consistency
-    template<typename Mat>
-    void SetDiag(const Mat&) {}             // just for consistency
+    template<typename Mat, typename ExT>
+    void SetDiag(const Mat&, const ExT&) {}             // just for consistency
     //@}
 
     /// \brief Apply preconditioner: x <- b
-    template <typename Mat, typename Vec>
-    void Apply(const Mat& /*A*/, Vec &x, const Vec& b) const
+    template <typename Mat, typename Vec, typename ExT>
+    void Apply(const Mat& /*A*/, Vec &x, const Vec& b, const ExT&) const
+    {
+        x=b;
+    }
+    /// \brief Apply preconditioner: x <- b
+    template <typename Mat, typename Vec, typename ExT>
+    void Apply(const Mat& /*A*/, Vec &x, const Vec& b, const ExT&, const ExT&) const
     {
         x=b;
     }
     /// \brief Apply preconditioner of A^T: x <- b
-    template <typename Mat, typename Vec>
-    void transp_Apply(const Mat&, Vec &x, const Vec& b) const
+    template <typename Mat, typename Vec, typename ExT>
+    void transp_Apply(const Mat&, Vec &x, const Vec& b, const ExT&) const
     {
         x=b;
     }
 
 };
 
+#ifdef _PAR
 // ***************************************************************************
 /// \brief Class for performing one Step of the Jacobi-Iteration
 // ***************************************************************************
-class ParJacCL : public ParPreconditioningBaseCL
+class JORsmoothCL : public PreBaseCL
 {
-  protected:
-    typedef ParPreconditioningBaseCL base_;
-    using base_::diag_;
-    using base_::mat_version_;
-    using base_::check_mat_version_;
-
-  protected:
+  private:
+    typedef PreBaseCL base_;
     double  omega_;                                 // overrelaxion-parameter
 
   public:
-    ParJacCL (const IdxDescCL& idx, double omega=1) : base_(idx), omega_(omega) {}
+    JORsmoothCL (double omega=1) : base_(), omega_(omega) {}
 
     /// \brief Check if return preconditioned vectors are accumulated after calling Apply
-    bool RetAcc() const   { return false; }
+    bool RetAcc() const   { return true; }
     /// \brief Check if the diagonal of the matrix is needed
     bool NeedDiag() const { return true; }
     /// \brief Get overrelaxation parameter
     double GetOmega() const {return omega_;}
 
     /// \brief Apply preconditioner: one step of the Jacobi-iteration
-    template <typename Mat, typename Vec>
-    void Apply(const Mat& A, Vec &x, const Vec& b) const
+    template <typename Mat, typename Vec, typename ExT>
+    void Apply(const Mat& A, Vec &x, const Vec& b, const ExT& ex) const
     {
         Assert(mat_version_==A.Version() || !check_mat_version_,
                DROPSErrCL("ParJacCL::Apply: Diagonal of actual matrix has not been set"),
                DebugNumericC);
-        Jacobi(A, diag_, x, b, omega_, std::fabs(omega_-1.)>DoubleEpsC);
+        Jacobi(A, diag_, x, b, ex, omega_, std::fabs(omega_-1.)>DoubleEpsC);
     }
 };
 
 // ********************************************************************************
 /// \brief Class for performing one Step of the Jacobi-Iteration with startvector 0
 // ********************************************************************************
-class ParJac0CL : public ParJacCL
+
+class JACPcCL : public PreBaseCL
 {
-  protected:
-    typedef ParJacCL base_;
-    using base_::mat_version_;
-    using base_::diag_;
-    using base_::omega_;
-    using base_::check_mat_version_;
+private:
+  typedef PreBaseCL base_;
+  double  omega_;
 
   public:
+    JACPcCL (double omega=1) : base_(), omega_(omega) {}
 
-    ParJac0CL (const IdxDescCL& idx, double omega=1) : base_(idx, omega) {}
+    /// \brief Check if return preconditioned vectors are accumulated after calling Apply
+    bool RetAcc() const   { return false; }
+    /// \brief Check if the diagonal of the matrix is needed
+    bool NeedDiag() const { return true; }
 
     /// \brief Apply preconditioner: one step of the Jacobi-iteration with start vector 0
-    template <typename Mat, typename Vec>
-    void Apply(const Mat& A, Vec &x, const Vec& b) const
+    template <typename Mat, typename Vec, typename ExT>
+    void Apply(const Mat& A, Vec &x, const Vec& b, const ExT&) const
     {
         Assert(mat_version_==A.Version() || !check_mat_version_,
-               DROPSErrCL("ParJac0CL::Apply: Diagonal of actual matrix has not been set"),
+               DROPSErrCL("JACPcCL::Apply: Diagonal of actual matrix has not been set"),
                DebugNumericC);
         Jacobi0(A, diag_, x, b, omega_, std::fabs(omega_-1.)>DoubleEpsC);
     }
 
     /// \brief Apply preconditioner of A^T: one step of the Jacobi-iteration with start vector 0
-    template <typename Mat, typename Vec>
-    void transp_Apply(const Mat& A, Vec &x, const Vec& b) const
+    template <typename Mat, typename Vec, typename ExT>
+    void transp_Apply(const Mat& A, Vec &x, const Vec& b, const ExT&) const
     {
         Assert(mat_version_==A.Version()  || !check_mat_version_,
-               DROPSErrCL("ParJac0CL::transp_Apply: Diagonal of actual matrix has not been set"),
+               DROPSErrCL("JACPcCL::transp_Apply: Diagonal of actual matrix has not been set"),
                DebugNumericC);
         Jacobi0(A, diag_, x, b, omega_, std::fabs(omega_-1.)>DoubleEpsC);
     }
 };
 
+// ***************************************************************************
+/// \brief Class for performing one Step of the SSOR-Iteration
+// ***************************************************************************
+class SSORsmoothCL : public PreBaseCL
+{
+    private:
+        typedef PreBaseCL base_;
+        double  omega_;                                 // overrelaxion-parameter
+
+    public:
+        SSORsmoothCL (double omega=1) : base_(), omega_(omega) {}
+
+        /// \brief Check if return preconditioned vectors are accumulated after calling Apply
+        bool RetAcc() const   { return true; }
+        /// \brief Check if the diagonal of the matrix is needed
+        bool NeedDiag() const { return true; }
+        /// \brief Get overrelaxation parameter
+        double GetOmega() const {return omega_;}
+
+        /// \brief Apply preconditioner: one step of the SSOR-iteration
+        template <typename Mat, typename Vec, typename ExT>
+        void Apply(const Mat& A, Vec &x, const Vec& b, const ExT& ex) const
+        {
+            Assert(mat_version_==A.Version() || !check_mat_version_,
+                   DROPSErrCL("ParJacCL::Apply: Diagonal of actual matrix has not been set"),
+                   DebugNumericC);
+                   ApproxSSOR(A, diag_, x, b, ex, omega_, std::fabs(omega_-1.)>DoubleEpsC);
+        }
+        /// \brief Apply preconditioner: one step of the SSOR-iteration
+        template <typename Vec, typename ExT>
+        void Apply(const MLMatrixCL& A, Vec &x, const Vec& b, const ExT& ex) const
+        {
+            Apply<>(A.GetFinest(), x, b, ex);
+        }
+};
+
+
 // ********************************************************************************
 /// \brief Class for performing one step of the Jacobi-Iteration on a matrix A*A^T
 ///   with startvector 0
 // ********************************************************************************
-class ParJacNEG0CL : public ParJac0CL
+class ParJacNEG0CL : public JACPcCL
 {
   protected:
-    typedef ParJac0CL base_;        ///< base class
-    ExchangeMatrixCL  exMat_;       ///< handling of accumulating matrix-entries
+    typedef JACPcCL base_;        ///< base class
+    ExchangeMatrixCL exMat_;      ///< handling of accumulating matrix-entries
 
     /// \brief Determine the diagonal of A*A^T
     inline void MySetDiag(const MatrixCL& A, const ExchangeCL& RowEx, const ExchangeCL& ColEx);
 
   public:
     /// \brief Constructor
-    ParJacNEG0CL (const IdxDescCL& idx, double omega=1) : base_(idx, omega) {}
+    ParJacNEG0CL (double omega=1) : base_(omega) {}
 
     /// \name Compute diagonal of matrix AA^T
     //@{
@@ -1159,197 +1200,38 @@ inline void ParJacNEG0CL::SetDiag(const CompositeMatrixBaseCL<MatrixCL, MatrixCL
     MySetDiag(*BBT.GetBlock1(), BBT.GetEx1(), BBT.GetEx0());
 }
 
+#endif
 
 // ********************************************************************************
-/// \brief Class for performing one Step of the Jacobi-Iteration with startvector 0 and own matrix
+///\brief Multilevel Smoother
 // ********************************************************************************
-class ParJac0OwnMatCL : public ParJac0CL
-{
+
+template <class SmootherT>
+class MLSmootherCL : public MLDataCL<SmootherT> {
   private:
-    typedef ParJac0CL base_;
-    using base_::mat_version_;
-    using base_::diag_;
-    using base_::omega_;
-    using base_::check_mat_version_;
-
+    typedef MLDataCL<SmootherT> base_;
+    double omega_;
   public:
-    ParJac0OwnMatCL (const IdxDescCL& idx, double omega=1) : base_(idx, omega) {}
+    MLSmootherCL( const double omega = 1.0) : omega_(omega) {}
 
-    /// \brief Apply preconditioner: one step of the Jacobi-iteration with start vector 0
-    template <typename Mat, typename Vec>
-    void Apply(const Mat& A, Vec &x, const Vec& b) const
-    {
-        Jacobi0(A, diag_, x, b, omega_, std::fabs(omega_-1.)>DoubleEpsC);
+    void SetDiag( const MLMatrixCL& A, const MLIdxDescCL& idx) {
+        Assert( A.size() == idx.size(), DROPSErrCL ("MLSmootherCL::SetDiag: dimensions do not fit\n"), DebugNumericC);
+        this->resize(A.size(), SmootherT(omega_));
+        MLMatrixCL::const_iterator Ait = A.begin();
+        MLIdxDescCL::const_iterator ExIt = idx.begin();
+        for ( typename MLSmootherCL::iterator Sit = this->begin(); Sit != this->end(); ++Sit, ++Ait, ++ExIt)
+            Sit->SetDiag(*Ait, ExIt->GetEx());
     }
-
-    /// \brief Apply preconditioner of A^T: one step of the Jacobi-iteration with start vector 0
-    template <typename Mat, typename Vec>
-    void transp_Apply(const Mat& A, Vec &x, const Vec& b) const
-    {
-        Jacobi0(A, diag_, x, b, omega_, std::fabs(omega_-1.)>DoubleEpsC);
-    }
-
-    /// \brief Check if the diagonal of the matrix is needed
-    bool NeedDiag() const { return false; }
-
-    /// \brief Set Diag makes nothing, because own matrix is used
-    template<typename Mat>
-    void SetDiag(const Mat&) {}
-
-    /// \brief Set new diagonal
-    template<typename Mat>
-    void SetNewDiag(const Mat& M) { base_::SetDiag(M); }
-
-    /// \brief Set new diagonal (given as an accumulated vector)
-    void SetNewDiag(const VectorCL& v) { base_::SetDiag(v); }
+    bool NeedDiag() const { return false;}
 };
-
-// ********************************************************************************
-/// \brief Class for performing an accumulation as preconditioning
-// ********************************************************************************
-class ParAccPcCL : public ParDummyPcCL
-{
-  private:
-    typedef ParDummyPcCL base_;
-
-  public:
-    ParAccPcCL(const IdxDescCL& idx) : base_(idx) {}
-
-    /// \brief Check if the diagonal of the matrix is needed
-    bool NeedDiag() const { return false; }
-    /// \brief Check if return preconditioned vectors are accumulated after calling Apply
-    bool RetAcc() const { return true; }
-
-    /// \brief Apply preconditioner: x <- Accumulate(b)
-    template <typename Mat, typename Vec>
-    void Apply(const Mat&, Vec &x, const Vec& b) const
-    {
-        x= base_::GetEx().GetAccumulate(b);
-    }
-};
-
-// ********************************************************************************
-/// \brief Class for performing one Step of the blocked inexact SSOR0 step
-// ********************************************************************************
-class ParSSOR0CL : public ParJacCL
-{
-  private:
-    typedef ParJacCL base_;
-    using base_::diag_;
-    using base_::mat_version_;
-    using base_::omega_;
-    using base_::check_mat_version_;
-
-  public:
-    ParSSOR0CL (const IdxDescCL& idx, double omega=1) : base_(idx, omega) {}
-
-    /// \brief Check if return preconditioned vectors are accumulated after calling Apply
-    bool RetAcc() const { return false; }
-    /// \brief Check if the diagonal of the matrix is needed
-    bool NeedDiag() const { return true; }
-
-    /// \brief Apply preconditioner: one step of the incomplete SSOR-iteration
-    template <typename Mat, typename Vec>
-    void Apply(const Mat& A, Vec &x, const Vec& b) const
-    {
-        Assert(mat_version_==A.Version() || !check_mat_version_,
-               DROPSErrCL("ParJac0CL::Apply: Diagonal of actual matrix has not been set"),
-               DebugNumericC);
-        SSOR0(A, diag_, x, b, omega_, std::fabs(omega_-1.)>DoubleEpsC);
-    }
-};
-
-// ********************************************************************************
-/// \brief serial CG as preconditioner
-// ********************************************************************************
-class ParCGPreCL
-{
-  private:
-    int iters_;
-    double tol_;
-
-  public:
-    ParCGPreCL(int Steps, double tol) : iters_(Steps), tol_(tol) {}
-
-    inline bool RetAcc() const {return true;}
-    inline bool NeedDiag() const {return false;}
-    void SetDiag(VectorCL */*diag*/) {}
-
-    template <typename Mat, typename Vec>
-    void Apply(const Mat& A, Vec &x, const Vec& b) const
-    {
-        int iter= iters_;
-        double tol=tol_;
-        x=0.;
-        PCG(A, x, b, SSORPcCL(), iter, tol);
-        if (ProcCL::MyRank()==0)
-            std::cout << "  -- CG as Precond used " << iter <<" steps\n";
-    }
-};
-
-// ********************************************************************************
-/// \brief serial GMRES as preconditioner
-// ********************************************************************************
-class ParGMResPreCL
-{
-  private:
-    int iters_;
-    int restart_;
-    double tol_;
-
- public:
-    ParGMResPreCL(int Restart, int Steps, double tol) : iters_(Steps), restart_(Restart), tol_(tol) {}
-
-    inline bool RetAcc() const {return true;}
-    inline bool NeedDiag() const {return false;}
-    void SetDiag(VectorCL */*diag*/) {}
-
-    template <typename Mat, typename Vec>
-    void Apply(const Mat& A, Vec &x, const Vec& b) const
-    {
-        int iter= iters_;
-        double tol=tol_;
-        GMRES(A, x, b, MultiSSORPcCL(1,1), restart_, iter, tol);
-        if (ProcCL::MyRank()==0)
-            std::cout << "  -- GMRES as Precond used " << iter <<" steps\n";
-    }
-};
-
-
-// ********************************************************************************
-///\brief Apply a diagonal-matrix given as a vector.
-// ********************************************************************************
-class ParDiagPcCL : public ParPreconditioningBaseCL
-{
-  private:
-    typedef ParPreconditioningBaseCL base_;
-    const VectorCL& D_;
-
-  public:
-    ParDiagPcCL (const IdxDescCL& idx, const VectorCL& D) : base_(idx), D_( D) {}
-
-    template <typename Mat, typename Vec>
-    void Apply (const Mat&, Vec& x, const Vec& b) const
-    {
-        Assert( D_.size()==b.size(), DROPSErrCL("DiagPcCL: incompatible dimensions"), DebugNumericC);
-        x= D_*b;
-    }
-
-    inline bool RetAcc() const {return false;}
-    inline bool NeedDiag() const {return false;}
-    /// \brief Set Diag makes nothing, because own matrix is used
-    template<typename Mat>
-    void SetDiag(const Mat&) {}
-};
-
 
 //***************************************************************************
 // Implementations of the methods
 //***************************************************************************
 
 /// \brief One step of a Jacobi-iteration
-template <typename Mat, typename Vec>
-void Jacobi(const Mat& A, const Vec& Diag, Vec& x, const Vec& b, const double omega, const bool HasOmega)
+template <typename Mat, typename Vec, typename ExT>
+void Jacobi(const Mat& A, const Vec& Diag, Vec& x, const Vec& b, const ExT& ex, const double omega, const bool HasOmega)
         /// \param[in]     A        local distributed coefficients-matrix of the linear equation system
         /// \param[in]     Diag     accumulated form of the diagonalelements of A
         /// \param[in,out] x        startvector (accumulated) and result (distributed)
@@ -1366,11 +1248,13 @@ void Jacobi(const Mat& A, const Vec& Diag, Vec& x, const Vec& b, const double om
         for (const size_t end= A.row_beg(i+1); nz<end; ++nz)
             if (A.col_ind(nz) != i)
                 sum-= A.val(nz)*x[A.col_ind(nz)];
-        if (HasOmega)
-            y[i]= (1.-omega)*x[i]+omega*sum/Diag[i];
-        else
-            y[i]= sum/Diag[i];
+
+        y[i] = sum/Diag[i];
     }
+    ex.Accumulate(y);
+
+    if (HasOmega)
+        y = (1.-omega)*x+omega*y;
 
     std::swap(x,y);
 }
@@ -1395,38 +1279,47 @@ void Jacobi0(const Mat&, const Vec& Diag, Vec& x, const Vec& b, const double ome
     }
 }
 
-// One step of the Symmetric-Gauss-Seidel/SSOR method with start vector 0
-template <typename Mat, typename Vec>
-void SSOR0(const Mat& A, const Vec& Diag, Vec& x, const Vec& b, const double omega, const bool HasOmega)
+// One (approximate) step of the Symmetric-Gauss-Seidel/SSOR method with start vector x
+// some kind of block SSOR, works as smoother but NOT as preconditioner, ToDo: fix it
+template <typename Mat, typename Vec, typename ExT>
+void ApproxSSOR(const Mat& A, const Vec& Diag, Vec& x, const Vec& b, const ExT& ex, const double omega, const double HasOmega)
 {
     const size_t n= A.num_rows();
+    double aii, sum;
+    Vec y(x);
 
-    for (size_t i=0; i<n; ++i)
-    {
-        double sum= b[i];
-        size_t j= A.row_beg(i);
-        for ( ; A.col_ind(j) < i; ++j)
-            sum-= A.val(j)*x[A.col_ind(j)];
-        if (HasOmega)
-            x[i]= omega*sum/Diag[i];
-        else
-            x[i]= sum/Diag[i];
+    for (size_t i=0, nz=0; i<n; ++i) {
+        sum= b[i];
+        const size_t end= A.row_beg( i+1);
+        for (; A.col_ind( nz) != i; ++nz) // This is safe: Without diagonal entry, Gauss-Seidel would explode anyway.
+            sum-= A.val( nz)*x[A.col_ind( nz)];
+        aii= Diag[i];
+        for (; nz<end; ++nz)
+            sum-= A.val( nz)*x[A.col_ind( nz)];
+        x[i]= sum/aii;
     }
+    ex.Accumulate(x);
+    if (HasOmega)
+        y = x= (1.-omega)*y+omega*x;
 
-    for (size_t i=n; i>0; )
-    {
+    for (size_t i= n, nz= A.row_beg( n); i>0; ) { // This is safe: Without diagonal entry, Gauss-Seidel would explode anyway.
         --i;
-        double sum= 0;
-        size_t j= A.row_beg(i+1)-1;
-        for ( ; A.col_ind(j) > i; --j)
-            sum-= A.val(j)*x[A.col_ind(j)];
-        if (HasOmega)
-            x[i]= (2.-omega)*x[i]+omega*sum/Diag[i];
-        else
-            x[i]+= sum/Diag[i];
+        double aii, sum= b[i];
+        const size_t beg= A.row_beg( i);
+        for (; A.col_ind( --nz) != i; ) {
+            sum-= A.val( nz)*x[A.col_ind( nz)];
+        }
+        aii= Diag[i];
+        for (; nz>beg; ) {
+            --nz;
+            sum-= A.val( nz)*x[A.col_ind( nz)];
+        }
+        x[i]= sum/aii;
     }
+    ex.Accumulate(x);
+    if (HasOmega)
+        x= (1.-omega)*y+omega*x;
 }
-#endif
 
 } // end of namespace DROPS
 

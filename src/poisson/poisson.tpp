@@ -1492,10 +1492,6 @@ double PoissonP2CL<Coeff>::CheckSolution(const VecDescCL& lsg, scalar_tetra_func
 template<class Coeff>
 void PoissonP2CL<Coeff>::SetNumLvl( size_t n)
 {
-#ifdef _PAR
-    if (n>1)
-        throw DROPSErrCL(" PoissonP2CL<Coeff>::SetNumLvl: Sorry, in parallel version no multi-level is implemented, yet!");
-#endif
     match_fun match= MG_.GetBnd().GetMatchFun();
     idx.resize( n, P2_FE, BndData_, match);
     A.Data.resize( idx.size());

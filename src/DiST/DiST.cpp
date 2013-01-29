@@ -36,10 +36,10 @@ namespace DiST{
 std::ostream& operator<< ( std::ostream& os, const SimplexTransferInfoCL::ProcSetT& pl)
 // for debugging
 {
-	SimplexTransferInfoCL::ProcSetT::const_iterator it( pl.begin());
+    SimplexTransferInfoCL::ProcSetT::const_iterator it( pl.begin());
     if (it!=pl.end()) {
-    	os << '(' << it->first << ',' << PriorityToString( it->second) << ')';
-    	++it;
+        os << '(' << it->first << ',' << PriorityToString( it->second) << ')';
+        ++it;
     }
     for (; it!=pl.end(); ++it) {
         os << ", (" << it->first << ',' << PriorityToString( it->second) << ')';
@@ -83,10 +83,10 @@ void SimplexTransferInfoCL::AddProcSet( const ProcSetT& procs)
 
 int SimplexTransferInfoCL::GetPostProc( Priority prio) const
 {
-	for (ProcSetT::const_iterator it= postProcs_.begin(), end= postProcs_.end(); it!=end; ++it)
-		if (it->second==prio)
-			return it->first;
-	return -1;
+    for (ProcSetT::const_iterator it= postProcs_.begin(), end= postProcs_.end(); it!=end; ++it)
+        if (it->second==prio)
+          return it->first;
+    return -1;
 }
 
 void SimplexTransferInfoCL::ComputeSendToProcs( bool tetra)
@@ -94,20 +94,20 @@ void SimplexTransferInfoCL::ComputeSendToProcs( bool tetra)
 {
     const int me= ProcCL::MyRank();
     if (tetra) {
-    	if (postProcs_.size()==2 && rd_.GetNumProcs()==2) { // Ma/Gh before and after transfer: only send to remote post procs with same prio
-    		procsToSend_.clear();
-    		Priority myprio= rd_.GetLocalPrio();
-    		const int p= GetPostProc(myprio);
-			if (p!=-1 && p!=me)
-				procsToSend_[p]= myprio;
-    	} else { // send to all remote post procs
-			procsToSend_= postProcs_;
-			procsToSend_.erase( me);
-    	}
+        if (postProcs_.size()==2 && rd_.GetNumProcs()==2) { // Ma/Gh before and after transfer: only send to remote post procs with same prio
+            procsToSend_.clear();
+            Priority myprio= rd_.GetLocalPrio();
+            const int p= GetPostProc(myprio);
+            if (p!=-1 && p!=me)
+                procsToSend_[p]= myprio;
+        } else { // send to all remote post procs
+            procsToSend_= postProcs_;
+            procsToSend_.erase( me);
+        }
     } else { // for all sub-simplices (non-tetra): procsToSend_ = postProcs_ - remote data proc list
         procsToSend_= postProcs_;
-    	for (RemoteDataCL::ProcListT::const_iterator it= rd_.GetProcListBegin(), end= rd_.GetProcListEnd(); it!=end; ++it)
-    		procsToSend_.erase( it->proc);
+        for (RemoteDataCL::ProcListT::const_iterator it= rd_.GetProcListBegin(), end= rd_.GetProcListEnd(); it!=end; ++it)
+            procsToSend_.erase( it->proc);
     }
 }
 
@@ -407,19 +407,19 @@ class ModifyCL::CommToUpdateHandlerCL
             bool updateSubs= false, upSubs, transferHere= false;
             int postproc;
             for (size_t i=0; i<numData; ++i) {
-            	is >> upSubs >> postproc;
-            	updateSubs= updateSubs || upSubs;
-            	transferHere= transferHere || postproc==ProcCL::MyRank(); // some remote will transfer tetra to me
+                is >> upSubs >> postproc;
+                updateSubs= updateSubs || upSubs;
+                transferHere= transferHere || postproc==ProcCL::MyRank(); // some remote will transfer tetra to me
             }
             ModifyCL::UpdateListT& ul= mod_.entsToUpdt_[dim];
             ModifyCL::UpdateIterator it= ul.find( &t);
             if (it==ul.end()) { // not already in update list
-            	it= mod_.AddSimplexToUpdate( dim, &t, updateSubs);
-            	// add (local proc,local prio) to update list, otherwise local Ma/Gh copy will be lost
-          	    it->second.AddProc( ProcCL::MyRank(), t.GetPrio());
+                it= mod_.AddSimplexToUpdate( dim, &t, updateSubs);
+                // add (local proc,local prio) to update list, otherwise local Ma/Gh copy will be lost
+                it->second.AddProc( ProcCL::MyRank(), t.GetPrio());
             }
         } else // non-tetra
-        	mod_.AddSimplexToUpdate( dim, &t, false);
+            mod_.AddSimplexToUpdate( dim, &t, false);
         return true;
     }
 
@@ -672,11 +672,11 @@ void TransferCL::Transfer( const TetraCL& t, int toProc, Priority prio, bool del
     /// add/merge proc/prio
     info.AddProc( toProc, prio);
     if (!del) { // keep local object, if not already there
-    	prio= info.GetRemoteData().GetLocalPrio();
+        prio= info.GetRemoteData().GetLocalPrio();
         if (info.GetPostProc(prio)==-1) // prio not found
-        	info.AddProc( ProcCL::MyRank(), prio);
+            info.AddProc( ProcCL::MyRank(), prio);
     } else
-    	info.RemoveProc( ProcCL::MyRank());
+        info.RemoveProc( ProcCL::MyRank());
 
     // Code below was copied from ParMultiGridCL::Transfer. Please use ParMultiGridCL::Transfer directly!
 //    if (t.IsRegularlyRef() && t.IsMaster() && prio==PrioMaster)
@@ -738,7 +738,7 @@ void TransferCL::UpdateOwners()
     InfoCL& info= InfoCL::Instance();
     for (int dim=0; dim<4; ++dim)
         for (RemoteDataListCL::iterator it= info.GetRemoteList(dim).begin(), end= info.GetRemoteList(dim).end(); it!=end; ++it)
-                it->second.UpdateOwner(loadOfProc);
+            it->second.UpdateOwner(loadOfProc);
 }
 
 /** Generate for each process that gets some data a buffer containing all
@@ -799,13 +799,13 @@ void TransferCL::Receive()
     int numRecvFrom= 0;
     for ( int p=0; p < ProcCL::Size(); ++p)
         if ( IreceiveFrom[p]>0)
-        	++numRecvFrom;
+            ++numRecvFrom;
     // receive from other processes
     std::vector<RecvStreamCL*> recv( numRecvFrom);
     std::vector<SArrayCL<size_t,5> >   numMsg( numRecvFrom);
     for ( int p=0, i=0; p < ProcCL::Size(); ++p)
         if ( IreceiveFrom[p]>0) {
-        	recv[i]= new RecvStreamCL( binary_);
+            recv[i]= new RecvStreamCL( binary_);
             recv[i]->Recv( p);
             // receive number of verts/edges/faces/tetras
             for (int dim=0; dim<5; ++dim)
@@ -814,13 +814,13 @@ void TransferCL::Receive()
         }
     // Receive vertices
     for (int i=0; i<numRecvFrom; ++i)
-    	ReceiveSimplices<VertexCL>( *recv[i], numMsg[i][0]);
+        ReceiveSimplices<VertexCL>( *recv[i], numMsg[i][0]);
     // Receive edges
     for (int i=0; i<numRecvFrom; ++i)
-    	ReceiveSimplices<EdgeCL>  ( *recv[i], numMsg[i][1]);
+        ReceiveSimplices<EdgeCL>  ( *recv[i], numMsg[i][1]);
     // Receive faces
     for (int i=0; i<numRecvFrom; ++i)
-    	ReceiveSimplices<FaceCL>  ( *recv[i], numMsg[i][2]);
+        ReceiveSimplices<FaceCL>  ( *recv[i], numMsg[i][2]);
     // receive tetras
     for (int i=0; i<numRecvFrom; ++i)
         ReceiveSimplices<TetraCL> ( *recv[i], numMsg[i][3]);
@@ -888,11 +888,11 @@ void DiST::TransferCL::ReceiveSimplices<TetraCL>( DiST::RecvStreamCL& recvstream
         bool modMFR= true;
         TetraCL* tp= 0;
         if (!InfoCL::Instance().Exists(stmp.GetGID())) {
-        	tp= &CreateSimplex<TetraCL>( stmp, procList); // creates simplex and remote data list entry
-        	if (formerPrio==PrioGhost && procList.size()==1) // there will be a merge afterwards by master received from another proc who will take care of the edge MFRs
-        	    modMFR= false;
+            tp= &CreateSimplex<TetraCL>( stmp, procList); // creates simplex and remote data list entry
+            if (formerPrio==PrioGhost && procList.size()==1) // there will be a merge afterwards by master received from another proc who will take care of the edge MFRs
+            modMFR= false;
         } else { // merge with existing tetra
-        	tp= InfoCL::Instance().GetTetra( stmp.GetGID());
+            tp= InfoCL::Instance().GetTetra( stmp.GetGID());
             tp->Merge(stmp);
             modMFR= formerPrio==PrioMaster;
         }

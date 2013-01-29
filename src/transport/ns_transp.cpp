@@ -39,6 +39,8 @@
 #include "surfactant/ifacetransp.h"
 #include "levelset/twophaseutils.h"
 #include "misc/funcmap.h"
+#include "misc/progressaccu.h"
+#include "misc/dynamicload.h"
 
 #include "num/stokessolverfactory.h"
 #ifdef _PAR
@@ -126,9 +128,9 @@ void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTr
     adap.push_back( &lsetrepair);
     LevelsetRepairCL oldlsetrepair( oldlset);
     adap.push_back( &oldlsetrepair);
-    IdxDescCL* lidx= &lset.idx;
+    MLIdxDescCL* lidx= &lset.idx;
     // index wrt the interface at previous time step
-    IdxDescCL* oldlidx= &oldlset.idx;
+    MLIdxDescCL* oldlidx= &oldlset.idx;
     lset.CreateNumbering( MG.GetLastLevel(), lidx);
     lset.Phi.SetIdx( lidx);
     oldlset.CreateNumbering( MG.GetLastLevel(), oldlidx);
@@ -331,9 +333,9 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbndda
     adap.push_back( &velrepair);
     PressureRepairCL prrepair( Stokes, lset);
     adap.push_back( &prrepair);
-    IdxDescCL* lidx= &lset.idx;
+    MLIdxDescCL* lidx= &lset.idx;
     // index wrt the interface at previous time step
-    IdxDescCL* oldlidx= &oldlset.idx;
+    MLIdxDescCL* oldlidx= &oldlset.idx;
     MLIdxDescCL* vidx= &Stokes.vel_idx;
     IdxDescCL old_vidx(vecP2_FE);
     MLIdxDescCL* pidx= &Stokes.pr_idx;
@@ -501,9 +503,9 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbndda
                                          &Stokes.M.Data, &Stokes.prM.Data, &Stokes.pr_idx);
     }
 
-    UpdateProlongationCL PVel( Stokes.GetMG(), stokessolverfactory.GetPVel(), &Stokes.vel_idx, &Stokes.vel_idx);
+    UpdateProlongationCL<Point3DCL> PVel( Stokes.GetMG(), stokessolverfactory.GetPVel(), &Stokes.vel_idx, &Stokes.vel_idx);
     adap.push_back( &PVel);
-    UpdateProlongationCL PPr ( Stokes.GetMG(), stokessolverfactory.GetPPr(), &Stokes.pr_idx, &Stokes.pr_idx);
+    UpdateProlongationCL<double> PPr ( Stokes.GetMG(), stokessolverfactory.GetPPr(), &Stokes.pr_idx, &Stokes.pr_idx);
     adap.push_back( &PPr);
     // For a two-level MG-solver: P2P1 -- P2P1X;
 //     MakeP1P1XProlongation ( Stokes.vel_idx.NumUnknowns(), Stokes.pr_idx.NumUnknowns(),
@@ -702,6 +704,9 @@ void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<double>("Levelset.Downwind.MaxRelComponentSize", 0.05);
     P.put_if_unset<double>("Levelset.Downwind.WeakEdgeRatio", 0.2);
     P.put_if_unset<double>("Levelset.Downwind.CrosswindLimit", std::cos( M_PI/6.));
+
+    P.put_if_unset<int>("General.ProgressBar", 0);
+    P.put_if_unset<std::string>("General.DynamicLibsPrefix", "../");
 }
 
 int main (int argc, char** argv)
@@ -734,6 +739,10 @@ int main (int argc, char** argv)
 
     std::cout << P << std::endl;
 
+    DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
+    if (P.get<int>("General.ProgressBar"))
+        DROPS::ProgressBarTetraAccumulatorCL::Activate();
+    
     DROPS::MultiGridCL* mg= 0;
     DROPS::StokesBndDataCL* bnddata= 0;
     DROPS::LsetBndDataCL* lsetbnddata= 0;

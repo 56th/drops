@@ -46,6 +46,7 @@
 //solver factory for stokes
 #include "num/stokessolverfactory.h"
 #include "num/oseensolver.h"
+#include "num/prolongation.h"
 #ifdef _PAR
 #include "parallel/loadbal.h"
 #include "parallel/parmultigrid.h"
@@ -55,6 +56,9 @@
 #include <sstream>
 
 #include "misc/progressaccu.h"
+#include "misc/dynamicload.h"
+
+#include <sys/resource.h>
 
 DROPS::ParamCL P;
 
@@ -145,9 +149,18 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     PressureRepairCL prrepair( Stokes, lset);
     adap.push_back( &prrepair);
 
-    IdxDescCL* lidx= &lset.idx;
+    MLIdxDescCL* lidx= &lset.idx;
     MLIdxDescCL* vidx= &Stokes.vel_idx;
     MLIdxDescCL* pidx= &Stokes.pr_idx;
+
+    if ( StokesSolverFactoryHelperCL().VelMGUsed(P)){
+        Stokes.SetNumVelLvl ( Stokes.GetMG().GetNumLevel());
+        lset.SetNumLvl(Stokes.GetMG().GetNumLevel());
+    }
+    if ( StokesSolverFactoryHelperCL().PrMGUsed(P)){
+        Stokes.SetNumPrLvl  ( Stokes.GetMG().GetNumLevel());
+        lset.SetNumLvl(Stokes.GetMG().GetNumLevel());
+    }
 
     lset.CreateNumbering( MG.GetLastLevel(), lidx, periodic_match);
     lset.Phi.SetIdx( lidx);
@@ -156,11 +169,6 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         lset.SetSurfaceForce( SF_ImprovedLBVar);
     else
         lset.SetSurfaceForce( SF_ImprovedLB);
-
-    if ( StokesSolverFactoryHelperCL().VelMGUsed(P))
-        Stokes.SetNumVelLvl ( Stokes.GetMG().GetNumLevel());
-    if ( StokesSolverFactoryHelperCL().PrMGUsed(P))
-        Stokes.SetNumPrLvl  ( Stokes.GetMG().GetNumLevel());
 
     SetInitialLevelsetConditions( lset, MG, P);
     Stokes.CreateNumberingVel( MG.GetLastLevel(), vidx, periodic_match);
@@ -273,16 +281,27 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     // Level-Set-Solver
 #ifndef _PAR
     // SSORPcCL lset_pc;
-    GSPcCL lset_pc;
-    // GMResSolverCL<SSORPcCL>* gm = new GMResSolverCL<SSORPcCL>( lset_pc, 100, P.get<int>("Levelset.Iter"), P.get<double>("Levelset.Tol"));
-    GMResSolverCL<GSPcCL>* gm = new GMResSolverCL<GSPcCL>( lset_pc, 200, P.get<int>("Levelset.Iter"), P.get<double>("Levelset.Tol"));
+    typedef GSPcCL LsetPcT;
 #else
-    ParJac0CL jacparpc( *lidx);
-    ParPreGMResSolverCL<ParJac0CL>* gm = new ParPreGMResSolverCL<ParJac0CL>
-           (/*restart*/100, P.get<int>("Levelset.Iter"), P.get<double>("Levelset.Tol"), *lidx, jacparpc,/*rel*/true, /*modGS*/false, LeftPreconditioning, /*parmod*/true);
+    typedef JACPcCL LsetPcT;
 #endif
+    LsetPcT lset_pc;
+    GMResSolverCL<LsetPcT>* gm = new GMResSolverCL<LsetPcT>( lset_pc, 200, P.get<int>("Levelset.Iter"), P.get<double>("Levelset.Tol"));
 
     LevelsetModifyCL lsetmod( P.get<int>("Reparam.Freq"), P.get<int>("Reparam.Method"), P.get<double>("Reparam.MaxGrad"), P.get<double>("Reparam.MinGrad"), P.get<int>("Levelset.VolCorrection"), Vol, is_periodic);
+
+    UpdateProlongationCL<Point3DCL> PVel( Stokes.GetMG(), stokessolverfactory.GetPVel(), &Stokes.vel_idx, &Stokes.vel_idx);
+    adap.push_back( &PVel);
+    UpdateProlongationCL<double> PPr ( Stokes.GetMG(), stokessolverfactory.GetPPr(), &Stokes.pr_idx, &Stokes.pr_idx);
+    adap.push_back( &PPr);
+    UpdateProlongationCL<double> PLset( lset.GetMG(), lset.GetProlongation(), &lset.idx, &lset.idx);
+    adap.push_back( &PLset);
+    Stokes.P_ = stokessolverfactory.GetPVel();
+
+    // For a two-level MG-solver: P2P1 -- P2P1X;
+//     MakeP1P1XProlongation ( Stokes.vel_idx.NumUnknowns(), Stokes.pr_idx.NumUnknowns(),
+//         Stokes.pr_idx.GetFinest().GetXidx().GetNumUnknownsStdFE(),
+//         stokessolverfactory.GetPVel()->GetFinest(), stokessolverfactory.GetPPr()->GetFinest());
 
     // Time discretisation + coupling
     TimeDisc2PhaseCL* timedisc= CreateTimeDisc(Stokes, lset, navstokessolver, gm, P, lsetmod);
@@ -302,15 +321,6 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
                                          &Stokes.M.Data, &Stokes.prM.Data, &Stokes.pr_idx);
     }
 
-    UpdateProlongationCL PVel( Stokes.GetMG(), stokessolverfactory.GetPVel(), &Stokes.vel_idx, &Stokes.vel_idx);
-    adap.push_back( &PVel);
-    UpdateProlongationCL PPr ( Stokes.GetMG(), stokessolverfactory.GetPPr(), &Stokes.pr_idx, &Stokes.pr_idx);
-    adap.push_back( &PPr);
-    // For a two-level MG-solver: P2P1 -- P2P1X;
-//     MakeP1P1XProlongation ( Stokes.vel_idx.NumUnknowns(), Stokes.pr_idx.NumUnknowns(),
-//         Stokes.pr_idx.GetFinest().GetXidx().GetNumUnknownsStdFE(),
-//         stokessolverfactory.GetPVel()->GetFinest(), stokessolverfactory.GetPPr()->GetFinest());
-
     std::ofstream* infofile = 0;
     IF_MASTER {
         infofile = new std::ofstream ((P.get<std::string>("VTK.VTKName","twophasedrops")+".info").c_str());
@@ -328,6 +338,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
                                                         P.get<int>("Restart.Binary"),
                                                         vel_downwind, lset_downwind);
     Stokes.v.t += GetTimeOffset();
+
     // Output-Registrations:
 #ifndef _PAR
     Ensight6OutCL* ensight = NULL;
@@ -502,12 +513,13 @@ void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<double>("SurfTens.DilatationalVisco", 0.0);
 
     P.put_if_unset<int>("General.ProgressBar", 0);
+    P.put_if_unset<std::string>("General.DynamicLibsPrefix", "../");
 }
 
 int main (int argc, char** argv)
 {
 #ifdef _PAR
-    DROPS::ProcInitCL procinit(&argc, &argv);
+    DROPS::ProcCL::Instance(&argc, &argv);
 #endif
   try
   {
@@ -533,7 +545,9 @@ int main (int argc, char** argv)
     SetMissingParameters(P);
 
     std::cout << P << std::endl;
-
+    
+    DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
+    
     if (P.get<int>("General.ProgressBar"))
         DROPS::ProgressBarTetraAccumulatorCL::Activate();
 
@@ -611,6 +625,16 @@ int main (int argc, char** argv)
     delete velbnddata;
     delete prbnddata;
     delete lsetbnddata;
+
+    rusage usage;
+    getrusage( RUSAGE_SELF, &usage);
+
+#ifdef _PAR
+    printf( "[%i]: ru_maxrss: %li kB.\n", DROPS::ProcCL::MyRank(), usage.ru_maxrss);
+#else
+    printf( "ru_maxrss: %li kB.\n", usage.ru_maxrss);
+#endif
+    std::cout << " twophasedrops finished regularly" << std::endl;
     return 0;
   }
   catch (DROPS::DROPSErrCL& err) { err.handle(); }

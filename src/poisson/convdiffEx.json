@@ -8,6 +8,21 @@
     //=========================================================================
 
     //#######################################
+    // General options
+    //#######################################
+    //General section
+    "General":
+    {
+            "ProgressBar":  1, //show progress bar
+            "DynamicLibsPrefix": "../", //where should we look for shared objects?
+            "DynamicLibs": [ //select libraries to be loaded after program start
+                    "poisson/libpoisson-poissonCoeff",
+                    "misc/libmisc-scalarFunctions",
+                    "misc/libmisc-vectorFunctions"
+            ]
+    },
+
+    //#######################################
     // Options for the iterative Solver
     //#######################################
     "Poisson":

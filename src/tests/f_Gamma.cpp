@@ -31,6 +31,7 @@
 #include "levelset/coupling.h"
 #include "misc/params.h"
 #include "levelset/surfacetension.h"
+#include "misc/dynamicload.h"
 #include <fstream>
 #include <sstream>
 
@@ -176,7 +177,7 @@ void ApplyToTestFct( InstatStokes2PhaseP2P1CL& Stokes, const LsetBndDataCL& lsbn
     LevelsetP2CL lset( MG, lsbnd, sf, P.get<double>("Levelset.SD"), /*CurvDiff*/ -1.);
 //    lset.SetSurfaceForce( SF_Const);
 
-    IdxDescCL* lidx= &lset.idx;
+    MLIdxDescCL* lidx= &lset.idx;
     MLIdxDescCL* vidx= &Stokes.vel_idx;
     MLIdxDescCL* pidx= &Stokes.pr_idx;
 
@@ -267,7 +268,7 @@ void Compare_LaplBeltramiSF_ConstSF( InstatStokes2PhaseP2P1CL& Stokes, const Lse
     SurfaceTensionCL sf( sigmaf, 0);
     LevelsetP2CL lset( MG, lsbnd, sf, P.get<double>("Levelset.SD"), /*CurvDiff*/ -1.);
 
-    IdxDescCL* lidx= &lset.idx;
+    MLIdxDescCL* lidx= &lset.idx;
     MLIdxDescCL* vidx= &Stokes.vel_idx;
     MLIdxDescCL* pidx= &Stokes.pr_idx;
 
@@ -313,7 +314,7 @@ void Compare_LaplBeltramiSF_ConstSF( InstatStokes2PhaseP2P1CL& Stokes, const Lse
     typedef PCGSolverCL<SSORPcCL>     PCG_SsorCL;
     PCG_SsorCL cg( pc, 1000, 1e-18);
     std::cout << "Solving system with stiffness matrix:\t";
-    cg.Solve( Stokes.A.Data, A_inv_d, d);
+    cg.Solve( Stokes.A.Data, A_inv_d, d, vidx->GetEx());
     std::cout << cg.GetIter() << " iter,\tresid = " << cg.GetResid();
     const double sup= std::sqrt(dot( A_inv_d, d));
 
@@ -323,7 +324,7 @@ void Compare_LaplBeltramiSF_ConstSF( InstatStokes2PhaseP2P1CL& Stokes, const Lse
     MA.LinComb( 1, Stokes.M.Data, 1, Stokes.A.Data);
     VectorCL MA_inv_d( A_inv_d);
     std::cout << "Solving system with MA matrix:\t";
-    cg.Solve( MA, MA_inv_d, d);
+    cg.Solve( MA, MA_inv_d, d, vidx->GetEx());
     std::cout << cg.GetIter() << " iter,\tresid = " << cg.GetResid();
     const double sup2= std::sqrt(dot( MA_inv_d, d));
     std::cout << "\n\nsup |f1(v)-f2(v)|/||v||_1 = \t\t" << sup2
@@ -398,6 +399,8 @@ int main (int argc, char** argv)
     SetMissingParameters(P);
 
     std::cout << P << std::endl;
+
+    DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
 
     typedef DROPS::InstatStokes2PhaseP2P1CL    MyStokesCL;
 

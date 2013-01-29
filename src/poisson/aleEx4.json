@@ -5,6 +5,18 @@
 	//    simulation of poisson problem
 	//=============================================================
 	//poisson solver
+//General section
+    "General":
+    {
+            "ProgressBar":  1, //show progress bar
+            "DynamicLibsPrefix": "../", //where should we look for shared objects?
+            "DynamicLibs": [ //select libraries to be loaded after program start
+                    "poisson/libpoisson-poissonCoeff",
+                    "misc/libmisc-scalarFunctions",
+                    "misc/libmisc-vectorFunctions"
+            ]
+    },
+
 	"Poisson":
 	{
 		"PcIter":		    1,

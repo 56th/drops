@@ -1456,7 +1456,8 @@ class System1Accumulator_P2CL : public TetraAccumulatorCL
   protected:
     const TwoPhaseFlowCoeffCL& Coeff;
     const StokesBndDataCL& BndData;
-    const LevelsetP2CL& lset;
+    const VecDescCL& lset_Phi;
+    const BndDataCL<double>& lset_Bnd;
     double t;
 
     IdxDescCL& RowIdx;
@@ -1490,7 +1491,7 @@ class System1Accumulator_P2CL : public TetraAccumulatorCL
 
   public:
     System1Accumulator_P2CL (const TwoPhaseFlowCoeffCL& Coeff, const StokesBndDataCL& BndData_,
-        const LevelsetP2CL& ls, IdxDescCL& RowIdx_, MatrixCL& A_, MatrixCL& M_,
+        const VecDescCL& ls, const BndDataCL<double>& ls_bnd, IdxDescCL& RowIdx_, MatrixCL& A_, MatrixCL& M_,
         VecDescCL* b_, VecDescCL* cplA_, VecDescCL* cplM_, double t);
 
     ///\brief Initializes matrix-builders and load-vectors
@@ -1504,9 +1505,9 @@ class System1Accumulator_P2CL : public TetraAccumulatorCL
 };
 
 System1Accumulator_P2CL::System1Accumulator_P2CL (const TwoPhaseFlowCoeffCL& Coeff_, const StokesBndDataCL& BndData_,
-    const LevelsetP2CL& lset_arg, IdxDescCL& RowIdx_, MatrixCL& A_, MatrixCL& M_,
+    const VecDescCL& lset_arg, const BndDataCL<double>& lset_bnd, IdxDescCL& RowIdx_, MatrixCL& A_, MatrixCL& M_,
     VecDescCL* b_, VecDescCL* cplA_, VecDescCL* cplM_, double t_)
-    : Coeff( Coeff_), BndData( BndData_), lset( lset_arg), t( t_),
+    : Coeff( Coeff_), BndData( BndData_), lset_Phi( lset_arg), lset_Bnd( lset_bnd), t( t_),
       RowIdx( RowIdx_), A( A_), M( M_), cplA( cplA_), cplM( cplM_), b( b_),
       local_twophase( Coeff.mu( 1.0), Coeff.mu( -1.0), Coeff.rho( 1.0), Coeff.rho( -1.0), Coeff.volforce)
 {}
@@ -1550,7 +1551,7 @@ void System1Accumulator_P2CL::local_setup (const TetraCL& tet)
 
     n.assign( tet, RowIdx, BndData.Vel);
 
-    ls_loc.assign( tet, lset.Phi, lset.GetBndData());
+    ls_loc.assign( tet, lset_Phi, lset_Bnd);
     const bool noCut= equal_signs( ls_loc);
     if (noCut) {
         local_onephase.mu(  local_twophase.mu(  sign( ls_loc[0])));
@@ -1622,9 +1623,9 @@ class System1Accumulator_P2XCL : public System1Accumulator_P2CL
 
   public:
     System1Accumulator_P2XCL (const TwoPhaseFlowCoeffCL& Coeff, const StokesBndDataCL& BndData,
-        const LevelsetP2CL& ls, IdxDescCL& RowIdx, MatrixCL& A, MatrixCL& M,
+        const VecDescCL& ls_phi, const BndDataCL<double>& ls_bnd, IdxDescCL& RowIdx, MatrixCL& A, MatrixCL& M,
         VecDescCL* b, VecDescCL* cplA, VecDescCL* cplM, double t)
-      : base(Coeff, BndData, ls, RowIdx, A, M, b, cplA, cplM, t),
+      : base(Coeff, BndData, ls_phi, ls_bnd, RowIdx, A, M, b, cplA, cplM, t),
         localX_twophase( Coeff.mu( 1.0), Coeff.mu( -1.0), Coeff.rho( 1.0), Coeff.rho( -1.0)) {}
 
     ///\brief Initializes matrix-builders and load-vectors
@@ -1704,13 +1705,13 @@ void System1Accumulator_P2XCL::update_global_system ()
 
 
 void SetupSystem1_P2( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_, const StokesBndDataCL& BndData_, MatrixCL& A, MatrixCL& M,
-                      VecDescCL* b, VecDescCL* cplA, VecDescCL* cplM, const LevelsetP2CL& lset, IdxDescCL& RowIdx, double t)
+                      VecDescCL* b, VecDescCL* cplA, VecDescCL* cplM, const VecDescCL& lset_phi, const BndDataCL<>& lset_bnd, IdxDescCL& RowIdx, double t)
 /// Set up matrices A, M and rhs b (depending on phase bnd)
 {
     // TimerCL time;
     // time.Start();
     ScopeTimerCL scope("SetupSystem1_P2");
-    System1Accumulator_P2CL accu( Coeff_, BndData_, lset, RowIdx, A, M, b, cplA, cplM, t);
+    System1Accumulator_P2CL accu( Coeff_, BndData_, lset_phi, lset_bnd, RowIdx, A, M, b, cplA, cplM, t);
     TetraAccumulatorTupleCL accus;
     MaybeAddProgressBar(MG_, "System1(P2) Setup", accus, RowIdx.TriangLevel());    accus.push_back( &accu);
     accumulate( accus, MG_, RowIdx.TriangLevel(), RowIdx.GetMatchingFunction(), RowIdx.GetBndInfo());
@@ -1720,13 +1721,13 @@ void SetupSystem1_P2( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_,
 
 
 void SetupSystem1_P2X( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_, const StokesBndDataCL& BndData_, MatrixCL& A, MatrixCL& M,
-                      VecDescCL* b, VecDescCL* cplA, VecDescCL* cplM, const LevelsetP2CL& lset, IdxDescCL& RowIdx, double t)
+                      VecDescCL* b, VecDescCL* cplA, VecDescCL* cplM, const VecDescCL& lset_phi, const BndDataCL<double>& lset_bnd, IdxDescCL& RowIdx, double t)
 /// Set up matrices A, M and rhs b (depending on phase bnd)
 {
     // TimerCL time;
     // time.Start();
 
-    System1Accumulator_P2XCL accu( Coeff_, BndData_, lset, RowIdx, A, M, b, cplA, cplM, t);
+    System1Accumulator_P2XCL accu( Coeff_, BndData_, lset_phi, lset_bnd, RowIdx, A, M, b, cplA, cplM, t);
     TetraAccumulatorTupleCL accus;
     MaybeAddProgressBar(MG_, "System1(P2X) Setup", accus, RowIdx.TriangLevel());
     accus.push_back( &accu);
@@ -1737,7 +1738,7 @@ void SetupSystem1_P2X( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_
 
 
 void SetupSystem1_P2R( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_, const StokesBndDataCL& BndData_, MatrixCL& A, MatrixCL& M,
-                         VecDescCL* b, VecDescCL* cplA, VecDescCL* cplM, const LevelsetP2CL& lset, IdxDescCL& RowIdx, double t)
+                         VecDescCL* b, VecDescCL* cplA, VecDescCL* cplM, const VecDescCL& lset_phi, const BndDataCL<double>& lset_bnd, IdxDescCL& RowIdx, double t)
 /// Set up matrices A, M and rhs b (depending on phase bnd)
 {
     ScopeTimerCL scope("SetupSystem1_P2R");
@@ -1777,7 +1778,6 @@ void SetupSystem1_P2R( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_
            coupM[14][14], rho_phi[14];
     double det, absdet, cAp, cAn, cAkp, cAkn, intHat_p, intHat_n;
     Point3DCL tmp, intRhs[14];
-    LevelsetP2CL::const_DiscSolCL ls= lset.GetSolution();
     LocalP2CL<> aij_n, aij_p, akreuz_n[3][3], akreuz_p[3][3], phi_i, ones( 1.);
 
     P2DiscCL::GetGradientsOnRef( GradRef);
@@ -1812,7 +1812,7 @@ void SetupSystem1_P2R( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_
         // collect some information about the edges and verts of the tetra
         // and save it n.
         n.assign( *sit, RowIdx, BndData_.Vel);
-        loc_phi.assign( *sit, ls);
+        loc_phi.assign( *sit, lset_phi, lset_bnd);
         patch.Init( *sit, loc_phi);
         const bool nocut= !patch.Intersects();
         if (nocut) {
@@ -2039,16 +2039,17 @@ void InstatStokes2PhaseP2P1CL::SetupSystem1( MLMatDescCL* A, MLMatDescCL* M, Vec
     MLMatrixCL::iterator itA = A->Data.begin();
     MLMatrixCL::iterator itM = M->Data.begin();
     MLIdxDescCL::iterator it = A->RowIdx->begin();
-    for (size_t lvl=0; lvl < A->Data.size(); ++lvl, ++itA, ++itM, ++it)
+    MLDataCL<VecDescCL>::const_iterator itLset = lset.MLPhi.begin();
+    for (size_t lvl=0; lvl < A->Data.size(); ++lvl, ++itA, ++itM, ++it, ++itLset)
         switch (it->GetFE()) {
           case vecP2_FE:
-            SetupSystem1_P2 ( MG_, Coeff_, BndData_, *itA, *itM, lvl == A->Data.size()-1 ? b : 0, cplA, cplM, lset, *it, t);
+            SetupSystem1_P2 ( MG_, Coeff_, BndData_, *itA, *itM, lvl == A->Data.size()-1 ? b : 0, cplA, cplM, lvl == A->Data.size()-1 ? lset.Phi : *itLset, lset.GetBndData(), *it, t);
             break;
           case vecP2R_FE:
-            SetupSystem1_P2R( MG_, Coeff_, BndData_, *itA, *itM, lvl == A->Data.size()-1 ? b : 0, cplA, cplM, lset, *it, t);
+            SetupSystem1_P2R( MG_, Coeff_, BndData_, *itA, *itM, lvl == A->Data.size()-1 ? b : 0, cplA, cplM, lvl == A->Data.size()-1 ? lset.Phi : *itLset, lset.GetBndData(), *it, t);
             break;
           case vecP2X_FE:
-            SetupSystem1_P2X( MG_, Coeff_, BndData_, *itA, *itM, lvl == A->Data.size()-1 ? b : 0, cplA, cplM, lset, *it, t);
+            SetupSystem1_P2X( MG_, Coeff_, BndData_, *itA, *itM, lvl == A->Data.size()-1 ? b : 0, cplA, cplM, lvl == A->Data.size()-1 ? lset.Phi : *itLset, lset.GetBndData(), *it, t);
             break;
           default:
             throw DROPSErrCL("InstatStokes2PhaseP2P1CL<Coeff>::SetupSystem1 not implemented for this FE type");
@@ -2074,14 +2075,15 @@ void InstatStokes2PhaseP2P1CL::SetupSystem1( MLMatDescCL* A, MLMatDescCL* M, Vec
 MLTetraAccumulatorTupleCL&
 InstatStokes2PhaseP2P1CL::system1_accu (MLTetraAccumulatorTupleCL& accus, MLMatDescCL* A, MLMatDescCL* M, VecDescCL* b, VecDescCL* cplA, VecDescCL* cplM, const LevelsetP2CL& lset, double t) const
 {
-    MLMatrixCL::iterator                   itA= A->Data.begin();
-    MLMatrixCL::iterator                   itM= M->Data.begin();
-    MLIdxDescCL::iterator                   it= A->RowIdx->begin();
+    MLMatrixCL::iterator                    itA= A->Data.begin();
+    MLMatrixCL::iterator                    itM= M->Data.begin();
+    MLIdxDescCL::iterator                    it= A->RowIdx->begin();
+    MLDataCL<VecDescCL>::const_iterator itLset = lset.MLPhi.begin();
     MLTetraAccumulatorTupleCL::iterator itaccu= accus.begin();
-    for (size_t lvl= 0; lvl < A->Data.size(); ++lvl, ++itA, ++itM, ++it, ++itaccu)
+    for (size_t lvl= 0; lvl < A->Data.size(); ++lvl, ++itA, ++itM, ++it, ++itaccu, ++itLset)
         switch (it->GetFE()) {
           case vecP2_FE:
-            itaccu->push_back_acquire( new System1Accumulator_P2CL( GetCoeff(), GetBndData(), lset,
+            itaccu->push_back_acquire( new System1Accumulator_P2CL( GetCoeff(), GetBndData(), lvl == A->Data.size()-1 ? lset.Phi : *itLset, lset.GetBndData(),
                 *it, *itA, *itM, lvl == A->Data.size() - 1 ? b : 0, cplA, cplM, t));
             break;
 
@@ -2395,7 +2397,8 @@ class LBAccumulator_P2CL : public TetraAccumulatorCL
     double locA [10][10];
     const TwoPhaseFlowCoeffCL& Coeff;
     const StokesBndDataCL& BndData;
-    const LevelsetP2CL& lset;
+    const VecDescCL& lset;
+    const LsetBndDataCL& lset_bnd;
     double t;
 
     IdxDescCL& RowIdx;
@@ -2421,7 +2424,7 @@ class LBAccumulator_P2CL : public TetraAccumulatorCL
 
   public:
     LBAccumulator_P2CL (const TwoPhaseFlowCoeffCL& Coeff, const StokesBndDataCL& BndData_,
-        const LevelsetP2CL& ls, IdxDescCL& RowIdx_, MatrixCL& A_, VecDescCL* cplA_, double t );
+        const VecDescCL& ls, const LsetBndDataCL& ls_bnd, IdxDescCL& RowIdx_, MatrixCL& A_, VecDescCL* cplA_, double t );
 
     ///\brief Initializes matrix-builders and load-vectors
     void begin_accumulation ();
@@ -2434,8 +2437,8 @@ class LBAccumulator_P2CL : public TetraAccumulatorCL
 };
 
 LBAccumulator_P2CL::LBAccumulator_P2CL (const TwoPhaseFlowCoeffCL& Coeff_, const StokesBndDataCL& BndData_,
-    const LevelsetP2CL& lset_arg, IdxDescCL& RowIdx_, MatrixCL& A_, VecDescCL* cplA_, double t_)
-    : Coeff( Coeff_), BndData( BndData_), lset( lset_arg), t( t_),
+    const VecDescCL& lset_arg, const LsetBndDataCL& lset_bnd_arg, IdxDescCL& RowIdx_, MatrixCL& A_, VecDescCL* cplA_, double t_)
+    : Coeff( Coeff_), BndData( BndData_), lset( lset_arg), lset_bnd( lset_bnd_arg), t( t_),
       RowIdx( RowIdx_), A( A_), cplA( cplA_), local_twophase( Coeff.SurfTens)
 {}
 
@@ -2461,7 +2464,7 @@ void LBAccumulator_P2CL::finalize_accumulation ()
 
 void LBAccumulator_P2CL::visit (const TetraCL& tet)
 {
-    ls_loc.assign( tet, lset.Phi, lset.GetBndData());
+    ls_loc.assign( tet, lset, lset_bnd);
 
     if (!equal_signs( ls_loc))
     {
@@ -2507,11 +2510,11 @@ void LBAccumulator_P2CL::update_global_system ()
         }
 }
 
-void SetupLB_P2( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_, const StokesBndDataCL& BndData_, MatrixCL& A, VelVecDescCL* cplA, const LevelsetP2CL& lset, IdxDescCL& RowIdx, double t)
+void SetupLB_P2( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_, const StokesBndDataCL& BndData_, MatrixCL& A, VelVecDescCL* cplA, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, IdxDescCL& RowIdx, double t)
 /// Set up the Laplace-Beltrami-matrix
 {
     ScopeTimerCL scope("SetupLB_P2");
-    LBAccumulator_P2CL accu( Coeff_, BndData_, lset, RowIdx, A, cplA, t);
+    LBAccumulator_P2CL accu( Coeff_, BndData_, lset, lset_bnd, RowIdx, A, cplA, t);
     TetraAccumulatorTupleCL accus;
     MaybeAddProgressBar(MG_, "LapBeltr(P2) Setup", accus, RowIdx.TriangLevel());
     accus.push_back( &accu);
@@ -2523,9 +2526,10 @@ void InstatStokes2PhaseP2P1CL::SetupLB (MLMatDescCL* A, VecDescCL* cplA, const L
 {
     MLMatrixCL::iterator  itA = A->Data.begin();
     MLIdxDescCL::iterator it  = A->RowIdx->begin();
-    for (size_t lvl=0; lvl < A->RowIdx->size(); ++lvl, ++itA, ++it)
+    MLDataCL<VecDescCL>::const_iterator itLset = lset.MLPhi.begin();
+    for (size_t lvl=0; lvl < A->RowIdx->size(); ++lvl, ++itA, ++it, ++itLset)
     {
-       SetupLB_P2( MG_,  Coeff_, BndData_, *itA, lvl == A->Data.size()-1 ? cplA : 0, lset, *it, t);
+       SetupLB_P2( MG_,  Coeff_, BndData_, *itA, lvl == A->Data.size()-1 ? cplA : 0, lvl == A->Data.size()-1 ? lset.Phi : *itLset, lset.GetBndData(), *it, t);
     }
 
 }
@@ -2983,10 +2987,6 @@ void InstatStokes2PhaseP2P1CL::SetIdx()
 
 void InstatStokes2PhaseP2P1CL::SetNumVelLvl( size_t n)
 {
-#ifdef _PAR
-    if (n>1)
-        throw DROPSErrCL("Multilevel not implemented in parallel DROPS yet, sorry");
-#endif
     match_fun match= MG_.GetBnd().GetMatchFun();
     const double bound = vel_idx.GetFinest().GetXidx().GetBound();
     vel_idx.resize( n, GetVelFE(), BndData_.Vel, match, bound);
@@ -2997,10 +2997,6 @@ void InstatStokes2PhaseP2P1CL::SetNumVelLvl( size_t n)
 
 void InstatStokes2PhaseP2P1CL::SetNumPrLvl( size_t n)
 {
-#ifdef _PAR
-    if (n>1)
-        throw DROPSErrCL("Multilevel not implemented in parallel DROPS yet, sorry");
-#endif
     match_fun match= MG_.GetBnd().GetMatchFun();
     const double bound = pr_idx.GetFinest().GetXidx().GetBound();
     pr_idx.resize( n, GetPrFE(),  BndData_.Pr, match, bound);

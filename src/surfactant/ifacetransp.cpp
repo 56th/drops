@@ -419,7 +419,7 @@ void SurfactantcGP1CL::DoStep (const VectorCL& rhs)
         L_.LinComb( 1., m, 1. - theta_, M2.Data);
     }
     std::cout << "Before solve: res = " << norm( L_*ic.Data - rhs) << std::endl;
-    gm_.Solve( L_, ic.Data, rhs);
+    gm_.Solve( L_, ic.Data, rhs, ic.RowIdx->GetEx());
     std::cout << "res = " << gm_.GetResid() << ", iter = " << gm_.GetIter() << std::endl;
 }
 

@@ -179,9 +179,9 @@ bool CheckAccumulation( MultiGridCL& mg)
 
     // Check ExchangeBlockCL
     ExchangeBlockCL exblock;
-    exblock.AttachTo( *idx_desc[2]);
-    exblock.AttachTo( *idx_desc[1]);
-    exblock.AttachTo( *idx_desc[0]);
+    exblock.AttachTo( idx_desc[2]->GetEx());
+    exblock.AttachTo( idx_desc[1]->GetEx());
+    exblock.AttachTo( idx_desc[0]->GetEx());
     VectorCL x( idx_desc[2]->NumUnknowns() + idx_desc[1]->NumUnknowns() + idx_desc[0]->NumUnknowns());
     x= 1.0;
     exblock.Accumulate( x);
@@ -416,9 +416,9 @@ bool CheckInnerProducts( MultiGridCL& mg)
     }
 
     ExchangeBlockCL exBlock;
-    exBlock.AttachTo( *idx_desc[2]);
-    exBlock.AttachTo( *idx_desc[1]);
-    exBlock.AttachTo( *idx_desc[0]);
+    exBlock.AttachTo( idx_desc[2]->GetEx());
+    exBlock.AttachTo( idx_desc[1]->GetEx());
+    exBlock.AttachTo( idx_desc[0]->GetEx());
 
     std::cout << " - Check case 5" << std::endl;
     bool case_correct=true;
@@ -495,7 +495,7 @@ void MakeTimeMeasurements( MultiGridCL& mg, const size_t num_test)
 int main( int argc, char **argv)
 {
 #ifdef _PAR
-    DROPS::ProcInitCL procinit(&argc, &argv);
+    DROPS::ProcCL::Instance(&argc, &argv);
 #endif
     try {
         bool binary=true;

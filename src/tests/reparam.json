@@ -1,10 +1,27 @@
 {
-	"_comment":
-"#=============================================================
-#    DROPS parameter file for reparam.cpp
-#    Testing reparametrization strategies
-#=============================================================
-# re-initialization of levelset function",
+//=============================================================
+//    DROPS parameter file for reparam.cpp
+//    Testing reparametrization strategies
+//=============================================================
+
+//General section
+        "General":
+        {
+                "ProgressBar":  1, //show progress bar
+                "DynamicLibsPrefix": "../", //where should we look for shared objects?
+                "DynamicLibs": [ //select libraries to be loaded after program start
+                        //"levelset/liblevelset-filmCoeff",
+                        "levelset/liblevelset-twophaseCoeff",
+                        "misc/libmisc-scalarFunctions",
+                        "misc/libmisc-vectorFunctions"
+                        //"poisson/libpoisson-poissonCoeff",
+                        //"stokes/libstokes-stokesCoeff",
+                        //"tests/libtests-csgtest",
+                        //"transport/libtransport-transportCoeff"
+                ]
+        },
+
+// re-initialization of levelset function",
 
 	"Reparam":
 	{

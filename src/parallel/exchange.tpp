@@ -24,6 +24,8 @@
 
 namespace DROPS{
 
+#ifdef _PAR
+
 template <typename T>
 void SendNumDataCL<T>::freeType()
 /** If the datatype mpidatatype_ has been commited to MPI unregister
@@ -188,5 +190,6 @@ inline ExchangeMatrixCL::ProcNumCT ExchangeMatrixCL::Intersect(
     return result;
 }
 
+#endif // parallel
 
 } // end of namespace DROPS

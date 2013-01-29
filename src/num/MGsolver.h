@@ -52,11 +52,23 @@ namespace DROPS
  \param Solver        coarse grid/direct solver with relative residual measurement
  \param numLevel      number of vidited levels
  \param numUnknDirect minimal number of unknowns for the direct solver */
-template<class SmootherCL, class DirectSolverCL, class ProlongationIteratorT>
+template<class SmootherIteratorT, class DirectSolverCL, class ProlongationIteratorT>
 void MGM( const MLMatrixCL::const_iterator& begin, const MLMatrixCL::const_iterator& fine,
           const ProlongationIteratorT& P, VectorCL& x, const VectorCL& b,
-          const SmootherCL& Smoother, Uint smoothSteps,
+          MLIdxDescCL::const_iterator& idx,
+          const SmootherIteratorT& Smoother, Uint smoothSteps,
           DirectSolverCL& Solver, int numLevel, int numUnknDirect);
+
+
+template<class SmootherIteratorT, class DirectSolverCL, class ProlongationIterT>
+void
+MGMPr(const std::vector<VectorCL>::const_iterator& ones,
+      const MLMatrixCL::const_iterator& begin, const MLMatrixCL::const_iterator& fine,
+      ProlongationIterT P, VectorCL& x, const VectorCL& b,
+      MLIdxDescCL::const_iterator& idx,
+      const SmootherIteratorT& Smoother, const Uint smoothSteps,
+      DirectSolverCL& Solver, const int numLevel, const int numUnknDirect);
+
 
 /**
 \brief Uses MGM for solving to tolerance tol or until maxiter iterations are reached.
@@ -65,9 +77,8 @@ void MGM( const MLMatrixCL::const_iterator& begin, const MLMatrixCL::const_itera
  sm controls the number of smoothing steps, lvl the number of used levels */
 template<class SmootherCL, class DirectSolverCL, class ProlongationT>
 void MG(const MLMatrixCL& MGData, const ProlongationT& Prolong, const SmootherCL&,
-        DirectSolverCL&, VectorCL& x, const VectorCL& b, int& maxiter, double& tol,
+        DirectSolverCL&, VectorCL& x, const VectorCL& b, const MLIdxDescCL& idx, int& maxiter, double& tol,
         const bool residerr= true, Uint sm=1, int lvl=-1);
-
 
 /*******************************************************************
 *   M G S o l v e r  C L                                           *
@@ -82,12 +93,13 @@ template<class SmootherT, class DirectSolverT, class ProlongationT= MLMatrixCL>
 class MGSolverCL : public SolverBaseCL
 {
   private:
-    ProlongationT     P;                 ///< prolongation
-    const SmootherT&  smoother_;         ///< multigrid smoother
-    DirectSolverT&    directSolver_;     ///< coarse grid solver with relative residual measurement
-    const bool        residerr_;         ///< controls the error measuring: false : two-norm of dx, true: two-norm of residual
-    Uint              smoothSteps_;      ///< number of smoothing steps
-    int               usedLevels_;       ///< number of used levels (-1 = all)
+    ProlongationT      P;                 ///< prolongation
+    SmootherT&         smoother_;         ///< multigrid smoother
+    DirectSolverT&     directSolver_;     ///< coarse grid solver with relative residual measurement
+    const MLIdxDescCL& idx_;
+    const bool         residerr_;         ///< controls the error measuring: false : two-norm of dx, true: two-norm of residual
+    Uint               smoothSteps_;      ///< number of smoothing steps
+    int                usedLevels_;       ///< number of used levels (-1 = all)
 
   public:
     /// constructor for MGSolverCL
@@ -98,24 +110,30 @@ class MGSolverCL : public SolverBaseCL
         \param residerr   controls the error measuring: false : two-norm of dx, true: two-norm of residual
         \param smsteps    number of smoothing steps
         \param lvl        number of used levels (-1 = all) */
-    MGSolverCL( const SmootherT& sm, DirectSolverT& ds, int maxiter,
-                double tol, const bool residerr= true, Uint smsteps= 1, int lvl= -1 )
-        : SolverBaseCL(maxiter,tol), smoother_(sm), directSolver_(ds),
+    MGSolverCL( SmootherT& sm, DirectSolverT& ds, int maxiter,
+                double tol, const MLIdxDescCL& idx, const bool residerr= true, Uint smsteps= 1, int lvl= -1 )
+        : SolverBaseCL(maxiter, tol), smoother_(sm), directSolver_(ds), idx_(idx),
           residerr_(residerr), smoothSteps_(smsteps), usedLevels_(lvl) {}
 
     ProlongationT* GetProlongation() { return &P; }
     /// solve function: calls the MultiGrid-routine
-    void Solve(const MLMatrixCL& A, VectorCL& x, const VectorCL& b)
+    template<typename ExT>
+    void Solve(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const ExT&)
     {
-        _res=  _tol;
-        _iter= _maxiter;
-        MG( A, P, smoother_, directSolver_, x, b, _iter, _res, residerr_, smoothSteps_, usedLevels_);
+        smoother_.SetDiag(A, idx_);
+        res_=  tol_;
+        iter_= maxiter_;
+        MG( A, P, smoother_, directSolver_, x, b, idx_, iter_, res_, residerr_, smoothSteps_, usedLevels_);
     }
-    void Solve(const MatrixCL&, VectorCL&, const VectorCL&)
+    template<typename ExT>
+    void Solve(const MatrixCL&, VectorCL&, const VectorCL&, const ExT&)
     {
         throw DROPSErrCL( "MGSolverCL::Solve: need multilevel data structure\n");
     }
-
+    SmootherT& GetPc() { return smoother_; }
+    bool NeedDiag()  {return false; } // diag is saved during solve
+    template<typename Mat, typename ExT>
+    void SetDiag(const Mat&, const ExT&) {}
 };
 
 /// checks multigrid structure
@@ -202,9 +220,9 @@ class PVankaSmootherCL
  \param idx          optional extended index for 2x2-systems with pressure & extended pressure */
     PVankaSmootherCL(int vanka_method=0, double tau=1.0, const MLIdxDescCL* idx= 0)
         : vanka_method_(vanka_method), tau_(tau), idx_( idx) {}
-    template <typename Mat, typename Vec>
+    template <typename Mat, typename Vec, typename ExT>
     void Apply( const Mat& A, const Mat& B, const Mat& BT, const Mat&,
-                Vec& u, Vec& p, const Vec& f, const Vec& g ) const;
+                Vec& u, Vec& p, const Vec& f, const Vec& g, const ExT& vel_ex, const ExT& p_ex ) const;
     void SetRelaxation (double tau) { tau_= tau; }
     void SetVankaMethod( int method) {vanka_method_ = method;}  ///< change the method for solving the local problems
     int  GetVankaMethod()            {return vanka_method_;}    ///< get the number of the method for solving the local problems
@@ -234,9 +252,9 @@ class BSSmootherCL
  \param red    stopping criterion for the inner CG method
  \param omega  scaling parameter for the diagonal of A */
     BSSmootherCL( int maxit = 20, double red = 2e-1, double omega = 2.0) : maxit_(maxit), red_(red), omega_(omega) {};
-    template <typename Mat, typename Vec>
+    template <typename Mat, typename Vec, typename ExT>
     void Apply( const Mat& A, const Mat& B, const Mat&, const Mat& M,
-                Vec& u, Vec& p, const Vec& f, const Vec& g ) const;
+                Vec& u, Vec& p, const Vec& f, const Vec& g, const ExT& vel_ex, const ExT& p_ex ) const;
 };
 
 //===================================

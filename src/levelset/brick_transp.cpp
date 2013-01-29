@@ -34,6 +34,9 @@
 #include "misc/funcmap.h"
 #include <fstream>
 
+#include "misc/progressaccu.h"
+#include "misc/dynamicload.h"
+
 DROPS::ParamCL P;
 
 double Initialcneg (const DROPS::Point3DCL&, double)
@@ -50,11 +53,6 @@ typedef DROPS::BndDataCL<DROPS::Point3DCL> VelBndDataCL;
 typedef VelBndDataCL::bnd_val_fun  vel_bnd_val_fun;
 typedef DROPS::BndDataCL<> cBndDataCL;
 typedef cBndDataCL::bnd_val_fun  c_bnd_val_fun;
-
-const DROPS::BndCondT v_bc[6]= { DROPS::Dir0BC, DROPS::Dir0BC, DROPS::DirBC, DROPS::DirBC, DROPS::Dir0BC, DROPS::Dir0BC };
-const vel_bnd_val_fun v_bfun[6]= { 0, 0, DROPS::InVecMap::getInstance()["InflowBrickTransp"], DROPS::InVecMap::getInstance()["InflowBrickTransp"], 0, 0};
-const DROPS::BndCondT c_bc[6]= { DROPS::DirBC, DROPS::DirBC, DROPS::DirBC, DROPS::DirBC, DROPS::DirBC, DROPS::DirBC };
-const c_bnd_val_fun c_bfun[6]= { & Initialcpos,  & Initialcpos, & Initialcpos,& Initialcpos, & Initialcpos, & Initialcpos };
 
 double D[2]= { /*pos. part*/ 10e-3, /*neg. part*/ 5e-3 };
 double H= 0.5; // in the neg. part
@@ -82,9 +80,16 @@ typedef P2EvalCL<SVectorCL<3>, const VelBndDataCL, const VecDescCL> const_DiscVe
 
 void Strategy (MultiGridCL& MG, const LsetBndDataCL& lsbnd)
 {
+
+    const DROPS::BndCondT v_bc[6]= { DROPS::Dir0BC, DROPS::Dir0BC, DROPS::DirBC, DROPS::DirBC, DROPS::Dir0BC, DROPS::Dir0BC };
+    const vel_bnd_val_fun v_bfun[6]= { 0, 0, DROPS::InVecMap::getInstance()["InflowBrickTransp"], DROPS::InVecMap::getInstance()["InflowBrickTransp"], 0, 0};
+    const DROPS::BndCondT c_bc[6]= { DROPS::DirBC, DROPS::DirBC, DROPS::DirBC, DROPS::DirBC, DROPS::DirBC, DROPS::DirBC };
+    const c_bnd_val_fun c_bfun[6]= { & Initialcpos,  & Initialcpos, & Initialcpos,& Initialcpos, & Initialcpos, & Initialcpos };
+
+
     SurfaceTensionCL sf( sigmaf, 0);
     LevelsetP2CL lset( MG, lsbnd, sf, P.get<double>("Levelset.SD"), P.get<double>("Levelset.CurvDiff"));
-    IdxDescCL* lidx= &lset.idx;
+    MLIdxDescCL* lidx= &lset.idx;
     lset.CreateNumbering( MG.GetLastLevel(), lidx);
     lset.Phi.SetIdx( lidx);
     lset.Init( EllipsoidCL::DistanceFct);
@@ -156,6 +161,11 @@ int main (int argc, char** argv)
     param.close();
     std::cout << P << std::endl;
 
+    DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
+    
+    if (P.get<int>("General.ProgressBar"))
+        DROPS::ProgressBarTetraAccumulatorCL::Activate();
+
     DROPS::Point3DCL e1(0.), e2(0.), e3(0.), orig;
     e1[0]=2*P.get<double>("Exp.RadInlet"); e2[1]=1.0; e3[2]= 2*P.get<double>("Exp.RadInlet");
     DROPS::BrickBuilderCL builder( orig, e1, e2, e3, 20, 20, 20);
@@ -170,6 +180,7 @@ int main (int argc, char** argv)
 
     Strategy( mg, lsbnd);    // do all the stuff
 
+    std::cout << " brick_transp finished regularly" << std::endl;
     return 0;
   }
   catch (DROPS::DROPSErrCL err) { err.handle(); }

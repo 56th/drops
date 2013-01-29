@@ -585,7 +585,7 @@ void LevelsetP2CL::Init( instat_scalar_fun_ptr phi0, double t)
 }
 
 
-void LevelsetP2CL::CreateNumbering( Uint level, IdxDescCL* idx, match_fun match)
+void LevelsetP2CL::CreateNumbering( Uint level, MLIdxDescCL* idx, match_fun match)
 {
     idx->CreateNumbering( level, MG_, BndData_, match);
 }
@@ -718,15 +718,16 @@ void LevelsetP2CL::SmoothPhi( VectorCL& SmPhi, double diff) const
     SetupSmoothSystem( M, A);
     C.LinComb( 1, M, diff, A);
 #ifndef _PAR
-    SSORPcCL pc;
-    PCGSolverCL<SSORPcCL> pcg( pc, 500, 1e-10);
-    pcg.Solve( C, SmPhi, M*Phi.Data);
+    typedef SSORPcCL PcT;
+#else
+    typedef JACPcCL PcT;
+#endif
+    PcT pc;
+    PCGSolverCL<PcT> pcg( pc, 500, 1e-10);
+    pcg.Solve( C, SmPhi, M*Phi.Data, idx.GetEx());
+#ifndef _PAR
     __UNUSED__ double inf_norm= supnorm( SmPhi-Phi.Data);
 #else
-    ParJac0CL  JACPc (idx);
-    typedef ParPCGSolverCL<ParJac0CL> JacPCGSolverT;
-    JacPCGSolverT cg( 500, 1e-10, idx, JACPc);
-    cg.Solve( C, SmPhi, M*Phi.Data);
     __UNUSED__ const double inf_norm= ProcCL::GlobalMax(supnorm( SmPhi-Phi.Data));
 #endif
     Comment("||SmPhi - Phi||_oo = " <<inf_norm<< std::endl, DebugDiscretizeC);
@@ -820,6 +821,13 @@ void LevelsetP2CL::GetMaxMinGradPhi(double& maxGradPhi, double& minGradPhi) cons
 #endif
 }
 
+void LevelsetP2CL::SetNumLvl( size_t n)
+{
+    match_fun match= MG_.GetBnd().GetMatchFun();
+    idx.resize( n, P2_FE, BndData_, match);
+    MLPhi.resize(n);
+}
+
 //*****************************************************************************
 //                               LevelsetRepairCL
 //*****************************************************************************
@@ -835,17 +843,17 @@ LevelsetRepairCL::post_refine ()
 /// Do all things to complete the repairing of the FE level-set function
 {
     VecDescCL loc_phi;
-    IdxDescCL loc_lidx( P2_FE);
+    MLIdxDescCL loc_lidx( P2_FE, ls_.idx.size());
     VecDescCL& phi= ls_.Phi;
     match_fun match= ls_.GetMG().GetBnd().GetMatchFun();
 
-    ls_.CreateNumbering( ls_.GetMG().GetLastLevel(), &loc_lidx, match);
+    loc_lidx.CreateNumbering( ls_.GetMG().GetLastLevel(), ls_.GetMG(), ls_.GetBndData(), match);
     loc_phi.SetIdx( &loc_lidx);
 
     p2repair_->repair( loc_phi);
 
     phi.Clear( phi.t);
-    ls_.DeleteNumbering( phi.RowIdx);
+    ls_.idx.DeleteNumbering( ls_.GetMG());
     ls_.idx.swap( loc_lidx);
     phi.SetIdx( &ls_.idx);
     phi.Data= loc_phi.Data;

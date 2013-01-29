@@ -30,17 +30,17 @@ def replacearch( a,  b):
 
 def serial():
     #modify the architecture to serial strategy
-    replacearch("ARCH = LINUX_MPI\n","ARCH = LINUX\n")
+    #replacearch("ARCH = LINUX_MPI\n","ARCH = LINUX\n")
     #clean DROPS
-    command = "cd ../../; make clean; make dep"
+    command = "cd ../../; make clean"
     return os.system(command)
     
 def parallel():
     #modify the architecture to parallel strategy
-    replacearch("ARCH = LINUX\n","ARCH = LINUX_MPI\n")
+    #replacearch("ARCH = LINUX\n","ARCH = LINUX_MPI\n")
     #create and run the command for generating the libraries and the
     #dependencies
-    command = "cd ../../; make clean; make dep"
+    command = "cd ../../; make clean"
     return os.system(command)
 
 #Test - parameter, object of class TestCL found in classtest.py file

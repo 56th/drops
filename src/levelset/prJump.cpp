@@ -38,7 +38,7 @@
 #include <fstream>
 #include <iomanip>
 #include <vector>
-
+#include "misc/dynamicload.h"
 
 DROPS::ParamCL P;
 
@@ -256,7 +256,7 @@ void Strategy( InstatStokes2PhaseP2P1CL& Stokes, const LsetBndDataCL& lsbnd, Ada
         avg_ex= prJump/2.*(8./3.*M_PI*P.get<DROPS::Point3DCL>("Exp.RadDrop")[0]*P.get<DROPS::Point3DCL>("Exp.RadDrop")[0]*P.get<DROPS::Point3DCL>("Exp.RadDrop")[0] - Vol)/Vol; // for spherical interface
 //        avg_ex= 0; // for planar interface
 
-    IdxDescCL* lidx= &lset.idx;
+    MLIdxDescCL* lidx= &lset.idx;
     MLIdxDescCL* vidx= &Stokes.vel_idx;
     MLIdxDescCL* pidx= &Stokes.pr_idx;
     if ( StokesSolverFactoryHelperCL().VelMGUsed(P))
@@ -311,7 +311,7 @@ void Strategy( InstatStokes2PhaseP2P1CL& Stokes, const LsetBndDataCL& lsbnd, Ada
         PrintNorm( "BT p", BTp);
         PrintNorm( "Diff.", VectorCL(curv.Data - BTp));
         std::cout << "Solving velocity for exact pressure given...\n";
-        PCG.Solve( Stokes.A.Data, Stokes.v.Data, VectorCL( curv.Data - transp_mul( Stokes.B.Data, Stokes.p.Data)) );
+        PCG.Solve( Stokes.A.Data, Stokes.v.Data, VectorCL( curv.Data - transp_mul( Stokes.B.Data, Stokes.p.Data)), Stokes.v.RowIdx->GetEx() );
       } break;
 
     case 1:
@@ -333,9 +333,9 @@ void Strategy( InstatStokes2PhaseP2P1CL& Stokes, const LsetBndDataCL& lsbnd, Ada
         StokesSolverBaseCL* solver = stokessolverfactory.CreateStokesSolver();
 
         // initializes prolongation matrices
-        UpdateProlongationCL PVel( Stokes.GetMG(), stokessolverfactory.GetPVel(), &Stokes.vel_idx, &Stokes.vel_idx);
+        UpdateProlongationCL<Point3DCL> PVel( Stokes.GetMG(), stokessolverfactory.GetPVel(), &Stokes.vel_idx, &Stokes.vel_idx);
         adap.push_back( &PVel);
-        UpdateProlongationCL PPr ( Stokes.GetMG(), stokessolverfactory.GetPPr(), &Stokes.pr_idx, &Stokes.pr_idx);
+        UpdateProlongationCL<double> PPr ( Stokes.GetMG(), stokessolverfactory.GetPPr(), &Stokes.pr_idx, &Stokes.pr_idx);
         adap.push_back( &PPr);
 
         // for MinComm
@@ -345,7 +345,7 @@ void Strategy( InstatStokes2PhaseP2P1CL& Stokes, const LsetBndDataCL& lsbnd, Ada
                                          &Stokes.M.Data, &Stokes.prM.Data, &Stokes.pr_idx);
 
         solver->Solve( Stokes.A.Data, Stokes.B.Data, Stokes.v.Data, Stokes.p.Data,
-                       curv.Data, Stokes.c.Data);
+                       curv.Data, Stokes.c.Data, Stokes.v.RowIdx->GetEx(), Stokes.p.RowIdx->GetEx());
         std::cout << "iter: " << solver->GetIter()
                   << "\tresid: " << solver->GetResid() << std::endl;
         time.Stop();
@@ -456,6 +456,8 @@ int main (int argc, char** argv)
     param.close();
     SetMissingParameters(P);
     std::cout << P << std::endl;
+
+    DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
 
     typedef DROPS::InstatStokes2PhaseP2P1CL   MyStokesCL;
     DROPS::StokesVelBndDataCL::bnd_val_fun ZeroVel = DROPS::InVecMap::getInstance().find("ZeroVel")->second;

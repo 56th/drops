@@ -4,6 +4,17 @@
 	//    simulation of stokes problem
 	//    Inherited from isdrops.cpp (old file before merging)
 	//=============================================================
+	//General section
+        "General":
+        {
+                "ProgressBar":  1, //show progress bar
+                "DynamicLibsPrefix": "../", //where should we look for shared objects?
+                "DynamicLibs": [ //select libraries to be loaded after program start
+                        "misc/libmisc-vectorFunctions",
+                        "stokes/libstokes-stokesCoeff"
+                ]
+        },
+	
 	// time stepping
 	"Time":
 	{ 

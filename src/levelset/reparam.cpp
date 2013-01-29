@@ -165,7 +165,7 @@ void Reparam( LevelsetP2CL& lset, Uint steps, double dt, double theta, double di
         typedef GMResSolverCL<SSORPcCL> LsetSolverT;
         SSORPcCL ssorpc;
         GMResSolverCL<SSORPcCL> gm( ssorpc, 100, 1000, 1e-7);
-        gm.Solve( L, Psi, b);
+        gm.Solve( L, Psi, b, lset.idx.GetEx());
         std::cout << "Reparam: res = " << gm.GetResid() << ", iter = " << gm.GetIter() << std::endl;
     }
 
@@ -181,7 +181,7 @@ void Strategy( ProblemT& prob, BndDataCL<>& lsetbnd, double dt, int num_steps, d
     SurfaceTensionCL sf( sigma, 0);
     LevelsetP2CL lset( mg, lsetbnd, sf, 0.5);
 
-    IdxDescCL& lidx= lset.idx;
+    MLIdxDescCL& lidx= lset.idx;
     MLIdxDescCL& vidx= prob.vel_idx;
     VecDescCL& vel=  prob.v;
 

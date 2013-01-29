@@ -29,6 +29,7 @@
 #include "geom/builder.h"
 #include "num/fe.h"
 #include "misc/problem.h"
+#include "num/prolongation.h"
 
 using namespace DROPS;
 
@@ -79,14 +80,13 @@ int TestProlongation()
         v0.SetIdx( &i0);
         i1.CreateNumbering( mg.GetLastLevel(), mg);
         v1.SetIdx( &i1);
-        DROPS::MatDescCL P;
-        P.SetIdx( &i0, &i1);
-        SetupP2ProlongationMatrix( mg, P.Data, i0, i1);
+        DROPS::ProlongationCL<double> P(mg);
+        P.Create(&i0, &i1);
 //        TetraCL* t= &*mg.GetTetrasBegin( 0);
         for (int k= 0; k<10; ++k) {
             VectorCL v( 10u);
             v[k]= 1.0;
-            VectorCL w= P.Data*v;
+            VectorCL w= P*v;
 
 //            for (TetraCL::ChildPIterator cp= t->GetChildBegin(); cp != t->GetChildEnd(); ++cp) {
 //                (*cp)->DebugInfo( std::cout);

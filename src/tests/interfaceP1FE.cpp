@@ -48,13 +48,13 @@ TestSingleTetra()
     IdxDescCL ifaceidx( P1IF_FE);
     std::cout << "Testing vertex numbering around no interface:" << std::endl;
     ifaceidx.CreateNumbering( 0, mg, &lset.Phi, &lset.GetBndData());
-    std::cout << "NumUnknowns: " << ifaceidx.NumUnknowns() << std::endl;
+    std::cout << "(S. no int.) NumUnknowns: " << ifaceidx.NumUnknowns() << std::endl;
     ifaceidx.DeleteNumbering( mg);
 
     std::cout << "Testing vertex numbering interface in 1 tetra:" << std::endl;
     lset.Phi.Data[0]= -1.0;
     ifaceidx.CreateNumbering( 0, mg, &lset.Phi, &lset.GetBndData());
-    std::cout << "NumUnknowns: " << ifaceidx.NumUnknowns() << std::endl;
+    std::cout << "(S. int.) NumUnknowns: " << ifaceidx.NumUnknowns() << std::endl;
     ifaceidx.DeleteNumbering( mg);
 }
 
@@ -117,13 +117,13 @@ TestPlaneInCube()
     std::cout << "Testing vertex numbering around planar interface:" << std::endl;
     lset.Init( plane);
     ifaceidx.CreateNumbering( 0, mg, &lset.Phi, &lset.GetBndData());
-    std::cout << "NumUnknowns: " << ifaceidx.NumUnknowns() << std::endl;
+    std::cout << "(P.) NumUnknowns: " << ifaceidx.NumUnknowns() << std::endl;
     ifaceidx.DeleteNumbering( mg);
 
     std::cout << "Testing vertex numbering around planar interface containing vertices:" << std::endl;
     lset.Init( plane2);
     ifaceidx.CreateNumbering( 0, mg, &lset.Phi, &lset.GetBndData());
-    std::cout << "NumUnknowns: " << ifaceidx.NumUnknowns() << std::endl;
+    std::cout << "(P. with vert.) NumUnknowns: " << ifaceidx.NumUnknowns() << std::endl;
     ifaceidx.DeleteNumbering( mg);
 }
 
@@ -258,7 +258,7 @@ int main ()
 
     IdxDescCL ifaceidx( P1IF_FE);
     ifaceidx.CreateNumbering( 0, mg, &lset.Phi, &lset.GetBndData());
-    std::cout << "NumUnknowns: " << ifaceidx.NumUnknowns() << std::endl;
+    std::cout << "(sphere) NumUnknowns: " << ifaceidx.NumUnknowns() << std::endl;
 
     MatDescCL M( &ifaceidx, &ifaceidx);
     SetupInterfaceMassP1( mg, &M, lset.Phi, lset.GetBndData());

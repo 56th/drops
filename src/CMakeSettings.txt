@@ -5,8 +5,13 @@ set(HYPRE_HOME "${CMAKE_SOURCE_DIR}/../hypre-2.0.0" CACHE PATH "")
 set(SCOTCH_HOME "${CMAKE_SOURCE_DIR}/../scotch_5.1.8a" CACHE PATH "")
 set(SUITESPARSE_HOME "${CMAKE_SOURCE_DIR}/../SuiteSpare/" CACHE PATH "")
 
-set(IPC_CXX_FLAGS_DEBUG "-DVALARRAY_DEBUG -wd1572")
-set(IPC_CXX_FLAGS_RELEASE "-O3 -ip -xhost -fp-model fast=2")
+set(BOOST_HOME "" CACHE PATH "")
 
-set(GCC_CXX_FLAGS_DEBUG "-g -O0")
-set(GCC_CXX_FLAGS_RELEASE "-O3 --fast-math")
+set(DROPS_BUILD_TYPE "" CACHE STRING "")
+
+set(IPC_CXX_FLAGS_DEBUG "-DVALARRAY_DEBUG -wd1572 -g")
+set(IPC_CXX_FLAGS_RELEASE "-O3 -ip -fp-model fast=2")
+
+set(GCC_CXX_FLAGS_DEBUG "-g -O0 -W -Wall -pedantic")
+set(GCC_CXX_FLAGS_RELEASE "-O3 --fast-math -W -Wall -pedantic")
+option(MPI FALSE)

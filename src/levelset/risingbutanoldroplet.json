@@ -5,18 +5,30 @@
 //    butanol droplet in water
 //=============================================================
 
+//General section
+        "General": 
+        {
+                "ProgressBar":  1, //show progress bar
+                "DynamicLibsPrefix": "../", //where should we look for shared objects?
+                "DynamicLibs": [ //select libraries to be loaded after program start
+                        "levelset/liblevelset-twophaseCoeff",
+                        "misc/libmisc-scalarFunctions",
+                        "misc/libmisc-vectorFunctions"
+                ]
+        },
+
 // time stepping
         "Time":
         {
                 "NumSteps":             10,     // number of time steps
-                "StepSize":             0.003,  // time step size
+                "StepSize":             0.0003,  // time step size
                 "Scheme":               1       // choose a specific time discretization
         },
 
 // flow solver
         "Stokes":
         {
-                "StokesMethod":         20401,  // Stokes solver, cf. num/stokessolverfactory.h
+                "StokesMethod":         10409,  // Stokes solver, cf. num/stokessolverfactory.h
                 "InnerIter":            1000,   // maximum number of iterations for the inner solver
                 "OuterIter":            200,    // maximum number of iterations for the outer solver
                 "InnerTol":             0.6,    // tolerance for the inner solver. (! Attention:
@@ -88,7 +100,7 @@
         {
                 "Freq":                 1,      // number of timesteps before the levelset function is
                                                 // reparameterized. Freq = 0 deactivates the reparameterization.
-                "Method":               3,      // Method how to determine distance of frontier vertices and
+                "Method":               11,      // Method how to determine distance of frontier vertices and
                                                 // propagation scheme, see documentation of ReparamFactoryCLfor
                                                 // a detailed description
                 "MinGrad":              0.1,    // minimal allowed norm of the gradient of the levelset function.
@@ -182,12 +194,12 @@
 // surfactant transport
         "SurfTransp":
         {
-                "DoTransp":             0,      // Ensight output (0 = off, 1 = on).
-                "Theta":                0.5,    // name of Ensight case.
-                "Iter":                 1000,   // local directory of Ensight files.
-                "Tol":                  1e-10,  // write out Ensight files in binary format (0 = off, 1 = on).
-                "OmitBound":            -1.0,   // only master writes out Ensight files.
-                "Visc":                 1e-5    // name for the geometry.
+                "DoTransp":             0,      // 
+                "Theta":                0.5,    // 
+                "Iter":                 1000,   // 
+                "Tol":                  1e-10,  // 
+                "OmitBound":            -1.0,   // 
+                "Visc":                 1e-5    // 
         },
 
 

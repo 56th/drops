@@ -384,22 +384,22 @@ private:
     friend class ModifyCL;
     friend class TransferCL;
     friend class OldTransferCL;
-	friend class InterfaceCL;
+    friend class InterfaceCL;
     friend class MultiGridCL;
     friend class SimplexFactoryCL;
 
   private:
     /// \brief RemoteDataListCL
     /** For each simplex type, a single list is stored where list i contains all simplices of dimension i. */
-	RemoteDataListCL remoteData_[4];
+    RemoteDataListCL remoteData_[4];
     RemoteDataCL::LoadVecT loadOfProc_;
 
-	MultiGridCL* mg_; // do we need it?
+    MultiGridCL* mg_; // do we need it?
 
     /// \name singleton pattern
     //@{
     static InfoCL* instance_;
-	InfoCL( MultiGridCL* mg) : loadOfProc_( ProcCL::Size()), mg_(mg) {}
+    InfoCL( MultiGridCL* mg) : loadOfProc_( ProcCL::Size()), mg_(mg) {}
     //@}
 
     InfoCL( const InfoCL&);           // copy ctr not implemented
@@ -411,7 +411,7 @@ private:
   public:
     /// \name Implementing the singleton pattern. So access to this class is only provided via the get instance functions.
     //@{
-	static inline InfoCL& Instance( MultiGridCL* mg=0);
+    static inline InfoCL& Instance( MultiGridCL* mg=0);
     static inline InfoCL* InstancePtr();
     static inline void Destroy() { if (instance_) delete instance_; }
     //@}

@@ -278,7 +278,8 @@ int main (int argc, char** argv)
     // Solve the linear system...
     int max_iter= 200;
     double tol= 1e-16;
-    PCG( M.Data, beta.Data, b.Data, JACPcCL( 1.0), max_iter, tol, /*measure_relative_tol*/ true);
+    JACPcCL pc( 1.0);
+    PCG( M.Data, beta.Data, b.Data, DummyExchangeCL(), pc, max_iter, tol, /*measure_relative_tol*/ true);
     std::cout <<  "iter: " << max_iter << "\ttol: " << tol << '\n';
 
     //Ensight output
