@@ -835,8 +835,8 @@ Vec NEGSPcCL::transp_mul(const Mat& A, const Vec& b, const ExT& rowex, const ExT
 typedef PreGSCL<P_SOR>     SORsmoothCL;
 typedef PreGSCL<P_SGS>     SGSsmoothCL;
 typedef PreGSCL<P_GS>      GSsmoothCL;
-#ifndef _PAR
 typedef PreGSCL<P_SSOR>    SSORsmoothCL;
+#ifndef _PAR
 typedef PreGSCL<P_JOR>     JORsmoothCL;
 typedef PreGSCL<P_JAC0>    JACPcCL;
 #endif
@@ -1101,42 +1101,6 @@ private:
     }
 };
 
-// ***************************************************************************
-/// \brief Class for performing one Step of the SSOR-Iteration
-// ***************************************************************************
-class SSORsmoothCL : public PreBaseCL
-{
-    private:
-        typedef PreBaseCL base_;
-        double  omega_;                                 // overrelaxion-parameter
-
-    public:
-        SSORsmoothCL (double omega=1) : base_(), omega_(omega) {}
-
-        /// \brief Check if return preconditioned vectors are accumulated after calling Apply
-        bool RetAcc() const   { return true; }
-        /// \brief Check if the diagonal of the matrix is needed
-        bool NeedDiag() const { return true; }
-        /// \brief Get overrelaxation parameter
-        double GetOmega() const {return omega_;}
-
-        /// \brief Apply preconditioner: one step of the SSOR-iteration
-        template <typename Mat, typename Vec, typename ExT>
-        void Apply(const Mat& A, Vec &x, const Vec& b, const ExT& ex) const
-        {
-            Assert(mat_version_==A.Version() || !check_mat_version_,
-                   DROPSErrCL("ParJacCL::Apply: Diagonal of actual matrix has not been set"),
-                   DebugNumericC);
-                   ApproxSSOR(A, diag_, x, b, ex, omega_, std::fabs(omega_-1.)>DoubleEpsC);
-        }
-        /// \brief Apply preconditioner: one step of the SSOR-iteration
-        template <typename Vec, typename ExT>
-        void Apply(const MLMatrixCL& A, Vec &x, const Vec& b, const ExT& ex) const
-        {
-            Apply<>(A.GetFinest(), x, b, ex);
-        }
-};
-
 
 // ********************************************************************************
 /// \brief Class for performing one step of the Jacobi-Iteration on a matrix A*A^T
@@ -1277,48 +1241,6 @@ void Jacobi0(const Mat&, const Vec& Diag, Vec& x, const Vec& b, const double ome
         else
             x[i] = b[i] / Diag[i];
     }
-}
-
-// One (approximate) step of the Symmetric-Gauss-Seidel/SSOR method with start vector x
-// some kind of block SSOR, works as smoother but NOT as preconditioner, ToDo: fix it
-template <typename Mat, typename Vec, typename ExT>
-void ApproxSSOR(const Mat& A, const Vec& Diag, Vec& x, const Vec& b, const ExT& ex, const double omega, const double HasOmega)
-{
-    const size_t n= A.num_rows();
-    double aii, sum;
-    Vec y(x);
-
-    for (size_t i=0, nz=0; i<n; ++i) {
-        sum= b[i];
-        const size_t end= A.row_beg( i+1);
-        for (; A.col_ind( nz) != i; ++nz) // This is safe: Without diagonal entry, Gauss-Seidel would explode anyway.
-            sum-= A.val( nz)*x[A.col_ind( nz)];
-        aii= Diag[i];
-        for (; nz<end; ++nz)
-            sum-= A.val( nz)*x[A.col_ind( nz)];
-        x[i]= sum/aii;
-    }
-    ex.Accumulate(x);
-    if (HasOmega)
-        y = x= (1.-omega)*y+omega*x;
-
-    for (size_t i= n, nz= A.row_beg( n); i>0; ) { // This is safe: Without diagonal entry, Gauss-Seidel would explode anyway.
-        --i;
-        double aii, sum= b[i];
-        const size_t beg= A.row_beg( i);
-        for (; A.col_ind( --nz) != i; ) {
-            sum-= A.val( nz)*x[A.col_ind( nz)];
-        }
-        aii= Diag[i];
-        for (; nz>beg; ) {
-            --nz;
-            sum-= A.val( nz)*x[A.col_ind( nz)];
-        }
-        x[i]= sum/aii;
-    }
-    ex.Accumulate(x);
-    if (HasOmega)
-        x= (1.-omega)*y+omega*x;
 }
 
 } // end of namespace DROPS
