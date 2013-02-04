@@ -405,22 +405,20 @@ int main(int argc, char* argv[])
 		cout << "verwendet. Es markiert der Prozessor " << markingproc << "\n" << dline << endl;
 
 		int movedRefNodes=0, movedCoarseNodes=0;
-        int numrefs;
 
-        switch (C.get<int>("Refine.Strategy"))
-        {
-            case 0:  numrefs= markall+markdrop+markcorner; break;
-            case 1:  numrefs=5; break;
-            case 2:  numrefs=markall; break;
-            case 3:  numrefs=markall; break;
-            default: throw DROPSErrCL("Specify the refinement strategy!");
-        }
+//        switch (C.get<int>("Refine.Strategy"))
+//        {
+//            case 0:  numrefs= markall+markdrop+markcorner; break;
+//            case 1:  numrefs=5; break;
+//            case 2:  numrefs=markall; break;
+//            case 3:  numrefs=markall; break;
+//            default: throw DROPSErrCL("Specify the refinement strategy!");
+//        }
 
         DROPS::LoadBalCL LoadBal(mg);
         for (int ref=0; ref<markall+markdrop+markcorner; ++ref)
         {
             DROPS::Point3DCL e, e1;
-            bool marked=false;
             bool killedghost=false;
 
             switch (C.get<int>("Refine.Strategy"))
@@ -451,21 +449,19 @@ int main(int argc, char* argv[])
                     case 0:
                         std::cout << "Mark all "<<std::endl;
                         MarkAll(mg);
-                        marked=true;
                         break;
                     case 1:
                         std::cout << "Mark all"<<std::endl;
                         MarkAll(mg);
-    //                     marked=MarkAround(mg, e1, 0.5);
-                        marked=true;
+    //                     MarkAround(mg, e1, 0.5);
                         break;
                     case 2:
                         std::cout << "Mark around "<<e<<std::endl;
-                        marked=MarkAround(mg, e, 0.5);
+                        MarkAround(mg, e, 0.5);
                         break;
                     case 3:
                         std::cout << "UnMark around "<<e<<std::endl;
-                        marked=UnMarkAround(mg, e, 0.6);
+                        UnMarkAround(mg, e, 0.6);
                         break;
                     case 4:
                         std::cout << "UnMark for ghost tetra kill"<<std::endl;
@@ -483,7 +479,6 @@ int main(int argc, char* argv[])
                     MarkAll(mg);
                 else
                     UnMarkAll(mg);
-                marked=true;
             break;
             }   // end of switch C.Strategy
 

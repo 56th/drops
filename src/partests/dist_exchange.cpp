@@ -498,17 +498,6 @@ int main( int argc, char **argv)
     DROPS::ProcCL::Instance(&argc, &argv);
 #endif
     try {
-        bool binary=true;
-        if ( argc==2){
-            const int arg_binary=atoi(argv[1]);
-            if ( arg_binary==0)
-                binary=false;
-        }
-        else{
-            std::cout << "usage: " << argv[0] << " 0 : for transferring information ASCII based\n"
-                      << "usage: " << argv[0] << " 1 : for transferring information binary based (default)"
-                      << std::endl;
-        }
         DROPS::MultiGridCL* mg= 0;
         DROPS::BuildBrick( mg);
         DROPS::LoadBalCL lb( *mg);      // loadbalancing
