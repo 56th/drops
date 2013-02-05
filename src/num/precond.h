@@ -1031,6 +1031,20 @@ class DummyPcCL
 
 };
 
+// computes an approximation of the largest eigenvalue of D^{-1}A
+template <class ExT>
+double GerschgorinScaledMatrix(const MatrixCL& A, const VectorCL& D, const ExT& ex) {
+    VectorCL y(A.GetLumpedDiag());
+    ex.Accumulate(y);
+    y/=D;
+#ifdef _PAR
+    const double max_lambda = ProcCL::GlobalMax(y.max());
+#else
+    const double max_lambda = y.max();
+#endif
+    return max_lambda;
+}
+
 #ifdef _PAR
 // ***************************************************************************
 /// \brief Class for performing one Step of the Jacobi-Iteration
@@ -1039,10 +1053,11 @@ class JORsmoothCL : public PreBaseCL
 {
   private:
     typedef PreBaseCL base_;
-    double  omega_;                                 // overrelaxion-parameter
+    double  scale_;             // scaling of overrelaxtion-parameter
+    double  omega_;             // overrelaxion-parameter
 
   public:
-    JORsmoothCL (double omega=1) : base_(), omega_(omega) {}
+    JORsmoothCL (double scale=1) : base_(), scale_(scale), omega_(1.0) {}
 
     /// \brief Check if return preconditioned vectors are accumulated after calling Apply
     bool RetAcc() const   { return true; }
@@ -1050,6 +1065,25 @@ class JORsmoothCL : public PreBaseCL
     bool NeedDiag() const { return true; }
     /// \brief Get overrelaxation parameter
     double GetOmega() const {return omega_;}
+
+    /// \brief Set accumulated diagonal of a matrix, that is needed by most of the preconditioners
+    template<typename Mat, typename ExT>
+    void SetDiag(const Mat& A, const ExT& ex)
+    {
+        if (A.Version() == mat_version_)
+            return;
+
+        base_::SetDiag(A, ex);
+        omega_ = 2.0/(GerschgorinScaledMatrix(A, diag_, ex) - 1.0);
+        std::cout << "JORsmoothCL: omega = " << omega_ << std::endl;
+    }
+
+    /// \brief Set accumulated diagonal of a matrix, that is needed by most of the preconditioners
+    template<typename ExT>
+    void SetDiag(const MLMatrixCL& A, const ExT& ex)
+    {
+        SetDiag<>(A.GetFinest(), ex);
+    }
 
     /// \brief Apply preconditioner: one step of the Jacobi-iteration
     template <typename Mat, typename Vec, typename ExT>
@@ -1243,19 +1277,6 @@ void Jacobi0(const Mat&, const Vec& Diag, Vec& x, const Vec& b, const double ome
     }
 }
 
-// computes an approximation of the largest eigenvalue of D^{-1}A
-template <class ExT>
-double GerschgorinScaledMatrix(const MatrixCL& A, const VectorCL& D, const ExT& ex) {
-    VectorCL y(A.GetLumpedDiag());
-    ex.Accumulate(y);
-    y/=D;
-#ifdef _PAR
-    const double max_lambda = ProcCL::GlobalMax(y.max());
-#else
-    const double max_lambda = y.max();
-#endif
-    return max_lambda;
-}
 
 // Chebychev-polynomial based smoother/preconditionier
 template < bool InitialGuess, class Mat, class Vec, class ExT>
@@ -1338,6 +1359,7 @@ class ChebyshevsmoothCL : public PreBaseCL
 
             base_::SetDiag(A, ex);
             lambda_max_ = scale_ * GerschgorinScaledMatrix(A, diag_, ex);
+            std::cout << "ChebyshevsmoothCL: lambda_max = " << lambda_max_ << std::endl;
         }
 
         /// \brief Apply preconditioner: one step of the SSOR-iteration
@@ -1388,6 +1410,7 @@ class ChebyshevPcCL : public PreBaseCL
 
             base_::SetDiag(A, ex);
             lambda_max_ = scale_ * GerschgorinScaledMatrix(A, diag_, ex);
+            std::cout << "ChebyshevPcCL: lambda_max = " << lambda_max_ << std::endl;
         }
 
         /// \brief Set accumulated diagonal of a matrix, that is needed by most of the preconditioners
