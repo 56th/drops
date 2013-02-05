@@ -403,13 +403,20 @@ class RecThetaScheme2PhaseCL: public CoupledTimeDisc2PhaseBaseCL<LsetSolverT, Re
              phidot_;   // time derivate of phi
 
 #ifndef _PAR
-    SSORPcCL mpc_;
-    typedef PCGSolverCL<SSORPcCL> MsolverT;
+    typedef SSORPcCL MPcT;
+    typedef GSPcCL   EPcT;
 #else
-    JACPcCL mpc_;
-    typedef PCGSolverCL<JACPcCL> MsolverT;
+    typedef JACPcCL MPcT;
+    typedef JACPcCL EPcT;
 #endif
+    MPcT mpc_;
+    typedef GMResSolverCL<MPcT> MsolverT;
     MsolverT Msolver_;
+
+    EPcT hpc_;
+    typedef GMResSolverCL<EPcT> EsolverT;
+    EsolverT Esolver_;
+
     ISBBTPreCL ispc_;
     GCRSolverCL<ISBBTPreCL> Ssolver_;
 

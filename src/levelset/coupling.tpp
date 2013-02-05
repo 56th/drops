@@ -1035,7 +1035,7 @@ RecThetaScheme2PhaseCL<LsetSolverT,RelaxationPolicyT>::RecThetaScheme2PhaseCL
     		double dt, double tol, double stk_theta, double ls_theta, double nonlinear, bool withProjection, double stab)
   : base_( Stokes, ls, solver, lsetsolver, lsetmod, dt, tol, nonlinear, withProjection, stab),
     stk_theta_( stk_theta), ls_theta_( ls_theta),
-    mpc_(), Msolver_( mpc_, 200, 1e-10, true),
+    Msolver_( mpc_, 500, 1e-10, true), Esolver_( hpc_, 500, 1e-15, true),
     ispc_( &Stokes_.B.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(), &Stokes_.M.Data.GetFinest(), Stokes_.pr_idx.GetFinest(), 1.0, 0.0, 1e-4, 1e-4),
     Ssolver_( ispc_, 200, 200, 1e-10, true)
 {
@@ -1150,6 +1150,7 @@ void RecThetaScheme2PhaseCL<LsetSolverT,RelaxationPolicyT>::ComputePressure ()
 #else
     SchurComplMatrixCL<MsolverT, MLMatrixCL, DummyExchangeCL> S(Msolver_, Stokes_.M.Data, Stokes_.B.Data, Stokes_.vel_idx.GetEx());
 #endif
+    Msolver_.SetTol( 1e-10);
     Msolver_.Solve( Stokes_.M.Data, b3, b2, Stokes_.vel_idx.GetEx());
     std::cout << "ComputePressure: rhs: iter= " << Msolver_.GetIter() << "\tres= " << Msolver_.GetResid() << '\n';
 
@@ -1176,10 +1177,9 @@ void RecThetaScheme2PhaseCL<LsetSolverT,RelaxationPolicyT>::ComputeDots ()
     Msolver_.Solve( Stokes_.M.Data, vdot_, b2, Stokes_.vel_idx.GetEx());
     std::cout << "ComputeDots: vdot:   iter= " << Msolver_.GetIter() << "\tres= " << Msolver_.GetResid() << std::endl;
 
-    Msolver_.SetTol( 1e-15);
     VectorCL b3 ((-1.0) * (LvlSet_.H * LvlSet_.Phi.Data));
-    Msolver_.Solve( LvlSet_.E, phidot_, b3, LvlSet_.idx.GetEx());
-    std::cout << "ComputeDots: phidot: iter= " << Msolver_.GetIter() << "\tres= " << Msolver_.GetResid() << std::endl;
+    Esolver_.Solve( LvlSet_.E, phidot_, b3, LvlSet_.idx.GetEx());
+    std::cout << "ComputeDots: phidot: iter= " << Esolver_.GetIter() << "\tres= " << Esolver_.GetResid() << std::endl;
 }
 
 template <class LsetSolverT, class RelaxationPolicyT>
