@@ -1243,6 +1243,179 @@ void Jacobi0(const Mat&, const Vec& Diag, Vec& x, const Vec& b, const double ome
     }
 }
 
+// computes an approximation of the largest eigenvalue of D^{-1}A
+template <class ExT>
+double GerschgorinScaledMatrix(const MatrixCL& A, const VectorCL& D, const ExT& ex) {
+    VectorCL y(A.GetLumpedDiag());
+    ex.Accumulate(y);
+    y/=D;
+#ifdef _PAR
+    const double max_lambda = ProcCL::GlobalMax(y.max());
+#else
+    const double max_lambda = y.max();
+#endif
+    return max_lambda;
+}
+
+// Chebychev-polynomial based smoother/preconditionier
+template < bool InitialGuess, class Mat, class Vec, class ExT>
+void Chebyshev(const Mat &A, Vec &x, const Vec &b, const ExT &ex, const Vec& diag, const int PolyDegree, const double LambdaMax, const double EigRatio)
+{
+    if (PolyDegree == 0)
+        return;
+
+    const Vec invDiag(1.0/diag);
+
+    //--- Initialize coefficients
+    const double alpha = LambdaMax / EigRatio;
+    const double beta = LambdaMax;
+    const double delta = 2.0 / (beta - alpha);
+    const double theta = 0.5 * (beta + alpha);
+    const double s1 = theta * delta;
+
+    Vec W(x.size());
+
+    const double oneOverTheta = 1.0/theta;
+
+    Vec res(b.size());
+    // --- Treat the initial guess
+    if (InitialGuess)
+        res = b-A*x;
+    else
+        res = b;
+    W = invDiag * res * oneOverTheta;
+    ex.Accumulate(W);
+
+    if (InitialGuess)
+        x+= W;
+    else
+        x= W;
+
+    //--- Apply the polynomial
+    double rhok = 1.0/s1, rhokp1;
+    double dtemp1, dtemp2;
+    const int degreeMinusOne = PolyDegree - 1;
+
+    for (int k = 0; k < degreeMinusOne; ++k) {
+        res = b-A*x;
+        rhokp1 = 1.0 / (2.0*s1 - rhok);
+        dtemp1 = rhokp1 * rhok;
+        dtemp2 = 2.0 * rhokp1 * delta;
+        rhok = rhokp1;
+        W*=dtemp1;
+        W += dtemp2* invDiag * ex.GetAccumulate(res);
+
+        x+=W;
+      }
+}
+
+// ***************************************************************************
+/// \brief Class for performing Chebychev-polynomial based smoothing
+// ***************************************************************************
+class ChebyshevsmoothCL : public PreBaseCL
+{
+    private:
+        typedef PreBaseCL base_;
+        const double scale_;        // scaling of lambda_max_
+        int degree_;                // degree of used Chebychev polynomial
+        double  EigRatio_;          // ratio between lambda_max and lambda_min
+        double  lambda_max_;        // approximation of largest eigenvalue
+
+    public:
+        ChebyshevsmoothCL (double lambda_scale = 1, int degree = 3, double ratio = 30.0) : base_(), scale_(lambda_scale), degree_(degree), EigRatio_( ratio) {}
+
+        /// \brief Check if return preconditioned vectors are accumulated after calling Apply
+        bool RetAcc() const   { return true; }
+        /// \brief Check if the diagonal of the matrix is needed
+        bool NeedDiag() const { return true; }
+
+        /// \brief Set accumulated diagonal of a matrix, that is needed by most of the preconditioners
+        template<typename Mat, typename ExT>
+        void SetDiag(const Mat& A, const ExT& ex)
+        {
+            if (A.Version() == mat_version_)
+                return;
+
+            base_::SetDiag(A, ex);
+            lambda_max_ = scale_ * GerschgorinScaledMatrix(A, diag_, ex);
+        }
+
+        /// \brief Apply preconditioner: one step of the SSOR-iteration
+        template <typename Mat, typename Vec, typename ExT>
+        void Apply(const Mat& A, Vec &x, const Vec& b, const ExT& ex) const
+        {
+            Assert(mat_version_==A.Version() || !check_mat_version_,
+                   DROPSErrCL("ChebyshevsmoothCL::Apply: Diagonal of actual matrix has not been set"),
+                   DebugNumericC);
+
+            Chebyshev<true, Mat, Vec, ExT>(A, x, b, ex, diag_, degree_, lambda_max_, EigRatio_);
+
+        }
+        /// \brief Apply preconditioner: one step of the SSOR-iteration
+        template <typename Vec, typename ExT>
+        void Apply(const MLMatrixCL& A, Vec &x, const Vec& b, const ExT& ex) const
+        {
+            Apply<>(A.GetFinest(), x, b, ex);
+        }
+};
+
+// ***************************************************************************
+/// \brief Class for performing Chebychev-polynomial based preconditioning
+// ***************************************************************************
+class ChebyshevPcCL : public PreBaseCL
+{
+    private:
+        typedef PreBaseCL base_;
+        const double scale_;        // scaling of lambda_max_
+        int degree_;                // degree of used Chebychev polynomial
+        double  EigRatio_;          // ratio between lambda_max and lambda_min
+        double  lambda_max_;        // approximation of largest eigenvalue
+
+    public:
+        ChebyshevPcCL (double lambda_scale = 1, int degree = 3, double ratio = 30.0) : base_(), scale_(lambda_scale), degree_(degree), EigRatio_( ratio) {}
+
+        /// \brief Check if return preconditioned vectors are accumulated after calling Apply
+        bool RetAcc() const   { return true; }
+        /// \brief Check if the diagonal of the matrix is needed
+        bool NeedDiag() const { return true; }
+
+        /// \brief Set accumulated diagonal of a matrix, that is needed by most of the preconditioners
+        template<typename Mat, typename ExT>
+        void SetDiag(const Mat& A, const ExT& ex)
+        {
+            if (A.Version() == mat_version_)
+                return;
+
+            base_::SetDiag(A, ex);
+            lambda_max_ = scale_ * GerschgorinScaledMatrix(A, diag_, ex);
+        }
+
+        /// \brief Set accumulated diagonal of a matrix, that is needed by most of the preconditioners
+        template<typename ExT>
+        void SetDiag(const MLMatrixCL& A, const ExT& ex)
+        {
+            SetDiag<>(A.GetFinest(), ex);
+        }
+
+        /// \brief Apply preconditioner: one step of the SSOR-iteration
+        template <typename Mat, typename Vec, typename ExT>
+        void Apply(const Mat& A, Vec &x, const Vec& b, const ExT& ex) const
+        {
+            Assert(mat_version_==A.Version() || !check_mat_version_,
+                   DROPSErrCL("ChebyshevsmoothCL::Apply: Diagonal of actual matrix has not been set"),
+                   DebugNumericC);
+
+            Chebyshev<false, Mat, Vec, ExT>(A, x, b, ex, diag_, degree_, lambda_max_, EigRatio_);
+
+        }
+        /// \brief Apply preconditioner: one step of the SSOR-iteration
+        template <typename Vec, typename ExT>
+        void Apply(const MLMatrixCL& A, Vec &x, const Vec& b, const ExT& ex) const
+        {
+            Apply<>(A.GetFinest(), x, b, ex);
+        }
+};
+
 } // end of namespace DROPS
 
 #endif /* PRECOND_H_ */

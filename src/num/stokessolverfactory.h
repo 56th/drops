@@ -194,8 +194,9 @@ class StokesSolverFactoryCL : public StokesSolverFactoryBaseCL<StokesT, Prolonga
     JACPcCL  JACPc_;
     GSPcCL   GSPc_;
 #ifdef _PAR
-    typedef SSORPcCL SymmPcPcT;
+    typedef SSORPcCL      SymmPcPcT;
 #else
+    //typedef ChebyshevPcCL SymmPcPcT;
     typedef JACPcCL  SymmPcPcT;
 #endif
     SymmPcPcT symmPcPc_;
@@ -216,7 +217,8 @@ class StokesSolverFactoryCL : public StokesSolverFactoryBaseCL<StokesT, Prolonga
     ExpensivePreBaseCL *apc_;
     // MultiGrid symm.
 #ifdef _PAR
-    typedef MLSmootherCL<JORsmoothCL> SmootherT;
+    typedef MLSmootherCL<ChebyshevsmoothCL> SmootherT;
+    //typedef MLSmootherCL<JORsmoothCL> SmootherT;
 #else
     typedef MLSmootherCL<SSORsmoothCL> SmootherT;
 #endif
@@ -375,12 +377,7 @@ StokesSolverFactoryCL<StokesT, ProlongationVelT, ProlongationPT>::
         isnonlinearprepc2_( symmPcPc_, 100, P.get<double>("Stokes.PcSTol"), true),
         isnonlinearpc_( isnonlinearprepc1_, isnonlinearprepc2_, Stokes_.prA.Data.GetFinest(), Stokes_.prM.Data.GetFinest(), kA_, kM_),
         // preconditioner for A
-#ifdef _PAR
-        smoother_( 0.8),
-#else
-        smoother_( 1.0),
-#endif
-	coarsesolversymm_( symmPcPc_, 500, 1e-6, true),
+        smoother_( 1.0), coarsesolversymm_( symmPcPc_, 500, 1e-6, true),
         MGSolversymm_ ( smoother_, coarsesolversymm_, P.get<int>("Stokes.PcAIter"), P.get<double>("Stokes.PcATol"), Stokes.vel_idx, false),
         MGPcsymm_( MGSolversymm_),
         coarsesolver_( JACPc_, 500, 500, 1e-6, true),

@@ -111,7 +111,7 @@ class PoissonSolverCL : public PoissonSolverBaseCL
     <tr><td>  4 </td><td> Hypre-AMG           </td><td> GS                   </td></tr>
     <tr><td>  5 </td><td>                     </td><td> SGS                  </td></tr>
     <tr><td>  6 </td><td>                     </td><td> SOR                  </td></tr>
-    <tr><td>  7 </td><td>                     </td><td>                      </td></tr>
+    <tr><td>  7 </td><td>                     </td><td> Chebychev            </td></tr>
     </table>*/
 
 template <class ProlongationT= MLDataCL<ProlongationCL<double> > >
@@ -123,20 +123,26 @@ class PoissonSolverFactoryCL
     ProlongationT* prolongptr_;
 
 // generic preconditioners
-    JACPcCL  JACPc_;
-    SSORPcCL SSORPc_;
+#ifdef _PAR
+    //typedef ChebyshevPcCL CoarseSolverPcT;
+    typedef JACPcCL CoarseSolverPcT;
+#else
+    typedef SSORPcCL      CoarseSolverPcT;
+#endif
+    CoarseSolverPcT genpc_;
+    JACPcCL         JACPc_;
+    SSORPcCL        SSORPc_;
+    ChebyshevPcCL   ChebyPc_;
 
     // MultiGrid symm.
-    MLSmootherCL<JORsmoothCL>  jorsmoother_;   // Jacobi
-    MLSmootherCL<GSsmoothCL>   gssmoother_;    // Gauss-Seidel
-    MLSmootherCL<SGSsmoothCL>  sgssmoother_;   // symmetric Gauss-Seidel
-    MLSmootherCL<SORsmoothCL>  sorsmoother_;   // Gauss-Seidel with over-relaxation
-    MLSmootherCL<SSORsmoothCL> ssorsmoother_;  // symmetric Gauss-Seidel with over-relaxation
-#ifdef _PAR
-    typedef PCGSolverCL<JACPcCL>  CoarseSolverT;
-#else
-    typedef PCGSolverCL<SSORPcCL> CoarseSolverT;
-#endif
+    MLSmootherCL<JORsmoothCL>  jorsmoother_;         // Jacobi
+    MLSmootherCL<GSsmoothCL>   gssmoother_;          // Gauss-Seidel
+    MLSmootherCL<SGSsmoothCL>  sgssmoother_;         // symmetric Gauss-Seidel
+    MLSmootherCL<SORsmoothCL>  sorsmoother_;         // Gauss-Seidel with over-relaxation
+    MLSmootherCL<SSORsmoothCL> ssorsmoother_;        // symmetric Gauss-Seidel with over-relaxation
+    MLSmootherCL<ChebyshevsmoothCL> chebysmoother_;  // Chebychev-polynomial based smoother
+    typedef PCGSolverCL<CoarseSolverPcT> CoarseSolverT;
+
     CoarseSolverT   coarsesolversymm_;
     typedef MGSolverCL<MLSmootherCL<JORsmoothCL>, CoarseSolverT, ProlongationT> MGSolversymmJORT;
     MGSolversymmJORT MGSolversymmJOR_;
@@ -148,6 +154,8 @@ class PoissonSolverFactoryCL
     MGSolversymmSORT MGSolversymmSOR_;
     typedef MGSolverCL<MLSmootherCL<SSORsmoothCL>, CoarseSolverT, ProlongationT> MGSolversymmSSORT;
     MGSolversymmSSORT MGSolversymmSSOR_;
+    typedef MGSolverCL<MLSmootherCL<ChebyshevsmoothCL>, CoarseSolverT, ProlongationT> MGSolversymmChebychevT;
+    MGSolversymmChebychevT MGSolversymmChebychev_;
 
     //JAC-GMRes
     typedef GMResSolverCL<JACPcCL> GMResSolverT;
@@ -156,8 +164,12 @@ class PoissonSolverFactoryCL
     GMResSolverSSORT GMResSolverSSOR_;
 
     //PCG
-    typedef PCGSolverCL<SSORPcCL> PCGSolverT;
-    PCGSolverT PCGSolver_;
+    typedef PCGSolverCL<JACPcCL>       PCGSolverJACT;
+    PCGSolverJACT PCGSolverJAC_;
+    typedef PCGSolverCL<SSORPcCL>      PCGSolverSSORT;
+    PCGSolverSSORT PCGSolverSSOR_;
+    typedef PCGSolverCL<ChebyshevPcCL> PCGSolverChebychevT;
+    PCGSolverChebychevT PCGSolverChebychev_;
 
   public:
     PoissonSolverFactoryCL( ParamCL& P, MLIdxDescCL& idx);
@@ -173,21 +185,20 @@ class PoissonSolverFactoryCL
 template <class ProlongationT>
 PoissonSolverFactoryCL<ProlongationT>::
     PoissonSolverFactoryCL(ParamCL& P, MLIdxDescCL& idx)
-    : P_(P), idx_(idx), prolongptr_( 0), JACPc_( P.get<double>("Poisson.Relax")), SSORPc_( P.get<double>("Poisson.Relax")),
-        jorsmoother_( P.get<double>("Poisson.Relax")), gssmoother_( P.get<double>("Poisson.Relax")), sgssmoother_( P.get<double>("Poisson.Relax")), sorsmoother_( P.get<double>("Poisson.Relax")), ssorsmoother_( P.get<double>("Poisson.Relax")),
-#ifndef _PAR
-        coarsesolversymm_( SSORPc_, 500, 1e-6, true),
-#else
-        coarsesolversymm_( JACPc_, 500, 1e-6, true),
-#endif
+    : P_(P), idx_(idx), prolongptr_( 0), JACPc_( P.get<double>("Poisson.Relax")), SSORPc_( P.get<double>("Poisson.Relax")), ChebyPc_( P.get<double>("Poisson.Relax")),
+        jorsmoother_( P.get<double>("Poisson.Relax")), gssmoother_( P.get<double>("Poisson.Relax")), sgssmoother_( P.get<double>("Poisson.Relax")), sorsmoother_( P.get<double>("Poisson.Relax")), ssorsmoother_( P.get<double>("Poisson.Relax")), chebysmoother_( P.get<double>("Poisson.Relax")),
+        coarsesolversymm_( genpc_, 500, 1e-6, true),
         MGSolversymmJOR_( jorsmoother_, coarsesolversymm_, P.get<int>("Poisson.Iter"), P.get<double>("Poisson.Tol"), idx, P.get<double>("Poisson.RelativeErr"), P.get<int>("Poisson.SmoothingSteps"), P.get<int>("Poisson.NumLvl")),
         MGSolversymmGS_( gssmoother_, coarsesolversymm_, P.get<int>("Poisson.Iter"), P.get<double>("Poisson.Tol"), idx, P.get<double>("Poisson.RelativeErr"), P.get<int>("Poisson.SmoothingSteps"), P.get<int>("Poisson.NumLvl")),
         MGSolversymmSGS_( sgssmoother_, coarsesolversymm_, P.get<int>("Poisson.Iter"), P.get<double>("Poisson.Tol"), idx, P.get<double>("Poisson.RelativeErr"), P.get<int>("Poisson.SmoothingSteps"), P.get<int>("Poisson.NumLvl")),
         MGSolversymmSOR_( sorsmoother_, coarsesolversymm_, P.get<int>("Poisson.Iter"), P.get<double>("Poisson.Tol"), idx, P.get<double>("Poisson.RelativeErr"), P.get<int>("Poisson.SmoothingSteps"), P.get<int>("Poisson.NumLvl")),
         MGSolversymmSSOR_( ssorsmoother_, coarsesolversymm_, P.get<int>("Poisson.Iter"), P.get<double>("Poisson.Tol"), idx, P.get<double>("Poisson.RelativeErr"), P.get<int>("Poisson.SmoothingSteps"), P.get<int>("Poisson.NumLvl")),
+        MGSolversymmChebychev_( chebysmoother_, coarsesolversymm_, P.get<int>("Poisson.Iter"), P.get<double>("Poisson.Tol"), idx, P.get<double>("Poisson.RelativeErr"), P.get<int>("Poisson.SmoothingSteps"), P.get<int>("Poisson.NumLvl")),
         GMResSolver_( JACPc_, P.get<int>("Poisson.Restart"), P.get<int>("Poisson.Iter"), P.get<double>("Poisson.Tol"), P.get<double>("Poisson.RelativeErr")),
         GMResSolverSSOR_( SSORPc_, P.get<int>("Poisson.Restart"), P.get<int>("Poisson.Iter"), P.get<double>("Poisson.Tol"), P.get<double>("Poisson.RelativeErr")),
-        PCGSolver_( SSORPc_, P.get<int>("Poisson.Iter"), P.get<double>("Poisson.Tol"), P.get<double>("Poisson.RelativeErr"))
+        PCGSolverJAC_( JACPc_, P.get<int>("Poisson.Iter"), P.get<double>("Poisson.Tol"), P.get<double>("Poisson.RelativeErr")),
+        PCGSolverSSOR_( SSORPc_, P.get<int>("Poisson.Iter"), P.get<double>("Poisson.Tol"), P.get<double>("Poisson.RelativeErr")),
+        PCGSolverChebychev_( ChebyPc_, P.get<int>("Poisson.Iter"), P.get<double>("Poisson.Tol"), P.get<double>("Poisson.RelativeErr"))
         {}
 
 template <class ProlongationT>
@@ -216,9 +227,15 @@ PoissonSolverBaseCL* PoissonSolverFactoryCL<ProlongationT>::CreatePoissonSolver(
             Poissonsolver = new PoissonSolverCL<MGSolversymmSORT>( MGSolversymmSOR_);
             prolongptr_ = MGSolversymmSOR_.GetProlongation();
         } break;
+        case  107 : {
+            Poissonsolver = new PoissonSolverCL<MGSolversymmChebychevT>( MGSolversymmChebychev_);
+            prolongptr_ = MGSolversymmChebychev_.GetProlongation();
+        } break;
         case  302 : Poissonsolver = new PoissonSolverCL<GMResSolverT>( GMResSolver_);  break;
         case  303 : Poissonsolver = new PoissonSolverCL<GMResSolverSSORT>( GMResSolverSSOR_);  break;
-        case  203 : Poissonsolver = new PoissonSolverCL<PCGSolverT>( PCGSolver_); break;
+        case  202 : Poissonsolver = new PoissonSolverCL<PCGSolverJACT>( PCGSolverJAC_); break;
+        case  203 : Poissonsolver = new PoissonSolverCL<PCGSolverSSORT>( PCGSolverSSOR_); break;
+        case  207 : Poissonsolver = new PoissonSolverCL<PCGSolverChebychevT>( PCGSolverChebychev_); break;
         default: throw DROPSErrCL("PoissonSolverFactoryCL: Unknown Poisson solver");
     }
     return Poissonsolver;
