@@ -1075,7 +1075,8 @@ class JORsmoothCL : public PreBaseCL
 
         base_::SetDiag(A, ex);
         omega_ = 2.0/(GerschgorinScaledMatrix(A, diag_, ex) - 1.0);
-        std::cout << "JORsmoothCL: omega = " << omega_ << std::endl;
+        std::cout << "JORsmoothCL: computed omega is " << omega_ << ", scaled (and used) omega is " << omega_* scale_ << std::endl;
+        omega_ *= scale_;
     }
 
     /// \brief Set accumulated diagonal of a matrix, that is needed by most of the preconditioners
