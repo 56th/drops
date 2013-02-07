@@ -49,8 +49,8 @@ enum BndCondT
     Nat0BC= 21,                  ///< hom.   natural   boundary condition
     NatBC= 23,                   ///< inhom. natural   boundary conditions
     OutflowBC= 21,               ///< same as Nat0BC, for convenience
-	SlipBC= 31,                  ///< Navier-Slip boundary conditions
-	SymmBC= 33,                   ///< Symmetric boundary conditions
+	SlipBC= 18,                  ///< Navier-Slip boundary conditions
+	SymmBC= 19,                   ///< Symmetric boundary conditions
     WallBC= 0,                   ///< same as Dir0BC, for convenience
     NoBC= 98,                    ///< interior simplices
     UndefinedBC_= 99,            ///< ReadMeshBuilderCL: error, unknown bc
