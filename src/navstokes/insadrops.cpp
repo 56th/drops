@@ -285,6 +285,87 @@ namespace DROPS{
 
 typedef PCGSolverCL<SSORPcCL>     PCG_SsorCL;
 
+template <typename PoissonSolverT>
+class UzawaSolverCL : public StokesSolverBaseCL
+{
+  private:
+    PoissonSolverT& _poissonSolver;
+    MatrixCL&       _M;
+    double          _tau;
+
+    template <typename Mat, typename Vec>
+    void doSolve( const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c);
+
+  public:
+    UzawaSolverCL (PoissonSolverT& solver, MatrixCL& M, int maxiter, double tol, double tau= 1.)
+        : StokesSolverBaseCL(maxiter,tol), _poissonSolver(solver), _M(M), _tau(tau) {}
+    UzawaSolverCL (PoissonSolverT& solver, MLMatrixCL& M, int maxiter, double tol, double tau= 1.)
+    : StokesSolverBaseCL(maxiter,tol), _poissonSolver(solver), _M(M.GetFinest()), _tau(tau) {}
+
+
+    double GetTau()            const { return _tau; }
+    void   SetTau( double tau)       { _tau= tau; }
+
+    void Solve( const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p,
+                const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&);
+    void Solve( const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p,
+                const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&);
+};
+
+template <class PoissonSolverT>
+template <typename Mat, typename Vec>
+void UzawaSolverCL<PoissonSolverT>::doSolve(
+    const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c)
+{
+    Vec v_corr(v.size()),
+        p_corr(p.size()),
+        res1(v.size()),
+        res2(p.size());
+
+    double tol= tol_;
+    tol*= tol;
+    Uint output= 50;//max_iter/20;  // nur 20 Ausgaben pro Lauf
+
+    double res1_norm= 0., res2_norm= 0.;
+    for( iter_=0; iter_<maxiter_; ++iter_) {
+        z_xpay(res2, B*v, -1.0, c);
+        res2_norm= norm_sq( res2);
+        _poissonSolver.SetTol( std::sqrt( res2_norm)/20.0);
+        _poissonSolver.Solve(_M, p_corr, res2, DummyExchangeCL());
+//        p+= _tau * p_corr;
+        axpy(_tau, p_corr, p);
+//        res1= A*v + transp_mul(B,p) - b;
+        z_xpaypby2(res1, A*v, 1.0, transp_mul(B,p), -1.0, b);
+        res1_norm= norm_sq( res1);
+        if (res1_norm + res2_norm < tol) {
+            res_= std::sqrt( res1_norm + res2_norm );
+            return;
+        }
+        if( (iter_%output)==0)
+            std::cout << "step " << iter_ << ": norm of 1st eq= " << std::sqrt( res1_norm)
+                      << ", norm of 2nd eq= " << std::sqrt( res2_norm) << std::endl;
+
+        _poissonSolver.SetTol( std::sqrt( res1_norm)/20.0);
+        _poissonSolver.Solve( A, v_corr, res1, DummyExchangeCL());
+        v-= v_corr;
+    }
+    res_= std::sqrt( res1_norm + res2_norm );
+}
+
+template <class PoissonSolverT>
+void UzawaSolverCL<PoissonSolverT>::Solve(
+    const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&)
+{
+    doSolve( A, B, v, p, b, c);
+}
+
+template <class PoissonSolverT>
+void UzawaSolverCL<PoissonSolverT>::Solve(
+    const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&)
+{
+    doSolve( A, B, v, p, b, c);
+}
+
 class Uzawa_PCG_CL : public UzawaSolverCL<PCG_SsorCL>
 {
   private:

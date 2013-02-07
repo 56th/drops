@@ -42,11 +42,12 @@ class NSSolverBaseCL : public SolverBaseCL
   protected:
     NavStokesT& NS_;
     StokesSolverBaseCL& solver_;
-    using SolverBaseCL::_iter;
-    using SolverBaseCL::_maxiter;
-    using SolverBaseCL::_tol;
-    using SolverBaseCL::_res;
+    using SolverBaseCL::iter_;
+    using SolverBaseCL::maxiter_;
+    using SolverBaseCL::tol_;
+    using SolverBaseCL::res_;
     using SolverBaseCL::rel_;
+    using SolverBaseCL::output_;
 
   public:
     NSSolverBaseCL (NavStokesT& NS, StokesSolverBaseCL& solver, int maxiter= -1, double tol= -1.0, bool rel= false)
@@ -61,16 +62,30 @@ class NSSolverBaseCL : public SolverBaseCL
 
     /// solves the system   A v + BT p = b
     ///                     B v        = c
+#ifdef _PAR
     virtual void Solve (const MatrixCL& A, const MatrixCL& B, VecDescCL& v, VectorCL& p,
-        const VectorCL& b, VecDescCL& cplN, const VectorCL& c, double)
+        const VectorCL& b, VecDescCL& cplN, const VectorCL& c, const ExchangeCL& vel_ex, const ExchangeCL& pr_ex, double)
     {
-        solver_.Solve( A, B, v.Data, p, b, c);
+        solver_.Solve( A, B, v.Data, p, b, c, vel_ex, pr_ex);
         cplN.Data= 0.;
     }
     virtual void Solve (const MLMatrixCL& A, const MLMatrixCL& B, VecDescCL& v, VectorCL& p,
-        const VectorCL& b, VecDescCL& cplN, const VectorCL& c, double)
+        const VectorCL& b, VecDescCL& cplN, const VectorCL& c, const ExchangeCL& vel_ex, const ExchangeCL& pr_ex, double)
     {
-        solver_.Solve( A, B, v.Data, p, b, c);
+        solver_.Solve( A, B, v.Data, p, b, c, vel_ex, pr_ex);
+        cplN.Data= 0.;
+    }
+#endif
+    virtual void Solve (const MatrixCL& A, const MatrixCL& B, VecDescCL& v, VectorCL& p,
+        const VectorCL& b, VecDescCL& cplN, const VectorCL& c, const DummyExchangeCL& vel_ex, const DummyExchangeCL& pr_ex, double)
+    {
+        solver_.Solve( A, B, v.Data, p, b, c, vel_ex, pr_ex);
+        cplN.Data= 0.;
+    }
+    virtual void Solve (const MLMatrixCL& A, const MLMatrixCL& B, VecDescCL& v, VectorCL& p,
+        const VectorCL& b, VecDescCL& cplN, const VectorCL& c, const DummyExchangeCL& vel_ex, const DummyExchangeCL& pr_ex, double)
+    {
+        solver_.Solve( A, B, v.Data, p, b, c, vel_ex, pr_ex);
         cplN.Data= 0.;
     }
 };
@@ -93,10 +108,11 @@ class AdaptFixedPtDefectCorrCL : public NSSolverBaseCL<NavStokesT>
     typedef NSSolverBaseCL<NavStokesT> base_;
     using base_::NS_;
     using base_::solver_;
-    using base_::_iter;
-    using base_::_maxiter;
-    using base_::_tol;
-    using base_::_res;
+    using base_::iter_;
+    using base_::maxiter_;
+    using base_::tol_;
+    using base_::res_;
+    using base_::output_;
 
     MLMatrixCL* AN_;
 
@@ -111,18 +127,45 @@ class AdaptFixedPtDefectCorrCL : public NSSolverBaseCL<NavStokesT>
     ~AdaptFixedPtDefectCorrCL() { delete AN_; }
 
     void SetReduction( double red) { red_= red; }
-    double   GetResid ()         const { return _res; }
-    int      GetIter  ()         const { return _iter; }
+    double   GetResid ()         const { return res_; }
+    int      GetIter  ()         const { return iter_; }
 
     const MLMatrixCL* GetAN()          { return AN_; }
 
     /// solves the system   [A + alpha*N] v + BT p = b + alpha*cplN
     ///                                 B v        = c
     /// (param. alpha is used for time integr. schemes)
+    template <typename ExT>
     void Solve( const MatrixCL& A, const MatrixCL& B, VecDescCL& v, VectorCL& p,
-                const VectorCL& b, VecDescCL& cplN, const VectorCL& c, double alpha= 1.);
+                const VectorCL& b, VecDescCL& cplN, const VectorCL& c, const ExT& vel_ex, const ExT& pr_ex, double alpha= 1.);
+    template <typename ExT>
     void Solve( const MLMatrixCL& A, const MLMatrixCL& B, VecDescCL& v, VectorCL& p,
-                const VectorCL& b, VecDescCL& cplN, const VectorCL& c, double alpha= 1.);
+                const VectorCL& b, VecDescCL& cplN, const VectorCL& c, const ExT& vel_ex, const ExT& pr_ex, double alpha= 1.);
+
+#ifdef _PAR
+    void Solve( const MatrixCL& A, const MatrixCL& B, VecDescCL& v, VectorCL& p,
+                const VectorCL& b, VecDescCL& cplN, const VectorCL& c, const ExchangeCL& vel_ex, const ExchangeCL& pr_ex, double alpha= 1.)
+    {
+        Solve<>(A, B, v, p, b, cplN, c, vel_ex, pr_ex, alpha);
+    }
+
+    void Solve( const MLMatrixCL& A, const MLMatrixCL& B, VecDescCL& v, VectorCL& p,
+                const VectorCL& b, VecDescCL& cplN, const VectorCL& c, const ExchangeCL& vel_ex, const ExchangeCL& pr_ex, double alpha= 1.)
+    {
+        Solve<>(A, B, v, p, b, cplN, c, vel_ex, pr_ex, alpha);
+    }
+#endif
+    void Solve( const MatrixCL& A, const MatrixCL& B, VecDescCL& v, VectorCL& p,
+                const VectorCL& b, VecDescCL& cplN, const VectorCL& c, const DummyExchangeCL& vel_ex, const DummyExchangeCL& pr_ex, double alpha= 1.)
+    {
+        Solve<>(A, B, v, p, b, cplN, c, vel_ex, pr_ex, alpha);
+    }
+    void Solve( const MLMatrixCL& A, const MLMatrixCL& B, VecDescCL& v, VectorCL& p,
+                const VectorCL& b, VecDescCL& cplN, const VectorCL& c, const DummyExchangeCL& vel_ex, const DummyExchangeCL& pr_ex, double alpha= 1.)
+    {
+        Solve<>(A, B, v, p, b, cplN, c, vel_ex, pr_ex, alpha);
+    }
+
 };
 
 
@@ -145,10 +188,8 @@ class LineSearchPolicyCL
 #endif
         {}
 
-    /// \todo (merge) More "const" in Update make it easier to see, that no parameter vectors changes ...
     template<class NavStokesT>
-      void
-      Update (NavStokesT&, const MatrixCL&, const MatrixCL&,
+    void Update (NavStokesT&, const MatrixCL&, const MatrixCL&,
         const VecDescCL&, const VectorCL&, const VectorCL&, VecDescCL&, const VectorCL&,
         const VectorCL&, const VectorCL&, double);
 
@@ -162,8 +203,7 @@ class FixedPolicyCL
     FixedPolicyCL (size_t, size_t) {}
 
     template<class NavStokesT>
-      void
-      Update (NavStokesT&, const MatrixCL&, const MatrixCL&,
+    void Update (NavStokesT&, const MatrixCL&, const MatrixCL&,
         const VecDescCL&, const VectorCL&, const VectorCL&, VecDescCL&, const VectorCL&,
         const VectorCL&, const VectorCL&, double) {}
 
@@ -172,7 +212,7 @@ class FixedPolicyCL
 
 /// \brief Compute the relaxation factor in AdapFixedPtDefectCorrCL by Aitken's delta-squared method.
 ///
-/// This vector version of classical delta-squared concergence-acceleration computes the
+/// This vector version of classical delta-squared convergence-acceleration computes the
 /// relaxation factor in span{ (w, q)^T}.
 class DeltaSquaredPolicyCL
 {
@@ -190,8 +230,7 @@ class DeltaSquaredPolicyCL
           w_diff_( vsize), q_diff_( psize) {}
 
     template<class NavStokesT>
-      void
-      Update (NavStokesT& ns, const MatrixCL& A, const MatrixCL& B,
+    void Update (NavStokesT& ns, const MatrixCL& A, const MatrixCL& B,
         const VecDescCL& v, const VectorCL& p, const VectorCL& b, VecDescCL& cplN, const VectorCL& c,
         const VectorCL& w, const VectorCL& q, double alpha);
 
@@ -202,8 +241,7 @@ class DeltaSquaredPolicyCL
 //     template definitions
 //=================================
 template<class NavStokesT>
-  inline void
-  LineSearchPolicyCL::Update (NavStokesT& ns, const MatrixCL& A, const MatrixCL& B,
+inline void LineSearchPolicyCL::Update (NavStokesT& ns, const MatrixCL& A, const MatrixCL& B,
     const VecDescCL& v, const VectorCL& p, const VectorCL& b, VecDescCL& cplN, const VectorCL& c,
     const VectorCL& w, const VectorCL& q, double alpha)
 // accumulated and non accumulated vectors:
@@ -236,8 +274,7 @@ template<class NavStokesT>
 }
 
 template<class NavStokesT>
-  inline void
-  DeltaSquaredPolicyCL::Update (__UNUSED__ NavStokesT& ns, const MatrixCL&, const MatrixCL&,
+inline void DeltaSquaredPolicyCL::Update (__UNUSED__ NavStokesT& ns, const MatrixCL&, const MatrixCL&,
     const VecDescCL&, const VectorCL&, const VectorCL&, VecDescCL&, const VectorCL&,
     const VectorCL& w, const VectorCL& q, double)
 {
@@ -262,50 +299,42 @@ template<class NavStokesT>
 }
 
 template<class NavStokesT, class RelaxationPolicyT>
-void
-AdaptFixedPtDefectCorrCL<NavStokesT, RelaxationPolicyT>::Solve(
+template<typename ExT>
+void AdaptFixedPtDefectCorrCL<NavStokesT, RelaxationPolicyT>::Solve(
     const MatrixCL& A, const MatrixCL& B, VecDescCL& v, VectorCL& p,
-    const VectorCL& b, VecDescCL& cplN, const VectorCL& c, double alpha)
+    const VectorCL& b, VecDescCL& cplN, const VectorCL& c, const ExT& ExVel, const ExT& ExPr, double alpha)
 {
     VectorCL d( v.Data.size()), e( p.size()),
              w( v.Data.size()), q( p.size());
     RelaxationPolicyT relax( v.Data.size(), p.size());
-#ifdef _PAR
-    VectorCL d_acc( v.Data.size()), e_acc( p.size()),
-             w_acc( v.Data.size()), q_acc( p.size());
-    ExchangeCL& ExVel= NS_.vel_idx.GetEx();
-    ExchangeCL& ExPr = NS_.pr_idx.GetEx();
-#endif
+
     double res0= 1.;
     int oseenIter= 0;
-    _iter= 0;
-    for(;;++_iter) { // ever
+    iter_= 0;
+    for(;;++iter_) { // ever
         NS_.SetupNonlinear(&NS_.N, &v, &cplN);
-        //std::cout << "sup_norm : N: " << supnorm( _NS.N.Data) << std::endl;
+        //if (output_) (*output_) << "sup_norm : N: " << supnorm( _NS.N.Data) << std::endl;
         AN_->GetFinest().LinComb( 1., A, alpha, NS_.N.Data.GetFinest());
 
         // calculate defect:
         d= *AN_*v.Data + transp_mul( B, p) - b - alpha*cplN.Data;
         e= B*v.Data - c;
-#ifndef _PAR
-        _res= std::sqrt( norm_sq( d) + norm_sq( e) );
-#else
-        _res= std::sqrt( ExVel.Norm_sq(d, false, &d_acc) + ExPr.Norm_sq(e, false, &e_acc) );
-#endif
-        /// \todo(merge) Do we need this output? Or should/could we use the (*output_)?
-        std::cout << _iter << ": res = " << _res << " reltol: " << this->GetRelError() << std::endl;
-        if (this->GetRelError() == true && _iter == 0)
-            res0= _res;
-        if (_res < _tol*res0 || _iter>=_maxiter) // if absolute errors are required, res0==1.
+
+        res_= std::sqrt( ExVel.Norm_sq(d, false) + ExPr.Norm_sq(e, false) );
+
+        if (output_) (*output_) << iter_ << ": res = " << res_ << " reltol: " << this->GetRelError() << std::endl;
+        if (this->GetRelError() == true && iter_ == 0)
+            res0= res_;
+        if (res_ < tol_*res0 || iter_>=maxiter_) // if absolute errors are required, res0==1.
             break;
 
         // solve correction:
-        double outer_tol= _res*red_;
-        if (outer_tol < 0.5*_tol && this->GetRelError() == false)
-            outer_tol= 0.5*_tol;
+        double outer_tol= res_*red_;
+        if (outer_tol < 0.5*tol_ && this->GetRelError() == false)
+            outer_tol= 0.5*tol_;
         solver_.SetTol( outer_tol);
         w= 0.0; q= 0.0;
-        solver_.Solve( AN_->GetFinest(), B, w, q, d, e); // solver_ should use a relative termination criterion.
+        solver_.Solve( AN_->GetFinest(), B, w, q, d, e, ExVel, ExPr); // solver_ should use a relative termination criterion.
         oseenIter+= solver_.GetIter();
 
         // calculate step length omega:
@@ -313,57 +342,49 @@ AdaptFixedPtDefectCorrCL<NavStokesT, RelaxationPolicyT>::Solve(
 
         // update solution:
         const double omega( relax.RelaxFactor());
-        std::cout << "omega = " << omega << std::endl;
+        if (output_) (*output_) << "omega = " << omega << std::endl;
         v.Data-= omega*w;
         p     -= omega*q;
     }
-      std::cout << "overall iterations of Oseen solver:\t" << oseenIter << std::endl;
+    if (output_) (*output_) << "overall iterations of Oseen solver:\t" << oseenIter << std::endl;
 }
 
 template<class NavStokesT, class RelaxationPolicyT>
-void
-AdaptFixedPtDefectCorrCL<NavStokesT, RelaxationPolicyT>::Solve(
+template<typename ExT>
+void AdaptFixedPtDefectCorrCL<NavStokesT, RelaxationPolicyT>::Solve(
     const MLMatrixCL& A, const MLMatrixCL& B, VecDescCL& v, VectorCL& p,
-    const VectorCL& b, VecDescCL& cplN, const VectorCL& c, double alpha)
+    const VectorCL& b, VecDescCL& cplN, const VectorCL& c, const ExT& ExVel, const ExT& ExPr, double alpha)
 {
     VectorCL d( v.Data.size()), e( p.size()),
              w( v.Data.size()), q( p.size());
     RelaxationPolicyT relax( v.Data.size(), p.size());
-#ifdef _PAR
-    VectorCL d_acc( v.Data.size()), e_acc( p.size()),
-             w_acc( v.Data.size()), q_acc( p.size());
-    ExchangeCL& ExVel= NS_.vel_idx.GetEx();
-    ExchangeCL& ExPr = NS_.pr_idx.GetEx();
-#endif
+
     double res0= 1.;
     int oseenIter= 0;
 
-    _iter= 0;
-    for(;;++_iter) { // ever
+    iter_= 0;
+    for(;;++iter_) { // ever
         NS_.SetupNonlinear(&NS_.N, &v, &cplN);
-        //std::cout << "sup_norm : N: " << supnorm( _NS.N.Data) << std::endl;
+        //if (output_) (*output_) << "sup_norm : N: " << supnorm( _NS.N.Data) << std::endl;
         AN_->LinComb( 1., A, alpha, NS_.N.Data);
         // calculate defect:
         d= *AN_*v.Data + transp_mul( B, p) - b - alpha*cplN.Data;
         e= B*v.Data - c;
-#ifndef _PAR
-        _res= std::sqrt( norm_sq( d) + norm_sq( e) );
-#else
-        _res= std::sqrt( ExVel.Norm_sq(d, false, &d_acc) + ExPr.Norm_sq(e, false, &e_acc) );
-#endif
-        std::cout << _iter << ": res = " << _res << " reltol: " << this->GetRelError() << std::endl;
-        if (this->GetRelError() == true && _iter == 0)
-            res0= _res;
-        if (_res < _tol*res0 || _iter>=_maxiter) // if absolute errors are required, res0==1.
+        res_= std::sqrt( ExVel.Norm_sq(d, false) + ExPr.Norm_sq(e, false) );
+
+        if (output_) (*output_) << iter_ << ": res = " << res_ << " reltol: " << this->GetRelError() << std::endl;
+        if (this->GetRelError() == true && iter_ == 0)
+            res0= res_;
+        if (res_ < tol_*res0 || iter_>=maxiter_) // if absolute errors are required, res0==1.
             break;
 
         // solve correction:
-        double outer_tol= _res*red_;
-        if (outer_tol < 0.5*_tol && this->GetRelError() == false)
-            outer_tol= 0.5*_tol;
+        double outer_tol= res_*red_;
+        if (outer_tol < 0.5*tol_ && this->GetRelError() == false)
+            outer_tol= 0.5*tol_;
         w= 0.0; q= 0.0;
         solver_.SetTol( outer_tol);
-        solver_.Solve( *AN_, B, w, q, d, e); // solver_ should use a relative termination criterion.
+        solver_.Solve( *AN_, B, w, q, d, e, ExVel, ExPr); // solver_ should use a relative termination criterion.
         oseenIter+= solver_.GetIter();
 
         // calculate step length omega:
@@ -371,11 +392,11 @@ AdaptFixedPtDefectCorrCL<NavStokesT, RelaxationPolicyT>::Solve(
 
         // update solution:
         const double omega( relax.RelaxFactor());
-        std::cout << "omega = " << omega << std::endl;
+        if (output_) (*output_) << "omega = " << omega << std::endl;
         v.Data-= omega*w;
         p     -= omega*q;
     }
-    std::cout << "overall iterations of Oseen solver:\t" << oseenIter << std::endl;
+    if (output_) (*output_) << "overall iterations of Oseen solver:\t" << oseenIter << std::endl;
 }
 
 }    // end of namespace DROPS

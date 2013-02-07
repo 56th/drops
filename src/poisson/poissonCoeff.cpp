@@ -24,31 +24,10 @@
 
 #include "misc/funcmap.h"
 #include "misc/params.h"
-#include "poisson/poissonCoeff.h"
 #define PI 3.14159265
 
 //======================================================================================================================
-//                                  static members declarations of poissonCoeff class
-//======================================================================================================================
-
-namespace DROPS{
-ParamCL PoissonCoeffCL::C_;
-double PoissonCoeffCL::dx_;
-double PoissonCoeffCL::dy_;
-int PoissonCoeffCL::nx_;
-int PoissonCoeffCL::ny_;
-double PoissonCoeffCL::dt_;
-scalar_tetra_function PoissonCoeffCL::q;
-double PoissonCoeffCL::alpha;
-scalar_tetra_function PoissonCoeffCL::f;
-scalar_tetra_function PoissonCoeffCL::Solution;
-instat_scalar_fun_ptr PoissonCoeffCL::InitialCondition;
-vector_tetra_function PoissonCoeffCL::Vel;
-instat_scalar_fun_ptr PoissonCoeffCL::interface;
-}
-
-//======================================================================================================================
-//                                  special Functions for scalar.cpp
+//                                  special Functions for scalar
 //======================================================================================================================
 
 extern DROPS::ParamCL P;

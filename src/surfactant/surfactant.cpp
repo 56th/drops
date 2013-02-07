@@ -29,6 +29,7 @@
 #include "levelset/adaptriang.h"
 #include "levelset/surfacetension.h"
 #include "out/ensightOut.h"
+#include "misc/dynamicload.h"
 
 #include <fstream>
 
@@ -324,6 +325,9 @@ int main (int argc, char* argv[])
     param >> P;
     param.close();
     std::cout << P << std::endl;
+
+    DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
+
     ensf= P.get<std::string>("EnsightDir") + "/" + P.get<std::string>("EnsightCase"); // basename of the ensight files
 
     std::cout << "Setting up interface-PDE:\n";
@@ -385,7 +389,7 @@ int main (int argc, char* argv[])
     SurfSolverT surfsolver( surfpc, P.get<int>("SurfTransp.Iter"), P.get<double>("SurfTransp.Tol"), true);
 
     DROPS::VecDescCL x( &ifaceidx);
-    surfsolver.Solve( L, x.Data, b.Data);
+    surfsolver.Solve( L, x.Data, b.Data, x.RowIdx->GetEx());
     std::cout << "Iter: " << surfsolver.GetIter() << "\tres: " << surfsolver.GetResid() << '\n';
 
     DROPS::WriteToFile( x.Data, "x_iface.txt", "solution");

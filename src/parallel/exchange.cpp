@@ -23,9 +23,9 @@
 */
 
 #ifdef _PAR
-#  include "parallel/exchange.h"
-#  include "parallel/parmultigrid.h"
-#endif
+#include "parallel/exchange.h"
+#include "parallel/parmultigrid.h"
+
 #include <iomanip>
 #include <map>
 #include <limits>
@@ -525,14 +525,14 @@ void ExchangeCL::clear()
 * E X C H A N G E  B L O C K  C L A S S                                     *
 ****************************************************************************/
 
-void ExchangeBlockCL::AttachTo(const IdxDescCL& idx)
+void ExchangeBlockCL::AttachTo(const ExchangeCL& ex)
 /** Beside attaching the index describer to the known indices, this functions fill
     the offsets array and link the receive buffer to allocated memory in the
     corresponding ExchangeCL s.
-    \param[in] idx new index description
+    \param[in] ex new exchangecl
 */
 {
-    idxDesc_.push_back(&idx);
+    exchange_.push_back(&ex);
     Update();
 }
 
@@ -542,26 +542,26 @@ void ExchangeBlockCL::Update()
     corresponding index describers has been changed
 */
 {
-    blockOffset_.resize( idxDesc_.size()+1);
+    blockOffset_.resize( exchange_.size()+1);
 
     // fill block offsets
     blockOffset_[0]=0;
     for (size_t i=1; i<blockOffset_.size(); ++i) {
-        blockOffset_[i]= blockOffset_[i-1] + idxDesc_[i-1]->NumUnknowns();
+        blockOffset_[i]= blockOffset_[i-1] + exchange_[i-1]->GetNum();
     }
 
     // Set buffers
     xBuf_.resize( GetNumBlocks());
     yBuf_.resize( GetNumBlocks());
     for ( size_t i=0; i<GetNumBlocks(); ++i) {
-        xBuf_[i]= &(idxDesc_[i]->GetEx().xBuf_);
-        yBuf_[i]= &(idxDesc_[i]->GetEx().yBuf_);
+        xBuf_[i]= &(exchange_[i]->xBuf_);
+        yBuf_[i]= &(exchange_[i]->yBuf_);
     }
 
     // Check if all ExchangeCLs have the same communication pattern
-    bool comm= idxDesc_[0]->GetEx().CommViaOwner();
+    bool comm= exchange_[0]->CommViaOwner();
     for ( size_t i=1; i<GetNumBlocks(); ++i) {
-        if ( comm!=idxDesc_[i]->GetEx().CommViaOwner())
+        if ( comm!=exchange_[i]->CommViaOwner())
             throw DROPSErrCL("ExchangeBlockCL::Update: All ExchangeCLs must have \
                              the same communication pattern");
     }
@@ -574,7 +574,7 @@ void ExchangeBlockCL::InitComm(
 /** For a detailed description, see ExchangeCL::InitComm. */
 {
     for ( size_t j=0; j<GetNumBlocks(); ++j) {
-        const ExchangeCL& ex= idxDesc_[j]->GetEx();
+        const ExchangeCL& ex= *exchange_[j];
         // set iterators for sending
         ExchangeCL::SendListT::const_iterator sendit=
             (Phase==1) ? ex.sendListPhase1_.begin() : ex.sendListPhase2_.begin();
@@ -605,7 +605,7 @@ void ExchangeBlockCL::DoAllAccumulations( VectorCL& v, const BufferListT& buf) c
 /** For a detailed description, see ExchangeCL::DoAllAccumulations. */
 {
     for ( size_t j=0; j<GetNumBlocks(); ++j) {
-        const ExchangeCL& ex= idxDesc_[j]->GetEx();
+        const ExchangeCL& ex= *exchange_[j];
         ex.DoAllAccumulations( v, *buf[j], blockOffset_[j]);
     }
 }
@@ -614,7 +614,7 @@ void ExchangeBlockCL::DoAllAssigning( VectorCL& v, const BufferListT& buf) const
 /** For a detailed description, see ExchangeCL::DoAllAssigning. */
 {
     for ( size_t j=0; j<GetNumBlocks(); ++j) {
-        const ExchangeCL& ex= idxDesc_[j]->GetEx();
+        const ExchangeCL& ex= *exchange_[j];
         ex.DoAllAssigning( v, *buf[j], blockOffset_[j]);
     }
 }
@@ -623,7 +623,7 @@ double ExchangeBlockCL::LocalDotNoAccumulation(const VectorCL& x, const VectorCL
 {
     double sum=0.0;
     for ( size_t j=0; j<GetNumBlocks(); ++j) {
-        const ExchangeCL& ex= idxDesc_[j]->GetEx();
+        const ExchangeCL& ex= *exchange_[j];
         sum= KahanInnerProd( x, y, ex.LocalIndex.begin(), ex.LocalIndex.end(),
             sum, blockOffset_[j]);
         sum= KahanInnerProd( x, y, ex.OwnerDistrIndex.begin(), ex.OwnerDistrIndex.end(),
@@ -649,12 +649,12 @@ double ExchangeBlockCL::LocalDotOneAccumulation(
         y_acc_created= true;
         y_acc= new VectorCL(y);
     }
-    const bool doSecondComm= !y_acc_created && idxDesc_[0]->GetEx().CommViaOwner();
+    const bool doSecondComm= !y_acc_created && exchange_[0]->CommViaOwner();
 
     RequestListT sendreq1( GetNumBlocks()), sendreq2( GetNumBlocks()), recvreq( GetNumBlocks());
     // Send distributed entries to the owners
     for ( size_t j=0; j<GetNumBlocks(); ++j) {
-        const ExchangeCL& ex= idxDesc_[j]->GetEx();
+        const ExchangeCL& ex= *exchange_[j];
         sendreq1[j].resize( ex.sendListPhase1_.size());
         recvreq[j].resize( ex.recvListPhase1_.size());
         ex.InitComm( 1, y, Addr(sendreq1[j]), Addr(recvreq[j]), *yBuf_[j],
@@ -662,7 +662,7 @@ double ExchangeBlockCL::LocalDotOneAccumulation(
     }
 
     for ( size_t j=0; j<GetNumBlocks(); ++j) {
-        const ExchangeCL& ex= idxDesc_[j]->GetEx();
+        const ExchangeCL& ex= *exchange_[j];
         result= KahanInnerProd( x, y, ex.LocalIndex.begin(),
             ex.LocalIndex.end(), result, blockOffset_[j]);
     }
@@ -678,7 +678,7 @@ double ExchangeBlockCL::LocalDotOneAccumulation(
     // Here, the buffer for y can be re-used.
     if ( doSecondComm) {
         for ( size_t j=0; j<GetNumBlocks(); ++j) {
-            const ExchangeCL& ex= idxDesc_[j]->GetEx();
+            const ExchangeCL& ex= *exchange_[j];
             sendreq2[j].resize( ex.sendListPhase2_.size());
             recvreq[j].resize( ex.recvListPhase2_.size());
             ex.InitComm( 2, *y_acc, Addr(sendreq2[j]), Addr(recvreq[j]), *yBuf_[j],
@@ -688,7 +688,7 @@ double ExchangeBlockCL::LocalDotOneAccumulation(
 
     // While communication accumulated values, do product on distributed elements
     for ( size_t j=0; j<GetNumBlocks(); ++j) {
-        const ExchangeCL& ex= idxDesc_[j]->GetEx();
+        const ExchangeCL& ex= *exchange_[j];
         result= KahanInnerProd( x, *y_acc, ex.OwnerDistrIndex.begin(),
             ex.OwnerDistrIndex.end(), result, blockOffset_[j]);
     }
@@ -728,12 +728,12 @@ double ExchangeBlockCL::LocalNormSQAccumulation( const VectorCL& x, VectorCL* x_
         x_acc_created= true;
         x_acc= new VectorCL(x);
     }
-    const bool doSecondComm= !x_acc_created && idxDesc_[0]->GetEx().CommViaOwner();
+    const bool doSecondComm= !x_acc_created && exchange_[0]->CommViaOwner();
 
     RequestListT sendreq1( GetNumBlocks()), sendreq2( GetNumBlocks()), recvreq( GetNumBlocks());
     // Send distributed entries to the owners
     for ( size_t j=0; j<GetNumBlocks(); ++j) {
-        const ExchangeCL& ex= idxDesc_[j]->GetEx();
+        const ExchangeCL& ex= *exchange_[j];
         sendreq1[j].resize( ex.sendListPhase1_.size());
         recvreq[j].resize( ex.recvListPhase1_.size());
         ex.InitComm( 1, x, Addr(sendreq1[j]), Addr(recvreq[j]), *xBuf_[j],
@@ -742,7 +742,7 @@ double ExchangeBlockCL::LocalNormSQAccumulation( const VectorCL& x, VectorCL* x_
 
     // While communicating, do product on local elements
     for ( size_t j=0; j<GetNumBlocks(); ++j) {
-        const ExchangeCL& ex= idxDesc_[j]->GetEx();
+        const ExchangeCL& ex= *exchange_[j];
         result= KahanInnerProd( x, x, ex.LocalIndex.begin(),
             ex.LocalIndex.end(), result, blockOffset_[j]);
     }
@@ -756,7 +756,7 @@ double ExchangeBlockCL::LocalNormSQAccumulation( const VectorCL& x, VectorCL* x_
     // Init Second transfer phase only if accumulated version of x is requested
     if ( doSecondComm) {
         for ( size_t j=0; j<GetNumBlocks(); ++j) {
-            const ExchangeCL& ex= idxDesc_[j]->GetEx();
+            const ExchangeCL& ex= *exchange_[j];
             sendreq2[j].resize( ex.sendListPhase2_.size());
             recvreq[j].resize( ex.recvListPhase2_.size());
             ex.InitComm( 2, *x_acc, Addr(sendreq2[j]), Addr(recvreq[j]), *xBuf_[j],
@@ -766,7 +766,7 @@ double ExchangeBlockCL::LocalNormSQAccumulation( const VectorCL& x, VectorCL* x_
 
     // While communication accumulated values, do product on distributed elements
     for ( size_t j=0; j<GetNumBlocks(); ++j) {
-        const ExchangeCL& ex= idxDesc_[j]->GetEx();
+        const ExchangeCL& ex= *exchange_[j];
         result= KahanInnerProd( *x_acc, *x_acc, ex.OwnerDistrIndex.begin(),
             ex.OwnerDistrIndex.end(), result, blockOffset_[j]);
     }
@@ -822,7 +822,7 @@ double ExchangeBlockCL::LocalDotTwoAccumulations(
 
     // Initiate the first communication phase for x and y
     for ( size_t j=0; j<GetNumBlocks(); ++j) {
-        const ExchangeCL& ex= idxDesc_[j]->GetEx();
+        const ExchangeCL& ex= *exchange_[j];
         sendreqX1[j].resize( ex.sendListPhase1_.size());
         recvreqX[j].resize( ex.recvListPhase1_.size());
         ex.InitComm( 1, x, Addr(sendreqX1[j]), Addr(recvreqX[j]), *xBuf_[j],
@@ -835,7 +835,7 @@ double ExchangeBlockCL::LocalDotTwoAccumulations(
 
     // While communicating, do product on local elements
     for ( size_t j=0; j<GetNumBlocks(); ++j) {
-        const ExchangeCL& ex= idxDesc_[j]->GetEx();
+        const ExchangeCL& ex= *exchange_[j];
         result=KahanInnerProd( x, y, ex.LocalIndex.begin(),
             ex.LocalIndex.end(), result, blockOffset_[j]);
     }
@@ -853,18 +853,18 @@ double ExchangeBlockCL::LocalDotTwoAccumulations(
     DoAllAccumulations( *y_acc, yBuf_);
 
     // Init Second transfer phase
-    if ( !x_acc_created && idxDesc_[0]->GetEx().CommViaOwner()) {
+    if ( !x_acc_created && exchange_[0]->CommViaOwner()) {
         for ( size_t j=0; j<GetNumBlocks(); ++j) {
-            const ExchangeCL& ex= idxDesc_[j]->GetEx();
+            const ExchangeCL& ex= *exchange_[j];
             sendreqX2[j].resize( ex.sendListPhase2_.size());
             recvreqX[j].resize( ex.recvListPhase2_.size());
             ex.InitComm( 2, *x_acc, Addr(sendreqX2[j]), Addr(recvreqX[j]), *xBuf_[j],
                 2001+j, blockOffset_[j]);
         }
     }
-    if ( !y_acc_created && idxDesc_[0]->GetEx().CommViaOwner()) {
+    if ( !y_acc_created && exchange_[0]->CommViaOwner()) {
         for ( size_t j=0; j<GetNumBlocks(); ++j) {
-            const ExchangeCL& ex= idxDesc_[j]->GetEx();
+            const ExchangeCL& ex= *exchange_[j];
             sendreqY2[j].resize( ex.sendListPhase2_.size());
             recvreqY[j].resize( ex.recvListPhase2_.size());
             ex.InitComm( 2, *y_acc, Addr(sendreqY2[j]), Addr(recvreqY[j]), *yBuf_[j],
@@ -874,7 +874,7 @@ double ExchangeBlockCL::LocalDotTwoAccumulations(
 
     // While communication accumulated values, do product on distributed elements
     for ( size_t j=0; j<GetNumBlocks(); ++j) {
-        const ExchangeCL& ex= idxDesc_[j]->GetEx();
+        const ExchangeCL& ex= *exchange_[j];
         result= KahanInnerProd( *x_acc, *y_acc, ex.OwnerDistrIndex.begin(),
             ex.OwnerDistrIndex.end(), result, blockOffset_[j]);
     }
@@ -885,14 +885,14 @@ double ExchangeBlockCL::LocalDotTwoAccumulations(
         ProcCL::WaitAll( sendreqX1[j]);
         ProcCL::WaitAll( sendreqY1[j]);
     }
-    if ( !x_acc_created && idxDesc_[0]->GetEx().CommViaOwner()) {
+    if ( !x_acc_created && exchange_[0]->CommViaOwner()) {
         for ( size_t j=0; j<GetNumBlocks(); ++j) {
             ProcCL::WaitAll( sendreqX2[j]);
             ProcCL::WaitAll( recvreqX[j]);
         }
         DoAllAssigning( *x_acc, xBuf_);
     }
-    if ( !y_acc_created && idxDesc_[0]->GetEx().CommViaOwner()) {
+    if ( !y_acc_created && exchange_[0]->CommViaOwner()) {
         for ( size_t j=0; j<GetNumBlocks(); ++j) {
             ProcCL::WaitAll( sendreqY2[j]);
             ProcCL::WaitAll( recvreqY[j]);
@@ -916,7 +916,7 @@ void ExchangeBlockCL::Accumulate( VectorCL& v) const
     RequestListT sendreq( GetNumBlocks()), recvreq( GetNumBlocks());
     // Send distributed entries to the owners
     for ( size_t j=0; j<GetNumBlocks(); ++j) {
-        const ExchangeCL& ex= idxDesc_[j]->GetEx();
+        const ExchangeCL& ex= *exchange_[j];
         sendreq[j].resize( ex.sendListPhase1_.size());
         recvreq[j].resize( ex.recvListPhase1_.size());
         ex.InitComm( 1, v, Addr(sendreq[j]), Addr(recvreq[j]), *xBuf_[j], 1001+j, blockOffset_[j]);
@@ -929,10 +929,10 @@ void ExchangeBlockCL::Accumulate( VectorCL& v) const
     // Do all accumulations
     DoAllAccumulations( v, xBuf_);
 
-    if ( idxDesc_[0]->GetEx().CommViaOwner()) {
+    if ( exchange_[0]->CommViaOwner()) {
         // Send back to copies
         for ( size_t j=0; j<GetNumBlocks(); ++j) {
-            const ExchangeCL& ex= idxDesc_[j]->GetEx();
+            const ExchangeCL& ex=  *exchange_[j];
             sendreq[j].resize( ex.sendListPhase2_.size());
             recvreq[j].resize( ex.recvListPhase2_.size());
             ex.InitComm( 2, v, Addr(sendreq[j]), Addr(recvreq[j]), *xBuf_[j], 2001+j, blockOffset_[j]);
@@ -2095,3 +2095,4 @@ MatrixCL ExchangeMatrixCL::Accumulate(const MatrixCL& mat)
 }
 
 } // end of namespace DROPS
+#endif // parallel

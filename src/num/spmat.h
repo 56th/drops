@@ -77,7 +77,17 @@ class VectorBaseCL: public std::valarray<T>
 
 DROPS_DEFINE_VALARRAY_DERIVATIVE( VectorBaseCL, T, base_type)
 
-    void swap( VectorBaseCL<T>& v) { std::swap( *this, v); }
+    void swap( VectorBaseCL<T>& v) {
+#if GCC_VERSION > 40406
+        std::swap(*this, v);
+#else
+        VectorBaseCL tmp (v);
+        v.resize(this->size());
+        v = *this;
+        this->resize(tmp.size());
+        *this = tmp;
+#endif
+    }
 
     const T* raw() const { return Addr( *this); }
     T*       raw()       { return &(*this)[0]; }
@@ -250,6 +260,23 @@ KahanInnerProd( Iterator first1, const Iterator& end1, Iterator first2, const T 
     T sum= init, c=T(0), t, y;
     while(first1!=end1){
         y  = (*first1++)*(*first2++) - c;
+        t  = sum + y;
+        c  = (t-sum)-y;
+        sum= t;
+    }
+    return sum;
+}
+template <class ValueT, template<class> class VecT>
+inline ValueT
+#if GCC_VERSION > 40305
+    __attribute__((optimize("no-associative-math")))
+#endif
+KahanInnerProd( const VecT<ValueT>& first, const VecT<ValueT>& second, const ValueT init=(ValueT)0)
+{
+    Assert(first.size() == second.size(), "KahanInnerProd: sizes don't match", DebugNumericC);
+    ValueT sum= init, c=ValueT(0), t, y;
+    for (size_t i = 0; i<first.size(); ++i) {
+        y  = first[i]*second[i] - c;
         t  = sum + y;
         c  = (t-sum)-y;
         sum= t;

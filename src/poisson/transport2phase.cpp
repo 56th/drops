@@ -220,7 +220,7 @@ void TransportP1CL::InitStep (VectorCL& rhs)
     if (theta_ != 1.0) {
         VectorCL tmp( (1. - theta_)*(oldcplA.Data - A.Data*ct.Data + oldcplC.Data - C.Data*ct.Data));
         VectorCL rhs2( tmp.size());
-        gm_.Solve( M.Data, rhs2, tmp);
+        gm_.Solve( M.Data, rhs2, tmp, DummyExchangeCL());
         std::cout << "Inverting M_old: res = " << gm_.GetResid() << ", iter = " << gm_.GetIter() << std::endl;
         rhs1+= rhs2;
     }
@@ -240,7 +240,7 @@ void TransportP1CL::DoStep (const VectorCL& rhs)
     // std::cout << "ct:\n" << ct.Data << "\ncplC:\n" << cplC.Data << "\nC:\n" << C.Data << std::endl;
     // std::cout << "\ncplM:\n" << cplM.Data << "\nM:\n" << M.Data << std::endl;
     // std::cout << "\ncplA:\n" << cplA.Data << "\nA:\n" << A.Data << std::endl;
-    gm_.Solve( L_, ct.Data, rhs);
+    gm_.Solve( L_, ct.Data, rhs, DummyExchangeCL());
     std::cout << "res = " << gm_.GetResid() << ", iter = " << gm_.GetIter() << std::endl;
 }
 

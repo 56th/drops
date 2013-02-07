@@ -111,7 +111,7 @@ StatStokesCL::StokesCoeffCL StatStokesCL::Coeff;
 template <typename Mat, typename Vec>
 void Solve(const Mat &A, const Mat &B, Vec &u, Vec &p, const Vec &b, const Vec &c,
            __UNUSED__ const IdxDescCL& vel_idx, __UNUSED__ const IdxDescCL& pr_idx,
-           Mat& prM)
+           __UNUSED__ Mat& prM)
 {
     // parameter for solver:
     __UNUSED__ const int    PCrestart = 100;
@@ -124,7 +124,6 @@ void Solve(const Mat &A, const Mat &B, Vec &u, Vec &p, const Vec &b, const Vec &
     const int    InnerIter = 1000;
     __UNUSED__ std::ostream *output   = &std::cout;    // set pointer to 0 to make solver quiet (only in parallel version)
 
-#ifndef _PAR
     // time measurement
     TimerCL timer;
 
@@ -140,45 +139,13 @@ void Solve(const Mat &A, const Mat &B, Vec &u, Vec &p, const Vec &b, const Vec &
     APcT         Apc (gmres);
     SPcT         Spc;
     OseenSolverT oseen( Apc, Spc, OuterIter, OuterTol, InnerRed, InnerIter);
-#else
-    // time measurement
-    ParTimerCL timer;
 
-    // preconditioner
-    typedef ParJac0CL                                PCT;
-    typedef SolverAsPreCL<ParPCGSolverCL<PCT> >      APcT;         // preconditioner of A
-    typedef ISNonlinearPreCL<ParPCGSolverCL<PCT>, ParPCGSolverCL<PCT> > SPcT;         // preconditioner of Schur-complement
-    PCT          jacpc( vel_idx);
-    ParPCGSolverCL<PCT> pcg( PCmaxiter, PCtol, vel_idx, jacpc, PCrelative);
-    PCT          jacpc_pr( pr_idx);
-    ParPCGSolverCL<PCT> pcg_pr( PCmaxiter, PCtol, pr_idx, jacpc_pr, PCrelative);
-    APcT         Apc( pcg);
-    SPcT         Spc( pcg_pr, pcg_pr, prM, prM);
-
-    // START INEXACT UZAWA
-    typedef ParInexactUzawaCL<APcT, SPcT, APC_SYM> OseenSolverT; // solver of above system
-    OseenSolverT oseen( Apc, Spc, vel_idx, pr_idx, OuterIter, OuterTol, InnerRed, InnerIter, output);
-    // END INEXACT UZAWA
-
-    // START BLOCK SOLVER
-/*
-    typedef BlockPreCL<APcT, SPcT> OseenPCT;
-    typedef ParPCGSolverCL<OseenPCT> OseenBaseSolT;
-    typedef BlockMatrixSolverCL<OseenBaseSolT> SolverT;
-
-    OseenPCT OseenPC(Apc, Spc);
-    OseenBaseSolT OseenBaseSol( OuterIter, OuterTol, OseenPC, false);
-    SolverT oseen(OseenBaseSol, vel_idx, pr_idx);
-*/
-    // END BLOCK SOLVER
-
-#endif
 
     std::cout << " o Solving system with Inexact-Uzawa-Method: ... \n";
 
     // Solve the linear equation system
     timer.Reset();
-    oseen.Solve( A, B, u, p, b, c);
+    oseen.Solve( A, B, u, p, b, c, vel_idx.GetEx(), pr_idx.GetEx());
     timer.Stop();
 
     double realresid1, realresid2;
@@ -305,7 +272,7 @@ void Strategy( StokesP2P1CL<CoeffCL>& Stokes)
 int main (int argc, char** argv)
 {
 #ifdef _PAR
-    DROPS::ProcInitCL procinit(&argc, &argv);
+    DROPS::ProcCL::Instance(&argc, &argv);
 #endif
     try
     {

@@ -24,9 +24,8 @@
 
 #include "misc/problem.h"
 #include "num/interfacePatch.h"
-#ifdef _PAR
-#  include "parallel/exchange.h"
-#endif
+#include "parallel/exchange.h"
+
 
 namespace DROPS
 {
@@ -40,6 +39,8 @@ IdxDescCL::IdxDescCL( FiniteElementT fe, const BndCondCL& bnd, match_fun match, 
 {
 #ifdef _PAR
     ex_= new ExchangeCL();
+#else
+    ex_= new DummyExchangeCL();
 #endif
 }
 
@@ -47,9 +48,7 @@ IdxDescCL::~IdxDescCL()
 {
     if (Idx_!=InvalidIdx)
         IdxFree[Idx_]= true;
-#ifdef _PAR
     delete ex_;
-#endif
 }
 
 Uint IdxDescCL::GetFreeIdx()
@@ -72,7 +71,10 @@ IdxDescCL::IdxDescCL( const IdxDescCL& orig)
     const_cast<IdxDescCL&>(orig).Idx_= InvalidIdx;
 #ifdef _PAR
     ex_= new ExchangeCL(*orig.ex_);
+#else
+    ex_= new DummyExchangeCL(*orig.ex_);
 #endif
+
 }
 
 void IdxDescCL::swap( IdxDescCL& obj)
@@ -86,9 +88,7 @@ void IdxDescCL::swap( IdxDescCL& obj)
     std::swap( Bnd_,         obj.Bnd_);
     std::swap( match_,       obj.match_);
     std::swap( extIdx_,      obj.extIdx_);
-#ifdef _PAR
     std::swap( ex_,          obj.ex_);
-#endif
 }
 
 bool IdxDescCL::Equal(IdxDescCL& i, IdxDescCL& j, const MultiGridCL* mg)

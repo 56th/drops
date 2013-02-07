@@ -48,7 +48,7 @@ int Test1()
 #endif
     gauss_pivot(M, v);
     std::cout << v << std::endl;
-    return 1;
+    return 0;
 }
 
 int Test2()
@@ -62,7 +62,7 @@ int Test2()
     QRDecompCL<3,2> qrls ( dat3 + 0);
     SVectorCL<3> rls( dat4 + 0);
     qrls.Solve( rls);
-    std::cout << rls << std::endl;
+    std::cout << "Solution: " << rls << std::endl;
 
     return 0;
 }
@@ -71,3 +71,4 @@ int main()
 {
     return Test1() + Test2();
 }
+

@@ -718,15 +718,16 @@ void LevelsetP2CL::SmoothPhi( VectorCL& SmPhi, double diff) const
     SetupSmoothSystem( M, A);
     C.LinComb( 1, M, diff, A);
 #ifndef _PAR
-    SSORPcCL pc;
-    PCGSolverCL<SSORPcCL> pcg( pc, 500, 1e-10);
-    pcg.Solve( C, SmPhi, M*Phi.Data);
+    typedef SSORPcCL PcT;
+#else
+    typedef JACPcCL PcT;
+#endif
+    PcT pc;
+    PCGSolverCL<PcT> pcg( pc, 500, 1e-10);
+    pcg.Solve( C, SmPhi, M*Phi.Data, idx.GetEx());
+#ifndef _PAR
     __UNUSED__ double inf_norm= supnorm( SmPhi-Phi.Data);
 #else
-    ParJac0CL  JACPc (idx.GetFinest());
-    typedef ParPCGSolverCL<ParJac0CL> JacPCGSolverT;
-    JacPCGSolverT cg( 500, 1e-10, idx.GetFinest(), JACPc);
-    cg.Solve( C, SmPhi, M*Phi.Data);
     __UNUSED__ const double inf_norm= ProcCL::GlobalMax(supnorm( SmPhi-Phi.Data));
 #endif
     Comment("||SmPhi - Phi||_oo = " <<inf_norm<< std::endl, DebugDiscretizeC);

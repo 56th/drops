@@ -23,7 +23,7 @@
 #ifndef SCOPETIMER_H
 #define SCOPETIMER_H
 
-#ifdef WIN32
+#ifdef DROPS_WIN
  #include <Windows.h>
  #undef min
  #undef max

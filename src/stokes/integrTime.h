@@ -200,7 +200,7 @@ void InstatStokesThetaSchemeCL<StokesT,SolverT>::DoStep( VectorCL& v, VectorCL& 
     _rhs+= (1./_dt)*(_Stokes.M.Data*v + _cplM->Data - _old_cplM->Data)
          +  _theta*_b->Data + (1.-_theta)*_old_b->Data;
 
-    _solver.Solve( _mat, _Stokes.B.Data, v, p, _rhs, _Stokes.c.Data);
+    _solver.Solve( _mat, _Stokes.B.Data, v, p, _rhs, _Stokes.c.Data, _Stokes.vel_idx.GetEx(), _Stokes.pr_idx.GetEx());
 
     std::swap( _b, _old_b);
     std::swap( _cplM, _old_cplM);

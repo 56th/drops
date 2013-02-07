@@ -6,4 +6,5 @@ target_link_libraries_par(num-interfacePatch parallel-exchange num-fe)
 target_link_libraries_par(num-quadrature num-discretize)
 
 target_link_libraries(num-discretize num-fe)
-target_link_libraries(num-interfacePatch misc-problem num-fe misc-utils)
+target_link_libraries(num-interfacePatch num-fe misc-utils)
+target_link_libraries(num-interfacePatch num-discretize)

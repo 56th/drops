@@ -37,7 +37,7 @@ using namespace DROPS;
 int main( int argc, char **argv)
 {
 #ifdef _PAR
-    DROPS::ProcInitCL procinit(&argc, &argv);
+    DROPS::ProcCL::Instance(&argc, &argv);
 #endif
     try {
         if (DROPS::ProcCL::Size()!=3){

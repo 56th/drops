@@ -538,6 +538,53 @@ Point3DCL InterfaceTriangleCL::GetNormal() const
     return n/n.norm();
 }
 
+/* calculation of improved normal */
+Quad5_2DCL<Point3DCL> InterfaceTriangleCL::GetImprovedNormal(Uint n) const
+{
+	//TODO: GradRef static?
+	LocalP1CL<Point3DCL> GradRef[10], GradP2[10];
+	P2DiscCL::GetGradientsOnRef( GradRef);
+	SMatrixCL<3,3> T;
+	//double dummy;
+	//GetTrafoTr( T, dummy, tet);
+
+	//Transoformation matrix, function: GetTrafoTr
+	//but without needing the tetra
+	double M[3][3];
+	const Point3DCL& pt0= Coord_[0];
+	for(int i=0; i<3; ++i)
+		for(int j=0; j<3; ++j)
+			M[j][i]= Coord_[i+1][j] - pt0[j];
+	double det=   M[0][0] * (M[1][1]*M[2][2] - M[1][2]*M[2][1])
+		 - M[0][1] * (M[1][0]*M[2][2] - M[1][2]*M[2][0])
+		 + M[0][2] * (M[1][0]*M[2][1] - M[1][1]*M[2][0]);
+
+	T(0,0)= (M[1][1]*M[2][2] - M[1][2]*M[2][1])/det;
+	T(0,1)= (M[2][0]*M[1][2] - M[1][0]*M[2][2])/det;
+	T(0,2)= (M[1][0]*M[2][1] - M[2][0]*M[1][1])/det;
+	T(1,0)= (M[2][1]*M[0][2] - M[0][1]*M[2][2])/det;
+	T(1,1)= (M[0][0]*M[2][2] - M[2][0]*M[0][2])/det;
+	T(1,2)= (M[2][0]*M[0][1] - M[0][0]*M[2][1])/det;
+	T(2,0)= (M[0][1]*M[1][2] - M[1][1]*M[0][2])/det;
+	T(2,1)= (M[1][0]*M[0][2] - M[0][0]*M[1][2])/det;
+	T(2,2)= (M[0][0]*M[1][1] - M[1][0]*M[0][1])/det;
+
+	Quad5_2DCL<>          p2[10];
+	Quad5_2DCL<Point3DCL> GradQ[10]; // and their gradients
+	P2DiscCL::GetGradients( GradP2, GradRef, T);
+	Quad5_2DCL<Point3DCL> normal;
+	P2DiscCL::GetP2Basis( p2, &this->GetBary(n));
+	for (int v=0; v<10; ++v)
+	{
+		GradQ[v].assign( GradP2[v], &this->GetBary(n));
+		normal += this->GetPhi(v)*GradQ[v];
+	}
+
+	for (int i =0; i<Quad5_2DDataCL::NumNodesC; i++) if (normal[i].norm()>1e-8) normal[i]/= normal[i].norm();
+
+	return normal;
+}
+
 LocalP2CL<double> ProjectIsoP2ChildToParentP1 (LocalP2CL<double> lpin, Uint child){
     const double vertices[][3]=
         {

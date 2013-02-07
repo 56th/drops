@@ -49,13 +49,13 @@ int TestLanczos()
 
     std::cout << "A\n" << A << "r0\n" << r0 << std::endl;
     DROPS::LanczosONBCL<DROPS::VectorCL> onb;
-    onb.new_basis(A, r0);
+    onb.new_basis(A, r0, DROPS::DummyExchangeCL());
     std::vector<DROPS::VectorCL> basis;
     do {
         basis.push_back( onb.q[0]);
         std::cout << onb.q[0] << std::endl;
         std::cout << "a " << onb.a0 << " b " << onb.b[0] << std::endl;
-    } while (onb.next( A));
+    } while (onb.next( A, DROPS::DummyExchangeCL()));
     basis.push_back( onb.q[0]);
     std::cout << onb.q[0] << std::endl;
     std::cout << "a " << onb.a0 << " b " << onb.b[0] << std::endl;
@@ -84,7 +84,7 @@ int TestMinres()
     std::cout << "A\n" << A << "b\n" << b << std::endl;
     int mi= 10;
     double tol= 1e-10;
-    MINRES( A, x, b, mi, tol);
+    MINRES( A, x, b, DROPS::DummyExchangeCL(), mi, tol);
     std::cout << x << DROPS::VectorCL( A*x - b) << '\n' << mi << '\n' << tol << std::endl;
     return 0;
 }
@@ -124,7 +124,7 @@ int TestMinres2()
     std::cout << "A\n" << A << "b\n" << b << std::endl;
     int mi= 10;
     double tol= 1e-10;
-    MINRES( A, x, b, mi, tol);
+    MINRES( A, x, b, DROPS::DummyExchangeCL(), mi, tol);
     std::cout << x << DROPS::VectorCL( A*x - b) << '\n' << mi << '\n' << tol << std::endl;
     return 0;
 }
@@ -165,9 +165,9 @@ int TestPMinres()
     int mi= 10;
     double tol= 1e-10;
     DROPS::LanczosONBCL<DROPS::VectorCL> q;
-    q.new_basis( A, b);
+    q.new_basis( A, b, DROPS::DummyExchangeCL());
     DROPS::PMResSolverCL<DROPS::LanczosONBCL<DROPS::VectorCL> > pmr( q, mi, tol);
-    pmr.Solve( A, x, b);
+    pmr.Solve( A, x, b, DROPS::DummyExchangeCL());
     std::cout << x << DROPS::VectorCL( A*x - b) << '\n' << pmr.GetIter() << '\n' << pmr.GetResid() << std::endl;
     return 0;
 }
@@ -210,7 +210,7 @@ int TestPMinres2()
     DROPS::DummyPcCL pc;
     DROPS::PLanczosONBCL<DROPS::VectorCL, DROPS::DummyPcCL> q( pc);
     DROPS::PMResSolverCL<DROPS::PLanczosONBCL<DROPS::VectorCL, DROPS::DummyPcCL> > pmr( q, mi, tol);
-    pmr.Solve( A, x, b);
+    pmr.Solve( A, x, b, DROPS::DummyExchangeCL());
     std::cout << x << DROPS::VectorCL( A*x - b) << '\n' << pmr.GetIter() << '\n' << pmr.GetResid() << std::endl;
     return 0;
 }

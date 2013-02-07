@@ -41,8 +41,9 @@ int Test()
     std::cout << "A\n" << A << "b\n" << b << std::endl;
     int mi= 100;
     double tol= 1e-10;
-    DROPS::GCR( A, x, b, DROPS::DummyPcCL(), 10, mi, tol, false);
-    std::cout << x << DROPS::VectorCL( A*x - b) << '\n' << mi << '\n' << tol << std::endl;
+    DROPS::DummyPcCL pc;
+    DROPS::GCR( A, x, b, DROPS::DummyExchangeCL(), pc, 10, mi, tol, false);
+    std::cout << x << DROPS::VectorCL( A*x - b) << '\n' << mi << '\n' << "Residual1: " << tol << std::endl;
     return 0;
 }
 
@@ -81,8 +82,9 @@ int Test2()
     std::cout << "A\n" << A << "b\n" << b << std::endl;
     int mi= 100;
     double tol= 1e-10;
-    DROPS::GCR( A, x, b, DROPS::DummyPcCL(), 10, mi, tol, false);
-    std::cout << x << DROPS::VectorCL( A*x - b) << '\n' << mi << '\n' << tol << std::endl;
+    DROPS::DummyPcCL pc;
+    DROPS::GCR( A, x, b, DROPS::DummyExchangeCL(), pc, 10, mi, tol, false);
+    std::cout << x << DROPS::VectorCL( A*x - b) << '\n' << mi << '\n' << "Residual2: " << tol << std::endl;
     return 0;
 }
 

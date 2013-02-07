@@ -89,22 +89,6 @@ class StokesCoeffCL
 namespace DROPS // for Strategy
 {
 using ::MyStokesCL;
-typedef PCGSolverCL<SSORPcCL>     PCG_SsorCL;
-
-
-class Uzawa_PCG_CL : public UzawaSolverCL<PCG_SsorCL>
-{
-  private:
-    SSORPcCL   _ssor;
-    PCG_SsorCL _PCGsolver;
-  public:
-    Uzawa_PCG_CL( MatrixCL& M, int outer_iter, double outer_tol, int inner_iter,
-                  double inner_tol, double tau= 1., double omega=1.)
-        : UzawaSolverCL<PCG_SsorCL>( _PCGsolver, M, outer_iter, outer_tol, tau),
-          _ssor( omega),
-          _PCGsolver(_ssor, inner_iter, inner_tol)
-        {}
-};
 
 template<class Coeff>
 void Strategy(StokesP1BubbleP1CL<Coeff>& Stokes, double omega, double inner_iter_tol, Uint maxStep, double rel_red)
@@ -207,65 +191,45 @@ void Strategy(StokesP1BubbleP1CL<Coeff>& Stokes, double omega, double inner_iter
         std::cout << vert->GetCoord() << " has index " << unk << std::endl;
         std::cout << "A(i,i) = " << A->Data(unk,unk) <<std::endl;
         std::cout << "B(i,j) = " << B->Data(vert->Unknowns(B->RowIdx->Idx),unk) << std::endl;
-*/        Uint meth;
+*/
         int max_iter;
         double tol;
-        std::cout << "\nwhich method? 0=Uzawa, 1=Schur > "; std::cin >> meth;
         time.Reset();
-        if (meth)
-        {
-            SSORPcCL  pc(omega);
-            MLMatDescCL prM;
-            prM.SetIdx( pidx1, pidx1);
-            Stokes.SetupPrMass( &prM);
-            PreGSOwnMatCL<P_SSOR0> schur_pc(prM.Data.GetFinest());
-            SSORPcCL poissonpc;
-            PCG_SsorCL poissonsolver( poissonpc, 500, inner_iter_tol);
-            SchurComplMatrixCL<PCG_SsorCL, MLMatrixCL> BABT( poissonsolver, A->Data, B->Data);
-            double outer_tol;
-            std::cout << "tol = "; std::cin >> outer_tol;
-            time.Start();
-            VectorCL rhs( -c->Data);
-            {
-                double tol= inner_iter_tol;
-                int max_iter= 200;
-                VectorCL tmp(vidx1->NumUnknowns());
-                PCG(A->Data, tmp, b->Data, pc, max_iter, tol);
-                std::cout << "Iterationen: " << max_iter << "    Norm des Residuums: " << tol << std::endl;
-                rhs+= B->Data*tmp;
-            }
-            std::cout << "rhs has been set!" << std::endl;
-//            tol= 1.0e-14;
-            max_iter= 200;
-            tol= outer_tol;
-    //        PCG(A->Data, new_x->Data, b->Data, pc, max_iter, tol);
-            PCG(BABT, p1->Data, rhs, schur_pc, max_iter, tol);
-            std::cout << "Iterationen: " << max_iter << "    Norm des Residuums: " << tol << std::endl;
 
-            tol= outer_tol;
-            max_iter= 200;
-            PCG(A->Data, v1->Data, VectorCL( b->Data - transp_mul(B->Data, p1->Data)), pc, max_iter, tol);
-            time.Stop();
-        }
-        else
+        SSORPcCL  pc(omega);
+        MLMatDescCL prM;
+        prM.SetIdx( pidx1, pidx1);
+        Stokes.SetupPrMass( &prM);
+        PreGSOwnMatCL<P_SSOR0> schur_pc(prM.Data.GetFinest());
+        SSORPcCL poissonpc;
+        typedef PCGSolverCL<SSORPcCL> PCG_SsorCL;
+        PCG_SsorCL poissonsolver( poissonpc, 500, inner_iter_tol);
+        SchurComplMatrixCL<PCG_SsorCL, MLMatrixCL, DummyExchangeCL> BABT( poissonsolver, A->Data, B->Data, DummyExchangeCL());
+        double outer_tol;
+        std::cout << "tol = "; std::cin >> outer_tol;
+        time.Start();
+        VectorCL rhs( -c->Data);
         {
-            max_iter= 5000;
-            double tau;
-            Uint inner_iter;
-            std::cout << "tol = "; std::cin >> tol;
-            std::cout << "tau = "; std::cin >> tau;
-            std::cout << "#PCG steps = "; std::cin >> inner_iter;
-            MLMatDescCL prM;
-            prM.SetIdx( pidx1, pidx1);
-            Stokes.SetupPrMass( &prM);
-            time.Start();
-            Uzawa_PCG_CL uzawaSolver( prM.Data.GetFinest(), max_iter, tol, inner_iter, inner_iter_tol, tau);
-            uzawaSolver.Solve( A->Data, B->Data, v1->Data, p1->Data, b->Data, c->Data);
-//            Uzawa( A->Data, B->Data, M.Data, v1->Data, p1->Data, b->Data, c->Data, tau, max_iter, tol, inner_iter, inner_iter_tol);
-            time.Stop();
-            std::cout << "iterations: " << uzawaSolver.GetIter()
-                      << "\tresidual: " << uzawaSolver.GetResid() << std::endl;
+            double tol= inner_iter_tol;
+            int max_iter= 200;
+            VectorCL tmp(vidx1->NumUnknowns());
+            PCG(A->Data, tmp, b->Data, DummyExchangeCL(), pc, max_iter, tol);
+            std::cout << "Iterationen: " << max_iter << "    Norm des Residuums: " << tol << std::endl;
+            rhs+= B->Data*tmp;
         }
+        std::cout << "rhs has been set!" << std::endl;
+//            tol= 1.0e-14;
+        max_iter= 200;
+        tol= outer_tol;
+//        PCG(A->Data, new_x->Data, b->Data, DummyExchangeCL(), pc, max_iter, tol);
+        PCG(BABT, p1->Data, rhs, DummyExchangeCL(), schur_pc, max_iter, tol);
+        std::cout << "Iterationen: " << max_iter << "    Norm des Residuums: " << tol << std::endl;
+
+        tol= outer_tol;
+        max_iter= 200;
+        PCG(A->Data, v1->Data, VectorCL( b->Data - transp_mul(B->Data, p1->Data)), DummyExchangeCL(), pc, max_iter, tol);
+        time.Stop();
+
         std::cout << "Das Verfahren brauchte "<<time.GetTime()<<" Sekunden.\n";
         Stokes.CheckSolution(v1, p1, &LsgVel, &LsgPr);
         typename MyStokesCL::const_DiscPrSolCL  pr(p1, &PrBndData, &MG);

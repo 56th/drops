@@ -51,7 +51,7 @@ enum FiniteElementT
 {
     P0_FE=0, P1_FE=1, P2_FE=2, P1Bubble_FE=3,         // for scalars
     P1D_FE=4, P1X_FE=5, P1IF_FE=6, P2R_FE=7, P2X_FE=8,
-    vecP2_FE=130, vecP1Bubble_FE=131, vecP2R_FE=135, vecP2X_FE=136, // for vectors
+    vecP1_FE = 129, vecP2_FE=130, vecP1Bubble_FE=131, vecP2R_FE=135, vecP2X_FE=136,// for vectors
     UnknownFE_=-1
 };
 
@@ -87,6 +87,7 @@ class FE_InfoCL
             case P2X_FE:
             case P2R_FE:
             case P2_FE:          NumUnknownsVertex_= NumUnknownsEdge_= 1; break;
+            case vecP1_FE:		 NumUnknownsVertex_ = 3; break;
             case vecP2X_FE:
             case vecP2R_FE:
             case vecP2_FE:       NumUnknownsVertex_= NumUnknownsEdge_= 3; break;
@@ -218,6 +219,8 @@ permute_fe_basis_extended_part (ExtIdxDescCL& ext, const PermutationT& p, Uint n
 
 #ifdef _PAR
 class ExchangeCL;
+#else
+class DummyExchangeCL;
 #endif
 
 /// \brief Mapping from the simplices in a triangulation to the components
@@ -239,8 +242,11 @@ class IdxDescCL: public FE_InfoCL
     BndCondCL                Bnd_;         ///< boundary conditions
     match_fun                match_;       ///< matching function for periodic boundaries
     ExtIdxDescCL             extIdx_;      ///< extended index for XFEM
+
 #ifdef _PAR
     ExchangeCL*              ex_;          ///< exchanging numerical data
+#else
+    DummyExchangeCL*         ex_;          ///< exchanging numerical data
 #endif
 
     /// \brief Returns the lowest index that was not used and reserves it.
@@ -324,6 +330,11 @@ class IdxDescCL: public FE_InfoCL
     IdxT GetNumOwnedUnknowns() const;
     /// \brief get global number of owned unknowns
     IdxT GetGlobalNumUnknowns() const;
+#else
+    /// \brief Get a reference on the ExchangeCL
+    DummyExchangeCL& GetEx() { return *ex_; }
+    /// \brief Get a constant reference on the ExchangeCL
+    const DummyExchangeCL& GetEx() const { return *ex_; }
 #endif
 };
 
@@ -435,8 +446,6 @@ class MLIdxDescCL : public MLDataCL<IdxDescCL>
             it->swap(*sec);
 
     }
-
-
 #ifdef _PAR
     /// \brief Get a reference on the ExchangeCL (of the finest level)
     ExchangeCL& GetEx() { return this->GetFinest().GetEx(); }
@@ -448,6 +457,11 @@ class MLIdxDescCL : public MLDataCL<IdxDescCL>
     /// \brief get global number of owned unknowns
     IdxT GetGlobalNumUnknowns() const
     { return this->GetFinest().GetGlobalNumUnknowns(); }
+#else
+    /// \brief Get a reference on the ExchangeCL (of the finest level)
+    DummyExchangeCL& GetEx() { return this->GetFinest().GetEx(); }
+    /// \brief Get a constant reference on the ExchangeCL (of the finest level)
+    const DummyExchangeCL& GetEx() const { return this->GetFinest().GetEx(); }
 #endif
 };
 
