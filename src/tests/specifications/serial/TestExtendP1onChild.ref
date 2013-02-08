@@ -11,8 +11,9 @@ Name of test: testExtendP1onChild
 Name of author: Sven Gross
 #-------------------------------------------------------------------------------
 #------------------------------NUMBERS------------------------------------------
+Name of variable: "number of total errors"
 Prefix of variable: "total errors found:"
-Value of variable: 0
+Value of variable:
 Relative error:
 Absolute error:
 Minimal value: 0
