@@ -29,18 +29,13 @@ def replacearch( a,  b):
     file.close()
 
 def serial():
-    #modify the architecture to serial strategy
-    #replacearch("ARCH = LINUX_MPI\n","ARCH = LINUX\n")
-    #clean DROPS
-    command = "cd ../../; make clean"
+    #clean DROPS and enable serial build
+    command = "cd ../../; make clean; cmake -DMPI=0"
     return os.system(command)
     
 def parallel():
-    #modify the architecture to parallel strategy
-    #replacearch("ARCH = LINUX\n","ARCH = LINUX_MPI\n")
-    #create and run the command for generating the libraries and the
-    #dependencies
-    command = "cd ../../; make clean"
+    #clean DROPS and enable parallel build
+    command = "cd ../../; make clean; cmake -DMPI=1"
     return os.system(command)
 
 #Test - parameter, object of class TestCL found in classtest.py file
