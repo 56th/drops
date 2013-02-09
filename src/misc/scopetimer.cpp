@@ -28,6 +28,9 @@
 #include <map>
 
 #include "misc/scopetimer.h"
+#ifdef _PAR
+  #include "parallel/parallel.h"
+#endif
 
 RealTimerCL::RealTimerCL(double time)
 	: _t_begin(timestamp()), _t_end(timestamp()), _time(time)
@@ -111,7 +114,6 @@ private:
    mapping *_hm_times;
    int _threads;
 
-public:
    ScopeTimeCollectorCL()
    {
 #ifdef _OPENMP
@@ -123,6 +125,10 @@ public:
       _hm_times = new mapping[_threads];
    }
 
+  public:
+      
+   static ScopeTimeCollectorCL& GetInstance() { static ScopeTimeCollectorCL inst; return inst; }
+
    ~ScopeTimeCollectorCL()
    {
       mapping::iterator it;
@@ -130,11 +136,24 @@ public:
       {
          if (_hm_times[i].size() > 0)
          {
+#ifdef _PAR
+            if (DROPS::ProcCL::IamMaster())
+#endif
             fprintf(stderr, "\nCollected Timers:\n");
             for(it=_hm_times[i].begin(); it != _hm_times[i].end(); it++)
             {
+#ifdef _PAR
+               const double maxtime = DROPS::ProcCL::GlobalMax(it->second.dTime);
+               const double mintime = DROPS::ProcCL::GlobalMin(it->second.dTime);
+               const double avgtime = DROPS::ProcCL::GlobalSum(it->second.dTime)/DROPS::ProcCL::Size();
+               if (DROPS::ProcCL::IamMaster())
+                 fprintf(stderr, "    %38s [%2d](%4ld) :: %12.3f - %12.3f, avg: %12.3f\n",
+                       it->first.c_str(), i, it->second.lCall, mintime, maxtime, avgtime);
+#else
                fprintf(stderr, "    %38s [%2d](%4ld) :: %12.3f\n",
-                   it->first.c_str(), i, it->second.lCall, it->second.dTime);
+                       it->first.c_str(), i, it->second.lCall, it->second.dTime);
+        
+#endif
             }
          }
       }
@@ -159,7 +178,6 @@ public:
    omp_lock_t   globalLock;
 #endif
 };
-ScopeTimeCollectorCL scopetimecollector;
 
 ScopeTimerCL::ScopeTimerCL(const std::string& name)
 {
@@ -170,5 +188,5 @@ ScopeTimerCL::ScopeTimerCL(const std::string& name)
 ScopeTimerCL::~ScopeTimerCL()
 {
    _timer.Stop();
-   scopetimecollector.add(_name, _timer.GetTime());
+   ScopeTimeCollectorCL::GetInstance().add(_name, _timer.GetTime());
 }
