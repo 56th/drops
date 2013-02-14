@@ -1032,9 +1032,9 @@ class DummyPcCL
 };
 
 // computes an approximation of the largest eigenvalue of D^{-1}A
-template <class ExT>
-double GerschgorinScaledMatrix(const MatrixCL& A, const VectorCL& D, const ExT& ex) {
-    VectorCL y(A.GetLumpedDiag());
+template <class Mat, class Vec, class ExT>
+double GerschgorinScaledMatrix(const Mat& A, const Vec& D, const ExT& ex) {
+    Vec y(A.GetLumpedDiag());
     ex.Accumulate(y);
     y/=D;
 #ifdef _PAR
@@ -1043,6 +1043,24 @@ double GerschgorinScaledMatrix(const MatrixCL& A, const VectorCL& D, const ExT& 
     const double max_lambda = y.max();
 #endif
     return max_lambda;
+}
+
+// computes an approximation of the largest eigenvalue of D^{-1}A
+template <class Mat, class Vec, class ExT>
+double MaxEigenvalueScaledMatrix(const Mat& A, const Vec& D, const ExT& ex, const int iter = 10) {
+    Vec y(D);
+    ex.Accumulate(y);
+    y/=D;
+    y /= ex.Norm(y, true);
+    double lambda = 0.0;
+
+    for (int i=0; i<iter; ++i){
+        y=(A*y)/D;
+        ex.Accumulate(y);
+        lambda = ex.Norm(y, true);
+        y/=lambda;
+    }
+    return lambda;
 }
 
 #ifdef _PAR
@@ -1213,10 +1231,11 @@ class MLSmootherCL : public MLDataCL<SmootherT> {
   public:
     MLSmootherCL( const double omega = 1.0) : omega_(omega) {}
 
-    void SetDiag( const MLMatrixCL& A, const MLIdxDescCL& idx) {
+    template<class Mat>
+    void SetDiag( const MLDataCL<Mat>& A, const MLIdxDescCL& idx) {
         Assert( A.size() == idx.size(), DROPSErrCL ("MLSmootherCL::SetDiag: dimensions do not fit\n"), DebugNumericC);
         this->resize(A.size(), SmootherT(omega_));
-        MLMatrixCL::const_iterator Ait = A.begin();
+        typename MLDataCL<Mat>::const_iterator Ait = A.begin();
         MLIdxDescCL::const_iterator ExIt = idx.begin();
         for ( typename MLSmootherCL::iterator Sit = this->begin(); Sit != this->end(); ++Sit, ++Ait, ++ExIt)
             Sit->SetDiag(*Ait, ExIt->GetEx());
@@ -1360,6 +1379,7 @@ class ChebyshevsmoothCL : public PreBaseCL
 
             base_::SetDiag(A, ex);
             lambda_max_ = scale_ * GerschgorinScaledMatrix(A, diag_, ex);
+            //lambda_max_ = scale_ * MaxEigenvalueScaledMatrix(A, diag_, ex);
             std::cout << "ChebyshevsmoothCL: lambda_max = " << lambda_max_ << std::endl;
         }
 
