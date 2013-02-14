@@ -16,5 +16,9 @@ Name of author: Jens Berger
 #-------------------------------------------------------------------------------
 #------------------------------STRINGS------------------------------------------
 #-------------------------------------------------------------------------------
+String value: "Solution of the linear system based on Gauss-Elimination: -2 1"
+String find: 1
+String value: "Solution of the linear system based on QR-Decomposition: -2 1"
+String find: 1
 String value: "Solution: 0.4 0.4 -11"
 String find: 1
