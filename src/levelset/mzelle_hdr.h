@@ -332,7 +332,7 @@ TimeDisc2PhaseCL* CreateTimeDisc( InstatNavierStokes2PhaseP2P1CL& Stokes, Levels
 }
 
 template <class StokesT>
-void SolveStatProblem( StokesT& Stokes, const LevelsetP2CL& lset,
+void SolveStatProblem( StokesT& Stokes, LevelsetP2CL& lset,
                        NSSolverBaseCL<StokesT >& solver)
 {
 #ifndef _PAR
@@ -350,6 +350,7 @@ void SolveStatProblem( StokesT& Stokes, const LevelsetP2CL& lset,
     Stokes.SetIdx();
     Stokes.SetLevelSet( lset);
     lset.AccumulateBndIntegral( curv);
+    lset.UpdateMLPhi();
     Stokes.SetupSystem1( &Stokes.A, &Stokes.M, &Stokes.b, &Stokes.b, &cplM, lset, Stokes.v.t);
     Stokes.SetupPrStiff( &Stokes.prA, lset);
     Stokes.SetupPrMass ( &Stokes.prM, lset);
@@ -394,7 +395,7 @@ void SetInitialLevelsetConditions( LevelsetP2CL& lset, MultiGridCL& MG, ParamCL&
 }
 
 template <typename StokesT>
-void SetInitialConditions(StokesT& Stokes, const LevelsetP2CL& lset, MultiGridCL& MG, const ParamCL& P)
+void SetInitialConditions(StokesT& Stokes, LevelsetP2CL& lset, MultiGridCL& MG, const ParamCL& P)
 {
     MLIdxDescCL* pidx= &Stokes.pr_idx;
     switch (P.get<int>("DomainCond.InitialCond"))
