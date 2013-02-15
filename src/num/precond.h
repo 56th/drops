@@ -1351,14 +1351,14 @@ void Chebyshev(const Mat &A, Vec &x, const Vec &b, const ExT &ex, const Vec& dia
 }
 
 // ***************************************************************************
-/// \brief Class for performing Chebychev-polynomial based smoothing
+/// \brief Class for performing Chebyshev-polynomial based smoothing
 // ***************************************************************************
 class ChebyshevsmoothCL : public PreBaseCL
 {
     private:
         typedef PreBaseCL base_;
         const double scale_;        // scaling of lambda_max_
-        int degree_;                // degree of used Chebychev polynomial
+        int degree_;                // degree of used Chebyshev polynomial
         double  EigRatio_;          // ratio between lambda_max and lambda_min
         double  lambda_max_;        // approximation of largest eigenvalue
 
@@ -1383,7 +1383,7 @@ class ChebyshevsmoothCL : public PreBaseCL
             std::cout << "ChebyshevsmoothCL: lambda_max = " << lambda_max_ << std::endl;
         }
 
-        /// \brief Apply preconditioner: one step of the SSOR-iteration
+        /// \brief Apply preconditioner: one step of the Chebyshev-iteration
         template <typename Mat, typename Vec, typename ExT>
         void Apply(const Mat& A, Vec &x, const Vec& b, const ExT& ex) const
         {
@@ -1394,7 +1394,7 @@ class ChebyshevsmoothCL : public PreBaseCL
             Chebyshev<true, Mat, Vec, ExT>(A, x, b, ex, diag_, degree_, lambda_max_, EigRatio_);
 
         }
-        /// \brief Apply preconditioner: one step of the SSOR-iteration
+        /// \brief Apply preconditioner: one step of the Chebyshev-iteration
         template <typename Vec, typename ExT>
         void Apply(const MLMatrixCL& A, Vec &x, const Vec& b, const ExT& ex) const
         {
@@ -1403,14 +1403,14 @@ class ChebyshevsmoothCL : public PreBaseCL
 };
 
 // ***************************************************************************
-/// \brief Class for performing Chebychev-polynomial based preconditioning
+/// \brief Class for performing Chebyshev-polynomial based preconditioning
 // ***************************************************************************
 class ChebyshevPcCL : public PreBaseCL
 {
     private:
         typedef PreBaseCL base_;
         const double scale_;        // scaling of lambda_max_
-        int degree_;                // degree of used Chebychev polynomial
+        int degree_;                // degree of used Chebyshev polynomial
         double  EigRatio_;          // ratio between lambda_max and lambda_min
         double  lambda_max_;        // approximation of largest eigenvalue
 
@@ -1441,7 +1441,7 @@ class ChebyshevPcCL : public PreBaseCL
             SetDiag<>(A.GetFinest(), ex);
         }
 
-        /// \brief Apply preconditioner: one step of the SSOR-iteration
+        /// \brief Apply preconditioner: one step of the Chebyshev-iteration
         template <typename Mat, typename Vec, typename ExT>
         void Apply(const Mat& A, Vec &x, const Vec& b, const ExT& ex) const
         {
@@ -1452,7 +1452,7 @@ class ChebyshevPcCL : public PreBaseCL
             Chebyshev<false, Mat, Vec, ExT>(A, x, b, ex, diag_, degree_, lambda_max_, EigRatio_);
 
         }
-        /// \brief Apply preconditioner: one step of the SSOR-iteration
+        /// \brief Apply preconditioner: one step of the Chebyshev-iteration
         template <typename Vec, typename ExT>
         void Apply(const MLMatrixCL& A, Vec &x, const Vec& b, const ExT& ex) const
         {
