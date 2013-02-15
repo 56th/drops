@@ -1508,7 +1508,7 @@ class ChebyshevBBTPcCL : public ChebyshevPcCL {
 
     }
 
-    ~ChebyshevAATPcCL() { delete mat_;}
+    ~ChebyshevBBTPcCL() { delete mat_;}
 
 };
 
