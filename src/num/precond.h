@@ -657,7 +657,15 @@ class NEGSPcCL
     void Apply(const CompositeMatrixCL& AAT, VectorCL& x, const VectorCL& b, const ExT& rowex, const ExT& colex) const
     { Apply<>( *AAT.GetBlock1(), x, b, rowex, colex); }
     
-    bool RetAcc() const {return false;}
+    /// \brief Check if return preconditioned vectors are accumulated after calling Apply
+    bool RetAcc()   const { return false; }
+    /// \brief Check if the diagonal of the matrix is needed
+    bool NeedDiag() const { return false; }
+    /// \name Set diagonal of the matrix for consistency
+    //@{
+    void SetDiag(const VectorCL&) {}            // just for consistency
+    template<typename Mat, typename ExT>
+    void SetDiag(const Mat&, const ExT&) {}     // just for consistency
 };
 
 #ifdef _PAR
@@ -1446,7 +1454,7 @@ class ChebyshevPcCL : public PreBaseCL
         void Apply(const Mat& A, Vec &x, const Vec& b, const ExT& ex) const
         {
             Assert(mat_version_==A.Version() || !check_mat_version_,
-                   DROPSErrCL("ChebyshevsmoothCL::Apply: Diagonal of actual matrix has not been set"),
+                   DROPSErrCL("ChebyshevPcCL::Apply: Diagonal of actual matrix has not been set"),
                    DebugNumericC);
 
             Chebyshev<false, Mat, Vec, ExT>(A, x, b, ex, diag_, degree_, lambda_max_, EigRatio_);
@@ -1458,6 +1466,50 @@ class ChebyshevPcCL : public PreBaseCL
         {
             Apply<>(A.GetFinest(), x, b, ex);
         }
+};
+
+class ChebyshevBBTPcCL : public ChebyshevPcCL {
+  private:
+    CompositeMatrixCL* mat_;
+
+  public:
+    ChebyshevBBTPcCL(double lambda_scale = 1, int degree = 3, double ratio = 30.0) : ChebyshevPcCL(lambda_scale, degree, ratio), mat_(0) {}
+
+    /// \brief Set accumulated diagonal of a matrix, that is needed by most of the preconditioners
+    template<typename Mat, typename ExT>
+    void SetDiag(const Mat& A, const ExT& ex)
+    {
+        if (A.Version() == mat_version_)
+            return;
+
+        delete mat_;
+        mat_ = new CompositeMatrixBaseCL<Mat, Mat>(&A, TRANSP_MUL, &A, MUL);
+        if (diag_.size() != A.num_rows())
+            diag_.resize(A.num_rows());
+        // accumulate diagonal of the matrix
+        diag_= BBTDiag(A);
+        ex.Accumulate(diag_);
+        // remember version of the matrix
+        mat_version_= A.Version();
+
+        lambda_max_ = scale_ *MaxEigenvalueScaledMatrix(*mat_, diag_, ex);
+        std::cout << "ChebyshevBBTPcCL: lambda_max = " << lambda_max_ << std::endl;
+    }
+
+    /// \brief Apply preconditioner: one step of the Chebyshev-iteration
+    template <typename Mat, typename Vec, typename ExT>
+    void Apply(__UNUSED__ const Mat& A, Vec &x, const Vec& b, const ExT& ex, const ExT&) const
+    {
+        Assert(mat_version_==A.Version() || !check_mat_version_,
+               DROPSErrCL("ChebyshevBBTPcCL::Apply: Diagonal of actual matrix has not been set"),
+               DebugNumericC);
+
+        Chebyshev<false, CompositeMatrixCL, Vec, ExT>(*mat_, x, b, ex, diag_, degree_, lambda_max_, EigRatio_);
+
+    }
+
+    ~ChebyshevAATPcCL() { delete mat_;}
+
 };
 
 } // end of namespace DROPS
