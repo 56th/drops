@@ -319,7 +319,7 @@ void TransportP1XCL::InitStep (VectorCL& rhs)
 void TransportP1XCL::DoStep (const VectorCL& rhs)
 {
     std::cout << "Before solve: res = " << norm( L_*ct.Data - rhs) << std::endl;
-    gm_.Solve( L_, ct.Data, rhs);
+    gm_.Solve( L_, ct.Data, rhs, ct.RowIdx->GetEx());
     L_.clear();
     std::cout << "res = " << gm_.GetResid() << ", iter = " << gm_.GetIter()<<"\n";// <<", norm of ct = " << norm(ct.Data)<< std::endl;
 }

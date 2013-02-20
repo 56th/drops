@@ -1,0 +1,58 @@
+#---------------------SPECIFICATION FILE----------------------------------------
+Type of test: serial
+Name of executable: serialization
+#The path to the folder where the executable is located must be relative to the
+#/drops folder
+Folder of executable: tests
+#The path to the folder where the parameter-file is located must be relative to
+#the folder where the executable is situated
+Path of parameter-file: | tail -n 17
+Name of test: serialization(part 2/2)
+Name of author: lehrenfeld
+#-------------------------------------------------------------------------------
+#------------------------------NUMBERS------------------------------------------
+# Name of variable: "GCR interations"
+# Prefix of variable: "GCR: k:"
+# Value of variable:
+# Relative error:
+# Absolute error:
+# Minimal value: 0
+# Maximal value: 50
+#-------------------------------------------------------------------------------
+#------------------------------STRINGS-------------------------------------------
+# String find = 1: you want to find this string, = 0: you don't want to find this string
+String value: "Writing Vertices --> success"
+String find: 1
+String value: "Writing Edges --> success"
+String find: 1
+String value: "Writing Tetras --> success"
+String find: 1
+String value: "Writing Faces --> success"
+String find: 1
+String value: "Building Vertices --> success"
+String find: 1
+String value: "Building Edges --> success"
+String find: 1
+String value: "Building Faces Part I --> success"
+String find: 1
+String value: "Building Tetras --> success"
+String find: 1
+String value: "Building Faces Part II --> success"
+String find: 1
+String value: "Building Boundary --> success"
+String find: 1
+String value: "MultiGrid aus Datei gelesen"
+String find: 1
+String value: "4 Verts, 6 Edges, 4 Faces, 1 Tetras"
+String find: 1
+String value: "As far as I can tell the MultigridCL is sane"
+String find: 1
+String value: "Writing Vertices --> success"
+String find: 1
+String value: "Writing Edges --> success"
+String find: 1
+String value: "Writing Tetras --> success"
+String find: 1
+String value: "Writing Faces --> success"
+String find: 1
+#-------------------------------------------------------------------------------

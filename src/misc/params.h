@@ -149,6 +149,9 @@ DROPS::Point3DCL ParamCL::get<DROPS::Point3DCL>(const std::string & pathInPT) co
 template<>
 DROPS::Point2DCL ParamCL::get<DROPS::Point2DCL>(const std::string & pathInPT) const;
 
+/// \brief specialisation of standard get routine for std::vector<std::string>
+template<>
+std::vector<std::string > ParamCL::get<std::vector<std::string> >(const std::string & pathInPT) const;
 
 //DELETE ReadParamsCL?
 ///   \brief Parser for parameter files used by ParamBaseCL.

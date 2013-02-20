@@ -1,4 +1,18 @@
 {
+//General section
+     "General":
+     {
+             "ProgressBar":  1, //show progress bar
+             "DynamicLibsPrefix": "../", //where should we look for shared objects?
+             "DynamicLibs": [ //select libraries to be loaded after program start
+                     "levelset/liblevelset-twophaseCoeff",
+                     "misc/libmisc-scalarFunctions",
+                     "misc/libmisc-vectorFunctions"
+             ]
+     },
+
+
+
 	"_comment":
 "#=============================================================
 #    DROPS parameter file for twophasedrops
@@ -200,7 +214,7 @@
 
 		"Serialization":		1,
 		"Overwrite":		1,
-		"Inputfile":		"start/data",
+		"Inputfile":		"none", //former: "start/data",
 		"Outputfile":		"mg/data",
 		"Binary":		0
 	},
@@ -210,10 +224,10 @@
 		"_comment":
 "# domain, bnd/ini conditions",
 
-		"InitialCond":		-1,
+		"InitialCond":		1, //former: -1,
 		"GeomType":		0,
 		"InitialFile":		"start/data",
-		"MeshFile":		"gambit/NMR_05.msh",
+		"MeshFile":		"../../meshes/NMR_05.msh",
 		"BoundaryType":		"2!21!0",
 		"BoundaryFncs":		"InflowCell!ZeroVel!ZeroVel"
 	}

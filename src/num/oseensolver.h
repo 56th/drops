@@ -48,243 +48,18 @@ class StokesSolverBaseCL: public SolverBaseCL
     StokesSolverBaseCL (int maxiter, double tol, bool rel= false, std::ostream* output= 0)
         : SolverBaseCL(maxiter, tol, rel, output){}
 
-    virtual void Solve( const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p,
-                        const VectorCL& b, const VectorCL& c) = 0;
-    virtual void Solve( const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p,
-                        const VectorCL& b, const VectorCL& c) = 0;
-};
-
 #ifdef _PAR
-// ***************************************************************************
-/// \brief Parallel base solver class for Stokes problems
-// ***************************************************************************
-template <typename ApcT, typename SpcT>
-class ParStokesSolverBaseCL : public StokesSolverBaseCL
-{
-  protected:
-    typedef StokesSolverBaseCL base;// base class
-
-    const IdxDescCL& vel_idx_;      // accessing ExchangeCL for velocity
-    const IdxDescCL& pr_idx_;       // accessing ExchangeCL for pressure
-    ApcT*  Apc_;                    // preconditioner for A
-    SpcT*  Spc_;                    // preconditioner for Schurcomplement
-
-  public:
-    ParStokesSolverBaseCL(int maxiter, double tol, const IdxDescCL& vel_idx,
-                          const IdxDescCL& pr_idx, ApcT& apc, SpcT& spc,
-                          std::ostream* output= 0)
-      : base(maxiter, tol, /*rel*/false, output), vel_idx_(vel_idx), pr_idx_(pr_idx), Apc_(&apc), Spc_(&spc)
-        /// \param maxiter maximal iterations
-        /// \param tol     tolerance for residual
-        /// \param vel_idx index description for accessing the ExchangeCL for velocity
-        /// \param pr_idx  index description for accessing the ExchangeCL for pressure
-        /// \param apc     preconditioner for A-block
-        /// \param spc     preconditioner for Schur complement matrix
-        /// \param output  give output
-    {}
-
-    const ExchangeCL& GetExV() const    { return vel_idx_.GetEx(); }    ///< return constant reference on exchange class for velocities
-    const ExchangeCL& GetExP() const    { return pr_idx_.GetEx(); }     ///< return constant reference on exchange class for pressures
-
-    ApcT& GetInnerPC()             { return *Apc_; }    ///< return reference on inner preconditioner
-    const ApcT& GetInnerPC() const { return *Apc_; }    ///< return constant reference on inner preconditioner
-
-    SpcT& GetOuterPC()             { return *Spc_; }    ///< return reference on inner preconditioner
-    const ApcT& GetOuterPC() const { return *Spc_; }    ///< return constant reference on inner preconditioner
-
-};
+    virtual void Solve( const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p,
+                        const VectorCL& b, const VectorCL& c, const ExchangeCL& vel_ex, const ExchangeCL& pr_ex) = 0;
+    virtual void Solve( const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p,
+                        const VectorCL& b, const VectorCL& c, const ExchangeCL& vel_ex, const ExchangeCL& pr_ex) = 0;
 #endif
+    virtual void Solve( const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p,
+                        const VectorCL& b, const VectorCL& c, const DummyExchangeCL& vel_ex, const DummyExchangeCL& pr_ex) = 0;
+    virtual void Solve( const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p,
+                        const VectorCL& b, const VectorCL& c, const DummyExchangeCL& vel_ex, const DummyExchangeCL& pr_ex) = 0;
 
-template <typename PoissonSolverT>
-class SchurSolverCL : public StokesSolverBaseCL
-{
-  private:
-    PoissonSolverT& _poissonSolver;
-    template <typename Mat, typename Vec>
-    void doSolve( const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c);
-
-  public:
-    SchurSolverCL (PoissonSolverT& solver, int maxiter, double tol)
-        : StokesSolverBaseCL(maxiter,tol), _poissonSolver(solver) {}
-
-    void Solve( const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p,
-                const VectorCL& b, const VectorCL& c);
-    void Solve( const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p,
-                const VectorCL& b, const VectorCL& c);
 };
-
-template <typename PoissonSolverT>
-class SchurNoPcSolverCL : public StokesSolverBaseCL
-{
-  private:
-    PoissonSolverT& _poissonSolver;
-    template <typename Mat, typename Vec>
-    void doSolve( const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c);
-
-  public:
-    SchurNoPcSolverCL (PoissonSolverT& solver, int maxiter, double tol)
-        : StokesSolverBaseCL(maxiter,tol), _poissonSolver(solver) {}
-
-    void Solve( const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p,
-                const VectorCL& b, const VectorCL& c);
-    void Solve( const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p,
-                const VectorCL& b, const VectorCL& c);
-};
-
-template <typename PoissonSolverT>
-class PSchurSolverCL : public StokesSolverBaseCL
-{
-  private:
-    PoissonSolverT&        _poissonSolver;
-    PreGSOwnMatCL<P_SSOR0> _schurPc;
-
-    template <typename Mat, typename Vec>
-    void doSolve( const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c);
-
-  public:
-    PSchurSolverCL (PoissonSolverT& solver, MatrixCL& M, int maxiter, double tol)
-        : StokesSolverBaseCL(maxiter,tol), _poissonSolver(solver), _schurPc(M) {}
-    PSchurSolverCL (PoissonSolverT& solver, MLMatrixCL& M, int maxiter, double tol)
-    : StokesSolverBaseCL(maxiter,tol), _poissonSolver(solver), _schurPc( M.GetFinest()) {}
-
-    void Solve( const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p,
-                const VectorCL& b, const VectorCL& c);
-    void Solve( const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p,
-                const VectorCL& b, const VectorCL& c);
-};
-
-template <typename InnerSolverT, typename OuterSolverT>
-class PSchurSolver2CL : public StokesSolverBaseCL
-{
-  private:
-    InnerSolverT& innerSolver_;
-    OuterSolverT& outerSolver_;
-
-    template <typename Mat, typename Vec>
-    void doSolve( const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c);
-
-  public:
-    PSchurSolver2CL( InnerSolverT& solver1, OuterSolverT& solver2,
-                    int maxiter, double tol)
-        : StokesSolverBaseCL( maxiter, tol), innerSolver_( solver1),
-          outerSolver_( solver2) {}
-
-    void Solve( const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p,
-                const VectorCL& b, const VectorCL& c);
-    void Solve( const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p,
-                const VectorCL& b, const VectorCL& c);
-
-    InnerSolverT& GetInnerSolver() { return innerSolver_; }
-};
-
-template <typename PoissonSolverT>
-class UzawaSolverCL : public StokesSolverBaseCL
-{
-  private:
-    PoissonSolverT& _poissonSolver;
-    MatrixCL&       _M;
-    double          _tau;
-
-    template <typename Mat, typename Vec>
-    void doSolve( const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c);
-
-  public:
-    UzawaSolverCL (PoissonSolverT& solver, MatrixCL& M, int maxiter, double tol, double tau= 1.)
-        : StokesSolverBaseCL(maxiter,tol), _poissonSolver(solver), _M(M), _tau(tau) {}
-    UzawaSolverCL (PoissonSolverT& solver, MLMatrixCL& M, int maxiter, double tol, double tau= 1.)
-    : StokesSolverBaseCL(maxiter,tol), _poissonSolver(solver), _M(M.GetFinest()), _tau(tau) {}
-
-
-    double GetTau()            const { return _tau; }
-    void   SetTau( double tau)       { _tau= tau; }
-
-    void Solve( const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p,
-                const VectorCL& b, const VectorCL& c);
-    void Solve( const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p,
-                const VectorCL& b, const VectorCL& c);
-};
-
-template <typename PoissonSolverT, typename PoissonSolver2T>
-class UzawaSolver2CL : public StokesSolverBaseCL
-{
-  private:
-    PoissonSolverT&  poissonSolver_;
-    PoissonSolver2T& poissonSolver2_;
-    MatrixCL& M_;
-    double    tau_;
-
-    template <typename Mat, typename Vec>
-    void doSolve( const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c);
-
-  public:
-    UzawaSolver2CL (PoissonSolverT& solver, PoissonSolver2T& solver2,
-                    MatrixCL& M, int maxiter, double tol, double tau= 1.)
-        : StokesSolverBaseCL( maxiter, tol), poissonSolver_( solver), poissonSolver2_( solver2),
-          M_( M), tau_( tau) {}
-
-    double GetTau()            const { return tau_; }
-    void   SetTau( double tau)       { tau_= tau; }
-
-    void Solve( const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p,
-                const VectorCL& b, const VectorCL& c);
-    void Solve( const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p,
-                const VectorCL& b, const VectorCL& c);
-};
-
-//! Special UzawaSolver2CL using PoissonSolver.Apply() functions
-template <typename PressurePreT, typename PoissonSolver2T>
-class UzawaSolver2ModifiedCL : public StokesSolverBaseCL
-{
-  private:
-    PressurePreT&    pr_pre_;
-    PoissonSolver2T& poissonSolver2_;
-    MatrixCL& M_;
-    double    tau_;
-
-  public:
-    UzawaSolver2ModifiedCL ( PressurePreT& pre, PoissonSolver2T& solver2,
-                      MatrixCL& M, int maxiter, double tol, double tau= 1.)
-        : StokesSolverBaseCL( maxiter, tol), pr_pre_( pre), poissonSolver2_( solver2),
-          M_( M), tau_( tau) {}
-
-    double GetTau()            const { return tau_; }
-    void   SetTau( double tau)       { tau_= tau; }
-
-    void Solve( const MatrixCL& , const MatrixCL& , VectorCL& , VectorCL& ,
-                    const VectorCL& , const VectorCL& ){};
-    void Solve( const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p,
-                const VectorCL& b, const VectorCL& c);
-};
-
-class Uzawa_IPCG_CL : public StokesSolverBaseCL
-{
-  private:
-    SSORDiagPcCL   _ssordiagpc;
-    PCGSolverCL<SSORDiagPcCL> _M_IPCGsolver;
-    PCGSolverCL<SSORDiagPcCL> _A_IPCGsolver;
-    MatrixCL&      _M;
-    double         _tau;
-
-    template <typename Mat, typename Vec>
-    void doSolve( const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c);
-
-  public:
-    Uzawa_IPCG_CL(MatrixCL& M, int outer_iter, double outer_tol, int inner_iter, double inner_tol, double tau= 1.)
-        : StokesSolverBaseCL(outer_iter,outer_tol),
-          _M_IPCGsolver( _ssordiagpc, inner_iter, inner_tol ),
-          _A_IPCGsolver( _ssordiagpc, inner_iter, inner_tol ),
-          _M(M), _tau(tau)
-        { _M_IPCGsolver.GetPc().Init(_M); }
-
-    // Always call this when A has changed, before Solve()!
-    void Init_A_Pc(MatrixCL& A) { _A_IPCGsolver.GetPc().Init(A); }
-
-    inline void Solve( const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p,
-                       const VectorCL& b, const VectorCL& c);
-    inline void Solve( const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p,
-                const VectorCL& b, const VectorCL& c);
-};
-
 
 //=============================================================================
 // Ready-to-use solver-class with inexact Uzawa method InexactUzawa.
@@ -314,65 +89,71 @@ template <class ApcT, class SpcT, InexactUzawaApcMethodT ApcMeth= APC_OTHER>
         :StokesSolverBaseCL( outer_iter, outer_tol),
          Apc_( Apc), Spc_( Spc), innerreduction_( innerreduction), innermaxiter_( innermaxiter)
     {}
-    inline void
-    Solve(const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p,
-          const VectorCL& b, const VectorCL& c);
+    template<class Mat, class Vec, class ExT>
     inline
-    void Solve( const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p,
-                const VectorCL& b, const VectorCL& c);
-};
+    void Solve(const Mat& A, const Mat& B, Vec& v, Vec& p,
+          const Vec& b, const Vec& c, const ExT& vel_ex, const ExT& pr_ex);
 
 #ifdef _PAR
-// ***************************************************************************
-/// \brief Parallel preconditioned inexact Uzawa class
-// ***************************************************************************
-template <typename ApcT, typename SpcT, InexactUzawaApcMethodT ApcMeth= APC_OTHER>
-class ParInexactUzawaCL : public ParStokesSolverBaseCL<ApcT, SpcT>
-{
-  private:
-    typedef ParStokesSolverBaseCL<ApcT, SpcT> base;
-
-    double innerreduction_;     // reduction
-    int    innermaxiter_;       // maximal inner iterations
-    int    inneriter_;          // number of inner iterations (accumulated)
-
-  public:
-    ParInexactUzawaCL(ApcT& Apc, SpcT& Spc, const IdxDescCL& vel_idx, const IdxDescCL& pr_idx,
-                      int outer_iter, double outer_tol,
-                      double innerreduction= 0.3, int innermaxiter= 500, std::ostream* output= 0)
-    : base( outer_iter, outer_tol, vel_idx, pr_idx, Apc, Spc, output),
-      innerreduction_( innerreduction), innermaxiter_( innermaxiter), inneriter_(0)
-    {}
-
-    void Solve( const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p,
-                const VectorCL& b, const VectorCL& c)
-    /// Solve the Stokes problem given by the matrices \a A and \a B and rhs \a b and \a c with the inexact Uzawa
-    /// algorithm and stores the solution for the velocity and pressure in \a v and \a p
-    {
-        base::_res=  base::_tol;
-        base::_iter= base::_maxiter;
-        inneriter_ = 0;
-        ParInexactUzawa( A, B, v, p, b, c, base::GetExV(), base::GetExP(), *base::Apc_,
-                       *base::Spc_, base::_iter, base::_res, inneriter_, ApcMeth, innerreduction_,
-                       innermaxiter_, base::output_);
-    }
-
+    inline
+    void Solve(const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p,
+          const VectorCL& b, const VectorCL& c, const ExchangeCL& vel_ex, const ExchangeCL& pr_ex);
+    inline
     void Solve( const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p,
-                const VectorCL& b, const VectorCL& c)
-    {
-        base::_res=  base::_tol;
-        base::_iter= base::_maxiter;
-        inneriter_ = 0;
-        ParInexactUzawa( A, B, v, p, b, c, base::GetExV(), base::GetExP(), *base::Apc_,
-                       *base::Spc_, base::_iter, base::_res, inneriter_, ApcMeth,
-                       innerreduction_, innermaxiter_, base::output_);
-    }
-
-    int GetInnerIter()    const  { return inneriter_; }
-    int GetInnerMaxIter() const  { return innermaxiter_; }
-};
+          const VectorCL& b, const VectorCL& c, const ExchangeCL& vel_ex, const ExchangeCL& pr_ex);
 #endif
+    inline
+    void Solve(const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p,
+          const VectorCL& b, const VectorCL& c, const DummyExchangeCL& vel_ex, const DummyExchangeCL& pr_ex);
+    inline
+    void Solve( const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p,
+          const VectorCL& b, const VectorCL& c, const DummyExchangeCL& vel_ex, const DummyExchangeCL& pr_ex);
+};
 
+template <class ApcT, class SpcT, InexactUzawaApcMethodT Apcmeth>
+template <class Mat, class Vec, class ExT>
+  inline void
+  InexactUzawaCL<ApcT, SpcT, Apcmeth>::Solve( const Mat& A, const Mat& B, Vec& v, Vec& p,
+          const Vec& b, const Vec& c, const ExT& vel_ex, const ExT& pr_ex)
+{
+    res_=  tol_;
+    iter_= maxiter_;
+    InexactUzawa( A, B, v, p, b, c, vel_ex, pr_ex, Apc_, Spc_, iter_, res_, Apcmeth, innerreduction_, innermaxiter_, rel_, output_);
+}
+
+template <class ApcT, class SpcT, InexactUzawaApcMethodT Apcmeth>
+  inline void
+  InexactUzawaCL<ApcT, SpcT, Apcmeth>::Solve( const MatrixCL& A, const MatrixCL& B,
+    VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c, const DummyExchangeCL& vel_ex, const DummyExchangeCL& pr_ex)
+{
+    Solve<>(A, B, v, p, b, c, vel_ex, pr_ex);
+}
+
+template <class ApcT, class SpcT, InexactUzawaApcMethodT Apcmeth>
+  inline void
+  InexactUzawaCL<ApcT, SpcT, Apcmeth>::Solve( const MLMatrixCL& A, const MLMatrixCL& B,
+    VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c, const DummyExchangeCL& vel_ex, const DummyExchangeCL& pr_ex)
+{
+    Solve<>(A, B, v, p, b, c, vel_ex, pr_ex);
+}
+
+#ifdef _PAR
+template <class ApcT, class SpcT, InexactUzawaApcMethodT Apcmeth>
+  inline void
+  InexactUzawaCL<ApcT, SpcT, Apcmeth>::Solve( const MatrixCL& A, const MatrixCL& B,
+    VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c, const ExchangeCL& vel_ex, const ExchangeCL& pr_ex)
+{
+    Solve<>(A, B, v, p, b, c, vel_ex, pr_ex);
+}
+
+template <class ApcT, class SpcT, InexactUzawaApcMethodT Apcmeth>
+  inline void
+  InexactUzawaCL<ApcT, SpcT, Apcmeth>::Solve( const MLMatrixCL& A, const MLMatrixCL& B,
+    VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c, const ExchangeCL& vel_ex, const ExchangeCL& pr_ex)
+{
+    Solve<>(A, B, v, p, b, c, vel_ex, pr_ex);
+}
+#endif
 
 // Use a Krylow-method (from num/krylovsolver.h) with the standard-interface of
 // the Oseensolvers in this file.
@@ -381,74 +162,80 @@ class BlockMatrixSolverCL: public StokesSolverBaseCL
 {
   private:
     SolverT& solver_;
-#ifdef _PAR
-    ExchangeBlockCL exBlock_;
-#endif
 
   public:
-#ifndef _PAR
     BlockMatrixSolverCL( SolverT& solver)
         : StokesSolverBaseCL(-1, -1.0), solver_( solver) {}
-#else
-    BlockMatrixSolverCL( SolverT& solver, const IdxDescCL& vel_idx, const IdxDescCL& pr_idx)
-        : StokesSolverBaseCL(-1, -1.0), solver_( solver)
-    {
-        exBlock_.AttachTo( vel_idx);
-        exBlock_.AttachTo( pr_idx);
-    }
-#endif
 
 // We overwrite these functions.
     void   SetTol     (double tol) { solver_.SetTol( tol); }
     void   SetMaxIter (int iter)   { solver_.SetMaxIter( iter); }
     void   SetRelError(bool rel)   { solver_.SetRelError( rel); }
+    void   SetOutput  (std::ostream* output) {solver_.SetOutput( output); }
 
     double GetTol     () const { return solver_.GetTol(); }
     int    GetMaxIter () const { return solver_.GetMaxIter(); }
     double GetResid   () const { return solver_.GetResid(); }
     int    GetIter    () const { return solver_.GetIter(); }
     bool   GetRelError() const { return solver_.GetRelError(); }
-
+#ifdef _PAR
+    template <typename Mat, typename Vec>
     void
-    Solve(const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p,
-          const VectorCL& b, const VectorCL& c) {
-        BlockMatrixCL M( &A, MUL, &B, TRANSP_MUL, &B, MUL);
+    Solve(const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c, const ExchangeCL& vel_ex, const ExchangeCL& pr_ex) {
+        BlockMatrixBaseCL<Mat> M( &A, MUL, &B, TRANSP_MUL, &B, MUL);
         VectorCL rhs( M.num_rows());
         rhs[std::slice( 0, M.num_rows( 0), 1)]= b;
         rhs[std::slice( M.num_rows( 0), M.num_rows( 1), 1)]= c;
         VectorCL x( M.num_cols());
         x[std::slice( 0, M.num_cols( 0), 1)]= v;
         x[std::slice( M.num_cols( 0), M.num_cols( 1), 1)]= p;
-#ifndef _PAR
-        solver_.Solve( M, x, rhs);
-#else
-        exBlock_.Update();
-        solver_.Solve( M, x, rhs, exBlock_);
-#endif
+        ExchangeBlockCL exBlock;
+        exBlock.AttachTo(vel_ex);
+        exBlock.AttachTo(pr_ex);
+        solver_.Solve( M, x, rhs, exBlock);
         v= x[std::slice( 0, M.num_cols( 0), 1)];
         p= x[std::slice( M.num_cols( 0), M.num_cols( 1), 1)];
+    }
+#endif
+    template <typename Mat, typename Vec>
+    void
+    Solve(const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c, const DummyExchangeCL& vel_ex, const DummyExchangeCL& pr_ex) {
+        BlockMatrixBaseCL<Mat> M( &A, MUL, &B, TRANSP_MUL, &B, MUL);
+        VectorCL rhs( M.num_rows());
+        rhs[std::slice( 0, M.num_rows( 0), 1)]= b;
+        rhs[std::slice( M.num_rows( 0), M.num_rows( 1), 1)]= c;
+        VectorCL x( M.num_cols());
+        x[std::slice( 0, M.num_cols( 0), 1)]= v;
+        x[std::slice( M.num_cols( 0), M.num_cols( 1), 1)]= p;
+        DummyExchangeBlockCL exBlock;
+        exBlock.AttachTo(vel_ex);
+        exBlock.AttachTo(pr_ex);
+        solver_.Solve( M, x, rhs, exBlock);
+        v= x[std::slice( 0, M.num_cols( 0), 1)];
+        p= x[std::slice( M.num_cols( 0), M.num_cols( 1), 1)];
+    }
+#ifdef _PAR
+    void Solve( const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p,
+                const VectorCL& b, const VectorCL& c, const ExchangeCL& vel_ex, const ExchangeCL& pr_ex) {
+        Solve<>(A, B, v, p, b, c, vel_ex, pr_ex);
     }
     void Solve( const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p,
-                const VectorCL& b, const VectorCL& c) {
-        MLBlockMatrixCL M( &A, MUL, &B, TRANSP_MUL, &B, MUL);
-        VectorCL rhs( M.num_rows());
-        rhs[std::slice( 0, M.num_rows( 0), 1)]= b;
-        rhs[std::slice( M.num_rows( 0), M.num_rows( 1), 1)]= c;
-        VectorCL x( M.num_cols());
-        x[std::slice( 0, M.num_cols( 0), 1)]= v;
-        x[std::slice( M.num_cols( 0), M.num_cols( 1), 1)]= p;
-#ifndef _PAR
-        solver_.Solve( M, x, rhs);
-#else
-        exBlock_.Update();
-        solver_.Solve( M, x, rhs, exBlock_);
-#endif
-        v= x[std::slice( 0, M.num_cols( 0), 1)];
-        p= x[std::slice( M.num_cols( 0), M.num_cols( 1), 1)];
+                const VectorCL& b, const VectorCL& c, const ExchangeCL& vel_ex, const ExchangeCL& pr_ex) {
+        Solve<>(A, B, v, p, b, c, vel_ex, pr_ex);
     }
+#endif
+    void Solve( const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p,
+                const VectorCL& b, const VectorCL& c, const DummyExchangeCL& vel_ex, const DummyExchangeCL& pr_ex) {
+        Solve<>(A, B, v, p, b, c, vel_ex, pr_ex);
+    }
+    void Solve( const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p,
+                const VectorCL& b, const VectorCL& c, const DummyExchangeCL& vel_ex, const DummyExchangeCL& pr_ex) {
+        Solve<>(A, B, v, p, b, c, vel_ex, pr_ex);
+    }
+
 };
 
-
+/*
 // StokesSolverBaseCL can be used as a preconditioner for the methods in solver.h
 class StokesSolverAsPreCL
 {
@@ -484,132 +271,19 @@ class StokesSolverAsPreCL
             *output_<< "StokesSolverAsPreCL: iterations: " << solver_.GetIter()
                     << "\trelative residual: " << solver_.GetResid() << std::endl;
     }
-};
+};*/
 
 //=============================================================================
 //  SchurComplMatrixCL
 //=============================================================================
-
-template<typename, typename>
-class SchurComplMatrixCL;
-
-template<typename T, typename Mat>
-VectorCL operator*(const SchurComplMatrixCL<T, Mat>&, const VectorCL&);
-
-
-template<class PoissonSolverT, typename Mat>
-class SchurComplMatrixCL
-{
-  private:
-    PoissonSolverT& solver_;
-    const Mat& A_;
-    const Mat& B_;
-
-  public:
-    SchurComplMatrixCL(PoissonSolverT& solver, const Mat& A, const Mat& B)
-        : solver_( solver), A_( A), B_( B) {}
-
-    friend VectorCL
-    operator*<>(const SchurComplMatrixCL<PoissonSolverT, Mat>&, const VectorCL&);
-};
-
-
-template<class PoissonSolverT, class Mat>
-VectorCL operator*(const SchurComplMatrixCL<PoissonSolverT, Mat>& M, const VectorCL& v)
-{
-    VectorCL x( M.A_.num_cols());
-    M.solver_.Solve( M.A_, x, transp_mul( M.B_, v));
-//    std::cout << "> inner iterations: " << M.solver_.GetIter()
-//              << "\tresidual: " << M.solver_.GetResid() << std::endl;
-    return M.B_*x;
-}
-
-//=============================================================================
-//  SchurComplNoPcMatrixCL
-//=============================================================================
-template<typename>
-class SchurComplNoPcMatrixCL;
-
-template<typename Mat>
-VectorCL operator*(const SchurComplNoPcMatrixCL<Mat>&, const VectorCL&);
-
-template<typename Mat>
-class SchurComplNoPcMatrixCL
-{
-  private:
-    const Mat& _matA;
-    const Mat&       _matB;
-    double    _tol;
-
-  public:
-    SchurComplNoPcMatrixCL( const Mat& A, const Mat& B, double tol)
-        : _matA(A), _matB(B), _tol(tol) {}
-    friend VectorCL operator*<>( const SchurComplNoPcMatrixCL& M, const VectorCL& v);
-};
-
-template<typename Mat>
-VectorCL operator* (const SchurComplNoPcMatrixCL<Mat>& M, const VectorCL& v)
-{
-    double tol= M._tol;
-    int maxiter= 1000;
-    VectorCL x( M._matA.num_cols());
-
-    CG(M._matA, x, transp_mul(M._matB, v), maxiter, tol);
-    if (maxiter > 990)
-        Comment(     "VectorCL operator* (const SchurComplNoPcMatrixCL& M, const VectorCL& v): "
-                  << "Needed more than 990 iterations! tol: " << tol << std::endl,
-                  DebugNumericC);
-//    std::cout << "Inner iteration took " << maxiter << " steps, residuum is " << tol << std::endl;
-    return M._matB*x;
-}
-
-//=============================================================================
-// ApproximateSchurComplMatrixCL
-// BApc^{-1}B^T, where Apc is a preconditioner for A.
-//=============================================================================
-template<typename, typename>
-class ApproximateSchurComplMatrixCL;
-
-template<typename T, typename MatT>
-VectorCL operator*(const ApproximateSchurComplMatrixCL<T, MatT>&, const VectorCL&);
-
-template<typename APC, typename Mat>
-class ApproximateSchurComplMatrixCL
-{
-  private:
-    const Mat& A_;
-    APC& Apc_;
-    const Mat& B_;
-
-  public:
-    ApproximateSchurComplMatrixCL(const Mat& A, APC& Apc, const Mat& B)
-        : A_( A), Apc_( Apc), B_( B) {}
-
-    friend VectorCL
-    operator*<>(const ApproximateSchurComplMatrixCL<APC, Mat>&, const VectorCL&);
-};
-
-template<typename APC, typename Mat>
-VectorCL operator*(const ApproximateSchurComplMatrixCL<APC, Mat>& M, const VectorCL& v)
-{
-    VectorCL x( 0.0, M.B_.num_cols());
-    VectorCL r= transp_mul( M.B_, v);
-    M.Apc_.Apply( M.A_, x, r);
-    return M.B_*x;
-}
-
-#ifdef _PAR
-// ***************************************************************************
-/// \brief Parallel Schur complement matrix class
-// ***************************************************************************
 template<typename, typename, typename>
-  class ParSchurComplMatrixCL;
+  class SchurComplMatrixCL;
 
 template<typename T1, typename T2, typename T3>
-  VectorCL operator*(const ParSchurComplMatrixCL<T1, T2, T3>&, const VectorCL&);
+  VectorCL operator*(const SchurComplMatrixCL<T1, T2, T3>&, const VectorCL&);
 
 template<typename PoissonSolverT, typename MatT, typename ExVCL>
-class ParSchurComplMatrixCL
+class SchurComplMatrixCL
 /// This class can multiply B*A^(-1)*B * x.
 {
   private:
@@ -619,18 +293,20 @@ class ParSchurComplMatrixCL
     const ExVCL& ex_;
 
   public:
-    ParSchurComplMatrixCL(PoissonSolverT& solver, const MatT& A, const MatT& B, const ExVCL& ex)
+    SchurComplMatrixCL(PoissonSolverT& solver, const MatT& A, const MatT& B, const ExVCL& ex)
       : solver_(solver), A_( A), B_( B), ex_(ex) {}
 
     friend VectorCL
-    operator*<>(const ParSchurComplMatrixCL<PoissonSolverT, MatT, ExVCL>&, const VectorCL&);
+    operator*<>(const SchurComplMatrixCL<PoissonSolverT, MatT, ExVCL>&, const VectorCL&);
+
+    const ExVCL& GetVelEx() const { return ex_; }
 };
 
 template<class PoissonSolverT, typename MatT, typename ExVCL>
-  VectorCL operator*(const ParSchurComplMatrixCL<PoissonSolverT, MatT, ExVCL>& M, const VectorCL& v)
+  VectorCL operator*(const SchurComplMatrixCL<PoissonSolverT, MatT, ExVCL>& M, const VectorCL& v)
 {
     VectorCL x(  M.A_.num_cols() );
-    M.solver_.Solve( M.A_, x, transp_mul( M.B_, v));
+    M.solver_.Solve( M.A_, x, transp_mul( M.B_, v), M.ex_);
 //     IF_MASTER
 //       std::cout << "> inner iterations: " << M.solver_.GetIter()
 //                 << "\tresidual: " << M.solver_.GetResid()
@@ -640,16 +316,16 @@ template<class PoissonSolverT, typename MatT, typename ExVCL>
 
 
 // ***************************************************************************
-/// \brief Parallel approximate Schur complement matrix class
+/// \brief approximate Schur complement matrix class
 // ***************************************************************************
 template<typename, typename, typename>
-  class ParApproximateSchurComplMatrixCL;
+  class ApproximateSchurComplMatrixCL;
 
 template<typename T1, typename T2, typename T3>
-  VectorCL operator*(const ParApproximateSchurComplMatrixCL<T1, T2, T3>&, const VectorCL&);
+  VectorCL operator*(const ApproximateSchurComplMatrixCL<T1, T2, T3>&, const VectorCL&);
 
 template<typename APC, typename MatT, typename ExVCL>
-class ParApproximateSchurComplMatrixCL
+class ApproximateSchurComplMatrixCL
 /// Assume M is a approximate of A. Then instead of performing B*A^(-1)*B^T * v this class can
 /// perform the multiplication B*M^(-1)*B^T * v
 {
@@ -660,428 +336,24 @@ class ParApproximateSchurComplMatrixCL
     const ExVCL& ex_;
 
   public:
-    ParApproximateSchurComplMatrixCL(const MatT& A, APC& Apc, const MatT& B, const ExVCL& ex)
+    ApproximateSchurComplMatrixCL(const MatT& A, APC& Apc, const MatT& B, const ExVCL& ex)
       : A_( A), Apc_( Apc), B_( B), ex_(ex) {}
 
     friend VectorCL
-    operator*<>(const ParApproximateSchurComplMatrixCL<APC, MatT, ExVCL>&, const VectorCL&);
+    operator*<>(const ApproximateSchurComplMatrixCL<APC, MatT, ExVCL>&, const VectorCL&);
+    const ExVCL& GetVelEx() const { return ex_; }
+    size_t Version() const  { return A_.Version(); } ///< Get modification version number
 };
 
 template<class APC, typename MatT, typename ExVCL>
-  VectorCL operator*(const ParApproximateSchurComplMatrixCL<APC, MatT, ExVCL>& M, const VectorCL& v)
+  VectorCL operator*(const ApproximateSchurComplMatrixCL<APC, MatT, ExVCL>& M, const VectorCL& v)
 {
     VectorCL x( 0.0, M.B_.num_cols());
     VectorCL r= transp_mul( M.B_, v);
-    M.Apc_.Apply( M.A_, x, r);
+    M.Apc_.Apply( M.A_, x, r, M.ex_);
     if (!M.Apc_.RetAcc())
         M.ex_.Accumulate(x);
     return M.B_*x;
-}
-#endif
-
-//=============================================================================
-//  The "Solve" functions
-//=============================================================================
-
-template <class PoissonSolverT>
-template <typename Mat, typename Vec>
-void UzawaSolverCL<PoissonSolverT>::doSolve(
-    const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c)
-{
-    Vec v_corr(v.size()),
-        p_corr(p.size()),
-        res1(v.size()),
-        res2(p.size());
-
-    double tol= _tol;
-    tol*= tol;
-    Uint output= 50;//max_iter/20;  // nur 20 Ausgaben pro Lauf
-
-    double res1_norm= 0., res2_norm= 0.;
-    for( _iter=0; _iter<_maxiter; ++_iter) {
-        z_xpay(res2, B*v, -1.0, c);
-        res2_norm= norm_sq( res2);
-        _poissonSolver.SetTol( std::sqrt( res2_norm)/20.0);
-        _poissonSolver.Solve(_M, p_corr, res2);
-//        p+= _tau * p_corr;
-        axpy(_tau, p_corr, p);
-//        res1= A*v + transp_mul(B,p) - b;
-        z_xpaypby2(res1, A*v, 1.0, transp_mul(B,p), -1.0, b);
-        res1_norm= norm_sq( res1);
-        if (res1_norm + res2_norm < tol) {
-            _res= std::sqrt( res1_norm + res2_norm );
-            return;
-        }
-        if( (_iter%output)==0)
-            std::cout << "step " << _iter << ": norm of 1st eq= " << std::sqrt( res1_norm)
-                      << ", norm of 2nd eq= " << std::sqrt( res2_norm) << std::endl;
-
-        _poissonSolver.SetTol( std::sqrt( res1_norm)/20.0);
-        _poissonSolver.Solve( A, v_corr, res1);
-        v-= v_corr;
-    }
-    _res= std::sqrt( res1_norm + res2_norm );
-}
-
-template <class PoissonSolverT>
-void UzawaSolverCL<PoissonSolverT>::Solve(
-    const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c)
-{
-    doSolve( A, B, v, p, b, c);
-}
-
-template <class PoissonSolverT>
-void UzawaSolverCL<PoissonSolverT>::Solve(
-    const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c)
-{
-    doSolve( A, B, v, p, b, c);
-}
-
-template <class PoissonSolverT, class PoissonSolver2T>
-template <typename Mat, typename Vec>
-void UzawaSolver2CL<PoissonSolverT, PoissonSolver2T>::doSolve(
-    const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c)
-{
-    Vec v_corr( v.size()),
-        p_corr( p.size()),
-        res1( v.size()),
-        res2( p.size());
-    double tol= _tol;
-    tol*= tol;
-    Uint output= 50;//max_iter/20;  // nur 20 Ausgaben pro Lauf
-
-    double res1_norm= 0., res2_norm= 0.;
-    for( _iter=0; _iter<_maxiter; ++_iter) {
-        z_xpay(res2, B*v, -1.0, c);
-        res2_norm= norm_sq( res2);
-        poissonSolver_.SetTol( std::sqrt( res2_norm)/20.0);
-        poissonSolver_.Solve( M_, p_corr, res2);
-//        p+= _tau * p_corr;
-        axpy(tau_, p_corr, p);
-//        res1= A*v + transp_mul(B,p) - b;
-        z_xpaypby2( res1, A*v, 1.0, transp_mul( B, p), -1.0, b);
-        res1_norm= norm_sq( res1);
-        if (res1_norm + res2_norm < tol) {
-            _res= std::sqrt( res1_norm + res2_norm);
-            return;
-        }
-        if( (_iter%output)==0)
-            std::cout << "step " << _iter << ": norm of 1st eq= " << std::sqrt( res1_norm)
-                      << ", norm of 2nd eq= " << std::sqrt( res2_norm) << std::endl;
-
-        poissonSolver2_.SetTol( std::sqrt( res1_norm)/20.0);
-        poissonSolver2_.Solve( A, v_corr, res1);
-        v-= v_corr;
-    }
-    _res= std::sqrt( res1_norm + res2_norm );
-}
-
-template <class PoissonSolverT, class PoissonSolver2T>
-void UzawaSolver2CL<PoissonSolverT, PoissonSolver2T>::Solve(
-    const MatrixCL& A, const MatrixCL& B,
-    VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c)
-{
-    doSolve( A, B, v, p, b, c);
-}
-
-template <class PoissonSolverT, class PoissonSolver2T>
-void UzawaSolver2CL<PoissonSolverT, PoissonSolver2T>::Solve(
-    const MLMatrixCL& A, const MLMatrixCL& B,
-    VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c)
-{
-    doSolve( A, B, v, p, b, c);
-}
-
-template <class PoissonSolverT, class PoissonSolver2T>
-void UzawaSolver2ModifiedCL<PoissonSolverT, PoissonSolver2T>::Solve(
-    const MLMatrixCL& A, const MLMatrixCL& B,
-    VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c)
-{
-    VectorCL v_corr( v.size()),
-             p_corr( p.size()),
-             res1( v.size()),
-             res2( p.size());
-    double tol= _tol;
-    tol*= tol;
-    Uint output= 50;//max_iter/20;  // nur 20 Ausgaben pro Lauf
-
-    double res1_norm= 0., res2_norm= 0.;
-    for( _iter=0; _iter<_maxiter; ++_iter) {
-        z_xpay(res2, B*v, -1.0, c);
-        res2_norm= norm_sq( res2);
-        pr_pre_.Apply( M_, p_corr, res2);
-//        p+= _tau * p_corr;
-        axpy(tau_, p_corr, p);
-//        res1= A*v + transp_mul(B,p) - b;
-        z_xpaypby2( res1, A*v, 1.0, transp_mul( B, p), -1.0, b);
-        res1_norm= norm_sq( res1);
-        if (res1_norm + res2_norm < tol) {
-            _res= std::sqrt( res1_norm + res2_norm);
-            return;
-        }
-        if( (_iter%output)==0)
-            std::cout << "step " << _iter << ": norm of 1st eq= " << std::sqrt( res1_norm)
-                      << ", norm of 2nd eq= " << std::sqrt( res2_norm) << std::endl;
-
-        poissonSolver2_.Apply( A, v_corr, res1);
-        //std::cout << v_corr << std::endl;
-        //std::cin >> oo;
-//        poissonSolver2_.SetTol( std::sqrt( res1_norm)/20.0);
-//        poissonSolver2_.Solve( A, v_corr, res1);
-//        std::cout << "velocity: iterations: " << poissonSolver2_.GetIter()
-//                  << "\tresidual: " << poissonSolver2_.GetResid() << std::endl;
-        v-= v_corr;
-    }
-    _res= std::sqrt( res1_norm + res2_norm );
-}
-///////////SchurSolverCL Methods
-template <class PoissonSolverT>
-template <typename Mat, typename Vec>
-void SchurSolverCL<PoissonSolverT>::doSolve(
-    const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c)
-// solve:       S*p = B*(A^-1)*b - c   with SchurCompl. S = B A^(-1) BT
-//              A*u = b - BT*p
-{
-    Vec _tmp;
-    Vec rhs(-c);
-    if (_tmp.size() != v.size())
-        _tmp.resize( v.size());
-    _poissonSolver.Solve( A, _tmp, b);
-    std::cout << "iterations: " << _poissonSolver.GetIter()
-              << "\tresidual: " << _poissonSolver.GetResid() << std::endl;
-    rhs+= B*_tmp;
-
-    std::cout << "rhs has been set! Now solving pressure..." << std::endl;
-    int iter= _maxiter;
-    double tol= _tol;
-    CG( SchurComplMatrixCL<PoissonSolverT, Mat>( _poissonSolver, A, B), p, rhs, iter, tol);
-    std::cout << "iterations: " << iter << "\tresidual: " << tol << std::endl;
-    std::cout << "pressure has been solved! Now solving velocities..." << std::endl;
-
-    _poissonSolver.Solve( A, v, Vec(b - transp_mul(B, p)));
-    std::cout << "Iterationen: " << _poissonSolver.GetIter()
-              << "\tresidual: " << _poissonSolver.GetResid() << std::endl;
-
-    _iter= iter+_poissonSolver.GetIter();
-    _res= tol + _poissonSolver.GetResid();
-/* std::cout << "Real residuals are: "
-          << norm( A*v+transp_mul(B, p)-b) << ", "
-          << norm( B*v-c) << std::endl; */
-    std::cout << "-----------------------------------------------------" << std::endl;
-}
-
-template <class PoissonSolverT>
-void SchurSolverCL<PoissonSolverT>::Solve(
-    const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c)
-{
-    doSolve( A, B, v, p, b, c);
-}
-
-template <class PoissonSolverT>
-void SchurSolverCL<PoissonSolverT>::Solve(
-    const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c)
-{
-    doSolve( A, B, v, p, b, c);
-}
-
-//////////////////SchurNoPcSolverCl Methods
-template <class PoissonSolverT>
-template <typename Mat, typename Vec>
-void SchurNoPcSolverCL<PoissonSolverT>::doSolve(
-    const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c)
-// solve:       S*p = B*(A^-1)*b - c   with SchurCompl. S = B A^(-1) BT
-//              A*u = b - BT*p
-{
-    Vec _tmp;
-    Vec rhs(-c);
-    if (_tmp.size() != v.size())
-        _tmp.resize( v.size());
-    _poissonSolver.Solve( A, _tmp, b);
-    std::cout << "iterations: " << _poissonSolver.GetIter()
-              << "\tresidual: " << _poissonSolver.GetResid() << std::endl;
-    rhs+= B*_tmp;
-
-    std::cout << "rhs has been set! Now solving pressure..." << std::endl;
-    int iter= _maxiter;
-    double tol= _tol;
-    CG( SchurComplNoPcMatrixCL<Mat>( A, B, _poissonSolver.GetTol()), p, rhs, iter, tol);
-    std::cout << "iterations: " << iter << "\tresidual: " << tol << std::endl;
-    std::cout << "pressure has been solved! Now solving velocities..." << std::endl;
-
-    _poissonSolver.Solve( A, v, Vec(b - transp_mul(B, p)));
-    std::cout << "Iterationen: " << _poissonSolver.GetIter()
-              << "\tresidual: " << _poissonSolver.GetResid() << std::endl;
-
-    _iter= iter+_poissonSolver.GetIter();
-    _res= tol + _poissonSolver.GetResid();
-/* std::cout << "Real residuals are: "
-          << norm( A*v+transp_mul(B, p)-b) << ", "
-          << norm( B*v-c) << std::endl; */
-    std::cout << "-----------------------------------------------------" << std::endl;
-}
-
-template <class PoissonSolverT>
-void SchurNoPcSolverCL<PoissonSolverT>::Solve(
-    const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c)
-{
-    doSolve( A, B, v, p, b, c);
-}
-
-template <class PoissonSolverT>
-void SchurNoPcSolverCL<PoissonSolverT>::Solve(
-    const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c)
-{
-    doSolve( A, B, v, p, b, c);
-}
-
-
-template <typename Mat, typename Vec>
-inline void Uzawa_IPCG_CL::doSolve(
-    const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c)
-
-{
-    Vec v_corr(v.size()),
-        p_corr(p.size()),
-        res1(v.size()),
-        res2(p.size());
-    double tol= _tol;
-    tol*= tol;
-    Uint output= 50;//max_iter/20;  // nur 20 Ausgaben pro Lauf
-
-    double res1_norm= 0., res2_norm= 0.;
-    for( _iter=0; _iter<_maxiter; ++_iter)
-    {
-//        _poissonSolver.Solve( _M, p_corr, res2= B*v - c);
-        z_xpay(res2, B*v, -1.0, c);
-        _M_IPCGsolver.Solve(_M, p_corr, res2);
-//        p+= _tau * p_corr;
-        axpy(_tau, p_corr, p);
-//        res1= A*v + transp_mul(B,p) - b;
-        z_xpaypby2(res1, A*v, 1.0, transp_mul(B,p), -1.0, b);
-        res1_norm= norm_sq( res1);
-        res2_norm= norm_sq( res2);
-
-        if (res1_norm + res2_norm < tol)
-        {
-            _res= std::sqrt( res1_norm + res2_norm );
-            return;
-        }
-
-        if( (_iter%output)==0 )
-            std::cout << "step " << _iter << ": norm of 1st eq= " << std::sqrt( res1_norm)
-                      << ", norm of 2nd eq= " << std::sqrt( res2_norm) << std::endl;
-
-        _A_IPCGsolver.Solve( A, v_corr, res1);
-//        v-= v_corr;
-        axpy(-1.0, v_corr, v);
-    }
-    _res= std::sqrt( res1_norm + res2_norm );
-}
-
-inline void Uzawa_IPCG_CL::Solve(
-    const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c)
-{
-    doSolve( A, B, v, p, b, c);
-}
-
-inline void Uzawa_IPCG_CL::Solve(
-    const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c)
-{
-    doSolve( A, B, v, p, b, c);
-}
-
-template <class PoissonSolverT>
-template <typename Mat, typename Vec>
-void PSchurSolverCL<PoissonSolverT>::doSolve(const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c)
-// solve:       S*p = B*(A^-1)*b - c   with SchurCompl. S = B A^(-1) BT
-//              A*u = b - BT*p
-{
-    Vec _tmp;
-    Vec rhs( -c);
-    if (_tmp.size() != v.size())
-        _tmp.resize( v.size());
-    _poissonSolver.Solve( A, _tmp, b);
-    std::cout << "iterations: " << _poissonSolver.GetIter()
-              << "\tresidual: " << _poissonSolver.GetResid() << std::endl;
-    rhs+= B*_tmp;
-
-    std::cout << "rhs has been set! Now solving pressure..." << std::endl;
-    int iter= _maxiter;
-    double tol= _tol;
-    PCG( SchurComplMatrixCL<PoissonSolverT, Mat>( _poissonSolver, A, B), p, rhs, _schurPc, iter, tol);
-    std::cout << "iterations: " << iter << "\tresidual: " << tol << std::endl;
-    std::cout << "pressure has been solved! Now solving velocities..." << std::endl;
-
-    _poissonSolver.Solve( A, v, Vec( b - transp_mul(B, p)));
-    std::cout << "iterations: " << _poissonSolver.GetIter()
-              << "\tresidual: " << _poissonSolver.GetResid() << std::endl;
-
-    _iter= iter+_poissonSolver.GetIter();
-    _res= std::sqrt( tol*tol + _poissonSolver.GetResid()*_poissonSolver.GetResid());
-    std::cout << "-----------------------------------------------------" << std::endl;
-}
-
-template <class PoissonSolverT>
-void PSchurSolverCL<PoissonSolverT>::Solve(
-    const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c)
-// solve:       S*p = B*(A^-1)*b - c   with SchurCompl. S = B A^(-1) BT
-//              A*u = b - BT*p
-{
-    doSolve( A, B, v, p, b, c);
-}
-
-template <class PoissonSolverT>
-void PSchurSolverCL<PoissonSolverT>::Solve(
-    const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c)
-// solve:       S*p = B*(A^-1)*b - c   with SchurCompl. S = B A^(-1) BT
-//              A*u = b - BT*p
-{
-    doSolve( A, B, v, p, b, c);
-}
-
-template <typename InnerSolverT, typename OuterSolverT>
-template <typename Mat, typename Vec>
-void PSchurSolver2CL<InnerSolverT, OuterSolverT>::doSolve(
-    const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c)
-// solve:       S*p = B*(A^-1)*b - c   with SchurCompl. S = B A^(-1) BT
-//              A*u = b - BT*p
-{
-    Vec tmp_;
-    Vec rhs( -c);
-    if (tmp_.size() != v.size()) tmp_.resize( v.size());
-    innerSolver_.Solve( A, tmp_, b);
-    std::cout << "rhs     : iterations: " << innerSolver_.GetIter()
-              << "\tresidual: " << innerSolver_.GetResid() << std::endl;
-    rhs+= B*tmp_;
-
-    outerSolver_.SetTol( _tol);
-    outerSolver_.SetMaxIter( _maxiter);
-    outerSolver_.Solve( SchurComplMatrixCL<InnerSolverT, Mat>( innerSolver_, A, B), p, rhs);
-    std::cout << "pressure: iterations: " << outerSolver_.GetIter()
-              << "\tresidual: " << outerSolver_.GetResid() << std::endl;
-
-    innerSolver_.Solve( A, v, Vec( b - transp_mul(B, p)));
-    std::cout << "velocity: iterations: " << innerSolver_.GetIter()
-              << "\tresidual: " << innerSolver_.GetResid() << std::endl;
-
-    _iter= innerSolver_.GetIter() + outerSolver_.GetIter();
-    _res= std::sqrt( std::pow( innerSolver_.GetResid(), 2)
-                   + std::pow( outerSolver_.GetResid(), 2));
-    std::cout << "-----------------------------------------------------" << std::endl;
-}
-
-template <typename InnerSolverT, typename OuterSolverT>
-void PSchurSolver2CL<InnerSolverT, OuterSolverT>::Solve(
-    const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c)
-{
-    doSolve( A, B, v, p, b, c);
-}
-
-template <typename InnerSolverT, typename OuterSolverT>
-void PSchurSolver2CL<InnerSolverT, OuterSolverT>::Solve(
-    const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c)
-{
-    doSolve( A, B, v, p, b, c);
 }
 
 
@@ -1115,7 +387,7 @@ UzawaPCG(const APC& Apc, const Mat& A, const Mat& B,
 
     for (int i=1; i<=max_iter; ++i)
     {
-        M.Apply( B/*dummy*/, z, r);
+        M.Apply( B/*dummy*/, z, r, DummyExchangeCL(), DummyExchangeCL());
         rho= dot( r, z);
         if (i == 1)
             p= z;
@@ -1125,7 +397,7 @@ UzawaPCG(const APC& Apc, const Mat& A, const Mat& B,
         // q= A*p;
         q1= transp_mul( B, p);
         q2= 0.0;
-        Apc.Apply( A, q2, q1);
+        Apc.Apply( A, q2, q1, DummyExchangeCL());
         q= B*q2;
 
         const double alpha= rho/dot( p, q);
@@ -1153,134 +425,19 @@ UzawaPCG(const APC& Apc, const Mat& A, const Mat& B,
 // convergence.
 // Due to theory (see paper), we should use 0.2 < innerred < 0.7.
 //=============================================================================
-template <typename Mat, typename Vec, typename PC1, typename PC2>
-bool
-InexactUzawa(const Mat& A, const Mat& B, Vec& xu, Vec& xp, const Vec& f, const Vec& g,
-    PC1& Apc, PC2& Spc,
-    int& max_iter, double& tol,
-    InexactUzawaApcMethodT apcmeth= APC_OTHER,
-    double innerred= 0.3, int innermaxiter= 500, bool rel= false)
-{
-    VectorCL ru( f - A*xu - transp_mul( B, xp));
-    VectorCL rp( g - B*xu);
-    VectorCL w( f.size());
-    VectorCL z( g.size());
-    VectorCL z2( g.size());
-    VectorCL zbar( f.size());
-    VectorCL zhat( f.size());
-    VectorCL du( f.size());
-    VectorCL c( g.size());
-    ApproximateSchurComplMatrixCL<PC1, Mat>* asc= apcmeth == APC_SYM_LINEAR ? 0 :
-        new ApproximateSchurComplMatrixCL<PC1, Mat>( A, Apc, B);
-    double innertol;
-    int inneriter;
-    int pr_iter_cumulative= 0;
-    double resid0= std::sqrt( norm_sq( ru) + norm_sq( rp));
-    double resid= resid0;
-    std::cout << "residual (2-norm): " << resid
-              << "\tres-impuls: " << norm( ru)
-              << "\tres-mass: " << norm( rp)
-              << std::endl;
-    if (rel) tol*= resid0;
-    if (resid <= tol) { // The fixed point iteration between levelset and Stokes
-        tol= resid;     // equation uses this to determine convergence.
-        max_iter= 0;
-        delete asc;
-        return true;
-    }
-    for (int k= 1; k <= max_iter; ++k) {
-        w= 0.0;
-        Apc.Apply( A, w, ru);
-        c= B*w - rp;
-        z= 0.0;
-        z2= 0.0;
-        inneriter= innermaxiter;
-        switch (apcmeth) {
-          case APC_SYM_LINEAR:
-            zbar= 0.0;
-            zhat= 0.0;
-            innertol= innerred*norm( c);
-            UzawaPCG( Apc, A, B, z, zbar, zhat, c, Spc, inneriter, innertol);
-            break;
-          case APC_SYM:
-            innertol= innerred*norm( c);
-            PCG( *asc, z, c, Spc, inneriter, innertol);
-            break;
-          default:
-            std::cout << "WARNING: InexactUzawa: Unknown apcmeth; using GMRes.\n";
-            // fall through
-          case APC_OTHER:
-            innertol= innerred; // GMRES can do relative tolerances.
-            GMRES( *asc, z, c, Spc, /*restart*/ inneriter, inneriter, innertol,
-                /*relative errors*/ true, /*don't check 2-norm*/ false);
-              break;
-        }
-        if (apcmeth != APC_SYM_LINEAR) {
-            zbar= transp_mul( B, z);
-            zhat= 0.0;
-            Apc.Apply( A, zhat, zbar);
-        }
-        pr_iter_cumulative+= inneriter;
-        std::cout << "pr solver: iterations: " << pr_iter_cumulative
-                  << "\tresid: " << innertol << std::endl;
-        du= w - zhat;
-        xu+= du;
-        xp+= z;
-        ru-= A*du + zbar; // z_xpaypby2(ru, ru, -1.0, A*du, -1.0, zbar);
-        rp= g - B*xu;
-        resid= std::sqrt( norm_sq( ru) + norm_sq( rp));
-        std::cout << "residual reduction (2-norm): " << resid/resid0
-                  << "\nresidual (2-norm): " << resid
-                  << "\tres-impuls: " << norm( ru)
-                  << "\tres-mass: " << norm( rp)
-                  << std::endl;
-        if (resid <= tol) { // absolute errors
-            tol= resid;
-            max_iter= pr_iter_cumulative;
-            delete asc;
-            return true;
-        }
-    }
-    tol= resid;
-    delete asc;
-    return false;
-}
-
-
-template <class ApcT, class SpcT, InexactUzawaApcMethodT Apcmeth>
-  inline void
-  InexactUzawaCL<ApcT, SpcT, Apcmeth>::Solve( const MatrixCL& A, const MatrixCL& B,
-    VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c)
-{
-    _res=  _tol;
-    _iter= _maxiter;
-    InexactUzawa( A, B, v, p, b, c, Apc_, Spc_, _iter, _res, Apcmeth, innerreduction_, innermaxiter_, rel_);
-}
-
-template <class ApcT, class SpcT, InexactUzawaApcMethodT Apcmeth>
-  inline void
-  InexactUzawaCL<ApcT, SpcT, Apcmeth>::Solve( const MLMatrixCL& A, const MLMatrixCL& B,
-    VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c)
-{
-    _res=  _tol;
-    _iter= _maxiter;
-    InexactUzawa( A, B, v, p, b, c, Apc_, Spc_, _iter, _res, Apcmeth, innerreduction_, innermaxiter_, rel_);
-}
-
-#ifdef _PAR
 template <typename Mat, typename Vec, typename PC1, typename PC2, typename ExVCL, typename ExPCL>
-  bool ParInexactUzawa(const Mat& A, const Mat& B, Vec& xu_acc, Vec& xp_acc, const Vec& f, const Vec& g,
+  bool InexactUzawa(const Mat& A, const Mat& B, Vec& xu_acc, Vec& xp_acc, const Vec& f, const Vec& g,
                     const ExVCL& exV, const ExPCL& exP, PC1& Apc, PC2& Spc,
-                    int& max_iter, double& tol, int &usedinnerit, InexactUzawaApcMethodT apcmeth,
-                    double innerred, int innermaxiter, std::ostream* output)
+                    int& max_iter, double& tol, InexactUzawaApcMethodT apcmeth,
+                    double innerred, int innermaxiter, bool rel, std::ostream* output)
 /// \param[in]     A            Coefficient matrix for velocities
 /// \param[in]     B            Coefficient matrix for coupling velocity and pressure
 /// \param[in,out] xu_acc IN:   initial vector for velocity, OUT: velocity result
 /// \param[in,out] xp_acc IN:   initial vector for pressure, OUT: pressure result
 /// \param[in]     f            upper rhs
 /// \param[in]     g            lower rhs
-/// \param[in]     exV          Exchange class for velocities
-/// \param[in]     exP          Exchange class for pressures
+/// \param[in]     exV          Exchange class for velocity
+/// \param[in]     exP          Exchange class for pressure
 /// \param[in]     Apc          Preconditioner for A
 /// \param[in]     Spc          Preconditioner for Schur-Complement
 /// \param[in,out] max_iter     IN: maximal iterations, OUT: used iterations
@@ -1292,11 +449,9 @@ template <typename Mat, typename Vec, typename PC1, typename PC2, typename ExVCL
 /// \param[in,out] output       Debug information
 {
     if (Apc.NeedDiag())
-        Apc.SetDiag(A);
+        Apc.SetDiag(A, exV);
     if (Spc.NeedDiag())
-        Spc.SetDiag(B);
-    if (apcmeth==APC_SYM_LINEAR)
-        throw DROPSErrCL("InexactUzawa: Because the exact UzawaAlgorithm has not been implemented the choice \"apcmeth==APC_SYM_LINEAR\" is not valid");
+        Spc.SetDiag(B, exP);
     VectorCL ru( f - A*xu_acc - transp_mul( B, xp_acc));
     VectorCL rp( g - B*xu_acc);
     VectorCL w( f.size());
@@ -1306,8 +461,8 @@ template <typename Mat, typename Vec, typename PC1, typename PC2, typename ExVCL
     VectorCL zhat( f.size());
     VectorCL du( f.size());
     VectorCL c( g.size());
-    ParApproximateSchurComplMatrixCL<PC1, Mat, ExVCL>* asc = apcmeth == APC_SYM_LINEAR ? 0 :
-            new ParApproximateSchurComplMatrixCL<PC1, Mat, ExVCL>( A, Apc, B, exV);
+    ApproximateSchurComplMatrixCL<PC1, Mat, ExVCL>* asc = apcmeth == APC_SYM_LINEAR ? 0 :
+            new ApproximateSchurComplMatrixCL<PC1, Mat, ExVCL>( A, Apc, B, exV);
     double innertol;
     int inneriter;
     int pr_iter_cumulative= 0;
@@ -1320,6 +475,7 @@ template <typename Mat, typename Vec, typename PC1, typename PC2, typename ExVCL
                   << ", res-impuls " << std::sqrt(res_u)
                   << ", res-mass " << std::sqrt(res_p)
                   << '\n';
+    if (rel) tol*= resid0;
     if (resid <= tol) { // The fixed point iteration between levelset and Stokes
         tol= resid;     // equation uses this to determine convergence.
         max_iter= 0;
@@ -1328,7 +484,7 @@ template <typename Mat, typename Vec, typename PC1, typename PC2, typename ExVCL
     }
     for (int k= 1; k <= max_iter; ++k) {
         w= 0.0;
-        Apc.Apply( A, w, ru);
+        Apc.Apply( A, w, ru, exV);
         if (!Apc.RetAcc())
             exV.Accumulate(w);
         c= B*w - rp;            // w is accumulated
@@ -1336,12 +492,15 @@ template <typename Mat, typename Vec, typename PC1, typename PC2, typename ExVCL
         z2= 0.0;
         inneriter= innermaxiter;
         switch (apcmeth) {
-//             case APC_SYM_LINEAR:         // this case has not been implemented yet!
-//                 zbar= 0.0;
-//                 zhat= 0.0;
-//                 innertol= innerred*norm( c);
-//                 UzawaPCG( Apc, A, B, z, zbar, zhat, c, Spc, inneriter, innertol);
-//                 break;
+             case APC_SYM_LINEAR:         // this case has not been implemented yet!
+#ifdef _PAR
+        throw DROPSErrCL("InexactUzawa: parallel implementation of \"APC_SYM_LINEAR\" is not available");
+#endif
+                 zbar= 0.0;
+                 zhat= 0.0;
+                 innertol= innerred*norm( c);
+                 UzawaPCG( Apc, A, B, z, zbar, zhat, c, Spc, inneriter, innertol);
+                 break;
             case APC_SYM:
                 innertol= innerred*exP.Norm(c, false);
                 PCG( *asc, z, c, exP, Spc, inneriter, innertol);
@@ -1351,15 +510,20 @@ template <typename Mat, typename Vec, typename PC1, typename PC2, typename ExVCL
             // fall through
             case APC_OTHER:
                 innertol= innerred; // GMRES can do relative tolerances.
+#ifdef _PAR
                 ModGMRES( *asc, z, c, exP, Spc, /*restart*/ inneriter,
                     inneriter, innertol, /*relative errors*/ true, /*use MGS*/false,
                     LeftPreconditioning);
+#else
+                GMRES( *asc, z, c, exP, Spc, /*restart*/ inneriter, inneriter, innertol,
+                                /*relative errors*/ true, /*don't check 2-norm*/ false);
+#endif
                 break;
         }
         if (apcmeth != APC_SYM_LINEAR) {
             zbar= transp_mul( B, z);        // z is accumulated
             zhat= 0.0;
-            Apc.Apply( A, zhat, zbar);
+            Apc.Apply( A, zhat, zbar, exV);
             if (!Apc.RetAcc())
                 exV.Accumulate(zhat);
         }
@@ -1382,18 +546,15 @@ template <typename Mat, typename Vec, typename PC1, typename PC2, typename ExVCL
         if (resid <= tol) { // absolute errors
             tol= resid;
             max_iter= k;
-            usedinnerit = pr_iter_cumulative;
             if (asc!=0) delete asc;
             return true;
         }
     }
     tol= resid;
     if (asc!=0) delete asc;
-    usedinnerit = pr_iter_cumulative;
-    std::cout << "===> Warning, InexactUzawa stoped without reaching tolerance!" << std::endl;
+    std::cout << "===> Warning, InexactUzawa stopped without reaching tolerance!" << std::endl;
     return false;
 }
-#endif
 
 //-----------------------------------------------------------------------------
 // UzawaPCG: The basic scheme is identical to PCG, but two extra recursions for
@@ -1560,15 +721,15 @@ class UzawaCGSolverEffCL : public StokesSolverBaseCL
 
     void Solve( const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p,
                 const VectorCL& b, const VectorCL& c) {
-        _res=  _tol;
-        _iter= _maxiter;
-        UzawaCGEff( A, B, v, p, b, c, Apc_, Spc_, _iter, _res);
+        res_=  tol_;
+        iter_= maxiter_;
+        UzawaCGEff( A, B, v, p, b, c, Apc_, Spc_, iter_, res_);
     }
     void Solve( const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p,
                 const VectorCL& b, const VectorCL& c) {
-        _res=  _tol;
-        _iter= _maxiter;
-        UzawaCGEff( A, B, v, p, b, c, Apc_, Spc_, _iter, _res);
+        res_=  tol_;
+        iter_= maxiter_;
+        UzawaCGEff( A, B, v, p, b, c, Apc_, Spc_, iter_, res_);
     }
 };
 
@@ -1585,15 +746,15 @@ class UzawaCGSolverCL : public StokesSolverBaseCL
 
     void Solve( const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p,
                 const VectorCL& b, const VectorCL& c) {
-        _res=  _tol;
-        _iter= _maxiter;
-        UzawaCG( A, B, v, p, b, c, Apc_, Spc_, _iter, _res);
+        res_=  tol_;
+        iter_= maxiter_;
+        UzawaCG( A, B, v, p, b, c, Apc_, Spc_, iter_, res_);
     }
     void Solve( const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p,
                 const VectorCL& b, const VectorCL& c) {
-        _res=  _tol;
-        _iter= _maxiter;
-        UzawaCG( A, B, v, p, b, c, Apc_, Spc_, _iter, _res);
+        res_=  tol_;
+        iter_= maxiter_;
+        UzawaCG( A, B, v, p, b, c, Apc_, Spc_, iter_, res_);
     }
 };
 
@@ -1717,17 +878,29 @@ class StokesMGSolverCL: public StokesSolverBaseCL
 
     PVelT* GetPVel() { return &PVel_;}
     PPrT*  GetPPr()  { return &PPr_; }
+#ifdef _PAR
     void
-    Solve(const MatrixCL& /*A*/, const MatrixCL& /*B*/, VectorCL&, VectorCL&, const VectorCL&, const VectorCL&)
+    Solve(const MatrixCL& /*A*/, const MatrixCL& /*B*/, VectorCL&, VectorCL&, const VectorCL&, const VectorCL&, const ExchangeCL&, const ExchangeCL&)
+    {
+        throw DROPSErrCL( "StokesMGSolverCL::Solve: need multilevel data structure\n");
+    }
+    void
+    Solve(const MLMatrixCL& /*A*/, const MLMatrixCL& /*B*/, VectorCL&, VectorCL&, const VectorCL&, const VectorCL&, const ExchangeCL&, const ExchangeCL&)
+    {
+        throw DROPSErrCL( "StokesMGSolverCL::Solve: not implemented in parallel\n");
+    }
+#endif
+    void
+    Solve(const MatrixCL& /*A*/, const MatrixCL& /*B*/, VectorCL&, VectorCL&, const VectorCL&, const VectorCL&, const DummyExchangeCL&, const DummyExchangeCL&)
     {
         throw DROPSErrCL( "StokesMGSolverCL::Solve: need multilevel data structure\n");
     }
 
     void
-    Solve(const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c) {
+    Solve(const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&) {
 // define MG parameters for the first diagonal blockS
         if (B.Version() != BVersion_) UpdateBT( B);
-        int nit=_maxiter;
+        int nit=maxiter_;
         double actualtol = 1;
         Uint   wc   = 1;   // how many W-cycle steps? (1=V-cycle)
 
@@ -1743,7 +916,7 @@ class StokesMGSolverCL: public StokesSolverBaseCL
         const double rpnorm0= norm_sq( B * v - c);
         const double resid0= std::sqrt(runorm0+rpnorm0);
         double resid;
-        for (int j=0; j<_maxiter; ++j)
+        for (int j=0; j<maxiter_; ++j)
         {
             StokesMGM( A.begin(), A_end, B_end, BT_end, prM_end, PVel, PPr, v, p, b, c, smoother_, smoothSteps_, wc, directSolver_, usedLevels_, -1);
             const double runorm= norm_sq( A * v + transp_mul(B, p ) - b);
@@ -1754,7 +927,7 @@ class StokesMGSolverCL: public StokesSolverBaseCL
             else
                 actualtol= resid;
             std::cout << "P2P1:StokesMGSolverCL: residual = " << actualtol << std::endl;
-            if (actualtol<=_tol)
+            if (actualtol<=tol_)
             {
                 nit= j+1;
                 break;
@@ -1762,14 +935,14 @@ class StokesMGSolverCL: public StokesSolverBaseCL
         }
         std::cout << "StokesMGM: actual residual = " << actualtol
                   << "  after " << nit << " iterations " << std::endl;
-        _res = actualtol;
-        _iter= nit;
+        res_ = actualtol;
+        iter_= nit;
    }
 };
 
 ///\brief Preconditioner for the (Navier-) Stokes operator
 ///
-/// Vertex-based multiplikative Schwartz-method. The implementation is based on the Vanka-smoother class for
+/// Vertex-based multiplicative Schwartz-method. The implementation is based on the Vanka-smoother class for
 /// Stokes-multigrid in Drops. The effect of Apply is one smoother-iteration with 0 as starting value.
 class VankaPreCL
 {
@@ -1788,27 +961,37 @@ class VankaPreCL
 
     void Setidx (const MLIdxDescCL* idx) { smoother_.Setidx( idx); }
 
+    template<typename ExT>
     void
-    Apply (const BlockMatrixCL& M, VectorCL& x, const VectorCL& rhs) const {
+    Apply (const BlockMatrixCL& M, VectorCL& x, const VectorCL& rhs, const ExT& ex) const {
         VectorCL v(M.num_cols( 0)), p(M.num_cols( 1)),
                  b(rhs[std::slice( 0, M.num_rows( 0), 1)]),
                  c(rhs[std::slice( M.num_rows( 0), M.num_rows( 1), 1)]);
         if (M.GetBlock( 1)->Version() != BVersion_) UpdateBT( *M.GetBlock( 1));
-        smoother_.Apply( *M.GetBlock( 0), *M.GetBlock( 1), BT_, /*dummy*/ *M.GetBlock( 0), v, p, b, c);
+        smoother_.Apply( *M.GetBlock( 0), *M.GetBlock( 1), BT_, /*dummy*/ *M.GetBlock( 0), v, p, b, c, ex.GetEx(0), ex.GetEx(1));
         x[std::slice( 0, M.num_cols( 0), 1)]= v;
         x[std::slice( M.num_cols( 0), M.num_cols( 1), 1)]= p;
     }
+    template<typename ExT>
     void
-    Apply (const MLBlockMatrixCL& M, VectorCL& x, const VectorCL& rhs) const {
+    Apply (const MLBlockMatrixCL& M, VectorCL& x, const VectorCL& rhs, const ExT& ex) const {
         BlockMatrixCL MM( &M.GetBlock( 0)->GetFinest(), MUL, &M.GetBlock( 1)->GetFinest(), TRANSP_MUL,
                           &M.GetBlock( 1)->GetFinest(), MUL);
-        this->Apply( MM, x, rhs);
+        this->Apply( MM, x, rhs, ex);
     }
+    /// \name Parallel preconditioner setup ...
+    //@{
+    bool NeedDiag() const { return false; }
+    bool RetAcc()   const { return true; }
+    template<typename Mat, typename ExT>
+    void SetDiag( const Mat&, const ExT&) {} // just for consistency
+    void SetDiag( const VectorCL&)        {} // just for consistency
+    //@}
 };
 
 ///\brief Preconditioner for the Schur-complement of the (Navier-) Stokes operator
 ///
-/// Vertex-based multiplikative Schwartz-method. The implementation is based on the Vanka-smoother class for
+/// Vertex-based multiplicative Schwartz-method. The implementation is based on the Vanka-smoother class for
 /// Stokes-multigrid in Drops. The effect of Apply is one smoother-iteration with 0 as starting value. The
 /// right-hand side for the momentum equations is set to 0. Thus, the action of the Schur-complement is approximated.
 class VankaSchurPreCL: public SchurPreBaseCL
@@ -1831,19 +1014,34 @@ class VankaSchurPreCL: public SchurPreBaseCL
     void Setidx (const MLIdxDescCL* idx)   { smoother_.Setidx( idx); }
     void SetAB   (const MatrixCL* A, const MatrixCL* B) { M.SetBlock( 0, A); M.SetBlock( 1, B); M.SetBlock( 2, B); }
 
+    template<typename Mat,  typename Vec, typename ExT>
     void
-    Apply (const MatrixCL& /*S*/, VectorCL& x, const VectorCL& rhs) const {
-        VectorCL v(M.num_cols( 0)), p(M.num_cols( 1)), b( M.num_rows( 0));
+    Apply (const Mat& /*S*/, Vec& x, const Vec& rhs, const ExT& vel_ex, const ExT& p_ex) const {
+        Vec v(M.num_cols( 0)), p(M.num_cols( 1)), b( M.num_rows( 0));
         if (M.GetBlock( 1)->Version() != BVersion_) UpdateBT( *M.GetBlock( 1));
-        smoother_.Apply( *M.GetBlock( 0), *M.GetBlock( 1), BT_, /*dummy*/ *M.GetBlock( 0), v, p, b, rhs);
+        smoother_.Apply( *M.GetBlock( 0), *M.GetBlock( 1), BT_, /*dummy*/ *M.GetBlock( 0), v, p, b, rhs, vel_ex, p_ex);
         x= p;
     }
-    void
-    Apply (const MLMatrixCL& /*S*/, VectorCL& x, const VectorCL& rhs) const {
-        this->Apply( MatrixCL(), x, rhs);
-    }
-};
+#ifdef _PAR
+    void Apply(const MatrixCL& A, VectorCL& x, const VectorCL& b, const ExchangeCL& vel_ex, const ExchangeCL& p_ex) const
+    { Apply<>(A, x, b, vel_ex, p_ex);}
+    void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const ExchangeCL& vel_ex, const ExchangeCL& p_ex) const
+    { Apply<>(A, x, b, vel_ex, p_ex);}
+#endif
+    void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& p_ex) const
+    { Apply<>(A, x, b, vel_ex, p_ex);}
+    void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& p_ex) const
+    { Apply<>(A, x, b, vel_ex, p_ex);}
 
+    /// \name Parallel preconditioner setup ...
+    //@{
+    bool NeedDiag() const { return false; }
+    bool RetAcc()   const { return true; }
+    template<typename Mat, typename ExT>
+    void SetDiag( const Mat&, const ExT&) {} // just for consistency
+    void SetDiag( const VectorCL&)        {} // just for consistency
+    //@}
+};
 
 } // end of namespace DROPS
 

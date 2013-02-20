@@ -5,6 +5,19 @@
 	//    Inherited from FSdrops.cpp (old file before merging)
 	//=============================================================
 	// time stepping
+
+    //General section
+    "General":
+    {
+            "ProgressBar":  1, //show progress bar
+            "DynamicLibsPrefix": "../", //where should we look for shared objects?
+            "DynamicLibs": [ //select libraries to be loaded after program start
+                    "stokes/libstokes-stokesCoeff",
+                    "misc/libmisc-scalarFunctions",
+                    "misc/libmisc-vectorFunctions"
+            ]
+    },
+
 	"Time":
 	{ 
 		"NumSteps":		2,

@@ -34,25 +34,18 @@ namespace DROPS
 {
 
 
-typedef SingletonMapCL<DROPS::instat_vector_fun_ptr> InVecMap;
-typedef SingletonMapCL<DROPS::instat_scalar_fun_ptr> InScaMap;
-typedef SingletonMapCL<DROPS::vector_tetra_function> VecTetMap;
-typedef SingletonMapCL<DROPS::scalar_tetra_function> ScaTetMap;
-typedef SingletonMapCL<DROPS::match_fun> MatchMap;
-typedef SingletonMapCL<DROPS::instat_matrix_fun_ptr> InMatMap;
-
-
-Point3DCL TestFunction(const Point3DCL& , double);
+typedef SingletonMapCL< instat_vector_fun_ptr> InVecMap;
+typedef SingletonMapCL< instat_scalar_fun_ptr> InScaMap;
+typedef SingletonMapCL< vector_tetra_function> VecTetMap;
+typedef SingletonMapCL< scalar_tetra_function> ScaTetMap;
+typedef SingletonMapCL< match_fun> MatchMap;
+typedef SingletonMapCL< instat_matrix_fun_ptr> InMatMap;
 
 typedef MapRegisterCL< instat_vector_fun_ptr> RegisterVectorFunction;
-typedef MapRegisterCL< vector_tetra_function> RegisterVectorTetraFunction;
-
 typedef MapRegisterCL< instat_scalar_fun_ptr> RegisterScalarFunction;
+typedef MapRegisterCL< vector_tetra_function> RegisterVectorTetraFunction;
 typedef MapRegisterCL< scalar_tetra_function> RegisterScalarTetraFunction;
-
-
 typedef MapRegisterCL< match_fun> RegisterMatchingFunction;
-
 typedef MapRegisterCL< instat_matrix_fun_ptr> RegisterMatrixFunction;
 
 

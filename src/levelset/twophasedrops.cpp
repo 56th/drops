@@ -56,6 +56,9 @@
 #include <sstream>
 
 #include "misc/progressaccu.h"
+#include "misc/dynamicload.h"
+
+#include <sys/resource.h>
 
 DROPS::ParamCL P;
 
@@ -278,14 +281,12 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     // Level-Set-Solver
 #ifndef _PAR
     // SSORPcCL lset_pc;
-    GSPcCL lset_pc;
-    // GMResSolverCL<SSORPcCL>* gm = new GMResSolverCL<SSORPcCL>( lset_pc, 100, P.get<int>("Levelset.Iter"), P.get<double>("Levelset.Tol"));
-    GMResSolverCL<GSPcCL>* gm = new GMResSolverCL<GSPcCL>( lset_pc, 200, P.get<int>("Levelset.Iter"), P.get<double>("Levelset.Tol"));
+    typedef GSPcCL LsetPcT;
 #else
-    ParJac0CL jacparpc( lidx->GetFinest());
-    ParPreGMResSolverCL<ParJac0CL>* gm = new ParPreGMResSolverCL<ParJac0CL>
-           (/*restart*/100, P.get<int>("Levelset.Iter"), P.get<double>("Levelset.Tol"), lidx->GetFinest(), jacparpc,/*rel*/true, /*modGS*/false, LeftPreconditioning, /*parmod*/true);
+    typedef JACPcCL LsetPcT;
 #endif
+    LsetPcT lset_pc;
+    GMResSolverCL<LsetPcT>* gm = new GMResSolverCL<LsetPcT>( lset_pc, 200, P.get<int>("Levelset.Iter"), P.get<double>("Levelset.Tol"));
 
     LevelsetModifyCL lsetmod( P.get<int>("Reparam.Freq"), P.get<int>("Reparam.Method"), P.get<double>("Reparam.MaxGrad"), P.get<double>("Reparam.MinGrad"), P.get<int>("Levelset.VolCorrection"), Vol, is_periodic);
 
@@ -337,6 +338,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
                                                         P.get<int>("Restart.Binary"),
                                                         vel_downwind, lset_downwind);
     Stokes.v.t += GetTimeOffset();
+
     // Output-Registrations:
 #ifndef _PAR
     Ensight6OutCL* ensight = NULL;
@@ -511,12 +513,13 @@ void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<double>("SurfTens.DilatationalVisco", 0.0);
 
     P.put_if_unset<int>("General.ProgressBar", 0);
+    P.put_if_unset<std::string>("General.DynamicLibsPrefix", "../");
 }
 
 int main (int argc, char** argv)
 {
 #ifdef _PAR
-    DROPS::ProcInitCL procinit(&argc, &argv);
+    DROPS::ProcCL::Instance(&argc, &argv);
 #endif
   try
   {
@@ -542,7 +545,9 @@ int main (int argc, char** argv)
     SetMissingParameters(P);
 
     std::cout << P << std::endl;
-
+    
+    DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
+    
     if (P.get<int>("General.ProgressBar"))
         DROPS::ProgressBarTetraAccumulatorCL::Activate();
 
@@ -620,6 +625,16 @@ int main (int argc, char** argv)
     delete velbnddata;
     delete prbnddata;
     delete lsetbnddata;
+
+    rusage usage;
+    getrusage( RUSAGE_SELF, &usage);
+
+#ifdef _PAR
+    printf( "[%i]: ru_maxrss: %li kB.\n", DROPS::ProcCL::MyRank(), usage.ru_maxrss);
+#else
+    printf( "ru_maxrss: %li kB.\n", usage.ru_maxrss);
+#endif
+    std::cout << " twophasedrops finished regularly" << std::endl;
     return 0;
   }
   catch (DROPS::DROPSErrCL& err) { err.handle(); }

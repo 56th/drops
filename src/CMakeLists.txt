@@ -9,8 +9,13 @@ include(CMakeSettings.txt)
 include_directories(${CMAKE_SOURCE_DIR})
 
 #use openMP
-find_package(OpenMP REQUIRED)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+message(STATUS "### GENERATOR is ${CMAKE_GENERATOR}")
+if(CMAKE_GENERATOR MATCHES "Visual Studio 10")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /openmp")
+else(CMAKE_GENERATOR MATCHES "Visual Studio 10")
+  find_package(OpenMP REQUIRED)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+endif(CMAKE_GENERATOR MATCHES "Visual Studio 10")
 
 #use MPI
 if(MPI)
@@ -41,17 +46,23 @@ else(WIN32)
 endif(WIN32)
 
 #compiler specific options
-if(CMAKE_CXX_COMPILER MATCHES icpc)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
     message(STATUS "### setting flags for INTEL compiler ###")
     set(DROPS_CXX_FLAGS_DEBUG "${IPC_CXX_FLAGS_DEBUG}")
     set(DROPS_CXX_FLAGS_RELEASE "${IPC_CXX_FLAGS_RELEASE}")
-elseif(CMAKE_COMPILER_IS_GNUCXX)
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     message(STATUS "### setting flags for GCC compiler ###")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--no-as-needed")
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--no-as-needed")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--as-needed")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--as-needed")
     set(DROPS_CXX_FLAGS_DEBUG "${GCC_CXX_FLAGS_DEBUG}")
     set(DROPS_CXX_FLAGS_RELEASE "${GCC_CXX_FLAGS_RELEASE}")
-endif(CMAKE_CXX_COMPILER MATCHES icpc)
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "XL")
+    message(STATUS "### setting flags for IBM XL compiler ###")
+    set(DROPS_CXX_FLAGS_DEBUG "${XL_CXX_FLAGS_DEBUG}")
+    set(DROPS_CXX_FLAGS_RELEASE "${XL_CXX_FLAGS_RELEASE}")
+else()
+    message(STATUS "### could not determine compiler ${CMAKE_CXX_COMPILER_ID}, it seems to be neither gcc nor intel")
+endif()
 
 if(NOT DROPS_BUILD_TYPE)
     set(DROPS_BUILD_TYPE "DEBUG")
@@ -66,9 +77,10 @@ if(DROPS_BUILD_TYPE STREQUAL "RELEASE")
 elseif(DROPS_BUILD_TYPE STREQUAL "DEBUG")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${DROPS_CXX_FLAGS_DEBUG}")
 endif()
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${DROPS_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${DROPS_CXX_FLAGS} -fPIC")
 
-message(STATUS "###      GLOBAL COMPILER FLAGS: ${CMAKE_CXX_FLAGS} ###")
+message(STATUS "### CXX_COMPILER:               ${CMAKE_CXX_COMPILER}")
+message(STATUS "### GLOBAL COMPILER FLAGS:      ${CMAKE_CXX_FLAGS} ###")
 message(STATUS "### GLOBAL SHARED LINKER FLAGS: ${CMAKE_SHARED_LINKER_FLAGS} ###")
 message(STATUS "###    GLOBAL EXE LINKER FLAGS: ${CMAKE_EXE_LINKER_FLAGS} ###")
 
@@ -161,7 +173,7 @@ function(exec f)
 endfunction(exec)
 
 
-set(PACKAGES parallel levelset poisson DiST geom num out misc stokes navstokes surfactant transport partests tests)
+set(PACKAGES parallel levelset poisson DiST geom num out misc osmosis stokes navstokes surfactant transport partests tests)
 string(REPLACE ";" " " PACKAGES_STRING "${PACKAGES}")
 
 option(TESTS "compile tests" OFF)
@@ -177,6 +189,7 @@ foreach(package ${PACKAGES})
           configure_file(${file} ${package}/)
           #message(STATUS "copying ${file} ${package}/")
     endforeach(file)
+
 endforeach(${package})
 
 add_custom_target(stat COMMAND ls */*.cpp */*.tpp */*.h | xargs wc -l WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
@@ -195,3 +208,5 @@ if(DOXYGEN_FOUND)
         COMMENT "Generating API documentation with Doxygen" VERBATIM
     )
 endif()
+
+add_custom_target(coeffs DEPENDS misc-scalarFunctions misc-vectorFunctions levelset-twophaseCoeff levelset-filmCoeff poisson-poissonCoeff stokes-stokesCoeff)

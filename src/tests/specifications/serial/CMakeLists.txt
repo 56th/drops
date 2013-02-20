@@ -1,0 +1,5 @@
+file(GLOB pyfiles *.ref)
+foreach(file ${pyfiles})
+      configure_file(${file} .)
+      #message(STATUS "copying ${file} tests/specifications/serial/")
+endforeach(file)

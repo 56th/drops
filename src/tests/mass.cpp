@@ -65,7 +65,7 @@ main()
     VectorCL v( M.num_cols());
     VectorCL r( 1.0, M.num_rows());
     VectorCL r2( r/norm( r));
-    ExactAsolver.Solve( N, v, r2);
+    ExactAsolver.Solve( N, v, r2, DummyExchangeCL());
     std::cout << "\niterations: " << ExactAsolver.GetIter()
               << "\tresidual: " << ExactAsolver.GetResid()
               << '\n' << norm( v)

@@ -1,5 +1,5 @@
-/// \file poissonCoeff.h
-/// \brief PoissonCoeffCL the Coefficient-Function Container
+/// \file poissonParam.h
+/// \brief PoissonCoeffCL
 /// \author LNM RWTH Aachen: Christoph Lehrenfeld, Liang Zhang, Thorolf Schulte; SC RWTH Aachen:
 /*
  * This file is part of DROPS.
@@ -21,8 +21,8 @@
  * Copyright 2009 LNM/SC RWTH Aachen, Germany
 */
 
-#ifndef POISSONCOEFF_H_
-#define POISSONCOEFF_H_
+#ifndef POISSONPARAM_H_
+#define POISSONPARAM_H_
 
 #include "misc/container.h"
 #include "misc/params.h"

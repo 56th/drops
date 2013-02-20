@@ -1,28 +1,26 @@
 #---------------------SPECIFICATION FILE----------------------------------------
-Type of test: parallel interpolation refinement
-Name of executable: dist_ref_rising_drop
+Type of test: serial
+Name of executable: gcr
 #The path to the folder where the executable is located must be relative to the
 #/drops folder
-Folder of executable: partests
+Folder of executable: tests
 #The path to the folder where the parameter-file is located must be relative to
 #the folder where the executable is situated
-Path of parameter-file: ref_rising_drop.json
-Name of test: dist_ref_rising_drop
-Number of processes: 4
-Name of author: Eva
+Path of parameter-file:
+Name of test: testGCR
+Name of author: Jens Berger
 #-------------------------------------------------------------------------------
 #------------------------------NUMBERS------------------------------------------
-Name of variable: "memory for geometry"
-Prefix of variable: "Memory used for geometry:"
-Value of variable: 50
-Relative error: 10
-Absolute error:
-Minimal value:
-Maximal value:
+Name of variable: "Residual 1"
+Prefix of variable: "Residual1: "
+Value of variable: 0
+Relative error:
+Absolute error: 1e-10
+Name of variable: "Residual 2"
+Prefix of variable: "Residual2: "
+Value of variable: 0
+Relative error:
+Absolute error: 1e-10
 #-------------------------------------------------------------------------------
-#------------------------------STRINGS------------------------------------------
-String value: "Mark interface for"
-String find: 1
-String value: "Don't find me!"
-String find: 0
+#------------------------------STRINGS-------------------------------------------
 #-------------------------------------------------------------------------------

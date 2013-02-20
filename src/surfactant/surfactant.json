@@ -1,12 +1,26 @@
 {
-	"_comment":
-"#=============================================================
-#    DROPS parameter file for surfactant.cpp
-#    tests of the surfactant model implementation:
-#    droplet in brick
-#=============================================================
-# time stepping",
+//=============================================================
+//    DROPS parameter file for surfactant.cpp
+//    tests of the surfactant model implementation:
+//    droplet in brick
+//=============================================================, 
+        "General":
+        {
+                "ProgressBar":  1, //show progress bar
+                "DynamicLibsPrefix": "../", //where should we look for shared objects?
+                "DynamicLibs": [ //select libraries to be loaded after program start
+                        //"levelset/liblevelset-filmCoeff",
+                        //"levelset/liblevelset-twophaseCoeff",
+                        "misc/libmisc-scalarFunctions",
+                        "misc/libmisc-vectorFunctions"
+                        //"poisson/libpoisson-poissonCoeff",
+                        //"stokes/libstokes-stokesCoeff",
+                        //"tests/libtests-csgtest",
+                        //"transport/libtransport-transportCoeff"
+                ]
+        },
 
+// time stepping,
 	"Time":
 	{
 		"NumSteps":		1,

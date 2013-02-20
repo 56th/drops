@@ -439,7 +439,7 @@ protected:
 //            std::cout << "[" << ProcCL::MyRank() << "]:   - for edge " << (*it)->GetGID()
 //                      << " from " << PriorityToString((*it)->GetPrio()) << " to "
 //                      << PriorityToString( prio) << std::endl;
-        	modify_.ChangePrio( **it, prio);
+            modify_.ChangePrio( **it, prio);
         }
         for (TetraCL::const_FacePIterator it= t.GetFacesBegin(), end= t.GetFacesEnd(); it!=end; ++it){
 //            std::cout << "[" << ProcCL::MyRank() << "]:   - for face " << (*it)->GetGID()
@@ -596,7 +596,7 @@ class ParMultiGridCL::AdaptMidVertexCL
             e.RemoveMidVertex();
         else if ( !e.GetMidVertex() && e.IsMarkedForRef()) {
             const DiST::GeomIdCL midVertGID( e.GetLevel()+1, e.GetGID().bary, DiST::GetDim<VertexCL>());
-        	e.SetMidVertex( DiST::InfoCL::Instance().GetVertex(midVertGID));
+            e.SetMidVertex( DiST::InfoCL::Instance().GetVertex(midVertGID));
         }
         if (e.IsLocal() && e.GetMFR() != e.GetAccMFR()) // set local MFR = AccMFR
             e.MFR_= e.AccMFR_;
@@ -686,35 +686,35 @@ void ParMultiGridCL::TransferEnd()
 void ParMultiGridCL::MarkSimplicesForUnknowns()
 {
     for (MultiGridCL::VertexIterator it= mg_->GetAllVertexBegin(); it != mg_->GetAllVertexEnd(); ++it)
-		it->Unknowns.DisableAllUnknowns( mg_->GetNumLevel());
+        it->Unknowns.DisableAllUnknowns( mg_->GetNumLevel());
 
-	for (MultiGridCL::EdgeIterator it= mg_->GetAllEdgeBegin(); it != mg_->GetAllEdgeEnd(); ++it)
-		it->Unknowns.DisableAllUnknowns( mg_->GetNumLevel());
+    for (MultiGridCL::EdgeIterator it= mg_->GetAllEdgeBegin(); it != mg_->GetAllEdgeEnd(); ++it)
+        it->Unknowns.DisableAllUnknowns( mg_->GetNumLevel());
 
-	for (MultiGridCL::FaceIterator it= mg_->GetAllFaceBegin(); it != mg_->GetAllFaceEnd(); ++it)
-		it->Unknowns.DisableAllUnknowns( mg_->GetNumLevel());
+    for (MultiGridCL::FaceIterator it= mg_->GetAllFaceBegin(); it != mg_->GetAllFaceEnd(); ++it)
+        it->Unknowns.DisableAllUnknowns( mg_->GetNumLevel());
 
-	for (MultiGridCL::TetraIterator it= mg_->GetAllTetraBegin(); it != mg_->GetAllTetraEnd(); ++it)
-		it->Unknowns.DisableAllUnknowns( mg_->GetNumLevel());
+    for (MultiGridCL::TetraIterator it= mg_->GetAllTetraBegin(); it != mg_->GetAllTetraEnd(); ++it)
+        it->Unknowns.DisableAllUnknowns( mg_->GetNumLevel());
 
-	for (Uint lvl= 0; lvl <= mg_->GetLastLevel(); ++lvl)
-	{
-	    for (MultiGridCL::TriangTetraIteratorCL tit(mg_->GetTriangTetraBegin(lvl));
-	         tit!=mg_->GetTriangTetraEnd(lvl); ++tit)
-	    {
-	        // master tetras in current triang level are able to store unknowns on their sub-simplices
-	        for (TetraCL::const_VertexPIterator it(tit->GetVertBegin()); it!=tit->GetVertEnd(); ++it)
-	        	(**it).Unknowns.EnableUnknowns(lvl);
+    for (Uint lvl= 0; lvl <= mg_->GetLastLevel(); ++lvl)
+    {
+        for (MultiGridCL::TriangTetraIteratorCL tit(mg_->GetTriangTetraBegin(lvl));
+             tit!=mg_->GetTriangTetraEnd(lvl); ++tit)
+        {
+        // master tetras in current triang level are able to store unknowns on their sub-simplices
+            for (TetraCL::const_VertexPIterator it(tit->GetVertBegin()); it!=tit->GetVertEnd(); ++it)
+                (**it).Unknowns.EnableUnknowns(lvl);
 
-	        for (TetraCL::const_EdgePIterator it(tit->GetEdgesBegin()); it!=tit->GetEdgesEnd(); ++it)
-	        	(**it).Unknowns.EnableUnknowns(lvl);
+            for (TetraCL::const_EdgePIterator it(tit->GetEdgesBegin()); it!=tit->GetEdgesEnd(); ++it)
+              (**it).Unknowns.EnableUnknowns(lvl);
 
-	        for (TetraCL::const_FacePIterator it(tit->GetFacesBegin()); it!=tit->GetFacesEnd(); ++it)
-	        	(**it).Unknowns.EnableUnknowns(lvl);
+            for (TetraCL::const_FacePIterator it(tit->GetFacesBegin()); it!=tit->GetFacesEnd(); ++it)
+              (**it).Unknowns.EnableUnknowns(lvl);
 
-	        tit->Unknowns.EnableUnknowns(lvl);
-	    }
-	}
+            tit->Unknowns.EnableUnknowns(lvl);
+        }
+    }
 }
 
 

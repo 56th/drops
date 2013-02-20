@@ -332,7 +332,7 @@ TimeDisc2PhaseCL* CreateTimeDisc( InstatNavierStokes2PhaseP2P1CL& Stokes, Levels
 }
 
 template <class StokesT>
-void SolveStatProblem( StokesT& Stokes, const LevelsetP2CL& lset,
+void SolveStatProblem( StokesT& Stokes, LevelsetP2CL& lset,
                        NSSolverBaseCL<StokesT >& solver)
 {
 #ifndef _PAR
@@ -350,6 +350,7 @@ void SolveStatProblem( StokesT& Stokes, const LevelsetP2CL& lset,
     Stokes.SetIdx();
     Stokes.SetLevelSet( lset);
     lset.AccumulateBndIntegral( curv);
+    lset.UpdateMLPhi();
     Stokes.SetupSystem1( &Stokes.A, &Stokes.M, &Stokes.b, &Stokes.b, &cplM, lset, Stokes.v.t);
     Stokes.SetupPrStiff( &Stokes.prA, lset);
     Stokes.SetupPrMass ( &Stokes.prM, lset);
@@ -359,7 +360,7 @@ void SolveStatProblem( StokesT& Stokes, const LevelsetP2CL& lset,
     std::cout << "Discretizing took "<< duration << " sec.\n";
     time.Reset();
     Stokes.b.Data += curv.Data;
-    solver.Solve( Stokes.A.Data, Stokes.B.Data, Stokes.v, Stokes.p.Data, Stokes.b.Data, cplN, Stokes.c.Data, 1.0);
+    solver.Solve( Stokes.A.Data, Stokes.B.Data, Stokes.v, Stokes.p.Data, Stokes.b.Data, cplN, Stokes.c.Data, Stokes.vel_idx.GetEx(), Stokes.pr_idx.GetEx(), 1.0);
     time.Stop();
     duration = time.GetTime();
     std::cout << "Solving (Navier-)Stokes took "<<  duration << " sec.\n";
@@ -394,7 +395,7 @@ void SetInitialLevelsetConditions( LevelsetP2CL& lset, MultiGridCL& MG, ParamCL&
 }
 
 template <typename StokesT>
-void SetInitialConditions(StokesT& Stokes, const LevelsetP2CL& lset, MultiGridCL& MG, const ParamCL& P)
+void SetInitialConditions(StokesT& Stokes, LevelsetP2CL& lset, MultiGridCL& MG, const ParamCL& P)
 {
     MLIdxDescCL* pidx= &Stokes.pr_idx;
     switch (P.get<int>("DomainCond.InitialCond"))
@@ -433,22 +434,17 @@ void SetInitialConditions(StokesT& Stokes, const LevelsetP2CL& lset, MultiGridCL
         Stokes.UpdateXNumbering( pidx, lset);
         Stokes.p.SetIdx( pidx);
 #ifdef _PAR
-        ParJac0CL jacpc( Stokes.vel_idx.GetFinest());
-        typedef ParPCGSolverCL<ParJac0CL> PCGSolverT;
-        typedef SolverAsPreCL<PCGSolverT> PCGPcT;
-        PCGSolverT PCGSolver(200, 1e-2, Stokes.vel_idx.GetFinest(), jacpc, /*rel*/ true);
-        PCGPcT     apc(PCGSolver);
-        ISBBTPreCL bbtispc( &Stokes.B.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.M.Data.GetFinest(), Stokes.pr_idx.GetFinest(), Stokes.vel_idx.GetFinest(), 0.0, 1.0, 1e-4, 1e-4);
-        ParInexactUzawaCL<PCGPcT, ISBBTPreCL, APC_SYM> inexactuzawasolver( apc, bbtispc, Stokes.vel_idx.GetFinest(), Stokes.pr_idx.GetFinest(),
-                                                                           P.get<int>("Stokes.OuterIter"), P.get<double>("Stokes.OuterTol"), 0.6, 50, &std::cout);
+        typedef JACPcCL PcT;
 #else
-        SSORPcCL ssorpc;
-        PCGSolverCL<SSORPcCL> PCGsolver( ssorpc, 200, 1e-2, true);
-        typedef SolverAsPreCL<PCGSolverCL<SSORPcCL> > PCGPcT;
+        typedef SSORPcCL PcT;
+#endif
+        PcT pc;
+        PCGSolverCL<PcT> PCGsolver( pc, 200, 1e-2, true);
+        typedef SolverAsPreCL<PCGSolverCL<PcT> > PCGPcT;
         PCGPcT apc( PCGsolver);
         ISBBTPreCL bbtispc( &Stokes.B.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.M.Data.GetFinest(), Stokes.pr_idx.GetFinest(), 0.0, 1.0, 1e-4, 1e-4);
         InexactUzawaCL<PCGPcT, ISBBTPreCL, APC_SYM> inexactuzawasolver( apc, bbtispc, P.get<int>("Stokes.OuterIter"), P.get<double>("Stokes.OuterTol"), 0.6, 50);
-#endif
+
         NSSolverBaseCL<StokesT> stokessolver( Stokes, inexactuzawasolver);
         SolveStatProblem( Stokes, lset, stokessolver);
       } break;

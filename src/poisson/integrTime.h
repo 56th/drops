@@ -169,7 +169,7 @@ void InstatPoissonThetaSchemeCL<PoissonT,SolverT>::StadScheme( VecDescCL& v)
       AU.LinComb( 1, _Poisson.A.Data, 1, _Poisson.U.Data);
       _Lmat.LinComb( 1, _Poisson.M.Data, _dt*_theta, AU);
   }
-  _solver.Solve( _Lmat, v.Data, _rhs);
+  _solver.Solve( _Lmat, v.Data, _rhs, v.RowIdx->GetEx());
 
   std::swap( _b, _old_b);
   std::swap( _cplA, _old_cplA);
@@ -193,7 +193,7 @@ void InstatPoissonThetaSchemeCL<PoissonT,SolverT>::GeneralScheme( VecDescCL& v)
       } 
       SSORPcCL pc(1.0);
       GMResSolverCL<SSORPcCL> solver(pc, 50, 1000, 1.0e-12);
-      solver.Solve( _Poisson.M.Data , _Zeta, _innerb); 
+      solver.Solve( _Poisson.M.Data , _Zeta, _innerb, _Poisson.idx.GetEx());
       std::cout << " o Solved system with:\n"
                 << "   - iterations    " << solver.GetIter()  << '\n'
                 << "   - residuum      " << solver.GetResid() << '\n';
@@ -228,7 +228,7 @@ void InstatPoissonThetaSchemeCL<PoissonT,SolverT>::GeneralScheme( VecDescCL& v)
       AU.LinComb( 1, _Poisson.A.Data, 1, _Poisson.U.Data);
       _Lmat.LinComb( 1, _Poisson.M.Data, _dt*_theta, AU);
   }
-  _solver.Solve( _Lmat, v.Data, _rhs);
+  _solver.Solve( _Lmat, v.Data, _rhs, v.RowIdx->GetEx());
   //Update zeta sequence
   VectorCL _old_Zeta( _Poisson.b.RowIdx->NumUnknowns());
   _old_Zeta = _Zeta;

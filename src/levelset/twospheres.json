@@ -1,0 +1,13 @@
+{
+  "Two spheres":
+  {
+    "Type": "CSG-body (v0)",
+    "Instructions" : [
+        { "Type": "Sphere", "Center": [0.25, 0.5, 0.5], "Radius": 0.15 },
+        { "Type": "CreateReference", "Name": "s0" },
+        { "Type": "ApplySimilarityToDomain", "Translation": [-0.5, 0,0], "Scaling": 1.2 }, // optional RotationAxis, RotationAngle
+        { "Type": "PushReference", "Name": "s0" },
+        "SmoothUnion" // A close relative of "Union"
+    ]
+  }
+}

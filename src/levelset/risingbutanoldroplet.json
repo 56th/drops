@@ -5,6 +5,18 @@
 //    butanol droplet in water
 //=============================================================
 
+//General section
+        "General": 
+        {
+                "ProgressBar":  1, //show progress bar
+                "DynamicLibsPrefix": "../", //where should we look for shared objects?
+                "DynamicLibs": [ //select libraries to be loaded after program start
+                        "levelset/liblevelset-twophaseCoeff",
+                        "misc/libmisc-scalarFunctions",
+                        "misc/libmisc-vectorFunctions"
+                ]
+        },
+
 // time stepping
         "Time":
         {
@@ -182,12 +194,12 @@
 // surfactant transport
         "SurfTransp":
         {
-                "DoTransp":             0,      // Ensight output (0 = off, 1 = on).
-                "Theta":                0.5,    // name of Ensight case.
-                "Iter":                 1000,   // local directory of Ensight files.
-                "Tol":                  1e-10,  // write out Ensight files in binary format (0 = off, 1 = on).
-                "OmitBound":            -1.0,   // only master writes out Ensight files.
-                "Visc":                 1e-5    // name for the geometry.
+                "DoTransp":             0,      // 
+                "Theta":                0.5,    // 
+                "Iter":                 1000,   // 
+                "Tol":                  1e-10,  // 
+                "OmitBound":            -1.0,   // 
+                "Visc":                 1e-5    // 
         },
 
 

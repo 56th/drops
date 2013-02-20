@@ -14,33 +14,14 @@ Version :1.0
 
 __author__ = "Oliver Fortmeier, Alin Bastea and Eva Loch"
 
-def replacearch( a,  b):
-    confFile = '../../drops.conf'               #configuration file for DROPS
-    #read the configuration file
-    file = open(confFile)
-    confFileLines = file.readlines()
-    file.close()
-    #modify the architecture to strategy b
-    for i,line in enumerate(confFileLines):
-        confFileLines[i] = line.replace(a,b)
-    #rewrite the configuration file
-    file = open(confFile, "w")
-    file.writelines(confFileLines)
-    file.close()
-
 def serial():
-    #modify the architecture to serial strategy
-    replacearch("ARCH = LINUX_MPI\n","ARCH = LINUX\n")
-    #clean DROPS
-    command = "cd ../../; make clean; make dep"
+    #clean DROPS and enable serial build
+    command = "cd ../../; make clean; cmake -DMPI=0 ."
     return os.system(command)
     
 def parallel():
-    #modify the architecture to parallel strategy
-    replacearch("ARCH = LINUX\n","ARCH = LINUX_MPI\n")
-    #create and run the command for generating the libraries and the
-    #dependencies
-    command = "cd ../../; make clean; make dep"
+    #clean DROPS and enable parallel build
+    command = "cd ../../; make clean; cmake -DMPI=1 ."
     return os.system(command)
 
 #Test - parameter, object of class TestCL found in classtest.py file

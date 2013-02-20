@@ -279,7 +279,7 @@ int TestRepair()
 int main ( int argc, char **argv)
 {
 #ifdef _PAR
-    DROPS::ProcInitCL procinit(&argc, &argv);
+    DROPS::ProcCL::Instance(&argc, &argv);
 #endif
   int ret = 0;
   try {
