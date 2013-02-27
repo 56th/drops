@@ -1279,6 +1279,53 @@ struct LocalSystem1DataCL
     double rho_phi[10];
 };
 
+/// \brief Update the local system 1 (nocut) with respect to special boundary conditions: slip Bnd and symmetric Bnd;
+class SpecialBndHandleOnePhaseCL
+{
+  private:
+	double mu_;
+	double beta_;      //Slip coefficient, beta_=0 for symmetric Bnd;
+	double alpha_;     //Coefficient for Nitche method
+  public:	
+	SpecialBndHandleOnePhaseCL(double mu, double beta=0, double alpha=0): mu_(mu), beta_(beta), alpha_(alpha){}
+    void setup(const TetraCL& tet, double absdet, LocalSystem1DataCL& loc);  //update local system 1
+};
+void SpecialBndHandleOnePhaseCL::setup(const TetraCL& tet, double absdet, LocalSystem1DataCL& loc)
+{ 
+	for (Uint k =0; k< 4; ++k) //Go throught all faces of a tet
+	{
+		SMatrixCL<3, 3> dm[10][10];
+		Point3DCL normal;
+		Uint unknownIdx[6];
+		LocalP2CL<double> phi[6]; 
+		Quad5_2DCL<double> mass2D;
+		BaryCoordCL bary[3];
+		if(tet.GetFace(k)->GetBndIdx()== SlipBC ||tet.GetFace(k)->GetBndIdx()== SymmBC){ 
+			tet.GetOuterNormal(k, normal);
+			for (Uint i= 0; i<3; ++i) //m is index for Vertex or Edge
+			{
+				unknownIdx[i]   = VertOfFace(k, i);
+				unknownIdx[i+4] = EdgeOfFace(k, i);
+				bary[i][unknownIdx[i]]=1;
+			}
+
+			for(Uint i=0; i<6; ++i)
+				phi[i][unknownIdx[i]] = 1;
+				
+			for(Uint i=0; i<6; ++i){
+				for(Uint j=0; j<=i; ++j){
+					
+					mass2D.assign(LocalP2CL<double>(phi[j]*phi[i]), bary);
+					dm[unknownIdx[j]][unknownIdx[i]](0, 0)= dm[unknownIdx[j]][unknownIdx[i]](1, 1) = dm[unknownIdx[j]][unknownIdx[i]](2, 2) = beta_ * mass2D.quad(absdet);
+					loc.Ak[unknownIdx[j]][unknownIdx[i]] += dm[unknownIdx[j]][unknownIdx[i]];	
+					loc.Ak[unknownIdx[j]][unknownIdx[i]] += (alpha_ - beta_) * mass2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));
+					if (i != j)
+						assign_transpose( loc.Ak[i][j], loc.Ak[j][i]);
+				}
+			}
+		}
+	}
+}
 /// \brief Setup of the local "system 1" on a tetra in a single phase.
 class LocalSystem1OnePhase_P2CL
 {
@@ -1301,13 +1348,6 @@ class LocalSystem1OnePhase_P2CL
 
     void setup (const SMatrixCL<3,3>& T, double absdet, LocalSystem1DataCL& loc);
 };
-
-/// \brief Update the local "systme 1 and 2" with respect to special boundary conditions: slip Bnd and symmetric Bnd;
-class SpecialBndHandleCL
-{
-  public:	
-    void updateSystem1(const TetraCL& tet, LocalSystem1DataCL& loc){ return 0;}
-}
 
 void LocalSystem1OnePhase_P2CL::setup (const SMatrixCL<3,3>& T, double absdet, LocalSystem1DataCL& loc)
 {
@@ -1481,12 +1521,14 @@ class System1Accumulator_P2CL : public TetraAccumulatorCL
     LocalSystem1TwoPhase_P2CL local_twophase; ///< used on intersected tetras
     LocalSystem1DataCL loc;                   ///< Contains the memory, in which the local operators are set up; former coupM, coupA, coupAk, rho_phi.
     LocalIntegrals_P2CL locInt[2];            ///< stores computed integrals on neg./pos. part to be used by P2X discretization
+	SpecialBndHandleOnePhaseCL speBndHandle;
 
     LocalNumbP2CL n; ///< global numbering of the P2-unknowns
 
     SMatrixCL<3,3> T;
     double det, absdet;
     LocalP2CL<> ls_loc;
+	bool speBnd;        //if there is a slip or symmetric boundary condtion
 
     Quad2CL<Point3DCL> rhs;
     Point3DCL loc_b[10], dirichlet_val[10]; ///< Used to transfer boundary-values from local_setup() update_global_system().
@@ -1516,7 +1558,8 @@ System1Accumulator_P2CL::System1Accumulator_P2CL (const TwoPhaseFlowCoeffCL& Coe
     VecDescCL* b_, VecDescCL* cplA_, VecDescCL* cplM_, double t_)
     : Coeff( Coeff_), BndData( BndData_), lset_Phi( lset_arg), lset_Bnd( lset_bnd), t( t_),
       RowIdx( RowIdx_), A( A_), M( M_), cplA( cplA_), cplM( cplM_), b( b_),
-      local_twophase( Coeff.mu( 1.0), Coeff.mu( -1.0), Coeff.rho( 1.0), Coeff.rho( -1.0), Coeff.volforce)
+      local_twophase( Coeff.mu( 1.0), Coeff.mu( -1.0), Coeff.rho( 1.0), Coeff.rho( -1.0), Coeff.volforce),
+	  speBndHandle(Coeff.mu( 1.0))
 {}
 
 void System1Accumulator_P2CL::begin_accumulation ()
@@ -1560,13 +1603,25 @@ void System1Accumulator_P2CL::local_setup (const TetraCL& tet)
 
     ls_loc.assign( tet, lset_Phi, lset_Bnd);
     const bool noCut= equal_signs( ls_loc);
+	speBnd = false;
+	//if speBnd = true , there is at least one slip or symmetric boundary on this tetra 
+	for(int i =0; i< 4; ++i){
+		if( tet.GetFace(i)->GetBndIdx()==SlipBC || tet.GetFace(i)->GetBndIdx()==SymmBC)
+		{
+			speBnd = true;
+			break;
+		}
+	}
     if (noCut) {
         local_onephase.mu(  local_twophase.mu(  sign( ls_loc[0])));
         local_onephase.rho( local_twophase.rho( sign( ls_loc[0])));
         local_onephase.setup( T, absdet, loc);
+		if(speBnd)
+			speBndHandle.setup(tet, absdet, loc);
     }
     else
         local_twophase.setup( T, absdet, tet, ls_loc, locInt, loc);
+		//update loc for special boundary condtion
     add_transpose_kronecker_id( loc.Ak, loc.A);
 
     if (b != 0) {
