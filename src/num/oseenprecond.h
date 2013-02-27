@@ -242,7 +242,8 @@ class ISMGPreCL : public SchurPreBaseCL
     const Uint sm; // how many smoothing steps?
     const int lvl; // how many levels? (-1=all)
     const double omega; // relaxation parameter for smoother
-    MLSmootherCL<SSORsmoothCL> smoother;  // Symmetric-Gauss-Seidel with over-relaxation
+    typedef SSORsmoothCL SmootherT;
+    MLSmootherCL<SmootherT> smoother;  // Symmetric-Gauss-Seidel with over-relaxation
     SSORPcCL directpc;
     mutable PCGSolverCL<SSORPcCL> solver;
 
@@ -263,7 +264,7 @@ class ISMGPreCL : public SchurPreBaseCL
         : SchurPreBaseCL( kA, kM), sm( 1), lvl( -1), omega( 1.0), smoother( omega), solver( directpc, 200, 1e-12),
           Apr_( A_pr), Mpr_( M_pr), idx_(idx), iter_prA_( iter_prA), iter_prM_( iter_prM), ones_(0)
     {
-        smoother.resize( idx.size(), SSORsmoothCL(omega));
+        smoother.resize( idx.size(), SmootherT(omega));
     }
 
     /// \brief Apply preconditioner
@@ -279,6 +280,50 @@ class ISMGPreCL : public SchurPreBaseCL
     using SchurPreBaseCL::Apply;
     ProlongationT* GetProlongation() { return &P_; }
 };
+
+template<class ProlongationT>
+void ISMGPreCL<ProlongationT>::MaybeInitOnes() const
+{
+    if (Mpr_.size() == ones_.size()) return;
+    // Compute projection on constant pressure function only once.
+    Uint i= 0;
+    ones_.resize(0); // clear all
+    ones_.resize(Mpr_.size());
+    for (MLMatrixCL::const_iterator it= Mpr_.begin(); it != Mpr_.end(); ++it, ++i) {
+        ones_[i].resize( it->num_cols(), 1.0/it->num_cols());
+    }
+}
+
+template<class ProlongationT>
+template <typename Mat, typename Vec, typename ExT>
+void ISMGPreCL<ProlongationT>::Apply(const Mat& /*A*/, Vec& p, const Vec& c, const ExT&, const ExT&) const
+{
+    MaybeInitOnes();
+    p= 0.0;
+    const Vec c2_( c - dot( ones_.back(), c));
+    typename ProlongationT::const_iterator finestP = --P_.end();
+    MLIdxDescCL::const_iterator finestIdx = idx_.GetFinestIter();
+    MLSmootherCL<SmootherT>::const_iterator smootherit = smoother.GetFinestIter();
+//    double new_res= norm(Apr_*p - c);
+//    double old_res;
+//    std::cout << "Pressure: iterations: " << iter_prA_ <<'\t';
+    for (DROPS::Uint i=0; i<iter_prA_; ++i) {
+        DROPS::MGMPr( ones_.end()-1, Apr_.begin(), --Apr_.end(), finestP, p, c2_, finestIdx, smootherit, sm, solver, lvl, -1);
+//        old_res= new_res;
+//        std::cout << " residual: " <<  (new_res= norm(Apr_*p - c)) << '\t';
+//        std::cout << " reduction: " << new_res/old_res << '\n';
+    }
+    p*= kA_;
+//    std::cout << " residual: " <<  norm(Apr_*p - c) << '\t';
+
+    Vec p2( p.size());
+    for (DROPS::Uint i=0; i<iter_prM_; ++i)
+        DROPS::MGM( Mpr_.begin(), --Mpr_.end(), finestP, p2, c, finestIdx, smootherit, sm, solver, lvl, -1);
+//    std::cout << "Mass: iterations: " << iter_prM_ << '\t'
+//              << " residual: " <<  norm(Mpr_*p2 - c) << '\n';
+
+    p+= kM_*p2;
+}
 
 #ifndef _PAR
 // Append the kernel of Bs as last column to Bs.
@@ -821,51 +866,6 @@ class BlockPreCL
           PC2T& GetPC2()       { return pc2_; }
 
 };
-
-template<class ProlongationT>
-void ISMGPreCL<ProlongationT>::MaybeInitOnes() const
-{
-    if (Mpr_.size() == ones_.size()) return;
-    // Compute projection on constant pressure function only once.
-    Uint i= 0;
-    ones_.resize(0); // clear all
-    ones_.resize(Mpr_.size());
-    for (MLMatrixCL::const_iterator it= Mpr_.begin(); it != Mpr_.end(); ++it, ++i) {
-        ones_[i].resize( it->num_cols(), 1.0/it->num_cols());
-    }
-}
-
-template<class ProlongationT>
-template <typename Mat, typename Vec, typename ExT>
-void ISMGPreCL<ProlongationT>::Apply(const Mat& /*A*/, Vec& p, const Vec& c, const ExT&, const ExT&) const
-{
-    MaybeInitOnes();
-    p= 0.0;
-    const Vec c2_( c - dot( ones_.back(), c));
-    typename ProlongationT::const_iterator finestP = --P_.end();
-    MLIdxDescCL::const_iterator finestIdx = idx_.GetFinestIter();
-    MLSmootherCL<SSORsmoothCL>::const_iterator smootherit = smoother.GetFinestIter();
-//    double new_res= (Apr_.back().A.Data*p - c).norm();
-//    double old_res;
-//    std::cout << "Pressure: iterations: " << iter_prA_ <<'\t';
-    for (DROPS::Uint i=0; i<iter_prA_; ++i) {
-        DROPS::MGMPr( ones_.end()-1, Apr_.begin(), --Apr_.end(), finestP, p, c2_, finestIdx, smootherit, sm, solver, lvl, -1);
-//        old_res= new_res;
-//        std::cout << " residual: " <<  (new_res= (Apr_.back().A.Data*p - c).norm()) << '\t';
-//        std::cout << " reduction: " << new_res/old_res << '\n';
-    }
-    p*= kA_;
-//    std::cout << " residual: " <<  (Apr_.back().A.Data*p - c).norm() << '\t';
-
-    Vec p2( p.size());
-    for (DROPS::Uint i=0; i<iter_prM_; ++i)
-        DROPS::MGM( Mpr_.begin(), --Mpr_.end(), finestP, p2, c, finestIdx, smootherit, sm, solver, lvl, -1);
-//    std::cout << "Mass: iterations: " << iter_prM_ << '\t'
-//              << " residual: " <<  (Mpr_.back().A.Data*p2 - c).norm() << '\n';
-
-    p+= kM_*p2;
-}
-
 
 } // end of namespace DROPS
 

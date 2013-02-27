@@ -38,7 +38,7 @@ int Test1()
 {
     SMatrixCL<2,2> M(dat+0);
     SVectorCL<2> v(dat2+0);
-    std::cout << M << std::endl << v << std::endl;
+    std::cout<<"Data: Matrix M= " << M << std::endl << " Righthandside v= "<< v << std::endl;
 #if 0
     std::cout << v-2.0*v << std::endl;
     std::cout << (M*= 0.5) << std::endl;
@@ -47,21 +47,25 @@ int Test1()
     std::cout << M*M << std::endl;
 #endif
     gauss_pivot(M, v);
-    std::cout << v << std::endl;
+    std::cout << "Solution shoud be: -2 1. Drops says: " << std::endl;
+    std::cout << "Solution of the linear system based on Gauss-Elimination: "<< v << std::endl;
+    
+    QRDecompCL<2> qr ( dat + 0);
+    SVectorCL<2> r( dat2 + 0);
+    qr.Solve( r);
+    std::cout <<"Solution of the linear system based on QR-Decomposition: "<< r << std::endl;
+    
     return 0;
 }
 
 int Test2()
 {
-    QRDecompCL<2> qr ( dat + 0);
-    SVectorCL<2> r( dat2 + 0);
-    qr.Solve( r);
-    std::cout << r << std::endl;
-
-    std::cout << "Least squares: solution should be (0.4 0.4) with residual 11. Drops says:" << std::endl;
     QRDecompCL<3,2> qrls ( dat3 + 0);
+    SMatrixCL<3,2> qrlsoutput (dat3+0);
     SVectorCL<3> rls( dat4 + 0);
+    std::cout << std::endl << "Data: Nonquadratic matrix qrls= "<< qrlsoutput << std::endl << " Righthandside rls= " << rls << std::endl;
     qrls.Solve( rls);
+    std::cout << "Least squares: solution should be (0.4 0.4) with residual 11. Drops says:" << std::endl;
     std::cout << "Solution: " << rls << std::endl;
 
     return 0;

@@ -94,6 +94,7 @@ int main()
         err1+= Test1(i);
         err2+= Test2(i);
     }
+    std::cout << "total errors found: " << err1+err2 << std::endl;
     return err1+err2;
   }
   catch (DROPS::DROPSErrCL err) { err.handle(); }

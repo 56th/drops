@@ -1384,12 +1384,13 @@ transpose (const SparseMatBaseCL<T>& M, SparseMatBaseCL<T>& Mt)
 /// \brief Compute the diagonal of B*B^T.
 ///
 /// The commented out version computes B*M^(-1)*B^T
-///
-/// In parallel, this function may not work as expected
 template <typename T>
 VectorBaseCL<T>
 BBTDiag (const SparseMatBaseCL<T>& B /*, const VectorBaseCL<T>& Mdiaginv*/)
 {
+#ifdef _PAR
+    throw DROPSErrCL("BBTDiag will not work as expected");
+#endif
     VectorBaseCL<T> ret( B.num_rows());
 
     T Bik;

@@ -657,7 +657,15 @@ class NEGSPcCL
     void Apply(const CompositeMatrixCL& AAT, VectorCL& x, const VectorCL& b, const ExT& rowex, const ExT& colex) const
     { Apply<>( *AAT.GetBlock1(), x, b, rowex, colex); }
     
-    bool RetAcc() const {return false;}
+    /// \brief Check if return preconditioned vectors are accumulated after calling Apply
+    bool RetAcc()   const { return false; }
+    /// \brief Check if the diagonal of the matrix is needed
+    bool NeedDiag() const { return false; }
+    /// \name Set diagonal of the matrix for consistency
+    //@{
+    void SetDiag(const VectorCL&) {}            // just for consistency
+    template<typename Mat, typename ExT>
+    void SetDiag(const Mat&, const ExT&) {}     // just for consistency
 };
 
 #ifdef _PAR
@@ -1032,9 +1040,9 @@ class DummyPcCL
 };
 
 // computes an approximation of the largest eigenvalue of D^{-1}A
-template <class ExT>
-double GerschgorinScaledMatrix(const MatrixCL& A, const VectorCL& D, const ExT& ex) {
-    VectorCL y(A.GetLumpedDiag());
+template <class Mat, class Vec, class ExT>
+double GerschgorinScaledMatrix(const Mat& A, const Vec& D, const ExT& ex) {
+    Vec y(A.GetLumpedDiag());
     ex.Accumulate(y);
     y/=D;
 #ifdef _PAR
@@ -1043,6 +1051,24 @@ double GerschgorinScaledMatrix(const MatrixCL& A, const VectorCL& D, const ExT& 
     const double max_lambda = y.max();
 #endif
     return max_lambda;
+}
+
+// computes an approximation of the largest eigenvalue of D^{-1}A
+template <class Mat, class Vec, class ExT>
+double MaxEigenvalueScaledMatrix(const Mat& A, const Vec& D, const ExT& ex, const int iter = 10) {
+    Vec y(D);
+    ex.Accumulate(y);
+    y/=D;
+    y /= ex.Norm(y, true);
+    double lambda = 0.0;
+
+    for (int i=0; i<iter; ++i){
+        y=(A*y)/D;
+        ex.Accumulate(y);
+        lambda = ex.Norm(y, true);
+        y/=lambda;
+    }
+    return lambda;
 }
 
 #ifdef _PAR
@@ -1213,10 +1239,11 @@ class MLSmootherCL : public MLDataCL<SmootherT> {
   public:
     MLSmootherCL( const double omega = 1.0) : omega_(omega) {}
 
-    void SetDiag( const MLMatrixCL& A, const MLIdxDescCL& idx) {
+    template<class Mat>
+    void SetDiag( const MLDataCL<Mat>& A, const MLIdxDescCL& idx) {
         Assert( A.size() == idx.size(), DROPSErrCL ("MLSmootherCL::SetDiag: dimensions do not fit\n"), DebugNumericC);
         this->resize(A.size(), SmootherT(omega_));
-        MLMatrixCL::const_iterator Ait = A.begin();
+        typename MLDataCL<Mat>::const_iterator Ait = A.begin();
         MLIdxDescCL::const_iterator ExIt = idx.begin();
         for ( typename MLSmootherCL::iterator Sit = this->begin(); Sit != this->end(); ++Sit, ++Ait, ++ExIt)
             Sit->SetDiag(*Ait, ExIt->GetEx());
@@ -1332,14 +1359,14 @@ void Chebyshev(const Mat &A, Vec &x, const Vec &b, const ExT &ex, const Vec& dia
 }
 
 // ***************************************************************************
-/// \brief Class for performing Chebychev-polynomial based smoothing
+/// \brief Class for performing Chebyshev-polynomial based smoothing
 // ***************************************************************************
 class ChebyshevsmoothCL : public PreBaseCL
 {
     private:
         typedef PreBaseCL base_;
         const double scale_;        // scaling of lambda_max_
-        int degree_;                // degree of used Chebychev polynomial
+        int degree_;                // degree of used Chebyshev polynomial
         double  EigRatio_;          // ratio between lambda_max and lambda_min
         double  lambda_max_;        // approximation of largest eigenvalue
 
@@ -1360,10 +1387,11 @@ class ChebyshevsmoothCL : public PreBaseCL
 
             base_::SetDiag(A, ex);
             lambda_max_ = scale_ * GerschgorinScaledMatrix(A, diag_, ex);
+            //lambda_max_ = scale_ * MaxEigenvalueScaledMatrix(A, diag_, ex);
             std::cout << "ChebyshevsmoothCL: lambda_max = " << lambda_max_ << std::endl;
         }
 
-        /// \brief Apply preconditioner: one step of the SSOR-iteration
+        /// \brief Apply preconditioner: one step of the Chebyshev-iteration
         template <typename Mat, typename Vec, typename ExT>
         void Apply(const Mat& A, Vec &x, const Vec& b, const ExT& ex) const
         {
@@ -1374,7 +1402,7 @@ class ChebyshevsmoothCL : public PreBaseCL
             Chebyshev<true, Mat, Vec, ExT>(A, x, b, ex, diag_, degree_, lambda_max_, EigRatio_);
 
         }
-        /// \brief Apply preconditioner: one step of the SSOR-iteration
+        /// \brief Apply preconditioner: one step of the Chebyshev-iteration
         template <typename Vec, typename ExT>
         void Apply(const MLMatrixCL& A, Vec &x, const Vec& b, const ExT& ex) const
         {
@@ -1383,14 +1411,14 @@ class ChebyshevsmoothCL : public PreBaseCL
 };
 
 // ***************************************************************************
-/// \brief Class for performing Chebychev-polynomial based preconditioning
+/// \brief Class for performing Chebyshev-polynomial based preconditioning
 // ***************************************************************************
 class ChebyshevPcCL : public PreBaseCL
 {
     private:
         typedef PreBaseCL base_;
         const double scale_;        // scaling of lambda_max_
-        int degree_;                // degree of used Chebychev polynomial
+        int degree_;                // degree of used Chebyshev polynomial
         double  EigRatio_;          // ratio between lambda_max and lambda_min
         double  lambda_max_;        // approximation of largest eigenvalue
 
@@ -1421,23 +1449,67 @@ class ChebyshevPcCL : public PreBaseCL
             SetDiag<>(A.GetFinest(), ex);
         }
 
-        /// \brief Apply preconditioner: one step of the SSOR-iteration
+        /// \brief Apply preconditioner: one step of the Chebyshev-iteration
         template <typename Mat, typename Vec, typename ExT>
         void Apply(const Mat& A, Vec &x, const Vec& b, const ExT& ex) const
         {
             Assert(mat_version_==A.Version() || !check_mat_version_,
-                   DROPSErrCL("ChebyshevsmoothCL::Apply: Diagonal of actual matrix has not been set"),
+                   DROPSErrCL("ChebyshevPcCL::Apply: Diagonal of actual matrix has not been set"),
                    DebugNumericC);
 
             Chebyshev<false, Mat, Vec, ExT>(A, x, b, ex, diag_, degree_, lambda_max_, EigRatio_);
 
         }
-        /// \brief Apply preconditioner: one step of the SSOR-iteration
+        /// \brief Apply preconditioner: one step of the Chebyshev-iteration
         template <typename Vec, typename ExT>
         void Apply(const MLMatrixCL& A, Vec &x, const Vec& b, const ExT& ex) const
         {
             Apply<>(A.GetFinest(), x, b, ex);
         }
+};
+
+class ChebyshevBBTPcCL : public ChebyshevPcCL {
+  private:
+    CompositeMatrixCL* mat_;
+
+  public:
+    ChebyshevBBTPcCL(double lambda_scale = 1, int degree = 3, double ratio = 30.0) : ChebyshevPcCL(lambda_scale, degree, ratio), mat_(0) {}
+
+    /// \brief Set accumulated diagonal of a matrix, that is needed by most of the preconditioners
+    template<typename Mat, typename ExT>
+    void SetDiag(const Mat& A, const ExT& ex)
+    {
+        if (A.Version() == mat_version_)
+            return;
+
+        delete mat_;
+        mat_ = new CompositeMatrixBaseCL<Mat, Mat>(&A, TRANSP_MUL, &A, MUL);
+        if (diag_.size() != A.num_rows())
+            diag_.resize(A.num_rows());
+        // accumulate diagonal of the matrix
+        diag_= BBTDiag(A);
+        ex.Accumulate(diag_);
+        // remember version of the matrix
+        mat_version_= A.Version();
+
+        lambda_max_ = scale_ *MaxEigenvalueScaledMatrix(*mat_, diag_, ex);
+        std::cout << "ChebyshevBBTPcCL: lambda_max = " << lambda_max_ << std::endl;
+    }
+
+    /// \brief Apply preconditioner: one step of the Chebyshev-iteration
+    template <typename Mat, typename Vec, typename ExT>
+    void Apply(__UNUSED__ const Mat& A, Vec &x, const Vec& b, const ExT& ex, const ExT&) const
+    {
+        Assert(mat_version_==A.Version() || !check_mat_version_,
+               DROPSErrCL("ChebyshevBBTPcCL::Apply: Diagonal of actual matrix has not been set"),
+               DebugNumericC);
+
+        Chebyshev<false, CompositeMatrixCL, Vec, ExT>(*mat_, x, b, ex, diag_, degree_, lambda_max_, EigRatio_);
+
+    }
+
+    ~ChebyshevBBTPcCL() { delete mat_;}
+
 };
 
 } // end of namespace DROPS

@@ -8,7 +8,7 @@ Folder of executable: tests
 #the folder where the executable is situated
 Path of parameter-file: 
 Name of test: testP2Local
-Name of author: Gross
+Name of author: Sven Gross
 #-------------------------------------------------------------------------------
 #------------------------------NUMBERS------------------------------------------
 Name of variable: "Integral"
