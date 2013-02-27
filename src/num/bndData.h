@@ -49,7 +49,7 @@ enum BndCondT
     Nat0BC= 21,                  ///< hom.   natural   boundary condition
     NatBC= 23,                   ///< inhom. natural   boundary conditions
     OutflowBC= 21,               ///< same as Nat0BC, for convenience
-	SlipBC= 18,                  ///< Navier-Slip boundary conditions
+	SlipBC= 17,                  ///< Navier-Slip boundary conditions
 	SymmBC= 19,                   ///< Symmetric boundary conditions
     WallBC= 0,                   ///< same as Dir0BC, for convenience
     NoBC= 98,                    ///< interior simplices
