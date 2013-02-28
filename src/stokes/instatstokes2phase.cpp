@@ -1292,13 +1292,15 @@ class SpecialBndHandleOnePhaseCL
 };
 void SpecialBndHandleOnePhaseCL::setup(const TetraCL& tet, double absdet, LocalSystem1DataCL& loc)
 { 
+	Point3DCL normal;
+	Uint unknownIdx[6];
 	for (Uint k =0; k< 4; ++k) //Go throught all faces of a tet
 	{
 		SMatrixCL<3, 3> dm[10][10];
-		Point3DCL normal;
-		Uint unknownIdx[6];
 		LocalP2CL<double> phi[6]; 
-		Quad5_2DCL<double> mass2D;
+		Quad5_2DCL<double> mass2D1;
+		Quad5_2DCL<double> mass2D2;
+
 		BaryCoordCL bary[3];
 		if(tet.GetFace(k)->GetBndIdx()== SlipBC ||tet.GetFace(k)->GetBndIdx()== SymmBC){ 
 			tet.GetOuterNormal(k, normal);
@@ -1315,12 +1317,17 @@ void SpecialBndHandleOnePhaseCL::setup(const TetraCL& tet, double absdet, LocalS
 			for(Uint i=0; i<6; ++i){
 				for(Uint j=0; j<=i; ++j){
 					
-					mass2D.assign(LocalP2CL<double>(phi[j]*phi[i]), bary);
+					mass2D1.assign(phi[j], bary);  //
+					mass2D2.assign(phi[i], bary);
+					Quad5_2DCL<double> mass2D(mass2D1 * mass2D2); //
 					dm[unknownIdx[j]][unknownIdx[i]](0, 0)= dm[unknownIdx[j]][unknownIdx[i]](1, 1) = dm[unknownIdx[j]][unknownIdx[i]](2, 2) = beta_ * mass2D.quad(absdet);
-					loc.Ak[unknownIdx[j]][unknownIdx[i]] += dm[unknownIdx[j]][unknownIdx[i]];	
-					loc.Ak[unknownIdx[j]][unknownIdx[i]] += (alpha_ - beta_) * mass2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));
+					dm[unknownIdx[j]][unknownIdx[i]]     += (alpha_ - beta_) * mass2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));
 					if (i != j)
-						assign_transpose( loc.Ak[i][j], loc.Ak[j][i]);
+						assign_transpose( dm[unknownIdx[i]][unknownIdx[j]], dm[unknownIdx[j]][unknownIdx[i]]);
+					loc.Ak[unknownIdx[j]][unknownIdx[i]] += dm[unknownIdx[j]][unknownIdx[i]];
+					if (i != j)	
+						loc.Ak[unknownIdx[i]][unknownIdx[j]] += dm[unknownIdx[i]][unknownIdx[j]];	
+
 				}
 			}
 		}
