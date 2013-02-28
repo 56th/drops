@@ -1286,20 +1286,27 @@ class SpecialBndHandleOnePhaseCL
 	double mu_;
 	double beta_;      //Slip coefficient, beta_=0 for symmetric Bnd;
 	double alpha_;     //Coefficient for Nitche method
-  public:	
-	SpecialBndHandleOnePhaseCL(double mu, double beta=0, double alpha=0): mu_(mu), beta_(beta), alpha_(alpha){}
-    void setup(const TetraCL& tet, double absdet, LocalSystem1DataCL& loc);  //update local system 1
-};
-void SpecialBndHandleOnePhaseCL::setup(const TetraCL& tet, double absdet, LocalSystem1DataCL& loc)
-{ 
+	LocalP1CL<Point3DCL> Grad[10], GradRef[10];
 	Point3DCL normal;
 	Uint unknownIdx[6];
+  public:	
+	SpecialBndHandleOnePhaseCL(double mu, double beta=0, double alpha=0): mu_(mu), beta_(beta), alpha_(alpha)
+    { P2DiscCL::GetGradientsOnRef( GradRef); }
+    void setup(const TetraCL& tet, const SMatrixCL<3,3>& T, double absdet, LocalSystem1DataCL& loc);  //update local system 1
+};
+void SpecialBndHandleOnePhaseCL::setup(const TetraCL& tet, const SMatrixCL<3,3>& T, double absdet, LocalSystem1DataCL& loc)
+{ 
+
+    P2DiscCL::GetGradients( Grad, GradRef, T);
 	for (Uint k =0; k< 4; ++k) //Go throught all faces of a tet
 	{
 		SMatrixCL<3, 3> dm[10][10];
 		LocalP2CL<double> phi[6]; 
-		Quad5_2DCL<double> mass2D1;
-		Quad5_2DCL<double> mass2D2;
+		Quad5_2DCL<double> mass2Dj;
+		Quad5_2DCL<double> mass2Di;
+		Quad5_2DCL<double> Grad2Dj;   //\nabla phi_j* n
+		Quad5_2DCL<double> Grad2Di;   //\nabla phi_i* n
+		
 
 		BaryCoordCL bary[3];
 		if(tet.GetFace(k)->GetBndIdx()== SlipBC ||tet.GetFace(k)->GetBndIdx()== SymmBC){ 
@@ -1316,12 +1323,17 @@ void SpecialBndHandleOnePhaseCL::setup(const TetraCL& tet, double absdet, LocalS
 				
 			for(Uint i=0; i<6; ++i){
 				for(Uint j=0; j<=i; ++j){
-					
-					mass2D1.assign(phi[j], bary);  //
-					mass2D2.assign(phi[i], bary);
-					Quad5_2DCL<double> mass2D(mass2D1 * mass2D2); //
+					LocalP1CL<double> Gradjn(dot( normal, Grad[unknownIdx[j]]));
+					LocalP1CL<double> Gradin(dot( normal, Grad[unknownIdx[i]]));					
+					mass2Dj.assign(phi[j], bary);  //
+					mass2Di.assign(phi[i], bary);
+					Grad2Dj.assign(Gradjn, bary);
+					Grad2Di.assign(Gradin, bary);
+					Quad5_2DCL<double> mass2D(mass2Dj * mass2Di); //
+					Quad5_2DCL<double> Grad2D(Grad2Di * mass2Dj + Grad2Dj * mass2Di); //
 					dm[unknownIdx[j]][unknownIdx[i]](0, 0)= dm[unknownIdx[j]][unknownIdx[i]](1, 1) = dm[unknownIdx[j]][unknownIdx[i]](2, 2) = beta_ * mass2D.quad(absdet);
 					dm[unknownIdx[j]][unknownIdx[i]]     += (alpha_ - beta_) * mass2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));
+					dm[unknownIdx[j]][unknownIdx[i]]     += 2 * mu_ * Grad2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));  
 					if (i != j)
 						assign_transpose( dm[unknownIdx[i]][unknownIdx[j]], dm[unknownIdx[j]][unknownIdx[i]]);
 					loc.Ak[unknownIdx[j]][unknownIdx[i]] += dm[unknownIdx[j]][unknownIdx[i]];
@@ -1624,7 +1636,7 @@ void System1Accumulator_P2CL::local_setup (const TetraCL& tet)
         local_onephase.rho( local_twophase.rho( sign( ls_loc[0])));
         local_onephase.setup( T, absdet, loc);
 		if(speBnd)
-			speBndHandle.setup(tet, absdet, loc);
+			speBndHandle.setup(tet, T, absdet, loc);
     }
     else
         local_twophase.setup( T, absdet, tet, ls_loc, locInt, loc);
