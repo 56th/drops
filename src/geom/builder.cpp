@@ -1801,9 +1801,8 @@ void FileBuilderCL::BuildVerts(MultiGridCL* mgp) const
         VertexCL tmpvert;
         simplex_file >> tmpvert;
         level = tmpvert.GetLevel();
-        if (level > oldlevel) {
+        for (; oldlevel < level; ++oldlevel) {
             AppendLevel(mgp);  // append Level in ALL lists
-            oldlevel=level;
         }
         simplex_file >> numdist;
         for (Uint k=0; k<numdist; ++k){
