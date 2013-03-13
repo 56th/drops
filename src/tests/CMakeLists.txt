@@ -96,6 +96,9 @@ exec_ser(csgtest levelset-adaptriang levelset-levelset levelset-levelsetmapper l
 exec_ser(dynload geom-simplex misc-funcmap misc-dynamicload)
 
 exec_ser(show_domain geom-boundary geom-builder geom-simplex geom-multigrid geom-deformation misc-scopetimer num-unknowns geom-topo num-fe misc-problem levelset-levelset misc-utils out-output num-discretize num-interfacePatch misc-params levelset-fastmarch stokes-instatstokes2phase levelset-surfacetension misc-funcmap misc-vectorFunctions geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature misc-dynamicload out-vtkOut)
+
+exec_ser(jacobi misc-utils)
+
 if(NOT MPI)
     add_dependencies(show_domain levelset-twophaseCoeff misc-scalarFunctions misc-vectorFunctions misc-csgFunctions)
 endif(NOT MPI)

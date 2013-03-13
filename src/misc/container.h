@@ -60,11 +60,27 @@ class DMatrixCL
         Assert(row<Rows_ && col<Cols_, DROPSErrCL("DMatrixCL::operator() const: Invalide index"), DebugNumericC);
         return Array_[col*Rows_+row];
     }
-    T* GetCol     (size_t col)                   {
+    T* GetCol       (size_t col)                 {
         Assert(col<Cols_, DROPSErrCL("DMatrixCL::GetCol: Invalide index"), DebugNumericC);
         return Array_+col*Rows_;
     }
+    const T* GetCol (size_t col) const           {
+        Assert(col<Cols_, DROPSErrCL("DMatrixCL::GetCol: Invalide index"), DebugNumericC);
+        return Array_+col*Rows_;
+    }
+    Uint num_rows() const { return Rows_; }  // Zeilenzahl
+    Uint num_cols() const { return Cols_; }  // Spaltenzahl
 };
+
+inline double
+frobenius_norm_sq (const DMatrixCL<double>& a)
+{
+    double ret = 0;
+    const double* d= a.GetCol( 0);
+    for (Uint i= 0; i < a.num_rows()*a.num_cols(); ++i)
+        ret += d[i]*d[i];
+    return ret;
+}
 
 
 template <class T, Uint _Size>
@@ -1316,6 +1332,140 @@ template <Uint Rows_, Uint Cols_>
     std::copy( buffer, buffer + a_.size(), a_.begin());
     std::copy( buffer + a_.size(), buffer + a_.size() + Cols_, d_);
     std::copy( buffer + a_.size() + Cols_, buffer + a_.size() + 2*Cols_, beta_);
+}
+
+/// \brief Represents the Given-/Jacobi-rotation J=(c & s \\ -s & c) with respect to row/column-pairs p and q.
+class GivensRotationCL
+{
+  private:
+    size_t p_, q_; ///< Row/column-pairs i=j=p and i=j=q.
+    double c_, s_; ///< Cosine and sine.
+
+  public:
+
+    /// \brief Let A be a symmetric matrix, B= J^TAJ, then, B_{pq} = B_{qp} = 0.
+    template <typename Mat>
+    void inline compute_symmetric_rotation (const Mat& A, size_t p, size_t q);
+
+    ///\brief Compute A= J^TA.
+    template <typename Mat>
+    void apply_transpose_from_left (Mat& A) const;
+
+    ///\brief Compute A= AJ.
+    template <typename Mat>
+    void apply_from_right (Mat& A) const;
+
+    ///\brief Compute A= J^TAJ.
+    template <typename Mat>
+    void inline apply_conjugation (Mat& A) const;
+};
+
+template <typename Mat>
+void inline GivensRotationCL::compute_symmetric_rotation (const Mat& A, size_t p, size_t q)
+{
+    c_= 1.;
+    s_= 0.;
+    p_= p;
+    q_= q;
+    if (A( p, q) == 0.)
+        return;
+
+    const double tau= (A( q, q) - A( p, p))/(2.*A( p, q)),
+                 t= tau >= 0. ?  1./( tau + std::sqrt( 1. + tau*tau))
+                              : -1./(-tau + std::sqrt( 1. + tau*tau));
+    c_= 1./std::sqrt( 1. + t*t);
+    s_= t*c_;
+}
+
+template <typename Mat>
+void GivensRotationCL::apply_transpose_from_left (Mat& A) const
+{
+    double Apj, Aqj;
+    const size_t n= A.num_cols();
+    for (size_t j= 0; j < n; ++j) {
+        Apj= A( p_, j);
+        Aqj= A( q_, j);
+        A( p_, j)= c_*Apj - s_*Aqj;
+        A( q_, j)= s_*Apj + c_*Aqj;
+    }
+}
+
+template <typename Mat>
+void GivensRotationCL::apply_from_right (Mat& A) const
+{
+    double Aip, Aiq;
+    const size_t n= A.num_rows();
+    for (size_t i= 0; i < n; ++i) {
+        Aip= A( i, p_);
+        Aiq= A( i, q_);
+        A( i, p_)= c_*Aip - s_*Aiq;
+        A( i, q_)= s_*Aip + c_*Aiq;
+    }
+}
+
+template <typename Mat>
+void GivensRotationCL::apply_conjugation (Mat& A) const
+{
+    double Aip, Aiq, Api, Aqi;
+    const size_t n= A.num_rows();
+    for (size_t i= 0; i < n; ++i) {
+        if (i == p_ || i == q_)
+            continue;
+        Aip= A( i, p_);
+        Aiq= A( i, q_);
+        Api= A( p_, i);
+        Aqi= A( q_, i);
+        A( i, p_)= c_*Aip - s_*Aiq;
+        A( i, q_)= s_*Aip + c_*Aiq;
+        A( p_, i)= c_*Api - s_*Aqi;
+        A( q_, i)= s_*Api + c_*Aqi;
+    }
+    const double App= A( p_, p_), Apq= A( p_, q_), Aqp= A( q_, p_), Aqq= A( q_, q_),
+                 N= c_*s_*(Apq + Aqp), D= c_*s_*(App - Aqq),
+                 csq= c_*c_, ssq= s_*s_;
+    A( p_, p_)= csq*App + ssq*Aqq - N;
+    A( p_, q_)= csq*Apq - ssq*Aqp + D;
+    A( q_, p_)= csq*Aqp - ssq*Apq + D;
+    A( q_, q_)= csq*Aqq + ssq*App + N;
+}
+
+template <typename Mat>
+double off_diagonal_sq (const Mat& A)
+{
+    double off= 0.;
+    const size_t m= A.num_rows(),
+                 n= A.num_cols();
+    for (size_t i= 0; i < m; ++i)
+        for (size_t j= 0; j < n; ++j)
+            if (j != i)
+                off+= std::pow( A( i, j), 2);
+    return off;
+}
+
+///\brief Computes all eigenvalues of a symmetric matrix A up to tolerance tol; overwrites A.
+///
+/// If Q is given, then AQ=Q\Lambda, where \Lambda is the diagonal matrix returned in A and A is the original A.
+/// Q is an orthogonal matrix.
+template <typename Mat>
+void cyclic_jacobi (Mat& A, double tol, Mat* Q= 0)
+{
+    const size_t n= A.num_rows();
+    if (Q) {
+        std::fill_n( &(*Q)(0, 0), n*n, 0.);
+        for (size_t i= 0; i < n; ++i)
+            (*Q)( i, i)= 1.;
+    }
+    GivensRotationCL J;
+    const double eps= tol*std::sqrt( frobenius_norm_sq( A));
+    while (std::sqrt( off_diagonal_sq( A)) > eps) {
+        for (size_t p= 0; p < n - 1; ++p)
+            for (size_t q= p + 1; q < n; ++q) {
+                J.compute_symmetric_rotation( A, p, q);
+                J.apply_conjugation( A);
+                if (Q)
+                    J.apply_from_right( *Q);
+            }
+    }
 }
 
 //**************************************************************************
