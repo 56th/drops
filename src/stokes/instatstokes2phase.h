@@ -99,6 +99,7 @@ class TwoPhaseFlowCoeffCL
     DROPS::instat_vector_fun_ptr volforce;
     const SmoothedJumpCL rho, mu;
     const double SurfTens, DilVisco, ShearVisco;
+	const double alpha, beta;
     const Point3DCL g;
 
     TwoPhaseFlowCoeffCL( ParamCL& P, bool dimless = false)
@@ -117,6 +118,8 @@ class TwoPhaseFlowCoeffCL
         SurfTens (dimless ? surfTens/rho_koeff2 : surfTens),
         DilVisco( film ? P.get<double>("Mat.DilatationalVisco") : P.get<double>("SurfTens.DilatationalVisco")),
         ShearVisco( film ? P.get<double>("Mat.ShearVisco") : P.get<double>("SurfTens.ShearVisco")),
+		alpha(P.get<double>("SpeBnd.alpha")),
+		beta(P.get<double>("SpeBnd.beta")),
         g( P.get<DROPS::Point3DCL>("Exp.Gravity"))
         {
         volforce = InVecMap::getInstance()[P.get<std::string>("Exp.VolForce")];
@@ -130,6 +133,8 @@ class TwoPhaseFlowCoeffCL
         SurfTens( dimless ? surftension/rho1 : surftension),
         DilVisco( dilatationalvisco),
         ShearVisco( shearvisco),
+		alpha(1.), //??
+		beta(1.),  //??
         g( gravity)    {
           volforce = InVecMap::getInstance()["ZeroVel"];
         }

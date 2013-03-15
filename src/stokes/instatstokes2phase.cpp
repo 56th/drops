@@ -1283,17 +1283,18 @@ struct LocalSystem1DataCL
 class SpecialBndHandleOnePhaseCL
 {
   private:
-	double mu_;
-	double beta_;      //Slip coefficient, beta_=0 for symmetric Bnd;
-	double alpha_;     //Coefficient for Nitche method
+	const double mu_;
+	const double beta_;      //Slip coefficient, beta_=0 for symmetric Bnd;
+	const double alpha_;     //Coefficient for Nitche method
 	LocalP1CL<Point3DCL> Grad[10], GradRef[10];
 	Point3DCL normal;
 	Uint unknownIdx[6];
   public:	
-	SpecialBndHandleOnePhaseCL(double mu, double beta=0, double alpha=0): mu_(mu), beta_(beta), alpha_(alpha)
-    { P2DiscCL::GetGradientsOnRef( GradRef); }
+	SpecialBndHandleOnePhaseCL(double mu, const double beta=0, const double alpha=0): mu_(mu), beta_(beta), alpha_(alpha)
+    { P2DiscCL::GetGradientsOnRef( GradRef); 
+	  std::cout << "************************SpecialBnd Class is initialized: beta" <<beta_<<"alpha"<<alpha_<<"\n";
+	}
     void setup(const TetraCL& tet, const SMatrixCL<3,3>& T, double absdet, LocalSystem1DataCL& loc);  //update local system 1
-	void setupB(const TetraCL& tet, double absdet, SMatrixCL<1, 3>** loc_b);
 };
 void SpecialBndHandleOnePhaseCL::setup(const TetraCL& tet, const SMatrixCL<3,3>& T, double absdet, LocalSystem1DataCL& loc)
 { 
@@ -1347,46 +1348,6 @@ void SpecialBndHandleOnePhaseCL::setup(const TetraCL& tet, const SMatrixCL<3,3>&
 	}
 }
 
-
-//P2_P1 multiplication
-void SpecialBndHandleOnePhaseCL::setupB(const TetraCL& tet, double absdet, SMatrixCL<1, 3>** loc_b)
-{
-
-	for (Uint k =0; k< 4; ++k) //Go throught all faces of a tet
-	{
-		LocalP2CL<double> phiP2[6];   //local basis for velocity
-		LocalP1CL<double> phiP1[3];   //local basis for pressure
-		Quad5_2DCL<double> mass2Dj;
-		Quad5_2DCL<double> mass2Di;
-
-		BaryCoordCL bary[3];
-		if(tet.GetFace(k)->GetBndIdx()== SlipBC ||tet.GetFace(k)->GetBndIdx()== SymmBC){ 
-			tet.GetOuterNormal(k, normal);
-			for (Uint i= 0; i<3; ++i) //m is index for Vertex or Edge
-			{
-				unknownIdx[i]   = VertOfFace(k, i);
-				unknownIdx[i+3] = EdgeOfFace(k, i);
-				bary[i][unknownIdx[i]]=1;
-				phiP1[i][unknownIdx[i]]=1;
-			}
-
-			for(Uint i=0; i<6; ++i)
-				phiP2[i][unknownIdx[i]] = 1;
-				
-			for(Uint i=0; i<6; ++i){
-				for(Uint j=0; j<3; ++j){					
-					mass2Dj.assign(phiP2[i], bary);  //
-					mass2Di.assign(phiP1[j], bary);
-					Quad5_2DCL<double> mass2D(mass2Dj * mass2Di); //
-					loc_b[unknownIdx[i]][unknownIdx[j]](0, 0)+= mass2D.quad(absdet)*normal[0];
-					loc_b[unknownIdx[i]][unknownIdx[j]](0, 1)+= mass2D.quad(absdet)*normal[1];
-					loc_b[unknownIdx[i]][unknownIdx[j]](0, 2)+= mass2D.quad(absdet)*normal[2];
-				}
-			}
-		}
-	}	
-	
-}
 /// \brief Setup of the local "system 1" on a tetra in a single phase.
 class LocalSystem1OnePhase_P2CL
 {
@@ -1620,7 +1581,7 @@ System1Accumulator_P2CL::System1Accumulator_P2CL (const TwoPhaseFlowCoeffCL& Coe
     : Coeff( Coeff_), BndData( BndData_), lset_Phi( lset_arg), lset_Bnd( lset_bnd), t( t_),
       RowIdx( RowIdx_), A( A_), M( M_), cplA( cplA_), cplM( cplM_), b( b_),
       local_twophase( Coeff.mu( 1.0), Coeff.mu( -1.0), Coeff.rho( 1.0), Coeff.rho( -1.0), Coeff.volforce),
-	  speBndHandle(Coeff.mu( 1.0))
+	  speBndHandle(Coeff.mu( 1.0), Coeff.beta, Coeff.alpha)
 {}
 
 void System1Accumulator_P2CL::begin_accumulation ()
