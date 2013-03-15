@@ -39,7 +39,8 @@ void SpecialBndHandleSystem2OnePhaseCL::setupB(const TetraCL& tet, double& absde
 		Quad5_2DCL<double> mass2Di;
 
 		BaryCoordCL bary[3];
-		if(tet.GetFace(k)->GetBndIdx()== SlipBC ||tet.GetFace(k)->GetBndIdx()== SymmBC){ 
+		if( BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC || BndData_.Vel.GetBC(*tet.GetFace(k))==SymmBC){ 
+			std::cout << "************************"<<"\n";
 			tet.GetOuterNormal(k, normal);
 			for (Uint i= 0; i<3; ++i) //m is index for Vertex or Edge
 			{

@@ -55,11 +55,12 @@ class StokesBndDataCL
 
 class SpecialBndHandleSystem2OnePhaseCL
 {
-  private:
+ private:
+	const StokesBndDataCL& BndData_;
 	Point3DCL normal;
 	Uint unknownIdx[6];
   public:	
-	SpecialBndHandleSystem2OnePhaseCL()
+	SpecialBndHandleSystem2OnePhaseCL(const StokesBndDataCL& BndData): BndData_(BndData) 
     {
 	  std::cout << "******************************************SpecialBndSystem2 Class is initialized:\n";
 	}

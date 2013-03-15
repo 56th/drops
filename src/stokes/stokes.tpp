@@ -458,7 +458,7 @@ template< class CoeffT>
 System2Accumulator_P2P1CL<CoeffT>::System2Accumulator_P2P1CL ( const CoeffT& coeff_arg, const StokesBndDataCL& BndData_arg,
     const IdxDescCL& RowIdx_arg, const IdxDescCL& ColIdx_arg,
     MatrixCL& B_arg, VecDescCL* c_arg, double t_arg)
-    : lat( PrincipalLatticeCL::instance( 2)), coeff( coeff_arg), BndData( BndData_arg), t( t_arg), RowIdx( RowIdx_arg), ColIdx( ColIdx_arg), B( B_arg), speBndHandle()
+    : lat( PrincipalLatticeCL::instance( 2)), coeff( coeff_arg), BndData( BndData_arg), t( t_arg), RowIdx( RowIdx_arg), ColIdx( ColIdx_arg), B( B_arg), speBndHandle(BndData)
 {
     c = c_arg;
     P2DiscCL::GetGradientsOnRef( GradRef);
@@ -507,7 +507,7 @@ void System2Accumulator_P2P1CL<CoeffT>::local_setup (const TetraCL& tet)
 	speBnd = false;
 	//if speBnd = true , there is at least one slip or symmetric boundary on this tetra 
 	for(int i =0; i< 4; ++i){
-		if( tet.GetFace(i)->GetBndIdx()==SlipBC || tet.GetFace(i)->GetBndIdx()==SymmBC)
+		if( BndData.Vel.GetBC(*tet.GetFace(i))==SlipBC || BndData.Vel.GetBC(*tet.GetFace(i))==SymmBC)
 		{
 			speBnd = true;
 			break;
