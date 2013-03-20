@@ -1293,11 +1293,11 @@ class SpecialBndHandleOnePhaseCL
   public:	
 	SpecialBndHandleOnePhaseCL(const StokesBndDataCL& BndData, double mu, const double beta=0, const double alpha=0): BndData_(BndData), mu_(mu), beta_(beta), alpha_(alpha)
     { P2DiscCL::GetGradientsOnRef( GradRef); 
-	  std::cout << "************************SpecialBnd Class is initialized: beta" <<beta_<<"alpha"<<alpha_<<"\n";
 	}
-    void setup(const TetraCL& tet, const SMatrixCL<3,3>& T, double absdet, LocalSystem1DataCL& loc);  //update local system 1
+    void setup(const TetraCL& tet, const SMatrixCL<3,3>& T, LocalSystem1DataCL& loc);  //update local system 1
 };
-void SpecialBndHandleOnePhaseCL::setup(const TetraCL& tet, const SMatrixCL<3,3>& T, double absdet, LocalSystem1DataCL& loc)
+
+void SpecialBndHandleOnePhaseCL::setup(const TetraCL& tet, const SMatrixCL<3,3>& T, LocalSystem1DataCL& loc)
 { 
 
     P2DiscCL::GetGradients( Grad, GradRef, T);
@@ -1312,7 +1312,10 @@ void SpecialBndHandleOnePhaseCL::setup(const TetraCL& tet, const SMatrixCL<3,3>&
 		
 
 		BaryCoordCL bary[3];
-		if( BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC || BndData_.Vel.GetBC(*tet.GetFace(k))==SymmBC){ 
+		if( BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC || BndData_.Vel.GetBC(*tet.GetFace(k))==SymmBC){
+			const FaceCL& face = *tet.GetFace(k);
+            double absdet = FuncDet2D(	face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
+                                           	face.GetVertex(2)->GetCoord()-face.GetVertex(0)->GetCoord()); 
 			tet.GetOuterNormal(k, normal);
 			for (Uint i= 0; i<3; ++i) //m is index for Vertex or Edge
 			{
@@ -1641,7 +1644,7 @@ void System1Accumulator_P2CL::local_setup (const TetraCL& tet)
         local_onephase.rho( local_twophase.rho( sign( ls_loc[0])));
         local_onephase.setup( T, absdet, loc);
 		if(speBnd)
-			speBndHandle.setup(tet, T, absdet, loc);
+			speBndHandle.setup(tet, T, loc);
     }
     else
         local_twophase.setup( T, absdet, tet, ls_loc, locInt, loc);

@@ -519,7 +519,7 @@ void System2Accumulator_P2P1CL<CoeffT>::local_setup (const TetraCL& tet)
             locB[vel][pr]= SMatrixCL<1,3>( quad( Grad[vel], absdet, Quad2Data_Mul_P1_CL(), pr));
     }
 	if(speBnd)
-		speBndHandle.setupB(tet, absdet, locB);
+		speBndHandle.setupB(tet, locB);
 }
 
 template< class CoeffT>

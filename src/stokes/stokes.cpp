@@ -28,7 +28,7 @@ namespace DROPS
 {
 
 //P2_P1 multiplication
-void SpecialBndHandleSystem2OnePhaseCL::setupB(const TetraCL& tet, double& absdet, SMatrixCL<1, 3> loc_b[10][4])
+void SpecialBndHandleSystem2OnePhaseCL::setupB(const TetraCL& tet, SMatrixCL<1, 3> loc_b[10][4])
 {
 
 	for (Uint k =0; k< 4; ++k) //Go throught all faces of a tet
@@ -39,13 +39,15 @@ void SpecialBndHandleSystem2OnePhaseCL::setupB(const TetraCL& tet, double& absde
 		Quad5_2DCL<double> mass2Di;
 
 		BaryCoordCL bary[3];
-		if( BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC || BndData_.Vel.GetBC(*tet.GetFace(k))==SymmBC){ 
-			std::cout << "************************"<<"\n";
+		if( BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC || BndData_.Vel.GetBC(*tet.GetFace(k))==SymmBC){
+			const FaceCL& face = *tet.GetFace(k);
+            double absdet = FuncDet2D(	face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
+                                           	face.GetVertex(2)->GetCoord()-face.GetVertex(0)->GetCoord());  
 			tet.GetOuterNormal(k, normal);
 			for (Uint i= 0; i<3; ++i) //m is index for Vertex or Edge
 			{
 				unknownIdx[i]   = VertOfFace(k, i);
-				unknownIdx[i+3] = EdgeOfFace(k, i);
+				unknownIdx[i+3] = EdgeOfFace(k, i) + 4;
 				bary[i][unknownIdx[i]]=1;
 				phiP1[i][unknownIdx[i]]=1;
 			}
