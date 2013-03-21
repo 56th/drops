@@ -1307,8 +1307,8 @@ void SpecialBndHandleOnePhaseCL::setup(const TetraCL& tet, const SMatrixCL<3,3>&
 		LocalP2CL<double> phi[6]; 
 		Quad5_2DCL<double> mass2Dj;
 		Quad5_2DCL<double> mass2Di;
-		Quad5_2DCL<double> Grad2Dj;   //\nabla phi_j* n
-		Quad5_2DCL<double> Grad2Di;   //\nabla phi_i* n
+		Quad5_2DCL<double> Grad2Dj;   // \nabla phi_j* n
+		Quad5_2DCL<double> Grad2Di;   // \nabla phi_i* n
 		
 
 		BaryCoordCL bary[3];
@@ -1317,13 +1317,12 @@ void SpecialBndHandleOnePhaseCL::setup(const TetraCL& tet, const SMatrixCL<3,3>&
             double absdet = FuncDet2D(	face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
                                            	face.GetVertex(2)->GetCoord()-face.GetVertex(0)->GetCoord()); 
 			tet.GetOuterNormal(k, normal);
-			for (Uint i= 0; i<3; ++i) //m is index for Vertex or Edge
+			for (Uint i= 0; i<3; ++i)    
 			{
-				unknownIdx[i]   = VertOfFace(k, i);
-				unknownIdx[i+3] = EdgeOfFace(k, i) + 4;
+				unknownIdx[i]   = VertOfFace(k, i);      // i is index for Vertex
+				unknownIdx[i+3] = EdgeOfFace(k, i) + 4;  // i is index for Edge
 				bary[i][unknownIdx[i]]=1;
 			}
-
 			for(Uint i=0; i<6; ++i)
 				phi[i][unknownIdx[i]] = 1;
 				
