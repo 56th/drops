@@ -1,5 +1,5 @@
 set(HOME stokes)
-libs(instatstokes2phase)
+libs(instatstokes2phase stokes)
 libs_ser(integrTime)
 
 target_link_libraries_par(stokes-instatstokes2phase num-discretize)

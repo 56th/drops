@@ -1283,19 +1283,21 @@ struct LocalSystem1DataCL
 class SpecialBndHandleOnePhaseCL
 {
   private:
-	double mu_;
-	double beta_;      //Slip coefficient, beta_=0 for symmetric Bnd;
-	double alpha_;     //Coefficient for Nitche method
+    const StokesBndDataCL& BndData_;
+	const double mu_;
+	const double beta_;      //Slip coefficient, beta_=0 for symmetric Bnd;
+	const double alpha_;     //Coefficient for Nitche method
 	LocalP1CL<Point3DCL> Grad[10], GradRef[10];
 	Point3DCL normal;
 	Uint unknownIdx[6];
   public:	
-	SpecialBndHandleOnePhaseCL(double mu, double beta=0, double alpha=0): mu_(mu), beta_(beta), alpha_(alpha)
-    { P2DiscCL::GetGradientsOnRef( GradRef); }
-    void setup(const TetraCL& tet, const SMatrixCL<3,3>& T, double absdet, LocalSystem1DataCL& loc);  //update local system 1
-	void setupB(const TetraCL& tet, double absdet, SMatrixCL<1, 3>** loc_b);
+	SpecialBndHandleOnePhaseCL(const StokesBndDataCL& BndData, double mu, const double beta=0, const double alpha=0): BndData_(BndData), mu_(mu), beta_(beta), alpha_(alpha)
+    { P2DiscCL::GetGradientsOnRef( GradRef); 
+	}
+    void setup(const TetraCL& tet, const SMatrixCL<3,3>& T, LocalSystem1DataCL& loc);  //update local system 1
 };
-void SpecialBndHandleOnePhaseCL::setup(const TetraCL& tet, const SMatrixCL<3,3>& T, double absdet, LocalSystem1DataCL& loc)
+
+void SpecialBndHandleOnePhaseCL::setup(const TetraCL& tet, const SMatrixCL<3,3>& T, LocalSystem1DataCL& loc)
 { 
 
     P2DiscCL::GetGradients( Grad, GradRef, T);
@@ -1305,20 +1307,21 @@ void SpecialBndHandleOnePhaseCL::setup(const TetraCL& tet, const SMatrixCL<3,3>&
 		LocalP2CL<double> phi[6]; 
 		Quad5_2DCL<double> mass2Dj;
 		Quad5_2DCL<double> mass2Di;
-		Quad5_2DCL<double> Grad2Dj;   //\nabla phi_j* n
-		Quad5_2DCL<double> Grad2Di;   //\nabla phi_i* n
-		
-
+		Quad5_2DCL<double> Grad2Dj;   // \nabla phi_j* n
+		Quad5_2DCL<double> Grad2Di;   // \nabla phi_i* n
 		BaryCoordCL bary[3];
-		if(tet.GetFace(k)->GetBndIdx()== SlipBC ||tet.GetFace(k)->GetBndIdx()== SymmBC){ 
+		if( BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC || BndData_.Vel.GetBC(*tet.GetFace(k))==SymmBC){
+			const FaceCL& face = *tet.GetFace(k);
+            double absdet = FuncDet2D(	face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
+                                           	face.GetVertex(2)->GetCoord()-face.GetVertex(0)->GetCoord()); 
+			double h= std::sqrt(absdet);
 			tet.GetOuterNormal(k, normal);
-			for (Uint i= 0; i<3; ++i) //m is index for Vertex or Edge
+			for (Uint i= 0; i<3; ++i)    
 			{
-				unknownIdx[i]   = VertOfFace(k, i);
-				unknownIdx[i+3] = EdgeOfFace(k, i);
+				unknownIdx[i]   = VertOfFace(k, i);      // i is index for Vertex
+				unknownIdx[i+3] = EdgeOfFace(k, i) + 4;  // i is index for Edge
 				bary[i][unknownIdx[i]]=1;
 			}
-
 			for(Uint i=0; i<6; ++i)
 				phi[i][unknownIdx[i]] = 1;
 				
@@ -1333,60 +1336,19 @@ void SpecialBndHandleOnePhaseCL::setup(const TetraCL& tet, const SMatrixCL<3,3>&
 					Quad5_2DCL<double> mass2D(mass2Dj * mass2Di); //
 					Quad5_2DCL<double> Grad2D(Grad2Di * mass2Dj + Grad2Dj * mass2Di); //
 					dm[unknownIdx[j]][unknownIdx[i]](0, 0)= dm[unknownIdx[j]][unknownIdx[i]](1, 1) = dm[unknownIdx[j]][unknownIdx[i]](2, 2) = beta_ * mass2D.quad(absdet);
-					dm[unknownIdx[j]][unknownIdx[i]]     += (alpha_ - beta_) * mass2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));
-					dm[unknownIdx[j]][unknownIdx[i]]     += 2 * mu_ * Grad2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));  
-					if (i != j)
-						assign_transpose( dm[unknownIdx[i]][unknownIdx[j]], dm[unknownIdx[j]][unknownIdx[i]]);
+					dm[unknownIdx[j]][unknownIdx[i]]     += (alpha_/h - beta_) * mass2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));
+					dm[unknownIdx[j]][unknownIdx[i]]     -=  mu_ * Grad2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));  
 					loc.Ak[unknownIdx[j]][unknownIdx[i]] += dm[unknownIdx[j]][unknownIdx[i]];
-					if (i != j)	
-						loc.Ak[unknownIdx[i]][unknownIdx[j]] += dm[unknownIdx[i]][unknownIdx[j]];	
-
+					if (i != j){
+						assign_transpose( dm[unknownIdx[i]][unknownIdx[j]], dm[unknownIdx[j]][unknownIdx[i]]);
+						loc.Ak[unknownIdx[i]][unknownIdx[j]] += dm[unknownIdx[i]][unknownIdx[j]];
+					}	
 				}
 			}
 		}
 	}
 }
 
-
-//P2_P1 multiplication
-void SpecialBndHandleOnePhaseCL::setupB(const TetraCL& tet, double absdet, SMatrixCL<1, 3>** loc_b)
-{
-
-	for (Uint k =0; k< 4; ++k) //Go throught all faces of a tet
-	{
-		LocalP2CL<double> phiP2[6];   //local basis for velocity
-		LocalP1CL<double> phiP1[3];   //local basis for pressure
-		Quad5_2DCL<double> mass2Dj;
-		Quad5_2DCL<double> mass2Di;
-
-		BaryCoordCL bary[3];
-		if(tet.GetFace(k)->GetBndIdx()== SlipBC ||tet.GetFace(k)->GetBndIdx()== SymmBC){ 
-			tet.GetOuterNormal(k, normal);
-			for (Uint i= 0; i<3; ++i) //m is index for Vertex or Edge
-			{
-				unknownIdx[i]   = VertOfFace(k, i);
-				unknownIdx[i+3] = EdgeOfFace(k, i);
-				bary[i][unknownIdx[i]]=1;
-				phiP1[i][unknownIdx[i]]=1;
-			}
-
-			for(Uint i=0; i<6; ++i)
-				phiP2[i][unknownIdx[i]] = 1;
-				
-			for(Uint i=0; i<6; ++i){
-				for(Uint j=0; j<3; ++j){					
-					mass2Dj.assign(phiP2[i], bary);  //
-					mass2Di.assign(phiP1[j], bary);
-					Quad5_2DCL<double> mass2D(mass2Dj * mass2Di); //
-					loc_b[unknownIdx[i]][unknownIdx[j]](0, 0)+= mass2D.quad(absdet)*normal[0];
-					loc_b[unknownIdx[i]][unknownIdx[j]](0, 1)+= mass2D.quad(absdet)*normal[1];
-					loc_b[unknownIdx[i]][unknownIdx[j]](0, 2)+= mass2D.quad(absdet)*normal[2];
-				}
-			}
-		}
-	}	
-	
-}
 /// \brief Setup of the local "system 1" on a tetra in a single phase.
 class LocalSystem1OnePhase_P2CL
 {
@@ -1620,7 +1582,7 @@ System1Accumulator_P2CL::System1Accumulator_P2CL (const TwoPhaseFlowCoeffCL& Coe
     : Coeff( Coeff_), BndData( BndData_), lset_Phi( lset_arg), lset_Bnd( lset_bnd), t( t_),
       RowIdx( RowIdx_), A( A_), M( M_), cplA( cplA_), cplM( cplM_), b( b_),
       local_twophase( Coeff.mu( 1.0), Coeff.mu( -1.0), Coeff.rho( 1.0), Coeff.rho( -1.0), Coeff.volforce),
-	  speBndHandle(Coeff.mu( 1.0))
+	  speBndHandle(BndData_, Coeff.mu( 1.0), Coeff.beta, Coeff.alpha)
 {}
 
 void System1Accumulator_P2CL::begin_accumulation ()
@@ -1667,7 +1629,8 @@ void System1Accumulator_P2CL::local_setup (const TetraCL& tet)
 	speBnd = false;
 	//if speBnd = true , there is at least one slip or symmetric boundary on this tetra 
 	for(int i =0; i< 4; ++i){
-		if( tet.GetFace(i)->GetBndIdx()==SlipBC || tet.GetFace(i)->GetBndIdx()==SymmBC)
+
+		if( BndData.Vel.GetBC(*tet.GetFace(i))==SlipBC || BndData.Vel.GetBC(*tet.GetFace(i))==SymmBC)
 		{
 			speBnd = true;
 			break;
@@ -1678,7 +1641,7 @@ void System1Accumulator_P2CL::local_setup (const TetraCL& tet)
         local_onephase.rho( local_twophase.rho( sign( ls_loc[0])));
         local_onephase.setup( T, absdet, loc);
 		if(speBnd)
-			speBndHandle.setup(tet, T, absdet, loc);
+			speBndHandle.setup(tet, T, loc);
     }
     else
         local_twophase.setup( T, absdet, tet, ls_loc, locInt, loc);

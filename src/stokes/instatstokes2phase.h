@@ -102,6 +102,7 @@ class TwoPhaseFlowCoeffCL
     const SmoothedJumpCL rho, mu;
     const SmoothedJumpCL sliplength;
     const double SurfTens, DilVisco, ShearVisco;
+	const double alpha, beta;
     const Point3DCL g;
 
     TwoPhaseFlowCoeffCL( ParamCL& P, bool dimless = false)
@@ -120,6 +121,8 @@ class TwoPhaseFlowCoeffCL
         SurfTens (dimless ? surfTens/rho_koeff2 : surfTens),
         DilVisco( film ? P.get<double>("Mat.DilatationalVisco") : P.get<double>("SurfTens.DilatationalVisco")),
         ShearVisco( film ? P.get<double>("Mat.ShearVisco") : P.get<double>("SurfTens.ShearVisco")),
+		alpha(P.get<double>("SpeBnd.alpha")),
+		beta(P.get<double>("SpeBnd.beta")),
         g( P.get<DROPS::Point3DCL>("Exp.Gravity")),
         slip_length1(P.get<double>("Slip.SlipLength1")),
         slip_length2(P.get<double>("Slip.SlipLength2")),
@@ -139,6 +142,8 @@ class TwoPhaseFlowCoeffCL
         SurfTens( dimless ? surftension/rho1 : surftension),
         DilVisco( dilatationalvisco),
         ShearVisco( shearvisco),
+		alpha(1.), //??
+		beta(1.),  //??
         g( gravity),
         sliplength(dimless ? JumpCL( 1., sl2/sl1)
                      :JumpCL(sl2,sl1), H_sm, 0)

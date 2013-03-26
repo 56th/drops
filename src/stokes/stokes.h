@@ -53,6 +53,16 @@ class StokesBndDataCL
     typedef VelBndDataCL::bnd_val_fun bnd_val_fun;
 };
 
+class SpecialBndHandleSystem2OnePhaseCL
+{
+ private:
+	const StokesBndDataCL& BndData_;
+	Point3DCL normal;
+	Uint unknownIdx[6];
+  public:	
+	SpecialBndHandleSystem2OnePhaseCL(const StokesBndDataCL& BndData): BndData_(BndData) {}
+	void setupB(const TetraCL& tet, SMatrixCL<1, 3> loc_b[10][4]);
+};
 
 typedef StokesBndDataCL::VelBndDataCL StokesVelBndDataCL;
 typedef StokesBndDataCL::PrBndDataCL  StokesPrBndDataCL;

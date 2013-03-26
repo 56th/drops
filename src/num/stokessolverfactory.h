@@ -193,7 +193,7 @@ class StokesSolverFactoryCL : public StokesSolverFactoryBaseCL<StokesT, Prolonga
 // generic preconditioners
     JACPcCL  JACPc_;
     GSPcCL   GSPc_;
-#ifdef _PAR
+#ifndef _PAR
     typedef SSORPcCL      SymmPcPcT;
 #else
     //typedef ChebyshevPcCL SymmPcPcT;

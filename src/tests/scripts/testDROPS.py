@@ -34,15 +34,15 @@ def runtest(Test):
     return 0
 
 def runtests(testlist, compileproc=1):
+    failedtests= []
     for test in testlist:
-        failedtests= []
         setup.compile(test, compileproc)
         #Run and gather the output of the tests
         runtest(test)
         #perform the testing logic
         resultOfTest=checktest.main(test)
         report.main(test, resultOfTest)
-        if (len(resultOfTest[0]) > 0 or len(resultOfTest[1]) > 0):
+        if (len(resultOfTest[0]) > 0 or len(resultOfTest[1]) > 0 or test.status > 0):
             failedtests.append(test.testName)
     return failedtests
 
@@ -93,10 +93,14 @@ def main(argv=sys.argv):
             #Compile the serial tests
             failedTests = failedTests + runtests(serialList,compileproc)
     reportFile = open(reportfile, "a")
-    line = '#=========================FAILED TESTS==============================\n'
-    reportFile.writelines(line)
-    for i in range (0, len(failedTests)):
-        reportFile.writelines(failedTests[i]+'\n')
+    if (len(failedTests) == 0):
+        line = '#=======================ALL TESTS PASSED===========================\n'
+        reportFile.writelines(line)
+    else:
+        line = '#=========================FAILED TESTS=============================\n'
+        reportFile.writelines(line)
+        for i in range (0, len(failedTests)):
+            reportFile.writelines(failedTests[i]+'\n')
     reportFile.close()
     return 0
 

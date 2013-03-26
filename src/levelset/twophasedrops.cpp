@@ -208,10 +208,13 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     if (P.get("Exp.InitialLSet", std::string("Ellipsoid")) == "Ellipsoid"){
         Vol = EllipsoidCL::GetVolume();
         std::cout << "initial volume: " << lset.GetVolume()/Vol << std::endl;
-        double dphi= lset.AdjustVolume( Vol, 1e-9);
-        std::cout << "initial volume correction is " << dphi << std::endl;
-        lset.Phi.Data+= dphi;
-        std::cout << "new initial volume: " << lset.GetVolume()/Vol << std::endl;
+		if( P.get<int>("Levelset.VolCorrection"))
+		{
+			double dphi= lset.AdjustVolume( Vol, 1e-9);
+			std::cout << "initial volume correction is " << dphi << std::endl;
+			lset.Phi.Data+= dphi;
+			std::cout << "new initial volume: " << lset.GetVolume()/Vol << std::endl;
+		}
     }else{
         Vol = lset.GetVolume();
     }

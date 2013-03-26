@@ -11,6 +11,7 @@ include_directories(${CMAKE_SOURCE_DIR})
 #use openMP
 message(STATUS "### GENERATOR is ${CMAKE_GENERATOR}")
 if(CMAKE_GENERATOR MATCHES "Visual Studio 10")
+  set(OpenMP_CXX_FLAGS "/openmp")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /openmp")
 else(CMAKE_GENERATOR MATCHES "Visual Studio 10")
   find_package(OpenMP REQUIRED)

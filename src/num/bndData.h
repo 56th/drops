@@ -46,11 +46,11 @@ enum BndCondT
     DirBC= 2,                    ///< inhom. Dirichlet boundary conditions
     Per1BC= 13,                  ///< periodic boundary conditions, where
     Per2BC= 11,                  ///< Per1BC and Per2BC denote corresponding boundaries
+	SlipBC= 17,                  ///< Navier-Slip boundary conditions
+	SymmBC= 19,                  ///< Symmetric boundary conditions
     Nat0BC= 21,                  ///< hom.   natural   boundary condition
     NatBC= 23,                   ///< inhom. natural   boundary conditions
     OutflowBC= 21,               ///< same as Nat0BC, for convenience
-	SlipBC= 17,                  ///< Navier-Slip boundary conditions
-	SymmBC= 19,                   ///< Symmetric boundary conditions
     WallBC= 0,                   ///< same as Dir0BC, for convenience
 	
     NoBC= 98,                    ///< interior simplices
