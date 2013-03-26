@@ -517,6 +517,9 @@ void SetMissingParameters(DROPS::ParamCL& P){
 
     P.put_if_unset<int>("General.ProgressBar", 0);
     P.put_if_unset<std::string>("General.DynamicLibsPrefix", "../");
+	
+	P.put_if_unset<double>("SpeBnd.alpha", 0.0);
+    P.put_if_unset<double>("SpeBnd.beta", 0.0);
 }
 
 int main (int argc, char** argv)
