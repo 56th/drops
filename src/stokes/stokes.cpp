@@ -42,9 +42,9 @@ void SpecialBndHandleSystem2OnePhaseCL::setupB(const TetraCL& tet, SMatrixCL<1, 
 		if( BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC || BndData_.Vel.GetBC(*tet.GetFace(k))==SymmBC){
 			const FaceCL& face = *tet.GetFace(k);            //Get a face on a special boundary 
             double absdet = FuncDet2D(	face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
-                                           	face.GetVertex(2)->GetCoord()-face.GetVertex(0)->GetCoord());  
+                                           	face.GetVertex(2)->GetCoord()-face.GetVertex(0)->GetCoord());
 			tet.GetOuterNormal(k, normal);
-			for (Uint i= 0; i<3; ++i)  // i is index for Vertex or Edge
+			for (Uint i= 0; i<3; ++i)  
 			{
 				unknownIdx[i]   = VertOfFace(k, i);          // i is index for Vertex
 				unknownIdx[i+3] = EdgeOfFace(k, i) + 4;      // i is index for Edge

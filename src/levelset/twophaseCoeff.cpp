@@ -298,3 +298,39 @@ namespace filmperiodic{
     static DROPS::RegisterMatchingFunction regmatch1_y("periodicy", periodic_1side<1>);
     static DROPS::RegisterMatchingFunction regmatch1_z("periodicz", periodic_1side<2>);
 }
+
+namespace slipBnd{
+    /// \name inflow condition
+	
+    DROPS::SVectorCL<3> InflowPoiseuille (const DROPS::Point3DCL& p, double)
+    {
+        DROPS::SVectorCL<3> ret(0.);
+        static bool first = true;
+        static DROPS::Point3DCL dx;
+        //dirty hack
+        if (first){
+            std::string mesh( P.get<std::string>("DomainCond.MeshFile")), delim("x@");
+            size_t idx_;
+            while ((idx_= mesh.find_first_of( delim)) != std::string::npos )
+                mesh[idx_]= ' ';
+            std::istringstream brick_info( mesh);
+            brick_info >> dx[0] >> dx[1] >> dx[2] ;
+            first = false;
+        }
+
+        static double half_z= dx[2]/2.0;
+        ret[0] = 0.0125 - 5.*(p[2]-half_z)*(p[2]-half_z);
+        return ret;
+    }
+    DROPS::SVectorCL<3> WallVel( const DROPS::Point3DCL& p, double)
+    {
+        DROPS::SVectorCL<3> ret(0.);
+		ret[0] = p[0] * (1. -p[0]);
+        return ret;
+    }
+    //========================================================================
+    //            Registration of functions in the func-container
+    //========================================================================
+    static DROPS::RegisterVectorFunction regvelwall("WallVel", WallVel);
+    static DROPS::RegisterVectorFunction regvelpoiseuille("InflowPoiseuille", InflowPoiseuille); 
+}

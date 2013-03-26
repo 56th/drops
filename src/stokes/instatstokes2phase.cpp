@@ -1309,13 +1309,12 @@ void SpecialBndHandleOnePhaseCL::setup(const TetraCL& tet, const SMatrixCL<3,3>&
 		Quad5_2DCL<double> mass2Di;
 		Quad5_2DCL<double> Grad2Dj;   // \nabla phi_j* n
 		Quad5_2DCL<double> Grad2Di;   // \nabla phi_i* n
-		
-
 		BaryCoordCL bary[3];
 		if( BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC || BndData_.Vel.GetBC(*tet.GetFace(k))==SymmBC){
 			const FaceCL& face = *tet.GetFace(k);
             double absdet = FuncDet2D(	face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
                                            	face.GetVertex(2)->GetCoord()-face.GetVertex(0)->GetCoord()); 
+			double h= std::sqrt(absdet);
 			tet.GetOuterNormal(k, normal);
 			for (Uint i= 0; i<3; ++i)    
 			{
@@ -1337,14 +1336,13 @@ void SpecialBndHandleOnePhaseCL::setup(const TetraCL& tet, const SMatrixCL<3,3>&
 					Quad5_2DCL<double> mass2D(mass2Dj * mass2Di); //
 					Quad5_2DCL<double> Grad2D(Grad2Di * mass2Dj + Grad2Dj * mass2Di); //
 					dm[unknownIdx[j]][unknownIdx[i]](0, 0)= dm[unknownIdx[j]][unknownIdx[i]](1, 1) = dm[unknownIdx[j]][unknownIdx[i]](2, 2) = beta_ * mass2D.quad(absdet);
-					dm[unknownIdx[j]][unknownIdx[i]]     += (alpha_ - beta_) * mass2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));
-					dm[unknownIdx[j]][unknownIdx[i]]     += 2 * mu_ * Grad2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));  
-					if (i != j)
-						assign_transpose( dm[unknownIdx[i]][unknownIdx[j]], dm[unknownIdx[j]][unknownIdx[i]]);
+					dm[unknownIdx[j]][unknownIdx[i]]     += (alpha_/h - beta_) * mass2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));
+					dm[unknownIdx[j]][unknownIdx[i]]     -=  mu_ * Grad2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));  
 					loc.Ak[unknownIdx[j]][unknownIdx[i]] += dm[unknownIdx[j]][unknownIdx[i]];
-					if (i != j)	
-						loc.Ak[unknownIdx[i]][unknownIdx[j]] += dm[unknownIdx[i]][unknownIdx[j]];	
-
+					if (i != j){
+						assign_transpose( dm[unknownIdx[i]][unknownIdx[j]], dm[unknownIdx[j]][unknownIdx[i]]);
+						loc.Ak[unknownIdx[i]][unknownIdx[j]] += dm[unknownIdx[i]][unknownIdx[j]];
+					}	
 				}
 			}
 		}
