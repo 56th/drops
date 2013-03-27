@@ -39,7 +39,7 @@ void SpecialBndHandleSystem2OnePhaseCL::setupB(const TetraCL& tet, SMatrixCL<1, 
 		Quad5_2DCL<double> vel2Di;
 
 		BaryCoordCL bary[3];
-		if( BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC || BndData_.Vel.GetBC(*tet.GetFace(k))==SymmBC){
+		if( BndData_.Vel.GetBC(*tet.GetFace(k))==Slip0BC || BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC || BndData_.Vel.GetBC(*tet.GetFace(k))==SymmBC){
 			const FaceCL& face = *tet.GetFace(k);            //Get a face on a special boundary 
             double absdet = FuncDet2D(	face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
                                            	face.GetVertex(2)->GetCoord()-face.GetVertex(0)->GetCoord());
