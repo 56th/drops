@@ -1295,6 +1295,7 @@ class SpecialBndHandleOnePhaseCL
     { P2DiscCL::GetGradientsOnRef( GradRef); 
 	}
     void setup(const TetraCL& tet, const SMatrixCL<3,3>& T, LocalSystem1DataCL& loc);  //update local system 1
+	void setupRhs(const TetraCL& tet, Point3DCL loc_b[10]);
 };
 
 void SpecialBndHandleOnePhaseCL::setup(const TetraCL& tet, const SMatrixCL<3,3>& T, LocalSystem1DataCL& loc)
@@ -1310,7 +1311,7 @@ void SpecialBndHandleOnePhaseCL::setup(const TetraCL& tet, const SMatrixCL<3,3>&
 		Quad5_2DCL<double> Grad2Dj;   // \nabla phi_j* n
 		Quad5_2DCL<double> Grad2Di;   // \nabla phi_i* n
 		BaryCoordCL bary[3];
-		if( BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC || BndData_.Vel.GetBC(*tet.GetFace(k))==SymmBC){
+		if( BndData_.Vel.GetBC(*tet.GetFace(k))==Slip0BC || BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC|| BndData_.Vel.GetBC(*tet.GetFace(k))==SymmBC){
 			const FaceCL& face = *tet.GetFace(k);
             double absdet = FuncDet2D(	face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
                                            	face.GetVertex(2)->GetCoord()-face.GetVertex(0)->GetCoord()); 
@@ -1347,6 +1348,57 @@ void SpecialBndHandleOnePhaseCL::setup(const TetraCL& tet, const SMatrixCL<3,3>&
 			}
 		}
 	}
+}
+
+void SpecialBndHandleOnePhaseCL::setupRhs(const TetraCL& tet, Point3DCL loc_b[10])
+{
+
+	Point3DCL Wallvel_val[6];
+	for (Uint k =0; k< 4; ++k) //Go throught all faces of a tet
+	{
+		SMatrixCL<3, 3> dm[10][10];
+		LocalP2CL<double> phi[6]; 
+		Quad5_2DCL<double> mass2Dj;
+		Quad5_2DCL<double> mass2Di;
+		BaryCoordCL bary[3];
+		if( BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC ){
+			const FaceCL& face = *tet.GetFace(k);
+            double absdet = FuncDet2D(	face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
+                                           	face.GetVertex(2)->GetCoord()-face.GetVertex(0)->GetCoord()); 
+			tet.GetOuterNormal(k, normal);
+			for (Uint i= 0; i<3; ++i)    
+			{
+				unknownIdx[i]   = VertOfFace(k, i);      // i is index for Vertex
+				unknownIdx[i+3] = EdgeOfFace(k, i) + 4;  // i is index for Edge
+				bary[i][unknownIdx[i]]=1;
+			}
+			for(Uint i=0; i<6; ++i)
+				phi[i][unknownIdx[i]] = 1;
+				
+			for(Uint i=0; i<6; ++i){
+				for(Uint j=0; j<=i; ++j){					
+					mass2Dj.assign(phi[j], bary);  //
+					mass2Di.assign(phi[i], bary);
+					Quad5_2DCL<double> mass2D(mass2Dj * mass2Di); //
+					dm[unknownIdx[j]][unknownIdx[i]](0, 0)= dm[unknownIdx[j]][unknownIdx[i]](1, 1) = dm[unknownIdx[j]][unknownIdx[i]](2, 2) = beta_ * mass2D.quad(absdet);
+					//dm[unknownIdx[j]][unknownIdx[i]]     -= beta_ * mass2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));
+					if (i != j){
+						assign_transpose( dm[unknownIdx[i]][unknownIdx[j]], dm[unknownIdx[j]][unknownIdx[i]]);
+					}	
+				}
+			}
+			for(Uint i=0; i<6; ++i){
+				typedef StokesBndDataCL::VelBndDataCL::bnd_val_fun bnd_val_fun;
+                bnd_val_fun bf= BndData_.Vel.GetBndSeg(face.GetBndIdx()).GetBndFun();
+                Wallvel_val[i]= i<3 ? bf( tet.GetVertex( unknownIdx[i])->GetCoord(), 0.)
+                    : bf( GetBaryCenter( *tet.GetEdge(unknownIdx[i]-4)), 0.);
+					
+				for(Uint j=0; j<6; ++j){
+	            loc_b[unknownIdx[i]] += dm[unknownIdx[j]][unknownIdx[i]]* Wallvel_val[j];
+			    }
+			}		
+		}
+	}	
 }
 
 /// \brief Setup of the local "system 1" on a tetra in a single phase.
@@ -1630,7 +1682,7 @@ void System1Accumulator_P2CL::local_setup (const TetraCL& tet)
 	//if speBnd = true , there is at least one slip or symmetric boundary on this tetra 
 	for(int i =0; i< 4; ++i){
 
-		if( BndData.Vel.GetBC(*tet.GetFace(i))==SlipBC || BndData.Vel.GetBC(*tet.GetFace(i))==SymmBC)
+		if( BndData.Vel.GetBC(*tet.GetFace(i))==Slip0BC || BndData.Vel.GetBC(*tet.GetFace(i))==SlipBC || BndData.Vel.GetBC(*tet.GetFace(i))==SymmBC)
 		{
 			speBnd = true;
 			break;
@@ -1660,13 +1712,30 @@ void System1Accumulator_P2CL::local_setup (const TetraCL& tet)
             }
             else { // setup b
                 loc_b[i]= loc.rho_phi[i]*Coeff.g;
-                if (noCut)
-                    loc_b[i]+= rhs.quadP2( i, absdet);
+                if (noCut){
+					loc_b[i]+= rhs.quadP2( i, absdet);
+				}
                 else
                     loc_b[i]+= locInt[0].rhs[i] + locInt[1].rhs[i];
             }
+							
         }
+		if (noCut){
+			speBnd = false;
+			for(int i =0; i< 4; ++i){
+				if(  BndData.Vel.GetBC(*tet.GetFace(i))==SlipBC )
+				{
+					speBnd = true;
+					break;
+				}
+			}
+			if(speBnd)
+			{
+				speBndHandle.setupRhs(tet, loc_b);
+			}
+		}
     }
+	
 }
 
 void System1Accumulator_P2CL::update_global_system ()
@@ -1674,7 +1743,7 @@ void System1Accumulator_P2CL::update_global_system ()
     SparseMatBuilderCL<double, SMatrixCL<3,3> >& mA= *mA_;
     SparseMatBuilderCL<double, SDiagMatrixCL<3> >& mM= *mM_;
 
-    for(int i= 0; i < 10; ++i)    // assemble row Numb[i]
+    for(int i= 0; i < 10; ++i){    // assemble row Numb[i]
         if (n.WithUnknowns( i)) { // dof i is not on a Dirichlet boundary
             for(int j= 0; j < 10; ++j) {
                 if (n.WithUnknowns( j)) { // dof j is not on a Dirichlet boundary
@@ -1687,8 +1756,12 @@ void System1Accumulator_P2CL::update_global_system ()
                 }
             }
             if (b != 0) // assemble the right-hand side
+			{
                 add_to_global_vector( b->Data, loc_b[i], n.num[i]);
+			}
        }
+	   
+	}
 }
 
 /// \brief P2X FE accumulator to set up the matrices A, M and, if requested the right-hand side b and cplM, cplA for two-phase flow.
@@ -2182,7 +2255,6 @@ InstatStokes2PhaseP2P1CL::system1_accu (MLTetraAccumulatorTupleCL& accus, MLMatD
 void SetupRhs1_P2( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_, const StokesBndDataCL& BndData_, VecDescCL* b, const LevelsetP2CL& lset, double t)
 {
     ScopeTimerCL scope("SetupRhs1_P2");
-
     const Uint lvl = b->GetLevel();
 
     b->Clear( t);

@@ -322,15 +322,23 @@ namespace slipBnd{
         ret[0] = 0.0125 - 5.*(p[2]-half_z)*(p[2]-half_z);
         return ret;
     }
-    DROPS::SVectorCL<3> WallVel( const DROPS::Point3DCL& p, double)
+    DROPS::SVectorCL<3> WallVel( const DROPS::Point3DCL&, double)
     {
         DROPS::SVectorCL<3> ret(0.);
-		ret[0] = p[0] * (1. -p[0]);
+		ret[0] = 40.;
+        return ret;
+    }
+    DROPS::SVectorCL<3> TopVel( const DROPS::Point3DCL& p, double)
+    {
+        DROPS::SVectorCL<3> ret(0.);
+		ret[0] = 0.4;
+		//ret[0] = 2.4 * p[0] * (1.0-p[0]);
         return ret;
     }
     //========================================================================
     //            Registration of functions in the func-container
     //========================================================================
     static DROPS::RegisterVectorFunction regvelwall("WallVel", WallVel);
+	static DROPS::RegisterVectorFunction regveltop("TopVel", TopVel);
     static DROPS::RegisterVectorFunction regvelpoiseuille("InflowPoiseuille", InflowPoiseuille); 
 }
