@@ -24,6 +24,7 @@
 
 #include "num/spmat.h"
 #include "num/spblockmat.h"
+#include "parallel/exchange.h"
 #include <iostream>
 
 
@@ -62,6 +63,7 @@ int Test()
 
 int TestComposite()
 {
+    DROPS::DummyExchangeCL ex;
     std::cout << "\n\nCompositeMatrixCL:\n" << std::endl;
     DROPS::MatrixCL A;
     DROPS::MatrixBuilderCL AB(&A, 2, 2);
@@ -73,7 +75,7 @@ int TestComposite()
     BB( 0, 0)= 1.; BB( 0, 1)= 1.;
     BB.Build();
     std::cout << "B:\n" << B << '\n';
-    DROPS::CompositeMatrixCL S( &A, DROPS::TRANSP_MUL, &B, DROPS::MUL);
+    DROPS::CompositeMatrixCL S( &A, DROPS::TRANSP_MUL, ex, &B, DROPS::MUL, ex);
     DROPS::VectorCL b( 2);
     b[0]= 1.; b[1]= 2.;
 
@@ -102,8 +104,8 @@ int TestComposite()
     std::cout << "A:" << &A << '\n' << A.num_rows() << "x" << A.num_cols() << '\n'
               << "B:" << &B << '\n' << B.num_rows() << "x" << B.num_cols() << '\n';
 
-    typedef DROPS::CompositeMatrixBaseCL<DROPS::CompositeMatrixCL, DROPS::MatrixCL> CompositeMatrix3CL;
-    CompositeMatrix3CL S2( &S, DROPS::MUL, &B, DROPS::TRANSP_MUL);
+    typedef DROPS::CompositeMatrixBaseCL<DROPS::CompositeMatrixCL, DROPS::MatrixCL, DROPS::DummyExchangeCL> CompositeMatrix3CL;
+    CompositeMatrix3CL S2( &S, DROPS::MUL, ex, &B, DROPS::TRANSP_MUL, ex);
     std::cout << "nr: "   << S2.num_rows()
               << "\nnc: " << S2.num_cols()
               << "\nni: " << S2.intermediate_dim()
@@ -111,10 +113,10 @@ int TestComposite()
               << "op1: " << S2.GetOperation( 1) << '\t' << S2.GetBlock1() << '\n';
     std::cout << "S2*b: " << S2*b << '\n';
 
-    typedef DROPS::CompositeMatrixBaseCL<DROPS::CompositeMatrixCL, DROPS::VectorAsDiagMatrixCL> CompositeMatrix4CL;
+    typedef DROPS::CompositeMatrixBaseCL<DROPS::CompositeMatrixCL, DROPS::VectorAsDiagMatrixCL, DROPS::DummyExchangeCL> CompositeMatrix4CL;
     DROPS::VectorCL v( 1);
     DROPS::VectorAsDiagMatrixCL Mv( &v);
-    CompositeMatrix4CL S3( &S, DROPS::MUL, &Mv, DROPS::MUL);
+    CompositeMatrix4CL S3( &S, DROPS::MUL, ex, &Mv, DROPS::MUL, ex);
     std::cout << "nr: "   << S3.num_rows()
               << "\nnc: " << S3.num_cols()
               << "\nni: " << S3.intermediate_dim()

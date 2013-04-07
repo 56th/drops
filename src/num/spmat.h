@@ -1381,29 +1381,6 @@ transpose (const SparseMatBaseCL<T>& M, SparseMatBaseCL<T>& Mt)
 }
 
 
-/// \brief Compute the diagonal of B*B^T.
-///
-/// The commented out version computes B*M^(-1)*B^T
-template <typename T>
-VectorBaseCL<T>
-BBTDiag (const SparseMatBaseCL<T>& B /*, const VectorBaseCL<T>& Mdiaginv*/)
-{
-#ifdef _PAR
-    throw DROPSErrCL("BBTDiag will not work as expected");
-#endif
-    VectorBaseCL<T> ret( B.num_rows());
-
-    T Bik;
-    for (size_t i= 0; i < B.num_rows(); ++i) {
-        for (size_t l= B.row_beg( i); l < B.row_beg( i + 1); ++l) {
-            Bik= B.val( l);
-            ret[i]+= /*Mdiaginv[B.col_ind( l)]**/ Bik*Bik;
-        }
-    }
-    return ret;
-}
-
-
 // y= A*x
 // fails, if num_rows==0.
 // Assumes, that none of the arrays involved do alias.

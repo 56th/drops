@@ -26,6 +26,7 @@
 #include "num/spmat.h"
 #include "num/krylovsolver.h"
 #include "num/precond.h"
+#include "parallel/exchange.h"
 
 using namespace DROPS;
 
@@ -43,8 +44,9 @@ int main ()
     in3 >> m3;
     ScaleRows( m, VectorCL( 1./std::sqrt( m2.GetDiag())));
     //ScaleCols( m, VectorCL( 1./std::sqrt( m3.GetDiag())));
+    DummyExchangeCL ex;
 
-    CompositeMatrixCL M( &m, TRANSP_MUL, &m, MUL);
+    CompositeMatrixCL M( &m, TRANSP_MUL, ex, &m, MUL, ex);
     VectorCL b( M.num_rows());
     //add_col_to_vec( m, 1., b, 10); // Test with a consistent rhs.
     //b/= norm( b);

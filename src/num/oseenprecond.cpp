@@ -70,6 +70,7 @@ void BDinvBTPreCL::Update(const ExchangeCL& vel_ex, const ExchangeCL& pr_ex) con
     delete BDinvBT_;
 
     BDinvBT_= new AppSchurComplMatrixT( *L_, diagVelPc_, *Bs_, vel_ex);
+//    SchurPc_.SetDiag(*BDinvBT_, D, pr_ex);
 }
 #endif
 
@@ -114,6 +115,7 @@ void BDinvBTPreCL::Update(const DummyExchangeCL& vel_ex, const DummyExchangeCL& 
         Dvelinv_[tmp.size()]= 1.;
     }
 #endif
+//    SchurPc_.SetDiag(*SerBDinvBT_, Bs_->GetSchurDiag(Dvelinv_), pr_ex);
 }
 
 BDinvBTPreCL::~BDinvBTPreCL()
