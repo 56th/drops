@@ -102,6 +102,9 @@ DROPS_DEFINE_VALARRAY_DERIVATIVE( VectorBaseCL, T, base_type)
     T  operator[](size_t s) const;
     T& operator[](size_t s);
 #endif
+#ifdef __INTEL_COMPILER
+    size_t size() const { return this->size(); }
+#endif
 };
 
 
@@ -234,7 +237,7 @@ inline VectorBaseCL<T>& add_to_global_vector (VectorBaseCL<T>& v, const Point3DC
 
 template <typename T, typename Iterator>
 inline T
-#if GCC_VERSION > 40305
+#if GCC_VERSION > 40305 && !__INTEL_COMPILER
     __attribute__((optimize("no-associative-math")))
 #endif
 KahanSumm( Iterator first, const Iterator& end, const T init=(T)0)
@@ -252,7 +255,7 @@ KahanSumm( Iterator first, const Iterator& end, const T init=(T)0)
 /// \brief Use Kahan's algorithm to perform an inner product
 template <typename T, typename Iterator>
 inline T
-#if GCC_VERSION > 40305
+#if GCC_VERSION > 40305 && !__INTEL_COMPILER
     __attribute__((optimize("no-associative-math")))
 #endif
 KahanInnerProd( Iterator first1, const Iterator& end1, Iterator first2, const T init=(T)0)
@@ -268,7 +271,7 @@ KahanInnerProd( Iterator first1, const Iterator& end1, Iterator first2, const T 
 }
 template <class ValueT, template<class> class VecT>
 inline ValueT
-#if GCC_VERSION > 40305
+#if GCC_VERSION > 40305 && !__INTEL_COMPILER
     __attribute__((optimize("no-associative-math")))
 #endif
 KahanInnerProd( const VecT<ValueT>& first, const VecT<ValueT>& second, const ValueT init=(ValueT)0)
@@ -287,7 +290,7 @@ KahanInnerProd( const VecT<ValueT>& first, const VecT<ValueT>& second, const Val
 /// \brief Use Kahan's algorithm to perform an inner product on given indices
 template <typename T, typename Cont, typename Iterator>
 inline T
-#if GCC_VERSION > 40305
+#if GCC_VERSION > 40305 && !__INTEL_COMPILER
     __attribute__((optimize("no-associative-math")))
 #endif
 KahanInnerProd( const Cont& a, const Cont&b, const Iterator& firstIdx, const Iterator& endIdx, const T init=(T)0, const size_t offset=0)
