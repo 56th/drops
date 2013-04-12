@@ -205,6 +205,63 @@ class SurfacePatchCL
 };
 
 
+class BndTriangPartitionCL
+{
+  public:
+    typedef LatticePartitionTypesNS::TriangleT               TriangleT;
+    typedef LatticePartitionTypesNS::TriangleContT           TriangleContT;
+    typedef LatticePartitionTypesNS::const_triangle_iterator const_triangle_iterator;
+
+    typedef LatticePartitionTypesNS::VertexContT           VertexContT;
+    typedef LatticePartitionTypesNS::const_vertex_iterator const_vertex_iterator;
+
+  private:
+    typedef std::pair<Uint, Uint> RenumberVertexPairT; ///< Helper type to handle zero-vertexes
+
+
+    TriangleContT     triangles_;             ///< All triangles of the interface.
+    Uint       pos_triang_begin_;             ///< begin of the subsequence of triangles tetras
+    std::vector<bool> is_boundary_triangle_;  ///< True, iff the triangle is a face of one of the tetras of the principal lattice.
+
+    VertexContT vertexes_;
+    Uint        pos_vertex_begin_; ///< begin of the subsequence of vertexes of positive tetras
+    Uint        neg_vertex_end_;   ///< end of the subsequence of of vertexes of negative tetras
+	
+    template <class VertexCutMergingPolicyT>
+      const TriangleT ///< Create a single sub-triangle and its vertexes
+      make_sub_triangle (const RefTetraPatchCL::TriangleT& ref_tri, const PrincipalLatticeCL::TetraT& lattice_tet,
+        const PrincipalLatticeCL& lattice, const double lset[4],
+        std::vector<Uint>& copied_vertexes, std::vector<RenumberVertexPairT>& renumber_zero_verts,
+        VertexCutMergingPolicyT& edgecut);
+
+  public:
+    /// Empty default-interface
+
+    ///\brief Computes the piecewise triangular interface for the principal lattice with num_intervals on each edge of the reference-tetra given the level set values in ls.
+    template <class VertexCutMergingPolicyT>
+    void make_partition2D (const PrincipalLatticeCL& lat, const std::valarray<double>& ls);
+
+    /// True, iff the triangle is a face of one of the tetras of the principal lattice.
+    ///@{
+    bool is_boundary_triangle (Uint i) const { return is_boundary_triangle_[i]; }
+    bool is_boundary_triangle (const_triangle_iterator it) const { return is_boundary_triangle_[it - triangles_.begin()]; }
+    ///@}
+
+    Uint triangle_size  () const ///< number of triangles
+         { return triangles_.size(); }
+    Uint vertex_size () const ///< number of vertexes
+         { return vertexes_.size(); }
+
+    /// Random-access to the tetras and vertices.
+    ///@{
+    const_triangle_iterator triangle_begin () const { return triangles_.begin(); }
+    const_triangle_iterator triangle_end   () const { return triangles_.end(); }
+    const_vertex_iterator vertex_begin () const { return vertexes_.begin(); }
+    const_vertex_iterator vertex_end   () const { return vertexes_.end(); }
+    ///@}
+};
+
+
 /// \brief Vertices are not ordered with respect to the sign of the levelset function: First the vertexes from the principal lattice, then all proper cut-vertexes.
 class UnorderedVertexPolicyCL
 {
