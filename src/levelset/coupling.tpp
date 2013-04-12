@@ -610,6 +610,7 @@ void CoupledTimeDisc2PhaseBaseCL<LsetSolverT,RelaxationPolicyT>::SetupStokesMatV
 {
     curv_->Clear( Stokes_.v.t);
     LvlSet_.AccumulateBndIntegral( *curv_);
+    LvlSet_.AccumulateYoungForce( *curv_);
     LvlSet_.UpdateMLPhi();
 
     Stokes_.SetupSystem1( &Stokes_.A, &Stokes_.M, b_, b_, cplM_, LvlSet_, Stokes_.v.t);

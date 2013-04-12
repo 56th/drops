@@ -561,6 +561,112 @@ void MarkInterface ( const LevelsetP2CL::const_DiscSolCL& lset, double width, Mu
 }
 
 
+
+
+/// \brief Accumulator for the Young's force on the three-phase contact line.
+///
+/// Computes the integral
+///         \f[ \sigma \int_{MCL} \cos(\theta)v\cdot \tau ds \f]
+/// with \f$\tau \f$ being the normal direction of the moving contact line in tangential plain of domain boundary.
+class YoungForceAccumulatorCL : public  TetraAccumulatorCL
+{
+ private:
+    VecDescCL  SmPhi_;
+    const BndDataCL<>& lsetbnd_;
+    VecDescCL& f;
+   // SMatrixCL<3,3> T;
+    InterfaceTriangleCL triangle;
+
+    const double sigma_;
+    scalar_fun_ptr angle_;	//Young's contact angle
+    vector_fun_ptr outnormal_;//outnormal of the domain boundary
+
+   // LocalP1CL<Point3DCL> Grad[10], GradRef[10];
+    IdxT Numb[10];
+    LocalP2CL<> velR_p[4][8], velR_n[4][8]; // for P2R basis on children
+ //   LocalP2CL<> loc_phi;
+
+  public:
+    YoungForceAccumulatorCL( const LevelsetP2CL& ls, VecDescCL& f_Gamma, double sigma,scalar_fun_ptr cangle,vector_fun_ptr outnormal)
+     :  SmPhi_(ls.Phi),lsetbnd_(ls.GetBndData()),f(f_Gamma), sigma_(sigma),angle_(cangle),outnormal_(outnormal)
+    { ls.MaybeSmooth( SmPhi_.Data);
+    //P2DiscCL::GetGradientsOnRef( GradRef);
+    }
+
+    void begin_accumulation ()
+        {
+            // uncomment for Geomview output
+            //std::ofstream fil("surf.off");
+            //fil << "appearance {\n-concave\nshading smooth\n}\nLIST\n{\n";
+        }
+        void finalize_accumulation()
+        {
+            // uncomment for Geomview output
+            //fil << "}\n";
+        }
+    void visit (const TetraCL&);
+
+    TetraAccumulatorCL* clone (int /*tid*/) { return new YoungForceAccumulatorCL ( *this); };
+};
+
+void YoungForceAccumulatorCL::visit ( const TetraCL& t)
+{
+
+
+    const Uint idx_f=   f.RowIdx->GetIdx();
+    const bool velXfem= f.RowIdx->IsExtended();
+    if (velXfem)
+    	throw DROPSErrCL("WARNING: YoungForceAccumulatorCL : not implemented for velocity XFEM method yet!");
+  //  double det;
+
+   // GetTrafoTr( T, det, t);
+
+  //  loc_phi.assign( t, SmPhi_, lsetbnd_);
+    triangle.BInit( t, SmPhi_,lsetbnd_); //we have to use this init function!!!!!!!!!
+    triangle.SetBndOutNormal(outnormal_);
+    for (int v=0; v<10; ++v)
+    {   const UnknownHandleCL& unk= v<4 ? t.GetVertex(v)->Unknowns : t.GetEdge(v-4)->Unknowns;
+        Numb[v]= unk.Exist(idx_f) ? unk(idx_f) : NoIdx;
+    }
+	LocalP2CL<double> phi[10];
+	for(Uint i=0; i<10; ++i)
+		phi[i][i] = 1;
+	Point3DCL normal_mcl;
+	double costheta[3];
+//	for (int ch=0; ch<8; ++ch)
+	for(int ch=8;ch<9;++ch)
+    {
+        if (!triangle.ComputeMCLForChild(ch)) // no patch for this child
+            continue;
+        BaryCoordCL Barys[2];
+        Point3DCL pts[2];
+        Point3DCL midpt;
+        double length;
+        Uint ncl=triangle.GetNumMCL();
+        for(Uint i=0;i<ncl;i++)
+        {
+        	length = triangle.GetInfoMCL(i,Barys[0],Barys[1],pts[0],pts[1]);
+        	normal_mcl = triangle.GetMCLNormal(i);
+        	midpt=(pts[0]+pts[1])/2;
+
+        	costheta[0]=cos(angle_(pts[0]));
+        	costheta[1]=cos(angle_(pts[1]));
+        	costheta[2]=cos(angle_(midpt));
+        	std::cout<<costheta[0]<<" "<<costheta[0]<<" "<<costheta[0]<<" : "<<normal_mcl<<" : "<<midpt<<" : "<<length<<std::endl;
+        	for (int v=0; v<10; ++v)
+        	{
+        		const IdxT Numbv= v<10 ? Numb[v] : (velXfem && Numb[v-10]!=NoIdx ? f.RowIdx->GetXidx()[Numb[v-10]] : NoIdx);
+        		if (Numbv==NoIdx) continue;
+        		double value = (phi[v](Barys[0])*costheta[0]+ phi[v](Barys[1])*costheta[1]+ 4*phi[v]((Barys[0]+Barys[1])/2)*costheta[2])/6;
+        		for (int j=0; j<3; ++j)
+        		{
+        			f.Data[Numbv+j] += sigma_*value*normal_mcl[j]*length;
+        		}
+        	}
+        }
+    } // Ende der for-Schleife ueber die Kinder
+}
+
 //*****************************************************************************
 //                               LevelsetP2CL
 //*****************************************************************************
@@ -625,6 +731,20 @@ void LevelsetP2CL::AccumulateBndIntegral( VecDescCL& f) const
     accumulate( accus, MG_, Phi.RowIdx->TriangLevel(), Phi.RowIdx->GetMatchingFunction(), Phi.RowIdx->GetBndInfo());
 
     delete accu;
+}
+
+
+void LevelsetP2CL::AccumulateYoungForce( VecDescCL& f) const
+{
+    YoungForceAccumulatorCL *accu;
+
+    if(SF_==SF_ImprovedLB)
+    	accu= new YoungForceAccumulatorCL( *this, f, sf_.GetSigma()(std_basis<3>(0), 0.),CA_,Bndoutnormal_);
+    else
+    	throw DROPSErrCL("LevelsetP2CL::AccumulateYoungForce not implemented for non-constant surface tension");
+    TetraAccumulatorTupleCL accus;
+    accus.push_back( accu);
+    accumulate( accus, MG_, Phi.RowIdx->TriangLevel(), Phi.RowIdx->GetMatchingFunction(), Phi.RowIdx->GetBndInfo());
 }
 
 double LevelsetP2CL::GetVolume( double translation, int l) const

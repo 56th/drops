@@ -79,8 +79,6 @@ void SetupLumpedMass (const MultiGridCL& MG, VectorCL& M, const IdxDescCL& RowId
                     const BndCondCL& bnd= BndCondCL( 0), const VecDescCL* lsetp=0, const BndDataCL<>* lsetbnd=0);
 
 
-
-
 // rho*du/dt - mu*laplace u + Dp = f + rho*g - okn
 //                        -div u = 0
 //                             u = u0, t=t0
@@ -94,13 +92,12 @@ class TwoPhaseFlowCoeffCL
     bool film;
     double surfTens;
     double rho_koeff1, rho_koeff2, mu_koeff1, mu_koeff2;
-    double slip_length1, slip_length2;
+//    double slip_length1, slip_length2;
 
   public:
     DROPS::instat_vector_fun_ptr volforce;
-    DROPS::instat_scalar_fun_ptr ctangle;
     const SmoothedJumpCL rho, mu;
-    const SmoothedJumpCL sliplength;
+ //   const SmoothedJumpCL sliplength;
     const double SurfTens, DilVisco, ShearVisco;
 	const double alpha, beta;
     const Point3DCL g;
@@ -123,18 +120,17 @@ class TwoPhaseFlowCoeffCL
         ShearVisco( film ? P.get<double>("Mat.ShearVisco") : P.get<double>("SurfTens.ShearVisco")),
 		alpha(P.get<double>("SpeBnd.alpha")),
 		beta(P.get<double>("SpeBnd.beta")),
-        g( P.get<DROPS::Point3DCL>("Exp.Gravity")),
-        slip_length1(P.get<double>("Slip.SlipLength1")),
-        slip_length2(P.get<double>("Slip.SlipLength2")),
-        sliplength(dimless ? JumpCL( 1., slip_length2/slip_length1)
-                     :JumpCL(slip_length2,slip_length1), H_sm, P.get<double>("Slip.SmoothZone"))
+        g( P.get<DROPS::Point3DCL>("Exp.Gravity"))
+ //       slip_length1(P.get<double>("Slip.SlipLength1")),
+//        slip_length2(P.get<double>("Slip.SlipLength2")),
+ //       sliplength(dimless ? JumpCL( 1., slip_length2/slip_length1)
+  //                   :JumpCL(slip_length2,slip_length1), H_sm, P.get<double>("Slip.SmoothZone"))
         {
         volforce = InVecMap::getInstance()[P.get<std::string>("Exp.VolForce")];
-        ctangle = InScaMap::getInstance()[P.get<std::string>("Slip.CtAngle")];
     }
 
-    TwoPhaseFlowCoeffCL( double rho1, double rho2, double mu1, double mu2, double surftension, Point3DCL gravity, bool dimless = false, double dilatationalvisco = 0.0, double shearvisco = 0.0,
-    							double sl1=1, double sl2=1)
+    TwoPhaseFlowCoeffCL( double rho1, double rho2, double mu1, double mu2, double surftension, Point3DCL gravity, bool dimless = false, double dilatationalvisco = 0.0, double shearvisco = 0.0
+    							)//double sl1=1, double sl2=1
       : rho( dimless ? JumpCL( 1., rho2/rho1)
                      : JumpCL( rho1, rho2), H_sm, 0),
         mu(  dimless ? JumpCL( 1., mu2/mu1)
@@ -144,12 +140,11 @@ class TwoPhaseFlowCoeffCL
         ShearVisco( shearvisco),
 		alpha(1.), //??
 		beta(1.),  //??
-        g( gravity),
-        sliplength(dimless ? JumpCL( 1., sl2/sl1)
-                     :JumpCL(sl2,sl1), H_sm, 0)
+        g( gravity)
+//        sliplength(dimless ? JumpCL( 1., sl2/sl1)
+//                     :JumpCL(sl2,sl1), H_sm, 0)
                          {
           volforce = InVecMap::getInstance()["ZeroVel"];
-          ctangle = InScaMap::getInstance()["Zero"];
         }
 };
 

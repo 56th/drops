@@ -1695,12 +1695,16 @@ void System1Accumulator_P2CL::local_setup (const TetraCL& tet)
 		if(speBnd)
 			speBndHandle.setup(tet, T, loc);
     }
-    else
+    else{
         local_twophase.setup( T, absdet, tet, ls_loc, locInt, loc);
+        if(speBnd)
+        	speBndHandle.setup(tet, T, loc);//need modification when the slip length is different in the two phase flow
+    }
 		//update loc for special boundary condtion
     add_transpose_kronecker_id( loc.Ak, loc.A);
 
     if (b != 0) {
+
         if (noCut)
             rhs.assign( tet, Coeff.volforce, t);
         for (int i= 0; i < 10; ++i) {
@@ -1720,20 +1724,21 @@ void System1Accumulator_P2CL::local_setup (const TetraCL& tet)
             }
 							
         }
-		if (noCut){
-			speBnd = false;
-			for(int i =0; i< 4; ++i){
-				if(  BndData.Vel.GetBC(*tet.GetFace(i))==SlipBC )
-				{
-					speBnd = true;
-					break;
-				}
-			}
-			if(speBnd)
-			{
+        speBnd = false;
+        for(int i =0; i< 4; ++i){
+        	if(  BndData.Vel.GetBC(*tet.GetFace(i))==SlipBC )
+        	{
+        			speBnd = true;
+        			break;
+        	}
+        }
+        if(speBnd)
+        {
+        	if (noCut)
 				speBndHandle.setupRhs(tet, loc_b);
-			}
-		}
+            else
+		    	speBndHandle.setupRhs(tet, loc_b);//need modification when the slip length is different in the two phase flow
+        }
     }
 	
 }

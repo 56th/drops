@@ -65,6 +65,28 @@ void InterfacePatchCL::Init( const TetraCL& t, const LocalP2CL<double>& ls, doub
     barysubtetra_ = false;
 }
 
+//Init InterfacePatchCL include special surface boundary information
+void InterfacePatchCL::BInit( const TetraCL& t, const VecDescCL& ls,const BndDataCL<>& lsetbnd, double translation)
+{
+    ch_= -1;
+    LocalP2CL<double> locphi(t, ls, lsetbnd);
+    PhiLoc_= locphi + translation;
+    for (Uint v=0; v<10; ++v)
+    { // collect data on all DoF
+        Coord_[v]= v<4 ? t.GetVertex(v)->GetCoord() : GetBaryCenter( *t.GetEdge(v-4));
+        sign_[v]= Sign(PhiLoc_[v]);
+    }
+    double dir;
+    for(Uint v=0; v<4; v++)
+    {
+    	BC_Face_[v] =  lsetbnd.GetBC(*t.GetFace(v));
+    //	t.GetNormal(v, outnormal_[v], dir);
+    //	outnormal_[v]*=dir;
+    }
+    for(Uint v=0; v<6; v++)
+        BC_Edge_[v] =  lsetbnd.GetBC(*t.GetEdge(v));
+    barysubtetra_ = false;
+}
  SMatrixCL<3,4> GetCoordMatrix( const TetraCL& t)
 {
    SMatrixCL<3,4> V(Uninitialized);
@@ -177,7 +199,7 @@ bool InterfacePatchCL::ComputeVerticesOfCut( Uint ch, bool compute_PQRS)
         }
     }
     
-    bool cut_point_on_face[4][4];
+
     const double eps = 1e-9;
     
     for (int i = 0; i<intersec_; ++i){
@@ -522,6 +544,81 @@ bool InterfaceTriangleCL::ComputeForChild( Uint ch)
     return true; // computed patch of child;
 }
 
+bool InterfaceTriangleCL::ComputeMCLForChild(Uint ch)
+{
+
+//	std::cout<<"test0 ";
+	if( BC_Face_[0]==NoBC && BC_Face_[1]==NoBC && BC_Face_[2]==NoBC && BC_Face_[3]==NoBC
+		&& BC_Edge_[0]==NoBC && BC_Edge_[1]==NoBC && BC_Edge_[2]==NoBC && BC_Edge_[3]==NoBC && BC_Edge_[4]==NoBC && BC_Edge_[5]==NoBC )
+	{//The tetrahedra has no surface and edge on boundary
+	    	return false;
+	}
+	//std::cout<<"test1 ";
+	const bool iscut= ComputeVerticesOfCut( ch, /*compute_PQRS*/ true);
+	if (!iscut) { // no change of sign on child
+	     numtriangles_= 0;
+	     return false;
+	}
+//	std::cout<<"test2 ";
+	numMCL_=0;
+	Uint num=0;
+	int idx[2];
+    for( Uint i=0; i<intersec_; i++ )
+    {
+    /*	if(std::fabs(PQRS_[i][1]-0)<0.00001)
+		{
+			std::cout<<PQRS_[i]<<": ";
+			std::cout<<BC_Face_[0]<<" "<<BC_Face_[1]<<" "<<BC_Face_[2]<<" "<<BC_Face_[3]<<" : "<<intersec_<<std::endl;
+		}*/
+    	num=0;
+   // 	std::cout<<num<<" ->num ";
+    	for( Uint j=0; j<4; j++ )
+    	{
+    	//	std::cout<<"test "<<i<<" : "<<j<<"; ";
+			if( cut_point_on_face[i][j]==true && cut_point_on_face[(i+1)%intersec_][j]==true)
+			{
+				idx[num]=j;
+				num++;
+			}
+    	}
+    //	std::cout<<num<<" ->num ";
+    	if(num==1 &&(BC_Face_[idx[0]]==SlipBC||BC_Face_[idx[0]]==Slip0BC))
+    	{
+    		IdxMCL_[numMCL_]=i;
+    	   	numMCL_++;
+    	}
+    	else if(num==2)//the contact line  intersect with one edge, one need check if the edge on the boundary
+    	{
+    		for(Uint v=0;v<6;v++)
+    		{
+    			if(FaceOfEdge(v,0)==idx[0]&&FaceOfEdge(v,1)==idx[1]&&(BC_Edge_[v]==SlipBC||BC_Edge_[v]==Slip0BC))
+    			{	IdxMCL_[numMCL_]=i;
+    				numMCL_++;
+    			}
+    		}
+
+    	}
+
+    }
+    //std::cout<<std::endl;
+    if(numMCL_==0)
+    	return false;
+    else
+    	return true;
+}
+Uint InterfaceTriangleCL::GetNumMCL()
+{
+	return numMCL_;
+}
+double InterfaceTriangleCL::GetInfoMCL(Uint v, BaryCoordCL& bary0, BaryCoordCL& bary1, Point3DCL& pt0, Point3DCL& pt1)
+{
+	bary0 = Bary_[IdxMCL_[v]];
+	bary1 = Bary_[(IdxMCL_[v]+1)%intersec_];
+	pt0 = PQRS_[IdxMCL_[v]];
+	pt1 = PQRS_[(IdxMCL_[v]+1)%intersec_];
+	return (pt1-pt0).norm();
+}
+
 Point3DCL InterfaceTriangleCL::GetNormal() const
 {
     const ChildDataCL data= GetChildData( ch_);
@@ -584,6 +681,30 @@ Quad5_2DCL<Point3DCL> InterfaceTriangleCL::GetImprovedNormal(Uint n) const
 
 	return normal;
 }
+void InterfaceTriangleCL::SetBndOutNormal(vector_fun_ptr outnormal)
+{
+	outnormal_=outnormal;
+}
+Point3DCL InterfaceTriangleCL::GetMCLNormal(Uint v) const
+{
+	Point3DCL midpt = (PQRS_[IdxMCL_[v]]+PQRS_[(IdxMCL_[v]+1)%intersec_])/2;
+	Point3DCL n;
+	Point3DCL tau=PQRS_[(IdxMCL_[v]+1)%intersec_]-PQRS_[IdxMCL_[v]];
+	tau=tau/tau.norm();
+	cross_product(n, tau, outnormal_(midpt));
+
+	if(inner_prod(GetNormal(),n)>=0)
+		return n/n.norm();
+	else
+		return -n/n.norm();
+}
+
+double InterfaceTriangleCL::GetActualContactAngle(Uint v) const
+{
+	Point3DCL midpt = (PQRS_[IdxMCL_[v]]+PQRS_[(IdxMCL_[v]+1)%intersec_])/2;
+	return M_PI - acos(inner_prod(GetNormal(),outnormal_(midpt)));
+}
+
 
 LocalP2CL<double> ProjectIsoP2ChildToParentP1 (LocalP2CL<double> lpin, Uint child){
     const double vertices[][3]=

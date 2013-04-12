@@ -69,6 +69,22 @@ DROPS::ParamCL P;
 namespace DROPS // for Strategy
 {
 
+double ConstantAngle(const Point3DCL&)
+{
+	return P.get<double>("Slip.contactangle")/180.0*M_PI;
+}
+static DROPS::RegisterStatScalarFunction regconstangle("ConstantAngle", ConstantAngle);
+
+Point3DCL OutNormalBottomPlane(const Point3DCL&)
+{
+	Point3DCL outnormal(0.0);
+//	outnormal[0]=0;
+	outnormal[1]=-1.0;
+//	outnormal[2]=0;
+	return outnormal;
+}
+static DROPS::RegisterStatVectorFunction regunitcubicoutnomal("OutNormalBottomPlane", OutNormalBottomPlane);
+
 double GetTimeOffset(){
     double timeoffset = 0.0;
     const std::string restartfilename = P.get<std::string>("DomainCond.InitialFile");
@@ -112,6 +128,8 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
     LevelsetP2CL lset( MG, lsetbnddata, sf, P.get<double>("Levelset.SD"), P.get<double>("Levelset.CurvDiff"));
 
+    lset.SetYoungAngle(ConstantAngle);//set Young's Contact angle on the solid boundary
+    lset.SetBndOutNormal(OutNormalBottomPlane);//set outnormal of the domain boundary
     if (is_periodic) //CL: Anyone a better idea? perDirection from ParameterFile?
     {
         DROPS::Point3DCL dx;
@@ -592,7 +610,7 @@ int main (int argc, char** argv)
     std::cout << "Generated boundary conditions for velocity, ";
     DROPS::BuildBoundaryData( mg, prbnddata, perbndtypestr, zerobndfun, periodic_match);
     std::cout << "pressure, ";
-    DROPS::BuildBoundaryData( mg, lsetbnddata, perbndtypestr, zerobndfun, periodic_match);
+    DROPS::BuildBoundaryData( mg, lsetbnddata,  P.get<std::string>("DomainCond.BoundaryType"), zerobndfun, periodic_match);//Hope this will not affect solving levelset equation!?
     std::cout << "and levelset." << std::endl;
     DROPS::StokesBndDataCL bnddata(*velbnddata,*prbnddata);
 

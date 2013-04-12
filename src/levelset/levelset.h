@@ -47,6 +47,7 @@ namespace DROPS
 
 typedef BndDataCL<double>    LsetBndDataCL;
 
+
 enum SurfaceForceT
 /// different types of surface forces
 {
@@ -86,6 +87,9 @@ class LevelsetP2CL : public ProblemCL< LevelsetCoeffCL, LsetBndDataCL>
     SurfaceForceT       SF_;
 
     SurfaceTensionCL&   sf_;      ///< data for surface tension
+    scalar_fun_ptr CA_;		    ///<Young's contact angle on domain boundary
+    vector_fun_ptr Bndoutnormal_; ///outnormal of domain boundary
+
     void SetupSmoothSystem ( MatrixCL&, MatrixCL&)               const;
     void SmoothPhi( VectorCL& SmPhi, double diff)                const;
     double GetVolume_Composite( double translation, int l)    const;
@@ -98,7 +102,7 @@ class LevelsetP2CL : public ProblemCL< LevelsetCoeffCL, LsetBndDataCL>
     MatrixCL            E, H;
 
     LevelsetP2CL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, double SD= 0, double curvDiff= -1)
-    : base_( mg, LevelsetCoeffCL(), bnd), idx( P2_FE), MLPhi( &idx), curvDiff_( curvDiff), SD_( SD),
+    : base_( mg, LevelsetCoeffCL(), bnd), idx( P2_FE), MLPhi( &idx), curvDiff_( curvDiff),  SD_( SD),
         SF_(SF_ImprovedLB), sf_(sf), perDirections(NULL)
     {}
 
@@ -147,6 +151,12 @@ class LevelsetP2CL : public ProblemCL< LevelsetCoeffCL, LsetBndDataCL>
     SurfaceForceT GetSurfaceForce() const { return SF_; }
     /// Discretize surface force
     void   AccumulateBndIntegral( VecDescCL& f) const;
+    /// Set type of contact angle function(defined only on boundary).
+    void   SetYoungAngle(scalar_fun_ptr CA) { CA_= CA; }
+    ///Discretize Young Force on the three-phase contact line
+    void   SetBndOutNormal(vector_fun_ptr outnormal) { Bndoutnormal_= outnormal; }
+    ///Discretize Young Force on the three-phase contact line
+    void   AccumulateYoungForce( VecDescCL& f) const;
     /// Clear all matrices, should be called after grid change to avoid reuse of matrix pattern
     void   ClearMat() { E.clear(); H.clear(); }
     /// \name Evaluate Solution

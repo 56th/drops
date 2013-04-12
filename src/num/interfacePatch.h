@@ -62,6 +62,12 @@ class InterfacePatchCL
     int numtriangles_;    ///< number of triangles in the intersection with the interface (0, 1, 2);
     Point3DCL Coord_[10]; ///< coordinates of the vertices and edge-barycenters of T
 
+    bool cut_point_on_face[4][4];     ///< if (i,j)-th value is true, the i-th point of the cut is on j-th face
+    BndCondT  BC_Face_[4];				  ///< boundary condition type for all four faces
+    BndCondT  BC_Edge_[6];				///< boundary condition type for all six edges
+  //  Point3DCL outnormal_[4];		  ///< out normal of the faces
+
+
   private:
     static BaryCoordCL AllEdgeBaryCenter_[10][10]; ///< barycenters of all edges of the reference-tetra.
                                                     ///< \todo These fields belong into geom/topo.h or a new geom/geom.h.
@@ -78,6 +84,8 @@ class InterfacePatchCL
       void Init( const TetraCL& t, const SubTetraT& st, const LocalP2CL<double>& ls, double translation);
       ///< Wird nur von masstransport P1X verwendet      
       void Init( const SubTetraT& st, const LocalP2CL<double>& ls, double translation);
+      ///< Init including information of boundary information for tetrahedra surfaces. Used for MCL problem
+      void BInit( const TetraCL& t, const VecDescCL& ls,const BndDataCL<>& lsetbnd,  double translation= 0.);
 
       /// \name Use after Init
       /// \remarks The following functions are only valid, if Init(...) was called before! They refer to T. If st_ was given to Init, they refer to the transformation of T.
@@ -154,11 +162,19 @@ class InterfaceTriangleCL : public InterfacePatchCL
     double         DetA_;
     Point3DCL       B_[3];
     Point2DCL       ab_;
+    Uint	 numMCL_;				 //number of moving contact lines
+    Uint	 IdxMCL_[4];			 //the edge index  for each contact line
+    vector_fun_ptr outnormal_; ///the outnormal of the boundary. instat might be useful for varying boundary.
 
     BaryCoordCL TransformToSubTetra (const BaryCoordCL& b); ///< compute st_*b \todo remove this by introducing a column-oriented small matrix class
 
   public:
     bool ComputeForChild( Uint ch);                            ///< returns true, if a patch exists for this child
+    bool ComputeMCLForChild(Uint ch);			 			   ///< returns true, if a moving contact line exists for this child
+															   ///< called after BInit()!!
+    Uint GetNumMCL();									///< returns numMCL_
+    void SetBndOutNormal(vector_fun_ptr outnormal);   ///set outnormal
+    double GetInfoMCL(Uint v, BaryCoordCL& bary0, BaryCoordCL& bary1, Point3DCL& pt0, Point3DCL& pt1);
     double GetAbsDet( Uint tri= 0) const { return DetA_*(tri==0 ? 1.0 : GetAreaFrac()); } ///< Returns the Determinant for surface integration on the triangle \p tri.
     double GetAreaFrac()   const { return intersec_==4 ? ab_[0]+ab_[1]-1 : 0; }                   ///< Quotient of the areas of the first and the second triangle.
     template<class ValueT>
@@ -166,6 +182,10 @@ class InterfaceTriangleCL : public InterfacePatchCL
     const Point3DCL& GetGradId( Uint i) const { return B_[i]; }   ///< Returns the projection of the i-th standard-basis-vector of \f$R^3\f$ on the patch.
     Point3DCL GetNormal () const;                         ///< Returns the unit normal to the linear approximation of \f$\Gamma\f$, that points from \f$\{\varphi<0\}\f$ to \f$\{\varphi<0\}\f$.
     Quad5_2DCL<Point3DCL> GetImprovedNormal(Uint) const;  ///< Returns the improved unit normal
+    Point3DCL GetMCLNormal(Uint) const;						  ///< Returns the unit normal to the contact line in tangential surface of the boundary
+															  ///call after SetBndoutNormal()
+    double GetActualContactAngle(Uint) const;				///< Returns the contact angle
+															///call after SetBndoutNormal()
     Point3DCL ApplyProj( const Point3DCL& grad) const { return grad[0]*B_[0] + grad[1]*B_[1] + grad[2]*B_[2]; }
 };
 
