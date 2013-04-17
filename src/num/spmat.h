@@ -102,9 +102,6 @@ DROPS_DEFINE_VALARRAY_DERIVATIVE( VectorBaseCL, T, base_type)
     T  operator[](size_t s) const;
     T& operator[](size_t s);
 #endif
-#ifdef __INTEL_COMPILER
-    size_t size() const { return this->size(); }
-#endif
 };
 
 
