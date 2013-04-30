@@ -247,7 +247,7 @@ double Quadrature( DROPS::MultiGridCL& mg, VecDescCL& vd0, VecDescCL& vd1,
     VecDescCL& /*vd2*/)
 {
     std::cout << "\n-----------------------------------------------------------------"
-                 "\nOld Quadrature:\n";
+                 "\nOld Quadrature ";
     double ret= 0.;
     P2FuncT f( &vd0, &theBnd, &mg);
     P2FuncT g( &vd1, &theBnd, &mg);
@@ -292,7 +292,7 @@ double NewQuadrature(DROPS::MultiGridCL& mg, VecDescCL& vd0, VecDescCL& vd1,
     VecDescCL& /*vd2*/)
 {
     std::cout << "\n-----------------------------------------------------------------"
-                 "\nNew Quadrature:\n";
+                 "\nNew Quadrature ";
     double ret= 0.;
     P2FuncT f( &vd0, &theBnd, &mg);
     P2FuncT g( &vd1, &theBnd, &mg);
