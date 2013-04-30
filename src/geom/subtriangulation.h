@@ -204,7 +204,7 @@ class SurfacePatchCL
     friend void write_paraview_vtu (std::ostream&, const SurfacePatchCL&);
 };
 
-
+/*
 class BndTriangPartitionCL
 {
   public:
@@ -221,11 +221,10 @@ class BndTriangPartitionCL
 
     TriangleContT     triangles_;             ///< All triangles of the interface.
     Uint       pos_triang_begin_;             ///< begin of the subsequence of triangles tetras
-    std::vector<bool> is_boundary_triangle_;  ///< True, iff the triangle is a face of one of the tetras of the principal lattice.
 
     VertexContT vertexes_;
-    Uint        pos_vertex_begin_; ///< begin of the subsequence of vertexes of positive tetras
-    Uint        neg_vertex_end_;   ///< end of the subsequence of of vertexes of negative tetras
+    Uint        pos_vertex_begin_;           ///< begin of the subsequence of vertexes of positive tetras
+    Uint        neg_vertex_end_;             ///< end of the subsequence of of vertexes of negative tetras
 	
     template <class VertexCutMergingPolicyT>
       const TriangleT ///< Create a single sub-triangle and its vertexes
@@ -241,12 +240,6 @@ class BndTriangPartitionCL
     template <class VertexCutMergingPolicyT>
     void make_partition2D (const PrincipalLatticeCL& lat, const std::valarray<double>& ls);
 
-    /// True, iff the triangle is a face of one of the tetras of the principal lattice.
-    ///@{
-    bool is_boundary_triangle (Uint i) const { return is_boundary_triangle_[i]; }
-    bool is_boundary_triangle (const_triangle_iterator it) const { return is_boundary_triangle_[it - triangles_.begin()]; }
-    ///@}
-
     Uint triangle_size  () const ///< number of triangles
          { return triangles_.size(); }
     Uint vertex_size () const ///< number of vertexes
@@ -260,7 +253,7 @@ class BndTriangPartitionCL
     const_vertex_iterator vertex_end   () const { return vertexes_.end(); }
     ///@}
 };
-
+*/
 
 /// \brief Vertices are not ordered with respect to the sign of the levelset function: First the vertexes from the principal lattice, then all proper cut-vertexes.
 class UnorderedVertexPolicyCL

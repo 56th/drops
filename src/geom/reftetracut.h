@@ -235,6 +235,32 @@ RefTetraPartitionCL::instance (const double ls[4])
     return instance( ls_byte);
 }
 
+
+class RefTrianglePartitionCL
+{
+  public:
+    typedef SArrayCL<Ubyte, 3> TriangleT;            ///< the vertices of a triangle of the cut: the tetra's vertices are denoted by 0..3, the edge-cuts by edge-num + 4, which is in 4..9.
+    typedef const TriangleT* const_triangle_iterator;
+    typedef       TriangleT*       triangle_iterator;
+	
+  private:
+    TriangleT triangle_[3];      ///< at most three triangles
+    Ubyte size_;                 ///< number of triangles
+	int sign_[3];
+
+    TriangleT MakeTriangle (Ubyte v0, Ubyte v1, Ubyte v2) const { return MakeSArray( v0, v1, v2); }
+	
+  public:
+    RefTrianglePartitionCL(const byte ls[4], Ubyte VertexNum); 
+    size_t size () const { return size_; }      ///< Number of triangles, 0, 1, or 2
+    int sign (const_triangle_iterator t) const { return sign_[ t- triangle_begin() ]; } ///< Sign of the tetra, to which t points
+
+    ///@{ Random-access to the triangles
+    const_triangle_iterator triangle_begin () const { return triangle_; }
+    const_triangle_iterator triangle_end   () const { return triangle_ + size_; }
+    ///@}
+};
+
 } // end of namespace DROPS
 
 #endif
