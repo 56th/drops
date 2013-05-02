@@ -134,25 +134,25 @@ int main ()
     time.Start();
     Uint q0= Old( mg);
     time.Stop();
-    std::cout << "value: " << q0 << "\ttime: " << time.GetTime() << " seconds"
+    std::cout << "value1: " << q0 << "\ttime: " << time.GetTime() << " seconds"
         << std::endl;
     time.Reset();
     time.Start();
     Uint q3= Old( mg);
     time.Stop();
-    std::cout << "value: " << q3 << "\ttime: " << time.GetTime() << " seconds"
+    std::cout << "value2: " << q3 << "\ttime: " << time.GetTime() << " seconds"
         << std::endl;
     time.Reset();
     time.Start();
     Uint q1= New( mg, vt, et, ft, tt);
     time.Stop();
-    std::cout << "value: " << q1 << "\ttime: " << time.GetTime() << " seconds"
+    std::cout << "value3: " << q1 << "\ttime: " << time.GetTime() << " seconds"
         << std::endl;
     time.Reset();
     time.Start();
     Uint q2= New( mg, vt, et, ft, tt);
     time.Stop();
-    std::cout << "value: " << q2 << "\ttime: " << time.GetTime() << " seconds"
+    std::cout << "value4: " << q2 << "\ttime: " << time.GetTime() << " seconds"
         << std::endl;
     time.Reset();
     std::cout << "tt.size: " << tt.size() << std::endl;
