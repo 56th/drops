@@ -221,6 +221,50 @@ class InfiniteCylinderBodyCL : public BodyCL
         { return  (x - origin_ - inner_prod(x - origin_, axis_)*axis_).norm() - r_; }
 };
 
+
+class TorusBodyCL : public BodyCL
+{
+  private:
+    Point3DCL origin_,
+              axis_;
+    double R_,
+           r_;
+
+  public:
+    TorusBodyCL (BodyStackT&, const ParamCL& p)
+        : origin_( std_basis<3>( 0)), axis_( std_basis<3>( 1)), R_( 0.75), r_( 0.25) {
+        try {
+            R_= p.get<double>( "BigRadius");
+        } catch (DROPSErrCL) {}
+        try {
+            r_= p.get<double>( "SmallRadius");
+        } catch (DROPSErrCL) {}
+        try {
+            origin_= p.get<Point3DCL>( "Origin");
+        } catch (DROPSErrCL) {}
+        try {
+            axis_= p.get<Point3DCL>( "Axis");
+        } catch (DROPSErrCL) {}
+        axis_/=axis_.norm();
+    }
+
+    const VecOfStringT& known_keys () const {
+        static std::string keys[] = {
+            std::string( "Type"),
+            std::string( "BigRadius"),
+            std::string( "SmallRadius"),
+            std::string( "Origin"),
+            std::string( "Axis") };
+        static const VecOfStringT k( keys, keys + 5);
+        return k;
+    }
+
+    double operator() (const Point3DCL& x, double) const {
+        const double  z= inner_prod( axis_, x - origin_),
+                     xy= std::sqrt( (x - origin_).norm_sq() - z*z);
+        return  std::sqrt( z*z + std::pow( xy - R_, 2)) - r_; }
+};
+
 /// Levelset
 class LevelsetBodyCL : public BodyCL
 {
@@ -395,9 +439,10 @@ RegisterBuilder reg00("Halfspace",               &make_new<HalfspaceBodyCL>);
 RegisterBuilder reg01("Sphere",                  &make_new<SphereBodyCL>);
 RegisterBuilder reg02("InfiniteCone",            &make_new<InfiniteConeBodyCL>);
 RegisterBuilder reg03("InfiniteCylinder",        &make_new<InfiniteCylinderBodyCL>);
-RegisterBuilder reg04("Levelset",                &make_new<LevelsetBodyCL>);
-RegisterBuilder reg05("LoadFromModule",          &make_new<ModuleBodyCL>);
-RegisterBuilder reg06("ApplySimilarityToDomain", &make_new<SimilarityTransformBodyCL>);
+RegisterBuilder reg04("Torus",                   &make_new<TorusBodyCL>);
+RegisterBuilder reg05("Levelset",                &make_new<LevelsetBodyCL>);
+RegisterBuilder reg06("LoadFromModule",          &make_new<ModuleBodyCL>);
+RegisterBuilder reg07("ApplySimilarityToDomain", &make_new<SimilarityTransformBodyCL>);
 
 
 std::string unknown_keys (const ParamCL& p, const VecOfStringT& known_keys)

@@ -31,6 +31,14 @@
     ]
   },
 
+  "Torus":
+  {
+    "Type": "CSG-body (v0)",
+    "Instructions" : [
+        { "Type": "Torus", "Origin": [0, 0, 0], "Axis": [1, 0, 0], "BigRadius": 0.75, "SmallRadius": 0.25 } // all args are optional.
+    ]
+  },
+
   "Suess":
   {
     "Type": "CSG-body (v0)",
@@ -145,6 +153,21 @@
         "Union",
         { "Type": "PushReference", "Name": "candle0" },
         { "Type": "ApplySimilarityToDomain", "RotationAxis": [1,0,0], "RotationAngle": -2.094 },
+        "Union"
+    ]
+  },
+
+  "Dented ball":
+  {
+    "Type": "CSG-body (v0)",
+    "Instructions" : [
+        { "Type": "Torus", "Origin": [0, 0, 0], "Axis": [0, 0, 1], "BigRadius": 0.75, "SmallRadius": 0.25 },
+        { "Type": "Sphere", "Center": [0, 0, 0], "Radius": 1 }, // The big sphere; Radius= BigRadius + SmallRadius
+        { "Type": "Sphere", "Center": [0, 0, 0], "Radius": 0.5 }, // The small sphere; Radius= BigRadius - SmallRadius
+        "Complement",
+        "Intersection",
+        { "Type": "Halfspace", "Normal": [0, 0, 1]},
+        "Intersection",
         "Union"
     ]
   }
