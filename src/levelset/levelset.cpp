@@ -652,7 +652,7 @@ void YoungForceAccumulatorCL::visit ( const TetraCL& t)
         	costheta[0]=cos(angle_(pts[0]));
         	costheta[1]=cos(angle_(pts[1]));
         	costheta[2]=cos(angle_(midpt));
-        	std::cout<<costheta[0]<<" "<<costheta[0]<<" "<<costheta[0]<<" : "<<normal_mcl<<" : "<<midpt<<" : "<<length<<std::endl;
+
         	for (int v=0; v<10; ++v)
         	{
         		const IdxT Numbv= v<10 ? Numb[v] : (velXfem && Numb[v-10]!=NoIdx ? f.RowIdx->GetXidx()[Numb[v-10]] : NoIdx);
