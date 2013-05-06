@@ -255,6 +255,7 @@ int TestExamples (MultiGridCL& mg)
     }
     lset.idx.DeleteNumbering( mg);
     p1idx.DeleteNumbering( mg);
+    std::cout << "Successfully proccessed '../geom/csg-examples.json'.\n";
     return 0;
 }
 
