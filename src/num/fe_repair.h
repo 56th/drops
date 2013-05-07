@@ -61,6 +61,9 @@ struct RepairFEDataCL
 
     /// \brief Evaluate all augmented dof in dof on the repair-data in data and put the values into newdata.
     void repair (AugmentedDofVecT& dof, VectorCL& newdata) const;
+
+    /// \brief Returns true, if data for child ch (per topo.h) is available.
+    bool has_child (Ubyte ch) const;
 };
 
 /// \brief types for a P2-FE-function on a Tetra
@@ -137,7 +140,10 @@ void RepairP1LocalDataTypeCL<ValueT>::Init() {
 /// after ruling out (1), (2a), (3), (4).
 /// 
 ///     3) Changed refinement of parent: t is deleted, but p is refined differently
-/// again. The repair-data on the parent identifies this situation.
+/// again. The repair-data on the parent identifies this situation. We perform an
+/// optimization which is essential for discontinuous finite elements. If t was also
+/// one of the old children, we can (and do) handle it as if no change of refinement
+/// had taken place, i.e. as in (2).
 /// 
 ///     4) Refinement of t (or its regular replacement, if t was irregular), where the
 /// children c are in l: a) If there is a grand-parent gp, this identifies the
@@ -167,8 +173,8 @@ class RepairFECL
     typedef LocalFEDataT<ValueT> localfedata_;
     typedef typename localfedata_::LocalFECL   LocalFECL;
     typedef typename localfedata_::LocalNumbCL LocalNumbCL;
-    
-    typedef std::tr1::unordered_set<const TetraCL*>                              TetraSetT;
+
+    typedef std::tr1::unordered_set<const TetraCL*> TetraSetT;
 
     RepairMapCL parent_data_;
     TetraSetT   level0_leaves_;
@@ -187,7 +193,7 @@ class RepairFECL
     void unchanged_refinement    (const TetraCL& t); ///< use data from t for copying
     void regular_leaf_refinement (const TetraCL& t); ///< use data from t for repair
     void unrefinement            (const TetraCL& t, const RepairFEDataCL<LocalFECL>& t_data);  ///< use repair-data from the tetra itself
-    void changed_refinement      (const TetraCL& t, const RepairFEDataCL<LocalFECL>& p_data);  ///< use repair-data from the parent
+    void changed_refinement      (const TetraCL& t, Ubyte ch, const RepairFEDataCL<LocalFECL>& p_data);  ///< use repair-data from the parent; ch is the child-number per topo.h of t in its parent.
     void genuine_refinement      (const TetraCL& t, const RepairFEDataCL<LocalFECL>& gp_data); ///< use repair-data from the grand-parent
 
 #ifdef _PAR

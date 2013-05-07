@@ -173,7 +173,9 @@ int Test()
 int main ()
 {
   try {
-    return  Test();
+    int ret = Test();
+    std::cerr << "return value: " << ret << std::endl;
+    return ret;
   }
   catch (DROPS::DROPSErrCL err) { err.handle(); }
 }
