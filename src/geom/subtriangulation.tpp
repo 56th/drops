@@ -251,6 +251,7 @@ template <class VertexCutMergingPolicyT>
     double loc_ls[4];
     byte   loc_ls_sign[4];
     for (PrincipalLatticeCL::const_tetra_iterator lattice_tet= lat.tetra_begin(), lattice_end= lat.tetra_end(); lattice_tet != lattice_end; ++lattice_tet) {
+		// check if a tetra in lattice is a tetra on the face, and set level set value to 0 if a vertex is not on this face
         bool OncuttedBnd = on_cuttedBnd( ls, ls_sign, lat, *lattice_tet, loc_ls, loc_ls_sign, face);
 		if(OncuttedBnd)
 		{

@@ -219,12 +219,12 @@ class BndTriangPartitionCL
     typedef std::pair<Uint, Uint> RenumberVertexPairT; ///< Helper type to handle zero-vertexes
 
 
-    TriangleContT     triangles_;             ///< All triangles of the cutted boundary triangle.
-    Uint       pos_triangles_begin_;             ///< begin of the subsequence of triangles tetras
+    TriangleContT     triangles_;             ///< All triangles of one cutted boundary face.
+    Uint       pos_triangles_begin_;          ///< begin of the subsequence of positive triangles
 
     VertexContT vertexes_;
-    Uint        pos_vertex_begin_;           ///< begin of the subsequence of vertexes of positive tetras
-    Uint        neg_vertex_end_;             ///< end of the subsequence of of vertexes of negative tetras
+    Uint        pos_vertex_begin_;           /// not used for now < begin of the subsequence of vertexes of positive triangle
+    Uint        neg_vertex_end_;             /// not used for now < end of the subsequence of of vertexes of negative triangle
 	
     template <class VertexCutMergingPolicyT>
       const TriangleT ///< Create a single sub-triangle and its vertexes
@@ -236,7 +236,7 @@ class BndTriangPartitionCL
   public:
     /// Empty default-interface
 
-    ///\brief Computes the piecewise triangular interface for the principal lattice with num_intervals on each edge of the reference-tetra given the level set values in ls.
+    ///\brief partition a cutted face on special boundary 
     template <class VertexCutMergingPolicyT>
     void make_partition2D (const PrincipalLatticeCL& lat, Uint face, const std::valarray<double>& ls);
 
