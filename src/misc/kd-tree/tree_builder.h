@@ -401,7 +401,7 @@ namespace KDTree{
                 if ( !success){             // merge the points in the interval [first,last)
                     determineBB( first, last, node->bounding_box());
                     node->sdim()= node->bounding_box().suggestSplitDim();
-                    if ( node->sdim()!=K){  // warn if something strange has happened
+                    if ( node->sdim()==K){  // warn if something strange has happened
                         std::cerr << "Cannot split the interval " << node->bounding_box() << " with points \n";
                         for ( size_t i=first; i<last; ++i){
                             std::cerr << "- (";

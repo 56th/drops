@@ -200,6 +200,7 @@ bool
 PCGNE(const Mat& A, Vec& u, const Vec& b, const ExACL& ExAX,  const ExATranspCL& ExATranspX, PreCon& M,
     int& max_iter, double& tol, bool measure_relative_tol=false, std::ostream* output=0)
 {
+    M.SetDiag(A, ExATranspX, ExAX);
     Vec Atranspu( transp_mul( A, u));
     ExAX.Accumulate( Atranspu);
     Vec r( b - A*Atranspu);

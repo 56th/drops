@@ -794,19 +794,19 @@ Point3DCL GetBaryCenter(const TetraCL& t, Uint face);
 #endif
 
 Point3DCL
-#if GCC_VERSION > 40305
+#if GCC_VERSION > 40305 && !__INTEL_COMPILER
 __attribute__((__optimize__("no-associative-math")))
 #endif
     ComputeBaryCenter(const Point3DCL& v0, const Point3DCL& v1);
 
 Point3DCL
-#if GCC_VERSION > 40305
+#if GCC_VERSION > 40305 && !__INTEL_COMPILER
 __attribute__((__optimize__("no-associative-math")))
 #endif
     ComputeBaryCenter(const Point3DCL& v0, const Point3DCL& v1, const Point3DCL& v2);
 
 Point3DCL
-#if GCC_VERSION > 40305
+#if GCC_VERSION > 40305 && !__INTEL_COMPILER
 __attribute__((__optimize__("no-associative-math")))
 #endif
     ComputeBaryCenter(const Point3DCL& v0, const Point3DCL& v1, const Point3DCL& v2, const Point3DCL& v3);

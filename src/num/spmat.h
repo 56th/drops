@@ -234,7 +234,7 @@ inline VectorBaseCL<T>& add_to_global_vector (VectorBaseCL<T>& v, const Point3DC
 
 template <typename T, typename Iterator>
 inline T
-#if GCC_VERSION > 40305
+#if GCC_VERSION > 40305 && !__INTEL_COMPILER
     __attribute__((optimize("no-associative-math")))
 #endif
 KahanSumm( Iterator first, const Iterator& end, const T init=(T)0)
@@ -252,7 +252,7 @@ KahanSumm( Iterator first, const Iterator& end, const T init=(T)0)
 /// \brief Use Kahan's algorithm to perform an inner product
 template <typename T, typename Iterator>
 inline T
-#if GCC_VERSION > 40305
+#if GCC_VERSION > 40305 && !__INTEL_COMPILER
     __attribute__((optimize("no-associative-math")))
 #endif
 KahanInnerProd( Iterator first1, const Iterator& end1, Iterator first2, const T init=(T)0)
@@ -268,7 +268,7 @@ KahanInnerProd( Iterator first1, const Iterator& end1, Iterator first2, const T 
 }
 template <class ValueT, template<class> class VecT>
 inline ValueT
-#if GCC_VERSION > 40305
+#if GCC_VERSION > 40305 && !__INTEL_COMPILER
     __attribute__((optimize("no-associative-math")))
 #endif
 KahanInnerProd( const VecT<ValueT>& first, const VecT<ValueT>& second, const ValueT init=(ValueT)0)
@@ -287,7 +287,7 @@ KahanInnerProd( const VecT<ValueT>& first, const VecT<ValueT>& second, const Val
 /// \brief Use Kahan's algorithm to perform an inner product on given indices
 template <typename T, typename Cont, typename Iterator>
 inline T
-#if GCC_VERSION > 40305
+#if GCC_VERSION > 40305 && !__INTEL_COMPILER
     __attribute__((optimize("no-associative-math")))
 #endif
 KahanInnerProd( const Cont& a, const Cont&b, const Iterator& firstIdx, const Iterator& endIdx, const T init=(T)0, const size_t offset=0)
@@ -1378,29 +1378,6 @@ transpose (const SparseMatBaseCL<T>& M, SparseMatBaseCL<T>& Mt)
         for (size_t nz= M.row_beg( i); nz < M.row_beg( i + 1); ++nz)
             Tr( M.col_ind( nz), i)= M.val( nz);
     Tr.Build();
-}
-
-
-/// \brief Compute the diagonal of B*B^T.
-///
-/// The commented out version computes B*M^(-1)*B^T
-template <typename T>
-VectorBaseCL<T>
-BBTDiag (const SparseMatBaseCL<T>& B /*, const VectorBaseCL<T>& Mdiaginv*/)
-{
-#ifdef _PAR
-    throw DROPSErrCL("BBTDiag will not work as expected");
-#endif
-    VectorBaseCL<T> ret( B.num_rows());
-
-    T Bik;
-    for (size_t i= 0; i < B.num_rows(); ++i) {
-        for (size_t l= B.row_beg( i); l < B.row_beg( i + 1); ++l) {
-            Bik= B.val( l);
-            ret[i]+= /*Mdiaginv[B.col_ind( l)]**/ Bik*Bik;
-        }
-    }
-    return ret;
 }
 
 

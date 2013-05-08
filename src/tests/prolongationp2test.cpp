@@ -138,6 +138,7 @@ int main ()
 {
   try {
     int ret= TestProlongation();
+    std::cerr << "return value: " << ret << std::endl;
     return ret;
   }
   catch (DROPS::DROPSErrCL err) { err.handle(); }

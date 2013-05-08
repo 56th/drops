@@ -189,6 +189,20 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         lset.SetSurfaceForce( SF_ImprovedLB);
 
     SetInitialLevelsetConditions( lset, MG, P);
+
+    double Vol = 0;
+
+    if (P.get("Exp.InitialLSet", std::string("Ellipsoid")) == "Ellipsoid" && P.get<int>("Levelset.VolCorrection") != 0){
+        Vol = EllipsoidCL::GetVolume();
+        std::cout << "initial volume: " << lset.GetVolume()/Vol << std::endl;
+        double dphi= lset.AdjustVolume( Vol, 1e-9);
+        std::cout << "initial volume correction is " << dphi << std::endl;
+        lset.Phi.Data+= dphi;
+        std::cout << "new initial volume: " << lset.GetVolume()/Vol << std::endl;
+    }else{
+        Vol = lset.GetVolume();
+    }
+
     Stokes.CreateNumberingVel( MG.GetLastLevel(), vidx, periodic_match);
     Stokes.CreateNumberingPr(  MG.GetLastLevel(), pidx, periodic_match, &lset);
     PermutationT vel_downwind;
@@ -206,7 +220,6 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     Stokes.v.SetIdx  ( vidx);
     Stokes.p.SetIdx  ( pidx);
     Stokes.InitVel( &Stokes.v, ZeroVel);
-    SetInitialConditions( Stokes, lset, MG, P);
 
     IteratedDownwindCL navstokes_downwind( P.get_child( "NavStokes.Downwind"));
     if (P.get<int>( "NavStokes.Downwind.Frequency") > 0) {
@@ -220,22 +233,6 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
     DisplayDetailedGeom( MG);
     DisplayUnks(Stokes, lset, MG);
-
-    double Vol = 0;
-
-    if (P.get("Exp.InitialLSet", std::string("Ellipsoid")) == "Ellipsoid"){
-        Vol = EllipsoidCL::GetVolume();
-        std::cout << "initial volume: " << lset.GetVolume()/Vol << std::endl;
-		if( P.get<int>("Levelset.VolCorrection"))
-		{
-			double dphi= lset.AdjustVolume( Vol, 1e-9);
-			std::cout << "initial volume correction is " << dphi << std::endl;
-			lset.Phi.Data+= dphi;
-			std::cout << "new initial volume: " << lset.GetVolume()/Vol << std::endl;
-		}
-    }else{
-        Vol = lset.GetVolume();
-    }
 
     TransportP1CL * massTransp = NULL;
     TransportRepairCL *  transprepair = NULL;
@@ -287,10 +284,14 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     // Stokes-Solver
     StokesSolverFactoryCL<InstatNavierStokes2PhaseP2P1CL> stokessolverfactory(Stokes, P);
     StokesSolverBaseCL* stokessolver = stokessolverfactory.CreateStokesSolver();
-//     StokesSolverAsPreCL pc (*stokessolver1, 1);
-//     GCRSolverCL<StokesSolverAsPreCL> gcr(pc, C.stk_OuterIter, C.stk_OuterIter, C.stk_OuterTol, /*rel*/ false);
-//     BlockMatrixSolverCL<GCRSolverCL<StokesSolverAsPreCL> >* stokessolver =
-//             new BlockMatrixSolverCL<GCRSolverCL<StokesSolverAsPreCL> > (gcr);
+//  comment: construction of a oseen solver, preconditioned by another oseen solver,
+//           e.g. GCR preconditioned by Vanka-MG, do not forget to delete stokessolver1 at the end of strategy
+//
+//    StokesSolverBaseCL* stokessolver1 = stokessolverfactory.CreateStokesSolver();
+//    StokesSolverAsPreCL pc (*stokessolver1, 1);
+//    GCRSolverCL<StokesSolverAsPreCL> gcr(pc, C.stk_OuterIter, C.stk_OuterIter, C.stk_OuterTol, /*rel*/ false);
+//    BlockMatrixSolverCL<GCRSolverCL<StokesSolverAsPreCL> >* stokessolver =
+//            new BlockMatrixSolverCL<GCRSolverCL<StokesSolverAsPreCL> > (gcr);
 
     // Navier-Stokes-Solver
     NSSolverBaseCL<InstatNavierStokes2PhaseP2P1CL>* navstokessolver = 0;
@@ -301,8 +302,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
     // Level-Set-Solver
 #ifndef _PAR
-    // SSORPcCL lset_pc;
-    typedef GSPcCL LsetPcT;
+    typedef GSPcCL  LsetPcT;
 #else
     typedef JACPcCL LsetPcT;
 #endif
@@ -323,6 +323,8 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 //     MakeP1P1XProlongation ( Stokes.vel_idx.NumUnknowns(), Stokes.pr_idx.NumUnknowns(),
 //         Stokes.pr_idx.GetFinest().GetXidx().GetNumUnknownsStdFE(),
 //         stokessolverfactory.GetPVel()->GetFinest(), stokessolverfactory.GetPPr()->GetFinest());
+
+    SetInitialConditions( Stokes, lset, MG, P);
 
     // Time discretisation + coupling
     TimeDisc2PhaseCL* timedisc= CreateTimeDisc(Stokes, lset, navstokessolver, gm, P, lsetmod);

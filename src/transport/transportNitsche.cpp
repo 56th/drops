@@ -529,7 +529,7 @@ void TransportP1XCL::SetupNitscheSystem( MatrixCL& matA, IdxDescCL& RowIdx/*, bo
     LocalNumbP1CL ln;
     SMatrixCL<3,3> T;
     double det,VolP, VolN, kappa[2], h;
-    int sign[4]={0.};
+    int sign[4]={0};
     const MultiGridCL& mg= this->GetMG();
     BndDataCL<> Bndlset(mg.GetBnd().GetNumBndSeg());
 

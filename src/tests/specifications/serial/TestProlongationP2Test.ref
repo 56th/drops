@@ -1,0 +1,20 @@
+#---------------------SPECIFICATION FILE----------------------------------------
+Type of test: serial
+Name of executable: prolongationp2test
+#The path to the folder where the executable is located must be relative to the
+#/drops folder
+Folder of executable: tests
+#The path to the folder where the parameter-file is located must be relative to
+#the folder where the executable is situated
+Path of parameter-file: 
+Name of test: TestProlongationP2Test
+Name of author: Christoph Lehrenfeld
+#-------------------------------------------------------------------------------
+#------------------------------NUMBERS------------------------------------------
+String value: "return value: 0"
+String find: 1
+String value: "Inconsistency"
+String find: 0
+#-------------------------------------------------------------------------------
+#------------------------------STRINGS-------------------------------------------
+#------------------------------------------------------------------------------- 
