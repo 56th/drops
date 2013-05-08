@@ -85,7 +85,7 @@ int main()
         std::cout << i+1 << ". Totalverfeinerung ------------------"<<std::endl;
         mg.Refine();
         std::cout << DROPS::SanityMGOutCL(mg) << std::endl;
-        mg.SizeInfo(std::cout);
+        std::cout<<i+1<<".Totalverf.: "; mg.SizeInfo(std::cout);
     }
 //    std::cout << DROPS::SanityMGOutCL(mg);
     for (DROPS::Uint i=0; i<4; ++i)
@@ -97,7 +97,7 @@ int main()
 //        std::cout << DROPS::DumpMGCL(mg);
         std::cout << i+1 << ". Tropfenverfeinerung ------------------"<<std::endl;
         mg.Refine();
-        mg.SizeInfo(std::cout);
+        std::cout<<i+1<<".Tropfenverf.: "; mg.SizeInfo(std::cout);
         std::cout << DROPS::SanityMGOutCL(mg) << std::endl;
 //        DebugIt(&mg);
         char str[20];
@@ -121,9 +121,9 @@ int main()
 //    std::cout << DROPS::SanityMGOutCL(mg) << std::endl;
 //    mg.SizeInfo(std::cout);
 
-    int wait;
-    std::cout << "Press a key: " << std::flush;
-    std::cin>>wait;
+//    int wait;
+//    std::cout << "Press a key: " << std::flush;
+//    std::cin>>wait;
 
     for (DROPS::Uint i=0; i<6; ++i)
     {
@@ -132,7 +132,7 @@ int main()
 //        DROPS::UnMarkAll(mg);
         mg.Refine();
         std::cout << DROPS::SanityMGOutCL(mg)  << std::endl;
-        mg.SizeInfo(std::cout);
+        std::cout<<i+1<<".Tropfenentf.: "; mg.SizeInfo(std::cout);
     }
 //    DROPS::UnMarkAll(mg);
 //    for (DROPS::MultiGridCL::TetraIterator it= mg.GetAllTetraBegin(); it!=mg.GetAllTetraEnd(); ++it)
@@ -145,7 +145,7 @@ int main()
         std::cout << i+1 << ". Totalentfeinerung ------------------"<<std::endl;
         mg.Refine();
         std::cout << DROPS::SanityMGOutCL(mg) << std::endl;
-        mg.SizeInfo(std::cout);
+        std::cout<<i+1<<".Totalentf.: "; mg.SizeInfo(std::cout);
     }
 
     {std::ofstream os("ttt2.off");

@@ -241,7 +241,8 @@ int TestRefineUniform()
 int TestRefine()
 {
 //    std::cout << "---------------------------------------------------\n";
-    DROPS::ReadMeshBuilderCL builder( std::cin);
+    std::istringstream is( meshfile);
+    DROPS::ReadMeshBuilderCL builder( is);
     DROPS::MultiGridCL mg( builder);
     for (DROPS::MultiGridCL::TriangTetraIteratorCL It( mg.GetTriangTetraBegin()),
              ItEnd( mg.GetTriangTetraEnd()); It!=ItEnd; ++It)

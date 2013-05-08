@@ -325,6 +325,9 @@ Test_rcm()
 
     PermutationT p;
     reverse_cuthill_mckee( M, p);
+    std::cout << "RCM-permutation: ";
+    seq_out( p.begin(), p.end(), std::cout, " ");
+    std::cout << '\n';
     M.permute_rows( p);
     M.permute_columns( p);
     std::cout << "M permuted:\n" << M << '\n';
@@ -351,7 +354,9 @@ TestTarjanDownwind ()
 
     TarjanDownwindCL re_num;
     const PermutationT& p= re_num.number_connected_components( M);
-    seq_out( p.begin(), p.end(), std::cout);
+    std::cout << "Tarjan-permutation: ";
+    seq_out( p.begin(), p.end(), std::cout, " ");
+    std::cout << '\n';
     re_num.stats( std::cout);
     M.permute_rows( p);
     M.permute_columns( p);
@@ -378,7 +383,7 @@ try {
 //     std::ofstream of( "normalperm.dat");
 //     of << M;
 
-//    Test_rcm();
+    Test_rcm();
     TestTarjanDownwind();
 
 }
