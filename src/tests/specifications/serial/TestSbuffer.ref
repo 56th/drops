@@ -1,0 +1,39 @@
+#---------------------SPECIFICATION FILE----------------------------------------
+Type of test: serial
+Name of executable: sbuffer
+#The path to the folder where the executable is located must be relative to the
+#/drops folder
+Folder of executable: tests
+Name of author: Jens Berger
+#-------------------------------------------------------------------------------
+#------------------------------NUMBERS------------------------------------------
+#Name of variable: 
+#Prefix of variable: 
+#Value of variable: 
+#Relative error: 
+#Absolute error: 
+#Minimal value:
+#Maximal value:
+#-------------------------------------------------------------------------------
+#------------------------------STRINGS------------------------------------------
+# String find = 1: you want to find this string,
+# = 0: you don't want to find this string
+String value: "TestPushBack Row1: 0 0 0"
+String find: 1
+String value: "TestPushBack Row2: 0 1 2"
+String find: 1
+String value: "TestPushBack Row3: 1 2 3"
+String find: 1
+String value: "TestPushBack Row4: 3 2 1"
+String find: 1
+String value: "TestPushBack Row5: 1 2 3"
+String find: 1
+String value: "TestRotate Row1: 0 0 0"
+String find: 1
+String value: "TestRotate Row2: 0 1 2"
+String find: 1
+String value: "TestRotate Row3: 2 0 1"
+String find: 1
+String value: "TestRotate Row4: 0 1 2"
+String find: 1
+#-------------------------------------------------------------------------------

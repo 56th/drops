@@ -27,9 +27,7 @@
 
 #include "num/spmat.h"
 #include "misc/container.h"
-#ifdef _PAR
-#  include "misc/problem.h"
-#endif
+#include "misc/problem.h"
 
 namespace DROPS{
 
@@ -280,29 +278,23 @@ Mat BuildMatrix( BlockMatrixBaseCL<Mat>& A)
 /** The matrices are applied as block1_*block0_*v */
 //
 //*****************************************************************************
-template <class MatT0, class MatT1>
+template <class MatT0, class MatT1, class ExT>
 class CompositeMatrixBaseCL
 {
   public:
     typedef BlockMatrixOperationT OperationT;
 
   private:
-#ifdef _PAR
-    const IdxDescCL& idx0_;      // IdxDescCL for accessing ExchangeCL for handling resulting vectors of block[0]*v
-    const IdxDescCL& idx1_;      // IdxDescCL for accessing ExchangeCL for handling resulting vectors of block_[1]*block[0]*v
-#endif
+    const ExT& ex0_;      // ExchangeCL for handling resulting vectors of block[0]*v
+    const ExT& ex1_;      // ExchangeCL for handling resulting vectors of block_[1]*block[0]*v
+
     const MatT0* block0_;
     const MatT1* block1_;
     OperationT operation_[2];
 
   public:
-#ifndef _PAR
-    CompositeMatrixBaseCL( const MatT0* A, OperationT Aop, const MatT1* B, OperationT Bop)
-#else
-    CompositeMatrixBaseCL( const MatT0* A, OperationT Aop, const MatT1* B, OperationT Bop,
-                           const IdxDescCL& idx0, const IdxDescCL& idx1)
-      : idx0_(idx0), idx1_(idx1)
-#endif
+    CompositeMatrixBaseCL( const MatT0* A, OperationT Aop, const ExT& ex0, const MatT1* B, OperationT Bop, const ExT& ex1)
+      : ex0_(ex0), ex1_(ex1)
     {
         block0_= A; operation_[0]= Aop;
         block1_= B; operation_[1]= Bop;
@@ -314,14 +306,12 @@ class CompositeMatrixBaseCL
     size_t num_cols() const;
     /// \brief Get number of rows of the second matrix
     size_t intermediate_dim() const;
-#ifdef _PAR
     /// \name Get a reference on the ExchangeCLs
     //@{
-    const ExchangeCL& GetEx0() const { return idx0_.GetEx(); }
-    const ExchangeCL& GetEx1() const { return idx1_.GetEx(); }
+    const ExT& GetEx0() const { return ex0_; }
+    const ExT& GetEx1() const { return ex1_; }
     VectorCL GetDiag() const { throw DROPSErrCL("CompositeMatrixBaseCL:GetDiag(): Not implemented"); return VectorCL(); };
     //@}
-#endif
 
     /// \name Getters and Setters
     //@{
@@ -334,13 +324,13 @@ class CompositeMatrixBaseCL
     OperationT GetTransposeOperation( size_t b) const {
         return operation_[b] == MUL ? TRANSP_MUL : MUL;
     }
-    CompositeMatrixBaseCL<MatT1, MatT0> GetTranspose() const;
+    CompositeMatrixBaseCL<MatT1, MatT0, ExT> GetTranspose() const;
     size_t Version() const { return block0_->Version(); }
     //@}
 };
 
-template <class MatT0, class MatT1>
-  size_t CompositeMatrixBaseCL<MatT0, MatT1>::num_rows() const
+template <class MatT0, class MatT1, class ExT>
+  size_t CompositeMatrixBaseCL<MatT0, MatT1, ExT>::num_rows() const
 {
     switch (operation_[1]) {
       case MUL:        return block1_->num_rows();
@@ -351,8 +341,8 @@ template <class MatT0, class MatT1>
     }
 }
 
-template <class MatT0, class MatT1>
-  size_t CompositeMatrixBaseCL<MatT0, MatT1>::num_cols() const
+template <class MatT0, class MatT1, class ExT>
+  size_t CompositeMatrixBaseCL<MatT0, MatT1, ExT>::num_cols() const
 {
     switch (operation_[0]) {
       case MUL:        return block0_->num_cols();
@@ -363,8 +353,8 @@ template <class MatT0, class MatT1>
     }
 }
 
-template <class MatT0, class MatT1>
-  size_t CompositeMatrixBaseCL<MatT0, MatT1>::intermediate_dim() const
+template <class MatT0, class MatT1, class ExT>
+  size_t CompositeMatrixBaseCL<MatT0, MatT1, ExT>::intermediate_dim() const
 {
     switch (operation_[0]) {
       case MUL:        return block0_->num_rows();
@@ -376,22 +366,15 @@ template <class MatT0, class MatT1>
 }
 
 
-template <class MatT0, class MatT1>
-  CompositeMatrixBaseCL<MatT1, MatT0> CompositeMatrixBaseCL<MatT0, MatT1>::GetTranspose() const
+template <class MatT0, class MatT1, class ExT>
+  CompositeMatrixBaseCL<MatT1, MatT0, ExT> CompositeMatrixBaseCL<MatT0, MatT1, ExT>::GetTranspose() const
 {
-#ifndef _PAR
-    return CompositeMatrixBaseCL<MatT1,MatT0>( block1_, GetTransposeOperation( 1),
-                                               block0_, GetTransposeOperation( 0));
-#else
-    return CompositeMatrixBaseCL<MatT1,MatT0>( block1_, GetTransposeOperation( 1),
-                                               block0_, GetTransposeOperation( 0),
-                                               idx1_, idx0_
-                                             );
-#endif
+    return CompositeMatrixBaseCL<MatT1,MatT0, ExT>( block1_, GetTransposeOperation( 1), ex1_,
+                                               block0_, GetTransposeOperation( 0), ex0_);
 }
 
-template <typename _MatT0, typename _MatT1, typename _VecEntry>
-  VectorBaseCL<_VecEntry> operator*(const CompositeMatrixBaseCL<_MatT0, _MatT1>& A,
+template <typename _MatT0, typename _MatT1, class ExT, typename _VecEntry>
+  VectorBaseCL<_VecEntry> operator*(const CompositeMatrixBaseCL<_MatT0, _MatT1, ExT>& A,
                                     const VectorBaseCL<_VecEntry>& x)
 {
     VectorBaseCL<_VecEntry> tmp( A.intermediate_dim());
@@ -401,9 +384,7 @@ template <typename _MatT0, typename _MatT1, typename _VecEntry>
       case TRANSP_MUL:
         tmp= transp_mul( *A.GetBlock0(), x); break;
     }
-#ifdef _PAR
     A.GetEx0().Accumulate(tmp);
-#endif
     VectorBaseCL<_VecEntry> ret( A.num_cols());
     switch( A.GetOperation( 1)) {
       case MUL:
@@ -414,9 +395,9 @@ template <typename _MatT0, typename _MatT1, typename _VecEntry>
     return ret;
 }
 
-template <typename _MatT0, typename _MatT1, typename _VecEntry>
+template <typename _MatT0, typename _MatT1, class ExT, typename _VecEntry>
 VectorBaseCL<_VecEntry>
-transp_mul(const CompositeMatrixBaseCL<_MatT0, _MatT1>& A,
+transp_mul(const CompositeMatrixBaseCL<_MatT0, _MatT1, ExT>& A,
     const VectorBaseCL<_VecEntry>& x)
 {
     return A.GetTranspose()*x;
@@ -428,7 +409,11 @@ transp_mul(const CompositeMatrixBaseCL<_MatT0, _MatT1>& A,
 
 typedef BlockMatrixBaseCL<MatrixCL>               BlockMatrixCL;
 typedef BlockMatrixBaseCL<MLMatrixCL>             MLBlockMatrixCL;
-typedef CompositeMatrixBaseCL<MatrixCL, MatrixCL> CompositeMatrixCL;
+#ifndef _PAR
+typedef CompositeMatrixBaseCL<MatrixCL, MatrixCL, DummyExchangeCL> CompositeMatrixCL;
+#else
+typedef CompositeMatrixBaseCL<MatrixCL, MatrixCL, ExchangeCL> CompositeMatrixCL;
+#endif
 
 } // end of namespace DROPS
 

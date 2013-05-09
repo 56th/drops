@@ -483,12 +483,12 @@ PermutationT
 compose_permutations (const PermutationT& p, const PermutationT& q);
 
 
-/// \brief Output [begin, end) to out, separated by newline.
+/// \brief Output [begin, end) to out, separated by sep.
 template <class Iterator>
 void
-inline seq_out (Iterator begin, Iterator end, std::ostream& out)
+inline seq_out (Iterator begin, Iterator end, std::ostream& out, std::string sep= "\n")
 {
-    for (; begin != end; ++begin) out << *begin << '\n';
+    for (; begin != end; ++begin) out << *begin << sep;
 }
 
 /// \brief Output obj via operator<<  to a file filename.

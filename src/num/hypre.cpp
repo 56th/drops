@@ -1,5 +1,5 @@
 /// \file hypre.cpp
-/// \brief Interface to HYPRE (high performance preconditioners), Lawrence Livermore Nat. Lab. 
+/// \brief Interface to HYPRE (high performance preconditioners), Lawrence Livermore Nat. Lab.
 /// \author LNM RWTH Aachen: Sven Gross; SC RWTH Aachen: Oliver Fortmeier
 
 /*
@@ -51,7 +51,7 @@ void HypreIndexCL::Generate()
     exclusive_idx_.resize( numUnk, -1);
     local_idx_.resize(  numUnk, -1);
     exclusive_global_idx_.resize( num_exclusive_);
-    
+
     // assign each exclusive index a consecutive number
     int gidx=0;
     for ( size_t i=0; i<numUnk; ++i){
@@ -60,7 +60,7 @@ void HypreIndexCL::Generate()
             if (gidx<0) throw DROPSErrCL("HypreIndexCL::Generate: int is to small");
         }
     }
-    if (gidx!=(int)num_exclusive_){ 
+    if (gidx!=(int)num_exclusive_){
         throw DROPSErrCL("HypreIndexCL::Generate: Number of exclusive dof does not match");
     }
 
@@ -204,10 +204,10 @@ void HypreMatrixCL::Generate()
     }
 
     // receive elements
-    std::vector<NonZeroST> recvBuf;
+    std::valarray<NonZeroST> recvBuf;
     for ( ExchangeCL::ProcNumCT::const_iterator neigh= rowidx_.GetEx().GetNeighbors().begin(); neigh!=rowidx_.GetEx().GetNeighbors().end(); ++neigh){
         recvBuf.resize( ProcCL::GetMessageLength( *neigh, tag_, sendMPItype_));
-        ProcCL::Recv( Addr(recvBuf), recvBuf.size(), sendMPItype_, *neigh, tag_);
+        ProcCL::Recv( recvBuf, sendMPItype_, *neigh, tag_);
         for ( size_t i=0; i<recvBuf.size(); ++i){
             if ( !recvBuf[i].IsDummy()){
                 const int localRow= rowidx_.GetExclusiveNum( recvBuf[i].row);
@@ -321,7 +321,7 @@ HypreAMGSolverCL::~HypreAMGSolverCL()
     HYPRE_BoomerAMGDestroy( solver_);
 }
 
-void HypreAMGSolverCL::SetupAndSolve( const MatrixCL& A, VectorCL& x, const VectorCL& b, const IdxDescCL& idx) const 
+void HypreAMGSolverCL::SetupAndSolve( const MatrixCL& A, VectorCL& x, const VectorCL& b, const IdxDescCL& idx) const
 {
     HypreMatrixCL hA(A, idx, idx);
     HypreVectorCL hx(x, hA.GetRowIdx());
@@ -332,22 +332,22 @@ void HypreAMGSolverCL::SetupAndSolve( const MatrixCL& A, VectorCL& x, const Vect
     hx.Retrieve(); // copy solution to x
 }
 
-void HypreAMGSolverCL::Setup( const HypreMatrixCL& A, const HypreVectorCL& x, const HypreVectorCL& b) const 
-{ 
+void HypreAMGSolverCL::Setup( const HypreMatrixCL& A, const HypreVectorCL& x, const HypreVectorCL& b) const
+{
     // set some solver parameters...
-    HYPRE_BoomerAMGSetup( solver_, A(), b(), x()); 
+    HYPRE_BoomerAMGSetup( solver_, A(), b(), x());
 }
 
-void HypreAMGSolverCL::Solve( const HypreMatrixCL& A, HypreVectorCL& x, const HypreVectorCL& b) const 
-{ 
+void HypreAMGSolverCL::Solve( const HypreMatrixCL& A, HypreVectorCL& x, const HypreVectorCL& b) const
+{
     // set stopping criterion
-    HYPRE_BoomerAMGSetTol( solver_, _tol); 
+    HYPRE_BoomerAMGSetTol( solver_, _tol);
     HYPRE_BoomerAMGSetMaxIter( solver_, _maxiter);
-    // solve 
+    // solve
     HYPRE_BoomerAMGSolve( solver_, A(), b(), x());
     // get iteration info
-    HYPRE_BoomerAMGGetNumIterations( solver_, &_iter); 
-    HYPRE_BoomerAMGGetFinalRelativeResidualNorm( solver_, &_res); 
+    HYPRE_BoomerAMGGetNumIterations( solver_, &_iter);
+    HYPRE_BoomerAMGGetFinalRelativeResidualNorm( solver_, &_res);
 }
 
 }    // end of namespace DROPS

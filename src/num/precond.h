@@ -32,6 +32,47 @@
 
 namespace DROPS{
 
+#ifdef _PAR    
+/// \brief Compute the diagonal of B*B^T.
+template <typename T>
+VectorBaseCL<T>
+BBTDiag (const SparseMatBaseCL<T>& B, const ExchangeCL& RowEx, const ExchangeCL& ColEx)
+{
+    // Accumulate matrix
+    ExchangeMatrixCL exMat;
+    exMat.BuildCommPattern(B, RowEx, ColEx);
+    MatrixCL Bacc(exMat.Accumulate(B));
+    // Determine diagonal of BB^T
+    VectorBaseCL<T> ret( Bacc.num_rows());
+    for (size_t i = 0; i < Bacc.num_rows(); ++i)
+        for (size_t nz = Bacc.row_beg(i); nz < Bacc.row_beg(i + 1); ++nz)
+            ret[i] += Bacc.val(nz) * B.val(nz);
+    RowEx.Accumulate(ret);
+    
+    return ret;
+}
+#endif
+
+/// \brief Compute the diagonal of B*B^T.
+///
+/// The commented out version computes B*M^(-1)*B^T
+template <typename T>
+VectorBaseCL<T>
+BBTDiag (const SparseMatBaseCL<T>& B /*, const VectorBaseCL<T>& Mdiaginv*/, const DummyExchangeCL&, const DummyExchangeCL&)
+{
+    VectorBaseCL<T> ret( B.num_rows());
+
+    T Bik;
+    for (size_t i= 0; i < B.num_rows(); ++i) {
+        for (size_t l= B.row_beg( i); l < B.row_beg( i + 1); ++l) {
+            Bik= B.val( l);
+            ret[i]+= /*Mdiaginv[B.col_ind( l)]**/ Bik*Bik;
+        }
+    }
+   
+    return ret;
+}
+    
 //*****************************************************************************
 //
 //  Gauss-Seidel type methods for preconditioning
@@ -87,10 +128,13 @@ SolveGSstep(const PreDummyCL<PB_JAC>&, const MatrixCL& A, Vec& x, const Vec& b, 
 {
     const size_t n= A.num_rows();
     Vec          y(x.size());
+    size_t nz;
 
-    for (size_t i=0, nz=0; i<n; ++i)
+#pragma omp parallel for private (nz)
+    for (size_t i=0; i<n; ++i)
     {
         double aii=0, sum= b[i];
+        nz = A.row_beg( i);
         for (const size_t end= A.row_beg(i+1); nz<end; ++nz)
             if (A.col_ind(nz) != i)
                 sum-= A.val(nz)*x[A.col_ind(nz)];
@@ -113,6 +157,7 @@ SolveGSstep(const PreDummyCL<PB_JAC0>&, const MatrixCL& A, Vec& x, const Vec& b,
     const size_t n= A.num_rows();
     size_t nz;
 
+#pragma omp parallel for private (nz)
     for (size_t i= 0; i < n; ++i) {
         nz= A.row_beg( i);
         for (const size_t end= A.row_beg( i+1); A.col_ind( nz) != i && nz < end; ++nz) ; // empty loop
@@ -607,9 +652,6 @@ class NEGSPcCL
     mutable VectorCL D_;         ///< diagonal of AA^T
     mutable VectorCL y_;         ///< temp-variable: A^T*x.
 
-    template <typename Mat>
-    void Update (const Mat& A, const DummyExchangeCL& rowex, const DummyExchangeCL& colex) const;
-
     ///\brief Forward Gauss-Seidel-step with start-vector 0 for A*A^T
     template <typename Mat, typename Vec>
     void ForwardGS(const Mat& A, Vec& x, const Vec& b, const DummyExchangeCL& ex) const;
@@ -617,9 +659,10 @@ class NEGSPcCL
     template <typename Mat, typename Vec>
     void BackwardGS(const Mat& A, Vec& x, const Vec& b, const DummyExchangeCL& ex) const;
 
+    template <typename Mat, typename ExT>
+    void Update (const Mat& A, const ExT& rowex, const ExT& colex) const;
+
 #ifdef _PAR
-    template <typename Mat>
-    void Update (const Mat& A, const ExchangeCL& rowex, const ExchangeCL& colex) const;
     template <typename Mat, typename Vec>
     void ForwardGS(const Mat& A, Vec& x, const Vec& b, const ExchangeCL& ex) const;
     template <typename Mat, typename Vec>
@@ -666,30 +709,12 @@ class NEGSPcCL
     void SetDiag(const VectorCL&) {}            // just for consistency
     template<typename Mat, typename ExT>
     void SetDiag(const Mat&, const ExT&) {}     // just for consistency
+    template<typename Mat, typename ExT>
+    void SetDiag(const Mat&, const ExT&, const ExT&) {}     // just for consistency
+
 };
 
 #ifdef _PAR
-template <typename Mat>
-void NEGSPcCL::Update (const Mat& A, const ExchangeCL& rowex, const ExchangeCL& colex) const
-{
-    if (&A == Aaddr_ && Aversion_ == A.Version()) return;
-    Aaddr_= &A;
-    Aversion_= A.Version();
-
-    D_.resize( A.num_rows());
-    // Accumulate matrix
-    ExchangeMatrixCL exMat_;
-    exMat_.BuildCommPattern(A, rowex, colex);
-    MatrixCL Aacc(exMat_.Accumulate(A));
-    // Determine diagonal of AA^T
-    D_.resize(Aacc.num_rows());
-    for (size_t i = 0; i < Aacc.num_rows(); ++i)
-        for (size_t nz = Aacc.row_beg(i); nz < Aacc.row_beg(i + 1); ++nz)
-            D_[i] += Aacc.val(nz) * A.val(nz);
-    rowex.Accumulate(D_);
-    y_.resize( A.num_cols());
-}
-
 template <typename Mat, typename Vec>
 void NEGSPcCL::ForwardGS(const Mat& A, Vec& x, const Vec& b, const ExchangeCL& RowEx) const
 {
@@ -725,15 +750,15 @@ void NEGSPcCL::BackwardGS(const Mat& A, Vec& x, const Vec& b, const ExchangeCL& 
 }
 #endif
 
-template <typename Mat>
-void NEGSPcCL::Update (const Mat& A, const DummyExchangeCL&, const DummyExchangeCL&) const
+template <typename Mat, typename ExT>
+void NEGSPcCL::Update (const Mat& A, const ExT& rowex, const ExT& colex) const
 {
     if (&A == Aaddr_ && Aversion_ == A.Version()) return;
     Aaddr_= &A;
     Aversion_= A.Version();
 
     D_.resize( A.num_rows());
-    D_= BBTDiag( A);
+    D_= BBTDiag( A, rowex, colex);
     y_.resize( A.num_cols());
 }
 
@@ -1191,39 +1216,15 @@ class ParJacNEG0CL : public JACPcCL
         throw DROPSErrCL("ParJacNEG0CL::SetDiag: Not defined for that matrix type.");
     }
     //@}
+      /// \brief Determine diagonal of a matrix A is not implemented for all MatTs
+    template<typename ExT>
+    void SetDiag(const CompositeMatrixBaseCL<MatrixCL, MatrixCL, ExT>& A){
+        if (A.Version() == base_::mat_version_) return;
+        base_::diag_.resize(A.num_rows());
+        base_::diag_ = BBTDiag (A , A.GetEx1(), A.GetEx0());
+    }
+    //@}  
 };
-
-inline void ParJacNEG0CL::MySetDiag(const MatrixCL& A, const ExchangeCL& RowEx, const ExchangeCL& ColEx)
-/// This function determines the diagonal of the matrix A*A^T and stores this diagonal
-/// in the base class. Therefore, the matrix A has to be accumulated. This is done by
-/// the class MatrixExchangeCL.
-///
-/// Conservatively, we assume that the pattern of the matrix has changed, so the MatrixExchangeCL
-/// is created each time, this function is called.
-///
-/// \todo(par) Determine when to create the communication-pattern more precisely
-/// \param A     Compute diagonal of the matrix A*A^T
-/// \param RowEx ExchangeCL according to the RowIdx of matrix A
-/// \param ColEx ExchangeCL according to the ColIdx of matrix A
-{
-    // Accumulate matrix
-    exMat_.BuildCommPattern(A, RowEx, ColEx);
-    MatrixCL Aacc(exMat_.Accumulate(A));
-    // Determine diagonal of AA^T
-    base_::diag_.resize(Aacc.num_rows());
-    for (size_t i = 0; i < Aacc.num_rows(); ++i)
-        for (size_t nz = Aacc.row_beg(i); nz < Aacc.row_beg(i + 1); ++nz)
-            base_::diag_[i] += Aacc.val(nz) * A.val(nz);
-    RowEx.Accumulate(base_::diag_);
-    mat_version_= A.Version();
-}
-
-/// \brief (Specialization) SetDiag for CompositeMatrixBaseCL<MatrixCL, MatrixCL>
-template <>
-inline void ParJacNEG0CL::SetDiag(const CompositeMatrixBaseCL<MatrixCL, MatrixCL>& BBT)
-{
-    MySetDiag(*BBT.GetBlock1(), BBT.GetEx1(), BBT.GetEx0());
-}
 
 #endif
 
@@ -1267,9 +1268,12 @@ void Jacobi(const Mat& A, const Vec& Diag, Vec& x, const Vec& b, const ExT& ex, 
 {
     const size_t n= A.num_rows();
     Vec          y(x.size());
+    size_t nz;
 
-    for (size_t i=0, nz=0; i<n; ++i)
+#pragma omp parallel for private (nz)
+    for (size_t i=0; i<n; ++i)
     {
+        nz = A.row_beg(i);
         double sum= b[i];
         for (const size_t end= A.row_beg(i+1); nz<end; ++nz)
             if (A.col_ind(nz) != i)
@@ -1296,6 +1300,7 @@ void Jacobi0(const Mat&, const Vec& Diag, Vec& x, const Vec& b, const double ome
 
 {
     const size_t n = x.size();
+#pragma omp parallel for
     for (size_t i=0; i<n; ++i)
     {
         if (HasOmega)
@@ -1415,7 +1420,7 @@ class ChebyshevsmoothCL : public PreBaseCL
 // ***************************************************************************
 class ChebyshevPcCL : public PreBaseCL
 {
-    private:
+    protected:
         typedef PreBaseCL base_;
         const double scale_;        // scaling of lambda_max_
         int degree_;                // degree of used Chebyshev polynomial
@@ -1423,7 +1428,7 @@ class ChebyshevPcCL : public PreBaseCL
         double  lambda_max_;        // approximation of largest eigenvalue
 
     public:
-        ChebyshevPcCL (double lambda_scale = 1, int degree = 3, double ratio = 30.0) : base_(), scale_(lambda_scale), degree_(degree), EigRatio_( ratio) {}
+        ChebyshevPcCL (double lambda_scale = 1.1, int degree = 3, double ratio = 30.0) : base_(), scale_(lambda_scale), degree_(degree), EigRatio_( ratio) {}
 
         /// \brief Check if return preconditioned vectors are accumulated after calling Apply
         bool RetAcc() const   { return true; }
@@ -1438,7 +1443,8 @@ class ChebyshevPcCL : public PreBaseCL
                 return;
 
             base_::SetDiag(A, ex);
-            lambda_max_ = scale_ * GerschgorinScaledMatrix(A, diag_, ex);
+            //lambda_max_ = scale_ * GerschgorinScaledMatrix(A, diag_, ex);
+            lambda_max_ = scale_ * MaxEigenvalueScaledMatrix(A, diag_, ex);
             std::cout << "ChebyshevPcCL: lambda_max = " << lambda_max_ << std::endl;
         }
 
@@ -1448,6 +1454,16 @@ class ChebyshevPcCL : public PreBaseCL
         {
             SetDiag<>(A.GetFinest(), ex);
         }
+        
+        template<typename Mat, typename ExT>
+        void SetDiag(const Mat& A, const VectorCL& vec, const ExT& ex)
+        {
+            mat_version_ = A.Version();
+            diag_ = vec;
+            lambda_max_ = scale_ * MaxEigenvalueScaledMatrix(A, diag_, ex);
+            std::cout << "ChebyshevPcCL: lambda_max = " << lambda_max_ << std::endl;
+        }
+
 
         /// \brief Apply preconditioner: one step of the Chebyshev-iteration
         template <typename Mat, typename Vec, typename ExT>
@@ -1469,47 +1485,42 @@ class ChebyshevPcCL : public PreBaseCL
 };
 
 class ChebyshevBBTPcCL : public ChebyshevPcCL {
-  private:
-    CompositeMatrixCL* mat_;
-
   public:
-    ChebyshevBBTPcCL(double lambda_scale = 1, int degree = 3, double ratio = 30.0) : ChebyshevPcCL(lambda_scale, degree, ratio), mat_(0) {}
+    ChebyshevBBTPcCL(double lambda_scale = 1, int degree = 3, double ratio = 30.0) : ChebyshevPcCL(lambda_scale, degree, ratio) {}
 
     /// \brief Set accumulated diagonal of a matrix, that is needed by most of the preconditioners
     template<typename Mat, typename ExT>
-    void SetDiag(const Mat& A, const ExT& ex)
+    void SetDiag(const Mat& A, const ExT& RowEx, const ExT& ColEx)
     {
         if (A.Version() == mat_version_)
             return;
 
-        delete mat_;
-        mat_ = new CompositeMatrixBaseCL<Mat, Mat>(&A, TRANSP_MUL, &A, MUL);
         if (diag_.size() != A.num_rows())
             diag_.resize(A.num_rows());
         // accumulate diagonal of the matrix
-        diag_= BBTDiag(A);
-        ex.Accumulate(diag_);
+        diag_= BBTDiag(A, RowEx, ColEx);
+
         // remember version of the matrix
         mat_version_= A.Version();
+        CompositeMatrixBaseCL<Mat, Mat, ExT> mat (&A, TRANSP_MUL, ColEx, &A, MUL, RowEx);
+        lambda_max_ = scale_ *MaxEigenvalueScaledMatrix(mat, diag_, RowEx);
 
-        lambda_max_ = scale_ *MaxEigenvalueScaledMatrix(*mat_, diag_, ex);
         std::cout << "ChebyshevBBTPcCL: lambda_max = " << lambda_max_ << std::endl;
+
     }
 
     /// \brief Apply preconditioner: one step of the Chebyshev-iteration
     template <typename Mat, typename Vec, typename ExT>
-    void Apply(__UNUSED__ const Mat& A, Vec &x, const Vec& b, const ExT& ex, const ExT&) const
+    void Apply(__UNUSED__ const Mat& A, Vec &x, const Vec& b, const ExT& RowEx, const ExT& ColEx) const
     {
         Assert(mat_version_==A.Version() || !check_mat_version_,
                DROPSErrCL("ChebyshevBBTPcCL::Apply: Diagonal of actual matrix has not been set"),
                DebugNumericC);
 
-        Chebyshev<false, CompositeMatrixCL, Vec, ExT>(*mat_, x, b, ex, diag_, degree_, lambda_max_, EigRatio_);
+        CompositeMatrixBaseCL<Mat, Mat, ExT> mat (&A, TRANSP_MUL, ColEx, &A, MUL, RowEx);
+        Chebyshev<false, CompositeMatrixBaseCL<Mat, Mat, ExT>, Vec, ExT>(mat, x, b, RowEx, diag_, degree_, lambda_max_, EigRatio_);
 
     }
-
-    ~ChebyshevBBTPcCL() { delete mat_;}
-
 };
 
 } // end of namespace DROPS

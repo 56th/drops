@@ -1,0 +1,25 @@
+#---------------------SPECIFICATION FILE----------------------------------------
+Type of test: serial
+Name of executable: reftest
+#The path to the folder where the executable is located must be relative to the
+#/drops folder
+Folder of executable: tests
+#The path to the folder where the parameter-file is located must be relative to
+#the folder where the executable is situated
+Path of parameter-file:
+Name of test: reftest
+Name of author: loch
+#-------------------------------------------------------------------------------
+#------------------------------NUMBERS------------------------------------------
+#-------------------------------------------------------------------------------
+#------------------------------STRINGS-------------------------------------------
+# String find = 1: you want to find this string, = 0: you don't want to find this string
+String value: "2.Totalverf.: 729 Verts, 4886 Edges, 7512 Faces, 3504 Tetras"
+String find: 1
+String value: "4.Tropfenverf.: 9629 Verts, 75564 Edges, 131868 Faces, 66786 Tetras"
+String find: 1
+String value: "6.Tropfenentf.: 4051 Verts, 31138 Edges, 55404 Faces, 28572 Tetras"
+String find: 1
+String value: "3.Totalentf.: 585 Verts, 4346 Edges, 7584 Faces, 3828 Tetras"
+String find: 1
+#-------------------------------------------------------------------------------

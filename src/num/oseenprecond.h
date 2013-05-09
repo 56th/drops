@@ -25,7 +25,7 @@
 #include "num/precond.h"
 #include "num/MGsolver.h"
 #include "num/spblockmat.h"
-
+#include "misc/scopetimer.h"
 
 #ifndef OSEENPRECOND_H_
 #define OSEENPRECOND_H_
@@ -357,7 +357,12 @@ class ISBBTPreCL : public SchurPreBaseCL
 
     double     tolA_, tolM_;                                    ///< tolerances of the solvers
     mutable VectorCL Dprsqrtinv_;                               ///< diag(M)^{-1/2}
+
+#ifdef _PAR
+    typedef ChebyshevBBTPcCL  PCSolver1T;                       ///< type of the preconditioner for solver 1
+#else
     typedef NEGSPcCL    PCSolver1T;                             ///< type of the preconditioner for solver 1
+#endif
     typedef JACPcCL     PCSolver2T;                             ///< type of the preconditioner for solver 2
     PCSolver1T PCsolver1_;
     PCSolver2T PCsolver2_;
@@ -443,6 +448,7 @@ void ISBBTPreCL::Update(const ExT& vel_ex, const ExT& p_ex) const
 template <typename Mat, typename Vec, typename ExT>
 void ISBBTPreCL::Apply(const Mat&, Vec& p, const Vec& c, const ExT& vel_ex, const ExT& p_ex) const
 {
+    ScopeTimerCL scope("ISBBTPreCL::Apply");
     if (B_->Version() != Bversion_)
         Update(vel_ex, p_ex);
 
@@ -489,10 +495,14 @@ class MinCommPreCL : public SchurPreBaseCL
     mutable VectorCL Dprsqrtinv_, Dvelsqrtinv_;
     double  tol_;
 
-    typedef NEGSPcCL SPcT_;
-    SPcT_ spc_;
-    mutable PCGNESolverCL<SPcT_> solver_;
-    const IdxDescCL* pr_idx_;                                   ///< Used to determine, how to represent the kernel of BB^T in case of pure Dirichlet-BCs.
+    #ifdef _PAR
+    typedef ChebyshevBBTPcCL SPcT;                       ///< type of the preconditioner for solver
+#else
+    typedef NEGSPcCL SPcT;                               ///< type of the preconditioner for solver
+#endif
+    SPcT spc_;
+    mutable PCGNESolverCL<SPcT> solver_;
+    const IdxDescCL* pr_idx_;                            ///< Used to determine, how to represent the kernel of BB^T in case of pure Dirichlet-BCs.
     double regularize_;
 
     template <typename ExT>
@@ -546,6 +556,7 @@ class MinCommPreCL : public SchurPreBaseCL
 template <typename Mat, typename Vec, typename ExT>
 void MinCommPreCL::Apply (const Mat&, Vec& x, const Vec& b, const ExT& vel_ex, const ExT& pr_ex) const
 {
+    ScopeTimerCL scope("MinCommPreCL::Apply");
     if ((A_->Version() != Aversion_) || (Mvel_->Version() != Mvelversion_) || (B_->Version() != Bversion_))
         Update(vel_ex, pr_ex);
 
@@ -617,7 +628,10 @@ class BDinvBTPreCL: public SchurPreBaseCL
     mutable size_t Lversion_, Bversion_, Mvelversion_, Mversion_;
     mutable VectorCL Dprsqrtinv_, Dvelinv_, DSchurinv_;
     double  tol_;
-    mutable DiagPcCL diagVelPc_, diagSchurPc_;
+    mutable DiagPcCL diagVelPc_;
+    typedef DiagPcCL SchurPcT;
+    //typedef ChebyshevPcCL SchurPcT;
+    mutable SchurPcT SchurPc_;
 #ifdef _PAR
     typedef ApproximateSchurComplMatrixCL<DiagPcCL, MatrixCL, ExchangeCL> AppSchurComplMatrixT;
     mutable AppSchurComplMatrixT* BDinvBT_;
@@ -625,7 +639,7 @@ class BDinvBTPreCL: public SchurPreBaseCL
     typedef ApproximateSchurComplMatrixCL<DiagPcCL, MatrixCL, DummyExchangeCL> SerAppSchurComplMatrixT;
     mutable SerAppSchurComplMatrixT* SerBDinvBT_;
 
-    mutable PCGSolverCL<DiagPcCL> solver_;
+    mutable PCGSolverCL<SchurPcT> solver_;
 
     const IdxDescCL* pr_idx_;                                   ///< Used to determine, how to represent the kernel of BB^T in case of pure Dirichlet-BCs.
     double regularize_;
@@ -641,12 +655,12 @@ class BDinvBTPreCL: public SchurPreBaseCL
                   double tol=1e-2, double regularize= 0.0, std::ostream* output= 0)
         : SchurPreBaseCL( 0, 0, output), L_( L), B_( B), Mvel_( M_vel), M_( M_pr), Bs_( 0),
           Lversion_( 0), Bversion_( 0), Mvelversion_( 0), Mversion_( 0), tol_(tol),
-          diagVelPc_(Dvelinv_), diagSchurPc_(DSchurinv_),
+          diagVelPc_(Dvelinv_), SchurPc_( DSchurinv_),
 #ifdef _PAR
           BDinvBT_(0),
 #endif
           SerBDinvBT_(0),
-          solver_( diagSchurPc_, 200,  tol_, /*relative*/ true), pr_idx_( &pr_idx),
+          solver_( SchurPc_, 200,  tol_, /*relative*/ true), pr_idx_( &pr_idx),
           regularize_( regularize), lumped_(false) {}
 
     BDinvBTPreCL (const BDinvBTPreCL & pc)
@@ -654,12 +668,12 @@ class BDinvBTPreCL: public SchurPreBaseCL
           Bs_( pc.Bs_ == 0 ? 0 : new MatrixCL( *pc.Bs_)),
           Lversion_( pc.Lversion_), Bversion_( pc.Bversion_), Mvelversion_( pc.Mvelversion_), Mversion_( pc.Mversion_),
           Dprsqrtinv_( pc.Dprsqrtinv_), Dvelinv_( pc.Dvelinv_), DSchurinv_( pc.DSchurinv_), tol_(pc.tol_),
-          diagVelPc_( Dvelinv_), diagSchurPc_( DSchurinv_),
+          diagVelPc_( Dvelinv_), SchurPc_( DSchurinv_),
 #ifdef _PAR
           BDinvBT_(0),
 #endif
           SerBDinvBT_(0),
-          solver_( diagSchurPc_, 200, tol_, /*relative*/ true), pr_idx_( pc.pr_idx_),
+          solver_( SchurPc_, 200, tol_, /*relative*/ true), pr_idx_( pc.pr_idx_),
           regularize_( pc.regularize_), lumped_( pc.lumped_) {}
 
     BDinvBTPreCL& operator= (const BDinvBTPreCL&) {
@@ -710,6 +724,7 @@ class BDinvBTPreCL: public SchurPreBaseCL
 template <typename Mat, typename Vec>
 void BDinvBTPreCL::Apply (const Mat&, Vec& x, const Vec& b, const ExchangeCL& vel_ex, const ExchangeCL& pr_ex) const
 {
+    ScopeTimerCL scope("BDinvBTPreCL::Apply");
     if ((L_->Version() != Lversion_) || (Mvel_->Version() != Mvelversion_) || (M_->Version() != Mversion_) || (B_->Version() != Bversion_))
         Update( vel_ex, pr_ex);
 
@@ -723,8 +738,9 @@ void BDinvBTPreCL::Apply (const Mat&, Vec& x, const Vec& b, const ExchangeCL& ve
 #endif
 
 template <typename Mat, typename Vec>
-  void BDinvBTPreCL::Apply (const Mat&, Vec& x, const Vec& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& pr_ex) const
+void BDinvBTPreCL::Apply (const Mat&, Vec& x, const Vec& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& pr_ex) const
 {
+    ScopeTimerCL scope("BDinvBTPreCL::Apply");
     if ((L_->Version() != Lversion_) || (Mvel_->Version() != Mvelversion_) || (M_->Version() != Mversion_) || (B_->Version() != Bversion_))
         Update( vel_ex, pr_ex);
 

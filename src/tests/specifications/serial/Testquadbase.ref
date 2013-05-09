@@ -1,0 +1,36 @@
+#---------------------SPECIFICATION FILE----------------------------------------
+Type of test: serial
+Name of executable: quadbase
+#The path to the folder where the executable is located must be relative to the
+#/drops folder
+Folder of executable: tests
+Name of author: Jens Berger
+#-------------------------------------------------------------------------------
+#------------------------------NUMBERS------------------------------------------
+Name of variable: "IntegralOld"
+Prefix of variable: "Old Quadrature integral: "
+Value of variable: 28244.4
+Relative error: 
+Absolute error: 0
+Minimal value:
+Maximal value:
+Name of variable: "IntegralNew"
+Prefix of variable: "New Quadrature integral: "
+Value of variable: 28244.4
+Relative error: 
+Absolute error: 0
+Minimal value:
+Maximal value:
+Name of variable: "DotProduct"
+Prefix of variable: "dot: "
+Value of variable: 0
+Relative error: 
+Absolute error: 0
+Minimal value:
+Maximal value:
+#------------------------------STRINGS------------------------------------------
+# String find = 1: you want to find this string,
+# = 0: you don't want to find this string
+#String value: "TestPushBack Row1: 0 0 0"
+#String find: 1
+#-------------------------------------------------------------------------------

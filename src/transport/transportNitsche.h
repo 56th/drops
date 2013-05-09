@@ -377,7 +377,7 @@ class TransformedP1FiniteElement{
       nodes = NULL;
     }
 
-    ~TransformedP1FiniteElement(){
+    virtual ~TransformedP1FiniteElement(){
       if (nodes) delete nodes;
     }
 

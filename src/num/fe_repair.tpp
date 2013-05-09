@@ -49,6 +49,15 @@ void RepairFEDataCL<LocalFEDataT>::repair (AugmentedDofVecT& dof, VectorCL& newd
         throw DROPSErrCL("RepairFEDataCL::repair: Could not locate all new dof.\n");
 }
 
+template <class LocalFEDataT>
+bool RepairFEDataCL<LocalFEDataT>::has_child (Ubyte ch) const
+{
+    for (size_t i= 0; i < data.size(); ++i)
+        if (data[i].first == ch)
+            return true;
+    return false;
+}
+
 
 /// RepairFECL
 
@@ -185,15 +194,13 @@ void RepairFECL<ValueT, LocalFEDataT, BndDataT>::unrefinement (const TetraCL& t,
 }
 
 template <class ValueT, template<class> class LocalFEDataT, template<class> class BndDataT>
-void RepairFECL<ValueT, LocalFEDataT, BndDataT>::changed_refinement (const TetraCL& t, const RepairFEDataCL<LocalFECL>& repairdata)
+void RepairFECL<ValueT, LocalFEDataT, BndDataT>::changed_refinement (const TetraCL& t, Ubyte ch, const RepairFEDataCL<LocalFECL>& repairdata)
 {
     AugmentedDofVecT dof= collect_unrepaired_dofs( t);
     if (dof.empty())
         return;
 
-    const TetraCL* p= t.GetParent();
-    const Ubyte ch= std::find( p->GetChildBegin(), p->GetChildEnd(), &t) - p->GetChildBegin();
-    const SMatrixCL<4,4>& to_parent= child_to_parent_bary( p->GetRefData().Children[ch]);
+    const SMatrixCL<4,4>& to_parent= child_to_parent_bary( ch);
     for (AugmentedDofVecT::iterator d= dof.begin(); d != dof.end(); ++d)
         d->second= to_parent*d->second;
     repairdata.repair( dof, new_vd_->Data);
@@ -223,14 +230,20 @@ template <class ValueT, template<class> class LocalFEDataT, template<class> clas
             unchanged_refinement( *t);
         else { // t has no parent-data and t->GetLevel() > 0
             const TetraCL* p= t->GetParent();
-            if (parent_data_.count( p) == 1) // Case 3
-                changed_refinement( *t, parent_data_[p]);
+            if (parent_data_.count( p) == 1) { // Case 3
+                const Ubyte chpos= std::find( p->GetChildBegin(), p->GetChildEnd(), &*t) - p->GetChildBegin(),
+                            ch= p->GetRefData().Children[chpos]; // Child-number of t per topo.h.
+                if (parent_data_[p].has_child( ch)) // t was a child of p before refinement, handle as case (2b).
+                    unchanged_refinement( *t);
+                else
+                    changed_refinement( *t, ch, parent_data_[p]);
+            }
             else { // t has no repair-data, t->GetLevel() > 0, and p has no repair-data
                 if ((p->GetLevel() > 0 && parent_data_.count( p->GetParent()) == 1))
                     genuine_refinement( *t, parent_data_[p->GetParent()]); // Case (4a).
                 else if (level0_leaves_.count( p) == 1)
                     regular_leaf_refinement( *t); // Case (4b).
-                else // Case (2)
+                else // Case (2b)
                     unchanged_refinement( *t);
             }
         }
