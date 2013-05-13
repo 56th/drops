@@ -239,7 +239,7 @@ template <class VertexCutMergingPolicyT>
 	const Uint lattice_num_vertexes= lat.vertex_size();
 
     triangles_.clear();
-    pos_triangles_begin_= 0;
+    pos_triangles_begin_ = 0;
     vertexes_.clear();
 
     std::valarray<byte> ls_sign;
@@ -264,8 +264,10 @@ template <class VertexCutMergingPolicyT>
     pos_triangles_begin_= triangles_.size();
     std::copy( loc_triangles. begin(), loc_triangles.end(), std::back_inserter( triangles_));
 
-    //VertexPartitionPolicyT vertex_order_policy( lat, ls, tetras_.begin(), tetras_.end(), pos_tetra_begin_);    ??
-    //vertex_order_policy.sort_vertexes( vertexes_, edgecut.cut_vertex_container(), pos_vertex_begin_, neg_vertex_end_);   ??
+    //unsorted vertexes, other sorted policy could be added if needed in the future
+    VertexContT cut_vertexes=edgecut.cut_vertex_container();
+    std::copy( cut_vertexes.begin(), cut_vertexes.end(), std::back_inserter( vertexes_));
+    pos_vertex_begin_= neg_vertex_end_= 0;
   }
 
 } // end of namespace DROPS
