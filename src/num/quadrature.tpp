@@ -155,6 +155,36 @@ template <class QuadDataT>
     return q;
 }
 
+template <class QuadDataT>
+  const QuadDomainCL&
+  make_CompositeQuadDomainBnd2D (QuadDomainCL& q, const BndTriangPartitionCL& p)
+{
+    /*const Uint num_nodes= QuadDataT::NumNodesC;
+
+    q.vertexes_.resize( 0);
+    q.vertexes_.reserve( num_nodes*p.triangle_size());
+    q.pos_begin_= q.neg_end_= num_nodes*p.triangle_size( NegTetraC);
+    q.weights_.resize( num_nodes*p.triangle_size());
+    q.all_weights_begin_= 0;
+    q.pos_weights_begin_= q.pos_begin_;
+
+    const typename BndTriangPartitionCL::const_vertex_iterator partition_vertexes= p.vertex_begin();
+    const typename QuadDomainCL::WeightContT triangle_weights( QuadDataT::Weight, num_nodes);
+    Uint w_begin= 0;
+    SMatrixCL<3,3> T;   //in 2D
+    double absdet;
+    for (typename BndTriangPartitionCL::const_triangle_iterator it= p.triangle_begin(); it != p.triangle_end();
+        ++it, w_begin+= num_nodes) {
+        for (int i= 0; i < 3; ++i)
+            T.col( i, partition_vertexes[(*it)[i]]);
+        for (Uint i= 0; i < num_nodes; ++i)
+            q.vertexes_.push_back( T*QuadDataT::Node[i]);                         //push back all the nodes for quadrature rule as I understand
+        absdet= std::fabs( (T));                                                  //absdet
+        q.weights_[std::slice( w_begin, num_nodes, 1)]= absdet*triangle_weights;  //weight
+    }*/
+    return q;
+}
+
 inline const QuadDomainCL&
 make_CompositeQuad5Domain (QuadDomainCL& q, const TetraPartitionCL& p)
 {
