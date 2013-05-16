@@ -229,6 +229,17 @@ template <class QuadDataT>
 inline const QuadDomain2DCL&
 make_CompositeQuad5Domain2D (QuadDomain2DCL& q, const SurfacePatchCL& p, const TetraCL& t);
 
+/// \brief Create a composite quadrature rule for a boundary-triangle cut by moving contact lines.
+/// No sharing of quadrature points is performed.
+/// The template-parameter QuadDataT must be given explicitly.
+/// Helpers for common QuadData_2DCL are given below.
+template <class QuadDataT>
+  const QuadDomain2DCL&
+  make_CompositeQuadBndDomain2D (QuadDomain2DCL& q, const BndTriangPartitionCL& p, const TetraCL& t);
+///\brief Initialize q as a composite Quad5_2DDataCL-quadrature-rule for boundary triangles
+inline const QuadDomain2DCL&
+make_CompositeQuad5BndDomain2D (QuadDomain2DCL& q, const BndTriangPartitionCL& p, const TetraCL& t);
+
 /// \brief Create an extrapolated quadrature rule.
 /// No sharing of quadrature points is performed.
 /// The extrapolation method is determined by extra.
@@ -267,6 +278,10 @@ class QuadDomain2DCL
     template <class QuadDataT, class LocalFET>
       friend const QuadDomain2DCL&
       make_ExtrapolatedQuadDomain2D (QuadDomain2DCL&, const LocalFET&, const TetraCL&, const ExtrapolationToZeroCL&);
+
+    template <class QuadDataT>
+      friend const QuadDomain2DCL&
+      make_CompositeQuadBndDomain2D (QuadDomain2DCL& q, const BndTriangPartitionCL& p, const TetraCL& t);
     ///@}
 
   private:
