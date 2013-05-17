@@ -124,17 +124,6 @@ QuadDomain2DCL::operator= (const QuadDomain2DCL& q)
     return *this;
 }
 
-/*QuadCutDomain2DCL&
-QuadCutDomain2DCL::operator= (const QuadCutDomain2DCL& q)
-{
-    vertexes_= q.vertexes_;
-
-    weights_.resize( q.weights_.size());
-    weights_= q.weights_;
-
-    return *this;
-}*/
-
 void
 copy_weights_surface (const std::vector<CompositeQuadratureTypesNS::WeightContT>& w_vec,
     const std::valarray<double >& w_factor, CompositeQuadratureTypesNS::WeightContT& weights)
