@@ -63,6 +63,9 @@ set(xfem-staticlibs ${BEGIN_STATIC_LIBS} misc-vectorFunctions ${END_STATIC_LIBS}
 exec_ser(xfem misc-utils geom-builder geom-simplex geom-multigrid geom-deformation misc-scopetimer misc-progressaccu geom-boundary geom-topo num-unknowns misc-problem num-interfacePatch num-fe num-discretize levelset-levelset levelset-fastmarch stokes-instatstokes2phase out-ensightOut levelset-surfacetension misc-funcmap misc-vectorFunctions geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature)
 
 exec_ser(f_Gamma geom-boundary geom-builder geom-simplex geom-multigrid geom-deformation misc-scopetimer misc-progressaccu num-unknowns geom-topo num-fe misc-problem levelset-levelset misc-utils out-output num-discretize num-interfacePatch misc-params levelset-fastmarch stokes-instatstokes2phase levelset-surfacetension misc-funcmap misc-vectorFunctions geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature misc-dynamicload)
+if(NOT MPI)
+add_dependencies(f_Gamma levelset-twophaseCoeff)
+endif(NOT MPI)
 
 exec_ser(neq misc-utils) 
 
