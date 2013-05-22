@@ -37,8 +37,11 @@ namespace CSG {
 /// A CSG-object is a directed acyclic graph (DAG) of BodyCL-objects (bodies):
 ///    * Leave-nodes (do not refer to other nodes):
 ///         * Halfspace
-///         * Sphere
+///         * InfiniteCone
+///         * InfiniteCylinder
 ///         * Levelset
+///         * Sphere
+///         * Torus
 
 ///    * inner nodes: Operators (refer to at least one node):
 ///         * Complement (Body b)
@@ -162,6 +165,15 @@ namespace CSG {
 /// The Origin defines a point on the Axis.
 /// Pushes one body on the stack;
 /// InfiniteCylinderBodyCL
+
+/// ==Torus: Level set function function for a torus==
+///    * key "Origin" [Point3DCL]; optional, defaults to (0,0,0)^T;
+///    * key "Axis", [Point3DCL]; optional, defaults to (1,0,0)^T;
+///    * key "BigRadius", [double]; optional, defaults to 0.75;
+///    * key "SmallRadius", [double]; optional, defaults to 0.25;
+/// The Origin defines a point on the Axis.
+/// Pushes one body on the stack;
+/// TorusBodyCL
 
 /// ==Levelset: Use level set function from InScaMap==
 ///    * key "Function", value of type string, required;

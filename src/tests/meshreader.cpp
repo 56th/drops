@@ -56,23 +56,27 @@ const char meshfile[]= {
     "\n"
     "(0 \"Faces:\")\n"
     "(13 (0 1 1e 0))\n"
-    "(13 (2 1 4 3 3) (\n"
+    "(13 (1 1 2 3 3) (\n"
     "6 5 3 4 0\n"
     "6 3 4 8 0\n"
+    "))\n"
+    "(13 (2 3 4 3 3) (\n"
     "4 2 1 9 0\n"
     "4 3 2 a 0\n"
     "))\n"
-    "(13 (3 5 8 24 3) (\n"
-    "1 7 8 1 0\n"
+    "(13 (3 5 6 24 3) (\n"
     "8 7 5 3 0\n"
     "8 5 6 5 0\n"
+    "))\n"
+    "(13 (4 7 8 24 3) (\n"
+    "1 7 8 1 0\n"
     "1 2 7 b 0\n"
     "))\n"
-    "(13 (4 9 a a 3) (\n"
+    "(13 (5 9 a a 3) (\n"
     "3 5 7 2 0\n"
     "3 7 2 c 0\n"
     "))\n"
-    "(13 (5 b c e 3) (\n"
+    "(13 (6 b c e 3) (\n"
     "1 8 6 6 0\n"
     "1 6 4 7 0\n"
     "))\n"
@@ -241,7 +245,8 @@ int TestRefineUniform()
 int TestRefine()
 {
 //    std::cout << "---------------------------------------------------\n";
-    DROPS::ReadMeshBuilderCL builder( std::cin);
+    std::istringstream is( meshfile);
+    DROPS::ReadMeshBuilderCL builder( is);
     DROPS::MultiGridCL mg( builder);
     for (DROPS::MultiGridCL::TriangTetraIteratorCL It( mg.GetTriangTetraBegin()),
              ItEnd( mg.GetTriangTetraEnd()); It!=ItEnd; ++It)

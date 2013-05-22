@@ -29,13 +29,13 @@
 int TestPushBack()
 {
     DROPS::SBufferCL<int, 3> b;
-    std::cout << b[0] << '\t' << b[1] << '\t' << b[2] << '\t' << std::endl;
+    std::cout << "TestPushBack Row1: " << b[0] << " " << b[1] << " " << b[2] << std::endl;
     b[0]= 0; b[1]= 1; b[2]= 2;
-    std::cout << b[0] << '\t' << b[1] << '\t' << b[2] << '\t' << std::endl;
+    std::cout << "TestPushBack Row2: " << b[0] << " " << b[1] << " " << b[2] << std::endl;
     b.push_back( 3);
-    std::cout << b[0] << '\t' << b[1] << '\t' << b[2] << '\t' << std::endl;
-    std::cout << b[-1] << '\t' << b[-2] << '\t' << b[-3] << '\t' << std::endl;
-    std::cout << b[3] << '\t' << b[4] << '\t' << b[5] << '\t' << std::endl;
+    std::cout << "TestPushBack Row3: " << b[0] << " " << b[1] << " " << b[2] << std::endl;
+    std::cout << "TestPushBack Row4: " << b[-1]<< " " << b[-2]<< " " << b[-3]<< std::endl;
+    std::cout << "TestPushBack Row5: " << b[3] << " " << b[4] << " " << b[5] << std::endl;
     std::cout << std::endl;
     return 0;
 }
@@ -43,14 +43,14 @@ int TestPushBack()
 int TestRotate()
 {
     DROPS::SBufferCL<int, 3> b;
-    std::cout << b[0] << '\t' << b[1] << '\t' << b[2] << '\t' << std::endl;
+    std::cout << "TestRotate Row1: " << b[0] << " " << b[1] << " " << b[2] << std::endl;
     b[0]= 0; b[1]= 1; b[2]= 2;
-    std::cout << b[0] << '\t' << b[1] << '\t' << b[2] << '\t' << std::endl;
+    std::cout << "TestRotate Row2: " << b[0] << " " << b[1] << " " << b[2] << std::endl;
     b.rotate( 2);
-    std::cout << b[0] << '\t' << b[1] << '\t' << b[2] << '\t' << std::endl;
+    std::cout << "TestRotate Row3: " << b[0] << " " << b[1] << " " << b[2] << std::endl;
     b.rotate( -1);
     b.rotate( -1);
-    std::cout << b[0] << '\t' << b[1] << '\t' << b[2] << '\t' << std::endl;
+    std::cout << "TestRotate Row4: " << b[0] << " " << b[1] << " " << b[2] << std::endl;
     return 0;
 }
 

@@ -306,6 +306,8 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 //         Stokes.pr_idx.GetFinest().GetXidx().GetNumUnknownsStdFE(),
 //         stokessolverfactory.GetPVel()->GetFinest(), stokessolverfactory.GetPPr()->GetFinest());
 
+    SetInitialConditions( Stokes, lset, MG, P);
+
     // Time discretisation + coupling
     TimeDisc2PhaseCL* timedisc= CreateTimeDisc(Stokes, lset, navstokessolver, gm, P, lsetmod);
     if (P.get<int>("Time.NumSteps") != 0){
@@ -323,8 +325,6 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         stokessolverfactory.SetMatrices( timedisc->GetUpperLeftBlock(), &Stokes.B.Data,
                                          &Stokes.M.Data, &Stokes.prM.Data, &Stokes.pr_idx);
     }
-
-    SetInitialConditions( Stokes, lset, MG, P);
 
     std::ofstream* infofile = 0;
     IF_MASTER {

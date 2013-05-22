@@ -390,7 +390,9 @@ int main ()
     int ret= TestRepairUniform();
     ret+= TestRepair();
     // ret+= TestInterpolateOld();
-    return ret + TestReMark();
+    ret += TestReMark();
+    std::cerr << "return value: " << ret << std::endl;
+    return ret;
   }
   catch (DROPS::DROPSErrCL err) { err.handle(); }
 }
