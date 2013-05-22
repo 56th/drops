@@ -239,9 +239,12 @@ void CheckReparametrization( const LevelsetP2CL& lset, const VectorCL& phiEx)
 
     std::cout << "\n----------------------------------------------\n"
               << "Difference of re-parametrized level set function to given level set function:\n"
-              << "e1 " << e1 << ", e1 (rel) " << e1Rel
-              << ", e2 " << e2 << ", e2 (rel) " << e2Rel
-              << ", eSup " << eSup << ", eSup (rel) " << eSupRel
+              << "e1 : " << e1 <<"\n"
+              << "e1 (rel) : " << e1Rel <<"\n"
+              << "e2 : " << e2 <<"\n"
+              << "e2 (rel) : " << e2Rel << "\n"
+              << "eSup : " << eSup <<"\n"
+              << "eSup (rel) : " << eSupRel <<"\n"
               << "\nmax and min grad: " << maxGradPhi << ' ' << minGradPhi << std::endl;
 }
 

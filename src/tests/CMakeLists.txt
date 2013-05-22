@@ -77,6 +77,9 @@ exec_ser(reparam_init geom-boundary geom-builder geom-simplex geom-multigrid geo
 
 #reparam renamed to reparamtest
 exec_ser(reparamtest levelset-fastmarch levelset-levelset geom-deformation misc-scopetimer misc-progressaccu geom-simplex geom-multigrid geom-builder geom-topo geom-boundary num-unknowns misc-utils misc-problem num-discretize num-fe out-ensightOut num-interfacePatch levelset-surfacetension misc-params out-vtkOut geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature misc-dynamicload) ##${PAR_OBJ}
+if(NOT MPI)
+add_dependencies(reparamtest levelset-twophaseCoeff misc-scalarFunctions misc-vectorFunctions)
+endif(NOT MPI)
 
 exec_ser(principallattice tests-principallattice misc-utils geom-principallattice num-discretize geom-deformation geom-topo num-fe num-interfacePatch misc-problem num-unknowns geom-simplex geom-multigrid geom-builder geom-boundary num-unknowns geom-reftetracut geom-subtriangulation num-quadrature)
 
