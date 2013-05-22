@@ -1,0 +1,14 @@
+{
+//=============================================================
+//    DROPS parameter file for reparam_init.cpp
+//    Testing reparametrization strategies
+//=============================================================
+
+// re-initialization of levelset function",
+
+	"Reparam":
+	{
+		"NumRef":	1,
+		"FineLvl":	0
+	}
+}

@@ -73,7 +73,7 @@ exec_ser(extendP1onChild tests-extendP1onChild num-discretize misc-utils geom-to
 
 exec_ser(splitboundary geom-boundary geom-builder geom-simplex geom-multigrid geom-deformation num-unknowns misc-utils geom-topo out-output num-fe misc-problem num-interfacePatch)
 
-exec_ser(reparam_init geom-boundary geom-builder geom-simplex geom-multigrid geom-deformation misc-scopetimer misc-progressaccu num-unknowns misc-utils geom-topo out-output misc-problem levelset-levelset num-fe misc-utils num-discretize num-interfacePatch levelset-fastmarch levelset-surfacetension out-ensightOut geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature)
+exec_ser(reparam_init geom-boundary geom-builder geom-simplex geom-multigrid geom-deformation misc-scopetimer misc-progressaccu num-unknowns misc-utils geom-topo out-output misc-problem levelset-levelset num-fe misc-utils misc-params num-discretize num-interfacePatch levelset-fastmarch levelset-surfacetension out-ensightOut geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature)
 
 #reparam renamed to reparamtest
 exec_ser(reparamtest levelset-fastmarch levelset-levelset geom-deformation misc-scopetimer misc-progressaccu geom-simplex geom-multigrid geom-builder geom-topo geom-boundary num-unknowns misc-utils misc-problem num-discretize num-fe out-ensightOut num-interfacePatch levelset-surfacetension misc-params out-vtkOut geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature misc-dynamicload) ##${PAR_OBJ}
