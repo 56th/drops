@@ -1295,7 +1295,7 @@ class SpecialBndHandleOnePhaseCL
     { P2DiscCL::GetGradientsOnRef( GradRef); 
 	}
     void setup(const TetraCL& tet, const SMatrixCL<3,3>& T, LocalSystem1DataCL& loc);  //update local system 1
-	void setupRhs(const TetraCL& tet, Point3DCL loc_b[10]);
+	void setupRhs(const TetraCL& tet, Point3DCL loc_b[10]);                            //for no homogenour slip boundary condition (the slip wall is moving)
 };
 
 void SpecialBndHandleOnePhaseCL::setup(const TetraCL& tet, const SMatrixCL<3,3>& T, LocalSystem1DataCL& loc)
@@ -1336,6 +1336,7 @@ void SpecialBndHandleOnePhaseCL::setup(const TetraCL& tet, const SMatrixCL<3,3>&
 					Grad2Di.assign(Gradin, bary);
 					Quad5_2DCL<double> mass2D(mass2Dj * mass2Di); //
 					Quad5_2DCL<double> Grad2D(Grad2Di * mass2Dj + Grad2Dj * mass2Di); //
+					// three additional terms
 					dm[unknownIdx[j]][unknownIdx[i]](0, 0)= dm[unknownIdx[j]][unknownIdx[i]](1, 1) = dm[unknownIdx[j]][unknownIdx[i]](2, 2) = beta_ * mass2D.quad(absdet);
 					dm[unknownIdx[j]][unknownIdx[i]]     += (alpha_/h - beta_) * mass2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));
 					dm[unknownIdx[j]][unknownIdx[i]]     -=  mu_ * Grad2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));  
@@ -1350,6 +1351,7 @@ void SpecialBndHandleOnePhaseCL::setup(const TetraCL& tet, const SMatrixCL<3,3>&
 	}
 }
 
+//for no homogenour slip boundary condition (the slip wall is moving)
 void SpecialBndHandleOnePhaseCL::setupRhs(const TetraCL& tet, Point3DCL loc_b[10])
 {
 
@@ -1455,6 +1457,84 @@ struct LocalIntegrals_P2CL
     double         mass[10][10];
     SMatrixCL<3,3> cAk[10][10];
 };
+
+/// \brief Update the local system 1 (with cut) with respect to special boundary conditions: slip Bnd and symmetric Bnd;
+/*class SpecialBndHandleTwoPhaseCL
+{
+  private:
+	const PrincipalLatticeCL& lat;
+	const double mu1_, mu2_;
+	const double beta1_, beta2_;                            //Slip coefficient, beta_=0 for symmetric Bnd;
+	const double alpha_;                                    //Coefficient for Nitche method
+	LocalP1CL<Point3DCL> Grad[10], GradRef[10];
+	LocalP2CL<> p2;
+
+    std::valarray<double> ls_loc;
+    BndTrianglePartitionCL partition;
+	Point3DCL normal;
+	Uint unknownIdx[6];
+  public:	
+	SpecialBndHandleTwoPhaseCL(double mu1, double mu2, const double beta1=0, const double beta2=0, const double alpha=0)
+	: lat( PrincipalLatticeCL::instance( 2)), mu1_(mu1), mu2_(mu2), beta1_(beta1), beta2_(beta2), alpha_(alpha), ls_loc( lat.vertex_size())
+    { P2DiscCL::GetGradientsOnRef( GradRef); }
+
+    double mu  (int sign) const { return sign > 0 ?  mu1_  : mu2_; }
+    double beta (int sign) const { return sign > 0 ? beta1_ : beta2_; }
+    void setup(const TetraCL& tet, const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, LocalIntegrals_P2CL[2], LocalSystem1DataCL& loc);  //update local system 1
+};
+
+void SpecialBndHandleTwoPhaseCL::setup(const TetraCL& tet, const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, LocalIntegrals_P2CL[2], LocalSystem1DataCL& loc)
+{ 
+
+    P2DiscCL::GetGradients( Grad, GradRef, T);
+	for (Uint k =0; k< 4; ++k) //Go throught all faces of a tet
+	{
+		SMatrixCL<3, 3> dm[10][10];
+		LocalP2CL<double> phi[6]; 
+		Quad5_2DCL<double> mass2Dj;
+		Quad5_2DCL<double> mass2Di;
+		Quad5_2DCL<double> Grad2Dj;   // \nabla phi_j* n
+		Quad5_2DCL<double> Grad2Di;   // \nabla phi_i* n
+		BaryCoordCL bary[3];
+		if( BndData_.Vel.GetBC(*tet.GetFace(k))==Slip0BC || BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC|| BndData_.Vel.GetBC(*tet.GetFace(k))==SymmBC){
+			const FaceCL& face = *tet.GetFace(k);
+            double absdet = FuncDet2D(	face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
+                                           	face.GetVertex(2)->GetCoord()-face.GetVertex(0)->GetCoord()); 
+			double h= std::sqrt(absdet);
+			tet.GetOuterNormal(k, normal);
+			for (Uint i= 0; i<3; ++i)    
+			{
+				unknownIdx[i]   = VertOfFace(k, i);      // i is index for Vertex
+				unknownIdx[i+3] = EdgeOfFace(k, i) + 4;  // i is index for Edge
+				bary[i][unknownIdx[i]]=1;
+			}
+			for(Uint i=0; i<6; ++i)
+				phi[i][unknownIdx[i]] = 1;
+				
+			for(Uint i=0; i<6; ++i){
+				for(Uint j=0; j<=i; ++j){
+					LocalP1CL<double> Gradjn(dot( normal, Grad[unknownIdx[j]]));
+					LocalP1CL<double> Gradin(dot( normal, Grad[unknownIdx[i]]));					
+					mass2Dj.assign(phi[j], bary);  //
+					mass2Di.assign(phi[i], bary);
+					Grad2Dj.assign(Gradjn, bary);
+					Grad2Di.assign(Gradin, bary);
+					Quad5_2DCL<double> mass2D(mass2Dj * mass2Di); //
+					Quad5_2DCL<double> Grad2D(Grad2Di * mass2Dj + Grad2Dj * mass2Di); //
+					// three additional terms
+					dm[unknownIdx[j]][unknownIdx[i]](0, 0)= dm[unknownIdx[j]][unknownIdx[i]](1, 1) = dm[unknownIdx[j]][unknownIdx[i]](2, 2) = beta_ * mass2D.quad(absdet);
+					dm[unknownIdx[j]][unknownIdx[i]]     += (alpha_/h - beta_) * mass2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));
+					dm[unknownIdx[j]][unknownIdx[i]]     -=  mu_ * Grad2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));  
+					loc.Ak[unknownIdx[j]][unknownIdx[i]] += dm[unknownIdx[j]][unknownIdx[i]];
+					if (i != j){
+						assign_transpose( dm[unknownIdx[i]][unknownIdx[j]], dm[unknownIdx[j]][unknownIdx[i]]);
+						loc.Ak[unknownIdx[i]][unknownIdx[j]] += dm[unknownIdx[i]][unknownIdx[j]];
+					}	
+				}
+			}
+		}
+	}
+}*/
 
 /// \brief Setup of the local P2 "system 1" on a tetra intersected by the dividing surface.
 class LocalSystem1TwoPhase_P2CL

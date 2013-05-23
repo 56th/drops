@@ -53,11 +53,23 @@ template <class GridFunT, class QuadDataT, class WeightSelectorT>
 template <class GridFunT>
   inline typename ValueHelperCL<GridFunT>::value_type
   quad (const GridFunT& f, double absdet, const QuadDomainCL& dom, TetraSignEnum s= AllTetraC);
+/// \brief Integrate on the negative, the positive part or on the whole tetra without using absdet
+template <class GridFunT>
+  inline typename ValueHelperCL<GridFunT>::value_type
+  quad (const GridFunT& f, const QuadDomainCL& dom, TetraSignEnum s= AllTetraC);
 
 /// \brief Integrate on the negative and the positive part of a tetra.
 template <class GridFunT>
   inline void
   quad (const GridFunT& f, double absdet, const QuadDomainCL& dom,
+    typename ValueHelperCL<GridFunT>::value_type& neg_int,
+    typename ValueHelperCL<GridFunT>::value_type& pos_int);
+///@}
+
+/// \brief Integrate on the negative and the positive part of a tetra without using absdet.
+template <class GridFunT>
+  inline void
+  quad (const GridFunT& f, const QuadDomainCL& dom,
     typename ValueHelperCL<GridFunT>::value_type& neg_int,
     typename ValueHelperCL<GridFunT>::value_type& pos_int);
 ///@}
@@ -168,10 +180,6 @@ class QuadDomainCL
     template <class QuadDataT>
       friend const QuadDomainCL&
       make_CompositeQuadDomain (QuadDomainCL&, const TetraPartitionCL&);
-	  
-    template <class QuadDataT>
-      friend const QuadDomainCL&
-      make_CompositeQuadDomainBnd2D (QuadDomainCL&, const BndTriangPartitionCL&);
 
     friend const QuadDomainCL&
     make_CompositeQuad2Domain (QuadDomainCL&, const TetraPartitionCL&);
@@ -323,76 +331,6 @@ class QuadDomain2DCL
     const_vertex_iterator vertex_end   () const { return vertexes_.end(); }
     ///@}
 };
-
-/// \brief General 2D-quadrature-cut-domain
-/// A quadrature rule is defined (and implemented) as a collection of quadrature points and a corresponding collection of weights.
-/*class QuadCutDomain2DCL
-{
-  public:
-     /// \brief Container for barycentric coordinates of quadrature points.
-    typedef LatticePartitionTypesNS::VertexContT           VertexContT;
-    typedef LatticePartitionTypesNS::const_vertex_iterator const_vertex_iterator;
-
-     ///\brief Container for the quadrature weights
-    typedef CompositeQuadratureTypesNS::WeightContT           WeightContT;
-    typedef CompositeQuadratureTypesNS::const_weight_iterator const_weight_iterator;
-
-    /// Friend declaration for the factory methods; if their number becomes to big, a more elaborate factory-design is in order.
-    ///@{
-    template <class QuadDataT>
-      friend const QuadCutDomain2DCL&
-      make_CompositeQuadDomain2D (QuadCutDomain2DCL& quad, const BndTriangPartitionCL& cutBnd);
-
-    //template <class QuadDataT, class LocalFET>
-     // friend const QuadDomain2DCL&
-     // make_ExtrapolatedQuadDomain2D (QuadDomain2DCL&, const LocalFET&, const TetraCL&, const ExtrapolationToZeroCL&);
-    ///@}
-
-	private:
-  
-    VertexContT vertexes_;  ///< sequence of all vertexes; some may be used for both, the positive and the negative domain
-    Uint        pos_begin_; ///< begin of the subsequence of vertexes of positive tetras
-    Uint        neg_end_;   ///< end of the subsequence of vertexes of negative tetras
-
-    WeightContT weights_; ///< sequence of all weights; if there are vertexes on the interface, which are used for both domains, the weights for the whole domain are appended and all_weights_begin_ > 0.
-    Uint        pos_weights_begin_;
-    Uint        all_weights_begin_;   //
-
-  public:
-    QuadCutDomain2DCL () ///
-        : pos_begin_( 0), neg_end_( 0), weights_( 0), pos_weights_begin_( 0), all_weights_begin_( 0) {}
-
-    /// The default copy-constructor does the right thing
-    /// \brief copy assignment: resize the valarray for weights to make it behave like a container
-    QuadCutDomain2DCL& operator= (const QuadCutDomain2DCL&);
-	
-    /// \brief sequence of the indices of the vertexes (quadrature points) for the given domain
-    ///@{
-    Uint dof_begin (TetraSignEnum s= AllTetraC) const
-        { return s == PosTetraC ? pos_begin_ : 0; }
-    Uint dof_end   (TetraSignEnum s= AllTetraC) const
-        { return s == NegTetraC ? neg_end_ : vertexes_.size(); }
-    ///@}
-
-    Uint vertex_size (TetraSignEnum s= AllTetraC) const ///< Number of quadrature points in the given domain
-        { return dof_end( s) - dof_begin( s); }
-
-    /// \brief Begin of the sequence of weights for integration on the given domain
-    const_weight_iterator weight_begin (TetraSignEnum s= AllTetraC) const {
-        return Addr( weights_) + (s == NegTetraC ? 0
-            : (s == PosTetraC ? pos_weights_begin_
-                              : all_weights_begin_));
-    }
-
-    /// \brief sequence of quadrature points in the given domain.
-    ///@{
-    const_vertex_iterator vertex_begin (TetraSignEnum s= AllTetraC) const
-        { return vertexes_.begin() + (s == PosTetraC ? pos_begin_ : 0); }
-    const_vertex_iterator vertex_end   (TetraSignEnum s= AllTetraC) const
-        { return s == NegTetraC ? vertexes_.begin() + neg_end_ : vertexes_.end(); }
-    ///@}	
-	
-};*/
 
 /// Determine, how many subdivisions of the tetra-edges are required for extrapolation on level i.
 ///@{
