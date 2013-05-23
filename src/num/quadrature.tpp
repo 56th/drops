@@ -159,9 +159,9 @@ template <class QuadDataT>
   const QuadDomainCL&
   make_CompositeQuadDomainBnd2D (QuadDomainCL& q, const BndTriangPartitionCL& p)
 {
-    /*const Uint num_nodes= QuadDataT::NumNodesC;
+ /*   const Uint num_nodes= QuadDataT::NumNodesC;
 
-    q.vertexes_.resize( 0);
+  q.vertexes_.resize( 0);
     q.vertexes_.reserve( num_nodes*p.triangle_size());
     q.pos_begin_= q.neg_end_= num_nodes*p.triangle_size( NegTetraC);
     q.weights_.resize( num_nodes*p.triangle_size());
@@ -181,8 +181,8 @@ template <class QuadDataT>
             q.vertexes_.push_back( T*QuadDataT::Node[i]);                         //push back all the nodes for quadrature rule as I understand
         absdet= std::fabs( (T));                                                  //absdet
         q.weights_[std::slice( w_begin, num_nodes, 1)]= absdet*triangle_weights;  //weight
-    }*/
-    return q;
+    }
+    return q;*/
 }
 
 inline const QuadDomainCL&
