@@ -341,14 +341,19 @@ template <class LocalFET>
 
 
 template <class QuadDataT>
-  const QuadDomain2DCL&
-  make_CompositeQuadBndDomain2D (QuadDomain2DCL& q, const BndTriangPartitionCL& p, const TetraCL& t)
+  const QuadDomainCL&
+  make_CompositeQuadBndDomain2D (QuadDomainCL& q, const BndTriangPartitionCL& p, const TetraCL& t)
 {
     const Uint num_nodes= QuadDataT::NumNodesC;
 
     q.vertexes_.resize( 0);
     q.vertexes_.resize( num_nodes*p.triangle_size());
+   // q.pos_begin_= q.neg_end_= num_nodes*p.triangle_size( NegTetraC); ///will be added later after BndTriangPartitionCL include triangle_size( NegTetraC)
+
     q.weights_.resize( num_nodes*p.triangle_size());
+    q.all_weights_begin_= 0;
+    q.pos_weights_begin_= q.pos_begin_;
+
 
     const typename BndTriangPartitionCL::const_vertex_iterator partition_vertexes= p.vertex_begin();
     const typename QuadDomainCL::WeightContT triangle_weights( QuadDataT::Weight, num_nodes);
@@ -371,8 +376,8 @@ template <class QuadDataT>
 
 }
 
-inline const QuadDomain2DCL&
-make_CompositeQuad5BndDomain2D  (QuadDomain2DCL& q, const BndTriangPartitionCL& p, const TetraCL& t)
+inline const QuadDomainCL&
+make_CompositeQuad5BndDomain2D  (QuadDomainCL& q, const BndTriangPartitionCL& p, const TetraCL& t)
 {
     return make_CompositeQuadBndDomain2D<Quad5_2DDataCL>( q, p, t);
 }
