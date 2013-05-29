@@ -348,7 +348,7 @@ template <class QuadDataT>
 
     q.vertexes_.resize( 0);
     q.vertexes_.resize( num_nodes*p.triangle_size());
-   // q.pos_begin_= q.neg_end_= num_nodes*p.triangle_size( NegTetraC); ///will be added later after BndTriangPartitionCL include triangle_size( NegTetraC)
+    q.pos_begin_= q.neg_end_= num_nodes*p.triangle_size( NegTetraC); ///will be added later after BndTriangPartitionCL include triangle_size( NegTetraC)
 
     q.weights_.resize( num_nodes*p.triangle_size());
     q.all_weights_begin_= 0;

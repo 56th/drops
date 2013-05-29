@@ -233,7 +233,7 @@ template <class VertexCutMergingPolicyT>
 		return tri;
 	}
 
-template <class VertexCutMergingPolicyT>
+template <class VertexPartitionPolicyT, class VertexCutMergingPolicyT>
   void BndTriangPartitionCL:: make_partition2D (const PrincipalLatticeCL& lat, Uint face, const std::valarray<double>& ls)
   {
 	const Uint lattice_num_vertexes= lat.vertex_size();

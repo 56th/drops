@@ -237,20 +237,24 @@ class BndTriangPartitionCL
     /// Empty default-interface
 
     ///\brief partition a cutted face on special boundary 
-    template <class VertexCutMergingPolicyT>
+    template <class VertexPartitionPolicyT,class VertexCutMergingPolicyT>
     void make_partition2D (const PrincipalLatticeCL& lat, Uint face, const std::valarray<double>& ls);
 
-    Uint triangle_size  () const ///< number of triangles
-         { return triangles_.size(); }
-    Uint vertex_size () const ///< number of vertexes
-         { return vertexes_.size(); }
+    Uint triangle_size  (TetraSignEnum s= AllTetraC) const ///< number of triangles
+         { return triangle_begin(s) - triangle_end(s); }
+    Uint vertex_size (TetraSignEnum s= AllTetraC) const ///< number of vertexes
+         { return vertex_begin(s) - vertex_end(s); }
 
-    /// Random-access to the tetras and vertices.
+    /// Random-access to the triangles and vertices, order of vertices and triangles: first the negative, then the positve
     ///@{
-    const_triangle_iterator triangle_begin () const { return triangles_.begin(); }
-    const_triangle_iterator triangle_end   () const { return triangles_.end(); }
-    const_vertex_iterator vertex_begin () const { return vertexes_.begin(); }
-    const_vertex_iterator vertex_end   () const { return vertexes_.end(); }
+    const_triangle_iterator triangle_begin (TetraSignEnum s= AllTetraC) const 
+	    { return triangles_.begin() + (s == PosTetraC ? pos_triangles_begin_ : 0); }
+    const_triangle_iterator triangle_end   (TetraSignEnum s= AllTetraC) const 
+	    { return s == NegTetraC ? triangles_.begin() + pos_triangles_begin_ : triangles_.end(); }
+    const_vertex_iterator vertex_begin (TetraSignEnum s= AllTetraC) const
+        { return vertexes_.begin() + (s == PosTetraC ? pos_vertex_begin_ : 0); }
+    const_vertex_iterator vertex_end   (TetraSignEnum s= AllTetraC) const
+        { return s == NegTetraC ? vertexes_.begin() + neg_vertex_end_ : vertexes_.end(); }
     ///@}
 };
 
