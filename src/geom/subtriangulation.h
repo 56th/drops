@@ -229,8 +229,7 @@ class BndTriangPartitionCL
     template <class VertexCutMergingPolicyT>
       const TriangleT ///< Create a single sub-triangle and its vertexes
       make_sub_triangle (const RefTetraPatchCL::TriangleT& ref_tri, const PrincipalLatticeCL::TetraT& lattice_tet,
-        const PrincipalLatticeCL& lattice, const double lset[4],
-        Uint lattice_num_vertexes,
+        const double lset[4],      Uint lattice_num_vertexes,
         VertexCutMergingPolicyT& edgecut);
 
   public:

@@ -98,6 +98,53 @@ void SetupSystem2_P2P1( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& coeff,
 }
 
 
+//P2_P1X multiplication
+void SpecialBndHandleSystem2_P2P1XCL::setupB(SMatrixCL<1, 3> loc_b[4][10], const TetraCL& tet, int ls_sign[4], const PrincipalLatticeCL& lat, const std::valarray<double>& ls_loc_)
+{
+	GridFunctionCL<> qvel[6];
+	GridFunctionCL<> qpr[3];
+	int eqsign;
+	for (Uint k =0; k< 4; ++k) //Go throught all faces of a tet
+	{
+		if( BndData_.Vel.GetBC(*tet.GetFace(k))==Slip0BC || BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC || BndData_.Vel.GetBC(*tet.GetFace(k))==SymmBC)
+		{
+			eqsign=0;
+			for(Uint j=0; j<3; j++)
+				eqsign+=ls_sign[j<k?j:j+1];
+			if(eqsign==3||eqsign==-3)	continue;
+
+		    tet.GetOuterNormal(k, normal);
+
+			bndpartition_.make_partition2D<SortedVertexPolicyCL, MergeCutPolicyCL>( lat, k, ls_loc_);
+			make_CompositeQuad5BndDomain2D( bndq5dom_, bndpartition_,tet);
+
+			LocalP2CL<double> phiVelP2[6];   //local basis for velocity
+			LocalP1CL<double> phiPrP1[3];    //local basis for pressure
+
+			for (Uint i= 0; i<3; ++i)
+			{
+				unknownIdx[i]   = VertOfFace(k, i);          // i is index for Vertex
+				unknownIdx[i+3] = EdgeOfFace(k, i) + 4;      // i is index for Edge
+				phiPrP1[i][unknownIdx[i]]=1;
+				resize_and_evaluate_on_vertexes(phiPrP1[i], bndq5dom_, qpr[i]);
+			}
+
+		    for(Uint i=0; i<6; ++i){
+		    	phiVelP2[i][unknownIdx[i]] = 1;
+		    	resize_and_evaluate_on_vertexes(phiVelP2[i], bndq5dom_, qvel[i]);
+		    	for(Uint j=0; j<3; ++j){
+					const bool is_pos= ls_sign[unknownIdx[j]] == 1;
+					const double value=(is_pos ? -1. : 1.)*quad( qvel[i]*qpr[j], bndq5dom_, is_pos ? NegTetraC : PosTetraC);
+				    loc_b[unknownIdx[j]][unknownIdx[i]](0, 0)+= value*normal[0]; //need verification!
+					loc_b[unknownIdx[j]][unknownIdx[i]](0, 1)+= value*normal[1];
+					loc_b[unknownIdx[j]][unknownIdx[i]](0, 2)+= value*normal[2];
+				}
+			}
+		}
+	}
+}
+
+
 /// \brief Accumulator to set up the matrix B and, if requested the right-hand side C for two-phase flow.
 class System2Accumulator_P2P1XCL : public System2Accumulator_P2P1CL<TwoPhaseFlowCoeffCL>
 {
@@ -133,11 +180,16 @@ class System2Accumulator_P2P1XCL : public System2Accumulator_P2P1CL<TwoPhaseFlow
 
     SMatrixCL<1,3>            loc_B_[4][10]; ///< transposed representation for better memory-access.
 
+    bool 	spebnd;
+    SpecialBndHandleSystem2_P2P1XCL speBndHandle;	///< Slip or symmetric boundary condition handler
+
+
+
     using base_::RowIdx;
     const ExtIdxDescCL* Xidx_;
 
     ///\brief Computes the mapping from local to global data "n", the local matrices in loc and, if required, the Dirichlet-values needed to eliminate the boundary-dof from the global system.
-    void local_setup ();
+    void local_setup (const TetraCL& tet);
     ///\brief Update the global system.
     void update_global_system ();
 
@@ -159,7 +211,7 @@ class System2Accumulator_P2P1XCL : public System2Accumulator_P2P1CL<TwoPhaseFlow
 System2Accumulator_P2P1XCL::System2Accumulator_P2P1XCL (const TwoPhaseFlowCoeffCL& coeff_arg, const StokesBndDataCL& BndData_arg,
 		const LevelsetP2CL& lset, const IdxDescCL& RowIdx_arg, const IdxDescCL& ColIdx_arg,
 	    MatrixCL& B_arg, VecDescCL* c_arg, double t_arg)
-    :  base_( coeff_arg, BndData_arg, RowIdx_arg, ColIdx_arg, B_arg, c_arg, t_arg), lset_( lset), ls_loc_( lat.vertex_size())
+    :  base_( coeff_arg, BndData_arg, RowIdx_arg, ColIdx_arg, B_arg, c_arg, t_arg), lset_( lset), ls_loc_( lat.vertex_size()), speBndHandle(BndData_arg)
 {
     P2DiscCL::GetGradientsOnRef( GradRefLP1_);
 }
@@ -185,11 +237,11 @@ void System2Accumulator_P2P1XCL::visit (const TetraCL& tet)
     make_CompositeQuad2Domain( q2dom_, partition_);
     local_p2_lset.assign(tet, lset_.Phi, lset_.GetBndData());
 
-    local_setup();
+    local_setup(tet);
     update_global_system();
 }
 
-void System2Accumulator_P2P1XCL::local_setup ()
+void System2Accumulator_P2P1XCL::local_setup (const TetraCL& tet)
 {
     P2DiscCL::GetGradients( GradLP1_, GradRefLP1_, T);
     for (int i= 0; i < 10; ++i) // Gradients of the velocity hat-functions
@@ -217,6 +269,19 @@ void System2Accumulator_P2P1XCL::local_setup ()
             loc_B_[pr][vel]= SMatrixCL<1,3>( (is_pos ? -1. : 1.)*quad( qgrad_[vel]*qpr, absdet, q2dom_, is_pos ? NegTetraC : PosTetraC));
         }
     }
+
+
+	//if there is at least one slip or symmetric boundary on this tetra
+    spebnd=false;
+	for(int i =0; i< 4; ++i){
+		if(BndData.Vel.GetBC(*tet.GetFace(i))==Slip0BC  || BndData.Vel.GetBC(*tet.GetFace(i))==SlipBC || BndData.Vel.GetBC(*tet.GetFace(i))==SymmBC)
+		{
+			spebnd=true;
+			break;
+		}
+	}
+	if(spebnd)
+		speBndHandle.setupB(loc_B_,tet,ls_sign_,lat,ls_loc_);
 }
 
 void System2Accumulator_P2P1XCL::update_global_system ()

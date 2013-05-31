@@ -324,6 +324,22 @@ class PressureRepairCL : public MGObserverCL
 #endif
 };
 
+
+//\brief Handle the slip or symmetric boundary condition
+class SpecialBndHandleSystem2_P2P1XCL
+{
+ private:
+    BndTriangPartitionCL 	  bndpartition_;
+    QuadDomainCL              bndq5dom_;
+
+	const StokesBndDataCL& BndData_;
+	Point3DCL normal;
+	Uint unknownIdx[6];
+  public:
+	SpecialBndHandleSystem2_P2P1XCL(const StokesBndDataCL& BndData): BndData_(BndData) {}
+	void setupB(SMatrixCL<1, 3> loc_b[4][10], const TetraCL& tet, int ls_sign[4], const PrincipalLatticeCL& lat, const std::valarray<double>& ls_loc_);
+};
+
 } // end of namespace DROPS
 
 #include "stokes/instatstokes2phase.tpp"
