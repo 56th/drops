@@ -62,13 +62,14 @@ copy_local_level_set_values( const std::valarray<double>& ls, const std::valarra
 ///\brief See if the tetra in Lattice on specific boundary, and set up "correct" level set values and sign;
 inline bool
 on_cutBnd(const std::valarray<double>& ls, const std::valarray<byte>& ls_sign, const PrincipalLatticeCL& lattice, const PrincipalLatticeCL::TetraT& lattice_tet, 
-double loc_ls[4], byte loc_ls_sign[4], Uint face)
+double loc_ls[4], byte loc_ls_sign[4], Uint FaceNum)
 {
     bool OnCutBnd = false;
 	int counter = 0;
     for (Uint i= 0; i < 4; ++i)
 	{
-	  if( lattice.GetBaryCoord(lattice_tet[i])[face] < 10e-9)
+	  //check if the vertex i is on the face 	
+	  if( lattice.GetBaryCoord(lattice_tet[i])[FaceNum] < 10e-9)
 	  {
 		loc_ls_sign[i]= ls_sign[lattice_tet[i]];
         loc_ls     [i]= ls     [lattice_tet[i]];
@@ -76,8 +77,8 @@ double loc_ls[4], byte loc_ls_sign[4], Uint face)
 	  }
 	  else
       {
-		loc_ls_sign[i]= 0;
-        loc_ls     [i]= 0;
+		loc_ls_sign[i]= 0.;
+        loc_ls     [i]= 0.;
 	  }
 	}
 	if (counter == 3 )
@@ -256,6 +257,7 @@ template <class VertexPartitionPolicyT, class VertexCutMergingPolicyT>
         bool OnCutBnd = on_cutBnd( ls, ls_sign, lat, *lattice_tet, loc_ls, loc_ls_sign, face);
 		if(OnCutBnd)
 		{
+			std::cout<<"****************** One cut boundary face is found"<<std::endl;
 			const RefTrianglePartitionCL cut(loc_ls_sign, Ubyte(face));                          //casting from unsigned int to unsigned char?
 			for (RefTrianglePartitionCL::const_triangle_iterator it= cut.triangle_begin(), end= cut.triangle_end(); it != end; ++it)
 				(cut.sign( it) == -1 ? triangles_ : loc_triangles).push_back( make_sub_triangle(

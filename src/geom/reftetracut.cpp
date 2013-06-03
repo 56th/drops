@@ -218,6 +218,8 @@ RefTrianglePartitionCL::RefTrianglePartitionCL(const byte ls[4], Ubyte VertexNum
    Ubyte vert[3]; //Used to store indices of vertices of the triangle
    const RefTetraPartitionCL& RefTetraPart= RefTetraPartitionCL::instance(ls);
    size_=RefTetraPart.tetra_size(AllTetraC);
+   if(size_> 3)
+	   throw DROPSErrCL("Size of the triangles of RefTrianglePartitionCL is bigger than 3");
    Uint index=0;
    for (RefTetraPartitionCL::const_tetra_iterator it= RefTetraPart.tetra_begin(), end=RefTetraPart.tetra_end(); it != end; ++it){
 	 Uint j=0;
@@ -225,6 +227,8 @@ RefTrianglePartitionCL::RefTrianglePartitionCL(const byte ls[4], Ubyte VertexNum
 		 if((*it)[i]!=VertexNum){
 			 vert[j]=(*it)[i];
 			 ++j;
+			if (j > 3)
+				throw DROPSErrCL("Index of vertex of the triangle is bigger than 3");
 		 }	 
 	 }
 	 //make a triangle and store its sign;
