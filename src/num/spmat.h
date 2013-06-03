@@ -533,8 +533,10 @@ public:
         {
             Comment("SparseMatBuilderCL: Creating NEW matrix" << std::endl, DebugNumericC);
             _coupl= new couplT[_rows/BlockTraitT::num_rows];
+#if DROPS_SPARSE_MAT_BUILDER_USES_HASH_MAP
             for (size_t i=0; i< _rows/BlockTraitT::num_rows; ++i)
                 _coupl[i].rehash(100);
+#endif
         }
     }
 
