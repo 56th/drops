@@ -235,7 +235,9 @@ RefTetraPartitionCL::instance (const double ls[4])
     return instance( ls_byte);
 }
 
-
+/// \brief creat a partition of a boundary triangle face cut by interface
+//Setting level-set value of the opposite vertex of the face to 0,  with the rule of RefTetraPartitionCL we can first make a partition of the tetra which is the only tetra has this face;
+//Then we just map this tetra partition to the face we are interested in.   
 class RefTrianglePartitionCL
 {
   public:
@@ -246,14 +248,15 @@ class RefTrianglePartitionCL
   private:
     TriangleT triangle_[3];      ///< at most three triangles
     Ubyte size_;                 ///< number of triangles
-	int sign_[3];
+	int sign_[3];                ///< sign  the triangles
 
     TriangleT MakeTriangle (Ubyte v0, Ubyte v1, Ubyte v2) const { return MakeSArray( v0, v1, v2); }
 	
-  public:
+	public:
+    //parameters: level set sign of the tetra which has the face with ls[VertexNum] = 0;
     RefTrianglePartitionCL(const byte ls[4], Ubyte VertexNum); 
     size_t size () const { return size_; }      ///< Number of triangles, 0, 1, or 2
-    int sign (const_triangle_iterator t) const { return sign_[ t- triangle_begin() ]; } ///< Sign of the tetra, to which t points
+    int sign (const_triangle_iterator t) const { return sign_[ t- triangle_begin() ]; } ///< Sign of the triangle, to which t points
 
     ///@{ Random-access to the triangles
     const_triangle_iterator triangle_begin () const { return triangle_; }

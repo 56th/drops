@@ -215,18 +215,19 @@ operator<< (std::ostream& out, const RefTetraPartitionCL& c)
 
 RefTrianglePartitionCL::RefTrianglePartitionCL(const byte ls[4], Ubyte VertexNum)
 {
-   Ubyte vert[3];
+   Ubyte vert[3]; //Used to store indices of vertices of the triangle
    const RefTetraPartitionCL& RefTetraPart= RefTetraPartitionCL::instance(ls);
    size_=RefTetraPart.tetra_size(AllTetraC);
    Uint index=0;
    for (RefTetraPartitionCL::const_tetra_iterator it= RefTetraPart.tetra_begin(), end=RefTetraPart.tetra_end(); it != end; ++it){
+	 Uint j=0;
 	 for(Uint i=0; i<4; ++i){
-		 Uint j=0;
 		 if((*it)[i]!=VertexNum){
 			 vert[j]=(*it)[i];
 			 ++j;
 		 }	 
 	 }
+	 //make a triangle and store its sign;
 	 triangle_[index] = MakeTriangle(vert[0], vert[1], vert[2]);
 	 sign_[index] = RefTetraPart.sign(it);
      ++index;
