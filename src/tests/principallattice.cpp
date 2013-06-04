@@ -1,4 +1,4 @@
-/// \file combinatorialcut.cpp
+/// \file principallattice.cpp
 /// \brief tests the PrincipalLattice-class
 /// \author LNM RWTH Aachen: Joerg Grande; SC RWTH Aachen:
 
@@ -37,6 +37,7 @@
 
 void test_tetra_cut ()
 {
+	std::cout<<"TetraPartition test: all 81 level-set sign patterns will be prescribed, then the corresponding tetra partition visualization files will be created."<<std::endl;
     DROPS::GridFunctionCL<> ls( 4);
     ls[0]= -1.; ls[1]= 0.; ls[2]= 0.; ls[3]= 0.;
     DROPS::TetraPartitionCL tet;
@@ -51,7 +52,7 @@ void test_tetra_cut ()
               ls[0]= i; ls[1]= j; ls[2]= k; ls[3]= l;
               std::cout << "c: " << c << " ls: " << ls[0] << ' ' << ls[1] << ' ' << ls[2] << ' ' << ls[3] << std::endl;
               DROPS::RefTetraPartitionCL cut( static_cast<double*>(&ls[0]));
-              DROPS::SignPatternTraitCL comb_cut( static_cast<double*>(&ls[0]));
+//              DROPS::SignPatternTraitCL comb_cut( static_cast<double*>(&ls[0]));
               tet.make_partition<DROPS::SortedVertexPolicyCL, DROPS::MergeCutPolicyCL> ( DROPS::PrincipalLatticeCL::instance( 1), ls);
 //              if (c == 5) {
 //                  std::cerr << comb_cut << std::endl;
@@ -117,6 +118,7 @@ inline double sphere_instat (const DROPS::Point3DCL& p, double)
 
 void test_sphere_cut ()
 {
+	
     DROPS::TetraBuilderCL tetrabuilder( 0);
     DROPS::MultiGridCL mg( tetrabuilder);
 
@@ -272,14 +274,14 @@ void test_extrapolated_sphere_surface_integral ()
 int main()
 {
     try {
-        // test_tetra_cut();
-        // test_cut_surface();
-        // test_principal_lattice();
-        // test_sphere_cut();
-        // test_sphere_integral();
-        // test_extrapolated_sphere_integral();
-        test_sphere_surface_integral();
-        // test_extrapolated_sphere_surface_integral();
+        test_tetra_cut();
+        //test_cut_surface();
+        //test_principal_lattice();
+        //test_sphere_cut();
+        //test_sphere_integral();
+        //test_extrapolated_sphere_integral();
+        //test_sphere_surface_integral();
+        //test_extrapolated_sphere_surface_integral();
     }
     catch (DROPS::DROPSErrCL err) { err.handle(); }
     return 0;
