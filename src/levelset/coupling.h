@@ -645,11 +645,8 @@ class cplDeltaSquaredPolicyCL
 /// \brief Always uses 1 as relaxation factor in RecThetaScheme2PhaseCL
 class cplFixedPolicyCL
 {
-  private:
-    std::ostream* output_;
-
   public:
-    cplFixedPolicyCL (std::ostream* output = 0) : output_( output) {}
+    cplFixedPolicyCL (std::ostream* = 0) {}
     void Update (const VecDescCL&) {}
 };
 

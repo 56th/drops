@@ -649,7 +649,7 @@ protected:
 
     inline DataT // helper-function to evaluate on a vertex; use val() instead
     GetDoF(const FaceCL& s) const {
-        return _bnd->IsOnDirBnd( s) ? _bnd->GetDirBndValue( s, _sol.t)
+        return _bnd->IsOnDirBnd( s) ? _bnd->GetDirBndValue( s, _sol->t)
             : DoFHelperCL<DataT, typename VecDescT::DataType>::get( _sol->Data, s.Unknowns(_sol->RowIdx->GetIdx()));
     }
 
