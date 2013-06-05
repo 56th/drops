@@ -159,12 +159,12 @@ void test_sphere_integral ()
 	std::cout<<"=========================Volume integral test: \n"
 	         <<"A 2x2x2 cubic is cut by a sphere with 0.5 radius;\n"
              <<"Negative part and positive part will be integrated seperately by using QuadDomainCL."<<std::endl;
-    std::cout << "Enter the number of subdivisions of the cube: ";
-    DROPS::Uint num_sub;
-    std::cin >> num_sub;
-    std::cout << "Enter the number of subdivisions of the principal lattice: ";
-    DROPS::Uint num_sub_lattice;
-    std::cin >> num_sub_lattice;
+    //std::cout << "Enter the number of subdivisions of the cube: ";
+    DROPS::Uint num_sub = 8;
+    //std::cin >> num_sub;
+    //std::cout << "Enter the number of subdivisions of the principal lattice: ";
+    DROPS::Uint num_sub_lattice = 2;
+    //std::cin >> num_sub_lattice;
     DROPS::BrickBuilderCL brick(DROPS::Point3DCL( -1.),
                                 2.*DROPS::std_basis<3>(1),
                                 2.*DROPS::std_basis<3>(2),
@@ -233,12 +233,12 @@ void test_sphere_surface_integral ()
 	std::cout<<"=========================Interface area integral test: \n"
 	         <<"A 2x2x2 cubic is cut by a sphere with 0.5 radius;\n"
              <<"Interface area will be computed by using QuadDomain2DCL"<<std::endl;
-    std::cout << "Enter the number of subdivisions of the cube: ";
-    DROPS::Uint num_sub;
-    std::cin >> num_sub;
-    std::cout << "Enter the number of subdivisions of the principal lattice: ";
-    DROPS::Uint num_sub_lattice;
-    std::cin >> num_sub_lattice;
+    //std::cout << "Enter the number of subdivisions of the cube: ";
+    DROPS::Uint num_sub = 8;
+    //std::cin >> num_sub;
+    //std::cout << "Enter the number of subdivisions of the principal lattice: ";
+    DROPS::Uint num_sub_lattice =2;
+    //std::cin >> num_sub_lattice;
     DROPS::BrickBuilderCL brick(DROPS::Point3DCL( -1.),
                                 2.*DROPS::std_basis<3>(1),
                                 2.*DROPS::std_basis<3>(2),
