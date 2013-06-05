@@ -1,6 +1,6 @@
 /// \file principallattice.cpp
 /// \brief tests the PrincipalLattice-class
-/// \author LNM RWTH Aachen: Joerg Grande; SC RWTH Aachen:
+/// \author LNM RWTH Aachen: Joerg Grande, Liang Zhang; SC RWTH Aachen:
 
 /*
  * This file is part of DROPS.
@@ -37,7 +37,8 @@
 
 void test_tetra_cut ()
 {
-	std::cout<<"TetraPartition test: all 81 level-set sign patterns will be prescribed, then the corresponding tetra partition visualization files will be created."<<std::endl;
+	std::cout<<"=========================TetraPartition test: \n"
+	         <<"all 81 level-set sign patterns will be prescribed, then the corresponding tetra partition visualization files will be created."<<std::endl;
     DROPS::GridFunctionCL<> ls( 4);
     ls[0]= -1.; ls[1]= 0.; ls[2]= 0.; ls[3]= 0.;
     DROPS::TetraPartitionCL tet;
@@ -68,6 +69,8 @@ void test_tetra_cut ()
 
 void test_cut_surface ()
 {
+	std::cout<<"=========================Surface patch test: \n"
+	         <<"all 81 level-set sign patterns will be prescribed in a tetra, then the corresponding interface patch visualization files will be created."<<std::endl;
     DROPS::GridFunctionCL<> ls( 4);
     ls[0]= -1.; ls[1]= 0.; ls[2]= 0.; ls[3]= 0.;
     DROPS::SurfacePatchCL tet;
@@ -81,8 +84,8 @@ void test_cut_surface ()
               if (i == 0 && j == 0 && k == 0 && l == 0) continue;
               ls[0]= i; ls[1]= j; ls[2]= k; ls[3]= l;
               std::cout << "c: " << c << " ls: " << ls[0] << ' ' << ls[1] << ' ' << ls[2] << ' ' << ls[3] << std::endl;
-              DROPS::RefTetraPartitionCL cut( static_cast<double*>(&ls[0]));
-              DROPS::SignPatternTraitCL comb_cut( static_cast<double*>(&ls[0]));
+              //DROPS::RefTetraPartitionCL cut( static_cast<double*>(&ls[0]));
+              //DROPS::SignPatternTraitCL comb_cut( static_cast<double*>(&ls[0]));
               tet.make_patch<DROPS::MergeCutPolicyCL>( DROPS::PrincipalLatticeCL::instance( 1), ls);
               std::ostringstream name;
               name << "hallo_surf" << c << ".vtu";
@@ -93,13 +96,19 @@ void test_cut_surface ()
 
 void test_principal_lattice ()
 {
+	std::cout<<"=========================PrincipalLatticeCL test: \n"
+	         <<"4 principal lattice with 1, 2, 3, 4 intervals will be created respectively, and key information will be showed."<<std::endl;
     for (int i= 1; i <= 4; ++i) {
         const DROPS::PrincipalLatticeCL& lat= DROPS::PrincipalLatticeCL::instance( i);
-        std::cout << "=======================================" << lat.num_intervals() << ' ' << lat.vertex_size() << " " << lat.tetra_size() << std::endl;
+        std::cout << "======================================= \n" 
+		          << "Number of intervals: "<<lat.num_intervals() 
+				  << "| " << "Number of vertices: "<<lat.vertex_size() 
+				  << "| " << "Number of tetra: "   <<lat.tetra_size() << std::endl;
+		std::cout << "=======================================Barycentric coordinates of vertices: "<<std::endl; 
         for (DROPS::PrincipalLatticeCL::const_vertex_iterator v= lat.vertex_begin(), end= lat.vertex_end(); v != end; ++v) {
-            std::cout << lat.num_intervals()*(*v) << std::endl;
+            std::cout << /*lat.num_intervals()*/(*v) << std::endl;
         }
-        std:: cout << "++++++++++++++++++++++++++++++++++++++" << std::endl;
+        std::cout << "=======================================Indices of each sub-tetra:" << std::endl;
         for (DROPS::PrincipalLatticeCL::const_tetra_iterator v= lat.tetra_begin(), end= lat.tetra_end(); v != end; ++v) {
             std::cout << (*v)[0] << ' '  << (*v)[1] << ' ' << (*v)[2] << ' ' << (*v)[3] << ' ' << std::endl;
         }
@@ -118,6 +127,9 @@ inline double sphere_instat (const DROPS::Point3DCL& p, double)
 
 void test_sphere_cut ()
 {
+	std::cout<<"=========================Sphere cut test: \n"
+	         <<"A principal lattice with 10 intervals will be cut by a sphere with 0.5 radius;\n"
+             <<"Negative tetras and interface patch will be showed in two vtu files respectively."<<std::endl;
 	
     DROPS::TetraBuilderCL tetrabuilder( 0);
     DROPS::MultiGridCL mg( tetrabuilder);
@@ -144,6 +156,9 @@ void test_sphere_cut ()
 
 void test_sphere_integral ()
 {
+	std::cout<<"=========================Volume integral test: \n"
+	         <<"A 2x2x2 cubic is cut by a sphere with 0.5 radius;\n"
+             <<"Negative part and positive part will be integrated seperately by using QuadDomainCL."<<std::endl;
     std::cout << "Enter the number of subdivisions of the cube: ";
     DROPS::Uint num_sub;
     std::cin >> num_sub;
@@ -215,6 +230,9 @@ void test_extrapolated_sphere_integral ()
 
 void test_sphere_surface_integral ()
 {
+	std::cout<<"=========================Interface area integral test: \n"
+	         <<"A 2x2x2 cubic is cut by a sphere with 0.5 radius;\n"
+             <<"Interface area will be computed by using QuadDomain2DCL"<<std::endl;
     std::cout << "Enter the number of subdivisions of the cube: ";
     DROPS::Uint num_sub;
     std::cin >> num_sub;
@@ -275,12 +293,12 @@ int main()
 {
     try {
         test_tetra_cut();
-        //test_cut_surface();
-        //test_principal_lattice();
-        //test_sphere_cut();
-        //test_sphere_integral();
+        test_cut_surface();
+        test_principal_lattice();
+        test_sphere_cut();
+        test_sphere_integral();
         //test_extrapolated_sphere_integral();
-        //test_sphere_surface_integral();
+        test_sphere_surface_integral();
         //test_extrapolated_sphere_surface_integral();
     }
     catch (DROPS::DROPSErrCL err) { err.handle(); }
