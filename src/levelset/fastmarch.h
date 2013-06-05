@@ -207,7 +207,7 @@ class InitZeroP1CL : public InitZeroCL
 
 /// \brief ComputeOnChild is defined for scale==0 or scale==1, otherwise, this standard template is called
 template <int scale>
-void InitZeroP1CL<scale>::ComputeOnChild( IdxT* Numb, int* sign, const ChildDataCL& data, LocalP2CL<>& PhiLoc)
+void InitZeroP1CL<scale>::ComputeOnChild( IdxT* /*Numb*/, int* /*sign*/, const ChildDataCL& /*data*/, LocalP2CL<>& /*PhiLoc*/)
 {
     throw DROPSErrCL("InitZeroP1CL<scale>::ComputeOnChild: scale not defined");
 }

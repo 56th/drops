@@ -61,7 +61,7 @@ class VTKOutCL
 
     const MultiGridCL& mg_;                         ///< reference to the multigrid
     char               decDigits_;                  ///< number of digits for encoding time in filename
-    Uint               timestep_, numsteps_;        ///< actual timestep and number of timesteps
+    Uint               timestep_;                   ///< actual timestep
     std::string        descstr_;                    ///< stores description info
     std::string        dirname_;
     std::string        filename_;                   ///< filenames
@@ -70,7 +70,6 @@ class VTKOutCL
     VTKvarMapT         vars_;                       ///< The variables stored by varName.
     const bool         binary_;                     ///< output in binary or ascii format
     const bool         onlyP1_;                     ///< the simulation only contains P1 data and therefore only that kind of data will be written out (shrinks file sizes)
-    bool               geomwritten_;                ///< flag if geometry has been written
 
     vertexAddressMapT   vAddrMap_;                  ///< Map vertex address to a unique (consecutive) number
     edgeAddressMapT     eAddrMap_;                  ///< Map edge address to a unique (consecutive) number

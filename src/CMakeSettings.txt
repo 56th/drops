@@ -24,6 +24,9 @@ set(GCC_CXX_FLAGS_RELEASE "-O3 --fast-math -W -Wall -pedantic")
 # IBM compiler
 set(XL_CXX_FLAGS_DEBUG "-O0 -g -qlanglvl=extended0x")
 set(XL_CXX_FLAGS_RELEASE "-O5 -qlanglvl=extended0x")
+# CLANG compiler
+set(CLANG_CXX_FLAGS_DEBUG "-g -O0 -W -Wall -pedantic -Wno-unknown-pragmas")
+set(CLANG_CXX_FLAGS_RELEASE "-O3 -W -Wall -pedantic -Wno-unknown-pragmas")
 
 # MPI turned off by default
 option(MPI FALSE)

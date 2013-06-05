@@ -151,6 +151,7 @@ void AccumulatorTupleCL<VisitedT>::operator() (ExternalIteratorCL begin, Externa
     finalize_iteration();
 }
 
+#ifdef _OPENMP
 template<class VisitedT>
 void AccumulatorTupleCL<VisitedT>::operator() (const ColorClassesCL& colors)
 {
@@ -177,6 +178,8 @@ void AccumulatorTupleCL<VisitedT>::operator() (const ColorClassesCL& colors)
 
     finalize_iteration();
 }
+#endif
+
 
 /// \brief Accumulation over sequences of TetraCL.
 typedef AccumulatorTupleCL<TetraCL> TetraAccumulatorTupleCL;
@@ -198,11 +201,13 @@ struct do_accumulateCL
 template <class VisitedT>
 struct do_accumulateCL<AccumulatorTupleCL<VisitedT> >
 {
-    static void accumulate (AccumulatorTupleCL<VisitedT>& accu, const MultiGridCL& mg, int lvl, match_fun match, const BndCondCL& Bnd)
+    static void accumulate (AccumulatorTupleCL<VisitedT>& accu, const MultiGridCL& mg, int lvl, __UNUSED__ match_fun match, __UNUSED__ const BndCondCL& Bnd)
     {
+#ifdef _OPENMP
         if (omp_get_max_threads() > 1)
             accu( mg.GetColorClasses( lvl, match, Bnd));
         else
+#endif
             accu( mg.GetTriangTetraBegin( lvl), mg.GetTriangTetraEnd( lvl));
     }
 };

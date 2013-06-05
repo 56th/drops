@@ -778,7 +778,7 @@ EigenValueMaxMG(const MLMatrixCL& A, const ProlongationT& P, VectorCL& x, int it
 //    SORsmoothCL smoother( omega); // Gauss-Seidel with over-relaxation
     SSORsmoothCL smoother( omega); // symmetric Gauss-Seidel with over-relaxation
 //    CGSolverCL  solver( 200, tol); //CG-Verfahren
-    SSORPcCL directpc; PCGSolverCL<SSORDiagPcCL> solver( directpc, 200, 1e-15);
+    SSORPcCL directpc; PCGSolverCL<SSORPcCL> solver( directpc, 200, 1e-15);
     x/= norm( x);
     std::cout << "EigenValueMaxMG:\n";
     for (int i= 0; i<iter; ++i) {
