@@ -189,7 +189,6 @@ void RepairFECL<ValueT, LocalFEDataT, BndDataT>::unrefinement (const TetraCL& t,
 
     QRDecompCL<4> T;
     BaryCoordCL tmp;
-    typedef typename RepairFEDataCL<value_type>::ChildVecT ChildVecT;
     repairdata.repair( dof, new_vd_->Data);
 }
 

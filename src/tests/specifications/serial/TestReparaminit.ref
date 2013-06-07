@@ -1,0 +1,46 @@
+#---------------------SPECIFICATION FILE----------------------------------------
+Type of test: serial
+Name of executable: reparam_init
+#The path to the folder where the executable is located must be relative to the
+#/drops folder
+Folder of executable: tests
+#The path to the folder where the parameter-file is located must be relative to
+#the folder where the executable is situated
+Path of parameter-file: reparam_init.json
+Name of test: testReaparaminit
+Name of author: Yuanjun Zhang
+#-------------------------------------------------------------------------------
+#------------------------------NUMBERS------------------------------------------
+Name of variable: "vertex-sup-norm"
+Prefix of variable: "v1 : "
+Value of variable: 0
+Relative error:
+Absolute error: 0.57
+Name of variable: "dist-to-sphere"
+Prefix of variable: "d1 : "
+Value of variable: 0
+Relative error:
+Absolute error: 0.4
+Name of variable: "facet-sup-norm"
+Prefix of variable: "f1 :"
+Value of variable: 0
+Relative error:
+Absolute error: 1
+Name of variable: "vertex-sup-norm-rep"
+Prefix of variable: "v2 : "
+Value of variable: 0
+Relative error:
+Absolute error: 0.58
+Name of variable: "dist-to-sphere-rep"
+Prefix of variable: "d2 : "
+Value of variable: 0
+Relative error:
+Absolute error: 0.4
+Name of variable: "facet-sup-norm-rep"
+Prefix of variable: "f2 : "
+Value of variable: 0
+Relative error:
+Absolute error: 1
+#-------------------------------------------------------------------------------
+#------------------------------STRINGS-------------------------------------------
+#-------------------------------------------------------------------------------

@@ -1333,7 +1333,7 @@ ReadMeshBuilderCL::buildBoundaryImp(MultiGridCL* mgp) const
         switch(section.headerinfo[3]) { // switch on boundary-condition.
           case 2: break; // interior faces
           default:
-            Bnd.push_back( new MeshBoundaryCL( section.headerinfo[0], // zone-id
+            Bnd.push_back( new MeshBoundaryCL( //section.headerinfo[0], // zone-id
                                                section.headerinfo[3])); // the bc-type; see Mesh-File-Format C.8
             BC_.push_back( MapBC(section.headerinfo[3]));
             zone_id2bndidx_[section.headerinfo[0]]= Bnd.size()-1;

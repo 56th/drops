@@ -880,7 +880,6 @@ void Adapt( P2EvalCL<Data, _BndData, _VD>& sol, const P2EvalCL<Data, _BndData, c
     const MultiGridCL& _MG= old_sol.GetMG();
     const Uint level= sol.GetLevel();
     const Uint old_idx= old_sol.GetSolution()->RowIdx->GetIdx();
-    const Uint NumUnknowns=  old_sol.GetSolution()->RowIdx->NumUnknownsEdge;
 
     Assert( level==old_sol.GetLevel(),
         DROPSErrCL("Adapt: Same triang levels are expected\n"), ~0);

@@ -101,9 +101,17 @@ class GeomMGOutCL : public MGOutCL
     Uint   _level;
     bool   _onlyBnd;
     double _explode;
+#ifdef _PAR
     double _procExplode;
+#endif
 
   public:
+#ifndef _PAR
+    GeomMGOutCL (const MultiGridCL& MG, int TriLevel=-1, bool onlyBnd=false,
+                 double explode=0)
+        : MGOutCL(&MG), _level( TriLevel<0 ? MG.GetLastLevel() : TriLevel ),
+          _onlyBnd(onlyBnd), _explode(explode) {}
+#else
     GeomMGOutCL (const MultiGridCL& MG, int TriLevel=-1, bool onlyBnd=false,
                  double explode=0, double procExplode=0.5)
         : MGOutCL(&MG), _level( TriLevel<0 ? MG.GetLastLevel() : TriLevel ),
@@ -111,7 +119,7 @@ class GeomMGOutCL : public MGOutCL
 
     void   SetExplode (double explode) { _explode = explode; }
     double GetExplode () const         { return _explode; }
-
+#endif
     virtual std::ostream& put (std::ostream&) const;
 };
 

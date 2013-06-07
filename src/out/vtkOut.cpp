@@ -41,10 +41,9 @@ VTKOutCL::VTKOutCL(const MultiGridCL& mg, const std::string& dataname, Uint nums
 \param binary    Write out files in binary format.
 \param lvl       Multigrid level
 */
-    : mg_(mg), timestep_(0), numsteps_(numsteps), descstr_(dataname),
-      dirname_(dirname), filename_(filename), pvdfilename_(pvdfilename), 
-      binary_(binary), onlyP1_(onlyP1), geomwritten_(false),
-      vAddrMap_(), eAddrMap_(), coords_(), tetras_(), lvl_(lvl),
+    : mg_(mg), timestep_(0), descstr_(dataname), dirname_(dirname), 
+      filename_(filename), pvdfilename_(pvdfilename), binary_(binary), 
+      onlyP1_(onlyP1), vAddrMap_(), eAddrMap_(), coords_(), tetras_(), lvl_(lvl),
       numPoints_(0), numTetras_(0), reusepvd_(reusepvd), usedeformed_(usedeformed)
 {
     if (!dirname.empty() && *dirname.rbegin()!='/' )

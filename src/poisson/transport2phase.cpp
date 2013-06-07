@@ -155,20 +155,24 @@ void TransportP1CL::SetupInstatSystem (MatrixCL& matA, VecDescCL* cplA,
         SetupLocalSystem ( *sit, coupM, coupA, coupC, p2, pipj, p);
         n.assign( *sit, RowIdx, Bnd_);
         // write values into matrix
-        for(int i= 0; i < 4; ++i)
+        for(int i= 0; i < 4; ++i){
             if (n.WithUnknowns( i))
-                for(int j= 0; j < 4; ++j)
+                for(int j= 0; j < 4; ++j){
                     if (n.WithUnknowns( j)) {
                         M( n.num[i], n.num[j])+= coupM[j][i];
                         A( n.num[i], n.num[j])+= coupA[j][i];
                         C( n.num[i], n.num[j])+= coupC[j][i];
                     }
-                    else if (cplM != 0) {
-                        const double val= Bnd_.GetBndFun( n.bndnum[j])( sit->GetVertex( j)->GetCoord(), time);
-                        cplM->Data[n.num[i]]-= coupM[j][i]*val;
-                        cplA->Data[n.num[i]]-= coupA[j][i]*val;
-                        cplC->Data[n.num[i]]-= coupC[j][i]*val;
+                    else {
+                        if (cplM != 0) {
+                            const double val= Bnd_.GetBndFun( n.bndnum[j])( sit->GetVertex( j)->GetCoord(), time);
+                            cplM->Data[n.num[i]]-= coupM[j][i]*val;
+                            cplA->Data[n.num[i]]-= coupA[j][i]*val;
+                            cplC->Data[n.num[i]]-= coupC[j][i]*val;
+                        }
                     }
+                }
+        }
     }
     A.Build();
     M.Build();

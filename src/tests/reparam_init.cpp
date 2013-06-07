@@ -33,6 +33,10 @@
 #include "out/ensightOut.h"
 #include "levelset/adaptriang.h"
 #include <tr1/unordered_map>
+#include "misc/params.h"
+#include <fstream>
+
+DROPS::ParamCL P;
 
 using namespace DROPS;
 
@@ -167,19 +171,34 @@ void CheckSigns (MultiGridCL& mg, const VecDescCL& Phi, const VecDescCL* Phi2= 0
 }
 
 
-int main ()
+int main( int argc, char **argv)
 {
   try {
     orig[0]= 0.005; orig[1]= 0.003; orig[2]= 0.001;
     // TestDist();
     // return 0;
 
+    std::ifstream param;
+    if (argc != 2) {
+        std::cout << "Using default parameter file: reparam_init.json\n";
+        param.open("reparam_init.json");
+    }
+    else{
+        std::cout << "Opening file " << argv[1] << std::endl;
+        param.open(argv[1]);
+    }
+    if (!param) {
+        std::cerr << "error while opening parameter file\n";
+        return 1;
+    }
+    param >> P;
+    param.close();
+    std::cout << P << std::endl;
+
     int numref;
-    std::cout << " numref: ";
-    std::cin >> numref;
+    numref = P.get<int>("Reparam.NumRef");
     int f_lvl;
-    std::cout << " f_lvl: ";
-    std::cin >> f_lvl;
+    f_lvl = P.get<int>("Reparam.FineLvl");
 
     DROPS::BrickBuilderCL brick( Point3DCL( -1.0),
                                   2.0*std_basis<3>(1),
@@ -209,11 +228,12 @@ int main ()
 
     VecDescCL vd_dist( &lset.idx);
     vd_dist.Data= lset_d.Phi.Data;
-    std::cout << "sup of (the P2-interpolant of) dist_\\Gamma  on \\Gamma_h: "
-        << vertex_sup_norm( mg, lset.Phi, lset.GetBndData(), lset_d.GetSolution()) << std::endl;
-    std::cout << "sup of dist_\\Gamma on \\Gamma_h: " << dist_to_sphere( mg, lset.Phi, lset.GetBndData()) << std::endl;
-    std::cout << "sup of gradient-difference on \\Gamma_h: "
-        << facet_sup_norm( mg, lset.Phi, lset.GetBndData()) << std::endl;
+    std::cout << "sup of (the P2-interpolant of) dist_\\Gamma  on \\Gamma_h: " << "\n"
+    		  << "v1 : "<< vertex_sup_norm( mg, lset.Phi, lset.GetBndData(), lset_d.GetSolution()) << std::endl;
+    std::cout << "sup of dist_\\Gamma on \\Gamma_h: " << "\n"
+    		  << "d1 : "<< dist_to_sphere( mg, lset.Phi, lset.GetBndData()) << std::endl;
+    std::cout << "sup of gradient-difference on \\Gamma_h: " << "\n"
+    		  << "f1 : " << facet_sup_norm( mg, lset.Phi, lset.GetBndData()) << std::endl;
     // CheckSigns ( mg, lset.Phi);
 
 
@@ -232,13 +252,12 @@ int main ()
     ensight.Register( make_Ensight6Scalar( lset_rep.GetSolution(),  "Reparam",     ensf + "_reparam.scl"));
     ensight.Write();
 
-    std::cout << "after reparametrization: sup of (the P2-interpolant of) dist_\\Gamma  on \\Gamma_h: "
-        << vertex_sup_norm( mg, lset_rep.Phi, lset_rep.GetBndData(), make_P2Eval( mg, lsbnd, vd_dist)) << std::endl;
-    std::cout << "after reparametrization: sup of dist_\\Gamma on \\Gamma_h: "
-        << dist_to_sphere( mg, lset_rep.Phi, lset_rep.GetBndData()) << std::endl;
-
-    std::cout << "sup of gradient-difference on \\Gamma_h: "
-        << facet_sup_norm( mg, lset_rep.Phi, lset_rep.GetBndData()) << std::endl;
+    std::cout << "after reparametrization: sup of (the P2-interpolant of) dist_\\Gamma  on \\Gamma_h: " << "\n"
+    		  << "v2 : "<< vertex_sup_norm( mg, lset_rep.Phi, lset_rep.GetBndData(), make_P2Eval( mg, lsbnd, vd_dist)) << std::endl;
+    std::cout << "after reparametrization: sup of dist_\\Gamma on \\Gamma_h: " << "\n"
+    		  << "d2 : "<< dist_to_sphere( mg, lset_rep.Phi, lset_rep.GetBndData()) << std::endl;
+    std::cout << "sup of gradient-difference on \\Gamma_h: " << "\n"
+    		  << "f2 : "<<facet_sup_norm( mg, lset_rep.Phi, lset_rep.GetBndData()) << std::endl;
     // CheckSigns ( mg, lset_rep.Phi, &lset.Phi);
   }
   catch( DROPSErrCL d) {

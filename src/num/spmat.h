@@ -318,8 +318,13 @@ void inplace_parallel_partial_sum (iterator begin, iterator end,
     if (begin == end)
         return;
 
+#ifdef _OPENMP
     const Uint num_threads= omp_get_num_threads();
     const Uint tid= omp_get_thread_num();
+#else
+    const Uint num_threads= 1;
+    const Uint tid= 0;
+#endif
 
     // Compute the part of [begin, end) to be considered in the current thread.
     const size_t chunk_size= (end - begin)/num_threads;
@@ -533,8 +538,10 @@ public:
         {
             Comment("SparseMatBuilderCL: Creating NEW matrix" << std::endl, DebugNumericC);
             _coupl= new couplT[_rows/BlockTraitT::num_rows];
+#if DROPS_SPARSE_MAT_BUILDER_USES_HASH_MAP
             for (size_t i=0; i< _rows/BlockTraitT::num_rows; ++i)
                 _coupl[i].rehash(100);
+#endif
         }
     }
 
@@ -575,7 +582,12 @@ void SparseMatBuilderCL<T, BlockT>::Build()
     int i;
 #endif
 
+#ifdef _OPENMP
     size_t* t_sum= new size_t[omp_get_max_threads()];
+#else
+    size_t* t_sum= new size_t[1];
+#endif
+
 #   pragma omp parallel
     {
 #       pragma omp for
@@ -1197,7 +1209,11 @@ SparseMatBaseCL<T>& SparseMatBaseCL<T>::LinComb (double coeffA, const SparseMatB
     num_rows( A.num_rows());
     num_cols( A.num_cols());
     _rowbeg[0]= 0;
+#ifdef _OPENMP
     size_t* t_sum= new size_t[omp_get_max_threads()];
+#else
+    size_t* t_sum= new size_t[1];
+#endif
 
 #   pragma omp parallel
     {
