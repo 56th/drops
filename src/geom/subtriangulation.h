@@ -241,9 +241,9 @@ class BndTriangPartitionCL
     void make_partition2D (const PrincipalLatticeCL& lat, Uint face, const std::valarray<double>& ls);
 
     Uint triangle_size  (TetraSignEnum s= AllTetraC) const ///< number of triangles
-         { return triangle_begin(s) - triangle_end(s); }
+         {  return triangle_end(s)-triangle_begin(s); }
     Uint vertex_size () const                              ///< number of vertexes
-         { return vertex_begin() - vertex_end(); }
+         { return   vertex_end()-vertex_begin(); }
 
     /// Random-access to the triangles and vertices, order of vertices and triangles: first the negative, then the positve
     ///@{

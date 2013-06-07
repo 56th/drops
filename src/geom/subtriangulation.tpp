@@ -257,7 +257,7 @@ template <class VertexPartitionPolicyT, class VertexCutMergingPolicyT>
         bool OnCutBnd = on_cutBnd( ls, ls_sign, lat, *lattice_tet, loc_ls, loc_ls_sign, face);
 		if(OnCutBnd)
 		{
-			std::cout<<"****************** One cut boundary face is found"<<std::endl;
+			//std::cout<<"****************** One cut boundary face is found"<<std::endl;
 			const RefTrianglePartitionCL cut(loc_ls_sign, Ubyte(face));                          //casting from unsigned int to unsigned char?
 			for (RefTrianglePartitionCL::const_triangle_iterator it= cut.triangle_begin(), end= cut.triangle_end(); it != end; ++it)
 				(cut.sign( it) == -1 ? triangles_ : loc_triangles).push_back( make_sub_triangle(
@@ -265,8 +265,10 @@ template <class VertexPartitionPolicyT, class VertexCutMergingPolicyT>
 		}
     }
     pos_triangles_begin_= triangles_.size(); 
+
+    if(loc_triangles.end()-loc_triangles.begin()!=0)
     std::copy( loc_triangles. begin(), loc_triangles.end(), std::back_inserter( triangles_));    //insert the positive triangles
-    
+
 	//unsorted vertexes, other sorted policy could be added if needed in the future
 	std::copy( lat.vertex_begin(), lat.vertex_end(), std::back_inserter( vertexes_));            //insert all vertices in the principal lattice;
     VertexContT cut_vertexes=edgecut.cut_vertex_container();

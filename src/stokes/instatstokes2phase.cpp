@@ -103,15 +103,19 @@ void SpecialBndHandleSystem2_P2P1XCL::setupB(SMatrixCL<1, 3> loc_b[4][10], const
 {
 	GridFunctionCL<> qvel[6];
 	GridFunctionCL<> qpr[3];
-	int eqsign;
+	int sign1=0,sign2=0;
 	for (Uint k =0; k< 4; ++k) //Go throught all faces of a tet
 	{
 		if( BndData_.Vel.GetBC(*tet.GetFace(k))==Slip0BC || BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC || BndData_.Vel.GetBC(*tet.GetFace(k))==SymmBC)
 		{
-			eqsign=0;
+			sign1=0,sign2=0;
 			for(Uint j=0; j<3; j++)
-				eqsign+=ls_sign[j<k?j:j+1];
-			if(eqsign==3||eqsign==-3)	continue;
+			{
+				sign1= (ls_sign[j<k?j:j+1]<0)?-1:sign1;
+				sign2= (ls_sign[j<k?j:j+1]>0)?1:sign2;
+			}
+		//	std::cout<<sign1<<" "<<sign2<<std::endl;
+			if(sign1*sign2!=-1)	continue;
 
 		    tet.GetOuterNormal(k, normal);
 
@@ -1580,8 +1584,9 @@ void SpecialBndHandler_System1TwoPhaseCL::setup(const TetraCL& tet, const SMatri
 			
 			evaluate_on_vertexes( ls, lat, Addr( ls_loc));  //Get level set valuse
 			partition.make_partition2D<SortedVertexPolicyCL, MergeCutPolicyCL>(lat, k, ls_loc);
+
 			make_CompositeQuad5BndDomain2D(q5dom, partition, tet);
-			
+
 			for (Uint i= 0; i<3; ++i)    
 			{
 				unknownIdx[i]   = VertOfFace(k, i);      // i is index for Vertex
