@@ -25,6 +25,7 @@
 #include "num/directsolver.h"
 #include <iostream>
 
+// A symmetric matrix and rhs b is given, both symmetric and non-symmetric solver will be tested.
 int Test()
 {
     std::cout << "DirectSolver 4x4:\n" << std::endl;
@@ -62,10 +63,10 @@ int Test()
     dsolver.Solve(A,x,b);
     dsolver.Update(A);
     dsolver.Solve(A,x,b);
-    std::cout << "x\n" << x << std::endl;
+    std::cout << "Using DirectSymmSoverCL x:" << x << std::endl;
     DROPS::DirectNonSymmSolverCL dnsolver(A);
     dnsolver.Solve(A,x,b);
-    std::cout << "x\n" << x << std::endl;
+    std::cout << "Using DirectNonSymmSoverCL x:" << x << std::endl;
     return 0;
 }
 
