@@ -157,7 +157,7 @@ void TransportP1CL::SetupInstatSystem (MatrixCL& matA, VecDescCL* cplA,
         // write values into matrix
         for(int i= 0; i < 4; ++i){
             if (n.WithUnknowns( i))
-                for(int j= 0; j < 4; ++j)
+                for(int j= 0; j < 4; ++j){
                     if (n.WithUnknowns( j)) {
                         M( n.num[i], n.num[j])+= coupM[j][i];
                         A( n.num[i], n.num[j])+= coupA[j][i];
@@ -171,6 +171,7 @@ void TransportP1CL::SetupInstatSystem (MatrixCL& matA, VecDescCL* cplA,
                             cplC->Data[n.num[i]]-= coupC[j][i]*val;
                         }
                     }
+                }
         }
     }
     A.Build();

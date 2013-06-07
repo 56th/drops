@@ -201,12 +201,11 @@ class AffineTriangleCL : public BndSegCL
 class MeshBoundaryCL : public BndSegCL
 {
   private:
-    Uint zone_id_;
     Uint bc_; // Boundary condition as per mesh file. TODO: Use an enum.
 
   public:
-    MeshBoundaryCL(Uint zid, Uint bc)
-        :BndSegCL( false), zone_id_( zid), bc_( bc) {}
+    MeshBoundaryCL(Uint bc)
+        :BndSegCL( false), bc_( bc) {}
     // Default copy-ctor, assignment-op.
 
     virtual bool      IsInBounds (const Point2DCL&) const {
