@@ -352,7 +352,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         std::string ensf( P.get<std::string>("Ensight.EnsDir") + "/" + P.get<std::string>("Ensight.EnsCase"));
         ensight = new Ensight6OutCL( P.get<std::string>("Ensight.EnsCase") + ".case",
                                      P.get<int>("Time.NumSteps")/P.get("Ensight.EnsightOut", 0)+1,
-                                     P.get<int>("Ensight.Binary"), P.get<int>("Ensight.MasterOut"));
+                                     P.get<int>("Ensight.Binary"));
         ensight->Register( make_Ensight6Geom      ( MG, MG.GetLastLevel(), P.get<std::string>("Ensight.GeomName"),
                                                     ensf + ".geo", true));
         ensight->Register( make_Ensight6Scalar    ( lset.GetSolution(),      "Levelset",      ensf + ".scl", true));
