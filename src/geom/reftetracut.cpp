@@ -213,8 +213,9 @@ operator<< (std::ostream& out, const RefTetraPartitionCL& c)
     return out;
 }
 
-RefTrianglePartitionCL::RefTrianglePartitionCL(const byte ls[4], Ubyte VertexNum)
+RefTrianglePartitionCL::RefTrianglePartitionCL(byte ls[4], Ubyte VertexNum)
 {
+   ls[VertexNum] = 0;
    Ubyte vert[3]; //Used to store indices of vertices of the triangle
    const RefTetraPartitionCL& RefTetraPart= RefTetraPartitionCL::instance(ls);
    size_=RefTetraPart.tetra_size(AllTetraC);

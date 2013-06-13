@@ -59,7 +59,8 @@ copy_local_level_set_values( const std::valarray<double>& ls, const std::valarra
     }
 }
 
-///\brief See if the tetra in Lattice on specific boundary, and set up "correct" level set values and sign;
+///\brief Check if a sub-tetra in the Lattice has the face with FaceNum, and copy the local level set values and signs;
+//This function is created for check if a sub-tetra has a face which is a cut face by interface
 inline bool
 on_cutBnd(const std::valarray<double>& ls, const std::valarray<byte>& ls_sign, const PrincipalLatticeCL& lattice, const PrincipalLatticeCL::TetraT& lattice_tet, 
 double loc_ls[4], byte loc_ls_sign[4], Uint FaceNum)
@@ -68,18 +69,14 @@ double loc_ls[4], byte loc_ls_sign[4], Uint FaceNum)
 	int counter = 0;
     for (Uint i= 0; i < 4; ++i)
 	{
-	  //check if the vertex i is on the face 	
-	  if( lattice.GetBaryCoord(lattice_tet[i])[FaceNum] < 10e-9)
-	  {
 		loc_ls_sign[i]= ls_sign[lattice_tet[i]];
         loc_ls     [i]= ls     [lattice_tet[i]];
-		counter++;
-	  }
-	  else
-      {
-		loc_ls_sign[i]= 0.;
-        loc_ls     [i]= 0.;
-	  }
+		//check if the vertex i is on the face 	
+		if( lattice.GetBaryCoord(lattice_tet[i])[FaceNum] < 10e-9)
+		{
+
+			counter++;
+		}
 	}
 	if (counter == 3 )
         OnCutBnd = true;
@@ -253,7 +250,7 @@ template <class VertexPartitionPolicyT, class VertexCutMergingPolicyT>
     byte   loc_ls_sign[4];
     for (PrincipalLatticeCL::const_tetra_iterator lattice_tet= lat.tetra_begin(), lattice_end= lat.tetra_end(); lattice_tet != lattice_end; ++lattice_tet) {
 		
-		// check if a sub_tetra in lattice is a tetra on the face, and set level set value to 0 if a vertex is not on this face
+		// check if a sub_tetra in the lattice (with 2 intervals) is a sub_tetra which has the face
         bool OnCutBnd = on_cutBnd( ls, ls_sign, lat, *lattice_tet, loc_ls, loc_ls_sign, face);
 		if(OnCutBnd)
 		{
