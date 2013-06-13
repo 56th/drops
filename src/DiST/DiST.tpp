@@ -47,8 +47,6 @@ void InterfaceCL::GatherData( HandlerT& handler, const iterator& begin,
     const iterator& end, CommPhase phase)
 /** This function also allocates the memory for sending data to the owner processes. */
 {
-    typedef RemoteDataCL::ProcList_const_iterator ProcList_const_iterator;
-
     for ( iterator it( begin); it != end; ++it) {
         const int owner= it->second.GetOwnerProc();
         // Generates the sendbuf_ for owner, if not already there.

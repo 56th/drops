@@ -162,7 +162,6 @@ void Reparam( LevelsetP2CL& lset, Uint steps, double dt, double theta, double di
         L.LinComb( 1./dt, M, theta, R);
 
         b+= (1./dt)*(M*Psi) - (1.-theta) * (R*Psi);
-        typedef GMResSolverCL<SSORPcCL> LsetSolverT;
         SSORPcCL ssorpc;
         GMResSolverCL<SSORPcCL> gm( ssorpc, 100, 1000, 1e-7);
         gm.Solve( L, Psi, b, lset.idx.GetEx());

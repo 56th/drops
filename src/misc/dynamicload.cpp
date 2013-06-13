@@ -67,7 +67,6 @@ void read_file(const std::string& path){
     
     if(!handle) throw DROPSErrCL((std::string)dlerror());
     
-    typedef int (*fnc_t)(void* handle);
     dlerror(); //clear errors
     
     /* in case we ever want to load function symbols, this is how to do it
