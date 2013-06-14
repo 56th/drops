@@ -34,7 +34,7 @@
 #include <sstream>
 
 
-void triangle_partition()
+void test_triangle_partition()
 {
 	std::cout<<"=========================TrianglePartitionCL test: \n"
 	         <<"all 26 level-set sign patterns (except 0, 0, 0) will be prescribed, then the corresponding reference triangle partition info will be given"<<std::endl;
@@ -74,10 +74,57 @@ void triangle_partition()
 		std::cout<<"The vertex size and the triangle size of BndTrianglePartitionCL is consistent with Ref..."<<std::endl;
 }
 
+inline double cylinder_instat (const DROPS::Point3DCL& p, double)
+{
+    return p[0]*p[0] + p[2]*p[2] -0.5*0.5;
+}
+
+inline double ball_instat (const DROPS::Point3DCL& p, double)
+{
+	return p.norm() - 0.5;
+}
+
+void test_bnd_integral()
+{
+	std::cout<<"=========================cut boundary integral test: \n"
+	         <<"One cut boundary is integrated seperately by positive part and negative part"<<std::endl;
+	DROPS::Uint num_sub = 32;
+    DROPS::Uint num_sub_lattice = 2;
+	DROPS::Point3DCL orig;
+	orig[0] = -1;
+	orig[2] = -1;
+	// [-1, 1] x[0, 2] x[-1, 1] brick
+    DROPS::BrickBuilderCL brick(orig, 2.*DROPS::std_basis<3>(1), 2.*DROPS::std_basis<3>(2), 2.*DROPS::std_basis<3>(3), num_sub, num_sub, num_sub);
+    DROPS::MultiGridCL mg( brick);
+    const DROPS::PrincipalLatticeCL& lat= DROPS::PrincipalLatticeCL::instance( num_sub_lattice);
+    DROPS::GridFunctionCL<> ls( lat.vertex_size());	
+    DROPS::BndTriangPartitionCL BndTri;
+    double area_neg= 0.;
+    double area_pos= 0.;
+	DROPS::QuadDomainCL qdom;
+	bool onbnd = false;
+	DROPS_FOR_TRIANG_TETRA( mg, 0, it) {
+		evaluate_on_vertexes( ball_instat, *it, lat, 0., Addr( ls));
+		onbnd = (*it).IsBndSeg(3);   //it seems segment 3 is the face number for all "bottom" tetra
+		if(onbnd)
+		{
+			BndTri.make_partition2D<DROPS::PartitionedVertexPolicyCL, DROPS::MergeCutPolicyCL>( lat, 3, ls);
+			DROPS::make_CompositeQuad5BndDomain2D(qdom, BndTri, *it); 
+			DROPS::GridFunctionCL<> integrand( 1., qdom.vertex_size()); // Gridfunction with constant 1 everywhere
+			double tmp_neg, tmp_pos;
+			quad( integrand, qdom, tmp_neg, tmp_pos);
+			area_neg+= tmp_neg; area_pos+= tmp_pos;
+		}
+    }
+	//analytical solution of negative area is 0.78539815
+    std::cout << "Aear of the negative part: " << area_neg << ", area of the positive part: " << area_pos << std::endl;
+}
+
 int main()
 {
     try {
-        triangle_partition();
+        test_triangle_partition();
+		test_bnd_integral();
     }
     catch (DROPS::DROPSErrCL err) { err.handle(); }
     return 0;
