@@ -1,6 +1,6 @@
 /// \file instatstokes2phase.cpp
 /// \brief classes that constitute the 2-phase Stokes problem
-/// \author LNM RWTH Aachen: Jens Berger, Patrick Esser, Joerg Grande, Sven Gross, Volker Reichelt, Yuanjun Zhang; SC RWTH Aachen: Oliver Fortmeier
+/// \author LNM RWTH Aachen: Jens Berger, Patrick Esser, Joerg Grande, Sven Gross, Volker Reichelt, Liang Zhang, Yuanjun Zhang; SC RWTH Aachen: Oliver Fortmeier
 
 /*
  * This file is part of DROPS.
@@ -1349,7 +1349,7 @@ struct LocalSystem1DataCL
 };
 
 /// \brief Update the local system 1 (nocut) with respect to special boundary conditions: slip Bnd and symmetric Bnd;
-class SpecialBndHandler_System1OnePhaseCL
+class SpecialBndHandler_System1OnePhaseP2CL
 {
   private:
     const StokesBndDataCL& BndData_;
@@ -1360,14 +1360,14 @@ class SpecialBndHandler_System1OnePhaseCL
 	Point3DCL normal;
 	Uint unknownIdx[6];
   public:	
-	SpecialBndHandler_System1OnePhaseCL(const StokesBndDataCL& BndData, double mu, const double beta=0, const double alpha=0): BndData_(BndData), mu_(mu), beta_(beta), alpha_(alpha)
+	SpecialBndHandler_System1OnePhaseP2CL(const StokesBndDataCL& BndData, double mu, const double beta=0, const double alpha=0): BndData_(BndData), mu_(mu), beta_(beta), alpha_(alpha)
     { P2DiscCL::GetGradientsOnRef( GradRef); 
 	}
     void setup(const TetraCL& tet, const SMatrixCL<3,3>& T, LocalSystem1DataCL& loc);  //update local system 1
 	void setupRhs(const TetraCL& tet, Point3DCL loc_b[10]);                            //for no homogenour slip boundary condition (the slip wall is moving)
 };
 
-void SpecialBndHandler_System1OnePhaseCL::setup(const TetraCL& tet, const SMatrixCL<3,3>& T, LocalSystem1DataCL& loc)
+void SpecialBndHandler_System1OnePhaseP2CL::setup(const TetraCL& tet, const SMatrixCL<3,3>& T, LocalSystem1DataCL& loc)
 { 
 
     P2DiscCL::GetGradients( Grad, GradRef, T);
@@ -1421,7 +1421,7 @@ void SpecialBndHandler_System1OnePhaseCL::setup(const TetraCL& tet, const SMatri
 }
 
 //for no homogenour slip boundary condition (the slip wall is moving)
-void SpecialBndHandler_System1OnePhaseCL::setupRhs(const TetraCL& tet, Point3DCL loc_b[10])
+void SpecialBndHandler_System1OnePhaseP2CL::setupRhs(const TetraCL& tet, Point3DCL loc_b[10])
 {
 
 	Point3DCL Wallvel_val[6];
@@ -1534,7 +1534,7 @@ struct LocalIntegrals_P2CL
 };
 
 /// \brief Update the local system 1 (with cut) with respect to special boundary conditions: slip Bnd and symmetric Bnd;
-class SpecialBndHandler_System1TwoPhaseCL
+class SpecialBndHandler_System1TwoPhaseP2CL
 {
 	private:
 	const PrincipalLatticeCL& lat;
@@ -1553,7 +1553,7 @@ class SpecialBndHandler_System1TwoPhaseCL
 	GridFunctionCL<double>   basisP2[6];
     GridFunctionCL<double>   gradP1[6];
   public:	
-	SpecialBndHandler_System1TwoPhaseCL(const StokesBndDataCL& BndData, double mu1, double mu2, const double beta1=0, const double beta2=0, const double alpha=0)
+	SpecialBndHandler_System1TwoPhaseP2CL(const StokesBndDataCL& BndData, double mu1, double mu2, const double beta1=0, const double beta2=0, const double alpha=0)
 	: lat( PrincipalLatticeCL::instance( 2)), BndData_(BndData), mu1_(mu1), mu2_(mu2), beta1_(beta1), beta2_(beta2), alpha_(alpha), ls_loc( lat.vertex_size())
     { P2DiscCL::GetGradientsOnRef( GradRef); }
 
@@ -1562,7 +1562,7 @@ class SpecialBndHandler_System1TwoPhaseCL
     void setup(const TetraCL& tet, const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, LocalSystem1DataCL& loc);  //update local system 1
 };
 
-void SpecialBndHandler_System1TwoPhaseCL::setup(const TetraCL& tet, const SMatrixCL<3,3>& T, const LocalP2CL<>& ls,  LocalSystem1DataCL& loc)
+void SpecialBndHandler_System1TwoPhaseP2CL::setup(const TetraCL& tet, const SMatrixCL<3,3>& T, const LocalP2CL<>& ls,  LocalSystem1DataCL& loc)
 { 
 
 	LocalBndIntegrals_P2CL locInt[2];
@@ -1765,8 +1765,8 @@ class System1Accumulator_P2CL : public TetraAccumulatorCL
     LocalSystem1TwoPhase_P2CL local_twophase; ///< used on intersected tetras
     LocalSystem1DataCL loc;                   ///< Contains the memory, in which the local operators are set up; former coupM, coupA, coupAk, rho_phi.
     LocalIntegrals_P2CL locInt[2];            ///< stores computed integrals on neg./pos. part to be used by P2X discretization
-	SpecialBndHandler_System1OnePhaseCL speBndHandler1;
-	SpecialBndHandler_System1TwoPhaseCL speBndHandler2;
+	SpecialBndHandler_System1OnePhaseP2CL speBndHandler1;
+	SpecialBndHandler_System1TwoPhaseP2CL speBndHandler2;
 
     LocalNumbP2CL n; ///< global numbering of the P2-unknowns
 
