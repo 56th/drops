@@ -328,7 +328,7 @@ namespace slipBnd{
 		ret[0] = 40.;
         return ret;
     }
-    DROPS::SVectorCL<3> TopVel( const DROPS::Point3DCL& p, double)
+    DROPS::SVectorCL<3> TopVel( const DROPS::Point3DCL&, double)
     {
         DROPS::SVectorCL<3> ret(0.);
 		ret[0] = 0.4;
