@@ -64,12 +64,10 @@ exec_ser(xfem misc-utils geom-builder geom-simplex geom-multigrid geom-deformati
 
 exec_ser(f_Gamma geom-boundary geom-builder geom-simplex geom-multigrid geom-deformation misc-scopetimer misc-progressaccu num-unknowns geom-topo num-fe misc-problem levelset-levelset misc-utils out-output num-discretize num-interfacePatch misc-params levelset-fastmarch stokes-instatstokes2phase levelset-surfacetension misc-funcmap misc-vectorFunctions geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature misc-dynamicload)
 if(NOT MPI)
-add_dependencies(f_Gamma levelset-twophaseCoeff)
+    add_dependencies(f_Gamma levelset-twophaseCoeff)
 endif(NOT MPI)
 
 exec_ser(neq misc-utils)
-
-exec_ser(directsolver misc-utils)
 
 exec_ser(extendP1onChild tests-extendP1onChild num-discretize misc-utils geom-topo num-fe misc-problem geom-deformation geom-simplex geom-multigrid num-unknowns num-interfacePatch)
 
@@ -80,7 +78,7 @@ exec_ser(reparam_init geom-boundary geom-builder geom-simplex geom-multigrid geo
 #reparam renamed to reparamtest
 exec_ser(reparamtest levelset-fastmarch levelset-levelset geom-deformation misc-scopetimer misc-progressaccu geom-simplex geom-multigrid geom-builder geom-topo geom-boundary num-unknowns misc-utils misc-problem num-discretize num-fe out-ensightOut num-interfacePatch levelset-surfacetension misc-params out-vtkOut geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature misc-dynamicload) ##${PAR_OBJ}
 if(NOT MPI)
-add_dependencies(reparamtest levelset-twophaseCoeff misc-scalarFunctions misc-vectorFunctions)
+    add_dependencies(reparamtest levelset-twophaseCoeff misc-scalarFunctions misc-vectorFunctions)
 endif(NOT MPI)
 
 exec_ser(principallattice tests-principallattice misc-utils geom-principallattice num-discretize geom-deformation geom-topo num-fe num-interfacePatch misc-problem num-unknowns geom-simplex geom-multigrid geom-builder geom-boundary num-unknowns geom-reftetracut geom-subtriangulation num-quadrature)
@@ -98,21 +96,20 @@ if(NOT MPI)
 endif(NOT MPI)
 
 if(EXISTS ${SUITESPARSE_HOME}) 
+    exec_ser(directsolver misc-utils)
 	#${SUITESPARSE_HOME}/metis-4.0/libmetis.a not used for now
-	target_link_libraries_ser(tests-directsolver ${SUITESPARSE_HOME}/UMFPACK/Lib/libumfpack.a ${SUITESPARSE_HOME}/CHOLMOD/Lib/libcholmod.a ${SUITESPARSE_HOME}/AMD/Lib/libamd.a ${SUITESPARSE_HOME}/COLAMD/Lib/libcolamd.a ${SUITESPARSE_HOME}/CCOLAMD/Lib/libccolamd.a ${SUITESPARSE_HOME}/CAMD/Lib/libcamd.a ${SUITESPARSE_HOME}/SuiteSparse_config/libsuitesparseconfig.a blas lapack)
-	set_target_properties(tests-directsolver PROPERTIES COMPILE_FLAGS "-I${SUITESPARSE_HOME}/CHOLMOD/Include -I${SUITESPARSE_HOME}/SuiteSparse_config -I${SUITESPARSE_HOME}/UMFPACK/Include -I${SUITESPARSE_HOME}/AMD/Include")
+    find_package(BLAS)
+    if (BLAS_FOUND)
+	    target_link_libraries_ser(tests-directsolver ${SUITESPARSE_HOME}/UMFPACK/Lib/libumfpack.a ${SUITESPARSE_HOME}/CHOLMOD/Lib/libcholmod.a ${SUITESPARSE_HOME}/AMD/Lib/libamd.a ${SUITESPARSE_HOME}/COLAMD/Lib/libcolamd.a ${SUITESPARSE_HOME}/CCOLAMD/Lib/libccolamd.a ${SUITESPARSE_HOME}/CAMD/Lib/libcamd.a ${SUITESPARSE_HOME}/SuiteSparse_config/libsuitesparseconfig.a ${BLAS_LIBRARIES} lapack)
+	    set_target_properties(tests-directsolver PROPERTIES COMPILE_FLAGS "-I${SUITESPARSE_HOME}/CHOLMOD/Include -I${SUITESPARSE_HOME}/SuiteSparse_config -I${SUITESPARSE_HOME}/UMFPACK/Include -I${SUITESPARSE_HOME}/AMD/Include")
+	else(BLAS_FOUND)
+	    add_custom_target(GiveBlasWarning COMMENT "Warning: BLAS library not found, directsolver will not link properly.")
+	    target_link_libraries(tests-directsolver GiveBlasWarning)
+	endif(BLAS_FOUND)    
 else()
-    add_custom_target(GiveSuiteSparseWarning COMMENT "Warning: SuiteSparse library not found, directsolver will not link properly.")
-    add_dependencies(directsolver GiveSuiteSparseWarning)
+    add_custom_target(directsolver COMMENT "Warning: SuiteSparse library not found, skipped compilation of directsolver.")
 endif()
 
-
-
-############### TEST FAILS TO COMPILE #######################
-#exec_ser(quad_extra misc-utils geom-builder geom-simplex geom-multigrid
-# geom-boundary geom-topo num-unknowns misc-problem
-# num-fe num-discretize num-interfacePatch
-# geom-principallattice geom-reftetracut geom-subtriangulation num-#quadrature)
 
 #### BEGIN HACKY VERSION OF TEST SUITE ###
 

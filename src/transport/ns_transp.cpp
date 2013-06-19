@@ -199,7 +199,7 @@ void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTr
         std::string ensf( P.get<std::string>("Ensight.EnsDir") + "/" + P.get<std::string>("Ensight.EnsCase"));
         ensight = new Ensight6OutCL( P.get<std::string>("Ensight.EnsCase") + ".case",
                                      P.get<int>("Time.NumSteps")/P.get("Ensight.EnsightOut", 0)+1,
-                                     P.get<int>("Ensight.Binary"), P.get<int>("Ensight.MasterOut"));
+                                     P.get<int>("Ensight.Binary"));
         ensight->Register( make_Ensight6Geom      ( MG, MG.GetLastLevel(),
                                                     P.get<std::string>("Ensight.GeomName"),
                                                     ensf + ".geo", true));
@@ -345,7 +345,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbndda
     VecDescCL old_v(&old_vidx);
 
     //Prolongate and Restrict solution vector old_v from old mesh to new mesh after mesh adaptation:
-    DROPS::VelTranspRepairCL old_vrepair(old_v, MG, Stokes.GetBndData().Vel, old_vidx, lset.Phi, lsetbnddata, 0.);
+    DROPS::VelTranspRepairCL old_vrepair(old_v, MG, Stokes.GetBndData().Vel, old_vidx, 0.);
     adap.push_back( &old_vrepair);
     oldlset.CreateNumbering( MG.GetLastLevel(), oldlidx);
     oldlset.Phi.SetIdx( oldlidx);
@@ -537,7 +537,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbndda
         std::string ensf( P.get<std::string>("Ensight.EnsDir") + "/" + P.get<std::string>("Ensight.EnsCase"));
         ensight = new Ensight6OutCL( P.get<std::string>("Ensight.EnsCase") + ".case",
                                      P.get<int>("Time.NumSteps")/P.get<int>("Ensight.EnsightOut")+1,
-                                     P.get<int>("Ensight.Binary"), P.get<int>("Ensight.MasterOut"));
+                                     P.get<int>("Ensight.Binary"));
         ensight->Register( make_Ensight6Geom      ( MG, MG.GetLastLevel(), P.get<std::string>("Ensight.GeomName"),
                                                     ensf + ".geo", true));
         ensight->Register( make_Ensight6Scalar    ( lset.GetSolution(),      "Levelset",      ensf + ".scl", true));

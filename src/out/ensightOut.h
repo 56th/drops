@@ -78,22 +78,16 @@ class Ensight6OutCL
     bool               timedep_;   ///< true, if there are time-dependent variables
     std::map<std::string, Ensight6VariableCL*> vars_;        ///< The variables and geometry stored by varName.
 
-    const int          tag_;        ///< tags used by this class (set to 2001) (used: tag, tag+1, tag+2)
-    char               procDigits_; ///< digits used for encoding procnumber
-    Ulint              nodes_;      ///< number of exclusive vertices of this proc
-    bool               masterout_;  ///< just the master processor writes a single file
-    bool               IamMaster_;  ///< serial code: true; parallel code: ProcCL::IamMaster
-
     /// \brief Internal helper
     ///@{
-    void OpenFile       (std::ofstream& of, std::string varName, bool appendproccode= false); ///< Append timecode for transient output and check the stream
+    void OpenFile       (std::ofstream& of, std::string varName); ///< Append timecode for transient output and check the stream
     bool putTime        (double t);                               ///< Advance timestep_, time_, timestr_, if t_> time_ and set time_= t_; returns true, if t_>time_.
     void CheckFile      (const std::ofstream&) const;
     void CommitCaseFile ();                                       ///< (Re)write case file
     ///@}
 
   public:
-    Ensight6OutCL  (std::string casefileName, Uint numsteps= 0, bool binary= true, bool masterout= true);
+    Ensight6OutCL  (std::string casefileName, Uint numsteps= 0, bool binary= true);
     ~Ensight6OutCL ();
 
     /// \brief Register a variable or the geometry for output with Write().
@@ -108,8 +102,6 @@ class Ensight6OutCL
 
     /// \brief Append the current timestep-value with the required number of leading '0' to str.
     void AppendTimecode(std::string& str) const;
-    /// \brief Append the id of this proc to the argument; does nothing in the serial code.
-    void AppendProccode( std::string&) const;
 
     /// \brief Interface for classes that implement the Ensight6VariableCL-interface, i.e. output of specific varibles; should probably be private.
     ///@{
@@ -126,13 +118,6 @@ class Ensight6OutCL
     /// \brief Write a vector value finite element function into a file
     template<class DiscVecT>
     void putVector (const DiscVecT& v, std::string varName);
-    ///@}
-
-    ///@{ Parallel output behaviour
-    /// \brief Set format, that each process writes out only own values
-    void SetMultipleOut() { masterout_= false; }
-    /// \brief Set format, that master process writes out all values
-    void SetMasterOut() { masterout_= true; }
     ///@}
 };
 
@@ -242,7 +227,6 @@ template <class DiscVectorT>
     return *new Ensight6VectorCL<DiscVectorT>( f, varName, fileName, timedep);
 }
 
-#ifndef _PAR
 ///\brief Represents a scalar P1X function as two Ensight6 variables.
 ///
 /// The class registers two P1-functions, neg and pos, which do the actual output. In order to prepare the data
@@ -349,7 +333,7 @@ make_Ensight6P2RVector (MultiGridCL& mg, const VecDescCL& lset, const BndDataCL<
 {
     return *new Ensight6P2RVectorCL( mg, lset, lsetbnd, v, bnd, varName, fileName, timedep);
 }
-#endif
+
 
 /// \brief Class for writing out 2 phase flows in ensight format
 template<typename StokesT, typename LevelsetT>
@@ -384,8 +368,8 @@ class Ensight2PhaseOutCL
                         const StokesT& stokes, const LevelsetT& lset,
                         const std::string& directory, const std::string& caseName,
                         const std::string& geomName, bool adaptive,
-                        Uint numsteps=0, bool binary=false, bool masterout=true )
-        : ensight_(caseName + ".case", numsteps, binary, masterout), adaptive_(adaptive),
+                        Uint numsteps=0, bool binary=false)
+        : ensight_(caseName + ".case", numsteps, binary), adaptive_(adaptive),
           timedep_(numsteps>0), stokes_(stokes), lset_(lset)
     {
         std::string ensf( directory + "/" + caseName);
@@ -407,25 +391,13 @@ class ReadEnsightP2SolCL
   private:
     const MultiGridCL* _MG;
     const bool         binary_;
-#ifdef _PAR
-    char               _procDigits;     // digits used for encoding procnumber
-
-    void AppendProccode( std::string&) const;
-#endif
 
     void CheckFile( const std::ifstream&) const;
 
   public:
     ReadEnsightP2SolCL( const MultiGridCL& mg, bool binary=true)
       : _MG(&mg), binary_(binary)
-    {
-#ifdef _PAR
-        _procDigits= 1;
-        int procs=ProcCL::Size();
-        while( procs>9)
-        { ++_procDigits; procs/=10; }
-#endif
-    }
+    {}
 
     template<class BndT>
     void ReadScalar( const std::string&, VecDescCL&, const BndT&) const;
@@ -438,7 +410,6 @@ class ReadEnsightP2SolCL
 //              template definitions
 //=====================================================
 
-#ifndef _PAR
 template<class DiscScalT>
 void Ensight6OutCL::putScalar (const DiscScalT& v, std::string varName)
 {
@@ -558,431 +529,6 @@ void Ensight6OutCL::putVector (const DiscVecT& v, std::string varName)
     }
 }
 
-#else           // parallel implementation
-
-template<class DiscScalT>
-void Ensight6OutCL::putScalar (const DiscScalT& v, std::string varName)
-/** This function writes out the values of a finite element function on a
-    multigrid in ensight file format. Therefore it writes out the values on
-    vertices and edges in the same ordering as the function putGeom. Note, call
-    DescribeScalar() and CaseBegin() before calling this function the first
-    time. The template parameter DiscScalT describe the finite element function.
-    \param varName  name of the file
-    \param v        finite element function
-*/
-{
-    const MultiGridCL& mg= v.GetMG();
-    const Uint lvl= v.GetLevel();
-    char buffer[80];
-    std::memset(buffer,0,80);
-    showFloat sFlo;
-
-    std::ofstream os;
-    OpenFile( os, varName, /*append proc-code*/ !masterout_);
-
-    // parallele Ausgabe
-    int cnt=0;
-    if(!binary_)
-    {
-        os.flags(std::ios_base::scientific);
-        os.precision(5);
-        os.width(12);
-    }
-    VectorCL *vals=0;
-
-    if (!masterout_)
-    {
-        os << nodes_ << "  ";
-        os << "DROPS data file, scalar variable:\n";
-    }
-    else
-    {
-        vals = new VectorCL( nodes_);
-        if (ProcCL::IamMaster()) {
-            if(binary_) {
-                std::strcpy(buffer,"DROPS data file, scalar variable:");
-                os.write(buffer,80);
-            }
-            else {
-                os << "DROPS data file, scalar variable:\n";
-            }
-        }
-    }
-
-    Uint pos=0;
-
-    for (MultiGridCL::const_TriangVertexIteratorCL it= mg.GetTriangVertexBegin(lvl),
-        end= mg.GetTriangVertexEnd(lvl); it!=end; ++it)
-    {
-        // Write only the vals on exclusive vertices!
-        if (!it->IsExclusive(PrioMaster))
-            continue;
-
-        if (!masterout_)
-        {
-            os << std::setw(12) << v.val( *it);
-            if ( (++cnt)==6)
-            { // Ensight expects six real numbers per line
-                cnt= 0;
-                os << '\n';
-            }
-        }
-        else
-        {
-            (*vals)[pos++]=v.val( *it);
-        }
-    }
-
-    for (MultiGridCL::const_TriangEdgeIteratorCL it= mg.GetTriangEdgeBegin(lvl),
-            end= mg.GetTriangEdgeEnd(lvl); it!=end; ++it)
-    {
-        // Write only the vals on exclusive edges!
-        if (!it->IsExclusive(PrioMaster))
-            continue;
-
-        if (!masterout_)
-        {
-            os << std::setw(12) << v.val( *it, 0.5);
-            if ( (++cnt)==6)
-            { // Ensight expects six real numbers per line
-                cnt= 0;
-                os << '\n';
-            }
-        }
-        else
-        {
-            (*vals)[pos++]=v.val( *it, 0.5);
-        }
-    }
-
-    if (masterout_)
-    {
-        if(pos!=vals->size())
-            throw DROPSErrCL("Ensight6OutCL::putScalar: Not enough data collected!");
-
-        Uint maxUnk= ProcCL::GlobalMax(nodes_,ProcCL::Master());
-
-        if (!ProcCL::IamMaster())
-        {
-            ProcCL::RequestT req;
-            req= ProcCL::Isend(Addr(*vals), nodes_, ProcCL::Master(), tag_);
-            ProcCL::Wait(req);
-        }
-        else
-        {
-            VectorCL *recvBuf = new VectorCL(maxUnk);
-            VectorCL *tmpBuf=0;
-            IdxT numUnk;
-
-            for (int p=0; p<ProcCL::Size(); ++p)
-            {
-                if (p!=ProcCL::MyRank())
-                {
-                    ProcCL::StatusT stat;
-                    ProcCL::Probe(p, tag_, stat);
-                    numUnk = (IdxT)ProcCL::GetCount<double>(stat);
-
-                    ProcCL::Recv(Addr(*recvBuf), numUnk, p, tag_);
-                }
-                else
-                {
-                    tmpBuf=recvBuf;
-                    recvBuf=vals;
-                    numUnk=nodes_;
-                }
-                for (IdxT i=0; i<numUnk; ++i)
-                {
-                    if(binary_) {
-                        sFlo.f=(*recvBuf)[i];
-                        os.write(sFlo.s,sizeof(float));
-                    }
-                    else {
-                        os << std::setw(12) << (*recvBuf)[i];
-                        if ( (++cnt)==6)
-                        { // Ensight expects six real numbers per line
-                            cnt= 0;
-                            os << '\n';
-                        }
-                    }
-                }
-                if (p==ProcCL::MyRank())
-                {
-                    recvBuf=tmpBuf;
-                    tmpBuf=0;
-                }
-            }
-            delete recvBuf;
-            if(!binary_) {
-                os << '\n';
-            }
-        }
-        delete vals;
-    }
-    else {
-        if(!binary_) {
-            os << '\n';
-        }
-    }
-    os.close();
-}
-
-template<class DiscVecT>
-void Ensight6OutCL::putVector( const DiscVecT& v, std::string varName)
-/** This function writes out the values of a finite element function on a
-    multigrid in ensight file format. Therefore it writes out the values on
-    vertices and edges in the same ordering as the function putGeom. Note, call
-    DescribeScalar() and CaseBegin() before calling this function the first
-    time. The template parameter DiscScalT describe the finite element function.
-    \param fileName name of the file
-    \param v        finite element function
-    \param varName  Name of vector
-*/
-{
-    const MultiGridCL& mg= v.GetMG();
-    const Uint lvl= v.GetLevel();
-    char buffer[80];
-    std::memset(buffer,0,80);
-
-    std::ofstream os;
-    OpenFile( os, varName, /*append proc-code*/ !masterout_);
-
-    if(binary_)
-    {
-        char buffer[128];
-        std::memset(buffer,0,128);
-        showFloat sFlo;
-
-        // parallele Ausgabe
-        VectorCL *vals=0;
-
-        if (masterout_)
-        {
-            vals = new VectorCL(3*nodes_);
-            if (ProcCL::IamMaster())
-            {
-                std::strcpy(buffer,"DROPS data file, vector variable:");
-                os.write(buffer,80);
-            }
-        }
-
-        Uint pos=0;
-
-        for (MultiGridCL::const_TriangVertexIteratorCL it= mg.GetTriangVertexBegin(lvl),
-            end= mg.GetTriangVertexEnd(lvl); it!=end; ++it)
-        {
-
-            // Write only the vals on exclusive vertices!
-            if (!it->IsExclusive(PrioMaster))
-                continue;
-            if (masterout_)
-            {
-                for (int i=0; i<3; ++i)
-                    (*vals)[pos++]= v.val( *it)[i];
-            }
-        }
-        for (MultiGridCL::const_TriangEdgeIteratorCL it= mg.GetTriangEdgeBegin(lvl),
-            end= mg.GetTriangEdgeEnd(lvl); it!=end; ++it)
-        {
-            // Write only the vals on exclusive edges!
-            if (!it->IsExclusive(PrioMaster))
-                continue;
-
-            if (masterout_)
-            {
-                for (int i=0; i<3; ++i)
-                    (*vals)[pos++]= v.val( *it)[i];
-            }
-        }
-
-        if (masterout_)
-        {
-            if(pos!=vals->size())
-                throw DROPSErrCL("Ensight6OutCL::putVector: Not enough data collected!");
-
-            Uint maxUnk= ProcCL::GlobalMax(3*nodes_, ProcCL::Master());
-
-            if (!ProcCL::IamMaster())
-            {
-                ProcCL::RequestT req;
-                req= ProcCL::Isend(Addr(*vals), 3*nodes_, ProcCL::Master(), tag_);
-                ProcCL::Wait(req);
-            }
-            else
-            {
-                VectorCL *recvBuf = new VectorCL(maxUnk);
-                VectorCL *tmpBuf=0;
-                IdxT numUnk;
-
-                for (int p=0; p<ProcCL::Size(); ++p)
-                {
-                    if (p!=ProcCL::MyRank())
-                    {
-                        ProcCL::StatusT stat;
-                        ProcCL::Probe(p, tag_, stat);
-                        numUnk = (IdxT)ProcCL::GetCount<double>(stat);
-
-                        ProcCL::Recv(Addr(*recvBuf), numUnk, p, tag_);
-                    }
-                    else
-                    {
-                        tmpBuf=recvBuf;
-                        recvBuf=vals;
-                        numUnk=3*nodes_;
-                    }
-
-                    for (IdxT i=0; i<numUnk; ++i)
-                    {
-                     //   os << std::setw(12) << (*recvBuf)[i];
-                        sFlo.f =(float) (*recvBuf)[i];
-                        os.write(sFlo.s,sizeof(float));
-
-                    }
-                    if (p==ProcCL::MyRank())
-                    {
-                        recvBuf=tmpBuf;
-                        tmpBuf=0;
-                    }
-                }
-                delete recvBuf;
-
-            }
-            delete vals;
-        }
-
-    }
-    else
-    { // ASCII
-        int cnt=0;
-        os.precision(5);
-        os.width(12);
-
-        VectorCL *vals=0;
-
-        if (!masterout_)
-        {
-            os << (3*nodes_) << "  ";
-            os << "DROPS data file, vector variable:\n";
-        }
-        else
-        {
-            vals = new VectorCL(3*nodes_);
-            if (ProcCL::IamMaster())
-                os << "DROPS data file, vector variable:\n";
-        }
-
-        Uint pos=0;
-
-        for (MultiGridCL::const_TriangVertexIteratorCL it= mg.GetTriangVertexBegin(lvl),
-            end= mg.GetTriangVertexEnd(lvl); it!=end; ++it)
-        {
-
-            // Write only the vals on exclusive vertices!
-            if (!it->IsExclusive(PrioMaster))
-                continue;
-            if (!masterout_)
-            {
-                for (int i=0; i<3; ++i)
-                    os << std::setw(12) << v.val( *it)[i];
-                if ( (cnt+=3)==6)
-                { // Ensight expects six real numbers per line
-                    cnt= 0;
-                    os << '\n';
-                }
-            }
-            else
-            {
-                for (int i=0; i<3; ++i)
-                    (*vals)[pos++]= v.val( *it)[i];
-            }
-        }
-        for (MultiGridCL::const_TriangEdgeIteratorCL it= mg.GetTriangEdgeBegin(lvl),
-            end= mg.GetTriangEdgeEnd(lvl); it!=end; ++it)
-        {
-            // Write only the vals on exclusive edges!
-            if (!it->IsExclusive(PrioMaster))
-                continue;
-
-            if (!masterout_)
-            {
-                for (int i=0; i<3; ++i)
-                    os << std::setw(12) << v.val( *it)[i];
-                if ( (cnt+=3)==6)
-                { // Ensight expects six real numbers per line
-                    cnt= 0;
-                    os << '\n';
-                }
-            }
-            else
-            {
-                for (int i=0; i<3; ++i)
-                    (*vals)[pos++]= v.val( *it)[i];
-            }
-        }
-
-        if (masterout_)
-        {
-            if(pos!=vals->size())
-                throw DROPSErrCL("Ensight6OutCL::putVector: Not enough data collected!");
-
-            Uint maxUnk= ProcCL::GlobalMax(3*nodes_, ProcCL::Master());
-
-            if (!ProcCL::IamMaster())
-            {
-                ProcCL::RequestT req;
-                req= ProcCL::Isend(Addr(*vals), 3*nodes_, ProcCL::Master(), tag_);
-                ProcCL::Wait(req);
-            }
-            else
-            {
-                VectorCL *recvBuf = new VectorCL(maxUnk);
-                VectorCL *tmpBuf=0;
-                IdxT numUnk;
-
-                for (int p=0; p<ProcCL::Size(); ++p)
-                {
-                    if (p!=ProcCL::MyRank())
-                    {
-                        ProcCL::StatusT stat;
-                        ProcCL::Probe(p, tag_, stat);
-                        numUnk = (IdxT)ProcCL::GetCount<double>(stat);
-
-                        ProcCL::Recv(Addr(*recvBuf), numUnk, p, tag_);
-                    }
-                    else
-                    {
-                        tmpBuf=recvBuf;
-                        recvBuf=vals;
-                        numUnk=3*nodes_;
-                    }
-
-                    for (IdxT i=0; i<numUnk; ++i)
-                    {
-                        os << std::setw(12) << (*recvBuf)[i];
-                        if ( (++cnt)==6)
-                        { // Ensight expects six real numbers per line
-                            cnt= 0;
-                            os << '\n';
-                        }
-                    }
-                    if (p==ProcCL::MyRank())
-                    {
-                        recvBuf=tmpBuf;
-                        tmpBuf=0;
-                    }
-                }
-                delete recvBuf;
-                os << '\n';
-            }
-            delete vals;
-        }
-        else
-            os << '\n';
-    }
-    os.close();
-}
-
-#endif          // end of parallel implementation
-
 
 // ========== ReadEnsightP2SolCL ==========
 
@@ -992,21 +538,12 @@ void ReadEnsightP2SolCL::ReadScalar( const std::string& file, VecDescCL& v, cons
     const Uint lvl= v.GetLevel(),
                idx= v.RowIdx->GetIdx();
     std::string fileName(file);
-#ifdef _PAR
-    const ExchangeCL& ex= v.RowIdx->GetEx();
-    AppendProccode(fileName);
-#endif
 
     std::ifstream is( fileName.c_str());
     CheckFile( is);
 
     if (binary_)
     {
-#ifdef _PAR
-        IF_MASTER
-            std::cout << "ReadEnsightP2SolCL::ReadScalar: Binary parallel output for ensight not yet implemented! (of)" << std::endl;
-        throw DROPSErrCL("ReadEnsightP2SolCL::ReadScalar: Binary parallel output for ensight not yet implemented!");
-#endif
         showFloat fl;
         char buffer[80];
         is.read( buffer, 80);           //ignore first 80 characters
@@ -1037,10 +574,6 @@ void ReadEnsightP2SolCL::ReadScalar( const std::string& file, VecDescCL& v, cons
         for (MultiGridCL::const_TriangVertexIteratorCL it= _MG->GetTriangVertexBegin(lvl),
              end= _MG->GetTriangVertexEnd(lvl); it!=end; ++it)
         {
-#ifdef _PAR
-            if (!it->IsExclusive(PrioMaster)) continue;
-#endif
-
             is >> d;
             if (bnd.IsOnDirBnd( *it) || !(it->Unknowns.Exist(idx)) ) continue;
             v.Data[it->Unknowns(idx)]= d;
@@ -1048,17 +581,10 @@ void ReadEnsightP2SolCL::ReadScalar( const std::string& file, VecDescCL& v, cons
         for (MultiGridCL::const_TriangEdgeIteratorCL it= _MG->GetTriangEdgeBegin(lvl),
             end= _MG->GetTriangEdgeEnd(lvl); it!=end; ++it)
         {
-#ifdef _PAR
-            if (!it->IsExclusive(PrioMaster)) continue;
-#endif
-
             is >> d;
             if (bnd.IsOnDirBnd( *it) || !(it->Unknowns.Exist(idx)) ) continue;
             v.Data[it->Unknowns(idx)]= d;
         }
-#ifdef _PAR
-        ex.Accumulate(v.Data);
-#endif
     }
 
     CheckFile( is);
@@ -1070,10 +596,6 @@ void ReadEnsightP2SolCL::ReadVector( const std::string& file, VecDescCL& v, cons
     const Uint lvl= v.GetLevel(),
                idx= v.RowIdx->GetIdx();
     std::string fileName(file);
-#ifdef _PAR
-    const ExchangeCL& ex= v.RowIdx->GetEx();
-    AppendProccode(fileName);
-#endif
 
     std::ifstream is( fileName.c_str());
     CheckFile( is);
@@ -1082,11 +604,6 @@ void ReadEnsightP2SolCL::ReadVector( const std::string& file, VecDescCL& v, cons
 
     if(binary_)
     {
-#ifdef _PAR
-        IF_MASTER
-            std::cout << "ReadEnsightP2SolCL::ReadVector: Binary parallel output for ensight not yet implemented! (of)" << std::endl;
-        throw DROPSErrCL("ReadEnsightP2SolCL::ReadVector: Binary parallel output for ensight not yet implemented!");
-#endif
         showFloat fl;
         //std::cout<<"READVECTOR: "<<file.c_str()<<"\n";
         char buffer[80];
@@ -1130,9 +647,6 @@ void ReadEnsightP2SolCL::ReadVector( const std::string& file, VecDescCL& v, cons
         for (MultiGridCL::const_TriangVertexIteratorCL it= _MG->GetTriangVertexBegin(lvl),
             end= _MG->GetTriangVertexEnd(lvl); it!=end; ++it)
         {
-#ifdef _PAR
-            if (!it->IsExclusive(PrioMaster)) continue;
-#endif
             is >> d0 >> d1 >> d2;
             count +=3;
 
@@ -1144,9 +658,6 @@ void ReadEnsightP2SolCL::ReadVector( const std::string& file, VecDescCL& v, cons
         for (MultiGridCL::const_TriangEdgeIteratorCL it= _MG->GetTriangEdgeBegin(lvl),
             end= _MG->GetTriangEdgeEnd(lvl); it!=end; ++it)
         {
-#ifdef _PAR
-            if (!it->IsExclusive(PrioMaster)) continue;
-#endif
             is >> d0 >> d1 >> d2;
             count +=3;
             if (bnd.IsOnDirBnd( *it) || !(it->Unknowns.Exist(idx)) ) continue;
@@ -1154,12 +665,6 @@ void ReadEnsightP2SolCL::ReadVector( const std::string& file, VecDescCL& v, cons
             const IdxT Nr= it->Unknowns(idx);
             v.Data[Nr]= d0;    v.Data[Nr+1]= d1;    v.Data[Nr+2]= d2;
         }
-#ifdef _PAR
-        ex.Accumulate(v.Data);
-
-        if (!is)
-            std::cout << "["<<ProcCL::MyRank()<<"] Read "<<count<<" numbers from file <"<<fileName<<">"<<std::endl;
-#endif
     }
 
     CheckFile( is);

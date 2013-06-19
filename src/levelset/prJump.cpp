@@ -399,7 +399,7 @@ void Strategy( InstatStokes2PhaseP2P1CL& Stokes, const LsetBndDataCL& lsbnd, Ada
 
     // Initialize Ensight6 output
     std::string ensf( P.get<std::string>("Ensight.EnsDir") + "/" + P.get<std::string>("Ensight.EnsCase"));
-    Ensight6OutCL ensight( P.get<std::string>("Ensight.EnsCase") + ".case", P.get<int>("Time.NumSteps") + 1, P.get<int>("Ensight.Binary"), P.get<int>("Ensight.MasterOut"));
+    Ensight6OutCL ensight( P.get<std::string>("Ensight.EnsCase") + ".case", P.get<int>("Time.NumSteps") + 1, P.get<int>("Ensight.Binary"));
     ensight.Register( make_Ensight6Geom  ( MG, MG.GetLastLevel(), P.get<std::string>("Ensight.GeomName"),           ensf + ".geo"));
     ensight.Register( make_Ensight6Scalar( lset.GetSolution(),             "Levelset",  ensf + ".scl"));
     ensight.Register( make_Ensight6Scalar( Stokes.GetPrSolution( new_pr),  "Pressure",  ensf + ".pr"));

@@ -300,7 +300,7 @@ void Strategy( StokesProblemT& Stokes)
         const std::string ensf = P.get<string>("Ensight.EnsDir") + "/" + P.get<string>("Ensight.EnsCase");
         ensight = new Ensight6OutCL (P.get<string>("Ensight.EnsCase")+".case",
                                      P.get<int>("Time.NumSteps")/P.get("Ensight.EnsightOut", 0)+1,
-                                     P.get<int>("Ensight.Binary"), P.get<int>("Ensight.MasterOut"));
+                                     P.get<int>("Ensight.Binary"));
 
         ensight->Register( make_Ensight6Geom  ( MG, MG.GetLastLevel(), P.get<string>("Ensight.GeomName"),
                                                 ensf + ".geo", /*time_dependent*/ false));

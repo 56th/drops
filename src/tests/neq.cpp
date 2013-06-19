@@ -70,7 +70,6 @@ int main ()
     //typedef DummyPcCL SPcT;
     //SPcT spc;
     typedef SSORPcCL SPc2T;
-    typedef GSPcCL SPc3T;
     SPc2T spc2;
     SPc2T spc3;
     //PCGSolverCL<SPcT> solver( spc, 200, 1e-6, true);
