@@ -71,7 +71,7 @@ namespace DROPS // for Strategy
 
 double ConstantAngle(const Point3DCL&)
 {
-	return P.get<double>("Slip.contactangle")/180.0*M_PI;
+	return P.get<double>("SpeBnd.contactangle")/180.0*M_PI;
 }
 static DROPS::RegisterStatScalarFunction regconstangle("ConstantAngle", ConstantAngle);
 
