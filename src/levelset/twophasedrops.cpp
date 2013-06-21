@@ -75,6 +75,20 @@ double ConstantAngle(const Point3DCL&)
 }
 static DROPS::RegisterStatScalarFunction regconstangle("ConstantAngle", ConstantAngle);
 
+double PeriodicAngle(const Point3DCL& pt)
+{
+	double theta=pt[2]>0?std::acos(pt[0]/std::sqrt(pt[0]*pt[0]+pt[2]*pt[2])):M_PI+std::acos(pt[0]/std::sqrt(pt[0]*pt[0]+pt[2]*pt[2]));
+	return P.get<double>("Slip.contactangle")/180.0*M_PI*(1+0.5*sin(2*theta));
+}
+static DROPS::RegisterStatScalarFunction regperangle("PeriodicAngle", PeriodicAngle);
+
+double PatternAngle(const Point3DCL& pt)
+{
+	double theta=std::sqrt(pt[0]*pt[0]+pt[2]*pt[2]);
+	return P.get<double>("Slip.contactangle")/180.0*M_PI*(1+0.5*sin(10*theta));
+}
+static DROPS::RegisterStatScalarFunction regpatangle("PatternAngle", PatternAngle);
+
 Point3DCL OutNormalBottomPlane(const Point3DCL&)
 {
 	Point3DCL outnormal(0.0);
@@ -612,6 +626,7 @@ int main (int argc, char** argv)
     std::cout << "Generated boundary conditions for velocity, ";
     DROPS::BuildBoundaryData( mg, prbnddata, perbndtypestr, zerobndfun, periodic_match);
     std::cout << "pressure, ";
+ // DROPS::BuildBoundaryData( mg, lsetbnddata,  perbndtypestr, zerobndfun, periodic_match);
     DROPS::BuildBoundaryData( mg, lsetbnddata,  P.get<std::string>("DomainCond.BoundaryType"), zerobndfun, periodic_match);//Hope this will not affect solving levelset equation!?
     std::cout << "and levelset." << std::endl;
     DROPS::StokesBndDataCL bnddata(*velbnddata,*prbnddata);
