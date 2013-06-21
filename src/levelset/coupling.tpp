@@ -1036,7 +1036,7 @@ RecThetaScheme2PhaseCL<LsetSolverT,RelaxationPolicyT>::RecThetaScheme2PhaseCL
     		double dt, double tol, double stk_theta, double ls_theta, double nonlinear, bool withProjection, double stab)
   : base_( Stokes, ls, solver, lsetsolver, lsetmod, dt, tol, nonlinear, withProjection, stab),
     stk_theta_( stk_theta), ls_theta_( ls_theta),
-    Msolver_( mpc_, 500, 1e-10, true), Esolver_( hpc_, 500, 1e-15, true),
+    Msolver_( mpc_, 500, 500, 1e-10, true), Esolver_( hpc_, 500, 500, 1e-15, true),
     ispc_( &Stokes_.B.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(), &Stokes_.M.Data.GetFinest(), Stokes_.pr_idx.GetFinest(), 1.0, 0.0, 1e-4, 1e-4),
     Ssolver_( ispc_, 200, 200, 1e-10, true)
 {

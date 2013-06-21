@@ -289,16 +289,14 @@ class VelTranspRepairCL : public MGObserverCL
   private:
     MultiGridCL& mg_;
     VecDescCL& v_;
-    VecDescCL& lset_;
     const VelBndDataT& Bnd_v_;
-    LsetBndDataCL& Bnd_ls_;
     IdxDescCL& vidx_;
-    double& time_;
+    double time_;
     std::auto_ptr<RepairP2CL<Point3DCL>::type> p2repair_;
 
   public:
-    VelTranspRepairCL (VecDescCL& v, MultiGridCL& mg, const VelBndDataT& Bnd_v, IdxDescCL& vidx, VecDescCL& lset, LsetBndDataCL& Bnd_ls, double t )
-        :  mg_(mg), v_(v), lset_(lset), Bnd_v_(Bnd_v), Bnd_ls_(Bnd_ls), vidx_(vidx) , time_(t){}
+    VelTranspRepairCL (VecDescCL& v, MultiGridCL& mg, const VelBndDataT& Bnd_v, IdxDescCL& vidx, double t )
+        :  mg_(mg), v_(v),Bnd_v_(Bnd_v), vidx_(vidx) , time_(t){}
 
     void pre_refine  ();
     void post_refine ();

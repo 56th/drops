@@ -169,8 +169,6 @@ void ApplyToTestFct( InstatStokes2PhaseP2P1CL& Stokes, const LsetBndDataCL& lsbn
 // using simple trial functions:
 //     | f_Gamma(v) - f_{Gamma_h}(v) |  =   O(h^p)
 {
-    typedef InstatStokes2PhaseP2P1CL StokesProblemT;
-
     MultiGridCL& MG= Stokes.GetMG();
     const double curv= 2/P.get<DROPS::Point3DCL>("Exp.RadDrop")[0];
     SurfaceTensionCL sf( sigmaf, 0);
@@ -260,8 +258,6 @@ void Compare_LaplBeltramiSF_ConstSF( InstatStokes2PhaseP2P1CL& Stokes, const Lse
 // SIAM J. Numer. Anal. 45, 1679--1700 (2007)
 
 {
-    typedef InstatStokes2PhaseP2P1CL StokesProblemT;
-
     MultiGridCL& MG= Stokes.GetMG();
     // Levelset-Disc.: Crank-Nicholson
     const double curv= 2/P.get<DROPS::Point3DCL>("Exp.RadDrop")[0];

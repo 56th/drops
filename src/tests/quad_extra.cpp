@@ -132,22 +132,22 @@ void TestExactness_extrapolation2D(int num_extrapolation)
         DROPS::GridFunctionCL<> integrand;
         Quad5CL<> q;
         degz = 0;
-        int it =0.;
+        int iter =0.;
         for (degy= 0; degy <= 5; ++degy) {
             for (degx= 0; degx + degy <= 5; ++degx) {
-                exactint_surf[it] = 0.;
+                exactint_surf[iter] = 0.;
                 for (int k = 0; k<= degy+1; ++k) {
-                    exactint_surf[it] += std::pow(-1,k)*binomi(degy+1,k)/(degx+k+1);
+                    exactint_surf[iter] += std::pow(-1,k)*binomi(degy+1,k)/(degx+k+1);
                 }    
-                exactint_surf[it] *= 1./(degy+1);
+                exactint_surf[iter] *= 1./(degy+1);
                 resize_and_evaluate_on_vertexes (f, s, qdom, 0., integrand);
                 std::cout << "degz: " << degz << "\tdegy: " << degy << "\tdegx: " << degx
-                          << "\t\tI-Q_h: " << exactint_surf[it] - quad_2D(integrand, qdom)//q.quad( 1.)
+                          << "\t\tI-Q_h: " << exactint_surf[iter] - quad_2D(integrand, qdom)//q.quad( 1.)
                           << "\tIntegral: " << quad_2D(integrand,  qdom) <<  "             ";//q.quad( 1.)
                 /*for (size_t i= 0; i < q.size(); ++i)
                     std::cout << '\t' << q[i];*/
                 std::cout << std::endl;
-                ++it;
+                ++iter;
              }
         }
     }

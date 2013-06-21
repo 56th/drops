@@ -322,7 +322,7 @@ void Strategy(PoissonCL& Poisson)
         // Initialize Ensight6 output
         const std::string filename= P.get<std::string>("Ensight.EnsDir") + "/" + P.get<std::string>("Ensight.EnsCase");
         ensight = new Ensight6OutCL(P.get<std::string>("Ensight.EnsCase")+".case", P.get<int>("Time.NumSteps")+1,
-                                    P.get<int>("Ensight.Binary"), P.get<int>("Ensight.MasterOut"));
+                                    P.get<int>("Ensight.Binary"));
         ensight->Register( make_Ensight6Geom  ( mg, mg.GetLastLevel(),
                                                 P.get<std::string>("Ensight.GeomName"), filename + ".geo"));
         ensight->Register( make_Ensight6Scalar( Poisson.GetSolution(), "Temperatur", filename + ".tp", true));

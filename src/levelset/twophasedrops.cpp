@@ -71,7 +71,7 @@ namespace DROPS // for Strategy
 
 double ConstantAngle(const Point3DCL&)
 {
-	return P.get<double>("Slip.contactangle")/180.0*M_PI;
+	return P.get<double>("SpeBnd.contactangle")/180.0*M_PI;
 }
 static DROPS::RegisterStatScalarFunction regconstangle("ConstantAngle", ConstantAngle);
 
@@ -384,7 +384,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         std::string ensf( P.get<std::string>("Ensight.EnsDir") + "/" + P.get<std::string>("Ensight.EnsCase"));
         ensight = new Ensight6OutCL( P.get<std::string>("Ensight.EnsCase") + ".case",
                                      P.get<int>("Time.NumSteps")/P.get("Ensight.EnsightOut", 0)+1,
-                                     P.get<int>("Ensight.Binary"), P.get<int>("Ensight.MasterOut"));
+                                     P.get<int>("Ensight.Binary"));
         ensight->Register( make_Ensight6Geom      ( MG, MG.GetLastLevel(), P.get<std::string>("Ensight.GeomName"),
                                                     ensf + ".geo", true));
         ensight->Register( make_Ensight6Scalar    ( lset.GetSolution(),      "Levelset",      ensf + ".scl", true));
@@ -553,7 +553,9 @@ void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<std::string>("General.DynamicLibsPrefix", "../");
 	
 	P.put_if_unset<double>("SpeBnd.alpha", 0.0);
-    P.put_if_unset<double>("SpeBnd.beta", 0.0);
+    P.put_if_unset<double>("SpeBnd.SlipLength1", 0.0);
+    P.put_if_unset<double>("SpeBnd.SlipLength2", 0.0);
+	P.put_if_unset<double>("SpeBnd.SmoothZone", 0.0);	
 }
 
 int main (int argc, char** argv)

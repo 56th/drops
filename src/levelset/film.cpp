@@ -453,7 +453,6 @@ int main (int argc, char** argv)
     //DIDNT FIND A PARAM WITH PeriodicMatching, so I didnt know the type
     DROPS::match_fun periodic_match = DROPS::MatchMap::getInstance()[P.get<std::string>("DomainCond.PeriodicMatching", std::string("periodicxz"))];
 
-    typedef DROPS::TwoPhaseFlowCoeffCL            CoeffT;
     typedef DROPS::InstatNavierStokes2PhaseP2P1CL MyStokesCL;
 
     DROPS::Point3DCL orig, e1, e2, e3;

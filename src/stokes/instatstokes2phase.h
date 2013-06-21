@@ -92,14 +92,14 @@ class TwoPhaseFlowCoeffCL
     bool film;
     double surfTens;
     double rho_koeff1, rho_koeff2, mu_koeff1, mu_koeff2;
-//    double slip_length1, slip_length2;
+    double beta_coeff1, beta_coeff2;
 
   public:
     DROPS::instat_vector_fun_ptr volforce;
     const SmoothedJumpCL rho, mu;
- //   const SmoothedJumpCL sliplength;
+    const SmoothedJumpCL beta;    //slip length
     const double SurfTens, DilVisco, ShearVisco;
-	const double alpha, beta;
+	const double alpha;
     const Point3DCL g;
 
     TwoPhaseFlowCoeffCL( ParamCL& P, bool dimless = false)
@@ -110,40 +110,38 @@ class TwoPhaseFlowCoeffCL
         rho_koeff2( film ? P.get<double>("Mat.DensFluid") : P.get<double>("Mat.DensDrop")),
         mu_koeff1( film ? P.get<double>("Mat.ViscGas") : P.get<double>("Mat.ViscFluid")),
         mu_koeff2( film ? P.get<double>("Mat.ViscFluid") : P.get<double>("Mat.ViscDrop")),
-
+        beta_coeff1(P.get<double>("SpeBnd.SlipLength1")),
+        beta_coeff2(P.get<double>("SpeBnd.SlipLength2")),
+		
         rho( dimless ? JumpCL( 1., rho_koeff1/rho_koeff2)
           : JumpCL( rho_koeff2, rho_koeff1), H_sm, P.get<double>("Mat.SmoothZone")),
         mu( dimless ? JumpCL( 1., mu_koeff1/mu_koeff2)
           : JumpCL( mu_koeff2, mu_koeff1), H_sm, P.get<double>("Mat.SmoothZone")),
+        beta(dimless ? JumpCL( 1., beta_coeff2/beta_coeff1)
+                     :JumpCL(beta_coeff2,beta_coeff1), H_sm, P.get<double>("SpeBnd.SmoothZone")),
         SurfTens (dimless ? surfTens/rho_koeff2 : surfTens),
         DilVisco( film ? P.get<double>("Mat.DilatationalVisco") : P.get<double>("SurfTens.DilatationalVisco")),
         ShearVisco( film ? P.get<double>("Mat.ShearVisco") : P.get<double>("SurfTens.ShearVisco")),
 		alpha(P.get<double>("SpeBnd.alpha")),
-		beta(P.get<double>("SpeBnd.beta")),
         g( P.get<DROPS::Point3DCL>("Exp.Gravity"))
- //       slip_length1(P.get<double>("Slip.SlipLength1")),
-//        slip_length2(P.get<double>("Slip.SlipLength2")),
- //       sliplength(dimless ? JumpCL( 1., slip_length2/slip_length1)
-  //                   :JumpCL(slip_length2,slip_length1), H_sm, P.get<double>("Slip.SmoothZone"))
         {
         volforce = InVecMap::getInstance()[P.get<std::string>("Exp.VolForce")];
     }
 
-    TwoPhaseFlowCoeffCL( double rho1, double rho2, double mu1, double mu2, double surftension, Point3DCL gravity, bool dimless = false, double dilatationalvisco = 0.0, double shearvisco = 0.0
+    TwoPhaseFlowCoeffCL( double rho1, double rho2, double mu1, double mu2, double surftension, Point3DCL gravity, bool dimless = false, double dilatationalvisco = 0.0, double shearvisco = 0.0, double alpha_ = 1.0, double beta1 = 0.0, double beta2 =0.0
     							)//double sl1=1, double sl2=1
       : rho( dimless ? JumpCL( 1., rho2/rho1)
                      : JumpCL( rho1, rho2), H_sm, 0),
         mu(  dimless ? JumpCL( 1., mu2/mu1)
                      : JumpCL( mu1, mu2), H_sm, 0),
+        beta( dimless ? JumpCL( 1., beta2/beta1)
+                     :JumpCL(beta2,beta1), H_sm, 0),
         SurfTens( dimless ? surftension/rho1 : surftension),
         DilVisco( dilatationalvisco),
         ShearVisco( shearvisco),
-		alpha(1.), //??
-		beta(1.),  //??
+		alpha(alpha_), 
         g( gravity)
-//        sliplength(dimless ? JumpCL( 1., sl2/sl1)
-//                     :JumpCL(sl2,sl1), H_sm, 0)
-                         {
+		{
           volforce = InVecMap::getInstance()["ZeroVel"];
         }
 };

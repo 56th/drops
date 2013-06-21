@@ -201,7 +201,6 @@ UpdateTriangulation(DROPS::StokesP2P1CL<Coeff>& NS,
                     DROPS::VecDescCL* p1)
 {
     using namespace DROPS;
-    typedef StokesP2P1CL<Coeff> StokesCL;
     Assert( 0<=c_level && c_level<=f_level, "UpdateTriangulation: Levels are cheesy.\n", ~0);
     TimerCL time;
 
