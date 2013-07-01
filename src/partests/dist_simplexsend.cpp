@@ -33,6 +33,13 @@
 using namespace std;
 using namespace DROPS;
 
+void CheckDiST( std::ostream& os)
+{
+    if ( DROPS::ProcCL::Check( DROPS::DiST::InfoCL::Instance().IsSane( os)))
+        std::cout << " DiST-module seems to be alright!" << std::endl;
+    else
+        std::cout << " DiST-module seems to be broken!" << std::endl;
+}
 
 int main( int argc, char **argv)
 {
@@ -104,6 +111,7 @@ int main( int argc, char **argv)
                 }
             }
         }
+        CheckDiST( std::cerr);
 
     }
     catch (DROPS::DROPSErrCL err) {err.handle();}
