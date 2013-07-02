@@ -639,18 +639,18 @@ void YoungForceAccumulatorCL::visit ( const TetraCL& t)
         if (!triangle.ComputeMCLForChild(ch)) // no patch for this child
             continue;
         BaryCoordCL Barys[2];
-        Point3DCL pts[2];
+        Point3DCL pt0,pt1;
         Point3DCL midpt;
         double length;
         Uint ncl=triangle.GetNumMCL();
         for(Uint i=0;i<ncl;i++)
         {
-        	length = triangle.GetInfoMCL(i,Barys[0],Barys[1],pts[0],pts[1]);
+        	length = triangle.GetInfoMCL(i,Barys[0],Barys[1],pt0,pt1);
         	normal_mcl = triangle.GetMCLNormal(i);
-        	midpt=(pts[0]+pts[1])/2;
+        	midpt=(pt0 + pt1)/2;
 
-        	costheta[0]=cos(angle_(pts[0]));
-        	costheta[1]=cos(angle_(pts[1]));
+        	costheta[0]=cos(angle_(pt0));
+        	costheta[1]=cos(angle_(pt1));
         	costheta[2]=cos(angle_(midpt));
 
         	for (int v=0; v<10; ++v)
