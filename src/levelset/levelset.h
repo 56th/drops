@@ -151,9 +151,9 @@ class LevelsetP2CL : public ProblemCL< LevelsetCoeffCL, LsetBndDataCL>
     SurfaceForceT GetSurfaceForce() const { return SF_; }
     /// Discretize surface force
     void   AccumulateBndIntegral( VecDescCL& f) const;
-    /// Set type of contact angle function(defined only on boundary).
+    /// Set contact angle function(defined only on boundary).
     void   SetYoungAngle(scalar_fun_ptr CA) { CA_= CA; }
-    ///Discretize Young Force on the three-phase contact line
+    ///Set  out normal function
     void   SetBndOutNormal(vector_fun_ptr outnormal) { Bndoutnormal_= outnormal; }
     ///Discretize Young Force on the three-phase contact line
     void   AccumulateYoungForce( VecDescCL& f) const;

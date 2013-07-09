@@ -75,6 +75,22 @@ double ConstantAngle(const Point3DCL&)
 }
 static DROPS::RegisterStatScalarFunction regconstangle("ConstantAngle", ConstantAngle);
 
+double PeriodicAngle(const Point3DCL& pt)
+{
+	double r=std::sqrt(pt[0]*pt[0]+pt[2]*pt[2]);
+	double theta=r<0.01? 0: (pt[2]>0?std::acos(pt[0]/r): 2*M_PI- std::acos(pt[0]/r));
+	return (P.get<double>("SpeBnd.contactangle"))*(1+0.5*std::sin(30*theta))/180.0*M_PI;
+}
+static DROPS::RegisterStatScalarFunction regperangle("PeriodicAngle", PeriodicAngle);
+
+double PatternAngle(const Point3DCL& pt)
+{
+	double r=std::sqrt(pt[0]*pt[0]+pt[2]*pt[2]);
+	double theta= int(r/0.05)%2==0?1:-1;
+	return P.get<double>("SpeBnd.contactangle")/180.0*M_PI*(1+0.5*theta);
+}
+static DROPS::RegisterStatScalarFunction regpatangle("PatternAngle", PatternAngle);
+
 Point3DCL OutNormalBottomPlane(const Point3DCL&)
 {
 	Point3DCL outnormal(0.0);
@@ -102,10 +118,15 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 // flow control
 {
     DROPS::InScaMap & inscamap = DROPS::InScaMap::getInstance();
-    //DROPS::ScaMap & scamap = DROPS::ScaMap::getInstance();
-    //DROPS::InVecMap & vecmap = DROPS::InVecMap::getInstance();
+    DROPS::StatScaMap & scamap = DROPS::StatScaMap::getInstance();
+    DROPS::StatVecMap & vecmap = DROPS::StatVecMap::getInstance();
     DROPS::MatchMap & matchmap = DROPS::MatchMap::getInstance();
 
+    scalar_fun_ptr the_Young_angle;
+    vector_fun_ptr the_Bnd_outnormal;
+
+    the_Young_angle= scamap[P.get<std::string>("SpeBnd.CtAngle")];
+    the_Bnd_outnormal= vecmap[P.get<std::string>("SpeBnd.BndOutNormal")];
 
     bool is_periodic = P.get<std::string>("DomainCond.PeriodicMatching", "none") != "none";
     match_fun periodic_match = is_periodic ? matchmap[P.get("DomainCond.PeriodicMatching", std::string("periodicx"))] : 0;
@@ -128,8 +149,8 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
     LevelsetP2CL lset( MG, lsetbnddata, sf, P.get<double>("Levelset.SD"), P.get<double>("Levelset.CurvDiff"));
 
-    lset.SetYoungAngle(ConstantAngle);//set Young's Contact angle on the solid boundary
-    lset.SetBndOutNormal(OutNormalBottomPlane);//set outnormal of the domain boundary
+    lset.SetYoungAngle(the_Young_angle);//set Young's Contact angle on the solid boundary
+    lset.SetBndOutNormal(the_Bnd_outnormal);//set outnormal of the domain boundary
     if (is_periodic) //CL: Anyone a better idea? perDirection from ParameterFile?
     {
         DROPS::Point3DCL dx;
@@ -541,7 +562,10 @@ void SetMissingParameters(DROPS::ParamCL& P){
 	P.put_if_unset<double>("SpeBnd.alpha", 0.0);
     P.put_if_unset<double>("SpeBnd.SlipLength1", 0.0);
     P.put_if_unset<double>("SpeBnd.SlipLength2", 0.0);
-	P.put_if_unset<double>("SpeBnd.SmoothZone", 0.0);	
+	P.put_if_unset<double>("SpeBnd.SmoothZone", 0.0);
+	P.put_if_unset<std::string>("SpeBnd.CtAngle", "ConstantAngle");
+	P.put_if_unset<double>("SpeBnd.contactangle", 0.0);
+	P.put_if_unset<std::string>("SpeBnd.BndOutNormal", "OutNormalBottomPlane");
 }
 
 int main (int argc, char** argv)
@@ -614,7 +638,10 @@ int main (int argc, char** argv)
     std::cout << "Generated boundary conditions for velocity, ";
     DROPS::BuildBoundaryData( mg, prbnddata, perbndtypestr, zerobndfun, periodic_match);
     std::cout << "pressure, ";
-    DROPS::BuildBoundaryData( mg, lsetbnddata,  P.get<std::string>("DomainCond.BoundaryType"), zerobndfun, periodic_match);//Hope this will not affect solving levelset equation!?
+    //DROPS::BuildBoundaryData( mg, lsetbnddata,  perbndtypestr, zerobndfun, periodic_match);
+    //DROPS::BuildBoundaryData( mg, lsetbnddata,P.get<std::string>("DomainCond.BoundaryType"), zerobndfun, periodic_match);
+    DROPS::BuildlsetBoundaryData( mg, lsetbnddata, perbndtypestr, P.get<std::string>("DomainCond.BoundaryType"), zerobndfun, periodic_match);
+    //Hope this will not affect solving levelset equation!?
     std::cout << "and levelset." << std::endl;
     DROPS::StokesBndDataCL bnddata(*velbnddata,*prbnddata);
 
