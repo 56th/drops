@@ -1452,21 +1452,22 @@ void SpecialBndHandler_System1OnePhaseP2CL::setupRhs(const TetraCL& tet, Point3D
 					mass2Di.assign(phi[i], bary);
 					Quad5_2DCL<double> mass2D(mass2Dj * mass2Di); //
 					dm[unknownIdx[j]][unknownIdx[i]](0, 0)= dm[unknownIdx[j]][unknownIdx[i]](1, 1) = dm[unknownIdx[j]][unknownIdx[i]](2, 2) = beta_ * mass2D.quad(absdet);
-					//dm[unknownIdx[j]][unknownIdx[i]]     -= beta_ * mass2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));
+					dm[unknownIdx[j]][unknownIdx[i]]     -= beta_ * mass2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));
 					if (i != j){
 						assign_transpose( dm[unknownIdx[i]][unknownIdx[j]], dm[unknownIdx[j]][unknownIdx[i]]);
 					}	
 				}
 			}
-			for(Uint i=0; i<6; ++i){
+			for(Uint i=0; i<6; ++i){//Get wall velocity
 				typedef StokesBndDataCL::VelBndDataCL::bnd_val_fun bnd_val_fun;
                 bnd_val_fun bf= BndData_.Vel.GetBndSeg(face.GetBndIdx()).GetBndFun();
                 Wallvel_val[i]= i<3 ? bf( tet.GetVertex( unknownIdx[i])->GetCoord(), 0.)
                     : bf( GetBaryCenter( *tet.GetEdge(unknownIdx[i]-4)), 0.);
-					
-				for(Uint j=0; j<6; ++j){
-	            loc_b[unknownIdx[i]] += dm[unknownIdx[j]][unknownIdx[i]]* Wallvel_val[j];
-			    }
+			}	
+			for(Uint i=0; i<6; ++i){//setup right hand side	
+				for(Uint j=0; j<6; ++j)
+					loc_b[unknownIdx[i]] += dm[unknownIdx[j]][unknownIdx[i]]* Wallvel_val[j];
+			    
 			}		
 		}
 	}	
