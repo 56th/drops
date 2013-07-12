@@ -500,7 +500,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     const double dt = P.get<double>("Time.StepSize");
     std::ofstream out("spreadinfo.txt");
     out<<"time: "<<" angle: "<<" radius: "<<std::endl;
-    out<<" "<<0<<"  "<<1.5707963<<"  "<<P.get<double>("Exp.RadDrop")<<std::endl;
+    out<<" "<<0<<"  "<<1.5707963<<"  "<<P.get<DROPS::Point3DCL>("Exp.RadDrop")[0]<<std::endl;
     for (int step= 1; step<=nsteps; ++step)
     {
         std::cout << "============================================================ step " << step << std::endl;
