@@ -262,8 +262,8 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     SetInitialLevelsetConditions( lset, MG, P);
 
     double Vol = 0;
-
-    if (P.get("Exp.InitialLSet", std::string("Ellipsoid")) == "Ellipsoid" && P.get<int>("Levelset.VolCorrection") != 0){
+    Vol = lset.GetVolume();
+   /* if (P.get("Exp.InitialLSet", std::string("Ellipsoid")) == "Ellipsoid" && P.get<int>("Levelset.VolCorrection") != 0){
         Vol = EllipsoidCL::GetVolume();
         std::cout << "initial volume: " << lset.GetVolume()/Vol << std::endl;
         double dphi= lset.AdjustVolume( Vol, 1e-9);
@@ -272,7 +272,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         std::cout << "new initial volume: " << lset.GetVolume()/Vol << std::endl;
     }else{
         Vol = lset.GetVolume();
-    }
+    }*/
 
     Stokes.CreateNumberingVel( MG.GetLastLevel(), vidx, periodic_match);
     Stokes.CreateNumberingPr(  MG.GetLastLevel(), pidx, periodic_match, &lset);
