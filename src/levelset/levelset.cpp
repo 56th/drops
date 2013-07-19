@@ -581,6 +581,8 @@ class YoungForceAccumulatorCL : public  TetraAccumulatorCL
     scalar_fun_ptr angle_;	//Young's contact angle
     vector_fun_ptr outnormal_;//outnormal of the domain boundary
 
+    bool SpeBnd; //special boundary condition
+
    // LocalP1CL<Point3DCL> Grad[10], GradRef[10];
     IdxT Numb[10];
     LocalP2CL<> velR_p[4][8], velR_n[4][8]; // for P2R basis on children
@@ -611,8 +613,22 @@ class YoungForceAccumulatorCL : public  TetraAccumulatorCL
 
 void YoungForceAccumulatorCL::visit ( const TetraCL& t)
 {
-
-
+	SpeBnd=false;
+	for(Uint v=0; v<4; v++)
+	   	if(lsetbnd_.GetBC(*t.GetFace(v))==Slip0BC||lsetbnd_.GetBC(*t.GetFace(v))==SlipBC)
+	   	{
+	   		SpeBnd=true; break;
+	   	}
+	if(!SpeBnd)
+	{
+		for(Uint v=0; v<6; v++)
+			if(lsetbnd_.GetBC(*t.GetEdge(v))==Slip0BC||lsetbnd_.GetBC(*t.GetEdge(v))==SlipBC)
+			{
+				SpeBnd=true; break;
+			}
+		if(!SpeBnd)
+		return;
+	}
     const Uint idx_f=   f.RowIdx->GetIdx();
     const bool velXfem= f.RowIdx->IsExtended();
     if (velXfem)

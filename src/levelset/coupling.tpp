@@ -59,7 +59,6 @@ void LinThetaScheme2PhaseCL<LsetSolverT>::SolveLsNs()
 #endif
     double duration;
     time.Reset();
-
     // operators are computed for old level set
     {
         ScopeTimerCL scope("System1 within SolveLsNs");
@@ -71,8 +70,7 @@ void LinThetaScheme2PhaseCL<LsetSolverT>::SolveLsNs()
     }
     Stokes_.SetupPrStiff( &Stokes_.prA, LvlSet_);
     Stokes_.SetupPrMass( &Stokes_.prM, LvlSet_);
-
-    if (!implCurv_)
+       if (!implCurv_)
         mat_->LinComb( 1./dt_, Stokes_.M.Data, stk_theta_, Stokes_.A.Data);
     else // semi-implicit treatment of curvature term, cf. Baensch
     {
@@ -120,6 +118,7 @@ void LinThetaScheme2PhaseCL<LsetSolverT>::SolveLsNs()
     // rhs for new level set
     curv_->Clear( Stokes_.v.t);
     LvlSet_.AccumulateBndIntegral( *curv_);
+    LvlSet_.AccumulateYoungForce( *curv_);
     Stokes_.SetupRhs1( b_, LvlSet_, Stokes_.v.t);
 
     rhs_=  (1./dt_)*(Stokes_.M.Data*Stokes_.v.Data) + stk_theta_*b_->Data + cplA_->Data
@@ -228,6 +227,7 @@ void LinThetaScheme2PhaseCL<LsetSolverT>::Update()
 
     // Diskretisierung
     LvlSet_.AccumulateBndIntegral( *old_curv_);
+    LvlSet_.AccumulateYoungForce( *old_curv_);
     LvlSet_.SetupSystem( Stokes_.GetVelSolution(), dt_);
     LvlSet_.UpdateMLPhi();
 

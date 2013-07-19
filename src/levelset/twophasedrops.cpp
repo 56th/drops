@@ -114,6 +114,56 @@ double GetTimeOffset(){
     return timeoffset;
 }
 
+void computeRadius_Angle(const DROPS::MultiGridCL& mg,LevelsetP2CL& lset,vector_fun_ptr Outnormal_fun,double& r,double& a)
+{
+	InterfaceTriangleCL triangle;
+	const DROPS::Uint lvl = mg.GetLastLevel();
+	BndDataCL<> lsetbnd=lset.GetBndData();
+	bool SpeBnd;
+    double angle=0;
+    double radius=0;
+    double circ=0;
+    DROPS_FOR_TRIANG_CONST_TETRA( mg, lvl, it){
+		SpeBnd=false;
+		for(Uint v=0; v<4; v++)
+		   	if(lsetbnd.GetBC(*it->GetFace(v))==Slip0BC||lsetbnd.GetBC(*it->GetFace(v))==SlipBC)
+		   	{
+		   		SpeBnd=true; break;
+		   	}
+		if(!SpeBnd)
+		{
+			for(Uint v=0; v<6; v++)
+				if(lsetbnd.GetBC(*it->GetEdge(v))==Slip0BC||lsetbnd.GetBC(*it->GetEdge(v))==SlipBC)
+				{
+					SpeBnd=true; break;
+				}
+			if(!SpeBnd)
+			continue;
+		}
+		triangle.BInit( *it, lset.Phi,lsetbnd); //we have to use this init function!!!!!!!!!
+		triangle.SetBndOutNormal(Outnormal_fun);
+		for(int ch=8;ch<9;++ch)
+	    {
+	        if (!triangle.ComputeMCLForChild(ch)) // no patch for this child
+	            continue;
+	         BaryCoordCL Barys[2];
+	          Point3DCL pt0,pt1;
+	          double length;
+	        Uint ncl=triangle.GetNumMCL();
+	        for(Uint i=0;i<ncl;i++)
+	        {
+	        	length=triangle.GetInfoMCL(i,Barys[0],Barys[1],pt0,pt1);
+	        	circ+=length;
+	        	radius+=(pt0-P.get<DROPS::Point3DCL>("SpeBnd.posDrop")).norm()/2*length;
+	        	radius+=(pt1-P.get<DROPS::Point3DCL>("SpeBnd.posDrop")).norm()/2*length;
+	        	angle+=length*triangle.GetActualContactAngle(i);
+	        }
+	    }
+	}
+	r=radius/circ;
+	a=angle/circ;
+}
+
 void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddata, AdapTriangCL& adap)
 // flow control
 {
@@ -212,8 +262,8 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     SetInitialLevelsetConditions( lset, MG, P);
 
     double Vol = 0;
-
-    if (P.get("Exp.InitialLSet", std::string("Ellipsoid")) == "Ellipsoid" && P.get<int>("Levelset.VolCorrection") != 0){
+    Vol = lset.GetVolume();
+   /* if (P.get("Exp.InitialLSet", std::string("Ellipsoid")) == "Ellipsoid" && P.get<int>("Levelset.VolCorrection") != 0){
         Vol = EllipsoidCL::GetVolume();
         std::cout << "initial volume: " << lset.GetVolume()/Vol << std::endl;
         double dphi= lset.AdjustVolume( Vol, 1e-9);
@@ -222,7 +272,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         std::cout << "new initial volume: " << lset.GetVolume()/Vol << std::endl;
     }else{
         Vol = lset.GetVolume();
-    }
+    }*/
 
     Stokes.CreateNumberingVel( MG.GetLastLevel(), vidx, periodic_match);
     Stokes.CreateNumberingPr(  MG.GetLastLevel(), pidx, periodic_match, &lset);
@@ -448,6 +498,9 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
     const int nsteps = P.get<int>("Time.NumSteps");
     const double dt = P.get<double>("Time.StepSize");
+    std::ofstream out("spreadinfo.txt");
+    out<<"time: "<<" angle: "<<" radius: "<<std::endl;
+    out<<" "<<0<<"  "<<1.5707963<<"  "<<P.get<DROPS::Point3DCL>("Exp.RadDrop")[0]<<std::endl;
     for (int step= 1; step<=nsteps; ++step)
     {
         std::cout << "============================================================ step " << step << std::endl;
@@ -464,7 +517,9 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
             BndDataCL<> ifbnd( 0);
             std::cout << "surfactant on \\Gamma: " << Integral_Gamma( MG, lset.Phi, lset.GetBndData(), make_P1Eval(  MG, ifbnd, surfTransp.ic)) << '\n';
         }
-
+        double angle,radius;
+        computeRadius_Angle( MG, lset, the_Bnd_outnormal,radius,angle);
+        out<<" "<<time_new<<"  "<<angle<<"  "<<radius<<std::endl;
         // WriteMatrices( Stokes, step);
 
         // grid modification
