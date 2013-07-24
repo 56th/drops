@@ -24,8 +24,35 @@
 
 #include "num/krylovsolver.h"
 #include "num/precond.h"
+#include "num/pardisosolver.h"
 #include <iostream>
 
+
+
+int PardisoTest()
+{
+    std::cout << "PARDISO: 2x2:\n" << std::endl;
+    DROPS::MatrixCL A;
+    DROPS::MatrixBuilderCL AB(&A, 2, 2);
+    AB( 0, 1)= 1.; AB( 1, 0)= 1.;
+    AB.Build();
+    DROPS::VectorCL b( 1., 2);
+    b[0]= 1.; b[1]= 2.;
+    DROPS::VectorCL x( 0., 2);
+
+    std::cout << "A\n" << A << "b\n" << b << std::endl;
+    int mi= 10;
+    double tol= 1e-10;
+    DROPS::DummyPcCL pc;
+    
+    DROPS::PardisoSolverCL SolveA( A);
+    // SolveA.Update(A);
+    SolveA.Solve(A, x, b);
+    // DROPS::BICGSTAB( A, x, b, DROPS::DummyExchangeCL(), pc, mi, tol);
+    DROPS::VectorCL r(A*x - b);
+    std::cout << x << r << '\n' << mi << '\n' << "PARDISO 1 Residual:  "<< norm(r) << std::endl;
+    return 0;
+}
 
 int Test()
 {
@@ -91,7 +118,7 @@ int Test2()
 int main (int, char**)
 {
   try {
-    return Test() + Test2();
+      return PardisoTest() + Test() + Test2();
   }
   catch (DROPS::DROPSErrCL err) { err.handle(); }
 }

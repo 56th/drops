@@ -108,6 +108,8 @@ if(NOT MPI)
     endif()
 endif(NOT MPI)
 
+target_link_libraries_ser(bicgstab -fopenmp -Wl,--start-group /home/lehrenfeld/software/intel_composer_xe_2013.4.183/mkl/lib/intel64/libmkl_intel_ilp64.a /home/lehrenfeld/software/intel_composer_xe_2013.4.183/mkl/lib/intel64/libmkl_gnu_thread.a /home/lehrenfeld/software/intel_composer_xe_2013.4.183/mkl/lib/intel64/libmkl_core.a -Wl,--end-group -ldl -lpthread -lm) 
+
 
 #### BEGIN HACKY VERSION OF TEST SUITE ###
 
