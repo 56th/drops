@@ -32,7 +32,7 @@
 
 int PardisoTest()
 {
-    std::cout << "PARDISO: 1000x1000:\n" << std::endl;
+    std::cout << "PARDISO: 500x500:\n" << std::endl;
     DROPS::MatrixCL A;
     const int N = 500;
     DROPS::MatrixBuilderCL AB(&A, N*N, N*N);

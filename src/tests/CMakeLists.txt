@@ -47,7 +47,7 @@ exec_ser(bicgstab tests-bicgstab misc-utils)
 
 exec_ser(pardiso tests-pardiso misc-utils)
 
-target_link_libraries_ser(pardiso -fopenmp -Wl,--start-group /home/schruste/netgen/mkl/composer_xe_2013.4.183/mkl/lib/intel64/libmkl_intel_ilp64.a /home/schruste/netgen/mkl/composer_xe_2013.4.183/mkl/lib/intel64/libmkl_gnu_thread.a /home/schruste/netgen/mkl/composer_xe_2013.4.183/mkl/lib/intel64/libmkl_core.a -Wl,--end-group -ldl -lpthread -lm) 
+target_link_libraries_ser(pardiso -fopenmp -Wl,--start-group ${MKL_HOME}/lib/intel64/libmkl_intel_ilp64.a ${MKL_HOME}/lib/intel64/libmkl_gnu_thread.a ${MKL_HOME}/lib/intel64/libmkl_core.a -Wl,--end-group -ldl -lpthread -lm) 
 
 exec_ser(gcr tests-gcr misc-utils)
 
