@@ -191,13 +191,15 @@ endif(TESTS)
 
 foreach(package ${PACKAGES})
     add_subdirectory(${package})
-    file(GLOB jsonfiles ${package}/*.json)
-    foreach(file ${jsonfiles})
-          configure_file(${file} ${package}/)
-          #message(STATUS "copying ${file} ${package}/")
-    endforeach(file)
-
 endforeach(${package})
+
+add_custom_target(param-files 
+    COMMAND for PACK in ${PACKAGES} \; do
+              echo \"copy \$$PACK json files...\" \;
+              cp -f ${CMAKE_CURRENT_SOURCE_DIR}/\$$PACK/*.json ${CMAKE_CURRENT_BINARY_DIR}/\$$PACK/ 2> /dev/null \; 
+            done
+    COMMENT "copy param files from ${CMAKE_CURRENT_SOURCE_DIR} to ${CMAKE_CURRENT_BINARY_DIR}"
+)
 
 add_custom_target(stat COMMAND ls */*.cpp */*.tpp */*.h | xargs wc -l WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 

@@ -93,22 +93,22 @@ exec_ser(dynload geom-simplex misc-funcmap misc-dynamicload)
 
 if(NOT MPI)
     add_dependencies(dynload misc-scalarFunctions misc-vectorFunctions)
-endif(NOT MPI)
 
-if(EXISTS ${SUITESPARSE_HOME}) 
-    exec_ser(directsolver misc-utils)
-	#${SUITESPARSE_HOME}/metis-4.0/libmetis.a not used for now
-    find_package(BLAS)
-    if (BLAS_FOUND)
-	    target_link_libraries_ser(tests-directsolver ${SUITESPARSE_HOME}/UMFPACK/Lib/libumfpack.a ${SUITESPARSE_HOME}/CHOLMOD/Lib/libcholmod.a ${SUITESPARSE_HOME}/AMD/Lib/libamd.a ${SUITESPARSE_HOME}/COLAMD/Lib/libcolamd.a ${SUITESPARSE_HOME}/CCOLAMD/Lib/libccolamd.a ${SUITESPARSE_HOME}/CAMD/Lib/libcamd.a ${SUITESPARSE_HOME}/SuiteSparse_config/libsuitesparseconfig.a ${BLAS_LIBRARIES} lapack)
-	    set_target_properties(tests-directsolver PROPERTIES COMPILE_FLAGS "-I${SUITESPARSE_HOME}/CHOLMOD/Include -I${SUITESPARSE_HOME}/SuiteSparse_config -I${SUITESPARSE_HOME}/UMFPACK/Include -I${SUITESPARSE_HOME}/AMD/Include")
-	else(BLAS_FOUND)
-	    add_custom_target(GiveBlasWarning COMMENT "Warning: BLAS library not found, directsolver will not link properly.")
-	    target_link_libraries(tests-directsolver GiveBlasWarning)
-	endif(BLAS_FOUND)    
-else()
-    add_custom_target(directsolver COMMENT "Warning: SuiteSparse library not found, skipped compilation of directsolver.")
-endif()
+    if(EXISTS ${SUITESPARSE_HOME}) 
+        exec_ser(directsolver misc-utils)
+        #${SUITESPARSE_HOME}/metis-4.0/libmetis.a not used for now
+        find_package(BLAS)
+        if (BLAS_FOUND)
+            target_link_libraries_ser(tests-directsolver ${SUITESPARSE_HOME}/UMFPACK/Lib/libumfpack.a ${SUITESPARSE_HOME}/CHOLMOD/Lib/libcholmod.a ${SUITESPARSE_HOME}/AMD/Lib/libamd.a ${SUITESPARSE_HOME}/COLAMD/Lib/libcolamd.a ${SUITESPARSE_HOME}/CCOLAMD/Lib/libccolamd.a ${SUITESPARSE_HOME}/CAMD/Lib/libcamd.a ${SUITESPARSE_HOME}/SuiteSparse_config/libsuitesparseconfig.a ${BLAS_LIBRARIES} lapack)
+            set_target_properties(tests-directsolver PROPERTIES COMPILE_FLAGS "-I${SUITESPARSE_HOME}/CHOLMOD/Include -I${SUITESPARSE_HOME}/SuiteSparse_config -I${SUITESPARSE_HOME}/UMFPACK/Include -I${SUITESPARSE_HOME}/AMD/Include")
+        else(BLAS_FOUND)
+            add_custom_target(GiveBlasWarning COMMENT "Warning: BLAS library not found, directsolver will not link properly.")
+            target_link_libraries(tests-directsolver GiveBlasWarning)
+        endif(BLAS_FOUND)    
+    else()
+        add_custom_target(directsolver COMMENT "Warning: SuiteSparse library not found, skipped compilation of directsolver.")
+    endif()
+endif(NOT MPI)
 
 
 #### BEGIN HACKY VERSION OF TEST SUITE ###

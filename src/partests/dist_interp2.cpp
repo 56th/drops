@@ -312,7 +312,7 @@ int main ( int argc, char **argv)
 #endif
   int ret = 0;
   try {
-//    ret +=TestRepairUniform();
+    ret +=TestRepairUniform();
     int sum = ProcCL::GlobalSum(ret);
     std::cout << "ret: " << sum << std::endl;
     ret += TestRepair();

@@ -60,17 +60,25 @@ def main(argv=sys.argv):
 
     pattern = '*.ref' # default
     nondefaultpattern = False
+    compileproc = "1" # default
+
+    # parse command line arguments
     for arg in sys.argv:
         if re.match('--select=',arg):
             [dummy,pattern] = arg.split('=',1)
             nondefaultpattern = True
-    print "chosen pattern is ", pattern
-            
-    
-    compileproc = "1"
-    for arg in sys.argv:
         if re.match('--compileproc=',arg):
             [dummy,compileproc] = arg.split('=',1)
+        if re.match('--help',arg):
+            print "Usage: python testDROPS.py [OPTIONS]"
+            print "Run DROPS test suite.\n"
+            print "  serial\t\tconsider only serial test cases"
+            print "  parallel\t\tconsider only parallel test cases"
+            print "  --select=PATTERN\ttest specifications to use, default pattern is *.ref"
+            print "  --compileproc=P\tnumber of processes used for compilation"
+            print "  --help\t\tprint this message and exit"
+            return 0
+    print "chosen pattern is ", pattern
     print "number of processes for compilation ", compileproc
 
     parallelList = readtests.parallel(pattern)
@@ -78,7 +86,7 @@ def main(argv=sys.argv):
 
     if ('parallel' in sys.argv or ('parallel' not in sys.argv and 'serial' not in sys.argv)):
         if nondefaultpattern:
-            print "parallelList =", parallelList
+            print "parallelList =", [t.testName for t in parallelList]
         if (parallelList != []):
             #Set up DROPS for parallel testing
             setup.parallel()
@@ -86,7 +94,7 @@ def main(argv=sys.argv):
             failedTests = failedTests + runtests(parallelList,compileproc)
     if ('serial' in sys.argv or ('parallel' not in sys.argv and 'serial' not in sys.argv)):
         if nondefaultpattern:
-            print "serialList =", serialList
+            print "serialList =", [t.testName for t in serialList]
         if (serialList != []):
             #Set up DROPS for serial testing
             setup.serial()

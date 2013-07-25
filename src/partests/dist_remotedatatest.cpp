@@ -96,7 +96,7 @@ int main( int argc, char **argv)
         DROPS::DiST::PrioListT prioList;
         prioList.push_back( DROPS::PrioMaster);
         prioList.push_back( DROPS::PrioKilledGhost);
-        int prioLevel = 1;
+        DROPS::Uint prioLevel = 1;
         DROPS::DiST::LevelListCL lvlList;
         lvlList.push_back( prioLevel);
 
@@ -116,6 +116,10 @@ int main( int argc, char **argv)
                                     "  " << (*it).first.bary[2]         <<
                               " Level: " << (*it).first.level           <<
                           " LocalPrio: " << (*it).second.GetLocalPrio() << std::endl;
+            if (prioLevel != (*it).first.level)
+                std::cerr << "Level does not match!\n";
+            if (!prioList.contains( (*it).second.GetLocalPrio()))
+                std::cerr << "Prio does not match!\n";
         }
     }
     catch (DROPS::DROPSErrCL err) {err.handle();}

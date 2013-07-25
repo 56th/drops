@@ -35,6 +35,7 @@
 #include "stokes/instatstokes2phase.h"
 #include "geom/geomselect.h"
 #include "out/vtkOut.h"
+#include "misc/dynamicload.h"
 #include <iostream>
 #include <sstream>
 
@@ -236,6 +237,13 @@ double sigmaf (const Point3DCL&, double) { return 0; }
 void CheckMigration( LoadBalCL& lb)
 {
     std::cout << "Checking migration with unknowns ..." << std::endl;
+
+    std::vector<std::string> libs;
+    libs.push_back("misc/libmisc-scalarFunctions");
+    libs.push_back("misc/libmisc-vectorFunctions");
+//    libs.push_back("levelset/liblevelset-twophaseCoeff");
+    dynamicLoad( "../", libs);
+
     MultiGridCL& mg= lb.GetMG();
 
     // Create boundary conditions
