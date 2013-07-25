@@ -119,11 +119,13 @@ inline void
     MLIdxDescCL loc_vidx( vecP2_FE, stokes_.vel_idx.size());
 
     loc_vidx.CreateNumbering( LastLevel, stokes_.GetMG(), stokes_.GetBndData().Vel, match);
+    /*
     if (LastLevel != v.RowIdx->TriangLevel()) {
         std::cout << "LastLevel: " << LastLevel
                   << " old v->TriangLevel(): " << v.RowIdx->TriangLevel() << std::endl;
         throw DROPSErrCL( "VelocityRepairCL::post_refine: Sorry, not yet implemented.");
     }
+    */
     loc_v.SetIdx( &loc_vidx);
 
     p2repair_->repair( loc_v);
