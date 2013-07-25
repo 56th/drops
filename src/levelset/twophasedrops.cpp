@@ -518,7 +518,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
             std::cout << "surfactant on \\Gamma: " << Integral_Gamma( MG, lset.Phi, lset.GetBndData(), make_P1Eval(  MG, ifbnd, surfTransp.ic)) << '\n';
         }
 		
-		Stokes.CheckOnePhaseSolution( &Stokes.v, Stokes.Coeff_.RefVel);
+		Stokes.CheckOnePhaseSolution( &Stokes.v, &Stokes.p, Stokes.Coeff_.RefVel, Stokes.Coeff_.RefGradPr);
         double angle,radius;
         computeRadius_Angle( MG, lset, the_Bnd_outnormal,radius,angle);
         out<<" "<<time_new<<"  "<<angle<<"  "<<radius<<std::endl;
@@ -625,6 +625,7 @@ void SetMissingParameters(DROPS::ParamCL& P){
 	P.put_if_unset<std::string>("SpeBnd.BndOutNormal", "OutNormalBottomPlane");
 
 	P.put_if_unset<std::string>("Exp.Solution_Vel", "None");
+	P.put_if_unset<std::string>("Exp.Solution_GradPr", "None");
 }
 
 int main (int argc, char** argv)

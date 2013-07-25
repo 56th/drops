@@ -97,6 +97,7 @@ class TwoPhaseFlowCoeffCL
   public:
     DROPS::instat_vector_fun_ptr volforce;
     DROPS::instat_vector_fun_ptr RefVel;
+    DROPS::instat_vector_fun_ptr RefGradPr;
     const SmoothedJumpCL rho, mu;
     const SmoothedJumpCL beta;    //slip length
     const double SurfTens, DilVisco, ShearVisco;
@@ -131,6 +132,10 @@ class TwoPhaseFlowCoeffCL
 				RefVel = InVecMap::getInstance()[P.get<std::string>("Exp.Solution_Vel")];
 			else
 				RefVel = NULL;
+			if( P.get<std::string>("Exp.Solution_GradPr").compare("None")!=0)
+				RefGradPr = InVecMap::getInstance()[P.get<std::string>("Exp.Solution_GradPr")];
+			else
+				RefGradPr = NULL;
     }
 
     TwoPhaseFlowCoeffCL( double rho1, double rho2, double mu1, double mu2, double surftension, Point3DCL gravity, bool dimless = false, double dilatationalvisco = 0.0, double shearvisco = 0.0, double alpha_ = 1.0, double beta1 = 0.0, double beta2 =0.0
@@ -147,8 +152,9 @@ class TwoPhaseFlowCoeffCL
 		alpha(alpha_), 
         g( gravity)
 		{
-          volforce = InVecMap::getInstance()["ZeroVel"];
-		  RefVel   = InVecMap::getInstance()["ZeroVel"];
+          volforce   = InVecMap::getInstance()["ZeroVel"];
+		  RefVel     = InVecMap::getInstance()["ZeroVel"];
+		  RefGradPr  = InVecMap::getInstance()["ZeroVel"];
         }
 };
 
@@ -260,8 +266,9 @@ class InstatStokes2PhaseP2P1CL : public ProblemCL<TwoPhaseFlowCoeffCL, StokesBnd
     /// Get CFL restriction for explicit time stepping
     double GetCFLTimeRestriction( LevelsetP2CL& lset);
 
-	//Only apply for one phase simulation for the second fluid;
-    void CheckOnePhaseSolution(const VelVecDescCL* DescVel , instat_vector_fun_ptr RefVel) const;
+	//This function can only be applied for one phase simulation, because the function doesn't consider any discontinuity in solutions;
+	//It checks the L2 norm of discretized error of velocity and gradient of pressure
+    void CheckOnePhaseSolution(const VelVecDescCL* DescVel, const VecDescCL* DescPr, const instat_vector_fun_ptr RefVel, const instat_vector_fun_ptr RefGradPr) const;
 	
     /// \name Evaluate Solution
     //@{
