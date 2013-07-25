@@ -49,7 +49,7 @@ else(WIN32)
 
   if (MKL_HOME STREQUAL "")
   else (MKL_HOME STREQUAL "")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DMKL_ILP64 -I${MKL_HOME}/include -Wno-long-long")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DMKL_ILP64 -m64 -I${MKL_HOME}/include -Wno-long-long")
   endif (MKL_HOME STREQUAL "")
 
 endif(WIN32)
