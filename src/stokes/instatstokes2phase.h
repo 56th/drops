@@ -96,6 +96,7 @@ class TwoPhaseFlowCoeffCL
 
   public:
     DROPS::instat_vector_fun_ptr volforce;
+    DROPS::instat_vector_fun_ptr RefVel;
     const SmoothedJumpCL rho, mu;
     const SmoothedJumpCL beta;    //slip length
     const double SurfTens, DilVisco, ShearVisco;
@@ -125,7 +126,11 @@ class TwoPhaseFlowCoeffCL
 		alpha(P.get<double>("SpeBnd.alpha")),
         g( P.get<DROPS::Point3DCL>("Exp.Gravity"))
         {
-        volforce = InVecMap::getInstance()[P.get<std::string>("Exp.VolForce")];
+			volforce = InVecMap::getInstance()[P.get<std::string>("Exp.VolForce")];
+			if( P.get<std::string>("Exp.Solution_Vel").compare("None")!=0)
+				RefVel = InVecMap::getInstance()[P.get<std::string>("Exp.Solution_Vel")];
+			else
+				RefVel = NULL;
     }
 
     TwoPhaseFlowCoeffCL( double rho1, double rho2, double mu1, double mu2, double surftension, Point3DCL gravity, bool dimless = false, double dilatationalvisco = 0.0, double shearvisco = 0.0, double alpha_ = 1.0, double beta1 = 0.0, double beta2 =0.0
@@ -143,6 +148,7 @@ class TwoPhaseFlowCoeffCL
         g( gravity)
 		{
           volforce = InVecMap::getInstance()["ZeroVel"];
+		  RefVel   = InVecMap::getInstance()["ZeroVel"];
         }
 };
 
@@ -254,7 +260,9 @@ class InstatStokes2PhaseP2P1CL : public ProblemCL<TwoPhaseFlowCoeffCL, StokesBnd
     /// Get CFL restriction for explicit time stepping
     double GetCFLTimeRestriction( LevelsetP2CL& lset);
 
-
+	//Only apply for one phase simulation for the second fluid;
+    void CheckOnePhaseSolution(const VelVecDescCL* DescVel , instat_vector_fun_ptr RefVel) const;
+	
     /// \name Evaluate Solution
     //@{
     /// Get solution as FE-function for evaluation

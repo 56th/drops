@@ -3430,6 +3430,65 @@ double InstatStokes2PhaseP2P1CL::GetCFLTimeRestriction( LevelsetP2CL& lset)
     return dtMax;
 }
 
+void InstatStokes2PhaseP2P1CL:: CheckOnePhaseSolution(const VelVecDescCL* DescVel , instat_vector_fun_ptr RefVel) const
+{
+
+    double t = DescVel->t;
+//#ifdef _PAR
+//    const ExchangeCL& exV = vel_idx.GetEx();
+//    const ExchangeCL& exP = pr_idx.GetEx();
+//#endif
+    Uint lvl=DescVel->GetLevel();
+
+//check the residual of the stationary solution
+/*    if (is_stat)
+    {
+        VectorCL res1( A.Data*lsgvel->Data + transp_mul( B.Data, lsgpr->Data ) - b.Data);
+        VectorCL res2( B.Data*lsgvel->Data - c.Data);
+
+        #ifndef _PAR
+            const double norm_res1      = norm(res1);
+            const double norm_res2      = norm(res2);
+            const double norm_sup_res_1 = supnorm(res1);
+            const double norm_sup_res_2 = supnorm(res2);
+        #else
+            VectorCL res1_acc(res1);
+            VectorCL res2_acc(res2);
+            const double norm_res1      = std::sqrt(exV.ParDot(res1_acc, true, res1, false));
+            const double norm_res2      = std::sqrt(exP.ParDot(res2_acc, true, res2, false));
+            const double norm_sup_res_1 = ProcCL::GlobalMax(supnorm(res1_acc));
+            const double norm_sup_res_2 = ProcCL::GlobalMax(supnorm(res2_acc));
+        #endif
+
+        IF_MASTER
+            std::cout << "\nCheck the solution..."
+                      << "\n|| Ax + BTy - F || = " << norm_res1 << ", max. " << norm_sup_res_1
+                      << "\n||       Bx - G || = " << norm_res2 << ", max. " << norm_sup_res_2
+                      << '\n' << std::endl;
+    }*/
+
+    SMatrixCL<3,3> T;
+    double det;
+
+    // Some norms of velocities: u_h - u
+    // number of nodes for Quad5CL rule is 15 (see discretize.h Quad5_DataCL NumNodesC =15)
+    double L2_vel(0.0);
+
+    Quad5CL<Point3DCL> q5_vel, q5_vel_exact;
+    for (MultiGridCL::const_TriangTetraIteratorCL sit= const_cast<const MultiGridCL&>(MG_).GetTriangTetraBegin(lvl),
+        send= const_cast<const MultiGridCL&>(MG_).GetTriangTetraEnd(lvl); sit != send; ++sit)
+    {
+         GetTrafoTr(T,det,*sit);
+         const double absdet= std::fabs(det);
+         LocalP2CL<Point3DCL> loc_vel(*sit, make_P2Eval(MG_,BndData_.Vel,*DescVel));
+         q5_vel.assign(loc_vel);
+         q5_vel_exact.assign(*sit, RefVel,t);
+         Quad5CL<Point3DCL> q5_vel_diff( q5_vel-q5_vel_exact);
+         L2_vel += Quad5CL<> (dot(q5_vel_diff,q5_vel_diff)).quad(absdet);
+     }
+     L2_vel = std::sqrt(L2_vel);               //L2_vel is the true value.
+         std::cout << "---------------------Discretize error || u_h - u ||_L2 = " <<  L2_vel << std::endl;	
+}
 
 
 P1XRepairCL::P1XRepairCL (MultiGridCL& mg, VecDescCL& p)
