@@ -143,7 +143,7 @@ void Update(const MatrixCL& A)
 
     /* Matrix data. */
     n = A.num_rows();
-    ia = new MKL_INT[n];
+    ia = new MKL_INT[n+1];
     ja = new MKL_INT[A.num_nonzeros()];
     a  = new double [A.num_nonzeros()];
 
