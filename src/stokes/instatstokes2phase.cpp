@@ -1364,7 +1364,7 @@ class SpecialBndHandler_System1OnePhaseP2CL
     { P2DiscCL::GetGradientsOnRef( GradRef); 
 	}
     void setup(const TetraCL& tet, const SMatrixCL<3,3>& T, LocalSystem1DataCL& loc);  //update local system 1
-	void setupRhs(const TetraCL& tet, Point3DCL loc_b[10]);                            //for no homogenour slip boundary condition (the slip wall is moving)
+	void setupRhs(const TetraCL& tet, Point3DCL loc_b[10], double t);                            //for no homogenour slip boundary condition (the slip wall is moving)
 };
 
 void SpecialBndHandler_System1OnePhaseP2CL::setup(const TetraCL& tet, const SMatrixCL<3,3>& T, LocalSystem1DataCL& loc)
@@ -1421,7 +1421,7 @@ void SpecialBndHandler_System1OnePhaseP2CL::setup(const TetraCL& tet, const SMat
 }
 
 //for no homogenour slip boundary condition (the slip wall is moving)
-void SpecialBndHandler_System1OnePhaseP2CL::setupRhs(const TetraCL& tet, Point3DCL loc_b[10])
+void SpecialBndHandler_System1OnePhaseP2CL::setupRhs(const TetraCL& tet, Point3DCL loc_b[10], double t)
 {
 
 	Point3DCL Wallvel_val[6];
@@ -1461,8 +1461,8 @@ void SpecialBndHandler_System1OnePhaseP2CL::setupRhs(const TetraCL& tet, Point3D
 			for(Uint i=0; i<6; ++i){//Get wall velocity
 				typedef StokesBndDataCL::VelBndDataCL::bnd_val_fun bnd_val_fun;
                 bnd_val_fun bf= BndData_.Vel.GetBndSeg(face.GetBndIdx()).GetBndFun();
-                Wallvel_val[i]= i<3 ? bf( tet.GetVertex( unknownIdx[i])->GetCoord(), 0.)
-                    : bf( GetBaryCenter( *tet.GetEdge(unknownIdx[i]-4)), 0.);
+                Wallvel_val[i]= i<3 ? bf( tet.GetVertex( unknownIdx[i])->GetCoord(), t)
+                    : bf( GetBaryCenter( *tet.GetEdge(unknownIdx[i]-4)), t);
 			}	
 			for(Uint i=0; i<6; ++i){//setup right hand side	
 				for(Uint j=0; j<6; ++j)
@@ -1907,7 +1907,7 @@ void System1Accumulator_P2CL::local_setup (const TetraCL& tet)
         if(speBnd)
         {
         	if (noCut)
-				speBndHandler1.setupRhs(tet, loc_b);
+				speBndHandler1.setupRhs(tet, loc_b, t);
             //else
 		    //	speBndHandler1.setupRhs(tet, loc_b);//<not used for now --need modification when the slip length is different in the two phase flow
         }
@@ -3451,7 +3451,7 @@ void InstatStokes2PhaseP2P1CL::CheckOnePhaseSolution(const VelVecDescCL* DescVel
     double L2_vel(0.0);
     double Grad_pr(0.0);
     Quad5CL<Point3DCL> q5_vel, q5_vel_exact;
-    Quad5CL<Point3DCL> q5_grad_pr, q5_grad_pr_exact;
+    Quad5CL<Point3DCL> q5_grad_pr_exact;
 
     for (MultiGridCL::const_TriangTetraIteratorCL sit= const_cast<const MultiGridCL&>(MG_).GetTriangTetraBegin(lvl),
         send= const_cast<const MultiGridCL&>(MG_).GetTriangTetraEnd(lvl); sit != send; ++sit)
@@ -3461,14 +3461,14 @@ void InstatStokes2PhaseP2P1CL::CheckOnePhaseSolution(const VelVecDescCL* DescVel
          LocalP2CL<Point3DCL> loc_vel(*sit, make_P2Eval(MG_,BndData_.Vel,*DescVel));
          LocalP1CL<double> loc_pr(*sit, make_P1Eval(MG_,BndData_.Pr,*DescPr));
 		
-		 LocalP1CL<Point3DCL> loc_grad_pr;
+		 Point3DCL loc_grad_pr;
 		 P1DiscCL::GetGradients(Grad, det, *sit);		 
 		 for(int i=0; i < 4; i++)
-			 loc_grad_pr[i] = loc_pr[i] * Grad[i];  //Gradient of pressure
+			 loc_grad_pr += loc_pr[i] * Grad[i];  //Gradient of pressure
 			 
          q5_vel.assign(loc_vel);
          q5_vel_exact.assign(*sit, RefVel,t);
-		 q5_grad_pr.assign(loc_grad_pr);
+		 Quad5CL<Point3DCL> q5_grad_pr(loc_grad_pr);
 		 q5_grad_pr_exact.assign(*sit, RefGradPr, t);
          Quad5CL<Point3DCL> q5_vel_diff( q5_vel-q5_vel_exact);
 		 Quad5CL<Point3DCL> q5_grad_pr_diff(q5_grad_pr-q5_grad_pr_exact);
