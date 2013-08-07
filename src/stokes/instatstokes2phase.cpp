@@ -3461,7 +3461,7 @@ void InstatStokes2PhaseP2P1CL::CheckOnePhaseSolution(const VelVecDescCL* DescVel
          LocalP2CL<Point3DCL> loc_vel(*sit, make_P2Eval(MG_,BndData_.Vel,*DescVel));
          LocalP1CL<double> loc_pr(*sit, make_P1Eval(MG_,BndData_.Pr,*DescPr));
 		
-		 Point3DCL loc_grad_pr;
+		 Point3DCL loc_grad_pr(0.);
 		 P1DiscCL::GetGradients(Grad, det, *sit);		 
 		 for(int i=0; i < 4; i++)
 			 loc_grad_pr += loc_pr[i] * Grad[i];  //Gradient of pressure
