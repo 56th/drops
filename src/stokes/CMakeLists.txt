@@ -19,7 +19,7 @@ geom-multigrid misc-scopetimer misc-progressaccu misc-params num-unknowns
 geom-topo num-fe misc-problem misc-scopetimer num-interfacePatch misc-utils
 out-output num-discretize num-MGsolver misc-params out-ensightOut out-vtkOut
 stokes-integrTime geom-geomselect misc-funcmap geom-principallattice
-geom-reftetracut num-oseenprecond misc-dynamicload)
+geom-reftetracut num-oseenprecond misc-dynamicload stokes-stokes)
 if(NOT MPI)
 add_dependencies(sdropsP2 misc-vectorFunctions misc-scalarFunctions stokes-stokesCoeff)
 endif(NOT MPI)

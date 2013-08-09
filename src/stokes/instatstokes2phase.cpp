@@ -1423,14 +1423,11 @@ void SpecialBndHandler_System1OnePhaseP2CL::setup(const TetraCL& tet, const SMat
 //for no homogenour slip boundary condition (the slip wall is moving)
 void SpecialBndHandler_System1OnePhaseP2CL::setupRhs(const TetraCL& tet, Point3DCL loc_b[10], double t)
 {
-
-	Point3DCL Wallvel_val[6];
-	for (Uint k =0; k< 4; ++k) //Go throught all faces of a tet
-	{
-		SMatrixCL<3, 3> dm[10][10];
+	for (Uint k =0; k< 4; ++k){ //Go throught all faces of a tet
+	
 		LocalP2CL<double> phi[6]; 
-		Quad5_2DCL<double> mass2Dj;
-		Quad5_2DCL<double> mass2Di;
+		Quad5_2DCL<double> locP2[6];
+		Quad5_2DCL<Point3DCL> WallVel;
 		BaryCoordCL bary[3];
 		if( BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC ){
 			const FaceCL& face = *tet.GetFace(k);
@@ -1443,31 +1440,20 @@ void SpecialBndHandler_System1OnePhaseP2CL::setupRhs(const TetraCL& tet, Point3D
 				unknownIdx[i+3] = EdgeOfFace(k, i) + 4;  // i is index for Edge
 				bary[i][unknownIdx[i]]=1;
 			}
+			
+			typedef StokesBndDataCL::VelBndDataCL::bnd_val_fun bnd_val_fun;
+			bnd_val_fun bf= BndData_.Vel.GetBndSeg(face.GetBndIdx()).GetBndFun();
+			WallVel.assign(tet, bary, bf, t);
 			for(Uint i=0; i<6; ++i)
 				phi[i][unknownIdx[i]] = 1;
 				
 			for(Uint i=0; i<6; ++i){
-				for(Uint j=0; j<=i; ++j){					
-					mass2Dj.assign(phi[j], bary);  //
-					mass2Di.assign(phi[i], bary);
-					Quad5_2DCL<double> mass2D(mass2Dj * mass2Di); //
-					dm[unknownIdx[j]][unknownIdx[i]](0, 0)= dm[unknownIdx[j]][unknownIdx[i]](1, 1) = dm[unknownIdx[j]][unknownIdx[i]](2, 2) = beta_ * mass2D.quad(absdet);
-					dm[unknownIdx[j]][unknownIdx[i]]     -= beta_ * mass2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));
-					if (i != j){
-						assign_transpose( dm[unknownIdx[i]][unknownIdx[j]], dm[unknownIdx[j]][unknownIdx[i]]);
-					}	
-				}
+					locP2[i].assign(phi[i], bary);
 			}
-			for(Uint i=0; i<6; ++i){//Get wall velocity
-				typedef StokesBndDataCL::VelBndDataCL::bnd_val_fun bnd_val_fun;
-                bnd_val_fun bf= BndData_.Vel.GetBndSeg(face.GetBndIdx()).GetBndFun();
-                Wallvel_val[i]= i<3 ? bf( tet.GetVertex( unknownIdx[i])->GetCoord(), t)
-                    : bf( GetBaryCenter( *tet.GetEdge(unknownIdx[i]-4)), t);
-			}	
+
 			for(Uint i=0; i<6; ++i){//setup right hand side	
-				for(Uint j=0; j<6; ++j)
-					loc_b[unknownIdx[i]] += dm[unknownIdx[j]][unknownIdx[i]]* Wallvel_val[j];
-			    
+					Quad5_2DCL<Point3DCL> WallVelRhs( locP2[i]* WallVel);
+					loc_b[unknownIdx[i]] += beta_ * WallVelRhs.quad(absdet);
 			}		
 		}
 	}	
