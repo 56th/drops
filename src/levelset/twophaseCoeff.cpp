@@ -350,7 +350,7 @@ namespace slipBnd{
 	static DROPS::RegisterVectorFunction regveltop("TopVel", TopVel);
     static DROPS::RegisterVectorFunction regvelpoiseuille("InflowPoiseuille", InflowPoiseuille);
 }
-namespace TestSlip{
+namespace InstatSlip{
 
 	DROPS::SVectorCL<3> Velocity( const DROPS::Point3DCL& p,double t)
 	{
@@ -406,61 +406,64 @@ namespace TestSlip{
 
         return f+PressureGr(p,t);
     }
-
-
-
     static DROPS::RegisterVectorFunction regvelVel("TestSlipVel", Velocity);
     static DROPS::RegisterVectorFunction regvelf("TestSlipF", VolForce);
 	static DROPS::RegisterVectorFunction regvelgpr("TestSlipPrGrad",PressureGr);
 
 }
 
-namespace StokesSlip{
+namespace StatSlip{
 
-	DROPS::SVectorCL<3> Velocity( const DROPS::Point3DCL& p,double t)
+	DROPS::SVectorCL<3> Velocity( const DROPS::Point3DCL& p,double)
 	{
 		DROPS::SVectorCL<3> v(0.);
-        double F = std::sin(t);
-		v[0]=  std::sin(p[0])*(2.*p[1]-3)*F;
-		v[1]= -std::cos(p[0])*(p[1] * p[1]-3 * p[1] + 2)*F;
+        static bool first = true;
+		static double l_s;
+		if(first){
+			l_s=1./(P.get<double>("SpeBnd.SlipLength2"));
+			first = false;
+		}
+		v[0]=  std::sin(p[0]/l_s)*std::cos(p[1]/l_s);
+		v[1]= -std::cos(p[0]/l_s)*std::sin(p[1]/l_s);
 		v[2]= 0;
-
 		return v;
 	}
 
-	DROPS::SVectorCL<3> PressureGr(const DROPS::Point3DCL& p, double t)
+	DROPS::SVectorCL<3> PressureGr(const DROPS::Point3DCL& p, double)
 	{
 		DROPS::SVectorCL<3> delp(0.);
         static bool first = true;
-		static double nu;
+		static double l_s;
 		if(first){
-			nu=P.get<double>("Mat.ViscFluid")/P.get<double>("Mat.DensFluid");
+			l_s=1./(P.get<double>("SpeBnd.SlipLength2"));
 			first = false;
 		}
-		double F = std::sin(t);
-		delp[0]= -nu*std::sin(p[0])*(2.*p[1]-3)*F;
-		delp[1]=-2*nu*std::cos(p[0])*F;
+		delp[0]=-1./(2.*l_s)*std::sin(2*p[0]/l_s);
+		delp[1]=-1./(2.*l_s)*std::sin(2*p[1]/l_s);
 		delp[2]= 0;
 
 		return delp;
 
 	}
 
-	DROPS::SVectorCL<3> VolForce( const DROPS::Point3DCL& p, double t)
+	DROPS::SVectorCL<3> VolForce( const DROPS::Point3DCL& p, double)
     {
         DROPS::SVectorCL<3> f(0.);
+        static bool first = true;
+		static double nu, l_s;
+		if(first){
+			nu=P.get<double>("Mat.ViscFluid")/P.get<double>("Mat.DensFluid");
+			l_s=1./(P.get<double>("SpeBnd.SlipLength2"));
+			first = false;
+		}
+		f[0] =  2.* nu * std::sin(p[0]/l_s) * std::cos(p[1]/l_s) *  1./(l_s*l_s) ;
+		f[1] = -2.* nu * std::cos(p[0]/l_s) * std::sin(p[1]/l_s) *  1./(l_s*l_s) ;
+		f[2] = 0;
 
-		double m = std::cos(t);
-		f[0] = 0 ;//std::sin(p[0])*(2.*p[1]-3)*m;
-		f[1] = 1;//-std::cos(p[0])*(p[1]*p[1]-3*p[1]+2)*m;
-		f[2] =0.;
-        return f;
+        return f+PressureGr(p,0);
     }
-
-
-
-    static DROPS::RegisterVectorFunction regvelStokesVel("StokesSlipVel", Velocity);
-    static DROPS::RegisterVectorFunction regvelStokesf("StokesSlipF", VolForce);
-	static DROPS::RegisterVectorFunction regvelStokesgpr("StokesSlipPrGrad",PressureGr);
+    static DROPS::RegisterVectorFunction regvelVel("StatSlipVel", Velocity);
+    static DROPS::RegisterVectorFunction regvelf("StatSlipF", VolForce);
+	static DROPS::RegisterVectorFunction regvelgpr("StatSlipPrGrad",PressureGr);
 
 }

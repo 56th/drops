@@ -56,8 +56,8 @@ void SpecialBndHandleSystem2OnePhaseCL::setupB(const TetraCL& tet, SMatrixCL<1, 
 				phiVelP2[i][unknownIdx[i]] = 1;
 				
 			for(Uint i=0; i<6; ++i){
+				vel2Di.assign(phiVelP2[i], bary);  
 				for(Uint j=0; j<3; ++j){					
-					vel2Di.assign(phiVelP2[i], bary);  
 					pr2Dj.assign(phiPrP1[j], bary);  
 					Quad5_2DCL<double> quad2D(pr2Dj * vel2Di); 
 					loc_b[unknownIdx[i]][unknownIdx[j]](0, 0)-= quad2D.quad(absdet)*normal[0];
