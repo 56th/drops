@@ -785,30 +785,42 @@ template<class BndDataT>
 /// \param idx The IdxDescCL -object to be used.
 /// \param bnd The BndDataCL -like object, from which boundary-segment-numbers are used.
 {
-    BndIdxT bidx= 0;
     const Uint sys= idx.GetIdx();
-
-    for (Uint i= 0; i < NumVertsC; ++i)
-        if (NoBC == (bc[i]= bnd.GetBC( *s.GetVertex( i), bidx))) {
+    if (!idx.IsDG())
+    {
+        BndIdxT bidx= 0;
+        for (Uint i= 0; i < NumVertsC; ++i)
+            if (NoBC == (bc[i]= bnd.GetBC( *s.GetVertex( i), bidx))) {
+                bndnum[i]= NoBndC;
+                num[i]= s.GetVertex( i)->Unknowns( sys);
+            }
+            else {
+                bndnum[i]= bidx;
+                num[i]= (bnd.GetBndSeg( bidx).WithUnknowns())
+                    ? s.GetVertex( i)->Unknowns( sys) : NoIdx;
+            }
+        for (Uint i= 0; i< NumEdgesC; ++i)
+            if (NoBC == (bc[i+NumVertsC]= bnd.GetBC( *s.GetEdge( i), bidx))) {
+                bndnum[i+NumVertsC]= NoBndC;
+                num[i+NumVertsC]= s.GetEdge( i)->Unknowns( sys);
+            }
+            else {
+                bndnum[i+NumVertsC]= bidx;
+                num[i+NumVertsC]= (bnd.GetBndSeg( bidx).WithUnknowns())
+                    ? s.GetEdge( i)->Unknowns( sys) : NoIdx;
+            }
+    }
+    else
+    {
+        Uint first = s.Unknowns(sys);
+        for (int i = 0; i < 10; ++i)
+        {
             bndnum[i]= NoBndC;
-            num[i]= s.GetVertex( i)->Unknowns( sys);
+            num[i] = first++;
         }
-        else {
-            bndnum[i]= bidx;
-            num[i]= (bnd.GetBndSeg( bidx).WithUnknowns())
-                ? s.GetVertex( i)->Unknowns( sys) : NoIdx;
-        }
-    for (Uint i= 0; i< NumEdgesC; ++i)
-        if (NoBC == (bc[i+NumVertsC]= bnd.GetBC( *s.GetEdge( i), bidx))) {
-            bndnum[i+NumVertsC]= NoBndC;
-            num[i+NumVertsC]= s.GetEdge( i)->Unknowns( sys);
-        }
-        else {
-            bndnum[i+NumVertsC]= bidx;
-            num[i+NumVertsC]= (bnd.GetBndSeg( bidx).WithUnknowns())
-                ? s.GetEdge( i)->Unknowns( sys) : NoIdx;
-        }
+    }
 }
+
 
 template<class T>
 void VecDescBaseCL<T>::SetIdx(IdxDescCL* idx)
