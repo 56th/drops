@@ -91,6 +91,7 @@
                                                 // correction is made and for VolCorrection = 1 it is carried
                                                 // out after each time step and reparameterization of the level
                                                 // set function.
+     		    "Discontinuous":		0,      // Use DG for levelset?
                 "Theta":                1,      // controls the implicitness of the theta-scheme for time
                                                 // discretization of the Navier-Stokes and level set equations.
                                                 // Theta = 0 yields the explicit and Theta = 1 the implicit
