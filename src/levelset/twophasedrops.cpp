@@ -385,6 +385,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
                                  P.get<std::string>("VTK.TimeFileName"),
                                  P.get<int>("VTK.Binary"),
                                  P.get<int>("VTK.UseOnlyP1"),
+                                 false,
                                  -1,  /* <- level */
                                  P.get<int>("VTK.ReUseTimeFile"),
                                  P.get<int>("VTK.UseDeformation"));
@@ -499,6 +500,7 @@ void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<int>("VTK.ReUseTimeFile",0);
     P.put_if_unset<int>("VTK.UseDeformation",0);
     P.put_if_unset<int>("VTK.UseOnlyP1",0);
+    P.put_if_unset<int>("VTK.AddP1XPressure",0);
     P.put_if_unset<int>("Transp.DoTransp",0);
     P.put_if_unset<std::string>("Restart.Inputfile","none");
     P.put_if_unset<int>("NavStokes.Downwind.Frequency", 0);

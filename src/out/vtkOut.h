@@ -145,7 +145,7 @@ class VTKOutCL
     /// \brief Constructor of this class
     VTKOutCL(const MultiGridCL& mg, const std::string& dataname, Uint numsteps,
              const std::string& dirname, const std::string& filename, const std::string& pvdfilename,
-             bool binary, bool onlyP1=false, Uint lvl=(Uint)-1, bool reusepvd=false, bool usedeformed=false);
+             bool binary, bool onlyP1=false, bool P2DG=false, Uint lvl=(Uint)-1, bool reusepvd=false, bool usedeformed=false);
     ~VTKOutCL();
 
     /// \brief Register a variable or the geometry for output with Write().

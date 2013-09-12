@@ -254,6 +254,7 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
                                  P.get<std::string>("VTK.TimeFileName"),
                                  P.get<int>("VTK.Binary"),
                                  P.get<int>("VTK.UseOnlyP1"),
+                                 false,
                                  -1,  /* <- level */
                                  P.get<int>("VTK.ReUseTimeFile"),
                                  P.get<int>("VTK.UseDeformation"));

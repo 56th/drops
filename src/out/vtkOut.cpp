@@ -31,7 +31,7 @@ namespace DROPS
 
 VTKOutCL::VTKOutCL(const MultiGridCL& mg, const std::string& dataname, Uint numsteps,
                    const std::string& dirname, const std::string& filename, 
-                   const std::string& pvdfilename, bool binary, bool onlyP1, 
+                   const std::string& pvdfilename, bool binary, bool onlyP1, bool P2DG,
                    Uint lvl, bool reusepvd, bool usedeformed)
 /** Beside constructing the VTKOutCL, this function computes the number of
     digits, that are used to decode the time steps in the filename.
@@ -46,7 +46,7 @@ VTKOutCL::VTKOutCL(const MultiGridCL& mg, const std::string& dataname, Uint nums
 */
     : mg_(mg), timestep_(0), numsteps_(numsteps), descstr_(dataname),
       dirname_(dirname), filename_(filename), pvdfilename_(pvdfilename), 
-      binary_(binary), onlyP1_(onlyP1), P2DG_(false), geomwritten_(false),
+      binary_(binary), onlyP1_(onlyP1), P2DG_(P2DG), geomwritten_(false),
       vAddrMap_(), eAddrMap_(), coords_(), tetras_(), lvl_(lvl),
       numPoints_(0), numTetras_(0), reusepvd_(reusepvd), usedeformed_(usedeformed)
 {
