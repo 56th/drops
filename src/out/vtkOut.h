@@ -35,6 +35,8 @@
 #include <map>
 #include <vector>
 
+#include "num/discretize.h"
+
 #ifdef _PAR
 # include "parallel/parallel.h"
 # include "parallel/exchange.h"
@@ -56,12 +58,16 @@ class VTKOutCL
 
     typedef std::map<const VertexCL*, Uint>     vertexAddressMapT;
     typedef std::map<const EdgeCL*, Uint>         edgeAddressMapT;
+    typedef std::map<const TetraCL*, Uint>       tetraAddressMapT;
     typedef std::map<std::string, VTKVariableCL*> VTKvarMapT;
     typedef VectorBaseCL<Uint>                    TetraVecT;
 
+    Point3DCL refcoords[10];
+    BaryCoordCL refcoords_b[10];
+
     const MultiGridCL& mg_;                         ///< reference to the multigrid
     char               decDigits_;                  ///< number of digits for encoding time in filename
-    Uint               timestep_;                   ///< actual timestep
+    Uint               timestep_, numsteps_;        ///< actual timestep and number of timesteps
     std::string        descstr_;                    ///< stores description info
     std::string        dirname_;
     std::string        filename_;                   ///< filenames
@@ -70,9 +76,12 @@ class VTKOutCL
     VTKvarMapT         vars_;                       ///< The variables stored by varName.
     const bool         binary_;                     ///< output in binary or ascii format
     const bool         onlyP1_;                     ///< the simulation only contains P1 data and therefore only that kind of data will be written out (shrinks file sizes)
+    const bool         P2DG_;                       ///< the simulation only contains discontinuous P2 data and therefore only that kind of data will be written out (increases file sizes dramatically)
+    bool               geomwritten_;                ///< flag if geometry has been written
 
     vertexAddressMapT   vAddrMap_;                  ///< Map vertex address to a unique (consecutive) number
     edgeAddressMapT     eAddrMap_;                  ///< Map edge address to a unique (consecutive) number
+    tetraAddressMapT    tAddrMap_;                  ///< Map edge address to a unique (consecutive) number
 
     VectorBaseCL<float>   coords_;                  ///< Coordinates of the points
     TetraVecT             tetras_;                  ///< Connectivities (tetras)
@@ -362,6 +371,9 @@ template <typename  DiscVecT>
     WriteValues(allData, name, 3);
 }
 
+typedef BndDataCL<double>    LsetBndDataCL;
+typedef P2EvalCL<double, const LsetBndDataCL, const VecDescCL> const_DiscSolCL_lset;
+
 template <typename DiscScalT>
   void VTKOutCL::GatherScalar(const DiscScalT& f, VectorBaseCL<float>& locData) const
 /** Gathers the values of the function f on vertices and edges*/
@@ -371,13 +383,25 @@ template <typename DiscScalT>
 
     // Get values on vertices
     Uint pos= 0;
-    for (MultiGridCL::const_TriangVertexIteratorCL it= mg_.GetTriangVertexBegin(lvl_); it!=mg_.GetTriangVertexEnd(lvl_); ++it){
-        locData[pos++]= (float)f.val( *it);
-    }
+    if (!P2DG_)
+        for (MultiGridCL::const_TriangVertexIteratorCL it= mg_.GetTriangVertexBegin(lvl_); it!=mg_.GetTriangVertexEnd(lvl_); ++it){
+            locData[pos++]= (float)f.val( *it);
+        }
 
     // Get values on edges
-    for (MultiGridCL::const_TriangEdgeIteratorCL it= mg_.GetTriangEdgeBegin(lvl_); it!=mg_.GetTriangEdgeEnd(lvl_); ++it){
-        locData[pos++]= (float)f.val( *it, 0.5);
+    if (!P2DG_)
+        for (MultiGridCL::const_TriangEdgeIteratorCL it= mg_.GetTriangEdgeBegin(lvl_); it!=mg_.GetTriangEdgeEnd(lvl_); ++it){
+            locData[pos++]= (float)f.val( *it, 0.5);
+        }
+    if (P2DG_)
+    {
+        for (MultiGridCL::const_TriangTetraIteratorCL it= mg_.GetTriangTetraBegin(lvl_); it!=mg_.GetTriangTetraEnd(lvl_); ++it){
+            LocalP2CL<double> lp2 (*it,*f.GetSolution(),*f.GetBndData());
+            std::swap(lp2[5],lp2[6]);
+            for (int i = 0; i < 10; ++i){
+                locData[pos++]= (float)(lp2[i]); 
+            }
+        }
     }
 }
 
@@ -390,17 +414,28 @@ template <typename DiscVecT>
 
     // Get values of vertices
     Uint pos= 0;
-    for (MultiGridCL::const_TriangVertexIteratorCL it= mg_.GetTriangVertexBegin(lvl_); it!=mg_.GetTriangVertexEnd(lvl_); ++it){
-        const Point3DCL val= f.val( *it);
-        for (int j=0; j<3; ++j)
-            locData[pos++]= (float)val[j];
-    }
+    if (!P2DG_)
+        for (MultiGridCL::const_TriangVertexIteratorCL it= mg_.GetTriangVertexBegin(lvl_); it!=mg_.GetTriangVertexEnd(lvl_); ++it){
+            const Point3DCL val= f.val( *it);
+            for (int j=0; j<3; ++j)
+                locData[pos++]= (float)val[j];
+        }
 
     // Get values on edges
-    for (MultiGridCL::const_TriangEdgeIteratorCL it= mg_.GetTriangEdgeBegin(lvl_); it!=mg_.GetTriangEdgeEnd(lvl_); ++it){
-        const Point3DCL val= f.val( *it, 0.5);
-        for (int j=0; j<3; ++j)
-            locData[pos++]= (float)val[j];
+    if (!P2DG_)
+        for (MultiGridCL::const_TriangEdgeIteratorCL it= mg_.GetTriangEdgeBegin(lvl_); it!=mg_.GetTriangEdgeEnd(lvl_); ++it){
+            const Point3DCL val= f.val( *it, 0.5);
+            for (int j=0; j<3; ++j)
+                locData[pos++]= (float)val[j];
+        }
+    if (P2DG_)
+    {
+        for (MultiGridCL::const_TriangTetraIteratorCL it= mg_.GetTriangTetraBegin(lvl_); it!=mg_.GetTriangTetraEnd(lvl_); ++it){
+            LocalP2CL<Point3DCL> lp2 (*it,*f.GetSolution(),*f.GetBndData());
+            for (int i = 0; i < 10; ++i)
+                for (int j=0; j<3; ++j)
+                    locData[pos++]= (float)(lp2(refcoords_b[i])[j]);
+        }
     }
 }
 

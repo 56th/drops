@@ -23,6 +23,7 @@
 */
 
 #include "out/vtkOut.h"
+#include "geom/simplex.h"
 #include "geom/deformation.h"
 
 namespace DROPS
@@ -39,17 +40,42 @@ VTKOutCL::VTKOutCL(const MultiGridCL& mg, const std::string& dataname, Uint nums
 \param numsteps  number of time steps
 \param filename  prefix of all files (e.g. vtk/output)
 \param binary    Write out files in binary format.
+\param onlyP1    output special for P1 FE (less output)
+\param P2DG      output for DG FE (discontinuous data)
 \param lvl       Multigrid level
 */
-    : mg_(mg), timestep_(0), descstr_(dataname), dirname_(dirname), 
-      filename_(filename), pvdfilename_(pvdfilename), binary_(binary), 
-      onlyP1_(onlyP1), vAddrMap_(), eAddrMap_(), coords_(), tetras_(), lvl_(lvl),
+    : mg_(mg), timestep_(0), numsteps_(numsteps), descstr_(dataname),
+      dirname_(dirname), filename_(filename), pvdfilename_(pvdfilename), 
+      binary_(binary), onlyP1_(onlyP1), P2DG_(false), geomwritten_(false),
+      vAddrMap_(), eAddrMap_(), coords_(), tetras_(), lvl_(lvl),
       numPoints_(0), numTetras_(0), reusepvd_(reusepvd), usedeformed_(usedeformed)
 {
     if (!dirname.empty() && *dirname.rbegin()!='/' )
         dirname_+= '/';
     decDigits_= 1;
     while( numsteps>9){ ++decDigits_; numsteps/=10; }
+    // reference coordinates for local P2 function
+    // todo: clean up
+    refcoords[1][0] = 1.0;
+    refcoords[2][1] = 1.0;
+    refcoords[3][2] = 1.0;
+    refcoords[4][0] = 0.5;
+    refcoords[5][0] = refcoords[5][1] = 0.5;
+    refcoords[6][1] = 0.5;
+    refcoords[7][2] = 0.5;
+    refcoords[8][0] = refcoords[8][2] = 0.5;
+    refcoords[9][1] = refcoords[9][2] = 0.5;
+    for (int i = 0; i < 10; ++i)
+    {
+        double tmp=1.0;
+        for (int j = 0; j < 3; ++j)
+        {
+            refcoords_b[i][j] = refcoords[i][j];
+            tmp -= refcoords[i][j];
+        }
+        refcoords_b[i][3] = tmp;
+    }
+
 }
 
 VTKOutCL::~VTKOutCL ()
@@ -219,60 +245,93 @@ void VTKOutCL::GatherCoord()
     for (MultiGridCL::const_TriangEdgeIteratorCL it= mg_.GetTriangEdgeBegin(lvl_); it!=mg_.GetTriangEdgeEnd(lvl_); ++it)
         numEdges++;
 
-    numPoints_= numLocPoints_= numVertices + numEdges;
+    numTetras_=std::distance(mg_.GetTriangTetraBegin(lvl_),mg_.GetTriangTetraEnd(lvl_));  // calculates the number of tetrahedra
+
+    if (!P2DG_)
+        numPoints_= numLocPoints_= numVertices + numEdges;
+    else 
+        numPoints_= numLocPoints_ = 10 * numTetras_;
+
     coords_.resize(3*numLocPoints_);
+    
+    if (P2DG_ && usedeformed_)
+      throw DROPSErrCL("P2DG and usedeformed in VTK!");
 
-    if (usedeformed_)
+    ///\todo instead of v/eAddrMap_, one could use a P2 index instead (cf. EnsightOutCL)
+    if (!P2DG_)
     {
-        MeshDeformationCL & md = MeshDeformationCL::getInstance();
-        ///\todo instead of v/eAddrMap_, one could use a P2 index instead (cf. EnsightOutCL)
-        Uint counter=0;
-        for (MultiGridCL::const_TriangVertexIteratorCL it= mg_.GetTriangVertexBegin(lvl_); it!=mg_.GetTriangVertexEnd(lvl_); ++it){
-            // store a consecutive number for the vertex
-            vAddrMap_[&*it]= counter;
+        if (usedeformed_)
+        {
+            MeshDeformationCL & md = MeshDeformationCL::getInstance();
+            ///\todo instead of v/eAddrMap_, one could use a P2 index instead (cf. EnsightOutCL)
+            Uint counter=0;
+            for (MultiGridCL::const_TriangVertexIteratorCL it= mg_.GetTriangVertexBegin(lvl_); it!=mg_.GetTriangVertexEnd(lvl_); ++it){
+                // store a consecutive number for the vertex
+                vAddrMap_[&*it]= counter;
 
-            // Put coordinate of the vertex into the field of coordinates
-            for (int i=0; i<3; ++i)
-                coords_[3*counter+i]= (float)md.GetTransformedVertexCoord(*it)[i]; // (float)it->GetCoord()[i];
-            ++counter;
+                // Put coordinate of the vertex into the field of coordinates
+                for (int i=0; i<3; ++i)
+                    coords_[3*counter+i]= (float)md.GetTransformedVertexCoord(*it)[i]; // (float)it->GetCoord()[i];
+                ++counter;
+            }
+
+            for (MultiGridCL::const_TriangEdgeIteratorCL it= mg_.GetTriangEdgeBegin(lvl_); it!=mg_.GetTriangEdgeEnd(lvl_); ++it){
+                // store a consecutive number for the edge
+                eAddrMap_[&*it]= counter;
+
+                // Put coordinate of the barycenter of the edge into the field of coordinates
+                // const Point3DCL baryCenter= GetBaryCenter(*it);
+                for (int i=0; i<3; ++i)
+                    coords_[3*counter+i]= (float)md.GetTransformedEdgeBaryCenter(*it)[i]; // (float)baryCenter[i];
+                ++counter;
+            }
         }
+        else
+        {
+            ///\todo instead of v/eAddrMap_, one could use a P2 index instead (cf. EnsightOutCL)
+            Uint counter=0;
+            for (MultiGridCL::const_TriangVertexIteratorCL it= mg_.GetTriangVertexBegin(lvl_); it!=mg_.GetTriangVertexEnd(lvl_); ++it){
+                // store a consecutive number for the vertex
+                vAddrMap_[&*it]= counter;
+                // Put coordinate of the vertex into the field of coordinates
+                for (int i=0; i<3; ++i)
+                    coords_[3*counter+i]= (float)it->GetCoord()[i];
+                ++counter;
+            }
 
-        for (MultiGridCL::const_TriangEdgeIteratorCL it= mg_.GetTriangEdgeBegin(lvl_); it!=mg_.GetTriangEdgeEnd(lvl_); ++it){
-            // store a consecutive number for the edge
-            eAddrMap_[&*it]= counter;
+            for (MultiGridCL::const_TriangEdgeIteratorCL it= mg_.GetTriangEdgeBegin(lvl_); it!=mg_.GetTriangEdgeEnd(lvl_); ++it){
+                // store a consecutive number for the edge
+                eAddrMap_[&*it]= counter;
 
-            // Put coordinate of the barycenter of the edge into the field of coordinates
-            // const Point3DCL baryCenter= GetBaryCenter(*it);
-            for (int i=0; i<3; ++i)
-                coords_[3*counter+i]= (float)md.GetTransformedEdgeBaryCenter(*it)[i]; // (float)baryCenter[i];
-            ++counter;
+                // Put coordinate of the barycenter of the edge into the field of coordinates
+                const Point3DCL baryCenter= GetBaryCenter(*it);
+                for (int i=0; i<3; ++i)
+                    coords_[3*counter+i]= (float)baryCenter[i];
+                ++counter;
+            }
         }
     }
-    else
+    if (P2DG_)
     {
         ///\todo instead of v/eAddrMap_, one could use a P2 index instead (cf. EnsightOutCL)
         Uint counter=0;
-        for (MultiGridCL::const_TriangVertexIteratorCL it= mg_.GetTriangVertexBegin(lvl_); it!=mg_.GetTriangVertexEnd(lvl_); ++it){
-            // store a consecutive number for the vertex
-            vAddrMap_[&*it]= counter;
-
-            // Put coordinate of the vertex into the field of coordinates
-            for (int i=0; i<3; ++i)
-                coords_[3*counter+i]= (float)it->GetCoord()[i];
-            ++counter;
-        }
-
-        for (MultiGridCL::const_TriangEdgeIteratorCL it= mg_.GetTriangEdgeBegin(lvl_); it!=mg_.GetTriangEdgeEnd(lvl_); ++it){
+        Point3DCL mid(1.0/3.0);
+        const double inshift = 1e-6;
+        for (MultiGridCL::const_TriangTetraIteratorCL it= mg_.GetTriangTetraBegin(lvl_); it!=mg_.GetTriangTetraEnd(lvl_); ++it){
             // store a consecutive number for the edge
-            eAddrMap_[&*it]= counter;
-
-            // Put coordinate of the barycenter of the edge into the field of coordinates
-            const Point3DCL baryCenter= GetBaryCenter(*it);
-            for (int i=0; i<3; ++i)
-                coords_[3*counter+i]= (float)baryCenter[i];
-            ++counter;
+            tAddrMap_[&*it]= counter;
+            for (int i = 0; i < 10; ++i)
+            {
+                Point3DCL tmp = (1-inshift)*refcoords[i] + inshift*mid;
+                Point3DCL p = GetWorldCoord(*it,tmp);//refcoords[i]);
+                for (int j=0; j<3; ++j)
+                    coords_[3*counter+j]= (float)p[j];
+                counter++;
+            }
+            // Put coordinate of the barycenter of the edge into the field of 
         }
     }
+
 }
 
 void Write6Bits( std::ostream& os, char array[8], unsigned int bitposition)
@@ -399,18 +458,29 @@ void VTKOutCL::GatherTetra()
 /** Gathers tetrahedra in an array*/
 {
     numTetras_=std::distance(mg_.GetTriangTetraBegin(lvl_),mg_.GetTriangTetraEnd(lvl_));  // calculates the number of tetrahedra
-    tetras_.resize((onlyP1_?4:10)*numTetras_);      // (four vertices) * Number of Tetrahedra respectively (four vertices + six edges) * Number of Tetrahedra
+    if (P2DG_)
+        tetras_.resize((10)*numTetras_);      //
+    else
+        tetras_.resize((onlyP1_?4:10)*numTetras_);      // (four vertices) * Number of Tetrahedra respectively (four vertices + six edges) * Number of Tetrahedra
 
     // Gathers connectivities
     Uint counter=0;
     for (MultiGridCL::const_TriangTetraIteratorCL it= mg_.GetTriangTetraBegin(lvl_); it!=mg_.GetTriangTetraEnd(lvl_); ++it){ //loop over all tetrahedra
-        for (int vert= 0; vert<4; ++vert)
-            tetras_[counter++] = vAddrMap_[it->GetVertex(vert)];
-        if(!onlyP1_)
+        if (P2DG_){
+            Uint offset = tAddrMap_[&*it];
+            for (int i= 0; i<10; ++i)
+                tetras_[counter++] = offset + i;
+        }
+        else
         {
-            for (int eddy=0; eddy<6; ++eddy)
-                tetras_[counter++] = eAddrMap_[it->GetEdge(eddy)];
+            for (int vert= 0; vert<4; ++vert)
+                tetras_[counter++] = vAddrMap_[it->GetVertex(vert)];
+            if(!onlyP1_)
+            {
+                for (int eddy=0; eddy<6; ++eddy)
+                    tetras_[counter++] = eAddrMap_[it->GetEdge(eddy)];
             std::swap(tetras_[counter-4],tetras_[counter-5]);    // Permutation needed to make DROPS and VTK compatible (different numeration)
+            }
         }
     }
     Assert(counter==(onlyP1_? 4:10)*numTetras_, DROPSErrCL("VTKOutCL::GatherTetra: Mismatching number of tetrahedra"), ~0);
@@ -554,6 +624,7 @@ void VTKOutCL::Clear()
 
         vAddrMap_.clear();
         eAddrMap_.clear();
+        tAddrMap_.clear();
         coords_.resize(0);
         tetras_.resize(0);
     }
