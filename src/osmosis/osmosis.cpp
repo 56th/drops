@@ -109,9 +109,9 @@ void  OnlyOsmosisStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTria
     DROPS::instat_scalar_fun_ptr sigmap = 0;
     SurfaceTensionCL sf( sigmap, Bnd_c);
     
-    LevelsetP2CL lset( MG, lsetbnddata, sf, P.get<double>("Levelset.SD"), P.get<double>("Levelset.CurvDiff"));
+    LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsetbnddata, sf, P.get_child("Levelset")) );
     // levelset wrt the previous time step:
-    LevelsetP2CL oldlset( MG, lsetbnddata, sf, P.get<double>("Levelset.SD"), P.get<double>("Levelset.CurvDiff"));
+    LevelsetP2CL & oldlset( * LevelsetP2CL::Create( MG, lsetbnddata, sf, P.get_child("Levelset")) );
     //Prolongate and Restrict solution vector levelset from old mesh to new mesh after mesh adaptation:
     //always act on the same grid with possibly different interface position
     LevelsetRepairCL lsetrepair( lset);
@@ -227,6 +227,8 @@ void  OnlyOsmosisStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTria
     gnu.Close();
 
     std::cout << std::endl;
+    delete &lset;
+    delete &oldlset;
 }
 
 

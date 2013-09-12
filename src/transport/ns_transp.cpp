@@ -119,9 +119,10 @@ void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTr
     DROPS::instat_scalar_fun_ptr sigmap = 0;
     SurfaceTensionCL sf( sigmap, Bnd_c);
 
-    LevelsetP2CL lset( MG, lsetbnddata, sf, 1, -1);
+    LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsetbnddata, sf, false, 1, -1) ) ;
+
     // levelset wrt the previous time step:
-    LevelsetP2CL oldlset( MG, lsetbnddata, sf, 1, -1);
+    LevelsetP2CL & oldlset( * LevelsetP2CL::Create( MG, lsetbnddata, sf, false, 1, -1) ) ;
     //Prolongate and Restrict solution vector levelset from old mesh to new mesh after mesh adaptation:
     //always act on the same grid with possibly different interface position
     LevelsetRepairCL lsetrepair( lset);
@@ -221,6 +222,7 @@ void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTr
                                  P.get<std::string>("VTK.TimeFileName"),
                                  P.get<int>("VTK.Binary"),
                                  P.get<int>("VTK.UseOnlyP1"),
+                                 false,
                                  -1,  /* <- level */
                                  P.get<int>("VTK.ReUseTimeFile") );
 
@@ -271,6 +273,8 @@ void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTr
     delete pBnd_ct;
     delete vtkwriter;
     delete ensight;
+    delete &lset;
+    delete &oldlset;
 }
 
 void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbnddata, AdapTriangCL& adap)
@@ -318,9 +322,10 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbndda
 
     SurfaceTensionCL sf( sigmap, Bnd_c);
     sf.SetCoeff(coeffC, cp);
-    LevelsetP2CL lset( MG, lsetbnddata, sf, P.get<double>("Levelset.SD"), P.get<double>("Levelset.CurvDiff"));
+    LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsetbnddata, sf, P.get_child("Levelset")) );
+
     // levelset wrt the previous time step:
-    LevelsetP2CL oldlset( MG, lsetbnddata, sf, P.get<double>("Levelset.SD"), P.get<double>("Levelset.CurvDiff"));
+    LevelsetP2CL & oldlset( * LevelsetP2CL::Create( MG, lsetbnddata, sf, P.get_child("Levelset")) );
     //Prolongate and Restrict solution vector levelset from old mesh to new mesh after mesh adaptation:
     //always act on the same grid with possibly different interface position
     LevelsetRepairCL lsetrepair( lset);
@@ -665,6 +670,8 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbndda
     if (ensight) delete ensight;
     delete pBnd_c;
     delete pBnd_ct;
+    delete &lset;
+    delete &oldlset;
 
 }
 

@@ -94,7 +94,7 @@ void LinThetaScheme2PhaseCL<LsetSolverT>::SolveLsNs()
     // setup system for levelset eq.
     LvlSet_.SetupSystem( Stokes_.GetVelSolution(), dt_);
     L_->LinComb( 1./dt_, LvlSet_.E, ls_theta_, LvlSet_.H);
-    ls_rhs_= (1./dt_)*(LvlSet_.E*LvlSet_.Phi.Data) - (1.-ls_theta_)*(LvlSet_.H*LvlSet_.Phi.Data);
+    ls_rhs_= (1./dt_)*(LvlSet_.E*LvlSet_.Phi.Data)  + LvlSet_.rhs.Data - (1.-ls_theta_)*(LvlSet_.H*LvlSet_.Phi.Data);
 
     time.Stop();
     duration=time.GetTime();
@@ -103,13 +103,14 @@ void LinThetaScheme2PhaseCL<LsetSolverT>::SolveLsNs()
 
     lsetsolver_.Solve( *L_, LvlSet_.Phi.Data, ls_rhs_, LvlSet_.idx.GetEx());
     std::cout << "res = " << lsetsolver_.GetResid() << ", iter = " << lsetsolver_.GetIter() <<std::endl;
-
     time.Stop();
     duration=time.GetTime();
     std::cout << "Solving Levelset took " << duration << " sec.\n";
 
     lsetmod_.maybeDoVolCorr( LvlSet_);
     lsetmod_.maybeDoReparam( LvlSet_);
+
+    LvlSet_.UpdateContinuous();
 
     time.Reset();
 
@@ -377,6 +378,8 @@ void OperatorSplitting2PhaseCL<LsetSolverT>::DoNonlinearFPIter()
     time.Reset();
     lsetsolver_.Solve( *L_, LvlSet_.Phi.Data, VectorCL( LvlSet_.E*ls_rhs_), LvlSet_.idx.GetEx());
     std::cout << "res = " << lsetsolver_.GetResid() << ", iter = " << lsetsolver_.GetIter() <<std::endl;
+    LvlSet_.UpdateContinuous();
+
     time.Stop();
     std::cout << "Solving Levelset took "<<time.GetTime()<<" sec.\n";
     time.Reset();
@@ -1177,7 +1180,8 @@ void RecThetaScheme2PhaseCL<LsetSolverT,RelaxationPolicyT>::ComputeDots ()
     Msolver_.Solve( Stokes_.M.Data, vdot_, b2, Stokes_.vel_idx.GetEx());
     std::cout << "ComputeDots: vdot:   iter= " << Msolver_.GetIter() << "\tres= " << Msolver_.GetResid() << std::endl;
 
-    VectorCL b3 ((-1.0) * (LvlSet_.H * LvlSet_.Phi.Data));
+    Esolver_.SetTol( 1e-15);
+    VectorCL b3 ((-1.0) * (LvlSet_.H * LvlSet_.Phi.Data)+LvlSet_.rhs.Data);
     Esolver_.Solve( LvlSet_.E, phidot_, b3, LvlSet_.idx.GetEx());
     std::cout << "ComputeDots: phidot: iter= " << Esolver_.GetIter() << "\tres= " << Esolver_.GetResid() << std::endl;
 }
@@ -1199,7 +1203,8 @@ void RecThetaScheme2PhaseCL<LsetSolverT,RelaxationPolicyT>::SetupLevelsetSystem(
     LvlSet_.SetupSystem( Stokes_.GetVelSolution(), dt_);
 
     L_->LinComb( 1./dt_, LvlSet_.E, ls_theta_, LvlSet_.H);
-    ls_rhs_ = LvlSet_.E * fixed_ls_rhs_;
+    // boundary data
+    ls_rhs_ = LvlSet_.E * fixed_ls_rhs_+ ls_theta_* LvlSet_.rhs.Data;
 }
 
 } // end of namespace DROPS

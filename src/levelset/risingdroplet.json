@@ -235,6 +235,7 @@
                 "VTKDir":               "vtk",             // local directory for VTK files.
                 "VTKName":              "risingdroplet",   // name of VTK files
                 "AddP1XPressure":       1,                 // pressure output as p1 on neg. and p1 on pos. part      
+                "AddDGOutput":          1,                 // additional VTK file(s) for levelset dg 
                 "Binary":               1                  // write out VTK files in binary format.
         },
 

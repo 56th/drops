@@ -672,11 +672,55 @@ void LevelsetP2CL::SetupSystem( const DiscVelSolT& vel, __UNUSED__ const double 
 /// Setup level set matrices E, H
 {
     ScopeTimerCL scope("Levelset SetupSystem");
+    if (!IsDG)
+    {
+      LevelsetP2ContCL* asp2cont = dynamic_cast<LevelsetP2ContCL*>(this);
+      if (asp2cont)
+        asp2cont->SetupSystem(vel,dt);
+      else
+         throw DROPSErrCL("SetupSystem: cast failed");
+    }
+    else if (IsDG)
+    {
+      LevelsetP2DiscontCL* asp2discont = dynamic_cast<LevelsetP2DiscontCL*>(this);
+      if (asp2discont)
+        asp2discont->SetupSystem(vel,dt);
+      else
+         throw DROPSErrCL("SetupSystem: cast failed");
+    }
+    else
+      throw DROPSErrCL("SetupSystem: unknown FETYPE");
+}
+
+template<class DiscVelSolT>
+void LevelsetP2ContCL::SetupSystem( const DiscVelSolT& vel, const double dt)
+/// Setup level set matrices E, H
+{
     LevelsetAccumulator_P2CL<DiscVelSolT> accu( *this, vel, SD_, dt);
     TetraAccumulatorTupleCL accus;
     MaybeAddProgressBar(MG_, "Levelset Setup", accus, Phi.RowIdx->TriangLevel());
     accus.push_back( &accu);
     accumulate( accus, MG_, Phi.RowIdx->TriangLevel(), Phi.RowIdx->GetMatchingFunction(), Phi.RowIdx->GetBndInfo());
+    rhs.SetIdx( &idx.GetFinest());
+    // rhs.Data.resize(Phi.RowIdx->NumUnknowns());
+}
+
+template<class DiscVelSolT>
+void LevelsetP2DiscontCL::SetupSystem( const DiscVelSolT& vel, __UNUSED__ const double dt)
+/// Setup level set matrices E, H
+/// contains face and tetra accumulators
+{
+//    throw DROPSErrCL("LevelsetP2DiscontCL::SetupSystem : not yet");
+
+    LevelsetTetraAccumulator_P2DCL<DiscVelSolT> accu_tet( *this, vel);
+    TetraAccumulatorTupleCL accus_tet;
+    accus_tet.push_back( &accu_tet);
+    accumulate( accus_tet, MG_, Phi.RowIdx->TriangLevel(), Phi.RowIdx->GetMatchingFunction(), Phi.RowIdx->GetBndInfo());
+
+    LevelsetFaceAccumulator_P2DCL<DiscVelSolT> accu_face( *this, vel, accu_tet.GetHMatrix(), rhs);
+    FaceAccumulatorTupleCL accus_face;
+    accus_face.push_back( &accu_face);
+    accumulate_faces( accus_face, MG_, Phi.RowIdx->TriangLevel(), Phi.RowIdx->GetMatchingFunction(), Phi.RowIdx->GetBndInfo());
 }
 
 template <class DiscVelSolT>

@@ -61,7 +61,9 @@ class LevelsetCoeffCL {
 
 };
 
+
 class LevelsetP2CL : public ProblemCL< LevelsetCoeffCL, LsetBndDataCL>
+/// abstract base class for continuous and discontinuous P2 level set discretization
 /// P2-discretization and solution of the level set equation for two phase flow problems. Bnd_ will be used to impose boundary data on the inflow boundary.
 /// At the moment setting all boundary conditions to NoBC is the only valid case.
 {
@@ -69,9 +71,11 @@ class LevelsetP2CL : public ProblemCL< LevelsetCoeffCL, LsetBndDataCL>
     typedef P2EvalCL<double, const LsetBndDataCL, VecDescCL>       DiscSolCL;
     typedef P2EvalCL<double, const LsetBndDataCL, const VecDescCL> const_DiscSolCL;
     typedef std::vector<Point3DCL> perDirSetT;
-    MLIdxDescCL idx;
-    MLVecDescCL MLPhi;     ///< level set function on all level (needed in parallel for multigrid)
-    VecDescCL   Phi;       ///< level set function
+    MLIdxDescCL  idx;
+    MLIdxDescCL* idxC;
+    MLVecDescCL  MLPhi;     ///< level set function on all level (needed in parallel for multigrid)
+    VecDescCL    Phi;       ///< level set function
+    VecDescCL *  PhiC;      ///< continuous version of level set function
 
     typedef ProblemCL<LevelsetCoeffCL, LsetBndDataCL> base_;
     using base_::MG_;
@@ -80,7 +84,7 @@ class LevelsetP2CL : public ProblemCL< LevelsetCoeffCL, LsetBndDataCL>
     using base_::GetBndData;
     using base_::GetMG;
 
-  private:
+  protected:
     double              curvDiff_, ///< amount of diffusion in curvature calculation
                         SD_;       ///< streamline diffusion
     SurfaceForceT       SF_;
@@ -88,23 +92,39 @@ class LevelsetP2CL : public ProblemCL< LevelsetCoeffCL, LsetBndDataCL>
     SurfaceTensionCL&   sf_;      ///< data for surface tension
     void SetupSmoothSystem ( MatrixCL&, MatrixCL&)               const;
     void SmoothPhi( VectorCL& SmPhi, double diff)                const;
-    double GetVolume_Composite( double translation, int l)    const;
-    double GetVolume_Extrapolation( double translation, int l) const;
+    double GetVolume_Composite( double translation, int l)       const;
+    double GetVolume_Extrapolation( double translation, int l)   const;
     perDirSetT* perDirections;    ///< periodic directions
     typedef MLDataCL<ProlongationCL<double> > ProlongationT;
     ProlongationT P_;
 
-  public:
-    MatrixCL            E, H;
+    bool IsDG;
 
-    LevelsetP2CL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, double SD= 0, double curvDiff= -1)
-    : base_( mg, LevelsetCoeffCL(), bnd), idx( P2_FE), MLPhi( &idx), curvDiff_( curvDiff), SD_( SD),
-        SF_(SF_ImprovedLB), sf_(sf), perDirections(NULL)
+  public:
+    MatrixCL            E, H;  ///< E: mass matrix, H: convection matrix
+    VecDescCL           rhs;  ///< rhs due to boundary conditions 
+
+    bool IsDiscontinuous(){ return IsDG; }
+
+LevelsetP2CL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, FiniteElementT fetype, double SD= 0, double curvDiff= -1)
+    : base_( mg, LevelsetCoeffCL(), bnd), idx(fetype, mg.GetNumLevel()), idxC(NULL), MLPhi( &idx), PhiC(NULL), curvDiff_( curvDiff), SD_( SD),
+        SF_(SF_ImprovedLB), sf_(sf), perDirections(NULL), IsDG(false)
     {}
 
-    ~LevelsetP2CL(){
+    virtual ~LevelsetP2CL(){
       if (perDirections) delete perDirections;
     }
+
+    static LevelsetP2CL * Create(  MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, const ParamCL & P);
+    static LevelsetP2CL * Create(  MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, 
+                                   bool discontinuous = false, double SD = 0, double curvdiff = -1);
+
+
+    /// Update PhiC (do nothing if continuous anyway)
+    virtual void UpdateContinuous( ) = 0;
+    /// Update Phi (do nothing if continuous anyway)
+    virtual void UpdateDiscontinuous( ) = 0;
+
     /// \name Numbering
     ///@{
     void CreateNumbering( Uint level, MLIdxDescCL* idx, match_fun match= 0);
@@ -113,8 +133,8 @@ class LevelsetP2CL : public ProblemCL< LevelsetCoeffCL, LsetBndDataCL>
     ///@}
 
     /// initialize level set function
-    void Init( instat_scalar_fun_ptr, double =0.);
-
+    virtual void Init( instat_scalar_fun_ptr) = 0;
+    
     /// \remarks call SetupSystem \em before calling SetTimeStep!
     template<class DiscVelSolT>
     void SetupSystem( const DiscVelSolT&, const double);
@@ -152,7 +172,7 @@ class LevelsetP2CL : public ProblemCL< LevelsetCoeffCL, LsetBndDataCL>
     /// \name Evaluate Solution
     ///@{
     const_DiscSolCL GetSolution() const
-        { return const_DiscSolCL( &Phi, &BndData_, &MG_); }
+        { return const_DiscSolCL( PhiC, &BndData_, &MG_); }
     const_DiscSolCL GetSolution( const VecDescCL& MyPhi) const
         { return const_DiscSolCL( &MyPhi, &BndData_, &MG_); }
     ///@}
@@ -169,11 +189,11 @@ class LevelsetP2CL : public ProblemCL< LevelsetCoeffCL, LsetBndDataCL>
 
     void UpdateMLPhi()
     {
-        if (idx.size() == 1) return;
-        MLPhi.SetIdx( &idx);
+        if (idxC->size() == 1) return;
+        MLPhi.SetIdx(idxC);
         ProlongationT::const_iterator prolong = P_.GetFinestIter();
         MLDataCL<VecDescCL>::iterator mlphi = MLPhi.GetFinestIter();
-        mlphi->Data = Phi.Data;
+        mlphi->Data = PhiC->Data;
         for (size_t lvl = MG_.GetLastLevel(); lvl >= 1; --lvl){
             const VectorCL tmp (transp_mul(*prolong, mlphi->Data)); // tmp is distributed
             (--mlphi)->Data = tmp;
@@ -184,6 +204,108 @@ class LevelsetP2CL : public ProblemCL< LevelsetCoeffCL, LsetBndDataCL>
         }
     }
     ProlongationT* GetProlongation() { return &P_; }
+};
+
+
+/// levelset class for continuous P2FE
+///differs from discontinuous P2FE by Init and SetUpSystem
+class LevelsetP2ContCL: public LevelsetP2CL
+{
+  public:
+    typedef P2EvalCL<double, const LsetBndDataCL, VecDescCL>       DiscSolCL;
+    typedef P2EvalCL<double, const LsetBndDataCL, const VecDescCL> const_DiscSolCL;
+    typedef std::vector<Point3DCL> perDirSetT;
+    typedef LevelsetP2CL base_;
+    using base_::MG_;
+    using base_::Coeff_;
+    using base_::BndData_;
+    using base_::GetBndData;
+    using base_::GetMG;  
+    using base_::idx;
+    using base_::idxC;
+    using base_::Phi;
+    using base_::PhiC;
+  protected:
+    using base_::IsDG;
+  
+    public: 
+    LevelsetP2ContCL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, double SD= 0, double curvDiff= -1)
+        : base_( mg, bnd, sf, P2_FE, SD, curvDiff)
+    {
+        PhiC = &Phi;
+        idxC = &idx;
+    }
+    
+    /// Update PhiC (do nothing)
+    virtual void UpdateContinuous( );
+    /// Update Phi (do nothing) 
+    virtual void UpdateDiscontinuous( );
+
+    void Init( instat_scalar_fun_ptr); //void Init( instat_scalar_fun_ptr, double);
+    
+    template<class DiscVelSolT>
+    void SetupSystem( const DiscVelSolT&, const double);
+};
+
+
+/// levelset class for discontinuous P2FE
+///differs from continuous P2FE by Init and SetUpSystem
+class LevelsetP2DiscontCL: public LevelsetP2CL
+{
+  public:
+    typedef P2EvalCL<double, const LsetBndDataCL, VecDescCL>       DiscSolCL;
+    typedef P2EvalCL<double, const LsetBndDataCL, const VecDescCL> const_DiscSolCL;
+    typedef std::vector<Point3DCL> perDirSetT;
+    typedef LevelsetP2CL base_;
+    using base_::MG_;
+    using base_::Coeff_;
+    using base_::BndData_;
+    using base_::GetBndData;
+    using base_::GetMG;  
+    using base_::idx;
+    using base_::idxC;
+    using base_::Phi;
+    using base_::PhiC;
+  protected:
+    using base_::IsDG;
+  public:
+    MLIdxDescCL             idxContinuous;
+    VecDescCL             PhiContinuous;        ///< level set function
+
+
+    public: 
+    LevelsetP2DiscontCL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, double SD= 0, double curvDiff= -1)
+        : base_( mg, bnd, sf, P2D_FE, SD, curvDiff), idxContinuous(P2_FE, mg.GetNumLevel())
+    {
+        IsDG = true;
+        PhiC = &PhiContinuous;
+        idxC = &idxContinuous;
+    }
+    
+    /// \name Numbering
+    ///@{
+    /* virtual void CreateNumbering( Uint level, IdxDescCL* idx, match_fun match= 0); */
+    /* virtual void DeleteNumbering( IdxDescCL* idx); */
+    ///@}
+
+    const_DiscSolCL GetDSolution() const
+        { return const_DiscSolCL( &Phi, &BndData_, &MG_); }
+
+
+    /// Update PhiC (Clement-Call...)
+    virtual void UpdateContinuous( );
+    /// Update Phi (Prolongation...) 
+    virtual void UpdateDiscontinuous( );
+
+    void InitProjection( instat_scalar_fun_ptr);
+    void Init( instat_scalar_fun_ptr);
+    
+    void ApplyZeroOrderClementInterpolation();
+    void ApplyClementInterpolation();
+    void ProjectContinuousToDiscontinuous();
+
+    template<class DiscVelSolT>
+    void SetupSystem( const DiscVelSolT&, const double);
 };
 
 

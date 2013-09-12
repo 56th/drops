@@ -512,8 +512,7 @@ int main (int argc, char** argv)
 
     sigma= prob.GetCoeff().SurfTens;
     DROPS::SurfaceTensionCL sf( sigmaf, 0);
-    DROPS::LevelsetP2CL lset( *mgp, DROPS::LsetBndDataCL( 6, bc_ls),
-        sf, P.get<double>("Levelset.SD"), P.get<double>("Levelset.CurvDiff"));
+    DROPS::LevelsetP2CL & lset( * DROPS::LevelsetP2CL::Create( *mgp, DROPS::LsetBndDataCL( 6, bc_ls), sf, P.get_child("Levelset")) );
 
     for (DROPS::BndIdxT i=0, num= bnd.GetNumBndSeg(); i<num; ++i)
     {
@@ -540,7 +539,7 @@ int main (int argc, char** argv)
     double min= prob.p.Data.min(),
            max= prob.p.Data.max();
     std::cout << "pressure min/max: "<<min<<", "<<max<<std::endl;
-
+    delete &lset;
     return 0;
   }
   catch (DROPS::DROPSErrCL err) { err.handle(); }

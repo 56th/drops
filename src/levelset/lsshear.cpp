@@ -84,7 +84,7 @@ void Strategy( StokesProblemT& Stokes, const BndDataCL<>& lsbnd)
 {
     MultiGridCL& MG= Stokes.GetMG();
     SurfaceTensionCL sf( sigmaf);
-    LevelsetP2CL lset( MG, lsbnd, sf, 0.1);
+    LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsbnd, sf, false, 0.1) );
 
     MLIdxDescCL* lidx= &lset.idx;
     MLIdxDescCL* vidx= &Stokes.vel_idx;
@@ -180,6 +180,8 @@ void Strategy( StokesProblemT& Stokes, const BndDataCL<>& lsbnd)
               << "\tNorm des Res.: " << inexactuzawasolver.GetResid() << std::endl;
 
     std::cout << std::endl;
+
+    delete &lset;
 }
 
 } // end of namespace DROPS

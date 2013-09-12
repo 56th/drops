@@ -172,7 +172,7 @@ class InterfaceInfoCL
     template<class DiscVelSolT>
     void Update (const LevelsetP2CL& ls, const DiscVelSolT& u) {
         ls.GetInfo( maxGrad, Vol, bary, vel, u, min, max, surfArea);
-        std::pair<double, double> h= h_interface( ls.GetMG().GetTriangEdgeBegin( ls.Phi.RowIdx->TriangLevel()), ls.GetMG().GetTriangEdgeEnd( ls.Phi.RowIdx->TriangLevel()), ls.Phi);
+        std::pair<double, double> h= h_interface( ls.GetMG().GetTriangEdgeBegin( ls.PhiC->RowIdx->TriangLevel()), ls.GetMG().GetTriangEdgeEnd( ls.PhiC->RowIdx->TriangLevel()), *ls.PhiC);
         h_min= h.first; h_max= h.second;
         // sphericity is the ratio of surface area of a sphere of same volume and surface area of the approximative interface
         sphericity= std::pow(6*Vol, 2./3.)*std::pow(M_PI, 1./3.)/surfArea;
@@ -349,8 +349,8 @@ void SolveStatProblem( StokesT& Stokes, LevelsetP2CL& lset,
     curv.SetIdx( &Stokes.vel_idx);
     Stokes.SetIdx();
     Stokes.SetLevelSet( lset);
-    lset.AccumulateBndIntegral( curv);
     lset.UpdateMLPhi();
+    lset.AccumulateBndIntegral( curv);
     Stokes.SetupSystem1( &Stokes.A, &Stokes.M, &Stokes.b, &Stokes.b, &cplM, lset, Stokes.v.t);
     Stokes.SetupPrStiff( &Stokes.prA, lset);
     Stokes.SetupPrMass ( &Stokes.prM, lset);
@@ -423,7 +423,7 @@ void SetInitialConditions(StokesT& Stokes, LevelsetP2CL& lset, MultiGridCL& MG, 
         ReadFEFromFile( Stokes.v, MG, P.get<std::string>("DomainCond.InitialFile")+"velocity", P.get<int>("Restart.Binary"));
         Stokes.UpdateXNumbering( pidx, lset);
         Stokes.p.SetIdx( pidx);
-        ReadFEFromFile( Stokes.p, MG, P.get<std::string>("DomainCond.InitialFile")+"pressure", P.get<int>("Restart.Binary"), &lset.Phi); // pass also level set, as p may be extended
+        ReadFEFromFile( Stokes.p, MG, P.get<std::string>("DomainCond.InitialFile")+"pressure", P.get<int>("Restart.Binary"), lset.PhiC); // pass also level set, as p may be extended
       } break;
       case 0: // zero initial condition
           Stokes.UpdateXNumbering( pidx, lset);
