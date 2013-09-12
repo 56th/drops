@@ -41,6 +41,21 @@ namespace DROPS
 /// Prints a text-message describing the given boundary-condition.
 void BndCondInfo (BndCondT, std::ostream&);
 
+// two digits for P0/P1/P2/P1B
+// + offsets:
+// - one digit for dg or cg
+const Uint OFFSET_DFE = 8;
+
+// - two digits for xfem, rfem or iffem
+const Uint OFFSET_XFE = 16;
+const Uint OFFSET_RFE = 32;
+const Uint OFFSET_IFFE = 64;
+
+// - one digit for spacetime or not
+const Uint OFFSET_STFE = 128;
+
+// - vector valued fe space
+const Uint OFFSET_VECFE = 256;
 enum FiniteElementT
 /// \brief enum for several FE types
 ///
@@ -50,8 +65,17 @@ enum FiniteElementT
 ///   the difference to the scalar FE counterpart should be 128
 {
     P0_FE=0, P1_FE=1, P2_FE=2, P1Bubble_FE=3,         // for scalars
-    P1D_FE=4, P1X_FE=5, P1IF_FE=6, P2R_FE=7, P2X_FE=8,
-    vecP1_FE = 129, vecP2_FE=130, vecP1Bubble_FE=131, vecP2R_FE=135, vecP2X_FE=136,// for vectors
+	P1D_FE=P1_FE+OFFSET_DFE,
+	P2D_FE=P2_FE+OFFSET_DFE,
+	P1X_FE=P1_FE+OFFSET_XFE,
+	P2X_FE=P2_FE+OFFSET_XFE,
+	P2R_FE=P2_FE+OFFSET_RFE,
+	P1IF_FE=P1_FE+OFFSET_IFFE,
+    vecP1_FE=P1_FE+OFFSET_VECFE,
+	vecP2_FE=P2_FE+OFFSET_VECFE,
+	vecP1Bubble_FE=P1Bubble_FE+OFFSET_VECFE,
+	vecP2R_FE=P2R_FE+OFFSET_VECFE,
+	vecP2X_FE=P2X_FE+OFFSET_VECFE, 
     UnknownFE_=-1
 };
 
@@ -91,6 +115,7 @@ class FE_InfoCL
             case vecP2X_FE:
             case vecP2R_FE:
             case vecP2_FE:       NumUnknownsVertex_= NumUnknownsEdge_= 3; break;
+	        case P2D_FE:         NumUnknownsTetra_ = 10; break;
             default:             throw DROPSErrCL("FE_InfoCL: unknown FE type");
         }
     }
@@ -98,11 +123,12 @@ class FE_InfoCL
     /// \brief Return enum code corresponding to FE-type
     FiniteElementT GetFE() const { return fe_; }
     /// \brief Returns true for scalar FEM, false for vector-valued FEM
-    bool IsScalar() const { return fe_ < 128; }
+    bool IsScalar() const { return !(fe_ & OFFSET_VECFE); }
     /// \brief Returns true for XFEM
-    bool IsExtended() const { return fe_==P1X_FE || fe_==P2R_FE || fe_==vecP2R_FE  || fe_==P2X_FE || fe_==vecP2X_FE; }
+    bool IsExtended() const { return (fe_ & OFFSET_XFE) || (fe_ & OFFSET_RFE) ; }
     /// \brief Returns true for interface FE
-    bool IsOnInterface() const { return fe_==P1IF_FE; }
+    bool IsOnInterface() const { return fe_& OFFSET_IFFE; }
+    bool IsDG() const { return fe_ & OFFSET_DFE;}
 
     /// \brief Number of unknowns on the simplex-type
     //@{
