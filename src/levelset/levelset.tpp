@@ -335,6 +335,338 @@ void LevelsetAccumulator_P2CL<DiscVelSolT>::visit (const TetraCL& t)
         }
 }
 
+
+/// \brief Accumulator to set up the matrices E and H for the discontinous P2 level set equation.
+/// takes care of volume integarls only
+/// creates SparseMatBuilder for E and H, but creates E only 
+///creating H is accomplished in the FaceAccumulator
+template<class DiscVelSolT>
+class LevelsetTetraAccumulator_P2DCL : public TetraAccumulatorCL
+{
+    LevelsetP2DiscontCL& ls_;
+    const DiscVelSolT& vel_;
+    SparseMatBuilderCL<double> *bE_, *bH_;
+
+    Quad5CL<Point3DCL> Grad[10], GradRef[10], u_loc;
+    Quad5CL<double> u_Grad[10]; // fuer u grad v_i
+    SMatrixCL<3,3> T;
+    LocalNumbP2CL n;
+
+  public:
+    LevelsetTetraAccumulator_P2DCL( LevelsetP2CL& ls, const DiscVelSolT& vel)
+      : ls_(dynamic_cast<LevelsetP2DiscontCL&>(ls)), vel_(vel)
+    { P2DiscCL::GetGradientsOnRef( GradRef); }
+
+    SparseMatBuilderCL<double> * GetHMatrix() {return bH_;};
+    ///\brief Initializes matrix-builders and load-vectors
+    void begin_accumulation ();
+    ///\brief Builds the matrices
+    void finalize_accumulation();
+    ///\brief Do setup of E, H on given tetra
+    void visit (const TetraCL&);
+
+    TetraAccumulatorCL* clone (int /*tid*/) { return new LevelsetTetraAccumulator_P2DCL ( *this); };
+};
+
+
+template<class DiscVelSolT>
+void LevelsetTetraAccumulator_P2DCL<DiscVelSolT>::begin_accumulation ()
+{
+    const IdxT num_unks= ls_.Phi.RowIdx->NumUnknowns();
+    bE_= new SparseMatBuilderCL<double>(&ls_.E, num_unks, num_unks);
+    bH_= new SparseMatBuilderCL<double>(&ls_.H, num_unks, num_unks);
+
+#ifndef _PAR
+    __UNUSED__ const IdxT allnum_unks= num_unks;
+#else
+    __UNUSED__ const IdxT allnum_unks= DROPS::ProcCL::GlobalSum(num_unks);
+#endif
+    Comment("entering LevelsetTetraAccumulator_P2DCL: " << allnum_unks << " levelset unknowns.\n", DebugDiscretizeC);
+}
+
+template<class DiscVelSolT>
+void LevelsetTetraAccumulator_P2DCL<DiscVelSolT>::finalize_accumulation ()
+{
+    bE_->Build();
+    delete bE_;
+    // bH_->Build(); // FaceAccumulator takes care of bH
+    // delete bH_;
+#ifndef _PAR
+    Comment(E.num_nonzeros() << " nonzeros in E, "<< H.num_nonzeros() << " nonzeros in H! " << std::endl, DebugDiscretizeC);
+#endif
+}
+
+template<class DiscVelSolT>
+void LevelsetTetraAccumulator_P2DCL<DiscVelSolT>::visit (const TetraCL& t)
+/**Sets up the stiffness matrices: <br>
+   E is of mass matrix type:    E_ij =   (  v_j ,        v_i ) <br>
+   H describes the convection:  H_ij = - (  v_j , u grad v_i)  <br>
+   where v_i, v_j denote the ansatz functions.
+   \todo: implementation of other boundary conditions
+*/
+{
+    double det;
+    GetTrafoTr( T, det, t);
+    P2DiscCL::GetGradients( Grad, GradRef, T);
+    const double absdet= std::fabs( det);
+
+    // save information about the edges and verts of the tetra in Numb
+    n.assign( t, *ls_.Phi.RowIdx, ls_.GetBndData()); //BndData is dummy
+    // save velocities inside tetra for quadrature in u_loc
+    u_loc.assign( t, vel_);
+
+    for(int i=0; i<10; ++i)
+        u_Grad[i]= dot( u_loc, Grad[i]);
+
+    SparseMatBuilderCL<double> &bE= *bE_, &bH= *bH_;
+    for(int i=0; i<10; ++i)    // assemble row Numb[i]
+        for(int j=0; j<10; ++j)
+        {
+            // E is of mass matrix type:    E_ij = ( v_j       , v_i )
+            bE( n.num[i], n.num[j])+= P2DiscCL::GetMass(i,j) * absdet;
+            // H describes the convection:  H_ij = - (  v_j , u grad v_i)
+            bH( n.num[i], n.num[j])-= u_Grad[i].quadP2(j, absdet);
+        }
+}
+
+
+
+/// \brief Accumulator to set up the matrix H for the level set equation.
+/// matrix builder is assumend to be created before
+/// matric H is build in finalize_accumulation()
+/// face integrals are added to volume integrals
+template<class DiscVelSolT>
+class LevelsetFaceAccumulator_P2DCL : public FaceAccumulatorCL
+{
+    LevelsetP2DiscontCL& ls_;
+    const DiscVelSolT& vel_;
+
+    SparseMatBuilderCL<double> *bH_;
+    VecDescCL & rhs_;
+
+    Uint lvl;
+    LocalNumbP2CL n[2];
+
+  public:
+    LevelsetFaceAccumulator_P2DCL( LevelsetP2CL& ls, const DiscVelSolT& vel, SparseMatBuilderCL<double> * bH, VecDescCL & rhs)
+        : ls_(dynamic_cast<LevelsetP2DiscontCL&>(ls)), vel_(vel), bH_(bH), rhs_(rhs), lvl(ls.idx.TriangLevel())
+        { ; }
+
+    ///\brief Initializes load-vectors
+    void begin_accumulation ();
+    ///\brief Builds the matrix H
+    void finalize_accumulation();
+    ///\brief Do setup of H on given face
+    void visit (const FaceCL&);
+
+    FaceAccumulatorCL* clone (int ) { return new LevelsetFaceAccumulator_P2DCL ( *this); };
+};
+
+template<class DiscVelSolT>
+void LevelsetFaceAccumulator_P2DCL<DiscVelSolT>::begin_accumulation ()
+{
+    // TetraAccumulator takes care of MatrixBuilder construction
+    Comment("entering LevelsetFaceAccumulator_P2DCL: " << allnum_unks << " levelset unknowns.\n", DebugDiscretizeC);
+    rhs_.SetIdx(ls_.Phi.RowIdx);
+    rhs_.Data = 0. ;
+}
+
+template<class DiscVelSolT>
+void LevelsetFaceAccumulator_P2DCL<DiscVelSolT>::finalize_accumulation ()
+{
+    bH_->Build();
+    delete bH_;
+    std::cout << ls_.E.num_nonzeros() << " nonzeros in E, "<< ls_.H.num_nonzeros() << " nonzeros in H! " << std::endl;
+#ifndef _PAR
+    Comment(E.num_nonzeros() << " nonzeros in E, "<< H.num_nonzeros() << " nonzeros in H! " << std::endl, DebugDiscretizeC);
+#endif
+}
+
+template<class DiscVelSolT>
+void LevelsetFaceAccumulator_P2DCL<DiscVelSolT>::visit (const FaceCL& face)
+/**Sets up the stiffness matrices: <br>
+   H describes the convection:  H_ij(face) = (un v_i,h(v_j)), h upwind flux operator <br>
+   where v_i, v_j denote the ansatz functions.
+   \todo: implementation of other boundary conditions
+*/
+{
+   
+// search for aligned tets of face
+// if only one tet is found we are on the boundary
+   /* static int mycnt = 0;
+    mycnt++;
+    std::cout << "mycnt = " << mycnt << std::endl;
+    std::cout << "&face= " << &face << std::endl;*/
+
+    const TetraCL* tets[2];    
+    Uint facnum[2];
+    Uint cnt=0;
+    for (int i = 0; i < 4; ++i)
+    {
+        const TetraCL* tet ( face.GetNeighbor(i));
+        if (tet==NULL || cnt==2) continue;
+
+        if ( tet->IsInTriang ( lvl ) )
+        {
+            tets[cnt] = tet;
+            facnum[cnt++] = face.GetFaceNumInTetra(tet);
+        }
+
+    }
+    if (cnt == 2){
+    // description of face vertex as a barycoord of each neighbor tet
+    // takes care of diffent oriantation of the tets
+        BaryCoordCL BaryC_tet[2][3]; // description of face vertex as a barycoord of each neighbor tet
+        //Point3DCL m(0.75), p3zero(0.), q[3],qm[3];
+
+        for (int i = 0; i < 3; ++i) //vertices of face
+            for (int k = 0; k < 2; ++k) // neighbor tets
+                for (int j = 0; j < 4; ++j) //vertices of (both) tets
+                    if (tets[k]->GetVertex(j)==face.GetVertex(i))
+                        BaryC_tet[k][i][j] = 1.0;
+
+        Quad5_2DCL<Point3DCL> velocity;//, velocity_extern;
+        velocity.assign( *tets[0], BaryC_tet[0], vel_);
+        Point3DCL normal;
+        tets[0]->GetOuterNormal(facnum[0],normal);
+        Quad5_2DCL<double> vn (dot(normal,velocity));
+        LocalP2CL<> lp2;
+        LocalP2CL<> mlp2;
+        // shape_as_q5: shape function at Quad5 quadrature points on face
+        Quad5_2DCL<> shape_as_q5[2][10];
+        //upwshape_as_q5: upwind operator applied to shape function at Quad5 quadrature points on face
+        Quad5_2DCL<> upwshape_as_q5[2][10];
+        for (int j = 0; j < 10; ++j)
+        {
+            if (j>0){
+                lp2[j-1] = 0.0;
+                mlp2[j-1] = 0.0;
+            }
+            lp2[j]  =  1.0;
+            mlp2[j] = -1.0;
+            for (int i = 0; i < 2; ++i)
+                upwshape_as_q5[i][j].assign(lp2, BaryC_tet[i]);
+            shape_as_q5[0][j].assign(lp2, BaryC_tet[0]);
+            shape_as_q5[1][j].assign(mlp2, BaryC_tet[1]);
+        }
+
+      //  Point3DCL normal;
+      //  tets[0]->GetOuterNormal(facnum[0],normal);
+
+       // Quad5_2DCL<Point3DCL> velocity;
+       // velocity.assign( *tets[0], BaryC_tet[0], vel_);
+        // flow direction relative to face at Quad5 quadrature points
+        //Quad5_2DCL<double> vn (dot(normal,velocity));
+
+        //Quad5_2DCL<double> v2 (dot(velocity,velocity));
+        //const double v_max = std::max(v2.max(),-v2.min());
+        // applying upwind operator
+        for (int j = 0; j < 10; ++j)
+            for (int k = 0; k < Quad5_2DDataCL::NumNodesC; ++k)
+                if (vn[k] > 0)
+                    upwshape_as_q5[1][j][k] = 0.0;
+                else
+                    upwshape_as_q5[0][j][k] = 0.0;
+
+        for (int i = 0; i < 2; ++i)
+        {
+            n[i].assign( *tets[i], *ls_.Phi.RowIdx, ls_.GetBndData()); //BndData is dummy
+        }
+
+        const VertexCL* v[3];
+        for (Uint i= 0; i < 3; ++i)
+            v[i]= face.GetVertex( i);
+
+        const double absdet_face=FuncDet2D(v[1]->GetCoord()-v[0]->GetCoord(),
+                                           v[2]->GetCoord()-v[0]->GetCoord());
+
+
+        for (int i = 0; i < 2; ++i)
+            for (int j = 0; j < 2; ++j)
+                for (int k = 0; k < 10; ++k)
+                    for (int l = 0; l < 10; ++l)
+                    {
+                        const double integral = Quad5_2DCL<>(vn*upwshape_as_q5[j][l]*shape_as_q5[i][k]).quad(absdet_face);
+                        // test integarl for beeing close to zero to reduce matrix entries
+                        //if (std::abs(integral) > 1e-17*v_max)
+                            (*bH_)( n[i].num[k], n[j].num[l]) += integral;
+                    }
+    }
+    else // weakly imposed boundary condition case
+    {
+        if (!tets[0]->IsBndSeg(facnum[0]))
+            throw DROPSErrCL("not a boundary --- should not happen");
+        BaryCoordCL BaryC_tet[3]; // description of face vertex as a barycoord of each neighbor tet
+
+        for (int i = 0; i < 3; ++i) //vertices of face
+            for (int j = 0; j < 4; ++j) //vertices of (both) tets
+                if (tets[0]->GetVertex(j)==face.GetVertex(i))
+                    BaryC_tet[i][j] = 1.0;
+
+        LocalP2CL<> lp2;
+
+        Point3DCL normal;
+        tets[0]->GetOuterNormal(facnum[0],normal);
+
+        Quad5_2DCL<Point3DCL> velocity;
+        velocity.assign( *tets[0], BaryC_tet, vel_);
+        //velocity.assign( *tets[0], BaryC_tet, fixed_velocity);
+        Quad5_2DCL<double> vn (dot(normal,velocity));
+
+        Quad5_2DCL<> shape_as_q5[10];
+        Quad5_2DCL<> upwshape_as_q5[10];
+
+        for (int j = 0; j < 10; ++j)
+        {
+            if (j>0){
+                lp2[j-1] = 0.0;
+            }
+            lp2[j]  =  1.0;
+            upwshape_as_q5[j].assign(lp2, BaryC_tet);
+            shape_as_q5[j].assign(lp2, BaryC_tet);
+        }
+
+        for (int j = 0; j < 10; ++j)
+            for (int k = 0; k < Quad5_2DDataCL::NumNodesC; ++k)
+                if (vn[k] <= 0)
+                    upwshape_as_q5[j][k] = 0.0;
+
+        n[0].assign( *tets[0], *ls_.Phi.RowIdx, ls_.GetBndData()); //BndData is dummy
+
+        const VertexCL* v[3];
+        for (Uint i= 0; i < 3; ++i)
+            v[i]= face.GetVertex( i);
+
+        const double absdet_face=FuncDet2D(v[1]->GetCoord()-v[0]->GetCoord(),
+                                           v[2]->GetCoord()-v[0]->GetCoord());
+
+
+        for (int k = 0; k < 10; ++k)
+            for (int l = 0; l < 10; ++l)
+                (*bH_)( n[0].num[k], n[0].num[l])
+                    += Quad5_2DCL<>(vn*upwshape_as_q5[l]*shape_as_q5[k]).quad(absdet_face);
+
+
+        Quad5_2DCL<> bndf;
+        bndf.assign( *tets[0], BaryC_tet, ls_.GetBndData().GetBndFun(tets[0]->GetBndIdx(facnum[0])));
+
+        for (int k = 0; k < Quad5_2DDataCL::NumNodesC; ++k)
+            if (vn[k] > 0)
+                bndf[k] = 0.0;
+        // create rhs due to boundary conditions
+        for (int k = 0; k < 10; ++k)
+                rhs_.Data[ n[0].num[k] ] -= Quad5_2DCL<>(vn*bndf*shape_as_q5[k]).quad(absdet_face);
+
+    }
+
+    // const double absdet_face=FuncDet2D(v[1]->GetCoord()-v[0]->GetCoord(),
+    //                                    v[2]->GetCoord()-v[0]->GetCoord());
+
+    // Quad5_2DCL(const TetraCL&, const BaryCoordCL* const, const PFunT&);
+}
+
+/// because virtual functions can not be templatized, cases are catched individually
+/// and implemented with hard casts depending on FE type
 template<class DiscVelSolT>
 void LevelsetP2CL::SetupSystem( const DiscVelSolT& vel, __UNUSED__ const double dt)
 /// Setup level set matrices E, H
