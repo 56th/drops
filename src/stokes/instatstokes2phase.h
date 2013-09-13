@@ -189,7 +189,8 @@ class InstatStokes2PhaseP2P1CL : public ProblemCL<TwoPhaseFlowCoeffCL, StokesBnd
                  M,
                  prA,
                  prM;
-
+    //VelVecDescCL dv;        ///< velocity error, not used now
+  
   public:
     InstatStokes2PhaseP2P1CL( const MGBuilderCL& mgb, const TwoPhaseFlowCoeffCL& coeff, const BndDataCL& bdata, FiniteElementT prFE= P1_FE, double XFEMstab=0.1, FiniteElementT velFE= vecP2_FE)
         : base_(mgb, coeff, bdata), vel_idx(velFE, 1, bdata.Vel, 0, XFEMstab), pr_idx(prFE, 1, bdata.Pr, 0, XFEMstab) {}
@@ -270,6 +271,8 @@ class InstatStokes2PhaseP2P1CL : public ProblemCL<TwoPhaseFlowCoeffCL, StokesBnd
 	//It checks the L2 norm of discretized error of velocity and gradient of pressure
     void CheckOnePhaseSolution(const VelVecDescCL* DescVel, const VecDescCL* DescPr, const instat_vector_fun_ptr RefVel, const instat_vector_fun_ptr RefGradPr) const;
 	
+	// To setup u-u_h
+	//void SetupVelError(const instat_vector_fun_ptr RefVel);
     /// \name Evaluate Solution
     //@{
     /// Get solution as FE-function for evaluation
@@ -277,6 +280,9 @@ class InstatStokes2PhaseP2P1CL : public ProblemCL<TwoPhaseFlowCoeffCL, StokesBnd
         { return const_DiscPrSolCL( &p, &GetBndData().Pr, &GetMG()); }
     const_DiscVelSolCL GetVelSolution() const
         { return const_DiscVelSolCL( &v, &GetBndData().Vel, &GetMG()); }
+	// to get error in velocity	
+    //const_DiscVelSolCL GetVelError(StokesBndDataCL::VelBndDataCL& bnd) const
+    //    { return const_DiscVelSolCL( &dv, &bnd, &GetMG()); }		
 
     const_DiscPrSolCL GetPrSolution( const VecDescCL& pr) const
         { return const_DiscPrSolCL( &pr, &GetBndData().Pr, &GetMG()); }

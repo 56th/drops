@@ -634,7 +634,6 @@ void SetupRhs2_P2P0( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL&, const St
 void SetupRhs2_P2P1( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL&, const StokesBndDataCL& BndData, VecDescCL* c, double t)
 {
     ScopeTimerCL scope("SetupRhs2_P2P1");
-
     c->Clear( t);
 
     const Uint lvl = c->GetLevel();
@@ -1374,7 +1373,7 @@ void SpecialBndHandler_System1OnePhaseP2CL::setup(const TetraCL& tet, const SMat
 	for (Uint k =0; k< 4; ++k) //Go throught all faces of a tet
 	{
 		SMatrixCL<3, 3> dm[10][10];
-		LocalP2CL<double> phi[6]; 
+		LocalP2CL<double> phi[10]; 
 		Quad5_2DCL<double> mass2Dj;
 		Quad5_2DCL<double> mass2Di;
 		Quad5_2DCL<double> Grad2Dj;   // \nabla phi_j* n
@@ -1388,31 +1387,29 @@ void SpecialBndHandler_System1OnePhaseP2CL::setup(const TetraCL& tet, const SMat
 			tet.GetOuterNormal(k, normal);
 			for (Uint i= 0; i<3; ++i)    
 			{
-				unknownIdx[i]   = VertOfFace(k, i);      // i is index for Vertex
-				unknownIdx[i+3] = EdgeOfFace(k, i) + 4;  // i is index for Edge
-				bary[i][unknownIdx[i]]=1;
+				bary[i][VertOfFace(k, i)]=1;
 			}
-			for(Uint i=0; i<6; ++i)
-				phi[i][unknownIdx[i]] = 1;
+			for(Uint i=0; i<10; ++i)
+				phi[i][i] = 1;
 				
-			for(Uint i=0; i<6; ++i){
+			for(Uint i=0; i<10; ++i){
+				LocalP1CL<double> Gradin(dot( normal, Grad[i]));
+				mass2Di.assign(phi[i], bary);	
+				Grad2Di.assign(Gradin, bary);
 				for(Uint j=0; j<=i; ++j){
-					LocalP1CL<double> Gradjn(dot( normal, Grad[unknownIdx[j]]));
-					LocalP1CL<double> Gradin(dot( normal, Grad[unknownIdx[i]]));					
+					LocalP1CL<double> Gradjn(dot( normal, Grad[j]));
 					mass2Dj.assign(phi[j], bary);  //
-					mass2Di.assign(phi[i], bary);
 					Grad2Dj.assign(Gradjn, bary);
-					Grad2Di.assign(Gradin, bary);
 					Quad5_2DCL<double> mass2D(mass2Dj * mass2Di); //
 					Quad5_2DCL<double> Grad2D(Grad2Di * mass2Dj + Grad2Dj * mass2Di); //
 					// three additional terms
-					dm[unknownIdx[j]][unknownIdx[i]](0, 0)= dm[unknownIdx[j]][unknownIdx[i]](1, 1) = dm[unknownIdx[j]][unknownIdx[i]](2, 2) = beta_ * mass2D.quad(absdet);
-					dm[unknownIdx[j]][unknownIdx[i]]     += (alpha_/h - beta_) * mass2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));
-					dm[unknownIdx[j]][unknownIdx[i]]     -=  2. * mu_ * Grad2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));  
-					loc.Ak[unknownIdx[j]][unknownIdx[i]] += dm[unknownIdx[j]][unknownIdx[i]];
+					dm[j][i](0, 0)=dm[j][i](1, 1) = dm[j][i](2, 2) = beta_ * mass2D.quad(absdet);
+					dm[j][i]     += (alpha_/h - beta_) * mass2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));
+					dm[j][i]     -=  2. * mu_ * Grad2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));  
+					loc.Ak[j][i] += dm[j][i];
 					if (i != j){
-						assign_transpose( dm[unknownIdx[i]][unknownIdx[j]], dm[unknownIdx[j]][unknownIdx[i]]);
-						loc.Ak[unknownIdx[i]][unknownIdx[j]] += dm[unknownIdx[i]][unknownIdx[j]];
+						assign_transpose( dm[i][j], dm[j][i]);
+						loc.Ak[i][j] += dm[i][j];
 					}	
 				}
 			}
@@ -1440,7 +1437,6 @@ void SpecialBndHandler_System1OnePhaseP2CL::setupRhs(const TetraCL& tet, Point3D
 				unknownIdx[i+3] = EdgeOfFace(k, i) + 4;  // i is index for Edge
 				bary[i][unknownIdx[i]]=1;
 			}
-			
 			typedef StokesBndDataCL::VelBndDataCL::bnd_val_fun bnd_val_fun;
 			bnd_val_fun bf= BndData_.Vel.GetBndSeg(face.GetBndIdx()).GetBndFun();
 			WallVel.assign(tet, bary, bf, t);
@@ -1453,7 +1449,7 @@ void SpecialBndHandler_System1OnePhaseP2CL::setupRhs(const TetraCL& tet, Point3D
 
 			for(Uint i=0; i<6; ++i){//setup right hand side	
 					Quad5_2DCL<Point3DCL> WallVelRhs( locP2[i]* WallVel);
-					loc_b[unknownIdx[i]] += beta_ * WallVelRhs.quad(absdet);
+					loc_b[unknownIdx[i]] += (beta_ * WallVelRhs.quad(absdet) - beta_ * SMatrixCL<3,3> (outer_product(normal, normal)) * WallVelRhs.quad(absdet));
 			}		
 		}
 	}	
@@ -1791,7 +1787,7 @@ System1Accumulator_P2CL::System1Accumulator_P2CL (const TwoPhaseFlowCoeffCL& Coe
     : Coeff( Coeff_), BndData( BndData_), lset_Phi( lset_arg), lset_Bnd( lset_bnd), t( t_),
       RowIdx( RowIdx_), A( A_), M( M_), cplA( cplA_), cplM( cplM_), b( b_),
       local_twophase( Coeff.mu( 1.0), Coeff.mu( -1.0), Coeff.rho( 1.0), Coeff.rho( -1.0), Coeff.volforce),
-	  speBndHandler1(BndData_, Coeff.mu( 1.0), Coeff.beta(-1.0), Coeff.alpha),
+	  speBndHandler1(BndData_, Coeff.mu( -1.0), Coeff.beta(-1.0), Coeff.alpha),
 	  speBndHandler2(BndData_, Coeff.mu( 1.0), Coeff.mu( -1.0), Coeff.beta(1.0), Coeff.beta(-1.0), Coeff.alpha)
 {}
 
@@ -2419,7 +2415,6 @@ void SetupRhs1_P2( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_, co
 {
     ScopeTimerCL scope("SetupRhs1_P2");
     const Uint lvl = b->GetLevel();
-
     b->Clear( t);
 
     LocalNumbP2CL n;
@@ -3468,6 +3463,32 @@ void InstatStokes2PhaseP2P1CL::CheckOnePhaseSolution(const VelVecDescCL* DescVel
 				   <<"\n || nabla (p_h - p) ||_L2 = " << Grad_pr << std::endl;	
 }
 
+/*void InstatStokes2PhaseP2P1CL::SetupVelError(const instat_vector_fun_ptr RefVel)
+{
+	
+    VectorCL& lsgvel= dv.Data;
+    Uint lvl= dv.GetLevel(),
+         idx= dv.RowIdx->GetIdx();
+	Point3DCL tmp;
+    for (MultiGridCL::const_TriangVertexIteratorCL sit= const_cast<const MultiGridCL&>(MG_).GetTriangVertexBegin(lvl), send= const_cast<const MultiGridCL&>(MG_).GetTriangVertexEnd(lvl);
+         sit != send; ++sit)
+    {
+        if (sit->Unknowns.Exist(idx))
+			DoFHelperCL<Point3DCL, VectorCL>::set( lsgvel, sit->Unknowns(idx), RefVel(sit->GetCoord(), 0));
+    }
+
+    for (MultiGridCL::const_TriangEdgeIteratorCL sit=const_cast<const MultiGridCL&>(MG_).GetTriangEdgeBegin(lvl), send=const_cast<const MultiGridCL&>(MG_).GetTriangEdgeEnd(lvl);
+         sit != send; ++sit)
+    {
+        if (sit->Unknowns.Exist(idx))
+        {
+            tmp= RefVel( (sit->GetVertex(0)->GetCoord() + sit->GetVertex(1)->GetCoord())/2., 0);
+            for(int i=0; i<3; ++i)
+                lsgvel[sit->Unknowns(idx)+i]= tmp[i];
+        }
+    }	
+	dv.Data-=v.Data;
+}*/
 
 P1XRepairCL::P1XRepairCL (MultiGridCL& mg, VecDescCL& p)
     : UsesXFEM_( p.RowIdx->IsExtended()), mg_( mg), idx_( P1_FE), ext_( &idx_), p_( p)
