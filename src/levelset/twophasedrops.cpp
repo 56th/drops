@@ -543,6 +543,7 @@ void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<double>("NavStokes.Downwind.MaxRelComponentSize", 0.05);
     P.put_if_unset<double>("NavStokes.Downwind.WeakEdgeRatio", 0.2);
     P.put_if_unset<double>("NavStokes.Downwind.CrosswindLimit", std::cos( M_PI/6.));
+    P.put_if_unset<int>("Levelset.Discontinuous", 0);
     P.put_if_unset<int>("Levelset.Downwind.Frequency", 0);
     P.put_if_unset<double>("Levelset.Downwind.MaxRelComponentSize", 0.05);
     P.put_if_unset<double>("Levelset.Downwind.WeakEdgeRatio", 0.2);
