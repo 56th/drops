@@ -116,7 +116,7 @@ inline void
     VelVecDescCL& v= stokes_.v;
     Uint LastLevel= stokes_.GetMG().GetLastLevel();
     match_fun match= stokes_.GetMG().GetBnd().GetMatchFun();
-    MLIdxDescCL loc_vidx( vecP2_FE, LastLevel+1); //stokes_.vel_idx.size());
+    MLIdxDescCL loc_vidx( vecP2_FE, stokes_.vel_idx.size());
 
     loc_vidx.CreateNumbering( LastLevel, stokes_.GetMG(), stokes_.GetBndData().Vel, match);
     /*
@@ -131,7 +131,6 @@ inline void
     p2repair_->repair( loc_v);
 
     v.Clear( v.t);
-    stokes_.vel_idx.resize( LastLevel+1, vecP2_FE); //wird sowieso nicht verwendet.. hauptsache ml-groesse stimmt
     stokes_.vel_idx.DeleteNumbering( stokes_.GetMG());
 
     stokes_.vel_idx.swap( loc_vidx);
@@ -154,18 +153,16 @@ inline void
   PressureRepairCL::post_refine ()
 {
     VecDescCL loc_p;
-    Uint LastLevel= stokes_.GetMG().GetLastLevel();
-    MLIdxDescCL loc_pidx( stokes_.GetPrFE(), LastLevel+1); //stokes_.pr_idx.size());
+    MLIdxDescCL loc_pidx( stokes_.GetPrFE(), stokes_.pr_idx.size());
     VecDescCL& p= stokes_.p;
     match_fun match= stokes_.GetMG().GetBnd().GetMatchFun();
 
-    loc_pidx.CreateNumbering( LastLevel, stokes_.GetMG(), stokes_.GetBndData().Pr, match, ls_.PhiC, &ls_.GetBndData());
+    loc_pidx.CreateNumbering( stokes_.GetMG().GetLastLevel(), stokes_.GetMG(), stokes_.GetBndData().Pr, match, ls_.PhiC, &ls_.GetBndData());
     loc_p.SetIdx( &loc_pidx);
 
     p1repair_->repair( loc_p);
 
     p.Clear( p.t);
-    stokes_.pr_idx.resize( LastLevel+1, stokes_.pr_idx.GetFinest().GetFE() ); //wird sowieso nicht verwendet.. hauptsache ml-groesse stimmt
     stokes_.pr_idx.DeleteNumbering( stokes_.GetMG());
     stokes_.pr_idx.swap( loc_pidx);
     p.SetIdx( &stokes_.pr_idx);

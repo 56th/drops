@@ -1085,7 +1085,7 @@ LevelsetRepairCL::post_refine ()
 /// Do all things to complete the repairing of the FE level-set function
 {
     VecDescCL loc_phi;
-    MLIdxDescCL loc_lidx( P2_FE, ls_.GetMG().GetLastLevel() + 1);
+    MLIdxDescCL loc_lidx( P2_FE, ls_.idxC->size());
     VecDescCL& phiC= *ls_.PhiC;
     match_fun match= ls_.GetMG().GetBnd().GetMatchFun();
 
@@ -1116,7 +1116,6 @@ LevelsetRepairCL::post_refine ()
     }
 
     phiC.Clear( phiC.t);
-    ls_.idxC->resize( ls_.GetMG().GetLastLevel() + 1, P2_FE); //wird sowieso nicht verwendet.. hauptsache ml-groesse stimmt
     ls_.DeleteNumbering( ls_.idxC );
     ls_.idxC->swap( loc_lidx);
 
