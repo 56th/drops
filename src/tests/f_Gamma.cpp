@@ -372,6 +372,12 @@ void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<std::string>("Exp.VolForce", "ZeroVel");
     P.put_if_unset<double>("SurfTens.ShearVisco", 0.0);
     P.put_if_unset<double>("SurfTens.DilatationalVisco", 0.0);
+    P.put_if_unset<double>("Mat.DensDrop", 1000);
+    P.put_if_unset<double>("Mat.ViscDrop", 0.001);
+    P.put_if_unset<double>("Mat.DensFluid", 1000);
+    P.put_if_unset<double>("Mat.ViscFluid", 0.001);
+    P.put_if_unset<double>("Mat.SmoothZone", 1e-05);
+    P.put_if_unset<DROPS::Point3DCL>("Exp.Gravity", DROPS::Point3DCL());
 }
 
 int main (int argc, char** argv)
