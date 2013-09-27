@@ -214,8 +214,9 @@ operator* (const GridFunctionCL< SMatrixCL<Rows, Cols> >& a, const GridFunctionC
     return ret;
 }
 
+template <Uint Dim>
 inline GridFunctionCL<double>
-dot(const GridFunctionCL<Point3DCL>& a, const GridFunctionCL<Point3DCL>& b)
+dot(const GridFunctionCL<SVectorCL<Dim> >& a, const GridFunctionCL<SVectorCL<Dim> >& b)
 {
     GridFunctionCL<double> ret( 0.0, a.size());
     for (size_t i= 0; i<a.size(); ++i)
