@@ -1,0 +1,25 @@
+#---------------------SPECIFICATION FILE----------------------------------------
+Type of test: serial
+Name of executable: extendP1onChild
+#The path to the folder where the executable is located must be relative to the
+#/drops folder
+Folder of executable: tests
+#The path to the folder where the parameter-file is located must be relative to
+#the folder where the executable is situated
+Path of parameter-file: 
+Name of test: testExtendP1onChild
+Name of author: Sven Gross
+#-------------------------------------------------------------------------------
+#------------------------------NUMBERS------------------------------------------
+Name of variable: "number of total errors"
+Prefix of variable: "total errors found:"
+Value of variable:
+Relative error:
+Absolute error:
+Minimal value: 0
+Maximal value: 0
+#-------------------------------------------------------------------------------
+#------------------------------STRINGS-------------------------------------------
+String value: "test"
+String find: 0
+#-------------------------------------------------------------------------------

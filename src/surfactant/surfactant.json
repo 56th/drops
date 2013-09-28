@@ -1,0 +1,109 @@
+//    = DROPS parameter file for surfactant.cpp =
+//    tests of the surfactant model implementation:
+//    droplet in brick
+{
+        "General":
+        {
+                "ProgressBar":  1, //show progress bar
+                "DynamicLibsPrefix": "../", //where should we look for shared objects?
+                "DynamicLibs": [ //select libraries to be loaded after program start
+                        //"levelset/liblevelset-filmCoeff",
+                        //"levelset/liblevelset-twophaseCoeff",
+                        "misc/libmisc-scalarFunctions",
+                        "misc/libmisc-vectorFunctions"
+                        //"poisson/libpoisson-poissonCoeff",
+                        //"stokes/libstokes-stokesCoeff",
+                        //"tests/libtests-csgtest",
+                        //"transport/libtransport-transportCoeff"
+                ]
+        },
+
+	"Time": // time stepping
+	{
+		"NumSteps":		16,
+		"StepSize":		0.25
+	},
+
+	"Domain":
+	{
+		"Type":		"BrickBuilder",
+		"Origin":	[-2, -2, -2],
+		"E1":		[ 4,  0,  0],
+		"E2":		[ 0,  4,  0],
+		"E3":		[ 0,  0,  4],
+		"N1":		2,
+		"N2":		2,
+		"N3":		2
+	},
+
+	"AdaptRef": // adaptive refinement
+	{
+		"Freq":			0,
+		"Width":		10,
+		"CoarsestLevel":	0,
+		"FinestLevel":		3
+	},
+
+	"Exp": // experimental conditions
+	{
+		"RadDrop":	[1, 1, 1],
+		"PosDrop":	[0, 0, 0],
+		"RadTorus":	[1, 0.7],
+		"Velocity":	[0, 0, 0],
+
+		"StationaryPDE":	false,
+//		"Wind":			"ConstantWind",
+//		"Levelset":		"Ellipsoid",
+//		"Rhs":			"HeatConductionRhs",
+//		"Solution":		"HeatConductionSol"
+//		"Wind":			"ToroidalFlowWind",
+//		"Levelset":		"Torus",
+//		"Rhs":			"ToroidalFlowRhs",
+//		"Solution":		"ToroidalFlowSol"
+		"Wind":			"AxisScalingWind",
+		"Levelset":		"AxisScalingLset",
+		"Rhs":			"AxisScalingRhs",
+		"Solution":		"AxisScalingSol"
+	},
+
+	"SurfTransp": // surfactant transport
+	{
+		"Method":	"cGcG", // "spacetime-cGcG" "spacetime-cGdG" "characteristic-transport"
+		"UseMassDiv":	true, // only implemented for "spacetime-*"
+
+		"Theta":	0.5,
+		"Iter":		1000,
+		"Tol":		1e-10,
+		"OmitBound":	-1,
+		"Visc":		1 // 0.05
+	},
+
+	"Levelset": // levelset solver
+	{
+		"Tol":			1e-14,
+		"Iter":			500,
+		"SD":			0.1,
+		"CurvDiff":		-1,
+		"VolCorrection":	0,
+		"Theta":		1,
+		"Discontinuous": 0
+	},
+
+	"VTK": // VTK output
+	{
+		"VTKOut":		1,
+		"VTKDir":		"vtk",
+		"VTKName":		"surfactant",
+		"TimeFileName":		"surfactant",
+		"Binary":		1,
+		"UseOnlyP1":		false,
+		"ReUseTimeFile":	false
+	},
+
+	"SolutionOutput": // Machine readable output of the surfactant-solution
+	{
+		"Freq":		1,
+		"Path":		"solutions/iface_sol",
+		"Binary":	true
+	}
+}

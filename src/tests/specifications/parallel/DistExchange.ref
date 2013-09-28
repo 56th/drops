@@ -1,0 +1,21 @@
+#---------------------SPECIFICATION FILE----------------------------------------
+Type of test: parallel calculation of dot-products
+Name of executable: dist_exchange
+#The path to the folder where the executable is located must be relative to the
+#/drops folder
+Folder of executable: partests
+#The path to the folder where the parameter-file is located must be relative to
+#the folder where the executable is situated
+Path of parameter-file:
+Name of test: dist_exchange
+Number of processes: 4
+Name of author: Patrick
+#-------------------------------------------------------------------------------
+#------------------------------STRINGS------------------------------------------
+String value: "Accumulation seems to be alright"
+String find: 1
+String value: "Computing inner products seems to be alright"
+String find: 1
+String value: " DiST-module seems to be alright!"
+String find: 1
+#-------------------------------------------------------------------------------

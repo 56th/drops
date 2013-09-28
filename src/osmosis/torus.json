@@ -1,0 +1,138 @@
+{
+        "_comment":
+"#=============================================================
+#    DROPS parameter file for osmosis (level 1)
+#=============================================================
+# time stepping",
+
+//General section
+        "General":
+        {
+                "ProgressBar":  1, //show progress bar
+                "DynamicLibsPrefix": "../", //where should we look for shared objects?
+                "DynamicLibs": [ //select libraries to be loaded after program start
+                        "misc/libmisc-scalarFunctions",
+                        "misc/libmisc-vectorFunctions",
+                        "osmosis/libosmosis-osmosisCoeff"
+                ]
+        },
+
+        "Time":
+        {
+                "NumSteps":             100,
+                "StepSize":             0.005,
+                "Scheme":               0.5
+        },
+        
+        "Osmosis":
+        {
+                "Levelset":             "torus",
+                "ScaleInitialConc":     0,
+                "InitialConc":          "TransverseLinear",
+                "GrowVelocity":         -1.0,
+                "Diffusivity":          10.1,
+                "alpha":                -1,
+                "beta":                 0.25,
+                "RelStationary":        1e-10
+        },      
+        
+        "Exp":
+        {
+                "RadDrop":              [0.8, 0.8, 0.8 ],
+                "PosDrop":              [2.0, 2.0, 2.0 ],
+                "Gravity":              [0, -9.81, 0 ],
+                "OmitBound":            1e-4
+        },  
+        
+        "Stabilisation":
+        {
+                "Active":               1,
+                "Scaling":              20.0,
+                "Exp":                  1.0,
+                "Anisotropic":          1
+        },
+
+        "ZeroVelAtBnd":
+        {
+                "Active":               0,
+                "WeightedDiffusion":    1,
+                "WeightedDiffDistance": 0.25,
+                "WeightedDiffFactor":   0.001
+        },
+
+        "Solver":
+        {
+                "Iter":                 1000,
+                "Tol":                  1e-16,
+                "Interface":            2
+        },
+
+        "Coupling":
+        {
+                "Active":               0,
+                "Damping":              1.0,
+                "maxIter":              10,
+                "Tol":                  1e-3
+        },
+        
+        "Levelset":
+        {
+                "Tol":                  1e-10,
+                "Iter":                 1000,
+                "SD":                   0.1,
+                "CurvDiff":             -1,
+                "VolCorrection":        0,
+                "Theta":                1
+        },
+        
+        "Reparam":
+        {
+                "Active":               0,
+                "method":               13,
+                "VolCorrection":        0
+        },
+
+        "AdaptRef":
+        {
+                "_comment":
+"# adaptive refinement",
+
+                "Freq":                 0,
+                "FinestLevel":          0,
+                "CoarsestLevel":        0,
+                "Width":                0.1,
+                "RefineStrategy":       1,
+                "LoadBalStrategy":      1,
+                "Partitioner":          1
+        },
+
+        "VTK":
+        {
+                "VTKOut":               1,
+                "VTKDir":               "vtk",
+                "VTKName":              "torus_weakCoup_1",
+                "Binary":               0
+        },
+
+        "GNUPlot":
+        {
+            "Out":                      1,
+            "Plotname":                 "plot/strongCoup_1.plot"
+        },
+
+        "DomainCond":
+        {
+                "_comment":
+"# domain, bnd/ini conditions",
+
+                "InitialCond":          0,
+                "GeomType":             1,
+                "InitialFile":          "none",
+                "MeshFile":             "4x4x4@10x10x10",
+                "BoundaryType":         "21!21!21!21!21!21!",
+                "BoundaryFncs":         "ZeroVel!ZeroVel!ZeroVel!ZeroVel!ZeroVel!ZeroVel"
+        }
+
+}
+
+

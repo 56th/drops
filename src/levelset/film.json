@@ -1,0 +1,155 @@
+{
+//=============================================================
+//    DROPS parameter file for film
+//    simulation of two-phase flow:
+//    falling film flow
+//=============================================================
+
+//General section
+        "General":
+        {
+                "ProgressBar": 0, //show progress bar
+                "DynamicLibsPrefix": "../", //where should we look for shared objects?
+                "DynamicLibs": [ //select libraries to be loaded after program start
+                        "levelset/liblevelset-filmCoeff",
+                        "misc/libmisc-scalarFunctions",
+                        "misc/libmisc-vectorFunctions"
+                ]
+        },
+
+// time stepping
+        "Time":
+        {
+            "NumSteps":		10000,		// number of time steps
+            "StepSize":		0.0001		// time step size
+        },
+
+// flow solver, Stokes part
+        "Stokes":
+        {
+            "StokesMethod":		10502,	// Stokes solver, cf. num/stokessolverfactory.h
+            "InnerIter":		1000,
+            "OuterIter":		200,
+            "InnerTol":		1e-10,
+            "OuterTol":		1e-08,
+            "PcAIter":		200,		// preconditioner for left upper block: max. number of iterations
+            "PcATol":		0.0001,		// preconditioner for left upper block: tolerance
+            "PcSTol":		0.0001,		// Schur complement preconditioner: tolerance
+            "XFEMStab":		1,			// controls how many XFEM basis functions are skipped
+            "Theta":		1			// controls implicitness of time stepping scheme
+        },
+
+// flow solver, Navier-Stokes part
+        "NavStokes":
+        {
+            "Nonlinear":		0,		// coefficient in front of nonlinear convection term
+            "Tol":		5e-10,			// N-S fixed point iteration: tolerance
+            "Iter":		10,				// N-S fixed point iteration: max. number of iterations
+            "Reduction":		0.1		// N-S fixed point iteration: reduction of resid. in each iteration
+        },
+
+// levelset solver
+        "Levelset":
+        {
+            "Tol":		1e-16,			// levelset solver: tolerance
+            "Iter":		1000,			// levelset solver: max. number of iterations
+            "SD":		1,				// streamline diffusion parameter
+            "CurvDiff":		-1,			// smoothing of interface for curvature computation
+            "VolCorrection":		1,	// toggles volume correction
+		    "Discontinuous":		0,  // Use DG for levelset?
+            "Theta":		1			// controls implicitness of time stepping scheme
+        },
+
+// coupling of level set and flow 
+        "Coupling":
+        {
+            "Tol":		1e-10,	// fixed point iteration: tolerance
+            "Iter":		0		// fixed point iteration: max. number of iterations
+        },
+
+// re-initialization of levelset function
+        "Reparam":
+        {
+            "Freq":		1,	// how often to re-initialize
+            "Method":	3	// Fast-Marching variants
+        },
+
+// adaptive refinement
+	"AdaptRef":
+	{
+		"Freq":		10,				// how often to refine 
+		"FinestLevel":		2,		// refinement level inside shell
+		"CoarsestLevel":		0,	// refinement level outside shell
+		"Width":		0.0005,		// width of refinement shell around interface
+		"LoadBalStrategy":  1011    // inactive
+	},
+
+        "Mat":
+        {
+// material data, all units are SI, scaled by rho
+//  "DensGas":		1,			// 'air' / silicon oil
+//  "ViscGas":		1.425e-5,	// mu/rho
+//  "DensFluid":		1,
+//  "ViscFluid":		5.7e-6,	// mu/rho
+//  "SmoothZone":		1e-4,	// inactive
+//  "SurfTension":		0 // 5.5e-6	// tau/(0.4 rho_F + 0.6 rho_G)
+
+       // material data, all units are SI
+            "DensGas":		1.2,			// density of gas
+            "ViscGas":		1.71e-05,		// dynamic viscosity of gas
+            "DensFluid":		909.3,		// density of liquid film
+            "ViscFluid":		0.005183,	// dynamic viscosity of liquid film
+            "SmoothZone":		0.0001,		// inactive
+            "SurfTension":		0.022		// surface tension coefficient
+        },
+
+// experimental conditions
+        "Exp":
+        {
+            "Gravity":		[8.036, -5.627, 0 ],    // gravity vector -> inclined film, 35 degree (0 degree = perpendicular)
+            "PumpAmpl":		0.2, 			        // rel. amplitude of initial wave in x direction 
+            "PumpFreq":		10, 
+            "Ampl_zDir":	0.5, 		            // rel. amplitude of initial wave in z direction
+            "Thickness":	0.000635	            // average film thickness
+        },
+// Visualization Toolkit output format settings
+        "VTK":
+        {
+                "VTKOut":               1,                   // VTK output (0 = off, 1 = on).
+                "VTKDir":               "vtk",               // local directory for VTK files.
+                "VTKName":              "filmStokesDMS-T05", // name of VTK files
+                "AddP1XPressure":       1,                   // pressure output as p1 on neg. and p1 on pos. part      
+                "Binary":               1                    // write out VTK files in binary format.
+        },
+// Ensight output
+        "Ensight":
+        {
+                "EnsightOut":           0,                     // Ensight output (0 = off, 1 = on).
+                "EnsDir":               "ensight",             // local directory for Ensight files.
+                "EnsCase":              "filmStokesDMS-T05",   // name of Ensight case file
+                "GeomName":             "film",                // name of geometry part
+                "Binary":               1                      // write out Ensight files in binary format.
+        },
+// write out results, read in for restart
+        "Restart":
+        {
+                "Serialization":        1,                 // run serialization (0 = off, 1 = 0n).
+                "Overwrite":            1,                 // overwrite old output-files or create new ones
+                                                           // for every time step.
+                "Inputfile":            "none",            // reads multigrid from deserialization files
+                                                           // (to deactivate the reading choose Inputfile = none).
+                "Outputfile":           "serial/data",         // writes multigrid to serialization files
+                                                           // (to deactivate the writing choose Outputfile = none).
+                "Binary":               0                  //
+        },
+
+// misc parameters	
+        "MeshResolution":		[20, 6, 2 ],	                // number of sub-intervals per dimension
+        "MeshSize":		[20.9e-3, 4e-3, 4e-3 ],                 // length of cuboid domain per dimension 
+        "InitialCond":		1,					                // controls initial condition: 1 = stationary Stokes, 2 = Nusselt solution, -1 = read from file
+        "InitialFile":		"serial/filmNs40",                 // prefix for initial data files
+        "BndCond":		"12wo12",				                // boundary conditions: Per1!Per2!Wall!Outflow!Per1!Per2
+        "SerializationFile":		"filmNs.mg",                // write to files
+        "DeserializationFile":		"none"		                // read from files
+
+}

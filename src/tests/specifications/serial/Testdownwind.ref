@@ -1,0 +1,20 @@
+#---------------------SPECIFICATION FILE----------------------------------------
+Type of test: serial
+Name of executable: downwind
+#The path to the folder where the executable is located must be relative to the
+#/drops folder
+Folder of executable: tests
+#The path to the folder where the parameter-file is located must be relative to
+#the folder where the executable is situated
+Path of parameter-file:
+Name of test: testdownwind
+Name of author: Joerg Grande
+#-------------------------------------------------------------------------------
+#------------------------------STRINGS-------------------------------------------
+# String find = 1: you want to find this string, = 0: you don't want to find this string
+String value: "RCM-permutation: 0 1 2"
+String find: 1
+#
+String value: "Tarjan-permutation: 1 2 0"
+String find: 1
+#-------------------------------------------------------------------------------

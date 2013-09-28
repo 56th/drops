@@ -1,0 +1,19 @@
+{
+
+  "interrupted sphere":
+  {
+    "Type": "CSG-body (v0)",
+    "Instructions" : [
+         { "Type": "Halfspace", "Normal": [  1, 0, 0], "ValueAtOrigin":   -1.1 },
+         { "Type": "Halfspace", "Normal": [ -1, 0, 0], "ValueAtOrigin":    0.9, "MakeUnitNormal": true },
+         "Intersection",
+         "Complement",
+        { "Type": "Sphere", "Center": [1, 1, 1], "Radius": 0.75 }
+         ,
+         "SmoothIntersection",
+        { "Type": "Sphere", "Center": [1, 1, 1], "Radius": 0.25 },
+        "SmoothUnion" // A close relative of "Union"
+    ]
+  }
+
+}

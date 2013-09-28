@@ -1,0 +1,17 @@
+#---------------------SPECIFICATION FILE----------------------------------------
+Type of test: parallel interpolation after grid refinement
+Name of executable: dist_interp2
+#The path to the folder where the executable is located must be relative to the
+#/drops folder
+Folder of executable: partests
+#The path to the folder where the parameter-file is located must be relative to
+#the folder where the executable is situated
+Path of parameter-file:
+Name of test: dist_interp2
+Number of processes: 4
+Name of author: Patrick
+#-------------------------------------------------------------------------------
+#------------------------------STRINGS------------------------------------------
+String value: "ret: 0"
+String find: 1
+#-------------------------------------------------------------------------------

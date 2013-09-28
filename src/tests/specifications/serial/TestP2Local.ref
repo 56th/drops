@@ -1,0 +1,37 @@
+#---------------------SPECIFICATION FILE----------------------------------------
+Type of test: serial
+Name of executable: p2local
+#The path to the folder where the executable is located must be relative to the
+#/drops folder
+Folder of executable: tests
+#The path to the folder where the parameter-file is located must be relative to
+#the folder where the executable is situated
+Path of parameter-file: 
+Name of test: testP2Local
+Name of author: Sven Gross
+#-------------------------------------------------------------------------------
+#------------------------------NUMBERS------------------------------------------
+Name of variable: "Integral"
+Prefix of variable: "integral:"
+Value of variable: 0.277297
+Relative error: 1E-6
+Absolute error:
+Minimal value:
+Maximal value:
+Name of variable: "Differenz Schwerpunkt"
+Prefix of variable: "max. Differenz im Schwerpunkt:"
+Value of variable: 0
+Relative error:
+Absolute error: 1E-10
+Minimal value: 
+Maximal value:
+Name of variable: "Differenz Freiheitsgrad"
+Prefix of variable: "in den Freiheitsgraden:"
+Value of variable: 0
+Relative error:
+Absolute error: 1E-10
+Minimal value:
+Maximal value:
+#-------------------------------------------------------------------------------
+#------------------------------STRINGS-------------------------------------------
+#-------------------------------------------------------------------------------

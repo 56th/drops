@@ -1,0 +1,23 @@
+#---------------------SPECIFICATION FILE----------------------------------------
+Type of test: serial
+Name of executable: f_Gamma
+#The path to the folder where the executable is located must be relative to the
+#/drops folder
+Folder of executable: tests
+#The path to the folder where the parameter-file is located must be relative to
+#the folder where the executable is situated
+Path of parameter-file: f_Gamma.json
+Name of test: testfGamma
+Name of author: Yuanjun Zhang
+#-------------------------------------------------------------------------------
+#------------------------------NUMBERS------------------------------------------
+Name of variable: "Difference"
+Prefix of variable: "\|d\| = "
+Value of variable: 0
+Relative error:
+Absolute error: 1e-2
+Minimal value:
+Maximal value:
+#-------------------------------------------------------------------------------
+#------------------------------STRINGS-------------------------------------------
+#-------------------------------------------------------------------------------

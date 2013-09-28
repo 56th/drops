@@ -1,0 +1,52 @@
+#---------------------SPECIFICATION FILE----------------------------------------
+Type of test: serial
+Name of executable: minres
+#The path to the folder where the executable is located must be relative to the
+#/drops folder
+Folder of executable: tests
+Name of author: Jens Berger
+#-------------------------------------------------------------------------------
+#------------------------------NUMBERS------------------------------------------
+Name of variable: "Residual2"
+Prefix of variable: "TEST2 Residual: "
+Value of variable: 4.213e-16
+Relative error: 
+Absolute error: 1e-10
+Minimal value:
+Maximal value:
+Name of variable: "Residual3"
+Prefix of variable: "TEST3 Residual: "
+Value of variable: 2.87588e-11
+Relative error: 
+Absolute error: 1e-10
+Minimal value:
+Maximal value:
+Name of variable: "Residual4"
+Prefix of variable: "TEST4 Residual: "
+Value of variable: 2.87588e-11
+Relative error: 
+Absolute error: 1e-10
+Minimal value:
+Maximal value:
+Name of variable: "Residual5"
+Prefix of variable: "TEST5 Residual: "
+Value of variable: 2.87596e-11
+Relative error: 
+Absolute error: 1e-10
+Minimal value:
+Maximal value:
+#-------------------------------------------------------------------------------
+#------------------------------STRINGS------------------------------------------
+# String find = 1: you want to find this string,
+# = 0: you don't want to find this string
+String value:  "lucky breakdown after 2 vectors"
+String find: 1
+String value:  "TEST2 x: 2      2 1 "
+String find: 1
+String value:  "TEST3 x: 4      0.25 0.5 0.75 1"
+String find: 1
+String value:  "TEST4 x: 4      0.25 0.5 0.75 1"
+String find: 1
+String value:  "TEST5 x: 4      0.25 0.5 0.75 1"
+String find: 1
+#-------------------------------------------------------------------------------

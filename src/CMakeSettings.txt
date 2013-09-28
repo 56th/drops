@@ -1,0 +1,32 @@
+##########################################################################
+# path to external libraries
+##########################################################################
+set(PARMETIS_HOME "${CMAKE_SOURCE_DIR}/../parmetis-4.0.2" CACHE PATH "")
+set(METIS_HOME "${CMAKE_SOURCE_DIR}/../metis-5.0.2" CACHE PATH "")
+set(ZOLTAN_HOME "${CMAKE_SOURCE_DIR}/../Zoltan_v3.2" CACHE PATH "")
+set(HYPRE_HOME "${CMAKE_SOURCE_DIR}/../hypre-2.0.0" CACHE PATH "")
+set(SCOTCH_HOME "${CMAKE_SOURCE_DIR}/../scotch_5.1.8a" CACHE PATH "")
+set(SUITESPARSE_HOME "${CMAKE_SOURCE_DIR}/../SuiteSparse" CACHE PATH "")
+
+set(BOOST_HOME "" CACHE PATH "")
+
+set(DROPS_BUILD_TYPE "" CACHE STRING "")
+
+##########################################################################
+# predefined compiler flags
+##########################################################################
+# Intel compiler
+set(IPC_CXX_FLAGS_DEBUG "-DVALARRAY_DEBUG -wd1572 -g")
+set(IPC_CXX_FLAGS_RELEASE "-O3 -ip -fp-model fast=2")
+# GNU compiler
+set(GCC_CXX_FLAGS_DEBUG "-g -O0 -W -Wall -pedantic")
+set(GCC_CXX_FLAGS_RELEASE "-O3 --fast-math -W -Wall -pedantic")
+# IBM compiler
+set(XL_CXX_FLAGS_DEBUG "-O0 -g -qlanglvl=extended0x")
+set(XL_CXX_FLAGS_RELEASE "-O5 -qlanglvl=extended0x")
+# CLANG compiler
+set(CLANG_CXX_FLAGS_DEBUG "-g -O0 -W -Wall -pedantic -Wno-unknown-pragmas")
+set(CLANG_CXX_FLAGS_RELEASE "-O3 -W -Wall -pedantic -Wno-unknown-pragmas")
+
+# MPI turned off by default
+option(MPI FALSE)

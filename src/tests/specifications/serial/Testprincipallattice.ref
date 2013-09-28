@@ -1,0 +1,31 @@
+#---------------------SPECIFICATION FILE----------------------------------------
+Type of test: serial
+Name of executable: principallattice
+#The path to the folder where the executable is located must be relative to the
+#/drops folder
+Folder of executable: tests
+#The path to the folder where the parameter-file is located must be relative to
+#the folder where the executable is situated
+Path of parameter-file:
+Name of test: testprincipallatice
+Name of author: Liang Zhang
+#-------------------------------------------------------------------------------
+#------------------------------NUMBERS------------------------------------------
+Name of variable: "Volume of the negative part"
+Prefix of variable: "Volume of the negative part: "
+Value of variable: 0.507192
+Relative error:
+Absolute error: 1e-5
+Name of variable: "Volume of the positive part"
+Prefix of variable: "volume of the positive part: "
+Value of variable: 7.49281
+Relative error:
+Absolute error: 1e-5
+Name of variable: "Area of surface"
+Prefix of variable: "Surface: "
+Value of variable: 3.0909
+Relative error: 1e-4
+Absolute error:
+#-------------------------------------------------------------------------------
+#------------------------------STRINGS-------------------------------------------
+#-------------------------------------------------------------------------------

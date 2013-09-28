@@ -1,0 +1,52 @@
+{
+//=============================================================
+//    DROPS parameter file
+//    Study different discretizations of interfacial tension
+//=============================================================
+//General section
+        "General":
+        {
+                "ProgressBar":  1, //show progress bar
+                "DynamicLibsPrefix": "../", //where should we look for shared objects?
+                "DynamicLibs": [ //select libraries to be loaded after program start
+                        "misc/libmisc-scalarFunctions",
+                        "misc/libmisc-vectorFunctions"
+                ]
+        },
+
+	"Levelset":
+	{
+		"Tol":		1e-14,
+		"Iter":		10000,
+		"SD":		0,
+		"CurvDiff":		-5e-09,
+		"VolCorrection":		0,
+		"Discontinuous":		0,
+		"Theta":		1
+	},
+
+	"Exp":
+	{
+		"RadDrop":		[0.5, 0.5, 0.5 ],
+		"PosDrop":		[0, 0, 0 ],
+		"RadInlet":		0.0035
+	},
+
+	"AdaptRef":
+	{
+		"FinestLevel":		2,
+		"CoarsestLevel":	0,
+		"Width":		0.00049
+	},
+
+	"SurfTens":
+	{
+		"SurfTension":		1
+	},
+
+	"DomainCond":
+	{
+		"MeshFile":		"2x2x2@5x5x5"
+	}
+
+}
