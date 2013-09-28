@@ -378,7 +378,7 @@ template <class DiscVelSolT>
 class LocalInterfaceConvectionP1CL
 {
   private:
-    const DiscVelSolT& w_; // wind
+    const DiscVelSolT w_; // wind
 
     QuadDomain2DCL qdom;
     Point3DCL grad[4];
@@ -408,7 +408,7 @@ template <typename DiscVelSolT>
 class LocalInterfaceMassDivP1CL
 {
   private:
-    const DiscVelSolT& w_;
+    const DiscVelSolT w_;
 
     QuadDomain2DCL qdom;
     LocalP2CL<Point3DCL> w_loc;
@@ -1364,7 +1364,7 @@ template <class DiscVelSolT>
 class LocalMaterialDerivativeSTP1P1CL
 {
   private:
-    const DiscVelSolT& w_; // wind
+    const DiscVelSolT w_; // wind
     LocalSTP2P1CL<Point3DCL> loc_w_;
 
     const bool transpose_local_matrix_;
@@ -1406,7 +1406,7 @@ template <class DiscVelSolT>
 class LocalMassdivSTP1P1CL
 {
   private:
-    const DiscVelSolT&               w_; // wind
+    const DiscVelSolT                w_; // wind
     LocalSTP2P1CL<Point3DCL>         loc_w_;
     LocalSTP1P1CL< SMatrixCL<3,3> >  dw;
     GridFunctionCL< SMatrixCL<3,3> > qdw;
