@@ -50,10 +50,11 @@ typedef BndDataCL<double>    LsetBndDataCL;
 enum SurfaceForceT
 /// different types of surface forces
 {
-    SF_LB=0,             ///< Laplace-Beltrami discretization: \f$\mathcal O(h^{1/2})\f$
-    SF_ImprovedLB=1,     ///< improved Laplace-Beltrami discretization: \f$\mathcal O(h)\f$
-    SF_Const=2,          ///< surface force with constant curvature
-    SF_ImprovedLBVar=3   ///< improved Laplace-Beltrami discretization with variable surface tension
+    SF_LB=0,            ///< Laplace-Beltrami discretization: \f$\mathcal O(h^{1/2})\f$
+    SF_ImprovedLB=1,    ///< improved Laplace-Beltrami discretization: \f$\mathcal O(h)\f$
+    SF_Const=2,         ///< surface force with constant curvature
+    SF_ImprovedLBVar=3, ///< improved Laplace-Beltrami discretization with variable surface tension
+    SF_ObliqueLBVar=4   ///< Laplace-Beltrami discretization with variable surface tension via oblique projector
 };
 
 /// not used at the moment

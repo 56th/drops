@@ -496,6 +496,106 @@ void VarImprovedLaplaceBeltramiAccuCL::visit( const TetraCL& t)
     } // Ende der for-Schleife ueber die Kinder
 }
 
+
+/// \brief Accumulator for the interfacial tension term with variable interfacial tension coefficient.
+class VarObliqueLaplaceBeltramiAccuCL : public SurfTensAccumulatorCL
+{
+  private:
+    const SurfaceTensionCL& sf_;
+    const LevelsetP2CL& ls_;
+    LocalNumbP2CL n_;
+
+    const PrincipalLatticeCL& lat_;
+    LocalP2CL<> loc_ls_;
+    std::valarray<double> ls_val_;
+    SurfacePatchCL p_;
+    QuadDomain2DCL q_;
+
+    LocalP1CL<Point3DCL> gradref_[10],
+                         grad_[10];
+    GridFunctionCL<Point3DCL> w_[10],
+                              qnt_,
+                              qnh_;
+    SMatrixCL<3, 3> T_;
+    GridFunctionCL<double> qsigma;
+
+
+  public:
+    VarObliqueLaplaceBeltramiAccuCL (const LevelsetP2CL& ls, VecDescCL& f_Gamma, const SurfaceTensionCL& sf)
+     : SurfTensAccumulatorCL( ls, f_Gamma), sf_(sf), ls_( ls), lat_( PrincipalLatticeCL::instance( 2)),
+       ls_val_( 10)
+    {
+        P2DiscCL::GetGradientsOnRef( gradref_);
+    }
+
+    void begin_accumulation () {
+        f.Data= 0.;
+        std::cerr << "VarObliqueLaplaceBeltramiAccuCL::begin_accumulation: " << f.Data.size() << "dof.\n";
+    }
+    void finalize_accumulation() {
+        std::cerr << "VarObliqueLaplaceBeltramiAccuCL::finalize_accumulation.\n";
+    }
+
+    void visit (const TetraCL&);
+
+    TetraAccumulatorCL* clone (int /*tid*/) { return new VarObliqueLaplaceBeltramiAccuCL ( *this); };
+};
+
+void
+resize_and_scatter_piecewise_spatial_normal (const SPatchCL<3>& surf, const QuadDomainCodim1CL<3>& qdom, std::valarray<Point3DCL>& spatial_normal)
+{
+    spatial_normal.resize( qdom.vertex_size());
+    if (spatial_normal.size() == 0)
+        return;
+    if (surf.normal_empty()) // As qdom has vertexes, the must be facets, i.e. normals.
+        throw DROPSErrCL( "resize_and_scatter_piecewise_spatial_normal: normals were not precomputed.\n");
+
+    const Uint NodesPerFacet= qdom.vertex_size()/surf.facet_size();
+    if (qdom.vertex_size()%surf.facet_size() != 0)
+        throw DROPSErrCL( "resize_and_scatter_piecewise_spatial_normal: qdom.vertex_size is not a multiple of surf.facet_size.\n");
+
+    const SPatchCL<3>::const_normal_iterator n= surf.normal_begin();
+    for (Uint i= 0; i < surf.facet_size(); ++i) {
+        std::fill_n( &spatial_normal[i*NodesPerFacet], NodesPerFacet, n[i]/n[i].norm());
+    }
+}
+
+void VarObliqueLaplaceBeltramiAccuCL::visit (const TetraCL& t)
+{
+    evaluate_on_vertexes( ls_.GetSolution(), t, lat_, Addr( ls_val_));
+    if (equal_signs( ls_val_))
+        return;
+
+    loc_ls_.assign( t, ls_.GetSolution());
+    double det; // dummy
+    GetTrafoTr( T, det, t);
+    P2DiscCL::GetGradients( grad_, gradref_, T);
+    LocalP1CL<Point3DCL> nt; // gradient of quadratic level set function
+    for (Uint i= 0; i < 10 ; ++i)
+        nt+= grad_[i]*loc_ls_[i];
+
+    p_.make_patch<MergeCutPolicyCL>( lat_, ls_val_);
+    p_.compute_normals( t);
+    make_CompositeQuad5Domain2D( q_, p_, t);
+    resize_and_scatter_piecewise_spatial_normal( p_, q_, qnh_); // unit-length normal to linear interface
+    resize_and_evaluate_on_vertexes( nt, q_, qnt_); // normal to quadratic interface
+    for (Uint i= 0; i < q_.vertex_size(); ++i)
+        qnt_[i]/= norm( qnt_[i]);
+    GridFunctionCL<> qalpha( dot( qnh_, qnt_));
+    GridFunctionCL<Point3DCL> qgradi( q_.vertex_size());
+    for (Uint i= 0; i < 10; ++i) {
+        evaluate_on_vertexes( grad_[i], q_, Addr( qgradi));
+        w_[i].resize( q_.vertex_size());
+        w_[i]= qgradi - GridFunctionCL<double>( dot( qnt_, qgradi)/qalpha)*qnh_; // \bQt D b^i, where b^i is the ith scalar P2-basis-function.
+    }
+    qsigma.resize( q_.vertex_size());
+    sf_.evaluate_on_vertexes( t, q_, /*time*/ 0., Addr( qsigma)); // interfacial tension
+
+    n_.assign_indices_only( t, *f.RowIdx);
+    for (Uint i= 0; i < 10; ++i)
+        add_to_global_vector( f.Data, -quad_2D( qsigma*w_[i], q_), n_.num[i]);
+}
+
 bool MarkInterface ( instat_scalar_fun_ptr DistFct, double width, MultiGridCL& mg, Uint f_level, Uint c_level, double t)
 {
     bool marked= false;
@@ -832,6 +932,8 @@ void LevelsetP2CL::AccumulateBndIntegral( VecDescCL& f) const
           accu= new ImprovedLaplaceBeltramiAccuCL( *this, f, sf_.GetSigma()(std_basis<3>(0), 0.)); break;
       case SF_ImprovedLBVar:
           accu= new VarImprovedLaplaceBeltramiAccuCL( *this, f, sf_); break;
+      case SF_ObliqueLBVar:
+          accu= new VarObliqueLaplaceBeltramiAccuCL( *this, f, sf_); break;
       default:
         throw DROPSErrCL("LevelsetP2CL::AccumulateBndIntegral not implemented for this SurfaceForceT");
     }

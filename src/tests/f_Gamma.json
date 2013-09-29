@@ -25,9 +25,9 @@
 
 	"Levelset":
 	{
-		"Tol":		1e-14,
-		"Iter":		10000,
-		"SD":		0,
+		"Tol":			1e-14,
+		"Iter":			10000,
+		"SD":			0,
 		"CurvDiff":		-5e-09,
 		"VolCorrection":	0,
 		"Discontinuous":	0,
@@ -39,8 +39,7 @@
 	"Exp":
 	{
 		"RadDrop":		[0.5, 0.5, 0.5 ],
-		"PosDrop":		[0, 0, 0 ],
-		"RadInlet":		0.0035
+		"PosDrop":		[0, 0, 0 ]
 	},
 
 	"AdaptRef":
@@ -65,5 +64,16 @@
 		"N1": 5,		// Number of cells along the E1-direction,
 		"N2": 5,		//			 the E2-direction,
 		"N3": 5			//			 the E3-direction.
-	 } 
+	},
+
+	"VTK": // VTK output
+	{
+		"VTKOut":		1,
+		"VTKDir":		"vtk",
+		"VTKName":		"f_Gamma",
+		"TimeFileName":		"f_Gamma",
+		"Binary":		1,
+		"UseOnlyP1":		false,
+		"ReUseTimeFile":	false
+	}
 }

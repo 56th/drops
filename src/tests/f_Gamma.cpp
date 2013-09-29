@@ -24,11 +24,13 @@
 
 #include "geom/multigrid.h"
 #include "out/output.h"
+#include "out/vtkOut.h"
 #include "geom/builder.h"
 #include "stokes/instatstokes2phase.h"
 #include "num/krylovsolver.h"
 #include "num/precond.h"
 #include "levelset/coupling.h"
+#include "levelset/adaptriang.h"
 #include "misc/params.h"
 #include "levelset/surfacetension.h"
 #include "misc/dynamicload.h"
@@ -38,24 +40,12 @@
 
 DROPS::ParamCL P;
 
+std::auto_ptr<DROPS::VTKOutCL> vtkwriter;
+
 int FctCode=9;
 
-class ZeroFlowCL
-{
-// \Omega_1 = Tropfen,    \Omega_2 = umgebendes Fluid
-  public:
-    static DROPS::Point3DCL f(const DROPS::Point3DCL&, double)
-        { DROPS::Point3DCL ret(0.0); return ret; }
-    const DROPS::SmoothedJumpCL rho, mu;
-    const DROPS::Point3DCL g;
-
-    ZeroFlowCL( const DROPS::ParamCL& P)
-      : rho( DROPS::JumpCL( 1, 1), DROPS::H_sm, P.get<double>("Mat.SmoothZone")),
-         mu( DROPS::JumpCL( 1, 1),   DROPS::H_sm, P.get<double>("Mat.SmoothZone")),
-        g()    {}
-};
-
-double sigmaf( const DROPS::Point3DCL&, double) { return -1.0; }
+double SurfTension;
+double sigmaf( const DROPS::Point3DCL&, double) { return SurfTension; }
 
 /*
 double DistanceFct( const DROPS::Point3DCL& p)
@@ -72,18 +62,13 @@ double DistanceFct( const DROPS::Point3DCL& p)
     return inner_prod( C.Mitte/norm(C.Mitte), p) - C.Radius;
 }
 
-double DistanceFct( const DROPS::Point3DCL& p)
-{ // ball
-    const DROPS::Point3DCL d= C.Mitte-p;
-    return d.norm()-C.Radius;
-}
 */
 
 double DistanceFct( const DROPS::Point3DCL& p, double)
 { // ball
-    const DROPS::Point3DCL d= P.get<DROPS::Point3DCL>("Exp.PosDrop")-p;
-//    return d.norm_sq()-C.Radius*C.Radius; // exakte Darstellung mit P2-FE, aber keine Abstandsfunktion
-    return d.norm()-P.get<DROPS::Point3DCL>("Exp.RadDrop")[0];
+    static const DROPS::Point3DCL c= P.get<DROPS::Point3DCL>("Exp.PosDrop");
+    static const double r= P.get<DROPS::Point3DCL>("Exp.RadDrop")[0];
+    return (p-c).norm()-r;
 }
 
 DROPS::Point3DCL Null( const DROPS::Point3DCL&, double)
@@ -335,39 +320,70 @@ void Compare_LaplBeltramiSF_ConstSF( InstatStokes2PhaseP2P1CL& Stokes, const Lse
     delete &lset;
 }
 
+void Compare_Oblique_Improved (DROPS::AdapTriangCL& adap, InstatStokes2PhaseP2P1CL& Stokes, LevelsetP2CL& lset)
+{
+    MultiGridCL& MG= Stokes.GetMG();
+
+    MLIdxDescCL* vidx= &Stokes.vel_idx;
+    Stokes.CreateNumberingVel( MG.GetLastLevel(), vidx);
+
+    MG.SizeInfo( std::cout);
+    Stokes.b.SetIdx( vidx);
+    Stokes.v.SetIdx( vidx);
+    Stokes.A.SetIdx( vidx, vidx);
+    Stokes.M.SetIdx( vidx, vidx);
+
+    std::cout << vidx->NumUnknowns() << " velocity unknowns,\n";
+    std::cout << lset.Phi.Data.size() << " levelset unknowns.\n";
+
+    const double Vol= 4./3*M_PI*std::pow( P.get<DROPS::Point3DCL>("Exp.RadDrop")[0], 3);
+    const double curv= 2./P.get<DROPS::Point3DCL>("Exp.RadDrop")[0];
+    std::cout << "Volumen = " << Vol << "\tKruemmung = " << curv << "\n\n";
+
+    Stokes.SetupSystem1( &Stokes.A, &Stokes.M, &Stokes.b, &Stokes.b, &Stokes.b, lset, 0.);
+
+    VecDescCL f_improved( vidx);
+    lset.SetSurfaceForce( SF_ImprovedLB);
+    lset.AccumulateBndIntegral( f_improved);
+
+    VecDescCL f_oblique( vidx);
+    lset.SetSurfaceForce( SF_ObliqueLBVar);
+    lset.AccumulateBndIntegral( f_oblique);
+
+    vtkwriter->Register( make_VTKScalar( lset.GetSolution(), "Levelset") );
+    vtkwriter->Register( make_VTKVector( make_P2Eval( MG, Stokes.GetBndData().Vel, f_oblique),      "f_oblique"));
+    vtkwriter->Register( make_VTKVector( make_P2Eval( MG, Stokes.GetBndData().Vel, f_improved),     "f_improved"));
+    vtkwriter->Write( 0.);
+
+    VectorCL d( f_oblique.Data - f_improved.Data);
+// std::cerr << "oblique: " << f_oblique.Data.size() << ", improved: " << f_improved.Data.size() << std::endl;
+// for (size_t i= 0; i < f_oblique.Data.size(); ++i)
+//     if (isnan( f_oblique.Data[i]))
+//         std::cerr << "i: " << i << std::endl;
+// for (size_t i= 0; i < f_improved.Data.size(); ++i)
+//     if (isnan( f_improved.Data[i]))
+//         std::cerr << "Hallo i: " << i << std::endl;
+// for (size_t i= 0; i < d.size(); ++i)
+//     if (isnan( d[i]))
+//         std::cerr << "Hallo d i: " << i << std::endl;
+
+    std::cout << "|d| = \t\t" << norm(d) << std::endl;
+    SSORPcCL pc;
+    typedef PCGSolverCL<SSORPcCL> PCG_SsorCL;
+    PCG_SsorCL cg( pc, 1000, 1e-18);
+    MLMatrixCL MA;
+    MA.LinComb( 1, Stokes.M.Data, 1, Stokes.A.Data);
+    VectorCL MA_inv_d( d);
+    std::cout << "Solving system with MA matrix:\t";
+    cg.Solve( MA, MA_inv_d, d, vidx->GetEx());
+    std::cout << cg.GetIter() << " iter,\tresid = " << cg.GetResid();
+    const double sup2= std::sqrt(dot( MA_inv_d, d));
+    std::cout << "\n\nsup |f1(v)-f2(v)|/||v||_1 = \t\t" << sup2
+              << "\n|(MA)^-1 d| = " << norm( MA_inv_d) << std::endl;
+}
+
 } // end of namespace DROPS
 
-
-void MarkDrop (DROPS::MultiGridCL& mg, int maxLevel= -1)
-{
-    for (DROPS::MultiGridCL::TriangTetraIteratorCL It(mg.GetTriangTetraBegin(maxLevel)),
-             ItEnd(mg.GetTriangTetraEnd(maxLevel)); It!=ItEnd; ++It)
-    {
-/*            for (int i=0; i<4; ++i)
-            {
-                const double val= DistanceFct( It->GetVertex(i)->GetCoord() );
-                if ( val<C.ref_width && val > -C.ref_width)
-                    It->SetRegRefMark();
-            }
-            const double val= DistanceFct( GetBaryCenter(*It));
-            if ( val<C.ref_width && val > -C.ref_width)
-                It->SetRegRefMark();
-*/
-            int neg= 0, zero= 0;
-            for (int i=0; i<4; ++i)
-            {
-                const double val= DistanceFct( It->GetVertex(i)->GetCoord(), 0.);
-                neg+= val<0;
-                zero+= fabs(val)<1e-8;
-            }
-            const double val= DistanceFct( GetBaryCenter(*It), 0.);
-            neg+= val<0;
-            zero+= fabs(val)<1e-8;
-
-            if ( (neg!=0 && neg!=5) || zero) // change of sign or zero in tetra
-               It->SetRegRefMark();
-    }
-}
 
 /// \brief Set Default parameters here s.t. they are initialized.
 /// The result can be checked when Param-list is written to the output.
@@ -375,10 +391,10 @@ void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<std::string>("Exp.VolForce", "ZeroVel");
     P.put_if_unset<double>("SurfTens.ShearVisco", 0.0);
     P.put_if_unset<double>("SurfTens.DilatationalVisco", 0.0);
-    P.put_if_unset<double>("Mat.DensDrop", 1000);
-    P.put_if_unset<double>("Mat.ViscDrop", 0.001);
-    P.put_if_unset<double>("Mat.DensFluid", 1000);
-    P.put_if_unset<double>("Mat.ViscFluid", 0.001);
+    P.put_if_unset<double>("Mat.DensDrop", 1);
+    P.put_if_unset<double>("Mat.ViscDrop", 1);
+    P.put_if_unset<double>("Mat.DensFluid", 1);
+    P.put_if_unset<double>("Mat.ViscFluid", 1);
     P.put_if_unset<double>("Mat.SmoothZone", 1e-05);
     P.put_if_unset<DROPS::Point3DCL>("Exp.Gravity", DROPS::Point3DCL());
 }
@@ -391,10 +407,27 @@ int main (int argc, char** argv)
     SetMissingParameters(P);
     std::cout << P << std::endl;
 
+    SurfTension= P.get<double>( "SurfTens.SurfTension");
+
     DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
 
     std::auto_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P.get_child( "Domain")));
     DROPS::MultiGridCL mg( *builder);
+    DROPS::AdapTriangCL adap(
+        mg,
+        P.get<double>("AdaptRef.Width"),
+        P.get<int>("AdaptRef.CoarsestLevel"),
+        P.get<int>("AdaptRef.FinestLevel")
+    );
+    adap.MakeInitialTriang( DistanceFct);
+
+    DROPS::SurfaceTensionCL sf( sigmaf);
+    DROPS::LsetBndDataCL lsbnd( 0);
+    read_BndData( lsbnd, mg, P.get_child( "Levelset.BndData"));
+    DROPS::LevelsetP2CL& lset( *DROPS::LevelsetP2CL::Create( mg, lsbnd, sf, P.get_child("Levelset")));
+    lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
+    lset.Phi.SetIdx( &lset.idx);
+    lset.Init( DistanceFct);
 
     DROPS::StokesBndDataCL::VelBndDataCL velbnd( 0);
     read_BndData( velbnd, mg, P.get_child( "Stokes.VelocityBndData"));
@@ -404,20 +437,23 @@ int main (int argc, char** argv)
     typedef DROPS::InstatStokes2PhaseP2P1CL MyStokesCL;
     MyStokesCL prob( mg, DROPS::TwoPhaseFlowCoeffCL(P), DROPS::StokesBndDataCL( velbnd, prbnd));
 
-    DROPS::LsetBndDataCL lsbnd( 0);
-    read_BndData( lsbnd, mg, P.get_child( "Levelset.BndData"));
+    vtkwriter= std::auto_ptr<DROPS::VTKOutCL>( new DROPS::VTKOutCL(
+        mg,
+        "DROPS data",
+        1,
+        P.get<std::string>("VTK.VTKDir"),
+        P.get<std::string>("VTK.VTKName"),
+        P.get<std::string>("VTK.TimeFileName"),
+        P.get<int>("VTK.Binary"), 
+        P.get<bool>("VTK.UseOnlyP1"),
+        false, /* <- P2DG */
+        -1,    /* <- level */
+        P.get<bool>("VTK.ReUseTimeFile")
+    ));
+//     Compare_LaplBeltramiSF_ConstSF( prob, lsbnd);
+    Compare_Oblique_Improved( adap, prob, lset);
 
-    for (int i=0; i<P.get<int>("AdaptRef.FinestLevel"); ++i)
-    {
-        MarkDrop( mg);
-        mg.Refine();
-    }
-    std::cout << DROPS::SanityMGOutCL(mg) << std::endl;
-    DROPS::GeomMGOutCL out( mg, -1, false, 0);
-    std::ofstream fil("cube.off");
-    fil << out;
-    fil.close();
-    Compare_LaplBeltramiSF_ConstSF( prob, lsbnd);
+    delete &lset;
     return 0;
   }
   catch (DROPS::DROPSErrCL& err) { err.handle(); }
