@@ -556,7 +556,7 @@ resize_and_scatter_piecewise_spatial_normal (const SPatchCL<3>& surf, const Quad
 
     const SPatchCL<3>::const_normal_iterator n= surf.normal_begin();
     for (Uint i= 0; i < surf.facet_size(); ++i) {
-        std::fill_n( &spatial_normal[i*NodesPerFacet], NodesPerFacet, n[i]/n[i].norm());
+        std::fill_n( &spatial_normal[i*NodesPerFacet], NodesPerFacet, n[i]);
     }
 }
 
@@ -582,6 +582,11 @@ void VarObliqueLaplaceBeltramiAccuCL::visit (const TetraCL& t)
     for (Uint i= 0; i < q_.vertex_size(); ++i)
         qnt_[i]/= norm( qnt_[i]);
     GridFunctionCL<> qalpha( dot( qnh_, qnt_));
+    // If a triangle has zero area, its normal is returned as 0; we avoid 
+    // division by zero... the value will not matter later as the func-det in quad_2D is also 0.
+    for (size_t i=0; i < qalpha.size(); ++i)
+        if (std::fabs( qalpha[i]) == 0.)
+            qalpha[i]= 1.;
     GridFunctionCL<Point3DCL> qgradi( q_.vertex_size());
     for (Uint i= 0; i < 10; ++i) {
         evaluate_on_vertexes( grad_[i], q_, Addr( qgradi));

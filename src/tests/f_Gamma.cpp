@@ -340,8 +340,6 @@ void Compare_Oblique_Improved (DROPS::AdapTriangCL& adap, InstatStokes2PhaseP2P1
     const double curv= 2./P.get<DROPS::Point3DCL>("Exp.RadDrop")[0];
     std::cout << "Volumen = " << Vol << "\tKruemmung = " << curv << "\n\n";
 
-    Stokes.SetupSystem1( &Stokes.A, &Stokes.M, &Stokes.b, &Stokes.b, &Stokes.b, lset, 0.);
-
     VecDescCL f_improved( vidx);
     lset.SetSurfaceForce( SF_ImprovedLB);
     lset.AccumulateBndIntegral( f_improved);
@@ -356,6 +354,7 @@ void Compare_Oblique_Improved (DROPS::AdapTriangCL& adap, InstatStokes2PhaseP2P1
     vtkwriter->Write( 0.);
 
     VectorCL d( f_oblique.Data - f_improved.Data);
+    std::cout << "|d| = \t\t" << norm(d) << std::endl;
 // std::cerr << "oblique: " << f_oblique.Data.size() << ", improved: " << f_improved.Data.size() << std::endl;
 // for (size_t i= 0; i < f_oblique.Data.size(); ++i)
 //     if (isnan( f_oblique.Data[i]))
@@ -367,14 +366,14 @@ void Compare_Oblique_Improved (DROPS::AdapTriangCL& adap, InstatStokes2PhaseP2P1
 //     if (isnan( d[i]))
 //         std::cerr << "Hallo d i: " << i << std::endl;
 
-    std::cout << "|d| = \t\t" << norm(d) << std::endl;
-    SSORPcCL pc;
-    typedef PCGSolverCL<SSORPcCL> PCG_SsorCL;
-    PCG_SsorCL cg( pc, 1000, 1e-18);
+    Stokes.SetupSystem1( &Stokes.A, &Stokes.M, &Stokes.b, &Stokes.b, &Stokes.b, lset, 0.);
     MLMatrixCL MA;
     MA.LinComb( 1, Stokes.M.Data, 1, Stokes.A.Data);
     VectorCL MA_inv_d( d);
     std::cout << "Solving system with MA matrix:\t";
+    SSORPcCL pc;
+    typedef PCGSolverCL<SSORPcCL> PCG_SsorCL;
+    PCG_SsorCL cg( pc, 1000, 1e-18);
     cg.Solve( MA, MA_inv_d, d, vidx->GetEx());
     std::cout << cg.GetIter() << " iter,\tresid = " << cg.GetResid();
     const double sup2= std::sqrt(dot( MA_inv_d, d));
