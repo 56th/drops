@@ -717,6 +717,7 @@ int main (int argc, char* argv[])
             P.get<std::string>("VTK.TimeFileName"),
             P.get<int>("VTK.Binary"), 
             P.get<bool>("VTK.UseOnlyP1"),
+            false, /* <- P2DG */
             -1,  /* <- level */
             P.get<bool>("VTK.ReUseTimeFile")));
 
