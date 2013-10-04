@@ -906,14 +906,7 @@ int main (int argc, char** argv)
         SetDescriber();
         //DDD_SetOption(OPT_INFO_XFER, XFER_SHOW_MEMUSAGE/*|XFER_SHOW_MSGSALL*/);
 
-        if (argc!=2 && ProcCL::IamMaster()){
-            std::cout << "You have to specify one parameter:\n\t" << argv[0] << " <param_file>" << std::endl; return 1;
-        }
-        std::ifstream param( argv[1]);
-        if (!param && ProcCL::IamMaster()){
-            std::cout << "error while opening parameter file\n"; return 1;
-        }
-        param >> C; param.close();
+        DROPS::read_parameter_file_from_cmdline( C, argc, argv);
         if (ProcCL::IamMaster())
             std::cout << C << std::endl;
 

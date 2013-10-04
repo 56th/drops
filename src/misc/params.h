@@ -166,6 +166,11 @@ std::vector<std::string > ParamCL::get<std::vector<std::string> >(const std::str
 template<>
 DROPS::SArrayCL<Uint, 3> ParamCL::get<DROPS::SArrayCL<Uint, 3> >(const std::string & pathInPT) const;
 
+
+/// \brief Read P from the file argv[1] or from default_file if argv[1] does not exist; else throw DROPSErrCL.
+void read_parameter_file_from_cmdline (ParamCL& P, int argc, char** argv, std::string default_file= std::string());
+
+
 //DELETE ReadParamsCL?
 ///   \brief Parser for parameter files used by ParamBaseCL.
 ///

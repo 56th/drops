@@ -334,21 +334,7 @@ int main( int argc, char **argv)
         DROPS::ParMultiGridInitCL pmginit;
 #endif
 
-        std::ifstream param;
-        if (argc != 2) {
-            std::cout << "Using default parameter file: reparam.json\n";
-            param.open("reparam.json");
-        }
-        else{
-            std::cout << "Opening file " << argv[1] << std::endl;
-            param.open(argv[1]);
-        }
-        if (!param) {
-            std::cerr << "error while opening parameter file\n";
-            return 1;
-        }
-        param >> P;
-        param.close();
+        DROPS::read_parameter_file_from_cmdline( P, argc, argv, "reparam.json");
         std::cout << P << std::endl;
 
         DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );

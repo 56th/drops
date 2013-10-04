@@ -434,22 +434,10 @@ int main (int argc, char** argv)
         DROPS::ParTimerCL timer;
 #endif
 
-        std::ifstream param;
-        if (argc!=2){
-            std::cout << "Using default parameter file: statpoissonEx.json\n";
-            param.open( "statpoissonEx.json");
-        }
-        else
-            param.open( argv[1]);
-        if (!param){
-            std::cerr << "error while opening parameter file\n";
-            return 1;
-        }
-        //output all the parameters
-        param >> P;
-        param.close();
+        DROPS::read_parameter_file_from_cmdline( P, argc, argv, "statpoissonEx.json");
         //Setup missing parameters
         SetMissingParameters(P);
+        //output all the parameters
         std::cout << P << std::endl;
 
         DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), 

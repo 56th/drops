@@ -313,19 +313,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
 int main (int argc, char* argv[])
 {
   try {
-    std::ifstream param;
-    if (argc!=2) {
-        std::cout << "Using default parameter file: surfactant.json\n";
-        param.open( "surfactant.json");
-    }
-    else
-        param.open( argv[1]);
-    if (!param) {
-        std::cout << "error while opening parameter file\n";
-        return 1;
-    }
-    param >> P;
-    param.close();
+    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "surfactant.json");
     std::cout << P << std::endl;
 
     DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );

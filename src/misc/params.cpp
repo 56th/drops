@@ -144,7 +144,22 @@ template <typename T, Uint Size>
         print(it->second, level+"\t", s);
     }
   }
-  
+
+void read_parameter_file_from_cmdline (ParamCL& P, int argc, char **argv, std::string default_file)
+{
+    if (argc == 1) {
+        if (default_file == std::string())
+            throw DROPSErrCL(
+                "read_parameter_file_from_cmdline: You must specify a parameter file on the command line.\n"
+                "        " + std::string( argv[0]) + " <path_to_parameter_file>\n");
+        std::cout << "Using default parameter file '" << default_file << "'." << std::endl;
+        P.read_json( default_file);
+    }
+    else {
+        std::cout << "Using  parameter file '" << argv[1] << "'." << std::endl;
+        P.read_json( argv[1]);
+    }
+}
 
 
   // =====================================================

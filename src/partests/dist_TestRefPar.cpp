@@ -340,17 +340,7 @@ int main(int argc, char* argv[])
         const int me= DROPS::ProcCL::MyRank();
 
         // Parameter file einlesen ...
-        if (argc!=2){
-            std::cout << "You have to specify one parameter:\n\t" << argv[0] << " <param_file>" << std::endl; return 1;
-        }
-        std::ifstream param( argv[1]);
-        if (!param){
-            std::cout << "error while opening parameter file\n"; return 1;
-        }
-
-        param >> C;
-
-        param.close();
+        DROPS::read_parameter_file_from_cmdline( C, argc, argv);
         std::cout << C << std::endl;
 
         const bool printTime= C.get<int>("Misc.PrintTime"),

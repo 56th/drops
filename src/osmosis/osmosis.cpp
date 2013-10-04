@@ -261,22 +261,8 @@ int main (int argc, char** argv)
 #ifdef _PAR
     DROPS::ParMultiGridInitCL pmginit;
 #endif
-    std::ifstream param;
-    if (argc!=2)
-    {
-        std::cout << "Using default parameter file: osmosis.json\n";
-        param.open( "osmosis.json");
-    }
-    else
-        param.open( argv[1]);
-    if (!param)
-    {
-        std::cerr << "error while opening parameter file\n";
-        return 1;
-    }
-    param >> P;
+    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "osmosis.json");
     SetMissingParameters(P);
-    param.close();
     std::cout << P << std::endl;
 
     DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), 

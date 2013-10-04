@@ -446,24 +446,7 @@ int main (int argc, char** argv)
 {
   try
   {
-    if (argc>2)
-    {
-        std::cout << "You have to specify at most one parameter:\n\t"
-                  << argv[0] << " [<param_file>]" << std::endl;
-        return 1;
-    }
-    std::ifstream param;
-    if (argc>1)
-        param.open( argv[1]);
-    else
-        param.open( "prJump.json");
-    if (!param)
-    {
-        std::cout << "error while opening parameter file\n";
-        return 1;
-    }
-    param >> P;
-    param.close();
+    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "prJump.json");
     SetMissingParameters(P);
     std::cout << P << std::endl;
 
