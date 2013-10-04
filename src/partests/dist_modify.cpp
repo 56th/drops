@@ -38,19 +38,13 @@ namespace DROPS{
 /// \brief Build a brick and tell parallel info class about the multigrid
 void BuildBrick( MultiGridCL*& mg)
 {
-    MGBuilderCL* builder=0;
     Point3DCL origin, e1, e2, e3;
     e1[0]= e2[1]= e3[2]= 1.;
-    if ( ProcCL::IamMaster()){
-        Uint ref= 4;
-        builder = new BrickBuilderCL( origin, e1, e2, e3, ref, ref, ref);
-    }
-    else{
-        builder = new DROPS::EmptyBrickBuilderCL( origin, e1, e2, e3);
-    }
-    mg = new MultiGridCL( *builder);
-    delete builder;
+    Uint ref[3]= { 4, 4, 4};
+    BrickBuilderCL builder( origin, e1, e2, e3, ref[0], ref[1], ref[2]);
+    mg = new MultiGridCL( builder);
 }
+
 
 /// \brief Process sender sends its i-th tetrahedron to process sender+i mod P
 void SendTetras( MultiGridCL& mg, int sender, const bool binary=true)

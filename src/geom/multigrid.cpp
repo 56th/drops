@@ -1069,6 +1069,21 @@ TriangFillCL<TetraCL>::fill (MultiGridCL& mg, TriangCL<TetraCL>::LevelCont& c, i
     c.swap( tmp);
 }
 
+
+MGBuilderCL::MGBuilderCL (Uint parnumLevel)
+    : parnumLevel_( parnumLevel)
+{}
+
+void MGBuilderCL::build_par_impl(MultiGridCL* mgp) const
+{
+    for (Uint i= 0; i < parnumLevel_; ++i)
+        AppendLevel( mgp);
+
+    // Create boundary
+    buildBoundary( mgp);
+}
+
+
 void
 LocatorCL::LocateInTetra(LocationCL& loc, Uint trilevel, const Point3DCL&p, double tol)
 // Assumes, that p lies in loc.Tetra_ and that loc.Tetra_ contains the barycentric

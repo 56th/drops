@@ -354,18 +354,13 @@ int main( int argc, char **argv)
         DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
 
         DROPS::MultiGridCL* mg= 0;
-        DROPS::BrickBuilderCL *mgb = 0;
         DROPS::Point3DCL a,b,c;
         a[0]= P.get<DROPS::Point3DCL>("Brick.dim")[0];
         b[1]= P.get<DROPS::Point3DCL>("Brick.dim")[1];
         c[2]= P.get<DROPS::Point3DCL>("Brick.dim")[2];
-        IF_MASTER
-            mgb = new DROPS::BrickBuilderCL( P.get<DROPS::Point3DCL>("Brick.orig"), a, b, c, P.get<double>("Brick.BasicRefX"), P.get<double>("Brick.BasicRefY"), P.get<double>("Brick.BasicRefZ"));
-        IF_NOT_MASTER
-            mgb = new DROPS::EmptyBrickBuilderCL(P.get<DROPS::Point3DCL>("Brick.orig"), a, b, c);
+        DROPS::BrickBuilderCL mgb( P.get<DROPS::Point3DCL>("Brick.orig"), a, b, c, P.get<double>("Brick.BasicRefX"), P.get<double>("Brick.BasicRefY"), P.get<double>("Brick.BasicRefZ"));
 
-        mg= new DROPS::MultiGridCL( *mgb);
-        delete mgb;
+        mg= new DROPS::MultiGridCL( mgb);
 
         DROPS::AdapTriangCL adap( *mg, P.get<double>("AdaptRef.Width"), P.get<int>("AdaptRef.CoarsestLevel"), P.get<int>("AdaptRef.FinestLevel"), -1);
 

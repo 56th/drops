@@ -941,14 +941,10 @@ int main (int argc, char** argv)
                  << " Create initial grid and distribution ... \n";
         }
 
-        DROPS::MGBuilderCL * mgb;
-        if (ProcCL::IamMaster())
-            mgb = new DROPS::BrickBuilderCL(orig, e1, e2, e3, C.brk_BasicRefX, C.brk_BasicRefY, C.brk_BasicRefZ);
-        else
-            mgb = new DROPS::EmptyBrickBuilderCL(orig, e1, e2, e3);
+        DROPS::BrickBuilderCL mgb(orig, e1, e2, e3, C.brk_BasicRefX, C.brk_BasicRefY, C.brk_BasicRefZ);
 
         // Setup the problem
-        PoissonOnBCL prob(*mgb, PoissonCoeffCL(), bdata);
+        PoissonOnBCL prob(mgb, PoissonCoeffCL(), bdata);
         DROPS::MultiGridCL &mg = prob.GetMG();
         pmg.AttachTo(mg);
 

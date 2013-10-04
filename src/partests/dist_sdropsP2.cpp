@@ -308,13 +308,7 @@ int main (int argc, char** argv)
         timer.Reset();
 
         // create builder for geometry
-        DROPS::MGBuilderCL * mgb;
-#ifdef _PAR
-        if ( !DROPS::ProcCL::IamMaster())
-            mgb = new DROPS::EmptyBrickBuilderCL( orig, e1, e2, e3);
-#endif
-        IF_MASTER
-            mgb = new DROPS::BrickBuilderCL( orig, e1, e2, e3, refX, refY, refZ);
+        DROPS::BrickBuilderCL mgb( orig, e1, e2, e3, refX, refY, refZ);
 
         // boundary conditions
         DROPS::BndCondT bndcond[6] = { DROPS::DirBC, DROPS::DirBC, DROPS::DirBC,
@@ -329,7 +323,7 @@ int main (int argc, char** argv)
 
         // Setup the problem
         DROPS::StokesP2P1CL<DROPS::StatStokesCL::StokesCoeffCL> prob(
-            *mgb, DROPS::StatStokesCL::Coeff, bdata);
+            mgb, DROPS::StatStokesCL::Coeff, bdata);
         DROPS::MultiGridCL& mg= prob.GetMG();
 
 #ifdef _PAR

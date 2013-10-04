@@ -75,7 +75,7 @@ void BrickBuilderCL::buildBoundary (MultiGridCL* mgp) const
 
 /// \todo Check, if the parallelepiped spanned by e1,e2,e3 is degenerated
 /// \todo Do we need the local vector ta?
-void BrickBuilderCL::build (MultiGridCL* mgp) const
+void BrickBuilderCL::build_ser_impl (MultiGridCL* mgp) const
 {
     AppendLevel(mgp);
     SimplexFactoryCL factory( this->GetVertices( mgp), this->GetEdges( mgp), this->GetFaces( mgp), this->GetTetras( mgp));
@@ -203,7 +203,7 @@ void CavityBuilderCL::buildBoundary (MultiGridCL* mgp) const
 }
 
 /// \todo Check, if the parallelepiped spanned by e1,e2,e3 is degenerated
-void CavityBuilderCL::build (MultiGridCL* mgp) const
+void CavityBuilderCL::build_ser_impl (MultiGridCL* mgp) const
 {
     SimplexFactoryCL factory( this->GetVertices(mgp), this->GetEdges(mgp), this->GetFaces(mgp), this->GetTetras(mgp));
 
@@ -332,23 +332,6 @@ void CavityBuilderCL::build (MultiGridCL* mgp) const
     std::for_each( verts.begin(), verts.end(), std::mem_fun_ref( &VertexCL::DestroyRecycleBin ) );
 }
 
-void EmptyCavityBuilderCL::build( MultiGridCL* mgp) const
-{
-    for (Uint i= 0; i<_numLevel; ++i)
-        AppendLevel( mgp);
-
-    // Create boundary
-    base_::buildBoundary(mgp);
-}
-
-void EmptyBrickBuilderCL::build( MultiGridCL* mgp) const
-{
-    for (Uint i= 0; i<_numLevel; ++i)
-        AppendLevel( mgp);
-
-    // Create boundary
-    base_::buildBoundary(mgp);
-}
 
 LBuilderCL::LBuilderCL(const Point3DCL& origin,
                        const Point3DCL& e1,
@@ -389,7 +372,7 @@ void LBuilderCL::buildBoundary(MultiGridCL* mgp) const
     Bnd.push_back( new AffineSquareCL(_orig+b1*_e1+_e3, _orig+_e1+_e3, _orig+b1*_e1+b2*_e2+_e3) ); // e1-e2-plane
 }
 
-void LBuilderCL::build (MultiGridCL* mgp) const
+void LBuilderCL::build_ser_impl (MultiGridCL* mgp) const
 {
     const double _dn1= static_cast<double>(_n1);
     const double _dn2= static_cast<double>(_n2);
@@ -569,7 +552,7 @@ void BBuilderCL::buildBoundary(MultiGridCL* mgp) const
 }
 
 
-void BBuilderCL::build (MultiGridCL* mgp) const
+void BBuilderCL::build_ser_impl (MultiGridCL* mgp) const
 {
     const double _dn1= static_cast<double>(_n1);
     const double _dn2= static_cast<double>(_n2);
@@ -805,7 +788,7 @@ void TetraBuilderCL::buildBoundary(MultiGridCL* mgp) const
     Bnd.push_back( new AffineTriangleCL( p1_, p2_, p3_)); // lid
 }
 
-void TetraBuilderCL::build(MultiGridCL* mgp) const
+void TetraBuilderCL::build_ser_impl(MultiGridCL* mgp) const
 {
     SimplexFactoryCL factory( this->GetVertices(mgp), this->GetEdges(mgp), this->GetFaces(mgp), this->GetTetras(mgp));
 
@@ -873,14 +856,6 @@ void TetraBuilderCL::build(MultiGridCL* mgp) const
     PrepareModify( mgp);
 }
 
-void EmptyTetraBuilderCL::build(MultiGridCL* mgp) const
-{
-    for (Uint i= 0; i<_numLevel; ++i)
-        AppendLevel( mgp);
-
-    // Create boundary
-    buildBoundary(mgp);
-}
 
 //--------------------------------------------------------------------
 // Mesh-file-parser
@@ -1352,7 +1327,7 @@ ReadMeshBuilderCL::buildBoundary(MultiGridCL* mgp) const
 
 /// \todo Did I determine the barycenter of a face correctly?
 void
-ReadMeshBuilderCL::build(MultiGridCL* mgp) const
+ReadMeshBuilderCL::build_ser_impl(MultiGridCL* mgp) const
 {
     // Read the mesh file.
     const_cast<ReadMeshBuilderCL*>( this)->ReadFile(); // It is not useful that build is a
@@ -1456,6 +1431,18 @@ ReadMeshBuilderCL::build(MultiGridCL* mgp) const
     delete factory_; factory_=0;
 }
 
+void ReadMeshBuilderCL::build_par_impl(MultiGridCL* mgp) const
+{
+    // Read the mesh file.
+    const_cast<ReadMeshBuilderCL*>( this)->ReadFile(); // It is not useful that build is a
+                                                       // const member-function by inheritance.
+    nodes_.Check();
+    mfaces_.Check();
+    cells_.Check();
+
+    MGBuilderCL::build_par_impl(mgp);
+}
+
 const char*
 ReadMeshBuilderCL::Symbolic(const Uint id)
 {
@@ -1482,22 +1469,6 @@ BndCondT ReadMeshBuilderCL::MapBC( Uint gambit_bc)
       case  8: return Per2BC;           // periodic-shadow
       default: return UndefinedBC_;
     }
-}
-
-void EmptyReadMeshBuilderCL::build(MultiGridCL* mgp) const
-{
-    // Read the mesh file.
-    const_cast<EmptyReadMeshBuilderCL*>( this)->ReadFile(); // It is not useful that build is a
-                                                       // const member-function by inheritance.
-    nodes_.Check();
-    mfaces_.Check();
-    cells_.Check();
-
-    for (Uint i=0; i<numLevel_; ++i)
-        AppendLevel( mgp);
-
-    // Create boundary
-    base_::buildBoundaryImp(mgp);
 }
 
 /*******************************************************************
@@ -1728,7 +1699,7 @@ void FileBuilderCL::AddChildren() const
     CheckFile(child_file);
 }
 
-void FileBuilderCL::build(MultiGridCL* mgp) const
+void FileBuilderCL::build_ser_impl(MultiGridCL* mgp) const
 {
     AppendLevel(mgp);
     factory_ = new SimplexFactoryCL( this->GetVertices(mgp), this->GetEdges(mgp), this->GetFaces(mgp), this->GetTetras(mgp));
@@ -1946,7 +1917,7 @@ void FileBuilderCL::BuildFacesII(MultiGridCL* mgp) const
                 it->second.UpdateOwner(loadOfProc);
 }
 
-void FileBuilderCL::build(MultiGridCL* mgp) const
+void FileBuilderCL::build_ser_impl(MultiGridCL* mgp) const
 {
     AppendLevel(mgp);
     factory_ = new SimplexFactoryCL( this->GetVertices(mgp), this->GetEdges(mgp), this->GetFaces(mgp), this->GetTetras(mgp));

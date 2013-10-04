@@ -54,15 +54,8 @@ void BuildBrick( MultiGridCL*& mg)
     brick_info >> dx >> dy >> dz >> nx >> ny >> nz;
     Point3DCL orig, px, py, pz;
     px[0]= dx; py[1]= dy; pz[2]= dz;
-    MGBuilderCL* builder=0;
-    if ( ProcCL::IamMaster()){
-        builder = new BrickBuilderCL( orig, px, py, pz, nx, ny, nz);
-    }
-    else{
-        builder = new DROPS::EmptyBrickBuilderCL( orig, px, py, pz);
-    }
-    mg = new MultiGridCL( *builder);
-    delete builder;
+    BrickBuilderCL builder( orig, px, py, pz, nx, ny, nz);
+    mg = new MultiGridCL( builder);
 }
 
 

@@ -46,18 +46,11 @@ namespace DROPS{
 /// \brief Build a brick and tell parallel info class about the multigrid
 void BuildBrick( MultiGridCL*& mg)
 {
-    MGBuilderCL* builder=0;
     Point3DCL origin, e1, e2, e3;
     e1[0]= e2[1]= e3[2]= 1.;
-    if ( ProcCL::IamMaster()){
-        Uint ref[3]= { 1, 1, 1};
-        builder = new BrickBuilderCL( origin, e1, e2, e3, ref[0], ref[1], ref[2]);
-    }
-    else{
-        builder = new DROPS::EmptyBrickBuilderCL( origin, e1, e2, e3);
-    }
-    mg = new MultiGridCL( *builder);
-    delete builder;
+    Uint ref[3]= { 1, 1, 1};
+    BrickBuilderCL builder( origin, e1, e2, e3, ref[0], ref[1], ref[2]);
+    mg = new MultiGridCL( builder);
 }
 
 double DistToSphere( const Point3DCL& p, double)
@@ -263,7 +256,7 @@ void CheckMigration( LoadBalCL& lb)
     LsetBndDataCL* lsetbnddata= 0;
     BuildBoundaryData( &mg, lsetbnddata, perbndtypestr, zerobndfun, periodic_match);
     SurfaceTensionCL sft( DROPS::sigmaf);
-    LevelsetP2CL & lset( * LevelsetP2CL::Create( mg, *lsetbnddata, sf) );
+    LevelsetP2CL & lset( * LevelsetP2CL::Create( mg, *lsetbnddata, sft) );
 
     MLIdxDescCL* lidx= &lset.idx;
     lset.CreateNumbering( mg.GetLastLevel(), lidx);
