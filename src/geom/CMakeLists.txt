@@ -10,7 +10,7 @@ endif()
 target_link_libraries_par(geom-simplex parallel-parmultigrid geom-topo)
 target_link_libraries_par(geom-multigrid parallel-partime)
 
-target_link_libraries(geom-builder geom-boundary misc-utils)
+target_link_libraries(geom-builder geom-boundary misc-utils misc-params)
 target_link_libraries(geom-simplex geom-deformation num-unknowns)
 target_link_libraries(geom-geomselect geom-builder)
 target_link_libraries(geom-multigrid geom-simplex)

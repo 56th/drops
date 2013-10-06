@@ -390,24 +390,6 @@ int main (int argc, char** argv)
 
     DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
 
-    typedef DROPS::InstatStokes2PhaseP2P1CL    MyStokesCL;
-
-    int nx, ny, nz;
-    double dx, dy, dz;
-    std::string mesh( P.get<std::string>("DomainCond.MeshFile")), delim("x@");
-    size_t idx;
-    while ((idx= mesh.find_first_of( delim)) != std::string::npos )
-        mesh[idx]= ' ';
-    std::istringstream brick_info( mesh);
-    brick_info >> dx >> dy >> dz >> nx >> ny >> nz;
-    if (!brick_info)
-        DROPS::DROPSErrCL("error while reading geometry information: " + mesh);
-    P.put("Exp.RadInlet", dx/2);
-    DROPS::Point3DCL orig, px, py, pz;
-    px[0]= dx; py[1]= dy; pz[2]= dz;
-    orig= -0.5*(px+py+pz);
-    DROPS::BrickBuilderCL builder ( orig, px, py, pz, nx, ny, nz);
-
     const DROPS::BndCondT bc[6]=
         { DROPS::DirBC, DROPS::DirBC, DROPS::DirBC, DROPS::DirBC, DROPS::DirBC, DROPS::DirBC};
     const DROPS::StokesVelBndDataCL::bnd_val_fun bnd_fun[6]=
@@ -417,7 +399,10 @@ int main (int argc, char** argv)
     const DROPS::LsetBndDataCL::bnd_val_fun bfunls[6]= { 0,0,0,0,0,0};
     DROPS::LsetBndDataCL lsbnd( 6, bcls, bfunls);
 
-    MyStokesCL prob(builder, DROPS::TwoPhaseFlowCoeffCL(P), DROPS::StokesBndDataCL( 6, bc, bnd_fun));
+    std::auto_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P.get_child( "Domain")));
+
+    typedef DROPS::InstatStokes2PhaseP2P1CL MyStokesCL;
+    MyStokesCL prob( *builder, DROPS::TwoPhaseFlowCoeffCL(P), DROPS::StokesBndDataCL( 6, bc, bnd_fun));
 
     DROPS::MultiGridCL& mg = prob.GetMG();
 

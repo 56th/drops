@@ -25,7 +25,7 @@ exec_ser(sbuffer tests-sbuffer misc-utils)
 
 exec_ser(minres tests-minres misc-utils)
 
-exec_ser(meshreader geom-deformation geom-simplex geom-multigrid geom-topo num-unknowns geom-builder geom-boundary misc-utils out-output misc-problem num-interfacePatch num-fe)
+exec_ser(meshreader geom-deformation geom-simplex geom-multigrid geom-topo num-unknowns geom-builder geom-boundary misc-utils out-output misc-problem num-interfacePatch num-fe misc-params)
 
 exec_ser(restrictp2 geom-deformation geom-simplex geom-multigrid geom-topo out-output num-unknowns geom-builder misc-problem num-interfacePatch num-fe geom-boundary misc-utils)
 
@@ -37,7 +37,7 @@ exec_ser(quadbase tests-quadbase misc-utils geom-builder geom-deformation geom-s
 
 exec_ser(globallist tests-globallist misc-utils)
 
-exec_ser(serialization misc-utils misc-utils geom-builder geom-simplex geom-multigrid geom-deformation geom-boundary geom-topo num-unknowns out-output num-fe misc-problem num-interfacePatch)
+exec_ser(serialization misc-utils misc-params geom-builder geom-simplex geom-multigrid geom-deformation geom-boundary geom-topo num-unknowns out-output num-fe misc-problem num-interfacePatch)
 
 exec_ser(triang tests-triang misc-utils geom-builder geom-simplex geom-multigrid geom-boundary geom-topo num-unknowns geom-deformation misc-problem num-interfacePatch num-fe)
 
