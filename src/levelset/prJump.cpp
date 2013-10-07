@@ -245,7 +245,7 @@ void Strategy( InstatStokes2PhaseP2P1CL& Stokes, const LsetBndDataCL& lsbnd, Ada
     sigma= P.get<double>("SurfTens.SurfTension");
     SurfaceTensionCL sf( sigmaf, 0);
     // Levelset-Disc.: Crank-Nicholson
-    LevelsetP2CL lset( MG, lsbnd, sf, P.get<double>("Levelset.SD"), P.get<double>("Levelset.CurvDiff"));
+    LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsbnd, sf, P.get_child("Levelset")) );
 
 //    lset.SetSurfaceForce( SF_LB);
     lset.SetSurfaceForce( SF_ImprovedLB);
@@ -331,7 +331,7 @@ void Strategy( InstatStokes2PhaseP2P1CL& Stokes, const LsetBndDataCL& lsbnd, Ada
         adap.push_back( &PVel);
         UpdateProlongationCL<double> PPr ( Stokes.GetMG(), stokessolverfactory.GetPPr(), &Stokes.pr_idx, &Stokes.pr_idx);
         adap.push_back( &PPr);
-        UpdateProlongationCL<double> PLset( lset.GetMG(), lset.GetProlongation(), &lset.idx, &lset.idx);
+        UpdateProlongationCL<double> PLset( lset.GetMG(), lset.GetProlongation(), lset.idxC, lset.idxC);
         adap.push_back( &PLset);
         lset.UpdateMLPhi();
 
@@ -412,6 +412,7 @@ void Strategy( InstatStokes2PhaseP2P1CL& Stokes, const LsetBndDataCL& lsbnd, Ada
     if (P.get<int>("Ensight.EnsightOut")) ensight.Write();
 
     std::cout << std::endl;
+    delete &lset;
 }
 
 } // end of namespace DROPS

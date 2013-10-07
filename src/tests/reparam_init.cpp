@@ -215,13 +215,16 @@ int main( int argc, char **argv)
     const DROPS::BndCondT bcls[6]= { DROPS::NoBC, DROPS::NoBC, DROPS::NoBC, DROPS::NoBC, DROPS::NoBC, DROPS::NoBC };
     const DROPS::LsetBndDataCL::bnd_val_fun bfunls[6]= { 0,0,0,0,0,0};
     DROPS::LsetBndDataCL lsbnd( 6, bcls, bfunls);
-    LevelsetP2CL lset( mg, lsbnd, sf);
+    LevelsetP2CL & lset( * LevelsetP2CL::Create( mg, lsbnd, sf) ) ;
+
     lset.idx.CreateNumbering( mg.GetLastLevel(), mg);
     lset.Phi.SetIdx( &lset.idx);
 
     lset.Init( &sphere2_stat);
 
-    LevelsetP2CL lset_d( mg, lsbnd, sf);
+    LevelsetP2CL & lset_d( * LevelsetP2CL::Create( mg, lsbnd, sf) ) ;
+
+
     lset_d.idx.CreateNumbering( mg.GetLastLevel(), mg);
     lset_d.Phi.SetIdx( &lset_d.idx);
     lset_d.Init( &sphere_dist_stat);
@@ -244,7 +247,8 @@ int main( int argc, char **argv)
     ensight.Register( make_Ensight6Scalar( lset.GetSolution(),      "P2_Levelset",  ensf + "_p2.scl"));
     ensight.Register( make_Ensight6Scalar( lset_d.GetSolution(),  "Dist",     ensf + "_dist.scl"));
 
-    LevelsetP2CL lset_rep( mg, lsbnd, sf);
+    LevelsetP2CL & lset_rep( * LevelsetP2CL::Create( mg, lsbnd, sf) ) ;
+
     lset_rep.idx.CreateNumbering( mg.GetLastLevel(), mg);
     lset_rep.Phi.SetIdx( &lset_rep.idx);
     lset_rep.Init( &sphere2_stat);
@@ -259,6 +263,9 @@ int main( int argc, char **argv)
     std::cout << "sup of gradient-difference on \\Gamma_h: " << "\n"
     		  << "f2 : "<<facet_sup_norm( mg, lset_rep.Phi, lset_rep.GetBndData()) << std::endl;
     // CheckSigns ( mg, lset_rep.Phi, &lset.Phi);
+    delete &lset;
+    delete &lset_d;
+    delete &lset_rep;
   }
   catch( DROPSErrCL d) {
       d.handle();

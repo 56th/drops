@@ -88,6 +88,20 @@
                                                 // discretization of the Navier-Stokes and level set equations.
                                                 // Theta = 0 yields the explicit and Theta = 1 the implicit
                                                 // Euler method. Theta = 0.5 results in the Crank-Nicholson scheme.
+                "Discontinuous":        0,
+
+                "BoundaryType":         "98!98!98!98!98!98",     // List of boundary types separated by a !.
+                                                           // Each defining a boundary type for one boundary
+                                                           // domain ( The following indices may be used:
+                                                           //          Dir0BC= 0, DirBC= 2, Per1BC= 13,
+                                                           //          Per2BC= 11, Nat0BC= 21, NatBC= 23,
+                                                           //          NoBC= 98, UndefinedBC_= 99        ).
+                "BoundaryFncs":         "Zero!Zero!Zero!Zero!Zero!Zero",
+                                                           // List of boundary functions separated by a !.
+                                                           // Each string defines a function which is taken
+                                                           // from a function container during runtime.
+
+
                "Downwind":
                 {
                         "Frequency": 0,         // 0 disables downwind-numbering
@@ -221,6 +235,7 @@
                 "VTKDir":               "vtk",             // local directory for VTK files.
                 "VTKName":              "risingdroplet",   // name of VTK files
                 "AddP1XPressure":       1,                 // pressure output as p1 on neg. and p1 on pos. part      
+                "AddDGOutput":          1,                 // additional VTK file(s) for levelset dg 
                 "Binary":               1                  // write out VTK files in binary format.
         },
 

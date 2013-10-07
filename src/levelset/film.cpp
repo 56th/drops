@@ -254,6 +254,7 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
                                  P.get<std::string>("VTK.TimeFileName"),
                                  P.get<int>("VTK.Binary"),
                                  P.get<int>("VTK.UseOnlyP1"),
+                                 false,
                                  -1,  /* <- level */
                                  P.get<int>("VTK.ReUseTimeFile"),
                                  P.get<int>("VTK.UseDeformation"));
@@ -511,8 +512,7 @@ int main (int argc, char** argv)
 
     sigma= prob.GetCoeff().SurfTens;
     DROPS::SurfaceTensionCL sf( sigmaf, 0);
-    DROPS::LevelsetP2CL lset( *mgp, DROPS::LsetBndDataCL( 6, bc_ls),
-        sf, P.get<double>("Levelset.SD"), P.get<double>("Levelset.CurvDiff"));
+    DROPS::LevelsetP2CL & lset( * DROPS::LevelsetP2CL::Create( *mgp, DROPS::LsetBndDataCL( 6, bc_ls), sf, P.get_child("Levelset")) );
 
     for (DROPS::BndIdxT i=0, num= bnd.GetNumBndSeg(); i<num; ++i)
     {
@@ -539,7 +539,7 @@ int main (int argc, char** argv)
     double min= prob.p.Data.min(),
            max= prob.p.Data.max();
     std::cout << "pressure min/max: "<<min<<", "<<max<<std::endl;
-
+    delete &lset;
     return 0;
   }
   catch (DROPS::DROPSErrCL err) { err.handle(); }

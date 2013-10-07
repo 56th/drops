@@ -50,7 +50,7 @@ class SurfTensAccumulatorCL : public TetraAccumulatorCL
 
   public:
     SurfTensAccumulatorCL( const LevelsetP2CL& ls, VecDescCL& f_Gamma)
-     : SmPhi_(ls.Phi), lsetbnd_(ls.GetBndData()), f(f_Gamma)
+     : SmPhi_(*ls.PhiC), lsetbnd_(ls.GetBndData()), f(f_Gamma)
     { ls.MaybeSmooth( SmPhi_.Data); }
 
     void begin_accumulation ()
@@ -687,8 +687,14 @@ void YoungForceAccumulatorCL::visit ( const TetraCL& t)
 //                               LevelsetP2CL
 //*****************************************************************************
 
-void LevelsetP2CL::Init( instat_scalar_fun_ptr phi0, double t)
-{
+void LevelsetP2ContCL::UpdateContinuous( ){ ; }
+void LevelsetP2ContCL::UpdateDiscontinuous( ) { ; }
+
+// setting inital values for level set function in case of continuous P2 FE
+// via interpolation
+void LevelsetP2ContCL::Init( instat_scalar_fun_ptr phi0)
+{   
+    double t= 0.;
     const Uint lvl= Phi.GetLevel(),
                idx= Phi.RowIdx->GetIdx();
 
@@ -707,6 +713,216 @@ void LevelsetP2CL::Init( instat_scalar_fun_ptr phi0, double t)
 }
 
 
+void LevelsetP2DiscontCL::UpdateContinuous( )
+{
+    ApplyClementInterpolation();
+}
+
+
+void LevelsetP2DiscontCL::UpdateDiscontinuous( )
+{
+    ProjectContinuousToDiscontinuous();
+}
+
+
+void LevelsetP2DiscontCL::ProjectContinuousToDiscontinuous()
+{
+
+    Phi.t = PhiC->t;  
+
+    const Uint lvl= Phi.GetLevel(), idx= PhiC->RowIdx->GetIdx();
+    const Uint didx = Phi.RowIdx->GetIdx();
+
+    // Phi.Data =0.;
+    
+    DROPS_FOR_TRIANG_TETRA(MG_,lvl,tet){
+        for (int i=0; i <4; ++i){
+            if (tet->GetVertex(i)->Unknowns.Exist(idx))
+            {
+                Phi.Data[tet->Unknowns(didx)+i] = PhiC->Data[(*tet).GetVertex(i)->Unknowns(idx)];
+            }
+            else
+                throw DROPSErrCL("Projections not implemented for levelset non-trivial-bnds");
+        }
+        for (int i =0; i<6; ++i)
+        {
+            if (tet->GetEdge(i)->Unknowns.Exist(idx))
+            {
+                Phi.Data[tet->Unknowns(didx)+4+i] = PhiC->Data[(*tet).GetEdge(i)->Unknowns(idx)];
+            }
+            else
+                throw DROPSErrCL("Projections not implemented for levelset non-trivial-bnds");
+        }
+    
+    }
+}
+
+// setting inital values for level set function in case of discontinuous P2 FE
+// via elementwise L2-projection
+void LevelsetP2DiscontCL::InitProjection( instat_scalar_fun_ptr phi0)
+{
+// local mass matrix and its QR decomposition are computet on reference element only
+    Uint idx_num = idx.GetIdx();
+    Uint lvl = idx.TriangLevel();
+    QRDecompCL<10> localmass;
+    SMatrixCL<10,10> & localmassm = localmass.GetMatrix();
+    SVectorCL<10> sol;
+    LocalP2CL<> lp2[10];
+    Quad5CL<> lp2q[10];
+
+    for(int i=0; i<10; ++i)
+    {
+        lp2[i][i] = 1.0;
+        lp2q[i].assign(lp2[i]);
+    }
+    for(int i=0; i<10; ++i)
+        for(int j=0; j<=i; ++j)
+        {
+            localmassm(i,j) = Quad5CL<>(lp2q[i]*lp2q[j]).quad(1.0);
+            localmassm(j,i) = localmassm(i,j);
+        }
+    localmass.prepare_solve();
+
+    DROPS_FOR_TRIANG_TETRA(MG_,lvl,sit)
+    {
+        Uint first = sit->Unknowns(idx_num);
+        Quad5CL<> f_q5(*sit, phi0);
+        for(int i=0; i<10; ++i)
+            sol[i] = Quad5CL<>(f_q5*lp2q[i]).quad(1.0);
+        localmass.Solve(sol);
+        for(int i=0; i<10; ++i){
+            Phi.Data[first++] = sol[i];
+        }
+    }
+
+    UpdateContinuous();
+
+}
+
+void LevelsetP2DiscontCL::Init( instat_scalar_fun_ptr phi0)
+{
+    double t= 0.;
+    Uint idx_num = idx.GetIdx();
+    Uint lvl = idx.TriangLevel();
+    SVectorCL<10> sol;
+    DROPS_FOR_TRIANG_TETRA(MG_,lvl,sit) // sit is tetra
+    {
+        for (int i=0; i <4; ++i)
+        {
+          sol[i] = phi0((*sit).GetVertex(i)-> GetCoord(), t);
+        }
+        for (int i =0; i<6; ++i)
+        {
+            sol[i+4] = phi0(GetBaryCenter(*(*sit).GetEdge(i)), t);
+        }
+        Uint first = sit->Unknowns(idx_num);
+        for(int i=0; i<10; ++i){
+            Phi.Data[first++] =sol[i];
+        }
+    }
+    
+    ApplyClementInterpolation(); 
+}
+
+
+void LevelsetP2DiscontCL::ApplyZeroOrderClementInterpolation()
+{
+    // PhiC->Data.resize(
+    PhiC->t = Phi.t;  
+    const Uint lvl= Phi.GetLevel(), idx= PhiC->RowIdx->GetIdx();
+    double tetvol;
+    const Uint didx = Phi.RowIdx->GetIdx();
+    PhiC->Data =0.;
+    VectorCL vols(PhiC->Data);
+    vols =0.;
+    
+    std::cout << PhiC->Data.size() << std::endl;
+    DROPS_FOR_TRIANG_TETRA(MG_,lvl,tet){
+        tetvol = (*tet).GetVolume();
+        for (int i=0; i <4; ++i){
+            if (tet->GetVertex(i)->Unknowns.Exist(idx))
+            {
+                PhiC->Data[(*tet).GetVertex(i)->Unknowns(idx)] += Phi.Data[tet->Unknowns(didx)+i]*tetvol;
+                vols[(*tet).GetVertex(i)->Unknowns(idx)] += tetvol;
+            }
+        }
+        for (int i =0; i<6; ++i)
+        {
+            if (tet->GetEdge(i)->Unknowns.Exist(idx))
+            {
+                PhiC->Data[(*tet).GetEdge(i)->Unknowns(idx)] += Phi.Data[tet->Unknowns(didx)+i+4]*tetvol;
+                vols[(*tet).GetEdge(i)->Unknowns(idx)] += tetvol;
+            }
+        }
+    
+    }
+    for (Uint i=0; i<vols.size(); ++i){
+        PhiC->Data[i] /= vols[i];
+    }
+}
+ 
+void evaluate_polys(std::valarray<double>& q, const DROPS::QuadDomainCL& qdom, const Point3DCL& v, int j, const TetraCL& tet)
+{
+    Uint E[10][3] = {{0,0,0},{1,0,0},{0,1,0},{0,0,1},{2,0,0},{1,1,0},{0,2,0},{1,0,1},{0,1,1},{0,0,2}};
+    q.resize(qdom.vertex_size());
+    QuadDomainCL::const_vertex_iterator qit = qdom.vertex_begin();
+    Point3DCL quadp;
+    
+    for (Uint k=0; k< qdom.vertex_size(); ++k, ++qit){
+        quadp = GetWorldCoord(tet, *qit)-v;
+        q[k] = pow(quadp[0],E[j][0])*pow(quadp[1],E[j][1])*pow(quadp[2],E[j][2]);
+    }
+}
+
+void LevelsetP2DiscontCL::ApplyClementInterpolation() //LevelsetP2DiscontCL& discontls
+{
+    PhiC->SetIdx( idxC );
+
+    PhiC->t = Phi.t;  
+    const Uint lvl= PhiC->GetLevel(), idx= PhiC->RowIdx->GetIdx();
+    PhiC->Data =0.;
+    const IdxT num_unks= PhiC->RowIdx->NumUnknowns();
+    LocalP2CL<> phiD;
+    std::vector< SMatrixCL<10,10> > mat(num_unks);
+    std::vector< SVectorCL<10> > rhs(num_unks);
+    std::valarray<double> q[10], qphiD;
+    QuadDomainCL qdom;
+    double absdet;
+    Point3DCL v;
+    const TetraSignEnum s= AllTetraC;
+    
+    DROPS_FOR_TRIANG_TETRA(MG_,lvl,tet){// set up local matrices and right hand sides for each dof of the continuous P2-fct
+        absdet = 6.*(*tet).GetVolume();
+        phiD.assign(*tet,Phi,GetBndData());
+        make_SimpleQuadDomain<Quad5DataCL>(qdom, s); 
+        resize_and_evaluate_on_vertexes (phiD,qdom,qphiD); //<LocalP2CL, QuadDomainCL, std::valarray<double> >
+    
+        for (int i=0; i<10; ++i){ // Dofs
+            v = i<4? (tet->GetVertex(i))->GetCoord() : GetBaryCenter(*(*tet).GetEdge(i-4));
+            const Uint dofi = i<4 ?  (*tet).GetVertex(i)->Unknowns(idx) : (*tet).GetEdge(i-4)->Unknowns(idx);
+            for (int j=0; j<10; ++j) // polys
+                evaluate_polys(q[j], qdom, v, j, *tet);
+            for (int k=0; k<10; ++k){
+                rhs[dofi][k] += quad(qphiD*q[k],absdet,qdom);
+                for (int l=0; l<10; ++l)
+                    mat[dofi](l,k) += quad(q[l]*q[k],absdet,qdom);
+
+            }
+        }
+    }
+    // solve local 10x10-systems
+    QRDecompCL<10> localmat;
+    SMatrixCL<10,10> & localm = localmat.GetMatrix();
+    SVectorCL<10> sol;
+    for (Uint i=0; i<num_unks; ++i){
+        localm = mat[i];
+        sol = rhs[i];
+        localmat.prepare_solve();
+        localmat.Solve(sol);
+        PhiC->Data[i] = sol[0];
+    }
+}
+ 
 void LevelsetP2CL::CreateNumbering( Uint level, MLIdxDescCL* idx, match_fun match)
 {
     idx->CreateNumbering( level, MG_, BndData_, match);
@@ -718,8 +934,9 @@ void LevelsetP2CL::Reparam( int method, bool Periodic)
     \param Periodic: If true, a special variant of the algorithm for periodic boundaries is used.
 */
 {
-    std::auto_ptr<ReparamCL> reparam= ReparamFactoryCL::GetReparam( MG_, Phi, method, Periodic, &BndData_, perDirections);
+    std::auto_ptr<ReparamCL> reparam= ReparamFactoryCL::GetReparam( MG_, *PhiC, method, Periodic, &BndData_, perDirections);
     reparam->Perform();
+    UpdateDiscontinuous();
 }
 
 void LevelsetP2CL::AccumulateBndIntegral( VecDescCL& f) const
@@ -936,9 +1153,9 @@ void LevelsetP2CL::GetMaxMinGradPhi(double& maxGradPhi, double& minGradPhi) cons
     {
         GetTrafoTr( T, det, *it);
         P2DiscCL::GetGradients( Grad, GradRef, T); // Gradienten auf aktuellem Tetraeder
-        patch.Init( *it, Phi, BndData_);
+        patch.Init( *it, *PhiC, BndData_);
 
-        // compute maximal norm of grad Phi
+        // compute maximal norm of grad *PhiC
         Quad2CL<Point3DCL> gradPhi;
         for (int v=0; v<10; ++v) // init gradPhi, Coord
             gradPhi+= patch.GetPhi(v)*Grad[v];
@@ -956,6 +1173,31 @@ void LevelsetP2CL::GetMaxMinGradPhi(double& maxGradPhi, double& minGradPhi) cons
     minGradPhi= ProcCL::GlobalMin( minNorm= minGradPhi);
 #endif
 }
+
+// Creates new Levelset-Object, has to be cleaned manually
+LevelsetP2CL * LevelsetP2CL::Create(  MultiGridCL& MG, const LsetBndDataCL& lsetbnddata, SurfaceTensionCL& sf, const ParamCL & P)
+{
+    LevelsetP2CL * plset;
+    if (P.get<int>("Discontinuous") <= 0)
+        plset = new LevelsetP2ContCL ( MG, lsetbnddata, sf, P.get<double>("SD"), P.get<double>("CurvDiff"));
+    else 
+        plset = new LevelsetP2DiscontCL ( MG, lsetbnddata, sf, P.get<double>("SD"), P.get<double>("CurvDiff"));
+    return plset;
+}
+
+// Creates new Levelset-Object, has to be cleaned manually
+LevelsetP2CL * LevelsetP2CL::Create(  MultiGridCL& MG, const LsetBndDataCL& lsetbnddata, SurfaceTensionCL& sf, bool discontinuous, double SD, double curvdiff)
+{
+    LevelsetP2CL * plset;
+    if (!discontinuous)
+        plset = new LevelsetP2ContCL ( MG, lsetbnddata, sf, SD, curvdiff);
+    else 
+        plset = new LevelsetP2DiscontCL ( MG, lsetbnddata, sf, SD, curvdiff);
+    return plset;
+}
+
+
+
 
 void LevelsetP2CL::SetNumLvl( size_t n)
 {
@@ -979,20 +1221,46 @@ LevelsetRepairCL::post_refine ()
 /// Do all things to complete the repairing of the FE level-set function
 {
     VecDescCL loc_phi;
-    MLIdxDescCL loc_lidx( P2_FE, ls_.idx.size());
-    VecDescCL& phi= ls_.Phi;
+    MLIdxDescCL loc_lidx( P2_FE, ls_.idxC->size());
+    VecDescCL& phiC= *ls_.PhiC;
     match_fun match= ls_.GetMG().GetBnd().GetMatchFun();
 
     loc_lidx.CreateNumbering( ls_.GetMG().GetLastLevel(), ls_.GetMG(), ls_.GetBndData(), match);
     loc_phi.SetIdx( &loc_lidx);
 
-    p2repair_->repair( loc_phi);
+    if (ls_.IsDiscontinuous())
+    {
+        // LevelsetP2DiscontCL & lsD = dynamic_cast<LevelsetP2DiscontCL&>(ls_);
+        VecDescCL& phiD= ls_.Phi;
+        VecDescCL loc_phiD;
+        MLIdxDescCL loc_ldidx( P2D_FE, ls_.idx.size());
+        ls_.CreateNumbering( ls_.GetMG().GetLastLevel(), &loc_ldidx, match);
+        loc_phiD.SetIdx( &loc_ldidx);
+        p2repair_->repair( loc_phiD);
 
-    phi.Clear( phi.t);
-    ls_.idx.DeleteNumbering( ls_.GetMG());
-    ls_.idx.swap( loc_lidx);
-    phi.SetIdx( &ls_.idx);
-    phi.Data= loc_phi.Data;
+        phiD.Clear( phiD.t);
+        ls_.DeleteNumbering( &ls_.idx);
+        ls_.idx.swap( loc_ldidx);
+
+        phiD.SetIdx( &ls_.idx);
+        phiD.Data= loc_phiD.Data;
+
+    }
+    else
+    {
+        p2repair_->repair( loc_phi);
+    }
+
+    phiC.Clear( phiC.t);
+    ls_.DeleteNumbering( ls_.idxC );
+    ls_.idxC->swap( loc_lidx);
+
+    phiC.SetIdx( ls_.idxC);
+
+    if (!ls_.IsDiscontinuous())
+        phiC.Data= loc_phi.Data;
+
+    ls_.UpdateContinuous();
 }
 
 } // end of namespace DROPS

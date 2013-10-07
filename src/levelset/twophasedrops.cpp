@@ -197,8 +197,9 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     }
     SurfaceTensionCL sf( sigmap);
 
-    LevelsetP2CL lset( MG, lsetbnddata, sf, P.get<double>("Levelset.SD"), P.get<double>("Levelset.CurvDiff"));
-
+    // Creates new Levelset-Object, has to be cleaned manually
+    LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsetbnddata, sf, P.get_child("Levelset")) );
+  
     lset.SetYoungAngle(the_Young_angle);//set Young's Contact angle on the solid boundary
     lset.SetBndOutNormal(the_Bnd_outnormal);//set outnormal of the domain boundary
     if (is_periodic) //CL: Anyone a better idea? perDirection from ParameterFile?
@@ -250,14 +251,27 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         Stokes.SetNumPrLvl  ( Stokes.GetMG().GetNumLevel());
         lset.SetNumLvl(Stokes.GetMG().GetNumLevel());
     }
-
     lset.CreateNumbering( MG.GetLastLevel(), lidx, periodic_match);
     lset.Phi.SetIdx( lidx);
+
+    if (lset.IsDiscontinuous())
+    {
+        LevelsetP2DiscontCL& lsetD (dynamic_cast<LevelsetP2DiscontCL&>(lset)); 
+        MLIdxDescCL* lidxc = lsetD.idxC;
+        lsetD.CreateNumbering( MG.GetLastLevel(), lidxc, periodic_match);
+        lsetD.PhiContinuous.SetIdx( lidxc);
+    }
+
     PermutationT lset_downwind;
     if (P.get<double>("SurfTens.VarTension"))
         lset.SetSurfaceForce( SF_ImprovedLBVar);
     else
         lset.SetSurfaceForce( SF_ImprovedLB);
+
+    if ( StokesSolverFactoryHelperCL().VelMGUsed(P))
+        Stokes.SetNumVelLvl ( Stokes.GetMG().GetNumLevel());
+    if ( StokesSolverFactoryHelperCL().PrMGUsed(P))
+        Stokes.SetNumPrLvl  ( Stokes.GetMG().GetNumLevel());
 
     SetInitialLevelsetConditions( lset, MG, P);
 
@@ -340,13 +354,13 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     }
 
     /// \todo rhs beruecksichtigen
-    SurfactantcGP1CL surfTransp( MG, Stokes.GetBndData().Vel, P.get<double>("SurfTransp.Theta"), P.get<double>("SurfTransp.Visc"), &Stokes.v, lset.Phi, lset.GetBndData(),
+    SurfactantcGP1CL surfTransp( MG, Stokes.GetBndData().Vel, P.get<double>("SurfTransp.Theta"), P.get<double>("SurfTransp.Visc"), &Stokes.v, *lset.PhiC, lset.GetBndData(),
                                  P.get<double>("Time.StepSize"), P.get<int>("SurfTransp.Iter"), P.get<double>("SurfTransp.Tol"), P.get<double>("SurfTransp.OmitBound"));
-    InterfaceP1RepairCL surf_repair( MG, lset.Phi, lset.GetBndData(), surfTransp.ic);
+    InterfaceP1RepairCL surf_repair( MG, *lset.PhiC, lset.GetBndData(), surfTransp.ic);
     if (P.get("SurfTransp.DoTransp", 0))
     {
         adap.push_back( &surf_repair);
-        surfTransp.idx.CreateNumbering( MG.GetLastLevel(), MG, &lset.Phi, &lset.GetBndData());
+        surfTransp.idx.CreateNumbering( MG.GetLastLevel(), MG, lset.PhiC, &lset.GetBndData());
         std::cout << "Surfactant transport: NumUnknowns: " << surfTransp.idx.NumUnknowns() << std::endl;
         surfTransp.ic.SetIdx( &surfTransp.idx);
         surfTransp.Init( inscamap["surf_sol"]);
@@ -386,7 +400,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     adap.push_back( &PVel);
     UpdateProlongationCL<double> PPr ( Stokes.GetMG(), stokessolverfactory.GetPPr(), &Stokes.pr_idx, &Stokes.pr_idx);
     adap.push_back( &PPr);
-    UpdateProlongationCL<double> PLset( lset.GetMG(), lset.GetProlongation(), &lset.idx, &lset.idx);
+    UpdateProlongationCL<double> PLset( lset.GetMG(), lset.GetProlongation(), lset.idxC, lset.idxC);
     adap.push_back( &PLset);
     Stokes.P_ = stokessolverfactory.GetPVel();
 
@@ -474,13 +488,14 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
                                  P.get<std::string>("VTK.TimeFileName"),
                                  P.get<int>("VTK.Binary"),
                                  P.get<int>("VTK.UseOnlyP1"),
+                                 false,
                                  -1,  /* <- level */
                                  P.get<int>("VTK.ReUseTimeFile"),
                                  P.get<int>("VTK.UseDeformation"));
         vtkwriter->Register( make_VTKVector( Stokes.GetVelSolution(), "velocity") );
         vtkwriter->Register( make_VTKScalar( Stokes.GetPrSolution(), "pressure") );
         if (P.get<int>("VTK.AddP1XPressure",0) && Stokes.UsesXFEM())
-            vtkwriter->Register( make_VTKP1XScalar( MG, lset.Phi, Stokes.p, "xpressure"));
+            vtkwriter->Register( make_VTKP1XScalar( MG, *lset.PhiC, Stokes.p, "xpressure"));
         vtkwriter->Register( make_VTKScalar( lset.GetSolution(), "level-set") );
 
         if (massTransp) {
@@ -493,17 +508,32 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         vtkwriter->Write(Stokes.v.t);
     }
 
-    // if (P.get("Restart.Serialization", 0))
-    //     ser.Write();
+    VTKOutCL * dgvtkwriter = NULL;
+    if ((P.get<int>("Levelset.Discontinuous")&&(P.get<int>("VTK.VTKOut",0))&&(P.get<int>("VTK.AddDGOutput",0))))
+    {
+        dgvtkwriter = new VTKOutCL(adap.GetMG(), "DROPS data",
+                                   P.get<int>("Time.NumSteps")/P.get("VTK.VTKOut", 0)+1,
+                                   P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName")+"_dg",
+                                   P.get<std::string>("VTK.TimeFileName"),
+                                   P.get<int>("VTK.Binary"),
+                                   false, /*onlyP1*/
+                                   true, /*P2DG*/
+                                   -1, /*,-level*/
+                                   P.get<int>("VTK.ReUseTimeFile") + "_dg");
+        dgvtkwriter->Register( make_VTKScalar( dynamic_cast<LevelsetP2DiscontCL&>(lset).GetDSolution(), "dg-level-set") );
+        dgvtkwriter->Write(Stokes.v.t);
+    }
 
     const int nsteps = P.get<int>("Time.NumSteps");
     const double dt = P.get<double>("Time.StepSize");
     std::ofstream out("spreadinfo.txt");
     out<<"time: "<<" angle: "<<" radius: "<<std::endl;
     out<<" "<<0<<"  "<<1.5707963<<"  "<<P.get<DROPS::Point3DCL>("Exp.RadDrop")[0]<<std::endl;
+    double time = 0.0;
     for (int step= 1; step<=nsteps; ++step)
     {
         std::cout << "============================================================ step " << step << std::endl;
+        time += dt;
         const double time_old = Stokes.v.t;
         const double time_new = Stokes.v.t + dt;
         IFInfo.Update( lset, Stokes.GetVelSolution());
@@ -515,7 +545,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         if (P.get("SurfTransp.DoTransp", 0)) {
             surfTransp.DoStep( time_new);
             BndDataCL<> ifbnd( 0);
-            std::cout << "surfactant on \\Gamma: " << Integral_Gamma( MG, lset.Phi, lset.GetBndData(), make_P1Eval(  MG, ifbnd, surfTransp.ic)) << '\n';
+            std::cout << "surfactant on \\Gamma: " << Integral_Gamma( MG, *lset.PhiC, lset.GetBndData(), make_P1Eval(  MG, ifbnd, surfTransp.ic)) << '\n';
         }
 		
 		Stokes.CheckOnePhaseSolution( &Stokes.v, &Stokes.p, Stokes.Coeff_.RefVel, Stokes.Coeff_.RefGradPr);
@@ -563,6 +593,8 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         if (ensight && step%P.get("Ensight.EnsightOut", 0)==0)
             ensight->Write( time_new);
 #endif
+        if (dgvtkwriter && step%P.get("VTK.VTKOut", 0)==0)
+            dgvtkwriter->Write( time_new);
         if (vtkwriter && step%P.get("VTK.VTKOut", 0)==0)
             vtkwriter->Write( time_new);
         if (P.get("Restart.Serialization", 0) && step%P.get("Restart.Serialization", 0)==0)
@@ -575,13 +607,16 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     delete navstokessolver;
     delete stokessolver;
     delete gm;
+    delete &lset;
     if (massTransp) delete massTransp;
     if (transprepair) delete transprepair;
 #ifndef _PAR
     if (ensight) delete ensight;
 #endif
     if (vtkwriter) delete vtkwriter;
+    if (dgvtkwriter) delete dgvtkwriter;
     if (infofile) delete infofile;
+
 //     delete stokessolver1;
 }
 
@@ -595,12 +630,15 @@ void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<int>("VTK.ReUseTimeFile",0);
     P.put_if_unset<int>("VTK.UseDeformation",0);
     P.put_if_unset<int>("VTK.UseOnlyP1",0);
+    P.put_if_unset<int>("VTK.AddP1XPressure",0);
+    P.put_if_unset<int>("VTK.AddDGOutput",0);
     P.put_if_unset<int>("Transp.DoTransp",0);
     P.put_if_unset<std::string>("Restart.Inputfile","none");
     P.put_if_unset<int>("NavStokes.Downwind.Frequency", 0);
     P.put_if_unset<double>("NavStokes.Downwind.MaxRelComponentSize", 0.05);
     P.put_if_unset<double>("NavStokes.Downwind.WeakEdgeRatio", 0.2);
     P.put_if_unset<double>("NavStokes.Downwind.CrosswindLimit", std::cos( M_PI/6.));
+    P.put_if_unset<int>("Levelset.Discontinuous", 0);
     P.put_if_unset<int>("Levelset.Downwind.Frequency", 0);
     P.put_if_unset<double>("Levelset.Downwind.MaxRelComponentSize", 0.05);
     P.put_if_unset<double>("Levelset.Downwind.WeakEdgeRatio", 0.2);

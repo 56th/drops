@@ -172,7 +172,9 @@ void ApplyToTestFct( InstatStokes2PhaseP2P1CL& Stokes, const LsetBndDataCL& lsbn
     MultiGridCL& MG= Stokes.GetMG();
     const double curv= 2/P.get<DROPS::Point3DCL>("Exp.RadDrop")[0];
     SurfaceTensionCL sf( sigmaf, 0);
-    LevelsetP2CL lset( MG, lsbnd, sf, P.get<double>("Levelset.SD"), /*CurvDiff*/ -1.);
+
+    LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsbnd, sf, P.get_child("Levelset")) );
+
 //    lset.SetSurfaceForce( SF_Const);
 
     MLIdxDescCL* lidx= &lset.idx;
@@ -250,6 +252,7 @@ void ApplyToTestFct( InstatStokes2PhaseP2P1CL& Stokes, const LsetBndDataCL& lsbn
     for (size_t i=0; i<errVec.size(); ++i)
         std::cout << errVec[i] << ",\t";
     std::cout << "\n\n";
+    delete &lset;
 }
 
 void Compare_LaplBeltramiSF_ConstSF( InstatStokes2PhaseP2P1CL& Stokes, const LsetBndDataCL& lsbnd)
@@ -262,7 +265,8 @@ void Compare_LaplBeltramiSF_ConstSF( InstatStokes2PhaseP2P1CL& Stokes, const Lse
     // Levelset-Disc.: Crank-Nicholson
     const double curv= 2/P.get<DROPS::Point3DCL>("Exp.RadDrop")[0];
     SurfaceTensionCL sf( sigmaf, 0);
-    LevelsetP2CL lset( MG, lsbnd, sf, P.get<double>("Levelset.SD"), /*CurvDiff*/ -1.);
+    LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsbnd, sf, P.get_child("Levelset")) );
+
 
     MLIdxDescCL* lidx= &lset.idx;
     MLIdxDescCL* vidx= &Stokes.vel_idx;
@@ -325,6 +329,7 @@ void Compare_LaplBeltramiSF_ConstSF( InstatStokes2PhaseP2P1CL& Stokes, const Lse
     const double sup2= std::sqrt(dot( MA_inv_d, d));
     std::cout << "\n\nsup |f1(v)-f2(v)|/||v||_1 = \t\t" << sup2
               << "\n|(MA)^-1 d| = " << norm( MA_inv_d) << std::endl;
+    delete &lset;
 }
 
 } // end of namespace DROPS

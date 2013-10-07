@@ -278,10 +278,12 @@ int main (int argc, char** argv)
 
     DROPS::instat_scalar_fun_ptr sigma (0);
     DROPS::SurfaceTensionCL sf( sigma, 0);
-    DROPS::LevelsetP2CL lset( mg, lsbnd, sf);
+    DROPS::LevelsetP2CL & lset( * DROPS::LevelsetP2CL::Create( mg, lsbnd, sf) );
+
     lset.idx.CreateNumbering( mg.GetLastLevel(), mg);
     lset.Phi.SetIdx( &lset.idx);
     Strategy( adap, lset);
+    delete &lset;
   }
   catch (DROPS::DROPSErrCL err) { err.handle(); }
 }

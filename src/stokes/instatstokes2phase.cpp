@@ -239,7 +239,7 @@ void System2Accumulator_P2P1XCL::visit (const TetraCL& tet)
 
     partition_.make_partition<SortedVertexPolicyCL, MergeCutPolicyCL>( lat, ls_loc_);
     make_CompositeQuad2Domain( q2dom_, partition_);
-    local_p2_lset.assign(tet, lset_.Phi, lset_.GetBndData());
+    local_p2_lset.assign(tet, *lset_.PhiC, lset_.GetBndData());
 
     local_setup(tet);
     update_global_system();
@@ -373,7 +373,7 @@ void SetupSystem2_P2RP1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL&, con
             }
         }
         // now handle extended dofs
-        loc_phi.assign( *sit, lset.Phi, lset.GetBndData());
+        loc_phi.assign( *sit, *lset.PhiC, lset.GetBndData());
         cut.Init( *sit, loc_phi);
         if (!cut.Intersects()) continue; // extended basis functions have only support on tetra intersecting Gamma!
 
@@ -494,7 +494,7 @@ void SetupSystem2_P2RP1( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL&, cons
             }
         }
         // now handle extended dofs
-        loc_phi.assign( *sit, lset.Phi, lset.GetBndData());
+        loc_phi.assign( *sit, *lset.PhiC, lset.GetBndData());
         cut.Init( *sit, loc_phi);
         if (!cut.Intersects()) continue; // extended basis functions have only support on tetra intersecting Gamma!
 
@@ -710,7 +710,7 @@ void SetupRhs2_P2P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL&, const S
 
         GetTrafoTr( T, det, *sit);
         absdet= std::fabs( det);
-        cut.Init( *sit, lset.Phi, lset.GetBndData());
+        cut.Init( *sit, *lset.PhiC, lset.GetBndData());
         const bool nocut= !cut.Intersects();
 
         // Setup B:   b(i,j) =  -\int psi_i * div( phi_j)
@@ -913,7 +913,7 @@ void PrMassAccumulator_P1CL::visit (const TetraCL& sit)
 {
     const ExtIdxDescCL& Xidx= RowIdx.GetXidx();
     const double absdet= sit.GetVolume()*6.;
-    loc_phi.assign( sit, lset.Phi, lset.GetBndData());
+    loc_phi.assign( sit, *lset.PhiC, lset.GetBndData());
     cut.Init( sit, loc_phi);
     const bool nocut= !cut.Intersects();
     GetLocalNumbP1NoBnd( prNumb, sit, RowIdx);
@@ -2401,7 +2401,7 @@ InstatStokes2PhaseP2P1CL::system1_accu (MLTetraAccumulatorTupleCL& accus, MLMatD
     for (size_t lvl= 0; lvl < A->Data.size(); ++lvl, ++itA, ++itM, ++it, ++itaccu, ++itLset)
         switch (it->GetFE()) {
           case vecP2_FE:
-            itaccu->push_back_acquire( new System1Accumulator_P2CL( GetCoeff(), GetBndData(), lvl == A->Data.size()-1 ? lset.Phi : *itLset, lset.GetBndData(),
+            itaccu->push_back_acquire( new System1Accumulator_P2CL( GetCoeff(), GetBndData(), lvl == A->Data.size()-1 ? *lset.PhiC : *itLset, lset.GetBndData(),
                 *it, *itA, *itM, lvl == A->Data.size() - 1 ? b : 0, cplA, cplM, t));
             break;
 
@@ -2443,7 +2443,7 @@ void SetupRhs1_P2( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_, co
         // collect some information about the edges and verts of the tetra
         // and save it n.
         n.assign( *sit, *b->RowIdx, BndData_.Vel);
-        tetra.Init( *sit, lset.Phi, lset.GetBndData());
+        tetra.Init( *sit, *lset.PhiC, lset.GetBndData());
         const bool nocut= !tetra.Intersects();
         if (nocut) {
             const double rho_const= tetra.GetSign( 0) == 1 ? rho_p : rho_n;
@@ -2845,7 +2845,7 @@ void InstatStokes2PhaseP2P1CL::SetupLB (MLMatDescCL* A, VecDescCL* cplA, const L
     MLDataCL<VecDescCL>::const_iterator itLset = lset.MLPhi.begin();
     for (size_t lvl=0; lvl < A->RowIdx->size(); ++lvl, ++itA, ++it, ++itLset)
     {
-       SetupLB_P2( MG_,  Coeff_, BndData_, *itA, lvl == A->Data.size()-1 ? cplA : 0, lvl == A->Data.size()-1 ? lset.Phi : *itLset, lset.GetBndData(), *it, t);
+       SetupLB_P2( MG_,  Coeff_, BndData_, *itA, lvl == A->Data.size()-1 ? cplA : 0, lvl == A->Data.size()-1 ? *lset.PhiC : *itLset, lset.GetBndData(), *it, t);
     }
 
 }
@@ -3022,7 +3022,7 @@ void BSAccumulator_P2CL::finalize_accumulation ()
 
 void BSAccumulator_P2CL::visit (const TetraCL& tet)
 {
-    ls_loc.assign( tet, lset.Phi, lset.GetBndData());
+    ls_loc.assign( tet, *lset.PhiC, lset.GetBndData());
 
     if (!equal_signs( ls_loc))
     {
@@ -3245,7 +3245,7 @@ void InstatStokes2PhaseP2P1CL::SetupBdotv (VecDescCL* Bdotv, const VelVecDescCL*
     const ExtIdxDescCL& p_xidx= Bdotv->RowIdx->GetXidx();
 
     DROPS_FOR_TRIANG_TETRA( MG_, lvl, sit) {
-        cut.Init( *sit, lset.Phi, lset.GetBndData());
+        cut.Init( *sit, *lset.PhiC, lset.GetBndData());
         if (!cut.Intersects()) continue;
 
         GetLocalNumbP1NoBnd( prNumb, *sit, *Bdotv->RowIdx);

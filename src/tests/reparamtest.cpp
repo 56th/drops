@@ -252,7 +252,8 @@ void Strategy( DROPS::AdapTriangCL& adap, DROPS::BndDataCL<>& lsbnd)
 {
     SurfaceTensionCL sf( sigmaf);   // dummy class
 
-    LevelsetP2CL lset( adap.GetMG(), lsbnd, sf);
+    LevelsetP2CL & lset( * LevelsetP2CL::Create( adap.GetMG(), lsbnd, sf) ) ;
+
 
     // writer for vtk-format
     VTKOutCL vtkwriter(adap.GetMG(), "DROPS data", (P.get<int>("VTK.VTKOut") ? 3 : 0),
@@ -318,6 +319,7 @@ void Strategy( DROPS::AdapTriangCL& adap, DROPS::BndDataCL<>& lsbnd)
         std::swap( lset.Phi.Data, phiDiff);
     }
 
+    delete &lset;
 }
 
 } // end of namespace DROPS

@@ -66,6 +66,7 @@
 		"SD":		0,
 		"CurvDiff":		-5e-09,
 		"VolCorrection":		0,
+		"Discontinuous":		0,
 		"Theta":		1
 	},
 
