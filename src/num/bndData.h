@@ -26,7 +26,7 @@
 #define DROPS_BNDDATA_H
 
 #include "misc/utils.h"
-#include "geom/multigrid.h"
+#include "geom/simplex.h"
 #include "geom/boundary.h"
 
 namespace DROPS
@@ -41,19 +41,25 @@ enum BndCondT
 /// - valid boundary conditions have numbers in the range 0..99
 /// - interior simplices have no boundary data and return NoBC
 ///   in BndDataCL::GetBC
+///
+/// If you make changes here, also change the functions BndCondInfo and string_to_BndCondT below.
 {
-    Dir0BC= 0,                   ///< hom.   Dirichlet boundary conditions
-    DirBC= 2,                    ///< inhom. Dirichlet boundary conditions
-    Per1BC= 13,                  ///< periodic boundary conditions, where
-    Per2BC= 11,                  ///< Per1BC and Per2BC denote corresponding boundaries
-    Nat0BC= 21,                  ///< hom.   natural   boundary condition
-    NatBC= 23,                   ///< inhom. natural   boundary conditions
-    OutflowBC= 21,               ///< same as Nat0BC, for convenience
-    WallBC= 0,                   ///< same as Dir0BC, for convenience
+    /// The fundamental boundary conditions.
+    Dir0BC=  0, ///< hom.   Dirichlet boundary conditions
+    DirBC=   2, ///< inhom. Dirichlet boundary conditions
+    Per1BC= 13, ///< periodic boundary conditions, where
+    Per2BC= 11, ///< Per1BC and Per2BC denote corresponding boundaries
+    Nat0BC= 21, ///< hom.   natural   boundary condition
+    NatBC=  23, ///< inhom. natural   boundary conditions
+    NoBC=   98, ///< interior simplices
 
-    NoBC= 98,                    ///< interior simplices
-    UndefinedBC_= 99,            ///< ReadMeshBuilderCL: error, unknown bc
-    MaxBC_= 100                  ///< upper bound for valid bc's
+    /// Synonymous names, for convenience
+    WallBC=    Dir0BC,
+    OutflowBC= Nat0BC,
+
+    /// Corner cases
+    UndefinedBC_=  99, ///< ReadMeshBuilderCL: error, unknown bc
+    MaxBC_=       100  ///< upper bound for valid bc's
 };
 
 
@@ -76,25 +82,9 @@ class BndCondInfoCL
 };
 
 /// Prints a text-message describing the given boundary-condition.
-void inline BndCondInfo (BndCondT bc, std::ostream& os)
 /// \param bc Value of type BndCondT, which shall be described.
 /// \param os Stream, to which the description is written.
-{
-    switch(bc)
-    {
-      case Dir0BC: /* WallBC has the same number */
-                         os << "hom. Dirichlet BC / wall\n"; break;
-      case DirBC:        os << "inhom. Dirichlet BC / inflow\n"; break;
-      case Per1BC:       os << "periodic BC\n"; break;
-      case Per2BC:       os << "periodic BC, correspondent\n"; break;
-      case Nat0BC: /* OutflowBC has the same number */
-                         os << "hom. Natural BC / outflow\n"; break;
-      case NatBC:        os << "inhom. Natural BC\n"; break;
-      case NoBC:         os << "no boundary\n"; break;
-      case UndefinedBC_: os << "WARNING! unknown BC from ReadMeshBuilderCL\n"; break;
-      default:           os << "WARNING! unknown BC\n";
-    }
-}
+void BndCondInfo (BndCondT bc, std::ostream& os);
 
 
 /// \brief Represents the boundary data of a single boundary segment for a certain variable.
