@@ -63,8 +63,14 @@ class ParamCL
 
     void read_json (std::string path);
 
-    const ptree_type& get_child(const path_type& path) const
-        { return pt.get_child( path); }
+    const ptree_type& get_child(const std::string& path) const { 
+      try {
+        return pt.get_child( path); 
+      }
+      catch(boost::property_tree::ptree_error& e) {
+        throw DROPSParamErrCL( "ParamCL::get_child: Trying to get '" + path + "' failed.\n");
+      }
+    }
 
     /// \brief standard get routine
     /// template parameter is the desired type of returned variable
@@ -80,7 +86,7 @@ class ParamCL
         return this->pt.get<OutType>(pathInPT);
       }
       catch(boost::property_tree::ptree_error& e) {
-        throw DROPSParamErrCL( std::string( "ParamCL::get: Trying to get '") + pathInPT + std::string( "' failed.\n"));
+        throw DROPSParamErrCL( "ParamCL::get: Trying to get '" + pathInPT + "' failed.\n");
       }
     }
 
