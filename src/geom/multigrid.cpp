@@ -34,6 +34,8 @@
 #endif
 
 #include "geom/multigrid.h"
+#include "misc/params.h"
+#include "misc/singletonmap.h"
 #include "num/gauss.h"
 #include <iterator>
 #include <set>
@@ -1321,5 +1323,61 @@ const ColorClassesCL& MultiGridCL::GetColorClasses (int Level, match_fun match, 
 
     return *colors_[Level];
 }
+
+void read_PeriodicBoundaries (MultiGridCL& mg, const ParamCL& P)
+{
+    const BoundaryCL& bnd= mg.GetBnd();
+    const BndIdxT num_bnd= bnd.GetNumBndSeg();
+
+    match_fun mfun= 0;
+    BoundaryCL::BndTypeCont bnd_type( num_bnd, BoundaryCL::OtherBnd);
+
+    // Try to read and set PeriodicMatching.
+    const ParamCL::ptree_type* child= 0;
+    try {
+        child= &P.get_child( "PeriodicMatching");
+    } catch (DROPSParamErrCL e) {}
+    if (child != 0)
+        try {
+            const std::string s= child->get_value<std::string>();
+            if (s != "")
+                mfun= SingletonMapCL<match_fun>::getInstance()[s];
+        } catch (DROPSErrCL e) {
+            std:: cerr << "read_PeriodicBoundaries: While processing 'PeriodicMatching'...\n";
+            throw e;
+        }
+
+    // Read data for the boundary segments.
+    for (ParamCL::ptree_const_iterator_type it= P.begin(), end= P.end(); it != end; ++it) {
+        const std::string key= it->first;
+        if (key == std::string( "PeriodicMatching"))
+            continue;
+
+        BndIdxT i;
+        std::istringstream iss( key);
+        iss >> i;
+        if (!iss) // As BndIdxT is unsigned, the 2nd test is redundant.
+            throw DROPSErrCL( "read_PeriodicBoundaries: Invalid boundary segment '" + key + "'.\n");
+
+        BoundaryCL::BndType type= BoundaryCL::OtherBnd;
+        try {
+            const std::string s= it->second.get_value<std::string>();
+            if (s == "Per1Bnd")
+                type= BoundaryCL::Per1Bnd;
+            else if (s == "Per2Bnd")
+                type= BoundaryCL::Per2Bnd;
+        } catch (DROPSParamErrCL e) {
+            std:: cerr << "read_PeriodicBoundaries: While processing key '" << key << "'...\n";
+            throw e;
+        }
+        if (type != BoundaryCL::Per1Bnd && type != BoundaryCL::Per2Bnd && type != BoundaryCL::OtherBnd)
+            throw DROPSErrCL( "read_PeriodicBoundaries: Key '" + key + "' specifies an invalid BndType.\n");
+        bnd_type[i]= type;
+    }
+
+    // Enter the data to bnd
+    bnd.SetPeriodicBnd( bnd_type, mfun);
+}
+
 
 } // end of namespace DROPS

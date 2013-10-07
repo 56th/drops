@@ -651,6 +651,16 @@ inline void GetTrafoTr( SMatrixCL<3,3>& T, double& det, const TetraCL& t)
 void MarkAll (MultiGridCL&);
 void UnMarkAll (MultiGridCL&);
 
+
+class ParamCL; // forward declaration for read_PeriodicBoundaries.
+
+/// \brief Read PeriodicMatching and the periodic boundary-segments from P and insert them into mg.Bnd_.
+/// The key PeriodicMatching is optional; ommitting it or setting it to the empty string disables periodic matching.
+/// The default for all boundary-segments is OtherBnd.
+/// All other keys are interpreted as boundary-segment indices.
+/// The values have the form "Per1Bnd" or "Per2Bnd".
+void read_PeriodicBoundaries (MultiGridCL& mg, const ParamCL& P);
+
 } // end of namespace DROPS
 
 #endif
