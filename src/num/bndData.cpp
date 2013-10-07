@@ -46,4 +46,13 @@ void BndCondInfo (BndCondT bc, std::ostream& os)
     }
 }
 
+BndCondCL::BndCondCL (BndIdxT numbndseg, const BndCondT* bc, match_fun mfun)
+    : mfun_( mfun)
+{
+    BndCond_.resize( numbndseg);
+    for (Uint i=0; i<numbndseg; ++i)
+        BndCond_[i]= bc ? bc[i] : Nat0BC;
+}
+
+
 } //end of namespace DROPS

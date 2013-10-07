@@ -32,6 +32,8 @@
 namespace DROPS
 {
 
+typedef bool (*match_fun) (const Point3DCL&, const Point3DCL&);
+
 enum BndCondT
 /// \brief enum for boundary conditions in DROPS.
 ///
@@ -124,11 +126,13 @@ class BndSegDataCL: public BndCondInfoCL
 
 
 /// \brief Contains the boundary conditions of all boundary segments for a certain variable.
+///    The matching function for periodic data is also stored here.
 ///
 /// For each sub-simplex on the boundary, the boundary condition can be accessed.
 class BndCondCL
 {
   protected:
+    mutable match_fun mfun_;
     std::vector<BndCondInfoCL> BndCond_;
 
   public:
@@ -136,12 +140,17 @@ class BndCondCL
     /// containing the boundary conditions of the boundary segments.
     /// If \a bc is omitted, hom. natural boundary conditions are imposed (Nat0BC) for all boundary segments.
     /// For the special case \a numbndseg=0 we always have GetBC() = NoBC and IsOnXXXBnd(...) = false (aka NoBndCondCL)
-    BndCondCL( BndIdxT numbndseg, const BndCondT* bc= 0)
-    {
-        BndCond_.resize( numbndseg);
-        for (Uint i=0; i<numbndseg; ++i)
-            BndCond_[i]= bc ? bc[i] : Nat0BC;
+    BndCondCL( BndIdxT numbndseg, const BndCondT* bc= 0, match_fun mfun= 0);
+    /// \brief Initialize all members.
+    void Init (const std::vector<BndCondInfoCL>& BndCond, match_fun mfun) {
+        mfun_= mfun;
+        BndCond_= BndCond;
     }
+
+    /// Get/Set the matching function. @{
+    match_fun GetMatchingFunction ()               const { return mfun_; }
+    void      SetMatchingFunction (match_fun mfun) const { mfun_= mfun; }
+    /// @}
 
     /// \name boundary condition
     /// Returns superior boundary condition of sub-simplex
@@ -198,6 +207,11 @@ class BndDataCL: public BndCondCL
     BndDataCL( BndIdxT numbndseg, const BndCondT* bc= 0, const bnd_val_fun* fun= 0);
     /// Deprecated ctor, just for compatibility with older code
     BndDataCL( BndIdxT numbndseg, const bool* isneumann, const bnd_val_fun* fun); // deprecated ctor!
+
+    void Init (const std::vector<BndCondInfoCL>& bnd_cond, const std::vector<bnd_val_fun>& BndFun, match_fun mfun) {
+        BndCondCL::Init( bnd_cond, mfun);
+        BndFun_= BndFun;
+    }
 
     /// \name boundary value
     /// Returns boundary value of sub-simplex
