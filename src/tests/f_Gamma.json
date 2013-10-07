@@ -4,15 +4,24 @@
 //    Study different discretizations of interfacial tension
 //=============================================================
 //General section
-        "General":
-        {
-                "ProgressBar":  1, //show progress bar
-                "DynamicLibsPrefix": "../", //where should we look for shared objects?
-                "DynamicLibs": [ //select libraries to be loaded after program start
-                        "misc/libmisc-scalarFunctions",
-                        "misc/libmisc-vectorFunctions"
-                ]
-        },
+	"General":
+	{
+		"ProgressBar":  1, //show progress bar
+		"DynamicLibsPrefix": "../", //where should we look for shared objects?
+		"DynamicLibs": [ //select libraries to be loaded after program start
+			"misc/libmisc-scalarFunctions",
+			"misc/libmisc-vectorFunctions"
+		]
+	},
+
+	"Stokes":
+	{
+		"VelocityBndData":
+		{
+			"Default": ["DirBC", "VecZero"] // Bug in some accumulators: The boundary-function is accessed for Dir0BC.
+		},
+		"PressureBndData": { "Default": ["Nat0BC"] }
+	},
 
 	"Levelset":
 	{
@@ -20,9 +29,11 @@
 		"Iter":		10000,
 		"SD":		0,
 		"CurvDiff":		-5e-09,
-		"VolCorrection":		0,
-		"Discontinuous":		0,
-		"Theta":		1
+		"VolCorrection":	0,
+		"Discontinuous":	0,
+		"Theta":		1,
+
+		"BndData": { "Default": ["NoBC"] }
 	},
 
 	"Exp":
@@ -44,9 +55,15 @@
 		"SurfTension":		1
 	},
 
-	"DomainCond":
+	"Domain":
 	{
-		"MeshFile":		"2x2x2@5x5x5"
-	}
-
+		"Type": "BrickBuilder", // A parallelepiped
+		"Origin": [-1,-1,-1],	// Origin
+		"E1": [2,0,0],		// Basis to span the object,
+		"E2": [0,2,0],		// not necessary orthonormal
+		"E3": [0,0,2],		// ...
+		"N1": 5,		// Number of cells along the E1-direction,
+		"N2": 5,		//			 the E2-direction,
+		"N3": 5			//			 the E3-direction.
+	 } 
 }

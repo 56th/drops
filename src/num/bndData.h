@@ -88,6 +88,9 @@ class BndCondInfoCL
 /// \param os Stream, to which the description is written.
 void BndCondInfo (BndCondT bc, std::ostream& os);
 
+/// \brief Return the BndCondT matching the given string.
+BndCondT string_to_BndCondT (std::string s);
+
 
 /// \brief Represents the boundary data of a single boundary segment for a certain variable.
 ///
@@ -237,6 +240,16 @@ class BndDataCL: public BndCondCL
     /// \}
 };
 
+
+class MultiGridCL; // forward declaration for read_BndData below.
+class ParamCL;     // forward declaration for read_BndData below.
+
+///\brief Read a BndDataCL<T>-object from the parameter-file section P.
+/// mg is only required to obtain the number of boundary segments.
+/// The definition is in bndData.cpp to avoid some header dependencies. Instantiations for other types T must be added there manually.
+template <class T>
+  void
+  read_BndData (BndDataCL<T>& bnddata, const MultiGridCL& mg, const ParamCL& P);
 
 class NoBndCondCL: public BndCondCL
 {
@@ -546,7 +559,6 @@ inline BndValT BndDataCL<BndValT>::GetNatBndValue( const FaceCL& f, double t) co
     Assert( BndCond_.size() && BndCond_[f.GetBndIdx()].IsNatural(), DROPSErrCL("GetNeuBndValue(FaceCL): No Neumann Boundary Segment!"), ~0);
     return BndFun_[f.GetBndIdx()]( GetBaryCenter(f), t);
 }
-
 
 } //end of namespace DROPS
 
