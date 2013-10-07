@@ -125,7 +125,9 @@ template <class T>
     } catch (DROPSParamErrCL e) {}
     if (child != 0)
         try {
-            mfun= SingletonMapCL<match_fun>::getInstance()[child->get_value<std::string>()];
+            const std::string s= child->get_value<std::string>();
+            if (s != "")
+                mfun= SingletonMapCL<match_fun>::getInstance()[s];
         } catch (DROPSErrCL e) {
             std:: cerr << "read_BndData: While processing 'PeriodicMatching'...\n";
             throw e;

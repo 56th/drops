@@ -247,6 +247,12 @@ class ParamCL;     // forward declaration for read_BndData below.
 ///\brief Read a BndDataCL<T>-object from the parameter-file section P.
 /// mg is only required to obtain the number of boundary segments.
 /// The definition is in bndData.cpp to avoid some header dependencies. Instantiations for other types T must be added there manually.
+///
+/// All keys are optional.
+/// The default value can be specified via "Default"; if not set explicitly, it is UndefinedBC_.
+/// The key "PeriodicMatching" sets a matching function for the finite element space.
+/// All other keys are interpreted as boundary-segment indices.
+/// The values have the form ["BndCondT"] or ["BndCondT, "NameOfFunction"]; the second form is obligatory for non-homogeneous boundary values.
 template <class T>
   void
   read_BndData (BndDataCL<T>& bnddata, const MultiGridCL& mg, const ParamCL& P);
