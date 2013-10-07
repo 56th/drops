@@ -1533,8 +1533,8 @@ class SpecialBndHandler_System1TwoPhaseP2CL
     QuadDomainCL q5dom;
 	Point3DCL normal;
 	Uint unknownIdx[6];
-	GridFunctionCL<double>   basisP2[6];
-    GridFunctionCL<double>   gradP1[6];
+	GridFunctionCL<double>   basisP2[10];
+    GridFunctionCL<double>   gradP1[10];
   public:	
 	SpecialBndHandler_System1TwoPhaseP2CL(const StokesBndDataCL& BndData, double mu1, double mu2, const double beta1=0, const double beta2=0, const double alpha=0)
 	: lat( PrincipalLatticeCL::instance( 2)), BndData_(BndData), mu1_(mu1), mu2_(mu2), beta1_(beta1), beta2_(beta2), alpha_(alpha), ls_loc( lat.vertex_size())
@@ -1555,8 +1555,8 @@ void SpecialBndHandler_System1TwoPhaseP2CL::setup(const TetraCL& tet, const SMat
 	for (Uint k =0; k< 4; ++k) //Go through all faces of a tet
 	{
 		SMatrixCL<3, 3> dm[10][10];
-		LocalP2CL<double> phi[6]; 
-	    LocalP1CL<double> Gradn[6];
+		LocalP2CL<double> phi[10]; 
+	    LocalP1CL<double> Gradn[10];
 		BaryCoordCL bary[3];
 		if( BndData_.Vel.GetBC(*tet.GetFace(k))==Slip0BC || BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC|| BndData_.Vel.GetBC(*tet.GetFace(k))==SymmBC){
 			const FaceCL& face = *tet.GetFace(k);
@@ -1572,35 +1572,33 @@ void SpecialBndHandler_System1TwoPhaseP2CL::setup(const TetraCL& tet, const SMat
 
 			for (Uint i= 0; i<3; ++i)    
 			{
-				unknownIdx[i]   = VertOfFace(k, i);      // i is index for Vertex
-				unknownIdx[i+3] = EdgeOfFace(k, i) + 4;  // i is index for Edge
-				bary[i][unknownIdx[i]]=1;
+				bary[i][VertOfFace(k, i)]=1;
 			}
 			for(Uint i=0; i<6; ++i)
 			{
-				phi[i][unknownIdx[i]] = 1;
-				Gradn[i] = dot( normal, Grad[unknownIdx[i]]); 
+				phi[i][i] = 1;
+				Gradn[i] = dot( normal, Grad[i]); 
 			}
 			
-			for(Uint i=0; i<6; ++i)
+			for(Uint i=0; i<10; ++i)
 			{
 				resize_and_evaluate_on_vertexes( phi[i], q5dom, basisP2[i]); // for M
 				resize_and_evaluate_on_vertexes( Gradn[i], q5dom, gradP1[i]); // for A	
 			}
 
 	
-			for(Uint i=0; i<6; ++i){
+			for(Uint i=0; i<10; ++i){
 				for(Uint j=0; j<=i; ++j){	
                     quad( basisP2[i] * basisP2[j], q5dom, locInt[0].mass2D[i][j], locInt[1].mass2D[i][j]);			
                     quad( gradP1[i] * basisP2[j] + gradP1[j] * basisP2[i], q5dom, locInt[0].grad2D[i][j], locInt[1].grad2D[i][j]);
 					// three additional terms
-					dm[unknownIdx[j]][unknownIdx[i]](0, 0)= dm[unknownIdx[j]][unknownIdx[i]](1, 1) = dm[unknownIdx[j]][unknownIdx[i]](2, 2) = beta1_ * locInt[0].mass2D[i][j] + beta2_ * locInt[1].mass2D[i][j];
-					dm[unknownIdx[j]][unknownIdx[i]]     += ( (alpha_/h -beta1_)* locInt[0].mass2D[i][j] + (alpha_/h -beta2_) * locInt[1].mass2D[i][j] )* SMatrixCL<3,3> (outer_product(normal, normal));
-					dm[unknownIdx[j]][unknownIdx[i]]     -= ( 2. * mu1_ * locInt[0].grad2D[i][j]+ 2.* mu2_ * locInt[1].grad2D[i][j] )* SMatrixCL<3,3> (outer_product(normal, normal));  
-					loc.Ak[unknownIdx[j]][unknownIdx[i]] += dm[unknownIdx[j]][unknownIdx[i]];
+					dm[j][i](0, 0)= dm[j][i](1, 1) = dm[j][i](2, 2) = beta1_ * locInt[0].mass2D[i][j] + beta2_ * locInt[1].mass2D[i][j];
+					dm[j][i]     += ( (alpha_/h -beta1_)* locInt[0].mass2D[i][j] + (alpha_/h -beta2_) * locInt[1].mass2D[i][j] )* SMatrixCL<3,3> (outer_product(normal, normal));
+					dm[j][i]     -= ( 2. * mu1_ * locInt[0].grad2D[i][j]+ 2.* mu2_ * locInt[1].grad2D[i][j] )* SMatrixCL<3,3> (outer_product(normal, normal));  
+					loc.Ak[j][i] += dm[j][i];
 					if (i != j){
-						assign_transpose( dm[unknownIdx[i]][unknownIdx[j]], dm[unknownIdx[j]][unknownIdx[i]]);
-						loc.Ak[unknownIdx[i]][unknownIdx[j]] += dm[unknownIdx[i]][unknownIdx[j]];
+						assign_transpose( dm[i][j], dm[j][i]);
+						loc.Ak[i][j] += dm[i][j];
 					}	
 				}
 			}
