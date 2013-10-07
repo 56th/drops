@@ -45,7 +45,6 @@ BoundaryCL::~BoundaryCL()
 {
     for (SegPtrCont::iterator It=Bnd_.begin(); It!=Bnd_.end(); ++It)
         delete *It;
-    delete BndType_;
 }
 
 void BoundaryCL::SetPeriodicBnd( const BndTypeCont& type, match_fun match) const
@@ -59,7 +58,7 @@ void BoundaryCL::SetPeriodicBnd( const BndTypeCont& type, match_fun match) const
         }
     }
 #endif
-    BndType_= new BndTypeCont(type);
+    BndType_= type;
     match_= match;
 }
 

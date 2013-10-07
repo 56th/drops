@@ -123,18 +123,18 @@ class BoundaryCL
     typedef std::vector<BndType>   BndTypeCont;
 
   private:
-    SegPtrCont           Bnd_;
-    mutable BndTypeCont* BndType_;
-    mutable match_fun    match_;
+    SegPtrCont          Bnd_;
+    mutable BndTypeCont BndType_;
+    mutable match_fun   match_;
 
   public:
-    BoundaryCL() : BndType_(0), match_(0) {}
-    /// deletes the objects pointed to in Bnd_ and BndType_
+    BoundaryCL() : match_(0) {}
+    /// deletes the objects pointed to in Bnd_.
     ~BoundaryCL();
 
     const BndSegCL* GetBndSeg(BndIdxT idx)  const { return Bnd_[idx]; }
     BndIdxT         GetNumBndSeg()          const { return Bnd_.size(); }
-    BndType         GetBndType(BndIdxT idx) const { return BndType_? (*BndType_)[idx] : OtherBnd; }
+    BndType         GetBndType(BndIdxT idx) const { return !BndType_.empty() ? BndType_[idx] : OtherBnd; }
 
     void      SetPeriodicBnd( const BndTypeCont& type, match_fun) const;
     match_fun GetMatchFun() const { return match_; }
