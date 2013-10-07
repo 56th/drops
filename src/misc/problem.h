@@ -329,11 +329,9 @@ class IdxDescCL: public FE_InfoCL
     /// \brief Used to number unknowns.
     void CreateNumbering( Uint level, MultiGridCL& mg, const VecDescCL* lsetp= 0, const BndDataCL<>* lsetbnd =0);
     /// \brief Used to number unknowns and store boundary condition and matching function.
-    void CreateNumbering( Uint level, MultiGridCL& mg, const BndCondCL& Bnd, match_fun match= 0, const VecDescCL* lsetp= 0, const BndDataCL<>* lsetbnd =0)
-    { Bnd_= Bnd; Bnd_.SetMatchingFunction( match); CreateNumbering( level, mg, lsetp, lsetbnd); }
+    void CreateNumbering( Uint level, MultiGridCL& mg, const BndCondCL& Bnd, match_fun match= 0, const VecDescCL* lsetp= 0, const BndDataCL<>* lsetbnd =0);
     /// \brief Used to number unknowns taking boundary condition and matching function from \a baseIdx
-    void CreateNumbering( Uint level, MultiGridCL& mg, const IdxDescCL& baseIdx, const VecDescCL* lsetp= 0, const BndDataCL<>* lsetbnd =0)
-    { Bnd_= baseIdx.Bnd_; CreateNumbering( level, mg, lsetp, lsetbnd); }
+    void CreateNumbering( Uint level, MultiGridCL& mg, const IdxDescCL& baseIdx, const VecDescCL* lsetp= 0, const BndDataCL<>* lsetbnd =0);
     /// \brief Update numbering of extended DoFs.
     /// Has to be called whenever level set function has changed to account for the moving interface.
     void UpdateXNumbering( MultiGridCL& mg, const VecDescCL& lset, const BndDataCL<>& lsetbnd);

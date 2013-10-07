@@ -434,6 +434,22 @@ void IdxDescCL::UpdateXNumbering( MultiGridCL& mg, const VecDescCL& lset, const 
     }
 }
 
+void IdxDescCL::CreateNumbering( Uint level, MultiGridCL& mg, const BndCondCL& Bnd,
+    match_fun match, const VecDescCL* lsetp, const BndDataCL<>* lsetbnd)
+{
+    Bnd_= Bnd;
+    if (match)
+        Bnd_.SetMatchingFunction( match);
+    CreateNumbering( level, mg, lsetp, lsetbnd);
+}
+
+void IdxDescCL::CreateNumbering( Uint level, MultiGridCL& mg, const IdxDescCL& baseIdx,
+    const VecDescCL* lsetp, const BndDataCL<>* lsetbnd)
+{
+    Bnd_= baseIdx.Bnd_;
+    CreateNumbering( level, mg, lsetp, lsetbnd);
+}
+
 void IdxDescCL::DeleteNumbering(MultiGridCL& MG)
 /// This routine writes NoIdx as unknown-index for all indices of the
 /// given index-description. NumUnknowns will be set to zero.
