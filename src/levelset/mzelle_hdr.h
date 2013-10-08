@@ -365,7 +365,7 @@ void SolveStatProblem( StokesT& Stokes, LevelsetP2CL& lset,
     duration = time.GetTime();
     std::cout << "Solving (Navier-)Stokes took "<<  duration << " sec.\n";
     std::cout << "iter: " << solver.GetIter() << "\tresid: " << solver.GetResid() << std::endl;
-    Stokes.CheckOnePhaseSolution( &Stokes.v, &Stokes.p, Stokes.Coeff_.RefVel, Stokes.Coeff_.RefGradPr);
+    //Stokes.CheckOnePhaseSolution( &Stokes.v, &Stokes.p, Stokes.Coeff_.RefVel, Stokes.Coeff_.RefGradPr);
 }
 
 void SetInitialLevelsetConditions( LevelsetP2CL& lset, MultiGridCL& MG, ParamCL& P)

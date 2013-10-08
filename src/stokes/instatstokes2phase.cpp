@@ -1405,7 +1405,8 @@ void SpecialBndHandler_System1OnePhaseP2CL::setup(const TetraCL& tet, const SMat
 					// three additional terms
 					dm[j][i](0, 0)=dm[j][i](1, 1) = dm[j][i](2, 2) = beta_ * mass2D.quad(absdet);
 					dm[j][i]     += (alpha_/h - beta_) * mass2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));
-					dm[j][i]     -=  2. * mu_ * Grad2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));  
+					if(BndData_.Vel.GetBC(*tet.GetFace(k))!= SymmBC)
+						dm[j][i]     -=  2. * mu_ * Grad2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));  
 					loc.Ak[j][i] += dm[j][i];
 					if (i != j){
 						assign_transpose( dm[i][j], dm[j][i]);
@@ -1594,7 +1595,8 @@ void SpecialBndHandler_System1TwoPhaseP2CL::setup(const TetraCL& tet, const SMat
 					// three additional terms
 					dm[j][i](0, 0)= dm[j][i](1, 1) = dm[j][i](2, 2) = beta1_ * locInt[0].mass2D[i][j] + beta2_ * locInt[1].mass2D[i][j];
 					dm[j][i]     += ( (alpha_/h -beta1_)* locInt[0].mass2D[i][j] + (alpha_/h -beta2_) * locInt[1].mass2D[i][j] )* SMatrixCL<3,3> (outer_product(normal, normal));
-					dm[j][i]     -= ( 2. * mu1_ * locInt[0].grad2D[i][j]+ 2.* mu2_ * locInt[1].grad2D[i][j] )* SMatrixCL<3,3> (outer_product(normal, normal));  
+					if(BndData_.Vel.GetBC(*tet.GetFace(k))!= SymmBC)
+						dm[j][i]     -= ( 2. * mu1_ * locInt[0].grad2D[i][j]+ 2.* mu2_ * locInt[1].grad2D[i][j] )* SMatrixCL<3,3> (outer_product(normal, normal));  
 					loc.Ak[j][i] += dm[j][i];
 					if (i != j){
 						assign_transpose( dm[i][j], dm[j][i]);
