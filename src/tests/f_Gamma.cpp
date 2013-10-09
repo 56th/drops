@@ -89,6 +89,9 @@ double DistanceFct( const DROPS::Point3DCL& p, double)
 DROPS::Point3DCL Null( const DROPS::Point3DCL&, double)
 { return DROPS::Point3DCL(0.); }
 
+static DROPS::RegisterVectorFunction regveczero("VecZero",  Null);
+
+
 void WriteFct( std::ostream& os)
 {
     const int idx= FctCode%10,
@@ -384,61 +387,25 @@ int main (int argc, char** argv)
 {
   try
   {
-    if (argc>2)
-    {
-        std::cout << "You have to specify at most one parameter:\n\t"
-                  << argv[0] << " [<param_file>]" << std::endl;
-        return 1;
-    }
-    std::ifstream param;
-    if (argc>1)
-        param.open( argv[1]);
-    else
-        param.open( "f_Gamma.json");
-    if (!param)
-    {
-        std::cout << "error while opening parameter file\n";
-        return 1;
-    }
-    param >> P;
-    param.close();
-
+    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "f_Gamma.json");
     SetMissingParameters(P);
-
     std::cout << P << std::endl;
 
     DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
 
-    typedef DROPS::InstatStokes2PhaseP2P1CL    MyStokesCL;
+    std::auto_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P.get_child( "Domain")));
+    DROPS::MultiGridCL mg( *builder);
 
-    int nx, ny, nz;
-    double dx, dy, dz;
-    std::string mesh( P.get<std::string>("DomainCond.MeshFile")), delim("x@");
-    size_t idx;
-    while ((idx= mesh.find_first_of( delim)) != std::string::npos )
-        mesh[idx]= ' ';
-    std::istringstream brick_info( mesh);
-    brick_info >> dx >> dy >> dz >> nx >> ny >> nz;
-    if (!brick_info)
-        DROPS::DROPSErrCL("error while reading geometry information: " + mesh);
-    P.put("Exp.RadInlet", dx/2);
-    DROPS::Point3DCL orig, px, py, pz;
-    px[0]= dx; py[1]= dy; pz[2]= dz;
-    orig= -0.5*(px+py+pz);
-    DROPS::BrickBuilderCL builder ( orig, px, py, pz, nx, ny, nz);
+    DROPS::StokesBndDataCL::VelBndDataCL velbnd( 0);
+    read_BndData( velbnd, mg, P.get_child( "Stokes.VelocityBndData"));
+    DROPS::StokesBndDataCL::PrBndDataCL  prbnd( 0);
+    read_BndData( prbnd,  mg, P.get_child( "Stokes.PressureBndData"));
 
-    const DROPS::BndCondT bc[6]=
-        { DROPS::DirBC, DROPS::DirBC, DROPS::DirBC, DROPS::DirBC, DROPS::DirBC, DROPS::DirBC};
-    const DROPS::StokesVelBndDataCL::bnd_val_fun bnd_fun[6]=
-        { &Null, &Null, &Null, &Null, &Null, &Null};
+    typedef DROPS::InstatStokes2PhaseP2P1CL MyStokesCL;
+    MyStokesCL prob( mg, DROPS::TwoPhaseFlowCoeffCL(P), DROPS::StokesBndDataCL( velbnd, prbnd));
 
-    const DROPS::BndCondT bcls[6]= { DROPS::NoBC, DROPS::NoBC, DROPS::NoBC, DROPS::NoBC, DROPS::NoBC, DROPS::NoBC };
-    const DROPS::LsetBndDataCL::bnd_val_fun bfunls[6]= { 0,0,0,0,0,0};
-    DROPS::LsetBndDataCL lsbnd( 6, bcls, bfunls);
-
-    MyStokesCL prob(builder, DROPS::TwoPhaseFlowCoeffCL(P), DROPS::StokesBndDataCL( 6, bc, bnd_fun));
-
-    DROPS::MultiGridCL& mg = prob.GetMG();
+    DROPS::LsetBndDataCL lsbnd( 0);
+    read_BndData( lsbnd, mg, P.get_child( "Levelset.BndData"));
 
     for (int i=0; i<P.get<int>("AdaptRef.FinestLevel"); ++i)
     {

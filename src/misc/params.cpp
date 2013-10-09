@@ -31,15 +31,27 @@ namespace DROPS
   // =====================================================
 
   ParamCL::ParamCL() {}
-
-  void ParamCL::open(const std::string path)
+  ParamCL::ParamCL(std::string path)
   {
-    boost::property_tree::read_json(path, this->pt);
+    this->read_json( path);
+  }
+
+  void ParamCL::read_json (std::string path)
+  {
+    try {
+        boost::property_tree::read_json(path, this->pt);
+    } catch (boost::property_tree::ptree_error& e) {
+          throw DROPSParamErrCL( "ParamCL::read_json: Error while opening or reading file.\n");
+    }
   }
 
   std::istream &operator>>(std::istream& stream, ParamCL& P)
   {
-    boost::property_tree::read_json(stream, P.pt);
+    try {
+        boost::property_tree::read_json(stream, P.pt);
+    } catch (boost::property_tree::ptree_error& e) {
+          throw DROPSParamErrCL( "ParamCL::operator>>: Read error.\n");
+    }
     return stream;
   }
 
@@ -61,9 +73,9 @@ template <typename T, Uint Size>
             a[i++]= it->second.get_value<T>();
     }
     catch (boost::property_tree::ptree_error& e) {
-        throw DROPSErrCL( std::string( "get_SArray: Trying to get '") + path + std::string( "' failed.\n"));
+        throw DROPSParamErrCL( std::string( "get_SArray: Trying to get '") + path + std::string( "' failed.\n"));
     }
-    Assert( i == Size, DROPSErrCL( "get_SArray: Wrong number of components in parameter.\n"), ~0);
+    Assert( i == Size, DROPSParamErrCL( "get_SArray: Wrong number of components in parameter.\n"), ~0);
 
     return a;
   }
@@ -84,6 +96,15 @@ template <typename T, Uint Size>
     return ret;
   }
 
+  template<>
+  SArrayCL<Uint, 3> ParamCL::get<SArrayCL<Uint, 3> >(const std::string & pathInPT) const
+  {
+    SArrayCL<Uint, 3> ret;
+    get_SArray( *this, pathInPT, ret);
+    return ret;
+  }
+
+
   std::ostream& ParamCL::print(std::ostream& s)
   {
     using boost::property_tree::ptree;
@@ -94,7 +115,7 @@ template <typename T, Uint Size>
     }
     return s;
   }
-  
+
     template <>
     std::vector<std::string> ParamCL::get<std::vector<std::string> >(const
     std::string &path) const
@@ -107,7 +128,7 @@ template <typename T, Uint Size>
             v.push_back(it->second.get_value<std::string>());
       }
       catch (boost::property_tree::ptree_error& e) {
-          throw DROPSErrCL( std::string( "get: Trying to get '") + path + std::string( "' failed.\n"));
+          throw DROPSParamErrCL( std::string( "get: Trying to get '") + path + std::string( "' failed.\n"));
       }
       return v;
     }
@@ -123,7 +144,22 @@ template <typename T, Uint Size>
         print(it->second, level+"\t", s);
     }
   }
-  
+
+void read_parameter_file_from_cmdline (ParamCL& P, int argc, char **argv, std::string default_file)
+{
+    if (argc == 1) {
+        if (default_file == std::string())
+            throw DROPSErrCL(
+                "read_parameter_file_from_cmdline: You must specify a parameter file on the command line.\n"
+                "        " + std::string( argv[0]) + " <path_to_parameter_file>\n");
+        std::cout << "Using default parameter file '" << default_file << "'." << std::endl;
+        P.read_json( default_file);
+    }
+    else {
+        std::cout << "Using  parameter file '" << argv[1] << "'." << std::endl;
+        P.read_json( argv[1]);
+    }
+}
 
 
   // =====================================================

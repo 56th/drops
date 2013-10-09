@@ -60,22 +60,6 @@ SurfaceTensionCL sf( sigma, 0);
 DROPS::LsetBndDataCL lsbnd( 6);
 
 
-DROPS::MGBuilderCL* make_MGBuilder (const DROPS::ParamCL& P)
-{
-    const std::string type= P.get<std::string>( "Type");
-    if (type != std::string("BrickBuilder"))
-        throw DROPS::DROPSErrCL(std::string( "make_MGBuilder: Unknown Domain: ") + type + std::string("\n"));
-
-    const Point3DCL orig( P.get<Point3DCL>( "Origin")),
-                      e1( P.get<Point3DCL>( "E1")),
-                      e2( P.get<Point3DCL>( "E2")),
-                      e3( P.get<Point3DCL>( "E3"));
-    const Uint n1= P.get<Uint>( "N1"),
-               n2= P.get<Uint>( "N2"),
-               n3= P.get<Uint>( "N3");
-    return new BrickBuilderCL( orig, e1, e2, e3, n1, n2, n3);
-}
-
 // Surface divergence of a vector field w
 inline double div_gamma_wind (const Point3DCL& n, const SMatrixCL<3,3>& dw)
 {
@@ -697,17 +681,7 @@ int main (int argc, char* argv[])
   try {
     ScopeTimerCL timer( "main");
 
-    std::ifstream param;
-    if (argc != 2) {
-        std::cout << "Using default parameter file: surfactant.json\n";
-        param.open( "surfactant.json");
-    }
-    else
-        param.open( argv[1]);
-    if (!param)
-        throw DROPS::DROPSErrCL( "main: error while opening parameter file\n");
-    param >> P;
-    param.close();
+    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "surfactant.json");
     std::cout << P << std::endl;
 
     DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );

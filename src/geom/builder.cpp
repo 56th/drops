@@ -34,6 +34,7 @@
 #include <fstream>
 #include <iomanip>
 #include "geom/builder.h"
+#include "misc/params.h"
 #ifdef _PAR
 #include "DiST/DiST.h"
 #include "DiST/mpistream.h"
@@ -41,6 +42,26 @@
 
 namespace DROPS
 {
+
+MGBuilderCL* make_MGBuilder (const ParamCL& P)
+{
+    const std::string type= P.get<std::string>( "Type");
+    if (BuilderMap::getInstance().count( type) == 0) {
+        const std::string msg= "make_MGBuilder: Builder for '" + type + "' not registered.\n";
+        throw DROPSErrCL( msg);
+    }
+    MGBuilderCL* tmp= BuilderMap::getInstance()[type]( P);
+
+    std::string restartfile;
+    try {
+        restartfile= P.get<std::string>( "RestartFile");
+    } catch (DROPSParamErrCL) {}
+    if (restartfile == std::string())
+        return tmp;
+    else
+        return new FileBuilderCL( restartfile, tmp, /*delete_bndbuilder*/ true);
+}
+
 
 /// \brief Creates a MultigridCL of a brick shaped domain
 BrickBuilderCL::BrickBuilderCL(const Point3DCL& origin,
@@ -75,7 +96,7 @@ void BrickBuilderCL::buildBoundary (MultiGridCL* mgp) const
 
 /// \todo Check, if the parallelepiped spanned by e1,e2,e3 is degenerated
 /// \todo Do we need the local vector ta?
-void BrickBuilderCL::build (MultiGridCL* mgp) const
+void BrickBuilderCL::build_ser_impl (MultiGridCL* mgp) const
 {
     AppendLevel(mgp);
     SimplexFactoryCL factory( this->GetVertices( mgp), this->GetEdges( mgp), this->GetFaces( mgp), this->GetTetras( mgp));
@@ -158,6 +179,22 @@ void BrickBuilderCL::build (MultiGridCL* mgp) const
     std::for_each( verts.begin(), verts.end(), std::mem_fun_ref( &VertexCL::DestroyRecycleBin ) );
 }
 
+MGBuilderCL* BrickBuilderCL::make_MGBuilder( const ParamCL& P)
+{
+    if (P.get<std::string>("Type") != std::string("BrickBuilder")) {
+        std::string msg= "BrickBuilderCL::make_MGBuilder: Unexpected type '" + P.get<std::string>("Type") + "'.\n";
+        throw DROPSErrCL( msg.c_str());
+    }
+    Point3DCL orig= P.get<Point3DCL>( "Origin");
+    Point3DCL e1= P.get<Point3DCL>( "E1");
+    Point3DCL e2= P.get<Point3DCL>( "E2");
+    Point3DCL e3= P.get<Point3DCL>( "E3");
+    Uint n1= P.get<Uint>( "N1");
+    Uint n2= P.get<Uint>( "N2");
+    Uint n3= P.get<Uint>( "N3");
+    return new BrickBuilderCL( orig, e1, e2, e3, n1, n2, n3);
+}
+
 /// \brief Creates a MultigridCL of a brick shaped domain
 CavityBuilderCL::CavityBuilderCL(const Point3DCL& origin,
                                const Point3DCL& e1,
@@ -203,7 +240,7 @@ void CavityBuilderCL::buildBoundary (MultiGridCL* mgp) const
 }
 
 /// \todo Check, if the parallelepiped spanned by e1,e2,e3 is degenerated
-void CavityBuilderCL::build (MultiGridCL* mgp) const
+void CavityBuilderCL::build_ser_impl (MultiGridCL* mgp) const
 {
     SimplexFactoryCL factory( this->GetVertices(mgp), this->GetEdges(mgp), this->GetFaces(mgp), this->GetTetras(mgp));
 
@@ -332,22 +369,22 @@ void CavityBuilderCL::build (MultiGridCL* mgp) const
     std::for_each( verts.begin(), verts.end(), std::mem_fun_ref( &VertexCL::DestroyRecycleBin ) );
 }
 
-void EmptyCavityBuilderCL::build( MultiGridCL* mgp) const
+MGBuilderCL* CavityBuilderCL::make_MGBuilder( const ParamCL& P)
 {
-    for (Uint i= 0; i<_numLevel; ++i)
-        AppendLevel( mgp);
-
-    // Create boundary
-    base_::buildBoundary(mgp);
-}
-
-void EmptyBrickBuilderCL::build( MultiGridCL* mgp) const
-{
-    for (Uint i= 0; i<_numLevel; ++i)
-        AppendLevel( mgp);
-
-    // Create boundary
-    base_::buildBoundary(mgp);
+    if (P.get<std::string>("Type") != std::string("CavityBuilder")) {
+        std::string msg= "CavityBuilderCL::make_MGBuilder: Unexpected type '" + P.get<std::string>("Type") + "'.\n";
+        throw DROPSErrCL( msg.c_str());
+    }
+    Point3DCL orig= P.get<Point3DCL>( "Origin");
+    Point3DCL e1= P.get<Point3DCL>( "E1");
+    Point3DCL e2= P.get<Point3DCL>( "E2");
+    Point3DCL e3= P.get<Point3DCL>( "E3");
+    Uint n1= P.get<Uint>( "N1");
+    Uint n2= P.get<Uint>( "N2");
+    Uint n3= P.get<Uint>( "N3");
+    SArrayCL<Uint, 3> cavityorig= P.get<SArrayCL<Uint, 3> >( "CavityOrigin");
+    SArrayCL<Uint, 3> cavity= P.get<SArrayCL<Uint, 3> >( "Cavity");
+    return new CavityBuilderCL(orig, e1, e2, e3, n1, n2, n3, cavityorig, cavity);
 }
 
 LBuilderCL::LBuilderCL(const Point3DCL& origin,
@@ -389,7 +426,7 @@ void LBuilderCL::buildBoundary(MultiGridCL* mgp) const
     Bnd.push_back( new AffineSquareCL(_orig+b1*_e1+_e3, _orig+_e1+_e3, _orig+b1*_e1+b2*_e2+_e3) ); // e1-e2-plane
 }
 
-void LBuilderCL::build (MultiGridCL* mgp) const
+void LBuilderCL::build_ser_impl (MultiGridCL* mgp) const
 {
     const double _dn1= static_cast<double>(_n1);
     const double _dn2= static_cast<double>(_n2);
@@ -511,6 +548,23 @@ void LBuilderCL::build (MultiGridCL* mgp) const
     std::for_each( verts.begin(), verts.end(), std::mem_fun_ref( &VertexCL::DestroyRecycleBin ) );
 }
 
+MGBuilderCL* LBuilderCL::make_MGBuilder( const ParamCL& P)
+{
+    if (P.get<std::string>("Type") != std::string("LBuilder")) {
+        std::string msg= "LBuilderCL::make_MGBuilder: Unexpected type '" + P.get<std::string>("Type") + "'.\n";
+        throw DROPSErrCL( msg.c_str());
+    }
+    Point3DCL orig= P.get<Point3DCL>( "Origin");
+    Point3DCL e1= P.get<Point3DCL>( "E1");
+    Point3DCL e2= P.get<Point3DCL>( "E2");
+    Point3DCL e3= P.get<Point3DCL>( "E3");
+    Uint n1= P.get<Uint>( "N1");
+    Uint n2= P.get<Uint>( "N2");
+    Uint n3= P.get<Uint>( "N3");
+    Uint b1= P.get<Uint>( "B1");
+    Uint b2= P.get<Uint>( "B2");
+    return new LBuilderCL( orig, e1, e2, e3, n1, n2, n3, b1, b2);    
+}
 
 BBuilderCL::BBuilderCL(const Point3DCL& origin,
                        const Point3DCL& e1,
@@ -569,7 +623,7 @@ void BBuilderCL::buildBoundary(MultiGridCL* mgp) const
 }
 
 
-void BBuilderCL::build (MultiGridCL* mgp) const
+void BBuilderCL::build_ser_impl (MultiGridCL* mgp) const
 {
     const double _dn1= static_cast<double>(_n1);
     const double _dn2= static_cast<double>(_n2);
@@ -723,6 +777,24 @@ void BBuilderCL::build (MultiGridCL* mgp) const
     std::for_each( verts.begin(), verts.end(), std::mem_fun_ref( &VertexCL::DestroyRecycleBin ) );
 }
 
+MGBuilderCL* BBuilderCL::make_MGBuilder (const ParamCL& P)
+{
+    if (P.get<std::string>("Type") != std::string("BBuilder")) {
+        std::string msg= "BBuilderCL::make_MGBuilder: Unexpected type '" + P.get<std::string>("Type") + "'.\n";
+        throw DROPSErrCL( msg.c_str());
+    }
+    Point3DCL orig= P.get<Point3DCL>( "Origin");
+    Point3DCL e1= P.get<Point3DCL>( "E1");
+    Point3DCL e2= P.get<Point3DCL>( "E2");
+    Point3DCL e3= P.get<Point3DCL>( "E3");
+    Uint n1= P.get<Uint>( "N1");
+    Uint n2= P.get<Uint>( "N2");
+    Uint n3= P.get<Uint>( "N3");
+    Uint b1= P.get<Uint>( "B1");
+    Uint b2= P.get<Uint>( "B2");
+    Uint b3= P.get<Uint>( "B3");
+    return new BBuilderCL( orig, e1, e2, e3, n1, n2, n3, b1, b2, b3);    
+}
 
 TetraBuilderCL::TetraBuilderCL(Ubyte rule)
     :rule_(rule), p0_( std_basis<3>(0)), p1_( std_basis<3>(1)),
@@ -805,7 +877,7 @@ void TetraBuilderCL::buildBoundary(MultiGridCL* mgp) const
     Bnd.push_back( new AffineTriangleCL( p1_, p2_, p3_)); // lid
 }
 
-void TetraBuilderCL::build(MultiGridCL* mgp) const
+void TetraBuilderCL::build_ser_impl(MultiGridCL* mgp) const
 {
     SimplexFactoryCL factory( this->GetVertices(mgp), this->GetEdges(mgp), this->GetFaces(mgp), this->GetTetras(mgp));
 
@@ -873,13 +945,18 @@ void TetraBuilderCL::build(MultiGridCL* mgp) const
     PrepareModify( mgp);
 }
 
-void EmptyTetraBuilderCL::build(MultiGridCL* mgp) const
+MGBuilderCL* TetraBuilderCL::make_MGBuilder (const ParamCL& P)
 {
-    for (Uint i= 0; i<_numLevel; ++i)
-        AppendLevel( mgp);
-
-    // Create boundary
-    buildBoundary(mgp);
+    if (P.get<std::string>( "Type") != std::string( "TetraBuilder")) {
+        std::string msg= "TetraBuilderCL::make_MGBuilder: Unexpected type '" + P.get<std::string>( "Type") + "'.\n";
+        throw DROPSErrCL( msg.c_str());
+    }
+    Point3DCL p0= P.get<Point3DCL>( "P0");
+    Point3DCL p1= P.get<Point3DCL>( "P1");
+    Point3DCL p2= P.get<Point3DCL>( "P2");
+    Point3DCL p3= P.get<Point3DCL>( "P3");
+    Uint rule= P.get<Uint>( "Rule");
+    return new TetraBuilderCL( Ubyte(rule), p0, p1, p2, p3);
 }
 
 //--------------------------------------------------------------------
@@ -1322,7 +1399,19 @@ ReadMeshBuilderCL::Clear() const
 }
 
 ReadMeshBuilderCL::ReadMeshBuilderCL(std::istream& f, std::ostream* msg)
-    : f_( f), msg_( msg), factory_(0) {}
+    : f_( f), delete_f_( false), msg_( msg), factory_( 0)
+{}
+
+ReadMeshBuilderCL::ReadMeshBuilderCL (std::string filename, std::ostream* msg) 
+    : f_( *new std::ifstream( filename.c_str())), delete_f_( true), msg_( msg), factory_( 0)
+{}
+
+ReadMeshBuilderCL::~ReadMeshBuilderCL()
+{
+    if (delete_f_)
+        delete &f_;
+}
+
 
 void
 ReadMeshBuilderCL::buildBoundaryImp(MultiGridCL* mgp) const
@@ -1333,7 +1422,7 @@ ReadMeshBuilderCL::buildBoundaryImp(MultiGridCL* mgp) const
         switch(section.headerinfo[3]) { // switch on boundary-condition.
           case 2: break; // interior faces
           default:
-            Bnd.push_back( new MeshBoundaryCL( //section.headerinfo[0], // zone-id
+            Bnd.push_back( new MeshBoundaryCL( // section.headerinfo[0], // zone-id
                                                section.headerinfo[3])); // the bc-type; see Mesh-File-Format C.8
             BC_.push_back( MapBC(section.headerinfo[3]));
             zone_id2bndidx_[section.headerinfo[0]]= Bnd.size()-1;
@@ -1352,7 +1441,7 @@ ReadMeshBuilderCL::buildBoundary(MultiGridCL* mgp) const
 
 /// \todo Did I determine the barycenter of a face correctly?
 void
-ReadMeshBuilderCL::build(MultiGridCL* mgp) const
+ReadMeshBuilderCL::build_ser_impl(MultiGridCL* mgp) const
 {
     // Read the mesh file.
     const_cast<ReadMeshBuilderCL*>( this)->ReadFile(); // It is not useful that build is a
@@ -1456,6 +1545,28 @@ ReadMeshBuilderCL::build(MultiGridCL* mgp) const
     delete factory_; factory_=0;
 }
 
+void ReadMeshBuilderCL::build_par_impl(MultiGridCL* mgp) const
+{
+    // Read the mesh file.
+    const_cast<ReadMeshBuilderCL*>( this)->ReadFile(); // It is not useful that build is a
+                                                       // const member-function by inheritance.
+    nodes_.Check();
+    mfaces_.Check();
+    cells_.Check();
+
+    MGBuilderCL::build_par_impl(mgp);
+}
+
+MGBuilderCL* ReadMeshBuilderCL::make_MGBuilder (const ParamCL& P)
+{
+    if (P.get<std::string>( "Type") != std::string( "ReadMeshBuilder")) {
+        std::string msg= "ReadMeshBuilderCL::make_MGBuilder: Unexpected type '" + P.get<std::string>( "Type") + "'.\n";
+        throw DROPSErrCL( msg.c_str());
+    }
+    std::string path= P.get<std::string>( "Path");
+    return new ReadMeshBuilderCL( path);
+}
+
 const char*
 ReadMeshBuilderCL::Symbolic(const Uint id)
 {
@@ -1482,22 +1593,6 @@ BndCondT ReadMeshBuilderCL::MapBC( Uint gambit_bc)
       case  8: return Per2BC;           // periodic-shadow
       default: return UndefinedBC_;
     }
-}
-
-void EmptyReadMeshBuilderCL::build(MultiGridCL* mgp) const
-{
-    // Read the mesh file.
-    const_cast<EmptyReadMeshBuilderCL*>( this)->ReadFile(); // It is not useful that build is a
-                                                       // const member-function by inheritance.
-    nodes_.Check();
-    mfaces_.Check();
-    cells_.Check();
-
-    for (Uint i=0; i<numLevel_; ++i)
-        AppendLevel( mgp);
-
-    // Create boundary
-    base_::buildBoundaryImp(mgp);
 }
 
 /*******************************************************************
@@ -1728,7 +1823,7 @@ void FileBuilderCL::AddChildren() const
     CheckFile(child_file);
 }
 
-void FileBuilderCL::build(MultiGridCL* mgp) const
+void FileBuilderCL::build_ser_impl(MultiGridCL* mgp) const
 {
     AppendLevel(mgp);
     factory_ = new SimplexFactoryCL( this->GetVertices(mgp), this->GetEdges(mgp), this->GetFaces(mgp), this->GetTetras(mgp));
@@ -1946,7 +2041,7 @@ void FileBuilderCL::BuildFacesII(MultiGridCL* mgp) const
                 it->second.UpdateOwner(loadOfProc);
 }
 
-void FileBuilderCL::build(MultiGridCL* mgp) const
+void FileBuilderCL::build_ser_impl(MultiGridCL* mgp) const
 {
     AppendLevel(mgp);
     factory_ = new SimplexFactoryCL( this->GetVertices(mgp), this->GetEdges(mgp), this->GetFaces(mgp), this->GetTetras(mgp));
@@ -2257,4 +2352,16 @@ void MGSerializationCL::CheckFile( const std::ostream& os) const
     if (!os) throw DROPSErrCL( "MGSerializationCL: error while opening file!");
 }
 #endif
+
+/// \brief Registration of the MGBuilder-factories in the singleton. @{
+typedef MapRegisterCL <MGBuilder_fun> RegisterBuilder;
+
+static RegisterBuilder RegBrickBuilder     ("BrickBuilder"   , &BrickBuilderCL::make_MGBuilder);
+static RegisterBuilder RegBBuilder         ("BBuilder"       , &BBuilderCL::make_MGBuilder);
+static RegisterBuilder RegLBuilder         ("LBuilder"       , &LBuilderCL::make_MGBuilder);
+static RegisterBuilder RegCavityBuilder    ("CavityBuilder"  , &CavityBuilderCL::make_MGBuilder);
+static RegisterBuilder RegTetraBuilder     ("TetraBuilder"   , &TetraBuilderCL::make_MGBuilder);
+static RegisterBuilder RegMeshReaderBuilder("ReadMeshBuilder", &ReadMeshBuilderCL::make_MGBuilder);
+/// @}
+
 } //end of namespace DROPS

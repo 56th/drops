@@ -261,16 +261,8 @@ DROPS::MultiGridCL* CreateInitGrid(int master= 0)
         const Point3DCL brk_dim = C.get<Point3DCL>("Brick.dim"),
                         brk_orig= C.get<Point3DCL>("Brick.orig");
         e1[0]=brk_dim[0]; e2[1]=brk_dim[1]; e3[2]= brk_dim[2];
-        if (ProcCL::MyRank()==master)
-        {
-            BrickBuilderCL brick(brk_orig, e1, e2, e3, C.get<int>("Brick.BasicRefX"), C.get<int>("Brick.BasicRefY"), C.get<int>("Brick.BasicRefZ"));
-            mg = new DROPS::MultiGridCL(brick);
-        }
-        else
-        {
-            EmptyBrickBuilderCL emptyBrick(brk_orig, e1, e2, e3);
-            mg = new DROPS::MultiGridCL(emptyBrick);
-        }
+        BrickBuilderCL brick(brk_orig, e1, e2, e3, C.get<int>("Brick.BasicRefX"), C.get<int>("Brick.BasicRefY"), C.get<int>("Brick.BasicRefZ"));
+        mg = new DROPS::MultiGridCL(brick);
     }
     else if (C.get<int>("Refine.InitCond")==1)
     {
@@ -288,7 +280,8 @@ DROPS::MultiGridCL* CreateInitGrid(int master= 0)
         }
         else
         {
-            EmptyBrickBuilderCL builder(orig, e1, e2, e3, C.get<int>("Refine.Refined")+1);
+            BrickBuilderCL builder(orig, e1, e2, e3, 4, 4, 4);
+            builder.set_par_numlevel( C.get<int>("Refine.Refined")+1);
             mg = new DROPS::MultiGridCL(builder);
         }
     }
@@ -347,17 +340,7 @@ int main(int argc, char* argv[])
         const int me= DROPS::ProcCL::MyRank();
 
         // Parameter file einlesen ...
-        if (argc!=2){
-            std::cout << "You have to specify one parameter:\n\t" << argv[0] << " <param_file>" << std::endl; return 1;
-        }
-        std::ifstream param( argv[1]);
-        if (!param){
-            std::cout << "error while opening parameter file\n"; return 1;
-        }
-
-        param >> C;
-
-        param.close();
+        DROPS::read_parameter_file_from_cmdline( C, argc, argv);
         std::cout << C << std::endl;
 
         const bool printTime= C.get<int>("Misc.PrintTime"),

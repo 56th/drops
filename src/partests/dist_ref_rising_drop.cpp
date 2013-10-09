@@ -54,15 +54,8 @@ void BuildBrick( MultiGridCL*& mg)
     brick_info >> dx >> dy >> dz >> nx >> ny >> nz;
     Point3DCL orig, px, py, pz;
     px[0]= dx; py[1]= dy; pz[2]= dz;
-    MGBuilderCL* builder=0;
-    if ( ProcCL::IamMaster()){
-        builder = new BrickBuilderCL( orig, px, py, pz, nx, ny, nz);
-    }
-    else{
-        builder = new DROPS::EmptyBrickBuilderCL( orig, px, py, pz);
-    }
-    mg = new MultiGridCL( *builder);
-    delete builder;
+    BrickBuilderCL builder( orig, px, py, pz, nx, ny, nz);
+    mg = new MultiGridCL( builder);
 }
 
 
@@ -111,23 +104,7 @@ int main( int argc, char **argv)
     DROPS::ProcCL::Instance(&argc, &argv);
 #endif
     try {
-        std::ifstream param;
-        if (argc!=2)
-        {
-            std::cout << "Using default parameter file: risingdroplet.json\n";
-            param.open( "risingdroplet.json");
-        }
-        else{
-            std::cout << "Opening file " << argv[1] << "\n";
-            param.open( argv[1]);
-        }
-        if (!param)
-        {
-            std::cerr << "error while opening parameter file\n";
-            return 1;
-        }
-        param >> P;
-        param.close();
+        DROPS::read_parameter_file_from_cmdline( P, argc, argv, "risingdroplet.json");
         std::cout << P << std::endl;
 
 

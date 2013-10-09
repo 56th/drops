@@ -34,6 +34,8 @@
 #endif
 
 #include "geom/multigrid.h"
+#include "misc/params.h"
+#include "misc/singletonmap.h"
 #include "num/gauss.h"
 #include <iterator>
 #include <set>
@@ -45,7 +47,6 @@ BoundaryCL::~BoundaryCL()
 {
     for (SegPtrCont::iterator It=Bnd_.begin(); It!=Bnd_.end(); ++It)
         delete *It;
-    delete BndType_;
 }
 
 void BoundaryCL::SetPeriodicBnd( const BndTypeCont& type, match_fun match) const
@@ -59,7 +60,7 @@ void BoundaryCL::SetPeriodicBnd( const BndTypeCont& type, match_fun match) const
         }
     }
 #endif
-    BndType_= new BndTypeCont(type);
+    BndType_= type;
     match_= match;
 }
 
@@ -1069,6 +1070,21 @@ TriangFillCL<TetraCL>::fill (MultiGridCL& mg, TriangCL<TetraCL>::LevelCont& c, i
     c.swap( tmp);
 }
 
+
+MGBuilderCL::MGBuilderCL (Uint parnumLevel)
+    : parnumLevel_( parnumLevel)
+{}
+
+void MGBuilderCL::build_par_impl(MultiGridCL* mgp) const
+{
+    for (Uint i= 0; i < parnumLevel_; ++i)
+        AppendLevel( mgp);
+
+    // Create boundary
+    buildBoundary( mgp);
+}
+
+
 void
 LocatorCL::LocateInTetra(LocationCL& loc, Uint trilevel, const Point3DCL&p, double tol)
 // Assumes, that p lies in loc.Tetra_ and that loc.Tetra_ contains the barycentric
@@ -1307,5 +1323,61 @@ const ColorClassesCL& MultiGridCL::GetColorClasses (int Level, match_fun match, 
 
     return *colors_[Level];
 }
+
+void read_PeriodicBoundaries (MultiGridCL& mg, const ParamCL& P)
+{
+    const BoundaryCL& bnd= mg.GetBnd();
+    const BndIdxT num_bnd= bnd.GetNumBndSeg();
+
+    match_fun mfun= 0;
+    BoundaryCL::BndTypeCont bnd_type( num_bnd, BoundaryCL::OtherBnd);
+
+    // Try to read and set PeriodicMatching.
+    const ParamCL::ptree_type* child= 0;
+    try {
+        child= &P.get_child( "PeriodicMatching");
+    } catch (DROPSParamErrCL e) {}
+    if (child != 0)
+        try {
+            const std::string s= child->get_value<std::string>();
+            if (s != "")
+                mfun= SingletonMapCL<match_fun>::getInstance()[s];
+        } catch (DROPSErrCL e) {
+            std:: cerr << "read_PeriodicBoundaries: While processing 'PeriodicMatching'...\n";
+            throw e;
+        }
+
+    // Read data for the boundary segments.
+    for (ParamCL::ptree_const_iterator_type it= P.begin(), end= P.end(); it != end; ++it) {
+        const std::string key= it->first;
+        if (key == std::string( "PeriodicMatching"))
+            continue;
+
+        BndIdxT i;
+        std::istringstream iss( key);
+        iss >> i;
+        if (!iss) // As BndIdxT is unsigned, the 2nd test is redundant.
+            throw DROPSErrCL( "read_PeriodicBoundaries: Invalid boundary segment '" + key + "'.\n");
+
+        BoundaryCL::BndType type= BoundaryCL::OtherBnd;
+        try {
+            const std::string s= it->second.get_value<std::string>();
+            if (s == "Per1Bnd")
+                type= BoundaryCL::Per1Bnd;
+            else if (s == "Per2Bnd")
+                type= BoundaryCL::Per2Bnd;
+        } catch (DROPSParamErrCL e) {
+            std:: cerr << "read_PeriodicBoundaries: While processing key '" << key << "'...\n";
+            throw e;
+        }
+        if (type != BoundaryCL::Per1Bnd && type != BoundaryCL::Per2Bnd && type != BoundaryCL::OtherBnd)
+            throw DROPSErrCL( "read_PeriodicBoundaries: Key '" + key + "' specifies an invalid BndType.\n");
+        bnd_type[i]= type;
+    }
+
+    // Enter the data to bnd
+    bnd.SetPeriodicBnd( bnd_type, mfun);
+}
+
 
 } // end of namespace DROPS

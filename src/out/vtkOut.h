@@ -298,54 +298,6 @@ template <class DiscVectorT>
 }
 
 //=====================================================
-// Derived classes for easier usage
-//=====================================================
-
-/// \brief Class for writing out a twophase flow in VTK file format
-template<typename StokesCL, typename LevelsetCL>
-class TwoPhaseVTKCL : public VTKOutCL
-/** This class writes out information about the geometry, velocity, pressure
-    and the level-set function.*/
-{
-  private:
-    typedef VTKOutCL base_;
-
-  protected:
-    const StokesCL&   stokes_;
-    const LevelsetCL& levelset_;
-    const bool        writeDist_;
-
-  public:
-    /// \brief Constructor of this class
-    TwoPhaseVTKCL (const MultiGridCL& mg, const StokesCL& st, const LevelsetCL& ls,
-                   Uint numsteps, const std::string& filename, bool binary, bool writeDistribution=false);
-
-    /// \brief Write all information of a two phase problem
-    void write();
-};
-
-/// \brief Class for writing out a twophase flow with transport in VTK file format
-template<typename StokesCL, typename LevelsetCL, typename TransportCL>
-class TwoPhaseTransportVTKCL : public TwoPhaseVTKCL<StokesCL, LevelsetCL>
-/** This class writes out information about the geometry, velocity, pressure,
-    the level-set function and transport .*/
-{
-  private:
-    typedef TwoPhaseVTKCL<StokesCL, LevelsetCL> base_;
-
-    const TransportCL& transport_;
-
-  public:
-    /// \brief Constructor of this class
-    TwoPhaseTransportVTKCL (const MultiGridCL& mg, const StokesCL& st, const LevelsetCL& ls,
-                            const TransportCL& tr, Uint numsteps, const std::string& filename,
-                            bool binary);
-
-    /// \brief Write all information of a two-phase problem with mass transport
-    void write();
-};
-
-//=====================================================
 //              template definitions
 //=====================================================
 

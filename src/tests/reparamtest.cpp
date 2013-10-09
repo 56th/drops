@@ -334,38 +334,19 @@ int main( int argc, char **argv)
         DROPS::ParMultiGridInitCL pmginit;
 #endif
 
-        std::ifstream param;
-        if (argc != 2) {
-            std::cout << "Using default parameter file: reparam.json\n";
-            param.open("reparam.json");
-        }
-        else{
-            std::cout << "Opening file " << argv[1] << std::endl;
-            param.open(argv[1]);
-        }
-        if (!param) {
-            std::cerr << "error while opening parameter file\n";
-            return 1;
-        }
-        param >> P;
-        param.close();
+        DROPS::read_parameter_file_from_cmdline( P, argc, argv, "reparam.json");
         std::cout << P << std::endl;
 
         DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
 
         DROPS::MultiGridCL* mg= 0;
-        DROPS::BrickBuilderCL *mgb = 0;
         DROPS::Point3DCL a,b,c;
         a[0]= P.get<DROPS::Point3DCL>("Brick.dim")[0];
         b[1]= P.get<DROPS::Point3DCL>("Brick.dim")[1];
         c[2]= P.get<DROPS::Point3DCL>("Brick.dim")[2];
-        IF_MASTER
-            mgb = new DROPS::BrickBuilderCL( P.get<DROPS::Point3DCL>("Brick.orig"), a, b, c, P.get<double>("Brick.BasicRefX"), P.get<double>("Brick.BasicRefY"), P.get<double>("Brick.BasicRefZ"));
-        IF_NOT_MASTER
-            mgb = new DROPS::EmptyBrickBuilderCL(P.get<DROPS::Point3DCL>("Brick.orig"), a, b, c);
+        DROPS::BrickBuilderCL mgb( P.get<DROPS::Point3DCL>("Brick.orig"), a, b, c, P.get<double>("Brick.BasicRefX"), P.get<double>("Brick.BasicRefY"), P.get<double>("Brick.BasicRefZ"));
 
-        mg= new DROPS::MultiGridCL( *mgb);
-        delete mgb;
+        mg= new DROPS::MultiGridCL( mgb);
 
         DROPS::AdapTriangCL adap( *mg, P.get<double>("AdaptRef.Width"), P.get<int>("AdaptRef.CoarsestLevel"), P.get<int>("AdaptRef.FinestLevel"), -1);
 

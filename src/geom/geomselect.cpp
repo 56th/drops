@@ -41,10 +41,7 @@ void BuildDomain( MultiGridCL* &mgp, const std::string& meshfile_name, int GeomT
         ReadMeshBuilderCL *mgb= 0;       // builder of the multigrid
 
         // read geometry information from a file and create the multigrid
-        IF_MASTER
-            mgb = new ReadMeshBuilderCL( meshfile );
-        IF_NOT_MASTER
-            mgb = new EmptyReadMeshBuilderCL( meshfile );
+        mgb = new ReadMeshBuilderCL( meshfile );
         // Create the multigrid
         if (deserialization_file == "none"){
             mgp= new MultiGridCL( *mgb);
@@ -74,10 +71,7 @@ void BuildDomain( MultiGridCL* &mgp, const std::string& meshfile_name, int GeomT
         px[0]= dx; py[1]= dy; pz[2]= dz;
 
         BrickBuilderCL *mgb = 0;
-        IF_MASTER
-            mgb = new BrickBuilderCL( orig, px, py, pz, nx, ny, nz);
-        IF_NOT_MASTER
-            mgb = new EmptyBrickBuilderCL(orig, px, py, pz);
+        mgb = new BrickBuilderCL( orig, px, py, pz, nx, ny, nz);
 
         if (deserialization_file == "none")
             mgp= new MultiGridCL( *mgb);
@@ -108,10 +102,7 @@ void BuildDomain( MultiGridCL* &mgp, const std::string& meshfile_name, int GeomT
         SArrayCL<Uint, 3> corg, cav;
         corg[0]= cdx; corg[1]= cdy; corg[2]= cdz;
         cav[0]= cnx; cav[1]= cny; cav[2]= cnz;
-        IF_MASTER
-            mgb = new CavityBuilderCL( orig, px, py, pz, nx, ny, nz, corg, cav);
-        IF_NOT_MASTER
-            mgb = new EmptyCavityBuilderCL(orig, px, py, pz, 1, corg, cav);
+        mgb = new CavityBuilderCL( orig, px, py, pz, nx, ny, nz, corg, cav);
 
         if (deserialization_file == "none")
             mgp= new MultiGridCL( *mgb);
@@ -188,10 +179,7 @@ void BuildDomain( MultiGridCL* &mgp, const std::string& meshfile_name, int GeomT
         ReadMeshBuilderCL *mgb= 0;       // builder of the multigrid
 
         // read geometry information from a file and create the multigrid
-        IF_MASTER
-            mgb = new ReadMeshBuilderCL( meshfile );
-        IF_NOT_MASTER
-            mgb = new EmptyReadMeshBuilderCL( meshfile );
+        mgb = new ReadMeshBuilderCL( meshfile );
         // Create the multigrid
         if (deserialization_file == "none")
             mgp= new MultiGridCL( *mgb);

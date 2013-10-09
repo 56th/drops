@@ -571,31 +571,14 @@ int main (int argc, char** argv)
 #endif
   try
   {
-    std::ifstream param;
-
     std::cout << "Boost version: " << BOOST_LIB_VERSION << std::endl;
 
-    if (argc!=2)
-    {
-        std::cout << "Using default parameter file: risingdroplet.json\n";
-        param.open( "risingdroplet.json");
-    }
-    else
-        param.open( argv[1]);
-    if (!param)
-    {
-        std::cerr << "error while opening parameter file\n";
-        return 1;
-    }
-    param >> P;
-    param.close();
-
+    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "risingdroplet.json");
     SetMissingParameters(P);
-
     std::cout << P << std::endl;
-    
+
     DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
-    
+
     if (P.get<int>("General.ProgressBar"))
         DROPS::ProgressBarTetraAccumulatorCL::Activate();
 

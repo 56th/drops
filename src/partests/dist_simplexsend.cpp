@@ -67,7 +67,7 @@ int main( int argc, char **argv)
             transfer.Finalize();
         }
         else{
-            builder= new EmptyTetraBuilderCL();
+            builder= new TetraBuilderCL(0);
             mg = new MultiGridCL( *builder);
             DiST::TransferCL transfer( *mg, true, true);
 
