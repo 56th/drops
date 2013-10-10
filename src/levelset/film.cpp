@@ -490,9 +490,11 @@ int main (int argc, char** argv)
             case 'w': case 'W':
                 bc[i]= DROPS::WallBC;    bnd_fun[i]= ZeroVel; bndType.push_back( DROPS::BoundaryCL::OtherBnd); break;
             case 'i': case 'I':
-                bc[i]= DROPS::DirBC;     bnd_fun[i]= Inflow;         bndType.push_back( DROPS::BoundaryCL::OtherBnd); break;
+                bc[i]= DROPS::DirBC;     bnd_fun[i]= Inflow;  bndType.push_back( DROPS::BoundaryCL::OtherBnd); break;
             case 'o': case 'O':
                 bc[i]= DROPS::OutflowBC; bnd_fun[i]= ZeroVel; bndType.push_back( DROPS::BoundaryCL::OtherBnd); break;
+            case 's': case 'S':
+                bc[i]= DROPS::SymmBC;    bnd_fun[i]= ZeroVel; bndType.push_back( DROPS::BoundaryCL::OtherBnd); break;
             case '1':
                 is_periodic= true;
                 bc_ls[i]= bc[i]= DROPS::Per1BC;    bnd_fun[i]= ZeroVel; bndType.push_back( DROPS::BoundaryCL::Per1Bnd); break;
