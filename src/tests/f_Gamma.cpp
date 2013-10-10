@@ -47,8 +47,8 @@ int FctCode=9;
 double SurfTension;
 double sigmaf( const DROPS::Point3DCL& p, double)
 {
-//     return SurfTension;
-    return 1 + std::cos( 2.*M_PI*p[0]);
+    return SurfTension;
+//     return 1 + std::cos( 2.*M_PI*p[0]);
 }
 
 /*
@@ -86,6 +86,11 @@ DROPS::Point3DCL Null( const DROPS::Point3DCL&, double)
 
 static DROPS::RegisterVectorFunction regveczero("VecZero",  Null);
 
+DROPS::Point3DCL TestFunLowerBound (const DROPS::Point3DCL& p, double)
+{
+//     return std::abs( p[2])*p;
+    return DROPS::MakePoint3D( std::abs( p[1])*p[1], std::abs( p[0])*p[0], std::abs(p[2])*p[2])/(r*r);
+}
 
 void WriteFct( std::ostream& os)
 {
@@ -476,41 +481,81 @@ void LSInit (const DROPS::MultiGridCL& mg, DROPS::VecDescCL& ls, double (*d)(con
     ls.t= t;
 }
 
-void Compare_Oblique_Improved (DROPS::AdapTriangCL& adap, InstatStokes2PhaseP2P1CL& Stokes, LevelsetP2CL& lset)
+void MyInit (const DROPS::MultiGridCL& mg, DROPS::VecDescCL& ls, Point3DCL (*d)(const Point3DCL&, double), double t= 0.)
 {
-    MultiGridCL& MG= Stokes.GetMG();
+    const DROPS::Uint lvl= ls.GetLevel(),
+                      idx= ls.RowIdx->GetIdx();
 
-    MLIdxDescCL* vidx= &Stokes.vel_idx;
-    Stokes.CreateNumberingVel( MG.GetLastLevel(), vidx);
+    DROPS_FOR_TRIANG_CONST_VERTEX( mg, lvl, it) {
+        if (!it->Unknowns.Exist( idx))
+            continue;
+        const Point3DCL& v= d( it->GetCoord(), t);
+        ls.Data[it->Unknowns( idx)  ]= v[0];
+        ls.Data[it->Unknowns( idx)+1]= v[1];
+        ls.Data[it->Unknowns( idx)+2]= v[2];
+    }
 
-    MG.SizeInfo( std::cout);
-    Stokes.b.SetIdx( vidx);
-    Stokes.v.SetIdx( vidx);
-    Stokes.A.SetIdx( vidx, vidx);
-    Stokes.M.SetIdx( vidx, vidx);
+    DROPS_FOR_TRIANG_CONST_EDGE( mg, lvl, it) {
+        if (!it->Unknowns.Exist( idx))
+            continue;
+        const Point3DCL& v= d( 0.5*(it->GetVertex( 0)->GetCoord() + it->GetVertex( 1)->GetCoord()), t);
+        ls.Data[it->Unknowns( idx)  ]= v[0];
+        ls.Data[it->Unknowns( idx)+1]= v[1];
+        ls.Data[it->Unknowns( idx)+2]= v[2];
+    }
+    ls.t= t;
+}
 
-    std::cout << vidx->NumUnknowns() << " velocity unknowns,\n";
-    std::cout << lset.Phi.Data.size() << " levelset unknowns.\n";
+void Compare_Oblique_Coarse (DROPS::AdapTriangCL& adap, InstatStokes2PhaseP2P1CL& Stokes, LevelsetP2CL& lset, std::string comparison_target)
+{
+    MultiGridCL& mg= Stokes.GetMG();
+    if (mg.GetLastLevel() == 0)
+        throw DROPSErrCL( "Compare_Oblique: Need level > 0.\n");
 
-    const double Vol= 4./3*M_PI*std::pow( P.get<DROPS::Point3DCL>("Exp.RadDrop")[0], 3);
-    const double curv= 2./P.get<DROPS::Point3DCL>("Exp.RadDrop")[0];
+    const Uint flvl= mg.GetLastLevel(),
+               clvl= flvl - 1;
+
+    DROPS::SurfaceTensionCL csf( sigmaf);
+    std::auto_ptr<DROPS::LevelsetP2CL> clsetp( DROPS::LevelsetP2CL::Create( mg, lset.GetBndData(), csf, P.get_child("Levelset")));
+    DROPS::LevelsetP2CL& clset= *clsetp;
+    clset.CreateNumbering( clvl, &clset.idx);
+    clset.Phi.SetIdx( &clset.idx);
+    clset.Init( DistanceFct);
+
+    MLIdxDescCL* cvidx= &Stokes.vel_idx;
+    Stokes.CreateNumberingVel( clvl, cvidx);
+
+    mg.SizeInfo( std::cout);
+    Stokes.b.SetIdx( cvidx);
+    Stokes.v.SetIdx( cvidx);
+    Stokes.A.SetIdx( cvidx, cvidx);
+    Stokes.M.SetIdx( cvidx, cvidx);
+
+    std::cout << cvidx->NumUnknowns() << " coarse: velocity unknowns,\n";
+    std::cout << clset.Phi.Data.size() << " coarse: levelset unknowns.\n";
+
+    const double Vol= 4./3*M_PI*std::pow( r, 3);
+    const double curv= 2./r;
     std::cout << "Volumen = " << Vol << "\tKruemmung = " << curv << "\n\n";
 
-    VecDescCL f_improved( vidx);
+    VecDescCL f_oblique( cvidx);
+    clset.SetSurfaceForce( SF_ObliqueLBVar);
+    clset.AccumulateBndIntegral( f_oblique);
+
+    DROPS::IdxDescCL fvidx( vecP2_FE, Stokes.GetBndData().Vel);
+    fvidx.CreateNumbering( flvl, mg);
+    VecDescCL ff_improved( &fvidx);
     lset.SetSurfaceForce( SF_ImprovedLBVar);
-    lset.AccumulateBndIntegral( f_improved);
+    lset.AccumulateBndIntegral( ff_improved);
 
-    VecDescCL f_oblique( vidx);
-    lset.SetSurfaceForce( SF_ObliqueLBVar);
-    lset.AccumulateBndIntegral( f_oblique);
+    ProlongationCL<Point3DCL> prolongation( mg);
+    prolongation.Create( cvidx->GetFinestPtr(), &fvidx);
+    VecDescCL f_improved( cvidx);
+    f_improved.Data= transp_mul( prolongation, ff_improved.Data);
 
-    vtkwriter->Register( make_VTKScalar( lset.GetSolution(), "Levelset") );
-    vtkwriter->Register( make_VTKVector( make_P2Eval( MG, Stokes.GetBndData().Vel, f_oblique),  "f_oblique"));
-    vtkwriter->Register( make_VTKVector( make_P2Eval( MG, Stokes.GetBndData().Vel, f_improved), "f_improved"));
-    BndDataCL<> nobnd( 0);
-    VecDescCL vd_sigmaf( &lset.idx);
-    LSInit( MG, vd_sigmaf, sigmaf, 0.);
-    vtkwriter->Register( make_VTKScalar( make_P2Eval( MG, nobnd, vd_sigmaf),                    "sigmaf"));
+    vtkwriter->Register( make_VTKScalar( clset.GetSolution(), "Levelset") );
+    vtkwriter->Register( make_VTKVector( make_P2Eval( mg, Stokes.GetBndData().Vel, f_oblique),  "f_oblique"));
+    vtkwriter->Register( make_VTKVector( make_P2Eval( mg, Stokes.GetBndData().Vel, f_improved), "f_improved"));
     vtkwriter->Write( 0.);
 
     VectorCL d( f_oblique.Data - f_improved.Data);
@@ -526,29 +571,31 @@ void Compare_Oblique_Improved (DROPS::AdapTriangCL& adap, InstatStokes2PhaseP2P1
 //     if (isnan( d[i]))
 //         std::cerr << "Hallo d i: " << i << std::endl;
 
-    Stokes.SetupSystem1( &Stokes.A, &Stokes.M, &Stokes.b, &Stokes.b, &Stokes.b, lset, 0.);
+    Stokes.SetupSystem1( &Stokes.A, &Stokes.M, &Stokes.b, &Stokes.b, &Stokes.b, clset, 0.);
     MLMatrixCL MA;
     MA.LinComb( 1, Stokes.M.Data, 1, Stokes.A.Data);
     VectorCL MA_inv_d( d);
     std::cout << "Solving system with MA matrix:\t";
     SSORPcCL pc;
     typedef PCGSolverCL<SSORPcCL> PCG_SsorCL;
-    PCG_SsorCL cg( pc, 1000, 1e-18);
-    cg.Solve( MA, MA_inv_d, d, vidx->GetEx());
+//     PCG_SsorCL cg( pc, 1000, 1e-18);
+    PCG_SsorCL cg( pc, 1000, 1e-14);
+    cg.Solve( MA, MA_inv_d, d, cvidx->GetEx());
     std::cout << cg.GetIter() << " iter,\tresid = " << cg.GetResid();
     const double sup2= std::sqrt(dot( MA_inv_d, d));
+    std::cout.precision( 12);
     std::cout << "\n\nsup |f1(v)-f2(v)|/||v||_1 = \t\t" << sup2
               << "\n|(MA)^-1 d| = " << norm( MA_inv_d) << std::endl;
 }
 
-void Compare_Oblique_Helper (DROPS::AdapTriangCL& adap, InstatStokes2PhaseP2P1CL& Stokes, LevelsetP2CL& lset)
+void Compare_Oblique (DROPS::AdapTriangCL& adap, InstatStokes2PhaseP2P1CL& Stokes, LevelsetP2CL& lset, std::string comparison_target)
 {
-    MultiGridCL& MG= Stokes.GetMG();
+    MultiGridCL& mg= Stokes.GetMG();
 
     MLIdxDescCL* vidx= &Stokes.vel_idx;
-    Stokes.CreateNumberingVel( MG.GetLastLevel(), vidx);
+    Stokes.CreateNumberingVel( mg.GetLastLevel(), vidx);
 
-    MG.SizeInfo( std::cout);
+    mg.SizeInfo( std::cout);
     Stokes.b.SetIdx( vidx);
     Stokes.v.SetIdx( vidx);
     Stokes.A.SetIdx( vidx, vidx);
@@ -557,26 +604,46 @@ void Compare_Oblique_Helper (DROPS::AdapTriangCL& adap, InstatStokes2PhaseP2P1CL
     std::cout << vidx->NumUnknowns() << " velocity unknowns,\n";
     std::cout << lset.Phi.Data.size() << " levelset unknowns.\n";
 
-    const double Vol= 4./3*M_PI*std::pow( P.get<DROPS::Point3DCL>("Exp.RadDrop")[0], 3);
-    const double curv= 2./P.get<DROPS::Point3DCL>("Exp.RadDrop")[0];
+    const double Vol= 4./3*M_PI*std::pow( r, 3);
+    const double curv= 2./r;
     std::cout << "Volumen = " << Vol << "\tKruemmung = " << curv << "\n\n";
-
-    VecDescCL f_improved( vidx);
-    TetraAccumulatorTupleCL accus;
-    accus.push_back_acquire( new SphereObliqueLaplaceBeltramiAccuCL( lset, f_improved));
-    accumulate( accus, MG, vidx->TriangLevel(), vidx->GetMatchingFunction(), vidx->GetBndInfo());
 
     VecDescCL f_oblique( vidx);
     lset.SetSurfaceForce( SF_ObliqueLBVar);
     lset.AccumulateBndIntegral( f_oblique);
 
+    VecDescCL f_improved( vidx);
+    if (comparison_target == "Helper") {
+        TetraAccumulatorTupleCL accus;
+        accus.push_back_acquire( new SphereObliqueLaplaceBeltramiAccuCL( lset, f_improved));
+        accumulate( accus, mg, vidx->TriangLevel(), vidx->GetMatchingFunction(), vidx->GetBndInfo());
+    }
+    else if (comparison_target == "Improved") {
+        lset.SetSurfaceForce( SF_ImprovedLBVar);
+        lset.AccumulateBndIntegral( f_improved);
+    }
+    else if (comparison_target == "LowerBound") {
+        VecDescCL funvd( vidx);
+        MyInit( mg, funvd, TestFunLowerBound);
+//         const double exact= -4.*M_PI*std::pow( r, 3);
+        const double exact= -2.*M_PI*r;
+        std::cout << "LowerBound dot( f_oblique, funvd): " << dot( f_oblique.Data, funvd.Data) << "\n"
+                     "fh(v) - f(v): " << dot( f_oblique.Data, funvd.Data) - exact << ".\n";
+        return;
+    }
+    else if (comparison_target == "Norm") {
+        f_improved.Data= 0.;
+    }
+    else
+        throw DROPSErrCL( "Compare_Oblique: Unknown target: " + comparison_target + ".\n");
+
     vtkwriter->Register( make_VTKScalar( lset.GetSolution(), "Levelset") );
-    vtkwriter->Register( make_VTKVector( make_P2Eval( MG, Stokes.GetBndData().Vel, f_oblique),  "f_oblique"));
-    vtkwriter->Register( make_VTKVector( make_P2Eval( MG, Stokes.GetBndData().Vel, f_improved), "f_improved"));
+    vtkwriter->Register( make_VTKVector( make_P2Eval( mg, Stokes.GetBndData().Vel, f_oblique),  "f_oblique"));
+    vtkwriter->Register( make_VTKVector( make_P2Eval( mg, Stokes.GetBndData().Vel, f_improved), "f_improved"));
     BndDataCL<> nobnd( 0);
     VecDescCL vd_sigmaf( &lset.idx);
-    LSInit( MG, vd_sigmaf, sigmaf, 0.);
-    vtkwriter->Register( make_VTKScalar( make_P2Eval( MG, nobnd, vd_sigmaf),                    "sigmaf"));
+    LSInit( mg, vd_sigmaf, sigmaf, 0.);
+    vtkwriter->Register( make_VTKScalar( make_P2Eval( mg, nobnd, vd_sigmaf),                    "sigmaf"));
     vtkwriter->Write( 0.);
 
     VectorCL d( f_oblique.Data - f_improved.Data);
@@ -599,10 +666,12 @@ void Compare_Oblique_Helper (DROPS::AdapTriangCL& adap, InstatStokes2PhaseP2P1CL
     std::cout << "Solving system with MA matrix:\t";
     SSORPcCL pc;
     typedef PCGSolverCL<SSORPcCL> PCG_SsorCL;
-    PCG_SsorCL cg( pc, 1000, 1e-18);
+//     PCG_SsorCL cg( pc, 1000, 1e-18);
+    PCG_SsorCL cg( pc, 1000, 1e-14);
     cg.Solve( MA, MA_inv_d, d, vidx->GetEx());
     std::cout << cg.GetIter() << " iter,\tresid = " << cg.GetResid();
     const double sup2= std::sqrt(dot( MA_inv_d, d));
+    std::cout.precision( 12);
     std::cout << "\n\nsup |f1(v)-f2(v)|/||v||_1 = \t\t" << sup2
               << "\n|(MA)^-1 d| = " << norm( MA_inv_d) << std::endl;
 }
@@ -651,7 +720,8 @@ int main (int argc, char** argv)
     DROPS::SurfaceTensionCL sf( sigmaf);
     DROPS::LsetBndDataCL lsbnd( 0);
     read_BndData( lsbnd, mg, P.get_child( "Levelset.BndData"));
-    DROPS::LevelsetP2CL& lset( *DROPS::LevelsetP2CL::Create( mg, lsbnd, sf, P.get_child("Levelset")));
+    std::auto_ptr<DROPS::LevelsetP2CL> lsetp( DROPS::LevelsetP2CL::Create( mg, lsbnd, sf, P.get_child("Levelset")));
+    DROPS::LevelsetP2CL& lset= *lsetp;
     lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
     lset.Phi.SetIdx( &lset.idx);
     lset.Init( DistanceFct);
@@ -679,9 +749,11 @@ int main (int argc, char** argv)
     ));
 //     Compare_LaplBeltramiSF_ConstSF( prob, lsbnd);
 //     Compare_Oblique_Improved( adap, prob, lset);
-    Compare_Oblique_Helper( adap, prob, lset);
+    if (P.get<std::string>( "Exp.ComparisonTarget") == "CoarseLevel")
+        Compare_Oblique_Coarse( adap, prob, lset, P.get<std::string>( "Exp.ComparisonTarget"));
+    else
+        Compare_Oblique( adap, prob, lset, P.get<std::string>( "Exp.ComparisonTarget"));
 
-    delete &lset;
     return 0;
   }
   catch (DROPS::DROPSErrCL& err) { err.handle(); }

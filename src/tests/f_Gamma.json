@@ -39,7 +39,8 @@
 	"Exp":
 	{
 		"RadDrop":		[0.5, 0.5, 0.5 ],
-		"PosDrop":		[0, 0, 0 ]
+		"PosDrop":		[0, 0, 0 ],
+		"ComparisonTarget":	"Improved" // "Improved", "Helper", "LowerBound", "Norm", "CoarseLevel"
 	},
 
 	"AdaptRef":
