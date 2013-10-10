@@ -329,7 +329,7 @@ namespace slipBnd{
 		static double nu, l_s;
 		if(first){
 			nu=P.get<double>("Mat.ViscFluid")/P.get<double>("Mat.DensFluid");
-			l_s=1./(P.get<double>("SpeBnd.SlipLength2"));
+			l_s=1./(P.get<double>("SpeBnd.beta2"));
 			first = false;
 		}
 		double		    F=std::sin(2*nu*t);
@@ -359,7 +359,7 @@ namespace InstatSlip{
 		static double nu, l_s;
 		if(first){
 			nu=P.get<double>("Mat.ViscFluid")/P.get<double>("Mat.DensFluid");
-			l_s=1./(P.get<double>("SpeBnd.SlipLength2"));
+			l_s=1./(P.get<double>("SpeBnd.beta2"));
 			first = false;
 		}
 		double		        F=std::sin(2*nu*t);
@@ -378,7 +378,7 @@ namespace InstatSlip{
 		static double nu, l_s;
 		if(first){
 			nu=P.get<double>("Mat.ViscFluid")/P.get<double>("Mat.DensFluid");
-			l_s=1./(P.get<double>("SpeBnd.SlipLength2"));
+			l_s=1./(P.get<double>("SpeBnd.beta2"));
 			first = false;
 		}
 		double F=std::sin(2*nu*t);
@@ -397,7 +397,7 @@ namespace InstatSlip{
 		static double nu, l_s;
 		if(first){
 			nu=P.get<double>("Mat.ViscFluid")/P.get<double>("Mat.DensFluid");
-			l_s=1./(P.get<double>("SpeBnd.SlipLength2"));
+			l_s=1./(P.get<double>("SpeBnd.beta2"));
 			first = false;
 		}
 		f[0] =  2.* nu * std::sin(p[0]/l_s) * std::cos(p[1]/l_s) * ( std::cos(2*nu*t) + 1./(l_s*l_s) * std::sin(2*nu*t) ) ;
@@ -420,7 +420,7 @@ namespace StatSlip{
         static bool first = true;
 		static double l_s;
 		if(first){
-			l_s=1./(P.get<double>("SpeBnd.SlipLength2"));
+			l_s=1./(P.get<double>("SpeBnd.beta2"));
 			first = false;
 		}
 		v[0]=  std::sin(p[0]/l_s)*std::cos(p[1]/l_s);
@@ -435,7 +435,7 @@ namespace StatSlip{
         static bool first = true;
 		static double l_s;
 		if(first){
-			l_s=1./(P.get<double>("SpeBnd.SlipLength2"));
+			l_s=1./(P.get<double>("SpeBnd.beta2"));
 			first = false;
 		}
 		delp[0]=-1./(2.*l_s)*std::sin(2*p[0]/l_s);
@@ -453,7 +453,7 @@ namespace StatSlip{
 		static double nu, l_s;
 		if(first){
 			nu=P.get<double>("Mat.ViscFluid")/P.get<double>("Mat.DensFluid");
-			l_s=1./(P.get<double>("SpeBnd.SlipLength2"));
+			l_s=1./(P.get<double>("SpeBnd.beta2"));
 			first = false;
 		}
 		f[0] =  2.* nu * std::sin(p[0]/l_s) * std::cos(p[1]/l_s) *  1./(l_s*l_s) ;

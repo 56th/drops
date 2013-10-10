@@ -655,8 +655,8 @@ void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<std::string>("General.DynamicLibsPrefix", "../");
 	
 	P.put_if_unset<double>("SpeBnd.alpha", 0.0);
-    P.put_if_unset<double>("SpeBnd.SlipLength1", 0.0);
-    P.put_if_unset<double>("SpeBnd.SlipLength2", 0.0);
+    P.put_if_unset<double>("SpeBnd.beta1", 0.0);
+    P.put_if_unset<double>("SpeBnd.beta2", 0.0);
 	P.put_if_unset<double>("SpeBnd.SmoothZone", 0.0);
 	P.put_if_unset<std::string>("SpeBnd.CtAngle", "ConstantAngle");
 	P.put_if_unset<double>("SpeBnd.contactangle", 0.0);

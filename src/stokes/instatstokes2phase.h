@@ -112,8 +112,8 @@ class TwoPhaseFlowCoeffCL
         rho_koeff2( film ? P.get<double>("Mat.DensFluid") : P.get<double>("Mat.DensDrop")),
         mu_koeff1( film ? P.get<double>("Mat.ViscGas") : P.get<double>("Mat.ViscFluid")),
         mu_koeff2( film ? P.get<double>("Mat.ViscFluid") : P.get<double>("Mat.ViscDrop")),
-        beta_coeff1(P.get<double>("SpeBnd.SlipLength1")),
-        beta_coeff2(P.get<double>("SpeBnd.SlipLength2")),
+        beta_coeff1(P.get<double>("SpeBnd.beta1")),
+        beta_coeff2(P.get<double>("SpeBnd.beta2")),
 		
         rho( dimless ? JumpCL( 1., rho_koeff1/rho_koeff2)
           : JumpCL( rho_koeff2, rho_koeff1), H_sm, P.get<double>("Mat.SmoothZone")),
