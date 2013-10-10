@@ -437,7 +437,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     IFInfo.WriteHeader();
 
     if (P.get<int>("Time.NumSteps") == 0)
-        SolveStatProblem( Stokes, lset, *navstokessolver);
+        SolveStatProblem( Stokes, lset, *navstokessolver, P);
 
     // for serialization of geometry and numerical data
     TwoPhaseStoreCL<InstatNavierStokes2PhaseP2P1CL> ser(MG, Stokes, lset, massTransp,
@@ -547,8 +547,8 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
             BndDataCL<> ifbnd( 0);
             std::cout << "surfactant on \\Gamma: " << Integral_Gamma( MG, *lset.PhiC, lset.GetBndData(), make_P1Eval(  MG, ifbnd, surfTransp.ic)) << '\n';
         }
-		
-		//Stokes.CheckOnePhaseSolution( &Stokes.v, &Stokes.p, Stokes.Coeff_.RefVel, Stokes.Coeff_.RefGradPr);
+		if( P.get<std::string>("Exp.Solution_Vel").compare("None")!=0)
+			Stokes.CheckOnePhaseSolution( &Stokes.v, &Stokes.p, Stokes.Coeff_.RefVel, Stokes.Coeff_.RefGradPr);
         double angle,radius;
         computeRadius_Angle( MG, lset, the_Bnd_outnormal,radius,angle);
         out<<" "<<time_new<<"  "<<angle<<"  "<<radius<<std::endl;
