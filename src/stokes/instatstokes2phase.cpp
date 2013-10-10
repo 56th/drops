@@ -1533,7 +1533,6 @@ class SpecialBndHandler_System1TwoPhaseP2CL
     BndTriangPartitionCL partition;
     QuadDomainCL q5dom;
 	Point3DCL normal;
-	Uint unknownIdx[6];
 	GridFunctionCL<double>   basisP2[10];
     GridFunctionCL<double>   gradP1[10];
   public:	
@@ -1575,7 +1574,7 @@ void SpecialBndHandler_System1TwoPhaseP2CL::setup(const TetraCL& tet, const SMat
 			{
 				bary[i][VertOfFace(k, i)]=1;
 			}
-			for(Uint i=0; i<6; ++i)
+			for(Uint i=0; i<10; ++i)
 			{
 				phi[i][i] = 1;
 				Gradn[i] = dot( normal, Grad[i]); 
