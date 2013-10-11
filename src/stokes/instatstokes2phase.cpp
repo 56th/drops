@@ -1503,8 +1503,8 @@ void LocalSystem1OnePhase_P2CL::setup (const SMatrixCL<3,3>& T, double absdet, L
 
 struct LocalBndIntegrals_P2CL
 {
-    double         mass2D[6][6];
-    double         grad2D[6][6];
+    double         mass2D[10][10];
+    double         grad2D[10][10];
 };
 
 /// \brief Place to store P2 integrals on positive/negative part of tetrahedron
