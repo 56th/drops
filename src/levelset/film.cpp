@@ -423,6 +423,22 @@ void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<int>("VTK.ReUseTimeFile",0);
     P.put_if_unset<int>("VTK.UseDeformation",0);
     P.put_if_unset<int>("VTK.UseOnlyP1",0);
+
+    P.put_if_unset<int>("Levelset.Discontinuous", 0);
+    P.put_if_unset<int>("Levelset.Downwind.Frequency", 0);
+    P.put_if_unset<double>("Levelset.Downwind.MaxRelComponentSize", 0.05);
+    P.put_if_unset<double>("Levelset.Downwind.WeakEdgeRatio", 0.2);
+    P.put_if_unset<double>("Levelset.Downwind.CrosswindLimit", std::cos( M_PI/6.));
+	
+	P.put_if_unset<double>("SpeBnd.alpha", 0.0);
+    P.put_if_unset<double>("SpeBnd.beta1", 0.0);
+    P.put_if_unset<double>("SpeBnd.beta2", 0.0);
+	P.put_if_unset<double>("SpeBnd.SmoothZone", 0.0);
+	P.put_if_unset<std::string>("SpeBnd.CtAngle", "ConstantAngle");
+	P.put_if_unset<double>("SpeBnd.contactangle", 0.0);
+	P.put_if_unset<std::string>("SpeBnd.BndOutNormal", "OutNormalBottomPlane");
+	P.put_if_unset<std::string>("Exp.Solution_Vel", "None");
+	P.put_if_unset<std::string>("Exp.Solution_GradPr", "None");
 }
 
 
