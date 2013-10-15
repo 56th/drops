@@ -661,6 +661,7 @@ void SetMissingParameters(DROPS::ParamCL& P){
 	P.put_if_unset<std::string>("SpeBnd.CtAngle", "ConstantAngle");
 	P.put_if_unset<double>("SpeBnd.contactangle", 0.0);
 	P.put_if_unset<std::string>("SpeBnd.BndOutNormal", "OutNormalBottomPlane");
+	P.put_if_unset<std::string>("SpeBnd.posDrop", "[0.5, 0, 0.5 ]");
 
 	P.put_if_unset<std::string>("Exp.Solution_Vel", "None");
 	P.put_if_unset<std::string>("Exp.Solution_GradPr", "None");
