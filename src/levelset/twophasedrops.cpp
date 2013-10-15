@@ -597,7 +597,27 @@ int main (int argc, char** argv)
 
     //you cannot pass a double& per P.get, so you need to use this indirect way
     double ExpRadInlet = P.get<double>("Exp.RadInlet");
-    DROPS::BuildDomain( mg, P.get<std::string>("DomainCond.MeshFile"), P.get<int>("DomainCond.GeomType"), P.get<std::string>("Restart.Inputfile"), ExpRadInlet);
+
+    try
+    {
+        std::auto_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P.get_child( "Domain")));
+        mg = new DROPS::MultiGridCL( *builder);
+    }
+    catch (DROPS::DROPSParamErrCL& e)
+    {
+        std::cout << "\n"
+                  << "  /----------------------------------------------------------------\\ \n"
+                  << "  | WARNING: It seems you are using the old domain descriptions    | \n"
+                  << "  |          or your \"Domain\" section is not correct.              | \n"
+                  << "  |          Please adapt your json-file to the new description.   | \n" 
+                  <<"  \\----------------------------------------------------------------/ \n"
+                  << std::endl;
+        DROPS::BuildDomain( mg, P.get<std::string>("DomainCond.MeshFile"), P.get<int>("DomainCond.GeomType"), P.get<std::string>("Restart.Inputfile"), ExpRadInlet);
+    }
+
+    
+
+
     P.put("Exp.RadInlet", ExpRadInlet);
 
     std::cout << "Generated MG of " << mg->GetLastLevel() << " levels." << std::endl;
