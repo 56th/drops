@@ -47,8 +47,8 @@ int FctCode=9;
 double SurfTension;
 double sigmaf( const DROPS::Point3DCL& p, double)
 {
-    return SurfTension;
-//     return 1 + std::cos( 2.*M_PI*p[0]);
+//     return SurfTension;
+    return 1 + std::cos( 2.*M_PI*p[0]);
 }
 
 /*
@@ -345,7 +345,7 @@ class SphereObliqueLaplaceBeltramiAccuCL : public TetraAccumulatorCL
     const LevelsetP2CL& ls_;
     LocalNumbP2CL n_;
 
-    const PrincipalLatticeCL& lat_;
+    const PrincipalLatticeCL* latp_;
     LocalP2CL<> loc_ls_;
     std::valarray<double> ls_val_;
     SurfacePatchCL p_;
@@ -368,10 +368,17 @@ class SphereObliqueLaplaceBeltramiAccuCL : public TetraAccumulatorCL
 
   public:
     SphereObliqueLaplaceBeltramiAccuCL (const LevelsetP2CL& ls, VecDescCL& f_Gamma)
-     : f( f_Gamma), ls_( ls), lat_( PrincipalLatticeCL::instance( 2)),
-       ls_val_( 10)
+     : f( f_Gamma), ls_( ls), latp_( &PrincipalLatticeCL::instance( 2)),
+       ls_val_( latp_->vertex_size())
     {
         P2DiscCL::GetGradientsOnRef( gradref_);
+    }
+
+    /// Set the sublevel of the principal-lattice for integration.
+    void set_sublevel (Uint lvl) {
+        std::cout << "set_sublevel: sublevel: " << lvl << ", subdivisions: " << (1u << lvl) << ".\n";
+        latp_= &PrincipalLatticeCL::instance( 1u << lvl);
+        ls_val_.resize( latp_->vertex_size());
     }
 
     void begin_accumulation () {
@@ -418,7 +425,7 @@ void SphereObliqueLaplaceBeltramiAccuCL::evaluate_sigma_on_vertexes (const Tetra
 
 void SphereObliqueLaplaceBeltramiAccuCL::visit (const TetraCL& t)
 {
-    evaluate_on_vertexes( ls_.GetSolution(), t, lat_, Addr( ls_val_));
+    evaluate_on_vertexes( ls_.GetSolution(), t, *latp_, Addr( ls_val_));
     if (equal_signs( ls_val_))
         return;
 
@@ -431,7 +438,7 @@ void SphereObliqueLaplaceBeltramiAccuCL::visit (const TetraCL& t)
     for (Uint i= 0; i < 10 ; ++i)
         nt+= grad_[i]*loc_ls_[i];
 
-    p_.make_patch<MergeCutPolicyCL>( lat_, ls_val_);
+    p_.make_patch<MergeCutPolicyCL>( *latp_, ls_val_);
     p_.compute_normals( t);
     make_CompositeQuad5Domain2D( q_, p_, t);
     resize_and_scatter_piecewise_spatial_normal( p_, q_, qnh_); // unit-length normal to linear interface
@@ -506,7 +513,7 @@ void MyInit (const DROPS::MultiGridCL& mg, DROPS::VecDescCL& ls, Point3DCL (*d)(
     ls.t= t;
 }
 
-void Compare_Oblique_Coarse (DROPS::AdapTriangCL& adap, InstatStokes2PhaseP2P1CL& Stokes, LevelsetP2CL& lset, std::string comparison_target)
+void Compare_Oblique_Coarse (DROPS::AdapTriangCL&, InstatStokes2PhaseP2P1CL& Stokes, LevelsetP2CL& lset)
 {
     MultiGridCL& mg= Stokes.GetMG();
     if (mg.GetLastLevel() == 0)
@@ -588,7 +595,7 @@ void Compare_Oblique_Coarse (DROPS::AdapTriangCL& adap, InstatStokes2PhaseP2P1CL
               << "\n|(MA)^-1 d| = " << norm( MA_inv_d) << std::endl;
 }
 
-void Compare_Oblique (DROPS::AdapTriangCL& adap, InstatStokes2PhaseP2P1CL& Stokes, LevelsetP2CL& lset, std::string comparison_target)
+void Compare_Oblique (DROPS::AdapTriangCL&, InstatStokes2PhaseP2P1CL& Stokes, LevelsetP2CL& lset, std::string comparison_target)
 {
     MultiGridCL& mg= Stokes.GetMG();
 
@@ -613,9 +620,12 @@ void Compare_Oblique (DROPS::AdapTriangCL& adap, InstatStokes2PhaseP2P1CL& Stoke
     lset.AccumulateBndIntegral( f_oblique);
 
     VecDescCL f_improved( vidx);
-    if (comparison_target == "Helper") {
+    if (comparison_target == "Helper" || comparison_target == "VariableHelper") {
         TetraAccumulatorTupleCL accus;
-        accus.push_back_acquire( new SphereObliqueLaplaceBeltramiAccuCL( lset, f_improved));
+        SphereObliqueLaplaceBeltramiAccuCL accu( lset, f_improved);
+        accus.push_back( &accu);
+        if (comparison_target == "VariableHelper")
+            accu.set_sublevel( mg.GetLastLevel());
         accumulate( accus, mg, vidx->TriangLevel(), vidx->GetMatchingFunction(), vidx->GetBndInfo());
     }
     else if (comparison_target == "Improved") {
@@ -750,7 +760,7 @@ int main (int argc, char** argv)
 //     Compare_LaplBeltramiSF_ConstSF( prob, lsbnd);
 //     Compare_Oblique_Improved( adap, prob, lset);
     if (P.get<std::string>( "Exp.ComparisonTarget") == "CoarseLevel")
-        Compare_Oblique_Coarse( adap, prob, lset, P.get<std::string>( "Exp.ComparisonTarget"));
+        Compare_Oblique_Coarse( adap, prob, lset);
     else
         Compare_Oblique( adap, prob, lset, P.get<std::string>( "Exp.ComparisonTarget"));
 
