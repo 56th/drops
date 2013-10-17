@@ -176,9 +176,9 @@ template<class ProblemT>
 void Strategy( ProblemT& prob, BndDataCL<>& lsetbnd, double dt, int num_steps, double diff, int bsp)
 {
     MultiGridCL& mg= prob.GetMG();
-    // Levelset: sigma= 0, theta= 0.5, SD= 0
+    // Levelset: sigma= 0, SD= 0.1
     SurfaceTensionCL sf( sigma, 0);
-    LevelsetP2CL lset( mg, lsetbnd, sf, 0.5);
+    LevelsetP2CL & lset( * LevelsetP2CL::Create( mg, lsetbnd, sf, false, 0.1, -1) );
 
     MLIdxDescCL& lidx= lset.idx;
     MLIdxDescCL& vidx= prob.vel_idx;
@@ -216,6 +216,7 @@ void Strategy( ProblemT& prob, BndDataCL<>& lsetbnd, double dt, int num_steps, d
         Reparam( lset, 1, dt, 0.5, diff);
         ensight.Write( i*dt);
     }
+    delete &lset;
 }
 
 class DummyStokesCoeffCL {};

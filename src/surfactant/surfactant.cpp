@@ -209,7 +209,8 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     BndDataCL<> lsetbnd2( 6);
     instat_scalar_fun_ptr sigma (0);
     SurfaceTensionCL sf( sigma, 0);
-    DROPS::LevelsetP2CL lset2( mg, lsetbnd2, sf, P.get<double>("Levelset.Theta"), P.get<double>("Levelset.SD")); // Only for output
+    LevelsetP2CL & lset2( * LevelsetP2CL::Create( mg, lsetbnd2, sf, P.get_child("Levelset")) );
+
     lset2.idx.CreateNumbering( mg.GetLastLevel(), mg);
     lset2.Phi.SetIdx( &lset2.idx);
     LSInit( mg, lset2.Phi, &sphere_2move, 0.);
@@ -305,6 +306,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
 //                  << std::endl;
     }
     std::cout << std::endl;
+    delete &lset2;
 }
 
 
@@ -346,7 +348,8 @@ int main (int argc, char* argv[])
     const DROPS::LsetBndDataCL::bnd_val_fun bfunls[6]= { 0,0,0,0,0,0};
     DROPS::LsetBndDataCL lsbnd( 6, bcls, bfunls);
 
-    DROPS::LevelsetP2CL lset( mg, lsbnd, sf);
+    DROPS::LevelsetP2CL & lset( * DROPS::LevelsetP2CL::Create( mg, lsbnd, sf) );
+
     lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
     lset.Phi.SetIdx( &lset.idx);
     LinearLSInit( mg, lset.Phi, &sphere_2);
@@ -405,6 +408,7 @@ int main (int argc, char* argv[])
     double L2_err( L2_error( mg, lset.Phi, lset.GetBndData(), make_P1Eval( mg, nobnd, xext), &sol0));
     std::cout << "L_2-error: " << L2_err << std::endl;
 
+    delete &lset;
     return 0;
   }
   catch (DROPS::DROPSErrCL err) { err.handle(); }

@@ -136,6 +136,16 @@ template<class T>
     typedef VecDescCL::DataType VecT;
     typedef DoFHelperCL<value_type, VecT> DoFT;
     const VecT& v= vd.Data;
+    if (vd.RowIdx->IsDG())
+    { // This is just for P2 
+        Uint idx_num = vd.RowIdx->GetIdx();
+        Uint first = s.Unknowns(idx_num);
+        for (int i = 0; i < 10; ++i)
+        {
+            (*this)[i] = DoFT::get( vd.Data, first++);
+        }
+        return *this;
+    }
     const Uint tlvl= s.GetLevel();
     const Uint vlvl= vd.GetLevel();
     const Uint idx= vd.RowIdx->GetIdx();
@@ -166,14 +176,29 @@ template<class T>
     typedef DoFHelperCL<value_type, VecT> DoFT;
     const VecT& v= vd.Data;
     const Uint idx= vd.RowIdx->GetIdx();
-    for (Uint i= 0; i< NumVertsC; ++i)
-        (*this)[i]= !bnd.IsOnDirBnd( *s.GetVertex( i))
-            ? DoFT::get( v, s.GetVertex( i)->Unknowns( idx))
-            : bnd.GetDirBndValue( *s.GetVertex( i), vd.t);
-    for (Uint i= 0; i< NumEdgesC; ++i)
-        (*this)[i+NumVertsC]= !bnd.IsOnDirBnd( *s.GetEdge( i))
-            ? DoFT::get( v, s.GetEdge( i)->Unknowns( idx))
-            : bnd.GetDirBndValue( *s.GetEdge( i), vd.t);
+
+    //const Uint tlvl= s.GetLevel();
+    //const Uint flvl= vd.GetLevel();
+
+    if (vd.RowIdx->IsDG())
+    { // This is just for P2 
+        Uint first = s.Unknowns(idx);
+        for (int i = 0; i < 10; ++i)
+        {
+            (*this)[i] = DoFT::get( v, first++);
+        }
+    }
+    else
+    {
+        for (Uint i= 0; i< NumVertsC; ++i)
+            (*this)[i]= !bnd.IsOnDirBnd( *s.GetVertex( i))
+                ? DoFT::get( v, s.GetVertex( i)->Unknowns( idx))
+                : bnd.GetDirBndValue( *s.GetVertex( i), vd.t);
+        for (Uint i= 0; i< NumEdgesC; ++i)
+            (*this)[i+NumVertsC]= !bnd.IsOnDirBnd( *s.GetEdge( i))
+                ? DoFT::get( v, s.GetEdge( i)->Unknowns( idx))
+                : bnd.GetDirBndValue( *s.GetEdge( i), vd.t);
+    }
     return *this;
 }
 
@@ -182,13 +207,36 @@ template<class T>
     inline LocalP2CL<T>&
     LocalP2CL<T>::assign(const TetraCL& s, const P2FunT& f)
 {
+    typedef VecDescCL::DataType VecT;
+    typedef DoFHelperCL<value_type, VecT> DoFT;
+    const VecDescCL& vd = *(f.GetSolution());
     const Uint tlvl= s.GetLevel();
-    const Uint flvl= f.GetLevel();
-    if (tlvl == flvl)
-        f.GetDoF( s, *this);
+    const Uint flvl= vd.GetLevel();
+    //const Uint idx= vd.RowIdx->GetIdx();
+
+    if (vd.RowIdx->IsDG())
+    { // This is just for P2 
+        if (tlvl != flvl)
+            throw DROPSErrCL( "LocalP2CL::Assign: Prolongation not implemented.\n");
+        Uint idx_num = vd.RowIdx->GetIdx();
+        Uint first = s.Unknowns(idx_num);
+        for (int i = 0; i < 10; ++i)
+        {
+            (*this)[i] = DoFT::get( vd.Data, first++);
+        }
+        return *this;
+    }
     else
-        if (tlvl < flvl) RestrictP2( s, f, *this);
-        else throw DROPSErrCL( "LocalP2CL::Assign: Prolongation not implemented.\n");
+        
+    {
+        const Uint tlvl= s.GetLevel();
+        const Uint flvl= f.GetLevel();
+        if (tlvl == flvl)
+            f.GetDoF( s, *this);
+        else
+            if (tlvl < flvl) RestrictP2( s, f, *this);
+            else throw DROPSErrCL( "LocalP2CL::Assign: Prolongation not implemented.\n");
+    }
     return *this;
 }
 

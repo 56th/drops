@@ -254,6 +254,7 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
                                  P.get<std::string>("VTK.TimeFileName"),
                                  P.get<int>("VTK.Binary"),
                                  P.get<int>("VTK.UseOnlyP1"),
+                                 false,
                                  -1,  /* <- level */
                                  P.get<int>("VTK.ReUseTimeFile"),
                                  P.get<int>("VTK.UseDeformation"));
@@ -422,6 +423,22 @@ void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<int>("VTK.ReUseTimeFile",0);
     P.put_if_unset<int>("VTK.UseDeformation",0);
     P.put_if_unset<int>("VTK.UseOnlyP1",0);
+
+    P.put_if_unset<int>("Levelset.Discontinuous", 0);
+    P.put_if_unset<int>("Levelset.Downwind.Frequency", 0);
+    P.put_if_unset<double>("Levelset.Downwind.MaxRelComponentSize", 0.05);
+    P.put_if_unset<double>("Levelset.Downwind.WeakEdgeRatio", 0.2);
+    P.put_if_unset<double>("Levelset.Downwind.CrosswindLimit", std::cos( M_PI/6.));
+	
+	P.put_if_unset<double>("SpeBnd.alpha", 0.0);
+    P.put_if_unset<double>("SpeBnd.beta1", 0.0);
+    P.put_if_unset<double>("SpeBnd.beta2", 0.0);
+	P.put_if_unset<double>("SpeBnd.SmoothZone", 0.0);
+	P.put_if_unset<std::string>("SpeBnd.CtAngle", "ConstantAngle");
+	P.put_if_unset<double>("SpeBnd.contactangle", 0.0);
+	P.put_if_unset<std::string>("SpeBnd.BndOutNormal", "OutNormalBottomPlane");
+	P.put_if_unset<std::string>("Exp.Solution_Vel", "None");
+	P.put_if_unset<std::string>("Exp.Solution_GradPr", "None");
 }
 
 
@@ -489,9 +506,11 @@ int main (int argc, char** argv)
             case 'w': case 'W':
                 bc[i]= DROPS::WallBC;    bnd_fun[i]= ZeroVel; bndType.push_back( DROPS::BoundaryCL::OtherBnd); break;
             case 'i': case 'I':
-                bc[i]= DROPS::DirBC;     bnd_fun[i]= Inflow;         bndType.push_back( DROPS::BoundaryCL::OtherBnd); break;
+                bc[i]= DROPS::DirBC;     bnd_fun[i]= Inflow;  bndType.push_back( DROPS::BoundaryCL::OtherBnd); break;
             case 'o': case 'O':
                 bc[i]= DROPS::OutflowBC; bnd_fun[i]= ZeroVel; bndType.push_back( DROPS::BoundaryCL::OtherBnd); break;
+            case 's': case 'S':
+                bc[i]= DROPS::SymmBC;    bnd_fun[i]= ZeroVel; bndType.push_back( DROPS::BoundaryCL::OtherBnd); break;
             case '1':
                 is_periodic= true;
                 bc_ls[i]= bc[i]= DROPS::Per1BC;    bnd_fun[i]= ZeroVel; bndType.push_back( DROPS::BoundaryCL::Per1Bnd); break;
@@ -511,8 +530,7 @@ int main (int argc, char** argv)
 
     sigma= prob.GetCoeff().SurfTens;
     DROPS::SurfaceTensionCL sf( sigmaf, 0);
-    DROPS::LevelsetP2CL lset( *mgp, DROPS::LsetBndDataCL( 6, bc_ls),
-        sf, P.get<double>("Levelset.SD"), P.get<double>("Levelset.CurvDiff"));
+    DROPS::LevelsetP2CL & lset( * DROPS::LevelsetP2CL::Create( *mgp, DROPS::LsetBndDataCL( 6, bc_ls), sf, P.get_child("Levelset")) );
 
     for (DROPS::BndIdxT i=0, num= bnd.GetNumBndSeg(); i<num; ++i)
     {
@@ -539,7 +557,7 @@ int main (int argc, char** argv)
     double min= prob.p.Data.min(),
            max= prob.p.Data.max();
     std::cout << "pressure min/max: "<<min<<", "<<max<<std::endl;
-
+    delete &lset;
     return 0;
   }
   catch (DROPS::DROPSErrCL err) { err.handle(); }

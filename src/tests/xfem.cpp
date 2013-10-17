@@ -196,7 +196,8 @@ int main (int argc, char** argv)
     BndCondT bc[6]= { NoBC, NoBC, NoBC, NoBC, NoBC, NoBC };
     LsetBndDataCL::bnd_val_fun bfun[6]= { 0,0,0,0,0,0};
     LsetBndDataCL lsbnd( 6, bc, bfun);
-    LevelsetP2CL lset( mg, lsbnd, sf);
+    LevelsetP2CL & lset( * LevelsetP2CL::Create( mg, lsbnd, sf) ) ;
+
     lset.idx.CreateNumbering( mg.GetLastLevel(), mg);
     lset.Phi.SetIdx( &lset.idx);
     lset.Init( &phasebnd);
@@ -319,6 +320,7 @@ int main (int argc, char** argv)
     const double err = intval - dot (M.Data*beta.Data, beta.Data);
     std::cout << "|| u - u_l ||_0 = " << std::scientific << std::sqrt(std::abs(err)) << '\n';
     if (err<0) std::cout << "Fehler: Norm der Projektion > Norm der Funktion\n";
+    delete &lset;
   } catch (DROPSErrCL d) {
         d.handle();
     }

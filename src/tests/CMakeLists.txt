@@ -64,7 +64,7 @@ exec_ser(xfem misc-utils geom-builder geom-simplex geom-multigrid geom-deformati
 
 exec_ser(f_Gamma geom-boundary geom-builder geom-simplex geom-multigrid geom-deformation misc-scopetimer misc-progressaccu num-unknowns geom-topo num-fe misc-problem levelset-levelset misc-utils out-output num-discretize num-interfacePatch misc-params levelset-fastmarch stokes-instatstokes2phase levelset-surfacetension misc-funcmap misc-vectorFunctions geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature misc-dynamicload)
 if(NOT MPI)
-    add_dependencies(f_Gamma levelset-twophaseCoeff)
+    add_dependencies(f_Gamma levelset-twophaseCoeff misc-scalarFunctions misc-vectorFunctions misc-csgFunctions)
 endif(NOT MPI)
 
 exec_ser(neq misc-utils)

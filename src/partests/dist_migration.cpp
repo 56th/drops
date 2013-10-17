@@ -263,7 +263,8 @@ void CheckMigration( LoadBalCL& lb)
     LsetBndDataCL* lsetbnddata= 0;
     BuildBoundaryData( &mg, lsetbnddata, perbndtypestr, zerobndfun, periodic_match);
     SurfaceTensionCL sft( DROPS::sigmaf);
-    LevelsetP2CL lset( mg, *lsetbnddata, sft);
+    LevelsetP2CL & lset( * LevelsetP2CL::Create( mg, *lsetbnddata, sf) );
+
     MLIdxDescCL* lidx= &lset.idx;
     lset.CreateNumbering( mg.GetLastLevel(), lidx);
     lset.Phi.SetIdx( lidx);
@@ -326,7 +327,7 @@ void CheckMigration( LoadBalCL& lb)
     delete lsetbnddata; lsetbnddata=0;
     delete velbnddata; velbnddata=0;
     delete prbnddata; prbnddata=0;
-
+    delete &lset;
     std::cout << "Check migration with unknowns performed" << std::endl;
 }
 

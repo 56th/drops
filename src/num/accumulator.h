@@ -60,6 +60,8 @@ class AccumulatorCL
 /// \brief Accumulation over sequences of TetraCL.
 typedef AccumulatorCL<TetraCL> TetraAccumulatorCL;
 
+/// \brief Accumulation over sequences of FaceCL.
+typedef AccumulatorCL<FaceCL> FaceAccumulatorCL;
 
 /// \brief A tuple of accumulators plus the iteration logic.
 ///
@@ -184,6 +186,8 @@ void AccumulatorTupleCL<VisitedT>::operator() (const ColorClassesCL& colors)
 /// \brief Accumulation over sequences of TetraCL.
 typedef AccumulatorTupleCL<TetraCL> TetraAccumulatorTupleCL;
 
+/// \brief Accumulation over sequences of FaceCL.
+typedef AccumulatorTupleCL<FaceCL> FaceAccumulatorTupleCL;
 
 namespace AccumulatorImplNS {
 
@@ -214,6 +218,34 @@ struct do_accumulateCL<AccumulatorTupleCL<VisitedT> >
 
 } // end of namespace DROPS::AccumulatorImplNS
 
+namespace AccumulatorFace {
+
+template <class AccuContainerT>
+struct do_accumulateCL
+{
+    static void accumulate (AccuContainerT& accus, const MultiGridCL& mg, int lastlvl, match_fun match, const BndCondCL& Bnd)
+    {
+        for (typename AccuContainerT::iterator it= accus.begin(), end= accus.end(); it != end; ++it)
+            do_accumulateCL<typename AccuContainerT::value_type>::accumulate(
+                *it, mg, lastlvl++ - accus.size() + 1, match, Bnd);
+    }
+};
+
+template <class VisitedT>
+struct do_accumulateCL<AccumulatorTupleCL<VisitedT> >
+{
+    static void accumulate (AccumulatorTupleCL<VisitedT>& accu, const MultiGridCL& mg, int lvl,__UNUSED__ match_fun match, __UNUSED__ const BndCondCL& Bnd)
+    {
+        // todo: find OpenMP compatible implementation
+        /*if (omp_get_max_threads() > 1)
+            accu( mg.GetColorClasses( lvl, match, Bnd));
+        else*/
+            accu( mg.GetTriangFaceBegin( lvl), mg.GetTriangFaceEnd( lvl));
+    }
+};
+
+} // end of namespace DROPS::AccumulatorImplNS
+
 /// \brief Perform the accumulation for one or several AccumulatorTupleCL in an OpenMP-aware manner.
 /// OpenMP is only used if omp_get_max_threads() > 1.
 /// If accus is a container of AccumulatorTupleCL-objects, lvl is interpreted as last (finest) level to be used.
@@ -224,9 +256,18 @@ template <class AccumulatorTupleT>
     AccumulatorImplNS::do_accumulateCL<AccumulatorTupleT>::accumulate( accus, mg, lvl, match, Bnd);
 }
 
+template <class AccumulatorTupleT>
+  inline void
+  accumulate_faces (AccumulatorTupleT& accus, const MultiGridCL& mg, int lvl, match_fun match, const BndCondCL& Bnd)
+{
+    AccumulatorFace::do_accumulateCL<AccumulatorTupleT>::accumulate( accus, mg, lvl, match, Bnd);
+}
+
 /// \brief An AccumulatorTupleCL for each level.
 /// A simpler data-structure like a std::vector would suffice, as we do not have to guarantee that the AccumulatorTupleCL not move in memory. Still, the following is consistent with all other multi-level-objects.
 typedef MLDataCL<TetraAccumulatorTupleCL> MLTetraAccumulatorTupleCL;
+
+typedef MLDataCL<FaceAccumulatorTupleCL> MLFaceAccumulatorTupleCL;
 
 } // end of namespace DROPS
 

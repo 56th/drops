@@ -56,6 +56,7 @@
             "SD":		1,				// streamline diffusion parameter
             "CurvDiff":		-1,			// smoothing of interface for curvature computation
             "VolCorrection":		1,	// toggles volume correction
+		    "Discontinuous":		0,  // Use DG for levelset?
             "Theta":		1			// controls implicitness of time stepping scheme
         },
 

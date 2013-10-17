@@ -161,7 +161,8 @@ int TestExamples (MultiGridCL& mg)
 {
     SurfaceTensionCL sf( sigmaf);   // dummy class
     LsetBndDataCL lsbnd( 6);
-    LevelsetP2CL lset( mg, lsbnd, sf);
+    LevelsetP2CL & lset( * LevelsetP2CL::Create( mg, lsbnd, sf) );
+
     lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
     lset.Phi.SetIdx( &lset.idx);
 
@@ -180,7 +181,11 @@ int TestExamples (MultiGridCL& mg)
     VTKOutCL vtkwriter( mg, "DROPS data", num,
                         ".", "csg-examples", 
                         "csg-examples", /* <- time file name */
-                        true, 0, -1, 0);
+                        true, /* <- binary */
+                        false, /* <- onlyp1 */
+                        false, /* <- p2dg */
+                        -1, /* <- level */
+                        0, 0);
     vtkwriter.Register( make_VTKScalar( lset.GetSolution(), "level-set") );
     vtkwriter.Register( make_VTKScalar( make_P1Eval( mg, lsbnd, ierr), "interpolation-errorH") );
     vtkwriter.Register( make_VTKScalar( make_P1Eval( mg, lsbnd, ierrg), "interpolation-errorG") );
@@ -256,6 +261,7 @@ int TestExamples (MultiGridCL& mg)
     lset.idx.DeleteNumbering( mg);
     p1idx.DeleteNumbering( mg);
     std::cout << "Successfully proccessed '../geom/csg-examples.json'.\n";
+    delete &lset;
     return 0;
 }
 

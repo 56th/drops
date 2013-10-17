@@ -81,6 +81,15 @@
                                                 // discretization of the Navier-Stokes and level set equations.
                                                 // Theta = 0 yields the explicit and Theta = 1 the implicit
                                                 // Euler method. Theta = 0.5 results in the Crank-Nicholson scheme.
+		        "Discontinuous":		0,      // Use DG for levelset?
+
+                "BoundaryType":         "98!98!98!98!98!98",     // List of boundary types separated by a !.
+                                                           // Each defining a boundary type for one boundary
+                                                           // domain ( The following indices may be used:
+                                                           //          Dir0BC= 0, DirBC= 2, Per1BC= 13,
+                                                           //          Per2BC= 11, Nat0BC= 21, NatBC= 23,
+                                                           //          NoBC= 98, UndefinedBC_= 99        ).
+                "BoundaryFncs":         "Ellipsoiddist!Ellipsoiddist!Ellipsoiddist!Ellipsoiddist!Ellipsoiddist!Ellipsoiddist!"
         },
 
 // coupling of Navier-Stokes and level set
@@ -194,12 +203,12 @@
 // surfactant transport
         "SurfTransp":
         {
-                "DoTransp":             0,      // 
-                "Theta":                0.5,    // 
-                "Iter":                 1000,   // 
-                "Tol":                  1e-10,  // 
-                "OmitBound":            -1.0,   // 
-                "Visc":                 1e-5    // 
+                "DoTransp":             0,      // Ensight output (0 = off, 1 = on).
+                "Theta":                0.5,    // name of Ensight case.
+                "Iter":                 1000,   // local directory of Ensight files.
+                "Tol":                  1e-10,  // write out Ensight files in binary format (0 = off, 1 = on).
+                "OmitBound":            -1.0,   // only master writes out Ensight files.
+                "Visc":                 1e-5    // name for the geometry.
         },
 
 

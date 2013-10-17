@@ -698,10 +698,19 @@ void
 LocalNumbP2CL::assign_indices_only (const TetraCL& s, const IdxDescCL& idx)
 {
     const Uint sys= idx.GetIdx();
-    for (Uint i= 0; i < 4; ++i)
-        num[i]= s.GetVertex( i)->Unknowns.Exist( sys) ? s.GetVertex( i)->Unknowns( sys) : NoIdx;
-    for(Uint i= 0; i < 6; ++i)
-        num[i+4]= s.GetEdge( i)->Unknowns.Exist( sys) ? s.GetEdge( i)->Unknowns( sys)   : NoIdx;
+    if (!idx.IsDG())
+    {
+        for (Uint i= 0; i < 4; ++i)
+            num[i]= s.GetVertex( i)->Unknowns.Exist( sys) ? s.GetVertex( i)->Unknowns( sys) : NoIdx;
+        for(Uint i= 0; i < 6; ++i)
+            num[i+4]= s.GetEdge( i)->Unknowns.Exist( sys) ? s.GetEdge( i)->Unknowns( sys)   : NoIdx;
+    }
+    else
+    {
+        Uint first = s.Unknowns(sys);
+        for (int i = 0; i < 10; ++i)
+            num[i] = first++;
+    }
 }
 
 LocalNumbP2CL::LocalNumbP2CL(const TetraCL& s, const IdxDescCL& idx)

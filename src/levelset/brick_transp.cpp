@@ -88,7 +88,10 @@ void Strategy (MultiGridCL& MG, const LsetBndDataCL& lsbnd)
 
 
     SurfaceTensionCL sf( sigmaf, 0);
-    LevelsetP2CL lset( MG, lsbnd, sf, P.get<double>("Levelset.SD"), P.get<double>("Levelset.CurvDiff"));
+    // LevelsetP2CL lset( MG, lsbnd, sf, P.get<double>("Levelset.SD"), P.get<double>("Levelset.CurvDiff"));
+    // Creates new Levelset-Object, has to be cleaned manually
+    LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsbnd, sf, P.get_child("Levelset")) );
+
     MLIdxDescCL* lidx= &lset.idx;
     lset.CreateNumbering( MG.GetLastLevel(), lidx);
     lset.Phi.SetIdx( lidx);
@@ -139,6 +142,7 @@ void Strategy (MultiGridCL& MG, const LsetBndDataCL& lsbnd)
             ensight.Write( step*P.get<double>("Time.StepSize"));
     }
     std::cout << std::endl;
+    delete &lset;
 }
 
 } // end of namespace DROPS

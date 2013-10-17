@@ -39,7 +39,8 @@ TestSingleTetra()
     BndCondT bc[4]= { NoBC, NoBC, NoBC, NoBC };
     LsetBndDataCL::bnd_val_fun bfun[4]= { 0,0,0,0};
     LsetBndDataCL lsbnd( 4, bc, bfun);
-    LevelsetP2CL lset( mg, lsbnd, sf);
+
+    LevelsetP2CL & lset( * LevelsetP2CL::Create(mg,  lsbnd, sf) );
 
     lset.idx.CreateNumbering( 0, mg);
     lset.Phi.SetIdx( &lset.idx);
@@ -56,6 +57,7 @@ TestSingleTetra()
     ifaceidx.CreateNumbering( 0, mg, &lset.Phi, &lset.GetBndData());
     std::cout << "(S. int.) NumUnknowns: " << ifaceidx.NumUnknowns() << std::endl;
     ifaceidx.DeleteNumbering( mg);
+    delete &lset;
 }
 
 
@@ -107,7 +109,7 @@ TestPlaneInCube()
     BndCondT bc[6]= { NoBC, NoBC, NoBC, NoBC, NoBC, NoBC };
     LsetBndDataCL::bnd_val_fun bfun[6]= { 0,0,0,0,0,0};
     LsetBndDataCL lsbnd( 6, bc, bfun);
-    LevelsetP2CL lset( mg, lsbnd, sf);
+    LevelsetP2CL & lset( * LevelsetP2CL::Create( mg, lsbnd, sf) );
 
     lset.idx.CreateNumbering( 0, mg);
     lset.Phi.SetIdx( &lset.idx);
@@ -125,6 +127,7 @@ TestPlaneInCube()
     ifaceidx.CreateNumbering( 0, mg, &lset.Phi, &lset.GetBndData());
     std::cout << "(P. with vert.) NumUnknowns: " << ifaceidx.NumUnknowns() << std::endl;
     ifaceidx.DeleteNumbering( mg);
+    delete &lset;
 }
 
 
@@ -250,7 +253,8 @@ int main ()
     BndCondT bc[6]= { NoBC, NoBC, NoBC, NoBC, NoBC, NoBC };
     LsetBndDataCL::bnd_val_fun bfun[6]= { 0,0,0,0,0,0};
     LsetBndDataCL lsbnd( 6, bc, bfun);
-    LevelsetP2CL lset( mg, lsbnd, sf);
+
+    LevelsetP2CL & lset( * LevelsetP2CL::Create( mg, lsbnd, sf) ) ;
 
     lset.idx.CreateNumbering( 0, mg);
     lset.Phi.SetIdx( &lset.idx);
@@ -280,7 +284,7 @@ int main ()
     D.LinComb( 1., M.Data,  -1., Mnew.Data); // M - Mnew
     std::cout <<   "|| M-Mnew ||_sup  / || M ||_sup  = " << supnorm(D)/supnorm(M.Data)
               << "\n|| M-Mnew ||_frob / || M ||_frob = " << frobeniusnorm(D)/frobeniusnorm(M.Data) << std::endl;
-
+    delete &lset;
     return 0;
   }
   catch (DROPS::DROPSErrCL err) { err.handle(); }

@@ -239,7 +239,7 @@ void System2Accumulator_P2P1XCL::visit (const TetraCL& tet)
 
     partition_.make_partition<SortedVertexPolicyCL, MergeCutPolicyCL>( lat, ls_loc_);
     make_CompositeQuad2Domain( q2dom_, partition_);
-    local_p2_lset.assign(tet, lset_.Phi, lset_.GetBndData());
+    local_p2_lset.assign(tet, *lset_.PhiC, lset_.GetBndData());
 
     local_setup(tet);
     update_global_system();
@@ -373,7 +373,7 @@ void SetupSystem2_P2RP1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL&, con
             }
         }
         // now handle extended dofs
-        loc_phi.assign( *sit, lset.Phi, lset.GetBndData());
+        loc_phi.assign( *sit, *lset.PhiC, lset.GetBndData());
         cut.Init( *sit, loc_phi);
         if (!cut.Intersects()) continue; // extended basis functions have only support on tetra intersecting Gamma!
 
@@ -494,7 +494,7 @@ void SetupSystem2_P2RP1( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL&, cons
             }
         }
         // now handle extended dofs
-        loc_phi.assign( *sit, lset.Phi, lset.GetBndData());
+        loc_phi.assign( *sit, *lset.PhiC, lset.GetBndData());
         cut.Init( *sit, loc_phi);
         if (!cut.Intersects()) continue; // extended basis functions have only support on tetra intersecting Gamma!
 
@@ -634,7 +634,6 @@ void SetupRhs2_P2P0( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL&, const St
 void SetupRhs2_P2P1( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL&, const StokesBndDataCL& BndData, VecDescCL* c, double t)
 {
     ScopeTimerCL scope("SetupRhs2_P2P1");
-
     c->Clear( t);
 
     const Uint lvl = c->GetLevel();
@@ -711,7 +710,7 @@ void SetupRhs2_P2P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL&, const S
 
         GetTrafoTr( T, det, *sit);
         absdet= std::fabs( det);
-        cut.Init( *sit, lset.Phi, lset.GetBndData());
+        cut.Init( *sit, *lset.PhiC, lset.GetBndData());
         const bool nocut= !cut.Intersects();
 
         // Setup B:   b(i,j) =  -\int psi_i * div( phi_j)
@@ -914,7 +913,7 @@ void PrMassAccumulator_P1CL::visit (const TetraCL& sit)
 {
     const ExtIdxDescCL& Xidx= RowIdx.GetXidx();
     const double absdet= sit.GetVolume()*6.;
-    loc_phi.assign( sit, lset.Phi, lset.GetBndData());
+    loc_phi.assign( sit, *lset.PhiC, lset.GetBndData());
     cut.Init( sit, loc_phi);
     const bool nocut= !cut.Intersects();
     GetLocalNumbP1NoBnd( prNumb, sit, RowIdx);
@@ -1374,7 +1373,7 @@ void SpecialBndHandler_System1OnePhaseP2CL::setup(const TetraCL& tet, const SMat
 	for (Uint k =0; k< 4; ++k) //Go throught all faces of a tet
 	{
 		SMatrixCL<3, 3> dm[10][10];
-		LocalP2CL<double> phi[6]; 
+		LocalP2CL<double> phi[10]; 
 		Quad5_2DCL<double> mass2Dj;
 		Quad5_2DCL<double> mass2Di;
 		Quad5_2DCL<double> Grad2Dj;   // \nabla phi_j* n
@@ -1388,31 +1387,30 @@ void SpecialBndHandler_System1OnePhaseP2CL::setup(const TetraCL& tet, const SMat
 			tet.GetOuterNormal(k, normal);
 			for (Uint i= 0; i<3; ++i)    
 			{
-				unknownIdx[i]   = VertOfFace(k, i);      // i is index for Vertex
-				unknownIdx[i+3] = EdgeOfFace(k, i) + 4;  // i is index for Edge
-				bary[i][unknownIdx[i]]=1;
+				bary[i][VertOfFace(k, i)]=1;
 			}
-			for(Uint i=0; i<6; ++i)
-				phi[i][unknownIdx[i]] = 1;
+			for(Uint i=0; i<10; ++i)
+				phi[i][i] = 1;
 				
-			for(Uint i=0; i<6; ++i){
+			for(Uint i=0; i<10; ++i){
+				LocalP1CL<double> Gradin(dot( normal, Grad[i]));
+				mass2Di.assign(phi[i], bary);	
+				Grad2Di.assign(Gradin, bary);
 				for(Uint j=0; j<=i; ++j){
-					LocalP1CL<double> Gradjn(dot( normal, Grad[unknownIdx[j]]));
-					LocalP1CL<double> Gradin(dot( normal, Grad[unknownIdx[i]]));					
+					LocalP1CL<double> Gradjn(dot( normal, Grad[j]));
 					mass2Dj.assign(phi[j], bary);  //
-					mass2Di.assign(phi[i], bary);
 					Grad2Dj.assign(Gradjn, bary);
-					Grad2Di.assign(Gradin, bary);
 					Quad5_2DCL<double> mass2D(mass2Dj * mass2Di); //
 					Quad5_2DCL<double> Grad2D(Grad2Di * mass2Dj + Grad2Dj * mass2Di); //
 					// three additional terms
-					dm[unknownIdx[j]][unknownIdx[i]](0, 0)= dm[unknownIdx[j]][unknownIdx[i]](1, 1) = dm[unknownIdx[j]][unknownIdx[i]](2, 2) = beta_ * mass2D.quad(absdet);
-					dm[unknownIdx[j]][unknownIdx[i]]     += (alpha_/h - beta_) * mass2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));
-					dm[unknownIdx[j]][unknownIdx[i]]     -=  2. * mu_ * Grad2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));  
-					loc.Ak[unknownIdx[j]][unknownIdx[i]] += dm[unknownIdx[j]][unknownIdx[i]];
+					dm[j][i](0, 0)=dm[j][i](1, 1) = dm[j][i](2, 2) = beta_ * mass2D.quad(absdet);
+					dm[j][i]     += (alpha_/h - beta_) * mass2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));
+					if(BndData_.Vel.GetBC(*tet.GetFace(k))!= SymmBC)
+						dm[j][i]     -=  2. * mu_ * Grad2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));  
+					loc.Ak[j][i] += dm[j][i];
 					if (i != j){
-						assign_transpose( dm[unknownIdx[i]][unknownIdx[j]], dm[unknownIdx[j]][unknownIdx[i]]);
-						loc.Ak[unknownIdx[i]][unknownIdx[j]] += dm[unknownIdx[i]][unknownIdx[j]];
+						assign_transpose( dm[i][j], dm[j][i]);
+						loc.Ak[i][j] += dm[i][j];
 					}	
 				}
 			}
@@ -1440,7 +1438,6 @@ void SpecialBndHandler_System1OnePhaseP2CL::setupRhs(const TetraCL& tet, Point3D
 				unknownIdx[i+3] = EdgeOfFace(k, i) + 4;  // i is index for Edge
 				bary[i][unknownIdx[i]]=1;
 			}
-			
 			typedef StokesBndDataCL::VelBndDataCL::bnd_val_fun bnd_val_fun;
 			bnd_val_fun bf= BndData_.Vel.GetBndSeg(face.GetBndIdx()).GetBndFun();
 			WallVel.assign(tet, bary, bf, t);
@@ -1453,7 +1450,7 @@ void SpecialBndHandler_System1OnePhaseP2CL::setupRhs(const TetraCL& tet, Point3D
 
 			for(Uint i=0; i<6; ++i){//setup right hand side	
 					Quad5_2DCL<Point3DCL> WallVelRhs( locP2[i]* WallVel);
-					loc_b[unknownIdx[i]] += beta_ * WallVelRhs.quad(absdet);
+					loc_b[unknownIdx[i]] += (beta_ * WallVelRhs.quad(absdet) - beta_ * SMatrixCL<3,3> (outer_product(normal, normal)) * WallVelRhs.quad(absdet));
 			}		
 		}
 	}	
@@ -1506,8 +1503,8 @@ void LocalSystem1OnePhase_P2CL::setup (const SMatrixCL<3,3>& T, double absdet, L
 
 struct LocalBndIntegrals_P2CL
 {
-    double         mass2D[6][6];
-    double         grad2D[6][6];
+    double         mass2D[10][10];
+    double         grad2D[10][10];
 };
 
 /// \brief Place to store P2 integrals on positive/negative part of tetrahedron
@@ -1536,9 +1533,8 @@ class SpecialBndHandler_System1TwoPhaseP2CL
     BndTriangPartitionCL partition;
     QuadDomainCL q5dom;
 	Point3DCL normal;
-	Uint unknownIdx[6];
-	GridFunctionCL<double>   basisP2[6];
-    GridFunctionCL<double>   gradP1[6];
+	GridFunctionCL<double>   basisP2[10];
+    GridFunctionCL<double>   gradP1[10];
   public:	
 	SpecialBndHandler_System1TwoPhaseP2CL(const StokesBndDataCL& BndData, double mu1, double mu2, const double beta1=0, const double beta2=0, const double alpha=0)
 	: lat( PrincipalLatticeCL::instance( 2)), BndData_(BndData), mu1_(mu1), mu2_(mu2), beta1_(beta1), beta2_(beta2), alpha_(alpha), ls_loc( lat.vertex_size())
@@ -1559,8 +1555,8 @@ void SpecialBndHandler_System1TwoPhaseP2CL::setup(const TetraCL& tet, const SMat
 	for (Uint k =0; k< 4; ++k) //Go through all faces of a tet
 	{
 		SMatrixCL<3, 3> dm[10][10];
-		LocalP2CL<double> phi[6]; 
-	    LocalP1CL<double> Gradn[6];
+		LocalP2CL<double> phi[10]; 
+	    LocalP1CL<double> Gradn[10];
 		BaryCoordCL bary[3];
 		if( BndData_.Vel.GetBC(*tet.GetFace(k))==Slip0BC || BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC|| BndData_.Vel.GetBC(*tet.GetFace(k))==SymmBC){
 			const FaceCL& face = *tet.GetFace(k);
@@ -1576,35 +1572,34 @@ void SpecialBndHandler_System1TwoPhaseP2CL::setup(const TetraCL& tet, const SMat
 
 			for (Uint i= 0; i<3; ++i)    
 			{
-				unknownIdx[i]   = VertOfFace(k, i);      // i is index for Vertex
-				unknownIdx[i+3] = EdgeOfFace(k, i) + 4;  // i is index for Edge
-				bary[i][unknownIdx[i]]=1;
+				bary[i][VertOfFace(k, i)]=1;
 			}
-			for(Uint i=0; i<6; ++i)
+			for(Uint i=0; i<10; ++i)
 			{
-				phi[i][unknownIdx[i]] = 1;
-				Gradn[i] = dot( normal, Grad[unknownIdx[i]]); 
+				phi[i][i] = 1;
+				Gradn[i] = dot( normal, Grad[i]); 
 			}
 			
-			for(Uint i=0; i<6; ++i)
+			for(Uint i=0; i<10; ++i)
 			{
 				resize_and_evaluate_on_vertexes( phi[i], q5dom, basisP2[i]); // for M
 				resize_and_evaluate_on_vertexes( Gradn[i], q5dom, gradP1[i]); // for A	
 			}
 
 	
-			for(Uint i=0; i<6; ++i){
+			for(Uint i=0; i<10; ++i){
 				for(Uint j=0; j<=i; ++j){	
                     quad( basisP2[i] * basisP2[j], q5dom, locInt[0].mass2D[i][j], locInt[1].mass2D[i][j]);			
                     quad( gradP1[i] * basisP2[j] + gradP1[j] * basisP2[i], q5dom, locInt[0].grad2D[i][j], locInt[1].grad2D[i][j]);
 					// three additional terms
-					dm[unknownIdx[j]][unknownIdx[i]](0, 0)= dm[unknownIdx[j]][unknownIdx[i]](1, 1) = dm[unknownIdx[j]][unknownIdx[i]](2, 2) = beta1_ * locInt[0].mass2D[i][j] + beta2_ * locInt[1].mass2D[i][j];
-					dm[unknownIdx[j]][unknownIdx[i]]     += ( (alpha_/h -beta1_)* locInt[0].mass2D[i][j] + (alpha_/h -beta2_) * locInt[1].mass2D[i][j] )* SMatrixCL<3,3> (outer_product(normal, normal));
-					dm[unknownIdx[j]][unknownIdx[i]]     -= ( 2. * mu1_ * locInt[0].grad2D[i][j]+ 2.* mu2_ * locInt[1].grad2D[i][j] )* SMatrixCL<3,3> (outer_product(normal, normal));  
-					loc.Ak[unknownIdx[j]][unknownIdx[i]] += dm[unknownIdx[j]][unknownIdx[i]];
+					dm[j][i](0, 0)= dm[j][i](1, 1) = dm[j][i](2, 2) = beta1_ * locInt[0].mass2D[i][j] + beta2_ * locInt[1].mass2D[i][j];
+					dm[j][i]     += ( (alpha_/h -beta1_)* locInt[0].mass2D[i][j] + (alpha_/h -beta2_) * locInt[1].mass2D[i][j] )* SMatrixCL<3,3> (outer_product(normal, normal));
+					if(BndData_.Vel.GetBC(*tet.GetFace(k))!= SymmBC)
+						dm[j][i]     -= ( 2. * mu1_ * locInt[0].grad2D[i][j]+ 2.* mu2_ * locInt[1].grad2D[i][j] )* SMatrixCL<3,3> (outer_product(normal, normal));  
+					loc.Ak[j][i] += dm[j][i];
 					if (i != j){
-						assign_transpose( dm[unknownIdx[i]][unknownIdx[j]], dm[unknownIdx[j]][unknownIdx[i]]);
-						loc.Ak[unknownIdx[i]][unknownIdx[j]] += dm[unknownIdx[i]][unknownIdx[j]];
+						assign_transpose( dm[i][j], dm[j][i]);
+						loc.Ak[i][j] += dm[i][j];
 					}	
 				}
 			}
@@ -1791,7 +1786,7 @@ System1Accumulator_P2CL::System1Accumulator_P2CL (const TwoPhaseFlowCoeffCL& Coe
     : Coeff( Coeff_), BndData( BndData_), lset_Phi( lset_arg), lset_Bnd( lset_bnd), t( t_),
       RowIdx( RowIdx_), A( A_), M( M_), cplA( cplA_), cplM( cplM_), b( b_),
       local_twophase( Coeff.mu( 1.0), Coeff.mu( -1.0), Coeff.rho( 1.0), Coeff.rho( -1.0), Coeff.volforce),
-	  speBndHandler1(BndData_, Coeff.mu( 1.0), Coeff.beta(-1.0), Coeff.alpha),
+	  speBndHandler1(BndData_, Coeff.mu( -1.0), Coeff.beta(-1.0), Coeff.alpha),
 	  speBndHandler2(BndData_, Coeff.mu( 1.0), Coeff.mu( -1.0), Coeff.beta(1.0), Coeff.beta(-1.0), Coeff.alpha)
 {}
 
@@ -2405,7 +2400,7 @@ InstatStokes2PhaseP2P1CL::system1_accu (MLTetraAccumulatorTupleCL& accus, MLMatD
     for (size_t lvl= 0; lvl < A->Data.size(); ++lvl, ++itA, ++itM, ++it, ++itaccu, ++itLset)
         switch (it->GetFE()) {
           case vecP2_FE:
-            itaccu->push_back_acquire( new System1Accumulator_P2CL( GetCoeff(), GetBndData(), lvl == A->Data.size()-1 ? lset.Phi : *itLset, lset.GetBndData(),
+            itaccu->push_back_acquire( new System1Accumulator_P2CL( GetCoeff(), GetBndData(), lvl == A->Data.size()-1 ? *lset.PhiC : *itLset, lset.GetBndData(),
                 *it, *itA, *itM, lvl == A->Data.size() - 1 ? b : 0, cplA, cplM, t));
             break;
 
@@ -2419,7 +2414,6 @@ void SetupRhs1_P2( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_, co
 {
     ScopeTimerCL scope("SetupRhs1_P2");
     const Uint lvl = b->GetLevel();
-
     b->Clear( t);
 
     LocalNumbP2CL n;
@@ -2448,7 +2442,7 @@ void SetupRhs1_P2( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_, co
         // collect some information about the edges and verts of the tetra
         // and save it n.
         n.assign( *sit, *b->RowIdx, BndData_.Vel);
-        tetra.Init( *sit, lset.Phi, lset.GetBndData());
+        tetra.Init( *sit, *lset.PhiC, lset.GetBndData());
         const bool nocut= !tetra.Intersects();
         if (nocut) {
             const double rho_const= tetra.GetSign( 0) == 1 ? rho_p : rho_n;
@@ -2850,7 +2844,7 @@ void InstatStokes2PhaseP2P1CL::SetupLB (MLMatDescCL* A, VecDescCL* cplA, const L
     MLDataCL<VecDescCL>::const_iterator itLset = lset.MLPhi.begin();
     for (size_t lvl=0; lvl < A->RowIdx->size(); ++lvl, ++itA, ++it, ++itLset)
     {
-       SetupLB_P2( MG_,  Coeff_, BndData_, *itA, lvl == A->Data.size()-1 ? cplA : 0, lvl == A->Data.size()-1 ? lset.Phi : *itLset, lset.GetBndData(), *it, t);
+       SetupLB_P2( MG_,  Coeff_, BndData_, *itA, lvl == A->Data.size()-1 ? cplA : 0, lvl == A->Data.size()-1 ? *lset.PhiC : *itLset, lset.GetBndData(), *it, t);
     }
 
 }
@@ -3027,7 +3021,7 @@ void BSAccumulator_P2CL::finalize_accumulation ()
 
 void BSAccumulator_P2CL::visit (const TetraCL& tet)
 {
-    ls_loc.assign( tet, lset.Phi, lset.GetBndData());
+    ls_loc.assign( tet, *lset.PhiC, lset.GetBndData());
 
     if (!equal_signs( ls_loc))
     {
@@ -3250,7 +3244,7 @@ void InstatStokes2PhaseP2P1CL::SetupBdotv (VecDescCL* Bdotv, const VelVecDescCL*
     const ExtIdxDescCL& p_xidx= Bdotv->RowIdx->GetXidx();
 
     DROPS_FOR_TRIANG_TETRA( MG_, lvl, sit) {
-        cut.Init( *sit, lset.Phi, lset.GetBndData());
+        cut.Init( *sit, *lset.PhiC, lset.GetBndData());
         if (!cut.Intersects()) continue;
 
         GetLocalNumbP1NoBnd( prNumb, *sit, *Bdotv->RowIdx);
@@ -3468,6 +3462,32 @@ void InstatStokes2PhaseP2P1CL::CheckOnePhaseSolution(const VelVecDescCL* DescVel
 				   <<"\n || nabla (p_h - p) ||_L2 = " << Grad_pr << std::endl;	
 }
 
+/*void InstatStokes2PhaseP2P1CL::SetupVelError(const instat_vector_fun_ptr RefVel)
+{
+	
+    VectorCL& lsgvel= dv.Data;
+    Uint lvl= dv.GetLevel(),
+         idx= dv.RowIdx->GetIdx();
+	Point3DCL tmp;
+    for (MultiGridCL::const_TriangVertexIteratorCL sit= const_cast<const MultiGridCL&>(MG_).GetTriangVertexBegin(lvl), send= const_cast<const MultiGridCL&>(MG_).GetTriangVertexEnd(lvl);
+         sit != send; ++sit)
+    {
+        if (sit->Unknowns.Exist(idx))
+			DoFHelperCL<Point3DCL, VectorCL>::set( lsgvel, sit->Unknowns(idx), RefVel(sit->GetCoord(), 0));
+    }
+
+    for (MultiGridCL::const_TriangEdgeIteratorCL sit=const_cast<const MultiGridCL&>(MG_).GetTriangEdgeBegin(lvl), send=const_cast<const MultiGridCL&>(MG_).GetTriangEdgeEnd(lvl);
+         sit != send; ++sit)
+    {
+        if (sit->Unknowns.Exist(idx))
+        {
+            tmp= RefVel( (sit->GetVertex(0)->GetCoord() + sit->GetVertex(1)->GetCoord())/2., 0);
+            for(int i=0; i<3; ++i)
+                lsgvel[sit->Unknowns(idx)+i]= tmp[i];
+        }
+    }	
+	dv.Data-=v.Data;
+}*/
 
 P1XRepairCL::P1XRepairCL (MultiGridCL& mg, VecDescCL& p)
     : UsesXFEM_( p.RowIdx->IsExtended()), mg_( mg), idx_( P1_FE), ext_( &idx_), p_( p)

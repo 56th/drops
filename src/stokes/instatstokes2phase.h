@@ -112,8 +112,8 @@ class TwoPhaseFlowCoeffCL
         rho_koeff2( film ? P.get<double>("Mat.DensFluid") : P.get<double>("Mat.DensDrop")),
         mu_koeff1( film ? P.get<double>("Mat.ViscGas") : P.get<double>("Mat.ViscFluid")),
         mu_koeff2( film ? P.get<double>("Mat.ViscFluid") : P.get<double>("Mat.ViscDrop")),
-        beta_coeff1(P.get<double>("SpeBnd.SlipLength1")),
-        beta_coeff2(P.get<double>("SpeBnd.SlipLength2")),
+        beta_coeff1(P.get<double>("SpeBnd.beta1")),
+        beta_coeff2(P.get<double>("SpeBnd.beta2")),
 		
         rho( dimless ? JumpCL( 1., rho_koeff1/rho_koeff2)
           : JumpCL( rho_koeff2, rho_koeff1), H_sm, P.get<double>("Mat.SmoothZone")),
@@ -189,7 +189,8 @@ class InstatStokes2PhaseP2P1CL : public ProblemCL<TwoPhaseFlowCoeffCL, StokesBnd
                  M,
                  prA,
                  prM;
-
+    //VelVecDescCL dv;        ///< velocity error, not used now
+  
   public:
     InstatStokes2PhaseP2P1CL( const MGBuilderCL& mgb, const TwoPhaseFlowCoeffCL& coeff, const BndDataCL& bdata, FiniteElementT prFE= P1_FE, double XFEMstab=0.1, FiniteElementT velFE= vecP2_FE)
         : base_(mgb, coeff, bdata), vel_idx(velFE, 1, bdata.Vel, 0, XFEMstab), pr_idx(prFE, 1, bdata.Pr, 0, XFEMstab) {}
@@ -204,7 +205,7 @@ class InstatStokes2PhaseP2P1CL : public ProblemCL<TwoPhaseFlowCoeffCL, StokesBnd
     /// \brief Only used for XFEM
     void UpdateXNumbering( MLIdxDescCL* idx, const LevelsetP2CL& lset)
         {
-            if (UsesXFEM()) idx->UpdateXNumbering( MG_, lset.Phi, lset.GetBndData());
+            if (UsesXFEM()) idx->UpdateXNumbering( MG_, *lset.PhiC, lset.GetBndData());
         }
     /// \brief Only used for XFEM
     void UpdatePressure( VecDescCL* p)
@@ -270,6 +271,8 @@ class InstatStokes2PhaseP2P1CL : public ProblemCL<TwoPhaseFlowCoeffCL, StokesBnd
 	//It checks the L2 norm of discretized error of velocity and gradient of pressure
     void CheckOnePhaseSolution(const VelVecDescCL* DescVel, const VecDescCL* DescPr, const instat_vector_fun_ptr RefVel, const instat_vector_fun_ptr RefGradPr) const;
 	
+	// To setup u-u_h
+	//void SetupVelError(const instat_vector_fun_ptr RefVel);
     /// \name Evaluate Solution
     //@{
     /// Get solution as FE-function for evaluation
@@ -277,6 +280,9 @@ class InstatStokes2PhaseP2P1CL : public ProblemCL<TwoPhaseFlowCoeffCL, StokesBnd
         { return const_DiscPrSolCL( &p, &GetBndData().Pr, &GetMG()); }
     const_DiscVelSolCL GetVelSolution() const
         { return const_DiscVelSolCL( &v, &GetBndData().Vel, &GetMG()); }
+	// to get error in velocity	
+    //const_DiscVelSolCL GetVelError(StokesBndDataCL::VelBndDataCL& bnd) const
+    //    { return const_DiscVelSolCL( &dv, &bnd, &GetMG()); }		
 
     const_DiscPrSolCL GetPrSolution( const VecDescCL& pr) const
         { return const_DiscPrSolCL( &pr, &GetBndData().Pr, &GetMG()); }

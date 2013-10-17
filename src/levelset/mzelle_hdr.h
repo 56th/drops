@@ -172,7 +172,7 @@ class InterfaceInfoCL
     template<class DiscVelSolT>
     void Update (const LevelsetP2CL& ls, const DiscVelSolT& u) {
         ls.GetInfo( maxGrad, Vol, bary, vel, u, min, max, surfArea);
-        std::pair<double, double> h= h_interface( ls.GetMG().GetTriangEdgeBegin( ls.Phi.RowIdx->TriangLevel()), ls.GetMG().GetTriangEdgeEnd( ls.Phi.RowIdx->TriangLevel()), ls.Phi);
+        std::pair<double, double> h= h_interface( ls.GetMG().GetTriangEdgeBegin( ls.PhiC->RowIdx->TriangLevel()), ls.GetMG().GetTriangEdgeEnd( ls.PhiC->RowIdx->TriangLevel()), *ls.PhiC);
         h_min= h.first; h_max= h.second;
         // sphericity is the ratio of surface area of a sphere of same volume and surface area of the approximative interface
         sphericity= std::pow(6*Vol, 2./3.)*std::pow(M_PI, 1./3.)/surfArea;
@@ -333,7 +333,7 @@ TimeDisc2PhaseCL* CreateTimeDisc( InstatNavierStokes2PhaseP2P1CL& Stokes, Levels
 
 template <class StokesT>
 void SolveStatProblem( StokesT& Stokes, LevelsetP2CL& lset,
-                       NSSolverBaseCL<StokesT >& solver)
+                       NSSolverBaseCL<StokesT >& solver, const ParamCL& P)
 {
 #ifndef _PAR
     TimerCL time;
@@ -349,8 +349,8 @@ void SolveStatProblem( StokesT& Stokes, LevelsetP2CL& lset,
     curv.SetIdx( &Stokes.vel_idx);
     Stokes.SetIdx();
     Stokes.SetLevelSet( lset);
-    lset.AccumulateBndIntegral( curv);
     lset.UpdateMLPhi();
+    lset.AccumulateBndIntegral( curv);
     Stokes.SetupSystem1( &Stokes.A, &Stokes.M, &Stokes.b, &Stokes.b, &cplM, lset, Stokes.v.t);
     Stokes.SetupPrStiff( &Stokes.prA, lset);
     Stokes.SetupPrMass ( &Stokes.prM, lset);
@@ -365,7 +365,8 @@ void SolveStatProblem( StokesT& Stokes, LevelsetP2CL& lset,
     duration = time.GetTime();
     std::cout << "Solving (Navier-)Stokes took "<<  duration << " sec.\n";
     std::cout << "iter: " << solver.GetIter() << "\tresid: " << solver.GetResid() << std::endl;
-    Stokes.CheckOnePhaseSolution( &Stokes.v, &Stokes.p, Stokes.Coeff_.RefVel, Stokes.Coeff_.RefGradPr);
+	if( P.get<std::string>("Exp.Solution_Vel").compare("None")!=0)
+		Stokes.CheckOnePhaseSolution( &Stokes.v, &Stokes.p, Stokes.Coeff_.RefVel, Stokes.Coeff_.RefGradPr);
 }
 
 void SetInitialLevelsetConditions( LevelsetP2CL& lset, MultiGridCL& MG, ParamCL& P)
@@ -424,7 +425,7 @@ void SetInitialConditions(StokesT& Stokes, LevelsetP2CL& lset, MultiGridCL& MG, 
         ReadFEFromFile( Stokes.v, MG, P.get<std::string>("DomainCond.InitialFile")+"velocity", P.get<int>("Restart.Binary"));
         Stokes.UpdateXNumbering( pidx, lset);
         Stokes.p.SetIdx( pidx);
-        ReadFEFromFile( Stokes.p, MG, P.get<std::string>("DomainCond.InitialFile")+"pressure", P.get<int>("Restart.Binary"), &lset.Phi); // pass also level set, as p may be extended
+        ReadFEFromFile( Stokes.p, MG, P.get<std::string>("DomainCond.InitialFile")+"pressure", P.get<int>("Restart.Binary"), lset.PhiC); // pass also level set, as p may be extended
       } break;
       case 0: // zero initial condition
           Stokes.UpdateXNumbering( pidx, lset);
@@ -447,7 +448,7 @@ void SetInitialConditions(StokesT& Stokes, LevelsetP2CL& lset, MultiGridCL& MG, 
         InexactUzawaCL<PCGPcT, ISBBTPreCL, APC_SYM> inexactuzawasolver( apc, bbtispc, P.get<int>("Stokes.OuterIter"), P.get<double>("Stokes.OuterTol"), 0.6, 50);
 
         NSSolverBaseCL<StokesT> stokessolver( Stokes, inexactuzawasolver);
-        SolveStatProblem( Stokes, lset, stokessolver);
+        SolveStatProblem( Stokes, lset, stokessolver, P);
       } break;
       case  2: //flow without droplet
           Stokes.UpdateXNumbering( pidx, lset);

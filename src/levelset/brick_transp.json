@@ -59,6 +59,7 @@
 		"Tol":		1e-14,
 		"Iter":		10000,
 		"SD":		0,
+        "Discontinuous": 0,
 		"CurvDiff":		-5e-9,
 		"VolCorrection":		0,
 		"Theta":		1.0
