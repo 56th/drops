@@ -139,9 +139,9 @@ void SpecialBndHandleSystem2_P2P1XCL::setupB(SMatrixCL<1, 3> loc_b[4][10], const
 		    	for(Uint j=0; j<3; ++j){
 					const bool is_pos= ls_sign[unknownIdx[j]] == 1;
 					const double value=(is_pos ? -1. : 1.)*quad( qvel[i]*qpr[j], bndq5dom_, is_pos ? NegTetraC : PosTetraC);
-				    loc_b[unknownIdx[j]][unknownIdx[i]](0, 0)+= value*normal[0]; //need verification!
-					loc_b[unknownIdx[j]][unknownIdx[i]](0, 1)+= value*normal[1];
-					loc_b[unknownIdx[j]][unknownIdx[i]](0, 2)+= value*normal[2];
+				    loc_b[unknownIdx[j]][unknownIdx[i]](0, 0)-= value*normal[0]; //need verification!
+					loc_b[unknownIdx[j]][unknownIdx[i]](0, 1)-= value*normal[1];
+					loc_b[unknownIdx[j]][unknownIdx[i]](0, 2)-= value*normal[2];
 				}
 			}
 		}
