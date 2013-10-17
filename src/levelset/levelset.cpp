@@ -648,9 +648,13 @@ void YoungForceAccumulatorCL::visit ( const TetraCL& t)
 	for(Uint i=0; i<10; ++i)
 		phi[i][i] = 1;
 	Point3DCL normal_mcl;
-	double costheta[3];
-//	for (int ch=0; ch<8; ++ch)
-	for(int ch=8;ch<9;++ch)
+	double costheta[5];
+	BaryCoordCL quadBarys[5];
+	double weight[5]={0.568888889, 0.47862867,0.47862867,0.236926885,0.236926885};
+	//integral in [-1,1]
+	double qupt[5]={0,-0.53846931,0.53846931,-0.906179846,0.906179846};
+	for (int ch=0; ch<8; ++ch)
+//	for(int ch=8;ch<9;++ch)
     {
         if (!triangle.ComputeMCLForChild(ch)) // no patch for this child
             continue;
@@ -663,20 +667,159 @@ void YoungForceAccumulatorCL::visit ( const TetraCL& t)
         {
         	length = triangle.GetInfoMCL(i,Barys[0],Barys[1],pt0,pt1);
         	normal_mcl = triangle.GetMCLNormal(i);
-        	midpt=(pt0 + pt1)/2;
+        	for(Uint j=0;j<5;j++)
+        	{
+        		quadBarys[j]=(Barys[0]+Barys[1])/2+qupt[j]*(Barys[1]-Barys[0])/2;
+        		midpt=(pt0+pt1)/2 + qupt[j]*(pt1-pt0)/2;
+        		costheta[j]=cos(angle_(midpt));
+        	}
 
-        	costheta[0]=cos(angle_(pt0));
-        	costheta[1]=cos(angle_(pt1));
-        	costheta[2]=cos(angle_(midpt));
 
         	for (int v=0; v<10; ++v)
         	{
         		const IdxT Numbv= v<10 ? Numb[v] : (velXfem && Numb[v-10]!=NoIdx ? f.RowIdx->GetXidx()[Numb[v-10]] : NoIdx);
         		if (Numbv==NoIdx) continue;
-        		double value = (phi[v](Barys[0])*costheta[0]+ phi[v](Barys[1])*costheta[1]+ 4*phi[v]((Barys[0]+Barys[1])/2)*costheta[2])/6;
+
+        		double value = (phi[v](quadBarys[0])*costheta[0]*weight[0]+ phi[v](quadBarys[1])*costheta[1]*weight[1]
+        		              + phi[v](quadBarys[2])*costheta[2]*weight[2]+ phi[v](quadBarys[3])*costheta[3]*weight[3]
+        		              + phi[v](quadBarys[4])*costheta[4]*weight[4])*length/2;
+        		//higher order quadrature is used!!
         		for (int j=0; j<3; ++j)
         		{
-        			f.Data[Numbv+j] += sigma_*value*normal_mcl[j]*length;
+        			f.Data[Numbv+j] += sigma_*value*normal_mcl[j];
+        		}
+        	}
+        }
+    } // Ende der for-Schleife ueber die Kinder
+}
+
+/// \brief Impoved Accumulator for the Young's force on the three-phase contact line.
+///
+/// Computes the integral
+///         \f[ \sigma \int_{MCL} \cos(\theta)v\cdot \tau ds \f]
+/// with \f$\tau \f$ being the normal direction of the moving contact line in tangential plain of domain boundary.
+/// we compute the force using the outnormal of the levelset instead of the straight contact line
+class ImprovedYoungForceAccumulatorCL : public  TetraAccumulatorCL
+{
+ private:
+    VecDescCL  SmPhi_;
+    const BndDataCL<>& lsetbnd_;
+    VecDescCL& f;
+   // SMatrixCL<3,3> T;
+    InterfaceTriangleCL triangle;
+
+    const double sigma_;
+    scalar_fun_ptr angle_;	//Young's contact angle
+    vector_fun_ptr outnormal_;//outnormal of the domain boundary
+
+    bool SpeBnd; //special boundary condition
+
+   // LocalP1CL<Point3DCL> Grad[10], GradRef[10];
+    IdxT Numb[10];
+    LocalP2CL<> velR_p[4][8], velR_n[4][8]; // for P2R basis on children
+ //   LocalP2CL<> loc_phi;
+
+  public:
+    ImprovedYoungForceAccumulatorCL( const LevelsetP2CL& ls, VecDescCL& f_Gamma, double sigma,scalar_fun_ptr cangle,vector_fun_ptr outnormal)
+     :  SmPhi_(ls.Phi),lsetbnd_(ls.GetBndData()),f(f_Gamma), sigma_(sigma),angle_(cangle),outnormal_(outnormal)
+    { ls.MaybeSmooth( SmPhi_.Data);
+    //P2DiscCL::GetGradientsOnRef( GradRef);
+    }
+
+    void begin_accumulation ()
+        {
+            // uncomment for Geomview output
+            //std::ofstream fil("surf.off");
+            //fil << "appearance {\n-concave\nshading smooth\n}\nLIST\n{\n";
+        }
+        void finalize_accumulation()
+        {
+            // uncomment for Geomview output
+            //fil << "}\n";
+        }
+    void visit (const TetraCL&);
+
+    TetraAccumulatorCL* clone (int /*tid*/) { return new ImprovedYoungForceAccumulatorCL ( *this); };
+};
+
+void ImprovedYoungForceAccumulatorCL::visit ( const TetraCL& t)
+{
+	SpeBnd=false;
+	for(Uint v=0; v<4; v++)
+	   	if(lsetbnd_.GetBC(*t.GetFace(v))==Slip0BC||lsetbnd_.GetBC(*t.GetFace(v))==SlipBC)
+	   	{
+	   		SpeBnd=true; break;
+	   	}
+	if(!SpeBnd)
+	{
+		for(Uint v=0; v<6; v++)
+			if(lsetbnd_.GetBC(*t.GetEdge(v))==Slip0BC||lsetbnd_.GetBC(*t.GetEdge(v))==SlipBC)
+			{
+				SpeBnd=true; break;
+			}
+		if(!SpeBnd)
+		return;
+	}
+    const Uint idx_f=   f.RowIdx->GetIdx();
+    const bool velXfem= f.RowIdx->IsExtended();
+    if (velXfem)
+    	throw DROPSErrCL("WARNING: ImprovedYoungForceAccumulatorCL : not implemented for velocity XFEM method yet!");
+  //  double det;
+
+   // GetTrafoTr( T, det, t);
+
+  //  loc_phi.assign( t, SmPhi_, lsetbnd_);
+    triangle.BInit( t, SmPhi_,lsetbnd_); //we have to use this init function!!!!!!!!!
+    triangle.SetBndOutNormal(outnormal_);
+    for (int v=0; v<10; ++v)
+    {   const UnknownHandleCL& unk= v<4 ? t.GetVertex(v)->Unknowns : t.GetEdge(v-4)->Unknowns;
+        Numb[v]= unk.Exist(idx_f) ? unk(idx_f) : NoIdx;
+    }
+	LocalP2CL<double> phi[10];
+	for(Uint i=0; i<10; ++i)
+		phi[i][i] = 1;
+	Point3DCL normal_mcl[5];
+	double costheta[5];
+	BaryCoordCL quadBarys[5];
+	double weight[5]={0.568888889, 0.47862867,0.47862867,0.236926885,0.236926885};
+	//integral in [-1,1]
+	double qupt[5]={0,-0.53846931,0.53846931,-0.906179846,0.906179846};
+	Point3DCL value;
+	for (int ch=0; ch<8; ++ch)
+//	for(int ch=8;ch<9;++ch)
+    {
+        if (!triangle.ComputeMCLForChild(ch)) // no patch for this child
+            continue;
+        BaryCoordCL Barys[2];
+        Point3DCL pt0,pt1;
+        Point3DCL midpt;
+        double length;
+        Uint ncl=triangle.GetNumMCL();
+        for(Uint i=0;i<ncl;i++)
+        {
+        	length = triangle.GetInfoMCL(i,Barys[0],Barys[1],pt0,pt1);
+
+        	for(Uint j=0;j<5;j++)
+        	{
+        		normal_mcl[j] = triangle.GetImprovedMCLNormal(i,(qupt[j]+1)/2);
+        		quadBarys[j]=(Barys[0]+Barys[1])/2+qupt[j]*(Barys[1]-Barys[0])/2;
+        		midpt=(pt0+pt1)/2 + qupt[j]*(pt1-pt0)/2;
+        		costheta[j]=cos(angle_(midpt));
+        	}
+
+
+        	for (int v=0; v<10; ++v)
+        	{
+        		const IdxT Numbv= v<10 ? Numb[v] : (velXfem && Numb[v-10]!=NoIdx ? f.RowIdx->GetXidx()[Numb[v-10]] : NoIdx);
+        		if (Numbv==NoIdx) continue;
+
+        		value = (phi[v](quadBarys[0])*costheta[0]*weight[0]*normal_mcl[0]+ phi[v](quadBarys[1])*costheta[1]*weight[1]*normal_mcl[1]
+        		                 + phi[v](quadBarys[2])*costheta[2]*weight[2]*normal_mcl[2]+ phi[v](quadBarys[3])*costheta[3]*weight[3]*normal_mcl[3]
+        		                 + phi[v](quadBarys[4])*costheta[4]*weight[4]*normal_mcl[4])*length/2;
+        		//higher order quadrature is used!!
+        		for (int j=0; j<3; ++j)
+        		{
+        			f.Data[Numbv+j] += sigma_*value[j];
         		}
         	}
         }
@@ -969,12 +1112,16 @@ void LevelsetP2CL::AccumulateBndIntegral( VecDescCL& f) const
 
 void LevelsetP2CL::AccumulateYoungForce( VecDescCL& f) const
 {
-    YoungForceAccumulatorCL *accu;
-
-    if(SF_==SF_ImprovedLB)
-    	accu= new YoungForceAccumulatorCL( *this, f, sf_.GetSigma()(std_basis<3>(0), 0.),CA_,Bndoutnormal_);
-    else
+	 ScopeTimerCL scope("AccumulateYoungForce");
+	TetraAccumulatorCL *accu;
+    switch (SF_)
+    {
+    	//accu= new YoungForceAccumulatorCL( *this, f, sf_.GetSigma()(std_basis<3>(0), 0.),CA_,Bndoutnormal_);
+    case SF_ImprovedLB:
+       	accu= new ImprovedYoungForceAccumulatorCL( *this, f, sf_.GetSigma()(std_basis<3>(0), 0.),CA_,Bndoutnormal_); break;
+    default:
     	throw DROPSErrCL("LevelsetP2CL::AccumulateYoungForce not implemented for non-constant surface tension");
+    }
     TetraAccumulatorTupleCL accus;
     accus.push_back( accu);
     accumulate( accus, MG_, Phi.RowIdx->TriangLevel(), Phi.RowIdx->GetMatchingFunction(), Phi.RowIdx->GetBndInfo());

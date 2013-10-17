@@ -184,6 +184,10 @@ class InterfaceTriangleCL : public InterfacePatchCL
     Quad5_2DCL<Point3DCL> GetImprovedNormal(Uint) const;  ///< Returns the improved unit normal
     Point3DCL GetMCLNormal(Uint) const;						  ///< Returns the unit normal to the contact line in tangential surface of the boundary
 															  ///call after SetBndoutNormal()
+    Point3DCL GetImprovedMCLNormal(Uint v,double bary1D) const; ///< Returns the unit normal to the contact line in tangential surface of the boundary
+    														///computed in an improved way using levelset function
+    														///v denotes the v-th contact line(at most two). bary1D is the bary coordinate on the straight contact line
+    														///call after SetBndoutNormal()
     double GetActualContactAngle(Uint) const;				///< Returns the contact angle
 															///call after SetBndoutNormal()
     Point3DCL ApplyProj( const Point3DCL& grad) const { return grad[0]*B_[0] + grad[1]*B_[1] + grad[2]*B_[2]; }

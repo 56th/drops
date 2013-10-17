@@ -698,7 +698,55 @@ Point3DCL InterfaceTriangleCL::GetMCLNormal(Uint v) const
 	else
 		return -n/n.norm();
 }
+//A better way would be use some 1D Quad class which should be implemented later!!
+Point3DCL InterfaceTriangleCL::GetImprovedMCLNormal(Uint v,double bary1D) const
+{
+	Point3DCL mpt = PQRS_[IdxMCL_[v]] + bary1D*(PQRS_[(IdxMCL_[v]+1)%intersec_]-PQRS_[IdxMCL_[v]]);
+	BaryCoordCL bary = Bary_[IdxMCL_[v]]+  bary1D*(Bary_[(IdxMCL_[v]+1)%intersec_]-Bary_[IdxMCL_[v]]);
+	Point3DCL n=outnormal_(mpt);//out normal of the domain boundary
 
+	//BEGIN to compute the outnormal of the level-set
+	LocalP1CL<Point3DCL> GradRef[10], GradP2[10];
+	P2DiscCL::GetGradientsOnRef( GradRef);
+	SMatrixCL<3,3> T;
+
+	double M[3][3];
+	const Point3DCL& pt0= Coord_[0];
+	for(int i=0; i<3; ++i)
+		for(int j=0; j<3; ++j)
+			M[j][i]= Coord_[i+1][j] - pt0[j];
+	double det=   M[0][0] * (M[1][1]*M[2][2] - M[1][2]*M[2][1])
+			- M[0][1] * (M[1][0]*M[2][2] - M[1][2]*M[2][0])
+			+ M[0][2] * (M[1][0]*M[2][1] - M[1][1]*M[2][0]);
+
+	T(0,0)= (M[1][1]*M[2][2] - M[1][2]*M[2][1])/det;
+	T(0,1)= (M[2][0]*M[1][2] - M[1][0]*M[2][2])/det;
+	T(0,2)= (M[1][0]*M[2][1] - M[2][0]*M[1][1])/det;
+	T(1,0)= (M[2][1]*M[0][2] - M[0][1]*M[2][2])/det;
+	T(1,1)= (M[0][0]*M[2][2] - M[2][0]*M[0][2])/det;
+	T(1,2)= (M[2][0]*M[0][1] - M[0][0]*M[2][1])/det;
+	T(2,0)= (M[0][1]*M[1][2] - M[1][1]*M[0][2])/det;
+	T(2,1)= (M[1][0]*M[0][2] - M[0][0]*M[1][2])/det;
+	T(2,2)= (M[0][0]*M[1][1] - M[1][0]*M[0][1])/det;
+
+	//	Quad5_2DCL<>          p2[10];
+	Point3DCL GradQ[10]; // and their gradients
+	P2DiscCL::GetGradients( GradP2, GradRef, T);
+	Point3DCL normal;//outnormal of the leveset
+	//	P2DiscCL::GetP2Basis( p2, &this->GetBary(n));
+	for (int v=0; v<10; ++v)
+	{
+		GradQ[v]=GradP2[v](bary);
+		normal += this->GetPhi(v)*GradQ[v];
+	}
+
+	if (normal.norm()>1e-8) normal/= normal.norm();
+	//END compute the outnormal of the level-set
+	n=normal - inner_prod(normal,n)*n;
+	//std::cout<<n<<std::endl;
+	return n/n.norm();
+
+}
 double InterfaceTriangleCL::GetActualContactAngle(Uint v) const
 {
 	Point3DCL midpt = (PQRS_[IdxMCL_[v]]+PQRS_[(IdxMCL_[v]+1)%intersec_])/2;
