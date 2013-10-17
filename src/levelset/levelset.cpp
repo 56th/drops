@@ -648,9 +648,13 @@ void YoungForceAccumulatorCL::visit ( const TetraCL& t)
 	for(Uint i=0; i<10; ++i)
 		phi[i][i] = 1;
 	Point3DCL normal_mcl;
-	double costheta[3];
-//	for (int ch=0; ch<8; ++ch)
-	for(int ch=8;ch<9;++ch)
+	double costheta[5];
+	BaryCoordCL quadBarys[5];
+	double weight[5]={0.568888889, 0.47862867,0.47862867,0.236926885,0.236926885};
+	//integral in [-1,1]
+	double qupt[5]={0,-0.53846931,0.53846931,-0.906179846,0.906179846};
+	for (int ch=0; ch<8; ++ch)
+//	for(int ch=8;ch<9;++ch)
     {
         if (!triangle.ComputeMCLForChild(ch)) // no patch for this child
             continue;
@@ -663,20 +667,26 @@ void YoungForceAccumulatorCL::visit ( const TetraCL& t)
         {
         	length = triangle.GetInfoMCL(i,Barys[0],Barys[1],pt0,pt1);
         	normal_mcl = triangle.GetMCLNormal(i);
-        	midpt=(pt0 + pt1)/2;
+        	for(Uint j=0;j<5;j++)
+        	{
+        		quadBarys[j]=(Barys[0]+Barys[1])/2+qupt[j]*(Barys[1]-Barys[0])/2;
+        		midpt=(pt0+pt1)/2 + qupt[j]*(pt1-pt0)/2;
+        		costheta[j]=cos(angle_(midpt));
+        	}
 
-        	costheta[0]=cos(angle_(pt0));
-        	costheta[1]=cos(angle_(pt1));
-        	costheta[2]=cos(angle_(midpt));
 
         	for (int v=0; v<10; ++v)
         	{
         		const IdxT Numbv= v<10 ? Numb[v] : (velXfem && Numb[v-10]!=NoIdx ? f.RowIdx->GetXidx()[Numb[v-10]] : NoIdx);
         		if (Numbv==NoIdx) continue;
-        		double value = (phi[v](Barys[0])*costheta[0]+ phi[v](Barys[1])*costheta[1]+ 4*phi[v]((Barys[0]+Barys[1])/2)*costheta[2])/6;
+
+        		double value = (phi[v](quadBarys[0])*costheta[0]*weight[0]+ phi[v](quadBarys[1])*costheta[1]*weight[1]
+        		              + phi[v](quadBarys[2])*costheta[2]*weight[2]+ phi[v](quadBarys[3])*costheta[3]*weight[3]
+        		              + phi[v](quadBarys[4])*costheta[4]*weight[4])*length/2;
+        		//higher order quadrature is used!!
         		for (int j=0; j<3; ++j)
         		{
-        			f.Data[Numbv+j] += sigma_*value*normal_mcl[j]*length;
+        			f.Data[Numbv+j] += sigma_*value*normal_mcl[j];
         		}
         	}
         }
