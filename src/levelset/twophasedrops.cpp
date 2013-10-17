@@ -142,7 +142,7 @@ void computeRadius_Angle(const DROPS::MultiGridCL& mg,LevelsetP2CL& lset,vector_
 		}
 		triangle.BInit( *it, lset.Phi,lsetbnd); //we have to use this init function!!!!!!!!!
 		triangle.SetBndOutNormal(Outnormal_fun);
-		for(int ch=8;ch<9;++ch)
+		for(int ch=0;ch<8;++ch)
 	    {
 	        if (!triangle.ComputeMCLForChild(ch)) // no patch for this child
 	            continue;
