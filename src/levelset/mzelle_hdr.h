@@ -351,6 +351,7 @@ void SolveStatProblem( StokesT& Stokes, LevelsetP2CL& lset,
     Stokes.SetLevelSet( lset);
     lset.UpdateMLPhi();
     lset.AccumulateBndIntegral( curv);
+	lset.AccumulateYoungForce ( curv);
     Stokes.SetupSystem1( &Stokes.A, &Stokes.M, &Stokes.b, &Stokes.b, &cplM, lset, Stokes.v.t);
     Stokes.SetupPrStiff( &Stokes.prA, lset);
     Stokes.SetupPrMass ( &Stokes.prM, lset);

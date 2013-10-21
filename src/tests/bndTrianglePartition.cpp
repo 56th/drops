@@ -105,15 +105,21 @@ void test_bnd_integral()
 	bool onbnd = false;
 	DROPS_FOR_TRIANG_TETRA( mg, 0, it) {
 		evaluate_on_vertexes( ball_instat, *it, lat, 0., Addr( ls));
+		
 		onbnd = (*it).IsBndSeg(3);   //it seems segment 3 is the face number for all "bottom" tetra
 		if(onbnd)
 		{
-			BndTri.make_partition2D<DROPS::PartitionedVertexPolicyCL, DROPS::MergeCutPolicyCL>( lat, 3, ls);
-			DROPS::make_CompositeQuad5BndDomain2D(qdom, BndTri, *it); 
-			DROPS::GridFunctionCL<> integrand( 1., qdom.vertex_size()); // Gridfunction with constant 1 everywhere
-			double tmp_neg, tmp_pos;
-			quad( integrand, qdom, tmp_neg, tmp_pos);
-			area_neg+= tmp_neg; area_pos+= tmp_pos;
+			DROPS::Point3DCL normal;
+			(*it).GetOuterNormal(3, normal);
+		    if(normal[1]==-1){
+				BndTri.make_partition2D<DROPS::PartitionedVertexPolicyCL, DROPS::MergeCutPolicyCL>( lat, 3, ls);
+				DROPS::make_CompositeQuad5BndDomain2D(qdom, BndTri, *it); 
+				DROPS::GridFunctionCL<> integrand( 1., qdom.vertex_size()); // Gridfunction with constant 1 everywhere
+				//double tmp_neg, tmp_pos;
+				area_neg +=quad( integrand, qdom, DROPS::NegTetraC);
+				area_pos +=quad( integrand, qdom, DROPS::PosTetraC);			
+				//area_neg+= tmp_neg; area_pos+= tmp_pos;
+			}
 		}
     }
 	//analytical solution of negative area is 0.78539815
