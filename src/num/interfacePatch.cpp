@@ -685,6 +685,50 @@ void InterfaceTriangleCL::SetBndOutNormal(vector_fun_ptr outnormal)
 {
 	outnormal_=outnormal;
 }
+Point3DCL InterfaceTriangleCL::GetImprovedNormalOnMCL(Uint v,double bary1D) const
+{
+	//Point3DCL mpt = PQRS_[IdxMCL_[v]] + bary1D*(PQRS_[(IdxMCL_[v]+1)%intersec_]-PQRS_[IdxMCL_[v]]);
+	BaryCoordCL bary = Bary_[IdxMCL_[v]]+  bary1D*(Bary_[(IdxMCL_[v]+1)%intersec_]-Bary_[IdxMCL_[v]]);
+	//BEGIN to compute the outnormal of the level-set
+		LocalP1CL<Point3DCL> GradRef[10], GradP2[10];
+		P2DiscCL::GetGradientsOnRef( GradRef);
+		SMatrixCL<3,3> T;
+
+		double M[3][3];
+		const Point3DCL& pt0= Coord_[0];
+		for(int i=0; i<3; ++i)
+			for(int j=0; j<3; ++j)
+				M[j][i]= Coord_[i+1][j] - pt0[j];
+		double det=   M[0][0] * (M[1][1]*M[2][2] - M[1][2]*M[2][1])
+				- M[0][1] * (M[1][0]*M[2][2] - M[1][2]*M[2][0])
+				+ M[0][2] * (M[1][0]*M[2][1] - M[1][1]*M[2][0]);
+
+		T(0,0)= (M[1][1]*M[2][2] - M[1][2]*M[2][1])/det;
+		T(0,1)= (M[2][0]*M[1][2] - M[1][0]*M[2][2])/det;
+		T(0,2)= (M[1][0]*M[2][1] - M[2][0]*M[1][1])/det;
+		T(1,0)= (M[2][1]*M[0][2] - M[0][1]*M[2][2])/det;
+		T(1,1)= (M[0][0]*M[2][2] - M[2][0]*M[0][2])/det;
+		T(1,2)= (M[2][0]*M[0][1] - M[0][0]*M[2][1])/det;
+		T(2,0)= (M[0][1]*M[1][2] - M[1][1]*M[0][2])/det;
+		T(2,1)= (M[1][0]*M[0][2] - M[0][0]*M[1][2])/det;
+		T(2,2)= (M[0][0]*M[1][1] - M[1][0]*M[0][1])/det;
+
+		//	Quad5_2DCL<>          p2[10];
+		Point3DCL GradQ[10]; // and their gradients
+		P2DiscCL::GetGradients( GradP2, GradRef, T);
+		Point3DCL normal;//outnormal of the leveset
+		//	P2DiscCL::GetP2Basis( p2, &this->GetBary(n));
+		for (int v=0; v<10; ++v)
+		{
+			GradQ[v]=GradP2[v](bary);
+			normal += this->GetPhi(v)*GradQ[v];
+		}
+
+		if (normal.norm()>1e-8) normal/= normal.norm();
+		//END compute the outnormal of the level-set
+		return normal;
+}
+
 Point3DCL InterfaceTriangleCL::GetMCLNormal(Uint v) const
 {
 	Point3DCL midpt = (PQRS_[IdxMCL_[v]]+PQRS_[(IdxMCL_[v]+1)%intersec_])/2;
@@ -702,9 +746,10 @@ Point3DCL InterfaceTriangleCL::GetMCLNormal(Uint v) const
 Point3DCL InterfaceTriangleCL::GetImprovedMCLNormal(Uint v,double bary1D) const
 {
 	Point3DCL mpt = PQRS_[IdxMCL_[v]] + bary1D*(PQRS_[(IdxMCL_[v]+1)%intersec_]-PQRS_[IdxMCL_[v]]);
-	BaryCoordCL bary = Bary_[IdxMCL_[v]]+  bary1D*(Bary_[(IdxMCL_[v]+1)%intersec_]-Bary_[IdxMCL_[v]]);
+//	BaryCoordCL bary = Bary_[IdxMCL_[v]]+  bary1D*(Bary_[(IdxMCL_[v]+1)%intersec_]-Bary_[IdxMCL_[v]]);
 	Point3DCL n=outnormal_(mpt);//out normal of the domain boundary
 
+/*
 	//BEGIN to compute the outnormal of the level-set
 	LocalP1CL<Point3DCL> GradRef[10], GradP2[10];
 	P2DiscCL::GetGradientsOnRef( GradRef);
@@ -741,7 +786,8 @@ Point3DCL InterfaceTriangleCL::GetImprovedMCLNormal(Uint v,double bary1D) const
 	}
 
 	if (normal.norm()>1e-8) normal/= normal.norm();
-	//END compute the outnormal of the level-set
+	//END compute the outnormal of the level-set*/
+	Point3DCL normal=GetImprovedNormalOnMCL(v,bary1D);
 	n=normal - inner_prod(normal,n)*n;
 	//std::cout<<n<<std::endl;
 	return n/n.norm();
@@ -752,7 +798,11 @@ double InterfaceTriangleCL::GetActualContactAngle(Uint v) const
 	Point3DCL midpt = (PQRS_[IdxMCL_[v]]+PQRS_[(IdxMCL_[v]+1)%intersec_])/2;
 	return M_PI - acos(inner_prod(GetNormal(),outnormal_(midpt)));
 }
-
+double InterfaceTriangleCL::GetImprovedActualContactAngle(Uint v,double bary1D) const
+{
+	Point3DCL mpt = PQRS_[IdxMCL_[v]] + bary1D*(PQRS_[(IdxMCL_[v]+1)%intersec_]-PQRS_[IdxMCL_[v]]);
+	return M_PI - acos(inner_prod(GetImprovedNormalOnMCL(v,bary1D),outnormal_(mpt)));
+}
 
 LocalP2CL<double> ProjectIsoP2ChildToParentP1 (LocalP2CL<double> lpin, Uint child){
     const double vertices[][3]=

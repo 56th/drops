@@ -182,6 +182,7 @@ class InterfaceTriangleCL : public InterfacePatchCL
     const Point3DCL& GetGradId( Uint i) const { return B_[i]; }   ///< Returns the projection of the i-th standard-basis-vector of \f$R^3\f$ on the patch.
     Point3DCL GetNormal () const;                         ///< Returns the unit normal to the linear approximation of \f$\Gamma\f$, that points from \f$\{\varphi<0\}\f$ to \f$\{\varphi<0\}\f$.
     Quad5_2DCL<Point3DCL> GetImprovedNormal(Uint) const;  ///< Returns the improved unit normal
+    Point3DCL GetImprovedNormalOnMCL(Uint,double bary1D) const;  ///< Returns the improved unit normal on moving contact line
     Point3DCL GetMCLNormal(Uint) const;						  ///< Returns the unit normal to the contact line in tangential surface of the boundary
 															  ///call after SetBndoutNormal()
     Point3DCL GetImprovedMCLNormal(Uint v,double bary1D) const; ///< Returns the unit normal to the contact line in tangential surface of the boundary
@@ -190,6 +191,8 @@ class InterfaceTriangleCL : public InterfacePatchCL
     														///call after SetBndoutNormal()
     double GetActualContactAngle(Uint) const;				///< Returns the contact angle
 															///call after SetBndoutNormal()
+    double GetImprovedActualContactAngle(Uint,double bary1D) const;				///< Returns the contact angle
+    															///call after SetBndoutNormal()
     Point3DCL ApplyProj( const Point3DCL& grad) const { return grad[0]*B_[0] + grad[1]*B_[1] + grad[2]*B_[2]; }
 };
 
