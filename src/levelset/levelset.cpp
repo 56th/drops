@@ -615,14 +615,14 @@ void YoungForceAccumulatorCL::visit ( const TetraCL& t)
 {
 	SpeBnd=false;
 	for(Uint v=0; v<4; v++)
-	   	if(lsetbnd_.GetBC(*t.GetFace(v))==Slip0BC||lsetbnd_.GetBC(*t.GetFace(v))==SlipBC)
+	   	if(lsetbnd_.GetBC(*t.GetFace(v))==Slip0BC||lsetbnd_.GetBC(*t.GetFace(v))==SlipBC ||lsetbnd_.GetBC(*t.GetFace(v))==SymmBC )
 	   	{
 	   		SpeBnd=true; break;
 	   	}
 	if(!SpeBnd)
 	{
 		for(Uint v=0; v<6; v++)
-			if(lsetbnd_.GetBC(*t.GetEdge(v))==Slip0BC||lsetbnd_.GetBC(*t.GetEdge(v))==SlipBC)
+			if(lsetbnd_.GetBC(*t.GetEdge(v))==Slip0BC||lsetbnd_.GetBC(*t.GetEdge(v))==SlipBC ||lsetbnd_.GetBC(*t.GetEdge(v))==SymmBC)
 			{
 				SpeBnd=true; break;
 			}
@@ -658,8 +658,10 @@ void YoungForceAccumulatorCL::visit ( const TetraCL& t)
 	for (int ch=0; ch<8; ++ch)
 //	for(int ch=8;ch<9;++ch)
     {
+
         if (!triangle.ComputeMCLForChild(ch)) // no patch for this child
             continue;
+
         BaryCoordCL Barys[2];
         Point3DCL pt0,pt1;
         Point3DCL midpt;
@@ -753,14 +755,14 @@ void ImprovedYoungForceAccumulatorCL::visit ( const TetraCL& t)
 {
 	SpeBnd=false;
 	for(Uint v=0; v<4; v++)
-	   	if(lsetbnd_.GetBC(*t.GetFace(v))==Slip0BC||lsetbnd_.GetBC(*t.GetFace(v))==SlipBC)
+	   	if(lsetbnd_.GetBC(*t.GetFace(v))==Slip0BC||lsetbnd_.GetBC(*t.GetFace(v))==SlipBC||lsetbnd_.GetBC(*t.GetFace(v))==SymmBC )
 	   	{
 	   		SpeBnd=true; break;
 	   	}
 	if(!SpeBnd)
 	{
 		for(Uint v=0; v<6; v++)
-			if(lsetbnd_.GetBC(*t.GetEdge(v))==Slip0BC||lsetbnd_.GetBC(*t.GetEdge(v))==SlipBC)
+			if(lsetbnd_.GetBC(*t.GetEdge(v))==Slip0BC||lsetbnd_.GetBC(*t.GetEdge(v))==SlipBC||lsetbnd_.GetBC(*t.GetEdge(v))==SymmBC )
 			{
 				SpeBnd=true; break;
 			}
@@ -816,6 +818,7 @@ void ImprovedYoungForceAccumulatorCL::visit ( const TetraCL& t)
         		costheta[j]=cos(angle_(midpt));
         		sintheta_D[j]=sin(triangle.GetImprovedActualContactAngle(i,(qupt[j]+1)/2));
         		outnormalOnMcl[j]=outnormal_(midpt);
+				std::cout<<"outnormal========================="<< outnormalOnMcl[j] <<std::endl;
         	}
 
 

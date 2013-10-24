@@ -582,7 +582,7 @@ bool InterfaceTriangleCL::ComputeMCLForChild(Uint ch)
 			}
     	}
     //	std::cout<<num<<" ->num ";
-    	if(num==1 &&(BC_Face_[idx[0]]==SlipBC||BC_Face_[idx[0]]==Slip0BC))
+    	if(num==1 &&(BC_Face_[idx[0]]==SlipBC||BC_Face_[idx[0]]==Slip0BC||BC_Face_[idx[0]]==SymmBC))
     	{
     		IdxMCL_[numMCL_]=i;
     	   	numMCL_++;
@@ -591,7 +591,7 @@ bool InterfaceTriangleCL::ComputeMCLForChild(Uint ch)
     	{
     		for(Uint v=0;v<6;v++)
     		{
-    			if(FaceOfEdge(v,0)==idx[0]&&FaceOfEdge(v,1)==idx[1]&&(BC_Edge_[v]==SlipBC||BC_Edge_[v]==Slip0BC))
+    			if(FaceOfEdge(v,0)==idx[0]&&FaceOfEdge(v,1)==idx[1]&&(BC_Edge_[v]==SlipBC||BC_Edge_[v]==Slip0BC||BC_Edge_[v]==SymmBC))
     			{	IdxMCL_[numMCL_]=i;
     				numMCL_++;
     			}

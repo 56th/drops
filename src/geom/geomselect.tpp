@@ -112,6 +112,8 @@ void BuildlsetBoundaryData( const MultiGridCL* mgp, BoundaryT* &bnddata,
 	    			   bnd_idx[i] = 15; break;
 	    		   case 17:
 	    			   bnd_idx[i] = 17; break;
+	    		   case 19:
+	    			   bnd_idx[i] = 19; break;
 	    		   default:
 	    		       break;
 	    	}
