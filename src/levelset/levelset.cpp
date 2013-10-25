@@ -754,22 +754,29 @@ class ImprovedYoungForceAccumulatorCL : public  TetraAccumulatorCL
 void ImprovedYoungForceAccumulatorCL::visit ( const TetraCL& t)
 {
 	SpeBnd=false;
+	bool SymBnd=false;
 	for(Uint v=0; v<4; v++)
 	   	if(lsetbnd_.GetBC(*t.GetFace(v))==Slip0BC||lsetbnd_.GetBC(*t.GetFace(v))==SlipBC||lsetbnd_.GetBC(*t.GetFace(v))==SymmBC )
 	   	{
-	   		SpeBnd=true; break;
+	   		SpeBnd=true;
+	   		if(lsetbnd_.GetBC(*t.GetFace(v))==SymmBC)
+	   			SymBnd=true;
+	   		break;
 	   	}
 	if(!SpeBnd)
 	{
 		for(Uint v=0; v<6; v++)
 			if(lsetbnd_.GetBC(*t.GetEdge(v))==Slip0BC||lsetbnd_.GetBC(*t.GetEdge(v))==SlipBC||lsetbnd_.GetBC(*t.GetEdge(v))==SymmBC )
 			{
-				SpeBnd=true; break;
+				SpeBnd=true;
+				if(lsetbnd_.GetBC(*t.GetEdge(v))==SymmBC)
+			   			SymBnd=true;
+				break;
 			}
 		if(!SpeBnd)
 		return;
 	}
-    const Uint idx_f=   f.RowIdx->GetIdx();
+	const Uint idx_f=   f.RowIdx->GetIdx();
     const bool velXfem= f.RowIdx->IsExtended();
     if (velXfem)
     	throw DROPSErrCL("WARNING: ImprovedYoungForceAccumulatorCL : not implemented for velocity XFEM method yet!");
@@ -815,12 +822,11 @@ void ImprovedYoungForceAccumulatorCL::visit ( const TetraCL& t)
         		normal_mcl[j] = triangle.GetImprovedMCLNormal(i,(qupt[j]+1)/2);
         		quadBarys[j]=(Barys[0]+Barys[1])/2+qupt[j]*(Barys[1]-Barys[0])/2;
         		midpt=(pt0+pt1)/2 + qupt[j]*(pt1-pt0)/2;
-        		costheta[j]=cos(angle_(midpt));
+        		costheta[j]=SymBnd ? 0 : cos(angle_(midpt));
         		sintheta_D[j]=sin(triangle.GetImprovedActualContactAngle(i,(qupt[j]+1)/2));
         		outnormalOnMcl[j]=outnormal_(midpt);
-				std::cout<<"outnormal========================="<< outnormalOnMcl[j] <<std::endl;
+			//	std::cout<<"outnormal========================="<< outnormalOnMcl[j] <<std::endl;
         	}
-
 
         	for (int v=0; v<10; ++v)
         	{

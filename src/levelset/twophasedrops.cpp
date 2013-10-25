@@ -99,7 +99,40 @@ Point3DCL OutNormalBottomPlane(const Point3DCL&)
 //	outnormal[2]=0;
 	return outnormal;
 }
-static DROPS::RegisterStatVectorFunction regunitcubicoutnomal("OutNormalBottomPlane", OutNormalBottomPlane);
+static DROPS::RegisterStatVectorFunction regunitbottomoutnomal("OutNormalBottomPlane", OutNormalBottomPlane);
+Point3DCL OutNormalBrick(const Point3DCL& pt)
+{
+	if(P.get<int>("DomainCond.GeomType")!=1)
+		 throw DROPSErrCL("Error: compute out normal of brick, please use other functions");
+	int nx, ny, nz;
+	double dx, dy, dz;
+	std::string mesh( P.get<std::string>("DomainCond.MeshFile")), delim("x@");
+	size_t idx;
+	while ((idx= mesh.find_first_of( delim)) != std::string::npos )
+	       mesh[idx]= ' ';
+	std::istringstream brick_info( mesh);
+	brick_info >> dx >> dy >> dz >> nx >> ny >> nz;
+	if (!brick_info)
+	        throw DROPSErrCL("error while reading geometry information: " + mesh);
+	double EPS=1e-10;
+	Point3DCL outnormal(0.0);
+	if(std::fabs(pt[0])<EPS)
+	{	outnormal[0]=-1.0; }
+	else if(std::fabs(pt[0]-dx)<EPS)
+	{	outnormal[0]=1.0; }
+	else if(std::fabs(pt[1])<EPS)
+	{	outnormal[1]=-1.0; }
+	else if(std::fabs(pt[1]-dy)<EPS)
+	{	outnormal[1]=1.0; }
+	else if(std::fabs(pt[2])<EPS)
+	{	outnormal[2]=-1.0; }
+	else if(std::fabs(pt[2]-dy)<EPS)
+	{	outnormal[2]=1.0; }
+	else
+		 throw DROPSErrCL("error while computing outnormal");
+	return outnormal;
+}
+static DROPS::RegisterStatVectorFunction regunitcubicoutnomal("OutNormalBrick", OutNormalBrick);
 
 double GetTimeOffset(){
     double timeoffset = 0.0;
@@ -123,6 +156,9 @@ void computeRadius_Angle(const DROPS::MultiGridCL& mg,LevelsetP2CL& lset,vector_
     double angle=0;
     double radius=0;
     double circ=0;
+    double weight[5]={0.568888889, 0.47862867,0.47862867,0.236926885,0.236926885};
+	//integral in [-1,1]
+	double qupt[5]={0,-0.53846931,0.53846931,-0.906179846,0.906179846};
     DROPS_FOR_TRIANG_CONST_TETRA( mg, lvl, it){
 		SpeBnd=false;
 		for(Uint v=0; v<4; v++)
@@ -142,6 +178,7 @@ void computeRadius_Angle(const DROPS::MultiGridCL& mg,LevelsetP2CL& lset,vector_
 		}
 		triangle.BInit( *it, lset.Phi,lsetbnd); //we have to use this init function!!!!!!!!!
 		triangle.SetBndOutNormal(Outnormal_fun);
+
 		for(int ch=0;ch<8;++ch)
 	    {
 	        if (!triangle.ComputeMCLForChild(ch)) // no patch for this child
@@ -156,7 +193,8 @@ void computeRadius_Angle(const DROPS::MultiGridCL& mg,LevelsetP2CL& lset,vector_
 	        	circ+=length;
 	        	radius+=(pt0-P.get<DROPS::Point3DCL>("SpeBnd.posDrop")).norm()/2*length;
 	        	radius+=(pt1-P.get<DROPS::Point3DCL>("SpeBnd.posDrop")).norm()/2*length;
-	        	angle+=length*triangle.GetActualContactAngle(i);
+	        	for(Uint j=0;j<5;j++)
+	        		angle+=length*triangle.GetImprovedActualContactAngle(i,(qupt[j]+1)/2)*weight[j]/2;
 	        }
 	    }
 	}
@@ -199,10 +237,10 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
     // Creates new Levelset-Object, has to be cleaned manually
     LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsetbnddata, sf, P.get_child("Levelset")) );
-  
+
     lset.SetYoungAngle(the_Young_angle);//set Young's Contact angle on the solid boundary
     lset.SetBndOutNormal(the_Bnd_outnormal);//set outnormal of the domain boundary
-    if (is_periodic) //CL: Anyone a better idea? perDirection from ParameterFile?
+     if (is_periodic) //CL: Anyone a better idea? perDirection from ParameterFile?
     {
         DROPS::Point3DCL dx;
         //hack:
@@ -660,7 +698,7 @@ void SetMissingParameters(DROPS::ParamCL& P){
 	P.put_if_unset<double>("SpeBnd.SmoothZone", 0.0);
 	P.put_if_unset<std::string>("SpeBnd.CtAngle", "ConstantAngle");
 	P.put_if_unset<double>("SpeBnd.contactangle", 0.0);
-	P.put_if_unset<std::string>("SpeBnd.BndOutNormal", "OutNormalBottomPlane");
+	P.put_if_unset<std::string>("SpeBnd.BndOutNormal", "OutNormalBrick");
 	P.put_if_unset<std::string>("SpeBnd.posDrop", "[0.5, 0, 0.5 ]");
 
 	P.put_if_unset<std::string>("Exp.Solution_Vel", "None");
