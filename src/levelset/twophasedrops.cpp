@@ -126,7 +126,7 @@ Point3DCL OutNormalBrick(const Point3DCL& pt)
 	{	outnormal[1]=1.0; }
 	else if(std::fabs(pt[2])<EPS)
 	{	outnormal[2]=-1.0; }
-	else if(std::fabs(pt[2]-dy)<EPS)
+	else if(std::fabs(pt[2]-dz)<EPS)
 	{	outnormal[2]=1.0; }
 	else
 		 throw DROPSErrCL("error while computing outnormal");
