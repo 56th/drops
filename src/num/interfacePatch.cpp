@@ -570,7 +570,7 @@ bool InterfaceTriangleCL::ComputeMCLForChild(Uint ch)
 			std::cout<<PQRS_[i]<<": ";
 			std::cout<<BC_Face_[0]<<" "<<BC_Face_[1]<<" "<<BC_Face_[2]<<" "<<BC_Face_[3]<<" : "<<intersec_<<std::endl;
 		}*/
-    	num=0;
+    	num=0; 
    // 	std::cout<<num<<" ->num ";
     	for( Uint j=0; j<4; j++ )
     	{
@@ -584,7 +584,8 @@ bool InterfaceTriangleCL::ComputeMCLForChild(Uint ch)
     //	std::cout<<num<<" ->num ";
     	if(num==1 &&(BC_Face_[idx[0]]==SlipBC||BC_Face_[idx[0]]==Slip0BC||BC_Face_[idx[0]]==SymmBC))
     	{
-    		IdxMCL_[numMCL_]=i;
+    		IdxMCL_[numMCL_][0]= i;
+			IdxMCL_[numMCL_][1]= (i+1)%intersec_;
     	   	numMCL_++;
     	}
     	else if(num==2)//the contact line  intersect with one edge, one need check if the edge on the boundary
@@ -592,15 +593,46 @@ bool InterfaceTriangleCL::ComputeMCLForChild(Uint ch)
     		for(Uint v=0;v<6;v++)
     		{
     			if(FaceOfEdge(v,0)==idx[0]&&FaceOfEdge(v,1)==idx[1]&&(BC_Edge_[v]==SlipBC||BC_Edge_[v]==Slip0BC||BC_Edge_[v]==SymmBC))
-    			{	IdxMCL_[numMCL_]=i;
+    			{	
+					IdxMCL_[numMCL_][0]= i;
+					IdxMCL_[numMCL_][1]= (i+1)%intersec_;
     				numMCL_++;
     			}
     		}
-
     	}
-
     }
-    //std::cout<<std::endl;
+	if(intersec_==4 )
+		for(Uint i=0; i< 2; i++)
+		{
+			num=0;
+			for( Uint j=0; j<4; j++ )
+			{
+				if( cut_point_on_face[i][j]==true && cut_point_on_face[(i+2)%intersec_][j]==true)
+				{
+					idx[num]=j;
+					num++;
+				}
+			}
+			if(num==1 &&(BC_Face_[idx[0]]==SlipBC||BC_Face_[idx[0]]==Slip0BC||BC_Face_[idx[0]]==SymmBC))
+			{
+				IdxMCL_[numMCL_][0]= i;
+				IdxMCL_[numMCL_][1]= i+2;
+				numMCL_++;
+			}
+			else if(num==2)//the contact line  intersect with one edge, one need check if the edge on the boundary
+			{
+				for(Uint v=0;v<6;v++)
+				{
+					if(FaceOfEdge(v,0)==idx[0]&&FaceOfEdge(v,1)==idx[1]&&(BC_Edge_[v]==SlipBC||BC_Edge_[v]==Slip0BC||BC_Edge_[v]==SymmBC))
+					{	
+						IdxMCL_[numMCL_][0]= i;
+						IdxMCL_[numMCL_][1]= i+2;
+						numMCL_++;
+					}
+				}
+			}
+		}
+	
     if(numMCL_==0)
     	return false;
     else
@@ -612,11 +644,12 @@ Uint InterfaceTriangleCL::GetNumMCL()
 }
 double InterfaceTriangleCL::GetInfoMCL(Uint v, BaryCoordCL& bary0, BaryCoordCL& bary1, Point3DCL& pt0, Point3DCL& pt1)
 {
-	bary0 = Bary_[IdxMCL_[v]];
-	bary1 = Bary_[(IdxMCL_[v]+1)%intersec_];
-	pt0 = PQRS_[IdxMCL_[v]];
-	pt1 = PQRS_[(IdxMCL_[v]+1)%intersec_];
-	return (pt1-pt0).norm();
+	    //read two index of the two points of the contact edge
+		bary0 = Bary_[IdxMCL_[v][0]];
+		bary1 = Bary_[IdxMCL_[v][1]];
+		pt0 = PQRS_[IdxMCL_[v][0]];
+		pt1 = PQRS_[IdxMCL_[v][1]];
+		return (pt1-pt0).norm();
 }
 
 Point3DCL InterfaceTriangleCL::GetNormal() const
@@ -688,7 +721,9 @@ void InterfaceTriangleCL::SetBndOutNormal(vector_fun_ptr outnormal)
 Point3DCL InterfaceTriangleCL::GetImprovedNormalOnMCL(Uint v,double bary1D) const
 {
 	//Point3DCL mpt = PQRS_[IdxMCL_[v]] + bary1D*(PQRS_[(IdxMCL_[v]+1)%intersec_]-PQRS_[IdxMCL_[v]]);
-	BaryCoordCL bary = Bary_[IdxMCL_[v]]+  bary1D*(Bary_[(IdxMCL_[v]+1)%intersec_]-Bary_[IdxMCL_[v]]);
+	//BaryCoordCL bary = Bary_[IdxMCL_[v]]+  bary1D*(Bary_[(IdxMCL_[v]+1)%intersec_]-Bary_[IdxMCL_[v]]);
+	
+	BaryCoordCL bary = Bary_[IdxMCL_[v][0]]+  bary1D*(Bary_[IdxMCL_[v][1]]-Bary_[IdxMCL_[v][0]]);
 	//BEGIN to compute the outnormal of the level-set
 		LocalP1CL<Point3DCL> GradRef[10], GradP2[10];
 		P2DiscCL::GetGradientsOnRef( GradRef);
@@ -731,9 +766,11 @@ Point3DCL InterfaceTriangleCL::GetImprovedNormalOnMCL(Uint v,double bary1D) cons
 
 Point3DCL InterfaceTriangleCL::GetMCLNormal(Uint v) const
 {
-	Point3DCL midpt = (PQRS_[IdxMCL_[v]]+PQRS_[(IdxMCL_[v]+1)%intersec_])/2;
+	//Point3DCL midpt = (PQRS_[IdxMCL_[v]]+PQRS_[(IdxMCL_[v]+1)%intersec_])/2;
+	Point3DCL midpt = (PQRS_[IdxMCL_[v][0]]+PQRS_[IdxMCL_[v][1]])/2;
 	Point3DCL n;
-	Point3DCL tau=PQRS_[(IdxMCL_[v]+1)%intersec_]-PQRS_[IdxMCL_[v]];
+	//Point3DCL tau=PQRS_[(IdxMCL_[v]+1)%intersec_]-PQRS_[IdxMCL_[v]];
+	Point3DCL tau=PQRS_[IdxMCL_[v][1]]-PQRS_[IdxMCL_[v][0]];
 	tau=tau/tau.norm();
 	cross_product(n, tau, outnormal_(midpt));
 
@@ -745,7 +782,9 @@ Point3DCL InterfaceTriangleCL::GetMCLNormal(Uint v) const
 //A better way would be use some 1D Quad class which should be implemented later!!
 Point3DCL InterfaceTriangleCL::GetImprovedMCLNormal(Uint v,double bary1D) const
 {
-	Point3DCL mpt = PQRS_[IdxMCL_[v]] + bary1D*(PQRS_[(IdxMCL_[v]+1)%intersec_]-PQRS_[IdxMCL_[v]]);
+	//Point3DCL mpt = PQRS_[IdxMCL_[v]] + bary1D*(PQRS_[(IdxMCL_[v]+1)%intersec_]-PQRS_[IdxMCL_[v]]);
+	
+	Point3DCL mpt = PQRS_[IdxMCL_[v][0]] + bary1D*(PQRS_[IdxMCL_[v][1]]-PQRS_[IdxMCL_[v][0]]);
 //	BaryCoordCL bary = Bary_[IdxMCL_[v]]+  bary1D*(Bary_[(IdxMCL_[v]+1)%intersec_]-Bary_[IdxMCL_[v]]);
 	Point3DCL n=outnormal_(mpt);//out normal of the domain boundary
 
@@ -795,12 +834,14 @@ Point3DCL InterfaceTriangleCL::GetImprovedMCLNormal(Uint v,double bary1D) const
 }
 double InterfaceTriangleCL::GetActualContactAngle(Uint v) const
 {
-	Point3DCL midpt = (PQRS_[IdxMCL_[v]]+PQRS_[(IdxMCL_[v]+1)%intersec_])/2;
+	//Point3DCL midpt = (PQRS_[IdxMCL_[v]]+PQRS_[(IdxMCL_[v]+1)%intersec_])/2;
+	Point3DCL midpt = (PQRS_[IdxMCL_[v][0]]+PQRS_[IdxMCL_[v][1]])/2;
 	return M_PI - acos(inner_prod(GetNormal(),outnormal_(midpt)));
 }
 double InterfaceTriangleCL::GetImprovedActualContactAngle(Uint v,double bary1D) const
 {
-	Point3DCL mpt = PQRS_[IdxMCL_[v]] + bary1D*(PQRS_[(IdxMCL_[v]+1)%intersec_]-PQRS_[IdxMCL_[v]]);
+	//Point3DCL mpt = PQRS_[IdxMCL_[v]] + bary1D*(PQRS_[(IdxMCL_[v]+1)%intersec_]-PQRS_[IdxMCL_[v]]);
+	Point3DCL mpt = PQRS_[IdxMCL_[v][0]] + bary1D*(PQRS_[IdxMCL_[v][1]]-PQRS_[IdxMCL_[v][0]]);	
 	return M_PI - acos(inner_prod(GetImprovedNormalOnMCL(v,bary1D),outnormal_(mpt)));
 }
 

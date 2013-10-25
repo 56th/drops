@@ -163,7 +163,7 @@ class InterfaceTriangleCL : public InterfacePatchCL
     Point3DCL       B_[3];
     Point2DCL       ab_;
     Uint	 numMCL_;				 //number of moving contact lines
-    Uint	 IdxMCL_[4];			 //the edge index  for each contact line
+    Uint	 IdxMCL_[4][2];			 //the edge index  for each contact line
     vector_fun_ptr outnormal_; ///the outnormal of the boundary. instat might be useful for varying boundary.
 
     BaryCoordCL TransformToSubTetra (const BaryCoordCL& b); ///< compute st_*b \todo remove this by introducing a column-oriented small matrix class
