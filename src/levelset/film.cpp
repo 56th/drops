@@ -126,8 +126,10 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
     adap.push_back( &velrepair);
     PressureRepairCL prrepair( Stokes, lset);
     adap.push_back( &prrepair);
+#ifndef _PAR
     EnsightIdxRepairCL ensrepair( MG, ens_idx);
     adap.push_back( &ensrepair);
+#endif
 
     lset.CreateNumbering(      MG.GetLastLevel(), lidx, periodic_match);
     lset.Phi.SetIdx( lidx);
@@ -200,12 +202,14 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
       {
         if(P.get<int>("Ensight.EnsightOut",0))
         {
+#ifndef _PAR
             ReadEnsightP2SolCL reader( MG);
             reader.ReadVector( P.get<std::string>("InitialFile")+".vel", Stokes.v, Stokes.GetBndData().Vel);
             reader.ReadScalar( P.get<std::string>("InitialFile")+".scl", lset.Phi, lset.GetBndData());
             Stokes.UpdateXNumbering( pidx, lset);
             Stokes.p.SetIdx( pidx); // Zero-vector for now.
             reader.ReadScalar( P.get<std::string>("InitialFile")+".pr",  Stokes.p, Stokes.GetBndData().Pr); // reads the P1-part of the pressure
+#endif
         }
         else
         {
@@ -292,18 +296,15 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
 
     // Level-Set-Solver
 #ifndef _PAR
-    typedef GMResSolverCL<SSORPcCL> LsetSolverT;
-    SSORPcCL ssorpc;
-    LsetSolverT* gm = new LsetSolverT( ssorpc, 100, P.get<int>("Levelset.Iter"), P.get<double>("Levelset.Tol"));
+    typedef SSORPcCL LsetPcT;
 #else
-    typedef ParPreGMResSolverCL<ParJac0CL> LsetSolverT;
-    ParJac0CL jacparpc( *lidx);
-    LsetSolverT *gm = new LsetSolverT
-           (/*restart*/100, P.get<int>("Levelset.Iter"), P.get<double>("Levelset.Tol"), *lidx, jacparpc,/*rel*/true, /*acc*/ true, /*modGS*/false, LeftPreconditioning, /*parmod*/true);
+    typedef JACPcCL LsetPcT;
 #endif
+    LsetPcT lset_pc;
+    GMResSolverCL<LsetPcT>* gm = new GMResSolverCL<LsetPcT>( lset_pc, 100, P.get<int>("Levelset.Iter"), P.get<double>("Levelset.Tol"));
     LevelsetModifyCL lsetmod( P.get<int>("Reparam.Freq"), P.get<int>("Reparam.Method"), /*rpm_MaxGrad*/ 1.0, /*rpm_MinGrad*/ 1.0, P.get<double>("Levelset.VolCorrection"), Vol, /*periodic*/ is_periodic);
 
-    LinThetaScheme2PhaseCL<LsetSolverT>
+    LinThetaScheme2PhaseCL< GMResSolverCL<LsetPcT> >
         cpl( Stokes, lset, *navstokessolver, *gm, lsetmod, P.get<double>("Time.StepSize"), P.get<double>("Stokes.Theta"), P.get<double>("Levelset.Theta"), P.get("NavierStokes.Nonlinear", 0.0), /*implicitCurv*/ true);
 
     if (P.get("NavierStokes.Nonlinear", 0.0)!=0.0 || P.get<int>("Time.NumSteps") == 0) {
@@ -353,9 +354,10 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
             adap.UpdateTriang( lset);
             cpl.Update();
         }
-
+#ifndef _PAR
         if (ensight && step%10==0)
             ensight->Write(time_new);
+#endif
         if (vtkwriter && step%10==0)
             vtkwriter->Write(time_new);
         if (P.get("Restart.Serialization", 0) && step%P.get("Restart.Serialization", 0)==0)
@@ -365,7 +367,9 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
     FilmInfo.Update( lset, Stokes.GetVelSolution());
     FilmInfo.Write(Stokes.v.t);
     std::cout << std::endl;
+#ifndef _PAR
     if (ensight ) delete ensight;
+#endif
     if (vtkwriter) delete vtkwriter;
     delete stokessolver;
     delete navstokessolver;
@@ -444,6 +448,9 @@ void SetMissingParameters(DROPS::ParamCL& P){
 
 int main (int argc, char** argv)
 {
+#ifdef _PAR
+    DROPS::ProcCL::Instance(&argc, &argv);
+#endif
   try
   {
     if (argc!=2)
@@ -558,6 +565,15 @@ int main (int argc, char** argv)
            max= prob.p.Data.max();
     std::cout << "pressure min/max: "<<min<<", "<<max<<std::endl;
     delete &lset;
+    
+    rusage usage;
+    getrusage( RUSAGE_SELF, &usage);
+
+#ifdef _PAR
+    printf( "[%i]: ru_maxrss: %li kB.\n", DROPS::ProcCL::MyRank(), usage.ru_maxrss);
+#else
+    printf( "ru_maxrss: %li kB.\n", usage.ru_maxrss);
+#endif
     return 0;
   }
   catch (DROPS::DROPSErrCL err) { err.handle(); }
