@@ -22,7 +22,7 @@
         "Time":
         {
                 "NumSteps":		10000,		// number of time steps
-                "StepSize":		0.0001		// time step size
+                "StepSize":		0.0001,		// time step size
                 "Scheme":          1       // choose a specific time discretization
         },
 
@@ -188,11 +188,11 @@
                 "RadInlet":             1,                   // radius of the circular intake.
                 "InflowFreq":           0,                   // inflow frequency.
                 "InflowAmpl":           0,                   // inflow amplitude.
-                "PumpAmpl":		        0.2, 			        // rel. amplitude of initial wave in x direction 
-                "PumpFreq":		        10, 
+                "PumpAmpl":		        0.2, 			        // rel. amplitude of initial wave in x direction
+                "PumpFreq":		        10,
                 "Ampl_zDir":	        0.5, 		            // rel. amplitude of initial wave in z direction
-                "Thickness":	        0.000635	            // average film thickness
-                "InitialLSet":          "Ellipsoid",         // choose a LevelSet function you want to start with
+                "Thickness":	        0.000635,	            // average film thickness
+                "InitialLSet":          "WavyFilm",         // choose a LevelSet function you want to start with
                                                              // (default: 'Ellipsoid')
                 "VolForce":             "ZeroVel"            // r.h.s. force of navier stokes equations.
                                                              // (default: 'ZeroVel')
@@ -230,12 +230,12 @@
 // surfactant transport
         "SurfTransp":
         {
-                "DoTransp":             0,      // 
-                "Theta":                0.5,    // 
-                "Iter":                 1000,   // 
-                "Tol":                  1e-10,  // 
-                "OmitBound":            -1.0,   // 
-                "Visc":                 1e-5    // 
+                "DoTransp":             0,      //
+                "Theta":                0.5,    //
+                "Iter":                 1000,   //
+                "Tol":                  1e-10,  //
+                "OmitBound":            -1.0,   //
+                "Visc":                 1e-5    //
         },
 
 
@@ -245,8 +245,8 @@
                 "VTKOut":               1,                 // VTK output (0 = off, 1 = on).
                 "VTKDir":               "vtk",             // local directory for VTK files.
                 "VTKName":              "filmStokesDMS-T05",   // name of VTK files
-                "AddP1XPressure":       1,                 // pressure output as p1 on neg. and p1 on pos. part      
-                "AddDGOutput":          1,                 // additional VTK file(s) for levelset dg 
+                "AddP1XPressure":       1,                 // pressure output as p1 on neg. and p1 on pos. part
+                "AddDGOutput":          1,                 // additional VTK file(s) for levelset dg
                 "Binary":               1                  // write out VTK files in binary format.
         },
 
@@ -266,7 +266,7 @@
 // domain, boundary and initial conditions
         "DomainCond":
         {
-                "PeriodicMatching":     "none",            // matching function 
+                "PeriodicMatching":     "none",            // matching function
                                                            // identifier for periodic boundaries
                 "InitialCond":          0,                 // initial conditions (0 = zero, 1/2 = stationary
                                                            // flow with/without droplet, -1 = read from file).
@@ -274,17 +274,17 @@
                                                            // (0 = ReadMeshBuilder, 1 = BrickBuilder).
                 "InitialFile":          "mg/data",         // file prefix when reading data for initial condition.
                 "MeshFile":             "20.9e-3x4e-3x4e-3@20x6x2",
-                                                           // mesh file (created by GAMBIT or NETGEN, FLUENT/UNS 
+                                                           // mesh file (created by GAMBIT or NETGEN, FLUENT/UNS
                                                            // format) or (in case of the BrickBuilder:)
                                                            // dimensions of a cuboid (e.g. AxBxC@DxExF) with edge
                                                            // sizes A,B and C in x,y,z direction and a partition into
                                                            // D/E/F cuboids in x/y/z direction (for initial mesh)
-                                                           // Note that the Brickbuilder genenrates 6 Boundary 
-                                                           // domains with the order: 
+                                                           // Note that the Brickbuilder genenrates 6 Boundary
+                                                           // domains with the order:
                                                            // - b.dom. 1 has normal in neg. x direction
                                                            // - b.dom. 2 has normal in pos. x direction
                                                            // - b.dom. 3 has normal in neg. y direction, etc..
-                                                           // -> Here: a cube which is divived by 3 in x- and 
+                                                           // -> Here: a cube which is divived by 3 in x- and
                                                            // y-direction and by 6 in z-direction.
                 "BoundaryType":         "0!0!0!0!0!0",     // List of boundary types separated by a !.
                                                            // Each defining a boundary type for one boundary

@@ -34,7 +34,21 @@ namespace filminflow{
 
     DROPS::Point3DCL FilmInflow( const DROPS::Point3DCL& p, double t)
     {
-        static double Ly= P.get<DROPS::Point3DCL>("MeshSize")[1];
+		
+		static DROPS::Point3DCL dx;
+        static bool first = true;
+        //dirty hack
+        if (first){
+            std::string mesh( P.get<std::string>("DomainCond.MeshFile")), delim("x@");
+            size_t idx_;
+            while ((idx_= mesh.find_first_of( delim)) != std::string::npos )
+                mesh[idx_]= ' ';
+            std::istringstream brick_info( mesh);
+            brick_info >> dx[0] >> dx[1] >> dx[2] ;
+            first = false;
+        }
+        //static double Ly= P.get<DROPS::Point3DCL>("MeshSize")[1];
+		static double Ly= dx[1];
         static double PumpFreq = P.get<double>("Exp.PumpFreq");
         static double PumpAmpl = P.get<double>("Exp.PumpAmpl");
         static double Thickness= P.get<double>("Exp.Thickness");
@@ -61,8 +75,21 @@ namespace filminflow{
 namespace filmdistance{
     double WavyDistanceFct( const DROPS::Point3DCL& p, double)
     {
+		
+		static DROPS::Point3DCL MeshSize;
+        static bool first = true;
+        //dirty hack
+        if (first){
+            std::string mesh( P.get<std::string>("DomainCond.MeshFile")), delim("x@");
+            size_t idx_;
+            while ((idx_= mesh.find_first_of( delim)) != std::string::npos )
+                mesh[idx_]= ' ';
+            std::istringstream brick_info( mesh);
+            brick_info >> MeshSize[0] >> MeshSize[1] >> MeshSize[2] ;
+            first = false;
+        }
         // wave length = 100 x film width
-        static DROPS::Point3DCL MeshSize= P.get<DROPS::Point3DCL>("MeshSize");
+        //static DROPS::Point3DCL MeshSize= P.get<DROPS::Point3DCL>("MeshSize");
         static double Ampl_zDir= P.get<double>("Exp.Ampl_zDir");
         static double PumpAmpl = P.get<double>("Exp.PumpAmpl");
         static double Thickness= P.get<double>("Exp.Thickness");
@@ -77,7 +104,19 @@ namespace filmdistance{
     }
     DROPS::Point3DCL Nusselt_film( const DROPS::Point3DCL& p, double)
     {
-        static DROPS::Point3DCL MeshSize= P.get<DROPS::Point3DCL>("MeshSize");
+		static DROPS::Point3DCL MeshSize;
+        static bool first = true;
+        //dirty hack
+        if (first){
+            std::string mesh( P.get<std::string>("DomainCond.MeshFile")), delim("x@");
+            size_t idx_;
+            while ((idx_= mesh.find_first_of( delim)) != std::string::npos )
+                mesh[idx_]= ' ';
+            std::istringstream brick_info( mesh);
+            brick_info >> MeshSize[0] >> MeshSize[1] >> MeshSize[2] ;
+            first = false;
+        }
+        //static DROPS::Point3DCL MeshSize= P.get<DROPS::Point3DCL>("MeshSize");
         static double Ampl_zDir= P.get<double>("Exp.Ampl_zDir");
         static double PumpAmpl = P.get<double>("Exp.PumpAmpl");
         static double Thickness= P.get<double>("Exp.Thickness");
@@ -111,8 +150,20 @@ namespace filmperiodic{
     template<int A, int B>
     bool periodic_2sides( const DROPS::Point3DCL& p, const DROPS::Point3DCL& q)
     {
+		static DROPS::Point3DCL MeshSize;
+        static bool first = true;
+        //dirty hack
+        if (first){
+            std::string mesh( P.get<std::string>("DomainCond.MeshFile")), delim("x@");
+            size_t idx_;
+            while ((idx_= mesh.find_first_of( delim)) != std::string::npos )
+                mesh[idx_]= ' ';
+            std::istringstream brick_info( mesh);
+            brick_info >> MeshSize[0] >> MeshSize[1] >> MeshSize[2] ;
+            first = false;
+        }
         const DROPS::Point3DCL d= fabs(p-q);
-        static DROPS::Point3DCL L= fabs(P.get<DROPS::Point3DCL>("MeshSize"));
+        static DROPS::Point3DCL L= fabs(MeshSize); //fabs(P.get<DROPS::Point3DCL>("MeshSize"));
 
         const int D = 3 - A - B;
         return (d[B] + d[D] < 1e-12 && std::abs( d[A] - L[A]) < 1e-12)  // dB=dD=0 and dA=LA
@@ -123,10 +174,22 @@ namespace filmperiodic{
     template<int A>
     bool periodic_1side( const DROPS::Point3DCL& p, const DROPS::Point3DCL& q)
     {
+		static DROPS::Point3DCL MeshSize;
+        static bool first = true;
+        //dirty hack
+        if (first){
+            std::string mesh( P.get<std::string>("DomainCond.MeshFile")), delim("x@");
+            size_t idx_;
+            while ((idx_= mesh.find_first_of( delim)) != std::string::npos )
+                mesh[idx_]= ' ';
+            std::istringstream brick_info( mesh);
+            brick_info >> MeshSize[0] >> MeshSize[1] >> MeshSize[2] ;
+            first = false;
+        }
         const int B = (A+1)%2;
         const int D = (B+1)%2;
         const DROPS::Point3DCL d= fabs(p-q);
-        static DROPS::Point3DCL L= fabs(P.get<DROPS::Point3DCL>("MeshSize"));
+        static DROPS::Point3DCL L= fabs(MeshSize); //fabs(P.get<DROPS::Point3DCL>("MeshSize"));
         return (d[B] + d[D] < 1e-12 && std::abs( d[A] - L[A]) < 1e-12);
     }
 
