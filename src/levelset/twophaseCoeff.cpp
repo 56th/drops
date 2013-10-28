@@ -318,10 +318,53 @@ namespace slipBnd{
             first = false;
         }
 
-        static double half_z= dx[2]/2.0;
+        static double half_z= dx[2];
         ret[0] = 0.0125 - 5.*(p[2]-half_z)*(p[2]-half_z);
         return ret;
     }
+	
+    DROPS::SVectorCL<3> InflowSine (const DROPS::Point3DCL& p, double)
+    {
+        DROPS::SVectorCL<3> ret(0.);
+        static bool first = true;
+        static DROPS::Point3DCL dx;
+        //dirty hack
+        if (first){
+            std::string mesh( P.get<std::string>("DomainCond.MeshFile")), delim("x@");
+            size_t idx_;
+            while ((idx_= mesh.find_first_of( delim)) != std::string::npos )
+                mesh[idx_]= ' ';
+            std::istringstream brick_info( mesh);
+            brick_info >> dx[0] >> dx[1] >> dx[2] ;
+            first = false;
+        }
+
+        static double half_z= dx[2];
+        ret[0] = sin( p[2]/half_z * M_PI_2);
+        return ret;
+    }
+	
+	DROPS::SVectorCL<3> SineF (const DROPS::Point3DCL& p, double)
+    {
+        DROPS::SVectorCL<3> ret(0.);
+        static bool first = true;
+        static DROPS::Point3DCL dx;
+        //dirty hack
+        if (first){
+            std::string mesh( P.get<std::string>("DomainCond.MeshFile")), delim("x@");
+            size_t idx_;
+            while ((idx_= mesh.find_first_of( delim)) != std::string::npos )
+                mesh[idx_]= ' ';
+            std::istringstream brick_info( mesh);
+            brick_info >> dx[0] >> dx[1] >> dx[2] ;
+            first = false;
+        }
+
+        static double half_z= dx[2];
+        ret[0] = (1.0/half_z * M_PI_2)* (1.0/half_z * M_PI_2) * sin( p[2]/half_z * M_PI_2);
+        return ret;
+    }
+	
     DROPS::SVectorCL<3> WallVel( const DROPS::Point3DCL& p, double t)
     {
         DROPS::SVectorCL<3> V_w(0.);
@@ -349,6 +392,8 @@ namespace slipBnd{
     static DROPS::RegisterVectorFunction regvelwall("WallVel", WallVel);
 	static DROPS::RegisterVectorFunction regveltop("TopVel", TopVel);
     static DROPS::RegisterVectorFunction regvelpoiseuille("InflowPoiseuille", InflowPoiseuille);
+    static DROPS::RegisterVectorFunction regvelsine("InflowSine", InflowSine);
+	static DROPS::RegisterVectorFunction regvelsineF("SineF", SineF);
 }
 namespace InstatSlip{
 
@@ -549,5 +594,74 @@ namespace StatSlip3{
     static DROPS::RegisterVectorFunction regvelWall3("Wall3", Wall3);
     static DROPS::RegisterVectorFunction regvelf3("StatSlip3F", VolForce);
 	static DROPS::RegisterVectorFunction regvelgpr3("StatSlip3PrGrad",PressureGr);
+}
 
+namespace contactangle{
+	
+	double ConstantAngle(const DROPS::Point3DCL&)
+	{
+		return P.get<double>("SpeBnd.contactangle")/180.0*M_PI;
+	}
+
+	double PeriodicAngle(const DROPS::Point3DCL& pt)
+	{
+		double r=std::sqrt(pt[0]*pt[0]+pt[2]*pt[2]);
+		double theta=r<0.01? 0: (pt[2]>0?std::acos(pt[0]/r): 2*M_PI- std::acos(pt[0]/r));
+		return (P.get<double>("SpeBnd.contactangle"))*(1+0.5*std::sin(30*theta))/180.0*M_PI;
+	}
+
+	double PatternAngle(const DROPS::Point3DCL& pt)
+	{
+		double r=std::sqrt(pt[0]*pt[0]+pt[2]*pt[2]);
+		double theta= int(r/0.05)%2==0?1:-1;
+		return P.get<double>("SpeBnd.contactangle")/180.0*M_PI*(1+0.5*theta);
+	}
+
+	DROPS::Point3DCL OutNormalBottomPlane(const DROPS::Point3DCL&)
+	{
+		DROPS::Point3DCL outnormal(0.0);
+	//	outnormal[0]=0;
+		outnormal[1]=-1.0;
+	//	outnormal[2]=0;
+		return outnormal;
+	}
+
+	DROPS::Point3DCL OutNormalBrick(const DROPS::Point3DCL& pt)
+	{
+		if(P.get<int>("DomainCond.GeomType")!=1)
+			 throw DROPS::DROPSErrCL("Error: compute out normal of brick, please use other functions");
+		int nx, ny, nz;
+		double dx, dy, dz;
+		std::string mesh( P.get<std::string>("DomainCond.MeshFile")), delim("x@");
+		size_t idx;
+		while ((idx= mesh.find_first_of( delim)) != std::string::npos )
+			   mesh[idx]= ' ';
+		std::istringstream brick_info( mesh);
+		brick_info >> dx >> dy >> dz >> nx >> ny >> nz;
+		if (!brick_info)
+				throw DROPS::DROPSErrCL("error while reading geometry information: " + mesh);
+		double EPS=1e-10;
+		DROPS::Point3DCL outnormal(0.0);
+		if(std::fabs(pt[0])<EPS)
+		{	outnormal[0]=-1.0; }
+		else if(std::fabs(pt[0]-dx)<EPS)
+		{	outnormal[0]=1.0; }
+		else if(std::fabs(pt[1])<EPS)
+		{	outnormal[1]=-1.0; }
+		else if(std::fabs(pt[1]-dy)<EPS)
+		{	outnormal[1]=1.0; }
+		else if(std::fabs(pt[2])<EPS)
+		{	outnormal[2]=-1.0; }
+		else if(std::fabs(pt[2]-dz)<EPS)
+		{	outnormal[2]=1.0; }
+		else
+			 throw DROPS::DROPSErrCL("error while computing outnormal");
+		return outnormal;
+	}
+	
+	static DROPS::RegisterStatScalarFunction regconstangle("ConstantAngle", ConstantAngle);	
+	static DROPS::RegisterStatScalarFunction regperangle("PeriodicAngle", PeriodicAngle);
+	static DROPS::RegisterStatScalarFunction regpatangle("PatternAngle", PatternAngle);
+	static DROPS::RegisterStatVectorFunction regunitbottomoutnomal("OutNormalBottomPlane", OutNormalBottomPlane);
+	static DROPS::RegisterStatVectorFunction regunitcubicoutnomal("OutNormalBrick", OutNormalBrick);
 }
