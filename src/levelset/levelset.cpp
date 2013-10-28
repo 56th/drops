@@ -823,16 +823,15 @@ void ImprovedYoungForceAccumulatorCL::visit ( const TetraCL& t)
         		quadBarys[j]=(Barys[0]+Barys[1])/2+qupt[j]*(Barys[1]-Barys[0])/2;
         		midpt=(pt0+pt1)/2 + qupt[j]*(pt1-pt0)/2;
         		costheta[j]=SymBnd ? 0 : cos(angle_(midpt));
-        		sintheta_D[j]=sin(triangle.GetImprovedActualContactAngle(i,(qupt[j]+1)/2));
+        		sintheta_D[j]=SymBnd ? 1 : sin(triangle.GetImprovedActualContactAngle(i,(qupt[j]+1)/2));
         		outnormalOnMcl[j]=outnormal_(midpt);
-			//	std::cout<<"outnormal========================="<< outnormalOnMcl[j] <<std::endl;
         	}
 
         	for (int v=0; v<10; ++v)
         	{
         		const IdxT Numbv= v<10 ? Numb[v] : (velXfem && Numb[v-10]!=NoIdx ? f.RowIdx->GetXidx()[Numb[v-10]] : NoIdx);
         		if (Numbv==NoIdx) continue;
-
+				//could be written in a loop
         		value = (phi[v](quadBarys[0])*costheta[0]*weight[0]*normal_mcl[0]+ phi[v](quadBarys[1])*costheta[1]*weight[1]*normal_mcl[1]
         		                 + phi[v](quadBarys[2])*costheta[2]*weight[2]*normal_mcl[2]+ phi[v](quadBarys[3])*costheta[3]*weight[3]*normal_mcl[3]
         		                 + phi[v](quadBarys[4])*costheta[4]*weight[4]*normal_mcl[4])*length/2;

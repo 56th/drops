@@ -1379,7 +1379,10 @@ void SpecialBndHandler_System1OnePhaseP2CL::setup(const TetraCL& tet, const SMat
 		Quad5_2DCL<double> Grad2Dj;   // \nabla phi_j* n
 		Quad5_2DCL<double> Grad2Di;   // \nabla phi_i* n
 		BaryCoordCL bary[3];
+		bool symmBC=false;
 		if( BndData_.Vel.GetBC(*tet.GetFace(k))==Slip0BC || BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC|| BndData_.Vel.GetBC(*tet.GetFace(k))==SymmBC){
+			if(BndData_.Vel.GetBC(*tet.GetFace(k))==SymmBC)
+				symmBC=true;
 			const FaceCL& face = *tet.GetFace(k);
             double absdet = FuncDet2D(	face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
                                            	face.GetVertex(2)->GetCoord()-face.GetVertex(0)->GetCoord()); 
@@ -1392,6 +1395,7 @@ void SpecialBndHandler_System1OnePhaseP2CL::setup(const TetraCL& tet, const SMat
 			for(Uint i=0; i<10; ++i)
 				phi[i][i] = 1;
 				
+            double temp = symmBC? 0.: beta_;
 			for(Uint i=0; i<10; ++i){
 				LocalP1CL<double> Gradin(dot( normal, Grad[i]));
 				mass2Di.assign(phi[i], bary);	
@@ -1403,8 +1407,8 @@ void SpecialBndHandler_System1OnePhaseP2CL::setup(const TetraCL& tet, const SMat
 					Quad5_2DCL<double> mass2D(mass2Dj * mass2Di); //
 					Quad5_2DCL<double> Grad2D(Grad2Di * mass2Dj + Grad2Dj * mass2Di); //
 					// three additional terms
-					dm[j][i](0, 0)=dm[j][i](1, 1) = dm[j][i](2, 2) = beta_ * mass2D.quad(absdet);
-					dm[j][i]     += (alpha_/h - beta_) * mass2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));
+					dm[j][i](0, 0)=dm[j][i](1, 1) = dm[j][i](2, 2) = temp * mass2D.quad(absdet);
+					dm[j][i]     += (alpha_/h - temp) * mass2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));
 					if(BndData_.Vel.GetBC(*tet.GetFace(k))!= SymmBC)
 						dm[j][i]     -=  2. * mu_ * Grad2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));  
 					loc.Ak[j][i] += dm[j][i];
@@ -1558,7 +1562,10 @@ void SpecialBndHandler_System1TwoPhaseP2CL::setup(const TetraCL& tet, const SMat
 		LocalP2CL<double> phi[10]; 
 	    LocalP1CL<double> Gradn[10];
 		BaryCoordCL bary[3];
+		bool symmBC=false;
 		if( BndData_.Vel.GetBC(*tet.GetFace(k))==Slip0BC || BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC|| BndData_.Vel.GetBC(*tet.GetFace(k))==SymmBC){
+			if(BndData_.Vel.GetBC(*tet.GetFace(k))==SymmBC)
+				symmBC=true;
 			const FaceCL& face = *tet.GetFace(k);
             double absdet = FuncDet2D(	face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
                                            	face.GetVertex(2)->GetCoord()-face.GetVertex(0)->GetCoord()); 
@@ -1586,14 +1593,15 @@ void SpecialBndHandler_System1TwoPhaseP2CL::setup(const TetraCL& tet, const SMat
 				resize_and_evaluate_on_vertexes( Gradn[i], q5dom, gradP1[i]); // for A	
 			}
 
-	
+	        double temp1 = symmBC? 0: beta1_;
+			double temp2 = symmBC? 0: beta2_;
 			for(Uint i=0; i<10; ++i){
 				for(Uint j=0; j<=i; ++j){	
                     quad( basisP2[i] * basisP2[j], q5dom, locInt[0].mass2D[i][j], locInt[1].mass2D[i][j]);			
                     quad( gradP1[i] * basisP2[j] + gradP1[j] * basisP2[i], q5dom, locInt[0].grad2D[i][j], locInt[1].grad2D[i][j]);
 					// three additional terms
-					dm[j][i](0, 0)= dm[j][i](1, 1) = dm[j][i](2, 2) = beta1_ * locInt[0].mass2D[i][j] + beta2_ * locInt[1].mass2D[i][j];
-					dm[j][i]     += ( (alpha_/h -beta1_)* locInt[0].mass2D[i][j] + (alpha_/h -beta2_) * locInt[1].mass2D[i][j] )* SMatrixCL<3,3> (outer_product(normal, normal));
+					dm[j][i](0, 0)= dm[j][i](1, 1) = dm[j][i](2, 2) = temp1 * locInt[0].mass2D[i][j] + temp2* locInt[1].mass2D[i][j];
+					dm[j][i]     += ( (alpha_/h -temp1)* locInt[0].mass2D[i][j] + (alpha_/h - temp2) * locInt[1].mass2D[i][j] )* SMatrixCL<3,3> (outer_product(normal, normal));
 					if(BndData_.Vel.GetBC(*tet.GetFace(k))!= SymmBC)
 						dm[j][i]     -= ( 2. * mu1_ * locInt[0].grad2D[i][j]+ 2.* mu2_ * locInt[1].grad2D[i][j] )* SMatrixCL<3,3> (outer_product(normal, normal));  
 					loc.Ak[j][i] += dm[j][i];
