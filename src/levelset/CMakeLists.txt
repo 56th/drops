@@ -49,4 +49,4 @@ endif(NOT MPI)
 
 exec(twophasedrops geom-boundary geom-builder geom-deformation geom-simplex geom-multigrid num-unknowns geom-topo num-fe misc-problem levelset-levelset misc-progressaccu misc-scopetimer misc-utils out-output num-discretize navstokes-instatnavstokes2phase misc-params levelset-fastmarch stokes-instatstokes2phase num-MGsolver num-fe out-ensightOut num-oseenprecond poisson-transport2phase num-interfacePatch out-vtkOut surfactant-ifacetransp levelset-surfacetension geom-geomselect levelset-twophaseutils num-hypre levelset-coupling misc-funcmap geom-principallattice geom-reftetracut geom-subtriangulation num-renumber num-quadrature misc-dynamicload stokes-stokes)
 # convention: makethose coefficient-defining shared objects are built which ared used in the default configuration of the executable..
-add_dependencies(twophasedrops levelset-twophaseCoeff misc-scalarFunctions misc-vectorFunctions misc-csgFunctions)
+add_dependencies(twophasedrops levelset-twophaseCoeff levelset-filmCoeff misc-scalarFunctions misc-vectorFunctions misc-csgFunctions)

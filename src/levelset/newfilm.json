@@ -173,21 +173,14 @@
 // experimental conditions (all units are SI)
         "Exp":
         {
-
                 "RadDrop":              [0.25, 0.25, 0.25 ], // radii of the ellipsoidal droplet at initial time.
                                                              // ( ! Attention: If RadDrop is negativ, a flow
                                                              // without a droplet is simulated).
                 "PosDrop":              [0.5, 0.5, 0.5 ],    // position of the droplet's centre at initial time.
+                "SimuType":              1,                     // risingdroplet =0, film=1;
+                "MessurePoint":          10.45e-3,
                 "Gravity":		        [8.036, -5.627, 0 ],    // gravity vector -> inclined film, 35 degree (0 degree = perpendicular)
-                "FlowDir":              0,                   // direction of the flow at the inlet.
-                                                             // FlowDir = 0 / 1 / 2 describes the x- / y- / z-
-                                                             // direction. If the flow is orientated in negativ
-                                                             // coordinate direction, a minus sign must be used
-                                                             // for the parameter InflowVel.
-                "InflowVel":            0,                   // magnitude of the inflow velocity.
                 "RadInlet":             1,                   // radius of the circular intake.
-                "InflowFreq":           0,                   // inflow frequency.
-                "InflowAmpl":           0,                   // inflow amplitude.
                 "PumpAmpl":		        0.2, 			        // rel. amplitude of initial wave in x direction
                 "PumpFreq":		        10,
                 "Ampl_zDir":	        0.5, 		            // rel. amplitude of initial wave in z direction
@@ -242,7 +235,7 @@
 // Visualization Toolkit output format settings
         "VTK":
         {
-                "VTKOut":               1,                 // VTK output (0 = off, 1 = on).
+                "VTKOut":               5,                 // VTK output (0 = off, 1 = on).
                 "VTKDir":               "vtk",             // local directory for VTK files.
                 "VTKName":              "filmStokesDMS-T05",   // name of VTK files
                 "AddP1XPressure":       1,                 // pressure output as p1 on neg. and p1 on pos. part

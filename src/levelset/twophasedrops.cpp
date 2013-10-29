@@ -405,8 +405,14 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     IF_MASTER {
         infofile = new std::ofstream ((P.get<std::string>("VTK.VTKName","twophasedrops")+".info").c_str());
     }
-    IFInfo.Init(infofile);
-    IFInfo.WriteHeader();
+	if(P.get<double>("Exp.SimuType")==0){
+		IFInfo.Init(infofile);
+		IFInfo.WriteHeader();
+	}
+	else if(P.get<double>("Exp.SimuType")==1){
+		FilmInfo.Init(infofile, P.get<double>("Exp.MessurePoint"), 0.);
+		FilmInfo.WriteHeader();
+	}
 
     if (P.get<int>("Time.NumSteps") == 0)
         SolveStatProblem( Stokes, lset, *navstokessolver, P);
@@ -508,8 +514,15 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         time += dt;
         const double time_old = Stokes.v.t;
         const double time_new = Stokes.v.t + dt;
-        IFInfo.Update( lset, Stokes.GetVelSolution());
-        IFInfo.Write(time_old);
+		
+		if(P.get<double>("Exp.SimuType")==0){
+			IFInfo.Update( lset, Stokes.GetVelSolution());
+			IFInfo.Write(time_old);
+		}
+		else if(P.get<double>("Exp.SimuType")==1){
+			FilmInfo.Update( lset, Stokes.GetVelSolution());
+			FilmInfo.Write(time_old);
+		}
 
         if (P.get("SurfTransp.DoTransp", 0)) surfTransp.InitOld();
         timedisc->DoStep( P.get<int>("Coupling.Iter"));
@@ -572,8 +585,14 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         if (P.get("Restart.Serialization", 0) && step%P.get("Restart.Serialization", 0)==0)
             ser.Write();
     }
-    IFInfo.Update( lset, Stokes.GetVelSolution());
-    IFInfo.Write(Stokes.v.t);
+	if(P.get<double>("Exp.SimuType")==0){
+		IFInfo.Update( lset, Stokes.GetVelSolution());
+		IFInfo.Write(Stokes.v.t);
+	}
+	else if(P.get<double>("Exp.SimuType")==1){
+		FilmInfo.Update( lset, Stokes.GetVelSolution());
+		FilmInfo.Write(Stokes.v.t);
+	}
     std::cout << std::endl;
     delete timedisc;
     delete navstokessolver;
@@ -625,7 +644,7 @@ void SetMissingParameters(DROPS::ParamCL& P){
 
     P.put_if_unset<int>("General.ProgressBar", 0);
     P.put_if_unset<std::string>("General.DynamicLibsPrefix", "../");
-	
+	//contactangle problem--------------------------------------------
 	P.put_if_unset<double>("SpeBnd.alpha", 0.0);
     P.put_if_unset<double>("SpeBnd.beta1", 0.0);
     P.put_if_unset<double>("SpeBnd.beta2", 0.0);
@@ -637,6 +656,8 @@ void SetMissingParameters(DROPS::ParamCL& P){
 
 	P.put_if_unset<std::string>("Exp.Solution_Vel", "None");
 	P.put_if_unset<std::string>("Exp.Solution_GradPr", "None");
+	//---------------------------------------------------------------
+	P.put_if_unset<double>("Exp.SimuType", 0.0);
 }
 
 int main (int argc, char** argv)
