@@ -656,6 +656,7 @@ void SetMissingParameters(DROPS::ParamCL& P){
 
 	P.put_if_unset<std::string>("Exp.Solution_Vel", "None");
 	P.put_if_unset<std::string>("Exp.Solution_GradPr", "None");
+	P.put_if_unset<std::string>("Exp.Solution_Pr", "None");
 	//---------------------------------------------------------------
 	P.put_if_unset<double>("Exp.SimuType", 0.0);
 }

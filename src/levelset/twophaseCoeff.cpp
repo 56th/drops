@@ -434,6 +434,30 @@ namespace InstatSlip{
 		return delp;
 
 	}
+	
+	double Pressure (const DROPS::Point3DCL& p, double t)
+	{
+        double norm2=0.;
+		double ret=0;
+		double p_average=0;
+		//P_average =10* 2/3*PI*R^3/Volume
+		p_average = 10. * 2./3. * M_PI * 0.001 / 0.125;
+		DROPS::Point3DCL origin;
+		origin[0] = 0.25;
+        origin[1] = 0;
+		origin[2] = 0.25;
+		
+		for (int i=0; i< 3; i++)
+		  norm2 += (p[i]-origin[i]) * (p[i]-origin[i]);
+        ret = (norm2 > 0.01) ? 0: 10; 
+		
+		if( t>3. && t<5 )
+			ret = 0;
+		else if(t >5.)
+			ret = 10;
+		ret -= p_average;
+		return ret;
+	}
 
 	DROPS::SVectorCL<3> VolForce( const DROPS::Point3DCL& p, double t)
     {
@@ -454,6 +478,7 @@ namespace InstatSlip{
     static DROPS::RegisterVectorFunction regvelVel("TestSlipVel", Velocity);
     static DROPS::RegisterVectorFunction regvelf("TestSlipF", VolForce);
 	static DROPS::RegisterVectorFunction regvelgpr("TestSlipPrGrad",PressureGr);
+	static DROPS::RegisterScalarFunction regscatestpr("TestSlipPressure",Pressure);
 
 }
 
