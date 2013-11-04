@@ -86,6 +86,34 @@ Point3DCL EllipsoidCL::Radius_;
 
 static DROPS::RegisterScalarFunction regsca_ellipsoid("Ellipsoid", DROPS::EllipsoidCL::DistanceFct);
 
+class HalfEllipsoidCL
+{
+  private:
+    static Point3DCL Mitte_;
+    static Point3DCL Radius_;
+
+  public:
+    HalfEllipsoidCL( const Point3DCL& Mitte, const Point3DCL& Radius)
+    { Init( Mitte, Radius); }
+    static void Init( const Point3DCL& Mitte, const Point3DCL& Radius)
+    { Mitte_= Mitte;    Radius_= Radius; }
+    static double DistanceFct( const Point3DCL& p, double)
+    {
+        Point3DCL d= p - Mitte_;
+        const double avgRad= cbrt(Radius_[0]*Radius_[1]*Radius_[2]);
+        d/= Radius_;
+        return std::abs( avgRad)*d.norm() - avgRad;
+    }
+    static double GetVolume() { return 2./3.*M_PI*Radius_[0]*Radius_[1]*Radius_[2]; }
+    static Point3DCL& GetCenter() { return Mitte_; }
+    static Point3DCL& GetRadius() { return Radius_; }
+};
+
+Point3DCL HalfEllipsoidCL::Mitte_;
+Point3DCL HalfEllipsoidCL::Radius_;
+
+static DROPS::RegisterScalarFunction regsca_halfellipsoid("HalfEllipsoid", DROPS::HalfEllipsoidCL::DistanceFct);
+
 /// \brief Represents a cylinder with ellipsoidal cross section
 class CylinderCL
 {
@@ -368,6 +396,7 @@ void SolveStatProblem( StokesT& Stokes, LevelsetP2CL& lset,
     std::cout << "iter: " << solver.GetIter() << "\tresid: " << solver.GetResid() << std::endl;
 	if( P.get<std::string>("Exp.Solution_Vel").compare("None")!=0)
 		Stokes.CheckOnePhaseSolution( &Stokes.v, &Stokes.p, Stokes.Coeff_.RefVel, Stokes.Coeff_.RefGradPr);
+		//Stokes.CheckTwoPhaseSolution( &Stokes.v, &Stokes.p, lset, Stokes.Coeff_.RefVel, Stokes.Coeff_.RefPr);
 }
 
 void SetInitialLevelsetConditions( LevelsetP2CL& lset, MultiGridCL& MG, ParamCL& P)
