@@ -99,23 +99,24 @@ void SetupSystem2_P2P1( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& coeff,
 
 
 //P2_P1X multiplication
-void SpecialBndHandleSystem2_P2P1XCL::setupB(SMatrixCL<1, 3> loc_b[4][10], const TetraCL& tet, int ls_sign[4], const PrincipalLatticeCL& lat, const std::valarray<double>& ls_loc_)
+void SpecialBndHandleSystem2_P2P1XCL::setupB(SMatrixCL<1, 3> loc_b[4][10], const TetraCL& tet, int ls_sign[4], const PrincipalLatticeCL& lat, 
+    const std::valarray<double>& ls_loc_, IdxT prNumb[4], const ExtIdxDescCL* Xidx_)
 {
 	GridFunctionCL<> qvel[6];
 	GridFunctionCL<> qpr[3];
-	int sign1=0,sign2=0;
+	//int sign1=0,sign2=0;
 	for (Uint k =0; k< 4; ++k) //Go throught all faces of a tet
 	{
 		if( BndData_.Vel.GetBC(*tet.GetFace(k))==Slip0BC || BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC || BndData_.Vel.GetBC(*tet.GetFace(k))==SymmBC)
 		{
-			sign1=0,sign2=0;
-			for(Uint j=0; j<3; j++)
-			{
-				sign1= (ls_sign[j<k?j:j+1]<0)?-1:sign1;
-				sign2= (ls_sign[j<k?j:j+1]>0)?1:sign2;
-			}
+			//sign1=0,sign2=0;
+			//for(Uint j=0; j<3; j++)
+			//{
+			//	sign1= (ls_sign[j<k?j:j+1]<0)?-1:sign1;
+			//	sign2= (ls_sign[j<k?j:j+1]>0)?1:sign2;
+			//}
 		//	std::cout<<sign1<<" "<<sign2<<std::endl;
-			if(sign1*sign2!=-1)	continue;
+		//	if(sign1*sign2!=-1)	continue;
 
 		    tet.GetOuterNormal(k, normal);
 
@@ -132,12 +133,14 @@ void SpecialBndHandleSystem2_P2P1XCL::setupB(SMatrixCL<1, 3> loc_b[4][10], const
 				phiPrP1[i][unknownIdx[i]]=1;
 				resize_and_evaluate_on_vertexes(phiPrP1[i], bndq5dom_, qpr[i]);
 			}
-
-		    for(Uint i=0; i<6; ++i){
-		    	phiVelP2[i][unknownIdx[i]] = 1;
-		    	resize_and_evaluate_on_vertexes(phiVelP2[i], bndq5dom_, qvel[i]);
-		    	for(Uint j=0; j<3; ++j){
-					const bool is_pos= ls_sign[unknownIdx[j]] == 1;
+		    
+			for(Uint j=0; j<3; ++j){
+				const IdxT xidx= (*Xidx_)[prNumb[ unknownIdx[j] ] ];
+				if (xidx==NoIdx) continue;
+				const bool is_pos= ls_sign[unknownIdx[j]] == 1;
+				for(Uint i=0; i<6; ++i){
+					phiVelP2[i][unknownIdx[i]] = 1;
+					resize_and_evaluate_on_vertexes(phiVelP2[i], bndq5dom_, qvel[i]);
 					const double value=(is_pos ? -1. : 1.)*quad( qvel[i]*qpr[j], bndq5dom_, is_pos ? NegTetraC : PosTetraC);
 				    loc_b[unknownIdx[j]][unknownIdx[i]](0, 0)-= value*normal[0]; //need verification!
 					loc_b[unknownIdx[j]][unknownIdx[i]](0, 1)-= value*normal[1];
@@ -285,7 +288,7 @@ void System2Accumulator_P2P1XCL::local_setup (const TetraCL& tet)
 		}
 	}
 	if(spebnd)
-		speBndHandle.setupB(loc_B_,tet,ls_sign_,lat,ls_loc_);
+		speBndHandle.setupB(loc_B_,tet,ls_sign_,lat,ls_loc_, prNumb, Xidx_);
 }
 
 void System2Accumulator_P2P1XCL::update_global_system ()
@@ -3537,8 +3540,8 @@ void InstatStokes2PhaseP2P1CL::CheckTwoPhaseSolution(const VelVecDescCL* DescVel
 		 }
      }
 	 //Get the average pressure, use it to normalize the pressure;
-	 average= Sum/volume;
-	 //std::cout<<"The average of the pressure is: "<<average<<" The volume is: "<<volume<<std::endl;
+	average= Sum/volume;
+	//std::cout<<"The average of the pressure is: "<<average<<" The volume is: "<<volume<<std::endl;
 
     for (MultiGridCL::const_TriangTetraIteratorCL sit= const_cast<const MultiGridCL&>(MG_).GetTriangTetraBegin(lvl),
         send= const_cast<const MultiGridCL&>(MG_).GetTriangTetraEnd(lvl); sit != send; ++sit)

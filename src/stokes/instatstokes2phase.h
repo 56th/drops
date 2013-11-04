@@ -363,7 +363,8 @@ class SpecialBndHandleSystem2_P2P1XCL
 	Uint unknownIdx[6];
   public:
 	SpecialBndHandleSystem2_P2P1XCL(const StokesBndDataCL& BndData): BndData_(BndData) {}
-	void setupB(SMatrixCL<1, 3> loc_b[4][10], const TetraCL& tet, int ls_sign[4], const PrincipalLatticeCL& lat, const std::valarray<double>& ls_loc_);
+	void setupB(SMatrixCL<1, 3> loc_b[4][10], const TetraCL& tet, int ls_sign[4], const PrincipalLatticeCL& lat,
+                     const std::valarray<double>& ls_loc_, IdxT prNumb[4], const ExtIdxDescCL* Xidx);
 };
 
 } // end of namespace DROPS
