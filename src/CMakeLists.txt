@@ -179,6 +179,15 @@ function(exec f)
     exec_par(${f} ${ARGN})
 endfunction(exec)
 
+function(add_my_custom_targets f)
+  add_custom_target(${f}-param-files 
+    echo \"copy $f json files...\" \;
+    cp -f ${CMAKE_CURRENT_SOURCE_DIR}/*.json ${CMAKE_CURRENT_BINARY_DIR}/ 2> /dev/null \; 
+    COMMENT "copy param files from ${CMAKE_CURRENT_SOURCE_DIR}/ to ${CMAKE_CURRENT_BINARY_DIR}/"
+    )
+  add_custom_target(${f}-stat COMMAND ls ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp ${CMAKE_CURRENT_SOURCE_DIR}/*.tpp ${CMAKE_CURRENT_SOURCE_DIR}/*.h | xargs wc -l WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+  add_custom_target(${f}-coeffs DEPENDS misc-scalarFunctions misc-vectorFunctions levelset-twophaseCoeff levelset-filmCoeff poisson-poissonCoeff stokes-stokesCoeff)
+endfunction(add_my_custom_targets f)
 
 set(PACKAGES parallel levelset poisson DiST geom num out misc osmosis stokes navstokes surfactant transport partests tests)
 string(REPLACE ";" " " PACKAGES_STRING "${PACKAGES}")

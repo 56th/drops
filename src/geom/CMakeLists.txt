@@ -22,3 +22,5 @@ if(NOT MPI)
 
     add_custom_target(topo COMMAND ${CMAKE_CURRENT_BINARY_DIR}/maketopo ${CMAKE_CURRENT_SOURCE_DIR}/maketopo_helper.cpp ${CMAKE_CURRENT_SOURCE_DIR}/topo.cpp DEPENDS maketopo)
 endif()
+
+add_my_custom_targets(geom)

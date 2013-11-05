@@ -120,3 +120,5 @@ add_subdirectory(scripts)
 add_subdirectory(specifications)
 
 #### END HACKY VERSION OF TEST SUITE ###
+
+add_my_custom_targets(tests)

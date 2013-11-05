@@ -14,3 +14,5 @@ exec_ser(osmosis misc-scopetimer osmosis-osmosis geom-boundary geom-builder geom
 if(NOT MPI)
     add_dependencies(osmosis misc-scalarFunctions misc-vectorFunctions misc-csgFunctions osmosis-osmosisCoeff)
 endif(NOT MPI)
+
+add_my_custom_targets(osmosis)

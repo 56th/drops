@@ -25,3 +25,5 @@ exec_ser(ns_transp
 if(NOT MPI)
 add_dependencies(ns_transp transport-transportCoeff misc-scalarFunctions misc-vectorFunctions)
 endif(NOT MPI)
+
+add_my_custom_targets(transport)

@@ -32,3 +32,5 @@ exec_par(dist_sdropsP2 geom-boundary geom-builder geom-simplex geom-multigrid nu
 exec_par(dist_interp2 partests-dist_interp2 geom-simplex geom-multigrid geom-topo out-output num-unknowns geom-builder misc-problem num-interfacePatch num-fe geom-boundary misc-utils num-discretize geom-deformation)
 
 exec_par(dist_interp1 geom-simplex geom-multigrid geom-topo out-output num-unknowns geom-builder misc-problem num-interfacePatch num-fe geom-boundary misc-utils num-discretize geom-deformation)
+
+add_my_custom_targets(partests)

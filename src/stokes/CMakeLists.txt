@@ -28,3 +28,5 @@ exec_ser(errorestimator stokes-errorestimator geom-boundary geom-builder geom-de
 if(NOT MPI)
 add_dependencies(errorestimator misc-scalarFunctions misc-vectorFunctions stokes-stokesCoeff)
 endif(NOT MPI)
+
+add_my_custom_targets(stokes)
