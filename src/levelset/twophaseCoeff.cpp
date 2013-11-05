@@ -442,10 +442,7 @@ namespace InstatSlip{
 		double p_average=0;
 		//P_average =10* 2/3*PI*R^3/Volume
 		p_average = 10. * 2./3. * M_PI * 0.001 / 0.125;
-		DROPS::Point3DCL origin;
-		origin[0] = 0.25;
-        origin[1] = 0;
-		origin[2] = 0.25;
+		DROPS::Point3DCL origin = P.get<DROPS::Point3DCL>("Exp.PosDrop");
 		
 		for (int i=0; i< 3; i++)
 		  norm2 += (p[i]-origin[i]) * (p[i]-origin[i]);
