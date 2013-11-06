@@ -156,6 +156,7 @@ endif(WIN32)
 # THIS FUNCTION REQUIRES ${HOME} and ${PAR_OBJ}
 
 function(exec_ f)
+#    libs(${f})
     add_executable(${f} ${f})
 endfunction(exec_)
 
@@ -169,7 +170,7 @@ endfunction(exec_ser)
 function(exec_par f)
     if(MPI)
         exec_(${f})
-        target_link_libraries_par(${f} ${HOME}-${f} ${ARGN} ${${f}-staticlibs})
+        target_link_libraries_par(${f} ${ARGN} ${${f}-staticlibs})
     endif()
 endfunction(exec_par)
 
