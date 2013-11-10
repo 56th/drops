@@ -81,6 +81,7 @@ double GetTimeOffset(){
     return timeoffset;
 }
 
+//To do: move to some other file
 void computeRadius_Angle(const DROPS::MultiGridCL& mg,LevelsetP2CL& lset,vector_fun_ptr Outnormal_fun,double& r,double& a)
 {
 	InterfaceTriangleCL triangle;
@@ -88,11 +89,13 @@ void computeRadius_Angle(const DROPS::MultiGridCL& mg,LevelsetP2CL& lset,vector_
 	BndDataCL<> lsetbnd=lset.GetBndData();
 	bool SpeBnd;
     double angle=0;
-    double radius=0;
+    //double radius=0;
     double circ=0;
+	double area=0;
     double weight[5]={0.568888889, 0.47862867,0.47862867,0.236926885,0.236926885};
 	//integral in [-1,1]
 	double qupt[5]={0,-0.53846931,0.53846931,-0.906179846,0.906179846};
+	Point3DCL center = P.get<DROPS::Point3DCL>("SpeBnd.posDrop");
     DROPS_FOR_TRIANG_CONST_TETRA( mg, lvl, it){
 		SpeBnd=false;
 		for(Uint v=0; v<4; v++)
@@ -125,14 +128,16 @@ void computeRadius_Angle(const DROPS::MultiGridCL& mg,LevelsetP2CL& lset,vector_
 	        {
 	        	length=triangle.GetInfoMCL(i,Barys[0],Barys[1],pt0,pt1);
 	        	circ+=length;
-	        	radius+=(pt0-P.get<DROPS::Point3DCL>("SpeBnd.posDrop")).norm()/2*length;
-	        	radius+=(pt1-P.get<DROPS::Point3DCL>("SpeBnd.posDrop")).norm()/2*length;
+				area += ( (pt0 + pt1)/2.0 - center ).norm()/2.0 *length;
+	        	//radius+=(pt0-P.get<DROPS::Point3DCL>("SpeBnd.posDrop")).norm()/2*length;
+	        	//radius+=(pt1-P.get<DROPS::Point3DCL>("SpeBnd.posDrop")).norm()/2*length;
 	        	for(Uint j=0;j<5;j++)
 	        		angle+=length*triangle.GetImprovedActualContactAngle(i,(qupt[j]+1)/2)*weight[j]/2;
 	        }
 	    }
 	}
-	r=radius/circ;
+	r = std::sqrt(area/ M_PI);
+	//r=radius/circ;
 	a=angle/circ;
 }
 

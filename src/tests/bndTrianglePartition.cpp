@@ -91,8 +91,9 @@ void test_bnd_integral()
 	DROPS::Uint num_sub = 32;
     DROPS::Uint num_sub_lattice = 2;
 	DROPS::Point3DCL orig;
-	orig[0] = -1;
+	orig[0] = -2;
 	orig[2] = -1;
+	orig[1] = -1;
 	// [-1, 1] x[0, 2] x[-1, 1] brick
     DROPS::BrickBuilderCL brick(orig, 2.*DROPS::std_basis<3>(1), 2.*DROPS::std_basis<3>(2), 2.*DROPS::std_basis<3>(3), num_sub, num_sub, num_sub);
     DROPS::MultiGridCL mg( brick);
@@ -105,14 +106,14 @@ void test_bnd_integral()
 	bool onbnd = false;
 	DROPS_FOR_TRIANG_TETRA( mg, 0, it) {
 		evaluate_on_vertexes( ball_instat, *it, lat, 0., Addr( ls));
-		
-		onbnd = (*it).IsBndSeg(3);   //it seems segment 3 is the face number for all "bottom" tetra
+		DROPS::Uint facenum =3;
+		onbnd = (*it).IsBndSeg(facenum);   //it seems segment 3 is the face number for all "bottom" tetra
 		if(onbnd)
 		{
 			DROPS::Point3DCL normal;
-			(*it).GetOuterNormal(3, normal);
-		    if(normal[1]==-1){
-				BndTri.make_partition2D<DROPS::PartitionedVertexPolicyCL, DROPS::MergeCutPolicyCL>( lat, 3, ls);
+			(*it).GetOuterNormal(facenum, normal);
+		    if(normal[0]==1){
+				BndTri.make_partition2D<DROPS::PartitionedVertexPolicyCL, DROPS::MergeCutPolicyCL>( lat, facenum, ls);
 				DROPS::make_CompositeQuad5BndDomain2D(qdom, BndTri, *it); 
 				DROPS::GridFunctionCL<> integrand( 1., qdom.vertex_size()); // Gridfunction with constant 1 everywhere
 				//double tmp_neg, tmp_pos;
