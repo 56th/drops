@@ -128,7 +128,7 @@ void computeRadius_Angle(const DROPS::MultiGridCL& mg,LevelsetP2CL& lset,vector_
 	        {
 	        	length=triangle.GetInfoMCL(i,Barys[0],Barys[1],pt0,pt1);
 	        	circ+=length;
-				area += ( (pt0 + pt1)/2.0 - center ).norm()/2.0 *length;
+				area += FuncDet2D(pt0 - center, pt1 - center);
 	        	//radius+=(pt0-P.get<DROPS::Point3DCL>("SpeBnd.posDrop")).norm()/2*length;
 	        	//radius+=(pt1-P.get<DROPS::Point3DCL>("SpeBnd.posDrop")).norm()/2*length;
 	        	for(Uint j=0;j<5;j++)
@@ -136,7 +136,7 @@ void computeRadius_Angle(const DROPS::MultiGridCL& mg,LevelsetP2CL& lset,vector_
 	        }
 	    }
 	}
-	r = std::sqrt(area/ M_PI);
+	r = std::sqrt(0.5 * area/ M_PI);
 	//r=radius/circ;
 	a=angle/circ;
 }
@@ -774,8 +774,11 @@ int main (int argc, char** argv)
 
     DROPS::InstatNavierStokes2PhaseP2P1CL prob( *mg, DROPS::TwoPhaseFlowCoeffCL(P), bnddata, P.get<double>("Stokes.XFEMStab")<0 ? DROPS::P1_FE : DROPS::P1X_FE, P.get<double>("Stokes.XFEMStab"));
 
+    //DROPS::TimerCL time;
+	//time.Reset();
     Strategy( prob, *lsetbnddata, adap);    // do all the stuff
-
+    //time.Stop();
+	//std::cout<<"In strategy function it took "<<time.GetTime()<<std::endl;
     delete mg;
     delete velbnddata;
     delete prbnddata;

@@ -105,6 +105,7 @@ class HalfEllipsoidCL
         return std::abs( avgRad)*d.norm() - avgRad;
     }
     static double GetVolume() { return 2./3.*M_PI*Radius_[0]*Radius_[1]*Radius_[2]; }
+    //static double GetVolume() { return 1./6.*M_PI*Radius_[0]*Radius_[1]*Radius_[2]; }
     static Point3DCL& GetCenter() { return Mitte_; }
     static Point3DCL& GetRadius() { return Radius_; }
 };
