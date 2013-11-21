@@ -3510,7 +3510,7 @@ void InstatStokes2PhaseP2P1CL::CheckTwoPhaseSolution(const VelVecDescCL* DescVel
 	const PrincipalLatticeCL lat(PrincipalLatticeCL::instance(2));
     std::valarray<double> ls_loc(lat.vertex_size());
 	
-	double Sum=0.;
+	double SumErr=0.;
 	double volume=0.;
 	double average=0.;
     for (MultiGridCL::const_TriangTetraIteratorCL sit= const_cast<const MultiGridCL&>(MG_).GetTriangTetraBegin(lvl),
@@ -3526,22 +3526,25 @@ void InstatStokes2PhaseP2P1CL::CheckTwoPhaseSolution(const VelVecDescCL* DescVel
 		 volume += sit->GetVolume();
 		 if(noCut){
 			 q5_pr.assign(loc_pr);
-			 Sum  += Quad5CL<> (q5_pr).quad(absdet);			 
+			 q5_pr_exact.assign(*sit, RefPr, 0.);
+			 SumErr += Quad5CL<> (q5_pr-q5_pr_exact).quad(absdet);			 
 		 }
 		 else{
 			 partition.make_partition<SortedVertexPolicyCL, MergeCutPolicyCL>( lat, ls_loc);
 			 make_CompositeQuad5Domain( q5dom, partition);
 			 LocalP1CL<double> loc_pr_neg(*sit, make_P1Eval(MG_,BndData_.Pr, DescPr_neg));
+             resize_and_evaluate_on_vertexes( RefPr, *sit, q5dom, 6., pre_exact1);
 			 LocalP1CL<double> loc_pr_pos(*sit, make_P1Eval(MG_,BndData_.Pr, DescPr_pos));
+			 resize_and_evaluate_on_vertexes( RefPr, *sit, q5dom, 4., pre_exact2); 
 			 resize_and_evaluate_on_vertexes( loc_pr_neg, q5dom, pre_neg);
 			 resize_and_evaluate_on_vertexes( loc_pr_pos, q5dom, pre_pos); 
-			 Sum+= quad_neg_part_integrand ( pre_neg, absdet, q5dom);
-			 Sum+= quad_pos_part_integrand ( pre_pos, absdet, q5dom);
+			 SumErr+= quad_neg_part_integrand ( pre_neg-pre_exact1, absdet, q5dom);
+			 SumErr+= quad_pos_part_integrand ( pre_pos-pre_exact2, absdet, q5dom);
 		 }
      }
 	 //Get the average pressure, use it to normalize the pressure;
-	average= Sum/volume;
-	//std::cout<<"The average of the pressure is: "<<average<<" The volume is: "<<volume<<std::endl;
+	average= SumErr/volume;
+	std::cout<<"The average of the pressure error is: "<<average<<" The volume is: "<<volume<<std::endl;
 
     for (MultiGridCL::const_TriangTetraIteratorCL sit= const_cast<const MultiGridCL&>(MG_).GetTriangTetraBegin(lvl),
         send= const_cast<const MultiGridCL&>(MG_).GetTriangTetraEnd(lvl); sit != send; ++sit)
