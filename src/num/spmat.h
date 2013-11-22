@@ -646,7 +646,10 @@ private:
 
     void num_rows (size_t rows);    ///< Set _rows and resize _rowbeg
     void num_cols (size_t cols);    ///< Set _cols
+#pragma GCC push_options
+#pragma GCC optimize ("-O0")
     void num_nonzeros (size_t nnz); ///< Set nnz_ and resize _colind and _val
+#pragma GCC pop_options
 
     size_t sizeof_colind_and_val() const{ return nnz_*(sizeof( T) + sizeof( size_t)); }
 
@@ -738,6 +741,8 @@ template <typename T>
     _cols= cols;
 }
 
+#pragma GCC push_options
+#pragma GCC optimize ("-O0")
 template <typename T>
   void
   SparseMatBaseCL<T>::num_nonzeros (size_t nnz)
@@ -786,12 +791,11 @@ template <typename T>
         if (tmp == MAP_FAILED)
             throw DROPSErrCL( "SparseMatBaseCL::num_nonzeros: mmap failed.\n");
 
-        _val= static_cast<T*>( tmp);
-        _colind= reinterpret_cast<size_t*>( _val + nnz_);
-        // std::cerr << "SparseMatBaseCL::num_nonzeros: Mapped " << nb << " bytes at " << _val << ".\n";
+        _colind= reinterpret_cast<size_t*>( static_cast<char*>( tmp) + nnz_*sizeof( T));
     }
 #endif
 }
+#pragma GCC pop_options
 
 template <typename T>
   SparseMatBaseCL<T>::SparseMatBaseCL ()
