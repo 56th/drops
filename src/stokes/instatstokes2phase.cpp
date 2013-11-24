@@ -3484,7 +3484,8 @@ void InstatStokes2PhaseP2P1CL::CheckTwoPhaseSolution(const VelVecDescCL* DescVel
 //    const ExchangeCL& exV = vel_idx.GetEx();
 //    const ExchangeCL& exP = pr_idx.GetEx();
 //#endif
-    Uint lvl=DescVel->GetLevel();
+	
+	Uint lvl=DescVel->GetLevel();
 	VecDescCL DescPr_neg; 
 	VecDescCL DescPr_pos;
 	GetPrOnPart(DescPr_neg, lset, false);
@@ -3502,7 +3503,6 @@ void InstatStokes2PhaseP2P1CL::CheckTwoPhaseSolution(const VelVecDescCL* DescVel
     Quad5CL<Point3DCL> q5_vel, q5_vel_exact;
     Quad5CL<double> q5_pr, q5_pr_exact;
 	GridFunctionCL<double> pre_neg, pre_pos, pre_exact1,pre_exact2;
-	double inte_pre_pos, inte_pre_neg;
 	
 	TetraPartitionCL partition;
 	QuadDomainCL q5dom;
@@ -3513,6 +3513,8 @@ void InstatStokes2PhaseP2P1CL::CheckTwoPhaseSolution(const VelVecDescCL* DescVel
 	double SumErr=0.;
 	double volume=0.;
 	double average=0.;
+	double trash;
+	double neg =0, pos=0;
     for (MultiGridCL::const_TriangTetraIteratorCL sit= const_cast<const MultiGridCL&>(MG_).GetTriangTetraBegin(lvl),
         send= const_cast<const MultiGridCL&>(MG_).GetTriangTetraEnd(lvl); sit != send; ++sit)
     {
@@ -3525,8 +3527,11 @@ void InstatStokes2PhaseP2P1CL::CheckTwoPhaseSolution(const VelVecDescCL* DescVel
 		 
 		 volume += sit->GetVolume();
 		 if(noCut){
+			 if (sign(ls_loc[0])==1)
+				 q5_pr_exact.assign(*sit, RefPr, 4);
+			 else
+				 q5_pr_exact.assign(*sit, RefPr, 6);
 			 q5_pr.assign(loc_pr);
-			 q5_pr_exact.assign(*sit, RefPr, 0.);
 			 SumErr += Quad5CL<> (q5_pr-q5_pr_exact).quad(absdet);			 
 		 }
 		 else{
@@ -3538,14 +3543,17 @@ void InstatStokes2PhaseP2P1CL::CheckTwoPhaseSolution(const VelVecDescCL* DescVel
 			 resize_and_evaluate_on_vertexes( RefPr, *sit, q5dom, 4., pre_exact2); 
 			 resize_and_evaluate_on_vertexes( loc_pr_neg, q5dom, pre_neg);
 			 resize_and_evaluate_on_vertexes( loc_pr_pos, q5dom, pre_pos); 
-			 SumErr+= quad_neg_part_integrand ( pre_neg-pre_exact1, absdet, q5dom);
-			 SumErr+= quad_pos_part_integrand ( pre_pos-pre_exact2, absdet, q5dom);
+			 quad ( pre_neg-pre_exact1, absdet, q5dom, neg, trash);  
+             resize_and_evaluate_on_vertexes( RefPr, *sit, q5dom, 4., pre_exact2); 
+             quad ( pre_pos-pre_exact2, absdet, q5dom, trash, pos);
+			 SumErr+= neg;
+			 SumErr+= pos;
 		 }
      }
 	 //Get the average pressure, use it to normalize the pressure;
 	average= SumErr/volume;
-	std::cout<<"The average of the pressure error is: "<<average<<" The volume is: "<<volume<<std::endl;
-
+	//std::cout<<"The average of the pressure error is: "<<average<<" The volume is: "<<volume<<std::endl;
+    neg=0, pos=0;
     for (MultiGridCL::const_TriangTetraIteratorCL sit= const_cast<const MultiGridCL&>(MG_).GetTriangTetraBegin(lvl),
         send= const_cast<const MultiGridCL&>(MG_).GetTriangTetraEnd(lvl); sit != send; ++sit)
     {
@@ -3564,10 +3572,15 @@ void InstatStokes2PhaseP2P1CL::CheckTwoPhaseSolution(const VelVecDescCL* DescVel
          L2_vel += Quad5CL<> (dot(q5_vel_diff,q5_vel_diff)).quad(absdet);
 		 
 		 if(noCut){
+			 if (sign(ls_loc[0])==1)
+				 q5_pr_exact.assign(*sit, RefPr, 4);
+			 else
+				 q5_pr_exact.assign(*sit, RefPr, 6);
 			 LocalP1CL<double> temp3(loc_pr-loc_aver);
 			 q5_pr.assign(temp3);
-			 q5_pr_exact.assign(*sit, RefPr, t);
+	
 			 Quad5CL<double> q5_pr_diff( q5_pr-q5_pr_exact);
+
 			 L2_pr  += Quad5CL<> (q5_pr_diff*q5_pr_diff).quad(absdet);			 
 		 }
 		 else{
@@ -3580,15 +3593,13 @@ void InstatStokes2PhaseP2P1CL::CheckTwoPhaseSolution(const VelVecDescCL* DescVel
 			 resize_and_evaluate_on_vertexes( temp1, q5dom, pre_neg);
 			 resize_and_evaluate_on_vertexes( temp2, q5dom, pre_pos); 
 			 //To do: currently not find the best way, use the time to as level set sign flag;
-             resize_and_evaluate_on_vertexes( RefPr, *sit, q5dom, 6., pre_exact1);    
-			 inte_pre_neg = quad_neg_part_integrand ( (pre_neg-pre_exact1)*(pre_neg-pre_exact1), absdet, q5dom);
-             resize_and_evaluate_on_vertexes( RefPr, *sit, q5dom, 4., pre_exact2);    
-			 inte_pre_pos = quad_pos_part_integrand ( (pre_pos-pre_exact2)*(pre_pos-pre_exact2), absdet, q5dom);
-			 L2_pr +=inte_pre_neg;
-             L2_pr +=inte_pre_pos;
-			 
+             resize_and_evaluate_on_vertexes( RefPr, *sit, q5dom, 6., pre_exact1);  
+			 quad ( (pre_neg-pre_exact1)*(pre_neg-pre_exact1), absdet, q5dom, neg, trash);  
+			 L2_pr += neg;
+             resize_and_evaluate_on_vertexes( RefPr, *sit, q5dom, 4., pre_exact2); 
+             quad ( (pre_pos-pre_exact2)*(pre_pos-pre_exact2), absdet, q5dom, trash, pos);
+			 L2_pr += pos;			 
 		 }
-
      }
      L2_vel  = std::sqrt(L2_vel);               //L2_vel is the true value.
 	 L2_pr = std::sqrt(L2_pr);

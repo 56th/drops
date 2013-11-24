@@ -439,9 +439,6 @@ namespace InstatSlip{
 	{
         double norm2=0.;
 		double ret=0;
-		double p_average=0;
-		//P_average =10* 2/3*PI*R^3/Volume
-		p_average = 10. * 2./3. * M_PI * 0.001 / 0.125;
 		DROPS::Point3DCL origin = P.get<DROPS::Point3DCL>("Exp.PosDrop");
 		
 		for (int i=0; i< 3; i++)
@@ -452,9 +449,9 @@ namespace InstatSlip{
 			ret = 0;
 		else if(t >5.)
 			ret = 10;
-		ret -= p_average;
 		return ret;
 	}
+	
 
 	DROPS::SVectorCL<3> VolForce( const DROPS::Point3DCL& p, double t)
     {
