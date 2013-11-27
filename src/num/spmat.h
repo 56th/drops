@@ -791,6 +791,7 @@ template <typename T>
         if (tmp == MAP_FAILED)
             throw DROPSErrCL( "SparseMatBaseCL::num_nonzeros: mmap failed.\n");
 
+        _val= static_cast<T*>( tmp);
         _colind= reinterpret_cast<size_t*>( static_cast<char*>( tmp) + nnz_*sizeof( T));
     }
 #endif
