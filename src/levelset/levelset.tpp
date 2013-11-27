@@ -466,7 +466,7 @@ template<class DiscVelSolT>
 void LevelsetFaceAccumulator_P2DCL<DiscVelSolT>::begin_accumulation ()
 {
     // TetraAccumulator takes care of MatrixBuilder construction
-    Comment("entering LevelsetFaceAccumulator_P2DCL: " << allnum_unks << " levelset unknowns.\n", DebugDiscretizeC);
+   // Comment("entering LevelsetFaceAccumulator_P2DCL: " << ls_.Phi.RowIdx->NumUnknowns() << " levelset unknowns.\n", DebugDiscretizeC);
     rhs_.SetIdx(ls_.Phi.RowIdx);
     rhs_.Data = 0. ;
 }
