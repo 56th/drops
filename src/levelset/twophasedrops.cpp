@@ -188,13 +188,20 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
     double Vol = 0;
 
-    if (P.get("Exp.InitialLSet", std::string("Ellipsoid")) == "Ellipsoid" && P.get<int>("Levelset.VolCorrection") != 0){
-        Vol = EllipsoidCL::GetVolume();
-        std::cout << "initial volume: " << lset.GetVolume()/Vol << std::endl;
+
+    if (( (P.get("Exp.InitialLSet", std::string("Ellipsoid")) == "TaylorFlowDistance")
+          || (P.get("Exp.InitialLSet", std::string("Ellipsoid")) == "Ellipsoid"))
+        && (P.get<int>("Levelset.VolCorrection") != 0))
+    {
+        if (P.get<double>("Exp.InitialVolume",-1.0) > 0 )
+            Vol = P.get<double>("Exp.InitialVolume");
+        else
+            Vol = EllipsoidCL::GetVolume();
+        std::cout << "initial volume: " << lset.GetVolume() << std::endl;
         double dphi= lset.AdjustVolume( Vol, 1e-9);
-        std::cout << "initial volume correction is " << dphi << std::endl;
+        std::cout << "initial lset offset for correction is " << dphi << std::endl;
         lset.Phi.Data+= dphi;
-        std::cout << "new initial volume: " << lset.GetVolume()/Vol << std::endl;
+        std::cout << "new initial volume: " << lset.GetVolume() << std::endl;
     }else{
         Vol = lset.GetVolume();
     }
@@ -567,6 +574,8 @@ int main (int argc, char** argv)
 #endif
   try
   {
+      std::cout << "max: " << std::numeric_limits<int>::max() << std::endl;
+
     std::cout << "Boost version: " << BOOST_LIB_VERSION << std::endl;
 
     DROPS::read_parameter_file_from_cmdline( P, argc, argv, "risingdroplet.json");
