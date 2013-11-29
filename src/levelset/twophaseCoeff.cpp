@@ -481,12 +481,7 @@ namespace StatSlip{
 	DROPS::SVectorCL<3> Velocity( const DROPS::Point3DCL& p,double)
 	{
 		DROPS::SVectorCL<3> v(0.);
-        static bool first = true;
-		static double l_s;
-		if(first){
-			l_s=1./(P.get<double>("SpeBnd.beta2"));
-			first = false;
-		}
+		double l_s=2.;
 		v[0]=  std::sin(p[0]/l_s)*std::cos(p[1]/l_s);
 		v[1]= -std::cos(p[0]/l_s)*std::sin(p[1]/l_s);
 		v[2]= 0;
@@ -496,12 +491,7 @@ namespace StatSlip{
 	DROPS::SVectorCL<3> PressureGr(const DROPS::Point3DCL& p, double)
 	{
 		DROPS::SVectorCL<3> delp(0.);
-        static bool first = true;
-		static double l_s;
-		if(first){
-			l_s=1./(P.get<double>("SpeBnd.beta2"));
-			first = false;
-		}
+		double l_s=2.;
 		delp[0]=-1./(2.*l_s)*std::sin(2*p[0]/l_s);
 		delp[1]=-1./(2.*l_s)*std::sin(2*p[1]/l_s);
 		delp[2]= 0;
@@ -513,13 +503,7 @@ namespace StatSlip{
 	DROPS::SVectorCL<3> VolForce( const DROPS::Point3DCL& p, double)
     {
         DROPS::SVectorCL<3> f(0.);
-        static bool first = true;
-		static double nu, l_s;
-		if(first){
-			nu=P.get<double>("Mat.ViscFluid")/P.get<double>("Mat.DensFluid");
-			l_s=1./(P.get<double>("SpeBnd.beta2"));
-			first = false;
-		}
+		double nu=1., l_s=2.;
 		f[0] =  2.* nu * std::sin(p[0]/l_s) * std::cos(p[1]/l_s) *  1./(l_s*l_s) ;
 		f[1] = -2.* nu * std::cos(p[0]/l_s) * std::sin(p[1]/l_s) *  1./(l_s*l_s) ;
 		f[2] = 0;
@@ -580,6 +564,13 @@ namespace StatSlip3{
 		v[2]=  p[0]*p[2];
 		return v;
 	}
+	
+	double Pressure(const DROPS::Point3DCL& p, double)
+	{
+		double pr = - std::cos(p[0]) + std::sin(p[1]);
+
+		return pr;
+	}
 
 	DROPS::SVectorCL<3> PressureGr(const DROPS::Point3DCL& p, double)
 	{
@@ -601,6 +592,16 @@ namespace StatSlip3{
 
         return f+PressureGr(p,0);
     }
+	
+	DROPS::SVectorCL<3> flux( const DROPS::Point3DCL& p,double)
+	{
+		DROPS::SVectorCL<3> v(0.);
+		v[0]= 0;
+		v[1]= 0;
+		v[2]= p[0];
+		return v;
+	}
+	
 	DROPS::SVectorCL<3> Wall3( const DROPS::Point3DCL& p,double)
 	{
 		DROPS::SVectorCL<3> v(0.);
@@ -613,6 +614,8 @@ namespace StatSlip3{
     static DROPS::RegisterVectorFunction regvelWall3("Wall3", Wall3);
     static DROPS::RegisterVectorFunction regvelf3("StatSlip3F", VolForce);
 	static DROPS::RegisterVectorFunction regvelgpr3("StatSlip3PrGrad",PressureGr);
+	static DROPS::RegisterVectorFunction regvelflux("StatSlip3flux",flux);
+	static DROPS::RegisterScalarFunction regscapr3("StatSlip3Pr",Pressure);
 }
 
 namespace contactangle{

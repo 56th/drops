@@ -3422,7 +3422,7 @@ double InstatStokes2PhaseP2P1CL::GetCFLTimeRestriction( LevelsetP2CL& lset)
 }
 
 void InstatStokes2PhaseP2P1CL::CheckOnePhaseSolution(const VelVecDescCL* DescVel, const VecDescCL* DescPr, 
-							      const instat_vector_fun_ptr RefVel, const instat_vector_fun_ptr RefGradPr) const
+							      const instat_vector_fun_ptr RefVel, const instat_vector_fun_ptr RefGradPr , const instat_scalar_fun_ptr RefPr) const
 {
 
     double t = DescVel->t;
@@ -3440,9 +3440,30 @@ void InstatStokes2PhaseP2P1CL::CheckOnePhaseSolution(const VelVecDescCL* DescVel
 	// L2 norm of gradient of pressure: nabla (p_h - p)
     // number of nodes for Quad5CL rule is 15 (see discretize.h Quad5_DataCL NumNodesC =15)
     double L2_vel(0.0);
+	double L2_pr(0.0);
     double Grad_pr(0.0);
     Quad5CL<Point3DCL> q5_vel, q5_vel_exact;
     Quad5CL<Point3DCL> q5_grad_pr_exact;
+    Quad5CL<double>    q5_pr, q5_pr_exact;
+	
+	
+	double SumErr=0.;
+	double volume=0.;
+	double err_aver=0.;
+    for (MultiGridCL::const_TriangTetraIteratorCL sit= const_cast<const MultiGridCL&>(MG_).GetTriangTetraBegin(lvl),
+        send= const_cast<const MultiGridCL&>(MG_).GetTriangTetraEnd(lvl); sit != send; ++sit)
+    {
+         GetTrafoTr(T,det,*sit);
+         const double absdet= std::fabs(det);
+         LocalP1CL<double> loc_pr(*sit, make_P1Eval(MG_,BndData_.Pr,*DescPr));
+		 
+		 volume += sit->GetVolume();
+		 q5_pr_exact.assign(*sit, RefPr, 0);
+		 q5_pr.assign(loc_pr);
+		 SumErr += Quad5CL<> (q5_pr-q5_pr_exact).quad(absdet);			 
+     }
+	 //Get the average pressure, use it to normalize the pressure;
+	err_aver= SumErr/volume;
 
     for (MultiGridCL::const_TriangTetraIteratorCL sit= const_cast<const MultiGridCL&>(MG_).GetTriangTetraBegin(lvl),
         send= const_cast<const MultiGridCL&>(MG_).GetTriangTetraEnd(lvl); sit != send; ++sit)
@@ -3451,6 +3472,7 @@ void InstatStokes2PhaseP2P1CL::CheckOnePhaseSolution(const VelVecDescCL* DescVel
          const double absdet= std::fabs(det);
          LocalP2CL<Point3DCL> loc_vel(*sit, make_P2Eval(MG_,BndData_.Vel,*DescVel));
          LocalP1CL<double> loc_pr(*sit, make_P1Eval(MG_,BndData_.Pr,*DescPr));
+		 LocalP1CL<double> loc_aver(err_aver);
 		
 		 Point3DCL loc_grad_pr(0.);
 		 P1DiscCL::GetGradients(Grad, det, *sit);		 
@@ -3459,17 +3481,24 @@ void InstatStokes2PhaseP2P1CL::CheckOnePhaseSolution(const VelVecDescCL* DescVel
 			 
          q5_vel.assign(loc_vel);
          q5_vel_exact.assign(*sit, RefVel,t);
+		 LocalP1CL<double> temp(loc_pr-loc_aver);
+		 q5_pr.assign(temp);
+		 q5_pr_exact.assign(*sit, RefPr, t);
 		 Quad5CL<Point3DCL> q5_grad_pr(loc_grad_pr);
 		 q5_grad_pr_exact.assign(*sit, RefGradPr, t);
          Quad5CL<Point3DCL> q5_vel_diff( q5_vel-q5_vel_exact);
 		 Quad5CL<Point3DCL> q5_grad_pr_diff(q5_grad_pr-q5_grad_pr_exact);
+		 Quad5CL<> q5_pr_diff( q5_pr-q5_pr_exact);
          L2_vel += Quad5CL<> (dot(q5_vel_diff,q5_vel_diff)).quad(absdet);
 		 Grad_pr+= Quad5CL<> (dot(q5_grad_pr_diff, q5_grad_pr_diff)).quad(absdet);
+		 L2_pr+= Quad5CL<> (q5_pr_diff*q5_pr_diff).quad(absdet);
      }
      L2_vel  = std::sqrt(L2_vel);               //L2_vel is the true value.
 	 Grad_pr = std::sqrt(Grad_pr);
+     L2_pr   = std::sqrt(L2_pr); 	 
          std::cout << "---------------------Discretize error-------------------"
 		           <<"\n || u_h - u ||_L2 = " <<  L2_vel 
+				   <<"\n || p_h - p ||_L2 = " <<  L2_pr 
 				   <<"\n || nabla (p_h - p) ||_L2 = " << Grad_pr << std::endl;	
 }
 
