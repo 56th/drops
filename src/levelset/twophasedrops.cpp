@@ -538,7 +538,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
             std::cout << "surfactant on \\Gamma: " << Integral_Gamma( MG, *lset.PhiC, lset.GetBndData(), make_P1Eval(  MG, ifbnd, surfTransp.ic)) << '\n';
         }
 		if( P.get<std::string>("Exp.Solution_Vel").compare("None")!=0)
-			Stokes.CheckOnePhaseSolution( &Stokes.v, &Stokes.p, Stokes.Coeff_.RefVel, Stokes.Coeff_.RefGradPr);
+			Stokes.CheckOnePhaseSolution( &Stokes.v, &Stokes.p, Stokes.Coeff_.RefVel, Stokes.Coeff_.RefGradPr, Stokes.Coeff_.RefPr);
         double angle,radius;
         computeRadius_Angle( MG, lset, the_Bnd_outnormal,radius,angle);
         out<<" "<<time_new<<"  "<<angle<<"  "<<radius<<std::endl;
