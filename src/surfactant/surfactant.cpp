@@ -283,6 +283,76 @@ double axis_scaling_rhs (const Point3DCL& p, double t)
 static RegisterScalarFunction regsca_axis_scaling_rhs( "AxisScalingRhs", axis_scaling_rhs);
 
 
+// ==non-stationary test case "Collision"==
+
+const double collision_p= 3.0;
+
+// sphere 1: c1= (-1.5 0 0) + v*t
+Point3DCL collision_center_1 (double t)
+{
+    return MakePoint3D( -1.5, 0., 0.) + WindVelocity*t;
+}
+// sphere 2: c2= ( 1.5 0 0) - v*t = -c1
+Point3DCL collision_center_2 (double t)
+{
+    return -collision_center_1( t);
+}
+
+double collision_Dt_lset (const DROPS::Point3DCL& x, double t)
+{
+    Point3DCL x1= x - collision_center_1( t),
+              x2= x - collision_center_2( t);
+    const double n1= x1.norm() < 1e-3 ? 1e-3 : std::pow( x1.norm(), collision_p + 2.),
+                 n2= x2.norm() < 1e-3 ? 1e-3 : std::pow( x2.norm(), collision_p + 2.);
+    return collision_p*(DROPS::inner_prod( WindVelocity, x1)/n1
+                      - DROPS::inner_prod( WindVelocity, x2)/n2);
+}
+
+DROPS::Point3DCL collision_Dx_lset (const DROPS::Point3DCL& x, double t)
+{
+    Point3DCL x1= x - collision_center_1( t),
+              x2= x - collision_center_2( t);
+    const double n1= x1.norm() < 1e-3 ? 1e-3 : std::pow( x1.norm(), collision_p + 2.),
+                 n2= x2.norm() < 1e-3 ? 1e-3 : std::pow( x2.norm(), collision_p + 2.);
+    return collision_p*(x1/n1 + x2/n2);
+}
+
+DROPS::Point3DCL collision_wind (const DROPS::Point3DCL& x, double t)
+{
+    const Point3DCL Dphi= collision_Dx_lset( x, t);
+    const double Dtphi=   collision_Dt_lset( x, t);
+    return (Dtphi/Dphi.norm_sq())*Dphi;
+}
+static RegisterVectorFunction regvec_collision_wind( "CollisionWind", collision_wind);
+
+double collision_lset (const Point3DCL& x, double t)
+{
+    const Point3DCL c1= collision_center_1( t);
+    const Point3DCL x1= x - c1;
+    const Point3DCL c2= collision_center_2( t);
+    const Point3DCL x2= x - c2;
+
+    const double n1= x1.norm() < 1e-3 ? 1e-3 : std::pow( x1.norm(), collision_p),
+                 n2= x2.norm() < 1e-3 ? 1e-3 : std::pow( x2.norm(), collision_p);
+    return RadDrop[0] - 1./n1  - 1./n2;
+}
+static RegisterScalarFunction regsca_collision_lset( "CollisionLset", collision_lset);
+
+double collision_sol (const Point3DCL&, double)
+{
+    return 0.;
+}
+static RegisterScalarFunction regsca_collision_sol( "CollisionSol", collision_sol);
+
+double collision_rhs (const Point3DCL&, double)
+{
+    return 0;
+}
+static RegisterScalarFunction regsca_collision_rhs( "CollisionRhs", collision_rhs);
+
+
+// ==Some spheres==
+
 double sphere_dist (const DROPS::Point3DCL& p, double)
 {
     DROPS::Point3DCL x( p - PosDrop);
