@@ -717,9 +717,9 @@ int main (int argc, char* argv[])
             P.get<std::string>("VTK.TimeFileName"),
             P.get<int>("VTK.Binary"), 
             P.get<bool>("VTK.UseOnlyP1"),
-            -1,  /* <- level */
+            false, /* <- P2DG */
+            -1,    /* <- level */
             P.get<bool>("VTK.ReUseTimeFile")));
-
     if (P.get<bool>( "Exp.StationaryPDE"))
         StationaryStrategy( mg, adap, lset);
     else
