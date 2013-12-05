@@ -321,7 +321,8 @@ DROPS::Point3DCL collision_wind (const DROPS::Point3DCL& x, double t)
 {
     const Point3DCL Dphi= collision_Dx_lset( x, t);
     const double Dtphi=   collision_Dt_lset( x, t);
-    return (Dtphi/Dphi.norm_sq())*Dphi;
+    const double n= Dphi.norm_sq();
+    return n < 1e-6 ? DROPS::Point3DCL() : (Dtphi/n)*Dphi;
 }
 static RegisterVectorFunction regvec_collision_wind( "CollisionWind", collision_wind);
 
@@ -338,9 +339,9 @@ double collision_lset (const Point3DCL& x, double t)
 }
 static RegisterScalarFunction regsca_collision_lset( "CollisionLset", collision_lset);
 
-double collision_sol (const Point3DCL&, double)
+double collision_sol (const Point3DCL& x, double)
 {
-    return 0.;
+    return 2.*std::cos( x[0])*std::cos(x[1]);
 }
 static RegisterScalarFunction regsca_collision_sol( "CollisionSol", collision_sol);
 
