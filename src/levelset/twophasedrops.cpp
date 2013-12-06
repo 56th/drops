@@ -112,7 +112,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
     // Creates new Levelset-Object, has to be cleaned manually
     LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsetbnddata, sf, P.get_child("Levelset")) );
-  
+
     if (is_periodic) //CL: Anyone a better idea? perDirection from ParameterFile?
     {
         DROPS::Point3DCL dx;
@@ -167,7 +167,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
     if (lset.IsDiscontinuous())
     {
-        LevelsetP2DiscontCL& lsetD (dynamic_cast<LevelsetP2DiscontCL&>(lset)); 
+        LevelsetP2DiscontCL& lsetD (dynamic_cast<LevelsetP2DiscontCL&>(lset));
         MLIdxDescCL* lidxc = lsetD.idxC;
         lsetD.CreateNumbering( MG.GetLastLevel(), lidxc, periodic_match);
         lsetD.PhiContinuous.SetIdx( lidxc);
@@ -197,11 +197,11 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
             Vol = P.get<double>("Exp.InitialVolume");
         else
             Vol = EllipsoidCL::GetVolume();
-        std::cout << "initial volume: " << lset.GetVolume() << std::endl;
+        std::cout << "initial rel. volume: " << lset.GetVolume()/Vol << std::endl;
         double dphi= lset.AdjustVolume( Vol, 1e-9);
         std::cout << "initial lset offset for correction is " << dphi << std::endl;
         lset.Phi.Data+= dphi;
-        std::cout << "new initial volume: " << lset.GetVolume() << std::endl;
+        std::cout << "new initial rel. volume: " << lset.GetVolume()/Vol << std::endl;
     }else{
         Vol = lset.GetVolume();
     }
@@ -445,7 +445,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     const int nsteps = P.get<int>("Time.NumSteps");
     const double dt = P.get<double>("Time.StepSize");
     double time = 0.0;
-    
+
     for (int step= 1; step<=nsteps; ++step)
     {
         std::cout << "============================================================ step " << step << std::endl;
@@ -574,8 +574,6 @@ int main (int argc, char** argv)
 #endif
   try
   {
-      std::cout << "max: " << std::numeric_limits<int>::max() << std::endl;
-
     std::cout << "Boost version: " << BOOST_LIB_VERSION << std::endl;
 
     DROPS::read_parameter_file_from_cmdline( P, argc, argv, "risingdroplet.json");
@@ -587,7 +585,7 @@ int main (int argc, char** argv)
     if (P.get<int>("General.ProgressBar"))
         DROPS::ProgressBarTetraAccumulatorCL::Activate();
 
-    //!check paramterfile
+    // check parameter file
     if (P.get<double>("SurfTens.DilatationalVisco")< P.get<double>("SurfTens.ShearVisco"))
     {
         throw DROPS::DROPSErrCL("Parameter error : Dilatational viscosity must be larger than surface shear viscosity");
@@ -618,13 +616,13 @@ int main (int argc, char** argv)
                   << "  /----------------------------------------------------------------\\ \n"
                   << "  | WARNING: It seems you are using the old domain descriptions    | \n"
                   << "  |          or your \"Domain\" section is not correct.              | \n"
-                  << "  |          Please adapt your json-file to the new description.   | \n" 
+                  << "  |          Please adapt your json-file to the new description.   | \n"
                   <<"  \\----------------------------------------------------------------/ \n"
                   << std::endl;
         DROPS::BuildDomain( mg, P.get<std::string>("DomainCond.MeshFile"), P.get<int>("DomainCond.GeomType"), P.get<std::string>("Restart.Inputfile"), ExpRadInlet);
     }
 
-    
+
 
 
     P.put("Exp.RadInlet", ExpRadInlet);
