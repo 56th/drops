@@ -329,7 +329,7 @@ double TaylorFlowDistance( const DROPS::Point3DCL& p, double)
 static DROPS::RegisterScalarFunction regscataylor("TaylorFlowDistance", TaylorFlowDistance);
 
 
-DROPS::SVectorCL<3> TaylorInflow( const DROPS::Point3DCL& p, double t)
+DROPS::SVectorCL<3> TaylorInflow( const DROPS::Point3DCL& p, double)
 {
     const double x = p[0] / 6e-3;
     const double y = p[1] / 6e-3;
@@ -340,7 +340,7 @@ DROPS::SVectorCL<3> TaylorInflow( const DROPS::Point3DCL& p, double t)
 
 static DROPS::RegisterVectorFunction regvectaylor("TaylorInflow", TaylorInflow);
 
-double SmallDistance( const DROPS::Point3DCL& p, double t)
+double SmallDistance( const DROPS::Point3DCL&, double)
 {
     return 0.525e-3;
 }
