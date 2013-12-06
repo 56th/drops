@@ -29,7 +29,7 @@ exec_par(dist_exchange geom-simplex geom-multigrid geom-builder geom-topo geom-b
 
 exec_par(dist_sdropsP2 geom-boundary geom-builder geom-simplex geom-multigrid num-unknowns geom-topo num-fe misc-problem misc-utils num-discretize num-interfacePatch num-fe geom-reftetracut geom-principallattice misc-scopetimer geom-deformation)
 
-exec_par(dist_interp2 partests-dist_interp2 geom-simplex geom-multigrid geom-topo out-output num-unknowns geom-builder misc-problem num-interfacePatch num-fe geom-boundary misc-utils num-discretize geom-deformation)
+exec_par(dist_interp2 geom-simplex geom-multigrid geom-topo out-output num-unknowns geom-builder misc-problem num-interfacePatch num-fe geom-boundary misc-utils num-discretize geom-deformation)
 
 exec_par(dist_interp1 geom-simplex geom-multigrid geom-topo out-output num-unknowns geom-builder misc-problem num-interfacePatch num-fe geom-boundary misc-utils num-discretize geom-deformation)
 
