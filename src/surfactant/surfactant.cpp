@@ -342,9 +342,14 @@ static RegisterScalarFunction regsca_collision_lset( "CollisionLset", collision_
 double collision_sol (const Point3DCL& x, double)
 {
     return 2.*std::cos( x[0])*std::cos(M_PI*x[1]);
-//     return x[0] < 0. ? 0 : 2.;
 }
 static RegisterScalarFunction regsca_collision_sol( "CollisionSol", collision_sol);
+
+double collision_sol2 (const Point3DCL& x, double)
+{
+    return x[0] < 0. ? 0 : 3. - x[0];
+}
+static RegisterScalarFunction regsca_collision_sol2( "CollisionSol2", collision_sol2);
 
 double collision_rhs (const Point3DCL&, double)
 {
