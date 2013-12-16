@@ -3425,6 +3425,7 @@ void InstatStokes2PhaseP2P1CL::CheckOnePhaseSolution(const VelVecDescCL* DescVel
 							      const instat_vector_fun_ptr RefVel, const instat_vector_fun_ptr RefGradPr , const instat_scalar_fun_ptr RefPr) const
 {
 
+	ScopeTimerCL scope("CheckOnePhaseSolution");
     double t = DescVel->t;
 //#ifdef _PAR
 //    const ExchangeCL& exV = vel_idx.GetEx();
@@ -3507,7 +3508,7 @@ void InstatStokes2PhaseP2P1CL::CheckOnePhaseSolution(const VelVecDescCL* DescVel
 void InstatStokes2PhaseP2P1CL::CheckTwoPhaseSolution(const VelVecDescCL* DescVel, const VecDescCL* DescPr, 
 							      const LevelsetP2CL& lset, const instat_vector_fun_ptr RefVel, const instat_scalar_fun_ptr RefPr)
 {
-
+	ScopeTimerCL scope("CheckTwoPhaseSolution");
     double t = DescVel->t;
 //#ifdef _PAR
 //    const ExchangeCL& exV = vel_idx.GetEx();
