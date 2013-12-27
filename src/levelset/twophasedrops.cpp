@@ -81,8 +81,8 @@ double GetTimeOffset(){
     return timeoffset;
 }
 
-//To do: move to some other file
-void computeRadius_Angle(const DROPS::MultiGridCL& mg,LevelsetP2CL& lset,vector_fun_ptr Outnormal_fun,double& r,double& a)
+//To do: move to some other file and develop a more general methods!
+double compute_averageAngle(const DROPS::MultiGridCL& mg,LevelsetP2CL& lset,instat_vector_fun_ptr Outnormal_fun)
 {
 	InterfaceTriangleCL triangle;
 	const DROPS::Uint lvl = mg.GetLastLevel();
@@ -91,11 +91,10 @@ void computeRadius_Angle(const DROPS::MultiGridCL& mg,LevelsetP2CL& lset,vector_
     double angle=0;
     //double radius=0;
     double circ=0;
-	double area=0;
+	//double area=0;
     double weight[5]={0.568888889, 0.47862867,0.47862867,0.236926885,0.236926885};
 	//integral in [-1,1]
 	double qupt[5]={0,-0.53846931,0.53846931,-0.906179846,0.906179846};
-	Point3DCL center = P.get<DROPS::Point3DCL>("SpeBnd.posDrop");
     DROPS_FOR_TRIANG_CONST_TETRA( mg, lvl, it){
 		SpeBnd=false;
 		for(Uint v=0; v<4; v++)
@@ -128,32 +127,26 @@ void computeRadius_Angle(const DROPS::MultiGridCL& mg,LevelsetP2CL& lset,vector_
 	        {
 	        	length=triangle.GetInfoMCL(i,Barys[0],Barys[1],pt0,pt1);
 	        	circ+=length;
-				area += FuncDet2D(pt0 - center, pt1 - center);
-	        	//radius+=(pt0-P.get<DROPS::Point3DCL>("SpeBnd.posDrop")).norm()/2*length;
-	        	//radius+=(pt1-P.get<DROPS::Point3DCL>("SpeBnd.posDrop")).norm()/2*length;
-	        	for(Uint j=0;j<5;j++)
+			   	for(Uint j=0;j<5;j++)
 	        		angle+=length*triangle.GetImprovedActualContactAngle(i,(qupt[j]+1)/2)*weight[j]/2;
 	        }
 	    }
 	}
-	r = std::sqrt(0.5 * area/ M_PI);
-	//r=radius/circ;
-	a=angle/circ;
+    return angle/circ;
 }
 
 void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddata, AdapTriangCL& adap)
 // flow control
 {
     DROPS::InScaMap & inscamap = DROPS::InScaMap::getInstance();
-    DROPS::StatScaMap & scamap = DROPS::StatScaMap::getInstance();
-    DROPS::StatVecMap & vecmap = DROPS::StatVecMap::getInstance();
+    DROPS::InVecMap & invecmap = DROPS::InVecMap::getInstance();
     DROPS::MatchMap & matchmap = DROPS::MatchMap::getInstance();
 
-    scalar_fun_ptr the_Young_angle;
-    vector_fun_ptr the_Bnd_outnormal;
+    instat_scalar_fun_ptr the_Young_angle;
+    instat_vector_fun_ptr the_Bnd_outnormal;
 
-    the_Young_angle= scamap[P.get<std::string>("SpeBnd.CtAngle")];
-    the_Bnd_outnormal= vecmap[P.get<std::string>("SpeBnd.BndOutNormal")];
+    the_Young_angle= inscamap[P.get<std::string>("SpeBnd.CtAngle")];
+    the_Bnd_outnormal= invecmap[P.get<std::string>("SpeBnd.BndOutNormal")];
 
     bool is_periodic = P.get<std::string>("DomainCond.PeriodicMatching", "none") != "none";
     match_fun periodic_match = is_periodic ? matchmap[P.get("DomainCond.PeriodicMatching", std::string("periodicx"))] : 0;
@@ -509,9 +502,11 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
     const int nsteps = P.get<int>("Time.NumSteps");
     const double dt = P.get<double>("Time.StepSize");
+    //if(P.get<int>("Exp.OutputInfo")==1)
     std::ofstream out((P.get<std::string>("VTK.VTKName","contactangle")+".txt").c_str());
-    out<<"time: "<<" angle: "<<" radius: "<<std::endl;
-    out<<" "<<0<<"  "<<1.5707963<<"  "<<P.get<DROPS::Point3DCL>("Exp.RadDrop")[0]<<std::endl;
+    out<<"time: "<<" angle: "<<" wet_area: "<<"surface_energy:  "<<"kinetic_energy:  "<<"total energy:  "<<std::endl;
+
+    //out<<" "<<0<<"  "<<1.5707963<<"  "<<P.get<DROPS::Point3DCL>("Exp.RadDrop")[0]<<std::endl;
     double time = 0.0;
     for (int step= 1; step<=nsteps; ++step)
     {
@@ -539,9 +534,12 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         }
 		if( P.get<std::string>("Exp.Solution_Vel").compare("None")!=0)
 			Stokes.CheckOnePhaseSolution( &Stokes.v, &Stokes.p, Stokes.Coeff_.RefVel, Stokes.Coeff_.RefGradPr, Stokes.Coeff_.RefPr);
-        double angle,radius;
-        computeRadius_Angle( MG, lset, the_Bnd_outnormal,radius,angle);
-        out<<" "<<time_new<<"  "<<angle<<"  "<<radius<<std::endl;
+		if(P.get<int>("Exp.OutputInfo")==1)
+		{
+			double e1 = lset.GetSurfaceEnergy();
+			double e2 = Stokes.GetKineticEnergy(lset);
+		    out<<time_new<<"  "<<compute_averageAngle(MG, lset, the_Bnd_outnormal)<<"  "<<lset.GetWetArea()<<"  "<<e1<<"  "<<e2<<"   "<<e1+e2<<std::endl;
+		}
         // WriteMatrices( Stokes, step);
 
         // grid modification
@@ -662,6 +660,7 @@ void SetMissingParameters(DROPS::ParamCL& P){
 	P.put_if_unset<std::string>("Exp.Solution_Vel", "None");
 	P.put_if_unset<std::string>("Exp.Solution_GradPr", "None");
 	P.put_if_unset<std::string>("Exp.Solution_Pr", "None");
+	P.put_if_unset<int>("Exp.OutputInfo",0);
 	//---------------------------------------------------------------
 	P.put_if_unset<double>("Exp.SimuType", 0.0);
 }

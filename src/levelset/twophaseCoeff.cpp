@@ -620,26 +620,26 @@ namespace StatSlip3{
 
 namespace contactangle{
 	
-	double ConstantAngle(const DROPS::Point3DCL&)
+	double ConstantAngle(const DROPS::Point3DCL&,double)
 	{
 		return P.get<double>("SpeBnd.contactangle")/180.0*M_PI;
 	}
 
-	double PeriodicAngle(const DROPS::Point3DCL& pt)
+	double PeriodicAngle(const DROPS::Point3DCL& pt,double)
 	{
 		double r=std::sqrt(pt[0]*pt[0]+pt[2]*pt[2]);
 		double theta=r<0.01? 0: (pt[2]>0?std::acos(pt[0]/r): 2*M_PI- std::acos(pt[0]/r));
 		return (P.get<double>("SpeBnd.contactangle"))*(1+0.5*std::sin(30*theta))/180.0*M_PI;
 	}
 
-	double PatternAngle(const DROPS::Point3DCL& pt)
+	double PatternAngle(const DROPS::Point3DCL& pt,double)
 	{
 		double r=std::sqrt(pt[0]*pt[0]+pt[2]*pt[2]);
 		double theta= int(r/0.05)%2==0?1:-1;
 		return P.get<double>("SpeBnd.contactangle")/180.0*M_PI*(1+0.5*theta);
 	}
 
-	DROPS::Point3DCL OutNormalBottomPlane(const DROPS::Point3DCL&)
+	DROPS::Point3DCL OutNormalBottomPlane(const DROPS::Point3DCL&,double)
 	{
 		DROPS::Point3DCL outnormal(0.0);
 	//	outnormal[0]=0;
@@ -648,7 +648,7 @@ namespace contactangle{
 		return outnormal;
 	}
 
-	DROPS::Point3DCL OutNormalBrick(const DROPS::Point3DCL& pt)
+	DROPS::Point3DCL OutNormalBrick(const DROPS::Point3DCL& pt,double)
 	{
 		if(P.get<int>("DomainCond.GeomType")!=1)
 			 throw DROPS::DROPSErrCL("Error: compute out normal of brick, please use other functions");
@@ -681,9 +681,22 @@ namespace contactangle{
 		return outnormal;
 	}
 	
-	static DROPS::RegisterStatScalarFunction regconstangle("ConstantAngle", ConstantAngle);	
-	static DROPS::RegisterStatScalarFunction regperangle("PeriodicAngle", PeriodicAngle);
-	static DROPS::RegisterStatScalarFunction regpatangle("PatternAngle", PatternAngle);
-	static DROPS::RegisterStatVectorFunction regunitbottomoutnomal("OutNormalBottomPlane", OutNormalBottomPlane);
-	static DROPS::RegisterStatVectorFunction regunitcubicoutnomal("OutNormalBrick", OutNormalBrick);
+	static DROPS::RegisterScalarFunction regconstangle("ConstantAngle", ConstantAngle);
+	static DROPS::RegisterScalarFunction regperangle("PeriodicAngle", PeriodicAngle);
+	static DROPS::RegisterScalarFunction regpatangle("PatternAngle", PatternAngle);
+	static DROPS::RegisterVectorFunction regunitbottomoutnomal("OutNormalBottomPlane", OutNormalBottomPlane);
+	static DROPS::RegisterVectorFunction regunitcubicoutnomal("OutNormalBrick", OutNormalBrick);
+}
+
+namespace curvebndDomain{
+
+	DROPS::Point3DCL OutNormalSphere(const DROPS::Point3DCL& pt,double)
+	{
+		DROPS::Point3DCL outnormal(0.0);
+		outnormal=pt/pt.norm();
+		return outnormal;
+	}
+
+	static DROPS::RegisterVectorFunction regunitoutnomalsphere("OutNormalSphere", OutNormalSphere);
+
 }

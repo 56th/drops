@@ -277,7 +277,9 @@ class InstatStokes2PhaseP2P1CL : public ProblemCL<TwoPhaseFlowCoeffCL, StokesBnd
 	//It checks the L2 norm of discretized error of velocity and gradient of pressure
     void CheckOnePhaseSolution(const VelVecDescCL* DescVel, const VecDescCL* DescPr, const instat_vector_fun_ptr RefVel, const instat_vector_fun_ptr RefGradPr , const instat_scalar_fun_ptr RefPr) const;
     void CheckTwoPhaseSolution(const VelVecDescCL* DescVel, const VecDescCL* DescPr, const LevelsetP2CL& lset, const instat_vector_fun_ptr RefVel, const instat_scalar_fun_ptr RefPr);
-	
+
+    //Get the total kinetic energy
+    double GetKineticEnergy(const LevelsetP2CL& lset) const;
 	// To setup u-u_h
 	//void SetupVelError(const instat_vector_fun_ptr RefVel);
     /// \name Evaluate Solution

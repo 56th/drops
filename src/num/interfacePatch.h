@@ -159,12 +159,12 @@ class InterfaceTetraCL : public InterfacePatchCL
 class InterfaceTriangleCL : public InterfacePatchCL
 {
   private:
-    double         DetA_;
+    double         DetA_;			//detminant = 2 * area of triangle
     Point3DCL       B_[3];
     Point2DCL       ab_;
     Uint	 numMCL_;				 //number of moving contact lines
     Uint	 IdxMCL_[4][2];			 //the edge index  for each contact line
-    vector_fun_ptr outnormal_; ///the outnormal of the boundary. instat might be useful for varying boundary.
+    instat_vector_fun_ptr outnormal_; ///the outnormal of the boundary. instat might be useful for varying boundary.
 
     BaryCoordCL TransformToSubTetra (const BaryCoordCL& b); ///< compute st_*b \todo remove this by introducing a column-oriented small matrix class
 
@@ -173,7 +173,7 @@ class InterfaceTriangleCL : public InterfacePatchCL
     bool ComputeMCLForChild(Uint ch);			 			   ///< returns true, if a moving contact line exists for this child
 															   ///< called after BInit()!!
     Uint GetNumMCL();									///< returns numMCL_
-    void SetBndOutNormal(vector_fun_ptr outnormal);   ///set outnormal
+    void SetBndOutNormal(instat_vector_fun_ptr outnormal);   ///set outnormal
     double GetInfoMCL(Uint v, BaryCoordCL& bary0, BaryCoordCL& bary1, Point3DCL& pt0, Point3DCL& pt1);
     double GetAbsDet( Uint tri= 0) const { return DetA_*(tri==0 ? 1.0 : GetAreaFrac()); } ///< Returns the Determinant for surface integration on the triangle \p tri.
     double GetAreaFrac()   const { return intersec_==4 ? ab_[0]+ab_[1]-1 : 0; }                   ///< Quotient of the areas of the first and the second triangle.
