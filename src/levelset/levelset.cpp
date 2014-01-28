@@ -578,8 +578,8 @@ class YoungForceAccumulatorCL : public  TetraAccumulatorCL
     InterfaceTriangleCL triangle;
 
     const double sigma_;
-    scalar_fun_ptr angle_;	//Young's contact angle
-    vector_fun_ptr outnormal_;//outnormal of the domain boundary
+    instat_scalar_fun_ptr angle_;	//Young's contact angle
+    instat_vector_fun_ptr outnormal_;//outnormal of the domain boundary
 
     bool SpeBnd; //special boundary condition
 
@@ -589,7 +589,7 @@ class YoungForceAccumulatorCL : public  TetraAccumulatorCL
  //   LocalP2CL<> loc_phi;
 
   public:
-    YoungForceAccumulatorCL( const LevelsetP2CL& ls, VecDescCL& f_Gamma, double sigma,scalar_fun_ptr cangle,vector_fun_ptr outnormal)
+    YoungForceAccumulatorCL( const LevelsetP2CL& ls, VecDescCL& f_Gamma, double sigma,instat_scalar_fun_ptr cangle,instat_vector_fun_ptr outnormal)
      :  SmPhi_(ls.Phi),lsetbnd_(ls.GetBndData()),f(f_Gamma), sigma_(sigma),angle_(cangle),outnormal_(outnormal)
     { ls.MaybeSmooth( SmPhi_.Data);
     //P2DiscCL::GetGradientsOnRef( GradRef);
@@ -676,8 +676,8 @@ void YoungForceAccumulatorCL::visit ( const TetraCL& t)
         	{
         		quadBarys[j]=(Barys[0]+Barys[1])/2+qupt[j]*(Barys[1]-Barys[0])/2;
         		midpt=(pt0+pt1)/2 + qupt[j]*(pt1-pt0)/2;
-        		costheta[j]=cos(angle_(midpt));
-        		outnormalOnMcl[j]=outnormal_(midpt);
+        		costheta[j]=cos(angle_(midpt,0));
+        		outnormalOnMcl[j]=outnormal_(midpt,0);
         	}
 
 
@@ -718,8 +718,8 @@ class ImprovedYoungForceAccumulatorCL : public  TetraAccumulatorCL
     InterfaceTriangleCL triangle;
 
     const double sigma_;
-    scalar_fun_ptr angle_;	//Young's contact angle
-    vector_fun_ptr outnormal_;//outnormal of the domain boundary
+    instat_scalar_fun_ptr angle_;	//Young's contact angle
+    instat_vector_fun_ptr outnormal_;//outnormal of the domain boundary
 
     bool SpeBnd; //special boundary condition
 
@@ -729,7 +729,7 @@ class ImprovedYoungForceAccumulatorCL : public  TetraAccumulatorCL
  //   LocalP2CL<> loc_phi;
 
   public:
-    ImprovedYoungForceAccumulatorCL( const LevelsetP2CL& ls, VecDescCL& f_Gamma, double sigma,scalar_fun_ptr cangle,vector_fun_ptr outnormal)
+    ImprovedYoungForceAccumulatorCL( const LevelsetP2CL& ls, VecDescCL& f_Gamma, double sigma,instat_scalar_fun_ptr cangle,instat_vector_fun_ptr outnormal)
      :  SmPhi_(ls.Phi),lsetbnd_(ls.GetBndData()),f(f_Gamma), sigma_(sigma),angle_(cangle),outnormal_(outnormal)
     { ls.MaybeSmooth( SmPhi_.Data);
     //P2DiscCL::GetGradientsOnRef( GradRef);
@@ -822,9 +822,9 @@ void ImprovedYoungForceAccumulatorCL::visit ( const TetraCL& t)
         		normal_mcl[j] = triangle.GetImprovedMCLNormal(i,(qupt[j]+1)/2);
         		quadBarys[j]=(Barys[0]+Barys[1])/2+qupt[j]*(Barys[1]-Barys[0])/2;
         		midpt=(pt0+pt1)/2 + qupt[j]*(pt1-pt0)/2;
-        		costheta[j]=SymBnd ? 0 : cos(angle_(midpt));
+        		costheta[j]=SymBnd ? 0 : cos(angle_(midpt,0));
         		sintheta_D[j]=SymBnd ? 1 : sin(triangle.GetImprovedActualContactAngle(i,(qupt[j]+1)/2));
-        		outnormalOnMcl[j]=outnormal_(midpt);
+        		outnormalOnMcl[j]=outnormal_(midpt,0);
         	}
 
         	for (int v=0; v<10; ++v)
@@ -1149,6 +1149,145 @@ void LevelsetP2CL::AccumulateYoungForce( VecDescCL& f) const
     accumulate( accus, MG_, Phi.RowIdx->TriangLevel(), Phi.RowIdx->GetMatchingFunction(), Phi.RowIdx->GetBndInfo());
 }
 
+//>to do for parallel programe, we need add all values in different process
+double LevelsetP2CL::GetInterfaceArea() const
+{
+	InterfaceTriangleCL triangle;
+	const DROPS::Uint lvl = idx.TriangLevel();
+	BndDataCL lsetbnd = GetBndData();
+	double area = 0;
+	DROPS_FOR_TRIANG_TETRA( MG_, lvl, it){
+		triangle.Init( *it, Phi, lsetbnd);
+		for(int ch=0;ch<8;++ch)
+		{
+			if (!triangle.ComputeForChild(ch)) // no patch for this child
+		            continue;
+			for(int v=0;v<triangle.GetNumTriangles();v++)
+				area += triangle.GetAbsDet(v);
+		}
+	}
+	return area*0.5;
+}
+
+//>to do for parallel programe, we need add all values in different process
+double LevelsetP2CL::GetWetArea() const
+{
+	InterfaceTriangleCL triangle;
+	const DROPS::Uint lvl = idx.TriangLevel();
+	BndDataCL lsetbnd=GetBndData();
+	BndTriangPartitionCL 	  bndpartition_;
+    QuadDomainCL              bndq5dom_;
+    PrincipalLatticeCL lat= PrincipalLatticeCL::instance( 2);
+    std::valarray<double>     ls_loc(lat.vertex_size());
+	double area = 0;
+	GridFunctionCL<> qpr;
+	LocalP2CL<> ls_loc0;
+	DROPS_FOR_TRIANG_TETRA( MG_, lvl, it){
+
+		for(Uint v=0; v<4; v++)
+		{
+			if(lsetbnd.GetBC(*it->GetFace(v))==Slip0BC||lsetbnd.GetBC(*it->GetFace(v))==SlipBC)
+		  	{
+				ls_loc0.assign( *it, Phi, BndData_);
+				const bool noCut= equal_signs(ls_loc0);
+				if(noCut)
+				{
+					if(ls_loc0[0]>0) continue;
+					const FaceCL& face = *it->GetFace(v);
+				    double absdet = FuncDet2D(	face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
+				                                face.GetVertex(2)->GetCoord()-face.GetVertex(0)->GetCoord());
+				    area += absdet/2;
+				}
+				else
+				{
+					evaluate_on_vertexes( GetSolution(), *it, lat, Addr( ls_loc));
+					//Does this partition work for no cut situations??
+					bndpartition_.make_partition2D<SortedVertexPolicyCL, MergeCutPolicyCL>( lat, v, ls_loc);
+					make_CompositeQuad5BndDomain2D( bndq5dom_, bndpartition_,*it);
+
+					LocalP1CL<double> fun;
+					for (Uint i= 0; i<3; ++i)	fun[i]=1.0;
+					resize_and_evaluate_on_vertexes(fun, bndq5dom_, qpr);
+					area += quad( qpr, bndq5dom_, NegTetraC);
+				}
+			}
+		}
+	}
+	return area;
+}
+//>to do for parallel programe, we need add all values in different process
+double LevelsetP2CL::GetSurfaceEnergy() const
+{
+	InterfaceTriangleCL triangle;
+	const DROPS::Uint lvl = idx.TriangLevel();
+	BndDataCL lsetbnd = GetBndData();
+	instat_scalar_fun_ptr surface_tension = sf_.GetSigma();
+	DROPS::Quad5_2DCL<> sfdensity0,sfdensity1;
+
+	BndTriangPartitionCL 	  bndpartition_;
+    QuadDomainCL              bndq5dom;
+    PrincipalLatticeCL lat= PrincipalLatticeCL::instance( 2);
+    std::valarray<double>     ls_loc(lat.vertex_size());
+
+	GridFunctionCL<> qpr;
+	BaryCoordCL bary[3];
+	double sftn = surface_tension(std_basis<3>(0),0); //>to do: compute standard surface for general case
+	double total_energy1=0,total_energy2=0;
+	DROPS_FOR_TRIANG_TETRA( MG_, lvl, it){
+		triangle.Init( *it, Phi, lsetbnd);
+		for(int ch=0;ch<8;++ch)
+		{
+			if (!triangle.ComputeForChild(ch)) // no patch for this child
+		            continue;
+			for(int tri=0;tri<triangle.GetNumTriangles();tri++)
+			{
+				sfdensity0.assign(  *it, &triangle.GetBary( tri), surface_tension,0);
+				total_energy1 += sfdensity0.quad( triangle.GetAbsDet( tri));
+			}
+		}
+
+		for(Uint v=0; v<4; v++)
+		{
+			if(lsetbnd.GetBC(*it->GetFace(v))==Slip0BC||lsetbnd.GetBC(*it->GetFace(v))==SlipBC)
+			{
+						//ls_loc0.assign( *it, Phi, BndData_);
+						evaluate_on_vertexes( GetSolution(), *it, lat, Addr( ls_loc));
+						const bool noCut= equal_signs(ls_loc);
+						if(noCut)
+						{
+							if(ls_loc[0]>0) continue;
+							const FaceCL& face = *it->GetFace(v);
+							for (Uint i= 0; i<3; ++i)
+							{
+								bary[i][VertOfFace(v, i)]=1;
+							}
+							sfdensity1.assign(*it, bary, CA_,0 );
+							for(Uint s=0;s<sfdensity1.size();s++)
+								sfdensity1[s]=std::cos(sfdensity1[s]);//??
+
+						    double absdet = FuncDet2D(	face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
+						                                face.GetVertex(2)->GetCoord()-face.GetVertex(0)->GetCoord());
+						    total_energy2 += -sftn*sfdensity1.quad(absdet);
+						}
+						else
+						{
+
+							//Does this partition work for no cut situations??
+							bndpartition_.make_partition2D<SortedVertexPolicyCL, MergeCutPolicyCL>( lat, v, ls_loc);
+							make_CompositeQuad5BndDomain2D( bndq5dom, bndpartition_,*it);
+
+							resize_and_evaluate_on_vertexes(CA_,*it, bndq5dom,0, qpr);//???
+							for(Uint s=0;s<qpr.size();s++)
+								qpr[s]=std::cos(qpr[s]);//??
+							total_energy2 += -sftn*quad( qpr, bndq5dom, NegTetraC);
+						}
+			}
+		}
+
+	}
+	//std::cout<<total_energy1<<"  "<<total_energy2<<std::endl;
+	return total_energy1+total_energy2;
+}
 double LevelsetP2CL::GetVolume( double translation, int l) const
 {
     if (l==0)

@@ -76,7 +76,7 @@ void InterfacePatchCL::BInit( const TetraCL& t, const VecDescCL& ls,const BndDat
         Coord_[v]= v<4 ? t.GetVertex(v)->GetCoord() : GetBaryCenter( *t.GetEdge(v-4));
         sign_[v]= Sign(PhiLoc_[v]);
     }
-    double dir;
+
     for(Uint v=0; v<4; v++)
     {
     	BC_Face_[v] =  lsetbnd.GetBC(*t.GetFace(v));
@@ -714,7 +714,7 @@ Quad5_2DCL<Point3DCL> InterfaceTriangleCL::GetImprovedNormal(Uint n) const
 
 	return normal;
 }
-void InterfaceTriangleCL::SetBndOutNormal(vector_fun_ptr outnormal)
+void InterfaceTriangleCL::SetBndOutNormal(instat_vector_fun_ptr outnormal)
 {
 	outnormal_=outnormal;
 }
@@ -772,7 +772,7 @@ Point3DCL InterfaceTriangleCL::GetMCLNormal(Uint v) const
 	//Point3DCL tau=PQRS_[(IdxMCL_[v]+1)%intersec_]-PQRS_[IdxMCL_[v]];
 	Point3DCL tau=PQRS_[IdxMCL_[v][1]]-PQRS_[IdxMCL_[v][0]];
 	tau=tau/tau.norm();
-	cross_product(n, tau, outnormal_(midpt));
+	cross_product(n, tau, outnormal_(midpt,0));
 
 	if(inner_prod(GetNormal(),n)>=0)
 		return n/n.norm();
@@ -786,7 +786,7 @@ Point3DCL InterfaceTriangleCL::GetImprovedMCLNormal(Uint v,double bary1D) const
 	
 	Point3DCL mpt = PQRS_[IdxMCL_[v][0]] + bary1D*(PQRS_[IdxMCL_[v][1]]-PQRS_[IdxMCL_[v][0]]);
 //	BaryCoordCL bary = Bary_[IdxMCL_[v]]+  bary1D*(Bary_[(IdxMCL_[v]+1)%intersec_]-Bary_[IdxMCL_[v]]);
-	Point3DCL n=outnormal_(mpt);//out normal of the domain boundary
+	Point3DCL n=outnormal_(mpt,0);//out normal of the domain boundary
 
 /*
 	//BEGIN to compute the outnormal of the level-set
@@ -836,13 +836,13 @@ double InterfaceTriangleCL::GetActualContactAngle(Uint v) const
 {
 	//Point3DCL midpt = (PQRS_[IdxMCL_[v]]+PQRS_[(IdxMCL_[v]+1)%intersec_])/2;
 	Point3DCL midpt = (PQRS_[IdxMCL_[v][0]]+PQRS_[IdxMCL_[v][1]])/2;
-	return M_PI - acos(inner_prod(GetNormal(),outnormal_(midpt)));
+	return M_PI - acos(inner_prod(GetNormal(),outnormal_(midpt,0)));
 }
 double InterfaceTriangleCL::GetImprovedActualContactAngle(Uint v,double bary1D) const
 {
 	//Point3DCL mpt = PQRS_[IdxMCL_[v]] + bary1D*(PQRS_[(IdxMCL_[v]+1)%intersec_]-PQRS_[IdxMCL_[v]]);
 	Point3DCL mpt = PQRS_[IdxMCL_[v][0]] + bary1D*(PQRS_[IdxMCL_[v][1]]-PQRS_[IdxMCL_[v][0]]);	
-	return M_PI - acos(inner_prod(GetImprovedNormalOnMCL(v,bary1D),outnormal_(mpt)));
+	return M_PI - acos(inner_prod(GetImprovedNormalOnMCL(v,bary1D),outnormal_(mpt,0)));
 }
 
 LocalP2CL<double> ProjectIsoP2ChildToParentP1 (LocalP2CL<double> lpin, Uint child){

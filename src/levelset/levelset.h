@@ -91,8 +91,8 @@ class LevelsetP2CL : public ProblemCL< LevelsetCoeffCL, LsetBndDataCL>
     SurfaceForceT       SF_;
 
     SurfaceTensionCL&   sf_;      ///< data for surface tension
-    scalar_fun_ptr CA_;		    ///<Young's contact angle on domain boundary
-    vector_fun_ptr Bndoutnormal_; ///outnormal of domain boundary
+    instat_scalar_fun_ptr CA_;		    ///<Young's contact angle on domain boundary
+    instat_vector_fun_ptr Bndoutnormal_; ///outnormal of domain boundary
 
     void SetupSmoothSystem ( MatrixCL&, MatrixCL&)               const;
     void SmoothPhi( VectorCL& SmPhi, double diff)                const;
@@ -169,12 +169,20 @@ LevelsetP2CL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, F
     void   SetSurfaceForce( SurfaceForceT SF) { SF_= SF; }
     /// Get type of surface force.
     SurfaceForceT GetSurfaceForce() const { return SF_; }
+
+    ///returns the area of the two-phase flow interface(\phi=0)
+    double GetInterfaceArea() const;
+    ///returns the area of the solid-liquid(phi<0) interface
+    double GetWetArea() const;
+    /// returns the "total energy energy" including the two-phase interface energy and the solid-liquid(phi<0) interface energy
+    double GetSurfaceEnergy() const;
+
     /// Discretize surface force
     void   AccumulateBndIntegral( VecDescCL& f) const;
     /// Set contact angle function(defined only on boundary).
-    void   SetYoungAngle(scalar_fun_ptr CA) { CA_= CA; }
+    void   SetYoungAngle(instat_scalar_fun_ptr CA) { CA_= CA; }
     ///Set  out normal function
-    void   SetBndOutNormal(vector_fun_ptr outnormal) { Bndoutnormal_= outnormal; }
+    void   SetBndOutNormal(instat_vector_fun_ptr outnormal) { Bndoutnormal_= outnormal; }
     ///Discretize Young Force on the three-phase contact line
     void   AccumulateYoungForce( VecDescCL& f) const;
     /// Clear all matrices, should be called after grid change to avoid reuse of matrix pattern

@@ -1425,7 +1425,7 @@ void SpecialBndHandler_System1OnePhaseP2CL::setup(const TetraCL& tet, const SMat
 	}
 }
 
-//for no homogenour slip boundary condition (the slip wall is moving)
+//for non homogeneous slip boundary condition (the slip wall is moving)
 void SpecialBndHandler_System1OnePhaseP2CL::setupRhs(const TetraCL& tet, Point3DCL loc_b[10], double t)
 {
 	for (Uint k =0; k< 4; ++k){ //Go throught all faces of a tet
@@ -1898,7 +1898,7 @@ void System1Accumulator_P2CL::local_setup (const TetraCL& tet)
         }
         if(speBnd)
         {
-        	if (noCut)
+        	//if (noCut)
 				speBndHandler1.setupRhs(tet, loc_b, t);
             //else
 		    //	speBndHandler1.setupRhs(tet, loc_b);//<not used for now --need modification when the slip length is different in the two phase flow
@@ -3636,6 +3636,59 @@ void InstatStokes2PhaseP2P1CL::CheckTwoPhaseSolution(const VelVecDescCL* DescVel
          std::cout << "---------------------Discretize error-------------------"
 		           <<"\n || u_h - u ||_L2 = " <<  L2_vel 
 				   <<"\n || p_h - p ||_L2 = " << L2_pr << std::endl;	
+}
+
+///> To do, parallel case
+double InstatStokes2PhaseP2P1CL::GetKineticEnergy(const LevelsetP2CL& lset) const
+{
+	const DROPS::Uint lvl = vel_idx.TriangLevel();
+	const PrincipalLatticeCL lat(PrincipalLatticeCL::instance(2));
+    std::valarray<double> ls_loc(lat.vertex_size());
+    Quad5CL<Point3DCL> q5_vel;
+    Quad5CL<double> q5_vel_sq;
+    SMatrixCL<3,3> T;
+    double det;
+
+	TetraPartitionCL partition;
+	QuadDomainCL q5dom;
+
+	GridFunctionCL<Point3DCL> qvel;
+	GridFunctionCL<double> qvel_sq;
+	const_DiscVelSolCL vel =  GetVelSolution(v);
+	double energy(0.0);
+	double pos,neg;
+	double trash;
+	double prho =Coeff_.rho(1.),nrho=Coeff_.rho(-1.);
+	DROPS_FOR_TRIANG_TETRA( MG_, lvl, it){
+
+		GetTrafoTr(T,det,*it);
+		const double absdet= std::fabs(det);
+		evaluate_on_vertexes( lset.GetSolution(), *it, lat, Addr( ls_loc));
+		const bool noCut= equal_signs( ls_loc);
+
+		LocalP2CL<Point3DCL> loc_vel(*it, vel);
+
+		if(noCut)
+		{
+			q5_vel.assign(loc_vel);
+			q5_vel_sq=dot(q5_vel,q5_vel);
+			if(ls_loc[0]>0)
+				energy += q5_vel_sq.quad(absdet)*prho;
+			else
+				energy += q5_vel_sq.quad(absdet)*nrho;
+		}
+		else{
+			partition.make_partition<SortedVertexPolicyCL, MergeCutPolicyCL>( lat, ls_loc);
+			make_CompositeQuad5Domain( q5dom, partition);
+
+			resize_and_evaluate_on_vertexes( loc_vel, q5dom, qvel);
+			qvel_sq=dot(qvel,qvel);
+			quad (qvel_sq , absdet, q5dom, trash, pos);
+			quad (qvel_sq , absdet, q5dom, neg, trash);
+			energy += pos*prho + neg*nrho;
+		}
+	}
+	return std::sqrt(energy);
 }
 
 /*void InstatStokes2PhaseP2P1CL::SetupVelError(const instat_vector_fun_ptr RefVel)
