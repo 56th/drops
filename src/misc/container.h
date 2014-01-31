@@ -251,6 +251,13 @@ class SVectorCL : public SArrayCL<double,_Size>
     SVectorCL()                                                             {}
     explicit           SVectorCL(InitStateT i)      : base_type( i)         {}
     explicit           SVectorCL(double val)        : base_type( val)       {}
+    // constructors for Point3D/Point4D/BaryCoordCL 
+    // (constructor throws Exception if number of arg. does not coincide with _Size)
+    explicit SVectorCL(double arg1, double arg2, double arg3);
+    explicit SVectorCL(double arg1, double arg2, double arg3, double arg4);
+    template<Uint _Size2>
+    explicit SVectorCL(SVectorCL<_Size2> arg1, double arg2);
+
     template<class In> explicit SVectorCL(In start) : base_type( start)     {}
     template<class In> SVectorCL(In start, In end)  : base_type( start,end) {}
 
@@ -266,6 +273,42 @@ class SVectorCL : public SArrayCL<double,_Size>
     double norm_sq() const;
     double norm()    const { return std::sqrt(norm_sq()); }
 };
+
+
+template <Uint _Size>
+template <Uint _Size2>
+inline SVectorCL<_Size>::SVectorCL(SVectorCL<_Size2> arg1, double arg2) : base_type( Uninitialized )
+{
+    if (_Size != _Size2+1) // <- this is optimized away
+    {
+        throw DROPSErrCL("SVectorCL-classes have wrong size for constructor");
+    }
+    for (Uint i = 0; i < _Size2; i++)
+        (*this)[i] = arg1[i];
+    (*this)[_Size2] = arg2;
+}
+
+template <Uint _Size>
+inline SVectorCL<_Size>::SVectorCL(double arg1, double arg2, double arg3) : base_type( Uninitialized )
+{
+    if (_Size != 3) // <- this is optimized away
+        throw DROPSErrCL("SVectorCL-class has wrong size for constructor, number of args : 3");
+    (*this)[0] = arg1;
+    (*this)[1] = arg2;
+    (*this)[2] = arg3;
+}
+
+template <Uint _Size>
+inline SVectorCL<_Size>::SVectorCL(double arg1, double arg2, double arg3, double arg4) : base_type( Uninitialized )
+{
+    if (_Size != 4) // <- this is optimized away
+        throw DROPSErrCL("SVectorCL-class has wrong size for constructor, number of args : 4");
+    (*this)[0] = arg1;
+    (*this)[1] = arg2;
+    (*this)[2] = arg3;
+    (*this)[3] = arg4;
+}
+
 
 
 template <Uint _Size>
