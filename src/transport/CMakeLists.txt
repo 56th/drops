@@ -10,6 +10,7 @@ exec_ser(ns_transp
     geom-boundary geom-builder geom-multigrid
     geom-deformation
     num-unknowns geom-topo num-fe misc-problem levelset-levelset
+    levelset-adaptriang levelset-marking_strategy
     misc-scopetimer misc-progressaccu
     misc-utils out-output num-discretize
     navstokes-instatnavstokes2phase misc-scalarFunctions

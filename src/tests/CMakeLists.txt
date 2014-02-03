@@ -73,10 +73,10 @@ exec_ser(extendP1onChild num-discretize misc-utils geom-topo num-fe misc-problem
 
 exec_ser(splitboundary geom-boundary geom-builder geom-simplex geom-multigrid geom-deformation num-unknowns misc-utils geom-topo out-output num-fe misc-problem num-interfacePatch)
 
-exec_ser(reparam_init geom-boundary geom-builder geom-simplex geom-multigrid geom-deformation misc-scopetimer misc-progressaccu num-unknowns misc-utils geom-topo out-output misc-problem levelset-levelset num-fe misc-utils misc-params num-discretize num-interfacePatch levelset-fastmarch levelset-surfacetension out-ensightOut geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature)
+exec_ser(reparam_init geom-boundary geom-builder geom-simplex geom-multigrid geom-deformation misc-scopetimer misc-progressaccu num-unknowns misc-utils geom-topo out-output misc-problem levelset-levelset levelset-adaptriang levelset-marking_strategy num-fe misc-utils misc-params num-discretize num-interfacePatch levelset-fastmarch levelset-surfacetension out-ensightOut geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature)
 
 #reparam renamed to reparamtest
-exec_ser(reparamtest levelset-fastmarch levelset-levelset geom-deformation misc-scopetimer misc-progressaccu geom-simplex geom-multigrid geom-builder geom-topo geom-boundary num-unknowns misc-utils misc-problem num-discretize num-fe out-ensightOut num-interfacePatch levelset-surfacetension misc-params out-vtkOut geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature misc-dynamicload) ##${PAR_OBJ}
+exec_ser(reparamtest levelset-fastmarch levelset-levelset levelset-adaptriang levelset-marking_strategy geom-deformation misc-scopetimer misc-progressaccu geom-simplex geom-multigrid geom-builder geom-topo geom-boundary num-unknowns misc-utils misc-problem num-discretize num-fe out-ensightOut num-interfacePatch levelset-surfacetension misc-params out-vtkOut geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature misc-dynamicload) ##${PAR_OBJ}
 if(NOT MPI)
     add_dependencies(reparamtest levelset-twophaseCoeff misc-scalarFunctions misc-vectorFunctions)
 endif(NOT MPI)

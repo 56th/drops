@@ -31,7 +31,7 @@
 #include "out/ensightOut.h"
 #include "levelset/coupling.h"
 #include "levelset/adaptriang.h"
-#include "levelset/dist_marking_strategy.h"
+#include "levelset/marking_strategy.h"
 #include "levelset/mzelle_hdr.h"
 #include "levelset/surfacetension.h"
 #include "num/stokessolverfactory.h"
@@ -479,7 +479,7 @@ int main (int argc, char** argv)
 
     DROPS::EllipsoidCL::Init( P.get<DROPS::Point3DCL>("Exp.PosDrop"), P.get<DROPS::Point3DCL>("Exp.RadDrop") );
 
-    typedef DROPS::DistMarkingStrategyCL<DROPS::instat_scalar_fun_ptr> MarkerT;
+    typedef DROPS::DistMarkingStrategyCL MarkerT;
     MarkerT marker( DROPS::EllipsoidCL::DistanceFct, P.get<double>("AdaptRef.Width"),
                     P.get<int>("AdaptRef.CoarsestLevel"), P.get<int>("AdaptRef.FinestLevel") ); 
     DROPS::AdapTriangCL adap( mg, &marker );

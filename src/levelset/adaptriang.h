@@ -49,7 +49,8 @@ namespace DROPS
  * or refinement.
  *
  * Given such a marking strategy, this class does everything that's needed to
- * adapt a given multigrid hierarchy.
+ * adapt a given multigrid hierarchy. The AdapTriangCL only stores a pointer to
+ * a marking strategy, it does *not* call delete on that pointer.
  */
 class AdapTriangCL
 {

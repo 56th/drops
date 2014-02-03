@@ -36,7 +36,7 @@
 #include "out/vtkOut.h"
 //levelset
 #include "levelset/coupling.h"
-#include "levelset/dist_marking_strategy.h"
+#include "levelset/marking_strategy.h"
 #include "levelset/adaptriang.h"
 #include "levelset/mzelle_hdr.h"
 #include "levelset/twophaseutils.h"
@@ -440,6 +440,12 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     const double dt = P.get<double>("Time.StepSize");
     double time = 0.0;
     
+    typedef DistMarkingStrategyCL MarkerT;
+    MarkerT marker( lset,
+                    P.get<double>("AdaptRef.Width"),
+                    P.get<double>("AdaptRef.CoarsestLevel"), P.get<double>("AdaptRef.FinestLevel") );
+    adap.set_marking_strategy(&marker);
+
     for (int step= 1; step<=nsteps; ++step)
     {
         std::cout << "============================================================ step " << step << std::endl;
@@ -465,11 +471,6 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         bool gridChanged= false;
         if (doGridMod)
         {
-            typedef DistMarkingStrategyCL<LevelsetP2CL> MarkerT;
-            MarkerT marker( &lset,
-                            P.get<double>("AdaptRef.Width"),
-                            P.get<double>("AdaptRef.CoarsestLevel"), P.get<double>("AdaptRef.FinestLevel") );
-            adap.set_marking_strategy(&marker);
             gridChanged = adap.UpdateTriang();
         }
         // downwind-numbering for Navier-Stokes
@@ -652,10 +653,10 @@ int main (int argc, char** argv)
         DROPS::CylinderCL::Init( P.get<DROPS::Point3DCL>("Exp.PosDrop"), P.get<DROPS::Point3DCL>("Exp.RadDrop"), InitialLSet[8]-'X');
         P.put("Exp.InitialLSet", InitialLSet= "Cylinder");
     }
-    typedef DROPS::DistMarkingStrategyCL<DROPS::instat_scalar_fun_ptr> InitialMarkerT;
-    InitialMarkerT InitialMarker( DROPS::InScaMap::getInstance()[InitialLSet],
-                                  P.get<double>("AdaptRef.Width"),
-                                  P.get<double>("AdaptRef.CoarsestLevel"), P.get<double>("AdaptRef.FinestLevel") );
+    typedef DROPS::DistMarkingStrategyCL MarkerT;
+    MarkerT InitialMarker( DROPS::InScaMap::getInstance()[InitialLSet],
+                           P.get<double>("AdaptRef.Width"),
+                           P.get<double>("AdaptRef.CoarsestLevel"), P.get<double>("AdaptRef.FinestLevel") );
 
     DROPS::AdapTriangCL adap( *mg, &InitialMarker,
                               ((P.get<std::string>("Restart.Inputfile") == "none") ? P.get<int>("AdaptRef.LoadBalStrategy") : -P.get<int>("AdaptRef.LoadBalStrategy")));

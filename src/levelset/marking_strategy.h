@@ -25,23 +25,38 @@
 #define MARKING_STRATEGY_H
 
 #include "num/accumulator.h"
+#include "num/discretize.h" // For instat_scalar_fun_ptr.
 
 #include <vector>
-#include <limits>
 
 namespace DROPS
 {
 
+
+enum MarkingDecisionT { CoarsenC, RefineC, KeepC, DontCareC };
+
 /*!
- * \brief The base class for all marking strategies.
+ * \brief Base class for all marking strategies.
  *
- * This class provides the interface for all marking strategies. On input, a
- * marking strategy's visit function expects a tetrahedron which is marked as
- * 'NoRefMark'. This is true when it is used in the AdapTriangCL. It can then
- * choose between three options: change the mark to RegRefMark, change the mark
- * to RemoveMark, or do not touch the mark.
- * 
- * If a mark was changed, the modified() function will return true afterwards.
+ * This class represents the interface that is common to all marking strategies.
+ * A marking strategy is a TetraAccumulatorCL that performs the following tasks:
+ * <ol>
+ * <li>Make a decision what to do about a given tetrahedron. This decision is
+ *     one out of:
+ * <ul>
+ * <li><b>CoarsenC:</b> the tetrahedron should be "coarsened".
+ * <li><b>RefineC:</b> the tetrahedron should be refined.
+ * <li><b>KeepC:</b> the tetrahedron should neither be coarsend nor refined.
+ * <li><b>DontCareC:</b> it doesn't matter what happens to the tetrahedron.
+ * </ul>
+ * </li>
+ * <li>The decision is stored and can be retrieved using the "GetDecision" member.</li>
+ * <li>Set the mark of the tetrahedron accordingly, if necessary.</li>
+ * <li>If the mark of the tetrahedron was changed, set the status to modified.</li>
+ * </ol>
+ *
+ * On input, it is expected that the mark of the tetrahedron is set to
+ * NoRefMark.
  */
 class MarkingStrategyCL: public TetraAccumulatorCL
 {
@@ -49,102 +64,114 @@ public:
     virtual ~MarkingStrategyCL() {}
     virtual  void visit( const TetraCL& t ) = 0;
     virtual  TetraAccumulatorCL* clone (int clone_id) = 0;
+    virtual  MarkingStrategyCL*  clone_strategy() = 0;
 
     virtual  bool modified() const = 0;
     virtual  void SetUnmodified() = 0;
+
+    virtual  MarkingDecisionT GetDecision() const = 0;
 
     virtual  Uint GetFineLevel() const = 0;
     virtual  Uint GetCoarseLevel() const = 0;
 };
 
 
+
+
 /*!
- * \brief Combine various marking strategies into one.
+ * \brief Combines several MarkingStrategyCL into one.
  *
- * AdapTriangCL always uses a single marking strategy. This class can be used
- * to combine arbitrary many marking strategies into a single one. It uses a
- * simple approach: for a given tetrahedron, mark it as RegRefMark if only one
- * strategy does so. Only mark it with RemoveMark if no stratetgy sets RegRefMark
- * and at least one strategy sets RemoveMark.
+ * This class can be used for combining various marking strategies into a
+ * single one. In order to do so, it stores *copies* of given marking strategies.
+ * Based on the decisions returned by GetDecision() of these strategies, it then
+ * decides what to do to a tetrahedron. It implements a "Refinement always wins"
+ * approach.
  */
 class StrategyCombinerCL: public MarkingStrategyCL
 {
 public:
+    StrategyCombinerCL(); 
+    StrategyCombinerCL( const StrategyCombinerCL &rhs );
+    ~StrategyCombinerCL();
+
+    StrategyCombinerCL& operator=( const StrategyCombinerCL& rhs );
+
     void visit( const TetraCL& t );
     TetraAccumulatorCL* clone( int );
+    MarkingStrategyCL*  clone_strategy();
 
     bool modified() const;
     void SetUnmodified();
 
+    MarkingDecisionT GetDecision() const;
+
     Uint GetFineLevel() const;
     Uint GetCoarseLevel() const;
 
-    void push( MarkingStrategyCL* s );
-    MarkingStrategyCL* pop(); 
+    bool empty();
+    void push_back( MarkingStrategyCL &s );
+    void pop_back(); 
 
 private:
     bool modified_;
+    MarkingDecisionT decision_;
     std::vector<MarkingStrategyCL*> strategies_;
 };
 
-inline
-TetraAccumulatorCL* StrategyCombinerCL::clone( int )
+
+
+
+class LevelsetP2CL;
+class EdgeCL;
+class VertexCL;
+class ValueGetterCL;
+
+/*!
+ * \brief Refinement strategy according to a levelset function.
+ *
+ * This marking strategy refines the mesh arount the zero level of a given
+ * levelset function.
+ */
+class DistMarkingStrategyCL: public MarkingStrategyCL
 {
-    return new StrategyCombinerCL(*this);
-}
+public:
+    DistMarkingStrategyCL( instat_scalar_fun_ptr fct,
+                           double width, Uint coarse_level, Uint fine_level,
+                           double time = 0. );
+    DistMarkingStrategyCL( const LevelsetP2CL &fct,
+                           double width, Uint coarse_level, Uint fine_level );
+    DistMarkingStrategyCL( const DistMarkingStrategyCL &rhs );
+    ~DistMarkingStrategyCL();
+    DistMarkingStrategyCL& operator=( const DistMarkingStrategyCL& rhs );
+    TetraAccumulatorCL* clone( int );
+    MarkingStrategyCL*  clone_strategy();
 
-inline
-bool StrategyCombinerCL::modified() const
-{
-    return modified_;
-}
+    void visit( const TetraCL& t );
 
-inline
-void StrategyCombinerCL::SetUnmodified()
-{
-    modified_ = false;
-}
+    bool modified() const;
+    void SetUnmodified();
 
-inline
-Uint StrategyCombinerCL::GetFineLevel() const
-{
-    Uint result = 0;
-    for ( Uint i = 0; i < strategies_.size(); ++i )
-    {
-        result = std::max( result, strategies_[ i ]->GetFineLevel() );
-    }
-    return result;
-}
+    MarkingDecisionT GetDecision() const;
 
-inline
-Uint StrategyCombinerCL::GetCoarseLevel() const
-{
-    if ( strategies_.size() == 0 ) return 0;
+    void SetDistFct( instat_scalar_fun_ptr fct, double time = 0 );
+    void SetDistFct( const LevelsetP2CL& fct );
 
-    Uint result = std::numeric_limits<Uint>::max();
-    for ( Uint i = 0; i < strategies_.size(); ++i )
-    {
-        result = std::min( result, strategies_[ i ]->GetCoarseLevel() );
-    }
-    return result;
-}
+    double GetWidth() const;
+    void   SetWidth( double width );
+    Uint   GetCoarseLevel() const;
+    void   SetCoarseLevel( Uint level );
+    Uint   GetFineLevel() const;
+    void   SetFineLevel( Uint level ); 
 
-inline
-void StrategyCombinerCL::push( MarkingStrategyCL *s )
-{
-    strategies_.push_back( s );
-}
-
-inline
-MarkingStrategyCL* StrategyCombinerCL::pop()
-{
-    if ( strategies_.size() == 0 ) return 0;
-
-    MarkingStrategyCL *result = strategies_.back();
-    strategies_.pop_back();
-    return result;
-}
-
+private:
+    ValueGetterCL *getter_;
+    double width_;
+    Uint c_level_;
+    Uint f_level_;
+    bool modified_;
+    MarkingDecisionT decision_;
+};
+ 
 }
 
 #endif

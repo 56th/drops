@@ -25,6 +25,7 @@
 #include <fstream>
 #include "levelset/levelset.h"
 #include "levelset/fastmarch.h"
+#include "levelset/marking_strategy.h"
 #include "levelset/adaptriang.h"
 #include "misc/params.h"
 #include "levelset/surfacetension.h"
@@ -348,19 +349,28 @@ int main( int argc, char **argv)
 
         mg= new DROPS::MultiGridCL( mgb);
 
-        DROPS::AdapTriangCL adap( *mg, P.get<double>("AdaptRef.Width"), P.get<int>("AdaptRef.CoarsestLevel"), P.get<int>("AdaptRef.FinestLevel"), -1);
+        DROPS::AdapTriangCL adap( *mg, 0, -1 );
 
         DROPS::EllipsoidCL::Init( P.get<DROPS::Point3DCL>("Exp.PosDrop"), P.get<DROPS::Point3DCL>("Exp.RadDrop"));
         DROPS::HorizontalSlicesCL::Init( P.get<int>("Reparam.Freq"), P.get<DROPS::Point3DCL>("Brick.orig")[1], P.get<DROPS::Point3DCL>("Brick.orig")[1]+P.get<DROPS::Point3DCL>("Brick.dim")[1] );
         DROPS::TorusCL::Init( P.get<DROPS::Point3DCL>("Exp.RadDrop")[0], P.get<DROPS::Point3DCL>("Exp.RadDrop")[1]);
         DROPS::instat_scalar_fun_ptr distance= P.get<int>("Reparam.Freq")>0 ? DROPS::HorizontalSlicesCL::DistanceFct : DROPS::EllipsoidCL::DistanceFct;
-        adap.MakeInitialTriang( distance);
+
+        typedef DROPS::DistMarkingStrategyCL MarkerT;
+        MarkerT marker( distance, P.get<double>("AdaptRef.Width" ),
+                        P.get<int>("AdaptRef.CoarsestLevel"),
+                        P.get<int>("AdaptRef.FinestLevel") ); 
+
+        adap.set_marking_strategy( &marker );
+        adap.MakeInitialTriang();
 
         const DROPS::BndCondT bcls[6]= { DROPS::NoBC, DROPS::NoBC, DROPS::NoBC, DROPS::NoBC, DROPS::NoBC, DROPS::NoBC };
         const DROPS::LsetBndDataCL::bnd_val_fun bfunls[6]= { 0,0,0,0,0,0};
         DROPS::LsetBndDataCL lsbnd( 6, bcls, bfunls);
 
         DROPS::Strategy( adap, lsbnd);
+
+        adap.set_marking_strategy( 0 );
 
         std::cout << " reparamtest finished regularly" << std::endl;
     } catch (DROPS::DROPSErrCL err) {
