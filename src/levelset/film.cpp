@@ -34,6 +34,7 @@
 //levelset
 #include "levelset/coupling.h"
 #include "levelset/adaptriang.h"
+#include "levelset/marking_strategy.h"
 #include "levelset/mzelle_hdr.h"
 #include "levelset/twophaseutils.h"
 //surfactants
@@ -336,6 +337,11 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
 
     const int nsteps = P.get<int>("Time.NumSteps");
     const double dt = P.get<double>("Time.StepSize");
+    DistMarkingStrategyCL marker( lset,
+                                  P.get<double>("AdaptRef.Width"),
+                                  P.get<int>("AdaptRef.CoarsestLevel"),
+                                  P.get<int>("AdaptRef.FinestLevel") );
+    adap.set_marking_strategy( &marker );
     for (int step= 1; step<=nsteps; ++step)
     {
         std::cout << "======================================================== Schritt " << step << ":\n";
@@ -350,7 +356,7 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
 
         // grid modification
         if (doGridMod) {
-            adap.UpdateTriang( lset);
+            adap.UpdateTriang();
             cpl.Update();
         }
 
@@ -504,13 +510,20 @@ int main (int argc, char** argv)
         std::cout << "Bnd " << i << ": "; BndCondInfo( bc[i], std::cout);
     }
 
-    DROPS::AdapTriangCL adap( *mgp, P.get<double>("AdaptRef.Width"), P.get<int>("AdaptRef.CoarsestLevel"), P.get<int>("AdaptRef.FinestLevel"),
-      ((P.get<std::string>("Restart.Inputfile") == "none") ? P.get<int>("AdaptRef.LoadBalStrategy") : -P.get<int>("AdaptRef.LoadBalStrategy")));
+    DROPS::AdapTriangCL adap( *mgp, 0,
+                              P.get<std::string>("Restart.Inputfile") == "none" ?  P.get<int>("AdaptRef.LoadBalStrategy") :
+                                                                                  -P.get<int>("AdaptRef.LoadBalStrategy") );
+
     // If we read the Multigrid, it shouldn't be modified;
     // otherwise the pde-solutions from the ensight files might not fit.
-    if (P.get<std::string>("Restart.Inputfile") == "none"){
-        DROPS::instat_scalar_fun_ptr DistanceFct = DROPS::InScaMap::getInstance()[P.get("Exp.InitialLSet", std::string("WavyFilm"))];
-        adap.MakeInitialTriang( DistanceFct);
+    if ( P.get<std::string>("Restart.Inputfile") == "none")
+    {
+        DROPS::DistMarkingStrategyCL InitialMarker( DROPS::InScaMap::getInstance()[P.get("Ext.InitialLet", std::string("WavyFilm"))],
+                                                    P.get<double>("AdaptRef.Width"), P.get<int>("AdaptRef.CoarsestLevel"),
+                                                    P.get<int>("AdaptRef.FinestLevel") ); 
+        adap.set_marking_strategy( &InitialMarker );
+        adap.MakeInitialTriang();
+        adap.set_marking_strategy( 0 );
     }
 
     std::cout << DROPS::SanityMGOutCL(*mgp) << std::endl;

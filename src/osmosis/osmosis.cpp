@@ -37,6 +37,7 @@
 #include "levelset/coupling.h"
 #include "misc/params.h"
 #include "levelset/adaptriang.h"
+#include "levelset/marking_strategy.h"
 #include "levelset/mzelle_hdr.h"
 #include "levelset/surfacetension.h"
 #include "osmosis/osmosisSetup.h"
@@ -197,6 +198,13 @@ void  OnlyOsmosisStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTria
 
     const double dt = P.get<double>("Time.StepSize");
 
+    // Create the marking strategy for the adaptive mesh refinement.
+    typedef DistMarkingStrategyCL MarkerT;
+    MarkerT marker( lset, P.get<double>("AdaptRef.Width"),
+                          P.get<int>("AdaptRef.CoarsetLevel"),
+                          P.get<int>("AdaptRef.FiniestLevel") );
+    adap.set_marking_strategy( &marker );
+
     for (int step= 1; step<=P.get<int>("Time.NumSteps"); ++step)
     {
         std::cout << "============================================================ step " << std::setw(8) << step << "  /  " << std::setw(8) << P.get<int>("Time.NumSteps") << std::endl;
@@ -205,7 +213,7 @@ void  OnlyOsmosisStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTria
         // grid modification
         bool doGridMod= P.get<int>("AdaptRef.Freq") && step%P.get<int>("AdaptRef.Freq") == 0;
         if (doGridMod) {
-            adap.UpdateTriang( lset);
+            adap.UpdateTriang();
         }
 
 		std::cout << osmosis.conc.Data.size() << " concentration unknowns\n";
@@ -223,6 +231,8 @@ void  OnlyOsmosisStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTria
             vtkwriter.Write(t);
         }
     }
+
+    adap.set_marking_strategy(0);
 
     gnu.Close();
 
@@ -291,13 +301,20 @@ int main (int argc, char** argv)
     std::cout << "Generated MG of " << mg->GetLastLevel() << " levels." << std::endl;
 
     DROPS::EllipsoidCL::Init(P.get<DROPS::Point3DCL>("Exp.PosDrop"), P.get<DROPS::Point3DCL>("Exp.RadDrop"));
-    DROPS::AdapTriangCL adap( *mg, P.get<double>("AdaptRef.Width"), P.get<int>("AdaptRef.CoarsestLevel"), P.get<int>("AdaptRef.FinestLevel"), ((P.get<std::string>("Restart.Inputfile") == "none") ? P.get<int>("AdaptRef.LoadBalStrategy") : -P.get<int>("AdaptRef.LoadBalStrategy")));
+    DROPS::AdapTriangCL adap( *mg );
     // If we read the Multigrid, it shouldn't be modified;
     // otherwise the pde-solutions from the ensight files might not fit.
     if (!P.get<int>("Transp.UseNSSol") || (P.get<std::string>("Restart.Inputfile") == "none")){
         DROPS::InScaMap & scalarmap = DROPS::InScaMap::getInstance();
         DROPS::instat_scalar_fun_ptr distance = scalarmap[P.get("Osmosis.Levelset", std::string("Ellipsoid"))];
-        adap.MakeInitialTriang( distance);
+
+	typedef DROPS::DistMarkingStrategyCL InitMarkerT;
+	InitMarkerT initmarker( distance, P.get<double>("AdaptRef.Width"),
+                                          P.get<int>( "AdaptRef.CoarsestLevel" ),
+                                          P.get<int>( "AdaptRef.FinestLevel" ) ); 
+        adap.set_marking_strategy( &initmarker );
+        adap.MakeInitialTriang();
+        adap.set_marking_strategy(0);
     }
     
     std::cout << DROPS::SanityMGOutCL(*mg) << std::endl;

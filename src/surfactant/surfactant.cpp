@@ -256,6 +256,11 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     BndDataCL<> ifbnd( 0);
     std::cerr << "initial surfactant on \\Gamma: " << Integral_Gamma( mg, lset.Phi, lset.GetBndData(), make_P1Eval(  mg, ifbnd, timedisc.ic)) << '\n';
 
+    typedef DistMarkingStrategyCL MarkerT;
+    MarkerT marker( lset, P.get<double>( "AdaptRef.Width" ),
+                    0, P.get<int>( "AdaptRef.FinestLevel" ) );
+  
+    adap.set_marking_strategy( &marker );
     for (int step= 1; step <= P.get<int>("Time.NumSteps"); ++step) {
         std::cout << "======================================================== step " << step << ":\n";
 
@@ -282,7 +287,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
             // lset.ReparamFastMarching( C.rpm_Method);
         if (P.get("AdaptRef.Freq", 0) != 0 && step%P.get("AdaptRef.Freq", 0) == 0) {
             if (P.get("AdaptRef.Freq", 0) != 0) {
-                adap.UpdateTriang( lset);
+                adap.UpdateTriang();
                 vidx.DeleteNumbering( mg);
                 vidx.CreateNumbering( mg.GetLastLevel(), mg, Bnd_v);
                 v.SetIdx( &vidx);
@@ -306,6 +311,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
 //                  << std::endl;
     }
     std::cout << std::endl;
+    adap.set_marking_strategy(0);
     delete &lset2;
 }
 
@@ -327,8 +333,13 @@ int main (int argc, char* argv[])
                                  4.*DROPS::std_basis<3>( 3),
                                  P.get<int>("InitialDivisions"), P.get<int>("InitialDivisions"), P.get<int>("InitialDivisions"));
     DROPS::MultiGridCL mg( brick);
-    DROPS::AdapTriangCL adap( mg, P.get<double>("AdaptRef.Width"), 0, P.get<int>("AdaptRef.FinestLevel"));
-    adap.MakeInitialTriang( sphere_2);
+    DROPS::AdapTriangCL adap( mg );
+
+    typedef DROPS::DistMarkingStrategyCL InitMarkerT;
+    InitMarkerT initmarker( sphere_2, P.get<double>("AdaptRef.Width"), 0, P.get<int>("AdaptRef.FinestLevel") );
+    adap.set_marking_strategy( &initmarker );
+    adap.MakeInitialTriang();
+    adap.set_marking_strategy( 0 );
 
     instat_scalar_fun_ptr sigma (0);
     SurfaceTensionCL sf( sigma, 0);

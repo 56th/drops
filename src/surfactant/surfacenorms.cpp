@@ -174,6 +174,12 @@ void Strategy (DROPS::AdapTriangCL& adap, DROPS::LevelsetP2CL& lset)
     InterfaceP1RepairCL* ifrep[L][N];
     const char* lvlstr[]= { "-lvl2/", "-lvl3/", "-lvl4/", "-lvl5/" };
 
+    typedef DistMarkingStrategyCL MarkerT;
+    MarkerT marker( lset, P.get<double>("AdaptRef.Width"),
+                          0, 
+                          P.get<int>( "AdaptRef.FinestLevel" ) );
+    adap.set_marking_strategy( &marker );
+
   for (int l= 0; l < L; ++l) {
     for (int i= 0; i < N; ++i) {
         DV[l][i].SetIdx( &fullidx);
@@ -195,15 +201,17 @@ void Strategy (DROPS::AdapTriangCL& adap, DROPS::LevelsetP2CL& lset)
     reader.ReadScalar( ensdir + lvlstr[l] + enscase + ".sur512", DV[l][9], bnd);
     reader.ReadScalar( ensdir + lvlstr[l] + enscase + ".sur1024", DV[l][10], bnd);
 
+
     if (l == L - 1) continue;
     for (int i= 0; i < N; ++i) {
         ifrep[l][i]= new InterfaceP1RepairCL( mg, lset.Phi, lset.GetBndData(), DV[l][i]);
         adap.push_back( ifrep[l][i]);
     }
-    adap.SetFineLevel( mg.GetLastLevel() + 1);
-    adap.UpdateTriang( lset);
+    marker.SetFineLevel( mg.GetLastLevel() + 1 );
+    adap.UpdateTriang();
     LSInit( mg, lset.Phi, &sphere_2move, 1.);
   }
+  adap.set_marking_strategy( 0 );
 
     // LSInit( mg, lset.Phi, &sphere_2move, 0.);
     // VecDescCL DVinitial( &fullidx);
@@ -256,8 +264,17 @@ int main (int argc, char** argv)
                                  4.*DROPS::std_basis<3>( 3),
                                  P.get<int>("InitialDivisions"), P.get<int>("InitialDivisions"), P.get<int>("InitialDivisions"));
     DROPS::MultiGridCL mg( brick);
-    DROPS::AdapTriangCL adap( mg, P.get<double>("AdaptRef.Width"), 0, P.get<int>("AdaptRef.FinestLevel"));
-    adap.MakeInitialTriang( sphere_2);
+
+    DROPS::AdapTriangCL adap( mg );
+
+    typedef DROPS::DistMarkingStrategyCL InitialMarkerT;
+    InitialMarkerT initialmarker( sphere_2, P.get<double>("AdaptRef.Width"),
+                                            0,
+                                            P.get<int>("AdaptRef.FinestLevel") );
+
+    adap.set_marking_strategy( &initialmarker );
+    adap.MakeInitialTriang();
+    adap.set_marking_strategy( 0 );
 
     const DROPS::BndCondT bcls[6]= { DROPS::NoBC, DROPS::NoBC, DROPS::NoBC, DROPS::NoBC, DROPS::NoBC, DROPS::NoBC };
     const DROPS::LsetBndDataCL::bnd_val_fun bfunls[6]= { 0,0,0,0,0,0};

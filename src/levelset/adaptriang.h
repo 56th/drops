@@ -27,6 +27,7 @@
 
 #include "levelset/mgobserve.h"
 #include "levelset/levelset.h"
+#include "levelset/marking_strategy.h"
 #include <vector>
 
 #ifdef _PAR
@@ -39,49 +40,43 @@
 namespace DROPS
 {
 
-/// \brief Adaptive triangulation based on position of the interface provided by the levelset function
+/*!
+ * \brief Adaptive triangulation based on a given marking strategy.
+ *
+ * This class implements adaptive triangulations based on arbitrary marking
+ * strategy. A marking strategy is an object of type MarkingStrategyCL. It
+ * marks the leafs of a multigrid triangulation for removal, i.e., coarsening,
+ * or refinement.
+ *
+ * Given such a marking strategy, this class does everything that's needed to
+ * adapt a given multigrid hierarchy. The AdapTriangCL only stores a pointer to
+ * a marking strategy, it does *not* call delete on that pointer.
+ */
 class AdapTriangCL
 {
   private:
     MultiGridCL& mg_;
+    MarkingStrategyCL *marker_;
+
 #ifdef _PAR
     ParMultiGridCL*  pmg_;                                  ///< Reference to the parallel multigrid
     LoadBalCL lb_;                                          ///< The load balancing class used to determine a partitioning
 #endif
 
-    double width_;                                          ///< width of the refined grid
-    int c_level_, f_level_;                                 ///< coarsest and finest level of the grid
-    bool modified_;                                         ///< flag if the grid has been modified
-
     typedef ObservedVectorsCL ObserverContT;                ///< type for observing the multigrid dependent FE functions
     ObserverContT  observer_;                               ///< stores handlers to manipulate FE-functions due to grid changes (refinement, migration)
 
-    /// \name Evaluate a function on a simplex
-    //@{
-    template <class DistFctT>
-    double GetValue( const DistFctT& dist, const VertexCL& v) { return dist.val( v); }
-    template <class DistFctT>
-    double GetValue( const DistFctT& dist, const EdgeCL& e)   { return dist.val( e); }
-    template <class DistFctT>
-    double GetValue( const DistFctT& dist, const TetraCL& t)  { return dist.val( t, 0.25, 0.25, 0.25); }
-    double GetValue( instat_scalar_fun_ptr dist, const VertexCL& v, double t=0.)  { return dist( v.GetCoord(), t); }
-    double GetValue( instat_scalar_fun_ptr dist, const EdgeCL& e, double t=0.)    { return dist( GetBaryCenter( e), t); }
-    double GetValue( instat_scalar_fun_ptr dist, const TetraCL& tet, double t=0.) { return dist( GetBaryCenter( tet), t); }
-    //@}
-
-    /// \brief On step of the grid change
-    template <class DistFctT>
-    bool ModifyGridStep( DistFctT&, bool lb=true);
+    /// \brief One step of the grid change
+    bool ModifyGridStep( bool lb = true );
 
   public:
-    AdapTriangCL(  MultiGridCL& mg, double width, int c_level, int f_level, __UNUSED__ int lbStrategy = 1011)
-        : mg_( mg),
+    AdapTriangCL(  MultiGridCL& mg, MarkingStrategyCL *marker = 0, __UNUSED__ int lbStrategy = 1011)
+        : mg_( mg ), marker_( marker )
 #ifdef _PAR
           pmg_( ParMultiGridCL::InstancePtr()), lb_( mg_),
 #endif
-          width_(width), c_level_(c_level), f_level_(f_level), modified_(false)
     {
-        Assert( 0<=c_level && c_level<=f_level, "AdapTriangCL: Levels are cheesy.\n", ~0);
+
 #ifdef _PAR
         if (lbStrategy>=0){
             lb_.DoMigration();
@@ -106,33 +101,18 @@ class AdapTriangCL
     const LoadBalCL& GetLb() const { return lb_; }
 #endif
 
-    void SetWidth       (double width) { width_  = width; }
-    void SetCoarseLevel (int c_level)  { c_level_= c_level; }
-    void SetFineLevel   (int f_level)  { f_level_= f_level; }
+    /// \brief Make initial triangulation.
+    void MakeInitialTriang();
 
-    /// \brief Make initial triangulation according to a distance function
-    template <class DistFctT>
-      void MakeInitialTriang (DistFctT&);
+    /// \brief Coupling of all necessary steps update the triangulation according to the marking strategy.
+    /** This function updates the triangulation according to the marking strategy.
+        Therefore this function uses the marking strategy to mark the tetras.
+        Afterwards it refinesthem and balances the number of tetras over the
+        processors. Also the numerical data is interpolated to the new
+        triangulation.
+        \return WasModified() */
+    bool UpdateTriang();
 
-    /// \brief Coupling of all necessary steps update the triangulation according to a levelset function
-    /** This function updates the triangulation according to the position of the
-    interface provided by the levelset function. Therefore this function marks
-    and refines tetras and balance the number of tetras over the processors.
-    Also the numerical data are interpolated to the new triangulation.
-    \return WasModified() */
-    template <class DistFctT>
-      bool UpdateTriang (const DistFctT&);
-    bool UpdateTriang (const LevelsetP2CL& ls);
-
-    /// \brief Check if the triangulation has been modified within last update
-    bool WasModified () const { 
-        return
-#ifdef _PAR
-            modified_ || lb_.GetMovedMultiNodes() > 0;
-#else
-            modified_;
-#endif
-    }
 
     /// \name Get a reference onto the MultiGrid
     //@{
@@ -145,10 +125,31 @@ class AdapTriangCL
     {
         observer_.push_back( o);
     }
+
+    /// \brief Specify the marking strategy to use.
+    void set_marking_strategy( MarkingStrategyCL *s )
+    {
+        marker_ = s;
+    }
+
+    /// \brief Get the marking strategy currently in use.
+    MarkingStrategyCL* get_marking_strategy() const
+    {
+        return marker_;
+    }
+
+    bool WasModified()
+    {
+        if ( ! marker_ ) return false;
+#ifndef _PAR
+        return marker_->modified();
+#else
+        return marker_->modified() ||lb_.GetMovedMultiNodes() > 0;
+#endif
+    }
 };
 
 } // end of namespace DROPS
 
-#include "levelset/adaptriang.tpp"
-
 #endif
+
