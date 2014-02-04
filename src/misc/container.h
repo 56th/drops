@@ -1004,7 +1004,7 @@ template <Uint Rows_, Uint Cols_>
     QRDecompCL<Rows_, Cols_>::apply_Q (SVectorCL<Rows_>& b) const
 {
     // The Q_j are symmetric, so to transpose Q^T one just has to reverse the order of application.
-    for (Uint j= Cols_ - 1; j >=0 ; --j)
+    for (int j= Cols_ - 1; j >=0 ; --j)
         apply_reflection( j, b);
 }
 
