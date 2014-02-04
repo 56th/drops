@@ -513,6 +513,34 @@ cross_product(Point3DCL& res, const Point3DCL& v0, const Point3DCL& v1)
     res[2]= v0[0]*v1[1] - v0[1]*v1[0];
 }
 
+
+//taken from thesis hollasch
+inline void
+cross_product(Point4DCL& res, const Point4DCL& u, const Point4DCL& v, const Point4DCL& w)
+// res= X( v1, v2, v3); 
+{
+    const double a = v[0]*w[1]-v[1]*w[0];
+    const double b = v[0]*w[2]-v[2]*w[0];
+    const double c = v[0]*w[3]-v[3]*w[0];
+    const double d = v[1]*w[2]-v[2]*w[1];
+    const double e = v[1]*w[3]-v[3]*w[1];
+    const double f = v[2]*w[3]-v[3]*w[2];
+    res[0]=   u[1]*f - u[2]*e + u[3]*d;
+    res[1]= - u[0]*f + u[2]*c - u[3]*b;
+    res[2]=   u[0]*e - u[1]*c + u[3]*a;
+    res[3]= - u[0]*d + u[1]*b - u[2]*a;
+}
+
+//taken from thesis hollasch
+inline Point4DCL
+cross_product(const Point4DCL& u, const Point4DCL& v, const Point4DCL& w)
+// res= X( v1, v2, v3); 
+{
+    Point4DCL res;
+    cross_product(res,u,v,w);
+    return res;
+}
+
 // std_basis<n>(0)==Null, std_basis<n>(i)[j]==Delta_i-1_j
 template <Uint _Size>
 inline SVectorCL<_Size> std_basis(Uint i)
