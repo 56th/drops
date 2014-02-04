@@ -601,6 +601,16 @@ template <class SimplexT>
 void circumcircle(const TetraCL& t, Point3DCL& c, double& r);
 void circumcircle(const TetraCL& t, Uint face, Point3DCL& c, double& r);
 
+
+
+inline void GetTrafo( SMatrixCL<3,3>& T, const TetraCL & t)
+{
+    const Point3DCL& pt0= t.GetVertex(0)->GetCoord();
+    for(int i=0; i<3; ++i)
+        for(int j=0; j<3; ++j)
+            T(j,i)= t.GetVertex(i+1)->GetCoord()[j] - pt0[j];
+}
+
 /// calculates the transpose of the transformation  Tetra -> RefTetra
 inline void GetTrafoTr( SMatrixCL<3,3>& T, double& det, const Point3DCL pt[4])
 {
