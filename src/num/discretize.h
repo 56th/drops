@@ -963,6 +963,34 @@ DROPS_DEFINE_VALARRAY_DERIVATIVE(Quad5_2DCL, T, base_type)
 };
 
 
+/// \brief Contains the nodes and weights of a positive quadrature rule on the reference pentatope. It uses 5 nodes an is exact up to degree 3.
+///
+/// The data is initialized exactly once on program-startup by the global object in num/discretize.cpp.
+class Quad3_4DDataCL
+{
+  public:
+    Quad3_4DDataCL ();
+    enum { NumNodesC = 5 };
+    enum { Dim = 4 };
+    static STBaryCoordCL         Node[NumNodesC];   ///< quadrature nodes
+    static const double        Weight[NumNodesC]; ///< quadrature weights for each node
+};
+
+/// \brief Contains the nodes and weights of a positive quadrature rule on the reference pentatope. It uses 60 nodes an is exact up to degree 3.
+///
+/// The data is initialized exactly once on program-startup by the global object in num/discretize.cpp.
+class Quad5_4DDataCL
+{
+  public:
+    Quad5_4DDataCL ();
+    enum { NumNodesC = 60 };
+    enum { Dim = 4 };
+    static STBaryCoordCL         Node[NumNodesC];   ///< quadrature nodes
+    static const double        Weight[NumNodesC]; ///< quadrature weights for each node
+};
+
+
+
 class Quad3PosWeightsCL
 // contains cubatur on reference-tetra, that is exact up to degree 3, positive,
 // and uses only 8 points.
