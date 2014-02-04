@@ -480,6 +480,160 @@ void ISBBTPreCL::Apply(const Mat&, Vec& p, const Vec& c, const ExT& vel_ex, cons
     }
 }
 
+/*!
+ * \brief Modified ISBBT preconditioner for Ghost Penalty Stabilisation
+ *
+ * This preconditioner is an extension to the original ISBBT preconditioner
+ * for the instationary Stokes problem. When the ghost penalty method is used
+ * for stabilising the Stokes problem, the resulting system matrix contains an
+ * additional matrix -eps_p*J. The Schurkomplement therefore changes to:
+ * B^T A^-1 B  +  eps_p*J. Given C := -eps_p*J, this preconditoner is defined
+ * by Q_S := M - C = M + eps_p*J. In the stationary case this preconditioner
+ * has shown ideal behaviour. The instationary case requires further testing.
+ */
+class ISBBT_Stab_PreCL : public SchurPreBaseCL
+{
+private:
+    const MatrixCL*  B_;
+    mutable MatrixCL*  Bs_;                                     ///< scaled Matrix B
+    mutable size_t Bversion_;
+    const MatrixCL  *M_, *Mvel_;
+    const MatrixCL  *C_;                                        ///< Stabilisation matrix; C = -eps_p * prJ;
+    mutable MatrixCL   MminusC_;                                ///< Use M - C instead of M as a preconditioner of BA^-1B^T
+
+    double  tolA_, tolM_;                                       ///< tolerances of the solvers
+    mutable VectorCL Dprsqrtinv_;                               ///< diag(M)^{-1/2}
+
+#ifdef _PAR
+    typedef ChebyshevBBTPcCL  PCSolver1T;                       ///< type of the preconditioner for solver 1
+#else
+    typedef NEGSPcCL    PCSolver1T;                             ///< type of the preconditioner for solver 1
+#endif
+    typedef JACPcCL     PCSolver2T;                             ///< type of the preconditioner for solver 2
+    PCSolver1T PCsolver1_;
+    PCSolver2T PCsolver2_;
+    mutable PCGNESolverCL<PCSolver1T> solver_;                  ///< solver for BB^T
+    mutable PCGSolverCL<PCSolver2T> solver2_;                   ///< solver for M
+
+    const IdxDescCL* pr_idx_;                                   ///< used to determine, how to represent the kernel of BB^T in case of pure Dirichlet-BCs.
+    double regularize_;                                         ///< If regularize_==0. no regularization is performed. Otherwise, a column is attached to Bs.
+    template <typename ExT>
+    void Update (const ExT& vel_ex, const ExT& p_ex) const;     ///< Updating the diagonal matrices D and Dprsqrtinv
+
+  public:
+    ISBBT_Stab_PreCL (const MatrixCL* B, const MatrixCL *C, const MatrixCL* M_pr, const MatrixCL* Mvel,
+        const IdxDescCL& pr_idx, double kA= 0., double kM= 1., double tolA= 1e-2, double tolM= 1e-2, double regularize= 0., std::ostream* output= 0)
+        : SchurPreBaseCL( kA, kM, output), B_( B), Bs_( 0), Bversion_( 0),
+          M_( M_pr), Mvel_( Mvel), C_(C), tolA_(tolA), tolM_(tolM),
+          PCsolver1_(), PCsolver2_(),
+          solver_( PCsolver1_, 800, tolA_, /*relative*/ true),
+          solver2_( PCsolver2_, 500, tolM_, /*relative*/ true),
+          pr_idx_( &pr_idx), regularize_( regularize)
+    {
+	MminusC_.LinComb( 1.0, *M_, -1.0, *C_ );
+    }
+
+    ISBBT_Stab_PreCL (const ISBBT_Stab_PreCL& pc)
+        : SchurPreBaseCL( pc.kA_, pc.kM_), B_( pc.B_), Bs_( pc.Bs_ == 0 ? 0 : new MatrixCL( *pc.Bs_)),
+          Bversion_( pc.Bversion_),
+          M_( pc.M_), Mvel_( pc.Mvel_), C_( pc.C_ ),
+          PCsolver1_(), PCsolver2_(),
+          solver_( PCsolver1_, 800, tolA_, /*relative*/ true),
+          solver2_( PCsolver2_, 500, tolM_, /*relative*/ true),
+          pr_idx_( pc.pr_idx_), regularize_( pc.regularize_)
+    {
+	MminusC_.LinComb( 1.0, *M_, -1.0, *C_ );
+    }
+
+    ISBBT_Stab_PreCL& operator= (const ISBBT_Stab_PreCL&) {
+        throw DROPSErrCL( "ISBBT_Stab_PreCL::operator= is not permitted.\n");
+    }
+
+    ~ISBBT_Stab_PreCL () { delete Bs_; }
+
+    template <typename Mat, typename Vec, typename ExT>
+    void Apply(const Mat&, Vec& p, const Vec& c, const ExT& vel_ex, const ExT& p_ex) const;
+
+#ifdef _PAR
+    void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const ExchangeCL& vel_ex, const ExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
+    void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const ExchangeCL& vel_ex, const ExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
+#endif
+    void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
+    void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
+
+    using SchurPreBaseCL::Apply;
+
+    void SetMatrices (const MatrixCL* B, const MatrixCL* C, const MatrixCL* Mvel, const MatrixCL* M, const IdxDescCL* pr_idx)
+    {
+        B_= B;
+	C_= C;
+        Mvel_= Mvel;
+        M_= M;
+        pr_idx_= pr_idx;
+        Bversion_ = 0;
+	MminusC_.LinComb( 1.0, *M_, -1.0, *C_ );
+    }
+};
+
+template<typename ExT>
+void ISBBT_Stab_PreCL::Update(const ExT& vel_ex, const ExT& p_ex) const
+{
+    std::cout << "ISBBT_Stab_PreCL::Update: old version: " << Bversion_
+              << "\tnew version: " << B_->Version() << '\n';
+    delete Bs_;
+    Bs_= new MatrixCL( *B_);
+    Bversion_= B_->Version();
+
+    VectorCL Dvelinv( 1.0/ vel_ex.GetAccumulate(Mvel_->GetDiag()));
+    ScaleCols( *Bs_, VectorCL( std::sqrt( Dvelinv)));
+
+    MminusC_.LinComb( 1.0, *M_, -1.0, *C_ );
+    VectorCL Dprsqrt( std::sqrt( p_ex.GetAccumulate( MminusC_.GetDiag())));
+    Dprsqrtinv_.resize( MminusC_.num_rows());
+    Dprsqrtinv_= 1.0/Dprsqrt;
+    ScaleRows( *Bs_, Dprsqrtinv_);
+
+#ifndef _PAR
+    if (regularize_ != 0.)
+        Regularize( *Bs_, *pr_idx_, Dprsqrt, PCsolver1_, regularize_, vel_ex, p_ex);
+#endif
+}
+
+template <typename Mat, typename Vec, typename ExT>
+void ISBBT_Stab_PreCL::Apply(const Mat&, Vec& p, const Vec& c, const ExT& vel_ex, const ExT& p_ex) const
+{
+    ScopeTimerCL scope("ISBBT_Stab_PreCL::Apply");
+    if (B_->Version() != Bversion_)
+        Update(vel_ex, p_ex);
+
+    p= 0.0;
+    if (kA_ != 0.0) {
+        solver_.Solve( *Bs_, p, VectorCL( Dprsqrtinv_*c), vel_ex, p_ex);
+        if (solver_.GetIter() == solver_.GetMaxIter()){
+            std::cout << "ISBBT_Stab_PreCL::Apply: BBT-solve: " << solver_.GetIter()
+                    << " (max)\t" << solver_.GetResid() << '\n';
+        }
+        else if (output_)
+            *output_ << "ISBBT_Stab_PreCL BBT-solve: iterations: " << solver_.GetIter()
+                     << "\tresidual: " <<  solver_.GetResid();
+        p= kA_*(Dprsqrtinv_*p);
+    }
+    if (kM_ != 0.0) {
+        Vec p2_( c.size() );
+        solver2_.Solve( MminusC_, p2_, c, p_ex );
+        if (solver2_.GetIter() == solver2_.GetMaxIter()){
+            std::cout << "ISBBT_Stab_PreCL::Apply: (M-C)-solve: " << solver2_.GetIter()
+                    << " (max)\t" << solver2_.GetResid() << '\n';
+        }
+        else if (output_)
+            *output_ << "\tISBBT_Stab_PreCL (M-C)-solve: iterations: " << solver2_.GetIter()
+                     << "\tresidual: " <<  solver2_.GetResid()
+                     << '\n';
+
+        p+= kM_*p2_;
+    }
+}
+
 //**************************************************************************
 // Preconditioner for the instationary (Navier-) Stokes-equations.
 // It is a scaled version of the Min-Commutator-PC of Elman and can be used
