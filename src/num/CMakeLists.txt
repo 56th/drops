@@ -1,5 +1,5 @@
 set(HOME num)
-libs(bndData discretize fe hypre interfacePatch MGsolver oseenprecond quadrature renumber unknowns)
+libs(bndData discretize fe hypre interfacePatch MGsolver oseenprecond quadrature renumber unknowns spacetime_geom)
 
 target_link_libraries_par(num-unknowns misc-problem)
 target_link_libraries_par(num-interfacePatch parallel-exchange num-fe)
