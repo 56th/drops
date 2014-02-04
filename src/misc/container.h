@@ -541,6 +541,23 @@ cross_product(const Point4DCL& u, const Point4DCL& v, const Point4DCL& w)
     return res;
 }
 
+
+inline double
+l2norm_of_3D_vector(Point4DCL & in)
+{
+    return std::sqrt(in[0]*in[0]+in[1]*in[1]+in[2]*in[2]);
+}
+
+template <Uint _Size>
+inline double
+normalize_l2norm(SVectorCL<_Size> & in)
+{
+    double ret = in.norm();
+    in /= ret;
+    return ret;
+}
+
+
 // std_basis<n>(0)==Null, std_basis<n>(i)[j]==Delta_i-1_j
 template <Uint _Size>
 inline SVectorCL<_Size> std_basis(Uint i)
@@ -550,10 +567,87 @@ inline SVectorCL<_Size> std_basis(Uint i)
     return ret;
 }
 
+inline STBaryCoordCL
+MakeSTBaryCoord(double a, double b, double c, double d, double e)
+{
+    STBaryCoordCL ret( Uninitialized);
+    ret[0]= a; ret[1]= b; ret[2]= c; ret[3]= d; ret[4]= e;
+    return ret;
+}
+
+inline STBaryCoordCL
+MakeSTBaryCoord(const Point4DCL& p)
+{
+    STBaryCoordCL ret( Uninitialized);
+    ret[0]= 1-p[0]-p[1]-p[2]-p[3];
+    ret[1] = p[0];
+    ret[2] = p[1];
+    ret[3] = p[2];
+    ret[4] = p[3];
+    return ret;
+}
+
+
 inline BaryCoordCL
 MakeBaryCoord(double a, double b, double c, double d)
 {
     BaryCoordCL ret( Uninitialized);
+    ret[0]= a; ret[1]= b; ret[2]= c; ret[3]= d;
+    return ret;
+}
+
+inline BaryCoordCL
+MakeBaryCoord(double a, double b, double c)
+{
+    BaryCoordCL ret( Uninitialized);
+    ret[0]= 1-a-b-c;
+    ret[1] = a;
+    ret[2] = b;
+    ret[3] = c;
+    return ret;
+}
+
+
+inline Point3DCL
+BaryToRefCoord(const BaryCoordCL & p)
+{
+    Point3DCL ret( Uninitialized);
+    ret[0]= p[1]; ret[1]= p[2]; ret[2]= p[3];
+    return ret;
+}
+
+inline Point3DCL
+RestrictToPoint3D(const Point4DCL & p)
+{
+    Point3DCL ret( Uninitialized);
+    ret[0]= p[0]; ret[1]= p[1]; ret[2]= p[2];
+    return ret;
+}
+
+inline BaryCoordCL
+MakeBaryCoord(const Point3DCL& p)
+{
+    BaryCoordCL ret( Uninitialized);
+    ret[0]= 1-p[0]-p[1]-p[2];
+    ret[1] = p[0];
+    ret[2] = p[1];
+    ret[3] = p[2];
+    return ret;
+}
+
+
+inline Point4DCL
+MakePoint4D(Point3DCL a, double d) /*deprecated*/
+{
+    Point4DCL ret( Uninitialized);
+    ret[0]= a[0]; ret[1]= a[1]; ret[2]= a[2]; ret[3]= d;
+    return ret;
+}
+
+inline Point4DCL
+MakePoint4D(double a, double b, double c, double d) /*deprecated*/
+{
+    Point4DCL ret( Uninitialized);
     ret[0]= a; ret[1]= b; ret[2]= c; ret[3]= d;
     return ret;
 }
@@ -814,6 +908,19 @@ operator*(const SMatrixCL<3, 3>& m, const SVectorCL<3>& v)
     ret[2]= a[6]*v[0] + a[7]*v[1] + a[8]*v[2];
     return ret;
 }
+
+inline SVectorCL<4>
+operator*(const SMatrixCL<4, 4>& m, const SVectorCL<4>& v)
+{
+    SVectorCL<4> ret( Uninitialized);
+    const double* const a= m.begin();
+    ret[0]=  a[0]*v[0] +  a[1]*v[1] +  a[2]*v[2] +  a[3]*v[3];
+    ret[1]=  a[4]*v[0] +  a[5]*v[1] +  a[6]*v[2] +  a[7]*v[3];
+    ret[2]=  a[8]*v[0] +  a[9]*v[1] + a[10]*v[2] + a[11]*v[3];
+    ret[3]= a[12]*v[0] + a[13]*v[1] + a[14]*v[2] + a[15]*v[3];
+    return ret;
+}
+
 
 template <Uint Rows, Uint Cols>
 double inner_prod(const SVectorCL<Rows>& v1, const SMatrixCL<Rows, Cols>& m, const SVectorCL<Cols>& v2)
