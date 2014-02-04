@@ -31,6 +31,10 @@ exec_ser(restrictp2 geom-deformation geom-simplex geom-multigrid geom-topo out-o
 
 exec_ser(vectest misc-utils)
 
+exec_ser(spacetime_decomp misc-utils geom-deformation geom-simplex geom-boundary geom-topo num-spacetime_geom num-spacetime_map num-spacetime_quad misc-scopetimer geom-multigrid geom-builder geom-principallattice geom-topo)
+
+exec_ser(spacetime_surf geom-boundary geom-builder geom-simplex geom-multigrid geom-deformation num-spacetime_geom num-spacetime_map num-spacetime_quad misc-scopetimer misc-progressaccu num-unknowns geom-topo num-fe misc-problem levelset-levelset misc-utils out-output num-discretize num-interfacePatch misc-params levelset-fastmarch stokes-instatstokes2phase levelset-surfacetension misc-funcmap misc-vectorFunctions geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature misc-dynamicload)
+
 exec_ser(p2local misc-utils geom-deformation geom-simplex geom-multigrid geom-boundary geom-topo num-unknowns out-output misc-problem geom-builder num-interfacePatch num-discretize num-fe)
 
 exec_ser(quadbase misc-utils geom-builder geom-deformation geom-simplex geom-multigrid geom-boundary geom-topo num-unknowns misc-problem num-fe num-discretize num-interfacePatch)
