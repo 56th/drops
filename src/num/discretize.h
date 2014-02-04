@@ -579,6 +579,7 @@ class Quad2DataCL
     Quad2DataCL ();
 
     enum { NumNodesC= 5 };
+    enum { Dim = 3 };
 
     static BaryCoordCL  Node[NumNodesC];  ///< quadrature nodes
     static const double Wght[2];          ///< quadrature weights
@@ -597,6 +598,7 @@ class Quad2Data_Mul_P1_CL
 {
   public:
     enum { NumNodesC= Quad2DataCL::NumNodesC };
+    enum { Dim = 3 };
 
   private:
     static const double weights_[4][NumNodesC];
@@ -611,6 +613,7 @@ class Quad2Data_Mul_P2_CL
 {
   public:
     enum { NumNodesC= Quad2DataCL::NumNodesC };
+    enum { Dim = 3 };
 
   private:
     static const double weights_[10][NumNodesC];
@@ -714,6 +717,7 @@ class Quad3DataCL
     Quad3DataCL ();
 
     enum { NumNodesC= 5};
+    enum { Dim = 3 };
 
     static BaryCoordCL           Node[NumNodesC]; ///< quadrature nodes
     static const double          Wght[2];         ///< quadrature weights
@@ -803,6 +807,7 @@ class Quad5DataCL
     Quad5DataCL ();
 
     enum { NumNodesC= 15 };
+    enum { Dim = 3 };
 
     static BaryCoordCL           Node[NumNodesC]; ///< quadrature nodes
     static const double          Wght[4];         ///< quadrature weights
@@ -892,6 +897,7 @@ class Quad5_2DDataCL
     Quad5_2DDataCL ();
 
     enum { NumNodesC= 7 };
+    enum { Dim = 2 };
 
     static Point3DCL           Node[NumNodesC];   ///< quadrature nodes
     static const double        Wght[3];           ///< quadrature weights
