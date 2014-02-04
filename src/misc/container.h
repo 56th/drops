@@ -89,8 +89,12 @@ template <class T, Uint _Size>
 typedef SVectorCL<2> Point2DCL;
 /// Stores 3D coordinates
 typedef SVectorCL<3> Point3DCL;
+/// Stores 4D coordinates
+typedef SVectorCL<4> Point4DCL;
 /// Stores barycentric coordinates
 typedef SVectorCL<4> BaryCoordCL;
+/// Stores barycentric coordinates of a space-time simplex (pentatope)
+typedef SVectorCL<5> STBaryCoordCL;
 
 enum InitStateT { Uninitialized, Initialized };
 
