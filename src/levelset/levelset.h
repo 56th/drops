@@ -133,7 +133,7 @@ LevelsetP2CL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, F
     ///@}
 
     /// initialize level set function
-    virtual void Init( instat_scalar_fun_ptr) = 0;
+    virtual void Init( instat_scalar_fun_ptr, double t = 0) = 0;
     
     /// \remarks call SetupSystem \em before calling SetTimeStep!
     template<class DiscVelSolT>
@@ -241,7 +241,7 @@ class LevelsetP2ContCL: public LevelsetP2CL
     /// Update Phi (do nothing) 
     virtual void UpdateDiscontinuous( );
 
-    void Init( instat_scalar_fun_ptr); //void Init( instat_scalar_fun_ptr, double);
+    void Init( instat_scalar_fun_ptr, double t = 0); //void Init( instat_scalar_fun_ptr, double);
     
     template<class DiscVelSolT>
     void SetupSystem( const DiscVelSolT&, const double);
@@ -297,8 +297,8 @@ class LevelsetP2DiscontCL: public LevelsetP2CL
     /// Update Phi (Prolongation...) 
     virtual void UpdateDiscontinuous( );
 
-    void InitProjection( instat_scalar_fun_ptr);
-    void Init( instat_scalar_fun_ptr);
+    void InitProjection( instat_scalar_fun_ptr, double t = 0);
+    void Init( instat_scalar_fun_ptr, double t = 0);
     
     void ApplyZeroOrderClementInterpolation();
     void ApplyClementInterpolation();
