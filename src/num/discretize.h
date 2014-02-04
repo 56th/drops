@@ -143,62 +143,171 @@ template<class T>
     return *this;
 }
 
-inline GridFunctionCL<Point3DCL>&
-operator*=(GridFunctionCL<Point3DCL>& a, const GridFunctionCL<double>& b)
+template<class T1, class T2> 
+  inline GridFunctionCL<T1> eval( T1 (&f)(const T2&), const GridFunctionCL<T2>& a)
+{
+    GridFunctionCL<T1> ret(a.size());
+    for (size_t i = 0; i < a.size(); ++i)
+    {
+        ret[i] = f(a[i]);
+    }
+    return ret;
+}
+
+template<class T1, class T2, class U> 
+    inline GridFunctionCL<T1> eval( T1 (&f)(const U &, const T2&), const U & b, const GridFunctionCL<T2>& a)
+{
+    GridFunctionCL<T1> ret(a.size());
+    for (size_t i = 0; i < a.size(); ++i)
+    {
+        ret[i] = f(b,a[i]);
+    }
+    return ret;
+}
+
+template<class T1, class T2, class U, class V> 
+    inline GridFunctionCL<T1> eval( T1 (&f)(const U &, const V &, const T2&), const U & b, const V & c, const GridFunctionCL<T2>& a)
+{
+    GridFunctionCL<T1> ret(a.size());
+    for (size_t i = 0; i < a.size(); ++i)
+    {
+        ret[i] = f(b,c,a[i]);
+    }
+    return ret;
+}
+
+template<class T1, class T2, class U, class V, class W> 
+    inline GridFunctionCL<T1> eval( T1 (&f)(const U &, const V &, const W &, const T2&), const U & b, const V & c, const W & d, const GridFunctionCL<T2>& a)
+{
+    GridFunctionCL<T1> ret(a.size());
+    for (size_t i = 0; i < a.size(); ++i)
+    {
+        ret[i] = f(b,c,d,a[i]);
+    }
+    return ret;
+}
+
+
+template<class T1, class T2> 
+  inline GridFunctionCL<T1> apply_and_eval( T1 (&f)( T2&), GridFunctionCL<T2>& a)
+{
+    GridFunctionCL<T1> ret(a.size());
+    for (size_t i = 0; i < a.size(); ++i)
+    {
+        ret[i] = f(a[i]);
+    }
+    return ret;
+}
+
+template<class T1, class T2, class U> 
+    inline GridFunctionCL<T1> apply_and_eval( T1 (&f)(const U &, T2&), const U & b, GridFunctionCL<T2>& a)
+{
+    GridFunctionCL<T1> ret(a.size());
+    for (size_t i = 0; i < a.size(); ++i)
+    {
+        ret[i] = f(b,a[i]);
+    }
+    return ret;
+}
+
+template<class T1, class T2, class U, class V> 
+    inline GridFunctionCL<T1> apply_and_eval( T1 (&f)(const U &, const V &, T2&), const U & b, const V & c, GridFunctionCL<T2>& a)
+{
+    GridFunctionCL<T1> ret(a.size());
+    for (size_t i = 0; i < a.size(); ++i)
+    {
+        ret[i] = f(b,c,a[i]);
+    }
+    return ret;
+}
+
+template<class T1, class T2, class U, class V, class W> 
+    inline GridFunctionCL<T1> apply_and_eval( T1 (&f)(const U &, const V &, const W &, T2&), 
+                                              const U & b, const V & c, const W & d, 
+                                              GridFunctionCL<T2>& a)
+{
+    GridFunctionCL<T1> ret(a.size());
+    for (size_t i = 0; i < a.size(); ++i)
+    {
+        ret[i] = f(b,c,d,a[i]);
+    }
+    return ret;
+}
+
+template<Uint D>
+inline GridFunctionCL<SVectorCL<D> >&
+operator*=(GridFunctionCL<SVectorCL<D> >& a, const GridFunctionCL<double>& b)
 {
     for (size_t i= 0; i < b.size(); ++i)
         a[i]*= b[i];
     return a;
 }
 
-inline GridFunctionCL<Point3DCL>
-operator*(const GridFunctionCL<Point3DCL>& a, const GridFunctionCL<double>& b)
+template<Uint D>
+inline GridFunctionCL<SVectorCL<D> >
+operator*(const GridFunctionCL<SVectorCL<D> >& a, const GridFunctionCL<double>& b)
 {
-    GridFunctionCL<Point3DCL> ret( a);
+    GridFunctionCL<SVectorCL<D> > ret( a);
     return ret*= b;
 }
 
-inline GridFunctionCL<Point3DCL>
-operator*(const GridFunctionCL<double>& a, const GridFunctionCL<Point3DCL>& b)
+template<Uint D>
+inline GridFunctionCL<SVectorCL<D> > 
+operator*(const SMatrixCL<D,D>& A, const GridFunctionCL<SVectorCL<D> >& b)
+{
+    GridFunctionCL<SVectorCL<D> > ret( b);
+    for (size_t i= 0; i < b.size(); ++i)
+        ret[i] = A * b[i];
+    return ret;
+}
+
+template<Uint D>
+inline GridFunctionCL<SVectorCL<D> >
+operator*(const GridFunctionCL<double>& a, const GridFunctionCL<SVectorCL<D> >& b)
 {
     return b*a;
 }
 
-inline GridFunctionCL<Point3DCL>&
-operator*=(GridFunctionCL<Point3DCL>& a, double b)
+template<Uint D>
+inline GridFunctionCL<SVectorCL<D> >&
+operator*=(GridFunctionCL<SVectorCL<D> >& a, double b)
 {
     for (size_t i= 0; i < a.size(); ++i)
         a[i]*= b;
     return a;
 }
 
-inline GridFunctionCL<Point3DCL>
-operator*( double a, const GridFunctionCL<Point3DCL>& b)
+template<Uint D>
+inline GridFunctionCL<SVectorCL<D> >
+operator*( double a, const GridFunctionCL<SVectorCL<D> >& b)
 {
 
-    GridFunctionCL<SVectorCL<3> > ret( b);
+    GridFunctionCL<SVectorCL<D> > ret( b);
     return ret*= a;
 }
 
-inline GridFunctionCL<Point3DCL>
-operator*( const GridFunctionCL<Point3DCL>& a, double b)
+template<Uint D>
+inline GridFunctionCL<SVectorCL<D> >
+operator*( const GridFunctionCL<SVectorCL<D> >& a, double b)
 {
 
     return b*a;
 }
 
-inline GridFunctionCL<Point3DCL>
-operator*( const Point3DCL& a, const GridFunctionCL<double>& b)
+template<Uint D>
+inline GridFunctionCL<SVectorCL<D> >
+operator*( const SVectorCL<D> & a, const GridFunctionCL<double>& b)
 {
 
-    GridFunctionCL<SVectorCL<3> > ret( a, b.size());
+    GridFunctionCL<SVectorCL<D> > ret( a, b.size());
     for (size_t i= 0; i < b.size(); ++i)
         ret[i]*= b[i];
     return ret;
 }
 
-inline GridFunctionCL<Point3DCL>
-operator*( const GridFunctionCL<double>& a, const Point3DCL& b)
+template<Uint D>
+inline GridFunctionCL<SVectorCL<D> >
+operator*( const GridFunctionCL<double>& a, const SVectorCL<D> & b)
 {
 
     return b*a;
@@ -224,8 +333,9 @@ dot(const GridFunctionCL<SVectorCL<Dim> >& a, const GridFunctionCL<SVectorCL<Dim
     return ret;
 }
 
+template<Uint D>
 inline GridFunctionCL<double>
-dot(const Point3DCL& a, const GridFunctionCL<Point3DCL>& b)
+dot(const SVectorCL<D> & a, const GridFunctionCL<SVectorCL<D> >& b)
 {
     GridFunctionCL<double> ret( 0.0, b.size());
     for (size_t i= 0; i<b.size(); ++i)
@@ -243,7 +353,8 @@ dot(const GridFunctionCL< SVectorCL<Rows> >& a, const GridFunctionCL< SMatrixCL<
     return ret;
 }
 
-inline void ExtractComponent( const GridFunctionCL<Point3DCL>& src, GridFunctionCL<double>& target, int comp)
+template<Uint D>
+inline void ExtractComponent( const GridFunctionCL<SVectorCL<D> >& src, GridFunctionCL<double>& target, int comp)
 {
     Assert( target.size()==src.size(), DROPSErrCL("extractComponent: GridFunctionCL objects have different sizes"), DebugNumericC);
     for (size_t i= 0; i<src.size(); ++i)
