@@ -353,6 +353,20 @@ dot(const GridFunctionCL< SVectorCL<Rows> >& a, const GridFunctionCL< SMatrixCL<
     return ret;
 }
 
+
+template<class T>
+    std::ostream& operator << (std::ostream& os, const GridFunctionCL<T>& g)
+{
+    const size_t N = g.size();
+    os << " gridfunction of size " << N << '\n' ;
+    for (size_t i = 0; i < N; ++i)
+    {
+        os << g[i] << "\n";
+    }
+    os << "\n";
+    return os;
+}
+
 template<Uint D>
 inline void ExtractComponent( const GridFunctionCL<SVectorCL<D> >& src, GridFunctionCL<double>& target, int comp)
 {
