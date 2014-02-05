@@ -163,6 +163,7 @@ class InstatStokes2PhaseP2P1CL : public ProblemCL<TwoPhaseFlowCoeffCL, StokesBnd
     VecDescCL    c;
     MLMatDescCL  A,
                  B,
+                 C,
                  M,
                  prA,
                  prM;
@@ -214,6 +215,8 @@ class InstatStokes2PhaseP2P1CL : public ProblemCL<TwoPhaseFlowCoeffCL, StokesBnd
     void SetupBdotv (VecDescCL* Bdotv, const VelVecDescCL* vel, const LevelsetP2CL& lset, double t) const;
     /// Set up the mass matrix for the pressure, scaled by \f$\mu^{-1}\f$.
     void SetupPrMass( MLMatDescCL* prM, const LevelsetP2CL& lset) const;
+    /// Set up the stabilisation matrix for the pressure.
+    void SetupC( MLMatDescCL* matC, const LevelsetP2CL& lset, double eps_p ) const;
     /// Set up the stiffness matrix for the pressure, scaled by \f$\rho^{-1}\f$.
     void SetupPrStiff(MLMatDescCL* prA, const LevelsetP2CL& lset) const;
     //@}
@@ -223,7 +226,7 @@ class InstatStokes2PhaseP2P1CL : public ProblemCL<TwoPhaseFlowCoeffCL, StokesBnd
     /// Smooth velocity field
     void SmoothVel( VelVecDescCL*, int num= 1, double tau=0.5);
     /// Clear all matrices, should be called after grid change to avoid reuse of matrix pattern
-    void ClearMat() { A.Data.clear(); B.Data.clear(); M.Data.clear(); prA.Data.clear(); prM.Data.clear(); }
+    void ClearMat() { A.Data.clear(); B.Data.clear(); C.Data.clear(); M.Data.clear(); prA.Data.clear(); prM.Data.clear(); }
     /// Set all indices
     void SetIdx();
     /// Set number of used levels

@@ -90,6 +90,7 @@ class StokesP2P1CL : public ProblemCL<Coeff, StokesBndDataCL>
     VecDescCL    c;
     MLMatDescCL  A,
                  B,
+                 C,        // Optional, for stabilisation.
                  M,
                  prA,
                  prM;

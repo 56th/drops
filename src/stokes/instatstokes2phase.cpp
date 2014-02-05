@@ -29,6 +29,8 @@
 #include "misc/progressaccu.h"
 #include "misc/scopetimer.h"
 
+#include <set>
+
 extern DROPS::ParamCL P;
 
 namespace DROPS
@@ -962,6 +964,474 @@ void SetupPrMass_P1D(const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, Ma
     M_pr.Build();
 }
 
+// -----------------------------------------------------------------------------
+//                        Routines for SetupPrGhostStab_P1X
+// -----------------------------------------------------------------------------
+
+// These functions set up the stabilisation matrix C = -eps_p*J as described in the
+// Master's thesis "On the Application of a Stabilised XFEM Technique..."
+// by me (Matthias Kirchhart).
+
+// In order to avoid polluting the namespace, put the helper functions in an
+// anonymous one.
+namespace
+{
+Uint get_face_number_in_tetra( const FaceCL *const F, const TetraCL *const K );
+void get_tetra_to_face_indeces( const FaceCL *const F,
+                                Uint K1idx_to_Fidx[4], Uint K2idx_to_Fidx[4] );
+void get_tetra_corner_signs( const TetraCL *const K, const LevelsetP2CL &lset, int signs[4] );
+void treat_face( const FaceCL *const F, const int set_number,
+                 const IdxDescCL& RowIdx, const LevelsetP2CL &lset,
+                 const double h3, const double mu_inv, MatrixBuilderCL &J_pr );
+void get_stab_tetras( const MultiGridCL &MG, const IdxDescCL& RowIdx, const LevelsetP2CL& lset,
+                      std::vector<const TetraCL*>& stab_tetras );
+void get_stab_face_sets( const std::vector<const TetraCL*>& stab_tetras,
+                         const LevelsetP2CL& lset,
+                         std::set<const FaceCL*>& F_GammaOne,
+                         std::set<const FaceCL*>& F_GammaTwo );
+Ubyte is_in_F_Gamma_i( const TetraCL *const K, const Uint face_no,
+                       const LevelsetP2CL &lset );
+
+}
+
+void SetupPrGhostStab_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff,
+                           MatrixCL& matC, IdxDescCL& RowIdx, const LevelsetP2CL& lset,
+                           double eps_p )
+{
+    ScopeTimerCL scope( "SetupPrGhostStab_P1X" );
+
+    const IdxT num_unks_pr = RowIdx.NumUnknowns();
+    MatrixBuilderCL J_pr( &matC, num_unks_pr, num_unks_pr );
+
+    std::vector<const TetraCL*> stab_tetras(0);
+    get_stab_tetras( MG, RowIdx, lset, stab_tetras );
+
+    std::set<const FaceCL*> F_GammaOne, F_GammaTwo;
+    get_stab_face_sets( stab_tetras, lset, F_GammaOne, F_GammaTwo );
+
+    // Use the volume as a measure of "h^3"
+    // We use the minimum value instead of the maximum. Near the interface the
+    // cells are typically smallest and it is the h in the vicinity of these
+    // cells that is important for the stabilisation.
+    double h3 = std::numeric_limits<double>::max();
+    const Uint level = RowIdx.TriangLevel();
+    typedef MultiGridCL::const_TriangTetraIteratorCL tetra_MG_iter;
+    for ( tetra_MG_iter i = MG.GetTriangTetraBegin(level);
+          i != MG.GetTriangTetraEnd(level); ++i )
+    {
+        h3 = std::min( h3, i->GetVolume() );
+    }
+
+    const double mu_inv1 = 1.0/Coeff.mu(0);
+    const double mu_inv2 = 1.0/Coeff.mu(1);
+
+    // Perform the actual stabilisation
+    typedef std::set<const FaceCL*>::const_iterator face_iter;
+    for ( face_iter i = F_GammaOne.begin();
+          i != F_GammaOne.end(); ++i )
+    {
+        treat_face( *i, 1, RowIdx, lset, h3, mu_inv1, J_pr );
+    }
+
+    for ( face_iter i = F_GammaTwo.begin();
+          i != F_GammaTwo.end(); ++i )
+    {
+        treat_face( *i, 2, RowIdx, lset, h3, mu_inv2, J_pr );
+    }
+
+    J_pr.Build();
+
+    // We have assembled J, now multiply it by -eps_p to obtain C.
+    matC *= -eps_p;
+}
+
+namespace
+{
+
+/*!
+ * \brief Find all tetrahedra which are involved in the ghost stabilisation.
+ * 
+ * In the paper by Hansbo et al., the two sets of faces which are used in
+ * the stabilisation, are defined via means of a set of tetrahedra:
+ * those tetrahedra which are cut (\f$K_\Gamma\f$) and those which have more
+ * than two neighbours in \f$K_\Gamma\f$, called \f$\tilde{K}_\Gamma\f$.
+ * This method builds the union of these two sets and stores the result in
+ * stab_tetras.
+ */
+void get_stab_tetras( const MultiGridCL &MG, const IdxDescCL& RowIdx,
+                      const LevelsetP2CL& lset,
+                      std::vector<const TetraCL*>& stab_tetras )
+{
+    // First, we need to find all cut elements.
+    std::set<const TetraCL*> K_Gamma;
+
+    const Uint level = RowIdx.TriangLevel();
+    typedef MultiGridCL::const_TriangTetraIteratorCL tetra_MG_iter;
+    for ( tetra_MG_iter i = MG.GetTriangTetraBegin(level);
+          i != MG.GetTriangTetraEnd(level); ++i )
+    {
+        LocalP2CL<> loc_phi;
+        loc_phi.assign( *i, lset.Phi, lset.GetBndData() );
+        InterfaceTetraCL cut;
+        cut.Init( *i, loc_phi );
+
+        if ( cut.Intersects() )
+        {
+            K_Gamma.insert( &(*i) );    
+        }
+    }
+
+    // Now find all cells that have more than one face in common with
+    // cells in K_gamma. (Needed for LBB stability. The "blue" cells in
+    // the master's thesis.
+    std::set<const TetraCL*> K_Gamma_tilde;
+    typedef std::set<const TetraCL*>::const_iterator set_tetra_iter;
+    for ( set_tetra_iter i = K_Gamma.begin(); i != K_Gamma.end(); ++i )    
+    {
+        const TetraCL *const K = *i;
+        for ( TetraCL::const_FacePIterator j = K->GetFacesBegin();
+              j != K->GetFacesEnd(); ++j )
+        {
+            const FaceCL *const F = *j;
+            const TetraCL *const K_neigh = F->GetNeighborTetra(K);
+            if ( K_neigh == 0 ) continue;
+
+            int neighbours_in_K_gamma = 0;
+            for ( TetraCL::const_FacePIterator k = K_neigh->GetFacesBegin();
+                  k != K_neigh->GetFacesEnd(); ++k )
+            {
+                const FaceCL *const FF = *k;
+                const TetraCL *const candidate = FF->GetNeighborTetra(K_neigh);
+
+                if ( K_Gamma.find( candidate ) != K_Gamma.end() )
+                {
+                    ++neighbours_in_K_gamma;
+                }
+            }
+ 
+            if ( neighbours_in_K_gamma > 1 )
+            {
+                K_Gamma_tilde.insert( K_neigh );
+            }
+        }
+    }
+    // Now we have found all tetrahedra which we are interested in. Form a
+    // new set without duplicates and clear the old ones.
+    stab_tetras.resize( K_Gamma.size() + K_Gamma_tilde.size() );
+    typedef std::vector<const TetraCL*>::iterator vec_tetra_iter;
+
+    vec_tetra_iter tmp = std::set_union( K_Gamma.begin(), K_Gamma.end(),
+                                         K_Gamma_tilde.begin(), K_Gamma_tilde.end(),
+                                         stab_tetras.begin() );
+    stab_tetras.resize( tmp - stab_tetras.begin() );
+}
+
+/*!
+ * Given the set of stab_tetras from get_stab_tetras(), this function
+ * builds the two sets of faces \f$F_{\Gamma,1}\f$ and \f$F_{\Gamma,2}\f$
+ * which are involved in the stabilisation.
+ */
+void get_stab_face_sets( const std::vector<const TetraCL*>& stab_tetras,
+                         const LevelsetP2CL& lset,
+                         std::set<const FaceCL*>& F_GammaOne,
+                         std::set<const FaceCL*>& F_GammaTwo )
+{
+    typedef std::vector<const TetraCL*>::const_iterator vec_tetra_iter;
+    for ( vec_tetra_iter it = stab_tetras.begin();
+          it != stab_tetras.end(); ++it )
+    {
+        const TetraCL *const K = *it;
+        for ( Uint i = 0; i < 4; ++i )
+        {
+            Ubyte result = is_in_F_Gamma_i( K, i, lset );
+            if ( result & 1 ) F_GammaOne.insert( K->GetFace(i) );
+            if ( result & 2 ) F_GammaTwo.insert( K->GetFace(i) );
+        }
+    }
+}
+
+/*!
+ * \brief Returns whether a face belongs to one of the stabilisation sets.
+ *
+ * The ghost stabilisation by Hansbo et al. is defined via two face sets, which
+ * in turn are defined by means of a set of tetrahedra, see get_stab_tetras().
+ * This function expects a tetrahedron from this set and the number of the face
+ * within this tetrehedron. If the face lies at least partially in \f$\Omega_1\f$,
+ * the least significant bit of the result is set. If it lies at least partially
+ * in \f$\Omega_2\f$, the second lest significant bit of the result is set.
+ */
+Ubyte is_in_F_Gamma_i( const TetraCL *const K, const Uint face_no,
+                       const LevelsetP2CL &lset )
+{
+    LocalP2CL<> loc_phi;
+    loc_phi.assign( *K, lset.Phi, lset.GetBndData() );
+    InterfaceTetraCL cut;
+    cut.Init( *K, loc_phi );
+
+    // There are ten degrees of freedom in the tetrahedron for the
+    // level-set function. Here we obtain the local numbers for
+    // those DOFs which lie on the face we are interested in.
+    const Ubyte dof_numbers[] = { VertOfFace( face_no, 0 ),
+                                  VertOfFace( face_no, 1 ),
+                                  VertOfFace( face_no, 2 ),
+                                  EdgeOfFace( face_no, 0 ) + 4,
+                                  EdgeOfFace( face_no, 1 ) + 4,
+                                  EdgeOfFace( face_no, 2 ) + 4 };
+
+    // Get the signs of the level-set functions at the DOFs of the
+    // face.
+    const int dof_signs[] = { cut.GetSign( dof_numbers[0] ),
+                              cut.GetSign( dof_numbers[1] ),
+                              cut.GetSign( dof_numbers[2] ),
+                              cut.GetSign( dof_numbers[3] ),
+                              cut.GetSign( dof_numbers[4] ),
+                              cut.GetSign( dof_numbers[5] ) };
+
+    Ubyte result = 0;
+    // There are only two cases to consider:
+    // 1. At least one level-set value is strictly negative (positive).
+    //    In this case the face lies (at least) partially in \f$\Omega_1\f$
+    //    (\f$\Omega_2\f$) and belongs to \f$F_{\Gamma,1}\f$ (\f$F_{\Gamma,2}\f$).
+    // 2. The sign of the level-set function is exactly zero on all nodes.
+    //    In this case the face is a subset of the interface and it belongs
+    //    two both sets of faces for the stabilisation.
+
+    // Case 1.
+    if ( dof_signs[0] < 0 ) result |= 1;
+    if ( dof_signs[1] < 0 ) result |= 1;
+    if ( dof_signs[2] < 0 ) result |= 1;
+    if ( dof_signs[3] < 0 ) result |= 1;
+    if ( dof_signs[4] < 0 ) result |= 1;
+    if ( dof_signs[5] < 0 ) result |= 1;
+
+    if ( dof_signs[0] > 0 ) result |= 2;
+    if ( dof_signs[1] > 0 ) result |= 2;
+    if ( dof_signs[2] > 0 ) result |= 2;
+    if ( dof_signs[3] > 0 ) result |= 2;
+    if ( dof_signs[4] > 0 ) result |= 2;
+    if ( dof_signs[5] > 0 ) result |= 2;
+    
+    // Case 2.
+    if ( dof_signs[0] == dof_signs[1] && dof_signs[1] == dof_signs[2] &&
+         dof_signs[2] == dof_signs[3] && dof_signs[3] == dof_signs[4] &&
+         dof_signs[4] == dof_signs[5] && dof_signs[5] == 0 )
+    {
+        result |= 1;
+        result |= 2;
+    }
+
+    return result;
+}
+
+/*!
+ * \brief Add the contribution of a single face to the stabilisation matrix.
+ *
+ * Given a face and the number of the face set the face belongs to, this
+ * function adds the contribution of that face to the stabilisation matrix.
+ */
+void treat_face( const FaceCL *const F, const int set_number,
+                 const IdxDescCL& RowIdx, const LevelsetP2CL &lset,
+                 const double h3, const double mu_inv, MatrixBuilderCL &J_pr )
+{
+    const TetraCL *const K1 = F->GetNeighbor(0);
+    const TetraCL *const K2 = F->GetNeighbor(1);
+
+    if ( K1 == 0 || K2 == 0 )
+    {
+        // F is part of the boundary and does not take part in the
+        // stabilisation.
+        return;
+    }
+
+    const Uint face_no1 = get_face_number_in_tetra( F, K1 );
+
+    Point3DCL normal; double dir;
+    const double area = 0.5*K1->GetNormal( face_no1, normal, dir );
+
+    const double dir1 =  dir;
+    const double dir2 = -dir;
+    
+    // There are 5 vertices involved: the three vertices of the face and
+    // the respective opposite vertices in the tetrahedra. We introduce a
+    // face-local numbering: 0 - 2 refer to the vertices on the face, 3
+    // refers to the opposite vertex in K1, 4 to the opposite vertex in K2.
+
+    Uint K1idx_to_Fidx[4], K2idx_to_Fidx[4];
+    get_tetra_to_face_indeces( F, K1idx_to_Fidx, K2idx_to_Fidx );
+
+    //////////////////////////////////////////////////////////////////
+    // Compute the gradient jumps of the standard ansatz functions. //
+    //////////////////////////////////////////////////////////////////
+    double s_jumps[5] = { 0, 0, 0, 0, 0 };
+    Point3DCL gradients[4]; double det;
+    P1DiscCL::GetGradients( gradients, det, *K1 );
+    for ( int i = 0; i < 4; ++i )
+    {
+        s_jumps[ K1idx_to_Fidx[i] ] += dir1*inner_prod( gradients[i], normal );
+    }
+
+    P1DiscCL::GetGradients( gradients, det, *K2 );
+    for ( int i = 0; i < 4; ++i )
+    {
+        s_jumps[ K2idx_to_Fidx[i] ] += dir2*inner_prod( gradients[i], normal );
+    }
+
+
+    //////////////////////////////////////////////////////////////////
+    // Compute the gradient jumps of the extended ansatz functions. //
+    //////////////////////////////////////////////////////////////////
+    double x_jumps[5] = { 0, 0, 0, 0, 0 };
+
+    P1DiscCL::GetGradients( gradients, det, *K1 );
+
+    /// Now retrieve the heaviside values for the extended ansatz functions.
+    const int heaviside_face = ( set_number == 1 ) ? 0 : 1;
+
+    int heaviside_nodes[4], signs[4];
+    get_tetra_corner_signs( K1, lset, signs );
+    for ( int i = 0; i < 4; ++i )
+        heaviside_nodes[i] = ( signs[i] < 0 ) ? 0 : 1;
+
+    // Change the signs of the gradients accordingly.
+    for ( int i = 0; i < 4; ++i )
+        gradients[i] *= (heaviside_face - heaviside_nodes[i]);
+    
+    // Add contribution to the jumps.
+    for ( int i = 0; i < 4; ++i )
+    {
+        x_jumps[ K1idx_to_Fidx[i] ] += dir1*inner_prod( gradients[i], normal );
+    }
+
+
+    // The same, just for K2.
+    P1DiscCL::GetGradients( gradients, det, *K2 );
+
+    /// Now retrieve the \f$\Phi_j\f$ of the Ansatzfunctions.
+    get_tetra_corner_signs( K2, lset, signs );
+    for ( int i = 0; i < 4; ++i )
+        heaviside_nodes[i] = ( signs[i] < 0 ) ? 0 : 1;
+
+    // Change the signs of the gradients accordingly.
+    for ( int i = 0; i < 4; ++i )
+        gradients[i] *= (heaviside_face - heaviside_nodes[i]);
+
+    
+    // Add contribution to the jumps.
+    for ( int i = 0; i < 4; ++i )
+    {
+        x_jumps[ K2idx_to_Fidx[i] ] += dir2*inner_prod( gradients[i], normal );
+    }
+
+    ////////////////////////////////////////////////////////////////////
+    // Perform "integration" over the faces and add to global matrix. //
+    ////////////////////////////////////////////////////////////////////
+    const ExtIdxDescCL& Xidx = RowIdx.GetXidx();
+    const Uint idx = RowIdx.GetIdx(); 
+    IdxT indeces[10] = { NoIdx, NoIdx, NoIdx, NoIdx, NoIdx,
+                         NoIdx, NoIdx, NoIdx, NoIdx, NoIdx };
+    for ( int i = 0; i < 4; ++i )
+    {
+        IdxT std_idx = K1->GetVertex(i)->Unknowns(idx);
+        indeces[     K1idx_to_Fidx[i] ] = std_idx;
+        indeces[ 5 + K1idx_to_Fidx[i] ] = Xidx[ std_idx ];
+    }
+    for ( int i = 0; i < 4; ++i )
+    {
+        IdxT std_idx = K2->GetVertex(i)->Unknowns(idx);
+        indeces[     K2idx_to_Fidx[i] ] = std_idx;
+        indeces[ 5 + K2idx_to_Fidx[i] ] = Xidx[ std_idx ];
+    }
+
+    const double jumps[10] = { s_jumps[0], s_jumps[1], s_jumps[2], s_jumps[3], s_jumps[4],
+                               x_jumps[0], x_jumps[1], x_jumps[2], x_jumps[3], x_jumps[4] };
+
+    for ( int i = 0; i < 10; ++i )
+    {
+        if ( indeces[i] == NoIdx ) continue;
+        if ( jumps[i] == 0 ) continue;
+
+        for ( int j = 0; j < 10; ++j )
+        {
+            if ( indeces[j] == NoIdx ) continue;
+            if ( jumps[j] == 0 ) continue;
+
+            J_pr( indeces[i], indeces[j] ) += h3*mu_inv*area*jumps[i]*jumps[j];
+        }
+    }
+}
+
+void get_tetra_corner_signs( const TetraCL *const K, const LevelsetP2CL &lset, int signs[4] )
+{
+    LocalP2CL<> loc_phi;
+    loc_phi.assign( *K, lset.Phi, lset.GetBndData() );
+    InterfaceTetraCL cut;
+    cut.Init( *K, loc_phi );
+
+    signs[0] = cut.GetSign(0);  
+    signs[1] = cut.GetSign(1);  
+    signs[2] = cut.GetSign(2);  
+    signs[3] = cut.GetSign(3);  
+}
+
+void get_tetra_to_face_indeces( const FaceCL *const F,
+                                Uint K1idx_to_Fidx[4], Uint K2idx_to_Fidx[4] )
+{
+    const TetraCL *const K1 = F->GetNeighbor(0);
+    const TetraCL *const K2 = F->GetNeighbor(1);
+
+    for ( int i = 0; i < 4; ++i )
+    {
+        const VertexCL *const v = K1->GetVertex(i);
+        if ( v == F->GetVertex(0) )
+        {
+            K1idx_to_Fidx[i] = 0;
+        }
+        else if ( v == F->GetVertex(1) )
+        {
+            K1idx_to_Fidx[i] = 1;
+        }
+        else if ( v == F->GetVertex(2) )
+        {
+            K1idx_to_Fidx[i] = 2;
+        }
+        else
+        {
+            K1idx_to_Fidx[i] = 3;
+        }
+    }
+
+    for ( int i = 0; i < 4; ++i )
+    {
+        const VertexCL *const v = K2->GetVertex(i);
+        if ( v == F->GetVertex(0) )
+        {
+            K2idx_to_Fidx[i] = 0;
+        }
+        else if ( v == F->GetVertex(1) )
+        {
+            K2idx_to_Fidx[i] = 1;
+        }
+        else if ( v == F->GetVertex(2) )
+        {
+            K2idx_to_Fidx[i] = 2;
+        }
+        else
+        {
+            K2idx_to_Fidx[i] = 4;
+        }
+    }
+}
+
+Uint get_face_number_in_tetra( const FaceCL *const F, const TetraCL *const K )
+{
+    if ( F == K->GetFace(0) ) return 0;
+    if ( F == K->GetFace(1) ) return 1;
+    if ( F == K->GetFace(2) ) return 2;
+    if ( F == K->GetFace(3) ) return 3;
+    else throw DROPSErrCL("Could not find the given face in the tetrahedron.");
+}
+
+} // end of anonymous namespace.
 
 // -----------------------------------------------------------------------------
 //                        Routines for SetupPrStiff
@@ -1217,6 +1687,19 @@ void InstatStokes2PhaseP2P1CL::SetupPrMass( MLMatDescCL* matM, const LevelsetP2C
     }
 }
 
+void InstatStokes2PhaseP2P1CL::SetupC( MLMatDescCL* matC, const LevelsetP2CL& lset, double eps_p ) const
+{
+    MLMatrixCL::iterator itC = matC->Data.begin();
+    MLIdxDescCL::iterator itIdx = matC->RowIdx->begin();
+    for ( size_t lvl = 0; lvl < matC->Data.size(); ++lvl, ++itC, ++itIdx )
+    {
+        if ( GetPrFE() == P1X_FE )
+        {
+            SetupPrGhostStab_P1X( MG_, Coeff_, *itC, *itIdx, lset, eps_p );
+        }
+        else throw DROPSErrCL("InstatStokes2PhaseP2P1CL<Coeff>::SetupC not implemented for this FE type");
+    }
+}
 
 void InstatStokes2PhaseP2P1CL::SetupPrStiff( MLMatDescCL* A_pr, const LevelsetP2CL& lset) const
 /// Needed for preconditioning of the Schur complement. Uses natural
@@ -2979,6 +3462,7 @@ void InstatStokes2PhaseP2P1CL::SetIdx()
 
     A.SetIdx   ( vidx, vidx);
     B.SetIdx   ( pidx, vidx);
+    C.SetIdx   ( pidx, pidx);
     prM.SetIdx ( pidx, pidx);
     prA.SetIdx ( pidx, pidx);
     M.SetIdx   ( vidx, vidx);
@@ -3001,6 +3485,7 @@ void InstatStokes2PhaseP2P1CL::SetNumPrLvl( size_t n)
     const double bound = pr_idx.GetFinest().GetXidx().GetBound();
     pr_idx.resize( n, GetPrFE(),  BndData_.Pr, match, bound);
     B.Data.resize   (pr_idx.size());
+    C.Data.resize   (pr_idx.size());
     prM.Data.resize (pr_idx.size());
     prA.Data.resize (pr_idx.size());
 }
@@ -3244,7 +3729,7 @@ void SetupMassDiag_vecP2(const MultiGridCL& MG, VectorCL& M, const IdxDescCL& Ro
         Numb.assign( *sit, RowIdx, bnd);
         for(int i=0; i<10; ++i)
             if (Numb.WithUnknowns( i)) {
-            	const double contrib= P2DiscCL::GetMass( i, i)*absdet;
+                const double contrib= P2DiscCL::GetMass( i, i)*absdet;
                 M[Numb.num[i]  ]+= contrib;
                 M[Numb.num[i]+1]+= contrib;
                 M[Numb.num[i]+2]+= contrib;
@@ -3442,3 +3927,4 @@ void SetupLumpedMass (const MultiGridCL& MG, VectorCL& M, const IdxDescCL& RowId
 }
 
 } // end of namespace DROPS
+

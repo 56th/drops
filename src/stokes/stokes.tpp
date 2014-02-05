@@ -1079,6 +1079,7 @@ void StokesP2P1CL<Coeff>::SetNumPrLvl( size_t n)
     match_fun match= MG_.GetBnd().GetMatchFun();
     pr_idx.resize( n, P1_FE,  BndData_.Pr, match);
     B.Data.resize( pr_idx.size());
+    C.Data.resize( pr_idx.size());
     prM.Data.resize( pr_idx.size());
     prA.Data.resize( pr_idx.size());
 }
@@ -1094,6 +1095,7 @@ void StokesP2P1CL<Coeff>::SetIdx()
 
     A.SetIdx   ( vidx, vidx);
     B.SetIdx   ( pidx, vidx);
+    C.SetIdx   ( pidx, pidx);
     prM.SetIdx ( pidx, pidx);
     prA.SetIdx ( pidx, pidx);
     M.SetIdx   ( vidx, vidx);
