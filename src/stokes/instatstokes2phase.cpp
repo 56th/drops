@@ -968,11 +968,9 @@ void SetupPrMass_P1D(const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, Ma
 //                        Routines for SetupPrGhostStab_P1X
 // -----------------------------------------------------------------------------
 
-// These functions set up the stabilisation matrix J as described in the
+// These functions set up the stabilisation matrix C = -eps_p*J as described in the
 // Master's thesis "On the Application of a Stabilised XFEM Technique..."
-// by me (Matthias Kirchhart). After the call of SetupPrGhostStab_P1X, the
-// resulting matrix does neither contain the \f \varepsilon_p \f parameter,
-// nor the negative sign.
+// by me (Matthias Kirchhart).
 
 // In order to avoid polluting the namespace, put the helper functions in an
 // anonymous one.
@@ -997,12 +995,13 @@ Ubyte is_in_F_Gamma_i( const TetraCL *const K, const Uint face_no,
 }
 
 void SetupPrGhostStab_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff,
-                           MatrixCL& matJpr, IdxDescCL& RowIdx, const LevelsetP2CL& lset)
+                           MatrixCL& matC, IdxDescCL& RowIdx, const LevelsetP2CL& lset,
+                           double eps_p )
 {
     ScopeTimerCL scope( "SetupPrGhostStab_P1X" );
 
     const IdxT num_unks_pr = RowIdx.NumUnknowns();
-    MatrixBuilderCL J_pr( &matJpr, num_unks_pr, num_unks_pr );
+    MatrixBuilderCL J_pr( &matC, num_unks_pr, num_unks_pr );
 
     std::vector<const TetraCL*> stab_tetras(0);
     get_stab_tetras( MG, RowIdx, lset, stab_tetras );
@@ -1041,6 +1040,9 @@ void SetupPrGhostStab_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coe
     }
 
     J_pr.Build();
+
+    // We have assembled J, now multiply it by -eps_p to obtain C.
+    matC *= -eps_p;
 }
 
 namespace
@@ -1685,17 +1687,17 @@ void InstatStokes2PhaseP2P1CL::SetupPrMass( MLMatDescCL* matM, const LevelsetP2C
     }
 }
 
-void InstatStokes2PhaseP2P1CL::SetupPrJ( MLMatDescCL* matJ, const LevelsetP2CL& lset) const
+void InstatStokes2PhaseP2P1CL::SetupC( MLMatDescCL* matC, const LevelsetP2CL& lset, double eps_p ) const
 {
-    MLMatrixCL::iterator itJ = matJ->Data.begin();
-    MLIdxDescCL::iterator itIdx = matJ->RowIdx->begin();
-    for ( size_t lvl = 0; lvl < matJ->Data.size(); ++lvl, ++itJ, ++itIdx )
+    MLMatrixCL::iterator itC = matC->Data.begin();
+    MLIdxDescCL::iterator itIdx = matC->RowIdx->begin();
+    for ( size_t lvl = 0; lvl < matC->Data.size(); ++lvl, ++itC, ++itIdx )
     {
         if ( GetPrFE() == P1X_FE )
         {
-            SetupPrGhostStab_P1X( MG_, Coeff_, *itJ, *itIdx, lset );
+            SetupPrGhostStab_P1X( MG_, Coeff_, *itC, *itIdx, lset, eps_p );
         }
-        else throw DROPSErrCL("InstatStokes2PhaseP2P1CL<Coeff>::SetupPrJ not implemented for this FE type");
+        else throw DROPSErrCL("InstatStokes2PhaseP2P1CL<Coeff>::SetupC not implemented for this FE type");
     }
 }
 
@@ -3460,9 +3462,9 @@ void InstatStokes2PhaseP2P1CL::SetIdx()
 
     A.SetIdx   ( vidx, vidx);
     B.SetIdx   ( pidx, vidx);
+    C.SetIdx   ( pidx, pidx);
     prM.SetIdx ( pidx, pidx);
     prA.SetIdx ( pidx, pidx);
-    prJ.SetIdx ( pidx, pidx);
     M.SetIdx   ( vidx, vidx);
 }
 
@@ -3483,9 +3485,9 @@ void InstatStokes2PhaseP2P1CL::SetNumPrLvl( size_t n)
     const double bound = pr_idx.GetFinest().GetXidx().GetBound();
     pr_idx.resize( n, GetPrFE(),  BndData_.Pr, match, bound);
     B.Data.resize   (pr_idx.size());
+    C.Data.resize   (pr_idx.size());
     prM.Data.resize (pr_idx.size());
     prA.Data.resize (pr_idx.size());
-    prJ.Data.resize (pr_idx.size());
 }
 
 
@@ -3925,3 +3927,4 @@ void SetupLumpedMass (const MultiGridCL& MG, VectorCL& M, const IdxDescCL& RowId
 }
 
 } // end of namespace DROPS
+

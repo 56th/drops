@@ -150,23 +150,8 @@ void read_params( int argc, char **argv )
 		std::abort();
 	}
 
-	try
-	{
-		P.get<double>("Stokes.epsP");
-	}
-	catch ( ... )
-	{
-		P.put<double>( "Stokes.epsP", 0.0 );
-	}
-
-	try
-	{
-		P.get<bool>( "Stokes.PrintMatrices" );
-	}
-	catch ( ... )
-	{
-		P.put<bool>( "Stokes.PrintMatrices", false );
-	}
+	P.put_if_unset<double>( "Stokes.epsP", 1 );
+	P.put_if_unset<bool>( "Stokes.PrintMatrices", false );
 }
 
 void setup_problem( StokesCL*& Stokes, LevelsetP2CL*& lset, AdapTriangCL*& adap, MarkingStrategyCL*& marker,
@@ -281,8 +266,7 @@ void setup_problem( StokesCL*& Stokes, LevelsetP2CL*& lset, AdapTriangCL*& adap,
 	          << time.GetTime() << " seconds.\n";
 
 	time.Reset();
-	Stokes->SetupPrJ( &Stokes->prJ, *lset );
-	Stokes->prJ.Data.GetFinest() *= -P.get<double>( "Stokes.epsP" );
+	Stokes->SetupC( &Stokes->C, *lset, P.get<double>("Stokes.epsP") );
 	time.Stop();
 	std::cout << "Setup of pressure stabilisation matrix took "
 	          << time.GetTime() << " seconds.\n";
@@ -312,7 +296,7 @@ void solve( StokesCL& Stokes, VelVecDescCL& curv,
 
 	TimerCL time;
 	time.Reset();
-	solver->Solve( Stokes.A.Data, Stokes.B.Data, Stokes.prJ.Data,
+	solver->Solve( Stokes.A.Data, Stokes.B.Data, Stokes.C.Data,
 	               Stokes.v.Data, Stokes.p.Data, curv.Data, Stokes.c.Data,
 	               Stokes.v.RowIdx->GetEx(), Stokes.p.RowIdx->GetEx() );
 	time.Stop();
@@ -338,7 +322,7 @@ void output_matrices( StokesCL& Stokes )
 		Bfile << std::setprecision(16);
 		Bfile << Stokes.B.Data.GetFinest();
 		Cfile << std::setprecision(16);
-		Cfile << Stokes.prJ.Data.GetFinest();
+		Cfile << Stokes.C.Data.GetFinest();
 		Mfile << std::setprecision(16);
 		Mfile << Stokes.prM.Data.GetFinest();
 	}
@@ -485,7 +469,7 @@ double LBB_constant( const StokesCL &Stokes )
     // Inverse power-iteration on M^-1 B A^-1 B^T
     const MatrixCL &A(Stokes.A.Data.GetFinest());
     const MatrixCL &B(Stokes.B.Data.GetFinest());
-    const MatrixCL &C( Stokes.prJ.Data.GetFinest() );
+    const MatrixCL &C( Stokes.C.Data.GetFinest() );
     const MatrixCL &M(Stokes.prM.Data.GetFinest());
     const MatrixCL &Mvel(Stokes.prM.Data.GetFinest());
     const VectorCL  Dvec( M.GetDiag() );
