@@ -65,7 +65,7 @@ class StokesSolverBaseCL: public SolverBaseCL
         // stabilised discretisations to be optional. An error message is shown
         // when one tries this with a class not equipped for stabilised
         // discretisations.
-	throw DROPSErrCL( "This function is supposed to be overwritten in child classes." );
+    throw DROPSErrCL( "This function is supposed to be overwritten in child classes." );
     }
 
     virtual void Solve( const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p,
@@ -80,7 +80,7 @@ class StokesSolverBaseCL: public SolverBaseCL
         // stabilised discretisations to be optional. An error message is shown
         // when one tries this with a class not equipped for stabilised
         // discretisations.
-	throw DROPSErrCL( "This function is supposed to be overwritten in child classes." );
+    throw DROPSErrCL( "This function is supposed to be overwritten in child classes." );
     }
 
 
@@ -417,9 +417,9 @@ template<class APC, typename MatT, typename ExVCL>
     else
     {
         // Stabilised Schur Complement
-	VectorCL result = M.B_*x;
+        VectorCL result = M.B_*x;
         result -= (*(M.C_))*v;
-	return result;
+        return result;
     }
 }
 

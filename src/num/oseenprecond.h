@@ -530,7 +530,7 @@ private:
           solver2_( PCsolver2_, 500, tolM_, /*relative*/ true),
           pr_idx_( &pr_idx), regularize_( regularize)
     {
-	MminusC_.LinComb( 1.0, *M_, -1.0, *C_ );
+    MminusC_.LinComb( 1.0, *M_, -1.0, *C_ );
     }
 
     ISBBT_Stab_PreCL (const ISBBT_Stab_PreCL& pc)
@@ -542,7 +542,7 @@ private:
           solver2_( PCsolver2_, 500, tolM_, /*relative*/ true),
           pr_idx_( pc.pr_idx_), regularize_( pc.regularize_)
     {
-	MminusC_.LinComb( 1.0, *M_, -1.0, *C_ );
+    MminusC_.LinComb( 1.0, *M_, -1.0, *C_ );
     }
 
     ISBBT_Stab_PreCL& operator= (const ISBBT_Stab_PreCL&) {
@@ -566,12 +566,12 @@ private:
     void SetMatrices (const MatrixCL* B, const MatrixCL* C, const MatrixCL* Mvel, const MatrixCL* M, const IdxDescCL* pr_idx)
     {
         B_= B;
-	C_= C;
+        C_= C;
         Mvel_= Mvel;
         M_= M;
         pr_idx_= pr_idx;
         Bversion_ = 0;
-	MminusC_.LinComb( 1.0, *M_, -1.0, *C_ );
+        MminusC_.LinComb( 1.0, *M_, -1.0, *C_ );
     }
 };
 
