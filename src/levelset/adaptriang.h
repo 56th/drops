@@ -73,7 +73,7 @@ class AdapTriangCL
     AdapTriangCL(  MultiGridCL& mg, MarkingStrategyCL *marker = 0, __UNUSED__ int lbStrategy = 1011)
         : mg_( mg ), marker_( marker )
 #ifdef _PAR
-          pmg_( ParMultiGridCL::InstancePtr()), lb_( mg_),
+        , pmg_( ParMultiGridCL::InstancePtr()), lb_( mg_)
 #endif
     {
 
