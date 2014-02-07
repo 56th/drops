@@ -1171,12 +1171,12 @@ Ubyte is_in_F_Gamma_i( const TetraCL *const K, const Uint face_no,
     // There are ten degrees of freedom in the tetrahedron for the
     // level-set function. Here we obtain the local numbers for
     // those DOFs which lie on the face we are interested in.
-    const Ubyte dof_numbers[] = { VertOfFace( face_no, 0 ),
-                                  VertOfFace( face_no, 1 ),
-                                  VertOfFace( face_no, 2 ),
-                                  EdgeOfFace( face_no, 0 ) + 4,
-                                  EdgeOfFace( face_no, 1 ) + 4,
-                                  EdgeOfFace( face_no, 2 ) + 4 };
+    const int dof_numbers[] = { VertOfFace( face_no, 0 ),
+                                VertOfFace( face_no, 1 ),
+                                VertOfFace( face_no, 2 ),
+                                EdgeOfFace( face_no, 0 ) + 4,
+                                EdgeOfFace( face_no, 1 ) + 4,
+                                EdgeOfFace( face_no, 2 ) + 4 };
 
     // Get the signs of the level-set functions at the DOFs of the
     // face.

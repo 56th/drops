@@ -307,8 +307,6 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbndda
     cBndDataCL & Bnd_c(*pBnd_c);
     cBndDataCL & Bnd_ct(*pBnd_ct);
 
-    typedef InstatNavierStokes2PhaseP2P1CL StokesProblemT;
-
 
     // initialization of surface tension
     sigma= Stokes.GetCoeff().SurfTens;

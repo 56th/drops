@@ -203,7 +203,7 @@ class SurfactantcGP1CL
 
     GSPcCL                  pc_;
     GMResSolverCL<GSPcCL>   gm_;
-    __UNUSED__ double omit_bound_; ///< not used atm
+    double omit_bound_; ///< not used atm
 
   public:
     SurfactantcGP1CL (MultiGridCL& mg, const VelBndDataT& Bnd_v,
