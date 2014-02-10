@@ -45,6 +45,8 @@ exec_ser(serialization misc-utils misc-params geom-builder geom-simplex geom-mul
 
 exec_ser(triang misc-utils geom-builder geom-simplex geom-multigrid geom-boundary geom-topo num-unknowns geom-deformation misc-problem num-interfacePatch num-fe)
 
+exec_ser(combiner misc-utils geom-builder geom-simplex geom-multigrid geom-boundary geom-topo levelset-adaptriang levelset-marking_strategy out-output out-vtkOut)
+
 exec_ser(quadCut misc-utils geom-builder geom-deformation geom-simplex geom-multigrid misc-scopetimer misc-progressaccu geom-boundary geom-topo num-unknowns misc-problem num-interfacePatch levelset-levelset levelset-fastmarch num-discretize num-fe levelset-surfacetension geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature)
 
 exec_ser(bicgstab misc-utils)

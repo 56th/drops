@@ -121,6 +121,7 @@ void StrategyCombinerCL::visit( const TetraCL& t )
         modified_ = true;
         t.SetRemoveMark();
     }
+    else t.SetNoRefMark();
 }
 
 TetraAccumulatorCL* StrategyCombinerCL::clone( int )
