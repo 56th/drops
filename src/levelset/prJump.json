@@ -62,7 +62,7 @@
 		"SD":		0,
 		"CurvDiff":		0,
 		"VolCorrection":		0,
-		"Discontinuous":		0,  // Use DG for levelset?
+		"Discontinuous":		0,  
 		"Theta":		0
 	},
 
