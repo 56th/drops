@@ -21,7 +21,7 @@
         "PcATol": "0.01",
         "PcSTol": "0.01",
         "Theta": "1",
-        "epsP": "1",
+        "epsP": "0",
         "PrintMatrices": "false"
     },
 
@@ -29,7 +29,7 @@
     {
         "_comment": "# adaptive refinement",
         "Freq": "0",
-        "FinestLevel": "2",
+        "FinestLevel": "3",
         "CoarsestLevel": "0",
         "Width": "1e-08",
         "LoadBalStrategy": "1011"
@@ -39,9 +39,9 @@
     {
         "_comment": "# material data, all units are SI",
         "DensDrop": "1",
-        "ViscDrop": "0.01",
+        "ViscDrop": "1",
         "DensFluid": "1",
-        "ViscFluid": "0.01",
+        "ViscFluid": "1",
         "SmoothZone": "1e-05",
         "ShearVisco": "0",
         "DilatationalVisco": "0"
@@ -89,12 +89,12 @@
         "DilatationalVisco": "0"
     },
 
-    "Ensight":
+    "VTK":
     {
-        "_comment": "# Ensight settings",
-        "EnsightOut": "1",
-        "EnsCase": "prJump",
-        "EnsDir": "ensight",
+        "_comment": "# VTK settings",
+        "vtkOut": "true",
+        "vtkCase": "prJump",
+        "vtkDir": "vtk",
         "Binary": "0",
         "MasterOut": "1",
         "GeomName": "Cube"

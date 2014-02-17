@@ -22,11 +22,17 @@
  * Copyright 2009 LNM/SC RWTH Aachen, Germany
 */
 
+#include <vector>
+#include <memory>
+#include <limits>
+
 #include "geom/multigrid.h"
 #include "geom/builder.h"
 #include "stokes/instatstokes2phase.h"
 #include "num/krylovsolver.h"
 #include "num/precond.h"
+#include "out/output.h"
+#include "out/vtkOut.h"
 #include "levelset/coupling.h"
 #include "levelset/adaptriang.h"
 #include "levelset/marking_strategy.h"
@@ -34,9 +40,6 @@
 #include "levelset/surfacetension.h"
 #include "num/stokessolverfactory.h"
 #include "misc/funcmap.h"
-#include <vector>
-#include <memory>
-#include <limits>
 #include "misc/dynamicload.h"
 
 using namespace DROPS;
@@ -64,6 +67,9 @@ void NormalisePr( VectorCL& p, const MatrixCL& M,
 
 // Computation of the LBB constant.
 void LBB_constant( const StokesT &Stokes );
+
+// VTK output.
+void output( StokesT &Stokes, LevelsetP2CL& lset, BndDataCL<>& lsetbnd );
 
 //double DistanceFct( const Point3DCL& p )
 //{
@@ -173,6 +179,8 @@ int main ( int argc, char** argv )
         h1_vel_error = std::sqrt( h1_vel_error );
         std::cout << "||e_v||_L2 = " << l2_vel_error << std::endl;
         std::cout << "||e_v||_H1 = " << h1_vel_error << std::endl;
+ 
+        output( prob, lset, lsbnd );
     }
     catch ( DROPSErrCL err )
     {
@@ -289,6 +297,7 @@ void Solve( StokesT& Stokes, LevelsetP2CL& lset, VelVecDescCL& curv )
     // ...and solve.
     TimerCL time;
     time.Reset();
+
     solver->Solve( Stokes.A.Data, Stokes.B.Data, Stokes.C.Data,
                    Stokes.v.Data, Stokes.p.Data,
                    curv.Data, Stokes.c.Data,
@@ -464,5 +473,31 @@ void LBB_constant( const StokesT &Stokes )
     }      
     std::cout << "The value of the LBB-constant is: " << std::sqrt(lambda)
               << std::endl;
+}
+
+void output( StokesT &Stokes, LevelsetP2CL& lset, BndDataCL<>& lsetbnd )
+{
+    using std::string;
+
+    if ( ! P.get<bool>("VTK.vtkOut") ) return;
+
+    MultiGridCL& MG = Stokes.GetMG();
+    string casename = P.get<string>("VTK.vtkCase");
+    string casedir  = P.get<string>("VTK.vtkDir");
+    bool   binary   = P.get<bool>("VTK.Binary");
+    
+    VTKOutCL vtk( MG, casename, 1, casedir, casename, casename, binary );
+
+    vtk.Register( make_VTKScalar( Stokes.GetPrSolution(), "pressure" ) );
+
+    FiniteElementT prFE = P.get<double>("Stokes.XFEMStab") < 0 ? P1_FE : P1X_FE;
+    if ( prFE == P1X_FE )
+    {
+        vtk.Register( make_VTKP1XScalar( MG, lset.Phi, Stokes.p, lsetbnd, "Xpressure" ) );
+    }
+    vtk.Register( make_VTKScalar( make_P2Eval( MG, lsetbnd, lset.Phi ), "levelset" ) );
+
+    vtk.Register( make_VTKVector( Stokes.GetVelSolution() , "velocity" ) );
+    vtk.Write( 0 );
 }
 
