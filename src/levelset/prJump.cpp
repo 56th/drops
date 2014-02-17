@@ -27,8 +27,6 @@
 #include "stokes/instatstokes2phase.h"
 #include "num/krylovsolver.h"
 #include "num/precond.h"
-#include "out/output.h"
-#include "out/ensightOut.h"
 #include "levelset/coupling.h"
 #include "levelset/adaptriang.h"
 #include "levelset/marking_strategy.h"
@@ -36,23 +34,26 @@
 #include "levelset/surfacetension.h"
 #include "num/stokessolverfactory.h"
 #include "misc/funcmap.h"
-#include <fstream>
-#include <iomanip>
 #include <vector>
 #include <memory>
+#include <limits>
 #include "misc/dynamicload.h"
 
 using namespace DROPS;
 
+// Some useful abbreviations.
 typedef StokesVelBndDataCL::bnd_val_fun VelBndFunT;
 typedef LsetBndDataCL::bnd_val_fun     LsetBndFunT;
-//typedef InstatStokes2PhaseP2P1CL StokesT;
+// This has already been declared somewhere in the headers.
+// typedef InstatStokes2PhaseP2P1CL StokesT;
 typedef DistMarkingStrategyCL MarkerT;
 
 ParamCL P;
 
 void Assemble( StokesT& Stokes, LevelsetP2CL& lset, VelVecDescCL& curv );
 void Solve( StokesT& Stokes, LevelsetP2CL& lset, VelVecDescCL& curv );
+
+// Functions for the computation of the pressure error.
 double L2ErrorPr( VecDescCL& p, const MatrixCL& M, double delta_p,
                   const MultiGridCL& MG, const FiniteElementT prFE,
                   const ExtIdxDescCL& Xidx );
@@ -60,6 +61,9 @@ void ExactPr( VecDescCL& p, double delta_p, const MultiGridCL& mg,
               const FiniteElementT prFE, const ExtIdxDescCL& Xidx );
 void NormalisePr( VectorCL& p, const MatrixCL& M,
                   const FiniteElementT prFE, const ExtIdxDescCL& Xidx );
+
+// Computation of the LBB constant.
+void LBB_constant( const StokesT &Stokes );
 
 //double DistanceFct( const Point3DCL& p )
 //{
@@ -139,8 +143,10 @@ int main ( int argc, char** argv )
 
         VelVecDescCL rhs;
         Assemble( prob, lset, rhs );
-        Solve( prob, lset, rhs );
 
+        LBB_constant( prob );
+
+        Solve( prob, lset, rhs );
 
         // Create an unscaled version of the stokes version.
         // Its mass and stiffness matrices allow us to easily compute the
@@ -373,5 +379,90 @@ void NormalisePr( VectorCL& p, const MatrixCL& M,
     }
     const double p_avg = dot( M*p, ones ) / dot( M*ones, ones );
     p -= p_avg*ones;
+}
+
+void LBB_constant( const StokesT &Stokes )
+{
+    std::cout << "The computation of the LBB constant takes a long time.\n"
+              << "Do you wish to proceed? (y/n)" << std::endl;
+
+    char answer;
+    std::cin >> answer;
+    if ( answer != 'y' )
+    {
+        std::cout << "Skipping the computation of the LBB constant." << std::endl;
+        return;
+    }
+    std::cout << "Computing the value of the LBB-constant..." << std::endl;
+
+    // Inverse power-iteration on M^-1 B A^-1 B^T
+    const MatrixCL &A(Stokes.A.Data.GetFinest());
+    const MatrixCL &B(Stokes.B.Data.GetFinest());
+    const MatrixCL &C(Stokes.C.Data.GetFinest());
+    const MatrixCL &M(Stokes.prM.Data.GetFinest());
+    const MatrixCL &Mvel(Stokes.M.Data.GetFinest());
+
+    // Create a preconditioner for A. A PCG
+    typedef SSORPcCL SymmPcPcT;
+    typedef PCGSolverCL<SymmPcPcT> PCGSolverT;
+    typedef SolverAsPreCL<PCGSolverT> APcT;
+
+    SymmPcPcT symmpcpc;
+    PCGSolverT Asolver( symmpcpc, 500, 0.01, true );
+    APcT Apc(Asolver);
+
+    // Approximate Schur.
+    typedef ApproximateSchurComplMatrixCL<APcT, MatrixCL, DummyExchangeCL > SchurCL;
+    SchurCL schur( A, Apc, B, C, DummyExchangeCL() );
+    
+
+    // Schur-Inverter...
+    int tmp = 5000;
+    typedef GCRSolverCL<ISBBT_Stab_PreCL> SolverT;
+    ISBBT_Stab_PreCL Sprecond( &B, &C, &M, &Mvel, Stokes.pr_idx.GetFinest() );
+    SolverT gcr( Sprecond, tmp, 5000, 1e-10, true );
+ 
+    VectorCL y_k( Stokes.p.Data.size() ), y_k1( Stokes.p.Data.size() );
+    double lambda_prev = 2, lambda_prev2 = 3, lambda = 1;
+    double q, rel_error;
+    rel_error = std::numeric_limits<double>::max();
+
+    const ExtIdxDescCL& Xidx = Stokes.GetXidx();
+    VectorCL ones( 1.0, Stokes.p.Data.size() );
+    if ( Stokes.GetPrFE() == P1X_FE )
+        for ( size_t i = Xidx.GetNumUnknownsStdFE(); i < ones.size(); ++i )
+            ones[i]= 0;
+
+    y_k1[0] = 1;
+
+    int i = 0;
+    while ( true )
+    {
+    if ( i++ > 50 && rel_error < 1e-3 )
+        break;
+
+    y_k = y_k1;
+    y_k -= dot(M*y_k,ones)/dot(M*ones,ones)*ones;
+    y_k /= std::sqrt( dot(y_k,y_k) );
+
+    VectorCL rhs = M*y_k;
+    y_k1 = std::abs((1.0/lambda))*y_k;
+    gcr.Solve( schur, y_k1, rhs, DummyExchangeCL() );
+    std::cout << "GCR-Residual: " << gcr.GetResid()
+              << ".\t GCR-Iterations: " << gcr.GetIter() << ".\n";
+
+    lambda_prev2 = lambda_prev;
+    lambda_prev = lambda;
+    lambda = 1.0/dot( y_k, y_k1 );
+
+    q = ( lambda - lambda_prev ) / ( lambda_prev - lambda_prev2 );
+    double error  = std::abs((q/(1.0-q))*(lambda-lambda_prev));
+    rel_error = error/std::abs(lambda);
+    std::cout << "Eigenvalue estimate: " << lambda << "\tError estimate: "
+              << rel_error * 100 << "%\tLBB-Estimate: " << std::sqrt(lambda) << '\n';
+    std::cout.flush();
+    }      
+    std::cout << "The value of the LBB-constant is: " << std::sqrt(lambda)
+              << std::endl;
 }
 
