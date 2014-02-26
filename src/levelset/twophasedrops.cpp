@@ -614,7 +614,7 @@ int main (int argc, char** argv)
 
     try
     {
-        std::auto_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P.get_child( "Domain")));
+        std::auto_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P));
         mg = new DROPS::MultiGridCL( *builder);
     }
     catch (DROPS::DROPSParamErrCL& e)
