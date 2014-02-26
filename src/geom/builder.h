@@ -511,7 +511,9 @@ class FileBuilderCL : public MGBuilderCL
         if (delete_bndbuilder_)
             delete bndbuilder_;
     }
-    virtual void build_ser_impl(MultiGridCL*) const;
+    void build(MultiGridCL* mg) const;
+    virtual void build_ser_impl(MultiGridCL* mg) const { build(mg); }
+    virtual void build_par_impl(MultiGridCL* mg) const { build(mg); }
 };
 #endif
 
