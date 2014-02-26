@@ -1697,7 +1697,13 @@ void InstatStokes2PhaseP2P1CL::SetupC( MLMatDescCL* matC, const LevelsetP2CL& ls
         {
             SetupPrGhostStab_P1X( MG_, Coeff_, *itC, *itIdx, lset, eps_p );
         }
-        else throw DROPSErrCL("InstatStokes2PhaseP2P1CL<Coeff>::SetupC not implemented for this FE type");
+        else
+        { 
+            // Stabilisation is not defined for this type. Don't do anything.
+            const IdxT num_unks_pr = itIdx->NumUnknowns();
+            itC->clear();
+            itC->resize( num_unks_pr, num_unks_pr, 0 );
+        }
     }
 }
 
