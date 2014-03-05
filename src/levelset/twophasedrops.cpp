@@ -479,6 +479,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         if (doGridMod)
         {
             gridChanged = adap.UpdateTriang();
+
         }
         // downwind-numbering for Navier-Stokes
         const bool doNSDownwindNumbering= P.get<int>("NavStokes.Downwind.Frequency")
@@ -676,12 +677,12 @@ int main (int argc, char** argv)
 
     std::cout << DROPS::SanityMGOutCL(*mg) << std::endl;
 #ifdef _PAR
-    if ( DROPS::CheckParMultiGrid())
-        std::cout << "As far as I can tell the ParMultigridCL is sane\n";
     if ( DROPS::ProcCL::Check( DROPS::DiST::InfoCL::Instance().IsSane( std::cerr)))
         std::cout << " DiST-module seems to be alright!" << std::endl;
     else
         std::cout << " DiST-module seems to be broken!" << std::endl;
+    if ( DROPS::CheckParMultiGrid())
+        std::cout << "As far as I can tell the ParMultigridCL is sane\n";
 #endif
 
     DROPS::InstatNavierStokes2PhaseP2P1CL prob( *mg, DROPS::TwoPhaseFlowCoeffCL(P), bnddata, P.get<double>("Stokes.XFEMStab")<0 ? DROPS::P1_FE : DROPS::P1X_FE, P.get<double>("Stokes.XFEMStab"));
