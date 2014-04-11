@@ -1398,7 +1398,7 @@ void SpecialBndHandler_System1OnePhaseP2CL::setup(const TetraCL& tet, const SMat
 			for(Uint i=0; i<10; ++i)
 				phi[i][i] = 1;
 				
-            double temp = symmBC? 0.: beta_;
+		    double temp = symmBC? 0.: beta_;
 			for(Uint i=0; i<10; ++i){
 				LocalP1CL<double> Gradin(dot( normal, Grad[i]));
 				mass2Di.assign(phi[i], bary);	
@@ -1412,8 +1412,8 @@ void SpecialBndHandler_System1OnePhaseP2CL::setup(const TetraCL& tet, const SMat
 					// three additional terms
 					dm[j][i](0, 0)=dm[j][i](1, 1) = dm[j][i](2, 2) = temp * mass2D.quad(absdet);
 					dm[j][i]     += (alpha_/h - temp) * mass2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));
-					if(BndData_.Vel.GetBC(*tet.GetFace(k))!= SymmBC)
-						dm[j][i]     -=  2. * mu_ * Grad2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));  
+					// if(BndData_.Vel.GetBC(*tet.GetFace(k))!= SymmBC) not necessary
+					dm[j][i]     -=  2. * mu_ * Grad2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));  
 					loc.Ak[j][i] += dm[j][i];
 					if (i != j){
 						assign_transpose( dm[i][j], dm[j][i]);
@@ -1596,7 +1596,7 @@ void SpecialBndHandler_System1TwoPhaseP2CL::setup(const TetraCL& tet, const SMat
 				resize_and_evaluate_on_vertexes( Gradn[i], q5dom, gradP1[i]); // for A	
 			}
 
-	        double temp1 = symmBC? 0: beta1_;
+		    double temp1 = symmBC? 0: beta1_;
 			double temp2 = symmBC? 0: beta2_;
 			for(Uint i=0; i<10; ++i){
 				for(Uint j=0; j<=i; ++j){	
@@ -1605,8 +1605,8 @@ void SpecialBndHandler_System1TwoPhaseP2CL::setup(const TetraCL& tet, const SMat
 					// three additional terms
 					dm[j][i](0, 0)= dm[j][i](1, 1) = dm[j][i](2, 2) = temp1 * locInt[0].mass2D[i][j] + temp2* locInt[1].mass2D[i][j];
 					dm[j][i]     += ( (alpha_/h -temp1)* locInt[0].mass2D[i][j] + (alpha_/h - temp2) * locInt[1].mass2D[i][j] )* SMatrixCL<3,3> (outer_product(normal, normal));
-					if(BndData_.Vel.GetBC(*tet.GetFace(k))!= SymmBC)
-						dm[j][i]     -= ( 2. * mu1_ * locInt[0].grad2D[i][j]+ 2.* mu2_ * locInt[1].grad2D[i][j] )* SMatrixCL<3,3> (outer_product(normal, normal));  
+					//if(BndData_.Vel.GetBC(*tet.GetFace(k))!= SymmBC) not necessary
+					dm[j][i]     -= ( 2. * mu1_ * locInt[0].grad2D[i][j]+ 2.* mu2_ * locInt[1].grad2D[i][j] )* SMatrixCL<3,3> (outer_product(normal, normal));  
 					loc.Ak[j][i] += dm[j][i];
 					if (i != j){
 						assign_transpose( dm[i][j], dm[j][i]);
