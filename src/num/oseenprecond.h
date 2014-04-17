@@ -536,7 +536,7 @@ private:
     ISBBT_Stab_PreCL (const ISBBT_Stab_PreCL& pc)
         : SchurPreBaseCL( pc.kA_, pc.kM_), B_( pc.B_), Bs_( pc.Bs_ == 0 ? 0 : new MatrixCL( *pc.Bs_)),
           Bversion_( pc.Bversion_),
-          M_( pc.M_), Mvel_( pc.Mvel_), C_( pc.C_ ),
+          M_( pc.M_), Mvel_( pc.Mvel_), C_( pc.C_ ), tolA_( pc.tolA_), tolM_( pc.tolM_),
           PCsolver1_(), PCsolver2_(),
           solver_( PCsolver1_, 800, tolA_, /*relative*/ true),
           solver2_( PCsolver2_, 500, tolM_, /*relative*/ true),
