@@ -37,7 +37,7 @@ namespace DiST {
 /// True on program startup. Can be reassigned.
 extern bool use_binaryMPIstreams;
 
-class GeomIdCL; ///< forward declaration for operator>>/<<
+struct GeomIdCL; ///< forward declaration for operator>>/<<
 
 /// \brief Streambuf for MPI-messages based on std::stringbuf.
 /// The MPI operations are forwarded to ProcCL.
