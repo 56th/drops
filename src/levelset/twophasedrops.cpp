@@ -747,6 +747,8 @@ int main (int argc, char** argv)
         DROPS::EllipsoidCL::Init( P.get<DROPS::Point3DCL>("Exp.PosDrop"), P.get<DROPS::Point3DCL>("Exp.RadDrop"));
     if (InitialLSet == "HalfEllipsoid")
         DROPS::HalfEllipsoidCL::Init( P.get<DROPS::Point3DCL>("Exp.PosDrop"), P.get<DROPS::Point3DCL>("Exp.RadDrop"));
+    if (InitialLSet == "ContactDroplet")
+        DROPS::ContactDropletCL::Init( P.get<DROPS::Point3DCL>("Exp.PosDrop"), P.get<DROPS::Point3DCL>("Exp.RadDrop"), P.get<double>("Exp.AngleDrop"));
     if  (InitialLSet == "TwoEllipsoid")
         DROPS::TwoEllipsoidCL::Init( P.get<DROPS::Point3DCL>("Exp.PosDrop"), P.get<DROPS::Point3DCL>("Exp.RadDrop"), P.get<DROPS::Point3DCL>("Exp.PosDrop2"), P.get<DROPS::Point3DCL>("Exp.RadDrop2"));
     if (InitialLSet.find("Cylinder")==0) {

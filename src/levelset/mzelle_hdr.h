@@ -115,6 +115,41 @@ Point3DCL HalfEllipsoidCL::Radius_;
 
 static DROPS::RegisterScalarFunction regsca_halfellipsoid("HalfEllipsoid", DROPS::HalfEllipsoidCL::DistanceFct);
 
+class ContactDropletCL
+{
+  private:
+    static Point3DCL Mitte_;
+    static Point3DCL Radius_;
+    static double Angle_;
+
+  public:
+    ContactDropletCL( const Point3DCL& Mitte, const Point3DCL& Radius, const double Angle)
+    { Init( Mitte, Radius, Angle); }
+    static void Init( const Point3DCL& Mitte, const Point3DCL& Radius, const double Angle)
+    { Mitte_= Mitte;    Radius_= Radius;  Angle_= Angle;}
+    static double DistanceFct( const Point3DCL& p, double)
+    {
+        Point3DCL d= p - Mitte_;
+        const double avgRad= cbrt(Radius_[0]*Radius_[1]*Radius_[2]);
+        d/= Radius_;
+        return std::abs( avgRad)*d.norm() - avgRad;
+    }
+    static double GetVolume() 
+	{
+		double R_Angle_ = Angle_/180 * M_PI;
+		return 1./3.*M_PI*Radius_[0]*Radius_[1]*Radius_[2] * (2.- 2.*std::cos(R_Angle_)- std::sin(R_Angle_)*std::sin(R_Angle_)*std::cos(R_Angle_)); 
+	}
+    static Point3DCL& GetCenter() { return Mitte_; }
+    static Point3DCL& GetRadius() { return Radius_; }
+    static double GetAngle() { return Angle_; }
+};
+
+Point3DCL ContactDropletCL::Mitte_;
+Point3DCL ContactDropletCL::Radius_;
+double ContactDropletCL::Angle_;
+
+static DROPS::RegisterScalarFunction regsca_contactdroplet("ContactDroplet", DROPS::ContactDropletCL::DistanceFct);
+
 /// \brief Represents a cylinder with ellipsoidal cross section
 class CylinderCL
 {
