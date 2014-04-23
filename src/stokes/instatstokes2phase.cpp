@@ -1355,16 +1355,18 @@ class SpecialBndHandler_System1OnePhaseP2CL
 {
   private:
     const StokesBndDataCL& BndData_;
-	const double mu_;
-	const double beta_;      //Slip coefficient, beta_=0 for symmetric Bnd;
+	double mu_;
+	double beta_;      //Slip coefficient, beta_=0 for symmetric Bnd;
 	const double alpha_;     //Coefficient for Nitche method
 	LocalP1CL<Point3DCL> Grad[10], GradRef[10];
 	Point3DCL normal;
 	Uint unknownIdx[6];
   public:	
-	SpecialBndHandler_System1OnePhaseP2CL(const StokesBndDataCL& BndData, double mu, const double beta=0, const double alpha=0): BndData_(BndData), mu_(mu), beta_(beta), alpha_(alpha)
+	SpecialBndHandler_System1OnePhaseP2CL(const StokesBndDataCL& BndData, const double alpha=0): BndData_(BndData), alpha_(alpha)
     { P2DiscCL::GetGradientsOnRef( GradRef); 
 	}
+	void setMu(double mu){mu_=mu;}
+	void setBeta(double beta){beta_=beta;}
     void setup(const TetraCL& tet, const SMatrixCL<3,3>& T, LocalSystem1DataCL& loc);  //update local system 1
 	void setupRhs(const TetraCL& tet, Point3DCL loc_b[10], double t);                            //for no homogenour slip boundary condition (the slip wall is moving)
 };
@@ -1797,7 +1799,7 @@ System1Accumulator_P2CL::System1Accumulator_P2CL (const TwoPhaseFlowCoeffCL& Coe
     : Coeff( Coeff_), BndData( BndData_), lset_Phi( lset_arg), lset_Bnd( lset_bnd), t( t_),
       RowIdx( RowIdx_), A( A_), M( M_), cplA( cplA_), cplM( cplM_), b( b_),
       local_twophase( Coeff.mu( 1.0), Coeff.mu( -1.0), Coeff.rho( 1.0), Coeff.rho( -1.0), Coeff.volforce),
-	  speBndHandler1(BndData_, Coeff.mu( -1.0), Coeff.beta(-1.0), Coeff.alpha),
+	  speBndHandler1(BndData_, Coeff.alpha),
 	  speBndHandler2(BndData_, Coeff.mu( 1.0), Coeff.mu( -1.0), Coeff.beta(1.0), Coeff.beta(-1.0), Coeff.alpha)
 {}
 
@@ -1856,8 +1858,11 @@ void System1Accumulator_P2CL::local_setup (const TetraCL& tet)
         local_onephase.mu(  local_twophase.mu(  sign( ls_loc[0])));
         local_onephase.rho( local_twophase.rho( sign( ls_loc[0])));
         local_onephase.setup( T, absdet, loc);
-		if(speBnd)
-			speBndHandler1.setup(tet, T, loc);         //update loc for special boundary condtion
+		if(speBnd){
+		   speBndHandler1.setMu(Coeff.mu(sign( ls_loc[0])));
+		   speBndHandler1.setBeta(Coeff.beta(sign( ls_loc[0])));
+		   speBndHandler1.setup(tet, T, loc);         //update loc for special boundary condtion
+		}
     }
     else{
         local_twophase.setup( T, absdet, tet, ls_loc, locInt, loc);
