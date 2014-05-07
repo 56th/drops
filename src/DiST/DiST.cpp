@@ -393,9 +393,6 @@ class ModifyCL::CommToUpdateHandlerCL
         if (dim==GetDim<TetraCL>()) { // tetra: write SimplexTransferInfoCL::UpdateSubs_
             const bool updateSubs= it->second.UpdateSubs();
             os << updateSubs;
-            const int remoteProc= (++(it->second.GetRemoteData().GetProcListBegin()))->proc, // only called for distributed objects, so there are 2 tetras
-                postRemote= it->second.WillBeOnProc(remoteProc) ? remoteProc : -1;
-            os << postRemote;
         }
         return true;
     }
@@ -404,12 +401,10 @@ class ModifyCL::CommToUpdateHandlerCL
     {
         const Usint dim= t.GetDim();
         if (dim==GetDim<TetraCL>()) { // tetra
-            bool updateSubs= false, upSubs, transferHere= false;
-            int postproc;
+            bool updateSubs= false, upSubs;
             for (size_t i=0; i<numData; ++i) {
-                is >> upSubs >> postproc;
+                is >> upSubs;
                 updateSubs= updateSubs || upSubs;
-                transferHere= transferHere || postproc==ProcCL::MyRank(); // some remote will transfer tetra to me
             }
             ModifyCL::UpdateListT& ul= mod_.entsToUpdt_[dim];
             ModifyCL::UpdateIterator it= ul.find( &t);
