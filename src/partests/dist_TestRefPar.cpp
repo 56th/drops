@@ -303,7 +303,7 @@ DROPS::MultiGridCL* CreateInitGrid(int master= 0)
             duration = time.GetMaxTime();
             std::cout << "       --> "<<duration<<" sec\n";
         }
-        Times.IncCounter(lb.GetMovedMultiNodes());
+        Times.IncCounter(lb.GetNumMovedMultiNodes());
     }
 
     return mg;
@@ -318,7 +318,7 @@ void DoMigration( DROPS::LoadBalCL &LoadBal)
     if (C.get<int>("Misc.PrintTime")){
         std::cout << " Migration took "<<timer.GetMaxTime()<<" sec\n";
     }
-    Times.IncCounter(LoadBal.GetMovedMultiNodes());
+    Times.IncCounter(LoadBal.GetNumMovedMultiNodes());
 }
 
 using namespace DROPS;
@@ -480,7 +480,7 @@ int main(int argc, char* argv[])
             CheckParMultiGrid(pmg,REF);
 
             DoMigration( LoadBal);
-            movedRefNodes += LoadBal.GetMovedMultiNodes();
+            movedRefNodes += LoadBal.GetNumMovedMultiNodes();
 
             if (printPMG){
                 cout << "  - Schreibe Debug-Informationen in ein File ... ";
@@ -505,7 +505,7 @@ int main(int argc, char* argv[])
         if (C.get<int>("LoadBalancing.MiddleMig")){
             cout <<dline<<endl<< " + Last-Verteilung zwischen dem Verfeinern und Vergroebern ...\n";
             DoMigration( LoadBal);
-            movedRefNodes += LoadBal.GetMovedMultiNodes();
+            movedRefNodes += LoadBal.GetNumMovedMultiNodes();
             CheckParMultiGrid(pmg,MIG);
         }
 
@@ -556,7 +556,7 @@ int main(int argc, char* argv[])
 
             DoMigration( LoadBal);
 
-            movedCoarseNodes += LoadBal.GetMovedMultiNodes();
+            movedCoarseNodes += LoadBal.GetNumMovedMultiNodes();
 
             if (printSize){
                 cout << "  - Verteilung der Elemente:\n";

@@ -144,7 +144,7 @@ class AdapTriangCL
 #ifndef _PAR
         return marker_->modified();
 #else
-        return ProcCL::GlobalOr(marker_->modified() ||lb_.GetMovedMultiNodes() > 0);
+        return ProcCL::GlobalOr(marker_->modified() || lb_.GetNumMovedMultiNodes() > 0);
 #endif
     }
 };
