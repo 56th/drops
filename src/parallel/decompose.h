@@ -121,7 +121,7 @@ class LbIteratorCL
 class BaseGraphCL
 {
 protected:
-    std::vector<int> part_;             ///< obtained partitioning
+    std::vector<graph_index_type> part_;             ///< obtained partitioning
     int num_procs_w_verts_;
 
 public:
@@ -130,11 +130,11 @@ public:
     /// \brief
     bool isSerial() const { return num_procs_w_verts_ <= 1; }
     /// \brief Get partition number of a vertex
-    int getPartition( const graph_index_type v) const { return part_[v]; }
+    graph_index_type getPartition( const graph_index_type v) const { return part_[v]; }
     /// \brief Get number of vertices stored on this process
-    inline int get_num_verts() const { return part_.size(); }
+    inline size_t get_num_verts() const { return part_.size(); }
     /// \brief Getter for partitioners
-    int* part() { return Addr(part_); }
+    graph_index_type* part() { return Addr(part_); }
 };
 
 /// \brief Class that represents a concrete graph for METIS and SCOTCH
@@ -163,9 +163,9 @@ public:
     /// \brief free memory
     void clear();
     /// \brief Get number of adjacencies stored on this process
-    inline int get_num_adj() const { return adjwgt_.size(); }
+    inline size_t get_num_adj() const { return adjwgt_.size(); }
     /// \brief Get the first vertex stored by this proc
-    inline int get_first_vert() const { return vtxdist_[ ProcCL::MyRank()]; }
+    inline graph_index_type get_first_vert() const { return vtxdist_[ ProcCL::MyRank()]; }
     /// \brief get the process storing a given vertex (by the global id)
     /// \todo check me!
     inline int getProc( graph_index_type globalidx)
@@ -187,8 +187,8 @@ public:
 class BasePartitionerCL
 {
 protected:
-    int objective_;         ///< resulting objective of the partitioner
-    double balance_;        ///< resulting balancing constraint of the partitioner
+    graph_index_type objective_; ///< resulting objective of the partitioner
+    double balance_;             ///< resulting balancing constraint of the partitioner
 
 public:
     BasePartitionerCL() : objective_(0), balance_(0.0) {}
