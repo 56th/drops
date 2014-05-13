@@ -504,7 +504,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     const double dt = P.get<double>("Time.StepSize");
     //if(P.get<int>("Exp.OutputInfo")==1)
     std::ofstream out((P.get<std::string>("VTK.VTKName","contactangle")+".txt").c_str());
-    out<<"time: "<<" angle: "<<" wet_area: "<<"surface_energy:  "<<"kinetic_energy:  "<<"total energy:  "<<std::endl;
+    out<<"%time: "<<" angle: "<<" wet_area: "<<"surface_energy:  "<<"kinetic_energy:  "<<"total energy:  "<<std::endl;
 
     //out<<" "<<0<<"  "<<1.5707963<<"  "<<P.get<DROPS::Point3DCL>("Exp.RadDrop")[0]<<std::endl;
     double time = 0.0;

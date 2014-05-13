@@ -627,18 +627,19 @@ namespace contactangle{
 
 	double PeriodicAngle(const DROPS::Point3DCL& pt,double)
 	{
-		double r=std::sqrt(pt[0]*pt[0]+pt[2]*pt[2]);
-		double theta=r<0.01? 0: (pt[2]>0?std::acos(pt[0]/r): 2*M_PI- std::acos(pt[0]/r));
+		DROPS::Point3DCL pt1(pt-P.get<DROPS::Point3DCL>("SpeBnd.posDrop"));
+		double r=std::sqrt(pt1[0]*pt1[0]+pt1[2]*pt1[2]);
+		double theta=r<0.001? 0: (pt1[2]>0?std::acos(pt1[0]/r): 2*M_PI- std::acos(pt1[0]/r));
 		return (P.get<double>("SpeBnd.contactangle"))*(1+0.5*std::sin(30*theta))/180.0*M_PI;
 	}
 
 	double PatternAngle(const DROPS::Point3DCL& pt,double)
 	{
-		double r=std::sqrt(pt[0]*pt[0]+pt[2]*pt[2]);
-		double theta= int(r/0.05)%2==0?1:-1;
+		DROPS::Point3DCL pt1(pt-P.get<DROPS::Point3DCL>("SpeBnd.posDrop"));
+		double r=std::sqrt(pt1[0]*pt1[0]+pt1[2]*pt1[2]);
+		double theta= int(r/P.get<DROPS::Point3DCL>("Exp.RadDrop")[0]/5.0)%2==0?1:-1;
 		return P.get<double>("SpeBnd.contactangle")/180.0*M_PI*(1+0.5*theta);
 	}
-
 	DROPS::Point3DCL OutNormalBottomPlane(const DROPS::Point3DCL&,double)
 	{
 		DROPS::Point3DCL outnormal(0.0);
