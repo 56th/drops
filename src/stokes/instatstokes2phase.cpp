@@ -1355,16 +1355,18 @@ class SpecialBndHandler_System1OnePhaseP2CL
 {
   private:
     const StokesBndDataCL& BndData_;
-	const double mu_;
-	const double beta_;      //Slip coefficient, beta_=0 for symmetric Bnd;
+	double mu_;
+	double beta_;      //Slip coefficient, beta_=0 for symmetric Bnd;
 	const double alpha_;     //Coefficient for Nitche method
 	LocalP1CL<Point3DCL> Grad[10], GradRef[10];
 	Point3DCL normal;
 	Uint unknownIdx[6];
   public:	
-	SpecialBndHandler_System1OnePhaseP2CL(const StokesBndDataCL& BndData, double mu, const double beta=0, const double alpha=0): BndData_(BndData), mu_(mu), beta_(beta), alpha_(alpha)
+	SpecialBndHandler_System1OnePhaseP2CL(const StokesBndDataCL& BndData, const double alpha=0): BndData_(BndData), alpha_(alpha)
     { P2DiscCL::GetGradientsOnRef( GradRef); 
 	}
+	void setMu(double mu){mu_=mu;}
+	void setBeta(double beta){beta_=beta;}
     void setup(const TetraCL& tet, const SMatrixCL<3,3>& T, LocalSystem1DataCL& loc);  //update local system 1
 	void setupRhs(const TetraCL& tet, Point3DCL loc_b[10], double t);                            //for no homogenour slip boundary condition (the slip wall is moving)
 };
@@ -1398,7 +1400,7 @@ void SpecialBndHandler_System1OnePhaseP2CL::setup(const TetraCL& tet, const SMat
 			for(Uint i=0; i<10; ++i)
 				phi[i][i] = 1;
 				
-            double temp = symmBC? 0.: beta_;
+		    double temp = symmBC? 0.: beta_;
 			for(Uint i=0; i<10; ++i){
 				LocalP1CL<double> Gradin(dot( normal, Grad[i]));
 				mass2Di.assign(phi[i], bary);	
@@ -1411,9 +1413,9 @@ void SpecialBndHandler_System1OnePhaseP2CL::setup(const TetraCL& tet, const SMat
 					Quad5_2DCL<double> Grad2D(Grad2Di * mass2Dj + Grad2Dj * mass2Di); //
 					// three additional terms
 					dm[j][i](0, 0)=dm[j][i](1, 1) = dm[j][i](2, 2) = temp * mass2D.quad(absdet);
-					dm[j][i]     += (alpha_/h - temp) * mass2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));
-					if(BndData_.Vel.GetBC(*tet.GetFace(k))!= SymmBC)
-						dm[j][i]     -=  2. * mu_ * Grad2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));  
+					dm[j][i]     += (alpha_/h * mu_ - temp) * mass2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));
+					// if(BndData_.Vel.GetBC(*tet.GetFace(k))!= SymmBC) not necessary
+					dm[j][i]     -=  2. * mu_ * Grad2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));  
 					loc.Ak[j][i] += dm[j][i];
 					if (i != j){
 						assign_transpose( dm[i][j], dm[j][i]);
@@ -1596,7 +1598,7 @@ void SpecialBndHandler_System1TwoPhaseP2CL::setup(const TetraCL& tet, const SMat
 				resize_and_evaluate_on_vertexes( Gradn[i], q5dom, gradP1[i]); // for A	
 			}
 
-	        double temp1 = symmBC? 0: beta1_;
+		    double temp1 = symmBC? 0: beta1_;
 			double temp2 = symmBC? 0: beta2_;
 			for(Uint i=0; i<10; ++i){
 				for(Uint j=0; j<=i; ++j){	
@@ -1604,9 +1606,9 @@ void SpecialBndHandler_System1TwoPhaseP2CL::setup(const TetraCL& tet, const SMat
                     quad( gradP1[i] * basisP2[j] + gradP1[j] * basisP2[i], q5dom, locInt[0].grad2D[i][j], locInt[1].grad2D[i][j]);
 					// three additional terms
 					dm[j][i](0, 0)= dm[j][i](1, 1) = dm[j][i](2, 2) = temp1 * locInt[0].mass2D[i][j] + temp2* locInt[1].mass2D[i][j];
-					dm[j][i]     += ( (alpha_/h -temp1)* locInt[0].mass2D[i][j] + (alpha_/h - temp2) * locInt[1].mass2D[i][j] )* SMatrixCL<3,3> (outer_product(normal, normal));
-					if(BndData_.Vel.GetBC(*tet.GetFace(k))!= SymmBC)
-						dm[j][i]     -= ( 2. * mu1_ * locInt[0].grad2D[i][j]+ 2.* mu2_ * locInt[1].grad2D[i][j] )* SMatrixCL<3,3> (outer_product(normal, normal));  
+					dm[j][i]     += ( (alpha_/h*mu1_ -temp1)* locInt[0].mass2D[i][j] + (alpha_/h* mu2_ - temp2) * locInt[1].mass2D[i][j] )* SMatrixCL<3,3> (outer_product(normal, normal));
+					//if(BndData_.Vel.GetBC(*tet.GetFace(k))!= SymmBC) not necessary
+					dm[j][i]     -= ( 2. * mu1_ * locInt[0].grad2D[i][j]+ 2.* mu2_ * locInt[1].grad2D[i][j] )* SMatrixCL<3,3> (outer_product(normal, normal));  
 					loc.Ak[j][i] += dm[j][i];
 					if (i != j){
 						assign_transpose( dm[i][j], dm[j][i]);
@@ -1797,7 +1799,7 @@ System1Accumulator_P2CL::System1Accumulator_P2CL (const TwoPhaseFlowCoeffCL& Coe
     : Coeff( Coeff_), BndData( BndData_), lset_Phi( lset_arg), lset_Bnd( lset_bnd), t( t_),
       RowIdx( RowIdx_), A( A_), M( M_), cplA( cplA_), cplM( cplM_), b( b_),
       local_twophase( Coeff.mu( 1.0), Coeff.mu( -1.0), Coeff.rho( 1.0), Coeff.rho( -1.0), Coeff.volforce),
-	  speBndHandler1(BndData_, Coeff.mu( -1.0), Coeff.beta(-1.0), Coeff.alpha),
+	  speBndHandler1(BndData_, Coeff.alpha),
 	  speBndHandler2(BndData_, Coeff.mu( 1.0), Coeff.mu( -1.0), Coeff.beta(1.0), Coeff.beta(-1.0), Coeff.alpha)
 {}
 
@@ -1856,8 +1858,11 @@ void System1Accumulator_P2CL::local_setup (const TetraCL& tet)
         local_onephase.mu(  local_twophase.mu(  sign( ls_loc[0])));
         local_onephase.rho( local_twophase.rho( sign( ls_loc[0])));
         local_onephase.setup( T, absdet, loc);
-		if(speBnd)
-			speBndHandler1.setup(tet, T, loc);         //update loc for special boundary condtion
+		if(speBnd){
+		   speBndHandler1.setMu(Coeff.mu(sign( ls_loc[0])));
+		   speBndHandler1.setBeta(Coeff.beta(sign( ls_loc[0])));
+		   speBndHandler1.setup(tet, T, loc);         //update loc for special boundary condtion
+		}
     }
     else{
         local_twophase.setup( T, absdet, tet, ls_loc, locInt, loc);
@@ -3425,6 +3430,7 @@ void InstatStokes2PhaseP2P1CL::CheckOnePhaseSolution(const VelVecDescCL* DescVel
 							      const instat_vector_fun_ptr RefVel, const instat_vector_fun_ptr RefGradPr , const instat_scalar_fun_ptr RefPr) const
 {
 
+	ScopeTimerCL scope("CheckOnePhaseSolution");
     double t = DescVel->t;
 //#ifdef _PAR
 //    const ExchangeCL& exV = vel_idx.GetEx();
@@ -3507,7 +3513,7 @@ void InstatStokes2PhaseP2P1CL::CheckOnePhaseSolution(const VelVecDescCL* DescVel
 void InstatStokes2PhaseP2P1CL::CheckTwoPhaseSolution(const VelVecDescCL* DescVel, const VecDescCL* DescPr, 
 							      const LevelsetP2CL& lset, const instat_vector_fun_ptr RefVel, const instat_scalar_fun_ptr RefPr)
 {
-
+	ScopeTimerCL scope("CheckTwoPhaseSolution");
     double t = DescVel->t;
 //#ifdef _PAR
 //    const ExchangeCL& exV = vel_idx.GetEx();
