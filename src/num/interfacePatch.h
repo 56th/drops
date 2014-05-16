@@ -167,6 +167,7 @@ class InterfaceTriangleCL : public InterfacePatchCL
     instat_vector_fun_ptr outnormal_; ///the outnormal of the boundary. instat might be useful for varying boundary.
 
     BaryCoordCL TransformToSubTetra (const BaryCoordCL& b); ///< compute st_*b \todo remove this by introducing a column-oriented small matrix class
+    bool SymmType[4];              //store if a contact line segment is symmetric
 
   public:
     bool ComputeForChild( Uint ch);                            ///< returns true, if a patch exists for this child
@@ -194,6 +195,7 @@ class InterfaceTriangleCL : public InterfacePatchCL
     double GetImprovedActualContactAngle(Uint,double bary1D) const;				///< Returns the contact angle
     															///call after SetBndoutNormal()
     Point3DCL ApplyProj( const Point3DCL& grad) const { return grad[0]*B_[0] + grad[1]*B_[1] + grad[2]*B_[2]; }
+    bool IsSymmType(Uint i) {return SymmType[i];}  //return if a contact line segment is symmetric
 };
 
 
