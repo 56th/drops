@@ -563,7 +563,7 @@ bool InterfaceTriangleCL::ComputeMCLForChild(Uint ch)
 	numMCL_=0;
 	Uint num=0;
 	int idx[2];
-    for( Uint i=0; i<intersec_; i++ )
+    for( int i=0; i<intersec_; i++ )
     {
     /*	if(std::fabs(PQRS_[i][1]-0)<0.00001)
 		{
@@ -572,7 +572,7 @@ bool InterfaceTriangleCL::ComputeMCLForChild(Uint ch)
 		}*/
     	num=0; 
    // 	std::cout<<num<<" ->num ";
-    	for( Uint j=0; j<4; j++ )
+    	for( int j=0; j<4; j++ )
     	{
     	//	std::cout<<"test "<<i<<" : "<<j<<"; ";
 			if( cut_point_on_face[i][j]==true && cut_point_on_face[(i+1)%intersec_][j]==true)
@@ -586,6 +586,10 @@ bool InterfaceTriangleCL::ComputeMCLForChild(Uint ch)
     	{
     		IdxMCL_[numMCL_][0]= i;
 			IdxMCL_[numMCL_][1]= (i+1)%intersec_;
+			if(BC_Face_[idx[0]]==SymmBC)
+				SymmType[numMCL_]= true;
+			else
+				SymmType[numMCL_]= false;
     	   	numMCL_++;
     	}
     	else if(num==2)//the contact line  intersect with one edge, one need check if the edge on the boundary
@@ -596,16 +600,20 @@ bool InterfaceTriangleCL::ComputeMCLForChild(Uint ch)
     			{	
 					IdxMCL_[numMCL_][0]= i;
 					IdxMCL_[numMCL_][1]= (i+1)%intersec_;
+					if(BC_Edge_[v]==SymmBC)
+						SymmType[numMCL_]= true;
+					else
+						SymmType[numMCL_]= false;
     				numMCL_++;
     			}
     		}
     	}
     }
 	if(intersec_==4 )
-		for(Uint i=0; i< 2; i++)
+		for( int i=0; i< 2; i++)
 		{
 			num=0;
-			for( Uint j=0; j<4; j++ )
+			for( int j=0; j<4; j++ )
 			{
 				if( cut_point_on_face[i][j]==true && cut_point_on_face[(i+2)%intersec_][j]==true)
 				{
@@ -617,6 +625,10 @@ bool InterfaceTriangleCL::ComputeMCLForChild(Uint ch)
 			{
 				IdxMCL_[numMCL_][0]= i;
 				IdxMCL_[numMCL_][1]= i+2;
+				if(BC_Face_[idx[0]]==SymmBC)
+					SymmType[numMCL_]= true;
+				else
+					SymmType[numMCL_]= false;
 				numMCL_++;
 			}
 			else if(num==2)//the contact line  intersect with one edge, one need check if the edge on the boundary
@@ -627,6 +639,10 @@ bool InterfaceTriangleCL::ComputeMCLForChild(Uint ch)
 					{	
 						IdxMCL_[numMCL_][0]= i;
 						IdxMCL_[numMCL_][1]= i+2;
+						if(BC_Edge_[v]==SymmBC)
+							SymmType[numMCL_]= true;
+						else
+							SymmType[numMCL_]= false;
 						numMCL_++;
 					}
 				}

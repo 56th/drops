@@ -671,12 +671,12 @@ void YoungForceAccumulatorCL::visit ( const TetraCL& t)
         {
         	length = triangle.GetInfoMCL(i,Barys[0],Barys[1],pt0,pt1);
         	normal_mcl = triangle.GetMCLNormal(i);
-        	sintheta_D=sin(triangle.GetActualContactAngle(i));
+        	sintheta_D= triangle.IsSymmType(i) ? 0 :sin(triangle.GetActualContactAngle(i));
         	for(Uint j=0;j<5;j++)
         	{
         		quadBarys[j]=(Barys[0]+Barys[1])/2+qupt[j]*(Barys[1]-Barys[0])/2;
         		midpt=(pt0+pt1)/2 + qupt[j]*(pt1-pt0)/2;
-        		costheta[j]=cos(angle_(midpt,0));
+        		costheta[j]= triangle.IsSymmType(i) ? 1 : cos(angle_(midpt,0));
         		outnormalOnMcl[j]=outnormal_(midpt,0);
         	}
 
@@ -754,13 +754,11 @@ class ImprovedYoungForceAccumulatorCL : public  TetraAccumulatorCL
 void ImprovedYoungForceAccumulatorCL::visit ( const TetraCL& t)
 {
 	SpeBnd=false;
-	bool SymBnd=false;
+	//check if the tetra contains one face or one edge on slip or symmetric boundary.
 	for(Uint v=0; v<4; v++)
 	   	if(lsetbnd_.GetBC(*t.GetFace(v))==Slip0BC||lsetbnd_.GetBC(*t.GetFace(v))==SlipBC||lsetbnd_.GetBC(*t.GetFace(v))==SymmBC )
 	   	{
 	   		SpeBnd=true;
-	   		if(lsetbnd_.GetBC(*t.GetFace(v))==SymmBC)
-	   			SymBnd=true;
 	   		break;
 	   	}
 	if(!SpeBnd)
@@ -769,22 +767,16 @@ void ImprovedYoungForceAccumulatorCL::visit ( const TetraCL& t)
 			if(lsetbnd_.GetBC(*t.GetEdge(v))==Slip0BC||lsetbnd_.GetBC(*t.GetEdge(v))==SlipBC||lsetbnd_.GetBC(*t.GetEdge(v))==SymmBC )
 			{
 				SpeBnd=true;
-				if(lsetbnd_.GetBC(*t.GetEdge(v))==SymmBC)
-			   			SymBnd=true;
 				break;
 			}
 		if(!SpeBnd)
 		return;
 	}
-	const Uint idx_f=   f.RowIdx->GetIdx();
+    const Uint idx_f=   f.RowIdx->GetIdx();
     const bool velXfem= f.RowIdx->IsExtended();
     if (velXfem)
     	throw DROPSErrCL("WARNING: ImprovedYoungForceAccumulatorCL : not implemented for velocity XFEM method yet!");
-  //  double det;
-
-   // GetTrafoTr( T, det, t);
-
-  //  loc_phi.assign( t, SmPhi_, lsetbnd_);
+    //Initialize one interface patch
     triangle.BInit( t, SmPhi_,lsetbnd_); //we have to use this init function!!!!!!!!!
     triangle.SetBndOutNormal(outnormal_);
     for (int v=0; v<10; ++v)
@@ -794,10 +786,10 @@ void ImprovedYoungForceAccumulatorCL::visit ( const TetraCL& t)
 	LocalP2CL<double> phi[10];
 	for(Uint i=0; i<10; ++i)
 		phi[i][i] = 1;
-	Point3DCL normal_mcl[5];//normal of moving contact lines in tangential surface
-	double costheta[5];//cos\theta_s
+	Point3DCL normal_mcl[5];     //normal of moving contact lines in tangential surface
+	double costheta[5];          //cos\theta_s
 	Point3DCL outnormalOnMcl[5]; //outnormal of the domain boundary
-	double sintheta_D[5];//sin\theta_d
+	double sintheta_D[5];        //sin\theta_d
 	BaryCoordCL quadBarys[5];
 	double weight[5]={0.568888889, 0.47862867,0.47862867,0.236926885,0.236926885};
 	//integral in [-1,1]
@@ -816,14 +808,13 @@ void ImprovedYoungForceAccumulatorCL::visit ( const TetraCL& t)
         for(Uint i=0;i<ncl;i++)
         {
         	length = triangle.GetInfoMCL(i,Barys[0],Barys[1],pt0,pt1);
-
         	for(Uint j=0;j<5;j++)
         	{
         		normal_mcl[j] = triangle.GetImprovedMCLNormal(i,(qupt[j]+1)/2);
         		quadBarys[j]=(Barys[0]+Barys[1])/2+qupt[j]*(Barys[1]-Barys[0])/2;
         		midpt=(pt0+pt1)/2 + qupt[j]*(pt1-pt0)/2;
-        		costheta[j]=SymBnd ? 0 : cos(angle_(midpt,0));
-        		sintheta_D[j]=SymBnd ? 1 : sin(triangle.GetImprovedActualContactAngle(i,(qupt[j]+1)/2));
+        		costheta[j]=triangle.IsSymmType(i) ? 0 : cos(angle_(midpt,0));
+        		sintheta_D[j]=triangle.IsSymmType(i) ? 1 : sin(triangle.GetImprovedActualContactAngle(i,(qupt[j]+1)/2));
         		outnormalOnMcl[j]=outnormal_(midpt,0);
         	}
 
@@ -838,7 +829,7 @@ void ImprovedYoungForceAccumulatorCL::visit ( const TetraCL& t)
         		value+=(phi[v](quadBarys[0])*sintheta_D[0]*weight[0]*outnormalOnMcl[0]+ phi[v](quadBarys[1])*sintheta_D[1]*weight[1]*outnormalOnMcl[1]
         		                 + phi[v](quadBarys[2])*sintheta_D[2]*weight[2]*outnormalOnMcl[2]+ phi[v](quadBarys[3])*sintheta_D[3]*weight[3]*outnormalOnMcl[3]
         		                 + phi[v](quadBarys[4])*sintheta_D[4]*weight[4]*outnormalOnMcl[4])*length/2;
-        		//higher order quadrature is used!!
+        		//5 points Gauss–Legendre quadrature is used.
         		for (int j=0; j<3; ++j)
         		{
         			f.Data[Numbv+j] += sigma_*value[j];
