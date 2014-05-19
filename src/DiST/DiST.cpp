@@ -383,33 +383,23 @@ class ModifyCL::CommToUpdateHandlerCL
   public:
     CommToUpdateHandlerCL( ModifyCL& mod) : mod_(mod) {}
 
-    bool Gather( const TransferableCL& t, SendStreamCL& os)
+    bool Gather( const TransferableCL& t, SendStreamCL& )
     {
         const Usint dim= t.GetDim();
-        ModifyCL::UpdateListT& ul= mod_.entsToUpdt_[dim];
-        ModifyCL::UpdateIterator it= ul.find( &t);
-        if (it==ul.end())
-            return false;
-        if (dim==GetDim<TetraCL>()) { // tetra: write SimplexTransferInfoCL::UpdateSubs_
-            const bool updateSubs= it->second.UpdateSubs();
-            os << updateSubs;
-        }
-        return true;
+        ModifyCL::UpdateListT&   ul = mod_.entsToUpdt_[dim];
+        ModifyCL::UpdateIterator it = ul.find( &t);
+
+        return it != ul.end();
     }
 
-    bool Scatter( TransferableCL& t, const size_t numData, MPIistreamCL& is)
+    bool Scatter( TransferableCL& t, const size_t, MPIistreamCL& )
     {
-        const Usint dim= t.GetDim();
+        const Usint dim = t.GetDim();
         if (dim==GetDim<TetraCL>()) { // tetra
-            bool updateSubs= false, upSubs;
-            for (size_t i=0; i<numData; ++i) {
-                is >> upSubs;
-                updateSubs= updateSubs || upSubs;
-            }
             ModifyCL::UpdateListT& ul= mod_.entsToUpdt_[dim];
             ModifyCL::UpdateIterator it= ul.find( &t);
             if (it==ul.end()) { // not already in update list
-                it= mod_.AddSimplexToUpdate( dim, &t, updateSubs);
+                it= mod_.AddSimplexToUpdate( dim, &t, false );
                 // add (local proc,local prio) to update list, otherwise local Ma/Gh copy will be lost
                 it->second.AddProc( ProcCL::MyRank(), t.GetPrio());
             }
