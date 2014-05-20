@@ -679,19 +679,23 @@ void YoungForceAccumulatorCL::visit ( const TetraCL& t)
         		costheta[j]= triangle.IsSymmType(i) ? 1 : cos(angle_(midpt,0));
         		outnormalOnMcl[j]=outnormal_(midpt,0);
         	}
-
-
         	for (int v=0; v<10; ++v)
         	{
+				Point3DCL value;
         		const IdxT Numbv= v<10 ? Numb[v] : (velXfem && Numb[v-10]!=NoIdx ? f.RowIdx->GetXidx()[Numb[v-10]] : NoIdx);
         		if (Numbv==NoIdx) continue;
-
-        		Point3DCL value = ((phi[v](quadBarys[0])*costheta[0]*weight[0]+ phi[v](quadBarys[1])*costheta[1]*weight[1]
+				for (int j=0; j<5; j++)
+				{
+					value += weight[j]*costheta[j]*phi[v](quadBarys[j])*normal_mcl;       // cos (theta_e) v \dot tau_cl
+					value += weight[j]*sintheta_D*phi[v](quadBarys[j])*outnormalOnMcl[j]; // sin (theta_D) v \dot n
+				}
+			    value = value * length/2;
+        		/*Point3DCL value = ((phi[v](quadBarys[0])*costheta[0]*weight[0]+ phi[v](quadBarys[1])*costheta[1]*weight[1]
         		              + phi[v](quadBarys[2])*costheta[2]*weight[2]+ phi[v](quadBarys[3])*costheta[3]*weight[3]
         		              + phi[v](quadBarys[4])*costheta[4]*weight[4])*length/2)*normal_mcl;
         		value+=(phi[v](quadBarys[0])*weight[0]*outnormalOnMcl[0]+ phi[v](quadBarys[1])*weight[1]*outnormalOnMcl[1]
         		              + phi[v](quadBarys[2])*weight[2]*outnormalOnMcl[2]+ phi[v](quadBarys[3])*weight[3]*outnormalOnMcl[3]
-        		        	  + phi[v](quadBarys[4])*weight[4]*outnormalOnMcl[4])*length/2*sintheta_D;
+        		        	  + phi[v](quadBarys[4])*weight[4]*outnormalOnMcl[4])*length/2*sintheta_D;*/
         		//higher order quadrature is used!!
         		for (int j=0; j<3; ++j)
         		{
@@ -786,15 +790,16 @@ void ImprovedYoungForceAccumulatorCL::visit ( const TetraCL& t)
 	LocalP2CL<double> phi[10];
 	for(Uint i=0; i<10; ++i)
 		phi[i][i] = 1;
+		
 	Point3DCL normal_mcl[5];     //normal of moving contact lines in tangential surface
-	double costheta[5];          //cos\theta_s
 	Point3DCL outnormalOnMcl[5]; //outnormal of the domain boundary
+	double costheta[5];          //cos\theta_s
 	double sintheta_D[5];        //sin\theta_d
 	BaryCoordCL quadBarys[5];
 	double weight[5]={0.568888889, 0.47862867,0.47862867,0.236926885,0.236926885};
 	//integral in [-1,1]
 	double qupt[5]={0,-0.53846931,0.53846931,-0.906179846,0.906179846};
-	Point3DCL value;
+	
 	for (int ch=0; ch<8; ++ch)
 //	for(int ch=8;ch<9;++ch)
     {
@@ -817,19 +822,18 @@ void ImprovedYoungForceAccumulatorCL::visit ( const TetraCL& t)
         		sintheta_D[j]=triangle.IsSymmType(i) ? 1 : sin(triangle.GetImprovedActualContactAngle(i,(qupt[j]+1)/2));
         		outnormalOnMcl[j]=outnormal_(midpt,0);
         	}
-
         	for (int v=0; v<10; ++v)
         	{
+				Point3DCL value;
         		const IdxT Numbv= v<10 ? Numb[v] : (velXfem && Numb[v-10]!=NoIdx ? f.RowIdx->GetXidx()[Numb[v-10]] : NoIdx);
         		if (Numbv==NoIdx) continue;
-				//could be written in a loop
-        		value = (phi[v](quadBarys[0])*costheta[0]*weight[0]*normal_mcl[0]+ phi[v](quadBarys[1])*costheta[1]*weight[1]*normal_mcl[1]
-        		                 + phi[v](quadBarys[2])*costheta[2]*weight[2]*normal_mcl[2]+ phi[v](quadBarys[3])*costheta[3]*weight[3]*normal_mcl[3]
-        		                 + phi[v](quadBarys[4])*costheta[4]*weight[4]*normal_mcl[4])*length/2;
-        		value+=(phi[v](quadBarys[0])*sintheta_D[0]*weight[0]*outnormalOnMcl[0]+ phi[v](quadBarys[1])*sintheta_D[1]*weight[1]*outnormalOnMcl[1]
-        		                 + phi[v](quadBarys[2])*sintheta_D[2]*weight[2]*outnormalOnMcl[2]+ phi[v](quadBarys[3])*sintheta_D[3]*weight[3]*outnormalOnMcl[3]
-        		                 + phi[v](quadBarys[4])*sintheta_D[4]*weight[4]*outnormalOnMcl[4])*length/2;
         		//5 points Gauss–Legendre quadrature is used.
+				for (int j=0; j<5; j++)
+				{
+					value += weight[j]*costheta[j]*phi[v](quadBarys[j])*normal_mcl[j];       // cos (theta_e) v \dot tau_cl
+					value += weight[j]*sintheta_D[j]*phi[v](quadBarys[j])*outnormalOnMcl[j]; // sin (theta_D) v \dot n
+				}
+			    value = value * length/2;
         		for (int j=0; j<3; ++j)
         		{
         			f.Data[Numbv+j] += sigma_*value[j];
