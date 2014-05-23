@@ -847,14 +847,18 @@ class QuaQuaMapperCL
 
 // Return a tetra from neighborhood that contains v up to precision eps in barycentric coordinates.
 // Returns 0 on failure.
-const TetraCL* enclosing_tetra (const Point3DCL& v, const TetraSetT& neighborhood, double eps)
+void enclosing_tetra (const Point3DCL& v, const TetraSetT& neighborhood, double eps, const TetraCL*& tetra, BaryCoordCL& bary)
 {
+    World2BaryCoordCL w2b;
     for (TetraSetT::const_iterator tit = neighborhood.begin(); tit != neighborhood.end(); ++tit) {
-        const World2BaryCoordCL w2b( **tit);
-        if (is_in_ref_tetra( w2b( v), eps))
-            return *tit;
+        w2b.assign( **tit);
+        bary= w2b( v);
+        if (is_in_ref_tetra( bary, eps)) {
+            tetra= *tit;
+            return;
+        }
     }
-    return 0;
+    tetra= 0;
 }
 
 bool QuaQuaMapperCL::line_search (const Point3DCL& v, const Point3DCL& nx, const TetraCL*& tetra, BaryCoordCL& bary, const TetraSetT& neighborhood) const
@@ -864,49 +868,37 @@ bool QuaQuaMapperCL::line_search (const Point3DCL& v, const Point3DCL& nx, const
     const double eps= 1.0e-10;
     const double inner_tol= 1.0e-8;
 
-    double alpha= 0.;
+    double alpha= 0.,
+           dalpha= 0.;
     int inneriter= 0;
+    World2BaryCoordCL w2b;
     for (; inneriter < max_inneriter; ++inneriter) {
-        // find tetra containing v-alpha*nx
-        World2BaryCoordCL w2b( *tetra);
-        bary = w2b( v-alpha*nx);
-        bool in_tetra= is_in_ref_tetra( bary, eps);
-        for (int k= 0; !in_tetra && k < max_damping; ++k, alpha*= 0.5) {
-            for (TetraSetT::const_iterator tit = neighborhood.begin(); tit != neighborhood.end(); ++tit) {
-                World2BaryCoordCL w2b( **tit);
-                bary = w2b( v-alpha*nx);
-                in_tetra = is_in_ref_tetra( bary, eps);
-                if (in_tetra) {
-                    tetra= &**tit;
-                    break;
-                }
-            }
-        }
-        if (!in_tetra) {
-            std::cout << "v: " << v << "\ttn: " << alpha << "\tnx: " << nx <<  "\t= "<< v-alpha*nx << std::endl;
-            throw DROPSErrCL("QuaQuaMapperCL::line_search: Coord not in given tetra set.\n");
-        }
-        // find tetra containing v-alpha*nx; as optimization of the common case, try the current tetra first.
-//         World2BaryCoordCL w2b( *tetra);
-//         bary= w2b( v - alpha*nx);
-//         if (!is_in_ref_tetra( bary, eps))
-//             tetra= 0;
-//         for (int k= 0; tetra == 0 && k < max_damping; ++k, alpha*= 0.5)
-//             tetra= enclosing_tetra( v - alpha*nx, neighborhood, eps);
-//         if (tetra == 0) {
-//             std::cout << "v: " << v << "\talpha: " << alpha << "\tnx: " << nx <<  "\tv - alpha*nx: "<< v - alpha*nx << std::endl;
-//             throw DROPSErrCL("QuaQuaMapperCL::line_search: Coord not in given tetra set.\n");
-//         }
-
+        // Evaluate ls in v - alpha*nx and check convergence.
+        w2b.assign( *tetra);
+        bary= w2b( v - alpha*nx);
         const double lsval= ls.val( *tetra, bary);
+
         if (std::abs( lsval) < inner_tol)
             break;
 
+        // Compute undamped Newton correction dalpha.
         const Point3DCL& gradval= ls_grad_rec.val( *tetra, bary);
         const double slope= inner_prod( gradval, nx);
         if (std::abs( slope) < 1.0e-8)
             std::cout << "g_phi: " << gradval << "\tgy: " << nx << std::endl;
-        alpha+= lsval/slope;
+        dalpha= lsval/slope;
+
+        // Apply damping to dalpha until v - (alpha + dalpha)nx is in the neighborhood of tet.
+        bary= w2b( v - (alpha + dalpha)*nx);
+        if (!is_in_ref_tetra( bary, eps))
+            tetra= 0;
+        for (int k= 0; tetra == 0 && k < max_damping; ++k, dalpha*= 0.5)
+            enclosing_tetra( v - (alpha + dalpha)*nx, neighborhood, eps, tetra, bary);
+        if (tetra == 0) {
+            std::cout << "v: " << v << "\talpha: " << alpha << "\tnx: " << nx <<  "\tv - alpha*nx: "<< v - alpha*nx << std::endl;
+            throw DROPSErrCL("QuaQuaMapperCL::line_search: Coord not in given tetra set.\n");
+        }
+        alpha+= dalpha;
     }
 
     if (inneriter >= max_inneriter)
