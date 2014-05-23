@@ -32,9 +32,13 @@
 #include "out/vtkOut.h"
 #include "misc/dynamicload.h"
 #include "misc/funcmap.h"
+#include "geom/subtriangulation.h"
+#include "num/gradient_recovery.h"
 
 #include <fstream>
 #include <string>
+#include <tr1/unordered_map>
+#include <tr1/unordered_set>
 
 using namespace DROPS;
 
@@ -374,6 +378,12 @@ double sphere_2move (const DROPS::Point3DCL& p, double t)
 {
     DROPS::Point3DCL x( p - (PosDrop + t*constant_wind(p, t)));
     return x.norm() - RadDrop[0];
+}
+
+SMatrixCL<3,3> dp_sphere (const DROPS::Point3DCL& x, double)
+{
+    const double normx= x.norm();
+    return normx == 0. ? SMatrixCL<3,3>() : RadDrop[0]/normx*(eye<3,3>() - outer_product( x/normx, x/normx));
 }
 
 // ==stationary test case "LaplaceBeltrami0"==
@@ -753,6 +763,491 @@ void StationaryStrategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROP
     std::cout << "L_2-error: " << L2_err << std::endl;
 }
 
+typedef std::tr1::unordered_set<const TetraCL*> TetraSetT;
+typedef std::tr1::unordered_map<const VertexCL*, TetraSetT> VertexToTetrasT;
+
+/// Computes a map from the vertices at the pcw. linear interface to all tetras that contain the vertex.
+void compute_vertex_neighborhoods (const DROPS::MultiGridCL& mg, DROPS::LevelsetP2CL& lset, VertexToTetrasT& vertex_neighborhood)
+{
+    vertex_neighborhood.clear();
+
+    LocalP2CL<> locls;
+    DROPS_FOR_TRIANG_CONST_TETRA( mg, lset.Phi.GetLevel(), it) {
+        locls.assign( *it, lset.Phi, lset.GetBndData());
+        if (equal_signs( locls)) continue;
+
+        for (Uint i= 0; i < 4; ++i)
+            vertex_neighborhood[it->GetVertex( i)].insert( &*it);
+    }
+}
+
+typedef std::tr1::unordered_map<const TetraCL*, TetraSetT> TetraToTetrasT;
+
+void compute_tetra_neighborhoods (const DROPS::MultiGridCL& mg, DROPS::LevelsetP2CL& lset, TetraToTetrasT& tetra_neighborhoods)
+{
+    VertexToTetrasT vertex_neighborhoods;
+
+    LocalP2CL<> locls;
+    DROPS_FOR_TRIANG_CONST_TETRA( mg, lset.Phi.GetLevel(), it) {
+        locls.assign( *it, lset.Phi, lset.GetBndData());
+        if (equal_signs( locls)) continue;
+
+        tetra_neighborhoods[&*it]; // insert it with an empty set of neighbors.
+        for (Uint i= 0; i < 4; ++i)
+            vertex_neighborhoods[it->GetVertex( i)].insert( &*it);
+    }
+    for (TetraToTetrasT::iterator it= tetra_neighborhoods.begin(); it != tetra_neighborhoods.end(); ++it) {
+        const TetraCL& tet= *it->first;
+        for (Uint v= 0; v < 4; ++v) {
+            const TetraSetT& tset= vertex_neighborhoods[tet.GetVertex( v)];
+            it->second.insert( tset.begin(), tset.end());
+        }
+    }
+}
+
+bool is_in_ref_tetra (const BaryCoordCL& b, double eps= 1e-10)
+{
+    for (int i= 0; i < 4; ++i)
+        if (b[i] < -eps || b[i] > 1. + eps)
+            return false;
+    return true;
+}
+
+
+class QuaQuaMapperCL
+{
+  private:
+    int maxiter_;
+    double tol_;
+
+//  The level set function
+    NoBndDataCL<> nobnddata;
+    P2EvalCL<double, const NoBndDataCL<>, const VecDescCL> ls;
+
+//  The recovered gradient of ls.
+    NoBndDataCL<Point3DCL> nobnddata_vec;
+    P2EvalCL<Point3DCL, const NoBndDataCL<Point3DCL>, const VecDescCL> ls_grad_rec;
+
+    mutable LocalP1CL<Point3DCL> gradrefp2[10];
+
+    TetraToTetrasT& neighborhoods_; // The neighborhoods around each tetra in which base points are searched for.
+
+    bool line_search (const Point3DCL& v, const Point3DCL& nx, const TetraCL*& tetra, BaryCoordCL& bary, const TetraSetT& neighborhood) const;
+
+  public:
+    QuaQuaMapperCL (const MultiGridCL& mg, VecDescCL& lsarg, const VecDescCL& ls_grad_recarg, TetraToTetrasT& neigborhoods, int maxiter= 100, double tol= 1e-6)
+        : maxiter_( maxiter), tol_( tol), ls( &lsarg, &nobnddata, &mg), ls_grad_rec( &ls_grad_recarg, &nobnddata_vec, &mg), neighborhoods_( neigborhoods)
+    { P2DiscCL::GetGradientsOnRef( gradrefp2); }
+
+
+    void base_point (const TetraCL*& tet, BaryCoordCL& xb) const;
+    void jacobian (const TetraCL& tet, const BaryCoordCL& xb, SMatrixCL<3,3>& dph) const;
+};
+
+
+// Return a tetra from neighborhood that contains v up to precision eps in barycentric coordinates.
+// Returns 0 on failure.
+const TetraCL* enclosing_tetra (const Point3DCL& v, const TetraSetT& neighborhood, double eps)
+{
+    for (TetraSetT::const_iterator tit = neighborhood.begin(); tit != neighborhood.end(); ++tit) {
+        const World2BaryCoordCL w2b( **tit);
+        if (is_in_ref_tetra( w2b( v), eps))
+            return *tit;
+    }
+    return 0;
+}
+
+bool QuaQuaMapperCL::line_search (const Point3DCL& v, const Point3DCL& nx, const TetraCL*& tetra, BaryCoordCL& bary, const TetraSetT& neighborhood) const
+{
+    const int max_inneriter= 100;
+    const int max_damping= 10;
+    const double eps= 1.0e-10;
+    const double inner_tol= 1.0e-8;
+
+    double alpha= 0.;
+    int inneriter= 0;
+    for (; inneriter < max_inneriter; ++inneriter) {
+        // find tetra containing v-alpha*nx
+        World2BaryCoordCL w2b( *tetra);
+        bary = w2b( v-alpha*nx);
+        bool in_tetra= is_in_ref_tetra( bary, eps);
+        for (int k= 0; !in_tetra && k < max_damping; ++k, alpha*= 0.5) {
+            for (TetraSetT::const_iterator tit = neighborhood.begin(); tit != neighborhood.end(); ++tit) {
+                World2BaryCoordCL w2b( **tit);
+                bary = w2b( v-alpha*nx);
+                in_tetra = is_in_ref_tetra( bary, eps);
+                if (in_tetra) {
+                    tetra= &**tit;
+                    break;
+                }
+            }
+        }
+        if (!in_tetra) {
+            std::cout << "v: " << v << "\ttn: " << alpha << "\tnx: " << nx <<  "\t= "<< v-alpha*nx << std::endl;
+            throw DROPSErrCL("QuaQuaMapperCL::line_search: Coord not in given tetra set.\n");
+        }
+        // find tetra containing v-alpha*nx; as optimization of the common case, try the current tetra first.
+//         World2BaryCoordCL w2b( *tetra);
+//         bary= w2b( v - alpha*nx);
+//         if (!is_in_ref_tetra( bary, eps))
+//             tetra= 0;
+//         for (int k= 0; tetra == 0 && k < max_damping; ++k, alpha*= 0.5)
+//             tetra= enclosing_tetra( v - alpha*nx, neighborhood, eps);
+//         if (tetra == 0) {
+//             std::cout << "v: " << v << "\talpha: " << alpha << "\tnx: " << nx <<  "\tv - alpha*nx: "<< v - alpha*nx << std::endl;
+//             throw DROPSErrCL("QuaQuaMapperCL::line_search: Coord not in given tetra set.\n");
+//         }
+
+        const double lsval= ls.val( *tetra, bary);
+        if (std::abs( lsval) < inner_tol)
+            break;
+
+        const Point3DCL& gradval= ls_grad_rec.val( *tetra, bary);
+        const double slope= inner_prod( gradval, nx);
+        if (std::abs( slope) < 1.0e-8)
+            std::cout << "g_phi: " << gradval << "\tgy: " << nx << std::endl;
+        alpha+= lsval/slope;
+    }
+
+    if (inneriter >= max_inneriter)
+        std::cout <<"QuaQuaMapperCL::line_search: Warning: max inner iteration number at v : " << v << " exceeded; ls.val: " << ls.val( *tetra, bary) << std::endl;
+
+    return inneriter < max_inneriter;
+}
+
+void QuaQuaMapperCL::base_point (const TetraCL*& tet, BaryCoordCL& xb) const
+// tet and xb specify the point which is projected to the zero level.
+// On return tet and xb are the resulting base point.
+{
+    Point3DCL x, xold; // World coordinates of current and previous xb.
+    x= GetWorldCoord( *tet, xb);
+
+    Point3DCL n; // Current search direction.
+
+    int iter;
+    for (iter= 0; iter < maxiter_; ++iter) {
+        xold= x;
+        n=  ls_grad_rec.val( *tet, xb);
+        n/= norm( n);
+        const bool found_zero_level= line_search( x, n, tet, xb, neighborhoods_[tet]);
+        x= GetWorldCoord( *tet, xb);
+
+        if (norm( xold - x) < tol_ && found_zero_level)
+            break;
+    }
+    if (iter >= maxiter_) {
+        std::cout << "QuaQuaMapperCL::base_point: max iteration number exceeded; |x - xold|: " << norm( xold - x) << "\tx: " << x << "\t n: " << n << "\t ls(x): " << ls.val( *tet, xb) << std::endl;
+    }
+}
+
+void QuaQuaMapperCL::jacobian (const TetraCL& tet, const BaryCoordCL& xb, SMatrixCL<3,3>& dph) const
+{
+    // Compute the basepoint b.
+    const TetraCL* btet= &tet;
+    BaryCoordCL b= xb;
+    base_point( btet, b);
+
+    // Evaluate the quasi normal field in b.
+    LocalP2CL<Point3DCL> loc_gh( *btet, ls_grad_rec);
+    const Point3DCL gh= loc_gh( b);
+    const Point3DCL q_n= gh/gh.norm();
+
+    // Evaluate the normal to the interface in b.
+    Point3DCL n;
+    LocalP2CL<> locls( *btet, ls);
+    LocalP1CL<Point3DCL> gradp2[10];
+    SMatrixCL<3,3> T;
+    double dummy;
+    GetTrafoTr( T, dummy, *btet);
+    P2DiscCL::GetGradients( gradp2, gradrefp2, T);
+    for (Uint i= 0; i < 10; ++i)
+        n+= locls[i]*gradp2[i]( b);
+    n/= n.norm();
+
+    // Evaluate the Jacobian of the quasi-normal field in b: dn_h= 1/|G_h| P dG_h.
+    SMatrixCL<3,3> dgh;
+    for (Uint i= 0; i < 10; ++i)
+        dgh+= outer_product( loc_gh[i], gradp2[i]( b));
+    const SMatrixCL<3,3> dn= 1/gh.norm()*(dgh - outer_product( q_n, transp_mul( dgh, q_n)));
+
+    // Compute Q.
+    const SMatrixCL<3,3> Q= eye<3,3>() - outer_product( q_n/inner_prod( q_n, n), n);
+
+    // Compute d_h(x).
+    const Point3DCL x= GetWorldCoord( tet, xb),
+                    y= GetWorldCoord( *btet, b);
+    const double dhx= inner_prod( q_n, x - y);
+
+    // Compute the Jacobian of p_h.
+    QRDecompCL<3,3> qr;
+    qr.GetMatrix()= eye<3,3>() + dhx*Q*dn;
+    qr.prepare_solve();
+    Point3DCL tmp;
+    for (Uint i= 0; i < 3; ++i) {
+        tmp= Q.col( i);
+        qr.Solve( tmp);
+        dph.col( i, tmp);
+    }
+}
+
+double abs_det (const TetraCL& tet, const BaryCoordCL& xb, const QuaQuaMapperCL& quaqua, const SurfacePatchCL& p)
+{
+    if (p.empty())
+        return 0.;
+
+    // Compute the jacobian of p_h.
+    SMatrixCL<3,3> dph;
+    quaqua.jacobian( tet, xb, dph);
+
+    const Bary2WorldCoordCL b2w( tet);
+    QRDecompCL<3,2> qr;
+    SMatrixCL<3,2>& M= qr.GetMatrix();
+    M.col(0, b2w( p.vertex_begin()[1]) - b2w( p.vertex_begin()[0]));
+    M.col(1, b2w( p.vertex_begin()[2]) - b2w( p.vertex_begin()[0]));
+    qr.prepare_solve();
+    SMatrixCL<3,2> U;
+    Point3DCL tmp;
+    for (Uint i= 0; i < 2; ++i) {
+        tmp= std_basis<3>( i + 1);
+        qr.apply_Q( tmp);
+        U.col( i, tmp);
+    }
+    const SMatrixCL<2,2> Gram= GramMatrix( dph*U);
+    return std::sqrt( Gram(0,0)*Gram(1,1) - Gram(0,1)*Gram(1,0));
+}
+
+double abs_det_sphere (const TetraCL& tet, const BaryCoordCL& xb, const SurfacePatchCL& p)
+{
+    if (p.empty())
+        return 0.;
+
+    // Compute the jacobian of p.
+    SMatrixCL<3,3> dp= dp_sphere( GetWorldCoord( tet, xb), 0.);
+
+    const Bary2WorldCoordCL b2w( tet);
+    QRDecompCL<3,2> qr;
+    SMatrixCL<3,2>& M= qr.GetMatrix();
+    M.col(0, b2w( p.vertex_begin()[1]) - b2w( p.vertex_begin()[0]));
+    M.col(1, b2w( p.vertex_begin()[2]) - b2w( p.vertex_begin()[0]));
+    qr.prepare_solve();
+    SMatrixCL<3,2> U;
+    Point3DCL tmp;
+    for (Uint i= 0; i < 2; ++i) {
+        tmp= std_basis<3>( i + 1);
+        qr.apply_Q( tmp);
+        U.col( i, tmp);
+    }
+    const SMatrixCL<2,2> Gram= GramMatrix( dp*U);
+    return std::sqrt( Gram(0,0)*Gram(1,1) - Gram(0,1)*Gram(1,0));
+}
+
+class InterfaceCommonDataCL : public TetraAccumulatorCL
+{
+  private:
+    InterfaceCommonDataCL** the_clones;
+
+    const VecDescCL*   ls;      // P2-level-set
+    const BndDataCL<>* lsetbnd; // boundary data for the level set function
+    LocalP2CL<> locp2_ls;
+
+    VecDescCL* to_iface; // For all P2-dofs x: p_h(x) - x.
+
+    double max_dph_err,
+           surfacemeasP1,
+           surfacemeasP2,
+           max_absdet_err;
+
+  public:
+    const PrincipalLatticeCL& lat;
+    LocalP1CL<> p1[4];
+
+    std::valarray<double> ls_loc;
+    SurfacePatchCL surf;
+
+    QuaQuaMapperCL quaqua;
+
+    const InterfaceCommonDataCL& get_clone () const {
+        const int tid= omp_get_thread_num();
+        return tid == 0 ? *this : the_clones[tid][0];
+    }
+
+    bool empty () const { return surf.empty(); }
+
+    void store_offsets( VecDescCL& to_ifacearg) { to_iface= &to_ifacearg; }
+
+    InterfaceCommonDataCL (const VecDescCL& ls_arg, const BndDataCL<>& lsetbnd_arg, const QuaQuaMapperCL& quaquaarg)
+        : ls( &ls_arg), lsetbnd( &lsetbnd_arg), to_iface( 0), lat( PrincipalLatticeCL::instance( 1)), ls_loc( lat.vertex_size()), quaqua( quaquaarg)
+    { p1[0][0]= p1[1][1]= p1[2][2]= p1[3][3]= 1.; } // P1-Basis-Functions
+
+    virtual ~InterfaceCommonDataCL () {}
+
+    virtual void begin_accumulation   () {
+        the_clones= new InterfaceCommonDataCL*[omp_get_max_threads()];
+        the_clones[0]= this;
+
+        max_dph_err= 0;
+        surfacemeasP1= 0.;
+        surfacemeasP2= 0.;
+        max_absdet_err= 0.;
+    }
+    virtual void finalize_accumulation() {
+        delete[] the_clones;
+
+        const double surface_true= 4.*M_PI*RadDrop[0]*RadDrop[0];
+        std::cout << "max_dph_err: " << max_dph_err
+            << "\nsurfacemeasP1: " << surfacemeasP1 << " rel. error: " << std::abs(surfacemeasP1 - surface_true)/surface_true
+            << "\nsurfacemeasP2: " << surfacemeasP2 << " rel. error: " << std::abs(surfacemeasP2 - surface_true)/surface_true
+            << "\nmax_absdet_err: " << max_absdet_err << std::endl;
+    }
+
+    virtual void visit (const TetraCL& t) {
+        surf.clear();
+        locp2_ls.assign( t, *ls, *lsetbnd);
+        evaluate_on_vertexes( locp2_ls, lat, Addr( ls_loc));
+        if (equal_signs( ls_loc))
+            return;
+        surf.make_patch<MergeCutPolicyCL>( lat, ls_loc);
+        if (surf.empty())
+            return;
+
+        const TetraCL* tet;
+        BaryCoordCL b;
+        std::cout << "Tetra Id: " << t.GetId().GetIdent() << std::endl;
+        for (SurfacePatchCL::const_vertex_iterator it= surf.vertex_begin(); it != surf.vertex_end(); ++it) {
+            tet= &t;
+            b= *it;
+            quaqua.base_point( tet, b);
+            const Point3DCL& x= GetWorldCoord( t, *it);
+            const Point3DCL& xb= GetWorldCoord( *tet, b);
+//             std::cout  << "    |x-xb|: " << (x - xb).norm();
+
+            SMatrixCL<3,3> dph;
+            quaqua.jacobian( t, *it, dph);
+            const double dph_err= std::sqrt( frobenius_norm_sq( dph - dp_sphere( x, 0.)));
+            max_dph_err= std::max( max_dph_err, dph_err);
+//             std::cout  << " |dph -dp|_F: " << dph_err;
+
+            const double absdet= abs_det( t, *it, quaqua, surf),
+                         absdet_err= std::abs( absdet - abs_det_sphere( t, *it, surf));
+            max_absdet_err= std::max( max_absdet_err, absdet_err);
+            std::cout  << " |\\mu - \\mu^s|: " << absdet_err << std::endl;
+        }
+
+        QuadDomain2DCL qdom;
+        make_CompositeQuad5Domain2D ( qdom, surf, t);
+        std::valarray<double> absdet( 1., qdom.vertex_size());
+        surfacemeasP1+= quad_2D( absdet, qdom);
+        for (Uint i= 0; i < qdom.vertex_size(); ++i) {
+            absdet[i]= abs_det( t, qdom.vertex_begin()[i], quaqua, surf);
+        }
+        surfacemeasP2+= quad_2D( absdet, qdom);
+
+        if (to_iface != 0) {
+            const Uint sys= to_iface->RowIdx->GetIdx();
+            for (Uint i= 0; i < 4; ++i) {
+                tet= &t;
+                b= BaryCoordCL();
+                b[i]= 1.;
+                quaqua.base_point( tet, b);
+                Point3DCL offset= t.GetVertex( i)->GetCoord() - GetWorldCoord( *tet, b);
+                const size_t dof= t.GetVertex( i)->Unknowns( sys);
+                std::copy( Addr( offset), Addr( offset) + 3, &to_iface->Data[dof]);
+            }
+        }
+
+    }
+    virtual InterfaceCommonDataCL* clone (int clone_id) {
+        return the_clones[clone_id]= new InterfaceCommonDataCL( *this);
+    }
+};
+
+void StationaryStrategyHighOrder (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::LevelsetP2CL& lset)
+{
+    // Initialize level set and triangulation
+    adap.MakeInitialTriang( sphere_dist);
+
+    lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
+    lset.Phi.SetIdx( &lset.idx);
+    // LinearLSInit( mg, lset.Phi, &sphere_dist);
+    LSInit( mg, lset.Phi, sphere_dist, 0.);
+
+    // Setup an interface-P1 numbering
+    DROPS::IdxDescCL ifaceidx( P1IF_FE);
+    ifaceidx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
+    ifaceidx.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
+    std::cout << "NumUnknowns: " << ifaceidx.NumUnknowns() << std::endl;
+
+    // Recover the gradient of the level set function
+    IdxDescCL vecp2idx( vecP2_FE);
+    vecp2idx.CreateNumbering( mg.GetLastLevel(), mg);
+    VecDescCL lsgradrec( &vecp2idx);
+    averaging_P2_gradient_recovery( mg, lset.Phi, lset.GetBndData(), lsgradrec);
+
+    // Compute neighborhoods of the tetras at the interface
+    TetraToTetrasT tetra_neighborhoods;
+    compute_tetra_neighborhoods( mg, lset, tetra_neighborhoods);
+
+    QuaQuaMapperCL quaqua( mg, lset.Phi, lsgradrec, tetra_neighborhoods);
+
+    VecDescCL to_iface( &vecp2idx);
+    {
+    TetraAccumulatorTupleCL accus;
+    InterfaceCommonDataCL ttt( lset.Phi, lset.GetBndData(), quaqua);
+//     ttt.store_offsets( to_iface);
+    accus.push_back( &ttt);
+    accumulate( accus, mg, ifaceidx.TriangLevel(), ifaceidx.GetMatchingFunction(), ifaceidx.GetBndInfo());
+    }
+
+    TetraAccumulatorTupleCL accus;
+    InterfaceCommonDataP1CL cdata( lset.Phi, lset.GetBndData());
+    accus.push_back( &cdata);
+    DROPS::MatDescCL M( &ifaceidx, &ifaceidx);
+    InterfaceMatrixAccuP1CL<LocalInterfaceMassP1CL> accuM( &M, LocalInterfaceMassP1CL(), cdata, "M");
+    accus.push_back( &accuM);
+    DROPS::MatDescCL A( &ifaceidx, &ifaceidx);
+    InterfaceMatrixAccuP1CL<LocalLaplaceBeltramiP1CL> accuA( &A, LocalLaplaceBeltramiP1CL( P.get<double>("SurfTransp.Visc")), cdata, "A");
+    accus.push_back( &accuA);
+    accumulate( accus, mg, ifaceidx.TriangLevel(), ifaceidx.GetMatchingFunction(), ifaceidx.GetBndInfo());
+
+    DROPS::MatrixCL L;
+    L.LinComb( 1.0, A.Data, 1.0, M.Data);
+    DROPS::VecDescCL b( &ifaceidx);
+    DROPS::SetupInterfaceRhsP1( mg, &b, lset.Phi, lset.GetBndData(), laplace_beltrami_0_rhs);
+
+    //DROPS::WriteToFile( M.Data, "m_iface.txt", "M");
+    //DROPS::WriteToFile( A.Data, "a_iface.txt", "A");
+    //DROPS::WriteFEToFile( b, mg, "rhs_iface.txt", /*binary=*/ true);
+
+    typedef DROPS::SSORPcCL SurfPcT;
+    SurfPcT surfpc;
+    typedef DROPS::PCGSolverCL<SurfPcT> SurfSolverT;
+    SurfSolverT surfsolver( surfpc, P.get<int>("SurfTransp.Iter"), P.get<double>("SurfTransp.Tol"), true);
+
+    DROPS::VecDescCL x( &ifaceidx);
+    surfsolver.Solve( L, x.Data, b.Data, x.RowIdx->GetEx());
+    std::cout << "Iter: " << surfsolver.GetIter() << "\tres: " << surfsolver.GetResid() << '\n';
+
+    if (P.get<int>( "SolutionOutput.Freq") > 0)
+        DROPS::WriteFEToFile( x, mg, P.get<std::string>( "SolutionOutput.Path"), P.get<bool>( "SolutionOutput.Binary"));
+
+    DROPS::IdxDescCL ifacefullidx( DROPS::P1_FE);
+    ifacefullidx.CreateNumbering( mg.GetLastLevel(), mg);
+    DROPS::VecDescCL xext( &ifacefullidx);
+    DROPS::Extend( mg, x, xext);
+    DROPS::NoBndDataCL<> nobnd;
+    DROPS::NoBndDataCL<Point3DCL> nobnd_vec;
+    if (vtkwriter.get() != 0) {
+        vtkwriter->Register( make_VTKScalar( lset.GetSolution(), "Levelset") );
+        vtkwriter->Register( make_VTKIfaceScalar( mg, x, "InterfaceSol"));
+        vtkwriter->Register( make_VTKVector( make_P2Eval( mg, nobnd_vec, lsgradrec), "LSGradRec") );
+        vtkwriter->Register( make_VTKVector( make_P2Eval( mg, nobnd_vec, to_iface), "to_iface") );
+        vtkwriter->Write( 0.);
+    }
+
+    double L2_err( L2_error( lset.Phi, lset.GetBndData(), make_P1Eval( mg, nobnd, xext), &laplace_beltrami_0_sol));
+    std::cout << "L_2-error: " << L2_err << std::endl;
+}
+
 int main (int argc, char* argv[])
 {
   try {
@@ -798,7 +1293,10 @@ int main (int argc, char* argv[])
             -1,    /* <- level */
             P.get<bool>("VTK.ReUseTimeFile")));
     if (P.get<bool>( "Exp.StationaryPDE"))
-        StationaryStrategy( mg, adap, lset);
+        if (P.get<int>( "SurfTransp.FEDegree") == 1)
+            StationaryStrategy( mg, adap, lset);
+        else
+            StationaryStrategyHighOrder( mg, adap, lset);
     else
         Strategy( mg, adap, lset);
 

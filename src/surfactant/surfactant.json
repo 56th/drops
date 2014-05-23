@@ -75,7 +75,8 @@
 		"Iter":		1000,
 		"Tol":		1e-10,
 		"OmitBound":	-1,
-		"Visc":		1 // 0.05
+		"Visc":		1, // 0.05,
+		"FEDegree":	1 // 2
 	},
 
 	"Levelset": // levelset solver
