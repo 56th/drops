@@ -849,8 +849,12 @@ class World2BaryCoordCL
     QRDecompCL<4> qr_;
 
   public:
-    World2BaryCoordCL (const TetraCL& t);
+    World2BaryCoordCL (const TetraCL& t) { assign( t); }
     World2BaryCoordCL (const Point3DCL* coordVerts);
+    World2BaryCoordCL () {};
+
+    void assign (const TetraCL& t);
+
     BaryCoordCL operator() (const Point3DCL& p) const;
 };
 

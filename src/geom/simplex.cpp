@@ -453,8 +453,7 @@ SVectorCL<3> FaceToTetraCoord(__UNUSED__ const TetraCL& t, Uint f, SVectorCL<2> 
     return ret;
 }
 
-
-World2BaryCoordCL::World2BaryCoordCL (const TetraCL& t)
+void World2BaryCoordCL::assign (const TetraCL& t)
 {
     SMatrixCL<4,4>& m= qr_.GetMatrix();
     for (Uint v= 0; v < 4; ++v) {
@@ -464,6 +463,7 @@ World2BaryCoordCL::World2BaryCoordCL (const TetraCL& t)
     for (Uint j= 0; j < 4; ++j) m( 3, j)= 1.;
     qr_.prepare_solve();
 }
+
 
 World2BaryCoordCL::World2BaryCoordCL(const Point3DCL* coordVerts)
 {
