@@ -48,7 +48,18 @@ void Restrict (const MultiGridCL& mg, const VecDescCL& xext, VecDescCL& x);
 
 /// \brief The routine sets up the mass-matrix in matM on the interface defined by ls.
 ///        It belongs to the FE induced by standard P1-elements.
-void SetupInterfaceMassP1 (const MultiGridCL& MG, MatDescCL* matM, const VecDescCL& ls, const BndDataCL<>& lsetbnd);
+void SetupInterfaceMassP1 (const MultiGridCL& MG, MatDescCL* mat, const VecDescCL& ls, const BndDataCL<>& lsetbnd, const double alpha= 1.);
+
+/// \brief The routine sets up the mass-matrix in matM on the interface defined by ls.
+///        The FE spaces associated with rows and columns can be mixed among P1 and P1X.
+///        The jumping coefficient \a alpha is defined w.r.t. the positive(0) and negative(1) part of the domain. If omitted, \a alpha is assumed to be 1 on the whole domain.
+void SetupInterfaceMassP1X (const MultiGridCL& MG, MatDescCL* mat, const VecDescCL& ls, const BndDataCL<>& lsetbnd, const double alpha[2]= 0);
+
+/// \brief The routine equips the matrices with the right FE spaces \a mass_idx and \a surf_idx and
+///        sets up the ad/de-sorption terms for coupled mass/surfactant transport.
+///        The jumping coefficients \a k_a, \a k_d are defined w.r.t. the positive(0) and negative(1) part of the domain.
+void SetupInterfaceSorptionP1X (const MultiGridCL& MG, const VecDescCL& ls, const BndDataCL<>& lsetbnd,
+        MatDescCL* R, MatDescCL* C, MatDescCL* R_i, MatDescCL* C_i, const IdxDescCL* mass_idx, const IdxDescCL* surf_idx, const double k_a[2], const double k_d[2]);
 
 /// \brief The routine sets up the Laplace-Beltrami-matrix in mat on the interface defined by ls.
 ///        It belongs to the FE induced by standard P1-elements.
@@ -192,7 +203,7 @@ class SurfactantcGP1CL
     const VelBndDataT&  Bnd_v_;  ///< Boundary condition for the velocity
     VecDescCL*          v_;      ///< velocity at current time step
     VecDescCL&          lset_vd_;///< levelset at current time step
-    
+
     const BndDataCL<>&  lsetbnd_; ///< level set boundary
 
     IdxDescCL           oldidx_; ///< idx that corresponds to old time (and oldls_)

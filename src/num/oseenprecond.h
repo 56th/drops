@@ -1037,6 +1037,53 @@ class BlockPreCL
 
 };
 
+template <class PC1T, class PC2T>
+class BlockDiagPreCL
+{
+  private:
+    PC1T& pc1_; // Preconditioner for A.
+    PC2T& pc2_; // Preconditioner for S.
+
+  public:
+    BlockDiagPreCL (PC1T& pc1, PC2T& pc2)
+        : pc1_( pc1), pc2_( pc2) {}
+
+    template <typename Mat, typename Vec, typename ExT>
+    void Apply(const BlockMatrixBaseCL<Mat>& A, Vec& x, const Vec& b, const ExT& ex) const {
+        VectorCL b0( b[std::slice( 0, A.num_rows( 0), 1)]);
+        VectorCL b1( b[std::slice( A.num_rows( 0), A.num_rows( 1), 1)]);
+        VectorCL x0( A.num_cols( 0));
+        VectorCL x1( A.num_cols( 1));
+        pc1_.Apply( *A.GetBlock(0), x0, b0, ex.GetEx(0));
+        pc2_.Apply( *A.GetBlock(3), x1, b1, ex.GetEx(1));
+        x[std::slice( 0, A.num_cols( 0), 1)]= x0;
+        x[std::slice( A.num_cols( 0), A.num_cols( 1), 1)]= x1;
+    }
+
+    /// \brief Check if the preconditioned vector is accumulated
+    bool RetAcc() const {
+        Assert( pc1_.RetAcc()==pc2_.RetAcc(), DROPSErrCL("BlockPreCL::RetAcc: Preconditioners do not match"),
+                DebugNumericC);
+        return pc1_.RetAcc();
+    }
+
+    /// \brief Check if the diagonal of the matrix needs to be computed
+    bool NeedDiag() const { return pc1_.NeedDiag() || pc2_.NeedDiag(); }
+
+    /// \brief Set accumulated diagonal of a matrix, that is needed by most of the preconditioners
+    template<typename Mat, typename ExT>
+    void SetDiag(const Mat& A, const ExT& ex) const
+    {
+        pc1_.SetDiag(*A.GetBlock( 0), ex.GetEx(0));
+        pc2_.SetDiag(*A.GetBlock( 3), ex.GetEx(1));
+    }
+    const PC1T& GetPC1() const { return pc1_; }
+          PC1T& GetPC1()       { return pc1_; }
+    const PC2T& GetPC2() const { return pc2_; }
+          PC2T& GetPC2()       { return pc2_; }
+
+};
+
 } // end of namespace DROPS
 
 #endif /* OSEENPRECOND_H_ */

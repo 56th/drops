@@ -58,60 +58,161 @@ void Restrict (const MultiGridCL& mg, const VecDescCL& xext, VecDescCL& x)
     }
 }
 
-void SetupInterfaceMassP1OnTriangle (const LocalP1CL<> p1[4],
-    Quad5_2DCL<> q[4], MatrixBuilderCL& M, const IdxT Numb[4],
-    const BaryCoordCL triangle[3], double det)
+void SetupInterfaceMassP1OnTriangle (const LocalP1CL<> p1[4], Quad5_2DCL<> q[4],
+        const BaryCoordCL triangle[3], double det, double coup[4][4])
 {
     for (int i= 0; i < 4; ++i)
         q[i].assign( p1[i], triangle);
 
     Quad5_2DCL<> m;
-    double tmp;
     for (int i= 0; i < 4; ++i) {
-        if (Numb[i] == NoIdx) continue;
         m= q[i]*q[i];
-        M( Numb[i], Numb[i])+= m.quad( det);
+        coup[i][i]+= m.quad( det);
         for(int j= 0; j < i; ++j) {
-            if (Numb[j] == NoIdx) continue;
             m= (q[j]*q[i]);
-            tmp= m.quad( det);
-            M( Numb[i], Numb[j])+= tmp;
-            M( Numb[j], Numb[i])+= tmp;
+            coup[i][j]+= m.quad( det);
+            coup[j][i]= coup[i][j];
         }
     }
 }
 
-void SetupInterfaceMassP1 (const MultiGridCL& MG, MatDescCL* matM, const VecDescCL& ls, const BndDataCL<>& lsetbnd)
+void SetupInterfaceMassP1 (const MultiGridCL& MG, MatDescCL* mat, const VecDescCL& ls, const BndDataCL<>& lsetbnd, const double alpha)
 {
-    const IdxT num_unks=  matM->RowIdx->NumUnknowns();
-    MatrixBuilderCL M( &matM->Data, num_unks,  num_unks);
+    const IdxT num_rows= mat->RowIdx->NumUnknowns();
+    const IdxT num_cols= mat->ColIdx->NumUnknowns();
+    MatrixBuilderCL M( &mat->Data, num_rows, num_cols);
 
-    const Uint lvl= matM->GetRowLevel();
-    IdxT Numb[4];
+    const Uint lvl= mat->GetRowLevel();
+    IdxT numr[4], numc[4];
 
-    double det;
+    double coup[4][4];
     LocalP1CL<> p1[4];
     p1[0][0]= p1[1][1]= p1[2][2]= p1[3][3]= 1.; // P1-Basis-Functions
     Quad5_2DCL<double> q[4], m;
 
     InterfaceTriangleCL triangle;
     DROPS_FOR_TRIANG_CONST_TETRA( MG, lvl, it) {
+        // setup local matrix
         triangle.Init( *it, ls, lsetbnd);
+        if (triangle.Intersects()) { // We are at the phase boundary.
+            std::memset( coup, 0, 4*4*sizeof( double));
 
-        GetLocalNumbP1NoBnd( Numb, *it, *matM->RowIdx);
-        for (int ch= 0; ch < 8; ++ch) {
-            if (!triangle.ComputeForChild( ch)) // no patch for this child
-                continue;
+            for (int ch= 0; ch < 8; ++ch) {
+                if (!triangle.ComputeForChild( ch)) // no patch for this child
+                    continue;
 
-            det= triangle.GetAbsDet();
-            SetupInterfaceMassP1OnTriangle( p1, q, M, Numb, &triangle.GetBary( 0), det);
-            if (triangle.IsQuadrilateral()) {
-                det*= triangle.GetAreaFrac();
-                SetupInterfaceMassP1OnTriangle( p1, q, M, Numb, &triangle.GetBary( 1), det);
+                for (int tri= 0; tri < triangle.GetNumTriangles(); ++tri)
+                    SetupInterfaceMassP1OnTriangle( p1, q, &triangle.GetBary( tri), triangle.GetAbsDet( tri), coup);
+            }
+
+            // update global matrix
+            GetLocalNumbP1NoBnd( numr, *it, *mat->RowIdx);
+            GetLocalNumbP1NoBnd( numc, *it, *mat->ColIdx);
+            for(int i= 0; i < 4; ++i) {// assemble row Numb[i]
+                if (numr[i] == NoIdx) continue;
+                for(int j= 0; j < 4; ++j) {
+                    if (numc[j] == NoIdx) continue;
+                    M( numr[i],   numc[j])+= alpha*coup[j][i];
+                }
             }
         }
-   }
+    }
+
     M.Build();
+}
+
+void SetupInterfaceMassP1X (const MultiGridCL& MG, MatDescCL* mat, const VecDescCL& ls, const BndDataCL<>& lsetbnd, const double alpha[2])
+/// \todo: merge with  SetupInterfaceMassP1 by using accumulator pattern (difference only in update_global)
+{
+    const IdxT num_rows= mat->RowIdx->NumUnknowns();
+    const IdxT num_cols= mat->ColIdx->NumUnknowns();
+    const bool xfemr= mat->RowIdx->IsExtended(),
+            xfemc= mat->ColIdx->IsExtended();
+    ExtIdxDescCL &xidxr= mat->RowIdx->GetXidx(),
+            &xidxc= mat->ColIdx->GetXidx();
+    MatrixBuilderCL M( &mat->Data, num_rows, num_cols);
+
+    // compute coefficients
+    double Kneg, Kpos, Kboth, K[4];
+    if (alpha) {
+        Kpos= alpha[0];
+        Kneg= alpha[1];
+    } else
+        Kneg= Kpos= 1.;
+    Kboth= Kneg+Kpos;
+
+    const Uint lvl= mat->GetRowLevel();
+    IdxT numr[4], numc[4], xnumr[4], xnumc[4];
+    bool is_pos[4];
+
+    double coup[4][4];
+    LocalP1CL<> p1[4];
+    p1[0][0]= p1[1][1]= p1[2][2]= p1[3][3]= 1.; // P1-Basis-Functions
+    Quad5_2DCL<double> q[4], m;
+
+    InterfaceTriangleCL triangle;
+    DROPS_FOR_TRIANG_CONST_TETRA( MG, lvl, it) {
+        // setup local matrix
+        triangle.Init( *it, ls, lsetbnd);
+        if (triangle.Intersects()) { // We are at the phase boundary.
+            std::memset( coup, 0, 4*4*sizeof( double));
+
+            for (int ch= 0; ch < 8; ++ch) {
+                if (!triangle.ComputeForChild( ch)) // no patch for this child
+                    continue;
+
+                for (int tri= 0; tri < triangle.GetNumTriangles(); ++tri)
+                    SetupInterfaceMassP1OnTriangle( p1, q, &triangle.GetBary( tri), triangle.GetAbsDet( tri), coup);
+            }
+
+            // update global matrix
+
+            GetLocalNumbP1NoBnd( numr, *it, *mat->RowIdx);
+            GetLocalNumbP1NoBnd( numc, *it, *mat->ColIdx);
+            for(int k= 0; k < 4; ++k) {
+                xnumr[k]= xfemr ? xidxr[numr[k]] : NoIdx;
+                xnumc[k]= xfemc ? xidxc[numc[k]] : NoIdx;
+                is_pos[k]= triangle.GetSign(k)==1;
+                K[k]= is_pos[k] ? -Kneg : Kpos;
+            }
+
+            for(int i= 0; i < 4; ++i) {// assemble row Numb[i]
+                if (numr[i] == NoIdx) continue;
+                for(int j= 0; j < 4; ++j) {
+                    if (numc[j] == NoIdx) continue;
+                    M( numr[i],   numc[j])+= Kboth*coup[j][i];
+                    if (xnumc[j] == NoIdx) continue;
+                    M( numr[i],   xnumc[j])+= K[j]*coup[j][i];
+                }
+                if (xnumr[i] == NoIdx) continue;
+                for(int j= 0; j < 4; ++j) {
+                    if (numc[j] == NoIdx) continue;
+                    M( xnumr[i],   numc[j])+= K[i]*coup[j][i];
+                    if (xnumc[j] == NoIdx || is_pos[i]!= is_pos[j]) continue;
+                    M( xnumr[i],   xnumc[j])+= K[i]*coup[j][i];
+                }
+            }
+        }
+    }
+
+    M.Build();
+}
+
+void SetupInterfaceSorptionP1X (const MultiGridCL& MG, const VecDescCL& ls, const BndDataCL<>& lsetbnd,
+        MatDescCL* R, MatDescCL* C, MatDescCL* R_i, MatDescCL* C_i, const IdxDescCL* mass_idx, const IdxDescCL* surf_idx, const double k_a[2], const double k_d[2])
+{
+    R->SetIdx  ( mass_idx, mass_idx);
+    C->SetIdx  ( mass_idx, surf_idx);
+    R_i->SetIdx( surf_idx, surf_idx);
+    C_i->SetIdx( surf_idx, mass_idx);
+
+    SetupInterfaceMassP1( MG, R_i, ls, lsetbnd, k_d[0]+k_d[1]);
+    SetupInterfaceMassP1X( MG, R, ls, lsetbnd, k_a);
+
+    const double mk_a[2]= { -k_a[0], -k_a[1] },
+                 mk_d[2]= { -k_d[0], -k_d[1] };
+    SetupInterfaceMassP1X( MG, C, ls, lsetbnd, mk_d);
+    SetupInterfaceMassP1X( MG, C_i, ls, lsetbnd, mk_a);
 }
 
 void SetupLBP1OnTriangle (InterfaceTriangleCL& triangle, int tri, Point3DCL grad[4], double coup[4][4])
