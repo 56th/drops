@@ -88,8 +88,8 @@ class ProcCL
     static const DatatypeT  NullDataType;       ///< MPI-Datatype, which is not set
 
   private:
-    static Uint my_rank_;                       // Which Id do I have?
-    static Uint size_;                          // How many are out there?
+    static int my_rank_;                        // Which Id do I have?
+    static int size_;                           // How many are out there?
     static int  procDigits_;                    // How many digits are necessary to decode rank of process?
     static const CommunicatorT& Communicator_;  // communicator (=MPI_COMM_WORLD, MPI::COMM_WORLD)
     static MuteStdOstreamCL* mute_;             // for muting std::cout, std::cout, std::clog
@@ -365,6 +365,9 @@ template<> struct ProcCL::MPI_TT<byte>
   { static const ProcCL::DatatypeT& dtype; };
 
 template<> struct ProcCL::MPI_TT<float>
+  { static const ProcCL::DatatypeT& dtype; };
+
+template<> struct ProcCL::MPI_TT<long>
   { static const ProcCL::DatatypeT& dtype; };
 
 #ifdef WIN64
