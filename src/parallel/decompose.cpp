@@ -717,9 +717,7 @@ void MetisPartitionerCL::doParallelPartition()
 /** Graph is given on a single process. */
 void MetisPartitionerCL::doSerialPartition()
 {
-    const int me= ProcCL::MyRank();
-    if ( graph().vtxdist()[me+1]-graph().vtxdist()[me]==0)
-        return;
+    if ( !ProcCL::IamMaster()) return;
 
     graph_index_type nparts     = ProcCL::Size(),             // number of sub-domains (per proc one)
                      n          = graph().get_num_verts(),    // number of vertices
