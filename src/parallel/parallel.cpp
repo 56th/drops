@@ -80,13 +80,16 @@ ProcCL::ProcCL(int* argc, char*** argv)
     MPI_Init( argc, argv);
 #endif
 
+    int rank=-1, size=-1;
 #ifdef _MPICXX_INTERFACE
-    my_rank_= Communicator_::Get_rank();
-    size_= Communicator_::size();
+    rank= Communicator_::Get_rank();
+    size= Communicator_::size();
 #else
-    MPI_Comm_rank( Communicator_ , &my_rank_);
-    MPI_Comm_size( Communicator_, &size_ );
+    MPI_Comm_rank( Communicator_ , &rank);
+    MPI_Comm_size( Communicator_, &size );
 #endif
+    my_rank_=rank;
+    size_=size;
     procDigits_= 1;
     int procs  = Size();
     while( procs>9){
