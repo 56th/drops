@@ -767,6 +767,7 @@ typedef std::tr1::unordered_set<const TetraCL*> TetraSetT;
 typedef std::tr1::unordered_map<const VertexCL*, TetraSetT> VertexToTetrasT;
 
 /// Computes a map from the vertices at the pcw. linear interface to all tetras that contain the vertex.
+/// XXX Use a PrincipalLatticeCL!
 void compute_vertex_neighborhoods (const DROPS::MultiGridCL& mg, DROPS::LevelsetP2CL& lset, VertexToTetrasT& vertex_neighborhood)
 {
     vertex_neighborhood.clear();
@@ -783,6 +784,7 @@ void compute_vertex_neighborhoods (const DROPS::MultiGridCL& mg, DROPS::Levelset
 
 typedef std::tr1::unordered_map<const TetraCL*, TetraSetT> TetraToTetrasT;
 
+/// XXX Use a PrincipalLatticeCL!
 void compute_tetra_neighborhoods (const DROPS::MultiGridCL& mg, DROPS::LevelsetP2CL& lset, TetraToTetrasT& tetra_neighborhoods)
 {
     VertexToTetrasT vertex_neighborhoods;
@@ -820,17 +822,18 @@ class QuaQuaMapperCL
     int maxiter_;
     double tol_;
 
-//  The level set function
+    // The level set function.
     NoBndDataCL<> nobnddata;
     P2EvalCL<double, const NoBndDataCL<>, const VecDescCL> ls;
 
-//  The recovered gradient of ls.
+    // The recovered gradient of ls.
     NoBndDataCL<Point3DCL> nobnddata_vec;
     P2EvalCL<Point3DCL, const NoBndDataCL<Point3DCL>, const VecDescCL> ls_grad_rec;
 
     mutable LocalP1CL<Point3DCL> gradrefp2[10];
 
-    TetraToTetrasT& neighborhoods_; // The neighborhoods around each tetra in which base points are searched for.
+    // The neighborhoods around each tetra in which base points are searched for.
+    TetraToTetrasT& neighborhoods_;
 
     bool line_search (const Point3DCL& v, const Point3DCL& nx, const TetraCL*& tetra, BaryCoordCL& bary, const TetraSetT& neighborhood) const;
 
@@ -1047,7 +1050,8 @@ class InterfaceCommonDataCL : public TetraAccumulatorCL
     double max_dph_err,
            surfacemeasP1,
            surfacemeasP2,
-           max_absdet_err;
+           max_absdet_err,
+           max_dph2_err;
 
   public:
     const PrincipalLatticeCL& lat;
@@ -1081,6 +1085,7 @@ class InterfaceCommonDataCL : public TetraAccumulatorCL
         surfacemeasP1= 0.;
         surfacemeasP2= 0.;
         max_absdet_err= 0.;
+        max_dph2_err= 0;
     }
     virtual void finalize_accumulation() {
         delete[] the_clones;
@@ -1089,7 +1094,8 @@ class InterfaceCommonDataCL : public TetraAccumulatorCL
         std::cout << "max_dph_err: " << max_dph_err
             << "\nsurfacemeasP1: " << surfacemeasP1 << " rel. error: " << std::abs(surfacemeasP1 - surface_true)/surface_true
             << "\nsurfacemeasP2: " << surfacemeasP2 << " rel. error: " << std::abs(surfacemeasP2 - surface_true)/surface_true
-            << "\nmax_absdet_err: " << max_absdet_err << std::endl;
+            << "\nmax_absdet_err: " << max_absdet_err
+            << "\nmax_dph2_err: " << max_dph2_err << std::endl;
     }
 
     virtual void visit (const TetraCL& t) {
@@ -1115,14 +1121,28 @@ class InterfaceCommonDataCL : public TetraAccumulatorCL
 
             SMatrixCL<3,3> dph;
             quaqua.jacobian( t, *it, dph);
-            const double dph_err= std::sqrt( frobenius_norm_sq( dph - dp_sphere( x, 0.)));
+            SMatrixCL<3,3> diff_dp= dph - dp_sphere( x, 0.);
+            const double dph_err= std::sqrt( frobenius_norm_sq( diff_dp));
             max_dph_err= std::max( max_dph_err, dph_err);
 //             std::cout  << " |dph -dp|_F: " << dph_err;
 
             const double absdet= abs_det( t, *it, quaqua, surf),
                          absdet_err= std::abs( absdet - abs_det_sphere( t, *it, surf));
             max_absdet_err= std::max( max_absdet_err, absdet_err);
-            std::cout  << " |\\mu - \\mu^s|: " << absdet_err << std::endl;
+//             std::cout  << " |\\mu - \\mu^s|: " << absdet_err << std::endl;
+
+
+            Point3DCL n=x/x.norm();
+            SMatrixCL<3,3> diff_dp2= diff_dp - outer_product( n, transp_mul( diff_dp, n));
+            Point3DCL nh;
+            Point3DCL v1= GetWorldCoord( t, surf.vertex_begin()[1]) - GetWorldCoord( t, surf.vertex_begin()[0]),
+                      v2= GetWorldCoord( t, surf.vertex_begin()[2]) - GetWorldCoord( t,surf.vertex_begin()[0]);
+            cross_product( nh, v1, v2);
+            nh/= nh.norm();
+            diff_dp2= diff_dp2 - outer_product( diff_dp2*nh, nh);
+            const double dph2_err= std::sqrt( frobenius_norm_sq( diff_dp2));
+//             std::cout  << " |P(dph -dp)\\hat P|_F: " << dph2_err << std::endl;
+            max_dph2_err= std::max( max_dph2_err, dph2_err);
         }
 
         QuadDomain2DCL qdom;
