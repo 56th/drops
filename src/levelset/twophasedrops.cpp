@@ -523,7 +523,12 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 			FilmInfo.Update( lset, Stokes.GetVelSolution());
 			FilmInfo.Write(time_old);
 		}
-
+		if(P.get<int>("Exp.OutputInfo")==1)
+		{
+			double e1 = lset.GetSurfaceEnergy();
+			double e2 = Stokes.GetKineticEnergy(lset);
+		    out<<time_old<<"  "<<compute_averageAngle(MG, lset, the_Bnd_outnormal)<<"  "<<lset.GetWetArea()<<"  "<<e1<<"  "<<e2<<"   "<<e1+e2<<std::endl;
+		}
         if (P.get("SurfTransp.DoTransp", 0)) surfTransp.InitOld();
         timedisc->DoStep( P.get<int>("Coupling.Iter"));
         if (massTransp) massTransp->DoStep( time_new);
@@ -534,12 +539,12 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         }
 		if( P.get<std::string>("Exp.Solution_Vel").compare("None")!=0)
 			Stokes.CheckOnePhaseSolution( &Stokes.v, &Stokes.p, Stokes.Coeff_.RefVel, Stokes.Coeff_.RefGradPr, Stokes.Coeff_.RefPr);
-		if(P.get<int>("Exp.OutputInfo")==1)
-		{
-			double e1 = lset.GetSurfaceEnergy();
-			double e2 = Stokes.GetKineticEnergy(lset);
-		    out<<time_new<<"  "<<compute_averageAngle(MG, lset, the_Bnd_outnormal)<<"  "<<lset.GetWetArea()<<"  "<<e1<<"  "<<e2<<"   "<<e1+e2<<std::endl;
-		}
+		//if(P.get<int>("Exp.OutputInfo")==1)
+		//{
+		//	double e1 = lset.GetSurfaceEnergy();
+		//	double e2 = Stokes.GetKineticEnergy(lset);
+		//    out<<time_new<<"  "<<compute_averageAngle(MG, lset, the_Bnd_outnormal)<<"  "<<lset.GetWetArea()<<"  "<<e1<<"  "<<e2<<"   "<<e1+e2<<std::endl;
+		//}
         // WriteMatrices( Stokes, step);
 
         // grid modification
@@ -595,6 +600,12 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 	else if(P.get<double>("Exp.SimuType")==1){
 		FilmInfo.Update( lset, Stokes.GetVelSolution());
 		FilmInfo.Write(Stokes.v.t);
+	}
+	if(P.get<int>("Exp.OutputInfo")==1)
+	{
+		double e1 = lset.GetSurfaceEnergy();
+		double e2 = Stokes.GetKineticEnergy(lset);
+		out<<Stokes.v.t<<"  "<<compute_averageAngle(MG, lset, the_Bnd_outnormal)<<"  "<<lset.GetWetArea()<<"  "<<e1<<"  "<<e2<<"   "<<e1+e2<<std::endl;
 	}
     std::cout << std::endl;
     delete timedisc;
@@ -660,7 +671,7 @@ void SetMissingParameters(DROPS::ParamCL& P){
 	P.put_if_unset<std::string>("Exp.Solution_Vel", "None");
 	P.put_if_unset<std::string>("Exp.Solution_GradPr", "None");
 	P.put_if_unset<std::string>("Exp.Solution_Pr", "None");
-	P.put_if_unset<int>("Exp.OutputInfo",0);
+	P.put_if_unset<int>("Exp.OutputInfo",1);
 	//---------------------------------------------------------------
 	P.put_if_unset<double>("Exp.SimuType", 0.0);
 }

@@ -1201,7 +1201,7 @@ double LevelsetP2CL::GetWetArea() const
 					make_CompositeQuad5BndDomain2D( bndq5dom_, bndpartition_,*it);
 
 					LocalP1CL<double> fun;
-					for (Uint i= 0; i<3; ++i)	fun[i]=1.0;
+					for (Uint i= 0; i<4; ++i)	fun[i]=1.0;
 					resize_and_evaluate_on_vertexes(fun, bndq5dom_, qpr);
 					area += quad( qpr, bndq5dom_, NegTetraC);
 				}

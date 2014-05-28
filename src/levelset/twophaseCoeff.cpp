@@ -437,18 +437,27 @@ namespace InstatSlip{
 	
 	double Pressure (const DROPS::Point3DCL& p, double t)
 	{
-        double norm2=0.;
-		double ret=0;
-		DROPS::Point3DCL origin = P.get<DROPS::Point3DCL>("Exp.PosDrop");
+		double norm2=0.;
+		double ret=0;		
+		static bool first = true;
+		static DROPS::Point3DCL origin, VelR;
+		static double radius, surftension;
+		if(first){
+			origin = P.get<DROPS::Point3DCL>("Exp.PosDrop");
+			VelR = P.get<DROPS::Point3DCL>("Exp.RadDrop");
+			radius = VelR[0]; //assume the droplet is spherical;
+			surftension = P.get<double>("SurfTens.SurfTension");
+			first = false;
+		}
 		
 		for (int i=0; i< 3; i++)
 		  norm2 += (p[i]-origin[i]) * (p[i]-origin[i]);
-        ret = (norm2 > 0.01) ? 0: 10; 
+         ret = (std::sqrt(norm2) > radius) ? 0: 2.*surftension/radius; 
 		
 		if( t>3. && t<5 )
 			ret = 0;
 		else if(t >5.)
-			ret = 10;
+			ret = 2.*surftension/radius;
 		return ret;
 	}
 	
@@ -457,15 +466,15 @@ namespace InstatSlip{
     {
         DROPS::SVectorCL<3> f(0.);
         static bool first = true;
-		static double nu, l_s;
-		if(first){
-			nu=P.get<double>("Mat.ViscFluid")/P.get<double>("Mat.DensFluid");
-			l_s=1./(P.get<double>("SpeBnd.beta2"));
-			first = false;
-		}
-		f[0] =  2.* nu * std::sin(p[0]/l_s) * std::cos(p[1]/l_s) * ( std::cos(2*nu*t) + 1./(l_s*l_s) * std::sin(2*nu*t) ) ;
-		f[1] = -2.* nu * std::cos(p[0]/l_s) * std::sin(p[1]/l_s) * ( std::cos(2*nu*t) + 1./(l_s*l_s) * std::sin(2*nu*t) ) ;
-		f[2] = 0;
+		 static double nu, l_s;
+		 if(first){
+			 nu=P.get<double>("Mat.ViscFluid")/P.get<double>("Mat.DensFluid");
+			 l_s=1./(P.get<double>("SpeBnd.beta2"));
+			 first = false;
+		 }
+		 f[0] =  2.* nu * std::sin(p[0]/l_s) * std::cos(p[1]/l_s) * ( std::cos(2*nu*t) + 1./(l_s*l_s) * std::sin(2*nu*t) ) ;
+		 f[1] = -2.* nu * std::cos(p[0]/l_s) * std::sin(p[1]/l_s) * ( std::cos(2*nu*t) + 1./(l_s*l_s) * std::sin(2*nu*t) ) ;
+		 f[2] = 0;
 
         return f+PressureGr(p,t);
     }
@@ -550,7 +559,7 @@ namespace StatSlip2{
     }
     static DROPS::RegisterVectorFunction regvelVel2("StatSlip2Vel", Velocity);
     static DROPS::RegisterVectorFunction regvelf2("StatSlip2F", VolForce);
-	static DROPS::RegisterVectorFunction regvelgpr2("StatSlip2PrGrad",PressureGr);
+    static DROPS::RegisterVectorFunction regvelgpr2("StatSlip2PrGrad",PressureGr);
 
 }
 
