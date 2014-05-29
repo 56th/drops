@@ -1931,7 +1931,7 @@ void System1Accumulator_P2CL::update_global_system ()
             }
             if (b != 0) // assemble the right-hand side
 			{
-                add_to_global_vector( b->Data, loc_b[i], n.num[i]);
+                   add_to_global_vector( b->Data, loc_b[i], n.num[i]);
 			}
        }
 	   
@@ -2483,6 +2483,7 @@ void SetupRhs1_P2( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_, co
             }
         }
 
+
         for(int i=0; i<10; ++i)    // assemble row Numb[i]
             if (n.WithUnknowns( i))  // vert/edge i is not on a Dirichlet boundary
             {
@@ -2491,6 +2492,8 @@ void SetupRhs1_P2( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_, co
                 b->Data[n.num[i]+1]+= tmp[1];
                 b->Data[n.num[i]+2]+= tmp[2];
             }
+
+
     }
 }
 

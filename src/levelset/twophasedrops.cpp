@@ -751,19 +751,22 @@ int main (int argc, char** argv)
         DROPS::ContactDropletCL::Init( P.get<DROPS::Point3DCL>("Exp.PosDrop"), P.get<DROPS::Point3DCL>("Exp.RadDrop"), P.get<double>("Exp.AngleDrop"));
     if  (InitialLSet == "TwoEllipsoid")
         DROPS::TwoEllipsoidCL::Init( P.get<DROPS::Point3DCL>("Exp.PosDrop"), P.get<DROPS::Point3DCL>("Exp.RadDrop"), P.get<DROPS::Point3DCL>("Exp.PosDrop2"), P.get<DROPS::Point3DCL>("Exp.RadDrop2"));
-    if (InitialLSet.find("Cylinder")==0) {
+    if  (InitialLSet.find("Layer")==0){
+      	DROPS::LayerCL::Init( P.get<DROPS::Point3DCL>("Exp.PosDrop"), P.get<DROPS::Point3DCL>("Exp.RadDrop"), InitialLSet[5]-'X');
+    	P.put("Exp.InitialLSet", InitialLSet= "Layer");
+    }
+    if (InitialLSet.find("Cylinder")==0){
         DROPS::CylinderCL::Init( P.get<DROPS::Point3DCL>("Exp.PosDrop"), P.get<DROPS::Point3DCL>("Exp.RadDrop"), InitialLSet[8]-'X');
         P.put("Exp.InitialLSet", InitialLSet= "Cylinder");
     }
 
     DROPS::AdapTriangCL adap( *mg, P.get<double>("AdaptRef.Width"), P.get<int>("AdaptRef.CoarsestLevel"), P.get<int>("AdaptRef.FinestLevel"),
                               ((P.get<std::string>("Restart.Inputfile") == "none") ? P.get<int>("AdaptRef.LoadBalStrategy") : -P.get<int>("AdaptRef.LoadBalStrategy")));
-    // If we read the Multigrid, it shouldn't be modified;
+      // If we read the Multigrid, it shouldn't be modified;
     // otherwise the pde-solutions from the ensight files might not fit.
     if (P.get("Restart.Inputfile", std::string("none")) == "none")
         adap.MakeInitialTriang( DROPS::InScaMap::getInstance()[InitialLSet]);
-
-    std::cout << DROPS::SanityMGOutCL(*mg) << std::endl;
+     std::cout << DROPS::SanityMGOutCL(*mg) << std::endl;
 #ifdef _PAR
     if ( DROPS::CheckParMultiGrid())
         std::cout << "As far as I can tell the ParMultigridCL is sane\n";

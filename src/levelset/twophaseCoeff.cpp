@@ -701,3 +701,20 @@ namespace curvebndDomain{
 	static DROPS::RegisterVectorFunction regunitoutnomalsphere("OutNormalSphere", OutNormalSphere);
 
 }
+namespace CouetteFlow{
+
+	DROPS::Point3DCL UpwallVel(const DROPS::Point3DCL& ,double)
+	{
+		DROPS::Point3DCL vel(0.0);
+		vel[0]=0.5;
+		return vel;
+	}
+	DROPS::Point3DCL DownwallVel(const DROPS::Point3DCL& ,double)
+	{
+		DROPS::Point3DCL vel(0.0);
+		vel[0]=-0.5;
+		return vel;
+	}
+	static DROPS::RegisterVectorFunction regunitupwallvel("UpwallVel", UpwallVel);
+	static DROPS::RegisterVectorFunction regunitdownwallvel("DownwallVel", DownwallVel);
+}
