@@ -125,10 +125,13 @@ double compute_averageAngle(const DROPS::MultiGridCL& mg,LevelsetP2CL& lset,inst
 	        Uint ncl=triangle.GetNumMCL();
 	        for(Uint i=0;i<ncl;i++)
 	        {
-	        	length=triangle.GetInfoMCL(i,Barys[0],Barys[1],pt0,pt1);
-	        	circ+=length;
-			   	for(Uint j=0;j<5;j++)
-	        		angle+=length*triangle.GetImprovedActualContactAngle(i,(qupt[j]+1)/2)*weight[j]/2;
+				if(!triangle.IsSymmType(i))
+				{
+					length=triangle.GetInfoMCL(i,Barys[0],Barys[1],pt0,pt1);
+					circ+=length;
+					for(Uint j=0;j<5;j++)
+						angle+=length*triangle.GetImprovedActualContactAngle(i,(qupt[j]+1)/2)*weight[j]/2;
+				}
 	        }
 	    }
 	}
