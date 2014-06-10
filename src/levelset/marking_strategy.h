@@ -1,5 +1,5 @@
 /// \file marking_strategy.h
-/// \brief 
+/// \brief
 /// \author LNM RWTH Aachen: Matthias Kirchhart
 
 /*
@@ -46,7 +46,7 @@ enum MarkingDecisionT { CoarsenC, RefineC, KeepC, DontCareC };
  * <ul>
  * <li><b>CoarsenC:</b> the tetrahedron should be "coarsened".
  * <li><b>RefineC:</b> the tetrahedron should be refined.
- * <li><b>KeepC:</b> the tetrahedron should neither be coarsend nor refined.
+ * <li><b>KeepC:</b> the tetrahedron should neither be coarsened nor refined.
  * <li><b>DontCareC:</b> it doesn't matter what happens to the tetrahedron.
  * </ul>
  * </li>
@@ -76,6 +76,30 @@ public:
 };
 
 
+class UniformMarkingStrategyCL: public MarkingStrategyCL
+{
+public:
+    UniformMarkingStrategyCL( Uint Level) : level_(Level), decision_(DontCareC), modified_(false) {}
+    ~UniformMarkingStrategyCL() {}
+    void visit( const TetraCL& t );
+    TetraAccumulatorCL* clone (int clone_id);
+    MarkingStrategyCL*  clone_strategy();
+
+    bool modified() const { return modified_; }
+    void SetUnmodified()  { modified_= false; }
+
+    MarkingDecisionT GetDecision() const { return decision_; }
+
+    Uint GetFineLevel()   const { return level_; }
+    Uint GetCoarseLevel() const { return 0; }
+
+private:
+    Uint level_;
+    MarkingDecisionT decision_;
+    bool modified_;
+};
+
+
 
 
 /*!
@@ -90,7 +114,7 @@ public:
 class StrategyCombinerCL: public MarkingStrategyCL
 {
 public:
-    StrategyCombinerCL(); 
+    StrategyCombinerCL();
     StrategyCombinerCL( const StrategyCombinerCL &rhs );
     ~StrategyCombinerCL();
 
@@ -110,7 +134,7 @@ public:
 
     bool empty();
     void push_back( MarkingStrategyCL &s );
-    void pop_back(); 
+    void pop_back();
 
 private:
     bool modified_;
@@ -129,7 +153,7 @@ class ValueGetterCL;
 /*!
  * \brief Refinement strategy according to a levelset function.
  *
- * This marking strategy refines the mesh arount the zero level of a given
+ * This marking strategy refines the mesh around the zero level of a given
  * levelset function.
  */
 class DistMarkingStrategyCL: public MarkingStrategyCL
@@ -161,7 +185,7 @@ public:
     Uint   GetCoarseLevel() const;
     void   SetCoarseLevel( Uint level );
     Uint   GetFineLevel() const;
-    void   SetFineLevel( Uint level ); 
+    void   SetFineLevel( Uint level );
 
 private:
     ValueGetterCL *getter_;
@@ -171,7 +195,7 @@ private:
     bool modified_;
     MarkingDecisionT decision_;
 };
- 
+
 }
 
 #endif
