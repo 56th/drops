@@ -189,7 +189,7 @@ void SetupInterfaceMassP1X (const MultiGridCL& MG, MatDescCL* mat, const VecDesc
                     if (numc[j] == NoIdx) continue;
                     M( xnumr[i],   numc[j])+= K[i]*coup[j][i];
                     if (xnumc[j] == NoIdx || is_pos[i]!= is_pos[j]) continue;
-                    M( xnumr[i],   xnumc[j])+= K[i]*coup[j][i];
+                    M( xnumr[i],   xnumc[j])+= std::abs(K[i])*coup[j][i];
                 }
             }
         }
