@@ -67,18 +67,96 @@ typedef DROPS::BndDataCL<> cBndDataCL;
 typedef DROPS::BndDataCL<> cBndDataCL;
 typedef cBndDataCL::bnd_val_fun  c_bnd_val_fun;
 
-/// \name Initial data and rhs for surfactant transport
-//@{
-const double a( -13./8.*std::sqrt( 35./M_PI));
-double surf_rhs (const DROPS::Point3DCL& p, double)
+
+void TransformToDropOrig( DROPS::Point3DCL& p)
 {
-    return a*(3.*p[0]*p[0]*p[1] - p[1]*p[1]*p[1]);
+    static DROPS::Point3DCL dropPos= P.get<DROPS::Point3DCL>("Exp.PosDrop");
+    p-= dropPos;
 }
-double surf_sol (const DROPS::Point3DCL& p, double)
+
+/// \name Initial data and rhs for coupled mass/surfactant transport
+//@{
+// TestCase: Sphere around 0, RadDrop 1, vel == 0
+double surf_sol (const DROPS::Point3DCL& q, double)
+{
+    DROPS::Point3DCL p(q);
+    TransformToDropOrig( p);
+    return 3.*p[0]*p[0]*p[1] - p[1]*p[1]*p[1];
+}
+// ...and the corresponding right-hand side
+double surf_rhs (const DROPS::Point3DCL& q, double)
+{
+    return surf_sol( q, 0.)*12.;
+}
+// some nice looking initial data
+double surf_ini (const DROPS::Point3DCL& p, double)
 {
     return 1. + std::sin( atan2( p[0] -P.get<DROPS::Point3DCL>("Exp.PosDrop")[0], p[2] -P.get<DROPS::Point3DCL>("Exp.PosDrop")[2]));
 }
+
+
+double mass_sol_p (const DROPS::Point3DCL& q, double)
+{
+    DROPS::Point3DCL p(q);
+    TransformToDropOrig( p);
+    return surf_sol( q, 0.)*exp(1. - p.norm_sq());
+}
+double mass_sol_n (const DROPS::Point3DCL& q, double)
+{
+    static double mu_ratio= P.get<double>("Transp.DiffPos")/P.get<double>("Transp.DiffNeg");
+    return mass_sol_p( q, 0.)*mu_ratio;
+}
+double mass_rhs (const DROPS::Point3DCL& q, double)
+{
+    DROPS::Point3DCL p(q);
+    TransformToDropOrig( p);
+    return mass_sol_p( q, 0.)*(-4*p.norm_sq() + 18.);
+}
+
 //@}
+
+DROPS::Point3DCL RotateVelXZ (const DROPS::Point3DCL& q, double)
+{
+    DROPS::Point3DCL p(q);
+    TransformToDropOrig( p);
+    // return [z, 0, -x]^T
+    double h= p[0];
+    p[0]= p[2];
+    p[1]= 0.;
+    p[2]= -h;
+    return 0.1*p;
+}
+
+static DROPS::RegisterScalarFunction regsca_surfrhs("rhsSurfNoVel", surf_rhs);
+static DROPS::RegisterScalarFunction regsca_surfsol("solSurf", surf_sol);
+static DROPS::RegisterScalarFunction regsca_massrhs("rhsMassNoVel", mass_rhs);
+static DROPS::RegisterScalarFunction regsca_masssolp("solMassPos", mass_sol_p);
+static DROPS::RegisterScalarFunction regsca_masssoln("solMassNeg", mass_sol_n);
+static DROPS::RegisterVectorFunction regvec_rotxz("RotatingFlowfield", RotateVelXZ);
+
+
+
+/// L2 error on interface
+template <typename DiscP1FunT>
+double L2_error_interface (const DROPS::MultiGridCL& mg, const DROPS::VecDescCL& ls, const DROPS::BndDataCL<>& lsbnd,
+    const DiscP1FunT& discsol, DROPS::instat_scalar_fun_ptr sol, double t)
+{
+    double d( 0.);
+    const DROPS::Uint lvl = ls.GetLevel();
+    DROPS::InterfaceTriangleCL triangle;
+    DROPS::Quad5_2DCL<> qdiscsol, qsol;
+
+    DROPS_FOR_TRIANG_CONST_TETRA( mg, lvl, it) {
+        DROPS_FOR_TETRA_INTERFACE_BEGIN( *it, ls, lsbnd, triangle, tri) {
+            qdiscsol.assign(  *it, &triangle.GetBary( tri), discsol);
+            qsol.assign( *it, &triangle.GetBary( tri), sol, t);
+            qdiscsol-= qsol;
+            d+= DROPS::Quad5_2DCL<>( qdiscsol*qdiscsol).quad( triangle.GetAbsDet( tri));
+        }
+        DROPS_FOR_TETRA_INTERFACE_END
+    }
+    return std::sqrt( d);
+}
 
 namespace DROPS // for Strategy
 {
@@ -99,6 +177,209 @@ void InitVel (const MultiGridCL& MG, VecDescCL& v, instat_vector_fun_ptr vf)
                 vf( BaryCenter( it->GetVertex( 0)->GetCoord(), it->GetVertex( 1)->GetCoord()), 0.));
 }
 
+
+void  StatMassSurfTransportStrategy( MultiGridCL& MG, InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddata, AdapTriangCL& adap)
+// stationary coupled mass/surfactant transport
+{
+    std::cout << "Entering Strategy for stationary mass/surfactant transport...\n";
+    InVecMap & tdvectormap = InVecMap::getInstance();
+    InScaMap & tdscalarmap = InScaMap::getInstance();
+    instat_vector_fun_ptr Flowfield = tdvectormap[P.get<std::string>("Transp.Flow")];
+    instat_scalar_fun_ptr Reaction = tdscalarmap["Zero"]; // tdscalarmap["ReactionFct"];
+    instat_scalar_fun_ptr massRhs = tdscalarmap[P.get<std::string>("Transp.Rhs")];
+    instat_scalar_fun_ptr distance = tdscalarmap[P.get<std::string>("Transp.Levelset")];
+    instat_scalar_fun_ptr massSol_p= tdscalarmap[P.get<std::string>("Transp.SolPos")];
+    instat_scalar_fun_ptr massSol_n= tdscalarmap[P.get<std::string>("Transp.SolNeg")];
+
+    instat_scalar_fun_ptr surfRhs = tdscalarmap[P.get<std::string>("SurfTransp.Rhs")];
+    instat_scalar_fun_ptr surfSol = tdscalarmap[P.get<std::string>("SurfTransp.Sol")];
+
+
+    cBndDataCL *pBnd_c, *pBnd_ct;
+    DROPS::BuildBoundaryData( &MG, pBnd_c,  P.get<std::string>("Transp.BoundaryType"), P.get<std::string>("Transp.BoundaryFncs"));
+    DROPS::BuildBoundaryData( &MG, pBnd_ct, P.get<std::string>("Transp.BoundaryType"), P.get<std::string>("Transp.BoundaryFncst"));
+    cBndDataCL & Bnd_c(*pBnd_c);
+    cBndDataCL & Bnd_ct(*pBnd_ct);
+
+    DROPS::instat_scalar_fun_ptr sigmap = 0;
+    SurfaceTensionCL sf( sigmap, Bnd_c);
+
+    LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsetbnddata, sf, false, 1, -1) ) ;
+
+    // levelset wrt the previous time step:
+    LevelsetP2CL & oldlset( * LevelsetP2CL::Create( MG, lsetbnddata, sf, false, 1, -1) ) ;
+    //Prolongate and Restrict solution vector levelset from old mesh to new mesh after mesh adaptation:
+    //always act on the same grid with possibly different interface position
+    LevelsetRepairCL lsetrepair( lset);
+    adap.push_back( &lsetrepair);
+    LevelsetRepairCL oldlsetrepair( oldlset);
+    adap.push_back( &oldlsetrepair);
+    MLIdxDescCL* lidx= &lset.idx;
+    // index wrt the interface at previous time step
+    MLIdxDescCL* oldlidx= &oldlset.idx;
+    lset.CreateNumbering( MG.GetLastLevel(), lidx);
+    lset.Phi.SetIdx( lidx);
+    oldlset.CreateNumbering( MG.GetLastLevel(), oldlidx);
+    oldlset.Phi.SetIdx( oldlidx);
+    lset.Init( distance );
+    oldlset.Init( distance);
+    std::cout << "initial volume(abs value): " << lset.GetVolume() << std::endl;
+
+    // grid refinement
+    typedef UniformMarkingStrategyCL MarkerT;
+    MarkerT marker( P.get<int>("AdaptRef.FinestLevel") );
+    adap.set_marking_strategy( &marker );
+    adap.UpdateTriang();
+
+    lset.Init( distance );
+    oldlset.Init( distance);
+
+    //VelocityContainer vel(Stokes.v,Stokes.GetBndData().Vel,MG);
+    VelocityContainer vel(Flowfield);
+
+    TransportP1XCL massTransp( MG, Bnd_c, Bnd_ct, vel, lsetbnddata, lset.Phi, oldlset.Phi,P,0,Reaction,massRhs);
+    TransportXRepairCL transprepair(massTransp, MG.GetLastLevel());
+
+    // index of the concentration wrt the interface at actual time step:
+    MLIdxDescCL* cidx= &massTransp.idx;
+
+    // index of the concentration wrt the interface at previous time step:
+    MLIdxDescCL* cidx_old= &massTransp.oldidx;
+
+    //This following Vector c_out is responsable for the communication from concentration to surface tension.
+    //Before a new surface tension is computed c_out should be updated (via GetSolutionOnPart)
+    //Important: This vector has to be kept in memory as long as the surface tension is computed!
+    VecDescCL c_out;
+    //c_in: s. c_out but c_in is only used for visualization until now
+    VecDescCL c_in;
+    IdxDescCL p1idx(P1_FE,Bnd_c,0);
+    /// \todo for periodic stuff: matching function here
+    p1idx.CreateNumbering( MG.GetLastLevel(), MG, Bnd_c, MG.GetBnd().GetMatchFun(), &lset.Phi,&lsetbnddata);
+    c_in.SetIdx( &p1idx);
+    c_out.SetIdx( &p1idx);
+
+    {
+        adap.push_back(&transprepair);
+        massTransp.CreateNumbering( MG.GetLastLevel(), cidx, cidx_old, lset.Phi, oldlset.Phi);
+        massTransp.SetNewIdx();  // associate all matrices and vectors in massTransp with the FE space
+        massTransp.ct.SetIdx( cidx);
+        massTransp.c.SetIdx( cidx);
+        massTransp.oldct.SetIdx( cidx_old);
+        std::cout << massTransp.ct.Data.size() << " concentration unknowns,\n";
+        massTransp.Init( massSol_n, massSol_p, 0);
+    }
+
+    Stokes.CreateNumberingVel( MG.GetLastLevel(), &Stokes.vel_idx);
+    Stokes.v.SetIdx( &Stokes.vel_idx);
+    InitVel( MG, Stokes.v, Flowfield);
+    SurfactantcGP1CL surfTransp( MG, Stokes.GetBndData().Vel, P.get<double>("SurfTransp.Theta"), P.get<double>("SurfTransp.Visc"), &Stokes.v, *lset.PhiC, lset.GetBndData(),
+                                 P.get<double>("Time.StepSize"), P.get<int>("SurfTransp.Iter"), P.get<double>("SurfTransp.Tol"), P.get<double>("SurfTransp.OmitBound"));
+    InterfaceP1RepairCL surf_repair( MG, *lset.PhiC, lset.GetBndData(), surfTransp.ic);
+    {
+        adap.push_back( &surf_repair);
+        surfTransp.idx.CreateNumbering( MG.GetLastLevel(), MG, lset.PhiC, &lset.GetBndData());
+        surfTransp.ic.SetIdx( &surfTransp.idx);
+        surfTransp.Init( surfSol);
+        std::cout << surfTransp.ic.Data.size() << " interface concentration unknowns" << std::endl;
+    }
+    const VectorCL surfExSol= surfTransp.ic.Data;
+
+    // writer for vtk-format
+    VTKOutCL * vtkwriter = NULL;
+    if (P.get<int>("VTK.VTKOut")){
+        vtkwriter = new VTKOutCL(adap.GetMG(), "DROPS data", /*num time steps*/ 1,
+                                 P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName"),
+                                 P.get<std::string>("VTK.TimeFileName"),
+                                 P.get<int>("VTK.Binary"),
+                                 P.get<int>("VTK.UseOnlyP1"),
+                                 false,
+                                 -1,  /* <- level */
+                                 P.get<int>("VTK.ReUseTimeFile") );
+
+        vtkwriter->Register( make_VTKScalar( lset.GetSolution(), "level-set") );
+
+        vtkwriter->Register( make_VTKScalar( massTransp.GetSolution( massTransp.ct,false), "TransConcentration") );
+        vtkwriter->Register( make_VTKScalar( massTransp.GetSolution( c_out,false), "XConcentrationPos") );
+        vtkwriter->Register( make_VTKScalar( massTransp.GetSolution( c_in,false), "XConcentrationNeg") );
+        vtkwriter->Register( make_VTKIfaceScalar( MG, surfTransp.ic, "SurfConcentration") );
+    }
+
+    // setup system
+    massTransp.SetupInstatSystem( massTransp.A, massTransp.cplA, massTransp.M, massTransp.cplM, massTransp.C, massTransp.cplC,
+            massTransp.b, 0.);
+
+    surfTransp.Update(); // associate all matrices in surfTransp with the FE space and setup matrices
+    VecDescCL surf_rhs( &surfTransp.idx);
+    SetupInterfaceRhsP1( MG, &surf_rhs, lset.Phi, lset.GetBndData(), surfRhs);
+    MatDescCL R, C, R_i, C_i;
+    const double k_a[2]= { P.get<double>("SurfTransp.AdsorpPos"), P.get<double>("SurfTransp.AdsorpNeg")};
+    const double k_d[2]= { P.get<double>("SurfTransp.DesorpPos"), P.get<double>("SurfTransp.DesorpNeg")};
+    SetupInterfaceSorptionP1X( MG, lset.Phi, lset.GetBndData(), &R, &C, &R_i, &C_i, &massTransp.idx.GetFinest(), &surfTransp.idx, k_a, k_d);
+
+    MatrixCL A, A_i;
+    A.LinComb  ( 1., massTransp.A.Data.GetFinest(), 1., massTransp.C.Data.GetFinest(), 1., R.Data);
+    massTransp.b.Data+= massTransp.cplA.Data + massTransp.cplC.Data + massTransp.C.Data.GetFinest()*massTransp.ct.Data;
+    A_i.LinComb( 1., surfTransp.A.Data,             1., surfTransp.C.Data,             1., R_i.Data);
+    surf_rhs.Data+= surfTransp.C.Data*surfTransp.ic.Data;
+
+    // free some memory
+    massTransp.M.Data.clear();
+    massTransp.A.Data.clear();
+    massTransp.C.Data.clear();
+
+    // create block system
+    BlockMatrixCL bmat( &A, MUL, &C.Data, MUL, &C_i.Data, MUL, &A_i, MUL);
+    VectorCL &u= massTransp.ct.Data;
+    VectorCL &v= surfTransp.ic.Data;
+    size_t nmass= A.num_rows(), nsurf= A_i.num_rows();
+    VectorCL rhs( nmass+nsurf), x( nmass+nsurf);
+    rhs[std::slice( 0, nmass, 1)]= massTransp.b.Data;
+    rhs[std::slice( nmass, nsurf, 1)]= surf_rhs.Data;
+    x[std::slice( 0, nmass, 1)]= u;
+    x[std::slice( nmass, nsurf, 1)]= v;
+    DummyExchangeBlockCL exBlock;
+    exBlock.AttachTo( massTransp.idx.GetEx());
+    exBlock.AttachTo( surfTransp.idx.GetEx());
+
+    // solve system
+    typedef SSORPcCL PcT;
+    typedef BlockDiagPreCL<PcT,PcT> SPPcT;
+    typedef GCRSolverCL<SPPcT> SPSolverT;
+    PcT pcM, pcS;
+    SPPcT spPc( pcM, pcS);
+    SPSolverT solver(spPc, P.get<int>("Transp.Restart",100), P.get<int>("Transp.Iter"), P.get<double>("Transp.Tol"), /*rel*/ false, &std::cout);
+
+    std::cout << "Solving coupled system..." << std::endl;
+    solver.Solve( bmat, x, rhs, exBlock);
+    std::cout << "resid = " << solver.GetResid() << " after " << solver.GetIter() << " iterations.\n";
+
+    u= x[std::slice( 0, nmass, 1)];
+    v= x[std::slice( nmass, nsurf, 1)];
+
+    // compute errors
+    std::cout << "=== bulk error ===\n";
+    const double L2_mass= massTransp.CheckSolution( massSol_n, massSol_p, 0);
+    const double c_mean = massTransp.MeanDropConcentration();
+    std::cout << "Mean concentration in drop: " << c_mean <<"\n";
+    const double L2_surf= L2_error_interface( MG, lset.Phi, lsetbnddata, surfTransp.GetSolution(), surfSol, 0);
+    const VectorCL surfDiff(v - surfExSol);
+    const double H1_surf= std::sqrt( L2_surf*L2_surf + dot( surfTransp.A.Data*surfDiff, surfDiff));
+    std::cout << "=== surface error ===\nL2 = " << L2_surf << "\nH1 = " << H1_surf << std::endl;
+
+    // VTK output
+    massTransp.GetSolutionOnPart( c_out, true , false);
+    massTransp.GetSolutionOnPart( c_in, false , false);
+    vtkwriter->Write(0);
+
+    adap.set_marking_strategy(0);
+    std::cout << std::endl;
+
+    delete pBnd_c;
+    delete pBnd_ct;
+    delete vtkwriter;
+    delete &lset;
+    delete &oldlset;
+}
 
 void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTriangCL& adap)    // do just the transport stuff
 {
@@ -701,6 +982,8 @@ void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<std::string>("Transp.Levelset","Ellipsoid");
     P.put_if_unset<std::string>("Transp.Flow","ZeroVel");
     P.put_if_unset<std::string>("Transp.Rhs","Zero");
+    P.put_if_unset<std::string>("Transp.SolPos","Zero");
+    P.put_if_unset<std::string>("Transp.SolNeg","Zero");
     P.put_if_unset<std::string>("Transp.InitialConcNeg","IniCnegFct");
     P.put_if_unset<std::string>("Transp.InitialConcPos","IniCposFct");
     P.put_if_unset<std::string>("Transp.BoundaryType","21!21!21!21!21!21");
@@ -708,6 +991,8 @@ void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<std::string>("Transp.BoundaryFncst","Zero!Zero!Zero!Zero!Zero!Zero");
 
     P.put_if_unset<int>("SurfTransp.DoTransp",0);
+    P.put_if_unset<std::string>("SurfTransp.Rhs","Zero");
+    P.put_if_unset<std::string>("SurfTransp.Sol","Zero");
 
     P.put_if_unset<int>("VTK.VTKOut",0);
     P.put_if_unset<std::string>("VTK.VTKName","ns_transp");
@@ -746,7 +1031,7 @@ int main (int argc, char** argv)
     DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
     if (P.get<int>("General.ProgressBar"))
         DROPS::ProgressBarTetraAccumulatorCL::Activate();
-    
+
     DROPS::MultiGridCL* mg= 0;
     DROPS::StokesBndDataCL* bnddata= 0;
     DROPS::LsetBndDataCL* lsetbnddata= 0;
@@ -771,7 +1056,7 @@ int main (int argc, char** argv)
     using DROPS::DistMarkingStrategyCL;
 
     EllipsoidCL::Init(P.get<DROPS::Point3DCL>("Exp.PosDrop"), P.get<DROPS::Point3DCL>("Exp.RadDrop"));
-    AdapTriangCL adap( *mg, 0, 
+    AdapTriangCL adap( *mg, 0,
                       ((P.get<std::string>("Restart.Inputfile") == "none") ?  P.get<int>("AdaptRef.LoadBalStrategy") :
                                                                              -P.get<int>("AdaptRef.LoadBalStrategy")));
 
@@ -800,13 +1085,18 @@ int main (int argc, char** argv)
 #endif
 
     if (P.get<int>("Transp.UseNSSol",1)){
-      DROPS::InstatNavierStokes2PhaseP2P1CL prob( *mg, DROPS::TwoPhaseFlowCoeffCL(P), *bnddata, P.get<double>("Stokes.XFEMStab")<0 ? DROPS::P1_FE : DROPS::P1X_FE, P.get<double>("Stokes.XFEMStab"));
-      Strategy( prob, *lsetbnddata, adap);    // do all the stuff
+        DROPS::InstatNavierStokes2PhaseP2P1CL prob( *mg, DROPS::TwoPhaseFlowCoeffCL(P), *bnddata, P.get<double>("Stokes.XFEMStab")<0 ? DROPS::P1_FE : DROPS::P1X_FE, P.get<double>("Stokes.XFEMStab"));
+        Strategy( prob, *lsetbnddata, adap);    // do all the stuff
     }
-    else
+    else if (!P.get<int>("SurfTransp.DoTransp",0))
     {
-      OnlyTransportStrategy( *mg, *lsetbnddata, adap);    // do just the transport stuff
+        OnlyTransportStrategy( *mg, *lsetbnddata, adap);    // do just the transport stuff
     }
+    else {
+        DROPS::InstatNavierStokes2PhaseP2P1CL prob( *mg, DROPS::TwoPhaseFlowCoeffCL(0,0,0,0,0,DROPS::Point3DCL()), *bnddata, DROPS::P1_FE);
+        StatMassSurfTransportStrategy( *mg, prob, *lsetbnddata, adap); // stationary mass/surfactant transport
+    }
+
 
     delete mg;
     delete lsetbnddata;

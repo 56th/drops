@@ -1,5 +1,5 @@
 /// \file marking_strategy.cpp
-/// \brief 
+/// \brief
 /// \author LNM RWTH Aachen: Matthias Kirchhart
 
 /*
@@ -29,6 +29,45 @@
 
 namespace DROPS
 {
+
+TetraAccumulatorCL* UniformMarkingStrategyCL::clone( int )
+{
+    return new UniformMarkingStrategyCL( *this );
+}
+
+MarkingStrategyCL* UniformMarkingStrategyCL::clone_strategy()
+{
+    return new UniformMarkingStrategyCL( *this );
+}
+
+void UniformMarkingStrategyCL::visit( const TetraCL &t )
+{
+    // level should be level_.
+    const Uint l= t.GetLevel();
+
+    if ( l !=  level_ || (l == level_ && ! t.IsRegular()) )
+    {
+        // tetra will be marked for refinement/removement
+        if ( l <= level_ )
+        {
+            t.SetRegRefMark();
+            modified_ = true;
+            decision_ = RefineC;
+        }
+        else
+        {
+            t.SetRemoveMark();
+            modified_ = true;
+            decision_ = CoarsenC;
+        }
+    }
+    else if ( l == level_ )
+    {
+        // Tetrahedra has exactly the level that we require.
+        decision_ = KeepC;
+    }
+}
+
 
 StrategyCombinerCL::StrategyCombinerCL():
  modified_( false ), decision_( DontCareC ), strategies_( 0 )
@@ -86,7 +125,7 @@ void StrategyCombinerCL::visit( const TetraCL& t )
     {
         // Every strategy expects Refmark to be on NoRef on input.
 	t.SetNoRefMark();
-	
+
         MarkingStrategyCL *s = strategies_[ i ];
         s->visit( t );
 
@@ -132,7 +171,7 @@ TetraAccumulatorCL* StrategyCombinerCL::clone( int )
 MarkingStrategyCL* StrategyCombinerCL::clone_strategy()
 {
     return new StrategyCombinerCL(*this);
-} 
+}
 
 bool StrategyCombinerCL::modified() const
 {
@@ -148,7 +187,7 @@ void StrategyCombinerCL::SetUnmodified()
 
 MarkingDecisionT StrategyCombinerCL::GetDecision() const
 {
-    return decision_; 
+    return decision_;
 }
 
 
@@ -268,12 +307,12 @@ FunPtrGetterCL::FunPtrGetterCL( instat_scalar_fun_ptr fct, double time ):
 
 double FunPtrGetterCL::GetValue( const VertexCL& v ) const
 {
-    return fct_( v.GetCoord(), time_ ); 
+    return fct_( v.GetCoord(), time_ );
 }
 
 double FunPtrGetterCL::GetValue( const EdgeCL& e ) const
 {
-    return fct_( GetBaryCenter(e), time_ ); 
+    return fct_( GetBaryCenter(e), time_ );
 }
 
 double FunPtrGetterCL::GetValue( const TetraCL& t ) const
@@ -295,11 +334,11 @@ DistMarkingStrategyCL::DistMarkingStrategyCL( const LevelsetP2CL &dist,
                                               double width,
                                               Uint coarse_level, Uint fine_level ):
  getter_( new LevelsetP2GetterCL(dist) ), width_( width ), c_level_( coarse_level ),
- f_level_( fine_level ), modified_( false ), decision_( DontCareC ) 
+ f_level_( fine_level ), modified_( false ), decision_( DontCareC )
 {
     if ( f_level_ < c_level_ )
     {
-        throw DROPSErrCL( "Refinementlevels are cheesy.\n" );
+        throw DROPSErrCL( "Refinement levels are cheesy.\n" );
     }
 }
 
@@ -312,7 +351,7 @@ DistMarkingStrategyCL::DistMarkingStrategyCL( instat_scalar_fun_ptr fct,
 {
     if ( f_level_ < c_level_ )
     {
-        throw DROPSErrCL( "Refinementlevels are cheesy.\n" );
+        throw DROPSErrCL( "Refinement levels are cheesy.\n" );
     }
 }
 
@@ -364,7 +403,7 @@ void DistMarkingStrategyCL::visit( const TetraCL &t )
         if ( dist >= 0 ) ++num_pos;
         d = std::min( d, std::abs(dist) );
     }
-    
+
     for ( Uint j = 0; j < 6; ++j )
     {
         const double dist = getter_->GetValue( *t.GetEdge(j) );

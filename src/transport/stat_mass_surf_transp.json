@@ -1,0 +1,125 @@
+//=============================================================
+//    DROPS parameter file for two phase mass and surfactant transport
+//    simulation: (almost) artificial substance system
+//    stationary interface (no flow simulation)
+//=============================================================
+{
+
+        "General":
+        {
+                "ProgressBar":  1, //show progress bar
+                "DynamicLibsPrefix": "../", //where should we look for shared objects?
+                "DynamicLibs": [ //select libraries to be loaded after program start
+                        "transport/libtransport-transportCoeff",
+                        "misc/libmisc-scalarFunctions",
+                        "misc/libmisc-vectorFunctions"
+                ]
+        },
+
+        // time stepping:
+        "Time":
+        {
+                "NumSteps":             2000,
+                "StepSize":             0.0005,
+                "Scheme":               1
+        },
+    
+        //adaptive refinement:
+        "AdaptRef":
+        {
+                "Freq":                 1,
+                "FinestLevel":          0,
+                "CoarsestLevel":        0,
+                "Width":                0.00045,
+                "RefineStrategy":       1,
+                "LoadBalStrategy":      1,
+                "Partitioner":          1
+        },
+
+        // experimental conditions
+        "Exp":
+        {
+                "RadDrop":              [1, 1, 1 ],
+                "PosDrop":              [1.5, 1.5, 1.5 ],
+                "RadInlet":             0.005
+        },
+
+        "Transp":
+        {
+                "UseNSSol":             0,
+                "DoTransp":             1,
+                "Theta":                1,
+                "Iter":                 500,
+                "Restart":              250,
+                "Tol":                  1e-10,
+                "DiffPos":              1,
+                "DiffNeg":              0.5,
+                "HPos":                 1,  //!! Henry's constant is 1
+                "HNeg":                 1,
+                "NitschePenalty":       0,
+                "SDStabilization":      0,  //!! no stab 
+                "NitscheXFEMStab":      -1e-10,
+                "Levelset":             "Ellipsoid",             //Only active if UseNSSol == 0
+//                "Flow":                 "ZeroVel",               //Only active if UseNSSol == 0
+                "Flow":                 "RotatingFlowfield",               //Only active if UseNSSol == 0
+                "BoundaryType":         "2!2!2!2!2!2",
+                "BoundaryFncs":         "solMassPos!solMassPos!solMassPos!solMassPos!solMassPos!solMassPos",
+                "BoundaryFncst":        "solMassPos!solMassPos!solMassPos!solMassPos!solMassPos!solMassPos",
+                "Rhs":                  "rhsMassNoVel",
+                "SolNeg":               "solMassNeg",
+                "SolPos":               "solMassPos"
+        },
+
+	    "SurfTransp":
+	    {
+		        "DoTransp":		1,
+		        "OmitBound":    -0.001,
+		        "Tol":          1e-10,
+		        "Iter":         500,
+		        "Theta":        1,
+		        "Visc":         1,
+		        "AdsorpNeg":    0.5,
+		        "AdsorpPos":    2,
+		        "DesorpNeg":    2,
+		        "DesorpPos":    1,
+		        "Rhs":          "rhsSurfNoVel",
+		        "Sol":		    "solSurf"    
+//		        "Rhs":          "Zero",
+//		        "Sol":		    "Zero"    
+        },
+
+        //stokes solver parameters:
+        "Stokes":
+        {
+                "XFEMStab":         0.01,
+                "Theta":            1
+        },
+
+        "VTK":
+        {
+
+                "VTKOut":               5,
+                "VTKDir":               "vtk",
+                "VTKName":              "stationary_interface",
+                "Binary":               0
+        },
+
+        //Write out results:
+        "Restart":
+        {
+                "Inputfile":            "none"
+        },
+
+        // Domain boundary and initial condition
+        "DomainCond":
+        {
+                "InitialCond":          0,
+                "GeomType":             1,
+                "InitialFile":          "none",
+                "MeshFile":             "3x3x3@4x4x4",
+                "BoundaryType":         "2!2!2!2!2!2!",
+                "BoundaryFncs":         "RotatingFlowfield!RotatingFlowfield!RotatingFlowfield!RotatingFlowfield!RotatingFlowfield!RotatingFlowfield"
+//                "BoundaryFncs":         "ZeroVel!ZeroVel!ZeroVel!ZeroVel!ZeroVel!ZeroVel"
+        }
+
+}
