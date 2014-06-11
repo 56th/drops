@@ -28,7 +28,7 @@
         "AdaptRef":
         {
                 "Freq":                 1,
-                "FinestLevel":          3,
+                "FinestLevel":          0,
                 "CoarsestLevel":        0,
                 "Width":                0.00045,
                 "RefineStrategy":       1,
@@ -49,42 +49,43 @@
                 "UseNSSol":             0,
                 "DoTransp":             1,
                 "Theta":                1,
-                "Iter":                 200,
-                "Tol":                  1e-15,
-                "DiffPos":              5.8345e-05,
-                "DiffNeg":              2.29e-05,
+                "Iter":                 500,
+                "Restart":              250,
+                "Tol":                  1e-10,
+                "DiffPos":              1,
+                "DiffNeg":              0.5,
                 "HPos":                 1,  //!! Henry's constant is 1
                 "HNeg":                 1,
-                "IniCPos":              0.01,
-                "IniCNeg":              0,
-                "NitschePenalty":       5,
+                "NitschePenalty":       0,
                 "SDStabilization":      0,  //!! no stab 
-                "NitscheXFEMStab":      0.01,
+                "NitscheXFEMStab":      -1e-10,
                 "Levelset":             "Ellipsoid",             //Only active if UseNSSol == 0
-                "Flow":                 "ZeroVel",               //Only active if UseNSSol == 0
+//                "Flow":                 "ZeroVel",               //Only active if UseNSSol == 0
+                "Flow":                 "RotatingFlowfield",               //Only active if UseNSSol == 0
                 "BoundaryType":         "2!2!2!2!2!2",
-                "BoundaryFncs":         "Zero!Zero!Zero!Zero!Zero!Zero",
-//                "BoundaryFncs":         "IniCposFct!IniCposFct!IniCposFct!IniCposFct!IniCposFct!IniCposFct",
-//                "BoundaryFncst":        "IniCposFct!IniCposFct!IniCposFct!IniCposFct!IniCposFct!IniCposFct",
-                "Rhs":                  "Zero",
-                "SolNeg":               "Zero",
-                "SolPos":               "Zero"
+                "BoundaryFncs":         "solMassPos!solMassPos!solMassPos!solMassPos!solMassPos!solMassPos",
+                "BoundaryFncst":        "solMassPos!solMassPos!solMassPos!solMassPos!solMassPos!solMassPos",
+                "Rhs":                  "rhsMassNoVel",
+                "SolNeg":               "solMassNeg",
+                "SolPos":               "solMassPos"
         },
 
 	    "SurfTransp":
 	    {
 		        "DoTransp":		1,
-		        "OmitBound":    0.01,
+		        "OmitBound":    -0.001,
 		        "Tol":          1e-10,
 		        "Iter":         500,
 		        "Theta":        1,
-		        "Visc":         0.1,
-		        "AdsorpNeg":    0,
-		        "AdsorpPos":    0,
-		        "DesorpNeg":    0,
-		        "DesorpPos":    0,
-		        "Rhs":          "rhsNoVel",
-		        "Sol":		    "solNoVel"    
+		        "Visc":         1,
+		        "AdsorpNeg":    0.5,
+		        "AdsorpPos":    2,
+		        "DesorpNeg":    2,
+		        "DesorpPos":    1,
+		        "Rhs":          "rhsSurfNoVel",
+		        "Sol":		    "solSurf"    
+//		        "Rhs":          "Zero",
+//		        "Sol":		    "Zero"    
         },
 
         //stokes solver parameters:
@@ -117,7 +118,8 @@
                 "InitialFile":          "none",
                 "MeshFile":             "3x3x3@4x4x4",
                 "BoundaryType":         "2!2!2!2!2!2!",
-                "BoundaryFncs":         "ZeroVel!ZeroVel!ZeroVel!ZeroVel!ZeroVel!ZeroVel"
+                "BoundaryFncs":         "RotatingFlowfield!RotatingFlowfield!RotatingFlowfield!RotatingFlowfield!RotatingFlowfield!RotatingFlowfield"
+//                "BoundaryFncs":         "ZeroVel!ZeroVel!ZeroVel!ZeroVel!ZeroVel!ZeroVel"
         }
 
 }
