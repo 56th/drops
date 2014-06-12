@@ -176,7 +176,7 @@ void collect_streams (IStreamT& recv, InterfaceCL::CollectDataT& collect)
 {
     GeomIdCL gid;
 
-    while (recv >> gid) {
+    while ((recv >> gid).good()) {
         RefMPIistreamCL gid_data( 0, 0, recv.isBinary());
         recv >> gid_data;
         collect[gid].append( gid_data.begin(), gid_data.end());

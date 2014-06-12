@@ -78,7 +78,7 @@ bool InterfaceCL::ScatterData( HandlerT& handler, IStreamT& recv)
     bool result= true;
     GeomIdCL gid;
     size_t numData;
-    while (recv >> gid) {
+    while ((recv >> gid).good()) {
         recv >> numData;
 #       if DROPSDebugC & DebugDiSTC
         if (!recv) {
