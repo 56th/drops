@@ -1076,6 +1076,8 @@ void gradient_trafo (const TetraCL& tet, const BaryCoordCL& xb, const QuaQuaMapp
     W= dphT + outer_product( nl, n/inner_prod( nl, n) - dph*nl);
 }
 
+typedef std::vector<std::pair<const TetraCL*, BaryCoordCL> > BaryPosVectorT;
+
 class InterfaceCommonDataCL : public TetraAccumulatorCL
 {
   private:
@@ -1213,6 +1215,48 @@ class InterfaceCommonDataCL : public TetraAccumulatorCL
     }
 };
 
+
+template <class T, class ResultIterT>
+  inline ResultIterT
+  evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const BaryPosVectorT& pos, double t, ResultIterT result_iterator)
+{
+    for (Uint i= 0; i < pos.size(); ++i) {
+        const std::pair<const TetraCL*, BaryCoordCL>& p= pos[i];
+        const BaryEvalCL<> eval( *p.first, t, f);
+        *result_iterator++= eval( p.second);
+    }
+    return result_iterator;
+}
+
+template <class T, class ResultContT>
+  inline ResultContT&
+  resize_and_evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const BaryPosVectorT& pos, double t, ResultContT& result_container)
+{
+    result_container.resize( pos.size());
+    evaluate_on_vertexes( f, pos, t, sequence_begin( result_container));
+    return result_container;
+}
+
+template <class PEvalT, class ResultIterT>
+  inline ResultIterT
+  evaluate_on_vertexes (const PEvalT& f, const BaryPosVectorT& pos, ResultIterT result_iterator)
+{
+    for (Uint i= 0; i < pos.size(); ++i) {
+        const std::pair<const TetraCL*, BaryCoordCL>& p= pos[i];
+        typename PEvalT::LocalFET loc_f( *p.first, f);
+        *result_iterator++= loc_f( p.second);
+    }
+    return result_iterator;
+}
+
+template <class PEvalT, class ResultContT>
+  inline ResultContT&
+  resize_and_evaluate_on_vertexes (const PEvalT& f, const BaryPosVectorT& pos, ResultContT& result_container)
+{
+    result_container.resize( pos.size());
+    evaluate_on_vertexes( f, pos, sequence_begin( result_container));
+    return result_container;
+}
 void StationaryStrategyHighOrder (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::LevelsetP2CL& lset)
 {
     // Initialize level set and triangulation
