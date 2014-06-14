@@ -71,6 +71,7 @@ enum FiniteElementT
 	P2X_FE=P2_FE+OFFSET_XFE,
 	P2R_FE=P2_FE+OFFSET_RFE,
 	P1IF_FE=P1_FE+OFFSET_IFFE,
+	P2IF_FE=P2_FE+OFFSET_IFFE,
     vecP1_FE=P1_FE+OFFSET_VECFE,
 	vecP2_FE=P2_FE+OFFSET_VECFE,
 	vecP1Bubble_FE=P1Bubble_FE+OFFSET_VECFE,
@@ -110,6 +111,7 @@ class FE_InfoCL
             case P1D_FE:         NumUnknownsFace_= 1; break;
             case P2X_FE:
             case P2R_FE:
+            case P2IF_FE:
             case P2_FE:          NumUnknownsVertex_= NumUnknownsEdge_= 1; break;
             case vecP1_FE:		 NumUnknownsVertex_ = 3; break;
             case vecP2X_FE:

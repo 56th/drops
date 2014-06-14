@@ -336,10 +336,80 @@ void CreateNumbOnInterfaceVertex (const Uint idx, IdxT& counter, Uint stride,
     }
 }
 
+/// \brief Routine to number P2-unknowns on the vertices and edges surrounding an
+/// interface.
+///
+/// This function allocates memory for the Unknown-indices in system
+/// idx on all vertices belonging to tetras between begin and end which
+/// are cut by the zero level of lset.
+///
+/// The first number used is the initial value of counter, the next
+/// numbers are counter+stride, counter+2*stride, and so on.
+/// Upon return, counter contains the first number, that was not used,
+/// that is \# Unknowns+stride.
+/// A more user friendly interface is provided by IdxDescCL::CreateNumbOnInterface.
+void CreateNumbOnInterfaceP2 (const Uint idx, IdxT& counter,
+        const MultiGridCL::TriangVertexIteratorCL& vbegin,
+        const MultiGridCL::TriangVertexIteratorCL& vend,
+        const MultiGridCL::TriangEdgeIteratorCL& ebegin,
+        const MultiGridCL::TriangEdgeIteratorCL& eend,
+        const MultiGridCL::TriangTetraIteratorCL& begin,
+        const MultiGridCL::TriangTetraIteratorCL& end,
+        const VecDescCL& ls, const BndDataCL<>& lsetbnd, double omit_bound= -1./*default to using all dof*/)
+{
+    const size_t stride= 1;
+
+    LocalP2CL<> p2[10];
+    for (int i= 0; i < 10; ++i)
+        p2[i][i]= 1.;
+    // first set NoIdx in all vertices
+    for (MultiGridCL::TriangVertexIteratorCL vit= vbegin; vit != vend; ++vit) {
+        vit->Unknowns.Prepare(idx);
+        vit->Unknowns.Invalidate(idx);
+    }
+    for (MultiGridCL::TriangEdgeIteratorCL   eit= ebegin; eit != eend; ++eit) {
+        eit->Unknowns.Prepare(idx);
+        eit->Unknowns.Invalidate(idx);
+    }
+    // then create numbering of vertices at the interface
+    const PrincipalLatticeCL& lat= PrincipalLatticeCL::instance( 1);
+    std::valarray<double> ls_loc( lat.vertex_size());
+    LocalP2CL<> locp2_ls;
+    SPatchCL<3> patch;
+    QuadDomainCodim1CL<3> qdom;
+    std::valarray<double> qp2; // P2-shape-function as integrand
+    for (MultiGridCL::TriangTetraIteratorCL it= begin; it != end; ++it) {
+        locp2_ls.assign( *it, ls, lsetbnd);
+        evaluate_on_vertexes( locp2_ls, lat, Addr( ls_loc));
+        if (equal_signs( ls_loc))
+            continue;
+
+        const double limit= omit_bound < 0. ? 0. : omit_bound*std::pow( it->GetVolume()*6, 4./3.);
+        patch.make_patch<MergeCutPolicyCL>( lat, ls_loc);
+        if (patch.empty())
+            continue;
+
+        make_CompositeQuad5Domain2D( qdom, patch, *it);
+        qp2.resize( qdom.vertex_size());
+        for (Uint i= 0; i < 10; ++i) {
+            UnknownHandleCL& unknowns= i < 4 ? const_cast<VertexCL*>( it->GetVertex( i))->Unknowns
+                                             : const_cast<EdgeCL*>( it->GetEdge( i - 4))->Unknowns;
+            if (unknowns.Exist( idx))
+                continue;
+
+            evaluate_on_vertexes( p2[i], qdom, Addr( qp2));
+            if (quad_codim1( qp2*qp2, qdom) > limit) {
+                unknowns( idx)= counter;
+                counter+= stride;
+            }
+        }
+    }
+}
+
 void IdxDescCL::CreateNumbOnInterface(Uint level, MultiGridCL& mg, const VecDescCL& ls,
                                       const BndDataCL<>& lsetbnd, double omit_bound)
 /// Uses CreateNumbOnInterfaceVertex on the triangulation with level \p level on the multigrid \p mg.
-/// One can only create P1-elements.
+/// One can create P1-and P2-elements.
 {
     // set up the index description
     const Uint idxnum= GetIdx();
@@ -347,13 +417,19 @@ void IdxDescCL::CreateNumbOnInterface(Uint level, MultiGridCL& mg, const VecDesc
     NumUnknowns_= 0;
 
     // allocate space for indices; number unknowns in TriangLevel level
-    if (NumUnknownsVertex() != 0)
+    if (GetFE() == P1IF_FE)
         CreateNumbOnInterfaceVertex( idxnum, NumUnknowns_, NumUnknownsVertex(),
             mg.GetTriangVertexBegin(level), mg.GetTriangVertexEnd(level),
             mg.GetTriangTetraBegin( level), mg.GetTriangTetraEnd( level), ls, lsetbnd, omit_bound);
+    else if (GetFE() == P2IF_FE)
+        CreateNumbOnInterfaceP2( idxnum, NumUnknowns_,
+            mg.GetTriangVertexBegin(level), mg.GetTriangVertexEnd(level),
+            mg.GetTriangEdgeBegin(level),   mg.GetTriangEdgeEnd(level),
+            mg.GetTriangTetraBegin( level), mg.GetTriangTetraEnd( level),
+            ls, lsetbnd, omit_bound);
 
-    if (NumUnknownsEdge() != 0 || NumUnknownsFace() != 0 || NumUnknownsTetra() != 0)
-        throw DROPSErrCL( "CreateNumbOnInterface: Only vertex unknowns are implemented\n" );
+    if (NumUnknownsFace() != 0 || NumUnknownsTetra() != 0)
+        throw DROPSErrCL( "CreateNumbOnInterface: Only vertex and edge unknowns are implemented.\n" );
 }
 
 void IdxDescCL::CreateNumbStdFE( Uint level, MultiGridCL& mg)
