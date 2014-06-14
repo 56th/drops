@@ -1053,6 +1053,29 @@ double abs_det_sphere (const TetraCL& tet, const BaryCoordCL& xb, const SurfaceP
     return std::sqrt( Gram(0,0)*Gram(1,1) - Gram(0,1)*Gram(1,0));
 }
 
+// Computes W from La. 5.1. The transformation of the gradient requires W^{-1}.
+void gradient_trafo (const TetraCL& tet, const BaryCoordCL& xb, const QuaQuaMapperCL& quaqua, const SurfacePatchCL& p, SMatrixCL<3,3>& W)
+{
+    // Compute the basepoint b.
+    const TetraCL* btet= &tet;
+    BaryCoordCL b= xb;
+    quaqua.base_point( btet, b);
+
+    // nl(x)
+    p.compute_normals( tet);
+    Point3DCL nl= p.normal_begin()[0];
+    // Evaluate the normal to the interface in b, n(y).
+    Point3DCL n= quaqua.local_ls_grad( *btet, b);
+    n/= n.norm();
+
+    // Dp_h(x)^T
+    SMatrixCL<3,3> dph, dphT;
+    quaqua.jacobian( tet, xb, dph);
+    assign_transpose( dphT, dph);
+
+    W= dphT + outer_product( nl, n/inner_prod( nl, n) - dph*nl);
+}
+
 class InterfaceCommonDataCL : public TetraAccumulatorCL
 {
   private:
