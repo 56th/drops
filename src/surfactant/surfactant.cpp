@@ -845,6 +845,9 @@ class QuaQuaMapperCL
 
     void base_point (const TetraCL*& tet, BaryCoordCL& xb) const;
     void jacobian (const TetraCL& tet, const BaryCoordCL& xb, SMatrixCL<3,3>& dph) const;
+
+    LocalP2CL<> local_ls      (const TetraCL& tet) const { return LocalP2CL<>( tet, ls); }
+    Point3DCL   local_ls_grad (const TetraCL& tet, const BaryCoordCL& xb) const;
 };
 
 
@@ -983,6 +986,20 @@ void QuaQuaMapperCL::jacobian (const TetraCL& tet, const BaryCoordCL& xb, SMatri
         qr.Solve( tmp);
         dph.col( i, tmp);
     }
+}
+
+Point3DCL QuaQuaMapperCL::local_ls_grad (const TetraCL& tet, const BaryCoordCL& xb) const
+{
+    LocalP2CL<> locls( tet, ls);
+    LocalP1CL<Point3DCL> gradp2[10];
+    SMatrixCL<3,3> T;
+    double dummy;
+    GetTrafoTr( T, dummy, tet);
+    P2DiscCL::GetGradients( gradp2, gradrefp2, T);
+    Point3DCL grad;
+    for (Uint i= 0; i < 10; ++i)
+        grad+= locls[i]*gradp2[i]( xb);
+    return grad;
 }
 
 double abs_det (const TetraCL& tet, const BaryCoordCL& xb, const QuaQuaMapperCL& quaqua, const SurfacePatchCL& p)
