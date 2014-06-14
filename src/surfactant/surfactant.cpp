@@ -1095,70 +1095,18 @@ class InterfaceCommonDataCL : public TetraAccumulatorCL
            max_absdet_err,
            max_dph2_err;
 
-  public:
-    const PrincipalLatticeCL& lat;
-    LocalP1CL<> p1[4];
+    bool do_compute_debug_data_;
 
-    std::valarray<double> ls_loc;
-    SurfacePatchCL surf;
-
-    QuaQuaMapperCL quaqua;
-
-    const InterfaceCommonDataCL& get_clone () const {
-        const int tid= omp_get_thread_num();
-        return tid == 0 ? *this : the_clones[tid][0];
-    }
-
-    bool empty () const { return surf.empty(); }
-
-    void store_offsets( VecDescCL& to_ifacearg) { to_iface= &to_ifacearg; }
-
-    InterfaceCommonDataCL (const VecDescCL& ls_arg, const BndDataCL<>& lsetbnd_arg, const QuaQuaMapperCL& quaquaarg)
-        : ls( &ls_arg), lsetbnd( &lsetbnd_arg), to_iface( 0), lat( PrincipalLatticeCL::instance( 1)), ls_loc( lat.vertex_size()), quaqua( quaquaarg)
-    { p1[0][0]= p1[1][1]= p1[2][2]= p1[3][3]= 1.; } // P1-Basis-Functions
-
-    virtual ~InterfaceCommonDataCL () {}
-
-    virtual void begin_accumulation   () {
-        the_clones= new InterfaceCommonDataCL*[omp_get_max_threads()];
-        the_clones[0]= this;
-
-        max_dph_err= 0;
-        surfacemeasP1= 0.;
-        surfacemeasP2= 0.;
-        max_absdet_err= 0.;
-        max_dph2_err= 0;
-    }
-    virtual void finalize_accumulation() {
-        delete[] the_clones;
-
-        const double surface_true= 4.*M_PI*RadDrop[0]*RadDrop[0];
-        std::cout << "max_dph_err: " << max_dph_err
-            << "\nsurfacemeasP1: " << surfacemeasP1 << " rel. error: " << std::abs(surfacemeasP1 - surface_true)/surface_true
-            << "\nsurfacemeasP2: " << surfacemeasP2 << " rel. error: " << std::abs(surfacemeasP2 - surface_true)/surface_true
-            << "\nmax_absdet_err: " << max_absdet_err
-            << "\nmax_dph2_err: " << max_dph2_err << std::endl;
-    }
-
-    virtual void visit (const TetraCL& t) {
-        surf.clear();
-        locp2_ls.assign( t, *ls, *lsetbnd);
-        evaluate_on_vertexes( locp2_ls, lat, Addr( ls_loc));
-        if (equal_signs( ls_loc))
-            return;
-        surf.make_patch<MergeCutPolicyCL>( lat, ls_loc);
-        if (surf.empty())
-            return;
-
+    void compute_debug_data (const TetraCL& t) {
+//         std::cout << "Tetra Id: " << t.GetId().GetIdent() << std::endl;
         const TetraCL* tet;
         BaryCoordCL b;
-        std::cout << "Tetra Id: " << t.GetId().GetIdent() << std::endl;
         for (SurfacePatchCL::const_vertex_iterator it= surf.vertex_begin(); it != surf.vertex_end(); ++it) {
             tet= &t;
             b= *it;
             quaqua.base_point( tet, b);
             const Point3DCL& x= GetWorldCoord( t, *it);
-            const Point3DCL& xb= GetWorldCoord( *tet, b);
+//             const Point3DCL& xb= GetWorldCoord( *tet, b);
 //             std::cout  << "    |x-xb|: " << (x - xb).norm();
 
             SMatrixCL<3,3> dph;
@@ -1186,15 +1134,94 @@ class InterfaceCommonDataCL : public TetraAccumulatorCL
 //             std::cout  << " |P(dph -dp)\\hat P|_F: " << dph2_err << std::endl;
             max_dph2_err= std::max( max_dph2_err, dph2_err);
         }
+        surfacemeasP1+= quad_2D( std::valarray<double>( 1., qdom.vertex_size()), qdom);
+        surfacemeasP2+= quad_2D( absdet, qdom);
 
-        QuadDomain2DCL qdom;
+    }
+
+  public:
+    const PrincipalLatticeCL& lat;
+    LocalP2CL<> p2[10];
+    LocalP1CL<Point3DCL> gradrefp2[10];
+
+    std::valarray<double> ls_loc;
+    SurfacePatchCL surf;
+    QuadDomain2DCL qdom;
+
+    BaryPosVectorT qdom_projected;
+
+    std::valarray<double> absdet;
+
+    QuaQuaMapperCL quaqua;
+
+    const InterfaceCommonDataCL& get_clone () const {
+        const int tid= omp_get_thread_num();
+        return tid == 0 ? *this : the_clones[tid][0];
+    }
+
+    bool empty () const { return surf.empty(); }
+
+    void store_offsets( VecDescCL& to_ifacearg) { to_iface= &to_ifacearg; }
+
+    InterfaceCommonDataCL (const VecDescCL& ls_arg, const BndDataCL<>& lsetbnd_arg, const QuaQuaMapperCL& quaquaarg, bool do_compute_debug_data= false)
+        : ls( &ls_arg), lsetbnd( &lsetbnd_arg), to_iface( 0), do_compute_debug_data_( do_compute_debug_data),
+          lat( PrincipalLatticeCL::instance( 1)), ls_loc( lat.vertex_size()), quaqua( quaquaarg) {
+        P2DiscCL::GetGradientsOnRef( gradrefp2);
+        for (Uint i= 0; i < 10 ; ++i)
+            p2[i][i]= 1.; // P2-Basis-Functions
+    }
+
+    virtual ~InterfaceCommonDataCL () {}
+
+    virtual void begin_accumulation   () {
+        the_clones= new InterfaceCommonDataCL*[omp_get_max_threads()];
+        the_clones[0]= this;
+
+        max_dph_err= 0;
+        surfacemeasP1= 0.;
+        surfacemeasP2= 0.;
+        max_absdet_err= 0.;
+        max_dph2_err= 0;
+    }
+    virtual void finalize_accumulation() {
+        delete[] the_clones;
+
+        if (do_compute_debug_data_ == true) {
+            const double surface_true= 4.*M_PI*RadDrop[0]*RadDrop[0];
+            std::cout << "max_dph_err: " << max_dph_err
+                << "\nsurfacemeasP1: " << surfacemeasP1 << " rel. error: " << std::abs(surfacemeasP1 - surface_true)/surface_true
+                << "\nsurfacemeasP2: " << surfacemeasP2 << " rel. error: " << std::abs(surfacemeasP2 - surface_true)/surface_true
+                << "\nmax_absdet_err: " << max_absdet_err
+                << "\nmax_dph2_err: " << max_dph2_err << std::endl;
+        }
+    }
+
+    virtual void visit (const TetraCL& t) {
+        surf.clear();
+        locp2_ls.assign( t, *ls, *lsetbnd);
+        evaluate_on_vertexes( locp2_ls, lat, Addr( ls_loc));
+        if (equal_signs( ls_loc))
+            return;
+        surf.make_patch<MergeCutPolicyCL>( lat, ls_loc);
+        if (surf.empty())
+            return;
+
         make_CompositeQuad5Domain2D ( qdom, surf, t);
-        std::valarray<double> absdet( 1., qdom.vertex_size());
-        surfacemeasP1+= quad_2D( absdet, qdom);
+        qdom_projected.clear();
+        qdom_projected.reserve( qdom.vertex_size());
+        const TetraCL* tet;
+        BaryCoordCL b;
+        for (QuadDomain2DCL::const_vertex_iterator v= qdom.vertex_begin(); v != qdom.vertex_end(); ++v) {
+            tet= &t;
+            b= *v;
+            quaqua.base_point( tet, b);
+            qdom_projected.push_back( std::make_pair( tet, b));
+        }
+
+        absdet.resize( qdom.vertex_size());
         for (Uint i= 0; i < qdom.vertex_size(); ++i) {
             absdet[i]= abs_det( t, qdom.vertex_begin()[i], quaqua, surf);
         }
-        surfacemeasP2+= quad_2D( absdet, qdom);
 
         if (to_iface != 0) {
             const Uint sys= to_iface->RowIdx->GetIdx();
@@ -1209,7 +1236,10 @@ class InterfaceCommonDataCL : public TetraAccumulatorCL
             }
         }
 
+        if (do_compute_debug_data_ == true)
+            compute_debug_data( t);
     }
+
     virtual InterfaceCommonDataCL* clone (int clone_id) {
         return the_clones[clone_id]= new InterfaceCommonDataCL( *this);
     }
