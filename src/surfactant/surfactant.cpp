@@ -1245,6 +1245,182 @@ class InterfaceCommonDataCL : public TetraAccumulatorCL
     }
 };
 
+template <class LocalMatrixT>
+class InterfaceMatrixAccuP2CL : public TetraAccumulatorCL
+{
+  private:
+    const InterfaceCommonDataCL& cdata_;
+    std::string name_;
+
+    MatDescCL* mat_; // the matrix
+    MatrixBuilderCL* M;
+
+    LocalMatrixT local_mat;
+
+    Uint lvl;
+    IdxT numr[10],
+         numc[10];
+
+  public:
+    InterfaceMatrixAccuP2CL (MatDescCL* Mmat, const LocalMatrixT& loc_mat, const InterfaceCommonDataCL& cdata,
+                             std::string name= std::string())
+        : cdata_( cdata), name_( name), mat_( Mmat), M( 0), local_mat( loc_mat) {}
+    virtual ~InterfaceMatrixAccuP2CL () {}
+
+    void set_name (const std::string& n) { name_= n; }
+
+    virtual void begin_accumulation () {
+        const IdxT num_rows= mat_->RowIdx->NumUnknowns();
+        const IdxT num_cols= mat_->ColIdx->NumUnknowns();
+        std::cout << "InterfaceMatrixAccuP2CL::begin_accumulation";
+        if (name_ != std::string())
+            std::cout << " for \"" << name_ << "\"";
+        std::cout  << ": " << num_rows << " rows, " << num_cols << " cols.\n";
+        lvl = mat_->GetRowLevel();
+        M= new MatrixBuilderCL( &mat_->Data, num_rows, num_cols);
+    }
+
+    virtual void finalize_accumulation () {
+        M->Build();
+        delete M;
+        M= 0;
+        std::cout << "InterfaceMatrixAccuP2CL::finalize_accumulation";
+        if (name_ != std::string())
+            std::cout << " for \"" << name_ << "\"";
+        std::cout << ": " << mat_->Data.num_nonzeros() << " nonzeros." << std::endl;
+    }
+
+    virtual void visit (const TetraCL& t) {
+        const InterfaceCommonDataCL& cdata= cdata_.get_clone();
+        if (cdata.empty())
+            return;
+        local_mat.setup( t, cdata);
+        GetLocalNumbP2NoBnd( numr, t, *mat_->RowIdx);
+        GetLocalNumbP2NoBnd( numc, t, *mat_->ColIdx);
+        update_global_matrix_P2( *M, local_mat.coup, numr, numc);
+    }
+
+    virtual InterfaceMatrixAccuP2CL* clone (int /*clone_id*/) { return new InterfaceMatrixAccuP2CL( *this); }
+};
+
+class LocalLaplaceBeltramiP2CL
+{
+  private:
+    double D_; // diffusion coefficient
+
+    LocalP1CL<Point3DCL> gradp2[10];
+    GridFunctionCL<Point3DCL> qgradp2[10];
+
+    GridFunctionCL<Point3DCL> nl;
+    GridFunctionCL<SMatrixCL<3,3> > Winv;
+
+  public:
+    double coup[10][10];
+
+    void setup (const TetraCL& t, const InterfaceCommonDataCL& cdata) {
+        if (cdata.surf.normal_empty())
+            cdata.surf.compute_normals( t);
+        resize_and_scatter_piecewise_normal( cdata.surf, cdata.qdom, nl);
+
+        Winv.resize( cdata.qdom.vertex_size());
+        QRDecompCL<3,3> qr;
+        SVectorCL<3> tmp;
+        for (Uint i= 0; i < cdata.qdom.vertex_size(); ++i) {
+            gradient_trafo( t, cdata.qdom.vertex_begin()[i], cdata.quaqua, cdata.surf, qr.GetMatrix());
+            qr.prepare_solve();
+            for (Uint j= 0; j < 3; ++j) {
+                tmp= std_basis<3>( j + 1);
+                qr.Solve( tmp);
+                Winv[i].col( j, tmp);
+            }
+        }
+
+        double dummy;
+        SMatrixCL<3,3> T;
+        GetTrafoTr( T, dummy, t);
+        P2DiscCL::GetGradients( gradp2, cdata.gradrefp2, T);
+        for (int i= 0; i < 10; ++i) {
+            resize_and_evaluate_on_vertexes ( gradp2[i], cdata.qdom, qgradp2[i]);
+            for (Uint j= 0; j < qgradp2[i].size(); ++j) {
+                tmp=  qgradp2[i][j] - inner_prod( nl[j], qgradp2[i][j])*nl[j];
+                qgradp2[i][j]= Winv[j]*tmp;
+            }
+        }
+
+        for (int i= 0; i < 10; ++i) {
+            coup[i][i]= quad_2D( cdata.absdet*dot( qgradp2[i], qgradp2[i]), cdata.qdom);
+            for(int j= 0; j < i; ++j)
+                coup[i][j]= coup[j][i]= quad_2D( cdata.absdet*dot( qgradp2[j], qgradp2[i]), cdata.qdom);
+        }
+    }
+
+    LocalLaplaceBeltramiP2CL (double D)
+        :D_( D) {}
+};
+
+class LocalMassP2CL
+{
+  private:
+    std::valarray<double> qp2[10];
+
+  public:
+    double coup[10][10];
+
+    void setup (const TetraCL&, const InterfaceCommonDataCL& cdata) {
+        for (int i= 0; i < 10; ++i)
+            resize_and_evaluate_on_vertexes ( cdata.p2[i], cdata.qdom, qp2[i]);
+
+        for (int i= 0; i < 10; ++i) {
+            coup[i][i]= quad_2D( cdata.absdet*qp2[i]*qp2[i], cdata.qdom);
+            for(int j= 0; j < i; ++j)
+                coup[i][j]= coup[j][i]= quad_2D( cdata.absdet*qp2[j]*qp2[i], cdata.qdom);
+        }
+    }
+
+    LocalMassP2CL () {}
+};
+
+/// \brief Accumulate an interface-vector.
+template <class LocalVectorT>
+class InterfaceVectorAccuP2CL : public TetraAccumulatorCL
+{
+  private:
+    const InterfaceCommonDataCL& cdata_;
+    std::string name_;
+
+    VecDescCL* y_;
+    LocalVectorT local_vec;
+    IdxT numry[10];
+
+  public:
+    InterfaceVectorAccuP2CL (VecDescCL* y, const LocalVectorT& loc_vec, const InterfaceCommonDataCL& cdata, std::string name= std::string())
+        : cdata_( cdata), name_( name), y_( y), local_vec( loc_vec) {}
+    virtual ~InterfaceVectorAccuP2CL () {}
+
+    void set_name (const std::string& n) { name_= n; }
+
+    virtual void begin_accumulation () {
+        std::cout << "InterfaceVectorAccuP2CL::begin_accumulation";
+        if (name_ != std::string())
+            std::cout << " for \"" << name_ << "\"";
+        std::cout  << ": " << y_->RowIdx->NumUnknowns() << " rows.\n";
+    }
+
+    virtual void finalize_accumulation() {}
+
+    virtual void visit (const TetraCL& t) {
+        const InterfaceCommonDataCL& cdata= cdata_.get_clone();
+        if (cdata.empty())
+            return;
+        GetLocalNumbP2NoBnd( numry, t, *y_->RowIdx);
+        local_vec.setup( t, cdata, numry);
+        for (int i= 0; i < 10; ++i)
+            if (numry[i] != NoIdx)
+                y_->Data[numry[i]]+= local_vec.vec[i];
+    }
+
+    virtual InterfaceVectorAccuP2CL* clone (int /*clone_id*/) { return new InterfaceVectorAccuP2CL( *this); }
+};
 
 template <class T, class ResultIterT>
   inline ResultIterT
@@ -1287,6 +1463,42 @@ template <class PEvalT, class ResultContT>
     evaluate_on_vertexes( f, pos, sequence_begin( result_container));
     return result_container;
 }
+
+/// \brief Compute the load-vector corresponding to the function f on a single tetra.
+class LocalVectorP2CL
+{
+  private:
+    instat_scalar_fun_ptr f_;
+    double time_;
+
+    std::valarray<double> qp2,
+                          qf;
+
+  public:
+    double vec[10];
+
+    LocalVectorP2CL (instat_scalar_fun_ptr f, double time) : f_( f), time_( time) {}
+
+    void setup (const TetraCL&, const InterfaceCommonDataCL& cdata, const IdxT numr[10]) {
+//         resize_and_evaluate_on_vertexes( f_, t, cdata.qdom, time_, qf);
+        resize_and_evaluate_on_vertexes( f_, cdata.qdom_projected, time_, qf);
+//         qf.resize( cdata.qdom_projected.size());
+//         for (Uint i= 0; i < cdata.qdom_projected.size(); ++i) {
+//             const std::pair<const TetraCL*, BaryCoordCL>& pos= cdata.qdom_projected[i];
+//             BaryEvalCL<> feval( *pos.first, time_, f_);
+//             qf[i]= feval( pos.second);
+//         }
+        qp2.resize( cdata.qdom.vertex_size());
+        for (Uint i= 0; i < 10; ++i) {
+                if (numr[i] == NoIdx)
+                    continue;
+                evaluate_on_vertexes( cdata.p2[i], cdata.qdom, Addr( qp2));
+                vec[i]= quad_2D( cdata.absdet*qf*qp2, cdata.qdom);
+        }
+    }
+};
+
+
 void StationaryStrategyHighOrder (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::LevelsetP2CL& lset)
 {
     // Initialize level set and triangulation
@@ -1303,6 +1515,12 @@ void StationaryStrategyHighOrder (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& a
     ifaceidx.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
     std::cout << "NumUnknowns: " << ifaceidx.NumUnknowns() << std::endl;
 
+    // Setup an interface-P2 numbering
+    DROPS::IdxDescCL ifacep2idx( P2IF_FE);
+    ifacep2idx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
+    ifacep2idx.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
+    std::cout << "P2-NumUnknowns: " << ifacep2idx.NumUnknowns() << std::endl;
+
     // Recover the gradient of the level set function
     IdxDescCL vecp2idx( vecP2_FE);
     vecp2idx.CreateNumbering( mg.GetLastLevel(), mg);
@@ -1316,13 +1534,13 @@ void StationaryStrategyHighOrder (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& a
     QuaQuaMapperCL quaqua( mg, lset.Phi, lsgradrec, tetra_neighborhoods);
 
     VecDescCL to_iface( &vecp2idx);
-    {
-    TetraAccumulatorTupleCL accus;
-    InterfaceCommonDataCL ttt( lset.Phi, lset.GetBndData(), quaqua);
-//     ttt.store_offsets( to_iface);
-    accus.push_back( &ttt);
-    accumulate( accus, mg, ifaceidx.TriangLevel(), ifaceidx.GetMatchingFunction(), ifaceidx.GetBndInfo());
-    }
+//     {
+//     TetraAccumulatorTupleCL accus;
+//     InterfaceCommonDataCL ttt( lset.Phi, lset.GetBndData(), quaqua);
+// //     ttt.store_offsets( to_iface);
+//     accus.push_back( &ttt);
+//     accumulate( accus, mg, ifaceidx.TriangLevel(), ifaceidx.GetMatchingFunction(), ifaceidx.GetBndInfo());
+//     }
 
     TetraAccumulatorTupleCL accus;
     InterfaceCommonDataP1CL cdata( lset.Phi, lset.GetBndData());
@@ -1333,16 +1551,37 @@ void StationaryStrategyHighOrder (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& a
     DROPS::MatDescCL A( &ifaceidx, &ifaceidx);
     InterfaceMatrixAccuP1CL<LocalLaplaceBeltramiP1CL> accuA( &A, LocalLaplaceBeltramiP1CL( P.get<double>("SurfTransp.Visc")), cdata, "A");
     accus.push_back( &accuA);
+
+    InterfaceCommonDataCL cdatap2( lset.Phi, lset.GetBndData(), quaqua);
+    accus.push_back( &cdatap2);
+    DROPS::MatDescCL Mp2( &ifacep2idx, &ifacep2idx);
+    InterfaceMatrixAccuP2CL<LocalMassP2CL> accuMp2( &Mp2, LocalMassP2CL(), cdatap2, "Mp2");
+    accus.push_back( &accuMp2);
+    DROPS::MatDescCL Ap2( &ifacep2idx, &ifacep2idx);
+    InterfaceMatrixAccuP2CL<LocalLaplaceBeltramiP2CL> accuAp2( &Ap2, LocalLaplaceBeltramiP2CL( P.get<double>("SurfTransp.Visc")), cdatap2, "Ap2");
+    accus.push_back( &accuAp2);
+    DROPS::VecDescCL bp2( &ifacep2idx);
+    InterfaceVectorAccuP2CL<LocalVectorP2CL> acculoadp2( &bp2, LocalVectorP2CL( laplace_beltrami_0_rhs, bp2.t), cdatap2);
+    accus.push_back( &acculoadp2);
+
     accumulate( accus, mg, ifaceidx.TriangLevel(), ifaceidx.GetMatchingFunction(), ifaceidx.GetBndInfo());
 
-    DROPS::MatrixCL L;
-    L.LinComb( 1.0, A.Data, 1.0, M.Data);
+//     DROPS::MatrixCL L;
+//     L.LinComb( 1.0, A.Data, 1.0, M.Data);
+    MatrixCL& L= A.Data;
+//     DROPS::MatrixCL Lp2;
+//     Lp2.LinComb( 1.0, Ap2.Data, 1.0, Mp2.Data);
+    MatrixCL& Lp2= Ap2.Data;
+
     DROPS::VecDescCL b( &ifaceidx);
     DROPS::SetupInterfaceRhsP1( mg, &b, lset.Phi, lset.GetBndData(), laplace_beltrami_0_rhs);
 
-    //DROPS::WriteToFile( M.Data, "m_iface.txt", "M");
-    //DROPS::WriteToFile( A.Data, "a_iface.txt", "A");
-    //DROPS::WriteFEToFile( b, mg, "rhs_iface.txt", /*binary=*/ true);
+    DROPS::WriteToFile( M.Data, "m_iface.txt", "M");
+    DROPS::WriteToFile( A.Data, "a_iface.txt", "A");
+    DROPS::WriteFEToFile( b, mg, "rhs_iface.txt", /*binary=*/ false);
+    DROPS::WriteToFile( Ap2.Data, "ap2_iface.txt", "Ap2");
+    DROPS::WriteToFile( Mp2.Data, "mp2_iface.txt", "Mp2");
+    DROPS::WriteFEToFile( bp2, mg, "rhsp2_iface.txt", /*binary=*/ false);
 
     typedef DROPS::SSORPcCL SurfPcT;
     SurfPcT surfpc;
@@ -1353,8 +1592,15 @@ void StationaryStrategyHighOrder (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& a
     surfsolver.Solve( L, x.Data, b.Data, x.RowIdx->GetEx());
     std::cout << "Iter: " << surfsolver.GetIter() << "\tres: " << surfsolver.GetResid() << '\n';
 
-    if (P.get<int>( "SolutionOutput.Freq") > 0)
+    DROPS::VecDescCL xp2( &ifacep2idx);
+    surfsolver.Solve( Lp2, xp2.Data, bp2.Data, xp2.RowIdx->GetEx());
+    std::cout << "P2: Iter: " << surfsolver.GetIter() << "\tres: " << surfsolver.GetResid() << '\n';
+
+
+    if (P.get<int>( "SolutionOutput.Freq") > 0) {
         DROPS::WriteFEToFile( x, mg, P.get<std::string>( "SolutionOutput.Path"), P.get<bool>( "SolutionOutput.Binary"));
+        DROPS::WriteFEToFile( xp2, mg, P.get<std::string>( "SolutionOutput.Path") + "_p2", P.get<bool>( "SolutionOutput.Binary"));
+    }
 
     DROPS::IdxDescCL ifacefullidx( DROPS::P1_FE);
     ifacefullidx.CreateNumbering( mg.GetLastLevel(), mg);
@@ -1362,9 +1608,13 @@ void StationaryStrategyHighOrder (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& a
     DROPS::Extend( mg, x, xext);
     DROPS::NoBndDataCL<> nobnd;
     DROPS::NoBndDataCL<Point3DCL> nobnd_vec;
+    VecDescCL the_sol_vd( &lset.idx);
+    LSInit( mg, the_sol_vd, &laplace_beltrami_0_sol, /*t*/ 0.);
     if (vtkwriter.get() != 0) {
         vtkwriter->Register( make_VTKScalar( lset.GetSolution(), "Levelset") );
         vtkwriter->Register( make_VTKIfaceScalar( mg, x, "InterfaceSol"));
+        vtkwriter->Register( make_VTKIfaceScalar( mg, xp2, "InterfaceSolP2"));
+        vtkwriter->Register( make_VTKScalar(      make_P2Eval( mg, nobnd, the_sol_vd),  "TrueSol"));
         vtkwriter->Register( make_VTKVector( make_P2Eval( mg, nobnd_vec, lsgradrec), "LSGradRec") );
         vtkwriter->Register( make_VTKVector( make_P2Eval( mg, nobnd_vec, to_iface), "to_iface") );
         vtkwriter->Write( 0.);
