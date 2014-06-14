@@ -838,7 +838,7 @@ class QuaQuaMapperCL
     bool line_search (const Point3DCL& v, const Point3DCL& nx, const TetraCL*& tetra, BaryCoordCL& bary, const TetraSetT& neighborhood) const;
 
   public:
-    QuaQuaMapperCL (const MultiGridCL& mg, VecDescCL& lsarg, const VecDescCL& ls_grad_recarg, TetraToTetrasT& neigborhoods, int maxiter= 100, double tol= 1e-6)
+    QuaQuaMapperCL (const MultiGridCL& mg, VecDescCL& lsarg, const VecDescCL& ls_grad_recarg, TetraToTetrasT& neigborhoods, int maxiter= 100, double tol= 1e-7)
         : maxiter_( maxiter), tol_( tol), ls( &lsarg, &nobnddata, &mg), ls_grad_rec( &ls_grad_recarg, &nobnddata_vec, &mg), neighborhoods_( neigborhoods)
     { P2DiscCL::GetGradientsOnRef( gradrefp2); }
 
@@ -868,8 +868,8 @@ bool QuaQuaMapperCL::line_search (const Point3DCL& v, const Point3DCL& nx, const
 {
     const int max_inneriter= 100;
     const int max_damping= 10;
-    const double eps= 1.0e-10;
-    const double inner_tol= 1.0e-8;
+    const double eps= 1e-10;
+    const double inner_tol= 5e-9;
 
     double alpha= 0.,
            dalpha= 0.;
