@@ -45,6 +45,14 @@ void Extend (const MultiGridCL& mg, const VecDescCL& x, VecDescCL& xext)
         if (it->Unknowns.Exist( xidx) && it->Unknowns.Exist( xextidx))
             xext.Data[it->Unknowns( xextidx)]= x.Data[it->Unknowns( xidx)];
     }
+    if (x.RowIdx->GetFE() == P1IF_FE)
+        return;
+
+    // For P2IF_FE, also fixup the edge-dofs.
+    DROPS_FOR_TRIANG_CONST_EDGE( mg, lvl, it) {
+        if (it->Unknowns.Exist( xidx) && it->Unknowns.Exist( xextidx))
+            xext.Data[it->Unknowns( xextidx)]= x.Data[it->Unknowns( xidx)];
+    }
 }
 
 void Restrict (const MultiGridCL& mg, const VecDescCL& xext, VecDescCL& x)
@@ -57,6 +65,14 @@ void Restrict (const MultiGridCL& mg, const VecDescCL& xext, VecDescCL& x)
         if (it->Unknowns.Exist( xidx) && it->Unknowns.Exist( xextidx))
             x.Data[it->Unknowns( xidx)]= xext.Data[it->Unknowns( xextidx)];
     }
+    if (x.RowIdx->GetFE() == P1IF_FE)
+        return;
+
+    // For P2IF_FE, also fixup the edge-dofs.
+    DROPS_FOR_TRIANG_CONST_EDGE( mg, lvl, it) {
+        if (it->Unknowns.Exist( xidx) && it->Unknowns.Exist( xextidx))
+            x.Data[it->Unknowns( xidx)]= xext.Data[it->Unknowns( xextidx)];
+    }
 }
 
 void update_global_matrix_P1 (MatrixBuilderCL& M, const double coup[4][4], const IdxT numr[4], const IdxT numc[4])
@@ -64,6 +80,15 @@ void update_global_matrix_P1 (MatrixBuilderCL& M, const double coup[4][4], const
     for (int i= 0; i < 4; ++i)
         if (numr[i] != NoIdx)
             for (int j= 0; j < 4; ++j)
+                if (numc[j] != NoIdx)
+                    M( numr[i], numc[j])+= coup[i][j];
+}
+
+void update_global_matrix_P2 (MatrixBuilderCL& M, const double coup[10][10], const IdxT numr[10], const IdxT numc[10])
+{
+    for (int i= 0; i < 10; ++i)
+        if (numr[i] != NoIdx)
+            for (int j= 0; j < 10; ++j)
                 if (numc[j] != NoIdx)
                     M( numr[i], numc[j])+= coup[i][j];
 }
@@ -364,15 +389,20 @@ Ensight6IfaceScalarCL::put (Ensight6OutCL& cf) const
 void
 VTKIfaceScalarCL::put (VTKOutCL& cf) const
 {
-    IdxDescCL p1idx;
-    p1idx.CreateNumbering( u_.RowIdx->TriangLevel(), mg_);
-    VecDescCL p1u( &p1idx);
-    Extend( mg_, u_, p1u);
+    IdxDescCL fullidx( P1_FE);
+    if (u_.RowIdx->GetFE() == P2IF_FE)
+        fullidx.SetFE( P2_FE);
+    fullidx.CreateNumbering( u_.RowIdx->TriangLevel(), mg_);
+    VecDescCL uext( &fullidx);
+    Extend( mg_, u_, uext);
     BndDataCL<> bnd( 0);
 
-    cf.PutScalar( make_P1Eval( mg_, bnd, p1u), varName());
+    if (u_.RowIdx->GetFE() == P1IF_FE)
+        cf.PutScalar( make_P1Eval( mg_, bnd, uext), varName());
+    else if (u_.RowIdx->GetFE() == P2IF_FE)
+        cf.PutScalar( make_P2Eval( mg_, bnd, uext), varName());
 
-    p1idx.DeleteNumbering( mg_);
+    fullidx.DeleteNumbering( mg_);
 }
 
 

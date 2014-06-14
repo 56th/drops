@@ -51,6 +51,9 @@ void Restrict (const MultiGridCL& mg, const VecDescCL& xext, VecDescCL& x);
 /// \brief Helper for the accumulators: inserts the local matrix coup into M.
 void update_global_matrix_P1 (MatrixBuilderCL& M, const double coup[4][4], const IdxT numr[4], const IdxT numc[4]);
 
+/// \brief Helper for the accumulators: inserts the local matrix coup into M.
+void update_global_matrix_P2 (MatrixBuilderCL& M, const double coup[10][10], const IdxT numr[10], const IdxT numc[10]);
+
 /// \todo This should be a generic function somewhere in num or misc.
 void P1Init (instat_scalar_fun_ptr icf, VecDescCL& ic, const MultiGridCL& mg, double t);
 
