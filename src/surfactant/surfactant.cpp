@@ -389,17 +389,19 @@ SMatrixCL<3,3> dp_sphere (const DROPS::Point3DCL& x, double)
 // ==stationary test case "LaplaceBeltrami0"==
 // Sphere around 0, RadDrop 1, wind == 0
 // A right hand side from C.J. Heine...
-const double a( -13./8.*std::sqrt( 35./M_PI));
+// const double a( -13./8.*std::sqrt( 35./M_PI));
+const double a( 12.);
 double laplace_beltrami_0_rhs (const DROPS::Point3DCL& p, double)
 {
-    return a*(3.*p[0]*p[0]*p[1] - p[1]*p[1]*p[1]);
+    return a/std::pow( p.norm(), 3.)*(3.*p[0]*p[0]*p[1] - p[1]*p[1]*p[1]);
 }
 static RegisterScalarFunction regsca_laplace_beltrami_0_rhs( "LaplaceBeltrami0Rhs", laplace_beltrami_0_rhs);
 
 // ...and the corresponding solution (extended)
 double laplace_beltrami_0_sol (const DROPS::Point3DCL& p, double)
 {
-    return p.norm_sq()/(12. + p.norm_sq())*laplace_beltrami_0_rhs( p, 0.);
+//     return p.norm_sq()/(12. + p.norm_sq())*laplace_beltrami_0_rhs( p, 0.);
+    return 1./12.*laplace_beltrami_0_rhs( p, 0.);
 //    return 1. + p.norm_sq()/(12. + p.norm_sq())*laplace_beltrami_0_rhs( p, 0.);
 }
 static RegisterScalarFunction regsca_laplace_beltrami_0_sol( "LaplaceBeltrami0Sol", laplace_beltrami_0_sol);
@@ -1499,6 +1501,105 @@ class LocalVectorP2CL
 };
 
 
+/// \brief Accumulate L2-norms and errors on the higher order zero level.
+/// Works for P1IF_FE, P2IF_FE, and C-functions.
+class InterfaceL2AccuP2CL : public TetraAccumulatorCL
+{
+  private:
+    const InterfaceCommonDataCL& cdata_;
+    const MultiGridCL& mg;
+    std::string name_;
+
+    NoBndDataCL<> nobnddata;
+    const VecDescCL* fvd;
+
+    instat_scalar_fun_ptr f;
+    double f_time;
+
+    double f_grid_norm,
+           f_norm,
+           err;
+    double f_grid_int,
+           f_int,
+           area;
+
+  public:
+    InterfaceL2AccuP2CL (const InterfaceCommonDataCL& cdata, const MultiGridCL& mg_arg, std::string name= std::string())
+        : cdata_( cdata), mg( mg_arg), name_( name), fvd( 0), f( 0), f_time( 0.) {}
+    virtual ~InterfaceL2AccuP2CL () {}
+
+    void set_name (const std::string& n) { name_= n; }
+    void set_grid_function (const VecDescCL& fvdarg) { fvd= &fvdarg; }
+    void set_function (const instat_scalar_fun_ptr farg, double f_time_arg= 0.) {
+        f= farg;
+        f_time= f_time_arg;
+    }
+
+    virtual void begin_accumulation () {
+        std::cout << "InterfaceL2AccuP2CL::begin_accumulation";
+        if (name_ != std::string())
+            std::cout << " for \"" << name_ << "\".\n";
+        f_grid_norm= f_norm= err= 0.;
+        f_grid_int= f_int= area= 0.;
+    }
+
+    virtual void finalize_accumulation() {
+        std::cout << "InterfaceL2AccuP2CL::finalize_accumulation";
+        if (name_ != std::string())
+            std::cout << " for \"" << name_ << "\":";
+        std::cout << "\n\tarea: " << area;
+        if (fvd != 0) {
+            f_grid_norm= std::sqrt( f_grid_norm);
+            std::cout << "\n\t|| f_grid ||_L2: " << f_grid_norm
+                      << "\tintegral: " << f_grid_int;
+        }
+        if (f != 0) {
+            f_norm= std::sqrt( f_norm);
+            std::cout << "\n\t|| f ||_L2: " << f_norm
+                      << "\t integral: " << f_int;
+        }
+        if (fvd != 0 && f != 0) {
+            err= std::sqrt( err);
+            std::cout << "\n\t|| f - f_grid ||_L2: " << err;
+            const double mvf_err= std::sqrt( std::pow( err, 2) - std::pow( f_grid_int - f_int, 2)/area);
+            std:: cout << "\t|| f - c_f - (f_grid -c_{f_grid}) ||_L2: " << mvf_err;
+        }
+        std::cout << std::endl;
+    }
+
+    virtual void visit (const TetraCL& t) {
+        const InterfaceCommonDataCL& cdata= cdata_.get_clone();
+        if (cdata.empty())
+            return;
+
+        area+= quad_2D( cdata.absdet, cdata.qdom);
+
+        std::valarray<double> qfgrid,
+                              qf;
+        if (fvd != 0) {
+            // XXX: Check, whether incomplete P2-Data exists locally (which is allowed for P2IF_FE, but not handled correctly by this class --> Extend fvd). Likewise for P1IF_FE...
+            if (fvd->RowIdx->GetFE() == P2IF_FE)
+                resize_and_evaluate_on_vertexes( make_P2Eval( mg, nobnddata, *fvd), t, cdata.qdom, qfgrid);
+            else if (fvd->RowIdx->GetFE() == P1IF_FE)
+                resize_and_evaluate_on_vertexes( make_P1Eval( mg, nobnddata, *fvd), t, cdata.qdom, qfgrid);
+//             resize_and_evaluate_on_vertexes( make_P2Eval( mg, nobnddata, *fvd), cdata.qdom_projected, qfgrid);
+            f_grid_int+= quad_2D( cdata.absdet*qfgrid, cdata.qdom);
+            f_grid_norm+= quad_2D( cdata.absdet*qfgrid*qfgrid, cdata.qdom);
+        }
+        if (f != 0) {
+            resize_and_evaluate_on_vertexes( f, cdata.qdom_projected, f_time, qf);
+            f_int+= quad_2D( cdata.absdet*qf, cdata.qdom);
+            f_norm+= quad_2D( cdata.absdet*qf*qf, cdata.qdom);
+        }
+        if (fvd != 0 && f != 0) {
+            std::valarray<double> qerr= qfgrid - qf;
+            err+= quad_2D( cdata.absdet*qerr*qerr, cdata.qdom);
+        }
+    }
+
+    virtual InterfaceL2AccuP2CL* clone (int /*clone_id*/) { return new InterfaceL2AccuP2CL( *this); }
+};
+
 void StationaryStrategyHighOrder (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::LevelsetP2CL& lset)
 {
     // Initialize level set and triangulation
@@ -1596,6 +1697,17 @@ void StationaryStrategyHighOrder (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& a
     surfsolver.Solve( Lp2, xp2.Data, bp2.Data, xp2.RowIdx->GetEx());
     std::cout << "P2: Iter: " << surfsolver.GetIter() << "\tres: " << surfsolver.GetResid() << '\n';
 
+    TetraAccumulatorTupleCL err_accus;
+    err_accus.push_back( &cdatap2);
+    InterfaceL2AccuP2CL L2P1_accu( cdatap2, mg, "P1-solution");
+    L2P1_accu.set_grid_function( x);
+    L2P1_accu.set_function( &laplace_beltrami_0_sol, 0.);
+    err_accus.push_back( &L2P1_accu);
+    InterfaceL2AccuP2CL L2_accu( cdatap2, mg, "P2-solution");
+    L2_accu.set_grid_function( xp2);
+    L2_accu.set_function( &laplace_beltrami_0_sol, 0.);
+    err_accus.push_back( &L2_accu);
+    accumulate( err_accus, mg, ifaceidx.TriangLevel(), ifaceidx.GetMatchingFunction(), ifaceidx.GetBndInfo());
 
     if (P.get<int>( "SolutionOutput.Freq") > 0) {
         DROPS::WriteFEToFile( x, mg, P.get<std::string>( "SolutionOutput.Path"), P.get<bool>( "SolutionOutput.Binary"));
