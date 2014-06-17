@@ -1315,12 +1315,13 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
     instat_scalar_fun_ptr f;
     double f_time;
 
-    double f_grid_norm,
-           f_norm,
-           err;
-    double f_grid_int,
-           f_int,
-           area;
+    InterfaceL2AccuP2CL* tid0p; // The object in OpenMP-thread 0, in which the following variables are updated.
+    std::vector<double> f_grid_norm,
+                        f_grid_int,
+                        f_norm,
+                        f_int,
+                        err,
+                        area;
 
   public:
     InterfaceL2AccuP2CL (const InterfaceCommonDataCL& cdata, const MultiGridCL& mg_arg, std::string name= std::string())
@@ -1338,29 +1339,52 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
         std::cout << "InterfaceL2AccuP2CL::begin_accumulation";
         if (name_ != std::string())
             std::cout << " for \"" << name_ << "\".\n";
-        f_grid_norm= f_norm= err= 0.;
-        f_grid_int= f_int= area= 0.;
+
+        tid0p= this;
+        f_grid_norm.clear();
+        f_grid_norm.resize( omp_get_max_threads(), 0.);
+        f_grid_int.clear();
+        f_grid_int.resize( omp_get_max_threads(), 0.);
+
+        f_norm.clear();
+        f_norm.resize( omp_get_max_threads(), 0.);
+        f_int.clear();
+        f_int.resize( omp_get_max_threads(), 0.);
+
+        err.clear();
+        err.resize( omp_get_max_threads(), 0.);
+        area.clear();
+        area.resize( omp_get_max_threads(), 0.);
     }
 
     virtual void finalize_accumulation() {
         std::cout << "InterfaceL2AccuP2CL::finalize_accumulation";
         if (name_ != std::string())
             std::cout << " for \"" << name_ << "\":";
-        std::cout << "\n\tarea: " << area;
+        const double area_acc= std::accumulate( area.begin(), area.end(), 0.);
+        std::cout << "\n\tarea: " << area_acc;
         if (fvd != 0) {
-            f_grid_norm= std::sqrt( f_grid_norm);
-            std::cout << "\n\t|| f_grid ||_L2: " << f_grid_norm
-                      << "\tintegral: " << f_grid_int;
+            double tmp=  std::accumulate( f_grid_norm.begin(), f_grid_norm.end(), 0.),
+                   tmp2= std::accumulate( f_grid_int.begin(), f_grid_int.end(), 0.);
+            tmp= std::sqrt( tmp);
+            std::cout << "\n\t|| f_grid ||_L2: " << tmp
+                      << "\tintegral: " << tmp2;
         }
         if (f != 0) {
-            f_norm= std::sqrt( f_norm);
-            std::cout << "\n\t|| f ||_L2: " << f_norm
-                      << "\t integral: " << f_int;
+            double tmp=  std::accumulate( f_norm.begin(), f_norm.end(), 0.),
+                   tmp2= std::accumulate( f_int.begin(), f_int.end(), 0.);
+            tmp= std::sqrt( tmp);
+            std::cout << "\n\t|| f ||_L2: " << tmp
+                      << "\t integral: " << tmp2;
         }
         if (fvd != 0 && f != 0) {
-            err= std::sqrt( err);
-            std::cout << "\n\t|| f - f_grid ||_L2: " << err;
-            const double mvf_err= std::sqrt( std::pow( err, 2) - std::pow( f_grid_int - f_int, 2)/area);
+            double tmp=  std::accumulate( err.begin(), err.end(), 0.);
+            tmp= std::sqrt( tmp);
+            std::cout << "\n\t|| f - f_grid ||_L2: " << tmp;
+
+            const double f_grid_int_acc= std::accumulate( f_grid_int.begin(), f_grid_int.end(), 0.),
+                         f_int_acc=      std::accumulate( f_int.begin(), f_int.end(), 0.);
+            const double mvf_err= std::sqrt( std::pow( tmp, 2) - std::pow( f_grid_int_acc - f_int_acc, 2)/area_acc);
             std:: cout << "\t|| f - c_f - (f_grid -c_{f_grid}) ||_L2: " << mvf_err;
         }
         std::cout << std::endl;
@@ -1371,7 +1395,9 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
         if (cdata.empty())
             return;
 
-        area+= quad_2D( cdata.absdet, cdata.qdom);
+        const int tid= omp_get_thread_num();
+
+        tid0p->area[tid]+= quad_2D( cdata.absdet, cdata.qdom);
 
         std::valarray<double> qfgrid,
                               qf;
@@ -1382,17 +1408,17 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
             else if (fvd->RowIdx->GetFE() == P1IF_FE)
                 resize_and_evaluate_on_vertexes( make_P1Eval( mg, nobnddata, *fvd), t, cdata.qdom, qfgrid);
 //             resize_and_evaluate_on_vertexes( make_P2Eval( mg, nobnddata, *fvd), cdata.qdom_projected, qfgrid);
-            f_grid_int+= quad_2D( cdata.absdet*qfgrid, cdata.qdom);
-            f_grid_norm+= quad_2D( cdata.absdet*qfgrid*qfgrid, cdata.qdom);
+            tid0p->f_grid_int[tid]+=  quad_2D( cdata.absdet*qfgrid,        cdata.qdom);
+            tid0p->f_grid_norm[tid]+= quad_2D( cdata.absdet*qfgrid*qfgrid, cdata.qdom);
         }
         if (f != 0) {
             resize_and_evaluate_on_vertexes( f, cdata.qdom_projected, f_time, qf);
-            f_int+= quad_2D( cdata.absdet*qf, cdata.qdom);
-            f_norm+= quad_2D( cdata.absdet*qf*qf, cdata.qdom);
+            tid0p->f_int[tid]+= quad_2D( cdata.absdet*qf, cdata.qdom);
+            tid0p->f_norm[tid]+= quad_2D( cdata.absdet*qf*qf, cdata.qdom);
         }
         if (fvd != 0 && f != 0) {
             std::valarray<double> qerr= qfgrid - qf;
-            err+= quad_2D( cdata.absdet*qerr*qerr, cdata.qdom);
+            tid0p->err[tid]+= quad_2D( cdata.absdet*qerr*qerr, cdata.qdom);
         }
     }
 
