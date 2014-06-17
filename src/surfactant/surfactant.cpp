@@ -28,6 +28,7 @@
 #include "levelset/levelset.h"
 #include "levelset/adaptriang.h"
 #include "levelset/surfacetension.h"
+#include "levelset/levelsetmapper.h"
 #include "out/output.h"
 #include "out/vtkOut.h"
 #include "misc/dynamicload.h"
@@ -809,49 +810,6 @@ void compute_tetra_neighborhoods (const DROPS::MultiGridCL& mg, DROPS::LevelsetP
     }
 }
 
-bool is_in_ref_tetra (const BaryCoordCL& b, double eps= 1e-10)
-{
-    for (int i= 0; i < 4; ++i)
-        if (b[i] < -eps || b[i] > 1. + eps)
-            return false;
-    return true;
-}
-
-
-class QuaQuaMapperCL
-{
-  private:
-    int maxiter_;
-    double tol_;
-
-    // The level set function.
-    NoBndDataCL<> nobnddata;
-    P2EvalCL<double, const NoBndDataCL<>, const VecDescCL> ls;
-
-    // The recovered gradient of ls.
-    NoBndDataCL<Point3DCL> nobnddata_vec;
-    P2EvalCL<Point3DCL, const NoBndDataCL<Point3DCL>, const VecDescCL> ls_grad_rec;
-
-    mutable LocalP1CL<Point3DCL> gradrefp2[10];
-
-    // The neighborhoods around each tetra in which base points are searched for.
-    TetraToTetrasT& neighborhoods_;
-
-    bool line_search (const Point3DCL& v, const Point3DCL& nx, const TetraCL*& tetra, BaryCoordCL& bary, const TetraSetT& neighborhood) const;
-
-  public:
-    QuaQuaMapperCL (const MultiGridCL& mg, VecDescCL& lsarg, const VecDescCL& ls_grad_recarg, TetraToTetrasT& neigborhoods, int maxiter= 100, double tol= 1e-7)
-        : maxiter_( maxiter), tol_( tol), ls( &lsarg, &nobnddata, &mg), ls_grad_rec( &ls_grad_recarg, &nobnddata_vec, &mg), neighborhoods_( neigborhoods)
-    { P2DiscCL::GetGradientsOnRef( gradrefp2); }
-
-
-    void base_point (const TetraCL*& tet, BaryCoordCL& xb) const;
-    void jacobian (const TetraCL& tet, const BaryCoordCL& xb, SMatrixCL<3,3>& dph) const;
-
-    LocalP2CL<> local_ls      (const TetraCL& tet) const { return LocalP2CL<>( tet, ls); }
-    Point3DCL   local_ls_grad (const TetraCL& tet, const BaryCoordCL& xb) const;
-};
-
 
 // Return a tetra from neighborhood that contains v up to precision eps in barycentric coordinates.
 // Returns 0 on failure.
@@ -867,167 +825,6 @@ void enclosing_tetra (const Point3DCL& v, const TetraSetT& neighborhood, double 
         }
     }
     tetra= 0;
-}
-
-bool QuaQuaMapperCL::line_search (const Point3DCL& v, const Point3DCL& nx, const TetraCL*& tetra, BaryCoordCL& bary, const TetraSetT& neighborhood) const
-{
-    const int max_inneriter= 100;
-    const int max_damping= 10;
-    const double eps= 1e-10;
-    const double inner_tol= 5e-9;
-
-    double alpha= 0.,
-           dalpha= 0.;
-    int inneriter= 0;
-    World2BaryCoordCL w2b;
-    for (; inneriter < max_inneriter; ++inneriter) {
-        // Evaluate ls in v - alpha*nx and check convergence.
-        w2b.assign( *tetra);
-        bary= w2b( v - alpha*nx);
-        const double lsval= ls.val( *tetra, bary);
-
-        if (std::abs( lsval) < inner_tol)
-            break;
-
-        // Compute undamped Newton correction dalpha.
-        const Point3DCL& gradval= ls_grad_rec.val( *tetra, bary);
-        const double slope= inner_prod( gradval, nx);
-        if (std::abs( slope) < 1.0e-8)
-            std::cout << "g_phi: " << gradval << "\tgy: " << nx << std::endl;
-        dalpha= lsval/slope;
-
-        // Apply damping to dalpha until v - (alpha + dalpha)nx is in the neighborhood of tet.
-        bary= w2b( v - (alpha + dalpha)*nx);
-        if (!is_in_ref_tetra( bary, eps))
-            tetra= 0;
-        for (int k= 0; tetra == 0 && k < max_damping; ++k, dalpha*= 0.5)
-            enclosing_tetra( v - (alpha + dalpha)*nx, neighborhood, eps, tetra, bary);
-        if (tetra == 0) {
-            std::cout << "v: " << v << "\talpha: " << alpha << "\tnx: " << nx <<  "\tv - alpha*nx: "<< v - alpha*nx << std::endl;
-            throw DROPSErrCL("QuaQuaMapperCL::line_search: Coord not in given tetra set.\n");
-        }
-        alpha+= dalpha;
-    }
-
-    if (inneriter >= max_inneriter)
-        std::cout <<"QuaQuaMapperCL::line_search: Warning: max inner iteration number at v : " << v << " exceeded; ls.val: " << ls.val( *tetra, bary) << std::endl;
-
-    return inneriter < max_inneriter;
-}
-
-void QuaQuaMapperCL::base_point (const TetraCL*& tet, BaryCoordCL& xb) const
-// tet and xb specify the point which is projected to the zero level.
-// On return tet and xb are the resulting base point.
-{
-    Point3DCL x, xold; // World coordinates of current and previous xb.
-    x= GetWorldCoord( *tet, xb);
-
-    Point3DCL n; // Current search direction.
-
-    int iter;
-    for (iter= 0; iter < maxiter_; ++iter) {
-        xold= x;
-        n=  ls_grad_rec.val( *tet, xb);
-        n/= norm( n);
-        const bool found_zero_level= line_search( x, n, tet, xb, neighborhoods_[tet]);
-        x= GetWorldCoord( *tet, xb);
-
-        if (norm( xold - x) < tol_ && found_zero_level)
-            break;
-    }
-    if (iter >= maxiter_) {
-        std::cout << "QuaQuaMapperCL::base_point: max iteration number exceeded; |x - xold|: " << norm( xold - x) << "\tx: " << x << "\t n: " << n << "\t ls(x): " << ls.val( *tet, xb) << std::endl;
-    }
-}
-
-void QuaQuaMapperCL::jacobian (const TetraCL& tet, const BaryCoordCL& xb, SMatrixCL<3,3>& dph) const
-{
-    // Compute the basepoint b.
-    const TetraCL* btet= &tet;
-    BaryCoordCL b= xb;
-    base_point( btet, b);
-
-    // Evaluate the quasi normal field in b.
-    LocalP2CL<Point3DCL> loc_gh( *btet, ls_grad_rec);
-    const Point3DCL gh= loc_gh( b);
-    const Point3DCL q_n= gh/gh.norm();
-
-    // Evaluate the normal to the interface in b.
-    Point3DCL n;
-    LocalP2CL<> locls( *btet, ls);
-    LocalP1CL<Point3DCL> gradp2[10];
-    SMatrixCL<3,3> T;
-    double dummy;
-    GetTrafoTr( T, dummy, *btet);
-    P2DiscCL::GetGradients( gradp2, gradrefp2, T);
-    for (Uint i= 0; i < 10; ++i)
-        n+= locls[i]*gradp2[i]( b);
-    n/= n.norm();
-
-    // Evaluate the Jacobian of the quasi-normal field in b: dn_h= 1/|G_h| P dG_h.
-    SMatrixCL<3,3> dgh;
-    for (Uint i= 0; i < 10; ++i)
-        dgh+= outer_product( loc_gh[i], gradp2[i]( b));
-    const SMatrixCL<3,3> dn= 1/gh.norm()*(dgh - outer_product( q_n, transp_mul( dgh, q_n)));
-
-    // Compute Q.
-    const SMatrixCL<3,3> Q= eye<3,3>() - outer_product( q_n/inner_prod( q_n, n), n);
-
-    // Compute d_h(x).
-    const Point3DCL x= GetWorldCoord( tet, xb),
-                    y= GetWorldCoord( *btet, b);
-    const double dhx= inner_prod( q_n, x - y);
-
-    // Compute the Jacobian of p_h.
-    QRDecompCL<3,3> qr;
-    qr.GetMatrix()= eye<3,3>() + dhx*Q*dn;
-    qr.prepare_solve();
-    Point3DCL tmp;
-    for (Uint i= 0; i < 3; ++i) {
-        tmp= Q.col( i);
-        qr.Solve( tmp);
-        dph.col( i, tmp);
-    }
-}
-
-Point3DCL QuaQuaMapperCL::local_ls_grad (const TetraCL& tet, const BaryCoordCL& xb) const
-{
-    LocalP2CL<> locls( tet, ls);
-    LocalP1CL<Point3DCL> gradp2[10];
-    SMatrixCL<3,3> T;
-    double dummy;
-    GetTrafoTr( T, dummy, tet);
-    P2DiscCL::GetGradients( gradp2, gradrefp2, T);
-    Point3DCL grad;
-    for (Uint i= 0; i < 10; ++i)
-        grad+= locls[i]*gradp2[i]( xb);
-    return grad;
-}
-
-double abs_det (const TetraCL& tet, const BaryCoordCL& xb, const QuaQuaMapperCL& quaqua, const SurfacePatchCL& p)
-{
-    if (p.empty())
-        return 0.;
-
-    // Compute the jacobian of p_h.
-    SMatrixCL<3,3> dph;
-    quaqua.jacobian( tet, xb, dph);
-
-    const Bary2WorldCoordCL b2w( tet);
-    QRDecompCL<3,2> qr;
-    SMatrixCL<3,2>& M= qr.GetMatrix();
-    M.col(0, b2w( p.vertex_begin()[1]) - b2w( p.vertex_begin()[0]));
-    M.col(1, b2w( p.vertex_begin()[2]) - b2w( p.vertex_begin()[0]));
-    qr.prepare_solve();
-    SMatrixCL<3,2> U;
-    Point3DCL tmp;
-    for (Uint i= 0; i < 2; ++i) {
-        tmp= std_basis<3>( i + 1);
-        qr.apply_Q( tmp);
-        U.col( i, tmp);
-    }
-    const SMatrixCL<2,2> Gram= GramMatrix( dph*U);
-    return std::sqrt( Gram(0,0)*Gram(1,1) - Gram(0,1)*Gram(1,0));
 }
 
 double abs_det_sphere (const TetraCL& tet, const BaryCoordCL& xb, const SurfacePatchCL& p)
@@ -1099,6 +896,8 @@ class InterfaceCommonDataCL : public TetraAccumulatorCL
 
     bool do_compute_debug_data_;
 
+    // Compute test-data for the recovered gradient and QuaQuaMapperCL.
+    // This is only correct for 1 OpenMP-Thread due to update races.
     void compute_debug_data (const TetraCL& t) {
 //         std::cout << "Tetra Id: " << t.GetId().GetIdent() << std::endl;
         const TetraCL* tet;
@@ -1502,7 +1301,7 @@ class LocalVectorP2CL
 
 
 /// \brief Accumulate L2-norms and errors on the higher order zero level.
-/// Works for P1IF_FE, P2IF_FE, and C-functions.
+/// Works for P1IF_FE, P2IF_FE, and C-functions. All functions are evaluated on the P2-levelset.
 class InterfaceL2AccuP2CL : public TetraAccumulatorCL
 {
   private:

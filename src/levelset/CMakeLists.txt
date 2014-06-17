@@ -1,6 +1,6 @@
 set(HOME levelset)
 
-libs(coupling levelset fastmarch surfacetension twophaseutils)
+libs(coupling levelset levelsetmapper fastmarch surfacetension twophaseutils)
 
 target_link_libraries(levelset-levelset levelset-fastmarch misc-progressaccu misc-scopetimer)
 
