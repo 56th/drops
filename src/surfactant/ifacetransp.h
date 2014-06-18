@@ -40,19 +40,23 @@
 
 namespace DROPS {
 
-/// \brief Given a P1-vecdesc on the interface x and a P1-vecdesc xext on mg, the values of x
+/// \brief Given a P1IF_FE/P2IF_FE-vecdesc (on the interface) x and a P1/P2-vecdesc xext (on mg), the values of x
 ///        are copied to xext and the remaining values of xext are set to 0.
 void Extend (const MultiGridCL& mg, const VecDescCL& x, VecDescCL& xext);
 
-/// \brief Given a P1-vecdesc on the interface x and a P1-vecdesc xext on mg, the values of xext
+/// \brief Given a P1IF_FE/P2IF_FE-vecdesc (on the interface) x and a P1/P2-vecdesc xext (on mg), the values of xext
 ///        are copied to x, where x has an unknown.
 void Restrict (const MultiGridCL& mg, const VecDescCL& xext, VecDescCL& x);
 
-/// \brief Helper for the accumulators: inserts the local matrix coup into M.
-void update_global_matrix_P1 (MatrixBuilderCL& M, const double coup[4][4], const IdxT numr[4], const IdxT numc[4]);
+/// \brief Helper for the accumulators: inserts the local matrix loc.coup into M.
+/// Works for P1IF_FE and P2IF_FE.
+template <class LocalMatrixT>
+  void
+  update_global_matrix (MatrixBuilderCL& M, const LocalMatrixT& loc, const IdxT* numr, const IdxT* numc);
 
-/// \brief Helper for the accumulators: inserts the local matrix coup into M.
-void update_global_matrix_P2 (MatrixBuilderCL& M, const double coup[10][10], const IdxT numr[10], const IdxT numc[10]);
+/// \brief Copies P1IF_FE-unknown-indices or P2IF_FE-indices from idx on s into Numb.
+/// Non-existent dofs get NoIdx.
+void GetLocalNumbInterface(IdxT* Numb, const TetraCL& s, const IdxDescCL& idx);
 
 /// \todo This should be a generic function somewhere in num or misc.
 void P1Init (instat_scalar_fun_ptr icf, VecDescCL& ic, const MultiGridCL& mg, double t);
@@ -125,11 +129,11 @@ class InterfaceCommonDataP1CL : public TetraAccumulatorCL
     }
 };
 
-template <class LocalMatrixT>
-class InterfaceMatrixAccuP1CL : public TetraAccumulatorCL
+template <class LocalMatrixT, class InterfaceCommonDataT>
+class InterfaceMatrixAccuCL : public TetraAccumulatorCL
 {
   private:
-    const InterfaceCommonDataP1CL& cdata_;
+    const InterfaceCommonDataT& cdata_;
     std::string name_;
 
     MatDescCL* mat_; // the matrix
@@ -138,24 +142,33 @@ class InterfaceMatrixAccuP1CL : public TetraAccumulatorCL
     LocalMatrixT local_mat;
 
     Uint lvl;
-    IdxT numr[4],
-         numc[4];
+    SArrayCL<IdxT, LocalMatrixT::row_fe_type == P1IF_FE ? 4 : 10> numr;
+    SArrayCL<IdxT, LocalMatrixT::col_fe_type == P1IF_FE ? 4 : 10> numc;
 
   public:
-    InterfaceMatrixAccuP1CL (MatDescCL* Mmat, const LocalMatrixT& loc_mat, const InterfaceCommonDataP1CL& cdata,
-                             std::string name= std::string())
+    InterfaceMatrixAccuCL (MatDescCL* Mmat, const LocalMatrixT& loc_mat, const InterfaceCommonDataT& cdata,
+                           std::string name= std::string())
         : cdata_( cdata), name_( name), mat_( Mmat), M( 0), local_mat( loc_mat) {}
-    virtual ~InterfaceMatrixAccuP1CL () {}
+    virtual ~InterfaceMatrixAccuCL () {}
 
     void set_name (const std::string& n) { name_= n; }
 
     virtual void begin_accumulation () {
         const IdxT num_rows= mat_->RowIdx->NumUnknowns();
         const IdxT num_cols= mat_->ColIdx->NumUnknowns();
-        std::cout << "InterfaceMatrixAccuP1CL::begin_accumulation";
+
+        const FiniteElementT mat_row_fe= mat_->RowIdx->GetFE(),
+                             mat_col_fe= mat_->ColIdx->GetFE();
+
+        std::cout << "InterfaceMatrixAccuCL::begin_accumulation";
         if (name_ != std::string())
             std::cout << " for \"" << name_ << "\"";
         std::cout  << ": " << num_rows << " rows, " << num_cols << " cols.\n";
+        if (mat_row_fe != LocalMatrixT::row_fe_type)
+            std::cout << " Warning: LocalMatrixT and MatDescCL have different FE-type for rows.\n";
+        if (mat_col_fe != LocalMatrixT::col_fe_type)
+            std::cout << " Warning: LocalMatrixT and MatDescCL have different FE-type for cols.\n";
+
         lvl = mat_->GetRowLevel();
         M= new MatrixBuilderCL( &mat_->Data, num_rows, num_cols);
     }
@@ -164,23 +177,23 @@ class InterfaceMatrixAccuP1CL : public TetraAccumulatorCL
         M->Build();
         delete M;
         M= 0;
-        std::cout << "InterfaceMatrixAccuP1CL::finalize_accumulation";
+        std::cout << "InterfaceMatrixAccuCL::finalize_accumulation";
         if (name_ != std::string())
             std::cout << " for \"" << name_ << "\"";
         std::cout << ": " << mat_->Data.num_nonzeros() << " nonzeros." << std::endl;
     }
 
     virtual void visit (const TetraCL& t) {
-        const InterfaceCommonDataP1CL& cdata= cdata_.get_clone();
+        const InterfaceCommonDataT& cdata= cdata_.get_clone();
         if (cdata.empty())
             return;
         local_mat.setup( t, cdata);
-        GetLocalNumbP1NoBnd( numr, t, *mat_->RowIdx);
-        GetLocalNumbP1NoBnd( numc, t, *mat_->ColIdx);
-        update_global_matrix_P1( *M, local_mat.coup, numr, numc);
+        GetLocalNumbInterface( numr.begin(), t, *mat_->RowIdx);
+        GetLocalNumbInterface( numc.begin(), t, *mat_->ColIdx);
+        update_global_matrix( *M, local_mat, numr.begin(), numc.begin());
     }
 
-    virtual InterfaceMatrixAccuP1CL* clone (int /*clone_id*/) { return new InterfaceMatrixAccuP1CL( *this); }
+    virtual InterfaceMatrixAccuCL* clone (int /*clone_id*/) { return new InterfaceMatrixAccuCL( *this); }
 };
 
 /// \brief Accumulate an interface-vector.
@@ -267,6 +280,9 @@ class LocalMatVecP1CL
     const VecDescCL& x_;
 
   public:
+    static const FiniteElementT row_fe_type= P1IF_FE,
+                                col_fe_type= P1IF_FE;
+
     double vec[4];
 
     LocalMatVecP1CL (const LocalMatrixT& local_mat, const VecDescCL* x) : local_mat_( local_mat), x_( *x) {}
@@ -296,10 +312,10 @@ template <template <class> class LocalMatrixT, class DiscVelSolT>
 
 /// \brief Convenience-function to reduce the number of explicit template-parameters for the massdiv- and the convection-matrix.
 template <template <class> class LocalMatrixT, class DiscVelSolT>
-  inline InterfaceMatrixAccuP1CL< LocalMatrixT<DiscVelSolT> >*
+  inline InterfaceMatrixAccuCL< LocalMatrixT<DiscVelSolT>, InterfaceCommonDataP1CL>*
   make_wind_dependent_matrixP1_accu (MatDescCL* mat, const InterfaceCommonDataP1CL& cdata, const DiscVelSolT& wind, std::string name= std::string())
 {
-    return new InterfaceMatrixAccuP1CL< LocalMatrixT<DiscVelSolT> >( mat,
+    return new InterfaceMatrixAccuCL< LocalMatrixT<DiscVelSolT>, InterfaceCommonDataP1CL>( mat,
         LocalMatrixT<DiscVelSolT>( wind), cdata, name);
 }
 
@@ -311,6 +327,9 @@ class LocalInterfaceMassP1CL
     QuadDomain2DCL qdom;
 
   public:
+    static const FiniteElementT row_fe_type= P1IF_FE,
+                                col_fe_type= P1IF_FE;
+
     double coup[4][4];
 
     void setup (const TetraCL& t, const InterfaceCommonDataP1CL& cdata) {
@@ -344,6 +363,9 @@ class LocalLaplaceBeltramiP1CL
     std::valarray<double> absdet;
 
   public:
+    static const FiniteElementT row_fe_type= P1IF_FE,
+                                col_fe_type= P1IF_FE;
+
     double coup[4][4];
 
     void setup (const TetraCL& t, const InterfaceCommonDataP1CL& cdata) {
@@ -391,6 +413,9 @@ class LocalInterfaceConvectionP1CL
     GridFunctionCL<Point3DCL> qw;
 
   public:
+    static const FiniteElementT row_fe_type= P1IF_FE,
+                                col_fe_type= P1IF_FE;
+
     double coup[4][4];
 
     void setup (const TetraCL& t, const InterfaceCommonDataP1CL& cdata);
@@ -426,6 +451,9 @@ class LocalInterfaceMassDivP1CL
 
 
   public:
+    static const FiniteElementT row_fe_type= P1IF_FE,
+                                col_fe_type= P1IF_FE;
+
     double coup[4][4];
 
     void setup (const TetraCL& t, const InterfaceCommonDataP1CL& cdata);

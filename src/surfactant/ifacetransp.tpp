@@ -1,4 +1,4 @@
-/// \file
+/// \file ifacetransp.tpp
 /// \brief Discretization for PDEs on an interface.
 /// \author LNM RWTH Aachen: Joerg Grande
 
@@ -27,6 +27,20 @@
 #include <cstring>
 
 namespace DROPS {
+
+template <class LocalMatrixT>
+  void
+  update_global_matrix (MatrixBuilderCL& M, const LocalMatrixT& loc, const IdxT* numr, const IdxT* numc)
+{
+    const int num_row_dofs= LocalMatrixT::row_fe_type == P1IF_FE ? 4 : 10,
+              num_col_dofs= LocalMatrixT::col_fe_type == P1IF_FE ? 4 : 10;
+
+    for (int i= 0; i < num_row_dofs; ++i)
+        if (numr[i] != NoIdx)
+            for (int j= 0; j < num_col_dofs; ++j)
+                if (numc[j] != NoIdx)
+                    M( numr[i], numc[j])+= loc.coup[i][j];
+}
 
 template <Uint Dim>
   void
@@ -73,7 +87,7 @@ void SetupConvectionP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& 
     TetraAccumulatorTupleCL accus;
     InterfaceCommonDataP1CL cdata( ls, lsetbnd);
     accus.push_back( &cdata);
-    InterfaceMatrixAccuP1CL<LocalInterfaceConvectionP1CL<DiscVelSolT> > accu( mat, LocalInterfaceConvectionP1CL<DiscVelSolT>( w), cdata);
+    InterfaceMatrixAccuCL<LocalInterfaceConvectionP1CL<DiscVelSolT>, InterfaceCommonDataP1CL> accu( mat, LocalInterfaceConvectionP1CL<DiscVelSolT>( w), cdata);
     accus.push_back( &accu);
     const IdxDescCL* RowIdx= mat->RowIdx;
     accumulate( accus, mg, RowIdx->TriangLevel(), RowIdx->GetMatchingFunction(), RowIdx->GetBndInfo());
@@ -117,7 +131,7 @@ void SetupMassDivP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls,
     TetraAccumulatorTupleCL accus;
     InterfaceCommonDataP1CL cdata( ls, lsetbnd);
     accus.push_back( &cdata);
-    InterfaceMatrixAccuP1CL<LocalInterfaceMassDivP1CL<DiscVelSolT> > accu( mat, LocalInterfaceMassDivP1CL<DiscVelSolT>( w), cdata);
+    InterfaceMatrixAccuCL<LocalInterfaceMassDivP1CL<DiscVelSolT>, InterfaceCommonDataP1CL> accu( mat, LocalInterfaceMassDivP1CL<DiscVelSolT>( w), cdata);
     accus.push_back( &accu);
     const IdxDescCL* RowIdx= mat->RowIdx;
     accumulate( accus, mg, RowIdx->TriangLevel(), RowIdx->GetMatchingFunction(), RowIdx->GetBndInfo());

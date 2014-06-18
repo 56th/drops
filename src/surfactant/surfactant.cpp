@@ -1046,64 +1046,6 @@ class InterfaceCommonDataCL : public TetraAccumulatorCL
     }
 };
 
-template <class LocalMatrixT>
-class InterfaceMatrixAccuP2CL : public TetraAccumulatorCL
-{
-  private:
-    const InterfaceCommonDataCL& cdata_;
-    std::string name_;
-
-    MatDescCL* mat_; // the matrix
-    MatrixBuilderCL* M;
-
-    LocalMatrixT local_mat;
-
-    Uint lvl;
-    IdxT numr[10],
-         numc[10];
-
-  public:
-    InterfaceMatrixAccuP2CL (MatDescCL* Mmat, const LocalMatrixT& loc_mat, const InterfaceCommonDataCL& cdata,
-                             std::string name= std::string())
-        : cdata_( cdata), name_( name), mat_( Mmat), M( 0), local_mat( loc_mat) {}
-    virtual ~InterfaceMatrixAccuP2CL () {}
-
-    void set_name (const std::string& n) { name_= n; }
-
-    virtual void begin_accumulation () {
-        const IdxT num_rows= mat_->RowIdx->NumUnknowns();
-        const IdxT num_cols= mat_->ColIdx->NumUnknowns();
-        std::cout << "InterfaceMatrixAccuP2CL::begin_accumulation";
-        if (name_ != std::string())
-            std::cout << " for \"" << name_ << "\"";
-        std::cout  << ": " << num_rows << " rows, " << num_cols << " cols.\n";
-        lvl = mat_->GetRowLevel();
-        M= new MatrixBuilderCL( &mat_->Data, num_rows, num_cols);
-    }
-
-    virtual void finalize_accumulation () {
-        M->Build();
-        delete M;
-        M= 0;
-        std::cout << "InterfaceMatrixAccuP2CL::finalize_accumulation";
-        if (name_ != std::string())
-            std::cout << " for \"" << name_ << "\"";
-        std::cout << ": " << mat_->Data.num_nonzeros() << " nonzeros." << std::endl;
-    }
-
-    virtual void visit (const TetraCL& t) {
-        const InterfaceCommonDataCL& cdata= cdata_.get_clone();
-        if (cdata.empty())
-            return;
-        local_mat.setup( t, cdata);
-        GetLocalNumbP2NoBnd( numr, t, *mat_->RowIdx);
-        GetLocalNumbP2NoBnd( numc, t, *mat_->ColIdx);
-        update_global_matrix_P2( *M, local_mat.coup, numr, numc);
-    }
-
-    virtual InterfaceMatrixAccuP2CL* clone (int /*clone_id*/) { return new InterfaceMatrixAccuP2CL( *this); }
-};
-
 class LocalLaplaceBeltramiP2CL
 {
   private:
@@ -1116,6 +1058,9 @@ class LocalLaplaceBeltramiP2CL
     GridFunctionCL<SMatrixCL<3,3> > Winv;
 
   public:
+    static const FiniteElementT row_fe_type= P2IF_FE,
+                                col_fe_type= P2IF_FE;
+
     double coup[10][10];
 
     void setup (const TetraCL& t, const InterfaceCommonDataCL& cdata) {
@@ -1165,6 +1110,9 @@ class LocalMassP2CL
     std::valarray<double> qp2[10];
 
   public:
+    static const FiniteElementT row_fe_type= P2IF_FE,
+                                col_fe_type= P2IF_FE;
+
     double coup[10][10];
 
     void setup (const TetraCL&, const InterfaceCommonDataCL& cdata) {
@@ -1472,19 +1420,19 @@ void StationaryStrategyHighOrder (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& a
     InterfaceCommonDataP1CL cdata( lset.Phi, lset.GetBndData());
     accus.push_back( &cdata);
     DROPS::MatDescCL M( &ifaceidx, &ifaceidx);
-    InterfaceMatrixAccuP1CL<LocalInterfaceMassP1CL> accuM( &M, LocalInterfaceMassP1CL(), cdata, "M");
+    InterfaceMatrixAccuCL<LocalInterfaceMassP1CL, InterfaceCommonDataP1CL> accuM( &M, LocalInterfaceMassP1CL(), cdata, "M");
     accus.push_back( &accuM);
     DROPS::MatDescCL A( &ifaceidx, &ifaceidx);
-    InterfaceMatrixAccuP1CL<LocalLaplaceBeltramiP1CL> accuA( &A, LocalLaplaceBeltramiP1CL( P.get<double>("SurfTransp.Visc")), cdata, "A");
+    InterfaceMatrixAccuCL<LocalLaplaceBeltramiP1CL, InterfaceCommonDataP1CL> accuA( &A, LocalLaplaceBeltramiP1CL( P.get<double>("SurfTransp.Visc")), cdata, "A");
     accus.push_back( &accuA);
 
     InterfaceCommonDataCL cdatap2( lset.Phi, lset.GetBndData(), quaqua);
     accus.push_back( &cdatap2);
     DROPS::MatDescCL Mp2( &ifacep2idx, &ifacep2idx);
-    InterfaceMatrixAccuP2CL<LocalMassP2CL> accuMp2( &Mp2, LocalMassP2CL(), cdatap2, "Mp2");
+    InterfaceMatrixAccuCL<LocalMassP2CL, InterfaceCommonDataCL> accuMp2( &Mp2, LocalMassP2CL(), cdatap2, "Mp2");
     accus.push_back( &accuMp2);
     DROPS::MatDescCL Ap2( &ifacep2idx, &ifacep2idx);
-    InterfaceMatrixAccuP2CL<LocalLaplaceBeltramiP2CL> accuAp2( &Ap2, LocalLaplaceBeltramiP2CL( P.get<double>("SurfTransp.Visc")), cdatap2, "Ap2");
+    InterfaceMatrixAccuCL<LocalLaplaceBeltramiP2CL, InterfaceCommonDataCL> accuAp2( &Ap2, LocalLaplaceBeltramiP2CL( P.get<double>("SurfTransp.Visc")), cdatap2, "Ap2");
     accus.push_back( &accuAp2);
     DROPS::VecDescCL bp2( &ifacep2idx);
     InterfaceVectorAccuP2CL<LocalVectorP2CL> acculoadp2( &bp2, LocalVectorP2CL( laplace_beltrami_0_rhs, bp2.t), cdatap2);
