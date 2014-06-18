@@ -711,7 +711,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     //delete &lset2;
 }
 
-void StationaryStrategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::LevelsetP2CL& lset)
+void StationaryStrategyP1 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::LevelsetP2CL& lset)
 {
     adap.MakeInitialTriang( sphere_dist);
 
@@ -730,8 +730,9 @@ void StationaryStrategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROP
     std::cout << "M is set up.\n";
     DROPS::MatDescCL A( &ifaceidx, &ifaceidx);
     DROPS::SetupLBP1( mg, &A, lset.Phi, lset.GetBndData(), P.get<double>("SurfTransp.Visc"));
-    DROPS::MatrixCL L;
-    L.LinComb( 1.0, A.Data, 1.0, M.Data);
+//     DROPS::MatrixCL L;
+//     L.LinComb( 1.0, A.Data, 1.0, M.Data);
+    DROPS::MatrixCL& L= A.Data;
     DROPS::VecDescCL b( &ifaceidx);
     DROPS::SetupInterfaceRhsP1( mg, &b, lset.Phi, lset.GetBndData(), laplace_beltrami_0_rhs);
 
@@ -1333,7 +1334,7 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
     virtual InterfaceL2AccuP2CL* clone (int /*clone_id*/) { return new InterfaceL2AccuP2CL( *this); }
 };
 
-void StationaryStrategyHighOrder (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::LevelsetP2CL& lset)
+void StationaryStrategyP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::LevelsetP2CL& lset)
 {
     // Initialize level set and triangulation
     adap.MakeInitialTriang( sphere_dist);
@@ -1342,12 +1343,6 @@ void StationaryStrategyHighOrder (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& a
     lset.Phi.SetIdx( &lset.idx);
     // LinearLSInit( mg, lset.Phi, &sphere_dist);
     LSInit( mg, lset.Phi, sphere_dist, 0.);
-
-    // Setup an interface-P1 numbering
-    DROPS::IdxDescCL ifaceidx( P1IF_FE);
-    ifaceidx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
-    ifaceidx.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
-    std::cout << "NumUnknowns: " << ifaceidx.NumUnknowns() << std::endl;
 
     // Setup an interface-P2 numbering
     DROPS::IdxDescCL ifacep2idx( P2IF_FE);
@@ -1373,19 +1368,10 @@ void StationaryStrategyHighOrder (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& a
 //     InterfaceCommonDataCL ttt( lset.Phi, lset.GetBndData(), quaqua);
 // //     ttt.store_offsets( to_iface);
 //     accus.push_back( &ttt);
-//     accumulate( accus, mg, ifaceidx.TriangLevel(), ifaceidx.GetMatchingFunction(), ifaceidx.GetBndInfo());
+//     accumulate( accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetMatchingFunction(), ifacep2idx.GetBndInfo());
 //     }
 
     TetraAccumulatorTupleCL accus;
-    InterfaceCommonDataP1CL cdata( lset.Phi, lset.GetBndData());
-    accus.push_back( &cdata);
-    DROPS::MatDescCL M( &ifaceidx, &ifaceidx);
-    InterfaceMatrixAccuCL<LocalInterfaceMassP1CL, InterfaceCommonDataP1CL> accuM( &M, LocalInterfaceMassP1CL(), cdata, "M");
-    accus.push_back( &accuM);
-    DROPS::MatDescCL A( &ifaceidx, &ifaceidx);
-    InterfaceMatrixAccuCL<LocalLaplaceBeltramiP1CL, InterfaceCommonDataP1CL> accuA( &A, LocalLaplaceBeltramiP1CL( P.get<double>("SurfTransp.Visc")), cdata, "A");
-    accus.push_back( &accuA);
-
     InterfaceCommonDataCL cdatap2( lset.Phi, lset.GetBndData(), quaqua);
     accus.push_back( &cdatap2);
     DROPS::MatDescCL Mp2( &ifacep2idx, &ifacep2idx);
@@ -1398,21 +1384,12 @@ void StationaryStrategyHighOrder (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& a
     InterfaceVectorAccuCL<LocalVectorP2CL, InterfaceCommonDataCL> acculoadp2( &bp2, LocalVectorP2CL( laplace_beltrami_0_rhs, bp2.t), cdatap2);
     accus.push_back( &acculoadp2);
 
-    accumulate( accus, mg, ifaceidx.TriangLevel(), ifaceidx.GetMatchingFunction(), ifaceidx.GetBndInfo());
+    accumulate( accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetMatchingFunction(), ifacep2idx.GetBndInfo());
 
-//     DROPS::MatrixCL L;
-//     L.LinComb( 1.0, A.Data, 1.0, M.Data);
-    MatrixCL& L= A.Data;
 //     DROPS::MatrixCL Lp2;
 //     Lp2.LinComb( 1.0, Ap2.Data, 1.0, Mp2.Data);
     MatrixCL& Lp2= Ap2.Data;
 
-    DROPS::VecDescCL b( &ifaceidx);
-    DROPS::SetupInterfaceRhsP1( mg, &b, lset.Phi, lset.GetBndData(), laplace_beltrami_0_rhs);
-
-    DROPS::WriteToFile( M.Data, "m_iface.txt", "M");
-    DROPS::WriteToFile( A.Data, "a_iface.txt", "A");
-    DROPS::WriteFEToFile( b, mg, "rhs_iface.txt", /*binary=*/ false);
     DROPS::WriteToFile( Ap2.Data, "ap2_iface.txt", "Ap2");
     DROPS::WriteToFile( Mp2.Data, "mp2_iface.txt", "Mp2");
     DROPS::WriteFEToFile( bp2, mg, "rhsp2_iface.txt", /*binary=*/ false);
@@ -1422,51 +1399,33 @@ void StationaryStrategyHighOrder (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& a
     typedef DROPS::PCGSolverCL<SurfPcT> SurfSolverT;
     SurfSolverT surfsolver( surfpc, P.get<int>("SurfTransp.Iter"), P.get<double>("SurfTransp.Tol"), true);
 
-    DROPS::VecDescCL x( &ifaceidx);
-    surfsolver.Solve( L, x.Data, b.Data, x.RowIdx->GetEx());
-    std::cout << "Iter: " << surfsolver.GetIter() << "\tres: " << surfsolver.GetResid() << '\n';
-
     DROPS::VecDescCL xp2( &ifacep2idx);
     surfsolver.Solve( Lp2, xp2.Data, bp2.Data, xp2.RowIdx->GetEx());
-    std::cout << "P2: Iter: " << surfsolver.GetIter() << "\tres: " << surfsolver.GetResid() << '\n';
+    std::cout << "Iter: " << surfsolver.GetIter() << "\tres: " << surfsolver.GetResid() << '\n';
 
     TetraAccumulatorTupleCL err_accus;
     err_accus.push_back( &cdatap2);
-    InterfaceL2AccuP2CL L2P1_accu( cdatap2, mg, "P1-solution");
-    L2P1_accu.set_grid_function( x);
-    L2P1_accu.set_function( &laplace_beltrami_0_sol, 0.);
-    err_accus.push_back( &L2P1_accu);
     InterfaceL2AccuP2CL L2_accu( cdatap2, mg, "P2-solution");
     L2_accu.set_grid_function( xp2);
     L2_accu.set_function( &laplace_beltrami_0_sol, 0.);
     err_accus.push_back( &L2_accu);
-    accumulate( err_accus, mg, ifaceidx.TriangLevel(), ifaceidx.GetMatchingFunction(), ifaceidx.GetBndInfo());
+    accumulate( err_accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetMatchingFunction(), ifacep2idx.GetBndInfo());
 
-    if (P.get<int>( "SolutionOutput.Freq") > 0) {
-        DROPS::WriteFEToFile( x, mg, P.get<std::string>( "SolutionOutput.Path"), P.get<bool>( "SolutionOutput.Binary"));
+    if (P.get<int>( "SolutionOutput.Freq") > 0)
         DROPS::WriteFEToFile( xp2, mg, P.get<std::string>( "SolutionOutput.Path") + "_p2", P.get<bool>( "SolutionOutput.Binary"));
-    }
 
-    DROPS::IdxDescCL ifacefullidx( DROPS::P1_FE);
-    ifacefullidx.CreateNumbering( mg.GetLastLevel(), mg);
-    DROPS::VecDescCL xext( &ifacefullidx);
-    DROPS::Extend( mg, x, xext);
     DROPS::NoBndDataCL<> nobnd;
     DROPS::NoBndDataCL<Point3DCL> nobnd_vec;
     VecDescCL the_sol_vd( &lset.idx);
     LSInit( mg, the_sol_vd, &laplace_beltrami_0_sol, /*t*/ 0.);
     if (vtkwriter.get() != 0) {
         vtkwriter->Register( make_VTKScalar( lset.GetSolution(), "Levelset") );
-        vtkwriter->Register( make_VTKIfaceScalar( mg, x, "InterfaceSol"));
         vtkwriter->Register( make_VTKIfaceScalar( mg, xp2, "InterfaceSolP2"));
         vtkwriter->Register( make_VTKScalar(      make_P2Eval( mg, nobnd, the_sol_vd),  "TrueSol"));
         vtkwriter->Register( make_VTKVector( make_P2Eval( mg, nobnd_vec, lsgradrec), "LSGradRec") );
         vtkwriter->Register( make_VTKVector( make_P2Eval( mg, nobnd_vec, to_iface), "to_iface") );
         vtkwriter->Write( 0.);
     }
-
-    double L2_err( L2_error( lset.Phi, lset.GetBndData(), make_P1Eval( mg, nobnd, xext), &laplace_beltrami_0_sol));
-    std::cout << "L_2-error: " << L2_err << std::endl;
 }
 
 int main (int argc, char* argv[])
@@ -1515,9 +1474,9 @@ int main (int argc, char* argv[])
             P.get<bool>("VTK.ReUseTimeFile")));
     if (P.get<bool>( "Exp.StationaryPDE"))
         if (P.get<int>( "SurfTransp.FEDegree") == 1)
-            StationaryStrategy( mg, adap, lset);
+            StationaryStrategyP1( mg, adap, lset);
         else
-            StationaryStrategyHighOrder( mg, adap, lset);
+            StationaryStrategyP2( mg, adap, lset);
     else
         Strategy( mg, adap, lset);
 
