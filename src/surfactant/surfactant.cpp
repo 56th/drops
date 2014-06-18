@@ -1129,48 +1129,6 @@ class LocalMassP2CL
     LocalMassP2CL () {}
 };
 
-/// \brief Accumulate an interface-vector.
-template <class LocalVectorT>
-class InterfaceVectorAccuP2CL : public TetraAccumulatorCL
-{
-  private:
-    const InterfaceCommonDataCL& cdata_;
-    std::string name_;
-
-    VecDescCL* y_;
-    LocalVectorT local_vec;
-    IdxT numry[10];
-
-  public:
-    InterfaceVectorAccuP2CL (VecDescCL* y, const LocalVectorT& loc_vec, const InterfaceCommonDataCL& cdata, std::string name= std::string())
-        : cdata_( cdata), name_( name), y_( y), local_vec( loc_vec) {}
-    virtual ~InterfaceVectorAccuP2CL () {}
-
-    void set_name (const std::string& n) { name_= n; }
-
-    virtual void begin_accumulation () {
-        std::cout << "InterfaceVectorAccuP2CL::begin_accumulation";
-        if (name_ != std::string())
-            std::cout << " for \"" << name_ << "\"";
-        std::cout  << ": " << y_->RowIdx->NumUnknowns() << " rows.\n";
-    }
-
-    virtual void finalize_accumulation() {}
-
-    virtual void visit (const TetraCL& t) {
-        const InterfaceCommonDataCL& cdata= cdata_.get_clone();
-        if (cdata.empty())
-            return;
-        GetLocalNumbP2NoBnd( numry, t, *y_->RowIdx);
-        local_vec.setup( t, cdata, numry);
-        for (int i= 0; i < 10; ++i)
-            if (numry[i] != NoIdx)
-                y_->Data[numry[i]]+= local_vec.vec[i];
-    }
-
-    virtual InterfaceVectorAccuP2CL* clone (int /*clone_id*/) { return new InterfaceVectorAccuP2CL( *this); }
-};
-
 template <class T, class ResultIterT>
   inline ResultIterT
   evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const BaryPosVectorT& pos, double t, ResultIterT result_iterator)
@@ -1224,6 +1182,8 @@ class LocalVectorP2CL
                           qf;
 
   public:
+    static const FiniteElementT row_fe_type= P2IF_FE;
+
     double vec[10];
 
     LocalVectorP2CL (instat_scalar_fun_ptr f, double time) : f_( f), time_( time) {}
@@ -1435,7 +1395,7 @@ void StationaryStrategyHighOrder (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& a
     InterfaceMatrixAccuCL<LocalLaplaceBeltramiP2CL, InterfaceCommonDataCL> accuAp2( &Ap2, LocalLaplaceBeltramiP2CL( P.get<double>("SurfTransp.Visc")), cdatap2, "Ap2");
     accus.push_back( &accuAp2);
     DROPS::VecDescCL bp2( &ifacep2idx);
-    InterfaceVectorAccuP2CL<LocalVectorP2CL> acculoadp2( &bp2, LocalVectorP2CL( laplace_beltrami_0_rhs, bp2.t), cdatap2);
+    InterfaceVectorAccuCL<LocalVectorP2CL, InterfaceCommonDataCL> acculoadp2( &bp2, LocalVectorP2CL( laplace_beltrami_0_rhs, bp2.t), cdatap2);
     accus.push_back( &acculoadp2);
 
     accumulate( accus, mg, ifaceidx.TriangLevel(), ifaceidx.GetMatchingFunction(), ifaceidx.GetBndInfo());

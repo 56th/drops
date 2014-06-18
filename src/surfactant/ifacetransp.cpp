@@ -128,7 +128,7 @@ void SetupInterfaceRhsP1 (const MultiGridCL& mg, VecDescCL* v,
     TetraAccumulatorTupleCL accus;
     InterfaceCommonDataP1CL cdata( ls, lsetbnd);
     accus.push_back( &cdata);
-    InterfaceVectorAccuP1CL<LocalVectorP1CL> loadaccu( v, LocalVectorP1CL( f, v->t), cdata);
+    InterfaceVectorAccuCL<LocalVectorP1CL, InterfaceCommonDataP1CL> loadaccu( v, LocalVectorP1CL( f, v->t), cdata);
     accus.push_back( &loadaccu);
     accumulate( accus, mg, v->RowIdx->TriangLevel(), v->RowIdx->GetMatchingFunction(), v->RowIdx->GetBndInfo());
 
@@ -247,12 +247,12 @@ VectorCL SurfactantcGP1CL::InitStep (double new_t)
     TetraAccumulatorTupleCL accus;
     InterfaceCommonDataP1CL cdata( lset_vd_, lsetbnd_);
     accus.push_back( &cdata);
-    InterfaceVectorAccuP1CL< LocalMatVecP1CL<LocalInterfaceMassP1CL> > mass_accu( &vd_timeder,
+    InterfaceVectorAccuCL<LocalMatVecP1CL<LocalInterfaceMassP1CL>, InterfaceCommonDataP1CL> mass_accu( &vd_timeder,
         LocalMatVecP1CL<LocalInterfaceMassP1CL>( LocalInterfaceMassP1CL(), &vd_oldic), cdata, "mixed-mass");
     accus.push_back( &mass_accu);
 
     if (rhs_fun_)
-        accus.push_back_acquire( new InterfaceVectorAccuP1CL<LocalVectorP1CL>( &vd_load, LocalVectorP1CL( rhs_fun_, new_t), cdata, "load"));
+        accus.push_back_acquire( new InterfaceVectorAccuCL<LocalVectorP1CL, InterfaceCommonDataP1CL>( &vd_load, LocalVectorP1CL( rhs_fun_, new_t), cdata, "load"));
 
     if (theta_ == 1.0) {
         accumulate( accus, MG_, idx.TriangLevel(), idx.GetMatchingFunction(), idx.GetBndInfo());
@@ -263,12 +263,12 @@ VectorCL SurfactantcGP1CL::InitStep (double new_t)
     accus.push_back( &oldcdata);
 
     if (rhs_fun_)
-        accus.push_back_acquire( new InterfaceVectorAccuP1CL<LocalVectorP1CL>( &vd_oldload, LocalVectorP1CL( rhs_fun_, oldt_), oldcdata, "load on old iface"));
+        accus.push_back_acquire( new InterfaceVectorAccuCL<LocalVectorP1CL, InterfaceCommonDataP1CL>( &vd_oldload, LocalVectorP1CL( rhs_fun_, oldt_), oldcdata, "load on old iface"));
 
-    InterfaceVectorAccuP1CL< LocalMatVecP1CL<LocalInterfaceMassP1CL> > old_mass_accu( &vd_oldtimeder,
+    InterfaceVectorAccuCL<LocalMatVecP1CL<LocalInterfaceMassP1CL>, InterfaceCommonDataP1CL> old_mass_accu( &vd_oldtimeder,
         LocalMatVecP1CL<LocalInterfaceMassP1CL>( LocalInterfaceMassP1CL(), &vd_oldic), oldcdata, "mixed-mass on old iface");
     accus.push_back( &old_mass_accu);
-    InterfaceVectorAccuP1CL< LocalMatVecP1CL<LocalLaplaceBeltramiP1CL> > old_lb_accu( &vd_oldres,
+    InterfaceVectorAccuCL<LocalMatVecP1CL<LocalLaplaceBeltramiP1CL>, InterfaceCommonDataP1CL> old_lb_accu( &vd_oldres,
         LocalMatVecP1CL<LocalLaplaceBeltramiP1CL>( LocalLaplaceBeltramiP1CL( D_), &vd_oldic), oldcdata, "Laplace-Beltrami on old iface");
     accus.push_back( &old_lb_accu);
     accus.push_back_acquire( make_wind_dependent_vectorP1_accu<LocalInterfaceConvectionP1CL>( &vd_oldres, &vd_oldic,  oldcdata,  make_P2Eval( MG_, Bnd_v_, oldv_), "convection on old iface"));
@@ -863,7 +863,7 @@ void SurfactantCharTransportP1CL::Update()
     accus.push_back( &lb_accu);
     accus.push_back_acquire( make_wind_dependent_matrixP1_accu<LocalInterfaceMassDivP1CL>( &Md, cdata,  make_P2Eval( MG_, Bnd_v_, *v_), "massdiv"));
     if (rhs_fun_)
-        accus.push_back_acquire( new InterfaceVectorAccuP1CL<LocalVectorP1CL>( &vd_load, LocalVectorP1CL( rhs_fun_, ic.t), cdata, "load"));
+        accus.push_back_acquire( new InterfaceVectorAccuCL<LocalVectorP1CL, InterfaceCommonDataP1CL>( &vd_load, LocalVectorP1CL( rhs_fun_, ic.t), cdata, "load"));
 
     accumulate( accus, MG_, cidx->TriangLevel(), cidx->GetMatchingFunction(), cidx->GetBndInfo());
 

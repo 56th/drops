@@ -165,9 +165,9 @@ class InterfaceMatrixAccuCL : public TetraAccumulatorCL
             std::cout << " for \"" << name_ << "\"";
         std::cout  << ": " << num_rows << " rows, " << num_cols << " cols.\n";
         if (mat_row_fe != LocalMatrixT::row_fe_type)
-            std::cout << " Warning: LocalMatrixT and MatDescCL have different FE-type for rows.\n";
+            std::cout << "Warning: LocalMatrixT and MatDescCL have different FE-type for rows.\n";
         if (mat_col_fe != LocalMatrixT::col_fe_type)
-            std::cout << " Warning: LocalMatrixT and MatDescCL have different FE-type for cols.\n";
+            std::cout << "Warning: LocalMatrixT and MatDescCL have different FE-type for cols.\n";
 
         lvl = mat_->GetRowLevel();
         M= new MatrixBuilderCL( &mat_->Data, num_rows, num_cols);
@@ -197,46 +197,49 @@ class InterfaceMatrixAccuCL : public TetraAccumulatorCL
 };
 
 /// \brief Accumulate an interface-vector.
-template <class LocalVectorT>
-class InterfaceVectorAccuP1CL : public TetraAccumulatorCL
+template <class LocalVectorT, class InterfaceCommonDataT>
+class InterfaceVectorAccuCL : public TetraAccumulatorCL
 {
   private:
-    const InterfaceCommonDataP1CL& cdata_;
+    const InterfaceCommonDataT& cdata_;
     std::string name_;
 
     VecDescCL* y_;
     LocalVectorT local_vec;
-    IdxT numry[4];
+    SArrayCL<IdxT, LocalVectorT::row_fe_type == P1IF_FE ? 4 : 10> numry;
 
   public:
-    InterfaceVectorAccuP1CL (VecDescCL* y, const LocalVectorT& loc_vec, const InterfaceCommonDataP1CL& cdata,
+    InterfaceVectorAccuCL (VecDescCL* y, const LocalVectorT& loc_vec, const InterfaceCommonDataT& cdata,
                              std::string name= std::string())
         : cdata_( cdata), name_( name), y_( y), local_vec( loc_vec) {}
-    virtual ~InterfaceVectorAccuP1CL () {}
+    virtual ~InterfaceVectorAccuCL () {}
 
     void set_name (const std::string& n) { name_= n; }
 
     virtual void begin_accumulation () {
-        std::cout << "InterfaceVectorAccuP1CL::begin_accumulation";
+        std::cout << "InterfaceVectorAccuCL::begin_accumulation";
         if (name_ != std::string())
             std::cout << " for \"" << name_ << "\"";
         std::cout  << ": " << y_->RowIdx->NumUnknowns() << " rows.\n";
+        if (y_->RowIdx->GetFE() != LocalVectorT::row_fe_type)
+            std::cout << "Warning: LocalVectorT and VecDescCL have different FE-type for rows.\n";
     }
 
     virtual void finalize_accumulation() {}
 
     virtual void visit (const TetraCL& t) {
-        const InterfaceCommonDataP1CL& cdata= cdata_.get_clone();
+        const InterfaceCommonDataT& cdata= cdata_.get_clone();
         if (cdata.empty())
             return;
-        GetLocalNumbP1NoBnd( numry, t, *y_->RowIdx);
-        local_vec.setup( t, cdata, numry);
-        for (int i= 0; i < 4; ++i)
+        GetLocalNumbInterface( numry.begin(), t, *y_->RowIdx);
+        local_vec.setup( t, cdata, numry.begin());
+        const int num_row_dofs= LocalVectorT::row_fe_type == P1IF_FE ? 4 : 10;
+        for (int i= 0; i < num_row_dofs; ++i)
             if (numry[i] != NoIdx)
                 y_->Data[numry[i]]+= local_vec.vec[i];
     }
 
-    virtual InterfaceVectorAccuP1CL* clone (int /*clone_id*/) { return new InterfaceVectorAccuP1CL( *this); }
+    virtual InterfaceVectorAccuCL* clone (int /*clone_id*/) { return new InterfaceVectorAccuCL( *this); }
 };
 
 
@@ -253,6 +256,8 @@ class LocalVectorP1CL
     QuadDomain2DCL qdom;
 
   public:
+    static const FiniteElementT row_fe_type= P1IF_FE;
+
     double vec[4];
 
     LocalVectorP1CL (instat_scalar_fun_ptr f, double time) : f_( f), time_( time) { p1[0][0]= p1[1][1]= p1[2][2]= p1[3][3]= 1.; }
@@ -280,8 +285,7 @@ class LocalMatVecP1CL
     const VecDescCL& x_;
 
   public:
-    static const FiniteElementT row_fe_type= P1IF_FE,
-                                col_fe_type= P1IF_FE;
+    static const FiniteElementT row_fe_type= P1IF_FE;
 
     double vec[4];
 
@@ -303,10 +307,10 @@ class LocalMatVecP1CL
 
 /// \brief Convenience-function to reduce the number of explicit template-parameters for the massdiv- and the convection-rhs.
 template <template <class> class LocalMatrixT, class DiscVelSolT>
-  inline InterfaceVectorAccuP1CL<LocalMatVecP1CL< LocalMatrixT<DiscVelSolT> > >*
+  inline InterfaceVectorAccuCL<LocalMatVecP1CL< LocalMatrixT<DiscVelSolT> >, InterfaceCommonDataP1CL>*
   make_wind_dependent_vectorP1_accu (VecDescCL* y, const VecDescCL* x, const InterfaceCommonDataP1CL& cdata, const DiscVelSolT& wind, std::string name= std::string())
 {
-    return new InterfaceVectorAccuP1CL<LocalMatVecP1CL< LocalMatrixT<DiscVelSolT> > >( y,
+    return new InterfaceVectorAccuCL<LocalMatVecP1CL< LocalMatrixT<DiscVelSolT> >, InterfaceCommonDataP1CL>( y,
         LocalMatVecP1CL< LocalMatrixT<DiscVelSolT> >( LocalMatrixT<DiscVelSolT>( wind), x), cdata, name);
 }
 
