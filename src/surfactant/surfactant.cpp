@@ -767,31 +767,6 @@ void StationaryStrategyP1 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DR
     std::cout << "L_2-error: " << L2_err << std::endl;
 }
 
-typedef std::tr1::unordered_set<const TetraCL*> TetraSetT;
-typedef std::tr1::unordered_map<const VertexCL*, TetraSetT> VertexToTetrasT;
-
-/// XXX Use a PrincipalLatticeCL!
-void compute_tetra_neighborhoods (const DROPS::MultiGridCL& mg, DROPS::LevelsetP2CL& lset, TetraToTetrasT& tetra_neighborhoods)
-{
-    VertexToTetrasT vertex_neighborhoods;
-
-    LocalP2CL<> locls;
-    DROPS_FOR_TRIANG_CONST_TETRA( mg, lset.Phi.GetLevel(), it) {
-        locls.assign( *it, lset.Phi, lset.GetBndData());
-        if (equal_signs( locls)) continue;
-
-        tetra_neighborhoods[&*it]; // insert it with an empty set of neighbors.
-        for (Uint i= 0; i < 4; ++i)
-            vertex_neighborhoods[it->GetVertex( i)].insert( &*it);
-    }
-    for (TetraToTetrasT::iterator it= tetra_neighborhoods.begin(); it != tetra_neighborhoods.end(); ++it) {
-        const TetraCL& tet= *it->first;
-        for (Uint v= 0; v < 4; ++v) {
-            const TetraSetT& tset= vertex_neighborhoods[tet.GetVertex( v)];
-            it->second.insert( tset.begin(), tset.end());
-        }
-    }
-}
 double abs_det_sphere (const TetraCL& tet, const BaryCoordCL& xb, const SurfacePatchCL& p)
 {
     if (p.empty())
@@ -840,7 +815,8 @@ void gradient_trafo (const TetraCL& tet, const BaryCoordCL& xb, const QuaQuaMapp
     W= dphT + outer_product( nl, n/inner_prod( nl, n) - dph*nl);
 }
 
-typedef std::vector<std::pair<const TetraCL*, BaryCoordCL> > BaryPosVectorT;
+typedef std::pair<const TetraCL*, BaryCoordCL> TetraBaryPairT;
+typedef std::vector<TetraBaryPairT> BaryPosVectorT;
 
 class InterfaceCommonDataCL : public TetraAccumulatorCL
 {
@@ -1325,7 +1301,7 @@ void StationaryStrategyP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DR
     // Compute neighborhoods of the tetras at the interface
     const PrincipalLatticeCL& lat= PrincipalLatticeCL::instance( 1);
     TetraToTetrasT tetra_neighborhoods;
-    compute_tetra_neighborhoods( mg, lset, tetra_neighborhoods);
+    compute_tetra_neighborhoods( mg, lset.Phi, lset.GetBndData(), lat, tetra_neighborhoods);
 
     QuaQuaMapperCL quaqua( mg, lset.Phi, lsgradrec, tetra_neighborhoods);
 

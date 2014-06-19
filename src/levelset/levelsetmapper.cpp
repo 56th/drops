@@ -23,6 +23,7 @@
 */
 
 #include "levelset/levelsetmapper.h"
+#include "num/lattice-eval.h"
 
 namespace DROPS
 {
@@ -176,6 +177,32 @@ Point3DCL QuaQuaMapperCL::local_ls_grad (const TetraCL& tet, const BaryCoordCL& 
     for (Uint i= 0; i < 10; ++i)
         grad+= locls[i]*gradp2[i]( xb);
     return grad;
+}
+
+void compute_tetra_neighborhoods (const MultiGridCL& mg, const VecDescCL& lsetPhi, const BndDataCL<>& lsetbnd, const PrincipalLatticeCL& lat, TetraToTetrasT& tetra_neighborhoods)
+{
+    typedef std::tr1::unordered_map<const VertexCL*, TetraSetT> VertexToTetrasT;
+    VertexToTetrasT vertex_neighborhoods;
+
+    LocalP2CL<> locp2_ls;
+    std::valarray<double> ls_loc( lat.vertex_size());
+    DROPS_FOR_TRIANG_CONST_TETRA( mg, lsetPhi.GetLevel(), it) {
+        locp2_ls.assign( *it, lsetPhi, lsetbnd);
+        evaluate_on_vertexes( locp2_ls, lat, Addr( ls_loc));
+        if (equal_signs( ls_loc))
+            continue;
+
+        tetra_neighborhoods[&*it]; // insert it with an empty set of neighbors.
+        for (Uint i= 0; i < 4; ++i)
+            vertex_neighborhoods[it->GetVertex( i)].insert( &*it);
+    }
+    for (TetraToTetrasT::iterator it= tetra_neighborhoods.begin(); it != tetra_neighborhoods.end(); ++it) {
+        const TetraCL& tet= *it->first;
+        for (Uint v= 0; v < 4; ++v) {
+            const TetraSetT& tset= vertex_neighborhoods[tet.GetVertex( v)];
+            it->second.insert( tset.begin(), tset.end());
+        }
+    }
 }
 
 double abs_det (const TetraCL& tet, const BaryCoordCL& xb, const QuaQuaMapperCL& quaqua, const SurfacePatchCL& p)
