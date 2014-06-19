@@ -965,9 +965,11 @@ class InterfaceCommonDataCL : public TetraAccumulatorCL
 
     void store_offsets( VecDescCL& to_ifacearg) { to_iface= &to_ifacearg; }
 
-    InterfaceCommonDataCL (const VecDescCL& ls_arg, const BndDataCL<>& lsetbnd_arg, const QuaQuaMapperCL& quaquaarg, bool do_compute_debug_data= false)
+    InterfaceCommonDataCL (const VecDescCL& ls_arg, const BndDataCL<>& lsetbnd_arg,
+        const QuaQuaMapperCL& quaquaarg, const PrincipalLatticeCL& lat_arg,
+        bool do_compute_debug_data= false)
         : ls( &ls_arg), lsetbnd( &lsetbnd_arg), to_iface( 0), do_compute_debug_data_( do_compute_debug_data),
-          lat( PrincipalLatticeCL::instance( 1)), ls_loc( lat.vertex_size()), quaqua( quaquaarg) {
+          lat( lat_arg), ls_loc( lat.vertex_size()), quaqua( quaquaarg) {
         P2DiscCL::GetGradientsOnRef( gradrefp2);
         for (Uint i= 0; i < 10 ; ++i)
             p2[i][i]= 1.; // P2-Basis-Functions
@@ -1357,6 +1359,7 @@ void StationaryStrategyP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DR
     averaging_P2_gradient_recovery( mg, lset.Phi, lset.GetBndData(), lsgradrec);
 
     // Compute neighborhoods of the tetras at the interface
+    const PrincipalLatticeCL& lat= PrincipalLatticeCL::instance( 1);
     TetraToTetrasT tetra_neighborhoods;
     compute_tetra_neighborhoods( mg, lset, tetra_neighborhoods);
 
@@ -1365,14 +1368,14 @@ void StationaryStrategyP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DR
     VecDescCL to_iface( &vecp2idx);
 //     {
 //     TetraAccumulatorTupleCL accus;
-//     InterfaceCommonDataCL ttt( lset.Phi, lset.GetBndData(), quaqua);
+//     InterfaceCommonDataCL ttt( lset.Phi, lset.GetBndData(), quaqua, lat, true);
 // //     ttt.store_offsets( to_iface);
 //     accus.push_back( &ttt);
 //     accumulate( accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetMatchingFunction(), ifacep2idx.GetBndInfo());
 //     }
 
     TetraAccumulatorTupleCL accus;
-    InterfaceCommonDataCL cdatap2( lset.Phi, lset.GetBndData(), quaqua);
+    InterfaceCommonDataCL cdatap2( lset.Phi, lset.GetBndData(), quaqua, lat);
     accus.push_back( &cdatap2);
     DROPS::MatDescCL Mp2( &ifacep2idx, &ifacep2idx);
     InterfaceMatrixAccuCL<LocalMassP2CL, InterfaceCommonDataCL> accuMp2( &Mp2, LocalMassP2CL(), cdatap2, "Mp2");
