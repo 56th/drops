@@ -770,24 +770,6 @@ void StationaryStrategyP1 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DR
 typedef std::tr1::unordered_set<const TetraCL*> TetraSetT;
 typedef std::tr1::unordered_map<const VertexCL*, TetraSetT> VertexToTetrasT;
 
-/// Computes a map from the vertices at the pcw. linear interface to all tetras that contain the vertex.
-/// XXX Use a PrincipalLatticeCL!
-void compute_vertex_neighborhoods (const DROPS::MultiGridCL& mg, DROPS::LevelsetP2CL& lset, VertexToTetrasT& vertex_neighborhood)
-{
-    vertex_neighborhood.clear();
-
-    LocalP2CL<> locls;
-    DROPS_FOR_TRIANG_CONST_TETRA( mg, lset.Phi.GetLevel(), it) {
-        locls.assign( *it, lset.Phi, lset.GetBndData());
-        if (equal_signs( locls)) continue;
-
-        for (Uint i= 0; i < 4; ++i)
-            vertex_neighborhood[it->GetVertex( i)].insert( &*it);
-    }
-}
-
-typedef std::tr1::unordered_map<const TetraCL*, TetraSetT> TetraToTetrasT;
-
 /// XXX Use a PrincipalLatticeCL!
 void compute_tetra_neighborhoods (const DROPS::MultiGridCL& mg, DROPS::LevelsetP2CL& lset, TetraToTetrasT& tetra_neighborhoods)
 {
@@ -810,24 +792,6 @@ void compute_tetra_neighborhoods (const DROPS::MultiGridCL& mg, DROPS::LevelsetP
         }
     }
 }
-
-
-// Return a tetra from neighborhood that contains v up to precision eps in barycentric coordinates.
-// Returns 0 on failure.
-void enclosing_tetra (const Point3DCL& v, const TetraSetT& neighborhood, double eps, const TetraCL*& tetra, BaryCoordCL& bary)
-{
-    World2BaryCoordCL w2b;
-    for (TetraSetT::const_iterator tit = neighborhood.begin(); tit != neighborhood.end(); ++tit) {
-        w2b.assign( **tit);
-        bary= w2b( v);
-        if (is_in_ref_tetra( bary, eps)) {
-            tetra= *tit;
-            return;
-        }
-    }
-    tetra= 0;
-}
-
 double abs_det_sphere (const TetraCL& tet, const BaryCoordCL& xb, const SurfacePatchCL& p)
 {
     if (p.empty())
