@@ -181,9 +181,7 @@ Point3DCL QuaQuaMapperCL::local_ls_grad (const TetraCL& tet, const BaryCoordCL& 
 
 void compute_tetra_neighborhoods (const MultiGridCL& mg, const VecDescCL& lsetPhi, const BndDataCL<>& lsetbnd, const PrincipalLatticeCL& lat, TetraToTetrasT& tetra_neighborhoods)
 {
-    typedef std::tr1::unordered_map<const VertexCL*, TetraSetT> VertexToTetrasT;
-    VertexToTetrasT vertex_neighborhoods;
-
+    std::tr1::unordered_set<const VertexCL*> iface_vertices;
     LocalP2CL<> locp2_ls;
     std::valarray<double> ls_loc( lat.vertex_size());
     DROPS_FOR_TRIANG_CONST_TETRA( mg, lsetPhi.GetLevel(), it) {
@@ -194,7 +192,15 @@ void compute_tetra_neighborhoods (const MultiGridCL& mg, const VecDescCL& lsetPh
 
         tetra_neighborhoods[&*it]; // insert it with an empty set of neighbors.
         for (Uint i= 0; i < 4; ++i)
-            vertex_neighborhoods[it->GetVertex( i)].insert( &*it);
+            iface_vertices.insert( it->GetVertex( i));
+    }
+
+    typedef std::tr1::unordered_map<const VertexCL*, TetraSetT> VertexToTetrasT;
+    VertexToTetrasT vertex_neighborhoods;
+    DROPS_FOR_TRIANG_CONST_TETRA( mg, lsetPhi.GetLevel(), it) {
+        for (Uint i= 0; i < 4; ++i)
+            if (iface_vertices.count( it->GetVertex( i)) == 1)
+                vertex_neighborhoods[it->GetVertex( i)].insert( &*it);
     }
     for (TetraToTetrasT::iterator it= tetra_neighborhoods.begin(); it != tetra_neighborhoods.end(); ++it) {
         const TetraCL& tet= *it->first;
