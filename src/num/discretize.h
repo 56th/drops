@@ -428,7 +428,13 @@ class BaryEvalCL
 
   public:
     BaryEvalCL (const TetraCL& tet, double t, fun_type f)
-        : mapper_( tet), t_( t), f_(f) {}
+        : mapper_( tet), t_( t), f_( f) {}
+    BaryEvalCL ()
+        : t_( 0.), f_( 0) {}
+
+    void set      (const TetraCL& tet) { mapper_.assign( tet); }
+    void set_time (double time)        { t_= time; }
+    void set      (fun_type f)         { f_= f; }
 
     value_type operator() (const BaryCoordCL& b) const { return f_( mapper_( b), t_); }
 };
