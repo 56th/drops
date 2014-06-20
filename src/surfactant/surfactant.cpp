@@ -860,6 +860,13 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
                         area;
 
   public:
+    double f_grid_norm_acc,
+           f_grid_int_acc,
+           f_norm_acc,
+           f_int_acc,
+           err_acc,
+           area_acc;
+
     InterfaceL2AccuP2CL (const InterfaceCommonDataP2CL& cdata, const MultiGridCL& mg_arg, std::string name= std::string())
         : cdata_( cdata), mg( mg_arg), name_( name), fvd( 0), f( 0), f_time( 0.) {}
     virtual ~InterfaceL2AccuP2CL () {}
@@ -891,36 +898,33 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
         err.resize( omp_get_max_threads(), 0.);
         area.clear();
         area.resize( omp_get_max_threads(), 0.);
+
+        f_grid_norm_acc= f_grid_int_acc= f_norm_acc= f_int_acc= err_acc= area_acc= 0.;
     }
 
     virtual void finalize_accumulation() {
         std::cout << "InterfaceL2AccuP2CL::finalize_accumulation";
         if (name_ != std::string())
             std::cout << " for \"" << name_ << "\":";
-        const double area_acc= std::accumulate( area.begin(), area.end(), 0.);
+        area_acc= std::accumulate( area.begin(), area.end(), 0.);
         std::cout << "\n\tarea: " << area_acc;
         if (fvd != 0) {
-            double tmp=  std::accumulate( f_grid_norm.begin(), f_grid_norm.end(), 0.),
-                   tmp2= std::accumulate( f_grid_int.begin(), f_grid_int.end(), 0.);
-            tmp= std::sqrt( tmp);
-            std::cout << "\n\t|| f_grid ||_L2: " << tmp
-                      << "\tintegral: " << tmp2;
+            f_grid_norm_acc=  std::sqrt( std::accumulate( f_grid_norm.begin(), f_grid_norm.end(), 0.));
+            f_grid_int_acc= std::accumulate( f_grid_int.begin(), f_grid_int.end(), 0.);
+            std::cout << "\n\t|| f_grid ||_L2: " << f_grid_norm_acc
+                      << "\tintegral: " << f_grid_int_acc;
         }
         if (f != 0) {
-            double tmp=  std::accumulate( f_norm.begin(), f_norm.end(), 0.),
-                   tmp2= std::accumulate( f_int.begin(), f_int.end(), 0.);
-            tmp= std::sqrt( tmp);
-            std::cout << "\n\t|| f ||_L2: " << tmp
-                      << "\t integral: " << tmp2;
+            f_norm_acc=  std::sqrt( std::accumulate( f_norm.begin(), f_norm.end(), 0.));
+            f_int_acc= std::accumulate( f_int.begin(), f_int.end(), 0.);
+            std::cout << "\n\t|| f ||_L2: " << f_norm_acc
+                      << "\t integral: " << f_int_acc;
         }
         if (fvd != 0 && f != 0) {
-            double tmp=  std::accumulate( err.begin(), err.end(), 0.);
-            tmp= std::sqrt( tmp);
-            std::cout << "\n\t|| f - f_grid ||_L2: " << tmp;
+            err_acc=  std::sqrt( std::accumulate( err.begin(), err.end(), 0.));
+            std::cout << "\n\t|| f - f_grid ||_L2: " << err_acc;
 
-            const double f_grid_int_acc= std::accumulate( f_grid_int.begin(), f_grid_int.end(), 0.),
-                         f_int_acc=      std::accumulate( f_int.begin(), f_int.end(), 0.);
-            const double mvf_err= std::sqrt( std::pow( tmp, 2) - std::pow( f_grid_int_acc - f_int_acc, 2)/area_acc);
+            const double mvf_err= std::sqrt( std::pow( err_acc, 2) - std::pow( f_grid_int_acc - f_int_acc, 2)/area_acc);
             std:: cout << "\t|| f - c_f - (f_grid -c_{f_grid}) ||_L2: " << mvf_err;
         }
         std::cout << std::endl;
@@ -1018,6 +1022,19 @@ void StationaryStrategyP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DR
 
     accumulate( accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetMatchingFunction(), ifacep2idx.GetBndInfo());
 
+//     TetraAccumulatorTupleCL mean_accus;
+//     mean_accus.push_back( &cdatap2);
+//     InterfaceL2AccuP2CL L2_mean_accu( cdatap2, mg, "P2-mean");
+//     L2_mean_accu.set_grid_function( bp2);
+//     mean_accus.push_back( &L2_mean_accu);
+//     accumulate( mean_accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetMatchingFunction(), ifacep2idx.GetBndInfo());
+//     bp2.Data-= L2_mean_accu.f_grid_int_acc/L2_mean_accu.area_acc;
+//     accumulate( mean_accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetMatchingFunction(), ifacep2idx.GetBndInfo());
+
+//     VectorCL e( 1., bp2.Data.size());
+//     VectorCL Ldiag( Ap2.Data.GetDiag());
+//     bp2.Data-= dot( VectorCL( e/Ldiag), bp2.Data)/std::sqrt( dot( VectorCL( e/Ldiag), e));
+
 //     DROPS::MatrixCL Lp2;
 //     Lp2.LinComb( 1.0, Ap2.Data, 1.0, Mp2.Data);
     MatrixCL& Lp2= Ap2.Data;
@@ -1027,6 +1044,7 @@ void StationaryStrategyP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DR
     DROPS::WriteFEToFile( bp2, mg, "rhsp2_iface.txt", /*binary=*/ false);
 
     typedef DROPS::SSORPcCL SurfPcT;
+//     typedef DROPS::JACPcCL SurfPcT;
     SurfPcT surfpc;
     typedef DROPS::PCGSolverCL<SurfPcT> SurfSolverT;
     SurfSolverT surfsolver( surfpc, P.get<int>("SurfTransp.Iter"), P.get<double>("SurfTransp.Tol"), true);
