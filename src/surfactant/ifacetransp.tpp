@@ -60,6 +60,57 @@ template <Uint Dim>
         std::fill_n( &normal[i*NodesPerFacet], NodesPerFacet, surf.normal_begin()[i]);
 }
 
+template <class T, class ResultIterT>
+  inline ResultIterT
+  evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const TetraBaryPairVectorT& pos, double t, ResultIterT result_iterator)
+{
+    BaryEvalCL<> eval;
+    eval.set( f);
+    eval.set_time( t);
+    const TetraCL* prev_tetra= 0;
+    for (Uint i= 0; i < pos.size(); ++i) {
+        if (prev_tetra != pos[i].first) {
+            prev_tetra= pos[i].first;
+            eval.set( *pos[i].first);
+        }
+        *result_iterator++= eval( pos[i].second);
+    }
+    return result_iterator;
+}
+
+template <class T, class ResultContT>
+  inline ResultContT&
+  resize_and_evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const TetraBaryPairVectorT& pos, double t, ResultContT& result_container)
+{
+    result_container.resize( pos.size());
+    evaluate_on_vertexes( f, pos, t, sequence_begin( result_container));
+    return result_container;
+}
+
+template <class PEvalT, class ResultIterT>
+  inline ResultIterT
+  evaluate_on_vertexes (const PEvalT& f, const TetraBaryPairVectorT& pos, ResultIterT result_iterator)
+{
+    typename PEvalT::LocalFET loc_f;
+    const TetraCL* prev_tetra= 0;
+    for (Uint i= 0; i < pos.size(); ++i) {
+        if (prev_tetra != pos[i].first) {
+            prev_tetra= pos[i].first;
+            loc_f.assign( *pos[i].first, f);
+        }
+        *result_iterator++= loc_f( pos[i].second);
+    }
+    return result_iterator;
+}
+
+template <class PEvalT, class ResultContT>
+  inline ResultContT&
+  resize_and_evaluate_on_vertexes (const PEvalT& f, const TetraBaryPairVectorT& pos, ResultContT& result_container)
+{
+    result_container.resize( pos.size());
+    evaluate_on_vertexes( f, pos, sequence_begin( result_container));
+    return result_container;
+}
 
 template <class DiscVelSolT>
 void LocalInterfaceConvectionP1CL<DiscVelSolT>::setup (const TetraCL& t, const InterfaceCommonDataP1CL& cdata)

@@ -133,6 +133,23 @@ class InterfaceCommonDataP1CL : public TetraAccumulatorCL
 typedef std::pair<const TetraCL*, BaryCoordCL> TetraBaryPairT;
 typedef std::vector<TetraBaryPairT>            TetraBaryPairVectorT;
 
+template <class T, class ResultIterT>
+  inline ResultIterT
+  evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const TetraBaryPairVectorT& pos, double t, ResultIterT result_iterator);
+
+template <class T, class ResultContT>
+  inline ResultContT&
+  resize_and_evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const TetraBaryPairVectorT& pos, double t, ResultContT& result_container);
+
+template <class PEvalT, class ResultIterT>
+  inline ResultIterT
+  evaluate_on_vertexes (const PEvalT& f, const TetraBaryPairVectorT& pos, ResultIterT result_iterator);
+
+template <class PEvalT, class ResultContT>
+  inline ResultContT&
+  resize_and_evaluate_on_vertexes (const PEvalT& f, const TetraBaryPairVectorT& pos, ResultContT& result_container);
+
+
 class InterfaceCommonDataP2CL : public TetraAccumulatorCL
 {
   private:
@@ -542,6 +559,36 @@ class LocalInterfaceMassDivP1CL
     LocalInterfaceMassDivP1CL (const DiscVelSolT& w)
         : w_( w) { P2DiscCL::GetGradientsOnRef( gradrefp2); }
 };
+
+/// \brief Compute the P2 load vector corresponding to the function f on a single tetra.
+class LocalVectorP2CL
+{
+  private:
+    instat_scalar_fun_ptr f_;
+    double time_;
+
+    std::valarray<double> qp2,
+                          qf;
+
+  public:
+    static const FiniteElementT row_fe_type= P2IF_FE;
+
+    double vec[10];
+
+    LocalVectorP2CL (instat_scalar_fun_ptr f, double time) : f_( f), time_( time) {}
+
+    void setup (const TetraCL&, const InterfaceCommonDataP2CL& cdata, const IdxT numr[10]) {
+        resize_and_evaluate_on_vertexes( f_, cdata.qdom_projected, time_, qf);
+        qp2.resize( cdata.qdom.vertex_size());
+        for (Uint i= 0; i < 10; ++i) {
+                if (numr[i] == NoIdx)
+                    continue;
+                evaluate_on_vertexes( cdata.p2[i], cdata.qdom, Addr( qp2));
+                vec[i]= quad_2D( cdata.absdet*qf*qp2, cdata.qdom);
+        }
+    }
+};
+
 
 /// \brief Trafo of the interfacial gradient on the linear interface to the quadratic iface under a QuaQuaMapperCL.
 /// Computes W from La. 5.1 of the high order paper. The transformation of the gradient in the discretization requires W^{-1}.
