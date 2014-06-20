@@ -543,6 +543,93 @@ class LocalInterfaceMassDivP1CL
         : w_( w) { P2DiscCL::GetGradientsOnRef( gradrefp2); }
 };
 
+/// \brief Trafo of the interfacial gradient on the linear interface to the quadratic iface under a QuaQuaMapperCL.
+/// Computes W from La. 5.1 of the high order paper. The transformation of the gradient in the discretization requires W^{-1}.
+void gradient_trafo (const TetraCL& tet, const BaryCoordCL& xb, const QuaQuaMapperCL& quaqua, const SurfacePatchCL& p, SMatrixCL<3,3>& W);
+
+class LocalLaplaceBeltramiP2CL
+{
+  private:
+    double D_; // diffusion coefficient
+
+    LocalP1CL<Point3DCL> gradp2[10];
+    GridFunctionCL<Point3DCL> qgradp2[10];
+
+    GridFunctionCL<Point3DCL> nl;
+    GridFunctionCL<SMatrixCL<3,3> > Winv;
+
+  public:
+    static const FiniteElementT row_fe_type= P2IF_FE,
+                                col_fe_type= P2IF_FE;
+
+    double coup[10][10];
+
+    void setup (const TetraCL& t, const InterfaceCommonDataP2CL& cdata) {
+        if (cdata.surf.normal_empty())
+            cdata.surf.compute_normals( t);
+        resize_and_scatter_piecewise_normal( cdata.surf, cdata.qdom, nl);
+
+        Winv.resize( cdata.qdom.vertex_size());
+        QRDecompCL<3,3> qr;
+        SVectorCL<3> tmp;
+        for (Uint i= 0; i < cdata.qdom.vertex_size(); ++i) {
+            gradient_trafo( t, cdata.qdom.vertex_begin()[i], cdata.quaqua, cdata.surf, qr.GetMatrix());
+            qr.prepare_solve();
+            for (Uint j= 0; j < 3; ++j) {
+                tmp= std_basis<3>( j + 1);
+                qr.Solve( tmp);
+                Winv[i].col( j, tmp);
+            }
+        }
+
+        double dummy;
+        SMatrixCL<3,3> T;
+        GetTrafoTr( T, dummy, t);
+        P2DiscCL::GetGradients( gradp2, cdata.gradrefp2, T);
+        for (int i= 0; i < 10; ++i) {
+            resize_and_evaluate_on_vertexes ( gradp2[i], cdata.qdom, qgradp2[i]);
+            for (Uint j= 0; j < qgradp2[i].size(); ++j) {
+                tmp=  qgradp2[i][j] - inner_prod( nl[j], qgradp2[i][j])*nl[j];
+                qgradp2[i][j]= Winv[j]*tmp;
+            }
+        }
+
+        for (int i= 0; i < 10; ++i) {
+            coup[i][i]= quad_2D( cdata.absdet*dot( qgradp2[i], qgradp2[i]), cdata.qdom);
+            for(int j= 0; j < i; ++j)
+                coup[i][j]= coup[j][i]= quad_2D( cdata.absdet*dot( qgradp2[j], qgradp2[i]), cdata.qdom);
+        }
+    }
+
+    LocalLaplaceBeltramiP2CL (double D)
+        :D_( D) {}
+};
+
+class LocalMassP2CL
+{
+  private:
+    std::valarray<double> qp2[10];
+
+  public:
+    static const FiniteElementT row_fe_type= P2IF_FE,
+                                col_fe_type= P2IF_FE;
+
+    double coup[10][10];
+
+    void setup (const TetraCL&, const InterfaceCommonDataP2CL& cdata) {
+        for (int i= 0; i < 10; ++i)
+            resize_and_evaluate_on_vertexes ( cdata.p2[i], cdata.qdom, qp2[i]);
+
+        for (int i= 0; i < 10; ++i) {
+            coup[i][i]= quad_2D( cdata.absdet*qp2[i]*qp2[i], cdata.qdom);
+            for(int j= 0; j < i; ++j)
+                coup[i][j]= coup[j][i]= quad_2D( cdata.absdet*qp2[j]*qp2[i], cdata.qdom);
+        }
+    }
+
+    LocalMassP2CL () {}
+};
+
 /// \brief The routine sets up the load-vector in v on the interface defined by ls.
 ///        It belongs to the FE induced by standard P1-elements.
 void SetupInterfaceRhsP1 (const MultiGridCL& mg, VecDescCL* v,

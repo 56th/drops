@@ -242,6 +242,28 @@ void InterfaceDebugP2CL::visit (const TetraCL& t)
     surfacemeasP2+= quad_2D( cdata.absdet, cdata.qdom);
 }
 
+void gradient_trafo (const TetraCL& tet, const BaryCoordCL& xb, const QuaQuaMapperCL& quaqua, const SurfacePatchCL& p,
+                     SMatrixCL<3,3>& W)
+{
+    // Compute the basepoint b.
+    const TetraCL* btet= &tet;
+    BaryCoordCL b= xb;
+    quaqua.base_point( btet, b);
+
+    // nl(x)
+    p.compute_normals( tet);
+    Point3DCL nl= p.normal_begin()[0];
+    // Evaluate the normal to the interface in b, n(y).
+    Point3DCL n= quaqua.local_ls_grad( *btet, b);
+    n/= n.norm();
+
+    // Dp_h(x)^T
+    SMatrixCL<3,3> dph, dphT;
+    quaqua.jacobian( tet, xb, dph);
+    assign_transpose( dphT, dph);
+
+    W= dphT + outer_product( nl, n/inner_prod( nl, n) - dph*nl);
+}
 
 void SurfactantP1BaseCL::SetInitialValue (instat_scalar_fun_ptr icf, double t)
 {
