@@ -782,12 +782,12 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
 
 void StationaryStrategyP1 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::LevelsetP2CL& lset)
 {
-    adap.MakeInitialTriang( sphere_dist);
+    adap.MakeInitialTriang( the_lset_fun);
 
     lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
     lset.Phi.SetIdx( &lset.idx);
-    // LinearLSInit( mg, lset.Phi, &sphere_dist);
-    LSInit( mg, lset.Phi, sphere_dist, 0.);
+    // LinearLSInit( mg, lset.Phi, the_lset_fun);
+    LSInit( mg, lset.Phi, the_lset_fun, 0.);
 
     DROPS::IdxDescCL ifaceidx( P1IF_FE);
     ifaceidx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
@@ -803,7 +803,7 @@ void StationaryStrategyP1 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DR
 //     L.LinComb( 1.0, A.Data, 1.0, M.Data);
     DROPS::MatrixCL& L= A.Data;
     DROPS::VecDescCL b( &ifaceidx);
-    DROPS::SetupInterfaceRhsP1( mg, &b, lset.Phi, lset.GetBndData(), laplace_beltrami_0_rhs);
+    DROPS::SetupInterfaceRhsP1( mg, &b, lset.Phi, lset.GetBndData(), the_rhs_fun);
 
     //DROPS::WriteToFile( M.Data, "m_iface.txt", "M");
     //DROPS::WriteToFile( A.Data, "a_iface.txt", "A");
@@ -832,7 +832,7 @@ void StationaryStrategyP1 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DR
         vtkwriter->Write( 0.);
     }
 
-    double L2_err( L2_error( lset.Phi, lset.GetBndData(), make_P1Eval( mg, nobnd, xext), &laplace_beltrami_0_sol));
+    double L2_err( L2_error( lset.Phi, lset.GetBndData(), make_P1Eval( mg, nobnd, xext), the_sol_fun));
     std::cout << "L_2-error: " << L2_err << std::endl;
 }
 
