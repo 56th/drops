@@ -29,6 +29,7 @@
 #include "num/krylovsolver.h"
 #include "num/interfacePatch.h"
 #include "num/accumulator.h"
+#include "levelset/levelsetmapper.h"
 #include "levelset/mgobserve.h"
 #include "out/ensightOut.h"
 #include "out/vtkOut.h"
@@ -128,6 +129,82 @@ class InterfaceCommonDataP1CL : public TetraAccumulatorCL
         return the_clones[clone_id]= new InterfaceCommonDataP1CL( *this);
     }
 };
+
+typedef std::pair<const TetraCL*, BaryCoordCL> TetraBaryPairT;
+typedef std::vector<TetraBaryPairT>            TetraBaryPairVectorT;
+
+class InterfaceCommonDataP2CL : public TetraAccumulatorCL
+{
+  private:
+    InterfaceCommonDataP2CL** the_clones;
+
+    const VecDescCL*   ls;      // P2-level-set
+    const BndDataCL<>* lsetbnd; // boundary data for the level set function
+    LocalP2CL<> locp2_ls;
+
+  public:
+    /// common data @{
+    LocalP2CL<>          p2[10];
+    LocalP1CL<Point3DCL> gradrefp2[10];
+
+    const PrincipalLatticeCL& lat;
+    std::valarray<double>     ls_loc;
+    SurfacePatchCL            surf;
+    QuadDomain2DCL            qdom;
+    TetraBaryPairVectorT      qdom_projected;
+    std::valarray<double>     absdet;
+    QuaQuaMapperCL            quaqua;
+    /// @}
+
+    const InterfaceCommonDataP2CL& get_clone () const {
+        const int tid= omp_get_thread_num();
+        return tid == 0 ? *this : the_clones[tid][0];
+    }
+
+    bool empty () const { return surf.empty(); }
+
+    InterfaceCommonDataP2CL (const VecDescCL& ls_arg, const BndDataCL<>& lsetbnd_arg,
+        const QuaQuaMapperCL& quaquaarg, const PrincipalLatticeCL& lat_arg);
+    virtual ~InterfaceCommonDataP2CL () {}
+
+    virtual void begin_accumulation () {
+        the_clones= new InterfaceCommonDataP2CL*[omp_get_max_threads()];
+        the_clones[0]= this;
+    }
+    virtual void finalize_accumulation() { delete[] the_clones; }
+
+    virtual void visit (const TetraCL& t) {
+        surf.clear();
+        locp2_ls.assign( t, *ls, *lsetbnd);
+        evaluate_on_vertexes( locp2_ls, lat, Addr( ls_loc));
+        if (equal_signs( ls_loc))
+            return;
+        surf.make_patch<MergeCutPolicyCL>( lat, ls_loc);
+        if (surf.empty())
+            return;
+
+        make_CompositeQuad5Domain2D ( qdom, surf, t);
+        qdom_projected.clear();
+        qdom_projected.reserve( qdom.vertex_size());
+        const TetraCL* tet;
+        BaryCoordCL b;
+        for (QuadDomain2DCL::const_vertex_iterator v= qdom.vertex_begin(); v != qdom.vertex_end(); ++v) {
+            tet= &t;
+            b= *v;
+            quaqua.base_point( tet, b);
+            qdom_projected.push_back( std::make_pair( tet, b));
+        }
+        absdet.resize( qdom.vertex_size());
+        for (Uint i= 0; i < qdom.vertex_size(); ++i) {
+            absdet[i]= abs_det( t, qdom.vertex_begin()[i], quaqua, surf);
+        }
+    }
+
+    virtual InterfaceCommonDataP2CL* clone (int clone_id) {
+        return the_clones[clone_id]= new InterfaceCommonDataP2CL( *this);
+    }
+};
+
 
 template <class LocalMatrixT, class InterfaceCommonDataT>
 class InterfaceMatrixAccuCL : public TetraAccumulatorCL
@@ -514,6 +591,43 @@ double Integral_Gamma_Extrapolate (const DROPS::MultiGridCL& mg, const DROPS::Ve
 {
     return (4.*Integral_Gamma( mg, ls, bnd, discsol, 2) - Integral_Gamma_Coarse( mg, ls, bnd, discsol, 1))/3.;
 }
+
+/// Compute some data with QuaQuaMapperCL and simple integrals on the higher order interface.
+/// Optionally, compute the vector field p_h explicitly for visualization.
+/// This is only correct for 1 OpenMP-Thread due to update races.
+class InterfaceDebugP2CL : public TetraAccumulatorCL
+{
+  private:
+    const InterfaceCommonDataP2CL& cdata_;
+
+    VecDescCL* to_iface; // For all P2-dofs x at the interface: p_h(x) - x. Computed if to_iface != 0.
+
+    instat_matrix_fun_ptr ref_dp;
+    double (*ref_abs_det) (const TetraCL& t, const BaryCoordCL& b, const SurfacePatchCL& surf);
+
+    double max_dph_err,
+           surfacemeasP1,
+           surfacemeasP2,
+           max_absdet_err,
+           max_dph2_err;
+    double true_area;
+
+  public:
+    void store_offsets( VecDescCL& to_ifacearg) { to_iface= &to_ifacearg; }
+    void set_true_area( double a) { true_area= a; }
+    void set_ref_dp   ( instat_matrix_fun_ptr rdp) { ref_dp= rdp; }
+    void set_ref_abs_det   ( double (*rad) (const TetraCL& t, const BaryCoordCL& b, const SurfacePatchCL& surf)) { ref_abs_det= rad; }
+
+    InterfaceDebugP2CL (const InterfaceCommonDataP2CL& cdata);
+    virtual ~InterfaceDebugP2CL () {}
+
+    virtual void begin_accumulation   ();
+    virtual void finalize_accumulation();
+
+    virtual void visit (const TetraCL& t);
+
+    virtual InterfaceDebugP2CL* clone (int /*clone_id*/) { return new InterfaceDebugP2CL( *this); }
+};
 
 
 /// \brief P1-discretization and solution of the transport equation on the interface

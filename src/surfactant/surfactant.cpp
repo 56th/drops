@@ -387,6 +387,31 @@ SMatrixCL<3,3> dp_sphere (const DROPS::Point3DCL& x, double)
     return normx == 0. ? SMatrixCL<3,3>() : RadDrop[0]/normx*(eye<3,3>() - outer_product( x/normx, x/normx));
 }
 
+double abs_det_sphere (const TetraCL& tet, const BaryCoordCL& xb, const SurfacePatchCL& p)
+{
+    if (p.empty())
+        return 0.;
+
+    // Compute the jacobian of p.
+    SMatrixCL<3,3> dp= dp_sphere( GetWorldCoord( tet, xb), 0.);
+
+    const Bary2WorldCoordCL b2w( tet);
+    QRDecompCL<3,2> qr;
+    SMatrixCL<3,2>& M= qr.GetMatrix();
+    M.col(0, b2w( p.vertex_begin()[1]) - b2w( p.vertex_begin()[0]));
+    M.col(1, b2w( p.vertex_begin()[2]) - b2w( p.vertex_begin()[0]));
+    qr.prepare_solve();
+    SMatrixCL<3,2> U;
+    Point3DCL tmp;
+    for (Uint i= 0; i < 2; ++i) {
+        tmp= std_basis<3>( i + 1);
+        qr.apply_Q( tmp);
+        U.col( i, tmp);
+    }
+    const SMatrixCL<2,2> Gram= GramMatrix( dp*U);
+    return std::sqrt( Gram(0,0)*Gram(1,1) - Gram(0,1)*Gram(1,0));
+}
+
 // ==stationary test case "LaplaceBeltrami0"==
 // Sphere around 0, RadDrop 1, wind == 0
 // A right hand side from C.J. Heine...
@@ -767,32 +792,7 @@ void StationaryStrategyP1 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DR
     std::cout << "L_2-error: " << L2_err << std::endl;
 }
 
-double abs_det_sphere (const TetraCL& tet, const BaryCoordCL& xb, const SurfacePatchCL& p)
-{
-    if (p.empty())
-        return 0.;
-
-    // Compute the jacobian of p.
-    SMatrixCL<3,3> dp= dp_sphere( GetWorldCoord( tet, xb), 0.);
-
-    const Bary2WorldCoordCL b2w( tet);
-    QRDecompCL<3,2> qr;
-    SMatrixCL<3,2>& M= qr.GetMatrix();
-    M.col(0, b2w( p.vertex_begin()[1]) - b2w( p.vertex_begin()[0]));
-    M.col(1, b2w( p.vertex_begin()[2]) - b2w( p.vertex_begin()[0]));
-    qr.prepare_solve();
-    SMatrixCL<3,2> U;
-    Point3DCL tmp;
-    for (Uint i= 0; i < 2; ++i) {
-        tmp= std_basis<3>( i + 1);
-        qr.apply_Q( tmp);
-        U.col( i, tmp);
-    }
-    const SMatrixCL<2,2> Gram= GramMatrix( dp*U);
-    return std::sqrt( Gram(0,0)*Gram(1,1) - Gram(0,1)*Gram(1,0));
-}
-
-// Computes W from La. 5.1. The transformation of the gradient requires W^{-1}.
+// Computes W from La. 5.1 of the high order paper. The transformation of the gradient requires W^{-1}.
 void gradient_trafo (const TetraCL& tet, const BaryCoordCL& xb, const QuaQuaMapperCL& quaqua, const SurfacePatchCL& p, SMatrixCL<3,3>& W)
 {
     // Compute the basepoint b.
@@ -815,180 +815,6 @@ void gradient_trafo (const TetraCL& tet, const BaryCoordCL& xb, const QuaQuaMapp
     W= dphT + outer_product( nl, n/inner_prod( nl, n) - dph*nl);
 }
 
-typedef std::pair<const TetraCL*, BaryCoordCL> TetraBaryPairT;
-typedef std::vector<TetraBaryPairT> BaryPosVectorT;
-
-class InterfaceCommonDataCL : public TetraAccumulatorCL
-{
-  private:
-    InterfaceCommonDataCL** the_clones;
-
-    const VecDescCL*   ls;      // P2-level-set
-    const BndDataCL<>* lsetbnd; // boundary data for the level set function
-    LocalP2CL<> locp2_ls;
-
-    VecDescCL* to_iface; // For all P2-dofs x: p_h(x) - x.
-
-    double max_dph_err,
-           surfacemeasP1,
-           surfacemeasP2,
-           max_absdet_err,
-           max_dph2_err;
-
-    bool do_compute_debug_data_;
-
-    // Compute test-data for the recovered gradient and QuaQuaMapperCL.
-    // This is only correct for 1 OpenMP-Thread due to update races.
-    void compute_debug_data (const TetraCL& t) {
-//         std::cout << "Tetra Id: " << t.GetId().GetIdent() << std::endl;
-        const TetraCL* tet;
-        BaryCoordCL b;
-        for (SurfacePatchCL::const_vertex_iterator it= surf.vertex_begin(); it != surf.vertex_end(); ++it) {
-            tet= &t;
-            b= *it;
-            quaqua.base_point( tet, b);
-            const Point3DCL& x= GetWorldCoord( t, *it);
-//             const Point3DCL& xb= GetWorldCoord( *tet, b);
-//             std::cout  << "    |x-xb|: " << (x - xb).norm();
-
-            SMatrixCL<3,3> dph;
-            quaqua.jacobian( t, *it, dph);
-            SMatrixCL<3,3> diff_dp= dph - dp_sphere( x, 0.);
-            const double dph_err= std::sqrt( frobenius_norm_sq( diff_dp));
-            max_dph_err= std::max( max_dph_err, dph_err);
-//             std::cout  << " |dph -dp|_F: " << dph_err;
-
-            const double absdet= abs_det( t, *it, quaqua, surf),
-                         absdet_err= std::abs( absdet - abs_det_sphere( t, *it, surf));
-            max_absdet_err= std::max( max_absdet_err, absdet_err);
-//             std::cout  << " |\\mu - \\mu^s|: " << absdet_err << std::endl;
-
-
-            Point3DCL n=x/x.norm();
-            SMatrixCL<3,3> diff_dp2= diff_dp - outer_product( n, transp_mul( diff_dp, n));
-            Point3DCL nh;
-            Point3DCL v1= GetWorldCoord( t, surf.vertex_begin()[1]) - GetWorldCoord( t, surf.vertex_begin()[0]),
-                      v2= GetWorldCoord( t, surf.vertex_begin()[2]) - GetWorldCoord( t,surf.vertex_begin()[0]);
-            cross_product( nh, v1, v2);
-            nh/= nh.norm();
-            diff_dp2= diff_dp2 - outer_product( diff_dp2*nh, nh);
-            const double dph2_err= std::sqrt( frobenius_norm_sq( diff_dp2));
-//             std::cout  << " |P(dph -dp)\\hat P|_F: " << dph2_err << std::endl;
-            max_dph2_err= std::max( max_dph2_err, dph2_err);
-        }
-        surfacemeasP1+= quad_2D( std::valarray<double>( 1., qdom.vertex_size()), qdom);
-        surfacemeasP2+= quad_2D( absdet, qdom);
-
-    }
-
-  public:
-    const PrincipalLatticeCL& lat;
-    LocalP2CL<> p2[10];
-    LocalP1CL<Point3DCL> gradrefp2[10];
-
-    std::valarray<double> ls_loc;
-    SurfacePatchCL surf;
-    QuadDomain2DCL qdom;
-
-    BaryPosVectorT qdom_projected;
-
-    std::valarray<double> absdet;
-
-    QuaQuaMapperCL quaqua;
-
-    const InterfaceCommonDataCL& get_clone () const {
-        const int tid= omp_get_thread_num();
-        return tid == 0 ? *this : the_clones[tid][0];
-    }
-
-    bool empty () const { return surf.empty(); }
-
-    void store_offsets( VecDescCL& to_ifacearg) { to_iface= &to_ifacearg; }
-
-    InterfaceCommonDataCL (const VecDescCL& ls_arg, const BndDataCL<>& lsetbnd_arg,
-        const QuaQuaMapperCL& quaquaarg, const PrincipalLatticeCL& lat_arg,
-        bool do_compute_debug_data= false)
-        : ls( &ls_arg), lsetbnd( &lsetbnd_arg), to_iface( 0), do_compute_debug_data_( do_compute_debug_data),
-          lat( lat_arg), ls_loc( lat.vertex_size()), quaqua( quaquaarg) {
-        P2DiscCL::GetGradientsOnRef( gradrefp2);
-        for (Uint i= 0; i < 10 ; ++i)
-            p2[i][i]= 1.; // P2-Basis-Functions
-    }
-
-    virtual ~InterfaceCommonDataCL () {}
-
-    virtual void begin_accumulation   () {
-        the_clones= new InterfaceCommonDataCL*[omp_get_max_threads()];
-        the_clones[0]= this;
-
-        max_dph_err= 0;
-        surfacemeasP1= 0.;
-        surfacemeasP2= 0.;
-        max_absdet_err= 0.;
-        max_dph2_err= 0;
-    }
-    virtual void finalize_accumulation() {
-        delete[] the_clones;
-
-        if (do_compute_debug_data_ == true) {
-            const double surface_true= 4.*M_PI*RadDrop[0]*RadDrop[0];
-            std::cout << "max_dph_err: " << max_dph_err
-                << "\nsurfacemeasP1: " << surfacemeasP1 << " rel. error: " << std::abs(surfacemeasP1 - surface_true)/surface_true
-                << "\nsurfacemeasP2: " << surfacemeasP2 << " rel. error: " << std::abs(surfacemeasP2 - surface_true)/surface_true
-                << "\nmax_absdet_err: " << max_absdet_err
-                << "\nmax_dph2_err: " << max_dph2_err << std::endl;
-        }
-    }
-
-    virtual void visit (const TetraCL& t) {
-        surf.clear();
-        locp2_ls.assign( t, *ls, *lsetbnd);
-        evaluate_on_vertexes( locp2_ls, lat, Addr( ls_loc));
-        if (equal_signs( ls_loc))
-            return;
-        surf.make_patch<MergeCutPolicyCL>( lat, ls_loc);
-        if (surf.empty())
-            return;
-
-        make_CompositeQuad5Domain2D ( qdom, surf, t);
-        qdom_projected.clear();
-        qdom_projected.reserve( qdom.vertex_size());
-        const TetraCL* tet;
-        BaryCoordCL b;
-        for (QuadDomain2DCL::const_vertex_iterator v= qdom.vertex_begin(); v != qdom.vertex_end(); ++v) {
-            tet= &t;
-            b= *v;
-            quaqua.base_point( tet, b);
-            qdom_projected.push_back( std::make_pair( tet, b));
-        }
-
-        absdet.resize( qdom.vertex_size());
-        for (Uint i= 0; i < qdom.vertex_size(); ++i) {
-            absdet[i]= abs_det( t, qdom.vertex_begin()[i], quaqua, surf);
-        }
-
-        if (to_iface != 0) {
-            const Uint sys= to_iface->RowIdx->GetIdx();
-            for (Uint i= 0; i < 4; ++i) {
-                tet= &t;
-                b= BaryCoordCL();
-                b[i]= 1.;
-                quaqua.base_point( tet, b);
-                Point3DCL offset= t.GetVertex( i)->GetCoord() - GetWorldCoord( *tet, b);
-                const size_t dof= t.GetVertex( i)->Unknowns( sys);
-                std::copy( Addr( offset), Addr( offset) + 3, &to_iface->Data[dof]);
-            }
-        }
-
-        if (do_compute_debug_data_ == true)
-            compute_debug_data( t);
-    }
-
-    virtual InterfaceCommonDataCL* clone (int clone_id) {
-        return the_clones[clone_id]= new InterfaceCommonDataCL( *this);
-    }
-};
-
 class LocalLaplaceBeltramiP2CL
 {
   private:
@@ -1006,7 +832,7 @@ class LocalLaplaceBeltramiP2CL
 
     double coup[10][10];
 
-    void setup (const TetraCL& t, const InterfaceCommonDataCL& cdata) {
+    void setup (const TetraCL& t, const InterfaceCommonDataP2CL& cdata) {
         if (cdata.surf.normal_empty())
             cdata.surf.compute_normals( t);
         resize_and_scatter_piecewise_normal( cdata.surf, cdata.qdom, nl);
@@ -1058,7 +884,7 @@ class LocalMassP2CL
 
     double coup[10][10];
 
-    void setup (const TetraCL&, const InterfaceCommonDataCL& cdata) {
+    void setup (const TetraCL&, const InterfaceCommonDataP2CL& cdata) {
         for (int i= 0; i < 10; ++i)
             resize_and_evaluate_on_vertexes ( cdata.p2[i], cdata.qdom, qp2[i]);
 
@@ -1074,7 +900,7 @@ class LocalMassP2CL
 
 template <class T, class ResultIterT>
   inline ResultIterT
-  evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const BaryPosVectorT& pos, double t, ResultIterT result_iterator)
+  evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const TetraBaryPairVectorT& pos, double t, ResultIterT result_iterator)
 {
     for (Uint i= 0; i < pos.size(); ++i) {
         const std::pair<const TetraCL*, BaryCoordCL>& p= pos[i];
@@ -1086,7 +912,7 @@ template <class T, class ResultIterT>
 
 template <class T, class ResultContT>
   inline ResultContT&
-  resize_and_evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const BaryPosVectorT& pos, double t, ResultContT& result_container)
+  resize_and_evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const TetraBaryPairVectorT& pos, double t, ResultContT& result_container)
 {
     result_container.resize( pos.size());
     evaluate_on_vertexes( f, pos, t, sequence_begin( result_container));
@@ -1095,7 +921,7 @@ template <class T, class ResultContT>
 
 template <class PEvalT, class ResultIterT>
   inline ResultIterT
-  evaluate_on_vertexes (const PEvalT& f, const BaryPosVectorT& pos, ResultIterT result_iterator)
+  evaluate_on_vertexes (const PEvalT& f, const TetraBaryPairVectorT& pos, ResultIterT result_iterator)
 {
     for (Uint i= 0; i < pos.size(); ++i) {
         const std::pair<const TetraCL*, BaryCoordCL>& p= pos[i];
@@ -1107,7 +933,7 @@ template <class PEvalT, class ResultIterT>
 
 template <class PEvalT, class ResultContT>
   inline ResultContT&
-  resize_and_evaluate_on_vertexes (const PEvalT& f, const BaryPosVectorT& pos, ResultContT& result_container)
+  resize_and_evaluate_on_vertexes (const PEvalT& f, const TetraBaryPairVectorT& pos, ResultContT& result_container)
 {
     result_container.resize( pos.size());
     evaluate_on_vertexes( f, pos, sequence_begin( result_container));
@@ -1131,7 +957,7 @@ class LocalVectorP2CL
 
     LocalVectorP2CL (instat_scalar_fun_ptr f, double time) : f_( f), time_( time) {}
 
-    void setup (const TetraCL&, const InterfaceCommonDataCL& cdata, const IdxT numr[10]) {
+    void setup (const TetraCL&, const InterfaceCommonDataP2CL& cdata, const IdxT numr[10]) {
 //         resize_and_evaluate_on_vertexes( f_, t, cdata.qdom, time_, qf);
         resize_and_evaluate_on_vertexes( f_, cdata.qdom_projected, time_, qf);
 //         qf.resize( cdata.qdom_projected.size());
@@ -1156,7 +982,7 @@ class LocalVectorP2CL
 class InterfaceL2AccuP2CL : public TetraAccumulatorCL
 {
   private:
-    const InterfaceCommonDataCL& cdata_;
+    const InterfaceCommonDataP2CL& cdata_;
     const MultiGridCL& mg;
     std::string name_;
 
@@ -1175,7 +1001,7 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
                         area;
 
   public:
-    InterfaceL2AccuP2CL (const InterfaceCommonDataCL& cdata, const MultiGridCL& mg_arg, std::string name= std::string())
+    InterfaceL2AccuP2CL (const InterfaceCommonDataP2CL& cdata, const MultiGridCL& mg_arg, std::string name= std::string())
         : cdata_( cdata), mg( mg_arg), name_( name), fvd( 0), f( 0), f_time( 0.) {}
     virtual ~InterfaceL2AccuP2CL () {}
 
@@ -1242,7 +1068,7 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
     }
 
     virtual void visit (const TetraCL& t) {
-        const InterfaceCommonDataCL& cdata= cdata_.get_clone();
+        const InterfaceCommonDataP2CL& cdata= cdata_.get_clone();
         if (cdata.empty())
             return;
 
@@ -1280,7 +1106,6 @@ void StationaryStrategyP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DR
 {
     // Initialize level set and triangulation
     adap.MakeInitialTriang( sphere_dist);
-
     lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
     lset.Phi.SetIdx( &lset.idx);
     // LinearLSInit( mg, lset.Phi, &sphere_dist);
@@ -1307,24 +1132,29 @@ void StationaryStrategyP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DR
 
     VecDescCL to_iface( &vecp2idx);
 //     {
-//     TetraAccumulatorTupleCL accus;
-//     InterfaceCommonDataCL ttt( lset.Phi, lset.GetBndData(), quaqua, lat, true);
-// //     ttt.store_offsets( to_iface);
-//     accus.push_back( &ttt);
-//     accumulate( accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetMatchingFunction(), ifacep2idx.GetBndInfo());
+//         TetraAccumulatorTupleCL accus;
+//         InterfaceCommonDataP2CL cdatap2( lset.Phi, lset.GetBndData(), quaqua, lat);
+//         accus.push_back( &cdatap2);
+//         InterfaceDebugP2CL p2debugaccu( cdatap2);
+// //         p2debugaccu.store_offsets( to_iface);
+//         p2debugaccu.set_true_area( 4.*M_PI*RadDrop[0]*RadDrop[0]);
+//         p2debugaccu.set_ref_dp( &dp_sphere);
+//         p2debugaccu.set_ref_abs_det( &abs_det_sphere);
+//         accus.push_back( &p2debugaccu);
+//         accumulate( accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetMatchingFunction(), ifacep2idx.GetBndInfo());
 //     }
 
     TetraAccumulatorTupleCL accus;
-    InterfaceCommonDataCL cdatap2( lset.Phi, lset.GetBndData(), quaqua, lat);
+    InterfaceCommonDataP2CL cdatap2( lset.Phi, lset.GetBndData(), quaqua, lat);
     accus.push_back( &cdatap2);
     DROPS::MatDescCL Mp2( &ifacep2idx, &ifacep2idx);
-    InterfaceMatrixAccuCL<LocalMassP2CL, InterfaceCommonDataCL> accuMp2( &Mp2, LocalMassP2CL(), cdatap2, "Mp2");
+    InterfaceMatrixAccuCL<LocalMassP2CL, InterfaceCommonDataP2CL> accuMp2( &Mp2, LocalMassP2CL(), cdatap2, "Mp2");
     accus.push_back( &accuMp2);
     DROPS::MatDescCL Ap2( &ifacep2idx, &ifacep2idx);
-    InterfaceMatrixAccuCL<LocalLaplaceBeltramiP2CL, InterfaceCommonDataCL> accuAp2( &Ap2, LocalLaplaceBeltramiP2CL( P.get<double>("SurfTransp.Visc")), cdatap2, "Ap2");
+    InterfaceMatrixAccuCL<LocalLaplaceBeltramiP2CL, InterfaceCommonDataP2CL> accuAp2( &Ap2, LocalLaplaceBeltramiP2CL( P.get<double>("SurfTransp.Visc")), cdatap2, "Ap2");
     accus.push_back( &accuAp2);
     DROPS::VecDescCL bp2( &ifacep2idx);
-    InterfaceVectorAccuCL<LocalVectorP2CL, InterfaceCommonDataCL> acculoadp2( &bp2, LocalVectorP2CL( laplace_beltrami_0_rhs, bp2.t), cdatap2);
+    InterfaceVectorAccuCL<LocalVectorP2CL, InterfaceCommonDataP2CL> acculoadp2( &bp2, LocalVectorP2CL( laplace_beltrami_0_rhs, bp2.t), cdatap2);
     accus.push_back( &acculoadp2);
 
     accumulate( accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetMatchingFunction(), ifacep2idx.GetBndInfo());
