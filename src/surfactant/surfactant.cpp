@@ -902,10 +902,16 @@ template <class T, class ResultIterT>
   inline ResultIterT
   evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const TetraBaryPairVectorT& pos, double t, ResultIterT result_iterator)
 {
+    BaryEvalCL<> eval;
+    eval.set( f);
+    eval.set_time( t);
+    const TetraCL* prev_tetra= 0;
     for (Uint i= 0; i < pos.size(); ++i) {
-        const std::pair<const TetraCL*, BaryCoordCL>& p= pos[i];
-        const BaryEvalCL<> eval( *p.first, t, f);
-        *result_iterator++= eval( p.second);
+        if (prev_tetra != pos[i].first) {
+            prev_tetra= pos[i].first;
+            eval.set( *pos[i].first);
+        }
+        *result_iterator++= eval( pos[i].second);
     }
     return result_iterator;
 }
@@ -923,10 +929,14 @@ template <class PEvalT, class ResultIterT>
   inline ResultIterT
   evaluate_on_vertexes (const PEvalT& f, const TetraBaryPairVectorT& pos, ResultIterT result_iterator)
 {
+    typename PEvalT::LocalFET loc_f;
+    const TetraCL* prev_tetra= 0;
     for (Uint i= 0; i < pos.size(); ++i) {
-        const std::pair<const TetraCL*, BaryCoordCL>& p= pos[i];
-        typename PEvalT::LocalFET loc_f( *p.first, f);
-        *result_iterator++= loc_f( p.second);
+        if (prev_tetra != pos[i].first) {
+            prev_tetra= pos[i].first;
+            loc_f.assign( *pos[i].first, f);
+        }
+        *result_iterator++= loc_f( pos[i].second);
     }
     return result_iterator;
 }
