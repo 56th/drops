@@ -868,10 +868,11 @@ class Bary2WorldCoordCL
   public:
     typedef Point3DCL value_type;
 
-    Bary2WorldCoordCL (const TetraCL& tet) : mat_( Uninitialized) {
-        for (int i= 0; i < 4; ++i)
-            mat_.col( i, tet.GetVertex( i)->GetCoord());
-    }
+    Bary2WorldCoordCL (const TetraCL& tet) : mat_( Uninitialized) { assign( tet); }
+    Bary2WorldCoordCL () : mat_( Uninitialized) {}
+
+    void assign (const TetraCL& tet);
+
     Point3DCL operator() (const BaryCoordCL& b) const { return mat_*b; }
 };
 

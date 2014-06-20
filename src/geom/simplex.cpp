@@ -483,6 +483,12 @@ BaryCoordCL World2BaryCoordCL::operator() (const Point3DCL& p) const
     return r;
 }
 
+void Bary2WorldCoordCL::assign (const TetraCL& tet)
+{
+    for (int i= 0; i < 4; ++i)
+        mat_.col( i, tet.GetVertex( i)->GetCoord());
+}
+
 void ComputeChildFacesOfFace (const TetraCL& p, Uint f, std::vector<const FaceCL*>& childfaces)
 {
     if (p.IsUnrefined()) {
