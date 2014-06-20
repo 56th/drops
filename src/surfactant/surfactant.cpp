@@ -414,6 +414,7 @@ double abs_det_sphere (const TetraCL& tet, const BaryCoordCL& xb, const SurfaceP
 
 // ==stationary test case "LaplaceBeltrami0"==
 // Sphere around 0, RadDrop 1, wind == 0
+// "Levelset": "SphereDist"
 // A right hand side from C.J. Heine...
 // const double a( -13./8.*std::sqrt( 35./M_PI));
 const double a( 12.);
@@ -442,6 +443,49 @@ double sol0t (const DROPS::Point3DCL& p, double t)
     return 1. + q.norm_sq()/(12. + q.norm_sq())*val;
 }
 
+// ==stationary test case "LaplaceBeltrami1"==
+// Torus with R= RadTorus[0]= 1., r= RadTorus[1]= 0.6, wind == 0
+// "Levelset": "Torus"
+
+// angle from positive x-axis to (x,y,0)
+double t_angle (const Point3DCL& p, double)
+{
+    return std::atan2( p[1], p[0]);
+}
+
+// distance from the circle in the x-y-plane around 0 with radius R
+double rho (const Point3DCL& p, double)
+{
+    return std::sqrt( p[2]*p[2] + std::pow( std::sqrt( p[0]*p[0] + p[1]*p[1]) - RadTorus[0], 2));
+}
+
+// angle from positive (x,y,0)-direction to p.
+double p_angle (const Point3DCL& p, double)
+{
+    return std::atan2( p[2], std::sqrt( p[0]*p[0] + p[1]*p[1]) - RadTorus[0]);
+}
+
+double laplace_beltrami_1_rhs (const Point3DCL& p, double)
+{
+    const double pa= p_angle( p, 0.);
+    const double ta= t_angle( p, 0.);
+
+    using std::sin;
+    using std::cos;
+    using std::pow;
+    const double t0= (9.*sin( 3.*ta)*cos( 3.*pa + ta))/(RadTorus[1]*RadTorus[1]);
+    const double t1= -(-10.*sin( 3.*ta)*cos(3.*pa + ta) - 6.*cos( 3.*ta)*sin( 3.*pa + ta))
+                     /pow(RadTorus[0] + RadTorus[1]*cos( pa), 2);
+    const double t2= -(3.*sin( pa)*sin( 3.*ta)*sin( 3.*pa + ta))/(RadTorus[1]*(RadTorus[0] + RadTorus[1]*cos( pa)));
+    return t0 + t1 + t2;
+}
+static RegisterScalarFunction regsca_laplace_beltrami_1_rhs( "LaplaceBeltrami1Rhs", laplace_beltrami_1_rhs);
+
+double laplace_beltrami_1_sol (const Point3DCL& p, double)
+{
+    return std::sin(3.*t_angle( p, 0.))*std::cos( 3.*p_angle( p, 0.) + t_angle( p, 0.));
+}
+static RegisterScalarFunction regsca_laplace_beltrami_1_sol( "LaplaceBeltrami1Sol", laplace_beltrami_1_sol);
 
 template<class DiscP1FunType>
 double L2_error (const DROPS::VecDescCL& ls, const BndDataCL<>& lsbnd,
@@ -920,11 +964,11 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
 void StationaryStrategyP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::LevelsetP2CL& lset)
 {
     // Initialize level set and triangulation
-    adap.MakeInitialTriang( sphere_dist);
+    adap.MakeInitialTriang( the_lset_fun);
     lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
     lset.Phi.SetIdx( &lset.idx);
-    // LinearLSInit( mg, lset.Phi, &sphere_dist);
-    LSInit( mg, lset.Phi, sphere_dist, 0.);
+    // LinearLSInit( mg, lset.Phi, &the_lset_fun);
+    LSInit( mg, lset.Phi, the_lset_fun, 0.);
 
     // Setup an interface-P2 numbering
     DROPS::IdxDescCL ifacep2idx( P2IF_FE);
@@ -969,7 +1013,7 @@ void StationaryStrategyP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DR
     InterfaceMatrixAccuCL<LocalLaplaceBeltramiP2CL, InterfaceCommonDataP2CL> accuAp2( &Ap2, LocalLaplaceBeltramiP2CL( P.get<double>("SurfTransp.Visc")), cdatap2, "Ap2");
     accus.push_back( &accuAp2);
     DROPS::VecDescCL bp2( &ifacep2idx);
-    InterfaceVectorAccuCL<LocalVectorP2CL, InterfaceCommonDataP2CL> acculoadp2( &bp2, LocalVectorP2CL( laplace_beltrami_0_rhs, bp2.t), cdatap2);
+    InterfaceVectorAccuCL<LocalVectorP2CL, InterfaceCommonDataP2CL> acculoadp2( &bp2, LocalVectorP2CL( the_rhs_fun, bp2.t), cdatap2);
     accus.push_back( &acculoadp2);
 
     accumulate( accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetMatchingFunction(), ifacep2idx.GetBndInfo());
@@ -995,7 +1039,7 @@ void StationaryStrategyP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DR
     err_accus.push_back( &cdatap2);
     InterfaceL2AccuP2CL L2_accu( cdatap2, mg, "P2-solution");
     L2_accu.set_grid_function( xp2);
-    L2_accu.set_function( &laplace_beltrami_0_sol, 0.);
+    L2_accu.set_function( the_sol_fun, 0.);
     err_accus.push_back( &L2_accu);
     accumulate( err_accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetMatchingFunction(), ifacep2idx.GetBndInfo());
 
@@ -1005,7 +1049,7 @@ void StationaryStrategyP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DR
     DROPS::NoBndDataCL<> nobnd;
     DROPS::NoBndDataCL<Point3DCL> nobnd_vec;
     VecDescCL the_sol_vd( &lset.idx);
-    LSInit( mg, the_sol_vd, &laplace_beltrami_0_sol, /*t*/ 0.);
+    LSInit( mg, the_sol_vd, the_sol_fun, /*t*/ 0.);
     if (vtkwriter.get() != 0) {
         vtkwriter->Register( make_VTKScalar( lset.GetSolution(), "Levelset") );
         vtkwriter->Register( make_VTKIfaceScalar( mg, xp2, "InterfaceSolP2"));
