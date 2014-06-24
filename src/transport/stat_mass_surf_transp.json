@@ -67,7 +67,9 @@
                 "BoundaryFncst":        "solMassPos!solMassPos!solMassPos!solMassPos!solMassPos!solMassPos",
                 "Rhs":                  "rhsMassNoVel",
                 "SolNeg":               "solMassNeg",
-                "SolPos":               "solMassPos"
+                "SolPos":               "solMassPos",
+                "GradSolNeg":           "gradMassNeg",
+                "GradSolPos":           "gradMassPos"
         },
 
 	    "SurfTransp":
