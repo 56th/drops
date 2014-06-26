@@ -41,7 +41,7 @@ namespace DROPS
     try {
         boost::property_tree::read_json(path, this->pt);
     } catch (boost::property_tree::ptree_error& e) {
-          throw DROPSParamErrCL( "ParamCL::read_json: Error while opening or reading file.\n");
+          throw DROPSParamErrCL( "ParamCL::read_json: Error while opening or reading file.\n" + std::string(e.what()) + '\n');
     }
   }
 
@@ -50,7 +50,7 @@ namespace DROPS
     try {
         boost::property_tree::read_json(stream, P.pt);
     } catch (boost::property_tree::ptree_error& e) {
-          throw DROPSParamErrCL( "ParamCL::operator>>: Read error.\n");
+          throw DROPSParamErrCL( "ParamCL::operator>>: Read error.\n" + std::string(e.what()) + '\n');
     }
     return stream;
   }
