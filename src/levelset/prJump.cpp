@@ -368,6 +368,7 @@ void Strategy( InstatStokes2PhaseP2P1CL& Stokes, const LsetBndDataCL& lsbnd, Ada
               << "\n || u ||_M  = " << std::sqrt( dot( Stokes.M.Data*u, u))
               << "\n || u ||_A  = " << std::sqrt( dot( Stokes.A.Data*u, u))
               << "\n----------------\n";
+    //This if clause filters out too large/small pressure values due to xfem
     if (Stokes.UsesXFEM())
     {
         const ExtIdxDescCL& Xidx= Stokes.GetXidx();
@@ -429,6 +430,7 @@ void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<double>("NavStokes.Downwind.MaxRelComponentSize", 0.05);
     P.put_if_unset<double>("NavStokes.Downwind.WeakEdgeRatio", 0.2);
     P.put_if_unset<double>("NavStokes.Downwind.CrosswindLimit", std::cos( M_PI/6.));
+    P.put_if_unset<int>("Levelset.Discontinuous", 0);
     P.put_if_unset<int>("Levelset.Downwind.Frequency", 0);
     P.put_if_unset<double>("Levelset.Downwind.MaxRelComponentSize", 0.05);
     P.put_if_unset<double>("Levelset.Downwind.WeakEdgeRatio", 0.2);
@@ -440,6 +442,10 @@ void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<double>("Mat.DilatationalVisco", 0.0);
     P.put_if_unset<double>("SurfTens.ShearVisco", 0.0);
     P.put_if_unset<double>("SurfTens.DilatationalVisco", 0.0);
+	
+    P.put_if_unset<std::string>("Exp.Solution_Vel", "None");
+    P.put_if_unset<std::string>("Exp.Solution_GradPr", "None");
+    P.put_if_unset<std::string>("Exp.Solution_Pr", "None");
 }
 
 int main (int argc, char** argv)
