@@ -29,6 +29,7 @@
 #include "misc/progressaccu.h"
 #include "misc/scopetimer.h"
 
+
 extern DROPS::ParamCL P;
 
 namespace DROPS
@@ -37,7 +38,7 @@ namespace DROPS
 //                        Routines for SetupSystem2
 // -----------------------------------------------------------------------------
 
-
+class EllipsoidCL;
 void SetupSystem2_P2P0( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL&, const StokesBndDataCL& BndData,
                         MatrixCL* B, VecDescCL* c, IdxDescCL* RowIdx, IdxDescCL* ColIdx, double t)
 // P2 / P0 FEs for vel/pr
@@ -3340,7 +3341,7 @@ void InstatStokes2PhaseP2P1CL::SetNumPrLvl( size_t n)
 void InstatStokes2PhaseP2P1CL::GetPrOnPart( VecDescCL& p_part, const LevelsetP2CL& lset, bool posPart)
 {
     const Uint lvl= p.RowIdx->TriangLevel(),
-        idxnum= p.RowIdx->GetIdx();
+          idxnum= p.RowIdx->GetIdx();
     LevelsetP2CL::const_DiscSolCL ls= lset.GetSolution();
     const MultiGridCL& mg= this->GetMG();
     const ExtIdxDescCL& Xidx= this->GetXidx();
@@ -3353,18 +3354,18 @@ void InstatStokes2PhaseP2P1CL::GetPrOnPart( VecDescCL& p_part, const LevelsetP2C
     for( MultiGridCL::const_TriangVertexIteratorCL it= mg.GetTriangVertexBegin(lvl),
         end= mg.GetTriangVertexEnd(lvl); it != end; ++it)
     {
+		 if (!it->Unknowns.Exist( idxnum)) continue;
         const IdxT nr= it->Unknowns(idxnum);
         if (Xidx[nr]==NoIdx) continue;
 
-        const bool is_pos= InterfacePatchCL::Sign( ls.val( *it))==1;
-        if (posPart==is_pos) continue; // extended hat function ==0 on this part
+        const bool sign= InterfacePatchCL::Sign( ls.val( *it))==1;
+        if (posPart==sign) continue; // extended hat function ==0 on this part
         if (posPart)
             pp[nr]+= p.Data[Xidx[nr]];
         else
             pp[nr]-= p.Data[Xidx[nr]];
     }
 }
-
 
 double InstatStokes2PhaseP2P1CL::GetCFLTimeRestriction( LevelsetP2CL& lset)
 {
@@ -3507,7 +3508,94 @@ void InstatStokes2PhaseP2P1CL::CheckOnePhaseSolution(const VelVecDescCL* DescVel
 				   <<"\n || p_h - p ||_L2 = " <<  L2_pr 
 				   <<"\n || nabla (p_h - p) ||_L2 = " << Grad_pr << std::endl;	
 }
+//-------------------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------------------
+//The three functions in this block is used to repeat the L2 pressure error checker in prJump.cpp
+Point3DCL Radius; 
+Point3DCL Mitte;
+double DistanceFct( const Point3DCL& p, double)
+{
+	static bool first = true;
+	if (first){
+		Radius =  P.get<DROPS::Point3DCL>("Exp.RadDrop");
+		Mitte  =  P.get<DROPS::Point3DCL>("Exp.PosDrop");
+	}
+	Point3DCL d= p - Mitte;
+	const double avgRad= cbrt(Radius[0]*Radius[1]*Radius[2]);
+	d/= Radius;
+	return std::abs( avgRad)*d.norm() - avgRad;
+}
 
+void InitialPr( VecDescCL& p, double delta_p, const MultiGridCL& mg, const FiniteElementT prFE, const ExtIdxDescCL& Xidx)
+{
+    const Uint lvl= p.RowIdx->TriangLevel(),
+        idxnum= p.RowIdx->GetIdx();
+
+    delta_p/= 2;
+    switch (prFE)
+    {
+      case P0_FE:
+        for( MultiGridCL::const_TriangTetraIteratorCL it= mg.GetTriangTetraBegin(lvl),
+            end= mg.GetTriangTetraEnd(lvl); it != end; ++it)
+        {
+            const double dist= DistanceFct( GetBaryCenter( *it), 0);
+            p.Data[it->Unknowns(idxnum)]= dist > 0 ? -delta_p : delta_p;
+        }
+        break;
+      case P1X_FE:
+        for( MultiGridCL::const_TriangVertexIteratorCL it= mg.GetTriangVertexBegin(lvl),
+            end= mg.GetTriangVertexEnd(lvl); it != end; ++it)
+        {
+            const IdxT idx= it->Unknowns(idxnum);
+            if (Xidx[idx]==NoIdx) continue;
+            p.Data[Xidx[idx]]= -2*delta_p; // jump height
+        }
+      case P1_FE: // and P1X_FE
+        for( MultiGridCL::const_TriangVertexIteratorCL it= mg.GetTriangVertexBegin(lvl),
+            end= mg.GetTriangVertexEnd(lvl); it != end; ++it)
+        {
+            const double dist= DistanceFct( it->GetCoord(), 0.);
+            p.Data[it->Unknowns(idxnum)]= InterfacePatchCL::Sign(dist)==1 ? -delta_p : delta_p;
+        }
+        break;
+      default:
+        std::cout << "InitPr not implemented yet for this FE type!\n";
+    }
+}
+
+void L2ErrPr( const VecDescCL& p, const LevelsetP2CL& lset, const MatrixCL& prM, double delta_p, const MultiGridCL& mg, const FiniteElementT prFE, const ExtIdxDescCL& Xidx, double p_ex_avg)
+{
+    const double min= p.Data.min(), max= p.Data.max();
+    std::cout << "pressure min/max/diff:\t" << min << "\t" << max << "\t" << (max-min-delta_p) << "\n";
+
+    VectorCL ones( 1.0, p.Data.size());
+    if (prFE==P1X_FE)
+        for (int i=Xidx.GetNumUnknownsStdFE(), n=ones.size(); i<n; ++i)
+            ones[i]= 0;
+    const double Vol= dot( prM*ones, ones)*P.get<double>("Mat.ViscDrop"); // note that prM is scaled by 1/mu !!
+// std::cout << "Vol = " << Vol << '\n';
+    const double p_avg= dot( prM*p.Data, ones)*P.get<double>("Mat.ViscDrop")/Vol; // note that prM is scaled by 1/mu !!
+    VectorCL diff( p.Data - p_avg*ones);
+    const double p0_avg= dot( prM*diff, ones)*P.get<double>("Mat.ViscDrop")/Vol;
+    std::cout << "average of pressure:\t" << p_avg << std::endl;
+    std::cout << "avg. of scaled pr:\t" << p0_avg << std::endl;
+
+    if (prFE==P1X_FE)
+    {
+        VecDescCL p_exakt( p.RowIdx);
+        InitialPr( p_exakt, delta_p, mg, prFE, Xidx);
+        const double p_ex_avg2= dot( prM*p_exakt.Data, ones)*P.get<double>("Mat.ViscDrop")/Vol;
+        std::cout << "avg. of exact pr:\t" << p_ex_avg2 << std::endl;
+        diff-= VectorCL( p_exakt.Data - p_ex_avg*ones);
+        const double L2= std::sqrt( P.get<double>("Mat.ViscDrop")*dot( prM*diff, diff));
+        std::cout << "*************\n"
+                  << "assuming avg(p*)==" << p_ex_avg
+                  << "  ===>  \t||e_p||_L2 = " << L2 << std::endl
+                  << "*************\n";
+    }
+}
+//-----------------------------------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------------------------------------------------------
 
 //To check solution with continuous velocity, and discountious pressure;
 void InstatStokes2PhaseP2P1CL::CheckTwoPhaseSolution(const VelVecDescCL* DescVel, const VecDescCL* DescPr, 
@@ -3523,6 +3611,10 @@ void InstatStokes2PhaseP2P1CL::CheckTwoPhaseSolution(const VelVecDescCL* DescVel
 	Uint lvl=DescVel->GetLevel();
 	VecDescCL DescPr_neg; 
 	VecDescCL DescPr_pos;
+    /// \todo for periodic stuff: matching function here
+
+    DescPr_neg.SetIdx( p.RowIdx);
+    DescPr_pos.SetIdx( p.RowIdx);
 	GetPrOnPart(DescPr_neg, lset, false);
 	GetPrOnPart(DescPr_pos, lset, true);
 	
@@ -3537,25 +3629,23 @@ void InstatStokes2PhaseP2P1CL::CheckTwoPhaseSolution(const VelVecDescCL* DescVel
     double L2_pr(0.0);
     Quad5CL<Point3DCL> q5_vel, q5_vel_exact;
     Quad5CL<double> q5_pr, q5_pr_exact;
-	GridFunctionCL<double> pre_neg, pre_pos, pre_exact1,pre_exact2;
+	GridFunctionCL<double> pre_neg, pre_pos, pre_exact1,pre_exact2, err_neg, err_pos;
 	
 	TetraPartitionCL partition;
 	QuadDomainCL q5dom;
-
+	InterfaceTetraCL cut;
 	const PrincipalLatticeCL lat(PrincipalLatticeCL::instance(2));
     std::valarray<double> ls_loc(lat.vertex_size());
+	
 	
 	double SumErr=0.;
 	double volume=0.;
 	double average=0.;
-	double trash;
-	double neg =0, pos=0;
     for (MultiGridCL::const_TriangTetraIteratorCL sit= const_cast<const MultiGridCL&>(MG_).GetTriangTetraBegin(lvl),
         send= const_cast<const MultiGridCL&>(MG_).GetTriangTetraEnd(lvl); sit != send; ++sit)
     {
 		 evaluate_on_vertexes( lset.GetSolution(), *sit, lat, Addr( ls_loc));
-		 const bool noCut= equal_signs( ls_loc);
-		
+		 const bool noCut= equal_signs( ls_loc);	 
          GetTrafoTr(T,det,*sit);
          const double absdet= std::fabs(det);
          LocalP1CL<double> loc_pr(*sit, make_P1Eval(MG_,BndData_.Pr,*DescPr));
@@ -3571,35 +3661,35 @@ void InstatStokes2PhaseP2P1CL::CheckTwoPhaseSolution(const VelVecDescCL* DescVel
 		 }
 		 else{
 			 partition.make_partition<SortedVertexPolicyCL, MergeCutPolicyCL>( lat, ls_loc);
-			 make_CompositeQuad5Domain( q5dom, partition);
+			 make_CompositeQuad2Domain( q5dom, partition);
 			 LocalP1CL<double> loc_pr_neg(*sit, make_P1Eval(MG_,BndData_.Pr, DescPr_neg));
-             resize_and_evaluate_on_vertexes( RefPr, *sit, q5dom, 6., pre_exact1);
 			 LocalP1CL<double> loc_pr_pos(*sit, make_P1Eval(MG_,BndData_.Pr, DescPr_pos));
-			 resize_and_evaluate_on_vertexes( RefPr, *sit, q5dom, 4., pre_exact2); 
+
 			 resize_and_evaluate_on_vertexes( loc_pr_neg, q5dom, pre_neg);
 			 resize_and_evaluate_on_vertexes( loc_pr_pos, q5dom, pre_pos); 
-			 quad ( pre_neg-pre_exact1, absdet, q5dom, neg, trash);  
-             resize_and_evaluate_on_vertexes( RefPr, *sit, q5dom, 4., pre_exact2); 
-             quad ( pre_pos-pre_exact2, absdet, q5dom, trash, pos);
-			 SumErr+= neg;
-			 SumErr+= pos;
+			 
+			 resize_and_evaluate_on_vertexes( RefPr, *sit, q5dom, 6., pre_exact1);
+			 resize_and_evaluate_on_vertexes( RefPr, *sit, q5dom, 4., pre_exact2); 	
+			 
+			 SumErr+= quad ( (pre_neg-pre_exact1), absdet, q5dom, NegTetraC);
+			 SumErr+= quad ( (pre_pos-pre_exact2), absdet, q5dom, PosTetraC);	
 		 }
      }
 	 //Get the average pressure, use it to normalize the pressure;
 	average= SumErr/volume;
-	//std::cout<<"The average of the pressure error is: "<<average<<" The volume is: "<<volume<<std::endl;
-    neg=0, pos=0;
+	std::cout<<"The average of the pressure error is: "<<average<<" The volume is: "<<volume<<std::endl;
     for (MultiGridCL::const_TriangTetraIteratorCL sit= const_cast<const MultiGridCL&>(MG_).GetTriangTetraBegin(lvl),
         send= const_cast<const MultiGridCL&>(MG_).GetTriangTetraEnd(lvl); sit != send; ++sit)
     {
 		 evaluate_on_vertexes( lset.GetSolution(), *sit, lat, Addr( ls_loc));
+		 cut.Init( *sit, lset.Phi, lset.GetBndData());
 		 const bool noCut= equal_signs( ls_loc);
-		
+		 	
          GetTrafoTr(T,det,*sit);
          const double absdet= std::fabs(det);
          LocalP2CL<Point3DCL> loc_vel(*sit, make_P2Eval(MG_,BndData_.Vel,*DescVel));
          LocalP1CL<double> loc_pr(*sit, make_P1Eval(MG_,BndData_.Pr,*DescPr));
-		 LocalP1CL<double> loc_aver(average);
+		  LocalP1CL<double> loc_aver(average);
 			 
          q5_vel.assign(loc_vel);
          q5_vel_exact.assign(*sit, RefVel,t);
@@ -3620,27 +3710,63 @@ void InstatStokes2PhaseP2P1CL::CheckTwoPhaseSolution(const VelVecDescCL* DescVel
 		 }
 		 else{
 			 partition.make_partition<SortedVertexPolicyCL, MergeCutPolicyCL>( lat, ls_loc);
-			 make_CompositeQuad5Domain( q5dom, partition);
+			 make_CompositeQuad2Domain( q5dom, partition);
 			 LocalP1CL<double> loc_pr_neg(*sit, make_P1Eval(MG_,BndData_.Pr, DescPr_neg));
 			 LocalP1CL<double> loc_pr_pos(*sit, make_P1Eval(MG_,BndData_.Pr, DescPr_pos));
 			 LocalP1CL<double> temp1(loc_pr_neg-loc_aver); //for negative pressure;
 			 LocalP1CL<double> temp2(loc_pr_pos-loc_aver); //for positive pressure;
-			 resize_and_evaluate_on_vertexes( temp1, q5dom, pre_neg);
-			 resize_and_evaluate_on_vertexes( temp2, q5dom, pre_pos); 
-			 //To do: currently not find the best way, use the time to as level set sign flag;
-             resize_and_evaluate_on_vertexes( RefPr, *sit, q5dom, 6., pre_exact1);  
-			 quad ( (pre_neg-pre_exact1)*(pre_neg-pre_exact1), absdet, q5dom, neg, trash);  
-			 L2_pr += neg;
-             resize_and_evaluate_on_vertexes( RefPr, *sit, q5dom, 4., pre_exact2); 
-             quad ( (pre_pos-pre_exact2)*(pre_pos-pre_exact2), absdet, q5dom, trash, pos);
-			 L2_pr += pos;			 
+			 LocalP2CL<double> pr_neg_l2 (temp1);
+			 LocalP2CL<double> pr_pos_l2 (temp2);
+			 LocalP2CL<double> pr_ex_neg (*sit, RefPr, 6);
+			 LocalP2CL<double> pr_ex_pos (*sit, RefPr, 4);
+			 LocalP2CL<double> err_neg_l2( (pr_neg_l2-pr_ex_neg)*(pr_neg_l2-pr_ex_neg) );
+			 LocalP2CL<double> err_pos_l2( (pr_pos_l2-pr_ex_pos)*(pr_pos_l2-pr_ex_pos) );
+			 
+			 resize_and_evaluate_on_vertexes(err_neg_l2,  q5dom,  err_neg);
+			 resize_and_evaluate_on_vertexes(err_pos_l2,  q5dom,  err_pos); 
+			 //To do: currently not find the best way, use the time to as level set sign flag;			 
+			 L2_pr += quad ( err_pos,  absdet, q5dom,   PosTetraC);
+			 L2_pr += quad ( err_neg,  absdet, q5dom,   NegTetraC);	 
 		 }
      }
      L2_vel  = std::sqrt(L2_vel);               //L2_vel is the true value.
-	 L2_pr = std::sqrt(L2_pr);
+     L2_pr   = std::sqrt(L2_pr);
          std::cout << "---------------------Discretize error-------------------"
-		           <<"\n || u_h - u ||_L2 = " <<  L2_vel 
-				   <<"\n || p_h - p ||_L2 = " << L2_pr << std::endl;	
+		            <<"\n || u_h - u ||_L2 = " <<  L2_vel 
+				     <<"\n || p_h - p ||_L2 = " <<  L2_pr << std::endl;	
+	
+    //The following code is repeating the L2 pressure error checker in prJump.cpp
+	const double Vol= 8.,
+        prJump= P.get<double>("SurfTens.SurfTension")*2/P.get<DROPS::Point3DCL>("Exp.RadDrop")[0], // for SF_*LB force
+        avg_ex= prJump/2.*(8./3.*M_PI*P.get<DROPS::Point3DCL>("Exp.RadDrop")[0]*P.get<DROPS::Point3DCL>("Exp.RadDrop")[0]*P.get<DROPS::Point3DCL>("Exp.RadDrop")[0] - Vol)/Vol; // for spherical interface
+	
+	if (UsesXFEM())
+    {
+        const ExtIdxDescCL& Xidx= GetXidx();
+        const size_t n= p.Data.size();
+
+        const double limtol= 10,
+            lim_min= -prJump - limtol*prJump,
+            lim_max= -prJump + limtol*prJump;
+        double xmin= 1e99, xmax= -1e99, sum= 0, sum_lim= 0;
+        IdxT num= 0;
+        for (size_t i=Xidx.GetNumUnknownsStdFE(); i<n; ++i)
+        {
+            const double pr= p.Data[i];
+            sum+= pr;
+            ++num;
+            if (pr>xmax) xmax= pr;
+            if (pr<xmin) xmin= pr;
+            if (pr>lim_max) p.Data[i]= lim_max;
+            if (pr<lim_min) p.Data[i]= lim_min;
+            sum_lim+= p.Data[i];
+        }
+        std::cout << "extended pr: min/max/avg = " << xmin << ", " << xmax << ", " << sum/num << std::endl;
+        std::cout << "limited pr:  min/max/avg = " << lim_min << ", " << lim_max << ", " << sum_lim/num << std::endl;
+    }
+	
+	SetupPrMass(&prM, lset);
+	L2ErrPr( p, lset, prM.Data.GetFinest(), prJump, MG_, GetPrFE(), GetXidx(), avg_ex);	 
 }
 
 ///> To do, parallel case
