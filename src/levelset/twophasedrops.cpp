@@ -250,8 +250,19 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
     double Vol = 0;
     //Vol = lset.GetVolume();
-    if ((P.get("Exp.InitialLSet", std::string("Ellipsoid")) == "Ellipsoid" || P.get("Exp.InitialLSet", std::string("HalfEllipsoid")) == "HalfEllipsoid") && P.get<int>("Levelset.VolCorrection") != 0){
-        Vol = (P.get("Exp.InitialLSet", std::string("Ellipsoid")) == "Ellipsoid")? EllipsoidCL::GetVolume(): HalfEllipsoidCL::GetVolume();
+    if ((P.get("Exp.InitialLSet", std::string("Ellipsoid")) == "Ellipsoid" || P.get("Exp.InitialLSet", std::string("Ellipsoid")) == "Cylinder" 
+        || P.get("Exp.InitialLSet", std::string("Ellipsoid")) == "ContactDroplet" || P.get("Exp.InitialLSet", std::string("Ellipsoid")) == "HalfEllipsoid") 
+        && P.get<int>("Levelset.VolCorrection") != 0)
+    {        
+        std::string InitialLSet= P.get("Exp.InitialLSet", std::string("Ellipsoid"));
+        if (InitialLSet == "Ellipsoid")
+            Vol = EllipsoidCL::GetVolume();
+        if (InitialLSet == "HalfEllipsoid")
+            Vol = HalfEllipsoidCL::GetVolume();
+        if (InitialLSet == "ContactDroplet")
+            Vol = ContactDropletCL::GetVolume();
+        if (InitialLSet.find("Cylinder")==0)
+            Vol = CylinderCL::GetVolume();
         std::cout << "initial volume: " << lset.GetVolume()/Vol << std::endl;
         double dphi= lset.AdjustVolume( Vol, 1e-9);
         std::cout << "initial volume correction is " << dphi << std::endl;
