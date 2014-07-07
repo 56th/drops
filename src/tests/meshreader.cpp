@@ -23,6 +23,7 @@
 */
 
 #include "misc/container.h"
+#include "misc/params.h"
 #include "out/output.h"
 #include "geom/builder.h"
 #include "geom/multigrid.h"
@@ -259,6 +260,18 @@ int TestRefine()
     return 0;
 }
 
+int TestBuilder()
+{
+    DROPS::ParamCL P( "meshreader.json");
+    std::cout << P << std::endl;
+
+    std::auto_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P.get_child( "Domain")));
+    DROPS::MultiGridCL mg( *builder);
+    std::cout << DROPS::SanityMGOutCL( mg) << std::endl;
+    return 0;
+}
+
+
 int main (int, char**)
 {
 /*
@@ -274,6 +287,7 @@ int main (int, char**)
 //    return TestRefineUniform();
 //    return Test();
 //    return TestPrimitives() + TestReading();
+//    return TestBuilder();
   }
   catch (DROPS::DROPSErrCL err) { err.handle(); }
 }

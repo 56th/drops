@@ -36,6 +36,7 @@
 #include "out/vtkOut.h"
 //levelset
 #include "levelset/coupling.h"
+#include "levelset/marking_strategy.h"
 #include "levelset/adaptriang.h"
 #include "levelset/mzelle_hdr.h"
 #include "levelset/twophaseutils.h"
@@ -229,7 +230,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
     if (lset.IsDiscontinuous())
     {
-        LevelsetP2DiscontCL& lsetD (dynamic_cast<LevelsetP2DiscontCL&>(lset)); 
+        LevelsetP2DiscontCL& lsetD (dynamic_cast<LevelsetP2DiscontCL&>(lset));
         MLIdxDescCL* lidxc = lsetD.idxC;
         lsetD.CreateNumbering( MG.GetLastLevel(), lidxc, periodic_match);
         lsetD.PhiContinuous.SetIdx( lidxc);
@@ -251,9 +252,11 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     double Vol = 0;
     //Vol = lset.GetVolume();
     if ((P.get("Exp.InitialLSet", std::string("Ellipsoid")) == "Ellipsoid" || P.get("Exp.InitialLSet", std::string("Ellipsoid")) == "Cylinder" 
-        || P.get("Exp.InitialLSet", std::string("Ellipsoid")) == "ContactDroplet" || P.get("Exp.InitialLSet", std::string("Ellipsoid")) == "HalfEllipsoid") 
+        || P.get("Exp.InitialLSet", std::string("Ellipsoid")) == "ContactDroplet" || P.get("Exp.InitialLSet", std::string("Ellipsoid")) == "HalfEllipsoid" || P.get("Exp.InitialLSet", std::string("Ellipsoid")) == "TaylorFlowDistance") 
         && P.get<int>("Levelset.VolCorrection") != 0)
-    {        
+    {  
+        if (P.get<double>("Exp.InitialVolume",-1.0) > 0 )
+            Vol = P.get<double>("Exp.InitialVolume");      
         std::string InitialLSet= P.get("Exp.InitialLSet", std::string("Ellipsoid"));
         if (InitialLSet == "Ellipsoid")
             Vol = EllipsoidCL::GetVolume();
@@ -263,11 +266,11 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
             Vol = ContactDropletCL::GetVolume();
         if (InitialLSet.find("Cylinder")==0)
             Vol = CylinderCL::GetVolume();
-        std::cout << "initial volume: " << lset.GetVolume()/Vol << std::endl;
+        std::cout << "initial rel. volume: " << lset.GetVolume()/Vol << std::endl;
         double dphi= lset.AdjustVolume( Vol, 1e-9);
-        std::cout << "initial volume correction is " << dphi << std::endl;
+        std::cout << "initial lset offset for correction is " << dphi << std::endl;
         lset.Phi.Data+= dphi;
-        std::cout << "new initial volume: " << lset.GetVolume()/Vol << std::endl;
+        std::cout << "new initial rel. volume: " << lset.GetVolume()/Vol << std::endl;
     }else{
         Vol = lset.GetVolume();
     }
@@ -516,12 +519,17 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
     const int nsteps = P.get<int>("Time.NumSteps");
     const double dt = P.get<double>("Time.StepSize");
+
     //if(P.get<int>("Exp.OutputInfo")==1)
     std::ofstream out((P.get<std::string>("VTK.VTKName","contactangle")+".txt").c_str());
     out<<"time: "<<" angle: "<<" wet_area: "<<"surface_energy:  "<<"kinetic_energy:  "<<"total energy:  "<<std::endl;
-
-    //out<<" "<<0<<"  "<<1.5707963<<"  "<<P.get<DROPS::Point3DCL>("Exp.RadDrop")[0]<<std::endl;
     double time = 0.0;
+    typedef DistMarkingStrategyCL MarkerT;
+    MarkerT marker( lset,
+                    P.get<double>("AdaptRef.Width"),
+                    P.get<double>("AdaptRef.CoarsestLevel"), P.get<double>("AdaptRef.FinestLevel") );
+    adap.set_marking_strategy(&marker);
+
     for (int step= 1; step<=nsteps; ++step)
     {
         std::cout << "============================================================ step " << step << std::endl;
@@ -564,9 +572,10 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         // grid modification
         const bool doGridMod= P.get<int>("AdaptRef.Freq") && step%P.get<int>("AdaptRef.Freq") == 0;
         bool gridChanged= false;
-        if (doGridMod) {
-            adap.UpdateTriang( lset);
-            gridChanged= adap.WasModified();
+        if (doGridMod)
+        {
+            gridChanged = adap.UpdateTriang();
+
         }
         // downwind-numbering for Navier-Stokes
         const bool doNSDownwindNumbering= P.get<int>("NavStokes.Downwind.Frequency")
@@ -697,35 +706,18 @@ int main (int argc, char** argv)
 #endif
   try
   {
-    std::ifstream param;
-
     std::cout << "Boost version: " << BOOST_LIB_VERSION << std::endl;
 
-    if (argc!=2)
-    {
-        std::cout << "Using default parameter file: risingdroplet.json\n";
-        param.open( "risingdroplet.json");
-    }
-    else
-        param.open( argv[1]);
-    if (!param)
-    {
-        std::cerr << "error while opening parameter file\n";
-        return 1;
-    }
-    param >> P;
-    param.close();
-
+    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "risingdroplet.json");
     SetMissingParameters(P);
-
     std::cout << P << std::endl;
-    
+
     DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
-    
+
     if (P.get<int>("General.ProgressBar"))
         DROPS::ProgressBarTetraAccumulatorCL::Activate();
 
-    //!check paramterfile
+    // check parameter file
     if (P.get<double>("SurfTens.DilatationalVisco")< P.get<double>("SurfTens.ShearVisco"))
     {
         throw DROPS::DROPSErrCL("Parameter error : Dilatational viscosity must be larger than surface shear viscosity");
@@ -744,7 +736,27 @@ int main (int argc, char** argv)
 
     //you cannot pass a double& per P.get, so you need to use this indirect way
     double ExpRadInlet = P.get<double>("Exp.RadInlet");
-    DROPS::BuildDomain( mg, P.get<std::string>("DomainCond.MeshFile"), P.get<int>("DomainCond.GeomType"), P.get<std::string>("Restart.Inputfile"), ExpRadInlet);
+
+    try
+    {
+        std::auto_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P));
+        mg = new DROPS::MultiGridCL( *builder);
+    }
+    catch (DROPS::DROPSParamErrCL& e)
+    {
+        std::cout << "\n"
+                  << "  /----------------------------------------------------------------\\ \n"
+                  << "  | WARNING: It seems you are using the old domain descriptions    | \n"
+                  << "  |          or your \"Domain\" section is not correct.              | \n"
+                  << "  |          Please adapt your json-file to the new description.   | \n"
+                  <<"  \\----------------------------------------------------------------/ \n"
+                  << std::endl;
+        DROPS::BuildDomain( mg, P.get<std::string>("DomainCond.MeshFile"), P.get<int>("DomainCond.GeomType"), P.get<std::string>("Restart.Inputfile"), ExpRadInlet);
+    }
+
+
+
+
     P.put("Exp.RadInlet", ExpRadInlet);
 
     std::cout << "Generated MG of " << mg->GetLastLevel() << " levels." << std::endl;
@@ -780,22 +792,28 @@ int main (int argc, char** argv)
         DROPS::CylinderCL::Init( P.get<DROPS::Point3DCL>("Exp.PosDrop"), P.get<DROPS::Point3DCL>("Exp.RadDrop"), InitialLSet[8]-'X');
         P.put("Exp.InitialLSet", InitialLSet= "Cylinder");
     }
+    typedef DROPS::DistMarkingStrategyCL MarkerT;
+    MarkerT InitialMarker( DROPS::InScaMap::getInstance()[InitialLSet],
+                           P.get<double>("AdaptRef.Width"),
+                           P.get<double>("AdaptRef.CoarsestLevel"), P.get<double>("AdaptRef.FinestLevel") );
 
-    DROPS::AdapTriangCL adap( *mg, P.get<double>("AdaptRef.Width"), P.get<int>("AdaptRef.CoarsestLevel"), P.get<int>("AdaptRef.FinestLevel"),
+    DROPS::AdapTriangCL adap( *mg, &InitialMarker,
                               ((P.get<std::string>("Restart.Inputfile") == "none") ? P.get<int>("AdaptRef.LoadBalStrategy") : -P.get<int>("AdaptRef.LoadBalStrategy")));
     // If we read the Multigrid, it shouldn't be modified;
     // otherwise the pde-solutions from the ensight files might not fit.
     if (P.get("Restart.Inputfile", std::string("none")) == "none")
-        adap.MakeInitialTriang( DROPS::InScaMap::getInstance()[InitialLSet]);
+    {
+        adap.MakeInitialTriang();
+    }
 
     std::cout << DROPS::SanityMGOutCL(*mg) << std::endl;
 #ifdef _PAR
-    if ( DROPS::CheckParMultiGrid())
-        std::cout << "As far as I can tell the ParMultigridCL is sane\n";
     if ( DROPS::ProcCL::Check( DROPS::DiST::InfoCL::Instance().IsSane( std::cerr)))
         std::cout << " DiST-module seems to be alright!" << std::endl;
     else
         std::cout << " DiST-module seems to be broken!" << std::endl;
+    if ( DROPS::CheckParMultiGrid())
+        std::cout << "As far as I can tell the ParMultigridCL is sane\n";
 #endif
 
     DROPS::InstatNavierStokes2PhaseP2P1CL prob( *mg, DROPS::TwoPhaseFlowCoeffCL(P), bnddata, P.get<double>("Stokes.XFEMStab")<0 ? DROPS::P1_FE : DROPS::P1X_FE, P.get<double>("Stokes.XFEMStab"));

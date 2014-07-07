@@ -31,6 +31,7 @@
 #include "num/spmat.h"
 #include "misc/problem.h"
 #include "out/ensightOut.h"
+#include "levelset/marking_strategy.h"
 #include "levelset/adaptriang.h"
 #include <tr1/unordered_map>
 #include "misc/params.h"
@@ -178,21 +179,7 @@ int main( int argc, char **argv)
     // TestDist();
     // return 0;
 
-    std::ifstream param;
-    if (argc != 2) {
-        std::cout << "Using default parameter file: reparam_init.json\n";
-        param.open("reparam_init.json");
-    }
-    else{
-        std::cout << "Opening file " << argv[1] << std::endl;
-        param.open(argv[1]);
-    }
-    if (!param) {
-        std::cerr << "error while opening parameter file\n";
-        return 1;
-    }
-    param >> P;
-    param.close();
+    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "reparam_init.json");
     std::cout << P << std::endl;
 
     int numref;
@@ -206,8 +193,13 @@ int main( int argc, char **argv)
                                   2.0*std_basis<3>(3),
                                   numref, numref, numref);
     MultiGridCL mg( brick);
-    AdapTriangCL adap( mg, 0.1, 0, f_lvl);
-    adap.MakeInitialTriang( sphere_dist_stat);
+
+    AdapTriangCL adap( mg );
+    typedef DistMarkingStrategyCL MarkerT;
+    MarkerT marker( sphere_dist_stat, 0.1, 0, f_lvl );
+    adap.set_marking_strategy( &marker );
+
+    adap.MakeInitialTriang();
 
     // lset contains the quadratic levelset-function of the sphere
     // vd_dist ist the piecewise quadratic interpolation of the signed distance-function of the sphere.
@@ -263,6 +255,9 @@ int main( int argc, char **argv)
     std::cout << "sup of gradient-difference on \\Gamma_h: " << "\n"
     		  << "f2 : "<<facet_sup_norm( mg, lset_rep.Phi, lset_rep.GetBndData()) << std::endl;
     // CheckSigns ( mg, lset_rep.Phi, &lset.Phi);
+
+    adap.set_marking_strategy( 0 );
+
     delete &lset;
     delete &lset_d;
     delete &lset_rep;

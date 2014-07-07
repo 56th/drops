@@ -77,11 +77,11 @@
                                                 // correction is made and for VolCorrection = 1 it is carried
                                                 // out after each time step and reparameterization of the level
                                                 // set function.
-                "Theta":                1       // controls the implicitness of the theta-scheme for time
+                "Theta":                1,      // controls the implicitness of the theta-scheme for time
                                                 // discretization of the Navier-Stokes and level set equations.
                                                 // Theta = 0 yields the explicit and Theta = 1 the implicit
                                                 // Euler method. Theta = 0.5 results in the Crank-Nicholson scheme.
-		        "Discontinuous":		0,      // Use DG for levelset?
+		"Discontinuous":		0,      // Use DG for levelset?
 
                 "BoundaryType":         "98!98!98!98!98!98",     // List of boundary types separated by a !.
                                                            // Each defining a boundary type for one boundary

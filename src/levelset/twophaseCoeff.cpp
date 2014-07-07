@@ -298,6 +298,34 @@ namespace filmperiodic{
     static DROPS::RegisterMatchingFunction regmatch1_y("periodicy", periodic_1side<1>);
     static DROPS::RegisterMatchingFunction regmatch1_z("periodicz", periodic_1side<2>);
 }
+double TaylorFlowDistance( const DROPS::Point3DCL& p, double)
+{
+    static const double taylor_len = P.get<double>("Taylor.Length");
+    static const double taylor_width = P.get<double>("Taylor.Width");
+    static const double rel_filmthickness = P.get<double>("Taylor.RelFilmThickness");
+    static const DROPS::Point3DCL taylor_bubble_center = P.get<DROPS::Point3DCL>("Taylor.Center");
+    //const double taylor_top_z = taylor_bubble_center[2] + 0.5 * taylor_bubble_len;
+    //const double taylor_bottom_z = taylor_bubble_center[2] - 0.5 * taylor_bubble_len;
+    const double taylor_radius = (0.5-rel_filmthickness) * taylor_width;
+    const double taylor_top_z = taylor_bubble_center[2] + 0.5 * (taylor_len-2*taylor_radius);
+    const double taylor_bottom_z = taylor_bubble_center[2] - 0.5 * (taylor_len-2*taylor_radius);
+    DROPS::Point3DCL diff = p;
+    diff[0] -= taylor_bubble_center[0];
+    diff[1] -= taylor_bubble_center[1];
+    if (p[2] > taylor_top_z){
+        diff[2] -= taylor_top_z;
+        return diff.norm() - taylor_radius;
+    }
+    if (p[2] < taylor_bottom_z){
+        diff[2] -= taylor_bottom_z;
+        return diff.norm() - taylor_radius;
+    }
+    diff[2] = 0.0;
+    return diff.norm() - taylor_radius;
+}
+
+static DROPS::RegisterScalarFunction regscataylor("TaylorFlowDistance", TaylorFlowDistance);
+
 
 namespace slipBnd{
     /// \name inflow condition

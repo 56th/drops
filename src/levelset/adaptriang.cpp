@@ -1,4 +1,4 @@
-/// \file adaptriang.tpp
+/// \file adaptriang.cpp
 /// \brief adaptive triangulation based on position of the interface provided by the levelset function
 /// \author LNM RWTH Aachen: Joerg Grande, Sven Gross, Volker Reichelt; SC RWTH Aachen: Oliver Fortmeier
 
@@ -21,13 +21,18 @@
  *
  * Copyright 2009 LNM/SC RWTH Aachen, Germany
 */
-
+#include "adaptriang.h"
 namespace DROPS
 {
 
-template <class DistFctT>
-void AdapTriangCL::MakeInitialTriang( DistFctT& Dist)
+void AdapTriangCL::MakeInitialTriang()
 {
+    if ( ! marker_ )
+    {
+        throw DROPSErrCL( "Attempt to initialise a mesh without a strategy.\n"
+                          "Here: file __FILE__, line __LINE__.\n" );
+    }
+
 #ifndef _PAR
     TimerCL time;
 #else
@@ -36,11 +41,11 @@ void AdapTriangCL::MakeInitialTriang( DistFctT& Dist)
 
     time.Reset();
     time.Start();
-    const Uint min_ref_num= f_level_;
+    const Uint min_ref_num = marker_->GetFineLevel();
     Uint i;
-    bool modified= true;
+    bool modified = true;
     for (i=0; i<2*min_ref_num && modified; ++i)
-        modified=ModifyGridStep( Dist, true);
+        modified=ModifyGridStep(true);
 
     time.Stop();
     const double duration=time.GetTime();
@@ -48,54 +53,32 @@ void AdapTriangCL::MakeInitialTriang( DistFctT& Dist)
     std::cout << "MakeInitialTriang: " << i
                 << " refinements in " << duration << " seconds\n"
                 << "last level: " << mg_.GetLastLevel() << '\n';
-    mg_.SizeInfo( std::cout);
+    mg_.SizeInfo( std::cout );
 }
 
-template <class DistFctT>
-  bool AdapTriangCL::ModifyGridStep( DistFctT& Dist, bool lb)
+bool AdapTriangCL::ModifyGridStep( bool lb )
 /** One step of grid change
     \param lb Do a load-balancing?
     \return true if modifications were necessary,
     false, if nothing changed. */
 {
-    bool modified= false;
-    for (MultiGridCL::TriangTetraIteratorCL it= mg_.GetTriangTetraBegin(),
-         end= mg_.GetTriangTetraEnd(); it!=end; ++it)
+    if ( ! marker_ )
     {
-        double d= 1e99;
-        int num_pos= 0;
-        for (Uint j=0; j<4; ++j)
-        {
-            const double dist= GetValue( Dist, *it->GetVertex( j));
-            if (dist>=0) ++num_pos;
-            d= std::min( d, std::abs( dist));
-        }
-        for (Uint j=0; j<6; ++j)
-        {
-            const double dist= GetValue( Dist, *it->GetEdge( j));
-            if (dist>=0) ++num_pos;
-            d= std::min( d, std::abs( dist));
-        }
-        d= std::min( d, std::abs( GetValue( Dist, *it)));
-
-        const bool vzw= num_pos!=0 && num_pos!=10; // change of sign
-        const Uint l= it->GetLevel();
-        // In the shell:      level should be f_level_.
-        // Outside the shell: level should be c_level_.
-        const Uint soll_level= (d<=width_ || vzw) ? f_level_ : c_level_;
-
-        if (l !=  soll_level || (l == soll_level && !it->IsRegular()) )
-        { // tetra will be marked for refinement/removement
-            modified= true;
-            if (l <= soll_level)
-                it->SetRegRefMark();
-            else // l > soll_level
-                it->SetRemoveMark();
-        }
+        throw DROPSErrCL( "Attempt to mark a mesh without a strategy.\n"
+                          "Here: file __FILE__, line __LINE__.\n" );
     }
+
+    marker_->SetUnmodified();
+
+    TetraAccumulatorTupleCL accutuple;
+    accutuple.push_back( marker_ );
+    accutuple( mg_.GetTriangTetraBegin(), mg_.GetTriangTetraEnd() );
+
+    bool modified = marker_->modified();
 #ifdef _PAR
-    modified= ProcCL::GlobalOr(modified);
+    modified = ProcCL::GlobalOr(modified);
 #endif
+
     if (modified || lb) {
         observer_.notify_pre_refine();
         mg_.Refine();
@@ -115,27 +98,32 @@ template <class DistFctT>
     return modified;
 }
 
-template <class DistFctT>
-inline
-bool AdapTriangCL::UpdateTriang (const DistFctT& d)
+bool AdapTriangCL::UpdateTriang()
 {
+    if ( ! marker_ )
+    {
+        throw DROPSErrCL( "Attempt to update a mesh without a strategy.\n"
+                          "Here: file __FILE__, line __LINE__.\n" );
+    }
+
 #ifndef _PAR
     TimerCL time;
 #else
     ParTimerCL time;
 #endif
+
     double duration;
 
-    modified_= false;
-    const int min_ref_num= f_level_ - c_level_;
+    marker_->SetUnmodified();
+    const int min_ref_num = marker_->GetFineLevel() - marker_->GetCoarseLevel();
     int i;
-
-    observer_.notify_pre_refmig_sequence( GetMG());
-    for (i= 0; i < 2*min_ref_num; ++i) {
-        if (!ModifyGridStep(d, true)){
+    observer_.notify_pre_refmig_sequence( GetMG() );
+    for ( i = 0; i < 2*min_ref_num; ++i )
+    {
+        if (!ModifyGridStep(true))
+        {
             break;
         }
-        modified_= true;
     }
     observer_.notify_post_refmig_sequence();
 
@@ -144,14 +132,10 @@ bool AdapTriangCL::UpdateTriang (const DistFctT& d)
     std::cout << "UpdateTriang: " << i
               << " refinements/interpolations in " << duration << " seconds\n"
               << "last level: " << mg_.GetLastLevel() << '\n';
-    mg_.SizeInfo( std::cout);
-    return this->WasModified();
-}
+    mg_.SizeInfo( std::cout );
 
-inline
-bool AdapTriangCL::UpdateTriang (const LevelsetP2CL& lset)
-{
-    return this->UpdateTriang( lset.GetSolution());
+    return WasModified();
 }
 
 } // end of namespace DROPS
+

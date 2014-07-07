@@ -26,11 +26,13 @@
 #define DROPS_BNDDATA_H
 
 #include "misc/utils.h"
-#include "geom/multigrid.h"
+#include "geom/simplex.h"
 #include "geom/boundary.h"
 
 namespace DROPS
 {
+
+typedef bool (*match_fun) (const Point3DCL&, const Point3DCL&);
 
 enum BndCondT
 /// \brief enum for boundary conditions in DROPS.
@@ -41,22 +43,28 @@ enum BndCondT
 /// - valid boundary conditions have numbers in the range 0..99
 /// - interior simplices have no boundary data and return NoBC
 ///   in BndDataCL::GetBC
+///
+/// If you make changes here, also change the functions BndCondInfo and string_to_BndCondT below.
 {
-    Dir0BC= 0,                   ///< hom.   Dirichlet boundary conditions
-    DirBC= 2,                    ///< inhom. Dirichlet boundary conditions
-    Per1BC= 13,                  ///< periodic boundary conditions, where
-    Per2BC= 11,                  ///< Per1BC and Per2BC denote corresponding boundaries
-	Slip0BC= 15,                 ///< hom. Navier-Slip boundary conditions
-	SlipBC= 17,                  ///< inhom. Navier-Slip boundary conditions (Slipping boundary is moving)
-	SymmBC= 19,                  ///< Symmetric boundary conditions
-    Nat0BC= 21,                  ///< hom.   natural   boundary condition
-    NatBC= 23,                   ///< inhom. natural   boundary conditions
-    OutflowBC= 21,               ///< same as Nat0BC, for convenience
-    WallBC= 0,                   ///< same as Dir0BC, for convenience
-	
-    NoBC= 98,                    ///< interior simplices
-    UndefinedBC_= 99,            ///< ReadMeshBuilderCL: error, unknown bc
-    MaxBC_= 100                  ///< upper bound for valid bc's
+    /// The fundamental boundary conditions.
+    Dir0BC=  0, ///< hom.   Dirichlet boundary conditions
+    DirBC=   2, ///< inhom. Dirichlet boundary conditions
+    Per1BC= 13, ///< periodic boundary conditions, where
+    Per2BC= 11, ///< Per1BC and Per2BC denote corresponding boundaries
+    Slip0BC= 15,                 ///< hom. Navier-Slip boundary conditions
+    SlipBC= 17,                  ///< inhom. Navier-Slip boundary conditions (Slipping boundary is moving)
+    SymmBC= 19,                  ///< Symmetric boundary conditions
+    Nat0BC= 21, ///< hom.   natural   boundary condition
+    NatBC=  23, ///< inhom. natural   boundary conditions
+    NoBC=   98, ///< interior simplices
+
+    /// Synonymous names, for convenience
+    WallBC=    Dir0BC,
+    OutflowBC= Nat0BC,
+
+    /// Corner cases
+    UndefinedBC_=  99, ///< ReadMeshBuilderCL: error, unknown bc
+    MaxBC_=       100  ///< upper bound for valid bc's
 };
 
 
@@ -81,27 +89,12 @@ class BndCondInfoCL
 };
 
 /// Prints a text-message describing the given boundary-condition.
-void inline BndCondInfo (BndCondT bc, std::ostream& os)
 /// \param bc Value of type BndCondT, which shall be described.
 /// \param os Stream, to which the description is written.
-{
-    switch(bc)
-    {
-      case Dir0BC: /* WallBC has the same number */
-                         os << "hom. Dirichlet BC / wall\n"; break;
-      case DirBC:        os << "inhom. Dirichlet BC / inflow\n"; break;
-      case Per1BC:       os << "periodic BC\n"; break;
-      case Per2BC:       os << "periodic BC, correspondent\n"; break;
-	  case SlipBC:       os << "Slip BC\n"; break;
-	  case SymmBC:       os << "Symmetric BC\n"; break;
-      case Nat0BC: /* OutflowBC has the same number */
-                         os << "hom. Natural BC / outflow\n"; break;
-      case NatBC:        os << "inhom. Natural BC\n"; break;
-      case NoBC:         os << "no boundary\n"; break;
-      case UndefinedBC_: os << "WARNING! unknown BC from ReadMeshBuilderCL\n"; break;
-      default:           os << "WARNING! unknown BC\n";
-    }
-}
+void BndCondInfo (BndCondT bc, std::ostream& os);
+
+/// \brief Return the BndCondT matching the given string.
+BndCondT string_to_BndCondT (std::string s);
 
 
 /// \brief Represents the boundary data of a single boundary segment for a certain variable.
@@ -141,11 +134,13 @@ class BndSegDataCL: public BndCondInfoCL
 
 
 /// \brief Contains the boundary conditions of all boundary segments for a certain variable.
+///    The matching function for periodic data is also stored here.
 ///
 /// For each sub-simplex on the boundary, the boundary condition can be accessed.
 class BndCondCL
 {
   protected:
+    mutable match_fun mfun_;
     std::vector<BndCondInfoCL> BndCond_;
 
   public:
@@ -153,12 +148,17 @@ class BndCondCL
     /// containing the boundary conditions of the boundary segments.
     /// If \a bc is omitted, hom. natural boundary conditions are imposed (Nat0BC) for all boundary segments.
     /// For the special case \a numbndseg=0 we always have GetBC() = NoBC and IsOnXXXBnd(...) = false (aka NoBndCondCL)
-    BndCondCL( BndIdxT numbndseg, const BndCondT* bc= 0)
-    {
-        BndCond_.resize( numbndseg);
-        for (Uint i=0; i<numbndseg; ++i)
-            BndCond_[i]= bc ? bc[i] : Nat0BC;
+    BndCondCL( BndIdxT numbndseg, const BndCondT* bc= 0, match_fun mfun= 0);
+    /// \brief Initialize all members.
+    void Init (const std::vector<BndCondInfoCL>& BndCond, match_fun mfun) {
+        mfun_= mfun;
+        BndCond_= BndCond;
     }
+
+    /// Get/Set the matching function. @{
+    match_fun GetMatchingFunction ()               const { return mfun_; }
+    void      SetMatchingFunction (match_fun mfun) const { mfun_= mfun; }
+    /// @}
 
     /// \name boundary condition
     /// Returns superior boundary condition of sub-simplex
@@ -222,6 +222,11 @@ class BndDataCL: public BndCondCL
     /// Deprecated ctor, just for compatibility with older code
     BndDataCL( BndIdxT numbndseg, const bool* isneumann, const bnd_val_fun* fun); // deprecated ctor!
 
+    void Init (const std::vector<BndCondInfoCL>& bnd_cond, const std::vector<bnd_val_fun>& BndFun, match_fun mfun) {
+        BndCondCL::Init( bnd_cond, mfun);
+        BndFun_= BndFun;
+    }
+
     /// \name boundary value
     /// Returns boundary value of sub-simplex
     /// \{
@@ -246,6 +251,22 @@ class BndDataCL: public BndCondCL
     /// \}
 };
 
+
+class MultiGridCL; // forward declaration for read_BndData below.
+class ParamCL;     // forward declaration for read_BndData below.
+
+///\brief Read a BndDataCL<T>-object from the parameter-file section P.
+/// mg is only required to obtain the number of boundary segments.
+/// The definition is in bndData.cpp to avoid some header dependencies. Instantiations for other types T must be added there manually.
+///
+/// All keys are optional.
+/// The default value can be specified via "Default"; if not set explicitly, it is UndefinedBC_.
+/// The key "PeriodicMatching" sets a matching function for the finite element space.
+/// All other keys are interpreted as boundary-segment indices.
+/// The values have the form ["BndCondT"] or ["BndCondT, "NameOfFunction"]; the second form is obligatory for non-homogeneous boundary values.
+template <class T>
+  void
+  read_BndData (BndDataCL<T>& bnddata, const MultiGridCL& mg, const ParamCL& P);
 
 class NoBndCondCL: public BndCondCL
 {
@@ -611,7 +632,6 @@ inline BndValT BndDataCL<BndValT>::GetNatBndValue( const FaceCL& f, double t) co
     Assert( BndCond_.size() && BndCond_[f.GetBndIdx()].IsNatural(), DROPSErrCL("GetNeuBndValue(FaceCL): No Neumann Boundary Segment!"), ~0);
     return BndFun_[f.GetBndIdx()]( GetBaryCenter(f), t);
 }
-
 
 } //end of namespace DROPS
 

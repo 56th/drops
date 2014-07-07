@@ -119,19 +119,10 @@ int TestRepairUniform()
 {
     BndDataCL<> bnd( 6);
     int ret= 0;
-    MGBuilderCL* builder=0;
-
-    if ( ProcCL::IamMaster()){
-        builder = new BrickBuilderCL( DROPS::std_basis<3>( 0), DROPS::std_basis<3>( 1),
-                DROPS::std_basis<3>( 2), DROPS::std_basis<3>( 3),
-                1, 1, 1);
-    }
-    else{
-        builder = new DROPS::EmptyBrickBuilderCL( DROPS::std_basis<3>( 0), DROPS::std_basis<3>( 1),
-                DROPS::std_basis<3>( 2), DROPS::std_basis<3>( 3));
-    }
-
-    DROPS::MultiGridCL mg(*builder);
+    BrickBuilderCL builder( DROPS::std_basis<3>( 0), DROPS::std_basis<3>( 1),
+                            DROPS::std_basis<3>( 2), DROPS::std_basis<3>( 3),
+                            1, 1, 1);
+    DROPS::MultiGridCL mg(builder);
     DROPS::LoadBalCL lb( mg);  // loadbalancing
     lb.DoMigration();          // distribute initial grid
 
@@ -201,19 +192,10 @@ int TestRepair()
 {
     BndDataCL<> bnd( 6);
     int ret= 0;
-    MGBuilderCL* builder=0;
-
-    if ( ProcCL::IamMaster()){
-        builder = new BrickBuilderCL( DROPS::std_basis<3>( 0), DROPS::std_basis<3>( 1),
-                DROPS::std_basis<3>( 2), DROPS::std_basis<3>( 3),
-                1, 1, 1);
-    }
-    else{
-        builder = new DROPS::EmptyBrickBuilderCL( DROPS::std_basis<3>( 0), DROPS::std_basis<3>( 1),
-                DROPS::std_basis<3>( 2), DROPS::std_basis<3>( 3));
-    }
-
-    DROPS::MultiGridCL mg(*builder);
+    BrickBuilderCL builder( DROPS::std_basis<3>( 0), DROPS::std_basis<3>( 1),
+                            DROPS::std_basis<3>( 2), DROPS::std_basis<3>( 3),
+                            1, 1, 1);
+    DROPS::MultiGridCL mg(builder);
     DROPS::LoadBalCL lb( mg);  // loadbalancing
     lb.DoMigration();          // distribute initial grid
     DROPS::IdCL<DROPS::VertexCL>::ResetCounter();

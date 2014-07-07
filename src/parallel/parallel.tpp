@@ -282,7 +282,7 @@ template <typename T>
 template <typename T>
   inline ProcCL::AintT ProcCL::Get_address(T* data){
     AintT addr;
-    MPI_Address(data, &addr);
+    MPI_Get_Address(data, &addr);
     return addr;
 }
 
@@ -303,7 +303,7 @@ template <typename T>
 
 inline ProcCL::DatatypeT ProcCL::CreateStruct(int count, const int* block, const ProcCL::AintT* distplace, const ProcCL::DatatypeT* type){
     DatatypeT newtype;
-    MPI_Type_struct(count, const_cast<int*>(block), const_cast<AintT*>(distplace), const_cast<DatatypeT*>(type), &newtype);
+    MPI_Type_create_struct(count, const_cast<int*>(block), const_cast<AintT*>(distplace), const_cast<DatatypeT*>(type), &newtype);
     return newtype;
 }
 

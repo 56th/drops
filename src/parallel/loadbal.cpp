@@ -39,7 +39,7 @@ namespace DROPS{
     DiST to which process these tetras belong. For a detailed description see
     Diploma thesis of Sven Gross.
 */
-void LoadBalCL::Migrate( const DetermineDecompositionCL& detdecomp)
+void LoadBalCL::Migrate( const PartitioningCL& detdecomp)
 {
 #if DROPSDebugC
 /*  Maybe, you want to use this for tracking a specific tetrahedron (also it blows up the code)
@@ -149,7 +149,7 @@ void LoadBalCL::DoMigration()
     }
 
     Comment( "Perform load balancing step:\n - Determine a decomposition\n", DebugLoadBalC);
-    DetermineDecompositionCL detdecomp( *mg_, TriLevel_>0 ? TriLevel_ : mg_->GetLastLevel());
+    PartitioningCL detdecomp( *mg_, TriLevel_>0 ? TriLevel_ : mg_->GetLastLevel());
     detdecomp.make( method_, rho_I_, lset_, lsetbnd_, &ObservedMigrateFECL::Instance());
 
     Comment( " - Migrate tetrahedra\n", DebugLoadBalC);

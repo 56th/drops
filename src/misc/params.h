@@ -34,13 +34,20 @@
 namespace DROPS
 {
 
+/// \brief Specific error class for parameter-files.
+class DROPSParamErrCL : public DROPSErrCL
+{
+  public:
+    DROPSParamErrCL() : DROPSErrCL() {}
+    DROPSParamErrCL(const std::string& mesg) : DROPSErrCL( mesg) {}
+};
+
 /// \brief Parser and container for JSON parameter files
 ///        This class is based on BOOST Property Tree
 /// Usage:
 ///   - read in JSON file via ParamCL P << ifstream file
 ///   - use get routines to access data
 /// For further information see TRAC
-
 class ParamCL
 {
   public:
@@ -51,10 +58,19 @@ class ParamCL
     typedef ParamCL                     self_type;
 
     ParamCL ();
+    ParamCL (std::string path);
     ParamCL (const ptree_type& p) : pt( p) {}
 
-    const ptree_type& get_child(const path_type& path) const
-        { return pt.get_child( path); }
+    void read_json (std::string path);
+
+    const ptree_type& get_child(const std::string& path) const { 
+      try {
+        return pt.get_child( path); 
+      }
+      catch(boost::property_tree::ptree_error& e) {
+        throw DROPSParamErrCL( "ParamCL::get_child: Trying to get '" + path + "' failed.\n");
+      }
+    }
 
     /// \brief standard get routine
     /// template parameter is the desired type of returned variable
@@ -62,7 +78,7 @@ class ParamCL
     ///        e.g. for SimParams { "Timestep" : 0.1 };
     ///             you use: myvar = P.get("SimParams.TimeStep");
     /// \returns value stored in node
-    /// \exception BadTreePath if node does not exists
+    /// \exception DROPSParamErrCL if node does not exists
     template <typename OutType>
     OutType get(const std::string& pathInPT) const
     {
@@ -70,7 +86,7 @@ class ParamCL
         return this->pt.get<OutType>(pathInPT);
       }
       catch(boost::property_tree::ptree_error& e) {
-        throw DROPSErrCL( std::string( "ParamCL::get: Trying to get '") + pathInPT + std::string( "' failed.\n"));
+        throw DROPSParamErrCL( "ParamCL::get: Trying to get '" + pathInPT + "' failed.\n");
       }
     }
 
@@ -89,7 +105,7 @@ class ParamCL
           return get<OutType>(pathInPT);
       }
       //no? then add for next time
-      catch (DROPSErrCL& e) {
+      catch (DROPSParamErrCL& e) {
           this->pt.put(pathInPT, default_val);
           return default_val;
       }
@@ -118,7 +134,7 @@ class ParamCL
           return true;
       }
       //no? then add for next time
-      catch (DROPSErrCL& e) {
+      catch (DROPSParamErrCL& e) {
           this->pt.put(pathToNode, value);
           return false;
       }
@@ -135,7 +151,6 @@ class ParamCL
     //container for data
     boost::property_tree::ptree pt;
 
-    void open(const std::string path);
     std::ostream& print(std::ostream& s);
     void print(boost::property_tree::ptree child, std::string level, std::ostream& s);
 
@@ -152,6 +167,15 @@ DROPS::Point2DCL ParamCL::get<DROPS::Point2DCL>(const std::string & pathInPT) co
 /// \brief specialisation of standard get routine for std::vector<std::string>
 template<>
 std::vector<std::string > ParamCL::get<std::vector<std::string> >(const std::string & pathInPT) const;
+
+/// \brief specialisation of standard get routine for SArrayCL<Uint, 3>
+template<>
+DROPS::SArrayCL<Uint, 3> ParamCL::get<DROPS::SArrayCL<Uint, 3> >(const std::string & pathInPT) const;
+
+
+/// \brief Read P from the file argv[1] or from default_file if argv[1] does not exist; else throw DROPSErrCL.
+void read_parameter_file_from_cmdline (ParamCL& P, int argc, char** argv, std::string default_file= std::string());
+
 
 //DELETE ReadParamsCL?
 ///   \brief Parser for parameter files used by ParamBaseCL.

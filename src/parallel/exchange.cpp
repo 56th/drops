@@ -1071,7 +1071,7 @@ class ExchangeBuilderCL::HandlerDOFExchangeCL
     /// \brief Sort all dof which have to be sent
     void sortDOF( SendDOFListT& sendList);
     /// \brief Get the position of a dof which is sent to proc \a p
-    inline int getSendPos( const SendDOFListT& sendList, const int dof, const int p) const;
+    inline int getSendPos( const SendDOFListT& sendList, const int dof, const int p, const int numUnks) const;
     /// \brief Build data structures for sending
     void buildSendStructures( const SendDOFListT& sendList, ExchangeCL::SendListT& ex_sendlist) const;
     /// \brief Build data structures for receiving
@@ -1082,8 +1082,8 @@ class ExchangeBuilderCL::HandlerDOFExchangeCL
         : rowidx_(rowidx), mg_(mg) { }
 };
 
-inline int ExchangeBuilderCL::HandlerDOFExchangeCL::getSendPos( const SendDOFListT& sendList, const int dof, const int p) const
-/** If the element \a dof is not found in \a sendList for process \a p, NoInt_ is returned and exception is thrown.*/
+inline int ExchangeBuilderCL::HandlerDOFExchangeCL::getSendPos( const SendDOFListT& sendList, const int dof, const int p, const int numUnks) const
+/** If the element \a dof is not found in \a sendList for process \a p, NoInt_ is returned.*/
 {
     const SendDOFListT::const_iterator lit= sendList.find(p);
     if (lit==sendList.end()) {
@@ -1093,10 +1093,10 @@ inline int ExchangeBuilderCL::HandlerDOFExchangeCL::getSendPos( const SendDOFLis
         begin= lit->second.begin(),
         end= lit->second.end(),
         it= std::lower_bound( begin, end, dof);
-    if ( it==end) {
+    if ( it==end || *it != dof) {
         return NoInt_;
     }
-    return static_cast<IdxT>( std::distance(begin, it));
+    return static_cast<IdxT>( std::distance(begin, it))*numUnks;
 }
 
 void ExchangeBuilderCL::HandlerDOFExchangeCL::sortDOF( SendDOFListT& sendList)
@@ -1361,11 +1361,11 @@ bool ExchangeBuilderCL::HandlerDOFRecvCL::Gather( DiST::TransferableCL& t,
     const IdxT dof= t.Unknowns(idx);
     const int owner= hs_.owner_[dof];
 
-    send << getSendPos( hs_.sendList1_, static_cast<int>(dof), owner)*numUnk; // (A2)
+    send << getSendPos( hs_.sendList1_, static_cast<int>(dof), owner, numUnk); // (A2)
 
     if (rowidx_.IsExtended()) { // XFEM case
         const IdxT exdof= rowidx_.GetXidx()[dof];
-        send << (exdof!=NoIdx ? getSendPos( hs_.sendList1_, static_cast<int>(exdof), owner)*numUnk : NoInt_); // (A3)
+        send << (exdof!=NoIdx ? getSendPos( hs_.sendList1_, static_cast<int>(exdof), owner, numUnk) : NoInt_); // (A3)
     }
 
     // send positions for second phase
@@ -1382,8 +1382,8 @@ bool ExchangeBuilderCL::HandlerDOFRecvCL::Gather( DiST::TransferableCL& t,
     for ( it=t.GetProcListBegin(); it!=t.GetProcListEnd(); ++it) {
         const int toproc= it->proc;
         send << toproc; // (B1)   ToDo: write (B1)-(B3) only for Master?
-        const int firstPos=           getSendPos( hs_.sendList2_, static_cast<int>(dof), toproc)*numUnk,
-            extFirstPos= isExtended ? getSendPos( hs_.sendList2_, static_cast<int>(extdof), toproc)*numUnk
+        const int firstPos=           getSendPos( hs_.sendList2_, static_cast<int>(dof), toproc, numUnk),
+            extFirstPos= isExtended ? getSendPos( hs_.sendList2_, static_cast<int>(extdof), toproc, numUnk)
                                     : NoInt_;
         send << firstPos << extFirstPos; // (B2), (B3)
     }
@@ -1636,11 +1636,11 @@ bool ExchangeBuilderCL::HandlerDOFNtoNRecvCL::Gather( DiST::TransferableCL& t,
     for ( it=t.GetProcListBegin(); it!=t.GetProcListEnd(); ++it) {
         const int toproc= it->proc;
         send << toproc; // (1)
-        const int firstPos= getSendPos( hs_.sendList_, static_cast<int>(dof), toproc)*numUnk;
+        const int firstPos= getSendPos( hs_.sendList_, static_cast<int>(dof), toproc, numUnk);
         send << firstPos; // (2)
         if ( isExtended) {
             const int extFirstPos=
-                getSendPos( hs_.sendList_, static_cast<int>(extdof), toproc)*numUnk;
+                getSendPos( hs_.sendList_, static_cast<int>(extdof), toproc, numUnk);
             send << extFirstPos; // (3)
         }
         else // dof is not extended

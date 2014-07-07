@@ -66,7 +66,7 @@ int main (int , char** )
 
         DROPS::instat_scalar_fun_ptr test2(insca["Zero"]);
         std::cout << " function pointer address of \"Zero\" in InScaMap: " 
-                  << reinterpret_cast<void*>(test2) << std::endl;
+                  << test2 << std::endl;
 
         std::cout << " q2(a) is " << test2( b,0) << std::endl;
         std::cout << " q2(a) should be 0" << std::endl;
@@ -77,7 +77,7 @@ int main (int , char** )
         DROPS::scalar_tetra_function test(scatet["Zero"]);
 
         std::cout << " function pointer address of \"Zero\" in ScaTetMap: " 
-                  << reinterpret_cast<void*>(test) << std::endl;
+                  << test << std::endl;
 
         DROPS::TetraCL tet;
         std::cout << " p2(a) is " << test( tet,a,0) << std::endl;

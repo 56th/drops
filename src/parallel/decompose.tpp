@@ -1,6 +1,6 @@
 /// \file decompose.tpp
-/// \brief determining a decomposition of a distributed hierarchy of triangulations.
-/// \author LNM RWTH Aachen: ; SC RWTH Aachen: Oliver Fortmeier
+/// \brief determining a partitioning of a distributed hierarchy of triangulations.
+/// \author LNM RWTH Aachen: Patrick Esser, Sven Gross; SC RWTH Aachen: Oliver Fortmeier
 
 /*
  * This file is part of DROPS.
@@ -24,7 +24,7 @@
 namespace DROPS{
 
 bool LbIteratorCL::IsInLbSet(const TetraCL& t) const
-/// Test, if a tetraeder represents a mutinode of the LoadBalanceSet
+/// Test whether a tetrahedra represents a multi-node of the LoadBalanceSet
 {
     if (t.HasGhost() )
         return false;

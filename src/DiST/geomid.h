@@ -75,7 +75,7 @@ inline std::ostream& operator << ( std::ostream& os, const GeomIdCL& h)
 }
 const GeomIdCL NoGID= GeomIdCL( (Uint)(-1), Point3DCL(), 4);  // Dummy id, if simplex does not exist
 
-#if __GNUC__ >= 4 || DROPS_WIN
+#if __GNUC__ >= 4 || DROPS_WIN || __xlC__
 struct Hashing : std::unary_function<GeomIdCL, size_t>
 {
     size_t operator()(const GeomIdCL& h) const
