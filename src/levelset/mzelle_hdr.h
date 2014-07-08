@@ -397,7 +397,7 @@ TimeDisc2PhaseCL* CreateTimeDisc( InstatNavierStokes2PhaseP2P1CL& Stokes, Levels
 
 template <class StokesT>
 void SolveStatProblem( StokesT& Stokes, LevelsetP2CL& lset,
-                       NSSolverBaseCL<StokesT >& solver, const ParamCL& P)
+                       NSSolverBaseCL<StokesT >& solver, bool checkSolution = false)
 {
 #ifndef _PAR
     TimerCL time;
@@ -430,7 +430,7 @@ void SolveStatProblem( StokesT& Stokes, LevelsetP2CL& lset,
     duration = time.GetTime();
     std::cout << "Solving (Navier-)Stokes took "<<  duration << " sec.\n";
     std::cout << "iter: " << solver.GetIter() << "\tresid: " << solver.GetResid() << std::endl;
-	if( P.get<std::string>("Exp.Solution_Vel").compare("None")!=0)
+	if(checkSolution)
 		Stokes.CheckOnePhaseSolution( &Stokes.v, &Stokes.p, Stokes.Coeff_.RefVel, Stokes.Coeff_.RefGradPr, Stokes.Coeff_.RefPr);
 		//Stokes.CheckTwoPhaseSolution( &Stokes.v, &Stokes.p, lset, Stokes.Coeff_.RefVel, Stokes.Coeff_.RefPr);
 }
@@ -514,7 +514,8 @@ void SetInitialConditions(StokesT& Stokes, LevelsetP2CL& lset, MultiGridCL& MG, 
         InexactUzawaCL<PCGPcT, ISBBTPreCL, APC_SYM> inexactuzawasolver( apc, bbtispc, P.get<int>("Stokes.OuterIter"), P.get<double>("Stokes.OuterTol"), 0.6, 50);
 
         NSSolverBaseCL<StokesT> stokessolver( Stokes, inexactuzawasolver);
-        SolveStatProblem( Stokes, lset, stokessolver, P);
+        bool checkSolution = (P.get<std::string>("Exp.Solution_Vel").compare("None")!=0);
+        SolveStatProblem( Stokes, lset, stokessolver, checkSolution);
       } break;
       case  2: //flow without droplet
           Stokes.UpdateXNumbering( pidx, lset);

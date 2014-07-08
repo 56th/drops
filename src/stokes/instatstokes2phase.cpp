@@ -31,7 +31,7 @@
 
 #include <set>
 
-extern DROPS::ParamCL P;
+//extern DROPS::ParamCL P;
 
 namespace DROPS
 {
@@ -4001,7 +4001,7 @@ void InstatStokes2PhaseP2P1CL::CheckOnePhaseSolution(const VelVecDescCL* DescVel
 //-------------------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------------------
 //The three functions in this block is used to repeat the L2 pressure error checker in prJump.cpp
-Point3DCL Radius; 
+/*Point3DCL Radius; 
 Point3DCL Mitte;
 double DistanceFct( const Point3DCL& p, double)
 {
@@ -4083,7 +4083,7 @@ void L2ErrPr( const VecDescCL& p, const LevelsetP2CL& lset, const MatrixCL& prM,
                   << "  ===>  \t||e_p||_L2 = " << L2 << std::endl
                   << "*************\n";
     }
-}
+}*/
 //-----------------------------------------------------------------------------------------------------------------------------
 //-----------------------------------------------------------------------------------------------------------------------------
 
@@ -4226,7 +4226,7 @@ void InstatStokes2PhaseP2P1CL::CheckTwoPhaseSolution(const VelVecDescCL* DescVel
 				     <<"\n || p_h - p ||_L2 = " <<  L2_pr << std::endl;	
 	
     //The following code is repeating the L2 pressure error checker in prJump.cpp
-	const double Vol= 8.,
+	/*const double Vol= 8.,
         prJump= P.get<double>("SurfTens.SurfTension")*2/P.get<DROPS::Point3DCL>("Exp.RadDrop")[0], // for SF_*LB force
         avg_ex= prJump/2.*(8./3.*M_PI*P.get<DROPS::Point3DCL>("Exp.RadDrop")[0]*P.get<DROPS::Point3DCL>("Exp.RadDrop")[0]*P.get<DROPS::Point3DCL>("Exp.RadDrop")[0] - Vol)/Vol; // for spherical interface
 	
@@ -4256,7 +4256,7 @@ void InstatStokes2PhaseP2P1CL::CheckTwoPhaseSolution(const VelVecDescCL* DescVel
     }
 	
 	SetupPrMass(&prM, lset);
-	L2ErrPr( p, lset, prM.Data.GetFinest(), prJump, MG_, GetPrFE(), GetXidx(), avg_ex);	 
+	L2ErrPr( p, lset, prM.Data.GetFinest(), prJump, MG_, GetPrFE(), GetXidx(), avg_ex);	*/ 
 }
 
 ///> To do, parallel case
