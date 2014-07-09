@@ -397,7 +397,7 @@ TimeDisc2PhaseCL* CreateTimeDisc( InstatNavierStokes2PhaseP2P1CL& Stokes, Levels
 
 template <class StokesT>
 void SolveStatProblem( StokesT& Stokes, LevelsetP2CL& lset,
-                       NSSolverBaseCL<StokesT >& solver, bool checkSolution = false)
+                       NSSolverBaseCL<StokesT >& solver, bool checkSolution = false, double epsP = 0.)
 {
 #ifndef _PAR
     TimerCL time;
@@ -415,24 +415,27 @@ void SolveStatProblem( StokesT& Stokes, LevelsetP2CL& lset,
     Stokes.SetLevelSet( lset);
     lset.UpdateMLPhi();
     lset.AccumulateBndIntegral( curv);
-	lset.AccumulateYoungForce ( curv);
+    lset.AccumulateYoungForce ( curv);
     Stokes.SetupSystem1( &Stokes.A, &Stokes.M, &Stokes.b, &Stokes.b, &cplM, lset, Stokes.v.t);
     Stokes.SetupPrStiff( &Stokes.prA, lset);
     Stokes.SetupPrMass ( &Stokes.prM, lset);
     Stokes.SetupSystem2( &Stokes.B, &Stokes.c, lset, Stokes.v.t);
+    //for stabilization
+    Stokes.SetupC( &Stokes.C, lset, epsP);
     time.Stop();
     duration = time.GetTime();
     std::cout << "Discretizing took "<< duration << " sec.\n";
     time.Reset();
     Stokes.b.Data += curv.Data;
-    solver.Solve( Stokes.A.Data, Stokes.B.Data, Stokes.v, Stokes.p.Data, Stokes.b.Data, cplN, Stokes.c.Data, Stokes.vel_idx.GetEx(), Stokes.pr_idx.GetEx(), 1.0);
+    //solver.Solve( Stokes.A.Data, Stokes.B.Data, Stokes.v, Stokes.p.Data, Stokes.b.Data, cplN, Stokes.c.Data, Stokes.vel_idx.GetEx(), Stokes.pr_idx.GetEx(), 1.0);
+    solver.Solve( Stokes.A.Data, Stokes.B.Data, Stokes.C.Data, Stokes.v, Stokes.p.Data, Stokes.b.Data, cplN, Stokes.c.Data, Stokes.vel_idx.GetEx(), Stokes.pr_idx.GetEx(), 1.0);
     time.Stop();
     duration = time.GetTime();
     std::cout << "Solving (Navier-)Stokes took "<<  duration << " sec.\n";
     std::cout << "iter: " << solver.GetIter() << "\tresid: " << solver.GetResid() << std::endl;
 	if(checkSolution)
-		Stokes.CheckOnePhaseSolution( &Stokes.v, &Stokes.p, Stokes.Coeff_.RefVel, Stokes.Coeff_.RefGradPr, Stokes.Coeff_.RefPr);
-		//Stokes.CheckTwoPhaseSolution( &Stokes.v, &Stokes.p, lset, Stokes.Coeff_.RefVel, Stokes.Coeff_.RefPr);
+		//Stokes.CheckOnePhaseSolution( &Stokes.v, &Stokes.p, Stokes.Coeff_.RefVel, Stokes.Coeff_.RefGradPr, Stokes.Coeff_.RefPr);
+		Stokes.CheckTwoPhaseSolution( &Stokes.v, &Stokes.p, lset, Stokes.Coeff_.RefVel, Stokes.Coeff_.RefPr);
 }
 
 void SetInitialLevelsetConditions( LevelsetP2CL& lset, MultiGridCL& MG, ParamCL& P)
@@ -515,7 +518,8 @@ void SetInitialConditions(StokesT& Stokes, LevelsetP2CL& lset, MultiGridCL& MG, 
 
         NSSolverBaseCL<StokesT> stokessolver( Stokes, inexactuzawasolver);
         bool checkSolution = (P.get<std::string>("Exp.Solution_Vel").compare("None")!=0);
-        SolveStatProblem( Stokes, lset, stokessolver, checkSolution);
+        double epsP = P.get<double>("Stokes.epsP");
+        SolveStatProblem( Stokes, lset, stokessolver, checkSolution, epsP);
       } break;
       case  2: //flow without droplet
           Stokes.UpdateXNumbering( pidx, lset);

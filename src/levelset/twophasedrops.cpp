@@ -430,7 +430,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 	}
 
     if (P.get<int>("Time.NumSteps") == 0)
-        SolveStatProblem( Stokes, lset, *navstokessolver, P.get<std::string>("Exp.Solution_Vel").compare("None")!=0);
+        SolveStatProblem( Stokes, lset, *navstokessolver, P.get<std::string>("Exp.Solution_Vel").compare("None")!=0, P.get<double>("Stokes.epsP"));
 
     // for serialization of geometry and numerical data
     TwoPhaseStoreCL<InstatNavierStokes2PhaseP2P1CL> ser(MG, Stokes, lset, massTransp,
@@ -697,6 +697,7 @@ void SetMissingParameters(DROPS::ParamCL& P){
 	P.put_if_unset<int>("Exp.OutputInfo",1);
 	//---------------------------------------------------------------
 	P.put_if_unset<double>("Exp.SimuType", 0.0);
+   P.put_if_unset<double>("Stokes.epsP", 0.0);
 }
 
 int main (int argc, char** argv)
