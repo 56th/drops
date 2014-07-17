@@ -64,7 +64,7 @@ template <class T, class ResultIterT>
   inline ResultIterT
   evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const TetraBaryPairVectorT& pos, double t, ResultIterT result_iterator)
 {
-    BaryEvalCL<> eval;
+    BaryEvalCL<T> eval;
     eval.set( f);
     eval.set_time( t);
     const TetraCL* prev_tetra= 0;
