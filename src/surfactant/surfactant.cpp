@@ -54,6 +54,7 @@ instat_vector_fun_ptr the_wind_fun;
 instat_scalar_fun_ptr the_lset_fun;
 instat_scalar_fun_ptr the_rhs_fun;
 instat_scalar_fun_ptr the_sol_fun;
+instat_vector_fun_ptr the_sol_grad_fun;
 
 typedef DROPS::Point3DCL (*bnd_val_fun) (const DROPS::Point3DCL&, double);
 
@@ -433,6 +434,12 @@ double laplace_beltrami_0_sol (const DROPS::Point3DCL& p, double)
 }
 static RegisterScalarFunction regsca_laplace_beltrami_0_sol( "LaplaceBeltrami0Sol", laplace_beltrami_0_sol);
 
+// The tangential gradient of laplace_beltrami_0_sol with respect to the exact sphere.
+DROPS::Point3DCL laplace_beltrami_0_sol_grad (const DROPS::Point3DCL& p, double)
+{
+    DROPS::Point3DCL tmp= 3./std::pow( p.norm(), 3)*( MakePoint3D(2.*p[0]*p[1], p[0]*p[0] - p[1]*p[1], 0.) - (3.*p[0]*p[0]*p[1] - std::pow(p[1], 3))/p.norm_sq()*p);
+    return tmp; // This equals tmp - inner_prod( p/p.norm(), tmp)*p/p.norm().
+}
 
 double sol0t (const DROPS::Point3DCL& p, double t)
 {
@@ -851,13 +858,21 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
     instat_scalar_fun_ptr f;
     double f_time;
 
+    LocalLaplaceBeltramiP2CL loc_lb;
+
+    instat_vector_fun_ptr f_grad;
+    double f_grad_time;
+
     InterfaceL2AccuP2CL* tid0p; // The object in OpenMP-thread 0, in which the following variables are updated.
     std::vector<double> f_grid_norm,
                         f_grid_int,
                         f_norm,
                         f_int,
                         err,
-                        area;
+                        area,
+                        f_grid_grad_norm,
+                        f_grad_norm,
+                        grad_err;
 
   public:
     double f_grid_norm_acc,
@@ -865,10 +880,13 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
            f_norm_acc,
            f_int_acc,
            err_acc,
-           area_acc;
+           area_acc,
+           f_grid_grad_norm_acc,
+           f_grad_norm_acc,
+           grad_err_acc;
 
     InterfaceL2AccuP2CL (const InterfaceCommonDataP2CL& cdata, const MultiGridCL& mg_arg, std::string name= std::string())
-        : cdata_( cdata), mg( mg_arg), name_( name), fvd( 0), f( 0), f_time( 0.) {}
+        : cdata_( cdata), mg( mg_arg), name_( name), fvd( 0), f( 0), f_time( 0.),  loc_lb( 1.), f_grad( 0), f_grad_time( 0.){}
     virtual ~InterfaceL2AccuP2CL () {}
 
     void set_name (const std::string& n) { name_= n; }
@@ -876,6 +894,10 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
     void set_function (const instat_scalar_fun_ptr farg, double f_time_arg= 0.) {
         f= farg;
         f_time= f_time_arg;
+    }
+    void set_grad_function (const instat_vector_fun_ptr farg, double f_time_arg= 0.) {
+        f_grad= farg;
+        f_grad_time= f_time_arg;
     }
 
     virtual void begin_accumulation () {
@@ -899,7 +921,15 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
         area.clear();
         area.resize( omp_get_max_threads(), 0.);
 
+        f_grid_grad_norm.clear();
+        f_grid_grad_norm.resize( omp_get_max_threads(), 0.);
+        f_grad_norm.clear();
+        f_grad_norm.resize( omp_get_max_threads(), 0.);
+        grad_err.clear();
+        grad_err.resize( omp_get_max_threads(), 0.);
+
         f_grid_norm_acc= f_grid_int_acc= f_norm_acc= f_int_acc= err_acc= area_acc= 0.;
+        f_grid_grad_norm_acc= f_grad_norm_acc= grad_err_acc= 0.;
     }
 
     virtual void finalize_accumulation() {
@@ -926,6 +956,19 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
 
             const double mvf_err= std::sqrt( std::pow( err_acc, 2) - std::pow( f_grid_int_acc - f_int_acc, 2)/area_acc);
             std:: cout << "\t|| f - c_f - (f_grid -c_{f_grid}) ||_L2: " << mvf_err;
+        }
+
+        if (fvd != 0) {
+            f_grid_grad_norm_acc=  std::sqrt( std::accumulate( f_grid_grad_norm.begin(), f_grid_grad_norm.end(), 0.));
+            std::cout << "\n\t|| f_grid_grad ||_L2: " << f_grid_grad_norm_acc;
+        }
+        if (f_grad != 0) {
+            f_grad_norm_acc=  std::sqrt( std::accumulate( f_grad_norm.begin(), f_grad_norm.end(), 0.));
+            std::cout << "\n\t|| f_grad ||_L2: " << f_grad_norm_acc;
+        }
+        if (fvd != 0 && f_grad != 0) {
+            grad_err_acc=  std::sqrt( std::accumulate( grad_err.begin(), grad_err.end(), 0.));
+            std::cout << "\n\t|| f_grad - f_grid_grad ||_L2: " << grad_err_acc;
         }
         std::cout << std::endl;
     }
@@ -959,6 +1002,39 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
         if (fvd != 0 && f != 0) {
             std::valarray<double> qerr= qfgrid - qf;
             tid0p->err[tid]+= quad_2D( cdata.absdet*qerr*qerr, cdata.qdom);
+        }
+
+        GridFunctionCL<Point3DCL> qfgradgrid,
+                                  qfgrad;
+        if (fvd != 0) {
+            qfgradgrid.resize( cdata.qdom.vertex_size());
+            if (fvd->RowIdx->GetFE() == P2IF_FE) {
+                LocalP2CL<> lp2( t, *fvd, nobnddata);
+                loc_lb.setup( t, cdata);
+                for (Uint i= 0; i < 10; ++i)
+                    qfgradgrid+= lp2[i]*loc_lb.get_qgradp2( i);
+            }
+            else if (fvd->RowIdx->GetFE() == P1IF_FE) {
+// // XXX Implement this case.
+//                 LocalP1CL<> lp1( t, *fvd, nobnddata);
+//                 loc_lb_p1.setup( t, cdata);
+//                 for (Uint i= 0; i < 4; ++i)
+//                     qfgradgrid+= lp1[i]*loc_lb_p1.get_qgradp1( i);
+            }
+            tid0p->f_grid_grad_norm[tid]+= quad_2D( cdata.absdet*dot( qfgradgrid, qfgradgrid), cdata.qdom);
+        }
+        if (f_grad != 0) {
+            resize_and_evaluate_on_vertexes( f_grad, cdata.qdom_projected, f_grad_time, qfgrad);
+            for (Uint i= 0; i < cdata.qdom_projected.size(); ++i) {
+                Point3DCL n= cdata.quaqua.local_ls_grad( *cdata.qdom_projected[i].first, cdata.qdom_projected[i].second);
+                n/= n.norm();
+                qfgrad[i]-= inner_prod( n, qfgrad[i])*n;
+            }
+            tid0p->f_grad_norm[tid]+= quad_2D( cdata.absdet*dot( qfgrad, qfgrad), cdata.qdom);
+        }
+        if (fvd != 0 && f_grad != 0) {
+            GridFunctionCL<Point3DCL> qerr( qfgradgrid - qfgrad);
+            tid0p->grad_err[tid]+= quad_2D( cdata.absdet*dot( qerr, qerr), cdata.qdom);
         }
     }
 
@@ -1058,6 +1134,7 @@ void StationaryStrategyP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DR
     InterfaceL2AccuP2CL L2_accu( cdatap2, mg, "P2-solution");
     L2_accu.set_grid_function( xp2);
     L2_accu.set_function( the_sol_fun, 0.);
+    L2_accu.set_grad_function( the_sol_grad_fun, 0.);
     err_accus.push_back( &L2_accu);
     accumulate( err_accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetMatchingFunction(), ifacep2idx.GetBndInfo());
 
@@ -1097,6 +1174,8 @@ int main (int argc, char* argv[])
     the_lset_fun= inscamap[P.get<std::string>("Exp.Levelset")];
     the_rhs_fun=  inscamap[P.get<std::string>("Exp.Rhs")];
     the_sol_fun=  inscamap[P.get<std::string>("Exp.Solution")];
+    if (P.get<std::string>("Exp.Solution") == "LaplaceBeltrami0Sol")
+        the_sol_grad_fun=  &laplace_beltrami_0_sol_grad;
     for (Uint i= 0; i < 6; ++i)
         bf_wind[i]= the_wind_fun;
 

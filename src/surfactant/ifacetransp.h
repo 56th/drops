@@ -611,6 +611,8 @@ class LocalLaplaceBeltramiP2CL
 
     double coup[10][10];
 
+    const GridFunctionCL<Point3DCL>& get_qgradp2 (size_t i) { return qgradp2[i]; }
+
     void setup (const TetraCL& t, const InterfaceCommonDataP2CL& cdata) {
         if (cdata.surf.normal_empty())
             cdata.surf.compute_normals( t);
