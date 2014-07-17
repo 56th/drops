@@ -54,7 +54,7 @@ class QuaQuaMapperCL
     NoBndDataCL<Point3DCL> nobnddata_vec;
     P2EvalCL<Point3DCL, const NoBndDataCL<Point3DCL>, const VecDescCL> ls_grad_rec;
 
-    mutable LocalP1CL<Point3DCL> gradrefp2[10];
+    LocalP1CL<Point3DCL> gradrefp2[10];
 
     // The neighborhoods around each tetra in which base points are searched for.
     TetraToTetrasT& neighborhoods_;
