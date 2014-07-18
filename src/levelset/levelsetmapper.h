@@ -45,6 +45,7 @@ class QuaQuaMapperCL
   private:
     int maxiter_;
     double tol_;
+    bool use_line_search_;
 
     // The level set function.
     NoBndDataCL<> nobnddata;
@@ -60,10 +61,13 @@ class QuaQuaMapperCL
     TetraToTetrasT& neighborhoods_;
 
     bool line_search (const Point3DCL& v, const Point3DCL& nx, const TetraCL*& tetra, BaryCoordCL& bary, const TetraSetT& neighborhood) const;
+    void base_point_with_line_search (const TetraCL*& tet, BaryCoordCL& xb) const;
+    void base_point_newton (const TetraCL*& tet, BaryCoordCL& xb) const;
 
   public:
-    QuaQuaMapperCL (const MultiGridCL& mg, VecDescCL& lsarg, const VecDescCL& ls_grad_recarg, TetraToTetrasT& neigborhoods, int maxiter= 100, double tol= 1e-7)
-        : maxiter_( maxiter), tol_( tol), ls( &lsarg, &nobnddata, &mg), ls_grad_rec( &ls_grad_recarg, &nobnddata_vec, &mg), neighborhoods_( neigborhoods)
+    QuaQuaMapperCL (const MultiGridCL& mg, VecDescCL& lsarg, const VecDescCL& ls_grad_recarg, TetraToTetrasT& neigborhoods, int maxiter= 100, double tol= 1e-7, bool use_line_search= true)
+        : maxiter_( maxiter), tol_( tol), use_line_search_( use_line_search),
+          ls( &lsarg, &nobnddata, &mg), ls_grad_rec( &ls_grad_recarg, &nobnddata_vec, &mg), neighborhoods_( neigborhoods)
     { P2DiscCL::GetGradientsOnRef( gradrefp2); }
 
 

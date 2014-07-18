@@ -1067,7 +1067,10 @@ void StationaryStrategyP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DR
     TetraToTetrasT tetra_neighborhoods;
     compute_tetra_neighborhoods( mg, lset.Phi, lset.GetBndData(), lat, tetra_neighborhoods);
 
-    QuaQuaMapperCL quaqua( mg, lset.Phi, lsgradrec, tetra_neighborhoods);
+    QuaQuaMapperCL quaqua( mg, lset.Phi, lsgradrec, tetra_neighborhoods,
+                           P.get<int>( "LevelsetMapper.Iter"),
+                           P.get<double>( "LevelsetMapper.Tol"),
+                           P.get<std::string>( "LevelsetMapper.Method") == "FixedPointWithLineSearch");
 
     VecDescCL to_iface( &vecp2idx);
 //     {

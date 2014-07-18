@@ -84,6 +84,13 @@
 		"Discontinuous": 0
 	},
 
+	"LevelsetMapper": // quasi-orthogonal coordinate system at the interface
+	{
+		"Tol":			1e-7,
+		"Iter":			100,
+		"Method":		"Newton" // "FixedPointWithLineSearch" // "Newton"
+	},
+
 	"VTK": // VTK output
 	{
 		"VTKOut":		1,

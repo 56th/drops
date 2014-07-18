@@ -90,7 +90,7 @@ bool QuaQuaMapperCL::line_search (const Point3DCL& v, const Point3DCL& nx, const
     return inneriter < max_inneriter;
 }
 
-void QuaQuaMapperCL::base_point (const TetraCL*& tet, BaryCoordCL& xb) const
+void QuaQuaMapperCL::base_point_with_line_search (const TetraCL*& tet, BaryCoordCL& xb) const
 // tet and xb specify the point which is projected to the zero level.
 // On return tet and xb are the resulting base point.
 {
@@ -111,8 +111,133 @@ void QuaQuaMapperCL::base_point (const TetraCL*& tet, BaryCoordCL& xb) const
             break;
     }
     if (iter >= maxiter_) {
-        std::cout << "QuaQuaMapperCL::base_point: max iteration number exceeded; |x - xold|: " << norm( xold - x) << "\tx: " << x << "\t n: " << n << "\t ls(x): " << ls.val( *tet, xb) << std::endl;
+        std::cout << "QuaQuaMapperCL::base_point_with_line_search: max iteration number exceeded; |x - xold|: " << norm( xold - x) << "\tx: " << x << "\t n: " << n << "\t ls(x): " << ls.val( *tet, xb) << std::endl;
     }
+}
+
+
+
+void QuaQuaMapperCL::base_point_newton (const TetraCL*& tet, BaryCoordCL& xb) const
+// tet and xb specify the point which is projected to the zero level.
+// On return tet and xb are the resulting base point.
+{
+    const int max_damping= 10;
+    const double eps= 1e-10;
+    const double lset_tol= 5e-9;
+
+    const TetraSetT& neighborhood= neighborhoods_[tet];
+
+    Point3DCL x0, x, // World coordinates of initial and current xb.
+              dx; // Newton-correction for x.
+    x0= x= GetWorldCoord( *tet, xb);
+    SVectorCL<4> F; // The function of which we search a root, ( x0 - x - a*gh(x), -ls(x) ).
+    double a= 0.;
+
+    double d= 1.; // Damping factor for trust region.
+
+    QRDecompCL<4,4> qr;
+    SMatrixCL<4,4>& M= qr.GetMatrix();
+
+    Point3DCL g_ls; // The gradient of the level set function.
+    LocalP2CL<> locls( *tet, ls);
+    LocalP1CL<Point3DCL> gradp2[10];
+    SMatrixCL<3,3> T;
+    double dummy;
+
+    LocalP2CL<Point3DCL> loc_gh;
+    Point3DCL gh, // recovered gradient
+              nh; // quasi normal
+    SMatrixCL<3,3> dgh, // Jacobian of the recovered gradient.
+                   dn;  // Jacobian of the quasi-normal.
+
+    World2BaryCoordCL w2b( *tet);
+
+    int iter;
+    for (iter= 0; iter < maxiter_; ++iter) {
+        loc_gh.assign( *tet, ls_grad_rec);
+        gh= loc_gh( xb);
+        nh= gh/gh.norm();
+
+        GetTrafoTr( T, dummy, *tet);
+        P2DiscCL::GetGradients( gradp2, gradrefp2, T);
+        g_ls= locls[0]*gradp2[0]( xb);
+        for (Uint i= 1; i < 10; ++i)
+            g_ls+= locls[i]*gradp2[i]( xb);
+
+        // Evaluate the Jacobian of the quasi-normal field in xb: dn_h= 1/|G_h| P dG_h.
+        dgh= outer_product( loc_gh[0], gradp2[0]( xb));
+        for (Uint i= 1; i < 10; ++i)
+            dgh+= outer_product( loc_gh[i], gradp2[i]( xb));
+        dn= 1./gh.norm()*(dgh - outer_product( nh, transp_mul( dgh, nh)));
+
+        // Setup the blockmatrix M= (-I - a dn | - gh, -g_ls^T | 0).
+        for (Uint i= 0; i < 3; ++i) {
+            for (Uint j= 0; j < 3; ++j) {
+                M( i,j)= -a*dn( i,j);
+            }
+            M( i,i)-= 1.;
+            M( i, 3)= -nh[i];
+            M( 3, i)= -g_ls[i];
+        }
+        M( 3,3)= 0.;
+// std::cout << "before M: " << M << std::endl;
+        qr.prepare_solve();
+        // Setup F= (x0 - x - a*gh, -locls( xb)).
+        for (Uint i= 0; i < 3; ++i)
+            F[i]= x0[i] - x[i] - a*nh[i];
+        F[3]= -locls( xb);
+// std::cout << "before F: " << F << std::endl;
+        qr.Solve( F);
+// std::cout << "after M: " << M << std::endl;
+// std::cout << "after F: " << F << std::endl;
+        dx= MakePoint3D( F[0], F[1], F[2]);
+
+        // Apply damping until x - d*dx is in the neighborhood of tet.
+        xb= w2b( x - dx);
+        if (!is_in_ref_tetra( xb, eps))
+            tet= 0;
+        d= 1.;
+        for (int k= 0; tet == 0 && k < max_damping; ++k, d*= 0.5)
+            enclosing_tetra( x - d*dx, neighborhood, eps, tet, xb);
+        if (tet == 0) {
+            std::cout << "x: " << x << "\tdx: " << dx << "\tx - d*dx: "<< x - d*dx << std::endl;
+            throw DROPSErrCL("QuaQuaMapperCL::base_point_newton: Coord not in given tetra set.\n");
+        }
+        x-= d*dx;
+        a-= d*F[3];
+ 
+       locls.assign( *tet, ls);
+       w2b.assign( *tet);
+       xb= w2b( x);
+        if (/*dx.norm() < lset_tol*/std::abs( locls( xb)) < lset_tol) {
+            // Compute the quasi-distance dh:
+//             loc_gh.assign( *tet, ls_grad_rec);
+//             const Point3DCL& gh= loc_gh( xb);// The recovered gradient.
+//             a*= gh.norm();
+            break;
+        }
+    }
+    if (iter >= maxiter_) {
+        std::cout << "QuaQuaMapperCL::base_point_newton: max iteration number exceeded; x0: " << x0 << "\tx: " << x << "\t dx: " << dx << "\t ls(x): " << ls.val( *tet, xb) << "\tdamping: " << d << "\tunscaled distance: " << a << "\tgh: " << gh << "\tnh: " << nh << "g_ls: " << g_ls << std::endl;
+    }
+// std::cout << "F: " << F << std::endl;
+// char c;
+// std::cin >> c;
+// if (c == 'q')
+//     exit( 0);
+//     else {
+//         std::cout << "QuaQuaMapperCL::base_point_newton: Ok! x0: " << x0 << "\tx: " << x << "\t dx: " << dx << "\t ls(x): " << ls.val( *tet, xb) << "\tdamping: " << d << "\tunscaled distance: " << a << "\titer: " << iter << std::endl;
+//     }
+}
+
+void QuaQuaMapperCL::base_point (const TetraCL*& tet, BaryCoordCL& xb) const
+// tet and xb specify the point which is projected to the zero level.
+// On return tet and xb are the resulting base point.
+{
+    if (use_line_search_ == true)
+        base_point_with_line_search( tet, xb);
+    else
+        base_point_newton( tet, xb);
 }
 
 void QuaQuaMapperCL::jacobian (const TetraCL& tet, const BaryCoordCL& xb, SMatrixCL<3,3>& dph) const
@@ -143,7 +268,7 @@ void QuaQuaMapperCL::jacobian (const TetraCL& tet, const BaryCoordCL& xb, SMatri
     SMatrixCL<3,3> dgh;
     for (Uint i= 0; i < 10; ++i)
         dgh+= outer_product( loc_gh[i], gradp2[i]( b));
-    const SMatrixCL<3,3> dn= 1/gh.norm()*(dgh - outer_product( q_n, transp_mul( dgh, q_n)));
+    const SMatrixCL<3,3> dn= 1./gh.norm()*(dgh - outer_product( q_n, transp_mul( dgh, q_n)));
 
     // Compute Q.
     const SMatrixCL<3,3> Q= eye<3,3>() - outer_product( q_n/inner_prod( q_n, n), n);
