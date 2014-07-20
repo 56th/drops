@@ -170,7 +170,7 @@ class InterfaceCommonDataP2CL : public TetraAccumulatorCL
     QuadDomain2DCL            qdom;
     TetraBaryPairVectorT      qdom_projected;
     std::valarray<double>     absdet;
-    QuaQuaMapperCL            quaqua;
+    const QuaQuaMapperCL&     quaqua;
     /// @}
 
     const InterfaceCommonDataP2CL& get_clone () const {
