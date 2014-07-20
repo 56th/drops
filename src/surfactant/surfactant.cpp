@@ -1141,6 +1141,15 @@ void StationaryStrategyP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DR
     err_accus.push_back( &L2_accu);
     accumulate( err_accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetMatchingFunction(), ifacep2idx.GetBndInfo());
 
+    {
+        std::ofstream os( "quaqua_num_outer_iter.txt");
+        for (Uint i= 0; i != quaqua.num_outer_iter.size(); ++i)
+            os << i << '\t' << quaqua.num_outer_iter[i] << '\n';
+        os << '\n';
+        for (Uint i= 0; i != quaqua.num_inner_iter.size(); ++i)
+            os << i << '\t' << quaqua.num_inner_iter[i] << '\n';
+    }
+
     if (P.get<int>( "SolutionOutput.Freq") > 0)
         DROPS::WriteFEToFile( xp2, mg, P.get<std::string>( "SolutionOutput.Path") + "_p2", P.get<bool>( "SolutionOutput.Binary"));
 

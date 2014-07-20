@@ -45,6 +45,8 @@ class QuaQuaMapperCL
   private:
     int maxiter_;
     double tol_;
+    int maxinneriter_;
+    const double innertol_;
     bool use_line_search_;
 
     // The level set function.
@@ -66,8 +68,8 @@ class QuaQuaMapperCL
 
   public:
     QuaQuaMapperCL (const MultiGridCL& mg, VecDescCL& lsarg, const VecDescCL& ls_grad_recarg, TetraToTetrasT& neigborhoods, int maxiter= 100, double tol= 1e-7, bool use_line_search= true)
-        : maxiter_( maxiter), tol_( tol), use_line_search_( use_line_search),
-          ls( &lsarg, &nobnddata, &mg), ls_grad_rec( &ls_grad_recarg, &nobnddata_vec, &mg), neighborhoods_( neigborhoods)
+        : maxiter_( maxiter), tol_( tol), maxinneriter_( 100), innertol_( 5e-9), use_line_search_( use_line_search),
+          ls( &lsarg, &nobnddata, &mg), ls_grad_rec( &ls_grad_recarg, &nobnddata_vec, &mg), neighborhoods_( neigborhoods), num_outer_iter( maxiter + 1), num_inner_iter( maxinneriter_ + 1)
     { P2DiscCL::GetGradientsOnRef( gradrefp2); }
 
 
@@ -78,6 +80,10 @@ class QuaQuaMapperCL
     LocalP2CL<> local_ls      (const TetraCL& tet) const { return LocalP2CL<>( tet, ls); }
     Point3DCL   local_ls_grad (const TetraCL& tet, const BaryCoordCL& xb) const;
     ///@}
+
+    // Count number of iterations iter->#computations with iter iterations.
+    mutable std::vector<size_t> num_outer_iter;
+    mutable std::vector<size_t> num_inner_iter;
 };
 
 void compute_tetra_neighborhoods (const DROPS::MultiGridCL& mg, const VecDescCL& lsetPhi, const BndDataCL<>& lsetbnd, const PrincipalLatticeCL& lat, TetraToTetrasT& tetra_neighborhoods);
