@@ -504,6 +504,10 @@ void TransportP1XCL::SetupInstatSystem (MLMatDescCL& matA, VecDescCL& cplA,
     MLMatrixCL::iterator itC = --matC.Data.end();
     MLIdxDescCL::iterator it = --matA.RowIdx->end();
     SetupInstatSystem (*itA, &cplA, *itM, &cplM, *itC, &cplC, &b, *it, time);
+    --itA;
+    --itM;
+    --itC;
+    --it;
     for (size_t num= 1; num < matA.Data.size(); ++num, --itA, --itM, --itC, --it)
         SetupInstatSystem (*itA, 0, *itM, 0, *itC, 0, 0, *it, time);
 }
