@@ -27,20 +27,20 @@ namespace DROPS{
 template <class ValueT>
 void ProlongationCL<ValueT>::Create(IdxDescCL* coarse, IdxDescCL* fine)
 {
+    coarse_ = coarse;
+    fine_   = fine;
     const FiniteElementT fe= coarse->GetFE();
     if (fe == P1_FE){
 #ifdef _PAR
         throw DROPSErrCL("P1-prolongation not yet implemented in parallel");
 #endif
-        BuildP1ProlongationMatrix( *coarse, *fine);
+        BuildP1ProlongationMatrix( *coarse_, *fine);
         return;
     }
 
     if (fe != vecP2_FE && fe != P2_FE)
         throw DROPSErrCL("ProlongationCL: FE type not supported, yet");
 
-    coarse_ = coarse;
-    fine_   = fine;
     scale_.resize(fine_->NumUnknowns());
 
     const IdxT f_idx = fine_->GetIdx();
@@ -328,13 +328,14 @@ void ProlongationCL<ValueT>::BuildP1ProlongationMatrix( const IdxDescCL& cIdx, c
     for (MultiGridCL::const_EdgeIterator sit= mg_.GetAllEdgeBegin( c_level),
          theend= mg_.GetAllEdgeEnd( c_level); sit!=theend; ++sit)
         if ( sit->IsRefined() && sit->GetMidVertex()->Unknowns.Exist()
+             && sit->GetMidVertex()->Unknowns.Exist(f_idx)
              && !sit->GetMidVertex()->Unknowns.Exist(c_idx) )  {
             // only new non-boundary vertices are interpolated
 // if(!(*sit->GetMidVertex()->Unknowns.Exist(idx)) std::cout << "no unknown index in mid vertex" << std::endl;
             i= sit->GetMidVertex()->Unknowns(f_idx);
-            if (sit->GetVertex(0)->Unknowns.Exist())
+            if (sit->GetVertex(0)->Unknowns.Exist() && sit->GetVertex(0)->Unknowns.Exist(c_idx))
                 mat(i,sit->GetVertex(0)->Unknowns(c_idx))= 0.5;
-            if (sit->GetVertex(1)->Unknowns.Exist())
+            if (sit->GetVertex(1)->Unknowns.Exist() && sit->GetVertex(1)->Unknowns.Exist(c_idx))
                 mat(i,sit->GetVertex(1)->Unknowns(c_idx))= 0.5;
         }
     // Iterate over the vertices of the coarse triangulation and copy values
