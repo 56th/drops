@@ -113,6 +113,21 @@ double mass_rhs (const DROPS::Point3DCL& q, double)
     return mass_sol_p( q, 0.)*(-4*p.norm_sq() + 18.);
 }
 
+DROPS::Point3DCL mass_grad_p (const DROPS::Point3DCL& q, double)
+{
+    DROPS::Point3DCL p(q), g;
+    TransformToDropOrig( p);
+    // g= [ 6xy, 3x^2 - 3y^2, 0 ]^T
+    g[0]= 6*p[0]*p[1];
+    g[1]= 3*(p[0]*p[0] - p[1]*p[1]);
+    return exp(1. - p.norm_sq())*(-2*surf_sol( q, 0.)*p + g);
+}
+DROPS::Point3DCL mass_grad_n (const DROPS::Point3DCL& q, double)
+{
+    static double mu_ratio= P.get<double>("Transp.DiffPos")/P.get<double>("Transp.DiffNeg");
+    return mu_ratio*mass_grad_p( q, 0.);
+}
+
 //@}
 
 DROPS::Point3DCL RotateVelXZ (const DROPS::Point3DCL& q, double)
@@ -132,6 +147,8 @@ static DROPS::RegisterScalarFunction regsca_surfsol("solSurf", surf_sol);
 static DROPS::RegisterScalarFunction regsca_massrhs("rhsMassNoVel", mass_rhs);
 static DROPS::RegisterScalarFunction regsca_masssolp("solMassPos", mass_sol_p);
 static DROPS::RegisterScalarFunction regsca_masssoln("solMassNeg", mass_sol_n);
+static DROPS::RegisterVectorFunction regvec_gradp("gradMassPos", mass_grad_p);
+static DROPS::RegisterVectorFunction regvec_gradn("gradMassNeg", mass_grad_n);
 static DROPS::RegisterVectorFunction regvec_rotxz("RotatingFlowfield", RotateVelXZ);
 
 
@@ -190,6 +207,8 @@ void  StatMassSurfTransportStrategy( MultiGridCL& MG, InstatNavierStokes2PhaseP2
     instat_scalar_fun_ptr distance = tdscalarmap[P.get<std::string>("Transp.Levelset")];
     instat_scalar_fun_ptr massSol_p= tdscalarmap[P.get<std::string>("Transp.SolPos")];
     instat_scalar_fun_ptr massSol_n= tdscalarmap[P.get<std::string>("Transp.SolNeg")];
+    instat_vector_fun_ptr massGrad_p= tdvectormap[P.get<std::string>("Transp.GradSolPos")];
+    instat_vector_fun_ptr massGrad_n= tdvectormap[P.get<std::string>("Transp.GradSolNeg")];
 
     instat_scalar_fun_ptr surfRhs = tdscalarmap[P.get<std::string>("SurfTransp.Rhs")];
     instat_scalar_fun_ptr surfSol = tdscalarmap[P.get<std::string>("SurfTransp.Sol")];
@@ -358,7 +377,7 @@ void  StatMassSurfTransportStrategy( MultiGridCL& MG, InstatNavierStokes2PhaseP2
 
     // compute errors
     std::cout << "=== bulk error ===\n";
-    const double L2_mass= massTransp.CheckSolution( massSol_n, massSol_p, 0);
+    const double L2_mass= massTransp.CheckSolution( massSol_n, massSol_p, massGrad_n, massGrad_p, 0);
     const double c_mean = massTransp.MeanDropConcentration();
     std::cout << "Mean concentration in drop: " << c_mean <<"\n";
     const double L2_surf= L2_error_interface( MG, lset.Phi, lsetbnddata, surfTransp.GetSolution(), surfSol, 0);

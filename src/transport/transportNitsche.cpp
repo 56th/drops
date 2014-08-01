@@ -149,7 +149,8 @@ double TransportP1XCL::MeanDropConcentration()
 }
 
 
-double TransportP1XCL::CheckSolution(instat_scalar_fun_ptr Lsgn, instat_scalar_fun_ptr Lsgp, double time)
+double TransportP1XCL::CheckSolution(instat_scalar_fun_ptr Lsgn, instat_scalar_fun_ptr Lsgp,
+        instat_vector_fun_ptr Gradn, instat_vector_fun_ptr Gradp, double time)
 {
     VecDescCL cn (&idx);
     GetSolutionOnPart(cn, false, false);
@@ -169,6 +170,7 @@ double TransportP1XCL::CheckSolution(instat_scalar_fun_ptr Lsgn, instat_scalar_f
     const Uint lvl= ct.GetLevel();
 
     typedef Quad5CL<> QuadT;
+    typedef Quad5CL<Point3DCL> QuadVecT;
     DROPS_FOR_TRIANG_TETRA( MG_, lvl, it)
     {
         LocalP1CL<double> lp1_p (*it, cp, Bnd_);
@@ -194,20 +196,24 @@ double TransportP1XCL::CheckSolution(instat_scalar_fun_ptr Lsgn, instat_scalar_f
             QuadT q_diff(q_dsol - q_sol);
             QuadT q_diff2(q_diff * q_diff);
             QuadT q_diffabs( std::abs(q_diff));
-            LocalP1CL<> diffGradP1( pPart? lp1_p - lp1_psol : lp1_n - lp1_nsol);
-            Point3DCL diffGrad;
+            const LocalP1CL<>& P1( pPart? lp1_p : lp1_n);
+            Point3DCL grad;
             for (int i=0; i<4; ++i)
-                diffGrad+= diffGradP1[i]*G[i];
+                grad+= P1[i]*G[i];
+            QuadVecT q_gradSol( *it, pPart ? Gradp : Gradn, time, nodes),
+                    q_grad( grad),
+                    q_diffGrad( q_grad - q_gradSol);
+            QuadT q_diffGrad2( dot( q_diffGrad, q_diffGrad));
 
             double Vol = absdet*VolFrac(T);
             if (pPart) {
               errl2p += q_diff2.quad(Vol);
               errl1p += q_diffabs.quad(Vol);
-              errh1p += norm_sq( diffGrad)*Vol/6;
+              errh1p += q_diffGrad2.quad(Vol);
             } else {
               errl2n += q_diff2.quad(Vol);
               errl1n += q_diffabs.quad(Vol);
-              errh1n += norm_sq( diffGrad)*Vol/6;
+              errh1n += q_diffGrad2.quad(Vol);
             }
             delete nodes;
           }
@@ -221,19 +227,23 @@ double TransportP1XCL::CheckSolution(instat_scalar_fun_ptr Lsgn, instat_scalar_f
           QuadT q_diff(q_dsol - q_sol);
           QuadT q_diff2(q_diff * q_diff);
           QuadT q_diffabs( std::abs(q_diff));
-          LocalP1CL<> diffGradP1( pPart? lp1_p - lp1_psol : lp1_n - lp1_nsol);
-          Point3DCL diffGrad;
+          const LocalP1CL<>& P1( pPart? lp1_p : lp1_n);
+          Point3DCL grad;
           for (int i=0; i<4; ++i)
-              diffGrad+= diffGradP1[i]*G[i];
+              grad+= P1[i]*G[i];
+          QuadVecT q_gradSol( *it, pPart ? Gradp : Gradn, time),
+                  q_grad( grad),
+                  q_diffGrad( q_grad - q_gradSol);
+          QuadT q_diffGrad2( dot( q_diffGrad, q_diffGrad));
 
           if (pPart) {
             errl2p += q_diff2.quad(absdet);
             errl1p += q_diffabs.quad(absdet);
-            errh1p += norm_sq( diffGrad)*absdet/6;
+            errh1p += q_diffGrad2.quad(absdet);
           } else {
             errl2n += q_diff2.quad(absdet);
             errl1n += q_diffabs.quad(absdet);
-            errh1n += norm_sq( diffGrad)*absdet/6;
+            errh1n += q_diffGrad2.quad(absdet);
           }
         }
     }

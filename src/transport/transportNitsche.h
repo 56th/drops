@@ -253,7 +253,8 @@ class TransportP1XCL
         return H_;
     }
     double GetXFEMOmitBound(){ return omit_bound_; }
-    double CheckSolution(instat_scalar_fun_ptr Lsgn, instat_scalar_fun_ptr Lsgp, double time);
+    double CheckSolution(instat_scalar_fun_ptr Lsgn, instat_scalar_fun_ptr Lsgp,
+            instat_vector_fun_ptr Gradn, instat_vector_fun_ptr Gradp, double time);
 };
 
 /// \brief Observes the MultiGridCL-changes by AdapTriangCL to repair the function c.ct.
