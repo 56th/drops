@@ -45,6 +45,14 @@ void Extend (const MultiGridCL& mg, const VecDescCL& x, VecDescCL& xext)
         if (it->Unknowns.Exist( xidx) && it->Unknowns.Exist( xextidx))
             xext.Data[it->Unknowns( xextidx)]= x.Data[it->Unknowns( xidx)];
     }
+    if (x.RowIdx->GetFE() == P1IF_FE)
+        return;
+
+    // For P2IF_FE, also fixup the edge-dofs.
+    DROPS_FOR_TRIANG_CONST_EDGE( mg, lvl, it) {
+        if (it->Unknowns.Exist( xidx) && it->Unknowns.Exist( xextidx))
+            xext.Data[it->Unknowns( xextidx)]= x.Data[it->Unknowns( xidx)];
+    }
 }
 
 void Restrict (const MultiGridCL& mg, const VecDescCL& xext, VecDescCL& x)
@@ -57,15 +65,36 @@ void Restrict (const MultiGridCL& mg, const VecDescCL& xext, VecDescCL& x)
         if (it->Unknowns.Exist( xidx) && it->Unknowns.Exist( xextidx))
             x.Data[it->Unknowns( xidx)]= xext.Data[it->Unknowns( xextidx)];
     }
+    if (x.RowIdx->GetFE() == P1IF_FE)
+        return;
+
+    // For P2IF_FE, also fixup the edge-dofs.
+    DROPS_FOR_TRIANG_CONST_EDGE( mg, lvl, it) {
+        if (it->Unknowns.Exist( xidx) && it->Unknowns.Exist( xextidx))
+            x.Data[it->Unknowns( xidx)]= xext.Data[it->Unknowns( xextidx)];
+    }
 }
 
-void update_global_matrix_P1 (MatrixBuilderCL& M, const double coup[4][4], const IdxT numr[4], const IdxT numc[4])
+void GetLocalNumbInterface(IdxT* Numb, const TetraCL& s, const IdxDescCL& idx)
 {
-    for (int i= 0; i < 4; ++i)
-        if (numr[i] != NoIdx)
-            for (int j= 0; j < 4; ++j)
-                if (numc[j] != NoIdx)
-                    M( numr[i], numc[j])+= coup[i][j];
+    const Uint sys= idx.GetIdx();
+    for (Uint i= 0; i < 4; ++i)
+        Numb[i]= s.GetVertex( i)->Unknowns.Exist( sys) ? s.GetVertex( i)->Unknowns( sys) : NoIdx;
+    if (idx.GetFE() == P1IF_FE)
+        return;
+
+    for(Uint i= 0; i < 6; ++i)
+        Numb[i+4]= s.GetEdge( i)->Unknowns.Exist( sys) ? s.GetEdge( i)->Unknowns( sys) : NoIdx;
+}
+
+
+InterfaceCommonDataP2CL::InterfaceCommonDataP2CL (const VecDescCL& ls_arg, const BndDataCL<>& lsetbnd_arg,
+    const QuaQuaMapperCL& quaquaarg, const PrincipalLatticeCL& lat_arg)
+    : ls( &ls_arg), lsetbnd( &lsetbnd_arg), lat( lat_arg), ls_loc( lat.vertex_size()), quaqua( quaquaarg)
+{
+    P2DiscCL::GetGradientsOnRef( gradrefp2);
+    for (Uint i= 0; i < 10 ; ++i)
+        p2[i][i]= 1.; // P2-Basis-Functions
 }
 
 void SetupInterfaceMassP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls, const BndDataCL<>& lsetbnd)
@@ -75,7 +104,7 @@ void SetupInterfaceMassP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescC
     TetraAccumulatorTupleCL accus;
     InterfaceCommonDataP1CL cdata( ls, lsetbnd);
     accus.push_back( &cdata);
-    InterfaceMatrixAccuP1CL<LocalInterfaceMassP1CL> accu( mat, LocalInterfaceMassP1CL(), cdata);
+    InterfaceMatrixAccuCL<LocalInterfaceMassP1CL, InterfaceCommonDataP1CL> accu( mat, LocalInterfaceMassP1CL(), cdata);
     accus.push_back( &accu);
     const IdxDescCL* RowIdx= mat->RowIdx;
     accumulate( accus, mg, RowIdx->TriangLevel(), RowIdx->GetMatchingFunction(), RowIdx->GetBndInfo());
@@ -95,7 +124,7 @@ void SetupLBP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls, cons
     TetraAccumulatorTupleCL accus;
     InterfaceCommonDataP1CL cdata( ls, lsetbnd);
     accus.push_back( &cdata);
-    InterfaceMatrixAccuP1CL<LocalLaplaceBeltramiP1CL> accu( mat, LocalLaplaceBeltramiP1CL( D), cdata);
+    InterfaceMatrixAccuCL<LocalLaplaceBeltramiP1CL, InterfaceCommonDataP1CL> accu( mat, LocalLaplaceBeltramiP1CL( D), cdata);
     accus.push_back( &accu);
     const IdxDescCL* RowIdx= mat->RowIdx;
     accumulate( accus, mg, RowIdx->TriangLevel(), RowIdx->GetMatchingFunction(), RowIdx->GetBndInfo());
@@ -109,7 +138,7 @@ void SetupInterfaceRhsP1 (const MultiGridCL& mg, VecDescCL* v,
     TetraAccumulatorTupleCL accus;
     InterfaceCommonDataP1CL cdata( ls, lsetbnd);
     accus.push_back( &cdata);
-    InterfaceVectorAccuP1CL<LocalVectorP1CL> loadaccu( v, LocalVectorP1CL( f, v->t), cdata);
+    InterfaceVectorAccuCL<LocalVectorP1CL, InterfaceCommonDataP1CL> loadaccu( v, LocalVectorP1CL( f, v->t), cdata);
     accus.push_back( &loadaccu);
     accumulate( accus, mg, v->RowIdx->TriangLevel(), v->RowIdx->GetMatchingFunction(), v->RowIdx->GetBndInfo());
 
@@ -126,6 +155,114 @@ void P1Init (instat_scalar_fun_ptr icf, VecDescCL& ic, const MultiGridCL& mg, do
             ic.Data[it->Unknowns( idx)]= icf( it->GetCoord(), t);
     }
     ic.t= t;
+}
+
+InterfaceDebugP2CL::InterfaceDebugP2CL (const InterfaceCommonDataP2CL& cdata)
+    : cdata_( cdata), to_iface( 0), ref_dp( 0), ref_abs_det( 0), true_area( -1.)
+{}
+
+void InterfaceDebugP2CL::begin_accumulation ()
+{
+    max_dph_err= 0;
+    surfacemeasP1= 0.;
+    surfacemeasP2= 0.;
+    max_absdet_err= 0.;
+    max_dph2_err= 0;
+}
+
+void  InterfaceDebugP2CL::finalize_accumulation()
+{
+    std::cout << "max_dph_err: " << max_dph_err
+        << "\nsurfacemeasP1: " << surfacemeasP1;
+    if  (true_area > 0.)
+        std::cout << " rel. error: " << std::abs(surfacemeasP1 - true_area)/true_area;
+    std::cout << "\nsurfacemeasP2: " << surfacemeasP2;
+    if  (true_area > 0.)
+        std::cout << " rel. error: " << std::abs(surfacemeasP2 - true_area)/true_area;
+    std::cout << "\nmax_absdet_err: " << max_absdet_err
+              << "\nmax_dph2_err: " << max_dph2_err << std::endl;
+}
+
+void InterfaceDebugP2CL::visit (const TetraCL& t)
+{
+//     std::cout << "Tetra Id: " << t.GetId().GetIdent() << std::endl;
+    const InterfaceCommonDataP2CL& cdata= cdata_.get_clone();
+    if (cdata.empty())
+        return;
+
+    const TetraCL* tet;
+    BaryCoordCL b;
+
+    if (to_iface != 0) {
+        const Uint sys= to_iface->RowIdx->GetIdx();
+        for (Uint i= 0; i < 4; ++i) {
+            tet= &t;
+            b= std_basis<4>( i + 1);
+            cdata.quaqua.base_point( tet, b);
+            Point3DCL offset= t.GetVertex( i)->GetCoord() - GetWorldCoord( *tet, b);
+            const size_t dof= t.GetVertex( i)->Unknowns( sys);
+            std::copy( Addr( offset), Addr( offset) + 3, &to_iface->Data[dof]);
+        }
+    }
+
+    for (SurfacePatchCL::const_vertex_iterator it= cdata.surf.vertex_begin(); it != cdata.surf.vertex_end(); ++it) {
+        tet= &t;
+        b= *it;
+        cdata.quaqua.base_point( tet, b);
+        const Point3DCL& x= GetWorldCoord( t, *it);
+//         const Point3DCL& xb= GetWorldCoord( *tet, b);
+//         std::cout  << "    |x-xb|: " << (x - xb).norm();
+
+        SMatrixCL<3,3> dph;
+        cdata.quaqua.jacobian( t, *it, dph);
+        SMatrixCL<3,3> diff_dp= ref_dp != 0 ? dph - ref_dp( x, 0.) : SMatrixCL<3,3>();
+        const double dph_err= std::sqrt( frobenius_norm_sq( diff_dp));
+        max_dph_err= std::max( max_dph_err, dph_err);
+//         std::cout  << " |dph -dp|_F: " << dph_err;
+
+        const double absdet= abs_det( t, *it, cdata.quaqua, cdata.surf),
+                     absdet_err= ref_abs_det != 0 ? std::abs( absdet - ref_abs_det( t, *it, cdata.surf)) : 0.;
+        max_absdet_err= std::max( max_absdet_err, absdet_err);
+//         std::cout  << " |\\mu - \\mu^s|: " << absdet_err << std::endl;
+
+
+        Point3DCL n=x/x.norm();
+        SMatrixCL<3,3> diff_dp2= diff_dp - outer_product( n, transp_mul( diff_dp, n));
+        Point3DCL nh;
+        Point3DCL v1= GetWorldCoord( t, cdata.surf.vertex_begin()[1]) - GetWorldCoord( t, cdata.surf.vertex_begin()[0]),
+                  v2= GetWorldCoord( t, cdata.surf.vertex_begin()[2]) - GetWorldCoord( t, cdata.surf.vertex_begin()[0]);
+        cross_product( nh, v1, v2);
+        nh/= nh.norm();
+        diff_dp2= diff_dp2 - outer_product( diff_dp2*nh, nh);
+        const double dph2_err= std::sqrt( frobenius_norm_sq( diff_dp2));
+//         std::cout  << " |P(dph -dp)\\hat P|_F: " << dph2_err << std::endl;
+        max_dph2_err= std::max( max_dph2_err, dph2_err);
+    }
+    surfacemeasP1+= quad_2D( std::valarray<double>( 1., cdata.qdom.vertex_size()), cdata.qdom);
+    surfacemeasP2+= quad_2D( cdata.absdet, cdata.qdom);
+}
+
+void gradient_trafo (const TetraCL& tet, const BaryCoordCL& xb, const QuaQuaMapperCL& quaqua, const SurfacePatchCL& p,
+                     SMatrixCL<3,3>& W)
+{
+    // Compute the basepoint b.
+    const TetraCL* btet= &tet;
+    BaryCoordCL b= xb;
+    quaqua.base_point( btet, b);
+
+    // nl(x)
+    p.compute_normals( tet);
+    Point3DCL nl= p.normal_begin()[0];
+    // Evaluate the normal to the interface in b, n(y).
+    Point3DCL n= quaqua.local_ls_grad( *btet, b);
+    n/= n.norm();
+
+    // Dp_h(x)^T
+    SMatrixCL<3,3> dph, dphT;
+    quaqua.jacobian( tet, xb, dph);
+    assign_transpose( dphT, dph);
+
+    W= dphT + outer_product( nl, n/inner_prod( nl, n) - dph*nl);
 }
 
 void SurfactantP1BaseCL::SetInitialValue (instat_scalar_fun_ptr icf, double t)
@@ -181,9 +318,9 @@ void SurfactantcGP1CL::Update()
     TetraAccumulatorTupleCL accus;
     InterfaceCommonDataP1CL cdata( lset_vd_, lsetbnd_);
     accus.push_back( &cdata);
-    InterfaceMatrixAccuP1CL<LocalInterfaceMassP1CL> mass_accu( &M, LocalInterfaceMassP1CL(), cdata, "mass");
+    InterfaceMatrixAccuCL<LocalInterfaceMassP1CL, InterfaceCommonDataP1CL> mass_accu( &M, LocalInterfaceMassP1CL(), cdata, "mass");
     accus.push_back( &mass_accu);
-    InterfaceMatrixAccuP1CL<LocalLaplaceBeltramiP1CL> lb_accu( &A, LocalLaplaceBeltramiP1CL( D_), cdata, "Laplace-Beltrami");
+    InterfaceMatrixAccuCL<LocalLaplaceBeltramiP1CL, InterfaceCommonDataP1CL> lb_accu( &A, LocalLaplaceBeltramiP1CL( D_), cdata, "Laplace-Beltrami");
     accus.push_back( &lb_accu);
     accus.push_back_acquire( make_wind_dependent_matrixP1_accu<LocalInterfaceConvectionP1CL>( &C,  cdata,  make_P2Eval( MG_, Bnd_v_, *v_), "convection"));
     accus.push_back_acquire( make_wind_dependent_matrixP1_accu<LocalInterfaceMassDivP1CL>   ( &Md, cdata,  make_P2Eval( MG_, Bnd_v_, *v_), "massdiv"));
@@ -193,7 +330,7 @@ void SurfactantcGP1CL::Update()
         M2.SetIdx( cidx, cidx);
         InterfaceCommonDataP1CL* oldcdata= new InterfaceCommonDataP1CL( oldls_, lsetbnd_);
         accus.push_back_acquire( oldcdata);
-        accus.push_back_acquire( new InterfaceMatrixAccuP1CL<LocalInterfaceMassP1CL>( &M2, LocalInterfaceMassP1CL(), *oldcdata, "old mass"));
+        accus.push_back_acquire( new InterfaceMatrixAccuCL<LocalInterfaceMassP1CL, InterfaceCommonDataP1CL>( &M2, LocalInterfaceMassP1CL(), *oldcdata, "old mass"));
     }
     accumulate( accus, MG_, cidx->TriangLevel(), cidx->GetMatchingFunction(), cidx->GetBndInfo());
 
@@ -228,12 +365,12 @@ VectorCL SurfactantcGP1CL::InitStep (double new_t)
     TetraAccumulatorTupleCL accus;
     InterfaceCommonDataP1CL cdata( lset_vd_, lsetbnd_);
     accus.push_back( &cdata);
-    InterfaceVectorAccuP1CL< LocalMatVecP1CL<LocalInterfaceMassP1CL> > mass_accu( &vd_timeder,
+    InterfaceVectorAccuCL<LocalMatVecP1CL<LocalInterfaceMassP1CL>, InterfaceCommonDataP1CL> mass_accu( &vd_timeder,
         LocalMatVecP1CL<LocalInterfaceMassP1CL>( LocalInterfaceMassP1CL(), &vd_oldic), cdata, "mixed-mass");
     accus.push_back( &mass_accu);
 
     if (rhs_fun_)
-        accus.push_back_acquire( new InterfaceVectorAccuP1CL<LocalVectorP1CL>( &vd_load, LocalVectorP1CL( rhs_fun_, new_t), cdata, "load"));
+        accus.push_back_acquire( new InterfaceVectorAccuCL<LocalVectorP1CL, InterfaceCommonDataP1CL>( &vd_load, LocalVectorP1CL( rhs_fun_, new_t), cdata, "load"));
 
     if (theta_ == 1.0) {
         accumulate( accus, MG_, idx.TriangLevel(), idx.GetMatchingFunction(), idx.GetBndInfo());
@@ -244,12 +381,12 @@ VectorCL SurfactantcGP1CL::InitStep (double new_t)
     accus.push_back( &oldcdata);
 
     if (rhs_fun_)
-        accus.push_back_acquire( new InterfaceVectorAccuP1CL<LocalVectorP1CL>( &vd_oldload, LocalVectorP1CL( rhs_fun_, oldt_), oldcdata, "load on old iface"));
+        accus.push_back_acquire( new InterfaceVectorAccuCL<LocalVectorP1CL, InterfaceCommonDataP1CL>( &vd_oldload, LocalVectorP1CL( rhs_fun_, oldt_), oldcdata, "load on old iface"));
 
-    InterfaceVectorAccuP1CL< LocalMatVecP1CL<LocalInterfaceMassP1CL> > old_mass_accu( &vd_oldtimeder,
+    InterfaceVectorAccuCL<LocalMatVecP1CL<LocalInterfaceMassP1CL>, InterfaceCommonDataP1CL> old_mass_accu( &vd_oldtimeder,
         LocalMatVecP1CL<LocalInterfaceMassP1CL>( LocalInterfaceMassP1CL(), &vd_oldic), oldcdata, "mixed-mass on old iface");
     accus.push_back( &old_mass_accu);
-    InterfaceVectorAccuP1CL< LocalMatVecP1CL<LocalLaplaceBeltramiP1CL> > old_lb_accu( &vd_oldres,
+    InterfaceVectorAccuCL<LocalMatVecP1CL<LocalLaplaceBeltramiP1CL>, InterfaceCommonDataP1CL> old_lb_accu( &vd_oldres,
         LocalMatVecP1CL<LocalLaplaceBeltramiP1CL>( LocalLaplaceBeltramiP1CL( D_), &vd_oldic), oldcdata, "Laplace-Beltrami on old iface");
     accus.push_back( &old_lb_accu);
     accus.push_back_acquire( make_wind_dependent_vectorP1_accu<LocalInterfaceConvectionP1CL>( &vd_oldres, &vd_oldic,  oldcdata,  make_P2Eval( MG_, Bnd_v_, oldv_), "convection on old iface"));
@@ -364,15 +501,20 @@ Ensight6IfaceScalarCL::put (Ensight6OutCL& cf) const
 void
 VTKIfaceScalarCL::put (VTKOutCL& cf) const
 {
-    IdxDescCL p1idx;
-    p1idx.CreateNumbering( u_.RowIdx->TriangLevel(), mg_);
-    VecDescCL p1u( &p1idx);
-    Extend( mg_, u_, p1u);
+    IdxDescCL fullidx( P1_FE);
+    if (u_.RowIdx->GetFE() == P2IF_FE)
+        fullidx.SetFE( P2_FE);
+    fullidx.CreateNumbering( u_.RowIdx->TriangLevel(), mg_);
+    VecDescCL uext( &fullidx);
+    Extend( mg_, u_, uext);
     BndDataCL<> bnd( 0);
 
-    cf.PutScalar( make_P1Eval( mg_, bnd, p1u), varName());
+    if (u_.RowIdx->GetFE() == P1IF_FE)
+        cf.PutScalar( make_P1Eval( mg_, bnd, uext), varName());
+    else if (u_.RowIdx->GetFE() == P2IF_FE)
+        cf.PutScalar( make_P2Eval( mg_, bnd, uext), varName());
 
-    p1idx.DeleteNumbering( mg_);
+    fullidx.DeleteNumbering( mg_);
 }
 
 
@@ -833,13 +975,13 @@ void SurfactantCharTransportP1CL::Update()
     TetraAccumulatorTupleCL accus;
     InterfaceCommonDataP1CL cdata( lset_vd_, lsetbnd_);
     accus.push_back( &cdata);
-    InterfaceMatrixAccuP1CL<LocalInterfaceMassP1CL> mass_accu( &M, LocalInterfaceMassP1CL(), cdata, "mass");
+    InterfaceMatrixAccuCL<LocalInterfaceMassP1CL, InterfaceCommonDataP1CL> mass_accu( &M, LocalInterfaceMassP1CL(), cdata, "mass");
     accus.push_back( &mass_accu);
-    InterfaceMatrixAccuP1CL<LocalLaplaceBeltramiP1CL> lb_accu( &A, LocalLaplaceBeltramiP1CL( D_), cdata, "Laplace-Beltrami");
+    InterfaceMatrixAccuCL<LocalLaplaceBeltramiP1CL, InterfaceCommonDataP1CL> lb_accu( &A, LocalLaplaceBeltramiP1CL( D_), cdata, "Laplace-Beltrami");
     accus.push_back( &lb_accu);
     accus.push_back_acquire( make_wind_dependent_matrixP1_accu<LocalInterfaceMassDivP1CL>( &Md, cdata,  make_P2Eval( MG_, Bnd_v_, *v_), "massdiv"));
     if (rhs_fun_)
-        accus.push_back_acquire( new InterfaceVectorAccuP1CL<LocalVectorP1CL>( &vd_load, LocalVectorP1CL( rhs_fun_, ic.t), cdata, "load"));
+        accus.push_back_acquire( new InterfaceVectorAccuCL<LocalVectorP1CL, InterfaceCommonDataP1CL>( &vd_load, LocalVectorP1CL( rhs_fun_, ic.t), cdata, "load"));
 
     accumulate( accus, MG_, cidx->TriangLevel(), cidx->GetMatchingFunction(), cidx->GetBndInfo());
 

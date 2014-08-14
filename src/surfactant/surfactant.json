@@ -7,14 +7,8 @@
                 "ProgressBar":  1, //show progress bar
                 "DynamicLibsPrefix": "../", //where should we look for shared objects?
                 "DynamicLibs": [ //select libraries to be loaded after program start
-                        //"levelset/liblevelset-filmCoeff",
-                        //"levelset/liblevelset-twophaseCoeff",
                         "misc/libmisc-scalarFunctions",
                         "misc/libmisc-vectorFunctions"
-                        //"poisson/libpoisson-poissonCoeff",
-                        //"stokes/libstokes-stokesCoeff",
-                        //"tests/libtests-csgtest",
-                        //"transport/libtransport-transportCoeff"
                 ]
         },
 
@@ -31,9 +25,9 @@
 		"E1":		[ 4,  0,  0],
 		"E2":		[ 0,  4,  0],
 		"E3":		[ 0,  0,  4],
-		"N1":		2,
-		"N2":		2,
-		"N3":		2
+		"N1":		4,
+		"N2":		4,
+		"N3":		4
 	},
 
 	"AdaptRef": // adaptive refinement
@@ -75,7 +69,8 @@
 		"Iter":		1000,
 		"Tol":		1e-10,
 		"OmitBound":	-1,
-		"Visc":		1 // 0.05
+		"Visc":		1, // 0.05,
+		"FEDegree":	1 // 2
 	},
 
 	"Levelset": // levelset solver
@@ -87,6 +82,13 @@
 		"VolCorrection":	0,
 		"Theta":		1,
 		"Discontinuous": 0
+	},
+
+	"LevelsetMapper": // quasi-orthogonal coordinate system at the interface
+	{
+		"Tol":			1e-7,
+		"Iter":			100,
+		"Method":		"Newton" // "FixedPointWithLineSearch" // "Newton"
 	},
 
 	"VTK": // VTK output

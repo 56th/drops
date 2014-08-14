@@ -28,13 +28,18 @@
 #include "levelset/levelset.h"
 #include "levelset/adaptriang.h"
 #include "levelset/surfacetension.h"
+#include "levelset/levelsetmapper.h"
 #include "out/output.h"
 #include "out/vtkOut.h"
 #include "misc/dynamicload.h"
 #include "misc/funcmap.h"
+#include "geom/subtriangulation.h"
+#include "num/gradient_recovery.h"
 
 #include <fstream>
 #include <string>
+#include <tr1/unordered_map>
+#include <tr1/unordered_set>
 
 using namespace DROPS;
 
@@ -49,6 +54,7 @@ instat_vector_fun_ptr the_wind_fun;
 instat_scalar_fun_ptr the_lset_fun;
 instat_scalar_fun_ptr the_rhs_fun;
 instat_scalar_fun_ptr the_sol_fun;
+instat_vector_fun_ptr the_sol_grad_fun;
 
 typedef DROPS::Point3DCL (*bnd_val_fun) (const DROPS::Point3DCL&, double);
 
@@ -283,6 +289,83 @@ double axis_scaling_rhs (const Point3DCL& p, double t)
 static RegisterScalarFunction regsca_axis_scaling_rhs( "AxisScalingRhs", axis_scaling_rhs);
 
 
+// ==non-stationary test case "Collision"==
+
+const double collision_p= 3.0;
+
+// sphere 1: c1= (-1.5 0 0) + v*t
+Point3DCL collision_center_1 (double t)
+{
+    return MakePoint3D( -1.5, 0., 0.) + WindVelocity*t;
+}
+// sphere 2: c2= ( 1.5 0 0) - v*t = -c1
+Point3DCL collision_center_2 (double t)
+{
+    return -collision_center_1( t);
+}
+
+double collision_Dt_lset (const DROPS::Point3DCL& x, double t)
+{
+    Point3DCL x1= x - collision_center_1( t),
+              x2= x - collision_center_2( t);
+    const double n1= x1.norm() < 1e-3 ? 1e-3 : std::pow( x1.norm(), collision_p + 2.),
+                 n2= x2.norm() < 1e-3 ? 1e-3 : std::pow( x2.norm(), collision_p + 2.);
+    return collision_p*(DROPS::inner_prod( WindVelocity, x1)/n1
+                      - DROPS::inner_prod( WindVelocity, x2)/n2);
+}
+
+DROPS::Point3DCL collision_Dx_lset (const DROPS::Point3DCL& x, double t)
+{
+    Point3DCL x1= x - collision_center_1( t),
+              x2= x - collision_center_2( t);
+    const double n1= x1.norm() < 1e-3 ? 1e-3 : std::pow( x1.norm(), collision_p + 2.),
+                 n2= x2.norm() < 1e-3 ? 1e-3 : std::pow( x2.norm(), collision_p + 2.);
+    return collision_p*(x1/n1 + x2/n2);
+}
+
+DROPS::Point3DCL collision_wind (const DROPS::Point3DCL& x, double t)
+{
+    const Point3DCL Dphi= collision_Dx_lset( x, t);
+    const double Dtphi=   collision_Dt_lset( x, t);
+    const double n= Dphi.norm_sq();
+    return n < 1e-6 ? DROPS::Point3DCL() : (Dtphi/n)*Dphi;
+}
+static RegisterVectorFunction regvec_collision_wind( "CollisionWind", collision_wind);
+
+double collision_lset (const Point3DCL& x, double t)
+{
+    const Point3DCL c1= collision_center_1( t);
+    const Point3DCL x1= x - c1;
+    const Point3DCL c2= collision_center_2( t);
+    const Point3DCL x2= x - c2;
+
+    const double n1= x1.norm() < 1e-3 ? 1e-3 : std::pow( x1.norm(), collision_p),
+                 n2= x2.norm() < 1e-3 ? 1e-3 : std::pow( x2.norm(), collision_p);
+    return RadDrop[0] - 1./n1  - 1./n2;
+}
+static RegisterScalarFunction regsca_collision_lset( "CollisionLset", collision_lset);
+
+double collision_sol (const Point3DCL& x, double)
+{
+    return 2.*std::cos( x[0])*std::cos(M_PI*x[1]);
+}
+static RegisterScalarFunction regsca_collision_sol( "CollisionSol", collision_sol);
+
+double collision_sol2 (const Point3DCL& x, double)
+{
+    return x[0] < 0. ? 0 : 3. - x[0];
+}
+static RegisterScalarFunction regsca_collision_sol2( "CollisionSol2", collision_sol2);
+
+double collision_rhs (const Point3DCL&, double)
+{
+    return 0;
+}
+static RegisterScalarFunction regsca_collision_rhs( "CollisionRhs", collision_rhs);
+
+
+// ==Some spheres==
+
 double sphere_dist (const DROPS::Point3DCL& p, double)
 {
     DROPS::Point3DCL x( p - PosDrop);
@@ -299,24 +382,64 @@ double sphere_2move (const DROPS::Point3DCL& p, double t)
     return x.norm() - RadDrop[0];
 }
 
+SMatrixCL<3,3> dp_sphere (const DROPS::Point3DCL& x, double)
+{
+    const double normx= x.norm();
+    return normx == 0. ? SMatrixCL<3,3>() : RadDrop[0]/normx*(eye<3,3>() - outer_product( x/normx, x/normx));
+}
+
+double abs_det_sphere (const TetraCL& tet, const BaryCoordCL& xb, const SurfacePatchCL& p)
+{
+    if (p.empty())
+        return 0.;
+
+    // Compute the jacobian of p.
+    SMatrixCL<3,3> dp= dp_sphere( GetWorldCoord( tet, xb), 0.);
+
+    const Bary2WorldCoordCL b2w( tet);
+    QRDecompCL<3,2> qr;
+    SMatrixCL<3,2>& M= qr.GetMatrix();
+    M.col(0, b2w( p.vertex_begin()[1]) - b2w( p.vertex_begin()[0]));
+    M.col(1, b2w( p.vertex_begin()[2]) - b2w( p.vertex_begin()[0]));
+    qr.prepare_solve();
+    SMatrixCL<3,2> U;
+    Point3DCL tmp;
+    for (Uint i= 0; i < 2; ++i) {
+        tmp= std_basis<3>( i + 1);
+        qr.apply_Q( tmp);
+        U.col( i, tmp);
+    }
+    const SMatrixCL<2,2> Gram= GramMatrix( dp*U);
+    return std::sqrt( Gram(0,0)*Gram(1,1) - Gram(0,1)*Gram(1,0));
+}
+
 // ==stationary test case "LaplaceBeltrami0"==
 // Sphere around 0, RadDrop 1, wind == 0
+// "Levelset": "SphereDist"
 // A right hand side from C.J. Heine...
-const double a( -13./8.*std::sqrt( 35./M_PI));
+// const double a( -13./8.*std::sqrt( 35./M_PI));
+const double a( 12.);
 double laplace_beltrami_0_rhs (const DROPS::Point3DCL& p, double)
 {
-    return a*(3.*p[0]*p[0]*p[1] - p[1]*p[1]*p[1]);
+    return a/std::pow( p.norm(), 3.)*(3.*p[0]*p[0]*p[1] - p[1]*p[1]*p[1]);
 }
 static RegisterScalarFunction regsca_laplace_beltrami_0_rhs( "LaplaceBeltrami0Rhs", laplace_beltrami_0_rhs);
 
 // ...and the corresponding solution (extended)
 double laplace_beltrami_0_sol (const DROPS::Point3DCL& p, double)
 {
-    return p.norm_sq()/(12. + p.norm_sq())*laplace_beltrami_0_rhs( p, 0.);
+//     return p.norm_sq()/(12. + p.norm_sq())*laplace_beltrami_0_rhs( p, 0.);
+    return 1./12.*laplace_beltrami_0_rhs( p, 0.);
 //    return 1. + p.norm_sq()/(12. + p.norm_sq())*laplace_beltrami_0_rhs( p, 0.);
 }
 static RegisterScalarFunction regsca_laplace_beltrami_0_sol( "LaplaceBeltrami0Sol", laplace_beltrami_0_sol);
 
+// The tangential gradient of laplace_beltrami_0_sol with respect to the exact sphere.
+DROPS::Point3DCL laplace_beltrami_0_sol_grad (const DROPS::Point3DCL& p, double)
+{
+    DROPS::Point3DCL tmp= 3./std::pow( p.norm(), 3)*( MakePoint3D(2.*p[0]*p[1], p[0]*p[0] - p[1]*p[1], 0.) - (3.*p[0]*p[0]*p[1] - std::pow(p[1], 3))/p.norm_sq()*p);
+    return tmp; // This equals tmp - inner_prod( p/p.norm(), tmp)*p/p.norm().
+}
 
 double sol0t (const DROPS::Point3DCL& p, double t)
 {
@@ -327,6 +450,49 @@ double sol0t (const DROPS::Point3DCL& p, double t)
     return 1. + q.norm_sq()/(12. + q.norm_sq())*val;
 }
 
+// ==stationary test case "LaplaceBeltrami1"==
+// Torus with R= RadTorus[0]= 1., r= RadTorus[1]= 0.6, wind == 0
+// "Levelset": "Torus"
+
+// angle from positive x-axis to (x,y,0)
+double t_angle (const Point3DCL& p, double)
+{
+    return std::atan2( p[1], p[0]);
+}
+
+// distance from the circle in the x-y-plane around 0 with radius R
+double rho (const Point3DCL& p, double)
+{
+    return std::sqrt( p[2]*p[2] + std::pow( std::sqrt( p[0]*p[0] + p[1]*p[1]) - RadTorus[0], 2));
+}
+
+// angle from positive (x,y,0)-direction to p.
+double p_angle (const Point3DCL& p, double)
+{
+    return std::atan2( p[2], std::sqrt( p[0]*p[0] + p[1]*p[1]) - RadTorus[0]);
+}
+
+double laplace_beltrami_1_rhs (const Point3DCL& p, double)
+{
+    const double pa= p_angle( p, 0.);
+    const double ta= t_angle( p, 0.);
+
+    using std::sin;
+    using std::cos;
+    using std::pow;
+    const double t0= (9.*sin( 3.*ta)*cos( 3.*pa + ta))/(RadTorus[1]*RadTorus[1]);
+    const double t1= -(-10.*sin( 3.*ta)*cos(3.*pa + ta) - 6.*cos( 3.*ta)*sin( 3.*pa + ta))
+                     /pow(RadTorus[0] + RadTorus[1]*cos( pa), 2);
+    const double t2= -(3.*sin( pa)*sin( 3.*ta)*sin( 3.*pa + ta))/(RadTorus[1]*(RadTorus[0] + RadTorus[1]*cos( pa)));
+    return t0 + t1 + t2;
+}
+static RegisterScalarFunction regsca_laplace_beltrami_1_rhs( "LaplaceBeltrami1Rhs", laplace_beltrami_1_rhs);
+
+double laplace_beltrami_1_sol (const Point3DCL& p, double)
+{
+    return std::sin(3.*t_angle( p, 0.))*std::cos( 3.*p_angle( p, 0.) + t_angle( p, 0.));
+}
+static RegisterScalarFunction regsca_laplace_beltrami_1_sol( "LaplaceBeltrami1Sol", laplace_beltrami_1_sol);
 
 template<class DiscP1FunType>
 double L2_error (const DROPS::VecDescCL& ls, const BndDataCL<>& lsbnd,
@@ -621,14 +787,14 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     //delete &lset2;
 }
 
-void StationaryStrategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::LevelsetP2CL& lset)
+void StationaryStrategyP1 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::LevelsetP2CL& lset)
 {
-    adap.MakeInitialTriang( sphere_dist);
+    adap.MakeInitialTriang( the_lset_fun);
 
     lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
     lset.Phi.SetIdx( &lset.idx);
-    // LinearLSInit( mg, lset.Phi, &sphere_dist);
-    LSInit( mg, lset.Phi, sphere_dist, 0.);
+    // LinearLSInit( mg, lset.Phi, the_lset_fun);
+    LSInit( mg, lset.Phi, the_lset_fun, 0.);
 
     DROPS::IdxDescCL ifaceidx( P1IF_FE);
     ifaceidx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
@@ -640,10 +806,11 @@ void StationaryStrategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROP
     std::cout << "M is set up.\n";
     DROPS::MatDescCL A( &ifaceidx, &ifaceidx);
     DROPS::SetupLBP1( mg, &A, lset.Phi, lset.GetBndData(), P.get<double>("SurfTransp.Visc"));
-    DROPS::MatrixCL L;
-    L.LinComb( 1.0, A.Data, 1.0, M.Data);
+//     DROPS::MatrixCL L;
+//     L.LinComb( 1.0, A.Data, 1.0, M.Data);
+    DROPS::MatrixCL& L= A.Data;
     DROPS::VecDescCL b( &ifaceidx);
-    DROPS::SetupInterfaceRhsP1( mg, &b, lset.Phi, lset.GetBndData(), laplace_beltrami_0_rhs);
+    DROPS::SetupInterfaceRhsP1( mg, &b, lset.Phi, lset.GetBndData(), the_rhs_fun);
 
     //DROPS::WriteToFile( M.Data, "m_iface.txt", "M");
     //DROPS::WriteToFile( A.Data, "a_iface.txt", "A");
@@ -672,8 +839,332 @@ void StationaryStrategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROP
         vtkwriter->Write( 0.);
     }
 
-    double L2_err( L2_error( lset.Phi, lset.GetBndData(), make_P1Eval( mg, nobnd, xext), &laplace_beltrami_0_sol));
+    double L2_err( L2_error( lset.Phi, lset.GetBndData(), make_P1Eval( mg, nobnd, xext), the_sol_fun));
     std::cout << "L_2-error: " << L2_err << std::endl;
+}
+
+/// \brief Accumulate L2-norms and errors on the higher order zero level.
+/// Works for P1IF_FE, P2IF_FE, and C-functions. All functions are evaluated on the P2-levelset.
+class InterfaceL2AccuP2CL : public TetraAccumulatorCL
+{
+  private:
+    const InterfaceCommonDataP2CL& cdata_;
+    const MultiGridCL& mg;
+    std::string name_;
+
+    NoBndDataCL<> nobnddata;
+    const VecDescCL* fvd;
+
+    instat_scalar_fun_ptr f;
+    double f_time;
+
+    LocalLaplaceBeltramiP2CL loc_lb;
+
+    instat_vector_fun_ptr f_grad;
+    double f_grad_time;
+
+    InterfaceL2AccuP2CL* tid0p; // The object in OpenMP-thread 0, in which the following variables are updated.
+    std::vector<double> f_grid_norm,
+                        f_grid_int,
+                        f_norm,
+                        f_int,
+                        err,
+                        area,
+                        f_grid_grad_norm,
+                        f_grad_norm,
+                        grad_err;
+
+  public:
+    double f_grid_norm_acc,
+           f_grid_int_acc,
+           f_norm_acc,
+           f_int_acc,
+           err_acc,
+           area_acc,
+           f_grid_grad_norm_acc,
+           f_grad_norm_acc,
+           grad_err_acc;
+
+    InterfaceL2AccuP2CL (const InterfaceCommonDataP2CL& cdata, const MultiGridCL& mg_arg, std::string name= std::string())
+        : cdata_( cdata), mg( mg_arg), name_( name), fvd( 0), f( 0), f_time( 0.),  loc_lb( 1.), f_grad( 0), f_grad_time( 0.){}
+    virtual ~InterfaceL2AccuP2CL () {}
+
+    void set_name (const std::string& n) { name_= n; }
+    void set_grid_function (const VecDescCL& fvdarg) { fvd= &fvdarg; }
+    void set_function (const instat_scalar_fun_ptr farg, double f_time_arg= 0.) {
+        f= farg;
+        f_time= f_time_arg;
+    }
+    void set_grad_function (const instat_vector_fun_ptr farg, double f_time_arg= 0.) {
+        f_grad= farg;
+        f_grad_time= f_time_arg;
+    }
+
+    virtual void begin_accumulation () {
+        std::cout << "InterfaceL2AccuP2CL::begin_accumulation";
+        if (name_ != std::string())
+            std::cout << " for \"" << name_ << "\".\n";
+
+        tid0p= this;
+        f_grid_norm.clear();
+        f_grid_norm.resize( omp_get_max_threads(), 0.);
+        f_grid_int.clear();
+        f_grid_int.resize( omp_get_max_threads(), 0.);
+
+        f_norm.clear();
+        f_norm.resize( omp_get_max_threads(), 0.);
+        f_int.clear();
+        f_int.resize( omp_get_max_threads(), 0.);
+
+        err.clear();
+        err.resize( omp_get_max_threads(), 0.);
+        area.clear();
+        area.resize( omp_get_max_threads(), 0.);
+
+        f_grid_grad_norm.clear();
+        f_grid_grad_norm.resize( omp_get_max_threads(), 0.);
+        f_grad_norm.clear();
+        f_grad_norm.resize( omp_get_max_threads(), 0.);
+        grad_err.clear();
+        grad_err.resize( omp_get_max_threads(), 0.);
+
+        f_grid_norm_acc= f_grid_int_acc= f_norm_acc= f_int_acc= err_acc= area_acc= 0.;
+        f_grid_grad_norm_acc= f_grad_norm_acc= grad_err_acc= 0.;
+    }
+
+    virtual void finalize_accumulation() {
+        std::cout << "InterfaceL2AccuP2CL::finalize_accumulation";
+        if (name_ != std::string())
+            std::cout << " for \"" << name_ << "\":";
+        area_acc= std::accumulate( area.begin(), area.end(), 0.);
+        std::cout << "\n\tarea: " << area_acc;
+        if (fvd != 0) {
+            f_grid_norm_acc=  std::sqrt( std::accumulate( f_grid_norm.begin(), f_grid_norm.end(), 0.));
+            f_grid_int_acc= std::accumulate( f_grid_int.begin(), f_grid_int.end(), 0.);
+            std::cout << "\n\t|| f_grid ||_L2: " << f_grid_norm_acc
+                      << "\tintegral: " << f_grid_int_acc;
+        }
+        if (f != 0) {
+            f_norm_acc=  std::sqrt( std::accumulate( f_norm.begin(), f_norm.end(), 0.));
+            f_int_acc= std::accumulate( f_int.begin(), f_int.end(), 0.);
+            std::cout << "\n\t|| f ||_L2: " << f_norm_acc
+                      << "\t integral: " << f_int_acc;
+        }
+        if (fvd != 0 && f != 0) {
+            err_acc=  std::sqrt( std::accumulate( err.begin(), err.end(), 0.));
+            std::cout << "\n\t|| f - f_grid ||_L2: " << err_acc;
+
+            const double mvf_err= std::sqrt( std::pow( err_acc, 2) - std::pow( f_grid_int_acc - f_int_acc, 2)/area_acc);
+            std:: cout << "\t|| f - c_f - (f_grid -c_{f_grid}) ||_L2: " << mvf_err;
+        }
+
+        if (fvd != 0) {
+            f_grid_grad_norm_acc=  std::sqrt( std::accumulate( f_grid_grad_norm.begin(), f_grid_grad_norm.end(), 0.));
+            std::cout << "\n\t|| f_grid_grad ||_L2: " << f_grid_grad_norm_acc;
+        }
+        if (f_grad != 0) {
+            f_grad_norm_acc=  std::sqrt( std::accumulate( f_grad_norm.begin(), f_grad_norm.end(), 0.));
+            std::cout << "\n\t|| f_grad ||_L2: " << f_grad_norm_acc;
+        }
+        if (fvd != 0 && f_grad != 0) {
+            grad_err_acc=  std::sqrt( std::accumulate( grad_err.begin(), grad_err.end(), 0.));
+            std::cout << "\n\t|| f_grad - f_grid_grad ||_L2: " << grad_err_acc;
+        }
+        std::cout << std::endl;
+    }
+
+    virtual void visit (const TetraCL& t) {
+        const InterfaceCommonDataP2CL& cdata= cdata_.get_clone();
+        if (cdata.empty())
+            return;
+
+        const int tid= omp_get_thread_num();
+
+        tid0p->area[tid]+= quad_2D( cdata.absdet, cdata.qdom);
+
+        std::valarray<double> qfgrid,
+                              qf;
+        if (fvd != 0) {
+            // XXX: Check, whether incomplete P2-Data exists locally (which is allowed for P2IF_FE, but not handled correctly by this class --> Extend fvd). Likewise for P1IF_FE...
+            if (fvd->RowIdx->GetFE() == P2IF_FE)
+                resize_and_evaluate_on_vertexes( make_P2Eval( mg, nobnddata, *fvd), t, cdata.qdom, qfgrid);
+            else if (fvd->RowIdx->GetFE() == P1IF_FE)
+                resize_and_evaluate_on_vertexes( make_P1Eval( mg, nobnddata, *fvd), t, cdata.qdom, qfgrid);
+//             resize_and_evaluate_on_vertexes( make_P2Eval( mg, nobnddata, *fvd), cdata.qdom_projected, qfgrid);
+            tid0p->f_grid_int[tid]+=  quad_2D( cdata.absdet*qfgrid,        cdata.qdom);
+            tid0p->f_grid_norm[tid]+= quad_2D( cdata.absdet*qfgrid*qfgrid, cdata.qdom);
+        }
+        if (f != 0) {
+            resize_and_evaluate_on_vertexes( f, cdata.qdom_projected, f_time, qf);
+            tid0p->f_int[tid]+= quad_2D( cdata.absdet*qf, cdata.qdom);
+            tid0p->f_norm[tid]+= quad_2D( cdata.absdet*qf*qf, cdata.qdom);
+        }
+        if (fvd != 0 && f != 0) {
+            std::valarray<double> qerr= qfgrid - qf;
+            tid0p->err[tid]+= quad_2D( cdata.absdet*qerr*qerr, cdata.qdom);
+        }
+
+        GridFunctionCL<Point3DCL> qfgradgrid,
+                                  qfgrad;
+        if (fvd != 0) {
+            qfgradgrid.resize( cdata.qdom.vertex_size());
+            if (fvd->RowIdx->GetFE() == P2IF_FE) {
+                LocalP2CL<> lp2( t, *fvd, nobnddata);
+                loc_lb.setup( t, cdata);
+                for (Uint i= 0; i < 10; ++i)
+                    qfgradgrid+= lp2[i]*loc_lb.get_qgradp2( i);
+            }
+            else if (fvd->RowIdx->GetFE() == P1IF_FE) {
+// // XXX Implement this case.
+//                 LocalP1CL<> lp1( t, *fvd, nobnddata);
+//                 loc_lb_p1.setup( t, cdata);
+//                 for (Uint i= 0; i < 4; ++i)
+//                     qfgradgrid+= lp1[i]*loc_lb_p1.get_qgradp1( i);
+            }
+            tid0p->f_grid_grad_norm[tid]+= quad_2D( cdata.absdet*dot( qfgradgrid, qfgradgrid), cdata.qdom);
+        }
+        if (f_grad != 0) {
+            resize_and_evaluate_on_vertexes( f_grad, cdata.qdom_projected, f_grad_time, qfgrad);
+            for (Uint i= 0; i < cdata.qdom_projected.size(); ++i) {
+                Point3DCL n= cdata.quaqua.local_ls_grad( *cdata.qdom_projected[i].first, cdata.qdom_projected[i].second);
+                n/= n.norm();
+                qfgrad[i]-= inner_prod( n, qfgrad[i])*n;
+            }
+            tid0p->f_grad_norm[tid]+= quad_2D( cdata.absdet*dot( qfgrad, qfgrad), cdata.qdom);
+        }
+        if (fvd != 0 && f_grad != 0) {
+            GridFunctionCL<Point3DCL> qerr( qfgradgrid - qfgrad);
+            tid0p->grad_err[tid]+= quad_2D( cdata.absdet*dot( qerr, qerr), cdata.qdom);
+        }
+    }
+
+    virtual InterfaceL2AccuP2CL* clone (int /*clone_id*/) { return new InterfaceL2AccuP2CL( *this); }
+};
+
+void StationaryStrategyP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::LevelsetP2CL& lset)
+{
+    // Initialize level set and triangulation
+    adap.MakeInitialTriang( the_lset_fun);
+    lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
+    lset.Phi.SetIdx( &lset.idx);
+    // LinearLSInit( mg, lset.Phi, &the_lset_fun);
+    LSInit( mg, lset.Phi, the_lset_fun, 0.);
+
+    // Setup an interface-P2 numbering
+    DROPS::IdxDescCL ifacep2idx( P2IF_FE);
+    ifacep2idx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
+    ifacep2idx.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
+    std::cout << "P2-NumUnknowns: " << ifacep2idx.NumUnknowns() << std::endl;
+
+    // Recover the gradient of the level set function
+    IdxDescCL vecp2idx( vecP2_FE);
+    vecp2idx.CreateNumbering( mg.GetLastLevel(), mg);
+    VecDescCL lsgradrec( &vecp2idx);
+    averaging_P2_gradient_recovery( mg, lset.Phi, lset.GetBndData(), lsgradrec);
+
+    // Compute neighborhoods of the tetras at the interface
+    const PrincipalLatticeCL& lat= PrincipalLatticeCL::instance( 1);
+    TetraToTetrasT tetra_neighborhoods;
+    compute_tetra_neighborhoods( mg, lset.Phi, lset.GetBndData(), lat, tetra_neighborhoods);
+
+    QuaQuaMapperCL quaqua( mg, lset.Phi, lsgradrec, tetra_neighborhoods,
+                           P.get<int>( "LevelsetMapper.Iter"),
+                           P.get<double>( "LevelsetMapper.Tol"),
+                           P.get<std::string>( "LevelsetMapper.Method") == "FixedPointWithLineSearch");
+
+    VecDescCL to_iface( &vecp2idx);
+//     {
+//         TetraAccumulatorTupleCL accus;
+//         InterfaceCommonDataP2CL cdatap2( lset.Phi, lset.GetBndData(), quaqua, lat);
+//         accus.push_back( &cdatap2);
+//         InterfaceDebugP2CL p2debugaccu( cdatap2);
+// //         p2debugaccu.store_offsets( to_iface);
+//         p2debugaccu.set_true_area( 4.*M_PI*RadDrop[0]*RadDrop[0]);
+//         p2debugaccu.set_ref_dp( &dp_sphere);
+//         p2debugaccu.set_ref_abs_det( &abs_det_sphere);
+//         accus.push_back( &p2debugaccu);
+//         accumulate( accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetMatchingFunction(), ifacep2idx.GetBndInfo());
+//     }
+
+    TetraAccumulatorTupleCL accus;
+    InterfaceCommonDataP2CL cdatap2( lset.Phi, lset.GetBndData(), quaqua, lat);
+    accus.push_back( &cdatap2);
+    DROPS::MatDescCL Mp2( &ifacep2idx, &ifacep2idx);
+    InterfaceMatrixAccuCL<LocalMassP2CL, InterfaceCommonDataP2CL> accuMp2( &Mp2, LocalMassP2CL(), cdatap2, "Mp2");
+    accus.push_back( &accuMp2);
+    DROPS::MatDescCL Ap2( &ifacep2idx, &ifacep2idx);
+    InterfaceMatrixAccuCL<LocalLaplaceBeltramiP2CL, InterfaceCommonDataP2CL> accuAp2( &Ap2, LocalLaplaceBeltramiP2CL( P.get<double>("SurfTransp.Visc")), cdatap2, "Ap2");
+    accus.push_back( &accuAp2);
+    DROPS::VecDescCL bp2( &ifacep2idx);
+    InterfaceVectorAccuCL<LocalVectorP2CL, InterfaceCommonDataP2CL> acculoadp2( &bp2, LocalVectorP2CL( the_rhs_fun, bp2.t), cdatap2);
+    accus.push_back( &acculoadp2);
+
+    accumulate( accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetMatchingFunction(), ifacep2idx.GetBndInfo());
+
+//     TetraAccumulatorTupleCL mean_accus;
+//     mean_accus.push_back( &cdatap2);
+//     InterfaceL2AccuP2CL L2_mean_accu( cdatap2, mg, "P2-mean");
+//     L2_mean_accu.set_grid_function( bp2);
+//     mean_accus.push_back( &L2_mean_accu);
+//     accumulate( mean_accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetMatchingFunction(), ifacep2idx.GetBndInfo());
+//     bp2.Data-= L2_mean_accu.f_grid_int_acc/L2_mean_accu.area_acc;
+//     accumulate( mean_accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetMatchingFunction(), ifacep2idx.GetBndInfo());
+
+//     VectorCL e( 1., bp2.Data.size());
+//     VectorCL Ldiag( Ap2.Data.GetDiag());
+//     bp2.Data-= dot( VectorCL( e/Ldiag), bp2.Data)/std::sqrt( dot( VectorCL( e/Ldiag), e));
+
+//     DROPS::MatrixCL Lp2;
+//     Lp2.LinComb( 1.0, Ap2.Data, 1.0, Mp2.Data);
+    MatrixCL& Lp2= Ap2.Data;
+
+    DROPS::WriteToFile( Ap2.Data, "ap2_iface.txt", "Ap2");
+    DROPS::WriteToFile( Mp2.Data, "mp2_iface.txt", "Mp2");
+    DROPS::WriteFEToFile( bp2, mg, "rhsp2_iface.txt", /*binary=*/ false);
+
+    typedef DROPS::SSORPcCL SurfPcT;
+//     typedef DROPS::JACPcCL SurfPcT;
+    SurfPcT surfpc;
+    typedef DROPS::PCGSolverCL<SurfPcT> SurfSolverT;
+    SurfSolverT surfsolver( surfpc, P.get<int>("SurfTransp.Iter"), P.get<double>("SurfTransp.Tol"), true);
+
+    DROPS::VecDescCL xp2( &ifacep2idx);
+    surfsolver.Solve( Lp2, xp2.Data, bp2.Data, xp2.RowIdx->GetEx());
+    std::cout << "Iter: " << surfsolver.GetIter() << "\tres: " << surfsolver.GetResid() << '\n';
+
+    TetraAccumulatorTupleCL err_accus;
+    err_accus.push_back( &cdatap2);
+    InterfaceL2AccuP2CL L2_accu( cdatap2, mg, "P2-solution");
+    L2_accu.set_grid_function( xp2);
+    L2_accu.set_function( the_sol_fun, 0.);
+    L2_accu.set_grad_function( the_sol_grad_fun, 0.);
+    err_accus.push_back( &L2_accu);
+    accumulate( err_accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetMatchingFunction(), ifacep2idx.GetBndInfo());
+
+    {
+        std::ofstream os( "quaqua_num_outer_iter.txt");
+        for (Uint i= 0; i != quaqua.num_outer_iter.size(); ++i)
+            os << i << '\t' << quaqua.num_outer_iter[i] << '\n';
+        os << '\n';
+        for (Uint i= 0; i != quaqua.num_inner_iter.size(); ++i)
+            os << i << '\t' << quaqua.num_inner_iter[i] << '\n';
+    }
+
+    if (P.get<int>( "SolutionOutput.Freq") > 0)
+        DROPS::WriteFEToFile( xp2, mg, P.get<std::string>( "SolutionOutput.Path") + "_p2", P.get<bool>( "SolutionOutput.Binary"));
+
+    DROPS::NoBndDataCL<> nobnd;
+    DROPS::NoBndDataCL<Point3DCL> nobnd_vec;
+    VecDescCL the_sol_vd( &lset.idx);
+    LSInit( mg, the_sol_vd, the_sol_fun, /*t*/ 0.);
+    if (vtkwriter.get() != 0) {
+        vtkwriter->Register( make_VTKScalar( lset.GetSolution(), "Levelset") );
+        vtkwriter->Register( make_VTKIfaceScalar( mg, xp2, "InterfaceSolP2"));
+        vtkwriter->Register( make_VTKScalar(      make_P2Eval( mg, nobnd, the_sol_vd),  "TrueSol"));
+        vtkwriter->Register( make_VTKVector( make_P2Eval( mg, nobnd_vec, lsgradrec), "LSGradRec") );
+        vtkwriter->Register( make_VTKVector( make_P2Eval( mg, nobnd_vec, to_iface), "to_iface") );
+        vtkwriter->Write( 0.);
+    }
 }
 
 int main (int argc, char* argv[])
@@ -695,6 +1186,8 @@ int main (int argc, char* argv[])
     the_lset_fun= inscamap[P.get<std::string>("Exp.Levelset")];
     the_rhs_fun=  inscamap[P.get<std::string>("Exp.Rhs")];
     the_sol_fun=  inscamap[P.get<std::string>("Exp.Solution")];
+    if (P.get<std::string>("Exp.Solution") == "LaplaceBeltrami0Sol")
+        the_sol_grad_fun=  &laplace_beltrami_0_sol_grad;
     for (Uint i= 0; i < 6; ++i)
         bf_wind[i]= the_wind_fun;
 
@@ -718,11 +1211,13 @@ int main (int argc, char* argv[])
             P.get<int>("VTK.Binary"), 
             P.get<bool>("VTK.UseOnlyP1"),
             false, /* <- P2DG */
-            -1,  /* <- level */
+            -1,    /* <- level */
             P.get<bool>("VTK.ReUseTimeFile")));
-
     if (P.get<bool>( "Exp.StationaryPDE"))
-        StationaryStrategy( mg, adap, lset);
+        if (P.get<int>( "SurfTransp.FEDegree") == 1)
+            StationaryStrategyP1( mg, adap, lset);
+        else
+            StationaryStrategyP2( mg, adap, lset);
     else
         Strategy( mg, adap, lset);
 

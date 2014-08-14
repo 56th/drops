@@ -1,4 +1,4 @@
-/// \file
+/// \file ifacetransp.tpp
 /// \brief Discretization for PDEs on an interface.
 /// \author LNM RWTH Aachen: Joerg Grande
 
@@ -28,6 +28,20 @@
 
 namespace DROPS {
 
+template <class LocalMatrixT>
+  void
+  update_global_matrix (MatrixBuilderCL& M, const LocalMatrixT& loc, const IdxT* numr, const IdxT* numc)
+{
+    const int num_row_dofs= LocalMatrixT::row_fe_type == P1IF_FE ? 4 : 10,
+              num_col_dofs= LocalMatrixT::col_fe_type == P1IF_FE ? 4 : 10;
+
+    for (int i= 0; i < num_row_dofs; ++i)
+        if (numr[i] != NoIdx)
+            for (int j= 0; j < num_col_dofs; ++j)
+                if (numc[j] != NoIdx)
+                    M( numr[i], numc[j])+= loc.coup[i][j];
+}
+
 template <Uint Dim>
   void
   resize_and_scatter_piecewise_normal (const SPatchCL<Dim>& surf, const QuadDomainCodim1CL<Dim>& qdom, std::valarray<typename SPatchCL<Dim>::WorldVertexT>& normal)
@@ -46,6 +60,57 @@ template <Uint Dim>
         std::fill_n( &normal[i*NodesPerFacet], NodesPerFacet, surf.normal_begin()[i]);
 }
 
+template <class T, class ResultIterT>
+  inline ResultIterT
+  evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const TetraBaryPairVectorT& pos, double t, ResultIterT result_iterator)
+{
+    BaryEvalCL<T> eval;
+    eval.set( f);
+    eval.set_time( t);
+    const TetraCL* prev_tetra= 0;
+    for (Uint i= 0; i < pos.size(); ++i) {
+        if (prev_tetra != pos[i].first) {
+            prev_tetra= pos[i].first;
+            eval.set( *pos[i].first);
+        }
+        *result_iterator++= eval( pos[i].second);
+    }
+    return result_iterator;
+}
+
+template <class T, class ResultContT>
+  inline ResultContT&
+  resize_and_evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const TetraBaryPairVectorT& pos, double t, ResultContT& result_container)
+{
+    result_container.resize( pos.size());
+    evaluate_on_vertexes( f, pos, t, sequence_begin( result_container));
+    return result_container;
+}
+
+template <class PEvalT, class ResultIterT>
+  inline ResultIterT
+  evaluate_on_vertexes (const PEvalT& f, const TetraBaryPairVectorT& pos, ResultIterT result_iterator)
+{
+    typename PEvalT::LocalFET loc_f;
+    const TetraCL* prev_tetra= 0;
+    for (Uint i= 0; i < pos.size(); ++i) {
+        if (prev_tetra != pos[i].first) {
+            prev_tetra= pos[i].first;
+            loc_f.assign( *pos[i].first, f);
+        }
+        *result_iterator++= loc_f( pos[i].second);
+    }
+    return result_iterator;
+}
+
+template <class PEvalT, class ResultContT>
+  inline ResultContT&
+  resize_and_evaluate_on_vertexes (const PEvalT& f, const TetraBaryPairVectorT& pos, ResultContT& result_container)
+{
+    result_container.resize( pos.size());
+    evaluate_on_vertexes( f, pos, sequence_begin( result_container));
+    return result_container;
+}
 
 template <class DiscVelSolT>
 void LocalInterfaceConvectionP1CL<DiscVelSolT>::setup (const TetraCL& t, const InterfaceCommonDataP1CL& cdata)
@@ -73,7 +138,7 @@ void SetupConvectionP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& 
     TetraAccumulatorTupleCL accus;
     InterfaceCommonDataP1CL cdata( ls, lsetbnd);
     accus.push_back( &cdata);
-    InterfaceMatrixAccuP1CL<LocalInterfaceConvectionP1CL<DiscVelSolT> > accu( mat, LocalInterfaceConvectionP1CL<DiscVelSolT>( w), cdata);
+    InterfaceMatrixAccuCL<LocalInterfaceConvectionP1CL<DiscVelSolT>, InterfaceCommonDataP1CL> accu( mat, LocalInterfaceConvectionP1CL<DiscVelSolT>( w), cdata);
     accus.push_back( &accu);
     const IdxDescCL* RowIdx= mat->RowIdx;
     accumulate( accus, mg, RowIdx->TriangLevel(), RowIdx->GetMatchingFunction(), RowIdx->GetBndInfo());
@@ -117,7 +182,7 @@ void SetupMassDivP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls,
     TetraAccumulatorTupleCL accus;
     InterfaceCommonDataP1CL cdata( ls, lsetbnd);
     accus.push_back( &cdata);
-    InterfaceMatrixAccuP1CL<LocalInterfaceMassDivP1CL<DiscVelSolT> > accu( mat, LocalInterfaceMassDivP1CL<DiscVelSolT>( w), cdata);
+    InterfaceMatrixAccuCL<LocalInterfaceMassDivP1CL<DiscVelSolT>, InterfaceCommonDataP1CL> accu( mat, LocalInterfaceMassDivP1CL<DiscVelSolT>( w), cdata);
     accus.push_back( &accu);
     const IdxDescCL* RowIdx= mat->RowIdx;
     accumulate( accus, mg, RowIdx->TriangLevel(), RowIdx->GetMatchingFunction(), RowIdx->GetBndInfo());

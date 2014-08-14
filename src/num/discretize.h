@@ -428,7 +428,13 @@ class BaryEvalCL
 
   public:
     BaryEvalCL (const TetraCL& tet, double t, fun_type f)
-        : mapper_( tet), t_( t), f_(f) {}
+        : mapper_( tet), t_( t), f_( f) {}
+    BaryEvalCL ()
+        : t_( 0.), f_( 0) {}
+
+    void set      (const TetraCL& tet) { mapper_.assign( tet); }
+    void set_time (double time)        { t_= time; }
+    void set      (fun_type f)         { f_= f; }
 
     value_type operator() (const BaryCoordCL& b) const { return f_( mapper_( b), t_); }
 };
@@ -1095,7 +1101,7 @@ class P2DiscCL
     // p2[i] contains a Quad5_2DCL-object that is initialized with FE_P2CL::Hi
     static void GetP2Basis( Quad5_2DCL<> p2[10], const BaryCoordCL* const p);
     // compute gradients
-    static void GetGradients( LocalP1CL<Point3DCL> G[10], LocalP1CL<Point3DCL> GRef[10], const SMatrixCL<3,3> &T)
+    static void GetGradients( LocalP1CL<Point3DCL> G[10], const LocalP1CL<Point3DCL> GRef[10], const SMatrixCL<3,3> &T)
     { for (int i=0; i<10; ++i) for (int j=0; j<4; ++j) G[i][j]= T*GRef[i][j]; }
     static void GetGradients( Quad2CL<Point3DCL> G[10], Quad2CL<Point3DCL> GRef[10], const SMatrixCL<3,3> &T)
     { for (int i=0; i<10; ++i) for (int j=0; j<5; ++j) G[i][j]= T*GRef[i][j]; }

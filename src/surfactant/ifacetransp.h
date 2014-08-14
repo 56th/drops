@@ -29,6 +29,7 @@
 #include "num/krylovsolver.h"
 #include "num/interfacePatch.h"
 #include "num/accumulator.h"
+#include "levelset/levelsetmapper.h"
 #include "levelset/mgobserve.h"
 #include "out/ensightOut.h"
 #include "out/vtkOut.h"
@@ -40,16 +41,23 @@
 
 namespace DROPS {
 
-/// \brief Given a P1-vecdesc on the interface x and a P1-vecdesc xext on mg, the values of x
+/// \brief Given a P1IF_FE/P2IF_FE-vecdesc (on the interface) x and a P1/P2-vecdesc xext (on mg), the values of x
 ///        are copied to xext and the remaining values of xext are set to 0.
 void Extend (const MultiGridCL& mg, const VecDescCL& x, VecDescCL& xext);
 
-/// \brief Given a P1-vecdesc on the interface x and a P1-vecdesc xext on mg, the values of xext
+/// \brief Given a P1IF_FE/P2IF_FE-vecdesc (on the interface) x and a P1/P2-vecdesc xext (on mg), the values of xext
 ///        are copied to x, where x has an unknown.
 void Restrict (const MultiGridCL& mg, const VecDescCL& xext, VecDescCL& x);
 
-/// \brief Helper for the accumulators: inserts the local matrix coup into M.
-void update_global_matrix_P1 (MatrixBuilderCL& M, const double coup[4][4], const IdxT numr[4], const IdxT numc[4]);
+/// \brief Helper for the accumulators: inserts the local matrix loc.coup into M.
+/// Works for P1IF_FE and P2IF_FE.
+template <class LocalMatrixT>
+  void
+  update_global_matrix (MatrixBuilderCL& M, const LocalMatrixT& loc, const IdxT* numr, const IdxT* numc);
+
+/// \brief Copies P1IF_FE-unknown-indices or P2IF_FE-indices from idx on s into Numb.
+/// Non-existent dofs get NoIdx.
+void GetLocalNumbInterface(IdxT* Numb, const TetraCL& s, const IdxDescCL& idx);
 
 /// \todo This should be a generic function somewhere in num or misc.
 void P1Init (instat_scalar_fun_ptr icf, VecDescCL& ic, const MultiGridCL& mg, double t);
@@ -122,11 +130,104 @@ class InterfaceCommonDataP1CL : public TetraAccumulatorCL
     }
 };
 
-template <class LocalMatrixT>
-class InterfaceMatrixAccuP1CL : public TetraAccumulatorCL
+typedef std::pair<const TetraCL*, BaryCoordCL> TetraBaryPairT;
+typedef std::vector<TetraBaryPairT>            TetraBaryPairVectorT;
+
+template <class T, class ResultIterT>
+  inline ResultIterT
+  evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const TetraBaryPairVectorT& pos, double t, ResultIterT result_iterator);
+
+template <class T, class ResultContT>
+  inline ResultContT&
+  resize_and_evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const TetraBaryPairVectorT& pos, double t, ResultContT& result_container);
+
+template <class PEvalT, class ResultIterT>
+  inline ResultIterT
+  evaluate_on_vertexes (const PEvalT& f, const TetraBaryPairVectorT& pos, ResultIterT result_iterator);
+
+template <class PEvalT, class ResultContT>
+  inline ResultContT&
+  resize_and_evaluate_on_vertexes (const PEvalT& f, const TetraBaryPairVectorT& pos, ResultContT& result_container);
+
+
+class InterfaceCommonDataP2CL : public TetraAccumulatorCL
 {
   private:
-    const InterfaceCommonDataP1CL& cdata_;
+    InterfaceCommonDataP2CL** the_clones;
+
+    const VecDescCL*   ls;      // P2-level-set
+    const BndDataCL<>* lsetbnd; // boundary data for the level set function
+    LocalP2CL<> locp2_ls;
+
+  public:
+    /// common data @{
+    LocalP2CL<>          p2[10];
+    LocalP1CL<Point3DCL> gradrefp2[10];
+
+    const PrincipalLatticeCL& lat;
+    std::valarray<double>     ls_loc;
+    SurfacePatchCL            surf;
+    QuadDomain2DCL            qdom;
+    TetraBaryPairVectorT      qdom_projected;
+    std::valarray<double>     absdet;
+    const QuaQuaMapperCL&     quaqua;
+    /// @}
+
+    const InterfaceCommonDataP2CL& get_clone () const {
+        const int tid= omp_get_thread_num();
+        return tid == 0 ? *this : the_clones[tid][0];
+    }
+
+    bool empty () const { return surf.empty(); }
+
+    InterfaceCommonDataP2CL (const VecDescCL& ls_arg, const BndDataCL<>& lsetbnd_arg,
+        const QuaQuaMapperCL& quaquaarg, const PrincipalLatticeCL& lat_arg);
+    virtual ~InterfaceCommonDataP2CL () {}
+
+    virtual void begin_accumulation () {
+        the_clones= new InterfaceCommonDataP2CL*[omp_get_max_threads()];
+        the_clones[0]= this;
+    }
+    virtual void finalize_accumulation() { delete[] the_clones; }
+
+    virtual void visit (const TetraCL& t) {
+        surf.clear();
+        locp2_ls.assign( t, *ls, *lsetbnd);
+        evaluate_on_vertexes( locp2_ls, lat, Addr( ls_loc));
+        if (equal_signs( ls_loc))
+            return;
+        surf.make_patch<MergeCutPolicyCL>( lat, ls_loc);
+        if (surf.empty())
+            return;
+
+        make_CompositeQuad5Domain2D ( qdom, surf, t);
+        qdom_projected.clear();
+        qdom_projected.reserve( qdom.vertex_size());
+        const TetraCL* tet;
+        BaryCoordCL b;
+        for (QuadDomain2DCL::const_vertex_iterator v= qdom.vertex_begin(); v != qdom.vertex_end(); ++v) {
+            tet= &t;
+            b= *v;
+            quaqua.base_point( tet, b);
+            qdom_projected.push_back( std::make_pair( tet, b));
+        }
+        absdet.resize( qdom.vertex_size());
+        for (Uint i= 0; i < qdom.vertex_size(); ++i) {
+            absdet[i]= abs_det( t, qdom.vertex_begin()[i], quaqua, surf);
+        }
+    }
+
+    virtual InterfaceCommonDataP2CL* clone (int clone_id) {
+        return the_clones[clone_id]= new InterfaceCommonDataP2CL( *this);
+    }
+};
+
+
+template <class LocalMatrixT, class InterfaceCommonDataT>
+class InterfaceMatrixAccuCL : public TetraAccumulatorCL
+{
+  private:
+    const InterfaceCommonDataT& cdata_;
     std::string name_;
 
     MatDescCL* mat_; // the matrix
@@ -135,24 +236,33 @@ class InterfaceMatrixAccuP1CL : public TetraAccumulatorCL
     LocalMatrixT local_mat;
 
     Uint lvl;
-    IdxT numr[4],
-         numc[4];
+    SArrayCL<IdxT, LocalMatrixT::row_fe_type == P1IF_FE ? 4 : 10> numr;
+    SArrayCL<IdxT, LocalMatrixT::col_fe_type == P1IF_FE ? 4 : 10> numc;
 
   public:
-    InterfaceMatrixAccuP1CL (MatDescCL* Mmat, const LocalMatrixT& loc_mat, const InterfaceCommonDataP1CL& cdata,
-                             std::string name= std::string())
+    InterfaceMatrixAccuCL (MatDescCL* Mmat, const LocalMatrixT& loc_mat, const InterfaceCommonDataT& cdata,
+                           std::string name= std::string())
         : cdata_( cdata), name_( name), mat_( Mmat), M( 0), local_mat( loc_mat) {}
-    virtual ~InterfaceMatrixAccuP1CL () {}
+    virtual ~InterfaceMatrixAccuCL () {}
 
     void set_name (const std::string& n) { name_= n; }
 
     virtual void begin_accumulation () {
         const IdxT num_rows= mat_->RowIdx->NumUnknowns();
         const IdxT num_cols= mat_->ColIdx->NumUnknowns();
-        std::cout << "InterfaceMatrixAccuP1CL::begin_accumulation";
+
+        const FiniteElementT mat_row_fe= mat_->RowIdx->GetFE(),
+                             mat_col_fe= mat_->ColIdx->GetFE();
+
+        std::cout << "InterfaceMatrixAccuCL::begin_accumulation";
         if (name_ != std::string())
             std::cout << " for \"" << name_ << "\"";
         std::cout  << ": " << num_rows << " rows, " << num_cols << " cols.\n";
+        if (mat_row_fe != LocalMatrixT::row_fe_type)
+            std::cout << "Warning: LocalMatrixT and MatDescCL have different FE-type for rows.\n";
+        if (mat_col_fe != LocalMatrixT::col_fe_type)
+            std::cout << "Warning: LocalMatrixT and MatDescCL have different FE-type for cols.\n";
+
         lvl = mat_->GetRowLevel();
         M= new MatrixBuilderCL( &mat_->Data, num_rows, num_cols);
     }
@@ -161,66 +271,69 @@ class InterfaceMatrixAccuP1CL : public TetraAccumulatorCL
         M->Build();
         delete M;
         M= 0;
-        std::cout << "InterfaceMatrixAccuP1CL::finalize_accumulation";
+        std::cout << "InterfaceMatrixAccuCL::finalize_accumulation";
         if (name_ != std::string())
             std::cout << " for \"" << name_ << "\"";
         std::cout << ": " << mat_->Data.num_nonzeros() << " nonzeros." << std::endl;
     }
 
     virtual void visit (const TetraCL& t) {
-        const InterfaceCommonDataP1CL& cdata= cdata_.get_clone();
+        const InterfaceCommonDataT& cdata= cdata_.get_clone();
         if (cdata.empty())
             return;
         local_mat.setup( t, cdata);
-        GetLocalNumbP1NoBnd( numr, t, *mat_->RowIdx);
-        GetLocalNumbP1NoBnd( numc, t, *mat_->ColIdx);
-        update_global_matrix_P1( *M, local_mat.coup, numr, numc);
+        GetLocalNumbInterface( numr.begin(), t, *mat_->RowIdx);
+        GetLocalNumbInterface( numc.begin(), t, *mat_->ColIdx);
+        update_global_matrix( *M, local_mat, numr.begin(), numc.begin());
     }
 
-    virtual InterfaceMatrixAccuP1CL* clone (int /*clone_id*/) { return new InterfaceMatrixAccuP1CL( *this); }
+    virtual InterfaceMatrixAccuCL* clone (int /*clone_id*/) { return new InterfaceMatrixAccuCL( *this); }
 };
 
 /// \brief Accumulate an interface-vector.
-template <class LocalVectorT>
-class InterfaceVectorAccuP1CL : public TetraAccumulatorCL
+template <class LocalVectorT, class InterfaceCommonDataT>
+class InterfaceVectorAccuCL : public TetraAccumulatorCL
 {
   private:
-    const InterfaceCommonDataP1CL& cdata_;
+    const InterfaceCommonDataT& cdata_;
     std::string name_;
 
     VecDescCL* y_;
     LocalVectorT local_vec;
-    IdxT numry[4];
+    SArrayCL<IdxT, LocalVectorT::row_fe_type == P1IF_FE ? 4 : 10> numry;
 
   public:
-    InterfaceVectorAccuP1CL (VecDescCL* y, const LocalVectorT& loc_vec, const InterfaceCommonDataP1CL& cdata,
+    InterfaceVectorAccuCL (VecDescCL* y, const LocalVectorT& loc_vec, const InterfaceCommonDataT& cdata,
                              std::string name= std::string())
         : cdata_( cdata), name_( name), y_( y), local_vec( loc_vec) {}
-    virtual ~InterfaceVectorAccuP1CL () {}
+    virtual ~InterfaceVectorAccuCL () {}
 
     void set_name (const std::string& n) { name_= n; }
 
     virtual void begin_accumulation () {
-        std::cout << "InterfaceVectorAccuP1CL::begin_accumulation";
+        std::cout << "InterfaceVectorAccuCL::begin_accumulation";
         if (name_ != std::string())
             std::cout << " for \"" << name_ << "\"";
         std::cout  << ": " << y_->RowIdx->NumUnknowns() << " rows.\n";
+        if (y_->RowIdx->GetFE() != LocalVectorT::row_fe_type)
+            std::cout << "Warning: LocalVectorT and VecDescCL have different FE-type for rows.\n";
     }
 
     virtual void finalize_accumulation() {}
 
     virtual void visit (const TetraCL& t) {
-        const InterfaceCommonDataP1CL& cdata= cdata_.get_clone();
+        const InterfaceCommonDataT& cdata= cdata_.get_clone();
         if (cdata.empty())
             return;
-        GetLocalNumbP1NoBnd( numry, t, *y_->RowIdx);
-        local_vec.setup( t, cdata, numry);
-        for (int i= 0; i < 4; ++i)
+        GetLocalNumbInterface( numry.begin(), t, *y_->RowIdx);
+        local_vec.setup( t, cdata, numry.begin());
+        const int num_row_dofs= LocalVectorT::row_fe_type == P1IF_FE ? 4 : 10;
+        for (int i= 0; i < num_row_dofs; ++i)
             if (numry[i] != NoIdx)
                 y_->Data[numry[i]]+= local_vec.vec[i];
     }
 
-    virtual InterfaceVectorAccuP1CL* clone (int /*clone_id*/) { return new InterfaceVectorAccuP1CL( *this); }
+    virtual InterfaceVectorAccuCL* clone (int /*clone_id*/) { return new InterfaceVectorAccuCL( *this); }
 };
 
 
@@ -237,6 +350,8 @@ class LocalVectorP1CL
     QuadDomain2DCL qdom;
 
   public:
+    static const FiniteElementT row_fe_type= P1IF_FE;
+
     double vec[4];
 
     LocalVectorP1CL (instat_scalar_fun_ptr f, double time) : f_( f), time_( time) { p1[0][0]= p1[1][1]= p1[2][2]= p1[3][3]= 1.; }
@@ -264,6 +379,8 @@ class LocalMatVecP1CL
     const VecDescCL& x_;
 
   public:
+    static const FiniteElementT row_fe_type= P1IF_FE;
+
     double vec[4];
 
     LocalMatVecP1CL (const LocalMatrixT& local_mat, const VecDescCL* x) : local_mat_( local_mat), x_( *x) {}
@@ -284,19 +401,19 @@ class LocalMatVecP1CL
 
 /// \brief Convenience-function to reduce the number of explicit template-parameters for the massdiv- and the convection-rhs.
 template <template <class> class LocalMatrixT, class DiscVelSolT>
-  inline InterfaceVectorAccuP1CL<LocalMatVecP1CL< LocalMatrixT<DiscVelSolT> > >*
+  inline InterfaceVectorAccuCL<LocalMatVecP1CL< LocalMatrixT<DiscVelSolT> >, InterfaceCommonDataP1CL>*
   make_wind_dependent_vectorP1_accu (VecDescCL* y, const VecDescCL* x, const InterfaceCommonDataP1CL& cdata, const DiscVelSolT& wind, std::string name= std::string())
 {
-    return new InterfaceVectorAccuP1CL<LocalMatVecP1CL< LocalMatrixT<DiscVelSolT> > >( y,
+    return new InterfaceVectorAccuCL<LocalMatVecP1CL< LocalMatrixT<DiscVelSolT> >, InterfaceCommonDataP1CL>( y,
         LocalMatVecP1CL< LocalMatrixT<DiscVelSolT> >( LocalMatrixT<DiscVelSolT>( wind), x), cdata, name);
 }
 
 /// \brief Convenience-function to reduce the number of explicit template-parameters for the massdiv- and the convection-matrix.
 template <template <class> class LocalMatrixT, class DiscVelSolT>
-  inline InterfaceMatrixAccuP1CL< LocalMatrixT<DiscVelSolT> >*
+  inline InterfaceMatrixAccuCL< LocalMatrixT<DiscVelSolT>, InterfaceCommonDataP1CL>*
   make_wind_dependent_matrixP1_accu (MatDescCL* mat, const InterfaceCommonDataP1CL& cdata, const DiscVelSolT& wind, std::string name= std::string())
 {
-    return new InterfaceMatrixAccuP1CL< LocalMatrixT<DiscVelSolT> >( mat,
+    return new InterfaceMatrixAccuCL< LocalMatrixT<DiscVelSolT>, InterfaceCommonDataP1CL>( mat,
         LocalMatrixT<DiscVelSolT>( wind), cdata, name);
 }
 
@@ -308,6 +425,9 @@ class LocalInterfaceMassP1CL
     QuadDomain2DCL qdom;
 
   public:
+    static const FiniteElementT row_fe_type= P1IF_FE,
+                                col_fe_type= P1IF_FE;
+
     double coup[4][4];
 
     void setup (const TetraCL& t, const InterfaceCommonDataP1CL& cdata) {
@@ -341,6 +461,9 @@ class LocalLaplaceBeltramiP1CL
     std::valarray<double> absdet;
 
   public:
+    static const FiniteElementT row_fe_type= P1IF_FE,
+                                col_fe_type= P1IF_FE;
+
     double coup[4][4];
 
     void setup (const TetraCL& t, const InterfaceCommonDataP1CL& cdata) {
@@ -388,6 +511,9 @@ class LocalInterfaceConvectionP1CL
     GridFunctionCL<Point3DCL> qw;
 
   public:
+    static const FiniteElementT row_fe_type= P1IF_FE,
+                                col_fe_type= P1IF_FE;
+
     double coup[4][4];
 
     void setup (const TetraCL& t, const InterfaceCommonDataP1CL& cdata);
@@ -423,12 +549,134 @@ class LocalInterfaceMassDivP1CL
 
 
   public:
+    static const FiniteElementT row_fe_type= P1IF_FE,
+                                col_fe_type= P1IF_FE;
+
     double coup[4][4];
 
     void setup (const TetraCL& t, const InterfaceCommonDataP1CL& cdata);
 
     LocalInterfaceMassDivP1CL (const DiscVelSolT& w)
         : w_( w) { P2DiscCL::GetGradientsOnRef( gradrefp2); }
+};
+
+/// \brief Compute the P2 load vector corresponding to the function f on a single tetra.
+class LocalVectorP2CL
+{
+  private:
+    instat_scalar_fun_ptr f_;
+    double time_;
+
+    std::valarray<double> qp2,
+                          qf;
+
+  public:
+    static const FiniteElementT row_fe_type= P2IF_FE;
+
+    double vec[10];
+
+    LocalVectorP2CL (instat_scalar_fun_ptr f, double time) : f_( f), time_( time) {}
+
+    void setup (const TetraCL&, const InterfaceCommonDataP2CL& cdata, const IdxT numr[10]) {
+        resize_and_evaluate_on_vertexes( f_, cdata.qdom_projected, time_, qf);
+        qp2.resize( cdata.qdom.vertex_size());
+        for (Uint i= 0; i < 10; ++i) {
+                if (numr[i] == NoIdx)
+                    continue;
+                evaluate_on_vertexes( cdata.p2[i], cdata.qdom, Addr( qp2));
+                vec[i]= quad_2D( cdata.absdet*qf*qp2, cdata.qdom);
+        }
+    }
+};
+
+
+/// \brief Trafo of the interfacial gradient on the linear interface to the quadratic iface under a QuaQuaMapperCL.
+/// Computes W from La. 5.1 of the high order paper. The transformation of the gradient in the discretization requires W^{-1}.
+void gradient_trafo (const TetraCL& tet, const BaryCoordCL& xb, const QuaQuaMapperCL& quaqua, const SurfacePatchCL& p, SMatrixCL<3,3>& W);
+
+class LocalLaplaceBeltramiP2CL
+{
+  private:
+    double D_; // diffusion coefficient
+
+    LocalP1CL<Point3DCL> gradp2[10];
+    GridFunctionCL<Point3DCL> qgradp2[10];
+
+    GridFunctionCL<Point3DCL> nl;
+    GridFunctionCL<SMatrixCL<3,3> > Winv;
+
+  public:
+    static const FiniteElementT row_fe_type= P2IF_FE,
+                                col_fe_type= P2IF_FE;
+
+    double coup[10][10];
+
+    const GridFunctionCL<Point3DCL>& get_qgradp2 (size_t i) { return qgradp2[i]; }
+
+    void setup (const TetraCL& t, const InterfaceCommonDataP2CL& cdata) {
+        if (cdata.surf.normal_empty())
+            cdata.surf.compute_normals( t);
+        resize_and_scatter_piecewise_normal( cdata.surf, cdata.qdom, nl);
+
+        Winv.resize( cdata.qdom.vertex_size());
+        QRDecompCL<3,3> qr;
+        SVectorCL<3> tmp;
+        for (Uint i= 0; i < cdata.qdom.vertex_size(); ++i) {
+            gradient_trafo( t, cdata.qdom.vertex_begin()[i], cdata.quaqua, cdata.surf, qr.GetMatrix());
+            qr.prepare_solve();
+            for (Uint j= 0; j < 3; ++j) {
+                tmp= std_basis<3>( j + 1);
+                qr.Solve( tmp);
+                Winv[i].col( j, tmp);
+            }
+        }
+
+        double dummy;
+        SMatrixCL<3,3> T;
+        GetTrafoTr( T, dummy, t);
+        P2DiscCL::GetGradients( gradp2, cdata.gradrefp2, T);
+        for (int i= 0; i < 10; ++i) {
+            resize_and_evaluate_on_vertexes ( gradp2[i], cdata.qdom, qgradp2[i]);
+            for (Uint j= 0; j < qgradp2[i].size(); ++j) {
+                tmp=  qgradp2[i][j] - inner_prod( nl[j], qgradp2[i][j])*nl[j];
+                qgradp2[i][j]= Winv[j]*tmp;
+            }
+        }
+
+        for (int i= 0; i < 10; ++i) {
+            coup[i][i]= quad_2D( cdata.absdet*dot( qgradp2[i], qgradp2[i]), cdata.qdom);
+            for(int j= 0; j < i; ++j)
+                coup[i][j]= coup[j][i]= quad_2D( cdata.absdet*dot( qgradp2[j], qgradp2[i]), cdata.qdom);
+        }
+    }
+
+    LocalLaplaceBeltramiP2CL (double D)
+        :D_( D) {}
+};
+
+class LocalMassP2CL
+{
+  private:
+    std::valarray<double> qp2[10];
+
+  public:
+    static const FiniteElementT row_fe_type= P2IF_FE,
+                                col_fe_type= P2IF_FE;
+
+    double coup[10][10];
+
+    void setup (const TetraCL&, const InterfaceCommonDataP2CL& cdata) {
+        for (int i= 0; i < 10; ++i)
+            resize_and_evaluate_on_vertexes ( cdata.p2[i], cdata.qdom, qp2[i]);
+
+        for (int i= 0; i < 10; ++i) {
+            coup[i][i]= quad_2D( cdata.absdet*qp2[i]*qp2[i], cdata.qdom);
+            for(int j= 0; j < i; ++j)
+                coup[i][j]= coup[j][i]= quad_2D( cdata.absdet*qp2[j]*qp2[i], cdata.qdom);
+        }
+    }
+
+    LocalMassP2CL () {}
 };
 
 /// \brief The routine sets up the load-vector in v on the interface defined by ls.
@@ -479,6 +727,43 @@ double Integral_Gamma_Extrapolate (const DROPS::MultiGridCL& mg, const DROPS::Ve
 {
     return (4.*Integral_Gamma( mg, ls, bnd, discsol, 2) - Integral_Gamma_Coarse( mg, ls, bnd, discsol, 1))/3.;
 }
+
+/// Compute some data with QuaQuaMapperCL and simple integrals on the higher order interface.
+/// Optionally, compute the vector field p_h explicitly for visualization.
+/// This is only correct for 1 OpenMP-Thread due to update races.
+class InterfaceDebugP2CL : public TetraAccumulatorCL
+{
+  private:
+    const InterfaceCommonDataP2CL& cdata_;
+
+    VecDescCL* to_iface; // For all P2-dofs x at the interface: p_h(x) - x. Computed if to_iface != 0.
+
+    instat_matrix_fun_ptr ref_dp;
+    double (*ref_abs_det) (const TetraCL& t, const BaryCoordCL& b, const SurfacePatchCL& surf);
+
+    double max_dph_err,
+           surfacemeasP1,
+           surfacemeasP2,
+           max_absdet_err,
+           max_dph2_err;
+    double true_area;
+
+  public:
+    void store_offsets( VecDescCL& to_ifacearg) { to_iface= &to_ifacearg; }
+    void set_true_area( double a) { true_area= a; }
+    void set_ref_dp   ( instat_matrix_fun_ptr rdp) { ref_dp= rdp; }
+    void set_ref_abs_det   ( double (*rad) (const TetraCL& t, const BaryCoordCL& b, const SurfacePatchCL& surf)) { ref_abs_det= rad; }
+
+    InterfaceDebugP2CL (const InterfaceCommonDataP2CL& cdata);
+    virtual ~InterfaceDebugP2CL () {}
+
+    virtual void begin_accumulation   ();
+    virtual void finalize_accumulation();
+
+    virtual void visit (const TetraCL& t);
+
+    virtual InterfaceDebugP2CL* clone (int /*clone_id*/) { return new InterfaceDebugP2CL( *this); }
+};
 
 
 /// \brief P1-discretization and solution of the transport equation on the interface

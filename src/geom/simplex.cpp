@@ -453,8 +453,7 @@ SVectorCL<3> FaceToTetraCoord(__UNUSED__ const TetraCL& t, Uint f, SVectorCL<2> 
     return ret;
 }
 
-
-World2BaryCoordCL::World2BaryCoordCL (const TetraCL& t)
+void World2BaryCoordCL::assign (const TetraCL& t)
 {
     SMatrixCL<4,4>& m= qr_.GetMatrix();
     for (Uint v= 0; v < 4; ++v) {
@@ -464,6 +463,7 @@ World2BaryCoordCL::World2BaryCoordCL (const TetraCL& t)
     for (Uint j= 0; j < 4; ++j) m( 3, j)= 1.;
     qr_.prepare_solve();
 }
+
 
 World2BaryCoordCL::World2BaryCoordCL(const Point3DCL* coordVerts)
 {
@@ -481,6 +481,12 @@ BaryCoordCL World2BaryCoordCL::operator() (const Point3DCL& p) const
     BaryCoordCL r( MakeBaryCoord( p[0], p[1], p[2], 1.));
     qr_.Solve( r);
     return r;
+}
+
+void Bary2WorldCoordCL::assign (const TetraCL& tet)
+{
+    for (int i= 0; i < 4; ++i)
+        mat_.col( i, tet.GetVertex( i)->GetCoord());
 }
 
 void ComputeChildFacesOfFace (const TetraCL& p, Uint f, std::vector<const FaceCL*>& childfaces)
