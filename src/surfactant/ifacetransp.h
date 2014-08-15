@@ -223,6 +223,46 @@ class InterfaceCommonDataP2CL : public TetraAccumulatorCL
     }
 };
 
+/// \brief Map the QuadDomain2DCL from InterfaceCommonDataP2CL to the quadratic levelset.
+/// The result is represented as unordered map from tetras to (mapped) QuadDomain2DCL.
+/// The quadrature weights are adjusted by the absdet of the mapping.
+/// The mapping uses QuaQuaMapperCL.
+class QuaQuaQuadDomainMapperAccuCL : public TetraAccumulatorCL
+{
+  private:
+    const InterfaceCommonDataP2CL& cdata_;
+
+  public:
+    DROPS_STD_UNORDERED_MAP<const TetraCL*, QuadDomain2DCL> qmap;
+
+    QuaQuaQuadDomainMapperAccuCL (const InterfaceCommonDataP2CL& cdata)
+        : cdata_( cdata)
+    {}
+
+    void begin_accumulation () {
+        std::cerr << "QuaQuaQuadDomainMapperAccuCL::begin_accumulation.\n";
+        qmap.clear();
+    }
+    void finalize_accumulation() {
+        std::cerr << "QuaQuaQuadDomainMapperAccuCL::finalize_accumulation.\n";
+    }
+
+    void visit (const TetraCL&) {
+        const InterfaceCommonDataP2CL& cdata= cdata_.get_clone();
+        if (cdata.empty())
+            return;
+
+        for (Uint i= 0; i < cdata.qdom.vertex_size(); ++i) {
+            const TetraBaryPairT& p= cdata.qdom_projected[i];
+            const double newweight= cdata.qdom.weight_begin()[i]*cdata.absdet[i];
+#pragma omp critical
+            qmap[p.first].push_back_quad_node( p.second, newweight);
+        }
+    };
+
+    TetraAccumulatorCL* clone (int /*tid*/) { return new QuaQuaQuadDomainMapperAccuCL( *this); };
+};
+
 
 template <class LocalMatrixT, class InterfaceCommonDataT>
 class InterfaceMatrixAccuCL : public TetraAccumulatorCL
