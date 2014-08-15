@@ -51,6 +51,10 @@ exec_ser(quadCut misc-utils geom-builder geom-deformation geom-simplex geom-mult
 
 exec_ser(bicgstab misc-utils)
 
+exec_ser(pardiso misc-utils)
+
+target_link_libraries_ser(pardiso -fopenmp -Wl,--start-group ${MKL_HOME}/lib/intel64/libmkl_intel_ilp64.a ${MKL_HOME}/lib/intel64/libmkl_gnu_thread.a ${MKL_HOME}/lib/intel64/libmkl_core.a -Wl,--end-group -ldl -lpthread -lm) 
+
 exec_ser(gcr misc-utils)
 
 exec_ser(blockmat misc-utils)
