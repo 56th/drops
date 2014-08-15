@@ -48,6 +48,7 @@
 #include "num/stokessolverfactory.h"
 #include "num/oseensolver.h"
 #include "num/prolongation.h"
+#include "num/stokespardiso.h" 
 #ifdef _PAR
 #include "parallel/loadbal.h"
 #include "parallel/parmultigrid.h"
@@ -355,7 +356,13 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
     // Stokes-Solver
     StokesSolverFactoryCL<InstatNavierStokes2PhaseP2P1CL> stokessolverfactory(Stokes, P);
-    StokesSolverBaseCL* stokessolver = stokessolverfactory.CreateStokesSolver();
+    
+    StokesSolverBaseCL* stokessolver = NULL;
+    if (! P.get("Stokes.DirectSolve", 0))
+        stokessolver = stokessolverfactory.CreateStokesSolver();
+    else
+        stokessolver = new StokesPardisoSolverCL(); 
+    
 //  comment: construction of a oseen solver, preconditioned by another oseen solver,
 //           e.g. GCR preconditioned by Vanka-MG, do not forget to delete stokessolver1 at the end of strategy
 //
