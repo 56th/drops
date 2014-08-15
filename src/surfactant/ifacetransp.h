@@ -157,10 +157,11 @@ class InterfaceCommonDataP2CL : public TetraAccumulatorCL
 
     const VecDescCL*   ls;      // P2-level-set
     const BndDataCL<>* lsetbnd; // boundary data for the level set function
-    LocalP2CL<> locp2_ls;
 
   public:
     /// common data @{
+    LocalP2CL<> locp2_ls;
+
     LocalP2CL<>          p2[10];
     LocalP1CL<Point3DCL> gradrefp2[10];
 
