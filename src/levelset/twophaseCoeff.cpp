@@ -473,7 +473,7 @@ namespace InstatSlip{
 		if(first){
 			origin = P.get<DROPS::Point3DCL>("Exp.PosDrop");
 			VelR = P.get<DROPS::Point3DCL>("Exp.RadDrop");
-			radius = VelR[0]; //assume the droplet is spherical;
+			radius = 0.14736126;    //VelR[0]; //assume the droplet is spherical;
 			surftension = P.get<double>("SurfTens.SurfTension");
 			first = false;
 		}
