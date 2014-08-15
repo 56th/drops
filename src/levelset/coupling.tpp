@@ -135,7 +135,10 @@ void LinThetaScheme2PhaseCL<LsetSolverT>::SolveLsNs()
     std::cout << "Discretizing Rhs/Curv took "<< duration <<" sec.\n";
 
     time.Reset();
-    solver_.Solve( *mat_, Stokes_.B.Data,
+    //solver_.Solve( *mat_, Stokes_.B.Data,
+    //    Stokes_.v, Stokes_.p.Data,
+    //    rhs_, *cplN_, Stokes_.c.Data, Stokes_.vel_idx.GetEx(), Stokes_.pr_idx.GetEx(), /*alpha*/ stk_theta_*nonlinear_);
+    solver_.Solve( *mat_, Stokes_.B.Data, Stokes_.C.Data, 
         Stokes_.v, Stokes_.p.Data,
         rhs_, *cplN_, Stokes_.c.Data, Stokes_.vel_idx.GetEx(), Stokes_.pr_idx.GetEx(), /*alpha*/ stk_theta_*nonlinear_);
     time.Stop();
@@ -153,11 +156,14 @@ void LinThetaScheme2PhaseCL<LsetSolverT>::CommitStep()
         Stokes_.UpdatePressure( &Stokes_.p);
         Stokes_.c.SetIdx( &Stokes_.pr_idx);
         Stokes_.B.SetIdx( &Stokes_.pr_idx, &Stokes_.vel_idx);
+        // for XFEM stabilization
+        Stokes_.C.SetIdx( &Stokes_.pr_idx, &Stokes_.pr_idx);
         Stokes_.prA.SetIdx( &Stokes_.pr_idx, &Stokes_.pr_idx);
         Stokes_.prM.SetIdx( &Stokes_.pr_idx, &Stokes_.pr_idx);
         // The MatrixBuilderCL's method of determining when to reuse the pattern
         // is not save for P1X-elements.
         Stokes_.B.Data.clear();
+        Stokes_.C.Data.clear();
         Stokes_.prA.Data.clear();
         Stokes_.prM.Data.clear();
         {
@@ -168,6 +174,7 @@ void LinThetaScheme2PhaseCL<LsetSolverT>::CommitStep()
             accumulate( accus,
                         Stokes_.GetMG(), Stokes_.vel_idx.TriangLevel(), Stokes_.vel_idx.GetMatchingFunction(), Stokes_.vel_idx.GetBndInfo());
         }
+        Stokes_.SetupC(&Stokes_.C, LvlSet_, 1e-3);
     }
     else
         Stokes_.SetupRhs2( &Stokes_.c, LvlSet_, Stokes_.v.t);
@@ -214,6 +221,7 @@ void LinThetaScheme2PhaseCL<LsetSolverT>::Update()
         // The MatrixBuilderCL's method of determining when to reuse the pattern
         // is not save for P1X-elements.
         Stokes_.B.Data.clear();
+        Stokes_.C.Data.clear();
         Stokes_.prA.Data.clear();
         Stokes_.prM.Data.clear();
     }
@@ -237,6 +245,7 @@ void LinThetaScheme2PhaseCL<LsetSolverT>::Update()
         MLTetraAccumulatorTupleCL updates( Stokes_.A.Data.size());
         MaybeAddMLProgressbar( Stokes_.GetMG(), "System2+Nonl", updates, Stokes_.vel_idx.TriangLevel());
         Stokes_.system2_accu( updates, &Stokes_.B, &Stokes_.c, LvlSet_, Stokes_.v.t);
+        Stokes_.SetupC(&Stokes_.C, LvlSet_, 1e-3);
         Stokes_.nonlinear_accu( updates, &Stokes_.N, &Stokes_.v, old_cplN_, LvlSet_, Stokes_.v.t);
         accumulate( updates, Stokes_.GetMG(), Stokes_.vel_idx.TriangLevel(), Stokes_.vel_idx.GetMatchingFunction(), Stokes_.vel_idx.GetBndInfo());
     }
