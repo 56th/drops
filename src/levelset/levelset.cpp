@@ -28,6 +28,7 @@
 #include "levelset/fastmarch.h"
 #include "num/lattice-eval.h"
 #include "num/quadrature.h"
+#include "surfactant/ifacetransp.h"
 #include <fstream>
 
 namespace DROPS
@@ -599,6 +600,94 @@ void VarObliqueLaplaceBeltramiAccuCL::visit (const TetraCL& t)
     n_.assign_indices_only( t, *f.RowIdx);
     for (Uint i= 0; i < 10; ++i)
         add_to_global_vector( f.Data, -quad_2D( qsigma*w_[i], q_), n_.num[i]);
+}
+
+/// \brief Accumulator for the interfacial tension term with variable interfacial tension coefficient.
+/// Uses a higher order approximation of the normal field to obtain order 2.5.
+class VarObliqueLaplaceBeltrami2AccuCL : public SurfTensAccumulatorCL
+{
+  private:
+    const SurfaceTensionCL& sf_;
+    LocalNumbP2CL n_;
+
+    const InterfaceCommonDataP2CL& cdata_;
+    const DROPS_STD_UNORDERED_MAP<const TetraCL*, QuadDomain2DCL>& qmap_;
+
+    NoBndDataCL<Point3DCL> nobndvec_;
+    const VecDescCL& nt_; // Point3D-valued, h^3-approximation of the exact normal to \Gamma.
+
+    LocalP1CL<Point3DCL> gradref_[10],
+                         grad_[10];
+    GridFunctionCL<Point3DCL> w_[10],
+                              qnq_, // normal to quadratic interface
+                              qnt_; // higher order normal to quadratic interface
+    SMatrixCL<3, 3> T_;
+    GridFunctionCL<double> qsigma;
+
+
+  public:
+    VarObliqueLaplaceBeltrami2AccuCL (const LevelsetP2CL& ls, VecDescCL& f_Gamma, const SurfaceTensionCL& sf, const InterfaceCommonDataP2CL& cdata, const VecDescCL& nt, const DROPS_STD_UNORDERED_MAP<const TetraCL*, QuadDomain2DCL>& qmap)
+     : SurfTensAccumulatorCL( ls, f_Gamma), sf_( sf), cdata_( cdata), qmap_( qmap), nt_( nt)
+    {
+        P2DiscCL::GetGradientsOnRef( gradref_);
+    }
+
+    void begin_accumulation () {
+        f.Data= 0.;
+        std::cerr << "VarObliqueLaplaceBeltrami2AccuCL::begin_accumulation: " << f.Data.size() << "dof.\n";
+    }
+    void finalize_accumulation() {
+        std::cerr << "VarObliqueLaplaceBeltrami2AccuCL::finalize_accumulation.\n";
+    }
+
+    void visit (const TetraCL&);
+
+    TetraAccumulatorCL* clone (int /*tid*/) { return new VarObliqueLaplaceBeltrami2AccuCL ( *this); };
+};
+
+
+void VarObliqueLaplaceBeltrami2AccuCL::visit (const TetraCL& t)
+{
+    if (qmap_.count( &t) == 0) // Consider only tetras which meet the piecewise quadratic interface.
+        return;
+
+    const InterfaceCommonDataP2CL& cdata= cdata_.get_clone();
+    const QuadDomain2DCL& qdom= qmap_.find( &t)->second;
+
+    double det; // dummy
+    GetTrafoTr( T, det, t);
+    P2DiscCL::GetGradients( grad_, cdata_.gradrefp2, T);
+    LocalP1CL<Point3DCL> nt; // gradient of quadratic level set function
+    for (Uint i= 0; i < 10 ; ++i)
+        nt+= grad_[i]*cdata.locp2_ls[i];
+
+    resize_and_evaluate_on_vertexes( nt, qdom, qnq_);
+    for (Uint i= 0; i < qdom.vertex_size(); ++i)
+        qnq_[i]/= norm( qnq_[i]);
+
+    P2EvalCL<Point3DCL, const NoBndDataCL<Point3DCL>, const VecDescCL> nteval( &nt_, &nobndvec_, 0);
+    resize_and_evaluate_on_vertexes( nteval, t, qdom, qnt_);
+    for (Uint i= 0; i < qdom.vertex_size(); ++i)
+        qnt_[i]/= norm( qnt_[i]);
+
+    GridFunctionCL<> qalpha( dot( qnq_, qnt_));
+    // ??? If a triangle has zero area, its normal is returned as 0; we avoid 
+    // division by zero... the value will not matter later as the func-det in quad_2D is also 0.
+    for (size_t i= 0; i < qalpha.size(); ++i)
+        if (std::fabs( qalpha[i]) == 0.)
+            qalpha[i]= 1.;
+    GridFunctionCL<Point3DCL> qgradi( qdom.vertex_size());
+    for (Uint i= 0; i < 10; ++i) {
+        evaluate_on_vertexes( grad_[i], qdom, Addr( qgradi));
+        w_[i].resize( qdom.vertex_size());
+        w_[i]= qgradi - GridFunctionCL<double>( dot( qnt_, qgradi)/qalpha)*qnq_; // \bQt D b^i, where b^i is the ith scalar P2-basis-function.
+    }
+    qsigma.resize( qdom.vertex_size());
+    sf_.evaluate_on_vertexes( t, qdom, /*time*/ 0., Addr( qsigma)); // interfacial tension
+
+    n_.assign_indices_only( t, *f.RowIdx);
+    for (Uint i= 0; i < 10; ++i)
+        add_to_global_vector( f.Data, -quad_2D( qsigma*w_[i], qdom), n_.num[i]);
 }
 
 bool MarkInterface ( instat_scalar_fun_ptr DistFct, double width, MultiGridCL& mg, Uint f_level, Uint c_level, double t)
