@@ -214,6 +214,16 @@ operator* (const GridFunctionCL< SMatrixCL<Rows, Cols> >& a, const GridFunctionC
     return ret;
 }
 
+template <Uint Rows, Uint Cols>
+inline GridFunctionCL< SVectorCL<Cols> >
+transp_mul (const GridFunctionCL< SMatrixCL<Rows, Cols> >& a, const GridFunctionCL< SVectorCL<Rows> >& b)
+{
+    GridFunctionCL< SVectorCL<Cols> > ret( SVectorCL<Cols>(), a.size());
+    for (size_t i= 0; i<a.size(); ++i)
+        ret[i]= transp_mul( a[i], b[i]);
+    return ret;
+}
+
 template <Uint Dim>
 inline GridFunctionCL<double>
 dot(const GridFunctionCL<SVectorCL<Dim> >& a, const GridFunctionCL<SVectorCL<Dim> >& b)
