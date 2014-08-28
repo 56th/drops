@@ -18,7 +18,7 @@
 	{
 		"VelocityBndData":
 		{
-			"Default": ["DirBC", "VecZero"] // Bug in some accumulators: The boundary-function is accessed for Dir0BC.
+			"Default": ["Nat0BC", "VecZero"] // Bug in some accumulators: The boundary-function is accessed for Dir0BC.
 		},
 		"PressureBndData": { "Default": ["Nat0BC"] }
 	},
@@ -36,23 +36,33 @@
 		"BndData": { "Default": ["NoBC"] }
 	},
 
+	"LevelsetMapper":
+	{
+		"Tol":			1e-8,
+		"Iter":			100,
+		"Method":		"Newton" // "FixedPointWithLineSearch" // "Newton"
+	},
+
 	"Exp":
 	{
 		"RadDrop":		[0.5, 0.5, 0.5 ],
 		"PosDrop":		[0, 0, 0 ],
-		"ComparisonTarget":	"Improved" // "Improved", "Helper", "LowerBound", "Norm", "CoarseLevel"
+		"ComparisonSource":	"ObliqueLBVar3", // "ObliqueLBVar", "ObliqueLBVar2", "ObliqueLBVar3"
+		"ComparisonTarget":	"CoarseLevel" // "Improved", "Helper", "LowerBound", "Norm", "CoarseLevel"
 	},
 
 	"AdaptRef":
 	{
-		"FinestLevel":		2,
+		"FinestLevel":		3,
 		"CoarsestLevel":	0,
-		"Width":		0.00049
+		"Width":		0.0001 //10 //0.00049
 	},
 
 	"SurfTens":
 	{
-		"SurfTension":		1
+		"SurfTension":		1,
+		"UseMappedFESpace":	false,
+		"TestFunction":		"" // "exp_test_function", ""
 	},
 
 	"Domain":
@@ -62,9 +72,9 @@
 		"E1": [2,0,0],		// Basis to span the object,
 		"E2": [0,2,0],		// not necessary orthonormal
 		"E3": [0,0,2],		// ...
-		"N1": 5,		// Number of cells along the E1-direction,
-		"N2": 5,		//			 the E2-direction,
-		"N3": 5			//			 the E3-direction.
+		"N1": 4,		// Number of cells along the E1-direction,
+		"N2": 4,		//			 the E2-direction,
+		"N3": 4			//			 the E3-direction.
 	},
 
 	"VTK": // VTK output

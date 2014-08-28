@@ -31,9 +31,12 @@
 #include "num/precond.h"
 #include "levelset/coupling.h"
 #include "levelset/adaptriang.h"
+#include "levelset/levelsetmapper.h"
 #include "misc/params.h"
 #include "levelset/surfacetension.h"
 #include "misc/dynamicload.h"
+#include "num/gradient_recovery.h"
+#include "surfactant/ifacetransp.h"
 #include <fstream>
 #include <sstream>
 
@@ -548,7 +551,321 @@ void MyInit (const DROPS::MultiGridCL& mg, DROPS::VecDescCL& ls, Point3DCL (*d)(
     ls.t= t;
 }
 
-void Compare_Oblique_Coarse (DROPS::AdapTriangCL&, InstatStokes2PhaseP2P1CL& Stokes, LevelsetP2CL& lset)
+/// \brief Accumulator for the interfacial tension term with variable interfacial tension coefficient.
+/// Uses a higher order approximation of the normal field to obtain order 2.5.
+class VarObliqueLaplaceBeltrami2AccuCL : public SurfTensAccumulatorCL
+{
+  private:
+    const SurfaceTensionCL& sf_;
+    LocalNumbP2CL n_;
+
+    const InterfaceCommonDataP2CL& cdata_;
+    const DROPS_STD_UNORDERED_MAP<const TetraCL*, QuadDomain2DCL>& qmap_;
+
+    NoBndDataCL<Point3DCL> nobndvec_;
+    const VecDescCL& nt_; // Point3D-valued, h^3-approximation of the exact normal to \Gamma.
+
+    LocalP1CL<Point3DCL> gradref_[10],
+                         grad_[10];
+    GridFunctionCL<Point3DCL> w_[10],
+                              qnq_, // normal to quadratic interface
+                              qnt_, // higher order normal to quadratic interface
+                              qnl;  // normal to the linear interface
+    SMatrixCL<3, 3> T_;
+    GridFunctionCL<double> qsigma;
+
+    double area;
+
+    bool use_mapped_fe_space_;
+    bool use_linear_subsampling_;
+
+    double test_result;
+    instat_matrix_fun_ptr test_fun;
+    GridFunctionCL< SMatrixCL<3,3> > qtest_fun;
+
+    void visit_mapped_P2 (const TetraCL&);
+    void visit_P2 (const TetraCL&);
+    void visit_P2_fun (const TetraCL&);
+
+  public:
+    VarObliqueLaplaceBeltrami2AccuCL (const LevelsetP2CL& ls, VecDescCL& f_Gamma, const SurfaceTensionCL& sf, const InterfaceCommonDataP2CL& cdata, const VecDescCL& nt, const DROPS_STD_UNORDERED_MAP<const TetraCL*, QuadDomain2DCL>& qmap, bool use_mapped_fe_space)
+     : SurfTensAccumulatorCL( ls, f_Gamma), sf_( sf), cdata_( cdata), qmap_( qmap), nt_( nt), use_mapped_fe_space_( use_mapped_fe_space), use_linear_subsampling_( false), test_fun( 0)
+    {
+        P2DiscCL::GetGradientsOnRef( gradref_);
+    }
+
+    void set_test_function (instat_matrix_fun_ptr f) { test_fun= f; }
+    void use_linear_subsampling (bool use) { use_linear_subsampling_= use; }
+
+    void begin_accumulation () {
+        f.Data= 0.;
+        area= 0.;
+        test_result= 0.;
+        std::cerr << "VarObliqueLaplaceBeltrami2AccuCL::begin_accumulation: " << f.Data.size() << "dof.\n";
+    }
+    void finalize_accumulation() {
+        std::cerr << "VarObliqueLaplaceBeltrami2AccuCL::finalize_accumulation.\n";
+        std::cerr << "    area: " << area << ".\n";
+        if (test_fun) {
+            const double exact= -1.796234565533891; // Maple: 16 digits.
+            std::cout.precision( 15);
+            std::cout << "    test_result: " << test_result << " error: " << test_result - exact << ".\n";
+        }
+    }
+
+    void visit (const TetraCL& t) {
+        if (test_fun)
+            visit_P2_fun( t);
+        else if (use_mapped_fe_space_ || use_linear_subsampling_)
+            visit_mapped_P2( t);
+        else
+            visit_P2( t);
+    }
+
+    TetraAccumulatorCL* clone (int /*tid*/) { return new VarObliqueLaplaceBeltrami2AccuCL ( *this); };
+};
+
+void VarObliqueLaplaceBeltrami2AccuCL::visit_mapped_P2 (const TetraCL& t)
+{
+    const InterfaceCommonDataP2CL& cdata= cdata_.get_clone();
+    if (cdata.empty())
+        return;
+
+    double det; // dummy
+    GetTrafoTr( T, det, t);
+    P2DiscCL::GetGradients( grad_, cdata_.gradrefp2, T);
+    LocalP1CL<Point3DCL> nq; // gradient of quadratic level set function
+    for (Uint i= 0; i < 10 ; ++i)
+        nq+= grad_[i]*cdata.locp2_ls[i];
+
+    const QuadDomain2DCL&       qdom=           cdata.qdom;
+    const TetraBaryPairVectorT& qdom_projected= cdata.qdom_projected;
+
+    // resize_and_evaluate_on_vertexes( nq, qdom_projected, qnq_);
+    qnq_.resize( qdom.vertex_size());
+    for (Uint i= 0; i < qdom.vertex_size(); ++i) {
+        if (qdom_projected[i].first == &t)
+            qnq_[i]= nq( qdom_projected[i].second);
+        else {
+            GetTrafoTr( T, det, *qdom_projected[i].first);
+            LocalP1CL<Point3DCL> mygrad[10];
+            P2DiscCL::GetGradients( mygrad, cdata_.gradrefp2, T);
+            LocalP2CL<> mylocp2_ls( cdata.get_local_p2_ls( *qdom_projected[i].first));
+            LocalP1CL<Point3DCL> mynq; // gradient of quadratic level set function
+            for (Uint j= 0; j < 10 ; ++j)
+                mynq+= mygrad[j]*mylocp2_ls[j];
+            qnq_[i]= mynq( qdom_projected[i].second);
+        }
+    }
+
+    for (Uint i= 0; i < qdom.vertex_size(); ++i)
+        qnq_[i]/= norm( qnq_[i]);
+
+    P2EvalCL<Point3DCL, const NoBndDataCL<Point3DCL>, const VecDescCL> nteval( &nt_, &nobndvec_, 0);
+    resize_and_evaluate_on_vertexes( nteval, qdom_projected, qnt_);
+    for (Uint i= 0; i < qdom.vertex_size(); ++i)
+        qnt_[i]/= norm( qnt_[i]);
+
+    GridFunctionCL<> qalpha( dot( qnq_, qnt_));
+    // ??? If a triangle has zero area, its normal is returned as 0; we avoid 
+    // division by zero... the value will not matter later as the func-det in quad_2D is also 0.
+    for (size_t i= 0; i < qalpha.size(); ++i)
+        if (std::fabs( qalpha[i]) == 0.)
+            qalpha[i]= 1.;
+
+    GridFunctionCL<SMatrixCL<3,3> > Winv( cdata.qdom.vertex_size());
+    QRDecompCL<3,3> qr;
+    SVectorCL<3> tmp;
+    for (Uint i= 0; i < cdata.qdom.vertex_size(); ++i) {
+        gradient_trafo( t, cdata.qdom.vertex_begin()[i], cdata.quaqua, cdata.surf, qr.GetMatrix());
+        qr.prepare_solve();
+        for (Uint j= 0; j < 3; ++j) {
+            tmp= std_basis<3>( j + 1);
+            qr.Solve( tmp);
+            Winv[i].col( j, tmp);
+        }
+    }
+
+    GridFunctionCL<Point3DCL> qgradi( qdom.vertex_size());
+    if (use_linear_subsampling_) {
+        for (int i= 0; i < 10; ++i) {
+            evaluate_on_vertexes ( grad_[i], qdom, Addr( qgradi));
+            w_[i].resize( qdom.vertex_size());
+            w_[i]= qgradi - GridFunctionCL<double>( dot( qnt_, qgradi)/qalpha)*qnq_; // \bQt D b^i, where b^i is the ith scalar P2-basis-function.
+        }
+    }
+    else {
+        cdata.surf.compute_normals( t);
+        resize_and_scatter_piecewise_normal( cdata.surf, cdata.qdom, qnl);
+        for (int i= 0; i < 10; ++i) {
+            evaluate_on_vertexes ( grad_[i], cdata.qdom, Addr( qgradi));
+            for (Uint j= 0; j < qgradi.size(); ++j) {
+                tmp=  qgradi[j] - inner_prod( qnl[j], qgradi[j])*qnl[j];
+                qgradi[j]= Winv[j]*tmp;
+            }
+            w_[i].resize( qdom.vertex_size());
+            w_[i]= qgradi - GridFunctionCL<double>( dot( qnt_, qgradi)/qalpha)*qnq_; // \bQt D b^i, where b^i is the ith scalar P2-basis-function.
+        }
+    }
+
+    qsigma.resize( qdom.vertex_size());
+    evaluate_on_vertexes( sf_.GetSigma(), qdom_projected, /*time*/ 0., Addr( qsigma)); // interfacial tension
+
+    n_.assign_indices_only( t, *f.RowIdx);
+    for (Uint i= 0; i < 10; ++i)
+        add_to_global_vector( f.Data, -quad_2D( GridFunctionCL<double>( cdata.absdet*qsigma)*w_[i], qdom), n_.num[i]);
+}
+
+void VarObliqueLaplaceBeltrami2AccuCL::visit_P2 (const TetraCL& t)
+{
+    if (qmap_.count( &t) == 0) // Consider only tetras which meet the piecewise quadratic interface.
+        return;
+
+    const InterfaceCommonDataP2CL& cdata= cdata_.get_clone();
+    const QuadDomain2DCL& qdom= qmap_.find( &t)->second;
+
+std::valarray<double> ones( 1., qdom.vertex_size());
+area+= quad_2D( ones, qdom);
+
+    double det; // dummy
+    GetTrafoTr( T, det, t);
+    P2DiscCL::GetGradients( grad_, cdata_.gradrefp2, T);
+    LocalP1CL<Point3DCL> nq; // gradient of quadratic level set function
+    for (Uint i= 0; i < 10 ; ++i)
+        nq+= grad_[i]*cdata.locp2_ls[i];
+
+    resize_and_evaluate_on_vertexes( nq, qdom, qnq_);
+    for (Uint i= 0; i < qdom.vertex_size(); ++i)
+        qnq_[i]/= norm( qnq_[i]);
+
+    P2EvalCL<Point3DCL, const NoBndDataCL<Point3DCL>, const VecDescCL> nteval( &nt_, &nobndvec_, 0);
+    resize_and_evaluate_on_vertexes( nteval, t, qdom, qnt_);
+    for (Uint i= 0; i < qdom.vertex_size(); ++i)
+        qnt_[i]/= norm( qnt_[i]);
+
+    GridFunctionCL<> qalpha( dot( qnq_, qnt_));
+    // ??? If a triangle has zero area, its normal is returned as 0; we avoid 
+    // division by zero... the value will not matter later as the func-det in quad_2D is also 0.
+    for (size_t i= 0; i < qalpha.size(); ++i)
+        if (std::fabs( qalpha[i]) == 0.)
+            qalpha[i]= 1.;
+    GridFunctionCL<Point3DCL> qgradi( qdom.vertex_size());
+    for (Uint i= 0; i < 10; ++i) {
+        evaluate_on_vertexes( grad_[i], qdom, Addr( qgradi));
+        w_[i].resize( qdom.vertex_size());
+        w_[i]= qgradi - GridFunctionCL<double>( dot( qnt_, qgradi)/qalpha)*qnq_; // \bQt D b^i, where b^i is the ith scalar P2-basis-function.
+    }
+    qsigma.resize( qdom.vertex_size());
+    sf_.evaluate_on_vertexes( t, qdom, /*time*/ 0., Addr( qsigma)); // interfacial tension
+
+    n_.assign_indices_only( t, *f.RowIdx);
+    for (Uint i= 0; i < 10; ++i)
+        add_to_global_vector( f.Data, -quad_2D( qsigma*w_[i], qdom), n_.num[i]);
+}
+
+
+void VarObliqueLaplaceBeltrami2AccuCL::visit_P2_fun (const TetraCL& t)
+{
+    if (qmap_.count( &t) == 0) // Consider only tetras which meet the piecewise quadratic interface.
+        return;
+
+    const InterfaceCommonDataP2CL& cdata= cdata_.get_clone();
+    const QuadDomain2DCL& qdom= qmap_.find( &t)->second;
+
+std::valarray<double> ones( 1., qdom.vertex_size());
+area+= quad_2D( ones, qdom);
+
+    double det; // dummy
+    GetTrafoTr( T, det, t);
+    P2DiscCL::GetGradients( grad_, cdata_.gradrefp2, T);
+    LocalP1CL<Point3DCL> nq; // gradient of quadratic level set function
+    for (Uint i= 0; i < 10 ; ++i)
+        nq+= grad_[i]*cdata.locp2_ls[i];
+
+    resize_and_evaluate_on_vertexes( nq, qdom, qnq_);
+    for (Uint i= 0; i < qdom.vertex_size(); ++i)
+        qnq_[i]/= norm( qnq_[i]);
+
+    P2EvalCL<Point3DCL, const NoBndDataCL<Point3DCL>, const VecDescCL> nteval( &nt_, &nobndvec_, 0);
+    resize_and_evaluate_on_vertexes( nteval, t, qdom, qnt_);
+    for (Uint i= 0; i < qdom.vertex_size(); ++i)
+        qnt_[i]/= norm( qnt_[i]);
+
+    GridFunctionCL<> qalpha( dot( qnq_, qnt_));
+    // ??? If a triangle has zero area, its normal is returned as 0; we avoid 
+    // division by zero... the value will not matter later as the func-det in quad_2D is also 0.
+    for (size_t i= 0; i < qalpha.size(); ++i)
+        if (std::fabs( qalpha[i]) == 0.)
+            qalpha[i]= 1.;
+    resize_and_evaluate_on_vertexes( test_fun, t, qdom, 0., qtest_fun);
+    // \bQt Dv, where v is the (vector-valued) test-function.
+    qtest_fun-=  outer_product( GridFunctionCL<>(1./qalpha)*qnq_, transp_mul( qtest_fun, qnt_));
+    qsigma.resize( qdom.vertex_size());
+    sf_.evaluate_on_vertexes( t, qdom, /*time*/ 0., Addr( qsigma)); // interfacial tension
+
+    test_result+= -quad_2D( qsigma*trace( qtest_fun), qdom);
+}
+
+void AccumulateBndIntegral (LevelsetP2CL& lset, const PrincipalLatticeCL& lat, VecDescCL& f_Gamma)
+{
+    // SF_ObliqueLBVar2:
+    ScopeTimerCL scope("AccumulateBndIntegral2");
+
+    MultiGridCL& mg= lset.GetMG();
+    const Uint lvl= lset.Phi.GetLevel();
+
+    // Recover the gradient of the level set function
+    IdxDescCL vecp2idx( vecP2_FE);
+    vecp2idx.CreateNumbering( lvl, mg);
+    VecDescCL nt( &vecp2idx);
+    MyInit( mg, nt, &GradDistanceFct, 0.);
+
+    // Compute neighborhoods of the tetras at the interface
+    TetraToTetrasT tetra_neighborhoods;
+    compute_tetra_neighborhoods( mg, lset.Phi, lset.GetBndData(), lat, tetra_neighborhoods);
+
+    VecDescCL lsgradrec( &vecp2idx);
+    averaging_P2_gradient_recovery( mg, lset.Phi, lset.GetBndData(), lsgradrec);
+
+    QuaQuaMapperCL quaqua( mg, lset.Phi, lsgradrec, tetra_neighborhoods,
+                           P.get<int>( "LevelsetMapper.Iter"),
+                           P.get<double>( "LevelsetMapper.Tol"),
+                           P.get<std::string>( "LevelsetMapper.Method") == "FixedPointWithLineSearch");
+
+    InterfaceCommonDataP2CL cdatap2( lset.Phi, lset.GetBndData(), quaqua, lat);
+    QuaQuaQuadDomainMapperAccuCL hoqdom_accu( cdatap2);
+    if (P.get<std::string>( "Exp.ComparisonSource") == "ObliqueLBVar2") {
+        TetraAccumulatorTupleCL hoaccus;
+        hoaccus.push_back( &cdatap2);
+        hoaccus.push_back( &hoqdom_accu);
+        accumulate( hoaccus, lset.GetMG(), lvl, lset.Phi.RowIdx->GetMatchingFunction(), lset.Phi.RowIdx->GetBndInfo());
+    }
+
+    TetraAccumulatorTupleCL accus;
+    accus.push_back( &cdatap2);
+    VarObliqueLaplaceBeltrami2AccuCL accu( lset, f_Gamma, lset.GetSF(), cdatap2, nt, hoqdom_accu.qmap, P.get<bool>( "SurfTens.UseMappedFESpace"));
+    if (P.get<std::string>( "SurfTens.TestFunction") == "exp_test_function")
+        accu.set_test_function( &exp_test_function);
+    if (P.get<std::string>( "Exp.ComparisonSource") == "ObliqueLBVar3") {
+        accu.use_linear_subsampling( true);
+        cdatap2.set_lattice( PrincipalLatticeCL::instance(1u << (lvl == 0 ? 0 : lvl - 1)));
+    }
+    accus.push_back( &accu);
+    accumulate( accus, lset.GetMG(), lvl, lset.Phi.RowIdx->GetMatchingFunction(), lset.Phi.RowIdx->GetBndInfo());
+    if (P.get<std::string>( "Exp.ComparisonSource") == "ObliqueLBVar3")
+        cdatap2.set_lattice( PrincipalLatticeCL::instance( 1));
+
+//     InterfaceDebugP2CL debug_accu( cdatap2);
+//     debug_accu.set_true_area( 4.*M_PI*r*r);
+//     debug_accu.set_ref_dp( &dp_sphere);
+// //         p2debugaccu.set_ref_abs_det( &abs_det_sphere);
+//     TetraAccumulatorTupleCL debug_accus;
+//     debug_accus.push_back( &cdatap2);
+//     debug_accus.push_back( &debug_accu);
+//     accumulate( debug_accus, lset.GetMG(), lvl, lset.Phi.RowIdx->GetMatchingFunction(), lset.Phi.RowIdx->GetBndInfo());
+}
+
+void Compare_Oblique_Coarse (DROPS::AdapTriangCL&, InstatStokes2PhaseP2P1CL& Stokes, LevelsetP2CL& lset, std::string comparison_source)
 {
     MultiGridCL& mg= Stokes.GetMG();
     if (mg.GetLastLevel() == 0)
@@ -564,8 +881,18 @@ void Compare_Oblique_Coarse (DROPS::AdapTriangCL&, InstatStokes2PhaseP2P1CL& Sto
     mlidx.CreateNumbering( flvl, mg);
     MLVecDescCL ff_oblique( &mlidx);
     std::cout << "ff_oblique: " << ff_oblique.size() << " levels.\n";
-    lset.SetSurfaceForce( SF_ObliqueLBVar);
-    lset.AccumulateBndIntegral( ff_oblique.GetFinest());
+    const PrincipalLatticeCL& lat= PrincipalLatticeCL::instance( 1);
+
+    if (comparison_source == "ObliqueLBVar") {
+        lset.SetSurfaceForce( SF_ObliqueLBVar);
+        lset.AccumulateBndIntegral( ff_oblique.GetFinest());
+    }
+    else if (comparison_source == "ObliqueLBVar2" || comparison_source == "ObliqueLBVar3")
+        AccumulateBndIntegral( lset, lat, ff_oblique.GetFinest());
+    else
+        throw DROPSErrCL( "Compare_Oblique_Coarse: Unknown source: " + comparison_source + ".\n");
+    WriteFEToFile( ff_oblique.GetFinest(), mg, "ff_oblique.txt");
+
     {
         MLDataCL<ProlongationCL<Point3DCL> > mlprolongation;
         SetupProlongationMatrix( mg, mlprolongation, &mlidx, &mlidx);
@@ -609,14 +936,20 @@ void Compare_Oblique_Coarse (DROPS::AdapTriangCL&, InstatStokes2PhaseP2P1CL& Sto
         MA.LinComb( 1, Stokes.M.Data, 1, Stokes.A.Data);
 
         VecDescCL oblique( vidx);
-        clset.AccumulateBndIntegral( oblique);
+        if (comparison_source == "ObliqueLBVar")
+            clset.AccumulateBndIntegral( oblique);
+        else if (comparison_source == "ObliqueLBVar2" || comparison_source == "ObliqueLBVar3")
+            AccumulateBndIntegral( clset, lat, oblique);
+        else
+            throw DROPSErrCL( "Compare_Oblique_Coarse: Unknown source: " + comparison_source + " (2).\n");
         VectorCL d( oblique.Data - ffit->Data);
         std::cout << "|d| = \t\t" << norm(d) << std::endl;
         VectorCL MA_inv_d( d);
         std::cout << "Solving system with MA matrix:\t";
         SSORPcCL pc;
         typedef PCGSolverCL<SSORPcCL> PCG_SsorCL;
-        PCG_SsorCL cg( pc, 1000, 1e-14);
+//         PCG_SsorCL cg( pc, 1000, 1e-14);
+        PCG_SsorCL cg( pc, 1000, 1e-10);
         cg.Solve( MA, MA_inv_d, d, vidx->GetEx());
         std::cout << cg.GetIter() << " iter,\tresid = " << cg.GetResid();
         const double sup2= std::sqrt(dot( MA_inv_d, d));
@@ -626,7 +959,7 @@ void Compare_Oblique_Coarse (DROPS::AdapTriangCL&, InstatStokes2PhaseP2P1CL& Sto
     }
 }
 
-void Compare_Oblique (DROPS::AdapTriangCL&, InstatStokes2PhaseP2P1CL& Stokes, LevelsetP2CL& lset, std::string comparison_target)
+void Compare_Oblique (DROPS::AdapTriangCL&, InstatStokes2PhaseP2P1CL& Stokes, LevelsetP2CL& lset, std::string comparison_source, std::string comparison_target)
 {
     MultiGridCL& mg= Stokes.GetMG();
 
@@ -647,10 +980,19 @@ void Compare_Oblique (DROPS::AdapTriangCL&, InstatStokes2PhaseP2P1CL& Stokes, Le
     std::cout << "Volumen = " << Vol << "\tKruemmung = " << curv << "\n\n";
 
     VecDescCL f_oblique( vidx);
-    lset.SetSurfaceForce( SF_ObliqueLBVar);
-    lset.AccumulateBndIntegral( f_oblique);
+    if (comparison_source == "ObliqueLBVar") {
+        lset.SetSurfaceForce( SF_ObliqueLBVar);
+        lset.AccumulateBndIntegral( f_oblique);
+    }
+    else if (comparison_source == "ObliqueLBVar2" || comparison_source == "ObliqueLBVar3") {
+        const PrincipalLatticeCL& lat= PrincipalLatticeCL::instance( 1);
+        AccumulateBndIntegral( lset, lat, f_oblique);
+    }
+    else
+        throw DROPSErrCL( "Compare_Oblique: Unknown source: " + comparison_source + ".\n");
 
     VecDescCL f_improved( vidx);
+    VecDescCL funvd( vidx);
     if (comparison_target == "Helper" || comparison_target == "VariableHelper") {
         TetraAccumulatorTupleCL accus;
         SphereObliqueLaplaceBeltramiAccuCL accu( lset, f_improved);
@@ -664,10 +1006,10 @@ void Compare_Oblique (DROPS::AdapTriangCL&, InstatStokes2PhaseP2P1CL& Stokes, Le
         lset.AccumulateBndIntegral( f_improved);
     }
     else if (comparison_target == "LowerBound") {
-        VecDescCL funvd( vidx);
         MyInit( mg, funvd, TestFunLowerBound);
 //         const double exact= -4.*M_PI*std::pow( r, 3);
-        const double exact= -2.*M_PI*r;
+//         const double exact= -2.*M_PI*r;
+        const double exact= -1.796234565533891; // Maple: 16 digits.
         std::cout << "LowerBound dot( f_oblique, funvd): " << dot( f_oblique.Data, funvd.Data) << "\n"
                      "fh(v) - f(v): " << dot( f_oblique.Data, funvd.Data) - exact << ".\n";
         return;
@@ -703,6 +1045,10 @@ void Compare_Oblique (DROPS::AdapTriangCL&, InstatStokes2PhaseP2P1CL& Stokes, Le
     Stokes.SetupSystem1( &Stokes.A, &Stokes.M, &Stokes.b, &Stokes.b, &Stokes.b, lset, 0.);
     MLMatrixCL MA;
     MA.LinComb( 1, Stokes.M.Data, 1, Stokes.A.Data);
+    if (comparison_target == "LowerBound") {
+        const double h1norm= std::sqrt( dot( funvd.Data, MA*funvd.Data));
+        std::cout << "|f(v)|/||v||_1 = \t\t" << dot( f_oblique.Data, funvd.Data)/h1norm << ".\n";
+    }
     VectorCL MA_inv_d( d);
     std::cout << "Solving system with MA matrix:\t";
     SSORPcCL pc;
@@ -795,9 +1141,9 @@ int main (int argc, char** argv)
 //     Compare_LaplBeltramiSF_ConstSF( prob, lsbnd);
 //     Compare_Oblique_Improved( adap, prob, lset);
     if (P.get<std::string>( "Exp.ComparisonTarget") == "CoarseLevel")
-        Compare_Oblique_Coarse( adap, prob, lset);
+        Compare_Oblique_Coarse( adap, prob, lset, P.get<std::string>( "Exp.ComparisonSource"));
     else
-        Compare_Oblique( adap, prob, lset, P.get<std::string>( "Exp.ComparisonTarget"));
+        Compare_Oblique( adap, prob, lset, P.get<std::string>( "Exp.ComparisonSource"), P.get<std::string>( "Exp.ComparisonTarget"));
 
     return 0;
   }
