@@ -39,6 +39,52 @@ namespace DROPS
 typedef std::tr1::unordered_set<const TetraCL*>            TetraSetT;
 typedef std::tr1::unordered_map<const TetraCL*, TetraSetT> TetraToTetrasT;
 
+class base_point_newton_cacheCL
+{
+  private:
+    const TetraCL* tet;
+
+    const P2EvalCL<double, const NoBndDataCL<>, const VecDescCL>&             ls_;
+    const P2EvalCL<Point3DCL, const NoBndDataCL<Point3DCL>, const VecDescCL>& ls_grad_rec_;
+
+    const LocalP1CL<Point3DCL> (& gradrefp2_)[10];
+
+    LocalP2CL<>          locls_;
+    LocalP2CL<Point3DCL> loc_gh_;
+    LocalP1CL<Point3DCL> gradp2_[10];
+    World2BaryCoordCL    w2b_;
+
+  public:
+    base_point_newton_cacheCL (const P2EvalCL<double, const NoBndDataCL<>, const VecDescCL>& ls,
+                               const P2EvalCL<Point3DCL, const NoBndDataCL<Point3DCL>, const VecDescCL>& ls_grad_rec,
+                               const LocalP1CL<Point3DCL> (& gradrefp2)[10])
+        : tet( 0), ls_( ls), ls_grad_rec_( ls_grad_rec), gradrefp2_( gradrefp2) {}
+
+
+
+    void set_tetra (const TetraCL* newtet) {
+        if (tet == newtet)
+            return;
+
+        tet= newtet;
+
+        locls_.assign( *tet, ls_);
+        loc_gh_.assign( *tet, ls_grad_rec_);
+
+        SMatrixCL<3,3> T( Uninitialized);
+        double dummy;
+        GetTrafoTr( T, dummy, *tet);
+        P2DiscCL::GetGradients( gradp2_, gradrefp2_, T);
+
+        w2b_.assign( *tet);
+    }
+
+    const LocalP2CL<>&          locls  () const { return locls_; }
+    const LocalP2CL<Point3DCL>& loc_gh () const { return loc_gh_; }
+    const LocalP1CL<Point3DCL>& gradp2 (Uint i) const { return gradp2_[i]; }
+    const World2BaryCoordCL&    w2b    () const { return w2b_; }
+};
+
 
 class QuaQuaMapperCL
 {
@@ -62,6 +108,8 @@ class QuaQuaMapperCL
     // The neighborhoods around each tetra in which base points are searched for.
     TetraToTetrasT& neighborhoods_;
 
+    mutable base_point_newton_cacheCL cache_;
+
     bool line_search (const Point3DCL& v, const Point3DCL& nx, const TetraCL*& tetra, BaryCoordCL& bary, const TetraSetT& neighborhood) const;
     void base_point_with_line_search (const TetraCL*& tet, BaryCoordCL& xb) const;
     void base_point_newton (const TetraCL*& tet, BaryCoordCL& xb) const;
@@ -69,7 +117,7 @@ class QuaQuaMapperCL
   public:
     QuaQuaMapperCL (const MultiGridCL& mg, VecDescCL& lsarg, const VecDescCL& ls_grad_recarg, TetraToTetrasT& neigborhoods, int maxiter= 100, double tol= 1e-7, bool use_line_search= true)
         : maxiter_( maxiter), tol_( tol), maxinneriter_( 100), innertol_( 5e-9), use_line_search_( use_line_search),
-          ls( &lsarg, &nobnddata, &mg), ls_grad_rec( &ls_grad_recarg, &nobnddata_vec, &mg), neighborhoods_( neigborhoods), num_outer_iter( maxiter + 1), num_inner_iter( maxinneriter_ + 1)
+          ls( &lsarg, &nobnddata, &mg), ls_grad_rec( &ls_grad_recarg, &nobnddata_vec, &mg), neighborhoods_( neigborhoods), cache_( ls, ls_grad_rec, gradrefp2), num_outer_iter( maxiter + 1), num_inner_iter( maxinneriter_ + 1)
     { P2DiscCL::GetGradientsOnRef( gradrefp2); }
 
 

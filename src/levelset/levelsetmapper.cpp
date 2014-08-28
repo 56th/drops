@@ -119,54 +119,11 @@ void QuaQuaMapperCL::base_point_with_line_search (const TetraCL*& tet, BaryCoord
 }
 
 
-class base_point_newton_cacheCL
-{
-  private:
-    const TetraCL* tet;
-
-    const P2EvalCL<double, const NoBndDataCL<>, const VecDescCL>&             ls_;
-    const P2EvalCL<Point3DCL, const NoBndDataCL<Point3DCL>, const VecDescCL>& ls_grad_rec_;
-
-    const LocalP1CL<Point3DCL> (& gradrefp2_)[10];
-
-
-  public:
-    base_point_newton_cacheCL (const P2EvalCL<double, const NoBndDataCL<>, const VecDescCL>& ls,
-                               const P2EvalCL<Point3DCL, const NoBndDataCL<Point3DCL>, const VecDescCL>& ls_grad_rec,
-                               const LocalP1CL<Point3DCL> (& gradrefp2)[10])
-        : tet( 0), ls_( ls), ls_grad_rec_( ls_grad_rec), gradrefp2_( gradrefp2) {}
-
-
-
-    void set_tetra (const TetraCL* newtet) {
-        if (tet == newtet)
-            return;
-
-        tet= newtet;
-
-        locls.assign( *tet, ls_);
-        loc_gh.assign( *tet, ls_grad_rec_);
-
-        SMatrixCL<3,3> T( Uninitialized);
-        double dummy;
-        GetTrafoTr( T, dummy, *tet);
-        P2DiscCL::GetGradients( gradp2, gradrefp2_, T);
-
-        w2b.assign( *tet);
-    }
-
-    LocalP2CL<>          locls;
-    LocalP2CL<Point3DCL> loc_gh;
-    LocalP1CL<Point3DCL> gradp2[10];
-    World2BaryCoordCL    w2b;
-};
-
-
 void QuaQuaMapperCL::base_point_newton (const TetraCL*& tet, BaryCoordCL& xb) const
 // tet and xb specify the point which is projected to the zero level.
 // On return tet and xb are the resulting base point.
 {
-    ScopeTimerCL timer( "QuaQuaMapperCL::base_point_newton");
+//     ScopeTimerCL timer( "QuaQuaMapperCL::base_point_newton");
 
     const int max_damping= 10;
     const double eps= 1e-10;
@@ -185,8 +142,11 @@ void QuaQuaMapperCL::base_point_newton (const TetraCL*& tet, BaryCoordCL& xb) co
     QRDecompCL<4,4> qr;
     SMatrixCL<4,4>& M= qr.GetMatrix();
 
-    base_point_newton_cacheCL c( ls, ls_grad_rec, gradrefp2);
-    c.set_tetra( tet);
+//     base_point_newton_cacheCL cache_( ls, ls_grad_rec, gradrefp2);
+    cache_.set_tetra( tet);
+    const LocalP2CL<>& locls= cache_.locls();
+    const LocalP2CL<Point3DCL>& loc_gh= cache_.loc_gh();
+    Point3DCL gradp2_xb[10];
 
     Point3DCL g_ls, // gradient of the level set function.
 //               gh,   // recovered gradient
@@ -196,19 +156,21 @@ void QuaQuaMapperCL::base_point_newton (const TetraCL*& tet, BaryCoordCL& xb) co
                    dn;  // Jacobian of the quasi-normal.
 
     int iter;
-    for (iter= 0; iter < maxiter_ && std::abs( c.locls( xb)) >= lset_tol; ++iter) {
-        nh= c.loc_gh( xb);
+    for (iter= 0; iter < maxiter_ && std::abs( locls( xb)) >= lset_tol; ++iter) {
+        nh= loc_gh( xb);
         ghnorm= nh.norm();
         nh/= ghnorm;
 
-        g_ls= c.locls[0]*c.gradp2[0]( xb);
-        for (Uint i= 1; i < 10; ++i)
-            g_ls+= c.locls[i]*c.gradp2[i]( xb);
+        g_ls= Point3DCL(); // locls[0]*cache_.gradp2[0]( xb);
+        for (Uint i= 0; i < 10; ++i) {
+            gradp2_xb[i]= cache_.gradp2( i)( xb);
+            g_ls+= locls[i]*gradp2_xb[i];
+        }
 
         // Evaluate the Jacobian of the quasi-normal field in xb: dn_h= 1/|G_h| P dG_h.
-        dgh= outer_product( c.loc_gh[0], c.gradp2[0]( xb));
-        for (Uint i= 1; i < 10; ++i)
-            dgh+= outer_product( c.loc_gh[i], c.gradp2[i]( xb));
+        dgh= SMatrixCL<3,3>(); // outer_product( cache_.loc_gh[0], cache_.gradp2[0]( xb));
+        for (Uint i= 0; i < 10; ++i)
+            dgh+= outer_product( loc_gh[i], gradp2_xb[i]);
         dn= 1./ghnorm*(dgh - outer_product( nh, transp_mul( dgh, nh)));
 
         // Setup the blockmatrix M= (-I - dh dn | - gh, -g_ls^T | 0).
@@ -223,16 +185,16 @@ void QuaQuaMapperCL::base_point_newton (const TetraCL*& tet, BaryCoordCL& xb) co
         M( 3,3)= 0.;
         qr.prepare_solve();
 
-        // Setup F= (x0 - x - dh*gh, -c.locls( xb)).
+        // Setup F= (x0 - x - dh*gh, -locls( xb)).
         for (Uint i= 0; i < 3; ++i)
             F[i]= x0[i] - x[i] - dh*nh[i];
-        F[3]= -c.locls( xb);
+        F[3]= -locls( xb);
 
         qr.Solve( F);
         dx= MakePoint3D( F[0], F[1], F[2]);
 
         // Apply damping until x - d*dx is in the neighborhood of tet.
-        xb= c.w2b( x - dx);
+        xb= cache_.w2b()( x - dx);
         if (!is_in_ref_tetra( xb, eps))
             tet= 0;
         d= 1.;
@@ -244,12 +206,11 @@ void QuaQuaMapperCL::base_point_newton (const TetraCL*& tet, BaryCoordCL& xb) co
         }
         x-= d*dx;
         dh-= d*F[3];
-        c.set_tetra( tet);
-        xb= c.w2b( x);
+        cache_.set_tetra( tet);
+        xb= cache_.w2b()( x);
     }
     ++num_outer_iter[iter];
             // Compute the quasi-distance dh:
-//             loc_gh.assign( *tet, ls_grad_rec);
 //             const Point3DCL& gh= loc_gh( xb);// The recovered gradient.
 //             dh*= gh.norm();
     if (iter >= maxiter_) {
