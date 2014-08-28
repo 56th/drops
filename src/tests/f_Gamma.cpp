@@ -72,8 +72,36 @@ DROPS::Point3DCL c;
 double r;
 double DistanceFct( const DROPS::Point3DCL& p, double)
 { // ball
-//     return (p-c).norm()-r;
-    return inner_prod( p - c, p - c) - r*r;
+    return (p - c).norm() - r;
+//     return inner_prod( p - c, p - c) - r*r;
+}
+
+DROPS::Point3DCL GradDistanceFct( const DROPS::Point3DCL& p, double)
+{ // ball
+    if ((p - c).norm() < 1e-12)
+        return DROPS::Point3DCL();
+    return (p - c)/(p - c).norm();
+}
+
+DROPS::SMatrixCL<3,3> dp_sphere (const DROPS::Point3DCL& x, double)
+{
+    const double normx= x.norm();
+    return normx == 0. ? DROPS::SMatrixCL<3,3>() : r/normx*(DROPS::eye<3,3>() - outer_product( x/normx, x/normx));
+}
+
+double h_iface;
+
+// f(x)= exp(x0)*( cos(pi*x0), cos(2*pi*x1), cos(3*pi*x2))
+// Df(x)= e0*f(x)^T - exp(x0)*pi*diag(sin(pi*x0), 2*sin(2*pi*x1), 3*sin(3*pi*x2))
+DROPS::SMatrixCL<3,3> exp_test_function (const DROPS::Point3DCL& x, double)
+{
+    using std::cos;
+    using std::sin;
+    const DROPS::SVectorCL<3> f= std::exp( x[0])*DROPS::MakePoint3D( cos( M_PI*x[0]), cos( 2.*M_PI*x[1]), cos( 3.*M_PI*x[2]));
+    DROPS::SMatrixCL<3,3> ret= DROPS::outer_product( DROPS::std_basis<3>( 1), f);
+    for (int i= 0; i < 3; ++i)
+        ret( i, i)-= std::exp(x[0])*(i + 1)*M_PI*sin( (i + 1.)*M_PI*x[i]);
+    return ret;
 }
 
 // double DistanceFct( const DROPS::Point3DCL& p, double)
@@ -89,7 +117,14 @@ static DROPS::RegisterVectorFunction regveczero("VecZero",  Null);
 DROPS::Point3DCL TestFunLowerBound (const DROPS::Point3DCL& p, double)
 {
 //     return std::abs( p[2])*p;
-    return DROPS::MakePoint3D( std::abs( p[1])*p[1], std::abs( p[0])*p[0], std::abs(p[2])*p[2])/(r*r);
+//     return DROPS::MakePoint3D( std::abs( p[1])*p[1], std::abs( p[0])*p[0], std::abs(p[2])*p[2])/(r*r);
+//  f(x)= exp(x0)*( cos(pi*x0), cos(2*pi*x1), cos(3*pi*x2)):
+    using std::cos;
+//     return std::exp( p[0])*DROPS::MakePoint3D( cos(M_PI*p[0]), cos( 2.*M_PI*p[1]), cos( 3.*M_PI*p[2]));
+
+    DROPS::Point3DCL ret= std::exp( p[0])*DROPS::MakePoint3D( cos(M_PI*p[0]), cos( 2.*M_PI*p[1]), cos( 3.*M_PI*p[2]));
+    double drel= DistanceFct( p, 0.)/h_iface;
+    return (1. - drel*drel)*ret;
 }
 
 void WriteFct( std::ostream& os)
@@ -703,6 +738,9 @@ int main (int argc, char** argv)
 {
   try
   {
+    ScopeTimerCL scope("main");
+    std::cout.precision( 15);
+
     DROPS::read_parameter_file_from_cmdline( P, argc, argv, "f_Gamma.json");
     SetMissingParameters(P);
     std::cout << P << std::endl;
@@ -710,6 +748,7 @@ int main (int argc, char** argv)
     SurfTension= P.get<double>( "SurfTens.SurfTension");
     c= P.get<DROPS::Point3DCL>("Exp.PosDrop");
     r= P.get<DROPS::Point3DCL>("Exp.RadDrop")[0];
+    h_iface= P.get<DROPS::Point3DCL>( "Domain.E1")[0]/P.get<double>( "Domain.N1")/std::pow(2., P.get<DROPS::Uint>( "AdaptRef.FinestLevel"));
 
     DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
 
