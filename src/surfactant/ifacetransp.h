@@ -214,17 +214,22 @@ class InterfaceCommonDataP2CL : public TetraAccumulatorCL
         make_CompositeQuad5Domain2D ( qdom, surf, t);
         qdom_projected.clear();
         qdom_projected.reserve( qdom.vertex_size());
+        absdet.resize( qdom.vertex_size());
         const TetraCL* tet;
         BaryCoordCL b;
-        for (QuadDomain2DCL::const_vertex_iterator v= qdom.vertex_begin(); v != qdom.vertex_end(); ++v) {
+        QuadDomain2DCL::const_vertex_iterator v= qdom.vertex_begin();
+        for (Uint i= 0; i < qdom.vertex_size(); ++i, ++v) {
             tet= &t;
             b= *v;
             quaqua.base_point( tet, b);
             qdom_projected.push_back( std::make_pair( tet, b));
-        }
-        absdet.resize( qdom.vertex_size());
-        for (Uint i= 0; i < qdom.vertex_size(); ++i) {
-            absdet[i]= abs_det( t, qdom.vertex_begin()[i], quaqua, surf);
+            try { // Ignore very small triangles by setting absdet to 0.
+                absdet[i]= abs_det( t, *v, *tet, b, quaqua, surf);
+            } catch (const DROPSErrCL&) {
+//               t.DebugInfo( std::cerr);
+                absdet[i]= 0.; // Implied by absdet.resize above the loop...
+            }
+
         }
     }
 

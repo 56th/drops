@@ -122,6 +122,9 @@ class QuaQuaMapperCL
 
 
     void base_point (const TetraCL*& tet, BaryCoordCL& xb) const;
+    /// \brief (btet, b) must equal base_point( &tet, xb).
+    void jacobian (const TetraCL& tet, const BaryCoordCL& xb,
+                   const TetraCL& btet, const BaryCoordCL& b, SMatrixCL<3,3>& dph) const;
     void jacobian (const TetraCL& tet, const BaryCoordCL& xb, SMatrixCL<3,3>& dph) const;
 
     /// Return the local level set function and its gradient on tet; only for convenience. @{
@@ -135,6 +138,11 @@ class QuaQuaMapperCL
 };
 
 void compute_tetra_neighborhoods (const DROPS::MultiGridCL& mg, const VecDescCL& lsetPhi, const BndDataCL<>& lsetbnd, const PrincipalLatticeCL& lat, TetraToTetrasT& tetra_neighborhoods);
+
+
+/// (btet, b) must equal quaqua.base_point( &tet, xb).
+double abs_det (const TetraCL& tet, const BaryCoordCL& xb,
+                const TetraCL& btet, const BaryCoordCL& b, const QuaQuaMapperCL& quaqua, const SurfacePatchCL& p);
 
 double abs_det (const TetraCL& tet, const BaryCoordCL& xb, const QuaQuaMapperCL& quaqua, const SurfacePatchCL& p);
 

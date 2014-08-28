@@ -236,25 +236,20 @@ void QuaQuaMapperCL::base_point (const TetraCL*& tet, BaryCoordCL& xb) const
         base_point_newton( tet, xb);
 }
 
-void QuaQuaMapperCL::jacobian (const TetraCL& tet, const BaryCoordCL& xb, SMatrixCL<3,3>& dph) const
+void QuaQuaMapperCL::jacobian (const TetraCL& tet, const BaryCoordCL& xb, const TetraCL& btet, const BaryCoordCL& b, SMatrixCL<3,3>& dph) const
 {
-    // Compute the basepoint b.
-    const TetraCL* btet= &tet;
-    BaryCoordCL b= xb;
-    base_point( btet, b);
-
     // Evaluate the quasi normal field in b.
-    LocalP2CL<Point3DCL> loc_gh( *btet, ls_grad_rec);
+    LocalP2CL<Point3DCL> loc_gh( btet, ls_grad_rec);
     const Point3DCL gh= loc_gh( b);
     const Point3DCL q_n= gh/gh.norm();
 
     // Evaluate the normal to the interface in b.
     Point3DCL n;
-    LocalP2CL<> locls( *btet, ls);
+    LocalP2CL<> locls( btet, ls);
     LocalP1CL<Point3DCL> gradp2[10];
     SMatrixCL<3,3> T;
     double dummy;
-    GetTrafoTr( T, dummy, *btet);
+    GetTrafoTr( T, dummy, btet);
     P2DiscCL::GetGradients( gradp2, gradrefp2, T);
     for (Uint i= 0; i < 10; ++i)
         n+= locls[i]*gradp2[i]( b);
@@ -271,7 +266,7 @@ void QuaQuaMapperCL::jacobian (const TetraCL& tet, const BaryCoordCL& xb, SMatri
 
     // Compute d_h(x).
     const Point3DCL x= GetWorldCoord( tet, xb),
-                    y= GetWorldCoord( *btet, b);
+                    y= GetWorldCoord( btet, b);
     const double dhx= inner_prod( q_n, x - y);
 
     // Compute the Jacobian of p_h.
@@ -284,6 +279,16 @@ void QuaQuaMapperCL::jacobian (const TetraCL& tet, const BaryCoordCL& xb, SMatri
         qr.Solve( tmp);
         dph.col( i, tmp);
     }
+}
+
+void QuaQuaMapperCL::jacobian (const TetraCL& tet, const BaryCoordCL& xb, SMatrixCL<3,3>& dph) const
+{
+    // Compute the basepoint b.
+    const TetraCL* btet= &tet;
+    BaryCoordCL b= xb;
+    base_point( btet, b);
+
+    jacobian( tet, xb, *btet, b, dph);
 }
 
 Point3DCL QuaQuaMapperCL::local_ls_grad (const TetraCL& tet, const BaryCoordCL& xb) const
@@ -332,14 +337,14 @@ void compute_tetra_neighborhoods (const MultiGridCL& mg, const VecDescCL& lsetPh
     }
 }
 
-double abs_det (const TetraCL& tet, const BaryCoordCL& xb, const QuaQuaMapperCL& quaqua, const SurfacePatchCL& p)
+double abs_det (const TetraCL& tet, const BaryCoordCL& xb, const TetraCL& btet, const BaryCoordCL& b, const QuaQuaMapperCL& quaqua, const SurfacePatchCL& p)
 {
     if (p.empty())
         return 0.;
 
     // Compute the jacobian of p_h.
     SMatrixCL<3,3> dph;
-    quaqua.jacobian( tet, xb, dph);
+    quaqua.jacobian( tet, xb, btet, b, dph);
 
     const Bary2WorldCoordCL b2w( tet);
     QRDecompCL<3,2> qr;
@@ -358,5 +363,17 @@ double abs_det (const TetraCL& tet, const BaryCoordCL& xb, const QuaQuaMapperCL&
     return std::sqrt( Gram(0,0)*Gram(1,1) - Gram(0,1)*Gram(1,0));
 }
 
+double abs_det (const TetraCL& tet, const BaryCoordCL& xb, const QuaQuaMapperCL& quaqua, const SurfacePatchCL& p)
+{
+    if (p.empty())
+        return 0.;
+
+    // Compute the basepoint b.
+    const TetraCL* btet= &tet;
+    BaryCoordCL b= xb;
+    quaqua.base_point( btet, b);
+
+    return abs_det( tet, xb, *btet, b, quaqua, p);
+}
 
 } // end of namespace DROPS

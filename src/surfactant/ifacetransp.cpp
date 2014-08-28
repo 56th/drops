@@ -214,7 +214,7 @@ void InterfaceDebugP2CL::visit (const TetraCL& t)
 //         std::cout  << "    |x-xb|: " << (x - xb).norm();
 
         SMatrixCL<3,3> dph;
-        cdata.quaqua.jacobian( t, *it, dph);
+        cdata.quaqua.jacobian( t, *it, *tet, b, dph);
         SMatrixCL<3,3> diff_dp= ref_dp != 0 ? dph - ref_dp( x, 0.) : SMatrixCL<3,3>();
         const double dph_err= std::sqrt( frobenius_norm_sq( diff_dp));
         max_dph_err= std::max( max_dph_err, dph_err);
@@ -259,7 +259,7 @@ void gradient_trafo (const TetraCL& tet, const BaryCoordCL& xb, const QuaQuaMapp
 
     // Dp_h(x)^T
     SMatrixCL<3,3> dph, dphT;
-    quaqua.jacobian( tet, xb, dph);
+    quaqua.jacobian( tet, xb, *btet, b, dph);
     assign_transpose( dphT, dph);
 
     W= dphT + outer_product( nl, n/inner_prod( nl, n) - dph*nl);
