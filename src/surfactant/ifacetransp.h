@@ -158,6 +158,8 @@ class InterfaceCommonDataP2CL : public TetraAccumulatorCL
     const VecDescCL*   ls;      // P2-level-set
     const BndDataCL<>* lsetbnd; // boundary data for the level set function
 
+    const PrincipalLatticeCL* lat;
+
   public:
     /// common data @{
     LocalP2CL<> locp2_ls;
@@ -165,14 +167,17 @@ class InterfaceCommonDataP2CL : public TetraAccumulatorCL
     LocalP2CL<>          p2[10];
     LocalP1CL<Point3DCL> gradrefp2[10];
 
-    const PrincipalLatticeCL& lat;
     std::valarray<double>     ls_loc;
     SurfacePatchCL            surf;
     QuadDomain2DCL            qdom;
     TetraBaryPairVectorT      qdom_projected;
     std::valarray<double>     absdet;
-    const QuaQuaMapperCL&     quaqua;
+    QuaQuaMapperCL            quaqua;
+
+    const PrincipalLatticeCL& get_lattice () const { return *lat; }
     /// @}
+
+    LocalP2CL<> get_local_p2_ls (const TetraCL& t) const { return LocalP2CL<>( t, *ls, *lsetbnd); };
 
     const InterfaceCommonDataP2CL& get_clone () const {
         const int tid= omp_get_thread_num();
@@ -180,6 +185,11 @@ class InterfaceCommonDataP2CL : public TetraAccumulatorCL
     }
 
     bool empty () const { return surf.empty(); }
+
+    void set_lattice (const PrincipalLatticeCL& newlat) {
+        lat= &newlat;
+        ls_loc.resize( lat->vertex_size());
+    }
 
     InterfaceCommonDataP2CL (const VecDescCL& ls_arg, const BndDataCL<>& lsetbnd_arg,
         const QuaQuaMapperCL& quaquaarg, const PrincipalLatticeCL& lat_arg);
@@ -194,10 +204,10 @@ class InterfaceCommonDataP2CL : public TetraAccumulatorCL
     virtual void visit (const TetraCL& t) {
         surf.clear();
         locp2_ls.assign( t, *ls, *lsetbnd);
-        evaluate_on_vertexes( locp2_ls, lat, Addr( ls_loc));
+        evaluate_on_vertexes( locp2_ls, *lat, Addr( ls_loc));
         if (equal_signs( ls_loc))
             return;
-        surf.make_patch<MergeCutPolicyCL>( lat, ls_loc);
+        surf.make_patch<MergeCutPolicyCL>( *lat, ls_loc);
         if (surf.empty())
             return;
 
