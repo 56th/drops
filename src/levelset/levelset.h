@@ -107,6 +107,8 @@ class LevelsetP2CL : public ProblemCL< LevelsetCoeffCL, LsetBndDataCL>
 
     bool IsDiscontinuous(){ return IsDG; }
 
+    const SurfaceTensionCL&   GetSF () const { return sf_; }
+
 LevelsetP2CL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, FiniteElementT fetype, double SD= 0, double curvDiff= -1)
     : base_( mg, LevelsetCoeffCL(), bnd), idx(fetype, mg.GetNumLevel()), idxC(NULL), MLPhi( &idx), PhiC(NULL), curvDiff_( curvDiff), SD_( SD),
         SF_(SF_ImprovedLB), sf_(sf), perDirections(NULL), IsDG(false)
@@ -205,6 +207,37 @@ LevelsetP2CL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, F
         }
     }
     ProlongationT* GetProlongation() { return &P_; }
+};
+
+/// \brief Base class for all surface tension accumulators
+class SurfTensAccumulatorCL : public TetraAccumulatorCL
+{
+  protected:
+    VecDescCL  SmPhi_;
+    const BndDataCL<>& lsetbnd_;
+    VecDescCL& f;
+    SMatrixCL<3,3> T;
+    InterfaceTriangleCL triangle;
+
+  public:
+    SurfTensAccumulatorCL( const LevelsetP2CL& ls, VecDescCL& f_Gamma)
+     : SmPhi_(*ls.PhiC), lsetbnd_(ls.GetBndData()), f(f_Gamma)
+    { ls.MaybeSmooth( SmPhi_.Data); }
+
+    void begin_accumulation ()
+    {
+        // uncomment for Geomview output
+        //std::ofstream fil("surf.off");
+        //fil << "appearance {\n-concave\nshading smooth\n}\nLIST\n{\n";
+    }
+    void finalize_accumulation()
+    {
+        // uncomment for Geomview output
+        //fil << "}\n";
+    }
+    ///\brief Do setup of f_Gamma on given tetra
+    virtual void visit (const TetraCL&)= 0;
+
 };
 
 

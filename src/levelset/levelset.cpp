@@ -39,37 +39,6 @@ inline double SmoothedSign( double x, double alpha)
     return x/std::sqrt(x*x+alpha);
 }
 
-/// \brief Base class for all surface tension accumulators
-class SurfTensAccumulatorCL : public TetraAccumulatorCL
-{
-  protected:
-    VecDescCL  SmPhi_;
-    const BndDataCL<>& lsetbnd_;
-    VecDescCL& f;
-    SMatrixCL<3,3> T;
-    InterfaceTriangleCL triangle;
-
-  public:
-    SurfTensAccumulatorCL( const LevelsetP2CL& ls, VecDescCL& f_Gamma)
-     : SmPhi_(*ls.PhiC), lsetbnd_(ls.GetBndData()), f(f_Gamma)
-    { ls.MaybeSmooth( SmPhi_.Data); }
-
-    void begin_accumulation ()
-    {
-        // uncomment for Geomview output
-        //std::ofstream fil("surf.off");
-        //fil << "appearance {\n-concave\nshading smooth\n}\nLIST\n{\n";
-    }
-    void finalize_accumulation()
-    {
-        // uncomment for Geomview output
-        //fil << "}\n";
-    }
-    ///\brief Do setup of f_Gamma on given tetra
-    virtual void visit (const TetraCL&)= 0;
-
-};
-
 /// \brief Accumulator for the (artificial) constant surface force, mainly used for numerical test cases.
 ///
 /// Computes the integral
