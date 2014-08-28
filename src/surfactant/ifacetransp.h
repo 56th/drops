@@ -237,6 +237,7 @@ class InterfaceCommonDataP2CL : public TetraAccumulatorCL
 /// The result is represented as unordered map from tetras to (mapped) QuadDomain2DCL.
 /// The quadrature weights are adjusted by the absdet of the mapping.
 /// The mapping uses QuaQuaMapperCL.
+/// XXX Not OpenMP-thread-safe.
 class QuaQuaQuadDomainMapperAccuCL : public TetraAccumulatorCL
 {
   private:
@@ -265,7 +266,6 @@ class QuaQuaQuadDomainMapperAccuCL : public TetraAccumulatorCL
         for (Uint i= 0; i < cdata.qdom.vertex_size(); ++i) {
             const TetraBaryPairT& p= cdata.qdom_projected[i];
             const double newweight= cdata.qdom.weight_begin()[i]*cdata.absdet[i];
-#pragma omp critical
             qmap[p.first].push_back_quad_node( p.second, newweight);
         }
     };
