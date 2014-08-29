@@ -48,12 +48,14 @@
 		"RadDrop":		[0.5, 0.5, 0.5 ],
 		"PosDrop":		[0, 0, 0 ],
 		"ComparisonSource":	"ObliqueLBVar3", // "ObliqueLBVar", "ObliqueLBVar2", "ObliqueLBVar3"
-		"ComparisonTarget":	"CoarseLevel" // "Improved", "Helper", "LowerBound", "Norm", "CoarseLevel"
+		"ComparisonTarget":	"CoarseLevel", // "Improved", "Helper", "LowerBound", "Norm", "CoarseLevel"
+		"SubsamplingExponent":	1.0,
+		"SubsamplingFactor":	0.5
 	},
 
 	"AdaptRef":
 	{
-		"FinestLevel":		3,
+		"FinestLevel":		7,
 		"CoarsestLevel":	0,
 		"Width":		0.0001 //10 //0.00049
 	},

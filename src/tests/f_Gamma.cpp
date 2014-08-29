@@ -712,8 +712,10 @@ void VarObliqueLaplaceBeltrami2AccuCL::visit_mapped_P2 (const TetraCL& t)
     evaluate_on_vertexes( sf_.GetSigma(), qdom_projected, /*time*/ 0., Addr( qsigma)); // interfacial tension
 
     n_.assign_indices_only( t, *f.RowIdx);
+    if (!use_linear_subsampling_)
+        qsigma*= cdata.absdet;
     for (Uint i= 0; i < 10; ++i)
-        add_to_global_vector( f.Data, -quad_2D( GridFunctionCL<double>( cdata.absdet*qsigma)*w_[i], qdom), n_.num[i]);
+        add_to_global_vector( f.Data, -quad_2D( qsigma*w_[i], qdom), n_.num[i]);
 }
 
 void VarObliqueLaplaceBeltrami2AccuCL::visit_P2 (const TetraCL& t)
@@ -847,17 +849,19 @@ void AccumulateBndIntegral (LevelsetP2CL& lset, const PrincipalLatticeCL& lat, V
     if (P.get<std::string>( "SurfTens.TestFunction") == "exp_test_function")
         accu.set_test_function( &exp_test_function);
     if (P.get<std::string>( "Exp.ComparisonSource") == "ObliqueLBVar3") {
-        const Uint subsampling= std::ceil( std::pow( 2., 1.25*lvl));
+        const Uint subsampling= std::ceil( P.get<double>( "Exp.SubsamplingFactor")*std::pow( 2., P.get<double>( "Exp.SubsamplingExponent")*lvl));
 //         const Uint subsampling= 1u << (lvl == 0 ? 0 : lvl - 1);
-//         const Uint subsampling= 1u << lvl;
         std::cout << "ObliqueLBVar3: subsampling: " << subsampling << ".\n";
         accu.use_linear_subsampling( true);
         cdatap2.set_lattice( PrincipalLatticeCL::instance( subsampling));
+        cdatap2.compute_absdet( false);
     }
     accus.push_back( &accu);
     accumulate( accus, lset.GetMG(), lvl, lset.Phi.RowIdx->GetMatchingFunction(), lset.Phi.RowIdx->GetBndInfo());
-    if (P.get<std::string>( "Exp.ComparisonSource") == "ObliqueLBVar3")
+    if (P.get<std::string>( "Exp.ComparisonSource") == "ObliqueLBVar3") {
         cdatap2.set_lattice( PrincipalLatticeCL::instance( 1));
+        cdatap2.compute_absdet( true);
+    }
 
 //     InterfaceDebugP2CL debug_accu( cdatap2);
 //     debug_accu.set_true_area( 4.*M_PI*r*r);
