@@ -275,13 +275,18 @@ template <class QuadDataT, AbsdetPolicyEnum AbsdetPolicy, Uint Dim>
                                   const SPatchCL<Dim>& p,
                                   const typename DimensionTraitsCL<Dim>::WorldBodyT& wb)
 {
-    const Uint num_nodes= QuadDataT::NumNodesC;
+    q.clear();
+    if (p.empty())
+        return q;
 
-    q.vertexes_.clear(); // Zero init needed due to upddating with += below.
+    const Uint num_nodes= QuadDataT::NumNodesC;
     q.vertexes_.resize( num_nodes*p.facet_size());
     q.weights_.resize(  num_nodes*p.facet_size());
-    if (!p.empty() && p.normal_empty())
+
+    if (AbsdetPolicy == SpaceProjectedCodim1Absdet && p.normal_empty())
         p.compute_normals( wb);
+    else if (AbsdetPolicy == Codim1Absdet && p.absdets_empty())
+        p.compute_absdets( wb);
 
     const typename SPatchCL<Dim>::const_vertex_iterator p_vertexes= p.vertex_begin();
     const typename SPatchCL<Dim>::const_normal_iterator p_normals= p.normal_begin();
