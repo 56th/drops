@@ -251,7 +251,8 @@ void gradient_trafo (const TetraCL& tet, const BaryCoordCL& xb, const QuaQuaMapp
     quaqua.base_point( btet, b);
 
     // nl(x)
-    p.compute_normals( tet);
+    if (p.normal_empty())
+        p.compute_normals( tet);
     Point3DCL nl= p.normal_begin()[0];
     // Evaluate the normal to the interface in b, n(y).
     Point3DCL n= quaqua.local_ls_grad( *btet, b);
