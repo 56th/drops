@@ -60,24 +60,7 @@ class base_point_newton_cacheCL
                                const LocalP1CL<Point3DCL> (& gradrefp2)[10])
         : tet( 0), ls_( ls), ls_grad_rec_( ls_grad_rec), gradrefp2_( gradrefp2) {}
 
-
-
-    void set_tetra (const TetraCL* newtet) {
-        if (tet == newtet)
-            return;
-
-        tet= newtet;
-
-        locls_.assign( *tet, ls_);
-        loc_gh_.assign( *tet, ls_grad_rec_);
-
-        SMatrixCL<3,3> T( Uninitialized);
-        double dummy;
-        GetTrafoTr( T, dummy, *tet);
-        P2DiscCL::GetGradients( gradp2_, gradrefp2_, T);
-
-        w2b_.assign( *tet);
-    }
+    void set_tetra (const TetraCL* newtet);
 
     const LocalP2CL<>&          locls  () const { return locls_; }
     const LocalP2CL<Point3DCL>& loc_gh () const { return loc_gh_; }
@@ -139,7 +122,7 @@ class QuaQuaMapperCL
 
 void compute_tetra_neighborhoods (const DROPS::MultiGridCL& mg, const VecDescCL& lsetPhi, const BndDataCL<>& lsetbnd, const PrincipalLatticeCL& lat, TetraToTetrasT& tetra_neighborhoods);
 
-
+/// XXX Refactor to deal with patches that have more than 1 facet!
 /// (btet, b) must equal quaqua.base_point( &tet, xb).
 double abs_det (const TetraCL& tet, const BaryCoordCL& xb,
                 const TetraCL& btet, const BaryCoordCL& b, const QuaQuaMapperCL& quaqua, const SurfacePatchCL& p);

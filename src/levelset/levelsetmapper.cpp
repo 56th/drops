@@ -29,6 +29,24 @@
 namespace DROPS
 {
 
+void base_point_newton_cacheCL::set_tetra (const TetraCL* newtet)
+{
+    if (tet == newtet)
+        return;
+
+    tet= newtet;
+
+    locls_.assign( *tet, ls_);
+    loc_gh_.assign( *tet, ls_grad_rec_);
+
+    SMatrixCL<3,3> T( Uninitialized);
+    double dummy;
+    GetTrafoTr( T, dummy, *tet);
+    P2DiscCL::GetGradients( gradp2_, gradrefp2_, T);
+
+    w2b_.assign( *tet);
+}
+
 // Return a tetra from neighborhood that contains v up to precision eps in barycentric coordinates.
 // Returns 0 on failure.
 void enclosing_tetra (const Point3DCL& v, const TetraSetT& neighborhood, double eps, const TetraCL*& tetra, BaryCoordCL& bary)
