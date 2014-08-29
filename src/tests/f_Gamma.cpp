@@ -673,19 +673,6 @@ void VarObliqueLaplaceBeltrami2AccuCL::visit_mapped_P2 (const TetraCL& t)
         if (std::fabs( qalpha[i]) == 0.)
             qalpha[i]= 1.;
 
-    GridFunctionCL<SMatrixCL<3,3> > Winv( cdata.qdom.vertex_size());
-    QRDecompCL<3,3> qr;
-    SVectorCL<3> tmp;
-    for (Uint i= 0; i < cdata.qdom.vertex_size(); ++i) {
-        gradient_trafo( t, cdata.qdom.vertex_begin()[i], cdata.quaqua, cdata.surf, qr.GetMatrix());
-        qr.prepare_solve();
-        for (Uint j= 0; j < 3; ++j) {
-            tmp= std_basis<3>( j + 1);
-            qr.Solve( tmp);
-            Winv[i].col( j, tmp);
-        }
-    }
-
     GridFunctionCL<Point3DCL> qgradi( qdom.vertex_size());
     if (use_linear_subsampling_) {
         for (int i= 0; i < 10; ++i) {
@@ -695,7 +682,20 @@ void VarObliqueLaplaceBeltrami2AccuCL::visit_mapped_P2 (const TetraCL& t)
         }
     }
     else {
-        cdata.surf.compute_normals( t);
+        if (cdata.surf.normal_empty())
+            cdata.surf.compute_normals( t);
+        GridFunctionCL<SMatrixCL<3,3> > Winv( cdata.qdom.vertex_size());
+        QRDecompCL<3,3> qr;
+        SVectorCL<3> tmp;
+        for (Uint i= 0; i < cdata.qdom.vertex_size(); ++i) {
+            gradient_trafo( t, cdata.qdom.vertex_begin()[i], cdata.quaqua, cdata.surf, qr.GetMatrix());
+            qr.prepare_solve();
+            for (Uint j= 0; j < 3; ++j) {
+                tmp= std_basis<3>( j + 1);
+                qr.Solve( tmp);
+                Winv[i].col( j, tmp);
+            }
+        }
         resize_and_scatter_piecewise_normal( cdata.surf, cdata.qdom, qnl);
         for (int i= 0; i < 10; ++i) {
             evaluate_on_vertexes ( grad_[i], cdata.qdom, Addr( qgradi));
@@ -847,8 +847,12 @@ void AccumulateBndIntegral (LevelsetP2CL& lset, const PrincipalLatticeCL& lat, V
     if (P.get<std::string>( "SurfTens.TestFunction") == "exp_test_function")
         accu.set_test_function( &exp_test_function);
     if (P.get<std::string>( "Exp.ComparisonSource") == "ObliqueLBVar3") {
+        const Uint subsampling= std::ceil( std::pow( 2., 1.25*lvl));
+//         const Uint subsampling= 1u << (lvl == 0 ? 0 : lvl - 1);
+//         const Uint subsampling= 1u << lvl;
+        std::cout << "ObliqueLBVar3: subsampling: " << subsampling << ".\n";
         accu.use_linear_subsampling( true);
-        cdatap2.set_lattice( PrincipalLatticeCL::instance(1u << (lvl == 0 ? 0 : lvl - 1)));
+        cdatap2.set_lattice( PrincipalLatticeCL::instance( subsampling));
     }
     accus.push_back( &accu);
     accumulate( accus, lset.GetMG(), lvl, lset.Phi.RowIdx->GetMatchingFunction(), lset.Phi.RowIdx->GetBndInfo());
@@ -949,7 +953,7 @@ void Compare_Oblique_Coarse (DROPS::AdapTriangCL&, InstatStokes2PhaseP2P1CL& Sto
         SSORPcCL pc;
         typedef PCGSolverCL<SSORPcCL> PCG_SsorCL;
 //         PCG_SsorCL cg( pc, 1000, 1e-14);
-        PCG_SsorCL cg( pc, 1000, 1e-10);
+        PCG_SsorCL cg( pc, 1000, 1e-7);
         cg.Solve( MA, MA_inv_d, d, vidx->GetEx());
         std::cout << cg.GetIter() << " iter,\tresid = " << cg.GetResid();
         const double sup2= std::sqrt(dot( MA_inv_d, d));
