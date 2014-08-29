@@ -238,27 +238,27 @@ void QuaQuaMapperCL::base_point (const TetraCL*& tet, BaryCoordCL& xb) const
 
 void QuaQuaMapperCL::jacobian (const TetraCL& tet, const BaryCoordCL& xb, const TetraCL& btet, const BaryCoordCL& b, SMatrixCL<3,3>& dph) const
 {
+    cache_.set_tetra( &btet);
+
     // Evaluate the quasi normal field in b.
-    LocalP2CL<Point3DCL> loc_gh( btet, ls_grad_rec);
+    const LocalP2CL<Point3DCL>& loc_gh= cache_.loc_gh();
     const Point3DCL gh= loc_gh( b);
     const Point3DCL q_n= gh/gh.norm();
 
     // Evaluate the normal to the interface in b.
     Point3DCL n;
-    LocalP2CL<> locls( btet, ls);
-    LocalP1CL<Point3DCL> gradp2[10];
-    SMatrixCL<3,3> T;
-    double dummy;
-    GetTrafoTr( T, dummy, btet);
-    P2DiscCL::GetGradients( gradp2, gradrefp2, T);
-    for (Uint i= 0; i < 10; ++i)
-        n+= locls[i]*gradp2[i]( b);
+    const LocalP2CL<>& locls= cache_.locls();
+    Point3DCL gradp2_b[10];
+    for (Uint i= 0; i < 10; ++i) {
+        gradp2_b[i]= cache_.gradp2( i)( b);
+        n+= locls[i]*gradp2_b[i];
+    }
     n/= n.norm();
 
     // Evaluate the Jacobian of the quasi-normal field in b: dn_h= 1/|G_h| P dG_h.
     SMatrixCL<3,3> dgh;
     for (Uint i= 0; i < 10; ++i)
-        dgh+= outer_product( loc_gh[i], gradp2[i]( b));
+        dgh+= outer_product( loc_gh[i], gradp2_b[i]);
     const SMatrixCL<3,3> dn= 1./gh.norm()*(dgh - outer_product( q_n, transp_mul( dgh, q_n)));
 
     // Compute Q.
