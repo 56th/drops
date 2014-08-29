@@ -159,6 +159,7 @@ class InterfaceCommonDataP2CL : public TetraAccumulatorCL
     const BndDataCL<>* lsetbnd; // boundary data for the level set function
 
     const PrincipalLatticeCL* lat;
+    bool compute_absdet_;
 
   public:
     /// common data @{
@@ -185,6 +186,8 @@ class InterfaceCommonDataP2CL : public TetraAccumulatorCL
     }
 
     bool empty () const { return surf.empty(); }
+
+    void compute_absdet (bool b) { compute_absdet_= b; }
 
     void set_lattice (const PrincipalLatticeCL& newlat) {
         lat= &newlat;
@@ -214,7 +217,8 @@ class InterfaceCommonDataP2CL : public TetraAccumulatorCL
         make_CompositeQuad5Domain2D ( qdom, surf, t);
         qdom_projected.clear();
         qdom_projected.reserve( qdom.vertex_size());
-        absdet.resize( qdom.vertex_size());
+        if (compute_absdet_)
+            absdet.resize( qdom.vertex_size());
         const TetraCL* tet;
         BaryCoordCL b;
         QuadDomain2DCL::const_vertex_iterator v= qdom.vertex_begin();
@@ -223,13 +227,11 @@ class InterfaceCommonDataP2CL : public TetraAccumulatorCL
             b= *v;
             quaqua.base_point( tet, b);
             qdom_projected.push_back( std::make_pair( tet, b));
-            try { // Ignore very small triangles by setting absdet to 0.
+            if (compute_absdet_) {
                 absdet[i]= abs_det( t, *v, *tet, b, quaqua, surf);
-            } catch (const DROPSErrCL&) {
-//               t.DebugInfo( std::cerr);
-                absdet[i]= 0.; // Implied by absdet.resize above the loop...
+//                 if (absdet[i] == 0.)
+//                     t.DebugInfo( std::cerr);
             }
-
         }
     }
 
