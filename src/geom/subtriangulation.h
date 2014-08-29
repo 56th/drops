@@ -314,12 +314,16 @@ class SPatchCL
     const_world_vertex_iterator world_vertex_begin () const { return world_vertexes_.begin(); }
     const_world_vertex_iterator world_vertex_end   () const { return world_vertexes_.end(); }
 
+    bool absdets_empty () const { return absdets_.empty(); }
+    void compute_absdets (const WorldBodyT& wb) const;
+    const_absdet_iterator absdet_begin () const { return absdets_.begin(); }
+    const_absdet_iterator absdet_end   () const { return absdets_.end(); }
+
     bool normal_empty () const { return normals_.empty(); }
+    // Also computes absdets.
     void compute_normals (const WorldBodyT& wb) const;
     const_normal_iterator normal_begin () const { return normals_.begin(); }
     const_normal_iterator normal_end   () const { return normals_.end(); }
-    const_absdet_iterator absdet_begin () const { return absdets_.begin(); }
-    const_absdet_iterator absdet_end   () const { return absdets_.end(); }
 
 #   pragma GCC diagnostic ignored "-Wnon-template-friend"
     friend void write_paraview_vtu (std::ostream&, const SPatchCL<Dim>&);

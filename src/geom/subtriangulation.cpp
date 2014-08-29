@@ -124,6 +124,7 @@ void
 SPatchCL<Dim>::compute_world_vertexes (const WorldBodyT& wb) const
 {
     world_vertexes_.clear();
+    world_vertexes_.reserve( vertexes_.size());
     VertexToWorldVertexMapperT mapper( wb);
     std::transform( vertexes_.begin(), vertexes_.end(), std::back_inserter<WorldVertexContT>( world_vertexes_), mapper);
 }
@@ -166,6 +167,34 @@ SPatchCL<Dim>::compute_normals (const WorldBodyT& wb) const
 ///\brief explicit instantiations for 3D and 4D
 template void SPatchCL<3>::compute_normals (const WorldBodyT& wb) const;
 template void SPatchCL<4>::compute_normals (const WorldBodyT& wb) const;
+
+/// \brief Defined in the cpp-file to avoid a dependency on geom/simplex.h of the header subtriangulation.h.
+template <Uint Dim>
+void
+SPatchCL<Dim>::compute_absdets (const WorldBodyT& wb) const
+{
+    absdets_.clear();
+    if (world_vertex_empty())
+        compute_world_vertexes( wb);
+
+    QRDecompCL<Dim, Dim - 1> qr;
+    SMatrixCL<Dim, Dim - 1>& M= qr.GetMatrix();
+    WorldVertexT tmp( Uninitialized);
+    for (const_facet_iterator fit= facet_begin(); fit != facet_end(); ++fit) {
+        for (Uint i= 1; i < Dim; ++i)
+            M.col( i - 1, world_vertexes_[fit[0][i]] - world_vertexes_[fit[0][0]]);
+        if (!qr.prepare_solve( /*assume_full_rank*/ false)) { // prepare_solve returns true, iff M is rank-deficient.
+            absdets_.push_back( std::fabs( qr.Determinant_R()));
+        }
+        else {
+            absdets_.push_back( 0.);
+        }
+    }
+}
+
+///\brief explicit instantiations for 3D and 4D
+template void SPatchCL<3>::compute_absdets (const WorldBodyT& wb) const;
+template void SPatchCL<4>::compute_absdets (const WorldBodyT& wb) const;
 
 
 void
