@@ -39,6 +39,7 @@
 #include "surfactant/ifacetransp.h"
 #include <fstream>
 #include <sstream>
+#include <sys/resource.h>
 
 
 DROPS::ParamCL P;
@@ -1153,6 +1154,9 @@ int main (int argc, char** argv)
     else
         Compare_Oblique( adap, prob, lset, P.get<std::string>( "Exp.ComparisonSource"), P.get<std::string>( "Exp.ComparisonTarget"));
 
+    rusage usage;
+    getrusage( RUSAGE_SELF, &usage);
+    printf( "ru_maxrss: %li kB.\n", usage.ru_maxrss);
     return 0;
   }
   catch (DROPS::DROPSErrCL& err) { err.handle(); }
