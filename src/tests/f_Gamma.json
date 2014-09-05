@@ -64,7 +64,8 @@
 	{
 		"SurfTension":		1,
 		"UseMappedFESpace":	false,
-		"TestFunction":		"" // "exp_test_function", ""
+		"TestFunction":		"", // "exp_test_function", ""
+		"UseMatrixTension":	true
 	},
 
 	"Domain":

@@ -55,6 +55,25 @@ double sigmaf( const DROPS::Point3DCL& p, double)
     return 1 + std::cos( 2.*M_PI*p[0]);
 }
 
+DROPS::SMatrixCL<3,3> sigmaf_matrix( const DROPS::Point3DCL& p, double)
+{
+    using namespace DROPS;
+    SMatrixCL<3,3> ret;
+    const double normp= p.norm();
+    if (normp == 0.)
+        return ret;
+
+    const double tau= sigmaf( p, 0.);
+    const SMatrixCL<3,3> P= eye<3,3>() - outer_product( p/normp, p/normp);
+    SMatrixCL<3,3> M1;
+    M1( 0, 0)= std::sin( 2.*M_PI*p[1]);
+    M1( 0, 1)= 2.*std::sin( M_PI*p[1]);
+    M1( 1, 0)= std::cos( 3.*M_PI*p[2]);
+    M1( 1, 1)= std::cos( M_PI*p[2]);
+    M1( 2, 2)= -1.;
+    return tau*P*M1*P;
+}
+
 /*
 double DistanceFct( const DROPS::Point3DCL& p)
 { // cube
@@ -575,6 +594,9 @@ class VarObliqueLaplaceBeltrami2AccuCL : public SurfTensAccumulatorCL
     SMatrixCL<3, 3> T_;
     GridFunctionCL<double> qsigma;
 
+    instat_matrix_fun_ptr sigmaf_matrix;
+    GridFunctionCL< SMatrixCL<3,3> > qsigma_matrix;
+
     double area;
 
     bool use_mapped_fe_space_;
@@ -590,13 +612,14 @@ class VarObliqueLaplaceBeltrami2AccuCL : public SurfTensAccumulatorCL
 
   public:
     VarObliqueLaplaceBeltrami2AccuCL (const LevelsetP2CL& ls, VecDescCL& f_Gamma, const SurfaceTensionCL& sf, const InterfaceCommonDataP2CL& cdata, const VecDescCL& nt, const DROPS_STD_UNORDERED_MAP<const TetraCL*, QuadDomain2DCL>& qmap, bool use_mapped_fe_space)
-     : SurfTensAccumulatorCL( ls, f_Gamma), sf_( sf), cdata_( cdata), qmap_( qmap), nt_( nt), use_mapped_fe_space_( use_mapped_fe_space), use_linear_subsampling_( false), test_fun( 0)
+     : SurfTensAccumulatorCL( ls, f_Gamma), sf_( sf), cdata_( cdata), qmap_( qmap), nt_( nt), sigmaf_matrix( 0), use_mapped_fe_space_( use_mapped_fe_space), use_linear_subsampling_( false), test_fun( 0)
     {
         P2DiscCL::GetGradientsOnRef( gradref_);
     }
 
     void set_test_function (instat_matrix_fun_ptr f) { test_fun= f; }
     void use_linear_subsampling (bool use) { use_linear_subsampling_= use; }
+    void set_matrix_tension (instat_matrix_fun_ptr p) { sigmaf_matrix= p; }
 
     void begin_accumulation () {
         f.Data= 0.;
@@ -709,14 +732,30 @@ void VarObliqueLaplaceBeltrami2AccuCL::visit_mapped_P2 (const TetraCL& t)
         }
     }
 
-    qsigma.resize( qdom.vertex_size());
-    evaluate_on_vertexes( sf_.GetSigma(), qdom_projected, /*time*/ 0., Addr( qsigma)); // interfacial tension
+    if (!sigmaf_matrix) {
+        qsigma.resize( qdom.vertex_size());
+        evaluate_on_vertexes( sf_.GetSigma(), qdom_projected, /*time*/ 0., Addr( qsigma)); // interfacial tension
+    }
+    else {
+        qsigma_matrix.resize( qdom.vertex_size());
+        evaluate_on_vertexes( sigmaf_matrix, qdom_projected, /*time*/ 0., Addr( qsigma_matrix)); // interfacial tension
+    }
+    if (!use_linear_subsampling_) {
+        if (!sigmaf_matrix)
+            qsigma*= cdata.absdet;
+        else
+            for (Uint i= 0; i < qsigma_matrix.size(); ++i)
+                qsigma_matrix[i]*= cdata.absdet[i];
+    }
 
     n_.assign_indices_only( t, *f.RowIdx);
-    if (!use_linear_subsampling_)
-        qsigma*= cdata.absdet;
-    for (Uint i= 0; i < 10; ++i)
-        add_to_global_vector( f.Data, -quad_2D( qsigma*w_[i], qdom), n_.num[i]);
+
+    if (!sigmaf_matrix) 
+        for (Uint i= 0; i < 10; ++i)
+            add_to_global_vector( f.Data, -quad_2D( qsigma*w_[i], qdom), n_.num[i]);
+    else
+        for (Uint i= 0; i < 10; ++i)
+            add_to_global_vector( f.Data, -quad_2D( qsigma_matrix*w_[i], qdom), n_.num[i]);
 }
 
 void VarObliqueLaplaceBeltrami2AccuCL::visit_P2 (const TetraCL& t)
@@ -849,6 +888,8 @@ void AccumulateBndIntegral (LevelsetP2CL& lset, const PrincipalLatticeCL& lat, V
     VarObliqueLaplaceBeltrami2AccuCL accu( lset, f_Gamma, lset.GetSF(), cdatap2, nt, hoqdom_accu.qmap, P.get<bool>( "SurfTens.UseMappedFESpace"));
     if (P.get<std::string>( "SurfTens.TestFunction") == "exp_test_function")
         accu.set_test_function( &exp_test_function);
+    if (P.get<bool>( "SurfTens.UseMatrixTension") == true)
+        accu.set_matrix_tension( &sigmaf_matrix);
     if (P.get<std::string>( "Exp.ComparisonSource") == "ObliqueLBVar3") {
         const Uint subsampling= std::ceil( P.get<double>( "Exp.SubsamplingFactor")*std::pow( 2., P.get<double>( "Exp.SubsamplingExponent")*lvl));
 //         const Uint subsampling= 1u << (lvl == 0 ? 0 : lvl - 1);
