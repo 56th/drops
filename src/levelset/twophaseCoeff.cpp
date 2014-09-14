@@ -640,6 +640,20 @@ namespace contactangle{
 		double theta= int(r/P.get<DROPS::Point3DCL>("Exp.RadDrop")[0]/5.0)%2==0?1:-1;
 		return P.get<double>("SpeBnd.contactangle")/180.0*M_PI*(1+0.5*theta);
 	}
+	double PatternAngle1(const DROPS::Point3DCL& pt,double)
+		{
+			DROPS::Point3DCL pt1(pt-P.get<DROPS::Point3DCL>("SpeBnd.posDrop"));
+			double angl=P.get<double>("SpeBnd.contactangle")/180.0*M_PI;
+			return pt1[0]*pt1[2]<0?angl:M_PI-angl;
+		}
+	double PatternAngle2(const DROPS::Point3DCL& pt,double)
+		{
+			DROPS::Point3DCL pt1(pt-P.get<DROPS::Point3DCL>("SpeBnd.posDrop"));
+			double r=std::sqrt(pt1[0]*pt1[0]+pt1[2]*pt1[2]);
+			double theta=r<0.001? 0: (pt1[2]>0? std::acos(pt1[0]/r)/M_PI*180 : 360 - std::acos(pt1[0]/r)/M_PI*180);
+			double angl=P.get<double>("SpeBnd.contactangle")/180.0*M_PI;
+			return (int(theta)/60)%2==0?angl:M_PI-angl;
+		}
 	DROPS::Point3DCL OutNormalBottomPlane(const DROPS::Point3DCL&,double)
 	{
 		DROPS::Point3DCL outnormal(0.0);
@@ -685,6 +699,8 @@ namespace contactangle{
 	static DROPS::RegisterScalarFunction regconstangle("ConstantAngle", ConstantAngle);
 	static DROPS::RegisterScalarFunction regperangle("PeriodicAngle", PeriodicAngle);
 	static DROPS::RegisterScalarFunction regpatangle("PatternAngle", PatternAngle);
+	static DROPS::RegisterScalarFunction regpatangle1("PatternAngle1", PatternAngle1);
+	static DROPS::RegisterScalarFunction regpatangle2("PatternAngle2", PatternAngle2);
 	static DROPS::RegisterVectorFunction regunitbottomoutnomal("OutNormalBottomPlane", OutNormalBottomPlane);
 	static DROPS::RegisterVectorFunction regunitcubicoutnomal("OutNormalBrick", OutNormalBrick);
 }
