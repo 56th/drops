@@ -31,6 +31,7 @@
 #include "num/precond.h"
 #include "levelset/coupling.h"
 #include "levelset/adaptriang.h"
+#include "levelset/marking_strategy.h"
 #include "levelset/levelsetmapper.h"
 #include "misc/params.h"
 #include "levelset/surfacetension.h"
@@ -1150,13 +1151,13 @@ int main (int argc, char** argv)
 
     std::auto_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P.get_child( "Domain")));
     DROPS::MultiGridCL mg( *builder);
-    DROPS::AdapTriangCL adap(
-        mg,
-        P.get<double>("AdaptRef.Width"),
-        P.get<int>("AdaptRef.CoarsestLevel"),
-        P.get<int>("AdaptRef.FinestLevel")
-    );
-    adap.MakeInitialTriang( DistanceFct);
+    typedef DROPS::DistMarkingStrategyCL MarkerT;
+    MarkerT InitialMarker( DistanceFct,
+                           P.get<double>("AdaptRef.Width"),
+                           P.get<double>("AdaptRef.CoarsestLevel"), P.get<double>("AdaptRef.FinestLevel") );
+
+    DROPS::AdapTriangCL adap( mg, &InitialMarker);
+    adap.MakeInitialTriang();
 
     DROPS::SurfaceTensionCL sf( sigmaf);
     DROPS::LsetBndDataCL lsbnd( 0);

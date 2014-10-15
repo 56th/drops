@@ -282,7 +282,7 @@ void Strategy(PoissonCL& Poisson)
     std::cout << line << "Choose the poisson solver...\n";
     timer.Reset();
     // type of preconditioner and solver
-    PoissonSolverFactoryCL<> factory( P, Poisson.idx);
+    PoissonSolverFactoryCL<> factory( P.get_child("Poisson"), Poisson.idx);
     PoissonSolverBaseCL* solver = factory.CreatePoissonSolver();
 
     if ( factory.GetProlongation() != 0)

@@ -640,9 +640,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     using namespace DROPS;
 
     if (P.get<std::string>("Exp.Levelset") == std::string( "AxisScalingLset"))
-        adap.MakeInitialTriang( axis_scaling_lset_ini);
-    else
-        adap.MakeInitialTriang( the_lset_fun);
+        dynamic_cast<DistMarkingStrategyCL*>( adap.get_marking_strategy())->SetDistFct( axis_scaling_lset_ini);
 
     lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
     lset.Phi.SetIdx( &lset.idx);
@@ -709,6 +707,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     BndDataCL<> ifbnd( 0);
     std::cout << "initial surfactant on \\Gamma: " << Integral_Gamma( mg, lset.Phi, lset.GetBndData(), make_P1Eval(  mg, ifbnd, timedisc.ic)) << '\n';
 
+    dynamic_cast<DistMarkingStrategyCL*>( adap.get_marking_strategy())->SetDistFct( lset);
     for (int step= 1; step <= P.get<int>("Time.NumSteps"); ++step) {
         std::cout << "======================================================== step " << step << ":\n";
         ScopeTimerCL timer( "Strategy: Time-loop");
@@ -760,7 +759,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
         //if (C.rpm_Freq && step%C.rpm_Freq==0) { // reparam levelset function
             // lset.ReparamFastMarching( C.rpm_Method);
         const bool doGridMod= P.get<int>("AdaptRef.Freq") && step%P.get<int>("AdaptRef.Freq") == 0;
-        const bool gridChanged= doGridMod ? adap.UpdateTriang( lset) : false;
+        const bool gridChanged= doGridMod ? adap.UpdateTriang() : false;
         if (gridChanged) {
             std::cout << "Triangulation changed.\n";
             vidx.DeleteNumbering( mg);
@@ -789,7 +788,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
 
 void StationaryStrategyP1 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::LevelsetP2CL& lset)
 {
-    adap.MakeInitialTriang( the_lset_fun);
+    adap.MakeInitialTriang();
 
     lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
     lset.Phi.SetIdx( &lset.idx);
@@ -1044,7 +1043,7 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
 void StationaryStrategyP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::LevelsetP2CL& lset)
 {
     // Initialize level set and triangulation
-    adap.MakeInitialTriang( the_lset_fun);
+    adap.MakeInitialTriang();
     lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
     lset.Phi.SetIdx( &lset.idx);
     // LinearLSInit( mg, lset.Phi, &the_lset_fun);
@@ -1194,8 +1193,11 @@ int main (int argc, char* argv[])
     std::cout << "Setting up domain:\n";
     std::auto_ptr<MGBuilderCL> builder( make_MGBuilder( P.get_child( "Domain")));
     DROPS::MultiGridCL mg( *builder);
-    DROPS::AdapTriangCL adap( mg, P.get<double>("AdaptRef.Width"),
-                              P.get<int>("AdaptRef.CoarsestLevel"), P.get<int>("AdaptRef.FinestLevel"));
+    typedef DistMarkingStrategyCL MarkerT;
+    MarkerT marker( the_lset_fun, P.get<double>( "AdaptRef.Width"),
+                    P.get<int>( "AdaptRef.CoarsestLevel"), P.get<int>( "AdaptRef.FinestLevel"));
+
+    DROPS::AdapTriangCL adap( mg, &marker);
 
     // DROPS::LevelsetP2CL lset( mg, lsbnd, sf);
     DROPS::LevelsetP2CL& lset( *LevelsetP2CL::Create( mg, lsbnd, sf, P.get_child("Levelset")) );

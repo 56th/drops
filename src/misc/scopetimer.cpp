@@ -150,10 +150,11 @@ private:
                  fprintf(stderr, "    %38s [%2d](%4ld) :: %12.3f - %12.3f, avg: %12.3f\n",
                        it->first.c_str(), i, it->second.lCall, mintime, maxtime, avgtime);
 #else
-               fprintf(stderr, "    %38s [%2d](%4ld) :: %12.3f\n",
-                       it->first.c_str(), i, it->second.lCall, it->second.dTime);
+               fprintf(stderr, "    %38s [%2d](%4ld) :: %12.3f | %12.12f\n",
+                       it->first.c_str(), i, it->second.lCall, it->second.dTime, it->second.dTime/it->second.lCall);
         
 #endif
+
             }
          }
       }

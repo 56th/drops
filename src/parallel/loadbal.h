@@ -40,10 +40,10 @@ namespace DROPS{
 
 /// \brief Class for performing a load balancing step that consists of determining
 ///        a decomposition of tetrahedra and migrate the tetrahedra.
-/** This class makes intensive use of the class \ref DetermineDecompositionCL to 
-    determine a decomposition. Right now, the Triangulation- and Two-hase grap, 
+/** This class makes intensive use of the class \ref PartitioningCL to
+    determine a partitioning. Right now, the Triangulation- and Two-phase graph,
     see Diss. Fortmeier
-    As Partitioners, ParMetis, Zoltan and Scotch are available. All choices to 
+    As Partitioners, ParMetis, Zoltan and Scotch are available. All choices to
     determine a partitioning are explained in detail at \ref DetermineDecompositionCL_make.
 */
 class LoadBalCL
@@ -51,19 +51,19 @@ class LoadBalCL
   private:
     MultiGridCL*             mg_;           ///< Pointer to the multigrid
     int                      TriLevel_;     ///< Triangulation level, on which the LoadBalance should be made, normally set to LastTriangLevel (static for HandlerGather)
-    int                      method_;       ///< method used to determine a decomposition, see DetermineDecompositionCL::make for a detailed description
+    int                      method_;       ///< method used to determine a decomposition, see PartitioningCL::make for a detailed description
     const VecDescCL*         lset_;         ///< Eventually use information about interface for loadbalancing
     const BndDataCL<>*       lsetbnd_;      ///< Eventually use information about interface for loadbalancing
     int                      rho_I_;        ///< weight factor of intersected tetrahedra
     size_t                   movedNodes_;   ///< number of multi nodes which are transferred during the migration
 
-    /// \brief Migrate the tetrahedra according the decomposition
-    void Migrate( const DetermineDecompositionCL&);
+    /// \brief Migrate the tetrahedra according to the decomposition
+    void Migrate( const PartitioningCL&);
 
   public:
     /// \brief Constructor
     LoadBalCL(MultiGridCL& mg, int TriLevel=-1, int method=1011)
-        : mg_( &mg), TriLevel_( TriLevel), 
+        : mg_( &mg), TriLevel_( TriLevel),
           method_(method), lset_(0), lsetbnd_(0), rho_I_(11)
     {}
     /// \brief Destructor
@@ -77,12 +77,12 @@ class LoadBalCL
     void SetMethod( const int method)
         { method_= method; }
     /// \brief Set level set, so the two-phase graph model can be used
-    void SetLset( const VecDescCL& lset, const BndDataCL<>& lsetbnd, const int rho_I=11) 
+    void SetLset( const VecDescCL& lset, const BndDataCL<>& lsetbnd, const int rho_I=11)
         { rho_I_= rho_I; lset_=&lset; lsetbnd_=&lsetbnd; }
     //@}
 
-    /// \brief Get the number of moved multinodes
-    size_t GetMovedMultiNodes() const { return movedNodes_; }
+    /// \brief Get the number of moved multi nodes
+    size_t GetNumMovedMultiNodes() const { return movedNodes_; }
 
     /// \name Get the MultiGrid
     //@{

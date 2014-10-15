@@ -176,7 +176,7 @@ void collect_streams (IStreamT& recv, InterfaceCL::CollectDataT& collect)
 {
     GeomIdCL gid;
 
-    while (recv >> gid) {
+    while ((recv >> gid).good()) {
         RefMPIistreamCL gid_data( 0, 0, recv.isBinary());
         recv >> gid_data;
         collect[gid].append( gid_data.begin(), gid_data.end());
@@ -383,38 +383,23 @@ class ModifyCL::CommToUpdateHandlerCL
   public:
     CommToUpdateHandlerCL( ModifyCL& mod) : mod_(mod) {}
 
-    bool Gather( const TransferableCL& t, SendStreamCL& os)
+    bool Gather( const TransferableCL& t, SendStreamCL& )
     {
         const Usint dim= t.GetDim();
-        ModifyCL::UpdateListT& ul= mod_.entsToUpdt_[dim];
-        ModifyCL::UpdateIterator it= ul.find( &t);
-        if (it==ul.end())
-            return false;
-        if (dim==GetDim<TetraCL>()) { // tetra: write SimplexTransferInfoCL::UpdateSubs_
-            const bool updateSubs= it->second.UpdateSubs();
-            os << updateSubs;
-            const int remoteProc= (++(it->second.GetRemoteData().GetProcListBegin()))->proc, // only called for distributed objects, so there are 2 tetras
-                postRemote= it->second.WillBeOnProc(remoteProc) ? remoteProc : -1;
-            os << postRemote;
-        }
-        return true;
+        ModifyCL::UpdateListT&   ul = mod_.entsToUpdt_[dim];
+        ModifyCL::UpdateIterator it = ul.find( &t);
+
+        return it != ul.end();
     }
 
-    bool Scatter( TransferableCL& t, const size_t numData, MPIistreamCL& is)
+    bool Scatter( TransferableCL& t, const size_t, MPIistreamCL& )
     {
-        const Usint dim= t.GetDim();
+        const Usint dim = t.GetDim();
         if (dim==GetDim<TetraCL>()) { // tetra
-            bool updateSubs= false, upSubs, transferHere= false;
-            int postproc;
-            for (size_t i=0; i<numData; ++i) {
-                is >> upSubs >> postproc;
-                updateSubs= updateSubs || upSubs;
-                transferHere= transferHere || postproc==ProcCL::MyRank(); // some remote will transfer tetra to me
-            }
             ModifyCL::UpdateListT& ul= mod_.entsToUpdt_[dim];
             ModifyCL::UpdateIterator it= ul.find( &t);
             if (it==ul.end()) { // not already in update list
-                it= mod_.AddSimplexToUpdate( dim, &t, updateSubs);
+                it= mod_.AddSimplexToUpdate( dim, &t, false );
                 // add (local proc,local prio) to update list, otherwise local Ma/Gh copy will be lost
                 it->second.AddProc( ProcCL::MyRank(), t.GetPrio());
             }

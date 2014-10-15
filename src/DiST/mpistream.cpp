@@ -125,14 +125,12 @@ std::streamsize MPIrefbufCL::xsputnb(const char_type* p, std::streamsize n)
 
 MPIostreamCL& operator<< (MPIostreamCL& os, const GeomIdCL& h)
 {
-    return os.isBinary() ? os.write( reinterpret_cast<const char*>( &h), sizeof( GeomIdCL))
-                         : os << h.level << h.bary << h.dim;
+    return os << h.level << h.bary << h.dim;
 }
 
 MPIistreamCL& operator>> (MPIistreamCL& is, GeomIdCL& h)
 {
-    return is.isBinary() ? is.read( reinterpret_cast<char*>( &h), sizeof( GeomIdCL))
-                         : is >> h.level >> h.bary >> h.dim;
+    return is >> h.level >> h.bary >> h.dim;
 }
 
 

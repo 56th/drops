@@ -150,7 +150,7 @@ class VertexCL
     Uint                     Level_ : 8;      ///< level, where the vertex occurs first. In parallel mode, the level is stored by the base class
 #endif
     IdCL<VertexCL>           Id_;             ///< id of the vertex on this proc
-    std::vector<BndPointCL>* BndVerts_;       ///< Parameterdarstellung dieses Knotens auf evtl. mehreren Randsegmenten
+    std::vector<BndPointCL>* BndVerts_;       ///< parametrization for each boundary segment the vertex is part of
     RecycleBinCL*            Bin_;            ///< recycle-bin
     mutable bool             RemoveMark_;     ///< flag, if this vertex should be removed
 

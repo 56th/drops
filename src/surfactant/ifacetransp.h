@@ -55,6 +55,21 @@ template <class LocalMatrixT>
   void
   update_global_matrix (MatrixBuilderCL& M, const LocalMatrixT& loc, const IdxT* numr, const IdxT* numc);
 
+/// \brief The routine sets up the mass-matrix in matM on the interface defined by ls.
+///        It belongs to the FE induced by standard P1-elements.
+void SetupInterfaceMassP1 (const MultiGridCL& MG, MatDescCL* mat, const VecDescCL& ls, const BndDataCL<>& lsetbnd, double alpha= 1.);
+
+/// \brief The routine sets up the mass-matrix in matM on the interface defined by ls.
+///        The FE spaces associated with rows and columns can be mixed among P1 and P1X.
+///        The jumping coefficient \a alpha is defined w.r.t. the positive(0) and negative(1) part of the domain. If omitted, \a alpha is assumed to be 1 on the whole domain.
+void SetupInterfaceMassP1X (const MultiGridCL& MG, MatDescCL* mat, const VecDescCL& ls, const BndDataCL<>& lsetbnd, const double alpha[2]= 0);
+
+/// \brief The routine equips the matrices with the right FE spaces \a mass_idx and \a surf_idx and
+///        sets up the ad/de-sorption terms for coupled mass/surfactant transport.
+///        The jumping coefficients \a k_a, \a k_d are defined w.r.t. the positive(0) and negative(1) part of the domain.
+void SetupInterfaceSorptionP1X (const MultiGridCL& MG, const VecDescCL& ls, const BndDataCL<>& lsetbnd,
+        MatDescCL* R, MatDescCL* C, MatDescCL* R_i, MatDescCL* C_i, const IdxDescCL* mass_idx, const IdxDescCL* surf_idx, const double k_a[2], const double k_d[2]);
+
 /// \brief Copies P1IF_FE-unknown-indices or P2IF_FE-indices from idx on s into Numb.
 /// Non-existent dofs get NoIdx.
 void GetLocalNumbInterface(IdxT* Numb, const TetraCL& s, const IdxDescCL& idx);
@@ -70,7 +85,7 @@ template <Uint Dim>
 
 /// \brief The routine sets up the mass-matrix in matM on the interface defined by ls.
 ///        It belongs to the FE induced by standard P1-elements.
-void SetupInterfaceMassP1 (const MultiGridCL& mg, MatDescCL* matM, const VecDescCL& ls, const BndDataCL<>& lsetbnd);
+void SetupInterfaceMassP1 (const MultiGridCL& mg, MatDescCL* matM, const VecDescCL& ls, const BndDataCL<>& lsetbnd, double alpha);
 
 /// \brief The routine sets up the mixed mass-matrix on the interface given by ls: The rows belong
 ///        to the new timestep, the columns to the old timestep. It belongs to the FE induced by
@@ -481,6 +496,7 @@ class LocalInterfaceMassP1CL
   private:
     std::valarray<double> q[4];
     QuadDomain2DCL qdom;
+    double alpha_;
 
   public:
     static const FiniteElementT row_fe_type= P1IF_FE,
@@ -495,9 +511,11 @@ class LocalInterfaceMassP1CL
         for (int i= 0; i < 4; ++i) {
             coup[i][i]= quad_2D( q[i]*q[i], qdom);
             for(int j= 0; j < i; ++j)
-                coup[i][j]= coup[j][i]= quad_2D( q[j]*q[i], qdom);
+                coup[i][j]= coup[j][i]= alpha_*quad_2D( q[j]*q[i], qdom);
         }
     }
+
+    LocalInterfaceMassP1CL (double alpha= 1.) : alpha_( alpha) {}
 };
 
 
@@ -858,7 +876,7 @@ class SurfactantP1BaseCL
 
     GSPcCL                  pc_;
     GMResSolverCL<GSPcCL>   gm_;
-    __UNUSED__ double omit_bound_; ///< not used atm
+    double omit_bound_; ///< not used atm
 
   public:
     SurfactantP1BaseCL (MultiGridCL& mg,

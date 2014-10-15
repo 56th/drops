@@ -50,7 +50,7 @@ void TransportP1XCL::Init (instat_scalar_fun_ptr cn, instat_scalar_fun_ptr cp, d
 
     DROPS_FOR_TRIANG_VERTEX( MG_, lvl, it) {
         if (it->Unknowns.Exist( ctidx)){
-           bool nPart = lset_.Data[it->Unknowns( lset_.RowIdx->GetIdx())] <= 0.;
+            bool nPart = lset_.Data[it->Unknowns( lset_.RowIdx->GetIdx())] <= 0.;
             if (nPart)
                 ct.Data[it->Unknowns( ctidx)]= H_*cn( it->GetCoord(), t);
             else
@@ -149,7 +149,8 @@ double TransportP1XCL::MeanDropConcentration()
 }
 
 
-double TransportP1XCL::CheckSolution(instat_scalar_fun_ptr Lsgn, instat_scalar_fun_ptr Lsgp, double time)
+double TransportP1XCL::CheckSolution(instat_scalar_fun_ptr Lsgn, instat_scalar_fun_ptr Lsgp,
+        instat_vector_fun_ptr Gradn, instat_vector_fun_ptr Gradp, double time)
 {
     VecDescCL cn (&idx);
     GetSolutionOnPart(cn, false, false);
@@ -158,24 +159,29 @@ double TransportP1XCL::CheckSolution(instat_scalar_fun_ptr Lsgn, instat_scalar_f
 
     double errl2p = 0, errl2n = 0;
     double errl1p = 0, errl1n = 0;
+    double errh1p = 0, errh1n = 0;
     InterfaceTetraCL patch;
 
     LocalP2CL<double> ones( 1.);
+    Point3DCL G[4];  // gradients of P1 basis functions
+
     std::cout << "Difference to exact solution:" << std::endl;
 
     const Uint lvl= ct.GetLevel();
+
+    typedef Quad5CL<> QuadT;
+    typedef Quad5CL<Point3DCL> QuadVecT;
     DROPS_FOR_TRIANG_TETRA( MG_, lvl, it)
     {
-        LocalP2CL<double> lp2_soln (*it, Lsgn, time);
-        LocalP2CL<double> lp2_solp (*it, Lsgp, time);
         LocalP1CL<double> lp1_p (*it, cp, Bnd_);
-        LocalP2CL<double> lp2_p (lp1_p);
         LocalP1CL<double> lp1_n (*it, cn, Bnd_);
-        LocalP2CL<double> lp2_n (lp1_n);
+        LocalP1CL<double> lp1_psol (*it, Lsgp);
+        LocalP1CL<double> lp1_nsol (*it, Lsgn);
         SMatrixCL<3,3> M;
         double det;
         GetTrafoTr(M,det,*it);
         double absdet= std::fabs(det);
+        P1DiscCL::GetGradients( G, M);
         patch.Init( *it, lset_,0.);
         if (patch.Intersects()){
           patch.ComputeSubTets();
@@ -184,22 +190,31 @@ double TransportP1XCL::CheckSolution(instat_scalar_fun_ptr Lsgn, instat_scalar_f
           {
             bool pPart = (k>=patch.GetNumNegTetra());
             const SArrayCL<BaryCoordCL,4>& T =patch.GetTetra(k);
-            BaryCoordCL* nodes = Quad3CL<>::TransformNodes(T);
-            Quad3CL<> q3_sol = Quad3CL<>(pPart?lp2_solp : lp2_soln, nodes);
-            Quad3CL<> q3_dsol = Quad3CL<>(pPart? lp2_p : lp2_n, nodes);
-            Quad3CL<> q3_diff; q3_diff = q3_dsol - q3_sol;
-            Quad3CL<> q3_diff2; q3_diff2 = q3_diff * q3_diff;
-            Quad3CL<> q3_diffabs; q3_diffabs = std::abs(q3_dsol - q3_sol);
+            BaryCoordCL* nodes = QuadT::TransformNodes(T);
+            QuadT q_sol= QuadT( *it, pPart ? Lsgp : Lsgn, time, nodes);
+            QuadT q_dsol= QuadT(pPart? lp1_p : lp1_n, nodes);
+            QuadT q_diff(q_dsol - q_sol);
+            QuadT q_diff2(q_diff * q_diff);
+            QuadT q_diffabs( std::abs(q_diff));
+            const LocalP1CL<>& P1( pPart? lp1_p : lp1_n);
+            Point3DCL grad;
+            for (int i=0; i<4; ++i)
+                grad+= P1[i]*G[i];
+            QuadVecT q_gradSol( *it, pPart ? Gradp : Gradn, time, nodes),
+                    q_grad( grad),
+                    q_diffGrad( q_grad - q_gradSol);
+            QuadT q_diffGrad2( dot( q_diffGrad, q_diffGrad));
 
             double Vol = absdet*VolFrac(T);
-            if (pPart)
-              errl2p += q3_diff2.quad(Vol);
-            else
-              errl2n += q3_diff2.quad(Vol);
-            if (pPart)
-              errl1p += q3_diffabs.quad(Vol);
-            else
-              errl1n += q3_diffabs.quad(Vol);
+            if (pPart) {
+              errl2p += q_diff2.quad(Vol);
+              errl1p += q_diffabs.quad(Vol);
+              errh1p += q_diffGrad2.quad(Vol);
+            } else {
+              errl2n += q_diff2.quad(Vol);
+              errl1n += q_diffabs.quad(Vol);
+              errh1n += q_diffGrad2.quad(Vol);
+            }
             delete nodes;
           }
 
@@ -207,29 +222,43 @@ double TransportP1XCL::CheckSolution(instat_scalar_fun_ptr Lsgn, instat_scalar_f
         else
         {
           bool pPart= (patch.GetSign( 0) == 1);
-          Quad3CL<> q3_sol = Quad3CL<>(pPart?lp2_solp : lp2_soln);
-          Quad3CL<> q3_dsol = Quad3CL<>(pPart? lp2_p : lp2_n);
-          Quad3CL<> q3_diff; q3_diff = q3_dsol - q3_sol;
-          Quad3CL<> q3_diff2; q3_diff2 = q3_diff * q3_diff;
-          Quad3CL<> q3_diffabs; q3_diffabs = std::abs(q3_dsol - q3_sol);
-          if (pPart)
-            errl2p += q3_diff2.quad(absdet);
-          else
-            errl2n += q3_diff2.quad(absdet);
-          if (pPart)
-            errl1p += q3_diffabs.quad(absdet);
-          else
-            errl1n += q3_diffabs.quad(absdet);
+          QuadT q_sol= QuadT( *it, pPart ? Lsgp : Lsgn, time);
+          QuadT q_dsol= QuadT(pPart? lp1_p : lp1_n);
+          QuadT q_diff(q_dsol - q_sol);
+          QuadT q_diff2(q_diff * q_diff);
+          QuadT q_diffabs( std::abs(q_diff));
+          const LocalP1CL<>& P1( pPart? lp1_p : lp1_n);
+          Point3DCL grad;
+          for (int i=0; i<4; ++i)
+              grad+= P1[i]*G[i];
+          QuadVecT q_gradSol( *it, pPart ? Gradp : Gradn, time),
+                  q_grad( grad),
+                  q_diffGrad( q_grad - q_gradSol);
+          QuadT q_diffGrad2( dot( q_diffGrad, q_diffGrad));
+
+          if (pPart) {
+            errl2p += q_diff2.quad(absdet);
+            errl1p += q_diffabs.quad(absdet);
+            errh1p += q_diffGrad2.quad(absdet);
+          } else {
+            errl2n += q_diff2.quad(absdet);
+            errl1n += q_diffabs.quad(absdet);
+            errh1n += q_diffGrad2.quad(absdet);
+          }
         }
     }
-    double errl2 = std::sqrt(errl2n + errl2p);
-    double errl1 = (errl1n + errl1p);
-    std::cout << "errl2p = " << std::sqrt(errl2p) << "\t";
-    std::cout << "errl2n = " << std::sqrt(errl2n) << "\t";
-    std::cout << "errl2  = " << errl2 << std::endl;
-    std::cout << "errl1p = " << errl1p << "\t";
-    std::cout << "errl1n = " << errl1n << "\t";
-    std::cout << "errl1  = " << errl1 << std::endl;
+    const double errl2 = std::sqrt(errl2n + errl2p);
+    const double errl1 = errl1n + errl1p;
+    const double errh1 = std::sqrt(errl2n + errl2p + errh1n + errh1p);
+    std::cout << "errL2p = " << std::sqrt(errl2p) << "\t";
+    std::cout << "errL2n = " << std::sqrt(errl2n) << "\t";
+    std::cout << "errL2  = " << errl2 << std::endl;
+    std::cout << "errL1p = " << errl1p << "\t";
+    std::cout << "errL1n = " << errl1n << "\t";
+    std::cout << "errL1  = " << errl1 << std::endl;
+    std::cout << "errH1p = " << std::sqrt(errh1p) << "\t";
+    std::cout << "errH1n = " << std::sqrt(errh1n) << "\t";
+    std::cout << "errH1  = " << errh1 << std::endl;
     return errl2;
 }
 
@@ -455,6 +484,13 @@ void TransportP1XCL::SetupInstatSystem(MatrixCL& matA, VecDescCL *cplA,
                             A( xidx_i, xidx_j)+= sign[j]? elmats.A_n[i][j]: elmats.A_p[i][j];
                             C( xidx_i, xidx_j)+= sign[j]? elmats.C_n[i][j]: elmats.C_p[i][j];
                         }
+                    } else if (cplM !=0) {
+                        if (xidx_i!=NoIdx){
+                            const double val= Bndt_.GetBndFun( n.bndnum[j])( sit->GetVertex( j)->GetCoord(), time);
+                            cplM->Data[xidx_i]-= (sign[i]? -elmats.M_n[i][j]: elmats.M_p[i][j])*val;
+                            cplA->Data[xidx_i]-= (sign[i]? -elmats.A_n[i][j]: elmats.A_p[i][j])*val;
+                            cplC->Data[xidx_i]-= (sign[i]? -elmats.C_n[i][j]: elmats.C_p[i][j])*val;
+                        }
                     }
                 if((xidx_i!=NoIdx) && (b!=0))
                     b->Data[xidx_i] +=sign[i] ?  - elvecs.f_n[i] :elvecs.f_p[i];
@@ -478,6 +514,10 @@ void TransportP1XCL::SetupInstatSystem (MLMatDescCL& matA, VecDescCL& cplA,
     MLMatrixCL::iterator itC = --matC.Data.end();
     MLIdxDescCL::iterator it = --matA.RowIdx->end();
     SetupInstatSystem (*itA, &cplA, *itM, &cplM, *itC, &cplC, &b, *it, time);
+    --itA;
+    --itM;
+    --itC;
+    --it;
     for (size_t num= 1; num < matA.Data.size(); ++num, --itA, --itM, --itC, --it)
         SetupInstatSystem (*itA, 0, *itM, 0, *itC, 0, 0, *it, time);
 }

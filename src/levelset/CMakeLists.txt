@@ -1,6 +1,6 @@
 set(HOME levelset)
 
-libs(coupling levelset levelsetmapper fastmarch surfacetension twophaseutils)
+libs(coupling levelset levelsetmapper fastmarch surfacetension twophaseutils marking_strategy adaptriang)
 
 target_link_libraries(levelset-levelset levelset-fastmarch misc-progressaccu misc-scopetimer)
 
@@ -29,13 +29,13 @@ exec_ser(reparam levelset-fastmarch levelset-levelset misc-progressaccu misc-sco
 exec_ser(lsshear geom-boundary geom-builder geom-simplex geom-multigrid geom-deformation num-unknowns geom-topo num-fe misc-problem levelset-levelset misc-progressaccu misc-scopetimer misc-utils out-output num-discretize levelset-fastmarch num-fe out-ensightOut stokes-instatstokes2phase navstokes-instatnavstokes2phase num-MGsolver num-interfacePatch levelset-surfacetension levelset-coupling misc-funcmap geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature num-renumber)
 
 #set(prJump-staticlibs ${BEGIN_STATIC_LIBS} misc-scalarFunctions misc-vectorFunctions ${END_STATIC_LIBS})
-exec_ser(prJump geom-boundary geom-builder geom-simplex geom-multigrid geom-deformation num-unknowns geom-topo num-fe misc-problem levelset-levelset misc-progressaccu misc-scopetimer misc-utils out-output num-discretize misc-params levelset-fastmarch stokes-instatstokes2phase num-MGsolver num-fe  out-ensightOut num-oseenprecond num-interfacePatch levelset-surfacetension levelset-coupling misc-funcmap geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature num-renumber misc-dynamicload)
+exec_ser(prJump geom-boundary geom-builder geom-simplex geom-multigrid geom-deformation num-unknowns geom-topo num-fe misc-problem levelset-levelset misc-progressaccu misc-scopetimer misc-utils out-output num-discretize misc-params levelset-fastmarch levelset-adaptriang levelset-marking_strategy stokes-instatstokes2phase num-MGsolver num-fe out-ensightOut out-vtkOut num-oseenprecond num-interfacePatch levelset-surfacetension levelset-coupling misc-funcmap geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature num-renumber misc-dynamicload)
 # convention: make sure that those coefficient-defining shared objects are built which ared used in the default configuration of the executable..
 if(NOT MPI)
 add_dependencies(prJump levelset-twophaseCoeff misc-scalarFunctions misc-vectorFunctions)
 endif(NOT MPI)
 
-exec_ser(film geom-boundary geom-builder geom-deformation geom-simplex geom-multigrid num-unknowns geom-topo num-fe misc-problem levelset-levelset misc-progressaccu misc-scopetimer misc-utils out-output num-discretize navstokes-instatnavstokes2phase misc-params levelset-fastmarch stokes-instatstokes2phase num-MGsolver num-fe out-ensightOut out-vtkOut num-oseenprecond num-interfacePatch levelset-surfacetension levelset-coupling misc-funcmap geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature num-renumber misc-dynamicload)
+exec_ser(film geom-boundary geom-builder geom-deformation geom-simplex geom-multigrid num-unknowns geom-topo num-fe misc-problem levelset-levelset levelset-adaptriang levelset-marking_strategy misc-progressaccu misc-scopetimer misc-utils out-output num-discretize navstokes-instatnavstokes2phase misc-params levelset-fastmarch stokes-instatstokes2phase num-MGsolver num-fe out-ensightOut out-vtkOut num-oseenprecond num-interfacePatch levelset-surfacetension levelset-coupling misc-funcmap geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature num-renumber misc-dynamicload)
 # convention: make sure that those coefficient-defining shared objects are built which ared used in the default configuration of the executable..
 if(NOT MPI)
 add_dependencies(film levelset-filmCoeff misc-scalarFunctions misc-vectorFunctions)
@@ -47,6 +47,8 @@ if(NOT MPI)
 add_dependencies(brick_transp misc-scalarFunctions misc-vectorFunctions levelset-twophaseCoeff)
 endif(NOT MPI)
 
-exec(twophasedrops geom-boundary geom-builder geom-deformation geom-simplex geom-multigrid num-unknowns geom-topo num-fe misc-problem levelset-levelset misc-progressaccu misc-scopetimer misc-utils out-output num-discretize navstokes-instatnavstokes2phase misc-params levelset-fastmarch stokes-instatstokes2phase num-MGsolver num-fe out-ensightOut num-oseenprecond poisson-transport2phase num-interfacePatch surfactant-ifacetransp levelset-surfacetension geom-geomselect levelset-twophaseutils num-hypre levelset-coupling misc-funcmap geom-principallattice geom-reftetracut geom-subtriangulation num-renumber num-quadrature misc-dynamicload out-vtkOut)
+exec(twophasedrops geom-boundary geom-builder geom-deformation geom-simplex geom-multigrid num-unknowns geom-topo num-fe misc-problem levelset-levelset levelset-adaptriang levelset-marking_strategy misc-progressaccu misc-scopetimer misc-utils out-output num-discretize navstokes-instatnavstokes2phase misc-params levelset-fastmarch stokes-instatstokes2phase num-MGsolver num-fe out-ensightOut num-oseenprecond poisson-transport2phase num-interfacePatch surfactant-ifacetransp levelset-surfacetension geom-geomselect levelset-twophaseutils num-hypre levelset-coupling misc-funcmap geom-principallattice geom-reftetracut geom-subtriangulation num-renumber num-quadrature misc-dynamicload out-vtkOut)
 # convention: makethose coefficient-defining shared objects are built which ared used in the default configuration of the executable..
 add_dependencies(twophasedrops levelset-twophaseCoeff misc-scalarFunctions misc-vectorFunctions misc-csgFunctions)
+
+add_my_custom_targets(levelset)

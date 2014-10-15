@@ -25,6 +25,59 @@
 #include "misc/funcmap.h"
 #include "misc/params.h"
 
+double Special (const DROPS::Point3DCL& p, double )
+{
+    extern DROPS::ParamCL P;
+    static DROPS::Point3DCL x0 = P.get<DROPS::Point3DCL>("Exp.PosDrop");
+    static DROPS::Point3DCL shift = P.get<DROPS::Point3DCL>("Exp.Shift");
+    static double R = P.get<DROPS::Point3DCL>("Exp.RadDrop")[0];
+    const double r = 0.05;
+    DROPS::Point3DCL X = p-x0-shift;
+
+    DROPS::Point3DCL Y(std::abs(X[0]),std::abs(X[1]),std::abs(X[2]));
+    
+    int order[3];
+    for (int i = 0; i < 3; ++i)
+        order[i] = i;
+
+    if (Y[order[0]] < Y[order[1]])
+        std::swap(order[0],order[1]);
+
+    if (Y[order[1]] < Y[order[2]])
+        std::swap(order[1],order[2]);
+
+    if (Y[order[0]] < Y[order[1]])
+        std::swap(order[0],order[1]);
+
+    //cnt: how many are outsider inner(st) box
+    int cnt = 0;
+    for (int i = 0; i < 3; ++i)
+    {
+        if (Y[i] > R - r) cnt++;;
+    }
+
+    if (cnt <= 1)
+    {
+        return Y[order[0]] - R;
+    }
+    else if (cnt == 2)
+    {
+        double rx = Y[order[0]] - (R - r);
+        double ry = Y[order[1]] - (R - r);
+        return std::sqrt(rx*rx+ry*ry) - r;
+    }
+    else
+    {
+        double rx = Y[order[0]] - (R - r);
+        double ry = Y[order[1]] - (R - r);
+        double rz = Y[order[2]] - (R - r);
+        return std::sqrt(rx*rx+ry*ry+rz*rz) - r;
+    }
+
+}
+
+static DROPS::RegisterScalarFunction regsca_special("Special", Special);
+
 double Initialcneg (const DROPS::Point3DCL& , double )
 {
     extern DROPS::ParamCL P;

@@ -2,13 +2,14 @@
 # path to external libraries
 ##########################################################################
 set(PARMETIS_HOME "${CMAKE_SOURCE_DIR}/../parmetis-4.0.2" CACHE PATH "")
-set(METIS_HOME "${CMAKE_SOURCE_DIR}/../metis-5.0.2" CACHE PATH "")
+set(METIS_HOME "${CMAKE_SOURCE_DIR}/../parmetis-4.0.2/metis" CACHE PATH "")
 set(ZOLTAN_HOME "${CMAKE_SOURCE_DIR}/../Zoltan_v3.2" CACHE PATH "")
 set(HYPRE_HOME "${CMAKE_SOURCE_DIR}/../hypre-2.0.0" CACHE PATH "")
 set(SCOTCH_HOME "${CMAKE_SOURCE_DIR}/../scotch_5.1.8a" CACHE PATH "")
 set(SUITESPARSE_HOME "${CMAKE_SOURCE_DIR}/../SuiteSparse" CACHE PATH "")
 
 set(BOOST_HOME "" CACHE PATH "")
+set(MKL_HOME "" CACHE PATH "")
 
 set(DROPS_BUILD_TYPE "" CACHE STRING "")
 

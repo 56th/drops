@@ -644,9 +644,8 @@ void LevelsetP2ContCL::UpdateDiscontinuous( ) { ; }
 
 // setting inital values for level set function in case of continuous P2 FE
 // via interpolation
-void LevelsetP2ContCL::Init( instat_scalar_fun_ptr phi0)
+void LevelsetP2ContCL::Init( instat_scalar_fun_ptr phi0, double t)
 {   
-    double t= 0.;
     const Uint lvl= Phi.GetLevel(),
                idx= Phi.RowIdx->GetIdx();
 
@@ -711,7 +710,7 @@ void LevelsetP2DiscontCL::ProjectContinuousToDiscontinuous()
 
 // setting inital values for level set function in case of discontinuous P2 FE
 // via elementwise L2-projection
-void LevelsetP2DiscontCL::InitProjection( instat_scalar_fun_ptr phi0)
+void LevelsetP2DiscontCL::InitProjection( instat_scalar_fun_ptr phi0, double t)
 {
 // local mass matrix and its QR decomposition are computet on reference element only
     Uint idx_num = idx.GetIdx();
@@ -738,7 +737,7 @@ void LevelsetP2DiscontCL::InitProjection( instat_scalar_fun_ptr phi0)
     DROPS_FOR_TRIANG_TETRA(MG_,lvl,sit)
     {
         Uint first = sit->Unknowns(idx_num);
-        Quad5CL<> f_q5(*sit, phi0);
+        Quad5CL<> f_q5(*sit, phi0, t);
         for(int i=0; i<10; ++i)
             sol[i] = Quad5CL<>(f_q5*lp2q[i]).quad(1.0);
         localmass.Solve(sol);
@@ -751,9 +750,8 @@ void LevelsetP2DiscontCL::InitProjection( instat_scalar_fun_ptr phi0)
 
 }
 
-void LevelsetP2DiscontCL::Init( instat_scalar_fun_ptr phi0)
+void LevelsetP2DiscontCL::Init( instat_scalar_fun_ptr phi0, double t)
 {
-    double t= 0.;
     Uint idx_num = idx.GetIdx();
     Uint lvl = idx.TriangLevel();
     SVectorCL<10> sol;

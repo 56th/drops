@@ -2041,7 +2041,7 @@ void FileBuilderCL::BuildFacesII(MultiGridCL* mgp) const
                 it->second.UpdateOwner(loadOfProc);
 }
 
-void FileBuilderCL::build_ser_impl(MultiGridCL* mgp) const
+void FileBuilderCL::build(MultiGridCL* mgp) const
 {
     AppendLevel(mgp);
     factory_ = new SimplexFactoryCL( this->GetVertices(mgp), this->GetEdges(mgp), this->GetFaces(mgp), this->GetTetras(mgp));

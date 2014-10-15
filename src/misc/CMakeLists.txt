@@ -19,3 +19,5 @@ if(NOT WIN32)
     target_link_libraries(misc-vectorFunctions)
     target_link_libraries(misc-csgFunctions misc-params geom-csg)
 endif(NOT WIN32)
+
+add_my_custom_targets(misc)

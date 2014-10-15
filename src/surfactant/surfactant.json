@@ -35,7 +35,10 @@
 		"Freq":			0,
 		"Width":		10,
 		"CoarsestLevel":	0,
-		"FinestLevel":		3
+		"FinestLevel":		3,
+		"SD":			0.1,
+		"CurvDiff":		-1,
+                "Discontinuous":	0
 	},
 
 	"Exp": // experimental conditions

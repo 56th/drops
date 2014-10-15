@@ -33,6 +33,9 @@
 namespace DROPS
 {
 
+class IdxDescCL;
+class MultiGridCL;
+
 /// \brief Observer-base-class for the observer-pattern
 ///
 /// AdapTriangCL calls these methods around multigrid-changes. These can be used

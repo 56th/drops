@@ -533,7 +533,7 @@ void IdxDescCL::DeleteNumbering(MultiGridCL& MG)
 /// given index-description. NumUnknowns will be set to zero.
 {
     const Uint idxnum = GetIdx();    // idx is the index in UnknownIdxCL
-    const Uint level  = TriangLevel_;
+    const Uint level  = -1;          // last level
     NumUnknowns_ = 0;
 
     // delete memory allocated for indices

@@ -338,7 +338,7 @@ void LevelsetAccumulator_P2CL<DiscVelSolT>::visit (const TetraCL& t)
 
 /// \brief Accumulator to set up the matrices E and H for the discontinous P2 level set equation.
 /// takes care of volume integarls only
-/// creates SparseMatBuilder for E and H, but creates E only 
+/// creates SparseMatBuilder for E and H, but creates E only
 ///creating H is accomplished in the FaceAccumulator
 template<class DiscVelSolT>
 class LevelsetTetraAccumulator_P2DCL : public TetraAccumulatorCL
@@ -466,7 +466,7 @@ template<class DiscVelSolT>
 void LevelsetFaceAccumulator_P2DCL<DiscVelSolT>::begin_accumulation ()
 {
     // TetraAccumulator takes care of MatrixBuilder construction
-    Comment("entering LevelsetFaceAccumulator_P2DCL: " << allnum_unks << " levelset unknowns.\n", DebugDiscretizeC);
+    Comment("entering LevelsetFaceAccumulator_P2DCL: " << ls_.Phi.RowIdx->NumUnknowns() << " levelset unknowns.\n", DebugDiscretizeC);
     rhs_.SetIdx(ls_.Phi.RowIdx);
     rhs_.Data = 0. ;
 }
@@ -490,7 +490,7 @@ void LevelsetFaceAccumulator_P2DCL<DiscVelSolT>::visit (const FaceCL& face)
    \todo: implementation of other boundary conditions
 */
 {
-   
+
 // search for aligned tets of face
 // if only one tet is found we are on the boundary
    /* static int mycnt = 0;
@@ -498,7 +498,7 @@ void LevelsetFaceAccumulator_P2DCL<DiscVelSolT>::visit (const FaceCL& face)
     std::cout << "mycnt = " << mycnt << std::endl;
     std::cout << "&face= " << &face << std::endl;*/
 
-    const TetraCL* tets[2];    
+    const TetraCL* tets[2];
     Uint facnum[2];
     Uint cnt=0;
     for (int i = 0; i < 4; ++i)

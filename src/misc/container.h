@@ -89,8 +89,12 @@ template <class T, Uint _Size>
 typedef SVectorCL<2> Point2DCL;
 /// Stores 3D coordinates
 typedef SVectorCL<3> Point3DCL;
+/// Stores 4D coordinates
+typedef SVectorCL<4> Point4DCL;
 /// Stores barycentric coordinates
 typedef SVectorCL<4> BaryCoordCL;
+/// Stores barycentric coordinates of a space-time simplex (pentatope)
+typedef SVectorCL<5> STBaryCoordCL;
 
 /// Stores 4D coordinates
 typedef SVectorCL<4> Point4DCL;
@@ -255,6 +259,13 @@ class SVectorCL : public SArrayCL<double,_Size>
     SVectorCL()                                                             {}
     explicit           SVectorCL(InitStateT i)      : base_type( i)         {}
     explicit           SVectorCL(double val)        : base_type( val)       {}
+    // constructors for Point3D/Point4D/BaryCoordCL 
+    // (constructor throws Exception if number of arg. does not coincide with _Size)
+    explicit SVectorCL(double arg1, double arg2, double arg3);
+    explicit SVectorCL(double arg1, double arg2, double arg3, double arg4);
+    template<Uint _Size2>
+    explicit SVectorCL(SVectorCL<_Size2> arg1, double arg2);
+
     template<class In> explicit SVectorCL(In start) : base_type( start)     {}
     template<class In> SVectorCL(In start, In end)  : base_type( start,end) {}
 
@@ -270,6 +281,42 @@ class SVectorCL : public SArrayCL<double,_Size>
     double norm_sq() const;
     double norm()    const { return std::sqrt(norm_sq()); }
 };
+
+
+template <Uint _Size>
+template <Uint _Size2>
+inline SVectorCL<_Size>::SVectorCL(SVectorCL<_Size2> arg1, double arg2) : base_type( Uninitialized )
+{
+    if (_Size != _Size2+1) // <- this is optimized away
+    {
+        throw DROPSErrCL("SVectorCL-classes have wrong size for constructor");
+    }
+    for (Uint i = 0; i < _Size2; i++)
+        (*this)[i] = arg1[i];
+    (*this)[_Size2] = arg2;
+}
+
+template <Uint _Size>
+inline SVectorCL<_Size>::SVectorCL(double arg1, double arg2, double arg3) : base_type( Uninitialized )
+{
+    if (_Size != 3) // <- this is optimized away
+        throw DROPSErrCL("SVectorCL-class has wrong size for constructor, number of args : 3");
+    (*this)[0] = arg1;
+    (*this)[1] = arg2;
+    (*this)[2] = arg3;
+}
+
+template <Uint _Size>
+inline SVectorCL<_Size>::SVectorCL(double arg1, double arg2, double arg3, double arg4) : base_type( Uninitialized )
+{
+    if (_Size != 4) // <- this is optimized away
+        throw DROPSErrCL("SVectorCL-class has wrong size for constructor, number of args : 4");
+    (*this)[0] = arg1;
+    (*this)[1] = arg2;
+    (*this)[2] = arg3;
+    (*this)[3] = arg4;
+}
+
 
 
 template <Uint _Size>
@@ -470,6 +517,51 @@ cross_product(Point3DCL& res, const Point3DCL& v0, const Point3DCL& v1)
     res[2]= v0[0]*v1[1] - v0[1]*v1[0];
 }
 
+
+//taken from thesis hollasch
+inline void
+cross_product(Point4DCL& res, const Point4DCL& u, const Point4DCL& v, const Point4DCL& w)
+// res= X( v1, v2, v3); 
+{
+    const double a = v[0]*w[1]-v[1]*w[0];
+    const double b = v[0]*w[2]-v[2]*w[0];
+    const double c = v[0]*w[3]-v[3]*w[0];
+    const double d = v[1]*w[2]-v[2]*w[1];
+    const double e = v[1]*w[3]-v[3]*w[1];
+    const double f = v[2]*w[3]-v[3]*w[2];
+    res[0]=   u[1]*f - u[2]*e + u[3]*d;
+    res[1]= - u[0]*f + u[2]*c - u[3]*b;
+    res[2]=   u[0]*e - u[1]*c + u[3]*a;
+    res[3]= - u[0]*d + u[1]*b - u[2]*a;
+}
+
+//taken from thesis hollasch
+inline Point4DCL
+cross_product(const Point4DCL& u, const Point4DCL& v, const Point4DCL& w)
+// res= X( v1, v2, v3); 
+{
+    Point4DCL res;
+    cross_product(res,u,v,w);
+    return res;
+}
+
+
+inline double
+l2norm_of_3D_vector(Point4DCL & in)
+{
+    return std::sqrt(in[0]*in[0]+in[1]*in[1]+in[2]*in[2]);
+}
+
+template <Uint _Size>
+inline double
+normalize_l2norm(SVectorCL<_Size> & in)
+{
+    double ret = in.norm();
+    in /= ret;
+    return ret;
+}
+
+
 // std_basis<n>(0)==Null, std_basis<n>(i)[j]==Delta_i-1_j
 template <Uint _Size>
 inline SVectorCL<_Size> std_basis(Uint i)
@@ -532,6 +624,27 @@ inline std::ostream& operator<< (std::ostream& os, const STCoordCL& st)
     return os << st.x_bary << st.t_ref;
 }
 
+inline STBaryCoordCL
+MakeSTBaryCoord(double a, double b, double c, double d, double e)
+{
+    STBaryCoordCL ret( Uninitialized);
+    ret[0]= a; ret[1]= b; ret[2]= c; ret[3]= d; ret[4]= e;
+    return ret;
+}
+
+inline STBaryCoordCL
+MakeSTBaryCoord(const Point4DCL& p)
+{
+    STBaryCoordCL ret( Uninitialized);
+    ret[0]= 1-p[0]-p[1]-p[2]-p[3];
+    ret[1] = p[0];
+    ret[2] = p[1];
+    ret[3] = p[2];
+    ret[4] = p[3];
+    return ret;
+}
+
+
 inline BaryCoordCL
 MakeBaryCoord(double a, double b, double c, double d)
 {
@@ -540,10 +653,60 @@ MakeBaryCoord(double a, double b, double c, double d)
     return ret;
 }
 
-inline Point4DCL
-MakePoint4D (double a, double b, double c, double d)
+inline BaryCoordCL
+MakeBaryCoord(double a, double b, double c)
 {
-    return MakeBaryCoord(a, b, c, d);
+    BaryCoordCL ret( Uninitialized);
+    ret[0]= 1-a-b-c;
+    ret[1] = a;
+    ret[2] = b;
+    ret[3] = c;
+    return ret;
+}
+
+
+inline Point3DCL
+BaryToRefCoord(const BaryCoordCL & p)
+{
+    Point3DCL ret( Uninitialized);
+    ret[0]= p[1]; ret[1]= p[2]; ret[2]= p[3];
+    return ret;
+}
+
+inline Point3DCL
+RestrictToPoint3D(const Point4DCL & p)
+{
+    Point3DCL ret( Uninitialized);
+    ret[0]= p[0]; ret[1]= p[1]; ret[2]= p[2];
+    return ret;
+}
+
+inline BaryCoordCL
+MakeBaryCoord(const Point3DCL& p)
+{
+    BaryCoordCL ret( Uninitialized);
+    ret[0]= 1-p[0]-p[1]-p[2];
+    ret[1] = p[0];
+    ret[2] = p[1];
+    ret[3] = p[2];
+    return ret;
+}
+
+
+inline Point4DCL
+MakePoint4D(Point3DCL a, double d) /*deprecated*/
+{
+    Point4DCL ret( Uninitialized);
+    ret[0]= a[0]; ret[1]= a[1]; ret[2]= a[2]; ret[3]= d;
+    return ret;
+}
+
+inline Point4DCL
+MakePoint4D(double a, double b, double c, double d) /*deprecated*/
+{
+    Point4DCL ret( Uninitialized);
+    ret[0]= a; ret[1]= b; ret[2]= c; ret[3]= d;
+    return ret;
 }
 
 inline Point3DCL
@@ -811,6 +974,19 @@ operator*(const SMatrixCL<3, 3>& m, const SVectorCL<3>& v)
     ret[2]= a[6]*v[0] + a[7]*v[1] + a[8]*v[2];
     return ret;
 }
+
+inline SVectorCL<4>
+operator*(const SMatrixCL<4, 4>& m, const SVectorCL<4>& v)
+{
+    SVectorCL<4> ret( Uninitialized);
+    const double* const a= m.begin();
+    ret[0]=  a[0]*v[0] +  a[1]*v[1] +  a[2]*v[2] +  a[3]*v[3];
+    ret[1]=  a[4]*v[0] +  a[5]*v[1] +  a[6]*v[2] +  a[7]*v[3];
+    ret[2]=  a[8]*v[0] +  a[9]*v[1] + a[10]*v[2] + a[11]*v[3];
+    ret[3]= a[12]*v[0] + a[13]*v[1] + a[14]*v[2] + a[15]*v[3];
+    return ret;
+}
+
 
 template <Uint Rows, Uint Cols>
 double inner_prod(const SVectorCL<Rows>& v1, const SMatrixCL<Rows, Cols>& m, const SVectorCL<Cols>& v2)

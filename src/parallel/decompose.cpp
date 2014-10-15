@@ -1,6 +1,6 @@
 /// \file decompose.cpp
-/// \brief determining a decomposition of a distributed hierarchy of triangulations.
-/// \author LNM RWTH Aachen: ; SC RWTH Aachen: Oliver Fortmeier
+/// \brief determining a partitioning of a distributed hierarchy of triangulations.
+/// \author LNM RWTH Aachen: Patrick Esser, Sven Gross; SC RWTH Aachen: Oliver Fortmeier
 
 /*
  * This file is part of DROPS.
@@ -67,8 +67,17 @@ GraphCL::GraphCL()
 {}
 
 /** Determine the first vertex each process is responsible for. */
-void GraphCL::buildVtxDist( const graph_index_type num_vert)
+void GraphCL::buildVtxDist( graph_index_type num_vert)
 {
+    num_procs_w_verts_= 1;
+    if (num_vert==0) {
+        num_procs_w_verts_= 0;
+        // ParMetis does not allow procs without any graph vertex.
+        // As a work-around, in this case an artificial graph vertex with zero weight is added.
+        num_vert= 1;
+    }
+    num_procs_w_verts_= ProcCL::GlobalSum( num_procs_w_verts_);
+
     IndexArray verts= ProcCL::Gather(num_vert, -1);
     vtxdist_[0]=0;
     for ( int p=0; p<ProcCL::Size(); ++p)
@@ -76,13 +85,20 @@ void GraphCL::buildVtxDist( const graph_index_type num_vert)
 }
 
 
-/** Allocate memory to represent the graph given by the number of 
+/** Allocate memory to represent the graph given by the number of
     adjacencies and vertices.
     \param num_adj number of adjnacencies
     \param num_Vert number of vertices
 */
-void GraphCL::resize( const int num_adj, const int num_vert)
+void GraphCL::resize( int num_adj, int num_vert)
 {
+    if (num_adj==0) {
+        // ParMetis does not allow procs without any graph edge.
+        // As a work-around, in this case an artificial graph edge with zero weight is added, which connects graph vertex 0 with ithself.
+        num_adj= 1;
+    }
+    if (num_vert==0)
+        num_vert= 1;
     xadj_.resize( num_vert+1);
     adjncy_.resize( num_adj);
     vwgt_.resize( num_vert);
@@ -91,7 +107,7 @@ void GraphCL::resize( const int num_adj, const int num_vert)
 }
 
 
-// V E R T E X  W E I G H T E R S 
+// V E R T E X  W E I G H T E R S
 //-------------------------------
 
 /// \brief Class for weighting vertices. For more details about the weighting function, see Diss. Fortmeier
@@ -151,7 +167,7 @@ protected:
 public:
     /// \brief constructor that needs access to the level set fucntion
     VertexWeighterTwoPhaseCL( const Uint triang_level, const int factor, const VecDescCL& lset, const BndDataCL<>& lsetbnd)
-        : VertexWeighterTriangCL( triang_level), factor_(factor), 
+        : VertexWeighterTriangCL( triang_level), factor_(factor),
           lset_(lset), lsetbnd_(lsetbnd) {}
     /// \brief destructor
     ~VertexWeighterTwoPhaseCL() {}
@@ -165,7 +181,7 @@ bool VertexWeighterTwoPhaseCL::CheckForLsetUnk( const TetraCL& t) const
     const Uint idx= lset_.RowIdx->GetIdx();
     // check vertices
     for ( TetraCL::const_VertexPIterator sit=t.GetVertBegin(); sit!=t.GetVertEnd(); ++sit){
-        if ( !(*sit)->Unknowns.Exist(idx)) 
+        if ( !(*sit)->Unknowns.Exist(idx))
             return false;
     }
     // check edges
@@ -176,7 +192,7 @@ bool VertexWeighterTwoPhaseCL::CheckForLsetUnk( const TetraCL& t) const
     return true;
 }
 
-/** Determine the weight of a vertex by rho_I*num_intersected + num_nut_intersected children. 
+/** Determine the weight of a vertex by rho_I*num_intersected + num_nut_intersected children.
     \todo CHECK ME! (I cannot check this model, since no unknowns are working right now in DiST!
 */
 int VertexWeighterTwoPhaseCL::getWeight( const TetraCL& t) const
@@ -185,7 +201,7 @@ int VertexWeighterTwoPhaseCL::getWeight( const TetraCL& t) const
     int intersected=0, notintersected=0;    // number of intersected and not-intersected tetras
 
     if ( t.IsUnrefined()){                      // unrefined tetra
-        if ( CheckForLsetUnk(t)){               // only appply patch if level set unknowns are available
+        if ( CheckForLsetUnk(t)){               // only apply patch if level set unknowns are available
             patch.Init( t, lset_, lsetbnd_);
             if ( patch.Intersects())
                 intersected= 1;                 // increase number of intersected tetras
@@ -211,7 +227,7 @@ int VertexWeighterTwoPhaseCL::getWeight( const TetraCL& t) const
     return intersected*factor_+notintersected;  // compute the weight
 }
 
-// E D G E   W E I G H T E R S 
+// E D G E   W E I G H T E R S
 //----------------------------
 
 /// \brief Base class for weighting edges. This class weights each edge by 1
@@ -233,14 +249,14 @@ public:
     /// \brief destructor
     virtual ~EdgeWeighterCL() {}
     /// \brief Init the datastructures for a single vertex with a given ID
-    virtual void init( const graph_index_type myGlobalId) 
+    virtual void init( const graph_index_type myGlobalId)
         { adj_weight_.clear(); myid_= myGlobalId; }
     /// \brief Finalize the weighting process of a single vertex
     virtual void finalize() {}
-    /// \brief Get the weight that corresponds to a given neighbor 
+    /// \brief Get the weight that corresponds to a given neighbor
     int getWeight( graph_index_type globalNeighId) { return adj_weight_[ globalNeighId]; }
     /// \brief Update the neighbor list and the weight
-    virtual void update( graph_index_type globalNeighId, const FaceCL* const) 
+    virtual void update( graph_index_type globalNeighId, const FaceCL* const)
         { if ( globalNeighId!=myid_) adj_weight_[globalNeighId]= 1; }
     /// \name iterate over all neighbors
     //@{
@@ -249,7 +265,7 @@ public:
     //@}
 };
 
-/// \brief Weight the edges by the number of faces among the two tetrahedron families 
+/// \brief Weight the edges by the number of faces among the two tetrahedron families
 ///        represented by the two adjacent vertices
 class EdgeWeighterTriangCL : public EdgeWeighterCL
 {
@@ -263,11 +279,11 @@ public:
     void update( graph_index_type globalNeighId, __UNUSED__ const FaceCL* const fp)
     {
         Assert( !fp->IsRefined(), DROPSErrCL("EdgeWeighterTriangCL::update: Face must not be refined"), DebugLoadBalC);
-        if ( globalNeighId!=myid_) ++adj_weight_[globalNeighId]; 
+        if ( globalNeighId!=myid_) ++adj_weight_[globalNeighId];
     }
 };
 
-/// \brief Weight edges by the number of DoF located at the faces among the two tetrahedron families 
+/// \brief Weight edges by the number of DoF located at the faces among the two tetrahedron families
 ///        represented by the two adjacent vertices
 /** \todo Check me, if DOF handling works with DiST! */
 class EdgeWeighterDOFCL : public EdgeWeighterCL
@@ -280,8 +296,8 @@ protected:
 
 public:
     /// \brief constructor with a given set of dof that should be considered
-    EdgeWeighterDOFCL(const ObservedMigrateFECL& obs) 
-        : base() 
+    EdgeWeighterDOFCL(const ObservedMigrateFECL& obs)
+        : base()
     {
         ObservedMigrateFECL::const_iterator it= obs.begin();
         for ( ; it!=obs.end(); ++it)
@@ -300,9 +316,9 @@ public:
     void update( graph_index_type globalNeighId, const FaceCL* const fp);
 };
 
-/** Call this function before(!) call of getWeight. This function 
-    assumes the same number on unknowns---if exists--- on edges 
-    than on vertices. 
+/** Call this function before(!) call of getWeight. This function
+    assumes the same number on unknowns---if exists--- on edges
+    than on vertices.
 */
 void EdgeWeighterDOFCL::finalize()
 {
@@ -347,7 +363,7 @@ void EdgeWeighterDOFCL::update( graph_index_type globalNeighId, const FaceCL* co
 }
 
 
-// G R A P H  B U I L D E R S 
+// G R A P H  B U I L D E R S
 //---------------------------
 
 /// \brief Abstract base class for all graph builders
@@ -370,7 +386,7 @@ protected:
 public:
     /// \brief constructor
     BaseGraphBuilderCL( MultiGridCL& mg, Uint triang_level, const IdxDescCL& vIdx)
-        : mg_( mg), triang_level_( triang_level), vertexIdx_( vIdx), 
+        : mg_( mg), triang_level_( triang_level), vertexIdx_( vIdx),
           num_vert_(0),  my_first_vert_(0) {}
     /// \brief destrcutor
     virtual ~BaseGraphBuilderCL() {}
@@ -385,7 +401,7 @@ public:
     virtual BaseGraphCL const * getGraph() const { return 0; }
 };
 
-/** Make use of the index describer vertexIdx_ to assign a number to the
+/** Make use of the index description vertexIdx_ to assign a number to the
     tetrahedra, i.e., vertices of the graph
 */
 void BaseGraphBuilderCL::buildVertexNumbering()
@@ -411,14 +427,14 @@ void BaseGraphBuilderCL::buildVertexNumbering()
 class GraphBuilderCL : public BaseGraphBuilderCL
 {
 private:
-    class CommunicateAdjacencyCL;       ///< Interface communication class for communicating vertex numbers accross process boundaries
+    class CommunicateAdjacencyCL;       ///< Interface communication class for communicating vertex numbers across process boundaries
 
     GraphCL*         graph_;            ///< the graph to be build
     IdxDescCL        neighVertexIdx_;   ///< index describer, to store inter process neighbors on faces
     graph_index_type num_adj_;          ///< local number of adjacencies
-    
+
     /// \brief Communicate the local vertices among the processes
-    void buildVtxDist( const graph_index_type myVerts) 
+    void buildVtxDist( const graph_index_type myVerts)
         { getGraph()->buildVtxDist( myVerts); my_first_vert_= getGraph()->vtxdist()[ProcCL::MyRank()]; }
     /// \brief Get the index of storing neighbors on faces
     Uint getNeighVertexIdx() const { return neighVertexIdx_.GetIdx(); }
@@ -426,13 +442,13 @@ private:
     void determineNumberAdjacencies();
     /// \brief For a given tetrahedron, put the neighbors and the weights in the graph data structure
     void buildNeighbors( const TetraCL&, graph_index_type&, EdgeWeighterCL&);
-    /// \brief Fill the data into the graph data strcuture
+    /// \brief Fill the data into the graph data structure
     void buildVerticesAndEdges( VertexWeighterCL&, EdgeWeighterCL&);
 
 public:
     /// \brief constructor
     GraphBuilderCL( MultiGridCL& mg, Uint triang_level, const IdxDescCL& vIdx)
-        : BaseGraphBuilderCL( mg, triang_level, vIdx), 
+        : BaseGraphBuilderCL( mg, triang_level, vIdx),
           graph_( 0), neighVertexIdx_( P1D_FE), num_adj_(0) {}
 
     /// \brief build the graph
@@ -453,20 +469,20 @@ private:
 
 public:
     /// \brief constructor
-    CommunicateAdjacencyCL( GraphBuilderCL& gb, const IdxDescCL& neighVertIdx) 
+    CommunicateAdjacencyCL( GraphBuilderCL& gb, const IdxDescCL& neighVertIdx)
         : gb_(gb), neighVertexIdx_( neighVertIdx) {}
     /// \brief destructor
     ~CommunicateAdjacencyCL() {}
-    
+
     /// \brief Collect the adjacent vertex number on the sender side
     bool Gather( const DiST::TransferableCL& t, DiST::SendStreamCL& s)
     {
         FaceCL const * fp; simplex_cast( t, fp);   // transform t to a face
-        if ( !fp->IsInTriang( gb_.getTriangLevel())){ 
+        if ( !fp->IsInTriang( gb_.getTriangLevel())){
             return false;
         }
         TetraCL const * tp= fp->GetSomeTetra();
-        if ( tp->HasGhost()) 
+        if ( tp->HasGhost())
             tp= fp->GetNeighborTetra( tp);
         Assert( tp->Unknowns.Exist( gb_.getVertexIdx()), DROPSErrCL("CommunicateAdjacencyCL::Gather: Missing LB number"), DebugLoadBalC);
         s << gb_.getGlobalVertexId( *tp);
@@ -479,9 +495,9 @@ public:
         FaceCL * fp; simplex_cast( t, fp);   // transform t to a face
         graph_index_type remote_neigh;
         TetraCL const * tp= fp->GetSomeTetra();
-        if ( tp->HasGhost()) 
+        if ( tp->HasGhost())
             tp= fp->GetNeighborTetra( tp);
-        const graph_index_type local_lb= gb_.getGlobalVertexId(*tp);        
+        const graph_index_type local_lb= gb_.getGlobalVertexId(*tp);
 
         for ( size_t i=0; i<numData; ++i){
             r >> remote_neigh;
@@ -550,7 +566,7 @@ void GraphBuilderCL::determineNumberAdjacencies()
                             continue;
                         }
                         else if ( fp->IsOnProcBnd()){   // neighbor on other process, so it is stored on the face
-                            Assert( fp->Unknowns.Exist( getNeighVertexIdx()), DROPSErrCL("GraphBuilderCL::determineNumberAdjacencies: Adjacency accross process boundary not known"), DebugLoadBalC);
+                            Assert( fp->Unknowns.Exist( getNeighVertexIdx()), DROPSErrCL("GraphBuilderCL::determineNumberAdjacencies: Adjacency across process boundary not known"), DebugLoadBalC);
                             adj.insert( fp->Unknowns( getNeighVertexIdx()));
                         }
                         else{                           // local neighbor, so ask for the vertex number
@@ -582,7 +598,7 @@ void GraphBuilderCL::buildNeighbors( const TetraCL& t, graph_index_type& adj_cou
                 // get global id of the neighbor vertex
                 graph_index_type neigh_id= -1;
                 if ( fp->IsOnProcBnd()){                    // neighbor on other process, so the number is stored on the face
-                    Assert( fp->Unknowns.Exist( getNeighVertexIdx()), DROPSErrCL("GraphBuilderCL::buildNeighbors: (unref tetra) Adjacency accross process boundary not known"), DebugLoadBalC);
+                    Assert( fp->Unknowns.Exist( getNeighVertexIdx()), DROPSErrCL("GraphBuilderCL::buildNeighbors: (unref tetra) Adjacency across process boundary not known"), DebugLoadBalC);
                     neigh_id= fp->Unknowns( getNeighVertexIdx());
                 }
                 else{                                       // ask the local stored neighbor for the vertex number
@@ -605,7 +621,7 @@ void GraphBuilderCL::buildNeighbors( const TetraCL& t, graph_index_type& adj_cou
                         FaceCL const * fp = (*ch)->GetFace(face);
                         graph_index_type neigh_id= -1;
                         if ( fp->IsOnProcBnd()){
-                            Assert( fp->Unknowns.Exist( getNeighVertexIdx()), DROPSErrCL("GraphBuilderCL::buildNeighbors: (ref tetra) Adjacency accross process boundary not known"), DebugLoadBalC);
+                            Assert( fp->Unknowns.Exist( getNeighVertexIdx()), DROPSErrCL("GraphBuilderCL::buildNeighbors: (ref tetra) Adjacency across process boundary not known"), DebugLoadBalC);
                             neigh_id= fp->Unknowns( getNeighVertexIdx());
                         }
                         else {
@@ -631,7 +647,7 @@ void GraphBuilderCL::buildNeighbors( const TetraCL& t, graph_index_type& adj_cou
     }
 }
 
-/** Iterate over all vertices and put their weight and the neighbors in the 
+/** Iterate over all vertices and put their weight and the neighbors in the
     corresponding fields of the graph data structure.
 */
 void GraphBuilderCL::buildVerticesAndEdges( VertexWeighterCL& vw, EdgeWeighterCL& ew)
@@ -653,7 +669,7 @@ void GraphBuilderCL::build( BaseGraphCL*& graph, VertexWeighterCL& vw, EdgeWeigh
     graph= graph_;
     buildVertexNumbering();
     buildVtxDist( num_vert_);
-    CommunicateAdjacencyCL comm( *this, neighVertexIdx_); 
+    CommunicateAdjacencyCL comm( *this, neighVertexIdx_);
     comm.Call();
     determineNumberAdjacencies();
     getGraph()->resize( num_adj_, num_vert_);
@@ -671,7 +687,7 @@ void MetisPartitionerCL::doParallelPartition()
     graph_index_type wgtflag    = 3,                 // Weights on vertices and adjacencies are given
                      numflag    = 0,                 // numbering of verts starts by 0 (C-Style)
                      ncon       = 1,                 // number of conditions
-                     nparts     = ProcCL::Size(),    // number of subdomains (per proc one)
+                     nparts     = ProcCL::Size(),    // number of sub-domains (per proc one)
                      options[5] = {0,0,0,0,0};       // default options and no debug information
     graph_real_type  itr        = 1000.0,           // how much an exchange costs
                      ubvec      = 1.05;             // allowed imbalance
@@ -701,16 +717,14 @@ void MetisPartitionerCL::doParallelPartition()
 /** Graph is given on a single process. */
 void MetisPartitionerCL::doSerialPartition()
 {
-    const int me= ProcCL::MyRank();
-    if ( graph().vtxdist()[me+1]-graph().vtxdist()[me]==0)
-        return;
+    if ( !ProcCL::IamMaster()) return;
 
-    graph_index_type nparts     = ProcCL::Size(),             // number of subdomains (per proc one)
-                     n          = graph().get_num_verts(),    // number of vertices    
+    graph_index_type nparts     = ProcCL::Size(),             // number of sub-domains (per proc one)
+                     n          = graph().get_num_verts(),    // number of vertices
                      ncon       = 1,                          // number of conditions per vertex
                     *vsize      = 0;                          // default
     graph_index_type options[METIS_NOPTIONS];
-    METIS_SetDefaultOptions(options);    
+    METIS_SetDefaultOptions(options);
     graph_real_type    ubvec= 1.01;
     std::valarray<graph_real_type> tpwgts( 1.f/(graph_real_type)nparts, ProcCL::Size()*ncon);
 
@@ -735,44 +749,36 @@ void MetisPartitionerCL::doSerialPartition()
 /** Perform the graph partitioning. */
 void MetisPartitionerCL::doPartition()
 {
-    // Check if all processes store a part of the graph or only a master processes
-    int procs_owning_vertices=0;
-    for ( int p=0; p<ProcCL::Size(); ++p){
-        if ( graph().vtxdist()[p+1]-graph().vtxdist()[p] != 0)
-            ++procs_owning_vertices;
-    }
-    if ( procs_owning_vertices==1)
+    if ( graph().isSerial())
         doSerialPartition();
-    else if( procs_owning_vertices==ProcCL::Size())
-        doParallelPartition();
     else
-        printf("[%i]: MetisPartitionerCL::doPartition: At least one process does not store any vertex!\n", ProcCL::MyRank());
+        doParallelPartition();
 }
 
 
 
-/** Construct a class to determine a decomposition of a distributed triangulation 
-    hierarchy which is given by mg.
+/** Construct a class to determine a partitioning of a distributed triangulation
+    hierarchy which is given by \a mg.
     \param mg the parallel tetrahedral hierarchy
 */
-DetermineDecompositionCL::DetermineDecompositionCL( MultiGridCL& mg, int triang_level)
-    : graph_( 0), partitioner_(0), mg_(mg), 
+PartitioningCL::PartitioningCL( MultiGridCL& mg, int triang_level)
+    : graph_( 0), partitioner_(0), mg_(mg),
       triang_level_( triang_level<0 ? mg.GetLastLevel() : triang_level),
       vertexIdx_( P0_FE)
 {}
 
 /** Determine a decomposition. \anchor DetermineDecompositionCL_make
-    \param method this parameter specifies the strategy which is used to determine 
-           a decomposition. Therefore, four digits are used: P GT EW VW with
+    \param method this parameter specifies the strategy which is used to determine
+           a partitioning. Therefore, four digits are used: P GT EW VW with
            <ul>
              <li> P the partitioner, i.e., identity(0), Metis(1), Zoltan(2), Scotch(3), Mondriaan(4 - not implemented so far)... </li>
              <li> GT type of the graph, i.e., graph(0) or hypergraph(1) </li>
              <li> EW method to weight the edges, i.e., unity(0), number of faces(1) or number of DOF(2) </li>
-             <li> VW method to weight the vertices, i.e., unity(0), number of children on finest triangulation(1), 
+             <li> VW method to weight the vertices, i.e., unity(0), number of children on finest triangulation(1),
                   number of DOF(2), intersected tetras cause more work (3)</li>
            </ul>
 */
-void DetermineDecompositionCL::make( const int method, int rho_I, const VecDescCL* lset, const BndDataCL<>* lsetbnd, const ObservedMigrateFECL* obs)
+void PartitioningCL::make( const int method, int rho_I, const VecDescCL* lset, const BndDataCL<>* lsetbnd, const ObservedMigrateFECL* obs)
 {
     EdgeWeighterCL* ew= 0;
     VertexWeighterCL *vw=0;
@@ -781,33 +787,33 @@ void DetermineDecompositionCL::make( const int method, int rho_I, const VecDescC
     // make the graph builder
     switch ( (method%1000)/100){
     case 0: gb= new GraphBuilderCL( mg_, triang_level_, vertexIdx_); break;
-    default: throw DROPSErrCL("DetermineDecompositionCL::make: Unknown graph model");
+    default: throw DROPSErrCL("PartitioningCL::make: Unknown graph model");
     }
 
     // make the edge weighter
     switch ( (method%100)/10){
     case 0: ew= new EdgeWeighterCL(); break;
     case 1: ew= new EdgeWeighterTriangCL(); break;
-    case 2: 
+    case 2:
         if ( obs==0){
-            throw DROPSErrCL("DetermineDecompositionCL: To weight edges by DOF information, you have to provide DOF information");
+            throw DROPSErrCL("PartitioningCL: To weight edges by DOF information, you have to provide DOF information");
         }
-        ew= new EdgeWeighterDOFCL( *obs); 
+        ew= new EdgeWeighterDOFCL( *obs);
         break;
-    default: throw DROPSErrCL("DetermineDecompositionCL::make: Unknown edge weighting method");
+    default: throw DROPSErrCL("PartitioningCL::make: Unknown edge weighting method");
     }
 
     // make the vertex weighter
     switch ( method%10){
     case 0: vw= new VertexWeighterCL(); break;
     case 1: vw= new VertexWeighterTriangCL( triang_level_); break;
-    case 3: 
+    case 3:
         if (lset==0 || lsetbnd==0){
-            throw DROPSErrCL("DetermineDecompositionCL: To weight vertices by intersection metric, you have to provide the level set function!");
+            throw DROPSErrCL("PartitioningCL: To weight vertices by intersection metric, you have to provide the level set function!");
         }
         vw= new VertexWeighterTwoPhaseCL( triang_level_, rho_I, *lset, *lsetbnd);
         break;
-    default: throw DROPSErrCL("DetermineDecompositionCL::make: Unknown vertex weighting method");
+    default: throw DROPSErrCL("PartitioningCL::make: Unknown vertex weighting method");
     }
 
     // build the graph
@@ -817,7 +823,7 @@ void DetermineDecompositionCL::make( const int method, int rho_I, const VecDescC
     switch (method/1000){
     case 0: partitioner_= new IdentityPartitionerCL( *graph_); break;
     case 1: partitioner_= new MetisPartitionerCL( *dynamic_cast<GraphCL*>(graph_)); break;
-    default: throw DROPSErrCL("DetermineDecompositionCL::make: Unknown partitioner");
+    default: throw DROPSErrCL("PartitioningCL::make: Unknown partitioner");
     }
 
     // determine a partitioning
@@ -830,7 +836,7 @@ void DetermineDecompositionCL::make( const int method, int rho_I, const VecDescC
 }
 
 /** Free the memory of the graph, partitioner and delete the graph vertex numbering.*/
-void DetermineDecompositionCL::clear()
+void PartitioningCL::clear()
 {
     delete graph_;       graph_=0;
     delete partitioner_; partitioner_=0;

@@ -117,6 +117,7 @@ class TransportP1XCL
     VecDescCL cplA, cplM, cplC, b;
 
   private:
+    ParamCL& P_;
     MLMatrixCL     L_;              ///< sum of matrices
     MultiGridCL&   MG_;
     BndDataT&      Bnd_, Bndt_;     ///< Boundary condition for the concentration
@@ -164,8 +165,8 @@ class TransportP1XCL
     TransportP1XCL( MultiGridCL& mg, BndDataT& Bnd, BndDataT& Bndt, VelocityContainer& v, LsetBndDataCL& Bnd_ls,
         VecDescCL& lset, VecDescCL& oldlset,
         DROPS::ParamCL& P, double initialtime=0, instat_scalar_fun_ptr reac=0, instat_scalar_fun_ptr rhs=0)
-        : oldt_(initialtime), t_( initialtime),
-        idx( P1X_FE, 1, Bndt, mg.GetBnd().GetMatchFun(), P.get<double>("Transp.NitscheXFEMStab")), oldidx( P1X_FE, 1, Bndt, mg.GetBnd().GetMatchFun(), P.get<double>("Transp.NitscheXFEMStab")),
+        : P_(P), oldt_(initialtime), t_( initialtime),
+        idx( P1X_FE, 1, Bndt, mg.GetBnd().GetMatchFun(), P.get<double>("Transp.NitscheXFEMStab")), oldidx( P1X_FE, mg.GetLastLevel(), Bndt, mg.GetBnd().GetMatchFun(), P.get<double>("Transp.NitscheXFEMStab")),
         MG_( mg), Bnd_( Bnd), Bndt_( Bndt), v_ (v), Bnd_ls_(Bnd_ls),
         theta_( P.get<double>("Transp.Theta")), dt_( P.get<double>("Time.StepSize")),
         lambda_(P.get<double>("Transp.NitschePenalty")), H_( P.get<double>("Transp.HNeg")/P.get<double>("Transp.HPos")),
@@ -252,7 +253,8 @@ class TransportP1XCL
         return H_;
     }
     double GetXFEMOmitBound(){ return omit_bound_; }
-    double CheckSolution(instat_scalar_fun_ptr Lsgn, instat_scalar_fun_ptr Lsgp, double time);
+    double CheckSolution(instat_scalar_fun_ptr Lsgn, instat_scalar_fun_ptr Lsgp,
+            instat_vector_fun_ptr Gradn, instat_vector_fun_ptr Gradp, double time);
 };
 
 /// \brief Observes the MultiGridCL-changes by AdapTriangCL to repair the function c.ct.
