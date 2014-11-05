@@ -93,7 +93,8 @@ class QuaQuaMapperCL
 
     mutable base_point_newton_cacheCL cache_;
 
-    bool line_search (const Point3DCL& v, const Point3DCL& nx, const TetraCL*& tetra, BaryCoordCL& bary, const TetraSetT& neighborhood) const;
+    void locate_new_point (const Point3DCL& x, const Point3DCL& dx, const TetraCL*& tet, BaryCoordCL& xb, double& d) const;
+    bool line_search (Point3DCL& v, const Point3DCL& nx, const TetraCL*& tetra, BaryCoordCL& bary) const;
     void base_point_with_line_search (const TetraCL*& tet, BaryCoordCL& xb) const;
     void base_point_newton (const TetraCL*& tet, BaryCoordCL& xb) const;
 

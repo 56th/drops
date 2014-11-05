@@ -63,19 +63,35 @@ void enclosing_tetra (const Point3DCL& v, const TetraSetT& neighborhood, double 
     tetra= 0;
 }
 
-bool QuaQuaMapperCL::line_search (const Point3DCL& v, const Point3DCL& nx, const TetraCL*& tetra, BaryCoordCL& bary, const TetraSetT& neighborhood) const
+
+// Find a tetra in neighborhoods_[tet] enclosing x + d*dx; computes the barycentric coordinates in xb.
+// On entry, xb must contain the barycentric coordinates of x + d*dx.
+void QuaQuaMapperCL::locate_new_point (const Point3DCL& x, const Point3DCL& dx, const TetraCL*& tet, BaryCoordCL& xb, double& d) const
 {
     const int max_damping= 10;
     const double eps= 1e-10;
 
-    double alpha= 0.,
-           dalpha= 0.;
+    const TetraSetT& neighborhood= neighborhoods_[tet];
+
+    if (!is_in_ref_tetra( xb, eps))
+            tet= 0;
+    for (int k= 0; tet == 0 && k < max_damping; ++k, d*= 0.5)
+        enclosing_tetra( x + d*dx, neighborhood, eps, tet, xb);
+    if (tet == 0) {
+            std::cout << "x: " << x << "\tdx: " << dx << "\td: " << d << "\tx + d*dx: "<< x + d*dx << std::endl;
+            throw DROPSErrCL("QuaQuaMapperCL::locate_new_point: Coord not in given tetra set.\n");
+        }
+}
+
+bool QuaQuaMapperCL::line_search (Point3DCL& x, const Point3DCL& nx, const TetraCL*& tetra, BaryCoordCL& bary) const
+{
+    double dalpha= 0.;
     int inneriter= 0;
     World2BaryCoordCL w2b;
     for (; inneriter < maxinneriter_; ++inneriter) {
-        // Evaluate ls in v - alpha*nx and check convergence.
+        // Evaluate ls in x and check convergence.
         w2b.assign( *tetra);
-        bary= w2b( v - alpha*nx);
+        bary= w2b( x);
         const double lsval= ls.val( *tetra, bary);
 
         if (std::abs( lsval) < innertol_)
@@ -88,21 +104,14 @@ bool QuaQuaMapperCL::line_search (const Point3DCL& v, const Point3DCL& nx, const
             std::cout << "g_phi: " << gradval << "\tgy: " << nx << std::endl;
         dalpha= lsval/slope;
 
-        // Apply damping to dalpha until v - (alpha + dalpha)nx is in the neighborhood of tet.
-        bary= w2b( v - (alpha + dalpha)*nx);
-        if (!is_in_ref_tetra( bary, eps))
-            tetra= 0;
-        for (int k= 0; tetra == 0 && k < max_damping; ++k, dalpha*= 0.5)
-            enclosing_tetra( v - (alpha + dalpha)*nx, neighborhood, eps, tetra, bary);
-        if (tetra == 0) {
-            std::cout << "v: " << v << "\talpha: " << alpha << "\tnx: " << nx <<  "\tv - alpha*nx: "<< v - alpha*nx << std::endl;
-            throw DROPSErrCL("QuaQuaMapperCL::line_search: Coord not in given tetra set.\n");
-        }
-        alpha+= dalpha;
+        bary= w2b( x - dalpha*nx);
+        double damp= 1.;
+        locate_new_point( x, -dalpha*nx, tetra, bary, damp); // Find tetra enclosing x - dalpha*nx; depending on the method, the step must be damped with 0 < damp < 1.
+        x-= (damp*dalpha)*nx;
     }
 
     if (inneriter >= maxinneriter_)
-        std::cout <<"QuaQuaMapperCL::line_search: Warning: max inner iteration number at v : " << v << " exceeded; ls.val: " << ls.val( *tetra, bary) << std::endl;
+        std::cout <<"QuaQuaMapperCL::line_search: Warning: max inner iteration number at x : " << x << " exceeded; ls.val: " << ls.val( *tetra, bary) << std::endl;
     ++num_inner_iter[inneriter];
 
     return inneriter < maxinneriter_;
@@ -124,8 +133,7 @@ void QuaQuaMapperCL::base_point_with_line_search (const TetraCL*& tet, BaryCoord
         xold= x;
         n=  ls_grad_rec.val( *tet, xb);
         n/= norm( n);
-        const bool found_zero_level= line_search( x, n, tet, xb, neighborhoods_[tet]);
-        x= GetWorldCoord( *tet, xb);
+        const bool found_zero_level= line_search( x, n, tet, xb);
 
         if (norm( xold - x) < tol_ && found_zero_level)
             break;
@@ -143,11 +151,7 @@ void QuaQuaMapperCL::base_point_newton (const TetraCL*& tet, BaryCoordCL& xb) co
 {
 //     ScopeTimerCL timer( "QuaQuaMapperCL::base_point_newton");
 
-    const int max_damping= 10;
-    const double eps= 1e-10;
     const double lset_tol= 5e-9;
-
-    const TetraSetT& neighborhood= neighborhoods_[tet];
 
     Point3DCL x0, x, // World coordinates of initial and current xb.
               dx; // Newton-correction for x.
@@ -211,21 +215,13 @@ void QuaQuaMapperCL::base_point_newton (const TetraCL*& tet, BaryCoordCL& xb) co
         qr.Solve( F);
         dx= MakePoint3D( F[0], F[1], F[2]);
 
-        // Apply damping until x - d*dx is in the neighborhood of tet.
+        // Apply damping until x - damp*dx is in the neighborhood of tet.
         xb= cache_.w2b()( x - dx);
-        if (!is_in_ref_tetra( xb, eps))
-            tet= 0;
-        d= 1.;
-        for (int k= 0; tet == 0 && k < max_damping; ++k, d*= 0.5)
-            enclosing_tetra( x - d*dx, neighborhood, eps, tet, xb);
-        if (tet == 0) {
-            std::cout << "x: " << x << "\tdx: " << dx << "\tx - d*dx: "<< x - d*dx << std::endl;
-            throw DROPSErrCL("QuaQuaMapperCL::base_point_newton: Coord not in given tetra set.\n");
-        }
-        x-= d*dx;
-        dh-= d*F[3];
+        double damp= 1.;
+        locate_new_point( x, -dx, tet, xb, damp); // Find tetra enclosing x - damp*dx; depending on the method, the step is damped with 0 < damp < 1.
+        x-= damp*dx;
+        dh-= damp*F[3];
         cache_.set_tetra( tet);
-        xb= cache_.w2b()( x);
     }
     ++num_outer_iter[iter];
             // Compute the quasi-distance dh:
