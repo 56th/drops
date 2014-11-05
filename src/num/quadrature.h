@@ -329,10 +329,11 @@ class QuadDomainCodim1CL
     /// \brief XXX: Hack to incrementally construct mapped QuadDomains with QuaQuaQuadDomainMapperAccuCL.
     void push_back_quad_node (const VertexT& v, double w) {
         vertexes_.push_back( v);
-        WeightContT wc( weights_.size() + 1);
+        std::valarray<double> wc( weights_.size() + 1);
         wc[std::slice( 0, weights_.size(), 1)]= weights_;
         wc[weights_.size()]= w;
-        std::swap( weights_, wc);
+        weights_.resize( wc.size());
+        weights_= wc;
     }
 
     bool empty () const { return vertexes_.empty(); } ///< True, iff there are no quadrature-points
