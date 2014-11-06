@@ -948,8 +948,8 @@ void Compare_Oblique_Coarse (DROPS::AdapTriangCL&, InstatStokes2PhaseP2P1CL& Sto
         MLDataCL<ProlongationCL<Point3DCL> > mlprolongation;
         SetupProlongationMatrix( mg, mlprolongation, &mlidx, &mlidx);
         std::cout << "mlprolongation: " << mlprolongation.size() << " levels.\n";
-        typename MLVecDescCL::iterator vdit= ff_oblique.GetFinestIter();
-        typename MLDataCL<ProlongationCL<Point3DCL> >::const_iterator pit= mlprolongation.GetFinestIter();
+        MLVecDescCL::iterator vdit= ff_oblique.GetFinestIter();
+        MLDataCL<ProlongationCL<Point3DCL> >::const_iterator pit= mlprolongation.GetFinestIter();
         for (Uint l= flvl; l > 0; --vdit, --pit, --l) {
             --vdit;
             VectorCL& vc= vdit->Data;
@@ -962,7 +962,7 @@ void Compare_Oblique_Coarse (DROPS::AdapTriangCL&, InstatStokes2PhaseP2P1CL& Sto
     std::auto_ptr<DROPS::LevelsetP2CL> clsetp( DROPS::LevelsetP2CL::Create( mg, lset.GetBndData(), csf, P.get_child("Levelset")));
     DROPS::LevelsetP2CL& clset= *clsetp;
     clset.SetSurfaceForce( SF_ObliqueLBVar);
-    typename MLVecDescCL::const_iterator ffit= ff_oblique.GetCoarsestIter();
+    MLVecDescCL::const_iterator ffit= ff_oblique.GetCoarsestIter();
     for (Uint l= 0; l < flvl; ++l, ++ffit) {
         if (l > 0) {
             clset.ClearMat();
