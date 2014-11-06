@@ -2,7 +2,8 @@ set(HOME levelset)
 
 libs(coupling levelset levelsetmapper fastmarch surfacetension twophaseutils marking_strategy adaptriang)
 
-target_link_libraries(levelset-levelset levelset-fastmarch misc-progressaccu misc-scopetimer)
+target_link_libraries(levelset-levelset levelset-fastmarch misc-progressaccu misc-scopetimer geom-locator)
+target_link_libraries(levelset-levelsetmapper geom-locator)
 
 add_library(levelset-twophaseCoeff SHARED twophaseCoeff)
 

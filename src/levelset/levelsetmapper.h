@@ -25,6 +25,7 @@
 #ifndef DROPS_LEVELSETMAPPER_H
 #define DROPS_LEVELSETMAPPER_H
 
+#include "geom/locator.h"
 #include "geom/subtriangulation.h"
 #include "num/fe.h"
 #include "num/discretize.h"
@@ -89,7 +90,8 @@ class QuaQuaMapperCL
     LocalP1CL<Point3DCL> gradrefp2[10];
 
     // The neighborhoods around each tetra in which base points are searched for.
-    TetraToTetrasT& neighborhoods_;
+    TetraToTetrasT* neighborhoods_;
+    mutable MyLocatorCL locator_;
 
     mutable base_point_newton_cacheCL cache_;
 
@@ -99,11 +101,12 @@ class QuaQuaMapperCL
     void base_point_newton (const TetraCL*& tet, BaryCoordCL& xb) const;
 
   public:
-    QuaQuaMapperCL (const MultiGridCL& mg, VecDescCL& lsarg, const VecDescCL& ls_grad_recarg, TetraToTetrasT& neigborhoods, int maxiter= 100, double tol= 1e-7, bool use_line_search= true)
+    QuaQuaMapperCL (const MultiGridCL& mg, VecDescCL& lsarg, const VecDescCL& ls_grad_recarg, TetraToTetrasT* neighborhoods= 0, int maxiter= 100, double tol= 1e-7, bool use_line_search= true)
         : maxiter_( maxiter), tol_( tol), maxinneriter_( 100), innertol_( 5e-9), use_line_search_( use_line_search),
-          ls( &lsarg, &nobnddata, &mg), ls_grad_rec( &ls_grad_recarg, &nobnddata_vec, &mg), neighborhoods_( neigborhoods), cache_( ls, ls_grad_rec, gradrefp2), num_outer_iter( maxiter + 1), num_inner_iter( maxinneriter_ + 1)
+          ls( &lsarg, &nobnddata, &mg), ls_grad_rec( &ls_grad_recarg, &nobnddata_vec, &mg), neighborhoods_( neighborhoods), locator_( mg, lsarg.GetLevel(), /*greedy*/ true), cache_( ls, ls_grad_rec, gradrefp2), num_outer_iter( maxiter + 1), num_inner_iter( maxinneriter_ + 1)
     { P2DiscCL::GetGradientsOnRef( gradrefp2); }
 
+    void set_tetra_neighborhoods (TetraToTetrasT& neigborhoods) { neighborhoods_= &neigborhoods; }
 
     void base_point (const TetraCL*& tet, BaryCoordCL& xb) const;
     /// \brief (btet, b) must equal base_point( &tet, xb).

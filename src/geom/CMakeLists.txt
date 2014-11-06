@@ -1,5 +1,5 @@
 set(HOME geom)
-libs(boundary builder geomselect multigrid principallattice reftetracut simplex subtriangulation maketopo_helper deformation csg)
+libs(boundary builder geomselect multigrid principallattice reftetracut simplex subtriangulation maketopo_helper deformation csg locator)
 
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/topo.cpp) #otherwise it is impossible to build topo
     libs(topo)
@@ -15,6 +15,7 @@ target_link_libraries(geom-simplex geom-deformation num-unknowns)
 target_link_libraries(geom-geomselect geom-builder)
 target_link_libraries(geom-multigrid geom-simplex num-bndData misc-params)
 target_link_libraries(geom-deformation misc-problem)
+target_link_libraries(geom-locator misc-utils geom-simplex)
 
 if(NOT MPI)
     exec(maketopo geom-maketopo_helper misc-utils)

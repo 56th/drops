@@ -870,7 +870,7 @@ void AccumulateBndIntegral (LevelsetP2CL& lset, const PrincipalLatticeCL& lat, V
     VecDescCL lsgradrec( &vecp2idx);
     averaging_P2_gradient_recovery( mg, lset.Phi, lset.GetBndData(), lsgradrec);
 
-    QuaQuaMapperCL quaqua( mg, lset.Phi, lsgradrec, tetra_neighborhoods,
+    QuaQuaMapperCL quaqua( mg, lset.Phi, lsgradrec, &tetra_neighborhoods,
                            P.get<int>( "LevelsetMapper.Iter"),
                            P.get<double>( "LevelsetMapper.Tol"),
                            P.get<std::string>( "LevelsetMapper.Method") == "FixedPointWithLineSearch");
