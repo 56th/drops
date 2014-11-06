@@ -170,7 +170,6 @@ UpdateTriangulation(DROPS::NavierStokesP2P1CL<Coeff>& NS,
                     DROPS::VecDescCL* p1)
 {
     using namespace DROPS;
-    typedef NavierStokesP2P1CL<Coeff> NavStokesCL;
     Assert( 0<=c_level && c_level<=f_level, "UpdateTriangulation: Levels are cheesy.\n", ~0);
     TimerCL time;
 

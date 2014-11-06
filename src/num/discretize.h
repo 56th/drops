@@ -143,62 +143,171 @@ template<class T>
     return *this;
 }
 
-inline GridFunctionCL<Point3DCL>&
-operator*=(GridFunctionCL<Point3DCL>& a, const GridFunctionCL<double>& b)
+template<class T1, class T2> 
+  inline GridFunctionCL<T1> eval( T1 (&f)(const T2&), const GridFunctionCL<T2>& a)
+{
+    GridFunctionCL<T1> ret(a.size());
+    for (size_t i = 0; i < a.size(); ++i)
+    {
+        ret[i] = f(a[i]);
+    }
+    return ret;
+}
+
+template<class T1, class T2, class U> 
+    inline GridFunctionCL<T1> eval( T1 (&f)(const U &, const T2&), const U & b, const GridFunctionCL<T2>& a)
+{
+    GridFunctionCL<T1> ret(a.size());
+    for (size_t i = 0; i < a.size(); ++i)
+    {
+        ret[i] = f(b,a[i]);
+    }
+    return ret;
+}
+
+template<class T1, class T2, class U, class V> 
+    inline GridFunctionCL<T1> eval( T1 (&f)(const U &, const V &, const T2&), const U & b, const V & c, const GridFunctionCL<T2>& a)
+{
+    GridFunctionCL<T1> ret(a.size());
+    for (size_t i = 0; i < a.size(); ++i)
+    {
+        ret[i] = f(b,c,a[i]);
+    }
+    return ret;
+}
+
+template<class T1, class T2, class U, class V, class W> 
+    inline GridFunctionCL<T1> eval( T1 (&f)(const U &, const V &, const W &, const T2&), const U & b, const V & c, const W & d, const GridFunctionCL<T2>& a)
+{
+    GridFunctionCL<T1> ret(a.size());
+    for (size_t i = 0; i < a.size(); ++i)
+    {
+        ret[i] = f(b,c,d,a[i]);
+    }
+    return ret;
+}
+
+
+template<class T1, class T2> 
+  inline GridFunctionCL<T1> apply_and_eval( T1 (&f)( T2&), GridFunctionCL<T2>& a)
+{
+    GridFunctionCL<T1> ret(a.size());
+    for (size_t i = 0; i < a.size(); ++i)
+    {
+        ret[i] = f(a[i]);
+    }
+    return ret;
+}
+
+template<class T1, class T2, class U> 
+    inline GridFunctionCL<T1> apply_and_eval( T1 (&f)(const U &, T2&), const U & b, GridFunctionCL<T2>& a)
+{
+    GridFunctionCL<T1> ret(a.size());
+    for (size_t i = 0; i < a.size(); ++i)
+    {
+        ret[i] = f(b,a[i]);
+    }
+    return ret;
+}
+
+template<class T1, class T2, class U, class V> 
+    inline GridFunctionCL<T1> apply_and_eval( T1 (&f)(const U &, const V &, T2&), const U & b, const V & c, GridFunctionCL<T2>& a)
+{
+    GridFunctionCL<T1> ret(a.size());
+    for (size_t i = 0; i < a.size(); ++i)
+    {
+        ret[i] = f(b,c,a[i]);
+    }
+    return ret;
+}
+
+template<class T1, class T2, class U, class V, class W> 
+    inline GridFunctionCL<T1> apply_and_eval( T1 (&f)(const U &, const V &, const W &, T2&), 
+                                              const U & b, const V & c, const W & d, 
+                                              GridFunctionCL<T2>& a)
+{
+    GridFunctionCL<T1> ret(a.size());
+    for (size_t i = 0; i < a.size(); ++i)
+    {
+        ret[i] = f(b,c,d,a[i]);
+    }
+    return ret;
+}
+
+template<Uint D>
+inline GridFunctionCL<SVectorCL<D> >&
+operator*=(GridFunctionCL<SVectorCL<D> >& a, const GridFunctionCL<double>& b)
 {
     for (size_t i= 0; i < b.size(); ++i)
         a[i]*= b[i];
     return a;
 }
 
-inline GridFunctionCL<Point3DCL>
-operator*(const GridFunctionCL<Point3DCL>& a, const GridFunctionCL<double>& b)
+template<Uint D>
+inline GridFunctionCL<SVectorCL<D> >
+operator*(const GridFunctionCL<SVectorCL<D> >& a, const GridFunctionCL<double>& b)
 {
-    GridFunctionCL<Point3DCL> ret( a);
+    GridFunctionCL<SVectorCL<D> > ret( a);
     return ret*= b;
 }
 
-inline GridFunctionCL<Point3DCL>
-operator*(const GridFunctionCL<double>& a, const GridFunctionCL<Point3DCL>& b)
+template<Uint D>
+inline GridFunctionCL<SVectorCL<D> > 
+operator*(const SMatrixCL<D,D>& A, const GridFunctionCL<SVectorCL<D> >& b)
+{
+    GridFunctionCL<SVectorCL<D> > ret( b);
+    for (size_t i= 0; i < b.size(); ++i)
+        ret[i] = A * b[i];
+    return ret;
+}
+
+template<Uint D>
+inline GridFunctionCL<SVectorCL<D> >
+operator*(const GridFunctionCL<double>& a, const GridFunctionCL<SVectorCL<D> >& b)
 {
     return b*a;
 }
 
-inline GridFunctionCL<Point3DCL>&
-operator*=(GridFunctionCL<Point3DCL>& a, double b)
+template<Uint D>
+inline GridFunctionCL<SVectorCL<D> >&
+operator*=(GridFunctionCL<SVectorCL<D> >& a, double b)
 {
     for (size_t i= 0; i < a.size(); ++i)
         a[i]*= b;
     return a;
 }
 
-inline GridFunctionCL<Point3DCL>
-operator*( double a, const GridFunctionCL<Point3DCL>& b)
+template<Uint D>
+inline GridFunctionCL<SVectorCL<D> >
+operator*( double a, const GridFunctionCL<SVectorCL<D> >& b)
 {
 
-    GridFunctionCL<SVectorCL<3> > ret( b);
+    GridFunctionCL<SVectorCL<D> > ret( b);
     return ret*= a;
 }
 
-inline GridFunctionCL<Point3DCL>
-operator*( const GridFunctionCL<Point3DCL>& a, double b)
+template<Uint D>
+inline GridFunctionCL<SVectorCL<D> >
+operator*( const GridFunctionCL<SVectorCL<D> >& a, double b)
 {
 
     return b*a;
 }
 
-inline GridFunctionCL<Point3DCL>
-operator*( const Point3DCL& a, const GridFunctionCL<double>& b)
+template<Uint D>
+inline GridFunctionCL<SVectorCL<D> >
+operator*( const SVectorCL<D> & a, const GridFunctionCL<double>& b)
 {
 
-    GridFunctionCL<SVectorCL<3> > ret( a, b.size());
+    GridFunctionCL<SVectorCL<D> > ret( a, b.size());
     for (size_t i= 0; i < b.size(); ++i)
         ret[i]*= b[i];
     return ret;
 }
 
-inline GridFunctionCL<Point3DCL>
-operator*( const GridFunctionCL<double>& a, const Point3DCL& b)
+template<Uint D>
+inline GridFunctionCL<SVectorCL<D> >
+operator*( const GridFunctionCL<double>& a, const SVectorCL<D> & b)
 {
 
     return b*a;
@@ -214,8 +323,9 @@ operator* (const GridFunctionCL< SMatrixCL<Rows, Cols> >& a, const GridFunctionC
     return ret;
 }
 
+template <Uint Dim>
 inline GridFunctionCL<double>
-dot(const GridFunctionCL<Point3DCL>& a, const GridFunctionCL<Point3DCL>& b)
+dot(const GridFunctionCL<SVectorCL<Dim> >& a, const GridFunctionCL<SVectorCL<Dim> >& b)
 {
     GridFunctionCL<double> ret( 0.0, a.size());
     for (size_t i= 0; i<a.size(); ++i)
@@ -223,8 +333,9 @@ dot(const GridFunctionCL<Point3DCL>& a, const GridFunctionCL<Point3DCL>& b)
     return ret;
 }
 
+template<Uint D>
 inline GridFunctionCL<double>
-dot(const Point3DCL& a, const GridFunctionCL<Point3DCL>& b)
+dot(const SVectorCL<D> & a, const GridFunctionCL<SVectorCL<D> >& b)
 {
     GridFunctionCL<double> ret( 0.0, b.size());
     for (size_t i= 0; i<b.size(); ++i)
@@ -242,7 +353,22 @@ dot(const GridFunctionCL< SVectorCL<Rows> >& a, const GridFunctionCL< SMatrixCL<
     return ret;
 }
 
-inline void ExtractComponent( const GridFunctionCL<Point3DCL>& src, GridFunctionCL<double>& target, int comp)
+
+template<class T>
+    std::ostream& operator << (std::ostream& os, const GridFunctionCL<T>& g)
+{
+    const size_t N = g.size();
+    os << " gridfunction of size " << N << '\n' ;
+    for (size_t i = 0; i < N; ++i)
+    {
+        os << g[i] << "\n";
+    }
+    os << "\n";
+    return os;
+}
+
+template<Uint D>
+inline void ExtractComponent( const GridFunctionCL<SVectorCL<D> >& src, GridFunctionCL<double>& target, int comp)
 {
     Assert( target.size()==src.size(), DROPSErrCL("extractComponent: GridFunctionCL objects have different sizes"), DebugNumericC);
     for (size_t i= 0; i<src.size(); ++i)
@@ -453,6 +579,7 @@ class Quad2DataCL
     Quad2DataCL ();
 
     enum { NumNodesC= 5 };
+    enum { Dim = 3 };
 
     static BaryCoordCL  Node[NumNodesC];  ///< quadrature nodes
     static const double Wght[2];          ///< quadrature weights
@@ -471,6 +598,7 @@ class Quad2Data_Mul_P1_CL
 {
   public:
     enum { NumNodesC= Quad2DataCL::NumNodesC };
+    enum { Dim = 3 };
 
   private:
     static const double weights_[4][NumNodesC];
@@ -485,6 +613,7 @@ class Quad2Data_Mul_P2_CL
 {
   public:
     enum { NumNodesC= Quad2DataCL::NumNodesC };
+    enum { Dim = 3 };
 
   private:
     static const double weights_[10][NumNodesC];
@@ -588,6 +717,7 @@ class Quad3DataCL
     Quad3DataCL ();
 
     enum { NumNodesC= 5};
+    enum { Dim = 3 };
 
     static BaryCoordCL           Node[NumNodesC]; ///< quadrature nodes
     static const double          Wght[2];         ///< quadrature weights
@@ -677,6 +807,7 @@ class Quad5DataCL
     Quad5DataCL ();
 
     enum { NumNodesC= 15 };
+    enum { Dim = 3 };
 
     static BaryCoordCL           Node[NumNodesC]; ///< quadrature nodes
     static const double          Wght[4];         ///< quadrature weights
@@ -766,6 +897,7 @@ class Quad5_2DDataCL
     Quad5_2DDataCL ();
 
     enum { NumNodesC= 7 };
+    enum { Dim = 2 };
 
     static Point3DCL           Node[NumNodesC];   ///< quadrature nodes
     static const double        Wght[3];           ///< quadrature weights
@@ -829,6 +961,34 @@ DROPS_DEFINE_VALARRAY_DERIVATIVE(Quad5_2DCL, T, base_type)
       return absdet*(9./80.*(*this)[0] + (155. - std::sqrt( 15.0))/2400.*((*this)[1]+(*this)[2]+(*this)[3]) + (155. + std::sqrt( 15.0))/2400.*((*this)[4]+(*this)[5]+(*this)[6]));
     }
 };
+
+
+/// \brief Contains the nodes and weights of a positive quadrature rule on the reference pentatope. It uses 5 nodes an is exact up to degree 3.
+///
+/// The data is initialized exactly once on program-startup by the global object in num/discretize.cpp.
+class Quad3_4DDataCL
+{
+  public:
+    Quad3_4DDataCL ();
+    enum { NumNodesC = 5 };
+    enum { Dim = 4 };
+    static STBaryCoordCL         Node[NumNodesC];   ///< quadrature nodes
+    static const double        Weight[NumNodesC]; ///< quadrature weights for each node
+};
+
+/// \brief Contains the nodes and weights of a positive quadrature rule on the reference pentatope. It uses 60 nodes an is exact up to degree 3.
+///
+/// The data is initialized exactly once on program-startup by the global object in num/discretize.cpp.
+class Quad5_4DDataCL
+{
+  public:
+    Quad5_4DDataCL ();
+    enum { NumNodesC = 60 };
+    enum { Dim = 4 };
+    static STBaryCoordCL         Node[NumNodesC];   ///< quadrature nodes
+    static const double        Weight[NumNodesC]; ///< quadrature weights for each node
+};
+
 
 
 class Quad3PosWeightsCL

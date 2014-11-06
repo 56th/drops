@@ -298,6 +298,34 @@ namespace filmperiodic{
     static DROPS::RegisterMatchingFunction regmatch1_y("periodicy", periodic_1side<1>);
     static DROPS::RegisterMatchingFunction regmatch1_z("periodicz", periodic_1side<2>);
 }
+double TaylorFlowDistance( const DROPS::Point3DCL& p, double)
+{
+    static const double taylor_len = P.get<double>("Taylor.Length");
+    static const double taylor_width = P.get<double>("Taylor.Width");
+    static const double rel_filmthickness = P.get<double>("Taylor.RelFilmThickness");
+    static const DROPS::Point3DCL taylor_bubble_center = P.get<DROPS::Point3DCL>("Taylor.Center");
+    //const double taylor_top_z = taylor_bubble_center[2] + 0.5 * taylor_bubble_len;
+    //const double taylor_bottom_z = taylor_bubble_center[2] - 0.5 * taylor_bubble_len;
+    const double taylor_radius = (0.5-rel_filmthickness) * taylor_width;
+    const double taylor_top_z = taylor_bubble_center[2] + 0.5 * (taylor_len-2*taylor_radius);
+    const double taylor_bottom_z = taylor_bubble_center[2] - 0.5 * (taylor_len-2*taylor_radius);
+    DROPS::Point3DCL diff = p;
+    diff[0] -= taylor_bubble_center[0];
+    diff[1] -= taylor_bubble_center[1];
+    if (p[2] > taylor_top_z){
+        diff[2] -= taylor_top_z;
+        return diff.norm() - taylor_radius;
+    }
+    if (p[2] < taylor_bottom_z){
+        diff[2] -= taylor_bottom_z;
+        return diff.norm() - taylor_radius;
+    }
+    diff[2] = 0.0;
+    return diff.norm() - taylor_radius;
+}
+
+static DROPS::RegisterScalarFunction regscataylor("TaylorFlowDistance", TaylorFlowDistance);
+
 
 namespace slipBnd{
     /// \name inflow condition
@@ -437,18 +465,31 @@ namespace InstatSlip{
 	
 	double Pressure (const DROPS::Point3DCL& p, double t)
 	{
-        double norm2=0.;
-		double ret=0;
-		DROPS::Point3DCL origin = P.get<DROPS::Point3DCL>("Exp.PosDrop");
-		
+		double norm2=0.;
+		double ret=0;		
+		static bool first = true;
+		static DROPS::Point3DCL origin;
+		static double radius, surftension;
+		if(first){
+			DROPS::Point3DCL org0 = P.get<DROPS::Point3DCL>("Exp.PosDrop");
+			DROPS::Point3DCL VelR = P.get<DROPS::Point3DCL>("Exp.RadDrop");
+			double angle=P.get<double>("SpeBnd.contactangle")*M_PI/180;
+			radius=VelR[0]*std::pow(2/(2+std::cos(angle))/std::pow(1-std::cos(angle),2),1.0/3);
+			//assume the initial droplet is semi-spherical;
+			org0[1]=org0[1]-radius*std::cos(angle);//The drop is located in the plain normal to the y direction
+			origin=org0;
+			surftension = P.get<double>("SurfTens.SurfTension");
+			first = false;
+		}
+
 		for (int i=0; i< 3; i++)
 		  norm2 += (p[i]-origin[i]) * (p[i]-origin[i]);
-        ret = (norm2 > 0.01) ? 0: 10; 
-		
+         ret = (std::sqrt(norm2) > radius) ? 0: 2.*surftension/radius; 
+		/*
 		if( t>3. && t<5 )
 			ret = 0;
 		else if(t >5.)
-			ret = 10;
+			ret = 2.*surftension/radius;*/
 		return ret;
 	}
 	
@@ -457,15 +498,15 @@ namespace InstatSlip{
     {
         DROPS::SVectorCL<3> f(0.);
         static bool first = true;
-		static double nu, l_s;
-		if(first){
-			nu=P.get<double>("Mat.ViscFluid")/P.get<double>("Mat.DensFluid");
-			l_s=1./(P.get<double>("SpeBnd.beta2"));
-			first = false;
-		}
-		f[0] =  2.* nu * std::sin(p[0]/l_s) * std::cos(p[1]/l_s) * ( std::cos(2*nu*t) + 1./(l_s*l_s) * std::sin(2*nu*t) ) ;
-		f[1] = -2.* nu * std::cos(p[0]/l_s) * std::sin(p[1]/l_s) * ( std::cos(2*nu*t) + 1./(l_s*l_s) * std::sin(2*nu*t) ) ;
-		f[2] = 0;
+		 static double nu, l_s;
+		 if(first){
+			 nu=P.get<double>("Mat.ViscFluid")/P.get<double>("Mat.DensFluid");
+			 l_s=1./(P.get<double>("SpeBnd.beta2"));
+			 first = false;
+		 }
+		 f[0] =  2.* nu * std::sin(p[0]/l_s) * std::cos(p[1]/l_s) * ( std::cos(2*nu*t) + 1./(l_s*l_s) * std::sin(2*nu*t) ) ;
+		 f[1] = -2.* nu * std::cos(p[0]/l_s) * std::sin(p[1]/l_s) * ( std::cos(2*nu*t) + 1./(l_s*l_s) * std::sin(2*nu*t) ) ;
+		 f[2] = 0;
 
         return f+PressureGr(p,t);
     }
@@ -550,7 +591,7 @@ namespace StatSlip2{
     }
     static DROPS::RegisterVectorFunction regvelVel2("StatSlip2Vel", Velocity);
     static DROPS::RegisterVectorFunction regvelf2("StatSlip2F", VolForce);
-	static DROPS::RegisterVectorFunction regvelgpr2("StatSlip2PrGrad",PressureGr);
+    static DROPS::RegisterVectorFunction regvelgpr2("StatSlip2PrGrad",PressureGr);
 
 }
 
@@ -722,15 +763,31 @@ namespace CouetteFlow{
 	DROPS::Point3DCL UpwallVel(const DROPS::Point3DCL& ,double)
 	{
 		DROPS::Point3DCL vel(0.0);
-		vel[0]=0.5;
+		vel[0]=P.get<double>("Exp.WallVelocity");
 		return vel;
 	}
 	DROPS::Point3DCL DownwallVel(const DROPS::Point3DCL& ,double)
 	{
 		DROPS::Point3DCL vel(0.0);
-		vel[0]=-0.5;
+		vel[0]=-P.get<double>("Exp.WallVelocity");
 		return vel;
+	}
+	DROPS::Point3DCL LeftwallVel(const DROPS::Point3DCL& pt,double)
+	{
+
+		 double dx, dy, dz;
+		 const std::string meshfile_name=P.get<std::string>("DomainCond.MeshFile");
+		 std::string mesh( meshfile_name), delim("x@");
+		 size_t idx;
+		 while ((idx= mesh.find_first_of( delim)) != std::string::npos )
+		       mesh[idx]= ' ';
+		 std::istringstream brick_info( mesh);
+		 brick_info >> dx >> dy >> dz;
+		 DROPS::Point3DCL vel(0.0);
+		 vel[0]=P.get<double>("Exp.WallVelocity")*((pt[2]-dz/2)*2/dz)*(dz/(dz+2/P.get<double>("SpeBnd.beta1")));
+		 return vel;
 	}
 	static DROPS::RegisterVectorFunction regunitupwallvel("UpwallVel", UpwallVel);
 	static DROPS::RegisterVectorFunction regunitdownwallvel("DownwallVel", DownwallVel);
+	static DROPS::RegisterVectorFunction regunitleftwallvel("LeftwallVel", LeftwallVel);
 }

@@ -75,6 +75,12 @@ class NSSolverBaseCL : public SolverBaseCL
         solver_.Solve( A, B, v.Data, p, b, c, vel_ex, pr_ex);
         cplN.Data= 0.;
     }
+    virtual void Solve (const MLMatrixCL& A, const MLMatrixCL& B, const MLMatrixCL& C, VecDescCL& v, VectorCL& p,
+    const VectorCL& b, VecDescCL& cplN, const VectorCL& c, const ExchangeCL& vel_ex, const ExchangeCL& pr_ex, double)
+    {
+        solver_.Solve( A, B, C, v.Data, p, b, c, vel_ex, pr_ex);
+        cplN.Data= 0.;
+    }
 #endif
     virtual void Solve (const MatrixCL& A, const MatrixCL& B, VecDescCL& v, VectorCL& p,
         const VectorCL& b, VecDescCL& cplN, const VectorCL& c, const DummyExchangeCL& vel_ex, const DummyExchangeCL& pr_ex, double)
@@ -86,6 +92,12 @@ class NSSolverBaseCL : public SolverBaseCL
         const VectorCL& b, VecDescCL& cplN, const VectorCL& c, const DummyExchangeCL& vel_ex, const DummyExchangeCL& pr_ex, double)
     {
         solver_.Solve( A, B, v.Data, p, b, c, vel_ex, pr_ex);
+        cplN.Data= 0.;
+    }
+    virtual void Solve (const MLMatrixCL& A, const MLMatrixCL& B,  const MLMatrixCL& C, VecDescCL& v, VectorCL& p,
+    const VectorCL& b, VecDescCL& cplN, const VectorCL& c, const DummyExchangeCL& vel_ex, const DummyExchangeCL& pr_ex, double)
+    {
+        solver_.Solve( A, B, C, v.Data, p, b, c, vel_ex, pr_ex);
         cplN.Data= 0.;
     }
 };

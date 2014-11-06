@@ -780,12 +780,11 @@ Point3DCL InterfaceTriangleCL::GetImprovedNormalOnMCL(Uint v,double bary1D) cons
 		return normal;
 }
 
+//Get the outnormal of the contact line segment;
 Point3DCL InterfaceTriangleCL::GetMCLNormal(Uint v) const
 {
-	//Point3DCL midpt = (PQRS_[IdxMCL_[v]]+PQRS_[(IdxMCL_[v]+1)%intersec_])/2;
 	Point3DCL midpt = (PQRS_[IdxMCL_[v][0]]+PQRS_[IdxMCL_[v][1]])/2;
 	Point3DCL n;
-	//Point3DCL tau=PQRS_[(IdxMCL_[v]+1)%intersec_]-PQRS_[IdxMCL_[v]];
 	Point3DCL tau=PQRS_[IdxMCL_[v][1]]-PQRS_[IdxMCL_[v][0]];
 	tau=tau/tau.norm();
 	cross_product(n, tau, outnormal_(midpt,0));

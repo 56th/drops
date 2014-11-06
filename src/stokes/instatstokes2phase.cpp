@@ -29,7 +29,9 @@
 #include "misc/progressaccu.h"
 #include "misc/scopetimer.h"
 
-extern DROPS::ParamCL P;
+#include <set>
+
+//extern DROPS::ParamCL P;
 
 namespace DROPS
 {
@@ -37,7 +39,7 @@ namespace DROPS
 //                        Routines for SetupSystem2
 // -----------------------------------------------------------------------------
 
-
+class EllipsoidCL;
 void SetupSystem2_P2P0( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL&, const StokesBndDataCL& BndData,
                         MatrixCL* B, VecDescCL* c, IdxDescCL* RowIdx, IdxDescCL* ColIdx, double t)
 // P2 / P0 FEs for vel/pr
@@ -216,8 +218,8 @@ class System2Accumulator_P2P1XCL : public System2Accumulator_P2P1CL<TwoPhaseFlow
 };
 
 System2Accumulator_P2P1XCL::System2Accumulator_P2P1XCL (const TwoPhaseFlowCoeffCL& coeff_arg, const StokesBndDataCL& BndData_arg,
-		const LevelsetP2CL& lset, const IdxDescCL& RowIdx_arg, const IdxDescCL& ColIdx_arg,
-	    MatrixCL& B_arg, VecDescCL* c_arg, double t_arg)
+        const LevelsetP2CL& lset, const IdxDescCL& RowIdx_arg, const IdxDescCL& ColIdx_arg,
+        MatrixCL& B_arg, VecDescCL* c_arg, double t_arg)
     :  base_( coeff_arg, BndData_arg, RowIdx_arg, ColIdx_arg, B_arg, c_arg, t_arg), lset_( lset), ls_loc_( lat.vertex_size()), speBndHandle(BndData_arg)
 {
     P2DiscCL::GetGradientsOnRef( GradRefLP1_);
@@ -1033,6 +1035,474 @@ void SetupPrMass_P1D(const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, Ma
     M_pr.Build();
 }
 
+// -----------------------------------------------------------------------------
+//                        Routines for SetupPrGhostStab_P1X
+// -----------------------------------------------------------------------------
+
+// These functions set up the stabilisation matrix C = -eps_p*J as described in the
+// Master's thesis "On the Application of a Stabilised XFEM Technique..."
+// by me (Matthias Kirchhart).
+
+// In order to avoid polluting the namespace, put the helper functions in an
+// anonymous one.
+namespace
+{
+Uint get_face_number_in_tetra( const FaceCL *const F, const TetraCL *const K );
+void get_tetra_to_face_indeces( const FaceCL *const F,
+                                Uint K1idx_to_Fidx[4], Uint K2idx_to_Fidx[4] );
+void get_tetra_corner_signs( const TetraCL *const K, const LevelsetP2CL &lset, int signs[4] );
+void treat_face( const FaceCL *const F, const int set_number,
+                 const IdxDescCL& RowIdx, const LevelsetP2CL &lset,
+                 const double h3, const double mu_inv, MatrixBuilderCL &J_pr );
+void get_stab_tetras( const MultiGridCL &MG, const IdxDescCL& RowIdx, const LevelsetP2CL& lset,
+                      std::vector<const TetraCL*>& stab_tetras );
+void get_stab_face_sets( const std::vector<const TetraCL*>& stab_tetras,
+                         const LevelsetP2CL& lset,
+                         std::set<const FaceCL*>& F_GammaOne,
+                         std::set<const FaceCL*>& F_GammaTwo );
+Ubyte is_in_F_Gamma_i( const TetraCL *const K, const Uint face_no,
+                       const LevelsetP2CL &lset );
+
+}
+
+void SetupPrGhostStab_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff,
+                           MatrixCL& matC, IdxDescCL& RowIdx, const LevelsetP2CL& lset,
+                           double eps_p )
+{
+    ScopeTimerCL scope( "SetupPrGhostStab_P1X" );
+
+    const IdxT num_unks_pr = RowIdx.NumUnknowns();
+    MatrixBuilderCL J_pr( &matC, num_unks_pr, num_unks_pr );
+
+    std::vector<const TetraCL*> stab_tetras(0);
+    get_stab_tetras( MG, RowIdx, lset, stab_tetras );
+
+    std::set<const FaceCL*> F_GammaOne, F_GammaTwo;
+    get_stab_face_sets( stab_tetras, lset, F_GammaOne, F_GammaTwo );
+
+    // Use the volume as a measure of "h^3"
+    // We use the minimum value instead of the maximum. Near the interface the
+    // cells are typically smallest and it is the h in the vicinity of these
+    // cells that is important for the stabilisation.
+    double h3 = std::numeric_limits<double>::max();
+    const Uint level = RowIdx.TriangLevel();
+    typedef MultiGridCL::const_TriangTetraIteratorCL tetra_MG_iter;
+    for ( tetra_MG_iter i = MG.GetTriangTetraBegin(level);
+          i != MG.GetTriangTetraEnd(level); ++i )
+    {
+        h3 = std::min( h3, i->GetVolume() );
+    }
+
+    const double mu_inv1 = 1.0/Coeff.mu(0);
+    const double mu_inv2 = 1.0/Coeff.mu(1);
+
+    // Perform the actual stabilisation
+    typedef std::set<const FaceCL*>::const_iterator face_iter;
+    for ( face_iter i = F_GammaOne.begin();
+          i != F_GammaOne.end(); ++i )
+    {
+        treat_face( *i, 1, RowIdx, lset, h3, mu_inv1, J_pr );
+    }
+
+    for ( face_iter i = F_GammaTwo.begin();
+          i != F_GammaTwo.end(); ++i )
+    {
+        treat_face( *i, 2, RowIdx, lset, h3, mu_inv2, J_pr );
+    }
+
+    J_pr.Build();
+
+    // We have assembled J, now multiply it by -eps_p to obtain C.
+    matC *= -eps_p;
+}
+
+namespace
+{
+
+/*!
+ * \brief Find all tetrahedra which are involved in the ghost stabilisation.
+ * 
+ * In the paper by Hansbo et al., the two sets of faces which are used in
+ * the stabilisation, are defined via means of a set of tetrahedra:
+ * those tetrahedra which are cut (\f$K_\Gamma\f$) and those which have more
+ * than two neighbours in \f$K_\Gamma\f$, called \f$\tilde{K}_\Gamma\f$.
+ * This method builds the union of these two sets and stores the result in
+ * stab_tetras.
+ */
+void get_stab_tetras( const MultiGridCL &MG, const IdxDescCL& RowIdx,
+                      const LevelsetP2CL& lset,
+                      std::vector<const TetraCL*>& stab_tetras )
+{
+    // First, we need to find all cut elements.
+    std::set<const TetraCL*> K_Gamma;
+
+    const Uint level = RowIdx.TriangLevel();
+    typedef MultiGridCL::const_TriangTetraIteratorCL tetra_MG_iter;
+    for ( tetra_MG_iter i = MG.GetTriangTetraBegin(level);
+          i != MG.GetTriangTetraEnd(level); ++i )
+    {
+        LocalP2CL<> loc_phi;
+        loc_phi.assign( *i, lset.Phi, lset.GetBndData() );
+        InterfaceTetraCL cut;
+        cut.Init( *i, loc_phi );
+
+        if ( cut.Intersects() )
+        {
+            K_Gamma.insert( &(*i) );    
+        }
+    }
+
+    // Now find all cells that have more than one face in common with
+    // cells in K_gamma. (Needed for LBB stability. The "blue" cells in
+    // the master's thesis.
+    std::set<const TetraCL*> K_Gamma_tilde;
+    typedef std::set<const TetraCL*>::const_iterator set_tetra_iter;
+    for ( set_tetra_iter i = K_Gamma.begin(); i != K_Gamma.end(); ++i )    
+    {
+        const TetraCL *const K = *i;
+        for ( TetraCL::const_FacePIterator j = K->GetFacesBegin();
+              j != K->GetFacesEnd(); ++j )
+        {
+            const FaceCL *const F = *j;
+            const TetraCL *const K_neigh = F->GetNeighborTetra(K);
+            if ( K_neigh == 0 ) continue;
+
+            int neighbours_in_K_gamma = 0;
+            for ( TetraCL::const_FacePIterator k = K_neigh->GetFacesBegin();
+                  k != K_neigh->GetFacesEnd(); ++k )
+            {
+                const FaceCL *const FF = *k;
+                const TetraCL *const candidate = FF->GetNeighborTetra(K_neigh);
+
+                if ( K_Gamma.find( candidate ) != K_Gamma.end() )
+                {
+                    ++neighbours_in_K_gamma;
+                }
+            }
+ 
+            if ( neighbours_in_K_gamma > 1 )
+            {
+                K_Gamma_tilde.insert( K_neigh );
+            }
+        }
+    }
+    // Now we have found all tetrahedra which we are interested in. Form a
+    // new set without duplicates and clear the old ones.
+    stab_tetras.resize( K_Gamma.size() + K_Gamma_tilde.size() );
+    typedef std::vector<const TetraCL*>::iterator vec_tetra_iter;
+
+    vec_tetra_iter tmp = std::set_union( K_Gamma.begin(), K_Gamma.end(),
+                                         K_Gamma_tilde.begin(), K_Gamma_tilde.end(),
+                                         stab_tetras.begin() );
+    stab_tetras.resize( tmp - stab_tetras.begin() );
+}
+
+/*!
+ * Given the set of stab_tetras from get_stab_tetras(), this function
+ * builds the two sets of faces \f$F_{\Gamma,1}\f$ and \f$F_{\Gamma,2}\f$
+ * which are involved in the stabilisation.
+ */
+void get_stab_face_sets( const std::vector<const TetraCL*>& stab_tetras,
+                         const LevelsetP2CL& lset,
+                         std::set<const FaceCL*>& F_GammaOne,
+                         std::set<const FaceCL*>& F_GammaTwo )
+{
+    typedef std::vector<const TetraCL*>::const_iterator vec_tetra_iter;
+    for ( vec_tetra_iter it = stab_tetras.begin();
+          it != stab_tetras.end(); ++it )
+    {
+        const TetraCL *const K = *it;
+        for ( Uint i = 0; i < 4; ++i )
+        {
+            Ubyte result = is_in_F_Gamma_i( K, i, lset );
+            if ( result & 1 ) F_GammaOne.insert( K->GetFace(i) );
+            if ( result & 2 ) F_GammaTwo.insert( K->GetFace(i) );
+        }
+    }
+}
+
+/*!
+ * \brief Returns whether a face belongs to one of the stabilisation sets.
+ *
+ * The ghost stabilisation by Hansbo et al. is defined via two face sets, which
+ * in turn are defined by means of a set of tetrahedra, see get_stab_tetras().
+ * This function expects a tetrahedron from this set and the number of the face
+ * within this tetrehedron. If the face lies at least partially in \f$\Omega_1\f$,
+ * the least significant bit of the result is set. If it lies at least partially
+ * in \f$\Omega_2\f$, the second lest significant bit of the result is set.
+ */
+Ubyte is_in_F_Gamma_i( const TetraCL *const K, const Uint face_no,
+                       const LevelsetP2CL &lset )
+{
+    LocalP2CL<> loc_phi;
+    loc_phi.assign( *K, lset.Phi, lset.GetBndData() );
+    InterfaceTetraCL cut;
+    cut.Init( *K, loc_phi );
+
+    // There are ten degrees of freedom in the tetrahedron for the
+    // level-set function. Here we obtain the local numbers for
+    // those DOFs which lie on the face we are interested in.
+    const int dof_numbers[] = { VertOfFace( face_no, 0 ),
+                                VertOfFace( face_no, 1 ),
+                                VertOfFace( face_no, 2 ),
+                                EdgeOfFace( face_no, 0 ) + 4,
+                                EdgeOfFace( face_no, 1 ) + 4,
+                                EdgeOfFace( face_no, 2 ) + 4 };
+
+    // Get the signs of the level-set functions at the DOFs of the
+    // face.
+    const int dof_signs[] = { cut.GetSign( dof_numbers[0] ),
+                              cut.GetSign( dof_numbers[1] ),
+                              cut.GetSign( dof_numbers[2] ),
+                              cut.GetSign( dof_numbers[3] ),
+                              cut.GetSign( dof_numbers[4] ),
+                              cut.GetSign( dof_numbers[5] ) };
+
+    Ubyte result = 0;
+    // There are only two cases to consider:
+    // 1. At least one level-set value is strictly negative (positive).
+    //    In this case the face lies (at least) partially in \f$\Omega_1\f$
+    //    (\f$\Omega_2\f$) and belongs to \f$F_{\Gamma,1}\f$ (\f$F_{\Gamma,2}\f$).
+    // 2. The sign of the level-set function is exactly zero on all nodes.
+    //    In this case the face is a subset of the interface and it belongs
+    //    two both sets of faces for the stabilisation.
+
+    // Case 1.
+    if ( dof_signs[0] < 0 ) result |= 1;
+    if ( dof_signs[1] < 0 ) result |= 1;
+    if ( dof_signs[2] < 0 ) result |= 1;
+    if ( dof_signs[3] < 0 ) result |= 1;
+    if ( dof_signs[4] < 0 ) result |= 1;
+    if ( dof_signs[5] < 0 ) result |= 1;
+
+    if ( dof_signs[0] > 0 ) result |= 2;
+    if ( dof_signs[1] > 0 ) result |= 2;
+    if ( dof_signs[2] > 0 ) result |= 2;
+    if ( dof_signs[3] > 0 ) result |= 2;
+    if ( dof_signs[4] > 0 ) result |= 2;
+    if ( dof_signs[5] > 0 ) result |= 2;
+    
+    // Case 2.
+    if ( dof_signs[0] == dof_signs[1] && dof_signs[1] == dof_signs[2] &&
+         dof_signs[2] == dof_signs[3] && dof_signs[3] == dof_signs[4] &&
+         dof_signs[4] == dof_signs[5] && dof_signs[5] == 0 )
+    {
+        result |= 1;
+        result |= 2;
+    }
+
+    return result;
+}
+
+/*!
+ * \brief Add the contribution of a single face to the stabilisation matrix.
+ *
+ * Given a face and the number of the face set the face belongs to, this
+ * function adds the contribution of that face to the stabilisation matrix.
+ */
+void treat_face( const FaceCL *const F, const int set_number,
+                 const IdxDescCL& RowIdx, const LevelsetP2CL &lset,
+                 const double h3, const double mu_inv, MatrixBuilderCL &J_pr )
+{
+    const TetraCL *const K1 = F->GetNeighbor(0);
+    const TetraCL *const K2 = F->GetNeighbor(1);
+
+    if ( K1 == 0 || K2 == 0 )
+    {
+        // F is part of the boundary and does not take part in the
+        // stabilisation.
+        return;
+    }
+
+    const Uint face_no1 = get_face_number_in_tetra( F, K1 );
+
+    Point3DCL normal; double dir;
+    const double area = 0.5*K1->GetNormal( face_no1, normal, dir );
+
+    const double dir1 =  dir;
+    const double dir2 = -dir;
+    
+    // There are 5 vertices involved: the three vertices of the face and
+    // the respective opposite vertices in the tetrahedra. We introduce a
+    // face-local numbering: 0 - 2 refer to the vertices on the face, 3
+    // refers to the opposite vertex in K1, 4 to the opposite vertex in K2.
+
+    Uint K1idx_to_Fidx[4], K2idx_to_Fidx[4];
+    get_tetra_to_face_indeces( F, K1idx_to_Fidx, K2idx_to_Fidx );
+
+    //////////////////////////////////////////////////////////////////
+    // Compute the gradient jumps of the standard ansatz functions. //
+    //////////////////////////////////////////////////////////////////
+    double s_jumps[5] = { 0, 0, 0, 0, 0 };
+    Point3DCL gradients[4]; double det;
+    P1DiscCL::GetGradients( gradients, det, *K1 );
+    for ( int i = 0; i < 4; ++i )
+    {
+        s_jumps[ K1idx_to_Fidx[i] ] += dir1*inner_prod( gradients[i], normal );
+    }
+
+    P1DiscCL::GetGradients( gradients, det, *K2 );
+    for ( int i = 0; i < 4; ++i )
+    {
+        s_jumps[ K2idx_to_Fidx[i] ] += dir2*inner_prod( gradients[i], normal );
+    }
+
+
+    //////////////////////////////////////////////////////////////////
+    // Compute the gradient jumps of the extended ansatz functions. //
+    //////////////////////////////////////////////////////////////////
+    double x_jumps[5] = { 0, 0, 0, 0, 0 };
+
+    P1DiscCL::GetGradients( gradients, det, *K1 );
+
+    /// Now retrieve the heaviside values for the extended ansatz functions.
+    const int heaviside_face = ( set_number == 1 ) ? 0 : 1;
+
+    int heaviside_nodes[4], signs[4];
+    get_tetra_corner_signs( K1, lset, signs );
+    for ( int i = 0; i < 4; ++i )
+        heaviside_nodes[i] = ( signs[i] < 0 ) ? 0 : 1;
+
+    // Change the signs of the gradients accordingly.
+    for ( int i = 0; i < 4; ++i )
+        gradients[i] *= (heaviside_face - heaviside_nodes[i]);
+    
+    // Add contribution to the jumps.
+    for ( int i = 0; i < 4; ++i )
+    {
+        x_jumps[ K1idx_to_Fidx[i] ] += dir1*inner_prod( gradients[i], normal );
+    }
+
+
+    // The same, just for K2.
+    P1DiscCL::GetGradients( gradients, det, *K2 );
+
+    /// Now retrieve the \f$\Phi_j\f$ of the Ansatzfunctions.
+    get_tetra_corner_signs( K2, lset, signs );
+    for ( int i = 0; i < 4; ++i )
+        heaviside_nodes[i] = ( signs[i] < 0 ) ? 0 : 1;
+
+    // Change the signs of the gradients accordingly.
+    for ( int i = 0; i < 4; ++i )
+        gradients[i] *= (heaviside_face - heaviside_nodes[i]);
+
+    
+    // Add contribution to the jumps.
+    for ( int i = 0; i < 4; ++i )
+    {
+        x_jumps[ K2idx_to_Fidx[i] ] += dir2*inner_prod( gradients[i], normal );
+    }
+
+    ////////////////////////////////////////////////////////////////////
+    // Perform "integration" over the faces and add to global matrix. //
+    ////////////////////////////////////////////////////////////////////
+    const ExtIdxDescCL& Xidx = RowIdx.GetXidx();
+    const Uint idx = RowIdx.GetIdx(); 
+    IdxT indeces[10] = { NoIdx, NoIdx, NoIdx, NoIdx, NoIdx,
+                         NoIdx, NoIdx, NoIdx, NoIdx, NoIdx };
+    for ( int i = 0; i < 4; ++i )
+    {
+        IdxT std_idx = K1->GetVertex(i)->Unknowns(idx);
+        indeces[     K1idx_to_Fidx[i] ] = std_idx;
+        indeces[ 5 + K1idx_to_Fidx[i] ] = Xidx[ std_idx ];
+    }
+    for ( int i = 0; i < 4; ++i )
+    {
+        IdxT std_idx = K2->GetVertex(i)->Unknowns(idx);
+        indeces[     K2idx_to_Fidx[i] ] = std_idx;
+        indeces[ 5 + K2idx_to_Fidx[i] ] = Xidx[ std_idx ];
+    }
+
+    const double jumps[10] = { s_jumps[0], s_jumps[1], s_jumps[2], s_jumps[3], s_jumps[4],
+                               x_jumps[0], x_jumps[1], x_jumps[2], x_jumps[3], x_jumps[4] };
+
+    for ( int i = 0; i < 10; ++i )
+    {
+        if ( indeces[i] == NoIdx ) continue;
+        if ( jumps[i] == 0 ) continue;
+
+        for ( int j = 0; j < 10; ++j )
+        {
+            if ( indeces[j] == NoIdx ) continue;
+            if ( jumps[j] == 0 ) continue;
+
+            J_pr( indeces[i], indeces[j] ) += h3*mu_inv*area*jumps[i]*jumps[j];
+        }
+    }
+}
+
+void get_tetra_corner_signs( const TetraCL *const K, const LevelsetP2CL &lset, int signs[4] )
+{
+    LocalP2CL<> loc_phi;
+    loc_phi.assign( *K, lset.Phi, lset.GetBndData() );
+    InterfaceTetraCL cut;
+    cut.Init( *K, loc_phi );
+
+    signs[0] = cut.GetSign(0);  
+    signs[1] = cut.GetSign(1);  
+    signs[2] = cut.GetSign(2);  
+    signs[3] = cut.GetSign(3);  
+}
+
+void get_tetra_to_face_indeces( const FaceCL *const F,
+                                Uint K1idx_to_Fidx[4], Uint K2idx_to_Fidx[4] )
+{
+    const TetraCL *const K1 = F->GetNeighbor(0);
+    const TetraCL *const K2 = F->GetNeighbor(1);
+
+    for ( int i = 0; i < 4; ++i )
+    {
+        const VertexCL *const v = K1->GetVertex(i);
+        if ( v == F->GetVertex(0) )
+        {
+            K1idx_to_Fidx[i] = 0;
+        }
+        else if ( v == F->GetVertex(1) )
+        {
+            K1idx_to_Fidx[i] = 1;
+        }
+        else if ( v == F->GetVertex(2) )
+        {
+            K1idx_to_Fidx[i] = 2;
+        }
+        else
+        {
+            K1idx_to_Fidx[i] = 3;
+        }
+    }
+
+    for ( int i = 0; i < 4; ++i )
+    {
+        const VertexCL *const v = K2->GetVertex(i);
+        if ( v == F->GetVertex(0) )
+        {
+            K2idx_to_Fidx[i] = 0;
+        }
+        else if ( v == F->GetVertex(1) )
+        {
+            K2idx_to_Fidx[i] = 1;
+        }
+        else if ( v == F->GetVertex(2) )
+        {
+            K2idx_to_Fidx[i] = 2;
+        }
+        else
+        {
+            K2idx_to_Fidx[i] = 4;
+        }
+    }
+}
+
+Uint get_face_number_in_tetra( const FaceCL *const F, const TetraCL *const K )
+{
+    if ( F == K->GetFace(0) ) return 0;
+    if ( F == K->GetFace(1) ) return 1;
+    if ( F == K->GetFace(2) ) return 2;
+    if ( F == K->GetFace(3) ) return 3;
+    else throw DROPSErrCL("Could not find the given face in the tetrahedron.");
+}
+
+} // end of anonymous namespace.
 
 // -----------------------------------------------------------------------------
 //                        Routines for SetupPrStiff
@@ -1288,6 +1758,25 @@ void InstatStokes2PhaseP2P1CL::SetupPrMass( MLMatDescCL* matM, const LevelsetP2C
     }
 }
 
+void InstatStokes2PhaseP2P1CL::SetupC( MLMatDescCL* matC, const LevelsetP2CL& lset, double eps_p ) const
+{
+    MLMatrixCL::iterator itC = matC->Data.begin();
+    MLIdxDescCL::iterator itIdx = matC->RowIdx->begin();
+    for ( size_t lvl = 0; lvl < matC->Data.size(); ++lvl, ++itC, ++itIdx )
+    {
+        if ( GetPrFE() == P1X_FE )
+        {
+            SetupPrGhostStab_P1X( MG_, Coeff_, *itC, *itIdx, lset, eps_p );
+        }
+        else
+        { 
+            // Stabilisation is not defined for this type. Don't do anything.
+            const IdxT num_unks_pr = itIdx->NumUnknowns();
+            itC->clear();
+            itC->resize( num_unks_pr, num_unks_pr, 0 );
+        }
+    }
+}
 
 void InstatStokes2PhaseP2P1CL::SetupPrStiff( MLMatDescCL* A_pr, const LevelsetP2CL& lset) const
 /// Needed for preconditioning of the Schur complement. Uses natural
@@ -3313,6 +3802,7 @@ void InstatStokes2PhaseP2P1CL::SetIdx()
 
     A.SetIdx   ( vidx, vidx);
     B.SetIdx   ( pidx, vidx);
+    C.SetIdx   ( pidx, pidx);
     prM.SetIdx ( pidx, pidx);
     prA.SetIdx ( pidx, pidx);
     M.SetIdx   ( vidx, vidx);
@@ -3335,6 +3825,7 @@ void InstatStokes2PhaseP2P1CL::SetNumPrLvl( size_t n)
     const double bound = pr_idx.GetFinest().GetXidx().GetBound();
     pr_idx.resize( n, GetPrFE(),  BndData_.Pr, match, bound);
     B.Data.resize   (pr_idx.size());
+    C.Data.resize   (pr_idx.size());
     prM.Data.resize (pr_idx.size());
     prA.Data.resize (pr_idx.size());
 }
@@ -3343,7 +3834,7 @@ void InstatStokes2PhaseP2P1CL::SetNumPrLvl( size_t n)
 void InstatStokes2PhaseP2P1CL::GetPrOnPart( VecDescCL& p_part, const LevelsetP2CL& lset, bool posPart)
 {
     const Uint lvl= p.RowIdx->TriangLevel(),
-        idxnum= p.RowIdx->GetIdx();
+          idxnum= p.RowIdx->GetIdx();
     LevelsetP2CL::const_DiscSolCL ls= lset.GetSolution();
     const MultiGridCL& mg= this->GetMG();
     const ExtIdxDescCL& Xidx= this->GetXidx();
@@ -3356,18 +3847,18 @@ void InstatStokes2PhaseP2P1CL::GetPrOnPart( VecDescCL& p_part, const LevelsetP2C
     for( MultiGridCL::const_TriangVertexIteratorCL it= mg.GetTriangVertexBegin(lvl),
         end= mg.GetTriangVertexEnd(lvl); it != end; ++it)
     {
+		 if (!it->Unknowns.Exist( idxnum)) continue;
         const IdxT nr= it->Unknowns(idxnum);
         if (Xidx[nr]==NoIdx) continue;
 
-        const bool is_pos= InterfacePatchCL::Sign( ls.val( *it))==1;
-        if (posPart==is_pos) continue; // extended hat function ==0 on this part
+        const bool sign= InterfacePatchCL::Sign( ls.val( *it))==1;
+        if (posPart==sign) continue; // extended hat function ==0 on this part
         if (posPart)
             pp[nr]+= p.Data[Xidx[nr]];
         else
             pp[nr]-= p.Data[Xidx[nr]];
     }
 }
-
 
 double InstatStokes2PhaseP2P1CL::GetCFLTimeRestriction( LevelsetP2CL& lset)
 {
@@ -3510,7 +4001,94 @@ void InstatStokes2PhaseP2P1CL::CheckOnePhaseSolution(const VelVecDescCL* DescVel
 				   <<"\n || p_h - p ||_L2 = " <<  L2_pr 
 				   <<"\n || nabla (p_h - p) ||_L2 = " << Grad_pr << std::endl;	
 }
+//-------------------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------------------
+//The three functions in this block is used to repeat the L2 pressure error checker in prJump.cpp
+/*Point3DCL Radius; 
+Point3DCL Mitte;
+double DistanceFct( const Point3DCL& p, double)
+{
+	static bool first = true;
+	if (first){
+		Radius =  P.get<DROPS::Point3DCL>("Exp.RadDrop");
+		Mitte  =  P.get<DROPS::Point3DCL>("Exp.PosDrop");
+	}
+	Point3DCL d= p - Mitte;
+	const double avgRad= cbrt(Radius[0]*Radius[1]*Radius[2]);
+	d/= Radius;
+	return std::abs( avgRad)*d.norm() - avgRad;
+}
 
+void InitialPr( VecDescCL& p, double delta_p, const MultiGridCL& mg, const FiniteElementT prFE, const ExtIdxDescCL& Xidx)
+{
+    const Uint lvl= p.RowIdx->TriangLevel(),
+        idxnum= p.RowIdx->GetIdx();
+
+    delta_p/= 2;
+    switch (prFE)
+    {
+      case P0_FE:
+        for( MultiGridCL::const_TriangTetraIteratorCL it= mg.GetTriangTetraBegin(lvl),
+            end= mg.GetTriangTetraEnd(lvl); it != end; ++it)
+        {
+            const double dist= DistanceFct( GetBaryCenter( *it), 0);
+            p.Data[it->Unknowns(idxnum)]= dist > 0 ? -delta_p : delta_p;
+        }
+        break;
+      case P1X_FE:
+        for( MultiGridCL::const_TriangVertexIteratorCL it= mg.GetTriangVertexBegin(lvl),
+            end= mg.GetTriangVertexEnd(lvl); it != end; ++it)
+        {
+            const IdxT idx= it->Unknowns(idxnum);
+            if (Xidx[idx]==NoIdx) continue;
+            p.Data[Xidx[idx]]= -2*delta_p; // jump height
+        }
+      case P1_FE: // and P1X_FE
+        for( MultiGridCL::const_TriangVertexIteratorCL it= mg.GetTriangVertexBegin(lvl),
+            end= mg.GetTriangVertexEnd(lvl); it != end; ++it)
+        {
+            const double dist= DistanceFct( it->GetCoord(), 0.);
+            p.Data[it->Unknowns(idxnum)]= InterfacePatchCL::Sign(dist)==1 ? -delta_p : delta_p;
+        }
+        break;
+      default:
+        std::cout << "InitPr not implemented yet for this FE type!\n";
+    }
+}
+
+void L2ErrPr( const VecDescCL& p, const LevelsetP2CL& lset, const MatrixCL& prM, double delta_p, const MultiGridCL& mg, const FiniteElementT prFE, const ExtIdxDescCL& Xidx, double p_ex_avg)
+{
+    const double min= p.Data.min(), max= p.Data.max();
+    std::cout << "pressure min/max/diff:\t" << min << "\t" << max << "\t" << (max-min-delta_p) << "\n";
+
+    VectorCL ones( 1.0, p.Data.size());
+    if (prFE==P1X_FE)
+        for (int i=Xidx.GetNumUnknownsStdFE(), n=ones.size(); i<n; ++i)
+            ones[i]= 0;
+    const double Vol= dot( prM*ones, ones)*P.get<double>("Mat.ViscDrop"); // note that prM is scaled by 1/mu !!
+// std::cout << "Vol = " << Vol << '\n';
+    const double p_avg= dot( prM*p.Data, ones)*P.get<double>("Mat.ViscDrop")/Vol; // note that prM is scaled by 1/mu !!
+    VectorCL diff( p.Data - p_avg*ones);
+    const double p0_avg= dot( prM*diff, ones)*P.get<double>("Mat.ViscDrop")/Vol;
+    std::cout << "average of pressure:\t" << p_avg << std::endl;
+    std::cout << "avg. of scaled pr:\t" << p0_avg << std::endl;
+
+    if (prFE==P1X_FE)
+    {
+        VecDescCL p_exakt( p.RowIdx);
+        InitialPr( p_exakt, delta_p, mg, prFE, Xidx);
+        const double p_ex_avg2= dot( prM*p_exakt.Data, ones)*P.get<double>("Mat.ViscDrop")/Vol;
+        std::cout << "avg. of exact pr:\t" << p_ex_avg2 << std::endl;
+        diff-= VectorCL( p_exakt.Data - p_ex_avg*ones);
+        const double L2= std::sqrt( P.get<double>("Mat.ViscDrop")*dot( prM*diff, diff));
+        std::cout << "*************\n"
+                  << "assuming avg(p*)==" << p_ex_avg
+                  << "  ===>  \t||e_p||_L2 = " << L2 << std::endl
+                  << "*************\n";
+    }
+}*/
+//-----------------------------------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------------------------------------------------------
 
 //To check solution with continuous velocity, and discountious pressure;
 void InstatStokes2PhaseP2P1CL::CheckTwoPhaseSolution(const VelVecDescCL* DescVel, const VecDescCL* DescPr, 
@@ -3526,6 +4104,10 @@ void InstatStokes2PhaseP2P1CL::CheckTwoPhaseSolution(const VelVecDescCL* DescVel
 	Uint lvl=DescVel->GetLevel();
 	VecDescCL DescPr_neg; 
 	VecDescCL DescPr_pos;
+    /// \todo for periodic stuff: matching function here
+
+    DescPr_neg.SetIdx( p.RowIdx);
+    DescPr_pos.SetIdx( p.RowIdx);
 	GetPrOnPart(DescPr_neg, lset, false);
 	GetPrOnPart(DescPr_pos, lset, true);
 	
@@ -3540,25 +4122,23 @@ void InstatStokes2PhaseP2P1CL::CheckTwoPhaseSolution(const VelVecDescCL* DescVel
     double L2_pr(0.0);
     Quad5CL<Point3DCL> q5_vel, q5_vel_exact;
     Quad5CL<double> q5_pr, q5_pr_exact;
-	GridFunctionCL<double> pre_neg, pre_pos, pre_exact1,pre_exact2;
+	GridFunctionCL<double> pre_neg, pre_pos, pre_exact1,pre_exact2, err_neg, err_pos;
 	
 	TetraPartitionCL partition;
 	QuadDomainCL q5dom;
-
+	InterfaceTetraCL cut;
 	const PrincipalLatticeCL lat(PrincipalLatticeCL::instance(2));
     std::valarray<double> ls_loc(lat.vertex_size());
+	
 	
 	double SumErr=0.;
 	double volume=0.;
 	double average=0.;
-	double trash;
-	double neg =0, pos=0;
     for (MultiGridCL::const_TriangTetraIteratorCL sit= const_cast<const MultiGridCL&>(MG_).GetTriangTetraBegin(lvl),
         send= const_cast<const MultiGridCL&>(MG_).GetTriangTetraEnd(lvl); sit != send; ++sit)
     {
 		 evaluate_on_vertexes( lset.GetSolution(), *sit, lat, Addr( ls_loc));
-		 const bool noCut= equal_signs( ls_loc);
-		
+		 const bool noCut= equal_signs( ls_loc);	 
          GetTrafoTr(T,det,*sit);
          const double absdet= std::fabs(det);
          LocalP1CL<double> loc_pr(*sit, make_P1Eval(MG_,BndData_.Pr,*DescPr));
@@ -3574,35 +4154,35 @@ void InstatStokes2PhaseP2P1CL::CheckTwoPhaseSolution(const VelVecDescCL* DescVel
 		 }
 		 else{
 			 partition.make_partition<SortedVertexPolicyCL, MergeCutPolicyCL>( lat, ls_loc);
-			 make_CompositeQuad5Domain( q5dom, partition);
+			 make_CompositeQuad2Domain( q5dom, partition);
 			 LocalP1CL<double> loc_pr_neg(*sit, make_P1Eval(MG_,BndData_.Pr, DescPr_neg));
-             resize_and_evaluate_on_vertexes( RefPr, *sit, q5dom, 6., pre_exact1);
 			 LocalP1CL<double> loc_pr_pos(*sit, make_P1Eval(MG_,BndData_.Pr, DescPr_pos));
-			 resize_and_evaluate_on_vertexes( RefPr, *sit, q5dom, 4., pre_exact2); 
+
 			 resize_and_evaluate_on_vertexes( loc_pr_neg, q5dom, pre_neg);
 			 resize_and_evaluate_on_vertexes( loc_pr_pos, q5dom, pre_pos); 
-			 quad ( pre_neg-pre_exact1, absdet, q5dom, neg, trash);  
-             resize_and_evaluate_on_vertexes( RefPr, *sit, q5dom, 4., pre_exact2); 
-             quad ( pre_pos-pre_exact2, absdet, q5dom, trash, pos);
-			 SumErr+= neg;
-			 SumErr+= pos;
+			 
+			 resize_and_evaluate_on_vertexes( RefPr, *sit, q5dom, 6., pre_exact1);
+			 resize_and_evaluate_on_vertexes( RefPr, *sit, q5dom, 4., pre_exact2); 	
+			 
+			 SumErr+= quad ( (pre_neg-pre_exact1), absdet, q5dom, NegTetraC);
+			 SumErr+= quad ( (pre_pos-pre_exact2), absdet, q5dom, PosTetraC);	
 		 }
      }
 	 //Get the average pressure, use it to normalize the pressure;
 	average= SumErr/volume;
-	//std::cout<<"The average of the pressure error is: "<<average<<" The volume is: "<<volume<<std::endl;
-    neg=0, pos=0;
+	std::cout<<"The average of the pressure error is: "<<average<<" The volume is: "<<volume<<std::endl;
     for (MultiGridCL::const_TriangTetraIteratorCL sit= const_cast<const MultiGridCL&>(MG_).GetTriangTetraBegin(lvl),
         send= const_cast<const MultiGridCL&>(MG_).GetTriangTetraEnd(lvl); sit != send; ++sit)
     {
 		 evaluate_on_vertexes( lset.GetSolution(), *sit, lat, Addr( ls_loc));
+		 cut.Init( *sit, lset.Phi, lset.GetBndData());
 		 const bool noCut= equal_signs( ls_loc);
-		
+		 	
          GetTrafoTr(T,det,*sit);
          const double absdet= std::fabs(det);
          LocalP2CL<Point3DCL> loc_vel(*sit, make_P2Eval(MG_,BndData_.Vel,*DescVel));
          LocalP1CL<double> loc_pr(*sit, make_P1Eval(MG_,BndData_.Pr,*DescPr));
-		 LocalP1CL<double> loc_aver(average);
+		  LocalP1CL<double> loc_aver(average);
 			 
          q5_vel.assign(loc_vel);
          q5_vel_exact.assign(*sit, RefVel,t);
@@ -3623,27 +4203,63 @@ void InstatStokes2PhaseP2P1CL::CheckTwoPhaseSolution(const VelVecDescCL* DescVel
 		 }
 		 else{
 			 partition.make_partition<SortedVertexPolicyCL, MergeCutPolicyCL>( lat, ls_loc);
-			 make_CompositeQuad5Domain( q5dom, partition);
+			 make_CompositeQuad2Domain( q5dom, partition);
 			 LocalP1CL<double> loc_pr_neg(*sit, make_P1Eval(MG_,BndData_.Pr, DescPr_neg));
 			 LocalP1CL<double> loc_pr_pos(*sit, make_P1Eval(MG_,BndData_.Pr, DescPr_pos));
 			 LocalP1CL<double> temp1(loc_pr_neg-loc_aver); //for negative pressure;
 			 LocalP1CL<double> temp2(loc_pr_pos-loc_aver); //for positive pressure;
-			 resize_and_evaluate_on_vertexes( temp1, q5dom, pre_neg);
-			 resize_and_evaluate_on_vertexes( temp2, q5dom, pre_pos); 
-			 //To do: currently not find the best way, use the time to as level set sign flag;
-             resize_and_evaluate_on_vertexes( RefPr, *sit, q5dom, 6., pre_exact1);  
-			 quad ( (pre_neg-pre_exact1)*(pre_neg-pre_exact1), absdet, q5dom, neg, trash);  
-			 L2_pr += neg;
-             resize_and_evaluate_on_vertexes( RefPr, *sit, q5dom, 4., pre_exact2); 
-             quad ( (pre_pos-pre_exact2)*(pre_pos-pre_exact2), absdet, q5dom, trash, pos);
-			 L2_pr += pos;			 
+			 LocalP2CL<double> pr_neg_l2 (temp1);
+			 LocalP2CL<double> pr_pos_l2 (temp2);
+			 LocalP2CL<double> pr_ex_neg (*sit, RefPr, 6);
+			 LocalP2CL<double> pr_ex_pos (*sit, RefPr, 4);
+			 LocalP2CL<double> err_neg_l2( (pr_neg_l2-pr_ex_neg)*(pr_neg_l2-pr_ex_neg) );
+			 LocalP2CL<double> err_pos_l2( (pr_pos_l2-pr_ex_pos)*(pr_pos_l2-pr_ex_pos) );
+			 
+			 resize_and_evaluate_on_vertexes(err_neg_l2,  q5dom,  err_neg);
+			 resize_and_evaluate_on_vertexes(err_pos_l2,  q5dom,  err_pos); 
+			 //To do: currently not find the best way, use the time to as level set sign flag;			 
+			 L2_pr += quad ( err_pos,  absdet, q5dom,   PosTetraC);
+			 L2_pr += quad ( err_neg,  absdet, q5dom,   NegTetraC);	 
 		 }
      }
      L2_vel  = std::sqrt(L2_vel);               //L2_vel is the true value.
-	 L2_pr = std::sqrt(L2_pr);
+     L2_pr   = std::sqrt(L2_pr);
          std::cout << "---------------------Discretize error-------------------"
-		           <<"\n || u_h - u ||_L2 = " <<  L2_vel 
-				   <<"\n || p_h - p ||_L2 = " << L2_pr << std::endl;	
+		            <<"\n || u_h - u ||_L2 = " <<  L2_vel 
+				     <<"\n || p_h - p ||_L2 = " <<  L2_pr << std::endl;	
+	
+    //The following code is repeating the L2 pressure error checker in prJump.cpp
+	/*const double Vol= 8.,
+        prJump= P.get<double>("SurfTens.SurfTension")*2/P.get<DROPS::Point3DCL>("Exp.RadDrop")[0], // for SF_*LB force
+        avg_ex= prJump/2.*(8./3.*M_PI*P.get<DROPS::Point3DCL>("Exp.RadDrop")[0]*P.get<DROPS::Point3DCL>("Exp.RadDrop")[0]*P.get<DROPS::Point3DCL>("Exp.RadDrop")[0] - Vol)/Vol; // for spherical interface
+	
+	if (UsesXFEM())
+    {
+        const ExtIdxDescCL& Xidx= GetXidx();
+        const size_t n= p.Data.size();
+
+        const double limtol= 10,
+            lim_min= -prJump - limtol*prJump,
+            lim_max= -prJump + limtol*prJump;
+        double xmin= 1e99, xmax= -1e99, sum= 0, sum_lim= 0;
+        IdxT num= 0;
+        for (size_t i=Xidx.GetNumUnknownsStdFE(); i<n; ++i)
+        {
+            const double pr= p.Data[i];
+            sum+= pr;
+            ++num;
+            if (pr>xmax) xmax= pr;
+            if (pr<xmin) xmin= pr;
+            if (pr>lim_max) p.Data[i]= lim_max;
+            if (pr<lim_min) p.Data[i]= lim_min;
+            sum_lim+= p.Data[i];
+        }
+        std::cout << "extended pr: min/max/avg = " << xmin << ", " << xmax << ", " << sum/num << std::endl;
+        std::cout << "limited pr:  min/max/avg = " << lim_min << ", " << lim_max << ", " << sum_lim/num << std::endl;
+    }
+	
+	SetupPrMass(&prM, lset);
+	L2ErrPr( p, lset, prM.Data.GetFinest(), prJump, MG_, GetPrFE(), GetXidx(), avg_ex);	*/ 
 }
 
 ///> To do, parallel case
@@ -3873,7 +4489,7 @@ void SetupMassDiag_vecP2(const MultiGridCL& MG, VectorCL& M, const IdxDescCL& Ro
         Numb.assign( *sit, RowIdx, bnd);
         for(int i=0; i<10; ++i)
             if (Numb.WithUnknowns( i)) {
-            	const double contrib= P2DiscCL::GetMass( i, i)*absdet;
+                const double contrib= P2DiscCL::GetMass( i, i)*absdet;
                 M[Numb.num[i]  ]+= contrib;
                 M[Numb.num[i]+1]+= contrib;
                 M[Numb.num[i]+2]+= contrib;
@@ -4071,3 +4687,4 @@ void SetupLumpedMass (const MultiGridCL& MG, VectorCL& M, const IdxDescCL& RowId
 }
 
 } // end of namespace DROPS
+

@@ -1,6 +1,6 @@
 /// \file spmat.h
 /// \brief sparse matrix in compressed row format
-/// \author LNM RWTH Aachen: Joerg Peters, Volker Reichelt; SC RWTH Aachen: Oliver Fortmeier
+/// \author LNM RWTH Aachen: Patrick Esser, Joerg Grande, Volker Reichelt; SC RWTH Aachen: Oliver Fortmeier
 
 /*
  * This file is part of DROPS.
@@ -19,7 +19,7 @@
  * along with DROPS. If not, see <http://www.gnu.org/licenses/>.
  *
  *
- * Copyright 2009 LNM/SC RWTH Aachen, Germany
+ * Copyright 2013 LNM/SC RWTH Aachen, Germany
 */
 
 #ifndef DROPS_SPMAT_H
@@ -46,11 +46,6 @@
 #include "misc/container.h"
 #ifdef _PAR
 # include "parallel/parallel.h"
-#endif
-
-/// For mmap in the memory-management of SparseMatBaseCL.
-#ifndef DROPS_WIN
-#  include <sys/mman.h>
 #endif
 
 namespace DROPS
@@ -536,7 +531,6 @@ public:
                 throw DROPSErrCL( "SparseMatBuilderCL: Cannot reuse the pattern for block_type != double.");
             Comment("SparseMatBuilderCL: Reusing OLD matrix" << std::endl, DebugNumericC);
             _coupl=0;
-            std::memset( _mat->_val, 0, mat->num_nonzeros()*sizeof( T));
         }
         else
         {
@@ -640,9 +634,9 @@ private:
 
     size_t version_; ///< All modifications increment this. Starts with 1.
 
-    size_t* _rowbeg; ///< (_rows+1 entries, last entry must be <=_nz) index of first non-zero-entry in _val belonging to the row given as subscript
-    size_t* _colind; ///< (nnz_ entries) column-number of corresponding entry in _val
-    T*      _val;    ///< (nnz_ entries) the components of the matrix
+    std::valarray<size_t> _rowbeg; ///< (_rows+1 entries, last entry must be <=_nz) index of first non-zero-entry in _val belonging to the row given as subscript
+    std::valarray<size_t> _colind; ///< (nnz_ entries) column-number of corresponding entry in _val
+    std::valarray<T>      _val;    ///< (nnz_ entries) the components of the matrix
 
     void num_rows (size_t rows);    ///< Set _rows and resize _rowbeg
     void num_cols (size_t cols);    ///< Set _cols
@@ -658,18 +652,17 @@ public:
     ~SparseMatBaseCL ();
 
     SparseMatBaseCL (size_t rows, size_t cols, size_t nnz); ///< the fields are allocated, but not initialized
-    SparseMatBaseCL (size_t rows, size_t cols, size_t nnz,  ///< construct matrix from the CRS-fields
-                     const T* valbeg , const size_t* rowbeg, const size_t* colindbeg);
+
     SparseMatBaseCL (const std::valarray<T>&); ///< Creates a square diagonal matrix.
 
     SparseMatBaseCL& operator= (const SparseMatBaseCL& m);
 
-    const T*      raw_val() const { return _val; }
-    T*            raw_val()       { return _val; }
-    const size_t* raw_row() const { return _rowbeg; }
-    size_t*       raw_row()       { return _rowbeg; }
-    const size_t* raw_col() const { return _colind; }
-    size_t*       raw_col()       { return _colind; }
+    const T*      raw_val() const { return Addr(_val); }
+    T*            raw_val()       { return Addr(_val); }
+    const size_t* raw_row() const { return Addr(_rowbeg); }
+    size_t*       raw_row()       { return Addr(_rowbeg); }
+    const size_t* raw_col() const { return Addr(_colind); }
+    size_t*       raw_col()       { return Addr(_colind); }
 
     size_t num_rows     () const { return _rows; }
     size_t num_cols     () const { return _cols; }
@@ -685,10 +678,10 @@ public:
     void IncrementVersion() { ++version_; }      ///< Increment modification version number
     size_t Version() const  { return version_; } ///< Get modification version number
 
-    const size_t* GetFirstCol(size_t i) const { return _colind + _rowbeg[i]; }
-          size_t* GetFirstCol(size_t i)       { return _colind + _rowbeg[i]; }
-    const T*      GetFirstVal(size_t i) const { return _val    + _rowbeg[i]; }
-          T*      GetFirstVal(size_t i)       { return _val    + _rowbeg[i]; }
+    const size_t* GetFirstCol(size_t i) const { return Addr(_colind) + _rowbeg[i]; }
+          size_t* GetFirstCol(size_t i)       { return Addr(_colind) + _rowbeg[i]; }
+    const T*      GetFirstVal(size_t i) const { return Addr(_val)    + _rowbeg[i]; }
+          T*      GetFirstVal(size_t i)       { return Addr(_val)    + _rowbeg[i]; }
 
     inline T  operator() (size_t i, size_t j) const;
 
@@ -727,8 +720,7 @@ template <typename T>
   SparseMatBaseCL<T>::num_rows (size_t rows)
 {
     _rows= rows;
-    delete[] _rowbeg;
-    _rowbeg= new size_t[rows + 1];
+    _rowbeg.resize(rows + 1);
 }
 
 template <typename T>
@@ -745,115 +737,46 @@ template <typename T>
     if (nnz == nnz_)
         return;
 
-    // deallocate old mem
-#ifdef DROPS_WIN
-    delete[] _val;
-    delete[] _colind;
-#else
-    const size_t nbold= sizeof_colind_and_val();
-    if (nbold < mmap_threshold) {
-        delete[] _val;
-        delete[] _colind;
-    }
-    else {
-        // std::cerr << "SparseMatBaseCL::num_nonzeros: Unmapping " << nbold << " bytes at " << _val << ".\n";
-        // _val is the front of the allocated storage
-        if (munmap( (void*) _val, nbold) < 0)
-            throw DROPSErrCL( "SparseMatBaseCL::num_nonzeros: munmap failed.\n");
-    }
-#endif
-
-    _val= 0;
-    _colind= 0;
-
+    // resize arrays
+    _val.resize(nnz);
+    _colind.resize(nnz);
     nnz_= nnz;
-    if (nnz_ == 0)
-        return;
-
-    // allocate new mem
-#ifdef DROPS_WIN
-    _val= new T[nnz];
-    _colind= new size_t[nnz];
-#else
-    const size_t nb= sizeof_colind_and_val();
-    if (nb < mmap_threshold) {
-        _val= new T[nnz];
-        _colind= new size_t[nnz];
-    }
-    else {
-        void* tmp= mmap( /*addr*/ 0, nb, PROT_READ | PROT_WRITE,
-                         MAP_ANONYMOUS | MAP_PRIVATE, /*fd*/ -1, /*offset*/ 0);
-        if (tmp == MAP_FAILED)
-            throw DROPSErrCL( "SparseMatBaseCL::num_nonzeros: mmap failed.\n");
-
-        _val= static_cast<T*>( tmp);
-        _colind= reinterpret_cast<size_t*>( _val + nnz_);
-        // std::cerr << "SparseMatBaseCL::num_nonzeros: Mapped " << nb << " bytes at " << _val << ".\n";
-    }
-#endif
 }
 
 template <typename T>
   SparseMatBaseCL<T>::SparseMatBaseCL ()
-    : _rows(0), _cols(0), nnz_( 0), version_(1), _rowbeg( new size_t[1]), _colind( 0), _val( 0)
-{
-    _rowbeg[0]= 0;
-}
+    : _rows(0), _cols(0), nnz_( 0), version_(1), _rowbeg( size_t(), 1), _colind(), _val()
+{}
 
 template <typename T>
   SparseMatBaseCL<T>::SparseMatBaseCL (const SparseMatBaseCL& m)
-    : _rows( m._rows), _cols( m._cols), nnz_( 0), version_( m.version_),
-      _rowbeg( new size_t[m._rows+1]), _colind( 0), _val( 0)
-{
-    num_nonzeros( m.num_nonzeros());
-    std::copy( m.raw_row(), m.raw_row() + m.num_rows() + 1, raw_row());
-    std::copy( m.raw_col(), m.raw_col() + m.num_nonzeros(), raw_col());
-    std::copy( m.raw_val(), m.raw_val() + m.num_nonzeros(), raw_val());
-}
+    : _rows( m._rows), _cols( m._cols), nnz_( m.nnz_), version_( m.version_),
+      _rowbeg( m._rowbeg), _colind( m._colind), _val( m._val)
+{}
 
 template <typename T>
   SparseMatBaseCL<T>::~SparseMatBaseCL ()
-{
-    delete[] _rowbeg;
-    try {
-        num_nonzeros( 0);
-    } catch (const DROPSErrCL& e) {
-        std::cerr << "SparseMatBaseCL::~SparseMatBaseCL: num_nonzeros failed:\n";
-        e.handle();
-    }
-}
+{}
 
 template <typename T>
   SparseMatBaseCL<T>::SparseMatBaseCL (size_t rows, size_t cols, size_t nnz)
-    : _rows( rows), _cols( cols), nnz_( 0), version_( 1),
-      _rowbeg( new size_t[rows+1]), _colind( 0), _val( 0)
-{
-    num_nonzeros( nnz);
-}
+    : _rows( rows), _cols( cols), nnz_( nnz), version_( 1),
+      _rowbeg( rows+1), _colind( nnz), _val( nnz)
+{}
 
-template <typename T>
-  SparseMatBaseCL<T>::SparseMatBaseCL (size_t rows, size_t cols, size_t nnz,
-    const T* valbeg , const size_t* rowbeg, const size_t* colindbeg)
-    : _rows(rows), _cols(cols), nnz_( 0), version_( 1),
-      _rowbeg( new size_t[rows+1]), _colind( 0), _val( 0)
-{
-    num_nonzeros( nnz);
-    std::copy( rowbeg, rowbeg + num_rows() + 1, raw_row());
-    std::copy( colindbeg, colindbeg + num_nonzeros(), raw_col());
-    std::copy( valbeg,    valbeg    + num_nonzeros(), raw_val());
-}
 
 template <typename T>
   SparseMatBaseCL<T>::SparseMatBaseCL(const std::valarray<T>& v)
       : _rows( v.size()), _cols( v.size()), nnz_( 0), version_( 1),
-        _rowbeg( new size_t[v.size() + 1]), _colind( 0), _val( 0)
+        _rowbeg( v.size() + 1), _colind( 0), _val( 0)
 {
     num_nonzeros( v.size());
     for (size_t i= 0; i < _rows; ++i)
         _rowbeg[i]= _colind[i]= i;
     _rowbeg[_rows]= _rows;
-    std::copy( Addr( v), Addr( v) + num_nonzeros(), raw_val());
+    _val = v;
 }
+
 
 template <typename T>
   SparseMatBaseCL<T>& SparseMatBaseCL<T>::operator= (const SparseMatBaseCL<T>& m)
@@ -861,9 +784,9 @@ template <typename T>
     if (&m == this) return *this;
 
     resize( m.num_rows(), m.num_cols(), m.num_nonzeros());
-    std::copy( m.raw_row(), m.raw_row() + m.num_rows() + 1, raw_row());
-    std::copy( m.raw_col(), m.raw_col() + m.num_nonzeros(), raw_col());
-    std::copy( m.raw_val(), m.raw_val() + m.num_nonzeros(), raw_val());
+    _colind = m._colind;
+    _rowbeg = m._rowbeg;
+    _val    = m._val;
     return *this;
 }
 
@@ -881,8 +804,7 @@ template <typename T>
   SparseMatBaseCL<T>::operator*= (T c)
 {
     IncrementVersion();
-    for (size_t i= 0; i < nnz_; ++i)
-        _val[i]*= c;
+    _val *= c;
     return *this;
 }
 
@@ -891,8 +813,7 @@ template <typename T>
   SparseMatBaseCL<T>::operator/= (T c)
 {
     IncrementVersion();
-    for (size_t i= 0; i < nnz_; ++i)
-        _val[i]/= c;
+    _val /= c;
     return *this;
 }
 
@@ -1305,7 +1226,7 @@ SparseMatBaseCL<T>& SparseMatBaseCL<T>::LinComb (double coeffA, const SparseMatB
             _rowbeg[row + 1]= i + (rAend - rA) + (rBend - rB);
         }
 
-        inplace_parallel_partial_sum( _rowbeg, _rowbeg + num_rows() + 1, t_sum);
+        inplace_parallel_partial_sum( Addr(_rowbeg), Addr(_rowbeg) + num_rows() + 1, t_sum);
 #       pragma omp barrier
 #       pragma omp master
             num_nonzeros( row_beg( num_rows()));
@@ -1340,8 +1261,8 @@ SparseMatBaseCL<T>& SparseMatBaseCL<T>::LinComb (double coeffA, const SparseMatB
                     _colind[i]= B._colind[iB++];
                 }
             // At most one of A or B might have entries left.
-            std::copy( B._colind + iB, B._colind + rBend,
-                       std::copy( A._colind + iA, A._colind + rAend, _colind + i));
+            std::copy( Addr(B._colind) + iB, Addr(B._colind) + rBend,
+                       std::copy( Addr(A._colind) + iA, Addr(A._colind) + rAend, Addr(_colind) + i));
             for (; iA < rAend; ++iA, ++i)
                 _val[i]= coeffA*A._val[iA];
             for (; iB < rBend; ++iB, ++i)
@@ -1351,6 +1272,7 @@ SparseMatBaseCL<T>& SparseMatBaseCL<T>::LinComb (double coeffA, const SparseMatB
     delete [] t_sum;
     return *this;
 }
+
 
 /// \brief Compute the linear combination of three sparse matrices.
 template <typename T>
@@ -1434,10 +1356,10 @@ SparseMatBaseCL<T>::insert_col (size_t c, const VectorBaseCL<T>& v)
     // Adjust the last rowbeg-entry.
     rowbeg[num_rows()]= colind.size();
     // Copy adapted arrays into the matrix.
-    std::copy( &rowbeg[0], &rowbeg[0] + num_rows() + 1, _rowbeg);
+    _rowbeg = rowbeg;
     num_nonzeros( colind.size());
-    std::copy( &colind[0], &colind[0] + colind.size(), _colind);
-    std::copy( &val[0],    &val[0]    + val.size(),    _val);
+    _colind = colind;
+    _val    = val;
 }
 
 

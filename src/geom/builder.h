@@ -35,11 +35,24 @@
 #include "geom/multigrid.h"
 #include "num/bndData.h"
 #include "misc/utils.h"
+#include "misc/singletonmap.h"
 #include <istream>
 #include <map>
 
 namespace DROPS
 {
+
+class ParamCL; // Forward Declaration for make_MGBuilder
+
+/// \brief Type of the factory-functions for MGBuilderCL-objects.
+typedef MGBuilderCL* (*MGBuilder_fun) (const ParamCL&);
+
+/// \brief Singleton for the factory-functions.
+typedef SingletonMapCL<MGBuilder_fun> BuilderMap;
+
+///\brief The function returns a new-allocated MGBuilderCL-object as specified in the parameter-file section.
+MGBuilderCL* make_MGBuilder (const ParamCL& p);
+
 
 /// \brief Class for building a brick
 class BrickBuilderCL : public MGBuilderCL
@@ -66,7 +79,10 @@ class BrickBuilderCL : public MGBuilderCL
 
     /// \brief Build a triangulation of a brick
     virtual void
-    build(MultiGridCL*) const;
+    build_ser_impl(MultiGridCL*) const;
+
+    // Read parameters from json file.
+    static MGBuilderCL* make_MGBuilder (const ParamCL& P);
 };
 
 /// \brief Class for building a brick with a hole
@@ -96,48 +112,12 @@ class CavityBuilderCL : public MGBuilderCL
 
     /// \brief Build a triangulation of a brick
     virtual void
-    build(MultiGridCL*) const;
+    build_ser_impl(MultiGridCL*) const;
+
+    // Read parameters from json file.
+    static MGBuilderCL* make_MGBuilder (const ParamCL& P);
 };
 
-
-/// \brief Class for setting up data structures of a multigrid of a brick shaped
-///        domain
-/** In order to create a brick on a parallel computer, the following strategy is
-    used. Only the master processor creates the multigrid and all other
-    processors have to create an "empty" multigrid, i.e. they only create the
-    level views and the boundary. Therefore this class is instantiated from the
-    non-master processors. The master process instantiates the base class of this
-    class.
-*/
-class EmptyBrickBuilderCL : public BrickBuilderCL
-{
-  private:
-    typedef BrickBuilderCL base_;
-    Uint _numLevel;
-
-  public:
-    EmptyBrickBuilderCL( const Point3DCL& orig, const Point3DCL& e1,
-                         const Point3DCL& e2, const Point3DCL& e3, Uint Level=1)
-      : base_( orig, e1, e2, e3, 0, 0, 0), _numLevel( Level) {}
-
-    /// \brief Build level views and boundary information
-    virtual void build( MultiGridCL*) const;
-};
-
-class EmptyCavityBuilderCL : public CavityBuilderCL
-{
-  private:
-    typedef CavityBuilderCL base_;
-    Uint _numLevel;
-
-  public:
-    EmptyCavityBuilderCL( const Point3DCL& orig, const Point3DCL& e1,
-                         const Point3DCL& e2, const Point3DCL& e3, Uint Level, SArrayCL<Uint, 3>, SArrayCL<Uint, 3>)
-      : base_( orig, e1, e2, e3, 0, 0, 0, SArrayCL<Uint, 3>(0u), SArrayCL<Uint, 3>(0u)), _numLevel( Level) {}
-
-    /// \brief Build level views and boundary information
-    virtual void build( MultiGridCL*) const;
-};
 
 class LBuilderCL : public MGBuilderCL
 {
@@ -162,7 +142,10 @@ class LBuilderCL : public MGBuilderCL
                Uint, Uint, Uint, Uint, Uint);
 
     virtual void
-    build(MultiGridCL*) const;
+    build_ser_impl(MultiGridCL*) const;
+
+    // Read parameters from json file.
+    static MGBuilderCL* make_MGBuilder (const ParamCL& P);
 };
 
 
@@ -190,7 +173,10 @@ class BBuilderCL : public MGBuilderCL
                Uint, Uint, Uint, Uint, Uint, Uint);
 
     virtual void
-    build(MultiGridCL*) const;
+    build_ser_impl(MultiGridCL*) const;
+
+    // Read parameters from json file.
+    static MGBuilderCL* make_MGBuilder (const ParamCL& P);
 };
 
 
@@ -215,22 +201,12 @@ class TetraBuilderCL : public MGBuilderCL
     static void
     BogoReMark(DROPS::MultiGridCL& mg, DROPS::Uint rule);
     virtual void
-    build(MultiGridCL*) const;
+    build_ser_impl(MultiGridCL*) const;
+
+    // Read parameters from json file.
+    static MGBuilderCL* make_MGBuilder (const ParamCL& P);
 };
 
-/// \brief Create data structures for a tetrahedron-shaped multigrid
-/** For detailed information see description of EmptyBrickBuilderCL*/
-class EmptyTetraBuilderCL : public TetraBuilderCL
-{
-  private:
-    Uint _numLevel;
-    typedef TetraBuilderCL base_;
-
-  public:
-    EmptyTetraBuilderCL(Uint Level=1) : base_(0), _numLevel(Level) {}
-
-    virtual void build( MultiGridCL*) const;
-};
 
 //--------------------------------------------------------------------
 // Mesh-file-parser
@@ -385,6 +361,8 @@ class ReadMeshBuilderCL : public MGBuilderCL
     static const char *SymbolicName_[];
 
     std::istream& f_;
+    bool delete_f_;
+
     mutable std::vector<Uint> id_history_;
     mutable std::ostream* msg_;
     mutable std::vector<BndCondT> BC_;
@@ -439,9 +417,16 @@ class ReadMeshBuilderCL : public MGBuilderCL
     // Input stream, from which the mesh is read. Pass a pointer to an output stream,
     // e. g. msg= &std::cout, if you want to know, what happens during multigrid-construction.
     ReadMeshBuilderCL(std::istream& f, std::ostream* msg= 0);
+    ReadMeshBuilderCL(std::string filename, std::ostream* msg= 0);
+    ~ReadMeshBuilderCL();
 
     virtual void
-    build(MultiGridCL*) const;
+    build_ser_impl(MultiGridCL*) const;
+    virtual void
+    build_par_impl(MultiGridCL*) const;
+
+    // Read parameters from json file.
+    static MGBuilderCL* make_MGBuilder (const ParamCL& P);
 
     static const char* // Symbolic section-names per TGrid User's Guide.
     Symbolic(Uint id);
@@ -450,21 +435,6 @@ class ReadMeshBuilderCL : public MGBuilderCL
     void     GetBC( std::vector<BndCondT>& BC) const { BC= BC_; }
 };
 
-/// \brief This class creates an empty domain out of a mesh-file
-/** For detailed information see description of EmptyBrickBuilderCL*/
-class EmptyReadMeshBuilderCL : public ReadMeshBuilderCL
-{
-  private:
-    Uint numLevel_;
-    typedef ReadMeshBuilderCL base_;
-
-  public:
-    EmptyReadMeshBuilderCL (std::istream& f, std::ostream* msg=0, Uint Level=1)
-      : base_(f,msg) , numLevel_(Level) {}
-
-    /// Just create the level views boundary-information
-    virtual void build(MultiGridCL*) const;
-};
 
 /*******************************************************************
 *   F I L E B U I L D E R  C L                                    *
@@ -478,6 +448,7 @@ class FileBuilderCL : public MGBuilderCL
     std::string path_;
 
     MGBuilderCL* bndbuilder_;
+    bool delete_bndbuilder_;
 
     mutable SimplexFactoryCL* factory_;
 
@@ -499,8 +470,14 @@ class FileBuilderCL : public MGBuilderCL
     void buildBoundary (MultiGridCL* mgp) const {bndbuilder_->buildBoundary(mgp);};
 
   public:
-    FileBuilderCL (std::string path, MGBuilderCL* bndbuilder) : path_(path), bndbuilder_(bndbuilder), factory_(0) {};
-    virtual void build(MultiGridCL*) const;
+    FileBuilderCL (std::string path, MGBuilderCL* bndbuilder, bool delete_bndbuilder= false)
+        : path_(path), bndbuilder_(bndbuilder), delete_bndbuilder_(delete_bndbuilder), factory_(0)
+    {};
+    ~FileBuilderCL() {
+        if (delete_bndbuilder_)
+            delete bndbuilder_;
+    }
+    virtual void build_ser_impl(MultiGridCL*) const;
 };
 #else
 
@@ -512,6 +489,7 @@ class FileBuilderCL : public MGBuilderCL
     std::string path_;
 
     MGBuilderCL* bndbuilder_;
+    bool delete_bndbuilder_;
 
     mutable SimplexFactoryCL* factory_;
 
@@ -526,8 +504,16 @@ class FileBuilderCL : public MGBuilderCL
     void buildBoundary (MultiGridCL* mgp) const {bndbuilder_->buildBoundary(mgp);};
 
   public:
-    FileBuilderCL (std::string path, MGBuilderCL* bndbuilder) : path_(path), bndbuilder_(bndbuilder), factory_(0) {};
-    virtual void build(MultiGridCL*) const;
+    FileBuilderCL (std::string path, MGBuilderCL* bndbuilder, bool delete_bndbuilder= false)
+        : path_(path), bndbuilder_(bndbuilder), delete_bndbuilder_(delete_bndbuilder), factory_(0)
+    {};
+    ~FileBuilderCL() {
+        if (delete_bndbuilder_)
+            delete bndbuilder_;
+    }
+    void build(MultiGridCL* mg) const;
+    virtual void build_ser_impl(MultiGridCL* mg) const { build(mg); }
+    virtual void build_par_impl(MultiGridCL* mg) const { build(mg); }
 };
 #endif
 

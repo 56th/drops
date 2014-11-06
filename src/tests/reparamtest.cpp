@@ -25,6 +25,7 @@
 #include <fstream>
 #include "levelset/levelset.h"
 #include "levelset/fastmarch.h"
+#include "levelset/marking_strategy.h"
 #include "levelset/adaptriang.h"
 #include "misc/params.h"
 #include "levelset/surfacetension.h"
@@ -334,52 +335,42 @@ int main( int argc, char **argv)
         DROPS::ParMultiGridInitCL pmginit;
 #endif
 
-        std::ifstream param;
-        if (argc != 2) {
-            std::cout << "Using default parameter file: reparam.json\n";
-            param.open("reparam.json");
-        }
-        else{
-            std::cout << "Opening file " << argv[1] << std::endl;
-            param.open(argv[1]);
-        }
-        if (!param) {
-            std::cerr << "error while opening parameter file\n";
-            return 1;
-        }
-        param >> P;
-        param.close();
+        DROPS::read_parameter_file_from_cmdline( P, argc, argv, "reparam.json");
         std::cout << P << std::endl;
 
         DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
 
         DROPS::MultiGridCL* mg= 0;
-        DROPS::BrickBuilderCL *mgb = 0;
         DROPS::Point3DCL a,b,c;
         a[0]= P.get<DROPS::Point3DCL>("Brick.dim")[0];
         b[1]= P.get<DROPS::Point3DCL>("Brick.dim")[1];
         c[2]= P.get<DROPS::Point3DCL>("Brick.dim")[2];
-        IF_MASTER
-            mgb = new DROPS::BrickBuilderCL( P.get<DROPS::Point3DCL>("Brick.orig"), a, b, c, P.get<double>("Brick.BasicRefX"), P.get<double>("Brick.BasicRefY"), P.get<double>("Brick.BasicRefZ"));
-        IF_NOT_MASTER
-            mgb = new DROPS::EmptyBrickBuilderCL(P.get<DROPS::Point3DCL>("Brick.orig"), a, b, c);
+        DROPS::BrickBuilderCL mgb( P.get<DROPS::Point3DCL>("Brick.orig"), a, b, c, P.get<double>("Brick.BasicRefX"), P.get<double>("Brick.BasicRefY"), P.get<double>("Brick.BasicRefZ"));
 
-        mg= new DROPS::MultiGridCL( *mgb);
-        delete mgb;
+        mg= new DROPS::MultiGridCL( mgb);
 
-        DROPS::AdapTriangCL adap( *mg, P.get<double>("AdaptRef.Width"), P.get<int>("AdaptRef.CoarsestLevel"), P.get<int>("AdaptRef.FinestLevel"), -1);
+        DROPS::AdapTriangCL adap( *mg, 0, -1 );
 
         DROPS::EllipsoidCL::Init( P.get<DROPS::Point3DCL>("Exp.PosDrop"), P.get<DROPS::Point3DCL>("Exp.RadDrop"));
         DROPS::HorizontalSlicesCL::Init( P.get<int>("Reparam.Freq"), P.get<DROPS::Point3DCL>("Brick.orig")[1], P.get<DROPS::Point3DCL>("Brick.orig")[1]+P.get<DROPS::Point3DCL>("Brick.dim")[1] );
         DROPS::TorusCL::Init( P.get<DROPS::Point3DCL>("Exp.RadDrop")[0], P.get<DROPS::Point3DCL>("Exp.RadDrop")[1]);
         DROPS::instat_scalar_fun_ptr distance= P.get<int>("Reparam.Freq")>0 ? DROPS::HorizontalSlicesCL::DistanceFct : DROPS::EllipsoidCL::DistanceFct;
-        adap.MakeInitialTriang( distance);
+
+        typedef DROPS::DistMarkingStrategyCL MarkerT;
+        MarkerT marker( distance, P.get<double>("AdaptRef.Width" ),
+                        P.get<int>("AdaptRef.CoarsestLevel"),
+                        P.get<int>("AdaptRef.FinestLevel") ); 
+
+        adap.set_marking_strategy( &marker );
+        adap.MakeInitialTriang();
 
         const DROPS::BndCondT bcls[6]= { DROPS::NoBC, DROPS::NoBC, DROPS::NoBC, DROPS::NoBC, DROPS::NoBC, DROPS::NoBC };
         const DROPS::LsetBndDataCL::bnd_val_fun bfunls[6]= { 0,0,0,0,0,0};
         DROPS::LsetBndDataCL lsbnd( 6, bcls, bfunls);
 
         DROPS::Strategy( adap, lsbnd);
+
+        adap.set_marking_strategy( 0 );
 
         std::cout << " reparamtest finished regularly" << std::endl;
     } catch (DROPS::DROPSErrCL err) {

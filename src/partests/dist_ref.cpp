@@ -43,18 +43,11 @@ namespace DROPS{
 /// \brief Build a brick and tell parallel info class about the multigrid
 void BuildBrick( MultiGridCL*& mg)
 {
-    MGBuilderCL* builder=0;
     Point3DCL origin, e1, e2, e3;
     e1[0]= e2[1]= e3[2]= 1.;
-    if ( ProcCL::IamMaster()){
-        Uint ref[3]= { 2, 2, 2};
-        builder = new BrickBuilderCL( origin, e1, e2, e3, ref[0], ref[1], ref[2]);
-    }
-    else{
-        builder = new DROPS::EmptyBrickBuilderCL( origin, e1, e2, e3);
-    }
-    mg = new MultiGridCL( *builder);
-    delete builder;
+    Uint ref[3]= { 2, 2, 2};
+    BrickBuilderCL builder( origin, e1, e2, e3, ref[0], ref[1], ref[2]);
+    mg = new MultiGridCL( builder);
 }
 
 double DistToSphere( const Point3DCL& p, double)
@@ -94,8 +87,8 @@ int main( int argc, char **argv)
 /*
         DROPS::Point3DCL origin, e1, e2, e3;
         e1[0]= e2[1]= e3[2]= 1.;
-        DROPS::EmptyBrickBuilderCL emptybrick( origin, e1, e2, e3);
-        DROPS::MultiGridCL mg( emptybrick);
+        DROPS::BrickBuilderCL emptybrick( origin, e1, e2, e3);
+        DROPS::MultiGridCL mg( brick);
         mg.PrepareModify();
         DROPS::VertexCL& vert=mg.GetSimplexFactory().MakeVertex( origin, 0);
         mg.FinalizeModify();

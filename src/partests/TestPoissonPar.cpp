@@ -906,14 +906,7 @@ int main (int argc, char** argv)
         SetDescriber();
         //DDD_SetOption(OPT_INFO_XFER, XFER_SHOW_MEMUSAGE/*|XFER_SHOW_MSGSALL*/);
 
-        if (argc!=2 && ProcCL::IamMaster()){
-            std::cout << "You have to specify one parameter:\n\t" << argv[0] << " <param_file>" << std::endl; return 1;
-        }
-        std::ifstream param( argv[1]);
-        if (!param && ProcCL::IamMaster()){
-            std::cout << "error while opening parameter file\n"; return 1;
-        }
-        param >> C; param.close();
+        DROPS::read_parameter_file_from_cmdline( C, argc, argv);
         if (ProcCL::IamMaster())
             std::cout << C << std::endl;
 
@@ -941,14 +934,10 @@ int main (int argc, char** argv)
                  << " Create initial grid and distribution ... \n";
         }
 
-        DROPS::MGBuilderCL * mgb;
-        if (ProcCL::IamMaster())
-            mgb = new DROPS::BrickBuilderCL(orig, e1, e2, e3, C.brk_BasicRefX, C.brk_BasicRefY, C.brk_BasicRefZ);
-        else
-            mgb = new DROPS::EmptyBrickBuilderCL(orig, e1, e2, e3);
+        DROPS::BrickBuilderCL mgb(orig, e1, e2, e3, C.brk_BasicRefX, C.brk_BasicRefY, C.brk_BasicRefZ);
 
         // Setup the problem
-        PoissonOnBCL prob(*mgb, PoissonCoeffCL(), bdata);
+        PoissonOnBCL prob(mgb, PoissonCoeffCL(), bdata);
         DROPS::MultiGridCL &mg = prob.GetMG();
         pmg.AttachTo(mg);
 

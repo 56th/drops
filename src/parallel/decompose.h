@@ -1,6 +1,6 @@
 /// \file decompose.h
-/// \brief determining a decomposition of a distributed hierarchy of triangulations.
-/// \author LNM RWTH Aachen: ; SC RWTH Aachen: Oliver Fortmeier
+/// \brief determining a partitioning of a distributed hierarchy of triangulations.
+/// \author LNM RWTH Aachen: Patrick Esser, Sven Gross; SC RWTH Aachen: Oliver Fortmeier
 
 /*
  * This file is part of DROPS.
@@ -34,7 +34,7 @@ namespace DROPS{
 
 /*****************************************************************************
 This file contains the following classes:
-    - LbIteratorCL, iterate over tetrahedra the represents a vertex in the 
+    - LbIteratorCL, iterate over tetrahedra that represent a vertex in the
       graph, i.e.,
       * unrefined on a specified level
       * refined and children in the specified level
@@ -44,20 +44,20 @@ This file contains the following classes:
     - Partitioner classes to determine graph partitionings
       * BasePartitionerCL describes and interface for all partitioners
       * MetisPartitionerCL, the interface to the METIS family
-==> - DetermineDecompositionCL class using all the methods above to determine 
-      a decomposition of a MultiGridCL.
+==> - PartitioningCL class using all the methods above to determine
+      a partitioning of a MultiGridCL.
 *****************************************************************************/
 
 
-/// \brief Class for iterating through the multinodes of this proc to set up a
+/// \brief Class for iterating through the multi-nodes of this proc to set up a
 /// reduced, dual graph
 /** For numbering the tetrahedra for ParMETIS, we have to go through special
-    tetrahedra. This class helps to touch only the right ones. 
+    tetrahedra. This class helps to touch only the right ones.
 */
 class LbIteratorCL
 {
   public:
-    typedef MultiGridCL::TetraIterator IteratorT;     ///< Iteration through the tetraeders of the multigrid
+    typedef MultiGridCL::TetraIterator IteratorT;     ///< Iteration through the tetrahedra of the multigrid
 
   private:
     MultiGridCL* mg_;                                 ///< pointer to the multigrid, that is used for iterating
@@ -77,17 +77,17 @@ class LbIteratorCL
     // default destructor
 
     // Test if a tetra is in a loadbalancing set
-    inline bool IsInLbSet() const                    ///< Test, if the tetraeder, on which this iterator points, is in the loadbalancing set
+    inline bool IsInLbSet() const                     ///< Test, if the tetrahedron, on which this iterator points, is in the loadbalancing set
         { return IsInLbSet(*pos_); }
-    inline bool IsInLbSet( const TetraCL&) const;     ///< Test if a tetrahedra is in the loadbalancing set see above
+    inline bool IsInLbSet( const TetraCL&) const;     ///< Test if a tetrahedron is in the loadbalancing set, see above
 
     // access of the tetraeder
     TetraCL& operator *  () const { return  *pos_; }  ///< return a reference onto the tetra, this iterator points to
     TetraCL* operator -> () const { return &*pos_; }  ///< return a pointer to a tetra
 
     // iterate through the elements of the LoadBalance-Set
-    inline LbIteratorCL& operator ++ ();              ///< Go to the next multinode tetra (prefix)
-    inline LbIteratorCL  operator ++ (int);           ///< Go to the next multinode tetra (suffix)
+    inline LbIteratorCL& operator ++ ();              ///< Go to the next multi-node tetra (prefix)
+    inline LbIteratorCL  operator ++ (int);           ///< Go to the next multi-node tetra (suffix)
 
     // assignment
     LbIteratorCL& operator = (const LbIteratorCL& it) ///< assignment operator
@@ -116,25 +116,31 @@ class LbIteratorCL
 
 
 /// \brief Base class representing a (hyper)graph
-/** This class is only the base class and should not be instanciated. However, 
+/** This class is only the base class and should not be instanciated. However,
     this class also stores the partitioning. */
 class BaseGraphCL
 {
 protected:
-    std::vector<int> part_;             ///< obtained partitioning
+    std::vector<graph_index_type> part_;             ///< obtained partitioning
+    int num_procs_w_verts_;
 
 public:
-    BaseGraphCL() : part_(0) {}
+    BaseGraphCL() : part_(0), num_procs_w_verts_(0) {}
     virtual ~BaseGraphCL() {}
+    /// \brief
+    bool isSerial() const { return num_procs_w_verts_ <= 1; }
     /// \brief Get partition number of a vertex
-    int getPartition( const graph_index_type v) const { return part_[v]; }
+    graph_index_type getPartition( const graph_index_type v) const { return part_[v]; }
     /// \brief Get number of vertices stored on this process
-    inline int get_num_verts() const { return part_.size(); }
+    inline size_t get_num_verts() const { return part_.size(); }
     /// \brief Getter for partitioners
-    int* part() { return Addr(part_); }
+    graph_index_type* part() { return Addr(part_); }
 };
 
 /// \brief Class that represents a concrete graph for METIS and SCOTCH
+/** Note: for procs without any graph vertex, an artificial vertex with weight 0
+ *  and an artificial edge with weight zero is created to circumvent METIS' restrictions.
+ */
 class GraphCL : public BaseGraphCL
 {
 private:
@@ -148,21 +154,21 @@ private:
                 adjwgt_;                            ///< weight of the edges
 
 public:
-    /// \brief Constrcutor
+    /// \brief Constructor
     GraphCL();
     /// \brief build the array vtxdist
-    void buildVtxDist( const graph_index_type num_vert);
+    void buildVtxDist( graph_index_type num_vert);
     /// \brief resize the graph
-    void resize( const int num_adj, const int num_vert);
+    void resize( int num_adj, int num_vert);
     /// \brief free memory
     void clear();
     /// \brief Get number of adjacencies stored on this process
-    inline int get_num_adj() const { return adjwgt_.size(); }
+    inline size_t get_num_adj() const { return adjwgt_.size(); }
     /// \brief Get the first vertex stored by this proc
-    inline int get_first_vert() const { return vtxdist_[ ProcCL::MyRank()]; }
+    inline graph_index_type get_first_vert() const { return vtxdist_[ ProcCL::MyRank()]; }
     /// \brief get the process storing a given vertex (by the global id)
     /// \todo check me!
-    inline int getProc( const graph_index_type globalidx)
+    inline int getProc( graph_index_type globalidx)
         { return std::distance( vtxdist_.begin(), std::lower_bound(vtxdist_.begin(), vtxdist_.end(), globalidx)); }
 
     /// \name Getters and setters
@@ -176,13 +182,13 @@ public:
 };
 
 /// \brief Base class representing the partitioners
-/** The derived classes are responsible for partitioning a 
+/** The derived classes are responsible for partitioning a
     (hyper)graph. This class is an abstract class.*/
 class BasePartitionerCL
 {
 protected:
-    int objective_;         ///< resulting objective of the partitioner
-    double balance_;        ///< resulting balancing constraint of the partitioner
+    graph_index_type objective_; ///< resulting objective of the partitioner
+    double balance_;             ///< resulting balancing constraint of the partitioner
 
 public:
     BasePartitionerCL() : objective_(0), balance_(0.0) {}
@@ -199,9 +205,9 @@ private:
     BaseGraphCL& graph() { return graph_; }
 
 public:
-    IdentityPartitionerCL( BaseGraphCL& graph) 
+    IdentityPartitionerCL( BaseGraphCL& graph)
         : BasePartitionerCL(), graph_( graph) {}
-    void doPartition() 
+    void doPartition()
         { std::fill( graph().part(), graph().part()+graph().get_num_verts(), ProcCL::MyRank()); }
 };
 
@@ -251,32 +257,32 @@ class ScotchPartitionerCL : public BasePartitionerCL
 };
 
 
-/// \brief Class for determining a decomposition of a distributed hierarchy of triangulations.
+/// \brief Class for determining a partitioning of a distributed hierarchy of triangulations.
 ///        \anchor DetermineDecompositionCL
-/** This class provides an interface to determine a decomposition of a distributed
+/** This class provides an interface to determine a partitioning of a distributed
     hierarchy of triangulations. Therefore, this class internally uses a graph model which
-    can be specified by the method paramater given by the factory method "make".
+    can be specified by the method parameter given by the factory method "make".
 */
-class DetermineDecompositionCL
+class PartitioningCL
 {
 private:
     BaseGraphCL*       graph_;          ///< storing a (hyper)graph
     BasePartitionerCL* partitioner_;    ///< storing a partitioner
     MultiGridCL&       mg_;             ///< store a reference to the tetrahedral hierarchy
     Uint               triang_level_;   ///< triangulation level that should be decomposed
-    IdxDescCL          vertexIdx_;      ///< Used to number tetrahedra
+    IdxDescCL          vertexIdx_;      ///< Used to number tetrahedra corresponding to graph vertices
 
 public:
     /// \brief Constructor
-    DetermineDecompositionCL( MultiGridCL& mg, int triang_level=-1);
-    /// \brief Destructor cleans everything up (and deletes the decomposition)
-    ~DetermineDecompositionCL() { clear(); }
-    /// \brief Determine a decomposition
-    void make( const int method, int rho_I=11, 
+    PartitioningCL( MultiGridCL& mg, int triang_level=-1);
+    /// \brief Destructor cleans everything up (and deletes the partitioning)
+    ~PartitioningCL() { clear(); }
+    /// \brief Determine a partitioning
+    void make( const int method, int rho_I=11,
                const VecDescCL* lset=0, const BndDataCL<>* lsetbnd=0,
                const ObservedMigrateFECL* obs= 0);
     /// \brief get the destination process of a tetrahedron
-    int getDestination( const TetraCL& t) const 
+    int getDestination( const TetraCL& t) const
         { return graph_->getPartition( t.Unknowns( vertexIdx_.GetIdx())); }
     /// \brief Clean up and free the index used to number the tetrahedra
     void clear();

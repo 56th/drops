@@ -46,6 +46,12 @@ else(WIN32)
   else (BOOST_HOME STREQUAL "")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I${BOOST_HOME}")
   endif (BOOST_HOME STREQUAL "")
+
+  if (MKL_HOME STREQUAL "")
+  else (MKL_HOME STREQUAL "")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DMKL_ILP64 -m64 -I${MKL_HOME}/include -Wno-long-long")
+  endif (MKL_HOME STREQUAL "")
+
 endif(WIN32)
 
 #compiler specific options
@@ -156,21 +162,21 @@ endif(WIN32)
 # THIS FUNCTION REQUIRES ${HOME} and ${PAR_OBJ}
 
 function(exec_ f)
-    libs(${f})
+#    libs(${f})
     add_executable(${f} ${f})
 endfunction(exec_)
 
 function(exec_ser f)
     if(NOT MPI)
         exec_(${f})
-        target_link_libraries(${f} ${HOME}-${f} ${ARGN} ${${f}-staticlibs})
+        target_link_libraries(${f} ${ARGN} ${${f}-staticlibs})
     endif()
 endfunction(exec_ser)
 
 function(exec_par f)
     if(MPI)
         exec_(${f})
-        target_link_libraries_par(${f} ${HOME}-${f} ${ARGN} ${${f}-staticlibs})
+        target_link_libraries_par(${f} ${ARGN} ${${f}-staticlibs})
     endif()
 endfunction(exec_par)
 
@@ -179,6 +185,15 @@ function(exec f)
     exec_par(${f} ${ARGN})
 endfunction(exec)
 
+function(add_my_custom_targets f)
+  add_custom_target(${f}-param-files 
+    echo \"copy $f json files...\" \;
+    cp -f ${CMAKE_CURRENT_SOURCE_DIR}/*.json ${CMAKE_CURRENT_BINARY_DIR}/ 2> /dev/null \; 
+    COMMENT "copy param files from ${CMAKE_CURRENT_SOURCE_DIR}/ to ${CMAKE_CURRENT_BINARY_DIR}/"
+    )
+  add_custom_target(${f}-stat COMMAND ls ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp ${CMAKE_CURRENT_SOURCE_DIR}/*.tpp ${CMAKE_CURRENT_SOURCE_DIR}/*.h | xargs wc -l WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+  add_custom_target(${f}-coeffs DEPENDS misc-scalarFunctions misc-vectorFunctions levelset-twophaseCoeff levelset-filmCoeff poisson-poissonCoeff stokes-stokesCoeff)
+endfunction(add_my_custom_targets f)
 
 set(PACKAGES parallel levelset poisson DiST geom num out misc osmosis stokes navstokes surfactant transport partests tests)
 string(REPLACE ";" " " PACKAGES_STRING "${PACKAGES}")

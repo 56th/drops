@@ -32,6 +32,7 @@
 #include "out/vtkOut.h"
 #include "levelset/coupling.h"
 #include "misc/params.h"
+#include "levelset/marking_strategy.h"
 #include "levelset/adaptriang.h"
 #include "levelset/mzelle_hdr.h"
 #include "levelset/surfacetension.h"
@@ -237,6 +238,12 @@ void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTr
     // massTransp.CheckSolution(Solutioncneg,Solutioncpos,0);
     double cmean_old = massTransp.MeanDropConcentration();
 
+    typedef DistMarkingStrategyCL MarkerT;
+    MarkerT marker( lset, P.get<double>("AdaptRef.Width"),
+                          P.get<int>("AdaptRef.CoarsestLevel" ),
+                          P.get<int>("AdaptRef.FinestLevel") );
+    adap.set_marking_strategy( &marker );
+
     for (int step= 1; step<=P.get<int>("Time.NumSteps"); ++step)
     {
         std::cout << "============================================================ step " << std::setw(8) << step << "  /  " << std::setw(8) << P.get<int>("Time.NumSteps") << std::endl;
@@ -252,7 +259,7 @@ void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTr
         // grid modification
         bool doGridMod= P.get<int>("AdaptRef.Freq") && step%P.get<int>("AdaptRef.Freq") == 0;
         if (doGridMod) {
-            adap.UpdateTriang( lset);
+            adap.UpdateTriang();
         }
 
         massTransp.DoStep( t);
@@ -267,6 +274,7 @@ void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTr
         if (vtkoutnow)
             vtkwriter->Write(t);
     }
+    adap.set_marking_strategy(0);
     std::cout << std::endl;
 
     delete pBnd_c;
@@ -298,8 +306,6 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbndda
     DROPS::BuildBoundaryData( &MG, pBnd_ct, P.get<std::string>("Transp.BoundaryType"), P.get<std::string>("Transp.BoundaryFncst"));
     cBndDataCL & Bnd_c(*pBnd_c);
     cBndDataCL & Bnd_ct(*pBnd_ct);
-
-    typedef InstatNavierStokes2PhaseP2P1CL StokesProblemT;
 
 
     // initialization of surface tension
@@ -596,6 +602,12 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbndda
         vtkwriter->Write(Stokes.v.t);
     }
 
+    typedef DistMarkingStrategyCL MarkerT;
+    MarkerT marker( lset, P.get<double>("AdaptRef.Width"),
+                          P.get<int>("AdaptRef.CoarsestLevel" ),
+                          P.get<int>("AdaptRef.FinestLevel") );
+    adap.set_marking_strategy( &marker );
+
     for (int step= 1; step<=P.get<int>("Time.NumSteps"); ++step)
     {
         std::cout << "============================================================ step " << step << std::endl;
@@ -622,7 +634,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbndda
         // grid modification
         bool doGridMod= P.get<int>("AdaptRef.Freq") && step%P.get<int>("AdaptRef.Freq") == 0;
         if (doGridMod) {
-            adap.UpdateTriang( lset);
+            adap.UpdateTriang();
         }
 
         if (P.get<int>("Transp.DoTransp")) {
@@ -659,6 +671,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbndda
     }
     IFInfo.Update( lset, Stokes.GetVelSolution());
     IFInfo.Write(Stokes.v.t);
+    adap.set_marking_strategy(0);
     std::cout << std::endl;
     delete timedisc;
     delete navstokessolver;
@@ -726,24 +739,8 @@ int main (int argc, char** argv)
 #ifdef _PAR
     DROPS::ParMultiGridInitCL pmginit;
 #endif
-    std::ifstream param;
-    if (argc!=2)
-    {
-        std::cout << "Using default parameter file: risingbutanoldroplet.json\n";
-        param.open( "risingbutanoldroplet.json");
-    }
-    else
-        param.open( argv[1]);
-    if (!param)
-    {
-        std::cerr << "error while opening parameter file\n";
-        return 1;
-    }
-    param >> P;
-    param.close();
-
+    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "risingbutanoldroplet.json");
     SetMissingParameters(P);
-
     std::cout << P << std::endl;
 
     DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
@@ -767,17 +764,32 @@ int main (int argc, char** argv)
     }
 
     DROPS::BuildBoundaryData( mg, lsetbnddata, lsetbndtype, lsetbndfun);
-
     std::cout << "Generated MG of " << mg->GetLastLevel() << " levels." << std::endl;
 
-    DROPS::EllipsoidCL::Init(P.get<DROPS::Point3DCL>("Exp.PosDrop"), P.get<DROPS::Point3DCL>("Exp.RadDrop"));
-    DROPS::AdapTriangCL adap( *mg, P.get<double>("AdaptRef.Width"), P.get<int>("AdaptRef.CoarsestLevel"), P.get<int>("AdaptRef.FinestLevel"), ((P.get<std::string>("Restart.Inputfile") == "none") ? P.get<int>("AdaptRef.LoadBalStrategy") : -P.get<int>("AdaptRef.LoadBalStrategy")));
+    using DROPS::EllipsoidCL;
+    using DROPS::AdapTriangCL;
+    using DROPS::DistMarkingStrategyCL;
+
+    EllipsoidCL::Init(P.get<DROPS::Point3DCL>("Exp.PosDrop"), P.get<DROPS::Point3DCL>("Exp.RadDrop"));
+    AdapTriangCL adap( *mg, 0, 
+                      ((P.get<std::string>("Restart.Inputfile") == "none") ?  P.get<int>("AdaptRef.LoadBalStrategy") :
+                                                                             -P.get<int>("AdaptRef.LoadBalStrategy")));
+
+
     // If we read the Multigrid, it shouldn't be modified;
     // otherwise the pde-solutions from the ensight files might not fit.
-    if (!P.get<int>("Transp.UseNSSol",1) || (P.get<std::string>("Restart.Inputfile") == "none")){
+    if (!P.get<int>("Transp.UseNSSol",1) || (P.get<std::string>("Restart.Inputfile") == "none"))
+    {
         DROPS::InScaMap & tdscalarmap = DROPS::InScaMap::getInstance();
         DROPS::instat_scalar_fun_ptr distance = tdscalarmap[P.get("Transp.Levelset", std::string("Ellipsoid"))];
-        adap.MakeInitialTriang( distance);
+
+        DistMarkingStrategyCL marker( distance,
+                                      P.get<double>("AdaptRef.Width"),
+                                      P.get<int>("AdaptRef.CoarsestLevel"),
+                                      P.get<int>("AdaptRef.FinestLevel") );
+        adap.set_marking_strategy( &marker );
+        adap.MakeInitialTriang();
+        adap.set_marking_strategy(0);
     }
 
     std::cout << DROPS::SanityMGOutCL(*mg) << std::endl;

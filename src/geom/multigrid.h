@@ -123,18 +123,18 @@ class BoundaryCL
     typedef std::vector<BndType>   BndTypeCont;
 
   private:
-    SegPtrCont           Bnd_;
-    mutable BndTypeCont* BndType_;
-    mutable match_fun    match_;
+    SegPtrCont          Bnd_;
+    mutable BndTypeCont BndType_;
+    mutable match_fun   match_;
 
   public:
-    BoundaryCL() : BndType_(0), match_(0) {}
-    /// deletes the objects pointed to in Bnd_ and BndType_
+    BoundaryCL() : match_(0) {}
+    /// deletes the objects pointed to in Bnd_.
     ~BoundaryCL();
 
     const BndSegCL* GetBndSeg(BndIdxT idx)  const { return Bnd_[idx]; }
     BndIdxT         GetNumBndSeg()          const { return Bnd_.size(); }
-    BndType         GetBndType(BndIdxT idx) const { return BndType_? (*BndType_)[idx] : OtherBnd; }
+    BndType         GetBndType(BndIdxT idx) const { return !BndType_.empty() ? BndType_[idx] : OtherBnd; }
 
     void      SetPeriodicBnd( const BndTypeCont& type, match_fun) const;
     match_fun GetMatchFun() const { return match_; }
@@ -467,6 +467,8 @@ for (DROPS::TriangTetraCL::const_iterator it( mg.GetTriangTetraBegin( lvl)), end
 class MGBuilderCL
 {
   protected:
+    Uint parnumLevel_; /// \todo There is only one user of this and of set_par_numlevel... remove it?
+
     MultiGridCL::VertexCont& GetVertices(MultiGridCL* MG_) const { return MG_->Vertices_; }
     MultiGridCL::EdgeCont&   GetEdges   (MultiGridCL* MG_) const { return MG_->Edges_; }
     MultiGridCL::FaceCont&   GetFaces   (MultiGridCL* MG_) const { return MG_->Faces_; }
@@ -478,15 +480,32 @@ class MGBuilderCL
     void RemoveLastLevel(MultiGridCL* MG_) const { MG_->RemoveLastLevel(); }
 
   public:
-    // default ctor
-    virtual ~MGBuilderCL() {}
+    MGBuilderCL (Uint parnumLevel= 1);
+    virtual ~MGBuilderCL()  {}
+
+    void set_par_numlevel (Uint parnumLevel) { parnumLevel_=  parnumLevel; }
+
     virtual void buildBoundary(MultiGridCL* MG_) const = 0;
-    virtual void build(MultiGridCL*) const = 0;
+
+    /** In order to create a multigrid with MPI, the following strategy is
+    used. Only the master process creates the multigrid and all other
+    processes have to create an "empty" multigrid, i.e. they only create the
+    level views and the boundary. */
+    ///\brief Used on the master-process (and serially).
+    virtual void build_ser_impl(MultiGridCL* mgp) const = 0;
+    ///\brief Used on the non-masters in parallel. A default implementation is provided.
+    virtual void build_par_impl(MultiGridCL* mgp) const;
+    void build(MultiGridCL* mgp) const {
+        if (MASTER)
+            build_ser_impl( mgp);
+        else
+            build_par_impl( mgp);
+    }
 };
 
 class LocatorCL;
 
-/// \brief Class for combining a tetrahedra wtih its bary center
+/// \brief Class for combining a tetrahedra with its bary center
 class LocationCL
 {
   private:
@@ -582,6 +601,16 @@ template <class SimplexT>
 void circumcircle(const TetraCL& t, Point3DCL& c, double& r);
 void circumcircle(const TetraCL& t, Uint face, Point3DCL& c, double& r);
 
+
+
+inline void GetTrafo( SMatrixCL<3,3>& T, const TetraCL & t)
+{
+    const Point3DCL& pt0= t.GetVertex(0)->GetCoord();
+    for(int i=0; i<3; ++i)
+        for(int j=0; j<3; ++j)
+            T(j,i)= t.GetVertex(i+1)->GetCoord()[j] - pt0[j];
+}
+
 /// calculates the transpose of the transformation  Tetra -> RefTetra
 inline void GetTrafoTr( SMatrixCL<3,3>& T, double& det, const Point3DCL pt[4])
 {
@@ -631,6 +660,16 @@ inline void GetTrafoTr( SMatrixCL<3,3>& T, double& det, const TetraCL& t)
 
 void MarkAll (MultiGridCL&);
 void UnMarkAll (MultiGridCL&);
+
+
+class ParamCL; // forward declaration for read_PeriodicBoundaries.
+
+/// \brief Read PeriodicMatching and the periodic boundary-segments from P and insert them into mg.Bnd_.
+/// The key PeriodicMatching is optional; ommitting it or setting it to the empty string disables periodic matching.
+/// The default for all boundary-segments is OtherBnd.
+/// All other keys are interpreted as boundary-segment indices.
+/// The values have the form "Per1Bnd" or "Per2Bnd".
+void read_PeriodicBoundaries (MultiGridCL& mg, const ParamCL& P);
 
 } // end of namespace DROPS
 
