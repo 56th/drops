@@ -174,7 +174,7 @@ void LinThetaScheme2PhaseCL<LsetSolverT>::CommitStep()
             accumulate( accus,
                         Stokes_.GetMG(), Stokes_.vel_idx.TriangLevel(), Stokes_.vel_idx.GetMatchingFunction(), Stokes_.vel_idx.GetBndInfo());
         }
-        Stokes_.SetupC(&Stokes_.C, LvlSet_, 1e-3);
+        Stokes_.SetupC(&Stokes_.C, LvlSet_, 0);
     }
     else
         Stokes_.SetupRhs2( &Stokes_.c, LvlSet_, Stokes_.v.t);
@@ -245,7 +245,7 @@ void LinThetaScheme2PhaseCL<LsetSolverT>::Update()
         MLTetraAccumulatorTupleCL updates( Stokes_.A.Data.size());
         MaybeAddMLProgressbar( Stokes_.GetMG(), "System2+Nonl", updates, Stokes_.vel_idx.TriangLevel());
         Stokes_.system2_accu( updates, &Stokes_.B, &Stokes_.c, LvlSet_, Stokes_.v.t);
-        Stokes_.SetupC(&Stokes_.C, LvlSet_, 1e-3);
+        Stokes_.SetupC(&Stokes_.C, LvlSet_, 0);
         Stokes_.nonlinear_accu( updates, &Stokes_.N, &Stokes_.v, old_cplN_, LvlSet_, Stokes_.v.t);
         accumulate( updates, Stokes_.GetMG(), Stokes_.vel_idx.TriangLevel(), Stokes_.vel_idx.GetMatchingFunction(), Stokes_.vel_idx.GetBndInfo());
     }
