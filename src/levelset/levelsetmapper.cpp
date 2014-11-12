@@ -43,6 +43,7 @@ void base_point_newton_cacheCL::set_tetra (const TetraCL* newtet)
     double dummy;
     GetTrafoTr( T, dummy, *tet);
     P2DiscCL::GetGradients( gradp2_, gradrefp2_, T);
+    P2DiscCL::GetHessians( hessp2_, T);
 
     w2b_.assign( *tet);
 }
@@ -173,7 +174,6 @@ void QuaQuaMapperCL::base_point_newton (const TetraCL*& tet, BaryCoordCL& xb) co
     QRDecompCL<4,4> qr;
     SMatrixCL<4,4>& M= qr.GetMatrix();
 
-//     base_point_newton_cacheCL cache_( ls, ls_grad_rec, gradrefp2);
     cache_.set_tetra( tet);
     const LocalP2CL<>& locls= cache_.locls();
     const LocalP2CL<Point3DCL>& loc_gh= cache_.loc_gh();
@@ -192,7 +192,7 @@ void QuaQuaMapperCL::base_point_newton (const TetraCL*& tet, BaryCoordCL& xb) co
         ghnorm= nh.norm();
         nh/= ghnorm;
 
-        g_ls= Point3DCL(); // locls[0]*cache_.gradp2[0]( xb);
+        g_ls= Point3DCL();
         for (Uint i= 0; i < 10; ++i) {
             gradp2_xb[i]= cache_.gradp2( i)( xb);
             g_ls+= locls[i]*gradp2_xb[i];
@@ -224,10 +224,16 @@ void QuaQuaMapperCL::base_point_newton (const TetraCL*& tet, BaryCoordCL& xb) co
         qr.Solve( F);
         dx= MakePoint3D( F[0], F[1], F[2]);
 
-        // Apply damping until x - damp*dx is in the neighborhood of tet.
-        xb= cache_.w2b()( x - dx);
-        double damp= 1.;
-        locate_new_point( x, -dx, tet, xb, damp); // Find tetra enclosing x - damp*dx; depending on the method, the step is damped with 0 < damp < 1.
+        // Apply damping based on the trust region of the linearization of the level set function.
+        double hess_ls_dxdx= 0.;
+        for (Uint i= 0; i < 10; ++i) {
+             hess_ls_dxdx+= inner_prod( dx, cache_.hessp2( i)*dx);
+        }
+        double damp= std::min( 1., 0.5/(0.5*hess_ls_dxdx/inner_prod( g_ls, dx)) );
+
+        // Locate the tetra containing the new point; possibly apply more damping until x - damp*dx is in the neighborhood of tet.
+        xb= cache_.w2b()( x - damp*dx);
+        locate_new_point( x, -dx, tet, xb, damp);
         x-= damp*dx;
         dh-= damp*F[3];
         cache_.set_tetra( tet);
