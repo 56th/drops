@@ -1,0 +1,28 @@
+{
+    "CSGLevelsets": {
+//        "Torus": {
+//            "Type": "CSG-body (v0)",
+//            "Instructions" : [
+//                { "Type": "Torus", "Origin": [0, 0, 0], "Axis": [1, 0, 0], "BigRadius": 0.75, "SmallRadius": 0.25 } // all args are optional.
+//            ]
+//        },
+
+        "File": "../geom/csg-examples.json"
+    },
+
+    "Domain": {
+        "Type": "BrickBuilder",
+        "Origin": [-1, -1, -1],
+        "E1": [2, 0, 0],
+        "E2": [0, 2, 0],
+        "E3": [0, 0, 2],
+        "N1": 16,
+        "N2": 16,
+        "N3": 16
+    },
+
+    "VTK": {
+        "VTKName": "csgtest",
+        "VTKDir":  "."
+    }
+}

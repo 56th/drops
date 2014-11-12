@@ -41,6 +41,7 @@
 
 using namespace DROPS;
 
+ParamCL P;
 
 /// \brief Accumulate different error measures for the approximation of the level
 /// set function $\varphi$ by the piecewise linear approximation $\varphi_h$.
@@ -145,11 +146,12 @@ inline double csg_fun (const Point3DCL& x, double t)
     return (*thebody)( x, t);
 }
 
-int TestExamples (MultiGridCL& mg)
+int TestExamples (MultiGridCL& mg, ParamCL& p)
 {
     SurfaceTensionCL sf( sigmaf);   // dummy class
     LsetBndDataCL lsbnd( 6);
-    LevelsetP2CL & lset( * LevelsetP2CL::Create( mg, lsbnd, sf) );
+    std::auto_ptr<LevelsetP2CL> lset_ptr( LevelsetP2CL::Create( mg, lsbnd, sf));
+    LevelsetP2CL& lset= *lset_ptr;
 
     lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
     lset.Phi.SetIdx( &lset.idx);
@@ -160,20 +162,20 @@ int TestExamples (MultiGridCL& mg)
               ierrg( &p1idx),
               ierrq( &p1idx);
 
-    std::ifstream jsonfile( "../geom/csg-examples.json");
-    ParamCL p;
-    jsonfile >> p;
     const size_t num= 2*std::distance( p.begin(), p.end());
 
    // writer for vtk-format
     VTKOutCL vtkwriter( mg, "DROPS data", num,
-                        ".", "csg-examples", 
-                        "csg-examples", /* <- time file name */
-                        true, /* <- binary */
-                        false, /* <- onlyp1 */
+                        P.get<std::string>( "VTK.VTKDir"),
+                        P.get<std::string>( "VTK.VTKName"),
+                        P.get<std::string>( "VTK.TimeFileName"),
+                        P.get<bool>( "VTK.Binary"),
+                        P.get<bool>( "VTK.UseOnlyP1"), /* <- onlyp1 */
                         false, /* <- p2dg */
                         -1, /* <- level */
-                        0, 0);
+                        false, /* <- reusepvd */
+                        false /* <- usedeformed */
+              );
     vtkwriter.Register( make_VTKScalar( lset.GetSolution(), "level-set") );
     vtkwriter.Register( make_VTKScalar( make_P1Eval( mg, lsbnd, ierr), "interpolation-errorH") );
     vtkwriter.Register( make_VTKScalar( make_P1Eval( mg, lsbnd, ierrg), "interpolation-errorG") );
@@ -248,17 +250,49 @@ int TestExamples (MultiGridCL& mg)
     }
     lset.idx.DeleteNumbering( mg);
     p1idx.DeleteNumbering( mg);
-    std::cout << "Successfully proccessed '../geom/csg-examples.json'.\n";
-    delete &lset;
+    std::cout << "Successfully proccessed all examples.\n";
     return 0;
 }
 
-int main ()
+/// \brief Set Default parameters here s.t. they are initialized.
+/// The result can be checked when Param-list is written to the output.
+void SetMissingParameters (DROPS::ParamCL& P)
+{
+    P.put_if_unset<std::string>("VTK.VTKName", "csgtest");
+    P.put_if_unset<std::string>("VTK.VTKDir", ".");
+    P.put_if_unset<std::string>( "VTK.TimeFileName", P.get<std::string>("VTK.VTKName"));
+    P.put_if_unset<int>( "VTK.Binary", 1);
+    P.put_if_unset<int>( "VTK.UseOnlyP1", 0);
+    P.put_if_unset<int>( "VTK.ReUseTimeFile", 0);
+    P.put_if_unset<int>("VTK.UseDeformation", 0);
+}
+
+int main (int argc, char** argv)
 {
   try {
-    BrickBuilderCL mgb( Point3DCL( -1.), 2*std_basis<3>( 1), 2*std_basis<3>( 2), 2*std_basis<3>( 3), 16, 16, 16);
-    MultiGridCL mg( mgb);
-    return  TestExamples( mg);
+    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "csgtest.json");
+    SetMissingParameters(P);
+    std::cout << P << std::endl;
+
+    std::auto_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P.get_child( "Domain")));
+    DROPS::MultiGridCL mg( *builder);
+
+    // If the key CSGLevelsets.File exists and is not empty, read the examples from the given file; otherwise, assume that the section CSGLevelsets itself contains the examples.
+    std::string examples;
+    try {
+        examples= P.get<std::string>( "CSGLevelsets.File");
+    }
+    catch (DROPSParamErrCL&) {}
+    ParamCL ex;
+    if (examples != "") {
+        std::ifstream jsonfile( examples.c_str());
+        jsonfile >> ex;
+    }
+    else {
+        ex= P.get_child( "CSGLevelsets");
+        std::cout << ex << std::endl;
+    }
+    return TestExamples( mg, ex);;
   }
   catch (DROPSErrCL err) { err.handle(); }
 }
