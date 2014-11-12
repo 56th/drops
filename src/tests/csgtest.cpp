@@ -41,18 +41,6 @@
 
 using namespace DROPS;
 
-static void GetP2Hessian( SMatrixCL<3,3> G[10], const SMatrixCL<3,3>& M)
-// G[d]= M*Href[d]*M^T
-{
-    for (Uint d= 0; d< 10; ++d) {
-        std::memset( &G[d], 0, 3*3*sizeof( double));
-        for (Uint i= 0; i < 3; ++i)
-            for (Uint j= 0; j < 3; ++j)
-                for (Uint k= 0; k < 3; ++k)
-                    for (Uint l= 0; l < 3; ++l)
-                        G[d](i,j)+= M(i, k)*M(j, l)*FE_P2CL::D2HRef( d, k, l);
-    }
-}
 
 /// \brief Accumulate different error measures for the approximation of the level
 /// set function $\varphi$ by the piecewise linear approximation $\varphi_h$.
@@ -103,7 +91,7 @@ class InterfaceApproxErrorAccuCL : public TetraAccumulatorCL
             return;
 
         GetTrafoTr( M, det, t);
-        GetP2Hessian( Hp2, M);
+        P2DiscCL::GetHessians( Hp2, M);
         SMatrixCL<3,3> H;
         P2DiscCL::GetGradients( Gp2, Grefp2, M);
         Point3DCL G;

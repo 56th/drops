@@ -1286,6 +1286,17 @@ class P2DiscCL
     template<class GradT>
     static void GetFuncGradient( GradT& gradF, const LocalP2CL<>& F, const GradT G[10])
     { gradF= F[0]*G[0]; for (int i=1; i<10; ++i) gradF+= F[i]*G[i]; }
+    // Compute the Hessians H[d]= M*Href[d]*M^T
+    static void GetHessians (SMatrixCL<3,3> H[10], const SMatrixCL<3,3>& M) {
+        for (Uint d= 0; d< 10; ++d) {
+            std::memset( &H[d], 0, 3*3*sizeof( double));
+            for (Uint i= 0; i < 3; ++i)
+                for (Uint j= 0; j < 3; ++j)
+                    for (Uint k= 0; k < 3; ++k)
+                        for (Uint l= 0; l < 3; ++l)
+                            H[d](i,j)+= M(i, k)*M(j, l)*FE_P2CL::D2HRef( d, k, l);
+        }
+    }
     // cubatur formula for int f(x)*phi_i dx, exact up to degree 1
     static inline SVectorCL<3> Quad( const TetraCL& tetra, instat_vector_fun_ptr, Uint, double= 0.0);
     // cubatur formula for int f(x)*phi_i dx, exact up to degree 2
