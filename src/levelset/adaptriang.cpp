@@ -114,7 +114,6 @@ bool AdapTriangCL::UpdateTriang()
 
     double duration;
 
-    marker_->SetUnmodified();
     const int min_ref_num = marker_->GetFineLevel() - marker_->GetCoarseLevel();
     int i;
     observer_.notify_pre_refmig_sequence( GetMG() );
