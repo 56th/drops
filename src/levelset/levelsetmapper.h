@@ -102,8 +102,8 @@ class QuaQuaMapperCL
 
     void locate_new_point (const Point3DCL& x, const Point3DCL& dx, const TetraCL*& tet, BaryCoordCL& xb, double& d) const;
     bool line_search (Point3DCL& v, const Point3DCL& nx, const TetraCL*& tetra, BaryCoordCL& bary) const;
-    void base_point_with_line_search (const TetraCL*& tet, BaryCoordCL& xb) const;
-    void base_point_newton (const TetraCL*& tet, BaryCoordCL& xb) const;
+    double base_point_with_line_search (const TetraCL*& tet, BaryCoordCL& xb) const;
+    double base_point_newton (const TetraCL*& tet, BaryCoordCL& xb) const;
 
   public:
     QuaQuaMapperCL (const MultiGridCL& mg, VecDescCL& lsarg, const VecDescCL& ls_grad_recarg, TetraToTetrasT* neighborhoods= 0, int maxiter= 100, double tol= 1e-7, bool use_line_search= true)
@@ -113,7 +113,7 @@ class QuaQuaMapperCL
 
     void set_tetra_neighborhoods (TetraToTetrasT& neigborhoods) { neighborhoods_= &neigborhoods; }
 
-    void base_point (const TetraCL*& tet, BaryCoordCL& xb) const;
+    double base_point (const TetraCL*& tet, BaryCoordCL& xb) const;
     /// \brief (btet, b) must equal base_point( &tet, xb).
     void jacobian (const TetraCL& tet, const BaryCoordCL& xb,
                    const TetraCL& btet, const BaryCoordCL& b, SMatrixCL<3,3>& dph) const;

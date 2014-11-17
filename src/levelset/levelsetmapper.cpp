@@ -129,14 +129,14 @@ bool QuaQuaMapperCL::line_search (Point3DCL& x, const Point3DCL& nx, const Tetra
     return inneriter < maxinneriter_;
 }
 
-void QuaQuaMapperCL::base_point_with_line_search (const TetraCL*& tet, BaryCoordCL& xb) const
+double QuaQuaMapperCL::base_point_with_line_search (const TetraCL*& tet, BaryCoordCL& xb) const
 // tet and xb specify the point which is projected to the zero level.
 // On return tet and xb are the resulting base point.
 {
     ScopeTimerCL timer( "QuaQuaMapperCL::base_point_with_line_search");
 
-    Point3DCL x, xold; // World coordinates of current and previous xb.
-    x= GetWorldCoord( *tet, xb);
+    Point3DCL x, xold, x0; // World coordinates of current and previous xb and of the inital point.
+    x0= x= GetWorldCoord( *tet, xb);
 
     Point3DCL n; // Current search direction.
 
@@ -154,10 +154,10 @@ void QuaQuaMapperCL::base_point_with_line_search (const TetraCL*& tet, BaryCoord
         std::cout << "QuaQuaMapperCL::base_point_with_line_search: max iteration number exceeded; |x - xold|: " << norm( xold - x) << "\tx: " << x << "\t n: " << n << "\t ls(x): " << ls.val( *tet, xb) << std::endl;
     }
     ++num_outer_iter[iter];
+    return inner_prod( n, x0 - x);
 }
 
-
-void QuaQuaMapperCL::base_point_newton (const TetraCL*& tet, BaryCoordCL& xb) const
+double QuaQuaMapperCL::base_point_newton (const TetraCL*& tet, BaryCoordCL& xb) const
 // tet and xb specify the point which is projected to the zero level.
 // On return tet and xb are the resulting base point.
 {
@@ -238,9 +238,9 @@ void QuaQuaMapperCL::base_point_newton (const TetraCL*& tet, BaryCoordCL& xb) co
 
     }
     ++num_outer_iter[iter];
-            // Compute the quasi-distance dh:
-//             const Point3DCL& gh= loc_gh( xb);// The recovered gradient.
-//             dh*= gh.norm();
+    // Compute the quasi-distance dh:
+    gh= loc_gh( xb);// The recovered gradient.
+    const double dh= s*gh.norm();
     if (iter >= maxiter_) {
         std::cout << "QuaQuaMapperCL::base_point_newton: max iteration number exceeded; x0: " << x0 << "\tx: " << x << "\t dx: " << dx << "\t ls(x): " << ls.val( *tet, xb) << "\tdamping: " << d << "\tdh: " << dh << "\tghnorm: " << ghnorm << "\tnh: " << nh << "g_ls: " << g_ls << std::endl;
     }
@@ -250,18 +250,18 @@ void QuaQuaMapperCL::base_point_newton (const TetraCL*& tet, BaryCoordCL& xb) co
 // if (c == 'q')
 //     exit( 0);
 //     else {
-//         std::cout << "QuaQuaMapperCL::base_point_newton: Ok! x0: " << x0 << "\tx: " << x << "\t dx: " << dx << "\t ls(x): " << ls.val( *tet, xb) << "\tdamping: " << d << "\tdh: " << dh << "\titer: " << iter << std::endl;
+//         std::cout << "QuaQuaMapperCL::base_point_newton: Ok! x0: " << x0 << "\tx: " << x << "\t dx: " << dx << "\t ls(x): " << ls.val( *tet, xb) << "\tdamping: " << damp << "\tdh: " << dh << "\titer: " << iter << std::endl;
 //     }
+    return dh;
 }
 
-void QuaQuaMapperCL::base_point (const TetraCL*& tet, BaryCoordCL& xb) const
+double QuaQuaMapperCL::base_point (const TetraCL*& tet, BaryCoordCL& xb) const
 // tet and xb specify the point which is projected to the zero level.
 // On return tet and xb are the resulting base point.
 {
-    if (use_line_search_ == true)
-        base_point_with_line_search( tet, xb);
-    else
-        base_point_newton( tet, xb);
+    return use_line_search_ == true
+           ? base_point_with_line_search( tet, xb)
+           : base_point_newton( tet, xb);
 }
 
 void QuaQuaMapperCL::jacobian (const TetraCL& tet, const BaryCoordCL& xb, const TetraCL& btet, const BaryCoordCL& b, SMatrixCL<3,3>& dph) const
