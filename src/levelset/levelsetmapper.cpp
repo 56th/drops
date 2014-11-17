@@ -168,8 +168,8 @@ void QuaQuaMapperCL::base_point_newton (const TetraCL*& tet, BaryCoordCL& xb) co
     Point3DCL x0, x, // World coordinates of initial and current xb.
               dx; // Newton-correction for x.
     x0= x= GetWorldCoord( *tet, xb);
-    SVectorCL<4> F; // The function of which we search a root, ( x0 - x - dh*nh(x), -ls(x) ).
-    double dh= 0.;  // quasi-distance
+    SVectorCL<4> F; // The function of which we search a root, ( x0 - x - s*gh(x), -ls(x) ).
+    double s= 0.;  // scaled quasi-distance
 
     double d= 1.; // Damping factor for trust region.
 
@@ -182,17 +182,14 @@ void QuaQuaMapperCL::base_point_newton (const TetraCL*& tet, BaryCoordCL& xb) co
     Point3DCL gradp2_xb[10];
 
     Point3DCL g_ls, // gradient of the level set function.
-//               gh,   // recovered gradient
-              nh;   // quasi normal
+              gh;   // recovered gradient
     double ghnorm; // norm of the recovered gradient gh.
-    SMatrixCL<3,3> dgh, // Jacobian of the recovered gradient.
-                   dn;  // Jacobian of the quasi-normal.
+    SMatrixCL<3,3> dgh; // Jacobian of the recovered gradient.
 
     int iter;
     for (iter= 0; iter < maxiter_ && std::abs( locls( xb)) >= lset_tol; ++iter) {
-        nh= loc_gh( xb);
-        ghnorm= nh.norm();
-        nh/= ghnorm;
+        gh= loc_gh( xb);
+        ghnorm= gh.norm();
 
         g_ls= Point3DCL();
         for (Uint i= 0; i < 10; ++i) {
@@ -200,27 +197,26 @@ void QuaQuaMapperCL::base_point_newton (const TetraCL*& tet, BaryCoordCL& xb) co
             g_ls+= locls[i]*gradp2_xb[i];
         }
 
-        // Evaluate the Jacobian of the quasi-normal field in xb: dn_h= 1/|G_h| P dG_h.
-        dgh= SMatrixCL<3,3>(); // outer_product( cache_.loc_gh[0], cache_.gradp2[0]( xb));
+        // Evaluate the Jacobian of gh in xb: dg_h.
+        dgh= SMatrixCL<3,3>();
         for (Uint i= 0; i < 10; ++i)
             dgh+= outer_product( loc_gh[i], gradp2_xb[i]);
-        dn= 1./ghnorm*(dgh - outer_product( nh, transp_mul( dgh, nh)));
 
-        // Setup the blockmatrix M= (-I - dh dn | - gh, -g_ls^T | 0).
+        // Setup the blockmatrix M= (-I - s dgh | - gh, -g_ls^T | 0).
         for (Uint i= 0; i < 3; ++i) {
             for (Uint j= 0; j < 3; ++j) {
-                M( i,j)= -dh*dn( i,j);
+                M( i,j)= -s*dgh( i,j);
             }
             M( i,i)-= 1.;
-            M( i, 3)= -nh[i];
+            M( i, 3)= -gh[i];
             M( 3, i)= -g_ls[i];
         }
         M( 3,3)= 0.;
         qr.prepare_solve();
 
-        // Setup F= (x0 - x - dh*gh, -locls( xb)).
+        // Setup F= (x0 - x - s*gh, -locls( xb)).
         for (Uint i= 0; i < 3; ++i)
-            F[i]= x0[i] - x[i] - dh*nh[i];
+            F[i]= x0[i] - x[i] - s*gh[i];
         F[3]= -locls( xb);
 
         qr.Solve( F);
@@ -237,8 +233,9 @@ void QuaQuaMapperCL::base_point_newton (const TetraCL*& tet, BaryCoordCL& xb) co
         xb= cache_.w2b()( x - damp*dx);
         locate_new_point( x, -dx, tet, xb, damp);
         x-= damp*dx;
-        dh-= damp*F[3];
+        s-= damp*F[3];
         cache_.set_tetra( tet);
+
     }
     ++num_outer_iter[iter];
             // Compute the quasi-distance dh:
