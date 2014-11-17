@@ -56,6 +56,7 @@ class base_point_newton_cacheCL
     World2BaryCoordCL    w2b_;
 
     SMatrixCL<3,3> hessp2_[10];
+    double h_;
 
   public:
     base_point_newton_cacheCL (const P2EvalCL<double, const NoBndDataCL<>, const VecDescCL>& ls,
@@ -70,6 +71,7 @@ class base_point_newton_cacheCL
     const LocalP1CL<Point3DCL>& gradp2 (Uint i) const { return gradp2_[i]; }
     const SMatrixCL<3,3>&       hessp2 (Uint i) const { return hessp2_[i]; }
     const World2BaryCoordCL&    w2b    () const { return w2b_; }
+    double                      get_h  () const { return h_; }
 };
 
 

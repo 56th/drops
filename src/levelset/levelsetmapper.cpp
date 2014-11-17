@@ -46,6 +46,8 @@ void base_point_newton_cacheCL::set_tetra (const TetraCL* newtet)
     P2DiscCL::GetHessians( hessp2_, T);
 
     w2b_.assign( *tet);
+
+    h_= ::cbrt( std::abs( dummy));
 }
 
 // Return a tetra from neighborhood that contains v up to precision eps in barycentric coordinates.
