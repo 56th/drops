@@ -181,7 +181,9 @@ bool StrategyCombinerCL::modified() const
 
 void StrategyCombinerCL::SetUnmodified()
 {
-    modified_ = false;
+    modified_= false;
+    for (Uint i= 0; i < strategies_.size(); ++i)
+        strategies_[i]->SetUnmodified();
 }
 
 
@@ -418,28 +420,22 @@ void DistMarkingStrategyCL::visit( const TetraCL &t )
 
     // In the shell:      level should be f_level_.
     // Outside the shell: level should be c_level_.
-    const Uint soll_level = ( d <= width_ || vzw ) ? f_level_ : c_level_;
+    const Uint soll_level= (d <= width_ || vzw) ? f_level_ : c_level_;
 
-    if ( l !=  soll_level || (l == soll_level && ! t.IsRegular()) )
-    {
+    if (l <  soll_level || (l == soll_level && ! t.IsRegular())) {
         // tetra will be marked for refinement/removement
-        if ( l <= soll_level )
-        {
-            t.SetRegRefMark();
-            modified_ = true;
-            decision_ = RefineC;
-        }
-        else
-        {
-            t.SetRemoveMark();
-            modified_ = true;
-            decision_ = CoarsenC;
-        }
+        t.SetRegRefMark();
+        modified_= true;
+        decision_= RefineC;
     }
-    else if ( l == soll_level )
-    {
+    else if (l > soll_level) {
+        t.SetRemoveMark();
+        modified_= true;
+        decision_= CoarsenC;
+        }
+    else { // l == soll_level && t.IsRegular()
         // Tetrahedra has exactly the level that we require.
-        decision_ = KeepC;
+        decision_= KeepC;
     }
 }
 
