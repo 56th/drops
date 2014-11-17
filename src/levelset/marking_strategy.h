@@ -201,6 +201,65 @@ private:
     MarkingDecisionT decision_;
 };
 
+
+class PrincipalLatticeCL; // forward declaration
+
+/*!
+ * \brief Refinement strategy using the curvature of the level set function
+ *
+ * This marking strategy refines the mesh around the zero level of a given
+ * levelset function until the quadratic approximation error is smaller than the linear approximation error.
+ */
+class CurvatureMarkingStrategyCL: public MarkingStrategyCL
+{
+public:
+    CurvatureMarkingStrategyCL (const LevelsetP2CL &fct, const PrincipalLatticeCL& lattice, Uint fine_level);
+    CurvatureMarkingStrategyCL( const CurvatureMarkingStrategyCL &rhs );
+    ~CurvatureMarkingStrategyCL();
+    CurvatureMarkingStrategyCL& operator=( const CurvatureMarkingStrategyCL& rhs );
+    TetraAccumulatorCL* clone( int );
+    MarkingStrategyCL*  clone_strategy();
+
+    void visit( const TetraCL& t );
+
+    bool modified() const;
+    void SetUnmodified();
+
+    MarkingDecisionT GetDecision() const;
+
+    void SetDistFct( const LevelsetP2CL& fct );
+
+    Uint   GetFineLevel() const;
+    void   SetFineLevel( Uint level );
+
+    Uint GetCoarseLevel() const { return 0; }
+
+private:
+    std::auto_ptr<ValueGetterCL> getter_;
+
+    Uint f_level_;
+    bool modified_;
+    MarkingDecisionT decision_;
+
+    IdxT numry[4];
+    double vec[4];
+
+    const BaryCoordCL bc;
+    SMatrixCL<3,3> M;
+    double det;
+
+    SMatrixCL<3,3> Hp2[10];
+    LocalP1CL<Point3DCL> Grefp2[10],
+                         Gp2[10];
+
+    const PrincipalLatticeCL* lat;
+
+    LocalP2CL<> locp2_ls;
+    std::valarray<double> ls_loc;
+    const VecDescCL*   ls;      // P2-level-set
+    const BndDataCL<>* lsetbnd; // boundary data for the level set function
+};
+
 }
 
 #endif
