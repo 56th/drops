@@ -30,10 +30,14 @@
 #include "geom/multigrid.h"
 #include "geom/principallattice.h"
 #include "geom/subtriangulation.h"
-#include "levelset/surfacetension.h"
 #include "levelset/levelset.h"
+#include "levelset/adaptriang.h"
+#include "levelset/levelset.h"
+#include "levelset/levelsetmapper.h"
+#include "levelset/marking_strategy.h"
 #include "geom/builder.h"
 #include "num/fe.h"
+#include "num/gradient_recovery.h"
 #include "num/lattice-eval.h"
 #include "misc/problem.h"
 #include "out/vtkOut.h"
@@ -50,7 +54,8 @@ class InterfaceApproxErrorAccuCL : public TetraAccumulatorCL
   private:
     VecDescCL* yH_, ///< error-term for H^2-smooth \varphi
              * yG_, ///< error-term for H^1 smooth \varphi
-             * yQ_; ///< yH_/yG_ (clipped at 1e16) 
+             * yQ_, ///< yH_/yG_ (clipped at 1e16)
+             * ydist_; ///< distance per QuaQuamapper
 
     IdxT numry[4];
     double vec[4];
@@ -72,10 +77,12 @@ class InterfaceApproxErrorAccuCL : public TetraAccumulatorCL
 
     bool setrefmarks_;
 
+    QuaQuaMapperCL* mapper_;
+
   public:
     InterfaceApproxErrorAccuCL (const LevelsetP2CL& lset,
-        VecDescCL* yh, VecDescCL* yg, VecDescCL* yq, bool setrefmarks= false)
-        : yH_( yh), yG_( yg), yQ_( yq), bc( 0.25), lat( PrincipalLatticeCL::instance( 2)), ls( &lset.Phi), lsetbnd( &lset.GetBndData()), ls_loc( 10), setrefmarks_( setrefmarks) { P2DiscCL::GetGradientsOnRef( Grefp2); }
+        VecDescCL* yh, VecDescCL* yg, VecDescCL* yq, VecDescCL* ydist, bool setrefmarks= false)
+        : yH_( yh), yG_( yg), yQ_( yq), ydist_( ydist), bc( 0.25), lat( PrincipalLatticeCL::instance( 2)), ls( &lset.Phi), lsetbnd( &lset.GetBndData()), ls_loc( 10), setrefmarks_( setrefmarks), mapper_( 0) { P2DiscCL::GetGradientsOnRef( Grefp2); }
     virtual ~InterfaceApproxErrorAccuCL () {}
 
     virtual void begin_accumulation () {
@@ -118,14 +125,30 @@ class InterfaceApproxErrorAccuCL : public TetraAccumulatorCL
             const_cast<TetraCL&>( t).SetRegRefMark();
 
         GetLocalNumbP1NoBnd( numry, t, *yH_->RowIdx);
+        if (mapper_) {
+            const TetraCL* btet;;
+            BaryCoordCL xb;
+            for (Uint i= 0; i < 4; ++i) {
+                if (ydist_->Data[numry[i]] != 0.)
+                    continue;
+                xb= std_basis<4>( i + 1);
+                btet= &t;
+                ydist_->Data[numry[i]]= mapper_->base_point( btet, xb);
+            }
+        }
         for (int i= 0; i < 4; ++i) {
-            yH_->Data[numry[i]]=  std::max( yH_->Data[numry[i]], errH);
-            yG_->Data[numry[i]]= std::max( yG_->Data[numry[i]], errG);
+//             yH_->Data[numry[i]]=  std::max( yH_->Data[numry[i]], errH);
+//             yG_->Data[numry[i]]= std::max( yG_->Data[numry[i]], errG);
+//             yQ_->Data[numry[i]]= std::max( yQ_->Data[numry[i]], errQ);
+            yH_->Data[numry[i]]=  std::max( yH_->Data[numry[i]], errH/h);
+            yG_->Data[numry[i]]= std::max( yG_->Data[numry[i]], errG/h);
             yQ_->Data[numry[i]]= std::max( yQ_->Data[numry[i]], errQ);
         }
     }
 
     virtual InterfaceApproxErrorAccuCL* clone (int /*clone_id*/) { return new InterfaceApproxErrorAccuCL( *this); }
+
+    void set_mapper (QuaQuaMapperCL* mapper) { mapper_= mapper; }
 };
 
 
@@ -136,6 +159,122 @@ double suess (const Point3DCL& p, double)
 }
 RegisterScalarFunction reg_suess( "suess", &suess);
 
+
+double deco_cube_radius;
+double deco_cube_shift;
+
+template <typename T>
+class ADScalarCL
+{
+  private:
+    T s,
+      ds;
+
+  public:
+    ADScalarCL (T ss= T(), T dss= T())
+        : s( ss), ds( dss) {}
+
+    T value () const { return s; }
+    T derivative () const { return ds; }
+
+    void seed () { ds= 1.; }
+};
+
+template <typename T>
+ADScalarCL<T> operator+ (ADScalarCL<T> f, ADScalarCL<T> g)
+{
+    return ADScalarCL<T>( f.value() + g.value(),
+                          f.derivative() + g.derivative());
+}
+
+template <typename T>
+ADScalarCL<T> operator- (ADScalarCL<T> f, ADScalarCL<T> g)
+{
+    return ADScalarCL<T>( f.value() - g.value(),
+                          f.derivative() - g.derivative());
+}
+
+template <typename T>
+ADScalarCL<T> operator* (ADScalarCL<T> f, ADScalarCL<T> g)
+{
+    return ADScalarCL<T>( f.value()*g.value(),
+                          f.derivative() + g.value() + f.value()*g.derivative());
+}
+
+template <typename T>
+ADScalarCL<T> pow (ADScalarCL<T> f, int /*i*/)
+{
+//     return ADScalarCL<T>( std::pow( f.value(), i),
+//                           i*std::pow( f.value(), i - 1));
+    return ADScalarCL<T>( std::pow( f.value(), 2),
+                          2.*f.value());
+}
+
+void deco_cube_val_grad (const Point3DCL& pp, double& v, Point3DCL& g)
+{
+    typedef ADScalarCL<double> Ads;
+    const Ads cc( deco_cube_radius*deco_cube_radius),
+              one( 1.);
+    Ads p[3],
+        gi;
+    for (Uint i= 0; i < 3; ++i) {
+        for (Uint j= 0; j < 3; ++j)
+            p[j]= Ads( pp[j]);
+        p[i].seed();
+        gi= (pow( p[0]*p[0] + p[1]*p[1] - cc, 2) + pow( p[2]*p[2] - one, 2))
+           *(pow( p[1]*p[1] + p[2]*p[2] - cc, 2) + pow( p[0]*p[0] - one, 2))
+           *(pow( p[2]*p[2] + p[0]*p[0] - cc, 2) + pow( p[1]*p[1] - one, 2))
+           + Ads( deco_cube_shift);
+        g[i]= gi.derivative();
+    }
+    v= gi.value();
+}
+
+double deco_cube (const Point3DCL& p, double)
+{
+//     const double cc= deco_cube_radius*deco_cube_radius;
+//     return  (std::pow( p[0]*p[0] + p[1]*p[1] - cc, 2) + std::pow( p[2]*p[2] - 1, 2))
+//            *(std::pow( p[1]*p[1] + p[2]*p[2] - cc, 2) + std::pow( p[0]*p[0] - 1, 2))
+//            *(std::pow( p[2]*p[2] + p[0]*p[0] - cc, 2) + std::pow( p[1]*p[1] - 1, 2)) + deco_cube_shift;
+//     const double cc= deco_cube_radius*deco_cube_radius;
+//     return  (std::abs( p[0]*p[0] + p[1]*p[1] - cc) + std::abs( p[2]*p[2] - 1))
+//            *(std::abs( p[1]*p[1] + p[2]*p[2] - cc) + std::abs( p[0]*p[0] - 1))
+//            *(std::abs( p[2]*p[2] + p[0]*p[0] - cc) + std::abs( p[1]*p[1] - 1)) + deco_cube_shift;
+    double v;
+    Point3DCL g;
+    deco_cube_val_grad( p, v, g);
+//     return v/g.norm();
+    return v;
+}
+RegisterScalarFunction reg_deco_cube( "deco_cube", &deco_cube);
+
+class LevelsetReinitCL : public MGObserverCL
+{
+  private:
+    LevelsetP2CL& ls_;
+    instat_scalar_fun_ptr f_;
+
+  public:
+    LevelsetReinitCL (LevelsetP2CL& ls, instat_scalar_fun_ptr f)
+        : ls_( ls), f_( f) {}
+
+    void pre_refine  () {};
+    void post_refine ();
+
+    void pre_refine_sequence  () {}
+    void post_refine_sequence () {}
+    const IdxDescCL* GetIdxDesc() const { return ls_.Phi.RowIdx; }
+};
+
+void
+LevelsetReinitCL::post_refine ()
+{
+    ls_.DeleteNumbering( &ls_.idx);
+    ls_.CreateNumbering( ls_.GetMG().GetLastLevel(), &ls_.idx);
+    ls_.Phi.SetIdx( &ls_.idx);
+    ls_.Init( f_);
+}
+
 //dummy
 double sigmaf (const Point3DCL&, double) { return 0.; }
 
@@ -145,6 +284,7 @@ inline double csg_fun (const Point3DCL& x, double t)
 {
     return (*thebody)( x, t);
 }
+
 
 int TestExamples (MultiGridCL& mg, ParamCL& p)
 {
@@ -158,9 +298,14 @@ int TestExamples (MultiGridCL& mg, ParamCL& p)
 
     IdxDescCL p1idx;
     p1idx.CreateNumbering( mg.GetLastLevel(), mg, lsbnd);
+    IdxDescCL vecp2idx( vecP2_FE);
+    NoBndDataCL<Point3DCL> vecp2bnd;
+    vecp2idx.CreateNumbering( mg.GetLastLevel(), mg, vecp2bnd);
     VecDescCL ierr( &p1idx),
               ierrg( &p1idx),
-              ierrq( &p1idx);
+              ierrq( &p1idx),
+              idist( &p1idx),
+              lsgradrec( &vecp2idx);
 
     const size_t num= 2*std::distance( p.begin(), p.end());
 
@@ -180,9 +325,11 @@ int TestExamples (MultiGridCL& mg, ParamCL& p)
     vtkwriter.Register( make_VTKScalar( make_P1Eval( mg, lsbnd, ierr), "interpolation-errorH") );
     vtkwriter.Register( make_VTKScalar( make_P1Eval( mg, lsbnd, ierrg), "interpolation-errorG") );
     vtkwriter.Register( make_VTKScalar( make_P1Eval( mg, lsbnd, ierrq), "error-quotient") );
+    vtkwriter.Register( make_VTKScalar( make_P1Eval( mg, lsbnd, idist), "dh") );
+    vtkwriter.Register( make_VTKVector( make_P2Eval( mg, vecp2bnd, lsgradrec), "ls_grad_rec") );
 
     // InterfaceApproxErrAccuCL accu( lset, &ierr, &ierrg, &ierrq);
-    InterfaceApproxErrorAccuCL accu( lset, &ierr, &ierrg, &ierrq, true);
+    InterfaceApproxErrorAccuCL accu( lset, &ierr, &ierrg, &ierrq, &idist, true);
     TetraAccumulatorTupleCL accus;
     accus.push_back( &accu);
 
@@ -196,11 +343,18 @@ int TestExamples (MultiGridCL& mg, ParamCL& p)
         ierr.Data= 0.;
         ierrg.Data= 0.;
         ierrq.Data= 0.;
+        idist.Data= 0.;
+//         averaging_P2_gradient_recovery( mg, lset.Phi, lset.GetBndData(), lsgradrec);
+//         QuaQuaMapperCL quaqua( mg, lset.Phi, lsgradrec, /*neighborhoods*/ 0, /*maxiter*/ 100, /*tol*/ 1e-7, /*use_line_search*/ false);
+//         accu.set_mapper( &quaqua);
         accus( mg.GetTriangTetraBegin(), mg.GetTriangTetraEnd());
+//         accu.set_mapper( 0);
+
         vtkwriter.Write( 2*i);
 
         lset.idx.DeleteNumbering( mg);
         p1idx.DeleteNumbering( mg);
+        vecp2idx.DeleteNumbering( mg);
         mg.Refine();
         lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
         lset.Phi.SetIdx( &lset.idx);
@@ -209,11 +363,19 @@ int TestExamples (MultiGridCL& mg, ParamCL& p)
         ierr.SetIdx( &p1idx);
         ierrg.SetIdx( &p1idx);
         ierrq.SetIdx( &p1idx);
+        idist.SetIdx( &p1idx);
+        vecp2idx.CreateNumbering( mg.GetLastLevel(), mg, vecp2bnd);
+        lsgradrec.SetIdx( &vecp2idx);
+        averaging_P2_gradient_recovery( mg, lset.Phi, lset.GetBndData(), lsgradrec);
+        QuaQuaMapperCL quaqua( mg, lset.Phi, lsgradrec, /*neighborhoods*/ 0, /*maxiter*/ 100, /*tol*/ 1e-7, /*use_line_search*/ false);
+//         accu.set_mapper( &quaqua);
         accus( mg.GetTriangTetraBegin(), mg.GetTriangTetraEnd());
+        accu.set_mapper( 0);
 
         if (is_cake) { // needs an additional refinement to look good
             lset.idx.DeleteNumbering( mg);
             p1idx.DeleteNumbering( mg);
+            vecp2idx.DeleteNumbering( mg);
             mg.Refine();
             lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
             lset.Phi.SetIdx( &lset.idx);
@@ -222,6 +384,9 @@ int TestExamples (MultiGridCL& mg, ParamCL& p)
             ierr.SetIdx( &p1idx);
             ierrg.SetIdx( &p1idx);
             ierrq.SetIdx( &p1idx);
+            idist.SetIdx( &p1idx);
+            vecp2idx.CreateNumbering( mg.GetLastLevel(), mg, vecp2bnd);
+            lsgradrec.SetIdx( &vecp2idx);
             accus( mg.GetTriangTetraBegin(), mg.GetTriangTetraEnd());
         }
 
@@ -229,6 +394,7 @@ int TestExamples (MultiGridCL& mg, ParamCL& p)
 
         lset.idx.DeleteNumbering( mg);
         p1idx.DeleteNumbering( mg);
+        vecp2idx.DeleteNumbering( mg);
         DROPS_FOR_TRIANG_TETRA( mg, mg.GetLastLevel(), it)
             it->SetRemoveMark(); // level 0 will not be removed.
         mg.Refine();
@@ -244,12 +410,114 @@ int TestExamples (MultiGridCL& mg, ParamCL& p)
         ierr.SetIdx( &p1idx);
         ierrg.SetIdx( &p1idx);
         ierrq.SetIdx( &p1idx);
+        idist.SetIdx( &p1idx);
+        vecp2idx.CreateNumbering( mg.GetLastLevel(), mg, vecp2bnd);
+        lsgradrec.SetIdx( &vecp2idx);
 
         // seq_out( Addr( ierr.Data), Addr( ierr.Data) + ierr.Data.size(), std::cout);
         delete thebody;
     }
     lset.idx.DeleteNumbering( mg);
     p1idx.DeleteNumbering( mg);
+    vecp2idx.DeleteNumbering( mg);
+    std::cout << "Successfully proccessed all examples.\n";
+    return 0;
+}
+
+
+int TestAdap (MultiGridCL& mg, ParamCL& p)
+{
+    SurfaceTensionCL sf( sigmaf);   // dummy class
+    LsetBndDataCL lsbnd( 6);
+    std::auto_ptr<LevelsetP2CL> lset_ptr( LevelsetP2CL::Create( mg, lsbnd, sf));
+    LevelsetP2CL& lset= *lset_ptr;
+
+    lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
+    lset.Phi.SetIdx( &lset.idx);
+
+    DistMarkingStrategyCL dist_marker( csg_fun,
+        P.get<double>("AdaptRef.Width"),
+        P.get<Uint>(  "AdaptRef.CoarsestLevel"),
+        P.get<Uint>(  "AdaptRef.FinestLevel"));
+    CurvatureMarkingStrategyCL curv_marker( lset,
+        PrincipalLatticeCL::instance( 4),
+        P.get<Uint>( "AdaptRef.CurvatureFinestLevel"));
+    StrategyCombinerCL marker;
+    marker.push_back( dist_marker);
+    marker.push_back( curv_marker);
+
+
+    DROPS::AdapTriangCL adap( mg, &marker);
+    LevelsetReinitCL lsetreinit( lset, &csg_fun);
+    adap.push_back( &lsetreinit);
+
+    IdxDescCL p1idx;
+    IdxDescCL vecp2idx( vecP2_FE);
+    NoBndDataCL<Point3DCL> vecp2bnd;
+    VecDescCL ierr( &p1idx),
+              ierrg( &p1idx),
+              ierrq( &p1idx),
+              idist( &p1idx),
+              lsgradrec( &vecp2idx);
+
+    const size_t num= std::distance( p.begin(), p.end());
+
+   // writer for vtk-format
+    VTKOutCL vtkwriter( mg, "DROPS data", num,
+                        P.get<std::string>( "VTK.VTKDir"),
+                        P.get<std::string>( "VTK.VTKName"),
+                        P.get<std::string>( "VTK.TimeFileName"),
+                        P.get<bool>( "VTK.Binary"),
+                        P.get<bool>( "VTK.UseOnlyP1"), /* <- onlyp1 */
+                        false, /* <- p2dg */
+                        -1, /* <- level */
+                        false, /* <- reusepvd */
+                        false /* <- usedeformed */
+              );
+    vtkwriter.Register( make_VTKScalar( lset.GetSolution(), "level-set") );
+    vtkwriter.Register( make_VTKScalar( make_P1Eval( mg, lsbnd, ierr), "interpolation-errorH") );
+    vtkwriter.Register( make_VTKScalar( make_P1Eval( mg, lsbnd, ierrg), "interpolation-errorG") );
+    vtkwriter.Register( make_VTKScalar( make_P1Eval( mg, lsbnd, ierrq), "error-quotient") );
+    vtkwriter.Register( make_VTKScalar( make_P1Eval( mg, lsbnd, idist), "dh") );
+    vtkwriter.Register( make_VTKVector( make_P2Eval( mg, vecp2bnd, lsgradrec), "ls_grad_rec") );
+
+    // InterfaceApproxErrAccuCL accu( lset, &ierr, &ierrg, &ierrq);
+    InterfaceApproxErrorAccuCL accu( lset, &ierr, &ierrg, &ierrq, &idist, true);
+    TetraAccumulatorTupleCL accus;
+    accus.push_back( &accu);
+
+    size_t i= 0;
+    for (ParamCL::ptree_const_iterator_type it= p.begin(); it != p.end(); ++it, ++i) {
+        std::cout << "\n\n#Processing example \"" << it->first <<"\"." << std::endl;
+
+        thebody= CSG::body_builder( it->second);
+        lset.Init( csg_fun);
+        adap.UpdateTriang();
+        p1idx.CreateNumbering( mg.GetLastLevel(), mg, lsbnd);
+        vecp2idx.CreateNumbering( mg.GetLastLevel(), mg, vecp2bnd);
+        ierr.SetIdx( &p1idx);
+        ierrg.SetIdx( &p1idx);
+        ierrq.SetIdx( &p1idx);
+        idist.SetIdx( &p1idx);
+        lsgradrec.SetIdx( &vecp2idx);
+        averaging_P2_gradient_recovery( mg, lset.Phi, lset.GetBndData(), lsgradrec);
+        QuaQuaMapperCL quaqua( mg, lset.Phi, lsgradrec, /*neighborhoods*/ 0,
+            /*maxiter*/ P.get<int>( "LevelsetMapper.Iter"),
+            /*tol*/ P.get<double>( "LevelsetMapper.Tol"),
+            /*use_line_search*/ P.get<std::string>( "LevelsetMapper.Method") == "FixedPointWithLineSearch");
+        accu.set_mapper( &quaqua);
+        accus( mg.GetTriangTetraBegin(), mg.GetTriangTetraEnd());
+        accu.set_mapper( 0);
+        seq_out( quaqua.num_outer_iter.begin(), quaqua.num_outer_iter.end(), std::cout);
+
+        vtkwriter.Write( i);
+
+        lset.idx.DeleteNumbering( mg);
+        p1idx.DeleteNumbering( mg);
+        vecp2idx.DeleteNumbering( mg);
+
+        delete thebody;
+    }
     std::cout << "Successfully proccessed all examples.\n";
     return 0;
 }
@@ -269,10 +537,14 @@ void SetMissingParameters (DROPS::ParamCL& P)
 
 int main (int argc, char** argv)
 {
+    ScopeTimerCL timer( "main");
   try {
     DROPS::read_parameter_file_from_cmdline( P, argc, argv, "csgtest.json");
     SetMissingParameters(P);
     std::cout << P << std::endl;
+
+    deco_cube_radius= P.get<double>( "deco_cube_parameters.radius");
+    deco_cube_shift=  P.get<double>( "deco_cube_parameters.shift");
 
     std::auto_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P.get_child( "Domain")));
     DROPS::MultiGridCL mg( *builder);
@@ -292,7 +564,8 @@ int main (int argc, char** argv)
         ex= P.get_child( "CSGLevelsets");
         std::cout << ex << std::endl;
     }
-    return TestExamples( mg, ex);;
+//     return TestExamples( mg, ex);;
+    return TestAdap( mg, ex);;
   }
   catch (DROPSErrCL err) { err.handle(); }
 }
