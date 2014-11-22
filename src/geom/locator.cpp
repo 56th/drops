@@ -22,6 +22,7 @@
  * Copyright 2014 LNM RWTH Aachen, Germany
 */
 
+#include <sstream>
 #include "geom/locator.h"
 #include "geom/multigrid.h"
 
@@ -70,8 +71,11 @@ MyLocatorCL::locate_in_tetra ()
             tet= mtet;
             xb= mb;
         }
-        if (mincoeff <= -eps)
-            throw DROPSErrCL( "MyLocatorCL::LocateInTetra: Lost inclusion.\n");
+        if (mincoeff <= -eps) {
+            std::ostringstream os;
+            os << "MyLocatorCL::LocateInTetra: Lost inclusion; mincoeff: " << mincoeff << ".\n";
+            throw DROPSErrCL( os.str());
+        }
     }
 }
 
@@ -105,8 +109,11 @@ MyLocatorCL::locate (const Point3DCL& xarg)
         tet= mtet;
         xb= mb;
     }
-    if (tet == 0)
-        throw DROPSErrCL( "MyLocatorCL::Locate: Point not found on level 0.\n");
+    if (tet == 0) {
+        std::ostringstream os;
+        os << "MyLocatorCL::Locate: Point not found on level 0.; xarg: " << xarg << ".\n";
+        throw DROPSErrCL( os.str());
+    }
 
     locate_in_tetra();
 }
