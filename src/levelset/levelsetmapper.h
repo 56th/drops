@@ -108,7 +108,7 @@ class QuaQuaMapperCL
   public:
     QuaQuaMapperCL (const MultiGridCL& mg, VecDescCL& lsarg, const VecDescCL& ls_grad_recarg, TetraToTetrasT* neighborhoods= 0, int maxiter= 100, double tol= 1e-7, bool use_line_search= true)
         : maxiter_( maxiter), tol_( tol), maxinneriter_( 100), innertol_( 5e-9), use_line_search_( use_line_search),
-          ls( &lsarg, &nobnddata, &mg), ls_grad_rec( &ls_grad_recarg, &nobnddata_vec, &mg), neighborhoods_( neighborhoods), locator_( mg, lsarg.GetLevel(), /*greedy*/ true), cache_( ls, ls_grad_rec, gradrefp2), num_outer_iter( maxiter + 1), num_inner_iter( maxinneriter_ + 1)
+          ls( &lsarg, &nobnddata, &mg), ls_grad_rec( &ls_grad_recarg, &nobnddata_vec, &mg), neighborhoods_( neighborhoods), locator_( mg, lsarg.GetLevel(), /*greedy*/ false), cache_( ls, ls_grad_rec, gradrefp2), num_outer_iter( maxiter + 1), num_inner_iter( maxinneriter_ + 1)
     { P2DiscCL::GetGradientsOnRef( gradrefp2); }
 
     void set_tetra_neighborhoods (TetraToTetrasT& neigborhoods) { neighborhoods_= &neigborhoods; }
