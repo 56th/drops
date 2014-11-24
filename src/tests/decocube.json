@@ -40,9 +40,9 @@
     "AdaptRef": {
         "Width": 0,
         "CoarsestLevel": 0,
-        "FinestLevel": 5,
-        "CurvatureFinestLevel": 7
-        },
+        "FinestLevel": 4,
+        "CurvatureFinestLevel": 6
+    },
 
     "LevelsetMapper": {
         "Tol": 1e-7,

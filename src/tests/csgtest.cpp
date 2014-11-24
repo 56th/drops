@@ -125,16 +125,25 @@ class InterfaceApproxErrorAccuCL : public TetraAccumulatorCL
             const_cast<TetraCL&>( t).SetRegRefMark();
 
         GetLocalNumbP1NoBnd( numry, t, *yH_->RowIdx);
+        SurfacePatchCL p;
         if (mapper_) {
-            const TetraCL* btet;;
+            const TetraCL* btet;
             BaryCoordCL xb;
-            for (Uint i= 0; i < 4; ++i) {
-                if (ydist_->Data[numry[i]] != 0.)
-                    continue;
-                xb= std_basis<4>( i + 1);
+            p.make_patch<MergeCutPolicyCL>( lat, ls_loc);
+            for (Uint tri= 0; tri < p.facet_size(); ++tri) {
                 btet= &t;
-                ydist_->Data[numry[i]]= mapper_->base_point( btet, xb);
+                const SurfacePatchCL::FacetT& f= p.facet_begin()[tri];
+                xb= (p.vertex_begin()[f[0]] + p.vertex_begin()[f[1]] + p.vertex_begin()[f[2]])/3.;
+                mapper_->base_point( btet, xb);
             }
+
+//             for (Uint i= 0; i < 4; ++i) {
+//                 if (ydist_->Data[numry[i]] != 0.)
+//                     continue;
+//                 xb= std_basis<4>( i + 1);
+//                 btet= &t;
+//                 ydist_->Data[numry[i]]= mapper_->base_point( btet, xb);
+//             }
         }
         for (int i= 0; i < 4; ++i) {
 //             yH_->Data[numry[i]]=  std::max( yH_->Data[numry[i]], errH);
