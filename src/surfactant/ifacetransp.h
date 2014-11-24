@@ -234,16 +234,13 @@ class InterfaceCommonDataP2CL : public TetraAccumulatorCL
         qdom_projected.reserve( qdom.vertex_size());
         if (compute_absdet_)
             absdet.resize( qdom.vertex_size());
-        const TetraCL* tet;
-        BaryCoordCL b;
         QuadDomain2DCL::const_vertex_iterator v= qdom.vertex_begin();
         for (Uint i= 0; i < qdom.vertex_size(); ++i, ++v) {
-            tet= &t;
-            b= *v;
-            quaqua.base_point( tet, b);
-            qdom_projected.push_back( std::make_pair( tet, b));
+            quaqua.set_point( &t, *v)
+                  .base_point();
+            qdom_projected.push_back( quaqua.get_base_point());
             if (compute_absdet_) {
-                absdet[i]= abs_det( t, *v, *tet, b, quaqua, surf);
+                absdet[i]= abs_det( t, *v, quaqua, surf);
 //                 if (absdet[i] == 0.)
 //                     t.DebugInfo( std::cerr);
             }

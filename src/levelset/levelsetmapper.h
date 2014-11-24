@@ -40,6 +40,8 @@ namespace DROPS
 typedef std::tr1::unordered_set<const TetraCL*>            TetraSetT;
 typedef std::tr1::unordered_map<const TetraCL*, TetraSetT> TetraToTetrasT;
 
+typedef std::pair<const TetraCL*, BaryCoordCL> TetraBaryPairT;
+
 class base_point_newton_cacheCL
 {
   private:
@@ -101,10 +103,18 @@ class QuaQuaMapperCL
 
     mutable base_point_newton_cacheCL cache_;
 
+    mutable const TetraCL* tet;
+    mutable BaryCoordCL xb;
+    mutable const TetraCL* btet;
+    mutable BaryCoordCL bxb;
+    mutable double dh;
+    mutable SMatrixCL<3,3> dph;
+    mutable bool have_dph;
+
     void locate_new_point (const Point3DCL& x, const Point3DCL& dx, const TetraCL*& tet, BaryCoordCL& xb, double& d) const;
     bool line_search (Point3DCL& v, const Point3DCL& nx, const TetraCL*& tetra, BaryCoordCL& bary) const;
-    double base_point_with_line_search (const TetraCL*& tet, BaryCoordCL& xb) const;
-    double base_point_newton (const TetraCL*& tet, BaryCoordCL& xb) const;
+    void base_point_with_line_search () const;
+    void base_point_newton () const;
 
   public:
     QuaQuaMapperCL (const MultiGridCL& mg, VecDescCL& lsarg, const VecDescCL& ls_grad_recarg, TetraToTetrasT* neighborhoods= 0, int maxiter= 100, double tol= 1e-7, bool use_line_search= true, double armijo_c= 1e-4)
@@ -112,17 +122,21 @@ class QuaQuaMapperCL
           use_line_search_( use_line_search), armijo_c_( armijo_c), 
           ls( &lsarg, &nobnddata, &mg), ls_grad_rec( &ls_grad_recarg, &nobnddata_vec, &mg),
           neighborhoods_( neighborhoods), locator_( mg, lsarg.GetLevel(), /*greedy*/ false),
-          cache_( ls, ls_grad_rec, gradrefp2),
+          cache_( ls, ls_grad_rec, gradrefp2), tet( 0), btet( 0), have_dph( false),
           num_outer_iter( maxiter + 1), num_inner_iter( maxinneriter_ + 1)
     { P2DiscCL::GetGradientsOnRef( gradrefp2); }
 
     void set_tetra_neighborhoods (TetraToTetrasT& neigborhoods) { neighborhoods_= &neigborhoods; }
 
-    double base_point (const TetraCL*& tet, BaryCoordCL& xb) const;
-    /// \brief (btet, b) must equal base_point( &tet, xb).
-    void jacobian (const TetraCL& tet, const BaryCoordCL& xb,
-                   const TetraCL& btet, const BaryCoordCL& b, SMatrixCL<3,3>& dph) const;
-    void jacobian (const TetraCL& tet, const BaryCoordCL& xb, SMatrixCL<3,3>& dph) const;
+    const QuaQuaMapperCL& set_point (const TetraCL* tetarg, const BaryCoordCL& xbarg) const;
+    const QuaQuaMapperCL& base_point () const;
+    const QuaQuaMapperCL& jacobian   () const;
+
+    double                 get_dh ()         const { return dh; }
+    TetraBaryPairT         get_base_point () const { return std::make_pair( btet, bxb); }
+    const TetraCL*         get_base_tetra () const { return btet; }
+    const BaryCoordCL&     get_base_bary  () const { return bxb; }
+    const SMatrixCL<3, 3>& get_jacobian   () const { return dph; }
 
     /// Return the local level set function and its gradient on tet; only for convenience. @{
     LocalP2CL<> local_ls      (const TetraCL& tet) const { return LocalP2CL<>( tet, ls); }
@@ -137,10 +151,6 @@ class QuaQuaMapperCL
 void compute_tetra_neighborhoods (const DROPS::MultiGridCL& mg, const VecDescCL& lsetPhi, const BndDataCL<>& lsetbnd, const PrincipalLatticeCL& lat, TetraToTetrasT& tetra_neighborhoods);
 
 /// XXX Refactor to deal with patches that have more than 1 facet!
-/// (btet, b) must equal quaqua.base_point( &tet, xb).
-double abs_det (const TetraCL& tet, const BaryCoordCL& xb,
-                const TetraCL& btet, const BaryCoordCL& b, const QuaQuaMapperCL& quaqua, const SurfacePatchCL& p);
-
 double abs_det (const TetraCL& tet, const BaryCoordCL& xb, const QuaQuaMapperCL& quaqua, const SurfacePatchCL& p);
 
 inline bool is_in_ref_tetra (const BaryCoordCL& b, double eps= 1e-10)

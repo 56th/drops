@@ -302,31 +302,27 @@ void InterfaceDebugP2CL::visit (const TetraCL& t)
     if (cdata.empty())
         return;
 
-    const TetraCL* tet;
-    BaryCoordCL b;
-
     if (to_iface != 0) {
         const Uint sys= to_iface->RowIdx->GetIdx();
         for (Uint i= 0; i < 4; ++i) {
-            tet= &t;
-            b= std_basis<4>( i + 1);
-            cdata.quaqua.base_point( tet, b);
-            Point3DCL offset= t.GetVertex( i)->GetCoord() - GetWorldCoord( *tet, b);
+            cdata.quaqua.set_point( &t, std_basis<4>( i + 1))
+                        .base_point();
+            const TetraBaryPairT& tb= cdata.quaqua.get_base_point();
+            Point3DCL offset= t.GetVertex( i)->GetCoord() - GetWorldCoord( *tb.first, tb.second);
             const size_t dof= t.GetVertex( i)->Unknowns( sys);
             std::copy( Addr( offset), Addr( offset) + 3, &to_iface->Data[dof]);
         }
     }
 
     for (SurfacePatchCL::const_vertex_iterator it= cdata.surf.vertex_begin(); it != cdata.surf.vertex_end(); ++it) {
-        tet= &t;
-        b= *it;
-        cdata.quaqua.base_point( tet, b);
+        cdata.quaqua.set_point( &t, *it)
+             .jacobian();
+//         const TetraBaryPairT& tb= cdata.quaqua.get_base_point();
         const Point3DCL& x= GetWorldCoord( t, *it);
-//         const Point3DCL& xb= GetWorldCoord( *tet, b);
+//         const Point3DCL& xb= GetWorldCoord( *tb.first, tb.second);
 //         std::cout  << "    |x-xb|: " << (x - xb).norm();
 
-        SMatrixCL<3,3> dph;
-        cdata.quaqua.jacobian( t, *it, *tet, b, dph);
+        const SMatrixCL<3,3>& dph= cdata.quaqua.get_jacobian();
         SMatrixCL<3,3> diff_dp= ref_dp != 0 ? dph - ref_dp( x, 0.) : SMatrixCL<3,3>();
         const double dph_err= std::sqrt( frobenius_norm_sq( diff_dp));
         max_dph_err= std::max( max_dph_err, dph_err);
@@ -358,21 +354,21 @@ void gradient_trafo (const TetraCL& tet, const BaryCoordCL& xb, const QuaQuaMapp
                      SMatrixCL<3,3>& W)
 {
     // Compute the basepoint b.
-    const TetraCL* btet= &tet;
-    BaryCoordCL b= xb;
-    quaqua.base_point( btet, b);
+    quaqua.set_point( &tet, xb)
+          .jacobian();
+    const TetraBaryPairT& tb= quaqua.get_base_point();
 
     // nl(x)
     if (p.normal_empty())
         p.compute_normals( tet);
     Point3DCL nl= p.normal_begin()[0];
     // Evaluate the normal to the interface in b, n(y).
-    Point3DCL n= quaqua.local_ls_grad( *btet, b);
+    Point3DCL n= quaqua.local_ls_grad( *tb.first, tb.second);
     n/= n.norm();
 
     // Dp_h(x)^T
-    SMatrixCL<3,3> dph, dphT;
-    quaqua.jacobian( tet, xb, *btet, b, dph);
+    const SMatrixCL<3,3>& dph= quaqua.get_jacobian();
+    SMatrixCL<3,3> dphT;
     assign_transpose( dphT, dph);
 
     W= dphT + outer_product( nl, n/inner_prod( nl, n) - dph*nl);

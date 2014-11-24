@@ -873,7 +873,8 @@ void AccumulateBndIntegral (LevelsetP2CL& lset, const PrincipalLatticeCL& lat, V
     QuaQuaMapperCL quaqua( mg, lset.Phi, lsgradrec, &tetra_neighborhoods,
                            P.get<int>( "LevelsetMapper.Iter"),
                            P.get<double>( "LevelsetMapper.Tol"),
-                           P.get<std::string>( "LevelsetMapper.Method") == "FixedPointWithLineSearch");
+                           P.get<std::string>( "LevelsetMapper.Method") == "FixedPointWithLineSearch",
+                           P.get<double>( "LevelsetMapper.ArmijoConstant"));
 
     InterfaceCommonDataP2CL cdatap2( lset.Phi, lset.GetBndData(), quaqua, lat);
     QuaQuaQuadDomainMapperAccuCL hoqdom_accu( cdatap2);

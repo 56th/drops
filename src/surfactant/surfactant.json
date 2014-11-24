@@ -90,7 +90,8 @@
 	"LevelsetMapper": // quasi-orthogonal coordinate system at the interface
 	{
 		"Tol":			1e-7,
-		"Iter":			100,
+		"Iter":			50,
+		"ArmijoConstant":	1e-2,
 		"Method":		"Newton" // "FixedPointWithLineSearch" // "Newton"
 	},
 

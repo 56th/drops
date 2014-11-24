@@ -127,22 +127,21 @@ class InterfaceApproxErrorAccuCL : public TetraAccumulatorCL
         GetLocalNumbP1NoBnd( numry, t, *yH_->RowIdx);
         SurfacePatchCL p;
         if (mapper_) {
-            const TetraCL* btet;
             BaryCoordCL xb;
             p.make_patch<MergeCutPolicyCL>( lat, ls_loc);
             for (Uint tri= 0; tri < p.facet_size(); ++tri) {
-                btet= &t;
                 const SurfacePatchCL::FacetT& f= p.facet_begin()[tri];
                 xb= (p.vertex_begin()[f[0]] + p.vertex_begin()[f[1]] + p.vertex_begin()[f[2]])/3.;
-                mapper_->base_point( btet, xb);
+                mapper_->set_point( &t, xb)
+                        .base_point();
             }
 
 //             for (Uint i= 0; i < 4; ++i) {
 //                 if (ydist_->Data[numry[i]] != 0.)
 //                     continue;
-//                 xb= std_basis<4>( i + 1);
-//                 btet= &t;
-//                 ydist_->Data[numry[i]]= mapper_->base_point( btet, xb);
+//                 mapper_->set_point( &t,std_basis<4>( i + 1))
+//                            .base_point();
+//                 ydist_->Data[numry[i]]= mapper_->get_dh();
 //             }
         }
         for (int i= 0; i < 4; ++i) {
@@ -354,7 +353,7 @@ int TestExamples (MultiGridCL& mg, ParamCL& p)
         ierrq.Data= 0.;
         idist.Data= 0.;
 //         averaging_P2_gradient_recovery( mg, lset.Phi, lset.GetBndData(), lsgradrec);
-//         QuaQuaMapperCL quaqua( mg, lset.Phi, lsgradrec, /*neighborhoods*/ 0, /*maxiter*/ 100, /*tol*/ 1e-7, /*use_line_search*/ false);
+//         QuaQuaMapperCL quaqua( mg, lset.Phi, lsgradrec, /*neighborhoods*/ 0, /*maxiter*/ 100, /*tol*/ 1e-7, /*use_line_search*/ false, /*armijo_c*/ 1e-2);
 //         accu.set_mapper( &quaqua);
         accus( mg.GetTriangTetraBegin(), mg.GetTriangTetraEnd());
 //         accu.set_mapper( 0);
@@ -376,7 +375,7 @@ int TestExamples (MultiGridCL& mg, ParamCL& p)
         vecp2idx.CreateNumbering( mg.GetLastLevel(), mg, vecp2bnd);
         lsgradrec.SetIdx( &vecp2idx);
         averaging_P2_gradient_recovery( mg, lset.Phi, lset.GetBndData(), lsgradrec);
-        QuaQuaMapperCL quaqua( mg, lset.Phi, lsgradrec, /*neighborhoods*/ 0, /*maxiter*/ 100, /*tol*/ 1e-7, /*use_line_search*/ false);
+        QuaQuaMapperCL quaqua( mg, lset.Phi, lsgradrec, /*neighborhoods*/ 0, /*maxiter*/ 100, /*tol*/ 1e-7, /*use_line_search*/ false, /*armijo_c*/ 1e-2);
 //         accu.set_mapper( &quaqua);
         accus( mg.GetTriangTetraBegin(), mg.GetTriangTetraEnd());
         accu.set_mapper( 0);
