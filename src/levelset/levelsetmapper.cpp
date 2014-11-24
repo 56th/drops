@@ -163,28 +163,25 @@ double QuaQuaMapperCL::base_point_newton (const TetraCL*& tet, BaryCoordCL& xb) 
 {
     ScopeTimerCL timer( "QuaQuaMapperCL::base_point_newton");
 
-    bool need_damping= true,
-         have_mup= false;
-
+    cache_.set_tetra( tet);
     Point3DCL x0, x, dx; // World coordinates of initial and current xb and the coordinate part of fdx.
     x0= x= GetWorldCoord( *tet, xb);
-    SVectorCL<4> F, Fold, // The function of which we search a root, ( x0 - x - s*gh(x), -ls(x) ).
-        fdx; // Newton correction.
-    double s= 0., ds;  // scaled quasi-distance and increment part of fdx
-    double l= 1e-4; // Damping factor for trust region.
-    double mup, oldmup= -1.;
+    SVectorCL<4> F,   // The function of which we search a root, ( x0 - x - s*gh(x), -ls(x) ).
+                 fdx; // Newton correction.
+    double s= 0., ds, // scaled quasi-distance and increment part of fdx
+           l; // Damping factor for trust region.
 
     QRDecompCL<4,4> qr;
     SMatrixCL<4,4>& M= qr.GetMatrix();
+    SMatrixCL<4,4> Msave;
 
-    cache_.set_tetra( tet);
     const LocalP2CL<>& locls= cache_.locls();
     const LocalP2CL<Point3DCL>& loc_gh= cache_.loc_gh();
     Point3DCL gradp2_xb[10];
 
     Point3DCL g_ls, // gradient of the level set function.
               gh;   // recovered gradient
-    double ghnorm; // norm of the recovered gradient gh.
+    double ghnorm;  // norm of the recovered gradient gh.
     SMatrixCL<3,3> dgh; // Jacobian of the recovered gradient.
 
     int iter;
@@ -221,6 +218,7 @@ double QuaQuaMapperCL::base_point_newton (const TetraCL*& tet, BaryCoordCL& xb) 
             M( 3, i)= -g_ls[i];
         }
         M( 3,3)= 0.;
+        Msave= M;
         qr.prepare_solve();
 
         fdx= F;
@@ -228,251 +226,59 @@ double QuaQuaMapperCL::base_point_newton (const TetraCL*& tet, BaryCoordCL& xb) 
         dx= MakePoint3D( fdx[0], fdx[1], fdx[2]);
         ds= fdx[3];
 
-        if (need_damping && have_mup) {
-            const double mu= Fold.norm()/F.norm() * mup;
-            l= std::min( 1., mu);
-        }
-        if (have_mup)
-            oldmup=mup;
-
-        for (Uint j= 0; need_damping && j< 10; ++j) {
-            if (l < 1e-6) {
+        l= std::min( 1., 0.5*cache_.get_h()/dx.norm());
+        Uint j;
+        for (j= 0; j < 10; ++j, l*= 0.5) {
+            if (l < 1e-7) {
                 std::cerr << "QuaQuaMapperCL::base_point_newton: Too much damping, giving up. iter: " << iter << " x0: " << x0 << " x: " << x << " dx: " << dx << " ls(x): " << ls.val( *tet, xb) << " l: " << l << " s: " << s << " ghnorm: " << ghnorm << " g_ls: " << g_ls << std::endl;
-                l=1e-3;
-                need_damping= false;
+                cache_.set_tetra( tet);
+                l= 1e-2*cache_.get_h()/dx.norm();
                 break;
             }
             Point3DCL xnew= x - l*dx;
-            double snew= s - l*ds;
-            cache_.set_tetra( tet);
-            BaryCoordCL newxb= cache_.w2b()( xnew);
+            double    snew= s - l*ds;
             const TetraCL* newtet= tet;
+            cache_.set_tetra( tet);
+            BaryCoordCL xbnew= cache_.w2b()( xnew);
             try {
-                locate_new_point( x, -dx, newtet, newxb, l); // XXX Do not use neighborhoods (modifies l).
+                locate_new_point( x, -dx, newtet, xbnew, l); // XXX Do not use neighborhoods (modifies l).
             }
             catch (DROPSErrCL e) {
-//                 std::cerr << "Hallo Welt.\n";
-                l*= 0.5;
                 continue;
             }
             cache_.set_tetra( newtet);
 
-            gh= loc_gh( newxb);
-            // Setup Fnew= (x0 - xnew - snew*gh, -locls( newxb)); compute Newton update.
+            gh= loc_gh( xbnew);
+            // Setup Fnew= (x0 - xnew - snew*gh, -locls( xbnew)); compute Newton update.
             SVectorCL<4> Fnew;
             for (Uint i= 0; i < 3; ++i)
                 Fnew[i]= x0[i] - xnew[i] - snew*gh[i];
-            Fnew[3]= -locls( newxb);
+            Fnew[3]= -locls( xbnew);
 
-            const double theta= Fnew.norm()/F.norm(); // Error monitoring quantities Deuflhard "Newton Methods for Nonlinear Problems" NLEQ-ERR
-            mup= 0.5 * F.norm()/(Fnew - (1. - l)*F).norm() * l*l;
-            have_mup= true;
-// std::cout << "l: " << l << " theta: " << theta << " mup: " << mup << ".\n";
-            if (theta >= 1.) { // more damping required.
-                l= std::min( 0.5*l, mup);
-                continue;
-            }
-            const double lp= std::min( 1., mup);
-            if (l >= 1. && lp >= 1. && theta < 0.7) {
-                l= 1.;
-                need_damping= false;
-                break;
-            }
-            else if (lp > 4.*l) {
-//                 l= lp;
-                l*= 4.;
-            }
-            else {
+            // Armijo-rule
+//             if (Fnew.norm_sq() < F.norm_sq() + 2.*armijo_c_*inner_prod( transp_mul( Msave, F), fdx)*l) {
+            if (Fnew.norm() < F.norm() + armijo_c_*inner_prod( transp_mul( Msave, F), fdx)/F.norm()*l) {
+                tet= newtet;
                 break;
             }
         }
-        cache_.set_tetra( tet);
-        for (Uint j= 0; j < 10; ++j) {
-            try {
-                const TetraCL* newtet= tet;
-                BaryCoordCL newxb= cache_.w2b()( x - l*dx);
-                locate_new_point( x, -dx, newtet, newxb, l);
-                cache_.set_tetra( newtet);
-                xb= newxb;
-                break;
-            }
-            catch (DROPSErrCL e) {
-                e.what( std::cerr);
-                l*= 0.5;
-                if (have_mup)
-                    mup=oldmup;
-                continue;
-            }
-        }
+// if (j>1)
+//     std::cout << "l: " << l << " j: " << j << ".\n";
         x-= l*dx;
         s-= l*ds;
-        Fold= F;
+        cache_.set_tetra( tet);
+        xb= cache_.w2b()( x);
     }
     ++num_outer_iter[iter];
     // Compute the quasi-distance dh:
     gh= loc_gh( xb);
     const double dh= s*gh.norm();
     if (iter >= maxiter_) {
-        std::cout << "QuaQuaMapperCL::base_point_newton: max iteration number exceeded; x0: " << x0 << "\tx: " << x << "\t dx: " << dx << "\t s: " << s << "\t ls(x): " << ls.val( *tet, xb) << "\tl: " << l << "\tdh: " << dh << "\tghnorm: " << ghnorm << "\tg_ls: " << g_ls << std::endl;
+        std::cout << "QuaQuaMapperCL::base_point_newton: max iteration number exceeded; x0: " << x0 << "\tx: " << x << "\t fdx: " << fdx << "\t F: " << F << "\tl: " << l << "\tdh: " << dh << "\tg_ls: " << g_ls << std::endl;
     }
     return dh;
 }
 
-/// Error based Newton method
-// double QuaQuaMapperCL::base_point_newton (const TetraCL*& tet, BaryCoordCL& xb) const
-// // tet and xb specify the point which is projected to the zero level.
-// // On return tet and xb are the resulting base point.
-// {
-//     ScopeTimerCL timer( "QuaQuaMapperCL::base_point_newton");
-// 
-//     bool need_damping= true,
-//          solution_found= false;
-// 
-//     Point3DCL x0, x, dx; // World coordinates of initial and current xb and the coordinate part of fdx.
-//     x0= x= GetWorldCoord( *tet, xb);
-//     SVectorCL<4> F, // The function of which we search a root, ( x0 - x - s*gh(x), -ls(x) ).
-//         fdxold, fdx, fdxbar; // (old) Newton correction and simplified Newton correction.
-//     double s= 0.;  // scaled quasi-distance
-//     double l= 1e-4; // Damping factor for trust region.
-// 
-//     QRDecompCL<4,4> qr;
-//     SMatrixCL<4,4>& M= qr.GetMatrix();
-// 
-//     cache_.set_tetra( tet);
-//     const LocalP2CL<>& locls= cache_.locls();
-//     const LocalP2CL<Point3DCL>& loc_gh= cache_.loc_gh();
-//     Point3DCL gradp2_xb[10];
-// 
-//     Point3DCL g_ls, // gradient of the level set function.
-//               gh;   // recovered gradient
-//     double ghnorm; // norm of the recovered gradient gh.
-//     SMatrixCL<3,3> dgh; // Jacobian of the recovered gradient.
-// 
-//     int iter;
-//     for (iter= 0; iter < maxiter_ && !solution_found; ++iter) {
-//         gh= loc_gh( xb);
-//         ghnorm= gh.norm();
-// 
-//         g_ls= Point3DCL();
-//         for (Uint i= 0; i < 10; ++i) {
-//             gradp2_xb[i]= cache_.gradp2( i)( xb);
-//             g_ls+= locls[i]*gradp2_xb[i];
-//         }
-// 
-//         // Evaluate the Jacobian of gh in xb: dg_h.
-//         dgh= SMatrixCL<3,3>();
-//         for (Uint i= 0; i < 10; ++i)
-//             dgh+= outer_product( loc_gh[i], gradp2_xb[i]);
-// 
-//         // Setup the blockmatrix M= (-I - s dgh | - gh, -g_ls^T | 0).
-//         for (Uint i= 0; i < 3; ++i) {
-//             for (Uint j= 0; j < 3; ++j) {
-//                 M( i,j)= -s*dgh( i,j);
-//             }
-//             M( i,i)-= 1.;
-//             M( i, 3)= -gh[i];
-//             M( 3, i)= -g_ls[i];
-//         }
-//         M( 3,3)= 0.;
-//         qr.prepare_solve();
-// 
-//         // Setup F= (x0 - x - s*gh, -locls( xb)); compute Newton update.
-//         for (Uint i= 0; i < 3; ++i)
-//             F[i]= x0[i] - x[i] - s*gh[i];
-//         F[3]= -locls( xb);
-//         fdx= F;
-//         qr.Solve( fdx);
-//         dx= MakePoint3D( fdx[0], fdx[1], fdx[2]);
-// 
-//         if (fdx.norm() < tol_) { // Solution found.
-//             double dummy= 1.;
-//             locate_new_point( x, -dx, tet, xb, dummy);
-//             s-= fdx[3];
-//             cache_.set_tetra( tet);
-//             break;
-//         }
-//         if (need_damping && iter > 0) {
-//             const double mu= l * fdxold.norm()/(fdxbar - fdxold).norm() * fdxbar.norm()/fdx.norm();
-//             l= std::min( 1., mu);
-//         }
-// 
-//         while (need_damping && !solution_found) {
-//             if (l < 1e-6) {
-//                 std::cerr << "QuaQuaMapperCL::base_point_newton: Too much damping, giving up. iter: " << iter << " x0: " << x0 << " x: " << x << " dx: " << dx << " ls(x): " << ls.val( *tet, xb) << " l: " << l << " s: " << s << " ghnorm: " << ghnorm << " g_ls: " << g_ls << std::endl;
-// l=1e-4;
-// need_damping= false;
-//                 break;
-//             }
-//             cache_.set_tetra( tet);
-//             BaryCoordCL newxb= cache_.w2b()( x - l*dx);
-//             const TetraCL* newtet= tet;
-//             locate_new_point( x, -dx, newtet, newxb, l); // XXX Do not use neighborhoods (modifies l).
-//             Point3DCL xnew= x - l*dx;
-//             double snew= s - l*fdx[3];
-//             cache_.set_tetra( newtet);
-// 
-//             gh= loc_gh( newxb);
-//             // Setup F= (x0 - xnew - snew*gh, -locls( newxb)); compute Newton update.
-//             for (Uint i= 0; i < 3; ++i)
-//                 F[i]= x0[i] - xnew[i] - snew*gh[i];
-//             F[3]= -locls( newxb);
-//             fdxbar= F;
-//             qr.Solve( fdxbar);
-// 
-//             const double theta= fdxbar.norm()/fdx.norm(); // Error monitoring quantities Deuflhard "Newton Methods for Nonlinear Problems" NLEQ-ERR
-//             const double mup= 0.5*fdx.norm()*l*l/(fdxbar - (1. - l)*fdx).norm();
-// std::cout << "theta: " << theta << " mup: " << mup << ".\n";
-//             if (theta >= 1.) { // more damping required.
-//                 l= std::min( 0.5*l, mup);
-//                 continue;
-//             }
-//             const double lp= std::min( 1., mup);
-//             if (l > 0.999 && lp > 0.999) {
-//                 if (fdxbar.norm() < tol_) {
-//                     l= 1.;
-//                     fdx= fdxbar;
-//                     dx= MakePoint3D( fdx[0], fdx[1], fdx[2]);
-//                     solution_found= true;
-//                     locate_new_point( x, -dx, tet, xb, l);
-//                     break;
-//                 }
-//                 if (theta < 0.5) {
-//                     l= 1.;
-//                     need_damping= false;
-//                 }
-//             }
-//             else if (lp > 4.*l) {
-//                 l= lp;
-//             }
-//             else {
-//                 break;
-//             }
-//         }
-//         cache_.set_tetra( tet);
-//         xb= cache_.w2b()( x - l*dx);
-//         locate_new_point( x, -dx, tet, xb, l);
-//         x-= l*dx;
-//         s-= l*fdx[3];
-//         cache_.set_tetra( tet);
-//         fdxold= fdx;
-//     }
-//     ++num_outer_iter[iter];
-//     // Compute the quasi-distance dh:
-//     gh= loc_gh( xb);// The recovered gradient.
-//     const double dh= s*gh.norm();
-//     if (iter >= maxiter_) {
-//         std::cout << "QuaQuaMapperCL::base_point_newton: max iteration number exceeded; x0: " << x0 << "\tx: " << x << "\t dx: " << dx << "\t s: " << s << "\t ls(x): " << ls.val( *tet, xb) << "\tl: " << l << "\tdh: " << dh << "\tghnorm: " << ghnorm << "\tg_ls: " << g_ls << std::endl;
-//     }
-// // std::cout << "F: " << F << std::endl;
-// // char c;
-// // std::cin >> c;
-// // if (c == 'q')
-// //     exit( 0);
-// //     else {
-// //         std::cout << "QuaQuaMapperCL::base_point_newton: Ok! x0: " << x0 << "\tx: " << x << "\t dx: " << dx << "\t ls(x): " << ls.val( *tet, xb) << "\tdamping: " << damp << "\tdh: " << dh << "\titer: " << iter << std::endl;
-// //     }
-//     return dh;
-// }
 
 double QuaQuaMapperCL::base_point (const TetraCL*& tet, BaryCoordCL& xb) const
 // tet and xb specify the point which is projected to the zero level.

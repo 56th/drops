@@ -504,7 +504,8 @@ int TestAdap (MultiGridCL& mg, ParamCL& p)
         QuaQuaMapperCL quaqua( mg, lset.Phi, lsgradrec, /*neighborhoods*/ 0,
             /*maxiter*/ P.get<int>( "LevelsetMapper.Iter"),
             /*tol*/ P.get<double>( "LevelsetMapper.Tol"),
-            /*use_line_search*/ P.get<std::string>( "LevelsetMapper.Method") == "FixedPointWithLineSearch");
+            /*use_line_search*/ P.get<std::string>( "LevelsetMapper.Method") == "FixedPointWithLineSearch",
+            /*armijo_c*/ P.get<double>( "LevelsetMapper.ArmijoConstant"));
         accu.set_mapper( &quaqua);
         accus( mg.GetTriangTetraBegin(), mg.GetTriangTetraEnd());
         accu.set_mapper( 0);
