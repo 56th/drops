@@ -165,6 +165,31 @@ template <class PEvalT, class ResultContT>
   resize_and_evaluate_on_vertexes (const PEvalT& f, const TetraBaryPairVectorT& pos, ResultContT& result_container);
 
 
+class ProjectedQuadDomain2DCL
+{
+  private:
+    bool compute_absdets_;
+    const QuadDomain2DCL* qdom;
+    TetraBaryPairVectorT  vertexes_;
+    std::valarray<double> absdets_;
+
+    void resize (size_t s) {
+        vertexes_.resize( s);
+        if (compute_absdets_)
+            absdets_.resize( s);
+    }
+
+  public:
+    ProjectedQuadDomain2DCL () : compute_absdets_( true), qdom( 0) {}
+    void assign (const SurfacePatchCL& p, const QuadDomain2DCL& qdomarg, const QuaQuaMapperCL& quaqua);
+
+    void compute_absdets (bool b) { compute_absdets_= b; }
+
+    const TetraBaryPairVectorT&  vertexes() const { return vertexes_; }
+    const std::valarray<double>& absdets () const { return absdets_; }
+};
+
+
 class InterfaceCommonDataP2CL : public TetraAccumulatorCL
 {
   private:
@@ -174,7 +199,6 @@ class InterfaceCommonDataP2CL : public TetraAccumulatorCL
     const BndDataCL<>* lsetbnd; // boundary data for the level set function
 
     const PrincipalLatticeCL* lat;
-    bool compute_absdet_;
 
   public:
     /// common data @{
@@ -186,8 +210,7 @@ class InterfaceCommonDataP2CL : public TetraAccumulatorCL
     std::valarray<double>     ls_loc;
     SurfacePatchCL            surf;
     QuadDomain2DCL            qdom;
-    TetraBaryPairVectorT      qdom_projected;
-    std::valarray<double>     absdet;
+    ProjectedQuadDomain2DCL   qdom_projected;
     QuaQuaMapperCL            quaqua;
 
     const PrincipalLatticeCL& get_lattice () const { return *lat; }
@@ -202,7 +225,7 @@ class InterfaceCommonDataP2CL : public TetraAccumulatorCL
 
     bool empty () const { return surf.empty(); }
 
-    void compute_absdet (bool b) { compute_absdet_= b; }
+    void compute_absdet (bool b) { qdom_projected.compute_absdets( b); }
 
     void set_lattice (const PrincipalLatticeCL& newlat) {
         lat= &newlat;
@@ -230,21 +253,8 @@ class InterfaceCommonDataP2CL : public TetraAccumulatorCL
             return;
 
         make_CompositeQuad5Domain2D ( qdom, surf, t);
-        qdom_projected.clear();
-        qdom_projected.reserve( qdom.vertex_size());
-        if (compute_absdet_)
-            absdet.resize( qdom.vertex_size());
-        QuadDomain2DCL::const_vertex_iterator v= qdom.vertex_begin();
-        for (Uint i= 0; i < qdom.vertex_size(); ++i, ++v) {
-            quaqua.set_point( &t, *v)
-                  .base_point();
-            qdom_projected.push_back( quaqua.get_base_point());
-            if (compute_absdet_) {
-                absdet[i]= abs_det( t, *v, quaqua, surf);
-//                 if (absdet[i] == 0.)
-//                     t.DebugInfo( std::cerr);
-            }
-        }
+        quaqua.set_point( &t, BaryCoordCL()); // set the current tetra.
+        qdom_projected.assign( surf, qdom, quaqua);
     }
 
     virtual InterfaceCommonDataP2CL* clone (int clone_id) {
@@ -283,8 +293,8 @@ class QuaQuaQuadDomainMapperAccuCL : public TetraAccumulatorCL
             return;
 
         for (Uint i= 0; i < cdata.qdom.vertex_size(); ++i) {
-            const TetraBaryPairT& p= cdata.qdom_projected[i];
-            const double newweight= cdata.qdom.weight_begin()[i]*cdata.absdet[i];
+            const TetraBaryPairT& p= cdata.qdom_projected.vertexes()[i];
+            const double newweight= cdata.qdom.weight_begin()[i]*cdata.qdom_projected.absdets()[i];
             qmap[p.first].push_back_quad_node( p.second, newweight);
         }
     };
@@ -651,13 +661,13 @@ class LocalVectorP2CL
     LocalVectorP2CL (instat_scalar_fun_ptr f, double time) : f_( f), time_( time) {}
 
     void setup (const TetraCL&, const InterfaceCommonDataP2CL& cdata, const IdxT numr[10]) {
-        resize_and_evaluate_on_vertexes( f_, cdata.qdom_projected, time_, qf);
+        resize_and_evaluate_on_vertexes( f_, cdata.qdom_projected.vertexes(), time_, qf);
         qp2.resize( cdata.qdom.vertex_size());
         for (Uint i= 0; i < 10; ++i) {
                 if (numr[i] == NoIdx)
                     continue;
                 evaluate_on_vertexes( cdata.p2[i], cdata.qdom, Addr( qp2));
-                vec[i]= quad_2D( cdata.absdet*qf*qp2, cdata.qdom);
+                vec[i]= quad_2D( cdata.qdom_projected.absdets()*qf*qp2, cdata.qdom);
         }
     }
 };
@@ -717,9 +727,9 @@ class LocalLaplaceBeltramiP2CL
         }
 
         for (int i= 0; i < 10; ++i) {
-            coup[i][i]= quad_2D( cdata.absdet*dot( qgradp2[i], qgradp2[i]), cdata.qdom);
+            coup[i][i]= quad_2D( cdata.qdom_projected.absdets()*dot( qgradp2[i], qgradp2[i]), cdata.qdom);
             for(int j= 0; j < i; ++j)
-                coup[i][j]= coup[j][i]= quad_2D( cdata.absdet*dot( qgradp2[j], qgradp2[i]), cdata.qdom);
+                coup[i][j]= coup[j][i]= quad_2D( cdata.qdom_projected.absdets()*dot( qgradp2[j], qgradp2[i]), cdata.qdom);
         }
     }
 
@@ -743,9 +753,9 @@ class LocalMassP2CL
             resize_and_evaluate_on_vertexes ( cdata.p2[i], cdata.qdom, qp2[i]);
 
         for (int i= 0; i < 10; ++i) {
-            coup[i][i]= quad_2D( cdata.absdet*qp2[i]*qp2[i], cdata.qdom);
+            coup[i][i]= quad_2D( cdata.qdom_projected.absdets()*qp2[i]*qp2[i], cdata.qdom);
             for(int j= 0; j < i; ++j)
-                coup[i][j]= coup[j][i]= quad_2D( cdata.absdet*qp2[j]*qp2[i], cdata.qdom);
+                coup[i][j]= coup[j][i]= quad_2D( cdata.qdom_projected.absdets()*qp2[j]*qp2[i], cdata.qdom);
         }
     }
 

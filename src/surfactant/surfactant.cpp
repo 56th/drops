@@ -979,7 +979,7 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
 
         const int tid= omp_get_thread_num();
 
-        tid0p->area[tid]+= quad_2D( cdata.absdet, cdata.qdom);
+        tid0p->area[tid]+= quad_2D( cdata.qdom_projected.absdets(), cdata.qdom);
 
         std::valarray<double> qfgrid,
                               qf;
@@ -990,17 +990,17 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
             else if (fvd->RowIdx->GetFE() == P1IF_FE)
                 resize_and_evaluate_on_vertexes( make_P1Eval( mg, nobnddata, *fvd), t, cdata.qdom, qfgrid);
 //             resize_and_evaluate_on_vertexes( make_P2Eval( mg, nobnddata, *fvd), cdata.qdom_projected, qfgrid);
-            tid0p->f_grid_int[tid]+=  quad_2D( cdata.absdet*qfgrid,        cdata.qdom);
-            tid0p->f_grid_norm[tid]+= quad_2D( cdata.absdet*qfgrid*qfgrid, cdata.qdom);
+            tid0p->f_grid_int[tid]+=  quad_2D( cdata.qdom_projected.absdets()*qfgrid,        cdata.qdom);
+            tid0p->f_grid_norm[tid]+= quad_2D( cdata.qdom_projected.absdets()*qfgrid*qfgrid, cdata.qdom);
         }
         if (f != 0) {
-            resize_and_evaluate_on_vertexes( f, cdata.qdom_projected, f_time, qf);
-            tid0p->f_int[tid]+= quad_2D( cdata.absdet*qf, cdata.qdom);
-            tid0p->f_norm[tid]+= quad_2D( cdata.absdet*qf*qf, cdata.qdom);
+            resize_and_evaluate_on_vertexes( f, cdata.qdom_projected.vertexes(), f_time, qf);
+            tid0p->f_int[tid]+= quad_2D( cdata.qdom_projected.absdets()*qf, cdata.qdom);
+            tid0p->f_norm[tid]+= quad_2D( cdata.qdom_projected.absdets()*qf*qf, cdata.qdom);
         }
         if (fvd != 0 && f != 0) {
             std::valarray<double> qerr= qfgrid - qf;
-            tid0p->err[tid]+= quad_2D( cdata.absdet*qerr*qerr, cdata.qdom);
+            tid0p->err[tid]+= quad_2D( cdata.qdom_projected.absdets()*qerr*qerr, cdata.qdom);
         }
 
         GridFunctionCL<Point3DCL> qfgradgrid,
@@ -1020,20 +1020,20 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
 //                 for (Uint i= 0; i < 4; ++i)
 //                     qfgradgrid+= lp1[i]*loc_lb_p1.get_qgradp1( i);
             }
-            tid0p->f_grid_grad_norm[tid]+= quad_2D( cdata.absdet*dot( qfgradgrid, qfgradgrid), cdata.qdom);
+            tid0p->f_grid_grad_norm[tid]+= quad_2D( cdata.qdom_projected.absdets()*dot( qfgradgrid, qfgradgrid), cdata.qdom);
         }
         if (f_grad != 0) {
-            resize_and_evaluate_on_vertexes( f_grad, cdata.qdom_projected, f_grad_time, qfgrad);
-            for (Uint i= 0; i < cdata.qdom_projected.size(); ++i) {
-                Point3DCL n= cdata.quaqua.local_ls_grad( *cdata.qdom_projected[i].first, cdata.qdom_projected[i].second);
+            resize_and_evaluate_on_vertexes( f_grad, cdata.qdom_projected.vertexes(), f_grad_time, qfgrad);
+            for (Uint i= 0; i < cdata.qdom_projected.vertexes().size(); ++i) {
+                Point3DCL n= cdata.quaqua.local_ls_grad( *cdata.qdom_projected.vertexes()[i].first, cdata.qdom_projected.vertexes()[i].second);
                 n/= n.norm();
                 qfgrad[i]-= inner_prod( n, qfgrad[i])*n;
             }
-            tid0p->f_grad_norm[tid]+= quad_2D( cdata.absdet*dot( qfgrad, qfgrad), cdata.qdom);
+            tid0p->f_grad_norm[tid]+= quad_2D( cdata.qdom_projected.absdets()*dot( qfgrad, qfgrad), cdata.qdom);
         }
         if (fvd != 0 && f_grad != 0) {
             GridFunctionCL<Point3DCL> qerr( qfgradgrid - qfgrad);
-            tid0p->grad_err[tid]+= quad_2D( cdata.absdet*dot( qerr, qerr), cdata.qdom);
+            tid0p->grad_err[tid]+= quad_2D( cdata.qdom_projected.absdets()*dot( qerr, qerr), cdata.qdom);
         }
     }
 

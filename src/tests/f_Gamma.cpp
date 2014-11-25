@@ -664,7 +664,7 @@ void VarObliqueLaplaceBeltrami2AccuCL::visit_mapped_P2 (const TetraCL& t)
         nq+= grad_[i]*cdata.locp2_ls[i];
 
     const QuadDomain2DCL&       qdom=           cdata.qdom;
-    const TetraBaryPairVectorT& qdom_projected= cdata.qdom_projected;
+    const TetraBaryPairVectorT& qdom_projected= cdata.qdom_projected.vertexes();
 
     // resize_and_evaluate_on_vertexes( nq, qdom_projected, qnq_);
     qnq_.resize( qdom.vertex_size());
@@ -743,10 +743,10 @@ void VarObliqueLaplaceBeltrami2AccuCL::visit_mapped_P2 (const TetraCL& t)
     }
     if (!use_linear_subsampling_) {
         if (!sigmaf_matrix)
-            qsigma*= cdata.absdet;
+            qsigma*= cdata.qdom_projected.absdets();
         else
             for (Uint i= 0; i < qsigma_matrix.size(); ++i)
-                qsigma_matrix[i]*= cdata.absdet[i];
+                qsigma_matrix[i]*= cdata.qdom_projected.absdets()[i];
     }
 
     n_.assign_indices_only( t, *f.RowIdx);
@@ -903,7 +903,7 @@ void AccumulateBndIntegral (LevelsetP2CL& lset, const PrincipalLatticeCL& lat, V
     accus.push_back( &accu);
     accumulate( accus, lset.GetMG(), lvl, lset.Phi.RowIdx->GetMatchingFunction(), lset.Phi.RowIdx->GetBndInfo());
     if (P.get<std::string>( "Exp.ComparisonSource") == "ObliqueLBVar3") {
-        cdatap2.set_lattice( PrincipalLatticeCL::instance( 1));
+        cdatap2.set_lattice( PrincipalLatticeCL::instance( 1)); // XXX: Enhancement: Computation of absdets now also works for general lattices.
         cdatap2.compute_absdet( true);
     }
 

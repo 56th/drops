@@ -90,8 +90,9 @@ void GetLocalNumbInterface(IdxT* Numb, const TetraCL& s, const IdxDescCL& idx)
 
 InterfaceCommonDataP2CL::InterfaceCommonDataP2CL (const VecDescCL& ls_arg, const BndDataCL<>& lsetbnd_arg,
     const QuaQuaMapperCL& quaquaarg, const PrincipalLatticeCL& lat_arg)
-    : ls( &ls_arg), lsetbnd( &lsetbnd_arg), lat( &lat_arg), compute_absdet_( true), ls_loc( lat->vertex_size()), quaqua( quaquaarg)
+    : ls( &ls_arg), lsetbnd( &lsetbnd_arg), lat( &lat_arg), ls_loc( lat->vertex_size()), quaqua( quaquaarg)
 {
+    qdom_projected.compute_absdets( true);
     P2DiscCL::GetGradientsOnRef( gradrefp2);
     for (Uint i= 0; i < 10 ; ++i)
         p2[i][i]= 1.; // P2-Basis-Functions
@@ -347,7 +348,52 @@ void InterfaceDebugP2CL::visit (const TetraCL& t)
         max_dph2_err= std::max( max_dph2_err, dph2_err);
     }
     surfacemeasP1+= quad_2D( std::valarray<double>( 1., cdata.qdom.vertex_size()), cdata.qdom);
-    surfacemeasP2+= quad_2D( cdata.absdet, cdata.qdom);
+    surfacemeasP2+= quad_2D( cdata.qdom_projected.absdets(), cdata.qdom);
+}
+
+// Works only if the nodes of the quadrature rule are not shared across facets in QuadDomain2DCL.
+void ProjectedQuadDomain2DCL::assign (const SurfacePatchCL& p, const QuadDomain2DCL& qdomarg, const QuaQuaMapperCL& quaqua)
+{
+    qdom= &qdomarg;
+    resize( qdom->vertex_size());
+    QuadDomain2DCL::const_vertex_iterator qv= qdom->vertex_begin();
+
+    if (!compute_absdets_) {
+        for (Uint i= 0; i < qdom->vertex_size(); ++i, ++qv) {
+            quaqua.set_point( quaqua.get_tetra(), *qv)
+                  .base_point();
+            vertexes_[i]= quaqua.get_base_point();
+        }
+        return;
+    }
+
+    QRDecompCL<3,2> qr;
+    SMatrixCL<3,2>& M= qr.GetMatrix();
+    SMatrixCL<3,2> U;
+    Point3DCL tmp;
+    SMatrixCL<2,2> Gram;
+    const Bary2WorldCoordCL b2w( *quaqua.get_tetra());
+    const SurfacePatchCL::const_vertex_iterator pv= p.vertex_begin();
+
+    const Uint num_facets= p.facet_size();
+    for (Uint i= 0; i < qdom->vertex_size(); ++i, ++qv) {
+        if (i% num_facets == 0) {
+            const SurfacePatchCL::FacetT& facet= p.facet_begin()[i/num_facets];
+            M.col( 0, b2w( pv[facet[1]]) - b2w( pv[facet[0]]));
+            M.col( 1, b2w( pv[facet[2]]) - b2w( pv[facet[0]]));
+            qr.prepare_solve();
+            for (Uint j= 0; j < 2; ++j) {
+                tmp= std_basis<3>( j + 1);
+                qr.apply_Q( tmp);
+                U.col( i, tmp);
+            }
+        }
+        quaqua.set_point( quaqua.get_tetra(), *qv)
+              .jacobian();
+        vertexes_[i]= quaqua.get_base_point();
+        Gram= GramMatrix( quaqua.get_jacobian()*U);
+        absdets_[i]= std::sqrt( Gram(0,0)*Gram(1,1) - Gram(0,1)*Gram(1,0));
+    }
 }
 
 void gradient_trafo (const TetraCL& tet, const BaryCoordCL& xb, const QuaQuaMapperCL& quaqua, const SurfacePatchCL& p,
