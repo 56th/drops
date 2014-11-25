@@ -153,7 +153,7 @@ class QuaQuaMapperCL
 
 void compute_tetra_neighborhoods (const DROPS::MultiGridCL& mg, const VecDescCL& lsetPhi, const BndDataCL<>& lsetbnd, const PrincipalLatticeCL& lat, TetraToTetrasT& tetra_neighborhoods);
 
-/// XXX Refactor to deal with patches that have more than 1 facet!
+/// Deals only with patches that have 1 facet! (Use ProjectedQuadDomain2DCL for the general case)
 double abs_det (const TetraCL& tet, const BaryCoordCL& xb, const QuaQuaMapperCL& quaqua, const SurfacePatchCL& p);
 
 inline bool is_in_ref_tetra (const BaryCoordCL& b, double eps= 1e-10)

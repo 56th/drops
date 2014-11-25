@@ -255,7 +255,7 @@ void QuaQuaMapperCL::base_point_newton () const
             cache_.set_tetra( btet);
             BaryCoordCL bxbnew= cache_.w2b()( xnew);
             try {
-                locate_new_point( x, -dx, newtet, bxbnew, l); // XXX Do not use neighborhoods (modifies l).
+                locate_new_point( x, -dx, newtet, bxbnew, l);
             }
             catch (DROPSErrCL e) {
                 continue;

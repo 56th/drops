@@ -375,17 +375,17 @@ void ProjectedQuadDomain2DCL::assign (const SurfacePatchCL& p, const QuadDomain2
     const Bary2WorldCoordCL b2w( *quaqua.get_tetra());
     const SurfacePatchCL::const_vertex_iterator pv= p.vertex_begin();
 
-    const Uint num_facets= p.facet_size();
+    const Uint nodes_per_facet= qdom->vertex_size()/p.facet_size();
     for (Uint i= 0; i < qdom->vertex_size(); ++i, ++qv) {
-        if (i% num_facets == 0) {
-            const SurfacePatchCL::FacetT& facet= p.facet_begin()[i/num_facets];
+        if (i % nodes_per_facet == 0) {
+            const SurfacePatchCL::FacetT& facet= p.facet_begin()[i/nodes_per_facet];
             M.col( 0, b2w( pv[facet[1]]) - b2w( pv[facet[0]]));
             M.col( 1, b2w( pv[facet[2]]) - b2w( pv[facet[0]]));
             qr.prepare_solve();
             for (Uint j= 0; j < 2; ++j) {
                 tmp= std_basis<3>( j + 1);
                 qr.apply_Q( tmp);
-                U.col( i, tmp);
+                U.col( j, tmp);
             }
         }
         quaqua.set_point( quaqua.get_tetra(), *qv)
