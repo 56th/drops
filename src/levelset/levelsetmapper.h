@@ -132,10 +132,13 @@ class QuaQuaMapperCL
     const QuaQuaMapperCL& base_point () const;
     const QuaQuaMapperCL& jacobian   () const;
 
-    double                 get_dh ()         const { return dh; }
+    const TetraCL*         get_tetra () const { return tet; }
+    const BaryCoordCL&     get_bary  () const { return xb; }
+
     TetraBaryPairT         get_base_point () const { return std::make_pair( btet, bxb); }
     const TetraCL*         get_base_tetra () const { return btet; }
     const BaryCoordCL&     get_base_bary  () const { return bxb; }
+    double                 get_dh ()         const { return dh; }
     const SMatrixCL<3, 3>& get_jacobian   () const { return dph; }
 
     /// Return the local level set function and its gradient on tet; only for convenience. @{

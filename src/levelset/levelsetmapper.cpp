@@ -412,7 +412,7 @@ double abs_det (const TetraCL& tet, const BaryCoordCL& xb, const QuaQuaMapperCL&
           .jacobian();
     const SMatrixCL<3,3>& dph= quaqua.get_jacobian();
 
-    const Bary2WorldCoordCL b2w( *quaqua.get_base_tetra());
+    const Bary2WorldCoordCL b2w( *quaqua.get_tetra());
     QRDecompCL<3,2> qr;
     SMatrixCL<3,2>& M= qr.GetMatrix();
     M.col(0, b2w( p.vertex_begin()[1]) - b2w( p.vertex_begin()[0]));
