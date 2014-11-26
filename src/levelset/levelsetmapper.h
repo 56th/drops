@@ -156,12 +156,14 @@ void compute_tetra_neighborhoods (const DROPS::MultiGridCL& mg, const VecDescCL&
 /// Deals only with patches that have 1 facet! (Use ProjectedQuadDomain2DCL for the general case)
 double abs_det (const TetraCL& tet, const BaryCoordCL& xb, const QuaQuaMapperCL& quaqua, const SurfacePatchCL& p);
 
-inline bool is_in_ref_tetra (const BaryCoordCL& b, double eps= 1e-10)
+
+///\brief Assumes that \sum_i b_i = 1.
+inline bool is_in_ref_tetra (const BaryCoordCL& b, double eps= 1e-11)
 {
     for (int i= 0; i < 4; ++i)
-        if (b[i] < -eps || b[i] > 1. + eps)
+        if (b[i] < -eps)
             return false;
-    return true;
+    return true; // Implies b[i] < 1 + 3eps
 }
 
 
