@@ -391,12 +391,17 @@ class ColorClassesCL
         MultiGridCL::const_TriangTetraIteratorCL end);
 
   public:
+    ColorClassesCL () {}
     ColorClassesCL (MultiGridCL::const_TriangTetraIteratorCL begin,
                     MultiGridCL::const_TriangTetraIteratorCL end, match_fun match, const BndCondCL& Bnd)
     { compute_color_classes( begin, end, match, Bnd); }
 
     void compute_color_classes (MultiGridCL::const_TriangTetraIteratorCL begin,
                                 MultiGridCL::const_TriangTetraIteratorCL end, match_fun match, const BndCondCL& Bnd);
+    /// \brief Put all tetras in the same class --> perfect parallelization.
+    /// To avoid update races in code using this, you must only update tetra-specific data.
+    void make_single_color_class(MultiGridCL::const_TriangTetraIteratorCL begin,
+                                 MultiGridCL::const_TriangTetraIteratorCL end);
 
     size_t num_colors () const { return colors_.size(); }
     const_iterator begin () const { return colors_.begin(); }

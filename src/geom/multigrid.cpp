@@ -1253,7 +1253,7 @@ void ColorClassesCL::fill_pointer_arrays (
     // tetra sorting for better memory access pattern
     #pragma omp parallel for
     for (j= 0; j < num_colors(); ++j)
-        sort( colors_[j].begin(), colors_[j].end());
+        std::sort( colors_[j].begin(), colors_[j].end());
 }
 
 void ColorClassesCL::compute_color_classes (MultiGridCL::const_TriangTetraIteratorCL begin,
@@ -1311,6 +1311,28 @@ void ColorClassesCL::compute_color_classes (MultiGridCL::const_TriangTetraIterat
     timer.Stop();
     const double duration= timer.GetTime();
     std::cout << "Creation of the tetra-coloring took " << duration << " seconds, " << num_colors() << " colors used." << '\n';
+}
+
+void ColorClassesCL::make_single_color_class (MultiGridCL::const_TriangTetraIteratorCL begin,
+                                              MultiGridCL::const_TriangTetraIteratorCL end)
+{
+// #   ifdef _PAR
+//         ParTimerCL timer;
+// #   else
+//         TimerCL timer;
+// #   endif
+//         timer.Start();
+
+    colors_.resize( 1);
+    colors_[0].reserve( std::distance( begin, end));
+    for (; begin != end; ++begin)
+        colors_[0].push_back( &*begin);
+
+    // tetra sorting for better memory access pattern
+    std::sort( colors_[0].begin(), colors_[0].end());
+
+//     timer.Stop();
+//     std::cout << "ColorClassesCL::make_single_color_class: Creation of the tetra-coloring took " << timer.GetTime() << " seconds.\n";
 }
 
 const ColorClassesCL& MultiGridCL::GetColorClasses (int Level, match_fun match, const BndCondCL& Bnd) const
