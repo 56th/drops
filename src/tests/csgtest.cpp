@@ -171,6 +171,10 @@ RegisterScalarFunction reg_suess( "suess", &suess);
 double deco_cube_radius;
 double deco_cube_shift;
 
+
+///\brief Forward-mode automatic differentiation.
+/// Providing one argument to the constructor creates a scalar constant.
+/// Calling seed() turns the object into an instance of the independent variable.
 template <typename T>
 class ADScalarCL
 {
@@ -196,6 +200,13 @@ ADScalarCL<T> operator+ (ADScalarCL<T> f, ADScalarCL<T> g)
 }
 
 template <typename T>
+ADScalarCL<T> operator- (ADScalarCL<T> f)
+{
+    return ADScalarCL<T>( -f.value(),
+                          -f.derivative());
+}
+
+template <typename T>
 ADScalarCL<T> operator- (ADScalarCL<T> f, ADScalarCL<T> g)
 {
     return ADScalarCL<T>( f.value() - g.value(),
@@ -206,16 +217,14 @@ template <typename T>
 ADScalarCL<T> operator* (ADScalarCL<T> f, ADScalarCL<T> g)
 {
     return ADScalarCL<T>( f.value()*g.value(),
-                          f.derivative() + g.value() + f.value()*g.derivative());
+                          f.derivative()*g.value() + f.value()*g.derivative());
 }
 
 template <typename T>
-ADScalarCL<T> pow (ADScalarCL<T> f, int /*i*/)
+ADScalarCL<T> pow (ADScalarCL<T> f, int i)
 {
-//     return ADScalarCL<T>( std::pow( f.value(), i),
-//                           i*std::pow( f.value(), i - 1));
-    return ADScalarCL<T>( std::pow( f.value(), 2),
-                          2.*f.value());
+    return ADScalarCL<T>( std::pow( f.value(), i),
+                          i*std::pow( f.value(), i - 1));
 }
 
 void deco_cube_val_grad (const Point3DCL& pp, double& v, Point3DCL& g)
