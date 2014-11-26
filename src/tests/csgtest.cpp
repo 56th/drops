@@ -457,12 +457,12 @@ int TestAdap (MultiGridCL& mg, ParamCL& p)
         P.get<Uint>(  "AdaptRef.CoarsestLevel"),
         P.get<Uint>(  "AdaptRef.FinestLevel"));
     CurvatureMarkingStrategyCL curv_marker( lset,
-        PrincipalLatticeCL::instance( 4),
+        PrincipalLatticeCL::instance( 2),
         P.get<Uint>( "AdaptRef.CurvatureFinestLevel"));
     StrategyCombinerCL marker;
     marker.push_back( dist_marker);
-    marker.push_back( curv_marker);
-
+    if (curv_marker.GetFineLevel() > dist_marker.GetFineLevel())
+        marker.push_back( curv_marker);
 
     DROPS::AdapTriangCL adap( mg, &marker);
     LevelsetReinitCL lsetreinit( lset, &csg_fun);
@@ -566,6 +566,10 @@ int main (int argc, char** argv)
 
     std::auto_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P.get_child( "Domain")));
     DROPS::MultiGridCL mg( *builder);
+    MarkAll( mg);
+    mg.Refine();
+    MarkAll( mg);
+    mg.Refine();
 
     // If the key CSGLevelsets.File exists and is not empty, read the examples from the given file; otherwise, assume that the section CSGLevelsets itself contains the examples.
     std::string examples;
