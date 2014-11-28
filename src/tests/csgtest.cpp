@@ -27,6 +27,7 @@
 #include "geom/csg.h"
 #include "misc/funcmap.h"
 #include "misc/utils.h"
+#include "misc/omp_variable.h"
 #include "geom/multigrid.h"
 #include "geom/principallattice.h"
 #include "geom/subtriangulation.h"
@@ -40,7 +41,9 @@
 #include "num/gradient_recovery.h"
 #include "num/lattice-eval.h"
 #include "misc/problem.h"
+#include "misc/auto_diff.h"
 #include "out/vtkOut.h"
+#include "surfactant/ifacetransp.h"
 
 
 using namespace DROPS;
