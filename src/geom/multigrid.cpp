@@ -1316,12 +1316,12 @@ void ColorClassesCL::compute_color_classes (MultiGridCL::const_TriangTetraIterat
 void ColorClassesCL::make_single_color_class (MultiGridCL::const_TriangTetraIteratorCL begin,
                                               MultiGridCL::const_TriangTetraIteratorCL end)
 {
-// #   ifdef _PAR
-//         ParTimerCL timer;
-// #   else
-//         TimerCL timer;
-// #   endif
-//         timer.Start();
+#   ifdef _PAR
+        ParTimerCL timer;
+#   else
+        TimerCL timer;
+#   endif
+        timer.Start();
 
     colors_.resize( 1);
     colors_[0].reserve( std::distance( begin, end));
@@ -1331,8 +1331,8 @@ void ColorClassesCL::make_single_color_class (MultiGridCL::const_TriangTetraIter
     // tetra sorting for better memory access pattern
     std::sort( colors_[0].begin(), colors_[0].end());
 
-//     timer.Stop();
-//     std::cout << "ColorClassesCL::make_single_color_class: Creation of the tetra-coloring took " << timer.GetTime() << " seconds.\n";
+    timer.Stop();
+    std::cout << "ColorClassesCL::make_single_color_class: Creation of the tetra-coloring took " << timer.GetTime() << " seconds.\n";
 }
 
 const ColorClassesCL& MultiGridCL::GetColorClasses (int Level, match_fun match, const BndCondCL& Bnd) const
