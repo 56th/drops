@@ -72,14 +72,10 @@ bool AdapTriangCL::ModifyGridStep( bool lb )
 
     TetraAccumulatorTupleCL accutuple;
     accutuple.push_back( marker_);
-#ifdef _OPENMP
     ColorClassesCL cc;
     const MultiGridCL& cmg= mg_; // To get the const-iterators.
     cc.make_single_color_class( cmg.GetTriangTetraBegin(), cmg.GetTriangTetraEnd());
     accutuple( cc);
-#else
-    accutuple( mg_.GetTriangTetraBegin(), mg_.GetTriangTetraEnd());
-#endif
 
     bool modified = marker_->modified();
 #ifdef _PAR
