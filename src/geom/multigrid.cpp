@@ -1309,11 +1309,10 @@ class used_colors_CL
         }
     }
     Uint get_free_color () const {
-        const unsigned char fullbyte= 0xff;
         Uint byte;
-        for (byte= 0; byte < size && b[byte] == fullbyte; ++byte)
+        for (byte= 0; byte < size && b[byte] == 0xff /*a byte with all bits set*/; ++byte)
             ;
-        return ctz( ~b[byte] & (b[byte] + 1)) + (byte << 3u); // The argument of ctz has exactly one bit set in the position of the least significant zero bit of b[byte] (provided b != fullbyte, which cannot happen).
+        return ctz( ~b[byte] & (b[byte] + 1)) + (byte << 3u); // The argument of ctz has exactly one bit set in the position of the least significant zero bit of b[byte] (provided b != 0xff, which cannot happen).
     }
 };
 
@@ -1329,17 +1328,31 @@ void ColorClassesCL::my_compute_color_classes (MultiGridCL& mg, Uint lvl,
 
     colors_.resize( 0);
 
-    IdxDescCL p1idx( P1_FE, Bnd, match);
-    p1idx.CreateNumbering( lvl, mg);
-    const Uint sys= p1idx.GetIdx();
-    const size_t n= p1idx.NumUnknowns();
-    VecDescBaseCL<VectorBaseCL<unsigned short> > numtetra( &p1idx);
+    IdxDescCL p2idx( P2_FE, Bnd, match);
+    p2idx.CreateNumbering( lvl, mg);
+    const Uint sys= p2idx.GetIdx();
+    const size_t n= p2idx.NumUnknowns();
+    VecDescBaseCL<VectorBaseCL<unsigned short> > numtetra( &p2idx);
     DROPS_FOR_TRIANG_TETRA( mg, lvl, it) {
         for (Uint i= 0; i < 4; ++i)
             ++numtetra.Data[it->GetVertex( i)->Unknowns( sys)];
+        for (Uint i= 0; i < 6; ++i)
+            ++numtetra.Data[it->GetEdge( i)->Unknowns( sys)];
     }
-    const Uint maxcolors= 1 + 4*(*std::max_element( Addr( numtetra.Data), Addr( numtetra.Data) + n) - 1),
-               nb= ((maxcolors + 7u) & ~7u) >> 3u; // number of bytes with at least maxcolors bits.
+    Uint maxcolors= 0,
+         tmp;
+    // Use the inclusion-exclusion principle to count all tetras which intersect each tetra
+    DROPS_FOR_TRIANG_TETRA( mg, lvl, it) {
+        tmp= 4*2 - 1; // Tetras at the faces (upper bound), the tetra itself
+        for (Uint i= 0; i < 4; ++i)
+            tmp+= numtetra.Data[it->GetVertex( i)->Unknowns( sys)];
+        for (Uint i= 0; i < 6; ++i)
+            tmp-=numtetra.Data[it->GetEdge( i)->Unknowns( sys)];
+        maxcolors= std::max( maxcolors, tmp);
+    }
+    ++maxcolors;
+    const Uint nb= ((maxcolors + 7u) & ~7u) >> 3u; // number of bytes with at least maxcolors bits.
+//     std::cerr << "\nmaxcolors: " << maxcolors << " nb: " << nb << " old maxcolors: " << 1 + 4*(*std::max_element( Addr( numtetra.Data), Addr( numtetra.Data) + n) - 1) << ".\n";
     numtetra.Reset();
 
     std::vector<unsigned char> color_bitsets( n*nb);
@@ -1363,23 +1376,20 @@ void ColorClassesCL::my_compute_color_classes (MultiGridCL& mg, Uint lvl,
         }
     }
 
-
-
-
-
-    p1idx.DeleteNumbering( mg);
+    p2idx.DeleteNumbering( mg);
 
     Uint i;
-    size_t tetracheck= 0;
+//     size_t tetracheck= 0;
+    // tetra sorting for better memory access pattern
     for (i= 0; i < colors_.size() && !colors_[i].empty(); ++i) {
         std::sort( colors_[i].begin(), colors_[i].end());
-        tetracheck+= colors_[i].size();
+//         tetracheck+= colors_[i].size();
     }
     colors_.resize( i);
-    if (tetracheck != std::distance (mg.GetTriangTetraBegin( lvl), mg.GetTriangTetraEnd( lvl))) {
-        std::cerr << "tetracheck: " << tetracheck << " numtetra: " << std::distance (mg.GetTriangTetraBegin( lvl), mg.GetTriangTetraEnd( lvl)) << ".\n";
-        throw DROPSErrCL( "ColorClassesCL::my_compute_color_classes: messed up tetras.\n");
-    }
+//     if (tetracheck != std::distance (mg.GetTriangTetraBegin( lvl), mg.GetTriangTetraEnd( lvl))) {
+//         std::cerr << "tetracheck: " << tetracheck << " numtetra: " << std::distance (mg.GetTriangTetraBegin( lvl), mg.GetTriangTetraEnd( lvl)) << ".\n";
+//         throw DROPSErrCL( "ColorClassesCL::my_compute_color_classes: messed up tetras.\n");
+//     }
 
     timer.Stop();
     const double duration= timer.GetTime();
