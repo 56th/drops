@@ -395,7 +395,11 @@ class ColorClassesCL
     ColorClassesCL (MultiGridCL::const_TriangTetraIteratorCL begin,
                     MultiGridCL::const_TriangTetraIteratorCL end, match_fun match, const BndCondCL& Bnd)
     { compute_color_classes( begin, end, match, Bnd); }
+    ColorClassesCL ( const MultiGridCL& mg, Uint lvl, match_fun match, const BndCondCL& Bnd)
+    { my_compute_color_classes( const_cast<MultiGridCL&>( mg), lvl, match, Bnd); }
 
+    void my_compute_color_classes (MultiGridCL& mg, Uint lvl,
+                                   match_fun match, const BndCondCL& Bnd);
     void compute_color_classes (MultiGridCL::const_TriangTetraIteratorCL begin,
                                 MultiGridCL::const_TriangTetraIteratorCL end, match_fun match, const BndCondCL& Bnd);
     /// \brief Put all tetras in the same class --> perfect parallelization.

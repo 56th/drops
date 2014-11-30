@@ -36,6 +36,7 @@
 #include "geom/multigrid.h"
 #include "misc/params.h"
 #include "misc/singletonmap.h"
+#include "misc/problem.h"
 #include "num/gauss.h"
 #include <iterator>
 #include <set>
@@ -1256,6 +1257,136 @@ void ColorClassesCL::fill_pointer_arrays (
         std::sort( colors_[j].begin(), colors_[j].end());
 }
 
+///\brief Helper to ColorClassesCL.
+/// b Is a (dynamic) bitset of used colors, global_b is one such bitset for each p1-dof.
+class used_colors_CL
+{
+  private:
+    ///\brief count trailing zeros in the byte c.
+    static Uint ctz (unsigned char c) {
+        if (c == 0) // Short cut for 0 which could also be treated naturally by the following binary search.
+            return 8;
+        Uint n;
+#ifdef __GNUC__
+         n= __builtin_ctz( c);
+#else
+        n= 0;
+        if ((c & 15) == 0) { // 2^4 - 1
+            n+= 4;
+            c>>= 4;
+        }
+        if ((c & 3) == 0) {  // 2^2 - 1
+            n+= 2;
+            c>>= 2;
+        }
+        if ((c & 1) == 0) {  // 2^1 - 1
+            n+= 1;
+            c>>= 1;
+        }
+#endif
+        return n;
+    }
+
+    Uint size;
+    unsigned char* b;
+
+    const unsigned char* global_b;
+
+  public:
+    used_colors_CL (Uint nb, const unsigned char* global_barg)
+        : size( nb), b( new unsigned char[size]), global_b( global_barg) {}
+    ~used_colors_CL () {
+        delete[] b;
+    }
+
+    void assign( const TetraCL& t, Uint sys) {
+        size_t idx= t.GetVertex( 0)->Unknowns( sys);
+        std::copy( global_b + idx*size, global_b + (idx + 1)*size, b);
+        for (Uint i= 1; i < 4; ++i) {
+            idx= t.GetVertex( i)->Unknowns( sys);
+            for (Uint j= 0; j < size; ++j)
+                b[j]|= global_b[idx*size + j];
+        }
+    }
+    Uint get_free_color () const {
+        const unsigned char fullbyte= 0xff;
+        Uint byte;
+        for (byte= 0; byte < size && b[byte] == fullbyte; ++byte)
+            ;
+        return ctz( ~b[byte] & (b[byte] + 1)) + (byte << 3u); // The argument of ctz has exactly one bit set in the position of the least significant zero bit of b[byte] (provided b != fullbyte, which cannot happen).
+    }
+};
+
+void ColorClassesCL::my_compute_color_classes (MultiGridCL& mg, Uint lvl,
+                                               match_fun match, const BndCondCL& Bnd)
+{
+#   ifdef _PAR
+        ParTimerCL timer;
+#   else
+        TimerCL timer;
+#   endif
+        timer.Start();
+
+    colors_.resize( 0);
+
+    IdxDescCL p1idx( P1_FE, Bnd, match);
+    p1idx.CreateNumbering( lvl, mg);
+    const Uint sys= p1idx.GetIdx();
+    const size_t n= p1idx.NumUnknowns();
+    VecDescBaseCL<VectorBaseCL<unsigned short> > numtetra( &p1idx);
+    DROPS_FOR_TRIANG_TETRA( mg, lvl, it) {
+        for (Uint i= 0; i < 4; ++i)
+            ++numtetra.Data[it->GetVertex( i)->Unknowns( sys)];
+    }
+    const Uint maxcolors= 1 + 4*(*std::max_element( Addr( numtetra.Data), Addr( numtetra.Data) + n) - 1),
+               nb= ((maxcolors + 7u) & ~7u) >> 3u; // number of bytes with at least maxcolors bits.
+    numtetra.Reset();
+
+    std::vector<unsigned char> color_bitsets( n*nb);
+    colors_.resize( maxcolors);
+
+    size_t idx;
+    Uint c,    // The color in [0, maxcolors).
+         byte; // The byte in which bit number c is.
+    unsigned char bit_in_byte; // The bitmask with the bit corresponding to c set.
+    used_colors_CL used_colors( nb, Addr( color_bitsets));
+    DROPS_FOR_TRIANG_TETRA( mg, lvl, it) {
+        used_colors.assign( *it, sys);
+        c= used_colors.get_free_color();
+        colors_[c].push_back( &*it);
+
+        byte=         (c & ~7u) >> 3u;
+        bit_in_byte=  1u << (c & 7u);
+        for (Uint i= 0; i < 4; ++i) {
+            idx= it->GetVertex( i)->Unknowns( sys);
+            color_bitsets[idx*nb + byte] |= bit_in_byte;
+        }
+    }
+
+
+
+
+
+    p1idx.DeleteNumbering( mg);
+
+    Uint i;
+    size_t tetracheck= 0;
+    for (i= 0; i < colors_.size() && !colors_[i].empty(); ++i) {
+        std::sort( colors_[i].begin(), colors_[i].end());
+        tetracheck+= colors_[i].size();
+    }
+    colors_.resize( i);
+    if (tetracheck != std::distance (mg.GetTriangTetraBegin( lvl), mg.GetTriangTetraEnd( lvl))) {
+        std::cerr << "tetracheck: " << tetracheck << " numtetra: " << std::distance (mg.GetTriangTetraBegin( lvl), mg.GetTriangTetraEnd( lvl)) << ".\n";
+        throw DROPSErrCL( "ColorClassesCL::my_compute_color_classes: messed up tetras.\n");
+    }
+
+    timer.Stop();
+    const double duration= timer.GetTime();
+    std::cout << "ColorClassesCL::my_compute_color_classes: " << duration << " seconds, " << num_colors() << " colors.\n";
+}
+
+
 void ColorClassesCL::compute_color_classes (MultiGridCL::const_TriangTetraIteratorCL begin,
                                             MultiGridCL::const_TriangTetraIteratorCL end, match_fun match, const BndCondCL& Bnd)
 {
@@ -1340,8 +1471,18 @@ const ColorClassesCL& MultiGridCL::GetColorClasses (int Level, match_fun match, 
     if (Level < 0)
         Level+= GetNumLevel();
 
+    rusage usage;
+    getrusage( RUSAGE_SELF, &usage);
+    size_t before= usage.ru_maxrss;
+
     if (colors_.find( Level) == colors_.end())
-        colors_[Level]= new ColorClassesCL( GetTriangTetraBegin( Level), GetTriangTetraEnd( Level), match, Bnd);
+//         colors_[Level]= new ColorClassesCL( GetTriangTetraBegin( Level), GetTriangTetraEnd( Level), match, Bnd);
+        colors_[Level]= new ColorClassesCL( *this, Level, match, Bnd);
+
+    getrusage( RUSAGE_SELF, &usage);
+    size_t after= usage.ru_maxrss;
+
+    std::cerr << "MultiGridCL::GetColorClasses: rusage difference: " << after - before << ".\n";
 
     return *colors_[Level];
 }
