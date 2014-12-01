@@ -163,6 +163,34 @@ class OpenMPVar_ZeroInit_Sum_CL : public OpenMPVarBaseCL<T, OpenMPVar_ZeroInit_S
     using base_type::reduce;
 };
 
+///\brief Scatter initializes xx with -std::numeric_limits<T>::max(), reduce puts the max of xx into x.
+template <typename T>
+class OpenMPVar_MinInit_Max_CL : public OpenMPVarBaseCL<T, OpenMPVar_MinInit_Max_CL<T> >
+{
+  public:
+    typedef OpenMPVarBaseCL<T, OpenMPVar_MinInit_Max_CL<T> > base_type;
+
+    void scatter_impl () {
+#ifdef _OPENMP
+        std::fill( base_type::xx, base_type::xx + base_type::n, -std::numeric_limits<T>::max());
+#else
+         base_type::x= -std::numeric_limits<T>::max();
+#endif
+    }
+    void reduce_impl () {
+#ifdef _OPENMP
+        base_type::x= *std::max_element( base_type::xx, base_type::xx + base_type::n);
+#endif
+    }
+
+    using typename base_type::value_type;
+    using base_type::swap;
+    using base_type::make_reference_to;
+    using base_type::value;
+    using base_type::scatter;
+    using base_type::reduce;
+};
+
 } // end of namespace DROPS
 
 #endif
