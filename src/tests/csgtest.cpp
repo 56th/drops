@@ -180,6 +180,7 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
            err,
            area,
            areap1;
+    OpenMPVar_MinInit_Max_CL<double> max_curv;
 
     InterfaceL2AccuP2CL (const InterfaceCommonDataP2CL& cdata, const MultiGridCL& mg_arg, std::string name= std::string())
         : cdata_( cdata), mg( mg_arg), name_( name), f( 0), f_time( 0.) {}
@@ -201,6 +202,7 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
         err.scatter();
         area.scatter();
         areap1.scatter();
+        max_curv.scatter();
     }
 
     virtual void finalize_accumulation() {
@@ -213,6 +215,8 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
         std::cout << "\n\tarea: " << area.value();
         areap1.reduce();
         std::cout << "\n\tareap1: " << areap1.value();
+        max_curv.reduce();
+        std::cout << "\n\tmax_curv: " << max_curv.value();
         if (f != 0) {
             f_norm.reduce();
             f_norm.value()= std::sqrt( f_norm.value());
@@ -223,7 +227,7 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
         std::cout << std::endl;
     }
 
-    virtual void visit (const TetraCL&) {
+    virtual void visit (const TetraCL& t) {
         const InterfaceCommonDataP2CL& cdata= cdata_.get_clone();
         if (cdata.empty())
             return;
@@ -239,6 +243,35 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
             f_int.value( tid)+= quad_2D( cdata.qdom_projected.absdets()*qf, cdata.qdom);
             f_norm.value( tid)+= quad_2D( cdata.qdom_projected.absdets()*qf*qf, cdata.qdom);
         }
+
+        // Sample the maximal curvature radius in all quadrature points in t.
+        SMatrixCL<3,3> M,
+                       P;
+        double det;
+        GetTrafoTr( M, det, t);
+        SMatrixCL<3,3> Hp2[10];
+        LocalP1CL<Point3DCL> Gp2[10];
+        P2DiscCL::GetHessians( Hp2, M);
+        SMatrixCL<3,3> H;
+        P2DiscCL::GetGradients( Gp2, cdata.gradrefp2, M);
+        Point3DCL G;
+
+        for (Uint d= 0; d < 10; ++d) {
+            H+= Hp2[d]*cdata.locp2_ls[d];
+        }
+        for (Uint i= 0; i < cdata.qdom_projected.vertexes().size(); ++ i) {
+            const TetraBaryPairT& tb= cdata.qdom_projected.vertexes()[i];
+            if (tb.first != &t)
+                continue;
+            G= Point3DCL();
+            for (Uint d= 0; d < 10; ++d)
+               G+= Gp2[d]( tb.second)*cdata.locp2_ls[d];
+            P= eye<3,3>() - outer_product(G/G.norm_sq(), G);
+            M= P*H*P/G.norm();
+            cyclic_jacobi( M, 1e-6);
+            for (Uint j= 0; j < 3; ++j)
+                max_curv.value( tid)= std::max( max_curv.value( tid), M(j, j));
+        }
     }
 
     virtual InterfaceL2AccuP2CL* clone (int /*clone_id*/) {
@@ -248,6 +281,7 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
         tmp->err.make_reference_to( err);
         tmp->area.make_reference_to( area);
         tmp->areap1.make_reference_to( areap1);
+        tmp->max_curv.make_reference_to( max_curv);
         return tmp;
     }
 };
