@@ -162,6 +162,96 @@ class InterfaceApproxErrorAccuCL : public TetraAccumulatorCL
     void set_mapper (QuaQuaMapperCL* mapper) { mapper_= mapper; }
 };
 
+/// \brief Accumulate L2-norms and errors on the higher order zero level.
+/// Works for P1IF_FE, P2IF_FE, and C-functions. All functions are evaluated on the P2-levelset.
+class InterfaceL2AccuP2CL : public TetraAccumulatorCL
+{
+  private:
+    const InterfaceCommonDataP2CL& cdata_;
+    const MultiGridCL& mg;
+    std::string name_;
+
+    instat_scalar_fun_ptr f;
+    double f_time;
+
+  public:
+    OpenMPVar_ZeroInit_Sum_CL<double> f_norm,
+           f_int,
+           err,
+           area,
+           areap1;
+
+    InterfaceL2AccuP2CL (const InterfaceCommonDataP2CL& cdata, const MultiGridCL& mg_arg, std::string name= std::string())
+        : cdata_( cdata), mg( mg_arg), name_( name), f( 0), f_time( 0.) {}
+    virtual ~InterfaceL2AccuP2CL () {}
+
+    void set_name (const std::string& n) { name_= n; }
+    void set_function (const instat_scalar_fun_ptr farg, double f_time_arg= 0.) {
+        f= farg;
+        f_time= f_time_arg;
+    }
+
+    virtual void begin_accumulation () {
+        std::cout << "InterfaceL2AccuP2CL::begin_accumulation";
+        if (name_ != std::string())
+            std::cout << " for \"" << name_ << "\".\n";
+
+        f_norm.scatter();
+        f_int.scatter();
+        err.scatter();
+        area.scatter();
+        areap1.scatter();
+    }
+
+    virtual void finalize_accumulation() {
+        std::cout << "InterfaceL2AccuP2CL::finalize_accumulation";
+        if (name_ != std::string())
+            std::cout << " for \"" << name_ << "\":";
+
+        area.reduce();
+        std::cout.precision( 16);
+        std::cout << "\n\tarea: " << area.value();
+        areap1.reduce();
+        std::cout << "\n\tareap1: " << areap1.value();
+        if (f != 0) {
+            f_norm.reduce();
+            f_norm.value()= std::sqrt( f_norm.value());
+            f_int.reduce();
+            std::cout << "\n\t|| f ||_L2: " << f_norm.value()
+                      << "\t integral: " << f_int.value();
+        }
+        std::cout << std::endl;
+    }
+
+    virtual void visit (const TetraCL&) {
+        const InterfaceCommonDataP2CL& cdata= cdata_.get_clone();
+        if (cdata.empty())
+            return;
+
+        const int tid= omp_get_thread_num();
+
+        area.value( tid)+= quad_2D( cdata.qdom_projected.absdets(), cdata.qdom);
+        areap1.value( tid)+= quad_2D( std::valarray<double>( 1., cdata.qdom.vertex_size()), cdata.qdom);
+
+        std::valarray<double> qf;
+        if (f != 0) {
+            resize_and_evaluate_on_vertexes( f, cdata.qdom_projected.vertexes(), f_time, qf);
+            f_int.value( tid)+= quad_2D( cdata.qdom_projected.absdets()*qf, cdata.qdom);
+            f_norm.value( tid)+= quad_2D( cdata.qdom_projected.absdets()*qf*qf, cdata.qdom);
+        }
+    }
+
+    virtual InterfaceL2AccuP2CL* clone (int /*clone_id*/) {
+        InterfaceL2AccuP2CL* tmp= new InterfaceL2AccuP2CL( *this);
+        tmp->f_norm.make_reference_to( f_norm);
+        tmp->f_int.make_reference_to( f_int);
+        tmp->err.make_reference_to( err);
+        tmp->area.make_reference_to( area);
+        tmp->areap1.make_reference_to( areap1);
+        return tmp;
+    }
+};
+
 
 /// The level set is a heart with an inward and an outward cusp on the p[2]-axis; contained in \f$(-1.2,1.2)\times(-0.7,0.7)\times(-1.1,1.3)\f$.
 double suess (const Point3DCL& p, double)
@@ -174,77 +264,22 @@ RegisterScalarFunction reg_suess( "suess", &suess);
 double deco_cube_radius;
 double deco_cube_shift;
 
-
-///\brief Forward-mode automatic differentiation.
-/// Providing one argument to the constructor creates a scalar constant.
-/// Calling seed() turns the object into an instance of the independent variable.
-template <typename T>
-class ADScalarCL
-{
-  private:
-    T s,
-      ds;
-
-  public:
-    ADScalarCL (T ss= T(), T dss= T())
-        : s( ss), ds( dss) {}
-
-    T value () const { return s; }
-    T derivative () const { return ds; }
-
-    void seed () { ds= 1.; }
-};
-
-template <typename T>
-ADScalarCL<T> operator+ (ADScalarCL<T> f, ADScalarCL<T> g)
-{
-    return ADScalarCL<T>( f.value() + g.value(),
-                          f.derivative() + g.derivative());
-}
-
-template <typename T>
-ADScalarCL<T> operator- (ADScalarCL<T> f)
-{
-    return ADScalarCL<T>( -f.value(),
-                          -f.derivative());
-}
-
-template <typename T>
-ADScalarCL<T> operator- (ADScalarCL<T> f, ADScalarCL<T> g)
-{
-    return ADScalarCL<T>( f.value() - g.value(),
-                          f.derivative() - g.derivative());
-}
-
-template <typename T>
-ADScalarCL<T> operator* (ADScalarCL<T> f, ADScalarCL<T> g)
-{
-    return ADScalarCL<T>( f.value()*g.value(),
-                          f.derivative()*g.value() + f.value()*g.derivative());
-}
-
-template <typename T>
-ADScalarCL<T> pow (ADScalarCL<T> f, int i)
-{
-    return ADScalarCL<T>( std::pow( f.value(), i),
-                          i*std::pow( f.value(), i - 1));
-}
-
 void deco_cube_val_grad (const Point3DCL& pp, double& v, Point3DCL& g)
 {
-    typedef ADScalarCL<double> Ads;
-    const Ads cc( deco_cube_radius*deco_cube_radius),
+    typedef ADFwdCL<double> Adf;
+    const Adf cc( deco_cube_radius*deco_cube_radius),
+              shift( deco_cube_shift),
               one( 1.);
-    Ads p[3],
+    Adf p[3],
         gi;
     for (Uint i= 0; i < 3; ++i) {
         for (Uint j= 0; j < 3; ++j)
-            p[j]= Ads( pp[j]);
+            p[j]= Adf( pp[j]);
         p[i].seed();
         gi= (pow( p[0]*p[0] + p[1]*p[1] - cc, 2) + pow( p[2]*p[2] - one, 2))
            *(pow( p[1]*p[1] + p[2]*p[2] - cc, 2) + pow( p[0]*p[0] - one, 2))
            *(pow( p[2]*p[2] + p[0]*p[0] - cc, 2) + pow( p[1]*p[1] - one, 2))
-           + Ads( deco_cube_shift);
+           + shift;
         g[i]= gi.derivative();
     }
     v= gi.value();
@@ -252,19 +287,20 @@ void deco_cube_val_grad (const Point3DCL& pp, double& v, Point3DCL& g)
 
 double deco_cube (const Point3DCL& p, double)
 {
-//     const double cc= deco_cube_radius*deco_cube_radius;
-//     return  (std::pow( p[0]*p[0] + p[1]*p[1] - cc, 2) + std::pow( p[2]*p[2] - 1, 2))
-//            *(std::pow( p[1]*p[1] + p[2]*p[2] - cc, 2) + std::pow( p[0]*p[0] - 1, 2))
-//            *(std::pow( p[2]*p[2] + p[0]*p[0] - cc, 2) + std::pow( p[1]*p[1] - 1, 2)) + deco_cube_shift;
+    const double cc= deco_cube_radius*deco_cube_radius;
+    return  (std::pow( p[0]*p[0] + p[1]*p[1] - cc, 2) + std::pow( p[2]*p[2] - 1, 2))
+           *(std::pow( p[1]*p[1] + p[2]*p[2] - cc, 2) + std::pow( p[0]*p[0] - 1, 2))
+           *(std::pow( p[2]*p[2] + p[0]*p[0] - cc, 2) + std::pow( p[1]*p[1] - 1, 2)) + deco_cube_shift;
 //     const double cc= deco_cube_radius*deco_cube_radius;
 //     return  (std::abs( p[0]*p[0] + p[1]*p[1] - cc) + std::abs( p[2]*p[2] - 1))
 //            *(std::abs( p[1]*p[1] + p[2]*p[2] - cc) + std::abs( p[0]*p[0] - 1))
 //            *(std::abs( p[2]*p[2] + p[0]*p[0] - cc) + std::abs( p[1]*p[1] - 1)) + deco_cube_shift;
-    double v;
-    Point3DCL g;
-    deco_cube_val_grad( p, v, g);
-//     return v/g.norm();
-    return v;
+//     double v;
+//     Point3DCL g;
+//     deco_cube_val_grad( p, v, g);
+// //     std::cout << "p: " << p << "\t\t " << v << "\t " << g.norm() << "\t\t " << v/g.norm() << std::endl;
+// //     return v/std::sqrt( 10. + g.norm_sq());
+//     return v;
 }
 RegisterScalarFunction reg_deco_cube( "deco_cube", &deco_cube);
 
@@ -501,10 +537,10 @@ int TestAdap (MultiGridCL& mg, ParamCL& p)
     vtkwriter.Register( make_VTKScalar( make_P1Eval( mg, lsbnd, idist), "dh") );
     vtkwriter.Register( make_VTKVector( make_P2Eval( mg, vecp2bnd, lsgradrec), "ls_grad_rec") );
 
-    // InterfaceApproxErrAccuCL accu( lset, &ierr, &ierrg, &ierrq);
-    InterfaceApproxErrorAccuCL accu( lset, &ierr, &ierrg, &ierrq, &idist, true);
-    TetraAccumulatorTupleCL accus;
-    accus.push_back( &accu);
+    // InterfaceApproxErrAccuCL accu0( lset, &ierr, &ierrg, &ierrq);
+//     InterfaceApproxErrorAccuCL accu0( lset, &ierr, &ierrg, &ierrq, &idist, true);
+//     TetraAccumulatorTupleCL accus0;
+//     accus0.push_back( &accu0);
 
     size_t i= 0;
     for (ParamCL::ptree_const_iterator_type it= p.begin(); it != p.end(); ++it, ++i) {
@@ -526,10 +562,25 @@ int TestAdap (MultiGridCL& mg, ParamCL& p)
             /*tol*/ P.get<double>( "LevelsetMapper.Tol"),
             /*use_line_search*/ P.get<std::string>( "LevelsetMapper.Method") == "FixedPointWithLineSearch",
             /*armijo_c*/ P.get<double>( "LevelsetMapper.ArmijoConstant"));
-        accu.set_mapper( &quaqua);
-        accus( mg.GetTriangTetraBegin(), mg.GetTriangTetraEnd());
-        accu.set_mapper( 0);
-        seq_out( quaqua.num_outer_iter.begin(), quaqua.num_outer_iter.end(), std::cout);
+
+        TetraAccumulatorTupleCL accus;
+        InterfaceCommonDataP2CL cdatap2( lset.Phi, lset.GetBndData(), quaqua, PrincipalLatticeCL::instance( P.get<Uint>( "Subsampling")));
+        accus.push_back( &cdatap2);
+        InterfaceL2AccuP2CL l2accu( cdatap2, mg, "Area-Accumulator");
+        accus.push_back( &l2accu);
+//         InterfaceDebugP2CL p2debugaccu( cdatap2);
+//         accus.push_back( &p2debugaccu);
+//         accumulate( accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetMatchingFunction(), ifacep2idx.GetBndInfo());
+        const MultiGridCL& cmg= mg; // To get the const-iterators.
+        ColorClassesCL cc;
+        cc.make_single_color_class( cmg.GetTriangTetraBegin(), cmg.GetTriangTetraEnd());
+        accus( cc);
+        seq_out( cdatap2.quaqua.num_outer_iter.begin(), cdatap2.quaqua.num_outer_iter.end(), std::cout);
+
+//         accu0.set_mapper( &quaqua);
+//         accus0( mg.GetTriangTetraBegin(), mg.GetTriangTetraEnd());
+//         accu0.set_mapper( 0);
+//         seq_out( quaqua.num_outer_iter.begin(), quaqua.num_outer_iter.end(), std::cout);
 
         vtkwriter.Write( i);
 
@@ -589,8 +640,13 @@ int main (int argc, char** argv)
         ex= P.get_child( "CSGLevelsets");
         std::cout << ex << std::endl;
     }
-//     return TestExamples( mg, ex);;
-    return TestAdap( mg, ex);;
+//     return TestExamples( mg, ex);
+    TestAdap( mg, ex);
+
+    rusage usage;
+    getrusage( RUSAGE_SELF, &usage);
+    printf( "ru_maxrss: %li kB.\n", usage.ru_maxrss);
+    return 0;
   }
   catch (DROPSErrCL err) { err.handle(); }
 }
