@@ -381,6 +381,7 @@ void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<double>("Mat.ViscFluid", 0.001);
     P.put_if_unset<double>("Mat.SmoothZone", 1e-05);
     P.put_if_unset<DROPS::Point3DCL>("Exp.Gravity", DROPS::Point3DCL());
+    P.put_if_unset<std::string>("Restart.Inputfile", "none");
 }
 
 int main (int argc, char** argv)
@@ -393,7 +394,7 @@ int main (int argc, char** argv)
 
     DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
 
-    std::auto_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P.get_child( "Domain")));
+    std::auto_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P));
     DROPS::MultiGridCL mg( *builder);
 
     DROPS::StokesBndDataCL::VelBndDataCL velbnd( 0);
