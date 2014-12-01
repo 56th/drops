@@ -46,6 +46,12 @@ else(WIN32)
   else (BOOST_HOME STREQUAL "")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I${BOOST_HOME}")
   endif (BOOST_HOME STREQUAL "")
+
+  if (MKL_HOME STREQUAL "")
+  else (MKL_HOME STREQUAL "")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDROPS_PARDISO -DMKL_ILP64 -m64 -I${MKL_HOME}/include -Wno-long-long")
+  endif (MKL_HOME STREQUAL "")
+
 endif(WIN32)
 
 #compiler specific options

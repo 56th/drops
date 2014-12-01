@@ -56,6 +56,9 @@
 #include <fstream>
 #include <sstream>
 
+#ifndef _PAR
+#include "num/stokespardiso.h" 
+#endif
 #include "misc/progressaccu.h"
 #include "misc/dynamicload.h"
 
@@ -287,7 +290,18 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
     // Stokes-Solver
     StokesSolverFactoryCL<InstatNavierStokes2PhaseP2P1CL> stokessolverfactory(Stokes, P);
-    StokesSolverBaseCL* stokessolver = stokessolverfactory.CreateStokesSolver();
+    StokesSolverBaseCL* stokessolver;
+
+    if (! P.get<int>("Stokes.DirectSolve"))
+        stokessolver = stokessolverfactory.CreateStokesSolver();
+#ifndef _PAR
+    else
+        stokessolver = new StokesPardisoSolverCL(); 
+#else
+    else
+        throw DROPSErrCL("no direct solver in parallel");
+#endif
+
 //  comment: construction of a oseen solver, preconditioned by another oseen solver,
 //           e.g. GCR preconditioned by Vanka-MG, do not forget to delete stokessolver1 at the end of strategy
 //
@@ -570,6 +584,7 @@ void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<double>("Mat.DilatationalVisco", 0.0);
     P.put_if_unset<double>("SurfTens.ShearVisco", 0.0);
     P.put_if_unset<double>("SurfTens.DilatationalVisco", 0.0);
+    P.put_if_unset<int>("Stokes.DirectSolve", 0);
 
     P.put_if_unset<int>("General.ProgressBar", 0);
     P.put_if_unset<std::string>("General.DynamicLibsPrefix", "../");
