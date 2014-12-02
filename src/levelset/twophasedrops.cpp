@@ -704,8 +704,9 @@ void SetMissingParameters(DROPS::ParamCL& P){
 	P.put_if_unset<std::string>("Exp.Solution_Pr", "None");
 	P.put_if_unset<int>("Exp.OutputInfo",1);
 	//---------------------------------------------------------------
-	P.put_if_unset<double>("Exp.SimuType", 0.0);
+   P.put_if_unset<double>("Exp.SimuType", 0.0);
    P.put_if_unset<double>("Stokes.epsP", 0.0);
+   P.put_if_unset<double>("Stokes.DirectSolve", 0);
 }
 
 int main (int argc, char** argv)
