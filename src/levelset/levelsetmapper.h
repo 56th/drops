@@ -123,7 +123,9 @@ class QuaQuaMapperCL
           ls( &lsarg, &nobnddata, &mg), ls_grad_rec( &ls_grad_recarg, &nobnddata_vec, &mg),
           neighborhoods_( neighborhoods), locator_( mg, lsarg.GetLevel(), /*greedy*/ false),
           cache_( ls, ls_grad_rec, gradrefp2), tet( 0), btet( 0), have_dph( false),
-          num_outer_iter( maxiter + 1), num_inner_iter( maxinneriter_ + 1)
+          num_outer_iter( maxiter + 1), num_inner_iter( maxinneriter_ + 1),
+          base_point_time( 0.), cur_num_outer_iter( 0), min_outer_iter(-1u), max_outer_iter( 0),
+          total_outer_iter( 0), total_base_point_calls( 0)
     { P2DiscCL::GetGradientsOnRef( gradrefp2); }
 
     void set_tetra_neighborhoods (TetraToTetrasT& neigborhoods) { neighborhoods_= &neigborhoods; }
@@ -149,6 +151,13 @@ class QuaQuaMapperCL
     // Count number of iterations iter->#computations with iter iterations.
     mutable std::vector<size_t> num_outer_iter;
     mutable std::vector<size_t> num_inner_iter;
+
+    mutable double base_point_time;
+    mutable Uint cur_num_outer_iter,
+                 min_outer_iter,
+                 max_outer_iter,
+                 total_outer_iter,
+                 total_base_point_calls;
 };
 
 void compute_tetra_neighborhoods (const DROPS::MultiGridCL& mg, const VecDescCL& lsetPhi, const BndDataCL<>& lsetbnd, const PrincipalLatticeCL& lat, TetraToTetrasT& tetra_neighborhoods);

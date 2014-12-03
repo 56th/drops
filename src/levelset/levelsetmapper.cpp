@@ -165,6 +165,7 @@ void QuaQuaMapperCL::base_point_with_line_search () const
     if (iter >= maxiter_) {
         std::cout << "QuaQuaMapperCL::base_point_with_line_search: max iteration number exceeded; |x - xold|: " << norm( xold - x) << "\tx: " << x << "\t n: " << n << "\t ls(x): " << ls.val( *btet, bxb) << std::endl;
     }
+    cur_num_outer_iter= iter;
     ++num_outer_iter[iter];
     dh=  inner_prod( n, x0 - x);
 }
@@ -283,6 +284,7 @@ void QuaQuaMapperCL::base_point_newton () const
         cache_.set_tetra( btet);
         bxb= cache_.w2b()( x);
     }
+    cur_num_outer_iter= iter;
     ++num_outer_iter[iter];
     // Compute the quasi-distance dh:
     gh= loc_gh( bxb);
@@ -297,12 +299,20 @@ const QuaQuaMapperCL& QuaQuaMapperCL::base_point () const
 // tet and xb specify the point which is projected to the zero level.
 // On return tet and xb are the resulting base point.
 {
+    TimerCL timer;
+
     if (btet == 0) {
         if (use_line_search_ == true)
             base_point_with_line_search();
         else
             base_point_newton();
     }
+    timer.Stop();
+    base_point_time+= timer.GetTime();
+    min_outer_iter= std::min( min_outer_iter, cur_num_outer_iter);
+    max_outer_iter= std::max( max_outer_iter, cur_num_outer_iter);
+    total_outer_iter+= cur_num_outer_iter;
+    ++total_base_point_calls;
     return *this;
 }
 
