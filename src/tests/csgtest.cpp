@@ -179,8 +179,13 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
            f_int,
            err,
            area,
-           areap1;
-    OpenMPVar_MinInit_Max_CL<double> max_curv;
+           areap1,
+           time_dh,
+           iter_dh,
+           invocations_dh;
+    OpenMPVar_MinInit_Max_CL<double> max_curv,
+                                     max_iter;
+    OpenMPVar_MaxInit_Min_CL<double> min_iter;
 
     InterfaceL2AccuP2CL (const InterfaceCommonDataP2CL& cdata, const MultiGridCL& mg_arg, std::string name= std::string())
         : cdata_( cdata), mg( mg_arg), name_( name), f( 0), f_time( 0.) {}
@@ -202,7 +207,12 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
         err.scatter();
         area.scatter();
         areap1.scatter();
+        time_dh.scatter();
+        iter_dh.scatter();
+        invocations_dh.scatter();
         max_curv.scatter();
+        max_iter.scatter();
+        min_iter.scatter();
     }
 
     virtual void finalize_accumulation() {
@@ -215,8 +225,18 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
         std::cout << "\n\tarea: " << area.value();
         areap1.reduce();
         std::cout << "\n\tareap1: " << areap1.value();
+        time_dh.reduce();
+        std::cout << "\n\ttime_dh: " << time_dh.value();
+        iter_dh.reduce();
+        std::cout << "\n\titer_dh: " << iter_dh.value();
+        invocations_dh.reduce();
+        std::cout << "\n\tinvocations_dh: " << invocations_dh.value() << "\t average_iter: " << iter_dh.value()/invocations_dh.value();
         max_curv.reduce();
         std::cout << "\n\tmax_curv: " << max_curv.value();
+        max_iter.reduce();
+        std::cout << "\n\tmax_iter: " << max_iter.value();
+        min_iter.reduce();
+        std::cout << "\n\tmin_iter: " << min_iter.value();
         if (f != 0) {
             f_norm.reduce();
             f_norm.value()= std::sqrt( f_norm.value());
@@ -272,6 +292,13 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
             for (Uint j= 0; j < 3; ++j)
                 max_curv.value( tid)= std::max( max_curv.value( tid), M(j, j));
         }
+
+        time_dh.value( tid)= cdata.quaqua.base_point_time;
+        iter_dh.value( tid)= cdata.quaqua.total_outer_iter;
+        invocations_dh.value( tid)= cdata.quaqua.total_base_point_calls;
+        min_iter.value( tid)= cdata.quaqua.min_outer_iter;
+        max_iter.value( tid)= cdata.quaqua.max_outer_iter;
+
     }
 
     virtual InterfaceL2AccuP2CL* clone (int /*clone_id*/) {
@@ -281,7 +308,12 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
         tmp->err.make_reference_to( err);
         tmp->area.make_reference_to( area);
         tmp->areap1.make_reference_to( areap1);
+        tmp->time_dh.make_reference_to( time_dh);
+        tmp->iter_dh.make_reference_to( iter_dh);
+        tmp->invocations_dh.make_reference_to( invocations_dh);
         tmp->max_curv.make_reference_to( max_curv);
+        tmp->max_iter.make_reference_to( max_iter);
+        tmp->min_iter.make_reference_to( min_iter);
         return tmp;
     }
 };
