@@ -577,7 +577,8 @@ bool ExtIdxDescCL::CommunicateXFEMNumbCL::Scatter( DiST::TransferableCL& t, cons
     const IdxT dof= sp->Unknowns(current_Idx_->GetIdx());
 
     if (!current_Idx_->IsExtended( dof) && RemoteExtended)
-        current_Idx_->GetXidx()[dof]= NoIdx-1;
+        for (Uint i = 0; i < current_Idx_->NumUnknownsVertex(); ++i)
+            current_Idx_->GetXidx()[dof+i]= NoIdx-1;
     return true;
 }
 
