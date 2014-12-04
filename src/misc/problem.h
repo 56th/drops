@@ -76,6 +76,8 @@ enum FiniteElementT
 	vecP1Bubble_FE=P1Bubble_FE+OFFSET_VECFE,
 	vecP2R_FE=P2R_FE+OFFSET_VECFE,
 	vecP2X_FE=P2X_FE+OFFSET_VECFE, 
+    P1SP1T_FE=P1_FE+OFFSET_STFE, 
+    P1SP1TX_FE=P1_FE+OFFSET_XFE+OFFSET_STFE, 
     UnknownFE_=-1
 };
 
@@ -105,6 +107,8 @@ class FE_InfoCL
             case P1_FE:
             case P1IF_FE:
             case P1X_FE:         NumUnknownsVertex_= 1; break;
+            case P1SP1T_FE:
+            case P1SP1TX_FE:     NumUnknownsVertex_= 2; break;
             case P1Bubble_FE:    NumUnknownsVertex_= NumUnknownsTetra_= 1; break;
             case vecP1Bubble_FE: NumUnknownsVertex_= NumUnknownsTetra_= 3; break;
             case P1D_FE:         NumUnknownsFace_= 1; break;
@@ -126,6 +130,11 @@ class FE_InfoCL
     bool IsScalar() const { return !(fe_ & OFFSET_VECFE); }
     /// \brief Returns true for XFEM
     bool IsExtended() const { return (fe_ & OFFSET_XFE) || (fe_ & OFFSET_RFE) ; }
+    /// \brief Returns true for STXFEM
+    bool IsExtendedSpaceTime() const { return fe_==P1SP1TX_FE; }
+    /// \brief Returns true for STFEM
+    //bool IsSpaceTime() const { return fe_==P1SP1TX_FE || fe_==P1SP1T_FE; }
+
     /// \brief Returns true for interface FE
     bool IsOnInterface() const { return fe_& OFFSET_IFFE; }
     bool IsDG() const { return fe_ & OFFSET_DFE;}
