@@ -154,8 +154,10 @@ void QuaQuaMapperCL::base_point_with_line_search () const
 
     Point3DCL n; // Current search direction.
 
+    cache_.set_tetra( btet); // To make get_h() well-defined.
+
     int iter;
-    for (iter= 0; iter < maxiter_; ++iter) {
+    for (iter= 1; iter < maxiter_; ++iter) {
         xold= x;
         n=  ls_grad_rec.val( *btet, bxb);
         n/= norm( n);
