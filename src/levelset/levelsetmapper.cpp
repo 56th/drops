@@ -224,13 +224,11 @@ void QuaQuaMapperCL::base_point_newton () const
 
     Point3DCL g_ls, // gradient of the level set function.
               gh;   // recovered gradient
-    double ghnorm;  // norm of the recovered gradient gh.
     SMatrixCL<3,3> dgh; // Jacobian of the recovered gradient.
 
     int iter;
     for (iter= 0; iter < maxiter_; ++iter) {
         gh= loc_gh( bxb);
-        ghnorm= gh.norm();
 
         // Setup F= (x0 - x - s*gh, -locls( bxb)); compute Newton update.
         for (Uint i= 0; i < 3; ++i)
@@ -273,7 +271,7 @@ void QuaQuaMapperCL::base_point_newton () const
         Uint j;
         for (j= 0; j < 10; ++j, l*= 0.5) {
             if (l < 1e-7) {
-                std::cerr << "QuaQuaMapperCL::base_point_newton: Too much damping, giving up. iter: " << iter << " x0: " << x0 << " x: " << x << " dx: " << dx << " ls(x): " << ls.val( *btet, bxb) << " l: " << l << " s: " << s << " ghnorm: " << ghnorm << " g_ls: " << g_ls << std::endl;
+                std::cerr << "QuaQuaMapperCL::base_point_newton: Too much damping. iter: " << iter << " x0: " << x0 << " x: " << x << " dx: " << dx << " ls(x): " << ls.val( *btet, bxb) << " l: " << l << " s: " << s << " ghnorm: " << gh.norm() << " g_ls: " << g_ls << std::endl;
                 cache_.set_tetra( btet);
                 l= 1e-2*cache_.get_h()/dx.norm();
                 break;
