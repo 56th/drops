@@ -201,6 +201,7 @@ void QuaQuaMapperCL::base_point_with_line_search () const
 
 void QuaQuaMapperCL::base_point_newton () const
 {
+    bool found_newtet;
 
     btet= tet;
     bxb= xb;
@@ -226,18 +227,22 @@ void QuaQuaMapperCL::base_point_newton () const
               gh;   // recovered gradient
     SMatrixCL<3,3> dgh; // Jacobian of the recovered gradient.
 
+    Point3DCL xnew;
+    double    snew;
+    BaryCoordCL bxbnew;
+    const TetraCL* newtet;
+    SVectorCL<4> Fnew;
+
+    // Setup initial F= (x0 - x - s*gh, -locls( bxb))= (0, -locls( bxb)).
+    gh= loc_gh( bxb); // This is needed for the setup of M in the first iteration.
+    F[3]= -locls( bxb);
+
     int iter;
     for (iter= 0; iter < maxiter_; ++iter) {
-        gh= loc_gh( bxb);
-
-        // Setup F= (x0 - x - s*gh, -locls( bxb)); compute Newton update.
-        for (Uint i= 0; i < 3; ++i)
-            F[i]= x0[i] - x[i] - s*gh[i];
-        F[3]= -locls( bxb);
-
         if (F.norm() < tol_)
             break;
 
+        // Evaluate the gradient of locls in bxb: g_ls.
         g_ls= Point3DCL();
         for (Uint i= 0; i < 10; ++i) {
             gradp2_xb[i]= cache_.gradp2( i)( bxb);
@@ -262,6 +267,7 @@ void QuaQuaMapperCL::base_point_newton () const
         Msave= M;
         qr.prepare_solve();
 
+        // Compute Newton update.
         fdx= F;
         qr.Solve( fdx);
         dx= MakePoint3D( fdx[0], fdx[1], fdx[2]);
@@ -269,29 +275,27 @@ void QuaQuaMapperCL::base_point_newton () const
 
         l= std::min( 1., 0.5*cache_.get_h()/dx.norm());
         Uint j;
+        found_newtet= false;
         for (j= 0; j < 10; ++j, l*= 0.5) {
             if (l < 1e-7) {
                 std::cerr << "QuaQuaMapperCL::base_point_newton: Too much damping. iter: " << iter << " x0: " << x0 << " x: " << x << " dx: " << dx << " ls(x): " << ls.val( *btet, bxb) << " l: " << l << " s: " << s << " ghnorm: " << gh.norm() << " g_ls: " << g_ls << std::endl;
-                cache_.set_tetra( btet);
-                l= 1e-2*cache_.get_h()/dx.norm();
-                break;
             }
-            Point3DCL xnew= x - l*dx;
-            double    snew= s - l*ds;
-            const TetraCL* newtet= btet;
+            xnew= x - l*dx;
+            snew= s - l*ds;
+            newtet= btet;
             cache_.set_tetra( btet);
-            BaryCoordCL bxbnew= cache_.w2b()( xnew);
+            bxbnew= cache_.w2b()( xnew);
             try {
                 locate_new_point( x, -dx, newtet, bxbnew, l);
             }
-            catch (DROPSErrCL e) {
+            catch (DROPSErrCL& e) {
                 continue;
             }
+            found_newtet= true;
             cache_.set_tetra( newtet);
 
+            // Setup Fnew= (x0 - xnew - snew*gh, -locls( bxbnew)).
             gh= loc_gh( bxbnew);
-            // Setup Fnew= (x0 - xnew - snew*gh, -locls( bxbnew)); compute Newton update.
-            SVectorCL<4> Fnew;
             for (Uint i= 0; i < 3; ++i)
                 Fnew[i]= x0[i] - xnew[i] - snew*gh[i];
             Fnew[3]= -locls( bxbnew);
@@ -299,21 +303,22 @@ void QuaQuaMapperCL::base_point_newton () const
             // Armijo-rule
 //             if (Fnew.norm_sq() < F.norm_sq() + 2.*armijo_c_*inner_prod( transp_mul( Msave, F), fdx)*l) {
             if (Fnew.norm() < F.norm() + armijo_c_*inner_prod( transp_mul( Msave, F), fdx)/F.norm()*l) {
-                btet= newtet;
                 break;
             }
         }
+        if (!found_newtet)
+            throw DROPSErrCL( "QuaQuaMapperCL::base_point_newton: Could not find the right tetra.\n");
 // if (j>1)
 //     std::cout << "l: " << l << " j: " << j << ".\n";
-        x-= l*dx;
-        s-= l*ds;
-        cache_.set_tetra( btet);
-        bxb= cache_.w2b()( x);
+        btet= newtet;
+        x= xnew;
+        s= snew;
+        bxb= bxbnew;
+        F= Fnew;
     }
     cur_num_outer_iter= iter;
     ++num_outer_iter[iter];
     // Compute the quasi-distance dh:
-    gh= loc_gh( bxb);
     dh= s*gh.norm();
     if (iter >= maxiter_) {
         std::cout << "QuaQuaMapperCL::base_point_newton: max iteration number exceeded; x0: " << x0 << "\tx: " << x << "\t fdx: " << fdx << "\t F: " << F << "\tl: " << l << "\tdh: " << dh << "\tg_ls: " << g_ls << std::endl;
