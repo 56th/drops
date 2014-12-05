@@ -109,17 +109,22 @@ const QuaQuaMapperCL& QuaQuaMapperCL::set_point (const TetraCL* tetarg, const Ba
 
 bool QuaQuaMapperCL::line_search (Point3DCL& x, const Point3DCL& nx, const TetraCL*& tetra, BaryCoordCL& bary) const
 {
+    bool found_newtet;
+
     double dalpha= 0.;
     double l;
     int inneriter= 0;
-    World2BaryCoordCL w2b;
-    for (; inneriter < maxinneriter_; ++inneriter) {
-        // Evaluate ls in x and check convergence.
-        w2b.assign( *tetra);
-        bary= w2b( x);
-        const double lsval= ls.val( *tetra, bary);
 
-        if (std::abs( lsval) < innertol_)
+    Point3DCL xnew;
+    const TetraCL* newtet= tetra;
+    BaryCoordCL newbary;
+    double Fnew= std::numeric_limits<double>::max(); // Silence false warning.
+
+    World2BaryCoordCL w2b( *tetra);
+    bary= w2b( x);
+    double F= ls.val( *tetra, bary);
+    for (; inneriter < maxinneriter_; ++inneriter) {
+        if (std::abs( F) < innertol_)
             break;
 
         // Compute undamped Newton correction dalpha.
@@ -127,43 +132,49 @@ bool QuaQuaMapperCL::line_search (Point3DCL& x, const Point3DCL& nx, const Tetra
         const double slope= inner_prod( gradval, nx);
         if (std::abs( slope) < 1.0e-8)
             std::cout << "g_phi: " << gradval << "\tgy: " << nx << std::endl;
-        dalpha= lsval/slope;
+        dalpha= F/slope;
 
         l= std::min( 1., 0.5*cache_.get_h()/std::abs( dalpha));
         Uint j;
+        found_newtet= false;
         for (j= 0; j < 10; ++j, l*= 0.5) {
             if (l < 1e-7) {
-                std::cerr << "QuaQuaMapperCL::line_search: Too much damping, giving up. inneriter: " << inneriter <<  " x: " << x << " dalpha: " << dalpha << " ls(x): " << ls.val( *tetra, bary) << " l: " << l << " slope: " << slope << std::endl;
-                cache_.set_tetra( tetra);
-                l= 1e-2*cache_.get_h()/std::abs( dalpha);
-                break;
+                std::cerr << "QuaQuaMapperCL::line_search: Too much damping. inneriter: " << inneriter <<  " x: " << x << " dalpha: " << dalpha << " ls(x): " << ls.val( *tetra, bary) << " l: " << l << " slope: " << slope << std::endl;
             }
-            Point3DCL xnew= x - (l*dalpha)*nx;
-            const TetraCL* newtet= tetra;
-            w2b.assign( *tetra);
-            BaryCoordCL newbary= w2b( xnew);
+            xnew= x - (l*dalpha)*nx;
+            if (newtet != tetra) {
+                newtet= tetra;
+                w2b.assign( *tetra);
+            }
+            newbary= w2b( xnew);
             try {
                 locate_new_point( x, -dalpha*nx, newtet, newbary, l);
             }
             catch (DROPSErrCL e) {
                 continue;
             }
-            w2b.assign( *newtet);
-
+            found_newtet= true;
+            if (newtet != tetra) {
+                w2b.assign( *newtet);
+            }
             // Setup Fnew= locls( newbary)).
-            double Fnew= ls.val( *newtet, newbary);
+            Fnew= ls.val( *newtet, newbary);
 
             // Armijo-rule
-            if (std::abs( Fnew) < std::abs( lsval) + armijo_c_*lsval*slope*dalpha/std::abs( lsval)*l) {
-                tetra= newtet;
+            if (std::abs( Fnew) < std::abs( F) + armijo_c_*F*slope*dalpha/std::abs( F)*l) {
                 break;
             }
         }
-        x-= (l*dalpha)*nx;
+        if (!found_newtet)
+            throw DROPSErrCL( "QuaQuaMapperCL::line_search: Could not find the right tetra.\n");
+        tetra= newtet;
+        x= xnew;
+        bary= newbary;
+        F= Fnew;
     }
 
-    if (inneriter >= maxinneriter_)
-        std::cout <<"QuaQuaMapperCL::line_search: Warning: max inner iteration number at x : " << x << " exceeded; ls.val: " << ls.val( *tetra, bary) << std::endl;
+//     if (inneriter >= maxinneriter_)
+//         std::cout <<"QuaQuaMapperCL::line_search: Warning: max inner iteration number at x : " << x << " exceeded; ls.val: " << ls.val( *tetra, bary) << std::endl;
     ++num_inner_iter[inneriter];
 
     return inneriter < maxinneriter_;
