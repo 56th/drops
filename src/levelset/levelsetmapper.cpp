@@ -73,6 +73,8 @@ void QuaQuaMapperCL::locate_new_point (const Point3DCL& x, const Point3DCL& dx, 
 {
     const double eps= 1e-10;
 
+    ++total_locate_new_point_calls;
+
     if (is_in_ref_tetra( xb, eps))
         return;
 
