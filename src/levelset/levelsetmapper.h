@@ -56,8 +56,6 @@ class base_point_newton_cacheCL
     LocalP2CL<Point3DCL> loc_gh_;
     LocalP1CL<Point3DCL> gradp2_[10];
     World2BaryCoordCL    w2b_;
-
-    SMatrixCL<3,3> hessp2_[10];
     double h_;
 
   public:
@@ -71,7 +69,6 @@ class base_point_newton_cacheCL
     const LocalP2CL<>&          locls  () const { return locls_; }
     const LocalP2CL<Point3DCL>& loc_gh () const { return loc_gh_; }
     const LocalP1CL<Point3DCL>& gradp2 (Uint i) const { return gradp2_[i]; }
-    const SMatrixCL<3,3>&       hessp2 (Uint i) const { return hessp2_[i]; }
     const World2BaryCoordCL&    w2b    () const { return w2b_; }
     double                      get_h  () const { return h_; }
 };

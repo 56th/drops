@@ -43,7 +43,6 @@ void base_point_newton_cacheCL::set_tetra (const TetraCL* newtet)
     double dummy;
     GetTrafoTr( T, dummy, *tet);
     P2DiscCL::GetGradients( gradp2_, gradrefp2_, T);
-    P2DiscCL::GetHessians( hessp2_, T);
 
     w2b_.assign( *tet);
 
