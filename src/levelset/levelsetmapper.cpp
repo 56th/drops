@@ -70,30 +70,31 @@ void enclosing_tetra (const Point3DCL& v, const TetraSetT& neighborhood, double 
 // On entry, xb must contain the barycentric coordinates of x + d*dx.
 void QuaQuaMapperCL::locate_new_point (const Point3DCL& x, const Point3DCL& dx, const TetraCL*& tet, BaryCoordCL& xb, double& d) const
 {
-    const double eps= 1e-10;
-
+    TimerCL timer;
     ++total_locate_new_point_calls;
 
-    if (is_in_ref_tetra( xb, eps))
-        return;
+    const double eps= 1e-10;
+    if (!is_in_ref_tetra( xb, eps)) {
+        if (neighborhoods_ != 0) {
+            const int max_damping= 10;
+            const TetraSetT& neighborhood= neighborhoods_[0][tet];
 
-    if (neighborhoods_ != 0) {
-        const int max_damping= 10;
-        const TetraSetT& neighborhood= neighborhoods_[0][tet];
-
-        for (int k= 0; tet == 0 && k < max_damping; ++k, d*= 0.5)
-            enclosing_tetra( x + d*dx, neighborhood, eps, tet, xb);
-        if (tet == 0) {
-            std::cout << "x: " << x << "\tdx: " << dx << "\td: " << d << "\tx + d*dx: "<< x + d*dx << std::endl;
-            throw DROPSErrCL("QuaQuaMapperCL::locate_new_point: Coord not in given tetra set.\n");
+            for (int k= 0; tet == 0 && k < max_damping; ++k, d*= 0.5)
+                enclosing_tetra( x + d*dx, neighborhood, eps, tet, xb);
+            if (tet == 0) {
+                std::cout << "x: " << x << "\tdx: " << dx << "\td: " << d << "\tx + d*dx: "<< x + d*dx << std::endl;
+                throw DROPSErrCL("QuaQuaMapperCL::locate_new_point: Coord not in given tetra set.\n");
+            }
+        }
+        else {
+//             locator_.set_epsilon( eps);
+            locator_.locate( x + d*dx);
+            tet= &locator_.get_tetra();
+            xb= locator_.get_bary();
         }
     }
-    else {
-//         locator_.set_epsilon( eps);
-        locator_.locate( x + d*dx);
-        tet= &locator_.get_tetra();
-        xb= locator_.get_bary();
-    }
+    timer.Stop();
+    locate_new_point_time+= timer.GetTime();
 }
 
 const QuaQuaMapperCL& QuaQuaMapperCL::set_point (const TetraCL* tetarg, const BaryCoordCL& xbarg) const

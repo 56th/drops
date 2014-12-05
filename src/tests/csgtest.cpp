@@ -181,6 +181,7 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
            area,
            areap1,
            time_dh,
+           time_locate,
            iter_dh,
            invocations_dh,
            calls_locate;
@@ -209,6 +210,7 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
         area.scatter();
         areap1.scatter();
         time_dh.scatter();
+        time_locate.scatter();
         iter_dh.scatter();
         invocations_dh.scatter();
         calls_locate.scatter();
@@ -229,6 +231,8 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
         std::cout << "\n\tareap1: " << areap1.value();
         time_dh.reduce();
         std::cout << "\n\ttime_dh: " << time_dh.value();
+        time_locate.reduce();
+        std::cout << "\n\ttime_locate: " << time_locate.value();
         iter_dh.reduce();
         std::cout << "\n\titer_dh: " << iter_dh.value();
         invocations_dh.reduce();
@@ -298,6 +302,7 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
         }
 
         time_dh.value( tid)= cdata.quaqua.base_point_time;
+        time_locate.value( tid)= cdata.quaqua.locate_new_point_time;
         iter_dh.value( tid)= cdata.quaqua.total_outer_iter;
         invocations_dh.value( tid)= cdata.quaqua.total_base_point_calls;
         calls_locate.value( tid)= cdata.quaqua.total_locate_new_point_calls;
@@ -314,6 +319,7 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
         tmp->area.make_reference_to( area);
         tmp->areap1.make_reference_to( areap1);
         tmp->time_dh.make_reference_to( time_dh);
+        tmp->time_locate.make_reference_to( time_locate);
         tmp->iter_dh.make_reference_to( iter_dh);
         tmp->invocations_dh.make_reference_to( invocations_dh);
         tmp->calls_locate.make_reference_to( calls_locate);
@@ -649,7 +655,10 @@ int TestAdap (MultiGridCL& mg, ParamCL& p)
         ColorClassesCL cc;
         cc.make_single_color_class( cmg.GetTriangTetraBegin(), cmg.GetTriangTetraEnd());
         accus( cc);
+        std::cout << "Distribution of outer iterations in thread 0:\n";
         seq_out( cdatap2.quaqua.num_outer_iter.begin(), cdatap2.quaqua.num_outer_iter.end(), std::cout);
+        std::cout << "Distribution of inner iterations in thread 0:\n";
+        seq_out( cdatap2.quaqua.num_inner_iter.begin(), cdatap2.quaqua.num_inner_iter.end(), std::cout);
 
 //         accu0.set_mapper( &quaqua);
 //         accus0( mg.GetTriangTetraBegin(), mg.GetTriangTetraEnd());

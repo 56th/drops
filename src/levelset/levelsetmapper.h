@@ -121,7 +121,7 @@ class QuaQuaMapperCL
           neighborhoods_( neighborhoods), locator_( mg, lsarg.GetLevel(), /*greedy*/ false),
           cache_( ls, ls_grad_rec, gradrefp2), tet( 0), btet( 0), have_dph( false),
           num_outer_iter( maxiter + 1), num_inner_iter( maxinneriter_ + 1),
-          base_point_time( 0.), cur_num_outer_iter( 0), min_outer_iter(-1u), max_outer_iter( 0),
+          base_point_time( 0.), locate_new_point_time( 0.), cur_num_outer_iter( 0), min_outer_iter(-1u), max_outer_iter( 0),
           total_outer_iter( 0), total_base_point_calls( 0), total_locate_new_point_calls( 0)
     { P2DiscCL::GetGradientsOnRef( gradrefp2); }
 
@@ -155,7 +155,8 @@ class QuaQuaMapperCL
     mutable std::vector<size_t> num_outer_iter;
     mutable std::vector<size_t> num_inner_iter;
 
-    mutable double base_point_time;
+    mutable double base_point_time,
+                   locate_new_point_time;
     mutable Uint cur_num_outer_iter,
                  min_outer_iter,
                  max_outer_iter,
