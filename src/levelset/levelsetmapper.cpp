@@ -111,6 +111,7 @@ const QuaQuaMapperCL& QuaQuaMapperCL::set_point (const TetraCL* tetarg, const Ba
 bool QuaQuaMapperCL::line_search (Point3DCL& x, const Point3DCL& nx, const TetraCL*& tetra, BaryCoordCL& bary) const
 {
     double dalpha= 0.;
+    double l;
     int inneriter= 0;
     World2BaryCoordCL w2b;
     for (; inneriter < maxinneriter_; ++inneriter) {
@@ -129,10 +130,37 @@ bool QuaQuaMapperCL::line_search (Point3DCL& x, const Point3DCL& nx, const Tetra
             std::cout << "g_phi: " << gradval << "\tgy: " << nx << std::endl;
         dalpha= lsval/slope;
 
-        bary= w2b( x - dalpha*nx);
-        double damp= 1.;
-        locate_new_point( x, -dalpha*nx, tetra, bary, damp); // Find tetra enclosing x - dalpha*nx; depending on the method, the step must be damped with 0 < damp < 1.
-        x-= (damp*dalpha)*nx;
+        l= std::min( 1., 0.5*cache_.get_h()/std::abs( dalpha));
+        Uint j;
+        for (j= 0; j < 10; ++j, l*= 0.5) {
+            if (l < 1e-7) {
+                std::cerr << "QuaQuaMapperCL::line_search: Too much damping, giving up. inneriter: " << inneriter <<  " x: " << x << " dalpha: " << dalpha << " ls(x): " << ls.val( *tetra, bary) << " l: " << l << " slope: " << slope << std::endl;
+                cache_.set_tetra( tetra);
+                l= 1e-2*cache_.get_h()/std::abs( dalpha);
+                break;
+            }
+            Point3DCL xnew= x - (l*dalpha)*nx;
+            const TetraCL* newtet= tetra;
+            w2b.assign( *tetra);
+            BaryCoordCL newbary= w2b( xnew);
+            try {
+                locate_new_point( x, -dalpha*nx, newtet, newbary, l);
+            }
+            catch (DROPSErrCL e) {
+                continue;
+            }
+            w2b.assign( *newtet);
+
+            // Setup Fnew= locls( newbary)).
+            double Fnew= ls.val( *newtet, newbary);
+
+            // Armijo-rule
+            if (std::abs( Fnew) < std::abs( lsval) + armijo_c_*lsval*slope*dalpha/std::abs( lsval)*l) {
+                tetra= newtet;
+                break;
+            }
+        }
+        x-= (l*dalpha)*nx;
     }
 
     if (inneriter >= maxinneriter_)
