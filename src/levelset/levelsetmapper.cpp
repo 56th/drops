@@ -171,8 +171,6 @@ bool QuaQuaMapperCL::line_search (Point3DCL& x, const Point3DCL& nx, const Tetra
 
 void QuaQuaMapperCL::base_point_with_line_search () const
 {
-    ScopeTimerCL timer( "QuaQuaMapperCL::base_point_with_line_search");
-
     btet= tet;
     bxb= xb;
 
@@ -203,7 +201,6 @@ void QuaQuaMapperCL::base_point_with_line_search () const
 
 void QuaQuaMapperCL::base_point_newton () const
 {
-    ScopeTimerCL timer( "QuaQuaMapperCL::base_point_newton");
 
     btet= tet;
     bxb= xb;
@@ -330,6 +327,7 @@ const QuaQuaMapperCL& QuaQuaMapperCL::base_point () const
 // tet and xb specify the point which is projected to the zero level.
 // On return tet and xb are the resulting base point.
 {
+    ScopeTimerCL scopetimer( "QuaQuaMapperCL::base_point");
     TimerCL timer;
 
     if (btet == 0) {
