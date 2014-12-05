@@ -83,7 +83,7 @@ class QuaQuaMapperCL
     int maxiter_;
     double tol_;
     int maxinneriter_;
-    const double innertol_;
+    double innertol_;
     bool use_line_search_;
     double armijo_c_;
 
@@ -127,6 +127,12 @@ class QuaQuaMapperCL
           base_point_time( 0.), cur_num_outer_iter( 0), min_outer_iter(-1u), max_outer_iter( 0),
           total_outer_iter( 0), total_base_point_calls( 0)
     { P2DiscCL::GetGradientsOnRef( gradrefp2); }
+
+    void set_inner_iter_tol (Uint i, double t) {
+        maxinneriter_= i;
+        innertol_= t;
+        num_inner_iter.resize( i + 1);
+    }
 
     void set_tetra_neighborhoods (TetraToTetrasT& neigborhoods) { neighborhoods_= &neigborhoods; }
 

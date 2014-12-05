@@ -41,12 +41,14 @@
         "Width": 0.1,
         "CoarsestLevel": 0,
         "FinestLevel": 6,
-        "CurvatureFinestLevel": 6
+        "CurvatureFinestLevel": 0
     },
 
     "LevelsetMapper": {
         "Tol": 1e-7,
         "Iter": 30,
+        "InnerTol": 5e-9,
+        "InnerIter": 200,
         "ArmijoConstant": 1e-2,
         "Method": "Newton" // "FixedPointWithLineSearch" // "Newton"
     },

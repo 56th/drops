@@ -628,6 +628,8 @@ int TestAdap (MultiGridCL& mg, ParamCL& p)
             /*tol*/ P.get<double>( "LevelsetMapper.Tol"),
             /*use_line_search*/ P.get<std::string>( "LevelsetMapper.Method") == "FixedPointWithLineSearch",
             /*armijo_c*/ P.get<double>( "LevelsetMapper.ArmijoConstant"));
+        quaqua.set_inner_iter_tol( P.get<int>(    "LevelsetMapper.InnerIter"),
+                                   P.get<double>( "LevelsetMapper.InnerTol"));
 
         TetraAccumulatorTupleCL accus;
         InterfaceCommonDataP2CL cdatap2( lset.Phi, lset.GetBndData(), quaqua, PrincipalLatticeCL::instance( P.get<Uint>( "Subsampling")));
