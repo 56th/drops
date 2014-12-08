@@ -90,7 +90,8 @@ void GetLocalNumbInterface(IdxT* Numb, const TetraCL& s, const IdxDescCL& idx)
 
 InterfaceCommonDataP2CL::InterfaceCommonDataP2CL (const VecDescCL& ls_arg, const BndDataCL<>& lsetbnd_arg,
     const QuaQuaMapperCL& quaquaarg, const PrincipalLatticeCL& lat_arg)
-    : ls( &ls_arg), lsetbnd( &lsetbnd_arg), lat( &lat_arg), ls_loc( lat->vertex_size()), quaqua( quaquaarg)
+    : ls( &ls_arg), lsetbnd( &lsetbnd_arg), lat( &lat_arg), ls_loc( lat->vertex_size()),
+      quaqua( quaquaarg), compute_quaddomains_( true)
 {
     qdom_projected.compute_absdets( true);
     P2DiscCL::GetGradientsOnRef( gradrefp2);

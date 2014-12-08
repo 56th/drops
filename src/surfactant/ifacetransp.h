@@ -200,6 +200,8 @@ class InterfaceCommonDataP2CL : public TetraAccumulatorCL
 
     const PrincipalLatticeCL* lat;
 
+    bool compute_quaddomains_;
+
   public:
     /// common data @{
     LocalP2CL<> locp2_ls;
@@ -226,6 +228,7 @@ class InterfaceCommonDataP2CL : public TetraAccumulatorCL
     bool empty () const { return surf.empty(); }
 
     void compute_absdet (bool b) { qdom_projected.compute_absdets( b); }
+    void compute_quaddomains (bool b) { compute_quaddomains_= b; }
 
     void set_lattice (const PrincipalLatticeCL& newlat) {
         lat= &newlat;
@@ -252,9 +255,11 @@ class InterfaceCommonDataP2CL : public TetraAccumulatorCL
         if (surf.empty())
             return;
 
-        make_CompositeQuad5Domain2D ( qdom, surf, t);
-        quaqua.set_point( &t, BaryCoordCL()); // set the current tetra.
-        qdom_projected.assign( surf, qdom, quaqua);
+        if (compute_quaddomains_) {
+            make_CompositeQuad5Domain2D ( qdom, surf, t);
+            quaqua.set_point( &t, BaryCoordCL()); // set the current tetra.
+            qdom_projected.assign( surf, qdom, quaqua);
+        }
     }
 
     virtual InterfaceCommonDataP2CL* clone (int clone_id) {

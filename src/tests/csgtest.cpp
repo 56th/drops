@@ -174,6 +174,8 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
     instat_scalar_fun_ptr f;
     double f_time;
 
+    bool sample_curvature_;
+
   public:
     OpenMPVar_ZeroInit_Sum_CL<double> f_norm,
            f_int,
@@ -190,7 +192,7 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
     OpenMPVar_MaxInit_Min_CL<double> min_iter;
 
     InterfaceL2AccuP2CL (const InterfaceCommonDataP2CL& cdata, const MultiGridCL& mg_arg, std::string name= std::string())
-        : cdata_( cdata), mg( mg_arg), name_( name), f( 0), f_time( 0.) {}
+        : cdata_( cdata), mg( mg_arg), name_( name), f( 0), f_time( 0.), sample_curvature_( true) {}
     virtual ~InterfaceL2AccuP2CL () {}
 
     void set_name (const std::string& n) { name_= n; }
@@ -198,6 +200,8 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
         f= farg;
         f_time= f_time_arg;
     }
+
+    void set_sample_curvature (bool b) { sample_curvature_= b; }
 
     virtual void begin_accumulation () {
         std::cout << "InterfaceL2AccuP2CL::begin_accumulation";
@@ -273,34 +277,37 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
         }
 
         // Sample the maximal curvature radius in all quadrature points in t.
-        SMatrixCL<3,3> M,
-                       P;
-        double det;
-        GetTrafoTr( M, det, t);
-        SMatrixCL<3,3> Hp2[10];
-        LocalP1CL<Point3DCL> Gp2[10];
-        P2DiscCL::GetHessians( Hp2, M);
-        SMatrixCL<3,3> H;
-        P2DiscCL::GetGradients( Gp2, cdata.gradrefp2, M);
-        Point3DCL G;
+        if (sample_curvature_) {
+            SMatrixCL<3,3> M,
+                           P;
+            double det;
+            GetTrafoTr( M, det, t);
+            SMatrixCL<3,3> Hp2[10];
+            LocalP1CL<Point3DCL> Gp2[10];
+            P2DiscCL::GetHessians( Hp2, M);
+            SMatrixCL<3,3> H;
+            P2DiscCL::GetGradients( Gp2, cdata.gradrefp2, M);
+            Point3DCL G;
 
-        for (Uint d= 0; d < 10; ++d) {
-            H+= Hp2[d]*cdata.locp2_ls[d];
-        }
-        for (Uint i= 0; i < cdata.qdom_projected.vertexes().size(); ++ i) {
-            const TetraBaryPairT& tb= cdata.qdom_projected.vertexes()[i];
-            if (tb.first != &t)
-                continue;
-            G= Point3DCL();
-            for (Uint d= 0; d < 10; ++d)
-               G+= Gp2[d]( tb.second)*cdata.locp2_ls[d];
-            P= eye<3,3>() - outer_product(G/G.norm_sq(), G);
-            M= P*H*P/G.norm();
-            cyclic_jacobi( M, 1e-6);
-            for (Uint j= 0; j < 3; ++j)
-                max_curv.value( tid)= std::max( max_curv.value( tid), M(j, j));
+            for (Uint d= 0; d < 10; ++d) {
+                H+= Hp2[d]*cdata.locp2_ls[d];
+            }
+            for (Uint i= 0; i < cdata.qdom_projected.vertexes().size(); ++ i) {
+                const TetraBaryPairT& tb= cdata.qdom_projected.vertexes()[i];
+                if (tb.first != &t)
+                    continue;
+                G= Point3DCL();
+                for (Uint d= 0; d < 10; ++d)
+                    G+= Gp2[d]( tb.second)*cdata.locp2_ls[d];
+                P= eye<3,3>() - outer_product(G/G.norm_sq(), G);
+                M= P*H*P/G.norm();
+                cyclic_jacobi( M, 1e-6);
+                for (Uint j= 0; j < 3; ++j)
+                    max_curv.value( tid)= std::max( max_curv.value( tid), M(j, j));
+            }
         }
 
+        // Update QuaQua statistics
         time_dh.value( tid)= cdata.quaqua.base_point_time;
         time_locate.value( tid)= cdata.quaqua.locate_new_point_time;
         iter_dh.value( tid)= cdata.quaqua.total_outer_iter;
@@ -645,8 +652,10 @@ int TestAdap (MultiGridCL& mg, ParamCL& p)
 
         TetraAccumulatorTupleCL accus;
         InterfaceCommonDataP2CL cdatap2( lset.Phi, lset.GetBndData(), quaqua, PrincipalLatticeCL::instance( P.get<Uint>( "Subsampling")));
+        cdatap2.compute_quaddomains( P.get<std::string>("Testcase") == "area");
         accus.push_back( &cdatap2);
         InterfaceL2AccuP2CL l2accu( cdatap2, mg, "Area-Accumulator");
+        l2accu.set_sample_curvature(P.get<std::string>("Testcase") == "area" && P.get<bool>("SampleCurvature") == true);
         accus.push_back( &l2accu);
 //         InterfaceDebugP2CL p2debugaccu( cdatap2);
 //         accus.push_back( &p2debugaccu);
