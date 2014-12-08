@@ -200,6 +200,7 @@ class ExtIdxDescCL
     const BndDataCL<>* lsetbnd_;
 
 #ifdef _PAR
+  public:
     class CommunicateXFEMNumbCL
     {
     private:
@@ -210,6 +211,7 @@ class ExtIdxDescCL
         bool Scatter( DiST::TransferableCL& t, const size_t numData, DiST::MPIistreamCL& r);
         void Call();
     };
+  private:
 #endif
 
 
@@ -235,6 +237,11 @@ class ExtIdxDescCL
     IdxT& operator[]( const IdxT i )       { return Xidx_[i]; }
     /// Returns number of DoFs for standard FE space
     IdxT  GetNumUnknownsStdFE()      const { return Xidx_.size(); }
+
+    /// Reset size of Xidx_
+    void ResetExtIdx( IdxT size, IdxT val) { Xidx_.assign( size, val); }
+    /// Swap old and new Xidx_
+    void SwapExtIdxOldNew (){ Xidx_.swap(Xidx_old_);}
 
     /// \brief Replace vector entries to account for different numbering of extended DoFs after call of UpdateXNumbering(...)
     void Old2New( VecDescCL* );
