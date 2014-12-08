@@ -335,6 +335,8 @@ class IdxDescCL: public FE_InfoCL
     Uint TriangLevel() const { return TriangLevel_; }
     /// \brief total number of unknowns on the triangulation
     IdxT NumUnknowns() const { return NumUnknowns_; }
+    /// \brief change total number of unknowns on the triangulation (e.g. if xfem-type update took place)
+    void ChangeNumUnknowns(IdxT newval) { NumUnknowns_ = newval; }
     /// \brief Compare two IdxDescCL-objects. If a multigrid is given via mg, the
     ///     unknown-numbers on it are compared, too.
     static bool

@@ -411,22 +411,27 @@ void IdxDescCL::CreateNumbering( Uint level, MultiGridCL& mg, const VecDescCL* l
     }
     else {
         CreateNumbStdFE( level, mg);
-        if (IsExtended()) {
+        if (IsExtended() && !IsExtendedSpaceTime()) {
             if (lsetp == 0){
                 std::cout << "I am extended" << std::endl;
                 throw DROPSErrCL("IdxDescCL::CreateNumbering: no level set function for XFEM numbering given");
             }
             NumUnknowns_= extIdx_.UpdateXNumbering( this, mg, *lsetp, *lsetbnd, true);
         }
+        else if (IsExtendedSpaceTime()){
+            if (lsetp == 0) throw DROPSErrCL("IdxDescCL::CreateNumbering: no level set function for XFEM numbering given");
+            std::cout << " there should be a STXNumbering coming ... ";
+        }
     }
 #ifdef _PAR
-    ex_->CreateList(mg, this, true, true);
+    if (!IsExtendedSpaceTime())
+        ex_->CreateList(mg, this, true, true);
 #endif
 }
 
 void IdxDescCL::UpdateXNumbering( MultiGridCL& mg, const VecDescCL& lset, const BndDataCL<>& lsetbnd)
 {
-    if (IsExtended()) {
+    if (IsExtended() && !IsExtendedSpaceTime()) {
         NumUnknowns_= extIdx_.UpdateXNumbering( this, mg, lset, lsetbnd, false);
 #ifdef _PAR
         ex_->CreateList(mg, this, true, true);
