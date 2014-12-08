@@ -34,8 +34,23 @@ const Uint        IdxDescCL::InvalidIdx = std::numeric_limits<Uint>::max();
 std::vector<bool> IdxDescCL::IdxFree;
 
 IdxDescCL::IdxDescCL( FiniteElementT fe, const BndCondCL& bnd, match_fun match, double omit_bound)
-    : FE_InfoCL( fe), Idx_( GetFreeIdx()), TriangLevel_( 0), NumUnknowns_( 0), Bnd_(bnd),
-      extIdx_( omit_bound != -99 ? omit_bound : IsExtended() ? 1./32. : -1.) // default value is 1./32. for XFEM and -1 otherwise
+    : FE_InfoCL( fe), Idx_( GetFreeIdx()), TriangLevel_( 0), NumUnknowns_( 0), Bnd_(bnd), Bnd_aux_(bnd),
+      extIdx_( omit_bound != -99 ? omit_bound : IsExtended() ? 1./32. : -1.) 
+// default value for omit_bound is 1./32. for XFEM and -1 otherwise
+{
+    Bnd_.SetMatchingFunction( match);
+#ifdef _PAR
+    ex_= new ExchangeCL();
+#else
+    ex_= new DummyExchangeCL();
+#endif
+}
+
+IdxDescCL::IdxDescCL( FiniteElementT fe, const BndCondCL& bnd1, const BndCondCL& bnd2, 
+                      match_fun match, double omit_bound)
+    : FE_InfoCL( fe), Idx_( GetFreeIdx()), TriangLevel_( 0), NumUnknowns_( 0), Bnd_(bnd1), Bnd_aux_(bnd2),
+      extIdx_( omit_bound != -99 ? omit_bound : IsExtended() ? 1./32. : -1.) 
+// default value for omit_bound is 1./32. for XFEM and -1 otherwise
 {
     Bnd_.SetMatchingFunction( match);
 #ifdef _PAR
@@ -66,7 +81,7 @@ Uint IdxDescCL::GetFreeIdx()
 
 IdxDescCL::IdxDescCL( const IdxDescCL& orig)
  : FE_InfoCL(orig), Idx_(orig.Idx_), TriangLevel_(orig.TriangLevel_), NumUnknowns_(orig.NumUnknowns_),
-   Bnd_(orig.Bnd_), extIdx_(orig.extIdx_)
+   Bnd_(orig.Bnd_), Bnd_aux_(orig.Bnd_aux_), extIdx_(orig.extIdx_)
 {
     // invalidate orig
     const_cast<IdxDescCL&>(orig).Idx_= InvalidIdx;
@@ -420,6 +435,8 @@ void IdxDescCL::CreateNumbering( Uint level, MultiGridCL& mg, const VecDescCL* l
         }
         else if (IsExtendedSpaceTime()){
             if (lsetp == 0) throw DROPSErrCL("IdxDescCL::CreateNumbering: no level set function for XFEM numbering given");
+            //_NumUnknowns_= extIdx_.UpdateSTXNumbering( this, mg, *lsetp, *lsetp_new, *lsetbnd, true);
+            // throw DROPSErrCL("Not yet... ");
             std::cout << " there should be a STXNumbering coming ... ";
         }
     }
@@ -442,11 +459,22 @@ void IdxDescCL::UpdateXNumbering( MultiGridCL& mg, const VecDescCL& lset, const 
 void IdxDescCL::CreateNumbering( Uint level, MultiGridCL& mg, const BndCondCL& Bnd,
     match_fun match, const VecDescCL* lsetp, const BndDataCL<>* lsetbnd)
 {
+    CreateNumbering( level, mg, Bnd, Bnd, match, lsetp, lsetbnd);
+}
+
+void IdxDescCL::CreateNumbering( Uint level, MultiGridCL& mg, const BndCondCL& Bnd, const BndCondCL& Bnd_aux,
+    match_fun match, const VecDescCL* lsetp, const BndDataCL<>* lsetbnd)
+{
     Bnd_= Bnd;
+    Bnd_aux_= Bnd_aux;
     if (match)
+    {
         Bnd_.SetMatchingFunction( match);
+        Bnd_aux_.SetMatchingFunction( match);
+    }
     CreateNumbering( level, mg, lsetp, lsetbnd);
 }
+
 
 void IdxDescCL::CreateNumbering( Uint level, MultiGridCL& mg, const IdxDescCL& baseIdx,
     const VecDescCL* lsetp, const BndDataCL<>* lsetbnd)

@@ -282,6 +282,7 @@ class IdxDescCL: public FE_InfoCL
     Uint                     TriangLevel_; ///< Triangulation of the index.
     IdxT                     NumUnknowns_; ///< total number of unknowns on the triangulation
     BndCondCL                Bnd_;         ///< boundary conditions and  matching function for periodic boundaries
+    BndCondCL                Bnd_aux_;     ///< auxiliary boundary conditions (second phase)
     ExtIdxDescCL             extIdx_;      ///< extended index for XFEM
 
 #ifdef _PAR
@@ -303,6 +304,7 @@ class IdxDescCL: public FE_InfoCL
     /// \brief The constructor uses the lowest available index for the
     ///     numbering. The triangulation level is initialized as 0.
     IdxDescCL( FiniteElementT fe= P1_FE, const BndCondCL& bnd= BndCondCL(0), match_fun match=0, double omit_bound=-99);
+    IdxDescCL( FiniteElementT fe, const BndCondCL& bnd, const BndCondCL& bnd_aux, match_fun match, double omit_bound);
     /// \brief The copy will inherit the index number, whereas the index
     ///     of the original will be invalidated.
     IdxDescCL( const IdxDescCL& orig);
@@ -348,6 +350,7 @@ class IdxDescCL: public FE_InfoCL
     void CreateNumbering( Uint level, MultiGridCL& mg, const VecDescCL* lsetp= 0, const BndDataCL<>* lsetbnd =0);
     /// \brief Used to number unknowns and store boundary condition and matching function.
     void CreateNumbering( Uint level, MultiGridCL& mg, const BndCondCL& Bnd, match_fun match= 0, const VecDescCL* lsetp= 0, const BndDataCL<>* lsetbnd =0);
+    void CreateNumbering( Uint level, MultiGridCL& mg, const BndCondCL& Bnd, const BndCondCL& Bnd_aux, match_fun match= 0, const VecDescCL* lsetp= 0, const BndDataCL<>* lsetbnd =0);
     /// \brief Used to number unknowns taking boundary condition and matching function from \a baseIdx
     void CreateNumbering( Uint level, MultiGridCL& mg, const IdxDescCL& baseIdx, const VecDescCL* lsetp= 0, const BndDataCL<>* lsetbnd =0);
     /// \brief Update numbering of extended DoFs.
