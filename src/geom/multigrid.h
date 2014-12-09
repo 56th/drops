@@ -580,6 +580,8 @@ template <class SimplexT>
     const int level= StdIndex( lvl);
     Assert ( level >= 0 && level < static_cast<int>( mg_.GetNumLevel()),
         DROPSErrCL( "TriangCL::MaybeCreate: Wrong level."), DebugContainerC);
+#   pragma omp critical(TriangCL_MaybeCreate)
+  {
     if (triang_.size() != mg_.GetNumLevel()) {
         triang_.clear();
         triang_.resize( mg_.GetNumLevel());
@@ -589,6 +591,7 @@ template <class SimplexT>
         // Append a zero-pointer as explicit end-iterator of the sequence.
         triang_[level].push_back( 0);
     }
+  }
 }
 
 
