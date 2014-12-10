@@ -54,6 +54,7 @@
         "InnerTol": 5e-9,
         "InnerIter": 50,
         "ArmijoConstant": 1e-2,
+        "MaxDampingSteps": 5,
         "Method": "Newton" //"FixedPointWithLineSearch" // "Newton"
     },
 
