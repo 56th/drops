@@ -138,7 +138,7 @@ bool QuaQuaMapperCL::line_search (Point3DCL& x, const Point3DCL& nx, const Tetra
         l= std::min( 1., 0.5*cache_.get_h()/std::abs( dalpha));
         Uint j;
         found_newtet= false;
-        for (j= 0; j < 10; ++j, l*= 0.5) {
+        for (j= 0; j < max_damping_steps_; ++j, l*= 0.5) {
             if (l < 1e-7) {
                 std::cerr << "QuaQuaMapperCL::line_search: Too much damping. inneriter: " << inneriter <<  " x: " << x << " dalpha: " << dalpha << " ls(x): " << ls.val( *tetra, bary) << " l: " << l << " slope: " << slope << std::endl;
             }
@@ -288,7 +288,7 @@ void QuaQuaMapperCL::base_point_newton () const
         l= std::min( 1., 0.5*cache_.get_h()/dx.norm());
         Uint j;
         found_newtet= false;
-        for (j= 0; j < 10; ++j, l*= 0.5) {
+        for (j= 0; j < max_damping_steps_; ++j, l*= 0.5) {
             if (l < 1e-7) {
                 std::cerr << "QuaQuaMapperCL::base_point_newton: Too much damping. iter: " << iter << " x0: " << x0 << " x: " << x << " dx: " << dx << " ls(x): " << ls.val( *btet, bxb) << " l: " << l << " s: " << s << " ghnorm: " << gh.norm() << " g_ls: " << g_ls << std::endl;
             }

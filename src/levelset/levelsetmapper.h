@@ -83,6 +83,7 @@ class QuaQuaMapperCL
     double innertol_;
     bool use_line_search_;
     double armijo_c_;
+    Uint max_damping_steps_;
 
     // The level set function.
     NoBndDataCL<> nobnddata;
@@ -114,9 +115,9 @@ class QuaQuaMapperCL
     void base_point_newton () const;
 
   public:
-    QuaQuaMapperCL (const MultiGridCL& mg, VecDescCL& lsarg, const VecDescCL& ls_grad_recarg, TetraToTetrasT* neighborhoods= 0, int maxiter= 100, double tol= 1e-7, bool use_line_search= true, double armijo_c= 1e-4)
+    QuaQuaMapperCL (const MultiGridCL& mg, VecDescCL& lsarg, const VecDescCL& ls_grad_recarg, TetraToTetrasT* neighborhoods= 0, int maxiter= 100, double tol= 1e-7, bool use_line_search= true, double armijo_c= 1e-4, Uint max_damping_steps= 8)
         : maxiter_( maxiter), tol_( tol), maxinneriter_( 100), innertol_( 5e-9),
-          use_line_search_( use_line_search), armijo_c_( armijo_c), 
+          use_line_search_( use_line_search), armijo_c_( armijo_c), max_damping_steps_( max_damping_steps),
           ls( &lsarg, &nobnddata, &mg), ls_grad_rec( &ls_grad_recarg, &nobnddata_vec, &mg),
           neighborhoods_( neighborhoods), locator_( mg, lsarg.GetLevel(), /*greedy*/ false),
           cache_( ls, ls_grad_rec, gradrefp2), tet( 0), btet( 0), have_dph( false),

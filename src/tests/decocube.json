@@ -50,6 +50,7 @@
         "InnerTol": 5e-9,
         "InnerIter": 200,
         "ArmijoConstant": 1e-2,
+        "MaxDampingSteps": 10,
         "Method": "Newton" // "FixedPointWithLineSearch" // "Newton"
     },
 
@@ -58,5 +59,7 @@
         "VTKDir":  "."
     },
 
-    "Subsampling": 2
+    "Subsampling": 2,
+    "Testcase": "redistancing, // "area", // "redistancing"
+    "SampleCurvature": false
 }
