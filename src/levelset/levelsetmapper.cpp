@@ -186,6 +186,7 @@ void QuaQuaMapperCL::base_point_with_line_search () const
     btet= tet;
     bxb= xb;
 
+    double alpha= 0.;
     Point3DCL x, xold, x0; // World coordinates of current and previous xb and of the inital point.
     x0= x= GetWorldCoord( *btet, bxb);
 
@@ -198,7 +199,9 @@ void QuaQuaMapperCL::base_point_with_line_search () const
         xold= x;
         n=  ls_grad_rec.val( *btet, bxb);
         n/= norm( n);
+        x= x0 - alpha*n;
         const bool found_zero_level= line_search( x, n, btet, bxb);
+        alpha= inner_prod( n, x0 - x);
 
         if (norm( xold - x) < tol_ && found_zero_level)
             break;
