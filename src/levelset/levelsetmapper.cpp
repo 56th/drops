@@ -221,14 +221,22 @@ void QuaQuaMapperCL::base_point_newton () const
     btet= tet;
     bxb= xb;
 
-    cache_.set_tetra( btet);
-    Point3DCL x0, x, dx; // World coordinates of initial and current bxb and the coordinate part of fdx.
-    x0= x= GetWorldCoord( *btet, bxb);
     SVectorCL<4> F,   // The function of which we search a root, ( x0 - x - s*gh(x), -ls(x) ).
                  fdx; // Newton correction.
     double s= 0., // scaled quasi-distance
            ds,    // increment part of fdx
            l;     // Damping factor for line search.
+
+    Point3DCL x0, x, dx; // World coordinates of initial and current bxb and the coordinate part of fdx.
+    x0= x= GetWorldCoord( *btet, bxb);
+
+//     cache_.set_tetra( btet);
+//     {
+//         Point3DCL gh( ls_grad_rec.val( *btet, bxb));
+//         line_search( x, gh/gh.norm(), btet, bxb);
+//     }
+
+    cache_.set_tetra( btet);
 
     QRDecompCL<4,4> qr;
     SMatrixCL<4,4>& M= qr.GetMatrix();
@@ -250,6 +258,9 @@ void QuaQuaMapperCL::base_point_newton () const
 
     // Setup initial F= (x0 - x - s*gh, -locls( bxb))= (0, -locls( bxb)).
     gh= loc_gh( bxb); // This is needed for the setup of M in the first iteration.
+//     s= inner_prod( gh, x0 - x)/gh.norm_sq();
+//     for (Uint i= 0; i < 3; ++i)
+//         F[i]= x0[i] - x[i] - s*gh[i];
     F[3]= -locls( bxb);
 
     int iter;
