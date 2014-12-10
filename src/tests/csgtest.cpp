@@ -176,6 +176,8 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
 
     bool sample_curvature_;
 
+    VecDescCL* redist_err_vd;
+
   public:
     OpenMPVar_ZeroInit_Sum_CL<double> f_norm,
            f_int,
@@ -192,7 +194,7 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
     OpenMPVar_MaxInit_Min_CL<double> min_iter;
 
     InterfaceL2AccuP2CL (const InterfaceCommonDataP2CL& cdata, const MultiGridCL& mg_arg, std::string name= std::string())
-        : cdata_( cdata), mg( mg_arg), name_( name), f( 0), f_time( 0.), sample_curvature_( true) {}
+        : cdata_( cdata), mg( mg_arg), name_( name), f( 0), f_time( 0.), sample_curvature_( true), redist_err_vd( 0) {}
     virtual ~InterfaceL2AccuP2CL () {}
 
     void set_name (const std::string& n) { name_= n; }
@@ -202,11 +204,15 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
     }
 
     void set_sample_curvature (bool b) { sample_curvature_= b; }
+    void compute_redist_err (VecDescCL* vd) { redist_err_vd= vd; }
 
     virtual void begin_accumulation () {
         std::cout << "InterfaceL2AccuP2CL::begin_accumulation";
         if (name_ != std::string())
             std::cout << " for \"" << name_ << "\".\n";
+
+        if (redist_err_vd)
+            redist_err_vd->Data= 128.; // std::numeric_limits<double>::max();
 
         f_norm.scatter();
         f_int.scatter();
@@ -247,15 +253,22 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
         std::cout << "\n\tmax_curv: " << max_curv.value();
         max_iter.reduce();
         std::cout << "\n\tmax_iter: " << max_iter.value();
+        if (redist_err_vd) {
+            double tmp= 0.;
+            for (size_t i= 0; i < redist_err_vd->Data.size(); ++i)
+                if (redist_err_vd->Data[i] != 128. /*std::numeric_limits<double>::max()*/ && std::abs( redist_err_vd->Data[i]) > tmp)
+                    tmp= std::abs( redist_err_vd->Data[i]);
+            std::cout << "\n\tredist_err: " << tmp;
+        }
         min_iter.reduce();
         std::cout << "\n\tmin_iter: " << min_iter.value();
-        if (f != 0) {
-            f_norm.reduce();
-            f_norm.value()= std::sqrt( f_norm.value());
-            f_int.reduce();
-            std::cout << "\n\t|| f ||_L2: " << f_norm.value()
-                      << "\t integral: " << f_int.value();
-        }
+//         if (f != 0) {
+//             f_norm.reduce();
+//             f_norm.value()= std::sqrt( f_norm.value());
+//             f_int.reduce();
+//             std::cout << "\n\t|| f ||_L2: " << f_norm.value()
+//                       << "\t integral: " << f_int.value();
+//         }
         std::cout << std::endl;
     }
 
@@ -270,11 +283,11 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
         areap1.value( tid)+= quad_2D( std::valarray<double>( 1., cdata.qdom.vertex_size()), cdata.qdom);
 
         std::valarray<double> qf;
-        if (f != 0) {
-            resize_and_evaluate_on_vertexes( f, cdata.qdom_projected.vertexes(), f_time, qf);
-            f_int.value( tid)+= quad_2D( cdata.qdom_projected.absdets()*qf, cdata.qdom);
-            f_norm.value( tid)+= quad_2D( cdata.qdom_projected.absdets()*qf*qf, cdata.qdom);
-        }
+//         if (f != 0) {
+//             resize_and_evaluate_on_vertexes( f, cdata.qdom_projected.vertexes(), f_time, qf);
+//             f_int.value( tid)+= quad_2D( cdata.qdom_projected.absdets()*qf, cdata.qdom);
+//             f_norm.value( tid)+= quad_2D( cdata.qdom_projected.absdets()*qf*qf, cdata.qdom);
+//         }
 
         // Sample the maximal curvature radius in all quadrature points in t.
         if (sample_curvature_) {
@@ -304,6 +317,21 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
                 cyclic_jacobi( M, 1e-6);
                 for (Uint j= 0; j < 3; ++j)
                     max_curv.value( tid)= std::max( max_curv.value( tid), M(j, j));
+            }
+        }
+
+        if (redist_err_vd) {
+            for (Uint i= 0; i < 10; ++i) {
+                const IdxT idx= i < 4 ? t.GetVertex( i)->  Unknowns( redist_err_vd->RowIdx->GetIdx())
+                                      : t.GetEdge( i - 4)->Unknowns( redist_err_vd->RowIdx->GetIdx());
+                if (redist_err_vd->Data[idx] != 128. /*std::numeric_limits<double>::max()*/)
+                    continue;
+                const BaryCoordCL& b= i < 4 ? std_basis<4>( i + 1)
+                                            : BaryCenter( std_basis<4>( VertOfEdge( i - 4, 0) + 1), std_basis<4>( VertOfEdge( i - 4, 1) + 1));
+                const Point3DCL& p= i < 4 ? t.GetVertex( i)->GetCoord()
+                                          : GetBaryCenter( *t.GetEdge( i - 4));
+                cdata.quaqua.set_point( &t, b);
+                redist_err_vd->Data[idx]= std::abs( cdata.quaqua.base_point().get_dh() - f( p, 0.));
             }
         }
 
@@ -388,6 +416,18 @@ double deco_cube (const Point3DCL& p, double)
 //     return v;
 }
 RegisterScalarFunction reg_deco_cube( "deco_cube", &deco_cube);
+
+const CSG::BodyCL* torus_body; // The (unperturbed) distance function
+double torus_distance (const Point3DCL& p, double)
+{
+    return torus_body[0]( p, 0.);
+}
+double perturbed_torus_alpha; // perturbation parameter
+double perturbed_torus (const Point3DCL& p, double)
+{
+    return torus_body[0]( p, 0.)*(9. + 4.*std::cos( perturbed_torus_alpha*p[0]*p[1]/p.norm()));
+}
+RegisterScalarFunction reg_perturbed_torus( "perturbed_torus", &perturbed_torus);
 
 class LevelsetReinitCL : public MGObserverCL
 {
@@ -593,13 +633,16 @@ int TestAdap (MultiGridCL& mg, ParamCL& p)
     adap.push_back( &lsetreinit);
 
     IdxDescCL p1idx;
+    IdxDescCL p2idx( P2_FE);
     IdxDescCL vecp2idx( vecP2_FE);
+    NoBndDataCL<> p2bnd;
     NoBndDataCL<Point3DCL> vecp2bnd;
     VecDescCL ierr( &p1idx),
               ierrg( &p1idx),
               ierrq( &p1idx),
               idist( &p1idx),
-              lsgradrec( &vecp2idx);
+              lsgradrec( &vecp2idx),
+              redist_err( &p2idx);
 
     const size_t num= std::distance( p.begin(), p.end());
 
@@ -621,6 +664,7 @@ int TestAdap (MultiGridCL& mg, ParamCL& p)
     vtkwriter.Register( make_VTKScalar( make_P1Eval( mg, lsbnd, ierrq), "error-quotient") );
     vtkwriter.Register( make_VTKScalar( make_P1Eval( mg, lsbnd, idist), "dh") );
     vtkwriter.Register( make_VTKVector( make_P2Eval( mg, vecp2bnd, lsgradrec), "ls_grad_rec") );
+    vtkwriter.Register( make_VTKScalar( make_P2Eval( mg, p2bnd, redist_err), "redist_err") );
 
     // InterfaceApproxErrAccuCL accu0( lset, &ierr, &ierrg, &ierrq);
 //     InterfaceApproxErrorAccuCL accu0( lset, &ierr, &ierrg, &ierrq, &idist, true);
@@ -635,12 +679,14 @@ int TestAdap (MultiGridCL& mg, ParamCL& p)
         lset.Init( csg_fun);
         adap.UpdateTriang();
         p1idx.CreateNumbering( mg.GetLastLevel(), mg, lsbnd);
+        p2idx.CreateNumbering( mg.GetLastLevel(), mg, p2bnd);
         vecp2idx.CreateNumbering( mg.GetLastLevel(), mg, vecp2bnd);
         ierr.SetIdx( &p1idx);
         ierrg.SetIdx( &p1idx);
         ierrq.SetIdx( &p1idx);
         idist.SetIdx( &p1idx);
         lsgradrec.SetIdx( &vecp2idx);
+        redist_err.SetIdx( &p2idx);
         averaging_P2_gradient_recovery( mg, lset.Phi, lset.GetBndData(), lsgradrec);
         QuaQuaMapperCL quaqua( mg, lset.Phi, lsgradrec, /*neighborhoods*/ 0,
             /*maxiter*/ P.get<int>( "LevelsetMapper.Iter"),
@@ -657,14 +703,23 @@ int TestAdap (MultiGridCL& mg, ParamCL& p)
         accus.push_back( &cdatap2);
         InterfaceL2AccuP2CL l2accu( cdatap2, mg, "Area-Accumulator");
         l2accu.set_sample_curvature(P.get<std::string>("Testcase") == "area" && P.get<bool>("SampleCurvature") == true);
+        if (P.get<std::string>("Testcase") == "redistancing") {
+            l2accu.compute_redist_err( &redist_err);
+            l2accu.set_function( &torus_distance);
+        }
         accus.push_back( &l2accu);
 //         InterfaceDebugP2CL p2debugaccu( cdatap2);
 //         accus.push_back( &p2debugaccu);
 //         accumulate( accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetMatchingFunction(), ifacep2idx.GetBndInfo());
-        const MultiGridCL& cmg= mg; // To get the const-iterators.
-        ColorClassesCL cc;
-        cc.make_single_color_class( cmg.GetTriangTetraBegin(), cmg.GetTriangTetraEnd());
-        accus( cc);
+        if (P.get<std::string>("Testcase") == "area") {
+            const MultiGridCL& cmg= mg; // To get the const-iterators.
+            ColorClassesCL cc;
+            cc.make_single_color_class( cmg.GetTriangTetraBegin(), cmg.GetTriangTetraEnd());
+            accus( cc);
+        }
+        else {
+            accumulate( accus, mg, p2idx.TriangLevel(), p2idx.GetMatchingFunction(), p2idx.GetBndInfo());
+        }
         std::cout << "Distribution of outer iterations in thread 0:\n";
         seq_out( cdatap2.quaqua.num_outer_iter.begin(), cdatap2.quaqua.num_outer_iter.end(), std::cout);
         std::cout << "Distribution of inner iterations in thread 0:\n";
@@ -679,6 +734,7 @@ int TestAdap (MultiGridCL& mg, ParamCL& p)
 
         lset.idx.DeleteNumbering( mg);
         p1idx.DeleteNumbering( mg);
+        p2idx.DeleteNumbering( mg);
         vecp2idx.DeleteNumbering( mg);
 
         delete thebody;
@@ -711,12 +767,19 @@ int main (int argc, char** argv)
     deco_cube_radius= P.get<double>( "deco_cube_parameters.radius");
     deco_cube_shift=  P.get<double>( "deco_cube_parameters.shift");
 
+    if (P.get<std::string>( "Testcase") == "redistancing") {
+        torus_body= CSG::body_builder( P.get_child( "perturbed_torus_parameters.Torus"));
+        perturbed_torus_alpha= P.get<double>( "perturbed_torus_parameters.alpha");
+    }
+
     std::auto_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P.get_child( "Domain")));
     DROPS::MultiGridCL mg( *builder);
-    MarkAll( mg);
-    mg.Refine();
-    MarkAll( mg);
-    mg.Refine();
+    if (P.get<std::string>( "Testcase") == "area") {
+        MarkAll( mg);
+        mg.Refine();
+        MarkAll( mg);
+        mg.Refine();
+    }
 
     // If the key CSGLevelsets.File exists and is not empty, read the examples from the given file; otherwise, assume that the section CSGLevelsets itself contains the examples.
     std::string examples;
@@ -735,6 +798,9 @@ int main (int argc, char** argv)
     }
 //     return TestExamples( mg, ex);
     TestAdap( mg, ex);
+
+    if (P.get<std::string>( "Testcase") == "redistancing")
+        delete torus_body;
 
     rusage usage;
     getrusage( RUSAGE_SELF, &usage);
