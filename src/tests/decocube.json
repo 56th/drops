@@ -60,6 +60,6 @@
     },
 
     "Subsampling": 2,
-    "Testcase": "redistancing, // "area", // "redistancing"
+    "Testcase": "area", // "redistancing"
     "SampleCurvature": false
 }
