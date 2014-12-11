@@ -135,12 +135,14 @@ void LinThetaScheme2PhaseCL<LsetSolverT>::SolveLsNs()
     std::cout << "Discretizing Rhs/Curv took "<< duration <<" sec.\n";
 
     time.Reset();
-    //solver_.Solve( *mat_, Stokes_.B.Data,
-    //    Stokes_.v, Stokes_.p.Data,
-    //    rhs_, *cplN_, Stokes_.c.Data, Stokes_.vel_idx.GetEx(), Stokes_.pr_idx.GetEx(), /*alpha*/ stk_theta_*nonlinear_);
-    solver_.Solve( *mat_, Stokes_.B.Data, Stokes_.C.Data, 
+    solver_.Solve( *mat_, Stokes_.B.Data,
         Stokes_.v, Stokes_.p.Data,
         rhs_, *cplN_, Stokes_.c.Data, Stokes_.vel_idx.GetEx(), Stokes_.pr_idx.GetEx(), /*alpha*/ stk_theta_*nonlinear_);
+    
+    //Only specially designed pressure preconditioner works with iterative solvers
+    //solver_.Solve( *mat_, Stokes_.B.Data, Stokes_.C.Data, 
+    //    Stokes_.v, Stokes_.p.Data,
+    //    rhs_, *cplN_, Stokes_.c.Data, Stokes_.vel_idx.GetEx(), Stokes_.pr_idx.GetEx(), /*alpha*/ stk_theta_*nonlinear_);
     time.Stop();
     duration=time.GetTime();
     std::cout << "Solving NavierStokes: residual: " << solver_.GetResid()
