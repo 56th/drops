@@ -473,7 +473,7 @@ namespace InstatSlip{
 		if(first){
 			origin = P.get<DROPS::Point3DCL>("Exp.PosDrop");
 			VelR = P.get<DROPS::Point3DCL>("Exp.RadDrop");
-			radius = 0.14736126;    //VelR[0]; //assume the droplet is spherical;
+			radius = 0.36840315;    //VelR[0]; assume the droplet is spherical;
 			surftension = P.get<double>("SurfTens.SurfTension");
 			first = false;
 		}
@@ -512,6 +512,32 @@ namespace InstatSlip{
 	static DROPS::RegisterScalarFunction regscatestpr("TestSlipPressure",Pressure);
 
 }
+
+namespace AnalPressure{
+
+	double Pressure (const DROPS::Point3DCL& , double t)
+	{
+		double ret=0;		
+		static bool first = true;
+		static DROPS::Point3DCL origin, VelR;
+		static double radius, surftension;
+		if(first){
+			origin = P.get<DROPS::Point3DCL>("Exp.PosDrop");
+			VelR = P.get<DROPS::Point3DCL>("Exp.RadDrop");
+			radius = P.get<double>("Exp.EquiRadius");
+			surftension = P.get<double>("SurfTens.SurfTension");
+			first = false;
+		}
+		
+		if( t>3. && t<5 )
+			ret = 0;
+		else if(t >5.)
+			ret = 2.*surftension/radius;
+		return ret;
+	}
+    static DROPS::RegisterScalarFunction regscatestpr("AnalPressure",Pressure);
+}
+
 
 namespace StatSlip{
 
@@ -737,3 +763,4 @@ namespace curvebndDomain{
 	static DROPS::RegisterVectorFunction regunitoutnomalsphere("OutNormalSphere", OutNormalSphere);
 
 }
+
