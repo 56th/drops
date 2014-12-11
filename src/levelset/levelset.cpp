@@ -755,6 +755,17 @@ class ImprovedYoungForceAccumulatorCL : public  TetraAccumulatorCL
     TetraAccumulatorCL* clone (int /*tid*/) { return new ImprovedYoungForceAccumulatorCL ( *this); };
 };
 
+
+Point3DCL Hacknormal(Point3DCL mid)
+{
+    Point3DCL P = mid;
+    double length = std::sqrt(P[0]*P[0] + P[2]*P[2]);
+    P[0] /=length;
+    P[2] /=length;
+    P[1] = 0;
+    return P;
+}
+
 void ImprovedYoungForceAccumulatorCL::visit ( const TetraCL& t)
 {
 	SpeBnd=false;
@@ -812,33 +823,33 @@ void ImprovedYoungForceAccumulatorCL::visit ( const TetraCL& t)
         Uint ncl=triangle.GetNumMCL();
         for(Uint i=0;i<ncl;i++)
         {
-        	length = triangle.GetInfoMCL(i,Barys[0],Barys[1],pt0,pt1);
-        	for(Uint j=0;j<5;j++)
-        	{
-        		normal_mcl[j] = triangle.GetImprovedMCLNormal(i,(qupt[j]+1)/2);
-        		quadBarys[j]=(Barys[0]+Barys[1])/2+qupt[j]*(Barys[1]-Barys[0])/2;
-        		midpt=(pt0+pt1)/2 + qupt[j]*(pt1-pt0)/2;
-        		costheta[j]=triangle.IsSymmType(i) ? 0 : cos(angle_(midpt,0));
-        		sintheta_D[j]=triangle.IsSymmType(i) ? 1 : sin(triangle.GetImprovedActualContactAngle(i,(qupt[j]+1)/2));
-        		outnormalOnMcl[j]=outnormal_(midpt,0);
-        	}
-        	for (int v=0; v<10; ++v)
-        	{
-				Point3DCL value;
-        		const IdxT Numbv= v<10 ? Numb[v] : (velXfem && Numb[v-10]!=NoIdx ? f.RowIdx->GetXidx()[Numb[v-10]] : NoIdx);
-        		if (Numbv==NoIdx) continue;
-        		//5 points Gauss–Legendre quadrature is used.
-				for (int j=0; j<5; j++)
-				{
-					value += weight[j]*costheta[j]*phi[v](quadBarys[j])*normal_mcl[j];       // cos (theta_e) v \dot tau_cl
-					value += weight[j]*sintheta_D[j]*phi[v](quadBarys[j])*outnormalOnMcl[j]; // sin (theta_D) v \dot n
-				}
-			    value = value * length/2;
-        		for (int j=0; j<3; ++j)
-        		{
-        			f.Data[Numbv+j] += sigma_*value[j];
-        		}
-        	}
+            length = triangle.GetInfoMCL(i,Barys[0],Barys[1],pt0,pt1);
+            for(Uint j=0;j<5;j++)
+            {
+                midpt=(pt0+pt1)/2 + qupt[j]*(pt1-pt0)/2;
+                normal_mcl[j] = triangle.GetImprovedMCLNormal(i,(qupt[j]+1)/2);
+                quadBarys[j]=(Barys[0]+Barys[1])/2+qupt[j]*(Barys[1]-Barys[0])/2;
+                costheta[j]=triangle.IsSymmType(i) ? 0 : cos(angle_(midpt,0));
+                sintheta_D[j]=triangle.IsSymmType(i) ? 1 : sin(triangle.GetImprovedActualContactAngle(i,(qupt[j]+1)/2));
+                outnormalOnMcl[j]=outnormal_(midpt,0);
+            }
+            for (int v=0; v<10; ++v)
+            {
+                Point3DCL value;
+                const IdxT Numbv= v<10 ? Numb[v] : (velXfem && Numb[v-10]!=NoIdx ? f.RowIdx->GetXidx()[Numb[v-10]] : NoIdx);
+                if (Numbv==NoIdx) continue;
+                //5 points Gauss–Legendre quadrature is used.
+                for (int j=0; j<5; j++)
+                {
+                    value += weight[j]*costheta[j]*phi[v](quadBarys[j])*normal_mcl[j];       // cos (theta_e) v \dot tau_cl
+                    value += weight[j]*sintheta_D[j]*phi[v](quadBarys[j])*outnormalOnMcl[j]; // sin (theta_D) v \dot n
+                }
+                value = value * length/2;
+                for (int j=0; j<3; ++j)
+                {
+                    f.Data[Numbv+j] += sigma_*value[j];
+                }
+            }
         }
     } // Ende der for-Schleife ueber die Kinder
 }
