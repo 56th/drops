@@ -671,15 +671,15 @@ void YoungForceAccumulatorCL::visit ( const TetraCL& t)
         {
         	length = triangle.GetInfoMCL(i,Barys[0],Barys[1],pt0,pt1);
         	normal_mcl = triangle.GetMCLNormal(i);
-        	sintheta_D= triangle.IsSymmType(i) ? 0 :sin(triangle.GetActualContactAngle(i));
+        	sintheta_D= triangle.IsSymmType(i) ? 1 :sin(triangle.GetActualContactAngle(i));
         	for(Uint j=0;j<5;j++)
         	{
         		quadBarys[j]=(Barys[0]+Barys[1])/2+qupt[j]*(Barys[1]-Barys[0])/2;
         		midpt=(pt0+pt1)/2 + qupt[j]*(pt1-pt0)/2;
-        		costheta[j]= triangle.IsSymmType(i) ? 1 : cos(angle_(midpt,0));
+        		costheta[j]= triangle.IsSymmType(i) ? 0 : cos(angle_(midpt,0));
         		outnormalOnMcl[j]=outnormal_(midpt,0);
         	}
-        	for (int v=0; v<10; ++v)
+           	for (int v=0; v<10; ++v)
         	{
 				Point3DCL value;
         		const IdxT Numbv= v<10 ? Numb[v] : (velXfem && Numb[v-10]!=NoIdx ? f.RowIdx->GetXidx()[Numb[v-10]] : NoIdx);
@@ -688,7 +688,9 @@ void YoungForceAccumulatorCL::visit ( const TetraCL& t)
 				{
 					value += weight[j]*costheta[j]*phi[v](quadBarys[j])*normal_mcl;       // cos (theta_e) v \dot tau_cl
 					value += weight[j]*sintheta_D*phi[v](quadBarys[j])*outnormalOnMcl[j]; // sin (theta_D) v \dot n
+
 				}
+
 			    value = value * length/2;
         		/*Point3DCL value = ((phi[v](quadBarys[0])*costheta[0]*weight[0]+ phi[v](quadBarys[1])*costheta[1]*weight[1]
         		              + phi[v](quadBarys[2])*costheta[2]*weight[2]+ phi[v](quadBarys[3])*costheta[3]*weight[3]
@@ -822,7 +824,7 @@ void ImprovedYoungForceAccumulatorCL::visit ( const TetraCL& t)
         		sintheta_D[j]=triangle.IsSymmType(i) ? 1 : sin(triangle.GetImprovedActualContactAngle(i,(qupt[j]+1)/2));
         		outnormalOnMcl[j]=outnormal_(midpt,0);
         	}
-        	for (int v=0; v<10; ++v)
+           	for (int v=0; v<10; ++v)
         	{
 				Point3DCL value;
         		const IdxT Numbv= v<10 ? Numb[v] : (velXfem && Numb[v-10]!=NoIdx ? f.RowIdx->GetXidx()[Numb[v-10]] : NoIdx);
@@ -1131,8 +1133,9 @@ void LevelsetP2CL::AccumulateYoungForce( VecDescCL& f) const
 	TetraAccumulatorCL *accu;
     switch (SF_)
     {
-    	//accu= new YoungForceAccumulatorCL( *this, f, sf_.GetSigma()(std_basis<3>(0), 0.),CA_,Bndoutnormal_);
-    case SF_ImprovedLB:
+
+   case SF_ImprovedLB:
+	  // accu= new YoungForceAccumulatorCL( *this, f, sf_.GetSigma()(std_basis<3>(0), 0.),CA_,Bndoutnormal_);break;
        	accu= new ImprovedYoungForceAccumulatorCL( *this, f, sf_.GetSigma()(std_basis<3>(0), 0.),CA_,Bndoutnormal_); break;
     default:
     	throw DROPSErrCL("LevelsetP2CL::AccumulateYoungForce not implemented for non-constant surface tension");

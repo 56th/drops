@@ -474,6 +474,7 @@ namespace InstatSlip{
 			DROPS::Point3DCL org0 = P.get<DROPS::Point3DCL>("Exp.PosDrop");
 			DROPS::Point3DCL VelR = P.get<DROPS::Point3DCL>("Exp.RadDrop");
 			double angle=P.get<double>("SpeBnd.contactangle")*M_PI/180;
+			//radius=VelR[0];
 			radius=VelR[0]*std::pow(2/(2+std::cos(angle))/std::pow(1-std::cos(angle),2),1.0/3);
 			//assume the initial droplet is semi-spherical;
 			org0[1]=org0[1]-radius*std::cos(angle);//The drop is located in the plain normal to the y direction
@@ -485,11 +486,11 @@ namespace InstatSlip{
 		for (int i=0; i< 3; i++)
 		  norm2 += (p[i]-origin[i]) * (p[i]-origin[i]);
          ret = (std::sqrt(norm2) > radius) ? 0: 2.*surftension/radius; 
-		/*
+
 		if( t>3. && t<5 )
 			ret = 0;
 		else if(t >5.)
-			ret = 2.*surftension/radius;*/
+			ret = 2.*surftension/radius;
 		return ret;
 	}
 	
