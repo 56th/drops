@@ -537,6 +537,8 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
                     P.get<double>("AdaptRef.CoarsestLevel"), P.get<double>("AdaptRef.FinestLevel") );
     adap.set_marking_strategy(&marker);
 
+    //out<<" "<<0<<"  "<<1.5707963<<"  "<<P.get<DROPS::Point3DCL>("Exp.RadDrop")[0]<<std::endl;
+    //double time = 0.0;
     for (int step= 1; step<=nsteps; ++step)
     {
         std::cout << "============================================================ step " << step << std::endl;
@@ -798,7 +800,11 @@ int main (int argc, char** argv)
         DROPS::ContactDropletCL::Init( P.get<DROPS::Point3DCL>("Exp.PosDrop"), P.get<DROPS::Point3DCL>("Exp.RadDrop"), P.get<double>("Exp.AngleDrop"));
     if  (InitialLSet == "TwoEllipsoid")
         DROPS::TwoEllipsoidCL::Init( P.get<DROPS::Point3DCL>("Exp.PosDrop"), P.get<DROPS::Point3DCL>("Exp.RadDrop"), P.get<DROPS::Point3DCL>("Exp.PosDrop2"), P.get<DROPS::Point3DCL>("Exp.RadDrop2"));
-    if (InitialLSet.find("Cylinder")==0) {
+    if  (InitialLSet.find("Layer")==0){
+      	DROPS::LayerCL::Init( P.get<DROPS::Point3DCL>("Exp.PosDrop"), P.get<DROPS::Point3DCL>("Exp.RadDrop"), InitialLSet[5]-'X');
+    	P.put("Exp.InitialLSet", InitialLSet= "Layer");
+    }
+    if (InitialLSet.find("Cylinder")==0){
         DROPS::CylinderCL::Init( P.get<DROPS::Point3DCL>("Exp.PosDrop"), P.get<DROPS::Point3DCL>("Exp.RadDrop"), InitialLSet[8]-'X');
         P.put("Exp.InitialLSet", InitialLSet= "Cylinder");
     }
@@ -809,7 +815,7 @@ int main (int argc, char** argv)
 
     DROPS::AdapTriangCL adap( *mg, &InitialMarker,
                               ((P.get<std::string>("Restart.Inputfile") == "none") ? P.get<int>("AdaptRef.LoadBalStrategy") : -P.get<int>("AdaptRef.LoadBalStrategy")));
-    // If we read the Multigrid, it shouldn't be modified;
+      // If we read the Multigrid, it shouldn't be modified;
     // otherwise the pde-solutions from the ensight files might not fit.
     if (P.get("Restart.Inputfile", std::string("none")) == "none")
     {

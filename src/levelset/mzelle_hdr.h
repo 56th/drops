@@ -181,6 +181,36 @@ Usint     CylinderCL::axisDir_;
 
 static DROPS::RegisterScalarFunction regsca_cylinder("Cylinder", DROPS::CylinderCL::DistanceFct);
 
+
+/// \brief Represents a thin layer bounded by two parallel planes perpendicular to one axis
+class LayerCL
+{
+  private:
+    static Point3DCL Mitte_;
+    static Point3DCL Radius_;  ///< stores the width of the layer and axis lengths (former stored in entry given by axisDir_)
+    static Usint     axisDir_; ///< direction of axis (one of 0,1,2)
+
+  public:
+    LayerCL( const Point3DCL& Mitte, const Point3DCL& RadiusLength, Usint axisDir)
+    { Init( Mitte, RadiusLength, axisDir); }
+    static void Init( const Point3DCL& Mitte, const Point3DCL& RadiusLength, Usint axisDir)
+    { Mitte_= Mitte;    Radius_= RadiusLength;    axisDir_= axisDir; }
+    static double DistanceFct( const Point3DCL& p, double)
+    {
+        double d= p[axisDir_] - Mitte_[axisDir_];
+
+        return std::abs( d)  - Radius_[axisDir_]/2;
+    }
+    static double GetVolume() { return Radius_[0]*Radius_[1]*Radius_[2]; }
+    static Point3DCL& GetCenter() { return Mitte_; }
+};
+
+Point3DCL LayerCL::Mitte_;
+Point3DCL LayerCL::Radius_;
+Usint     LayerCL::axisDir_;
+
+static DROPS::RegisterScalarFunction regsca_layer("Layer", DROPS::LayerCL::DistanceFct);
+
 // collision setting (rising butanol droplet in water)
 //  RadDrop1 =  1.50e-3  1.500e-3  1.50e-3
 //  PosDrop1 =  6.00e-3  3.000e-3  6.00e-3

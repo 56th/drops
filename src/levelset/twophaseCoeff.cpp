@@ -468,20 +468,25 @@ namespace InstatSlip{
 		double norm2=0.;
 		double ret=0;		
 		static bool first = true;
-		static DROPS::Point3DCL origin, VelR;
+		static DROPS::Point3DCL origin;
 		static double radius, surftension;
 		if(first){
-			origin = P.get<DROPS::Point3DCL>("Exp.PosDrop");
-			VelR = P.get<DROPS::Point3DCL>("Exp.RadDrop");
-			radius = 0.36840315;    //VelR[0]; assume the droplet is spherical;
+			DROPS::Point3DCL org0 = P.get<DROPS::Point3DCL>("Exp.PosDrop");
+			DROPS::Point3DCL VelR = P.get<DROPS::Point3DCL>("Exp.RadDrop");
+			double angle=P.get<double>("SpeBnd.contactangle")*M_PI/180;
+			//radius=VelR[0];
+			radius=VelR[0]*std::pow(2/(2+std::cos(angle))/std::pow(1-std::cos(angle),2),1.0/3);
+			//assume the initial droplet is semi-spherical;
+			org0[1]=org0[1]-radius*std::cos(angle);//The drop is located in the plain normal to the y direction
+			origin=org0;
 			surftension = P.get<double>("SurfTens.SurfTension");
 			first = false;
 		}
-		
+
 		for (int i=0; i< 3; i++)
 		  norm2 += (p[i]-origin[i]) * (p[i]-origin[i]);
          ret = (std::sqrt(norm2) > radius) ? 0: 2.*surftension/radius; 
-		
+
 		if( t>3. && t<5 )
 			ret = 0;
 		else if(t >5.)
@@ -690,18 +695,33 @@ namespace contactangle{
 
 	double PeriodicAngle(const DROPS::Point3DCL& pt,double)
 	{
-		double r=std::sqrt(pt[0]*pt[0]+pt[2]*pt[2]);
-		double theta=r<0.01? 0: (pt[2]>0?std::acos(pt[0]/r): 2*M_PI- std::acos(pt[0]/r));
+		DROPS::Point3DCL pt1(pt-P.get<DROPS::Point3DCL>("SpeBnd.posDrop"));
+		double r=std::sqrt(pt1[0]*pt1[0]+pt1[2]*pt1[2]);
+		double theta=r<0.001? 0: (pt1[2]>0?std::acos(pt1[0]/r): 2*M_PI- std::acos(pt1[0]/r));
 		return (P.get<double>("SpeBnd.contactangle"))*(1+0.5*std::sin(30*theta))/180.0*M_PI;
 	}
 
 	double PatternAngle(const DROPS::Point3DCL& pt,double)
 	{
-		double r=std::sqrt(pt[0]*pt[0]+pt[2]*pt[2]);
-		double theta= int(r/0.05)%2==0?1:-1;
+		DROPS::Point3DCL pt1(pt-P.get<DROPS::Point3DCL>("SpeBnd.posDrop"));
+		double r=std::sqrt(pt1[0]*pt1[0]+pt1[2]*pt1[2]);
+		double theta= int(r/P.get<DROPS::Point3DCL>("Exp.RadDrop")[0]/5.0)%2==0?1:-1;
 		return P.get<double>("SpeBnd.contactangle")/180.0*M_PI*(1+0.5*theta);
 	}
-
+	double PatternAngle1(const DROPS::Point3DCL& pt,double)
+		{
+			DROPS::Point3DCL pt1(pt-P.get<DROPS::Point3DCL>("SpeBnd.posDrop"));
+			double angl=P.get<double>("SpeBnd.contactangle")/180.0*M_PI;
+			return pt1[0]*pt1[2]<0?angl:M_PI-angl;
+		}
+	double PatternAngle2(const DROPS::Point3DCL& pt,double)
+		{
+			DROPS::Point3DCL pt1(pt-P.get<DROPS::Point3DCL>("SpeBnd.posDrop"));
+			double r=std::sqrt(pt1[0]*pt1[0]+pt1[2]*pt1[2]);
+			double theta=r<0.001? 0: (pt1[2]>0? std::acos(pt1[0]/r)/M_PI*180 : 360 - std::acos(pt1[0]/r)/M_PI*180);
+			double angl=P.get<double>("SpeBnd.contactangle")/180.0*M_PI;
+			return (int(theta)/60)%2==0?angl:M_PI-angl;
+		}
 	DROPS::Point3DCL OutNormalBottomPlane(const DROPS::Point3DCL&,double)
 	{
 		DROPS::Point3DCL outnormal(0.0);
@@ -747,6 +767,8 @@ namespace contactangle{
 	static DROPS::RegisterScalarFunction regconstangle("ConstantAngle", ConstantAngle);
 	static DROPS::RegisterScalarFunction regperangle("PeriodicAngle", PeriodicAngle);
 	static DROPS::RegisterScalarFunction regpatangle("PatternAngle", PatternAngle);
+	static DROPS::RegisterScalarFunction regpatangle1("PatternAngle1", PatternAngle1);
+	static DROPS::RegisterScalarFunction regpatangle2("PatternAngle2", PatternAngle2);
 	static DROPS::RegisterVectorFunction regunitbottomoutnomal("OutNormalBottomPlane", OutNormalBottomPlane);
 	static DROPS::RegisterVectorFunction regunitcubicoutnomal("OutNormalBrick", OutNormalBrick);
 }
@@ -762,5 +784,38 @@ namespace curvebndDomain{
 
 	static DROPS::RegisterVectorFunction regunitoutnomalsphere("OutNormalSphere", OutNormalSphere);
 
+}
+namespace CouetteFlow{
+
+	DROPS::Point3DCL UpwallVel(const DROPS::Point3DCL& ,double)
+	{
+		DROPS::Point3DCL vel(0.0);
+		vel[0]=P.get<double>("Exp.WallVelocity");
+		return vel;
+	}
+	DROPS::Point3DCL DownwallVel(const DROPS::Point3DCL& ,double)
+	{
+		DROPS::Point3DCL vel(0.0);
+		vel[0]=-P.get<double>("Exp.WallVelocity");
+		return vel;
+	}
+	DROPS::Point3DCL LeftwallVel(const DROPS::Point3DCL& pt,double)
+	{
+
+		 double dx, dy, dz;
+		 const std::string meshfile_name=P.get<std::string>("DomainCond.MeshFile");
+		 std::string mesh( meshfile_name), delim("x@");
+		 size_t idx;
+		 while ((idx= mesh.find_first_of( delim)) != std::string::npos )
+		       mesh[idx]= ' ';
+		 std::istringstream brick_info( mesh);
+		 brick_info >> dx >> dy >> dz;
+		 DROPS::Point3DCL vel(0.0);
+		 vel[0]=P.get<double>("Exp.WallVelocity")*((pt[2]-dz/2)*2/dz)*(dz/(dz+2/P.get<double>("SpeBnd.beta1")));
+		 return vel;
+	}
+	static DROPS::RegisterVectorFunction regunitupwallvel("UpwallVel", UpwallVel);
+	static DROPS::RegisterVectorFunction regunitdownwallvel("DownwallVel", DownwallVel);
+	static DROPS::RegisterVectorFunction regunitleftwallvel("LeftwallVel", LeftwallVel);
 }
 

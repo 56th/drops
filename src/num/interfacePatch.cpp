@@ -665,7 +665,10 @@ double InterfaceTriangleCL::GetInfoMCL(Uint v, BaryCoordCL& bary0, BaryCoordCL& 
 		bary1 = Bary_[IdxMCL_[v][1]];
 		pt0 = PQRS_[IdxMCL_[v][0]];
 		pt1 = PQRS_[IdxMCL_[v][1]];
-		return (pt1-pt0).norm();
+		if (EqualToFace()) // interface is shared by two tetras
+			return (pt1-pt0).norm()/2;
+		else
+			return (pt1-pt0).norm();
 }
 
 Point3DCL InterfaceTriangleCL::GetNormal() const
@@ -794,7 +797,8 @@ Point3DCL InterfaceTriangleCL::GetMCLNormal(Uint v) const
 	else
 		return -n/n.norm();
 }
-//A better way would be use some 1D Quad class which should be implemented later!!
+//A better way would be use some 1D Quad class which should be implemented later
+//The method to compute out normal of MCL might have large error when the contact angle is small!!
 Point3DCL InterfaceTriangleCL::GetImprovedMCLNormal(Uint v,double bary1D) const
 {
 	//Point3DCL mpt = PQRS_[IdxMCL_[v]] + bary1D*(PQRS_[(IdxMCL_[v]+1)%intersec_]-PQRS_[IdxMCL_[v]]);
@@ -843,10 +847,14 @@ Point3DCL InterfaceTriangleCL::GetImprovedMCLNormal(Uint v,double bary1D) const
 	//END compute the outnormal of the level-set*/
 	Point3DCL normal=GetImprovedNormalOnMCL(v,bary1D);
 	n=normal - inner_prod(normal,n)*n;
+	if (n.norm()>5e-2) n/= n.norm();
+	else
+		n=GetMCLNormal(v);
 	//std::cout<<n<<std::endl;
-	return n/n.norm();
+	return n;
 
 }
+//output the "actual" dynamic angle
 double InterfaceTriangleCL::GetActualContactAngle(Uint v) const
 {
 	//Point3DCL midpt = (PQRS_[IdxMCL_[v]]+PQRS_[(IdxMCL_[v]+1)%intersec_])/2;
