@@ -730,7 +730,8 @@ int TestAdap (MultiGridCL& mg, ParamCL& p)
 //         accu0.set_mapper( 0);
 //         seq_out( quaqua.num_outer_iter.begin(), quaqua.num_outer_iter.end(), std::cout);
 
-        vtkwriter.Write( i);
+        if (P.get<std::string>( "VTK.VTKName") != "")
+            vtkwriter.Write( i);
 
         lset.idx.DeleteNumbering( mg);
         p1idx.DeleteNumbering( mg);
@@ -747,7 +748,7 @@ int TestAdap (MultiGridCL& mg, ParamCL& p)
 /// The result can be checked when Param-list is written to the output.
 void SetMissingParameters (DROPS::ParamCL& P)
 {
-    P.put_if_unset<std::string>("VTK.VTKName", "csgtest");
+//     P.put_if_unset<std::string>("VTK.VTKName", "csgtest");
     P.put_if_unset<std::string>("VTK.VTKDir", ".");
     P.put_if_unset<std::string>( "VTK.TimeFileName", P.get<std::string>("VTK.VTKName"));
     P.put_if_unset<int>( "VTK.Binary", 1);
