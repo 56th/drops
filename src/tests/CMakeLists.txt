@@ -100,6 +100,8 @@ if(NOT MPI)
     add_dependencies(show_domain levelset-twophaseCoeff misc-scalarFunctions misc-vectorFunctions misc-csgFunctions)
 endif(NOT MPI)
 
+exec_ser(base64test misc-base64)
+
 if(NOT MPI)
     add_dependencies(dynload misc-scalarFunctions misc-vectorFunctions)
 
