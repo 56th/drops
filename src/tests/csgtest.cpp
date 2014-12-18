@@ -190,8 +190,10 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
            invocations_dh,
            calls_locate;
     OpenMPVar_MinInit_Max_CL<double> max_curv,
-                                     max_iter;
-    OpenMPVar_MaxInit_Min_CL<double> min_iter;
+                                     max_iter,
+                                     max_grad;
+    OpenMPVar_MaxInit_Min_CL<double> min_iter,
+                                     min_grad;
 
     InterfaceL2AccuP2CL (const InterfaceCommonDataP2CL& cdata, const MultiGridCL& mg_arg, std::string name= std::string())
         : cdata_( cdata), mg( mg_arg), name_( name), f( 0), f_time( 0.), sample_curvature_( true), redist_err_vd( 0) {}
@@ -225,6 +227,8 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
         invocations_dh.scatter();
         calls_locate.scatter();
         max_curv.scatter();
+        max_grad.scatter();
+        min_grad.scatter();
         max_iter.scatter();
         min_iter.scatter();
     }
@@ -251,6 +255,10 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
         std::cout << "\n\tcalls_locate: " << calls_locate.value() << "\t average: " << calls_locate.value()/invocations_dh.value();
         max_curv.reduce();
         std::cout << "\n\tmax_curv: " << max_curv.value();
+        max_grad.reduce();
+        std::cout << "\n\tmax_grad: " << max_grad.value();
+        min_grad.reduce();
+        std::cout << "\n\tmin_grad: " << min_grad.value();
         max_iter.reduce();
         std::cout << "\n\tmax_iter: " << max_iter.value();
         if (redist_err_vd) {
@@ -317,6 +325,8 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
                 cyclic_jacobi( M, 1e-6);
                 for (Uint j= 0; j < 3; ++j)
                     max_curv.value( tid)= std::max( max_curv.value( tid), M(j, j));
+                max_grad.value( tid)= std::max( max_grad.value( tid), G.norm());
+                min_grad.value( tid)= std::min( min_grad.value( tid), G.norm());
             }
         }
 
@@ -359,6 +369,8 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
         tmp->invocations_dh.make_reference_to( invocations_dh);
         tmp->calls_locate.make_reference_to( calls_locate);
         tmp->max_curv.make_reference_to( max_curv);
+        tmp->max_grad.make_reference_to( max_grad);
+        tmp->min_grad.make_reference_to( min_grad);
         tmp->max_iter.make_reference_to( max_iter);
         tmp->min_iter.make_reference_to( min_iter);
         return tmp;
