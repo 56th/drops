@@ -13,7 +13,7 @@ int main ()
     std::getline( std::cin, s);
     std::cout << "base64:\n";
     unsigned char* p= (unsigned char*) &s[0];
-    DROPS::Base64Encoding::encode( p, p + s.size(), std::cout);
+    DROPS::Base64Encoding::encode( p, p + s.size(), std::cout, /*wrap_lines*/ true);
     std::cout << std::endl;
 
     std::cout << "base64? ";

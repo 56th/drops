@@ -51,6 +51,8 @@ void encode (const unsigned char* x, const unsigned char* xend, std::ostream& os
            << alphabet[buf>>12 & sixbits]
            << alphabet[buf>> 6 & sixbits]
            << alphabet[buf     & sixbits];
+        if (wrap_lines && (xend + 3 - rem - x)/3 % 19 == 0) // Output a newline after at most 19 octets written.
+            os << '\n';
     }
     if (rem == 0)
         return;
