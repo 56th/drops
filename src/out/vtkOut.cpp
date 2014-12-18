@@ -340,13 +340,11 @@ void WriteBase64( const VectorBaseCL<T>& x, std::ostream& os)
 /** Writes out a base64 encoded data-stream */
 {
     const size_t s= x.size()*sizeof( T);
-    std::vector<unsigned char> xx( s + 4);
-    memcpy( Addr(xx), &s, 4);
-    memcpy( Addr(xx) + 4, Addr(x), s);
-    Base64Encoding::encode( Addr( xx),
-                            Addr( xx) + s + 4,
-                            os,
-                            /*wrap_lines*/ false);
+    const unsigned char* p= reinterpret_cast<const unsigned char*>( &s);
+    // If sizeof( size_t) > 4, this only works in little endian... which we hard-code in the vtu-file in any case.
+    Base64Encoding::encode( p, p + 4, os, /*wrap_lines*/ false);
+    p= reinterpret_cast<const unsigned char*>( Addr( x));
+    Base64Encoding::encode( p, p + s, os, /*wrap_lines*/ false);
 }
 
 void VTKOutCL::WriteCoords()
