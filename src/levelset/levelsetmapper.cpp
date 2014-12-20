@@ -39,14 +39,30 @@ void base_point_newton_cacheCL::set_tetra (const TetraCL* newtet)
     locls_.assign( *tet, ls_);
     loc_gh_.assign( *tet, ls_grad_rec_);
 
-    SMatrixCL<3,3> T( Uninitialized);
-    double dummy;
-    GetTrafoTr( T, dummy, *tet);
-    P2DiscCL::GetGradients( gradp2_, gradrefp2_, T);
+    if (compute_gradp2_) {
+        SMatrixCL<3,3> T( Uninitialized);
+        double dummy;
+        GetTrafoTr( T, dummy, *tet);
+        P2DiscCL::GetGradients( gradp2_, gradrefp2_, T);
+
+        h_= ::cbrt( std::abs( dummy));
+    }
+    else {
+        h_= 6.*tet->GetVolume();
+    }
 
     w2b_.assign( *tet);
+}
 
-    h_= ::cbrt( std::abs( dummy));
+void base_point_newton_cacheCL::set_compute_gradp2 (bool b)
+{
+    if (tet != 0 && b && !compute_gradp2_) {
+        SMatrixCL<3,3> T( Uninitialized);
+        double dummy;
+        GetTrafoTr( T, dummy, *tet);
+        P2DiscCL::GetGradients( gradp2_, gradrefp2_, T);
+    }
+    compute_gradp2_= b;
 }
 
 // Return a tetra from neighborhood that contains v up to precision eps in barycentric coordinates.
@@ -190,6 +206,7 @@ void QuaQuaMapperCL::base_point_with_line_search () const
 
     Point3DCL n; // Current search direction.
 
+//     cache_.set_compute_gradp2( false);
     cache_.set_tetra( btet); // To make get_h() well-defined.
 
     int iter;
@@ -234,6 +251,7 @@ void QuaQuaMapperCL::base_point_newton () const
 //         line_search( x, gh/gh.norm(), btet, bxb);
 //     }
 
+//     cache_.set_compute_gradp2( true);
     cache_.set_tetra( btet);
 
     QRDecompCL<4,4> qr;
@@ -380,6 +398,7 @@ const QuaQuaMapperCL& QuaQuaMapperCL::jacobian () const
     if (btet == 0)
         base_point();
 
+//     cache_.set_compute_gradp2( true);
     cache_.set_tetra( btet);
 
     // Evaluate the quasi normal field in bxb.

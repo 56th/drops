@@ -58,13 +58,18 @@ class base_point_newton_cacheCL
     World2BaryCoordCL    w2b_;
     double h_;
 
+    bool compute_gradp2_;
+
   public:
     base_point_newton_cacheCL (const P2EvalCL<double, const NoBndDataCL<>, const VecDescCL>& ls,
                                const P2EvalCL<Point3DCL, const NoBndDataCL<Point3DCL>, const VecDescCL>& ls_grad_rec,
                                const LocalP1CL<Point3DCL> (& gradrefp2)[10])
-        : tet( 0), ls_( ls), ls_grad_rec_( ls_grad_rec), gradrefp2_( gradrefp2) {}
+        : tet( 0), ls_( ls), ls_grad_rec_( ls_grad_rec), gradrefp2_( gradrefp2), compute_gradp2_( true)
+    {}
 
     void set_tetra (const TetraCL* newtet);
+
+    void set_compute_gradp2 (bool b);
 
     const LocalP2CL<>&          locls  () const { return locls_; }
     const LocalP2CL<Point3DCL>& loc_gh () const { return loc_gh_; }
