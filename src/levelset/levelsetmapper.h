@@ -138,6 +138,7 @@ class QuaQuaMapperCL
     }
 
     void set_tetra_neighborhoods (TetraToTetrasT& neigborhoods) { neighborhoods_= &neigborhoods; }
+    MyLocatorCL& get_locator () { return locator_; }
 
     const QuaQuaMapperCL& set_point (const TetraCL* tetarg, const BaryCoordCL& xbarg) const;
     const QuaQuaMapperCL& base_point () const;

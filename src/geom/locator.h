@@ -26,10 +26,40 @@
 #define DROPS_LOCATOR_H
 
 #include "geom/simplex.h"
+#include "misc/container.h"
+#include "misc/params.h"
+
+#include <vector>
 
 namespace DROPS {
 
 class MultiGridCL;
+
+class StructuredCoarseTriangLocatorCL
+{
+  private:
+    Point3DCL orig;
+    Uint n[3];
+    std::vector<const TetraCL*> ta;
+    QRDecompCL<3, 3> qr;
+
+    // for tetras:
+    Uint t_idx(Uint i, Uint j, Uint k, Uint l) const { return k*n[1]*n[0]*6 + j*n[0]*6 + i*6 + l; }
+
+    Uint idx[3][2];
+    std::vector<const TetraCL*> tets;
+
+    void compute_cubes (Point3DCL x);
+
+  public:
+    bool is_initialized () const { return !ta.empty(); }
+
+    bool read_json (const ParamCL& P, const MultiGridCL& mg);
+
+    void locate_tetras (const Point3DCL& x);
+
+    const std::vector<const TetraCL*>& get_tetras() const { return tets; }
+};
 
 /// \brief Given a point x in R^3, find a tetra tet on level lvl that contains x.
 class MyLocatorCL
@@ -47,14 +77,21 @@ class MyLocatorCL
     const TetraCL* tet;
     BaryCoordCL    xb;
 
+    StructuredCoarseTriangLocatorCL structured_coarse_locator;
+
     double min_bary_coeff (const BaryCoordCL& b) const;
     void locate_in_tetra ();
+
+    void locate_structured ();
 
   public:
     MyLocatorCL(const MultiGridCL& MG, Uint level, bool greedyarg= false)
         : eps( 1e-10), greedy( greedyarg), mg( MG), lvl( level), tet( 0) {}
     // default copy-ctor, dtor, assignment-op
 
+    void set_structured_coarse_grid (const ParamCL& P) {
+        structured_coarse_locator.read_json( P, mg);
+    }
     void set_epsilon (double neweps) { eps= neweps; }
     void locate (const Point3DCL& x);
 

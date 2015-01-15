@@ -708,6 +708,7 @@ int TestAdap (MultiGridCL& mg, ParamCL& p)
             /*max_damping_steps*/ P.get<Uint>( "LevelsetMapper.MaxDampingSteps"));
         quaqua.set_inner_iter_tol( P.get<int>(    "LevelsetMapper.InnerIter"),
                                    P.get<double>( "LevelsetMapper.InnerTol"));
+        quaqua.get_locator().set_structured_coarse_grid( P.get_child( "Domain"));
 
         TetraAccumulatorTupleCL accus;
         InterfaceCommonDataP2CL cdatap2( lset.Phi, lset.GetBndData(), quaqua, PrincipalLatticeCL::instance( P.get<Uint>( "Subsampling")));
