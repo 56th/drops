@@ -180,6 +180,7 @@ bool QuaQuaMapperCL::line_search (Point3DCL& x, const Point3DCL& nx, const Tetra
                 break;
             }
         }
+        total_damping_iter+= j;
         if (!found_newtet)
             throw DROPSErrCL( "QuaQuaMapperCL::line_search: Could not find the right tetra.\n");
         tetra= newtet;
@@ -190,6 +191,7 @@ bool QuaQuaMapperCL::line_search (Point3DCL& x, const Point3DCL& nx, const Tetra
 
 //     if (inneriter >= maxinneriter_)
 //         std::cout <<"QuaQuaMapperCL::line_search: Warning: max inner iteration number at x : " << x << " exceeded; ls.val: " << ls.val( *tetra, bary) << std::endl;
+    total_inner_iter+= inneriter;
     ++num_inner_iter[inneriter];
 
     return inneriter < maxinneriter_;
@@ -209,20 +211,21 @@ void QuaQuaMapperCL::base_point_with_line_search () const
 //     cache_.set_compute_gradp2( false);
     cache_.set_tetra( btet); // To make get_h() well-defined.
 
+    bool found_zero_level= false;
     int iter;
     for (iter= 1; iter < maxiter_; ++iter) {
         xold= x;
         n=  cache_.loc_gh()( bxb);
         n/= norm( n);
         x= x0 - alpha*n;
-        const bool found_zero_level= line_search( x, n, btet, bxb);
+        found_zero_level= line_search( x, n, btet, bxb);
         alpha= inner_prod( n, x0 - x);
 
         if ((xold - x).norm() < tol_ && found_zero_level)
             break;
     }
     if (iter >= maxiter_) {
-        std::cout << "QuaQuaMapperCL::base_point_with_line_search: max iteration number exceeded; |x - xold|: " << norm( xold - x) << "\tx: " << x << "\t n: " << n << "\t ls(x): " << ls.val( *btet, bxb) << std::endl;
+        std::cout << "QuaQuaMapperCL::base_point_with_line_search: max iteration number exceeded; |x - xold|: " << norm( xold - x) << "\tx: " << x << "\t n: " << n << "\t ls(x): " << ls.val( *btet, bxb) << "found_zero_level: " << found_zero_level << std::endl;
     }
     cur_num_outer_iter= iter;
     ++num_outer_iter[iter];
@@ -348,6 +351,7 @@ void QuaQuaMapperCL::base_point_newton () const
                 break;
             }
         }
+        total_damping_iter+= j;
         if (!found_newtet)
             throw DROPSErrCL( "QuaQuaMapperCL::base_point_newton: Could not find the right tetra.\n");
 // if (j>1)

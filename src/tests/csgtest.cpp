@@ -187,6 +187,8 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
            time_dh,
            time_locate,
            iter_dh,
+           inner_iter_dh,
+           num_damping,
            invocations_dh,
            calls_locate;
     OpenMPVar_MinInit_Max_CL<double> max_curv,
@@ -224,6 +226,8 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
         time_dh.scatter();
         time_locate.scatter();
         iter_dh.scatter();
+        inner_iter_dh.scatter();
+        num_damping.scatter();
         invocations_dh.scatter();
         calls_locate.scatter();
         max_curv.scatter();
@@ -249,6 +253,10 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
         std::cout << "\n\ttime_locate: " << time_locate.value();
         iter_dh.reduce();
         std::cout << "\n\titer_dh: " << iter_dh.value();
+        inner_iter_dh.reduce();
+        std::cout << "\n\tinner_iter_dh: " << inner_iter_dh.value() << "\t average_per_outer_iter: " << inner_iter_dh.value()/iter_dh.value();
+        num_damping.reduce();
+        std::cout << "\n\tnum_damping: " << num_damping.value();
         invocations_dh.reduce();
         std::cout << "\n\tinvocations_dh: " << invocations_dh.value() << "\t average_iter: " << iter_dh.value()/invocations_dh.value();
         calls_locate.reduce();
@@ -349,6 +357,8 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
         time_dh.value( tid)= cdata.quaqua.base_point_time;
         time_locate.value( tid)= cdata.quaqua.locate_new_point_time;
         iter_dh.value( tid)= cdata.quaqua.total_outer_iter;
+        inner_iter_dh.value( tid)= cdata.quaqua.total_inner_iter;
+        num_damping.value( tid)= cdata.quaqua.total_damping_iter;
         invocations_dh.value( tid)= cdata.quaqua.total_base_point_calls;
         calls_locate.value( tid)= cdata.quaqua.total_locate_new_point_calls;
         min_iter.value( tid)= cdata.quaqua.min_outer_iter;
@@ -366,6 +376,8 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
         tmp->time_dh.make_reference_to( time_dh);
         tmp->time_locate.make_reference_to( time_locate);
         tmp->iter_dh.make_reference_to( iter_dh);
+        tmp->inner_iter_dh.make_reference_to( inner_iter_dh);
+        tmp->num_damping.make_reference_to( num_damping);
         tmp->invocations_dh.make_reference_to( invocations_dh);
         tmp->calls_locate.make_reference_to( calls_locate);
         tmp->max_curv.make_reference_to( max_curv);

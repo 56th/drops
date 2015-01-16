@@ -128,7 +128,7 @@ class QuaQuaMapperCL
           cache_( ls, ls_grad_rec, gradrefp2), tet( 0), btet( 0), have_dph( false),
           num_outer_iter( maxiter + 1), num_inner_iter( maxinneriter_ + 1),
           base_point_time( 0.), locate_new_point_time( 0.), cur_num_outer_iter( 0), min_outer_iter(-1u), max_outer_iter( 0),
-          total_outer_iter( 0), total_base_point_calls( 0), total_locate_new_point_calls( 0)
+          total_outer_iter( 0), total_inner_iter( 0), total_damping_iter( 0), total_base_point_calls( 0), total_locate_new_point_calls( 0)
     { P2DiscCL::GetGradientsOnRef( gradrefp2); }
 
     void set_inner_iter_tol (Uint i, double t) {
@@ -168,6 +168,8 @@ class QuaQuaMapperCL
                  min_outer_iter,
                  max_outer_iter,
                  total_outer_iter,
+                 total_inner_iter,
+                 total_damping_iter,
                  total_base_point_calls,
                  total_locate_new_point_calls;
 };
