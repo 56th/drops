@@ -51,6 +51,8 @@ class SchurPreBaseCL
     SchurPreBaseCL( double kA, double kM, std::ostream* output= 0) : kA_( kA), kM_( kM), output_(output) {}
     virtual ~SchurPreBaseCL() {}
     void SetWeights( double kA, double kM) { kA_ = kA; kM_ = kM; }
+    double getka(){return kA_;}
+    double getkm(){return kM_;}
 
 #ifdef _PAR
     virtual void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const ExchangeCL& vel_ex, const ExchangeCL& p_ex) const = 0;
@@ -75,6 +77,19 @@ class SchurPreBaseCL
     void SetDiag(const Mat&, const ExT&) {} // just for consistency
     bool RetAcc()   const { return true; }
     //@}
+};
+
+class NoPreCL : public SchurPreBaseCL
+{
+public:
+    NoPreCL( double kA, double kM, std::ostream* output=0) : SchurPreBaseCL(kA,kM,output){}
+
+#ifdef _PAR
+    void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const ExchangeCL& vel_ex, const ExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
+    void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const ExchangeCL& vel_ex, const ExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
+#endif
+    void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& p_ex) const { x = b; }
+    void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& p_ex) const { x = b; }
 };
 
 //**************************************************************************
@@ -329,7 +344,7 @@ void ISMGPreCL<ProlongationT>::Apply(const Mat& /*A*/, Vec& p, const Vec& c, con
 // Append the kernel of Bs as last column to Bs.
 template<typename ExT>
 static void Regularize (MatrixCL& Bs, const IdxDescCL& rowidx, VectorCL ker0, const NEGSPcCL& spc, double regularize, const ExT& row_ex, const ExT& col_ex)
-{
+{    
     if (rowidx.IsExtended())
         ker0[std::slice( rowidx.GetXidx().GetNumUnknownsStdFE(), rowidx.NumUnknowns() - rowidx.GetXidx().GetNumUnknownsStdFE(), 1)]= 0.;
     ker0*= 1./norm( ker0);
@@ -412,6 +427,11 @@ class ISBBTPreCL : public SchurPreBaseCL
 
     using SchurPreBaseCL::Apply;
 
+    void getBs( MatrixCL *& Bs)
+    {
+        Bs = Bs_;
+    }
+
     void SetMatrices (const MatrixCL* B, const MatrixCL* Mvel, const MatrixCL* M, const IdxDescCL* pr_idx)
     {
         B_= B;
@@ -447,7 +467,7 @@ void ISBBTPreCL::Update(const ExT& vel_ex, const ExT& p_ex) const
 
 template <typename Mat, typename Vec, typename ExT>
 void ISBBTPreCL::Apply(const Mat&, Vec& p, const Vec& c, const ExT& vel_ex, const ExT& p_ex) const
-{
+{    
     ScopeTimerCL scope("ISBBTPreCL::Apply");
     if (B_->Version() != Bversion_)
         Update(vel_ex, p_ex);

@@ -16,7 +16,7 @@
         "InnerIter": "1000",
         "OuterIter": "1000",
         "InnerTol": "0.6",
-        "OuterTol": "1e-09",
+        "OuterTol": "1e-03",
         "PcAIter": "100",
         "PcATol": "0.01",
         "PcSTol": "0.01",
@@ -94,7 +94,7 @@
         "_comment": "# VTK settings",
         "vtkOut": "true",
         "vtkCase": "prJump",
-        "vtkDir": "vtk",
+        "vtkDir": "~/dropsbin/prjump_test/vtk",
         "Binary": "0",
         "MasterOut": "1",
         "GeomName": "Cube"
