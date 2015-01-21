@@ -104,15 +104,12 @@ namespace tpd_volforce{
 
         static bool first = true;
         static DROPS::Point3DCL dx;
-        //dirty hack
+        //"hack": assume cartesian domain with e1=[a,0,0], e2=[0,b,0], ..
         if (first){
-            std::string mesh( P.get<std::string>("DomainCond.MeshFile")), delim("x@");
-            size_t idx_;
-            while ((idx_= mesh.find_first_of( delim)) != std::string::npos )
-                mesh[idx_]= ' ';
-            std::istringstream brick_info( mesh);
-            brick_info >> dx[0] >> dx[1] >> dx[2] ;
             first = false;
+            dx[0] = P.get<DROPS::Point3DCL>("Domain.E1")[0];
+            dx[1] = P.get<DROPS::Point3DCL>("Domain.E2")[1];
+            dx[2] = P.get<DROPS::Point3DCL>("Domain.E3")[2];
         }
 
         static double voldrop = 4./3.*M_PI* P.get<DROPS::Point3DCL>("Exp.RadDrop")[0]*P.get<DROPS::Point3DCL>("Exp.RadDrop")[1]*P.get<DROPS::Point3DCL>("Exp.RadDrop")[2] ;
@@ -155,15 +152,16 @@ namespace levelsetdistance{
 
         static bool first = true;
         static DROPS::Point3DCL dx;
-        //dirty hack
+
+        //hack
         if (first){
-            std::string mesh( P.get<std::string>("DomainCond.MeshFile")), delim("x@");
-            size_t idx_;
-            while ((idx_= mesh.find_first_of( delim)) != std::string::npos )
-                mesh[idx_]= ' ';
-            std::istringstream brick_info( mesh);
-            brick_info >> dx[0] >> dx[1] >> dx[2] ;
             first = false;
+            if (i==0)
+                dx = P.get<DROPS::Point3DCL>("Domain.E1");
+            else if (i==1)
+                dx = P.get<DROPS::Point3DCL>("Domain.E2");
+            else
+                dx = P.get<DROPS::Point3DCL>("Domain.E3");
         }
 
         DROPS::Point3DCL dp;
@@ -245,15 +243,13 @@ namespace filmperiodic{
 
         static bool first = true;
         static DROPS::Point3DCL dx;
-        //dirty hack
+
+        //"hack": assume cartesian domain with e1=[a,0,0], e2=[0,b,0], ..
         if (first){
-            std::string mesh( P.get<std::string>("DomainCond.MeshFile")), delim("x@");
-            size_t idx_;
-            while ((idx_= mesh.find_first_of( delim)) != std::string::npos )
-                mesh[idx_]= ' ';
-            std::istringstream brick_info( mesh);
-            brick_info >> dx[0] >> dx[1] >> dx[2] ;
             first = false;
+            dx[0] = P.get<DROPS::Point3DCL>("Domain.E1")[0];
+            dx[1] = P.get<DROPS::Point3DCL>("Domain.E2")[1];
+            dx[2] = P.get<DROPS::Point3DCL>("Domain.E3")[2];
         }
 
         const DROPS::Point3DCL d= fabs(p-q),
@@ -271,16 +267,18 @@ namespace filmperiodic{
 
         static bool first = true;
         static DROPS::Point3DCL dx;
-        //dirty hack
+
+        //hack
         if (first){
-            std::string mesh( P.get<std::string>("DomainCond.MeshFile")), delim("x@");
-            size_t idx_;
-            while ((idx_= mesh.find_first_of( delim)) != std::string::npos )
-                mesh[idx_]= ' ';
-            std::istringstream brick_info( mesh);
-            brick_info >> dx[0] >> dx[1] >> dx[2] ;
             first = false;
+            if (A==0)
+                dx = P.get<DROPS::Point3DCL>("Domain.E1");
+            else if (A==1)
+                dx = P.get<DROPS::Point3DCL>("Domain.E2");
+            else
+                dx = P.get<DROPS::Point3DCL>("Domain.E3");
         }
+
         const int B = (A+1)%3;
         const int D = (B+1)%3;
         const DROPS::Point3DCL d= fabs(p-q), L= fabs(dx);

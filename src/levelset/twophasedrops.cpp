@@ -119,26 +119,18 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
     if (is_periodic) //CL: Anyone a better idea? perDirection from ParameterFile?
     {
-        DROPS::Point3DCL dx;
-        //hack:
-        std::string mesh( P.get<std::string>("DomainCond.MeshFile")), delim("x@");
-        size_t idx_;
-        while ((idx_= mesh.find_first_of( delim)) != std::string::npos )
-            mesh[idx_]= ' ';
-        std::istringstream brick_info( mesh);
-        brick_info >> dx[0] >> dx[1] >> dx[2] ;
         int n = 0;
         if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicx" || P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicy" || P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicz")
             n = 1;
         if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicxy" || P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicxz" || P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicyz")
             n = 2;
         LevelsetP2CL::perDirSetT pdir(n);
-        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicx") pdir[0][0] = dx[0];
-        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicy") pdir[0][1] = dx[1];
-        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicz") pdir[0][2] = dx[2];
-        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicxy") {pdir[0][0] = dx[0]; pdir[1][1] = dx[1];}
-        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicxz") {pdir[0][0] = dx[0]; pdir[1][2] = dx[2];}
-        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicyz") {pdir[0][1] = dx[1]; pdir[1][2] = dx[2];}
+        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicx") pdir[0] = P.get<Point3DCL>("Domain.E1");
+        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicy") pdir[0] = P.get<Point3DCL>("Domain.E2");
+        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicz") pdir[0] = P.get<Point3DCL>("Domain.E3");
+        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicxy") {pdir[0] = P.get<Point3DCL>("Domain.E1"); pdir[1] = P.get<Point3DCL>("Domain.E2");}
+        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicxz") {pdir[0] = P.get<Point3DCL>("Domain.E1"); pdir[1] = P.get<Point3DCL>("Domain.E3");}
+        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicyz") {pdir[0] = P.get<Point3DCL>("Domain.E2"); pdir[1] = P.get<Point3DCL>("Domain.E3");}
         if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) != "periodicx" && P.get("DomainCond.PeriodicMatching", std::string("periodicx")) != "periodicy" && P.get("DomainCond.PeriodicMatching", std::string("periodicx")) != "periodicz" &&
           P.get("DomainCond.PeriodicMatching", std::string("periodicx")) != "periodicxy" && P.get("DomainCond.PeriodicMatching", std::string("periodicx")) != "periodicxz" && P.get("DomainCond.PeriodicMatching", std::string("periodicx")) != "periodicyz"){
             std::cout << "WARNING: could not set periodic directions! Reparametrization can not work correctly now!" << std::endl;
