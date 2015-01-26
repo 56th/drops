@@ -99,6 +99,9 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
 void SetupPrStiff_P1D( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, MatrixCL& A_pr, IdxDescCL& RowIdx, IdxDescCL& ColIdx, const LevelsetP2CL& lset);
 //@}
 
+//helper routine for calculating P1P1 products like in mass matrix
+void computeLocalP2_pipj(LocalP2CL<> (&pipj)[4][4] );
+
 
 //*****************************************************************************
 //                               VelocityRepairCL

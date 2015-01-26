@@ -1491,6 +1491,38 @@ void SetupPrStiff_P1( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, M
     A.Build();
 }
 
+// helper function to compute a P2 element as a product of 2 P1 elements in a tetrahedron
+void computeLocalP2_pipj( LocalP2CL<> (&pipj)[4][4] ){
+
+    //loop over 4 vertices of tetrahedron
+    for(int i= 0; i < 4; ++i) {
+        // product is symmetric, loop until i suffices
+        for(int j= 0; j < i; ++j) {
+            // only overlap of 2 p1 shape functions
+            // is on the edge between them (unknown of p2 elem)
+            Uint p2unknown = EdgeByVert( i , j ) + 4; // first 4 unknowns are the vertices of the tet
+            // 1/2 * 1/2 = 0.25 -- values at midpoint of edge
+            pipj[i][j][p2unknown] = pipj[j][i][p2unknown] = 0.25;
+        }
+
+        // product of p_i * p_i
+        // one at node i
+        pipj[i][i][i]= 1.;
+        // compute values at outgoing 3 outgoing edges
+        for (int vert= 0; vert < 3; ++vert)
+        {
+            // opposite face is i; get vertices of that face
+            // this avoids getting vertex i again
+            Uint neighborVertex = VertOfFace( i, vert );
+            // as above get edgenumber and add 4  for vertex unknowns
+            Uint p2unknown = EdgeByVert( i, neighborVertex ) + 4;
+            // value at midpoint of edge
+            pipj[i][i][p2unknown]= 0.25;
+
+        }
+    }
+}
+
 /// \todo: As in SetupPrMass_P1X, replace the smoothed density-function with integration
 ///        over the inner and outer part.
 void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, MatrixCL& A_pr, IdxDescCL& RowIdx, IdxDescCL& ColIdx, const LevelsetP2CL& lset)
@@ -1502,7 +1534,7 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
     const Uint lvl= RowIdx.TriangLevel();
     const Uint idx= RowIdx.GetIdx();
     SMatrixCL<3,4> G;
-    double coup[4][4], coupT2[4][4];
+    double coup[4][4], coupT2[4][4], coupJump[4][4] = {};
     double det;
     double absdet;
     IdxT UnknownIdx[4];
@@ -1512,7 +1544,31 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
     const double rho_inv_p= 1./Coeff.rho(1.),
                  rho_inv_n= 1./Coeff.rho(-1.);
     LevelsetP2CL::const_DiscSolCL ls= lset.GetSolution();
-    LocalP2CL<> locallset, ones( 1.);
+    LocalP2CL<> locallset,
+            ones( 1.), // for volume integration
+            pipj[4][4]; // for jump at the interface
+
+    // triangle representing the interface, this is where the integration takes place
+    InterfaceTriangleCL triang;
+
+    // compute characteristic element length  h for Nitsche jump term lambda/h * int_gamma <[p_i],[p_j]>
+    // use cubic root of minimal volume
+    double h3 = std::numeric_limits<double>::max();
+    for (MultiGridCL::const_TriangTetraIteratorCL sit= MG.GetTriangTetraBegin( lvl),
+         send= MG.GetTriangTetraEnd( lvl); sit != send; ++sit)
+    {
+        h3 = std::min( h3, sit->GetVolume() );
+    }
+    // 6 * vol of tetra = vol of cube
+    double h = cbrt( 6 * h3 );
+
+    // compute values on reference tet for pipj
+    // jump values at the interface correspond to values of p1 basis function at interface (jump to zero)
+    // with multiplied by +1/-1 depending on the location of the basis function
+    computeLocalP2_pipj( pipj );
+
+    double lambda = 1; // read from input file as solver parameter
+    int cutcount = 0;
 
     for (MultiGridCL::const_TriangTetraIteratorCL sit= MG.GetTriangTetraBegin( lvl),
          send= MG.GetTriangTetraEnd( lvl); sit != send; ++sit)
@@ -1538,6 +1594,31 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
             }
             IntRhoInv_p= Vol_p*rho_inv_p;
             IntRhoInv=   Vol_p*rho_inv_p + Vol_n*rho_inv_n;
+
+            //initialize triangle for cut tetrahedron
+            triang.Init( *sit, locallset);
+            Uint ch = 8;
+            for( Uint iCh = 0; iCh < ch; ++iCh )
+            {
+                if( triang.ComputeForChild(iCh) )
+                    std::cout<< "child: " << iCh << " trias: " << triang.GetNumTriangles() << std::endl;
+                for( Uint cutTria = 0; cutTria < triang.GetNumTriangles(); ++cutTria )
+                {
+                    std::cout << triang.quad2D(pipj[1][1], cutTria) << std::endl;
+                }
+            }
+            std::cout << std::endl;
+            if (++cutcount == 3)
+                return;
+            cut.ComputeSubTets(ch);
+
+            Uint v0=0,v1=1,v2=2,v3=3,v4=4,v5=5,v6=6,v7=7,v8=8,v9=9;
+
+            // subtetras need to be computed
+            // triangs need to be created for intersected subtet
+
+            // compute local matrices below
+            // quad2d on trias
         }
 
         // compute local matrices
