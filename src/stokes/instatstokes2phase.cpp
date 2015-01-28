@@ -1525,7 +1525,7 @@ void computeLocalP2_pipj( LocalP2CL<> (&pipj)[4][4] ){
 
 /// \todo: As in SetupPrMass_P1X, replace the smoothed density-function with integration
 ///        over the inner and outer part.
-void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, MatrixCL& A_pr, IdxDescCL& RowIdx, IdxDescCL& ColIdx, const LevelsetP2CL& lset)
+void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, MatrixCL& A_pr, IdxDescCL& RowIdx, IdxDescCL& ColIdx, const LevelsetP2CL& lset, double lambda=1.0)
 {
     ScopeTimerCL scope("SetupPrStiff_P1X");
 
@@ -1534,7 +1534,7 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
     const Uint lvl= RowIdx.TriangLevel();
     const Uint idx= RowIdx.GetIdx();
     SMatrixCL<3,4> G;
-    double coup[4][4], coupT2[4][4], coupJump[4][4] = {};
+    double coup[4][4], coupT2[4][4];
     double det;
     double absdet;
     IdxT UnknownIdx[4];
@@ -1559,20 +1559,24 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
     {
         h3 = std::min( h3, sit->GetVolume() );
     }
-    // 6 * vol of tetra = vol of cube
+    // 6 * vol of tetra = vol of cube    
     double h = cbrt( 6 * h3 );
 
     // compute values on reference tet for pipj
     // jump values at the interface correspond to values of p1 basis function at interface (jump to zero)
-    // with multiplied by +1/-1 depending on the location of the basis function
+    // multiplied by +1/-1 depending on the location of the basis function
+    // sign not relevant for jump terms (see below)
     computeLocalP2_pipj( pipj );
 
-    double lambda = 1; // read from input file as solver parameter
-    int cutcount = 0;
+    //double lambda = 1; // read from input file as solver parameter
 
     for (MultiGridCL::const_TriangTetraIteratorCL sit= MG.GetTriangTetraBegin( lvl),
          send= MG.GetTriangTetraEnd( lvl); sit != send; ++sit)
     {
+        //element matrix for jump terms
+        //redefined and set to zero for every tetrahedron
+        double coupJump[4][4] = {};
+
         locallset.assign( *sit, ls);
         cut.Init( *sit, locallset);
         const bool nocut= !cut.Intersects();
@@ -1597,28 +1601,7 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
 
             //initialize triangle for cut tetrahedron
             triang.Init( *sit, locallset);
-            Uint ch = 8;
-            for( Uint iCh = 0; iCh < ch; ++iCh )
-            {
-                if( triang.ComputeForChild(iCh) )
-                    std::cout<< "child: " << iCh << " trias: " << triang.GetNumTriangles() << std::endl;
-                for( Uint cutTria = 0; cutTria < triang.GetNumTriangles(); ++cutTria )
-                {
-                    std::cout << triang.quad2D(pipj[1][1], cutTria) << std::endl;
-                }
-            }
-            std::cout << std::endl;
-            if (++cutcount == 3)
-                return;
-            cut.ComputeSubTets(ch);
 
-            Uint v0=0,v1=1,v2=2,v3=3,v4=4,v5=5,v6=6,v7=7,v8=8,v9=9;
-
-            // subtetras need to be computed
-            // triangs need to be created for intersected subtet
-
-            // compute local matrices below
-            // quad2d on trias
         }
 
         // compute local matrices
@@ -1642,6 +1625,31 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
             }
         }
 
+        //compute jump terms; on cut elements only
+        // loop over refinement; 8 children for tetrahedron
+        if( !nocut )
+        {
+            for( Uint iCh = 0; iCh < 8; ++iCh )
+            {
+                //compute possible cuts for child iCh
+                triang.ComputeForChild( iCh );                
+
+                // compute part of the integral on cut triangle 0,1,2 (no cut, triang cut, quad cut)                
+                for( Uint cutTria = 0; cutTria < (Uint) triang.GetNumTriangles(); ++cutTria )
+                {
+                    //loop over possible combinations
+                    for( int i = 0; i < 4; ++i )
+                    {
+                        for( int j = 0; j<=i; ++j )
+                        {
+                            coupJump[i][j] += triang.quad2D( pipj[i][j] , cutTria ); // add parts triangle
+                            coupJump[j][i] = coupJump[i][j]; // symmetrize
+                        }
+                    }                    
+                }
+            }
+        }
+
         // write values into matrix
         for(int i=0; i<4; ++i)
         {
@@ -1657,8 +1665,19 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
                     A( UnknownIdx[i], xidx_j)+= coupT2[i][j] - sign[j]*coup[i][j];
                 if (xidx_i!=NoIdx)
                     A( xidx_i, UnknownIdx[j])+= coupT2[i][j] - sign[i]*coup[i][j];
-                if (xidx_i!=NoIdx && xidx_j!=NoIdx && sign[i]==sign[j])
-                    A( xidx_i, xidx_j)+= sign[i] ? coup[i][j] - coupT2[i][j] : coupT2[i][j];
+                if (xidx_i!=NoIdx && xidx_j!=NoIdx)
+                {                    
+                    if( sign[i] == sign[j] )
+                    {
+                        A( xidx_i, xidx_j)+= sign[i] ? coup[i][j] - coupT2[i][j] : coupT2[i][j];                        
+                    }
+
+                    //jump part -- has only effect on extended basis functions
+                    // no distinction between location of wrt the interface: [f] := f|_1 - f|_2
+                    // either f|_1 or f|_2 is zero, ext basis fcts have pos sign in omega_2 and neg sign in omega_1
+                    // jumps do always have the same sign (namely negative), hence a positive product [px_i][px_j]
+                    A( xidx_i, xidx_j) += lambda / h * coupJump[i][j];
+                }
             }
         }
     }
@@ -1788,7 +1807,7 @@ void InstatStokes2PhaseP2P1CL::SetupC( MLMatDescCL* matC, const LevelsetP2CL& ls
     }
 }
 
-void InstatStokes2PhaseP2P1CL::SetupPrStiff( MLMatDescCL* A_pr, const LevelsetP2CL& lset) const
+void InstatStokes2PhaseP2P1CL::SetupPrStiff( MLMatDescCL* A_pr, const LevelsetP2CL& lset, double lambda ) const
 /// Needed for preconditioning of the Schur complement. Uses natural
 /// boundary conditions for the pressure unknowns.
 {
@@ -1802,7 +1821,7 @@ void InstatStokes2PhaseP2P1CL::SetupPrStiff( MLMatDescCL* A_pr, const LevelsetP2
         case P1_FE:
             SetupPrStiff_P1( MG_, Coeff_, *itM, *itRowIdx, *itColIdx, lset); break;
         case P1X_FE:
-            SetupPrStiff_P1X( MG_, Coeff_, *itM, *itRowIdx, *itColIdx, lset); break;
+            SetupPrStiff_P1X( MG_, Coeff_, *itM, *itRowIdx, *itColIdx, lset, lambda); break;
         case P1D_FE:
             SetupPrStiff_P1D( MG_, Coeff_, *itM, *itRowIdx, *itColIdx, lset); break;
         default:

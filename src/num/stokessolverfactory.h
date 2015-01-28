@@ -378,12 +378,12 @@ StokesSolverFactoryCL<StokesT, ProlongationVelT, ProlongationPT>::
         kA_(P.get<int>("Time.NumSteps") != 0 ? 1.0/P.get<double>("Time.StepSize") : 0.0), // P.get<int>("Time.NumSteps") == 0: stat. problem
         kM_(P.get<double>("Stokes.Theta")),
         // schur complement preconditioner
+        nopc_ (kA_,kM_),
         bbtispc_    ( &Stokes_.B.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(), &Stokes_.M.Data.GetFinest(), Stokes_.pr_idx.GetFinest(), kA_, kM_, P.get<double>("Stokes.PcSTol"), P.get<double>("Stokes.PcSTol") /* enable regularization: , 0.707*/),
         bbtis_Stab_pc_    ( &Stokes_.B.Data.GetFinest(), &Stokes_.C.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(), &Stokes_.M.Data.GetFinest(), Stokes_.pr_idx.GetFinest(), kA_, kM_, P.get<double>("Stokes.PcSTol"), P.get<double>("Stokes.PcSTol") /* enable regularization: , 0.707*/),
         mincommispc_( 0, &Stokes_.B.Data.GetFinest(), &Stokes_.M.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(),Stokes_.pr_idx.GetFinest(), P.get<double>("Stokes.PcSTol") /* enable regularization: , 0.707*/),
         bdinvbtispc_( 0, &Stokes_.B.Data.GetFinest(), &Stokes_.M.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(),Stokes_.pr_idx.GetFinest(), P.get<double>("Stokes.PcSTol") /* enable regularization: , 0.707*/),
         vankaschurpc_( &Stokes.pr_idx), isprepc_( Stokes.prA.Data, Stokes.prM.Data, kA_, kM_),
-        nopc_ (kA_,kM_),
         ismgpre_( Stokes.prA.Data, Stokes.prM.Data, kA_, kM_, Stokes.pr_idx),
         isnonlinearprepc1_( symmPcPc_, 100, P.get<double>("Stokes.PcSTol"), true),
         isnonlinearprepc2_( symmPcPc_, 100, P.get<double>("Stokes.PcSTol"), true),

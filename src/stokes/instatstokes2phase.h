@@ -218,7 +218,7 @@ class InstatStokes2PhaseP2P1CL : public ProblemCL<TwoPhaseFlowCoeffCL, StokesBnd
     /// Set up the stabilisation matrix for the pressure.
     void SetupC( MLMatDescCL* matC, const LevelsetP2CL& lset, double eps_p ) const;
     /// Set up the stiffness matrix for the pressure, scaled by \f$\rho^{-1}\f$.
-    void SetupPrStiff(MLMatDescCL* prA, const LevelsetP2CL& lset) const;
+    void SetupPrStiff(MLMatDescCL* prA, const LevelsetP2CL& lset, double lambda=1.0) const;
     //@}
 
     /// Initialize velocity field
