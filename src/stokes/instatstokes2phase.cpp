@@ -1528,6 +1528,7 @@ void computeLocalP2_pipj( LocalP2CL<> (&pipj)[4][4] ){
 void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, MatrixCL& A_pr, IdxDescCL& RowIdx, IdxDescCL& ColIdx, const LevelsetP2CL& lset, double lambda=1.0)
 {
     ScopeTimerCL scope("SetupPrStiff_P1X");
+    bool reduced = true;
 
     const ExtIdxDescCL& Xidx= RowIdx.GetXidx();
     MatrixBuilderCL A( &A_pr, RowIdx.NumUnknowns(), ColIdx.NumUnknowns());
@@ -1553,6 +1554,7 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
 
     // compute characteristic element length  h for Nitsche jump term lambda/h * int_gamma <[p_i],[p_j]>
     // use cubic root of minimal volume
+    /*
     double h3 = std::numeric_limits<double>::max();
     for (MultiGridCL::const_TriangTetraIteratorCL sit= MG.GetTriangTetraBegin( lvl),
          send= MG.GetTriangTetraEnd( lvl); sit != send; ++sit)
@@ -1561,6 +1563,7 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
     }
     // 6 * vol of tetra = vol of cube    
     double h = cbrt( 6 * h3 );
+    */
 
     // compute values on reference tet for pipj
     // jump values at the interface correspond to values of p1 basis function at interface (jump to zero)
@@ -1576,6 +1579,7 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
         //element matrix for jump terms
         //redefined and set to zero for every tetrahedron
         double coupJump[4][4] = {};
+        double h = cbrt( 6 * sit->GetVolume() );
 
         locallset.assign( *sit, ls);
         cut.Init( *sit, locallset);
@@ -1617,11 +1621,19 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
             if (nocut) continue; // extended basis functions have only support on tetra intersecting Gamma!
 
             sign[i]= cut.GetSign(i)==1;
-            for(int j=0; j<=i; ++j) {
-                // compute the integrals
-                // \int_{T_2} grad_i grad_j dx,    where T_2 = T \cap \Omega_2
-                coupT2[j][i]= ( G( 0, i)*G( 0, j) + G( 1, i)*G( 1, j) + G( 2, i)*G( 2, j) )*IntRhoInv_p;
-                coupT2[i][j]= coupT2[j][i];
+            // assemble only diagonal of xfem block
+            if( reduced )
+            {
+                coupT2[i][i] = ( G( 0, i)*G( 0, i) + G( 1, i)*G( 1, i) + G( 2, i)*G( 2, i) )*IntRhoInv_p;
+            }
+            else
+            {
+                for(int j=0; j<=i; ++j) {
+                    // compute the integrals
+                    // \int_{T_2} grad_i grad_j dx,    where T_2 = T \cap \Omega_2
+                    coupT2[j][i]= ( G( 0, i)*G( 0, j) + G( 1, i)*G( 1, j) + G( 2, i)*G( 2, j) )*IntRhoInv_p;
+                    coupT2[i][j]= coupT2[j][i];
+                }
             }
         }
 
@@ -1658,25 +1670,36 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
             if (nocut) continue; // extended basis functions have only support on tetra intersecting Gamma!
 
             const IdxT xidx_i= Xidx[UnknownIdx[i]];
-            for(int j=0; j<4; ++j) // write values for extended basis functions
+            if (reduced)
             {
-                const IdxT xidx_j= Xidx[UnknownIdx[j]];
-                if (xidx_j!=NoIdx)
-                    A( UnknownIdx[i], xidx_j)+= coupT2[i][j] - sign[j]*coup[i][j];
-                if (xidx_i!=NoIdx)
-                    A( xidx_i, UnknownIdx[j])+= coupT2[i][j] - sign[i]*coup[i][j];
-                if (xidx_i!=NoIdx && xidx_j!=NoIdx)
-                {                    
-                    if( sign[i] == sign[j] )
+                if( xidx_i != NoIdx )
+                {
+                    A( xidx_i, xidx_i ) += sign[i] ? coup[i][i] - coupT2[i][i] : coupT2[i][i];
+                    A( xidx_i, xidx_i ) += lambda / h * coupJump[i][i];
+                }
+            }
+            else
+            {
+                for(int j=0; j<4; ++j) // write values for extended basis functions
+                {
+                    const IdxT xidx_j= Xidx[UnknownIdx[j]];
+                    if (xidx_j!=NoIdx)
+                        A( UnknownIdx[i], xidx_j)+= coupT2[i][j] - sign[j]*coup[i][j];
+                    if (xidx_i!=NoIdx)
+                        A( xidx_i, UnknownIdx[j])+= coupT2[i][j] - sign[i]*coup[i][j];
+                    if (xidx_i!=NoIdx && xidx_j!=NoIdx)
                     {
-                        A( xidx_i, xidx_j)+= sign[i] ? coup[i][j] - coupT2[i][j] : coupT2[i][j];                        
-                    }
+                        if( sign[i] == sign[j] )
+                        {
+                            A( xidx_i, xidx_j)+= sign[i] ? coup[i][j] - coupT2[i][j] : coupT2[i][j];
+                        }
 
-                    //jump part -- has only effect on extended basis functions
-                    // no distinction between location of wrt the interface: [f] := f|_1 - f|_2
-                    // either f|_1 or f|_2 is zero, ext basis fcts have pos sign in omega_2 and neg sign in omega_1
-                    // jumps do always have the same sign (namely negative), hence a positive product [px_i][px_j]
-                    A( xidx_i, xidx_j) += lambda / h * coupJump[i][j];
+                        //jump part -- has only effect on extended basis functions
+                        // no distinction between location of wrt the interface: [f] := f|_1 - f|_2
+                        // either f|_1 or f|_2 is zero, ext basis fcts have pos sign in omega_2 and neg sign in omega_1
+                        // jumps do always have the same sign (namely negative), hence a positive product [px_i][px_j]
+                        A( xidx_i, xidx_j) += lambda / h * coupJump[i][j];
+                    }
                 }
             }
         }

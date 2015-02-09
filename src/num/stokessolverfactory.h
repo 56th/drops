@@ -42,7 +42,7 @@ enum APcE {
 
 /// codes for the pressure Schur complement preconditioners
 enum SPcE {
-    ISBBT_SPC= 1, ISBBT_Stab_SPC = 11, NoPre_SPC=12, MinComm_SPC= 2, ISPre_SPC= 3, ISMG_SPC= 7, BDinvBT_SPC= 5, SIMPLER_SPC=8, MSIMPLER_SPC=9, VankaSchur_SPC= 4, VankaBlock_SPC=6, ISNonlinear_SPC=10
+    ISBBT_SPC= 1, ISBBT_Stab_SPC = 11, NoPre_SPC=12, IsXstab_SPC = 13, MinComm_SPC= 2, ISPre_SPC= 3, ISMG_SPC= 7, BDinvBT_SPC= 5, SIMPLER_SPC=8, MSIMPLER_SPC=9, VankaSchur_SPC= 4, VankaBlock_SPC=6, ISNonlinear_SPC=10
 };
 
 /// collects some information on the different Oseen solvers and preconditioners
@@ -79,9 +79,10 @@ struct StokesSolverInfoCL
     static std::string GetSchurPreName( int pre) {
         switch(pre) {
             case ISBBT_SPC:        return "ISBBT (modified Cahouet-Chabard)";
-            case ISBBT_Stab_SPC:    return "ISBBT_Stab  (modified for pressure Stabilisation)";
+            case ISBBT_Stab_SPC:   return "ISBBT_Stab  (modified for pressure Stabilisation)";
             case MinComm_SPC:      return "MinComm (minimal commutator)";
             case ISPre_SPC:        return "ISPre (Cahouet-Chabard)";
+            case IsXstab_SPC:      return "IsXstab (modified Cahouet-Chabard for stabilization)";
             case ISNonlinear_SPC:  return "ISNonlinearPreCL (Cahouet-Chabard)";
             case ISMG_SPC:         return "ISMGPre (multigrid Cahouet-Chabard)";
             case BDinvBT_SPC:      return "B D^-1 B^T";
@@ -122,6 +123,7 @@ struct StokesSolverInfoCL
     <tr><td>  9 </td><td>                   </td><td>                                    </td><td> MSIMPLER                     </td></tr>
     <tr><td> 11 </td><td>                   </td><td>                                    </td><td> ISBBT_Stab_PreCL             </td></tr>
     <tr><td> 12 </td><td>                   </td><td>                                    </td><td> NoPreCL                      </td></tr>
+    <tr><td> 13 </td><td>                   </td><td>                                    </td><td> IsXstabPreCL                 </td></tr>
     <tr><td> 20 </td><td>                   </td><td> HYPRE-AMG                          </td><td>                              </td></tr>
     <tr><td> 30 </td><td> StokesMGM         </td><td> PVankaSmootherCL                   </td><td> PVankaSmootherCL             </td></tr>
     <tr><td> 31 </td><td>                   </td><td> BSSmootherCL                       </td><td> BSSmootherCL                 </td></tr>
@@ -214,6 +216,7 @@ class StokesSolverFactoryCL : public StokesSolverFactoryBaseCL<StokesT, Prolonga
     BDinvBTPreCL    bdinvbtispc_;
     VankaSchurPreCL vankaschurpc_;
     ISPreCL         isprepc_;
+    IsXstabPreCL    isxstabpc_;
     ISMGPreCL<ProlongationPT> ismgpre_;
     typedef PCGSolverCL<SymmPcPcT> PCGSolverT;
     PCGSolverT isnonlinearprepc1_, isnonlinearprepc2_;
@@ -384,6 +387,7 @@ StokesSolverFactoryCL<StokesT, ProlongationVelT, ProlongationPT>::
         mincommispc_( 0, &Stokes_.B.Data.GetFinest(), &Stokes_.M.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(),Stokes_.pr_idx.GetFinest(), P.get<double>("Stokes.PcSTol") /* enable regularization: , 0.707*/),
         bdinvbtispc_( 0, &Stokes_.B.Data.GetFinest(), &Stokes_.M.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(),Stokes_.pr_idx.GetFinest(), P.get<double>("Stokes.PcSTol") /* enable regularization: , 0.707*/),
         vankaschurpc_( &Stokes.pr_idx), isprepc_( Stokes.prA.Data, Stokes.prM.Data, kA_, kM_),
+        isxstabpc_( &Stokes_.prA.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(), &Stokes_.C.Data.GetFinest(), kA_, kM_, P.get<double>("Stokes.PcSTol"), P.get<double>("Stokes.PcSTol"), P.get<int>("Stokes.PcAIter"), &std::cout),
         ismgpre_( Stokes.prA.Data, Stokes.prM.Data, kA_, kM_, Stokes.pr_idx),
         isnonlinearprepc1_( symmPcPc_, 100, P.get<double>("Stokes.PcSTol"), true),
         isnonlinearprepc2_( symmPcPc_, 100, P.get<double>("Stokes.PcSTol"), true),
@@ -498,16 +502,17 @@ SchurPreBaseCL* StokesSolverFactoryCL<StokesT, ProlongationVelT, ProlongationPT>
 {
     switch (SPc_) {
         case ISBBT_SPC:      return &bbtispc_;
-        case ISBBT_Stab_SPC:  return &bbtis_Stab_pc_;
+        case ISBBT_Stab_SPC: return &bbtis_Stab_pc_;
         case MinComm_SPC:    return &mincommispc_;
         case ISPre_SPC:      return &isprepc_;
+        case IsXstab_SPC:    return &isxstabpc_;
         case ISMG_SPC:       return &ismgpre_;
         case SIMPLER_SPC:
         case MSIMPLER_SPC:
         case BDinvBT_SPC:    return &bdinvbtispc_;
         case VankaSchur_SPC: return &vankaschurpc_;
         case ISNonlinear_SPC:return &isnonlinearpc_;
-        case NoPre_SPC:     return &nopc_;
+        case NoPre_SPC:      return &nopc_;
         default:             return 0;
     }
 }
