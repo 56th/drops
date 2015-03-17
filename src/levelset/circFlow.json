@@ -3,35 +3,35 @@
 "
 #======================================================================
 #    DROPS parameter file for prJump
-#    simulation of the static droplet governed by the stokes equation
-#    study the accuarcy and stability of various discretisations
+#    simulation of a static droplet governed by the stokes equation
+#    with circular flowfield (as in paper by Kirchhart, AR, SG)
 #======================================================================
 ",
     "Stokes":
     {
         "_comment": "# flow solver",
-        "StokesMethod": "10211",
+        "StokesMethod": "30211",
         "XFEMStab": "0",
 
         "InnerIter": "1000",
         "OuterIter": "1000",
         "InnerTol": "0.6",
-        "OuterTol": "1e-09",
-        "PcAIter": "100",
+        "OuterTol": "1e-9",
+        "PcAIter": "10",
         "PcATol": "0.01",
         "PcSTol": "0.01",
         "Theta": "1",
-        "epsP": "0",
+        "epsP": "1",
         "PrintMatrices": "false"
     },
 
     "AdaptRef":
     {
         "_comment": "# adaptive refinement",
-        "Freq": "0",
-        "FinestLevel": "3",
+        "Freq": "2",
+        "FinestLevel": "0",
         "CoarsestLevel": "0",
-        "Width": "1e-08",
+        "Width": "100",  // uniform refinement
         "LoadBalStrategy": "1011"
     },
 
@@ -42,9 +42,7 @@
         "ViscDrop": "1",
         "DensFluid": "1",
         "ViscFluid": "1",
-        "SmoothZone": "1e-05",
-        "ShearVisco": "0",
-        "DilatationalVisco": "0"
+        "SmoothZone": "1e-05"
     },
 
     "Exp":
@@ -79,8 +77,9 @@
     "SurfTens":
     {
         "_comment": "# surface tension",
-        "SurfTension": "1",
-        "ArtificialForce": "0",
+        "SurfTension": "10",
+        "ArtificialForce": "1",
+        
         "VarTension": "0",
         "JumpWidth": "0",
         "RelPos": "0",
