@@ -56,6 +56,9 @@
 #include <fstream>
 #include <sstream>
 
+#ifndef _PAR
+#include "num/stokespardiso.h" 
+#endif
 #include "misc/progressaccu.h"
 #include "misc/dynamicload.h"
 
@@ -116,26 +119,18 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
     if (is_periodic) //CL: Anyone a better idea? perDirection from ParameterFile?
     {
-        DROPS::Point3DCL dx;
-        //hack:
-        std::string mesh( P.get<std::string>("DomainCond.MeshFile")), delim("x@");
-        size_t idx_;
-        while ((idx_= mesh.find_first_of( delim)) != std::string::npos )
-            mesh[idx_]= ' ';
-        std::istringstream brick_info( mesh);
-        brick_info >> dx[0] >> dx[1] >> dx[2] ;
         int n = 0;
         if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicx" || P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicy" || P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicz")
             n = 1;
         if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicxy" || P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicxz" || P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicyz")
             n = 2;
         LevelsetP2CL::perDirSetT pdir(n);
-        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicx") pdir[0][0] = dx[0];
-        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicy") pdir[0][1] = dx[1];
-        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicz") pdir[0][2] = dx[2];
-        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicxy") {pdir[0][0] = dx[0]; pdir[1][1] = dx[1];}
-        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicxz") {pdir[0][0] = dx[0]; pdir[1][2] = dx[2];}
-        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicyz") {pdir[0][1] = dx[1]; pdir[1][2] = dx[2];}
+        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicx") pdir[0] = P.get<Point3DCL>("Domain.E1");
+        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicy") pdir[0] = P.get<Point3DCL>("Domain.E2");
+        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicz") pdir[0] = P.get<Point3DCL>("Domain.E3");
+        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicxy") {pdir[0] = P.get<Point3DCL>("Domain.E1"); pdir[1] = P.get<Point3DCL>("Domain.E2");}
+        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicxz") {pdir[0] = P.get<Point3DCL>("Domain.E1"); pdir[1] = P.get<Point3DCL>("Domain.E3");}
+        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicyz") {pdir[0] = P.get<Point3DCL>("Domain.E2"); pdir[1] = P.get<Point3DCL>("Domain.E3");}
         if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) != "periodicx" && P.get("DomainCond.PeriodicMatching", std::string("periodicx")) != "periodicy" && P.get("DomainCond.PeriodicMatching", std::string("periodicx")) != "periodicz" &&
           P.get("DomainCond.PeriodicMatching", std::string("periodicx")) != "periodicxy" && P.get("DomainCond.PeriodicMatching", std::string("periodicx")) != "periodicxz" && P.get("DomainCond.PeriodicMatching", std::string("periodicx")) != "periodicyz"){
             std::cout << "WARNING: could not set periodic directions! Reparametrization can not work correctly now!" << std::endl;
@@ -287,7 +282,18 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
     // Stokes-Solver
     StokesSolverFactoryCL<InstatNavierStokes2PhaseP2P1CL> stokessolverfactory(Stokes, P);
-    StokesSolverBaseCL* stokessolver = stokessolverfactory.CreateStokesSolver();
+    StokesSolverBaseCL* stokessolver;
+
+    if (! P.get<int>("Stokes.DirectSolve"))
+        stokessolver = stokessolverfactory.CreateStokesSolver();
+#ifndef _PAR
+    else
+        stokessolver = new StokesPardisoSolverCL(); 
+#else
+    else
+        throw DROPSErrCL("no direct solver in parallel");
+#endif
+
 //  comment: construction of a oseen solver, preconditioned by another oseen solver,
 //           e.g. GCR preconditioned by Vanka-MG, do not forget to delete stokessolver1 at the end of strategy
 //
@@ -570,6 +576,7 @@ void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<double>("Mat.DilatationalVisco", 0.0);
     P.put_if_unset<double>("SurfTens.ShearVisco", 0.0);
     P.put_if_unset<double>("SurfTens.DilatationalVisco", 0.0);
+    P.put_if_unset<int>("Stokes.DirectSolve", 0);
 
     P.put_if_unset<int>("General.ProgressBar", 0);
     P.put_if_unset<std::string>("General.DynamicLibsPrefix", "../");
