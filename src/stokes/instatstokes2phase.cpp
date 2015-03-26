@@ -1528,7 +1528,7 @@ void computeLocalP2_pipj( LocalP2CL<> (&pipj)[4][4] ){
 void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, MatrixCL& A_pr, IdxDescCL& RowIdx, IdxDescCL& ColIdx, const LevelsetP2CL& lset, double lambda=1.0)
 {
     ScopeTimerCL scope("SetupPrStiff_P1X");
-    bool reduced = true;
+    bool reduced = false;
 
     const ExtIdxDescCL& Xidx= RowIdx.GetXidx();
     MatrixBuilderCL A( &A_pr, RowIdx.NumUnknowns(), ColIdx.NumUnknowns());
@@ -1828,6 +1828,71 @@ void InstatStokes2PhaseP2P1CL::SetupC( MLMatDescCL* matC, const LevelsetP2CL& ls
             itC->resize( num_unks_pr, num_unks_pr, 0 );
         }
     }
+
+    //delete old version of kernel (if there is any)
+    //if( cKernel != NULL )
+      //  delete cKernel;
+    //compute new  kernel of c
+    //cKernel = new CkernelCL( MG_, lset, pr_idx.GetFinest() );
+    computeGhostPenaltyKernel( MG_ , lset , pr_idx.GetFinest() );
+
+
+}
+
+void InstatStokes2PhaseP2P1CL::computeGhostPenaltyKernel(MultiGridCL &mg, const LevelsetP2CL &lset, const IdxDescCL &prIdx) const
+{
+    Uint lvl = mg.GetNumLevel() - 1;
+    //Uint size = mg_.GetTriangVertex().size();
+    IdxT size = prIdx.NumUnknowns();
+    ExtIdxDescCL xidxdesc = prIdx.GetXidx();
+
+    //cKernelVecs = VectorBaseCL<VectorCL>( VectorCL(0.0, (size_t)size), 8 );
+    cKernel = VectorBaseCL<VectorCL>( VectorCL(0.0, (size_t)size), 8 );
+
+    for(MultiGridCL::TriangVertexIteratorCL vit   = mg.GetTriangVertexBegin(lvl),
+        vend  = mg.GetTriangVertexEnd(lvl) ; vit!=vend ; ++vit)
+    {
+        IdxT idx = vit->Unknowns( prIdx.GetIdx() );
+        IdxT xidx = xidxdesc[idx];
+
+        double xcoord,ycoord,zcoord;
+
+        Point3DCL coord = vit->GetCoord();
+        xcoord  = coord[0];
+        ycoord  = coord[1];
+        zcoord  = coord[2];
+
+        // const function
+        cKernel[0][idx] = 1;
+        // linear function in x direction
+        cKernel[1][idx] = xcoord;
+        // linear function in y direction
+        cKernel[2][idx] = ycoord;
+        // linear function in z direction
+        cKernel[3][idx] = zcoord;
+
+        if ( InterfacePatchCL::Sign( lset.GetSolution().val(*vit) ) != 1 )
+        {
+            // const func in omega 1
+            cKernel[4][idx] = 1;
+            // lin func in x in omega 1
+            cKernel[5][idx] = xcoord;
+            // lin func in y in omega 1
+            cKernel[6][idx] = ycoord;
+            // lin func in z in omega 1
+            cKernel[7][idx] = zcoord;
+        }
+        if ( xidx != NoIdx )
+        {
+            // in omega 1: ext basis funs have opposite sign
+            cKernel[4][xidx] = -1;
+            cKernel[5][xidx] = -xcoord;
+            cKernel[6][xidx] = -ycoord;
+            cKernel[7][xidx] = -zcoord;
+        }
+
+    }
+
 }
 
 void InstatStokes2PhaseP2P1CL::SetupPrStiff( MLMatDescCL* A_pr, const LevelsetP2CL& lset, double lambda ) const
@@ -4053,6 +4118,65 @@ void SetupLumpedMass (const MultiGridCL& MG, VectorCL& M, const IdxDescCL& RowId
     default:
         throw DROPSErrCL("SetupLumpedMass not implemented for this FE type");
     }
+}
+
+CkernelCL::CkernelCL(MultiGridCL &mg, const LevelsetP2CL &lset, const IdxDescCL& prIdx)
+{
+    std::cout << "calling constructor" << std::endl;
+    //mg_ = mg;
+    //lset_ = lset;
+    Uint lvl = mg.GetNumLevel() - 1;
+    //Uint size = mg_.GetTriangVertex().size();
+    IdxT size = prIdx.NumUnknowns();
+    ExtIdxDescCL xidxdesc = prIdx.GetXidx();
+
+    //cKernelVecs = VectorBaseCL<VectorCL>( VectorCL(0.0, (size_t)size), 8 );
+    cKernelVecs = VectorBaseCL<VectorCL>( VectorCL(0.0, (size_t)size), 8 );
+
+    for(MultiGridCL::TriangVertexIteratorCL vit   = mg.GetTriangVertexBegin(lvl),
+        vend  = mg.GetTriangVertexEnd(lvl) ; vit!=vend ; ++vit)
+    {
+        IdxT idx = vit->Unknowns( prIdx.GetIdx() );
+        IdxT xidx = xidxdesc[idx];
+
+        double xcoord,ycoord,zcoord;
+
+        Point3DCL coord = vit->GetCoord();
+        xcoord  = coord[0];
+        ycoord  = coord[1];
+        zcoord  = coord[2];
+
+        // const function
+        cKernelVecs[0][idx] = 1;
+        // linear function in x direction
+        cKernelVecs[1][idx] = xcoord;
+        // linear function in y direction
+        cKernelVecs[2][idx] = ycoord;
+        // linear function in z direction
+        cKernelVecs[3][idx] = zcoord;
+
+        if ( InterfacePatchCL::Sign( lset.GetSolution().val(*vit) ) != 1 )
+        {
+            // const func in omega 1
+            cKernelVecs[4][idx] = 1;
+            // lin func in x in omega 1
+            cKernelVecs[5][idx] = xcoord;
+            // lin func in y in omega 1
+            cKernelVecs[6][idx] = ycoord;
+            // lin func in z in omega 1
+            cKernelVecs[7][idx] = zcoord;
+        }
+        if ( xidx != NoIdx )
+        {
+            // in omega 1: ext basis funs have opposite sign
+            cKernelVecs[4][xidx] = -1;
+            cKernelVecs[5][xidx] = -xcoord;
+            cKernelVecs[6][xidx] = -ycoord;
+            cKernelVecs[7][xidx] = -zcoord;
+        }
+
+    }
+
 }
 
 } // end of namespace DROPS

@@ -42,7 +42,7 @@ enum APcE {
 
 /// codes for the pressure Schur complement preconditioners
 enum SPcE {
-    ISBBT_SPC= 1, ISBBT_Stab_SPC = 11, NoPre_SPC=12, IsXstab_SPC = 13, MinComm_SPC= 2, ISPre_SPC= 3, ISMG_SPC= 7, BDinvBT_SPC= 5, SIMPLER_SPC=8, MSIMPLER_SPC=9, VankaSchur_SPC= 4, VankaBlock_SPC=6, ISNonlinear_SPC=10
+    ISBBT_SPC= 1, ISBBT_Stab_SPC = 11, NoPre_SPC=12, IsXstab_SPC = 13, IsXmod_SPC =14, MinComm_SPC= 2, ISPre_SPC= 3, ISMG_SPC= 7, BDinvBT_SPC= 5, SIMPLER_SPC=8, MSIMPLER_SPC=9, VankaSchur_SPC= 4, VankaBlock_SPC=6, ISNonlinear_SPC=10
 };
 
 /// collects some information on the different Oseen solvers and preconditioners
@@ -83,6 +83,7 @@ struct StokesSolverInfoCL
             case MinComm_SPC:      return "MinComm (minimal commutator)";
             case ISPre_SPC:        return "ISPre (Cahouet-Chabard)";
             case IsXstab_SPC:      return "IsXstab (modified Cahouet-Chabard for stabilization)";
+            case IsXmod_SPC:       return "IsXmod (Cahouet-Chabard for ghost penalty) no kernel consideration";
             case ISNonlinear_SPC:  return "ISNonlinearPreCL (Cahouet-Chabard)";
             case ISMG_SPC:         return "ISMGPre (multigrid Cahouet-Chabard)";
             case BDinvBT_SPC:      return "B D^-1 B^T";
@@ -217,6 +218,7 @@ class StokesSolverFactoryCL : public StokesSolverFactoryBaseCL<StokesT, Prolonga
     VankaSchurPreCL vankaschurpc_;
     ISPreCL         isprepc_;
     IsXstabPreCL    isxstabpc_;
+    IsXprmod        isxprmodpc_;
     ISMGPreCL<ProlongationPT> ismgpre_;
     typedef PCGSolverCL<SymmPcPcT> PCGSolverT;
     PCGSolverT isnonlinearprepc1_, isnonlinearprepc2_;
@@ -387,7 +389,8 @@ StokesSolverFactoryCL<StokesT, ProlongationVelT, ProlongationPT>::
         mincommispc_( 0, &Stokes_.B.Data.GetFinest(), &Stokes_.M.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(),Stokes_.pr_idx.GetFinest(), P.get<double>("Stokes.PcSTol") /* enable regularization: , 0.707*/),
         bdinvbtispc_( 0, &Stokes_.B.Data.GetFinest(), &Stokes_.M.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(),Stokes_.pr_idx.GetFinest(), P.get<double>("Stokes.PcSTol") /* enable regularization: , 0.707*/),
         vankaschurpc_( &Stokes.pr_idx), isprepc_( Stokes.prA.Data, Stokes.prM.Data, kA_, kM_),
-        isxstabpc_( &Stokes_.prA.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(), &Stokes_.C.Data.GetFinest(), kA_, kM_, P.get<double>("Stokes.PcSTol"), P.get<double>("Stokes.PcSTol"), P.get<int>("Stokes.PcAIter"), &std::cout),
+        isxstabpc_( &Stokes_.prA.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(), &Stokes_.C.Data.GetFinest(), Stokes_.cKernel, kA_, kM_, P.get<double>("Stokes.PcSTol"), P.get<double>("Stokes.PcSTol"), P.get<int>("Stokes.PcSIter",150), &std::cout),
+        isxprmodpc_( &Stokes_.prA.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(), &Stokes_.C.Data.GetFinest(), Stokes_.cKernel, kA_, kM_, P.get<double>("Stokes.PcSTol"), P.get<double>("Stokes.PcSTol"), P.get<int>("Stokes.PcSIter",150), &std::cout),
         ismgpre_( Stokes.prA.Data, Stokes.prM.Data, kA_, kM_, Stokes.pr_idx),
         isnonlinearprepc1_( symmPcPc_, 100, P.get<double>("Stokes.PcSTol"), true),
         isnonlinearprepc2_( symmPcPc_, 100, P.get<double>("Stokes.PcSTol"), true),
@@ -506,6 +509,7 @@ SchurPreBaseCL* StokesSolverFactoryCL<StokesT, ProlongationVelT, ProlongationPT>
         case MinComm_SPC:    return &mincommispc_;
         case ISPre_SPC:      return &isprepc_;
         case IsXstab_SPC:    return &isxstabpc_;
+        case IsXmod_SPC:     return &isxprmodpc_;
         case ISMG_SPC:       return &ismgpre_;
         case SIMPLER_SPC:
         case MSIMPLER_SPC:
@@ -563,7 +567,8 @@ StokesSolverBaseCL* StokesSolverFactoryCL<StokesT, ProlongationVelT, Prolongatio
                 stokessolver= new BlockMatrixSolverCL<GCR_SBlockT>( *GCRSBlock_);
             } else {
                 LBlock_= new LowerBlockPcT( *apc_, *spc_);
-                GCRLBlock_= new GCR_LBlockT( *LBlock_,  P_.template get<int>("Stokes.OuterIter"), P_.template get<int>("Stokes.OuterIter"), P_.template get<double>("Stokes.OuterTol"), /*rel*/ false);
+                //GCRLBlock_= new GCR_LBlockT( *LBlock_,  P_.template get<int>("Stokes.OuterIter"), P_.template get<int>("Stokes.OuterIter"), P_.template get<double>("Stokes.OuterTol"), /*rel*/ false);
+                GCRLBlock_= new GCR_LBlockT( *LBlock_,  P_.template get<int>("Stokes.OuterIter"), P_.template get<int>("Stokes.OuterIter"), P_.template get<double>("Stokes.OuterTol"), /*rel*/  P_.template get<bool>("Stokes.relTol",false));
                 stokessolver= new BlockMatrixSolverCL<GCR_LBlockT>( *GCRLBlock_);
             }
         }

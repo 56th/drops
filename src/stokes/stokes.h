@@ -95,6 +95,8 @@ class StokesP2P1CL : public ProblemCL<Coeff, StokesBndDataCL>
                  prA,
                  prM;
 
+    VectorBaseCL<VectorCL> cKernel; // dummy, needed for preconditioner due to template structure
+
     StokesP2P1CL(const MGBuilderCL& mgb, const CoeffCL& coeff, const BndDataCL& bdata)
         : base_( mgb, coeff, bdata), vel_idx( vecP2_FE), pr_idx( P1_FE){}
     StokesP2P1CL(MultiGridCL& mg, const CoeffCL& coeff, const BndDataCL& bdata)

@@ -79,7 +79,16 @@ void SetupLumpedMass (const MultiGridCL& MG, VectorCL& M, const IdxDescCL& RowId
                     const BndCondCL& bnd= BndCondCL( 0), const VecDescCL* lsetp=0, const BndDataCL<>* lsetbnd=0);
 
 
+class CkernelCL
+{
 
+public:
+    //dummy constructor
+    CkernelCL(){}
+    CkernelCL(MultiGridCL& mg, const LevelsetP2CL& lset , const IdxDescCL &prIdx);
+    ~CkernelCL(){std::cout <<"deleting ckernelcl" << std::endl;}
+    VectorBaseCL<VectorCL> cKernelVecs;
+};
 
 // rho*du/dt - mu*laplace u + Dp = f + rho*g - okn
 //                        -div u = 0
@@ -140,6 +149,9 @@ class TwoPhaseFlowCoeffCL
 
 class InstatStokes2PhaseP2P1CL : public ProblemCL<TwoPhaseFlowCoeffCL, StokesBndDataCL>
 {
+private:
+    void computeGhostPenaltyKernel(MultiGridCL& mg, const LevelsetP2CL& lset , const IdxDescCL &prIdx) const;
+
   public:
     typedef ProblemCL<TwoPhaseFlowCoeffCL, StokesBndDataCL>       base_;
     typedef base_::BndDataCL                                      BndDataCL;
@@ -167,12 +179,14 @@ class InstatStokes2PhaseP2P1CL : public ProblemCL<TwoPhaseFlowCoeffCL, StokesBnd
                  M,
                  prA,
                  prM;
+    //mutable CkernelCL    *cKernel;
+    mutable VectorBaseCL<VectorCL> cKernel;
 
   public:
     InstatStokes2PhaseP2P1CL( const MGBuilderCL& mgb, const TwoPhaseFlowCoeffCL& coeff, const BndDataCL& bdata, FiniteElementT prFE= P1_FE, double XFEMstab=0.1, FiniteElementT velFE= vecP2_FE)
-        : base_(mgb, coeff, bdata), vel_idx(velFE, 1, bdata.Vel, 0, XFEMstab), pr_idx(prFE, 1, bdata.Pr, 0, XFEMstab) {}
+        : base_(mgb, coeff, bdata), vel_idx(velFE, 1, bdata.Vel, 0, XFEMstab), pr_idx(prFE, 1, bdata.Pr, 0, XFEMstab), cKernel(0) { }
     InstatStokes2PhaseP2P1CL( MultiGridCL& mg, const TwoPhaseFlowCoeffCL& coeff, const BndDataCL& bdata, FiniteElementT prFE= P1_FE, double XFEMstab=0.1, FiniteElementT velFE= vecP2_FE)
-        : base_(mg, coeff, bdata),  vel_idx(velFE, 1, bdata.Vel, 0, XFEMstab), pr_idx(prFE, 1, bdata.Pr, 0, XFEMstab) {}
+        : base_(mg, coeff, bdata),  vel_idx(velFE, 1, bdata.Vel, 0, XFEMstab), pr_idx(prFE, 1, bdata.Pr, 0, XFEMstab), cKernel(0) { }
 
     /// \name Numbering
     //@{
