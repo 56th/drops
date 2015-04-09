@@ -1852,10 +1852,10 @@ class LocalSystem1TwoPhase_P2CL
     double mu  (int sign) const { return sign > 0 ? mu_p  : mu_n; }
     double rho (int sign) const { return sign > 0 ? rho_p : rho_n; }
 
-    void setup (const SMatrixCL<3,3>& T, double absdet, const TetraCL& tet, const LocalP2CL<>& ls, LocalIntegrals_P2CL[2], LocalSystem1DataCL& loc);
+    void setup (const SMatrixCL<3,3>& T, double absdet, const TetraCL& tet, const LocalP2CL<>& ls, double t, LocalIntegrals_P2CL[2], LocalSystem1DataCL& loc);
 };
 
-void LocalSystem1TwoPhase_P2CL::setup (const SMatrixCL<3,3>& T, double absdet, const TetraCL& tet, const LocalP2CL<>& ls, LocalIntegrals_P2CL locInt[2], LocalSystem1DataCL& loc)
+void LocalSystem1TwoPhase_P2CL::setup (const SMatrixCL<3,3>& T, double absdet, const TetraCL& tet, const LocalP2CL<>& ls, double t, LocalIntegrals_P2CL locInt[2], LocalSystem1DataCL& loc)
 {
     P2DiscCL::GetGradients( GradLP1, GradRefLP1, T);
 
@@ -1863,7 +1863,7 @@ void LocalSystem1TwoPhase_P2CL::setup (const SMatrixCL<3,3>& T, double absdet, c
     partition.make_partition<SortedVertexPolicyCL, MergeCutPolicyCL>( lat, ls_loc);
     make_CompositeQuad5Domain( q5dom, partition);
     make_CompositeQuad2Domain( q2dom, partition);
-    resize_and_evaluate_on_vertexes( rhs_func, tet, q5dom, /*time*/ 0., rhs);
+    resize_and_evaluate_on_vertexes( rhs_func, tet, q5dom, /*time*/ t, rhs);
 
     for (int i= 0; i < 10; ++i) {
         p2[i]= 1.; p2[i==0 ? 9 : i - 1]= 0.;
@@ -2048,7 +2048,7 @@ void System1Accumulator_P2CL::local_setup (const TetraCL& tet)
         local_onephase.setup( T, absdet, loc);
     }
     else
-        local_twophase.setup( T, absdet, tet, ls_loc, locInt, loc);
+        local_twophase.setup( T, absdet, tet, ls_loc, t, locInt, loc);
     add_transpose_kronecker_id( loc.Ak, loc.A);
 
     if (b != 0) {
