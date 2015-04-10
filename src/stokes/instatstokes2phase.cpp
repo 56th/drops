@@ -1834,8 +1834,10 @@ void InstatStokes2PhaseP2P1CL::SetupC( MLMatDescCL* matC, const LevelsetP2CL& ls
       //  delete cKernel;
     //compute new  kernel of c
     //cKernel = new CkernelCL( MG_, lset, pr_idx.GetFinest() );
-    computeGhostPenaltyKernel( MG_ , lset , pr_idx.GetFinest() );
-
+    if ( GetPrFE() == P1X_FE )
+    {
+        computeGhostPenaltyKernel( MG_ , lset , pr_idx.GetFinest() );
+    }
 
 }
 
@@ -2240,7 +2242,7 @@ void System1Accumulator_P2CL::local_setup (const TetraCL& tet)
     add_transpose_kronecker_id( loc.Ak, loc.A);
 
     if (b != 0) {
-        if (noCut)
+//        if (noCut)
             rhs.assign( tet, Coeff.volforce, t);
         for (int i= 0; i < 10; ++i) {
             if (!n.WithUnknowns( i)) {
@@ -2251,10 +2253,10 @@ void System1Accumulator_P2CL::local_setup (const TetraCL& tet)
             }
             else { // setup b
                 loc_b[i]= loc.rho_phi[i]*Coeff.g;
-                if (noCut)
+//                if (noCut)
                     loc_b[i]+= rhs.quadP2( i, absdet);
-                else
-                    loc_b[i]+= locInt[0].rhs[i] + locInt[1].rhs[i];
+//                else
+//                    loc_b[i]+= locInt[0].rhs[i] + locInt[1].rhs[i];
             }
         }
     }

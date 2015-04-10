@@ -71,11 +71,11 @@ class TimeDiscStokes2phaseCL
             delete _b;
         else
             delete _old_b;
-            delete _cplM; delete _old_cplM;
+        delete _cplM; delete _old_cplM;
     }
 
     double GetTheta()    const { return _theta; }
-    double GetTime()     const { return _Stokes.t; }
+    double GetTime()     const { return _Stokes.v.t; }
     double GetTimeStep() const { return _dt; }
 
     /// \brief Get constant reference on solver
@@ -129,15 +129,15 @@ class InstatStokes2phaseThetaSchemeCL : public TimeDiscStokes2phaseCL< StokesT, 
 
     void SetTimeStep( double dt)
     {
-        _dt= dt;
-        _mat.LinComb( 1./dt, _Stokes.M.Data, _theta, _Stokes.A.Data);
+        _dt= dt;        
+        _mat.LinComb( 1./_dt, _Stokes.M.Data, _theta, _Stokes.A.Data);
+        //_mat.LinComb( 0.0, _Stokes.M.Data, 1.0, _Stokes.A.Data);
     }
 
     void SetTimeStep( double dt, double theta)
-    {
-        _dt= dt;
-        _mat.LinComb( 1./dt, _Stokes.M.Data, _theta, _Stokes.A.Data);
-         _theta= theta;
+    {        
+        _theta= theta;
+        SetTimeStep( dt );
     }
 
     void DoStep(VectorCL &v, VectorCL &p);
@@ -153,7 +153,9 @@ void InstatStokes2phaseThetaSchemeCL<StokesT,SolverT,LsetT>::DoStep( VectorCL& v
 
     // if system matrices do not change (i.e. stationary interface) quite inefficient
     // but cplM is needed if boundary conditions are time dependent; cplA is inside b    
+
     _Stokes.SetupSystem1( &_Stokes.A, &_Stokes.M, _b, _b, _cplM, _lset, _Stokes.v.t);
+    _Stokes.SetupSystem2( &_Stokes.B, &_Stokes.c, _lset, _Stokes.v.t );
 
     // if moving interface: uncomment the following lines
     //_Stokes.SetupSystem2(_Stokes.B, _Stokes.c, _lset, _Stokes.v.t);    
@@ -162,14 +164,17 @@ void InstatStokes2phaseThetaSchemeCL<StokesT,SolverT,LsetT>::DoStep( VectorCL& v
     // SetTimeStep(_dt);
 
     // compute surface tension integral for rhs    
-    VelVecDescCL surften( &_Stokes.vel_idx );    
+    VelVecDescCL surften( &_Stokes.vel_idx );
     _lset.AccumulateBndIntegral( surften );
     _b->Data += surften.Data;
 
     _rhs=  _Stokes.A.Data * v;
     _rhs*= (_theta-1.);
     _rhs+= (1./_dt)*(_Stokes.M.Data*v + _cplM->Data - _old_cplM->Data)
+    //_rhs = (1./_dt)*(_Stokes.M.Data*v + _cplM->Data - _old_cplM->Data)
          +  _theta*_b->Data + (1.-_theta)*_old_b->Data;
+    //_rhs = (1./_dt) * ( _Stokes.M.Data * v ) + _b->Data;
+    //_rhs = _Stokes.b.Data + (1./_dt) * ( _Stokes.M.Data * v );
 
     // solve stabilized version for two-phase flow
     std::cout << "dostep: solver.solve" << std:: endl;

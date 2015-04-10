@@ -104,7 +104,8 @@ void MakeP1P1XProlongation (size_t NumUnknownsVel, size_t NumUnknownsPr, size_t 
     PPr= MatrixCL( diag);
 }
 
-void ComputeErrorsP2R( const instat_vector_fun_ptr uPos, const instat_vector_fun_ptr uNeg, const VecDescCL& u_h, const BndDataCL<Point3DCL>& bnd, Point3DCL& L2, Point3DCL& H1, const LevelsetP2CL& lset, double t)
+void ComputeErrorsP2R( const instat_vector_fun_ptr uPos, const instat_vector_fun_ptr uNeg, const VecDescCL& u_h, const BndDataCL<Point3DCL>& bnd,
+        Point3DCL& L2, Point3DCL& H1, Point3DCL& L2_norm, Point3DCL& H1_norm, const LevelsetP2CL& lset, double t)
 {
     const IdxDescCL& idx= *u_h.RowIdx;
     const ExtIdxDescCL& extIdx= idx.GetXidx();
@@ -130,7 +131,7 @@ void ComputeErrorsP2R( const instat_vector_fun_ptr uPos, const instat_vector_fun
     P2DiscCL::GetGradientsOnRef( GradRef);
     LevelsetP2CL::const_DiscSolCL ls= lset.GetSolution();
 
-    L2= H1= Point3DCL();
+    L2= H1= L2_norm= H1_norm= Point3DCL();
 
     for (MultiGridCL::const_TriangTetraIteratorCL sit = MG.GetTriangTetraBegin(lvl), send=MG.GetTriangTetraEnd(lvl);
          sit != send; ++sit)
@@ -146,19 +147,18 @@ void ComputeErrorsP2R( const instat_vector_fun_ptr uPos, const instat_vector_fun
             if (patch.GetSign( 0) == 1) { // pos. part
                 u_p.assign(  *sit, uPos, t);
                 u5_p.assign(  *sit, uPos, t);
-                uh.assign( *sit, u_h, bnd);
-                diff= u_p - uh;
-                diff5= u5_p - Quad5CL<Point3DCL>(uh);
             } else { // neg. part
-                u_n.assign(  *sit, uNeg, t);
-                u5_n.assign( *sit, uNeg, t);
-                uh.assign( *sit, u_h, bnd);
-                diff= u_n - uh;
-                diff5= u5_n - Quad5CL<Point3DCL>(uh);
+                u_p.assign(  *sit, uNeg, t);
+                u5_p.assign( *sit, uNeg, t);
             }
+            uh.assign( *sit, u_h, bnd);
+            diff= u_p - uh;
+            diff5= u5_p - Quad5CL<Point3DCL>(uh);
             L2+= Quad5CL<Point3DCL>(diff5*diff5).quad( absdet);
+            L2_norm+= Quad5CL<Point3DCL>(u5_p*u5_p).quad( absdet);
 
             AccumulateH1( H1, diff, Grad, absdet);
+            AccumulateH1( H1_norm, u_p, Grad, absdet);
         }
         else { // We are at the phase boundary.
             u_p.assign( *sit, uPos, t);
@@ -191,16 +191,22 @@ void ComputeErrorsP2R( const instat_vector_fun_ptr uPos, const instat_vector_fun
                 const int ch= patch.GetChildIdx(k);
                 Quad5CL<Point3DCL> diff5cut( k<patch.GetNumNegTetra() ? LocalP2CL<Point3DCL>(diff_n - ext_n[ch])
                                                                       : LocalP2CL<Point3DCL>(diff_p - ext_p[ch]), nodes);
+                Quad5CL<Point3DCL> u5cut( k<patch.GetNumNegTetra() ? u_n : u_p, nodes);
                 L2+= Quad5CL<Point3DCL>( diff5cut*diff5cut).quad(absdet*VolFrac(patch.GetTetra(k)));
+                L2_norm+= Quad5CL<Point3DCL>( u5cut*u5cut).quad(absdet*VolFrac(patch.GetTetra(k)));
                 delete[] nodes;
             }
 
             AccumulateH1( H1, diff_p, diff_n, ext_p, ext_n, patch, Grad, absdet);
+            AccumulateH1( H1_norm, u_p, u_n, patch, Grad, absdet);
         }
     }
     H1+= L2;
     L2= sqrt( L2);
     H1= sqrt( H1);
+    H1_norm+= L2_norm;
+    L2_norm= sqrt( L2_norm);
+    H1_norm= sqrt( H1_norm);
 }
 
 
