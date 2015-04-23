@@ -2021,6 +2021,14 @@ class SpecialBndHandler_System1TwoPhaseP2CL
 	private:
 	const PrincipalLatticeCL& lat;
     const StokesBndDataCL& BndData_;
+    
+    const VecDescCL&    Phi_;
+    const BndDataCL<>& lsetbnd_;
+    InterfaceTriangleCL triangle;
+
+    instat_vector_fun_ptr outnormal_;//outnormal of the domain boundary
+
+    bool SpeBnd; //special boundary condition
 	const double mu1_, mu2_;                                //dynamic viscosities
 	const double beta1_, beta2_;                            //Slip length, beta1_=beta2_=0 for symmetric Bnd;
 	const double alpha_;                                    //Coefficient for Nitche method
@@ -2034,13 +2042,14 @@ class SpecialBndHandler_System1TwoPhaseP2CL
 	GridFunctionCL<double>   basisP2[10];
     GridFunctionCL<double>   gradP1[10];
   public:	
-	SpecialBndHandler_System1TwoPhaseP2CL(const StokesBndDataCL& BndData, double mu1, double mu2, const double beta1=0, const double beta2=0, const double alpha=0)
-	: lat( PrincipalLatticeCL::instance( 2)), BndData_(BndData), mu1_(mu1), mu2_(mu2), beta1_(beta1), beta2_(beta2), alpha_(alpha), ls_loc( lat.vertex_size())
+	SpecialBndHandler_System1TwoPhaseP2CL(const StokesBndDataCL& BndData, const VecDescCL& Phi, const BndDataCL<>& lsetbnd, instat_vector_fun_ptr outnormal, double mu1, double mu2, const double beta1=0, const double beta2=0, const double alpha=0)
+	: lat( PrincipalLatticeCL::instance( 2)), BndData_(BndData), Phi_(Phi), lsetbnd_(lsetbnd), outnormal_(outnormal), mu1_(mu1), mu2_(mu2), beta1_(beta1), beta2_(beta2), alpha_(alpha), ls_loc( lat.vertex_size())
     { P2DiscCL::GetGradientsOnRef( GradRef); }
 
     double mu  (int sign) const { return sign > 0 ?  mu1_  : mu2_; }
     double beta (int sign) const { return sign > 0 ? beta1_ : beta2_; }
     void setup(const TetraCL& tet, const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, LocalSystem1DataCL& loc);  //update local system 1
+    void CLdiss(const TetraCL& tet, LocalSystem1DataCL& loc); //Set up contact line dissipation term
 };
 
 void SpecialBndHandler_System1TwoPhaseP2CL::setup(const TetraCL& tet, const SMatrixCL<3,3>& T, const LocalP2CL<>& ls,  LocalSystem1DataCL& loc)
@@ -2087,6 +2096,12 @@ void SpecialBndHandler_System1TwoPhaseP2CL::setup(const TetraCL& tet, const SMat
 				resize_and_evaluate_on_vertexes( Gradn[i], q5dom, gradP1[i]); // for A	
 			}
 
+				DROPS::GridFunctionCL<> integrand( 1., q5dom.vertex_size()); // Gridfunction with constant 1 everywhere
+				double area_neg, area_pos;
+				area_neg =quad( integrand, q5dom, DROPS::NegTetraC);
+				area_pos =quad( integrand, q5dom, DROPS::PosTetraC);
+              double h1 = std::sqrt(area_pos)>0.1*h ? std::sqrt(area_pos): 0.1*h;
+              double h2 = std::sqrt(area_neg)>0.1*h ? std::sqrt(area_neg): 0.1*h;
 		    double temp1 = symmBC? 0: beta1_;
 			double temp2 = symmBC? 0: beta2_;
 			for(Uint i=0; i<10; ++i){
@@ -2095,7 +2110,8 @@ void SpecialBndHandler_System1TwoPhaseP2CL::setup(const TetraCL& tet, const SMat
                     quad( gradP1[i] * basisP2[j] + gradP1[j] * basisP2[i], q5dom, locInt[0].grad2D[i][j], locInt[1].grad2D[i][j]);
 					// three additional terms
 					dm[j][i](0, 0)= dm[j][i](1, 1) = dm[j][i](2, 2) = temp1 * locInt[0].mass2D[i][j] + temp2* locInt[1].mass2D[i][j];
-					dm[j][i]     += ( (alpha_/h*mu1_ -temp1)* locInt[0].mass2D[i][j] + (alpha_/h* mu2_ - temp2) * locInt[1].mass2D[i][j] )* SMatrixCL<3,3> (outer_product(normal, normal));
+					dm[j][i]     += ( (alpha_/h1*mu1_ -temp1)* locInt[0].mass2D[i][j] + (alpha_/h2* mu2_ - temp2) * locInt[1].mass2D[i][j] )* SMatrixCL<3,3> (outer_product(normal, normal));
+                  //dm[j][i]     += ( (alpha_/h1*mu1_)* locInt[0].mass2D[i][j] + (alpha_/h2* mu2_ ) * locInt[1].mass2D[i][j] )* SMatrixCL<3,3> (outer_product(normal, normal));
 					//if(BndData_.Vel.GetBC(*tet.GetFace(k))!= SymmBC) not necessary
 					dm[j][i]     -= ( 2. * mu1_ * locInt[0].grad2D[i][j]+ 2.* mu2_ * locInt[1].grad2D[i][j] )* SMatrixCL<3,3> (outer_product(normal, normal));  
 					loc.Ak[j][i] += dm[j][i];
@@ -2107,6 +2123,88 @@ void SpecialBndHandler_System1TwoPhaseP2CL::setup(const TetraCL& tet, const SMat
 			}
 		}
 	}
+}
+
+void SpecialBndHandler_System1TwoPhaseP2CL::CLdiss(const TetraCL& tet, LocalSystem1DataCL& loc)
+{
+    bool SpeBnd=false;
+    for(Uint v=0; v<4; v++)
+    if(lsetbnd_.GetBC(*tet.GetFace(v))==Slip0BC||lsetbnd_.GetBC(*tet.GetFace(v))==SlipBC)
+    {
+        SpeBnd=true;
+        break;
+    }
+	if(!SpeBnd)
+	{
+		for(Uint v=0; v<6; v++)
+			if(lsetbnd_.GetBC(*tet.GetEdge(v))==Slip0BC||lsetbnd_.GetBC(*tet.GetEdge(v))==SlipBC)
+			{
+				SpeBnd=true;
+				break;
+			}
+		if(!SpeBnd)
+		return;
+	}
+    //Initialize one interface patch
+    triangle.BInit( tet, Phi_,lsetbnd_); 
+    triangle.SetBndOutNormal(outnormal_);
+    Point3DCL normal_mcl[5];     //normal of moving contact lines in tangential surface
+	Point3DCL outnormalOnMcl[5];    //outnormal of the domain boundary
+	BaryCoordCL quadBarys[5];
+	double weight[5]={0.568888889, 0.47862867,0.47862867,0.236926885,0.236926885};
+	//integral in [-1,1]
+	double qupt[5]={0,-0.53846931,0.53846931,-0.906179846,0.906179846};
+    
+    SMatrixCL<3, 3> dm[10][10];
+    LocalP2CL<double> phi[10]; 
+    for(Uint i=0; i<10; ++i)
+    {
+        phi[i][i] = 1;
+    }
+    for (int ch=0; ch<8; ++ch)
+    {
+        if (!triangle.ComputeMCLForChild(ch)) // no  for this child
+            continue;
+        BaryCoordCL Barys[2];
+        Point3DCL pt0,pt1;
+        Point3DCL midpt;
+        double length;
+        Uint ncl=triangle.GetNumMCL();
+        for(Uint i=0;i<ncl;i++)
+        {
+            length = triangle.GetInfoMCL(i,Barys[0],Barys[1],pt0,pt1);
+            for(Uint j=0;j<5;j++)
+            {
+                midpt=(pt0+pt1)/2 + qupt[j]*(pt1-pt0)/2;
+                normal_mcl[j] = triangle.GetImprovedMCLNormal(i,(qupt[j]+1)/2);
+                quadBarys[j]=(Barys[0]+Barys[1])/2+qupt[j]*(Barys[1]-Barys[0])/2;
+                outnormalOnMcl[j]=outnormal_(midpt,0);
+            }
+            for (Uint i=0; i<10; ++i)
+            {
+                for(Uint j=0; j<=i; ++j)
+                {
+                    //5 points Gauss–Legendre quadrature is used.
+                    for(int m =0; m<3; m++)
+                        for(int n=0; n<3; n++)
+                            /*for (int v=0; v<5; v++)
+                            {
+                                dm[j][i](m, n) += weight[v]*phi[i](quadBarys[v])*phi[j](quadBarys[v])*normal_mcl[v][m]*normal_mcl[v][n];      
+                            }*/
+                        for (int v=0; v<5; v++)
+                        {
+                            dm[j][i](m, m) += weight[v]*phi[i](quadBarys[v])*phi[j](quadBarys[v]);      
+                        }
+                    dm[j][i] = length/2*beta1_*dm[j][i];
+                    loc.Ak[j][i] += dm[j][i];
+                    if (i != j){
+                        assign_transpose( dm[i][j], dm[j][i]);
+                        loc.Ak[i][j] += dm[i][j];
+                    }	
+                }
+            }
+        }
+    }
 }
 
 /// \brief Setup of the local P2 "system 1" on a tetra intersected by the dividing surface.
@@ -2289,7 +2387,7 @@ System1Accumulator_P2CL::System1Accumulator_P2CL (const TwoPhaseFlowCoeffCL& Coe
       RowIdx( RowIdx_), A( A_), M( M_), cplA( cplA_), cplM( cplM_), b( b_),
       local_twophase( Coeff.mu( 1.0), Coeff.mu( -1.0), Coeff.rho( 1.0), Coeff.rho( -1.0), Coeff.volforce),
 	  speBndHandler1(BndData_, Coeff.alpha),
-	  speBndHandler2(BndData_, Coeff.mu( 1.0), Coeff.mu( -1.0), Coeff.beta(1.0), Coeff.beta(-1.0), Coeff.alpha)
+	  speBndHandler2(BndData_, lset_Phi, lset_Bnd, Coeff.Bndoutnormal, Coeff.mu( 1.0), Coeff.mu( -1.0), Coeff.beta(1.0), Coeff.beta(-1.0), Coeff.alpha)
 {}
 
 void System1Accumulator_P2CL::begin_accumulation ()
@@ -2355,8 +2453,10 @@ void System1Accumulator_P2CL::local_setup (const TetraCL& tet)
     }
     else{
         local_twophase.setup( T, absdet, tet, ls_loc, locInt, loc);
-        if(speBnd)
+        if(speBnd){
         	speBndHandler2.setup(tet, T, ls_loc, loc); //update loc for special boundary condtion
+           //speBndHandler2.CLdiss(tet, loc);
+        }
     }
 		
     add_transpose_kronecker_id( loc.Ak, loc.A);
@@ -2392,10 +2492,10 @@ void System1Accumulator_P2CL::local_setup (const TetraCL& tet)
         }
         if(speBnd)
         {
-        	//if (noCut)
+        	if (noCut)
 				speBndHandler1.setupRhs(tet, loc_b, t);
-            //else
-		    //	speBndHandler1.setupRhs(tet, loc_b);//<not used for now --need modification when the slip length is different in the two phase flow
+          else
+		    	speBndHandler1.setupRhs(tet, loc_b, t);//<not used for now --need modification when the slip length is different in the two phase flow
         }
     }
 	
