@@ -4362,6 +4362,142 @@ void InstatStokes2PhaseP2P1CL::CheckTwoPhaseSolution(const VelVecDescCL* DescVel
 	L2ErrPr( p, lset, prM.Data.GetFinest(), prJump, MG_, GetPrFE(), GetXidx(), avg_ex);	*/ 
 }
 
+void InstatStokes2PhaseP2P1CL::CheckTwoPhaseSolution(const VelVecDescCL* DescVel, const VecDescCL* DescPr, 
+							      const LevelsetP2CL& lset, const VelVecDescCL* RefVel, const VecDescCL* RefPr)
+{
+	ScopeTimerCL scope("CheckTwoPhaseSolution");
+    double t = DescVel->t;
+//#ifdef _PAR
+//    const ExchangeCL& exV = vel_idx.GetEx();
+//    const ExchangeCL& exP = pr_idx.GetEx();
+//#endif
+	
+	Uint lvl=DescVel->GetLevel();
+	VecDescCL DescPr_neg; 
+	VecDescCL DescPr_pos;
+    /// \todo for periodic stuff: matching function here
+
+    DescPr_neg.SetIdx( p.RowIdx);
+    DescPr_pos.SetIdx( p.RowIdx);
+	GetPrOnPart(DescPr_neg, lset, false);
+	GetPrOnPart(DescPr_pos, lset, true);
+	
+    SMatrixCL<3,3> T;
+    double det;
+	//Point3DCL Grad[4];
+	
+    // L2 norms of velocities: ||u_h - u||_L2
+	// L2 norm of  pressure:   ||p_h - p||_L2
+    // number of nodes for Quad5CL rule is 15 (see discretize.h Quad5_DataCL NumNodesC =15)
+    double L2_vel(0.0);
+    double L2_pr(0.0);
+    Quad5CL<Point3DCL> q5_vel, q5_vel_exact;
+    Quad5CL<double> q5_pr, q5_pr_exact;
+	GridFunctionCL<double> pre_neg, pre_pos, pre_exact1,pre_exact2, err_neg, err_pos;
+	
+	TetraPartitionCL partition;
+	QuadDomainCL q5dom;
+	InterfaceTetraCL cut;
+	const PrincipalLatticeCL lat(PrincipalLatticeCL::instance(2));
+    std::valarray<double> ls_loc(lat.vertex_size());
+	
+	
+	double SumErr=0.;
+	double volume=0.;
+	double average=0.;
+    for (MultiGridCL::const_TriangTetraIteratorCL sit= const_cast<const MultiGridCL&>(MG_).GetTriangTetraBegin(lvl),
+        send= const_cast<const MultiGridCL&>(MG_).GetTriangTetraEnd(lvl); sit != send; ++sit)
+    {
+		 evaluate_on_vertexes( lset.GetSolution(), *sit, lat, Addr( ls_loc));
+		 const bool noCut= equal_signs( ls_loc);	 
+         GetTrafoTr(T,det,*sit);
+         const double absdet= std::fabs(det);
+         LocalP1CL<double> loc_pr(*sit, make_P1Eval(MG_,BndData_.Pr,*DescPr));
+         LocalP1CL<double> loc_Refpr(*sit, make_P1Eval(MG_,BndData_.Pr,*RefPr));		 
+		 volume += sit->GetVolume();
+		 if(noCut){
+            q5_pr_exact.assign(loc_Refpr);
+            q5_pr.assign(loc_pr);
+			 SumErr += Quad5CL<> (q5_pr-q5_pr_exact).quad(absdet);			 
+		 }
+		 else{
+			 partition.make_partition<SortedVertexPolicyCL, MergeCutPolicyCL>( lat, ls_loc);
+			 make_CompositeQuad2Domain( q5dom, partition);
+			 LocalP1CL<double> loc_pr_neg(*sit, make_P1Eval(MG_,BndData_.Pr, DescPr_neg));
+			 LocalP1CL<double> loc_pr_pos(*sit, make_P1Eval(MG_,BndData_.Pr, DescPr_pos));
+			 LocalP1CL<double> loc_Refpr_neg(*sit, make_P1Eval(MG_,BndData_.Pr, *RefPr));
+			 LocalP1CL<double> loc_Refpr_pos(*sit, make_P1Eval(MG_,BndData_.Pr, *RefPr));
+			 resize_and_evaluate_on_vertexes( loc_pr_neg, q5dom, pre_neg);
+			 resize_and_evaluate_on_vertexes( loc_pr_pos, q5dom, pre_pos); 
+			 
+			 resize_and_evaluate_on_vertexes( loc_Refpr_neg, q5dom, pre_exact1);
+			 resize_and_evaluate_on_vertexes( loc_Refpr_pos, q5dom, pre_exact2); 	
+			 
+			 SumErr+= quad ( (pre_neg-pre_exact1), absdet, q5dom, NegTetraC);
+			 SumErr+= quad ( (pre_pos-pre_exact2), absdet, q5dom, PosTetraC);	
+		 }
+     }
+	 //Get the average pressure, use it to normalize the pressure;
+	average= SumErr/volume;
+	std::cout<<"The average of the pressure error is: "<<average<<" The volume is: "<<volume<<std::endl;
+    for (MultiGridCL::const_TriangTetraIteratorCL sit= const_cast<const MultiGridCL&>(MG_).GetTriangTetraBegin(lvl),
+        send= const_cast<const MultiGridCL&>(MG_).GetTriangTetraEnd(lvl); sit != send; ++sit)
+    {
+		 evaluate_on_vertexes( lset.GetSolution(), *sit, lat, Addr( ls_loc));
+		 cut.Init( *sit, lset.Phi, lset.GetBndData());
+		 const bool noCut= equal_signs( ls_loc);
+		 	
+         GetTrafoTr(T,det,*sit);
+         const double absdet= std::fabs(det);
+         LocalP2CL<Point3DCL> loc_vel(*sit, make_P2Eval(MG_,BndData_.Vel,*DescVel));
+         LocalP2CL<Point3DCL> loc_Refvel(*sit, make_P2Eval(MG_,BndData_.Vel,*RefVel));
+         LocalP1CL<double> loc_pr(*sit, make_P1Eval(MG_,BndData_.Pr,*DescPr));
+         LocalP1CL<double> loc_Refpr(*sit, make_P1Eval(MG_,BndData_.Pr,*RefPr));
+		  LocalP1CL<double> loc_aver(average);
+			 
+         q5_vel.assign(loc_vel);
+         q5_vel_exact.assign(loc_Refvel);
+         Quad5CL<Point3DCL> q5_vel_diff( q5_vel-q5_vel_exact);
+         L2_vel += Quad5CL<> (dot(q5_vel_diff,q5_vel_diff)).quad(absdet);
+		 
+		 if(noCut){
+
+            q5_pr_exact.assign(loc_Refpr);
+			 LocalP1CL<double> temp3(loc_pr-loc_aver);
+			 q5_pr.assign(temp3);
+	
+			 Quad5CL<double> q5_pr_diff( q5_pr-q5_pr_exact);
+
+			 L2_pr  += Quad5CL<> (q5_pr_diff*q5_pr_diff).quad(absdet);			 
+		 }
+		 else{
+			 partition.make_partition<SortedVertexPolicyCL, MergeCutPolicyCL>( lat, ls_loc);
+			 make_CompositeQuad2Domain( q5dom, partition);
+			 LocalP1CL<double> loc_pr_neg(*sit, make_P1Eval(MG_,BndData_.Pr, DescPr_neg));
+			 LocalP1CL<double> loc_pr_pos(*sit, make_P1Eval(MG_,BndData_.Pr, DescPr_pos));
+			 LocalP1CL<double> temp1(loc_pr_neg-loc_aver); //for negative pressure;
+			 LocalP1CL<double> temp2(loc_pr_pos-loc_aver); //for positive pressure;
+			 LocalP2CL<double> pr_neg_l2 (temp1);
+			 LocalP2CL<double> pr_pos_l2 (temp2);
+			 LocalP2CL<double> pr_ex_neg (*sit, make_P1Eval(MG_,BndData_.Pr, *RefPr));
+			 LocalP2CL<double> pr_ex_pos (*sit, make_P1Eval(MG_,BndData_.Pr, *RefPr));
+			 LocalP2CL<double> err_neg_l2( (pr_neg_l2-pr_ex_neg)*(pr_neg_l2-pr_ex_neg) );
+			 LocalP2CL<double> err_pos_l2( (pr_pos_l2-pr_ex_pos)*(pr_pos_l2-pr_ex_pos) );
+			 
+			 resize_and_evaluate_on_vertexes(err_neg_l2,  q5dom,  err_neg);
+			 resize_and_evaluate_on_vertexes(err_pos_l2,  q5dom,  err_pos); 
+			 //To do: currently not find the best way, use the time to as level set sign flag;			 
+			 L2_pr += quad ( err_pos,  absdet, q5dom,   PosTetraC);
+			 L2_pr += quad ( err_neg,  absdet, q5dom,   NegTetraC);	 
+		 }
+     }
+     L2_vel  = std::sqrt(L2_vel);               //L2_vel is the true value.
+     L2_pr   = std::sqrt(L2_pr);
+         std::cout << "---------------------Discretize error-------------------"
+		            <<"\n || u_h - u ||_L2 = " <<  L2_vel 
+				     <<"\n || p_h - p ||_L2 = " <<  L2_pr << std::endl;	
+}
+
 ///> To do, parallel case
 double InstatStokes2PhaseP2P1CL::GetKineticEnergy(const LevelsetP2CL& lset) const
 {

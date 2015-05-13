@@ -285,6 +285,7 @@ class InstatStokes2PhaseP2P1CL : public ProblemCL<TwoPhaseFlowCoeffCL, StokesBnd
 	//This function can only be applied for one phase simulation, because the function doesn't consider any discontinuity in solutions;
 	//It checks the L2 norm of discretized error of velocity and gradient of pressure
     void CheckOnePhaseSolution(const VelVecDescCL* DescVel, const VecDescCL* DescPr, const instat_vector_fun_ptr RefVel, const instat_vector_fun_ptr RefGradPr , const instat_scalar_fun_ptr RefPr) const;
+    void CheckTwoPhaseSolution(const VelVecDescCL* DescVel, const VecDescCL* DescPr, const LevelsetP2CL& lset, const VelVecDescCL* RefVel, const VecDescCL* RefPr);
     void CheckTwoPhaseSolution(const VelVecDescCL* DescVel, const VecDescCL* DescPr, const LevelsetP2CL& lset, const instat_vector_fun_ptr RefVel, const instat_scalar_fun_ptr RefPr);
 
     //Get the total kinetic energy
