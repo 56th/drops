@@ -92,6 +92,7 @@ class TwoPhaseFlowCoeffCL
 
   private:
     bool film;
+    bool ns_shiftframe;
     double surfTens;
     double rho_koeff1, rho_koeff2, mu_koeff1, mu_koeff2;
 
@@ -100,10 +101,12 @@ class TwoPhaseFlowCoeffCL
     const SmoothedJumpCL rho, mu;
     const double SurfTens, DilVisco, ShearVisco;
     const Point3DCL g;
+    const Point3DCL framevel;
 
     TwoPhaseFlowCoeffCL( ParamCL& P, bool dimless = false)
       //big question: film or measurecell? 1: measure, 2: film
         : film( (P.get<double>("Mat.DensDrop") == 0.0) ),
+        ns_shiftframe( (P.get<int>("NavStokes.ShiftFrame", 0) == 1) ),
         surfTens( film ? P.get<double>("Mat.SurfTension") : P.get<double>("SurfTens.SurfTension")),
         rho_koeff1( film ? P.get<double>("Mat.DensGas") : P.get<double>("Mat.DensFluid")),
         rho_koeff2( film ? P.get<double>("Mat.DensFluid") : P.get<double>("Mat.DensDrop")),
@@ -117,12 +120,13 @@ class TwoPhaseFlowCoeffCL
         SurfTens (dimless ? surfTens/rho_koeff2 : surfTens),
         DilVisco( film ? P.get<double>("Mat.DilatationalVisco") : P.get<double>("SurfTens.DilatationalVisco")),
         ShearVisco( film ? P.get<double>("Mat.ShearVisco") : P.get<double>("SurfTens.ShearVisco")),
-        g( P.get<DROPS::Point3DCL>("Exp.Gravity"))
+        g( P.get<DROPS::Point3DCL>("Exp.Gravity")),
+        framevel( ns_shiftframe ? P.get<DROPS::Point3DCL>("NavStokes.FrameVel", DROPS::Point3DCL(0.0)) : DROPS::Point3DCL(0.0) )
         {
         volforce = InVecMap::getInstance()[P.get<std::string>("Exp.VolForce")];
     }
 
-    TwoPhaseFlowCoeffCL( double rho1, double rho2, double mu1, double mu2, double surftension, Point3DCL gravity, bool dimless = false, double dilatationalvisco = 0.0, double shearvisco = 0.0)
+    TwoPhaseFlowCoeffCL( double rho1, double rho2, double mu1, double mu2, double surftension, Point3DCL gravity, Point3DCL framevelocity = Point3DCL(0.0), bool dimless = false, double dilatationalvisco = 0.0, double shearvisco = 0.0)
       : rho( dimless ? JumpCL( 1., rho2/rho1)
                      : JumpCL( rho1, rho2), H_sm, 0),
         mu(  dimless ? JumpCL( 1., mu2/mu1)
@@ -130,7 +134,8 @@ class TwoPhaseFlowCoeffCL
         SurfTens( dimless ? surftension/rho1 : surftension),
         DilVisco( dilatationalvisco),
         ShearVisco( shearvisco),
-        g( gravity)    {
+        g( gravity),
+        framevel( framevelocity)    {
           volforce = InVecMap::getInstance()["ZeroVel"];
         }
 };
