@@ -218,7 +218,10 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     Stokes.SetIdx();
     Stokes.v.SetIdx  ( vidx);
     Stokes.p.SetIdx  ( pidx);
-    Stokes.InitVel( &Stokes.v, ZeroVel);
+    if (P.get<int>("NavStokes.ShiftFrame") == 1)
+        Stokes.InitVel( &Stokes.v, InVecMap::getInstance().find("InflowShiftFrame")->second);  // shifted zero velocity initial condition
+    else
+        Stokes.InitVel( &Stokes.v, ZeroVel);
 
     IteratedDownwindCL navstokes_downwind( P.get_child( "NavStokes.Downwind"));
     if (P.get<int>( "NavStokes.Downwind.Frequency") > 0) {
@@ -560,6 +563,7 @@ void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<int>("VTK.AddDGOutput",0);
     P.put_if_unset<int>("Transp.DoTransp",0);
     P.put_if_unset<std::string>("Restart.Inputfile","none");
+    P.put_if_unset<int>("NavStokes.ShiftFrame", 0);
     P.put_if_unset<int>("NavStokes.Downwind.Frequency", 0);
     P.put_if_unset<double>("NavStokes.Downwind.MaxRelComponentSize", 0.05);
     P.put_if_unset<double>("NavStokes.Downwind.WeakEdgeRatio", 0.2);
