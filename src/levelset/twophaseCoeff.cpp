@@ -67,6 +67,15 @@ namespace tpd_inflow{
         return ret;
     }
 
+    /// Examplary inflow condition for a shift frame
+    DROPS::SVectorCL<3> InflowShiftFrame( const DROPS::Point3DCL& p, double)
+    {
+        DROPS::SVectorCL<3> ret(0.);
+        DROPS::SVectorCL<3> FrameVel(0.);
+        FrameVel = P.get<DROPS::Point3DCL>("NavStokes.FrameVel");
+        ret = -FrameVel;
+        return ret;
+    }
 
     //========================================================================
     //                       Functions for brick_transp.cpp
@@ -88,6 +97,7 @@ namespace tpd_inflow{
     static DROPS::RegisterVectorFunction regvelcell("InflowCell", InflowCell);
     static DROPS::RegisterVectorFunction regvelchannel("InflowChannel", InflowChannel);
     static DROPS::RegisterVectorFunction regvelbricktransp("InflowBrickTransp", InflowBrickTransp);
+    static DROPS::RegisterVectorFunction regvelshiftframe("InflowShiftFrame", InflowShiftFrame);
 }
 
 
