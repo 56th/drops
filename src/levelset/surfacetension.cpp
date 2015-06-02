@@ -1,6 +1,6 @@
 /// \file surfacetension.cpp
 /// \brief compute the interfacial tension
-/// \author LNM RWTH Aachen: Hieu Nguyen; SC RWTH Aachen:
+/// \author LNM RWTH Aachen: Hieu Nguyen, Yuanjun Zhang; SC RWTH Aachen:
 
 /*
  * This file is part of DROPS.
@@ -42,6 +42,13 @@ void SurfaceTensionCL::ComputeSF(const TetraCL& t, const BaryCoordCL * const p,
     {
         case Sigma_X: {
                           qsigma.assign(t, p, sigma_);
+                          if (sigma_vtk_)
+                          {
+                              LocalP1CL<> p1_sigma(t, sigma_);
+                              Uint lidx= sigma_vtk_->RowIdx->GetIdx();
+                              for (Uint i=0; i<4; i++)
+                                  sigma_vtk_->Data[t.GetVertex(i)->Unknowns(lidx)] = p1_sigma[i];
+                          }
                       }
                       break;
         case Sigma_C: {

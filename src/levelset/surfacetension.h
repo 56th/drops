@@ -48,20 +48,22 @@ class SurfaceTensionCL
     InputMethodT input_;
     VecDescCL * c_;                     ///< mass concentration
 
+    VecDescCL * sigma_vtk_;             ///< vtk output of the variable surface tension coefficient
+
     double sigma_c(double c) const;     ///< variable surface tension with Sigma_C
     double dsigma_dc(double c) const;   ///< variable surface tension gradient with Sigma_C
 
   public:
     SurfaceTensionCL ( instat_scalar_fun_ptr sigma)
-    :  cBnd_(0),  cp_(0.), sigma_(sigma), input_(Sigma_X), c_(0)
+    :  cBnd_(0),  cp_(0.), sigma_(sigma), input_(Sigma_X), c_(0), sigma_vtk_(0)
     { std::memset( C_, 0, 5*sizeof( double));}
 
     SurfaceTensionCL ( instat_scalar_fun_ptr sigma, BndDataCL<> cBnd)
-    :  cBnd_(cBnd),  cp_(0.), sigma_(sigma), input_(Sigma_X), c_(0)
+    :  cBnd_(cBnd),  cp_(0.), sigma_(sigma), input_(Sigma_X), c_(0), sigma_vtk_(0)
     { std::memset( C_, 0, 5*sizeof( double));}
 
     SurfaceTensionCL ( double C[5], double cp=0., BndDataCL<> cBnd = BndDataCL<>( 0),  VecDescCL* c =0)
-    :  cBnd_(cBnd),  cp_(cp), sigma_(0), input_(Sigma_C), c_(c)
+    :  cBnd_(cBnd),  cp_(cp), sigma_(0), input_(Sigma_C), c_(c), sigma_vtk_(0)
     { std::memcpy( C_, C, 5*sizeof( double));}
 
 
@@ -71,6 +73,7 @@ class SurfaceTensionCL
     void SetConcentration(VecDescCL * c) {c_=c;}
     void SetBoundary (BndDataCL<> cBnd) {cBnd_ =  cBnd;}
     void SetTime(double time) { c_->t=time;}
+    void SetVtkOutput(VecDescCL * sigma_vtk) {sigma_vtk_=sigma_vtk;}
 
     instat_scalar_fun_ptr GetSigma() const {return sigma_;}
     void SetCoeff (double C[5], double cp) {std::memcpy( C_, C, 5*sizeof( double)); cp_= cp;}

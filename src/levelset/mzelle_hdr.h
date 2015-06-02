@@ -221,6 +221,8 @@ double eps=5e-4, // halbe Sprungbreite
     lambda=1.5, // Position des Sprungs zwischen Oberkante (lambda=0) und Schwerpunkt (lambda=1)
     sigma_dirt_fac= 0.8; // gesenkte OFspannung durch Verunreinigungen im unteren Teil des Tropfens
 double sigma;
+double grad_tau=0;  // gradient of tau
+double Ly=0;  // length in y
 
 double sm_step(const Point3DCL& p)
 {
@@ -262,13 +264,21 @@ Point3DCL grad_lin (const Point3DCL&)
     return ret;
 }
 
+double lin_in_y(const Point3DCL& p)  // linear function in y-direction, zero in the middle of the domain
+{
+    return sigma + (p[1]-Ly*0.5)*grad_tau;  // grad_tau is the gradient of tau in y-direction
+}
+
 double sigmaf (const Point3DCL&, double) { return sigma; }
 Point3DCL gsigma (const Point3DCL&, double) { return Point3DCL(); }
 
 double sigma_step(const Point3DCL& p, double) { return sm_step( p); }
 Point3DCL gsigma_step (const Point3DCL& p, double) { return grad_sm_step( p); }
 
+double sigma_const_grad_tau_y(const Point3DCL& p, double) { return lin_in_y( p); }
 
+static DROPS::RegisterScalarFunction regconstsurftens("ConstTau", sigmaf);
+static DROPS::RegisterScalarFunction regconstgradtau_y("ConstGradTau_y", sigma_const_grad_tau_y);
 /// \brief factory for the time discretization schemes
 template<class LevelSetSolverT>
 TimeDisc2PhaseCL* CreateTimeDisc( InstatNavierStokes2PhaseP2P1CL& Stokes, LevelsetP2CL& lset,

@@ -102,20 +102,25 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
     // initialization of surface tension
     sigma= Stokes.GetCoeff().SurfTens;
-    eps= P.get<double>("SurfTens.JumpWidth");    lambda= P.get<double>("SurfTens.RelPos");    sigma_dirt_fac= P.get<double>("SurfTens.DirtFactor");
+    eps= P.get<double>("SurfTens.JumpWidth", 0.0);    lambda= P.get<double>("SurfTens.RelPos", 0.0);    sigma_dirt_fac= P.get<double>("SurfTens.DirtFactor", 0.0);
+    Ly= P.get<DROPS::Point3DCL>("Domain.E2")[1];
+    grad_tau= P.get<double>("SurfTens.GradTau", 0.0);
     instat_scalar_fun_ptr sigmap  = 0;
     if (P.get<double>("SurfTens.VarTension"))
     {
-        sigmap  = &sigma_step;
+        // sigmap  = &sigma_step;   // for old experiments
+        sigmap = inscamap[P.get<std::string>("SurfTens.VarTensionFncs")];
     }
     else
     {
         sigmap  = &sigmaf;
     }
-    SurfaceTensionCL sf( sigmap);
+    SurfaceTensionCL * sf;
+    sf = new SurfaceTensionCL( sigmap);
+    sf->SetInputMethod( Sigma_X);
 
     // Creates new Levelset-Object, has to be cleaned manually
-    LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsetbnddata, sf, P.get_child("Levelset")) );
+    LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsetbnddata, *sf, P.get_child("Levelset")) );
 
     if (is_periodic) //CL: Anyone a better idea? perDirection from ParameterFile?
     {
@@ -462,6 +467,13 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
                     P.get<double>("AdaptRef.CoarsestLevel"), P.get<double>("AdaptRef.FinestLevel") );
     adap.set_marking_strategy(&marker);
 
+    VecDescCL * sigma_vtk = NULL;
+    IdxDescCL p1idx;
+    
+    sigma_vtk = new VecDescCL;
+    vtkwriter->Register( make_VTKScalar( P1EvalCL<double, const StokesPrBndDataCL, const VecDescCL>( sigma_vtk, &Stokes.GetBndData().Pr, &MG), "tau"));
+    sf->SetVtkOutput( sigma_vtk);
+
     for (int step= 1; step<=nsteps; ++step)
     {
         std::cout << "============================================================ step " << step << std::endl;
@@ -470,6 +482,12 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         const double time_new = Stokes.v.t + dt;
         IFInfo.Update( lset, Stokes.GetVelSolution());
         IFInfo.Write(time_old);
+
+        if (P.get<int>("VTK.VTKOut")) {
+            p1idx.CreateNumbering( Stokes.p.RowIdx->TriangLevel(), MG);
+            sigma_vtk->SetIdx( &p1idx);
+            sigma_vtk->Data = 0.;
+        }
 
         if (P.get("SurfTransp.DoTransp", 0)) surfTransp.InitOld();
         timedisc->DoStep( P.get<int>("Coupling.Iter"));
@@ -532,6 +550,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     IFInfo.Update( lset, Stokes.GetVelSolution());
     IFInfo.Write(Stokes.v.t);
     std::cout << std::endl;
+    delete sf;
     delete timedisc;
     delete navstokessolver;
     delete stokessolver;
@@ -544,6 +563,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 #endif
     if (vtkwriter) delete vtkwriter;
     if (dgvtkwriter) delete dgvtkwriter;
+    if (sigma_vtk) delete sigma_vtk;
     if (infofile) delete infofile;
 
 //     delete stokessolver1;
@@ -580,6 +600,7 @@ void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<double>("Mat.DilatationalVisco", 0.0);
     P.put_if_unset<double>("SurfTens.ShearVisco", 0.0);
     P.put_if_unset<double>("SurfTens.DilatationalVisco", 0.0);
+    P.put_if_unset<std::string>("SurfTens.VarTensionFncs", "ConstTau");
     P.put_if_unset<int>("Stokes.DirectSolve", 0);
 
     P.put_if_unset<int>("General.ProgressBar", 0);
