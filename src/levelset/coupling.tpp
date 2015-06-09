@@ -343,6 +343,7 @@ void OperatorSplitting2PhaseCL<LsetSolverT>::DoStokesFPIter()
     time.Start();
     curv_->Clear( Stokes_.v.t);
     LvlSet_.AccumulateBndIntegral( *curv_);
+    LvlSet_.AccumulateYoungForce( *curv_);
     Stokes_.SetupSystem1( &Stokes_.A, &Stokes_.M, b_, cplA_, cplM_, LvlSet_, Stokes_.v.t);
     mat_->LinComb( 1./fracdt_, Stokes_.M.Data, alpha_, Stokes_.A.Data);
     if (Stokes_.UsesXFEM()) {
@@ -397,6 +398,7 @@ void OperatorSplitting2PhaseCL<LsetSolverT>::DoNonlinearFPIter()
     time.Start();
     curv_->Clear( Stokes_.v.t);
     LvlSet_.AccumulateBndIntegral( *curv_);
+    LvlSet_.AccumulateYoungForce( *curv_);
     Stokes_.SetupSystem1( &Stokes_.A, &Stokes_.M, b_, cplA_, cplM_, LvlSet_, Stokes_.v.t);
     time.Stop();
     std::cout << "Discretizing Stokes/Curv took "<<time.GetTime()<<" sec.\n";
@@ -1132,6 +1134,7 @@ void RecThetaScheme2PhaseCL<LsetSolverT,RelaxationPolicyT>::Update()
 
     // Diskretisierung
     LvlSet_.AccumulateBndIntegral( *old_curv_);
+    LvlSet_.AccumulateYoungForce( *old_curv_);
     LvlSet_.SetupSystem( Stokes_.GetVelSolution(), dt_);
     LvlSet_.UpdateMLPhi();
     Stokes_.SetupSystem1( &Stokes_.A, &Stokes_.M, old_b_, old_b_, old_cplM_, LvlSet_, Stokes_.v.t);

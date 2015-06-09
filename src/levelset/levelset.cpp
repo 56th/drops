@@ -1140,7 +1140,7 @@ void LevelsetP2CL::AccumulateBndIntegral( VecDescCL& f) const
 
 void LevelsetP2CL::AccumulateYoungForce( VecDescCL& f) const
 {
-	 ScopeTimerCL scope("AccumulateYoungForce");
+    ScopeTimerCL scope("AccumulateYoungForce");
 	TetraAccumulatorCL *accu;
     switch (SF_)
     {
@@ -1154,6 +1154,7 @@ void LevelsetP2CL::AccumulateYoungForce( VecDescCL& f) const
     TetraAccumulatorTupleCL accus;
     accus.push_back( accu);
     accumulate( accus, MG_, Phi.RowIdx->TriangLevel(), Phi.RowIdx->GetMatchingFunction(), Phi.RowIdx->GetBndInfo());
+    delete accu;
 }
 
 //>to do for parallel programe, we need add all values in different process

@@ -99,6 +99,7 @@ class TwoPhaseFlowCoeffCL
     DROPS::instat_vector_fun_ptr RefVel;
     DROPS::instat_vector_fun_ptr RefGradPr;
     DROPS::instat_scalar_fun_ptr RefPr;
+    DROPS::instat_vector_fun_ptr Bndoutnormal;
     const SmoothedJumpCL rho, mu;
     const SmoothedJumpCL beta;    //slip length
     const double SurfTens, DilVisco, ShearVisco;
@@ -141,6 +142,10 @@ class TwoPhaseFlowCoeffCL
 				RefPr = InScaMap::getInstance()[P.get<std::string>("Exp.Solution_Pr")];
 			else
 				RefPr = NULL;
+          if( P.get<std::string>("SpeBnd.BndOutNormal").compare("None")!=0)
+				Bndoutnormal = InVecMap::getInstance()[P.get<std::string>("SpeBnd.BndOutNormal")];
+			else
+				Bndoutnormal = NULL;
     }
 
     TwoPhaseFlowCoeffCL( double rho1, double rho2, double mu1, double mu2, double surftension, Point3DCL gravity, bool dimless = false, double dilatationalvisco = 0.0, double shearvisco = 0.0, double alpha_ = 1.0, double beta1 = 0.0, double beta2 =0.0
@@ -161,6 +166,7 @@ class TwoPhaseFlowCoeffCL
 		  RefVel     = InVecMap::getInstance()["ZeroVel"];
 		  RefGradPr  = InVecMap::getInstance()["ZeroVel"];
 		  RefPr      = InScaMap::getInstance()["Zero"];
+          Bndoutnormal = InVecMap::getInstance()["ZeroVel"];
         }
 };
 
@@ -279,6 +285,7 @@ class InstatStokes2PhaseP2P1CL : public ProblemCL<TwoPhaseFlowCoeffCL, StokesBnd
 	//This function can only be applied for one phase simulation, because the function doesn't consider any discontinuity in solutions;
 	//It checks the L2 norm of discretized error of velocity and gradient of pressure
     void CheckOnePhaseSolution(const VelVecDescCL* DescVel, const VecDescCL* DescPr, const instat_vector_fun_ptr RefVel, const instat_vector_fun_ptr RefGradPr , const instat_scalar_fun_ptr RefPr) const;
+    void CheckTwoPhaseSolution(const VelVecDescCL* DescVel, const VecDescCL* DescPr, const LevelsetP2CL& lset, const VelVecDescCL* RefVel, const VecDescCL* RefPr);
     void CheckTwoPhaseSolution(const VelVecDescCL* DescVel, const VecDescCL* DescPr, const LevelsetP2CL& lset, const instat_vector_fun_ptr RefVel, const instat_scalar_fun_ptr RefPr);
 
     //Get the total kinetic energy

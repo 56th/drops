@@ -2021,6 +2021,14 @@ class SpecialBndHandler_System1TwoPhaseP2CL
 	private:
 	const PrincipalLatticeCL& lat;
     const StokesBndDataCL& BndData_;
+    
+    const VecDescCL&    Phi_;
+    const BndDataCL<>& lsetbnd_;
+    InterfaceTriangleCL triangle;
+
+    instat_vector_fun_ptr outnormal_;//outnormal of the domain boundary
+
+    bool SpeBnd; //special boundary condition
 	const double mu1_, mu2_;                                //dynamic viscosities
 	const double beta1_, beta2_;                            //Slip length, beta1_=beta2_=0 for symmetric Bnd;
 	const double alpha_;                                    //Coefficient for Nitche method
@@ -2034,13 +2042,14 @@ class SpecialBndHandler_System1TwoPhaseP2CL
 	GridFunctionCL<double>   basisP2[10];
     GridFunctionCL<double>   gradP1[10];
   public:	
-	SpecialBndHandler_System1TwoPhaseP2CL(const StokesBndDataCL& BndData, double mu1, double mu2, const double beta1=0, const double beta2=0, const double alpha=0)
-	: lat( PrincipalLatticeCL::instance( 2)), BndData_(BndData), mu1_(mu1), mu2_(mu2), beta1_(beta1), beta2_(beta2), alpha_(alpha), ls_loc( lat.vertex_size())
+	SpecialBndHandler_System1TwoPhaseP2CL(const StokesBndDataCL& BndData, const VecDescCL& Phi, const BndDataCL<>& lsetbnd, instat_vector_fun_ptr outnormal, double mu1, double mu2, const double beta1=0, const double beta2=0, const double alpha=0)
+	: lat( PrincipalLatticeCL::instance( 2)), BndData_(BndData), Phi_(Phi), lsetbnd_(lsetbnd), outnormal_(outnormal), mu1_(mu1), mu2_(mu2), beta1_(beta1), beta2_(beta2), alpha_(alpha), ls_loc( lat.vertex_size())
     { P2DiscCL::GetGradientsOnRef( GradRef); }
 
     double mu  (int sign) const { return sign > 0 ?  mu1_  : mu2_; }
     double beta (int sign) const { return sign > 0 ? beta1_ : beta2_; }
     void setup(const TetraCL& tet, const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, LocalSystem1DataCL& loc);  //update local system 1
+    void CLdiss(const TetraCL& tet, LocalSystem1DataCL& loc); //Set up contact line dissipation term
 };
 
 void SpecialBndHandler_System1TwoPhaseP2CL::setup(const TetraCL& tet, const SMatrixCL<3,3>& T, const LocalP2CL<>& ls,  LocalSystem1DataCL& loc)
@@ -2087,6 +2096,12 @@ void SpecialBndHandler_System1TwoPhaseP2CL::setup(const TetraCL& tet, const SMat
 				resize_and_evaluate_on_vertexes( Gradn[i], q5dom, gradP1[i]); // for A	
 			}
 
+				DROPS::GridFunctionCL<> integrand( 1., q5dom.vertex_size()); // Gridfunction with constant 1 everywhere
+				double area_neg, area_pos;
+				area_neg =quad( integrand, q5dom, DROPS::NegTetraC);
+				area_pos =quad( integrand, q5dom, DROPS::PosTetraC);
+              double h1 = std::sqrt(area_pos)>0.1*h ? std::sqrt(area_pos): 0.1*h;
+              double h2 = std::sqrt(area_neg)>0.1*h ? std::sqrt(area_neg): 0.1*h;
 		    double temp1 = symmBC? 0: beta1_;
 			double temp2 = symmBC? 0: beta2_;
 			for(Uint i=0; i<10; ++i){
@@ -2095,7 +2110,8 @@ void SpecialBndHandler_System1TwoPhaseP2CL::setup(const TetraCL& tet, const SMat
                     quad( gradP1[i] * basisP2[j] + gradP1[j] * basisP2[i], q5dom, locInt[0].grad2D[i][j], locInt[1].grad2D[i][j]);
 					// three additional terms
 					dm[j][i](0, 0)= dm[j][i](1, 1) = dm[j][i](2, 2) = temp1 * locInt[0].mass2D[i][j] + temp2* locInt[1].mass2D[i][j];
-					dm[j][i]     += ( (alpha_/h*mu1_ -temp1)* locInt[0].mass2D[i][j] + (alpha_/h* mu2_ - temp2) * locInt[1].mass2D[i][j] )* SMatrixCL<3,3> (outer_product(normal, normal));
+					dm[j][i]     += ( (alpha_/h1*mu1_ -temp1)* locInt[0].mass2D[i][j] + (alpha_/h2* mu2_ - temp2) * locInt[1].mass2D[i][j] )* SMatrixCL<3,3> (outer_product(normal, normal));
+                  //dm[j][i]     += ( (alpha_/h1*mu1_)* locInt[0].mass2D[i][j] + (alpha_/h2* mu2_ ) * locInt[1].mass2D[i][j] )* SMatrixCL<3,3> (outer_product(normal, normal));
 					//if(BndData_.Vel.GetBC(*tet.GetFace(k))!= SymmBC) not necessary
 					dm[j][i]     -= ( 2. * mu1_ * locInt[0].grad2D[i][j]+ 2.* mu2_ * locInt[1].grad2D[i][j] )* SMatrixCL<3,3> (outer_product(normal, normal));  
 					loc.Ak[j][i] += dm[j][i];
@@ -2107,6 +2123,88 @@ void SpecialBndHandler_System1TwoPhaseP2CL::setup(const TetraCL& tet, const SMat
 			}
 		}
 	}
+}
+
+void SpecialBndHandler_System1TwoPhaseP2CL::CLdiss(const TetraCL& tet, LocalSystem1DataCL& loc)
+{
+    bool SpeBnd=false;
+    for(Uint v=0; v<4; v++)
+    if(lsetbnd_.GetBC(*tet.GetFace(v))==Slip0BC||lsetbnd_.GetBC(*tet.GetFace(v))==SlipBC)
+    {
+        SpeBnd=true;
+        break;
+    }
+	if(!SpeBnd)
+	{
+		for(Uint v=0; v<6; v++)
+			if(lsetbnd_.GetBC(*tet.GetEdge(v))==Slip0BC||lsetbnd_.GetBC(*tet.GetEdge(v))==SlipBC)
+			{
+				SpeBnd=true;
+				break;
+			}
+		if(!SpeBnd)
+		return;
+	}
+    //Initialize one interface patch
+    triangle.BInit( tet, Phi_,lsetbnd_); 
+    triangle.SetBndOutNormal(outnormal_);
+    Point3DCL normal_mcl[5];     //normal of moving contact lines in tangential surface
+	Point3DCL outnormalOnMcl[5];    //outnormal of the domain boundary
+	BaryCoordCL quadBarys[5];
+	double weight[5]={0.568888889, 0.47862867,0.47862867,0.236926885,0.236926885};
+	//integral in [-1,1]
+	double qupt[5]={0,-0.53846931,0.53846931,-0.906179846,0.906179846};
+    
+    SMatrixCL<3, 3> dm[10][10];
+    LocalP2CL<double> phi[10]; 
+    for(Uint i=0; i<10; ++i)
+    {
+        phi[i][i] = 1;
+    }
+    for (int ch=0; ch<8; ++ch)
+    {
+        if (!triangle.ComputeMCLForChild(ch)) // no  for this child
+            continue;
+        BaryCoordCL Barys[2];
+        Point3DCL pt0,pt1;
+        Point3DCL midpt;
+        double length;
+        Uint ncl=triangle.GetNumMCL();
+        for(Uint i=0;i<ncl;i++)
+        {
+            length = triangle.GetInfoMCL(i,Barys[0],Barys[1],pt0,pt1);
+            for(Uint j=0;j<5;j++)
+            {
+                midpt=(pt0+pt1)/2 + qupt[j]*(pt1-pt0)/2;
+                normal_mcl[j] = triangle.GetImprovedMCLNormal(i,(qupt[j]+1)/2);
+                quadBarys[j]=(Barys[0]+Barys[1])/2+qupt[j]*(Barys[1]-Barys[0])/2;
+                outnormalOnMcl[j]=outnormal_(midpt,0);
+            }
+            for (Uint i=0; i<10; ++i)
+            {
+                for(Uint j=0; j<=i; ++j)
+                {
+                    //5 points Gauss–Legendre quadrature is used.
+                    for(int m =0; m<3; m++)
+                        for(int n=0; n<3; n++)
+                            /*for (int v=0; v<5; v++)
+                            {
+                                dm[j][i](m, n) += weight[v]*phi[i](quadBarys[v])*phi[j](quadBarys[v])*normal_mcl[v][m]*normal_mcl[v][n];      
+                            }*/
+                        for (int v=0; v<5; v++)
+                        {
+                            dm[j][i](m, m) += weight[v]*phi[i](quadBarys[v])*phi[j](quadBarys[v]);      
+                        }
+                    dm[j][i] = length/2*beta1_*dm[j][i];
+                    loc.Ak[j][i] += dm[j][i];
+                    if (i != j){
+                        assign_transpose( dm[i][j], dm[j][i]);
+                        loc.Ak[i][j] += dm[i][j];
+                    }	
+                }
+            }
+        }
+    }
 }
 
 /// \brief Setup of the local P2 "system 1" on a tetra intersected by the dividing surface.
@@ -2289,7 +2387,7 @@ System1Accumulator_P2CL::System1Accumulator_P2CL (const TwoPhaseFlowCoeffCL& Coe
       RowIdx( RowIdx_), A( A_), M( M_), cplA( cplA_), cplM( cplM_), b( b_),
       local_twophase( Coeff.mu( 1.0), Coeff.mu( -1.0), Coeff.rho( 1.0), Coeff.rho( -1.0), Coeff.volforce),
 	  speBndHandler1(BndData_, Coeff.alpha),
-	  speBndHandler2(BndData_, Coeff.mu( 1.0), Coeff.mu( -1.0), Coeff.beta(1.0), Coeff.beta(-1.0), Coeff.alpha)
+	  speBndHandler2(BndData_, lset_Phi, lset_Bnd, Coeff.Bndoutnormal, Coeff.mu( 1.0), Coeff.mu( -1.0), Coeff.beta(1.0), Coeff.beta(-1.0), Coeff.alpha)
 {}
 
 void System1Accumulator_P2CL::begin_accumulation ()
@@ -2355,8 +2453,10 @@ void System1Accumulator_P2CL::local_setup (const TetraCL& tet)
     }
     else{
         local_twophase.setup( T, absdet, tet, ls_loc, locInt, loc);
-        if(speBnd)
+        if(speBnd){
         	speBndHandler2.setup(tet, T, ls_loc, loc); //update loc for special boundary condtion
+           //speBndHandler2.CLdiss(tet, loc);
+        }
     }
 		
     add_transpose_kronecker_id( loc.Ak, loc.A);
@@ -2392,10 +2492,10 @@ void System1Accumulator_P2CL::local_setup (const TetraCL& tet)
         }
         if(speBnd)
         {
-        	//if (noCut)
+        	if (noCut)
 				speBndHandler1.setupRhs(tet, loc_b, t);
-            //else
-		    //	speBndHandler1.setupRhs(tet, loc_b);//<not used for now --need modification when the slip length is different in the two phase flow
+          else
+		    	speBndHandler1.setupRhs(tet, loc_b, t);//<not used for now --need modification when the slip length is different in the two phase flow
         }
     }
 	
@@ -4260,6 +4360,142 @@ void InstatStokes2PhaseP2P1CL::CheckTwoPhaseSolution(const VelVecDescCL* DescVel
 	
 	SetupPrMass(&prM, lset);
 	L2ErrPr( p, lset, prM.Data.GetFinest(), prJump, MG_, GetPrFE(), GetXidx(), avg_ex);	*/ 
+}
+
+void InstatStokes2PhaseP2P1CL::CheckTwoPhaseSolution(const VelVecDescCL* DescVel, const VecDescCL* DescPr, 
+							      const LevelsetP2CL& lset, const VelVecDescCL* RefVel, const VecDescCL* RefPr)
+{
+	ScopeTimerCL scope("CheckTwoPhaseSolution");
+    double t = DescVel->t;
+//#ifdef _PAR
+//    const ExchangeCL& exV = vel_idx.GetEx();
+//    const ExchangeCL& exP = pr_idx.GetEx();
+//#endif
+	
+	Uint lvl=DescVel->GetLevel();
+	VecDescCL DescPr_neg; 
+	VecDescCL DescPr_pos;
+    /// \todo for periodic stuff: matching function here
+
+    DescPr_neg.SetIdx( p.RowIdx);
+    DescPr_pos.SetIdx( p.RowIdx);
+	GetPrOnPart(DescPr_neg, lset, false);
+	GetPrOnPart(DescPr_pos, lset, true);
+	
+    SMatrixCL<3,3> T;
+    double det;
+	//Point3DCL Grad[4];
+	
+    // L2 norms of velocities: ||u_h - u||_L2
+	// L2 norm of  pressure:   ||p_h - p||_L2
+    // number of nodes for Quad5CL rule is 15 (see discretize.h Quad5_DataCL NumNodesC =15)
+    double L2_vel(0.0);
+    double L2_pr(0.0);
+    Quad5CL<Point3DCL> q5_vel, q5_vel_exact;
+    Quad5CL<double> q5_pr, q5_pr_exact;
+	GridFunctionCL<double> pre_neg, pre_pos, pre_exact1,pre_exact2, err_neg, err_pos;
+	
+	TetraPartitionCL partition;
+	QuadDomainCL q5dom;
+	InterfaceTetraCL cut;
+	const PrincipalLatticeCL lat(PrincipalLatticeCL::instance(2));
+    std::valarray<double> ls_loc(lat.vertex_size());
+	
+	
+	double SumErr=0.;
+	double volume=0.;
+	double average=0.;
+    for (MultiGridCL::const_TriangTetraIteratorCL sit= const_cast<const MultiGridCL&>(MG_).GetTriangTetraBegin(lvl),
+        send= const_cast<const MultiGridCL&>(MG_).GetTriangTetraEnd(lvl); sit != send; ++sit)
+    {
+		 evaluate_on_vertexes( lset.GetSolution(), *sit, lat, Addr( ls_loc));
+		 const bool noCut= equal_signs( ls_loc);	 
+         GetTrafoTr(T,det,*sit);
+         const double absdet= std::fabs(det);
+         LocalP1CL<double> loc_pr(*sit, make_P1Eval(MG_,BndData_.Pr,*DescPr));
+         LocalP1CL<double> loc_Refpr(*sit, make_P1Eval(MG_,BndData_.Pr,*RefPr));		 
+		 volume += sit->GetVolume();
+		 if(noCut){
+            q5_pr_exact.assign(loc_Refpr);
+            q5_pr.assign(loc_pr);
+			 SumErr += Quad5CL<> (q5_pr-q5_pr_exact).quad(absdet);			 
+		 }
+		 else{
+			 partition.make_partition<SortedVertexPolicyCL, MergeCutPolicyCL>( lat, ls_loc);
+			 make_CompositeQuad2Domain( q5dom, partition);
+			 LocalP1CL<double> loc_pr_neg(*sit, make_P1Eval(MG_,BndData_.Pr, DescPr_neg));
+			 LocalP1CL<double> loc_pr_pos(*sit, make_P1Eval(MG_,BndData_.Pr, DescPr_pos));
+			 LocalP1CL<double> loc_Refpr_neg(*sit, make_P1Eval(MG_,BndData_.Pr, *RefPr));
+			 LocalP1CL<double> loc_Refpr_pos(*sit, make_P1Eval(MG_,BndData_.Pr, *RefPr));
+			 resize_and_evaluate_on_vertexes( loc_pr_neg, q5dom, pre_neg);
+			 resize_and_evaluate_on_vertexes( loc_pr_pos, q5dom, pre_pos); 
+			 
+			 resize_and_evaluate_on_vertexes( loc_Refpr_neg, q5dom, pre_exact1);
+			 resize_and_evaluate_on_vertexes( loc_Refpr_pos, q5dom, pre_exact2); 	
+			 
+			 SumErr+= quad ( (pre_neg-pre_exact1), absdet, q5dom, NegTetraC);
+			 SumErr+= quad ( (pre_pos-pre_exact2), absdet, q5dom, PosTetraC);	
+		 }
+     }
+	 //Get the average pressure, use it to normalize the pressure;
+	average= SumErr/volume;
+	std::cout<<"The average of the pressure error is: "<<average<<" The volume is: "<<volume<<std::endl;
+    for (MultiGridCL::const_TriangTetraIteratorCL sit= const_cast<const MultiGridCL&>(MG_).GetTriangTetraBegin(lvl),
+        send= const_cast<const MultiGridCL&>(MG_).GetTriangTetraEnd(lvl); sit != send; ++sit)
+    {
+		 evaluate_on_vertexes( lset.GetSolution(), *sit, lat, Addr( ls_loc));
+		 cut.Init( *sit, lset.Phi, lset.GetBndData());
+		 const bool noCut= equal_signs( ls_loc);
+		 	
+         GetTrafoTr(T,det,*sit);
+         const double absdet= std::fabs(det);
+         LocalP2CL<Point3DCL> loc_vel(*sit, make_P2Eval(MG_,BndData_.Vel,*DescVel));
+         LocalP2CL<Point3DCL> loc_Refvel(*sit, make_P2Eval(MG_,BndData_.Vel,*RefVel));
+         LocalP1CL<double> loc_pr(*sit, make_P1Eval(MG_,BndData_.Pr,*DescPr));
+         LocalP1CL<double> loc_Refpr(*sit, make_P1Eval(MG_,BndData_.Pr,*RefPr));
+		  LocalP1CL<double> loc_aver(average);
+			 
+         q5_vel.assign(loc_vel);
+         q5_vel_exact.assign(loc_Refvel);
+         Quad5CL<Point3DCL> q5_vel_diff( q5_vel-q5_vel_exact);
+         L2_vel += Quad5CL<> (dot(q5_vel_diff,q5_vel_diff)).quad(absdet);
+		 
+		 if(noCut){
+
+            q5_pr_exact.assign(loc_Refpr);
+			 LocalP1CL<double> temp3(loc_pr-loc_aver);
+			 q5_pr.assign(temp3);
+	
+			 Quad5CL<double> q5_pr_diff( q5_pr-q5_pr_exact);
+
+			 L2_pr  += Quad5CL<> (q5_pr_diff*q5_pr_diff).quad(absdet);			 
+		 }
+		 else{
+			 partition.make_partition<SortedVertexPolicyCL, MergeCutPolicyCL>( lat, ls_loc);
+			 make_CompositeQuad2Domain( q5dom, partition);
+			 LocalP1CL<double> loc_pr_neg(*sit, make_P1Eval(MG_,BndData_.Pr, DescPr_neg));
+			 LocalP1CL<double> loc_pr_pos(*sit, make_P1Eval(MG_,BndData_.Pr, DescPr_pos));
+			 LocalP1CL<double> temp1(loc_pr_neg-loc_aver); //for negative pressure;
+			 LocalP1CL<double> temp2(loc_pr_pos-loc_aver); //for positive pressure;
+			 LocalP2CL<double> pr_neg_l2 (temp1);
+			 LocalP2CL<double> pr_pos_l2 (temp2);
+			 LocalP2CL<double> pr_ex_neg (*sit, make_P1Eval(MG_,BndData_.Pr, *RefPr));
+			 LocalP2CL<double> pr_ex_pos (*sit, make_P1Eval(MG_,BndData_.Pr, *RefPr));
+			 LocalP2CL<double> err_neg_l2( (pr_neg_l2-pr_ex_neg)*(pr_neg_l2-pr_ex_neg) );
+			 LocalP2CL<double> err_pos_l2( (pr_pos_l2-pr_ex_pos)*(pr_pos_l2-pr_ex_pos) );
+			 
+			 resize_and_evaluate_on_vertexes(err_neg_l2,  q5dom,  err_neg);
+			 resize_and_evaluate_on_vertexes(err_pos_l2,  q5dom,  err_pos); 
+			 //To do: currently not find the best way, use the time to as level set sign flag;			 
+			 L2_pr += quad ( err_pos,  absdet, q5dom,   PosTetraC);
+			 L2_pr += quad ( err_neg,  absdet, q5dom,   NegTetraC);	 
+		 }
+     }
+     L2_vel  = std::sqrt(L2_vel);               //L2_vel is the true value.
+     L2_pr   = std::sqrt(L2_pr);
+         std::cout << "---------------------Discretize error-------------------"
+		            <<"\n || u_h - u ||_L2 = " <<  L2_vel 
+				     <<"\n || p_h - p ||_L2 = " <<  L2_pr << std::endl;	
 }
 
 ///> To do, parallel case

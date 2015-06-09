@@ -690,7 +690,13 @@ namespace contactangle{
 	
 	double ConstantAngle(const DROPS::Point3DCL&,double)
 	{
-		return P.get<double>("SpeBnd.contactangle")/180.0*M_PI;
+       static bool first = true;
+       static double angle;
+       if(first){
+           angle = P.get<double>("SpeBnd.contactangle");
+           first = false;
+       }
+		return angle/180.0*M_PI;
 	}
 
 	double PeriodicAngle(const DROPS::Point3DCL& pt,double)
@@ -733,18 +739,23 @@ namespace contactangle{
 
 	DROPS::Point3DCL OutNormalBrick(const DROPS::Point3DCL& pt,double)
 	{
-		if(P.get<int>("DomainCond.GeomType")!=1)
-			 throw DROPS::DROPSErrCL("Error: compute out normal of brick, please use other functions");
-		int nx, ny, nz;
-		double dx, dy, dz;
-		std::string mesh( P.get<std::string>("DomainCond.MeshFile")), delim("x@");
-		size_t idx;
-		while ((idx= mesh.find_first_of( delim)) != std::string::npos )
-			   mesh[idx]= ' ';
-		std::istringstream brick_info( mesh);
-		brick_info >> dx >> dy >> dz >> nx >> ny >> nz;
-		if (!brick_info)
-				throw DROPS::DROPSErrCL("error while reading geometry information: " + mesh);
+		//if(P.get<int>("DomainCond.GeomType")!=1)
+			 //throw DROPS::DROPSErrCL("Error: compute out normal of brick, please use other functions");
+       static bool first = true;
+       static double dx, dy, dz;;
+        //dirty hack
+       if (first){
+            std::string mesh( P.get<std::string>("DomainCond.MeshFile")), delim("x@");
+            size_t idx;
+            while ((idx= mesh.find_first_of( delim)) != std::string::npos )
+                   mesh[idx]= ' ';
+            std::istringstream brick_info( mesh);
+            brick_info >> dx >> dy >> dz;
+            first = false;
+            if (!brick_info)
+                throw DROPS::DROPSErrCL("error while reading geometry information: " + mesh);
+       }
+
 		double EPS=1e-10;
 		DROPS::Point3DCL outnormal(0.0);
 		if(std::fabs(pt[0])<EPS)
@@ -789,15 +800,29 @@ namespace CouetteFlow{
 
 	DROPS::Point3DCL UpwallVel(const DROPS::Point3DCL& ,double)
 	{
-		DROPS::Point3DCL vel(0.0);
-		vel[0]=P.get<double>("Exp.WallVelocity");
-		return vel;
+        static bool first = true;
+        static double WallVel;
+        if(first)
+        {
+            WallVel = P.get<double>("Exp.WallVelocity");   
+            first = false;
+        }
+        DROPS::Point3DCL vel(0.0);
+        vel[0]=WallVel; 
+        return vel;
 	}
 	DROPS::Point3DCL DownwallVel(const DROPS::Point3DCL& ,double)
 	{
-		DROPS::Point3DCL vel(0.0);
-		vel[0]=-P.get<double>("Exp.WallVelocity");
-		return vel;
+        static bool first = true;
+        static double WallVel;
+        if(first)
+        {
+            WallVel = P.get<double>("Exp.WallVelocity");   
+            first = false;
+        }        
+        DROPS::Point3DCL vel(0.0);
+        vel[0]=-WallVel; 
+        return vel;
 	}
 	DROPS::Point3DCL LeftwallVel(const DROPS::Point3DCL& pt,double)
 	{
