@@ -35,6 +35,19 @@ double SurfaceTensionCL::sigma_c(double c) const
     return 0.001*(C_[0] + C_[1]*y+ C_[2]*z +C_[3]*y*z)*x;
 }
 
+double SurfaceTensionCL::sigma_s(double s) const
+{
+  double R=8.3144621; // gas constant
+  if (s>=smax_) return 0.;
+  switch (surfmodel_)
+  {
+    case LANGMUIR: return R*T_*smax_*log(1.-s/smax_); break;
+    case LINEAR:   return -s*R*T_; break;
+    default:  throw DROPSErrCL("SurfaceTensionCL::sigma_s: no surface model chosen!\n");
+   }
+  return 0.;
+}
+
 void SurfaceTensionCL::ComputeSF(const TetraCL& t, const BaryCoordCL * const p,
                           Quad5_2DCL<>& qsigma) const
 {
@@ -61,7 +74,23 @@ void SurfaceTensionCL::ComputeSF(const TetraCL& t, const BaryCoordCL * const p,
                       }
                       break;
         case Sigma_S: {
-                          std::cerr<<"SurfaceTensionCL::ComputeSF: Sorry. Sigma_S not implemented yet."<<std::endl;
+                          LocalP1CL<> p1_s(t, *s_, cBnd_);
+                          LocalP2CL<> p2_s(p1_s);
+                          Quad5_2DCL<> q5_s(p2_s, p);
+                          Quad5_2DCL<> qsigma_0;
+                          qsigma_0.assign(t, p, sigma_);
+                          for (Uint i= 0; i < Quad5_2DDataCL::NumNodesC; ++i) {
+                              qsigma[i]= qsigma_0[i] + sigma_s(q5_s[i]);
+                          }
+                          if(sigma_vtk_)
+                          {
+                              LocalP1CL<> p1_sigma(t, sigma_);
+                              LocalP1CL<> p1_sigma_s(t, *s_, cBnd_);
+                              Uint lidx = sigma_vtk_->RowIdx->GetIdx();
+                              for(Uint i=0;i<4;i++)
+                                  sigma_vtk_->Data[t.GetVertex(i)->Unknowns(lidx)] = p1_sigma[i] + sigma_s(p1_sigma_s[i]); 
+                           }
+
                       }
                       break;
          default:     throw DROPSErrCL("SurfaceTensionCL::ComputeSF: unknown method\n");

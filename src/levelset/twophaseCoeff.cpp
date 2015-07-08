@@ -1,6 +1,6 @@
 /// \file twophaseCoeff.cpp
 /// \brief boundary and source functions for the twophasedrops-type problems
-/// \author LNM RWTH Aachen: Christoph Lehrenfeld
+/// \author LNM RWTH Aachen: Christoph Lehrenfeld, Yuanjun Zhang
 
 /*
  * This file is part of DROPS.
@@ -68,13 +68,35 @@ namespace tpd_inflow{
     }
 
     /// Examplary inflow condition for a shift frame
-    DROPS::SVectorCL<3> InflowShiftFrame( const DROPS::Point3DCL& p, double)
+    DROPS::SVectorCL<3> InflowShiftFrame( const DROPS::Point3DCL&, double)
     {
         DROPS::SVectorCL<3> ret(0.);
         DROPS::SVectorCL<3> FrameVel(0.);
         FrameVel = P.get<DROPS::Point3DCL>("NavStokes.FrameVel");
         ret = -FrameVel;
         return ret;
+    }
+
+    /// Axial symmetric extensional flow
+    DROPS::SVectorCL<3> InflowAxialExtensionalFlow( const DROPS::Point3DCL& p, double)
+    {
+        DROPS::SVectorCL<3> ret(0.);
+        DROPS::SVectorCL<3> PosDrop(0.);
+        PosDrop = P.get<DROPS::Point3DCL>("Exp.PosDrop");
+        ret[0]=-0.5*(p[0]-PosDrop[0]);
+        ret[1]=-0.5*(p[1]-PosDrop[1]);
+        ret[2]= p[2]-PosDrop[2];
+        return P.get<double>("Exp.ExtensionalFlowFactor",1.0)*ret;
+    }
+
+    /// Plane shear flow (z-direction)
+    DROPS::SVectorCL<3> InflowShearFlowZ( const DROPS::Point3DCL& p, double)
+    {
+        DROPS::SVectorCL<3> ret(0.);
+        DROPS::SVectorCL<3> E3(0.);
+        E3 = P.get<DROPS::Point3DCL>("Domain.E3");
+        ret[0]=p[2]-0.5*E3[2];
+        return P.get<double>("Exp.ShearFlowFactor",1.0)*ret;
     }
 
     //========================================================================
@@ -98,6 +120,8 @@ namespace tpd_inflow{
     static DROPS::RegisterVectorFunction regvelchannel("InflowChannel", InflowChannel);
     static DROPS::RegisterVectorFunction regvelbricktransp("InflowBrickTransp", InflowBrickTransp);
     static DROPS::RegisterVectorFunction regvelshiftframe("InflowShiftFrame", InflowShiftFrame);
+    static DROPS::RegisterVectorFunction regvelextensional("InflowAxialExtensionalFlow", InflowAxialExtensionalFlow);
+    static DROPS::RegisterVectorFunction regvelshearz("InflowShearFlowZ", InflowShearFlowZ);
 }
 
 
@@ -237,9 +261,14 @@ namespace surffunctions{
     {
         return 1. + std::sin( atan2( p[0] - P.get<DROPS::Point3DCL>("Exp.PosDrop")[0], p[2] - P.get<DROPS::Point3DCL>("Exp.PosDrop")[2]));
     }
+    double surf_uniform (const DROPS::Point3DCL&, double)
+    {
+        return P.get<double>("SurfTransp.InitialConcentration");
+    }
     //@}
     static DROPS::RegisterScalarFunction regscasurfrhs("surf_rhs", surf_rhs);
     static DROPS::RegisterScalarFunction regscasurfsol("surf_sol", surf_sol);
+    static DROPS::RegisterScalarFunction regscasurfuniform("surf_uniform", surf_uniform);
 }
 
 //TODO: unification with filmCoeff stoff
