@@ -804,10 +804,10 @@ Point3DCL InterfaceTriangleCL::GetImprovedMCLNormal(Uint v,double bary1D) const
 	//Point3DCL mpt = PQRS_[IdxMCL_[v]] + bary1D*(PQRS_[(IdxMCL_[v]+1)%intersec_]-PQRS_[IdxMCL_[v]]);
 	
 	Point3DCL mpt = PQRS_[IdxMCL_[v][0]] + bary1D*(PQRS_[IdxMCL_[v][1]]-PQRS_[IdxMCL_[v][0]]);
-//	BaryCoordCL bary = Bary_[IdxMCL_[v]]+  bary1D*(Bary_[(IdxMCL_[v]+1)%intersec_]-Bary_[IdxMCL_[v]]);
+	//BaryCoordCL bary = Bary_[IdxMCL_[v]]+  bary1D*(Bary_[(IdxMCL_[v]+1)%intersec_]-Bary_[IdxMCL_[v]]);
 	Point3DCL n=outnormal_(mpt,0);//out normal of the domain boundary
+	BaryCoordCL bary = Bary_[IdxMCL_[v][0]]+  bary1D*(Bary_[IdxMCL_[v][1]]-Bary_[IdxMCL_[v][0]]);
 
-/*
 	//BEGIN to compute the outnormal of the level-set
 	LocalP1CL<Point3DCL> GradRef[10], GradP2[10];
 	P2DiscCL::GetGradientsOnRef( GradRef);
@@ -843,9 +843,9 @@ Point3DCL InterfaceTriangleCL::GetImprovedMCLNormal(Uint v,double bary1D) const
 		normal += this->GetPhi(v)*GradQ[v];
 	}
 
-	if (normal.norm()>1e-8) normal/= normal.norm();
+	//if (normal.norm()>1e-8) normal/= normal.norm();
 	//END compute the outnormal of the level-set*/
-	Point3DCL normal=GetImprovedNormalOnMCL(v,bary1D);
+	//Point3DCL normal=GetImprovedNormalOnMCL(v,bary1D);
 	n=normal - inner_prod(normal,n)*n;
 	if (n.norm()>5e-2) n/= n.norm();
 	else

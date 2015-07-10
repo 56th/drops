@@ -825,11 +825,27 @@ namespace CouetteFlow{
 		 std::istringstream brick_info( mesh);
 		 brick_info >> dx >> dy >> dz;
 		 DROPS::Point3DCL vel(0.0);
-		 vel[0]=P.get<double>("Exp.WallVelocity")*((pt[2]-dz/2)*2/dz)*(dz/(dz+2/P.get<double>("SpeBnd.beta1")));
+		 vel[0]=P.get<double>("Exp.WallVelocity")*((pt[2]-dz/2)*2/dz)*(dz/(dz+2*P.get<double>("Mat.ViscDrop")/P.get<double>("SpeBnd.beta1")));
 		 return vel;
 	}
+	DROPS::Point3DCL RightwallVel(const DROPS::Point3DCL& pt,double)
+		{
+
+			 double dx, dy, dz;
+			 const std::string meshfile_name=P.get<std::string>("DomainCond.MeshFile");
+			 std::string mesh( meshfile_name), delim("x@");
+			 size_t idx;
+			 while ((idx= mesh.find_first_of( delim)) != std::string::npos )
+			       mesh[idx]= ' ';
+			 std::istringstream brick_info( mesh);
+			 brick_info >> dx >> dy >> dz;
+			 DROPS::Point3DCL vel(0.0);
+			 vel[0]=P.get<double>("Exp.WallVelocity")*((pt[2]-dz/2)*2/dz)*(dz/(dz+2*P.get<double>("Mat.ViscFluid")/P.get<double>("SpeBnd.beta2")));
+			 return vel;
+		}
 	static DROPS::RegisterVectorFunction regunitupwallvel("UpwallVel", UpwallVel);
 	static DROPS::RegisterVectorFunction regunitdownwallvel("DownwallVel", DownwallVel);
 	static DROPS::RegisterVectorFunction regunitleftwallvel("LeftwallVel", LeftwallVel);
+	static DROPS::RegisterVectorFunction regunitrightwallvel("RightwallVel", RightwallVel);
 }
 
