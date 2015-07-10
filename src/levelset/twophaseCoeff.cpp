@@ -690,12 +690,7 @@ namespace contactangle{
 	
 	double ConstantAngle(const DROPS::Point3DCL&,double)
 	{
-       static bool first = true;
-       static double angle;
-       if(first){
-           angle = P.get<double>("SpeBnd.contactangle");
-           first = false;
-       }
+       double angle = P.get<double>("SpeBnd.contactangle");
 		return angle/180.0*M_PI;
 	}
 
@@ -739,22 +734,20 @@ namespace contactangle{
 
 	DROPS::Point3DCL OutNormalBrick(const DROPS::Point3DCL& pt,double)
 	{
-		//if(P.get<int>("DomainCond.GeomType")!=1)
-			 //throw DROPS::DROPSErrCL("Error: compute out normal of brick, please use other functions");
-       static bool first = true;
-       static double dx, dy, dz;;
-        //dirty hack
-       if (first){
-            std::string mesh( P.get<std::string>("DomainCond.MeshFile")), delim("x@");
-            size_t idx;
-            while ((idx= mesh.find_first_of( delim)) != std::string::npos )
-                   mesh[idx]= ' ';
-            std::istringstream brick_info( mesh);
-            brick_info >> dx >> dy >> dz;
-            first = false;
-            if (!brick_info)
-                throw DROPS::DROPSErrCL("error while reading geometry information: " + mesh);
-       }
+		if(P.get<int>("DomainCond.GeomType")!=1)
+			 throw DROPS::DROPSErrCL("Error: compute out normal of brick, please use other functions");
+
+       double dx, dy, dz;
+
+        std::string mesh( P.get<std::string>("DomainCond.MeshFile")), delim("x@");
+        size_t idx;
+        while ((idx= mesh.find_first_of( delim)) != std::string::npos )
+               mesh[idx]= ' ';
+        std::istringstream brick_info( mesh);
+        brick_info >> dx >> dy >> dz;
+
+        if (!brick_info)
+            throw DROPS::DROPSErrCL("error while reading geometry information: " + mesh);
 
 		double EPS=1e-10;
 		DROPS::Point3DCL outnormal(0.0);
@@ -794,32 +787,28 @@ namespace curvebndDomain{
 	}
 
 	static DROPS::RegisterVectorFunction regunitoutnomalsphere("OutNormalSphere", OutNormalSphere);
+    DROPS::Point3DCL OutNormalCylinder(const DROPS::Point3DCL& pt,double)
+	{
+		DROPS::Point3DCL outnormal(0.0);
+		outnormal=pt/std::sqrt(pt[1]*pt[1]+pt[2]*pt[2]);
+       outnormal[0]=0;
+		return outnormal;
+	}
+	static DROPS::RegisterVectorFunction regunitoutnomalcylinder("OutNormalCylinder", OutNormalCylinder);
 
 }
 namespace CouetteFlow{
 
 	DROPS::Point3DCL UpwallVel(const DROPS::Point3DCL& ,double)
-	{
-        static bool first = true;
-        static double WallVel;
-        if(first)
-        {
-            WallVel = P.get<double>("Exp.WallVelocity");   
-            first = false;
-        }
+	{ 
+        double WallVel = P.get<double>("Exp.WallVelocity");
         DROPS::Point3DCL vel(0.0);
         vel[0]=WallVel; 
         return vel;
 	}
 	DROPS::Point3DCL DownwallVel(const DROPS::Point3DCL& ,double)
-	{
-        static bool first = true;
-        static double WallVel;
-        if(first)
-        {
-            WallVel = P.get<double>("Exp.WallVelocity");   
-            first = false;
-        }        
+	{ 
+        double WallVel = P.get<double>("Exp.WallVelocity");
         DROPS::Point3DCL vel(0.0);
         vel[0]=-WallVel; 
         return vel;
