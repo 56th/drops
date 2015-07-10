@@ -2049,6 +2049,7 @@ class SpecialBndHandler_System1TwoPhaseP2CL
     double mu  (int sign) const { return sign > 0 ?  mu1_  : mu2_; }
     double beta (int sign) const { return sign > 0 ? beta1_ : beta2_; }
     void setup(const TetraCL& tet, const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, LocalSystem1DataCL& loc);  //update local system 1
+    void setupRhs(const TetraCL& tet, Point3DCL loc_b[10], double t);
     void CLdiss(const TetraCL& tet, LocalSystem1DataCL& loc); //Set up contact line dissipation term
 };
 
@@ -2123,6 +2124,45 @@ void SpecialBndHandler_System1TwoPhaseP2CL::setup(const TetraCL& tet, const SMat
 			}
 		}
 	}
+}
+
+//for non homogeneous slip boundary condition (the slip wall is moving)
+void SpecialBndHandler_System1TwoPhaseP2CL::setupRhs(const TetraCL& tet, Point3DCL loc_b[10], double t)
+{
+    Uint unknownIdx[6];
+	for (Uint k =0; k< 4; ++k){ //Go throught all faces of a tet
+	
+		LocalP2CL<double> phi[6]; 
+		Quad5_2DCL<double> locP2[6];
+		Quad5_2DCL<Point3DCL> WallVel;
+		BaryCoordCL bary[3];
+		if( BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC ){
+			const FaceCL& face = *tet.GetFace(k);
+            double absdet = FuncDet2D(	face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
+                                           	face.GetVertex(2)->GetCoord()-face.GetVertex(0)->GetCoord()); 
+			tet.GetOuterNormal(k, normal);
+			for (Uint i= 0; i<3; ++i)    
+			{
+				unknownIdx[i]   = VertOfFace(k, i);      // i is index for Vertex
+				unknownIdx[i+3] = EdgeOfFace(k, i) + 4;  // i is index for Edge
+				bary[i][unknownIdx[i]]=1;
+			}
+			typedef StokesBndDataCL::VelBndDataCL::bnd_val_fun bnd_val_fun;
+			bnd_val_fun bf= BndData_.Vel.GetBndSeg(face.GetBndIdx()).GetBndFun();
+			WallVel.assign(tet, bary, bf, t);
+			for(Uint i=0; i<6; ++i)
+				phi[i][unknownIdx[i]] = 1;
+				
+			for(Uint i=0; i<6; ++i){
+					locP2[i].assign(phi[i], bary);
+			}
+
+			for(Uint i=0; i<6; ++i){//setup right hand side	
+					Quad5_2DCL<Point3DCL> WallVelRhs( locP2[i]* WallVel);
+					loc_b[unknownIdx[i]] += (beta1_ * WallVelRhs.quad(absdet) - beta1_ * SMatrixCL<3,3> (outer_product(normal, normal)) * WallVelRhs.quad(absdet));
+			}		
+		}
+	}	
 }
 
 void SpecialBndHandler_System1TwoPhaseP2CL::CLdiss(const TetraCL& tet, LocalSystem1DataCL& loc)
@@ -2494,8 +2534,8 @@ void System1Accumulator_P2CL::local_setup (const TetraCL& tet)
         {
         	if (noCut)
 				speBndHandler1.setupRhs(tet, loc_b, t);
-          else
-		    	speBndHandler1.setupRhs(tet, loc_b, t);//<not used for now --need modification when the slip length is different in the two phase flow
+           else
+		    	speBndHandler2.setupRhs(tet, loc_b, t);//<not used for now --need modification when the slip length is different in the two phase flow
         }
     }
 	
