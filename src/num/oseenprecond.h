@@ -138,6 +138,197 @@ void ISPreCL::Apply(const Mat&, Vec& p, const Vec& c, const ExT&, const ExT& pr_
     p+= kM_*p2_;
 }
 
+
+//**************************************************************************
+// Preconditioner for the instationary two-phase Stokes-equations with
+// ghost penalty stabilization. A modified version of Cahouet Chabard.
+//
+// A Poisson-problem with natural boundary-conditions for the pressure is
+// solved via 1 SSOR-step, a problem with the mass-matrix as well.
+// The constants kA_, kM_ have to be chosen according to h and dt, see Theorem 4.1
+// of the above paper.
+// kA_ = theta/Re and kM_ = 1/dt will do a good job,
+// where Re is proportional to the ratio density/viscosity.
+//
+// A_ is the pressure-Poisson-Matrix for the P1X space with Nitsche terms
+// for natural boundary-conditions, M_ the pressure-mass-matrix.
+//**************************************************************************
+class IsXstabPreCL : public SchurPreBaseCL
+{
+private:
+    const MatrixCL *Apr_;
+    const MatrixCL *Mpr_;
+    const MatrixCL *C_;
+    //const CkernelCL *kernel;
+    const VectorBaseCL<VectorCL> &kernel;
+    mutable MatrixCL MminusC_;
+    mutable MatrixCL AminusC_;
+    double tolA_;
+    double tolM_;
+    int pcAIter_;
+
+    typedef SGSPcCL Pc1Main;
+    //typedef JACPcCL PcSolver1;
+    typedef JACPcCL PcSolver2;
+    Pc1Main pcsgs_;
+    PcSolver2 pcjac_;
+    typedef PreKernel<Pc1Main> PcSolver1;
+    PcSolver1 pckern_;
+    mutable PCGSolverCL<PcSolver1> solver1;
+    mutable PCGSolverCL<PcSolver2> solver2;
+
+    // dimension of kernel of stabilization matrix C
+    // (if zero rows and cols are deleted)
+    //const size_t kdim = 8;
+    // 8-dimensional kernel, i.e. all functions for which the jump of the normal derivative accross
+    // element faces (which are used in ghost penalty) is zero
+    // for linear basis functions the dimension is 8 with (1,x,y,z)_omega all constant and linear functions
+    // on the entire domain plus (1,x,y,z)_omega(1,2) the constant and linear functions on ONE subdomain
+    // (the other subdomain can be obtained by linear combination)
+
+public:
+    IsXstabPreCL( const MatrixCL * Apr, const MatrixCL *Mpr, const MatrixCL *C,
+                  const VectorBaseCL<VectorCL> &ckernel, double kA = 0., double kM = 1.,
+                  double tolA = 1e-2, double tolM = 1e-2, int pcSIter = 150,
+                  std::ostream *output = 0 )
+        : SchurPreBaseCL( kA, kM, output ), Apr_(Apr), Mpr_(Mpr), C_(C), kernel(ckernel), tolA_(tolA),
+          tolM_(tolM), pcAIter_(pcSIter), pcsgs_(), pcjac_(),pckern_(pcsgs_,ckernel),
+          solver1( pckern_, pcAIter_, tolA_, true), solver2( pcjac_, 500, tolM_, true )
+    {
+        MminusC_.LinComb( 1.0 , *Mpr_ , -1.0 , *C_ );
+        AminusC_.LinComb( 1.0 , *Apr_ , -kA_ , *C_ );        
+
+    }
+
+    template <typename Mat, typename Vec, typename ExT>
+    void Apply(const Mat&, Vec& p, const Vec& c, const ExT& vel_ex, const ExT& pr_ex) const;
+#ifdef _PAR
+    void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const ExchangeCL& vel_ex, const ExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
+    void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const ExchangeCL& vel_ex, const ExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
+#endif
+    void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
+    void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
+};
+
+template <typename Mat, typename Vec, typename ExT>
+void IsXstabPreCL:: Apply(const Mat&, Vec& p, const Vec& c, const ExT&, const ExT& pr_ex) const
+{
+    p = 0.0;
+    if ( kA_ != 0.0 )
+    {
+        solver1.Solve( AminusC_ , p , c, pr_ex );
+        if( solver1.GetIter() == solver1.GetMaxIter() )
+            std::cout << "IsXstabPreCL::Apply: (Apr-1/dt*C)-solve: max iterations reached: " << solver1.GetIter()
+                      << "\twith residual: " << solver1.GetResid() << std::endl;
+        else if( output_ )
+            *output_ << "IsXstabPreCL::Apply: (Apr-1/dt*C)-solve: iterations: " << solver1.GetIter()
+                     << "\tresidual: " << solver1.GetResid() << std::endl;
+        p *= kA_;
+    }
+    if( kM_ != 0.0 )
+    {
+        Vec p2_( c.size() );
+        solver2.Solve( MminusC_ , p2_ , c , pr_ex );
+        if( solver2.GetIter() == solver2.GetMaxIter() )
+            std::cout << "IsXstabPreCL::Apply: (Mpr-C)-solve: max iterations reached: " << solver2.GetIter()
+                      << "\twith residual: " << solver2.GetResid() << std::endl;
+        else if( output_ )
+            *output_ << "IsXstabPreCL::Apply: (Mpr-C)-solve: iterations: " << solver2.GetIter()
+                     << "\tresidual: " << solver2.GetResid() << std::endl;
+        p += kM_ * p2_;
+    }
+}
+
+class IsXprmod : public SchurPreBaseCL
+{
+private:
+    const MatrixCL *Apr_;
+    const MatrixCL *Mpr_;
+    const MatrixCL *C_;
+    //const CkernelCL *kernel;
+    const VectorBaseCL<VectorCL> &kernel;
+    mutable MatrixCL MminusC_;
+    mutable MatrixCL AminusC_;
+    double tolA_;
+    double tolM_;
+    int pcAIter_;
+
+    typedef SGSPcCL Pc1Main;
+    //typedef JACPcCL PcSolver1;
+    typedef JACPcCL PcSolver2;
+    Pc1Main pcsgs_;
+    PcSolver2 pcjac_;
+    typedef PreKernel<Pc1Main> PcSolver1;
+    PcSolver1 pckern_;
+    mutable PCGSolverCL<Pc1Main> solver1;
+    mutable PCGSolverCL<PcSolver2> solver2;
+
+    // dimension of kernel of stabilization matrix C
+    // (if zero rows and cols are deleted)
+    //const size_t kdim = 8;
+    // 8-dimensional kernel, i.e. all functions for which the jump of the normal derivative accross
+    // element faces (which are used in ghost penalty) is zero
+    // for linear basis functions the dimension is 8 with (1,x,y,z)_omega all constant and linear functions
+    // on the entire domain plus (1,x,y,z)_omega(1,2) the constant and linear functions on ONE subdomain
+    // (the other subdomain can be obtained by linear combination)
+
+public:
+    IsXprmod( const MatrixCL * Apr, const MatrixCL *Mpr, const MatrixCL *C,
+                  const VectorBaseCL<VectorCL> &ckernel, double kA = 0., double kM = 1.,
+                  double tolA = 1e-2, double tolM = 1e-2, int pcAIter = 150,
+                  std::ostream *output = 0 )
+        : SchurPreBaseCL( kA, kM, output ), Apr_(Apr), Mpr_(Mpr), C_(C), kernel(ckernel), tolA_(tolA),
+          tolM_(tolM), pcAIter_(pcAIter), pcsgs_(), pcjac_(),pckern_(pcsgs_,ckernel),
+          solver1( pcsgs_, pcAIter_, tolA_, true), solver2( pcjac_, 500, tolM_, true )
+    {
+        MminusC_.LinComb( 1.0 , *Mpr_ , -1.0 , *C_ );
+        AminusC_.LinComb( 1.0 , *Apr_ , -kA_ , *C_ );
+    }
+
+    template <typename Mat, typename Vec, typename ExT>
+    void Apply(const Mat&, Vec& p, const Vec& c, const ExT& vel_ex, const ExT& pr_ex) const;
+#ifdef _PAR
+    void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const ExchangeCL& vel_ex, const ExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
+    void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const ExchangeCL& vel_ex, const ExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
+#endif
+    void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
+    void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
+};
+
+template <typename Mat, typename Vec, typename ExT>
+void IsXprmod:: Apply(const Mat&, Vec& p, const Vec& c, const ExT&, const ExT& pr_ex) const
+{
+    // If the interface change, we have to update these two matrices. This will be called at the same time step several times now.
+    //MminusC_ = MatrixCL();
+    
+    MminusC_.LinComb( 1.0 , *Mpr_ , -1.0 , *C_ );
+    AminusC_.LinComb( 1.0 , *Apr_ , -kA_ , *C_ );
+    p = 0.0;
+    if ( kA_ != 0.0 )
+    {
+        solver1.Solve( AminusC_ , p , c, pr_ex );
+        if( solver1.GetIter() == solver1.GetMaxIter() )
+            std::cout << "IsXstabPreCL::Apply: (Apr-1/dt*C)-solve: max iterations reached: " << solver1.GetIter()
+                      << "\twith residual: " << solver1.GetResid() << std::endl;
+        else if( output_ )
+            *output_ << "IsXstabPreCL::Apply: (Apr-1/dt*C)-solve: iterations: " << solver1.GetIter()
+                     << "\tresidual: " << solver1.GetResid() << std::endl;
+        p *= kA_;
+    }
+    if( kM_ != 0.0 )
+    {
+        Vec p2_( c.size() );
+        solver2.Solve( MminusC_ , p2_ , c , pr_ex );
+        if( solver2.GetIter() == solver2.GetMaxIter() )
+            std::cout << "IsXstabPreCL::Apply: (Mpr-C)-solve: max iterations reached: " << solver2.GetIter()
+                      << "\twith residual: " << solver2.GetResid() << std::endl;
+        else if( output_ )
+            *output_ << "IsXstabPreCL::Apply: (Mpr-C)-solve: iterations: " << solver2.GetIter()
+                     << "\tresidual: " << solver2.GetResid() << std::endl;
+        p += kM_ * p2_;
+    }
+}
+
 //**************************************************************************
 // Preconditioner for the instationary Stokes-equations.
 // Confer ISPreCL for details. This preconditioner uses a few CG-iterations
@@ -1029,6 +1220,53 @@ class BlockPreCL
     {
         pc1_.SetDiag(*A.GetBlock( 0), ex.GetEx(0));
         pc2_.SetDiag(/*dummy*/ *(A.GetBlock( 3)!=0 ? A.GetBlock( 3) : A.GetBlock( 1)), A.GetBlock( 3)!=0 ? ex.GetEx( 1) : ex.GetEx( 0));
+    }
+    const PC1T& GetPC1() const { return pc1_; }
+          PC1T& GetPC1()       { return pc1_; }
+    const PC2T& GetPC2() const { return pc2_; }
+          PC2T& GetPC2()       { return pc2_; }
+
+};
+
+template <class PC1T, class PC2T>
+class BlockDiagPreCL
+{
+  private:
+    PC1T& pc1_; // Preconditioner for A.
+    PC2T& pc2_; // Preconditioner for S.
+
+  public:
+    BlockDiagPreCL (PC1T& pc1, PC2T& pc2)
+        : pc1_( pc1), pc2_( pc2) {}
+
+    template <typename Mat, typename Vec, typename ExT>
+    void Apply(const BlockMatrixBaseCL<Mat>& A, Vec& x, const Vec& b, const ExT& ex) const {
+        VectorCL b0( b[std::slice( 0, A.num_rows( 0), 1)]);
+        VectorCL b1( b[std::slice( A.num_rows( 0), A.num_rows( 1), 1)]);
+        VectorCL x0( A.num_cols( 0));
+        VectorCL x1( A.num_cols( 1));
+        pc1_.Apply( *A.GetBlock(0), x0, b0, ex.GetEx(0));
+        pc2_.Apply( *A.GetBlock(3), x1, b1, ex.GetEx(1));
+        x[std::slice( 0, A.num_cols( 0), 1)]= x0;
+        x[std::slice( A.num_cols( 0), A.num_cols( 1), 1)]= x1;
+    }
+
+    /// \brief Check if the preconditioned vector is accumulated
+    bool RetAcc() const {
+        Assert( pc1_.RetAcc()==pc2_.RetAcc(), DROPSErrCL("BlockPreCL::RetAcc: Preconditioners do not match"),
+                DebugNumericC);
+        return pc1_.RetAcc();
+    }
+
+    /// \brief Check if the diagonal of the matrix needs to be computed
+    bool NeedDiag() const { return pc1_.NeedDiag() || pc2_.NeedDiag(); }
+
+    /// \brief Set accumulated diagonal of a matrix, that is needed by most of the preconditioners
+    template<typename Mat, typename ExT>
+    void SetDiag(const Mat& A, const ExT& ex) const
+    {
+        pc1_.SetDiag(*A.GetBlock( 0), ex.GetEx(0));
+        pc2_.SetDiag(*A.GetBlock( 3), ex.GetEx(1));
     }
     const PC1T& GetPC1() const { return pc1_; }
           PC1T& GetPC1()       { return pc1_; }
