@@ -135,14 +135,14 @@ void LinThetaScheme2PhaseCL<LsetSolverT>::SolveLsNs()
     std::cout << "Discretizing Rhs/Curv took "<< duration <<" sec.\n";
 
     time.Reset();
-    solver_.Solve( *mat_, Stokes_.B.Data,
-        Stokes_.v, Stokes_.p.Data,
-        rhs_, *cplN_, Stokes_.c.Data, Stokes_.vel_idx.GetEx(), Stokes_.pr_idx.GetEx(), /*alpha*/ stk_theta_*nonlinear_);
-
-    //Only specially designed pressure preconditioner works with iterative solvers
-    //solver_.Solve( *mat_, Stokes_.B.Data, Stokes_.C.Data,
+    //solver_.Solve( *mat_, Stokes_.B.Data,
     //    Stokes_.v, Stokes_.p.Data,
     //    rhs_, *cplN_, Stokes_.c.Data, Stokes_.vel_idx.GetEx(), Stokes_.pr_idx.GetEx(), /*alpha*/ stk_theta_*nonlinear_);
+
+    //Only specially designed pressure preconditioner works with iterative solvers
+    solver_.Solve( *mat_, Stokes_.B.Data, Stokes_.C.Data,
+        Stokes_.v, Stokes_.p.Data,
+        rhs_, *cplN_, Stokes_.c.Data, Stokes_.vel_idx.GetEx(), Stokes_.pr_idx.GetEx(), /*alpha*/ stk_theta_*nonlinear_);
     time.Stop();
     duration=time.GetTime();
     std::cout << "Solving NavierStokes: residual: " << solver_.GetResid()
@@ -176,7 +176,9 @@ void LinThetaScheme2PhaseCL<LsetSolverT>::CommitStep()
             accumulate( accus,
                         Stokes_.GetMG(), Stokes_.vel_idx.TriangLevel(), Stokes_.vel_idx.GetMatchingFunction(), Stokes_.vel_idx.GetBndInfo());
         }
-        Stokes_.SetupC(&Stokes_.C, LvlSet_, 0);
+        Stokes_.SetupPrStiff(&Stokes_.prA, LvlSet_ );
+        Stokes_.SetupPrMass(&Stokes_.prM, LvlSet_ );
+        Stokes_.SetupC(&Stokes_.C, LvlSet_, 1);
     }
     else
         Stokes_.SetupRhs2( &Stokes_.c, LvlSet_, Stokes_.v.t);
@@ -247,7 +249,9 @@ void LinThetaScheme2PhaseCL<LsetSolverT>::Update()
         MLTetraAccumulatorTupleCL updates( Stokes_.A.Data.size());
         MaybeAddMLProgressbar( Stokes_.GetMG(), "System2+Nonl", updates, Stokes_.vel_idx.TriangLevel());
         Stokes_.system2_accu( updates, &Stokes_.B, &Stokes_.c, LvlSet_, Stokes_.v.t);
-        Stokes_.SetupC(&Stokes_.C, LvlSet_, 0);
+        Stokes_.SetupPrStiff(&Stokes_.prA, LvlSet_ );
+        Stokes_.SetupPrMass(&Stokes_.prM, LvlSet_ );
+        Stokes_.SetupC(&Stokes_.C, LvlSet_, 1);
         Stokes_.nonlinear_accu( updates, &Stokes_.N, &Stokes_.v, old_cplN_, LvlSet_, Stokes_.v.t);
         accumulate( updates, Stokes_.GetMG(), Stokes_.vel_idx.TriangLevel(), Stokes_.vel_idx.GetMatchingFunction(), Stokes_.vel_idx.GetBndInfo());
     }

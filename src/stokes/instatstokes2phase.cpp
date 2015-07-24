@@ -846,7 +846,7 @@ void SetupPrMass_P0(const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, Mat
 /// \brief Accumulator to set up the pressure matrix for P1/P1-XFEM.
 class PrMassAccumulator_P1CL : public TetraAccumulatorCL
 {
-  private:
+  protected:
     const MultiGridCL& MG;
     const PrincipalLatticeCL& lat;
     const TwoPhaseFlowCoeffCL& Coeff;
@@ -882,9 +882,9 @@ class PrMassAccumulator_P1CL : public TetraAccumulatorCL
     ///\brief Builds the matrices
     void finalize_accumulation();
 
-    void visit (const TetraCL& sit);
+    virtual void visit (const TetraCL& sit);
 
-    TetraAccumulatorCL* clone (int /*tid*/){ return new PrMassAccumulator_P1CL ( *this); };
+    virtual TetraAccumulatorCL* clone (int /*tid*/){ return new PrMassAccumulator_P1CL ( *this); };
 };
 
 PrMassAccumulator_P1CL::PrMassAccumulator_P1CL (const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_, MatrixCL& matM_, IdxDescCL& RowIdx_, const LevelsetP2CL& lset_, bool XFEM)
@@ -1562,11 +1562,60 @@ void SetupPrStiff_P1( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, M
     A.Build();
 }
 
+// helper function to compute a P2 element as a product of 2 P1 elements in a tetrahedron
+void computeLocalP2_pipj( LocalP2CL<> (&pipj)[4][4] ){
+
+    //loop over 4 vertices of tetrahedron
+    for(int i= 0; i < 4; ++i) {
+        // product is symmetric, loop until i suffices
+        for(int j= 0; j < i; ++j) {
+            // only overlap of 2 p1 shape functions
+            // is on the edge between them (unknown of p2 elem)
+            Uint p2unknown = EdgeByVert( i , j ) + 4; // first 4 unknowns are the vertices of the tet
+            // 1/2 * 1/2 = 0.25 -- values at midpoint of edge
+            pipj[i][j][p2unknown] = pipj[j][i][p2unknown] = 0.25;
+        }
+
+        // product of p_i * p_i
+        // one at node i
+        pipj[i][i][i]= 1.;
+        // compute values at outgoing 3 outgoing edges
+        for (int vert= 0; vert < 3; ++vert)
+        {
+            // opposite face is i; get vertices of that face
+            // this avoids getting vertex i again
+            Uint neighborVertex = VertOfFace( i, vert );
+            // as above get edgenumber and add 4  for vertex unknowns
+            Uint p2unknown = EdgeByVert( i, neighborVertex ) + 4;
+            // value at midpoint of edge
+            pipj[i][i][p2unknown]= 0.25;
+
+        }
+    }
+}
+
+// helper function to compute a P2 element as a product of a P1 function and its gradient times normal in a tetrahedron
+// the gradient of a P1 function is constant within an element and so the normal is constant on the interface segments
+// hence the P2 function is the product of a P1 function times the 1-function
+void computeLocalP2_gradpipj( LocalP2CL<> (&gradpipj)[4] ){
+
+    //loop over 4 vertices of tetrahedron    
+        for( int j=0; j < 4; ++j ){
+            // basis function j is 1 on node j, 0 on other nodes
+            gradpipj[j][j] = 1.0;
+            // all edges are non-zero
+            for( int k=4; k < 10; ++k){
+                gradpipj[j][k] = 0.5;
+            }
+        }    
+}
+
 /// \todo: As in SetupPrMass_P1X, replace the smoothed density-function with integration
 ///        over the inner and outer part.
-void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, MatrixCL& A_pr, IdxDescCL& RowIdx, IdxDescCL& ColIdx, const LevelsetP2CL& lset)
+void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, MatrixCL& A_pr, IdxDescCL& RowIdx, IdxDescCL& ColIdx, const LevelsetP2CL& lset, double lambda=1.0)
 {
     ScopeTimerCL scope("SetupPrStiff_P1X");
+    bool reduced = false;
 
     const ExtIdxDescCL& Xidx= RowIdx.GetXidx();
     MatrixBuilderCL A( &A_pr, RowIdx.NumUnknowns(), ColIdx.NumUnknowns());
@@ -1583,11 +1632,47 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
     const double rho_inv_p= 1./Coeff.rho(1.),
                  rho_inv_n= 1./Coeff.rho(-1.);
     LevelsetP2CL::const_DiscSolCL ls= lset.GetSolution();
-    LocalP2CL<> locallset, ones( 1.);
+    LocalP2CL<> locallset,
+            ones( 1.), // for volume integration
+            pipj[4][4], // for jump at the interface
+            gradpipj[4];
+
+    // triangle representing the interface, this is where the integration takes place
+    InterfaceTriangleCL triang;
+
+    // compute characteristic element length  h for Nitsche jump term lambda/h * int_gamma <[p_i],[p_j]>
+    // use cubic root of minimal volume
+    /*
+    double h3 = std::numeric_limits<double>::max();
+    for (MultiGridCL::const_TriangTetraIteratorCL sit= MG.GetTriangTetraBegin( lvl),
+         send= MG.GetTriangTetraEnd( lvl); sit != send; ++sit)
+    {
+        h3 = std::min( h3, sit->GetVolume() );
+    }
+    // 6 * vol of tetra = vol of cube    
+    double h = cbrt( 6 * h3 );
+    */
+
+    // compute values on reference tet for pipj
+    // jump values at the interface correspond to values of p1 basis function at interface (jump to zero)
+    // multiplied by +1/-1 depending on the location of the basis function
+    // sign not relevant for jump terms (see below)
+    computeLocalP2_pipj( pipj );
+
+    computeLocalP2_gradpipj( gradpipj );
+    //lambda = lambda / rho_min;
+
+    //double lambda = 1; // read from input file as solver parameter
 
     for (MultiGridCL::const_TriangTetraIteratorCL sit= MG.GetTriangTetraBegin( lvl),
          send= MG.GetTriangTetraEnd( lvl); sit != send; ++sit)
     {
+        //element matrix for jump terms
+        //redefined and set to zero for every tetrahedron
+        double coupJump[4][4] = {};
+        double coupAv[4][4] = {};
+        double h = cbrt( 6 * sit->GetVolume() );
+
         locallset.assign( *sit, ls);
         cut.Init( *sit, locallset);
         const bool nocut= !cut.Intersects();
@@ -1595,6 +1680,10 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
         P1DiscCL::GetGradients( G,det,*sit);
         absdet= std::fabs( det);
         double IntRhoInv, IntRhoInv_p;
+        double kappa1, kappa2;
+        //kappa1=kappa2=0.5;
+        //double Vol_p, Vol_n;
+        double kappa_p,kappa_n, alphaK;
 
 
         if (nocut) {
@@ -1607,8 +1696,19 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
                 Vol_p+= cut.quad( ones, absdet, true);  // integrate on positive part
                 Vol_n+= cut.quad( ones, absdet, false); // integrate on negative part
             }
+            double alpha_p = Vol_p / ( std::pow(h,3) );
+            double alpha_n = Vol_n / ( std::pow(h,3) );
+            alphaK = alpha_p + alpha_n;
+            kappa_p = rho_inv_n * alpha_p / ( rho_inv_p * alpha_n + rho_inv_n * alpha_p );
+            kappa_n = rho_inv_p * alpha_n / ( rho_inv_p * alpha_n + rho_inv_n * alpha_p );
             IntRhoInv_p= Vol_p*rho_inv_p;
             IntRhoInv=   Vol_p*rho_inv_p + Vol_n*rho_inv_n;
+            kappa1 = Vol_n / ( Vol_p + Vol_n );
+            kappa2 = Vol_p / ( Vol_p + Vol_n );
+
+            //initialize triangle for cut tetrahedron
+            triang.Init( *sit, locallset);
+
         }
 
         // compute local matrices
@@ -1624,13 +1724,74 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
             if (nocut) continue; // extended basis functions have only support on tetra intersecting Gamma!
 
             sign[i]= cut.GetSign(i)==1;
-            for(int j=0; j<=i; ++j) {
-                // compute the integrals
-                // \int_{T_2} grad_i grad_j dx,    where T_2 = T \cap \Omega_2
-                coupT2[j][i]= ( G( 0, i)*G( 0, j) + G( 1, i)*G( 1, j) + G( 2, i)*G( 2, j) )*IntRhoInv_p;
-                coupT2[i][j]= coupT2[j][i];
+            // assemble only diagonal of xfem block
+            if( reduced )
+            {
+                coupT2[i][i] = ( G( 0, i)*G( 0, i) + G( 1, i)*G( 1, i) + G( 2, i)*G( 2, i) )*IntRhoInv_p;
+            }
+            else
+            {
+                for(int j=0; j<=i; ++j) {
+                    // compute the integrals
+                    // \int_{T_2} grad_i grad_j dx,    where T_2 = T \cap \Omega_2
+                    coupT2[j][i]= ( G( 0, i)*G( 0, j) + G( 1, i)*G( 1, j) + G( 2, i)*G( 2, j) )*IntRhoInv_p;
+                    coupT2[i][j]= coupT2[j][i];
+                }
             }
         }
+
+        //compute jump terms; on cut elements only
+        // loop over refinement; 8 children for tetrahedron
+        if( !nocut )
+        {
+            // compute {1/rho} for nitsche param
+            double invRhoAv = 1;//IntRhoInv / ( absdet / 6 );
+            double gammaK = 0.0;
+            for( Uint iCh = 0; iCh < 8; ++iCh )
+            {
+                //compute possible cuts for child iCh
+                triang.ComputeForChild( iCh );
+                //compute normal for child patch
+                Point3DCL ngamma = triang.GetNormal();
+                // scalar product of gradpi, ngamma
+                double graddotn[4] = {};
+                for( int i = 0; i < 4; ++i ){                    
+                    graddotn[i] = G(0,i)*ngamma[0] + G(1,i)*ngamma[1] + G(2,i)*ngamma[2];
+                }
+
+                // compute part of the integral on cut triangle 0,1,2 (no cut, triang cut, quad cut)                
+                for( Uint cutTria = 0; cutTria < (Uint) triang.GetNumTriangles(); ++cutTria )
+                {
+                    gammaK += triang.quad2D(ones,cutTria);
+                    //loop over possible combinations
+                    for( int i = 0; i < 4; ++i )
+                    {
+                        for( int j = 0; j<=i; ++j )
+                        {
+                            coupJump[i][j] += triang.quad2D( pipj[i][j] , cutTria ) * invRhoAv; // add parts triangle
+                            coupJump[j][i] = coupJump[i][j]; // symmetrize
+
+                            // compute average terms
+                            //coupAv[i][j] += graddotn[i] * triang.quad2D( gradpipj[j], cutTria );
+                            //coupAv[j][i] += graddotn[j] * triang.quad2D( gradpipj[i], cutTria );
+
+                        }
+                    }                    
+                }
+            }            
+            //some hack from hansbo paper
+
+            gammaK = gammaK / h / h;
+            double D = 0.5, C = 1.5;
+            invRhoAv = kappa_n*rho_inv_n + kappa_p*rho_inv_p;
+            double lambdaK = invRhoAv * ( D + C * gammaK / alphaK );
+            for( int i=0 ; i < 4 ; ++i )
+                for( int j=0; j < 4 ; ++j )
+                    coupJump[i][j] *= lambdaK;
+
+
+        }
+
 
         // write values into matrix
         for(int i=0; i<4; ++i)
@@ -1640,15 +1801,54 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
             if (nocut) continue; // extended basis functions have only support on tetra intersecting Gamma!
 
             const IdxT xidx_i= Xidx[UnknownIdx[i]];
-            for(int j=0; j<4; ++j) // write values for extended basis functions
+            if (reduced)
             {
-                const IdxT xidx_j= Xidx[UnknownIdx[j]];
-                if (xidx_j!=NoIdx)
-                    A( UnknownIdx[i], xidx_j)+= coupT2[i][j] - sign[j]*coup[i][j];
-                if (xidx_i!=NoIdx)
-                    A( xidx_i, UnknownIdx[j])+= coupT2[i][j] - sign[i]*coup[i][j];
-                if (xidx_i!=NoIdx && xidx_j!=NoIdx && sign[i]==sign[j])
-                    A( xidx_i, xidx_j)+= sign[i] ? coup[i][j] - coupT2[i][j] : coupT2[i][j];
+                if( xidx_i != NoIdx )
+                {
+                    A( xidx_i, xidx_i ) += sign[i] ? coup[i][i] - coupT2[i][i] : coupT2[i][i];
+                    A( xidx_i, xidx_i ) += lambda / h * coupJump[i][i];// /rho_max;
+                }
+            }
+            else
+            {
+                for(int j=0; j<4; ++j) // write values for extended basis functions
+                {
+                    const IdxT xidx_j= Xidx[UnknownIdx[j]];
+                    if (xidx_j!=NoIdx)
+                        A( UnknownIdx[i], xidx_j)+= coupT2[i][j] - sign[j]*coup[i][j]
+                                                 + coupAv[i][j] * ( kappa1 * rho_inv_n + kappa2 * rho_inv_p );
+                    if (xidx_i!=NoIdx)
+                        A( xidx_i, UnknownIdx[j])+= coupT2[i][j] - sign[i]*coup[i][j]
+                                                 + coupAv[j][i] * ( kappa1 * rho_inv_n + kappa2 * rho_inv_p );
+                    if (xidx_i!=NoIdx && xidx_j!=NoIdx)
+                    {
+                        if( sign[i] == sign[j] )
+                        {
+                            A( xidx_i, xidx_j)+= sign[i] ? coup[i][j] - coupT2[i][j] : coupT2[i][j];
+                            //in omega_2
+                            if( sign[i] == 1 )
+                                A( xidx_i, xidx_j) -= 2*kappa1*rho_inv_n * ( coupAv[i][j] + coupAv[j][i] );
+                            //in omega_1
+                            else
+                                A( xidx_i, xidx_j) += 2*kappa2*rho_inv_p * ( coupAv[i][j] + coupAv[j][i] );
+                        }
+                        else
+                        {
+                            //i in omega_2
+                            if( sign[i] ==1 )
+                                A( xidx_i, xidx_j) += kappa2*rho_inv_p * coupAv[j][i] - kappa1*rho_inv_n * coupAv[i][j];
+                            //j in omega_1
+                            else
+                                A( xidx_i, xidx_j) += kappa2*rho_inv_p * coupAv[i][j] - kappa1*rho_inv_n * coupAv[j][i];
+                        }
+
+                        //jump part -- has only effect on extended basis functions
+                        // no distinction between location of wrt the interface: [f] := f|_1 - f|_2
+                        // either f|_1 or f|_2 is zero, ext basis fcts have pos sign in omega_2 and neg sign in omega_1
+                        // jumps do always have the same sign (namely negative), hence a positive product [px_i][px_j]
+                        A( xidx_i, xidx_j) += lambda / h  * coupJump[i][j];// /rho_max;
+                    }
+                }
             }
         }
     }
@@ -1776,9 +1976,76 @@ void InstatStokes2PhaseP2P1CL::SetupC( MLMatDescCL* matC, const LevelsetP2CL& ls
             itC->resize( num_unks_pr, num_unks_pr, 0 );
         }
     }
+
+    //delete old version of kernel (if there is any)
+    //if( cKernel != NULL )
+      //  delete cKernel;
+    //compute new  kernel of c
+    //cKernel = new CkernelCL( MG_, lset, pr_idx.GetFinest() );
+    if ( GetPrFE() == P1X_FE )
+    {
+        computeGhostPenaltyKernel( MG_ , lset , pr_idx.GetFinest() );
+    }
+
 }
 
-void InstatStokes2PhaseP2P1CL::SetupPrStiff( MLMatDescCL* A_pr, const LevelsetP2CL& lset) const
+void InstatStokes2PhaseP2P1CL::computeGhostPenaltyKernel(MultiGridCL &mg, const LevelsetP2CL &lset, const IdxDescCL &prIdx) const
+{
+    Uint lvl = mg.GetNumLevel() - 1;
+    //Uint size = mg_.GetTriangVertex().size();
+    IdxT size = prIdx.NumUnknowns();
+    ExtIdxDescCL xidxdesc = prIdx.GetXidx();
+
+    //cKernelVecs = VectorBaseCL<VectorCL>( VectorCL(0.0, (size_t)size), 8 );
+    cKernel = VectorBaseCL<VectorCL>( VectorCL(0.0, (size_t)size), 8 );
+
+    for(MultiGridCL::TriangVertexIteratorCL vit   = mg.GetTriangVertexBegin(lvl),
+        vend  = mg.GetTriangVertexEnd(lvl) ; vit!=vend ; ++vit)
+    {
+        IdxT idx = vit->Unknowns( prIdx.GetIdx() );
+        IdxT xidx = xidxdesc[idx];
+
+        double xcoord,ycoord,zcoord;
+
+        Point3DCL coord = vit->GetCoord();
+        xcoord  = coord[0];
+        ycoord  = coord[1];
+        zcoord  = coord[2];
+
+        // const function
+        cKernel[0][idx] = 1;
+        // linear function in x direction
+        cKernel[1][idx] = xcoord;
+        // linear function in y direction
+        cKernel[2][idx] = ycoord;
+        // linear function in z direction
+        cKernel[3][idx] = zcoord;
+
+        if ( InterfacePatchCL::Sign( lset.GetSolution().val(*vit) ) != 1 )
+        {
+            // const func in omega 1
+            cKernel[4][idx] = 1;
+            // lin func in x in omega 1
+            cKernel[5][idx] = xcoord;
+            // lin func in y in omega 1
+            cKernel[6][idx] = ycoord;
+            // lin func in z in omega 1
+            cKernel[7][idx] = zcoord;
+        }
+        if ( xidx != NoIdx )
+        {
+            // in omega 1: ext basis funs have opposite sign
+            cKernel[4][xidx] = -1;
+            cKernel[5][xidx] = -xcoord;
+            cKernel[6][xidx] = -ycoord;
+            cKernel[7][xidx] = -zcoord;
+        }
+
+    }
+
+}
+
+void InstatStokes2PhaseP2P1CL::SetupPrStiff( MLMatDescCL* A_pr, const LevelsetP2CL& lset, double lambda ) const
 /// Needed for preconditioning of the Schur complement. Uses natural
 /// boundary conditions for the pressure unknowns.
 {
@@ -1792,7 +2059,7 @@ void InstatStokes2PhaseP2P1CL::SetupPrStiff( MLMatDescCL* A_pr, const LevelsetP2
         case P1_FE:
             SetupPrStiff_P1( MG_, Coeff_, *itM, *itRowIdx, *itColIdx, lset); break;
         case P1X_FE:
-            SetupPrStiff_P1X( MG_, Coeff_, *itM, *itRowIdx, *itColIdx, lset); break;
+            SetupPrStiff_P1X( MG_, Coeff_, *itM, *itRowIdx, *itColIdx, lset, lambda); break;
         case P1D_FE:
             SetupPrStiff_P1D( MG_, Coeff_, *itM, *itRowIdx, *itColIdx, lset); break;
         default:
@@ -2276,10 +2543,10 @@ class LocalSystem1TwoPhase_P2CL
     double mu  (int sign) const { return sign > 0 ? mu_p  : mu_n; }
     double rho (int sign) const { return sign > 0 ? rho_p : rho_n; }
 
-    void setup (const SMatrixCL<3,3>& T, double absdet, const TetraCL& tet, const LocalP2CL<>& ls, LocalIntegrals_P2CL[2], LocalSystem1DataCL& loc);
+    void setup (const SMatrixCL<3,3>& T, double absdet, const TetraCL& tet, const LocalP2CL<>& ls, double t, LocalIntegrals_P2CL[2], LocalSystem1DataCL& loc);
 };
 
-void LocalSystem1TwoPhase_P2CL::setup (const SMatrixCL<3,3>& T, double absdet, const TetraCL& tet, const LocalP2CL<>& ls, LocalIntegrals_P2CL locInt[2], LocalSystem1DataCL& loc)
+void LocalSystem1TwoPhase_P2CL::setup (const SMatrixCL<3,3>& T, double absdet, const TetraCL& tet, const LocalP2CL<>& ls, double t, LocalIntegrals_P2CL locInt[2], LocalSystem1DataCL& loc)
 {
     P2DiscCL::GetGradients( GradLP1, GradRefLP1, T);
 
@@ -2287,7 +2554,7 @@ void LocalSystem1TwoPhase_P2CL::setup (const SMatrixCL<3,3>& T, double absdet, c
     partition.make_partition<SortedVertexPolicyCL, MergeCutPolicyCL>( lat, ls_loc);
     make_CompositeQuad5Domain( q5dom, partition);
     make_CompositeQuad2Domain( q2dom, partition);
-    resize_and_evaluate_on_vertexes( rhs_func, tet, q5dom, /*time*/ 0., rhs);
+    resize_and_evaluate_on_vertexes( rhs_func, tet, q5dom, /*time*/ t, rhs);
 
     for (int i= 0; i < 10; ++i) {
         p2[i]= 1.; p2[i==0 ? 9 : i - 1]= 0.;
@@ -2492,7 +2759,7 @@ void System1Accumulator_P2CL::local_setup (const TetraCL& tet)
 		}
     }
     else{
-        local_twophase.setup( T, absdet, tet, ls_loc, locInt, loc);
+        local_twophase.setup( T, absdet, tet, ls_loc, t, locInt, loc);
         if(speBnd){
         	speBndHandler2.setup(tet, T, ls_loc, loc); //update loc for special boundary condtion
            //speBndHandler2.CLdiss(tet, loc);
