@@ -35,9 +35,9 @@ namespace DROPS
 template <class LsetSolverT>
 LinThetaScheme2PhaseCL<LsetSolverT>::LinThetaScheme2PhaseCL
     ( StokesT& Stokes, LevelsetP2CL& ls, StokesSolverT& solver, LsetSolverT& lsetsolver, LevelsetModifyCL& lsetmod,
-                double dt, double stk_theta, double ls_theta, double nonlinear, bool implicitCurv)
+                double dt, double stk_theta, double ls_theta, double xfem_eps, double nonlinear, bool implicitCurv)
   : base_( Stokes, ls, lsetmod, dt, nonlinear), solver_( solver), lsetsolver_( lsetsolver),
-  stk_theta_( stk_theta), ls_theta_( ls_theta), cplA_(new VelVecDescCL), implCurv_( implicitCurv)
+  stk_theta_( stk_theta), ls_theta_( ls_theta), xfem_eps_(xfem_eps), cplA_(new VelVecDescCL), implCurv_( implicitCurv)
 {
     Update();
 }
@@ -178,7 +178,7 @@ void LinThetaScheme2PhaseCL<LsetSolverT>::CommitStep()
         }
         Stokes_.SetupPrStiff(&Stokes_.prA, LvlSet_ );
         Stokes_.SetupPrMass(&Stokes_.prM, LvlSet_ );
-        Stokes_.SetupC(&Stokes_.C, LvlSet_, 1);
+        Stokes_.SetupC(&Stokes_.C, LvlSet_, xfem_eps_);
     }
     else
         Stokes_.SetupRhs2( &Stokes_.c, LvlSet_, Stokes_.v.t);

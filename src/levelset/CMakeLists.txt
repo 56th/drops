@@ -51,4 +51,8 @@ exec(twophasedrops geom-boundary geom-builder geom-deformation geom-simplex geom
 # convention: makethose coefficient-defining shared objects are built which ared used in the default configuration of the executable..
 add_dependencies(twophasedrops levelset-twophaseCoeff levelset-filmCoeff misc-scalarFunctions misc-vectorFunctions misc-csgFunctions)
 
+exec(couette_err geom-boundary geom-builder geom-deformation geom-simplex geom-multigrid num-unknowns geom-topo num-fe misc-problem levelset-levelset levelset-adaptriang levelset-marking_strategy misc-progressaccu misc-scopetimer misc-utils out-output num-discretize navstokes-instatnavstokes2phase misc-params levelset-fastmarch stokes-instatstokes2phase num-MGsolver num-fe out-ensightOut num-oseenprecond num-interfacePatch levelset-surfacetension geom-geomselect levelset-twophaseutils num-hypre levelset-coupling misc-funcmap geom-principallattice geom-reftetracut geom-subtriangulation num-renumber num-quadrature misc-dynamicload stokes-stokes num-stokespardiso)
+# convention: makethose coefficient-defining shared objects are built which ared used in the default configuration of the executable..
+add_dependencies(couette_err levelset-twophaseCoeff levelset-filmCoeff misc-scalarFunctions misc-vectorFunctions misc-csgFunctions)
+
 add_my_custom_targets(levelset)

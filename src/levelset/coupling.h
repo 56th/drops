@@ -96,7 +96,7 @@ class LinThetaScheme2PhaseCL: public TimeDisc2PhaseCL
     StokesSolverT& solver_;
     LsetSolverT&   lsetsolver_;
 
-    double stk_theta_, ls_theta_;
+    double stk_theta_, ls_theta_, xfem_eps_;
 
     VecDescCL    *cplA_;
     bool         implCurv_;
@@ -104,7 +104,7 @@ class LinThetaScheme2PhaseCL: public TimeDisc2PhaseCL
   public:
     LinThetaScheme2PhaseCL( StokesT& Stokes, LevelsetP2CL& ls,
                                 StokesSolverT& solver, LsetSolverT& lsetsolver,
-                                LevelsetModifyCL& lsetmod, double dt, double stk_theta= 0.5, double ls_theta = 0.5,
+                                LevelsetModifyCL& lsetmod, double dt, double stk_theta= 0.5, double ls_theta = 0.5, double xfem_eps = 0.1,
                                 double nonlinear= 1., bool implicitCurv= false);
     ~LinThetaScheme2PhaseCL();
 
