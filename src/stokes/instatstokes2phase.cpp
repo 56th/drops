@@ -4849,7 +4849,7 @@ double InstatStokes2PhaseP2P1CL::GetKineticEnergy(const LevelsetP2CL& lset) cons
 			make_CompositeQuad5Domain( q5dom, partition);
 
 			resize_and_evaluate_on_vertexes( loc_vel, q5dom, qvel);
-			qvel_sq=dot(qvel,qvel);
+			qvel_sq = dot(qvel,qvel);
 			quad (qvel_sq , absdet, q5dom, trash, pos);
 			quad (qvel_sq , absdet, q5dom, neg, trash);
 			energy += pos*prho + neg*nrho;

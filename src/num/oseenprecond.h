@@ -147,7 +147,7 @@ void ISPreCL::Apply(const Mat&, Vec& p, const Vec& c, const ExT&, const ExT& pr_
 // solved via 1 SSOR-step, a problem with the mass-matrix as well.
 // The constants kA_, kM_ have to be chosen according to h and dt, see Theorem 4.1
 // of the above paper.
-// kA_ = theta/Re and kM_ = 1/dt will do a good job,
+// kM_= theta/Re and  kA_  = 1/dt will do a good job,
 // where Re is proportional to the ratio density/viscosity.
 //
 // A_ is the pressure-Poisson-Matrix for the P1X space with Nitsche terms
@@ -213,6 +213,8 @@ public:
 template <typename Mat, typename Vec, typename ExT>
 void IsXstabPreCL:: Apply(const Mat&, Vec& p, const Vec& c, const ExT&, const ExT& pr_ex) const
 {
+    MminusC_.LinComb( 1.0 , *Mpr_ , -1.0 , *C_ );
+    AminusC_.LinComb( 1.0 , *Apr_ , -kA_ , *C_ );
     p = 0.0;
     if ( kA_ != 0.0 )
     {
