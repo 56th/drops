@@ -1662,8 +1662,7 @@ void computeLocalP2_gradpipj( LocalP2CL<> (&gradpipj)[4] ){
 //ParamCL P;
 void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, MatrixCL& A_pr, IdxDescCL& RowIdx, IdxDescCL& ColIdx, const LevelsetP2CL& lset, double lambda=1.0)
 {
-    ScopeTimerCL scope("SetupPrStiff_P1X");    
-    bool reduced = false;    
+    ScopeTimerCL scope("SetupPrStiff_P1X");
 
     const ExtIdxDescCL& Xidx= RowIdx.GetXidx();
     MatrixBuilderCL A( &A_pr, RowIdx.NumUnknowns(), ColIdx.NumUnknowns());
@@ -1676,7 +1675,7 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
     IdxT UnknownIdx[4];
     bool sign[4];
     InterfaceTetraCL cut;       
-    bool doAverage = P.get<bool>("Stokes.average",1);
+    bool doAverage = P.get<bool>("Stokes.average",0);
     bool hansbo = P.get<bool>("Stokes.hansbo",1);
     bool testAverage = P.get<bool>("Stokes.testaverage",0);
 
@@ -1693,19 +1692,6 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
     // triangle representing the interface, this is where the integration takes place
     InterfaceTriangleCL triang;
 
-    // compute characteristic element length  h for Nitsche jump term lambda/h * int_gamma <[p_i],[p_j]>
-    // use cubic root of minimal volume
-    /*
-    double h3 = std::numeric_limits<double>::max();
-    for (MultiGridCL::const_TriangTetraIteratorCL sit= MG.GetTriangTetraBegin( lvl),
-         send= MG.GetTriangTetraEnd( lvl); sit != send; ++sit)
-    {
-        h3 = std::min( h3, sit->GetVolume() );
-    }
-    // 6 * vol of tetra = vol of cube    
-    double h = cbrt( 6 * h3 );
-    */
-
     // compute values on reference tet for pipj
     // jump values at the interface correspond to values of p1 basis function at interface (jump to zero)
     // multiplied by +1/-1 depending on the location of the basis function
@@ -1715,7 +1701,6 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
     computeLocalP2_gradpipj( gradpipj );
     //lambda = lambda / rho_min;
 
-    //double lambda = 1; // read from input file as solver parameter
 
     for (MultiGridCL::const_TriangTetraIteratorCL sit= MG.GetTriangTetraBegin( lvl),
          send= MG.GetTriangTetraEnd( lvl); sit != send; ++sit)
@@ -1779,21 +1764,15 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
             UnknownIdx[i]= sit->GetVertex( i)->Unknowns( idx);
             if (nocut) continue; // extended basis functions have only support on tetra intersecting Gamma!
 
-            sign[i]= cut.GetSign(i)==1;
-            // assemble only diagonal of xfem block
-            if( reduced )
-            {
-                coupT2[i][i] = ( G( 0, i)*G( 0, i) + G( 1, i)*G( 1, i) + G( 2, i)*G( 2, i) )*IntRhoInv_p;
+            sign[i]= cut.GetSign(i)==1;            
+
+            for(int j=0; j<=i; ++j) {
+                // compute the integrals
+                // \int_{T_2} grad_i grad_j dx,    where T_2 = T \cap \Omega_2
+                coupT2[j][i]= ( G( 0, i)*G( 0, j) + G( 1, i)*G( 1, j) + G( 2, i)*G( 2, j) )*IntRhoInv_p;
+                coupT2[i][j]= coupT2[j][i];
             }
-            else
-            {
-                for(int j=0; j<=i; ++j) {
-                    // compute the integrals
-                    // \int_{T_2} grad_i grad_j dx,    where T_2 = T \cap \Omega_2
-                    coupT2[j][i]= ( G( 0, i)*G( 0, j) + G( 1, i)*G( 1, j) + G( 2, i)*G( 2, j) )*IntRhoInv_p;
-                    coupT2[i][j]= coupT2[j][i];
-                }
-            }
+
         }
 
         //compute jump terms; on cut elements only
@@ -1870,55 +1849,46 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
             if (nocut) continue; // extended basis functions have only support on tetra intersecting Gamma!
 
             const IdxT xidx_i= Xidx[UnknownIdx[i]];
-            if (reduced)
-            {
-                if( xidx_i != NoIdx )
-                {
-                    A( xidx_i, xidx_i ) += sign[i] ? coup[i][i] - coupT2[i][i] : coupT2[i][i];
-                    A( xidx_i, xidx_i ) += lambda / h * coupJump[i][i];// /rho_max;
-                }
-            }
-            else
-            {
-                for(int j=0; j<4; ++j) // write values for extended basis functions
-                {
-                    const IdxT xidx_j= Xidx[UnknownIdx[j]];
-                    if (xidx_j!=NoIdx)
-                        A( UnknownIdx[i], xidx_j)+= coupT2[i][j] - sign[j]*coup[i][j]
-                                                 + coupAv[i][j] * ( kappa1 * rho_inv_n + kappa2 * rho_inv_p );
-                    if (xidx_i!=NoIdx)
-                        A( xidx_i, UnknownIdx[j])+= coupT2[i][j] - sign[i]*coup[i][j]
-                                                 + coupAv[j][i] * ( kappa1 * rho_inv_n + kappa2 * rho_inv_p );
-                    if (xidx_i!=NoIdx && xidx_j!=NoIdx)
-                    {
-                        if( sign[i] == sign[j] )
-                        {
-                            A( xidx_i, xidx_j)+= sign[i] ? coup[i][j] - coupT2[i][j] : coupT2[i][j];
-                            //in omega_2
-                            if( sign[i] == 1 )
-                                A( xidx_i, xidx_j) -= kappa1*rho_inv_n * ( coupAv[i][j] + coupAv[j][i] );
-                            //in omega_1
-                            else
-                                A( xidx_i, xidx_j) += kappa2*rho_inv_p * ( coupAv[i][j] + coupAv[j][i] );
-                        }
-                        else
-                        {
-                            //i in omega_2
-                            if( sign[i] ==1 )
-                                A( xidx_i, xidx_j) += kappa2*rho_inv_p * coupAv[j][i] - kappa1*rho_inv_n * coupAv[i][j];
-                            //i in omega_1
-                            else
-                                A( xidx_i, xidx_j) += kappa2*rho_inv_p * coupAv[i][j] - kappa1*rho_inv_n * coupAv[j][i];
-                        }
 
-                        //jump part -- has only effect on extended basis functions
-                        // no distinction between location of wrt the interface: [f] := f|_1 - f|_2
-                        // either f|_1 or f|_2 is zero, ext basis fcts have pos sign in omega_2 and neg sign in omega_1
-                        // jumps do always have the same sign (namely negative), hence a positive product [px_i][px_j]
-                        A( xidx_i, xidx_j) += lambda / h  * coupJump[i][j];// /rho_max;
+            for(int j=0; j<4; ++j) // write values for extended basis functions
+            {
+                const IdxT xidx_j= Xidx[UnknownIdx[j]];
+                if (xidx_j!=NoIdx)
+                    A( UnknownIdx[i], xidx_j)+= coupT2[i][j] - sign[j]*coup[i][j]
+                            + coupAv[i][j] * ( kappa1 * rho_inv_n + kappa2 * rho_inv_p );
+                if (xidx_i!=NoIdx)
+                    A( xidx_i, UnknownIdx[j])+= coupT2[i][j] - sign[i]*coup[i][j]
+                            + coupAv[j][i] * ( kappa1 * rho_inv_n + kappa2 * rho_inv_p );
+                if (xidx_i!=NoIdx && xidx_j!=NoIdx)
+                {
+                    if( sign[i] == sign[j] )
+                    {
+                        A( xidx_i, xidx_j)+= sign[i] ? coup[i][j] - coupT2[i][j] : coupT2[i][j];
+                        //in omega_2
+                        if( sign[i] == 1 )
+                            A( xidx_i, xidx_j) -= kappa1*rho_inv_n * ( coupAv[i][j] + coupAv[j][i] );
+                        //in omega_1
+                        else
+                            A( xidx_i, xidx_j) += kappa2*rho_inv_p * ( coupAv[i][j] + coupAv[j][i] );
                     }
+                    else
+                    {
+                        //i in omega_2
+                        if( sign[i] ==1 )
+                            A( xidx_i, xidx_j) += kappa2*rho_inv_p * coupAv[j][i] - kappa1*rho_inv_n * coupAv[i][j];
+                        //i in omega_1
+                        else
+                            A( xidx_i, xidx_j) += kappa2*rho_inv_p * coupAv[i][j] - kappa1*rho_inv_n * coupAv[j][i];
+                    }
+
+                    //jump part -- has only effect on extended basis functions
+                    // no distinction between location of wrt the interface: [f] := f|_1 - f|_2
+                    // either f|_1 or f|_2 is zero, ext basis fcts have pos sign in omega_2 and neg sign in omega_1
+                    // jumps do always have the same sign (namely negative), hence a positive product [px_i][px_j]
+                    A( xidx_i, xidx_j) += lambda / h  * coupJump[i][j];// /rho_max;
                 }
             }
+
         }
     }
     A.Build();

@@ -124,20 +124,17 @@ class InstatStokes2phaseThetaSchemeCL : public TimeDiscStokes2phaseCL< StokesT, 
 
     using base_:: _theta;    using base_:: _dt;
 
-    VelVecDescCL *_cpl_tst;
-
 
   public:
     InstatStokes2phaseThetaSchemeCL( StokesT& Stokes, SolverT& solver, LsetT& lset, double theta= 0.5 )
-        :base_(Stokes, solver, lset, theta), _cpl_tst( new VelVecDescCL){}
+        :base_(Stokes, solver, lset, theta) {}
 
     ~InstatStokes2phaseThetaSchemeCL(){}
 
     void SetTimeStep( double dt)
     {
         _dt= dt;        
-        _mat.LinComb( 1./_dt, _Stokes.M.Data, _theta, _Stokes.A.Data);
-        //_mat.LinComb( 0.0, _Stokes.M.Data, 1.0, _Stokes.A.Data);
+        _mat.LinComb( 1./_dt, _Stokes.M.Data, _theta, _Stokes.A.Data);        
     }
 
     void SetTimeStep( double dt, double theta)
@@ -150,11 +147,8 @@ class InstatStokes2phaseThetaSchemeCL : public TimeDiscStokes2phaseCL< StokesT, 
 
     void CommitStep( const VecDescCL &un );
 
-    //void DoStep( VectorCL& v, VectorCL& p){ DoStep(v,p,0); }
-    //void DoStep( VectorCL& v, VectorCL& p);
 };
 
-//DROPS::ParamCL P;
 template <class StokesT, class SolverT, class LsetT>
 void InstatStokes2phaseThetaSchemeCL<StokesT,SolverT,LsetT>::DoStep( VectorCL& v, VectorCL& p)
 {
@@ -182,12 +176,13 @@ void InstatStokes2phaseThetaSchemeCL<StokesT,SolverT,LsetT>::DoStep( VectorCL& v
     _rhs.resize( vidx->NumUnknowns() );
     _b->SetIdx( vidx );    
     _cplM->SetIdx( vidx );
-    _old_cplM->SetIdx( vidx );    
-    _cpl_tst->SetIdx( vidx );
+    _old_cplM->SetIdx( vidx );        
 
     //get _old_cplM    
     _Stokes.SetupCplM( _old_cplM, _lset, oldTime );
 
+    /*
+     * for testing purposes only
     // very inefficient routine .... A not needed at all ...
     VelVecDescCL *tmpb = new VelVecDescCL( vidx );
     //tmpb->SetIdx( vidx );
@@ -205,6 +200,7 @@ void InstatStokes2phaseThetaSchemeCL<StokesT,SolverT,LsetT>::DoStep( VectorCL& v
     std::cout << "\n\ncplM test: " << scalprod << std::endl;
     std::cout << norm(v1) << std::endl;
     std::cout << norm(v2) << std::endl << std::endl;
+    */
 
 
     // if system matrices do not change (i.e. stationary interface) quite inefficient
@@ -254,7 +250,7 @@ void InstatStokes2phaseThetaSchemeCL<StokesT,SolverT,LsetT>::DoStep( VectorCL& v
 template <class StokesT, class SolverT, class LsetT>
 void InstatStokes2phaseThetaSchemeCL<StokesT,SolverT,LsetT>::CommitStep( const VecDescCL &un  )
 {
-    //if( _theta == 1.0 ) return;
+    if( _theta == 1.0 ) return;
 
     MLIdxDescCL *vidx= &_Stokes.vel_idx;
 
@@ -265,38 +261,10 @@ void InstatStokes2phaseThetaSchemeCL<StokesT,SolverT,LsetT>::CommitStep( const V
 
     _Stokes.SetupRhs1( _old_b, _lset, _Stokes.v.t );
 
-    // just for call of setupsystem1
-    //_old_cplM->SetIdx( vidx );
-
-    VelVecDescCL cplA( vidx );
-    VectorCL oldRes( vidx->NumUnknowns() );
-    VectorCL diff( oldRes.size() );
-
     VelVecDescCL newCplA( vidx );
-
-
-    VelVecDescCL *tmpb = new VelVecDescCL( vidx );
-    _Stokes.SetupSystem1( &_Stokes.A, &_Stokes.M, tmpb, &cplA, tmpb, _lset, _Stokes.v.t);
-    delete tmpb;
-    oldRes = _Stokes.A.Data * un.Data - cplA.Data;
-
-    //test
     _Stokes.SetupAdotU( &newCplA, un, _lset, _Stokes.v.t );
-    VectorCL newRes = newCplA.Data;
-    diff = newRes - oldRes;
 
     _old_b->Data -= newCplA.Data;
-
-
-    std::cout << "scalar prod" << std::endl;
-    double scalprod = norm(diff);
-
-    std::cout << "\n\ncplA test: " << scalprod << std::endl;
-
-    std::cout.precision(dbllimit::digits10);
-    std::cout << std::scientific;
-    std::cout << norm(oldRes) << std::endl;
-    std::cout << norm(newRes) << std::endl << std::endl;
 
 
     // get old surface tension force
@@ -306,6 +274,31 @@ void InstatStokes2phaseThetaSchemeCL<StokesT,SolverT,LsetT>::CommitStep( const V
 
     return;
 
+
+    /*
+     * for testing only
+     *
+    VelVecDescCL cplA( vidx );
+    VectorCL oldRes( vidx->NumUnknowns() );
+    VectorCL diff( oldRes.size() );
+
+    VelVecDescCL *tmpb = new VelVecDescCL( vidx );
+    _Stokes.SetupSystem1( &_Stokes.A, &_Stokes.M, tmpb, &cplA, tmpb, _lset, _Stokes.v.t);
+    delete tmpb;
+
+    oldRes = _Stokes.A.Data * un.Data - cplA.Data;
+    VectorCL newRes = newCplA.Data;
+    diff = newRes - oldRes;
+    std::cout << "scalar prod" << std::endl;
+    double scalprod = norm(diff);
+
+    std::cout << "\n\ncplA test: " << scalprod << std::endl;
+
+    std::cout.precision(dbllimit::digits10);
+    std::cout << std::scientific;
+    std::cout << norm(oldRes) << std::endl;
+    std::cout << norm(newRes) << std::endl << std::endl;
+    */
 
 
 }
