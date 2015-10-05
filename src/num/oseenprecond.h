@@ -188,6 +188,7 @@ private:
     const MatrixCL *Apr_;
     const MatrixCL *Mpr_;
     const MatrixCL *C_;
+    mutable size_t Cversion_;
     //const CkernelCL *kernel;
     const VectorBaseCL<VectorCL> &kernel;
     mutable MatrixCL MminusC_;
@@ -220,12 +221,12 @@ public:
                   const VectorBaseCL<VectorCL> &ckernel, double kA = 0., double kM = 1.,
                   double tolA = 1e-2, double tolM = 1e-2, int pcSIter = 150,
                   std::ostream *output = 0 )
-        : SchurPreBaseCL( kA, kM, output ), Apr_(Apr), Mpr_(Mpr), C_(C), kernel(ckernel), tolA_(tolA),
+        : SchurPreBaseCL( kA, kM, output ), Apr_(Apr), Mpr_(Mpr), C_(C), Cversion_(0), kernel(ckernel), tolA_(tolA),
           tolM_(tolM), pcAIter_(pcSIter), pcsgs_(), pcjac_(),pckern_(pcsgs_,ckernel),
           solver1( pckern_, pcAIter_, tolA_, true), solver2( pcjac_, 500, tolM_, true )
     {
-        MminusC_.LinComb( 1.0 , *Mpr_ , -1.0 , *C_ );
-        AminusC_.LinComb( 1.0 , *Apr_ , -kA_ , *C_ );        
+        //MminusC_.LinComb( 1.0 , *Mpr_ , -1.0 , *C_ );
+        //AminusC_.LinComb( 1.0 , *Apr_ , -kA_ , *C_ );
 
     }
 
@@ -242,6 +243,14 @@ public:
 template <typename Mat, typename Vec, typename ExT>
 void IsXstabPreCL:: Apply(const Mat&, Vec& p, const Vec& c, const ExT&, const ExT& pr_ex) const
 {
+    if( C_->Version() != Cversion_ )
+    {
+        std::cout << "m-c and a-c" << std::endl;
+        Cversion_ = C_->Version();
+        MminusC_.LinComb( 1.0 , *Mpr_ , -1.0 , *C_ );
+        AminusC_.LinComb( 1.0 , *Apr_ , -kA_ , *C_ );
+    }
+
     p = 0.0;
     if ( kA_ != 0.0 )
     {
@@ -274,8 +283,8 @@ private:
     const MatrixCL *Apr_;
     const MatrixCL *Mpr_;
     const MatrixCL *C_;
-    //const CkernelCL *kernel;
-    const VectorBaseCL<VectorCL> &kernel;
+
+    mutable size_t Cversion_;
     mutable MatrixCL MminusC_;
     mutable MatrixCL AminusC_;
     double tolA_;
@@ -287,8 +296,6 @@ private:
     typedef JACPcCL PcSolver2;
     Pc1Main pcsgs_;
     PcSolver2 pcjac_;
-    typedef PreKernel<Pc1Main> PcSolver1;
-    PcSolver1 pckern_;
     mutable PCGSolverCL<Pc1Main> solver1;
     mutable PCGSolverCL<PcSolver2> solver2;
 
@@ -303,15 +310,14 @@ private:
 
 public:
     IsXprmod( const MatrixCL * Apr, const MatrixCL *Mpr, const MatrixCL *C,
-                  const VectorBaseCL<VectorCL> &ckernel, double kA = 0., double kM = 1.,
-                  double tolA = 1e-2, double tolM = 1e-2, int pcAIter = 150,
-                  std::ostream *output = 0 )
-        : SchurPreBaseCL( kA, kM, output ), Apr_(Apr), Mpr_(Mpr), C_(C), kernel(ckernel), tolA_(tolA),
-          tolM_(tolM), pcAIter_(pcAIter), pcsgs_(), pcjac_(),pckern_(pcsgs_,ckernel),
+              double kA = 0., double kM = 1., double tolA = 1e-2,
+              double tolM = 1e-2, int pcAIter = 150, std::ostream *output = 0 )
+        : SchurPreBaseCL( kA, kM, output ), Apr_(Apr), Mpr_(Mpr), C_(C), Cversion_(0), tolA_(tolA),
+          tolM_(tolM), pcAIter_(pcAIter), pcsgs_(), pcjac_(),
           solver1( pcsgs_, pcAIter_, tolA_, true), solver2( pcjac_, 500, tolM_, true )
     {
-        MminusC_.LinComb( 1.0 , *Mpr_ , -1.0 , *C_ );
-        AminusC_.LinComb( 1.0 , *Apr_ , -kA_ , *C_ );
+        //MminusC_.LinComb( 1.0 , *Mpr_ , -1.0 , *C_ );
+        //AminusC_.LinComb( 1.0 , *Apr_ , -kA_ , *C_ );
     }
 
     template <typename Mat, typename Vec, typename ExT>
@@ -327,6 +333,14 @@ public:
 template <typename Mat, typename Vec, typename ExT>
 void IsXprmod:: Apply(const Mat&, Vec& p, const Vec& c, const ExT&, const ExT& pr_ex) const
 {
+    if( C_->Version() != Cversion_ )
+    {
+        std::cout << "m-c and a-c" << std::endl;
+        Cversion_ = C_->Version();
+        MminusC_.LinComb( 1.0 , *Mpr_ , -1.0 , *C_ );
+        AminusC_.LinComb( 1.0 , *Apr_ , -kA_ , *C_ );
+    }
+
     p = 0.0;
     if ( kA_ != 0.0 )
     {
@@ -762,6 +776,7 @@ private:
           solver2_( PCsolver2_, 500, tolM_, /*relative*/ true),
           pr_idx_( pc.pr_idx_), regularize_( pc.regularize_)
     {
+        std::cout << "before lincomb" << std::endl;
     MminusC_.LinComb( 1.0, *M_, -1.0, *C_ );
     }
 

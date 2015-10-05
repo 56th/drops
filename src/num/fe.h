@@ -871,9 +871,7 @@ class FunAsP2EvalCL
   public:
     typedef result_type        DataT;
     typedef NoBndDataCL<DataT> BndDataCL;
-    // this does not compile! void* is not a pointer-to-object type!!
-    //typedef void               VecDescT;
-    typedef VecDescCL VecDescT;
+    typedef void               VecDescT;
 
     typedef FunAsP2EvalCL<FunT, result_type> self_;
     typedef self_                            modifiable_type;
@@ -884,27 +882,25 @@ class FunAsP2EvalCL
     Uint lvl_;
 
   protected:
-    const BndDataCL*          bnd_;
+    BndDataCL          bnd_;
     const MultiGridCL* mg_; // the multigrid, maybe 0
 
-    //mutable double     t_;
-    double &t_;
+    mutable double     t_;
 
   public:
-    FunAsP2EvalCL( FunT f, double& t= 0.0, const MultiGridCL* mg= 0, Uint lvl= -1u)
+    FunAsP2EvalCL( FunT f, double t= 0.0, const MultiGridCL* mg= 0, Uint lvl= -1u)
         : f_( f), lvl_( lvl== -1u ? mg->GetLastLevel() : lvl), mg_( mg),  t_( t) {}
 
     void       SetSolution(VecDescT*)       {}
     VecDescT*  GetSolution()          const { return 0; }
     void       SetBndData(BndDataCL*)       {}
-    //BndDataCL* GetBndData()           const { return bnd_; }
-    BndDataCL* GetBndData()           const { return 0; }
+    BndDataCL* GetBndData()           const { return bnd_; }
     const MultiGridCL&
                GetMG()                const { return *mg_; }
     Uint       GetLevel()             const { return lvl_; }
     // The time at which boundary data is evaluated.
     double     GetTime()              const { return t_; }
-    //void       SetTime(double t)      const { t_= t; }
+    void       SetTime(double t)      const { t_= t; }
 
     bool UnknownsMissing(const TetraCL&)   const { return false; }
     // True, iff the function can be evaluated on the given simplex... if the functions were implemented :-)

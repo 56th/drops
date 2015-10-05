@@ -1,6 +1,6 @@
 /// \file instatstokes2phase.h
 /// \brief classes that constitute the 2-phase Stokes problem
-/// \author LNM RWTH Aachen: Patrick Esser, Joerg Grande, Sven Gross, Volker Reichelt; SC RWTH Aachen: Oliver Fortmeier
+/// \author LNM RWTH Aachen: Patrick Esser, Joerg Grande, Sven Gross, Volker Reichelt, Thomas Ludescher; SC RWTH Aachen: Oliver Fortmeier
 
 /*
  * This file is part of DROPS.
@@ -34,7 +34,7 @@
 #include "num/MGsolver.h"
 #include "num/fe_repair.h"
 #include "misc/funcmap.h"
-
+extern DROPS::ParamCL P;
 namespace DROPS
 {
 
@@ -78,17 +78,6 @@ void SetupMassDiag (const MultiGridCL& MG, VectorCL& M, const IdxDescCL& RowIdx,
 void SetupLumpedMass (const MultiGridCL& MG, VectorCL& M, const IdxDescCL& RowIdx,
                     const BndCondCL& bnd= BndCondCL( 0), const VecDescCL* lsetp=0, const BndDataCL<>* lsetbnd=0);
 
-
-class CkernelCL
-{
-
-public:
-    //dummy constructor
-    CkernelCL(){}
-    CkernelCL(MultiGridCL& mg, const LevelsetP2CL& lset , const IdxDescCL &prIdx);
-    ~CkernelCL(){std::cout <<"deleting ckernelcl" << std::endl;}
-    VectorBaseCL<VectorCL> cKernelVecs;
-};
 
 // rho*du/dt - mu*laplace u + Dp = f + rho*g - okn
 //                        -div u = 0
@@ -178,8 +167,8 @@ private:
                  C,
                  M,
                  prA,
-                 prM;
-    //mutable CkernelCL    *cKernel;
+                 prM,
+                 prMhat;
     mutable VectorBaseCL<VectorCL> cKernel;
 
   public:
@@ -216,6 +205,10 @@ private:
     MLTetraAccumulatorTupleCL& system1_accu (MLTetraAccumulatorTupleCL& accus, MLMatDescCL* A, MLMatDescCL* M, VecDescCL* b, VecDescCL* cplA, VecDescCL* cplM, const LevelsetP2CL& lset, double t) const;
     /// Set up rhs b (depending on phase bnd)
     void SetupRhs1( VecDescCL* b, const LevelsetP2CL& lset, double t) const;
+    /// Set up coupling terms for M matrix at given time t for time integration
+    void SetupCplM( VecDescCL *cplM, const LevelsetP2CL &lset, double t) const;
+    /// Set up matrix vector product A^n*u^n at given time t, as well as coupling terms for A matrix
+    void SetupAdotU( VecDescCL *cplA, const VecDescCL &un, const LevelsetP2CL &lset, double t) const;
     /// Set up the Laplace-Beltrami-Operator
     void SetupLB( MLMatDescCL* A, VecDescCL* cplA, const LevelsetP2CL& lset, double t) const;
     /// Set up the Boussinesq-Scriven Law of surface stress
@@ -229,6 +222,8 @@ private:
     void SetupBdotv (VecDescCL* Bdotv, const VelVecDescCL* vel, const LevelsetP2CL& lset, double t) const;
     /// Set up the mass matrix for the pressure, scaled by \f$\mu^{-1}\f$.
     void SetupPrMass( MLMatDescCL* prM, const LevelsetP2CL& lset) const;
+    /// Set up the overlapping mass matrix for the pressure, scaled by \f$\mu^{-1}\f$.
+    void SetupPrMassHat( MLMatDescCL* prMhat, const LevelsetP2CL& lset) const;
     /// Set up the stabilisation matrix for the pressure.
     void SetupC( MLMatDescCL* matC, const LevelsetP2CL& lset, double eps_p ) const;
     /// Set up the stiffness matrix for the pressure, scaled by \f$\rho^{-1}\f$.
