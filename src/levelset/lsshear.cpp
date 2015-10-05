@@ -40,6 +40,7 @@
 const double      delta_t= 0.01;
 const DROPS::Uint num_steps= 50;
 const int         FPsteps= -1;
+DROPS::ParamCL P;
 
 // du/dt - q*u - nu*laplace u + Dp = f - okn
 //                          -div u = 0

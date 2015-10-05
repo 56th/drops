@@ -1,6 +1,6 @@
 /// \file instatstokes2phase.h
 /// \brief classes that constitute the 2-phase Stokes problem
-/// \author LNM RWTH Aachen: Patrick Esser, Joerg Grande, Sven Gross, Volker Reichelt; SC RWTH Aachen: Oliver Fortmeier
+/// \author LNM RWTH Aachen: Patrick Esser, Joerg Grande, Sven Gross, Volker Reichelt, Thomas Ludescher; SC RWTH Aachen: Oliver Fortmeier
 
 /*
  * This file is part of DROPS.
@@ -34,7 +34,7 @@
 #include "num/MGsolver.h"
 #include "num/fe_repair.h"
 #include "misc/funcmap.h"
-
+extern DROPS::ParamCL P;
 namespace DROPS
 {
 
@@ -77,8 +77,6 @@ void SetupMassDiag (const MultiGridCL& MG, VectorCL& M, const IdxDescCL& RowIdx,
 /// \brief Compute the unscaled lumped \f$L_2(\Omega)\f$-mass-matrix, i.e., M = diag( \f$\int_\Omega v_i dx\f$).
 void SetupLumpedMass (const MultiGridCL& MG, VectorCL& M, const IdxDescCL& RowIdx,
                     const BndCondCL& bnd= BndCondCL( 0), const VecDescCL* lsetp=0, const BndDataCL<>* lsetbnd=0);
-
-
 
 
 // rho*du/dt - mu*laplace u + Dp = f + rho*g - okn
@@ -151,6 +149,9 @@ class TwoPhaseFlowCoeffCL
 
 class InstatStokes2PhaseP2P1CL : public ProblemCL<TwoPhaseFlowCoeffCL, StokesBndDataCL>
 {
+private:
+    void computeGhostPenaltyKernel(MultiGridCL& mg, const LevelsetP2CL& lset , const IdxDescCL &prIdx) const;
+
   public:
     typedef ProblemCL<TwoPhaseFlowCoeffCL, StokesBndDataCL>       base_;
     typedef base_::BndDataCL                                      BndDataCL;
@@ -177,13 +178,15 @@ class InstatStokes2PhaseP2P1CL : public ProblemCL<TwoPhaseFlowCoeffCL, StokesBnd
                  C,
                  M,
                  prA,
-                 prM;
+                 prM,
+                 prMhat;
+    mutable VectorBaseCL<VectorCL> cKernel;
 
   public:
     InstatStokes2PhaseP2P1CL( const MGBuilderCL& mgb, const TwoPhaseFlowCoeffCL& coeff, const BndDataCL& bdata, FiniteElementT prFE= P1_FE, double XFEMstab=0.1, FiniteElementT velFE= vecP2_FE)
-        : base_(mgb, coeff, bdata), vel_idx(velFE, 1, bdata.Vel, 0, XFEMstab), pr_idx(prFE, 1, bdata.Pr, 0, XFEMstab) {}
+        : base_(mgb, coeff, bdata), vel_idx(velFE, 1, bdata.Vel, 0, XFEMstab), pr_idx(prFE, 1, bdata.Pr, 0, XFEMstab), cKernel(0) { }
     InstatStokes2PhaseP2P1CL( MultiGridCL& mg, const TwoPhaseFlowCoeffCL& coeff, const BndDataCL& bdata, FiniteElementT prFE= P1_FE, double XFEMstab=0.1, FiniteElementT velFE= vecP2_FE)
-        : base_(mg, coeff, bdata),  vel_idx(velFE, 1, bdata.Vel, 0, XFEMstab), pr_idx(prFE, 1, bdata.Pr, 0, XFEMstab) {}
+        : base_(mg, coeff, bdata),  vel_idx(velFE, 1, bdata.Vel, 0, XFEMstab), pr_idx(prFE, 1, bdata.Pr, 0, XFEMstab), cKernel(0) { }
 
     /// \name Numbering
     //@{
@@ -213,6 +216,10 @@ class InstatStokes2PhaseP2P1CL : public ProblemCL<TwoPhaseFlowCoeffCL, StokesBnd
     MLTetraAccumulatorTupleCL& system1_accu (MLTetraAccumulatorTupleCL& accus, MLMatDescCL* A, MLMatDescCL* M, VecDescCL* b, VecDescCL* cplA, VecDescCL* cplM, const LevelsetP2CL& lset, double t) const;
     /// Set up rhs b (depending on phase bnd)
     void SetupRhs1( VecDescCL* b, const LevelsetP2CL& lset, double t) const;
+    /// Set up coupling terms for M matrix at given time t for time integration
+    void SetupCplM( VecDescCL *cplM, const LevelsetP2CL &lset, double t) const;
+    /// Set up matrix vector product A^n*u^n at given time t, as well as coupling terms for A matrix
+    void SetupAdotU( VecDescCL *cplA, const VecDescCL &un, const LevelsetP2CL &lset, double t) const;
     /// Set up the Laplace-Beltrami-Operator
     void SetupLB( MLMatDescCL* A, VecDescCL* cplA, const LevelsetP2CL& lset, double t) const;
     /// Set up the Boussinesq-Scriven Law of surface stress
@@ -226,10 +233,12 @@ class InstatStokes2PhaseP2P1CL : public ProblemCL<TwoPhaseFlowCoeffCL, StokesBnd
     void SetupBdotv (VecDescCL* Bdotv, const VelVecDescCL* vel, const LevelsetP2CL& lset, double t) const;
     /// Set up the mass matrix for the pressure, scaled by \f$\mu^{-1}\f$.
     void SetupPrMass( MLMatDescCL* prM, const LevelsetP2CL& lset) const;
+    /// Set up the overlapping mass matrix for the pressure, scaled by \f$\mu^{-1}\f$.
+    void SetupPrMassHat( MLMatDescCL* prMhat, const LevelsetP2CL& lset) const;
     /// Set up the stabilisation matrix for the pressure.
     void SetupC( MLMatDescCL* matC, const LevelsetP2CL& lset, double eps_p ) const;
     /// Set up the stiffness matrix for the pressure, scaled by \f$\rho^{-1}\f$.
-    void SetupPrStiff(MLMatDescCL* prA, const LevelsetP2CL& lset) const;
+    void SetupPrStiff(MLMatDescCL* prA, const LevelsetP2CL& lset, double lambda=1.0) const;
     //@}
 
     /// Initialize velocity field
