@@ -42,7 +42,7 @@ enum APcE {
 
 /// codes for the pressure Schur complement preconditioners
 enum SPcE {
-    ISBBT_SPC= 1, ISBBT_Stab_SPC = 11, NoPre_SPC=12, IsXstab_SPC = 13, IsXmod_SPC =14, MinComm_SPC= 2, ISPre_SPC= 3, ISMG_SPC= 7, BDinvBT_SPC= 5, SIMPLER_SPC=8, MSIMPLER_SPC=9, VankaSchur_SPC= 4, VankaBlock_SPC=6, ISNonlinear_SPC=10
+    ISBBT_SPC= 1, NoPre_SPC=12, ISGhPenKernel_SPC = 13, ISGhPen_SPC =14, MinComm_SPC= 2, ISPre_SPC= 3, ISMG_SPC= 7, BDinvBT_SPC= 5, SIMPLER_SPC=8, MSIMPLER_SPC=9, VankaSchur_SPC= 4, VankaBlock_SPC=6, ISNonlinear_SPC=10
 };
 
 /// collects some information on the different Oseen solvers and preconditioners
@@ -78,12 +78,11 @@ struct StokesSolverInfoCL
     }
     static std::string GetSchurPreName( int pre) {
         switch(pre) {
-            case ISBBT_SPC:        return "ISBBT (modified Cahouet-Chabard)";
-            case ISBBT_Stab_SPC:   return "ISBBT_Stab  (modified for pressure Stabilisation)";
+            case ISBBT_SPC:        return "ISBBT (modified Cahouet-Chabard)";            
             case MinComm_SPC:      return "MinComm (minimal commutator)";
             case ISPre_SPC:        return "ISPre (Cahouet-Chabard)";
-            case IsXstab_SPC:      return "IsXstab (modified Cahouet-Chabard for stabilization)";
-            case IsXmod_SPC:       return "IsXmod (Cahouet-Chabard for ghost penalty) no kernel consideration";
+            case ISGhPenKernel_SPC:return "ISGhPenKernelPre (Cahouet-Chabard for ghost penalty) with kernel info";
+            case ISGhPen_SPC:      return "ISGhPenPre (Cahouet-Chabard for ghost penalty)";
             case ISNonlinear_SPC:  return "ISNonlinearPreCL (Cahouet-Chabard)";
             case ISMG_SPC:         return "ISMGPre (multigrid Cahouet-Chabard)";
             case BDinvBT_SPC:      return "B D^-1 B^T";
@@ -93,7 +92,7 @@ struct StokesSolverInfoCL
             case VankaBlock_SPC:   return "block Vanka";
             case PVanka_SM:        return "Vanka smoother";
             case BraessSarazin_SM: return "Braess-Sarazin smoother";
-            case NoPre_SPC: return "No Preconditioner";
+            case NoPre_SPC:        return "No Preconditioner";
             default:               return "unknown";
         }
     }
@@ -122,9 +121,9 @@ struct StokesSolverInfoCL
     <tr><td>  7 </td><td> IDR(s)            </td><td> IDR(s)                             </td><td> ISMGPreCL                    </td></tr>
     <tr><td>  8 </td><td>                   </td><td> Gauss-Seidel-GMRes                 </td><td> SIMPLER                      </td></tr>
     <tr><td>  9 </td><td>                   </td><td>                                    </td><td> MSIMPLER                     </td></tr>
-    <tr><td> 11 </td><td>                   </td><td>                                    </td><td> ISBBT_Stab_PreCL             </td></tr>
     <tr><td> 12 </td><td>                   </td><td>                                    </td><td> NoPreCL                      </td></tr>
-    <tr><td> 13 </td><td>                   </td><td>                                    </td><td> IsXstabPreCL                 </td></tr>
+    <tr><td> 13 </td><td>                   </td><td>                                    </td><td> ISGhPenKernel                </td></tr>
+    <tr><td> 13 </td><td>                   </td><td>                                    </td><td> ISGhPen                      </td></tr>
     <tr><td> 20 </td><td>                   </td><td> HYPRE-AMG                          </td><td>                              </td></tr>
     <tr><td> 30 </td><td> StokesMGM         </td><td> PVankaSmootherCL                   </td><td> PVankaSmootherCL             </td></tr>
     <tr><td> 31 </td><td>                   </td><td> BSSmootherCL                       </td><td> BSSmootherCL                 </td></tr>
@@ -212,13 +211,12 @@ class StokesSolverFactoryCL : public StokesSolverFactoryBaseCL<StokesT, Prolonga
     SchurPreBaseCL  *spc_;
     NoPreCL nopc_;
     ISBBTPreCL      bbtispc_;
-    ISBBT_Stab_PreCL bbtis_Stab_pc_;
     MinCommPreCL    mincommispc_;
     BDinvBTPreCL    bdinvbtispc_;
     VankaSchurPreCL vankaschurpc_;
     ISPreCL         isprepc_;
-    IsXstabPreCL    isxstabpc_;
-    IsXprmod        isxprmodpc_;
+    ISGhPenKernelPreCL    isgpkernpc_;
+    ISGhPenPreCL        isgppc_;
     ISMGPreCL<ProlongationPT> ismgpre_;
     typedef PCGSolverCL<SymmPcPcT> PCGSolverT;
     PCGSolverT isnonlinearprepc1_, isnonlinearprepc2_;
@@ -385,12 +383,11 @@ StokesSolverFactoryCL<StokesT, ProlongationVelT, ProlongationPT>::
         // schur complement preconditioner        
         nopc_ (kA_,kM_),
         bbtispc_    ( &Stokes_.B.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(), &Stokes_.M.Data.GetFinest(), Stokes_.pr_idx.GetFinest(), kA_, kM_, P.get<double>("Stokes.PcSTol"), P.get<double>("Stokes.PcSTol") /* enable regularization: , 0.707*/),
-        bbtis_Stab_pc_    ( &Stokes_.B.Data.GetFinest(), &Stokes_.C.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(), &Stokes_.M.Data.GetFinest(), Stokes_.pr_idx.GetFinest(), kA_, kM_, P.get<double>("Stokes.PcSTol"), P.get<double>("Stokes.PcSTol") /* enable regularization: , 0.707*/),
         mincommispc_( 0, &Stokes_.B.Data.GetFinest(), &Stokes_.M.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(),Stokes_.pr_idx.GetFinest(), P.get<double>("Stokes.PcSTol") /* enable regularization: , 0.707*/),
         bdinvbtispc_( 0, &Stokes_.B.Data.GetFinest(), &Stokes_.M.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(),Stokes_.pr_idx.GetFinest(), P.get<double>("Stokes.PcSTol") /* enable regularization: , 0.707*/),
         vankaschurpc_( &Stokes.pr_idx), isprepc_( Stokes.prA.Data, Stokes.prM.Data, kA_, kM_),
-        isxstabpc_( &Stokes_.prA.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(), &Stokes_.C.Data.GetFinest(), Stokes_.cKernel, kA_, kM_, P.get<double>("Stokes.PcSTol"), P.get<double>("Stokes.PcSTol"), P.get<int>("Stokes.PcSIter",150), &std::cout),
-        isxprmodpc_( &Stokes_.prA.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(), &Stokes_.C.Data.GetFinest(), kA_, kM_, P.get<double>("Stokes.PcSTol"), P.get<double>("Stokes.PcSTol"), P.get<int>("Stokes.PcSIter",150) ),        
+        isgpkernpc_( &Stokes_.prA.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(), &Stokes_.C.Data.GetFinest(), Stokes_.cKernel, kA_, kM_, P.get<double>("Stokes.PcSTol"), P.get<double>("Stokes.PcSTol"), P.get<int>("Stokes.PcSIter",150), &std::cout),
+        isgppc_( &Stokes_.prA.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(), &Stokes_.C.Data.GetFinest(), kA_, kM_, P.get<double>("Stokes.PcSTol"), P.get<double>("Stokes.PcSTol"), P.get<int>("Stokes.PcSIter",150) ),
         ismgpre_( Stokes.prA.Data, Stokes.prM.Data, kA_, kM_, Stokes.pr_idx),
         isnonlinearprepc1_( symmPcPc_, 100, P.get<double>("Stokes.PcSTol"), true),
         isnonlinearprepc2_( symmPcPc_, 100, P.get<double>("Stokes.PcSTol"), true),
@@ -504,20 +501,19 @@ template <class StokesT, class ProlongationVelT, class ProlongationPT>
 SchurPreBaseCL* StokesSolverFactoryCL<StokesT, ProlongationVelT, ProlongationPT>::CreateSPc()
 {
     switch (SPc_) {
-        case ISBBT_SPC:      return &bbtispc_;
-        case ISBBT_Stab_SPC: return &bbtis_Stab_pc_;
-        case MinComm_SPC:    return &mincommispc_;
-        case ISPre_SPC:      return &isprepc_;
-        case IsXstab_SPC:    return &isxstabpc_;
-        case IsXmod_SPC:     return &isxprmodpc_;
-        case ISMG_SPC:       return &ismgpre_;
+        case ISBBT_SPC:         return &bbtispc_;
+        case MinComm_SPC:       return &mincommispc_;
+        case ISPre_SPC:         return &isprepc_;
+        case ISGhPenKernel_SPC: return &isgpkernpc_;
+        case ISGhPen_SPC:       return &isgppc_;
+        case ISMG_SPC:          return &ismgpre_;
         case SIMPLER_SPC:
         case MSIMPLER_SPC:
-        case BDinvBT_SPC:    return &bdinvbtispc_;
-        case VankaSchur_SPC: return &vankaschurpc_;
-        case ISNonlinear_SPC:return &isnonlinearpc_;
-        case NoPre_SPC:      return &nopc_;
-        default:             return 0;
+        case BDinvBT_SPC:       return &bdinvbtispc_;
+        case VankaSchur_SPC:    return &vankaschurpc_;
+        case ISNonlinear_SPC:   return &isnonlinearpc_;
+        case NoPre_SPC:         return &nopc_;
+        default:                return 0;
     }
 }
 
@@ -662,7 +658,6 @@ void StokesSolverFactoryCL<StokesT, ProlongationVelT, ProlongationPT>::
     SetMatrices( const MLMatrixCL* A, const MLMatrixCL* B, const MLMatrixCL* C, const MLMatrixCL* Mvel, const MLMatrixCL* M, const MLIdxDescCL* pr_idx) {
     if ( APc_ == PVanka_SM || APc_ == BraessSarazin_SM) { //  Vanka or Braess Sarazin smoother
         bbtispc_.SetMatrices(B->GetCoarsestPtr(), Mvel->GetCoarsestPtr(), M->GetCoarsestPtr(), pr_idx->GetCoarsestPtr());
-        bbtis_Stab_pc_.SetMatrices(B->GetCoarsestPtr(), C->GetCoarsestPtr(), Mvel->GetCoarsestPtr(), M->GetCoarsestPtr(), pr_idx->GetCoarsestPtr());
         return;
     }
     if ( SPc_ == VankaSchur_SPC) {              // VankaSchur
@@ -672,7 +667,6 @@ void StokesSolverFactoryCL<StokesT, ProlongationVelT, ProlongationPT>::
         mincommispc_.SetMatrices(A->GetFinestPtr(), B->GetFinestPtr(), Mvel->GetFinestPtr(), M->GetFinestPtr(), pr_idx->GetFinestPtr());
         bdinvbtispc_.SetMatrices(A->GetFinestPtr(), B->GetFinestPtr(), Mvel->GetFinestPtr(), M->GetFinestPtr(), pr_idx->GetFinestPtr());
         bbtispc_.SetMatrices(B->GetFinestPtr(), Mvel->GetFinestPtr(), M->GetFinestPtr(), pr_idx->GetFinestPtr());
-        bbtis_Stab_pc_.SetMatrices(B->GetFinestPtr(), C->GetFinestPtr(), Mvel->GetFinestPtr(), M->GetFinestPtr(), pr_idx->GetFinestPtr());
     }
 }
 

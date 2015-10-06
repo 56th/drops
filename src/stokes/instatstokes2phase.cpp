@@ -1674,10 +1674,9 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
     double absdet;
     IdxT UnknownIdx[4];
     bool sign[4];
-    InterfaceTetraCL cut;       
-    bool doAverage = P.get<bool>("Stokes.average",0);
-    bool hansbo = P.get<bool>("Stokes.hansbo",1);
-    bool testAverage = P.get<bool>("Stokes.testaverage",0);
+    InterfaceTetraCL cut;
+    bool doAverage = P.get<bool>("Stokes.prA_average",0);
+    bool hansbo = P.get<bool>("Stokes.prA_hansbo",1);
 
     const double rho_inv_p= 1./Coeff.rho(1.),
                  rho_inv_n= 1./Coeff.rho(-1.);
@@ -1721,7 +1720,7 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
         double kappa1, kappa2;
         kappa1=kappa2=0.5;
         //double Vol_p, Vol_n;
-        double kappa_p,kappa_n, alphaK;        
+        double kappa_p,kappa_n, alphaK;
 
 
         if (nocut) {
@@ -1741,11 +1740,9 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
             kappa_n = rho_inv_p * alpha_n / ( rho_inv_p * alpha_n + rho_inv_n * alpha_p );
             IntRhoInv_p= Vol_p*rho_inv_p;
             IntRhoInv=   Vol_p*rho_inv_p + Vol_n*rho_inv_n;
-            if( !testAverage )
-            {
-                kappa1 = Vol_n / ( Vol_p + Vol_n );
-                kappa2 = Vol_p / ( Vol_p + Vol_n );
-            }
+
+            kappa1 = Vol_n / ( Vol_p + Vol_n );
+            kappa2 = Vol_p / ( Vol_p + Vol_n );
 
             //initialize triangle for cut tetrahedron
             triang.Init( *sit, locallset);
@@ -1764,7 +1761,7 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
             UnknownIdx[i]= sit->GetVertex( i)->Unknowns( idx);
             if (nocut) continue; // extended basis functions have only support on tetra intersecting Gamma!
 
-            sign[i]= cut.GetSign(i)==1;            
+            sign[i]= cut.GetSign(i)==1;
 
             for(int j=0; j<=i; ++j) {
                 // compute the integrals
@@ -1790,11 +1787,12 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
                 Point3DCL ngamma = triang.GetNormal();
                 // scalar product of gradpi, ngamma
                 double graddotn[4] = {};
-                for( int i = 0; i < 4; ++i ){                    
+                for( int i = 0; i < 4; ++i )
+                {
                     graddotn[i] = G(0,i)*ngamma[0] + G(1,i)*ngamma[1] + G(2,i)*ngamma[2];
                 }
 
-                // compute part of the integral on cut triangle 0,1,2 (no cut, triang cut, quad cut)                
+                // compute part of the integral on cut triangle 0,1,2 (no cut, triang cut, quad cut)
                 for( Uint cutTria = 0; cutTria < (Uint) triang.GetNumTriangles(); ++cutTria )
                 {
                     gammaK += triang.quad2D(ones,cutTria);
@@ -1804,7 +1802,7 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
                         for( int j = 0; j<=i; ++j )
                         {
                             coupJump[i][j] += triang.quad2D( pipj[i][j] , cutTria ) * invRhoAv; // add parts triangle
-                            coupJump[j][i] = coupJump[i][j]; // symmetrize                            
+                            coupJump[j][i] = coupJump[i][j]; // symmetrize
 
                         }
                         // compute average terms
@@ -1815,9 +1813,9 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
                                 coupAv[i][j] += graddotn[i] * triang.quad2D( gradpipj[j], cutTria );
                             }
                         }
-                    }                    
+                    }
                 }
-            }            
+            }
             //some hack from hansbo paper
 
             if( hansbo )
@@ -1832,12 +1830,6 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
             }
 
 
-        }
-
-        if( testAverage )
-        {
-            memset(coup, 0.0, sizeof(coup) );
-            memset(coupT2, 0.0, sizeof(coupT2) );
         }
 
 
