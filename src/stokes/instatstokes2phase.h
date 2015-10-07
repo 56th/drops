@@ -218,8 +218,8 @@ private:
     void SetupRhs1( VecDescCL* b, const LevelsetP2CL& lset, double t) const;
     /// Set up coupling terms for M matrix at given time t for time integration
     void SetupCplM( VecDescCL *cplM, const LevelsetP2CL &lset, double t) const;
-    /// Set up matrix vector product A^n*u^n at given time t, as well as coupling terms for A matrix
-    void SetupAdotU( VecDescCL *cplA, const VecDescCL &un, const LevelsetP2CL &lset, double t) const;
+    /// Set up matrix vector product v = A^n*u^n - cplA at given time t
+    void SetupAdotU( VecDescCL *AdotU, const VecDescCL &un, const LevelsetP2CL &lset, double t) const;
     /// Set up the Laplace-Beltrami-Operator
     void SetupLB( MLMatDescCL* A, VecDescCL* cplA, const LevelsetP2CL& lset, double t) const;
     /// Set up the Boussinesq-Scriven Law of surface stress

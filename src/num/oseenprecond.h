@@ -79,29 +79,22 @@ class SchurPreBaseCL
     //@}
 };
 
-class NoPreCL : public SchurPreBaseCL
+/// Dummy Schur complement preconditioner, acts like the identity matrix.
+class DummyPreCL : public SchurPreBaseCL
 {
 public:
-    NoPreCL( double kA, double kM, std::ostream* output=0) : SchurPreBaseCL(kA,kM,output){}
+    DummyPreCL( double kA, double kM, std::ostream* output=0) : SchurPreBaseCL(kA,kM,output){}
 
 #ifdef _PAR
     void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const ExchangeCL& vel_ex, const ExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
     void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const ExchangeCL& vel_ex, const ExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
 #endif
-    void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& p_ex) const
+    void Apply(const MatrixCL&,   VectorCL& x, const VectorCL& b, const DummyExchangeCL&, const DummyExchangeCL&) const
     {
-        //mute compiler output unused variable
-        (void) A;
-        (void) vel_ex;
-        (void) p_ex;
         x = b;
     }
-    void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& p_ex) const
+    void Apply(const MLMatrixCL&, VectorCL& x, const VectorCL& b, const DummyExchangeCL&, const DummyExchangeCL&) const
     {
-        //mute compiler output unused variable
-        (void) A;
-        (void) vel_ex;
-        (void) p_ex;
         x = b;
     }
 };
@@ -231,7 +224,6 @@ void ISGhPenPreCL:: Apply(const Mat&, Vec& p, const Vec& c, const ExT&, const Ex
 {
     if( C_->Version() != Cversion_ )
     {
-        std::cout << "m-c and a-c" << std::endl;
         Cversion_ = C_->Version();
         MminusC_.LinComb( 1.0 , *Mpr_ , -1.0 , *C_ );
         AminusC_.LinComb( 1.0 , *Apr_ , -kA_ , *C_ );
@@ -242,10 +234,10 @@ void ISGhPenPreCL:: Apply(const Mat&, Vec& p, const Vec& c, const ExT&, const Ex
     {
         solver1.Solve( AminusC_ , p , c, pr_ex );
         if( solver1.GetIter() == solver1.GetMaxIter() )
-            std::cout << "IsXstabPreCL::Apply: (Apr-1/dt*C)-solve: max iterations reached: " << solver1.GetIter()
+            std::cout << "ISGhPenPreCL::Apply: (Apr-1/dt*C)-solve: max iterations reached: " << solver1.GetIter()
                       << "\twith residual: " << solver1.GetResid() << std::endl;
         else if( output_ )
-            *output_ << "IsXstabPreCL::Apply: (Apr-1/dt*C)-solve: iterations: " << solver1.GetIter()
+            *output_ << "ISGhPenPreCL::Apply: (Apr-1/dt*C)-solve: iterations: " << solver1.GetIter()
                      << "\tresidual: " << solver1.GetResid() << std::endl;
         p *= kA_;
     }
@@ -254,17 +246,17 @@ void ISGhPenPreCL:: Apply(const Mat&, Vec& p, const Vec& c, const ExT&, const Ex
         Vec p2_( c.size() );
         solver2.Solve( MminusC_ , p2_ , c , pr_ex );
         if( solver2.GetIter() == solver2.GetMaxIter() )
-            std::cout << "IsXstabPreCL::Apply: (Mpr-C)-solve: max iterations reached: " << solver2.GetIter()
+            std::cout << "ISGhPenPreCL::Apply: (Mpr-C)-solve: max iterations reached: " << solver2.GetIter()
                       << "\twith residual: " << solver2.GetResid() << std::endl;
         else if( output_ )
-            *output_ << "IsXstabPreCL::Apply: (Mpr-C)-solve: iterations: " << solver2.GetIter()
+            *output_ << "ISGhPenPreCL::Apply: (Mpr-C)-solve: iterations: " << solver2.GetIter()
                      << "\tresidual: " << solver2.GetResid() << std::endl;
         p += kM_ * p2_;
     }
 }
 
 //**************************************************************************
-// see above but with additional consideration of the kernel of ghost
+// Same as ISGhPenPreCL but with additional consideration of the kernel of ghost
 // penalty matrix C. Subspace splitting scheme similar to the idea from
 //
 // J.Schoberl. Robust Multigrid Preconditioning for Parameter-Dependent Problems
@@ -338,7 +330,6 @@ void ISGhPenKernelPreCL:: Apply(const Mat&, Vec& p, const Vec& c, const ExT&, co
 {
     if( C_->Version() != Cversion_ )
     {
-        std::cout << "m-c and a-c" << std::endl;
         Cversion_ = C_->Version();
         MminusC_.LinComb( 1.0 , *Mpr_ , -1.0 , *C_ );
         AminusC_.LinComb( 1.0 , *Apr_ , -kA_ , *C_ );
@@ -349,10 +340,10 @@ void ISGhPenKernelPreCL:: Apply(const Mat&, Vec& p, const Vec& c, const ExT&, co
     {
         solver1.Solve( AminusC_ , p , c, pr_ex );
         if( solver1.GetIter() == solver1.GetMaxIter() )
-            std::cout << "IsXstabPreCL::Apply: (Apr-1/dt*C)-solve: max iterations reached: " << solver1.GetIter()
+            std::cout << "ISGhPenKernelPreCL::Apply: (Apr-1/dt*C)-solve: max iterations reached: " << solver1.GetIter()
                       << "\twith residual: " << solver1.GetResid() << std::endl;
         else if( output_ )
-            *output_ << "IsXstabPreCL::Apply: (Apr-1/dt*C)-solve: iterations: " << solver1.GetIter()
+            *output_ << "ISGhPenKernelPreCL::Apply: (Apr-1/dt*C)-solve: iterations: " << solver1.GetIter()
                      << "\tresidual: " << solver1.GetResid() << std::endl;
         p *= kA_;
     }
@@ -361,10 +352,10 @@ void ISGhPenKernelPreCL:: Apply(const Mat&, Vec& p, const Vec& c, const ExT&, co
         Vec p2_( c.size() );
         solver2.Solve( MminusC_ , p2_ , c , pr_ex );
         if( solver2.GetIter() == solver2.GetMaxIter() )
-            std::cout << "IsXstabPreCL::Apply: (Mpr-C)-solve: max iterations reached: " << solver2.GetIter()
+            std::cout << "ISGhPenKernelPreCL::Apply: (Mpr-C)-solve: max iterations reached: " << solver2.GetIter()
                       << "\twith residual: " << solver2.GetResid() << std::endl;
         else if( output_ )
-            *output_ << "IsXstabPreCL::Apply: (Mpr-C)-solve: iterations: " << solver2.GetIter()
+            *output_ << "ISGhPenKernelPreCL::Apply: (Mpr-C)-solve: iterations: " << solver2.GetIter()
                      << "\tresidual: " << solver2.GetResid() << std::endl;
         p += kM_ * p2_;
     }

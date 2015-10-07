@@ -42,7 +42,7 @@ enum APcE {
 
 /// codes for the pressure Schur complement preconditioners
 enum SPcE {
-    ISBBT_SPC= 1, NoPre_SPC=12, ISGhPenKernel_SPC = 13, ISGhPen_SPC =14, MinComm_SPC= 2, ISPre_SPC= 3, ISMG_SPC= 7, BDinvBT_SPC= 5, SIMPLER_SPC=8, MSIMPLER_SPC=9, VankaSchur_SPC= 4, VankaBlock_SPC=6, ISNonlinear_SPC=10
+    ISBBT_SPC= 1, DummyPre_SPC=13, ISGhPenKernel_SPC = 10, ISGhPen_SPC =11, MinComm_SPC= 2, ISPre_SPC= 3, ISMG_SPC= 7, BDinvBT_SPC= 5, SIMPLER_SPC=8, MSIMPLER_SPC=9, VankaSchur_SPC= 4, VankaBlock_SPC=6, ISNonlinear_SPC=12
 };
 
 /// collects some information on the different Oseen solvers and preconditioners
@@ -92,7 +92,7 @@ struct StokesSolverInfoCL
             case VankaBlock_SPC:   return "block Vanka";
             case PVanka_SM:        return "Vanka smoother";
             case BraessSarazin_SM: return "Braess-Sarazin smoother";
-            case NoPre_SPC:        return "No Preconditioner";
+            case DummyPre_SPC:     return "No Preconditioner";
             default:               return "unknown";
         }
     }
@@ -117,13 +117,14 @@ struct StokesSolverInfoCL
     <tr><td>  3 </td><td> MinRes            </td><td> PCG                                </td><td> ISPreCL                      </td></tr>
     <tr><td>  4 </td><td> GMRes             </td><td> Jacobi-GMRes                       </td><td> VankaSchurPreCL              </td></tr>
     <tr><td>  5 </td><td> GMResR            </td><td> BiCGStab                           </td><td> BD^{-1}BT                    </td></tr>
-    <tr><td>  6 </td><td>                   </td><td> VankaPre                           </td><td> VankaPre                     </td></tr>
+    <tr><td>  6 </td><td>                   </td><td> VankaPreCL                         </td><td> VankaPreCL                   </td></tr>
     <tr><td>  7 </td><td> IDR(s)            </td><td> IDR(s)                             </td><td> ISMGPreCL                    </td></tr>
     <tr><td>  8 </td><td>                   </td><td> Gauss-Seidel-GMRes                 </td><td> SIMPLER                      </td></tr>
     <tr><td>  9 </td><td>                   </td><td>                                    </td><td> MSIMPLER                     </td></tr>
-    <tr><td> 12 </td><td>                   </td><td>                                    </td><td> NoPreCL                      </td></tr>
-    <tr><td> 13 </td><td>                   </td><td>                                    </td><td> ISGhPenKernel                </td></tr>
-    <tr><td> 13 </td><td>                   </td><td>                                    </td><td> ISGhPen                      </td></tr>
+    <tr><td> 10 </td><td>                   </td><td>                                    </td><td> ISGhPenKernelPreCL           </td></tr>
+    <tr><td> 11 </td><td>                   </td><td>                                    </td><td> ISGhPenPreCL                 </td></tr>
+    <tr><td> 12 </td><td>                   </td><td>                                    </td><td> ISNonlinearPreCL             </td></tr>
+    <tr><td> 13 </td><td>                   </td><td>                                    </td><td> DummyPreCL                   </td></tr>
     <tr><td> 20 </td><td>                   </td><td> HYPRE-AMG                          </td><td>                              </td></tr>
     <tr><td> 30 </td><td> StokesMGM         </td><td> PVankaSmootherCL                   </td><td> PVankaSmootherCL             </td></tr>
     <tr><td> 31 </td><td>                   </td><td> BSSmootherCL                       </td><td> BSSmootherCL                 </td></tr>
@@ -209,13 +210,13 @@ class StokesSolverFactoryCL : public StokesSolverFactoryBaseCL<StokesT, Prolonga
 
 // PC for instat. Schur complement
     SchurPreBaseCL  *spc_;
-    NoPreCL nopc_;
+    DummyPreCL      nopc_;
     ISBBTPreCL      bbtispc_;
     MinCommPreCL    mincommispc_;
     BDinvBTPreCL    bdinvbtispc_;
     VankaSchurPreCL vankaschurpc_;
     ISPreCL         isprepc_;
-    ISGhPenKernelPreCL    isgpkernpc_;
+    ISGhPenKernelPreCL  isgpkernpc_;
     ISGhPenPreCL        isgppc_;
     ISMGPreCL<ProlongationPT> ismgpre_;
     typedef PCGSolverCL<SymmPcPcT> PCGSolverT;
@@ -512,7 +513,7 @@ SchurPreBaseCL* StokesSolverFactoryCL<StokesT, ProlongationVelT, ProlongationPT>
         case BDinvBT_SPC:       return &bdinvbtispc_;
         case VankaSchur_SPC:    return &vankaschurpc_;
         case ISNonlinear_SPC:   return &isnonlinearpc_;
-        case NoPre_SPC:         return &nopc_;
+        case DummyPre_SPC:      return &nopc_;
         default:                return 0;
     }
 }

@@ -28,8 +28,8 @@
     "AdaptRef":
     {
         "_comment": "# adaptive refinement",
-        "Freq": "2",
-        "FinestLevel": "0",
+        "Freq": "0",
+        "FinestLevel": "2",
         "CoarsestLevel": "0",
         "Width": "100",  // uniform refinement
         "LoadBalStrategy": "1011"
