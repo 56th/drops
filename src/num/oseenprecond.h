@@ -215,7 +215,10 @@ public:
     }
 
     template <typename Mat, typename Vec, typename ExT>
-    void Apply(const Mat&, Vec& p, const Vec& c, const ExT& vel_ex, const ExT& pr_ex) const;
+    void Apply(const Mat&, Vec& p, const Vec& c, const ExT& pr_ex) const;
+
+    template <typename Mat, typename Vec, typename ExT>
+    void Apply(const Mat& A, Vec& p, const Vec& c, const ExT&, const ExT& pr_ex) const { Apply<>(A,p,c,pr_ex); }
 #ifdef _PAR
     void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const ExchangeCL& vel_ex, const ExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
     void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const ExchangeCL& vel_ex, const ExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
@@ -225,7 +228,7 @@ public:
 };
 
 template <typename Mat, typename Vec, typename ExT>
-void ISGhPenPreCL:: Apply(const Mat&, Vec& p, const Vec& c, const ExT&, const ExT& pr_ex) const
+void ISGhPenPreCL:: Apply(const Mat&, Vec& p, const Vec& c, const ExT& pr_ex) const
 {
     if( C_->Version() != Cversion_ )
     {

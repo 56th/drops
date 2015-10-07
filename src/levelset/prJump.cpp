@@ -465,7 +465,8 @@ void LBB_constant( const StokesT &Stokes )
     const MatrixCL &B(Stokes.B.Data.GetFinest());
     const MatrixCL &C(Stokes.C.Data.GetFinest());
     const MatrixCL &M(Stokes.prM.Data.GetFinest());
-    const MatrixCL &Mvel(Stokes.M.Data.GetFinest());
+    const MatrixCL &Apr(Stokes.prA.Data.GetFinest());
+    //const MatrixCL &Mvel(Stokes.M.Data.GetFinest());
 
     // Create a preconditioner for A. A PCG
     typedef SSORPcCL SymmPcPcT;
@@ -483,8 +484,8 @@ void LBB_constant( const StokesT &Stokes )
 
     // Schur-Inverter...
     int tmp = 5000;
-    typedef GCRSolverCL<ISBBT_Stab_PreCL> SolverT;
-    ISBBT_Stab_PreCL Sprecond( &B, &C, &M, &Mvel, Stokes.pr_idx.GetFinest() );
+    typedef GCRSolverCL<ISGhPenPreCL> SolverT;
+    ISGhPenPreCL Sprecond( &Apr, &M, &C );
     SolverT gcr( Sprecond, tmp, 5000, 1e-10, true );
  
     VectorCL y_k( Stokes.p.Data.size() ), y_k1( Stokes.p.Data.size() );
