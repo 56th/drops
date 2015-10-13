@@ -18,4 +18,6 @@ target_link_libraries(num-interfacePatch num-fe misc-utils)
 target_link_libraries(num-interfacePatch num-discretize)
 target_link_libraries(num-spacetime_quad num-spacetime_geom)
 
+target_link_libraries_par(num-spacetime_quad num-spacetime_geom)
+
 add_my_custom_targets(num)
