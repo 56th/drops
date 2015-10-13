@@ -33,7 +33,7 @@
 #include "geom/geomselect.h"
 #include "num/nssolver.h"
 #include "levelset/coupling.h"
-
+#include "spacetimetransp/spacetime_sol.h"
 #include "misc/funcmap.h"
 
 namespace DROPS
@@ -476,7 +476,8 @@ class TwoPhaseStoreCL
     MultiGridCL&         mg_;
     const StokesT&       Stokes_;
     const LevelsetP2CL&  lset_;
-    const TransportP1CL* transp_;
+    const TransportP1CL* transp_;//old
+    const SpaceTimeXSolutionCL* st_transp_;//new
     std::string          path_;
     Uint                 numRecoverySteps_;
     Uint                 recoveryStep_;
@@ -507,7 +508,14 @@ class TwoPhaseStoreCL
        *  */
     TwoPhaseStoreCL(MultiGridCL& mg, const StokesT& Stokes, const LevelsetP2CL& lset, const TransportP1CL* transp,
                     const std::string& path, Uint recoverySteps=2, bool binary= false, const PermutationT& vel_downwind= PermutationT(), const PermutationT& lset_downwind= PermutationT())
-      : mg_(mg), Stokes_(Stokes), lset_(lset), transp_(transp), path_(path), numRecoverySteps_(recoverySteps),
+      : mg_(mg), Stokes_(Stokes), lset_(lset), transp_(transp), st_transp_(NULL), path_(path), numRecoverySteps_(recoverySteps),
+        recoveryStep_(0), binary_( binary), vel_downwind_( vel_downwind), lset_downwind_( lset_downwind){}
+
+//new cstr with spacetimetransport-object (as reference to distinguish from std-cstr... - could be cleaned..)
+    TwoPhaseStoreCL(MultiGridCL& mg, const StokesT& Stokes, const LevelsetP2CL& lset, const SpaceTimeXSolutionCL& st_transp,
+                    const std::string& path, Uint recoverySteps=2, bool binary= false, 
+                    const PermutationT& vel_downwind= PermutationT(), const PermutationT& lset_downwind= PermutationT())
+        : mg_(mg), Stokes_(Stokes), lset_(lset), transp_(NULL), st_transp_(&st_transp), path_(path), numRecoverySteps_(recoverySteps),
         recoveryStep_(0), binary_( binary), vel_downwind_( vel_downwind), lset_downwind_( lset_downwind){}
 
     /// \brief Write all information in a file
@@ -534,6 +542,8 @@ class TwoPhaseStoreCL
         WriteFEToFile( ls, mg_, filename.str() + "levelset", binary_);
         WriteFEToFile(Stokes_.p, mg_, filename.str() + "pressure", binary_, &lset_.Phi); // pass also level set, as p may be extended
         if (transp_) WriteFEToFile(transp_->ct, mg_, filename.str() + "concentrationTransf", binary_);
+        if (st_transp_) WriteFEToFile(st_transp_->GetFutureTrace_Neg(), mg_, filename.str() + "concentration_neg", binary_);
+        if (st_transp_) WriteFEToFile(st_transp_->GetFutureTrace_Pos(), mg_, filename.str() + "concentration_pos", binary_);
     }
 };
 

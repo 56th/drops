@@ -1,0 +1,122 @@
+//=============================================================
+//    DROPS parameter file for two phase mass transport
+//    simulation: (almost) artificial substance system
+//    stationary interface (no flow simulation)
+//=============================================================
+{
+
+        //General section
+        "General":
+        {
+                "ProgressBar":  1, //show progress bar
+                "DynamicLibsPrefix": "../", //where should we look for shared objects?
+                "DynamicLibs": [ //select libraries to be loaded after program start
+                        "misc/libmisc-scalarFunctions",
+                        "misc/libmisc-vectorFunctions",
+                        "misc/libmisc-csgFunctions",
+                        "spacetimetransp/libspacetimetransp-sttranspCoeff"
+                ]
+        },
+
+        // time stepping:
+        "Time":
+        {
+                "NumSteps":             8,
+                "EndTime":              0.25,
+                "Scheme":               1
+        },
+    
+        //adaptive refinement:
+        "AdaptRef":
+        {
+                "Freq":                 1,
+                "FinestLevel":          0,
+                "CoarsestLevel":        0,
+                "Width":                0.1,
+                "RefineStrategy":       1,
+                "LoadBalStrategy":      1,
+                "Partitioner":          1
+        },
+
+        // experimental conditions
+        "Exp":
+        {
+                "RadDrop":              [0.333333333333, 0.333333333333, 0.333333333333 ],
+                "PosDrop":              [1, 1, 1 ],
+                "RadInlet":             0.005
+        },
+
+        // experimental conditions
+        "TestCase1":
+        {
+                "k":                    1.0,
+                // "a":                    1.24023, //automatically set
+                // "b":                    -8.1621,    //automatically set
+                "v":                    1.0,
+                "r":                    0.25,
+                "C":                    10
+        },
+
+        "Transp":
+        {
+                "DoTransp":             1,
+                "UseNSSol":             0,
+                "Theta":                1,
+                "Iter":                 200000,
+                "Tol":                  1e-15,
+                "DiffPos":              20000.0,
+                "DiffNeg":              10000.0,
+                "HPos":                 1.0,
+                "HNeg":                 2.0,
+                "IniCPos":              0.0,
+                "IniCNeg":              0.0,
+                "InitialConcNeg":       "testcase1_sol_neg",
+                "InitialConcPos":       "testcase1_sol_pos",
+                "NitschePenalty":       25,
+
+                "STXFEMStab":           0, //0.001,
+                "Levelset":             "testcase1_lset",             //Only active if UseNSSol == 0
+                "Flow":                 "testcase1_vel",               //Only active if UseNSSol == 0
+                "RhsPos":               "testcase1_rhs_pos",                  //Only active if UseNSSol == 0
+                "RhsNeg":               "testcase1_rhs_neg",                  //Only active if UseNSSol == 0
+                "SolPos":               "testcase1_sol_pos",                  //Only active if UseNSSol == 0
+                "SolNeg":               "testcase1_sol_neg",                  //Only active if UseNSSol == 0
+                "BoundaryType":         "2!2!2!2!2!2",
+                "BoundaryFncsNeg":      "testcase1_sol_neg!testcase1_sol_neg!testcase1_sol_neg!testcase1_sol_neg!testcase1_sol_neg!testcase1_sol_neg",
+                "BoundaryFncsPos":      "testcase1_sol_pos!testcase1_sol_pos!testcase1_sol_pos!testcase1_sol_pos!testcase1_sol_pos!testcase1_sol_pos",
+                "DirectSolve":          1,
+                "Quadrature":
+                {       
+                    "SubIntervalsPerEdge":  2,
+                    "SubTimeIntervals":     1,
+                    "LevelsetLinearInTime": 0
+                }
+        },
+
+        "VTK":
+        {
+
+                "VTKOut":               2,
+                "VTKDir":               "vtk",
+                "VTKName":              "testcase1_",
+                "Binary":               0
+        },
+
+        //Write out results:
+        "Restart":
+        {
+                "Inputfile":            "none"
+        },
+
+        // Domain boundary and initial condition
+        "DomainCond":
+        {
+                "InitialCond":          0,
+                "GeomType":             1,
+                "InitialFile":          "none",
+                "MeshFile":             "2x2x2@48x48x48",
+                "BoundaryType":         "21!21!21!21!21!21",
+                "BoundaryFncs":         "ZeroVel!ZeroVel!ZeroVel!ZeroVel!ZeroVel!ZeroVel"
+        }
+
+}
