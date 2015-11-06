@@ -85,18 +85,20 @@ class DummyPreCL : public SchurPreBaseCL
 public:
     DummyPreCL( double kA, double kM, std::ostream* output=0) : SchurPreBaseCL(kA,kM,output){}
 
+    template <typename Mat, typename Vec, typename ExT>
+    void Apply(const Mat&, Vec& x, const Vec& b, const ExT&, const ExT& p_ex) const
+    {
+        x= b;
+        p_ex.Accumulate( x);
+    }
 #ifdef _PAR
     void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const ExchangeCL& vel_ex, const ExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
     void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const ExchangeCL& vel_ex, const ExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
 #endif
-    void Apply(const MatrixCL&,   VectorCL& x, const VectorCL& b, const DummyExchangeCL&, const DummyExchangeCL&) const
-    {
-        x = b;
-    }
-    void Apply(const MLMatrixCL&, VectorCL& x, const VectorCL& b, const DummyExchangeCL&, const DummyExchangeCL&) const
-    {
-        x = b;
-    }
+    void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
+    void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
+
+    using SchurPreBaseCL::Apply;
 };
 
 //**************************************************************************
@@ -188,7 +190,6 @@ private:
     int pcAIter_;
 
     typedef SGSPcCL Pc1Main;
-    //typedef JACPcCL PcSolver1;
     typedef JACPcCL PcSolver2;
     Pc1Main pcsgs_;
     PcSolver2 pcjac_;
@@ -202,10 +203,7 @@ public:
         : SchurPreBaseCL( kA, kM, output ), Apr_(Apr), Mpr_(Mpr), C_(C), Cversion_(0), tolA_(tolA),
           tolM_(tolM), pcAIter_(pcAIter), pcsgs_(), pcjac_(),
           solver1( pcsgs_, pcAIter_, tolA_, true), solver2( pcjac_, 500, tolM_, true )
-    {
-        //MminusC_.LinComb( 1.0 , *Mpr_ , -1.0 , *C_ );
-        //AminusC_.LinComb( 1.0 , *Apr_ , -kA_ , *C_ );
-    }
+    {}
 
     template <typename Mat, typename Vec, typename ExT>
     void Apply(const Mat&, Vec& p, const Vec& c, const ExT& vel_ex, const ExT& pr_ex) const;
@@ -259,8 +257,8 @@ void ISGhPenPreCL:: Apply(const Mat&, Vec& p, const Vec& c, const ExT&, const Ex
 // Same as ISGhPenPreCL but with additional consideration of the kernel of ghost
 // penalty matrix C. Subspace splitting scheme similar to the idea from
 //
-// J.Schoberl. Robust Multigrid Preconditioning for Parameter-Dependent Problems
-// I: The Stokes-type Case. In Multigrid Methods V, pages 260–275. Springer, 1998.
+// J. Schoeberl. Robust Multigrid Preconditioning for Parameter-Dependent Problems
+// I: The Stokes-type Case. In Multigrid Methods V, pages 260--275. Springer, 1998.
 //
 // see detailed description below in class comments
 //
@@ -281,7 +279,6 @@ private:
     int pcAIter_;
 
     typedef SGSPcCL Pc1Main;
-    //typedef JACPcCL PcSolver1;
     typedef JACPcCL PcSolver2;
     Pc1Main pcsgs_;
     PcSolver2 pcjac_;
@@ -307,11 +304,7 @@ public:
         : SchurPreBaseCL( kA, kM, output ), Apr_(Apr), Mpr_(Mpr), C_(C), Cversion_(0), kernel(ckernel), tolA_(tolA),
           tolM_(tolM), pcAIter_(pcSIter), pcsgs_(), pcjac_(),pckern_(pcsgs_,ckernel),
           solver1( pckern_, pcAIter_, tolA_, true), solver2( pcjac_, 500, tolM_, true )
-    {
-        //MminusC_.LinComb( 1.0 , *Mpr_ , -1.0 , *C_ );
-        //AminusC_.LinComb( 1.0 , *Apr_ , -kA_ , *C_ );
-
-    }
+    {}
 
     template <typename Mat, typename Vec, typename ExT>
     void Apply(const Mat&, Vec& p, const Vec& c, const ExT& vel_ex, const ExT& pr_ex) const;
