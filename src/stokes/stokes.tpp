@@ -259,7 +259,7 @@ class StokesSystem1Accumulator_P2CL : public TetraAccumulatorCL
     double det, absdet;
     LocalP2CL<> ls_loc;
 
-    Quad2CL<Point3DCL> rhs;
+    Quad5CL<Point3DCL> rhs;
     Point3DCL loc_b[10], dirichlet_val[10]; ///< Used to transfer boundary-values from local_setup() update_global_system().
 
     ///\brief Computes the mapping from local to global data "n", the local matrices in loc and, if required, the Dirichlet-values needed to eliminate the boundary-dof from the global system.
@@ -340,8 +340,12 @@ void StokesSystem1Accumulator_P2CL<CoeffT>::local_setup (const TetraCL& tet)
                 dirichlet_val[i]= i<4 ? bf( tet.GetVertex( i)->GetCoord(), t)
                     : bf( GetBaryCenter( *tet.GetEdge( i-4)), t);
             }
-            else
-                loc_b[i]= rhs.quadP2( i, absdet);
+            else {
+                LocalP2CL<Point3DCL> pip1; 
+                pip1[i] = Point3DCL(1.,1.,1.); // vector valued hat function at node i
+                Quad5CL <Point3DCL> pip1Q(pip1);
+                loc_b[i] = Quad5CL<Point3DCL>(pip1Q*rhs).quad(absdet);
+            }
         }
     }
 }
@@ -691,7 +695,7 @@ void StokesP2P1CL<Coeff>::SetupInstatRhs( VelVecDescCL* vecA, VelVecDescCL* vecB
                             // depends on numbering of the unknowns
 
     Quad2CL<Point3DCL> Grad[10], GradRef[10];  // jeweils Werte des Gradienten in 5 Stuetzstellen
-    Quad2CL<Point3DCL> rhs;
+    Quad5CL<Point3DCL> rhs;
     SMatrixCL<3,3> T;
     double coup[10][10], coupMass[10][10];
     double det, absdet;
@@ -755,7 +759,11 @@ void StokesP2P1CL<Coeff>::SetupInstatRhs( VelVecDescCL* vecA, VelVecDescCL* vecB
                         id[Numb[i]+2*stride]-= val*tmp[2];
                     }
                 }
-                tmp= rhs.quadP2( i, absdet);//P2DiscCL::Quad(*sit, Coeff::f, i, tf)*absdet;
+                LocalP2CL<Point3DCL> pip1;
+                pip1[i] = Point3DCL(1.,1.,1.); // vector valued hat function at node i
+                Quad5CL <Point3DCL> pip1Q(pip1);
+                tmp = Quad5CL<Point3DCL>(pip1Q*rhs).quad(absdet);
+
                 f[Numb[i]]+=          tmp[0];
                 f[Numb[i]+stride]+=   tmp[1];
                 f[Numb[i]+2*stride]+= tmp[2];
