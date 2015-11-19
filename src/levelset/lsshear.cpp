@@ -97,6 +97,7 @@ void Strategy( StokesProblemT& Stokes, const BndDataCL<>& lsbnd)
     VelVecDescCL cpl_M;
     MLMatDescCL* A= &Stokes.A;
     MLMatDescCL* B= &Stokes.B;
+    MLMatDescCL* C= &Stokes.C;
     MLMatDescCL* M= &Stokes.M;
     MLMatDescCL* prM = &Stokes.prM;
 
@@ -126,7 +127,7 @@ void Strategy( StokesProblemT& Stokes, const BndDataCL<>& lsbnd)
     time.Reset();
     time.Start();
     Stokes.SetupSystem1( A, M, b, b, &cpl_M, lset, Stokes.v.t);
-    Stokes.SetupSystem2( B, c, lset, Stokes.v.t);
+    Stokes.SetupSystem2( B, C, c, lset, Stokes.v.t);
     Stokes.SetupPrMass( prM, lset);
     time.Stop();
     std::cout << time.GetTime() << " seconds for setting up all systems!" << std::endl;
@@ -148,7 +149,7 @@ void Strategy( StokesProblemT& Stokes, const BndDataCL<>& lsbnd)
     {
         std::cout << "Computing initial velocity..." << std::endl;
 
-        inexactuzawasolver.Solve( A->Data, B->Data, v->Data, p->Data, b->Data, c->Data, v->RowIdx->GetEx(),  p->RowIdx->GetEx());
+        inexactuzawasolver.Solve( A->Data, B->Data, C->Data, v->Data, p->Data, b->Data, c->Data, v->RowIdx->GetEx(),  p->RowIdx->GetEx());
     }
 
     // Initialize Ensight6 output

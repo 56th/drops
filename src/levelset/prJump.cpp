@@ -262,7 +262,7 @@ void Assemble( StokesT& Stokes, LevelsetP2CL& lset, VelVecDescCL& rhs )
     time.Reset();
     Stokes.SetupSystem1( &Stokes.A, &Stokes.M, &Stokes.b, &Stokes.b,
                          &rhs, lset, Stokes.v.t );
-    Stokes.SetupSystem2( &Stokes.B, &Stokes.c, lset, Stokes.v.t );
+    Stokes.SetupSystem2( &Stokes.B, &Stokes.C, &Stokes.c, lset, Stokes.v.t );
 
     time.Stop();
     std::cout << "Assembling the system matrices took: " << time.GetTime()

@@ -11,8 +11,8 @@ namespace DROPS
 //    B v        = c
 //=============================================================================
 
-void StokesPardisoSolverCL::Solve( const MatrixCL& A, const MatrixCL& B, const MatrixCL*C, VectorCL& v, VectorCL& p,
-                                   const VectorCL& b, const VectorCL& c, const DummyExchangeCL& vel_ex, const DummyExchangeCL& pr_ex){
+void StokesPardisoSolverCL::Solve( const MatrixCL& A, const MatrixCL& B, const MatrixCL& C, VectorCL& v, VectorCL& p,
+                                   const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&){
 
     size_t ndof_v = v.size();
     size_t ndof_p = p.size();
@@ -24,12 +24,7 @@ void StokesPardisoSolverCL::Solve( const MatrixCL& A, const MatrixCL& B, const M
         rhs[ndof_v + i] = c[i];
     VectorCL sol(ndof);
 
-    BlockMatrixCL * pBlockM = NULL;
-    if(C==NULL)
-        pBlockM = new BlockMatrixCL( &A, MUL, &B, TRANSP_MUL, &B, MUL);
-    else    
-        pBlockM = new BlockMatrixCL( &A, MUL, &B, TRANSP_MUL, &B, MUL, C, MUL);
-    BlockMatrixCL &BlockM(*pBlockM);
+    BlockMatrixCL BlockM( &A, MUL, &B, TRANSP_MUL, &B, MUL, &C, MUL);
 
     MatrixCL M(BuildMatrix( BlockM ));
 
@@ -50,7 +45,6 @@ void StokesPardisoSolverCL::Solve( const MatrixCL& A, const MatrixCL& B, const M
         v[i] = sol[i];
     for (size_t i = 0; i < ndof_p; i++)
         p[i] = sol[ndof_v +i];
-    delete pBlockM;
 }
 
 

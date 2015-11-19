@@ -174,7 +174,7 @@ void SolveStatProblem( StokesProblemT& Stokes, StokesSolverBaseCL& solver)
     timer.Reset();
 
     timer.Start();
-    solver.Solve( Stokes.A.Data, Stokes.B.Data, Stokes.v.Data, Stokes.p.Data, Stokes.b.Data, Stokes.c.Data, Stokes.v.RowIdx->GetEx(), Stokes.p.RowIdx->GetEx());
+    solver.Solve( Stokes.A.Data, Stokes.B.Data, Stokes.C.Data, Stokes.v.Data, Stokes.p.Data, Stokes.b.Data, Stokes.c.Data, Stokes.v.RowIdx->GetEx(), Stokes.p.RowIdx->GetEx());
     timer.Stop();
     const double duration = timer.GetTime();
     std::cout << "Solving Stokes took "<<  duration << " sec.\n";

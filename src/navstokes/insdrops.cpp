@@ -121,9 +121,9 @@ class UzawaSolverCL : public StokesSolverBaseCL
     double GetTau()            const { return _tau; }
     void   SetTau( double tau)       { _tau= tau; }
 
-    void Solve( const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p,
+    void Solve( const MatrixCL& A, const MatrixCL& B, const MatrixCL&, VectorCL& v, VectorCL& p,
                 const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&);
-    void Solve( const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p,
+    void Solve( const MLMatrixCL& A, const MLMatrixCL& B, const MLMatrixCL&, VectorCL& v, VectorCL& p,
                 const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&);
 };
 
@@ -169,14 +169,13 @@ void UzawaSolverCL<PoissonSolverT>::doSolve(
 
 template <class PoissonSolverT>
 void UzawaSolverCL<PoissonSolverT>::Solve(
-    const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&)
+    const MatrixCL& A, const MatrixCL& B, const MatrixCL&, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&)
 {
     doSolve( A, B, v, p, b, c);
 }
 
 template <class PoissonSolverT>
-void UzawaSolverCL<PoissonSolverT>::Solve(
-    const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&)
+void UzawaSolverCL<PoissonSolverT>::Solve(const MLMatrixCL& A, const MLMatrixCL& B, const MLMatrixCL &, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL &)
 {
     doSolve( A, B, v, p, b, c);
 }

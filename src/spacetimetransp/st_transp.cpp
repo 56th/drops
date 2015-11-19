@@ -59,8 +59,10 @@
 #include <sstream>
 //#include "num/directsolver.h"
 #ifndef _PAR
-#include "num/stokespardiso.h" 
+#include "num/stokespardiso.h"
+#ifdef DROPS_PARDISO
 #include "num/pardisosolver.h"
+#endif
 #endif
 #include <sys/resource.h>
 
@@ -617,10 +619,14 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
             if ( P.get("Transp.DirectSolve", 0))
             {
 #ifndef _PAR
+#ifdef DROPS_PARDISO
                 DROPS::PardisoSolverCL SolveA( A);
                 SolveA.Solve(A, sol.GetSolution().Data, b.Data);
                 DROPS::VectorCL r(A * sol.GetSolution().Data - b.Data);
                 std::cout << "PARDISO 1 Residual:  "<< norm(r) << std::endl;
+#else
+    throw DROPSErrCL("PardisoSolverCL called, but MKL_HOME is not specified in CMake");
+#endif
 #else
                 throw DROPSErrCL("no direct solver in parallel");
 #endif
@@ -941,10 +947,14 @@ void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTr
             if ( P.get("Transp.DirectSolve", 0))
             {
 #ifndef _PAR
+#ifdef DROPS_PARDISO
                 DROPS::PardisoSolverCL SolveA( A);
                 SolveA.Solve(A, sol.GetSolution().Data, b.Data);
                 DROPS::VectorCL r(A * sol.GetSolution().Data - b.Data);
                 std::cout << "PARDISO 1 Residual:  "<< norm(r) << std::endl;
+#else
+    throw DROPSErrCL("PardisoSolverCL called, but MKL_HOME is not specified in CMake");
+#endif
 #else
                 throw DROPSErrCL("no direct solver in parallel");
 #endif

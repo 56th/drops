@@ -1675,8 +1675,8 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
     IdxT UnknownIdx[4];
     bool sign[4];
     InterfaceTetraCL cut;
-    bool doAverage = P.get<bool>("Stokes.prA_average",0);
-    bool hansbo = P.get<bool>("Stokes.prA_hansbo",1);
+    bool doAverage = false;//P.get<bool>("Stokes.prA_average",0);
+    bool hansbo = true;//P.get<bool>("Stokes.prA_hansbo",1);
 
     const double rho_inv_p= 1./Coeff.rho(1.),
                  rho_inv_n= 1./Coeff.rho(-1.);
@@ -2015,13 +2015,14 @@ void InstatStokes2PhaseP2P1CL::SetupC( MLMatDescCL* matC, const LevelsetP2CL& ls
     MLIdxDescCL::iterator itIdx = matC->RowIdx->begin();    
     for ( size_t lvl = 0; lvl < matC->Data.size(); ++lvl, ++itC, ++itIdx )
     {
-        if ( GetPrFE() == P1X_FE )
+        if ( GetPrFE() == P1X_FE && eps_p != 0.0 )
         {
             SetupPrGhostStab_P1X( MG_, Coeff_, *itC, *itIdx, lset, eps_p );
         }
         else
         { 
-            // Stabilisation is not defined for this type. Don't do anything.
+            // Stabilization is not defined for this type or stabilization is not activated.
+            // create empty matrix
             const IdxT num_unks_pr = itIdx->NumUnknowns();
             itC->clear();
             itC->resize( num_unks_pr, num_unks_pr, 0 );
@@ -4147,7 +4148,7 @@ void InstatStokes2PhaseP2P1CL::SetupBS (MLMatDescCL* A, VecDescCL* cplA, const L
 }
 
 
-void InstatStokes2PhaseP2P1CL::SetupSystem2( MLMatDescCL* B, VecDescCL* c, const LevelsetP2CL& lset, double t) const
+void InstatStokes2PhaseP2P1CL::SetupSystem2(MLMatDescCL* B, MLMatDescCL *C, VecDescCL* c, const LevelsetP2CL& lset, double t) const
 // Set up matrix B and rhs c
 {
     MLMatrixCL::iterator     itB   = B->Data.begin();
@@ -4196,6 +4197,8 @@ void InstatStokes2PhaseP2P1CL::SetupSystem2( MLMatDescCL* B, VecDescCL* c, const
 #endif
         std::cout << '\n';
     }
+
+    SetupC( C, lset, epsP );
 }
 
 MLTetraAccumulatorTupleCL&

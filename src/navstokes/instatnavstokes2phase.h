@@ -68,10 +68,10 @@ class InstatNavierStokes2PhaseP2P1CL : public InstatStokes2PhaseP2P1CL
     typedef MLDataCL<ProlongationCL<Point3DCL> > ProlongationT;
     ProlongationT* P_;
 
-    InstatNavierStokes2PhaseP2P1CL(const MGBuilderCL& mgb, const TwoPhaseFlowCoeffCL& coeff, const BndDataCL& bdata, FiniteElementT prFE= P1_FE, double XFEMstab= 0.1, FiniteElementT velFE= vecP2_FE)
-        : InstatStokes2PhaseP2P1CL( mgb, coeff, bdata, prFE, XFEMstab, velFE), ls_( 0), P_(0) {}
-    InstatNavierStokes2PhaseP2P1CL(MultiGridCL& mg, const TwoPhaseFlowCoeffCL& coeff, const BndDataCL& bdata, FiniteElementT prFE= P1_FE, double XFEMstab= 0.1, FiniteElementT velFE= vecP2_FE)
-        : InstatStokes2PhaseP2P1CL( mg, coeff, bdata, prFE, XFEMstab, velFE), ls_( 0), P_(0) {}
+    InstatNavierStokes2PhaseP2P1CL(const MGBuilderCL& mgb, const TwoPhaseFlowCoeffCL& coeff, const BndDataCL& bdata, FiniteElementT prFE= P1_FE, double XFEMstab= 0.1, FiniteElementT velFE= vecP2_FE, double EpsP = 0.0)
+        : InstatStokes2PhaseP2P1CL( mgb, coeff, bdata, prFE, XFEMstab, velFE, EpsP), ls_( 0), P_(0) {}
+    InstatNavierStokes2PhaseP2P1CL(MultiGridCL& mg, const TwoPhaseFlowCoeffCL& coeff, const BndDataCL& bdata, FiniteElementT prFE= P1_FE, double XFEMstab= 0.1, FiniteElementT velFE= vecP2_FE, double EpsP = 0.0)
+        : InstatStokes2PhaseP2P1CL( mg, coeff, bdata, prFE, XFEMstab, velFE, EpsP), ls_( 0), P_(0) {}
 
     /// \name Discretization
     //@{

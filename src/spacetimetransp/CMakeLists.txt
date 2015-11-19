@@ -28,7 +28,11 @@ exec_par(st_transp geom-boundary geom-builder geom-deformation geom-simplex geom
 add_dependencies(st_transp misc-scalarFunctions misc-vectorFunctions misc-csgFunctions spacetimetransp-sttranspCoeff)
 
 if(NOT MPI)
-    target_link_libraries_ser(st_transp -fopenmp -Wl,--start-group ${MKL_HOME}/lib/intel64/libmkl_intel_ilp64.a ${MKL_HOME}/lib/intel64/libmkl_gnu_thread.a ${MKL_HOME}/lib/intel64/libmkl_core.a -Wl,--end-group -ldl -lpthread -lm) 
+# st_transp needs Pardiso from MKL
+	if (MKL_HOME STREQUAL "")
+	else(MKL_HOME STREQUAL "")
+		target_link_libraries_ser(st_transp -fopenmp -Wl,--start-group ${MKL_HOME}/lib/intel64/libmkl_intel_ilp64.a ${MKL_HOME}/lib/intel64/libmkl_gnu_thread.a ${MKL_HOME}/lib/intel64/libmkl_core.a -Wl,--end-group -ldl -lpthread -lm) 
+	endif(MKL_HOME STREQUAL "")
 endif(NOT MPI)
 
 add_my_custom_targets(spacetimetransp)
