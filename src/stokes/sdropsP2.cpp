@@ -377,7 +377,7 @@ int main ( int argc, char** argv)
 {
     try
     {
-        DROPS::read_parameter_file_from_cmdline( P, argc, argv, "stokes.json");
+        DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/stokes/sdropsP2/stokes.json");
         SetMissingParameters(P);
         std::cout << P << std::endl;
 

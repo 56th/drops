@@ -57,7 +57,7 @@ int main (int argc, char** argv)
   {
     DROPS::ParamCL P;
 
-    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "show_domain.json");
+    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/tests/show_domain/show_domain.json");
     SetMissingParameters(P);
     std::cout << P << std::endl;
 

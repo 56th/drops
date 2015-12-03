@@ -335,7 +335,7 @@ int main( int argc, char **argv)
         DROPS::ParMultiGridInitCL pmginit;
 #endif
 
-        DROPS::read_parameter_file_from_cmdline( P, argc, argv, "reparam.json");
+        DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/tests/reparamtest/reparam.json");
         std::cout << P << std::endl;
 
         DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );

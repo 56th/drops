@@ -434,7 +434,7 @@ int main (int argc, char** argv)
         DROPS::ParTimerCL timer;
 #endif
 
-        DROPS::read_parameter_file_from_cmdline( P, argc, argv, "statpoissonEx.json");
+        DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/poisson/cdrdrops/statpoissonEx.json");
         //Setup missing parameters
         SetMissingParameters(P);
         //output all the parameters

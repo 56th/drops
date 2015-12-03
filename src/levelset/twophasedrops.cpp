@@ -616,7 +616,7 @@ int main (int argc, char** argv)
   {
     std::cout << "Boost version: " << BOOST_LIB_VERSION << std::endl;
 
-    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "risingdroplet.json");
+    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/levelset/twophasedrops/risingdroplet.json");
     SetMissingParameters(P);
     std::cout << P << std::endl;
 

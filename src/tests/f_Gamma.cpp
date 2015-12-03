@@ -388,7 +388,7 @@ int main (int argc, char** argv)
 {
   try
   {
-    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "f_Gamma.json");
+    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/tests/f_Gamma/f_Gamma.json");
     SetMissingParameters(P);
     std::cout << P << std::endl;
 

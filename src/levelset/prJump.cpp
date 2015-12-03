@@ -92,7 +92,7 @@ int main ( int argc, char** argv )
     try
     {
         // Read input.
-        read_parameter_file_from_cmdline( P, argc, argv, "prJump.json" );
+        read_parameter_file_from_cmdline( P, argc, argv, "../../param/levelset/prJump/prJump.json" );
         std::cout << P << std::endl;
 
         dynamicLoad( P.get<std::string>("General.DynamicLibsPrefix"),

@@ -514,7 +514,7 @@ int main ( int argc, char** argv)
 {
     try
     {
-        DROPS::read_parameter_file_from_cmdline( P, argc, argv, "MGsdropsP2.json");
+        DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/stokes/errorestimator/MGsdropsP2.json");
         std::cout << P << std::endl;
 
         DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
