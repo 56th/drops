@@ -31,6 +31,7 @@
 #include "levelset/coupling.h"
 #include "misc/params.h"
 #include "levelset/surfacetension.h"
+#include "levelset/mzelle_hdr.h"
 #include "misc/dynamicload.h"
 #include <fstream>
 #include <sstream>

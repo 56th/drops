@@ -601,6 +601,8 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbndda
 
     instat_scalar_fun_ptr distance = tdscalarmap[P.get<std::string>("Transp.Levelset")];
 
+    instat_scalar_fun_ptr sigmap = tdscalarmap[P.get<std::string>("SurfTens.VarTensionFncs")];
+
     cBndDataCL *pBnd_c, *pBnd_ct;
     DROPS::BuildBoundaryData( &MG, pBnd_c,  P.get<std::string>("Transp.BoundaryType"), P.get<std::string>("Transp.BoundaryFncs"));
     DROPS::BuildBoundaryData( &MG, pBnd_ct, P.get<std::string>("Transp.BoundaryType"), P.get<std::string>("Transp.BoundaryFncst"));
@@ -609,29 +611,25 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbndda
 
 
     // initialization of surface tension
-    sigma= Stokes.GetCoeff().SurfTens;
-    //todo: weg oder Fallunterscheidung einfuehren
-    eps= P.get<double>("SurfTens.JumpWidth");    lambda= P.get<double>("SurfTens.RelPos");    sigma_dirt_fac= P.get<double>("SurfTens.DirtFactor");
-    instat_scalar_fun_ptr sigmap  = 0;
-    if (P.get<int>("SurfTens.VarTension"))
-    {
-        sigmap  = &sigma_step;
-    }
-    else
-    {
-        sigmap  = &sigmaf;
-    }
+    SurfaceTensionCL * sf;
+    sf = new SurfaceTensionCL( sigmap, Bnd_c);
+
     double cp=0., coeffC[5];
     //coefficients for ansatz of var. surface tension
-//    coeffC[0]= 1.625; coeffC[1]= 0.0; coeffC[2]= 0.0; coeffC[3]= coeffC[4]= 0.;
+    //coeffC[0]= 1.625; coeffC[1]= 0.0; coeffC[2]= 0.0; coeffC[3]= coeffC[4]= 0.;
     coeffC[0]= 1.625; coeffC[1]= -28.07768; coeffC[2]= 222.7858; coeffC[3]= coeffC[4]= 0.;
 
-    SurfaceTensionCL sf( sigmap, Bnd_c);
-    sf.SetCoeff(coeffC, cp);
-    LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsetbnddata, sf, P.get_child("Levelset")) );
+    if (!P.get<bool>("SurfTens.ConcentrationDep"))
+        sf->SetInputMethod(Sigma_X);            
+    else{
+        sf->SetInputMethod(Sigma_C);
+        sf->SetCoeff(coeffC, cp);
+    }
+
+    LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsetbnddata, *sf, P.get_child("Levelset")) );
 
     // levelset wrt the previous time step:
-    LevelsetP2CL & oldlset( * LevelsetP2CL::Create( MG, lsetbnddata, sf, P.get_child("Levelset")) );
+    LevelsetP2CL & oldlset( * LevelsetP2CL::Create( MG, lsetbnddata, *sf, P.get_child("Levelset")) );
     //Prolongate and Restrict solution vector levelset from old mesh to new mesh after mesh adaptation:
     //always act on the same grid with possibly different interface position
     LevelsetRepairCL lsetrepair( lset);
@@ -661,11 +659,8 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbndda
     oldlset.CreateNumbering( MG.GetLastLevel(), oldlidx);
     oldlset.Phi.SetIdx( oldlidx);
 
-    if (P.get<int>("SurfTens.VarTension"))
-        lset.SetSurfaceForce( SF_ImprovedLBVar);
-    else
-        lset.SetSurfaceForce( SF_ImprovedLB);
-
+    lset.SetSurfaceForce( SF_ImprovedLBVar);
+    
     if ( StokesSolverFactoryHelperCL().VelMGUsed(P))
         Stokes.SetNumVelLvl ( Stokes.GetMG().GetNumLevel());
     if ( StokesSolverFactoryHelperCL().PrMGUsed(P))
@@ -735,13 +730,13 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbndda
 
         std::cout << massTransp.ct.Data.size() << " concentration unknowns,\n";
 
-        if (P.get<int>("SurfTens.VarTension")){
+        if (P.get<bool>("SurfTens.ConcentrationDep")){
             massTransp.GetSolutionOnPart( c_out, true , false);
             massTransp.GetSolutionOnPart( c_in, false , false);
 //            P1XtoP1 (*massTransp.c.RowIdx, massTransp.c.Data, p1idx, c_out.Data, c_in.Data, lset.Phi, MG);
-            sf.SetConcentration(&c_out);
-            sf.SetInputMethod(Sigma_C);
-            sf.SetTime(0.);
+            sf->SetConcentration(&c_out);
+            sf->SetInputMethod(Sigma_C);
+            sf->SetTime(0.);
         }
 
         if (P.get<int>("DomainCond.InitialCond") != -1)
@@ -939,14 +934,14 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbndda
 
         if (P.get<int>("Transp.DoTransp")) {
             massTransp.DoStep( t);
-            old_vrepair.SetTime(t);\
+            old_vrepair.SetTime(t);
 
         //}
 
-            if (P.get<int>("SurfTens.VarTension")){
-                sf.SetConcentration(&c_out);
-                sf.SetInputMethod(Sigma_C);
-                sf.SetTime(t);
+            if (P.get<bool>("SurfTens.ConcentrationDep")){
+                sf->SetConcentration(&c_out);
+                sf->SetInputMethod(Sigma_C);
+                sf->SetTime(t);
             }
         }
 
@@ -985,6 +980,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbndda
     delete pBnd_ct;
     delete &lset;
     delete &oldlset;
+    if (sf) delete sf;
 
 }
 

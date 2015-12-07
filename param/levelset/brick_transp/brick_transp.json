@@ -136,11 +136,8 @@
 		"_comment":
 "# surface tension",
 
-		"VarTension":		0,
 		"SurfTension":		1,
-		"JumpWidth":		5e-4,
-		"RelPos":		1.5,
-		"DirtFactor":		0.8
+                "VarTensionFncs":       "ConstTau"
 	},
 
 	"Transp":

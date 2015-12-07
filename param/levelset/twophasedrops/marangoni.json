@@ -9,7 +9,7 @@
         "General": 
         {
                 "ProgressBar":  1, //show progress bar
-                "DynamicLibsPrefix": "../../", //where should we look for shared objects?
+                "DynamicLibsPrefix": "../", //where should we look for shared objects?
                 "DynamicLibs": [ //select libraries to be loaded after program start
                         "levelset/liblevelset-twophaseCoeff",
                         "misc/libmisc-scalarFunctions",
@@ -166,9 +166,8 @@
 // surface tension
         "SurfTens":
         {
-                "VarTension":           1,      // variable surface tension (0 = deactivated; 1 = activated).
+                "SurfTension":          1,	// surface tension coefficient for a clean interface.
                 "VarTensionFncs":	"ConstGradTau_y",
-                "SurfTension":          1,	// surface tension coefficient.
                 "GradTau":              -25     // (d tau)/d y          
         },
 

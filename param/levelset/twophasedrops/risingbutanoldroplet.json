@@ -174,13 +174,8 @@
 // surface tension
         "SurfTens":
         {
-                "VarTension":           0,      // variable surface tension (0 = deactivated; 1 = activated).
                 "SurfTension":          0.00163,// surface tension coefficient.
-                "JumpWidth":            0.0005, // jump width.
-                "RelPos":               1.5,    // position of the jump between upper edge (lambda = 0) and
-                                                // barycenter (lambda = 1).
-                "DirtFactor":           0.8     // reduction factor for surface tension due to contaminations
-                                                // in the droplet.
+                "VarTensionFncs":       "ConstTau"
         },
 
 // mass transport

@@ -113,21 +113,14 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     MultiGridCL& MG= Stokes.GetMG();
 
     // initialization of surface tension
-    sigma= Stokes.GetCoeff().SurfTens;
-    eps= P.get<double>("SurfTens.JumpWidth");    lambda= P.get<double>("SurfTens.RelPos");    sigma_dirt_fac= P.get<double>("SurfTens.DirtFactor");
-    instat_scalar_fun_ptr sigmap  = 0;
-    if (P.get<double>("SurfTens.VarTension"))
-    {
-        sigmap  = &sigma_step;
-    }
-    else
-    {
-        sigmap  = &sigmaf;
-    }
-    SurfaceTensionCL sf( sigmap);
+    // choose a proper model for surface tension coefficient, see levelset/surfacetension.h
+    SurfaceTensionCL * sf;
+    sf = new SurfaceTensionCL( inscamap[P.get<std::string>("SurfTens.VarTensionFncs")]);
+    sf->SetInputMethod( Sigma_X);
 
-    LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsetbnddata, sf, P.get_child("Levelset")) );
-    LevelsetP2CL & oldlset( * LevelsetP2CL::Create( MG, lsetbnddata, sf, P.get_child("Levelset")) );
+
+    LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsetbnddata, *sf, P.get_child("Levelset")) );
+    LevelsetP2CL & oldlset( * LevelsetP2CL::Create( MG, lsetbnddata, *sf, P.get_child("Levelset")) );
 
     if (is_periodic) //CL: Anyone a better idea? perDirection from ParameterFile?
     {
@@ -188,11 +181,8 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     // oldlset.CreateNumbering( MG.GetLastLevel(), lidx, periodic_match);
     oldlset.Phi.SetIdx( lidx);
     PermutationT lset_downwind;
-    if (P.get<double>("SurfTens.VarTension"))
-        lset.SetSurfaceForce( SF_ImprovedLBVar);
-    else
-        lset.SetSurfaceForce( SF_ImprovedLB);
-
+    lset.SetSurfaceForce( SF_ImprovedLBVar); // see levelset/levelset.h
+    
     SetInitialLevelsetConditions( lset, MG, P);
     // SetInitialLevelsetConditions( oldlset, MG, P);
     Stokes.CreateNumberingVel( MG.GetLastLevel(), vidx, periodic_match);
@@ -475,7 +465,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         ensight->Register( make_Ensight6Scalar    ( lset.GetSolution(),      "Levelset",      ensf + ".scl", true));
         ensight->Register( make_Ensight6Scalar    ( Stokes.GetPrSolution(),  "Pressure",      ensf + ".pr",  true));
         ensight->Register( make_Ensight6Vector    ( Stokes.GetVelSolution(), "Velocity",      ensf + ".vel", true));
-        ensight->Register( make_Ensight6Scalar    ( ScalarFunAsP2EvalCL( sigmap, 0., &MG, MG.GetLastLevel()),
+        ensight->Register( make_Ensight6Scalar    ( ScalarFunAsP2EvalCL( inscamap[P.get<std::string>("SurfTens.VarTensionFncs")], 0., &MG, MG.GetLastLevel()),
                                                     "Surfaceforce",  ensf + ".sf",  true));
 
         // if (massTransp) {
@@ -730,6 +720,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 #endif
     if (vtkwriter) delete vtkwriter;
     if (infofile) delete infofile;
+    if (sf) delete sf;
 //     delete stokessolver1;
 }
 

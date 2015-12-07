@@ -100,7 +100,6 @@ class TwoPhaseFlowCoeffCL
     const double SurfTens, DilVisco, ShearVisco;
     const Point3DCL g;
     const Point3DCL framevel;
-    const bool var_surfTens;
     DROPS::instat_scalar_fun_ptr var_tau_fncs;
 
     TwoPhaseFlowCoeffCL( ParamCL& P, bool dimless = false)
@@ -121,11 +120,10 @@ class TwoPhaseFlowCoeffCL
         DilVisco( film ? P.get<double>("Mat.DilatationalVisco") : P.get<double>("SurfTens.DilatationalVisco")),
         ShearVisco( film ? P.get<double>("Mat.ShearVisco") : P.get<double>("SurfTens.ShearVisco")),
         g( P.get<DROPS::Point3DCL>("Exp.Gravity")),
-        framevel( ns_shiftframe ? P.get<DROPS::Point3DCL>("NavStokes.FrameVel", DROPS::Point3DCL(0.0)) : DROPS::Point3DCL(0.0) ),
-        var_surfTens( film ? (P.get<int>("Mat.VarTension", 0) == 1) : (P.get<int>("SurfTens.VarTension",0) == 1) )
+        framevel( ns_shiftframe ? P.get<DROPS::Point3DCL>("NavStokes.FrameVel", DROPS::Point3DCL(0.0)) : DROPS::Point3DCL(0.0) )
         {
         volforce = InVecMap::getInstance()[P.get<std::string>("Exp.VolForce")];
-        var_tau_fncs = var_surfTens ? InScaMap::getInstance()[P.get<std::string>("SurfTens.VarTensionFncs")] : InScaMap::getInstance()["ConstTau"] ;
+        var_tau_fncs = InScaMap::getInstance()[P.get<std::string>("SurfTens.VarTensionFncs")];
     }
 
     TwoPhaseFlowCoeffCL( double rho1, double rho2, double mu1, double mu2, double surftension, Point3DCL gravity, Point3DCL framevelocity = Point3DCL(0.0), bool dimless = false, double dilatationalvisco = 0.0, double shearvisco = 0.0)
@@ -137,8 +135,8 @@ class TwoPhaseFlowCoeffCL
         DilVisco( dilatationalvisco),
         ShearVisco( shearvisco),
         g( gravity),
-        framevel( framevelocity),
-        var_surfTens (0)  {
+        framevel( framevelocity)
+        {
           volforce = InVecMap::getInstance()["ZeroVel"];
           var_tau_fncs = InScaMap::getInstance()["ConstTau"];
         }

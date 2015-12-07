@@ -81,10 +81,6 @@
         "_comment": "# surface tension",
         "SurfTension": "1",
         "ArtificialForce": "0",
-        "VarTension": "0",
-        "JumpWidth": "0",
-        "RelPos": "0",
-        "DirtFactor": "0",
         "ShearVisco": "0",
         "DilatationalVisco": "0"
     },

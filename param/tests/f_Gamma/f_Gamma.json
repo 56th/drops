@@ -52,7 +52,8 @@
 
 	"SurfTens":
 	{
-		"SurfTension":		1
+		"SurfTension":		1,
+                "VarTensionFncs":       "ConstTau"
 	},
 
 	"Domain":
