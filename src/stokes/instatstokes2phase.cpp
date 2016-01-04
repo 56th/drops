@@ -3702,15 +3702,14 @@ class LocalLBTwoPhase_P2CL
     std::valarray<double> ls_loc;
     SurfacePatchCL spatch;
 
-    bool var_surfTens_;
     double surfTension_;
     double t_;
     DROPS::instat_scalar_fun_ptr var_tau_fncs_;
     void Get_Normals(const LocalP2CL<>& ls, LocalP1CL<Point3DCL>&);
 
   public:
-    LocalLBTwoPhase_P2CL (double surfTension, DROPS::instat_scalar_fun_ptr var_tau_fncs = NULL, double t=0, bool var_surfTens=0)
-        : lat( PrincipalLatticeCL::instance( 2)), ls_loc( lat.vertex_size()), var_surfTens_(var_surfTens), surfTension_( surfTension), t_(t), var_tau_fncs_(var_tau_fncs)
+    LocalLBTwoPhase_P2CL (double surfTension, DROPS::instat_scalar_fun_ptr var_tau_fncs = NULL, double t=0)
+        : lat( PrincipalLatticeCL::instance( 2)), ls_loc( lat.vertex_size()), surfTension_( surfTension), t_(t), var_tau_fncs_(var_tau_fncs)
     { P2DiscCL::GetGradientsOnRef( GradRefLP1); }
 
     //Setup-Routine of (improved) LB for the tetrahedra tet
@@ -3739,8 +3738,7 @@ void LocalLBTwoPhase_P2CL::setup (const SMatrixCL<3,3>& T, const LocalP2CL<>& ls
     Get_Normals(ls, Normals);
     // Resize and evaluate Normals at all points which are needed for the two-dimensional quadrature-rule
     resize_and_evaluate_on_vertexes (Normals, q2Ddomain, qnormal);
-    if (var_surfTens_)
-        resize_and_evaluate_on_vertexes (var_tau_fncs_, tet, q2Ddomain, t_, qvarsurf);
+    resize_and_evaluate_on_vertexes (var_tau_fncs_, tet, q2Ddomain, t_, qvarsurf);
     // Scale Normals accordingly to the Euclidean Norm (only consider the ones which make a contribution in the sense of them being big enough... otherwise one has to expect problems with division through small numbers)
     for(Uint i=0; i<qnormal.size(); ++i) {
          //if(qnormal[i].norm()> 1e-8)
@@ -3752,20 +3750,12 @@ void LocalLBTwoPhase_P2CL::setup (const SMatrixCL<3,3>& T, const LocalP2CL<>& ls
         qgrad[j]= qgrad[j] - dot( qgrad[j], qnormal)*qnormal;
     }
     // Do all combinations for (i,j) i,j=1..10 and corresponding quadrature
-    if (var_surfTens_)
-        for (int i=0; i < 10; ++i) {
-            for (int j=0; j<=i; ++j) {
-                A[j][i]= quad_2D( qvarsurf*dot(qgrad[i],qgrad[j]),q2Ddomain);
-                A[i][j]= A[j][i]; //symmetric matrix
-            }
+    for (int i=0; i < 10; ++i) {
+        for (int j=0; j<=i; ++j) {
+            A[j][i]= quad_2D( qvarsurf*dot(qgrad[i],qgrad[j]),q2Ddomain);
+            A[i][j]= A[j][i]; //symmetric matrix
         }
-    else
-        for (int i=0; i < 10; ++i) {
-            for (int j=0; j<=i; ++j) {
-                A[j][i]= surfTension_*quad_2D( dot(qgrad[i],qgrad[j]),q2Ddomain);
-                A[i][j]= A[j][i]; //symmetric matrix
-            }
-        }
+    }
 }
 
 
@@ -3818,7 +3808,7 @@ class LBAccumulator_P2CL : public TetraAccumulatorCL
 LBAccumulator_P2CL::LBAccumulator_P2CL (const TwoPhaseFlowCoeffCL& Coeff_, const StokesBndDataCL& BndData_,
     const VecDescCL& lset_arg, const LsetBndDataCL& lset_bnd_arg, IdxDescCL& RowIdx_, MatrixCL& A_, VecDescCL* cplA_, double t_)
     : Coeff( Coeff_), BndData( BndData_), lset( lset_arg), lset_bnd( lset_bnd_arg), t( t_),
-      RowIdx( RowIdx_), A( A_), cplA( cplA_), local_twophase( Coeff_.SurfTens, Coeff_.var_tau_fncs, t_, Coeff_.var_surfTens)
+      RowIdx( RowIdx_), A( A_), cplA( cplA_), local_twophase( Coeff_.SurfTens, Coeff_.var_tau_fncs, t_)
 {}
 
 void LBAccumulator_P2CL::begin_accumulation ()

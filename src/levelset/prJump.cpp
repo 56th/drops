@@ -141,12 +141,14 @@ int main ( int argc, char** argv )
         adap.MakeInitialTriang();
 
         // Create and initialise the levelset function.
-        sigma = P.get<double>( "SurfTens.SurfTension" );
-        SurfaceTensionCL sf( sigmaf, 0 );
+        DROPS::InScaMap & inscamap = DROPS::InScaMap::getInstance();
+        SurfaceTensionCL * sf;
+        sf = new SurfaceTensionCL( inscamap["ConstTau"]);
+        double sigma = P.get<double>( "SurfTens.SurfTension" );
 
         std::auto_ptr<LevelsetP2CL> lset_ptr
         (
-            LevelsetP2CL::Create( MG, lsbnd, sf,
+            LevelsetP2CL::Create( MG, lsbnd, *sf,
                                   P.get<double>("Levelset.SD"),
                                   P.get<double>("Levelset.CurvDiff") )
         );
@@ -185,6 +187,8 @@ int main ( int argc, char** argv )
         ErrorVel( prob.GetVelSolution(), lset);
 
         output( prob, lset, lsbnd );
+
+        if(sf) delete sf;
     }
     catch ( DROPSErrCL err )
     {

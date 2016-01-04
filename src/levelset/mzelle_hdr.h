@@ -35,7 +35,9 @@
 #include "levelset/coupling.h"
 #include "spacetimetransp/spacetime_sol.h"
 #include "misc/funcmap.h"
+#include "misc/params.h"
 
+extern DROPS::ParamCL P;
 namespace DROPS
 {
 
@@ -217,68 +219,6 @@ class FilmInfoCL
     void Init(std::ofstream* file, double x, double z) { file_= file; x_=x; z_=z;}
 } FilmInfo;
 
-double eps=5e-4, // halbe Sprungbreite
-    lambda=1.5, // Position des Sprungs zwischen Oberkante (lambda=0) und Schwerpunkt (lambda=1)
-    sigma_dirt_fac= 0.8; // gesenkte OFspannung durch Verunreinigungen im unteren Teil des Tropfens
-double sigma;
-double grad_tau=0;  // gradient of tau
-double Ly=0;  // length in y
-
-double sm_step(const Point3DCL& p)
-{
-    double y_mid= lambda*IFInfo.bary[1] + (1-lambda)*IFInfo.max[1], // zwischen Tropfenschwerpunkt und Oberkante
-        y= p[1] - y_mid;
-    if (y > eps) return sigma;
-    if (y < -eps) return sigma_dirt_fac*sigma;
-    const double z=y/eps*M_PI/2.;
-    return sigma_dirt_fac*sigma + (sigma - sigma_dirt_fac*sigma) * (std::sin(z)+1)/2;
-}
-
-Point3DCL grad_sm_step (const Point3DCL& p)
-{
-    double y_mid= lambda*IFInfo.bary[1] + (1-lambda)*IFInfo.max[1], // zwischen Tropfenschwerpunkt und Oberkante
-        y= p[1] - y_mid;
-    Point3DCL ret;
-    if (y > eps) return ret;
-    if (y < -eps) return ret;
-    const double z=y/eps*M_PI/2.;
-    ret[1]= (sigma - sigma_dirt_fac*sigma) * std::cos(z)/eps*M_PI/4;
-    return ret;
-}
-
-double lin(const Point3DCL& p)
-{
-    const double y_top= IFInfo.max[1],
-                 y_bot= IFInfo.bary[1],
-                 y_slope= sigma*(1 - sigma_dirt_fac)/(y_top - y_bot);
-    return sigma + (p[1] - y_top)*y_slope;
-}
-
-Point3DCL grad_lin (const Point3DCL&)
-{
-    const double y_top= IFInfo.max[1],
-                 y_bot= IFInfo.bary[1],
-                 y_slope= sigma*(1 - sigma_dirt_fac)/(y_top - y_bot);
-    Point3DCL ret;
-    ret[1]= y_slope;
-    return ret;
-}
-
-double lin_in_y(const Point3DCL& p)  // linear function in y-direction, zero in the middle of the domain
-{
-    return sigma + (p[1]-Ly*0.5)*grad_tau;  // grad_tau is the gradient of tau in y-direction
-}
-
-double sigmaf (const Point3DCL&, double) { return sigma; }
-Point3DCL gsigma (const Point3DCL&, double) { return Point3DCL(); }
-
-double sigma_step(const Point3DCL& p, double) { return sm_step( p); }
-Point3DCL gsigma_step (const Point3DCL& p, double) { return grad_sm_step( p); }
-
-double sigma_const_grad_tau_y(const Point3DCL& p, double) { return lin_in_y( p); }
-
-static DROPS::RegisterScalarFunction regconstsurftens("ConstTau", sigmaf);
-static DROPS::RegisterScalarFunction regconstgradtau_y("ConstGradTau_y", sigma_const_grad_tau_y);
 /// \brief factory for the time discretization schemes
 template<class LevelSetSolverT>
 TimeDisc2PhaseCL* CreateTimeDisc( InstatNavierStokes2PhaseP2P1CL& Stokes, LevelsetP2CL& lset,
@@ -385,8 +325,8 @@ void SetInitialLevelsetConditions( LevelsetP2CL& lset, MultiGridCL& MG, ParamCL&
       case -10: // read from ensight-file [deprecated]
       {
         std::cout << "[DEPRECATED] read from ensight-file [DEPRECATED]\n";
-        ReadEnsightP2SolCL reader( MG);
-        reader.ReadScalar( P.get<std::string>("DomainCond.InitialFile")+".scl", lset.Phi, lset.GetBndData());
+        //        ReadEnsightP2SolCL reader( MG);
+        //        reader.ReadScalar( P.get<std::string>("DomainCond.InitialFile")+".scl", lset.Phi, lset.GetBndData());
       } break;
 #endif
       case -1: // read from file
@@ -414,7 +354,7 @@ void SetInitialConditions(StokesT& Stokes, LevelsetP2CL& lset, MultiGridCL& MG, 
       case -10: // read from ensight-file [deprecated]
       {
         std::cout << "[DEPRECATED] read from ensight-file [DEPRECATED]\n";
-        ReadEnsightP2SolCL reader( MG);
+        /*        ReadEnsightP2SolCL reader( MG);
         reader.ReadVector( P.get<std::string>("DomainCond.InitialFile")+".vel", Stokes.v, Stokes.GetBndData().Vel);
         Stokes.UpdateXNumbering( pidx, lset);
         Stokes.p.SetIdx( pidx);
@@ -425,7 +365,7 @@ void SetInitialConditions(StokesT& Stokes, LevelsetP2CL& lset, MultiGridCL& MG, 
             P1toP1X ( pidx->GetFinest(), Stokes.p.Data, pidx->GetFinest(), ppos.Data, pneg.Data, lset.Phi, MG);
         }
         else
-            reader.ReadScalar( P.get<std::string>("DomainCond.InitialFile")+".pr", Stokes.p, Stokes.GetBndData().Pr);
+        reader.ReadScalar( P.get<std::string>("DomainCond.InitialFile")+".pr", Stokes.p, Stokes.GetBndData().Pr);*/
       } break;
 #endif
       case -1: // read from file
@@ -548,6 +488,37 @@ class TwoPhaseStoreCL
 };
 
 }   // end of namespace DROPS
+
+namespace SurfTens
+{
+//==============================================================================
+//          Functions for twophasedrops-executable (surface tension coefficient)
+//==============================================================================
+// tau is constant
+double sigmaf (const DROPS::Point3DCL&, double) {
+    static double sigma = P.get<double>("SurfTens.SurfTension");
+    return sigma;
+}
+
+DROPS::Point3DCL gsigma (const DROPS::Point3DCL&, double) { return DROPS::Point3DCL(); }
+
+//linear decrease of surface tension coefficient in y direction
+double lin_in_y(const DROPS::Point3DCL& p)  // linear function in y-direction, zero in the middle of the domain
+{
+    static double sigma = P.get<double>("SurfTens.SurfTension",1.0); // surface tension coefficient sigma : if tau is a variable, sigma is the constant part of tau.
+    static double Ly = P.get<DROPS::Point3DCL>("Domain.E2")[1];  // domain size in y
+    static double grad_tau = P.get<double>("SurfTens.GradTau", 0.);  // gradient of tau
+
+    return sigma + (p[1] - Ly*0.5)*grad_tau;  // grad_tau is the gradient of tau in y-direction
+}
+
+double sigma_const_grad_tau_y(const DROPS::Point3DCL& p, double) { return lin_in_y( p); }
+
+// Registration of funcitons
+static DROPS::RegisterScalarFunction regconstsurftens("ConstTau", sigmaf);
+static DROPS::RegisterScalarFunction regconstgradtau_y("ConstGradTau_y", sigma_const_grad_tau_y);
+
+}// end of namespace SurfTens
 
 #endif
 

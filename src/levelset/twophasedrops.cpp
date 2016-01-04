@@ -101,20 +101,8 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     MultiGridCL& MG= Stokes.GetMG();
 
     // initialization of surface tension
-    sigma= Stokes.GetCoeff().SurfTens;
-    eps= P.get<double>("SurfTens.JumpWidth", 0.0);    lambda= P.get<double>("SurfTens.RelPos", 0.0);    sigma_dirt_fac= P.get<double>("SurfTens.DirtFactor", 0.0);
-    Ly= P.get<DROPS::Point3DCL>("Domain.E2")[1];
-    grad_tau= P.get<double>("SurfTens.GradTau", 0.0);
-    instat_scalar_fun_ptr sigmap  = 0;
-    if (P.get<double>("SurfTens.VarTension"))
-    {
-        // sigmap  = &sigma_step;   // for old experiments
-        sigmap = inscamap[P.get<std::string>("SurfTens.VarTensionFncs")];
-    }
-    else
-    {
-        sigmap  = &sigmaf;
-    }
+    // choose a proper model for surface tension coefficient, see levelset/surfacetension.h
+    instat_scalar_fun_ptr sigmap = inscamap[P.get<std::string>("SurfTens.VarTensionFncs", "ConstTau")];
     SurfaceTensionCL * sf;
     sf = new SurfaceTensionCL( sigmap);
     sf->SetInputMethod( Sigma_X);
@@ -175,11 +163,8 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     }
 
     PermutationT lset_downwind;
-    if (P.get<double>("SurfTens.VarTension"))
-        lset.SetSurfaceForce( SF_ImprovedLBVar);
-    else
-        lset.SetSurfaceForce( SF_ImprovedLB);
-
+    lset.SetSurfaceForce( SF_ImprovedLBVar); // see levelset.h
+    
     if ( StokesSolverFactoryHelperCL().VelMGUsed(P))
         Stokes.SetNumVelLvl ( Stokes.GetMG().GetNumLevel());
     if ( StokesSolverFactoryHelperCL().PrMGUsed(P))
@@ -413,6 +398,9 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 #endif
 
     // writer for vtk-format
+    VecDescCL * sigma_vtk = NULL;
+    sigma_vtk = new VecDescCL;
+
     VTKOutCL * vtkwriter = NULL;
     if (P.get<int>("VTK.VTKOut",0)){
         vtkwriter = new VTKOutCL(adap.GetMG(), "DROPS data",
@@ -439,6 +427,8 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
             vtkwriter->Register( make_VTKIfaceScalar( MG, surfTransp.ic,  "InterfaceSol"));
         }
         vtkwriter->Write(Stokes.v.t);
+        vtkwriter->Register( make_VTKScalar( P1EvalCL<double, const StokesPrBndDataCL, const VecDescCL>( sigma_vtk, &Stokes.GetBndData().Pr, &MG), "tau"));
+        sf->SetVtkOutput( sigma_vtk);
     }
 
     VTKOutCL * dgvtkwriter = NULL;
@@ -467,12 +457,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
                     P.get<double>("AdaptRef.CoarsestLevel"), P.get<double>("AdaptRef.FinestLevel") );
     adap.set_marking_strategy(&marker);
 
-    VecDescCL * sigma_vtk = NULL;
     IdxDescCL p1idx;
-    
-    sigma_vtk = new VecDescCL;
-    vtkwriter->Register( make_VTKScalar( P1EvalCL<double, const StokesPrBndDataCL, const VecDescCL>( sigma_vtk, &Stokes.GetBndData().Pr, &MG), "tau"));
-    sf->SetVtkOutput( sigma_vtk);
 
     for (int step= 1; step<=nsteps; ++step)
     {
@@ -550,7 +535,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     IFInfo.Update( lset, Stokes.GetVelSolution());
     IFInfo.Write(Stokes.v.t);
     std::cout << std::endl;
-    delete sf;
+    if(sf) delete sf;
     delete timedisc;
     delete navstokessolver;
     delete stokessolver;

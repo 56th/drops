@@ -80,10 +80,6 @@
         "SurfTension": "10",
         "ArtificialForce": "1",
         
-        "VarTension": "0",
-        "JumpWidth": "0",
-        "RelPos": "0",
-        "DirtFactor": "0",
         "ShearVisco": "0",
         "DilatationalVisco": "0"
     },

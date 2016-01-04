@@ -121,11 +121,12 @@
         //surface tension
         "SurfTens":
         {
-                "VarTension":           1,
                 "SurfTension":          0.00163,
-                "JumpWidth":            0.00045,
-                "RelPos":               1.5,
-                "DirtFactor":           0.8
+                "VarTensionFncs":       "ConstTau",
+                "ConcentrationDep":     1,
+                
+                "DilatationalVisco":    0,
+                "ShearVisco":           0
         },
 
         "Transp":
