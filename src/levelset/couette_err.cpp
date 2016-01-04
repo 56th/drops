@@ -286,7 +286,7 @@ DROPS::InScaMap & inscamap = DROPS::InScaMap::getInstance();
         
     //read in velocity and pressure in different levels of meshes.
     VecDescCL VelMesh[4]; 
-    VecDescCL PreMesh[4];
+    //VecDescCL PreMesh[4];
     int MeshLev = P.get<int>("Exp.MeshLevel");
     MLIdxDescCL  pr_idx(P1X_FE, MG.GetNumLevel(), Stokes.BndData_.Pr, 0, 0.1);
     pr_idx.CreateNumbering(MG.GetLastLevel(), MG, Stokes.BndData_.Pr, 0, &lset.Phi, &lset.GetBndData());
@@ -301,18 +301,18 @@ DROPS::InScaMap & inscamap = DROPS::InScaMap::getInstance();
         std::string filename = "Exp.InitialFile";
         s << filename << i;
         VelMesh[i].SetIdx(&(*it));
-        PreMesh[i].SetIdx(&(*itp));
+        //PreMesh[i].SetIdx(&(*itp));
         std::cout<<"Number of unknows of velocity of level "<<i<<" is "<<(*it).NumUnknowns()<<std::endl;
         std::cout<<"Number of unknows of pressure of level "<<i<<" is "<<(*itp).NumUnknowns()<<std::endl;
         ReadFEFromFile( VelMesh[i], MG, P.get<std::string>(s.str())+"velocity", P.get<int>("Restart.Binary"));
-        ReadFEFromFile( PreMesh[i], MG, P.get<std::string>(s.str())+"pressure", P.get<int>("Restart.Binary"), lset.PhiC);
+        //ReadFEFromFile( PreMesh[i], MG, P.get<std::string>(s.str())+"pressure", P.get<int>("Restart.Binary"), lset.PhiC);
         ++it;
         ++itp;
     }
     
     //prolongate the original matrices;
-    VectorCL VelVecProlong[4];    //used to store the prolongated data of solutions 
-    VecDescCL VelProlongMesh[4];  //the vector description objects with the data are the VelVecProlong;  
+    VectorCL VelVecProlong[5];    //used to store the prolongated data of solutions 
+    VecDescCL VelProlongMesh[5];  //the vector description objects with the data are the VelVecProlong;  
     MLDataCL<ProlongationCL<Point3DCL> > prolongVel;   //store the prolongation matrices
     
     //VectorCL PreVecProlong[4];    //used to store the prolongated data of solutions 
@@ -331,7 +331,9 @@ DROPS::InScaMap & inscamap = DROPS::InScaMap::getInstance();
     {
         for(int i=0; i<counter; i++)
         {
+            std::cout<<"The size of the vector before prolongation"<< VelVecProlong[i].size()<<std::endl;
             VelVecProlong[i] = (*proVelPtr)* VelVecProlong[i];   // the original matricies are prolongated
+            std::cout<<"The size of the vector after prolongation"<< VelVecProlong[i].size()<<std::endl;
         }
         if (counter < MeshLev)
             counter++;
