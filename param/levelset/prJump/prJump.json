@@ -21,7 +21,7 @@
         "PcATol": "0.01",
         "PcSTol": "0.01",
         "Theta": "1",
-        "epsP": "0",
+        "epsP": "0.1",
         "PrintMatrices": "false"
     },
 
@@ -81,8 +81,9 @@
         "_comment": "# surface tension",
         "SurfTension": "1",
         "ArtificialForce": "0",
-        "ShearVisco": "0",
-        "DilatationalVisco": "0"
+		"VarTensionFncs": "ConstTau",
+		"DilatationalVisco": "0",
+		"ShearVisco": "0"
     },
 
     "VTK":

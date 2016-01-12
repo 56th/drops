@@ -125,7 +125,7 @@ int main ( int argc, char** argv )
         TwoPhaseFlowCoeffCL coeffs(P); coeffs.volforce = &right_hand_side;
         StokesT prob( builder, coeffs,
                       StokesBndDataCL( 6, bc, bnd_fun ), prFE,
-                      P.get<double>("Stokes.XFEMStab") );
+                      P.get<double>("Stokes.XFEMStab"), vecP2_FE, P.get<double>("Stokes.epsP") );
 
         MultiGridCL& MG = prob.GetMG();
    
@@ -249,12 +249,14 @@ void Assemble( StokesT& Stokes, LevelsetP2CL& lset, VelVecDescCL& rhs )
               << "took: " << time.GetTime() << " seconds." << std::endl;
 
 
-    // Assemble the stabilisation matrix
+    // Assemble the stabilisation matrix -- part of SetupSystem2 now
+    /*
     time.Reset();
     Stokes.SetupC( &Stokes.C, lset, P.get<double>("Stokes.epsP") );
     time.Stop();
     std::cout << "Assembling the stabilisation matrix took: " << time.GetTime()
               << " seconds." << std::endl;
+    */
 
     // Assemble system matrices.
     rhs = VelVecDescCL( vidx );

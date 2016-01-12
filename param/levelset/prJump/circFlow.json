@@ -79,9 +79,9 @@
         "_comment": "# surface tension",
         "SurfTension": "10",
         "ArtificialForce": "1",
-        
-        "ShearVisco": "0",
-        "DilatationalVisco": "0"
+        "VarTensionFncs": "ConstTau",
+		"DilatationalVisco": "0",
+		"ShearVisco": "0"
     },
 
     "VTK":

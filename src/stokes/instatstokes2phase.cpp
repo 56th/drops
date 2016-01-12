@@ -1657,10 +1657,24 @@ void computeLocalP2_gradpipj( LocalP2CL<> (&gradpipj)[4] ){
         }    
 }
 
+void computeFaceBary( Uint face, BaryCoordCL (&bary)[3] )
+{
+    int i = 0;
+    for( Uint j = 0; j < 4; ++j )
+    {
+        if( j == face )
+            continue;
+        BaryCoordCL tmp;
+        tmp[ j ] = 1;
+        bary[ i ] = tmp;
+        ++i;
+    }
+}
+
 /// \todo: As in SetupPrMass_P1X, replace the smoothed density-function with integration
 ///        over the inner and outer part.
 //ParamCL P;
-void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, MatrixCL& A_pr, IdxDescCL& RowIdx, IdxDescCL& ColIdx, const LevelsetP2CL& lset, double lambda=1.0)
+void SetupPrStiff_P1X(const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, MatrixCL& A_pr, IdxDescCL& RowIdx, IdxDescCL& ColIdx, const LevelsetP2CL& lset, const StokesVelBndDataCL &velbnd, double lambda=1.0)
 {
     ScopeTimerCL scope("SetupPrStiff_P1X");
 
@@ -1708,6 +1722,7 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
         //redefined and set to zero for every tetrahedron
         double coupJump[4][4] = {};
         double coupAv[4][4] = {};
+        double coupNatBC[4][4] = {};
         double h = cbrt( 6 * sit->GetVolume() );
 
         locallset.assign( *sit, ls);
@@ -1747,6 +1762,54 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
             //initialize triangle for cut tetrahedron
             triang.Init( *sit, locallset);
 
+        }
+
+
+        //for a tetrahedron 3 faces could lie on a boundary
+        int natBcFaces[3] = {-1,-1,-1};
+        // check whether tet has boundary face
+        TetraCL tet = *sit;
+        int natBcIdx = 0;
+        for( Uint iFace = 0; iFace < NumFacesC; ++iFace )
+        {
+            if( tet.IsBndSeg( iFace ) )
+            {
+                if( velbnd.IsOnNatBnd( *tet.GetFace( iFace ) ) )
+                {
+                    natBcFaces[ natBcIdx ] = iFace;
+                    //std::cout << "\n\nnatBc\n";
+                    ++natBcIdx;
+                }
+            }
+        }
+        for( int k = 0; k < natBcIdx; ++k )
+        {
+            int natBcFace = natBcFaces[k];
+            //if( natBcFace >= 0 )
+            //{
+                BaryCoordCL faceBary[3];
+                computeFaceBary( natBcFace, faceBary );
+                const VertexCL* vert[3];
+                for (Uint i= 0; i < 3; ++i)
+                {
+                    vert[i]= tet.GetFace(natBcFace)->GetVertex( i);
+                }
+                double absDet2D = FuncDet2D( vert[1]->GetCoord()-vert[0]->GetCoord() ,
+                                             vert[2]->GetCoord()-vert[0]->GetCoord() );
+                double rhoInv = cut.GetSign( 0) == 1 ? rho_inv_p : rho_inv_n;
+
+                Quad5_2DCL<> natBcQuad;
+                for( int i = 0; i < 4; ++i )
+                {
+                    for( int j = 0; j <=i; ++j )
+                    {
+                        natBcQuad.assign( pipj[i][j], faceBary );
+                        coupNatBC[i][j] +=  rhoInv * natBcQuad.quad( absDet2D );
+                        //std::cout << "integral value: " << std::endl;
+                        coupNatBC[j][i] = coupNatBC[i][j];
+                    }
+                }
+            //}
         }
 
         // compute local matrices
@@ -1831,13 +1894,13 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
 
 
         }
-
+        double lamD = 10;//P.get<double>("Stokes.prA_lamd",10.0);
 
         // write values into matrix
         for(int i=0; i<4; ++i)
         {
             for(int j=0; j<4; ++j)
-                A(UnknownIdx[i], UnknownIdx[j])+= coup[j][i];
+                A(UnknownIdx[i], UnknownIdx[j])+= coup[j][i] + lamD/h * coupNatBC[j][i];
             if (nocut) continue; // extended basis functions have only support on tetra intersecting Gamma!
 
             const IdxT xidx_i= Xidx[UnknownIdx[i]];
@@ -2111,7 +2174,7 @@ void InstatStokes2PhaseP2P1CL::SetupPrStiff( MLMatDescCL* A_pr, const LevelsetP2
         case P1_FE:
             SetupPrStiff_P1( MG_, Coeff_, *itM, *itRowIdx, *itColIdx, lset); break;
         case P1X_FE:
-            SetupPrStiff_P1X( MG_, Coeff_, *itM, *itRowIdx, *itColIdx, lset, lambda); break;
+            SetupPrStiff_P1X( MG_, Coeff_, *itM, *itRowIdx, *itColIdx, lset, BndData_.Vel, lambda); break;
         case P1D_FE:
             SetupPrStiff_P1D( MG_, Coeff_, *itM, *itRowIdx, *itColIdx, lset); break;
         default:
