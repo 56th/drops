@@ -80,6 +80,7 @@
     {
         "_comment": "# surface tension",
         "SurfTension": "1",
+        "VarTensionFncs": "ConstTau",
         "ArtificialForce": "0",
 		"VarTensionFncs": "ConstTau",
 		"DilatationalVisco": "0",

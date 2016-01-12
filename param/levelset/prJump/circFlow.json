@@ -80,8 +80,8 @@
         "SurfTension": "10",
         "ArtificialForce": "1",
         "VarTensionFncs": "ConstTau",
-		"DilatationalVisco": "0",
-		"ShearVisco": "0"
+        "ShearVisco": "0",
+        "DilatationalVisco": "0"
     },
 
     "VTK":
