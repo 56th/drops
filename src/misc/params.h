@@ -63,9 +63,9 @@ class ParamCL
 
     void read_json (std::string path);
 
-    const ptree_type& get_child(const std::string& path) const { 
+    const ptree_type& get_child(const std::string& path) const {
       try {
-        return pt.get_child( path); 
+        return pt.get_child( path);
       }
       catch(boost::property_tree::ptree_error& e) {
         throw DROPSParamErrCL( "ParamCL::get_child: Trying to get '" + path + "' failed.\n");
@@ -176,6 +176,11 @@ DROPS::SArrayCL<Uint, 3> ParamCL::get<DROPS::SArrayCL<Uint, 3> >(const std::stri
 /// \brief Read P from the file argv[1] or from default_file if argv[1] does not exist; else throw DROPSErrCL.
 void read_parameter_file_from_cmdline (ParamCL& P, int argc, char** argv, std::string default_file= std::string());
 
+/// \brief Adds and/or overrides parameters of P directly from the command line
+void apply_parameter_modifications_from_cmdline (ParamCL& P, int argc, char **argv);
+
+/// \brief Adds and/or overrides parameters of P as specified in \a pt
+void update_parameters (const boost::property_tree::ptree& pt, std::string key, ParamCL& P);
 
 //DELETE ReadParamsCL?
 ///   \brief Parser for parameter files used by ParamBaseCL.
@@ -222,8 +227,8 @@ class ReadParamsCL
     void RegDouble( double&,      std::string);
     void RegCoord ( Point3DCL&,   std::string);
     void RegString( std::string&, std::string);
-    /// Register parameters under a certain name and allow for 
-    /// a default initialization 
+    /// Register parameters under a certain name and allow for
+    /// a default initialization
     void RegInt   ( int&,         std::string,         int defaultvalue);
     void RegDouble( double&,      std::string,      double defaultvalue);
     void RegCoord ( Point3DCL&,   std::string,   Point3DCL defaultvalue);
