@@ -4298,10 +4298,6 @@ InstatStokes2PhaseP2P1CL::system2_accu (MLTetraAccumulatorTupleCL& accus, MLMatD
             }
         else
             throw DROPSErrCL("InstatStokes2PhaseP2P1CL<Coeff>::system2_accu: not implemented for this velocity FE type");
-#ifndef _PAR
-        std::cout << itB->num_nonzeros() << " nonzeros in B!";
-#endif
-        std::cout << '\n';
     }
     return accus;
 }

@@ -476,6 +476,10 @@ void System2Accumulator_P2P1CL<CoeffT>::finalize_accumulation ()
 {
     mB_->Build();
     delete mB_;
+#ifndef _PAR
+        std::cout << B.num_nonzeros() << " nonzeros in B!";
+#endif
+        std::cout << '\n';
 }
 
 template< class CoeffT>
