@@ -2606,7 +2606,7 @@ class System1Accumulator_P2CL : public TetraAccumulatorCL
     double det, absdet;
     LocalP2CL<> ls_loc;
 
-    Quad2CL<Point3DCL> rhs;
+    Quad5CL<Point3DCL> rhs;
     Point3DCL loc_b[10], dirichlet_val[10]; ///< Used to transfer boundary-values from local_setup() update_global_system().
 
     ///\brief Computes the mapping from local to global data "n", the local matrices in loc and, if required, the Dirichlet-values needed to eliminate the boundary-dof from the global system.
@@ -2754,7 +2754,7 @@ class CplMAccumulator_P2CL : public TetraAccumulatorCL
     double det, absdet;
     LocalP2CL<> ls_loc;
 
-    Quad2CL<Point3DCL> rhs;
+    Quad5CL<Point3DCL> rhs;
     Point3DCL loc_b[10], dirichlet_val[10]; ///< Used to transfer boundary-values from local_setup() update_global_system().
 
     bool hasBoundary;
@@ -3497,7 +3497,7 @@ void SetupRhs1_P2( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_, co
     LocalNumbP2CL n;
     SMatrixCL<3,3> T;
 
-    Quad2CL<Point3DCL> rhs;
+    Quad5CL<Point3DCL> rhs;
     Quad2CL<double> Ones( 1.);
     LocalP2CL<> phi_i;
 
@@ -3571,7 +3571,7 @@ void SetupRhs1_P2R( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_, c
     const IdxDescCL& RowIdx= *b->RowIdx;
     const ExtIdxDescCL xidx= RowIdx.GetXidx();
 
-    Quad2CL<Point3DCL> rhs;
+    Quad5CL<Point3DCL> rhs;
     Quad2CL<double> Ones( 1.), kreuzterm;
     const double rho_p= Coeff_.rho( 1.0),
                  rho_n= Coeff_.rho( -1.0);
