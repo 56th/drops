@@ -186,9 +186,9 @@ void apply_parameter_modifications_from_cmdline (ParamCL& P, int argc, char **ar
 {
     int param_pos = 0;
 
-    for(int i = 1; i < argc&&(!param_pos); i++) {
+    for(int i = 1; i < argc && !param_pos; i++) {
 
-        if ((std::string)argv[i] == "--add-param") {
+        if (std::string (argv[i]) == "--add-param") {
 
             param_pos = i;
             break;
@@ -201,7 +201,7 @@ void apply_parameter_modifications_from_cmdline (ParamCL& P, int argc, char **ar
         std::stringstream input;
 
         for(int i = param_pos+1; i<argc; i++)
-            input << (std::string)argv[i];
+            input << argv[i];
 
         try {
             boost::property_tree::read_json(input,changes);
