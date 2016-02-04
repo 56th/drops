@@ -43,7 +43,7 @@ ConcentrationMarkingStrategyCL::ConcentrationMarkingStrategyCL
                                     double )
 : lsetgetter_( new LevelsetP2GetterCL(lset) ), solneg(a_solneg), solpos(a_solpos), 
   thresholdlist_( thresholdlist ), c_level_( coarse_level ),
-  f_level_( fine_level ), hacked_(a_hacked), hacked_width_(a_hacked_width), modified_( false ), decision_( DontCareC ), owndistout_(true), distributionout_( distributionout)
+  f_level_( fine_level ), hacked_(a_hacked), hacked_width_(a_hacked_width), modified_( false ), decision_( DontCareC ), distributionout_( distributionout), owndistout_(true)
 {
     if (distributionout_ != NULL) delete distributionout_;
     distributionout_ = new std::ofstream("distrib.out");

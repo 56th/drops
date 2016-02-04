@@ -392,7 +392,7 @@ double TestCase1_rhs_positive (const DROPS::Point3DCL& p ,  double t)
     static double apos (P.get<double>("Transp.DiffPos"));
     // static double hneg (P.get<double>("Transp.HNeg"));
     // static double aneg (P.get<double>("Transp.DiffNeg"));
-    static double k (P.get<double>("TestCase1.k"));
+    // static double k (P.get<double>("TestCase1.k"));
     static double C (P.get<double>("TestCase1.C"));
     static double v (P.get<double>("TestCase1.v"));
 
@@ -420,7 +420,7 @@ double TestCase1_rhs_negative (const DROPS::Point3DCL& p ,  double t)
     // static double apos (P.get<double>("Transp.DiffPos"));
     // static double hneg (P.get<double>("Transp.HNeg"));
     static double aneg (P.get<double>("Transp.DiffNeg"));
-    static double k (P.get<double>("TestCase1.k"));
+    // static double k (P.get<double>("TestCase1.k"));
     TestCase1_push();
     static double a (P.get<double>("TestCase1.a"));
     static double b (P.get<double>("TestCase1.b"));
@@ -446,7 +446,7 @@ double TestCase1_sol_positive (const DROPS::Point3DCL& p ,  double t)
     extern DROPS::ParamCL P;
     
     static DROPS::Point3DCL pos (P.get<DROPS::Point3DCL>("Exp.PosDrop"));
-    static double k (P.get<double>("TestCase1.k"));
+    // static double k (P.get<double>("TestCase1.k"));
     static double C (P.get<double>("TestCase1.C"));
     static double v (P.get<double>("TestCase1.v"));
     DROPS::Point3DCL shiftedpos;
@@ -464,7 +464,7 @@ double TestCase1_sol_negative (const DROPS::Point3DCL& p ,  double t)
     extern DROPS::ParamCL P;
     
     static DROPS::Point3DCL pos (P.get<DROPS::Point3DCL>("Exp.PosDrop"));
-    static double k (P.get<double>("TestCase1.k"));
+    // static double k (P.get<double>("TestCase1.k"));
     TestCase1_push();
     static double a (P.get<double>("TestCase1.a"));
     static double b (P.get<double>("TestCase1.b"));
@@ -1192,7 +1192,7 @@ double TestCase6_rhs_positive (const DROPS::Point3DCL& p ,  double t)
     static double apos (P.get<double>("Transp.DiffPos"));
     // static double hneg (P.get<double>("Transp.HNeg"));
     // static double aneg (P.get<double>("Transp.DiffNeg"));
-    static double k (P.get<double>("TestCase6.k"));
+    // static double k (P.get<double>("TestCase6.k"));
     static double C (P.get<double>("TestCase6.C"));
     static double v (P.get<double>("TestCase6.v"));
 
@@ -1228,7 +1228,7 @@ double TestCase6_rhs_negative (const DROPS::Point3DCL& p ,  double t)
     // static double apos (P.get<double>("Transp.DiffPos"));
     // static double hneg (P.get<double>("Transp.HNeg"));
     static double aneg (P.get<double>("Transp.DiffNeg"));
-    static double k (P.get<double>("TestCase6.k"));
+    // static double k (P.get<double>("TestCase6.k"));
     TestCase6_push();
     static double a (P.get<double>("TestCase6.a"));
     static double b (P.get<double>("TestCase6.b"));
@@ -1260,7 +1260,7 @@ double TestCase6_sol_positive (const DROPS::Point3DCL& p ,  double t)
     extern DROPS::ParamCL P;
     
     static DROPS::Point3DCL pos (P.get<DROPS::Point3DCL>("Exp.PosDrop"));
-    static double k (P.get<double>("TestCase6.k"));
+    // static double k (P.get<double>("TestCase6.k"));
     static double C (P.get<double>("TestCase6.C"));
     static double v (P.get<double>("TestCase6.v"));
     DROPS::Point3DCL shiftedpos;
@@ -1278,7 +1278,7 @@ double TestCase6_sol_negative (const DROPS::Point3DCL& p ,  double t)
     extern DROPS::ParamCL P;
     
     static DROPS::Point3DCL pos (P.get<DROPS::Point3DCL>("Exp.PosDrop"));
-    static double k (P.get<double>("TestCase6.k"));
+    // static double k (P.get<double>("TestCase6.k"));
     TestCase6_push();
     static double a (P.get<double>("TestCase6.a"));
     static double b (P.get<double>("TestCase6.b"));
@@ -1422,17 +1422,17 @@ double TestCase7_lset( const DROPS::Point3DCL& p ,  double t )
 
 
 
-double TestCase7_rhs_positive (const DROPS::Point3DCL& p ,  double t)
-{  
-    extern DROPS::ParamCL P;
+double TestCase7_rhs_positive (const DROPS::Point3DCL& ,  double )
+{
+    // extern DROPS::ParamCL P;
 
     return 0;
 }
 
 
-double TestCase7_rhs_negative (const DROPS::Point3DCL& p ,  double t)
-{  
-    extern DROPS::ParamCL P;
+double TestCase7_rhs_negative (const DROPS::Point3DCL& ,  double )
+{
+    //extern DROPS::ParamCL P;
 
     return 0;
 }

@@ -131,15 +131,18 @@ public:
         case 0:
             return quad1d_p0_modal_psik_times_psi_i_psi_j[l][i][j];
             break;
+        case 1:
+            return quad1d_p1_modal_psik_times_psi_i_psi_j[l][i][j];
+            break;
         case 2:
             return quad1d_p2_modal_psik_times_psi_i_psi_j[l][i][j];
             break;
         case 3:
             return quad1d_p3_modal_psik_times_psi_i_psi_j[l][i][j];
-            break;
-        case 1:
+            break;        
         default:
-            return quad1d_p1_modal_psik_times_psi_i_psi_j[l][i][j];
+            throw DROPSErrCL("MomentsQuad1D::GetIntegralPkP1P1: Unknown integration order!");
+            return 0;
         }
     }
 
@@ -150,15 +153,18 @@ public:
         case 0:
             return quad1d_p0_modal_psik_times_psi[l][i];
             break;
+        case 1:
+            return quad1d_p1_modal_psik_times_psi[l][i];
+            break;
         case 2:
             return quad1d_p2_modal_psik_times_psi[l][i];
             break;
         case 3:
             return quad1d_p3_modal_psik_times_psi[l][i];
             break;
-        case 1:
         default:
-            return quad1d_p1_modal_psik_times_psi[l][i];
+            throw DROPSErrCL("MomentsQuad1D::GetIntegralPkP1: Unknown integration order!");
+            return 0;
         }
     }
 

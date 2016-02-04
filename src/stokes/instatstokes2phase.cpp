@@ -1736,6 +1736,8 @@ void SetupPrStiff_P1X(const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, M
         kappa1=kappa2=0.5;
         //double Vol_p, Vol_n;
         double kappa_p,kappa_n, alphaK;
+        kappa_p = kappa_n = 0.5;
+        alphaK = 1.;
 
 
         if (nocut) {

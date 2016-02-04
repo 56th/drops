@@ -207,8 +207,10 @@ void  StatMassSurfTransportStrategy( MultiGridCL& MG, InstatNavierStokes2PhaseP2
     instat_scalar_fun_ptr distance = tdscalarmap[P.get<std::string>("Transp.Levelset")];
     instat_scalar_fun_ptr massSol_p= tdscalarmap[P.get<std::string>("Transp.SolPos")];
     instat_scalar_fun_ptr massSol_n= tdscalarmap[P.get<std::string>("Transp.SolNeg")];
+    /* unused
     instat_vector_fun_ptr massGrad_p= tdvectormap[P.get<std::string>("Transp.GradSolPos")];
     instat_vector_fun_ptr massGrad_n= tdvectormap[P.get<std::string>("Transp.GradSolNeg")];
+    */
 
     instat_scalar_fun_ptr surfRhs = tdscalarmap[P.get<std::string>("SurfTransp.Rhs")];
     instat_scalar_fun_ptr surfSol = tdscalarmap[P.get<std::string>("SurfTransp.Sol")];
@@ -377,7 +379,9 @@ void  StatMassSurfTransportStrategy( MultiGridCL& MG, InstatNavierStokes2PhaseP2
 
     // compute errors
     std::cout << "=== bulk error ===\n";
+    /* unused
     const double L2_mass= massTransp.CheckSolution( massSol_n, massSol_p, massGrad_n, massGrad_p, 0);
+    */
     const double c_mean = massTransp.MeanDropConcentration();
     std::cout << "Mean concentration in drop: " << c_mean <<"\n";
     const double L2_surf= L2_error_interface( MG, lset.Phi, lsetbnddata, surfTransp.GetSolution(), surfSol, 0);
