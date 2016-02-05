@@ -23,12 +23,12 @@ class StokesPardisoSolverCL: public StokesSolverBaseCL
         : StokesSolverBaseCL(1, 0, false, output){}
 
 #ifdef _PAR
-    virtual void Solve( const MatrixCL& A, const MatrixCL& B, const MatrixCL& C, VectorCL& v, VectorCL& p,
-                        const VectorCL& b, const VectorCL& c, const ExchangeCL& vel_ex, const ExchangeCL& pr_ex){
+    virtual void Solve( const MatrixCL& , const MatrixCL& , const MatrixCL& , VectorCL& , VectorCL& ,
+                        const VectorCL& , const VectorCL& , const ExchangeCL& , const ExchangeCL& ){
         throw DROPSErrCL("No parallel pardiso...");
     }
-    virtual void Solve( const MLMatrixCL& A, const MLMatrixCL& B, const MLMatrixCL& C, VectorCL& v, VectorCL& p,
-                        const VectorCL& b, const VectorCL& c, const ExchangeCL& vel_ex, const ExchangeCL& pr_ex){
+    virtual void Solve( const MLMatrixCL& , const MLMatrixCL& , const MLMatrixCL& , VectorCL& , VectorCL& ,
+                        const VectorCL& , const VectorCL& , const ExchangeCL& , const ExchangeCL& ){
         throw DROPSErrCL("No parallel pardiso...");
     }
 #endif    
