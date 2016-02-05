@@ -299,7 +299,7 @@ void Strategy( DROPS::AdapTriangCL& adap, DROPS::BndDataCL<>& lsbnd)
     Disturb( lset.Phi.Data);
 
     // Perform re-parametrization
-    std::auto_ptr<ReparamCL> reparam= ReparamFactoryCL::GetReparam( adap.GetMG(), lset.Phi, P.get<int>("Reparam.Method"), /*periodic*/ false, &lset.GetBndData());
+    std::unique_ptr<ReparamCL> reparam= ReparamFactoryCL::GetReparam( adap.GetMG(), lset.Phi, P.get<int>("Reparam.Method"), /*periodic*/ false, &lset.GetBndData());
     reparam->Perform();
 
 //    FastMarchCL fmm( adap.GetMG(), lset.Phi);

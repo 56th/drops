@@ -432,7 +432,7 @@ class MassTranspRepairCL : public MGObserverCL
     MultiGridCL & MG_;
     VecDescCL & c_;
     BndDataCL<> & cBnd_;
-    std::auto_ptr<RepairP1CL<double>::type> p1repair_;
+    std::unique_ptr<RepairP1CL<double>::type> p1repair_;
     const LevelsetP2CL& ls_;
   public:
     MassTranspRepairCL ( MultiGridCL & MG, VecDescCL & c, BndDataCL<> & cBnd, const LevelsetP2CL& ls)

@@ -832,9 +832,9 @@ double TransportP1XCL::Interface_L2error() const
 void
 TransportXRepairCL::pre_refine ()
 {
-    p1oldctrepair_= std::auto_ptr<RepairP1CL<double>::type >(
+    p1oldctrepair_= std::unique_ptr<RepairP1CL<double>::type >(
         new RepairP1CL<double>::type( c_.GetMG(), c_.oldct, c_.GetBndData()));
-    p1ctrepair_= std::auto_ptr<RepairP1CL<double>::type >(
+    p1ctrepair_= std::unique_ptr<RepairP1CL<double>::type >(
         new RepairP1CL<double>::type( c_.GetMG(), c_.ct, c_.GetBndData()));
 }
 
@@ -873,7 +873,7 @@ TransportXRepairCL::post_refine ()
 void
   TransportXRepairCL::pre_refine_sequence ()
 {
-    oldp1xrepair_= std::auto_ptr<P1XRepairCL>( new P1XRepairCL( c_.GetMG(), c_.oldct));
+    oldp1xrepair_= std::unique_ptr<P1XRepairCL>( new P1XRepairCL( c_.GetMG(), c_.oldct));
 }
 
 void
@@ -918,7 +918,7 @@ void VelTranspRepairCL::swap( IdxDescCL&, VectorCL&) {
 void
   VelTranspRepairCL::pre_refine ()
 {
-    p2repair_= std::auto_ptr<RepairP2CL<Point3DCL>::type >(
+    p2repair_= std::unique_ptr<RepairP2CL<Point3DCL>::type >(
         new RepairP2CL<Point3DCL>::type( mg_, v_, Bnd_v_));
 }
 

@@ -266,9 +266,9 @@ class TransportXRepairCL : public MGObserverCL
 {
   private:
     TransportP1XCL& c_;
-    std::auto_ptr<P1XRepairCL> oldp1xrepair_;
-    std::auto_ptr<RepairP1CL<double>::type> p1oldctrepair_;
-    std::auto_ptr<RepairP1CL<double>::type> p1ctrepair_;
+    std::unique_ptr<P1XRepairCL> oldp1xrepair_;
+    std::unique_ptr<RepairP1CL<double>::type> p1oldctrepair_;
+    std::unique_ptr<RepairP1CL<double>::type> p1ctrepair_;
     Uint mylvl;
   public:
     TransportXRepairCL (TransportP1XCL& c, Uint amylvl)
@@ -295,7 +295,7 @@ class VelTranspRepairCL : public MGObserverCL
     const VelBndDataT& Bnd_v_;
     IdxDescCL& vidx_;
     double time_;
-    std::auto_ptr<RepairP2CL<Point3DCL>::type> p2repair_;
+    std::unique_ptr<RepairP2CL<Point3DCL>::type> p2repair_;
 
   public:
     VelTranspRepairCL (VecDescCL& v, MultiGridCL& mg, const VelBndDataT& Bnd_v, IdxDescCL& vidx, double t )
