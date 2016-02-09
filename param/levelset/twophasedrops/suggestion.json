@@ -93,7 +93,7 @@
                                 "PcSTol":               0.01,   // tolerance for the preconditioner of the Schur complement
                                 "UzawaInnerIter":       1000,   // maximum number of iterations for the inner solver (now: inexact uzawa)
                                 "UzawaInnerTol":        0.6     // tolerance for the inner solver                    (now: inexact uzawa)
-                        },
+                        }
                 },
 
                 // Levelset solver
@@ -101,7 +101,7 @@
                 {
                         "Tol":                  1e-10,  // tolerance for the level set solver.
                         "Iter":                 1000    // maximum number of iterations for the level set solver.
-                },
+                }
         },
 
 
