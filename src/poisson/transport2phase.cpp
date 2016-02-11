@@ -294,7 +294,7 @@ void TransportP1CL::ct2c()
 void
 TransportRepairCL::pre_refine ()
 {
-    p1repair_= std::auto_ptr<RepairP1CL<double>::type >(
+    p1repair_= std::unique_ptr<RepairP1CL<double>::type >(
         new RepairP1CL<double>::type( mg_, c_.ct, c_.GetBndData()));
 }
 

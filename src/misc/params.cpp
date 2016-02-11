@@ -145,7 +145,7 @@ template <typename T, Uint Size>
     }
   }
 
-void read_parameter_file_from_cmdline (ParamCL& P, int argc, char **argv, std::string default_file)
+  void read_parameter_file_from_cmdline (ParamCL& P, int argc, char **argv, std::string default_file)
 {
     if (argc == 1) {
         if (default_file == std::string())
@@ -158,9 +158,61 @@ void read_parameter_file_from_cmdline (ParamCL& P, int argc, char **argv, std::s
     else {
         std::cout << "Using  parameter file '" << argv[1] << "'." << std::endl;
         P.read_json( argv[1]);
+        apply_parameter_modifications_from_cmdline(P,argc,argv);
     }
 }
 
+void update_parameters (const boost::property_tree::ptree& pt, std::string key, ParamCL& P)
+{
+    using boost::property_tree::ptree;
+    std::string nkey;
+
+    if (!key.empty()){
+        nkey = key + ".";
+    }
+
+    for (ptree::const_iterator it = pt.begin(); it != pt.end(); ++it) {
+        update_parameters(it->second, nkey + it->first, P);
+        P.put(nkey + it->first, it->second.data());
+    }
+}
+
+
+void apply_parameter_modifications_from_cmdline (ParamCL& P, int argc, char **argv)
+  /** Allows to apply changes to the property tree using the command line, without having to change the .json file.
+      Usage: --add-param '{"path_to_node":value}'
+             --add-param '...some data in JSON format...'
+      Note: use enclosing single quotation marks to prevent the shell from parsing. */
+{
+    int param_pos = 0;
+
+    for(int i = 1; i < argc && !param_pos; i++) {
+
+        if (std::string (argv[i]) == "--add-param") {
+
+            param_pos = i;
+            break;
+        }
+    }
+
+    if (param_pos) {
+
+        boost::property_tree::ptree changes;
+        std::stringstream input;
+
+        for(int i = param_pos+1; i<argc; i++)
+            input << argv[i];
+
+        try {
+            boost::property_tree::read_json(input,changes);
+        } catch (boost::property_tree::ptree_error& e) {
+              throw DROPSParamErrCL( "ParamCL::apply_parameter_modifications_from_cmdline: Error while reading from command line.\n" + std::string(e.what()) + '\n');
+        }
+        update_parameters(changes,"",P);
+
+    }
+
+}
 
   // =====================================================
   //                    ReadParamsCL

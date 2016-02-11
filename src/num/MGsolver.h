@@ -151,6 +151,7 @@ void CheckMGData( const MLMatrixCL& A, const MLMatrixCL& P);
  \param fineA         A on actual level
  \param fineB         B on actual level
  \param fineBT        B^T on actual level
+ \param fineC         empty matrix; needed as StokesDirectSolverCL inherits StokesSolverBaseCL (solver interface)
  \param fineprM       pressure mass matrix on actual level
  \param PVel          prolongation for P2
  \param PPr           prolongation for P1
@@ -167,6 +168,7 @@ void CheckMGData( const MLMatrixCL& A, const MLMatrixCL& P);
 template<class StokesSmootherCL, class StokesDirectSolverCL, class ProlongItT1, class ProlongItT2>
 void StokesMGM( const MLMatrixCL::const_iterator& beginA,  const MLMatrixCL::const_iterator& fineA,
                 const MLMatrixCL::const_iterator& fineB,   const MLMatrixCL::const_iterator& fineBT,
+                const MLMatrixCL::const_iterator& fineC,
                 const MLMatrixCL::const_iterator& fineprM, const ProlongItT1& PVel,
                 const ProlongItT2& PPr, VectorCL& u, VectorCL& p, const VectorCL& b,
                 const VectorCL& c, const StokesSmootherCL& Smoother, Uint smoothSteps, Uint cycleSteps,

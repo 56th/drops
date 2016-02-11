@@ -301,7 +301,7 @@ class OsmosisRepairCL : public MGObserverCL
 {
   private:
     OsmosisP1CL& c_;
-    std::auto_ptr<P1XRepairCL> oldp1xrepair_;
+    std::unique_ptr<P1XRepairCL> oldp1xrepair_;
     Uint mylvl;
   public:
     OsmosisRepairCL (OsmosisP1CL& c, Uint amylvl)

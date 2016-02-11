@@ -76,6 +76,8 @@ enum FiniteElementT
 	vecP1Bubble_FE=P1Bubble_FE+OFFSET_VECFE,
 	vecP2R_FE=P2R_FE+OFFSET_VECFE,
 	vecP2X_FE=P2X_FE+OFFSET_VECFE, 
+    P1SP1T_FE=P1_FE+OFFSET_STFE, 
+    P1SP1TX_FE=P1_FE+OFFSET_XFE+OFFSET_STFE, 
     UnknownFE_=-1
 };
 
@@ -105,6 +107,8 @@ class FE_InfoCL
             case P1_FE:
             case P1IF_FE:
             case P1X_FE:         NumUnknownsVertex_= 1; break;
+            case P1SP1T_FE:
+            case P1SP1TX_FE:     NumUnknownsVertex_= 2; break;
             case P1Bubble_FE:    NumUnknownsVertex_= NumUnknownsTetra_= 1; break;
             case vecP1Bubble_FE: NumUnknownsVertex_= NumUnknownsTetra_= 3; break;
             case P1D_FE:         NumUnknownsFace_= 1; break;
@@ -126,6 +130,11 @@ class FE_InfoCL
     bool IsScalar() const { return !(fe_ & OFFSET_VECFE); }
     /// \brief Returns true for XFEM
     bool IsExtended() const { return (fe_ & OFFSET_XFE) || (fe_ & OFFSET_RFE) ; }
+    /// \brief Returns true for STXFEM
+    bool IsExtendedSpaceTime() const { return fe_==P1SP1TX_FE; }
+    /// \brief Returns true for STFEM
+    //bool IsSpaceTime() const { return fe_==P1SP1TX_FE || fe_==P1SP1T_FE; }
+
     /// \brief Returns true for interface FE
     bool IsOnInterface() const { return fe_& OFFSET_IFFE; }
     bool IsDG() const { return fe_ & OFFSET_DFE;}
@@ -191,6 +200,7 @@ class ExtIdxDescCL
     const BndDataCL<>* lsetbnd_;
 
 #ifdef _PAR
+  public:
     class CommunicateXFEMNumbCL
     {
     private:
@@ -201,6 +211,7 @@ class ExtIdxDescCL
         bool Scatter( DiST::TransferableCL& t, const size_t numData, DiST::MPIistreamCL& r);
         void Call();
     };
+  private:
 #endif
 
 
@@ -226,6 +237,11 @@ class ExtIdxDescCL
     IdxT& operator[]( const IdxT i )       { return Xidx_[i]; }
     /// Returns number of DoFs for standard FE space
     IdxT  GetNumUnknownsStdFE()      const { return Xidx_.size(); }
+
+    /// Reset size of Xidx_
+    void ResetExtIdx( IdxT size, IdxT val) { Xidx_.assign( size, val); }
+    /// Swap old and new Xidx_
+    void SwapExtIdxOldNew (){ Xidx_.swap(Xidx_old_);}
 
     /// \brief Replace vector entries to account for different numbering of extended DoFs after call of UpdateXNumbering(...)
     void Old2New( VecDescCL* );
@@ -266,6 +282,7 @@ class IdxDescCL: public FE_InfoCL
     Uint                     TriangLevel_; ///< Triangulation of the index.
     IdxT                     NumUnknowns_; ///< total number of unknowns on the triangulation
     BndCondCL                Bnd_;         ///< boundary conditions and  matching function for periodic boundaries
+    BndCondCL                Bnd_aux_;     ///< auxiliary boundary conditions (second phase)
     ExtIdxDescCL             extIdx_;      ///< extended index for XFEM
 
 #ifdef _PAR
@@ -287,6 +304,7 @@ class IdxDescCL: public FE_InfoCL
     /// \brief The constructor uses the lowest available index for the
     ///     numbering. The triangulation level is initialized as 0.
     IdxDescCL( FiniteElementT fe= P1_FE, const BndCondCL& bnd= BndCondCL(0), match_fun match=0, double omit_bound=-99);
+    IdxDescCL( FiniteElementT fe, const BndCondCL& bnd, const BndCondCL& bnd_aux, match_fun match, double omit_bound);
     /// \brief The copy will inherit the index number, whereas the index
     ///     of the original will be invalidated.
     IdxDescCL( const IdxDescCL& orig);
@@ -319,6 +337,8 @@ class IdxDescCL: public FE_InfoCL
     Uint TriangLevel() const { return TriangLevel_; }
     /// \brief total number of unknowns on the triangulation
     IdxT NumUnknowns() const { return NumUnknowns_; }
+    /// \brief change total number of unknowns on the triangulation (e.g. if xfem-type update took place)
+    void ChangeNumUnknowns(IdxT newval) { NumUnknowns_ = newval; }
     /// \brief Compare two IdxDescCL-objects. If a multigrid is given via mg, the
     ///     unknown-numbers on it are compared, too.
     static bool
@@ -330,6 +350,7 @@ class IdxDescCL: public FE_InfoCL
     void CreateNumbering( Uint level, MultiGridCL& mg, const VecDescCL* lsetp= 0, const BndDataCL<>* lsetbnd =0);
     /// \brief Used to number unknowns and store boundary condition and matching function.
     void CreateNumbering( Uint level, MultiGridCL& mg, const BndCondCL& Bnd, match_fun match= 0, const VecDescCL* lsetp= 0, const BndDataCL<>* lsetbnd =0);
+    void CreateNumbering( Uint level, MultiGridCL& mg, const BndCondCL& Bnd, const BndCondCL& Bnd_aux, match_fun match= 0, const VecDescCL* lsetp= 0, const BndDataCL<>* lsetbnd =0);
     /// \brief Used to number unknowns taking boundary condition and matching function from \a baseIdx
     void CreateNumbering( Uint level, MultiGridCL& mg, const IdxDescCL& baseIdx, const VecDescCL* lsetp= 0, const BndDataCL<>* lsetbnd =0);
     /// \brief Update numbering of extended DoFs.

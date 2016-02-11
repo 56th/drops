@@ -430,6 +430,7 @@ void Strategy( StokesProblemT& Stokes)
         Stokes.A.SetIdx  ( vidx1, vidx1);
         Stokes.M.SetIdx  ( vidx1, vidx1);
         Stokes.B.SetIdx  ( pidx1, vidx1);
+        Stokes.C.SetIdx  ( pidx1, pidx1);
         Stokes.prM.SetIdx( pidx1, pidx1);
         Stokes.prA.SetIdx( pidx1, pidx1);
         Stokes.b.SetIdx  ( vidx1);
@@ -458,7 +459,7 @@ void Strategy( StokesProblemT& Stokes)
         std::cout << "000 residual: " << std::sqrt( err0) << std::endl;
 
         timer.Start();
-        solver->Solve( Stokes.A.Data, Stokes.B.Data, v1->Data, p1->Data, Stokes.b.Data, Stokes.c.Data, v1->RowIdx->GetEx(), p1->RowIdx->GetEx());
+        solver->Solve( Stokes.A.Data, Stokes.B.Data, Stokes.C.Data, v1->Data, p1->Data, Stokes.b.Data, Stokes.c.Data, v1->RowIdx->GetEx(), p1->RowIdx->GetEx());
         timer.Stop();
         double err= norm_sq( Stokes.A.Data*v1->Data + transp_mul( Stokes.B.Data, p1->Data) - Stokes.b.Data)
                     +norm_sq( Stokes.B.Data*v1->Data - Stokes.c.Data);
@@ -514,7 +515,7 @@ int main ( int argc, char** argv)
 {
     try
     {
-        DROPS::read_parameter_file_from_cmdline( P, argc, argv, "MGsdropsP2.json");
+        DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/stokes/errorestimator/MGsdropsP2.json");
         std::cout << P << std::endl;
 
         DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );

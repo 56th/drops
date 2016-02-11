@@ -51,6 +51,8 @@ class SchurPreBaseCL
     SchurPreBaseCL( double kA, double kM, std::ostream* output= 0) : kA_( kA), kM_( kM), output_(output) {}
     virtual ~SchurPreBaseCL() {}
     void SetWeights( double kA, double kM) { kA_ = kA; kM_ = kM; }
+    double getka(){return kA_;}
+    double getkm(){return kM_;}
 
 #ifdef _PAR
     virtual void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const ExchangeCL& vel_ex, const ExchangeCL& p_ex) const = 0;
@@ -75,6 +77,28 @@ class SchurPreBaseCL
     void SetDiag(const Mat&, const ExT&) {} // just for consistency
     bool RetAcc()   const { return true; }
     //@}
+};
+
+/// Dummy Schur complement preconditioner, acts like the identity matrix.
+class DummyPreCL : public SchurPreBaseCL
+{
+public:
+    DummyPreCL( double kA, double kM, std::ostream* output=0) : SchurPreBaseCL(kA,kM,output){}
+
+    template <typename Mat, typename Vec, typename ExT>
+    void Apply(const Mat&, Vec& x, const Vec& b, const ExT&, const ExT& p_ex) const
+    {
+        x= b;
+        p_ex.Accumulate( x);
+    }
+#ifdef _PAR
+    void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const ExchangeCL& vel_ex, const ExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
+    void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const ExchangeCL& vel_ex, const ExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
+#endif
+    void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
+    void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
+
+    using SchurPreBaseCL::Apply;
 };
 
 //**************************************************************************
@@ -137,6 +161,199 @@ void ISPreCL::Apply(const Mat&, Vec& p, const Vec& c, const ExT&, const ExT& pr_
 //    std::cout << " reduction: " << mnew_res/mold_res << '\n';
     p+= kM_*p2_;
 }
+
+
+//**************************************************************************
+// Preconditioner for the instationary two-phase Stokes-equations with
+// ghost penalty stabilization. A modified version of Cahouet Chabard.
+//
+// A Poisson-problem with natural boundary-conditions for the pressure is
+// solved via 1 SSOR-step, a problem with the mass-matrix as well.
+// kM should be chosen as 1 and kA is either zero (stationary case) or 1/dt
+//
+// Apr_ is the pressure-Poisson-Matrix for the P1X space with Nitsche terms
+// for natural boundary-conditions, M_ the pressure-mass-matrix.
+//**************************************************************************
+
+class ISGhPenPreCL : public SchurPreBaseCL
+{
+private:
+    const MatrixCL *Apr_;
+    const MatrixCL *Mpr_;
+    const MatrixCL *C_;
+
+    mutable size_t Cversion_;
+    mutable MatrixCL MminusC_;
+    mutable MatrixCL AminusC_;
+    double tolA_;
+    double tolM_;
+    int pcAIter_;
+
+    typedef SGSPcCL Pc1Main;
+    typedef JACPcCL PcSolver2;
+    Pc1Main pcsgs_;
+    PcSolver2 pcjac_;
+    mutable PCGSolverCL<Pc1Main> solver1;
+    mutable PCGSolverCL<PcSolver2> solver2;
+
+public:
+    ISGhPenPreCL( const MatrixCL * Apr, const MatrixCL *Mpr, const MatrixCL *C,
+              double kA = 0., double kM = 1., double tolA = 1e-2,
+              double tolM = 1e-2, int pcAIter = 150, std::ostream *output = 0 )
+        : SchurPreBaseCL( kA, kM, output ), Apr_(Apr), Mpr_(Mpr), C_(C), Cversion_(0), tolA_(tolA),
+          tolM_(tolM), pcAIter_(pcAIter), pcsgs_(), pcjac_(),
+          solver1( pcsgs_, pcAIter_, tolA_, true), solver2( pcjac_, 500, tolM_, true )
+    {}
+
+    template <typename Mat, typename Vec, typename ExT>
+    void Apply(const Mat&, Vec& p, const Vec& c, const ExT& vel_ex, const ExT& pr_ex) const;
+#ifdef _PAR
+    void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const ExchangeCL& vel_ex, const ExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
+    void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const ExchangeCL& vel_ex, const ExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
+#endif
+    void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
+    void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
+
+    using SchurPreBaseCL::Apply;
+};
+
+template <typename Mat, typename Vec, typename ExT>
+void ISGhPenPreCL:: Apply(const Mat&, Vec& p, const Vec& c, const ExT&, const ExT& pr_ex) const
+{
+    if( C_->Version() != Cversion_ )
+    {
+        Cversion_ = C_->Version();
+        MminusC_.LinComb( 1.0 , *Mpr_ , -1.0 , *C_ );
+        AminusC_.LinComb( 1.0 , *Apr_ , -kA_ , *C_ );
+    }
+
+    p = 0.0;
+    if ( kA_ != 0.0 )
+    {
+        solver1.Solve( AminusC_ , p , c, pr_ex );
+        if( solver1.GetIter() == solver1.GetMaxIter() )
+            std::cout << "ISGhPenPreCL::Apply: (Apr-1/dt*C)-solve: max iterations reached: " << solver1.GetIter()
+                      << "\twith residual: " << solver1.GetResid() << std::endl;
+        else if( output_ )
+            *output_ << "ISGhPenPreCL::Apply: (Apr-1/dt*C)-solve: iterations: " << solver1.GetIter()
+                     << "\tresidual: " << solver1.GetResid() << std::endl;
+        p *= kA_;
+    }
+    if( kM_ != 0.0 )
+    {
+        Vec p2_( c.size() );
+        solver2.Solve( MminusC_ , p2_ , c , pr_ex );
+        if( solver2.GetIter() == solver2.GetMaxIter() )
+            std::cout << "ISGhPenPreCL::Apply: (Mpr-C)-solve: max iterations reached: " << solver2.GetIter()
+                      << "\twith residual: " << solver2.GetResid() << std::endl;
+        else if( output_ )
+            *output_ << "ISGhPenPreCL::Apply: (Mpr-C)-solve: iterations: " << solver2.GetIter()
+                     << "\tresidual: " << solver2.GetResid() << std::endl;
+        p += kM_ * p2_;
+    }
+}
+
+//**************************************************************************
+// Same as ISGhPenPreCL but with additional consideration of the kernel of ghost
+// penalty matrix C. Subspace splitting scheme similar to the idea from
+//
+// J. Schoeberl. Robust Multigrid Preconditioning for Parameter-Dependent Problems
+// I: The Stokes-type Case. In Multigrid Methods V, pages 260--275. Springer, 1998.
+//
+// see detailed description below in class comments
+//
+//**************************************************************************
+
+class ISGhPenKernelPreCL : public SchurPreBaseCL
+{
+private:
+    const MatrixCL *Apr_;
+    const MatrixCL *Mpr_;
+    const MatrixCL *C_;
+    mutable size_t Cversion_;
+    const VectorBaseCL<VectorCL> &kernel;
+    mutable MatrixCL MminusC_;
+    mutable MatrixCL AminusC_;
+    double tolA_;
+    double tolM_;
+    int pcAIter_;
+
+    typedef SGSPcCL Pc1Main;
+    typedef JACPcCL PcSolver2;
+    Pc1Main pcsgs_;
+    PcSolver2 pcjac_;
+    typedef PreKernel<Pc1Main> PcSolver1;
+    PcSolver1 pckern_;
+    mutable PCGSolverCL<PcSolver1> solver1;
+    mutable PCGSolverCL<PcSolver2> solver2;
+
+    // dimension of kernel of stabilization matrix C
+    // (if zero rows and cols are deleted)
+    //const size_t kdim = 8;
+    // 8-dimensional kernel, i.e. all functions for which the jump of the normal derivative accross
+    // element faces (which are used in ghost penalty) is zero
+    // for linear basis functions the dimension is 8 with (1,x,y,z)_omega all constant and linear functions
+    // on the entire domain plus (1,x,y,z)_omega(1,2) the constant and linear functions on ONE subdomain
+    // (the other subdomain can be obtained by linear combination)
+
+public:
+    ISGhPenKernelPreCL( const MatrixCL * Apr, const MatrixCL *Mpr, const MatrixCL *C,
+                  const VectorBaseCL<VectorCL> &ckernel, double kA = 0., double kM = 1.,
+                  double tolA = 1e-2, double tolM = 1e-2, int pcSIter = 150,
+                  std::ostream *output = 0 )
+        : SchurPreBaseCL( kA, kM, output ), Apr_(Apr), Mpr_(Mpr), C_(C), Cversion_(0), kernel(ckernel), tolA_(tolA),
+          tolM_(tolM), pcAIter_(pcSIter), pcsgs_(), pcjac_(),pckern_(pcsgs_,ckernel),
+          solver1( pckern_, pcAIter_, tolA_, true), solver2( pcjac_, 500, tolM_, true )
+    {}
+
+    template <typename Mat, typename Vec, typename ExT>
+    void Apply(const Mat&, Vec& p, const Vec& c, const ExT& vel_ex, const ExT& pr_ex) const;
+#ifdef _PAR
+    void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const ExchangeCL& vel_ex, const ExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
+    void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const ExchangeCL& vel_ex, const ExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
+#endif
+    void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
+    void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
+
+    using SchurPreBaseCL::Apply;
+};
+
+template <typename Mat, typename Vec, typename ExT>
+void ISGhPenKernelPreCL:: Apply(const Mat&, Vec& p, const Vec& c, const ExT&, const ExT& pr_ex) const
+{
+    if( C_->Version() != Cversion_ )
+    {
+        Cversion_ = C_->Version();
+        MminusC_.LinComb( 1.0 , *Mpr_ , -1.0 , *C_ );
+        AminusC_.LinComb( 1.0 , *Apr_ , -kA_ , *C_ );
+    }
+
+    p = 0.0;
+    if ( kA_ != 0.0 )
+    {
+        solver1.Solve( AminusC_ , p , c, pr_ex );
+        if( solver1.GetIter() == solver1.GetMaxIter() )
+            std::cout << "ISGhPenKernelPreCL::Apply: (Apr-1/dt*C)-solve: max iterations reached: " << solver1.GetIter()
+                      << "\twith residual: " << solver1.GetResid() << std::endl;
+        else if( output_ )
+            *output_ << "ISGhPenKernelPreCL::Apply: (Apr-1/dt*C)-solve: iterations: " << solver1.GetIter()
+                     << "\tresidual: " << solver1.GetResid() << std::endl;
+        p *= kA_;
+    }
+    if( kM_ != 0.0 )
+    {
+        Vec p2_( c.size() );
+        solver2.Solve( MminusC_ , p2_ , c , pr_ex );
+        if( solver2.GetIter() == solver2.GetMaxIter() )
+            std::cout << "ISGhPenKernelPreCL::Apply: (Mpr-C)-solve: max iterations reached: " << solver2.GetIter()
+                      << "\twith residual: " << solver2.GetResid() << std::endl;
+        else if( output_ )
+            *output_ << "ISGhPenKernelPreCL::Apply: (Mpr-C)-solve: iterations: " << solver2.GetIter()
+                     << "\tresidual: " << solver2.GetResid() << std::endl;
+        p += kM_ * p2_;
+    }
+}
+
 
 //**************************************************************************
 // Preconditioner for the instationary Stokes-equations.
@@ -329,7 +546,7 @@ void ISMGPreCL<ProlongationT>::Apply(const Mat& /*A*/, Vec& p, const Vec& c, con
 // Append the kernel of Bs as last column to Bs.
 template<typename ExT>
 static void Regularize (MatrixCL& Bs, const IdxDescCL& rowidx, VectorCL ker0, const NEGSPcCL& spc, double regularize, const ExT& row_ex, const ExT& col_ex)
-{
+{    
     if (rowidx.IsExtended())
         ker0[std::slice( rowidx.GetXidx().GetNumUnknownsStdFE(), rowidx.NumUnknowns() - rowidx.GetXidx().GetNumUnknownsStdFE(), 1)]= 0.;
     ker0*= 1./norm( ker0);
@@ -412,6 +629,11 @@ class ISBBTPreCL : public SchurPreBaseCL
 
     using SchurPreBaseCL::Apply;
 
+    void getBs( MatrixCL *& Bs)
+    {
+        Bs = Bs_;
+    }
+
     void SetMatrices (const MatrixCL* B, const MatrixCL* Mvel, const MatrixCL* M, const IdxDescCL* pr_idx)
     {
         B_= B;
@@ -447,7 +669,7 @@ void ISBBTPreCL::Update(const ExT& vel_ex, const ExT& p_ex) const
 
 template <typename Mat, typename Vec, typename ExT>
 void ISBBTPreCL::Apply(const Mat&, Vec& p, const Vec& c, const ExT& vel_ex, const ExT& p_ex) const
-{
+{    
     ScopeTimerCL scope("ISBBTPreCL::Apply");
     if (B_->Version() != Bversion_)
         Update(vel_ex, p_ex);
@@ -480,159 +702,6 @@ void ISBBTPreCL::Apply(const Mat&, Vec& p, const Vec& c, const ExT& vel_ex, cons
     }
 }
 
-/*!
- * \brief Modified ISBBT preconditioner for Ghost Penalty Stabilisation
- *
- * This preconditioner is an extension to the original ISBBT preconditioner
- * for the instationary Stokes problem. When the ghost penalty method is used
- * for stabilising the Stokes problem, the resulting system matrix contains an
- * additional matrix -eps_p*J. The Schurkomplement therefore changes to:
- * B^T A^-1 B  +  eps_p*J. Given C := -eps_p*J, this preconditoner is defined
- * by Q_S := M - C = M + eps_p*J. In the stationary case this preconditioner
- * has shown ideal behaviour. The instationary case requires further testing.
- */
-class ISBBT_Stab_PreCL : public SchurPreBaseCL
-{
-private:
-    const MatrixCL*  B_;
-    mutable MatrixCL*  Bs_;                                     ///< scaled Matrix B
-    mutable size_t Bversion_;
-    const MatrixCL  *M_, *Mvel_;
-    const MatrixCL  *C_;                                        ///< Stabilisation matrix; C = -eps_p * prJ;
-    mutable MatrixCL   MminusC_;                                ///< Use M - C instead of M as a preconditioner of BA^-1B^T
-
-    double  tolA_, tolM_;                                       ///< tolerances of the solvers
-    mutable VectorCL Dprsqrtinv_;                               ///< diag(M)^{-1/2}
-
-#ifdef _PAR
-    typedef ChebyshevBBTPcCL  PCSolver1T;                       ///< type of the preconditioner for solver 1
-#else
-    typedef NEGSPcCL    PCSolver1T;                             ///< type of the preconditioner for solver 1
-#endif
-    typedef JACPcCL     PCSolver2T;                             ///< type of the preconditioner for solver 2
-    PCSolver1T PCsolver1_;
-    PCSolver2T PCsolver2_;
-    mutable PCGNESolverCL<PCSolver1T> solver_;                  ///< solver for BB^T
-    mutable PCGSolverCL<PCSolver2T> solver2_;                   ///< solver for M
-
-    const IdxDescCL* pr_idx_;                                   ///< used to determine, how to represent the kernel of BB^T in case of pure Dirichlet-BCs.
-    double regularize_;                                         ///< If regularize_==0. no regularization is performed. Otherwise, a column is attached to Bs.
-    template <typename ExT>
-    void Update (const ExT& vel_ex, const ExT& p_ex) const;     ///< Updating the diagonal matrices D and Dprsqrtinv
-
-  public:
-    ISBBT_Stab_PreCL (const MatrixCL* B, const MatrixCL *C, const MatrixCL* M_pr, const MatrixCL* Mvel,
-        const IdxDescCL& pr_idx, double kA= 0., double kM= 1., double tolA= 1e-2, double tolM= 1e-2, double regularize= 0., std::ostream* output= 0)
-        : SchurPreBaseCL( kA, kM, output), B_( B), Bs_( 0), Bversion_( 0),
-          M_( M_pr), Mvel_( Mvel), C_(C), tolA_(tolA), tolM_(tolM),
-          PCsolver1_(), PCsolver2_(),
-          solver_( PCsolver1_, 800, tolA_, /*relative*/ true),
-          solver2_( PCsolver2_, 500, tolM_, /*relative*/ true),
-          pr_idx_( &pr_idx), regularize_( regularize)
-    {
-    MminusC_.LinComb( 1.0, *M_, -1.0, *C_ );
-    }
-
-    ISBBT_Stab_PreCL (const ISBBT_Stab_PreCL& pc)
-        : SchurPreBaseCL( pc.kA_, pc.kM_), B_( pc.B_), Bs_( pc.Bs_ == 0 ? 0 : new MatrixCL( *pc.Bs_)),
-          Bversion_( pc.Bversion_),
-          M_( pc.M_), Mvel_( pc.Mvel_), C_( pc.C_ ), tolA_( pc.tolA_), tolM_( pc.tolM_),
-          PCsolver1_(), PCsolver2_(),
-          solver_( PCsolver1_, 800, tolA_, /*relative*/ true),
-          solver2_( PCsolver2_, 500, tolM_, /*relative*/ true),
-          pr_idx_( pc.pr_idx_), regularize_( pc.regularize_)
-    {
-    MminusC_.LinComb( 1.0, *M_, -1.0, *C_ );
-    }
-
-    ISBBT_Stab_PreCL& operator= (const ISBBT_Stab_PreCL&) {
-        throw DROPSErrCL( "ISBBT_Stab_PreCL::operator= is not permitted.\n");
-    }
-
-    ~ISBBT_Stab_PreCL () { delete Bs_; }
-
-    template <typename Mat, typename Vec, typename ExT>
-    void Apply(const Mat&, Vec& p, const Vec& c, const ExT& vel_ex, const ExT& p_ex) const;
-
-#ifdef _PAR
-    void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const ExchangeCL& vel_ex, const ExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
-    void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const ExchangeCL& vel_ex, const ExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
-#endif
-    void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
-    void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
-
-    using SchurPreBaseCL::Apply;
-
-    void SetMatrices (const MatrixCL* B, const MatrixCL* C, const MatrixCL* Mvel, const MatrixCL* M, const IdxDescCL* pr_idx)
-    {
-        B_= B;
-        C_= C;
-        Mvel_= Mvel;
-        M_= M;
-        pr_idx_= pr_idx;
-        Bversion_ = 0;
-        MminusC_.LinComb( 1.0, *M_, -1.0, *C_ );
-    }
-};
-
-template<typename ExT>
-void ISBBT_Stab_PreCL::Update(const ExT& vel_ex, const ExT& p_ex) const
-{
-    std::cout << "ISBBT_Stab_PreCL::Update: old version: " << Bversion_
-              << "\tnew version: " << B_->Version() << '\n';
-    delete Bs_;
-    Bs_= new MatrixCL( *B_);
-    Bversion_= B_->Version();
-
-    VectorCL Dvelinv( 1.0/ vel_ex.GetAccumulate(Mvel_->GetDiag()));
-    ScaleCols( *Bs_, VectorCL( std::sqrt( Dvelinv)));
-
-    MminusC_.LinComb( 1.0, *M_, -1.0, *C_ );
-    VectorCL Dprsqrt( std::sqrt( p_ex.GetAccumulate( MminusC_.GetDiag())));
-    Dprsqrtinv_.resize( MminusC_.num_rows());
-    Dprsqrtinv_= 1.0/Dprsqrt;
-    ScaleRows( *Bs_, Dprsqrtinv_);
-
-#ifndef _PAR
-    if (regularize_ != 0.)
-        Regularize( *Bs_, *pr_idx_, Dprsqrt, PCsolver1_, regularize_, vel_ex, p_ex);
-#endif
-}
-
-template <typename Mat, typename Vec, typename ExT>
-void ISBBT_Stab_PreCL::Apply(const Mat&, Vec& p, const Vec& c, const ExT& vel_ex, const ExT& p_ex) const
-{
-    ScopeTimerCL scope("ISBBT_Stab_PreCL::Apply");
-    if (B_->Version() != Bversion_)
-        Update(vel_ex, p_ex);
-
-    p= 0.0;
-    if (kA_ != 0.0) {
-        solver_.Solve( *Bs_, p, VectorCL( Dprsqrtinv_*c), vel_ex, p_ex);
-        if (solver_.GetIter() == solver_.GetMaxIter()){
-            std::cout << "ISBBT_Stab_PreCL::Apply: BBT-solve: " << solver_.GetIter()
-                    << " (max)\t" << solver_.GetResid() << '\n';
-        }
-        else if (output_)
-            *output_ << "ISBBT_Stab_PreCL BBT-solve: iterations: " << solver_.GetIter()
-                     << "\tresidual: " <<  solver_.GetResid();
-        p= kA_*(Dprsqrtinv_*p);
-    }
-    if (kM_ != 0.0) {
-        Vec p2_( c.size() );
-        solver2_.Solve( MminusC_, p2_, c, p_ex );
-        if (solver2_.GetIter() == solver2_.GetMaxIter()){
-            std::cout << "ISBBT_Stab_PreCL::Apply: (M-C)-solve: " << solver2_.GetIter()
-                    << " (max)\t" << solver2_.GetResid() << '\n';
-        }
-        else if (output_)
-            *output_ << "\tISBBT_Stab_PreCL (M-C)-solve: iterations: " << solver2_.GetIter()
-                     << "\tresidual: " <<  solver2_.GetResid()
-                     << '\n';
-
-        p+= kM_*p2_;
-    }
-}
 
 //**************************************************************************
 // Preconditioner for the instationary (Navier-) Stokes-equations.
@@ -777,9 +846,9 @@ void MinCommPreCL::Update(const ExT& vel_ex, const ExT& pr_ex) const
 class BDinvBTPreCL: public SchurPreBaseCL
 {
   private:
-    const MatrixCL* L_, *B_, *Mvel_, *M_;
-    mutable MatrixCL* Bs_;
-    mutable size_t Lversion_, Bversion_, Mvelversion_, Mversion_;
+    const MatrixCL* L_, *B_, *Mvel_, *M_, *C_;
+    mutable MatrixCL* Bs_, *Cs_;
+    mutable size_t Lversion_, Bversion_, Mvelversion_, Mversion_, Cversion_;
     mutable VectorCL Dprsqrtinv_, Dvelinv_, DSchurinv_;
     double  tol_;
     mutable DiagPcCL diagVelPc_;
@@ -805,10 +874,10 @@ class BDinvBTPreCL: public SchurPreBaseCL
     void Update (const DummyExchangeCL& vel_ex, const DummyExchangeCL& pr_ex) const;
 
   public:
-    BDinvBTPreCL (const MatrixCL* L, MatrixCL* B, MatrixCL* M_vel, MatrixCL* M_pr, const IdxDescCL& pr_idx,
+    BDinvBTPreCL (const MatrixCL* L, MatrixCL* B, MatrixCL* C, MatrixCL* M_vel, MatrixCL* M_pr, const IdxDescCL& pr_idx,
                   double tol=1e-2, double regularize= 0.0, std::ostream* output= 0)
-        : SchurPreBaseCL( 0, 0, output), L_( L), B_( B), Mvel_( M_vel), M_( M_pr), Bs_( 0),
-          Lversion_( 0), Bversion_( 0), Mvelversion_( 0), Mversion_( 0), tol_(tol),
+        : SchurPreBaseCL( 0, 0, output), L_( L), B_( B), Mvel_( M_vel), M_( M_pr), C_( C), Bs_( 0), Cs_(0),
+          Lversion_( 0), Bversion_( 0), Mvelversion_( 0), Mversion_( 0), Cversion_(0), tol_(tol),
           diagVelPc_(Dvelinv_), SchurPc_( DSchurinv_),
 #ifdef _PAR
           BDinvBT_(0),
@@ -818,9 +887,9 @@ class BDinvBTPreCL: public SchurPreBaseCL
           regularize_( regularize), lumped_(false) {}
 
     BDinvBTPreCL (const BDinvBTPreCL & pc)
-        : SchurPreBaseCL( pc.kA_, pc.kM_), L_( pc.L_), B_( pc.B_), Mvel_( pc.Mvel_), M_( pc.M_),
-          Bs_( pc.Bs_ == 0 ? 0 : new MatrixCL( *pc.Bs_)),
-          Lversion_( pc.Lversion_), Bversion_( pc.Bversion_), Mvelversion_( pc.Mvelversion_), Mversion_( pc.Mversion_),
+        : SchurPreBaseCL( pc.kA_, pc.kM_), L_( pc.L_), B_( pc.B_), Mvel_( pc.Mvel_), M_( pc.M_), C_( pc.C_ ),
+          Bs_( pc.Bs_ == 0 ? 0 : new MatrixCL( *pc.Bs_)), Cs_( pc.Cs_ == 0 ? 0 : new MatrixCL( *pc.Cs_)),
+          Lversion_( pc.Lversion_), Bversion_( pc.Bversion_), Mvelversion_( pc.Mvelversion_), Mversion_( pc.Mversion_), Cversion_( pc.Cversion_),
           Dprsqrtinv_( pc.Dprsqrtinv_), Dvelinv_( pc.Dvelinv_), DSchurinv_( pc.DSchurinv_), tol_(pc.tol_),
           diagVelPc_( Dvelinv_), SchurPc_( DSchurinv_),
 #ifdef _PAR
@@ -895,7 +964,7 @@ template <typename Mat, typename Vec>
 void BDinvBTPreCL::Apply (const Mat&, Vec& x, const Vec& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& pr_ex) const
 {
     ScopeTimerCL scope("BDinvBTPreCL::Apply");
-    if ((L_->Version() != Lversion_) || (Mvel_->Version() != Mvelversion_) || (M_->Version() != Mversion_) || (B_->Version() != Bversion_))
+    if ((L_->Version() != Lversion_) || (Mvel_->Version() != Mvelversion_) || (M_->Version() != Mversion_) || (B_->Version() != Bversion_) || (C_->Version() != Cversion_) )
         Update( vel_ex, pr_ex);
 
     Vec y( b.size());

@@ -411,11 +411,6 @@ void SF_ImprovedLaplBeltramiOnTriangle( const TetraCL& t, const BaryCoordCL * co
     const InterfaceTriangleCL&  triangle, const LocalP1CL<Point3DCL> Grad_f[10], const IdxT Numb[10],
     const Quad5_2DCL<Point3DCL> e[3], double det, VectorCL& f, const SurfaceTensionCL& sf)
 {
-    if (sf.GetInputMethod() == Sigma_X)
-    {
-        SF_ImprovedLaplBeltramiOnTriangle( t, p, triangle, Grad_f, Numb, sf.GetSigma(), e, det, f);
-        return;
-    }
     Quad5_2DCL<>          p2[10];   // P2-Hat-Functions...
     Quad5_2DCL<Point3DCL> Grad[10]; // and their gradients
     Quad5_2DCL<Point3DCL> n;
@@ -810,7 +805,7 @@ void LevelsetP2CL::Reparam( int method, bool Periodic)
     \param Periodic: If true, a special variant of the algorithm for periodic boundaries is used.
 */
 {
-    std::auto_ptr<ReparamCL> reparam= ReparamFactoryCL::GetReparam( MG_, *PhiC, method, Periodic, &BndData_, perDirections);
+    std::unique_ptr<ReparamCL> reparam= ReparamFactoryCL::GetReparam( MG_, *PhiC, method, Periodic, &BndData_, perDirections);
     reparam->Perform();
     UpdateDiscontinuous();
 }

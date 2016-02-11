@@ -33,9 +33,11 @@
 #include "geom/geomselect.h"
 #include "num/nssolver.h"
 #include "levelset/coupling.h"
-
+#include "spacetimetransp/spacetime_sol.h"
 #include "misc/funcmap.h"
+#include "misc/params.h"
 
+extern DROPS::ParamCL P;
 namespace DROPS
 {
 
@@ -217,58 +219,6 @@ class FilmInfoCL
     void Init(std::ofstream* file, double x, double z) { file_= file; x_=x; z_=z;}
 } FilmInfo;
 
-double eps=5e-4, // halbe Sprungbreite
-    lambda=1.5, // Position des Sprungs zwischen Oberkante (lambda=0) und Schwerpunkt (lambda=1)
-    sigma_dirt_fac= 0.8; // gesenkte OFspannung durch Verunreinigungen im unteren Teil des Tropfens
-double sigma;
-
-double sm_step(const Point3DCL& p)
-{
-    double y_mid= lambda*IFInfo.bary[1] + (1-lambda)*IFInfo.max[1], // zwischen Tropfenschwerpunkt und Oberkante
-        y= p[1] - y_mid;
-    if (y > eps) return sigma;
-    if (y < -eps) return sigma_dirt_fac*sigma;
-    const double z=y/eps*M_PI/2.;
-    return sigma_dirt_fac*sigma + (sigma - sigma_dirt_fac*sigma) * (std::sin(z)+1)/2;
-}
-
-Point3DCL grad_sm_step (const Point3DCL& p)
-{
-    double y_mid= lambda*IFInfo.bary[1] + (1-lambda)*IFInfo.max[1], // zwischen Tropfenschwerpunkt und Oberkante
-        y= p[1] - y_mid;
-    Point3DCL ret;
-    if (y > eps) return ret;
-    if (y < -eps) return ret;
-    const double z=y/eps*M_PI/2.;
-    ret[1]= (sigma - sigma_dirt_fac*sigma) * std::cos(z)/eps*M_PI/4;
-    return ret;
-}
-
-double lin(const Point3DCL& p)
-{
-    const double y_top= IFInfo.max[1],
-                 y_bot= IFInfo.bary[1],
-                 y_slope= sigma*(1 - sigma_dirt_fac)/(y_top - y_bot);
-    return sigma + (p[1] - y_top)*y_slope;
-}
-
-Point3DCL grad_lin (const Point3DCL&)
-{
-    const double y_top= IFInfo.max[1],
-                 y_bot= IFInfo.bary[1],
-                 y_slope= sigma*(1 - sigma_dirt_fac)/(y_top - y_bot);
-    Point3DCL ret;
-    ret[1]= y_slope;
-    return ret;
-}
-
-double sigmaf (const Point3DCL&, double) { return sigma; }
-Point3DCL gsigma (const Point3DCL&, double) { return Point3DCL(); }
-
-double sigma_step(const Point3DCL& p, double) { return sm_step( p); }
-Point3DCL gsigma_step (const Point3DCL& p, double) { return grad_sm_step( p); }
-
-
 /// \brief factory for the time discretization schemes
 template<class LevelSetSolverT>
 TimeDisc2PhaseCL* CreateTimeDisc( InstatNavierStokes2PhaseP2P1CL& Stokes, LevelsetP2CL& lset,
@@ -354,13 +304,13 @@ void SolveStatProblem( StokesT& Stokes, LevelsetP2CL& lset,
     Stokes.SetupSystem1( &Stokes.A, &Stokes.M, &Stokes.b, &Stokes.b, &cplM, lset, Stokes.v.t);
     Stokes.SetupPrStiff( &Stokes.prA, lset);
     Stokes.SetupPrMass ( &Stokes.prM, lset);
-    Stokes.SetupSystem2( &Stokes.B, &Stokes.c, lset, Stokes.v.t);
+    Stokes.SetupSystem2( &Stokes.B, &Stokes.C, &Stokes.c, lset, Stokes.v.t);
     time.Stop();
     duration = time.GetTime();
     std::cout << "Discretizing took "<< duration << " sec.\n";
     time.Reset();
     Stokes.b.Data += curv.Data;
-    solver.Solve( Stokes.A.Data, Stokes.B.Data, Stokes.v, Stokes.p.Data, Stokes.b.Data, cplN, Stokes.c.Data, Stokes.vel_idx.GetEx(), Stokes.pr_idx.GetEx(), 1.0);
+    solver.Solve( Stokes.A.Data, Stokes.B.Data, Stokes.C.Data, Stokes.v, Stokes.p.Data, Stokes.b.Data, cplN, Stokes.c.Data, Stokes.vel_idx.GetEx(), Stokes.pr_idx.GetEx(), 1.0);
     time.Stop();
     duration = time.GetTime();
     std::cout << "Solving (Navier-)Stokes took "<<  duration << " sec.\n";
@@ -375,8 +325,8 @@ void SetInitialLevelsetConditions( LevelsetP2CL& lset, MultiGridCL& MG, ParamCL&
       case -10: // read from ensight-file [deprecated]
       {
         std::cout << "[DEPRECATED] read from ensight-file [DEPRECATED]\n";
-        ReadEnsightP2SolCL reader( MG);
-        reader.ReadScalar( P.get<std::string>("DomainCond.InitialFile")+".scl", lset.Phi, lset.GetBndData());
+        //        ReadEnsightP2SolCL reader( MG);
+        //        reader.ReadScalar( P.get<std::string>("DomainCond.InitialFile")+".scl", lset.Phi, lset.GetBndData());
       } break;
 #endif
       case -1: // read from file
@@ -404,7 +354,7 @@ void SetInitialConditions(StokesT& Stokes, LevelsetP2CL& lset, MultiGridCL& MG, 
       case -10: // read from ensight-file [deprecated]
       {
         std::cout << "[DEPRECATED] read from ensight-file [DEPRECATED]\n";
-        ReadEnsightP2SolCL reader( MG);
+        /*        ReadEnsightP2SolCL reader( MG);
         reader.ReadVector( P.get<std::string>("DomainCond.InitialFile")+".vel", Stokes.v, Stokes.GetBndData().Vel);
         Stokes.UpdateXNumbering( pidx, lset);
         Stokes.p.SetIdx( pidx);
@@ -415,7 +365,7 @@ void SetInitialConditions(StokesT& Stokes, LevelsetP2CL& lset, MultiGridCL& MG, 
             P1toP1X ( pidx->GetFinest(), Stokes.p.Data, pidx->GetFinest(), ppos.Data, pneg.Data, lset.Phi, MG);
         }
         else
-            reader.ReadScalar( P.get<std::string>("DomainCond.InitialFile")+".pr", Stokes.p, Stokes.GetBndData().Pr);
+        reader.ReadScalar( P.get<std::string>("DomainCond.InitialFile")+".pr", Stokes.p, Stokes.GetBndData().Pr);*/
       } break;
 #endif
       case -1: // read from file
@@ -442,11 +392,23 @@ void SetInitialConditions(StokesT& Stokes, LevelsetP2CL& lset, MultiGridCL& MG, 
         PCGSolverCL<PcT> PCGsolver( pc, 200, 1e-2, true);
         typedef SolverAsPreCL<PCGSolverCL<PcT> > PCGPcT;
         PCGPcT apc( PCGsolver);
-        ISBBTPreCL bbtispc( &Stokes.B.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.M.Data.GetFinest(), Stokes.pr_idx.GetFinest(), 0.0, 1.0, 1e-4, 1e-4);
-        InexactUzawaCL<PCGPcT, ISBBTPreCL, APC_SYM> inexactuzawasolver( apc, bbtispc, P.get<int>("Stokes.OuterIter"), P.get<double>("Stokes.OuterTol"), 0.6, 50);
+        StokesSolverBaseCL *ssolver = 0;
+        if( Stokes.usesGhostPen() )
+        {
+            typedef BlockPreCL<ExpensivePreBaseCL, SchurPreBaseCL, LowerBlockPreCL>    LowerBlockPcT;
+            ISGhPenPreCL gpispc( &Stokes.prA.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.C.Data.GetFinest(), 0., 1., 1e-4, 1e-4, 200);
+            GCRSolverCL< LowerBlockPcT > gcrsolver( *(new LowerBlockPcT(apc, gpispc)),P.get<int>("Stokes.OuterIter"),P.get<int>("Stokes.OuterIter"),P.get<int>("Stokes.OuterTol") );
+            ssolver = new BlockMatrixSolverCL< GCRSolverCL<LowerBlockPcT> > ( gcrsolver );
+        }
+        else
+        {
+            ISBBTPreCL bbtispc( &Stokes.B.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.M.Data.GetFinest(), Stokes.pr_idx.GetFinest(), 0.0, 1.0, 1e-4, 1e-4);
+            ssolver = new InexactUzawaCL<PCGPcT, ISBBTPreCL, APC_SYM> ( apc, bbtispc, P.get<int>("Stokes.OuterIter"), P.get<double>("Stokes.OuterTol"), 0.6, 50);
+        }
 
-        NSSolverBaseCL<StokesT> stokessolver( Stokes, inexactuzawasolver);
+        NSSolverBaseCL<StokesT> stokessolver( Stokes, *ssolver);
         SolveStatProblem( Stokes, lset, stokessolver);
+        delete ssolver;
       } break;
       case  2: //flow without droplet
           Stokes.UpdateXNumbering( pidx, lset);
@@ -466,7 +428,8 @@ class TwoPhaseStoreCL
     MultiGridCL&         mg_;
     const StokesT&       Stokes_;
     const LevelsetP2CL&  lset_;
-    const TransportP1CL* transp_;
+    const TransportP1CL* transp_;//old
+    const SpaceTimeXSolutionCL* st_transp_;//new
     std::string          path_;
     Uint                 numRecoverySteps_;
     Uint                 recoveryStep_;
@@ -497,7 +460,14 @@ class TwoPhaseStoreCL
        *  */
     TwoPhaseStoreCL(MultiGridCL& mg, const StokesT& Stokes, const LevelsetP2CL& lset, const TransportP1CL* transp,
                     const std::string& path, Uint recoverySteps=2, bool binary= false, const PermutationT& vel_downwind= PermutationT(), const PermutationT& lset_downwind= PermutationT())
-      : mg_(mg), Stokes_(Stokes), lset_(lset), transp_(transp), path_(path), numRecoverySteps_(recoverySteps),
+      : mg_(mg), Stokes_(Stokes), lset_(lset), transp_(transp), st_transp_(NULL), path_(path), numRecoverySteps_(recoverySteps),
+        recoveryStep_(0), binary_( binary), vel_downwind_( vel_downwind), lset_downwind_( lset_downwind){}
+
+//new cstr with spacetimetransport-object (as reference to distinguish from std-cstr... - could be cleaned..)
+    TwoPhaseStoreCL(MultiGridCL& mg, const StokesT& Stokes, const LevelsetP2CL& lset, const SpaceTimeXSolutionCL& st_transp,
+                    const std::string& path, Uint recoverySteps=2, bool binary= false, 
+                    const PermutationT& vel_downwind= PermutationT(), const PermutationT& lset_downwind= PermutationT())
+        : mg_(mg), Stokes_(Stokes), lset_(lset), transp_(NULL), st_transp_(&st_transp), path_(path), numRecoverySteps_(recoverySteps),
         recoveryStep_(0), binary_( binary), vel_downwind_( vel_downwind), lset_downwind_( lset_downwind){}
 
     /// \brief Write all information in a file
@@ -524,10 +494,43 @@ class TwoPhaseStoreCL
         WriteFEToFile( ls, mg_, filename.str() + "levelset", binary_);
         WriteFEToFile(Stokes_.p, mg_, filename.str() + "pressure", binary_, &lset_.Phi); // pass also level set, as p may be extended
         if (transp_) WriteFEToFile(transp_->ct, mg_, filename.str() + "concentrationTransf", binary_);
+        if (st_transp_) WriteFEToFile(st_transp_->GetFutureTrace_Neg(), mg_, filename.str() + "concentration_neg", binary_);
+        if (st_transp_) WriteFEToFile(st_transp_->GetFutureTrace_Pos(), mg_, filename.str() + "concentration_pos", binary_);
     }
 };
 
 }   // end of namespace DROPS
+
+namespace SurfTens
+{
+//==============================================================================
+//          Functions for twophasedrops-executable (surface tension coefficient)
+//==============================================================================
+// tau is constant
+double sigmaf (const DROPS::Point3DCL&, double) {
+    static double sigma = P.get<double>("SurfTens.SurfTension");
+    return sigma;
+}
+
+DROPS::Point3DCL gsigma (const DROPS::Point3DCL&, double) { return DROPS::Point3DCL(); }
+
+//linear decrease of surface tension coefficient in y direction
+double lin_in_y(const DROPS::Point3DCL& p)  // linear function in y-direction, zero in the middle of the domain
+{
+    static double sigma = P.get<double>("SurfTens.SurfTension",1.0); // surface tension coefficient sigma : if tau is a variable, sigma is the constant part of tau.
+    static double Ly = P.get<DROPS::Point3DCL>("Domain.E2")[1];  // domain size in y
+    static double grad_tau = P.get<double>("SurfTens.GradTau", 0.);  // gradient of tau
+
+    return sigma + (p[1] - Ly*0.5)*grad_tau;  // grad_tau is the gradient of tau in y-direction
+}
+
+double sigma_const_grad_tau_y(const DROPS::Point3DCL& p, double) { return lin_in_y( p); }
+
+// Registration of funcitons
+static DROPS::RegisterScalarFunction regconstsurftens("ConstTau", sigmaf);
+static DROPS::RegisterScalarFunction regconstgradtau_y("ConstGradTau_y", sigma_const_grad_tau_y);
+
+}// end of namespace SurfTens
 
 #endif
 

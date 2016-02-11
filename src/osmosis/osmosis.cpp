@@ -271,7 +271,7 @@ int main (int argc, char** argv)
 #ifdef _PAR
     DROPS::ParMultiGridInitCL pmginit;
 #endif
-    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "osmosis.json");
+    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/osmosis/osmosis/osmosis.json");
     SetMissingParameters(P);
     std::cout << P << std::endl;
 

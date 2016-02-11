@@ -392,7 +392,7 @@ void LevelsetTetraAccumulator_P2DCL<DiscVelSolT>::finalize_accumulation ()
     // bH_->Build(); // FaceAccumulator takes care of bH
     // delete bH_;
 #ifndef _PAR
-    Comment(E.num_nonzeros() << " nonzeros in E, "<< H.num_nonzeros() << " nonzeros in H! " << std::endl, DebugDiscretizeC);
+    Comment(ls_.E.num_nonzeros() << " nonzeros in E, "<< ls_.H.num_nonzeros() << " nonzeros in H! " << std::endl, DebugDiscretizeC);
 #endif
 }
 
@@ -478,7 +478,7 @@ void LevelsetFaceAccumulator_P2DCL<DiscVelSolT>::finalize_accumulation ()
     delete bH_;
     std::cout << ls_.E.num_nonzeros() << " nonzeros in E, "<< ls_.H.num_nonzeros() << " nonzeros in H! " << std::endl;
 #ifndef _PAR
-    Comment(E.num_nonzeros() << " nonzeros in E, "<< H.num_nonzeros() << " nonzeros in H! " << std::endl, DebugDiscretizeC);
+    Comment(ls_.E.num_nonzeros() << " nonzeros in E, "<< ls_.H.num_nonzeros() << " nonzeros in H! " << std::endl, DebugDiscretizeC);
 #endif
 }
 

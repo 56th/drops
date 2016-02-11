@@ -104,7 +104,7 @@ int main( int argc, char **argv)
     DROPS::ProcCL::Instance(&argc, &argv);
 #endif
     try {
-        DROPS::read_parameter_file_from_cmdline( P, argc, argv, "risingdroplet.json");
+        DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/partests/dist_ref_rising_drop/ref_rising_drop.json");
         std::cout << P << std::endl;
 
 

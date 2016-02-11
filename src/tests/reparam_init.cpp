@@ -179,7 +179,7 @@ int main( int argc, char **argv)
     // TestDist();
     // return 0;
 
-    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "reparam_init.json");
+    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/tests/reparam_init/reparam_init.json");
     std::cout << P << std::endl;
 
     int numref;

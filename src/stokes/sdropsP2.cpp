@@ -174,7 +174,7 @@ void SolveStatProblem( StokesProblemT& Stokes, StokesSolverBaseCL& solver)
     timer.Reset();
 
     timer.Start();
-    solver.Solve( Stokes.A.Data, Stokes.B.Data, Stokes.v.Data, Stokes.p.Data, Stokes.b.Data, Stokes.c.Data, Stokes.v.RowIdx->GetEx(), Stokes.p.RowIdx->GetEx());
+    solver.Solve( Stokes.A.Data, Stokes.B.Data, Stokes.C.Data, Stokes.v.Data, Stokes.p.Data, Stokes.b.Data, Stokes.c.Data, Stokes.v.RowIdx->GetEx(), Stokes.p.RowIdx->GetEx());
     timer.Stop();
     const double duration = timer.GetTime();
     std::cout << "Solving Stokes took "<<  duration << " sec.\n";
@@ -318,6 +318,7 @@ void Strategy( StokesProblemT& Stokes)
                                  P.get<std::string>("VTK.TimeFileName"),
                                  P.get<int>("VTK.Binary"),
                                  P.get<int>("VTK.UseOnlyP1"),
+                                 false, /*P2DG*/
                                  -1,  /* <- level */
                                  P.get<int>("VTK.ReUseTimeFile"),
                                  P.get<int>("VTK.UseDeformation"));
@@ -377,7 +378,7 @@ int main ( int argc, char** argv)
 {
     try
     {
-        DROPS::read_parameter_file_from_cmdline( P, argc, argv, "stokes.json");
+        DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/stokes/sdropsP2/stokes.json");
         SetMissingParameters(P);
         std::cout << P << std::endl;
 

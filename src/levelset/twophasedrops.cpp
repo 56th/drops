@@ -56,6 +56,9 @@
 #include <fstream>
 #include <sstream>
 
+#ifndef _PAR
+#include "num/stokespardiso.h" 
+#endif
 #include "misc/progressaccu.h"
 #include "misc/dynamicload.h"
 
@@ -98,44 +101,29 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     MultiGridCL& MG= Stokes.GetMG();
 
     // initialization of surface tension
-    sigma= Stokes.GetCoeff().SurfTens;
-    eps= P.get<double>("SurfTens.JumpWidth");    lambda= P.get<double>("SurfTens.RelPos");    sigma_dirt_fac= P.get<double>("SurfTens.DirtFactor");
-    instat_scalar_fun_ptr sigmap  = 0;
-    if (P.get<double>("SurfTens.VarTension"))
-    {
-        sigmap  = &sigma_step;
-    }
-    else
-    {
-        sigmap  = &sigmaf;
-    }
-    SurfaceTensionCL sf( sigmap);
+    // choose a proper model for surface tension coefficient, see levelset/surfacetension.h
+    instat_scalar_fun_ptr sigmap = inscamap[P.get<std::string>("SurfTens.VarTensionFncs", "ConstTau")];
+    SurfaceTensionCL * sf;
+    sf = new SurfaceTensionCL( sigmap);
+    sf->SetInputMethod( Sigma_X);
 
     // Creates new Levelset-Object, has to be cleaned manually
-    LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsetbnddata, sf, P.get_child("Levelset")) );
+    LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsetbnddata, *sf, P.get_child("Levelset")) );
 
     if (is_periodic) //CL: Anyone a better idea? perDirection from ParameterFile?
     {
-        DROPS::Point3DCL dx;
-        //hack:
-        std::string mesh( P.get<std::string>("DomainCond.MeshFile")), delim("x@");
-        size_t idx_;
-        while ((idx_= mesh.find_first_of( delim)) != std::string::npos )
-            mesh[idx_]= ' ';
-        std::istringstream brick_info( mesh);
-        brick_info >> dx[0] >> dx[1] >> dx[2] ;
         int n = 0;
         if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicx" || P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicy" || P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicz")
             n = 1;
         if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicxy" || P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicxz" || P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicyz")
             n = 2;
         LevelsetP2CL::perDirSetT pdir(n);
-        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicx") pdir[0][0] = dx[0];
-        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicy") pdir[0][1] = dx[1];
-        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicz") pdir[0][2] = dx[2];
-        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicxy") {pdir[0][0] = dx[0]; pdir[1][1] = dx[1];}
-        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicxz") {pdir[0][0] = dx[0]; pdir[1][2] = dx[2];}
-        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicyz") {pdir[0][1] = dx[1]; pdir[1][2] = dx[2];}
+        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicx") pdir[0] = P.get<Point3DCL>("Domain.E1");
+        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicy") pdir[0] = P.get<Point3DCL>("Domain.E2");
+        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicz") pdir[0] = P.get<Point3DCL>("Domain.E3");
+        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicxy") {pdir[0] = P.get<Point3DCL>("Domain.E1"); pdir[1] = P.get<Point3DCL>("Domain.E2");}
+        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicxz") {pdir[0] = P.get<Point3DCL>("Domain.E1"); pdir[1] = P.get<Point3DCL>("Domain.E3");}
+        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicyz") {pdir[0] = P.get<Point3DCL>("Domain.E2"); pdir[1] = P.get<Point3DCL>("Domain.E3");}
         if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) != "periodicx" && P.get("DomainCond.PeriodicMatching", std::string("periodicx")) != "periodicy" && P.get("DomainCond.PeriodicMatching", std::string("periodicx")) != "periodicz" &&
           P.get("DomainCond.PeriodicMatching", std::string("periodicx")) != "periodicxy" && P.get("DomainCond.PeriodicMatching", std::string("periodicx")) != "periodicxz" && P.get("DomainCond.PeriodicMatching", std::string("periodicx")) != "periodicyz"){
             std::cout << "WARNING: could not set periodic directions! Reparametrization can not work correctly now!" << std::endl;
@@ -175,11 +163,8 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     }
 
     PermutationT lset_downwind;
-    if (P.get<double>("SurfTens.VarTension"))
-        lset.SetSurfaceForce( SF_ImprovedLBVar);
-    else
-        lset.SetSurfaceForce( SF_ImprovedLB);
-
+    lset.SetSurfaceForce( SF_ImprovedLBVar); // see levelset.h
+    
     if ( StokesSolverFactoryHelperCL().VelMGUsed(P))
         Stokes.SetNumVelLvl ( Stokes.GetMG().GetNumLevel());
     if ( StokesSolverFactoryHelperCL().PrMGUsed(P))
@@ -223,7 +208,10 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     Stokes.SetIdx();
     Stokes.v.SetIdx  ( vidx);
     Stokes.p.SetIdx  ( pidx);
-    Stokes.InitVel( &Stokes.v, ZeroVel);
+    if (P.get<int>("NavStokes.ShiftFrame") == 1)
+        Stokes.InitVel( &Stokes.v, InVecMap::getInstance().find("InflowShiftFrame")->second);  // shifted zero velocity initial condition
+    else
+        Stokes.InitVel( &Stokes.v, ZeroVel);
 
     IteratedDownwindCL navstokes_downwind( P.get_child( "NavStokes.Downwind"));
     if (P.get<int>( "NavStokes.Downwind.Frequency") > 0) {
@@ -287,7 +275,18 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
     // Stokes-Solver
     StokesSolverFactoryCL<InstatNavierStokes2PhaseP2P1CL> stokessolverfactory(Stokes, P);
-    StokesSolverBaseCL* stokessolver = stokessolverfactory.CreateStokesSolver();
+    StokesSolverBaseCL* stokessolver;
+
+    if (! P.get<int>("Stokes.DirectSolve"))
+        stokessolver = stokessolverfactory.CreateStokesSolver();
+#ifndef _PAR
+    else
+        stokessolver = new StokesPardisoSolverCL(); 
+#else
+    else
+        throw DROPSErrCL("no direct solver in parallel");
+#endif
+
 //  comment: construction of a oseen solver, preconditioned by another oseen solver,
 //           e.g. GCR preconditioned by Vanka-MG, do not forget to delete stokessolver1 at the end of strategy
 //
@@ -399,6 +398,9 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 #endif
 
     // writer for vtk-format
+    VecDescCL * sigma_vtk = NULL;
+    sigma_vtk = new VecDescCL;
+
     VTKOutCL * vtkwriter = NULL;
     if (P.get<int>("VTK.VTKOut",0)){
         vtkwriter = new VTKOutCL(adap.GetMG(), "DROPS data",
@@ -425,6 +427,8 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
             vtkwriter->Register( make_VTKIfaceScalar( MG, surfTransp.ic,  "InterfaceSol"));
         }
         vtkwriter->Write(Stokes.v.t);
+        vtkwriter->Register( make_VTKScalar( P1EvalCL<double, const StokesPrBndDataCL, const VecDescCL>( sigma_vtk, &Stokes.GetBndData().Pr, &MG), "tau"));
+        sf->SetVtkOutput( sigma_vtk);
     }
 
     VTKOutCL * dgvtkwriter = NULL;
@@ -453,6 +457,8 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
                     P.get<double>("AdaptRef.CoarsestLevel"), P.get<double>("AdaptRef.FinestLevel") );
     adap.set_marking_strategy(&marker);
 
+    IdxDescCL p1idx;
+
     for (int step= 1; step<=nsteps; ++step)
     {
         std::cout << "============================================================ step " << step << std::endl;
@@ -461,6 +467,12 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         const double time_new = Stokes.v.t + dt;
         IFInfo.Update( lset, Stokes.GetVelSolution());
         IFInfo.Write(time_old);
+
+        if (P.get<int>("VTK.VTKOut")) {
+            p1idx.CreateNumbering( Stokes.p.RowIdx->TriangLevel(), MG);
+            sigma_vtk->SetIdx( &p1idx);
+            sigma_vtk->Data = 0.;
+        }
 
         if (P.get("SurfTransp.DoTransp", 0)) surfTransp.InitOld();
         timedisc->DoStep( P.get<int>("Coupling.Iter"));
@@ -523,6 +535,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     IFInfo.Update( lset, Stokes.GetVelSolution());
     IFInfo.Write(Stokes.v.t);
     std::cout << std::endl;
+    if(sf) delete sf;
     delete timedisc;
     delete navstokessolver;
     delete stokessolver;
@@ -535,6 +548,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 #endif
     if (vtkwriter) delete vtkwriter;
     if (dgvtkwriter) delete dgvtkwriter;
+    if (sigma_vtk) delete sigma_vtk;
     if (infofile) delete infofile;
 
 //     delete stokessolver1;
@@ -554,6 +568,7 @@ void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<int>("VTK.AddDGOutput",0);
     P.put_if_unset<int>("Transp.DoTransp",0);
     P.put_if_unset<std::string>("Restart.Inputfile","none");
+    P.put_if_unset<int>("NavStokes.ShiftFrame", 0);
     P.put_if_unset<int>("NavStokes.Downwind.Frequency", 0);
     P.put_if_unset<double>("NavStokes.Downwind.MaxRelComponentSize", 0.05);
     P.put_if_unset<double>("NavStokes.Downwind.WeakEdgeRatio", 0.2);
@@ -570,6 +585,8 @@ void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<double>("Mat.DilatationalVisco", 0.0);
     P.put_if_unset<double>("SurfTens.ShearVisco", 0.0);
     P.put_if_unset<double>("SurfTens.DilatationalVisco", 0.0);
+    P.put_if_unset<std::string>("SurfTens.VarTensionFncs", "ConstTau");
+    P.put_if_unset<int>("Stokes.DirectSolve", 0);
 
     P.put_if_unset<int>("General.ProgressBar", 0);
     P.put_if_unset<std::string>("General.DynamicLibsPrefix", "../");
@@ -584,7 +601,7 @@ int main (int argc, char** argv)
   {
     std::cout << "Boost version: " << BOOST_LIB_VERSION << std::endl;
 
-    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "risingdroplet.json");
+    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/levelset/twophasedrops/risingdroplet.json");
     SetMissingParameters(P);
     std::cout << P << std::endl;
 
@@ -685,7 +702,7 @@ int main (int argc, char** argv)
         std::cout << "As far as I can tell the ParMultigridCL is sane\n";
 #endif
 
-    DROPS::InstatNavierStokes2PhaseP2P1CL prob( *mg, DROPS::TwoPhaseFlowCoeffCL(P), bnddata, P.get<double>("Stokes.XFEMStab")<0 ? DROPS::P1_FE : DROPS::P1X_FE, P.get<double>("Stokes.XFEMStab"));
+    DROPS::InstatNavierStokes2PhaseP2P1CL prob( *mg, DROPS::TwoPhaseFlowCoeffCL(P), bnddata, P.get<double>("Stokes.XFEMStab")<0 ? DROPS::P1_FE : DROPS::P1X_FE, P.get<double>("Stokes.XFEMStab"), DROPS::vecP2_FE, P.get<double>("Stokes.epsP",0.0));
 
     Strategy( prob, *lsetbnddata, adap);    // do all the stuff
 

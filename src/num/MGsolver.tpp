@@ -159,6 +159,7 @@ void MG(const MLMatrixCL& MGData, const ProlongationT& Prolong, const SmootherCL
 template<class StokesSmootherCL, class StokesDirectSolverCL, class ProlongItT1, class ProlongItT2>
 void StokesMGM( const MLMatrixCL::const_iterator& beginA,  const MLMatrixCL::const_iterator& fineA,
                 const MLMatrixCL::const_iterator& fineB,   const MLMatrixCL::const_iterator& fineBT, 
+                const MLMatrixCL::const_iterator& fineC,
                 const MLMatrixCL::const_iterator& fineprM, const ProlongItT1& PVel,
                 const ProlongItT2& PPr, VectorCL& u, VectorCL& p, const VectorCL& b,
                 const VectorCL& c, const StokesSmootherCL& Smoother, Uint smoothSteps, Uint cycleSteps,
@@ -167,6 +168,7 @@ void StokesMGM( const MLMatrixCL::const_iterator& beginA,  const MLMatrixCL::con
     MLMatrixCL::const_iterator coarseA   = fineA;
     MLMatrixCL::const_iterator coarseB   = fineB;
     MLMatrixCL::const_iterator coarseBT  = fineBT;
+    MLMatrixCL::const_iterator coarseC   = fineC;  //empty multilevel matrix, needed for due to solver interface for StokesSolverBaseCL
     MLMatrixCL::const_iterator coarseprM = fineprM;
     ProlongItT1 coarsePVel= PVel;
     ProlongItT2 coarsePPr = PPr;
@@ -177,13 +179,14 @@ void StokesMGM( const MLMatrixCL::const_iterator& beginA,  const MLMatrixCL::con
     {
         // use direct solver
         std::cout << "P2P1:StokesMGM: use direct solver " << std::endl;
-        Solver.Solve( *fineA, *fineB, u, p, b, c, DummyExchangeCL(), DummyExchangeCL());
+        Solver.Solve( *fineA, *fineB, *fineC, u, p, b, c, DummyExchangeCL(), DummyExchangeCL());
         //std::cout << "P2P1:StokesMGM: direct solver: iter: " << Solver.GetIter() << "\tresid: " << Solver.GetResid() << std::endl;
         return;
     }
     --coarseA;
     --coarseB;
     --coarseBT;
+    --coarseC;
     --coarseprM;
     --coarsePVel;
     --coarsePPr;
@@ -204,7 +207,7 @@ void StokesMGM( const MLMatrixCL::const_iterator& beginA,  const MLMatrixCL::con
     VectorCL eu ( du.size());
     VectorCL ep ( dp.size());
     for (Uint i=0; i<cycleSteps; ++i) {
-      StokesMGM( beginA, coarseA, coarseB, coarseBT, coarseprM, coarsePVel, coarsePPr, eu, ep, du, dp, Smoother,
+      StokesMGM( beginA, coarseA, coarseB, coarseBT, coarseC, coarseprM, coarsePVel, coarsePPr, eu, ep, du, dp, Smoother,
                  smoothSteps, cycleSteps, Solver, (numLevel==-1 ? -1 : numLevel-1), numUnknDirect);
     }
     // add coarse grid correction

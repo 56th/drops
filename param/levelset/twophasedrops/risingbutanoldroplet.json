@@ -1,0 +1,266 @@
+{
+//=============================================================
+//    DROPS parameter file for twophasedrops
+//    simulation of two-phase flow:
+//    butanol droplet in water
+//=============================================================
+
+//General section
+        "General": 
+        {
+                "ProgressBar":  1, //show progress bar
+                "DynamicLibsPrefix": "../", //where should we look for shared objects?
+                "DynamicLibs": [ //select libraries to be loaded after program start
+                        "levelset/liblevelset-twophaseCoeff",
+                        "misc/libmisc-scalarFunctions",
+                        "misc/libmisc-vectorFunctions"
+                ]
+        },
+
+// time stepping
+        "Time":
+        {
+                "NumSteps":             10,     // number of time steps
+                "StepSize":             0.0003,  // time step size
+                "Scheme":               1       // choose a specific time discretization
+        },
+
+// flow solver
+        "Stokes":
+        {
+                "StokesMethod":         10409,  // Stokes solver, cf. num/stokessolverfactory.h
+                "InnerIter":            1000,   // maximum number of iterations for the inner solver
+                "OuterIter":            200,    // maximum number of iterations for the outer solver
+                "InnerTol":             0.6,    // tolerance for the inner solver. (! Attention:
+                                                // The inner solver tolerance should be chosen some
+                                                // orders of magnitude smaller than the outer solver
+                                                // tolerance, otherwise the outer solver diverges)
+                "OuterTol":             1e-10,  // tolerance for the outer solver
+                "PcAIter":              500,    // maximum number of iterations for the preconditioner
+                                                // of the A-Block
+                "PcATol":               0.01,   // tolerance for the preconditioner of the A-Block
+                "PcSTol":               0.01,   // tolerance for the preconditioner of the Schur complement
+                "XFEMStab":             0.1,    // threshold for discarding additional dof parameters in
+                                                // the XFEM pressure space. Using a negative value
+                                                // yields the standard FEM pressure space.
+                "Theta":                1       // controls the implicitness of the theta-scheme
+                                                // for time discretization of the Navier-Stokes and
+                                                // level set equations. Theta = 0 yields the explicit and
+                                                // Theta = 1 the implicit Euler method. Theta = 0.5 results
+                                                // in the Crank-Nicholson scheme.
+        },
+
+// Navier Stokes solver
+        "NavStokes":
+        {
+                "Nonlinear":            1,      // determination of the influence of the nonlinear
+                                                // inertia term. For Nonlinear = 0 the linear Stokes
+                                                // equation and for Nonlinear = 1 the full Navier-Stokes
+                                                // equation is solved.
+                "Tol":                  1e-10,  // tolerance for the Navier-Stokes solver.
+                "Iter":                 20,     // maximum number of iterations for the Navier-Stokes solver.
+                "Reduction":            0.1     // reduction of the Oseen residual by this factor.
+        },
+
+// Levelset solver
+        "Levelset":
+        {
+                "Tol":                  1e-10,  // tolerance for the level set solver.
+                "Iter":                 1000,   // maximum number of iterations for the level set solver.
+                "SD":                   0.1,    // parameter controls the stability of the advection equation
+                                                // by streamline diffusion
+                "CurvDiff":             -1,     // smoothing of level set function before the discretization
+                                                // of the curvature term. ( ! Attention: The smoothing is only
+                                                // applied on temporary variables used for the curvature
+                                                // calculation. The interface remains unchanged.)
+                "VolCorrection":        1,      // control of the volume correction. For VolCorrection = 0 no
+                                                // correction is made and for VolCorrection = 1 it is carried
+                                                // out after each time step and reparameterization of the level
+                                                // set function.
+                "Theta":                1,      // controls the implicitness of the theta-scheme for time
+                                                // discretization of the Navier-Stokes and level set equations.
+                                                // Theta = 0 yields the explicit and Theta = 1 the implicit
+                                                // Euler method. Theta = 0.5 results in the Crank-Nicholson scheme.
+		"Discontinuous":		0,      // Use DG for levelset?
+
+                "BoundaryType":         "98!98!98!98!98!98",     // List of boundary types separated by a !.
+                                                           // Each defining a boundary type for one boundary
+                                                           // domain ( The following indices may be used:
+                                                           //          Dir0BC= 0, DirBC= 2, Per1BC= 13,
+                                                           //          Per2BC= 11, Nat0BC= 21, NatBC= 23,
+                                                           //          NoBC= 98, UndefinedBC_= 99        ).
+                "BoundaryFncs":         "Ellipsoiddist!Ellipsoiddist!Ellipsoiddist!Ellipsoiddist!Ellipsoiddist!Ellipsoiddist!"
+        },
+
+// coupling of Navier-Stokes and level set
+        "Coupling":
+        {
+                "Tol":                  1e-10,  // tolerance for the coupling.
+                "Iter":                 10,     // maximum number of iterations for the fixed-point iteration.
+                                                // ( ! Attention: For Iter = -1 the calculation is carried out
+                                                // until convergence).
+                "Stab":                 1,      // Laplace-Beltrami-stabilization.
+                "Projection":           0       // If Projection = 1, a projection step is carried out before
+                                                // the fixed-point-iteration.
+        },
+
+// re-initialization of levelset function",
+        "Reparam":
+        {
+                "Freq":                 1,      // number of timesteps before the levelset function is
+                                                // reparameterized. Freq = 0 deactivates the reparameterization.
+                "Method":               11,      // Method how to determine distance of frontier vertices and
+                                                // propagation scheme, see documentation of ReparamFactoryCLfor
+                                                // a detailed description
+                "MinGrad":              0.1,    // minimal allowed norm of the gradient of the levelset function.
+                "MaxGrad":              10,     // maximal allowed norm of the gradient of the levelset function.
+                "NarrowBand":           -1      // Narrow-Band method for the Euclidian method.
+                                                // (e. g. NarrowBand = 0.5 <=> all DOFs with < 50% of maximal
+                                                // level set value are considered).
+        },
+
+// adaptive refinement
+        "AdaptRef":
+        {
+                "Freq":                 1,      // number of timesteps before adaptive refinement is carried out.
+                "FinestLevel":          3,      // number of refinement levels and label of the finest level
+                                                // close to the phase boundary.
+                "CoarsestLevel":        0,      // label of coarsest level close to the phase boundary.
+                "Width":                0.0004, // domain of refinement.
+                "LoadBalStrategy":      1011    // load balancing method, see decompose.h for details
+        },
+
+// material data (all units are SI)
+        "Mat":
+        {
+                "DensDrop":           845.442,  // density of the droplet
+                "ViscDrop":           0.003281, // dynamic viscosity of the droplet
+                "DensFluid":          986.506,  // density of the surrounding fluid
+                "ViscFluid":          0.001388, // dynamic viscosity of the surrounding fluid.
+                "SmoothZone":         0.0001    // (deprecated) defines the width of the transition zone
+                                                // surrounding the interface, where the density- and viscosity-
+                                                // jump is smoothed numerically. In the current version we always
+                                                // use a sharp interface w/o any smoothing, hence, this parameter
+                                                // has no effect.
+        },
+
+// experimental conditions (all units are SI)
+        "Exp":
+        {
+
+                "RadDrop":              [2.0e-3, 2.0e-3, 2.0e-3 ], // radii of the ellipsoidal droplet at 
+                                                                   // initial time.
+                                                                   // ( ! Attention: If RadDrop is negativ, 
+                                                                   // a flow without a droplet is simulated)
+                "PosDrop":              [6.0e-3, 3.0e-3, 6.0e-3 ], // position of the droplet's centre at 
+                                                                   // initial time.
+                "Gravity":              [0, -9.81, 0 ],            // gravity vector
+                "FlowDir":              1,                         // direction of the flow at the inlet.
+                                                                   // FlowDir = 0 / 1 / 2 describes the 
+                                                                   // x- / y- / z-direction. If the flow 
+                                                                   // is orientated in negative coordinate 
+                                                                   // direction, a minus sign must be used
+                                                                   // for the parameter InflowVel.
+                "InflowVel":            0,                         // magnitude of the inflow velocity.
+                "RadInlet":             0.005,                     // radius of the circular intake.
+                "InflowFreq":           0,                         // inflow frequency.
+                "InflowAmpl":           0,                         // inflow amplitude.
+                "InitialLSet":          "Ellipsoid",               // choose a LevelSet function you want 
+                                                                   // to start with (default: 'Ellipsoid')
+                "VolForce":             "ZeroVel"                  // r.h.s. force of navier stokes
+                                                                   // equations (default: 'ZeroVel')
+        },
+
+// surface tension
+        "SurfTens":
+        {
+                "SurfTension":          0.00163,// surface tension coefficient.
+                "VarTensionFncs":       "ConstTau"
+        },
+
+// mass transport
+        "Transp":
+        {
+                "DoTransp":             0,      // mass transport (0 = deactivated, 1 = activated).
+                "Theta":                0.5,    // time integration theta scheme.
+                "Iter":                 200,    // maximum number of iterations.
+                "Tol":                  1e-10,  // tolerance.
+                "DiffPos":              0.005,  // diffusion coefficient (positiv part).
+                "DiffNeg":              0.01,   // diffusion coefficient (negativ part).
+                "HPos":                 1,      // Henry scaling number outside the droplet
+                "HNeg":                 0.5,    // Henry scaling number inside the droplet
+                "IniCPos":              0.1,    // initial concentration (positiv part).
+                "IniCNeg":              5,      // initial concentration (negativ part).
+                "NitschePenalty":       50,     // inactive! Penalty parameter for Nitsche formulation
+                "NitscheXFEMStab":      0.05    // treshold for discarding extending dof parameters.
+        },
+
+// surfactant transport
+        "SurfTransp":
+        {
+                "DoTransp":             0,      // Ensight output (0 = off, 1 = on).
+                "Theta":                0.5,    // name of Ensight case.
+                "Iter":                 1000,   // local directory of Ensight files.
+                "Tol":                  1e-10,  // write out Ensight files in binary format (0 = off, 1 = on).
+                "OmitBound":            -1.0,   // only master writes out Ensight files.
+                "Visc":                 1e-5    // name for the geometry.
+        },
+
+
+// Visualization Toolkit output format settings
+        "VTK":
+        {
+                "VTKOut":               1,                 // VTK output (0 = off, 1 = on).
+                "VTKDir":               "vtk",             // local directory for VTK files.
+                "VTKName":              "brick",           // name of VTK files
+                "Binary":               1                  // write out VTK files in binary format.
+        },
+
+// write out results, read in for restart
+        "Restart":
+        {
+                "Serialization":        0,                 // run serialization (0 = off, n>0 = write every n-th step).
+                "Overwrite":            1,                 // overwrite old output-files or create new ones
+                                                           // for every time step. 
+                                                           // (0 = every step a new file, n>0 generate n files in total)
+                "Inputfile":            "none",            // reads multigrid from deserialization files
+                                                           // (to deactivate the reading choose Inputfile = none).
+                "Outputfile":           "mg/data",         // writes multigrid to serialization files
+                                                           // (to deactivate the writing choose Outputfile = none).
+                "Binary":               0                  //
+        },
+
+// domain, boundary and initial conditions
+        "DomainCond":
+        {
+                "PeriodicMatching":     "none",            // matching function 
+                                                           // identifier for periodic boundaries
+                "InitialCond":          0,                 // initial conditions (0 = zero, 1/2 = stationary
+                                                           // flow with/without droplet, -1 = read from file).
+                "GeomType":             1,                 // specifies the used geometry
+                                                           // (0 = ReadMeshBuilder, 1 = BrickBuilder).
+                "InitialFile":          "mg/brick",        // file prefix when reading data for initial condition.
+                "MeshFile":             "12e-3x30e-3x12e-3@4x10x4",     
+                                                           // mesh file (created by GAMBIT or NETGEN, FLUENT/UNS 
+                                                           // format) or (in case of the BrickBuilder:)
+                                                           // dimensions of a cuboid (e.g. AxBxC@DxExF) with edge
+                                                           // sizes A,B and C in x,y,z direction and a partition into
+                                                           // D/E/F cuboids in x/y/z direction (for initial mesh)
+                                                           // Note that the Brickbuilder genenrates 6 Boundary 
+                                                           // domains with the order: 
+                                                           // - b.dom. 1 has normal in neg. x direction
+                                                           // - b.dom. 2 has normal in pos. x direction
+                                                           // - b.dom. 3 has normal in neg. y direction, etc..
+        "BoundaryType":     "0!0!23!2!0!0",                // List of boundary types separated by a !.
+                                                           // Each defining a boundary type for one boundary
+                                                           // domain ( The following indices may be used:
+                                                           //          Dir0BC= 0, DirBC= 2, Per1BC= 13,
+                                                           //          Per2BC= 11, Nat0BC= 21, NatBC= 23,
+                                                           //          NoBC= 98, UndefinedBC_= 99        ).
+        "BoundaryFncs":     "ZeroVel!ZeroVel!ZeroVel!InflowBrick!ZeroVel!ZeroVel"
+                                                           // List of boundary functions separated by a !.
+                                                           // Each string defines a function which is taken
+                                                           // from a function container during runtime.
+        }
+
+}

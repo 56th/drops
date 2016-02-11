@@ -89,11 +89,13 @@ class StokesP2P1CL : public ProblemCL<Coeff, StokesBndDataCL>
     VelVecDescCL b;
     VecDescCL    c;
     MLMatDescCL  A,
-                 B,
-                 C,        // Optional, for stabilisation.
+                 B,                 
                  M,
                  prA,
                  prM;
+    mutable MLMatDescCL C;          // Zero matrix by default. Optional, for stabilization.
+
+    VectorBaseCL<VectorCL> cKernel; // dummy, needed for preconditioner due to template structure
 
     StokesP2P1CL(const MGBuilderCL& mgb, const CoeffCL& coeff, const BndDataCL& bdata)
         : base_( mgb, coeff, bdata), vel_idx( vecP2_FE), pr_idx( P1_FE){}
@@ -146,11 +148,12 @@ class StokesP2P1CL : public ProblemCL<Coeff, StokesBndDataCL>
     const_DiscVelSolCL GetVelSolution( const VelVecDescCL& vel) const
         { return const_DiscVelSolCL( &vel, &GetBndData().Vel, &GetMG()); }
     //@}
-    bool UsesXFEM() { return false; } // just for consistency
+    bool UsesXFEM() { return false; }   // just for consistency
+    bool usesGhostPen(){ return false;} // just for consistency
 };
 
 //forward declarations
-/// \brief Accumulator to set up the matrix B and, if requested the right-hand side C for Stokes flow.
+/// \brief Accumulator to set up the matrix B and, if requested the right-hand side c for Stokes flow.
 template<class CoeffT>
 class System2Accumulator_P2P1CL;
 
