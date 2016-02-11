@@ -29,7 +29,7 @@
                 "N1": 1,                     // Number of cells along the E1-direction,
                 "N2": 2,                     //                       the E2-direction,
                 "N3": 10,                    //                       the E3-direction.
-                // "RestartFile": "path",    // If set, read the triangulation from the file (via FileBuilderCL).
+                "RestartFile": "none",    // If set, read the triangulation from the file (via FileBuilderCL).
                                              // and set boundary segments via domain builder (specified in "Type")
 
                 // adaptive refinement

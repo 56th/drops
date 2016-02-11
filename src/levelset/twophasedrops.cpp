@@ -617,8 +617,8 @@ int main (int argc, char** argv)
     }
 
     DROPS::MatchMap & matchmap = DROPS::MatchMap::getInstance();
-    bool is_periodic = P.get<std::string>("DomainCond.PeriodicMatching", "none") != "none";
-    DROPS::match_fun periodic_match = is_periodic ? matchmap[P.get<std::string>("DomainCond.PeriodicMatching", "periodicx")] : 0;
+    bool is_periodic = P.get<std::string>("NavStokes.BoundaryData.PeriodicMatching", "none") != "none";
+    DROPS::match_fun periodic_match = is_periodic ? matchmap[P.get<std::string>("NavStokes.BoundaryData.PeriodicMatching", "periodicx")] : 0;
 
     DROPS::MultiGridCL* mg= 0;
     typedef DROPS::BndDataCL<DROPS::Point3DCL> VelBndDataCL;
@@ -628,7 +628,7 @@ int main (int argc, char** argv)
     DROPS::LsetBndDataCL* lsetbnddata= 0;
 
     //you cannot pass a double& per P.get, so you need to use this indirect way
-    double ExpRadInlet = P.get<double>("Exp.RadInlet");
+    double ExpRadInlet = P.get<double>("NavStokes.RadInlet");
 
     try
     {

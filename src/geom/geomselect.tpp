@@ -59,7 +59,7 @@ void BuildBoundaryData( const MultiGridCL* mgp, BoundaryT* &bnddata,
     readBoundary( bnd_idx, bnd_type_string);
     readBoundary( bnd_names, bnd_funcs_string);
 
-    typedef std::vector<BoundaryCL::BndType>   BndTypeCont;    
+    typedef std::vector<BoundaryCL::BndType>   BndTypeCont;
     BndTypeCont perbndt(num_bnd);  
 
     for( size_t i=0; i<num_bnd; ++i){
@@ -84,6 +84,55 @@ void BuildBoundaryData( const MultiGridCL* mgp, BoundaryT* &bnddata,
     
     delete[] bnd_types;
     delete[] bnd_fun;
+}
+
+template< class BoundaryT>
+void BuildBoundaryData(const MultiGridCL* mgp, BoundaryT* &bnddata,
+                        const ParamCL &P, match_fun periodic_match, std::string *per_funcs)
+{
+    const BoundaryCL& bnd= mgp->GetBnd();
+    const BndIdxT num_bnd= bnd.GetNumBndSeg();
+
+    typedef typename BoundaryT::bnd_val_fun BndValFunT;
+
+    std::vector<int>         bnd_idx  ( num_bnd);
+    std::vector<std::string> bnd_names( num_bnd);
+    BndCondT* bnd_types = new BndCondT[num_bnd];
+
+
+    BndValFunT* bnd_fun = new BndValFunT[num_bnd];
+
+    readBoundary( bnd_idx, bnd_type_string);
+    readBoundary( bnd_names, bnd_funcs_string);
+
+    typedef std::vector<BoundaryCL::BndType>   BndTypeCont;
+    BndTypeCont perbndt(num_bnd);
+
+    BndCondT defaultBC =  string_to_BndCondT( P.get<std::string>("Default") );
+
+    for( size_t i=0; i<num_bnd; ++i){
+        bnd_types[i] = DROPS::BndCondT( bnd_idx[i]);
+        bnd_fun[i] = SingletonMapCL<BndValFunT>::getInstance()[bnd_names[i]];
+        switch (bnd_types[i])
+        {
+            case DROPS::Per1BC:
+                perbndt[i] = BoundaryCL::Per1Bnd; if (per_funcs) *per_funcs += "13"; break;
+            case DROPS::Per2BC:
+                perbndt[i] = BoundaryCL::Per2Bnd; if (per_funcs) *per_funcs += "11"; break;
+            default:
+                perbndt[i] = BoundaryCL::OtherBnd; if (per_funcs) *per_funcs += "98"; break;
+        }
+        if (i+1!=num_bnd && per_funcs)
+          *per_funcs += "!";
+    }
+
+    bnddata = new BoundaryT( num_bnd, bnd_types, bnd_fun);
+    if (periodic_match)
+      bnd.SetPeriodicBnd( perbndt, periodic_match);
+
+    delete[] bnd_types;
+    delete[] bnd_fun;
+
 }
 
 }// end of namespace DROPS
