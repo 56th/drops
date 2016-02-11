@@ -26,9 +26,9 @@
                 "E1": [1,0,0],               // Basis to span the object,
                 "E2": [0,1,0],               // not necessary orthonormal 
                 "E3": [0,0,1],               // ... 
-                "N1": 1,                     // Number of cells along the E1-direction,
-                "N2": 2,                     //                       the E2-direction,
-                "N3": 10,                    //                       the E3-direction.
+                "N1": 4,                     // Number of cells along the E1-direction,
+                "N2": 4,                     //                       the E2-direction,
+                "N3": 4,                    //                       the E3-direction.
                 "RestartFile": "none",    // If set, read the triangulation from the file (via FileBuilderCL).
                                              // and set boundary segments via domain builder (specified in "Type")
 
@@ -36,10 +36,10 @@
                 "AdaptRef":
                 {
                     "Freq":                 1,      // number of timesteps before adaptive refinement is carried out.
-                    "FinestLevel":          3,      // number of refinement levels and label of the finest level
+                    "FinestLevel":          1,      // number of refinement levels and label of the finest level
                                                     // close to the phase boundary.
                     "CoarsestLevel":        0,      // label of coarsest level close to the phase boundary.
-                    "Width":                0.0004, // domain of refinement.
+                    "Width":                0.4, // domain of refinement.
                     "LoadBalStrategy":      1011    // load balancing method, see decompose.h for details
                 }
         },
@@ -49,7 +49,8 @@
         "Time":
         {
                 "NumSteps":             10,     // number of time steps
-                "StepSize":             0.0003, // time step size
+                "TEnd":                 0.003,  // simulation time
+                //"StepSize":             0.0003, // time step size
                 "Scheme":               1,      // choose a specific time discretization
                 "Theta":                1       // controls the implicitness of the theta-scheme
                                                 // for time discretization of the Navier-Stokes and
@@ -67,11 +68,12 @@
                                                 // until convergence).
                 "ImplLB":               1,      // implicit Laplace-Beltrami in coupling of Navier-Stokes + Levelset 
                                                 // to stabilize fixed-point loop
+                "Projection":           0,
 
                 // Navier Stokes solver
                 "NavStokesSolver":
                 {
-                        "Nonlinear":            1,      // determination of the influence of the nonlinear
+                        "Nonlinear":            0,      // determination of the influence of the nonlinear
                                                         // inertia term. For Nonlinear = 0 the linear Stokes
                                                         // equation and for Nonlinear = 1 the full Navier-Stokes
                                                         // equation is solved.
@@ -82,7 +84,7 @@
                         "OseenSolver":
                         {
                                 // TODO: besser Dictionary, das verwendeten Loeser/Vorkonditionierer abbildet
-                                "Solver":               10409,  // Stokes solver, cf. num/stokessolverfactory.h
+                                "Solver":               10411,  // Stokes solver, cf. num/stokessolverfactory.h
                                 "Iter":                 200,    // maximum number of iterations for the solver
                                 "Tol":                  1e-10,  // tolerance for the solver
                                 "PcAIter":              500,    // maximum number of iterations for the preconditioner
@@ -162,11 +164,11 @@
         {
                 "InitialValue":   "Ellipsoid",                     // choose a Levelset function you want
                                                                    // to start with (default: 'Ellipsoid')
-                "RadDrop":              [2.0e-3, 2.0e-3, 2.0e-3 ], // radii of the ellipsoidal droplet at
+                "RadDrop":              [ 0.25, 0.25, 0.25 ], // radii of the ellipsoidal droplet at
                                                                    // initial time.
                                                                    // ( ! Attention: If RadDrop is negative,
                                                                    // a flow without a droplet is simulated)
-                "PosDrop":              [6.0e-3, 3.0e-3, 6.0e-3 ], // position of the droplet's center at
+                "PosDrop":              [ 0.5, 0.5, 0.5 ], // position of the droplet's center at
                                                                    // initial time.
                 "SD":                   0.1,    // parameter controls the stability of the advection equation
                                                 // by streamline diffusion
@@ -245,7 +247,7 @@
         {
                 "Freq":                 1,                 // VTK output (0 = off, n>0 = write every n-th step).
                 "VTKDir":               "vtk",             // local directory for VTK files.
-                "VTKName":              "brick",           // name of VTK files
+                "VTKName":              "risingdroplet",           // name of VTK files
                 "Binary":               1                  // write out VTK files in binary format.
         },
 
@@ -264,6 +266,27 @@
                 "InputData":            "",                // reads FE solutions
                                                            // (to deactivate choose InputData = "").
                 "Binary":               1                  // use binary format
-        }
+        },
+
+
+        "DomainCond":
+       {
+                "PeriodicMatching":     "none",            // matching function 
+                                                           // identifier for periodic boundaries
+                "InitialCond":          0,                 // initial conditions (0 = zero, 1/2 = stationary
+                                                              // flow with/without droplet, -1 = read from file).
+                     "InitialFile":          "mg/data",         // file prefix when reading data for initial condition.
+                   "BoundaryType":         "0!0!0!0!0!0",     // List of boundary types separated by a !.
+                                                              // Each defining a boundary type for one boundary
+                                                                  // domain ( The following indices may be used:
+                                                                  //          Dir0BC= 0, DirBC= 2, Per1BC= 13,
+                                                              //          Per2BC= 11, Nat0BC= 21, NatBC= 23,
+                                                              //          NoBC= 98, UndefinedBC_= 99        ).
+                       "BoundaryFncs":         "ZeroVel!ZeroVel!ZeroVel!ZeroVel!ZeroVel!ZeroVel"
+                                                                  // List of boundary functions separated by a !.
+                                                                  // Each string defines a function which is taken
+                                                                  // from a function container during runtime.
+               }
+
 
 } 

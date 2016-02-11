@@ -82,7 +82,7 @@ namespace tpd_inflow{
     {
         DROPS::SVectorCL<3> ret(0.);
         DROPS::SVectorCL<3> PosDrop(0.);
-        PosDrop = P.get<DROPS::Point3DCL>("Exp.PosDrop");
+        PosDrop = P.get<DROPS::Point3DCL>("Levelset.PosDrop");
         ret[0]=-0.5*(p[0]-PosDrop[0]);
         ret[1]=-0.5*(p[1]-PosDrop[1]);
         ret[2]= p[2]-PosDrop[2];
@@ -134,7 +134,7 @@ namespace tpd_volforce{
     DROPS::SVectorCL<3> PeriodicDropletPressure( const DROPS::Point3DCL& , double )
     {
         DROPS::SVectorCL<3> ret(0.);
-        ret[D] = -P.get<DROPS::Point3DCL>("Exp.Gravity")[D];
+        ret[D] = -P.get<DROPS::Point3DCL>("NavStokes.Coeff.Gravity")[D];
 
         static bool first = true;
         static DROPS::Point3DCL dx;
@@ -146,9 +146,11 @@ namespace tpd_volforce{
             dx[2] = P.get<DROPS::Point3DCL>("Domain.E3")[2];
         }
 
-        static double voldrop = 4./3.*M_PI* P.get<DROPS::Point3DCL>("Exp.RadDrop")[0]*P.get<DROPS::Point3DCL>("Exp.RadDrop")[1]*P.get<DROPS::Point3DCL>("Exp.RadDrop")[2] ;
+        static double voldrop = 4./3.*M_PI* P.get<DROPS::Point3DCL>("Levelset.RadDrop")[0]*P.get<DROPS::Point3DCL>("Levelset.RadDrop")[1]*P.get<DROPS::Point3DCL>("Levelset.RadDrop")[2] ;
         static double brickvol = dx[0]* dx[1]* dx[2];
-        static double volforce = P.get<double>("Mat.DensFluid") * brickvol - (P.get<double>("Mat.DensFluid") - P.get<double>("Mat.DensDrop")) * voldrop;
+        static double volforce = P.get<double>("NavStokes.Coeff.DensPos") * brickvol
+                               - ( P.get<double>("NavStokes.Coeff.DensPos")
+                                 - P.get<double>("NavStokes.Coeff.DensNeg") ) * voldrop;
         ret[D] *= volforce/brickvol;
         return ret;
     }
@@ -170,9 +172,9 @@ namespace levelsetdistance{
     ///mzelle_ns_adap.cpp + mzelle_instat.cpp
     double CubeDistance( const DROPS::Point3DCL& p, double)
     {
-        double maxd = - P.get<DROPS::Point3DCL>("Exp.RadDrop")[0] - P.get<DROPS::Point3DCL>("Exp.RadDrop")[1]- P.get<DROPS::Point3DCL>("Exp.RadDrop")[2];
+        double maxd = - P.get<DROPS::Point3DCL>("Levelset.RadDrop")[0] - P.get<DROPS::Point3DCL>("Levelset.RadDrop")[1]- P.get<DROPS::Point3DCL>("Levelset.RadDrop")[2];
         for (int i=0;i<3;i++){
-          double x = std::abs(p[i] - P.get<DROPS::Point3DCL>("Exp.PosDrop")[i]) - P.get<DROPS::Point3DCL>("Exp.RadDrop")[i];
+          double x = std::abs(p[i] - P.get<DROPS::Point3DCL>("Levelset.PosDrop")[i]) - P.get<DROPS::Point3DCL>("Levelset.RadDrop")[i];
           if (x>maxd) maxd=x;
         }
         return maxd;
@@ -200,8 +202,8 @@ namespace levelsetdistance{
 
         DROPS::Point3DCL dp;
         dp[i] = dx[i];
-        DROPS::Point3DCL ExpRadDrop = P.get<DROPS::Point3DCL>("Exp.RadDrop");
-        DROPS::Point3DCL ExpPosDrop = P.get<DROPS::Point3DCL>("Exp.PosDrop");
+        DROPS::Point3DCL ExpRadDrop = P.get<DROPS::Point3DCL>("Levelset.RadDrop");
+        DROPS::Point3DCL ExpPosDrop = P.get<DROPS::Point3DCL>("Levelset.PosDrop");
         DROPS::Point3DCL d= p - ExpPosDrop;
         DROPS::Point3DCL d1= p + dp - ExpPosDrop;
         DROPS::Point3DCL d2= p - dp - ExpPosDrop;
@@ -216,7 +218,7 @@ namespace levelsetdistance{
     template<int i>
     double planedistance( const DROPS::Point3DCL& p, double)
     {
-        double x=p[i]-P.get<DROPS::Point3DCL>("Exp.PosDrop")[i];
+        double x=p[i]-P.get<DROPS::Point3DCL>("Levelset.PosDrop")[i];
         return x;
     }
 
@@ -259,7 +261,7 @@ namespace surffunctions{
     }
     double surf_sol (const DROPS::Point3DCL& p, double)
     {
-        return 1. + std::sin( atan2( p[0] - P.get<DROPS::Point3DCL>("Exp.PosDrop")[0], p[2] - P.get<DROPS::Point3DCL>("Exp.PosDrop")[2]));
+        return 1. + std::sin( atan2( p[0] - P.get<DROPS::Point3DCL>("Levelset.PosDrop")[0], p[2] - P.get<DROPS::Point3DCL>("Levelset.PosDrop")[2]));
     }
     double surf_uniform (const DROPS::Point3DCL&, double)
     {

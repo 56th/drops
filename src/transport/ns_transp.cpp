@@ -595,7 +595,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbndda
 
     instat_scalar_fun_ptr distance = tdscalarmap[P.get<std::string>("Transp.Levelset")];
 
-    instat_scalar_fun_ptr sigmap = tdscalarmap[P.get<std::string>("SurfTens.VarTensionFncs")];
+    instat_scalar_fun_ptr sigmap = tdscalarmap[P.get<std::string>("NavStokes.Coeff.SurfTens.VarTensionFunc")];
 
     cBndDataCL *pBnd_c, *pBnd_ct;
     DROPS::BuildBoundaryData( &MG, pBnd_c,  P.get<std::string>("Transp.BoundaryType"), P.get<std::string>("Transp.BoundaryFncs"));
