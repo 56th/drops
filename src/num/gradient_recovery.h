@@ -1,6 +1,6 @@
 /// \file gradient_recovery.h
 /// \brief Compute a Lipschitz approximation of the gradient of a finite element function.
-/// \author LNM RWTH Aachen: Joerg Grande
+/// \author Joerg Grande
 
 /*
  * This file is part of DROPS.
@@ -19,7 +19,7 @@
  * along with DROPS. If not, see <http://www.gnu.org/licenses/>.
  *
  *
- * Copyright 2014 LNM RWTH Aachen, Germany
+ * Copyright 2014, 2015, 2016 Joerg Grande, Aachen, Germany
 */
 
 
