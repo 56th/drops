@@ -1191,6 +1191,8 @@ class QRDecompCL
     void Solve (SVecCont<SVectorCL<Rows_> >& b) const;
     template <Uint Size>
     void Solve (SArrayCL<SVectorCL<Rows_>, Size>& b) const;
+    template <Uint Size>
+    void Solve (SMatrixCL<Rows_, Size>& b) const;
 
     ///@{ Apply (parts of) Q or Q^T
     void apply_reflection  (Uint j, SVectorCL<Rows_>& b) const;
@@ -1313,6 +1315,19 @@ template <Uint Rows_, Uint Cols_>
 {
     for (Uint i= 0; i < Size; ++i)
         Solve( b[i]);
+}
+
+template <Uint Rows_, Uint Cols_>
+  template <Uint Size>
+    void
+    QRDecompCL<Rows_, Cols_>::Solve (SMatrixCL<Rows_, Size>& b) const
+{
+    SVectorCL<Rows_> c( Uninitialized);
+    for (Uint i= 0; i < Size; ++i) {
+        c= b.col (i);
+        Solve( c);
+        b.col( i, c);
+    }
 }
 
 /** Put the values of a_, d_ and beta_ in buffer. Note that buffer must be of size

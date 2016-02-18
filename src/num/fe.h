@@ -339,6 +339,9 @@ class FE_P2CL
     // Laplace(H_d) on a tetrahedron T; M:= transpose(inverse(A)), where A is the matrix
     // of the affine transformation that maps the reference tetrahedron onto T.
     static inline double Laplace(Uint dof, const SMatrixCL<3,3>& M);
+
+    // The barycentric coordinates of the dofs.
+    static const BaryCoordCL bary_coord[10];
 };
 
 

@@ -26,6 +26,7 @@
 #define DROPS_OSWALD_PROJECTION_H
 
 #include "misc/problem.h"
+#include "num/accumulator.h"
 #include "num/fe.h"
 
 namespace DROPS
@@ -62,7 +63,7 @@ class OswaldProjectionP2AccuCL : public TetraAccumulatorCL
     }
 
     virtual void visit (const TetraCL& t) {
-        loc_.set_tetra( t);
+        loc_.set_tetra( &t);
         numg.assign_indices_only( t, *avg_.RowIdx);
         for (Uint i= 0; i < 10; ++i) {
             if (!numg.WithUnknowns( i))

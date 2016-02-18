@@ -55,19 +55,19 @@ class LocalP2GradientCL
     LocalP2GradientCL (const VecDescCL& f, const BndDataCL<>& fbnd)
         : f_( f), fbnd_( fbnd)  { P2DiscCL::GetGradientsOnRef( GradRefLP1); }
 
-    void set_tetra (const TetraCL& t);
+    void set_tetra (const TetraCL* t);
     value_type&       operator[] (size_t i)       { return p2grad[i]; }
     const value_type& operator[] (size_t i) const { return p2grad[i]; }
 
 
 };
 
-void LocalP2GradientCL::set_tetra (const TetraCL& t)
+void LocalP2GradientCL::set_tetra (const TetraCL* t)
 {
     double det; // dummy
-    GetTrafoTr( M, det, t);
+    GetTrafoTr( M, det, *t);
     P2DiscCL::GetGradients( GradLP1, GradRefLP1, M);
-    p2.assign( t, f_, fbnd_);
+    p2.assign( *t, f_, fbnd_);
     p1grad= Point3DCL();
     for (Uint i= 0; i < 10; ++i)
         p1grad+= p2[i]*GradLP1[i];
