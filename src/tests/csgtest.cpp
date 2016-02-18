@@ -666,7 +666,8 @@ int TestAdap (MultiGridCL& mg, ParamCL& p)
               ierrq( &p1idx),
               idist( &p1idx),
               lsgradrec( &vecp2idx),
-              redist_err( &p2idx);
+              redist_err( &p2idx),
+              locdist( &p2idx);
 
     const size_t num= std::distance( p.begin(), p.end());
 
@@ -722,12 +723,25 @@ int TestAdap (MultiGridCL& mg, ParamCL& p)
                                    P.get<double>( "LevelsetMapper.InnerTol"));
         quaqua.get_locator().set_structured_coarse_grid( P.get_child( "Domain"));
 
+        LocalQuaMapperCL locqua (mg, lset.Phi,
+            /*maxiter*/ P.get<int>( "LevelsetMapper.Iter"),
+            /*tol*/ P.get<double>( "LevelsetMapper.Tol"),
+            /*armijo_c*/ P.get<double>( "LevelsetMapper.ArmijoConstant"),
+            /*max_damping_steps*/ P.get<Uint>( "LevelsetMapper.MaxDampingSteps"));
+        LocalQuaMapperP2CL locquap2(locqua); // Provides the interface for the Oswald-projection class.
+        locdist.SetIdx( &p2idx);
+        OswaldProjectionP2AccuCL<LocalQuaMapperP2CL> loc_dist_accu(locquap2, locdist);
+        TetraAccumulatorTupleCL accus2;
+        accus2.push_back( &loc_dist_accu);
+        accumulate( accus2, mg, p2idx.TriangLevel(), p2idx.GetMatchingFunction(), p2idx.GetBndInfo());
+
         TetraAccumulatorTupleCL accus;
         InterfaceCommonDataP2CL cdatap2( lset.Phi, lset.GetBndData(), quaqua, PrincipalLatticeCL::instance( P.get<Uint>( "Subsampling")));
-        cdatap2.compute_quaddomains( P.get<std::string>("Testcase") == "area");
+//         cdatap2.compute_quaddomains( P.get<std::string>("Testcase") == "area");
+        cdatap2.compute_quaddomains( true);
         accus.push_back( &cdatap2);
         InterfaceL2AccuP2CL l2accu( cdatap2, mg, "Area-Accumulator");
-        l2accu.set_sample_curvature(P.get<std::string>("Testcase") == "area" && P.get<bool>("SampleCurvature") == true);
+        l2accu.set_sample_curvature(/*P.get<std::string>("Testcase") == "area" &&*/ P.get<bool>("SampleCurvature") == true);
         if (P.get<std::string>("Testcase") == "redistancing") {
             l2accu.compute_redist_err( &redist_err);
             l2accu.set_function( &torus_distance);

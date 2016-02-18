@@ -518,4 +518,186 @@ double abs_det (const TetraCL& tet, const BaryCoordCL& xb, const QuaQuaMapperCL&
     return std::sqrt( Gram(0,0)*Gram(1,1) - Gram(0,1)*Gram(1,0));
 }
 
+
+const LocalQuaMapperCL& LocalQuaMapperCL::set_point (const BaryCoordCL& xbarg) const
+{
+    xb= xbarg;
+    have_base_point= false;
+    return *this;
+}
+
+const LocalQuaMapperCL& LocalQuaMapperCL::set_tetra (const TetraCL* tetarg) const
+{
+    if (tet != tetarg) {
+        tet= tetarg;
+        have_base_point= false;
+        locls.assign( *tet, ls);
+
+        SMatrixCL<3,3> T( Uninitialized);
+        double dummy;
+        GetTrafoTr( T, dummy, *tet);
+        P2DiscCL::GetGradients( gradp2, gradrefp2, T);
+        loc_ls_grad= LocalP1CL<Point3DCL>();
+        for (Uint i= 0; i < 10; ++i)
+            loc_ls_grad+= locls[i]*gradp2[i];
+        h= ::cbrt( std::abs( dummy));
+        SMatrixCL<3,3> H[10];
+        P2DiscCL::GetHessians (H, T);
+        H_ls= SMatrixCL<3,3>();
+        for (Uint i= 0; i < 10; ++i)
+            H_ls+= locls[i]*H[i];
+        w2b.assign( *tet);
+
+        const SVectorCL<4>& tmp= p2top1*SVectorCL<10> (&locls[0], &locls[10]);
+        std::copy (tmp.begin(), tmp.end(), &loclsp1[0]);
+        Point3DCL gradp1[4];
+        P1DiscCL::GetGradients( gradp1, T);
+        gp1= Point3DCL();
+        for (Uint i= 0; i < 4; ++i)
+            gp1+= loclsp1[i]*gradp1[i];
+
+        SMatrixCL<4, 4>& M= qrM.GetMatrix ();
+        for(Uint i= 0; i < 4; ++i) {
+            for(Uint j= 0; j < 3; ++j)
+                M (i, j)= tet->GetVertex (i)->GetCoord()[j];
+            M (i, 3)= 1.;
+        }
+        qrM.prepare_solve ();
+        SVectorCL<4> p;
+        std::copy (&gp1[0], &gp1[3], &p[0]);
+        p[3]= 0.;
+        qrM.Solve (p);
+        c_lin_dist= inner_prod (SVectorCL<4> (&loclsp1[0], &loclsp1[4]), p);
+    }
+    return *this;
+}
+
+void LocalQuaMapperCL::base_point_newton () const
+{
+    const Point3DCL x0= GetWorldCoord( *tet, xb); // World coordinates of the point to be projected.
+
+    // Initial values for bxxb and  s=dh/norm(g_ls)
+//     bxb= xb;
+//     double s= 0; // scaled quasi-distance
+    SVectorCL<4> p;
+    std::copy (x0.begin(), x0.end(), &p[0]);
+    p[3]= 1.;
+    qrM.Solve (p);
+    double s= inner_prod (SVectorCL<4> (&loclsp1[0], &loclsp1[4]), p)/c_lin_dist;
+    Point3DCL x= x0 - s*gp1;// World coordinates of the current bxb.
+    bxb= w2b (x);
+
+    SVectorCL<4> F,   // The function of which we search a root, ( x0 - x - s*gh(x), -ls(x) ).
+                 fdx; // Newton correction.
+    Point3DCL dx;     // The coordinate part of fdx.
+    double ds,    // increment part of fdx
+           l;     // Damping factor for line search.
+
+    Point3DCL g_ls= loc_ls_grad( bxb); // gradient of the level set function.
+
+    // Setup initial F= (x0 - x - s*g_ls(bxb), -locls( bxb))= (0, -locls( bxb)).
+    for (Uint i= 0; i < 3; ++i)
+        F[i]= x0[i] - x[i] - s*g_ls[i];
+    F[3]= -locls( bxb);
+
+    QRDecompCL<4,4> qr;
+    SMatrixCL<4,4>& M= qr.GetMatrix();
+    SMatrixCL<4,4>  Msave;
+
+    Point3DCL xnew;
+    double    snew;
+    BaryCoordCL bxbnew;
+    SVectorCL<4> Fnew;
+    int iter;
+    for (iter= 0; iter < maxiter_; ++iter) {
+        if (F.norm() < tol_)
+            break;
+
+        // Evaluate the gradient of locls in bxb: g_ls.
+        g_ls= loc_ls_grad( bxb);
+
+        // Evaluate the Jacobian of loc_ls_grad in bxb: H_ls.
+//         dgh= SMatrixCL<3,3>();
+//         for (Uint i= 0; i < 10; ++i)
+//             dgh+= outer_product( loc_gh[i], gradp2_xb[i]);
+
+        // Setup the blockmatrix M= (-I - s H_ls | - g_ls, -g_ls^T | 0).
+        for (Uint i= 0; i < 3; ++i) {
+            for (Uint j= 0; j < 3; ++j) {
+                M( i,j)= -s*H_ls( i,j);
+            }
+            M( i,i)-= 1.;
+            M( i, 3)= -g_ls[i];
+            M( 3, i)= -g_ls[i];
+        }
+        M( 3,3)= 0.;
+        Msave= M;
+        qr.prepare_solve();
+
+        // Compute Newton update.
+        fdx= F;
+        qr.Solve( fdx);
+        dx= MakePoint3D( fdx[0], fdx[1], fdx[2]);
+        ds= fdx[3];
+
+        l= std::min( 1., 0.5*h/dx.norm());
+        Uint j;
+        for (j= 0; j < max_damping_steps_; ++j, l*= 0.5) {
+            if (l < 1e-7) {
+                std::cerr << "LocalQuaMapperCL::base_point_newton: Too much damping. iter: " << iter << " x0: " << x0 << " x: " << x << " dx: " << dx << " ls(x): " << ls.val( *tet, bxb) << " l: " << l << " s: " << s << " g_ls: " << g_ls << std::endl;
+            }
+            xnew= x - l*dx;
+            snew= s - l*ds;
+            bxbnew= w2b( xnew);
+
+            // Setup Fnew= (x0 - xnew - snew*gh, -locls( bxbnew)).
+            g_ls= loc_ls_grad( bxbnew);
+            for (Uint i= 0; i < 3; ++i)
+                Fnew[i]= x0[i] - xnew[i] - snew*g_ls[i];
+            Fnew[3]= -locls( bxbnew);
+
+            // Armijo-rule
+            if (Fnew.norm() < F.norm() + armijo_c_*inner_prod( transp_mul( Msave, F), fdx)/F.norm()*l) {
+                break;
+            }
+        }
+        total_damping_iter+= j;
+// if (j>1)
+//     std::cout << "l: " << l << " j: " << j << ".\n";
+        x= xnew;
+        s= snew;
+        bxb= bxbnew;
+        F= Fnew;
+    }
+    cur_num_outer_iter= iter;
+    ++num_outer_iter[iter];
+    // Compute the quasi-distance dh:
+    dh= s*g_ls.norm();
+    if (iter >= maxiter_) {
+        std::cout << "LocalQuaMapperCL::base_point_newton: max iteration number exceeded; x0: " << x0 << "\tx: " << x << "\t fdx: " << fdx << "\t F: " << F << "\tl: " << l << "\tdh: " << dh << "\tg_ls: " << g_ls << std::endl;
+    }
+    have_base_point= true;
+}
+
+
+const LocalQuaMapperCL& LocalQuaMapperCL::base_point () const
+// tet and xb specify the point which is projected to the zero level.
+// On return tet and xb are the resulting base point.
+{
+    ScopeTimerCL scopetimer( "LocalQuaMapperCL::base_point");
+    TimerCL timer;
+
+    if (!have_base_point)
+        base_point_newton();
+
+    timer.Stop();
+    base_point_time+= timer.GetTime();
+    min_outer_iter= std::min( min_outer_iter, cur_num_outer_iter);
+    max_outer_iter= std::max( max_outer_iter, cur_num_outer_iter);
+    total_outer_iter+= cur_num_outer_iter;
+    ++total_base_point_calls;
+    return *this;
+}
+
+
 } // end of namespace DROPS

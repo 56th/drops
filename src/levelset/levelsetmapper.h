@@ -29,6 +29,7 @@
 #include "geom/subtriangulation.h"
 #include "num/fe.h"
 #include "num/discretize.h"
+#include "num/oswald_projection.h"
 #include "misc/problem.h"
 
 #include <tr1/unordered_map>
@@ -189,6 +190,173 @@ inline bool is_in_ref_tetra (const BaryCoordCL& b, double eps= 1e-11)
     return true; // Implies b[i] < 1 + 3eps
 }
 
+
+
+// Take LocalP2CL<> ls, check whether there is a linear interface. If yes, map to piecewise quadratic interface and return LocalP2CL<Point3DCL> with displacement for each P2-dof.
+// Two modes of operation: 2nd: For each dof, map the dof to the quadratic level set of the linear ls value in dof (Christophs method)
+// //                         1st: For each dof map base point on linear interface to base point on quadratic interface.
+// class LocalLinearToQuadraticIfaceCL
+// {
+//   private:
+//     enum map_type {MAP_BASE_POINTS, MAP_LEVEL_SETS};
+//     map_type t_;
+//     bool intersection_p_;
+//     LocalP2CL<Point3DCL> map_;
+// 
+//   public:
+//     LocalLinearToQuadraticIfaceCL () : t_(MAP_BASE_POINTS), intersection_p_ (false) {}
+//     LocalLinearToQuadraticIfaceCL& assign (const LocalP2CL<>& ls) { return *this; }
+// 
+//     bool intersection_p () const { return intersection_p_; }
+//     const LocalP2CL<Point3DCL>& get_map () const { return map_; }
+// };
+
+
+///\brief returns the L2-projector which turns a LocalP2CL into a LocalP1CL (M_1^{-1} M_{interpolation} M_2).
+inline SMatrixCL<4, 10> local_p2_to_p1_L2_projection ()
+{
+    QRDecompCL<4,4> qrp1;
+    SMatrixCL<4,4>& Mp1= qrp1.GetMatrix ();
+    for (Uint i= 0; i < 4; ++i) {
+        Mp1( i, i)= P1DiscCL::GetMass (i, i);
+        for (Uint j= 0; j < i; ++j)
+            Mp1 (i, j)= Mp1 (j, i)= P1DiscCL::GetMass (i, j);
+    }
+    qrp1.prepare_solve ();
+    SMatrixCL<10,10> Mp2;
+    for (Uint i= 0; i < 10; ++i) {
+        Mp2( i, i)= P2DiscCL::GetMass (i, i);
+        for (Uint j= 0; j < i; ++j)
+            Mp2 (i, j)= Mp2 (j, i)= P2DiscCL::GetMass (i, j);
+    }
+    SMatrixCL<4,10> Mp1p2;
+    LocalP1CL<> p1;
+    LocalP2CL<> p2;
+    for (Uint i= 0; i < 4; ++i) {
+        p1= 0.;
+        p1[i]= 1.;
+        p2.assign (p1); // Interpolation
+        for (Uint j= 0; j < 10; ++j)
+            Mp1p2 (i, j)= p2[j];
+    }
+    qrp1.Solve (Mp1p2);
+    return Mp1p2*Mp2;
+}
+
+class LocalQuaMapperCL
+{
+  private:
+    int maxiter_;
+    double tol_;
+    double armijo_c_;
+    Uint max_damping_steps_;
+
+    // The level set function.
+    NoBndDataCL<> nobnddata;
+    P2EvalCL<double, const NoBndDataCL<>, const VecDescCL> ls;
+
+    mutable SMatrixCL<4,10> p2top1;
+    mutable LocalP1CL<> loclsp1;
+    mutable Point3DCL gp1;
+    mutable QRDecompCL<4, 4> qrM;
+    mutable double c_lin_dist;
+
+    LocalP1CL<Point3DCL> gradrefp2[10];
+    mutable LocalP1CL<Point3DCL> gradp2[10];
+
+    mutable LocalP2CL<> locls;
+    mutable LocalP1CL<Point3DCL> loc_ls_grad;
+    mutable SMatrixCL<3,3> H_ls; // Hessian of level set function.
+    mutable double h; // Estimate of the local mesh-width.
+    mutable World2BaryCoordCL w2b;
+
+    mutable const TetraCL* tet;
+    mutable BaryCoordCL xb;
+    mutable BaryCoordCL bxb;
+    mutable double dh;
+    mutable SMatrixCL<3,3> dph;
+//     mutable bool have_dph;
+    mutable bool have_base_point;
+
+    void base_point_newton () const;
+
+  public:
+    LocalQuaMapperCL (const MultiGridCL& mg, VecDescCL& lsarg, int maxiter= 100, double tol= 1e-7, double armijo_c= 1e-4, Uint max_damping_steps= 8)
+        : maxiter_( maxiter), tol_( tol),
+          armijo_c_( armijo_c), max_damping_steps_( max_damping_steps),
+          ls( &lsarg, &nobnddata, &mg), h( 0),
+          tet( 0), /*have_dph( false),*/ have_base_point (false),
+          num_outer_iter( maxiter + 1),
+          base_point_time( 0.), locate_new_point_time( 0.), cur_num_outer_iter( 0), min_outer_iter(-1u), max_outer_iter( 0),
+          total_outer_iter( 0), total_damping_iter( 0), total_base_point_calls( 0) {
+        P2DiscCL::GetGradientsOnRef( gradrefp2);
+        p2top1= local_p2_to_p1_L2_projection ();
+    }
+    ~LocalQuaMapperCL () {
+        std::cout << "Distribution of outer iterations:\n";
+        seq_out( num_outer_iter.begin(), num_outer_iter.end(), std::cout);
+    }
+
+    void set_inner_iter_tol (Uint, double) {}
+
+    const LocalQuaMapperCL& set_point (const BaryCoordCL& xbarg) const;
+    const LocalQuaMapperCL& set_tetra (const TetraCL* tetarg) const;
+    const LocalQuaMapperCL& base_point () const;
+//     const QuaQuaMapperCL& jacobian   () const;
+
+    const TetraCL*         get_tetra () const { return tet; }
+    const BaryCoordCL&     get_bary  () const { return xb; }
+
+    TetraBaryPairT         get_base_point () const { return std::make_pair( tet, bxb); }
+    const TetraCL*         get_base_tetra () const { return tet; }
+    const BaryCoordCL&     get_base_bary  () const { return bxb; }
+    double                 get_dh ()         const { return dh; }
+//     const SMatrixCL<3, 3>& get_jacobian   () const { return dph; }
+
+    /// Return the local level set function and its gradient on tet; only for convenience. @{
+    LocalP2CL<> local_ls      (const TetraCL& tet) const { return LocalP2CL<>( tet, ls); }
+    Point3DCL   local_ls_grad (const TetraCL& tet, const BaryCoordCL& xb) const;
+    ///@}
+
+    // Count number of iterations iter->#computations with iter iterations.
+    mutable std::vector<size_t> num_outer_iter;
+    mutable std::vector<size_t> num_inner_iter;
+
+    mutable double base_point_time,
+                   locate_new_point_time;
+    mutable Uint cur_num_outer_iter,
+                 min_outer_iter,
+                 max_outer_iter,
+                 total_outer_iter,
+                 total_damping_iter,
+                 total_base_point_calls;
+};
+
+// Compute the average of a LocalQuaMapperCL in all P2-dofs.
+class LocalQuaMapperP2CL
+{
+  private:
+    LocalQuaMapperCL f_;
+
+    double loc_[10];
+
+  public:
+    typedef double value_type;
+    static const int num_components= 1;
+
+    LocalQuaMapperP2CL (const LocalQuaMapperCL& f)
+        : f_( f) {}
+
+    void set_tetra (const TetraCL* t) {
+        f_.set_tetra (t);
+        for (Uint i= 0; i < 10; ++i)
+            loc_[i]= f_.set_point(FE_P2CL::bary_coord[i])
+                       .base_point ()
+                       .get_dh ();
+    }
+    value_type&       operator[] (size_t i)       { return loc_[i]; }
+    const value_type& operator[] (size_t i) const { return loc_[i]; }
+};
 
 } // end of namespace DROPS
 
