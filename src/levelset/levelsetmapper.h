@@ -243,6 +243,74 @@ inline SMatrixCL<4, 10> local_p2_to_p1_L2_projection ()
     return Mp1p2*Mp2;
 }
 
+// The function of which we search a root is F(x, s) = ( p - x - s*gh(x), -ls(x) ).
+// Its Jacobian is the blockmatrix dF(x, s) = (-I - s H_ls(x) | - g_ls(x), -g_ls(x)^T | 0).
+class LocalQuaMapperFunctionCL
+{
+  public:
+    typedef SVectorCL<4> value_type;
+
+  private:
+    Point3DCL p;          // Point to be projected.
+    LocalP2CL<> locls;
+    LocalP2CL<Point3DCL> locls_grad;
+    SMatrixCL<3, 3> locls_H; // Hessian of ls on tet.
+    double h;             // local mesh width at tet.
+    World2BaryCoordCL w2b;
+
+    bool xF_p, xdF_p, xdFinv_p;  // Remember if xF, xdF, xdFinv have been initialized.
+    value_type xF, xdF, xdFinv;  // Points at which F, dF, dFinv are set up.
+    BaryCoordCL bxF, bxdF;       // Barycentric coordinates of the spatial part of xF, xdF, xdFinv.
+    Point3DCL g_ls_xF, g_ls_xdF; // Gradient of ls at xF, xdF, xdFinv.
+
+    value_type F;           // value at xF;
+    SMatrixCL<4, 4>  dF;    // Jacobian at xdFinv.
+    QRDecompCL<4, 4> dFinv; // Solver for Jacobian at xdFinv.
+
+    void compute_F (const value_type& x);     // Compute F and set xF.
+    void compute_dF (const value_type& x);    // Compute dF and set xdF.
+    void compute_dFinv (const value_type& x); // Compute dFinv and set xdFinv.
+
+  public:
+    LocalQuaMapperFunctionCL (
+        const LocalP2CL<>& loclsarg,
+        const LocalP2CL<Point3DCL>& locls_gradarg,
+        const SMatrixCL<3, 3>& locls_Harg,
+        double harg,
+        const World2BaryCoordCL& w2barg)
+        : locls (loclsarg), locls_grad (locls_gradarg), locls_H (locls_Harg),
+          h (harg), w2b (w2barg), xF_p (false), xdF_p (false), xdFinv_p (false) {}
+    LocalQuaMapperFunctionCL () : xF_p (false), xdF_p (false), xdFinv_p (false) {}
+
+    LocalQuaMapperFunctionCL& set_tetra (
+        const LocalP2CL<>& loclsarg,
+        const LocalP2CL<Point3DCL>& locls_gradarg,
+        const SMatrixCL<3, 3>& locls_Harg,
+        double harg,
+        const World2BaryCoordCL& w2barg) {
+        locls= loclsarg;
+        locls_grad= locls_gradarg;
+        locls_H= locls_Harg;
+        h= harg;
+        w2b= w2barg;
+        xF_p= false;
+        xdF_p= false;
+        xdFinv_p= false;
+        return *this;
+    }
+
+    LocalQuaMapperFunctionCL& set_point (const Point3DCL& x) {
+        p= x;
+        return *this;
+    }
+
+    value_type value (const value_type& x);
+    value_type apply_derivative (const value_type& x, const value_type& v);
+    value_type apply_derivative_inverse (const value_type& x, const value_type& v);
+
+    double initial_damping_factor (const value_type& x, const value_type& dx, const value_type& F);
+};
+
 class LocalQuaMapperCL
 {
   private:
@@ -255,19 +323,14 @@ class LocalQuaMapperCL
     NoBndDataCL<> nobnddata;
     P2EvalCL<double, const NoBndDataCL<>, const VecDescCL> ls;
 
-    mutable SMatrixCL<4,10> p2top1;
-    mutable LocalP1CL<> loclsp1;
-    mutable Point3DCL gp1;
-    mutable QRDecompCL<4, 4> qrM;
-    mutable double c_lin_dist;
+//     mutable SMatrixCL<4,10> p2top1;
+//     mutable LocalP1CL<> loclsp1;
+//     mutable Point3DCL gp1;
+//     mutable QRDecompCL<4, 4> qrM;
+//     mutable double c_lin_dist;
 
     LocalP1CL<Point3DCL> gradrefp2[10];
-    mutable LocalP1CL<Point3DCL> gradp2[10];
 
-    mutable LocalP2CL<> locls;
-    mutable LocalP1CL<Point3DCL> loc_ls_grad;
-    mutable SMatrixCL<3,3> H_ls; // Hessian of level set function.
-    mutable double h; // Estimate of the local mesh-width.
     mutable World2BaryCoordCL w2b;
 
     mutable const TetraCL* tet;
@@ -275,8 +338,9 @@ class LocalQuaMapperCL
     mutable BaryCoordCL bxb;
     mutable double dh;
     mutable SMatrixCL<3,3> dph;
-//     mutable bool have_dph;
     mutable bool have_base_point;
+
+    mutable LocalQuaMapperFunctionCL localF;
 
     void base_point_newton () const;
 
@@ -284,13 +348,13 @@ class LocalQuaMapperCL
     LocalQuaMapperCL (const MultiGridCL& mg, VecDescCL& lsarg, int maxiter= 100, double tol= 1e-7, double armijo_c= 1e-4, Uint max_damping_steps= 8)
         : maxiter_( maxiter), tol_( tol),
           armijo_c_( armijo_c), max_damping_steps_( max_damping_steps),
-          ls( &lsarg, &nobnddata, &mg), h( 0),
-          tet( 0), /*have_dph( false),*/ have_base_point (false),
+          ls( &lsarg, &nobnddata, &mg)/*, h( 0)*/,
+          tet( 0), have_base_point (false),
           num_outer_iter( maxiter + 1),
           base_point_time( 0.), locate_new_point_time( 0.), cur_num_outer_iter( 0), min_outer_iter(-1u), max_outer_iter( 0),
           total_outer_iter( 0), total_damping_iter( 0), total_base_point_calls( 0) {
         P2DiscCL::GetGradientsOnRef( gradrefp2);
-        p2top1= local_p2_to_p1_L2_projection ();
+//         p2top1= local_p2_to_p1_L2_projection ();
     }
     ~LocalQuaMapperCL () {
         std::cout << "Distribution of outer iterations:\n";
@@ -302,7 +366,6 @@ class LocalQuaMapperCL
     const LocalQuaMapperCL& set_point (const BaryCoordCL& xbarg) const;
     const LocalQuaMapperCL& set_tetra (const TetraCL* tetarg) const;
     const LocalQuaMapperCL& base_point () const;
-//     const QuaQuaMapperCL& jacobian   () const;
 
     const TetraCL*         get_tetra () const { return tet; }
     const BaryCoordCL&     get_bary  () const { return xb; }
@@ -311,7 +374,6 @@ class LocalQuaMapperCL
     const TetraCL*         get_base_tetra () const { return tet; }
     const BaryCoordCL&     get_base_bary  () const { return bxb; }
     double                 get_dh ()         const { return dh; }
-//     const SMatrixCL<3, 3>& get_jacobian   () const { return dph; }
 
     /// Return the local level set function and its gradient on tet; only for convenience. @{
     LocalP2CL<> local_ls      (const TetraCL& tet) const { return LocalP2CL<>( tet, ls); }
