@@ -855,7 +855,11 @@ class World2BaryCoordCL
 
     void assign (const TetraCL& t);
 
+    /// \brief Maps a point p to M\inv*(p, 1)^T.
     BaryCoordCL operator() (const Point3DCL& p) const;
+
+    /// \brief Maps a direction v to M\inv*(v, 0)^T. Given v= q - p, map_direction (v) = map(q) - map(p). 
+    BaryCoordCL map_direction (const Point3DCL& p) const;
 };
 
 ///\brief Compute world-coordinates from a tetra and barycentric coordinates.

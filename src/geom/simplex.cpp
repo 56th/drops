@@ -483,6 +483,13 @@ BaryCoordCL World2BaryCoordCL::operator() (const Point3DCL& p) const
     return r;
 }
 
+BaryCoordCL World2BaryCoordCL::map_direction (const Point3DCL& v) const
+{
+    BaryCoordCL r( MakeBaryCoord( v[0], v[1], v[2], 0.));
+    qr_.Solve( r);
+    return r;
+}
+
 void Bary2WorldCoordCL::assign (const TetraCL& tet)
 {
     for (int i= 0; i < 4; ++i)
