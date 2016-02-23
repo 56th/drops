@@ -260,7 +260,7 @@ class LocalQuaLineSearchFunctionCL
     BaryCoordCL a,
                 b;
     double h; // local mesh width at tet.
-    QRDecompCL<4, 4> M;
+    World2BaryCoordCL w2b;
 
     bool xF_p, xdF_p;  // Remember if xF, xdF have been initialized.
     value_type xF, xdF;  // Points at which F, dF are set up.
@@ -278,20 +278,20 @@ class LocalQuaLineSearchFunctionCL
         const LocalP2CL<>& loclsarg,
         const LocalP1CL<Point3DCL>& locls_gradarg,
         double harg,
-        const QRDecompCL<4, 4>& Marg)
+        const World2BaryCoordCL& w2barg)
         : locls (loclsarg), locls_grad (locls_gradarg),
-          h (harg), M (Marg), xF_p (false), xdF_p (false) {}
+          h (harg), w2b (w2barg), xF_p (false), xdF_p (false) {}
     LocalQuaLineSearchFunctionCL () : xF_p (false), xdF_p (false) {}
 
     LocalQuaLineSearchFunctionCL& set_tetra (
         const LocalP2CL<>& loclsarg,
         const LocalP1CL<Point3DCL>& locls_gradarg,
         double harg,
-        const QRDecompCL<4, 4>& Marg) {
+        const World2BaryCoordCL& w2barg) {
         locls= loclsarg;
         locls_grad= locls_gradarg;
         h= harg;
-        M= Marg;
+        w2b= w2barg;
         xF_p= false;
         xdF_p= false;
         return *this;
@@ -300,12 +300,8 @@ class LocalQuaLineSearchFunctionCL
     LocalQuaLineSearchFunctionCL& set_point_and_direction (const Point3DCL& parg, const Point3DCL& varg) {
         p= parg;
         v= varg;
-        std::copy (p.begin (), p.begin () + 3, a.begin ());
-        a[3]= 1.;
-        M.Solve (a);
-        std::copy (v.begin (), v.begin () + 3, b.begin ());
-        b[3]= 0.;
-        M.Solve (b);
+        a= w2b (p);
+        b= w2b.map_direction (v);
         return *this;
     }
 
@@ -402,7 +398,6 @@ class LocalQuaMapperCL
 //     mutable SMatrixCL<4,10> p2top1;
 //     mutable LocalP1CL<> loclsp1;
 //     mutable Point3DCL gp1;
-//     mutable QRDecompCL<4, 4> qrM;
 //     mutable double c_lin_dist;
 
     LocalP1CL<Point3DCL> gradrefp2[10];

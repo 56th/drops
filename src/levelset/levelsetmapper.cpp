@@ -614,17 +614,6 @@ LocalQuaMapperFunctionCL::initial_damping_factor (const value_type& x, const val
 }
 
 
-    // Initial values for bxxb and  s=dh/norm(g_ls)
-//     bxb= xb;
-//     double s= 0; // scaled quasi-distance
-
-//     SVectorCL<4> p;
-//     std::copy (x0.begin(), x0.end(), &p[0]);
-//     p[3]= 1.;
-//     qrM.Solve (p);
-//     double s= inner_prod (SVectorCL<4> (&loclsp1[0], &loclsp1[4]), p)/c_lin_dist;
-//     Point3DCL x= x0 - s*gp1;// World coordinates of the current bxb.
-
 const LocalQuaMapperCL& LocalQuaMapperCL::set_point (const BaryCoordCL& xbarg) const
 {
     xb= xbarg;
@@ -657,23 +646,14 @@ const LocalQuaMapperCL& LocalQuaMapperCL::set_tetra (const TetraCL* tetarg) cons
 
 //         const SVectorCL<4>& tmp= p2top1*SVectorCL<10> (&locls[0], &locls[10]);
 //         std::copy (tmp.begin(), tmp.end(), &loclsp1[0]);
+//         std::copy (&locls[0], &locls[4], &loclsp1[0]);
 //         Point3DCL gradp1[4];
 //         P1DiscCL::GetGradients( gradp1, T);
 //         gp1= Point3DCL();
 //         for (Uint i= 0; i < 4; ++i)
 //             gp1+= loclsp1[i]*gradp1[i];
 // 
-//         SMatrixCL<4, 4>& M= qrM.GetMatrix ();
-//         for(Uint i= 0; i < 4; ++i) {
-//             for(Uint j= 0; j < 3; ++j)
-//                 M (i, j)= tet->GetVertex (i)->GetCoord()[j];
-//             M (i, 3)= 1.;
-//         }
-//         qrM.prepare_solve ();
-//         SVectorCL<4> p;
-//         std::copy (&gp1[0], &gp1[3], &p[0]);
-//         p[3]= 0.;
-//         qrM.Solve (p);
+//         p= w2b.map_direction (gp1);
 //         c_lin_dist= inner_prod (SVectorCL<4> (&loclsp1[0], &loclsp1[4]), p);
 
         localF.set_tetra (locls, loc_ls_grad, H_ls, h, w2b);
@@ -759,7 +739,7 @@ LocalQuaLineSearchFunctionCL::apply_derivative_transpose (const value_type& x, c
 {
     if (!xdF_p || !(xdF == x))
         compute_dF (x);
-    return dF*v;
+    return dF*v; // dF is scalar, hence symmetric.
 }
 
 LocalQuaLineSearchFunctionCL::value_type
@@ -767,7 +747,7 @@ LocalQuaLineSearchFunctionCL::apply_derivative_inverse (const value_type& x, con
 {
     if (!xdF_p || !(xdF == x))
         compute_dF (x);
-    return v/dF;
+    return v/dF; // dF is scalar.
 }
 
 double
