@@ -32,13 +32,13 @@
 namespace DROPS
 {
 
-
 ///\brief Accumulator to compute the Oswald-projection (arithmetic mean in each dof) of the data in LocalP2T.
 /// LocalP2T is not a short-hand for LocalP2CL<...>. It must provide:
 ///    * a typedef value_type,
 ///    * the number of components of value_type (static int num_components),
 ///    * an operator[](size_t i) returning the local value in the P2-dof i,
-///    * the function set_tetra(const TetraCL&) to setup the local data on a tetra.
+///    * the function set_tetra(const TetraCL&) to setup the local data on a tetra,
+///    * the predicate invalid_p(size_t i).
 template <typename LocalP2T>
 class OswaldProjectionP2AccuCL : public TetraAccumulatorCL
 {
@@ -66,7 +66,7 @@ class OswaldProjectionP2AccuCL : public TetraAccumulatorCL
         loc_.set_tetra( &t);
         numg.assign_indices_only( t, *avg_.RowIdx);
         for (Uint i= 0; i < 10; ++i) {
-            if (!numg.WithUnknowns( i))
+            if (!numg.WithUnknowns( i) || loc_.invalid_p (i))
                 continue;
             const IdxT dof= numg.num[i];
             double& n= n_[0][dof/loc_.num_components]; // This assumes that the local gradient is in the components dof/3..dof/3 + 2.

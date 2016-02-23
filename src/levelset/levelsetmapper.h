@@ -418,6 +418,7 @@ class LocalQuaMapperP2CL
     }
     value_type&       operator[] (size_t i)       { return loc_[i]; }
     const value_type& operator[] (size_t i) const { return loc_[i]; }
+    bool invalid_p (size_t i) const { return loc_[i] == std::numeric_limits<double>::max (); }
 };
 
 } // end of namespace DROPS

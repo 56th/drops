@@ -58,8 +58,7 @@ class LocalP2GradientCL
     void set_tetra (const TetraCL* t);
     value_type&       operator[] (size_t i)       { return p2grad[i]; }
     const value_type& operator[] (size_t i) const { return p2grad[i]; }
-
-
+    bool invalid_p (size_t /*i*/) const { return false; }
 };
 
 void LocalP2GradientCL::set_tetra (const TetraCL* t)
