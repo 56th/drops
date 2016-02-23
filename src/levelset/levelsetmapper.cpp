@@ -709,4 +709,65 @@ const LocalQuaMapperCL& LocalQuaMapperCL::base_point () const
 }
 
 
+void
+LocalQuaLineSearchFunctionCL::compute_F (const value_type& x)
+{
+    xF_p= true;
+    xF= x;
+    bxF= a - x*b;
+    F= locls (bxF);
+}
+
+LocalQuaLineSearchFunctionCL::value_type
+LocalQuaLineSearchFunctionCL::value (const value_type& x)
+{
+    if (!xF_p || !(xF == x))
+        compute_F (x);
+    return F;
+}
+
+void
+LocalQuaLineSearchFunctionCL::compute_dF (const value_type& x)
+{
+    xdF_p= true;
+    xdF= x;
+
+    bxdF= a - x*b;
+    g_ls_xdF= locls_grad( bxdF);
+    dF= -inner_prod (g_ls_xdF, v);
+}
+
+LocalQuaLineSearchFunctionCL::value_type
+LocalQuaLineSearchFunctionCL::apply_derivative (const value_type& x, const value_type& v)
+{
+    if (!xdF_p || !(xdF == x))
+        compute_dF (x);
+    return dF*v;
+}
+
+LocalQuaLineSearchFunctionCL::value_type
+LocalQuaLineSearchFunctionCL::apply_derivative_transpose (const value_type& x, const value_type& v)
+{
+    if (!xdF_p || !(xdF == x))
+        compute_dF (x);
+    return dF*v;
+}
+
+LocalQuaLineSearchFunctionCL::value_type
+LocalQuaLineSearchFunctionCL::apply_derivative_inverse (const value_type& x, const value_type& v)
+{
+    if (!xdF_p || !(xdF == x))
+        compute_dF (x);
+    return v/dF;
+}
+
+double
+LocalQuaLineSearchFunctionCL::initial_damping_factor (const value_type& x, const value_type& dx, const value_type& /*F*/)
+{
+    const Point3DCL g_ls= xF_p && x == xF ? g_ls_xF : locls_grad (a - x*b);
+
+    return 0.5*h/std::max(1e-3*h, dx*g_ls.norm());
+}
+
+
 } // end of namespace DROPS

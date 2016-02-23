@@ -243,6 +243,81 @@ inline SMatrixCL<4, 10> local_p2_to_p1_L2_projection ()
     return Mp1p2*Mp2;
 }
 
+
+// The function of which we search a root is F(s) = \phi(M\inv*(p - s*v, 1)) =  = \phi(a - s*b) with a=M\inv*(p,1), b= M\inv*(v, 0). Here, \phi is the (local) level set function and M\inv*(x,1) for some matrix M is the affine function mapping world coordinates x to barycentric coordinates.
+// Its Jacobian is the dF(s) = -d\phi(p - s*v)*v.
+class LocalQuaLineSearchFunctionCL
+{
+  public:
+    typedef double value_type;
+    typedef double derivative_type;
+
+  private:
+    Point3DCL p, // Point to be projected.
+              v; // search direction
+    LocalP2CL<> locls;
+    LocalP2CL<Point3DCL> locls_grad;
+    BaryCoordCL a,
+                b;
+    double h; // local mesh width at tet.
+    QRDecompCL<4, 4> M;
+
+    bool xF_p, xdF_p;  // Remember if xF, xdF have been initialized.
+    value_type xF, xdF;  // Points at which F, dF are set up.
+    BaryCoordCL bxF, bxdF;       // Barycentric coordinates of the spatial part of xF, xdF, xdFinv.
+    Point3DCL g_ls_xF, g_ls_xdF; // Gradient of ls at xF, xdF, xdFinv.
+
+    value_type F;           // value at xF;
+    derivative_type  dF;    // Jacobian at xdFinv.
+
+    void compute_F (const value_type& x);     // Compute F and set xF.
+    void compute_dF (const value_type& x);    // Compute dF and set xdF.
+
+  public:
+    LocalQuaLineSearchFunctionCL (
+        const LocalP2CL<>& loclsarg,
+        const LocalP1CL<Point3DCL>& locls_gradarg,
+        double harg,
+        const QRDecompCL<4, 4>& Marg)
+        : locls (loclsarg), locls_grad (locls_gradarg),
+          h (harg), M (Marg), xF_p (false), xdF_p (false) {}
+    LocalQuaLineSearchFunctionCL () : xF_p (false), xdF_p (false) {}
+
+    LocalQuaLineSearchFunctionCL& set_tetra (
+        const LocalP2CL<>& loclsarg,
+        const LocalP1CL<Point3DCL>& locls_gradarg,
+        double harg,
+        const QRDecompCL<4, 4>& Marg) {
+        locls= loclsarg;
+        locls_grad= locls_gradarg;
+        h= harg;
+        M= Marg;
+        xF_p= false;
+        xdF_p= false;
+        return *this;
+    }
+
+    LocalQuaLineSearchFunctionCL& set_point_and_direction (const Point3DCL& parg, const Point3DCL& varg) {
+        p= parg;
+        v= varg;
+        std::copy (p.begin (), p.begin () + 3, a.begin ());
+        a[3]= 1.;
+        M.Solve (a);
+        std::copy (v.begin (), v.begin () + 3, b.begin ());
+        b[3]= 0.;
+        M.Solve (b);
+        return *this;
+    }
+
+    value_type value (const value_type& x);
+    value_type apply_derivative (const value_type& x, const value_type& v);
+    value_type apply_derivative_inverse (const value_type& x, const value_type& v);
+    value_type apply_derivative_transpose (const value_type& x, const value_type& v);
+
+    double initial_damping_factor (const value_type& x, const value_type& dx, const value_type& F);
+};
+
+
 // The function of which we search a root is F(x, s) = ( p - x - s*gh(x), -ls(x) ).
 // Its Jacobian is the blockmatrix dF(x, s) = (-I - s H_ls(x) | - g_ls(x), -g_ls(x)^T | 0).
 class LocalQuaMapperFunctionCL
