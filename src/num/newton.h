@@ -120,40 +120,47 @@ double dot (T x, T y)
 ///     * apply_derivative_inverse (x, v),
 ///     * initial_damping_factor (x, dx, F) (must return a nonnegative value which is further limited to 1 in the algorithm).
 template <typename FunctionT>
-void newton_solve (FunctionT& fun, typename FunctionT::value_type& x, size_t& maxiter, double& tol, size_t& max_damping_steps, double armijo_c)
+void newton_solve (FunctionT& fun, typename FunctionT::value_type& x, size_t& maxiter, double& tol, size_t& max_damping_steps, double armijo_c, std::ostream* os= 0)
 {
+    const double min_step_length= 1e-7; // Minimum value for step-length factor l.
+
     typedef typename FunctionT::value_type value_type;
     value_type dx, // Newton correction.
-               F;  // The function of which we search a root.
+               F,  // The function of which we search a root.
+               Fnew; // Helper in the step-size computation.
     double l; // Damping factor for line search.
     size_t total_damping_iter= 0; // Count all rejected steps sizes.
     double normF;
 
     int iter;
-    for (iter= 0; iter < maxiter; ++iter) {
+    for (iter= 0; true; ++iter) {
         F= fun.value (x);
         normF= std::sqrt (NewtonImplNS::dot (F, F));
-        if (normF < tol)
+        if (iter >= maxiter || normF < tol)
             break;
-
         dx= fun.apply_derivative_inverse (x, F);
+//         if (iter == 0) // Initial gradient descent step
+//             dx= fun.apply_derivative_transpose (x, F/normF);
         const double armijo_slope= armijo_c*inner_prod( F, fun.apply_derivative (x, dx))/normF;
+        // Armijo-rule with backtracking
         l= std::min( 1., fun.initial_damping_factor (x, dx, F));
         Uint j;
-        for (j= 0; j < max_damping_steps; ++j, l*= 0.5) {
-            if (l < 1e-7) {
-                std::cerr << "newton_solve: Too much damping. iter: " << iter << " x: " << x << " dx: " << dx << " l: " << l << " F: " << F << std::endl;
-            }
-            const value_type& Fnew= fun.value (x - l*dx);
-            // Armijo-rule
+        for (j= 0; j < max_damping_steps && l >= min_step_length; ++j, l*= 0.5) {
+            Fnew= fun.value (x - l*dx);
             if (std::sqrt (NewtonImplNS::dot (Fnew, Fnew)) < normF + armijo_slope*l)
                 break;
         }
-        x-= l*dx;
         total_damping_iter+= j;
+        if (l < min_step_length) {
+            std::cerr << "newton_solve: Too much damping. iter: " << iter << " x: " << x << " dx: " << dx << " l: " << l << " F: " << F << std::endl;
+            break;
+        }
+        if (os)
+            (*os) << "iter: " << iter << " x: " << x << " dx: " << dx << " l: " << l << " F: " << F << std::endl;
+        x-= l*dx;
     }
     if (iter >= maxiter) {
-        std::cout << "newton_solve: max iteration number exceeded; \tx: " << x << "\t dx: " << dx << "\t F: " << F << "\tl: " << l << std::endl;
+        std::cout << "newton_solve: max iteration number exceeded; \tx: " << x << "\t dx: " << dx << "\tl: " << l << "\t F: " << F << std::endl;
     }
     maxiter= iter;
     tol= normF;
