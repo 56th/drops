@@ -570,7 +570,16 @@ LocalQuaMapperFunctionCL::apply_derivative (const value_type& x, const value_typ
 {
     if (!xdF_p || !(xdF == x))
         compute_dF (x);
+// std::cerr << "LocalQuaMapperFunctionCL::apply_derivative: xdF: " << w2b (Point3DCL(x.begin (), x.begin () + 3)) << std::endl;
     return dF*v;
+}
+
+LocalQuaMapperFunctionCL::value_type
+LocalQuaMapperFunctionCL::apply_derivative_transpose (const value_type& x, const value_type& v)
+{
+    if (!xdF_p || !(xdF == x))
+        compute_dF (x);
+    return transp_mul(dF, v);
 }
 
 void

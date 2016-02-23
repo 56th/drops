@@ -382,6 +382,7 @@ class LocalQuaMapperFunctionCL
     value_type value (const value_type& x);
     value_type apply_derivative (const value_type& x, const value_type& v);
     value_type apply_derivative_inverse (const value_type& x, const value_type& v);
+    value_type apply_derivative_transpose (const value_type& x, const value_type& v);
 
     double initial_damping_factor (const value_type& x, const value_type& dx, const value_type& F);
 };
