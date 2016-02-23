@@ -328,7 +328,7 @@ class LocalQuaMapperFunctionCL
   private:
     Point3DCL p;          // Point to be projected.
     LocalP2CL<> locls;
-    LocalP2CL<Point3DCL> locls_grad;
+    LocalP1CL<Point3DCL> locls_grad;
     SMatrixCL<3, 3> locls_H; // Hessian of ls on tet.
     double h;             // local mesh width at tet.
     World2BaryCoordCL w2b;
@@ -349,7 +349,7 @@ class LocalQuaMapperFunctionCL
   public:
     LocalQuaMapperFunctionCL (
         const LocalP2CL<>& loclsarg,
-        const LocalP2CL<Point3DCL>& locls_gradarg,
+        const LocalP1CL<Point3DCL>& locls_gradarg,
         const SMatrixCL<3, 3>& locls_Harg,
         double harg,
         const World2BaryCoordCL& w2barg)
@@ -359,7 +359,7 @@ class LocalQuaMapperFunctionCL
 
     LocalQuaMapperFunctionCL& set_tetra (
         const LocalP2CL<>& loclsarg,
-        const LocalP2CL<Point3DCL>& locls_gradarg,
+        const LocalP1CL<Point3DCL>& locls_gradarg,
         const SMatrixCL<3, 3>& locls_Harg,
         double harg,
         const World2BaryCoordCL& w2barg) {
