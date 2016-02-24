@@ -605,12 +605,20 @@ LocalQuaMapperFunctionCL::apply_derivative_inverse (const value_type& x, const v
 }
 
 double
-LocalQuaMapperFunctionCL::initial_damping_factor (const value_type& x, const value_type& dx, const value_type& /*F*/)
+LocalQuaMapperFunctionCL::initial_damping_factor (const value_type& /*x*/, const value_type& dx, const value_type& /*F*/)
 {
-    const Point3DCL dx_spatial= MakePoint3D (dx[0], dx[1], dx[2]);
-    const Point3DCL g_ls= xF_p && x == xF ? g_ls_xF : locls_grad (w2b (Point3DCL (x.begin (), x.begin () + 3)));
+//     const Point3DCL dx_spatial= MakePoint3D (dx[0], dx[1], dx[2]);
+//     const Point3DCL g_ls= xF_p && x == xF ? g_ls_xF : locls_grad (w2b (Point3DCL (x.begin (), x.begin () + 3)));
+// 
+//     return std::min (0.5*h/std::max(1e-3*h, dx_spatial.norm()), 0.5*h/std::max(1e-3*h, dx[3]*g_ls.norm()));
 
-    return std::min (0.5*h/std::max(1e-3*h, dx_spatial.norm()), 0.5*h/std::max(1e-3*h, dx[3]*g_ls.norm()));
+    // Choose l so small that all barycentric coordinates of the new point are >= -0.5.
+    const BaryCoordCL bdir= w2b.map_direction (Point3DCL( dx.begin (), dx.begin () + 3));
+    double l= 1.;
+    for (Uint i= 0; i < 4; ++i)
+        if (std::abs (bdir[i]) > 1e-12)
+            l= std::min (l, std::abs ((bxdF[i] - (-0.5))/bdir[i]));
+    return l;
 }
 
 
