@@ -59,6 +59,7 @@ class OswaldProjectionP2AccuCL : public TetraAccumulatorCL
         n_= new std::valarray<double>( avg_.Data.size()/loc_.num_components);
     }
     virtual void finalize_accumulation() {
+        loc_.finalize_accumulation ();
         delete n_;
     }
 

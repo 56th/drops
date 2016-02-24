@@ -427,10 +427,6 @@ class LocalQuaMapperCL
         P2DiscCL::GetGradientsOnRef( gradrefp2);
 //         p2top1= local_p2_to_p1_L2_projection ();
     }
-    ~LocalQuaMapperCL () {
-        std::cout << "Distribution of outer iterations:\n";
-        seq_out( num_outer_iter.begin(), num_outer_iter.end(), std::cout);
-    }
 
     void set_inner_iter_tol (Uint, double) {}
 
@@ -490,6 +486,10 @@ class LocalQuaMapperP2CL
     value_type&       operator[] (size_t i)       { return loc_[i]; }
     const value_type& operator[] (size_t i) const { return loc_[i]; }
     bool invalid_p (size_t i) const { return loc_[i] == std::numeric_limits<double>::max (); }
+    void finalize_accumulation () {
+        std::cout << "Distribution of outer iterations:\n";
+        seq_out( f_.num_outer_iter.begin(), f_.num_outer_iter.end(), std::cout);
+    }
 };
 
 } // end of namespace DROPS
