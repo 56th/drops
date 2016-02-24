@@ -652,8 +652,8 @@ const LocalQuaMapperCL& LocalQuaMapperCL::set_tetra (const TetraCL* tetarg) cons
             H_ls+= locls[i]*H[i];
         World2BaryCoordCL w2b( *tet);
 
-//         const SVectorCL<4>& tmp= p2top1*SVectorCL<10> (&locls[0], &locls[10]);
-//         std::copy (tmp.begin(), tmp.end(), &loclsp1[0]);
+// //         const SVectorCL<4>& tmp= p2top1*SVectorCL<10> (&locls[0], &locls[10]);
+// //         std::copy (tmp.begin(), tmp.end(), &loclsp1[0]);
 //         std::copy (&locls[0], &locls[4], &loclsp1[0]);
 //         Point3DCL gradp1[4];
 //         P1DiscCL::GetGradients( gradp1, T);
@@ -661,7 +661,7 @@ const LocalQuaMapperCL& LocalQuaMapperCL::set_tetra (const TetraCL* tetarg) cons
 //         for (Uint i= 0; i < 4; ++i)
 //             gp1+= loclsp1[i]*gradp1[i];
 // 
-//         p= w2b.map_direction (gp1);
+//         const BaryCoordCL p= w2b.map_direction (gp1);
 //         c_lin_dist= inner_prod (SVectorCL<4> (&loclsp1[0], &loclsp1[4]), p);
 
         localF.set_tetra (locls, loc_ls_grad, H_ls, h, w2b);
@@ -687,10 +687,26 @@ const LocalQuaMapperCL& LocalQuaMapperCL::base_point () const
         LocalQuaMapperFunctionCL::value_type x;
         std::copy (p.begin (), p.end (), x.begin ());
         x[3]= 0.;
+//         const double s= loclsp1 (xb)/c_lin_dist;
+//         const Point3DCL xini= p - s*gp1;
+//         std::copy (xini.begin (), xini.end (), x.begin ());
+//         x[3]= 0.;
         newton_solve (localF, x, maxiter, tol, max_damping_steps, armijo_c_);
         const Point3DCL x_spatial (x.begin (), x.begin () + 3);
         bxb= w2b (x_spatial);
         dh= (p - x_spatial).norm () * (x[3] > 0. ? 1. : -1.); // x[3]*loc_ls_grad (bxb).norm ();
+//         if (maxiter >= (size_t) maxiter_) {
+//             dh= std::numeric_limits<double>::max();
+//             size_t maxiter= maxiter_;
+//             double tol= tol_;
+//             size_t max_damping_steps= max_damping_steps_;
+//             std::copy (p.begin (), p.end (), x.begin ());
+//             x[3]= 0.;
+//             newton_solve (localF, x, maxiter, tol, max_damping_steps, armijo_c_, &std::cerr);
+//             std::cerr << "Press enter to continue.";
+//             char tmp;
+//             std::cin >> tmp;
+//         }
         have_base_point= true;
 
         min_outer_iter= std::min( min_outer_iter, (Uint) maxiter);

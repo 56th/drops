@@ -395,7 +395,7 @@ class LocalQuaMapperCL
     NoBndDataCL<> nobnddata;
     P2EvalCL<double, const NoBndDataCL<>, const VecDescCL> ls;
 
-//     mutable SMatrixCL<4,10> p2top1;
+// //     mutable SMatrixCL<4,10> p2top1;
 //     mutable LocalP1CL<> loclsp1;
 //     mutable Point3DCL gp1;
 //     mutable double c_lin_dist;
