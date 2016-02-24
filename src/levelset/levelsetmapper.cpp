@@ -708,6 +708,7 @@ const LocalQuaMapperCL& LocalQuaMapperCL::base_point () const
 //             char tmp;
 //             std::cin >> tmp;
 //         }
+        base_in_trust_region= maxiter < (size_t) maxiter_ && tol < tol_; // Otherwise, the iteration was terminated prematurely because the boundary of the trust region was reached.
         have_base_point= true;
 
         min_outer_iter= std::min( min_outer_iter, (Uint) maxiter);

@@ -410,7 +410,8 @@ class LocalQuaMapperCL
     mutable BaryCoordCL xb;
     mutable BaryCoordCL bxb;
     mutable double dh;
-    mutable bool have_base_point;
+    mutable bool have_base_point,
+                 base_in_trust_region;
 
     mutable bool have_deformation;
     mutable Point3DCL deformation;
@@ -445,6 +446,7 @@ class LocalQuaMapperCL
     const TetraCL*         get_base_tetra () const { return tet; }
     const BaryCoordCL&     get_base_bary  () const { return bxb; }
     double                 get_dh ()         const { return dh; }
+    bool                   base_in_trust_region_p () const { return base_in_trust_region; }
 
     Point3DCL get_deformation () const { return deformation; }
 
@@ -479,10 +481,11 @@ class LocalQuaMapperP2CL
 
     void set_tetra (const TetraCL* t) {
         f_.set_tetra (t);
-        for (Uint i= 0; i < 10; ++i)
-            loc_[i]= f_.set_point(FE_P2CL::bary_coord[i])
-                       .base_point ()
-                       .get_dh ();
+        for (Uint i= 0; i < 10; ++i) {
+            f_.set_point(FE_P2CL::bary_coord[i])
+              .base_point ();
+            loc_[i]= f_.base_in_trust_region_p () ? f_.get_dh () : std::numeric_limits<double>::max ();
+        }
     }
     value_type&       operator[] (size_t i)       { return loc_[i]; }
     const value_type& operator[] (size_t i) const { return loc_[i]; }
