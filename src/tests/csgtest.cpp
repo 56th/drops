@@ -667,7 +667,8 @@ int TestAdap (MultiGridCL& mg, ParamCL& p)
               idist( &p1idx),
               lsgradrec( &vecp2idx),
               redist_err( &p2idx),
-              locdist( &p2idx);
+              locdist( &p2idx),
+              locdef( &vecp2idx);
 
     const size_t num= std::distance( p.begin(), p.end());
 
@@ -690,6 +691,8 @@ int TestAdap (MultiGridCL& mg, ParamCL& p)
     vtkwriter.Register( make_VTKScalar( make_P1Eval( mg, lsbnd, idist), "dh") );
     vtkwriter.Register( make_VTKVector( make_P2Eval( mg, vecp2bnd, lsgradrec), "ls_grad_rec") );
     vtkwriter.Register( make_VTKScalar( make_P2Eval( mg, p2bnd, redist_err), "redist_err") );
+    vtkwriter.Register( make_VTKScalar( make_P2Eval( mg, p2bnd, locdist), "locdist") );
+    vtkwriter.Register( make_VTKVector( make_P2Eval( mg, vecp2bnd, locdef), "locdef") );
 
     // InterfaceApproxErrAccuCL accu0( lset, &ierr, &ierrg, &ierrq);
 //     InterfaceApproxErrorAccuCL accu0( lset, &ierr, &ierrg, &ierrq, &idist, true);
@@ -733,6 +736,10 @@ int TestAdap (MultiGridCL& mg, ParamCL& p)
         OswaldProjectionP2AccuCL<LocalQuaMapperP2CL> loc_dist_accu(locquap2, locdist);
         TetraAccumulatorTupleCL accus2;
         accus2.push_back( &loc_dist_accu);
+        LocalQuaMapperDeformationP2CL locquadefp2(locqua); // Provides the interface for the Oswald-projection class.
+        locdef.SetIdx( &vecp2idx);
+        OswaldProjectionP2AccuCL<LocalQuaMapperDeformationP2CL> loc_def_accu(locquadefp2, locdef);
+        accus2.push_back( &loc_def_accu);
         accumulate( accus2, mg, p2idx.TriangLevel(), p2idx.GetMatchingFunction(), p2idx.GetBndInfo());
 
         TetraAccumulatorTupleCL accus;

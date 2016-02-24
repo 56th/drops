@@ -381,6 +381,8 @@ class LocalQuaMapperFunctionCL
     value_type apply_derivative_transpose (const value_type& x, const value_type& v);
 
     double initial_damping_factor (const value_type& x, const value_type& dx, const value_type& F);
+
+    const LocalP1CL<Point3DCL>& get_locls_grad () const { return locls_grad; }
 };
 
 class LocalQuaMapperCL
@@ -396,7 +398,7 @@ class LocalQuaMapperCL
     P2EvalCL<double, const NoBndDataCL<>, const VecDescCL> ls;
 
 // //     mutable SMatrixCL<4,10> p2top1;
-//     mutable LocalP1CL<> loclsp1;
+    mutable LocalP1CL<> loclsp1;
 //     mutable Point3DCL gp1;
 //     mutable double c_lin_dist;
 
@@ -408,8 +410,10 @@ class LocalQuaMapperCL
     mutable BaryCoordCL xb;
     mutable BaryCoordCL bxb;
     mutable double dh;
-    mutable SMatrixCL<3,3> dph;
     mutable bool have_base_point;
+
+    mutable bool have_deformation;
+    mutable Point3DCL deformation;
 
     mutable LocalQuaMapperFunctionCL localF;
 
@@ -420,7 +424,7 @@ class LocalQuaMapperCL
         : maxiter_( maxiter), tol_( tol),
           armijo_c_( armijo_c), max_damping_steps_( max_damping_steps),
           ls( &lsarg, &nobnddata, &mg),
-          tet( 0), have_base_point (false),
+          tet( 0), have_base_point (false), have_deformation (false),
           num_outer_iter( maxiter + 1),
           base_point_time( 0.), locate_new_point_time( 0.), cur_num_outer_iter( 0), min_outer_iter(-1u), max_outer_iter( 0),
           total_outer_iter( 0), total_damping_iter( 0), total_base_point_calls( 0) {
@@ -428,11 +432,11 @@ class LocalQuaMapperCL
 //         p2top1= local_p2_to_p1_L2_projection ();
     }
 
-    void set_inner_iter_tol (Uint, double) {}
-
     const LocalQuaMapperCL& set_point (const BaryCoordCL& xbarg) const;
     const LocalQuaMapperCL& set_tetra (const TetraCL* tetarg) const;
     const LocalQuaMapperCL& base_point () const;
+
+    const LocalQuaMapperCL& compute_deformation () const;
 
     const TetraCL*         get_tetra () const { return tet; }
     const BaryCoordCL&     get_bary  () const { return xb; }
@@ -442,10 +446,7 @@ class LocalQuaMapperCL
     const BaryCoordCL&     get_base_bary  () const { return bxb; }
     double                 get_dh ()         const { return dh; }
 
-    /// Return the local level set function and its gradient on tet; only for convenience. @{
-    LocalP2CL<> local_ls      (const TetraCL& tet) const { return LocalP2CL<>( tet, ls); }
-    Point3DCL   local_ls_grad (const TetraCL& tet, const BaryCoordCL& xb) const;
-    ///@}
+    Point3DCL get_deformation () const { return deformation; }
 
     // Count number of iterations iter->#computations with iter iterations.
     mutable std::vector<size_t> num_outer_iter;
@@ -487,7 +488,38 @@ class LocalQuaMapperP2CL
     const value_type& operator[] (size_t i) const { return loc_[i]; }
     bool invalid_p (size_t i) const { return loc_[i] == std::numeric_limits<double>::max (); }
     void finalize_accumulation () {
-        std::cout << "Distribution of outer iterations:\n";
+        std::cout << "LocalQuaMapperP2CL::Distribution of outer iterations:\n";
+        seq_out( f_.num_outer_iter.begin(), f_.num_outer_iter.end(), std::cout);
+    }
+};
+
+// Compute the average of the mesh deformation in LocalQuaMapperCL in all P2-dofs.
+class LocalQuaMapperDeformationP2CL
+{
+  private:
+    LocalQuaMapperCL f_;
+
+    Point3DCL loc_[10];
+
+  public:
+    typedef Point3DCL value_type;
+    static const int num_components= 3;
+
+    LocalQuaMapperDeformationP2CL (const LocalQuaMapperCL& f)
+        : f_( f) {}
+
+    void set_tetra (const TetraCL* t) {
+        f_.set_tetra (t);
+        for (Uint i= 0; i < 10; ++i)
+            loc_[i]= f_.set_point(FE_P2CL::bary_coord[i])
+                       .compute_deformation ()
+                       .get_deformation ();
+    }
+    value_type&       operator[] (size_t i)       { return loc_[i]; }
+    const value_type& operator[] (size_t i) const { return loc_[i]; }
+    bool invalid_p (size_t i) const { return loc_[i][0] == std::numeric_limits<double>::max (); }
+    void finalize_accumulation () {
+        std::cout << "LocalQuaMapperDeformationP2CL::Distribution of outer iterations:\n";
         seq_out( f_.num_outer_iter.begin(), f_.num_outer_iter.end(), std::cout);
     }
 };

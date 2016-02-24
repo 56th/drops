@@ -634,6 +634,7 @@ const LocalQuaMapperCL& LocalQuaMapperCL::set_tetra (const TetraCL* tetarg) cons
     if (tet != tetarg) {
         tet= tetarg;
         have_base_point= false;
+        have_deformation= false;
         const LocalP2CL<> locls ( *tet, ls);
 
         SMatrixCL<3,3> T( Uninitialized);
@@ -654,7 +655,7 @@ const LocalQuaMapperCL& LocalQuaMapperCL::set_tetra (const TetraCL* tetarg) cons
 
 // //         const SVectorCL<4>& tmp= p2top1*SVectorCL<10> (&locls[0], &locls[10]);
 // //         std::copy (tmp.begin(), tmp.end(), &loclsp1[0]);
-//         std::copy (&locls[0], &locls[4], &loclsp1[0]);
+        std::copy (&locls[0], &locls[4], &loclsp1[0]);
 //         Point3DCL gradp1[4];
 //         P1DiscCL::GetGradients( gradp1, T);
 //         gp1= Point3DCL();
@@ -721,6 +722,21 @@ const LocalQuaMapperCL& LocalQuaMapperCL::base_point () const
     return *this;
 }
 
+
+const LocalQuaMapperCL& LocalQuaMapperCL::compute_deformation () const
+{
+    ScopeTimerCL scopetimer( "LocalQuaMapperCL::deformation");
+
+    base_point ();
+    if (!have_deformation) {
+        const Point3DCL g (localF.get_locls_grad ()(bxb));
+        const double s= loclsp1 (bxb)/inner_prod (w2b.map_direction (g), SVectorCL<4> (&loclsp1[0], &loclsp1[4]));
+        deformation= s*g;
+        have_deformation= true;
+
+    }
+    return *this;
+}
 
 void
 LocalQuaLineSearchFunctionCL::compute_F (const value_type& x)
