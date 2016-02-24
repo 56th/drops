@@ -734,6 +734,7 @@ int TestAdap (MultiGridCL& mg, ParamCL& p)
         LocalQuaMapperP2CL locquap2(locqua); // Provides the interface for the Oswald-projection class.
         locdist.SetIdx( &p2idx);
         OswaldProjectionP2AccuCL<LocalQuaMapperP2CL> loc_dist_accu(locquap2, locdist);
+//         loc_dist_accu.set_check_averaging (true);
         TetraAccumulatorTupleCL accus2;
         accus2.push_back( &loc_dist_accu);
         LocalQuaMapperDeformationP2CL locquadefp2(locqua); // Provides the interface for the Oswald-projection class.

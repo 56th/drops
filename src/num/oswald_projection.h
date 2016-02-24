@@ -44,32 +44,58 @@ class OswaldProjectionP2AccuCL : public TetraAccumulatorCL
 {
   private:
     LocalP2T loc_;
-    std::valarray<double>* n_;
+    std::valarray<double>* n_,
+                         * n_invalid_;
+    bool check_averaging_;
     VecDescCL& avg_;
 
     LocalNumbP2CL numg;
 
-    void set_n (std::valarray<double>* n) { n_= n; } // The clones must refer to the n_ of thread 0.
+    OswaldProjectionP2AccuCL& set_n (std::valarray<double>* n) { // The clones must refer to the n_ of thread 0.
+        n_= n;
+        return *this;
+    }
+    OswaldProjectionP2AccuCL& set_n_invalid (std::valarray<double>* n) { // The clones must refer to the n_invalid of thread 0.
+        n_invalid_= n;
+        return *this;
+    }
 
   public:
     OswaldProjectionP2AccuCL (LocalP2T loc, VecDescCL& avg)
-        : loc_( loc), n_( 0), avg_( avg) {}
+        : loc_( loc), n_( 0), n_invalid_( 0), check_averaging_( false), avg_( avg) {}
+
+    OswaldProjectionP2AccuCL& set_check_averaging (bool b= true) {
+        check_averaging_= b;
+        return *this;
+    }
 
     virtual void begin_accumulation   () {
         n_= new std::valarray<double>( avg_.Data.size()/loc_.num_components);
+        if (check_averaging_)
+            n_invalid_= new std::valarray<double>( avg_.Data.size()/loc_.num_components);
     }
     virtual void finalize_accumulation() {
         loc_.finalize_accumulation ();
+        if (check_averaging_)
+            for (size_t i= 0; i < n_->size (); ++i)
+                if (n_[0][i] == 0 && n_invalid_[0][i] > 0)
+                    std::cerr << "OswaldProjectionP2AccuCL::finalize_accumulation: No local value for " << i << ".\n";
         delete n_;
+        delete n_invalid_;
     }
 
     virtual void visit (const TetraCL& t) {
         loc_.set_tetra( &t);
         numg.assign_indices_only( t, *avg_.RowIdx);
         for (Uint i= 0; i < 10; ++i) {
-            if (!numg.WithUnknowns( i) || loc_.invalid_p (i))
+            if (!numg.WithUnknowns( i))
                 continue;
             const IdxT dof= numg.num[i];
+        if (loc_.invalid_p (i)) {
+            if (check_averaging_)
+                ++n_invalid_[0][dof/loc_.num_components];
+            continue;
+        }
             double& n= n_[0][dof/loc_.num_components]; // This assumes that the local gradient is in the components dof/3..dof/3 + 2.
             n+= 1.;
             typedef typename LocalP2T::value_type value_type;
@@ -80,8 +106,10 @@ class OswaldProjectionP2AccuCL : public TetraAccumulatorCL
 
     virtual TetraAccumulatorCL* clone (int /*clone_id*/) {
         OswaldProjectionP2AccuCL* p= new OswaldProjectionP2AccuCL( loc_, avg_);
-        p->set_n( n_);
-        return p;
+        p->set_n( n_)
+          .set_check_averaging (check_averaging_)
+          .set_n_invalid (n_invalid_);
+       return p;
     }
 };
 
