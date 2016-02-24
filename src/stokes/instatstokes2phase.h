@@ -89,10 +89,10 @@ class TwoPhaseFlowCoeffCL
 // \Omega_1 = Tropfen,    \Omega_2 = umgebendes Fluid
 
   private:
-    bool film;
+    bool film; // TL: delete?
     bool ns_shiftframe;
     double surfTens;
-    double rho_koeff1, rho_koeff2, mu_koeff1, mu_koeff2;
+    double rho_koeff1, rho_koeff2, mu_koeff1, mu_koeff2; // TL: changing order 1<->2 makes more sense, right?
 
   public:
     DROPS::instat_vector_fun_ptr volforce;
@@ -104,26 +104,34 @@ class TwoPhaseFlowCoeffCL
 
     TwoPhaseFlowCoeffCL( ParamCL& P, bool dimless = false)
       //big question: film or measurecell? 1: measure, 2: film
-        : film( (P.get<double>("Mat.DensDrop") == 0.0) ),
+        : //film( (P.get<double>("Mat.DensDrop") == 0.0) ),
+          film( false ), /// \todo change to something meaningful
         ns_shiftframe( (P.get<int>("NavStokes.ShiftFrame", 0) == 1) ),
-        surfTens( film ? P.get<double>("Mat.SurfTension") : P.get<double>("SurfTens.SurfTension")),
-        rho_koeff1( film ? P.get<double>("Mat.DensGas") : P.get<double>("Mat.DensFluid")),
-        rho_koeff2( film ? P.get<double>("Mat.DensFluid") : P.get<double>("Mat.DensDrop")),
-        mu_koeff1( film ? P.get<double>("Mat.ViscGas") : P.get<double>("Mat.ViscFluid")),
-        mu_koeff2( film ? P.get<double>("Mat.ViscFluid") : P.get<double>("Mat.ViscDrop")),
+//        surfTens( film ? P.get<double>("Mat.SurfTension") : P.get<double>("SurfTens.SurfTension")),
+//        rho_koeff1( film ? P.get<double>("Mat.DensGas") : P.get<double>("Mat.DensFluid")),
+//        rho_koeff2( film ? P.get<double>("Mat.DensFluid") : P.get<double>("Mat.DensDrop")),
+//        mu_koeff1( film ? P.get<double>("Mat.ViscGas") : P.get<double>("Mat.ViscFluid")),
+//        mu_koeff2( film ? P.get<double>("Mat.ViscFluid") : P.get<double>("Mat.ViscDrop")),
+        surfTens( P.get<double>("NavStokes.Coeff.SurfTens.SurfTension") ),
+        rho_koeff1( P.get<double>("NavStokes.Coeff.DensPos") ),
+        rho_koeff2( P.get<double>("NavStokes.Coeff.DensNeg") ),
+        mu_koeff1( P.get<double>("NavStokes.Coeff.ViscPos") ),
+        mu_koeff2( P.get<double>("NavStokes.Coeff.ViscNeg") ),
 
         rho( dimless ? JumpCL( 1., rho_koeff1/rho_koeff2)
           : JumpCL( rho_koeff2, rho_koeff1), H_sm, P.get<double>("Mat.SmoothZone")),
         mu( dimless ? JumpCL( 1., mu_koeff1/mu_koeff2)
           : JumpCL( mu_koeff2, mu_koeff1), H_sm, P.get<double>("Mat.SmoothZone")),
         SurfTens (dimless ? surfTens/rho_koeff2 : surfTens),
-        DilVisco( film ? P.get<double>("Mat.DilatationalVisco") : P.get<double>("SurfTens.DilatationalVisco")),
-        ShearVisco( film ? P.get<double>("Mat.ShearVisco") : P.get<double>("SurfTens.ShearVisco")),
-        g( P.get<DROPS::Point3DCL>("Exp.Gravity")),
+        //DilVisco( film ? P.get<double>("Mat.DilatationalVisco") : P.get<double>("SurfTens.DilatationalVisco")),
+        //ShearVisco( film ? P.get<double>("Mat.ShearVisco") : P.get<double>("SurfTens.ShearVisco")),
+        DilVisco( P.get<double>("NavStokes.Coeff.SurfTens.DilatationalVisco") ),
+        ShearVisco( P.get<double>("NavStokes.Coeff.SurfTens.ShearVisco") ),
+        g( P.get<DROPS::Point3DCL>("NavStokes.Coeff.Gravity")),
         framevel( ns_shiftframe ? P.get<DROPS::Point3DCL>("NavStokes.FrameVel", DROPS::Point3DCL(0.0)) : DROPS::Point3DCL(0.0) )
         {
-        volforce = InVecMap::getInstance()[P.get<std::string>("Exp.VolForce")];
-        var_tau_fncs = InScaMap::getInstance()[P.get<std::string>("SurfTens.VarTensionFncs")];
+        volforce = InVecMap::getInstance()[P.get<std::string>("NavStokes.Coeff.VolForce")];
+        var_tau_fncs = InScaMap::getInstance()[P.get<std::string>("NavStokes.Coeff.SurfTens.VarTensionFncs")];
     }
 
     TwoPhaseFlowCoeffCL( double rho1, double rho2, double mu1, double mu2, double surftension, Point3DCL gravity, Point3DCL framevelocity = Point3DCL(0.0), bool dimless = false, double dilatationalvisco = 0.0, double shearvisco = 0.0)

@@ -102,7 +102,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
     // initialization of surface tension
     // choose a proper model for surface tension coefficient, see levelset/surfacetension.h
-    instat_scalar_fun_ptr sigmap = inscamap[P.get<std::string>("SurfTens.VarTensionFncs", "ConstTau")];
+    instat_scalar_fun_ptr sigmap = inscamap[P.get<std::string>("NavStokes.Coeff.SurfTens.VarTensionFncs", "ConstTau")];
     SurfaceTensionCL * sf;
     sf = new SurfaceTensionCL( sigmap);
     sf->SetInputMethod( Sigma_X);
@@ -277,7 +277,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     StokesSolverFactoryCL<InstatNavierStokes2PhaseP2P1CL> stokessolverfactory(Stokes, P);
     StokesSolverBaseCL* stokessolver;
 
-    if (! P.get<int>("Stokes.DirectSolve"))
+    if (! P.get<int>("OseenSolver.DirectSolve"))
         stokessolver = stokessolverfactory.CreateStokesSolver();
 #ifndef _PAR
     else
@@ -580,13 +580,14 @@ void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<double>("Levelset.Downwind.CrosswindLimit", std::cos( M_PI/6.));
 
     P.put_if_unset<std::string>("NavStokes.Coeff.VolForce", "ZeroVel");
-    P.put_if_unset<double>("Mat.DensDrop", 0.0);
-    P.put_if_unset<double>("Mat.ShearVisco", 0.0);
-    P.put_if_unset<double>("Mat.DilatationalVisco", 0.0);
-    P.put_if_unset<double>("SurfTens.ShearVisco", 0.0);
-    P.put_if_unset<double>("SurfTens.DilatationalVisco", 0.0);
-    P.put_if_unset<std::string>("SurfTens.VarTensionFncs", "ConstTau");
-    P.put_if_unset<int>("Stokes.DirectSolve", 0);
+    //P.put_if_unset<double>("Mat.DensDrop", 0.0);
+    //P.put_if_unset<double>("Mat.ShearVisco", 0.0);
+    //P.put_if_unset<double>("Mat.DilatationalVisco", 0.0);
+    P.put_if_unset<double>("Mat.SmoothZone", 0.05); // deprecated, right? remove from instatstokes2phase.h?
+    P.put_if_unset<double>("NavStokes.Coeff.SurfTens.ShearVisco", 0.0);
+    P.put_if_unset<double>("NavStokes.Coeff.SurfTens.DilatationalVisco", 0.0);
+    P.put_if_unset<std::string>("NavStokes.Coeff.SurfTens.VarTensionFncs", "ConstTau");
+    P.put_if_unset<int>("OseenSolver.DirectSolve", 0);
 
     P.put_if_unset<int>("General.ProgressBar", 0);
     P.put_if_unset<std::string>("General.DynamicLibsPrefix", "../");
@@ -611,7 +612,8 @@ int main (int argc, char** argv)
         DROPS::ProgressBarTetraAccumulatorCL::Activate();
 
     // check parameter file
-    if (P.get<double>("SurfTens.DilatationalVisco")< P.get<double>("SurfTens.ShearVisco"))
+    if ( P.get<double>("NavStokes.Coeff.SurfTens.DilatationalVisco") <
+         P.get<double>("NavStokes.Coeff.SurfTens.ShearVisco") )
     {
         throw DROPS::DROPSErrCL("Parameter error : Dilatational viscosity must be larger than surface shear viscosity");
     }
@@ -702,7 +704,10 @@ int main (int argc, char** argv)
         std::cout << "As far as I can tell the ParMultigridCL is sane\n";
 #endif
 
-    DROPS::InstatNavierStokes2PhaseP2P1CL prob( *mg, DROPS::TwoPhaseFlowCoeffCL(P), bnddata, P.get<double>("Stokes.XFEMStab")<0 ? DROPS::P1_FE : DROPS::P1X_FE, P.get<double>("Stokes.XFEMStab"), DROPS::vecP2_FE, P.get<double>("Stokes.epsP",0.0));
+    DROPS::InstatNavierStokes2PhaseP2P1CL prob( *mg, DROPS::TwoPhaseFlowCoeffCL(P), bnddata,
+                                                P.get<double>("NavStokes.XFEMReduced")<0 ? DROPS::P1_FE : DROPS::P1X_FE,
+                                                P.get<double>("NavStokes.XFEMReduced"), DROPS::vecP2_FE,
+                                                P.get<double>("NavStokes.GhostPenalty",0.0));
 
     Strategy( prob, *lsetbnddata, adap);    // do all the stuff
 
