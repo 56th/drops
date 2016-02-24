@@ -102,13 +102,13 @@ void BuildBoundaryData(const MultiGridCL* mgp, BoundaryT* &bnddata,
 
     BndValFunT* bnd_fun = new BndValFunT[num_bnd];
 
-    readBoundary( bnd_idx, bnd_type_string);
-    readBoundary( bnd_names, bnd_funcs_string);
+    //readBoundary( bnd_idx, bnd_type_string);
+    //readBoundary( bnd_names, bnd_funcs_string);
 
     typedef std::vector<BoundaryCL::BndType>   BndTypeCont;
     BndTypeCont perbndt(num_bnd);
 
-    BndCondT defaultBC =  string_to_BndCondT( P.get<std::string>("Default") );
+    //BndCondT defaultBC =  string_to_BndCondT( P.get<std::string>("Default") );
 
     for( size_t i=0; i<num_bnd; ++i){
         bnd_types[i] = DROPS::BndCondT( bnd_idx[i]);

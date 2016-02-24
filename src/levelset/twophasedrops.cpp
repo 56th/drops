@@ -175,12 +175,12 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     double Vol = 0;
 
 
-    if (( (P.get("Exp.InitialLSet", std::string("Ellipsoid")) == "TaylorFlowDistance")
-          || (P.get("Exp.InitialLSet", std::string("Ellipsoid")) == "Ellipsoid"))
+    if (( (P.get("Levelset.InitialValue", std::string("Ellipsoid")) == "TaylorFlowDistance")
+          || (P.get("Levelset.InitialValue", std::string("Ellipsoid")) == "Ellipsoid"))
         && (P.get<int>("Levelset.VolCorrection") != 0))
     {
-        if (P.get<double>("Exp.InitialVolume",-1.0) > 0 )
-            Vol = P.get<double>("Exp.InitialVolume");
+        if (P.get<double>("Levelset.InitialVolume",-1.0) > 0 )
+            Vol = P.get<double>("Levelset.InitialVolume");
         else
             Vol = EllipsoidCL::GetVolume();
         std::cout << "initial rel. volume: " << lset.GetVolume()/Vol << std::endl;
@@ -453,8 +453,8 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     
     typedef DistMarkingStrategyCL MarkerT;
     MarkerT marker( lset,
-                    P.get<double>("AdaptRef.Width"),
-                    P.get<double>("AdaptRef.CoarsestLevel"), P.get<double>("AdaptRef.FinestLevel") );
+                    P.get<double>("Mesh.AdaptRef.Width"),
+                    P.get<double>("Mesh.AdaptRef.CoarsestLevel"), P.get<double>("Mesh.AdaptRef.FinestLevel") );
     adap.set_marking_strategy(&marker);
 
     IdxDescCL p1idx;
@@ -486,7 +486,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         // WriteMatrices( Stokes, step);
 
         // grid modification
-        const bool doGridMod= P.get<int>("AdaptRef.Freq") && step%P.get<int>("AdaptRef.Freq") == 0;
+        const bool doGridMod= P.get<int>("Mesh.AdaptRef.Freq") && step%P.get<int>("Mesh.AdaptRef.Freq") == 0;
         bool gridChanged= false;
         if (doGridMod)
         {
@@ -579,7 +579,7 @@ void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<double>("Levelset.Downwind.WeakEdgeRatio", 0.2);
     P.put_if_unset<double>("Levelset.Downwind.CrosswindLimit", std::cos( M_PI/6.));
 
-    P.put_if_unset<std::string>("Exp.VolForce", "ZeroVel");
+    P.put_if_unset<std::string>("NavStokes.Coeff.VolForce", "ZeroVel");
     P.put_if_unset<double>("Mat.DensDrop", 0.0);
     P.put_if_unset<double>("Mat.ShearVisco", 0.0);
     P.put_if_unset<double>("Mat.DilatationalVisco", 0.0);
@@ -650,7 +650,7 @@ int main (int argc, char** argv)
 
 
 
-    P.put("Exp.RadInlet", ExpRadInlet);
+    P.put("NavStokes.RadInlet", ExpRadInlet);
 
     std::cout << "Generated MG of " << mg->GetLastLevel() << " levels." << std::endl;
 
@@ -669,22 +669,22 @@ int main (int argc, char** argv)
     std::cout << "and levelset." << std::endl;
     DROPS::StokesBndDataCL bnddata(*velbnddata,*prbnddata);
 
-    std::string InitialLSet= P.get("Exp.InitialLSet", std::string("Ellipsoid"));
+    std::string InitialLSet= P.get("Levelset.InitialValue", std::string("Ellipsoid"));
     if (InitialLSet == "Ellipsoid")
-        DROPS::EllipsoidCL::Init( P.get<DROPS::Point3DCL>("Exp.PosDrop"), P.get<DROPS::Point3DCL>("Exp.RadDrop"));
+        DROPS::EllipsoidCL::Init( P.get<DROPS::Point3DCL>("Levelset.PosDrop"), P.get<DROPS::Point3DCL>("Levelset.RadDrop"));
     if  (InitialLSet == "TwoEllipsoid")
-        DROPS::TwoEllipsoidCL::Init( P.get<DROPS::Point3DCL>("Exp.PosDrop"), P.get<DROPS::Point3DCL>("Exp.RadDrop"), P.get<DROPS::Point3DCL>("Exp.PosDrop2"), P.get<DROPS::Point3DCL>("Exp.RadDrop2"));
+        DROPS::TwoEllipsoidCL::Init( P.get<DROPS::Point3DCL>("Levelset.PosDrop"), P.get<DROPS::Point3DCL>("Levelset.RadDrop"), P.get<DROPS::Point3DCL>("Levelset.PosDrop2"), P.get<DROPS::Point3DCL>("Levelset.RadDrop2"));
     if (InitialLSet.find("Cylinder")==0) {
-        DROPS::CylinderCL::Init( P.get<DROPS::Point3DCL>("Exp.PosDrop"), P.get<DROPS::Point3DCL>("Exp.RadDrop"), InitialLSet[8]-'X');
-        P.put("Exp.InitialLSet", InitialLSet= "Cylinder");
+        DROPS::CylinderCL::Init( P.get<DROPS::Point3DCL>("Levelset.PosDrop"), P.get<DROPS::Point3DCL>("Levelset.RadDrop"), InitialLSet[8]-'X');
+        P.put("Levelset.InitialValue", InitialLSet= "Cylinder");
     }
     typedef DROPS::DistMarkingStrategyCL MarkerT;
     MarkerT InitialMarker( DROPS::InScaMap::getInstance()[InitialLSet],
-                           P.get<double>("AdaptRef.Width"),
-                           P.get<double>("AdaptRef.CoarsestLevel"), P.get<double>("AdaptRef.FinestLevel") );
+                           P.get<double>("Mesh.AdaptRef.Width"),
+                           P.get<double>("Mesh.AdaptRef.CoarsestLevel"), P.get<double>("Mesh.AdaptRef.FinestLevel") );
 
     DROPS::AdapTriangCL adap( *mg, &InitialMarker,
-                              ((P.get<std::string>("Restart.Inputfile") == "none") ? P.get<int>("AdaptRef.LoadBalStrategy") : -P.get<int>("AdaptRef.LoadBalStrategy")));
+                              ((P.get<std::string>("Restart.Inputfile") == "none") ? P.get<int>("Mesh.AdaptRef.LoadBalStrategy") : -P.get<int>("Mesh.AdaptRef.LoadBalStrategy")));
     // If we read the Multigrid, it shouldn't be modified;
     // otherwise the pde-solutions from the ensight files might not fit.
     if (P.get("Restart.Inputfile", std::string("none")) == "none")
