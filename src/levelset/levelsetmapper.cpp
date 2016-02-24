@@ -650,7 +650,7 @@ const LocalQuaMapperCL& LocalQuaMapperCL::set_tetra (const TetraCL* tetarg) cons
         SMatrixCL<3,3> H_ls;
         for (Uint i= 0; i < 10; ++i)
             H_ls+= locls[i]*H[i];
-        World2BaryCoordCL w2b( *tet);
+        w2b.assign (*tet);
 
 // //         const SVectorCL<4>& tmp= p2top1*SVectorCL<10> (&locls[0], &locls[10]);
 // //         std::copy (tmp.begin(), tmp.end(), &loclsp1[0]);
