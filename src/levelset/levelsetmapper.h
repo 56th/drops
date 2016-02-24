@@ -419,7 +419,7 @@ class LocalQuaMapperCL
     LocalQuaMapperCL (const MultiGridCL& mg, VecDescCL& lsarg, int maxiter= 100, double tol= 1e-7, double armijo_c= 1e-4, Uint max_damping_steps= 8)
         : maxiter_( maxiter), tol_( tol),
           armijo_c_( armijo_c), max_damping_steps_( max_damping_steps),
-          ls( &lsarg, &nobnddata, &mg)/*, h( 0)*/,
+          ls( &lsarg, &nobnddata, &mg),
           tet( 0), have_base_point (false),
           num_outer_iter( maxiter + 1),
           base_point_time( 0.), locate_new_point_time( 0.), cur_num_outer_iter( 0), min_outer_iter(-1u), max_outer_iter( 0),
