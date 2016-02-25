@@ -117,7 +117,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     // initialization of surface tension
     // choose a proper model for surface tension coefficient, see levelset/surfacetension.h
     SurfaceTensionCL * sf;
-    sf = new SurfaceTensionCL( inscamap[P.get<std::string>("SurfTens.VarTensionFncs")]);
+    sf = new SurfaceTensionCL( inscamap[P.get<std::string>("NavStokes.Coeff.SurfTens.VarTensionFunc")]);
     sf->SetInputMethod( Sigma_X);
 
 
@@ -467,7 +467,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         ensight->Register( make_Ensight6Scalar    ( lset.GetSolution(),      "Levelset",      ensf + ".scl", true));
         ensight->Register( make_Ensight6Scalar    ( Stokes.GetPrSolution(),  "Pressure",      ensf + ".pr",  true));
         ensight->Register( make_Ensight6Vector    ( Stokes.GetVelSolution(), "Velocity",      ensf + ".vel", true));
-        ensight->Register( make_Ensight6Scalar    ( ScalarFunAsP2EvalCL( inscamap[P.get<std::string>("SurfTens.VarTensionFncs")], 0., &MG, MG.GetLastLevel()),
+        ensight->Register( make_Ensight6Scalar    ( ScalarFunAsP2EvalCL( inscamap[P.get<std::string>("NavStokes.Coeff.SurfTens.VarTensionFunc")], 0., &MG, MG.GetLastLevel()),
                                                     "Surfaceforce",  ensf + ".sf",  true));
 
         // if (massTransp) {

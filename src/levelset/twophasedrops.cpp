@@ -102,7 +102,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
     // initialization of surface tension
     // choose a proper model for surface tension coefficient, see levelset/surfacetension.h
-    instat_scalar_fun_ptr sigmap = inscamap[P.get<std::string>("NavStokes.Coeff.SurfTens.VarTensionFncs", "ConstTau")];
+    instat_scalar_fun_ptr sigmap = inscamap[P.get<std::string>("NavStokes.Coeff.SurfTens.VarTensionFunc", "ConstTau")];
     SurfaceTensionCL * sf;
     sf = new SurfaceTensionCL( sigmap);
     sf->SetInputMethod( Sigma_X);
@@ -213,14 +213,14 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     else
         Stokes.InitVel( &Stokes.v, ZeroVel);
 
-    IteratedDownwindCL navstokes_downwind( P.get_child( "NavStokes.Downwind"));
-    if (P.get<int>( "NavStokes.Downwind.Frequency") > 0) {
+    IteratedDownwindCL navstokes_downwind( P.get_child( "CouplingSolver.NavStokesSolver.Downwind"));
+    if (P.get<int>( "CouplingSolver.NavStokesSolver.Downwind.Frequency") > 0) {
         if (StokesSolverFactoryHelperCL().VelMGUsed( P))
             throw DROPSErrCL( "Strategy: Multigrid-solver and downwind-numbering cannot be used together. Sorry.\n");
         vel_downwind= Stokes.downwind_numbering( lset, navstokes_downwind);
     }
-    IteratedDownwindCL levelset_downwind( P.get_child( "Levelset.Downwind"));
-    if (P.get<int>( "Levelset.Downwind.Frequency") > 0)
+    IteratedDownwindCL levelset_downwind( P.get_child( "CouplingSolver.LevelsetSolver.Downwind"));
+    if (P.get<int>( "CouplingSolver.LevelsetSolver.Downwind.Frequency") > 0)
         lset_downwind= lset.downwind_numbering( Stokes.GetVelSolution(), levelset_downwind);
 
     DisplayDetailedGeom( MG);
@@ -260,9 +260,10 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         std::cout << massTransp->c.Data.size() << " concentration unknowns,\n";
     }
 
+    // TL: can we make a pointer out of this? like massTransp
     /// \todo rhs beruecksichtigen
-    SurfactantcGP1CL surfTransp( MG, Stokes.GetBndData().Vel, P.get<double>("SurfTransp.Theta"), P.get<double>("SurfTransp.Visc"), &Stokes.v, *lset.PhiC, lset.GetBndData(),
-                                 P.get<double>("Time.StepSize"), P.get<int>("SurfTransp.Iter"), P.get<double>("SurfTransp.Tol"), P.get<double>("SurfTransp.OmitBound"));
+    SurfactantcGP1CL surfTransp( MG, Stokes.GetBndData().Vel, P.get<double>("Time.Theta"), P.get<double>("SurfTransp.Visc"), &Stokes.v, *lset.PhiC, lset.GetBndData(),
+                                 P.get<double>("Time.StepSize"), P.get<int>("SurfTransp.Solver.Iter"), P.get<double>("SurfTransp.Solver.Tol"), P.get<double>("SurfTransp.XFEMReduced"));
     InterfaceP1RepairCL surf_repair( MG, *lset.PhiC, lset.GetBndData(), surfTransp.ic);
     if (P.get("SurfTransp.DoTransp", 0))
     {
@@ -274,10 +275,11 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     }
 
     // Stokes-Solver
-    StokesSolverFactoryCL<InstatNavierStokes2PhaseP2P1CL> stokessolverfactory(Stokes, P);
+    ParamCL PSolver( P.get_child("CouplingSolver.NavStokesSolver.OseenSolver") );
+    StokesSolverFactoryCL<InstatNavierStokes2PhaseP2P1CL> stokessolverfactory(Stokes, PSolver, P );
     StokesSolverBaseCL* stokessolver;
 
-    if (! P.get<int>("OseenSolver.DirectSolve"))
+    if (! P.get<int>("CouplingSolver.NavStokesSolver.OseenSolver.DirectSolve"))
         stokessolver = stokessolverfactory.CreateStokesSolver();
 #ifndef _PAR
     else
@@ -298,10 +300,13 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
     // Navier-Stokes-Solver
     NSSolverBaseCL<InstatNavierStokes2PhaseP2P1CL>* navstokessolver = 0;
-    if (P.get<double>("NavStokes.Nonlinear")==0.0)
+    if (P.get<double>("CouplingSolver.NavStokesSolver.Nonlinear")==0.0)
         navstokessolver = new NSSolverBaseCL<InstatNavierStokes2PhaseP2P1CL>(Stokes, *stokessolver);
     else
-        navstokessolver = new AdaptFixedPtDefectCorrCL<InstatNavierStokes2PhaseP2P1CL>(Stokes, *stokessolver, P.get<int>("NavStokes.Iter"), P.get<double>("NavStokes.Tol"), P.get<double>("NavStokes.Reduction"));
+        navstokessolver = new AdaptFixedPtDefectCorrCL<InstatNavierStokes2PhaseP2P1CL>(Stokes, *stokessolver,
+                                                                                       P.get<int>("CouplingSolver.NavStokesSolver.Iter"),
+                                                                                       P.get<double>("CouplingSolver.NavStokesSolver.Tol"),
+                                                                                       P.get<double>("CouplingSolver.NavStokesSolver.Reduction"));
 
     // Level-Set-Solver
 #ifndef _PAR
@@ -310,7 +315,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     typedef JACPcCL LsetPcT;
 #endif
     LsetPcT lset_pc;
-    GMResSolverCL<LsetPcT>* gm = new GMResSolverCL<LsetPcT>( lset_pc, 200, P.get<int>("Levelset.Iter"), P.get<double>("Levelset.Tol"));
+    GMResSolverCL<LsetPcT>* gm = new GMResSolverCL<LsetPcT>( lset_pc, 200, P.get<int>("LevelsetSolver.Iter"), P.get<double>("LevelsetSolver.Tol"));
 
     LevelsetModifyCL lsetmod( P.get<int>("Reparam.Freq"), P.get<int>("Reparam.Method"), P.get<double>("Reparam.MaxGrad"), P.get<double>("Reparam.MinGrad"), P.get<int>("Levelset.VolCorrection"), Vol, is_periodic);
 
@@ -334,7 +339,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     if (P.get<int>("Time.NumSteps") != 0){
         timedisc->SetSchurPrePtr( stokessolverfactory.GetSchurPrePtr() );
     }
-    if (P.get<double>("NavStokes.Nonlinear")!=0.0 || P.get<int>("Time.NumSteps") == 0) {
+    if (P.get<double>("CouplingSolver.NavStokesSolver.Nonlinear")!=0.0 || P.get<int>("Time.NumSteps") == 0) {
         stokessolverfactory.SetMatrixA( &navstokessolver->GetAN()->GetFinest());
             //for Stokes-MGM
         stokessolverfactory.SetMatrices( navstokessolver->GetAN(), &Stokes.B.Data,
@@ -494,8 +499,8 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
         }
         // downwind-numbering for Navier-Stokes
-        const bool doNSDownwindNumbering= P.get<int>("NavStokes.Downwind.Frequency")
-            && step%P.get<int>("NavStokes.Downwind.Frequency") == 0;
+        const bool doNSDownwindNumbering= P.get<int>("CouplingSolver.NavStokesSolver.Downwind.Frequency")
+            && step%P.get<int>("CouplingSolver.NavStokesSolver.Downwind.Frequency") == 0;
         if (doNSDownwindNumbering) {
             if (!gridChanged) { // We must ensure that the permutation maps the original numbering of CreateNumbering to the downwind-numbering and that the renumbering starts in a known state, i.e. the original numbering.
                 vidx->DeleteNumbering( MG);
@@ -505,8 +510,8 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
             vel_downwind= Stokes.downwind_numbering( lset, navstokes_downwind);
         }
         // downwind-numbering for Levelset
-        const bool doLsetDownwindNumbering= P.get<int>("Levelset.Downwind.Frequency")
-            && step%P.get<int>("Levelset.Downwind.Frequency") == 0;
+        const bool doLsetDownwindNumbering= P.get<int>("CouplingSolver.LevelsetSolver.Downwind.Frequency")
+            && step%P.get<int>("CouplingSolver.LevelsetSolver.Downwind.Frequency") == 0;
         if (doLsetDownwindNumbering) {
             if (!gridChanged) { // We must ensure that the permutation maps the original numbering of CreateNumbering to the downwind-numbering and that the renumbering starts in a known state, i.e. the original numbering.
                 lset.DeleteNumbering( lidx);
@@ -569,15 +574,15 @@ void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<int>("Transp.DoTransp",0);
     P.put_if_unset<std::string>("Restart.Inputfile","none");
     P.put_if_unset<int>("NavStokes.ShiftFrame", 0);
-    P.put_if_unset<int>("NavStokes.Downwind.Frequency", 0);
-    P.put_if_unset<double>("NavStokes.Downwind.MaxRelComponentSize", 0.05);
-    P.put_if_unset<double>("NavStokes.Downwind.WeakEdgeRatio", 0.2);
-    P.put_if_unset<double>("NavStokes.Downwind.CrosswindLimit", std::cos( M_PI/6.));
+    P.put_if_unset<int>("CouplingSolver.NavStokesSolver.Downwind.Frequency", 0);
+    P.put_if_unset<double>("CouplingSolver.NavStokesSolver.Downwind.MaxRelComponentSize", 0.05);
+    P.put_if_unset<double>("CouplingSolver.NavStokesSolver.Downwind.WeakEdgeRatio", 0.2);
+    P.put_if_unset<double>("CouplingSolver.NavStokesSolver.Downwind.CrosswindLimit", std::cos( M_PI/6.));
     P.put_if_unset<int>("Levelset.Discontinuous", 0);
-    P.put_if_unset<int>("Levelset.Downwind.Frequency", 0);
-    P.put_if_unset<double>("Levelset.Downwind.MaxRelComponentSize", 0.05);
-    P.put_if_unset<double>("Levelset.Downwind.WeakEdgeRatio", 0.2);
-    P.put_if_unset<double>("Levelset.Downwind.CrosswindLimit", std::cos( M_PI/6.));
+    P.put_if_unset<int>("CouplingSolver.LevelsetSolver.Downwind.Frequency", 0);
+    P.put_if_unset<double>("CouplingSolver.LevelsetSolver.Downwind.MaxRelComponentSize", 0.05);
+    P.put_if_unset<double>("CouplingSolver.LevelsetSolver.Downwind.WeakEdgeRatio", 0.2);
+    P.put_if_unset<double>("CouplingSolver.LevelsetSolver.Downwind.CrosswindLimit", std::cos( M_PI/6.));
 
     P.put_if_unset<std::string>("NavStokes.Coeff.VolForce", "ZeroVel");
     //P.put_if_unset<double>("Mat.DensDrop", 0.0);
@@ -586,8 +591,8 @@ void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<double>("Mat.SmoothZone", 0.05); // deprecated, right? remove from instatstokes2phase.h?
     P.put_if_unset<double>("NavStokes.Coeff.SurfTens.ShearVisco", 0.0);
     P.put_if_unset<double>("NavStokes.Coeff.SurfTens.DilatationalVisco", 0.0);
-    P.put_if_unset<std::string>("NavStokes.Coeff.SurfTens.VarTensionFncs", "ConstTau");
-    P.put_if_unset<int>("OseenSolver.DirectSolve", 0);
+    P.put_if_unset<std::string>("NavStokes.Coeff.SurfTens.VarTensionFunc", "ConstTau");
+    P.put_if_unset<int>("CouplingSolver.NavStokesSolver.OseenSolver.DirectSolve", 0);
 
     P.put_if_unset<int>("General.ProgressBar", 0);
     P.put_if_unset<std::string>("General.DynamicLibsPrefix", "../");

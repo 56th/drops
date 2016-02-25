@@ -90,7 +90,7 @@ void Strategy (MultiGridCL& MG, const LsetBndDataCL& lsbnd)
     // initialization of surface tension
     // choose a proper model for surface tension coefficient, see levelset/surfacetension.h
     SurfaceTensionCL * sf;
-    sf = new SurfaceTensionCL( inscamap[P.get<std::string>("SurfTens.VarTensionFncs")]);
+    sf = new SurfaceTensionCL( inscamap[P.get<std::string>("NavStokes.Coeff.SurfTens.VarTensionFunc")]);
     sf->SetInputMethod( Sigma_X);
 
     // LevelsetP2CL lset( MG, lsbnd, sf, P.get<double>("Levelset.SD"), P.get<double>("Levelset.CurvDiff"));
