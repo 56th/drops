@@ -73,7 +73,9 @@
 		"Tol":		1e-10,
 		"OmitBound":	-1,
 		"Visc":		1, // 0.05,
-		"FEDegree":	1 // 2
+		"FEDegree":	2, // 1, 2
+                "UseMeshDeformation":   "distance", // "", "distance", "ls_value"
+                "NormalLaplaceCoefficent": 1.0
 	},
 
 	"Levelset": // levelset solver

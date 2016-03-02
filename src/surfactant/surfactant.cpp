@@ -1167,6 +1167,147 @@ void StationaryStrategyP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DR
     }
 }
 
+void StationaryStrategyDeformationP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::LevelsetP2CL& lset)
+{
+    // Initialize level set and triangulation
+    adap.MakeInitialTriang();
+    lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
+    lset.Phi.SetIdx( &lset.idx);
+    // LinearLSInit( mg, lset.Phi, &the_lset_fun);
+    LSInit( mg, lset.Phi, the_lset_fun, 0.);
+
+    // Setup an interface-P2 numbering
+    DROPS::IdxDescCL ifacep2idx( P2IF_FE);
+    ifacep2idx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
+    ifacep2idx.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
+    std::cout << "P2-NumUnknowns: " << ifacep2idx.NumUnknowns() << std::endl;
+
+    // Compute the mesh deformation
+    IdxDescCL vecp2idx( vecP2_FE);
+    vecp2idx.CreateNumbering( mg.GetLastLevel(), mg);
+    IdxDescCL p2idx( P2_FE);
+    p2idx.CreateNumbering( mg.GetLastLevel(), mg);
+    VecDescCL deformation( &vecp2idx);
+    LocalQuaMapperCL locqua (mg, lset.Phi,
+        /*maxiter*/ P.get<int>( "LevelsetMapper.Iter"),
+        /*tol*/ P.get<double>( "LevelsetMapper.Tol"),
+        /*armijo_c*/ P.get<double>( "LevelsetMapper.ArmijoConstant"),
+        /*max_damping_steps*/ P.get<Uint>( "LevelsetMapper.MaxDampingSteps"));
+//     LocalQuaMapperP2CL locquap2(locqua); // Provides the interface for the Oswald-projection class.
+//     locdist.SetIdx( &p2idx);
+//     OswaldProjectionP2AccuCL<LocalQuaMapperP2CL> loc_dist_accu(locquap2, locdist);
+//         loc_dist_accu.set_check_averaging (true);
+    TetraAccumulatorTupleCL accus2;
+//         accus2.push_back( &loc_dist_accu);
+    LocalQuaMapperDeformationP2CL locquadefp2(locqua); // Provides the interface for the Oswald-projection class.
+    OswaldProjectionP2AccuCL<LocalQuaMapperDeformationP2CL> loc_def_accu(locquadefp2, deformation);
+    loc_def_accu.set_level_set_function (&lset.Phi, &lset.GetBndData())
+                .set_check_averaging (true);
+    accus2.push_back( &loc_def_accu);
+    accumulate( accus2, mg, p2idx.TriangLevel(), p2idx.GetMatchingFunction(), p2idx.GetBndInfo());
+
+    // Compute neighborhoods of the tetras at the interface
+    const PrincipalLatticeCL& lat= PrincipalLatticeCL::instance( 1);
+
+    VecDescCL to_iface( &vecp2idx);
+//     {
+//         TetraAccumulatorTupleCL accus;
+//         InterfaceCommonDataP2CL cdatap2( lset.Phi, lset.GetBndData(), quaqua, lat);
+//         accus.push_back( &cdatap2);
+//         InterfaceDebugP2CL p2debugaccu( cdatap2);
+// //         p2debugaccu.store_offsets( to_iface);
+//         p2debugaccu.set_true_area( 4.*M_PI*RadDrop[0]*RadDrop[0]);
+//         p2debugaccu.set_ref_dp( &dp_sphere);
+//         p2debugaccu.set_ref_abs_det( &abs_det_sphere);
+//         accus.push_back( &p2debugaccu);
+//         accumulate( accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetMatchingFunction(), ifacep2idx.GetBndInfo());
+//     }
+
+    TetraAccumulatorTupleCL accus;
+    InterfaceCommonDataDeformP2CL cdatap2( lset.Phi, lset.GetBndData(), deformation, lat);
+    accus.push_back( &cdatap2);
+    DROPS::MatDescCL Mp2( &ifacep2idx, &ifacep2idx);
+    InterfaceMatrixAccuCL<LocalMassDeformP2CL, InterfaceCommonDataDeformP2CL> accuMp2( &Mp2, LocalMassDeformP2CL(), cdatap2, "Mp2");
+    accus.push_back( &accuMp2);
+    DROPS::MatDescCL Ap2( &ifacep2idx, &ifacep2idx);
+    InterfaceMatrixAccuCL<LocalLaplaceBeltramiDeformP2CL, InterfaceCommonDataDeformP2CL> accuAp2( &Ap2, LocalLaplaceBeltramiDeformP2CL( P.get<double>("SurfTransp.Visc")), cdatap2, "Ap2");
+    accus.push_back( &accuAp2);
+    DROPS::MatDescCL Anp2( &ifacep2idx, &ifacep2idx);
+    InterfaceMatrixAccuCL<LocalNormalLaplaceDeformP2CL, InterfaceCommonDataDeformP2CL> accuAnp2( &Anp2, LocalNormalLaplaceDeformP2CL (P.get<double>("SurfTransp.NormalLaplaceCoefficent")), cdatap2, "Anp2");
+    accus.push_back( &accuAnp2);
+    DROPS::VecDescCL bp2( &ifacep2idx);
+    InterfaceVectorAccuCL<LocalVectorDeformP2CL, InterfaceCommonDataDeformP2CL> acculoadp2( &bp2, LocalVectorDeformP2CL( the_rhs_fun, bp2.t), cdatap2);
+    accus.push_back( &acculoadp2);
+
+    accumulate( accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetMatchingFunction(), ifacep2idx.GetBndInfo());
+
+//     TetraAccumulatorTupleCL mean_accus;
+//     mean_accus.push_back( &cdatap2);
+//     InterfaceL2AccuP2CL L2_mean_accu( cdatap2, mg, "P2-mean");
+//     L2_mean_accu.set_grid_function( bp2);
+//     mean_accus.push_back( &L2_mean_accu);
+//     accumulate( mean_accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetMatchingFunction(), ifacep2idx.GetBndInfo());
+//     bp2.Data-= L2_mean_accu.f_grid_int_acc/L2_mean_accu.area_acc;
+//     accumulate( mean_accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetMatchingFunction(), ifacep2idx.GetBndInfo());
+
+//     VectorCL e( 1., bp2.Data.size());
+//     VectorCL Ldiag( Ap2.Data.GetDiag());
+//     bp2.Data-= dot( VectorCL( e/Ldiag), bp2.Data)/std::sqrt( dot( VectorCL( e/Ldiag), e));
+
+    DROPS::MatrixCL Lp2;
+    Lp2.LinComb (1.0, Ap2.Data, 1.0, Mp2.Data, 1.0, Anp2.Data);
+//     MatrixCL& Lp2= Mp2.Data;
+// 
+    DROPS::WriteToFile( Ap2.Data, "ap2_iface.txt", "Ap2");
+    DROPS::WriteToFile( Mp2.Data, "mp2_iface.txt", "Mp2");
+    DROPS::WriteToFile( Anp2.Data, "anp2_vol.txt", "Anp2");
+    DROPS::WriteFEToFile( bp2, mg, "rhsp2_iface.txt", /*binary=*/ false);
+
+    typedef DROPS::SSORPcCL SurfPcT;
+// //     typedef DROPS::JACPcCL SurfPcT;
+    SurfPcT surfpc;
+    typedef DROPS::PCGSolverCL<SurfPcT> SurfSolverT;
+    SurfSolverT surfsolver( surfpc, P.get<int>("SurfTransp.Iter"), P.get<double>("SurfTransp.Tol"), true);
+
+    DROPS::VecDescCL xp2( &ifacep2idx);
+    surfsolver.Solve( Lp2, xp2.Data, bp2.Data, xp2.RowIdx->GetEx());
+    std::cout << "Iter: " << surfsolver.GetIter() << "\tres: " << surfsolver.GetResid() << '\n';
+
+//     TetraAccumulatorTupleCL err_accus;
+//     err_accus.push_back( &cdatap2);
+//     InterfaceL2AccuP2CL L2_accu( cdatap2, mg, "P2-solution");
+//     L2_accu.set_grid_function( xp2);
+//     L2_accu.set_function( the_sol_fun, 0.);
+//     L2_accu.set_grad_function( the_sol_grad_fun, 0.);
+//     err_accus.push_back( &L2_accu);
+//     accumulate( err_accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetMatchingFunction(), ifacep2idx.GetBndInfo());
+// 
+//     {
+//         std::ofstream os( "quaqua_num_outer_iter.txt");
+//         for (Uint i= 0; i != quaqua.num_outer_iter.size(); ++i)
+//             os << i << '\t' << quaqua.num_outer_iter[i] << '\n';
+//         os << '\n';
+//         for (Uint i= 0; i != quaqua.num_inner_iter.size(); ++i)
+//             os << i << '\t' << quaqua.num_inner_iter[i] << '\n';
+//     }
+// 
+    if (P.get<int>( "SolutionOutput.Freq") > 0)
+        DROPS::WriteFEToFile( xp2, mg, P.get<std::string>( "SolutionOutput.Path") + "_p2", P.get<bool>( "SolutionOutput.Binary"));
+
+    DROPS::NoBndDataCL<> nobnd;
+    DROPS::NoBndDataCL<Point3DCL> nobnd_vec;
+    VecDescCL the_sol_vd( &lset.idx);
+    LSInit( mg, the_sol_vd, the_sol_fun, /*t*/ 0.);
+    if (vtkwriter.get() != 0) {
+        vtkwriter->Register( make_VTKScalar( lset.GetSolution(), "Levelset") );
+        vtkwriter->Register( make_VTKIfaceScalar( mg, xp2, "InterfaceSolP2"));
+        vtkwriter->Register( make_VTKScalar(      make_P2Eval( mg, nobnd, the_sol_vd),  "TrueSol"));
+        vtkwriter->Register( make_VTKVector( make_P2Eval( mg, nobnd_vec, deformation), "deformation") );
+//         vtkwriter->Register( make_VTKVector( make_P2Eval( mg, nobnd_vec, to_iface), "to_iface") );
+        vtkwriter->Write( 0.);
+    }
+}
+
 int main (int argc, char* argv[])
 {
   try {
@@ -1216,11 +1357,16 @@ int main (int argc, char* argv[])
             false, /* <- P2DG */
             -1,    /* <- level */
             P.get<bool>("VTK.ReUseTimeFile")));
-    if (P.get<bool>( "Exp.StationaryPDE"))
-        if (P.get<int>( "SurfTransp.FEDegree") == 1)
-            StationaryStrategyP1( mg, adap, lset);
-        else
-            StationaryStrategyP2( mg, adap, lset);
+    if (P.get<bool>( "Exp.StationaryPDE")) {
+        if (P.get<std::string>("SurfTransp.UseMeshDeformation") != "")
+            StationaryStrategyDeformationP2( mg, adap, lset);
+        else {
+            if (P.get<int>( "SurfTransp.FEDegree") == 1)
+                StationaryStrategyP1( mg, adap, lset);
+            else
+                StationaryStrategyP2( mg, adap, lset);
+        }
+    }
     else
         Strategy( mg, adap, lset);
 

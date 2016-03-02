@@ -99,6 +99,16 @@ InterfaceCommonDataP2CL::InterfaceCommonDataP2CL (const VecDescCL& ls_arg, const
         p2[i][i]= 1.; // P2-Basis-Functions
 }
 
+InterfaceCommonDataDeformP2CL::InterfaceCommonDataDeformP2CL (const VecDescCL& ls_arg, const BndDataCL<>& lsetbnd_arg,
+        VecDescCL& Psi_vdarg, const PrincipalLatticeCL& lat_arg)
+    : ls( &ls_arg), lsetbnd( &lsetbnd_arg), lat( &lat_arg), Psi_vd (&Psi_vdarg), ls_loc( lat->vertex_size()),
+      Phi (this)
+{
+    P2DiscCL::GetGradientsOnRef( gradrefp2);
+    for (Uint i= 0; i < 10 ; ++i)
+        p2[i][i]= 1.; // P2-Basis-Functions
+}
+
 void SetupInterfaceMassP1 (const MultiGridCL& mg, MatDescCL* matM, const VecDescCL& ls, const BndDataCL<>& lsetbnd, double alpha)
 {
     //ScopeTimerCL timer( "SetupInterfaceMassP1");

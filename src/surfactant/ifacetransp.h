@@ -267,6 +267,187 @@ class InterfaceCommonDataP2CL : public TetraAccumulatorCL
     }
 };
 
+class InterfaceCommonDataDeformP2CL;
+
+class LocalMeshTransformationCL
+{
+  public:
+    InterfaceCommonDataDeformP2CL* cdata; // Must be set before use of members.
+
+    LocalP2CL<Point3DCL> Psi; // Phi= id + Psi
+    Bary2WorldCoordCL b2w;
+
+    Point3DCL n_lin;
+    SMatrixCL<3, 2> Q;
+
+    LocalP1CL<SMatrixCL<3, 3> > dPhi;
+    SMatrixCL<3, 3> G,
+                    Ginv_wwT;
+    QRDecompCL<3, 3> Gqr;
+    Point3DCL w;  // the pull-back of n_Gamma (scaled to unit length)
+
+    double JPhi,
+           JPhiQ;
+
+    LocalMeshTransformationCL (InterfaceCommonDataDeformP2CL* cdataarg= 0)
+        : cdata (cdataarg) {}
+
+    void set_tetra (const TetraCL* t);
+
+    void set_surface_patch (const BaryCoordCL verts[3]) { // Set Q, n_lin
+        QRDecompCL<3, 2> qr;
+        SMatrixCL<3, 2>& M= qr.GetMatrix ();
+        M.col( 0, b2w( verts[1]) - b2w( verts[0]));
+        M.col( 1, b2w( verts[2]) - b2w( verts[0]));
+        qr.prepare_solve();
+        const SMatrixCL<3, 3> QQ= qr.get_Q ();
+        Q.col(0, QQ.col(0));
+        Q.col(1, QQ.col(1));
+        n_lin= QQ.col (2);
+    }
+
+    void set_point (const BaryCoordCL& xb, bool surface_data_p) {
+        SMatrixCL<3, 3> dPhix= dPhi(xb);
+        G= GramMatrix (dPhix);
+        Gqr.GetMatrix ()= G;
+        Gqr.prepare_solve ();
+        JPhi= std::sqrt (std::abs (Gqr.Determinant_R ())); // |det dPhix|
+        if (!surface_data_p)
+            return;
+
+        w= n_lin;
+        Gqr.Solve (w);
+        double nlinT_Ginv_nlin= inner_prod (w, n_lin);
+        w/= std::sqrt (nlinT_Ginv_nlin);
+        Ginv_wwT= eye<3, 3> ();
+        Gqr.Solve (Ginv_wwT);
+        Ginv_wwT-= outer_product (w, w);
+
+        const SMatrixCL<2, 2> gr= GramMatrix (dPhix*Q);
+        JPhiQ= std::sqrt(gr(0, 0)*gr(1, 1) - gr(0, 1)*gr(1, 0));
+    }
+
+    void map_QuadDomain (QuadDomainCL& qdom);
+
+    void map_QuadDomain2D (QuadDomain2DCL& qdom, const SurfacePatchCL& p) {
+        const Uint nodes_per_facet= qdom.vertex_size()/p.facet_size();
+        for (Uint i= 0; i < qdom.weights_.size(); ++i) {
+            if (i % nodes_per_facet == 0) {
+                const SurfacePatchCL::FacetT& facet= p.facet_begin()[i/nodes_per_facet];
+                const BaryCoordCL verts[3]= { qdom.vertexes_[facet[0]],
+                                              qdom.vertexes_[facet[1]],
+                                              qdom.vertexes_[facet[2]] };
+                set_surface_patch (verts);
+            }
+            set_point (qdom.vertexes_[i], /*surface_data_p=*/ true);
+            qdom.weights_[i]*= JPhiQ;
+        }
+    }
+};
+
+class InterfaceCommonDataDeformP2CL : public TetraAccumulatorCL
+{
+  private:
+    InterfaceCommonDataDeformP2CL** the_clones;
+
+    const VecDescCL*   ls;      // P2-level-set
+    const BndDataCL<>* lsetbnd; // boundary data for the level set function
+
+    const PrincipalLatticeCL* lat;
+
+  public:
+    /// common data @{
+    VecDescCL* Psi_vd;
+    LocalP2CL<> locp2_ls;
+
+    double det_T;
+    SMatrixCL<3,3> T;
+    LocalP2CL<>          p2[10];
+    LocalP1CL<Point3DCL> gradrefp2[10];
+    LocalP1CL<Point3DCL> gradp2[10];
+
+    std::valarray<double>     ls_loc;
+    SurfacePatchCL            surf;
+    QuadDomain2DCL            qdom2d;
+    QuadDomainCL              qdom;
+
+    mutable LocalMeshTransformationCL Phi;
+
+    const PrincipalLatticeCL& get_lattice () const { return *lat; }
+    /// @}
+
+    const InterfaceCommonDataDeformP2CL& get_clone () const {
+        const int tid= omp_get_thread_num();
+        return tid == 0 ? *this : the_clones[tid][0];
+    }
+
+    bool empty () const { return surf.empty(); }
+
+    void set_lattice (const PrincipalLatticeCL& newlat) {
+        lat= &newlat;
+        ls_loc.resize( lat->vertex_size());
+    }
+
+    InterfaceCommonDataDeformP2CL (const VecDescCL& ls_arg, const BndDataCL<>& lsetbnd_arg,
+        VecDescCL& Psi_vdarg, const PrincipalLatticeCL& lat_arg);
+    virtual ~InterfaceCommonDataDeformP2CL () {}
+
+    virtual void begin_accumulation () {
+        the_clones= new InterfaceCommonDataDeformP2CL*[omp_get_max_threads()];
+        the_clones[0]= this;
+    }
+    virtual void finalize_accumulation() {
+        for (int i= 1; i < omp_get_max_threads(); ++i)
+            delete the_clones[i];
+        delete[] the_clones;
+    }
+
+    virtual void visit (const TetraCL& t) {
+        surf.clear();
+        locp2_ls.assign( t, *ls, *lsetbnd);
+        evaluate_on_vertexes( locp2_ls, *lat, Addr( ls_loc));
+        if (equal_signs( ls_loc))
+            return;
+        surf.make_patch<MergeCutPolicyCL>( *lat, ls_loc);
+        if (surf.empty())
+            return;
+
+        GetTrafoTr( T, det_T, t);
+        P2DiscCL::GetGradients( gradp2, gradrefp2, T);
+        Phi.set_tetra (&t);
+        make_CompositeQuad5Domain2D (qdom2d, surf, t);
+        Phi.map_QuadDomain2D (qdom2d, surf);
+        make_SimpleQuadDomain<Quad5DataCL> (qdom, AllTetraC);
+        Phi.map_QuadDomain (qdom);
+    }
+
+    virtual InterfaceCommonDataDeformP2CL* clone (int clone_id) {
+        the_clones[clone_id]= new InterfaceCommonDataDeformP2CL( *this);
+        Phi.cdata= the_clones[clone_id];
+        return the_clones[clone_id];
+    }
+};
+
+
+inline void LocalMeshTransformationCL::set_tetra (const TetraCL* t)
+{ // Set Psi, dPhi
+    b2w.assign (*t);
+    const NoBndDataCL<Point3DCL> nobnd;
+    Psi.assign (*t, *cdata->Psi_vd, nobnd);
+    dPhi= eye<3, 3> ();
+    for (Uint i= 0; i < 10; ++i)
+        dPhi+= outer_product (Psi[i], cdata->gradp2[i]);
+}
+
+inline void LocalMeshTransformationCL::map_QuadDomain (QuadDomainCL& qdom)
+{
+    for (Uint i= 0; i < qdom.weights_.size(); ++i) {
+        set_point (qdom.vertexes_[i], /*surface_data_p=*/ false);
+        qdom.weights_[i]*= JPhi*std::abs(cdata->det_T);
+    }
+}
+
+
 /// \brief Map the QuadDomain2DCL from InterfaceCommonDataP2CL to the quadratic levelset.
 /// The result is represented as unordered map from tetras to (mapped) QuadDomain2DCL.
 /// The quadrature weights are adjusted by the absdet of the mapping.
@@ -765,6 +946,133 @@ class LocalMassP2CL
     }
 
     LocalMassP2CL () {}
+};
+
+/// \brief Compute the P2 load vector corresponding to the function f on a single tetra.
+class LocalVectorDeformP2CL
+{
+  private:
+    instat_scalar_fun_ptr f_;
+    double time_;
+
+    std::valarray<double> qp2,
+                          qf;
+
+  public:
+    static const FiniteElementT row_fe_type= P2IF_FE;
+
+    double vec[10];
+
+    LocalVectorDeformP2CL (instat_scalar_fun_ptr f, double time) : f_( f), time_( time) {}
+
+    void setup (const TetraCL& t, const InterfaceCommonDataDeformP2CL& cdata, const IdxT numr[10]) {
+        resize_and_evaluate_on_vertexes( f_, t, cdata.qdom2d, time_, qf);
+        qp2.resize( cdata.qdom2d.vertex_size());
+        for (Uint i= 0; i < 10; ++i) {
+                if (numr[i] == NoIdx)
+                    continue;
+                evaluate_on_vertexes( cdata.p2[i], cdata.qdom2d, Addr( qp2));
+                vec[i]= quad_2D( qf*qp2, cdata.qdom2d);
+        }
+    }
+};
+
+class LocalMassDeformP2CL
+{
+  private:
+    std::valarray<double> qp2[10];
+
+  public:
+    static const FiniteElementT row_fe_type= P2IF_FE,
+                                col_fe_type= P2IF_FE;
+
+    double coup[10][10];
+
+    void setup (const TetraCL&, const InterfaceCommonDataDeformP2CL& cdata) {
+        for (int i= 0; i < 10; ++i)
+            resize_and_evaluate_on_vertexes ( cdata.p2[i], cdata.qdom2d, qp2[i]);
+
+        for (int i= 0; i < 10; ++i) {
+            coup[i][i]= quad_2D (qp2[i]*qp2[i], cdata.qdom2d);
+            for(int j= 0; j < i; ++j)
+                coup[i][j]= coup[j][i]= quad_2D (qp2[j]*qp2[i], cdata.qdom2d);
+        }
+    }
+
+    LocalMassDeformP2CL () {}
+};
+
+class LocalLaplaceBeltramiDeformP2CL
+{
+  private:
+    double D_; // diffusion coefficient
+
+    GridFunctionCL<Point3DCL> qgradp2[10];
+
+    GridFunctionCL<Point3DCL> nl;
+    GridFunctionCL<SMatrixCL<3,3> > Ginv_wwT;
+
+  public:
+    static const FiniteElementT row_fe_type= P2IF_FE,
+                                col_fe_type= P2IF_FE;
+
+    double coup[10][10];
+
+    void setup (const TetraCL&, const InterfaceCommonDataDeformP2CL& cdata) {
+        Ginv_wwT.resize( cdata.qdom2d.vertex_size());
+        for (Uint i= 0; i < cdata.qdom2d.vertex_size(); ++i) {
+            cdata.Phi.set_point (cdata.qdom2d.vertex_begin()[i], true);
+            Ginv_wwT[i]= cdata.Phi.Ginv_wwT;
+        }
+
+        for (int i= 0; i < 10; ++i) {
+            resize_and_evaluate_on_vertexes ( cdata.gradp2[i], cdata.qdom2d, qgradp2[i]);
+        }
+
+        for (int i= 0; i < 10; ++i) {
+            coup[i][i]= D_*quad_2D( dot( qgradp2[i], Ginv_wwT, qgradp2[i]), cdata.qdom2d);
+            for(int j= 0; j < i; ++j)
+                coup[i][j]= coup[j][i]= D_*quad_2D( dot( qgradp2[j], Ginv_wwT, qgradp2[i]), cdata.qdom2d);
+        }
+    }
+
+    LocalLaplaceBeltramiDeformP2CL (double D)
+        :D_( D) {}
+};
+
+class LocalNormalLaplaceDeformP2CL
+{
+  private:
+    double D_; // diffusion coefficient
+
+    GridFunctionCL<Point3DCL> qgradp2[10];
+    GridFunctionCL<> qngradp2[10];
+
+  public:
+    static const FiniteElementT row_fe_type= P2IF_FE,
+                                col_fe_type= P2IF_FE;
+
+    double coup[10][10];
+
+    void setup (const TetraCL&, const InterfaceCommonDataDeformP2CL& cdata) {
+        for (int i= 0; i < 10; ++i) {
+            resize_and_evaluate_on_vertexes ( cdata.gradp2[i], cdata.qdom, qgradp2[i]);
+            qngradp2[i].resize (cdata.qdom.vertex_size ());
+            for (Uint j= 0; j < qgradp2[i].size(); ++j) {
+                cdata.Phi.set_point (cdata.qdom.vertex_begin()[j], true);
+                qngradp2[i][j]= inner_prod( cdata.Phi.w, qgradp2[i][j]);
+             }
+        }
+
+        for (int i= 0; i < 10; ++i) {
+            coup[i][i]= D_*quad( qngradp2[i]*qngradp2[i], 1., cdata.qdom);
+            for(int j= 0; j < i; ++j)
+                coup[i][j]= coup[j][i]= D_*quad( qngradp2[j]*qngradp2[i], 1., cdata.qdom);
+        }
+    }
+
+    LocalNormalLaplaceDeformP2CL (double D)
+        :D_( D) {}
 };
 
 /// \brief The routine sets up the load-vector in v on the interface defined by ls.
