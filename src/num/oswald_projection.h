@@ -25,6 +25,7 @@
 #ifndef DROPS_OSWALD_PROJECTION_H
 #define DROPS_OSWALD_PROJECTION_H
 
+#include "geom/subtriangulation.h"
 #include "misc/problem.h"
 #include "num/accumulator.h"
 #include "num/fe.h"
@@ -51,6 +52,9 @@ class OswaldProjectionP2AccuCL : public TetraAccumulatorCL
 
     LocalNumbP2CL numg;
 
+    const VecDescCL*   ls;      // a P2-level-set function
+    const BndDataCL<>* lsetbnd; // boundary data for the level set function
+
     OswaldProjectionP2AccuCL& set_n (std::valarray<double>* n) { // The clones must refer to the n_ of thread 0.
         n_= n;
         return *this;
@@ -62,10 +66,16 @@ class OswaldProjectionP2AccuCL : public TetraAccumulatorCL
 
   public:
     OswaldProjectionP2AccuCL (LocalP2T loc, VecDescCL& avg)
-        : loc_( loc), n_( 0), n_invalid_( 0), check_averaging_( false), avg_( avg) {}
+        : loc_( loc), n_( 0), n_invalid_( 0), check_averaging_( false), avg_( avg), ls( 0), lsetbnd( 0) {}
 
     OswaldProjectionP2AccuCL& set_check_averaging (bool b= true) {
         check_averaging_= b;
+        return *this;
+    }
+
+    OswaldProjectionP2AccuCL& set_level_set_function (const VecDescCL* lsarg, const BndDataCL<>* lsetbndarg) {
+        ls= lsarg;
+        lsetbnd= lsetbndarg;
         return *this;
     }
 
@@ -85,6 +95,11 @@ class OswaldProjectionP2AccuCL : public TetraAccumulatorCL
     }
 
     virtual void visit (const TetraCL& t) {
+        if (ls != 0) {
+            LocalP2CL<> locp2_ls( t, *ls, *lsetbnd);
+            if (equal_signs( locp2_ls))
+                return;
+        }
         loc_.set_tetra( &t);
         numg.assign_indices_only( t, *avg_.RowIdx);
         for (Uint i= 0; i < 10; ++i) {
