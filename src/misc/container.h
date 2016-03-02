@@ -1198,6 +1198,7 @@ class QRDecompCL
     void apply_reflection  (Uint j, SVectorCL<Rows_>& b) const;
     void apply_Q_transpose (SVectorCL<Rows_>& b) const;
     void apply_Q           (SVectorCL<Rows_>& b) const;
+    SMatrixCL<Rows_, Rows_> get_Q () const;
     ///@}
     ///\brief Computes the determinant of R (stable). For Rows_ > Cols_, the determinant of the upper Cols_ x Cols_ block of R is returned.
     double Determinant_R () const;
@@ -1236,6 +1237,20 @@ template <Uint Rows_, Uint Cols_>
     // The Q_j are symmetric, so to transpose Q^T one just has to reverse the order of application.
     for (Uint j= Cols_ - 1; j < Cols_; --j)
         apply_reflection( j, b);
+}
+
+template <Uint Rows_, Uint Cols_>
+  SMatrixCL<Rows_, Rows_>
+    QRDecompCL<Rows_, Cols_>::get_Q () const
+{
+    SMatrixCL<Rows_, Rows_> Q (eye<Rows_, Rows_> ());
+    SVectorCL<Rows_> tmp;
+    for (Uint j= 0; j < Rows_; ++j) {
+        tmp= Q.col( j);
+        apply_Q( tmp);
+        Q.col( j, tmp);
+    }
+    return Q;
 }
 
 template <Uint Rows_, Uint Cols_>
