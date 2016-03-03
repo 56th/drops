@@ -75,8 +75,9 @@ namespace DROPS // for Strategy
 
 double GetTimeOffset(){
     double timeoffset = 0.0;
-    const std::string restartfilename = P.get<std::string>("DomainCond.InitialFile");
-    if (P.get<int>("DomainCond.InitialCond") == -1){
+    const std::string restartfilename = P.get<std::string>("Restart.InputData");
+    if( ReadInitialConditionFromFile(P) )
+    {
         const std::string timefilename = restartfilename + "time";
         std::ifstream f_(timefilename.c_str());
         f_ >> timeoffset;
@@ -229,7 +230,8 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     TransportP1CL * massTransp = NULL;
     TransportRepairCL *  transprepair = NULL;
 
-    if (P.get<int>("Transp.DoTransp"))
+    //if (P.get<int>("Transp.DoTransp"))
+    if( P.exists("Transp") )
     {
         // CL: the following could be moved outside of strategy to some function like
         //" InitializeMassTransport(P,MG,Stokes,lset,adap, TransportP1CL * & massTransp,TransportRepairCL * & transprepair)"
@@ -241,9 +243,9 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         static DROPS::BndDataCL<> Bnd_c( 6, c_bc, c_bfun);
         double D[2] = {P.get<double>("Transp.DiffPos"), P.get<double>("Transp.DiffNeg")};
 
-        massTransp = new TransportP1CL( MG, Bnd_c, Stokes.GetBndData().Vel, P.get<double>("Transp.Theta"),
-                                  D, P.get<double>("Transp.HNeg")/P.get<double>("Transp.HPos"), &Stokes.v, lset,
-                                  P.get<double>("Time.StepSize"), P.get<int>("Transp.Iter"), P.get<double>("Transp.Tol"));
+        massTransp = new TransportP1CL( MG, Bnd_c, Stokes.GetBndData().Vel, P.get<double>("Time.Theta"),
+                                  D, P.get<double>("Transp.HenryNeg")/P.get<double>("Transp.HenryPos"), &Stokes.v, lset,
+                                  P.get<double>("Time.StepSize"), P.get<int>("Transp.Solver.Iter"), P.get<double>("Transp.Solver.Tol"));
 
         transprepair = new TransportRepairCL(*massTransp, MG);
         adap.push_back(transprepair);
@@ -251,10 +253,11 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         MLIdxDescCL* cidx= &massTransp->idx;
         massTransp->CreateNumbering( MG.GetLastLevel(), cidx);
         massTransp->ct.SetIdx( cidx);
-        if (P.get<int>("DomainCond.InitialCond") != -1)
+        //if (P.get<int>("DomainCond.InitialCond") != -1)
+        if( ReadInitialConditionFromFile(P) )
             massTransp->Init( inscamap["Initialcneg"], inscamap["Initialcpos"]);
         else
-            ReadFEFromFile( massTransp->ct, MG, P.get<std::string>("DomainCond.InitialFile")+"concentrationTransf");
+            ReadFEFromFile( massTransp->ct, MG, P.get<std::string>("Restart.InputData")+"concentrationTransf");
 
         massTransp->Update();
         std::cout << massTransp->c.Data.size() << " concentration unknowns,\n";
@@ -315,9 +318,9 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     typedef JACPcCL LsetPcT;
 #endif
     LsetPcT lset_pc;
-    GMResSolverCL<LsetPcT>* gm = new GMResSolverCL<LsetPcT>( lset_pc, 200, P.get<int>("LevelsetSolver.Iter"), P.get<double>("LevelsetSolver.Tol"));
+    GMResSolverCL<LsetPcT>* gm = new GMResSolverCL<LsetPcT>( lset_pc, 200, P.get<int>("CouplingSolver.LevelsetSolver.Iter"), P.get<double>("CouplingSolver.LevelsetSolver.Tol"));
 
-    LevelsetModifyCL lsetmod( P.get<int>("Reparam.Freq"), P.get<int>("Reparam.Method"), P.get<double>("Reparam.MaxGrad"), P.get<double>("Reparam.MinGrad"), P.get<int>("Levelset.VolCorrection"), Vol, is_periodic);
+    LevelsetModifyCL lsetmod( P.get<int>("Levelset.Reparam.Freq"), P.get<int>("Levelset.Reparam.Method"), P.get<double>("Levelset.Reparam.MaxGrad"), P.get<double>("Levelset.Reparam.MinGrad"), P.get<int>("Levelset.VolCorrection"), Vol, is_periodic);
 
     UpdateProlongationCL<Point3DCL> PVel( Stokes.GetMG(), stokessolverfactory.GetPVel(), &Stokes.vel_idx, &Stokes.vel_idx);
     adap.push_back( &PVel);
@@ -364,8 +367,9 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
     // for serialization of geometry and numerical data
     TwoPhaseStoreCL<InstatNavierStokes2PhaseP2P1CL> ser(MG, Stokes, lset, massTransp,
-                                                        P.get<std::string>("Restart.Outputfile"),
-                                                        P.get<int>("Restart.Overwrite"),
+                                                        P.get<std::string>("Restart.OutputData"),
+                                                        P.get<std::string>("Restart.OutputGrid"),
+                                                        P.get<int>("Restart.OutputOverwrite"),
                                                         P.get<int>("Restart.Binary"),
                                                         vel_downwind, lset_downwind);
     Stokes.v.t += GetTimeOffset();
@@ -480,7 +484,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         }
 
         if (P.get("SurfTransp.DoTransp", 0)) surfTransp.InitOld();
-        timedisc->DoStep( P.get<int>("Coupling.Iter"));
+        timedisc->DoStep( P.get<int>("CouplingSolver.Iter"));
         if (massTransp) massTransp->DoStep( time_new);
         if (P.get("SurfTransp.DoTransp", 0)) {
             surfTransp.DoStep( time_new);
@@ -534,7 +538,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
             dgvtkwriter->Write( time_new);
         if (vtkwriter && step%P.get("VTK.VTKOut", 0)==0)
             vtkwriter->Write( time_new);
-        if (P.get("Restart.Serialization", 0) && step%P.get("Restart.Serialization", 0)==0)
+        if (P.get("Restart.OutputFreq", 0) && step%P.get("Restart.OutputFreq", 0)==0)
             ser.Write();
     }
     IFInfo.Update( lset, Stokes.GetVelSolution());

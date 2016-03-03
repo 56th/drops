@@ -56,7 +56,7 @@ MGBuilderCL* make_MGBuilder (const ParamCL& P)
     try {
         restartfile= P.get<std::string>( "Mesh.RestartFile");
     } catch (DROPSParamErrCL& ) {}
-    if (restartfile == "none")
+    if (restartfile == "none" || restartfile == "" )
         return tmp;
     else
         return new FileBuilderCL( restartfile, tmp, /*delete_bndbuilder*/ true);

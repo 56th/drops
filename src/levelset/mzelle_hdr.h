@@ -326,9 +326,27 @@ void SolveStatProblem( StokesT& Stokes, LevelsetP2CL& lset,
     std::cout << "iter: " << solver.GetIter() << "\tresid: " << solver.GetResid() << std::endl;
 }
 
+bool ReadInitialConditionFromFile( const ParamCL &P )
+{
+    if( P.exists("Restart.InputData") )
+    {
+        std::string inputDat = P.get<std::string>("Restart.InputData");
+        if( inputDat == "" || inputDat == "none" )
+            return false;
+    }
+    return true;
+}
+
 void SetInitialLevelsetConditions( LevelsetP2CL& lset, MultiGridCL& MG, ParamCL& P)
 {
-    switch (P.get<int>("DomainCond.InitialCond"))
+    if( ReadInitialConditionFromFile( P ) )
+    {
+        ReadFEFromFile( lset.Phi, MG, P.get<std::string>("Restart.InputData")+"levelset",
+                        P.get<int>("Restart.Binary") );
+        return;
+    }
+
+    switch ( P.get<int>("NavStokes.InitialValue") )
     {
 #ifndef _PAR
       case -10: // read from ensight-file [deprecated]
@@ -340,11 +358,12 @@ void SetInitialLevelsetConditions( LevelsetP2CL& lset, MultiGridCL& MG, ParamCL&
 #endif
       case -1: // read from file
       {
-        ReadFEFromFile( lset.Phi, MG, P.get<std::string>("DomainCond.InitialFile")+"levelset", P.get<int>("Restart.Binary"));
+        throw DROPSErrCL("Specify \"Restart.InputData\" to read initial condition from file");
+        //ReadFEFromFile( lset.Phi, MG, P.get<std::string>("Restart.InputData")+"levelset", P.get<int>("Restart.Binary"));
       } break;
       case 0: case 1:
           //lset.Init( EllipsoidCL::DistanceFct);
-          lset.Init( DROPS::InScaMap::getInstance()[P.get("Exp.InitialLSet", std::string("Ellipsoid"))]);
+          lset.Init( DROPS::InScaMap::getInstance()[P.get("Levelset.InitialValue", std::string("Ellipsoid"))]);
         break;
       case  2: //flow without droplet
           lset.Init( DROPS::InScaMap::getInstance()["One"]);
@@ -357,7 +376,19 @@ template <typename StokesT>
 void SetInitialConditions(StokesT& Stokes, LevelsetP2CL& lset, MultiGridCL& MG, const ParamCL& P)
 {
     MLIdxDescCL* pidx= &Stokes.pr_idx;
-    switch (P.get<int>("DomainCond.InitialCond"))
+
+    if( ReadInitialConditionFromFile( P ) )
+    {
+        ReadFEFromFile( Stokes.v, MG, P.get<std::string>("Restart.InputData")+"velocity",
+                        P.get<int>("Restart.Binary"));
+        Stokes.UpdateXNumbering( pidx, lset);
+        Stokes.p.SetIdx( pidx);
+        // pass also level set, as p may be extended
+        ReadFEFromFile( Stokes.p, MG, P.get<std::string>("Restart.InputData")+"pressure",
+                        P.get<int>("Restart.Binary"), lset.PhiC);
+    }
+
+    switch ( P.get<int>("NavStokes.InitialValue") )
     {
 #ifndef _PAR
       case -10: // read from ensight-file [deprecated]
@@ -379,10 +410,11 @@ void SetInitialConditions(StokesT& Stokes, LevelsetP2CL& lset, MultiGridCL& MG, 
 #endif
       case -1: // read from file
       {
-        ReadFEFromFile( Stokes.v, MG, P.get<std::string>("DomainCond.InitialFile")+"velocity", P.get<int>("Restart.Binary"));
-        Stokes.UpdateXNumbering( pidx, lset);
-        Stokes.p.SetIdx( pidx);
-        ReadFEFromFile( Stokes.p, MG, P.get<std::string>("DomainCond.InitialFile")+"pressure", P.get<int>("Restart.Binary"), lset.PhiC); // pass also level set, as p may be extended
+        throw DROPSErrCL("Specify \"Restart.InputData\" to read initial condition from file");
+//        ReadFEFromFile( Stokes.v, MG, P.get<std::string>("Restart.InputData")+"velocity", P.get<int>("Restart.Binary"));
+//        Stokes.UpdateXNumbering( pidx, lset);
+//        Stokes.p.SetIdx( pidx);
+//        ReadFEFromFile( Stokes.p, MG, P.get<std::string>("Restart.InputData")+"pressure", P.get<int>("Restart.Binary"), lset.PhiC); // pass also level set, as p may be extended
       } break;
       case 0: // zero initial condition
           Stokes.UpdateXNumbering( pidx, lset);
@@ -440,6 +472,7 @@ class TwoPhaseStoreCL
     const TransportP1CL* transp_;//old
     const SpaceTimeXSolutionCL* st_transp_;//new
     std::string          path_;
+    std::string          mgPath_;
     Uint                 numRecoverySteps_;
     Uint                 recoveryStep_;
     bool                 binary_;
@@ -468,33 +501,45 @@ class TwoPhaseStoreCL
        *  \param binary save output  binary?
        *  */
     TwoPhaseStoreCL(MultiGridCL& mg, const StokesT& Stokes, const LevelsetP2CL& lset, const TransportP1CL* transp,
-                    const std::string& path, Uint recoverySteps=2, bool binary= false, const PermutationT& vel_downwind= PermutationT(), const PermutationT& lset_downwind= PermutationT())
-      : mg_(mg), Stokes_(Stokes), lset_(lset), transp_(transp), st_transp_(NULL), path_(path), numRecoverySteps_(recoverySteps),
+                    const std::string& solPath, const std::string& mgPath, Uint recoverySteps=2, bool binary= false, const PermutationT& vel_downwind= PermutationT(), const PermutationT& lset_downwind= PermutationT())
+      : mg_(mg), Stokes_(Stokes), lset_(lset), transp_(transp), st_transp_(NULL), path_(solPath), mgPath_(mgPath), numRecoverySteps_(recoverySteps),
         recoveryStep_(0), binary_( binary), vel_downwind_( vel_downwind), lset_downwind_( lset_downwind){}
 
 //new cstr with spacetimetransport-object (as reference to distinguish from std-cstr... - could be cleaned..)
     TwoPhaseStoreCL(MultiGridCL& mg, const StokesT& Stokes, const LevelsetP2CL& lset, const SpaceTimeXSolutionCL& st_transp,
-                    const std::string& path, Uint recoverySteps=2, bool binary= false, 
+                    const std::string& solPath, const std::string& mgPath, Uint recoverySteps=2, bool binary= false,
                     const PermutationT& vel_downwind= PermutationT(), const PermutationT& lset_downwind= PermutationT())
-        : mg_(mg), Stokes_(Stokes), lset_(lset), transp_(NULL), st_transp_(&st_transp), path_(path), numRecoverySteps_(recoverySteps),
+        : mg_(mg), Stokes_(Stokes), lset_(lset), transp_(NULL), st_transp_(&st_transp), path_(solPath), mgPath_(mgPath), numRecoverySteps_(recoverySteps),
         recoveryStep_(0), binary_( binary), vel_downwind_( vel_downwind), lset_downwind_( lset_downwind){}
 
     /// \brief Write all information in a file
     void Write()
     {
+        if( path_.empty() && mgPath_.empty() ) return;
+
         // Create filename
         std::stringstream filename;
+        std::stringstream mgFileName;
         const size_t postfix= numRecoverySteps_==0 ? recoveryStep_++ : (recoveryStep_++)%numRecoverySteps_;
-        filename << path_ << postfix;
+        if( path_.empty() )
+            filename << mgPath_ << postfix;
+        else
+            filename << path_ << postfix;
+        mgFileName << mgPath_ << postfix;
+
         // first master writes time info
         IF_MASTER
             WriteTime( filename.str() + "time");
 
         // write multigrid
-        MGSerializationCL ser( mg_, filename.str());
-        ser.WriteMG();
+        if( !mgPath_.empty() )
+        {
+            MGSerializationCL ser( mg_, mgFileName.str() );
+            ser.WriteMG();
+        }
 
-        // write numerical data
+        // write numerical data if path is specified
+        if( path_.empty() ) return;
         VecDescCL vel= Stokes_.v;
         permute_Vector( vel.Data, invert_permutation( vel_downwind_), 3);
         WriteFEToFile( vel, mg_, filename.str() + "velocity", binary_);
@@ -517,7 +562,7 @@ namespace SurfTens
 //==============================================================================
 // tau is constant
 double sigmaf (const DROPS::Point3DCL&, double) {
-    static double sigma = P.get<double>("SurfTens.SurfTension");
+    static double sigma = P.get<double>("NavStokes.Coeff.SurfTens.SurfTension");
     return sigma;
 }
 
@@ -526,7 +571,7 @@ DROPS::Point3DCL gsigma (const DROPS::Point3DCL&, double) { return DROPS::Point3
 //linear decrease of surface tension coefficient in y direction
 double lin_in_y(const DROPS::Point3DCL& p)  // linear function in y-direction, zero in the middle of the domain
 {
-    static double sigma = P.get<double>("SurfTens.SurfTension",1.0); // surface tension coefficient sigma : if tau is a variable, sigma is the constant part of tau.
+    static double sigma = P.get<double>("NavStokes.Coeff.SurfTens.SurfTension",1.0); // surface tension coefficient sigma : if tau is a variable, sigma is the constant part of tau.
     static double Ly = P.get<DROPS::Point3DCL>("Domain.E2")[1];  // domain size in y
     static double grad_tau = P.get<double>("SurfTens.GradTau", 0.);  // gradient of tau
 

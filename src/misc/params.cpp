@@ -45,6 +45,17 @@ namespace DROPS
     }
   }
 
+  bool ParamCL::exists(const std::string &pathToNode) const
+  {
+      typedef boost::property_tree::ptree ptree;
+
+      ptree::const_assoc_iterator it = pt.find( pathToNode );
+      if( it == pt.not_found() )
+          return false;
+
+      return true;
+  }
+
   std::istream &operator>>(std::istream& stream, ParamCL& P)
   {
     try {

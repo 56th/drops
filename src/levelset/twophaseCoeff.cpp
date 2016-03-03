@@ -35,8 +35,8 @@ namespace tpd_inflow{
     DROPS::SVectorCL<3> InflowBrick( const DROPS::Point3DCL& p, double t)
     {
         DROPS::SVectorCL<3> ret(0.);
-        const double x = p[0]*(2* P.get<double>("NavStokes.RadInlet") -p[0]) / (P.get<double>("NavStokes.RadInlet")*P.get<double>("NavStokes.RadInlet")),
-                     z = p[2]*(2*P.get<double>("NavStokes.RadInlet")-p[2]) / (P.get<double>("NavStokes.RadInlet")*P.get<double>("NavStokes.RadInlet"));
+        const double x = p[0]*(2* P.get<double>("Exp.RadInlet") -p[0]) / (P.get<double>("Exp.RadInlet")*P.get<double>("Exp.RadInlet")),
+                     z = p[2]*(2*P.get<double>("Exp.RadInlet")-p[2]) / (P.get<double>("Exp.RadInlet")*P.get<double>("Exp.RadInlet"));
 
         ret[1]= x * z * P.get<double>("Exp.InflowVel") * (1-P.get<double>("Exp.InflowAmpl")*std::cos(2*M_PI*P.get<double>("Exp.InflowFreq")*t));
 
@@ -60,7 +60,7 @@ namespace tpd_inflow{
     DROPS::SVectorCL<3> InflowCell( const DROPS::Point3DCL& p, double)
     {
         DROPS::SVectorCL<3> ret(0.);
-        const double s2= P.get<double>("NavStokes.RadInlet")*P.get<double>("NavStokes.RadInlet"),
+        const double s2= P.get<double>("Exp.RadInlet")*P.get<double>("Exp.RadInlet"),
                      r2= p.norm_sq() - p[P.get<int>("Exp.FlowDir")]*p[P.get<int>("Exp.FlowDir")];
         ret[P.get<int>("Exp.FlowDir")]= -(r2-s2)/s2*P.get<double>("Exp.InflowVel");
 
@@ -106,8 +106,8 @@ namespace tpd_inflow{
     DROPS::SVectorCL<3> InflowBrickTransp (const DROPS::Point3DCL& p, double)
     {
         DROPS::SVectorCL<3> ret(0.);
-        const double x = p[0]*(2*P.get<double>("NavStokes.RadInlet")-p[0]) / (P.get<double>("NavStokes.RadInlet")*P.get<double>("NavStokes.RadInlet")),
-                     z = p[2]*(2*P.get<double>("NavStokes.RadInlet")-p[2]) / (P.get<double>("NavStokes.RadInlet")*P.get<double>("NavStokes.RadInlet"));
+        const double x = p[0]*(2*P.get<double>("Exp.RadInlet")-p[0]) / (P.get<double>("Exp.RadInlet")*P.get<double>("Exp.RadInlet")),
+                     z = p[2]*(2*P.get<double>("Exp.RadInlet")-p[2]) / (P.get<double>("Exp.RadInlet")*P.get<double>("Exp.RadInlet"));
         ret[1]= x * z * P.get<double>("Exp.InflowVel");
         return ret;
     }
