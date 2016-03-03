@@ -729,12 +729,15 @@ const LocalQuaMapperCL& LocalQuaMapperCL::compute_deformation () const
     ScopeTimerCL scopetimer( "LocalQuaMapperCL::deformation");
 
     base_point ();
-    if (!have_deformation) {
+    if (!base_in_trust_region_p ()) {
+        deformation= MakePoint3D (std::numeric_limits<double>::max (), 0., 0.);
+        have_deformation= false;
+    }
+    else if (!have_deformation) {
         const Point3DCL g (localF.get_locls_grad ()(bxb));
         const double s= loclsp1 (bxb)/inner_prod (w2b.map_direction (g), SVectorCL<4> (&loclsp1[0], &loclsp1[4]));
         deformation= s*g;
         have_deformation= true;
-
     }
     return *this;
 }
