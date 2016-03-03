@@ -33,9 +33,11 @@
 #include "out/vtkOut.h"
 #include "misc/dynamicload.h"
 #include "misc/funcmap.h"
+#include "misc/omp_variable.h"
 #include "geom/subtriangulation.h"
 #include "num/gradient_recovery.h"
 
+#include <cmath>
 #include <fstream>
 #include <string>
 #include <tr1/unordered_map>
@@ -1046,6 +1048,91 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
     virtual InterfaceL2AccuP2CL* clone (int /*clone_id*/) { return new InterfaceL2AccuP2CL( *this); }
 };
 
+
+/// \brief Accumulate different error measures for the approximation of the level
+/// set function $\varphi$ by the piecewise linear approximation $\varphi_h$.
+class InterfaceApproxErrorDeformAccuCL : public TetraAccumulatorCL
+{
+  private:
+    VecDescCL* yG_, ///< error-term for H^1 smooth \varphi
+             * ydist_; ///< distance per QuaQuamapper
+
+    InterfaceCommonDataDeformP2CL* cdata_;
+
+    IdxT numry[4];
+    double vec[4];
+
+    instat_scalar_fun_ptr d_; // exact distance
+    instat_vector_fun_ptr Dd_; // gradient of exact distance
+    GridFunctionCL<> qd;
+    GridFunctionCL<Point3DCL> qDderr;
+
+    OpenMPVar_MinInit_Max_CL<double> max_h,
+                                     max_d,
+                                     max_Dderr;
+
+  public:
+    InterfaceApproxErrorDeformAccuCL (InterfaceCommonDataDeformP2CL* cdataarg, VecDescCL* yg, VecDescCL* ydist)
+        : yG_( yg), ydist_( ydist), cdata_ (cdataarg), d_ (0), Dd_ (0) {}
+    virtual ~InterfaceApproxErrorDeformAccuCL () {}
+
+    InterfaceApproxErrorDeformAccuCL& set_d  (instat_scalar_fun_ptr darg)  {  d_= darg;  return *this; }
+    InterfaceApproxErrorDeformAccuCL& set_Dd (instat_vector_fun_ptr Ddarg) { Dd_= Ddarg; return *this; }
+
+    virtual void begin_accumulation () {
+        std::cout << "#InterfaceApproxErrorDeformAccuCL::begin_accumulation"
+                     ": " << ydist_->RowIdx->NumUnknowns() << " rows.\n";
+        max_h.scatter ();
+        max_d.scatter ();
+        max_Dderr.scatter ();
+    }
+
+    virtual void finalize_accumulation() {
+        std::cout << "#InterfaceApproxErrorDeformAccuCL::finalize_accumulation: ";
+        max_h.reduce();
+        std::cout << "\n\tmax_h: " << max_h.value() << "\n";
+        max_d.reduce();
+        std::cout << "\n\tmax_d: " << max_d.value() << "\n";
+        max_Dderr.reduce();
+        std::cout << "\n\tmax_dDerr: " << max_Dderr.value() << "\n";
+    }
+
+    virtual void visit (const TetraCL& t) {
+        InterfaceCommonDataDeformP2CL& cdata= cdata_->get_clone ();
+        const int tid= omp_get_thread_num();
+        if (cdata.empty ())
+            return;
+
+        resize_and_evaluate_on_vertexes( d_, t, cdata.qdom2d, 0., qd);
+        max_d.value (tid)= std::max (max_d.value (tid), *std::max_element (&qd[0], &qd[0] + cdata.qdom2d.vertex_size ()));
+        resize_and_evaluate_on_vertexes( Dd_, t, cdata.qdom2d, 0., qDderr);
+        const SurfacePatchCL::FacetT& facet= cdata.surf.facet_begin()[0];
+        const BaryCoordCL verts[3]= { cdata.surf.vertex_begin()[facet[0]],
+                                      cdata.surf.vertex_begin()[facet[1]],
+                                      cdata.surf.vertex_begin()[facet[2]] };
+        cdata.Phi.set_surface_patch (verts, cdata.pos_pt);
+        for (Uint i= 0; i < cdata.qdom2d.vertex_size (); ++i) {
+            cdata.Phi.set_point (cdata.qdom2d.vertex_begin ()[i], true);
+            Point3DCL n= cdata.Phi.dPhi(cdata.qdom2d.vertex_begin ()[i])*cdata.Phi.w;
+            n/=n.norm();
+            qDderr[i]-= n;
+            max_Dderr.value (tid)= std::max (max_Dderr.value (tid), qDderr[i].norm ());
+        }
+
+//         for (Uint d= 0; d < 10; ++d) {
+//             G+= cdata.gradp2[d]( bc)*cdata.locp2_ls[d];
+//         }
+        max_h.value (tid)= std::max (max_h.value (tid), ::cbrt( std::abs( cdata.det_T)));
+        GetLocalNumbP1NoBnd( numry, t, *ydist_->RowIdx);
+        for (int i= 0; i < 4; ++i) {
+            ydist_->Data[numry[i]]= std::max (ydist_->Data[numry[i]], max_d.value (tid));
+//             yG_->Data[numry[i]]= std::max( yG_->Data[numry[i]], G.norm ());
+        }
+    }
+
+    virtual InterfaceApproxErrorDeformAccuCL* clone (int /*clone_id*/) { return new InterfaceApproxErrorDeformAccuCL( *this); }
+};
+
 void StationaryStrategyP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::LevelsetP2CL& lset)
 {
     // Initialize level set and triangulation
@@ -1232,6 +1319,15 @@ void StationaryStrategyDeformationP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangC
     TetraAccumulatorTupleCL accus;
     InterfaceCommonDataDeformP2CL cdatap2( lset.Phi, lset.GetBndData(), deformation, lat);
     accus.push_back( &cdatap2);
+    // Setup a P1 numbering
+    DROPS::IdxDescCL p1idx( P1_FE);
+    p1idx.CreateNumbering( mg.GetLastLevel(), mg);
+    std::cout << "P1-NumUnknowns: " << p1idx.NumUnknowns() << std::endl;
+    VecDescCL d_iface_vd (&p1idx);
+    InterfaceApproxErrorDeformAccuCL ifaceerroraccu (&cdatap2, /*yg*/ 0, &d_iface_vd);
+    ifaceerroraccu.set_d  (&sphere_dist)
+                  .set_Dd (&d_sphere_dist);
+    accus.push_back( &ifaceerroraccu);
     DROPS::MatDescCL Mp2( &ifacep2idx, &ifacep2idx);
     InterfaceMatrixAccuCL<LocalMassDeformP2CL, InterfaceCommonDataDeformP2CL> accuMp2( &Mp2, LocalMassDeformP2CL(), cdatap2, "Mp2");
     accus.push_back( &accuMp2);
@@ -1310,6 +1406,7 @@ void StationaryStrategyDeformationP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangC
         vtkwriter->Register( make_VTKScalar(      make_P2Eval( mg, nobnd, the_sol_vd),  "TrueSol"));
         vtkwriter->Register( make_VTKVector( make_P2Eval( mg, nobnd_vec, deformation), "deformation") );
 //         vtkwriter->Register( make_VTKVector( make_P2Eval( mg, nobnd_vec, to_iface), "to_iface") );
+        vtkwriter->Register( make_VTKScalar( make_P1Eval( mg, nobnd, d_iface_vd), "d_iface") );
         vtkwriter->Write( 0.);
     }
 }
