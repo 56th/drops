@@ -1344,7 +1344,7 @@ make_Ensight6IfaceScalar (MultiGridCL& mg, const VecDescCL& u,
 }
 #endif
 
-///\brief Represents a scalar P1 function on the interface as VTK variable by extension to the
+///\brief Represents a scalar P1/P2 function on the interface as VTK variable by extension to the
 ///       whole domain.
 class VTKIfaceScalarCL : public VTKVariableCL
 {
