@@ -1207,7 +1207,7 @@ void StationaryStrategyDeformationP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangC
 //         accus2.push_back( &loc_dist_accu);
     LocalQuaMapperDeformationP2CL locquadefp2(locqua); // Provides the interface for the Oswald-projection class.
     OswaldProjectionP2AccuCL<LocalQuaMapperDeformationP2CL> loc_def_accu(locquadefp2, deformation);
-    loc_def_accu.set_level_set_function (&lset.Phi, &lset.GetBndData())
+    loc_def_accu.set_level_set_function (&lset.Phi, &lset.GetBndData(), PrincipalLatticeCL::instance (1))
                 .set_check_averaging (true);
     accus2.push_back( &loc_def_accu);
     accumulate( accus2, mg, p2idx.TriangLevel(), p2idx.GetMatchingFunction(), p2idx.GetBndInfo());

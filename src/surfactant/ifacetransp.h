@@ -294,7 +294,7 @@ class LocalMeshTransformationCL
 
     void set_tetra (const TetraCL* t);
 
-    void set_surface_patch (const BaryCoordCL verts[3]) { // Set Q, n_lin
+    void set_surface_patch (const BaryCoordCL verts[3], const Point3DCL& pos_pt) { // Set Q, n_lin
         QRDecompCL<3, 2> qr;
         SMatrixCL<3, 2>& M= qr.GetMatrix ();
         M.col( 0, b2w( verts[1]) - b2w( verts[0]));
@@ -303,7 +303,7 @@ class LocalMeshTransformationCL
         const SMatrixCL<3, 3> QQ= qr.get_Q ();
         Q.col(0, QQ.col(0));
         Q.col(1, QQ.col(1));
-        n_lin= QQ.col (2);
+        n_lin= QQ.col (2)*sign (inner_prod (pos_pt - b2w (verts[1]), QQ.col (2))); // n_lin points out of the neg. domain.
     }
 
     void set_point (const BaryCoordCL& xb, bool surface_data_p) {
@@ -329,15 +329,15 @@ class LocalMeshTransformationCL
 
     void map_QuadDomain (QuadDomainCL& qdom);
 
-    void map_QuadDomain2D (QuadDomain2DCL& qdom, const SurfacePatchCL& p) {
+    void map_QuadDomain2D (QuadDomain2DCL& qdom, const SurfacePatchCL& p, const Point3DCL& pos_pt) {
         const Uint nodes_per_facet= qdom.vertex_size()/p.facet_size();
         for (Uint i= 0; i < qdom.weights_.size(); ++i) {
             if (i % nodes_per_facet == 0) {
                 const SurfacePatchCL::FacetT& facet= p.facet_begin()[i/nodes_per_facet];
-                const BaryCoordCL verts[3]= { qdom.vertexes_[facet[0]],
-                                              qdom.vertexes_[facet[1]],
-                                              qdom.vertexes_[facet[2]] };
-                set_surface_patch (verts);
+                const BaryCoordCL verts[3]= { p.vertex_begin()[facet[0]],
+                                              p.vertex_begin()[facet[1]],
+                                              p.vertex_begin()[facet[2]] };
+                set_surface_patch (verts, pos_pt);
             }
             set_point (qdom.vertexes_[i], /*surface_data_p=*/ true);
             qdom.weights_[i]*= JPhiQ;
@@ -370,12 +370,17 @@ class InterfaceCommonDataDeformP2CL : public TetraAccumulatorCL
     SurfacePatchCL            surf;
     QuadDomain2DCL            qdom2d;
     QuadDomainCL              qdom;
+    Point3DCL                 pos_pt;
 
     mutable LocalMeshTransformationCL Phi;
 
     const PrincipalLatticeCL& get_lattice () const { return *lat; }
     /// @}
 
+    InterfaceCommonDataDeformP2CL& get_clone () {
+        const int tid= omp_get_thread_num();
+        return tid == 0 ? *this : the_clones[tid][0];
+    }
     const InterfaceCommonDataDeformP2CL& get_clone () const {
         const int tid= omp_get_thread_num();
         return tid == 0 ? *this : the_clones[tid][0];
@@ -416,7 +421,13 @@ class InterfaceCommonDataDeformP2CL : public TetraAccumulatorCL
         P2DiscCL::GetGradients( gradp2, gradrefp2, T);
         Phi.set_tetra (&t);
         make_CompositeQuad5Domain2D (qdom2d, surf, t);
-        Phi.map_QuadDomain2D (qdom2d, surf);
+        Uint i= 0;
+        for (; ls_loc[i] <= 0.; ++i)
+            ;
+        if (i > 3)
+            std::cerr << "InterfaceCommonDataDeformP2CL::visit: No positive vertex.\n";
+        pos_pt= t.GetVertex (i)->GetCoord ();
+        Phi.map_QuadDomain2D (qdom2d, surf, pos_pt);
         make_SimpleQuadDomain<Quad5DataCL> (qdom, AllTetraC);
         Phi.map_QuadDomain (qdom);
     }
