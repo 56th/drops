@@ -373,6 +373,12 @@ double sphere_dist (const DROPS::Point3DCL& p, double)
 }
 static RegisterScalarFunction regsca_sphere_dist_lset( "SphereDist", sphere_dist);
 
+DROPS::Point3DCL d_sphere_dist (const DROPS::Point3DCL& p, double)
+{
+    DROPS::Point3DCL x( p - PosDrop);
+    return x/x.norm();
+}
+
 
 typedef double (*dist_funT) (const DROPS::Point3DCL&, double);
 
