@@ -29,6 +29,7 @@
 #include "misc/problem.h"
 #include "num/accumulator.h"
 #include "num/fe.h"
+#include "num/lattice-eval.h"
 
 namespace DROPS
 {
@@ -54,6 +55,8 @@ class OswaldProjectionP2AccuCL : public TetraAccumulatorCL
 
     const VecDescCL*   ls;      // a P2-level-set function
     const BndDataCL<>* lsetbnd; // boundary data for the level set function
+    std::valarray<double> ls_loc;
+    const PrincipalLatticeCL* lat;
 
     OswaldProjectionP2AccuCL& set_n (std::valarray<double>* n) { // The clones must refer to the n_ of thread 0.
         n_= n;
@@ -73,9 +76,11 @@ class OswaldProjectionP2AccuCL : public TetraAccumulatorCL
         return *this;
     }
 
-    OswaldProjectionP2AccuCL& set_level_set_function (const VecDescCL* lsarg, const BndDataCL<>* lsetbndarg) {
+    OswaldProjectionP2AccuCL& set_level_set_function (const VecDescCL* lsarg, const BndDataCL<>* lsetbndarg, const PrincipalLatticeCL& latarg) {
         ls= lsarg;
         lsetbnd= lsetbndarg;
+        lat= &latarg;
+        ls_loc.resize (lat->vertex_size ());
         return *this;
     }
 
@@ -89,7 +94,7 @@ class OswaldProjectionP2AccuCL : public TetraAccumulatorCL
         if (check_averaging_)
             for (size_t i= 0; i < n_->size (); ++i)
                 if (n_[0][i] == 0 && n_invalid_[0][i] > 0)
-                    std::cerr << "OswaldProjectionP2AccuCL::finalize_accumulation: No local value for " << i << ".\n";
+                    std::cerr << "OswaldProjectionP2AccuCL::finalize_accumulation: No local value for " << i << "; invalid_p: " << n_invalid_[0][i] << ".\n";
         delete n_;
         delete n_invalid_;
     }
@@ -97,7 +102,8 @@ class OswaldProjectionP2AccuCL : public TetraAccumulatorCL
     virtual void visit (const TetraCL& t) {
         if (ls != 0) {
             LocalP2CL<> locp2_ls( t, *ls, *lsetbnd);
-            if (equal_signs( locp2_ls))
+            evaluate_on_vertexes( locp2_ls, *lat, Addr( ls_loc));
+            if (equal_signs( ls_loc))
                 return;
         }
         loc_.set_tetra( &t);
