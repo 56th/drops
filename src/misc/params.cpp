@@ -145,36 +145,70 @@ template <typename T, Uint Size>
     }
   }
 
-  void read_parameter_file_from_cmdline (ParamCL& P, int argc, char **argv, std::string default_file)
+void read_parameter_file_from_cmdline (ParamCL& P, int argc, char **argv, std::string default_file)
 {
-    if (argc == 1) {
+    // first read default parameters from default.json, taking path from default_file
+    std::string default_params= default_file.substr( 0, default_file.std::string::rfind( "/", default_file.size() )) + "/default.json";
+    std::ifstream test_if_default_exists( default_params.c_str());
+    if (test_if_default_exists) {
+        test_if_default_exists.close();
+        P.read_json( default_params);
+    } else
+        throw DROPSErrCL("read_parameter_file_from_cmdline: Unable to read default parameters from '"
+                + default_params + "'\n");
+    
+    // then read parameters from JSON file specified on command line (otherwise use default_file)
+    boost::property_tree::ptree params;
+    if ( (argc == 1) || (argv[1][0] == '-') ) { // no file specified on command line
         if (default_file == std::string())
             throw DROPSErrCL(
                 "read_parameter_file_from_cmdline: You must specify a parameter file on the command line.\n"
                 "        " + std::string( argv[0]) + " <path_to_parameter_file>\n");
-        std::cout << "Using default parameter file '" << default_file << "'." << std::endl;
-        P.read_json( default_file);
+        std::cout << "Using fall-back parameter file '" << default_file << "'." << std::endl;
+        boost::property_tree::read_json( default_file, params);
     }
     else {
-        std::cout << "Using  parameter file '" << argv[1] << "'." << std::endl;
-        P.read_json( argv[1]);
-        apply_parameter_modifications_from_cmdline(P,argc,argv);
+        std::cout << "Using parameter file '" << argv[1] << "'." << std::endl;
+        boost::property_tree::read_json( argv[1], params);
+    }
+    update_parameters( params, P);
+
+    // finally, read parameters from command line specified by --add-param
+    apply_parameter_modifications_from_cmdline( P, argc, argv);
+}
+
+
+void aux_update(const boost::property_tree::ptree& pt, ParamCL& P, std::string key, boost::property_tree::ptree& make_array)
+{
+    using boost::property_tree::ptree;
+    std::string path;
+
+    if (!key.empty())
+        key+= ".";
+
+    for (ptree::const_iterator it = pt.begin(); it != pt.end(); ++it) {
+        path= key + it->first;
+        if (path == key) { // json array
+	        path.erase( path.size()-1, 1);
+            make_array.push_back( *it);
+            P.put_child( path, make_array);
+        }
+        else {
+            if (!make_array.empty())
+                make_array = ptree();
+
+            P.put( path, it->second.data());
+        }
+
+        aux_update( it->second, P, path, make_array);
     }
 }
 
-void update_parameters (const boost::property_tree::ptree& pt, std::string key, ParamCL& P)
+void update_parameters(const boost::property_tree::ptree& pt, ParamCL& P)
 {
-    using boost::property_tree::ptree;
-    std::string nkey;
+    boost::property_tree::ptree make_array;
 
-    if (!key.empty()){
-        nkey = key + ".";
-    }
-
-    for (ptree::const_iterator it = pt.begin(); it != pt.end(); ++it) {
-        update_parameters(it->second, nkey + it->first, P);
-        P.put(nkey + it->first, it->second.data());
-    }
+    aux_update(pt,P,std::string(),make_array);
 }
 
 
@@ -208,7 +242,7 @@ void apply_parameter_modifications_from_cmdline (ParamCL& P, int argc, char **ar
         } catch (boost::property_tree::ptree_error& e) {
               throw DROPSParamErrCL( "ParamCL::apply_parameter_modifications_from_cmdline: Error while reading from command line.\n" + std::string(e.what()) + '\n');
         }
-        update_parameters(changes,"",P);
+        update_parameters(changes,P);
 
     }
 

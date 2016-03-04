@@ -426,22 +426,6 @@ void MarkLower (DROPS::MultiGridCL& mg, double y_max, DROPS::Uint maxLevel= ~0)
     }
 }
 
-/// \brief Set Default parameters here s.t. they are initialized.
-/// The result can be checked when Param-list is written to the output.
-void SetMissingParameters(DROPS::ParamCL& P){
-
-    P.put_if_unset<std::string>("Exp.VolForce", "ZeroVel");
-    P.put_if_unset<double>("Mat.DensDrop", 0.0);
-    P.put_if_unset<double>("Mat.ShearVisco", 0.0);
-    P.put_if_unset<double>("Mat.DilatationalVisco", 0.0);
-    P.put_if_unset<double>("SurfTens.ShearVisco", 0.0);
-    P.put_if_unset<double>("SurfTens.DilatationalVisco", 0.0);
-
-    P.put_if_unset<std::string>("VTK.TimeFileName",P.get<std::string>("VTK.VTKName"));
-    P.put_if_unset<int>("VTK.ReUseTimeFile",0);
-    P.put_if_unset<int>("VTK.UseDeformation",0);
-    P.put_if_unset<int>("VTK.UseOnlyP1",0);
-}
 
 
 int main (int argc, char** argv)
@@ -449,7 +433,7 @@ int main (int argc, char** argv)
   try
   {
     DROPS::read_parameter_file_from_cmdline( P, argc, argv);
-    SetMissingParameters(P);
+    P.put_if_unset<std::string>("VTK.TimeFileName",P.get<std::string>("VTK.VTKName"));
     std::cout << P << std::endl;
 
     DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
@@ -532,7 +516,7 @@ int main (int argc, char** argv)
     {
         DROPS::DistMarkingStrategyCL InitialMarker( DROPS::InScaMap::getInstance()[P.get("Ext.InitialLet", std::string("WavyFilm"))],
                                                     P.get<double>("AdaptRef.Width"), P.get<int>("AdaptRef.CoarsestLevel"),
-                                                    P.get<int>("AdaptRef.FinestLevel") ); 
+                                                    P.get<int>("AdaptRef.FinestLevel") );
         adap.set_marking_strategy( &InitialMarker );
         adap.MakeInitialTriang();
         adap.set_marking_strategy( 0 );

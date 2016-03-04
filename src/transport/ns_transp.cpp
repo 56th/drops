@@ -624,7 +624,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbndda
     coeffC[0]= 1.625; coeffC[1]= -28.07768; coeffC[2]= 222.7858; coeffC[3]= coeffC[4]= 0.;
 
     if (!P.get<bool>("SurfTens.ConcentrationDep"))
-        sf->SetInputMethod(Sigma_X);            
+        sf->SetInputMethod(Sigma_X);
     else{
         sf->SetInputMethod(Sigma_C);
         sf->SetCoeff(coeffC, cp);
@@ -664,7 +664,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbndda
     oldlset.Phi.SetIdx( oldlidx);
 
     lset.SetSurfaceForce( SF_ImprovedLBVar);
-    
+
     if ( StokesSolverFactoryHelperCL().VelMGUsed(P))
         Stokes.SetNumVelLvl ( Stokes.GetMG().GetNumLevel());
     if ( StokesSolverFactoryHelperCL().PrMGUsed(P))
@@ -990,49 +990,6 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbndda
 
 } // end of namespace DROPS
 
-/// \brief Set Default parameters here s.t. they are initialized.
-/// The result can be checked when Param-list is written to the output.
-void SetMissingParameters(DROPS::ParamCL& P){
-    P.put_if_unset<std::string>("VTK.TimeFileName",P.get<std::string>("VTK.VTKName"));
-    P.put_if_unset<int>("VTK.ReUseTimeFile",0);
-    P.put_if_unset<int>("VTK.UseOnlyP1",0);
-
-    P.put_if_unset<int>("Transp.DoTransp",0);
-    P.put_if_unset<std::string>("Transp.Levelset","Ellipsoid");
-    P.put_if_unset<std::string>("Transp.Flow","ZeroVel");
-    P.put_if_unset<std::string>("Transp.Rhs","Zero");
-    P.put_if_unset<std::string>("Transp.SolPos","Zero");
-    P.put_if_unset<std::string>("Transp.SolNeg","Zero");
-    P.put_if_unset<std::string>("Transp.InitialConcNeg","IniCnegFct");
-    P.put_if_unset<std::string>("Transp.InitialConcPos","IniCposFct");
-    P.put_if_unset<std::string>("Transp.BoundaryType","21!21!21!21!21!21");
-    P.put_if_unset<std::string>("Transp.BoundaryFncs","Zero!Zero!Zero!Zero!Zero!Zero");
-    P.put_if_unset<std::string>("Transp.BoundaryFncst","Zero!Zero!Zero!Zero!Zero!Zero");
-
-    P.put_if_unset<int>("SurfTransp.DoTransp",0);
-    P.put_if_unset<std::string>("SurfTransp.Rhs","Zero");
-    P.put_if_unset<std::string>("SurfTransp.Sol","Zero");
-
-    P.put_if_unset<int>("VTK.VTKOut",0);
-    P.put_if_unset<std::string>("VTK.VTKName","ns_transp");
-    P.put_if_unset<int>("Ensight.EnsightOut",0);
-
-    P.put_if_unset<double>("NavStokes.Nonlinear", 0.0);
-
-    P.put_if_unset<std::string>("Restart.Inputfile","none");
-    P.put_if_unset<int>("NavStokes.Downwind.Frequency", 0);
-    P.put_if_unset<double>("NavStokes.Downwind.MaxRelComponentSize", 0.05);
-    P.put_if_unset<double>("NavStokes.Downwind.WeakEdgeRatio", 0.2);
-    P.put_if_unset<double>("NavStokes.Downwind.CrosswindLimit", std::cos( M_PI/6.));
-    P.put_if_unset<int>("Levelset.Downwind.Frequency", 0);
-    P.put_if_unset<double>("Levelset.Downwind.MaxRelComponentSize", 0.05);
-    P.put_if_unset<double>("Levelset.Downwind.WeakEdgeRatio", 0.2);
-    P.put_if_unset<double>("Levelset.Downwind.CrosswindLimit", std::cos( M_PI/6.));
-
-    P.put_if_unset<int>("General.ProgressBar", 0);
-    P.put_if_unset<std::string>("General.DynamicLibsPrefix", "../");
-}
-
 int main (int argc, char** argv)
 {
 #ifdef _PAR
@@ -1044,7 +1001,7 @@ int main (int argc, char** argv)
     DROPS::ParMultiGridInitCL pmginit;
 #endif
     DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/transport/ns_transp/risingbutanoldroplet.json");
-    SetMissingParameters(P);
+    P.put_if_unset<std::string>("VTK.TimeFileName",P.get<std::string>("VTK.VTKName"));
     std::cout << P << std::endl;
 
     DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );

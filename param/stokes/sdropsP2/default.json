@@ -1,0 +1,12 @@
+{
+    "VTK":
+    {
+        "VTKOut": "0"
+    },
+    "General":
+    {
+        "ProgressBar": "0",
+        "DynamicLibsPrefix": "..\/"
+    }
+}
+

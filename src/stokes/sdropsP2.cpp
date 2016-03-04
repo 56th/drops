@@ -358,28 +358,13 @@ void Strategy( StokesProblemT& Stokes)
 
 } // end of namespace DROPS
 
-void SetMissingParameters(DROPS::ParamCL& P){
-
-    P.put_if_unset<int>("VTK.VTKOut",0);
-    if (P.get<int>("VTK.VTKOut") != 0)
-    {
-        P.put_if_unset<std::string>("VTK.TimeFileName",P.get<std::string>("VTK.VTKName"));
-        P.put_if_unset<int>("VTK.ReUseTimeFile",0);
-        P.put_if_unset<int>("VTK.UseDeformation",0);
-        P.put_if_unset<int>("VTK.UseOnlyP1",0);
-    }
-
-    P.put_if_unset<int>("General.ProgressBar", 0);
-    P.put_if_unset<std::string>("General.DynamicLibsPrefix", "../");
-
-}
-
 int main ( int argc, char** argv)
 {
     try
     {
+
         DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/stokes/sdropsP2/stokes.json");
-        SetMissingParameters(P);
+        P.put_if_unset<std::string>("VTK.TimeFileName",P.get<std::string>("VTK.VTKName"));
         std::cout << P << std::endl;
 
         DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );

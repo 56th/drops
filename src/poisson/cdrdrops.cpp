@@ -357,7 +357,7 @@ void Strategy(PoissonCL& Poisson)
             std::cout << line << "Step: " << step << std::endl;
             if(Poisson.ALE_)
             {
-                mg.GetMeshDeformation().SetMeshTransformation(PoissonCoeffCL::ALEDeform, Poisson.x.t, P.get<int>("ALE.OnlyBndCurved"), P.get<int>("ALE.P1")==0 );   
+                mg.GetMeshDeformation().SetMeshTransformation(PoissonCoeffCL::ALEDeform, Poisson.x.t, P.get<int>("ALE.OnlyBndCurved"), P.get<int>("ALE.P1")==0 );
                 //ALE.MovGrid(Poisson.x.t);
             }
             ThetaScheme.DoStep( Poisson.x);
@@ -404,21 +404,6 @@ void Strategy(PoissonCL& Poisson)
 
 } // end of namespace DROPS
 
-/// \brief Set Default parameters here s.t. they are initialized.
-/// The result can be checked when Param-list is written to the output.
-void SetMissingParameters(DROPS::ParamCL& P){
-    P.put_if_unset<std::string>("VTK.TimeFileName",P.get<std::string>("VTK.VTKName"));
-    P.put_if_unset<int>("VTK.ReUseTimeFile",0);
-    P.put_if_unset<int>("VTK.UseDeformation",0);
-    P.put_if_unset<int>("VTK.UseOnlyP1",0);
-    P.put_if_unset<int>("Stabilization.SUPG",0);
-    P.put_if_unset<double>("Stabilization.Magnitude",1.0);
-    P.put_if_unset<int>("Stabilization.Grids",1);
-    P.put_if_unset<int>("ALE.wavy",0);
-    P.put_if_unset<int>("ALE.P1", 1);
-    P.put_if_unset<int>("ALE.OnlyBndCurved", 1);
-    P.put_if_unset<std::string>("ALE.Interface","Zero");
-}
 
 int main (int argc, char** argv)
 {
@@ -435,12 +420,11 @@ int main (int argc, char** argv)
 #endif
 
         DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/poisson/cdrdrops/statpoissonEx.json");
-        //Setup missing parameters
-        SetMissingParameters(P);
+        P.put_if_unset<std::string>("VTK.TimeFileName",P.get<std::string>("VTK.VTKName"));
         //output all the parameters
         std::cout << P << std::endl;
 
-        DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), 
+        DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"),
                            P.get<std::vector<std::string> >("General.DynamicLibs") );
 
         if (P.get<int>("General.ProgressBar"))
@@ -483,7 +467,7 @@ int main (int argc, char** argv)
             probP1 = new DROPS::PoissonP1CL<DROPS::PoissonCoeffCL>( *mg, tmp, *bdata, supg, P.get<int>("ALE.wavy"));
         else
         {
-            probP2 = new DROPS::PoissonP2CL<DROPS::PoissonCoeffCL>( *mg, tmp, *bdata, P.get<int>("ALE.wavy"));            
+            probP2 = new DROPS::PoissonP2CL<DROPS::PoissonCoeffCL>( *mg, tmp, *bdata, P.get<int>("ALE.wavy"));
         }
 
 #ifdef _PAR

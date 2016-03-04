@@ -1,0 +1,66 @@
+{
+    "VTK":
+    {
+        "ReUseTimeFile": "0",
+        "UseDeformation": "0",
+        "UseOnlyP1": "0",
+        "AddP1XPressure": "0",
+        "AddDGOutput": "0"
+    },
+    "Transp":
+    {
+        "DoTransp": "0"
+    },
+    "Restart":
+    {
+        "Inputfile": "none"
+    },
+    "NavStokes":
+    {
+        "ShiftFrame": "0",
+        "Downwind":
+        {
+            "Frequency": "0",
+            "MaxRelComponentSize": "0.05",
+            "WeakEdgeRatio": "0.2",
+            "CrosswindLimit": "0.8660254037844387"
+        }
+    },
+    "Levelset":
+    {
+        "Discontinuous": "0",
+        "Downwind":
+        {
+            "Frequency": "0",
+            "MaxRelComponentSize": "0.05",
+            "WeakEdgeRatio": "0.2",
+            "CrosswindLimit": "0.8660254037844387"
+        }
+    },
+    "Exp":
+    {
+        "VolForce": "ZeroVel"
+    },
+    "Mat":
+    {
+        "DensDrop": "0",
+        "ShearVisco": "0",
+        "DilatationalVisco": "0"
+    },
+    "SurfTens":
+    {
+        "ShearVisco": "0",
+        "DilatationalVisco": "0",
+        "VarTensionFncs": "ConstTau"
+    },
+    "Stokes":
+    {
+        "DirectSolve": "0"
+    },
+    "General":
+    {
+        "ProgressBar": "0",
+        "DynamicLibsPrefix": "..\/"
+    }
+}
+

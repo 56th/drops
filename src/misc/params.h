@@ -111,13 +111,21 @@ class ParamCL
       }
     }
 
+    /// \brief routine to insert a child ptree
+    /// \param pathToNode Path in tree hierarchy
+    /// \param child ptree to be inserted
+    void put_child(const std::string & pathToNode, ptree_type child)
+    {
+        this->pt.put_child(pathToNode, child);
+    }
+
     /// \brief routine to assign a value to node/create nodes manually
     /// \param pathToNode Path in tree hierarchy
     /// \param value This value will be assigned to node
     template <typename InType>
     void put(const std::string & pathToNode, InType value)
     {
-      this->pt.put(pathToNode, value);
+        this->pt.put(pathToNode, value);
     }
 
     /// \brief routine to assign a value to node/create nodes manually
@@ -180,7 +188,7 @@ void read_parameter_file_from_cmdline (ParamCL& P, int argc, char** argv, std::s
 void apply_parameter_modifications_from_cmdline (ParamCL& P, int argc, char **argv);
 
 /// \brief Adds and/or overrides parameters of P as specified in \a pt
-void update_parameters (const boost::property_tree::ptree& pt, std::string key, ParamCL& P);
+void update_parameters (const boost::property_tree::ptree& pt, ParamCL& P);
 
 //DELETE ReadParamsCL?
 ///   \brief Parser for parameter files used by ParamBaseCL.

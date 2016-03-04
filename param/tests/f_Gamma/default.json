@@ -1,0 +1,25 @@
+{
+    "Exp":
+    {
+        "VolForce": "ZeroVel",
+        "Gravity": "0 0 0 "
+    },
+    "SurfTens":
+    {
+        "ShearVisco": "0",
+        "DilatationalVisco": "0"
+    },
+    "Mat":
+    {
+        "DensDrop": "1000",
+        "ViscDrop": "0.001",
+        "DensFluid": "1000",
+        "ViscFluid": "0.001",
+        "SmoothZone": "1e-05"
+    },
+    "Restart":
+    {
+        "Inputfile": "none"
+    }
+}
+
