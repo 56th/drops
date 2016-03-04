@@ -314,7 +314,7 @@ class LocalQuaLineSearchFunctionCL
 };
 
 
-// The function of which we search a root is F(x, s) = ( p - x - s*gh(x), -ls(x) ).
+// The function of which we search a root is F(x, s) = ( p - x - s*gh(x), -(ls(x) - level_value ) ).
 // Its Jacobian is the blockmatrix dF(x, s) = (-I - s H_ls(x) | - g_ls(x), -g_ls(x)^T | 0).
 class LocalQuaMapperFunctionCL
 {
@@ -324,10 +324,12 @@ class LocalQuaMapperFunctionCL
   private:
     Point3DCL p;          // Point to be projected.
     LocalP2CL<> locls;
+    double level_value;
     LocalP1CL<Point3DCL> locls_grad;
     SMatrixCL<3, 3> locls_H; // Hessian of ls on tet.
     double h;             // local mesh width at tet.
     World2BaryCoordCL w2b;
+    double lower_bary;   // default -0.5; lower bound for the barycentric coordinates in initial_damping_factor.
 
     bool xF_p, xdF_p, xdFinv_p;  // Remember if xF, xdF, xdFinv have been initialized.
     value_type xF, xdF, xdFinv;  // Points at which F, dF, dFinv are set up.
@@ -349,9 +351,9 @@ class LocalQuaMapperFunctionCL
         const SMatrixCL<3, 3>& locls_Harg,
         double harg,
         const World2BaryCoordCL& w2barg)
-        : locls (loclsarg), locls_grad (locls_gradarg), locls_H (locls_Harg),
-          h (harg), w2b (w2barg), xF_p (false), xdF_p (false), xdFinv_p (false) {}
-    LocalQuaMapperFunctionCL () : xF_p (false), xdF_p (false), xdFinv_p (false) {}
+        : locls (loclsarg), level_value (0.), locls_grad (locls_gradarg), locls_H (locls_Harg),
+          h (harg), w2b (w2barg), lower_bary (-0.5), xF_p (false), xdF_p (false), xdFinv_p (false) {}
+    LocalQuaMapperFunctionCL () : level_value (0.), lower_bary (-0.5), xF_p (false), xdF_p (false), xdFinv_p (false) {}
 
     LocalQuaMapperFunctionCL& set_tetra (
         const LocalP2CL<>& loclsarg,
@@ -372,6 +374,16 @@ class LocalQuaMapperFunctionCL
 
     LocalQuaMapperFunctionCL& set_point (const Point3DCL& x) {
         p= x;
+        return *this;
+    }
+
+    LocalQuaMapperFunctionCL& set_level_value (double lsval) {
+        level_value= lsval;
+        return *this;
+    }
+
+    LocalQuaMapperFunctionCL& set_lower_bound_bary (double lb) {
+        lower_bary= lb;
         return *this;
     }
 
@@ -436,6 +448,10 @@ class LocalQuaMapperCL
     const LocalQuaMapperCL& set_point (const BaryCoordCL& xbarg) const;
     const LocalQuaMapperCL& set_tetra (const TetraCL* tetarg) const;
     const LocalQuaMapperCL& base_point () const;
+    const LocalQuaMapperCL& set_trust_region (double lb) {
+        localF.set_lower_bound_bary (-lb);
+        return *this;
+    }
 
     const LocalQuaMapperCL& compute_deformation () const;
 

@@ -529,7 +529,7 @@ LocalQuaMapperFunctionCL::compute_F (const value_type& x)
     g_ls_xF= locls_grad( bxF);
     for (Uint i= 0; i < 3; ++i)
         F[i]= p[i] - x[i] - x[3]*g_ls_xF[i];
-    F[3]= -locls( bxF);
+    F[3]= -(locls( bxF) - level_value);
 }
 
 LocalQuaMapperFunctionCL::value_type
@@ -612,12 +612,12 @@ LocalQuaMapperFunctionCL::initial_damping_factor (const value_type& /*x*/, const
 // 
 //     return std::min (0.5*h/std::max(1e-3*h, dx_spatial.norm()), 0.5*h/std::max(1e-3*h, dx[3]*g_ls.norm()));
 
-    // Choose l so small that all barycentric coordinates of the new point are >= -0.5.
+    // Choose l so small that all barycentric coordinates of the new point are >= lower_bary.
     const BaryCoordCL bdir= w2b.map_direction (Point3DCL( dx.begin (), dx.begin () + 3));
     double l= 1.;
     for (Uint i= 0; i < 4; ++i)
         if (std::abs (bdir[i]) > 1e-12)
-            l= std::min (l, std::abs ((bxdF[i] - (-0.5))/bdir[i]));
+            l= std::min (l, std::abs ((bxdF[i] - lower_bary)/bdir[i]));
     return l;
 }
 
