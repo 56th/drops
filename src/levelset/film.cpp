@@ -362,7 +362,7 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
 
         if (ensight && step%10==0)
             ensight->Write(time_new);
-        if (vtkwriter && step%10==0)
+        if (vtkwriter && step%1==0)
             vtkwriter->Write(time_new);
         if (P.get("Restart.Serialization", 0) && step%P.get("Restart.Serialization", 0)==0)
             ser.Write();
@@ -418,17 +418,36 @@ void MarkLower (DROPS::MultiGridCL& mg, double y_max, DROPS::Uint maxLevel= ~0)
 /// The result can be checked when Param-list is written to the output.
 void SetMissingParameters(DROPS::ParamCL& P){
 
+    P.put_if_unset<std::string>("VTK.TimeFileName",P.get<std::string>("VTK.VTKName"));
+    P.put_if_unset<int>("VTK.ReUseTimeFile",0);
+    P.put_if_unset<int>("VTK.UseDeformation",0);
+    P.put_if_unset<int>("VTK.UseOnlyP1",0);
+    P.put_if_unset<int>("VTK.AddP1XPressure",0);
+    P.put_if_unset<int>("VTK.AddDGOutput",0);
+    P.put_if_unset<int>("Transp.DoTransp",0);
+    P.put_if_unset<std::string>("Restart.Inputfile","none");
+    P.put_if_unset<int>("NavStokes.ShiftFrame", 0);
+    P.put_if_unset<int>("NavStokes.Downwind.Frequency", 0);
+    P.put_if_unset<double>("NavStokes.Downwind.MaxRelComponentSize", 0.05);
+    P.put_if_unset<double>("NavStokes.Downwind.WeakEdgeRatio", 0.2);
+    P.put_if_unset<double>("NavStokes.Downwind.CrosswindLimit", std::cos( M_PI/6.));
+    P.put_if_unset<int>("Levelset.Discontinuous", 0);
+    P.put_if_unset<int>("Levelset.Downwind.Frequency", 0);
+    P.put_if_unset<double>("Levelset.Downwind.MaxRelComponentSize", 0.05);
+    P.put_if_unset<double>("Levelset.Downwind.WeakEdgeRatio", 0.2);
+    P.put_if_unset<double>("Levelset.Downwind.CrosswindLimit", std::cos( M_PI/6.));
+
     P.put_if_unset<std::string>("Exp.VolForce", "ZeroVel");
     P.put_if_unset<double>("Mat.DensDrop", 0.0);
     P.put_if_unset<double>("Mat.ShearVisco", 0.0);
     P.put_if_unset<double>("Mat.DilatationalVisco", 0.0);
     P.put_if_unset<double>("SurfTens.ShearVisco", 0.0);
     P.put_if_unset<double>("SurfTens.DilatationalVisco", 0.0);
+    P.put_if_unset<std::string>("SurfTens.VarTensionFncs", "ConstTau");
+    P.put_if_unset<int>("Stokes.DirectSolve", 0);
 
-    P.put_if_unset<std::string>("VTK.TimeFileName",P.get<std::string>("VTK.VTKName"));
-    P.put_if_unset<int>("VTK.ReUseTimeFile",0);
-    P.put_if_unset<int>("VTK.UseDeformation",0);
-    P.put_if_unset<int>("VTK.UseOnlyP1",0);
+    P.put_if_unset<int>("General.ProgressBar", 0);
+    P.put_if_unset<std::string>("General.DynamicLibsPrefix", "../");
 }
 
 
