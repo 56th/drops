@@ -402,8 +402,6 @@ class InterfaceCommonDataDeformP2CL : public TetraAccumulatorCL
         the_clones[0]= this;
     }
     virtual void finalize_accumulation() {
-        for (int i= 1; i < omp_get_max_threads(); ++i)
-            delete the_clones[i];
         delete[] the_clones;
     }
 

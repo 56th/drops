@@ -626,6 +626,7 @@ const LocalQuaMapperCL& LocalQuaMapperCL::set_point (const BaryCoordCL& xbarg) c
 {
     xb= xbarg;
     have_base_point= false;
+    have_deformation= false;
     return *this;
 }
 

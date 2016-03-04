@@ -1092,9 +1092,9 @@ class InterfaceApproxErrorDeformAccuCL : public TetraAccumulatorCL
         max_h.reduce();
         std::cout << "\n\tmax_h: " << max_h.value() << "\n";
         max_d.reduce();
-        std::cout << "\n\tmax_d: " << max_d.value() << "\n";
+        std::cout << "\tmax_d: " << max_d.value() << "\n";
         max_Dderr.reduce();
-        std::cout << "\n\tmax_dDerr: " << max_Dderr.value() << "\n";
+        std::cout << "\tmax_dDerr: " << max_Dderr.value() << "\n";
     }
 
     virtual void visit (const TetraCL& t) {
@@ -1130,7 +1130,13 @@ class InterfaceApproxErrorDeformAccuCL : public TetraAccumulatorCL
         }
     }
 
-    virtual InterfaceApproxErrorDeformAccuCL* clone (int /*clone_id*/) { return new InterfaceApproxErrorDeformAccuCL( *this); }
+    virtual InterfaceApproxErrorDeformAccuCL* clone (int /*clone_id*/) {
+        InterfaceApproxErrorDeformAccuCL* p= new InterfaceApproxErrorDeformAccuCL( *this);
+        p->max_h.make_reference_to (max_h);
+        p->max_d.make_reference_to (max_d);
+        p->max_Dderr.make_reference_to (max_Dderr);
+        return p;
+    }
 };
 
 void StationaryStrategyP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::LevelsetP2CL& lset)
