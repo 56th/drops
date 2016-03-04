@@ -1103,17 +1103,18 @@ class InterfaceApproxErrorDeformAccuCL : public TetraAccumulatorCL
         if (cdata.empty ())
             return;
 
-        resize_and_evaluate_on_vertexes( d_, t, cdata.qdom2d, 0., qd);
-        max_d.value (tid)= std::max (max_d.value (tid), *std::max_element (&qd[0], &qd[0] + cdata.qdom2d.vertex_size ()));
-        resize_and_evaluate_on_vertexes( Dd_, t, cdata.qdom2d, 0., qDderr);
+        resize_and_evaluate_on_vertexes( d_, t, cdata.qdom2d_full, 0., qd);
+        qd= std::abs (qd);
+        max_d.value (tid)= std::max (max_d.value (tid), *std::max_element (&qd[0], &qd[0] + cdata.qdom2d_full.vertex_size ()));
+        resize_and_evaluate_on_vertexes( Dd_, t, cdata.qdom2d_full, 0., qDderr);
         const SurfacePatchCL::FacetT& facet= cdata.surf.facet_begin()[0];
         const BaryCoordCL verts[3]= { cdata.surf.vertex_begin()[facet[0]],
                                       cdata.surf.vertex_begin()[facet[1]],
                                       cdata.surf.vertex_begin()[facet[2]] };
         cdata.Phi.set_surface_patch (verts, cdata.pos_pt);
-        for (Uint i= 0; i < cdata.qdom2d.vertex_size (); ++i) {
-            cdata.Phi.set_point (cdata.qdom2d.vertex_begin ()[i], true);
-            Point3DCL n= cdata.Phi.dPhi(cdata.qdom2d.vertex_begin ()[i])*cdata.Phi.w;
+        for (Uint i= 0; i < cdata.qdom2d_full.vertex_size (); ++i) {
+            cdata.Phi.set_point (cdata.qdom2d_only_weights.vertex_begin ()[i], true);
+            Point3DCL n= cdata.Phi.dPhi(cdata.qdom2d_only_weights.vertex_begin ()[i])*cdata.Phi.w;
             n/=n.norm();
             qDderr[i]-= n;
             max_Dderr.value (tid)= std::max (max_Dderr.value (tid), qDderr[i].norm ());

@@ -276,6 +276,7 @@ class LocalMeshTransformationCL
 
     LocalP2CL<Point3DCL> Psi; // Phi= id + Psi
     Bary2WorldCoordCL b2w;
+    World2BaryCoordCL w2b;
 
     Point3DCL n_lin;
     SMatrixCL<3, 2> Q;
@@ -340,6 +341,7 @@ class LocalMeshTransformationCL
                 set_surface_patch (verts, pos_pt);
             }
             set_point (qdom.vertexes_[i], /*surface_data_p=*/ true);
+            qdom.vertexes_[i]+= w2b.map_direction( Psi (qdom.vertexes_[i]));
             qdom.weights_[i]*= JPhiQ;
         }
     }
@@ -368,8 +370,9 @@ class InterfaceCommonDataDeformP2CL : public TetraAccumulatorCL
 
     std::valarray<double>     ls_loc;
     SurfacePatchCL            surf;
-    QuadDomain2DCL            qdom2d;
-    QuadDomainCL              qdom;
+    QuadDomain2DCL            qdom2d_only_weights, // For the surface bilinear forms: points on linear interface, mapped weights.
+                              qdom2d_full; // For the right-hand side and error measurement: mapped points and weights
+    QuadDomainCL              qdom; // points not mapped, weights mapped.
     Point3DCL                 pos_pt;
 
     mutable LocalMeshTransformationCL Phi;
@@ -417,22 +420,26 @@ class InterfaceCommonDataDeformP2CL : public TetraAccumulatorCL
 
         GetTrafoTr( T, det_T, t);
         P2DiscCL::GetGradients( gradp2, gradrefp2, T);
+
         Phi.set_tetra (&t);
-        make_CompositeQuad5Domain2D (qdom2d, surf, t);
+        make_CompositeQuad5Domain2D (qdom2d_full, surf, t);
+        qdom2d_only_weights= qdom2d_full;
         Uint i= 0;
         for (; ls_loc[i] <= 0.; ++i)
             ;
         if (i > 3)
             std::cerr << "InterfaceCommonDataDeformP2CL::visit: No positive vertex.\n";
         pos_pt= t.GetVertex (i)->GetCoord ();
-        Phi.map_QuadDomain2D (qdom2d, surf, pos_pt);
+        Phi.map_QuadDomain2D (qdom2d_full, surf, pos_pt);
+        qdom2d_only_weights.weights_= qdom2d_full.weights_;
+
         make_SimpleQuadDomain<Quad5DataCL> (qdom, AllTetraC);
         Phi.map_QuadDomain (qdom);
     }
 
     virtual InterfaceCommonDataDeformP2CL* clone (int clone_id) {
         the_clones[clone_id]= new InterfaceCommonDataDeformP2CL( *this);
-        Phi.cdata= the_clones[clone_id];
+        the_clones[clone_id]->Phi.cdata= the_clones[clone_id];
         return the_clones[clone_id];
     }
 };
@@ -441,6 +448,7 @@ class InterfaceCommonDataDeformP2CL : public TetraAccumulatorCL
 inline void LocalMeshTransformationCL::set_tetra (const TetraCL* t)
 { // Set Psi, dPhi
     b2w.assign (*t);
+    w2b.assign (*t);
     const NoBndDataCL<Point3DCL> nobnd;
     Psi.assign (*t, *cdata->Psi_vd, nobnd);
     dPhi= eye<3, 3> ();
@@ -975,13 +983,13 @@ class LocalVectorDeformP2CL
     LocalVectorDeformP2CL (instat_scalar_fun_ptr f, double time) : f_( f), time_( time) {}
 
     void setup (const TetraCL& t, const InterfaceCommonDataDeformP2CL& cdata, const IdxT numr[10]) {
-        resize_and_evaluate_on_vertexes( f_, t, cdata.qdom2d, time_, qf);
-        qp2.resize( cdata.qdom2d.vertex_size());
+        resize_and_evaluate_on_vertexes( f_, t, cdata.qdom2d_full, time_, qf);
+        qp2.resize( cdata.qdom2d_full.vertex_size());
         for (Uint i= 0; i < 10; ++i) {
                 if (numr[i] == NoIdx)
                     continue;
-                evaluate_on_vertexes( cdata.p2[i], cdata.qdom2d, Addr( qp2));
-                vec[i]= quad_2D( qf*qp2, cdata.qdom2d);
+                evaluate_on_vertexes( cdata.p2[i], cdata.qdom2d_only_weights, Addr( qp2));
+                vec[i]= quad_2D( qf*qp2, cdata.qdom2d_full);
         }
     }
 };
@@ -999,12 +1007,12 @@ class LocalMassDeformP2CL
 
     void setup (const TetraCL&, const InterfaceCommonDataDeformP2CL& cdata) {
         for (int i= 0; i < 10; ++i)
-            resize_and_evaluate_on_vertexes ( cdata.p2[i], cdata.qdom2d, qp2[i]);
+            resize_and_evaluate_on_vertexes ( cdata.p2[i], cdata.qdom2d_only_weights, qp2[i]);
 
         for (int i= 0; i < 10; ++i) {
-            coup[i][i]= quad_2D (qp2[i]*qp2[i], cdata.qdom2d);
+            coup[i][i]= quad_2D (qp2[i]*qp2[i], cdata.qdom2d_only_weights);
             for(int j= 0; j < i; ++j)
-                coup[i][j]= coup[j][i]= quad_2D (qp2[j]*qp2[i], cdata.qdom2d);
+                coup[i][j]= coup[j][i]= quad_2D (qp2[j]*qp2[i], cdata.qdom2d_only_weights);
         }
     }
 
@@ -1028,20 +1036,20 @@ class LocalLaplaceBeltramiDeformP2CL
     double coup[10][10];
 
     void setup (const TetraCL&, const InterfaceCommonDataDeformP2CL& cdata) {
-        Ginv_wwT.resize( cdata.qdom2d.vertex_size());
-        for (Uint i= 0; i < cdata.qdom2d.vertex_size(); ++i) {
-            cdata.Phi.set_point (cdata.qdom2d.vertex_begin()[i], true);
+        Ginv_wwT.resize( cdata.qdom2d_only_weights.vertex_size());
+        for (Uint i= 0; i < cdata.qdom2d_only_weights.vertex_size(); ++i) {
+            cdata.Phi.set_point (cdata.qdom2d_only_weights.vertex_begin()[i], true);
             Ginv_wwT[i]= cdata.Phi.Ginv_wwT;
         }
 
         for (int i= 0; i < 10; ++i) {
-            resize_and_evaluate_on_vertexes ( cdata.gradp2[i], cdata.qdom2d, qgradp2[i]);
+            resize_and_evaluate_on_vertexes ( cdata.gradp2[i], cdata.qdom2d_only_weights, qgradp2[i]);
         }
 
         for (int i= 0; i < 10; ++i) {
-            coup[i][i]= D_*quad_2D( dot( qgradp2[i], Ginv_wwT, qgradp2[i]), cdata.qdom2d);
+            coup[i][i]= D_*quad_2D( dot( qgradp2[i], Ginv_wwT, qgradp2[i]), cdata.qdom2d_only_weights);
             for(int j= 0; j < i; ++j)
-                coup[i][j]= coup[j][i]= D_*quad_2D( dot( qgradp2[j], Ginv_wwT, qgradp2[i]), cdata.qdom2d);
+                coup[i][j]= coup[j][i]= D_*quad_2D( dot( qgradp2[j], Ginv_wwT, qgradp2[i]), cdata.qdom2d_only_weights);
         }
     }
 
