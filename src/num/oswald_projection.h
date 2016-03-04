@@ -76,10 +76,10 @@ class OswaldProjectionP2AccuCL : public TetraAccumulatorCL
         return *this;
     }
 
-    OswaldProjectionP2AccuCL& set_level_set_function (const VecDescCL* lsarg, const BndDataCL<>* lsetbndarg, const PrincipalLatticeCL& latarg) {
+    OswaldProjectionP2AccuCL& set_level_set_function (const VecDescCL* lsarg, const BndDataCL<>* lsetbndarg, const PrincipalLatticeCL* latarg) {
         ls= lsarg;
         lsetbnd= lsetbndarg;
-        lat= &latarg;
+        lat= latarg;
         ls_loc.resize (lat->vertex_size ());
         return *this;
     }
@@ -128,8 +128,9 @@ class OswaldProjectionP2AccuCL : public TetraAccumulatorCL
     virtual TetraAccumulatorCL* clone (int /*clone_id*/) {
         OswaldProjectionP2AccuCL* p= new OswaldProjectionP2AccuCL( loc_, avg_);
         p->set_n( n_)
+          .set_n_invalid (n_invalid_)
           .set_check_averaging (check_averaging_)
-          .set_n_invalid (n_invalid_);
+          .set_level_set_function (ls, lsetbnd, lat);
        return p;
     }
 };
