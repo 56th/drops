@@ -1295,12 +1295,13 @@ void StationaryStrategyDeformationP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangC
         /*max_damping_steps*/ P.get<Uint>( "LevelsetMapper.MaxDampingSteps"));
     locqua.set_trust_region (P.get<double>( "LevelsetMapper.TrustRegion"))
           .set_deformation_method (P.get<std::string>( "LevelsetMapper.DeformationMethod") == "map_local_level_sets" ? LocalQuaMapperCL::MAP_LOCAL_LEVEL_SETS : LocalQuaMapperCL::MAP_ZERO_LEVEL_SETS);
-//     LocalQuaMapperP2CL locquap2(locqua); // Provides the interface for the Oswald-projection class.
-//     locdist.SetIdx( &p2idx);
-//     OswaldProjectionP2AccuCL<LocalQuaMapperP2CL> loc_dist_accu(locquap2, locdist);
-//         loc_dist_accu.set_check_averaging (true);
+    LocalQuaMapperP2CL locquap2(locqua); // Provides the interface for the Oswald-projection class.
+    VecDescCL locdist_vd ( &p2idx);
+    OswaldProjectionP2AccuCL<LocalQuaMapperP2CL> loc_dist_accu(locquap2, locdist_vd);
+        loc_dist_accu.set_level_set_function (&lset.Phi, &lset.GetBndData(), &PrincipalLatticeCL::instance (1))
+                     .set_check_averaging (true);
     TetraAccumulatorTupleCL accus2;
-//         accus2.push_back( &loc_dist_accu);
+        accus2.push_back( &loc_dist_accu);
     LocalQuaMapperDeformationP2CL locquadefp2(locqua); // Provides the interface for the Oswald-projection class.
     OswaldProjectionP2AccuCL<LocalQuaMapperDeformationP2CL> loc_def_accu(locquadefp2, deformation);
     loc_def_accu.set_level_set_function (&lset.Phi, &lset.GetBndData(), &PrincipalLatticeCL::instance (1))
@@ -1337,6 +1338,10 @@ void StationaryStrategyDeformationP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangC
     ifaceerroraccu.set_d  (&sphere_dist)
                   .set_Dd (&d_sphere_dist);
     accus.push_back( &ifaceerroraccu);
+
+//     accumulate( accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetMatchingFunction(), ifacep2idx.GetBndInfo());
+//     exit (0);
+
     DROPS::MatDescCL Mp2( &ifacep2idx, &ifacep2idx);
     InterfaceMatrixAccuCL<LocalMassDeformP2CL, InterfaceCommonDataDeformP2CL> accuMp2( &Mp2, LocalMassDeformP2CL(), cdatap2, "Mp2");
     accus.push_back( &accuMp2);
@@ -1385,6 +1390,7 @@ void StationaryStrategyDeformationP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangC
         vtkwriter->Register( make_VTKVector( make_P2Eval( mg, nobnd_vec, deformation), "deformation") );
 //         vtkwriter->Register( make_VTKVector( make_P2Eval( mg, nobnd_vec, to_iface), "to_iface") );
         vtkwriter->Register( make_VTKScalar( make_P1Eval( mg, nobnd, d_iface_vd), "d_iface") );
+        vtkwriter->Register( make_VTKScalar( make_P2Eval( mg, nobnd, locdist_vd), "locdist") );
         vtkwriter->Write( 0.);
     }
 }
