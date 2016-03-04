@@ -1350,19 +1350,6 @@ void StationaryStrategyDeformationP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangC
 
     accumulate( accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetMatchingFunction(), ifacep2idx.GetBndInfo());
 
-//     TetraAccumulatorTupleCL mean_accus;
-//     mean_accus.push_back( &cdatap2);
-//     InterfaceL2AccuP2CL L2_mean_accu( cdatap2, mg, "P2-mean");
-//     L2_mean_accu.set_grid_function( bp2);
-//     mean_accus.push_back( &L2_mean_accu);
-//     accumulate( mean_accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetMatchingFunction(), ifacep2idx.GetBndInfo());
-//     bp2.Data-= L2_mean_accu.f_grid_int_acc/L2_mean_accu.area_acc;
-//     accumulate( mean_accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetMatchingFunction(), ifacep2idx.GetBndInfo());
-
-//     VectorCL e( 1., bp2.Data.size());
-//     VectorCL Ldiag( Ap2.Data.GetDiag());
-//     bp2.Data-= dot( VectorCL( e/Ldiag), bp2.Data)/std::sqrt( dot( VectorCL( e/Ldiag), e));
-
     DROPS::MatrixCL Lp2;
     Lp2.LinComb (1.0, Ap2.Data, 1.0, Mp2.Data, 1.0, Anp2.Data);
 //     MatrixCL& Lp2= Mp2.Data;
@@ -1382,24 +1369,6 @@ void StationaryStrategyDeformationP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangC
     surfsolver.Solve( Lp2, xp2.Data, bp2.Data, xp2.RowIdx->GetEx());
     std::cout << "Iter: " << surfsolver.GetIter() << "\tres: " << surfsolver.GetResid() << '\n';
 
-//     TetraAccumulatorTupleCL err_accus;
-//     err_accus.push_back( &cdatap2);
-//     InterfaceL2AccuP2CL L2_accu( cdatap2, mg, "P2-solution");
-//     L2_accu.set_grid_function( xp2);
-//     L2_accu.set_function( the_sol_fun, 0.);
-//     L2_accu.set_grad_function( the_sol_grad_fun, 0.);
-//     err_accus.push_back( &L2_accu);
-//     accumulate( err_accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetMatchingFunction(), ifacep2idx.GetBndInfo());
-// 
-//     {
-//         std::ofstream os( "quaqua_num_outer_iter.txt");
-//         for (Uint i= 0; i != quaqua.num_outer_iter.size(); ++i)
-//             os << i << '\t' << quaqua.num_outer_iter[i] << '\n';
-//         os << '\n';
-//         for (Uint i= 0; i != quaqua.num_inner_iter.size(); ++i)
-//             os << i << '\t' << quaqua.num_inner_iter[i] << '\n';
-//     }
-// 
     if (P.get<int>( "SolutionOutput.Freq") > 0)
         DROPS::WriteFEToFile( xp2, mg, P.get<std::string>( "SolutionOutput.Path") + "_p2", P.get<bool>( "SolutionOutput.Binary"));
 
