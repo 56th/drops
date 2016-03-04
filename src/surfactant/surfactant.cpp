@@ -1293,6 +1293,8 @@ void StationaryStrategyDeformationP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangC
         /*tol*/ P.get<double>( "LevelsetMapper.Tol"),
         /*armijo_c*/ P.get<double>( "LevelsetMapper.ArmijoConstant"),
         /*max_damping_steps*/ P.get<Uint>( "LevelsetMapper.MaxDampingSteps"));
+    locqua.set_trust_region (P.get<double>( "LevelsetMapper.TrustRegion"))
+          .set_deformation_method (P.get<std::string>( "LevelsetMapper.DeformationMethod") == "map_local_level_sets" ? LocalQuaMapperCL::MAP_LOCAL_LEVEL_SETS : LocalQuaMapperCL::MAP_ZERO_LEVEL_SETS);
 //     LocalQuaMapperP2CL locquap2(locqua); // Provides the interface for the Oswald-projection class.
 //     locdist.SetIdx( &p2idx);
 //     OswaldProjectionP2AccuCL<LocalQuaMapperP2CL> loc_dist_accu(locquap2, locdist);
@@ -1437,7 +1439,7 @@ int main (int argc, char* argv[])
             -1,    /* <- level */
             P.get<bool>("VTK.ReUseTimeFile")));
     if (P.get<bool>( "Exp.StationaryPDE")) {
-        if (P.get<std::string>("SurfTransp.UseMeshDeformation") != "")
+        if (P.get<std::string>("LevelsetMapper.DeformationMethod") != "")
             StationaryStrategyDeformationP2( mg, adap, lset);
         else {
             if (P.get<int>( "SurfTransp.FEDegree") == 1)

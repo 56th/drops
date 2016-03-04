@@ -653,15 +653,16 @@ const LocalQuaMapperCL& LocalQuaMapperCL::set_tetra (const TetraCL* tetarg) cons
         for (Uint i= 0; i < 10; ++i)
             H_ls+= locls[i]*H[i];
         w2b.assign (*tet);
+        b2w.assign (*tet);
 
 // //         const SVectorCL<4>& tmp= p2top1*SVectorCL<10> (&locls[0], &locls[10]);
 // //         std::copy (tmp.begin(), tmp.end(), &loclsp1[0]);
         std::copy (&locls[0], &locls[4], &loclsp1[0]);
-//         Point3DCL gradp1[4];
-//         P1DiscCL::GetGradients( gradp1, T);
-//         gp1= Point3DCL();
-//         for (Uint i= 0; i < 4; ++i)
-//             gp1+= loclsp1[i]*gradp1[i];
+        Point3DCL gradp1[4];
+        P1DiscCL::GetGradients( gradp1, T);
+        gp1= Point3DCL();
+        for (Uint i= 0; i < 4; ++i)
+            gp1+= loclsp1[i]*gradp1[i];
 // 
 //         const BaryCoordCL p= w2b.map_direction (gp1);
 //         c_lin_dist= inner_prod (SVectorCL<4> (&loclsp1[0], &loclsp1[4]), p);
@@ -683,7 +684,7 @@ const LocalQuaMapperCL& LocalQuaMapperCL::base_point () const
         size_t maxiter= maxiter_;
         double tol= tol_;
         size_t max_damping_steps= max_damping_steps_;
-        const Point3DCL p= GetWorldCoord (*tet, xb);
+        const Point3DCL p= b2w (xb);
         localF.set_point (p);
         // Setup initial value.
         LocalQuaMapperFunctionCL::value_type x;
@@ -729,17 +730,34 @@ const LocalQuaMapperCL& LocalQuaMapperCL::compute_deformation () const
 {
     ScopeTimerCL scopetimer( "LocalQuaMapperCL::deformation");
 
+    if (have_deformation)
+        return *this;
+
+    if (deformation_method == MAP_LOCAL_LEVEL_SETS)
+        localF.set_level_value (loclsp1 (xb));
+    else
+        localF.set_level_value (0.);
+
+    have_base_point= false;
     base_point ();
     if (!base_in_trust_region_p ()) {
         deformation= MakePoint3D (std::numeric_limits<double>::max (), 0., 0.);
         have_deformation= false;
+        return *this;
     }
-    else if (!have_deformation) {
-        const Point3DCL g (localF.get_locls_grad ()(bxb));
-        const double s= loclsp1 (bxb)/inner_prod (w2b.map_direction (g), SVectorCL<4> (&loclsp1[0], &loclsp1[4]));
-        deformation= s*g;
-        have_deformation= true;
+
+    if (deformation_method == MAP_LOCAL_LEVEL_SETS)
+        deformation= b2w (bxb) - b2w (xb);
+    else {
+//         const Point3DCL g (localF.get_locls_grad ()(bxb));
+//         const double s= loclsp1 (bxb)/inner_prod (w2b.map_direction (g), SVectorCL<4> (&loclsp1[0], &loclsp1[4]));
+//         deformation= s*g;
+        Point3DCL n (localF.get_locls_grad ()(bxb));
+        n/= n.norm ();
+        deformation= (loclsp1 (xb) - dh)*n;
     }
+
+    have_deformation= true;
     return *this;
 }
 

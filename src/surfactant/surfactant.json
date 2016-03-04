@@ -74,7 +74,6 @@
 		"OmitBound":	-1,
 		"Visc":		1, // 0.05,
 		"FEDegree":	2, // 1, 2
-                "UseMeshDeformation":   "distance", // "", "distance", "ls_value"
                 "NormalLaplaceCoefficent": 1.0
 	},
 
@@ -92,9 +91,12 @@
 	"LevelsetMapper": // quasi-orthogonal coordinate system at the interface
 	{
 		"Tol":			1e-7,
-		"Iter":			50,
+		"Iter":			20,
 		"ArmijoConstant":	1e-2,
-		"Method":		"Newton" // "FixedPointWithLineSearch" // "Newton"
+		"Method":		"Newton", // "FixedPointWithLineSearch" // "Newton"
+		"MaxDampingSteps":	8,
+		"TrustRegion":		1.0,
+                "DeformationMethod":   "map_zero_level_sets" // "", "map_zero_level_sets", "map_local_level_sets"
 	},
 
 	"VTK": // VTK output

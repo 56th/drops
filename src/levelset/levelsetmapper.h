@@ -399,6 +399,9 @@ class LocalQuaMapperFunctionCL
 
 class LocalQuaMapperCL
 {
+  public:
+    enum DeformationMethodE {MAP_LOCAL_LEVEL_SETS, MAP_ZERO_LEVEL_SETS};
+
   private:
     int maxiter_;
     double tol_;
@@ -411,20 +414,22 @@ class LocalQuaMapperCL
 
 // //     mutable SMatrixCL<4,10> p2top1;
     mutable LocalP1CL<> loclsp1;
-//     mutable Point3DCL gp1;
+    mutable Point3DCL gp1;
 //     mutable double c_lin_dist;
 
     LocalP1CL<Point3DCL> gradrefp2[10];
 
     mutable World2BaryCoordCL w2b;
+    mutable Bary2WorldCoordCL b2w;
 
     mutable const TetraCL* tet;
-    mutable BaryCoordCL xb;
-    mutable BaryCoordCL bxb;
+    mutable BaryCoordCL xb; // point to be projected
+    mutable BaryCoordCL bxb; // projection of xb
     mutable double dh;
     mutable bool have_base_point,
                  base_in_trust_region;
 
+    mutable DeformationMethodE deformation_method;
     mutable bool have_deformation;
     mutable Point3DCL deformation;
 
@@ -437,7 +442,7 @@ class LocalQuaMapperCL
         : maxiter_( maxiter), tol_( tol),
           armijo_c_( armijo_c), max_damping_steps_( max_damping_steps),
           ls( &lsarg, &nobnddata, &mg),
-          tet( 0), have_base_point (false), have_deformation (false),
+          tet( 0), have_base_point (false), deformation_method (MAP_ZERO_LEVEL_SETS), have_deformation (false),
           num_outer_iter( maxiter + 1),
           base_point_time( 0.), locate_new_point_time( 0.), cur_num_outer_iter( 0), min_outer_iter(-1u), max_outer_iter( 0),
           total_outer_iter( 0), total_damping_iter( 0), total_base_point_calls( 0) {
@@ -450,6 +455,10 @@ class LocalQuaMapperCL
     const LocalQuaMapperCL& base_point () const;
     const LocalQuaMapperCL& set_trust_region (double lb) {
         localF.set_lower_bound_bary (-lb);
+        return *this;
+    }
+    const LocalQuaMapperCL& set_deformation_method (DeformationMethodE m) const {
+        deformation_method= m;
         return *this;
     }
 
