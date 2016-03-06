@@ -128,7 +128,7 @@ void newton_solve (FunctionT& fun, typename FunctionT::value_type& x, size_t& ma
     value_type dx, // Newton correction.
                F,  // The function of which we search a root.
                Fnew; // Helper in the step-size computation.
-    double l; // Damping factor for line search.
+    double l= 1.; // Damping factor for line search.
     size_t total_damping_iter= 0; // Count all rejected steps sizes.
     double normF;
 
