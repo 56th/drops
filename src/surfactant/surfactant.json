@@ -48,19 +48,19 @@
 		"RadTorus":	[1, 0.7],
 		"Velocity":	[0, 0, 0],
 
-		"StationaryPDE":	false,
-//		"Wind":			"ConstantWind",
-//		"Levelset":		"Ellipsoid",
-//		"Rhs":			"HeatConductionRhs",
-//		"Solution":		"HeatConductionSol"
-//		"Wind":			"ToroidalFlowWind",
+		"StationaryPDE":	true,
+		"Wind":			"ConstantWind",
+		"Levelset":		"Ellipsoid",
+		"Rhs":			"LaplaceBeltrami0Rhs",
+		"Solution":		"LaplaceBeltrami0Sol"
+//		"Wind":			"ToroidalFlowWind"
 //		"Levelset":		"Torus",
 //		"Rhs":			"ToroidalFlowRhs",
 //		"Solution":		"ToroidalFlowSol"
-		"Wind":			"AxisScalingWind",
-		"Levelset":		"AxisScalingLset",
-		"Rhs":			"AxisScalingRhs",
-		"Solution":		"AxisScalingSol"
+//		"Wind":			"AxisScalingWind",
+//		"Levelset":		"AxisScalingLset",
+//		"Rhs":			"AxisScalingRhs",
+//		"Solution":		"AxisScalingSol"
 	},
 
 	"SurfTransp": // surfactant transport

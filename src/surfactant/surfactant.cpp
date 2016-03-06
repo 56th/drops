@@ -436,8 +436,8 @@ static RegisterScalarFunction regsca_laplace_beltrami_0_rhs( "LaplaceBeltrami0Rh
 // ...and the corresponding solution (extended)
 double laplace_beltrami_0_sol (const DROPS::Point3DCL& p, double)
 {
-//     return p.norm_sq()/(12. + p.norm_sq())*laplace_beltrami_0_rhs( p, 0.);
-    return 1./12.*laplace_beltrami_0_rhs( p, 0.);
+    return p.norm_sq()/(12. + p.norm_sq())*laplace_beltrami_0_rhs( p, 0.);
+//     return 1./12.*laplace_beltrami_0_rhs( p, 0.);
 //    return 1. + p.norm_sq()/(12. + p.norm_sq())*laplace_beltrami_0_rhs( p, 0.);
 }
 static RegisterScalarFunction regsca_laplace_beltrami_0_sol( "LaplaceBeltrami0Sol", laplace_beltrami_0_sol);
@@ -1140,6 +1140,205 @@ class InterfaceApproxErrorDeformAccuCL : public TetraAccumulatorCL
     }
 };
 
+/// \brief Accumulate L2-norms and errors on the deformed zero level.
+/// Works for P1IF_FE, P2IF_FE, and C-functions. All functions are evaluated on the deformed levelset.
+class InterfaceL2AccuDeformP2CL : public TetraAccumulatorCL
+{
+  private:
+    const InterfaceCommonDataDeformP2CL& cdata_;
+    const MultiGridCL& mg;
+    std::string name_;
+
+    NoBndDataCL<> nobnddata;
+    const VecDescCL* fvd;
+
+    instat_scalar_fun_ptr f;
+    double f_time;
+
+    LocalLaplaceBeltramiDeformP2CL loc_lb;
+
+    instat_vector_fun_ptr f_grad;
+    double f_grad_time;
+
+    InterfaceL2AccuDeformP2CL* tid0p; // The object in OpenMP-thread 0, in which the following variables are updated.
+    std::vector<double> f_grid_norm,
+                        f_grid_int,
+                        f_norm,
+                        f_int,
+                        err,
+                        area,
+                        f_grid_grad_norm,
+                        f_grad_norm,
+                        grad_err;
+
+  public:
+    double f_grid_norm_acc,
+           f_grid_int_acc,
+           f_norm_acc,
+           f_int_acc,
+           err_acc,
+           area_acc,
+           f_grid_grad_norm_acc,
+           f_grad_norm_acc,
+           grad_err_acc;
+
+    InterfaceL2AccuDeformP2CL (const InterfaceCommonDataDeformP2CL& cdata, const MultiGridCL& mg_arg, std::string name= std::string())
+        : cdata_( cdata), mg( mg_arg), name_( name), fvd( 0), f( 0), f_time( 0.),  loc_lb( 1.), f_grad( 0), f_grad_time( 0.){}
+    virtual ~InterfaceL2AccuDeformP2CL () {}
+
+    void set_name (const std::string& n) { name_= n; }
+    void set_grid_function (const VecDescCL& fvdarg) { fvd= &fvdarg; }
+    void set_function (const instat_scalar_fun_ptr farg, double f_time_arg= 0.) {
+        f= farg;
+        f_time= f_time_arg;
+    }
+    void set_grad_function (const instat_vector_fun_ptr farg, double f_time_arg= 0.) {
+        f_grad= farg;
+        f_grad_time= f_time_arg;
+    }
+
+    virtual void begin_accumulation () {
+        std::cout << "InterfaceL2AccuDeformP2CL::begin_accumulation";
+        if (name_ != std::string())
+            std::cout << " for \"" << name_ << "\".\n";
+
+        tid0p= this;
+        f_grid_norm.clear();
+        f_grid_norm.resize( omp_get_max_threads(), 0.);
+        f_grid_int.clear();
+        f_grid_int.resize( omp_get_max_threads(), 0.);
+
+        f_norm.clear();
+        f_norm.resize( omp_get_max_threads(), 0.);
+        f_int.clear();
+        f_int.resize( omp_get_max_threads(), 0.);
+
+        err.clear();
+        err.resize( omp_get_max_threads(), 0.);
+        area.clear();
+        area.resize( omp_get_max_threads(), 0.);
+
+        f_grid_grad_norm.clear();
+        f_grid_grad_norm.resize( omp_get_max_threads(), 0.);
+        f_grad_norm.clear();
+        f_grad_norm.resize( omp_get_max_threads(), 0.);
+        grad_err.clear();
+        grad_err.resize( omp_get_max_threads(), 0.);
+
+        f_grid_norm_acc= f_grid_int_acc= f_norm_acc= f_int_acc= err_acc= area_acc= 0.;
+        f_grid_grad_norm_acc= f_grad_norm_acc= grad_err_acc= 0.;
+    }
+
+    virtual void finalize_accumulation() {
+        std::cout << "InterfaceL2AccuDeformP2CL::finalize_accumulation";
+        if (name_ != std::string())
+            std::cout << " for \"" << name_ << "\":";
+        area_acc= std::accumulate( area.begin(), area.end(), 0.);
+        std::cout << "\n\tarea: " << area_acc;
+        if (fvd != 0) {
+            f_grid_norm_acc=  std::sqrt( std::accumulate( f_grid_norm.begin(), f_grid_norm.end(), 0.));
+            f_grid_int_acc= std::accumulate( f_grid_int.begin(), f_grid_int.end(), 0.);
+            std::cout << "\n\t|| f_grid ||_L2: " << f_grid_norm_acc
+                      << "\tintegral: " << f_grid_int_acc;
+        }
+        if (f != 0) {
+            f_norm_acc=  std::sqrt( std::accumulate( f_norm.begin(), f_norm.end(), 0.));
+            f_int_acc= std::accumulate( f_int.begin(), f_int.end(), 0.);
+            std::cout << "\n\t|| f ||_L2: " << f_norm_acc
+                      << "\t integral: " << f_int_acc;
+        }
+        if (fvd != 0 && f != 0) {
+            err_acc=  std::sqrt( std::accumulate( err.begin(), err.end(), 0.));
+            std::cout << "\n\t|| f - f_grid ||_L2: " << err_acc;
+
+            const double mvf_err= std::sqrt( std::pow( err_acc, 2) - std::pow( f_grid_int_acc - f_int_acc, 2)/area_acc);
+            std:: cout << "\t|| f - c_f - (f_grid -c_{f_grid}) ||_L2: " << mvf_err;
+        }
+
+        if (fvd != 0) {
+            f_grid_grad_norm_acc=  std::sqrt( std::accumulate( f_grid_grad_norm.begin(), f_grid_grad_norm.end(), 0.));
+            std::cout << "\n\t|| f_grid_grad ||_L2: " << f_grid_grad_norm_acc;
+        }
+        if (f_grad != 0) {
+            f_grad_norm_acc=  std::sqrt( std::accumulate( f_grad_norm.begin(), f_grad_norm.end(), 0.));
+            std::cout << "\n\t|| f_grad ||_L2: " << f_grad_norm_acc;
+        }
+        if (fvd != 0 && f_grad != 0) {
+            grad_err_acc=  std::sqrt( std::accumulate( grad_err.begin(), grad_err.end(), 0.));
+            std::cout << "\n\t|| f_grad - f_grid_grad ||_L2: " << grad_err_acc;
+        }
+        std::cout << std::endl;
+    }
+
+    virtual void visit (const TetraCL& t) {
+        const InterfaceCommonDataDeformP2CL& cdata= cdata_.get_clone();
+        if (cdata.empty())
+            return;
+
+        const int tid= omp_get_thread_num();
+
+        std::valarray<double> ones (1., cdata.qdom2d_only_weights.vertex_size ());
+        tid0p->area[tid]+= quad_2D( ones, cdata.qdom2d_only_weights);
+
+        std::valarray<double> qfgrid,
+                              qf;
+        if (fvd != 0) {
+            // XXX: Check, whether incomplete P2-Data exists locally (which is allowed for P2IF_FE, but not handled correctly by this class --> Extend fvd). Likewise for P1IF_FE...
+            if (fvd->RowIdx->GetFE() == P2IF_FE)
+                resize_and_evaluate_on_vertexes( make_P2Eval( mg, nobnddata, *fvd), t, cdata.qdom2d_only_weights, qfgrid);
+            else if (fvd->RowIdx->GetFE() == P1IF_FE)
+                resize_and_evaluate_on_vertexes( make_P1Eval( mg, nobnddata, *fvd), t, cdata.qdom2d_only_weights, qfgrid);
+//             resize_and_evaluate_on_vertexes( make_P2Eval( mg, nobnddata, *fvd), cdata.qdom_projected, qfgrid);
+            tid0p->f_grid_int[tid]+=  quad_2D( qfgrid,        cdata.qdom2d_only_weights);
+            tid0p->f_grid_norm[tid]+= quad_2D( qfgrid*qfgrid, cdata.qdom2d_only_weights);
+        }
+        if (f != 0) {
+            resize_and_evaluate_on_vertexes( f, t, cdata.qdom2d_full, f_time, qf);
+            tid0p->f_int[tid]+= quad_2D( qf, cdata.qdom2d_full);
+            tid0p->f_norm[tid]+= quad_2D( qf*qf, cdata.qdom2d_full);
+        }
+        if (fvd != 0 && f != 0) {
+            std::valarray<double> qerr= qfgrid - qf;
+            tid0p->err[tid]+= quad_2D( qerr*qerr, cdata.qdom2d_full);
+        }
+
+//         GridFunctionCL<Point3DCL> qfgradgrid,
+//                                   qfgrad;
+//         if (fvd != 0) {
+//             qfgradgrid.resize( cdata.qdom.vertex_size());
+//             if (fvd->RowIdx->GetFE() == P2IF_FE) {
+//                 LocalP2CL<> lp2( t, *fvd, nobnddata);
+//                 loc_lb.setup( t, cdata);
+//                 for (Uint i= 0; i < 10; ++i)
+//                     qfgradgrid+= lp2[i]*loc_lb.get_qgradp2( i);
+//             }
+//             else if (fvd->RowIdx->GetFE() == P1IF_FE) {
+// // // XXX Implement this case.
+// //                 LocalP1CL<> lp1( t, *fvd, nobnddata);
+// //                 loc_lb_p1.setup( t, cdata);
+// //                 for (Uint i= 0; i < 4; ++i)
+// //                     qfgradgrid+= lp1[i]*loc_lb_p1.get_qgradp1( i);
+//             }
+//             tid0p->f_grid_grad_norm[tid]+= quad_2D( cdata.qdom_projected.absdets()*dot( qfgradgrid, qfgradgrid), cdata.qdom);
+//         }
+//         if (f_grad != 0) {
+//             resize_and_evaluate_on_vertexes( f_grad, cdata.qdom_projected.vertexes(), f_grad_time, qfgrad);
+//             for (Uint i= 0; i < cdata.qdom_projected.vertexes().size(); ++i) {
+//                 Point3DCL n= cdata.quaqua.local_ls_grad( *cdata.qdom_projected.vertexes()[i].first, cdata.qdom_projected.vertexes()[i].second);
+//                 n/= n.norm();
+//                 qfgrad[i]-= inner_prod( n, qfgrad[i])*n;
+//             }
+//             tid0p->f_grad_norm[tid]+= quad_2D( cdata.qdom_projected.absdets()*dot( qfgrad, qfgrad), cdata.qdom);
+//         }
+//         if (fvd != 0 && f_grad != 0) {
+//             GridFunctionCL<Point3DCL> qerr( qfgradgrid - qfgrad);
+//             tid0p->grad_err[tid]+= quad_2D( cdata.qdom_projected.absdets()*dot( qerr, qerr), cdata.qdom);
+//         }
+    }
+
+    virtual InterfaceL2AccuDeformP2CL* clone (int /*clone_id*/) { return new InterfaceL2AccuDeformP2CL( *this); }
+};
+
 void StationaryStrategyP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::LevelsetP2CL& lset)
 {
     // Initialize level set and triangulation
@@ -1375,6 +1574,15 @@ void StationaryStrategyDeformationP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangC
     DROPS::VecDescCL xp2( &ifacep2idx);
     surfsolver.Solve( Lp2, xp2.Data, bp2.Data, xp2.RowIdx->GetEx());
     std::cout << "Iter: " << surfsolver.GetIter() << "\tres: " << surfsolver.GetResid() << '\n';
+
+    TetraAccumulatorTupleCL err_accus;
+    err_accus.push_back( &cdatap2);
+    InterfaceL2AccuDeformP2CL L2_accu( cdatap2, mg, "deformed P2-solution");
+    L2_accu.set_grid_function( xp2);
+    L2_accu.set_function( the_sol_fun, 0.);
+    L2_accu.set_grad_function( the_sol_grad_fun, 0.);
+    err_accus.push_back( &L2_accu);
+    accumulate( err_accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetMatchingFunction(), ifacep2idx.GetBndInfo());
 
     if (P.get<int>( "SolutionOutput.Freq") > 0)
         DROPS::WriteFEToFile( xp2, mg, P.get<std::string>( "SolutionOutput.Path") + "_p2", P.get<bool>( "SolutionOutput.Binary"));
