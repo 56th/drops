@@ -332,7 +332,7 @@ class LocalMeshTransformationCL
 
     void map_QuadDomain2D (QuadDomain2DCL& qdom, const SurfacePatchCL& p, const Point3DCL& pos_pt) {
         const Uint nodes_per_facet= qdom.vertex_size()/p.facet_size();
-        for (Uint i= 0; i < qdom.weights_.size(); ++i) {
+        for (Uint i= 0; i < qdom.vertex_size(); ++i) {
             if (i % nodes_per_facet == 0) {
                 const SurfacePatchCL::FacetT& facet= p.facet_begin()[i/nodes_per_facet];
                 const BaryCoordCL verts[3]= { p.vertex_begin()[facet[0]],
@@ -340,9 +340,9 @@ class LocalMeshTransformationCL
                                               p.vertex_begin()[facet[2]] };
                 set_surface_patch (verts, pos_pt);
             }
-            set_point (qdom.vertexes_[i], /*surface_data_p=*/ true);
-            qdom.vertexes_[i]+= w2b.map_direction( Psi (qdom.vertexes_[i]));
-            qdom.weights_[i]*= JPhiQ;
+            set_point (qdom.vertex_begin ()[i], /*surface_data_p=*/ true);
+            qdom.vertex_begin ()[i]+= w2b.map_direction( Psi (qdom.vertex_begin ()[i]));
+            qdom.weight_begin ()[i]*= JPhiQ;
         }
     }
 };
@@ -431,7 +431,8 @@ class InterfaceCommonDataDeformP2CL : public TetraAccumulatorCL
             std::cerr << "InterfaceCommonDataDeformP2CL::visit: No positive vertex.\n";
         pos_pt= t.GetVertex (i)->GetCoord ();
         Phi.map_QuadDomain2D (qdom2d_full, surf, pos_pt);
-        qdom2d_only_weights.weights_= qdom2d_full.weights_;
+        std::copy (qdom2d_full.weight_begin (), qdom2d_full.weight_begin () + qdom2d_full.vertex_size (),
+                   qdom2d_only_weights.weight_begin ());
 
         make_SimpleQuadDomain<Quad5DataCL> (qdom, AllTetraC);
         Phi.map_QuadDomain (qdom);
@@ -458,9 +459,9 @@ inline void LocalMeshTransformationCL::set_tetra (const TetraCL* t)
 
 inline void LocalMeshTransformationCL::map_QuadDomain (QuadDomainCL& qdom)
 {
-    for (Uint i= 0; i < qdom.weights_.size(); ++i) {
-        set_point (qdom.vertexes_[i], /*surface_data_p=*/ false);
-        qdom.weights_[i]*= JPhi*std::abs(cdata->det_T);
+    for (Uint i= 0; i < qdom.vertex_size (); ++i) {
+        set_point (qdom.vertex_begin ()[i], /*surface_data_p=*/ false);
+        qdom.weight_begin ()[i]*= JPhi*std::abs(cdata->det_T);
     }
 }
 

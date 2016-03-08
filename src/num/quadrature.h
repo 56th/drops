@@ -94,6 +94,7 @@ namespace CompositeQuadratureTypesNS {
 
 typedef std::valarray<double> WeightContT;
 typedef const double* const_weight_iterator;
+typedef       double*       weight_iterator;
 
 } // end of namespace DROPS::CompositeQudratureTypesNS
 
@@ -163,6 +164,7 @@ class QuadDomainCL
      ///\brief Container for the quadrature weights
     typedef CompositeQuadratureTypesNS::WeightContT           WeightContT;
     typedef CompositeQuadratureTypesNS::const_weight_iterator const_weight_iterator;
+    typedef CompositeQuadratureTypesNS::      weight_iterator       weight_iterator;
 
     /// Friend declaration for the factory methods; if their number becomes to big, a more elaborate factory-design is in order.
     ///@{
@@ -212,6 +214,11 @@ class QuadDomainCL
 
     /// \brief Begin of the sequence of weights for integration on the given domain
     const_weight_iterator weight_begin (TetraSignEnum s= AllTetraC) const {
+        return Addr( weights_) + (s == NegTetraC ? 0
+            : (s == PosTetraC ? pos_weights_begin_
+                              : all_weights_begin_));
+    }
+    weight_iterator weight_begin (TetraSignEnum s= AllTetraC) {
         return Addr( weights_) + (s == NegTetraC ? 0
             : (s == PosTetraC ? pos_weights_begin_
                               : all_weights_begin_));
@@ -296,10 +303,12 @@ class QuadDomainCodim1CL
     typedef typename DimTraitsT::VertexT               VertexT;
     typedef typename DimTraitsT::VertexContT           VertexContT;
     typedef typename DimTraitsT::const_vertex_iterator const_vertex_iterator;
+    typedef typename DimTraitsT::      vertex_iterator       vertex_iterator;
 
      ///\brief Container for the quadrature weights
     typedef CompositeQuadratureTypesNS::WeightContT           WeightContT;
     typedef CompositeQuadratureTypesNS::const_weight_iterator const_weight_iterator;
+    typedef CompositeQuadratureTypesNS::      weight_iterator       weight_iterator;
 
     /// Friend declaration for the factory methods; if their number becomes to big, a more elaborate factory-design is in order.
     ///@{
@@ -350,11 +359,14 @@ class QuadDomainCodim1CL
 
     /// \brief Begin of the sequence of weights for integration
     const_weight_iterator weight_begin () const { return Addr( weights_); }
+          weight_iterator weight_begin ()       { return Addr( weights_); }
 
     /// \brief sequence of quadrature points
     ///@{
     const_vertex_iterator vertex_begin () const { return vertexes_.begin(); }
     const_vertex_iterator vertex_end   () const { return vertexes_.end(); }
+    vertex_iterator vertex_begin () { return vertexes_.begin(); }
+    vertex_iterator vertex_end   () { return vertexes_.end(); }
     ///@}
 };
 

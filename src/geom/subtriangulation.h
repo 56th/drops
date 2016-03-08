@@ -53,9 +53,11 @@ typedef TriangleContT::const_iterator const_triangle_iterator;
 
 typedef std::vector<BaryCoordCL>    VertexContT;
 typedef VertexContT::const_iterator const_vertex_iterator;
+typedef VertexContT::      iterator       vertex_iterator;
 
 typedef std::vector<STCoordCL>        STVertexContT;
 typedef STVertexContT::const_iterator const_stvertex_iterator;
+typedef STVertexContT::      iterator       stvertex_iterator;
 
 } // end of namespace DROPS::LatticePartitionTypesNS
 
@@ -171,6 +173,7 @@ struct DimensionTraitsCL<3>
     typedef BaryCoordCL                                    VertexT;
     typedef LatticePartitionTypesNS::VertexContT           VertexContT;
     typedef LatticePartitionTypesNS::const_vertex_iterator const_vertex_iterator;
+    typedef LatticePartitionTypesNS::      vertex_iterator       vertex_iterator;
 
     typedef PrincipalLatticeCL         LatticeT;
     typedef PrincipalLatticeCL::TetraT LatticeBodyT;
@@ -200,6 +203,7 @@ struct DimensionTraitsCL<4>
     typedef STCoordCL                                        VertexT;
     typedef LatticePartitionTypesNS::STVertexContT           VertexContT;
     typedef LatticePartitionTypesNS::const_stvertex_iterator const_vertex_iterator;
+    typedef LatticePartitionTypesNS::      stvertex_iterator       vertex_iterator;
 
     typedef TetraPrismLatticeCL         LatticeT;
     typedef TetraPrismLatticeCL::PentaT LatticeBodyT;
