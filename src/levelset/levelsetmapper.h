@@ -191,59 +191,6 @@ inline bool is_in_ref_tetra (const BaryCoordCL& b, double eps= 1e-11)
 }
 
 
-
-// Take LocalP2CL<> ls, check whether there is a linear interface. If yes, map to piecewise quadratic interface and return LocalP2CL<Point3DCL> with displacement for each P2-dof.
-// Two modes of operation: 2nd: For each dof, map the dof to the quadratic level set of the linear ls value in dof (Christophs method)
-// //                         1st: For each dof map base point on linear interface to base point on quadratic interface.
-// class LocalLinearToQuadraticIfaceCL
-// {
-//   private:
-//     enum map_type {MAP_BASE_POINTS, MAP_LEVEL_SETS};
-//     map_type t_;
-//     bool intersection_p_;
-//     LocalP2CL<Point3DCL> map_;
-// 
-//   public:
-//     LocalLinearToQuadraticIfaceCL () : t_(MAP_BASE_POINTS), intersection_p_ (false) {}
-//     LocalLinearToQuadraticIfaceCL& assign (const LocalP2CL<>& ls) { return *this; }
-// 
-//     bool intersection_p () const { return intersection_p_; }
-//     const LocalP2CL<Point3DCL>& get_map () const { return map_; }
-// };
-
-
-///\brief returns the L2-projector which turns a LocalP2CL into a LocalP1CL (M_1^{-1} M_{interpolation} M_2).
-inline SMatrixCL<4, 10> local_p2_to_p1_L2_projection ()
-{
-    QRDecompCL<4,4> qrp1;
-    SMatrixCL<4,4>& Mp1= qrp1.GetMatrix ();
-    for (Uint i= 0; i < 4; ++i) {
-        Mp1( i, i)= P1DiscCL::GetMass (i, i);
-        for (Uint j= 0; j < i; ++j)
-            Mp1 (i, j)= Mp1 (j, i)= P1DiscCL::GetMass (i, j);
-    }
-    qrp1.prepare_solve ();
-    SMatrixCL<10,10> Mp2;
-    for (Uint i= 0; i < 10; ++i) {
-        Mp2( i, i)= P2DiscCL::GetMass (i, i);
-        for (Uint j= 0; j < i; ++j)
-            Mp2 (i, j)= Mp2 (j, i)= P2DiscCL::GetMass (i, j);
-    }
-    SMatrixCL<4,10> Mp1p2;
-    LocalP1CL<> p1;
-    LocalP2CL<> p2;
-    for (Uint i= 0; i < 4; ++i) {
-        p1= 0.;
-        p1[i]= 1.;
-        p2.assign (p1); // Interpolation
-        for (Uint j= 0; j < 10; ++j)
-            Mp1p2 (i, j)= p2[j];
-    }
-    qrp1.Solve (Mp1p2);
-    return Mp1p2*Mp2;
-}
-
-
 // The function of which we search a root is F(s) = \phi(M\inv*(p - s*v, 1)) =  = \phi(a - s*b) with a=M\inv*(p,1), b= M\inv*(v, 0). Here, \phi is the (local) level set function and M\inv*(x,1) for some matrix M is the affine function mapping world coordinates x to barycentric coordinates.
 // Its Jacobian is the dF(s) = -d\phi(p - s*v)*v.
 class LocalQuaLineSearchFunctionCL
@@ -412,10 +359,8 @@ class LocalQuaMapperCL
     NoBndDataCL<> nobnddata;
     P2EvalCL<double, const NoBndDataCL<>, const VecDescCL> ls;
 
-// //     mutable SMatrixCL<4,10> p2top1;
     mutable LocalP1CL<> loclsp1;
     mutable Point3DCL gp1;
-//     mutable double c_lin_dist;
 
     LocalP1CL<Point3DCL> gradrefp2[10];
 
@@ -447,7 +392,6 @@ class LocalQuaMapperCL
           base_point_time( 0.), locate_new_point_time( 0.), cur_num_outer_iter( 0), min_outer_iter(-1u), max_outer_iter( 0),
           total_outer_iter( 0), total_damping_iter( 0), total_base_point_calls( 0) {
         P2DiscCL::GetGradientsOnRef( gradrefp2);
-//         p2top1= local_p2_to_p1_L2_projection ();
     }
 
     const LocalQuaMapperCL& set_point (const BaryCoordCL& xbarg) const;

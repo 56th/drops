@@ -607,11 +607,6 @@ LocalQuaMapperFunctionCL::apply_derivative_inverse (const value_type& x, const v
 double
 LocalQuaMapperFunctionCL::initial_damping_factor (const value_type& /*x*/, const value_type& dx, const value_type& /*F*/)
 {
-//     const Point3DCL dx_spatial= MakePoint3D (dx[0], dx[1], dx[2]);
-//     const Point3DCL g_ls= xF_p && x == xF ? g_ls_xF : locls_grad (w2b (Point3DCL (x.begin (), x.begin () + 3)));
-// 
-//     return std::min (0.5*h/std::max(1e-3*h, dx_spatial.norm()), 0.5*h/std::max(1e-3*h, dx[3]*g_ls.norm()));
-
     // Choose l so small that all barycentric coordinates of the new point are >= lower_bary.
     const BaryCoordCL bdir= w2b.map_direction (Point3DCL( dx.begin (), dx.begin () + 3));
     double l= 1.;
@@ -655,17 +650,12 @@ const LocalQuaMapperCL& LocalQuaMapperCL::set_tetra (const TetraCL* tetarg) cons
         w2b.assign (*tet);
         b2w.assign (*tet);
 
-// //         const SVectorCL<4>& tmp= p2top1*SVectorCL<10> (&locls[0], &locls[10]);
-// //         std::copy (tmp.begin(), tmp.end(), &loclsp1[0]);
         std::copy (&locls[0], &locls[4], &loclsp1[0]);
         Point3DCL gradp1[4];
         P1DiscCL::GetGradients( gradp1, T);
         gp1= Point3DCL();
         for (Uint i= 0; i < 4; ++i)
             gp1+= loclsp1[i]*gradp1[i];
-// 
-//         const BaryCoordCL p= w2b.map_direction (gp1);
-//         c_lin_dist= inner_prod (SVectorCL<4> (&loclsp1[0], &loclsp1[4]), p);
 
         localF.set_tetra (locls, loc_ls_grad, H_ls, h, w2b);
     }
@@ -690,10 +680,6 @@ const LocalQuaMapperCL& LocalQuaMapperCL::base_point () const
         LocalQuaMapperFunctionCL::value_type x;
         std::copy (p.begin (), p.end (), x.begin ());
         x[3]= 0.;
-//         const double s= loclsp1 (xb)/c_lin_dist;
-//         const Point3DCL xini= p - s*gp1;
-//         std::copy (xini.begin (), xini.end (), x.begin ());
-//         x[3]= 0.;
         newton_solve (localF, x, maxiter, tol, max_damping_steps, armijo_c_);
         const Point3DCL x_spatial (x.begin (), x.begin () + 3);
         bxb= w2b (x_spatial);
@@ -749,9 +735,6 @@ const LocalQuaMapperCL& LocalQuaMapperCL::compute_deformation () const
     if (deformation_method == MAP_LOCAL_LEVEL_SETS)
         deformation= b2w (bxb) - b2w (xb);
     else {
-//         const Point3DCL g (localF.get_locls_grad ()(bxb));
-//         const double s= loclsp1 (bxb)/inner_prod (w2b.map_direction (g), SVectorCL<4> (&loclsp1[0], &loclsp1[4]));
-//         deformation= s*g;
         Point3DCL n (localF.get_locls_grad ()(bxb));
         n/= n.norm ();
         deformation= (loclsp1 (xb) - dh)*n;
