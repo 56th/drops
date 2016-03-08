@@ -132,7 +132,7 @@ void newton_solve (FunctionT& fun, typename FunctionT::value_type& x, size_t& ma
     size_t total_damping_iter= 0; // Count all rejected steps sizes.
     double normF;
 
-    int iter;
+    size_t iter;
     for (iter= 0; true; ++iter) {
         F= fun.value (x);
         normF= std::sqrt (NewtonImplNS::dot (F, F));
