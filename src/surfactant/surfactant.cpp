@@ -1156,6 +1156,7 @@ class InterfaceL2AccuDeformP2CL : public TetraAccumulatorCL
     double f_time;
 
     LocalLaplaceBeltramiDeformP2CL loc_lb;
+    LocalNormalLaplaceDeformP2CL loc_ngrad;
 
     instat_vector_fun_ptr f_grad;
     double f_grad_time;
@@ -1169,7 +1170,8 @@ class InterfaceL2AccuDeformP2CL : public TetraAccumulatorCL
                         area,
                         f_grid_grad_norm,
                         f_grad_norm,
-                        grad_err;
+                        grad_err,
+                        normal_grad;
 
   public:
     double f_grid_norm_acc,
@@ -1180,10 +1182,11 @@ class InterfaceL2AccuDeformP2CL : public TetraAccumulatorCL
            area_acc,
            f_grid_grad_norm_acc,
            f_grad_norm_acc,
-           grad_err_acc;
+           grad_err_acc,
+           normal_grad_acc;
 
     InterfaceL2AccuDeformP2CL (const InterfaceCommonDataDeformP2CL& cdata, const MultiGridCL& mg_arg, std::string name= std::string())
-        : cdata_( cdata), mg( mg_arg), name_( name), fvd( 0), f( 0), f_time( 0.),  loc_lb( 1.), f_grad( 0), f_grad_time( 0.){}
+        : cdata_( cdata), mg( mg_arg), name_( name), fvd( 0), f( 0), f_time( 0.),  loc_lb( 1.), loc_ngrad (1.), f_grad( 0), f_grad_time( 0.){}
     virtual ~InterfaceL2AccuDeformP2CL () {}
 
     void set_name (const std::string& n) { name_= n; }
@@ -1224,6 +1227,8 @@ class InterfaceL2AccuDeformP2CL : public TetraAccumulatorCL
         f_grad_norm.resize( omp_get_max_threads(), 0.);
         grad_err.clear();
         grad_err.resize( omp_get_max_threads(), 0.);
+        normal_grad.clear();
+        normal_grad.resize( omp_get_max_threads(), 0.);
 
         f_grid_norm_acc= f_grid_int_acc= f_norm_acc= f_int_acc= err_acc= area_acc= 0.;
         f_grid_grad_norm_acc= f_grad_norm_acc= grad_err_acc= 0.;
@@ -1267,6 +1272,10 @@ class InterfaceL2AccuDeformP2CL : public TetraAccumulatorCL
             grad_err_acc=  std::sqrt( std::accumulate( grad_err.begin(), grad_err.end(), 0.));
             std::cout << "\n\t|| f_grad - f_grid_grad ||_L2: " << grad_err_acc;
         }
+        if (fvd != 0) {
+            normal_grad_acc=  std::sqrt( std::accumulate( normal_grad.begin(), normal_grad.end(), 0.));
+            std::cout << "\n\t|| n^Tf_grid_grad ||_L2(vol): " << normal_grad_acc;
+        }
         std::cout << std::endl;
     }
 
@@ -1302,6 +1311,15 @@ class InterfaceL2AccuDeformP2CL : public TetraAccumulatorCL
             tid0p->err[tid]+= quad_2D( qerr*qerr, cdata.qdom2d_full);
         }
 
+        if (fvd != 0) {
+            if (fvd->RowIdx->GetFE() == P2IF_FE) {
+                LocalP2CL<> lp2( t, *fvd, nobnddata);
+                loc_ngrad.setup( t, cdata);
+                for (Uint i= 0; i < 10; ++i)
+                    for (Uint j= 0; j < 10; ++j)
+                        tid0p->normal_grad[tid]+= lp2[i]*lp2[j]*loc_ngrad.coup[i][j];
+            }
+        }
 //         GridFunctionCL<Point3DCL> qfgradgrid,
 //                                   qfgrad;
 //         if (fvd != 0) {
@@ -1560,10 +1578,10 @@ void StationaryStrategyDeformationP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangC
     Lp2.LinComb (1.0, Ap2.Data, 1.0, Mp2.Data, 1.0, Anp2.Data);
 //     MatrixCL& Lp2= Mp2.Data;
 // 
-    DROPS::WriteToFile( Ap2.Data, "ap2_iface.txt", "Ap2");
-    DROPS::WriteToFile( Mp2.Data, "mp2_iface.txt", "Mp2");
-    DROPS::WriteToFile( Anp2.Data, "anp2_vol.txt", "Anp2");
-    DROPS::WriteFEToFile( bp2, mg, "rhsp2_iface.txt", /*binary=*/ false);
+//     DROPS::WriteToFile( Ap2.Data, "ap2_iface.txt", "Ap2");
+//     DROPS::WriteToFile( Mp2.Data, "mp2_iface.txt", "Mp2");
+//     DROPS::WriteToFile( Anp2.Data, "anp2_vol.txt", "Anp2");
+//     DROPS::WriteFEToFile( bp2, mg, "rhsp2_iface.txt", /*binary=*/ false);
 
     typedef DROPS::SSORPcCL SurfPcT;
 // //     typedef DROPS::JACPcCL SurfPcT;
