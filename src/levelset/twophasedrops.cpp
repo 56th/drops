@@ -227,6 +227,10 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     DisplayDetailedGeom( MG);
     DisplayUnks(Stokes, lset, MG);
 
+    const int nsteps = P.get<int>("Time.NumSteps");
+    const double tEnd = P.get<double>("Time.TEnd");
+    const double dt = tEnd / nsteps;
+
     TransportP1CL * massTransp = NULL;
     TransportRepairCL *  transprepair = NULL;
 
@@ -245,7 +249,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
         massTransp = new TransportP1CL( MG, Bnd_c, Stokes.GetBndData().Vel, P.get<double>("Time.Theta"),
                                   D, P.get<double>("Transp.HenryNeg")/P.get<double>("Transp.HenryPos"), &Stokes.v, lset,
-                                  P.get<double>("Time.StepSize"), P.get<int>("Transp.Solver.Iter"), P.get<double>("Transp.Solver.Tol"));
+                                  dt, P.get<int>("Transp.Solver.Iter"), P.get<double>("Transp.Solver.Tol"));
 
         transprepair = new TransportRepairCL(*massTransp, MG);
         adap.push_back(transprepair);
@@ -266,7 +270,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     // TL: can we make a pointer out of this? like massTransp
     /// \todo rhs beruecksichtigen
     SurfactantcGP1CL surfTransp( MG, Stokes.GetBndData().Vel, P.get<double>("Time.Theta"), P.get<double>("SurfTransp.Visc"), &Stokes.v, *lset.PhiC, lset.GetBndData(),
-                                 P.get<double>("Time.StepSize"), P.get<int>("SurfTransp.Solver.Iter"), P.get<double>("SurfTransp.Solver.Tol"), P.get<double>("SurfTransp.XFEMReduced"));
+                                 dt, P.get<int>("SurfTransp.Solver.Iter"), P.get<double>("SurfTransp.Solver.Tol"), P.get<double>("SurfTransp.XFEMReduced"));
     InterfaceP1RepairCL surf_repair( MG, *lset.PhiC, lset.GetBndData(), surfTransp.ic);
     if (P.get("SurfTransp.DoTransp", 0))
     {
@@ -335,14 +339,14 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 //         Stokes.pr_idx.GetFinest().GetXidx().GetNumUnknownsStdFE(),
 //         stokessolverfactory.GetPVel()->GetFinest(), stokessolverfactory.GetPPr()->GetFinest());
 
-    SetInitialConditions( Stokes, lset, MG, P);
+    SetInitialConditions( Stokes, lset, MG, P);    
 
     // Time discretisation + coupling
     TimeDisc2PhaseCL* timedisc= CreateTimeDisc(Stokes, lset, navstokessolver, gm, P, lsetmod);
-    if (P.get<int>("Time.NumSteps") != 0){
+    if ( nsteps != 0){
         timedisc->SetSchurPrePtr( stokessolverfactory.GetSchurPrePtr() );
     }
-    if (P.get<double>("CouplingSolver.NavStokesSolver.Nonlinear")!=0.0 || P.get<int>("Time.NumSteps") == 0) {
+    if (P.get<double>("CouplingSolver.NavStokesSolver.Nonlinear")!=0.0 || nsteps == 0) {
         stokessolverfactory.SetMatrixA( &navstokessolver->GetAN()->GetFinest());
             //for Stokes-MGM
         stokessolverfactory.SetMatrices( navstokessolver->GetAN(), &Stokes.B.Data,
@@ -362,7 +366,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     IFInfo.Init(infofile);
     IFInfo.WriteHeader();
 
-    if (P.get<int>("Time.NumSteps") == 0)
+    if ( nsteps == 0)
         SolveStatProblem( Stokes, lset, *navstokessolver);
 
     // for serialization of geometry and numerical data
@@ -381,7 +385,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         // Initialize Ensight6 output
         std::string ensf( P.get<std::string>("Ensight.EnsDir") + "/" + P.get<std::string>("Ensight.EnsCase"));
         ensight = new Ensight6OutCL( P.get<std::string>("Ensight.EnsCase") + ".case",
-                                     P.get<int>("Time.NumSteps")/P.get("Ensight.EnsightOut", 0)+1,
+                                     nsteps/P.get("Ensight.EnsightOut", 0)+1,
                                      P.get<int>("Ensight.Binary"));
         ensight->Register( make_Ensight6Geom      ( MG, MG.GetLastLevel(), P.get<std::string>("Ensight.GeomName"),
                                                     ensf + ".geo", true));
@@ -413,7 +417,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     VTKOutCL * vtkwriter = NULL;
     if (P.get<int>("VTK.VTKOut",0)){
         vtkwriter = new VTKOutCL(adap.GetMG(), "DROPS data",
-                                 P.get<int>("Time.NumSteps")/P.get("VTK.VTKOut", 0)+1,
+                                 nsteps/P.get("VTK.VTKOut", 0)+1,
                                  P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName"),
                                  P.get<std::string>("VTK.TimeFileName"),
                                  P.get<int>("VTK.Binary"),
@@ -444,7 +448,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     if ((P.get<int>("Levelset.Discontinuous")&&(P.get<int>("VTK.VTKOut",0))&&(P.get<int>("VTK.AddDGOutput",0))))
     {
         dgvtkwriter = new VTKOutCL(adap.GetMG(), "DROPS data",
-                                   P.get<int>("Time.NumSteps")/P.get("VTK.VTKOut", 0)+1,
+                                   nsteps/P.get("VTK.VTKOut", 0)+1,
                                    P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName")+"_dg",
                                    P.get<std::string>("VTK.TimeFileName"),
                                    P.get<int>("VTK.Binary"),
@@ -456,8 +460,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         dgvtkwriter->Write(Stokes.v.t);
     }
 
-    const int nsteps = P.get<int>("Time.NumSteps");
-    const double dt = P.get<double>("Time.StepSize");
+
     double time = 0.0;
     
     typedef DistMarkingStrategyCL MarkerT;
