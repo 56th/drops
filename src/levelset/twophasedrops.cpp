@@ -565,7 +565,7 @@ int main (int argc, char** argv)
   {
     std::cout << "Boost version: " << BOOST_LIB_VERSION << std::endl;
 
-    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/levelset/twophasedrops/test.json");
+    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/levelset/twophasedrops/risingdroplet.json");
     P.put_if_unset<std::string>("VTK.TimeFileName",P.get<std::string>("VTK.VTKName"));
 
     std::cout << P << std::endl;

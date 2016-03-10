@@ -147,14 +147,20 @@ template <typename T, Uint Size>
 
 void read_parameter_file_from_cmdline (ParamCL& P, int argc, char **argv, std::string default_file)
 {
-    // first read default parameters from default.json, taking path from default_file
-    std::string default_params= default_file.substr( 0, default_file.std::string::rfind( "/", default_file.size() )) + "/default.json";
-    std::ifstream test_if_default_exists( default_params.c_str());
-    if (test_if_default_exists) {
-        test_if_default_exists.close();
-        P.read_json( default_params);
-    } else
-        throw DROPSErrCL("read_parameter_file_from_cmdline: Unable to read default parameters from '"
+    // first read default parameters from default.json, searching in 1.) local directory or 2.) path from default_file
+    bool fail= true;
+    std::string default_params= default_file.substr( 0, default_file.rfind( "/", default_file.size() )) + "/default.json";
+    for (int i=0; i<2 && fail; ++i) {
+        std::string fil= i==0 ? "default.json" : default_params;
+        std::ifstream test_if_default_exists( fil.c_str());
+        if (test_if_default_exists) {
+            test_if_default_exists.close();
+            fail= false;
+            P.read_json( fil);
+        }
+    }
+    if (fail)
+        throw DROPSErrCL("read_parameter_file_from_cmdline: Unable to read default parameters from './default.json' and '"
                 + default_params + "'\n");
     
     // then read parameters from JSON file specified on command line (otherwise use default_file)
