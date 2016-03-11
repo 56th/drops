@@ -846,9 +846,9 @@ void MinCommPreCL::Update(const ExT& vel_ex, const ExT& pr_ex) const
 class BDinvBTPreCL: public SchurPreBaseCL
 {
   private:
-    const MatrixCL* L_, *B_, *Mvel_, *M_;
-    mutable MatrixCL* Bs_;
-    mutable size_t Lversion_, Bversion_, Mvelversion_, Mversion_;
+    const MatrixCL* L_, *B_, *Mvel_, *M_, *C_;
+    mutable MatrixCL* Bs_, *Cs_;
+    mutable size_t Lversion_, Bversion_, Mvelversion_, Mversion_, Cversion_;
     mutable VectorCL Dprsqrtinv_, Dvelinv_, DSchurinv_;
     double  tol_;
     mutable DiagPcCL diagVelPc_;
@@ -874,10 +874,10 @@ class BDinvBTPreCL: public SchurPreBaseCL
     void Update (const DummyExchangeCL& vel_ex, const DummyExchangeCL& pr_ex) const;
 
   public:
-    BDinvBTPreCL (const MatrixCL* L, MatrixCL* B, MatrixCL* M_vel, MatrixCL* M_pr, const IdxDescCL& pr_idx,
+    BDinvBTPreCL (const MatrixCL* L, MatrixCL* B, MatrixCL* C, MatrixCL* M_vel, MatrixCL* M_pr, const IdxDescCL& pr_idx,
                   double tol=1e-2, double regularize= 0.0, std::ostream* output= 0)
-        : SchurPreBaseCL( 0, 0, output), L_( L), B_( B), Mvel_( M_vel), M_( M_pr), Bs_( 0),
-          Lversion_( 0), Bversion_( 0), Mvelversion_( 0), Mversion_( 0), tol_(tol),
+        : SchurPreBaseCL( 0, 0, output), L_( L), B_( B), Mvel_( M_vel), M_( M_pr), C_( C), Bs_( 0), Cs_(0),
+          Lversion_( 0), Bversion_( 0), Mvelversion_( 0), Mversion_( 0), Cversion_(0), tol_(tol),
           diagVelPc_(Dvelinv_), SchurPc_( DSchurinv_),
 #ifdef _PAR
           BDinvBT_(0),
@@ -887,9 +887,9 @@ class BDinvBTPreCL: public SchurPreBaseCL
           regularize_( regularize), lumped_(false) {}
 
     BDinvBTPreCL (const BDinvBTPreCL & pc)
-        : SchurPreBaseCL( pc.kA_, pc.kM_), L_( pc.L_), B_( pc.B_), Mvel_( pc.Mvel_), M_( pc.M_),
-          Bs_( pc.Bs_ == 0 ? 0 : new MatrixCL( *pc.Bs_)),
-          Lversion_( pc.Lversion_), Bversion_( pc.Bversion_), Mvelversion_( pc.Mvelversion_), Mversion_( pc.Mversion_),
+        : SchurPreBaseCL( pc.kA_, pc.kM_), L_( pc.L_), B_( pc.B_), Mvel_( pc.Mvel_), M_( pc.M_), C_( pc.C_ ),
+          Bs_( pc.Bs_ == 0 ? 0 : new MatrixCL( *pc.Bs_)), Cs_( pc.Cs_ == 0 ? 0 : new MatrixCL( *pc.Cs_)),
+          Lversion_( pc.Lversion_), Bversion_( pc.Bversion_), Mvelversion_( pc.Mvelversion_), Mversion_( pc.Mversion_), Cversion_( pc.Cversion_),
           Dprsqrtinv_( pc.Dprsqrtinv_), Dvelinv_( pc.Dvelinv_), DSchurinv_( pc.DSchurinv_), tol_(pc.tol_),
           diagVelPc_( Dvelinv_), SchurPc_( DSchurinv_),
 #ifdef _PAR
@@ -964,7 +964,7 @@ template <typename Mat, typename Vec>
 void BDinvBTPreCL::Apply (const Mat&, Vec& x, const Vec& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& pr_ex) const
 {
     ScopeTimerCL scope("BDinvBTPreCL::Apply");
-    if ((L_->Version() != Lversion_) || (Mvel_->Version() != Mvelversion_) || (M_->Version() != Mversion_) || (B_->Version() != Bversion_))
+    if ((L_->Version() != Lversion_) || (Mvel_->Version() != Mvelversion_) || (M_->Version() != Mversion_) || (B_->Version() != Bversion_) || (C_->Version() != Cversion_) )
         Update( vel_ex, pr_ex);
 
     Vec y( b.size());

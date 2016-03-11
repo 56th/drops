@@ -144,7 +144,7 @@ inline void MassTranspRepairCL::pre_refine()
 {
     // std::cout << " before " << std::endl;
     // std::cout << " c_.Data = " << c_.Data << std::endl;
-    p1repair_= std::auto_ptr<RepairP1CL<double>::type >(
+    p1repair_= std::unique_ptr<RepairP1CL<double>::type >(
         new RepairP1CL<double>::type( MG_, c_, cBnd_));
 }
 

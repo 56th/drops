@@ -63,8 +63,8 @@ EnergyNormErrorAccumulatorCL::EnergyNormErrorAccumulatorCL(const MultiGridCL& MG
     new_sol_pos(new_sol_pos_in),
     Bnd_neg(Bnd_neg_in),
     Bnd_pos(Bnd_pos_in),
-    alpha_neg(P.get<double>("DiffNeg")),alpha_pos(P.get<double>("DiffPos")),
     beta_neg(P.get<double>("HNeg")),beta_pos(P.get<double>("HPos")),
+    alpha_neg(P.get<double>("DiffNeg")),alpha_pos(P.get<double>("DiffPos")),
     lambda_stab(P.get<double>("NitschePenalty")),
     vmax(P.get<double>("MaxVelocity"))
 {
@@ -124,7 +124,7 @@ void EnergyNormErrorAccumulatorCL::visit (const TetraCL& sit)
 
     absdet= std::fabs(det);
 
-    const double h = std::pow(absdet,1.0/3.0);
+    // const double h = std::pow(absdet,1.0/3.0); //unused
     const double dt = tnew-told;
     const double st_absdet= absdet * dt;
     
@@ -172,7 +172,7 @@ void EnergyNormErrorAccumulatorCL::visit (const TetraCL& sit)
         iscut = false;
     }
 
-    double add=0.0;
+    // double add=0.0; //unused
 
     if (iscut)
     {
@@ -214,13 +214,18 @@ void EnergyNormErrorAccumulatorCL::visit (const TetraCL& sit)
             // double (* coup_s_s_cur)[8][8] = csign ? &coup_s_s_pos : &coup_s_s_neg;
             // double (* elvec_cur)[8] = csign ? &elvec_pos : &elvec_neg;
             // const GridFunctionCL<Point3DCL>& vel_cur (csign ? velpos : velneg);
+
+            /* unused
             const double & alpha (csign ? alpha_pos : alpha_neg);
+            */
             const double & beta (csign ? beta_pos : beta_neg);
 
+            /* unused
             GridFunctionCL<double> psi_PAST = cstquad.EvalLinearOnPart( constone, p0, csign);
             GridFunctionCL<double> psi_FUTURE = cstquad.EvalLinearOnPart( p0, constone, csign); 
             GridFunctionCL<double> & gfone (csign? gfone_pos: gfone_neg);
-            
+            */
+
             GridFunctionCL<double> uh = cstquad.EvalLinearOnPart( oldtr, newtr, csign);
             LocalP2CL<> dtr = newtr;
             newtr -= oldtr;
@@ -272,15 +277,15 @@ void EnergyNormErrorAccumulatorCL::visit (const TetraCL& sit)
 
 
             double tmp = beta * cstquad.QuadOnPart( err2, csign) * st_absdet;
- #pragma omp critical(l2norm2)            
+#pragma omp critical(l2norm2)
             *l2norm2 += tmp;
 
             tmp = beta * cstquad.QuadOnPart( err2grad, csign) * st_absdet;
-#pragma omp critical(l2norm2)            
+#pragma omp critical(l2norm2)
             *h10norm2 += tmp;
 
             tmp = beta * cstquad.QuadOnPart( err2dt, csign) * st_absdet;
-#pragma omp critical(l2norm2)            
+#pragma omp critical(l2norm2)
             *h01norm2 += tmp;
 
         }
@@ -343,15 +348,15 @@ void EnergyNormErrorAccumulatorCL::visit (const TetraCL& sit)
             err_elvec_st[FUTURE*4+i] = newtr[i]-newsolp1[i];
 
         SVectorCL<8> tmp = coup_s_s_lap * err_elvec_st;
-#pragma omp critical(h10norm2)            
+#pragma omp critical(h10norm2)
         *h10norm2 += inner_prod(tmp, err_elvec_st);
 
         tmp = coup_s_s_mass * err_elvec_st;
-#pragma omp critical(l2norm2)            
+#pragma omp critical(l2norm2)
         *l2norm2 += inner_prod(tmp, err_elvec_st);
 
         tmp = coup_s_s_dtdt * err_elvec_st;
-#pragma omp critical(h01norm2)            
+#pragma omp critical(h01norm2)
         *h01norm2 += inner_prod(tmp, err_elvec_st);
 
     }

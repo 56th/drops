@@ -206,13 +206,11 @@ void InstatStokes2phaseThetaSchemeCL<StokesT,SolverT,LsetT>::DoStep( VectorCL& v
     // if system matrices do not change (i.e. stationary interface) quite inefficient
     // but cplM is needed if boundary conditions are time dependent; cplA is inside b
     _Stokes.SetupSystem1( &_Stokes.A, &_Stokes.M, _b, _b, _cplM, _lset, _Stokes.v.t);
-    _Stokes.SetupSystem2( &_Stokes.B, &_Stokes.c, _lset, _Stokes.v.t );
+    _Stokes.SetupSystem2( &_Stokes.B, &_Stokes.C, &_Stokes.c, _lset, _Stokes.v.t );
 
     // if moving interface: uncomment the following lines        
     _Stokes.SetupPrMass ( &_Stokes.prM, _lset );
     _Stokes.SetupPrStiff( &_Stokes.prA, _lset, P.get<double>("Stokes.lambda",1.0) );
-    double epsP = P.get<double>("Stokes.epsP",0.0);
-    _Stokes.SetupC( &_Stokes.C, _lset, epsP );
 
 
     // create matrix mat

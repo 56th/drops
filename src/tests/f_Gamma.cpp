@@ -370,27 +370,12 @@ void MarkDrop (DROPS::MultiGridCL& mg, int maxLevel= -1)
     }
 }
 
-/// \brief Set Default parameters here s.t. they are initialized.
-/// The result can be checked when Param-list is written to the output.
-void SetMissingParameters(DROPS::ParamCL& P){
-    P.put_if_unset<std::string>("Exp.VolForce", "ZeroVel");
-    P.put_if_unset<double>("SurfTens.ShearVisco", 0.0);
-    P.put_if_unset<double>("SurfTens.DilatationalVisco", 0.0);
-    P.put_if_unset<double>("Mat.DensDrop", 1000);
-    P.put_if_unset<double>("Mat.ViscDrop", 0.001);
-    P.put_if_unset<double>("Mat.DensFluid", 1000);
-    P.put_if_unset<double>("Mat.ViscFluid", 0.001);
-    P.put_if_unset<double>("Mat.SmoothZone", 1e-05);
-    P.put_if_unset<DROPS::Point3DCL>("Exp.Gravity", DROPS::Point3DCL());
-    P.put_if_unset<std::string>("Restart.Inputfile", "none");
-}
-
 int main (int argc, char** argv)
 {
   try
   {
+
     DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/tests/f_Gamma/f_Gamma.json");
-    SetMissingParameters(P);
     std::cout << P << std::endl;
 
     DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );

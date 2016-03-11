@@ -476,6 +476,10 @@ void System2Accumulator_P2P1CL<CoeffT>::finalize_accumulation ()
 {
     mB_->Build();
     delete mB_;
+#ifndef _PAR
+        std::cout << B.num_nonzeros() << " nonzeros in B!";
+#endif
+        std::cout << '\n';
 }
 
 template< class CoeffT>
@@ -542,16 +546,20 @@ template <class CoeffT>
 void StokesP2P1CL<CoeffT>::SetupSystem2( MLMatDescCL* B, VecDescCL* c, double t) const
 // Set up matrix B and rhs c
 {
-    MLMatrixCL::iterator     itB   = B->Data.begin();
-    MLIdxDescCL::iterator    itRow = B->RowIdx->begin();
-    MLIdxDescCL::iterator    itCol = B->ColIdx->begin();
+    MLMatrixCL::iterator     itB    = B->Data.begin();
+    MLIdxDescCL::iterator    itRow  = B->RowIdx->begin();
+    MLIdxDescCL::iterator    itCol  = B->ColIdx->begin();
+    MLMatrixCL::iterator     itC    = C.Data.begin();
+    MLIdxDescCL::iterator    itCIdx = C.RowIdx->begin();
     if ( B->RowIdx->size() == 1 || B->ColIdx->size() == 1)
     { // setup B only on finest level, if row or column index has only 1 level
-        itCol = B->ColIdx->GetFinestIter();
-        itRow = B->RowIdx->GetFinestIter();
-        itB   = B->Data.GetFinestIter();
+        itCol  = B->ColIdx->GetFinestIter();
+        itRow  = B->RowIdx->GetFinestIter();
+        itB    = B->Data.GetFinestIter();
+        itC    = C.Data.GetFinestIter();
+        itCIdx = C.RowIdx->GetFinestIter();
     }
-    for (; itB!=B->Data.end() && itRow!=B->RowIdx->end() && itCol!=B->ColIdx->end(); ++itB, ++itRow, ++itCol)
+    for (; itB!=B->Data.end() && itRow!=B->RowIdx->end() && itCol!=B->ColIdx->end() && itC!=C.Data.end() && itCIdx!=C.RowIdx->end(); ++itB, ++itRow, ++itCol, ++itC, ++itCIdx)
     {
 #ifndef _PAR
         std::cout << "entering SetupSystem2: " << itRow->NumUnknowns() << " prs, " << itCol->NumUnknowns() << " vels. \n ";
@@ -561,6 +569,9 @@ void StokesP2P1CL<CoeffT>::SetupSystem2( MLMatDescCL* B, VecDescCL* c, double t)
 #ifndef _PAR
         std::cout << itB->num_nonzeros() << " nonzeros in B!" << std::endl;
 #endif
+        // creating zero matrix
+        const IdxT num_unks_pr = itCIdx->NumUnknowns();
+        itC->resize( num_unks_pr, num_unks_pr, 0 );
     }
 }
 

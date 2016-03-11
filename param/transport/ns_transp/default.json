@@ -1,0 +1,64 @@
+{
+    "VTK":
+    {
+        "ReUseTimeFile": "0",
+        "UseOnlyP1": "0",
+        "VTKOut": "0",
+        "VTKName": "ns_transp"
+    },
+    "Transp":
+    {
+        "DoTransp": "0",
+        "Levelset": "Ellipsoid",
+        "Flow": "ZeroVel",
+        "Rhs": "Zero",
+        "SolPos": "Zero",
+        "SolNeg": "Zero",
+        "InitialConcNeg": "IniCnegFct",
+        "InitialConcPos": "IniCposFct",
+        "BoundaryType": "21!21!21!21!21!21",
+        "BoundaryFncs": "Zero!Zero!Zero!Zero!Zero!Zero",
+        "BoundaryFncst": "Zero!Zero!Zero!Zero!Zero!Zero"
+    },
+    "SurfTransp":
+    {
+        "DoTransp": "0",
+        "Rhs": "Zero",
+        "Sol": "Zero"
+    },
+    "Ensight":
+    {
+        "EnsightOut": "0"
+    },
+    "NavStokes":
+    {
+        "Nonlinear": "0",
+        "Downwind":
+        {
+            "Frequency": "0",
+            "MaxRelComponentSize": "0.05",
+            "WeakEdgeRatio": "0.2",
+            "CrosswindLimit": "0.8660254037844387"
+        }
+    },
+    "Restart":
+    {
+        "Inputfile": "none"
+    },
+    "Levelset":
+    {
+        "Downwind":
+        {
+            "Frequency": "0",
+            "MaxRelComponentSize": "0.05",
+            "WeakEdgeRatio": "0.2",
+            "CrosswindLimit": "0.8660254037844387"
+        }
+    },
+    "General":
+    {
+        "ProgressBar": "0",
+        "DynamicLibsPrefix": "..\/"
+    }
+}
+

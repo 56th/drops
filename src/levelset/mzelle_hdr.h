@@ -304,13 +304,13 @@ void SolveStatProblem( StokesT& Stokes, LevelsetP2CL& lset,
     Stokes.SetupSystem1( &Stokes.A, &Stokes.M, &Stokes.b, &Stokes.b, &cplM, lset, Stokes.v.t);
     Stokes.SetupPrStiff( &Stokes.prA, lset);
     Stokes.SetupPrMass ( &Stokes.prM, lset);
-    Stokes.SetupSystem2( &Stokes.B, &Stokes.c, lset, Stokes.v.t);
+    Stokes.SetupSystem2( &Stokes.B, &Stokes.C, &Stokes.c, lset, Stokes.v.t);
     time.Stop();
     duration = time.GetTime();
     std::cout << "Discretizing took "<< duration << " sec.\n";
     time.Reset();
     Stokes.b.Data += curv.Data;
-    solver.Solve( Stokes.A.Data, Stokes.B.Data, Stokes.v, Stokes.p.Data, Stokes.b.Data, cplN, Stokes.c.Data, Stokes.vel_idx.GetEx(), Stokes.pr_idx.GetEx(), 1.0);
+    solver.Solve( Stokes.A.Data, Stokes.B.Data, Stokes.C.Data, Stokes.v, Stokes.p.Data, Stokes.b.Data, cplN, Stokes.c.Data, Stokes.vel_idx.GetEx(), Stokes.pr_idx.GetEx(), 1.0);
     time.Stop();
     duration = time.GetTime();
     std::cout << "Solving (Navier-)Stokes took "<<  duration << " sec.\n";
@@ -392,11 +392,23 @@ void SetInitialConditions(StokesT& Stokes, LevelsetP2CL& lset, MultiGridCL& MG, 
         PCGSolverCL<PcT> PCGsolver( pc, P.get<int>("Stokes.PcAIter"), P.get<double>("Stokes.PcATol"), true);
         typedef SolverAsPreCL<PCGSolverCL<PcT> > PCGPcT;
         PCGPcT apc( PCGsolver);
-        ISBBTPreCL bbtispc( &Stokes.B.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.M.Data.GetFinest(), Stokes.pr_idx.GetFinest(), 0.0, 1.0, P.get<double>("Stokes.PcSTol"), P.get<double>("Stokes.PcSTol"));
-        InexactUzawaCL<PCGPcT, ISBBTPreCL, APC_SYM> inexactuzawasolver( apc, bbtispc, P.get<int>("Stokes.OuterIter"), P.get<double>("Stokes.OuterTol"), 0.6, 50);
+        StokesSolverBaseCL *ssolver = 0;
+        if( Stokes.usesGhostPen() )
+        {
+            typedef BlockPreCL<ExpensivePreBaseCL, SchurPreBaseCL, LowerBlockPreCL>    LowerBlockPcT;
+            ISGhPenPreCL gpispc( &Stokes.prA.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.C.Data.GetFinest(), 0., 1., 1e-4, 1e-4, 200);
+            GCRSolverCL< LowerBlockPcT > gcrsolver( *(new LowerBlockPcT(apc, gpispc)),P.get<int>("Stokes.OuterIter"),P.get<int>("Stokes.OuterIter"),P.get<int>("Stokes.OuterTol") );
+            ssolver = new BlockMatrixSolverCL< GCRSolverCL<LowerBlockPcT> > ( gcrsolver );
+        }
+        else
+        {
+            ISBBTPreCL bbtispc( &Stokes.B.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.M.Data.GetFinest(), Stokes.pr_idx.GetFinest(), 0.0, 1.0, 1e-4, 1e-4);
+            ssolver = new InexactUzawaCL<PCGPcT, ISBBTPreCL, APC_SYM> ( apc, bbtispc, P.get<int>("Stokes.OuterIter"), P.get<double>("Stokes.OuterTol"), 0.6, 50);
+        }
 
-        NSSolverBaseCL<StokesT> stokessolver( Stokes, inexactuzawasolver);
+        NSSolverBaseCL<StokesT> stokessolver( Stokes, *ssolver);
         SolveStatProblem( Stokes, lset, stokessolver);
+        delete ssolver;
         //This block of code solves the stationary Stokes problem without considering surface tension.
 //        TimerCL time;
 //        VelVecDescCL curv( &Stokes.vel_idx);

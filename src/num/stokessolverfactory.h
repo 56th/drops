@@ -385,7 +385,7 @@ StokesSolverFactoryCL<StokesT, ProlongationVelT, ProlongationPT>::
         nopc_ (kA_,kM_),
         bbtispc_    ( &Stokes_.B.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(), &Stokes_.M.Data.GetFinest(), Stokes_.pr_idx.GetFinest(), kA_, kM_, P.get<double>("Stokes.PcSTol"), P.get<double>("Stokes.PcSTol") /* enable regularization: , 0.707*/),
         mincommispc_( 0, &Stokes_.B.Data.GetFinest(), &Stokes_.M.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(),Stokes_.pr_idx.GetFinest(), P.get<double>("Stokes.PcSTol") /* enable regularization: , 0.707*/),
-        bdinvbtispc_( 0, &Stokes_.B.Data.GetFinest(), &Stokes_.M.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(),Stokes_.pr_idx.GetFinest(), P.get<double>("Stokes.PcSTol") /* enable regularization: , 0.707*/),
+        bdinvbtispc_( 0, &Stokes_.B.Data.GetFinest(), &Stokes_.C.Data.GetFinest(), &Stokes_.M.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(),Stokes_.pr_idx.GetFinest(), P.get<double>("Stokes.PcSTol") /* enable regularization: , 0.707*/),
         vankaschurpc_( &Stokes.pr_idx), isprepc_( Stokes.prA.Data, Stokes.prM.Data, kA_, kM_),
         isgpkernpc_( &Stokes_.prA.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(), &Stokes_.C.Data.GetFinest(), Stokes_.cKernel, kA_, kM_, P.get<double>("Stokes.PcSTol"), P.get<double>("Stokes.PcSTol"), P.get<int>("Stokes.PcSIter",150), &std::cout),
         isgppc_( &Stokes_.prA.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(), &Stokes_.C.Data.GetFinest(), kA_, kM_, P.get<double>("Stokes.PcSTol"), P.get<double>("Stokes.PcSTol"), P.get<int>("Stokes.PcSIter",150) ),
@@ -467,6 +467,29 @@ bool StokesSolverFactoryCL<StokesT, ProlongationVelT, ProlongationPT>::ValidSolv
     else if (APc_ == GS_GMRes_APC)
         msg= "Gauss-Seidel is not available in parallel, yet";
 #endif
+    else if (Stokes_.UsesXFEM())
+    { // check whether solver is well-defined for XFEM
+        ok = true;
+        if (OseenSolver_ == StokesMGM_OS)
+        {
+            msg = "StokesMGM not implemented for P1X-elements";
+            ok  = false;
+        }
+        if (SPc_ == ISMG_SPC)
+        {
+            msg = "ISMGPreCL not implemented for P1X-elements";
+            ok  = false;
+        }
+/*
+        if( Stokes_.usesGhostPen() )
+        {
+            if( !( SPc_ == ISGhPen_SPC || SPc_ == ISGhPenKernel_SPC || SPc_ == DummyPre_SPC ) )
+            {
+                msg = StokesSolverInfoCL::GetSchurPreName( SPc_ ) + " not suited for Ghost Penalty stabilization";
+                ok = false;
+            }
+        }*/
+    }
     else // all tests passed successfully
         ok= true;
 
@@ -525,14 +548,6 @@ StokesSolverBaseCL* StokesSolverFactoryCL<StokesT, ProlongationVelT, Prolongatio
     PrintSolverInfo( std::cout);
     if (!ValidSolverCombination( &std::cout))
         throw DROPSErrCL("StokesSolverFactoryCL::CreateStokesSolver(): Invalid solver combination");
-
-    if (Stokes_.UsesXFEM())
-    { // check whether solver is well-defined for XFEM
-        if (OseenSolver_ == StokesMGM_OS)
-            throw DROPSErrCL("StokesMGM not implemented for P1X-elements");
-        if (SPc_ == ISMG_SPC)
-            throw DROPSErrCL("ISMGPreCL not implemented for P1X-elements");
-    }
 
     StokesSolverBaseCL* stokessolver = 0;
 

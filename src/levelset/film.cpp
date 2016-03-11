@@ -171,7 +171,7 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
         time.Reset();
         Stokes.SetupPrMass(  &Stokes.prM, lset/*, P.get<double>("Mat.ViscFluid"), C.mat_ViscGas*/);
         Stokes.SetupSystem1( &Stokes.A, &Stokes.M, &Stokes.b, &Stokes.b, &curv, lset, Stokes.v.t);
-        Stokes.SetupSystem2( &Stokes.B, &Stokes.c, lset, Stokes.v.t);
+        Stokes.SetupSystem2( &Stokes.B, &Stokes.C, &Stokes.c, lset, Stokes.v.t);
         curv.Clear( Stokes.v.t);
         lset.AccumulateBndIntegral( curv);
         time.Stop();
@@ -182,12 +182,25 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
         PCGSolverCL<SSORPcCL> PCGsolver( ssorpc, P.get<int>("Stokes.PcAIter"), P.get<double>("Stokes.PcATol"), true);
         typedef SolverAsPreCL<PCGSolverCL<SSORPcCL> > PCGPcT;
         PCGPcT apc( PCGsolver);
-        ISBBTPreCL bbtispc( &Stokes.B.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.M.Data.GetFinest(), Stokes.pr_idx.GetFinest(), 0.0, 1.0, P.get<double>("Stokes.PcSTol"), P.get<double>("Stokes.PcSTol"));
-        InexactUzawaCL<PCGPcT, ISBBTPreCL, APC_OTHER> inexactuzawasolver( apc, bbtispc, P.get<int>("Stokes.OuterIter"), P.get<double>("Stokes.OuterTol"), 0.6, 50);
-        inexactuzawasolver.Solve( Stokes.A.Data, Stokes.B.Data,
+        StokesSolverBaseCL *ssolver = 0;
+        if( Stokes.usesGhostPen() )
+        {
+            typedef BlockPreCL<ExpensivePreBaseCL, SchurPreBaseCL, LowerBlockPreCL>    LowerBlockPcT;
+            ISGhPenPreCL gpispc( &Stokes.prA.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.C.Data.GetFinest(), 0., 1., P.get<double>("Stokes.PcSTol"), P.get<double>("Stokes.PcSTol"), 200);
+            GCRSolverCL< LowerBlockPcT > gcrsolver( *(new LowerBlockPcT(apc, gpispc)),P.get<int>("Stokes.OuterIter"),P.get<int>("Stokes.OuterIter"),P.get<int>("Stokes.OuterTol") );
+            ssolver = new BlockMatrixSolverCL< GCRSolverCL<LowerBlockPcT> > ( gcrsolver );
+        }
+        else
+        {
+            ISBBTPreCL bbtispc( &Stokes.B.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.M.Data.GetFinest(), Stokes.pr_idx.GetFinest(), 0.0, 1.0, P.get<double>("Stokes.PcSTol"), P.get<double>("Stokes.PcSTol"));
+            ssolver = new InexactUzawaCL<PCGPcT, ISBBTPreCL, APC_OTHER> ( apc, bbtispc, P.get<int>("Stokes.OuterIter"), P.get<double>("Stokes.OuterTol"), 0.6, 50);
+        }
+        ssolver->Solve( Stokes.A.Data, Stokes.B.Data, Stokes.C.Data,
             Stokes.v.Data, Stokes.p.Data, Stokes.b.Data, Stokes.c.Data, Stokes.vel_idx.GetEx(), Stokes.pr_idx.GetEx());
+
         time.Stop();
         std::cout << "Solving Stokes for initial velocities took "<<time.GetTime()<<" sec.\n";
+        delete ssolver;
       } break;
 
       case 2: // Nusselt solution
@@ -414,41 +427,6 @@ void MarkLower (DROPS::MultiGridCL& mg, double y_max, DROPS::Uint maxLevel= ~0)
     }
 }
 
-/// \brief Set Default parameters here s.t. they are initialized.
-/// The result can be checked when Param-list is written to the output.
-void SetMissingParameters(DROPS::ParamCL& P){
-
-    P.put_if_unset<std::string>("VTK.TimeFileName",P.get<std::string>("VTK.VTKName"));
-    P.put_if_unset<int>("VTK.ReUseTimeFile",0);
-    P.put_if_unset<int>("VTK.UseDeformation",0);
-    P.put_if_unset<int>("VTK.UseOnlyP1",0);
-    P.put_if_unset<int>("VTK.AddP1XPressure",0);
-    P.put_if_unset<int>("VTK.AddDGOutput",0);
-    P.put_if_unset<int>("Transp.DoTransp",0);
-    P.put_if_unset<std::string>("Restart.Inputfile","none");
-    P.put_if_unset<int>("NavStokes.ShiftFrame", 0);
-    P.put_if_unset<int>("NavStokes.Downwind.Frequency", 0);
-    P.put_if_unset<double>("NavStokes.Downwind.MaxRelComponentSize", 0.05);
-    P.put_if_unset<double>("NavStokes.Downwind.WeakEdgeRatio", 0.2);
-    P.put_if_unset<double>("NavStokes.Downwind.CrosswindLimit", std::cos( M_PI/6.));
-    P.put_if_unset<int>("Levelset.Discontinuous", 0);
-    P.put_if_unset<int>("Levelset.Downwind.Frequency", 0);
-    P.put_if_unset<double>("Levelset.Downwind.MaxRelComponentSize", 0.05);
-    P.put_if_unset<double>("Levelset.Downwind.WeakEdgeRatio", 0.2);
-    P.put_if_unset<double>("Levelset.Downwind.CrosswindLimit", std::cos( M_PI/6.));
-
-    P.put_if_unset<std::string>("Exp.VolForce", "ZeroVel");
-    P.put_if_unset<double>("Mat.DensDrop", 0.0);
-    P.put_if_unset<double>("Mat.ShearVisco", 0.0);
-    P.put_if_unset<double>("Mat.DilatationalVisco", 0.0);
-    P.put_if_unset<double>("SurfTens.ShearVisco", 0.0);
-    P.put_if_unset<double>("SurfTens.DilatationalVisco", 0.0);
-    P.put_if_unset<std::string>("SurfTens.VarTensionFncs", "ConstTau");
-    P.put_if_unset<int>("Stokes.DirectSolve", 0);
-
-    P.put_if_unset<int>("General.ProgressBar", 0);
-    P.put_if_unset<std::string>("General.DynamicLibsPrefix", "../");
-}
 
 
 int main (int argc, char** argv)
@@ -456,7 +434,7 @@ int main (int argc, char** argv)
   try
   {
     DROPS::read_parameter_file_from_cmdline( P, argc, argv);
-    SetMissingParameters(P);
+    P.put_if_unset<std::string>("VTK.TimeFileName",P.get<std::string>("VTK.VTKName"));
     std::cout << P << std::endl;
 
     DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
@@ -515,7 +493,7 @@ int main (int argc, char** argv)
         }
     }
 
-    MyStokesCL prob( *mgp, P, DROPS::StokesBndDataCL( 6, bc, bnd_fun, bc_ls), DROPS::P1X_FE, P.get<double>("Stokes.XFEMStab"));
+    MyStokesCL prob( *mgp, P, DROPS::StokesBndDataCL( 6, bc, bnd_fun, bc_ls), DROPS::P1X_FE, P.get<double>("Stokes.XFEMStab"), DROPS::vecP2_FE, P.get<double>("Stokes.epsP",0.0));
 
     const DROPS::BoundaryCL& bnd= mgp->GetBnd();
     bnd.SetPeriodicBnd( bndType, periodic_match);
@@ -539,7 +517,7 @@ int main (int argc, char** argv)
     {
         DROPS::DistMarkingStrategyCL InitialMarker( DROPS::InScaMap::getInstance()[P.get("Ext.InitialLet", std::string("WavyFilm"))],
                                                     P.get<double>("AdaptRef.Width"), P.get<int>("AdaptRef.CoarsestLevel"),
-                                                    P.get<int>("AdaptRef.FinestLevel") ); 
+                                                    P.get<int>("AdaptRef.FinestLevel") );
         adap.set_marking_strategy( &InitialMarker );
         adap.MakeInitialTriang();
         adap.set_marking_strategy( 0 );

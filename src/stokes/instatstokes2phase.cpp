@@ -1657,10 +1657,24 @@ void computeLocalP2_gradpipj( LocalP2CL<> (&gradpipj)[4] ){
         }    
 }
 
+void computeFaceBary( Uint face, BaryCoordCL (&bary)[3] )
+{
+    int i = 0;
+    for( Uint j = 0; j < 4; ++j )
+    {
+        if( j == face )
+            continue;
+        BaryCoordCL tmp;
+        tmp[ j ] = 1;
+        bary[ i ] = tmp;
+        ++i;
+    }
+}
+
 /// \todo: As in SetupPrMass_P1X, replace the smoothed density-function with integration
 ///        over the inner and outer part.
 //ParamCL P;
-void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, MatrixCL& A_pr, IdxDescCL& RowIdx, IdxDescCL& ColIdx, const LevelsetP2CL& lset, double lambda=1.0)
+void SetupPrStiff_P1X(const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, MatrixCL& A_pr, IdxDescCL& RowIdx, IdxDescCL& ColIdx, const LevelsetP2CL& lset, const StokesVelBndDataCL &velbnd, double lambda=1.0)
 {
     ScopeTimerCL scope("SetupPrStiff_P1X");
 
@@ -1675,8 +1689,8 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
     IdxT UnknownIdx[4];
     bool sign[4];
     InterfaceTetraCL cut;
-    bool doAverage = P.get<bool>("Stokes.prA_average",0);
-    bool hansbo = P.get<bool>("Stokes.prA_hansbo",1);
+    bool doAverage = false;//P.get<bool>("Stokes.prA_average",0);
+    bool hansbo = true;//P.get<bool>("Stokes.prA_hansbo",1);
 
     const double rho_inv_p= 1./Coeff.rho(1.),
                  rho_inv_n= 1./Coeff.rho(-1.);
@@ -1708,6 +1722,7 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
         //redefined and set to zero for every tetrahedron
         double coupJump[4][4] = {};
         double coupAv[4][4] = {};
+        double coupNatBC[4][4] = {};
         double h = cbrt( 6 * sit->GetVolume() );
 
         locallset.assign( *sit, ls);
@@ -1721,6 +1736,8 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
         kappa1=kappa2=0.5;
         //double Vol_p, Vol_n;
         double kappa_p,kappa_n, alphaK;
+        kappa_p = kappa_n = 0.5;
+        alphaK = 1.;
 
 
         if (nocut) {
@@ -1747,6 +1764,54 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
             //initialize triangle for cut tetrahedron
             triang.Init( *sit, locallset);
 
+        }
+
+
+        //for a tetrahedron 3 faces could lie on a boundary
+        int natBcFaces[3] = {-1,-1,-1};
+        // check whether tet has boundary face
+        TetraCL tet = *sit;
+        int natBcIdx = 0;
+        for( Uint iFace = 0; iFace < NumFacesC; ++iFace )
+        {
+            if( tet.IsBndSeg( iFace ) )
+            {
+                if( velbnd.IsOnNatBnd( *tet.GetFace( iFace ) ) )
+                {
+                    natBcFaces[ natBcIdx ] = iFace;
+                    //std::cout << "\n\nnatBc\n";
+                    ++natBcIdx;
+                }
+            }
+        }
+        for( int k = 0; k < natBcIdx; ++k )
+        {
+            int natBcFace = natBcFaces[k];
+            //if( natBcFace >= 0 )
+            //{
+                BaryCoordCL faceBary[3];
+                computeFaceBary( natBcFace, faceBary );
+                const VertexCL* vert[3];
+                for (Uint i= 0; i < 3; ++i)
+                {
+                    vert[i]= tet.GetFace(natBcFace)->GetVertex( i);
+                }
+                double absDet2D = FuncDet2D( vert[1]->GetCoord()-vert[0]->GetCoord() ,
+                                             vert[2]->GetCoord()-vert[0]->GetCoord() );
+                double rhoInv = cut.GetSign( 0) == 1 ? rho_inv_p : rho_inv_n;
+
+                Quad5_2DCL<> natBcQuad;
+                for( int i = 0; i < 4; ++i )
+                {
+                    for( int j = 0; j <=i; ++j )
+                    {
+                        natBcQuad.assign( pipj[i][j], faceBary );
+                        coupNatBC[i][j] +=  rhoInv * natBcQuad.quad( absDet2D );
+                        //std::cout << "integral value: " << std::endl;
+                        coupNatBC[j][i] = coupNatBC[i][j];
+                    }
+                }
+            //}
         }
 
         // compute local matrices
@@ -1831,13 +1896,13 @@ void SetupPrStiff_P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
 
 
         }
-
+        double lamD = 10;//P.get<double>("Stokes.prA_lamd",10.0);
 
         // write values into matrix
         for(int i=0; i<4; ++i)
         {
             for(int j=0; j<4; ++j)
-                A(UnknownIdx[i], UnknownIdx[j])+= coup[j][i];
+                A(UnknownIdx[i], UnknownIdx[j])+= coup[j][i] + lamD/h * coupNatBC[j][i];
             if (nocut) continue; // extended basis functions have only support on tetra intersecting Gamma!
 
             const IdxT xidx_i= Xidx[UnknownIdx[i]];
@@ -2015,13 +2080,14 @@ void InstatStokes2PhaseP2P1CL::SetupC( MLMatDescCL* matC, const LevelsetP2CL& ls
     MLIdxDescCL::iterator itIdx = matC->RowIdx->begin();    
     for ( size_t lvl = 0; lvl < matC->Data.size(); ++lvl, ++itC, ++itIdx )
     {
-        if ( GetPrFE() == P1X_FE )
+        if ( GetPrFE() == P1X_FE && eps_p != 0.0 )
         {
             SetupPrGhostStab_P1X( MG_, Coeff_, *itC, *itIdx, lset, eps_p );
         }
         else
         { 
-            // Stabilisation is not defined for this type. Don't do anything.
+            // Stabilization is not defined for this type or stabilization is not activated.
+            // create empty matrix
             const IdxT num_unks_pr = itIdx->NumUnknowns();
             itC->clear();
             itC->resize( num_unks_pr, num_unks_pr, 0 );
@@ -2110,7 +2176,7 @@ void InstatStokes2PhaseP2P1CL::SetupPrStiff( MLMatDescCL* A_pr, const LevelsetP2
         case P1_FE:
             SetupPrStiff_P1( MG_, Coeff_, *itM, *itRowIdx, *itColIdx, lset); break;
         case P1X_FE:
-            SetupPrStiff_P1X( MG_, Coeff_, *itM, *itRowIdx, *itColIdx, lset, lambda); break;
+            SetupPrStiff_P1X( MG_, Coeff_, *itM, *itRowIdx, *itColIdx, lset, BndData_.Vel, lambda); break;
         case P1D_FE:
             SetupPrStiff_P1D( MG_, Coeff_, *itM, *itRowIdx, *itColIdx, lset); break;
         default:
@@ -2542,7 +2608,7 @@ class System1Accumulator_P2CL : public TetraAccumulatorCL
     double det, absdet;
     LocalP2CL<> ls_loc;
 
-    Quad2CL<Point3DCL> rhs;
+    Quad5CL<Point3DCL> rhs;
     Point3DCL loc_b[10], dirichlet_val[10]; ///< Used to transfer boundary-values from local_setup() update_global_system().
 
     ///\brief Computes the mapping from local to global data "n", the local matrices in loc and, if required, the Dirichlet-values needed to eliminate the boundary-dof from the global system.
@@ -2690,7 +2756,7 @@ class CplMAccumulator_P2CL : public TetraAccumulatorCL
     double det, absdet;
     LocalP2CL<> ls_loc;
 
-    Quad2CL<Point3DCL> rhs;
+    Quad5CL<Point3DCL> rhs;
     Point3DCL loc_b[10], dirichlet_val[10]; ///< Used to transfer boundary-values from local_setup() update_global_system().
 
     bool hasBoundary;
@@ -3433,7 +3499,7 @@ void SetupRhs1_P2( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_, co
     LocalNumbP2CL n;
     SMatrixCL<3,3> T;
 
-    Quad2CL<Point3DCL> rhs;
+    Quad5CL<Point3DCL> rhs;
     Quad2CL<double> Ones( 1.);
     LocalP2CL<> phi_i;
 
@@ -3507,7 +3573,7 @@ void SetupRhs1_P2R( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_, c
     const IdxDescCL& RowIdx= *b->RowIdx;
     const ExtIdxDescCL xidx= RowIdx.GetXidx();
 
-    Quad2CL<Point3DCL> rhs;
+    Quad5CL<Point3DCL> rhs;
     Quad2CL<double> Ones( 1.), kreuzterm;
     const double rho_p= Coeff_.rho( 1.0),
                  rho_n= Coeff_.rho( -1.0);
@@ -4147,7 +4213,7 @@ void InstatStokes2PhaseP2P1CL::SetupBS (MLMatDescCL* A, VecDescCL* cplA, const L
 }
 
 
-void InstatStokes2PhaseP2P1CL::SetupSystem2( MLMatDescCL* B, VecDescCL* c, const LevelsetP2CL& lset, double t) const
+void InstatStokes2PhaseP2P1CL::SetupSystem2(MLMatDescCL* B, MLMatDescCL *C, VecDescCL* c, const LevelsetP2CL& lset, double t) const
 // Set up matrix B and rhs c
 {
     MLMatrixCL::iterator     itB   = B->Data.begin();
@@ -4191,11 +4257,9 @@ void InstatStokes2PhaseP2P1CL::SetupSystem2( MLMatDescCL* B, VecDescCL* c, const
             }
         else
             throw DROPSErrCL("InstatStokes2PhaseP2P1CL<Coeff>::SetupSystem2 not implemented for this FE type");
-#ifndef _PAR
-        std::cout << itB->num_nonzeros() << " nonzeros in B!";
-#endif
-        std::cout << '\n';
     }
+
+    SetupC( C, lset, epsP );
 }
 
 MLTetraAccumulatorTupleCL&
@@ -4232,10 +4296,6 @@ InstatStokes2PhaseP2P1CL::system2_accu (MLTetraAccumulatorTupleCL& accus, MLMatD
             }
         else
             throw DROPSErrCL("InstatStokes2PhaseP2P1CL<Coeff>::system2_accu: not implemented for this velocity FE type");
-#ifndef _PAR
-        std::cout << itB->num_nonzeros() << " nonzeros in B!";
-#endif
-        std::cout << '\n';
     }
     return accus;
 }

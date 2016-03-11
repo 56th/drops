@@ -48,6 +48,7 @@ class NavierStokesP2P1CL : public StokesP2P1CL<Coeff>
     using                            base_::c;
     using                            base_::A;
     using                            base_::B;
+    using                            base_::C; //zero matrix
 
     typedef Coeff                     CoeffCL;
     typedef typename base_::BndDataCL BndDataCL;

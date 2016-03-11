@@ -109,7 +109,7 @@ StatStokesCL::StokesCoeffCL StatStokesCL::Coeff;
     \param pr_idx description of pressure DoF (only in parallel version)
 */
 template <typename Mat, typename Vec>
-void Solve(const Mat &A, const Mat &B, Vec &u, Vec &p, const Vec &b, const Vec &c,
+void Solve(const Mat &A, const Mat &B, const Mat &C, Vec &u, Vec &p, const Vec &b, const Vec &c,
            __UNUSED__ const IdxDescCL& vel_idx, __UNUSED__ const IdxDescCL& pr_idx,
            __UNUSED__ Mat& prM)
 {
@@ -145,7 +145,7 @@ void Solve(const Mat &A, const Mat &B, Vec &u, Vec &p, const Vec &b, const Vec &
 
     // Solve the linear equation system
     timer.Reset();
-    oseen.Solve( A, B, u, p, b, c, vel_idx.GetEx(), pr_idx.GetEx());
+    oseen.Solve( A, B, C, u, p, b, c, vel_idx.GetEx(), pr_idx.GetEx());
     timer.Stop();
 
     double realresid1, realresid2;
@@ -198,6 +198,7 @@ void Strategy( StokesP2P1CL<CoeffCL>& Stokes)
     Stokes.c.SetIdx( &Stokes.pr_idx);
     Stokes.A.SetIdx( &Stokes.vel_idx, &Stokes.vel_idx);
     Stokes.B.SetIdx( &Stokes.pr_idx, &Stokes.vel_idx);
+    Stokes.C.SetIdx( &Stokes.pr_idx, &Stokes.pr_idx);
 
     timer.Stop();
     std::cout << " o time " << timer.GetTime() << " s" << std::endl;
@@ -251,7 +252,7 @@ void Strategy( StokesP2P1CL<CoeffCL>& Stokes)
     // solve the linear equation system
     // -------------------------------------------------------------------------
     std::cout << line << "Solve the linear equation system ...\n";
-    Solve( Stokes.A.Data.GetFinest(), Stokes.B.Data.GetFinest(),
+    Solve( Stokes.A.Data.GetFinest(), Stokes.B.Data.GetFinest(), Stokes.C.Data.GetFinest(),
            Stokes.v.Data, Stokes.p.Data,
            Stokes.b.Data, Stokes.c.Data,
            Stokes.vel_idx.GetFinest(), Stokes.pr_idx.GetFinest(), prM.Data.GetFinest());

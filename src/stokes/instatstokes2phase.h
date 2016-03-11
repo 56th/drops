@@ -149,6 +149,7 @@ class InstatStokes2PhaseP2P1CL : public ProblemCL<TwoPhaseFlowCoeffCL, StokesBnd
 {
 private:
     void computeGhostPenaltyKernel(MultiGridCL& mg, const LevelsetP2CL& lset , const IdxDescCL &prIdx) const;
+    double epsP;           ///< ghost penalty stabilization parameter
 
   public:
     typedef ProblemCL<TwoPhaseFlowCoeffCL, StokesBndDataCL>       base_;
@@ -181,10 +182,10 @@ private:
     mutable VectorBaseCL<VectorCL> cKernel;
 
   public:
-    InstatStokes2PhaseP2P1CL( const MGBuilderCL& mgb, const TwoPhaseFlowCoeffCL& coeff, const BndDataCL& bdata, FiniteElementT prFE= P1_FE, double XFEMstab=0.1, FiniteElementT velFE= vecP2_FE)
-        : base_(mgb, coeff, bdata), vel_idx(velFE, 1, bdata.Vel, 0, XFEMstab), pr_idx(prFE, 1, bdata.Pr, 0, XFEMstab), cKernel(0) { }
-    InstatStokes2PhaseP2P1CL( MultiGridCL& mg, const TwoPhaseFlowCoeffCL& coeff, const BndDataCL& bdata, FiniteElementT prFE= P1_FE, double XFEMstab=0.1, FiniteElementT velFE= vecP2_FE)
-        : base_(mg, coeff, bdata),  vel_idx(velFE, 1, bdata.Vel, 0, XFEMstab), pr_idx(prFE, 1, bdata.Pr, 0, XFEMstab), cKernel(0) { }
+    InstatStokes2PhaseP2P1CL( const MGBuilderCL& mgb, const TwoPhaseFlowCoeffCL& coeff, const BndDataCL& bdata, FiniteElementT prFE= P1_FE, double XFEMstab=0.1, FiniteElementT velFE= vecP2_FE, double EpsP = 0.0 )
+        : base_(mgb, coeff, bdata), epsP(EpsP), vel_idx(velFE, 1, bdata.Vel, 0, XFEMstab), pr_idx(prFE, 1, bdata.Pr, 0, XFEMstab), cKernel(0) { }
+    InstatStokes2PhaseP2P1CL( MultiGridCL& mg, const TwoPhaseFlowCoeffCL& coeff, const BndDataCL& bdata, FiniteElementT prFE= P1_FE, double XFEMstab=0.1, FiniteElementT velFE= vecP2_FE, double EpsP = 0.0)
+        : base_(mg, coeff, bdata), epsP(EpsP),  vel_idx(velFE, 1, bdata.Vel, 0, XFEMstab), pr_idx(prFE, 1, bdata.Pr, 0, XFEMstab), cKernel(0) { }
 
     /// \name Numbering
     //@{
@@ -223,7 +224,7 @@ private:
     /// Set up the Boussinesq-Scriven Law of surface stress
     void SetupBS( MLMatDescCL* A, VecDescCL* cplA, const LevelsetP2CL& lset, double t) const;
     /// Set up matrix B and rhs c
-    void SetupSystem2( MLMatDescCL* B, VecDescCL* c, const LevelsetP2CL& lset, double t) const;
+    void SetupSystem2( MLMatDescCL* B, MLMatDescCL *C, VecDescCL* c, const LevelsetP2CL& lset, double t) const;
     MLTetraAccumulatorTupleCL& system2_accu (MLTetraAccumulatorTupleCL& accus, MLMatDescCL* B, VecDescCL* c, const LevelsetP2CL& lset, double t) const;
     /// Set up rhs c
     void SetupRhs2( VecDescCL* c, const LevelsetP2CL& lset, double t) const;
@@ -263,6 +264,12 @@ private:
     void GetPrOnPart( VecDescCL& p_part, const LevelsetP2CL& lset, bool posPart= true); // false = inner = Phi<0, true = outer = Phi>0
     /// Get CFL restriction for explicit time stepping
     double GetCFLTimeRestriction( LevelsetP2CL& lset);
+    /// check whether Ghost Penalty is used or not
+    bool usesGhostPen(){ return epsP > 0.0; }
+    /// get Ghost Penalty stabilization factor
+    double getGhPenStab(){ return epsP; }
+    /// set Ghost Penalty stabilization factor
+    void setGhPenStab( double EpsP ){ epsP = EpsP; }
 
 
     /// \name Evaluate Solution

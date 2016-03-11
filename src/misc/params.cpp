@@ -147,20 +147,112 @@ template <typename T, Uint Size>
 
 void read_parameter_file_from_cmdline (ParamCL& P, int argc, char **argv, std::string default_file)
 {
-    if (argc == 1) {
+    // first read default parameters from default.json, searching in 1.) local directory or 2.) path from default_file
+    bool fail= true;
+    std::string default_params= default_file.substr( 0, default_file.rfind( "/", default_file.size() )) + "/default.json";
+    for (int i=0; i<2 && fail; ++i) {
+        std::string fil= i==0 ? "default.json" : default_params;
+        std::ifstream test_if_default_exists( fil.c_str());
+        if (test_if_default_exists) {
+            test_if_default_exists.close();
+            fail= false;
+            P.read_json( fil);
+        }
+    }
+    if (fail)
+        throw DROPSErrCL("read_parameter_file_from_cmdline: Unable to read default parameters from './default.json' and '"
+                + default_params + "'\n");
+    
+    // then read parameters from JSON file specified on command line (otherwise use default_file)
+    boost::property_tree::ptree params;
+    if ( (argc == 1) || (argv[1][0] == '-') ) { // no file specified on command line
         if (default_file == std::string())
             throw DROPSErrCL(
                 "read_parameter_file_from_cmdline: You must specify a parameter file on the command line.\n"
                 "        " + std::string( argv[0]) + " <path_to_parameter_file>\n");
-        std::cout << "Using default parameter file '" << default_file << "'." << std::endl;
-        P.read_json( default_file);
+        std::cout << "Using fall-back parameter file '" << default_file << "'." << std::endl;
+        boost::property_tree::read_json( default_file, params);
     }
     else {
-        std::cout << "Using  parameter file '" << argv[1] << "'." << std::endl;
-        P.read_json( argv[1]);
+        std::cout << "Using parameter file '" << argv[1] << "'." << std::endl;
+        boost::property_tree::read_json( argv[1], params);
+    }
+    update_parameters( params, P);
+
+    // finally, read parameters from command line specified by --add-param
+    apply_parameter_modifications_from_cmdline( P, argc, argv);
+}
+
+
+void aux_update(const boost::property_tree::ptree& pt, ParamCL& P, std::string key, boost::property_tree::ptree& make_array)
+{
+    using boost::property_tree::ptree;
+    std::string path;
+
+    if (!key.empty())
+        key+= ".";
+
+    for (ptree::const_iterator it = pt.begin(); it != pt.end(); ++it) {
+        path= key + it->first;
+        if (path == key) { // json array
+	        path.erase( path.size()-1, 1);
+            make_array.push_back( *it);
+            P.put_child( path, make_array);
+        }
+        else {
+            if (!make_array.empty())
+                make_array = ptree();
+
+            P.put( path, it->second.data());
+        }
+
+        aux_update( it->second, P, path, make_array);
     }
 }
 
+void update_parameters(const boost::property_tree::ptree& pt, ParamCL& P)
+{
+    boost::property_tree::ptree make_array;
+
+    aux_update(pt,P,std::string(),make_array);
+}
+
+
+void apply_parameter_modifications_from_cmdline (ParamCL& P, int argc, char **argv)
+  /** Allows to apply changes to the property tree using the command line, without having to change the .json file.
+      Usage: --add-param '{"path_to_node":value}'
+             --add-param '...some data in JSON format...'
+      Note: use enclosing single quotation marks to prevent the shell from parsing. */
+{
+    int param_pos = 0;
+
+    for(int i = 1; i < argc && !param_pos; i++) {
+
+        if (std::string (argv[i]) == "--add-param") {
+
+            param_pos = i;
+            break;
+        }
+    }
+
+    if (param_pos) {
+
+        boost::property_tree::ptree changes;
+        std::stringstream input;
+
+        for(int i = param_pos+1; i<argc; i++)
+            input << argv[i];
+
+        try {
+            boost::property_tree::read_json(input,changes);
+        } catch (boost::property_tree::ptree_error& e) {
+              throw DROPSParamErrCL( "ParamCL::apply_parameter_modifications_from_cmdline: Error while reading from command line.\n" + std::string(e.what()) + '\n');
+        }
+        update_parameters(changes,P);
+
+    }
+
+}
 
   // =====================================================
   //                    ReadParamsCL

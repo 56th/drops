@@ -754,7 +754,7 @@ void STTransportVolumeAccumulator_P1SP1TXCL::local_setup (const TetraCL& sit)
         {
             const double h = std::pow(absdet,1.0/3.0);
             // const double g1 = (2.0/dt)*(2.0/dt) + (2*vmax/h)*(2*vmax/h)+9*(4*alpha/(h*h))*(4*alpha/(h*h));
-            const double g1 = (2*vmax/h)*(2*vmax/h);
+            // const double g1 = (2*vmax/h)*(2*vmax/h); // unused
             const double gT = 2* h/vmax;
 
             if (2 * vmax  * h > alpha)

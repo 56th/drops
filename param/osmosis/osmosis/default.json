@@ -1,0 +1,27 @@
+{
+    "Restart":
+    {
+        "Inputfile": "none"
+    },
+    "Exp":
+    {
+        "RadInlet": "1",
+        "RadDrop": "1 1 1 ",
+        "PosDrop": "1 1 1 "
+    },
+    "Levelset":
+    {
+        "CurvDiff": "-1",
+        "SD": "1"
+    },
+    "Transp":
+    {
+        "UseNSSol": "0"
+    },
+    "VTK":
+    {
+        "ReUseTimeFile": "0",
+        "UseOnlyP1": "0"
+    }
+}
+

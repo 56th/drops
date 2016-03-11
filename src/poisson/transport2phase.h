@@ -142,7 +142,7 @@ class TransportRepairCL : public MGObserverCL
   private:
     TransportP1CL& c_;
     MultiGridCL& mg_;
-    std::auto_ptr<RepairP1CL<double>::type > p1repair_;
+    std::unique_ptr<RepairP1CL<double>::type > p1repair_;
 
   public:
     TransportRepairCL (TransportP1CL& c, MultiGridCL& mg)
