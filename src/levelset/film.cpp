@@ -132,6 +132,7 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
 
     lset.CreateNumbering(      MG.GetLastLevel(), lidx, periodic_match);
     lset.Phi.SetIdx( lidx);
+    // lset.SetSurfaceForce( SF_ImprovedLBVar); // This line of code has been used in twophasedrops.cpp and makes some difference of results.
     DROPS::instat_scalar_fun_ptr DistanceFct = DROPS::InScaMap::getInstance()[P.get("Exp.InitialLSet", std::string("WavyFilm"))];
     lset.Init( DistanceFct);
     if ( StokesSolverFactoryHelperCL().VelMGUsed(P))
@@ -183,7 +184,6 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
         PCGPcT apc( PCGsolver);
         ISBBTPreCL bbtispc( &Stokes.B.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.M.Data.GetFinest(), Stokes.pr_idx.GetFinest(), 0.0, 1.0, P.get<double>("Stokes.PcSTol"), P.get<double>("Stokes.PcSTol"));
         InexactUzawaCL<PCGPcT, ISBBTPreCL, APC_OTHER> inexactuzawasolver( apc, bbtispc, P.get<int>("Stokes.OuterIter"), P.get<double>("Stokes.OuterTol"), 0.6, 50);
-
         inexactuzawasolver.Solve( Stokes.A.Data, Stokes.B.Data,
             Stokes.v.Data, Stokes.p.Data, Stokes.b.Data, Stokes.c.Data, Stokes.vel_idx.GetEx(), Stokes.pr_idx.GetEx());
         time.Stop();
@@ -293,7 +293,7 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
 
     // Level-Set-Solver
 #ifndef _PAR
-    typedef GMResSolverCL<SSORPcCL> LsetSolverT;
+    typedef GMResSolverCL<SSORPcCL> LsetSolverT; // In twophasedrops.cpp, the Gauss-Seidel preconditioner is used;
     SSORPcCL ssorpc;
     LsetSolverT* gm = new LsetSolverT( ssorpc, 100, P.get<int>("Levelset.Iter"), P.get<double>("Levelset.Tol"));
 #else

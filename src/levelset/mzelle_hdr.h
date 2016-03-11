@@ -381,7 +381,7 @@ void SetInitialConditions(StokesT& Stokes, LevelsetP2CL& lset, MultiGridCL& MG, 
         break;
       case 1: // stationary flow
       {
-       /* Stokes.UpdateXNumbering( pidx, lset);
+        Stokes.UpdateXNumbering( pidx, lset);
         Stokes.p.SetIdx( pidx);
 #ifdef _PAR
         typedef JACPcCL PcT;
@@ -389,37 +389,37 @@ void SetInitialConditions(StokesT& Stokes, LevelsetP2CL& lset, MultiGridCL& MG, 
         typedef SSORPcCL PcT;
 #endif
         PcT pc;
-        PCGSolverCL<PcT> PCGsolver( pc, 200, 1e-4, true);
+        PCGSolverCL<PcT> PCGsolver( pc, P.get<int>("Stokes.PcAIter"), P.get<double>("Stokes.PcATol"), true);
         typedef SolverAsPreCL<PCGSolverCL<PcT> > PCGPcT;
         PCGPcT apc( PCGsolver);
-        ISBBTPreCL bbtispc( &Stokes.B.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.M.Data.GetFinest(), Stokes.pr_idx.GetFinest(), 0.0, 1.0, 1e-4, 1e-4);
+        ISBBTPreCL bbtispc( &Stokes.B.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.M.Data.GetFinest(), Stokes.pr_idx.GetFinest(), 0.0, 1.0, P.get<double>("Stokes.PcSTol"), P.get<double>("Stokes.PcSTol"));
         InexactUzawaCL<PCGPcT, ISBBTPreCL, APC_SYM> inexactuzawasolver( apc, bbtispc, P.get<int>("Stokes.OuterIter"), P.get<double>("Stokes.OuterTol"), 0.6, 50);
 
         NSSolverBaseCL<StokesT> stokessolver( Stokes, inexactuzawasolver);
-        SolveStatProblem( Stokes, lset, stokessolver);*/
-        TimerCL time;
-        VelVecDescCL curv( &Stokes.vel_idx);
-        time.Reset();
-        Stokes.SetupPrMass(  &Stokes.prM, lset/*, P.get<double>("Mat.ViscFluid"), C.mat_ViscGas*/);
-        Stokes.SetupSystem1( &Stokes.A, &Stokes.M, &Stokes.b, &Stokes.b, &curv, lset, Stokes.v.t);
-        Stokes.SetupSystem2( &Stokes.B, &Stokes.c, lset, Stokes.v.t);
-        curv.Clear( Stokes.v.t);
-        lset.AccumulateBndIntegral( curv);
-        time.Stop();
-        std::cout << "Discretizing Stokes/Curv for initial velocities took "<<time.GetTime()<<" sec.\n";
-
-        time.Reset();
-        SSORPcCL ssorpc;
-        PCGSolverCL<SSORPcCL> PCGsolver( ssorpc, P.get<int>("Stokes.PcAIter"), P.get<double>("Stokes.PcATol"), true);
-        typedef SolverAsPreCL<PCGSolverCL<SSORPcCL> > PCGPcT;
-        PCGPcT apc( PCGsolver);
-        ISBBTPreCL bbtispc( &Stokes.B.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.M.Data.GetFinest(), Stokes.pr_idx.GetFinest(), 0.0, 1.0, P.get<double>("Stokes.PcSTol"), P.get<double>("Stokes.PcSTol"));
-        InexactUzawaCL<PCGPcT, ISBBTPreCL, APC_OTHER> inexactuzawasolver( apc, bbtispc, P.get<int>("Stokes.OuterIter"), P.get<double>("Stokes.OuterTol"), 0.6, 50);
-
-        inexactuzawasolver.Solve( Stokes.A.Data, Stokes.B.Data,
-            Stokes.v.Data, Stokes.p.Data, Stokes.b.Data, Stokes.c.Data, Stokes.vel_idx.GetEx(), Stokes.pr_idx.GetEx());
-        time.Stop();
-        std::cout << "Solving Stokes for initial velocities took "<<time.GetTime()<<" sec.\n";
+        SolveStatProblem( Stokes, lset, stokessolver);
+        //This block of code solves the stationary Stokes problem without considering surface tension.
+//        TimerCL time;
+//        VelVecDescCL curv( &Stokes.vel_idx);
+//        time.Reset();
+//        Stokes.SetupPrMass(  &Stokes.prM, lset/*, P.get<double>("Mat.ViscFluid"), C.mat_ViscGas*/);
+//        Stokes.SetupSystem1( &Stokes.A, &Stokes.M, &Stokes.b, &Stokes.b, &curv, lset, Stokes.v.t);
+//        Stokes.SetupSystem2( &Stokes.B, &Stokes.c, lset, Stokes.v.t);
+//        curv.Clear( Stokes.v.t);
+//        lset.AccumulateBndIntegral( curv);
+//        time.Stop();
+//        std::cout << "Discretizing Stokes/Curv for initial velocities took "<<time.GetTime()<<" sec.\n";
+//
+//        time.Reset();
+//        SSORPcCL ssorpc;
+//        PCGSolverCL<SSORPcCL> PCGsolver( ssorpc, P.get<int>("Stokes.PcAIter"), P.get<double>("Stokes.PcATol"), true);
+//        typedef SolverAsPreCL<PCGSolverCL<SSORPcCL> > PCGPcT;
+//        PCGPcT apc( PCGsolver);
+//        ISBBTPreCL bbtispc( &Stokes.B.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.M.Data.GetFinest(), Stokes.pr_idx.GetFinest(), 0.0, 1.0, P.get<double>("Stokes.PcSTol"), P.get<double>("Stokes.PcSTol"));
+//        InexactUzawaCL<PCGPcT, ISBBTPreCL, APC_OTHER> inexactuzawasolver( apc, bbtispc, P.get<int>("Stokes.OuterIter"), P.get<double>("Stokes.OuterTol"), 0.6, 50);
+//        inexactuzawasolver.Solve( Stokes.A.Data, Stokes.B.Data,
+//            Stokes.v.Data, Stokes.p.Data, Stokes.b.Data, Stokes.c.Data, Stokes.vel_idx.GetEx(), Stokes.pr_idx.GetEx());
+//        time.Stop();
+//        std::cout << "Solving Stokes for initial velocities took "<<time.GetTime()<<" sec.\n";
       } break;
       case  2: //flow without droplet
           Stokes.UpdateXNumbering( pidx, lset);
