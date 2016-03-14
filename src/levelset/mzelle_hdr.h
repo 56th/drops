@@ -224,11 +224,15 @@ template<class LevelSetSolverT>
 TimeDisc2PhaseCL* CreateTimeDisc( InstatNavierStokes2PhaseP2P1CL& Stokes, LevelsetP2CL& lset,
     NSSolverBaseCL<InstatNavierStokes2PhaseP2P1CL>* stokessolver, LevelSetSolverT* lsetsolver, ParamCL& P, LevelsetModifyCL& lsetmod)
 {
-    if (P.get<int>("Time.NumSteps") == 0) return 0;
+    int numSteps        = P.get<int>("Time.NumSteps");
+
+    if( numSteps == 0)
+        return 0;
 
     double theta        = P.get<double>("Time.Theta");
     double lsTheta      = theta;
-    double stepSize     = P.get<double>("Time.StepSize");
+    double tEnd         = P.get<double>("Time.TEnd");
+    double stepSize     = tEnd / numSteps;
     double implLB       = P.get<double>("CouplingSolver.ImplLB");
     double couplingTol  = P.get<double>("CouplingSolver.Tol");
     double couplingProj = P.get<double>("CouplingSolver.Projection");
@@ -328,13 +332,15 @@ void SolveStatProblem( StokesT& Stokes, LevelsetP2CL& lset,
 
 bool ReadInitialConditionFromFile( const ParamCL &P )
 {
-    if( P.exists("Restart.InputData") )
+    if( P.exists( std::string("Restart.InputData")) )
     {
         std::string inputDat = P.get<std::string>("Restart.InputData");
-        if( inputDat == "" || inputDat == "none" )
+        if( inputDat.empty() || inputDat == "none" )
             return false;
+
+        return true;
     }
-    return true;
+    return false;
 }
 
 void SetInitialLevelsetConditions( LevelsetP2CL& lset, MultiGridCL& MG, ParamCL& P)

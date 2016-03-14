@@ -380,7 +380,7 @@ template <class StokesT, class ProlongationVelT, class ProlongationPT>
 StokesSolverFactoryCL<StokesT, ProlongationVelT, ProlongationPT>::
     StokesSolverFactoryCL(StokesT& Stokes, ParamCL& P, ParamCL& PBase)
     : base_(Stokes, P),
-        kA_(PBase.get<int>("Time.NumSteps") != 0 ? 1.0/PBase.get<double>("Time.StepSize") : 0.0), // P.get<int>("Time.NumSteps") == 0: stat. problem
+        kA_(PBase.get<int>("Time.NumSteps") != 0 ? PBase.get<double>("Time.NumSteps")/PBase.get<double>("Time.TEnd") : 0.0), // P.get<int>("Time.NumSteps") == 0: stat. problem
         kM_(PBase.get<double>("Time.Theta")),
         // schur complement preconditioner        
         nopc_ (kA_,kM_),

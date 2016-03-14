@@ -234,8 +234,8 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     TransportP1CL * massTransp = NULL;
     TransportRepairCL *  transprepair = NULL;
 
-    //if (P.get<int>("Transp.DoTransp"))
-    if( P.exists("Transp") )
+    if (P.get<int>("Transp.DoTransp"))
+    //if( P.exists("Transp") )
     {
         // CL: the following could be moved outside of strategy to some function like
         //" InitializeMassTransport(P,MG,Stokes,lset,adap, TransportP1CL * & massTransp,TransportRepairCL * & transprepair)"
@@ -258,7 +258,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         massTransp->CreateNumbering( MG.GetLastLevel(), cidx);
         massTransp->ct.SetIdx( cidx);
         //if (P.get<int>("DomainCond.InitialCond") != -1)
-        if( ReadInitialConditionFromFile(P) )
+        if( !ReadInitialConditionFromFile(P) )
             massTransp->Init( inscamap["Initialcneg"], inscamap["Initialcpos"]);
         else
             ReadFEFromFile( massTransp->ct, MG, P.get<std::string>("Restart.InputData")+"concentrationTransf");
