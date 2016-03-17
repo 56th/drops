@@ -104,6 +104,7 @@ class TwoPhaseFlowCoeffCL
 
     TwoPhaseFlowCoeffCL( ParamCL& P, bool dimless = false)
       //big question: film or measurecell? 1: measure, 2: film
+      //If we merge film.cpp and twophasedrops.cpp, we don't need film flag anymore.
         : film( (P.get<double>("Mat.DensDrop") == 0.0) ),
         ns_shiftframe( (P.get<int>("NavStokes.ShiftFrame", 0) == 1) ),
         surfTens( film ? P.get<double>("Mat.SurfTension") : P.get<double>("SurfTens.SurfTension")),

@@ -409,7 +409,7 @@ void SetInitialConditions(StokesT& Stokes, LevelsetP2CL& lset, MultiGridCL& MG, 
         NSSolverBaseCL<StokesT> stokessolver( Stokes, *ssolver);
         SolveStatProblem( Stokes, lset, stokessolver);
         delete ssolver;
-        //This block of code solves the stationary Stokes problem without considering surface tension.
+//--------This block of code solves the stationary Stokes problem without considering surface tension.
 //        TimerCL time;
 //        VelVecDescCL curv( &Stokes.vel_idx);
 //        time.Reset();
@@ -432,6 +432,7 @@ void SetInitialConditions(StokesT& Stokes, LevelsetP2CL& lset, MultiGridCL& MG, 
 //            Stokes.v.Data, Stokes.p.Data, Stokes.b.Data, Stokes.c.Data, Stokes.vel_idx.GetEx(), Stokes.pr_idx.GetEx());
 //        time.Stop();
 //        std::cout << "Solving Stokes for initial velocities took "<<time.GetTime()<<" sec.\n";
+//---------------------------------------------------------------------------------------------------
       } break;
       case  2: //flow without droplet
           Stokes.UpdateXNumbering( pidx, lset);
