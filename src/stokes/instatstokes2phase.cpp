@@ -2285,10 +2285,10 @@ struct LocalIntegrals_P2CL
 /// \brief Update the local system 1 due to special (cut) boundary conditions: slip Bnd and symmetric Bnd;
 class SpecialBndHandler_System1TwoPhaseP2CL
 {
-	private:
-	const PrincipalLatticeCL& lat;
+  private:
+    const PrincipalLatticeCL& lat;
     const StokesBndDataCL& BndData_;
-    
+
     const VecDescCL&    Phi_;
     const BndDataCL<>& lsetbnd_;
     InterfaceTriangleCL triangle;
@@ -2296,21 +2296,22 @@ class SpecialBndHandler_System1TwoPhaseP2CL
     instat_vector_fun_ptr outnormal_;//outnormal of the domain boundary
 
     bool SpeBnd; //special boundary condition
-	const double mu1_, mu2_;                                //dynamic viscosities
-	const double beta1_, beta2_;                            //Slip length, beta1_=beta2_=0 for symmetric Bnd;
-	const double alpha_;                                    //Coefficient for Nitche method
-	LocalP1CL<Point3DCL> Grad[10], GradRef[10];
-	LocalP2CL<> p2;
+    const double mu1_, mu2_;                                //dynamic viscosities
+    const double beta1_, beta2_;                            //Slip length, beta1_=beta2_=0 for symmetric Bnd;
+    const double betaL_; 
+    const double alpha_;                                    //Coefficient for Nitche method
+    LocalP1CL<Point3DCL> Grad[10], GradRef[10];
+    LocalP2CL<> p2;
 
     std::valarray<double> ls_loc;
     BndTriangPartitionCL partition;
     QuadDomainCL q5dom;
-	Point3DCL normal;
-	GridFunctionCL<double>   basisP2[10];
+    Point3DCL normal;
+    GridFunctionCL<double>   basisP2[10];
     GridFunctionCL<double>   gradP1[10];
   public:	
-	SpecialBndHandler_System1TwoPhaseP2CL(const StokesBndDataCL& BndData, const VecDescCL& Phi, const BndDataCL<>& lsetbnd, instat_vector_fun_ptr outnormal, double mu1, double mu2, const double beta1=0, const double beta2=0, const double alpha=0)
-	: lat( PrincipalLatticeCL::instance( 2)), BndData_(BndData), Phi_(Phi), lsetbnd_(lsetbnd), outnormal_(outnormal), mu1_(mu1), mu2_(mu2), beta1_(beta1), beta2_(beta2), alpha_(alpha), ls_loc( lat.vertex_size())
+	SpecialBndHandler_System1TwoPhaseP2CL(const StokesBndDataCL& BndData, const VecDescCL& Phi, const BndDataCL<>& lsetbnd, instat_vector_fun_ptr outnormal, double mu1, double mu2, const double beta1=0, const double beta2=0, const double betaL=0, const double alpha=0)
+	: lat( PrincipalLatticeCL::instance( 2)), BndData_(BndData), Phi_(Phi), lsetbnd_(lsetbnd), outnormal_(outnormal), mu1_(mu1), mu2_(mu2), beta1_(beta1), beta2_(beta2), betaL_(betaL), alpha_(alpha), ls_loc( lat.vertex_size())
     { P2DiscCL::GetGradientsOnRef( GradRef); }
 
     double mu  (int sign) const { return sign > 0 ?  mu1_  : mu2_; }
@@ -2432,6 +2433,8 @@ void SpecialBndHandler_System1TwoPhaseP2CL::setupRhs(const TetraCL& tet, Point3D
 	}	
 }
 
+
+//For the case beta_L =/= 0
 void SpecialBndHandler_System1TwoPhaseP2CL::CLdiss(const TetraCL& tet, LocalSystem1DataCL& loc)
 {
     bool SpeBnd=false;
@@ -2492,17 +2495,15 @@ void SpecialBndHandler_System1TwoPhaseP2CL::CLdiss(const TetraCL& tet, LocalSyst
                 for(Uint j=0; j<=i; ++j)
                 {
                     //5 points Gauss–Legendre quadrature is used.
-                    for(int m =0; m<3; m++)
-                        for(int n=0; n<3; n++)
-                            /*for (int v=0; v<5; v++)
+                    for(int m =0; m<3; m++){
+                        for(int n=0; n<3; n++){
+                            for (int v=0; v<5; v++)
                             {
                                 dm[j][i](m, n) += weight[v]*phi[i](quadBarys[v])*phi[j](quadBarys[v])*normal_mcl[v][m]*normal_mcl[v][n];      
-                            }*/
-                        for (int v=0; v<5; v++)
-                        {
-                            dm[j][i](m, m) += weight[v]*phi[i](quadBarys[v])*phi[j](quadBarys[v]);      
+                            }
                         }
-                    dm[j][i] = length/2*beta1_*dm[j][i];
+                    }
+                    dm[j][i] = 0.5*length*betaL_*dm[j][i];
                     loc.Ak[j][i] += dm[j][i];
                     if (i != j){
                         assign_transpose( dm[i][j], dm[j][i]);
@@ -2694,7 +2695,7 @@ System1Accumulator_P2CL::System1Accumulator_P2CL (const TwoPhaseFlowCoeffCL& Coe
       RowIdx( RowIdx_), A( A_), M( M_), cplA( cplA_), cplM( cplM_), b( b_),
       local_twophase( Coeff.mu( 1.0), Coeff.mu( -1.0), Coeff.rho( 1.0), Coeff.rho( -1.0), Coeff.volforce),
 	  speBndHandler1(BndData_, Coeff.alpha),
-	  speBndHandler2(BndData_, lset_Phi, lset_Bnd, Coeff.Bndoutnormal, Coeff.mu( 1.0), Coeff.mu( -1.0), Coeff.beta(1.0), Coeff.beta(-1.0), Coeff.alpha)
+	  speBndHandler2(BndData_, lset_Phi, lset_Bnd, Coeff.Bndoutnormal, Coeff.mu( 1.0), Coeff.mu( -1.0), Coeff.beta(1.0), Coeff.beta(-1.0), Coeff.betaL, Coeff.alpha)
 {}
 
 void System1Accumulator_P2CL::begin_accumulation ()
@@ -2761,8 +2762,8 @@ void System1Accumulator_P2CL::local_setup (const TetraCL& tet)
     else{
         local_twophase.setup( T, absdet, tet, ls_loc, t, locInt, loc);
         if(speBnd){
-        	speBndHandler2.setup(tet, T, ls_loc, loc); //update loc for special boundary condtion
-           //speBndHandler2.CLdiss(tet, loc);
+            speBndHandler2.setup(tet, T, ls_loc, loc); //update loc for special boundary condtion
+            speBndHandler2.CLdiss(tet, loc);
         }
     }
 		
