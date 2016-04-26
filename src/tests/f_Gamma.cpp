@@ -303,7 +303,7 @@ void Compare_LaplBeltramiSF_ConstSF( InstatStokes2PhaseP2P1CL& Stokes, const Lse
     Stokes.SetupSystem1( &Stokes.A, &Stokes.M, &Stokes.b, &Stokes.b, &Stokes.b, lset, 0.);
 
     f_LaplBeltrami.Clear( Stokes.v.t);
-    lset.SetSurfaceForce( SF_ImprovedLB);
+    lset.SetSurfaceForce( SF_ImprovedLBVar);
 //     lset.SetSurfaceForce( SF_LB);
     lset.AccumulateBndIntegral( f_LaplBeltrami);
 

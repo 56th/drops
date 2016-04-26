@@ -132,7 +132,6 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
 
     lset.CreateNumbering(      MG.GetLastLevel(), lidx, periodic_match);
     lset.Phi.SetIdx( lidx);
-    // lset.SetSurfaceForce( SF_ImprovedLBVar); // This line of code has been used in twophasedrops.cpp and makes some difference of results.
     DROPS::instat_scalar_fun_ptr DistanceFct = DROPS::InScaMap::getInstance()[P.get("Exp.InitialLSet", std::string("WavyFilm"))];
     lset.Init( DistanceFct);
     if ( StokesSolverFactoryHelperCL().VelMGUsed(P))

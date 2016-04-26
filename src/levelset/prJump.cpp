@@ -278,7 +278,7 @@ void Assemble( StokesT& Stokes, LevelsetP2CL& lset, VelVecDescCL& rhs )
     if (P.get<int>("SurfTens.ArtificialForce"))
         lset.SetSurfaceForce( SF_Const );
     else
-        lset.SetSurfaceForce( SF_ImprovedLB );
+        lset.SetSurfaceForce( SF_ImprovedLBVar);
 
     lset.AccumulateBndIntegral( rhs );
 

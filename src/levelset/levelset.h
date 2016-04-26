@@ -51,7 +51,6 @@ enum SurfaceForceT
 /// different types of surface forces
 {
     SF_LB=0,             ///< Laplace-Beltrami discretization: \f$\mathcal O(h^{1/2})\f$
-    SF_ImprovedLB=1,     ///< improved Laplace-Beltrami discretization: \f$\mathcal O(h)\f$
     SF_Const=2,          ///< surface force with constant curvature
     SF_ImprovedLBVar=3   ///< improved Laplace-Beltrami discretization with variable surface tension
 };
@@ -108,7 +107,7 @@ class LevelsetP2CL : public ProblemCL< LevelsetCoeffCL, LsetBndDataCL>
 
 LevelsetP2CL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, FiniteElementT fetype, double SD= 0, double curvDiff= -1)
     : base_( mg, LevelsetCoeffCL(), bnd), idx(fetype), idxC(NULL), MLPhi( &idx), PhiC(NULL), curvDiff_( curvDiff), SD_( SD),
-        SF_(SF_ImprovedLB), sf_(sf), perDirections(NULL), IsDG(false)
+        SF_(SF_ImprovedLBVar), sf_(sf), perDirections(NULL), IsDG(false)
     {}
 
     virtual ~LevelsetP2CL(){

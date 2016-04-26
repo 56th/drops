@@ -163,7 +163,6 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     }
 
     PermutationT lset_downwind;
-    lset.SetSurfaceForce( SF_ImprovedLBVar); // see levelset.h
 
     if ( StokesSolverFactoryHelperCL().VelMGUsed(P))
         Stokes.SetNumVelLvl ( Stokes.GetMG().GetNumLevel());
