@@ -649,7 +649,7 @@ class ReparamFactoryCL
   public:
     ReparamFactoryCL() {}
     /// \brief Construct a reparametrization class
-    static std::unique_ptr<ReparamCL> GetReparam( MultiGridCL& mg, VecDescCL& phi, int method=03, bool periodic=false, const BndDataCL<>* bnd=0, const ReparamDataCL::perDirSetT* perDirections= 0);
+    static std::auto_ptr<ReparamCL> GetReparam( MultiGridCL& mg, VecDescCL& phi, int method=03, bool periodic=false, const BndDataCL<>* bnd=0, const ReparamDataCL::perDirSetT* perDirections= 0);
 };
 
 } // end of namespace DROPS

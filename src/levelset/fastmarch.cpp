@@ -1723,12 +1723,12 @@ void ReparamCL::Perform()
     \param perDirections directions of periodicity
     \return pointer to a reparametrization class
 */
-std::unique_ptr<ReparamCL> ReparamFactoryCL::GetReparam( MultiGridCL& mg,
+std::auto_ptr<ReparamCL> ReparamFactoryCL::GetReparam( MultiGridCL& mg,
         VecDescCL& phi, int method, bool periodic, const BndDataCL<>* bnd, const ReparamDataCL::perDirSetT* perDirections)
 {
     int initMethod= method%10;
     int propMethod= method/10;
-    std::unique_ptr<ReparamCL> reparam(new ReparamCL(mg, phi, propMethod==1, periodic, bnd));
+    std::auto_ptr<ReparamCL> reparam(new ReparamCL(mg, phi, propMethod==1, periodic, bnd));
     switch (initMethod) {
         case 0: {
             reparam->initZero_ = new InitZeroNoModCL( reparam->data_);

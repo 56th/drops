@@ -701,7 +701,7 @@ void LevelsetP2CL::Reparam( int method, bool Periodic)
     \param Periodic: If true, a special variant of the algorithm for periodic boundaries is used.
 */
 {
-    std::unique_ptr<ReparamCL> reparam= ReparamFactoryCL::GetReparam( MG_, *PhiC, method, Periodic, &BndData_, perDirections);
+    std::auto_ptr<ReparamCL> reparam= ReparamFactoryCL::GetReparam( MG_, *PhiC, method, Periodic, &BndData_, perDirections);
     reparam->Perform();
     UpdateDiscontinuous();
 }
