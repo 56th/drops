@@ -40,7 +40,7 @@ class SingletonMapCL : public std::map<std::string, T>
     static SingletonMapCL& getInstance();
     T& operator[](std::string s);
     void PrintAll() {
-        std::cout << " map contains : \n";
+        std::cout << "Map contains: \n";
         for ( typename SingletonMapCL<T>::const_iterator iter = this->begin();
               iter != this->end(); ++iter )
             std::cout << iter->first << std::endl;
@@ -54,7 +54,14 @@ class MapRegisterCL
 {
   public:
     MapRegisterCL(std::string name, T t) {
-        SingletonMapCL<T>::getInstance().insert(std::make_pair(name, t));
+        SingletonMapCL<T>& map= SingletonMapCL<T>::getInstance();
+        if (map.find(name) != map.end()){
+            std::cout << "MapRegisterCL::MapRegisterCL: Warning! Function with the name \"" << name
+                      << "\"\nalready exists in container and was not registered for a second time.\n";
+            map.PrintAll();
+        }
+        else
+            map.insert(std::make_pair(name, t));
     }
 };
 
@@ -69,9 +76,10 @@ SingletonMapCL<T>& SingletonMapCL<T>::getInstance()
 template<class T>
 T& SingletonMapCL<T>::operator[](std::string s)
 {
-    if (this->find(s) == this->end())
+    auto it= this->find(s);
+    if (it == this->end())
         throw DROPSErrCL(std::string("SingletonMapCL::operator[]: function with the name \"") + s + std::string("\" not found in container.\n"));
-    return this->find(s)->second;
+    return it->second;
 }
 
 }
