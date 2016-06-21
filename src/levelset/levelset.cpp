@@ -462,7 +462,7 @@ void LevelsetP2ContCL::UpdateDiscontinuous( ) { ; }
 // setting inital values for level set function in case of continuous P2 FE
 // via interpolation
 void LevelsetP2ContCL::Init( instat_scalar_fun_ptr phi0, double t)
-{   
+{
     const Uint lvl= Phi.GetLevel(),
                idx= Phi.RowIdx->GetIdx();
 
@@ -496,13 +496,13 @@ void LevelsetP2DiscontCL::UpdateDiscontinuous( )
 void LevelsetP2DiscontCL::ProjectContinuousToDiscontinuous()
 {
 
-    Phi.t = PhiC->t;  
+    Phi.t = PhiC->t;
 
     const Uint lvl= Phi.GetLevel(), idx= PhiC->RowIdx->GetIdx();
     const Uint didx = Phi.RowIdx->GetIdx();
 
     // Phi.Data =0.;
-    
+
     DROPS_FOR_TRIANG_TETRA(MG_,lvl,tet){
         for (int i=0; i <4; ++i){
             if (tet->GetVertex(i)->Unknowns.Exist(idx))
@@ -521,7 +521,7 @@ void LevelsetP2DiscontCL::ProjectContinuousToDiscontinuous()
             else
                 throw DROPSErrCL("Projections not implemented for levelset non-trivial-bnds");
         }
-    
+
     }
 }
 
@@ -587,22 +587,22 @@ void LevelsetP2DiscontCL::Init( instat_scalar_fun_ptr phi0, double t)
             Phi.Data[first++] =sol[i];
         }
     }
-    
-    ApplyClementInterpolation(); 
+
+    ApplyClementInterpolation();
 }
 
 
 void LevelsetP2DiscontCL::ApplyZeroOrderClementInterpolation()
 {
     // PhiC->Data.resize(
-    PhiC->t = Phi.t;  
+    PhiC->t = Phi.t;
     const Uint lvl= Phi.GetLevel(), idx= PhiC->RowIdx->GetIdx();
     double tetvol;
     const Uint didx = Phi.RowIdx->GetIdx();
     PhiC->Data =0.;
     VectorCL vols(PhiC->Data);
     vols =0.;
-    
+
     std::cout << PhiC->Data.size() << std::endl;
     DROPS_FOR_TRIANG_TETRA(MG_,lvl,tet){
         tetvol = (*tet).GetVolume();
@@ -621,20 +621,20 @@ void LevelsetP2DiscontCL::ApplyZeroOrderClementInterpolation()
                 vols[(*tet).GetEdge(i)->Unknowns(idx)] += tetvol;
             }
         }
-    
+
     }
     for (Uint i=0; i<vols.size(); ++i){
         PhiC->Data[i] /= vols[i];
     }
 }
- 
+
 void evaluate_polys(std::valarray<double>& q, const DROPS::QuadDomainCL& qdom, const Point3DCL& v, int j, const TetraCL& tet)
 {
     Uint E[10][3] = {{0,0,0},{1,0,0},{0,1,0},{0,0,1},{2,0,0},{1,1,0},{0,2,0},{1,0,1},{0,1,1},{0,0,2}};
     q.resize(qdom.vertex_size());
     QuadDomainCL::const_vertex_iterator qit = qdom.vertex_begin();
     Point3DCL quadp;
-    
+
     for (Uint k=0; k< qdom.vertex_size(); ++k, ++qit){
         quadp = GetWorldCoord(tet, *qit)-v;
         q[k] = pow(quadp[0],E[j][0])*pow(quadp[1],E[j][1])*pow(quadp[2],E[j][2]);
@@ -645,7 +645,7 @@ void LevelsetP2DiscontCL::ApplyClementInterpolation() //LevelsetP2DiscontCL& dis
 {
     PhiC->SetIdx( idxC );
 
-    PhiC->t = Phi.t;  
+    PhiC->t = Phi.t;
     const Uint lvl= PhiC->GetLevel(), idx= PhiC->RowIdx->GetIdx();
     PhiC->Data =0.;
     const IdxT num_unks= PhiC->RowIdx->NumUnknowns();
@@ -657,13 +657,13 @@ void LevelsetP2DiscontCL::ApplyClementInterpolation() //LevelsetP2DiscontCL& dis
     double absdet;
     Point3DCL v;
     const TetraSignEnum s= AllTetraC;
-    
+
     DROPS_FOR_TRIANG_TETRA(MG_,lvl,tet){// set up local matrices and right hand sides for each dof of the continuous P2-fct
         absdet = 6.*(*tet).GetVolume();
         phiD.assign(*tet,Phi,GetBndData());
-        make_SimpleQuadDomain<Quad5DataCL>(qdom, s); 
+        make_SimpleQuadDomain<Quad5DataCL>(qdom, s);
         resize_and_evaluate_on_vertexes (phiD,qdom,qphiD); //<LocalP2CL, QuadDomainCL, std::valarray<double> >
-    
+
         for (int i=0; i<10; ++i){ // Dofs
             v = i<4? (tet->GetVertex(i))->GetCoord() : GetBaryCenter(*(*tet).GetEdge(i-4));
             const Uint dofi = i<4 ?  (*tet).GetVertex(i)->Unknowns(idx) : (*tet).GetEdge(i-4)->Unknowns(idx);
@@ -689,7 +689,15 @@ void LevelsetP2DiscontCL::ApplyClementInterpolation() //LevelsetP2DiscontCL& dis
         PhiC->Data[i] = sol[0];
     }
 }
- 
+
+void LevelsetP2CL::CreateNumbering( Uint level, match_fun match)
+{
+    idx.CreateNumbering( level, MG_, BndData_, match);
+    Phi.SetIdx(&idx);
+}
+
+
+
 void LevelsetP2CL::CreateNumbering( Uint level, MLIdxDescCL* idx, match_fun match)
 {
     idx->CreateNumbering( level, MG_, BndData_, match);
@@ -931,7 +939,7 @@ LevelsetP2CL * LevelsetP2CL::Create(  MultiGridCL& MG, const LsetBndDataCL& lset
     LevelsetP2CL * plset;
     if (P.get<int>("Discontinuous") <= 0)
         plset = new LevelsetP2ContCL ( MG, lsetbnddata, sf, P.get<double>("SD"), P.get<double>("CurvDiff"));
-    else 
+    else
         plset = new LevelsetP2DiscontCL ( MG, lsetbnddata, sf, P.get<double>("SD"), P.get<double>("CurvDiff"));
     return plset;
 }
@@ -942,7 +950,7 @@ LevelsetP2CL * LevelsetP2CL::Create(  MultiGridCL& MG, const LsetBndDataCL& lset
     LevelsetP2CL * plset;
     if (!discontinuous)
         plset = new LevelsetP2ContCL ( MG, lsetbnddata, sf, SD, curvdiff);
-    else 
+    else
         plset = new LevelsetP2DiscontCL ( MG, lsetbnddata, sf, SD, curvdiff);
     return plset;
 }

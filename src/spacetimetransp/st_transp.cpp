@@ -178,8 +178,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         lset.SetNumLvl(Stokes.GetMG().GetNumLevel());
     }
 
-    lset.CreateNumbering( MG.GetLastLevel(), lidx, periodic_match);
-    lset.Phi.SetIdx( lidx);
+    lset.CreateNumbering( MG.GetLastLevel(), periodic_match);
     // oldlset.CreateNumbering( MG.GetLastLevel(), lidx, periodic_match);
     oldlset.Phi.SetIdx( lidx);
     PermutationT lset_downwind;
@@ -685,8 +684,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         if (doLsetDownwindNumbering) {
             if (!gridChanged) { // We must ensure that the permutation maps the original numbering of CreateNumbering to the downwind-numbering and that the renumbering starts in a known state, i.e. the original numbering.
                 lset.DeleteNumbering( lidx);
-                lset.CreateNumbering( MG.GetLastLevel(), lidx, periodic_match);
-                lset.Phi.SetIdx( lidx);
+                lset.CreateNumbering( MG.GetLastLevel(), periodic_match);
                 permute_Vector( lset.Phi.Data, invert_permutation( lset_downwind));
             }
             lset_downwind= lset.downwind_numbering( Stokes.GetVelSolution(), levelset_downwind);
@@ -776,15 +774,8 @@ void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTr
     LevelsetRepairCL oldlsetrepair( oldlset);
     adap.push_back( &oldlsetrepair);
 
-    MLIdxDescCL* lidx= &lset.idx;
-    // index wrt the interface at previous time step
-    MLIdxDescCL* oldlidx= &oldlset.idx;
-
-    lset.CreateNumbering( MG.GetLastLevel(), lidx);
-    lset.Phi.SetIdx( lidx);
-
-    oldlset.CreateNumbering( MG.GetLastLevel(), oldlidx);
-    oldlset.Phi.SetIdx( oldlidx);
+    lset.CreateNumbering( MG.GetLastLevel());
+    oldlset.CreateNumbering( MG.GetLastLevel()); // interface at previous time step
 
     SetInitialLevelsetConditions( lset, MG, P);
     SetInitialLevelsetConditions( oldlset, MG, P);

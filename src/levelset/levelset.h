@@ -101,7 +101,7 @@ class LevelsetP2CL : public ProblemCL< LevelsetCoeffCL, LsetBndDataCL>
 
   public:
     MatrixCL            E, H;  ///< E: mass matrix, H: convection matrix
-    VecDescCL           rhs;  ///< rhs due to boundary conditions 
+    VecDescCL           rhs;  ///< rhs due to boundary conditions
 
     bool IsDiscontinuous(){ return IsDG; }
 
@@ -115,7 +115,7 @@ LevelsetP2CL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, F
     }
 
     static LevelsetP2CL * Create(  MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, const ParamCL & P);
-    static LevelsetP2CL * Create(  MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, 
+    static LevelsetP2CL * Create(  MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf,
                                    bool discontinuous = false, double SD = 0, double curvdiff = -1);
 
 
@@ -126,6 +126,7 @@ LevelsetP2CL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, F
 
     /// \name Numbering
     ///@{
+    void CreateNumbering( Uint level, match_fun match= 0);
     void CreateNumbering( Uint level, MLIdxDescCL* idx, match_fun match= 0);
     void DeleteNumbering( MLIdxDescCL* idx)
         { idx->DeleteNumbering( MG_); }
@@ -133,7 +134,7 @@ LevelsetP2CL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, F
 
     /// initialize level set function
     virtual void Init( instat_scalar_fun_ptr, double t = 0) = 0;
-    
+
     /// \remarks call SetupSystem \em before calling SetTimeStep!
     template<class DiscVelSolT>
     void SetupSystem( const DiscVelSolT&, const double);
@@ -219,29 +220,29 @@ class LevelsetP2ContCL: public LevelsetP2CL
     using base_::Coeff_;
     using base_::BndData_;
     using base_::GetBndData;
-    using base_::GetMG;  
+    using base_::GetMG;
     using base_::idx;
     using base_::idxC;
     using base_::Phi;
     using base_::PhiC;
   protected:
     using base_::IsDG;
-  
-    public: 
+
+    public:
     LevelsetP2ContCL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, double SD= 0, double curvDiff= -1)
         : base_( mg, bnd, sf, P2_FE, SD, curvDiff)
     {
         PhiC = &Phi;
         idxC = &idx;
     }
-    
+
     /// Update PhiC (do nothing)
     virtual void UpdateContinuous( );
-    /// Update Phi (do nothing) 
+    /// Update Phi (do nothing)
     virtual void UpdateDiscontinuous( );
 
     void Init( instat_scalar_fun_ptr, double t = 0); //void Init( instat_scalar_fun_ptr, double);
-    
+
     template<class DiscVelSolT>
     void SetupSystem( const DiscVelSolT&, const double);
 };
@@ -260,7 +261,7 @@ class LevelsetP2DiscontCL: public LevelsetP2CL
     using base_::Coeff_;
     using base_::BndData_;
     using base_::GetBndData;
-    using base_::GetMG;  
+    using base_::GetMG;
     using base_::idx;
     using base_::idxC;
     using base_::Phi;
@@ -272,7 +273,7 @@ class LevelsetP2DiscontCL: public LevelsetP2CL
     VecDescCL             PhiContinuous;        ///< level set function
 
 
-    public: 
+    public:
     LevelsetP2DiscontCL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, double SD= 0, double curvDiff= -1)
         : base_( mg, bnd, sf, P2D_FE, SD, curvDiff), idxContinuous(P2_FE, mg.GetNumLevel())
     {
@@ -280,7 +281,7 @@ class LevelsetP2DiscontCL: public LevelsetP2CL
         PhiC = &PhiContinuous;
         idxC = &idxContinuous;
     }
-    
+
     /// \name Numbering
     ///@{
     /* virtual void CreateNumbering( Uint level, IdxDescCL* idx, match_fun match= 0); */
@@ -293,12 +294,12 @@ class LevelsetP2DiscontCL: public LevelsetP2CL
 
     /// Update PhiC (Clement-Call...)
     virtual void UpdateContinuous( );
-    /// Update Phi (Prolongation...) 
+    /// Update Phi (Prolongation...)
     virtual void UpdateDiscontinuous( );
 
     void InitProjection( instat_scalar_fun_ptr, double t = 0);
     void Init( instat_scalar_fun_ptr, double t = 0);
-    
+
     void ApplyZeroOrderClementInterpolation();
     void ApplyClementInterpolation();
     void ProjectContinuousToDiscontinuous();

@@ -128,7 +128,7 @@ int main ( int argc, char** argv )
                       P.get<double>("Stokes.XFEMStab"), vecP2_FE, P.get<double>("Stokes.epsP") );
 
         MultiGridCL& MG = prob.GetMG();
-   
+
         // Refine the mesh around the interface.
         EllipsoidCL::Init( P.get<Point3DCL>("Exp.PosDrop"),
                            P.get<Point3DCL>("Exp.RadDrop") );
@@ -136,7 +136,7 @@ int main ( int argc, char** argv )
         MarkerT marker( EllipsoidCL::DistanceFct,
                         P.get<double>("AdaptRef.Width"),
                         P.get<int>("AdaptRef.CoarsestLevel"),
-                        P.get<int>("AdaptRef.FinestLevel") ); 
+                        P.get<int>("AdaptRef.FinestLevel") );
         AdapTriangCL adap( MG, &marker );
         adap.MakeInitialTriang();
 
@@ -154,8 +154,7 @@ int main ( int argc, char** argv )
         );
         LevelsetP2CL& lset = *lset_ptr;
         lset.SetNumLvl( MG.GetNumLevel() );
-        lset.CreateNumbering( MG.GetLastLevel(), &lset.idx );
-        lset.Phi.SetIdx( &lset.idx );
+        lset.CreateNumbering( MG.GetLastLevel());
         lset.Init( EllipsoidCL::DistanceFct );
 
         std::cout << SanityMGOutCL(MG) << std::endl;
@@ -183,7 +182,7 @@ int main ( int argc, char** argv )
         std::cout.precision(5); std::cout << std::scientific;
         std::cout << "||e_p||_L2 = " << unscal_error << std::endl;
 
-        
+
         ErrorVel( prob.GetVelSolution(), lset);
 
         output( prob, lset, lsbnd );
@@ -200,7 +199,7 @@ int main ( int argc, char** argv )
 
 void Assemble( StokesT& Stokes, LevelsetP2CL& lset, VelVecDescCL& rhs )
 {
-    // Initialise the pressure, velocity and level-set vectors. 
+    // Initialise the pressure, velocity and level-set vectors.
     MultiGridCL& MG = Stokes.GetMG();
     MLIdxDescCL* vidx = &Stokes.vel_idx;
     MLIdxDescCL* pidx = &Stokes.pr_idx;
@@ -377,7 +376,7 @@ void ErrorVel( const StokesT::const_DiscVelSolCL& vel_sol, const LevelsetP2CL& l
 
     VectorCL error = true_v;
     error -= v.Data;
-    
+
     Point3DCL L2, H1, L2norm, H1norm;
     ComputeErrorsP2( analytic_u_pos, analytic_u_neg, vel_sol, vel_sol, L2, H1, L2norm, H1norm, lset, 0);
     std::cout << "velocity error:\tL2 = " << L2 << "\tH1 = " << H1 << std::endl;
@@ -486,14 +485,14 @@ void LBB_constant( const StokesT &Stokes )
     // Approximate Schur.
     typedef ApproximateSchurComplMatrixCL<APcT, MatrixCL, DummyExchangeCL > SchurCL;
     SchurCL schur( A, Apc, B, C, DummyExchangeCL() );
-    
+
 
     // Schur-Inverter...
     int tmp = 5000;
     typedef GCRSolverCL<ISGhPenPreCL> SolverT;
     ISGhPenPreCL Sprecond( &Apr, &M, &C );
     SolverT gcr( Sprecond, tmp, 5000, 1e-10, true );
- 
+
     VectorCL y_k( Stokes.p.Data.size() ), y_k1( Stokes.p.Data.size() );
     double lambda_prev = 2, lambda_prev2 = 3, lambda = 1;
     double q, rel_error;
@@ -533,7 +532,7 @@ void LBB_constant( const StokesT &Stokes )
     std::cout << "Eigenvalue estimate: " << lambda << "\tError estimate: "
               << rel_error * 100 << "%\tLBB-Estimate: " << std::sqrt(lambda) << '\n';
     std::cout.flush();
-    }      
+    }
     std::cout << "The value of the LBB-constant is: " << std::sqrt(lambda)
               << std::endl;
 }
@@ -548,7 +547,7 @@ void output( StokesT &Stokes, LevelsetP2CL& lset, BndDataCL<>& lsetbnd )
     string casename = P.get<string>("VTK.vtkCase");
     string casedir  = P.get<string>("VTK.vtkDir");
     bool   binary   = P.get<bool>("VTK.Binary");
-    
+
     VTKOutCL vtk( MG, casename, 1, casedir, casename, casename, binary );
 
     vtk.Register( make_VTKScalar( Stokes.GetPrSolution(), "pressure" ) );

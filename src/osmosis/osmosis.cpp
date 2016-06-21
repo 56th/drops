@@ -119,13 +119,8 @@ void  OnlyOsmosisStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTria
     adap.push_back( &lsetrepair);
     LevelsetRepairCL oldlsetrepair( oldlset);
     adap.push_back( &oldlsetrepair);
-    MLIdxDescCL* lidx= &lset.idx;
-    // index wrt the interface at previous time step
-    MLIdxDescCL* oldlidx= &oldlset.idx;
-    lset.CreateNumbering( MG.GetLastLevel(), lidx);
-    lset.Phi.SetIdx( lidx);
-    oldlset.CreateNumbering( MG.GetLastLevel(), oldlidx);
-    oldlset.Phi.SetIdx( oldlidx);
+    lset.CreateNumbering( MG.GetLastLevel());
+    oldlset.CreateNumbering( MG.GetLastLevel()); // interface at previous time step
     SetInitialLevelsetConditions( lset, MG, P);
     SetInitialLevelsetConditions( oldlset, MG, P);
     lset.Init( distance );

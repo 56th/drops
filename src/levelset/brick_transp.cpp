@@ -97,9 +97,7 @@ void Strategy (MultiGridCL& MG, const LsetBndDataCL& lsbnd)
     // Creates new Levelset-Object, has to be cleaned manually
     LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsbnd, *sf, P.get_child("Levelset")) );
 
-    MLIdxDescCL* lidx= &lset.idx;
-    lset.CreateNumbering( MG.GetLastLevel(), lidx);
-    lset.Phi.SetIdx( lidx);
+    lset.CreateNumbering( MG.GetLastLevel());
     lset.Init( EllipsoidCL::DistanceFct);
 
     VelBndDataCL Bnd_v( 6, v_bc, v_bfun);

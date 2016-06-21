@@ -181,13 +181,11 @@ void ApplyToTestFct( InstatStokes2PhaseP2P1CL& Stokes, const LsetBndDataCL& lsbn
 
 //    lset.SetSurfaceForce( SF_Const);
 
-    MLIdxDescCL* lidx= &lset.idx;
     MLIdxDescCL* vidx= &Stokes.vel_idx;
     MLIdxDescCL* pidx= &Stokes.pr_idx;
 
-    lset.CreateNumbering( MG.GetLastLevel(), lidx);
+    lset.CreateNumbering( MG.GetLastLevel());
 
-    lset.Phi.SetIdx( lidx);
     lset.Init( DistanceFct);
 
     Stokes.CreateNumberingVel( MG.GetLastLevel(), vidx);
@@ -272,13 +270,11 @@ void Compare_LaplBeltramiSF_ConstSF( InstatStokes2PhaseP2P1CL& Stokes, const Lse
     LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsbnd, sf, P.get_child("Levelset")) );
 
 
-    MLIdxDescCL* lidx= &lset.idx;
     MLIdxDescCL* vidx= &Stokes.vel_idx;
     MLIdxDescCL* pidx= &Stokes.pr_idx;
 
-    lset.CreateNumbering( MG.GetLastLevel(), lidx);
+    lset.CreateNumbering( MG.GetLastLevel());
 
-    lset.Phi.SetIdx( lidx);
     lset.Init( DistanceFct);
 
     Stokes.CreateNumberingVel( MG.GetLastLevel(), vidx);
