@@ -277,8 +277,9 @@
                 "PeriodicMatching":     "periodicxz",            // matching function 
 
                                                            // identifier for periodic boundaries
-                "InitialCond":          1,                 // initial conditions (0 = zero, 1/2 = stationary
-                                                           // flow with/without droplet, -1 = read from file).
+                "InitialCond":          10,                // initial conditions (0 = zero, 1/10 stationary flow with  
+                                                           // droplet which includes/dismiss surface tension, 
+                                                           // 2 = stationary flow without droplet, -1 = read from file).
                 "InitialFile":          "serial/filmNs40",         // file prefix when reading data for initial condition.
                 "BoundaryType":         "13!11!0!21!13!11",     // List of boundary types separated by a !.
                                                            // Each defining a boundary type for one boundary

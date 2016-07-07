@@ -53,6 +53,6 @@ exec_ser(twophasedrops geom-boundary geom-builder geom-deformation geom-simplex 
 
 
 # convention: makethose coefficient-defining shared objects are built which ared used in the default configuration of the executable..
-add_dependencies(twophasedrops levelset-twophaseCoeff misc-scalarFunctions misc-vectorFunctions misc-csgFunctions)
+add_dependencies(twophasedrops levelset-twophaseCoeff levelset-filmCoeff misc-scalarFunctions misc-vectorFunctions misc-csgFunctions)
 
 add_my_custom_targets(levelset)
