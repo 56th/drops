@@ -168,6 +168,24 @@ namespace DROPS // for Strategy
 using ::MyStokesCL;
 
 template <class StokesProblemT>
+void ComputeProjectedDivergence(VecDescCL& divu, const StokesProblemT& Stokes)
+{
+    VectorCL rhs( divu.Data.size() );
+    rhs = Stokes.B.Data.GetFinest() * Stokes.v.Data - Stokes.c.Data;
+
+    JACPcCL jacpc;
+    PCGSolverCL<JACPcCL> pcgsolver( jacpc, 100, 1e-6, true );
+
+    int numiter;
+    double resid;
+    pcgsolver.Solve( Stokes.prM.Data.GetFinest(), divu.Data, rhs, DummyExchangeCL(), numiter, resid );
+
+    std::cout << "divergence projection: numiter: " << numiter << std::endl;
+    std::cout << "divergence projection:   reisd: " << resid << std::endl;
+
+}
+
+template <class StokesProblemT>
 void SolveStatProblem( StokesProblemT& Stokes, StokesSolverBaseCL& solver)
 {
     TimerCL timer;
@@ -310,6 +328,10 @@ void Strategy( StokesProblemT& Stokes)
         ensight->Write();
     }
 
+    //create output for divergence of velocity
+    VecDescCL divu( Stokes.p.RowIdx );
+    ComputeProjectedDivergence( divu, Stokes );
+
     VTKOutCL * vtkwriter = NULL;
     if (P.get<int>("VTK.VTKOut",0)){
         vtkwriter = new VTKOutCL(MG, "DROPS data",
@@ -324,6 +346,7 @@ void Strategy( StokesProblemT& Stokes)
                                  P.get<int>("VTK.UseDeformation"));
         vtkwriter->Register( make_VTKVector( Stokes.GetVelSolution(), "velocity") );
         vtkwriter->Register( make_VTKScalar( Stokes.GetPrSolution(), "pressure") );
+        vtkwriter->Register( make_VTKScalar( Stokes.GetPrSolution(divu), "divu"));
         vtkwriter->Write(Stokes.v.t);
     }
 
@@ -335,6 +358,7 @@ void Strategy( StokesProblemT& Stokes)
         std::cout << line << "Step: " << step << std::endl;
 
         TimeScheme->DoStep( Stokes.v.Data, Stokes.p.Data);
+        ComputeProjectedDivergence( divu, Stokes );
 
         timer.Stop();
         std::cout << " o Solved system with:\n"
