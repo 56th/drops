@@ -289,10 +289,12 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 //     Stokes.pr_idx.GetFinest().   CreateNumbering( MG.GetLastLevel(), MG, Stokes.GetBndData().Pr, 0, &lset.Phi);
 
     StokesVelBndDataCL::bnd_val_fun ZeroVel = InVecMap::getInstance().find("ZeroVel")->second;
+    StokesVelBndDataCL::bnd_val_fun ImpactVel = InVecMap::getInstance().find("ImpactVel")->second;
     Stokes.SetIdx();
     Stokes.v.SetIdx  ( vidx);
     Stokes.p.SetIdx  ( pidx);
-    Stokes.InitVel( &Stokes.v, ZeroVel);
+    //Stokes.InitVel( &Stokes.v, ZeroVel);
+    Stokes.InitVel( &Stokes.v, ImpactVel);
 
     IteratedDownwindCL navstokes_downwind( P.get_child( "NavStokes.Downwind"));
     if (P.get<int>( "NavStokes.Downwind.Frequency") > 0) {
