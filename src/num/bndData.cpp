@@ -27,6 +27,7 @@
 #include "misc/params.h"
 #include "misc/singletonmap.h"
 #include "geom/multigrid.h"
+#include "num/discretize.h"
 
 namespace DROPS
 {
@@ -73,6 +74,16 @@ BndCondCL::BndCondCL (BndIdxT numbndseg, const BndCondT* bc, match_fun mfun)
         BndCond_[i]= bc ? bc[i] : Nat0BC;
 }
 
+void assignZeroFunc( instat_scalar_fun_ptr& f)
+{
+    f= SingletonMapCL<instat_scalar_fun_ptr>::getInstance()["Zero"];
+}
+
+void assignZeroFunc( instat_vector_fun_ptr& f)
+{
+    f= SingletonMapCL<instat_vector_fun_ptr>::getInstance()["ZeroVel"];
+}
+
 
 /// \brief Read an json-array with 1 or 2 members. The first is the BndCondT, the second possibly is a function-name.
 /// Implementation detail of read_BndData.
@@ -83,7 +94,7 @@ template <class BndValFunT>
     ParamCL::ptree_const_iterator_type it= P.begin();
     type= string_to_BndCondT( it->second.get_value<std::string>());
     if (type != DirBC && type != NatBC) {
-        fun= 0;
+        assignZeroFunc( fun);
         return;
     }
     if (++it == P.end())
