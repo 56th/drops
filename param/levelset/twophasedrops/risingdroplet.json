@@ -267,8 +267,9 @@
         {
                 "PeriodicMatching":     "none",            // matching function 
                                                            // identifier for periodic boundaries
-                "InitialCond":          0,                 // initial conditions (0 = zero, 1/2 = stationary
-                                                           // flow with/without droplet, -1 = read from file).
+                "InitialCond":          0,                 // initial conditions (0 = zero, 1/10 stationary flow with  
+                                                           // droplet which includes/dismiss surface tension,  
+                                                           // 2 = stationary flow without droplet, -1 = read from file).
                 "InitialFile":          "mg/data",         // file prefix when reading data for initial condition.
                 "BoundaryType":         "0!0!0!0!0!0",     // List of boundary types separated by a !.
                                                            // Each defining a boundary type for one boundary
