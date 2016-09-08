@@ -161,62 +161,81 @@ Point3DCL TwoEllipsoidCL::Radius2_;
 
 static DROPS::RegisterScalarFunction regsca_twoellipsoid("TwoEllipsoid", DROPS::TwoEllipsoidCL::DistanceFct);
 
-class InterfaceInfoCL
+class TwoPhaseInfoBaseCL
 {
-  private:
+  protected:
     std::ofstream* file_;    ///< write information, to this file
 
+    void Update (const LevelsetP2CL& ls) {
+        std::pair<double, double> h= h_interface( ls.GetMG().GetTriangEdgeBegin( ls.PhiC->RowIdx->TriangLevel()), ls.GetMG().GetTriangEdgeEnd( ls.PhiC->RowIdx->TriangLevel()), *ls.PhiC);
+        h_min= h.first; h_max= h.second;
+    }
+
+  public:
+    double h_min, h_max;
+
+    TwoPhaseInfoBaseCL() : file_(nullptr), h_min(0), h_max(0) {}
+
+    virtual void WriteHeader() = 0;
+    virtual void Write (double time) = 0;
+    /// \brief Set file for writing
+    void Init(std::ofstream* file) { file_= file; }
+};
+
+class InterfaceInfoCL: public TwoPhaseInfoBaseCL
+{
+    typedef TwoPhaseInfoBaseCL BaseT;
   public:
     Point3DCL bary, vel, min, max;
-    double maxGrad, Vol, h_min, h_max, surfArea, sphericity;
+    double maxGrad, Vol, surfArea, sphericity;
 
 
     template<class DiscVelSolT>
     void Update (const LevelsetP2CL& ls, const DiscVelSolT& u) {
+        BaseT::Update( ls);
         ls.GetInfo( maxGrad, Vol, bary, vel, u, min, max, surfArea);
-        std::pair<double, double> h= h_interface( ls.GetMG().GetTriangEdgeBegin( ls.PhiC->RowIdx->TriangLevel()), ls.GetMG().GetTriangEdgeEnd( ls.PhiC->RowIdx->TriangLevel()), *ls.PhiC);
-        h_min= h.first; h_max= h.second;
         // sphericity is the ratio of surface area of a sphere of same volume and surface area of the approximative interface
         sphericity= std::pow(6*Vol, 2./3.)*std::pow(M_PI, 1./3.)/surfArea;
     }
     void WriteHeader() {
         if (file_)
-          (*file_) << "# time maxGradPhi volume bary_drop min_drop max_drop vel_drop h_min h_max surfArea sphericity" << std::endl;
+          (*file_) << "# time maxGradPhi volume bary_drop min_drop max_drop vel_drop h_min h_max surfArea sphericity\n";
     }
     void Write (double time) {
         if (file_)
           (*file_) << time << " " << maxGrad << " " << Vol << " " << bary << " " << min << " " << max << " " << vel << " " << h_min << " " << h_max << " " << surfArea << " " << sphericity << std::endl;
     }
-    /// \brief Set file for writing
-    void Init(std::ofstream* file) { file_= file; }
 } IFInfo;
 
-class FilmInfoCL
+class FilmInfoCL: public TwoPhaseInfoBaseCL
 {
+    typedef TwoPhaseInfoBaseCL BaseT;
   private:
-    std::ofstream* file_;    ///< write information, to this file
     double x_, z_;
   public:
     Point3DCL vel;
-    double maxGrad, Vol, h_min, h_max, point_h;
-
+    double maxGrad, Vol, point_h;
 
     template<class DiscVelSolT>
     void Update (const LevelsetP2CL& ls, const DiscVelSolT& u) {
+        BaseT::Update( ls);
         ls.GetFilmInfo( maxGrad, Vol, vel, u, x_, z_, point_h);
-        std::pair<double, double> h= h_interface( ls.GetMG().GetTriangEdgeBegin( ls.Phi.RowIdx->TriangLevel()), ls.GetMG().GetTriangEdgeEnd( ls.Phi.RowIdx->TriangLevel()), ls.Phi);
-        h_min= h.first; h_max= h.second;
     }
     void WriteHeader() {
-        if (file_)
-          (*file_) << "# time maxGradPhi volume vel_drop h_min h_max point_x point_z point_h" << std::endl;
+        if (file_) {
+            (*file_) << "Film Reynolds number Re_f = "
+                     << P.get<double>("Mat.DensFluid")*P.get<double>("Mat.DensFluid")*P.get<DROPS::Point3DCL>("Exp.Gravity")[0]*std::pow(P.get<double>("Exp.Thickness"),3)/P.get<double>("Mat.ViscFluid")/P.get<double>("Mat.ViscFluid")/3 << '\n';
+            (*file_) << "max. inflow velocity at film surface = "
+                     << P.get<double>("Mat.DensFluid")*P.get<DROPS::Point3DCL>("Exp.Gravity")[0]*P.get<double>("Exp.Thickness")*P.get<double>("Exp.Thickness")/P.get<double>("Mat.ViscFluid")/2 << '\n';
+            (*file_) << "# time maxGradPhi volume vel_drop h_min h_max point_x point_z point_h\n";
+        }
     }
     void Write (double time) {
         if (file_)
           (*file_) << time << " " << maxGrad << " " << Vol << " " << vel << " " << h_min << " " << h_max << " " << x_ << " " << z_<< " " << point_h << std::endl;
     }
-    /// \brief Set file for writing
-    void Init(std::ofstream* file, double x, double z) { file_= file; x_=x; z_=z;}
+    /// \brief Set file for writing and film length (x) and width (z). Note: film height (y) is determined from level set.
+    void Init(std::ofstream* file, double x, double z) { file_= file; x_= x; z_= z; }
 } FilmInfo;
 
 /// \brief factory for the time discretization schemes
@@ -564,7 +583,7 @@ double lin_in_y(const DROPS::Point3DCL& p)  // linear function in y-direction, z
 
 double sigma_const_grad_tau_y(const DROPS::Point3DCL& p, double) { return lin_in_y( p); }
 
-// Registration of funcitons
+// Registration of functions
 static DROPS::RegisterScalarFunction regconstsurftens("ConstTau", sigmaf);
 static DROPS::RegisterScalarFunction regconstgradtau_y("ConstGradTau_y", sigma_const_grad_tau_y);
 
