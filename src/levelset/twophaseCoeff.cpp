@@ -34,11 +34,15 @@ namespace tpd_inflow{
     /// \name inflow condition
     DROPS::SVectorCL<3> InflowBrick( const DROPS::Point3DCL& p, double t)
     {
+        static double RadInlet=   P.get<double>("Exp.RadInlet");
+        static double InflowVel=  P.get<double>("Exp.InflowVel");
+        static double InflowAmpl= P.get<double>("Exp.InflowAmpl");
+        static double InflowFreq= P.get<double>("Exp.InflowFreq");
         DROPS::SVectorCL<3> ret(0.);
-        const double x = p[0]*(2* P.get<double>("Exp.RadInlet") -p[0]) / (P.get<double>("Exp.RadInlet")*P.get<double>("Exp.RadInlet")),
-                     z = p[2]*(2*P.get<double>("Exp.RadInlet")-p[2]) / (P.get<double>("Exp.RadInlet")*P.get<double>("Exp.RadInlet"));
+        const double x = p[0]*(2* RadInlet -p[0]) / (RadInlet*RadInlet),
+                     z = p[2]*(2*RadInlet-p[2]) / (RadInlet*RadInlet);
 
-        ret[1]= x * z * P.get<double>("Exp.InflowVel") * (1-P.get<double>("Exp.InflowAmpl")*std::cos(2*M_PI*P.get<double>("Exp.InflowFreq")*t));
+        ret[1]= x * z * InflowVel * (1-InflowAmpl*std::cos(2*M_PI*InflowFreq*t));
 
         return ret;
     }
@@ -47,11 +51,14 @@ namespace tpd_inflow{
     ///microchannel (eindhoven)
     DROPS::SVectorCL<3> InflowChannel( const DROPS::Point3DCL& p, double t)
     {
+        static double InflowVel=  P.get<double>("Exp.InflowVel");
+        static double InflowAmpl= P.get<double>("Exp.InflowAmpl");
+        static double InflowFreq= P.get<double>("Exp.InflowFreq");
         DROPS::SVectorCL<3> ret(0.);
         const double y = p[1]*(2*25e-6-p[1]) / (25e-6*25e-6),
                      z = p[2]*(2*50e-6-p[2]) / (50e-6*50e-6);
 
-        ret[0]= y * z * P.get<double>("Exp.InflowVel") * (1-P.get<double>("Exp.InflowAmpl")*std::cos(2*M_PI*P.get<double>("Exp.InflowFreq")*t));
+        ret[0]= y * z * InflowVel * (1-InflowAmpl*std::cos(2*M_PI*InflowFreq*t));
 
         return ret;
     }
@@ -59,10 +66,12 @@ namespace tpd_inflow{
     ///mzelle_ns_adap.cpp + mzelle_instat.cpp
     DROPS::SVectorCL<3> InflowCell( const DROPS::Point3DCL& p, double)
     {
+        static double RadInlet=   P.get<double>("Exp.RadInlet");
+        static double InflowVel=  P.get<double>("Exp.InflowVel");
         DROPS::SVectorCL<3> ret(0.);
-        const double s2= P.get<double>("Exp.RadInlet")*P.get<double>("Exp.RadInlet"),
+        const double s2= RadInlet*RadInlet,
                      r2= p.norm_sq() - p[P.get<int>("Exp.FlowDir")]*p[P.get<int>("Exp.FlowDir")];
-        ret[P.get<int>("Exp.FlowDir")]= -(r2-s2)/s2*P.get<double>("Exp.InflowVel");
+        ret[P.get<int>("Exp.FlowDir")]= -(r2-s2)/s2*InflowVel;
 
         return ret;
     }
@@ -70,9 +79,8 @@ namespace tpd_inflow{
     /// Examplary inflow condition for a shift frame
     DROPS::SVectorCL<3> InflowShiftFrame( const DROPS::Point3DCL&, double)
     {
+        static DROPS::SVectorCL<3> FrameVel= P.get<DROPS::Point3DCL>("NavStokes.FrameVel", DROPS::Point3DCL(0.));
         DROPS::SVectorCL<3> ret(0.);
-        DROPS::SVectorCL<3> FrameVel(0.);
-        FrameVel = P.get<DROPS::Point3DCL>("NavStokes.FrameVel");
         ret = -FrameVel;
         return ret;
     }
@@ -94,7 +102,7 @@ namespace tpd_inflow{
     {
         DROPS::SVectorCL<3> ret(0.);
         DROPS::SVectorCL<3> E3(0.);
-        E3 = P.get<DROPS::Point3DCL>("Domain.E3");
+        E3 = P.get<DROPS::Point3DCL>("Mesh.E3");
         ret[0]=p[2]-0.5*E3[2];
         return P.get<double>("Exp.ShearFlowFactor",1.0)*ret;
     }
@@ -105,10 +113,12 @@ namespace tpd_inflow{
 
     DROPS::SVectorCL<3> InflowBrickTransp (const DROPS::Point3DCL& p, double)
     {
+        static double RadInlet=   P.get<double>("Exp.RadInlet");
+        static double InflowVel=  P.get<double>("Exp.InflowVel");
         DROPS::SVectorCL<3> ret(0.);
-        const double x = p[0]*(2*P.get<double>("Exp.RadInlet")-p[0]) / (P.get<double>("Exp.RadInlet")*P.get<double>("Exp.RadInlet")),
-                     z = p[2]*(2*P.get<double>("Exp.RadInlet")-p[2]) / (P.get<double>("Exp.RadInlet")*P.get<double>("Exp.RadInlet"));
-        ret[1]= x * z * P.get<double>("Exp.InflowVel");
+        const double x = p[0]*(2*RadInlet-p[0]) / (RadInlet*RadInlet),
+                     z = p[2]*(2*RadInlet-p[2]) / (RadInlet*RadInlet);
+        ret[1]= x * z * InflowVel;
         return ret;
     }
 
@@ -141,9 +151,9 @@ namespace tpd_volforce{
         //"hack": assume cartesian domain with e1=[a,0,0], e2=[0,b,0], ..
         if (first){
             first = false;
-            dx[0] = P.get<DROPS::Point3DCL>("Domain.E1")[0];
-            dx[1] = P.get<DROPS::Point3DCL>("Domain.E2")[1];
-            dx[2] = P.get<DROPS::Point3DCL>("Domain.E3")[2];
+            dx[0] = P.get<DROPS::Point3DCL>("Mesh.E1")[0];
+            dx[1] = P.get<DROPS::Point3DCL>("Mesh.E2")[1];
+            dx[2] = P.get<DROPS::Point3DCL>("Mesh.E3")[2];
         }
 
         static double voldrop = 4./3.*M_PI* P.get<DROPS::Point3DCL>("Levelset.RadDrop")[0]*P.get<DROPS::Point3DCL>("Levelset.RadDrop")[1]*P.get<DROPS::Point3DCL>("Levelset.RadDrop")[2] ;
@@ -193,11 +203,11 @@ namespace levelsetdistance{
         if (first){
             first = false;
             if (i==0)
-                dx = P.get<DROPS::Point3DCL>("Domain.E1");
+                dx = P.get<DROPS::Point3DCL>("Mesh.E1");
             else if (i==1)
-                dx = P.get<DROPS::Point3DCL>("Domain.E2");
+                dx = P.get<DROPS::Point3DCL>("Mesh.E2");
             else
-                dx = P.get<DROPS::Point3DCL>("Domain.E3");
+                dx = P.get<DROPS::Point3DCL>("Mesh.E3");
         }
 
         DROPS::Point3DCL dp;
@@ -288,9 +298,9 @@ namespace filmperiodic{
         //"hack": assume cartesian domain with e1=[a,0,0], e2=[0,b,0], ..
         if (first){
             first = false;
-            dx[0] = P.get<DROPS::Point3DCL>("Domain.E1")[0];
-            dx[1] = P.get<DROPS::Point3DCL>("Domain.E2")[1];
-            dx[2] = P.get<DROPS::Point3DCL>("Domain.E3")[2];
+            dx[0] = P.get<DROPS::Point3DCL>("Mesh.E1")[0];
+            dx[1] = P.get<DROPS::Point3DCL>("Mesh.E2")[1];
+            dx[2] = P.get<DROPS::Point3DCL>("Mesh.E3")[2];
         }
 
         const DROPS::Point3DCL d= fabs(p-q),
@@ -313,11 +323,11 @@ namespace filmperiodic{
         if (first){
             first = false;
             if (A==0)
-                dx = P.get<DROPS::Point3DCL>("Domain.E1");
+                dx = P.get<DROPS::Point3DCL>("Mesh.E1");
             else if (A==1)
-                dx = P.get<DROPS::Point3DCL>("Domain.E2");
+                dx = P.get<DROPS::Point3DCL>("Mesh.E2");
             else
-                dx = P.get<DROPS::Point3DCL>("Domain.E3");
+                dx = P.get<DROPS::Point3DCL>("Mesh.E3");
         }
 
         const int B = (A+1)%3;

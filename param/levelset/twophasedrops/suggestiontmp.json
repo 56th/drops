@@ -137,13 +137,20 @@
 
                 "BoundaryData":
                 {
+                    "Velocity":
+                    {
                         "Default":              ["Dir0BC"],     // optional; if not set UndefinedBC_ is the default.
                         "PeriodicMatching":     "periodicz",    // optional
 
                         "0":    ["Dir0BC"],                     // indices refer to boundary segment
-                        "1":    ["DirBC", "MyKnownSolution"],
+                        "1":    ["DirBC", "ZeroVel"],
                         "4":   ["Per1BC"],
                         "5":   ["Per2BC"]
+                    },
+                    "Pressure":
+                    {
+                        "Default":        ["NoBC"]
+                    }
                 },
 
                 //TODO eigentlich sind das Randbedingungen fuer die Messzelle, oder? -> DELETE
