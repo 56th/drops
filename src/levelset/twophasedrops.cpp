@@ -95,9 +95,9 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     //DROPS::InVecMap & vecmap = DROPS::InVecMap::getInstance();
     DROPS::MatchMap & matchmap = DROPS::MatchMap::getInstance();
 
-
-    bool is_periodic = P.get<std::string>("DomainCond.PeriodicMatching", "none") != "none";
-    match_fun periodic_match = is_periodic ? matchmap[P.get("DomainCond.PeriodicMatching", std::string("periodicx"))] : 0;
+    const std::string perMatchName= P.get( "NavStokes.BoundaryData.Velocity.PeriodicMatching", std::string("none"));
+    const bool is_periodic = perMatchName != "none";
+    match_fun periodic_match = is_periodic ? matchmap[perMatchName] : 0;
 
     MultiGridCL& MG= Stokes.GetMG();
 
@@ -114,19 +114,19 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     if (is_periodic) //CL: Anyone a better idea? perDirection from ParameterFile?
     {
         int n = 0;
-        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicx" || P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicy" || P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicz")
+        if (perMatchName == "periodicx" || perMatchName == "periodicy" || perMatchName == "periodicz")
             n = 1;
-        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicxy" || P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicxz" || P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicyz")
+        if (perMatchName == "periodicxy" || perMatchName == "periodicxz" || perMatchName == "periodicyz")
             n = 2;
         LevelsetP2CL::perDirSetT pdir(n);
-        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicx") pdir[0] = P.get<Point3DCL>("Domain.E1");
-        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicy") pdir[0] = P.get<Point3DCL>("Domain.E2");
-        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicz") pdir[0] = P.get<Point3DCL>("Domain.E3");
-        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicxy") {pdir[0] = P.get<Point3DCL>("Domain.E1"); pdir[1] = P.get<Point3DCL>("Domain.E2");}
-        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicxz") {pdir[0] = P.get<Point3DCL>("Domain.E1"); pdir[1] = P.get<Point3DCL>("Domain.E3");}
-        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) == "periodicyz") {pdir[0] = P.get<Point3DCL>("Domain.E2"); pdir[1] = P.get<Point3DCL>("Domain.E3");}
-        if (P.get("DomainCond.PeriodicMatching", std::string("periodicx")) != "periodicx" && P.get("DomainCond.PeriodicMatching", std::string("periodicx")) != "periodicy" && P.get("DomainCond.PeriodicMatching", std::string("periodicx")) != "periodicz" &&
-          P.get("DomainCond.PeriodicMatching", std::string("periodicx")) != "periodicxy" && P.get("DomainCond.PeriodicMatching", std::string("periodicx")) != "periodicxz" && P.get("DomainCond.PeriodicMatching", std::string("periodicx")) != "periodicyz"){
+        if (perMatchName == "periodicx") pdir[0] = P.get<Point3DCL>("Mesh.E1");
+        if (perMatchName == "periodicy") pdir[0] = P.get<Point3DCL>("Mesh.E2");
+        if (perMatchName == "periodicz") pdir[0] = P.get<Point3DCL>("Mesh.E3");
+        if (perMatchName == "periodicxy") {pdir[0] = P.get<Point3DCL>("Mesh.E1"); pdir[1] = P.get<Point3DCL>("Mesh.E2");}
+        if (perMatchName == "periodicxz") {pdir[0] = P.get<Point3DCL>("Mesh.E1"); pdir[1] = P.get<Point3DCL>("Mesh.E3");}
+        if (perMatchName == "periodicyz") {pdir[0] = P.get<Point3DCL>("Mesh.E2"); pdir[1] = P.get<Point3DCL>("Mesh.E3");}
+        if (perMatchName != "periodicx" && perMatchName != "periodicy" && perMatchName != "periodicz" &&
+          perMatchName != "periodicxy" && perMatchName != "periodicxz" && perMatchName != "periodicyz"){
             std::cout << "WARNING: could not set periodic directions! Reparametrization can not work correctly now!" << std::endl;
             std::cout << "Press any key to continue" << std::endl; getchar();
         }
@@ -668,19 +668,45 @@ int main (int argc, char** argv)
 
     std::cout << "Generated MG of " << mg->GetLastLevel() << " levels." << std::endl;
 
-    std::string perbndtypestr;
-    std::string zerobndfun;
-    for( size_t i= 1; i<=mg->GetBnd().GetNumBndSeg(); ++i) {
-        zerobndfun += "Zero";
-        if (i!=mg->GetBnd().GetNumBndSeg())
-          zerobndfun += "!";
+    try
+    {
+        velbnddata=  new VelBndDataCL(0);
+        prbnddata=   new PrBndDataCL(0);
+        lsetbnddata= new DROPS::LsetBndDataCL(0);
+        read_BndData( *velbnddata, *mg, P.get_child( "NavStokes.BoundaryData.Velocity"));
+        std::cout << "Generated boundary conditions for velocity, ";
+        read_BndData( *prbnddata,  *mg, P.get_child( "NavStokes.BoundaryData.Pressure"));
+        std::cout << "pressure, ";
+        read_BndData( *lsetbnddata,*mg, P.get_child( "Levelset.BoundaryData"));
+        std::cout << "and levelset." << std::endl;
+    } catch (DROPS::DROPSParamErrCL& e)
+    {
+        e.what( std::cout);
+        delete velbnddata;
+        delete prbnddata;
+        delete lsetbnddata;
+        std::cout << "\n"
+                  << "  /----------------------------------------------------------------\\ \n"
+                  << "  | WARNING: It seems you are using the old bnd data descriptions  | \n"
+                  << "  |          or your \"BoundaryData\" section is not correct.        | \n"
+                  << "  |          Please adapt your json-file to the new description.   | \n"
+                  <<"  \\----------------------------------------------------------------/ \n"
+                  << std::endl;
+
+        std::string perbndtypestr;
+        std::string zerobndfun;
+        for( size_t i= 1; i<=mg->GetBnd().GetNumBndSeg(); ++i) {
+            zerobndfun += "Zero";
+            if (i!=mg->GetBnd().GetNumBndSeg())
+              zerobndfun += "!";
+        }
+        DROPS::BuildBoundaryData( mg, velbnddata, P.get<std::string>("DomainCond.BoundaryType"), P.get<std::string>("DomainCond.BoundaryFncs"), periodic_match, &perbndtypestr);
+        std::cout << "Generated boundary conditions for velocity, ";
+        DROPS::BuildBoundaryData( mg, prbnddata, perbndtypestr, zerobndfun, periodic_match);
+        std::cout << "pressure, ";
+        DROPS::BuildBoundaryData( mg, lsetbnddata, perbndtypestr, zerobndfun, periodic_match);
+        std::cout << "and levelset." << std::endl;
     }
-    DROPS::BuildBoundaryData( mg, velbnddata, P.get<std::string>("DomainCond.BoundaryType"), P.get<std::string>("DomainCond.BoundaryFncs"), periodic_match, &perbndtypestr);
-    std::cout << "Generated boundary conditions for velocity, ";
-    DROPS::BuildBoundaryData( mg, prbnddata, perbndtypestr, zerobndfun, periodic_match);
-    std::cout << "pressure, ";
-    DROPS::BuildBoundaryData( mg, lsetbnddata, perbndtypestr, zerobndfun, periodic_match);
-    std::cout << "and levelset." << std::endl;
     DROPS::StokesBndDataCL bnddata(*velbnddata,*prbnddata);
 
     std::string InitialLSet= P.get("Levelset.InitialValue", std::string("Ellipsoid"));
