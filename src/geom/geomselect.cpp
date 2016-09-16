@@ -28,7 +28,7 @@
 
 namespace DROPS {
 
-void BuildDomain( MultiGridCL* &mgp, const std::string& meshfile_name, int GeomType, const std::string& deserialization_file, double& r_inlet)
+void BuildDomain( MultiGridCL* &mgp, const std::string& meshfile_name, int GeomType, const std::string& deserialization_file)
 {
 #ifdef _PAR
     ParMultiGridCL::InstancePtr();
@@ -65,8 +65,7 @@ void BuildDomain( MultiGridCL* &mgp, const std::string& meshfile_name, int GeomT
         std::istringstream brick_info( mesh);
         brick_info >> dx >> dy >> dz >> nx >> ny >> nz;
         if (!brick_info)
-            throw DROPSErrCL("error while reading geometry information: " + mesh);
-        r_inlet= dx/2;
+            throw DROPSErrCL("error while reading geometry information: " + mesh);        
         Point3DCL orig, px, py, pz;
         px[0]= dx; py[1]= dy; pz[2]= dz;
 
@@ -93,8 +92,7 @@ void BuildDomain( MultiGridCL* &mgp, const std::string& meshfile_name, int GeomT
         std::istringstream brick_info( mesh);
         brick_info >> dx >> dy >> dz >> nx >> ny >> nz >> cdx >> cdy >> cdz >> cnx >> cny >> cnz;
         if (!brick_info)
-            throw DROPSErrCL("error while reading geometry information: " + mesh);
-        r_inlet= dx/2;
+            throw DROPSErrCL("error while reading geometry information: " + mesh);        
         Point3DCL orig, px, py, pz;
         px[0]= dx; py[1]= dy; pz[2]= dz;
 
@@ -125,8 +123,7 @@ void BuildDomain( MultiGridCL* &mgp, const std::string& meshfile_name, int GeomT
         std::istringstream brick_info( mesh);
         brick_info >> dx >> dy >> dz >> nx >> ny >> nz >> bx >> by ;
         if (!brick_info)
-            throw DROPSErrCL("error while reading geometry information: " + mesh);
-        r_inlet= dx/2;
+            throw DROPSErrCL("error while reading geometry information: " + mesh);        
         Point3DCL orig, px, py, pz;
         px[0]= dx; py[1]= dy; pz[2]= dz;
 
@@ -153,7 +150,6 @@ void BuildDomain( MultiGridCL* &mgp, const std::string& meshfile_name, int GeomT
             brick_info >> dx >> dy >> dz >> nx >> ny >> nz >> bx >> by >> bz ;
             if (!brick_info)
                 throw DROPSErrCL("error while reading geometry information: " + mesh);
-            r_inlet= dx/2;
             Point3DCL orig, px, py, pz;
             px[0]= dx; py[1]= dy; pz[2]= dz;
 
