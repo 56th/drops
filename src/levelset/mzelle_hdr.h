@@ -231,7 +231,7 @@ TimeDisc2PhaseCL* CreateTimeDisc( InstatNavierStokes2PhaseP2P1CL& Stokes, Levels
 
     double theta        = P.get<double>("Time.Theta");
     double lsTheta      = theta;
-    double tEnd         = P.get<double>("Time.TEnd");
+    double tEnd         = P.get<double>("Time.FinalTime");
     double stepSize     = tEnd / numSteps;
     double implLB       = P.get<double>("CouplingSolver.ImplLB");
     double couplingTol  = P.get<double>("CouplingSolver.Tol");

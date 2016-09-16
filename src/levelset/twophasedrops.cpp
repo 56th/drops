@@ -226,14 +226,13 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     DisplayUnks(Stokes, lset, MG);
 
     const int nsteps = P.get<int>("Time.NumSteps");
-    const double tEnd = P.get<double>("Time.TEnd");
+    const double tEnd = P.get<double>("Time.FinalTime");
     const double dt = tEnd / nsteps;
 
-    TransportP1CL * massTransp = NULL;
-    TransportRepairCL *  transprepair = NULL;
+    TransportP1CL * massTransp = nullptr;
+    TransportRepairCL *  transprepair = nullptr;
 
-    if (P.get<int>("Transp.DoTransp"))
-    //if( P.exists("Transp") )
+    if( P.exists("Transp") )
     {
         // CL: the following could be moved outside of strategy to some function like
         //" InitializeMassTransport(P,MG,Stokes,lset,adap, TransportP1CL * & massTransp,TransportRepairCL * & transprepair)"
@@ -267,21 +266,25 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
     // TL: can we make a pointer out of this? like massTransp
     /// \todo rhs beruecksichtigen
-    SurfactantcGP1CL surfTransp( MG, Stokes.GetBndData().Vel, P.get<double>("Time.Theta"), P.get<double>("SurfTransp.Visc"), &Stokes.v, *lset.PhiC, lset.GetBndData(),
-                                 dt, P.get<int>("SurfTransp.Solver.Iter"), P.get<double>("SurfTransp.Solver.Tol"), P.get<double>("SurfTransp.XFEMReduced"));
-    InterfaceP1RepairCL surf_repair( MG, *lset.PhiC, lset.GetBndData(), surfTransp.ic);
-    if (P.get("SurfTransp.DoTransp", 0))
+    SurfactantcGP1CL *surfTransp = nullptr;
+    InterfaceP1RepairCL *surf_repair = nullptr;
+
+    if( P.exists("SurfTransp") )
     {
-        adap.push_back( &surf_repair);
-        surfTransp.idx.CreateNumbering( MG.GetLastLevel(), MG, lset.PhiC, &lset.GetBndData());
-        std::cout << "Surfactant transport: NumUnknowns: " << surfTransp.idx.NumUnknowns() << std::endl;
-        surfTransp.ic.SetIdx( &surfTransp.idx);
-        surfTransp.Init( inscamap["surf_sol"]);
+        surfTransp = new SurfactantcGP1CL( MG, Stokes.GetBndData().Vel, P.get<double>("Time.Theta"), P.get<double>("SurfTransp.Visc"), &Stokes.v, *lset.PhiC, lset.GetBndData(),
+                                     dt, P.get<int>("SurfTransp.Solver.Iter"), P.get<double>("SurfTransp.Solver.Tol"), P.get<double>("SurfTransp.XFEMReduced"));
+        surf_repair = new InterfaceP1RepairCL ( MG, *lset.PhiC, lset.GetBndData(), surfTransp->ic);
+        adap.push_back( surf_repair);
+        surfTransp->idx.CreateNumbering( MG.GetLastLevel(), MG, lset.PhiC, &lset.GetBndData());
+        std::cout << "Surfactant transport: NumUnknowns: " << surfTransp->idx.NumUnknowns() << std::endl;
+        surfTransp->ic.SetIdx( &surfTransp->idx);
+        surfTransp->Init( inscamap["surf_sol"]);
     }
 
     // Stokes-Solver
     ParamCL PSolver( P.get_child("CouplingSolver.NavStokesSolver.OseenSolver") );
-    StokesSolverFactoryCL<InstatNavierStokes2PhaseP2P1CL> stokessolverfactory(Stokes, PSolver, P );
+    ParamCL PTime( P.get_child("Time") );
+    StokesSolverFactoryCL<InstatNavierStokes2PhaseP2P1CL> stokessolverfactory(Stokes, PSolver, PTime );
     StokesSolverBaseCL* stokessolver;
 
     if (! P.get<int>("CouplingSolver.NavStokesSolver.OseenSolver.DirectSolve"))
@@ -399,7 +402,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
                                                     "TransConc",     ensf + ".ct",  true));
         }
         if (P.get("SurfTransp.DoTransp", 0)) {
-            ensight->Register( make_Ensight6IfaceScalar( MG, surfTransp.ic,  "InterfaceSol",  ensf + ".sur", true));
+            ensight->Register( make_Ensight6IfaceScalar( MG, surfTransp->ic,  "InterfaceSol",  ensf + ".sur", true));
         }
         if (Stokes.UsesXFEM())
             ensight->Register( make_Ensight6P1XScalar( MG, lset.Phi, Stokes.p, "XPressure",   ensf + ".pr", true));
@@ -435,7 +438,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         }
 
         if (P.get("SurfTransp.DoTransp", 0)) {
-            vtkwriter->Register( make_VTKIfaceScalar( MG, surfTransp.ic,  "InterfaceSol"));
+            vtkwriter->Register( make_VTKIfaceScalar( MG, surfTransp->ic,  "InterfaceSol"));
         }
         vtkwriter->Write(Stokes.v.t);
         vtkwriter->Register( make_VTKScalar( P1EvalCL<double, const StokesPrBndDataCL, const VecDescCL>( sigma_vtk, &Stokes.GetBndData().Pr, &MG), "tau"));
@@ -484,13 +487,13 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
             sigma_vtk->Data = 0.;
         }
 
-        if (P.get("SurfTransp.DoTransp", 0)) surfTransp.InitOld();
+        if ( surfTransp ) surfTransp->InitOld();
         timedisc->DoStep( P.get<int>("CouplingSolver.Iter"));
         if (massTransp) massTransp->DoStep( time_new);
-        if (P.get("SurfTransp.DoTransp", 0)) {
-            surfTransp.DoStep( time_new);
+        if ( surfTransp ) {
+            surfTransp->DoStep( time_new);
             BndDataCL<> ifbnd( 0);
-            std::cout << "surfactant on \\Gamma: " << Integral_Gamma( MG, *lset.PhiC, lset.GetBndData(), make_P1Eval(  MG, ifbnd, surfTransp.ic)) << '\n';
+            std::cout << "surfactant on \\Gamma: " << Integral_Gamma( MG, *lset.PhiC, lset.GetBndData(), make_P1Eval(  MG, ifbnd, surfTransp->ic)) << '\n';
         }
 
         // WriteMatrices( Stokes, step);
@@ -606,9 +609,6 @@ int main (int argc, char** argv)
     PrBndDataCL *prbnddata = 0;
     DROPS::LsetBndDataCL* lsetbnddata= 0;
 
-    //you cannot pass a double& per P.get, so you need to use this indirect way
-    double ExpRadInlet = P.get<double>("NavStokes.RadInlet");
-
     try
     {
         std::auto_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P));
@@ -623,13 +623,10 @@ int main (int argc, char** argv)
                   << "  |          Please adapt your json-file to the new description.   | \n"
                   <<"  \\----------------------------------------------------------------/ \n"
                   << std::endl;
-        DROPS::BuildDomain( mg, P.get<std::string>("DomainCond.MeshFile"), P.get<int>("DomainCond.GeomType"), P.get<std::string>("Restart.Inputfile"), ExpRadInlet);
+        DROPS::BuildDomain( mg, P.get<std::string>("DomainCond.MeshFile"), P.get<int>("DomainCond.GeomType"), P.get<std::string>("Restart.Inputfile"));
     }
 
 
-
-
-    P.put("NavStokes.RadInlet", ExpRadInlet);
 
     std::cout << "Generated MG of " << mg->GetLastLevel() << " levels." << std::endl;
 

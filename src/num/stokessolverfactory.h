@@ -378,33 +378,33 @@ class StokesSolverFactoryCL : public StokesSolverFactoryBaseCL<StokesT, Prolonga
 
 template <class StokesT, class ProlongationVelT, class ProlongationPT>
 StokesSolverFactoryCL<StokesT, ProlongationVelT, ProlongationPT>::
-    StokesSolverFactoryCL(StokesT& Stokes, ParamCL& P, ParamCL& PBase)
-    : base_(Stokes, P),
-        kA_(PBase.get<int>("Time.NumSteps") != 0 ? PBase.get<double>("Time.NumSteps")/PBase.get<double>("Time.TEnd") : 0.0), // P.get<int>("Time.NumSteps") == 0: stat. problem
-        kM_(PBase.get<double>("Time.Theta")),
+    StokesSolverFactoryCL(StokesT& Stokes, ParamCL& PSolver, ParamCL& PTime)
+    : base_(Stokes, PSolver),
+        kA_(PTime.get<int>("NumSteps") != 0 ? PTime.get<double>("NumSteps")/PTime.get<double>("FinalTime") : 0.0), // PTime.get<int>("NumSteps") == 0: stat. problem
+        kM_(PTime.get<double>("Theta")),
         // schur complement preconditioner        
         nopc_ (kA_,kM_),
-        bbtispc_    ( &Stokes_.B.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(), &Stokes_.M.Data.GetFinest(), Stokes_.pr_idx.GetFinest(), kA_, kM_, P.get<double>("PcSTol"), P.get<double>("PcSTol") /* enable regularization: , 0.707*/),
-        mincommispc_( 0, &Stokes_.B.Data.GetFinest(), &Stokes_.M.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(),Stokes_.pr_idx.GetFinest(), P.get<double>("PcSTol") /* enable regularization: , 0.707*/),
-        bdinvbtispc_( 0, &Stokes_.B.Data.GetFinest(), &Stokes_.C.Data.GetFinest(), &Stokes_.M.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(),Stokes_.pr_idx.GetFinest(), P.get<double>("PcSTol") /* enable regularization: , 0.707*/),
+        bbtispc_    ( &Stokes_.B.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(), &Stokes_.M.Data.GetFinest(), Stokes_.pr_idx.GetFinest(), kA_, kM_, PSolver.get<double>("PcSTol"), PSolver.get<double>("PcSTol") /* enable regularization: , 0.707*/),
+        mincommispc_( 0, &Stokes_.B.Data.GetFinest(), &Stokes_.M.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(),Stokes_.pr_idx.GetFinest(), PSolver.get<double>("PcSTol") /* enable regularization: , 0.707*/),
+        bdinvbtispc_( 0, &Stokes_.B.Data.GetFinest(), &Stokes_.C.Data.GetFinest(), &Stokes_.M.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(),Stokes_.pr_idx.GetFinest(), PSolver.get<double>("PcSTol") /* enable regularization: , 0.707*/),
         vankaschurpc_( &Stokes.pr_idx), isprepc_( Stokes.prA.Data, Stokes.prM.Data, kA_, kM_),
-        isgpkernpc_( &Stokes_.prA.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(), &Stokes_.C.Data.GetFinest(), Stokes_.cKernel, kA_, kM_, P.get<double>("PcSTol"), P.get<double>("PcSTol"), P.get<int>("PcSIter",150), &std::cout),
-        isgppc_( &Stokes_.prA.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(), &Stokes_.C.Data.GetFinest(), kA_, kM_, P.get<double>("PcSTol"), P.get<double>("PcSTol"), P.get<int>("PcSIter",150) ),
+        isgpkernpc_( &Stokes_.prA.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(), &Stokes_.C.Data.GetFinest(), Stokes_.cKernel, kA_, kM_, PSolver.get<double>("PcSTol"), PSolver.get<double>("PcSTol"), PSolver.get<int>("PcSIter",150), &std::cout),
+        isgppc_( &Stokes_.prA.Data.GetFinest(), &Stokes_.prM.Data.GetFinest(), &Stokes_.C.Data.GetFinest(), kA_, kM_, PSolver.get<double>("PcSTol"), PSolver.get<double>("PcSTol"), PSolver.get<int>("PcSIter",150) ),
         ismgpre_( Stokes.prA.Data, Stokes.prM.Data, kA_, kM_, Stokes.pr_idx),
-        isnonlinearprepc1_( symmPcPc_, 100, P.get<double>("PcSTol"), true),
-        isnonlinearprepc2_( symmPcPc_, 100, P.get<double>("PcSTol"), true),
+        isnonlinearprepc1_( symmPcPc_, 100, PSolver.get<double>("PcSTol"), true),
+        isnonlinearprepc2_( symmPcPc_, 100, PSolver.get<double>("PcSTol"), true),
         isnonlinearpc_( isnonlinearprepc1_, isnonlinearprepc2_, Stokes_.prA.Data.GetFinest(), Stokes_.prM.Data.GetFinest(), kA_, kM_),        
         // preconditioner for A
         smoother_( 1.0), coarsesolversymm_( symmPcPc_, 500, 1e-6, true),
-        MGSolversymm_ ( smoother_, coarsesolversymm_, P.get<int>("PcAIter"), P.get<double>("PcATol"), Stokes.vel_idx, false),
+        MGSolversymm_ ( smoother_, coarsesolversymm_, PSolver.get<int>("PcAIter"), PSolver.get<double>("PcATol"), Stokes.vel_idx, false),
         MGPcsymm_( MGSolversymm_),
         coarsesolver_( JACPc_, 500, 500, 1e-6, true),        
-        MGSolver_ ( smoother_, coarsesolver_, P.get<int>("PcAIter"), P.get<double>("PcATol"), Stokes.vel_idx, false), MGPc_( MGSolver_),
-        GMResSolver_( JACPc_, P.get<int>("PcAIter"), /*restart*/ 100, P.get<double>("PcATol"), /*rel*/ true), GMResPc_( GMResSolver_),
-        GS_GMResSolver_( GSPc_, P.get<int>("PcAIter"), /*restart*/ 100, P.get<double>("PcATol"), /*rel*/ true), GS_GMResPc_( GS_GMResSolver_),
-        BiCGStabSolver_( JACPc_, P.get<int>("PcAIter"), P.get<double>("PcATol"), /*rel*/ true),BiCGStabPc_( BiCGStabSolver_),
-        PCGSolver_( symmPcPc_, P.get<int>("PcAIter"), P.get<double>("PcATol"), true), PCGPc_( PCGSolver_),
-        IDRsSolver_( JACPc_, P.get<int>("PcAIter"), P.get<double>("PcATol"), true), IDRsPc_( IDRsSolver_),
+        MGSolver_ ( smoother_, coarsesolver_, PSolver.get<int>("PcAIter"), PSolver.get<double>("PcATol"), Stokes.vel_idx, false), MGPc_( MGSolver_),
+        GMResSolver_( JACPc_, PSolver.get<int>("PcAIter"), /*restart*/ 100, PSolver.get<double>("PcATol"), /*rel*/ true), GMResPc_( GMResSolver_),
+        GS_GMResSolver_( GSPc_, PSolver.get<int>("PcAIter"), /*restart*/ 100, PSolver.get<double>("PcATol"), /*rel*/ true), GS_GMResPc_( GS_GMResSolver_),
+        BiCGStabSolver_( JACPc_, PSolver.get<int>("PcAIter"), PSolver.get<double>("PcATol"), /*rel*/ true),BiCGStabPc_( BiCGStabSolver_),
+        PCGSolver_( symmPcPc_, PSolver.get<int>("PcAIter"), PSolver.get<double>("PcATol"), true), PCGPc_( PCGSolver_),
+        IDRsSolver_( JACPc_, PSolver.get<int>("PcAIter"), PSolver.get<double>("PcATol"), true), IDRsPc_( IDRsSolver_),
         // block precondtioner
         DBlock_(0), LBlock_(0), SBlock_(0),
         vankapc_( &Stokes.pr_idx),

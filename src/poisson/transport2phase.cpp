@@ -240,7 +240,7 @@ void TransportP1CL::InitStep (VectorCL& rhs)
 
 void TransportP1CL::DoStep (const VectorCL& rhs)
 {
-    std::cout << "Before solve: res = " << norm( L_*ct.Data - rhs) << std::endl;
+    std::cout << "Before mass transport solve: res = " << norm( L_*ct.Data - rhs) << std::endl;
     // std::cout << "ct:\n" << ct.Data << "\ncplC:\n" << cplC.Data << "\nC:\n" << C.Data << std::endl;
     // std::cout << "\ncplM:\n" << cplM.Data << "\nM:\n" << M.Data << std::endl;
     // std::cout << "\ncplA:\n" << cplA.Data << "\nA:\n" << A.Data << std::endl;
