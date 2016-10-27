@@ -57,7 +57,7 @@
 #include <sstream>
 
 #ifndef _PAR
-#include "num/stokespardiso.h" 
+#include "num/stokespardiso.h"
 #endif
 #include "misc/progressaccu.h"
 #include "misc/dynamicload.h"
@@ -152,8 +152,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         Stokes.SetNumPrLvl  ( Stokes.GetMG().GetNumLevel());
         lset.SetNumLvl(Stokes.GetMG().GetNumLevel());
     }
-    lset.CreateNumbering( MG.GetLastLevel(), lidx, periodic_match);
-    lset.Phi.SetIdx( lidx);
+    lset.CreateNumbering( MG.GetLastLevel(), periodic_match);
 
     if (lset.IsDiscontinuous())
     {
@@ -164,8 +163,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     }
 
     PermutationT lset_downwind;
-    lset.SetSurfaceForce( SF_ImprovedLBVar); // see levelset.h
-    
+
     if ( StokesSolverFactoryHelperCL().VelMGUsed(P))
         Stokes.SetNumVelLvl ( Stokes.GetMG().GetNumLevel());
     if ( StokesSolverFactoryHelperCL().PrMGUsed(P))
@@ -234,7 +232,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     TransportP1CL * massTransp = nullptr;
     TransportRepairCL *  transprepair = nullptr;
 
-    if( P.exists("Transp") )
+    if( P.get<bool>("Transp.Enable") )
     {
         // CL: the following could be moved outside of strategy to some function like
         //" InitializeMassTransport(P,MG,Stokes,lset,adap, TransportP1CL * & massTransp,TransportRepairCL * & transprepair)"
@@ -271,7 +269,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     SurfactantcGP1CL *surfTransp = nullptr;
     InterfaceP1RepairCL *surf_repair = nullptr;
 
-    if( P.exists("SurfTransp") )
+    if( P.get<bool>("SurfTransp.Enable") )
     {
         surfTransp = new SurfactantcGP1CL( MG, Stokes.GetBndData().Vel, P.get<double>("Time.Theta"), P.get<double>("SurfTransp.Visc"), &Stokes.v, *lset.PhiC, lset.GetBndData(),
                                      dt, P.get<int>("SurfTransp.Solver.Iter"), P.get<double>("SurfTransp.Solver.Tol"), P.get<double>("SurfTransp.XFEMReduced"));
@@ -293,7 +291,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         stokessolver = stokessolverfactory.CreateStokesSolver();
 #ifndef _PAR
     else
-        stokessolver = new StokesPardisoSolverCL(); 
+        stokessolver = new StokesPardisoSolverCL();
 #else
     else
         throw DROPSErrCL("no direct solver in parallel");
@@ -465,7 +463,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
 
     double time = 0.0;
-    
+
     typedef DistMarkingStrategyCL MarkerT;
     MarkerT marker( lset,
                     P.get<double>("Mesh.AdaptRef.Width"),
@@ -571,43 +569,6 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
 } // end of namespace DROPS
 
-
-/// \brief Set Default parameters here s.t. they are initialized.
-/// The result can be checked when Param-list is written to the output.
-void SetMissingParameters(DROPS::ParamCL& P){
-    P.put_if_unset<std::string>("VTK.TimeFileName",P.get<std::string>("VTK.VTKName"));
-    P.put_if_unset<int>("VTK.ReUseTimeFile",0);
-    P.put_if_unset<int>("VTK.UseDeformation",0);
-    P.put_if_unset<int>("VTK.UseOnlyP1",0);
-    P.put_if_unset<int>("VTK.AddP1XPressure",0);
-    P.put_if_unset<int>("VTK.AddDGOutput",0);
-    P.put_if_unset<int>("Transp.DoTransp",0);
-    P.put_if_unset<std::string>("Restart.Inputfile","none");
-    P.put_if_unset<int>("NavStokes.ShiftFrame", 0);
-    P.put_if_unset<int>("CouplingSolver.NavStokesSolver.Downwind.Frequency", 0);
-    P.put_if_unset<double>("CouplingSolver.NavStokesSolver.Downwind.MaxRelComponentSize", 0.05);
-    P.put_if_unset<double>("CouplingSolver.NavStokesSolver.Downwind.WeakEdgeRatio", 0.2);
-    P.put_if_unset<double>("CouplingSolver.NavStokesSolver.Downwind.CrosswindLimit", std::cos( M_PI/6.));
-    P.put_if_unset<int>("Levelset.Discontinuous", 0);
-    P.put_if_unset<int>("CouplingSolver.LevelsetSolver.Downwind.Frequency", 0);
-    P.put_if_unset<double>("CouplingSolver.LevelsetSolver.Downwind.MaxRelComponentSize", 0.05);
-    P.put_if_unset<double>("CouplingSolver.LevelsetSolver.Downwind.WeakEdgeRatio", 0.2);
-    P.put_if_unset<double>("CouplingSolver.LevelsetSolver.Downwind.CrosswindLimit", std::cos( M_PI/6.));
-
-    P.put_if_unset<std::string>("NavStokes.Coeff.VolForce", "ZeroVel");
-    //P.put_if_unset<double>("Mat.DensDrop", 0.0);
-    //P.put_if_unset<double>("Mat.ShearVisco", 0.0);
-    //P.put_if_unset<double>("Mat.DilatationalVisco", 0.0);
-    P.put_if_unset<double>("Mat.SmoothZone", 0.05); // deprecated, right? remove from instatstokes2phase.h?
-    P.put_if_unset<double>("NavStokes.Coeff.SurfTens.ShearVisco", 0.0);
-    P.put_if_unset<double>("NavStokes.Coeff.SurfTens.DilatationalVisco", 0.0);
-    P.put_if_unset<std::string>("NavStokes.Coeff.SurfTens.VarTensionFunc", "ConstTau");
-    P.put_if_unset<int>("CouplingSolver.NavStokesSolver.OseenSolver.DirectSolve", 0);
-
-    P.put_if_unset<int>("General.ProgressBar", 0);
-    P.put_if_unset<std::string>("General.DynamicLibsPrefix", "../");
-}
-
 int main (int argc, char** argv)
 {
 #ifdef _PAR
@@ -618,8 +579,12 @@ int main (int argc, char** argv)
     std::cout << "Boost version: " << BOOST_LIB_VERSION << std::endl;
 
     DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/levelset/twophasedrops/risingdroplet.json");
-    SetMissingParameters(P);
+    P.put_if_unset<std::string>("VTK.TimeFileName",P.get<std::string>("VTK.VTKName"));
+
     std::cout << P << std::endl;
+
+
+
 
     DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
 

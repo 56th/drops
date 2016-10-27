@@ -42,8 +42,7 @@ TestSingleTetra()
 
     LevelsetP2CL & lset( * LevelsetP2CL::Create(mg,  lsbnd, sf) );
 
-    lset.idx.CreateNumbering( 0, mg);
-    lset.Phi.SetIdx( &lset.idx);
+    lset.CreateNumbering(0);
     lset.Phi.Data= 1.0;
 
     IdxDescCL ifaceidx( P1IF_FE);
@@ -111,8 +110,7 @@ TestPlaneInCube()
     LsetBndDataCL lsbnd( 6, bc, bfun);
     LevelsetP2CL & lset( * LevelsetP2CL::Create( mg, lsbnd, sf) );
 
-    lset.idx.CreateNumbering( 0, mg);
-    lset.Phi.SetIdx( &lset.idx);
+    lset.CreateNumbering(0);
     lset.Phi.Data= 1.0;
 
     IdxDescCL ifaceidx( P1IF_FE);
@@ -256,8 +254,7 @@ int main ()
 
     LevelsetP2CL & lset( * LevelsetP2CL::Create( mg, lsbnd, sf) ) ;
 
-    lset.idx.CreateNumbering( 0, mg);
-    lset.Phi.SetIdx( &lset.idx);
+    lset.CreateNumbering(0);
     lset.Init( &sphere_2);
 
     IdxDescCL ifaceidx( P1IF_FE);

@@ -104,14 +104,9 @@ class TwoPhaseFlowCoeffCL
 
     TwoPhaseFlowCoeffCL( ParamCL& P, bool dimless = false)
       //big question: film or measurecell? 1: measure, 2: film
-        : //film( (P.get<double>("Mat.DensDrop") == 0.0) ),
-          film( false ), /// \todo change to something meaningful
+            //If we merge film.cpp and twophasedrops.cpp, we don't need film flag anymore.
+        : film( false ), /// \todo change to something meaningful
         ns_shiftframe( (P.get<int>("NavStokes.ShiftFrame", 0) == 1) ),
-//        surfTens( film ? P.get<double>("Mat.SurfTension") : P.get<double>("SurfTens.SurfTension")),
-//        rho_koeff1( film ? P.get<double>("Mat.DensGas") : P.get<double>("Mat.DensFluid")),
-//        rho_koeff2( film ? P.get<double>("Mat.DensFluid") : P.get<double>("Mat.DensDrop")),
-//        mu_koeff1( film ? P.get<double>("Mat.ViscGas") : P.get<double>("Mat.ViscFluid")),
-//        mu_koeff2( film ? P.get<double>("Mat.ViscFluid") : P.get<double>("Mat.ViscDrop")),
         surfTens( P.get<double>("NavStokes.Coeff.SurfTens.SurfTension") ),
         rho_koeff1( P.get<double>("NavStokes.Coeff.DensPos") ),
         rho_koeff2( P.get<double>("NavStokes.Coeff.DensNeg") ),
@@ -119,9 +114,9 @@ class TwoPhaseFlowCoeffCL
         mu_koeff2( P.get<double>("NavStokes.Coeff.ViscNeg") ),
 
         rho( dimless ? JumpCL( 1., rho_koeff1/rho_koeff2)
-          : JumpCL( rho_koeff2, rho_koeff1), H_sm, P.get<double>("Mat.SmoothZone")),
+          : JumpCL( rho_koeff2, rho_koeff1), H_sm, P.get<double>("NavStokes.Coeff.SmoothZone")),
         mu( dimless ? JumpCL( 1., mu_koeff1/mu_koeff2)
-          : JumpCL( mu_koeff2, mu_koeff1), H_sm, P.get<double>("Mat.SmoothZone")),
+          : JumpCL( mu_koeff2, mu_koeff1), H_sm, P.get<double>("NavStokes.Coeff.SmoothZone")),
         SurfTens (dimless ? surfTens/rho_koeff2 : surfTens),
         //DilVisco( film ? P.get<double>("Mat.DilatationalVisco") : P.get<double>("SurfTens.DilatationalVisco")),
         //ShearVisco( film ? P.get<double>("Mat.ShearVisco") : P.get<double>("SurfTens.ShearVisco")),

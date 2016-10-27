@@ -178,13 +178,12 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         lset.SetNumLvl(Stokes.GetMG().GetNumLevel());
     }
 
-    lset.CreateNumbering( MG.GetLastLevel(), lidx, periodic_match);
-    lset.Phi.SetIdx( lidx);
+    lset.CreateNumbering( MG.GetLastLevel(), periodic_match);
     // oldlset.CreateNumbering( MG.GetLastLevel(), lidx, periodic_match);
     oldlset.Phi.SetIdx( lidx);
     PermutationT lset_downwind;
     lset.SetSurfaceForce( SF_ImprovedLBVar); // see levelset/levelset.h
-    
+
     SetInitialLevelsetConditions( lset, MG, P);
     // SetInitialLevelsetConditions( oldlset, MG, P);
     Stokes.CreateNumberingVel( MG.GetLastLevel(), vidx, periodic_match);
@@ -243,7 +242,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     DROPS::BuildBoundaryData( &MG, transp_pBnd_neg, P.get<std::string>("Transp.BoundaryType"), P.get<std::string>("Transp.BoundaryFncsNeg"));
 
     cBndDataCL & transp_Bnd_neg(*transp_pBnd_neg);
-    cBndDataCL & transp_Bnd_pos(*transp_pBnd_pos); 
+    cBndDataCL & transp_Bnd_pos(*transp_pBnd_pos);
 
 
 
@@ -301,7 +300,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         stokessolver = stokessolverfactory.CreateStokesSolver();
 #ifndef _PAR
     else
-        stokessolver = new StokesPardisoSolverCL(); 
+        stokessolver = new StokesPardisoSolverCL();
 #else
     else
         throw DROPSErrCL("no direct solver in parallel");
@@ -408,7 +407,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         VecDescCL & vpos(sol.GetFutureTrace_Pos());
         VecDescCL & vneg(sol.GetFutureTrace_Neg());
 
-        
+
         if (P.get<std::string>("Restart.Inputfile") == "none"){
             for (MultiGridCL::const_TriangVertexIteratorCL sit= const_cast<const MultiGridCL&>(MG).GetTriangVertexBegin(-1), send= const_cast<const MultiGridCL&>(MG).GetTriangVertexEnd(-1);
                  sit != send; ++sit)
@@ -437,7 +436,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     // err_idx.CreateNumbering( -1, MG);
     // err_vec.SetIdx(&err_idx);
 
-    // MassTranspErrorIndicatorCL errorindicator ( MG, 
+    // MassTranspErrorIndicatorCL errorindicator ( MG,
     //                                             lset,
     //                                             sol.GetFutureTrace_Neg(),
     //                                             sol.GetFutureTrace_Pos(),
@@ -527,8 +526,8 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
     DistMarkingStrategyCL markerlset( lset,
                                       P.get<double>("AdaptRef.Width"),
-                                      P.get<double>("AdaptRef.CoarsestLevel"), 
-                                      std::max(P.get<int>("AdaptRef.FinestLevel"), 
+                                      P.get<double>("AdaptRef.CoarsestLevel"),
+                                      std::max(P.get<int>("AdaptRef.FinestLevel"),
                                                P.get<int>("AdaptRef.CoarsestLevel")));
 
     // thresholdlist for classification of refinement lvl. in heuristically hacked
@@ -545,12 +544,12 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     }
 
     std::ofstream * concout = NULL;
-    ConcentrationMarkingStrategyCL markerconc (lset, solneg, solpos, 
+    ConcentrationMarkingStrategyCL markerconc (lset, solneg, solpos,
                                                thresholdlist,
-                                               P.get<int>("AdaptRef.CoarsestLevel"), 
-                                               P.get<double>("AdaptRef.FinestLevel"), 
-                                               P.get<int>("AdaptRef.Hacked",0) == 1, 
-                                               P.get<double>("AdaptRef.HackedWidth",0.0), 
+                                               P.get<int>("AdaptRef.CoarsestLevel"),
+                                               P.get<double>("AdaptRef.FinestLevel"),
+                                               P.get<int>("AdaptRef.Hacked",0) == 1,
+                                               P.get<double>("AdaptRef.HackedWidth",0.0),
                                                concout );
     combinedmarker.push_back(markerlset);
 
@@ -600,22 +599,22 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
             TetraAccumulatorTupleCL accus ;
             MatrixCL A;
-            VecDescCL b(&Idx);      
+            VecDescCL b(&Idx);
             ProgressBarTetraAccumulatorCL accup(MG,"STTranspAcc");
             accus.push_back(&accup);
             STTransportVolumeAccumulator_P1SP1TXCL accu(MG, transp_pBnd_neg, transp_pBnd_pos, &oldlset, &lset,
                                                         NULL,
-                                                        RhsNeg, RhsPos, Flowfield, &A, &b, 
-                                                        Idx, Idx, told, tnew, 
-                                                        sol.GetFutureTrace_Neg(), 
-                                                        sol.GetFutureTrace_Pos(), 
+                                                        RhsNeg, RhsPos, Flowfield, &A, &b,
+                                                        Idx, Idx, told, tnew,
+                                                        sol.GetFutureTrace_Neg(),
+                                                        sol.GetFutureTrace_Pos(),
                                                         P.get_child("Transp"));
             accus.push_back(&accu);
             std::cout << " accumulate " << std::endl;
             accumulate( accus, MG, Idx.TriangLevel(), Idx.GetMatchingFunction(), Idx.GetBndInfo());
 
             std::cout << " solve " << std::endl;
-            
+
             if ( P.get("Transp.DirectSolve", 0))
             {
 #ifndef _PAR
@@ -642,7 +641,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     typedef JACPcCL STConcPcT;
 #endif
                 STConcPcT                  pc_;
-                GMResSolverCL<STConcPcT> gm_( pc_, 20, P.get<int>("Transp.Iter"), P.get<double>("Transp.Tol"), 
+                GMResSolverCL<STConcPcT> gm_( pc_, 20, P.get<int>("Transp.Iter"), P.get<double>("Transp.Tol"),
                                               P.get<int>("Transp.RelTol",0), false, RightPreconditioning);
                 gm_.Solve( A, sol.GetSolution().Data, b.Data,Idx.GetEx());
                 std::cout << "res = " << gm_.GetResid() << ", iter = " << gm_.GetIter()<<"\n";
@@ -685,8 +684,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         if (doLsetDownwindNumbering) {
             if (!gridChanged) { // We must ensure that the permutation maps the original numbering of CreateNumbering to the downwind-numbering and that the renumbering starts in a known state, i.e. the original numbering.
                 lset.DeleteNumbering( lidx);
-                lset.CreateNumbering( MG.GetLastLevel(), lidx, periodic_match);
-                lset.Phi.SetIdx( lidx);
+                lset.CreateNumbering( MG.GetLastLevel(), periodic_match);
                 permute_Vector( lset.Phi.Data, invert_permutation( lset_downwind));
             }
             lset_downwind= lset.downwind_numbering( Stokes.GetVelSolution(), levelset_downwind);
@@ -731,7 +729,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 }
 
 
- 
+
 void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTriangCL& adap)    // do just the transport stuff
 {
     rusage usage;
@@ -762,10 +760,10 @@ void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTr
     match_fun periodic_match = is_periodic ? matchmap[P.get("DomainCond.PeriodicMatching", std::string("periodicx"))] : 0;
 
     cBndDataCL & Bnd_neg(*pBnd_neg);
-    cBndDataCL & Bnd_pos(*pBnd_pos); 
-   
+    cBndDataCL & Bnd_pos(*pBnd_pos);
+
     DROPS::instat_scalar_fun_ptr sigmap = 0;
-    SurfaceTensionCL sf( sigmap, Bnd_neg);    
+    SurfaceTensionCL sf( sigmap, Bnd_neg);
     LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsetbnddata, sf, P.get_child("Levelset")) );
     LevelsetP2CL & oldlset( * LevelsetP2CL::Create( MG, lsetbnddata, sf, P.get_child("Levelset")) );
 
@@ -776,20 +774,13 @@ void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTr
     LevelsetRepairCL oldlsetrepair( oldlset);
     adap.push_back( &oldlsetrepair);
 
-    MLIdxDescCL* lidx= &lset.idx;
-    // index wrt the interface at previous time step
-    MLIdxDescCL* oldlidx= &oldlset.idx; 
-
-    lset.CreateNumbering( MG.GetLastLevel(), lidx);
-    lset.Phi.SetIdx( lidx);
-
-    oldlset.CreateNumbering( MG.GetLastLevel(), oldlidx);
-    oldlset.Phi.SetIdx( oldlidx);
+    lset.CreateNumbering( MG.GetLastLevel());
+    oldlset.CreateNumbering( MG.GetLastLevel()); // interface at previous time step
 
     SetInitialLevelsetConditions( lset, MG, P);
     SetInitialLevelsetConditions( oldlset, MG, P);
 
-    
+
     const double dt = P.get<double>("Time.EndTime") / P.get<double>("Time.NumSteps");
 
     lset.Init( distance, dt);
@@ -801,19 +792,19 @@ void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTr
 
     //const double Vol= lset.GetVolume(); //0.5 * 0.125 * M_PI; //EllipsoidCL::GetVolume();
     std::cout << "initial volume(abs value): " << lset.GetVolume() << std::endl;
-    
+
     //VelocityContainer vel(Stokes.v,Stokes.GetBndData().Vel,MG);
     //-> VelocityContainer vel(Flowfield);
-    
+
     // TransportP1XCL massTransp( MG, Bnd_c, Bnd_ct, vel, lsetbnddata, lset.Phi, oldlset.Phi,P,0,Reaction,Rhs);
     // TransportXRepairCL transprepair(massTransp, MG.GetLastLevel());
-    
+
     // index of the concentration wrt the interface at actual time step:
     // MLIdxDescCL* cidx= &massTransp.idx;
-    
+
     // index of the concentration wrt the interface at previous time step:
-    // MLIdxDescCL* cidx_old= &massTransp.oldidx; 
-    
+    // MLIdxDescCL* cidx_old= &massTransp.oldidx;
+
     const double vmax = P.get<double>("Transp.MaxVelocity");
 
     SpaceTimeXSolutionCL sol(MG, Bnd_neg, Bnd_pos, P, periodic_match);
@@ -828,11 +819,11 @@ void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTr
     // writer for vtk-format
     VTKOutCL * vtkwriter = NULL;
     if (P.get<int>("VTK.VTKOut")){
-        vtkwriter = new VTKOutCL(adap.GetMG(), "DROPS data", 
+        vtkwriter = new VTKOutCL(adap.GetMG(), "DROPS data",
                                  P.get<int>("Time.NumSteps")/P.get<int>("VTK.VTKOut")+1,
-                                 P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName"), 
+                                 P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName"),
                                  P.get<std::string>("VTK.TimeFileName"),
-                                 P.get<int>("VTK.Binary"), 
+                                 P.get<int>("VTK.Binary"),
                                  P.get<int>("VTK.UseOnlyP1"),
                                  false,
                                  -1,  /* <- level */
@@ -902,10 +893,10 @@ void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTr
         // MatrixCL A2;
         // VecDescCL b2(&Idx);
 
-        // MassTestAccumulator_P1SP1TXCL accu(MG, pBnd_neg, pBnd_pos, &oldlset, &lset, 
+        // MassTestAccumulator_P1SP1TXCL accu(MG, pBnd_neg, pBnd_pos, &oldlset, &lset,
         //                                    RhsNeg, RhsPos, &A1, &b1, Idx, Idx, told, tnew);
 
-        // SpatialLaplaceAccumulator_P1SP1TXCL accu2(MG, pBnd_neg, pBnd_pos, &oldlset, &lset, 
+        // SpatialLaplaceAccumulator_P1SP1TXCL accu2(MG, pBnd_neg, pBnd_pos, &oldlset, &lset,
         //                                          RhsNeg, RhsPos, &A2, &b2, Idx, Idx, told, tnew);
 
 
@@ -913,16 +904,16 @@ void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTr
         accus.push_back(&accup);
 
 
-        MassTestAccumulator_P1SP1TXCL accumass(MG, pBnd_neg, pBnd_pos, &oldlset, &lset, 
+        MassTestAccumulator_P1SP1TXCL accumass(MG, pBnd_neg, pBnd_pos, &oldlset, &lset,
                                                SolNeg, SolPos, &A, &b, Idx, Idx, told, tnew, P.get_child("Transp"));
 
-        STTransportVolumeAccumulator_P1SP1TXCL accu(MG, pBnd_neg, pBnd_pos, &oldlset, &lset, 
+        STTransportVolumeAccumulator_P1SP1TXCL accu(MG, pBnd_neg, pBnd_pos, &oldlset, &lset,
                                                     P.get<int>("Transp.Quadrature.LevelsetLinearInTime")==1?
                                                     NULL:distance,
-                                                    RhsNeg, RhsPos, Flowfield, &A, &b, 
-                                                    Idx, Idx, told, tnew, 
-                                                    sol.GetFutureTrace_Neg(), 
-                                                    sol.GetFutureTrace_Pos(), 
+                                                    RhsNeg, RhsPos, Flowfield, &A, &b,
+                                                    Idx, Idx, told, tnew,
+                                                    sol.GetFutureTrace_Neg(),
+                                                    sol.GetFutureTrace_Pos(),
                                                     P.get_child("Transp"));
         if (P.get<int>("Transp.Mass")==1)
         {
@@ -969,7 +960,7 @@ void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTr
                 typedef JACPcCL STConcPcT;
 #endif
                 STConcPcT                  pc_;
-                GMResSolverCL<STConcPcT> gm_( pc_, 20, P.get<int>("Transp.Iter"), P.get<double>("Transp.Tol"), 
+                GMResSolverCL<STConcPcT> gm_( pc_, 20, P.get<int>("Transp.Iter"), P.get<double>("Transp.Tol"),
                                               P.get<int>("Transp.RelTol",0), false, RightPreconditioning);
                 gm_.Solve( A, sol.GetSolution().Data, b.Data,Idx.GetEx());
                 std::cout << "res = " << gm_.GetResid() << ", iter = " << gm_.GetIter()<<"\n";
@@ -986,7 +977,7 @@ void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTr
             TetraAccumulatorTupleCL accus ;
             accus.push_back(&accup);
 
-            STGeomApproxTestAccumulatorCL accu3(MG, &oldlset, &lset,  
+            STGeomApproxTestAccumulatorCL accu3(MG, &oldlset, &lset,
                                                 P.get<int>("Transp.Quadrature.LevelsetLinearInTime")==1?
                                                 NULL:distance,
                                                 told, tnew, P.get_child("Transp"));
@@ -997,29 +988,29 @@ void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTr
 
 
 
-            InterfaceJumpAccumulatorCL accu(MG, &oldlset, &lset, 
+            InterfaceJumpAccumulatorCL accu(MG, &oldlset, &lset,
                                             P.get<int>("Transp.Quadrature.LevelsetLinearInTime")==1?
                                             NULL:distance,
-                                            told, tnew, 
-                                            sol.GetPastTrace_Neg(), 
-                                            sol.GetPastTrace_Pos(), 
-                                            sol.GetFutureTrace_Neg(), 
-                                            sol.GetFutureTrace_Pos(), 
+                                            told, tnew,
+                                            sol.GetPastTrace_Neg(),
+                                            sol.GetPastTrace_Pos(),
+                                            sol.GetFutureTrace_Neg(),
+                                            sol.GetFutureTrace_Pos(),
                                             *pBnd_neg, *pBnd_pos,
                                             P.get_child("Transp"));
 
             accus.push_back(&accu);
-            EnergyNormErrorAccumulatorCL accuen(MG, &oldlset, &lset, 
+            EnergyNormErrorAccumulatorCL accuen(MG, &oldlset, &lset,
                                             P.get<int>("Transp.Quadrature.LevelsetLinearInTime")==1?
                                             NULL:distance,
-                                            told, tnew, 
-                                            sol.GetPastTrace_Neg(), 
-                                            sol.GetPastTrace_Pos(), 
-                                            sol.GetFutureTrace_Neg(), 
-                                            sol.GetFutureTrace_Pos(), 
+                                            told, tnew,
+                                            sol.GetPastTrace_Neg(),
+                                            sol.GetPastTrace_Pos(),
+                                            sol.GetFutureTrace_Neg(),
+                                            sol.GetFutureTrace_Pos(),
                                             *pBnd_neg, *pBnd_pos,
                                             P.get_child("Transp"));
-            
+
             accus.push_back(&accuen);
             std::cout << " accumulate " << std::endl;
             accumulate( accus, MG, Idx.TriangLevel(), Idx.GetMatchingFunction(), Idx.GetBndInfo());
@@ -1033,7 +1024,7 @@ void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTr
         if (vtkoutnow)
             vtkwriter->Write(tnew);
     }
-    
+
     // std::cout << " before destructors ... "<< std::endl;
     std::cout << std::endl;
 
@@ -1047,7 +1038,7 @@ void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTr
 
         std::cout << " outputting end... " << std::endl;
     }
-    // VecDescCL 
+    // VecDescCL
 
 
     if ( P.get("Transp.CompareResult", 0))
@@ -1113,65 +1104,6 @@ void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTr
 
 } // end of namespace DROPS
 
-/// \brief Set Default parameters here s.t. they are initialized.
-/// The result can be checked when Param-list is written to the output.
-void SetMissingParameters(DROPS::ParamCL& P){
-
-    P.put_if_unset<int>("Transp.DoTransp",0);
-    P.put_if_unset<std::string>("Transp.Levelset","Ellipsoid");
-    P.put_if_unset<std::string>("Transp.Flow","ZeroVel");
-    P.put_if_unset<std::string>("Transp.RhsNeg","Zero");
-    P.put_if_unset<std::string>("Transp.RhsPos","Zero");
-    P.put_if_unset<std::string>("Transp.InitialConcNeg","IniCnegFct");
-    P.put_if_unset<std::string>("Transp.InitialConcPos","IniCposFct");
-    P.put_if_unset<std::string>("Transp.BoundaryType","21!21!21!21!21!21");
-    P.put_if_unset<std::string>("Transp.BoundaryFncs","Zero!Zero!Zero!Zero!Zero!Zero");
-    P.put_if_unset<std::string>("Transp.BoundaryFncst","Zero!Zero!Zero!Zero!Zero!Zero");
-    P.put_if_unset<int>("Transp.KappaRule",0);
-    P.put_if_unset<int>("Transp.Debug",0);
-    P.put_if_unset<int>("Transp.Mass",0);
-    P.put_if_unset<int>("Transp.NoConvection",0);
-    P.put_if_unset<int>("Transp.MaxVelocity",1.0);
-    P.put_if_unset<int>("Transp.AntiSymmetricConvection",0);
-    P.put_if_unset<int>("Transp.RhsApproximationOrderInTime",2);
-    P.put_if_unset<int>("Transp.ConvectionApproximationOrderInTime",1);
-    P.put_if_unset<int>("TestCase5.DeformationCase",0);
-
-    P.put_if_unset<int>("SurfTransp.DoTransp",0);
-
-    P.put_if_unset<std::string>("VTK.TimeFileName",P.get<std::string>("VTK.VTKName"));
-    P.put_if_unset<int>("VTK.ReUseTimeFile",0);
-    P.put_if_unset<int>("VTK.UseOnlyP1",0);
-    P.put_if_unset<int>("VTK.VTKOut",0);
-    P.put_if_unset<std::string>("VTK.VTKName","ns_transp");
-
-    P.put_if_unset<int>("Ensight.EnsightOut",0);
-    P.put_if_unset<int>("Levelset.Discontinuous", 0);
-    P.put_if_unset<int>("Levelset.SD", 1);
-    P.put_if_unset<int>("Levelset.CurvDiff", 0);
-
-    P.put_if_unset<double>("NavStokes.Nonlinear", 0.0);
-
-    P.put_if_unset<std::string>("Restart.Inputfile","none");
-    P.put_if_unset<int>("NavStokes.Downwind.Frequency", 0);
-    P.put_if_unset<double>("NavStokes.Downwind.MaxRelComponentSize", 0.05);
-    P.put_if_unset<double>("NavStokes.Downwind.WeakEdgeRatio", 0.2);
-    P.put_if_unset<double>("NavStokes.Downwind.CrosswindLimit", std::cos( M_PI/6.));
-    P.put_if_unset<int>("Levelset.Downwind.Frequency", 0);
-    P.put_if_unset<double>("Levelset.Downwind.MaxRelComponentSize", 0.05);
-    P.put_if_unset<double>("Levelset.Downwind.WeakEdgeRatio", 0.2);
-    P.put_if_unset<double>("Levelset.Downwind.CrosswindLimit", std::cos( M_PI/6.));
-
-    P.put_if_unset<std::string>("Exp.VolForce", "ZeroVel");
-    P.put_if_unset<double>("Mat.DensDrop", 0.0);
-    P.put_if_unset<double>("Mat.ShearVisco", 0.0);
-    P.put_if_unset<double>("Mat.DilatationalVisco", 0.0);
-    P.put_if_unset<double>("SurfTens.ShearVisco", 0.0);
-    P.put_if_unset<double>("SurfTens.DilatationalVisco", 0.0);
-
-    P.put_if_unset<int>("General.ProgressBar", 0);
-    P.put_if_unset<std::string>("General.DynamicLibsPrefix", "../");
-}
 
 int main (int argc, char** argv)
 {
@@ -1180,10 +1112,11 @@ int main (int argc, char** argv)
 #endif
   try
   {
+
     std::cout << "Boost version: " << BOOST_LIB_VERSION << std::endl;
 
     DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/spacetimetransp/st_transp/risingdroplet.json");
-    SetMissingParameters(P);
+    P.put_if_unset<std::string>("VTK.TimeFileName",P.get<std::string>("VTK.VTKName"));
     std::cout << P << std::endl;
 
     DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
@@ -1299,8 +1232,8 @@ int main (int argc, char** argv)
         std::cout << "As far as I can tell the ParMultigridCL is sane\n";
 #endif
 
-    
-    if (P.get<int>("Transp.UseNSSol") == 1) 
+
+    if (P.get<int>("Transp.UseNSSol") == 1)
     {
         DROPS::InstatNavierStokes2PhaseP2P1CL prob( *mg, DROPS::TwoPhaseFlowCoeffCL(P), bnddata, P.get<double>("Stokes.XFEMStab")<0 ? DROPS::P1_FE : DROPS::P1X_FE, P.get<double>("Stokes.XFEMStab"));
 

@@ -249,8 +249,9 @@
         {
                 "PeriodicMatching":     "none",            // matching function 
                                                            // identifier for periodic boundaries
-                "InitialCond":          0,                 // initial conditions (0 = zero, 1/2 = stationary
-                                                           // flow with/without droplet, -1 = read from file).
+                "InitialCond":          0,                 // initial conditions (0 = zero, 1/10 stationary flow with 
+                                                           // droplet which includes/dismiss surface tension,
+                                                           // 2 = stationary flow without droplet, -1 = read from file).
                 "GeomType":             1,                 // specifies the used geometry
                                                            // (0 = ReadMeshBuilder, 1 = BrickBuilder).
                 "InitialFile":          "none",            // file prefix when reading data for initial condition.

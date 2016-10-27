@@ -200,8 +200,7 @@ int main (int argc, char** argv)
     LsetBndDataCL lsbnd( 6, bc, bfun);
     LevelsetP2CL & lset( * LevelsetP2CL::Create( mg, lsbnd, sf) ) ;
 
-    lset.idx.CreateNumbering( mg.GetLastLevel(), mg);
-    lset.Phi.SetIdx( &lset.idx);
+    lset.CreateNumbering( mg.GetLastLevel());
     lset.Init( &phasebnd);
 
     IdxDescCL idx( P1X_FE, BndCondCL(0), 0, /*omit_bound=*/ xfemstab);

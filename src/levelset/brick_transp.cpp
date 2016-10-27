@@ -97,9 +97,7 @@ void Strategy (MultiGridCL& MG, const LsetBndDataCL& lsbnd)
     // Creates new Levelset-Object, has to be cleaned manually
     LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsbnd, *sf, P.get_child("Levelset")) );
 
-    MLIdxDescCL* lidx= &lset.idx;
-    lset.CreateNumbering( MG.GetLastLevel(), lidx);
-    lset.Phi.SetIdx( lidx);
+    lset.CreateNumbering( MG.GetLastLevel());
     lset.Init( EllipsoidCL::DistanceFct);
 
     VelBndDataCL Bnd_v( 6, v_bc, v_bfun);
@@ -157,7 +155,7 @@ void Strategy (MultiGridCL& MG, const LsetBndDataCL& lsbnd)
 int main (int argc, char** argv)
 {
   try {
-    DROPS::read_parameter_file_from_cmdline( P, argc, argv);
+    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/levelset/brick_transp/brick_transp.json");
     std::cout << P << std::endl;
 
     DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );

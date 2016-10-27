@@ -258,15 +258,13 @@ void Strategy( DROPS::AdapTriangCL& adap, DROPS::BndDataCL<>& lsbnd)
 
     // writer for vtk-format
     VTKOutCL vtkwriter(adap.GetMG(), "DROPS data", (P.get<int>("VTK.VTKOut") ? 3 : 0),
-                       P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName"), 
+                       P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName"),
                        P.get<std::string>("VTK.VTKName"), /* <- time file name */
                        P.get<int>("VTK.Binary"), 0, -1, 0);
     vtkwriter.Register( make_VTKScalar( lset.GetSolution(), "level-set") );
 
     // Create numbering and assign given distance function
-    lset.CreateNumbering( adap.GetMG().GetLastLevel(), &lset.idx);
-    lset.Phi.SetIdx( &lset.idx);
-
+    lset.CreateNumbering( adap.GetMG().GetLastLevel());
     // Write out information:
     size_t numLsetUnk= lset.Phi.Data.size();
 #ifdef _PAR
@@ -359,8 +357,7 @@ int main( int argc, char **argv)
         typedef DROPS::DistMarkingStrategyCL MarkerT;
         MarkerT marker( distance, P.get<double>("AdaptRef.Width" ),
                         P.get<int>("AdaptRef.CoarsestLevel"),
-                        P.get<int>("AdaptRef.FinestLevel") ); 
-
+                        P.get<int>("AdaptRef.FinestLevel") );
         adap.set_marking_strategy( &marker );
         adap.MakeInitialTriang();
 
