@@ -232,7 +232,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     TransportP1CL * massTransp = nullptr;
     TransportRepairCL *  transprepair = nullptr;
 
-    if( P.exists("Transp") )
+    if( P.get<bool>("Transp.Enable") )
     {
         // CL: the following could be moved outside of strategy to some function like
         //" InitializeMassTransport(P,MG,Stokes,lset,adap, TransportP1CL * & massTransp,TransportRepairCL * & transprepair)"
@@ -269,7 +269,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     SurfactantcGP1CL *surfTransp = nullptr;
     InterfaceP1RepairCL *surf_repair = nullptr;
 
-    if( P.exists("SurfTransp") )
+    if( P.get<bool>("SurfTransp.Enable") )
     {
         surfTransp = new SurfactantcGP1CL( MG, Stokes.GetBndData().Vel, P.get<double>("Time.Theta"), P.get<double>("SurfTransp.Visc"), &Stokes.v, *lset.PhiC, lset.GetBndData(),
                                      dt, P.get<int>("SurfTransp.Solver.Iter"), P.get<double>("SurfTransp.Solver.Tol"), P.get<double>("SurfTransp.XFEMReduced"));

@@ -34,10 +34,10 @@ namespace tpd_inflow{
     /// \name inflow condition
     DROPS::SVectorCL<3> InflowBrick( const DROPS::Point3DCL& p, double t)
     {
-        static double RadInlet=   P.get<double>("Exp.RadInlet");
-        static double InflowVel=  P.get<double>("Exp.InflowVel");
-        static double InflowAmpl= P.get<double>("Exp.InflowAmpl");
-        static double InflowFreq= P.get<double>("Exp.InflowFreq");
+        static double RadInlet=   P.get<double>("Inflow.RadInlet");
+        static double InflowVel=  P.get<double>("Inflow.InflowVel");
+        static double InflowAmpl= P.get<double>("Inflow.InflowAmpl");
+        static double InflowFreq= P.get<double>("Inflow.InflowFreq");
         DROPS::SVectorCL<3> ret(0.);
         const double x = p[0]*(2* RadInlet -p[0]) / (RadInlet*RadInlet),
                      z = p[2]*(2*RadInlet-p[2]) / (RadInlet*RadInlet);
@@ -51,9 +51,9 @@ namespace tpd_inflow{
     ///microchannel (eindhoven)
     DROPS::SVectorCL<3> InflowChannel( const DROPS::Point3DCL& p, double t)
     {
-        static double InflowVel=  P.get<double>("Exp.InflowVel");
-        static double InflowAmpl= P.get<double>("Exp.InflowAmpl");
-        static double InflowFreq= P.get<double>("Exp.InflowFreq");
+        static double InflowVel=  P.get<double>("Inflow.InflowVel");
+        static double InflowAmpl= P.get<double>("Inflow.InflowAmpl");
+        static double InflowFreq= P.get<double>("Inflow.InflowFreq");
         DROPS::SVectorCL<3> ret(0.);
         const double y = p[1]*(2*25e-6-p[1]) / (25e-6*25e-6),
                      z = p[2]*(2*50e-6-p[2]) / (50e-6*50e-6);
@@ -66,12 +66,12 @@ namespace tpd_inflow{
     ///mzelle_ns_adap.cpp + mzelle_instat.cpp
     DROPS::SVectorCL<3> InflowCell( const DROPS::Point3DCL& p, double)
     {
-        static double RadInlet=   P.get<double>("Exp.RadInlet");
-        static double InflowVel=  P.get<double>("Exp.InflowVel");
+        static double RadInlet=   P.get<double>("Inflow.RadInlet");
+        static double InflowVel=  P.get<double>("Inflow.InflowVel");
         DROPS::SVectorCL<3> ret(0.);
         const double s2= RadInlet*RadInlet,
-                     r2= p.norm_sq() - p[P.get<int>("Exp.FlowDir")]*p[P.get<int>("Exp.FlowDir")];
-        ret[P.get<int>("Exp.FlowDir")]= -(r2-s2)/s2*InflowVel;
+                     r2= p.norm_sq() - p[P.get<int>("Inflow.FlowDir")]*p[P.get<int>("Inflow.FlowDir")];
+        ret[P.get<int>("Inflow.FlowDir")]= -(r2-s2)/s2*InflowVel;
 
         return ret;
     }
@@ -94,7 +94,7 @@ namespace tpd_inflow{
         ret[0]=-0.5*(p[0]-PosDrop[0]);
         ret[1]=-0.5*(p[1]-PosDrop[1]);
         ret[2]= p[2]-PosDrop[2];
-        return P.get<double>("Exp.ExtensionalFlowFactor",1.0)*ret;
+        return P.get<double>("Inflow.ExtensionalFlowFactor",1.0)*ret;
     }
 
     /// Plane shear flow (z-direction)
@@ -104,7 +104,7 @@ namespace tpd_inflow{
         DROPS::SVectorCL<3> E3(0.);
         E3 = P.get<DROPS::Point3DCL>("Mesh.E3");
         ret[0]=p[2]-0.5*E3[2];
-        return P.get<double>("Exp.ShearFlowFactor",1.0)*ret;
+        return P.get<double>("Inflow.ShearFlowFactor",1.0)*ret;
     }
 
     //========================================================================
@@ -113,8 +113,8 @@ namespace tpd_inflow{
 
     DROPS::SVectorCL<3> InflowBrickTransp (const DROPS::Point3DCL& p, double)
     {
-        static double RadInlet=   P.get<double>("Exp.RadInlet");
-        static double InflowVel=  P.get<double>("Exp.InflowVel");
+        static double RadInlet=   P.get<double>("Inflow.RadInlet");
+        static double InflowVel=  P.get<double>("Inflow.InflowVel");
         DROPS::SVectorCL<3> ret(0.);
         const double x = p[0]*(2*RadInlet-p[0]) / (RadInlet*RadInlet),
                      z = p[2]*(2*RadInlet-p[2]) / (RadInlet*RadInlet);
