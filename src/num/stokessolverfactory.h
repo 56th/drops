@@ -166,9 +166,9 @@ class StokesSolverFactoryBaseCL
 class StokesSolverFactoryHelperCL
 {
   public:
-    int GetOseenSolver( const ParamCL& P) const { return (P.get<int>("CouplingSolver.NavStokesSolver.OseenSolver.Solver") / 10000) % 100; }
-    int GetAPc( const ParamCL& P) const { return (P.get<int>("CouplingSolver.NavStokesSolver.OseenSolver.Solver") / 100) % 100; }
-    int GetSPc( const ParamCL& P) const { return P.get<int>("CouplingSolver.NavStokesSolver.OseenSolver.Solver") % 100; }
+    int GetOseenSolver( const ParamCL& P) const { return (P.get<int>("Solver") / 10000) % 100; }
+    int GetAPc( const ParamCL& P) const { return (P.get<int>("Solver") / 100) % 100; }
+    int GetSPc( const ParamCL& P) const { return P.get<int>("Solver") % 100; }
     bool VelMGUsed ( const ParamCL& P) const
     {
         const int APc = GetAPc( P);
