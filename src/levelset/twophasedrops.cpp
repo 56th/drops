@@ -144,11 +144,12 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     MLIdxDescCL* vidx= &Stokes.vel_idx;
     MLIdxDescCL* pidx= &Stokes.pr_idx;
 
-    if ( StokesSolverFactoryHelperCL().VelMGUsed(P)){
+    ParamCL PSolver( P.get_child("CouplingSolver.NavStokesSolver.OseenSolver") );
+    if ( StokesSolverFactoryHelperCL().VelMGUsed(PSolver)){
         Stokes.SetNumVelLvl ( Stokes.GetMG().GetNumLevel());
         lset.SetNumLvl(Stokes.GetMG().GetNumLevel());
     }
-    if ( StokesSolverFactoryHelperCL().PrMGUsed(P)){
+    if ( StokesSolverFactoryHelperCL().PrMGUsed(PSolver)){
         Stokes.SetNumPrLvl  ( Stokes.GetMG().GetNumLevel());
         lset.SetNumLvl(Stokes.GetMG().GetNumLevel());
     }
@@ -164,9 +165,9 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
     PermutationT lset_downwind;
 
-    if ( StokesSolverFactoryHelperCL().VelMGUsed(P))
+    if ( StokesSolverFactoryHelperCL().VelMGUsed(PSolver))
         Stokes.SetNumVelLvl ( Stokes.GetMG().GetNumLevel());
-    if ( StokesSolverFactoryHelperCL().PrMGUsed(P))
+    if ( StokesSolverFactoryHelperCL().PrMGUsed(PSolver))
         Stokes.SetNumPrLvl  ( Stokes.GetMG().GetNumLevel());
 
     SetInitialLevelsetConditions( lset, MG, P);
@@ -214,7 +215,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
     IteratedDownwindCL navstokes_downwind( P.get_child( "CouplingSolver.NavStokesSolver.Downwind"));
     if (P.get<int>( "CouplingSolver.NavStokesSolver.Downwind.Frequency") > 0) {
-        if (StokesSolverFactoryHelperCL().VelMGUsed( P))
+        if (StokesSolverFactoryHelperCL().VelMGUsed( PSolver))
             throw DROPSErrCL( "Strategy: Multigrid-solver and downwind-numbering cannot be used together. Sorry.\n");
         vel_downwind= Stokes.downwind_numbering( lset, navstokes_downwind);
     }
@@ -281,8 +282,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         surfTransp->Init( inscamap["surf_sol"]);
     }
 
-    // Stokes-Solver
-    ParamCL PSolver( P.get_child("CouplingSolver.NavStokesSolver.OseenSolver") );
+    // Stokes-Solver    
     ParamCL PTime( P.get_child("Time") );
     StokesSolverFactoryCL<InstatNavierStokes2PhaseP2P1CL> stokessolverfactory(Stokes, PSolver, PTime );
     StokesSolverBaseCL* stokessolver;
