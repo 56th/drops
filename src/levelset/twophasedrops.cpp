@@ -382,11 +382,11 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     // Output-Registrations:
 #ifndef _PAR
     Ensight6OutCL* ensight = NULL;
-    if (P.get<int>("Ensight.EnsightOut",0)){
+    if (P.get<int>("Ensight.Freq",0)){
         // Initialize Ensight6 output
         std::string ensf( P.get<std::string>("Ensight.EnsDir") + "/" + P.get<std::string>("Ensight.EnsCase"));
         ensight = new Ensight6OutCL( P.get<std::string>("Ensight.EnsCase") + ".case",
-                                     nsteps/P.get("Ensight.EnsightOut", 0)+1,
+                                     nsteps/P.get("Ensight.Freq", 0)+1,
                                      P.get<int>("Ensight.Binary"));
         ensight->Register( make_Ensight6Geom      ( MG, MG.GetLastLevel(), P.get<std::string>("Ensight.GeomName"),
                                                     ensf + ".geo", true));
@@ -416,9 +416,9 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     sigma_vtk = new VecDescCL;
 
     VTKOutCL * vtkwriter = NULL;
-    if (P.get<int>("VTK.VTKOut",0)){
+    if (P.get<int>("VTK.Freq",0)){
         vtkwriter = new VTKOutCL(adap.GetMG(), "DROPS data",
-                                 nsteps/P.get("VTK.VTKOut", 0)+1,
+                                 nsteps/P.get("VTK.Freq", 0)+1,
                                  P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName"),
                                  P.get<std::string>("VTK.TimeFileName"),
                                  P.get<int>("VTK.Binary"),
@@ -446,10 +446,10 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     }
 
     VTKOutCL * dgvtkwriter = NULL;
-    if ((P.get<int>("Levelset.Discontinuous")&&(P.get<int>("VTK.VTKOut",0))&&(P.get<int>("VTK.AddDGOutput",0))))
+    if ((P.get<int>("Levelset.Discontinuous")&&(P.get<int>("VTK.Freq",0))&&(P.get<int>("VTK.AddDGOutput",0))))
     {
         dgvtkwriter = new VTKOutCL(adap.GetMG(), "DROPS data",
-                                   nsteps/P.get("VTK.VTKOut", 0)+1,
+                                   nsteps/P.get("VTK.Freq", 0)+1,
                                    P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName")+"_dg",
                                    P.get<std::string>("VTK.TimeFileName"),
                                    P.get<int>("VTK.Binary"),
@@ -481,7 +481,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         IFInfo.Update( lset, Stokes.GetVelSolution());
         IFInfo.Write(time_old);
 
-        if (P.get<int>("VTK.VTKOut")) {
+        if (P.get<int>("VTK.Freq")) {
             p1idx.CreateNumbering( Stokes.p.RowIdx->TriangLevel(), MG);
             sigma_vtk->SetIdx( &p1idx);
             sigma_vtk->Data = 0.;
@@ -535,12 +535,12 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         }
 
 #ifndef _PAR
-        if (ensight && step%P.get("Ensight.EnsightOut", 0)==0)
+        if (ensight && step%P.get("Ensight.Freq", 0)==0)
             ensight->Write( time_new);
 #endif
-        if (dgvtkwriter && step%P.get("VTK.VTKOut", 0)==0)
+        if (dgvtkwriter && step%P.get("VTK.Freq", 0)==0)
             dgvtkwriter->Write( time_new);
-        if (vtkwriter && step%P.get("VTK.VTKOut", 0)==0)
+        if (vtkwriter && step%P.get("VTK.Freq", 0)==0)
             vtkwriter->Write( time_new);
         if (P.get("Restart.OutputFreq", 0) && step%P.get("Restart.OutputFreq", 0)==0)
             ser.Write();
