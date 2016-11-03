@@ -27,7 +27,7 @@
                 "N1": 3,                     // Number of cells along the E1-direction,
                 "N2": 3,                     //                       the E2-direction,
                 "N3": 6,                     //                       the E3-direction.
-                "RestartFile": "none",    // If set, read the triangulation from the file (via FileBuilderCL).
+                "RestartFile": "",           // If set, read the triangulation from the file (via FileBuilderCL).
                                              // and set boundary segments via domain builder (specified in "Type")
                                              
                 // adaptive refinement
@@ -181,13 +181,11 @@
                 "OutputOverwrite":      1,                 // overwrite old output-files or create new ones
                                                            // for every time step.
                                                            // (0 = every step a new file, n>0 generate n files in total)
-                "Inputfile":            "none",            // reads multigrid from deserialization files
-                                                           // (to deactivate the reading choose Inputfile = none).
                 "OutputGrid":           "out/grid",        // writes multigrid to serialization files
                                                            // (to deactivate the writing choose OutputGrid = "").
                 "OutputData":           "out/data",        // writes FE solutions
                                                            // (to deactivate the writing choose OutputData = "").
-                                                           // "InputGrid"... does not exist; set "Mesh.RestartFile" above.
+                                                           // "InputGrid"... does not exist; see "Mesh.RestartFile" above.
                 "InputData":            "",                // reads FE solutions
                                                            // (to deactivate choose InputData = "").
                 "Binary":               1                  // use binary format

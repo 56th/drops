@@ -243,10 +243,10 @@
                 "Serialization":        0,                 //#[->OutputFreq] run serialization (0 = off, 1 = 0n).
                 "Overwrite":            1,                 //#[->OutputOverwrite] overwrite old output-files or create new ones
                                                            // for every time step.
-                "Inputfile":            "none",            //#[??? ->Mesh.RestartFile] reads multigrid from deserialization files
-                                                           // (to deactivate the reading choose Inputfile = none).
+                "Inputfile":            "",            //#[-> Mesh.RestartFile] reads multigrid from deserialization files
+                                                           // (to deactivate the reading choose Inputfile = "").
                 "Outputfile":           "mg/data",         //#[-> OutputGrid/OutputData] writes multigrid to serialization files
-                                                           // (to deactivate the writing choose Outputfile = none).
+                                                           // (to deactivate the writing choose Outputfile = "").
                 "Binary":               1                  //
         },
 
@@ -265,20 +265,20 @@
 // domain, boundary and initial conditions
         "DomainCond":
         {
-                "PeriodicMatching":     "none",            //#[-> NavStokes.BoundaryData, falls !=none] matching function 
+                "PeriodicMatching":     "none",            //#[-> NavStokes.BoundaryData, falls !="none"] matching function 
                                                            // identifier for periodic boundaries
                 "InitialCond":          0,                 // initial conditions (0 = zero, 1/10 stationary flow with  
                                                            //#[-> NavStokes.InitialValue] droplet which includes/dismiss surface tension,  
                                                            // 2 = stationary flow without droplet, -1 = read from file).
-                "InitialFile":          "mg/data",         //#[remove for InitialCond!= -1] file prefix when reading data for initial condition.
-                "BoundaryType":         "0!0!0!0!0!0",     // #[-> NavStokes.BoundaryData.Velocity] List of boundary types separated by a !.
+                "InitialFile":          "mg/data",         //#[-> Restart.InputData. Set to "" for InitialCond = -1] file prefix when reading data for initial condition.
+                "BoundaryType":         "0!0!0!0!0!0",     // #[convert -> NavStokes.BoundaryData.Velocity] List of boundary types separated by a !.
                                                            // Each defining a boundary type for one boundary
                                                            // domain ( The following indices may be used:
                                                            //          Dir0BC= 0, DirBC= 2, Per1BC= 13,
                                                            //          Per2BC= 11, Nat0BC= 21, NatBC= 23,
                                                            //          NoBC= 98, UndefinedBC_= 99        ).
                 "BoundaryFncs":         "ZeroVel!ZeroVel!ZeroVel!ZeroVel!ZeroVel!ZeroVel"
-                                                           // #[-> NavStokes.BoundaryData.Velocity] List of boundary functions separated by a !.
+                                                           // #[convert -> NavStokes.BoundaryData.Velocity] List of boundary functions separated by a !.
                                                            // Each string defines a function which is taken
                                                            // from a function container during runtime.
         }

@@ -623,10 +623,9 @@ int main (int argc, char** argv)
                   << "  |          Please adapt your json-file to the new description.   | \n"
                   <<"  \\----------------------------------------------------------------/ \n"
                   << std::endl;
-        DROPS::BuildDomain( mg, P.get<std::string>("DomainCond.MeshFile"), P.get<int>("DomainCond.GeomType"), P.get<std::string>("Restart.Inputfile"));
+        DROPS::BuildDomain( mg, P.get<std::string>("DomainCond.MeshFile"), P.get<int>("DomainCond.GeomType"), P.get<std::string>("Mesh.RestartFile",""));
     }
-
-
+    const bool noRestart= (P.get<std::string>("Mesh.RestartFile","")).empty() || P.get<std::string>("Mesh.RestartFile","") == "none";
 
     std::cout << "Generated MG of " << mg->GetLastLevel() << " levels." << std::endl;
 
@@ -686,10 +685,10 @@ int main (int argc, char** argv)
                            P.get<double>("Mesh.AdaptRef.CoarsestLevel"), P.get<double>("Mesh.AdaptRef.FinestLevel") );
 
     DROPS::AdapTriangCL adap( *mg, &InitialMarker,
-                              ((P.get<std::string>("Restart.Inputfile") == "none") ? P.get<int>("Mesh.AdaptRef.LoadBalStrategy") : -P.get<int>("Mesh.AdaptRef.LoadBalStrategy")));
+                              (noRestart ? P.get<int>("Mesh.AdaptRef.LoadBalStrategy") : -P.get<int>("Mesh.AdaptRef.LoadBalStrategy")));
     // If we read the Multigrid, it shouldn't be modified;
     // otherwise the pde-solutions from the ensight files might not fit.
-    if (P.get("Restart.Inputfile", std::string("none")) == "none")
+    if (noRestart)
     {
         adap.MakeInitialTriang();
     }
