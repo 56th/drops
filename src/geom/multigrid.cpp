@@ -64,6 +64,26 @@ void BoundaryCL::SetPeriodicBnd( const BndTypeCont& type, match_fun match) const
     match_= match;
 }
 
+void BoundaryCL::SetPeriodicBnd( const BndCondCL& bc ) const
+{
+    BndType_.resize(GetNumBndSeg());
+    for (BndIdxT i= 0; i<GetNumBndSeg(); ++i)
+    {
+        switch (bc.GetBndSeg(i).GetBC()) {
+            case DROPS::Per1BC:
+#ifdef _PAR
+                throw DROPSErrCL("No periodic boundary conditions implemented in the parallel version, yet");
+#endif
+                BndType_[i]= BoundaryCL::Per1Bnd; break;
+            case DROPS::Per2BC:
+                BndType_[i]= BoundaryCL::Per2Bnd; break;
+            default:
+                BndType_[i]= BoundaryCL::OtherBnd;
+        }
+    }
+    match_= bc.GetMatchingFunction();
+}
+
 BoundaryCL::BndType PeriodicEdgesCL::GetBndType( const EdgeCL& e) const
 {
     BoundaryCL::BndType type= BoundaryCL::OtherBnd;

@@ -601,11 +601,11 @@ StokesSolverBaseCL* StokesSolverFactoryCL<StokesT, ProlongationVelT, Prolongatio
 
         case GMResR_OS: {
             if (APc_==VankaBlock_APC) {
-                GMResRVanka_= new GMResR_VankaT( vankapc_,  P_.template get<int>("Iter"), P_.template get<int>("Iter"), P_.template get<int>("Stokes.InnerIter"), P_.template get<double>("Tol"), P_.template get<double>("Stokes.InnerTol"), /*rel*/ false);
+                GMResRVanka_= new GMResR_VankaT( vankapc_,  P_.template get<int>("Iter"), P_.template get<int>("Iter"), P_.template get<int>("GMResRInnerIter"), P_.template get<double>("Tol"), P_.template get<double>("GMResRInnerTol"), /*rel*/ false);
                 stokessolver= new BlockMatrixSolverCL<GMResR_VankaT> ( *GMResRVanka_);
             } else {
                 LBlock_= new LowerBlockPcT( *apc_, *spc_);
-                GMResRLBlock_= new GMResR_LBlockT( *LBlock_,  P_.template get<int>("Iter"), P_.template get<int>("Iter"), P_.template get<int>("Stokes.InnerIter"), P_.template get<double>("Tol"), P_.template get<double>("Stokes.InnerTol"), /*rel*/ false);
+                GMResRLBlock_= new GMResR_LBlockT( *LBlock_,  P_.template get<int>("Iter"), P_.template get<int>("Iter"), P_.template get<int>("GMResRInnerIter"), P_.template get<double>("Tol"), P_.template get<double>("GMResRInnerTol"), /*rel*/ false);
                 stokessolver= new BlockMatrixSolverCL<GMResR_LBlockT>( *GMResRLBlock_);
             }
         }

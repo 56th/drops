@@ -87,17 +87,13 @@ double GetTimeOffset(){
     return timeoffset;
 }
 
-void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddata, AdapTriangCL& adap)
+void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddata, AdapTriangCL& adap, const bool is_periodic, match_fun periodic_match, const std::string& perMatchName)
 // flow control
 {
     DROPS::InScaMap & inscamap = DROPS::InScaMap::getInstance();
     //DROPS::ScaMap & scamap = DROPS::ScaMap::getInstance();
     //DROPS::InVecMap & vecmap = DROPS::InVecMap::getInstance();
-    DROPS::MatchMap & matchmap = DROPS::MatchMap::getInstance();
-
-    const std::string perMatchName= P.get( "NavStokes.BoundaryData.Velocity.PeriodicMatching", std::string("none"));
-    const bool is_periodic = perMatchName != "none";
-    match_fun periodic_match = is_periodic ? matchmap[perMatchName] : 0;
+    //DROPS::MatchMap & matchmap = DROPS::MatchMap::getInstance();
 
     MultiGridCL& MG= Stokes.GetMG();
 
@@ -172,17 +168,16 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
     SetInitialLevelsetConditions( lset, MG, P);
 
-    double Vol = 0;
+    double Vol= 0;
 
 
     if (( (P.get("Levelset.InitialValue", std::string("Ellipsoid")) == "TaylorFlowDistance")
           || (P.get("Levelset.InitialValue", std::string("Ellipsoid")) == "Ellipsoid"))
         && (P.get<int>("Levelset.VolCorrection") != 0))
     {
-        if (P.get<double>("Levelset.InitialVolume",-1.0) > 0 )
-            Vol = P.get<double>("Levelset.InitialVolume");
-        else
-            Vol = EllipsoidCL::GetVolume();
+        Vol= P.get<double>("Levelset.InitialVolume", -1.0);
+        if (Vol < 0)
+            Vol= EllipsoidCL::GetVolume();
         std::cout << "initial rel. volume: " << lset.GetVolume()/Vol << std::endl;
         double dphi= lset.AdjustVolume( Vol, 1e-9);
         std::cout << "initial lset offset for correction is " << dphi << std::endl;
@@ -583,9 +578,6 @@ int main (int argc, char** argv)
 
     std::cout << P << std::endl;
 
-
-
-
     DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
 
     if (P.get<int>("General.ProgressBar"))
@@ -598,9 +590,9 @@ int main (int argc, char** argv)
         throw DROPS::DROPSErrCL("Parameter error : Dilatational viscosity must be larger than surface shear viscosity");
     }
 
-    DROPS::MatchMap & matchmap = DROPS::MatchMap::getInstance();
-    bool is_periodic = P.get<std::string>("NavStokes.BoundaryData.PeriodicMatching", "none") != "none";
-    DROPS::match_fun periodic_match = is_periodic ? matchmap[P.get<std::string>("NavStokes.BoundaryData.PeriodicMatching", "periodicx")] : 0;
+    const std::string perMatchName= P.get( "NavStokes.BoundaryData.Velocity.PeriodicMatching", std::string());
+    const bool is_periodic = !perMatchName.empty();
+    DROPS::match_fun periodic_match = is_periodic ? DROPS::MatchMap::getInstance()[perMatchName] : 0;
 
     DROPS::MultiGridCL* mg= 0;
     typedef DROPS::BndDataCL<DROPS::Point3DCL> VelBndDataCL;
@@ -640,6 +632,8 @@ int main (int argc, char** argv)
         std::cout << "pressure, ";
         read_BndData( *lsetbnddata,*mg, P.get_child( "Levelset.BoundaryData"));
         std::cout << "and levelset." << std::endl;
+        if (is_periodic)
+            mg->GetBnd().SetPeriodicBnd( *velbnddata);
     } catch (DROPS::DROPSParamErrCL& e)
     {
         e.what( std::cout);
@@ -708,7 +702,7 @@ int main (int argc, char** argv)
                                                 P.get<double>("NavStokes.XFEMReduced"), DROPS::vecP2_FE,
                                                 P.get<double>("NavStokes.GhostPenalty",0.0));
 
-    Strategy( prob, *lsetbnddata, adap);    // do all the stuff
+    Strategy( prob, *lsetbnddata, adap, is_periodic, periodic_match, perMatchName);    // do all the stuff
 
     delete mg;
     delete velbnddata;

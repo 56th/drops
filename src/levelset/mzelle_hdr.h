@@ -252,7 +252,7 @@ TimeDisc2PhaseCL* CreateTimeDisc( InstatNavierStokes2PhaseP2P1CL& Stokes, Levels
         break;
         case 4 :
             return (new OperatorSplitting2PhaseCL<LevelSetSolverT>
-                        (Stokes, lset, stokessolver->GetStokesSolver(), *lsetsolver, lsetmod, stepSize, P.get<int>("Stokes.InnerIter"), P.get<double>("Stokes.InnerTol"), nonlinear));
+                        (Stokes, lset, stokessolver->GetStokesSolver(), *lsetsolver, lsetmod, stepSize, P.get<int>("CouplingSolver.NavStokesSolver.OseenSolver.Iter"), P.get<double>("CouplingSolver.NavStokesSolver.OseenSolver.Tol"), nonlinear));
         break;
         case 6 :
             return (new SpaceTimeDiscTheta2PhaseCL<LevelSetSolverT>
@@ -436,21 +436,24 @@ void SetInitialConditions(StokesT& Stokes, LevelsetP2CL& lset, MultiGridCL& MG, 
         typedef SSORPcCL PcT;
 #endif
         PcT pc;
-        PCGSolverCL<PcT> PCGsolver( pc, P.get<int>("Stokes.PcAIter"), P.get<double>("Stokes.PcATol"), true);
+        PCGSolverCL<PcT> PCGsolver( pc, P.get<int>("CouplingSolver.NavStokesSolver.OseenSolver.PcAIter"), P.get<double>("CouplingSolver.NavStokesSolver.OseenSolver.PcATol"), true);
         typedef SolverAsPreCL<PCGSolverCL<PcT> > PCGPcT;
         PCGPcT apc( PCGsolver);
         StokesSolverBaseCL *ssolver = 0;
+        const int iter= P.get<int>("CouplingSolver.NavStokesSolver.OseenSolver.Iter");
+        const double tol= P.get<double>("CouplingSolver.NavStokesSolver.OseenSolver.Tol"),
+                PcSTol= P.get<double>("CouplingSolver.NavStokesSolver.OseenSolver.PcSTol");
         if( Stokes.usesGhostPen() )
         {
             typedef BlockPreCL<ExpensivePreBaseCL, SchurPreBaseCL, LowerBlockPreCL>    LowerBlockPcT;
-            ISGhPenPreCL gpispc( &Stokes.prA.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.C.Data.GetFinest(), 0., 1., 1e-4, 1e-4, 200);
-            GCRSolverCL< LowerBlockPcT > gcrsolver( *(new LowerBlockPcT(apc, gpispc)),P.get<int>("Stokes.OuterIter"),P.get<int>("Stokes.OuterIter"),P.get<int>("Stokes.OuterTol") );
+            ISGhPenPreCL gpispc( &Stokes.prA.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.C.Data.GetFinest(), 0., 1., PcSTol, PcSTol, 200);
+            GCRSolverCL< LowerBlockPcT > gcrsolver( *(new LowerBlockPcT(apc, gpispc)), iter, iter, tol );
             ssolver = new BlockMatrixSolverCL< GCRSolverCL<LowerBlockPcT> > ( gcrsolver );
         }
         else
         {
             ISBBTPreCL bbtispc( &Stokes.B.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.M.Data.GetFinest(), Stokes.pr_idx.GetFinest(), 0.0, 1.0, 1e-4, 1e-4);
-            ssolver = new InexactUzawaCL<PCGPcT, ISBBTPreCL, APC_OTHER> ( apc, bbtispc, P.get<int>("Stokes.OuterIter"), P.get<double>("Stokes.OuterTol"), 0.6, 50);
+            ssolver = new InexactUzawaCL<PCGPcT, ISBBTPreCL, APC_OTHER> ( apc, bbtispc, iter, tol, 0.6, 50);
         }
 
         NSSolverBaseCL<StokesT> stokessolver( Stokes, *ssolver);
@@ -473,21 +476,24 @@ void SetInitialConditions(StokesT& Stokes, LevelsetP2CL& lset, MultiGridCL& MG, 
 
         time.Reset();
         SSORPcCL ssorpc;
-        PCGSolverCL<SSORPcCL> PCGsolver( ssorpc, P.get<int>("Stokes.PcAIter"), P.get<double>("Stokes.PcATol"), true);
+        PCGSolverCL<SSORPcCL> PCGsolver( ssorpc, P.get<int>("CouplingSolver.NavStokesSolver.OseenSolver.PcAIter"), P.get<double>("CouplingSolver.NavStokesSolver.OseenSolver.PcATol"), true);
         typedef SolverAsPreCL<PCGSolverCL<SSORPcCL> > PCGPcT;
         PCGPcT apc( PCGsolver);
         StokesSolverBaseCL *ssolver = 0;
+        const int iter= P.get<int>("CouplingSolver.NavStokesSolver.OseenSolver.Iter");
+        const double tol= P.get<double>("CouplingSolver.NavStokesSolver.OseenSolver.Tol"),
+                PcSTol= P.get<double>("CouplingSolver.NavStokesSolver.OseenSolver.PcSTol");
         if( Stokes.usesGhostPen() )
         {
             typedef BlockPreCL<ExpensivePreBaseCL, SchurPreBaseCL, LowerBlockPreCL>    LowerBlockPcT;
-            ISGhPenPreCL gpispc( &Stokes.prA.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.C.Data.GetFinest(), 0., 1., P.get<double>("Stokes.PcSTol"), P.get<double>("Stokes.PcSTol"), 200);
-            GCRSolverCL< LowerBlockPcT > gcrsolver( *(new LowerBlockPcT(apc, gpispc)),P.get<int>("Stokes.OuterIter"),P.get<int>("Stokes.OuterIter"),P.get<int>("Stokes.OuterTol") );
+            ISGhPenPreCL gpispc( &Stokes.prA.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.C.Data.GetFinest(), 0., 1., PcSTol, PcSTol, 200);
+            GCRSolverCL< LowerBlockPcT > gcrsolver( *(new LowerBlockPcT(apc, gpispc)), iter, iter, tol);
             ssolver = new BlockMatrixSolverCL< GCRSolverCL<LowerBlockPcT> > ( gcrsolver );
         }
         else
         {
-            ISBBTPreCL bbtispc( &Stokes.B.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.M.Data.GetFinest(), Stokes.pr_idx.GetFinest(), 0.0, 1.0, P.get<double>("Stokes.PcSTol"), P.get<double>("Stokes.PcSTol"));
-            ssolver = new InexactUzawaCL<PCGPcT, ISBBTPreCL, APC_OTHER> ( apc, bbtispc, P.get<int>("Stokes.OuterIter"), P.get<double>("Stokes.OuterTol"), 0.6, 50);
+            ISBBTPreCL bbtispc( &Stokes.B.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.M.Data.GetFinest(), Stokes.pr_idx.GetFinest(), 0.0, 1.0, PcSTol, PcSTol);
+            ssolver = new InexactUzawaCL<PCGPcT, ISBBTPreCL, APC_OTHER> ( apc, bbtispc, iter, tol, 0.6, 50);
         }
         ssolver->Solve( Stokes.A.Data, Stokes.B.Data, Stokes.C.Data,
             Stokes.v.Data, Stokes.p.Data, Stokes.b.Data, Stokes.c.Data, Stokes.vel_idx.GetEx(), Stokes.pr_idx.GetEx());
