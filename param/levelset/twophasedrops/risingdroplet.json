@@ -184,7 +184,7 @@
                 "RadInlet":             1,                   // #radius of the circular intake.
                 "InflowFreq":           0,                   // #inflow frequency.
                 "InflowAmpl":           0,                   // #inflow amplitude.
-                "InitialLSet":          "Ellipsoid",         // choose a LevelSet function you want to start with
+                "InitialLSet":          "Ellipsoid",         //#[-> Levelset.InitialValue] choose a LevelSet function you want to start with
                                                              // (default: 'Ellipsoid')
                 "VolForce":             "ZeroVel"            //#[-> NavStokes.Coeff] r.h.s. force of navier stokes equations.
                                                              // (default: 'ZeroVel')
@@ -194,7 +194,7 @@
         "SurfTens":  //#[-> NavStokes.Coeff.SurfTens]
         {
                 "SurfTension":          1,      // surface tension coefficient.
-                "VarTensionFncs":       "ConstTau"
+                "VarTensionFncs":       "ConstTau"   //#[-> varTensionFunc]
         },
 
 // mass transport
