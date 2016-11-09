@@ -790,11 +790,20 @@ template<class T>
   inline Quad5_2DCL<T>&
   Quad5_2DCL<T>::assign(const TetraCL& s, const BaryCoordCL* const p, instat_fun_ptr f , double t)
 {
-    Point3DCL v[3];
-    for (Uint k= 0; k < 3; ++k)
-        v[k]= GetWorldCoord(s, p[k]);
+//    Point3DCL v[3];
+//    for (Uint k= 0; k < 3; ++k)
+//        v[k]= GetWorldCoord(s, p[k]);
+//    for (Uint i= 0; i < Quad5_2DDataCL::NumNodesC; ++i)
+//        (*this)[i]= f( Quad5_2DDataCL::Node[i][0]*v[0]+Quad5_2DDataCL::Node[i][1]*v[1]+Quad5_2DDataCL::Node[i][2]*v[2], t) ;
+    Point3DCL v[Quad5_2DDataCL::NumNodesC];
+    BaryCoordCL Bary[Quad5_2DDataCL::NumNodesC];
+    for (Uint i= 0; i < Quad5_2DDataCL::NumNodesC; ++i){
+        Bary[i] = Quad5_2DDataCL::Node[i][0]*p[0]+Quad5_2DDataCL::Node[i][1]*p[1]+Quad5_2DDataCL::Node[i][2]*p[2];
+        v[i]= GetWorldCoord(s, Bary[i]);
+    }
     for (Uint i= 0; i < Quad5_2DDataCL::NumNodesC; ++i)
-        (*this)[i]= f( Quad5_2DDataCL::Node[i][0]*v[0]+Quad5_2DDataCL::Node[i][1]*v[1]+Quad5_2DDataCL::Node[i][2]*v[2], t) ;
+        (*this)[i]= f(v[i], t);
+
     return *this;
 }
 

@@ -70,4 +70,53 @@ void SpecialBndHandleSystem2OnePhaseCL::setupB(const TetraCL& tet, SMatrixCL<1, 
 	
 }
 
+//P2_P1 multiplication
+void SpecialBndHandleSystem2OnePhaseCL::setupB(const TetraCL& tet, SMatrixCL<1, 3> loc_b[10][4], instat_vector_fun_ptr f)
+{
+    MeshDeformationCL& md = MeshDeformationCL::getInstance();
+    Quad5_2DCL<double> adet;
+    Quad5_2DCL< SMatrixCL<3, 3> > Tq;
+    for (Uint k =0; k< 4; ++k) //Go throught all faces of a tet
+    {
+        LocalP2CL<double> phiVelP2[6];   //local basis for velocity
+        LocalP1CL<double> phiPrP1[3];    //local basis for pressure
+        Quad5_2DCL<double> pr2Dj;
+        Quad5_2DCL<double> vel2Di;
+        Quad5_2DCL<Point3DCL> Nout;
+
+        BaryCoordCL bary[3];
+        if( BndData_.Vel.GetBC(*tet.GetFace(k))==Slip0BC || BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC || BndData_.Vel.GetBC(*tet.GetFace(k))==SymmBC){
+            const FaceCL& face = *tet.GetFace(k);            //Get a face on a special boundary 
+            double absdet = FuncDet2D(	face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
+                                face.GetVertex(2)->GetCoord()-face.GetVertex(0)->GetCoord());
+            tet.GetOuterNormal(k, normal);
+            for (Uint i= 0; i<3; ++i){
+                unknownIdx[i]   = VertOfFace(k, i);          // i is index for Vertex
+                unknownIdx[i+3] = EdgeOfFace(k, i) + 4;      // i is index for Edge
+                bary[i][unknownIdx[i]]=1;
+                phiPrP1[i][unknownIdx[i]]=1;
+            }
+            if(md.IsTetraCurved(tet)){
+                Get2DTrafoAsQuad(md.GetLocalP2Deformation(tet), bary, Nout, adet, Tq);
+            }
+            else{
+                adet = Quad5_2DCL<double> (absdet);
+                Nout = Quad5_2DCL<Point3DCL>(normal);	
+            }
+            //Nout.assign(tet, bary, f);
+            for(Uint i=0; i<6; ++i)
+                phiVelP2[i][unknownIdx[i]] = 1;
+            for(Uint i=0; i<6; ++i){
+                vel2Di.assign(phiVelP2[i], bary);  
+                for(Uint j=0; j<3; ++j){					
+                    pr2Dj.assign(phiPrP1[j], bary);  
+                    Quad5_2DCL<double> temp(pr2Dj * vel2Di); 
+                    Quad5_2DCL<Point3DCL> quad2D( temp * Nout * adet);
+                    loc_b[unknownIdx[i]][unknownIdx[j]]-= SMatrixCL<1,3>( quad2D.quad(1.));
+                }
+            }
+        }
+    }		
+}
+
 }

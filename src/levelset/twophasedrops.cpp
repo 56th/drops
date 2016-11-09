@@ -25,6 +25,7 @@
 //multigrid
 #include "geom/multigrid.h"
 #include "geom/builder.h"
+#include "geom/deformation.h"
 //time integration
 #include "navstokes/instatnavstokes2phase.h"
 #include "stokes/integrTime.h"
@@ -157,6 +158,8 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     match_fun periodic_match = is_periodic ? matchmap[P.get("DomainCond.PeriodicMatching", std::string("periodicx"))] : 0;
 
     MultiGridCL& MG= Stokes.GetMG();
+    MeshDeformationCL& md = MeshDeformationCL::getInstance();
+    MG.SetMeshDeformation(md);
 
     // initialization of surface tension
     sigma= Stokes.GetCoeff().SurfTens;

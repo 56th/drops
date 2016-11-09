@@ -27,6 +27,8 @@
 #include "num/accumulator.h"
 #include "num/quadrature.h"
 #include "num/lattice-eval.h"
+#include "geom/deformation.h"
+#include "geom/isoparamP2.h"
 #include <vector>
 #include <numeric>
 
@@ -410,6 +412,7 @@ class System2Accumulator_P2P1CL : public TetraAccumulatorCL
     const PrincipalLatticeCL& lat;
     const CoeffT& coeff;
     const StokesBndDataCL& BndData;
+    MeshDeformationCL& md;
     const double t;
 
     const IdxDescCL& RowIdx;
@@ -426,10 +429,11 @@ class System2Accumulator_P2P1CL : public TetraAccumulatorCL
     VecDescCL*                                   c;
 
     SMatrixCL<3,3> T;
+    Quad5CL< SMatrixCL<3, 3> > Tq;
     double         absdet;
+    Quad5CL<double> adet;
 
-    Quad2CL<Point3DCL> GradRef[10],
-                       Grad[10];
+    Quad5CL<Point3DCL> Grad[10], GradRef[10];
     SMatrixCL<1,3>     locB[10][4];
 	bool speBnd;        //if there is a slip or symmetric boundary condtion
 
@@ -440,7 +444,7 @@ class System2Accumulator_P2P1CL : public TetraAccumulatorCL
     void update_global_system ();
 
   public:
-    System2Accumulator_P2P1CL (const CoeffT& coeff_arg, const StokesBndDataCL& BndData_arg,
+    System2Accumulator_P2P1CL (const CoeffT& coeff_arg, const StokesBndDataCL& BndData_arg, MeshDeformationCL& md_arg,
         const IdxDescCL& RowIdx_arg, const IdxDescCL& ColIdx_arg,
         MatrixCL& B_arg, VecDescCL* c_arg, double t_arg);
 
@@ -455,10 +459,10 @@ class System2Accumulator_P2P1CL : public TetraAccumulatorCL
 };
 
 template< class CoeffT>
-System2Accumulator_P2P1CL<CoeffT>::System2Accumulator_P2P1CL ( const CoeffT& coeff_arg, const StokesBndDataCL& BndData_arg,
+System2Accumulator_P2P1CL<CoeffT>::System2Accumulator_P2P1CL ( const CoeffT& coeff_arg, const StokesBndDataCL& BndData_arg,  MeshDeformationCL& md_arg,
     const IdxDescCL& RowIdx_arg, const IdxDescCL& ColIdx_arg,
     MatrixCL& B_arg, VecDescCL* c_arg, double t_arg)
-    : lat( PrincipalLatticeCL::instance( 2)), coeff( coeff_arg), BndData( BndData_arg), t( t_arg), RowIdx( RowIdx_arg), ColIdx( ColIdx_arg), B( B_arg), speBndHandle(BndData)
+    : lat( PrincipalLatticeCL::instance( 2)), coeff( coeff_arg), BndData( BndData_arg), md(md_arg), t( t_arg), RowIdx( RowIdx_arg), ColIdx( ColIdx_arg), B( B_arg), speBndHandle(BndData)
 {
     c = c_arg;
     P2DiscCL::GetGradientsOnRef( GradRef);
@@ -481,10 +485,18 @@ void System2Accumulator_P2P1CL<CoeffT>::finalize_accumulation ()
 template< class CoeffT>
 void System2Accumulator_P2P1CL<CoeffT>::visit (const TetraCL& tet)
 {
-    double det;
-    GetTrafoTr( T, det, tet);
-    P2DiscCL::GetGradients( Grad, GradRef, T);
-    absdet= std::fabs( det);
+    double det=0.;
+    //P2 isoparametric
+    if(md.IsTetraCurved(tet)){
+        GetTrafoAsQuad(md.GetLocalP2Deformation(tet), adet, Tq);
+    }
+    else{ //Standard finite element
+        GetTrafoTr( T, det, tet);
+        P2DiscCL::GetGradients( Grad, GradRef, T);
+        absdet= std::fabs( det); 
+        adet = Quad5CL<double>(absdet);
+        Tq = Quad5CL< SMatrixCL<3, 3> >(T);
+    }
     n.assign( tet, ColIdx, BndData.Vel);
     GetLocalNumbP1NoBnd( prNumb, tet, RowIdx);
 
@@ -513,13 +525,35 @@ void System2Accumulator_P2P1CL<CoeffT>::local_setup (const TetraCL& tet)
 			break;
 		}
 	}
-    // b(i,j) =  -\int psi_i * div( phi_j)
-    for(int vel=0; vel<10; ++vel) {
-        for(int pr=0; pr<4; ++pr)
-            locB[vel][pr]= SMatrixCL<1,3>( quad( Grad[vel], absdet, Quad2Data_Mul_P1_CL(), pr));
+    //   b(i,j) =  -\int psi_i * div( phi_j)
+    // if(md.IsTetraCurved(tet)){
+    LocalP1CL<double> phi[4];
+    Quad5CL<double> phiQuad[4];
+    for(int i=0; i<4; i++)
+    {
+        phi[i][i]=1.;
     }
+    for(int i=0; i<4; i++)
+    {
+        phiQuad[i].assign(phi[i], Quad5DataCL::Node);
+    }
+    for(int vel=0; vel<10; ++vel) {
+        for(int pr=0; pr<4; ++pr){
+            Quad5CL<Point3DCL> Grad5Vel(Tq * GradRef[vel]);
+            locB[vel][pr]= SMatrixCL<1,3>(Quad5CL<Point3DCL>(Grad5Vel * phiQuad[pr] * adet).quad(1.));
+        }
+    } 
+    
+//    }
+//    else
+//        for(int vel=0; vel<10; ++vel) {
+//            for(int pr=0; pr<4; ++pr)
+//                locB[vel][pr]= SMatrixCL<1,3>( quad( Grad[vel], absdet, Quad2Data_Mul_P1_CL(), pr));
+//        }
+
 	if(speBnd)
-		speBndHandle.setupB(tet, locB);
+		speBndHandle.setupB(tet, locB, coeff.Bndoutnormal);
+       //speBndHandle.setupB(tet, locB);
 }
 
 template< class CoeffT>

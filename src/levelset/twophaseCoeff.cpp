@@ -678,8 +678,18 @@ namespace StatSlip3{
 		v[2]= p[0]*p[2];
 		return v;
 	}
+    
+    	DROPS::SVectorCL<3> Wall1( const DROPS::Point3DCL& p,double)
+	{
+		DROPS::SVectorCL<3> v(0.);
+		v[0]= 0;
+		v[1]= 0;
+		v[2]= 0.4;
+		return v;
+	}
     static DROPS::RegisterVectorFunction regvelVel3("StatSlip3Vel", Velocity);
     static DROPS::RegisterVectorFunction regvelWall3("Wall3", Wall3);
+    static DROPS::RegisterVectorFunction regvelWall1("Wall1", Wall1);
     static DROPS::RegisterVectorFunction regvelf3("StatSlip3F", VolForce);
 	static DROPS::RegisterVectorFunction regvelgpr3("StatSlip3PrGrad",PressureGr);
 	static DROPS::RegisterVectorFunction regvelflux("StatSlip3flux",flux);
@@ -848,6 +858,81 @@ namespace CouetteFlow{
 	static DROPS::RegisterVectorFunction regunitleftwallvel("LeftwallVel", LeftwallVel);
 	static DROPS::RegisterVectorFunction regunitrightwallvel("RightwallVel", RightwallVel);
 }
+	
+namespace CylinderTest{
+
+	
+	DROPS::SVectorCL<3> Velocity( const DROPS::Point3DCL& p,double)
+	{
+		int i=1, j=2;
+		DROPS::SVectorCL<3> v(0.);
+		double r2= p[i]*p[i] + p[j]*p[j];
+		v[i]=  p[j]*r2;
+		v[j]= -p[i]*r2;
+		return v;
+	}
+    
+    DROPS::SVectorCL<3> BndVel( const DROPS::Point3DCL& p1,double)
+	{
+       double ratio = 0.5/ std::sqrt(p1[1]* p1[1]+ p1[2]*p1[2]);
+       DROPS::Point3DCL p(0.);
+       p[0] = p1[0];
+       p[1] = ratio * p1[1];
+       p[2] = ratio * p1[2];
+		int i=1, j=2;
+		DROPS::SVectorCL<3> v(0.);
+		double r2= p[i]*p[i] + p[j]*p[j];
+		v[i]=  p[j]*r2;
+		v[j]= -p[i]*r2;
+		return v;
+	}
+
+	DROPS::SVectorCL<3> VolForce( const DROPS::Point3DCL& p, double)
+    {
+		int i=1, j=2;
+        DROPS::SVectorCL<3> f(0.);
+		f[i] = -8.*p[j];
+		f[j] = 8.*p[i];
+
+        return f;
+    }
+	
+	DROPS::SVectorCL<3> Stress( const DROPS::Point3DCL& p,double)
+	{
+		int i=1, j=2;
+		DROPS::SVectorCL<3> v(0.);
+		double r = std::sqrt(p[i]*p[i] + p[j]*p[j]);
+		v[i]=  2.*p[j]* r;
+		v[j]=  -2.*p[i]* r;
+		return v;
+	}
+	
+	DROPS::SVectorCL<3> Wall( const DROPS::Point3DCL& p,double)
+	{
+       double ratio = 0.5/ std::sqrt(p[1]* p[1]+ p[2]*p[2]);
+       DROPS::Point3DCL ProjP(0.);
+       ProjP[0] = p[0];
+       ProjP[1] = ratio * p[1];
+       ProjP[2] = ratio * p[2];
+		return Velocity(ProjP, 0) + Stress(ProjP, 0);
+	}
+    
+    DROPS::SVectorCL<3> Nout( const DROPS::Point3DCL& p,double)
+	{
+       DROPS::SVectorCL<3> n(0.);
+       n[0]=0.;
+       n[1]=p[1];
+       n[2]=p[2];
+		return n/n.norm();
+	}
+    
+    static DROPS::RegisterVectorFunction regvelcyVel("CylinderVel", Velocity);
+    static DROPS::RegisterVectorFunction regvelcyBndVel("BndVel", BndVel);
+    static DROPS::RegisterVectorFunction regvelcyWall("CylinderWall", Wall);
+    static DROPS::RegisterVectorFunction regvelcyf("CylinderF", VolForce);	
+    static DROPS::RegisterVectorFunction regvelcyNout("CylinderN", Nout);	
+}
+	
 
 namespace ImpactDroplet{
     DROPS::Point3DCL ImpactVel(const DROPS::Point3DCL& p,double)
@@ -866,5 +951,94 @@ namespace ImpactDroplet{
         return vel;
 	}
  	static DROPS::RegisterVectorFunction regunitimpact("ImpactVel", ImpactVel);   
+}
+
+namespace CylinderTest2{
+
+	
+	DROPS::SVectorCL<3> Velocity( const DROPS::Point3DCL& p,double)
+	{
+		int i=1, j=2;
+		DROPS::SVectorCL<3> v(0.);
+		double r2= p[i]*p[i] + p[j]*p[j];
+		v[i]=  p[j]*r2;
+		v[j]= -p[i]*r2;
+		return v;
+	}
+    
+    DROPS::SVectorCL<3> BndVel( const DROPS::Point3DCL& p1,double)
+	{
+       double ratio = 0.5/ std::sqrt(p1[1]* p1[1]+ p1[2]*p1[2]);
+       DROPS::Point3DCL p(0.);
+       p[0] = p1[0];
+       p[1] = ratio * p1[1];
+       p[2] = ratio * p1[2];
+		int i=1, j=2;
+		DROPS::SVectorCL<3> v(0.);
+		double r2= p[i]*p[i] + p[j]*p[j];
+		v[i]=  p[j]*r2;
+		v[j]= -p[i]*r2;
+		return v;
+	}
+
+	DROPS::SVectorCL<3> VolForce( const DROPS::Point3DCL& p, double)
+    {
+		int i=1, j=2;
+        DROPS::SVectorCL<3> f(0.);
+		f[i] = -8.*p[j] + 2.* p[i];
+		f[j] = 8.*p[i] + 2.* p[j];
+        return f;
+    }
+	
+	DROPS::SVectorCL<3> Stress( const DROPS::Point3DCL& p,double)
+	{
+		int i=1, j=2;
+		DROPS::SVectorCL<3> v(0.);
+		double r = std::sqrt(p[i]*p[i] + p[j]*p[j]);
+		v[i]=  2.*p[j]* r;
+		v[j]=  -2.*p[i]* r;
+		return v;
+	}
+	
+	DROPS::SVectorCL<3> Wall( const DROPS::Point3DCL& p,double)
+	{
+       double ratio = 1.; //0.5/ std::sqrt(p[1]* p[1]+ p[2]*p[2]);
+       DROPS::Point3DCL ProjP(0.);
+       ProjP[0] = p[0];
+       ProjP[1] = ratio * p[1];
+       ProjP[2] = ratio * p[2];
+		return Velocity(ProjP, 0) + Stress(ProjP, 0);
+	}
+    
+    DROPS::SVectorCL<3> Nout( const DROPS::Point3DCL& p,double)
+	{
+       DROPS::SVectorCL<3> n(0.);
+       n[0]=0.;
+       n[1]=p[1];
+       n[2]=p[2];
+		return n/n.norm();
+	}
+    
+    double Pressure( const DROPS::Point3DCL& p,double)
+	{
+		return p[1]*p[1] + p[2]*p[2];
+	}
+
+    DROPS::SVectorCL<3> Natur( const DROPS::Point3DCL& p,double)
+	{
+       DROPS::SVectorCL<3> n(0.);
+       n[0]=-p[1]*p[1] + p[2]*p[2];
+       n[1]=0.;
+       n[2]=0.;
+		return n;
+	}
+    
+    static DROPS::RegisterVectorFunction regvelcyVel2("CylinderVel2", Velocity);
+    static DROPS::RegisterVectorFunction regvelcyBndVel2("BndVel2", BndVel);
+    static DROPS::RegisterVectorFunction regvelcyWall2("CylinderWall2", Wall);
+    static DROPS::RegisterScalarFunction regvelcyPre2("CylinderPre2", Pressure);
+    static DROPS::RegisterVectorFunction regvelcyNatur("CylinderNatur2", Natur);
+    static DROPS::RegisterVectorFunction regvelcyf2("CylinderF2", VolForce);	
+    static DROPS::RegisterVectorFunction regvelcyNout2("CylinderN2", Nout);	
 }
 

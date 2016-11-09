@@ -108,6 +108,10 @@ class Quad2DataCL; ///< forward declaration for the factory method
 inline const Quad2DataCL&
 make_Quad2Data ();
 
+class Quad5DataCL; ///< forward declaration for the factory method
+inline const Quad5DataCL&
+make_Quad5Data ();
+
 /// \brief Create a quadrature rule that equals a QuadDataCL-type rule.
 /// This lets one use a QuadDataCL-rule as QuadDomainCL. Generally, one should use the appropriate quad()-function for QuadDataCL-types directly and spare the copying. For obscure extrapolation rules, this approach is not possible, as a QuadDomainCL is required.
 /// The template-parameter QuadDataT must be given explicitly.

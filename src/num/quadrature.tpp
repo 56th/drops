@@ -124,6 +124,13 @@ make_Quad2Data ()
     return quad2data;
 }
 
+inline const Quad5DataCL&
+make_Quad5Data ()
+{
+    static const Quad5DataCL quad5data;
+    return quad5data;
+}
+
 template <class QuadDataT>
   const QuadDomainCL&
   make_SimpleQuadDomain (QuadDomainCL& q, const TetraSignEnum& s)

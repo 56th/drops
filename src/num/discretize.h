@@ -918,6 +918,7 @@ class Quad5_2DCL: public GridFunctionCL<T>
     typedef GridFunctionCL<T> base_type;
     typedef typename base_type::value_type value_type;
     typedef typename base_type::instat_fun_ptr instat_fun_ptr;
+    typedef Quad5_2DDataCL DataClass;
 
   protected:
     typedef Quad5_2DCL<T> self_;

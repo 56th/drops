@@ -162,7 +162,11 @@ void EdgeCL::BuildMidVertex(SimplexFactoryCL& factory, const BoundaryCL& Bnd)
 
 Point3DCL GetBaryCenter(const EdgeCL& e)
 {
-    return (e.GetVertex(0)->GetCoord() + e.GetVertex(1)->GetCoord() )*0.5;
+    static MeshDeformationCL & m = MeshDeformationCL::getInstance();
+    if (m.IsUsed())
+        return m.GetTransformedEdgeBaryCenter(e);
+    else
+        return (e.GetVertex(0)->GetCoord() + e.GetVertex(1)->GetCoord() )*0.5;
 }
 
 #ifdef _PAR
