@@ -1,6 +1,6 @@
 /// \file subtriangulation.tpp
 /// \brief Triangulation of a principal-lattice of a tetra adapted to a piecewise linear level-set function.
-/// \author LNM RWTH Aachen: Joerg Grande; SC RWTH Aachen:
+/// \author LNM RWTH Aachen: Joerg Grande, Liang Zhang; SC RWTH Aachen:
 
 /*
  * This file is part of DROPS.
@@ -19,7 +19,7 @@
  * along with DROPS. If not, see <http://www.gnu.org/licenses/>.
  *
  *
- * Copyright 2011 LNM/SC RWTH Aachen, Germany
+ * Copyright 2016 LNM/SC RWTH Aachen, Germany
 */
 
 #include "geom/topo.h"
@@ -66,19 +66,19 @@ on_cutBnd(const std::valarray<double>& ls, const std::valarray<byte>& ls_sign, c
 double loc_ls[4], byte loc_ls_sign[4], Uint FaceNum)
 {
     bool OnCutBnd = false;
-	int counter = 0;
+    int counter = 0;
     for (Uint i= 0; i < 4; ++i)
-	{
-		loc_ls_sign[i]= ls_sign[lattice_tet[i]];
+    {
+        loc_ls_sign[i]= ls_sign[lattice_tet[i]];
         loc_ls     [i]= ls     [lattice_tet[i]];
-		//check if the vertex i is on the face 	
-		if( lattice.GetBaryCoord(lattice_tet[i])[FaceNum] < 10e-9)
-		{
+        //check if the vertex i is on the face 	
+        if( lattice.GetBaryCoord(lattice_tet[i])[FaceNum] < 10e-9)
+        {
 
-			counter++;
-		}
-	}
-	if (counter == 3 )
+            counter++;
+        }
+    }
+    if (counter == 3 )
         OnCutBnd = true;
     return OnCutBnd; 
 }
@@ -215,26 +215,26 @@ template <class VertexCutMergingPolicyT>
 template <class VertexCutMergingPolicyT>
  const BndTriangPartitionCL::TriangleT BndTriangPartitionCL::make_sub_triangle(const RefTrianglePartitionCL::TriangleT& ref_tri, const PrincipalLatticeCL::TetraT& lattice_tet,
         const double lset[4], Uint lattice_num_vertexes, VertexCutMergingPolicyT& edgecut)
-	{
-		TriangleT tri;
-		Uint loc_vert_num;
-		for (Uint j= 0; j < 3; ++j) {
-			loc_vert_num= ref_tri[j];
-			if (loc_vert_num < 4)   // on the origianl vertices
-				tri[j]= lattice_tet[loc_vert_num];
-			else {                  // genuine edge cut
-				const Ubyte v0= VertOfEdge( loc_vert_num - 4, 0),
-							v1= VertOfEdge( loc_vert_num - 4, 1);
-				tri[j]= lattice_num_vertexes + edgecut( lattice_tet[v0], lattice_tet[v1], lset[v0], lset[v1]); // add the cut vertex if not find and return its number 
-			}
-		}
-		return tri;
-	}
+{
+    TriangleT tri;
+    Uint loc_vert_num;
+    for (Uint j= 0; j < 3; ++j) {
+        loc_vert_num= ref_tri[j];
+        if (loc_vert_num < 4)   // on the origianl vertices
+            tri[j]= lattice_tet[loc_vert_num];
+        else {                  // genuine edge cut
+            const Ubyte v0= VertOfEdge( loc_vert_num - 4, 0),
+                        v1= VertOfEdge( loc_vert_num - 4, 1);
+            tri[j]= lattice_num_vertexes + edgecut( lattice_tet[v0], lattice_tet[v1], lset[v0], lset[v1]); // add the cut vertex if not find and return its number 
+        }
+    }
+    return tri;
+}
 
 template <class VertexPartitionPolicyT, class VertexCutMergingPolicyT>
   void BndTriangPartitionCL:: make_partition2D (const PrincipalLatticeCL& lat, Uint face, const std::valarray<double>& ls)
   {
-	const Uint lattice_num_vertexes= lat.vertex_size();
+    const Uint lattice_num_vertexes= lat.vertex_size();
 
     triangles_.clear();
     pos_triangles_begin_ = 0;
@@ -249,26 +249,26 @@ template <class VertexPartitionPolicyT, class VertexCutMergingPolicyT>
     double loc_ls[4];
     byte   loc_ls_sign[4];
     for (PrincipalLatticeCL::const_tetra_iterator lattice_tet= lat.tetra_begin(), lattice_end= lat.tetra_end(); lattice_tet != lattice_end; ++lattice_tet) {
-		
-		// check if a sub_tetra in the lattice (with 2 intervals) is a sub_tetra which has the face
+        
+        // check if a sub_tetra in the lattice (with 2 intervals) is a sub_tetra which has the face
         bool OnCutBnd = on_cutBnd( ls, ls_sign, lat, *lattice_tet, loc_ls, loc_ls_sign, face);
-		if(OnCutBnd)
-		{
-			//std::cout<<"****************** One cut boundary face is found"<<std::endl;
-			const RefTrianglePartitionCL cut(loc_ls_sign, Ubyte(face));                          //casting from unsigned int to unsigned char?
-			for (RefTrianglePartitionCL::const_triangle_iterator it= cut.triangle_begin(), end= cut.triangle_end(); it != end; ++it)
-				(cut.sign( it) == -1 ? triangles_ : loc_triangles).push_back( make_sub_triangle(
-					*it, *lattice_tet, loc_ls, lattice_num_vertexes, edgecut));
-		}
+        if(OnCutBnd)
+        {
+            //std::cout<<"****************** One cut boundary face is found"<<std::endl;
+            const RefTrianglePartitionCL cut(loc_ls_sign, Ubyte(face));                          //casting from unsigned int to unsigned char?
+            for (RefTrianglePartitionCL::const_triangle_iterator it= cut.triangle_begin(), end= cut.triangle_end(); it != end; ++it)
+                (cut.sign( it) == -1 ? triangles_ : loc_triangles).push_back( make_sub_triangle(
+                    *it, *lattice_tet, loc_ls, lattice_num_vertexes, edgecut));
+        }
     }
     pos_triangles_begin_= triangles_.size(); 
 
     if(loc_triangles.end()-loc_triangles.begin()!=0)
     std::copy( loc_triangles. begin(), loc_triangles.end(), std::back_inserter( triangles_));    //insert the positive triangles
 
-	//unsorted vertexes, other sorted policy could be added if needed in the future
-	std::copy( lat.vertex_begin(), lat.vertex_end(), std::back_inserter( vertexes_));            //insert all vertices in the principal lattice;
+    //unsorted vertexes, other sorted policy could be added if needed in the future
+    std::copy( lat.vertex_begin(), lat.vertex_end(), std::back_inserter( vertexes_));            //insert all vertices in the principal lattice;
     VertexContT cut_vertexes=edgecut.cut_vertex_container();
     std::copy( cut_vertexes.begin(), cut_vertexes.end(), std::back_inserter( vertexes_));        //insert all vertices generated by edge cut;
-  }
+    }
 } // end of namespace DROPS

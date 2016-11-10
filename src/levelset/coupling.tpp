@@ -267,7 +267,7 @@ void LinThetaScheme2PhaseCL<LsetSolverT>::Update()
 template <class LsetSolverT>
 OperatorSplitting2PhaseCL<LsetSolverT>::OperatorSplitting2PhaseCL
     ( StokesT& Stokes, LevelsetP2CL& ls, StokesSolverBaseCL& solver, LsetSolverT& lsetsolver, LevelsetModifyCL& lsetmod, double dt,
-    		int gm_iter, double gm_tol, double nonlinear)
+    int gm_iter, double gm_tol, double nonlinear)
 
   : base_( Stokes, ls, lsetmod, dt, nonlinear), solver_(solver), lsetsolver_( lsetsolver),
     gm_( pc_, 100, gm_iter, gm_tol, false /*test absolute resid*/),

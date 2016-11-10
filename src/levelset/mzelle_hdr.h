@@ -136,10 +136,10 @@ class ContactDropletCL
         return std::abs( avgRad)*d.norm() - avgRad;
     }
     static double GetVolume() 
-	{
-		double R_Angle_ = Angle_/180 * M_PI;
-		return 1./3.*M_PI*Radius_[0]*Radius_[1]*Radius_[2] * (2.- 2.*std::cos(R_Angle_)- std::sin(R_Angle_)*std::sin(R_Angle_)*std::cos(R_Angle_)); 
-	}
+    {
+        double R_Angle_ = Angle_/180 * M_PI;
+        return 1./3.*M_PI*Radius_[0]*Radius_[1]*Radius_[2] * (2.- 2.*std::cos(R_Angle_)- std::sin(R_Angle_)*std::sin(R_Angle_)*std::cos(R_Angle_)); 
+    }
     static Point3DCL& GetCenter() { return Mitte_; }
     static Point3DCL& GetRadius() { return Radius_; }
     static double GetAngle() { return Angle_; }
@@ -464,9 +464,9 @@ void SolveStatProblem( StokesT& Stokes, LevelsetP2CL& lset,
     duration = time.GetTime();
     std::cout << "Solving (Navier-)Stokes took "<<  duration << " sec.\n";
     std::cout << "iter: " << solver.GetIter() << "\tresid: " << solver.GetResid() << std::endl;
-	if(checkSolution)
-		//Stokes.CheckOnePhaseSolution( &Stokes.v, &Stokes.p, Stokes.Coeff_.RefVel, Stokes.Coeff_.RefGradPr, Stokes.Coeff_.RefPr);
-		Stokes.CheckTwoPhaseSolution( &Stokes.v, &Stokes.p, lset, Stokes.Coeff_.RefVel, Stokes.Coeff_.RefPr);
+    if(checkSolution)
+        //Stokes.CheckOnePhaseSolution( &Stokes.v, &Stokes.p, Stokes.Coeff_.RefVel, Stokes.Coeff_.RefGradPr, Stokes.Coeff_.RefPr);
+        Stokes.CheckTwoPhaseSolution( &Stokes.v, &Stokes.p, lset, Stokes.Coeff_.RefVel, Stokes.Coeff_.RefPr);
 }
 
 void SetInitialLevelsetConditions( LevelsetP2CL& lset, MultiGridCL& MG, ParamCL& P)

@@ -56,10 +56,10 @@ class StokesBndDataCL
 class SpecialBndHandleSystem2OnePhaseCL
 {
  private:
-	const StokesBndDataCL& BndData_;
-	Point3DCL normal;
-	Uint unknownIdx[6];
-  public:	
+    const StokesBndDataCL& BndData_;
+    Point3DCL normal;
+    Uint unknownIdx[6];
+  public:
     SpecialBndHandleSystem2OnePhaseCL(const StokesBndDataCL& BndData): BndData_(BndData) {}
     void setupB(const TetraCL& tet, SMatrixCL<1, 3> loc_b[10][4]);
     void setupB(const TetraCL& tet, SMatrixCL<1, 3> loc_b[10][4], instat_vector_fun_ptr f);

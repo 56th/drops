@@ -31,47 +31,49 @@ namespace DROPS
 void SpecialBndHandleSystem2OnePhaseCL::setupB(const TetraCL& tet, SMatrixCL<1, 3> loc_b[10][4])
 {
 
-	for (Uint k =0; k< 4; ++k) //Go throught all faces of a tet
-	{
-		LocalP2CL<double> phiVelP2[6];   //local basis for velocity
-		LocalP1CL<double> phiPrP1[3];    //local basis for pressure
-		Quad5_2DCL<double> pr2Dj;
-		Quad5_2DCL<double> vel2Di;
+    for (Uint k =0; k< 4; ++k) //Go throught all faces of a tet
+    {
+        LocalP2CL<double> phiVelP2[6];   //local basis for velocity
+        LocalP1CL<double> phiPrP1[3];    //local basis for pressure
+        Quad5_2DCL<double> pr2Dj;
+        Quad5_2DCL<double> vel2Di;
 
-		BaryCoordCL bary[3];
-		if( BndData_.Vel.GetBC(*tet.GetFace(k))==Slip0BC || BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC || BndData_.Vel.GetBC(*tet.GetFace(k))==SymmBC){
-			const FaceCL& face = *tet.GetFace(k);            //Get a face on a special boundary 
-            double absdet = FuncDet2D(	face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
-                                           	face.GetVertex(2)->GetCoord()-face.GetVertex(0)->GetCoord());
-			tet.GetOuterNormal(k, normal);
-			for (Uint i= 0; i<3; ++i)  
-			{
-				unknownIdx[i]   = VertOfFace(k, i);          // i is index for Vertex
-				unknownIdx[i+3] = EdgeOfFace(k, i) + 4;      // i is index for Edge
-				bary[i][unknownIdx[i]]=1;
-				phiPrP1[i][unknownIdx[i]]=1;
-			}
+        BaryCoordCL bary[3];
+        if( BndData_.Vel.GetBC(*tet.GetFace(k))==Slip0BC || BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC || BndData_.Vel.GetBC(*tet.GetFace(k))==SymmBC){
+            const FaceCL& face = *tet.GetFace(k);            //Get a face on a special boundary 
+            double absdet = FuncDet2D(face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
+                                      face.GetVertex(2)->GetCoord()-face.GetVertex(0)->GetCoord());
+            tet.GetOuterNormal(k, normal);
+            for (Uint i= 0; i<3; ++i)  
+            {
+                unknownIdx[i]   = VertOfFace(k, i);          // i is index for Vertex
+                unknownIdx[i+3] = EdgeOfFace(k, i) + 4;      // i is index for Edge
+                bary[i][unknownIdx[i]]=1;
+                phiPrP1[i][unknownIdx[i]]=1;
+            }
 
-			for(Uint i=0; i<6; ++i)
-				phiVelP2[i][unknownIdx[i]] = 1;
-				
-			for(Uint i=0; i<6; ++i){
-				vel2Di.assign(phiVelP2[i], bary);  
-				for(Uint j=0; j<3; ++j){					
-					pr2Dj.assign(phiPrP1[j], bary);  
-					Quad5_2DCL<double> quad2D(pr2Dj * vel2Di); 
-					loc_b[unknownIdx[i]][unknownIdx[j]](0, 0)-= quad2D.quad(absdet)*normal[0];
-					loc_b[unknownIdx[i]][unknownIdx[j]](0, 1)-= quad2D.quad(absdet)*normal[1];
-					loc_b[unknownIdx[i]][unknownIdx[j]](0, 2)-= quad2D.quad(absdet)*normal[2];
-				}
-			}
-		}
-	}	
-	
+            for(Uint i=0; i<6; ++i)
+                phiVelP2[i][unknownIdx[i]] = 1;
+                
+            for(Uint i=0; i<6; ++i){
+                vel2Di.assign(phiVelP2[i], bary);  
+                for(Uint j=0; j<3; ++j){
+                    pr2Dj.assign(phiPrP1[j], bary);  
+                    Quad5_2DCL<double> quad2D(pr2Dj * vel2Di);
+                    const double qq= quad2D.quad(absdet);
+                    loc_b[unknownIdx[i]][unknownIdx[j]](0, 0)-= qq*normal[0];
+                    loc_b[unknownIdx[i]][unknownIdx[j]](0, 1)-= qq*normal[1];
+                    loc_b[unknownIdx[i]][unknownIdx[j]](0, 2)-= qq*normal[2];  
+                    //loc_b[i][j] -= quad2D.quad(absdet)*SMatrixCL<1,3>(normal) //  TODO LZ: only 
+                }
+            }
+        }
+    }
+
 }
 
 //P2_P1 multiplication
-void SpecialBndHandleSystem2OnePhaseCL::setupB(const TetraCL& tet, SMatrixCL<1, 3> loc_b[10][4], instat_vector_fun_ptr f)
+void SpecialBndHandleSystem2OnePhaseCL::setupB(const TetraCL& tet, SMatrixCL<1, 3> loc_b[10][4], instat_vector_fun_ptr bnd_normal) ///< curved case
 {
     MeshDeformationCL& md = MeshDeformationCL::getInstance();
     Quad5_2DCL<double> adet;
@@ -87,8 +89,8 @@ void SpecialBndHandleSystem2OnePhaseCL::setupB(const TetraCL& tet, SMatrixCL<1, 
         BaryCoordCL bary[3];
         if( BndData_.Vel.GetBC(*tet.GetFace(k))==Slip0BC || BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC || BndData_.Vel.GetBC(*tet.GetFace(k))==SymmBC){
             const FaceCL& face = *tet.GetFace(k);            //Get a face on a special boundary 
-            double absdet = FuncDet2D(	face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
-                                face.GetVertex(2)->GetCoord()-face.GetVertex(0)->GetCoord());
+            double absdet = FuncDet2D(face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
+                                      face.GetVertex(2)->GetCoord()-face.GetVertex(0)->GetCoord());
             tet.GetOuterNormal(k, normal);
             for (Uint i= 0; i<3; ++i){
                 unknownIdx[i]   = VertOfFace(k, i);          // i is index for Vertex
@@ -103,12 +105,12 @@ void SpecialBndHandleSystem2OnePhaseCL::setupB(const TetraCL& tet, SMatrixCL<1, 
                 adet = Quad5_2DCL<double> (absdet);
                 Nout = Quad5_2DCL<Point3DCL>(normal);	
             }
-            //Nout.assign(tet, bary, f);
+            //Nout.assign(tet, bary, bnd_normal);
             for(Uint i=0; i<6; ++i)
                 phiVelP2[i][unknownIdx[i]] = 1;
             for(Uint i=0; i<6; ++i){
                 vel2Di.assign(phiVelP2[i], bary);  
-                for(Uint j=0; j<3; ++j){					
+                for(Uint j=0; j<3; ++j){
                     pr2Dj.assign(phiPrP1[j], bary);  
                     Quad5_2DCL<double> temp(pr2Dj * vel2Di); 
                     Quad5_2DCL<Point3DCL> quad2D( temp * Nout * adet);
@@ -116,7 +118,7 @@ void SpecialBndHandleSystem2OnePhaseCL::setupB(const TetraCL& tet, SMatrixCL<1, 
                 }
             }
         }
-    }		
+    }
 }
 
 }

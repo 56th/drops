@@ -159,11 +159,11 @@ class InterfaceTetraCL : public InterfacePatchCL
 class InterfaceTriangleCL : public InterfacePatchCL
 {
   private:
-    double         DetA_;			//detminant = 2 * area of triangle
+    double         DetA_;   //detminant = 2 * area of triangle
     Point3DCL       B_[3];
     Point2DCL       ab_;
-    Uint	 numMCL_;				 //number of moving contact lines
-    Uint	 IdxMCL_[4][2];			 //the edge index  for each contact line
+    Uint     numMCL_;	       //number of moving contact lines
+    Uint     IdxMCL_[4][2]; //the edge index  for each contact line
     instat_vector_fun_ptr outnormal_; ///the outnormal of the boundary. instat might be useful for varying boundary.
 
     BaryCoordCL TransformToSubTetra (const BaryCoordCL& b); ///< compute st_*b \todo remove this by introducing a column-oriented small matrix class
@@ -171,10 +171,11 @@ class InterfaceTriangleCL : public InterfacePatchCL
 
   public:
     bool ComputeForChild( Uint ch);                            ///< returns true, if a patch exists for this child
-    bool ComputeMCLForChild(Uint ch);			 			   ///< returns true, if a moving contact line exists for this child
-															   ///< called after BInit()!!
-    Uint GetNumMCL();									///< returns numMCL_
-    void SetBndOutNormal(instat_vector_fun_ptr outnormal);   ///set outnormal
+    bool ComputeMCLForChild(Uint ch);                          ///< returns true, if a moving contact line exists for this child
+                                                               ///< called after BInit()!!
+    Uint GetNumMCL();	                                          ///< returns numMCL_
+    void SetBndOutNormal(instat_vector_fun_ptr outnormal);     ///set outnormal
+    //double GetInfoMCL(Uint v, BaryCoordCL& bary0, BaryCoordCL& bary1, Point3DCL& pt0, Point3DCL& pt1, Uint& face, Point3DCL& bnd_normal);
     double GetInfoMCL(Uint v, BaryCoordCL& bary0, BaryCoordCL& bary1, Point3DCL& pt0, Point3DCL& pt1);
     double GetAbsDet( Uint tri= 0) const { return DetA_*(tri==0 ? 1.0 : GetAreaFrac()); } ///< Returns the Determinant for surface integration on the triangle \p tri.
     double GetAreaFrac()   const { return intersec_==4 ? ab_[0]+ab_[1]-1 : 0; }                   ///< Quotient of the areas of the first and the second triangle.
@@ -184,18 +185,15 @@ class InterfaceTriangleCL : public InterfacePatchCL
     Point3DCL GetNormal () const;                         ///< Returns the unit normal to the linear approximation of \f$\Gamma\f$, that points from \f$\{\varphi<0\}\f$ to \f$\{\varphi<0\}\f$.
     Quad5_2DCL<Point3DCL> GetImprovedNormal(Uint) const;  ///< Returns the improved unit normal
     Point3DCL GetImprovedNormalOnMCL(Uint,double bary1D) const;  ///< Returns the improved unit normal on moving contact line
-    Point3DCL GetMCLNormal(Uint) const;						  ///< Returns the unit normal to the contact line in tangential surface of the boundary
-															  ///call after SetBndoutNormal()
+    Point3DCL GetMCLNormal(Uint) const;                          ///< Returns the unit normal to the contact line in tangential surface of the boundary
     Point3DCL GetImprovedMCLNormal(Uint v,double bary1D) const; ///< Returns the unit normal to the contact line in tangential surface of the boundary
-    														///computed in an improved way using levelset function
-    														///v denotes the v-th contact line(at most two). bary1D is the bary coordinate on the straight contact line
-    														///call after SetBndoutNormal()
-    double GetActualContactAngle(Uint) const;				///< Returns the contact angle
-															///call after SetBndoutNormal()
-    double GetImprovedActualContactAngle(Uint,double bary1D) const;				///< Returns the contact angle
-    															///call after SetBndoutNormal()
+                                                            ///computed in an improved way using levelset function
+                                                            ///v denotes the v-th contact line(at most two). bary1D is the bary coordinate on the straight contact line
+                                                            ///call after SetBndoutNormal()
+    double GetActualContactAngle(Uint) const;               ///< Returns the contact angle 
+    double GetImprovedActualContactAngle(Uint,double bary1D) const;	 ///< Returns the contact angle
     Point3DCL ApplyProj( const Point3DCL& grad) const { return grad[0]*B_[0] + grad[1]*B_[1] + grad[2]*B_[2]; }
-    bool IsSymmType(Uint i) {return SymmType[i];}  //return if a contact line segment is symmetric
+    bool IsSymmType(Uint i) {return SymmType[i];}    ///<return if a contact line segment is symmetric
 };
 
 

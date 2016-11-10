@@ -83,8 +83,8 @@ class BndCondInfoCL
     bool     IsDirichlet()  const { return bc_==Dir0BC || bc_==DirBC; }
     bool     IsNatural()    const { return bc_==Nat0BC || bc_==NatBC; }
     bool     IsPeriodic()   const { return bc_==Per1BC || bc_==Per2BC ; }
-    bool     IsSlip()       const { return bc_==SlipBC; }
-    bool     IsSymmetric()  const { return bc_==SymmBC; }
+    bool     IsSlip()       const { return bc_==Slip0BC || bc_==SlipBC || bc_==SymmBC; } // Note that Symmetric BC is considered as a special slip BC.
+    bool     IsSymmetric()  const { return bc_==SymmBC; } 
     BndCondT GetBC()        const { return bc_; }
 };
 
@@ -170,7 +170,7 @@ class BndCondCL
     inline BndCondT GetBC( const EdgeCL&, BndIdxT&)   const;
     inline BndCondT GetBC( const FaceCL&, BndIdxT&)   const;
     /// \}
-	/// Only used in creating numbering for unknown
+    /// Only used in creating numbering for unknown
     inline bool IsOnDirBnd( const VertexCL&) const;
     inline bool IsOnDirBnd( const EdgeCL&)   const;
     inline bool IsOnDirBnd( const FaceCL&)   const;
@@ -180,12 +180,12 @@ class BndCondCL
     inline bool IsOnPerBnd( const VertexCL&) const;
     inline bool IsOnPerBnd( const EdgeCL&)   const;
     inline bool IsOnPerBnd( const FaceCL&)   const;
-    inline bool IsOnSliBnd( const VertexCL&) const;
-    inline bool IsOnSliBnd( const EdgeCL&)   const;
-    inline bool IsOnSliBnd( const FaceCL&)   const;
-    inline bool IsOnSymBnd( const VertexCL&) const;
-    inline bool IsOnSymBnd( const EdgeCL&)   const;
-    inline bool IsOnSymBnd( const FaceCL&)   const;
+//    inline bool IsOnSlipBnd( const VertexCL&) const;
+    inline bool IsOnSlipBnd( const EdgeCL&)   const;
+    inline bool IsOnSlipBnd( const FaceCL&)   const;
+//    inline bool IsOnSymmBnd( const VertexCL&) const;
+    inline bool IsOnSymmBnd( const EdgeCL&)   const;
+    inline bool IsOnSymmBnd( const FaceCL&)   const;   // LZ keep it?
 
     /// \name boundary segment
     /// Returns boundary segment with superior boundary condition of sub-simplex
@@ -283,9 +283,9 @@ class NoBndCondCL: public BndCondCL
     template<class SimplexT>
     static inline bool IsOnPerBnd (const SimplexT&) { return false; }
     template<class SimplexT>
-    static inline bool IsOnSliBnd (const SimplexT&) { return false; }
+    static inline bool IsOnSlipBnd (const SimplexT&) { return false; }
     template<class SimplexT>
-    static inline bool IsOnSymBnd (const SimplexT&) { return false; }
+    static inline bool IsOnSymmBnd (const SimplexT&) { return false; }
 };
 
 
@@ -372,25 +372,25 @@ inline bool BndCondCL::IsOnPerBnd( const VertexCL& v) const
     return HasPer;
 }
 
-inline bool BndCondCL::IsOnSliBnd( const VertexCL& v) const
+/*inline bool BndCondCL::IsOnSlipBnd( const VertexCL& v) const
 { // 
     if ( !v.IsOnBoundary() || !BndCond_.size()) return false;
     const BndCondT bc= GetBC(v);
-    if (bc==SlipBC)
-		return true;
-	else
-		return false;
-}
+    if (bc==Slip0BC || bc==SlipBC || bc==SymmBC)
+        return true;
+    else
+        return false;
+}*/
 
-inline bool BndCondCL::IsOnSymBnd( const VertexCL& v) const
+/*inline bool BndCondCL::IsOnSymmBnd( const VertexCL& v) const
 { //
     if ( !v.IsOnBoundary() || !BndCond_.size()) return false;
     const BndCondT bc= GetBC(v);
     if (bc==SymmBC)
-		return true;
-	else
-		return false;
-}
+        return true;
+    else
+        return false;
+}*/
 
 inline BndCondT BndCondCL::GetBC( const VertexCL& v) const
 /// Returns BC on vertex \a v with lowest number (i.e. the superior BC on \a v)
@@ -477,25 +477,25 @@ inline bool BndCondCL::IsOnPerBnd( const EdgeCL& e) const
     return HasPer;
 }
 
-inline bool BndCondCL::IsOnSliBnd( const EdgeCL& e) const
+inline bool BndCondCL::IsOnSlipBnd( const EdgeCL& e) const
 {
     if ( !e.IsOnBoundary() || !BndCond_.size()) return false;
     const BndCondT bc= GetBC(e);
-    if (bc==SlipBC)
-		return true;
-	else
-		return false;
+    if (bc==Slip0BC || bc==SlipBC || bc==SymmBC)
+        return true;
+    else
+        return false;
     return true;
 }
 
-inline bool BndCondCL::IsOnSymBnd( const EdgeCL& e) const
+inline bool BndCondCL::IsOnSymmBnd( const EdgeCL& e) const
 {
     if ( !e.IsOnBoundary() || !BndCond_.size()) return false;
     const BndCondT bc= GetBC(e);
     if (bc==SymmBC)
-		return true;
-	else
-		return false;
+        return true;
+    else
+        return false;
     return true;
 }
 
@@ -556,12 +556,12 @@ inline bool BndCondCL::IsOnPerBnd( const FaceCL& f) const
     return f.IsOnBoundary() && BndCond_.size() && BndCond_[f.GetBndIdx()].IsPeriodic();
 }
 
-inline bool BndCondCL::IsOnSliBnd(const FaceCL& f) const
+inline bool BndCondCL::IsOnSlipBnd(const FaceCL& f) const
 {
     return f.IsOnBoundary() && BndCond_.size() && BndCond_[f.GetBndIdx()].IsSlip();
 }
 
-inline bool BndCondCL::IsOnSymBnd( const FaceCL& f) const
+inline bool BndCondCL::IsOnSymmBnd( const FaceCL& f) const
 {
     return f.IsOnBoundary() && BndCond_.size() && BndCond_[f.GetBndIdx()].IsSymmetric();
 }

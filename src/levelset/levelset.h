@@ -91,7 +91,7 @@ class LevelsetP2CL : public ProblemCL< LevelsetCoeffCL, LsetBndDataCL>
     SurfaceForceT       SF_;
 
     SurfaceTensionCL&   sf_;      ///< data for surface tension
-    instat_scalar_fun_ptr CA_;		    ///<Young's contact angle on domain boundary
+    instat_scalar_fun_ptr CA_;    ///<Young's contact angle on domain boundary
     instat_vector_fun_ptr Bndoutnormal_; ///outnormal of domain boundary
 
     void SetupSmoothSystem ( MatrixCL&, MatrixCL&)               const;

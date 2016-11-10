@@ -106,70 +106,70 @@ class TwoPhaseFlowCoeffCL
     const double betaL, alpha;
     const Point3DCL g;
 
-    TwoPhaseFlowCoeffCL( ParamCL& P, bool dimless = false)
-      //big question: film or measurecell? 1: measure, 2: film
-        : film( (P.get<double>("Mat.DensDrop") == 0.0) ),
-        surfTens( film ? P.get<double>("Mat.SurfTension") : P.get<double>("SurfTens.SurfTension")),
-        rho_koeff1( film ? P.get<double>("Mat.DensGas") : P.get<double>("Mat.DensFluid")),
-        rho_koeff2( film ? P.get<double>("Mat.DensFluid") : P.get<double>("Mat.DensDrop")),
-        mu_koeff1( film ? P.get<double>("Mat.ViscGas") : P.get<double>("Mat.ViscFluid")),
-        mu_koeff2( film ? P.get<double>("Mat.ViscFluid") : P.get<double>("Mat.ViscDrop")),
-        beta_coeff1(P.get<double>("SpeBnd.beta1")),
-        beta_coeff2(P.get<double>("SpeBnd.beta2")),
+TwoPhaseFlowCoeffCL( ParamCL& P, bool dimless = false)
+  //big question: film or measurecell? 1: measure, 2: film
+    : film( (P.get<double>("Mat.DensDrop") == 0.0) ),
+    surfTens( film ? P.get<double>("Mat.SurfTension") : P.get<double>("SurfTens.SurfTension")),
+    rho_koeff1( film ? P.get<double>("Mat.DensGas") : P.get<double>("Mat.DensFluid")),
+    rho_koeff2( film ? P.get<double>("Mat.DensFluid") : P.get<double>("Mat.DensDrop")),
+    mu_koeff1( film ? P.get<double>("Mat.ViscGas") : P.get<double>("Mat.ViscFluid")),
+    mu_koeff2( film ? P.get<double>("Mat.ViscFluid") : P.get<double>("Mat.ViscDrop")),
+    beta_coeff1(P.get<double>("SpeBnd.beta1")),
+    beta_coeff2(P.get<double>("SpeBnd.beta2")),
 
-		
-        rho( dimless ? JumpCL( 1., rho_koeff1/rho_koeff2)
-          : JumpCL( rho_koeff2, rho_koeff1), H_sm, P.get<double>("Mat.SmoothZone")),
-        mu( dimless ? JumpCL( 1., mu_koeff1/mu_koeff2)
-          : JumpCL( mu_koeff2, mu_koeff1), H_sm, P.get<double>("Mat.SmoothZone")),
-        beta(dimless ? JumpCL( 1., beta_coeff2/beta_coeff1)
-                     :JumpCL(beta_coeff2,beta_coeff1), H_sm, P.get<double>("SpeBnd.SmoothZone")),
-        SurfTens (dimless ? surfTens/rho_koeff2 : surfTens),
-        DilVisco( film ? P.get<double>("Mat.DilatationalVisco") : P.get<double>("SurfTens.DilatationalVisco")),
-        ShearVisco( film ? P.get<double>("Mat.ShearVisco") : P.get<double>("SurfTens.ShearVisco")),
-        betaL(P.get<double>("SpeBnd.betaL")), alpha(P.get<double>("SpeBnd.alpha")),
-        g( P.get<DROPS::Point3DCL>("Exp.Gravity"))
-        {
-			volforce = InVecMap::getInstance()[P.get<std::string>("Exp.VolForce")];
-			if( P.get<std::string>("Exp.Solution_Vel").compare("None")!=0)
-				RefVel = InVecMap::getInstance()[P.get<std::string>("Exp.Solution_Vel")];
-			else
-				RefVel = NULL;
-			if( P.get<std::string>("Exp.Solution_GradPr").compare("None")!=0)
-				RefGradPr = InVecMap::getInstance()[P.get<std::string>("Exp.Solution_GradPr")];
-			else
-				RefGradPr = NULL;
-			if( P.get<std::string>("Exp.Solution_Pr").compare("None")!=0)
-				RefPr = InScaMap::getInstance()[P.get<std::string>("Exp.Solution_Pr")];
-			else
-				RefPr = NULL;
-          if( P.get<std::string>("SpeBnd.BndOutNormal").compare("None")!=0)
-				Bndoutnormal = InVecMap::getInstance()[P.get<std::string>("SpeBnd.BndOutNormal")];
-			else
-				Bndoutnormal = NULL;
+    
+    rho( dimless ? JumpCL( 1., rho_koeff1/rho_koeff2)
+      : JumpCL( rho_koeff2, rho_koeff1), H_sm, P.get<double>("Mat.SmoothZone")),
+    mu( dimless ? JumpCL( 1., mu_koeff1/mu_koeff2)
+      : JumpCL( mu_koeff2, mu_koeff1), H_sm, P.get<double>("Mat.SmoothZone")),
+    beta(dimless ? JumpCL( 1., beta_coeff2/beta_coeff1)
+                 :JumpCL(beta_coeff2,beta_coeff1), H_sm, P.get<double>("SpeBnd.SmoothZone")),
+    SurfTens (dimless ? surfTens/rho_koeff2 : surfTens),
+    DilVisco( film ? P.get<double>("Mat.DilatationalVisco") : P.get<double>("SurfTens.DilatationalVisco")),
+    ShearVisco( film ? P.get<double>("Mat.ShearVisco") : P.get<double>("SurfTens.ShearVisco")),
+    betaL(P.get<double>("SpeBnd.betaL")), alpha(P.get<double>("SpeBnd.alpha")),
+    g( P.get<DROPS::Point3DCL>("Exp.Gravity"))
+    {
+        volforce = InVecMap::getInstance()[P.get<std::string>("Exp.VolForce")];
+        if( P.get<std::string>("Exp.Solution_Vel").compare("None")!=0)
+            RefVel = InVecMap::getInstance()[P.get<std::string>("Exp.Solution_Vel")];
+        else
+            RefVel = NULL;
+        if( P.get<std::string>("Exp.Solution_GradPr").compare("None")!=0)
+            RefGradPr = InVecMap::getInstance()[P.get<std::string>("Exp.Solution_GradPr")];
+        else
+            RefGradPr = NULL;
+        if( P.get<std::string>("Exp.Solution_Pr").compare("None")!=0)
+            RefPr = InScaMap::getInstance()[P.get<std::string>("Exp.Solution_Pr")];
+        else
+            RefPr = NULL;
+      if( P.get<std::string>("SpeBnd.BndOutNormal").compare("None")!=0)
+            Bndoutnormal = InVecMap::getInstance()[P.get<std::string>("SpeBnd.BndOutNormal")];
+        else
+            Bndoutnormal = NULL;
+}
+
+TwoPhaseFlowCoeffCL( double rho1, double rho2, double mu1, double mu2, double surftension, Point3DCL gravity, bool dimless = false, double dilatationalvisco = 0.0, double shearvisco = 0.0, double betaL_=0, double alpha_ = 1.0, double beta1 = 0.0, double beta2 =0.0
+                            )//double sl1=1, double sl2=1
+  : rho( dimless ? JumpCL( 1., rho2/rho1)
+                 : JumpCL( rho1, rho2), H_sm, 0),
+    mu(  dimless ? JumpCL( 1., mu2/mu1)
+                 : JumpCL( mu1, mu2), H_sm, 0),
+    beta( dimless ? JumpCL( 1., beta2/beta1)
+                 :JumpCL(beta2,beta1), H_sm, 0),
+    SurfTens( dimless ? surftension/rho1 : surftension),
+    DilVisco( dilatationalvisco),
+    ShearVisco( shearvisco),
+    betaL(betaL_),
+    alpha(alpha_), 
+    g( gravity)
+    {
+        volforce   = InVecMap::getInstance()["ZeroVel"];
+        RefVel     = InVecMap::getInstance()["ZeroVel"];
+        RefGradPr  = InVecMap::getInstance()["ZeroVel"];
+        RefPr      = InScaMap::getInstance()["Zero"];
+        Bndoutnormal = InVecMap::getInstance()["ZeroVel"];
     }
-
-    TwoPhaseFlowCoeffCL( double rho1, double rho2, double mu1, double mu2, double surftension, Point3DCL gravity, bool dimless = false, double dilatationalvisco = 0.0, double shearvisco = 0.0, double betaL_=0, double alpha_ = 1.0, double beta1 = 0.0, double beta2 =0.0
-    							)//double sl1=1, double sl2=1
-      : rho( dimless ? JumpCL( 1., rho2/rho1)
-                     : JumpCL( rho1, rho2), H_sm, 0),
-        mu(  dimless ? JumpCL( 1., mu2/mu1)
-                     : JumpCL( mu1, mu2), H_sm, 0),
-        beta( dimless ? JumpCL( 1., beta2/beta1)
-                     :JumpCL(beta2,beta1), H_sm, 0),
-        SurfTens( dimless ? surftension/rho1 : surftension),
-        DilVisco( dilatationalvisco),
-        ShearVisco( shearvisco),
-        betaL(betaL_),
-        alpha(alpha_), 
-        g( gravity)
-		{
-            volforce   = InVecMap::getInstance()["ZeroVel"];
-            RefVel     = InVecMap::getInstance()["ZeroVel"];
-            RefGradPr  = InVecMap::getInstance()["ZeroVel"];
-            RefPr      = InScaMap::getInstance()["Zero"];
-            Bndoutnormal = InVecMap::getInstance()["ZeroVel"];
-        }
 };
 
 /// problem class for instationary two-pase Stokes flow
@@ -288,16 +288,16 @@ private:
     /// Get CFL restriction for explicit time stepping
     double GetCFLTimeRestriction( LevelsetP2CL& lset);
 
-	//This function can only be applied for one phase simulation, because the function doesn't consider any discontinuity in solutions;
-	//It checks the L2 norm of discretized error of velocity and gradient of pressure
+    //This function can only be applied for one phase simulation, because the function doesn't consider any discontinuity in solutions;
+    //It checks the L2 norm of discretized error of velocity and gradient of pressure
     void CheckOnePhaseSolution(const VelVecDescCL* DescVel, const VecDescCL* DescPr, const instat_vector_fun_ptr RefVel, const instat_vector_fun_ptr RefGradPr , const instat_scalar_fun_ptr RefPr) const;
     void CheckTwoPhaseSolution(const VelVecDescCL* DescVel, const VecDescCL* DescPr, const LevelsetP2CL& lset, const VelVecDescCL* RefVel, const VecDescCL* RefPr);
     void CheckTwoPhaseSolution(const VelVecDescCL* DescVel, const VecDescCL* DescPr, const LevelsetP2CL& lset, const instat_vector_fun_ptr RefVel, const instat_scalar_fun_ptr RefPr);
 
     //Get the total kinetic energy
     double GetKineticEnergy(const LevelsetP2CL& lset) const;
-	// To setup u-u_h
-	//void SetupVelError(const instat_vector_fun_ptr RefVel);
+    // To setup u-u_h
+    //void SetupVelError(const instat_vector_fun_ptr RefVel);
     /// \name Evaluate Solution
     //@{
     /// Get solution as FE-function for evaluation
@@ -305,7 +305,7 @@ private:
         { return const_DiscPrSolCL( &p, &GetBndData().Pr, &GetMG()); }
     const_DiscVelSolCL GetVelSolution() const
         { return const_DiscVelSolCL( &v, &GetBndData().Vel, &GetMG()); }
-	// to get error in velocity	
+    // to get error in velocity	
     //const_DiscVelSolCL GetVelError(StokesBndDataCL::VelBndDataCL& bnd) const
     //    { return const_DiscVelSolCL( &dv, &bnd, &GetMG()); }		
 
@@ -373,15 +373,15 @@ class PressureRepairCL : public MGObserverCL
 class SpecialBndHandleSystem2_P2P1XCL
 {
  private:
-    BndTriangPartitionCL 	  bndpartition_;
+    BndTriangPartitionCL      bndpartition_;
     QuadDomainCL              bndq5dom_;
 
-	const StokesBndDataCL& BndData_;
-	Point3DCL normal;
-	Uint unknownIdx[6];
-  public:
-	SpecialBndHandleSystem2_P2P1XCL(const StokesBndDataCL& BndData): BndData_(BndData) {}
-	void setupB(SMatrixCL<1, 3> loc_b[4][10], const TetraCL& tet, int ls_sign[4], const PrincipalLatticeCL& lat,
+    const StokesBndDataCL& BndData_;
+    Point3DCL normal;
+    Uint unknownIdx[6];
+    public:
+    SpecialBndHandleSystem2_P2P1XCL(const StokesBndDataCL& BndData): BndData_(BndData) {}
+    void setupB(SMatrixCL<1, 3> loc_b[4][10], const TetraCL& tet, int ls_sign[4], const PrincipalLatticeCL& lat,
                      const std::valarray<double>& ls_loc_, IdxT prNumb[4], const ExtIdxDescCL* Xidx);
 };
 

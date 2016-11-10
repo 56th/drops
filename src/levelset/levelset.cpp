@@ -560,153 +560,144 @@ void MarkInterface ( const LevelsetP2CL::const_DiscSolCL& lset, double width, Mu
     }
 }
 
-
-
-
 /// \brief Accumulator for the Young's force on the three-phase contact line.
 ///
 /// Computes the integral
 ///         \f[ \sigma \int_{MCL} \cos(\theta)v\cdot \tau ds \f]
 /// with \f$\tau \f$ being the normal direction of the moving contact line in tangential plain of domain boundary.
-class YoungForceAccumulatorCL : public  TetraAccumulatorCL
-{
- private:
-    VecDescCL  SmPhi_;
-    const BndDataCL<>& lsetbnd_;
-    VecDescCL& f;
-   // SMatrixCL<3,3> T;
-    InterfaceTriangleCL triangle;
-
-    const double sigma_;
-    instat_scalar_fun_ptr angle_;	//Young's contact angle
-    instat_vector_fun_ptr outnormal_;//outnormal of the domain boundary
-
-    bool SpeBnd; //special boundary condition
-
-   // LocalP1CL<Point3DCL> Grad[10], GradRef[10];
-    IdxT Numb[10];
-    LocalP2CL<> velR_p[4][8], velR_n[4][8]; // for P2R basis on children
- //   LocalP2CL<> loc_phi;
-
-  public:
-    YoungForceAccumulatorCL( const LevelsetP2CL& ls, VecDescCL& f_Gamma, double sigma,instat_scalar_fun_ptr cangle,instat_vector_fun_ptr outnormal)
-     :  SmPhi_(ls.Phi),lsetbnd_(ls.GetBndData()),f(f_Gamma), sigma_(sigma),angle_(cangle),outnormal_(outnormal)
-    { ls.MaybeSmooth( SmPhi_.Data);
-    //P2DiscCL::GetGradientsOnRef( GradRef);
-    }
-
-    void begin_accumulation ()
-        {
-            // uncomment for Geomview output
-            //std::ofstream fil("surf.off");
-            //fil << "appearance {\n-concave\nshading smooth\n}\nLIST\n{\n";
-        }
-        void finalize_accumulation()
-        {
-            // uncomment for Geomview output
-            //fil << "}\n";
-        }
-    void visit (const TetraCL&);
-
-    TetraAccumulatorCL* clone (int /*tid*/) { return new YoungForceAccumulatorCL ( *this); };
-};
-
-void YoungForceAccumulatorCL::visit ( const TetraCL& t)
-{
-	SpeBnd=false;
-	for(Uint v=0; v<4; v++)
-	   	if(lsetbnd_.GetBC(*t.GetFace(v))==Slip0BC||lsetbnd_.GetBC(*t.GetFace(v))==SlipBC ||lsetbnd_.GetBC(*t.GetFace(v))==SymmBC )
-	   	{
-	   		SpeBnd=true; break;
-	   	}
-	if(!SpeBnd)
-	{
-		for(Uint v=0; v<6; v++)
-			if(lsetbnd_.GetBC(*t.GetEdge(v))==Slip0BC||lsetbnd_.GetBC(*t.GetEdge(v))==SlipBC ||lsetbnd_.GetBC(*t.GetEdge(v))==SymmBC)
-			{
-				SpeBnd=true; break;
-			}
-		if(!SpeBnd)
-		return;
-	}
-    const Uint idx_f=   f.RowIdx->GetIdx();
-    const bool velXfem= f.RowIdx->IsExtended();
-    if (velXfem)
-    	throw DROPSErrCL("WARNING: YoungForceAccumulatorCL : not implemented for velocity XFEM method yet!");
-  //  double det;
-
-   // GetTrafoTr( T, det, t);
-
-  //  loc_phi.assign( t, SmPhi_, lsetbnd_);
-    triangle.BInit( t, SmPhi_,lsetbnd_); //we have to use this init function!!!!!!!!!
-    triangle.SetBndOutNormal(outnormal_);
-    for (int v=0; v<10; ++v)
-    {   const UnknownHandleCL& unk= v<4 ? t.GetVertex(v)->Unknowns : t.GetEdge(v-4)->Unknowns;
-        Numb[v]= unk.Exist(idx_f) ? unk(idx_f) : NoIdx;
-    }
-	LocalP2CL<double> phi[10];
-	for(Uint i=0; i<10; ++i)
-		phi[i][i] = 1;
-	Point3DCL normal_mcl;
-	double costheta[5];
-	BaryCoordCL quadBarys[5];
-	Point3DCL outnormalOnMcl[5]; //outnormal of the domain boundary
-	double sintheta_D;//sin\theta_d
-	double weight[5]={0.568888889, 0.47862867,0.47862867,0.236926885,0.236926885};
-	//integral in [-1,1]
-	double qupt[5]={0,-0.53846931,0.53846931,-0.906179846,0.906179846};
-	for (int ch=0; ch<8; ++ch)
-//	for(int ch=8;ch<9;++ch)
-    {
-
-        if (!triangle.ComputeMCLForChild(ch)) // no patch for this child
-            continue;
-
-        BaryCoordCL Barys[2];
-        Point3DCL pt0,pt1;
-        Point3DCL midpt;
-        double length;
-        Uint ncl=triangle.GetNumMCL();
-        for(Uint i=0;i<ncl;i++)
-        {
-        	length = triangle.GetInfoMCL(i,Barys[0],Barys[1],pt0,pt1);
-        	normal_mcl = triangle.GetMCLNormal(i);
-        	sintheta_D= triangle.IsSymmType(i) ? 1 :sin(triangle.GetActualContactAngle(i));
-        	for(Uint j=0;j<5;j++)
-        	{
-        		quadBarys[j]=(Barys[0]+Barys[1])/2+qupt[j]*(Barys[1]-Barys[0])/2;
-        		midpt=(pt0+pt1)/2 + qupt[j]*(pt1-pt0)/2;
-        		costheta[j]= triangle.IsSymmType(i) ? 0 : cos(angle_(midpt,0));
-        		outnormalOnMcl[j]=outnormal_(midpt,0);
-        	}
-           	for (int v=0; v<10; ++v)
-        	{
-				Point3DCL value;
-        		const IdxT Numbv= v<10 ? Numb[v] : (velXfem && Numb[v-10]!=NoIdx ? f.RowIdx->GetXidx()[Numb[v-10]] : NoIdx);
-        		if (Numbv==NoIdx) continue;
-				for (int j=0; j<5; j++)
-				{
-					value += weight[j]*costheta[j]*phi[v](quadBarys[j])*normal_mcl;       // cos (theta_e) v \dot tau_cl
-					value += weight[j]*sintheta_D*phi[v](quadBarys[j])*outnormalOnMcl[j]; // sin (theta_D) v \dot n
-
-				}
-
-			    value = value * length/2;
-        		/*Point3DCL value = ((phi[v](quadBarys[0])*costheta[0]*weight[0]+ phi[v](quadBarys[1])*costheta[1]*weight[1]
-        		              + phi[v](quadBarys[2])*costheta[2]*weight[2]+ phi[v](quadBarys[3])*costheta[3]*weight[3]
-        		              + phi[v](quadBarys[4])*costheta[4]*weight[4])*length/2)*normal_mcl;
-        		value+=(phi[v](quadBarys[0])*weight[0]*outnormalOnMcl[0]+ phi[v](quadBarys[1])*weight[1]*outnormalOnMcl[1]
-        		              + phi[v](quadBarys[2])*weight[2]*outnormalOnMcl[2]+ phi[v](quadBarys[3])*weight[3]*outnormalOnMcl[3]
-        		        	  + phi[v](quadBarys[4])*weight[4]*outnormalOnMcl[4])*length/2*sintheta_D;*/
-        		//higher order quadrature is used!!
-        		for (int j=0; j<3; ++j)
-        		{
-        			f.Data[Numbv+j] += sigma_*value[j];
-        		}
-        	}
-        }
-    } // Ende der for-Schleife ueber die Kinder
-}
+//class YoungForceAccumulatorCL : public  TetraAccumulatorCL //removed this LZ
+//{
+// private:
+//    VecDescCL  SmPhi_;
+//    const BndDataCL<>& lsetbnd_;
+//    VecDescCL& f;
+//   // SMatrixCL<3,3> T;
+//    InterfaceTriangleCL triangle;
+//
+//    const double sigma_;
+//    instat_scalar_fun_ptr angle_;	//Young's contact angle
+//    instat_vector_fun_ptr outnormal_;//outnormal of the domain boundary
+//
+//    bool SpeBnd; //special boundary condition
+//
+//   // LocalP1CL<Point3DCL> Grad[10], GradRef[10];
+//    IdxT Numb[10];
+//    LocalP2CL<> velR_p[4][8], velR_n[4][8]; // for P2R basis on children
+// //   LocalP2CL<> loc_phi;
+//
+//  public:
+//    YoungForceAccumulatorCL( const LevelsetP2CL& ls, VecDescCL& f_Gamma, double sigma,instat_scalar_fun_ptr cangle,instat_vector_fun_ptr outnormal)
+//     :  SmPhi_(ls.Phi),lsetbnd_(ls.GetBndData()),f(f_Gamma), sigma_(sigma),angle_(cangle),outnormal_(outnormal)
+//    { ls.MaybeSmooth( SmPhi_.Data);
+//    //P2DiscCL::GetGradientsOnRef( GradRef);
+//    }
+//
+//    void begin_accumulation ()
+//        {
+//            // uncomment for Geomview output
+//            //std::ofstream fil("surf.off");
+//            //fil << "appearance {\n-concave\nshading smooth\n}\nLIST\n{\n";
+//        }
+//        void finalize_accumulation()
+//        {
+//            // uncomment for Geomview output
+//            //fil << "}\n";
+//        }
+//    void visit (const TetraCL&);
+//
+//    TetraAccumulatorCL* clone (int /*tid*/) { return new YoungForceAccumulatorCL ( *this); };
+//};
+//
+//void YoungForceAccumulatorCL::visit ( const TetraCL& t)
+//{
+//	SpeBnd=false;
+//	for(Uint v=0; v<4; v++)
+//	   	if(lsetbnd_.GetBC(*t.GetFace(v))==Slip0BC||lsetbnd_.GetBC(*t.GetFace(v))==SlipBC ||lsetbnd_.GetBC(*t.GetFace(v))==SymmBC )
+//	   	{
+//	   		SpeBnd=true; break;
+//	   	}
+//	if(!SpeBnd)
+//	{
+//		for(Uint v=0; v<6; v++)
+//			if(lsetbnd_.GetBC(*t.GetEdge(v))==Slip0BC||lsetbnd_.GetBC(*t.GetEdge(v))==SlipBC ||lsetbnd_.GetBC(*t.GetEdge(v))==SymmBC)
+//			{
+//				SpeBnd=true; break;
+//			}
+//		if(!SpeBnd)
+//		return;
+//	}
+//    const Uint idx_f=   f.RowIdx->GetIdx();
+//    const bool velXfem= f.RowIdx->IsExtended();
+//    if (velXfem)
+//    	throw DROPSErrCL("WARNING: YoungForceAccumulatorCL : not implemented for velocity XFEM method yet!");
+//  //  double det;
+//
+//   // GetTrafoTr( T, det, t);
+//
+//  //  loc_phi.assign( t, SmPhi_, lsetbnd_);
+//    triangle.BInit( t, SmPhi_,lsetbnd_); //we have to use this init function!!!!!!!!!
+//    triangle.SetBndOutNormal(outnormal_);
+//    for (int v=0; v<10; ++v)
+//    {   const UnknownHandleCL& unk= v<4 ? t.GetVertex(v)->Unknowns : t.GetEdge(v-4)->Unknowns;
+//        Numb[v]= unk.Exist(idx_f) ? unk(idx_f) : NoIdx;
+//    }
+//	LocalP2CL<double> phi[10];
+//	for(Uint i=0; i<10; ++i)
+//		phi[i][i] = 1;
+//	Point3DCL normal_mcl;
+//	double costheta[5];
+//	BaryCoordCL quadBarys[5];
+//	Point3DCL outnormalOnMcl[5]; //outnormal of the domain boundary
+//	double sintheta_D;//sin\theta_d
+//	double weight[5]={0.568888889, 0.47862867,0.47862867,0.236926885,0.236926885};
+//	//integral in [-1,1]
+//	double qupt[5]={0,-0.53846931,0.53846931,-0.906179846,0.906179846};
+//	for (int ch=0; ch<8; ++ch)
+////	for(int ch=8;ch<9;++ch)
+//    {
+//
+//        if (!triangle.ComputeMCLForChild(ch)) // no patch for this child
+//            continue;
+//
+//        BaryCoordCL Barys[2];
+//        Point3DCL pt0,pt1;
+//        Point3DCL midpt;
+//        double length;
+//        Uint ncl=triangle.GetNumMCL();
+//        for(Uint i=0;i<ncl;i++)
+//        {
+//        	length = triangle.GetInfoMCL(i,Barys[0],Barys[1],pt0,pt1);
+//        	normal_mcl = triangle.GetMCLNormal(i);
+//        	sintheta_D= triangle.IsSymmType(i) ? 1 :sin(triangle.GetActualContactAngle(i));
+//        	for(Uint j=0;j<5;j++)
+//        	{
+//        		quadBarys[j]=(Barys[0]+Barys[1])/2+qupt[j]*(Barys[1]-Barys[0])/2;
+//        		midpt=(pt0+pt1)/2 + qupt[j]*(pt1-pt0)/2;
+//        		costheta[j]= triangle.IsSymmType(i) ? 0 : cos(angle_(midpt,0));
+//        		outnormalOnMcl[j]=outnormal_(midpt,0);
+//        	}
+//           	for (int v=0; v<10; ++v)
+//        	{
+//				Point3DCL value;
+//        		const IdxT Numbv= v<10 ? Numb[v] : (velXfem && Numb[v-10]!=NoIdx ? f.RowIdx->GetXidx()[Numb[v-10]] : NoIdx);
+//        		if (Numbv==NoIdx) continue;
+//				for (int j=0; j<5; j++)
+//				{
+//					value += weight[j]*costheta[j]*phi[v](quadBarys[j])*normal_mcl;       // cos (theta_e) v \dot tau_cl
+//					value += weight[j]*sintheta_D*phi[v](quadBarys[j])*outnormalOnMcl[j]; // sin (theta_D) v \dot n
+//
+//				}
+//
+//			    value = value * length/2;
+//        		//higher order quadrature is used!!
+//        		for (int j=0; j<3; ++j)
+//        		{
+//        			f.Data[Numbv+j] += sigma_*value[j];
+//        		}
+//        	}
+//        }
+//    } // Ende der for-Schleife ueber die Kinder
+//}
 
 /// \brief Impoved Accumulator for the Young's force on the three-phase contact line.
 ///
@@ -724,7 +715,7 @@ class ImprovedYoungForceAccumulatorCL : public  TetraAccumulatorCL
     InterfaceTriangleCL triangle;
 
     const double sigma_;
-    instat_scalar_fun_ptr angle_;	//Young's contact angle
+    instat_scalar_fun_ptr angle_;    //Young's contact angle
     instat_vector_fun_ptr outnormal_;//outnormal of the domain boundary
 
     bool SpeBnd; //special boundary condition
@@ -757,42 +748,31 @@ class ImprovedYoungForceAccumulatorCL : public  TetraAccumulatorCL
     TetraAccumulatorCL* clone (int /*tid*/) { return new ImprovedYoungForceAccumulatorCL ( *this); };
 };
 
-
-Point3DCL Hacknormal(Point3DCL mid)
-{
-    Point3DCL P = mid;
-    double length = std::sqrt(P[0]*P[0] + P[2]*P[2]);
-    P[0] /=length;
-    P[2] /=length;
-    P[1] = 0;
-    return P;
-}
-
 void ImprovedYoungForceAccumulatorCL::visit ( const TetraCL& t)
 {
-	SpeBnd=false;
-	//check if the tetra contains one face or one edge on slip or symmetric boundary.
-	for(Uint v=0; v<4; v++)
-	   	if(lsetbnd_.GetBC(*t.GetFace(v))==Slip0BC||lsetbnd_.GetBC(*t.GetFace(v))==SlipBC||lsetbnd_.GetBC(*t.GetFace(v))==SymmBC )
-	   	{
-	   		SpeBnd=true;
-	   		break;
-	   	}
-	if(!SpeBnd)
-	{
-		for(Uint v=0; v<6; v++)
-			if(lsetbnd_.GetBC(*t.GetEdge(v))==Slip0BC||lsetbnd_.GetBC(*t.GetEdge(v))==SlipBC||lsetbnd_.GetBC(*t.GetEdge(v))==SymmBC )
-			{
-				SpeBnd=true;
-				break;
-			}
-		if(!SpeBnd)
-		return;
-	}
+    SpeBnd=false;
+    //check if the tetra contains one face or one edge on slip or symmetric boundary.
+    for(Uint v=0; v<4; v++)
+        if(lsetbnd_.GetBC(*t.GetFace(v))==Slip0BC||lsetbnd_.GetBC(*t.GetFace(v))==SlipBC||lsetbnd_.GetBC(*t.GetFace(v))==SymmBC )
+        {
+            SpeBnd=true;
+            break;
+        }
+    if(!SpeBnd)
+    {
+        for(Uint v=0; v<6; v++)
+            if(lsetbnd_.GetBC(*t.GetEdge(v))==Slip0BC||lsetbnd_.GetBC(*t.GetEdge(v))==SlipBC||lsetbnd_.GetBC(*t.GetEdge(v))==SymmBC )
+            {
+                SpeBnd=true;
+                break;
+            }
+        if(!SpeBnd)
+        return;
+    }
     const Uint idx_f=   f.RowIdx->GetIdx();
     const bool velXfem= f.RowIdx->IsExtended();
     if (velXfem)
-    	throw DROPSErrCL("WARNING: ImprovedYoungForceAccumulatorCL : not implemented for velocity XFEM method yet!");
+        throw DROPSErrCL("WARNING: ImprovedYoungForceAccumulatorCL : not implemented for velocity XFEM method yet!");
     //Initialize one interface patch
     triangle.BInit( t, SmPhi_,lsetbnd_); //we have to use this init function!!!!!!!!!
     triangle.SetBndOutNormal(outnormal_);
@@ -800,20 +780,20 @@ void ImprovedYoungForceAccumulatorCL::visit ( const TetraCL& t)
     {   const UnknownHandleCL& unk= v<4 ? t.GetVertex(v)->Unknowns : t.GetEdge(v-4)->Unknowns;
         Numb[v]= unk.Exist(idx_f) ? unk(idx_f) : NoIdx;
     }
-	LocalP2CL<double> phi[10];
-	for(Uint i=0; i<10; ++i)
-		phi[i][i] = 1;
-		
-	Point3DCL normal_mcl[5];     //normal of moving contact lines in tangential surface
-	Point3DCL outnormalOnMcl[5]; //outnormal of the domain boundary
-	double costheta[5];          //cos\theta_s
-	double sintheta_D[5];        //sin\theta_d
-	BaryCoordCL quadBarys[5];
-	double weight[5]={0.568888889, 0.47862867,0.47862867,0.236926885,0.236926885};
-	//integral in [-1,1]
-	double qupt[5]={0,-0.53846931,0.53846931,-0.906179846,0.906179846};
-	
-	for (int ch=0; ch<8; ++ch)
+    LocalP2CL<double> phi[10];
+    for(Uint i=0; i<10; ++i)
+        phi[i][i] = 1;
+        
+    Point3DCL normal_mcl[5];     //normal of moving contact lines in tangential surface
+    Point3DCL outnormalOnMcl[5]; //outnormal of the domain boundary
+    double costheta[5];          //cos\theta_s
+    double sintheta_D[5];        //sin\theta_d
+    BaryCoordCL quadBarys[5];
+    double weight[5]={0.568888889, 0.47862867,0.47862867,0.236926885,0.236926885};
+    //integral in [-1,1]
+    double qupt[5]={0,-0.53846931,0.53846931,-0.906179846,0.906179846};
+
+    for (int ch=0; ch<8; ++ch)
 //	for(int ch=8;ch<9;++ch)
     {
         if (!triangle.ComputeMCLForChild(ch)) // no patch for this child
@@ -1141,15 +1121,13 @@ void LevelsetP2CL::AccumulateBndIntegral( VecDescCL& f) const
 void LevelsetP2CL::AccumulateYoungForce( VecDescCL& f) const
 {
     ScopeTimerCL scope("AccumulateYoungForce");
-	TetraAccumulatorCL *accu;
+    TetraAccumulatorCL *accu;
     switch (SF_)
     {
-
-   case SF_ImprovedLB:
-	  // accu= new YoungForceAccumulatorCL( *this, f, sf_.GetSigma()(std_basis<3>(0), 0.),CA_,Bndoutnormal_);break;
-       	accu= new ImprovedYoungForceAccumulatorCL( *this, f, sf_.GetSigma()(std_basis<3>(0), 0.),CA_,Bndoutnormal_); break;
-    default:
-    	throw DROPSErrCL("LevelsetP2CL::AccumulateYoungForce not implemented for non-constant surface tension");
+      case SF_ImprovedLB:
+          accu= new ImprovedYoungForceAccumulatorCL( *this, f, sf_.GetSigma()(std_basis<3>(0), 0.),CA_,Bndoutnormal_); break;
+      default:
+          throw DROPSErrCL("LevelsetP2CL::AccumulateYoungForce not implemented for non-constant surface tension");
     }
     TetraAccumulatorTupleCL accus;
     accus.push_back( accu);
@@ -1160,141 +1138,141 @@ void LevelsetP2CL::AccumulateYoungForce( VecDescCL& f) const
 //>to do for parallel programe, we need add all values in different process
 double LevelsetP2CL::GetInterfaceArea() const
 {
-	InterfaceTriangleCL triangle;
-	const DROPS::Uint lvl = idx.TriangLevel();
-	BndDataCL lsetbnd = GetBndData();
-	double area = 0;
-	DROPS_FOR_TRIANG_TETRA( MG_, lvl, it){
-		triangle.Init( *it, Phi, lsetbnd);
-		for(int ch=0;ch<8;++ch)
-		{
-			if (!triangle.ComputeForChild(ch)) // no patch for this child
-		            continue;
-			for(int v=0;v<triangle.GetNumTriangles();v++)
-				area += triangle.GetAbsDet(v);
-		}
-	}
-	return area*0.5;
+    InterfaceTriangleCL triangle;
+    const DROPS::Uint lvl = idx.TriangLevel();
+    BndDataCL lsetbnd = GetBndData();
+    double area = 0;
+    DROPS_FOR_TRIANG_TETRA( MG_, lvl, it){
+        triangle.Init( *it, Phi, lsetbnd);
+        for(int ch=0;ch<8;++ch)
+        {
+            if (!triangle.ComputeForChild(ch)) // no patch for this child
+                    continue;
+            for(int v=0;v<triangle.GetNumTriangles();v++)
+                area += triangle.GetAbsDet(v);
+        }
+    }
+    return area*0.5;
 }
 
 //>to do for parallel programe, we need add all values in different process
 double LevelsetP2CL::GetWetArea() const
 {
-	InterfaceTriangleCL triangle;
-	const DROPS::Uint lvl = idx.TriangLevel();
-	BndDataCL lsetbnd=GetBndData();
-	BndTriangPartitionCL 	  bndpartition_;
+    InterfaceTriangleCL triangle;
+    const DROPS::Uint lvl = idx.TriangLevel();
+    BndDataCL lsetbnd=GetBndData();
+    BndTriangPartitionCL      bndpartition_;
     QuadDomainCL              bndq5dom_;
     PrincipalLatticeCL lat= PrincipalLatticeCL::instance( 2);
     std::valarray<double>     ls_loc(lat.vertex_size());
-	double area = 0;
-	GridFunctionCL<> qpr;
-	LocalP2CL<> ls_loc0;
-	DROPS_FOR_TRIANG_TETRA( MG_, lvl, it){
+    double area = 0;
+    GridFunctionCL<> qpr;
+    LocalP2CL<> ls_loc0;
+    DROPS_FOR_TRIANG_TETRA( MG_, lvl, it){
 
-		for(Uint v=0; v<4; v++)
-		{
-			if(lsetbnd.GetBC(*it->GetFace(v))==Slip0BC||lsetbnd.GetBC(*it->GetFace(v))==SlipBC)
-		  	{
-				ls_loc0.assign( *it, Phi, BndData_);
-				const bool noCut= equal_signs(ls_loc0);
-				if(noCut)
-				{
-					if(ls_loc0[0]>0) continue;
-					const FaceCL& face = *it->GetFace(v);
-				    double absdet = FuncDet2D(	face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
-				                                face.GetVertex(2)->GetCoord()-face.GetVertex(0)->GetCoord());
-				    area += absdet/2;
-				}
-				else
-				{
-					evaluate_on_vertexes( GetSolution(), *it, lat, Addr( ls_loc));
-					//Does this partition work for no cut situations??
-					bndpartition_.make_partition2D<SortedVertexPolicyCL, MergeCutPolicyCL>( lat, v, ls_loc);
-					make_CompositeQuad5BndDomain2D( bndq5dom_, bndpartition_,*it);
+    for(Uint v=0; v<4; v++)
+    {
+        if(lsetbnd.GetBC(*it->GetFace(v))==Slip0BC||lsetbnd.GetBC(*it->GetFace(v))==SlipBC)
+        {
+            ls_loc0.assign( *it, Phi, BndData_);
+            const bool noCut= equal_signs(ls_loc0);
+            if(noCut)
+            {
+                if(ls_loc0[0]>0) continue;
+                const FaceCL& face = *it->GetFace(v);
+                double absdet = FuncDet2D(	face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
+                                            face.GetVertex(2)->GetCoord()-face.GetVertex(0)->GetCoord());
+                area += absdet/2;
+            }
+            else
+            {
+                evaluate_on_vertexes( GetSolution(), *it, lat, Addr( ls_loc));
+                //Does this partition work for no cut situations??
+                bndpartition_.make_partition2D<SortedVertexPolicyCL, MergeCutPolicyCL>( lat, v, ls_loc);
+                make_CompositeQuad5BndDomain2D( bndq5dom_, bndpartition_,*it);
 
-					LocalP1CL<double> fun;
-					for (Uint i= 0; i<4; ++i)	fun[i]=1.0;
-					resize_and_evaluate_on_vertexes(fun, bndq5dom_, qpr);
-					area += quad( qpr, bndq5dom_, NegTetraC);
-				}
-			}
-		}
-	}
-	return area;
+                LocalP1CL<double> fun;
+                for (Uint i= 0; i<4; ++i)	fun[i]=1.0;
+                resize_and_evaluate_on_vertexes(fun, bndq5dom_, qpr);
+                area += quad( qpr, bndq5dom_, NegTetraC);
+            }
+        }
+    }
+}
+    return area;
 }
 //>to do for parallel programe, we need add all values in different process
 double LevelsetP2CL::GetSurfaceEnergy() const
 {
-	InterfaceTriangleCL triangle;
-	const DROPS::Uint lvl = idx.TriangLevel();
-	BndDataCL lsetbnd = GetBndData();
-	instat_scalar_fun_ptr surface_tension = sf_.GetSigma();
-	DROPS::Quad5_2DCL<> sfdensity0,sfdensity1;
+    InterfaceTriangleCL triangle;
+    const DROPS::Uint lvl = idx.TriangLevel();
+    BndDataCL lsetbnd = GetBndData();
+    instat_scalar_fun_ptr surface_tension = sf_.GetSigma();
+    DROPS::Quad5_2DCL<> sfdensity0,sfdensity1;
 
-	BndTriangPartitionCL 	  bndpartition_;
+    BndTriangPartitionCL      bndpartition_;
     QuadDomainCL              bndq5dom;
     PrincipalLatticeCL lat= PrincipalLatticeCL::instance( 2);
     std::valarray<double>     ls_loc(lat.vertex_size());
 
-	GridFunctionCL<> qpr;
-	BaryCoordCL bary[3];
-	double sftn = surface_tension(std_basis<3>(0),0); //>to do: compute standard surface for general case
-	double total_energy1=0,total_energy2=0;
-	DROPS_FOR_TRIANG_TETRA( MG_, lvl, it){
-		triangle.Init( *it, Phi, lsetbnd);
-		for(int ch=0;ch<8;++ch)
-		{
-			if (!triangle.ComputeForChild(ch)) // no patch for this child
-		            continue;
-			for(int tri=0;tri<triangle.GetNumTriangles();tri++)
-			{
-				sfdensity0.assign(  *it, &triangle.GetBary( tri), surface_tension,0);
-				total_energy1 += sfdensity0.quad( triangle.GetAbsDet( tri));
-			}
-		}
+    GridFunctionCL<> qpr;
+    BaryCoordCL bary[3];
+    double sftn = surface_tension(std_basis<3>(0),0); //>to do: compute standard surface for general case
+    double total_energy1=0,total_energy2=0;
+    DROPS_FOR_TRIANG_TETRA( MG_, lvl, it){
+        triangle.Init( *it, Phi, lsetbnd);
+        for(int ch=0;ch<8;++ch)
+        {
+            if (!triangle.ComputeForChild(ch)) // no patch for this child
+                    continue;
+            for(int tri=0;tri<triangle.GetNumTriangles();tri++)
+            {
+                sfdensity0.assign(  *it, &triangle.GetBary( tri), surface_tension,0);
+                total_energy1 += sfdensity0.quad( triangle.GetAbsDet( tri));
+            }
+        }
 
-		for(Uint v=0; v<4; v++)
-		{
-			if(lsetbnd.GetBC(*it->GetFace(v))==Slip0BC||lsetbnd.GetBC(*it->GetFace(v))==SlipBC)
-			{
-						//ls_loc0.assign( *it, Phi, BndData_);
-						evaluate_on_vertexes( GetSolution(), *it, lat, Addr( ls_loc));
-						const bool noCut= equal_signs(ls_loc);
-						if(noCut)
-						{
-							if(ls_loc[0]>0) continue;
-							const FaceCL& face = *it->GetFace(v);
-							for (Uint i= 0; i<3; ++i)
-							{
-								bary[i][VertOfFace(v, i)]=1;
-							}
-							sfdensity1.assign(*it, bary, CA_,0 );
-							for(Uint s=0;s<sfdensity1.size();s++)
-								sfdensity1[s]=std::cos(sfdensity1[s]);//??
+        for(Uint v=0; v<4; v++)
+        {
+            if(lsetbnd.GetBC(*it->GetFace(v))==Slip0BC||lsetbnd.GetBC(*it->GetFace(v))==SlipBC)
+            {
+                        //ls_loc0.assign( *it, Phi, BndData_);
+                        evaluate_on_vertexes( GetSolution(), *it, lat, Addr( ls_loc));
+                        const bool noCut= equal_signs(ls_loc);
+                        if(noCut)
+                        {
+                            if(ls_loc[0]>0) continue;
+                            const FaceCL& face = *it->GetFace(v);
+                            for (Uint i= 0; i<3; ++i)
+                            {
+                                bary[i][VertOfFace(v, i)]=1;
+                            }
+                            sfdensity1.assign(*it, bary, CA_,0 );
+                            for(Uint s=0;s<sfdensity1.size();s++)
+                                sfdensity1[s]=std::cos(sfdensity1[s]);//??
 
-						    double absdet = FuncDet2D(	face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
-						                                face.GetVertex(2)->GetCoord()-face.GetVertex(0)->GetCoord());
-						    total_energy2 += -sftn*sfdensity1.quad(absdet);
-						}
-						else
-						{
+                            double absdet = FuncDet2D(	face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
+                                                        face.GetVertex(2)->GetCoord()-face.GetVertex(0)->GetCoord());
+                            total_energy2 += -sftn*sfdensity1.quad(absdet);
+                        }
+                        else
+                        {
 
-							//Does this partition work for no cut situations??
-							bndpartition_.make_partition2D<SortedVertexPolicyCL, MergeCutPolicyCL>( lat, v, ls_loc);
-							make_CompositeQuad5BndDomain2D( bndq5dom, bndpartition_,*it);
+                            //Does this partition work for no cut situations??
+                            bndpartition_.make_partition2D<SortedVertexPolicyCL, MergeCutPolicyCL>( lat, v, ls_loc);
+                            make_CompositeQuad5BndDomain2D( bndq5dom, bndpartition_,*it);
 
-							resize_and_evaluate_on_vertexes(CA_,*it, bndq5dom,0, qpr);//???
-							for(Uint s=0;s<qpr.size();s++)
-								qpr[s]=std::cos(qpr[s]);//??
-							total_energy2 += -sftn*quad( qpr, bndq5dom, NegTetraC);
-						}
-			}
-		}
+                            resize_and_evaluate_on_vertexes(CA_,*it, bndq5dom,0, qpr);//???
+                            for(Uint s=0;s<qpr.size();s++)
+                                qpr[s]=std::cos(qpr[s]);//??
+                            total_energy2 += -sftn*quad( qpr, bndq5dom, NegTetraC);
+                        }
+            }
+        }
 
-	}
-	//std::cout<<total_energy1<<"  "<<total_energy2<<std::endl;
-	return total_energy1+total_energy2;
+    }
+    //std::cout<<total_energy1<<"  "<<total_energy2<<std::endl;
+    return total_energy1+total_energy2;
 }
 double LevelsetP2CL::GetVolume( double translation, int l) const
 {

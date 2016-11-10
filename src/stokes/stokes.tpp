@@ -418,7 +418,7 @@ class System2Accumulator_P2P1CL : public TetraAccumulatorCL
     const IdxDescCL& RowIdx;
     const IdxDescCL& ColIdx;
     MatrixCL& B;
-	SpecialBndHandleSystem2OnePhaseCL speBndHandle;
+    SpecialBndHandleSystem2OnePhaseCL speBndHandle;
 
     IdxT          prNumb[4];  ///< global numbering of the P1-unknowns
     LocalNumbP2CL n;          ///< global numbering of the P2-unknowns
@@ -435,7 +435,7 @@ class System2Accumulator_P2P1CL : public TetraAccumulatorCL
 
     Quad5CL<Point3DCL> Grad[10], GradRef[10];
     SMatrixCL<1,3>     locB[10][4];
-	bool speBnd;        //if there is a slip or symmetric boundary condtion
+    bool speBnd;        //if there is a slip or symmetric boundary condtion
 
   private:
     ///\brief Computes the mapping from local to global data "n", the local matrices in loc and, if required, the Dirichlet-values needed to eliminate the boundary-dof from the global system.
@@ -516,15 +516,15 @@ void System2Accumulator_P2P1CL<CoeffT>::visit (const TetraCL& tet)
 template< class CoeffT>
 void System2Accumulator_P2P1CL<CoeffT>::local_setup (const TetraCL& tet)
 {
-	speBnd = false;
-	//if speBnd = true , there is at least one slip or symmetric boundary on this tetra 
-	for(int i =0; i< 4; ++i){
-		if(BndData.Vel.GetBC(*tet.GetFace(i))==Slip0BC  || BndData.Vel.GetBC(*tet.GetFace(i))==SlipBC || BndData.Vel.GetBC(*tet.GetFace(i))==SymmBC)
-		{
-			speBnd = true;
-			break;
-		}
-	}
+    speBnd = false;
+    //if speBnd = true , there is at least one slip or symmetric boundary on this tetra 
+    for(int i =0; i< 4; ++i){
+        if(BndData.Vel.GetBC(*tet.GetFace(i))==Slip0BC  || BndData.Vel.GetBC(*tet.GetFace(i))==SlipBC || BndData.Vel.GetBC(*tet.GetFace(i))==SymmBC)
+        {
+            speBnd = true;
+            break;
+        }
+    }
     //   b(i,j) =  -\int psi_i * div( phi_j)
     // if(md.IsTetraCurved(tet)){
     LocalP1CL<double> phi[4];
@@ -551,8 +551,8 @@ void System2Accumulator_P2P1CL<CoeffT>::local_setup (const TetraCL& tet)
 //                locB[vel][pr]= SMatrixCL<1,3>( quad( Grad[vel], absdet, Quad2Data_Mul_P1_CL(), pr));
 //        }
 
-	if(speBnd)
-		speBndHandle.setupB(tet, locB, coeff.Bndoutnormal);
+    if(speBnd)
+        speBndHandle.setupB(tet, locB, coeff.Bndoutnormal);
        //speBndHandle.setupB(tet, locB);
 }
 
