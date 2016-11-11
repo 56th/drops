@@ -394,7 +394,8 @@ void SetInitialConditions(StokesT& Stokes, LevelsetP2CL& lset, MultiGridCL& MG, 
                         P.get<int>("Restart.Binary"), lset.PhiC);
     }
 
-    switch ( P.get<int>("NavStokes.InitialValue") )
+    const int inival= P.get<int>("NavStokes.InitialValue");
+    switch ( inival )
     {
 #ifndef _PAR
       case -10: // read from ensight-file [deprecated]
@@ -426,7 +427,7 @@ void SetInitialConditions(StokesT& Stokes, LevelsetP2CL& lset, MultiGridCL& MG, 
           Stokes.UpdateXNumbering( pidx, lset);
           Stokes.p.SetIdx( pidx);
         break;
-      case 1: // stationary flow with surface tension
+      case 1: case 10: // stationary flow with/without surface tension
       {
         Stokes.UpdateXNumbering( pidx, lset);
         Stokes.p.SetIdx( pidx);
@@ -438,69 +439,45 @@ void SetInitialConditions(StokesT& Stokes, LevelsetP2CL& lset, MultiGridCL& MG, 
         PcT pc;
         PCGSolverCL<PcT> PCGsolver( pc, P.get<int>("CouplingSolver.NavStokesSolver.OseenSolver.PcAIter"), P.get<double>("CouplingSolver.NavStokesSolver.OseenSolver.PcATol"), true);
         typedef SolverAsPreCL<PCGSolverCL<PcT> > PCGPcT;
-        PCGPcT apc( PCGsolver);
-        StokesSolverBaseCL *ssolver = 0;
-        const int iter= P.get<int>("CouplingSolver.NavStokesSolver.OseenSolver.Iter");
-        const double tol= P.get<double>("CouplingSolver.NavStokesSolver.OseenSolver.Tol"),
-                PcSTol= P.get<double>("CouplingSolver.NavStokesSolver.OseenSolver.PcSTol");
-        if( Stokes.usesGhostPen() )
-        {
-            typedef BlockPreCL<ExpensivePreBaseCL, SchurPreBaseCL, LowerBlockPreCL>    LowerBlockPcT;
-            ISGhPenPreCL gpispc( &Stokes.prA.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.C.Data.GetFinest(), 0., 1., PcSTol, PcSTol, 200);
-            GCRSolverCL< LowerBlockPcT > gcrsolver( *(new LowerBlockPcT(apc, gpispc)), iter, iter, tol );
-            ssolver = new BlockMatrixSolverCL< GCRSolverCL<LowerBlockPcT> > ( gcrsolver );
-        }
-        else
-        {
-            ISBBTPreCL bbtispc( &Stokes.B.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.M.Data.GetFinest(), Stokes.pr_idx.GetFinest(), 0.0, 1.0, 1e-4, 1e-4);
-            ssolver = new InexactUzawaCL<PCGPcT, ISBBTPreCL, APC_OTHER> ( apc, bbtispc, iter, tol, 0.6, 50);
-        }
-
-        NSSolverBaseCL<StokesT> stokessolver( Stokes, *ssolver);
-        SolveStatProblem( Stokes, lset, stokessolver);
-        delete ssolver;
-
-      } break;
-      case 10: // stationary flow without surface tension
-      {       
-        TimerCL time;
-        VelVecDescCL curv( &Stokes.vel_idx);
-        time.Reset();
-        Stokes.SetupPrMass(  &Stokes.prM, lset/*, P.get<double>("Mat.ViscFluid"), C.mat_ViscGas*/);
-        Stokes.SetupSystem1( &Stokes.A, &Stokes.M, &Stokes.b, &Stokes.b, &curv, lset, Stokes.v.t);
-        Stokes.SetupSystem2( &Stokes.B, &Stokes.C, &Stokes.c, lset, Stokes.v.t);
-        curv.Clear( Stokes.v.t);
-        lset.AccumulateBndIntegral( curv);
-        time.Stop();
-        std::cout << "Discretizing Stokes/Curv for initial velocities took "<<time.GetTime()<<" sec.\n";
-
-        time.Reset();
-        SSORPcCL ssorpc;
-        PCGSolverCL<SSORPcCL> PCGsolver( ssorpc, P.get<int>("CouplingSolver.NavStokesSolver.OseenSolver.PcAIter"), P.get<double>("CouplingSolver.NavStokesSolver.OseenSolver.PcATol"), true);
         typedef SolverAsPreCL<PCGSolverCL<SSORPcCL> > PCGPcT;
         PCGPcT apc( PCGsolver);
-        StokesSolverBaseCL *ssolver = 0;
+        SchurPreBaseCL *schurpc=0;
         const int iter= P.get<int>("CouplingSolver.NavStokesSolver.OseenSolver.Iter");
         const double tol= P.get<double>("CouplingSolver.NavStokesSolver.OseenSolver.Tol"),
                 PcSTol= P.get<double>("CouplingSolver.NavStokesSolver.OseenSolver.PcSTol");
         if( Stokes.usesGhostPen() )
-        {
-            typedef BlockPreCL<ExpensivePreBaseCL, SchurPreBaseCL, LowerBlockPreCL>    LowerBlockPcT;
-            ISGhPenPreCL gpispc( &Stokes.prA.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.C.Data.GetFinest(), 0., 1., PcSTol, PcSTol, 200);
-            GCRSolverCL< LowerBlockPcT > gcrsolver( *(new LowerBlockPcT(apc, gpispc)), iter, iter, tol);
-            ssolver = new BlockMatrixSolverCL< GCRSolverCL<LowerBlockPcT> > ( gcrsolver );
-        }
+            schurpc= new ISGhPenPreCL( &Stokes.prA.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.C.Data.GetFinest(), 0., 1., PcSTol, PcSTol, 200);
         else
-        {
-            ISBBTPreCL bbtispc( &Stokes.B.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.M.Data.GetFinest(), Stokes.pr_idx.GetFinest(), 0.0, 1.0, PcSTol, PcSTol);
-            ssolver = new InexactUzawaCL<PCGPcT, ISBBTPreCL, APC_OTHER> ( apc, bbtispc, iter, tol, 0.6, 50);
+            schurpc= new ISBBTPreCL( &Stokes.B.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.M.Data.GetFinest(), Stokes.pr_idx.GetFinest(), 0.0, 1.0, PcSTol, PcSTol);
+        typedef BlockPreCL<ExpensivePreBaseCL, SchurPreBaseCL, LowerBlockPreCL>    LowerBlockPcT;
+        LowerBlockPcT blockPc(apc, *schurpc);
+        GCRSolverCL< LowerBlockPcT > gcrsolver( blockPc, iter, iter, tol, false);
+        BlockMatrixSolverCL< GCRSolverCL<LowerBlockPcT> > ssolver( gcrsolver );
+
+        if (inival==1) { // with surface tension
+            NSSolverBaseCL<StokesT> stokessolver( Stokes, ssolver);
+            SolveStatProblem( Stokes, lset, stokessolver);
+        } else { // without surface tension
+            TimerCL time;
+            VelVecDescCL curv( &Stokes.vel_idx);
+            time.Reset();
+            Stokes.SetupPrMass(  &Stokes.prM, lset/*, P.get<double>("Mat.ViscFluid"), C.mat_ViscGas*/);
+            Stokes.SetupSystem1( &Stokes.A, &Stokes.M, &Stokes.b, &Stokes.b, &curv, lset, Stokes.v.t);
+            Stokes.SetupSystem2( &Stokes.B, &Stokes.C, &Stokes.c, lset, Stokes.v.t);
+            curv.Clear( Stokes.v.t);
+            lset.AccumulateBndIntegral( curv);
+            time.Stop();
+            std::cout << "Discretizing Stokes/Curv for initial velocities took "<<time.GetTime()<<" sec.\n";
+
+            time.Reset();
+            ssolver.Solve( Stokes.A.Data, Stokes.B.Data, Stokes.C.Data,
+                Stokes.v.Data, Stokes.p.Data, Stokes.b.Data, Stokes.c.Data, Stokes.vel_idx.GetEx(), Stokes.pr_idx.GetEx());
+            time.Stop();
+            std::cout << "Solving Stokes for initial velocities took "<<time.GetTime()<<" sec.\n";
         }
-        ssolver->Solve( Stokes.A.Data, Stokes.B.Data, Stokes.C.Data,
-            Stokes.v.Data, Stokes.p.Data, Stokes.b.Data, Stokes.c.Data, Stokes.vel_idx.GetEx(), Stokes.pr_idx.GetEx());
-        time.Stop();
-        std::cout << "Solving Stokes for initial velocities took "<<time.GetTime()<<" sec.\n";
-        delete ssolver; 
-      } break;    
+        delete schurpc;
+      } break;
+
       case  2: //Stationary flow without droplet
           Stokes.UpdateXNumbering( pidx, lset);
           Stokes.p.SetIdx( pidx);
