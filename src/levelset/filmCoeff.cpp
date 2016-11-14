@@ -30,6 +30,7 @@ extern DROPS::ParamCL P;
 //========================================================================
 //                        Functions for the film problem
 //========================================================================
+//A remark : The functions declared here still use MeshSize from json files. But the json style is different from general one.
 namespace filminflow{
 
     DROPS::Point3DCL FilmInflow( const DROPS::Point3DCL& p, double t)

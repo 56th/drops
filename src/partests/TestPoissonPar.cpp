@@ -906,7 +906,7 @@ int main (int argc, char** argv)
         SetDescriber();
         //DDD_SetOption(OPT_INFO_XFER, XFER_SHOW_MEMUSAGE/*|XFER_SHOW_MSGSALL*/);
 
-        DROPS::read_parameter_file_from_cmdline( C, argc, argv);
+        DROPS::read_parameter_file_from_cmdline( C, argc, argv, "../../param/partests/TestPoissonPar/Poisson.json");
         if (ProcCL::IamMaster())
             std::cout << C << std::endl;
 

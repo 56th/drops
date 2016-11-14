@@ -1,5 +1,5 @@
 /// \file marking_strategy.h
-/// \brief 
+/// \brief
 /// \author LNM RWTH Aachen: Matthias Kirchhart
 
 /*
@@ -46,7 +46,7 @@ enum MarkingDecisionT { CoarsenC, RefineC, KeepC, DontCareC };
  * <ul>
  * <li><b>CoarsenC:</b> the tetrahedron should be "coarsened".
  * <li><b>RefineC:</b> the tetrahedron should be refined.
- * <li><b>KeepC:</b> the tetrahedron should neither be coarsend nor refined.
+ * <li><b>KeepC:</b> the tetrahedron should neither be coarsened nor refined.
  * <li><b>DontCareC:</b> it doesn't matter what happens to the tetrahedron.
  * </ul>
  * </li>
@@ -76,6 +76,35 @@ public:
 };
 
 
+/*!
+ * \brief Refinement strategy for uniform refinement.
+ *
+ * This marking strategy marks all tetrahedra for refinement until a prescribed level is reached.
+ */
+class UniformMarkingStrategyCL: public MarkingStrategyCL
+{
+public:
+    UniformMarkingStrategyCL( Uint Level) : level_(Level), decision_(DontCareC), modified_(false) {}
+    ~UniformMarkingStrategyCL() {}
+    void visit( const TetraCL& t );
+    TetraAccumulatorCL* clone (int clone_id);
+    MarkingStrategyCL*  clone_strategy();
+
+    bool modified() const { return modified_; }
+    void SetUnmodified()  { modified_= false; }
+
+    MarkingDecisionT GetDecision() const { return decision_; }
+
+    Uint GetFineLevel()   const { return level_; }
+    Uint GetCoarseLevel() const { return 0; }
+
+private:
+    Uint level_;
+    MarkingDecisionT decision_;
+    bool modified_;
+};
+
+
 
 
 /*!
@@ -90,7 +119,7 @@ public:
 class StrategyCombinerCL: public MarkingStrategyCL
 {
 public:
-    StrategyCombinerCL(); 
+    StrategyCombinerCL();
     StrategyCombinerCL( const StrategyCombinerCL &rhs );
     ~StrategyCombinerCL();
 
@@ -110,7 +139,7 @@ public:
 
     bool empty();
     void push_back( MarkingStrategyCL &s );
-    void pop_back(); 
+    void pop_back();
 
 private:
     bool modified_;
@@ -129,7 +158,7 @@ class ValueGetterCL;
 /*!
  * \brief Refinement strategy according to a levelset function.
  *
- * This marking strategy refines the mesh arount the zero level of a given
+ * This marking strategy refines the mesh around the zero level of a given
  * levelset function.
  */
 class DistMarkingStrategyCL: public MarkingStrategyCL
@@ -161,7 +190,7 @@ public:
     Uint   GetCoarseLevel() const;
     void   SetCoarseLevel( Uint level );
     Uint   GetFineLevel() const;
-    void   SetFineLevel( Uint level ); 
+    void   SetFineLevel( Uint level );
 
 private:
     ValueGetterCL *getter_;
@@ -171,7 +200,51 @@ private:
     bool modified_;
     MarkingDecisionT decision_;
 };
- 
+
+
+///////////////////////////////////////////
+// ValueGetter for DistMarkingStrategyCL //
+///////////////////////////////////////////
+
+class ValueGetterCL
+{
+public:
+    virtual ~ValueGetterCL() {}
+    virtual double GetValue( const VertexCL& v ) const = 0;
+    virtual double GetValue( const EdgeCL&   e ) const = 0;
+    virtual double GetValue( const TetraCL&  t ) const = 0;
+    virtual ValueGetterCL* clone() const = 0;
+};
+
+class LevelsetP2GetterCL: public ValueGetterCL
+{
+public:
+    LevelsetP2GetterCL( const LevelsetP2CL& lset );
+
+    double GetValue( const VertexCL& v ) const;
+    double GetValue( const EdgeCL&   e ) const;
+    double GetValue( const TetraCL&  t ) const;
+    ValueGetterCL* clone() const;
+
+private:
+    const LevelsetP2CL& lset_;
+};
+
+class FunPtrGetterCL: public ValueGetterCL
+{
+public:
+    FunPtrGetterCL( instat_scalar_fun_ptr fct, double time = 0. );
+
+    double GetValue( const VertexCL& v ) const;
+    double GetValue( const EdgeCL&   e ) const;
+    double GetValue( const TetraCL&  t ) const;
+    ValueGetterCL* clone() const;
+
+private:
+    double time_;
+    instat_scalar_fun_ptr fct_;
+};
+
 }
 
 #endif

@@ -258,15 +258,13 @@ void Strategy( DROPS::AdapTriangCL& adap, DROPS::BndDataCL<>& lsbnd)
 
     // writer for vtk-format
     VTKOutCL vtkwriter(adap.GetMG(), "DROPS data", (P.get<int>("VTK.VTKOut") ? 3 : 0),
-                       P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName"), 
+                       P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName"),
                        P.get<std::string>("VTK.VTKName"), /* <- time file name */
                        P.get<int>("VTK.Binary"), 0, -1, 0);
     vtkwriter.Register( make_VTKScalar( lset.GetSolution(), "level-set") );
 
     // Create numbering and assign given distance function
-    lset.CreateNumbering( adap.GetMG().GetLastLevel(), &lset.idx);
-    lset.Phi.SetIdx( &lset.idx);
-
+    lset.CreateNumbering( adap.GetMG().GetLastLevel());
     // Write out information:
     size_t numLsetUnk= lset.Phi.Data.size();
 #ifdef _PAR
@@ -299,7 +297,7 @@ void Strategy( DROPS::AdapTriangCL& adap, DROPS::BndDataCL<>& lsbnd)
     Disturb( lset.Phi.Data);
 
     // Perform re-parametrization
-    std::auto_ptr<ReparamCL> reparam= ReparamFactoryCL::GetReparam( adap.GetMG(), lset.Phi, P.get<int>("Reparam.Method"), /*periodic*/ false, &lset.GetBndData());
+    std::unique_ptr<ReparamCL> reparam= ReparamFactoryCL::GetReparam( adap.GetMG(), lset.Phi, P.get<int>("Reparam.Method"), /*periodic*/ false, &lset.GetBndData());
     reparam->Perform();
 
 //    FastMarchCL fmm( adap.GetMG(), lset.Phi);
@@ -335,7 +333,7 @@ int main( int argc, char **argv)
         DROPS::ParMultiGridInitCL pmginit;
 #endif
 
-        DROPS::read_parameter_file_from_cmdline( P, argc, argv, "reparam.json");
+        DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/tests/reparamtest/reparam.json");
         std::cout << P << std::endl;
 
         DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
@@ -359,8 +357,7 @@ int main( int argc, char **argv)
         typedef DROPS::DistMarkingStrategyCL MarkerT;
         MarkerT marker( distance, P.get<double>("AdaptRef.Width" ),
                         P.get<int>("AdaptRef.CoarsestLevel"),
-                        P.get<int>("AdaptRef.FinestLevel") ); 
-
+                        P.get<int>("AdaptRef.FinestLevel") );
         adap.set_marking_strategy( &marker );
         adap.MakeInitialTriang();
 

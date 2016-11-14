@@ -1,0 +1,115 @@
+//=============================================================
+//    DROPS parameter file for two phase mass transport
+//    simulation: (almost) artificial substance system
+//    stationary interface (no flow simulation)
+//=============================================================
+{
+        //General section
+        "General":
+        {
+                "ProgressBar":  1, //show progress bar
+                "DynamicLibsPrefix": "../", //where should we look for shared objects?
+                "DynamicLibs": [ //select libraries to be loaded after program start
+                        "misc/libmisc-scalarFunctions",
+                        "misc/libmisc-vectorFunctions",
+                        "misc/libmisc-csgFunctions",
+                        "spacetimetransp/libspacetimetransp-sttranspCoeff"
+                ]
+        },
+
+        // time stepping:
+        "Time":
+        {
+                "NumSteps":             10,
+                "EndTime":              2.5,
+                "Scheme":               1
+        },
+    
+        //adaptive refinement:
+        "AdaptRef":
+        {
+                "Freq":                 1,
+                "FinestLevel":          0,
+                "CoarsestLevel":        0,
+                "Width":                0.1,
+                "RefineStrategy":       1,
+                "LoadBalStrategy":      1,
+                "Partitioner":          1
+        },
+
+        // experimental conditions
+        "Exp":
+        {
+                "RadDrop":              [2e-1, 2e-1, 2e-1 ],
+                "PosDrop":              [5e-1, 5e-1, 5e-1 ],
+                "RadInlet":             0.005
+        },
+
+        "Transp":
+        {
+               "UseNSSol":             0,
+                "DoTransp":             1,
+                "Theta":                1,
+                "Iter":                 200000,
+                "Tol":                  1e-15,
+                "DiffPos":              0.5e-1,
+                "DiffNeg":              1.0e-1,
+                "HPos":                 2.0,
+                "HNeg":                 1.0,
+                "IniCPos":              5.0,
+                "IniCNeg":              0.0,
+                // "InitialConcNeg":       "inineg",
+                // "InitialConcPos":       "inipos",
+                "InitialConcNeg":       "IniCnegFct",
+                "InitialConcPos":       "IniCposFct",
+                "NitschePenalty":       15e3,
+
+                "STXFEMStab":           0.0, //0.001,
+                "Levelset":             "MovingEllipsoid",             //Only active if UseNSSol == 0
+                "Flow":                 "straightsinus",               //Only active if UseNSSol == 0
+                // "Levelset":             "Ellipsoid",             //Only active if UseNSSol == 0
+                // "Flow":                 "ZeroVel",               //Only active if UseNSSol == 0
+                "RhsPos":               "One",                  //Only active if UseNSSol == 0
+                "RhsNeg":               "Zero",                  //Only active if UseNSSol == 0
+                "BoundaryType":         "13!11!21!21!21!21",
+                "BoundaryFncsNeg":      "IniCnegFct!IniCnegFct!IniCnegFct!IniCnegFct!IniCnegFct!IniCnegFct",
+                "BoundaryFncsPos":      "IniCposFct!IniCposFct!IniCposFct!IniCposFct!IniCposFct!IniCposFct",
+                "SolPos":               "Zero",
+                "SolNeg":               "Zero",
+                "DirectSolve":          1,
+                "Quadrature":
+                {       
+                    "SubIntervalsPerEdge":  2,
+                    "SubTimeIntervals":     4,
+                    "LevelsetLinearInTime": 0
+                }
+        },
+
+        "VTK":
+        {
+
+                "VTKOut":               1,
+                "VTKDir":               "vtk",
+                "VTKName":              "space_time_try",
+                "Binary":               0
+        },
+
+        //Write out results:
+        "Restart":
+        {
+                "Inputfile":            "none"
+        },
+
+        // Domain boundary and initial condition
+        "DomainCond":
+        {
+                "PeriodicMatching":     "periodicx",            // matching function 
+                "InitialCond":          0,
+                "GeomType":             1,
+                "InitialFile":          "none",
+                "MeshFile":             "1x1x1@17x17x17",
+                "BoundaryType":         "13!11!21!21!21!21",
+                "BoundaryFncs":         "ZeroVel!ZeroVel!ZeroVel!ZeroVel!ZeroVel!ZeroVel"
+        }
+
+}

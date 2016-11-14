@@ -61,7 +61,7 @@ class InterfaceApproxErrorAccuCL : public TetraAccumulatorCL
   private:
     VecDescCL* yH_, ///< error-term for H^2-smooth \varphi
              * yG_, ///< error-term for H^1 smooth \varphi
-             * yQ_; ///< yH_/yG_ (clipped at 1e16) 
+             * yQ_; ///< yH_/yG_ (clipped at 1e16)
 
     IdxT numry[4];
     double vec[4];
@@ -163,8 +163,7 @@ int TestExamples (MultiGridCL& mg)
     LsetBndDataCL lsbnd( 6);
     LevelsetP2CL & lset( * LevelsetP2CL::Create( mg, lsbnd, sf) );
 
-    lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
-    lset.Phi.SetIdx( &lset.idx);
+    lset.CreateNumbering( mg.GetLastLevel());
 
     IdxDescCL p1idx;
     p1idx.CreateNumbering( mg.GetLastLevel(), mg, lsbnd);
@@ -172,14 +171,15 @@ int TestExamples (MultiGridCL& mg)
               ierrg( &p1idx),
               ierrq( &p1idx);
 
-    std::ifstream jsonfile( "../geom/csg-examples.json");
+    std::ifstream jsonfile( "../../param/geom/unspecified/csg-examples.json");
+
     ParamCL p;
     jsonfile >> p;
     const size_t num= 2*std::distance( p.begin(), p.end());
 
    // writer for vtk-format
     VTKOutCL vtkwriter( mg, "DROPS data", num,
-                        ".", "csg-examples", 
+                        ".", "csg-examples",
                         "csg-examples", /* <- time file name */
                         true, /* <- binary */
                         false, /* <- onlyp1 */
@@ -212,8 +212,7 @@ int TestExamples (MultiGridCL& mg)
         lset.idx.DeleteNumbering( mg);
         p1idx.DeleteNumbering( mg);
         mg.Refine();
-        lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
-        lset.Phi.SetIdx( &lset.idx);
+        lset.CreateNumbering( mg.GetLastLevel());
         lset.Init( csg_fun);
         p1idx.CreateNumbering( mg.GetLastLevel(), mg, lsbnd);
         ierr.SetIdx( &p1idx);
@@ -225,8 +224,7 @@ int TestExamples (MultiGridCL& mg)
             lset.idx.DeleteNumbering( mg);
             p1idx.DeleteNumbering( mg);
             mg.Refine();
-            lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
-            lset.Phi.SetIdx( &lset.idx);
+            lset.CreateNumbering( mg.GetLastLevel());
             lset.Init( csg_fun);
             p1idx.CreateNumbering( mg.GetLastLevel(), mg, lsbnd);
             ierr.SetIdx( &p1idx);
@@ -247,8 +245,7 @@ int TestExamples (MultiGridCL& mg)
                 it->SetRemoveMark(); // level 0 will not be removed.
             mg.Refine();
         }
-        lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
-        lset.Phi.SetIdx( &lset.idx);
+        lset.CreateNumbering( mg.GetLastLevel());
         lset.Init( csg_fun);
         p1idx.CreateNumbering( mg.GetLastLevel(), mg, lsbnd);
         ierr.SetIdx( &p1idx);

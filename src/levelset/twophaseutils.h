@@ -149,7 +149,7 @@ void MakeP1P1XProlongation (size_t NumUnknownsVel, size_t NumUnknownsPr, size_t 
 
 /// For given exact solution u and discrete P2 solution uh on positive and negative subdomains, computes L2 and H1 errors || u - u_h ||
 template<class ValT, class DiscSolT>
-void ComputeErrorsP2(  ValT (*uPos)(const Point3DCL&, double), ValT (*uNeg)(const Point3DCL&, double), const DiscSolT& uhPos, const DiscSolT& uhNeg, ValT& L2, ValT& H1, const LevelsetP2CL& lset, double t);
+void ComputeErrorsP2(  ValT (*uPos)(const Point3DCL&, double), ValT (*uNeg)(const Point3DCL&, double), const DiscSolT& uhPos, const DiscSolT& uhNeg, ValT& L2, ValT& H1, ValT& L2_norm, ValT& H1_norm, const LevelsetP2CL& lset, double t);
 
 void ComputeErrorsP2R( const instat_vector_fun_ptr uPos, const instat_vector_fun_ptr uNeg, const VecDescCL& uh, const BndDataCL<Point3DCL>& bnd, Point3DCL& L2, Point3DCL& H1, const LevelsetP2CL& lset, double t=0.);
 
@@ -246,7 +246,9 @@ inline void AccumulateH1( Point3DCL& H1, const LocalP2CL<Point3DCL>& diff_p, con
 }
 
 template<class ValT, class DiscSolT>
-void ComputeErrorsP2(  ValT (*uPos)(const Point3DCL&, double), ValT (*uNeg)(const Point3DCL&, double), const DiscSolT& uhPos, const DiscSolT& uhNeg, ValT& L2, ValT& H1, const LevelsetP2CL& lset, double t)
+void ComputeErrorsP2(  ValT (*uPos)(const Point3DCL&, double), ValT (*uNeg)(const Point3DCL&, double),
+        const DiscSolT& uhPos, const DiscSolT& uhNeg,
+        ValT& L2, ValT& H1, ValT& L2_norm, ValT& H1_norm, const LevelsetP2CL& lset, double t)
 {
     const int lvl= uhPos.GetLevel();
     const MultiGridCL& MG= lset.GetMG();
@@ -262,7 +264,7 @@ void ComputeErrorsP2(  ValT (*uPos)(const Point3DCL&, double), ValT (*uNeg)(cons
     P2DiscCL::GetGradientsOnRef( GradRef);
     LevelsetP2CL::const_DiscSolCL ls= lset.GetSolution();
 
-    L2= H1= ValT();
+    L2= H1= L2_norm= H1_norm= ValT();
 
     for (MultiGridCL::const_TriangTetraIteratorCL sit = MG.GetTriangTetraBegin(lvl), send=MG.GetTriangTetraEnd(lvl);
          sit != send; ++sit)
@@ -278,25 +280,25 @@ void ComputeErrorsP2(  ValT (*uPos)(const Point3DCL&, double), ValT (*uNeg)(cons
             if (patch.GetSign( 0) == 1) { // pos. part
                 u_p.assign(  *sit, uPos, t);
                 u5_p.assign(  *sit, uPos, t);
-                uh_p.assign( *sit, uhPos, t);
-                diff= u_p - uh_p;
-                diff5= u5_p - Quad5CL<ValT>(uh_p);
+                uh_p.assign( *sit, uhPos);
             } else { // neg. part
-                u_n.assign(  *sit, uNeg, t);
-                u5_n.assign( *sit, uNeg, t);
-                uh_n.assign( *sit, uhNeg, t);
-                diff= u_n - uh_n;
-                diff5= u5_n - Quad5CL<ValT>(uh_n);
+                u_p.assign(  *sit, uNeg, t);
+                u5_p.assign( *sit, uNeg, t);
+                uh_p.assign( *sit, uhNeg);
             }
+            diff= u_p - uh_p;
+            diff5= u5_p - Quad5CL<ValT>(uh_p);
             L2+= Quad5CL<ValT>(diff5*diff5).quad( absdet);
+            L2_norm+= Quad5CL<ValT>(u5_p*u5_p).quad( absdet);
 
             AccumulateH1( H1, diff, Grad, absdet);
+            AccumulateH1( H1_norm, u_p, Grad, absdet);
         }
         else { // We are at the phase boundary.
             u_p.assign( *sit, uPos, t);
             u_n.assign( *sit, uNeg, t);
-            uh_p.assign( *sit, uhPos, t);
-            uh_n.assign( *sit, uhNeg, t);
+            uh_p.assign( *sit, uhPos);
+            uh_n.assign( *sit, uhNeg);
             diff_p= u_p - uh_p;
             diff_n= u_n - uh_n;
             // compute L2 norm
@@ -305,16 +307,22 @@ void ComputeErrorsP2(  ValT (*uPos)(const Point3DCL&, double), ValT (*uNeg)(cons
             { // init quadrature objects for integrals on sub tetras
                 nodes = Quad5CL<ValT>::TransformNodes(patch.GetTetra(k));
                 Quad5CL<ValT> diff5cut( k<patch.GetNumNegTetra() ? diff_n : diff_p, nodes);
+                Quad5CL<ValT> u5cut( k<patch.GetNumNegTetra() ? u_n : u_p, nodes);
                 L2+= Quad5CL<ValT>( diff5cut*diff5cut).quad(absdet*VolFrac(patch.GetTetra(k)));
+                L2_norm+= Quad5CL<ValT>( u5cut*u5cut).quad(absdet*VolFrac(patch.GetTetra(k)));
                 delete[] nodes;
             }
 
             AccumulateH1( H1, diff_p, diff_n, patch, Grad, absdet);
+            AccumulateH1( H1_norm, u_p, u_n, patch, Grad, absdet);
         }
     }
     H1+= L2;
     L2= sqrt( L2);
     H1= sqrt( H1);
+    H1_norm+= L2_norm;
+    L2_norm= sqrt( L2_norm);
+    H1_norm= sqrt( H1_norm);
 }
 
 } //end of namespace DROPS

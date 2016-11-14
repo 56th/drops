@@ -31,8 +31,8 @@ namespace DROPS
 /***************************************************************************
 *   P R O C - C L A S S                                                    *
 ***************************************************************************/
-Uint    ProcCL::my_rank_=0;
-Uint    ProcCL::size_   =0;             // if _size==0, then this proc has not created a ProcCL
+int    ProcCL::my_rank_=0;
+int    ProcCL::size_   =0;             // if _size==0, then this proc has not created a ProcCL
 int     ProcCL::procDigits_=0;
 ProcCL* ProcCL::instance_=0;            // only one instance of ProcCL may exist (Singleton-Pattern)
 MuteStdOstreamCL* ProcCL::mute_=0;
@@ -49,6 +49,7 @@ MuteStdOstreamCL* ProcCL::mute_=0;
     const ProcCL::DatatypeT& ProcCL::MPI_TT<char>::dtype   = MPI::CHAR;
     const ProcCL::DatatypeT& ProcCL::MPI_TT<byte>::dtype   = MPI::CHAR;
     const ProcCL::DatatypeT& ProcCL::MPI_TT<float>::dtype  = MPI::FLOAT;
+    const ProcCL::DatatypeT& ProcCL::MPI_TT<long>::dtype   = MPI::LONG;
 #ifdef DROPS_WIN
     const ProcCL::DatatypeT& ProcCL::MPI_TT<size_t>::dtype = MPI::UNSIGNED;
 #endif
@@ -64,6 +65,7 @@ MuteStdOstreamCL* ProcCL::mute_=0;
     const ProcCL::DatatypeT& ProcCL::MPI_TT<char>::dtype   = MPI_CHAR;
     const ProcCL::DatatypeT& ProcCL::MPI_TT<byte>::dtype   = MPI_CHAR;
     const ProcCL::DatatypeT& ProcCL::MPI_TT<float>::dtype  = MPI_FLOAT;
+    const ProcCL::DatatypeT& ProcCL::MPI_TT<long>::dtype   = MPI_LONG;
 #ifdef WIN64
     const ProcCL::DatatypeT& ProcCL::MPI_TT<size_t>::dtype = MPI_UNSIGNED;
 #endif
@@ -86,8 +88,8 @@ ProcCL::ProcCL(int* argc, char*** argv)
     MPI_Comm_rank( Communicator_ , &rank);
     MPI_Comm_size( Communicator_, &size );
 #endif
-    my_rank_=(Uint)rank;
-    size_=(Uint)size;
+    my_rank_=rank;
+    size_=size;
     procDigits_= 1;
     int procs  = Size();
     while( procs>9){

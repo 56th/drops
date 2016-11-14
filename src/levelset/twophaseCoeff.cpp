@@ -1,6 +1,6 @@
 /// \file twophaseCoeff.cpp
 /// \brief boundary and source functions for the twophasedrops-type problems
-/// \author LNM RWTH Aachen: Christoph Lehrenfeld
+/// \author LNM RWTH Aachen: Christoph Lehrenfeld, Yuanjun Zhang
 
 /*
  * This file is part of DROPS.
@@ -67,6 +67,37 @@ namespace tpd_inflow{
         return ret;
     }
 
+    /// Examplary inflow condition for a shift frame
+    DROPS::SVectorCL<3> InflowShiftFrame( const DROPS::Point3DCL&, double)
+    {
+        DROPS::SVectorCL<3> ret(0.);
+        DROPS::SVectorCL<3> FrameVel(0.);
+        FrameVel = P.get<DROPS::Point3DCL>("NavStokes.FrameVel");
+        ret = -FrameVel;
+        return ret;
+    }
+
+    /// Axial symmetric extensional flow
+    DROPS::SVectorCL<3> InflowAxialExtensionalFlow( const DROPS::Point3DCL& p, double)
+    {
+        DROPS::SVectorCL<3> ret(0.);
+        DROPS::SVectorCL<3> PosDrop(0.);
+        PosDrop = P.get<DROPS::Point3DCL>("Exp.PosDrop");
+        ret[0]=-0.5*(p[0]-PosDrop[0]);
+        ret[1]=-0.5*(p[1]-PosDrop[1]);
+        ret[2]= p[2]-PosDrop[2];
+        return P.get<double>("Exp.ExtensionalFlowFactor",1.0)*ret;
+    }
+
+    /// Plane shear flow (z-direction)
+    DROPS::SVectorCL<3> InflowShearFlowZ( const DROPS::Point3DCL& p, double)
+    {
+        DROPS::SVectorCL<3> ret(0.);
+        DROPS::SVectorCL<3> E3(0.);
+        E3 = P.get<DROPS::Point3DCL>("Domain.E3");
+        ret[0]=p[2]-0.5*E3[2];
+        return P.get<double>("Exp.ShearFlowFactor",1.0)*ret;
+    }
 
     //========================================================================
     //                       Functions for brick_transp.cpp
@@ -88,6 +119,9 @@ namespace tpd_inflow{
     static DROPS::RegisterVectorFunction regvelcell("InflowCell", InflowCell);
     static DROPS::RegisterVectorFunction regvelchannel("InflowChannel", InflowChannel);
     static DROPS::RegisterVectorFunction regvelbricktransp("InflowBrickTransp", InflowBrickTransp);
+    static DROPS::RegisterVectorFunction regvelshiftframe("InflowShiftFrame", InflowShiftFrame);
+    static DROPS::RegisterVectorFunction regvelextensional("InflowAxialExtensionalFlow", InflowAxialExtensionalFlow);
+    static DROPS::RegisterVectorFunction regvelshearz("InflowShearFlowZ", InflowShearFlowZ);
 }
 
 
@@ -104,15 +138,12 @@ namespace tpd_volforce{
 
         static bool first = true;
         static DROPS::Point3DCL dx;
-        //dirty hack
+        //"hack": assume cartesian domain with e1=[a,0,0], e2=[0,b,0], ..
         if (first){
-            std::string mesh( P.get<std::string>("DomainCond.MeshFile")), delim("x@");
-            size_t idx_;
-            while ((idx_= mesh.find_first_of( delim)) != std::string::npos )
-                mesh[idx_]= ' ';
-            std::istringstream brick_info( mesh);
-            brick_info >> dx[0] >> dx[1] >> dx[2] ;
             first = false;
+            dx[0] = P.get<DROPS::Point3DCL>("Domain.E1")[0];
+            dx[1] = P.get<DROPS::Point3DCL>("Domain.E2")[1];
+            dx[2] = P.get<DROPS::Point3DCL>("Domain.E3")[2];
         }
 
         static double voldrop = 4./3.*M_PI* P.get<DROPS::Point3DCL>("Exp.RadDrop")[0]*P.get<DROPS::Point3DCL>("Exp.RadDrop")[1]*P.get<DROPS::Point3DCL>("Exp.RadDrop")[2] ;
@@ -155,15 +186,16 @@ namespace levelsetdistance{
 
         static bool first = true;
         static DROPS::Point3DCL dx;
-        //dirty hack
+
+        //hack
         if (first){
-            std::string mesh( P.get<std::string>("DomainCond.MeshFile")), delim("x@");
-            size_t idx_;
-            while ((idx_= mesh.find_first_of( delim)) != std::string::npos )
-                mesh[idx_]= ' ';
-            std::istringstream brick_info( mesh);
-            brick_info >> dx[0] >> dx[1] >> dx[2] ;
             first = false;
+            if (i==0)
+                dx = P.get<DROPS::Point3DCL>("Domain.E1");
+            else if (i==1)
+                dx = P.get<DROPS::Point3DCL>("Domain.E2");
+            else
+                dx = P.get<DROPS::Point3DCL>("Domain.E3");
         }
 
         DROPS::Point3DCL dp;
@@ -229,9 +261,14 @@ namespace surffunctions{
     {
         return 1. + std::sin( atan2( p[0] - P.get<DROPS::Point3DCL>("Exp.PosDrop")[0], p[2] - P.get<DROPS::Point3DCL>("Exp.PosDrop")[2]));
     }
+    double surf_uniform (const DROPS::Point3DCL&, double)
+    {
+        return P.get<double>("SurfTransp.InitialConcentration");
+    }
     //@}
     static DROPS::RegisterScalarFunction regscasurfrhs("surf_rhs", surf_rhs);
     static DROPS::RegisterScalarFunction regscasurfsol("surf_sol", surf_sol);
+    static DROPS::RegisterScalarFunction regscasurfuniform("surf_uniform", surf_uniform);
 }
 
 //TODO: unification with filmCoeff stoff
@@ -245,15 +282,13 @@ namespace filmperiodic{
 
         static bool first = true;
         static DROPS::Point3DCL dx;
-        //dirty hack
+
+        //"hack": assume cartesian domain with e1=[a,0,0], e2=[0,b,0], ..
         if (first){
-            std::string mesh( P.get<std::string>("DomainCond.MeshFile")), delim("x@");
-            size_t idx_;
-            while ((idx_= mesh.find_first_of( delim)) != std::string::npos )
-                mesh[idx_]= ' ';
-            std::istringstream brick_info( mesh);
-            brick_info >> dx[0] >> dx[1] >> dx[2] ;
             first = false;
+            dx[0] = P.get<DROPS::Point3DCL>("Domain.E1")[0];
+            dx[1] = P.get<DROPS::Point3DCL>("Domain.E2")[1];
+            dx[2] = P.get<DROPS::Point3DCL>("Domain.E3")[2];
         }
 
         const DROPS::Point3DCL d= fabs(p-q),
@@ -271,16 +306,18 @@ namespace filmperiodic{
 
         static bool first = true;
         static DROPS::Point3DCL dx;
-        //dirty hack
+
+        //hack
         if (first){
-            std::string mesh( P.get<std::string>("DomainCond.MeshFile")), delim("x@");
-            size_t idx_;
-            while ((idx_= mesh.find_first_of( delim)) != std::string::npos )
-                mesh[idx_]= ' ';
-            std::istringstream brick_info( mesh);
-            brick_info >> dx[0] >> dx[1] >> dx[2] ;
             first = false;
+            if (A==0)
+                dx = P.get<DROPS::Point3DCL>("Domain.E1");
+            else if (A==1)
+                dx = P.get<DROPS::Point3DCL>("Domain.E2");
+            else
+                dx = P.get<DROPS::Point3DCL>("Domain.E3");
         }
+
         const int B = (A+1)%3;
         const int D = (B+1)%3;
         const DROPS::Point3DCL d= fabs(p-q), L= fabs(dx);

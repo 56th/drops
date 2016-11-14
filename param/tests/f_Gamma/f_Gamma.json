@@ -1,0 +1,70 @@
+{
+//=============================================================
+//    DROPS parameter file
+//    Study different discretizations of interfacial tension
+//=============================================================
+//General section
+	"General":
+	{
+		"ProgressBar":  1, //show progress bar
+		"DynamicLibsPrefix": "../", //where should we look for shared objects?
+		"DynamicLibs": [ //select libraries to be loaded after program start
+			"misc/libmisc-scalarFunctions",
+			"misc/libmisc-vectorFunctions"
+		]
+	},
+
+	"Stokes":
+	{
+		"VelocityBndData":
+		{
+			"Default": ["DirBC", "VecZero"] // Bug in some accumulators: The boundary-function is accessed for Dir0BC.
+		},
+		"PressureBndData": { "Default": ["Nat0BC"] }
+	},
+
+	"Levelset":
+	{
+		"Tol":		1e-14,
+		"Iter":		10000,
+		"SD":		0,
+		"CurvDiff":		-5e-09,
+		"VolCorrection":	0,
+		"Discontinuous":	0,
+		"Theta":		1,
+
+		"BndData": { "Default": ["NoBC"] }
+	},
+
+	"Exp":
+	{
+		"RadDrop":		[0.5, 0.5, 0.5 ],
+		"PosDrop":		[0, 0, 0 ],
+		"RadInlet":		0.0035
+	},
+
+	"AdaptRef":
+	{
+		"FinestLevel":		2,
+		"CoarsestLevel":	0,
+		"Width":		0.00049
+	},
+
+	"SurfTens":
+	{
+		"SurfTension":		1,
+                "VarTensionFncs":       "ConstTau"
+	},
+
+	"Domain":
+	{
+		"Type": "BrickBuilder", // A parallelepiped
+		"Origin": [-1,-1,-1],	// Origin
+		"E1": [2,0,0],		// Basis to span the object,
+		"E2": [0,2,0],		// not necessary orthonormal
+		"E3": [0,0,2],		// ...
+		"N1": 5,		// Number of cells along the E1-direction,
+		"N2": 5,		//			 the E2-direction,
+		"N3": 5			//			 the E3-direction.
+	 } 
+}

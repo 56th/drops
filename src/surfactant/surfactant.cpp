@@ -211,8 +211,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     SurfaceTensionCL sf( sigma, 0);
     LevelsetP2CL & lset2( * LevelsetP2CL::Create( mg, lsetbnd2, sf, P.get_child("Levelset")) );
 
-    lset2.idx.CreateNumbering( mg.GetLastLevel(), mg);
-    lset2.Phi.SetIdx( &lset2.idx);
+    lset2.CreateNumbering( mg.GetLastLevel());
     LSInit( mg, lset2.Phi, &sphere_2move, 0.);
 
     const double Vol= lset.GetVolume();
@@ -259,7 +258,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     typedef DistMarkingStrategyCL MarkerT;
     MarkerT marker( lset, P.get<double>( "AdaptRef.Width" ),
                     0, P.get<int>( "AdaptRef.FinestLevel" ) );
-  
+
     adap.set_marking_strategy( &marker );
     for (int step= 1; step <= P.get<int>("Time.NumSteps"); ++step) {
         std::cout << "======================================================== step " << step << ":\n";
@@ -319,7 +318,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
 int main (int argc, char* argv[])
 {
   try {
-    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "surfactant.json");
+    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/surfactant/surfactant/surfactant.json");
     std::cout << P << std::endl;
 
     DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
@@ -349,8 +348,7 @@ int main (int argc, char* argv[])
 
     DROPS::LevelsetP2CL & lset( * DROPS::LevelsetP2CL::Create( mg, lsbnd, sf) );
 
-    lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
-    lset.Phi.SetIdx( &lset.idx);
+    lset.CreateNumbering( mg.GetLastLevel());
     LinearLSInit( mg, lset.Phi, &sphere_2);
 //    lset.Init( &sphere_2);
 

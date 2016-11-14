@@ -24,7 +24,9 @@
 
 #include "misc/container.h"
 #include "num/spmat.h"
+#ifdef DROPS_PARDISO
 #include "num/pardisosolver.h"
+#endif
 #include <iostream>
 #include <math.h>
 
@@ -58,8 +60,10 @@ int PardisoTest()
     }
     AB.Build();
     
+#ifdef DROPS_PARDISO
     DROPS::PardisoSolverCL SolveA( A);
     SolveA.Solve(A, x, b);
+#endif
     DROPS::VectorCL r(A*x - b);
     std::cout << "PARDISO 1 Residual:  "<< norm(r) << std::endl;
     return 0;
@@ -68,8 +72,10 @@ int PardisoTest()
 
 int main (int, char**)
 {
+#ifdef DROPS_PARDISO
   try {
       return PardisoTest();
   }
   catch (DROPS::DROPSErrCL err) { err.handle(); }
+#endif
 }

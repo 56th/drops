@@ -40,6 +40,7 @@ void BDinvBTPreCL::Update(const ExchangeCL& vel_ex, const ExchangeCL& pr_ex) con
     Bversion_= B_->Version();
     Mversion_= M_->Version();
     Mvelversion_= Mvel_->Version();
+    Cversion_ = C_->Version();
 
     Dvelinv_.resize( Mvel_->num_rows());
     if (lumped_)
@@ -69,7 +70,7 @@ void BDinvBTPreCL::Update(const ExchangeCL& vel_ex, const ExchangeCL& pr_ex) con
 
     delete BDinvBT_;
 
-    BDinvBT_= new AppSchurComplMatrixT( *L_, diagVelPc_, *Bs_, vel_ex);
+    BDinvBT_= new AppSchurComplMatrixT( *L_, diagVelPc_, *Bs_, *C_, vel_ex);
 //    SchurPc_.SetDiag(*BDinvBT_, D, pr_ex);
 }
 #endif
@@ -80,11 +81,14 @@ void BDinvBTPreCL::Update(const DummyExchangeCL& vel_ex, const DummyExchangeCL& 
         << '\t' << Bversion_ << '/' << B_->Version() << '\t' << Mversion_ << '/' << M_->Version()
         << '\t' << Mvelversion_ << '/' << Mvel_->Version() << '\n';
     delete Bs_;
+    delete Cs_;
     Bs_= new MatrixCL( *B_);
+    Cs_= new MatrixCL( *C_);
     Lversion_= L_->Version();
     Bversion_= B_->Version();
     Mversion_= M_->Version();
     Mvelversion_= Mvel_->Version();
+    Cversion_ = C_->Version();
 
     Dvelinv_.resize( Mvel_->num_rows());
     if (lumped_)
@@ -98,12 +102,14 @@ void BDinvBTPreCL::Update(const DummyExchangeCL& vel_ex, const DummyExchangeCL& 
     Dprsqrtinv_= 1.0/Dprsqrt;
 
     ScaleRows( *Bs_, Dprsqrtinv_);
+    ScaleRows( *Cs_, Dprsqrtinv_);
+    ScaleCols( *Cs_, Dprsqrtinv_);
     DSchurinv_.resize( Dprsqrt.size());
 
-    DSchurinv_= 1.0/Bs_->GetSchurDiag(Dvelinv_);
+    DSchurinv_= 1.0/( Bs_->GetSchurDiag(Dvelinv_) - Cs_->GetDiag() );
     delete SerBDinvBT_;
 
-    SerBDinvBT_= new SerAppSchurComplMatrixT( *L_, diagVelPc_, *Bs_, vel_ex);
+    SerBDinvBT_= new SerAppSchurComplMatrixT( *L_, diagVelPc_, *Bs_, *Cs_, vel_ex);
 #ifndef _PAR
     if (regularize_ != 0.) {
         NEGSPcCL spc;

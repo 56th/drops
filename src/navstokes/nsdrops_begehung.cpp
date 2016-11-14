@@ -114,9 +114,9 @@ class PSchurSolverCL : public StokesSolverBaseCL
     PSchurSolverCL (PoissonSolverT& solver, MLMatrixCL& M, int maxiter, double tol)
     : StokesSolverBaseCL(maxiter,tol), _poissonSolver(solver), _schurPc( M.GetFinest()) {}
 
-    void Solve( const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p,
+    void Solve( const MatrixCL& A, const MatrixCL& B, const MatrixCL&, VectorCL& v, VectorCL& p,
                 const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&);
-    void Solve( const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p,
+    void Solve( const MLMatrixCL& A, const MLMatrixCL& B, const MLMatrixCL&, VectorCL& v, VectorCL& p,
                 const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&);
 };
 
@@ -152,8 +152,7 @@ void PSchurSolverCL<PoissonSolverT>::doSolve(const Mat& A, const Mat& B, Vec& v,
 }
 
 template <class PoissonSolverT>
-void PSchurSolverCL<PoissonSolverT>::Solve(
-    const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&)
+void PSchurSolverCL<PoissonSolverT>::Solve(const MatrixCL& A, const MatrixCL& B, const MatrixCL &, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&)
 // solve:       S*p = B*(A^-1)*b - c   with SchurCompl. S = B A^(-1) BT
 //              A*u = b - BT*p
 {
@@ -161,8 +160,7 @@ void PSchurSolverCL<PoissonSolverT>::Solve(
 }
 
 template <class PoissonSolverT>
-void PSchurSolverCL<PoissonSolverT>::Solve(
-    const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&)
+void PSchurSolverCL<PoissonSolverT>::Solve(const MLMatrixCL& A, const MLMatrixCL& B, const MLMatrixCL &, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&)
 // solve:       S*p = B*(A^-1)*b - c   with SchurCompl. S = B A^(-1) BT
 //              A*u = b - BT*p
 {
@@ -206,9 +204,9 @@ class Uzawa_IPCG_CL : public StokesSolverBaseCL
     // Always call this when A has changed, before Solve()!
     void Init_A_Pc(MatrixCL& A) { _A_IPCGsolver.GetPc().Init(A); }
 
-    inline void Solve( const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p,
+    inline void Solve( const MatrixCL& A, const MatrixCL& B, const MatrixCL&, VectorCL& v, VectorCL& p,
                        const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&);
-    inline void Solve( const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p,
+    inline void Solve( const MLMatrixCL& A, const MLMatrixCL& B, const MLMatrixCL&, VectorCL& v, VectorCL& p,
                 const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&);
 };
 
@@ -256,13 +254,12 @@ inline void Uzawa_IPCG_CL::doSolve(
 }
 
 inline void Uzawa_IPCG_CL::Solve(
-    const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&)
+    const MatrixCL& A, const MatrixCL& B, const MatrixCL&, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&)
 {
     doSolve( A, B, v, p, b, c);
 }
 
-inline void Uzawa_IPCG_CL::Solve(
-    const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&)
+inline void Uzawa_IPCG_CL::Solve(const MLMatrixCL& A, const MLMatrixCL& B, const MLMatrixCL &, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&)
 {
     doSolve( A, B, v, p, b, c);
 }
@@ -416,6 +413,7 @@ void Strategy(StokesP2P1CL<Coeff>& Stokes, double inner_iter_tol, double tol,
 
     MLMatDescCL* A= &Stokes.A;
     MLMatDescCL* B= &Stokes.B;
+    MLMatDescCL* C= &Stokes.C;
     MLMatDescCL* M= &Stokes.M;
     Uint step= 0;
     StokesDoerflerMarkCL<typename MyStokesCL::est_fun, MyStokesCL>
@@ -464,6 +462,7 @@ void Strategy(StokesP2P1CL<Coeff>& Stokes, double inner_iter_tol, double tol,
         A->SetIdx(vidx1, vidx1);
         M->SetIdx(vidx1, vidx1);
         B->SetIdx(pidx1, vidx1);
+        C->SetIdx(pidx1,pidx1);
         time.Reset();
         time.Start();
 
@@ -499,7 +498,7 @@ void Strategy(StokesP2P1CL<Coeff>& Stokes, double inner_iter_tol, double tol,
 //            PSchur_PCG_CL schurSolver( M.Data, 200, outer_tol, 200, inner_iter_tol);
             PSchur_GSPCG_CL schurSolver( Stokes.prM.Data.GetFinest(), 200, outer_tol, 200, inner_iter_tol);
             time.Start();
-            schurSolver.Solve( A->Data, B->Data, v1->Data, p1->Data, b->Data, c->Data, v1->RowIdx->GetEx(), p1->RowIdx->GetEx());
+            schurSolver.Solve( A->Data, B->Data, C->Data, v1->Data, p1->Data, b->Data, c->Data, v1->RowIdx->GetEx(), p1->RowIdx->GetEx());
             time.Stop();
         }
         else // Uzawa
@@ -508,7 +507,7 @@ void Strategy(StokesP2P1CL<Coeff>& Stokes, double inner_iter_tol, double tol,
             Uzawa_IPCG_CL uzawaSolver( Stokes.prM.Data.GetFinest(), 5000, outer_tol, uzawa_inner_iter, inner_iter_tol, tau);
             uzawaSolver.Init_A_Pc(A->Data.GetFinest()); // only for Uzawa_IPCG_CL.
             time.Start();
-            uzawaSolver.Solve( A->Data, B->Data, v1->Data, p1->Data, b->Data, c->Data, v1->RowIdx->GetEx(), p1->RowIdx->GetEx());
+            uzawaSolver.Solve( A->Data, B->Data, C->Data, v1->Data, p1->Data, b->Data, c->Data, v1->RowIdx->GetEx(), p1->RowIdx->GetEx());
             time.Stop();
             std::cout << "Iterationen: " << uzawaSolver.GetIter()
                       << "\tNorm des Res.: " << uzawaSolver.GetResid() << std::endl;
@@ -574,6 +573,7 @@ void StrategyNavSt(NavierStokesP2P1CL<Coeff>& NS, int maxStep, double fp_tol, in
     MLMatDescCL* A= &NS.A;
     MLMatDescCL* M= &NS.M;
     MLMatDescCL* B= &NS.B;
+    MLMatDescCL* C= &NS.C;
     MLMatDescCL* N= &NS.N;
     int step= 0;
 
@@ -614,6 +614,7 @@ void StrategyNavSt(NavierStokesP2P1CL<Coeff>& NS, int maxStep, double fp_tol, in
         A->SetIdx(vidx1, vidx1);
         M->SetIdx(vidx1, vidx1);
         B->SetIdx(pidx1, vidx1);
+        C->SetIdx(pidx1,pidx1);
         N->SetIdx(vidx1, vidx1);
         time.Reset();
         time.Start();
@@ -667,7 +668,7 @@ void StrategyNavSt(NavierStokesP2P1CL<Coeff>& NS, int maxStep, double fp_tol, in
             if (uzawa_tol < fp_tol) uzawa_tol= fp_tol;
             uzawaSolver.SetTol(uzawa_tol);
             uzawaSolver.Init_A_Pc(AN.GetFinest()); // only for Uzawa_IPCG_CL.
-            uzawaSolver.Solve(AN, B->Data, w, q, d, e, vidx1->GetEx(), pidx1->GetEx());
+            uzawaSolver.Solve(AN, B->Data, C->Data, w, q, d, e, vidx1->GetEx(), pidx1->GetEx());
             std::cout << "iteration stopped after step " << uzawaSolver.GetIter()
                       << " with res = " << uzawaSolver.GetResid() << std::endl;
 

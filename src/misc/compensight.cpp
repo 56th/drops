@@ -37,19 +37,6 @@
 namespace DROPS
 {
 
-/// \brief Lexicographic order
-/** This specialized function uses lexicographical odering for comparing two SVectorCL<3>.*/
-template<>
-  inline bool operator< (const SVectorCL<3>& a, const SVectorCL<3>& b)
-{
-    for (Uint i=0; i<3; ++i)
-        if (a[i] < b[i])
-            return true;
-        else if ( a[i] > b[i])
-            return false;
-    return false;
-}
-
 /// \brief Read a point from an input stream
 template<Uint size>
   inline std::istream& operator>> (std::istream& is, SVectorCL<size>& a)

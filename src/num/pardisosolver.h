@@ -98,8 +98,7 @@ public:
       iparm[19] = 0;        /* Output: Numbers of CG Iterations */
       maxfct = 1;           /* Maximum number of numerical factorizations. */
       mnum = 1;             /* Which factorization to use. */
-      // msglvl = 1;           /* Print statistical information in file */
-      msglvl = getenv("PARDISOMSG") ? 1 : 0;           /* Print statistical information in file */ 
+      msglvl = getenv("PARDISOMSG") ? 1 : 0;           /* Print statistical information in file */
       error = 0;            /* Initialize error flag */
     /* -------------------------------------------------------------------- */
     /* .. Initialize the internal solver memory pointer. This is only */

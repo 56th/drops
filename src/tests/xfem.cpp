@@ -32,15 +32,19 @@
 #include "misc/problem.h"
 #include "levelset/levelset.h"
 #include "levelset/surfacetension.h"
+#include "levelset/mzelle_hdr.h"
 #include "stokes/instatstokes2phase.h"
 #include "out/output.h"
 #include "out/ensightOut.h"
 #include "num/krylovsolver.h"
 #include "num/precond.h"
+#include "misc/dynamicload.h"
 #include <fstream>
 #include <iomanip>
 
 using namespace DROPS;
+
+ParamCL P;
 
 inline int iSign( double x)
 {
@@ -171,6 +175,9 @@ void P1XOnPart (const VecDescCL& p1x, const ExtIdxDescCL& Xidx, VecDescCL& p_par
 int main (int argc, char** argv)
 {
   try {
+    std::vector<std::string> dynlibs { "misc/libmisc-scalarFunctions", "misc/libmisc-vectorFunctions", "levelset/liblevelset-twophaseCoeff"};
+    DROPS::dynamicLoad("../", dynlibs );
+
     int numref=10;
     double xfemstab=0.;
     if (argc==3) {
@@ -198,8 +205,7 @@ int main (int argc, char** argv)
     LsetBndDataCL lsbnd( 6, bc, bfun);
     LevelsetP2CL & lset( * LevelsetP2CL::Create( mg, lsbnd, sf) ) ;
 
-    lset.idx.CreateNumbering( mg.GetLastLevel(), mg);
-    lset.Phi.SetIdx( &lset.idx);
+    lset.CreateNumbering( mg.GetLastLevel());
     lset.Init( &phasebnd);
 
     IdxDescCL idx( P1X_FE, BndCondCL(0), 0, /*omit_bound=*/ xfemstab);

@@ -823,7 +823,7 @@ OsmosisRepairCL::post_refine ()
 void
   OsmosisRepairCL::pre_refine_sequence ()
 {
-    oldp1xrepair_= std::auto_ptr<P1XRepairCL>( new P1XRepairCL( c_.GetMG(), c_.oldconc));
+    oldp1xrepair_= std::unique_ptr<P1XRepairCL>( new P1XRepairCL( c_.GetMG(), c_.oldconc));
 }
 
 void

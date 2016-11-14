@@ -54,7 +54,7 @@
 #  define DROPS_STD_HASH          std::hash
 #  include <unordered_set>
 #  define DROPS_STD_UNORDERED_SET std::unordered_set
-#elif defined(__INTEL_COMPILER) || (__GNUC__>=4)
+#elif defined(__INTEL_COMPILER) || (__GNUC__>=4) || __xlC__
 #  include <tr1/unordered_map>
 #  define DROPS_STD_UNORDERED_MAP std::tr1::unordered_map
 #  define DROPS_STD_HASH          std::tr1::hash
@@ -280,6 +280,10 @@ template <typename T>
   inline const T*
   Addr(const std::valarray<T>& x)
 {
+    if (x.size() ==0) {
+//        AllComment( "Addr(const std::valarray<T>& x): empty array\n", DebugNumericC | DebugParallelNumC);
+        return 0;
+    }
     return &(const_cast<std::valarray<T>&>(x)[0]);
 }
 
@@ -288,6 +292,10 @@ template <typename T>
   inline T*
   Addr(std::valarray<T>& x)
 {
+    if (x.size() ==0) {
+//        AllComment( "Addr(std::valarray<T>& x): empty array\n", DebugNumericC | DebugParallelNumC);
+        return 0;
+    }
     return &(x[0]);
 }
 
@@ -295,6 +303,10 @@ template <typename T>
   inline const T*
   Addr(const std::vector<T>& x)
 {
+    if (x.size() ==0) {
+//        AllComment( "Addr(const std::vector<T>& x): empty array\n", DebugNumericC | DebugParallelNumC);
+        return 0;
+    }
     return &(const_cast<std::vector<T>&>(x)[0]);
 }
 
@@ -303,6 +315,10 @@ template <typename T>
   inline T*
   Addr(std::vector<T>& x)
 {
+    if (x.size() ==0) {
+//        Comment( "Addr(std::vector<T>& x): empty array\n", DebugNumericC | DebugParallelNumC);
+        return 0;
+    }
     return &(x[0]);
 }
 

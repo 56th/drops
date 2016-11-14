@@ -80,21 +80,24 @@ typedef P2EvalCL<SVectorCL<3>, const VelBndDataCL, const VecDescCL> const_DiscVe
 
 void Strategy (MultiGridCL& MG, const LsetBndDataCL& lsbnd)
 {
+    DROPS::InScaMap & inscamap = DROPS::InScaMap::getInstance();
 
     const DROPS::BndCondT v_bc[6]= { DROPS::Dir0BC, DROPS::Dir0BC, DROPS::DirBC, DROPS::DirBC, DROPS::Dir0BC, DROPS::Dir0BC };
     const vel_bnd_val_fun v_bfun[6]= { 0, 0, DROPS::InVecMap::getInstance()["InflowBrickTransp"], DROPS::InVecMap::getInstance()["InflowBrickTransp"], 0, 0};
     const DROPS::BndCondT c_bc[6]= { DROPS::DirBC, DROPS::DirBC, DROPS::DirBC, DROPS::DirBC, DROPS::DirBC, DROPS::DirBC };
     const c_bnd_val_fun c_bfun[6]= { & Initialcpos,  & Initialcpos, & Initialcpos,& Initialcpos, & Initialcpos, & Initialcpos };
 
+    // initialization of surface tension
+    // choose a proper model for surface tension coefficient, see levelset/surfacetension.h
+    SurfaceTensionCL * sf;
+    sf = new SurfaceTensionCL( inscamap[P.get<std::string>("SurfTens.VarTensionFncs")]);
+    sf->SetInputMethod( Sigma_X);
 
-    SurfaceTensionCL sf( sigmaf, 0);
     // LevelsetP2CL lset( MG, lsbnd, sf, P.get<double>("Levelset.SD"), P.get<double>("Levelset.CurvDiff"));
     // Creates new Levelset-Object, has to be cleaned manually
-    LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsbnd, sf, P.get_child("Levelset")) );
+    LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsbnd, *sf, P.get_child("Levelset")) );
 
-    MLIdxDescCL* lidx= &lset.idx;
-    lset.CreateNumbering( MG.GetLastLevel(), lidx);
-    lset.Phi.SetIdx( lidx);
+    lset.CreateNumbering( MG.GetLastLevel());
     lset.Init( EllipsoidCL::DistanceFct);
 
     VelBndDataCL Bnd_v( 6, v_bc, v_bfun);
@@ -143,6 +146,7 @@ void Strategy (MultiGridCL& MG, const LsetBndDataCL& lsbnd)
     }
     std::cout << std::endl;
     delete &lset;
+    if(sf) delete sf;
 }
 
 } // end of namespace DROPS
@@ -151,7 +155,7 @@ void Strategy (MultiGridCL& MG, const LsetBndDataCL& lsbnd)
 int main (int argc, char** argv)
 {
   try {
-    DROPS::read_parameter_file_from_cmdline( P, argc, argv);
+    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/levelset/brick_transp/brick_transp.json");
     std::cout << P << std::endl;
 
     DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );

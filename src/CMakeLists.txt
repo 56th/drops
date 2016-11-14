@@ -32,7 +32,7 @@ if(MPI)
 
     include_directories(${MPI_INCLUDE_PATH} ${PARMETIS_INCLUDE} ${METIS_INCLUDE})
 
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MPI_CXX_FLAGS} -DMPICH_IGNORE_CXX_SEEK")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MPI_CXX_FLAGS} -DMPICH_IGNORE_CXX_SEEK -DOMPI_SKIP_MPICXX")
     set(PARMETIS_LIBRARIES ${MPI_CXX_LIBRARIES} ${METIS_LIBRARY} ${PARMETIS_LIBRARY} m)
     add_definitions("-D_PAR=1")
 else(MPI)
@@ -49,7 +49,7 @@ else(WIN32)
 
   if (MKL_HOME STREQUAL "")
   else (MKL_HOME STREQUAL "")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DMKL_ILP64 -m64 -I${MKL_HOME}/include -Wno-long-long")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDROPS_PARDISO -DMKL_ILP64 -m64 -I${MKL_HOME}/include -Wno-long-long")
   endif (MKL_HOME STREQUAL "")
 
 endif(WIN32)
@@ -195,7 +195,7 @@ function(add_my_custom_targets f)
   add_custom_target(${f}-coeffs DEPENDS misc-scalarFunctions misc-vectorFunctions levelset-twophaseCoeff levelset-filmCoeff poisson-poissonCoeff stokes-stokesCoeff)
 endfunction(add_my_custom_targets f)
 
-set(PACKAGES parallel levelset poisson DiST geom num out misc osmosis stokes navstokes surfactant transport partests tests)
+set(PACKAGES parallel levelset poisson DiST geom num out misc osmosis stokes navstokes surfactant spacetimetransp transport partests tests)
 string(REPLACE ";" " " PACKAGES_STRING "${PACKAGES}")
 
 option(TESTS "compile tests" OFF)

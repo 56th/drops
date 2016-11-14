@@ -348,10 +348,10 @@ template <typename T>
 }
 
 inline void ProcCL::WaitAll(std::valarray<ProcCL::RequestT>& reqs)
-  { WaitAll((int)reqs.size(), Addr(reqs)); }
+  { if (reqs.size() != 0) WaitAll((int)reqs.size(), Addr(reqs)); }
 
 inline void ProcCL::WaitAll(std::vector<ProcCL::RequestT>& reqs)
-  { WaitAll((int)reqs.size(), Addr(reqs)); }
+  { if (!reqs.empty()) WaitAll((int)reqs.size(), Addr(reqs)); }
 
 template <typename T>
   inline void ProcCL::Recv(T* data, int count, int source, int tag)

@@ -1,0 +1,91 @@
+{
+    "Transp":
+    {
+        "DoTransp": "0",
+        "Levelset": "Ellipsoid",
+        "Flow": "ZeroVel",
+        "RhsNeg": "Zero",
+        "RhsPos": "Zero",
+        "InitialConcNeg": "IniCnegFct",
+        "InitialConcPos": "IniCposFct",
+        "BoundaryType": "21!21!21!21!21!21",
+        "BoundaryFncs": "Zero!Zero!Zero!Zero!Zero!Zero",
+        "BoundaryFncst": "Zero!Zero!Zero!Zero!Zero!Zero",
+        "KappaRule": "0",
+        "Debug": "0",
+        "Mass": "0",
+        "NoConvection": "0",
+        "MaxVelocity": "1",
+        "AntiSymmetricConvection": "0",
+        "RhsApproximationOrderInTime": "2",
+        "ConvectionApproximationOrderInTime": "1"
+    },
+    "TestCase5":
+    {
+        "DeformationCase": "0"
+    },
+    "SurfTransp":
+    {
+        "DoTransp": "0"
+    },
+    "VTK":
+    {
+        "ReUseTimeFile": "0",
+        "UseOnlyP1": "0",
+        "VTKOut": "0",
+        "VTKName": "ns_transp"
+    },
+    "Ensight":
+    {
+        "EnsightOut": "0"
+    },
+    "Levelset":
+    {
+        "Discontinuous": "0",
+        "SD": "1",
+        "CurvDiff": "0",
+        "Downwind":
+        {
+            "Frequency": "0",
+            "MaxRelComponentSize": "0.05",
+            "WeakEdgeRatio": "0.2",
+            "CrosswindLimit": "0.8660254037844387"
+        }
+    },
+    "NavStokes":
+    {
+        "Nonlinear": "0",
+        "Downwind":
+        {
+            "Frequency": "0",
+            "MaxRelComponentSize": "0.05",
+            "WeakEdgeRatio": "0.2",
+            "CrosswindLimit": "0.8660254037844387"
+        }
+    },
+    "Restart":
+    {
+        "Inputfile": "none"
+    },
+    "Exp":
+    {
+        "VolForce": "ZeroVel"
+    },
+    "Mat":
+    {
+        "DensDrop": "0",
+        "ShearVisco": "0",
+        "DilatationalVisco": "0"
+    },
+    "SurfTens":
+    {
+        "ShearVisco": "0",
+        "DilatationalVisco": "0"
+    },
+    "General":
+    {
+        "ProgressBar": "0",
+        "DynamicLibsPrefix": "..\/"
+    }
+}
+

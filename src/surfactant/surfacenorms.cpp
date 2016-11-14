@@ -176,7 +176,7 @@ void Strategy (DROPS::AdapTriangCL& adap, DROPS::LevelsetP2CL& lset)
 
     typedef DistMarkingStrategyCL MarkerT;
     MarkerT marker( lset, P.get<double>("AdaptRef.Width"),
-                          0, 
+                          0,
                           P.get<int>( "AdaptRef.FinestLevel" ) );
     adap.set_marking_strategy( &marker );
 
@@ -252,7 +252,7 @@ int main (int argc, char** argv)
 {
   try
   {
-    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "surfactant.json");
+    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/surfactant/surfactant/surfactant.json");
     std::cout << P << std::endl;
 
     DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
@@ -284,8 +284,7 @@ int main (int argc, char** argv)
     DROPS::SurfaceTensionCL sf( sigma, 0);
     DROPS::LevelsetP2CL & lset( * DROPS::LevelsetP2CL::Create( mg, lsbnd, sf) );
 
-    lset.idx.CreateNumbering( mg.GetLastLevel(), mg);
-    lset.Phi.SetIdx( &lset.idx);
+    lset.CreateNumbering( mg.GetLastLevel());
     Strategy( adap, lset);
     delete &lset;
   }

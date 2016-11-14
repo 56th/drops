@@ -106,17 +106,8 @@ class TransportP1XCL
     typedef P1EvalCL<double, const BndDataT, const VecDescCL> const_DiscSolCL;
     typedef P2EvalCL<SVectorCL<3>, const VelBndDataT, const VecDescCL> const_DiscVelSolCL;
 
-    double oldt_, t_;
-    MLIdxDescCL idx, oldidx;
-    VecDescCL c,           ///< concentration
-              ct, oldct;   ///< transformed concentration
-    MLMatDescCL A,         ///< diffusion matrix
-                M,         ///< mass matrix
-                C,        ///< convection matrix
-                NA;       ///< Nitsche term
-    VecDescCL cplA, cplM, cplC, b;
-
   private:
+    ParamCL& P_;
     MLMatrixCL     L_;              ///< sum of matrices
     MultiGridCL&   MG_;
     BndDataT&      Bnd_, Bndt_;     ///< Boundary condition for the concentration
@@ -144,6 +135,16 @@ class TransportP1XCL
     void SetupMixedNitscheSystem( MatrixCL&, IdxDescCL&, IdxDescCL&, const double) const;
 
   public:
+    double oldt_, t_;
+    MLIdxDescCL idx, oldidx;
+    VecDescCL c,           ///< concentration
+              ct, oldct;   ///< transformed concentration
+    MLMatDescCL A,         ///< diffusion matrix
+                M,         ///< mass matrix
+                C,        ///< convection matrix
+                NA;       ///< Nitsche term
+    VecDescCL cplA, cplM, cplC, b;
+
 /*    TransportP1XCL( MultiGridCL& mg, BndDataT& Bnd, BndDataT& Bndt, const VelBndDataT& Bnd_v, LsetBndDataCL& Bnd_ls,
         double theta, double D[2], double H, VecDescCL* v, VecDescCL* oldv, VecDescCL& lset, VecDescCL& oldlset,
         double dt, instat_scalar_fun_ptr rhs=0, int iter= 1000, double tol= 1e-7,
@@ -164,14 +165,15 @@ class TransportP1XCL
     TransportP1XCL( MultiGridCL& mg, BndDataT& Bnd, BndDataT& Bndt, VelocityContainer& v, LsetBndDataCL& Bnd_ls,
         VecDescCL& lset, VecDescCL& oldlset,
         DROPS::ParamCL& P, double initialtime=0, instat_scalar_fun_ptr reac=0, instat_scalar_fun_ptr rhs=0)
-        : oldt_(initialtime), t_( initialtime),
-        idx( P1X_FE, 1, Bndt, mg.GetBnd().GetMatchFun(), P.get<double>("Transp.NitscheXFEMStab")), oldidx( P1X_FE, 1, Bndt, mg.GetBnd().GetMatchFun(), P.get<double>("Transp.NitscheXFEMStab")),
-        MG_( mg), Bnd_( Bnd), Bndt_( Bndt), v_ (v), Bnd_ls_(Bnd_ls),
+        : P_(P), MG_( mg), Bnd_( Bnd), Bndt_( Bndt), v_ (v), Bnd_ls_(Bnd_ls),
         theta_( P.get<double>("Transp.Theta")), dt_( P.get<double>("Time.StepSize")),
         lambda_(P.get<double>("Transp.NitschePenalty")), H_( P.get<double>("Transp.HNeg")/P.get<double>("Transp.HPos")),
         lset_( lset), oldlset_(oldlset),
         gm_( pc_, 20, P.get<int>("Transp.Iter"), P.get<double>("Transp.Tol"), false, false, RightPreconditioning),
-        f_(rhs), c_(reac), omit_bound_( P.get<double>("Transp.NitscheXFEMStab")), sdstab_(P.get<double>("Transp.SDStabilization"))
+        f_(rhs), c_(reac), omit_bound_( P.get<double>("Transp.NitscheXFEMStab")), sdstab_(P.get<double>("Transp.SDStabilization")),
+        oldt_(initialtime), t_( initialtime),
+        idx( P1X_FE, 1, Bndt, mg.GetBnd().GetMatchFun(), P.get<double>("Transp.NitscheXFEMStab")),
+        oldidx( P1X_FE, mg.GetLastLevel(), Bndt, mg.GetBnd().GetMatchFun(), P.get<double>("Transp.NitscheXFEMStab"))
     {
         double D[2] = {P.get<double>("Transp.DiffPos"), P.get<double>("Transp.DiffNeg")};
         std::memcpy( D_, D, 2*sizeof( double));
@@ -252,7 +254,8 @@ class TransportP1XCL
         return H_;
     }
     double GetXFEMOmitBound(){ return omit_bound_; }
-    double CheckSolution(instat_scalar_fun_ptr Lsgn, instat_scalar_fun_ptr Lsgp, double time);
+    double CheckSolution(instat_scalar_fun_ptr Lsgn, instat_scalar_fun_ptr Lsgp,
+            instat_vector_fun_ptr Gradn, instat_vector_fun_ptr Gradp, double time);
 };
 
 /// \brief Observes the MultiGridCL-changes by AdapTriangCL to repair the function c.ct.
@@ -263,9 +266,9 @@ class TransportXRepairCL : public MGObserverCL
 {
   private:
     TransportP1XCL& c_;
-    std::auto_ptr<P1XRepairCL> oldp1xrepair_;
-    std::auto_ptr<RepairP1CL<double>::type> p1oldctrepair_;
-    std::auto_ptr<RepairP1CL<double>::type> p1ctrepair_;
+    std::unique_ptr<P1XRepairCL> oldp1xrepair_;
+    std::unique_ptr<RepairP1CL<double>::type> p1oldctrepair_;
+    std::unique_ptr<RepairP1CL<double>::type> p1ctrepair_;
     Uint mylvl;
   public:
     TransportXRepairCL (TransportP1XCL& c, Uint amylvl)
@@ -292,7 +295,7 @@ class VelTranspRepairCL : public MGObserverCL
     const VelBndDataT& Bnd_v_;
     IdxDescCL& vidx_;
     double time_;
-    std::auto_ptr<RepairP2CL<Point3DCL>::type> p2repair_;
+    std::unique_ptr<RepairP2CL<Point3DCL>::type> p2repair_;
 
   public:
     VelTranspRepairCL (VecDescCL& v, MultiGridCL& mg, const VelBndDataT& Bnd_v, IdxDescCL& vidx, double t )

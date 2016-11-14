@@ -257,10 +257,8 @@ void CheckMigration( LoadBalCL& lb)
     BuildBoundaryData( &mg, lsetbnddata, perbndtypestr, zerobndfun, periodic_match);
     SurfaceTensionCL sft( DROPS::sigmaf);
     LevelsetP2CL & lset( * LevelsetP2CL::Create( mg, *lsetbnddata, sft) );
+    lset.CreateNumbering( mg.GetLastLevel());
 
-    MLIdxDescCL* lidx= &lset.idx;
-    lset.CreateNumbering( mg.GetLastLevel(), lidx);
-    lset.Phi.SetIdx( lidx);
 
     // Create all the stuff which is necessary to make a Stokes class
     typedef BndDataCL<DROPS::Point3DCL> VelBndDataCL;

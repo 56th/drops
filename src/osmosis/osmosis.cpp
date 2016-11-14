@@ -97,19 +97,19 @@ void  OnlyOsmosisStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTria
         DROPS::OutflowBC, DROPS::OutflowBC, DROPS::OutflowBC,
         DROPS::OutflowBC, DROPS::OutflowBC, DROPS::OutflowBC
     };
-    
+
     const DROPS::BndCondT v_bc[6]= {
         DROPS::DirBC, DROPS::DirBC, DROPS::DirBC,
         DROPS::DirBC, DROPS::DirBC, DROPS::DirBC
     };
-    
+
     cBndDataCL Bnd_c( 6, c_bc, c_bfun);
     cBndDataCL Bnd_ct( 6, c_bc, c_bfunt);
     bool vdirvals = P.get("ZeroVelAtBnd.Active", 0);
     BndDataCL<Point3DCL> VelBnd(6, vdirvals? v_bc : c_bc , v_bfun); // dir. boundary conditions for extendedvel.?
     DROPS::instat_scalar_fun_ptr sigmap = 0;
     SurfaceTensionCL sf( sigmap, Bnd_c);
-    
+
     LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsetbnddata, sf, P.get_child("Levelset")) );
     // levelset wrt the previous time step:
     LevelsetP2CL & oldlset( * LevelsetP2CL::Create( MG, lsetbnddata, sf, P.get_child("Levelset")) );
@@ -119,21 +119,16 @@ void  OnlyOsmosisStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTria
     adap.push_back( &lsetrepair);
     LevelsetRepairCL oldlsetrepair( oldlset);
     adap.push_back( &oldlsetrepair);
-    MLIdxDescCL* lidx= &lset.idx;
-    // index wrt the interface at previous time step
-    MLIdxDescCL* oldlidx= &oldlset.idx; 
-    lset.CreateNumbering( MG.GetLastLevel(), lidx);
-    lset.Phi.SetIdx( lidx);
-    oldlset.CreateNumbering( MG.GetLastLevel(), oldlidx);
-    oldlset.Phi.SetIdx( oldlidx);
+    lset.CreateNumbering( MG.GetLastLevel());
+    oldlset.CreateNumbering( MG.GetLastLevel()); // interface at previous time step
     SetInitialLevelsetConditions( lset, MG, P);
     SetInitialLevelsetConditions( oldlset, MG, P);
     lset.Init( distance );
     oldlset.Init( distance);
     DisplayDetailedGeom( MG);
-    
+
 	VelocityContainer vel(Flowfield);
-    
+
     OsmosisP1CL osmosis( MG, Bnd_c, VelBnd, /*TODO: remove*/  vel, lsetbnddata, lset, oldlset, P, 0, Reaction, Rhs);
     OsmosisRepairCL transprepair(osmosis, MG.GetLastLevel());
 
@@ -144,7 +139,7 @@ void  OnlyOsmosisStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTria
     IdxDescCL* oldvelidx= &osmosis.oldVelidx;
 
     // index of the concentration wrt the interface at previous time step:
-    MLIdxDescCL* cidx_old= &osmosis.oldidx; 
+    MLIdxDescCL* cidx_old= &osmosis.oldidx;
 
     {
         adap.push_back(&transprepair);
@@ -167,7 +162,7 @@ void  OnlyOsmosisStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTria
           ReadFEFromFile( osmosis.conc, MG, P.get<std::string>("DomainCond.InitialFile")+"concentrationTransf");
 
 	}
-    
+
     //LevelsetModifyCL lsetmod( P.get<int>("Reparam.Freq"), P.get<int>("Reparam.Method"), P.get<double>("Reparam.MaxGrad"), P.get<double>("Reparam.MinGrad"), P.get<int>("Levelset.VolCorrection"), Vol);
 
     // GNUPLOT
@@ -176,8 +171,8 @@ void  OnlyOsmosisStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTria
 		gnu.Write(0.0);
 
     // writer for vtk-format
-    VTKOutCL vtkwriter(adap.GetMG(), "DROPS data", 
-                       (P.get("VTK.VTKOut", 0) ? 
+    VTKOutCL vtkwriter(adap.GetMG(), "DROPS data",
+                       (P.get("VTK.VTKOut", 0) ?
                         P.get<int>("Time.NumSteps")/P.get("VTK.VTKOut", 0)+1 : 0),
                        P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName"),
                        P.get<std::string>("VTK.TimeFileName"),
@@ -190,7 +185,7 @@ void  OnlyOsmosisStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTria
 
     vtkwriter.Register( make_VTKScalar( osmosis.GetSolution( osmosis.conc), "Concentration") );
     vtkwriter.Register( make_VTKVector( osmosis.GetVelP1Solution( osmosis.Vn_), "V") );
-    
+
 
     if (P.get("VTK.VTKOut", 0))
         vtkwriter.Write(0);
@@ -244,22 +239,6 @@ void  OnlyOsmosisStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTria
 
 } // end of namespace DROPS
 
-/// \brief Set Default parameters here s.t. they are initialized.
-/// The result can be checked when Param-list is written to the output.
-void SetMissingParameters(DROPS::ParamCL& P){
-    P.put_if_unset<std::string>("Restart.Inputfile","none");
-    P.put_if_unset<double>("Exp.RadInlet",1.0);   //dummy
-    P.put_if_unset<double>("Levelset.CurvDiff",-1.0); //dummy
-    P.put_if_unset<double>("Levelset.SD",1.0); //dummy
-    P.put_if_unset<double>("Transp.UseNSSol",0);
-    P.put_if_unset<DROPS::Point3DCL>("Exp.RadDrop", DROPS::MakePoint3D(1.0,1.0,1.0));
-    P.put_if_unset<DROPS::Point3DCL>("Exp.PosDrop", DROPS::MakePoint3D(1.0,1.0,1.0));
-    //VTK
-    P.put_if_unset<std::string>("VTK.TimeFileName",P.get<std::string>("VTK.VTKName"));
-    P.put_if_unset<int>("VTK.ReUseTimeFile",0);
-    P.put_if_unset<int>("VTK.UseOnlyP1",0);
-
-}
 
 int main (int argc, char** argv)
 {
@@ -271,11 +250,12 @@ int main (int argc, char** argv)
 #ifdef _PAR
     DROPS::ParMultiGridInitCL pmginit;
 #endif
-    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "osmosis.json");
-    SetMissingParameters(P);
+
+    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/osmosis/osmosis/osmosis.json");
+    P.put_if_unset<std::string>("VTK.TimeFileName",P.get<std::string>("VTK.VTKName"));
     std::cout << P << std::endl;
 
-    DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), 
+    DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"),
                        P.get<std::vector<std::string> >("General.DynamicLibs") );
 
     if (P.get<int>("General.ProgressBar"))
@@ -311,12 +291,12 @@ int main (int argc, char** argv)
 	typedef DROPS::DistMarkingStrategyCL InitMarkerT;
 	InitMarkerT initmarker( distance, P.get<double>("AdaptRef.Width"),
                                           P.get<int>( "AdaptRef.CoarsestLevel" ),
-                                          P.get<int>( "AdaptRef.FinestLevel" ) ); 
+                                          P.get<int>( "AdaptRef.FinestLevel" ) );
         adap.set_marking_strategy( &initmarker );
         adap.MakeInitialTriang();
         adap.set_marking_strategy(0);
     }
-    
+
     std::cout << DROPS::SanityMGOutCL(*mg) << std::endl;
 #ifdef _PAR
     adap.GetLb().GetLB().SetWeightFnct(3);

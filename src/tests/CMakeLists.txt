@@ -51,9 +51,12 @@ exec_ser(quadCut misc-utils geom-builder geom-deformation geom-simplex geom-mult
 
 exec_ser(bicgstab misc-utils)
 
-exec_ser(pardiso misc-utils)
+if (MKL_HOME STREQUAL "")
+else (MKL_HOME STREQUAL "")
+  exec_ser(pardiso misc-utils)
+  target_link_libraries_ser(pardiso -fopenmp -Wl,--start-group ${MKL_HOME}/lib/intel64/libmkl_intel_ilp64.a ${MKL_HOME}/lib/intel64/libmkl_gnu_thread.a ${MKL_HOME}/lib/intel64/libmkl_core.a -Wl,--end-group -ldl -lpthread -lm) 
+endif (MKL_HOME STREQUAL "")
 
-target_link_libraries_ser(pardiso -fopenmp -Wl,--start-group ${MKL_HOME}/lib/intel64/libmkl_intel_ilp64.a ${MKL_HOME}/lib/intel64/libmkl_gnu_thread.a ${MKL_HOME}/lib/intel64/libmkl_core.a -Wl,--end-group -ldl -lpthread -lm) 
 
 exec_ser(gcr misc-utils)
 
@@ -69,12 +72,13 @@ exec_ser(quad5_2D misc-utils geom-builder geom-simplex geom-multigrid geom-bound
 
 exec_ser(interfaceP1FE misc-utils geom-builder geom-simplex geom-multigrid geom-deformation misc-scopetimer misc-progressaccu geom-boundary geom-topo num-unknowns misc-problem num-interfacePatch levelset-levelset levelset-fastmarch num-discretize num-fe levelset-surfacetension geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature)
 
-set(xfem-staticlibs ${BEGIN_STATIC_LIBS} misc-vectorFunctions ${END_STATIC_LIBS})
-exec_ser(xfem misc-utils geom-builder geom-simplex geom-multigrid geom-deformation misc-scopetimer misc-progressaccu geom-boundary geom-topo num-unknowns misc-problem num-interfacePatch num-fe num-discretize levelset-levelset levelset-fastmarch stokes-instatstokes2phase out-ensightOut levelset-surfacetension misc-funcmap misc-vectorFunctions geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature stokes-stokes)
+#set(xfem-staticlibs ${BEGIN_STATIC_LIBS} misc-vectorFunctions ${END_STATIC_LIBS})
+exec_ser(xfem misc-utils geom-builder geom-simplex geom-multigrid geom-deformation misc-scopetimer misc-progressaccu geom-boundary geom-topo num-unknowns misc-problem num-interfacePatch num-fe num-discretize levelset-levelset levelset-fastmarch stokes-instatstokes2phase out-output out-ensightOut levelset-surfacetension misc-funcmap misc-vectorFunctions geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature misc-dynamicload)
 
 exec_ser(f_Gamma geom-boundary geom-builder geom-simplex geom-multigrid geom-deformation misc-scopetimer misc-progressaccu num-unknowns geom-topo num-fe misc-problem levelset-levelset misc-utils out-output num-discretize num-interfacePatch misc-params levelset-fastmarch stokes-instatstokes2phase levelset-surfacetension misc-funcmap misc-vectorFunctions geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature misc-dynamicload stokes-stokes)
 if(NOT MPI)
     add_dependencies(f_Gamma levelset-twophaseCoeff misc-scalarFunctions misc-vectorFunctions misc-csgFunctions)
+    add_dependencies(xfem levelset-twophaseCoeff misc-scalarFunctions misc-vectorFunctions)
 endif(NOT MPI)
 
 exec_ser(neq misc-utils)
