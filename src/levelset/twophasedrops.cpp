@@ -87,7 +87,7 @@ double GetTimeOffset(){
 }
 
 //To do: move to some other file and develop a more general methods!
-double compute_averageAngle(const DROPS::MultiGridCL& mg,LevelsetP2CL& lset,instat_vector_fun_ptr Outnormal_fun)
+/*double compute_averageAngle(const DROPS::MultiGridCL& mg,LevelsetP2CL& lset,instat_vector_fun_ptr Outnormal_fun)
 {
     InterfaceTriangleCL triangle;
     const DROPS::Uint lvl = mg.GetLastLevel();
@@ -141,7 +141,7 @@ double compute_averageAngle(const DROPS::MultiGridCL& mg,LevelsetP2CL& lset,inst
         }
     }
     return angle/circ;
-}
+}*/
 
 void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddata, AdapTriangCL& adap)
 // flow control
@@ -523,9 +523,9 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     const double dt = P.get<double>("Time.StepSize");
     double time = 0.0;
 
-    //if(P.get<int>("Exp.OutputInfo")==1)
-    std::ofstream out((P.get<std::string>("VTK.VTKName","contactangle")+".txt").c_str());
-    out<<"time: "<<" angle: "<<" wet_area: "<<"surface_energy:  "<<"kinetic_energy:  "<<"total energy:  "<<std::endl;
+    // if(P.get<int>("Exp.OutputInfo")==1)
+    // std::ofstream out((P.get<std::string>("VTK.VTKName","contactangle")+".txt").c_str());
+    // <<"time: "<<" angle: "<<" wet_area: "<<"surface_energy:  "<<"kinetic_energy:  "<<"total energy:  "<<std::endl;
     typedef DistMarkingStrategyCL MarkerT;
     MarkerT marker( lset,
                     P.get<double>("AdaptRef.Width"),
@@ -548,12 +548,12 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
             sigma_vtk->SetIdx( &p1idx);
             sigma_vtk->Data = 0.;
         }
-        if(P.get<int>("Exp.OutputInfo")==1)
+/*        if(P.get<int>("Exp.OutputInfo")==1)
         {
             double e1 = lset.GetSurfaceEnergy();
             double e2 = Stokes.GetKineticEnergy(lset);
             out<<time_old<<"  "<<compute_averageAngle(MG, lset, the_Bnd_outnormal)<<"  "<<lset.GetWetArea()<<"  "<<e1<<"  "<<e2<<"   "<<e1+e2<<std::endl;
-        }
+        }*/
         if (P.get("SurfTransp.DoTransp", 0)) surfTransp.InitOld();
         timedisc->DoStep( P.get<int>("Coupling.Iter"));
         if (massTransp) massTransp->DoStep( time_new);
@@ -617,12 +617,13 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     }
     IFInfo.Update( lset, Stokes.GetVelSolution());
     IFInfo.Write(Stokes.v.t);
-    if(P.get<int>("Exp.OutputInfo")==1)
+/*    if(P.get<int>("Exp.OutputInfo")==1)
     {
+        //How to deal with the surface energy and kinetic energy? Remove them
         double e1 = lset.GetSurfaceEnergy();
         double e2 = Stokes.GetKineticEnergy(lset);
         out<<Stokes.v.t<<"  "<<compute_averageAngle(MG, lset, the_Bnd_outnormal)<<"  "<<lset.GetWetArea()<<"  "<<e1<<"  "<<e2<<"   "<<e1+e2<<std::endl;
-    }
+    }*/
     std::cout << std::endl;
     if(sf) delete sf;
     delete timedisc;
@@ -644,6 +645,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 }
 } // end of namespace DROPS
 
+/*//I need to consider if to include these parameters to the default parameter files
 void SetMissingParameters(DROPS::ParamCL& P){
     //contactangle problem--------------------------------------------
     P.put_if_unset<double>("SpeBnd.alpha", 0.0);
@@ -663,7 +665,7 @@ void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<double>("Exp.SimuType", 0.0);
     P.put_if_unset<double>("Stokes.epsP", 0.0);
     P.put_if_unset<double>("Stokes.DirectSolve", 0);
-}
+}*/
 
 int main (int argc, char** argv)
 {
