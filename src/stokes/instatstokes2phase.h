@@ -100,7 +100,7 @@ class TwoPhaseFlowCoeffCL
     DROPS::instat_vector_fun_ptr RefVel;
     DROPS::instat_vector_fun_ptr RefGradPr;
     DROPS::instat_scalar_fun_ptr RefPr;
-    DROPS::instat_vector_fun_ptr Bndoutnormal;
+    DROPS::instat_vector_fun_ptr BndOutNormal;
     const SmoothedJumpCL rho, mu;
     const SmoothedJumpCL beta;    //slip length
     const double SurfTens, DilVisco, ShearVisco;
@@ -151,9 +151,9 @@ TwoPhaseFlowCoeffCL( ParamCL& P, bool dimless = false)
         else
             RefPr = NULL;
       if( P.get<std::string>("SpeBnd.BndOutNormal").compare("None")!=0)
-            Bndoutnormal = InVecMap::getInstance()[P.get<std::string>("SpeBnd.BndOutNormal")];
+            BndOutNormal = InVecMap::getInstance()[P.get<std::string>("SpeBnd.BndOutNormal")];
         else
-            Bndoutnormal = NULL;
+            BndOutNormal = NULL;
 }
 
 TwoPhaseFlowCoeffCL( double rho1, double rho2, double mu1, double mu2, double surftension, Point3DCL gravity, Point3DCL framevelocity = Point3DCL(0.0), bool dimless = false, double dilatationalvisco = 0.0, double shearvisco = 0.0, double betaL_=0, double alpha_ = 1.0, double beta1 = 0.0, double beta2 =0.0
@@ -177,7 +177,7 @@ TwoPhaseFlowCoeffCL( double rho1, double rho2, double mu1, double mu2, double su
         var_tau_fncs = InScaMap::getInstance()["ConstTau"];
         RefGradPr  = InVecMap::getInstance()["ZeroVel"];
         RefPr      = InScaMap::getInstance()["Zero"];
-        Bndoutnormal = InVecMap::getInstance()["ZeroVel"];
+        BndOutNormal = InVecMap::getInstance()["ZeroVel"];
     }
 };
 

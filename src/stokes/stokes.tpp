@@ -560,8 +560,8 @@ void System2Accumulator_P2P1CL<CoeffT>::local_setup (const TetraCL& tet)
 //        }
 
     if(speBnd)
-        speBndHandle.setupB(tet, locB, coeff.Bndoutnormal);
-       //speBndHandle.setupB(tet, locB);
+        //speBndHandle.setupB(tet, locB, coeff.BndOutNormal);
+       speBndHandle.setupB(tet, locB);
 }
 
 template< class CoeffT>

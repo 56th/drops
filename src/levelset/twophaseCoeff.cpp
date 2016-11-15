@@ -387,7 +387,6 @@ namespace slipBnd{
         ret[0] = 0.0125 - 5.*(p[2]-half_z)*(p[2]-half_z);
         return ret;
     }
-	
     DROPS::SVectorCL<3> InflowSine (const DROPS::Point3DCL& p, double)
     {
         DROPS::SVectorCL<3> ret(0.);
@@ -408,8 +407,8 @@ namespace slipBnd{
         ret[0] = sin( p[2]/half_z * M_PI_2);
         return ret;
     }
-	
-	DROPS::SVectorCL<3> SineF (const DROPS::Point3DCL& p, double)
+
+    DROPS::SVectorCL<3> SineF (const DROPS::Point3DCL& p, double)
     {
         DROPS::SVectorCL<3> ret(0.);
         static bool first = true;
@@ -429,227 +428,227 @@ namespace slipBnd{
         ret[0] = (1.0/half_z * M_PI_2)* (1.0/half_z * M_PI_2) * sin( p[2]/half_z * M_PI_2);
         return ret;
     }
-	
+
     DROPS::SVectorCL<3> WallVel( const DROPS::Point3DCL& p, double t)
     {
         DROPS::SVectorCL<3> V_w(0.);
         static bool first = true;
-		static double nu, l_s;
-		if(first){
-			nu=P.get<double>("Mat.ViscFluid")/P.get<double>("Mat.DensFluid");
-			l_s=1./(P.get<double>("SpeBnd.beta2"));
-			first = false;
-		}
-		double		    F=std::sin(2*nu*t);
-		V_w[0] = std::sin(p[0]/l_s) * F * ( std::cos(M_PI_2/l_s) - std::sin(M_PI_2/l_s) );
+        static double nu, l_s;
+        if(first){
+            nu=P.get<double>("Mat.ViscFluid")/P.get<double>("Mat.DensFluid");
+            l_s=1./(P.get<double>("SpeBnd.beta2"));
+            first = false;
+        }
+        double		    F=std::sin(2*nu*t);
+        V_w[0] = std::sin(p[0]/l_s) * F * ( std::cos(M_PI_2/l_s) - std::sin(M_PI_2/l_s) );
         return V_w;
     }
     DROPS::SVectorCL<3> TopVel( const DROPS::Point3DCL&, double)
     {
         DROPS::SVectorCL<3> ret(0.);
-		ret[0] = 0.4;
-		//ret[0] = 2.4 * p[0] * (1.0-p[0]);
+        ret[0] = 0.4;
+        //ret[0] = 2.4 * p[0] * (1.0-p[0]);
         return ret;
     }
     //========================================================================
     //            Registration of functions in the func-container
     //========================================================================
     static DROPS::RegisterVectorFunction regvelwall("WallVel", WallVel);
-	static DROPS::RegisterVectorFunction regveltop("TopVel", TopVel);
+    static DROPS::RegisterVectorFunction regveltop("TopVel", TopVel);
     static DROPS::RegisterVectorFunction regvelpoiseuille("InflowPoiseuille", InflowPoiseuille);
     static DROPS::RegisterVectorFunction regvelsine("InflowSine", InflowSine);
-	static DROPS::RegisterVectorFunction regvelsineF("SineF", SineF);
+    static DROPS::RegisterVectorFunction regvelsineF("SineF", SineF);
 }
 namespace InstatSlip{
 
-	DROPS::SVectorCL<3> Velocity( const DROPS::Point3DCL& p,double t)
-	{
-		DROPS::SVectorCL<3> v(0.);
+    DROPS::SVectorCL<3> Velocity( const DROPS::Point3DCL& p,double t)
+    {
+        DROPS::SVectorCL<3> v(0.);
         static bool first = true;
-		static double nu, l_s;
-		if(first){
-			nu=P.get<double>("Mat.ViscFluid")/P.get<double>("Mat.DensFluid");
-			l_s=1./(P.get<double>("SpeBnd.beta2"));
-			first = false;
-		}
-		double		        F=std::sin(2*nu*t);
+        static double nu, l_s;
+        if(first){
+            nu=P.get<double>("Mat.ViscFluid")/P.get<double>("Mat.DensFluid");
+            l_s=1./(P.get<double>("SpeBnd.beta2"));
+            first = false;
+        }
+        double        F=std::sin(2*nu*t);
 
-		v[0]=  std::sin(p[0]/l_s)*std::cos(p[1]/l_s)*F;
-		v[1]= -std::cos(p[0]/l_s)*std::sin(p[1]/l_s)*F;
-		v[2]= 0;
+        v[0]=  std::sin(p[0]/l_s)*std::cos(p[1]/l_s)*F;
+        v[1]= -std::cos(p[0]/l_s)*std::sin(p[1]/l_s)*F;
+        v[2]= 0;
 
-		return v;
-	}
+        return v;
+    }
 
-	DROPS::SVectorCL<3> PressureGr(const DROPS::Point3DCL& p, double t)
-	{
-		DROPS::SVectorCL<3> delp(0.);
+    DROPS::SVectorCL<3> PressureGr(const DROPS::Point3DCL& p, double t)
+    {
+        DROPS::SVectorCL<3> delp(0.);
         static bool first = true;
-		static double nu, l_s;
-		if(first){
-			nu=P.get<double>("Mat.ViscFluid")/P.get<double>("Mat.DensFluid");
-			l_s=1./(P.get<double>("SpeBnd.beta2"));
-			first = false;
-		}
-		double F=std::sin(2*nu*t);
-		delp[0]=-1./(2.*l_s)*std::sin(2*p[0]/l_s)*F*F;
-		delp[1]=-1./(2.*l_s)*std::sin(2*p[1]/l_s)*F*F;
-		delp[2]= 0;
+        static double nu, l_s;
+        if(first){
+            nu=P.get<double>("Mat.ViscFluid")/P.get<double>("Mat.DensFluid");
+            l_s=1./(P.get<double>("SpeBnd.beta2"));
+            first = false;
+        }
+        double F=std::sin(2*nu*t);
+        delp[0]=-1./(2.*l_s)*std::sin(2*p[0]/l_s)*F*F;
+        delp[1]=-1./(2.*l_s)*std::sin(2*p[1]/l_s)*F*F;
+        delp[2]= 0;
 
-		return delp;
+        return delp;
 
-	}
-	
-	double Pressure (const DROPS::Point3DCL& p, double t)
-	{
-		double norm2=0.;
-		double ret=0;		
-		static bool first = true;
-		static DROPS::Point3DCL origin;
-		static double radius, surftension;
-		if(first){
-			DROPS::Point3DCL org0 = P.get<DROPS::Point3DCL>("Exp.PosDrop");
-			DROPS::Point3DCL VelR = P.get<DROPS::Point3DCL>("Exp.RadDrop");
-			double angle=P.get<double>("SpeBnd.contactangle")*M_PI/180;
-			//radius=VelR[0];
-			radius=VelR[0]*std::pow(2/(2+std::cos(angle))/std::pow(1-std::cos(angle),2),1.0/3);
-			//assume the initial droplet is semi-spherical;
-			org0[1]=org0[1]-radius*std::cos(angle);//The drop is located in the plain normal to the y direction
-			origin=org0;
-			surftension = P.get<double>("SurfTens.SurfTension");
-			first = false;
-		}
+    }
 
-		for (int i=0; i< 3; i++)
-		  norm2 += (p[i]-origin[i]) * (p[i]-origin[i]);
+    double Pressure (const DROPS::Point3DCL& p, double t)
+    {
+        double norm2=0.;
+        double ret=0;	
+        static bool first = true;
+        static DROPS::Point3DCL origin;
+        static double radius, surftension;
+        if(first){
+            DROPS::Point3DCL org0 = P.get<DROPS::Point3DCL>("Exp.PosDrop");
+            DROPS::Point3DCL VelR = P.get<DROPS::Point3DCL>("Exp.RadDrop");
+            double angle=P.get<double>("SpeBnd.contactangle")*M_PI/180;
+            //radius=VelR[0];
+            radius=VelR[0]*std::pow(2/(2+std::cos(angle))/std::pow(1-std::cos(angle),2),1.0/3);
+            //assume the initial droplet is semi-spherical;
+            org0[1]=org0[1]-radius*std::cos(angle);//The drop is located in the plain normal to the y direction
+            origin=org0;
+            surftension = P.get<double>("SurfTens.SurfTension");
+            first = false;
+        }
+
+        for (int i=0; i< 3; i++)
+          norm2 += (p[i]-origin[i]) * (p[i]-origin[i]);
          ret = (std::sqrt(norm2) > radius) ? 0: 2.*surftension/radius; 
 
-		if( t>3. && t<5 )
-			ret = 0;
-		else if(t >5.)
-			ret = 2.*surftension/radius;
-		return ret;
-	}
-	
+        if( t>3. && t<5 )
+            ret = 0;
+        else if(t >5.)
+            ret = 2.*surftension/radius;
+        return ret;
+    }
 
-	DROPS::SVectorCL<3> VolForce( const DROPS::Point3DCL& p, double t)
+
+    DROPS::SVectorCL<3> VolForce( const DROPS::Point3DCL& p, double t)
     {
         DROPS::SVectorCL<3> f(0.);
         static bool first = true;
-		 static double nu, l_s;
-		 if(first){
-			 nu=P.get<double>("Mat.ViscFluid")/P.get<double>("Mat.DensFluid");
-			 l_s=1./(P.get<double>("SpeBnd.beta2"));
-			 first = false;
-		 }
-		 f[0] =  2.* nu * std::sin(p[0]/l_s) * std::cos(p[1]/l_s) * ( std::cos(2*nu*t) + 1./(l_s*l_s) * std::sin(2*nu*t) ) ;
-		 f[1] = -2.* nu * std::cos(p[0]/l_s) * std::sin(p[1]/l_s) * ( std::cos(2*nu*t) + 1./(l_s*l_s) * std::sin(2*nu*t) ) ;
-		 f[2] = 0;
+         static double nu, l_s;
+         if(first){
+             nu=P.get<double>("Mat.ViscFluid")/P.get<double>("Mat.DensFluid");
+             l_s=1./(P.get<double>("SpeBnd.beta2"));
+             first = false;
+         }
+         f[0] =  2.* nu * std::sin(p[0]/l_s) * std::cos(p[1]/l_s) * ( std::cos(2*nu*t) + 1./(l_s*l_s) * std::sin(2*nu*t) ) ;
+         f[1] = -2.* nu * std::cos(p[0]/l_s) * std::sin(p[1]/l_s) * ( std::cos(2*nu*t) + 1./(l_s*l_s) * std::sin(2*nu*t) ) ;
+         f[2] = 0;
 
         return f+PressureGr(p,t);
     }
     static DROPS::RegisterVectorFunction regvelVel("TestSlipVel", Velocity);
     static DROPS::RegisterVectorFunction regvelf("TestSlipF", VolForce);
-	static DROPS::RegisterVectorFunction regvelgpr("TestSlipPrGrad",PressureGr);
-	static DROPS::RegisterScalarFunction regscatestpr("TestSlipPressure",Pressure);
+    static DROPS::RegisterVectorFunction regvelgpr("TestSlipPrGrad",PressureGr);
+    static DROPS::RegisterScalarFunction regscatestpr("TestSlipPressure",Pressure);
 
 }
 
 namespace AnalPressure{
 
-	double Pressure (const DROPS::Point3DCL& , double t)
-	{
-		double ret=0;		
-		static bool first = true;
-		static DROPS::Point3DCL origin, VelR;
-		static double radius, surftension;
-		if(first){
-			origin = P.get<DROPS::Point3DCL>("Exp.PosDrop");
-			VelR = P.get<DROPS::Point3DCL>("Exp.RadDrop");
-			radius = P.get<double>("Exp.EquiRadius");
-			surftension = P.get<double>("SurfTens.SurfTension");
-			first = false;
-		}
-		
-		if( t>3. && t<5 )
-			ret = 0;
-		else if(t >5.)
-			ret = 2.*surftension/radius;
-		return ret;
-	}
+    double Pressure (const DROPS::Point3DCL& , double t)
+    {
+        double ret=0;	
+        static bool first = true;
+        static DROPS::Point3DCL origin, VelR;
+        static double radius, surftension;
+        if(first){
+            origin = P.get<DROPS::Point3DCL>("Exp.PosDrop");
+            VelR = P.get<DROPS::Point3DCL>("Exp.RadDrop");
+            radius = P.get<double>("Exp.EquiRadius");
+            surftension = P.get<double>("SurfTens.SurfTension");
+            first = false;
+        }
+        
+        if( t>3. && t<5 )
+            ret = 0;
+        else if(t >5.)
+            ret = 2.*surftension/radius;
+        return ret;
+    }
     static DROPS::RegisterScalarFunction regscatestpr("AnalPressure",Pressure);
 }
 
 
 namespace StatSlip{
 
-	DROPS::SVectorCL<3> Velocity( const DROPS::Point3DCL& p,double)
-	{
-		DROPS::SVectorCL<3> v(0.);
-		double l_s=2.;
-		v[0]=  std::sin(p[0]/l_s)*std::cos(p[1]/l_s);
-		v[1]= -std::cos(p[0]/l_s)*std::sin(p[1]/l_s);
-		v[2]= 0;
-		return v;
-	}
+    DROPS::SVectorCL<3> Velocity( const DROPS::Point3DCL& p,double)
+    {
+        DROPS::SVectorCL<3> v(0.);
+        double l_s=2.;
+        v[0]=  std::sin(p[0]/l_s)*std::cos(p[1]/l_s);
+        v[1]= -std::cos(p[0]/l_s)*std::sin(p[1]/l_s);
+        v[2]= 0;
+        return v;
+    }
 
-	DROPS::SVectorCL<3> PressureGr(const DROPS::Point3DCL& p, double)
-	{
-		DROPS::SVectorCL<3> delp(0.);
-		double l_s=2.;
-		delp[0]=-1./(2.*l_s)*std::sin(2*p[0]/l_s);
-		delp[1]=-1./(2.*l_s)*std::sin(2*p[1]/l_s);
-		delp[2]= 0;
+    DROPS::SVectorCL<3> PressureGr(const DROPS::Point3DCL& p, double)
+    {
+        DROPS::SVectorCL<3> delp(0.);
+        double l_s=2.;
+        delp[0]=-1./(2.*l_s)*std::sin(2*p[0]/l_s);
+        delp[1]=-1./(2.*l_s)*std::sin(2*p[1]/l_s);
+        delp[2]= 0;
 
-		return delp;
+        return delp;
 
-	}
+    }
 
-	DROPS::SVectorCL<3> VolForce( const DROPS::Point3DCL& p, double)
+    DROPS::SVectorCL<3> VolForce( const DROPS::Point3DCL& p, double)
     {
         DROPS::SVectorCL<3> f(0.);
-		double nu=1., l_s=2.;
-		f[0] =  2.* nu * std::sin(p[0]/l_s) * std::cos(p[1]/l_s) *  1./(l_s*l_s) ;
-		f[1] = -2.* nu * std::cos(p[0]/l_s) * std::sin(p[1]/l_s) *  1./(l_s*l_s) ;
-		f[2] = 0;
+        double nu=1., l_s=2.;
+        f[0] =  2.* nu * std::sin(p[0]/l_s) * std::cos(p[1]/l_s) *  1./(l_s*l_s) ;
+        f[1] = -2.* nu * std::cos(p[0]/l_s) * std::sin(p[1]/l_s) *  1./(l_s*l_s) ;
+        f[2] = 0;
 
         return f+PressureGr(p,0);
     }
     static DROPS::RegisterVectorFunction regvelVel("StatSlipVel", Velocity);
     static DROPS::RegisterVectorFunction regvelf("StatSlipF", VolForce);
-	static DROPS::RegisterVectorFunction regvelgpr("StatSlipPrGrad",PressureGr);
+    static DROPS::RegisterVectorFunction regvelgpr("StatSlipPrGrad",PressureGr);
 
 }
 
 
 namespace StatSlip2{
 
-	DROPS::SVectorCL<3> Velocity( const DROPS::Point3DCL& p,double)
-	{
-		DROPS::SVectorCL<3> v(0.);
-		v[0]= p[0]*p[1]-2.*p[0];
-		v[1]= -0.5*p[1]*p[1]+2.*p[1]-1.5;
-		v[2]= 0;
-		return v;
-	}
+    DROPS::SVectorCL<3> Velocity( const DROPS::Point3DCL& p,double)
+    {
+        DROPS::SVectorCL<3> v(0.);
+        v[0]= p[0]*p[1]-2.*p[0];
+        v[1]= -0.5*p[1]*p[1]+2.*p[1]-1.5;
+        v[2]= 0;
+        return v;
+    }
 
-	DROPS::SVectorCL<3> PressureGr(const DROPS::Point3DCL& p, double)
-	{
-		DROPS::SVectorCL<3> delp(0.);
-		delp[0]= std::sin(p[0]);
-		delp[1]= std::cos(p[1]);
-		delp[2]= 0;
+    DROPS::SVectorCL<3> PressureGr(const DROPS::Point3DCL& p, double)
+    {
+        DROPS::SVectorCL<3> delp(0.);
+        delp[0]= std::sin(p[0]);
+        delp[1]= std::cos(p[1]);
+        delp[2]= 0;
 
-		return delp;
+        return delp;
 
-	}
+    }
 
-	DROPS::SVectorCL<3> VolForce( const DROPS::Point3DCL& p, double)
+    DROPS::SVectorCL<3> VolForce( const DROPS::Point3DCL& p, double)
     {
         DROPS::SVectorCL<3> f(0.);
-		f[0] = 0;
-		f[1] = 1;
-		f[2] = 0;
+        f[0] = 0;
+        f[1] = 1;
+        f[2] = 0;
 
         return f+PressureGr(p,0);
     }
@@ -661,128 +660,128 @@ namespace StatSlip2{
 
 namespace StatSlip3{
 
-	DROPS::SVectorCL<3> Velocity( const DROPS::Point3DCL& p,double)
-	{
-		DROPS::SVectorCL<3> v(0.);
-		v[0]= p[0]*p[0]*p[1]-2.*p[0]*p[0];  //x^2y-2x^2
-		v[1]= -p[0]*p[1]*p[1]+3.*p[0]*p[1]-2.*p[0];
-		v[2]=  p[0]*p[2];
-		return v;
-	}
-	
-	double Pressure(const DROPS::Point3DCL& p, double)
-	{
-		double pr = - std::cos(p[0]) + std::sin(p[1]);
+    DROPS::SVectorCL<3> Velocity( const DROPS::Point3DCL& p,double)
+    {
+        DROPS::SVectorCL<3> v(0.);
+        v[0]= p[0]*p[0]*p[1]-2.*p[0]*p[0];  //x^2y-2x^2
+        v[1]= -p[0]*p[1]*p[1]+3.*p[0]*p[1]-2.*p[0];
+        v[2]=  p[0]*p[2];
+        return v;
+    }
 
-		return pr;
-	}
+    double Pressure(const DROPS::Point3DCL& p, double)
+    {
+        double pr = - std::cos(p[0]) + std::sin(p[1]);
 
-	DROPS::SVectorCL<3> PressureGr(const DROPS::Point3DCL& p, double)
-	{
-		DROPS::SVectorCL<3> delp(0.);
-		delp[0]= std::sin(p[0]);
-		delp[1]= std::cos(p[1]);
-		delp[2]= 0;
+        return pr;
+    }
 
-		return delp;
+    DROPS::SVectorCL<3> PressureGr(const DROPS::Point3DCL& p, double)
+    {
+        DROPS::SVectorCL<3> delp(0.);
+        delp[0]= std::sin(p[0]);
+        delp[1]= std::cos(p[1]);
+        delp[2]= 0;
 
-	}
+        return delp;
 
-	DROPS::SVectorCL<3> VolForce( const DROPS::Point3DCL& p, double)
+    }
+
+    DROPS::SVectorCL<3> VolForce( const DROPS::Point3DCL& p, double)
     {
         DROPS::SVectorCL<3> f(0.);
-		f[0] = -2.*p[1]+4.;
-		f[1] = 2.*p[0];
-		f[2] = 0;
+        f[0] = -2.*p[1]+4.;
+        f[1] = 2.*p[0];
+        f[2] = 0;
 
         return f+PressureGr(p,0);
     }
-	
-	DROPS::SVectorCL<3> flux( const DROPS::Point3DCL& p,double)
-	{
-		DROPS::SVectorCL<3> v(0.);
-		v[0]= 0;
-		v[1]= 0;
-		v[2]= p[0];
-		return v;
-	}
-	
-	DROPS::SVectorCL<3> Wall3( const DROPS::Point3DCL& p,double)
-	{
-		DROPS::SVectorCL<3> v(0.);
-		v[0]= 0;
-		v[1]= 0;
-		v[2]= p[0]*p[2];
-		return v;
-	}
-    
-    	DROPS::SVectorCL<3> Wall1( const DROPS::Point3DCL& p,double)
-	{
-		DROPS::SVectorCL<3> v(0.);
-		v[0]= 0;
-		v[1]= 0;
-		v[2]= 0.4;
-		return v;
-	}
+
+    DROPS::SVectorCL<3> flux( const DROPS::Point3DCL& p,double)
+    {
+        DROPS::SVectorCL<3> v(0.);
+        v[0]= 0;
+        v[1]= 0;
+        v[2]= p[0];
+        return v;
+    }
+
+    DROPS::SVectorCL<3> Wall3( const DROPS::Point3DCL& p,double)
+    {
+        DROPS::SVectorCL<3> v(0.);
+        v[0]= 0;
+        v[1]= 0;
+        v[2]= p[0]*p[2];
+        return v;
+    }
+
+        DROPS::SVectorCL<3> Wall1( const DROPS::Point3DCL& p,double)
+    {
+        DROPS::SVectorCL<3> v(0.);
+        v[0]= 0;
+        v[1]= 0;
+        v[2]= 0.4;
+        return v;
+    }
     static DROPS::RegisterVectorFunction regvelVel3("StatSlip3Vel", Velocity);
     static DROPS::RegisterVectorFunction regvelWall3("Wall3", Wall3);
     static DROPS::RegisterVectorFunction regvelWall1("Wall1", Wall1);
     static DROPS::RegisterVectorFunction regvelf3("StatSlip3F", VolForce);
-	static DROPS::RegisterVectorFunction regvelgpr3("StatSlip3PrGrad",PressureGr);
-	static DROPS::RegisterVectorFunction regvelflux("StatSlip3flux",flux);
-	static DROPS::RegisterScalarFunction regscapr3("StatSlip3Pr",Pressure);
+    static DROPS::RegisterVectorFunction regvelgpr3("StatSlip3PrGrad",PressureGr);
+    static DROPS::RegisterVectorFunction regvelflux("StatSlip3flux",flux);
+    static DROPS::RegisterScalarFunction regscapr3("StatSlip3Pr",Pressure);
 }
 
 namespace contactangle{
-	
-	double ConstantAngle(const DROPS::Point3DCL&,double)
-	{
+
+    double ConstantAngle(const DROPS::Point3DCL&,double)
+    {
        double angle = P.get<double>("SpeBnd.contactangle");
-		return angle/180.0*M_PI;
-	}
+        return angle/180.0*M_PI;
+    }
 
-	double PeriodicAngle(const DROPS::Point3DCL& pt,double)
-	{
-		DROPS::Point3DCL pt1(pt-P.get<DROPS::Point3DCL>("SpeBnd.posDrop"));
-		double r=std::sqrt(pt1[0]*pt1[0]+pt1[2]*pt1[2]);
-		double theta=r<0.001? 0: (pt1[2]>0?std::acos(pt1[0]/r): 2*M_PI- std::acos(pt1[0]/r));
-		return (P.get<double>("SpeBnd.contactangle"))*(1+0.5*std::sin(30*theta))/180.0*M_PI;
-	}
+    double PeriodicAngle(const DROPS::Point3DCL& pt,double)
+    {
+        DROPS::Point3DCL pt1(pt-P.get<DROPS::Point3DCL>("SpeBnd.posDrop"));
+        double r=std::sqrt(pt1[0]*pt1[0]+pt1[2]*pt1[2]);
+        double theta=r<0.001? 0: (pt1[2]>0?std::acos(pt1[0]/r): 2*M_PI- std::acos(pt1[0]/r));
+        return (P.get<double>("SpeBnd.contactangle"))*(1+0.5*std::sin(30*theta))/180.0*M_PI;
+    }
 
-	double PatternAngle(const DROPS::Point3DCL& pt,double)
-	{
-		DROPS::Point3DCL pt1(pt-P.get<DROPS::Point3DCL>("SpeBnd.posDrop"));
-		double r=std::sqrt(pt1[0]*pt1[0]+pt1[2]*pt1[2]);
-		double theta= int(r/P.get<DROPS::Point3DCL>("Exp.RadDrop")[0]/5.0)%2==0?1:-1;
-		return P.get<double>("SpeBnd.contactangle")/180.0*M_PI*(1+0.5*theta);
-	}
-	double PatternAngle1(const DROPS::Point3DCL& pt,double)
-		{
-			DROPS::Point3DCL pt1(pt-P.get<DROPS::Point3DCL>("SpeBnd.posDrop"));
-			double angl=P.get<double>("SpeBnd.contactangle")/180.0*M_PI;
-			return pt1[0]*pt1[2]<0?angl:M_PI-angl;
-		}
-	double PatternAngle2(const DROPS::Point3DCL& pt,double)
-		{
-			DROPS::Point3DCL pt1(pt-P.get<DROPS::Point3DCL>("SpeBnd.posDrop"));
-			double r=std::sqrt(pt1[0]*pt1[0]+pt1[2]*pt1[2]);
-			double theta=r<0.001? 0: (pt1[2]>0? std::acos(pt1[0]/r)/M_PI*180 : 360 - std::acos(pt1[0]/r)/M_PI*180);
-			double angl=P.get<double>("SpeBnd.contactangle")/180.0*M_PI;
-			return (int(theta)/60)%2==0?angl:M_PI-angl;
-		}
-	DROPS::Point3DCL OutNormalBottomPlane(const DROPS::Point3DCL&,double)
-	{
-		DROPS::Point3DCL outnormal(0.0);
-	//	outnormal[0]=0;
-		outnormal[1]=-1.0;
-	//	outnormal[2]=0;
-		return outnormal;
-	}
+    double PatternAngle(const DROPS::Point3DCL& pt,double)
+    {
+        DROPS::Point3DCL pt1(pt-P.get<DROPS::Point3DCL>("SpeBnd.posDrop"));
+        double r=std::sqrt(pt1[0]*pt1[0]+pt1[2]*pt1[2]);
+        double theta= int(r/P.get<DROPS::Point3DCL>("Exp.RadDrop")[0]/5.0)%2==0?1:-1;
+        return P.get<double>("SpeBnd.contactangle")/180.0*M_PI*(1+0.5*theta);
+    }
+    double PatternAngle1(const DROPS::Point3DCL& pt,double)
+        {
+            DROPS::Point3DCL pt1(pt-P.get<DROPS::Point3DCL>("SpeBnd.posDrop"));
+            double angl=P.get<double>("SpeBnd.contactangle")/180.0*M_PI;
+            return pt1[0]*pt1[2]<0?angl:M_PI-angl;
+        }
+    double PatternAngle2(const DROPS::Point3DCL& pt,double)
+        {
+            DROPS::Point3DCL pt1(pt-P.get<DROPS::Point3DCL>("SpeBnd.posDrop"));
+            double r=std::sqrt(pt1[0]*pt1[0]+pt1[2]*pt1[2]);
+            double theta=r<0.001? 0: (pt1[2]>0? std::acos(pt1[0]/r)/M_PI*180 : 360 - std::acos(pt1[0]/r)/M_PI*180);
+            double angl=P.get<double>("SpeBnd.contactangle")/180.0*M_PI;
+            return (int(theta)/60)%2==0?angl:M_PI-angl;
+        }
+    DROPS::Point3DCL OutNormalBottomPlane(const DROPS::Point3DCL&,double)
+    {
+        DROPS::Point3DCL outnormal(0.0);
+    //	outnormal[0]=0;
+        outnormal[1]=-1.0;
+    //	outnormal[2]=0;
+        return outnormal;
+    }
 
-	DROPS::Point3DCL OutNormalBrick(const DROPS::Point3DCL& pt,double)
-	{
-		if(P.get<int>("DomainCond.GeomType")!=1)
-			 throw DROPS::DROPSErrCL("Error: compute out normal of brick, please use other functions");
+    DROPS::Point3DCL OutNormalBrick(const DROPS::Point3DCL& pt,double)
+    {
+        if(P.get<int>("DomainCond.GeomType")!=1)
+             throw DROPS::DROPSErrCL("Error: compute out normal of brick, please use other functions");
 
        double dx, dy, dz;
 
@@ -796,184 +795,184 @@ namespace contactangle{
         if (!brick_info)
             throw DROPS::DROPSErrCL("error while reading geometry information: " + mesh);
 
-		double EPS=1e-10;
-		DROPS::Point3DCL outnormal(0.0);
-		if(std::fabs(pt[0])<EPS)
-		{	outnormal[0]=-1.0; }
-		else if(std::fabs(pt[0]-dx)<EPS)
-		{	outnormal[0]=1.0; }
-		else if(std::fabs(pt[1])<EPS)
-		{	outnormal[1]=-1.0; }
-		else if(std::fabs(pt[1]-dy)<EPS)
-		{	outnormal[1]=1.0; }
-		else if(std::fabs(pt[2])<EPS)
-		{	outnormal[2]=-1.0; }
-		else if(std::fabs(pt[2]-dz)<EPS)
-		{	outnormal[2]=1.0; }
-		else
-			 throw DROPS::DROPSErrCL("error while computing outnormal");
-		return outnormal;
-	}
-	
-	static DROPS::RegisterScalarFunction regconstangle("ConstantAngle", ConstantAngle);
-	static DROPS::RegisterScalarFunction regperangle("PeriodicAngle", PeriodicAngle);
-	static DROPS::RegisterScalarFunction regpatangle("PatternAngle", PatternAngle);
-	static DROPS::RegisterScalarFunction regpatangle1("PatternAngle1", PatternAngle1);
-	static DROPS::RegisterScalarFunction regpatangle2("PatternAngle2", PatternAngle2);
-	static DROPS::RegisterVectorFunction regunitbottomoutnomal("OutNormalBottomPlane", OutNormalBottomPlane);
-	static DROPS::RegisterVectorFunction regunitcubicoutnomal("OutNormalBrick", OutNormalBrick);
+        double EPS=1e-10;
+        DROPS::Point3DCL outnormal(0.0);
+        if(std::fabs(pt[0])<EPS)
+        {	outnormal[0]=-1.0; }
+        else if(std::fabs(pt[0]-dx)<EPS)
+        {	outnormal[0]=1.0; }
+        else if(std::fabs(pt[1])<EPS)
+        {	outnormal[1]=-1.0; }
+        else if(std::fabs(pt[1]-dy)<EPS)
+        {	outnormal[1]=1.0; }
+        else if(std::fabs(pt[2])<EPS)
+        {	outnormal[2]=-1.0; }
+        else if(std::fabs(pt[2]-dz)<EPS)
+        {	outnormal[2]=1.0; }
+        else
+             throw DROPS::DROPSErrCL("error while computing outnormal");
+        return outnormal;
+    }
+
+    static DROPS::RegisterScalarFunction regconstangle("ConstantAngle", ConstantAngle);
+    static DROPS::RegisterScalarFunction regperangle("PeriodicAngle", PeriodicAngle);
+    static DROPS::RegisterScalarFunction regpatangle("PatternAngle", PatternAngle);
+    static DROPS::RegisterScalarFunction regpatangle1("PatternAngle1", PatternAngle1);
+    static DROPS::RegisterScalarFunction regpatangle2("PatternAngle2", PatternAngle2);
+    static DROPS::RegisterVectorFunction regunitbottomoutnomal("OutNormalBottomPlane", OutNormalBottomPlane);
+    static DROPS::RegisterVectorFunction regunitcubicoutnomal("OutNormalBrick", OutNormalBrick);
 }
 
 namespace curvebndDomain{
 
-	DROPS::Point3DCL OutNormalSphere(const DROPS::Point3DCL& pt,double)
-	{
-		DROPS::Point3DCL outnormal(0.0);
-		outnormal=pt/pt.norm();
-		return outnormal;
-	}
+    DROPS::Point3DCL OutNormalSphere(const DROPS::Point3DCL& pt,double)
+    {
+        DROPS::Point3DCL outnormal(0.0);
+        outnormal=pt/pt.norm();
+        return outnormal;
+    }
 
-	static DROPS::RegisterVectorFunction regunitoutnomalsphere("OutNormalSphere", OutNormalSphere);
+    static DROPS::RegisterVectorFunction regunitoutnomalsphere("OutNormalSphere", OutNormalSphere);
     DROPS::Point3DCL OutNormalCylinder(const DROPS::Point3DCL& pt,double)
-	{
-		DROPS::Point3DCL outnormal(0.0);
-		outnormal=pt/std::sqrt(pt[1]*pt[1]+pt[2]*pt[2]);
+    {
+        DROPS::Point3DCL outnormal(0.0);
+        outnormal=pt/std::sqrt(pt[1]*pt[1]+pt[2]*pt[2]);
        outnormal[0]=0;
-		return outnormal;
-	}
-	static DROPS::RegisterVectorFunction regunitoutnomalcylinder("OutNormalCylinder", OutNormalCylinder);
+        return outnormal;
+    }
+    static DROPS::RegisterVectorFunction regunitoutnomalcylinder("OutNormalCylinder", OutNormalCylinder);
 
 }
 namespace CouetteFlow{
 
-	DROPS::Point3DCL UpwallVel(const DROPS::Point3DCL& ,double)
-	{ 
+    DROPS::Point3DCL UpwallVel(const DROPS::Point3DCL& ,double)
+    { 
         double WallVel = P.get<double>("Exp.WallVelocity");
         DROPS::Point3DCL vel(0.0);
         vel[0]=WallVel; 
         return vel;
-	}
-	DROPS::Point3DCL DownwallVel(const DROPS::Point3DCL& ,double)
-	{ 
+    }
+    DROPS::Point3DCL DownwallVel(const DROPS::Point3DCL& ,double)
+    { 
         double WallVel = P.get<double>("Exp.WallVelocity");
         DROPS::Point3DCL vel(0.0);
         vel[0]=-WallVel; 
         return vel;
-	}
-	DROPS::Point3DCL LeftwallVel(const DROPS::Point3DCL& pt,double)
-	{
+    }
+    DROPS::Point3DCL LeftwallVel(const DROPS::Point3DCL& pt,double)
+    {
 
-		 double dx, dy, dz;
-		 const std::string meshfile_name=P.get<std::string>("DomainCond.MeshFile");
-		 std::string mesh( meshfile_name), delim("x@");
-		 size_t idx;
-		 while ((idx= mesh.find_first_of( delim)) != std::string::npos )
-		       mesh[idx]= ' ';
-		 std::istringstream brick_info( mesh);
-		 brick_info >> dx >> dy >> dz;
-		 DROPS::Point3DCL vel(0.0);
-		 vel[0]=P.get<double>("Exp.WallVelocity")*((pt[2]-dz/2)*2/dz)*(dz/(dz+2*P.get<double>("Mat.ViscDrop")/P.get<double>("SpeBnd.beta1")));
-		 return vel;
-	}
-	DROPS::Point3DCL RightwallVel(const DROPS::Point3DCL& pt,double)
-		{
+         double dx, dy, dz;
+         const std::string meshfile_name=P.get<std::string>("DomainCond.MeshFile");
+         std::string mesh( meshfile_name), delim("x@");
+         size_t idx;
+         while ((idx= mesh.find_first_of( delim)) != std::string::npos )
+               mesh[idx]= ' ';
+         std::istringstream brick_info( mesh);
+         brick_info >> dx >> dy >> dz;
+         DROPS::Point3DCL vel(0.0);
+         vel[0]=P.get<double>("Exp.WallVelocity")*((pt[2]-dz/2)*2/dz)*(dz/(dz+2*P.get<double>("Mat.ViscDrop")/P.get<double>("SpeBnd.beta1")));
+         return vel;
+    }
+    DROPS::Point3DCL RightwallVel(const DROPS::Point3DCL& pt,double)
+        {
 
-			 double dx, dy, dz;
-			 const std::string meshfile_name=P.get<std::string>("DomainCond.MeshFile");
-			 std::string mesh( meshfile_name), delim("x@");
-			 size_t idx;
-			 while ((idx= mesh.find_first_of( delim)) != std::string::npos )
-			       mesh[idx]= ' ';
-			 std::istringstream brick_info( mesh);
-			 brick_info >> dx >> dy >> dz;
-			 DROPS::Point3DCL vel(0.0);
-			 vel[0]=P.get<double>("Exp.WallVelocity")*((pt[2]-dz/2)*2/dz)*(dz/(dz+2*P.get<double>("Mat.ViscFluid")/P.get<double>("SpeBnd.beta2")));
-			 return vel;
-		}
-	static DROPS::RegisterVectorFunction regunitupwallvel("UpwallVel", UpwallVel);
-	static DROPS::RegisterVectorFunction regunitdownwallvel("DownwallVel", DownwallVel);
-	static DROPS::RegisterVectorFunction regunitleftwallvel("LeftwallVel", LeftwallVel);
-	static DROPS::RegisterVectorFunction regunitrightwallvel("RightwallVel", RightwallVel);
+             double dx, dy, dz;
+             const std::string meshfile_name=P.get<std::string>("DomainCond.MeshFile");
+             std::string mesh( meshfile_name), delim("x@");
+             size_t idx;
+             while ((idx= mesh.find_first_of( delim)) != std::string::npos )
+                   mesh[idx]= ' ';
+             std::istringstream brick_info( mesh);
+             brick_info >> dx >> dy >> dz;
+             DROPS::Point3DCL vel(0.0);
+             vel[0]=P.get<double>("Exp.WallVelocity")*((pt[2]-dz/2)*2/dz)*(dz/(dz+2*P.get<double>("Mat.ViscFluid")/P.get<double>("SpeBnd.beta2")));
+             return vel;
+        }
+    static DROPS::RegisterVectorFunction regunitupwallvel("UpwallVel", UpwallVel);
+    static DROPS::RegisterVectorFunction regunitdownwallvel("DownwallVel", DownwallVel);
+    static DROPS::RegisterVectorFunction regunitleftwallvel("LeftwallVel", LeftwallVel);
+    static DROPS::RegisterVectorFunction regunitrightwallvel("RightwallVel", RightwallVel);
 }
-	
+
 namespace CylinderTest{
 
-	
-	DROPS::SVectorCL<3> Velocity( const DROPS::Point3DCL& p,double)
-	{
-		int i=1, j=2;
-		DROPS::SVectorCL<3> v(0.);
-		double r2= p[i]*p[i] + p[j]*p[j];
-		v[i]=  p[j]*r2;
-		v[j]= -p[i]*r2;
-		return v;
-	}
-    
+
+    DROPS::SVectorCL<3> Velocity( const DROPS::Point3DCL& p,double)
+    {
+        int i=1, j=2;
+        DROPS::SVectorCL<3> v(0.);
+        double r2= p[i]*p[i] + p[j]*p[j];
+        v[i]=  p[j]*r2;
+        v[j]= -p[i]*r2;
+        return v;
+    }
+
     DROPS::SVectorCL<3> BndVel( const DROPS::Point3DCL& p1,double)
-	{
+    {
        double ratio = 0.5/ std::sqrt(p1[1]* p1[1]+ p1[2]*p1[2]);
        DROPS::Point3DCL p(0.);
        p[0] = p1[0];
        p[1] = ratio * p1[1];
        p[2] = ratio * p1[2];
-		int i=1, j=2;
-		DROPS::SVectorCL<3> v(0.);
-		double r2= p[i]*p[i] + p[j]*p[j];
-		v[i]=  p[j]*r2;
-		v[j]= -p[i]*r2;
-		return v;
-	}
+        int i=1, j=2;
+        DROPS::SVectorCL<3> v(0.);
+        double r2= p[i]*p[i] + p[j]*p[j];
+        v[i]=  p[j]*r2;
+        v[j]= -p[i]*r2;
+        return v;
+    }
 
-	DROPS::SVectorCL<3> VolForce( const DROPS::Point3DCL& p, double)
+    DROPS::SVectorCL<3> VolForce( const DROPS::Point3DCL& p, double)
     {
-		int i=1, j=2;
+        int i=1, j=2;
         DROPS::SVectorCL<3> f(0.);
-		f[i] = -8.*p[j];
-		f[j] = 8.*p[i];
+        f[i] = -8.*p[j];
+        f[j] = 8.*p[i];
 
         return f;
     }
-	
-	DROPS::SVectorCL<3> Stress( const DROPS::Point3DCL& p,double)
-	{
-		int i=1, j=2;
-		DROPS::SVectorCL<3> v(0.);
-		double r = std::sqrt(p[i]*p[i] + p[j]*p[j]);
-		v[i]=  2.*p[j]* r;
-		v[j]=  -2.*p[i]* r;
-		return v;
-	}
-	
-	DROPS::SVectorCL<3> Wall( const DROPS::Point3DCL& p,double)
-	{
+
+    DROPS::SVectorCL<3> Stress( const DROPS::Point3DCL& p,double)
+    {
+        int i=1, j=2;
+        DROPS::SVectorCL<3> v(0.);
+        double r = std::sqrt(p[i]*p[i] + p[j]*p[j]);
+        v[i]=  2.*p[j]* r;
+        v[j]=  -2.*p[i]* r;
+        return v;
+    }
+
+    DROPS::SVectorCL<3> Wall( const DROPS::Point3DCL& p,double)
+    {
        double ratio = 0.5/ std::sqrt(p[1]* p[1]+ p[2]*p[2]);
        DROPS::Point3DCL ProjP(0.);
        ProjP[0] = p[0];
        ProjP[1] = ratio * p[1];
        ProjP[2] = ratio * p[2];
-		return Velocity(ProjP, 0) + Stress(ProjP, 0);
-	}
-    
+        return Velocity(ProjP, 0) + Stress(ProjP, 0);
+    }
+
     DROPS::SVectorCL<3> Nout( const DROPS::Point3DCL& p,double)
-	{
+    {
        DROPS::SVectorCL<3> n(0.);
        n[0]=0.;
        n[1]=p[1];
        n[2]=p[2];
-		return n/n.norm();
-	}
-    
+        return n/n.norm();
+    }
+
     static DROPS::RegisterVectorFunction regvelcyVel("CylinderVel", Velocity);
     static DROPS::RegisterVectorFunction regvelcyBndVel("BndVel", BndVel);
     static DROPS::RegisterVectorFunction regvelcyWall("CylinderWall", Wall);
-    static DROPS::RegisterVectorFunction regvelcyf("CylinderF", VolForce);	
-    static DROPS::RegisterVectorFunction regvelcyNout("CylinderN", Nout);	
+    static DROPS::RegisterVectorFunction regvelcyf("CylinderF", VolForce);
+    static DROPS::RegisterVectorFunction regvelcyNout("CylinderN", Nout);
 }
-	
+
 
 namespace ImpactDroplet{
     DROPS::Point3DCL ImpactVel(const DROPS::Point3DCL& p,double)
-	{ 
+    { 
         double ImpactVel = P.get<double>("Exp.ImpactVel");
         DROPS::Point3DCL	origin = P.get<DROPS::Point3DCL>("Exp.PosDrop");
         DROPS::Point3DCL	radiusVec = P.get<DROPS::Point3DCL>("Exp.RadDrop");
@@ -986,89 +985,89 @@ namespace ImpactDroplet{
         else 
             vel[0]=vel[1]=vel[2] =0.;
         return vel;
-	}
- 	static DROPS::RegisterVectorFunction regunitimpact("ImpactVel", ImpactVel);   
+    }
+    static DROPS::RegisterVectorFunction regunitimpact("ImpactVel", ImpactVel);   
 }
 
 namespace CylinderTest2{
 
-	
-	DROPS::SVectorCL<3> Velocity( const DROPS::Point3DCL& p,double)
-	{
-		int i=1, j=2;
-		DROPS::SVectorCL<3> v(0.);
-		double r2= p[i]*p[i] + p[j]*p[j];
-		v[i]=  p[j]*r2;
-		v[j]= -p[i]*r2;
-		return v;
-	}
-    
+
+    DROPS::SVectorCL<3> Velocity( const DROPS::Point3DCL& p,double)
+    {
+        int i=1, j=2;
+        DROPS::SVectorCL<3> v(0.);
+        double r2= p[i]*p[i] + p[j]*p[j];
+        v[i]=  p[j]*r2;
+        v[j]= -p[i]*r2;
+        return v;
+    }
+
     DROPS::SVectorCL<3> BndVel( const DROPS::Point3DCL& p1,double)
-	{
+    {
        double ratio = 0.5/ std::sqrt(p1[1]* p1[1]+ p1[2]*p1[2]);
        DROPS::Point3DCL p(0.);
        p[0] = p1[0];
        p[1] = ratio * p1[1];
        p[2] = ratio * p1[2];
-		int i=1, j=2;
-		DROPS::SVectorCL<3> v(0.);
-		double r2= p[i]*p[i] + p[j]*p[j];
-		v[i]=  p[j]*r2;
-		v[j]= -p[i]*r2;
-		return v;
-	}
+        int i=1, j=2;
+        DROPS::SVectorCL<3> v(0.);
+        double r2= p[i]*p[i] + p[j]*p[j];
+        v[i]=  p[j]*r2;
+        v[j]= -p[i]*r2;
+        return v;
+    }
 
-	DROPS::SVectorCL<3> VolForce( const DROPS::Point3DCL& p, double)
+    DROPS::SVectorCL<3> VolForce( const DROPS::Point3DCL& p, double)
     {
-		int i=1, j=2;
+        int i=1, j=2;
         DROPS::SVectorCL<3> f(0.);
-		f[i] = -8.*p[j] + 2.* p[i];
-		f[j] = 8.*p[i] + 2.* p[j];
+        f[i] = -8.*p[j] + 2.* p[i];
+        f[j] = 8.*p[i] + 2.* p[j];
         return f;
     }
-	
-	DROPS::SVectorCL<3> Stress( const DROPS::Point3DCL& p,double)
-	{
-		int i=1, j=2;
-		DROPS::SVectorCL<3> v(0.);
-		double r = std::sqrt(p[i]*p[i] + p[j]*p[j]);
-		v[i]=  2.*p[j]* r;
-		v[j]=  -2.*p[i]* r;
-		return v;
-	}
-	
-	DROPS::SVectorCL<3> Wall( const DROPS::Point3DCL& p,double)
-	{
+
+    DROPS::SVectorCL<3> Stress( const DROPS::Point3DCL& p,double)
+    {
+        int i=1, j=2;
+        DROPS::SVectorCL<3> v(0.);
+        double r = std::sqrt(p[i]*p[i] + p[j]*p[j]);
+        v[i]=  2.*p[j]* r;
+        v[j]=  -2.*p[i]* r;
+        return v;
+    }
+
+    DROPS::SVectorCL<3> Wall( const DROPS::Point3DCL& p,double)
+    {
        double ratio = 1.; //0.5/ std::sqrt(p[1]* p[1]+ p[2]*p[2]);
        DROPS::Point3DCL ProjP(0.);
        ProjP[0] = p[0];
        ProjP[1] = ratio * p[1];
        ProjP[2] = ratio * p[2];
-		return Velocity(ProjP, 0) + Stress(ProjP, 0);
-	}
-    
+        return Velocity(ProjP, 0) + Stress(ProjP, 0);
+    }
+
     DROPS::SVectorCL<3> Nout( const DROPS::Point3DCL& p,double)
-	{
+    {
        DROPS::SVectorCL<3> n(0.);
        n[0]=0.;
        n[1]=p[1];
        n[2]=p[2];
-		return n/n.norm();
-	}
-    
+        return n/n.norm();
+    }
+
     double Pressure( const DROPS::Point3DCL& p,double)
-	{
-		return p[1]*p[1] + p[2]*p[2];
-	}
+    {
+        return p[1]*p[1] + p[2]*p[2];
+    }
 
     DROPS::SVectorCL<3> Natur( const DROPS::Point3DCL& p,double)
-	{
+    {
        DROPS::SVectorCL<3> n(0.);
        n[0]=-p[1]*p[1] + p[2]*p[2];
        n[1]=0.;
        n[2]=0.;
-		return n;
-	}
+        return n;
+    }
     
     static DROPS::RegisterVectorFunction regvelcyVel2("CylinderVel2", Velocity);
     static DROPS::RegisterVectorFunction regvelcyBndVel2("BndVel2", BndVel);

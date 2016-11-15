@@ -1022,7 +1022,7 @@ void LevelsetP2CL::AccumulateYoungForce( VecDescCL& f) const
     switch (SF_)
     {
       case SF_ImprovedLBVar:
-          accu= new ImprovedYoungForceAccumulatorCL( *this, f, sf_.GetSigma()(std_basis<3>(0), 0.),CA_,Bndoutnormal_); break;
+          accu= new ImprovedYoungForceAccumulatorCL( *this, f, sf_.GetSigma()(std_basis<3>(0), 0.),CA_,BndOutNormal_); break;
       default:
           throw DROPSErrCL("LevelsetP2CL::AccumulateYoungForce not implemented for non-constant surface tension");
     }

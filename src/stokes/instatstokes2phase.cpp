@@ -3242,7 +3242,7 @@ System1Accumulator_P2CL::System1Accumulator_P2CL (const TwoPhaseFlowCoeffCL& Coe
       RowIdx( RowIdx_), A( A_), M( M_), cplA( cplA_), cplM( cplM_), b( b_),
       local_twophase( Coeff.mu( 1.0), Coeff.mu( -1.0), Coeff.rho( 1.0), Coeff.rho( -1.0), Coeff.volforce),
       speBndHandler1(BndData_, Coeff.alpha),
-      speBndHandler2(BndData_, lset_Phi, lset_Bnd, Coeff.Bndoutnormal, Coeff.mu( 1.0), Coeff.mu( -1.0), Coeff.beta(1.0), Coeff.beta(-1.0), Coeff.betaL, Coeff.alpha)
+      speBndHandler2(BndData_, lset_Phi, lset_Bnd, Coeff.BndOutNormal, Coeff.mu( 1.0), Coeff.mu( -1.0), Coeff.beta(1.0), Coeff.beta(-1.0), Coeff.betaL, Coeff.alpha)
 {}
 
 void System1Accumulator_P2CL::begin_accumulation ()
@@ -3311,8 +3311,8 @@ void System1Accumulator_P2CL::local_setup (const TetraCL& tet)
         if(speBnd){
            speBndHandler1.setMu(Coeff.mu(sign( ls_loc[0])));
            speBndHandler1.setBeta(Coeff.beta(sign( ls_loc[0])));
-           speBndHandler1.setup(tet, T, loc, Coeff.Bndoutnormal);  
-           //speBndHandler1.setup(tet, T, loc);         //update loc for special boundary condtion
+           //speBndHandler1.setup(tet, T, loc, Coeff.BndOutNormal);  
+           speBndHandler1.setup(tet, T, loc);         //update loc for special boundary condtion
         }
     }
     else{
@@ -3367,7 +3367,7 @@ void System1Accumulator_P2CL::local_setup (const TetraCL& tet)
         if(speBnd)
         {
             if (noCut)
-                speBndHandler1.setupRhs(tet, loc_b, Coeff.Bndoutnormal,t);
+                speBndHandler1.setupRhs(tet, loc_b, Coeff.BndOutNormal,t);
            else
                 speBndHandler2.setupRhs(tet, loc_b, t);//<not used for now --need modification when the slip length is different in the two phase flow
         }
@@ -5492,7 +5492,7 @@ void InstatStokes2PhaseP2P1CL::CheckTwoPhaseSolution(const VelVecDescCL* DescVel
 
              Quad5CL<double> q5_pr_diff( q5_pr-q5_pr_exact);
 
-             L2_pr  += Quad5CL<> (q5_pr_diff*q5_pr_diff).quad(absdet);			 
+             L2_pr  += Quad5CL<> (q5_pr_diff*q5_pr_diff).quad(absdet);
          }
          else{
              partition.make_partition<SortedVertexPolicyCL, MergeCutPolicyCL>( lat, ls_loc);
@@ -5522,7 +5522,7 @@ void InstatStokes2PhaseP2P1CL::CheckTwoPhaseSolution(const VelVecDescCL* DescVel
                      <<"\n || p_h - p ||_L2 = " <<  L2_pr << std::endl;	
 }
 
-void InstatStokes2PhaseP2P1CL::CheckTwoPhaseSolution(const VelVecDescCL* DescVel, const VecDescCL* DescPr, 
+/*void InstatStokes2PhaseP2P1CL::CheckTwoPhaseSolution(const VelVecDescCL* DescVel, const VecDescCL* DescPr, 
                              const LevelsetP2CL& lset, const VelVecDescCL* RefVel, const VecDescCL* RefPr)
 {
     ScopeTimerCL scope("CheckTwoPhaseSolution");
@@ -5656,7 +5656,7 @@ void InstatStokes2PhaseP2P1CL::CheckTwoPhaseSolution(const VelVecDescCL* DescVel
          std::cout << "---------------------Discretize error-------------------"
                     <<"\n || u_h - u ||_L2 = " <<  L2_vel 
                      <<"\n || p_h - p ||_L2 = " <<  L2_pr << std::endl;	
-}
+}*/
 
 ///> To do, parallel case
 double InstatStokes2PhaseP2P1CL::GetKineticEnergy(const LevelsetP2CL& lset) const

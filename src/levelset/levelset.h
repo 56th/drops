@@ -91,7 +91,7 @@ class LevelsetP2CL : public ProblemCL< LevelsetCoeffCL, LsetBndDataCL>
 
     SurfaceTensionCL&   sf_;      ///< data for surface tension
     instat_scalar_fun_ptr CA_;    ///<Young's contact angle on domain boundary
-    instat_vector_fun_ptr Bndoutnormal_; ///outnormal of domain boundary
+    instat_vector_fun_ptr BndOutNormal_; ///outnormal of domain boundary
 
     void SetupSmoothSystem ( MatrixCL&, MatrixCL&)               const;
     void SmoothPhi( VectorCL& SmPhi, double diff)                const;
@@ -182,7 +182,7 @@ LevelsetP2CL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, F
     /// Set contact angle function(defined only on boundary).
     void   SetYoungAngle(instat_scalar_fun_ptr CA) { CA_= CA; }
     ///Set  out normal function
-    void   SetBndOutNormal(instat_vector_fun_ptr outnormal) { Bndoutnormal_= outnormal; }
+    void   SetBndOutNormal(instat_vector_fun_ptr outnormal) { BndOutNormal_= outnormal; }
     ///Discretize Young Force on the three-phase contact line
     void   AccumulateYoungForce( VecDescCL& f) const;
     /// Clear all matrices, should be called after grid change to avoid reuse of matrix pattern
