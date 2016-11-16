@@ -1,18 +1,18 @@
 {
     "Restart":
     {
-        "Inputfile": "none"
-    },
-    "Exp":
-    {
-        "RadInlet": "1",
-        "RadDrop": "1 1 1 ",
-        "PosDrop": "1 1 1 "
+        "Inputfile": ""
     },
     "Levelset":
     {
         "CurvDiff": "-1",
-        "SD": "1"
+        "SD": "1",
+        "Discontinuous":        0,       // Do not use DG for Levelset-Discretisation
+
+        "BoundaryData":
+        {
+        	"Default":  ["NoBC"]
+        }
     },
     "Transp":
     {

@@ -169,7 +169,7 @@ class OsmosisP1CL
         gm_( pc_, 20, P.get<int>("Solver.Iter"), P.get<double>("Solver.Tol"), false, false, RightPreconditioning),
         cg_( ssorpc_, P.get<int>("Solver.Iter"), P.get<double>("Solver.Tol"), false),
         f_(rhs), c_(reac),
-        omit_bound_(P.get<double>("Exp.OmitBound"))
+        omit_bound_(P.get<double>("Osmosis.XFEMReduced"))
     {
         if (theta_ >= 1.0 || theta_ <= 0.0)
         {

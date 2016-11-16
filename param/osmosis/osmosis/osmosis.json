@@ -22,12 +22,13 @@
         
         "CSG":
         {
-                "Library":  "osmosisCSG.json",
+                "Library":  "../../param/osmosis/osmosis/osmosisCSG.json",
                 "Geometry":  "interrupted sphere"
         },
 
         "Osmosis":
         {
+                "XFEMReduced":          1e-4,
                 "Levelset":             "csg_fun",
                 "ScaleInitialConc":          0,
                 "InitialConc":          "linearConc",
@@ -35,14 +36,6 @@
                 "alpha":                0.25,
                 "beta":                 1.0
         },      
-        
-        "Exp":
-        {
-                "RadDrop":              [1.0, 1.5, 1.0 ],
-                "PosDrop":              [2.0, 2.0, 2.0 ],
-                "Gravity":              [0, -9.81, 0 ],
-                "OmitBound":            1e-4
-        },  
         
         "Stabilisation":
         {
@@ -69,13 +62,14 @@
 
         "Levelset":
         {
+                "RadDrop":              [1.0, 1.5, 1.0 ],
+                "PosDrop":              [2.0, 2.0, 2.0 ],
                 "Tol":                  1e-10,
                 "Iter":                 500,
                 "SD":                   0.1,
                 "CurvDiff":             -1,
                 "VolCorrection":        0,
-                "Theta":                1,
-                "Discontinuous":        0       // Do not use DG for Levelset-Discretisation
+                "Theta":                1
         },
         
         "Reparam":
@@ -85,23 +79,9 @@
                 "VolCorrection":        0
         },
 
-        "AdaptRef":
-        {
-                "_comment":
-"# adaptive refinement",
-
-                "Freq":                 0,
-                "FinestLevel":          0,
-                "CoarsestLevel":        0,
-                "Width":                0.1,
-                "RefineStrategy":       1,
-                "LoadBalStrategy":      1,
-                "Partitioner":          1
-        },
-
         "VTK":
         {
-                "VTKOut":               1,
+                "Freq":                 1,
                 "VTKDir":               "vtk",
                 "VTKName":              "SimpleOsmosis",
                 "Binary":               0
@@ -113,17 +93,34 @@
             "Plotname":                 "TestCase5/plot/CoupLSInth20t10.plot"
         },
 
-        "DomainCond":
+// domain, bnd/ini conditions
+
+		"Mesh":
+		{
+                "Type": "BrickBuilder", // A parallelepiped
+                "Origin": [0,0,0],      // Origin
+                "E1": [2,0,0],          // Basis to span the object,
+                "E2": [0,2,0],          // not necessary orthonormal 
+                "E3": [0,0,2],          // ... 
+                "N1": 12,               // Number of cells along the E1-direction,
+                "N2": 12,               //                       the E2-direction,
+                "N3": 12,               //                       the E3-direction.
+		// adaptive refinement
+		        "AdaptRef":
+		        {
+		                "Freq":                 0,
+		                "FinestLevel":          0,
+		                "CoarsestLevel":        0,
+		                "Width":                0.1,
+		                "RefineStrategy":       1,
+		                "LoadBalStrategy":      1,
+		                "Partitioner":          1
+		        }
+        },
+        
+        "NavStokes":
         {
-                "_comment":
-"# domain, bnd/ini conditions",
-
-                "InitialCond":          0,
-                "GeomType":             1,
-                "InitialFile":          "none",
-                "MeshFile":             "2x2x2@12x12x12",
-                "BoundaryType":         "21!21!21!21!21!21!",
-                "BoundaryFncs":         "ZeroVel!ZeroVel!ZeroVel!ZeroVel!ZeroVel!ZeroVel"
+        	"InitialValue":     0
         }
-
+			
 }

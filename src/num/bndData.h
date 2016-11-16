@@ -205,9 +205,9 @@ class BndDataCL: public BndCondCL
     /// If \a bc and \a fun are given, they are assumed to be arrays of length \a numbndseg
     /// containing the boundary conditions and boundary data resp. of the boundary segments.
     /// If \a bc is omitted, hom. natural boundary conditions are imposed (Nat0BC) for all boundary segments.
-    /// \a fun should only be omitted, if all boundary conditions given are homogenious
+    /// \a fun should only be omitted, if all boundary conditions given are homogeneous
     /// and thus no boundary values have to be specified.
-    BndDataCL( BndIdxT numbndseg, const BndCondT* bc= 0, const bnd_val_fun* fun= 0);
+    BndDataCL( BndIdxT numbndseg= 0, const BndCondT* bc= 0, const bnd_val_fun* fun= 0);
     /// Deprecated ctor, just for compatibility with older code
     BndDataCL( BndIdxT numbndseg, const bool* isneumann, const bnd_val_fun* fun); // deprecated ctor!
 

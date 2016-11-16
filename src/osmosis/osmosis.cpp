@@ -151,7 +151,7 @@ void  OnlyOsmosisStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTria
         std::cout << osmosis.conc.Data.size() << " concentration unknowns,\n";
         std::cout << osmosis.Vn_.Data.size() << " velocity unknowns,\n";
 
-        if (P.get<int>("DomainCond.InitialCond") != -1)
+        if (P.get<int>("NavStokes.InitialValue") != -1)
         {
             if (P.get<int>("Osmosis.ScaleInitialConc") == 1)
                 osmosis.InitWithScaling( Initialcneg, P.get<double>("Osmosis.TotalConcentration"), 0);
@@ -159,7 +159,7 @@ void  OnlyOsmosisStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTria
                 osmosis.Init( Initialcneg, 0);
         }
         else
-          ReadFEFromFile( osmosis.conc, MG, P.get<std::string>("DomainCond.InitialFile")+"concentrationTransf");
+          ReadFEFromFile( osmosis.conc, MG, P.get<std::string>("Restart.InitialData")+"concentrationTransf");
 
 	}
 
@@ -172,12 +172,13 @@ void  OnlyOsmosisStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTria
 
     // writer for vtk-format
     VTKOutCL vtkwriter(adap.GetMG(), "DROPS data",
-                       (P.get("VTK.VTKOut", 0) ?
-                        P.get<int>("Time.NumSteps")/P.get("VTK.VTKOut", 0)+1 : 0),
+                       (P.get("VTK.Freq", 0) ?
+                        P.get<int>("Time.NumSteps")/P.get("VTK.Freq", 0)+1 : 0),
                        P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName"),
                        P.get<std::string>("VTK.TimeFileName"),
                        P.get<int>("VTK.Binary"),
                        P.get<int>("VTK.UseOnlyP1"),
+                       false, /* -< P2DG */
                        -1,  /* <- level */
                        P.get<int>("VTK.ReUseTimeFile") );
 
@@ -187,7 +188,7 @@ void  OnlyOsmosisStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTria
     vtkwriter.Register( make_VTKVector( osmosis.GetVelP1Solution( osmosis.Vn_), "V") );
 
 
-    if (P.get("VTK.VTKOut", 0))
+    if (P.get("VTK.Freq", 0))
         vtkwriter.Write(0);
 
 
@@ -195,9 +196,9 @@ void  OnlyOsmosisStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTria
 
     // Create the marking strategy for the adaptive mesh refinement.
     typedef DistMarkingStrategyCL MarkerT;
-    MarkerT marker( lset, P.get<double>("AdaptRef.Width"),
-                          P.get<int>("AdaptRef.CoarsetLevel"),
-                          P.get<int>("AdaptRef.FiniestLevel") );
+    MarkerT marker( lset, P.get<double>("Mesh.AdaptRef.Width"),
+                          P.get<int>("Mesh.AdaptRef.CoarsestLevel"),
+                          P.get<int>("Mesh.AdaptRef.FinestLevel") );
     adap.set_marking_strategy( &marker );
 
     for (int step= 1; step<=P.get<int>("Time.NumSteps"); ++step)
@@ -206,7 +207,7 @@ void  OnlyOsmosisStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTria
         double t= dt * step;
 
         // grid modification
-        bool doGridMod= P.get<int>("AdaptRef.Freq") && step%P.get<int>("AdaptRef.Freq") == 0;
+        bool doGridMod= P.get<int>("Mesh.AdaptRef.Freq") && step%P.get<int>("Mesh.AdaptRef.Freq") == 0;
         if (doGridMod) {
             adap.UpdateTriang();
         }
@@ -220,7 +221,7 @@ void  OnlyOsmosisStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTria
         if (gnuoutnow)
 			gnu.Write(t);
 
-        bool vtkoutnow = P.get("VTK.VTKOut", 0) && (step%P.get("VTK.VTKOut", 0)==0);// || step < 20);
+        bool vtkoutnow = P.get("VTK.Freq", 0) && (step%P.get("VTK.Freq", 0)==0);// || step < 20);
         if (vtkoutnow){
             ScopeTimer vtktime("VTK-output");
             vtkwriter.Write(t);
@@ -262,36 +263,25 @@ int main (int argc, char** argv)
         DROPS::ProgressBarTetraAccumulatorCL::Activate();
 
     DROPS::MultiGridCL* mg= 0;
-    DROPS::StokesBndDataCL* bnddata= 0;
-    DROPS::LsetBndDataCL* lsetbnddata= 0;
-    double RadInlet = P.get<double>("Exp.RadInlet");
-    DROPS::BuildDomain( mg, P.get<std::string>("DomainCond.MeshFile"), P.get<int>("DomainCond.GeomType"), P.get<std::string>("Restart.Inputfile"), RadInlet);
-    P.put("Exp.RadInlet", RadInlet);
-    DROPS::BuildBoundaryData( mg, bnddata, P.get<std::string>("DomainCond.BoundaryType"), P.get<std::string>("DomainCond.BoundaryFncs"));
-
-    // todo: reasonable implementation needed
-    std::string lsetbndtype = "98" /*NoBC*/, lsetbndfun = "Zero";
-    for( size_t i= 1; i<mg->GetBnd().GetNumBndSeg(); ++i) {
-        lsetbndtype += "!98";
-        lsetbndfun  += "!Zero";
-    }
-
-    DROPS::BuildBoundaryData( mg, lsetbnddata, lsetbndtype, lsetbndfun);
+    DROPS::LsetBndDataCL lsetbnddata;
+    std::auto_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P));
+    mg = new DROPS::MultiGridCL( *builder);
+    read_BndData( lsetbnddata,*mg, P.get_child( "Levelset.BoundaryData"));
 
     std::cout << "Generated MG of " << mg->GetLastLevel() << " levels." << std::endl;
 
-    DROPS::EllipsoidCL::Init(P.get<DROPS::Point3DCL>("Exp.PosDrop"), P.get<DROPS::Point3DCL>("Exp.RadDrop"));
+    DROPS::EllipsoidCL::Init(P.get<DROPS::Point3DCL>("Levelset.PosDrop"), P.get<DROPS::Point3DCL>("Levelset.RadDrop"));
     DROPS::AdapTriangCL adap( *mg );
     // If we read the Multigrid, it shouldn't be modified;
     // otherwise the pde-solutions from the ensight files might not fit.
-    if (!P.get<int>("Transp.UseNSSol") || (P.get<std::string>("Restart.Inputfile") == "none")){
+    if (!P.get<int>("Transp.UseNSSol") || (P.get<std::string>("Restart.InputData","") == "")){
         DROPS::InScaMap & scalarmap = DROPS::InScaMap::getInstance();
         DROPS::instat_scalar_fun_ptr distance = scalarmap[P.get("Osmosis.Levelset", std::string("Ellipsoid"))];
 
 	typedef DROPS::DistMarkingStrategyCL InitMarkerT;
-	InitMarkerT initmarker( distance, P.get<double>("AdaptRef.Width"),
-                                          P.get<int>( "AdaptRef.CoarsestLevel" ),
-                                          P.get<int>( "AdaptRef.FinestLevel" ) );
+	InitMarkerT initmarker( distance, P.get<double>("Mesh.AdaptRef.Width"),
+                                          P.get<int>( "Mesh.AdaptRef.CoarsestLevel" ),
+                                          P.get<int>( "Mesh.AdaptRef.FinestLevel" ) );
         adap.set_marking_strategy( &initmarker );
         adap.MakeInitialTriang();
         adap.set_marking_strategy(0);
@@ -306,12 +296,10 @@ int main (int argc, char** argv)
 
 
     // Osmosis without Navier Stokes etc.
-    OnlyOsmosisStrategy( *mg, *lsetbnddata, adap);
+    OnlyOsmosisStrategy( *mg, lsetbnddata, adap);
 
 
     delete mg;
-    delete lsetbnddata;
-    delete bnddata;
     return 0;
   }
 
