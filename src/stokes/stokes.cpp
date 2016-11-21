@@ -19,16 +19,15 @@
  * along with DROPS. If not, see <http://www.gnu.org/licenses/>.
  *
  *
- * Copyright 2013 LNM/SC RWTH Aachen, Germany
+ * Copyright 2016 LNM/SC RWTH Aachen, Germany
 */
 
 #include "stokes.h"
 
 namespace DROPS
 {
-
-//P2_P1 multiplication
-void SpecialBndHandleSystem2OnePhaseCL::setupB(const TetraCL& tet, SMatrixCL<1, 3> loc_b[10][4])
+/// Setup the integral of (bv * bn) * q on the slip bounary for uncut element 
+void SlipBndSystem2OnePhaseCL::setupB(const TetraCL& tet, SMatrixCL<1, 3> loc_b[10][4])
 {
 
     for (Uint k =0; k< 4; ++k) //Go throught all faces of a tet
@@ -37,17 +36,19 @@ void SpecialBndHandleSystem2OnePhaseCL::setupB(const TetraCL& tet, SMatrixCL<1, 
         LocalP1CL<double> phiPrP1[3];    //local basis for pressure
         Quad5_2DCL<double> pr2Dj;
         Quad5_2DCL<double> vel2Di;
-
         BaryCoordCL bary[3];
+        Point3DCL normal;
+        Uint unknownIdx[6];
+        
         if( BndData_.Vel.GetBC(*tet.GetFace(k))==Slip0BC || BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC || BndData_.Vel.GetBC(*tet.GetFace(k))==SymmBC){
-            const FaceCL& face = *tet.GetFace(k);            //Get a face on a special boundary 
+            const FaceCL& face = *tet.GetFace(k);            //Get a face on a slip boundary 
             double absdet = FuncDet2D(face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
                                       face.GetVertex(2)->GetCoord()-face.GetVertex(0)->GetCoord());
             tet.GetOuterNormal(k, normal);
             for (Uint i= 0; i<3; ++i)  
             {
-                unknownIdx[i]   = VertOfFace(k, i);          // i is index for Vertex
-                unknownIdx[i+3] = EdgeOfFace(k, i) + 4;      // i is index for Edge
+                unknownIdx[i]   = VertOfFace(k, i);          // index for Vertex
+                unknownIdx[i+3] = EdgeOfFace(k, i) + 4;      // ndex for Edge
                 bary[i][unknownIdx[i]]=1;
                 phiPrP1[i][unknownIdx[i]]=1;
             }
@@ -60,11 +61,11 @@ void SpecialBndHandleSystem2OnePhaseCL::setupB(const TetraCL& tet, SMatrixCL<1, 
                 for(Uint j=0; j<3; ++j){
                     pr2Dj.assign(phiPrP1[j], bary);  
                     Quad5_2DCL<double> quad2D(pr2Dj * vel2Di);
-                    const double qq= quad2D.quad(absdet);
-                    loc_b[unknownIdx[i]][unknownIdx[j]](0, 0)-= qq*normal[0];
-                    loc_b[unknownIdx[i]][unknownIdx[j]](0, 1)-= qq*normal[1];
-                    loc_b[unknownIdx[i]][unknownIdx[j]](0, 2)-= qq*normal[2];  
-                    //loc_b[i][j] -= quad2D.quad(absdet)*SMatrixCL<1,3>(normal) //  TODO LZ: only 
+                    //const double qq= quad2D.quad(absdet);
+                    //loc_b[unknownIdx[i]][unknownIdx[j]](0, 0)-= qq*normal[0];
+                    //loc_b[unknownIdx[i]][unknownIdx[j]](0, 1)-= qq*normal[1];
+                    //loc_b[unknownIdx[i]][unknownIdx[j]](0, 2)-= qq*normal[2];  
+                    loc_b[unknownIdx[i]][unknownIdx[j]] -= quad2D.quad(absdet)*SMatrixCL<1,3>(normal); 
                 }
             }
         }
@@ -72,8 +73,9 @@ void SpecialBndHandleSystem2OnePhaseCL::setupB(const TetraCL& tet, SMatrixCL<1, 
 
 }
 
-//P2_P1 multiplication
-void SpecialBndHandleSystem2OnePhaseCL::setupB(const TetraCL& tet, SMatrixCL<1, 3> loc_b[10][4], instat_vector_fun_ptr bnd_normal) ///< curved case
+
+void SlipBndSystem2OnePhaseCL::setupB(const TetraCL& tet, SMatrixCL<1, 3> loc_b[10][4], instat_vector_fun_ptr bnd_normal) 
+///< curved case
 {
     MeshDeformationCL& md = MeshDeformationCL::getInstance();
     Quad5_2DCL<double> adet;
@@ -85,6 +87,8 @@ void SpecialBndHandleSystem2OnePhaseCL::setupB(const TetraCL& tet, SMatrixCL<1, 
         Quad5_2DCL<double> pr2Dj;
         Quad5_2DCL<double> vel2Di;
         Quad5_2DCL<Point3DCL> Nout;
+        Point3DCL normal;
+        Uint unknownIdx[6];
 
         BaryCoordCL bary[3];
         if( BndData_.Vel.GetBC(*tet.GetFace(k))==Slip0BC || BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC || BndData_.Vel.GetBC(*tet.GetFace(k))==SymmBC){

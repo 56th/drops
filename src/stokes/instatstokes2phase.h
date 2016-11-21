@@ -102,7 +102,7 @@ class TwoPhaseFlowCoeffCL
     DROPS::instat_scalar_fun_ptr RefPr;
     DROPS::instat_vector_fun_ptr BndOutNormal;
     const SmoothedJumpCL rho, mu;
-    const SmoothedJumpCL beta;    //slip length
+    const SmoothedJumpCL beta;      //Coefficient for SlipBC
     const double SurfTens, DilVisco, ShearVisco;
     const double betaL, alpha;
     const Point3DCL g;
@@ -119,8 +119,8 @@ TwoPhaseFlowCoeffCL( ParamCL& P, bool dimless = false)
     rho_koeff2( film ? P.get<double>("Mat.DensFluid") : P.get<double>("Mat.DensDrop")),
     mu_koeff1( film ? P.get<double>("Mat.ViscGas") : P.get<double>("Mat.ViscFluid")),
     mu_koeff2( film ? P.get<double>("Mat.ViscFluid") : P.get<double>("Mat.ViscDrop")),
-    beta_coeff1(P.get<double>("SpeBnd.beta1")),
-    beta_coeff2(P.get<double>("SpeBnd.beta2")),
+    beta_coeff1(P.get<double>("SlipBnd.Beta1")),
+    beta_coeff2(P.get<double>("SlipBnd.Beta2")),
 
     
     rho( dimless ? JumpCL( 1., rho_koeff1/rho_koeff2)
@@ -128,11 +128,11 @@ TwoPhaseFlowCoeffCL( ParamCL& P, bool dimless = false)
     mu( dimless ? JumpCL( 1., mu_koeff1/mu_koeff2)
       : JumpCL( mu_koeff2, mu_koeff1), H_sm, P.get<double>("Mat.SmoothZone")),
     beta(dimless ? JumpCL( 1., beta_coeff2/beta_coeff1)
-                 :JumpCL(beta_coeff2,beta_coeff1), H_sm, P.get<double>("SpeBnd.SmoothZone")),
+                 :JumpCL(beta_coeff2,beta_coeff1), H_sm, 0),
     SurfTens (dimless ? surfTens/rho_koeff2 : surfTens),
     DilVisco( film ? P.get<double>("Mat.DilatationalVisco") : P.get<double>("SurfTens.DilatationalVisco")),
     ShearVisco( film ? P.get<double>("Mat.ShearVisco") : P.get<double>("SurfTens.ShearVisco")),
-    betaL(P.get<double>("SpeBnd.betaL")), alpha(P.get<double>("SpeBnd.alpha")),
+    betaL(P.get<double>("SlipBnd.BetaL")), alpha(P.get<double>("SlipBnd.NitschePenalty")),
     g( P.get<DROPS::Point3DCL>("Exp.Gravity")),
     framevel( ns_shiftframe ? P.get<DROPS::Point3DCL>("NavStokes.FrameVel", DROPS::Point3DCL(0.0)) : DROPS::Point3DCL(0.0) )
     {
@@ -150,8 +150,8 @@ TwoPhaseFlowCoeffCL( ParamCL& P, bool dimless = false)
             RefPr = InScaMap::getInstance()[P.get<std::string>("Exp.Solution_Pr")];
         else
             RefPr = NULL;
-      if( P.get<std::string>("SpeBnd.BndOutNormal").compare("None")!=0)
-            BndOutNormal = InVecMap::getInstance()[P.get<std::string>("SpeBnd.BndOutNormal")];
+      if( P.get<std::string>("SlipBnd.BndOutNormal").compare("None")!=0)
+            BndOutNormal = InVecMap::getInstance()[P.get<std::string>("SlipBnd.BndOutNormal")];
         else
             BndOutNormal = NULL;
 }
@@ -391,18 +391,15 @@ class PressureRepairCL : public MGObserverCL
 };
 
 
-//\brief Handle the slip or symmetric boundary condition
-class SpecialBndHandleSystem2_P2P1XCL
+/// \brief Handle the slip or symmetric boundary condition
+/// Due to the weak imposition of bu * n = 0 with Nitsche's method, setup the integral of (bv * bn) * q on the slip bounary for cut elements 
+class SlipBndSystem2_P2P1XCL
 {
- private:
-    BndTriangPartitionCL      bndpartition_;
-    QuadDomainCL              bndq5dom_;
-
+  private:
     const StokesBndDataCL& BndData_;
-    Point3DCL normal;
-    Uint unknownIdx[6];
-    public:
-    SpecialBndHandleSystem2_P2P1XCL(const StokesBndDataCL& BndData): BndData_(BndData) {}
+
+  public:
+    SlipBndSystem2_P2P1XCL(const StokesBndDataCL& BndData): BndData_(BndData) {}
     void setupB(SMatrixCL<1, 3> loc_b[4][10], const TetraCL& tet, int ls_sign[4], const PrincipalLatticeCL& lat,
                      const std::valarray<double>& ls_loc_, IdxT prNumb[4], const ExtIdxDescCL* Xidx);
 };

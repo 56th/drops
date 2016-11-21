@@ -436,7 +436,7 @@ namespace slipBnd{
         static double nu, l_s;
         if(first){
             nu=P.get<double>("Mat.ViscFluid")/P.get<double>("Mat.DensFluid");
-            l_s=1./(P.get<double>("SpeBnd.beta2"));
+            l_s=1./(P.get<double>("SlipBnd.beta2"));
             first = false;
         }
         double		    F=std::sin(2*nu*t);
@@ -468,7 +468,7 @@ namespace InstatSlip{
         static double nu, l_s;
         if(first){
             nu=P.get<double>("Mat.ViscFluid")/P.get<double>("Mat.DensFluid");
-            l_s=1./(P.get<double>("SpeBnd.beta2"));
+            l_s=1./(P.get<double>("SlipBnd.beta2"));
             first = false;
         }
         double        F=std::sin(2*nu*t);
@@ -487,7 +487,7 @@ namespace InstatSlip{
         static double nu, l_s;
         if(first){
             nu=P.get<double>("Mat.ViscFluid")/P.get<double>("Mat.DensFluid");
-            l_s=1./(P.get<double>("SpeBnd.beta2"));
+            l_s=1./(P.get<double>("SlipBnd.beta2"));
             first = false;
         }
         double F=std::sin(2*nu*t);
@@ -509,7 +509,7 @@ namespace InstatSlip{
         if(first){
             DROPS::Point3DCL org0 = P.get<DROPS::Point3DCL>("Exp.PosDrop");
             DROPS::Point3DCL VelR = P.get<DROPS::Point3DCL>("Exp.RadDrop");
-            double angle=P.get<double>("SpeBnd.contactangle")*M_PI/180;
+            double angle=P.get<double>("SlipBnd.CtAngle")*M_PI/180;
             //radius=VelR[0];
             radius=VelR[0]*std::pow(2/(2+std::cos(angle))/std::pow(1-std::cos(angle),2),1.0/3);
             //assume the initial droplet is semi-spherical;
@@ -538,7 +538,7 @@ namespace InstatSlip{
          static double nu, l_s;
          if(first){
              nu=P.get<double>("Mat.ViscFluid")/P.get<double>("Mat.DensFluid");
-             l_s=1./(P.get<double>("SpeBnd.beta2"));
+             l_s=1./(P.get<double>("SlipBnd.beta2"));
              first = false;
          }
          f[0] =  2.* nu * std::sin(p[0]/l_s) * std::cos(p[1]/l_s) * ( std::cos(2*nu*t) + 1./(l_s*l_s) * std::sin(2*nu*t) ) ;
@@ -736,45 +736,45 @@ namespace contactangle{
 
     double ConstantAngle(const DROPS::Point3DCL&,double)
     {
-       double angle = P.get<double>("SpeBnd.contactangle");
+       double angle = P.get<double>("SlipBnd.CtAngle");
         return angle/180.0*M_PI;
     }
 
     double PeriodicAngle(const DROPS::Point3DCL& pt,double)
     {
-        DROPS::Point3DCL pt1(pt-P.get<DROPS::Point3DCL>("SpeBnd.posDrop"));
+        DROPS::Point3DCL pt1(pt-P.get<DROPS::Point3DCL>("Exp.posDrop"));
         double r=std::sqrt(pt1[0]*pt1[0]+pt1[2]*pt1[2]);
         double theta=r<0.001? 0: (pt1[2]>0?std::acos(pt1[0]/r): 2*M_PI- std::acos(pt1[0]/r));
-        return (P.get<double>("SpeBnd.contactangle"))*(1+0.5*std::sin(30*theta))/180.0*M_PI;
+        return (P.get<double>("SlipBnd.CtAngle"))*(1+0.5*std::sin(30*theta))/180.0*M_PI;
     }
 
     double PatternAngle(const DROPS::Point3DCL& pt,double)
     {
-        DROPS::Point3DCL pt1(pt-P.get<DROPS::Point3DCL>("SpeBnd.posDrop"));
+        DROPS::Point3DCL pt1(pt-P.get<DROPS::Point3DCL>("Exp.posDrop"));
         double r=std::sqrt(pt1[0]*pt1[0]+pt1[2]*pt1[2]);
         double theta= int(r/P.get<DROPS::Point3DCL>("Exp.RadDrop")[0]/5.0)%2==0?1:-1;
-        return P.get<double>("SpeBnd.contactangle")/180.0*M_PI*(1+0.5*theta);
+        return P.get<double>("SlipBnd.CtAngle")/180.0*M_PI*(1+0.5*theta);
     }
     double PatternAngle1(const DROPS::Point3DCL& pt,double)
         {
-            DROPS::Point3DCL pt1(pt-P.get<DROPS::Point3DCL>("SpeBnd.posDrop"));
-            double angl=P.get<double>("SpeBnd.contactangle")/180.0*M_PI;
+            DROPS::Point3DCL pt1(pt-P.get<DROPS::Point3DCL>("Exp.posDrop"));
+            double angl=P.get<double>("SlipBnd.CtAngle")/180.0*M_PI;
             return pt1[0]*pt1[2]<0?angl:M_PI-angl;
         }
     double PatternAngle2(const DROPS::Point3DCL& pt,double)
         {
-            DROPS::Point3DCL pt1(pt-P.get<DROPS::Point3DCL>("SpeBnd.posDrop"));
+            DROPS::Point3DCL pt1(pt-P.get<DROPS::Point3DCL>("Exp.posDrop"));
             double r=std::sqrt(pt1[0]*pt1[0]+pt1[2]*pt1[2]);
             double theta=r<0.001? 0: (pt1[2]>0? std::acos(pt1[0]/r)/M_PI*180 : 360 - std::acos(pt1[0]/r)/M_PI*180);
-            double angl=P.get<double>("SpeBnd.contactangle")/180.0*M_PI;
+            double angl=P.get<double>("SlipBnd.CtAngle")/180.0*M_PI;
             return (int(theta)/60)%2==0?angl:M_PI-angl;
         }
     DROPS::Point3DCL OutNormalBottomPlane(const DROPS::Point3DCL&,double)
     {
         DROPS::Point3DCL outnormal(0.0);
-    //	outnormal[0]=0;
+    //outnormal[0]=0;
         outnormal[1]=-1.0;
-    //	outnormal[2]=0;
+    //outnormal[2]=0;
         return outnormal;
     }
 
@@ -798,17 +798,17 @@ namespace contactangle{
         double EPS=1e-10;
         DROPS::Point3DCL outnormal(0.0);
         if(std::fabs(pt[0])<EPS)
-        {	outnormal[0]=-1.0; }
+        {outnormal[0]=-1.0; }
         else if(std::fabs(pt[0]-dx)<EPS)
-        {	outnormal[0]=1.0; }
+        {outnormal[0]=1.0; }
         else if(std::fabs(pt[1])<EPS)
-        {	outnormal[1]=-1.0; }
+        {outnormal[1]=-1.0; }
         else if(std::fabs(pt[1]-dy)<EPS)
-        {	outnormal[1]=1.0; }
+        {outnormal[1]=1.0; }
         else if(std::fabs(pt[2])<EPS)
-        {	outnormal[2]=-1.0; }
+        {outnormal[2]=-1.0; }
         else if(std::fabs(pt[2]-dz)<EPS)
-        {	outnormal[2]=1.0; }
+        {outnormal[2]=1.0; }
         else
              throw DROPS::DROPSErrCL("error while computing outnormal");
         return outnormal;
@@ -871,7 +871,7 @@ namespace CouetteFlow{
          std::istringstream brick_info( mesh);
          brick_info >> dx >> dy >> dz;
          DROPS::Point3DCL vel(0.0);
-         vel[0]=P.get<double>("Exp.WallVelocity")*((pt[2]-dz/2)*2/dz)*(dz/(dz+2*P.get<double>("Mat.ViscDrop")/P.get<double>("SpeBnd.beta1")));
+         vel[0]=P.get<double>("Exp.WallVelocity")*((pt[2]-dz/2)*2/dz)*(dz/(dz+2*P.get<double>("Mat.ViscDrop")/P.get<double>("SlipBnd.Beta1")));
          return vel;
     }
     DROPS::Point3DCL RightwallVel(const DROPS::Point3DCL& pt,double)
@@ -886,7 +886,7 @@ namespace CouetteFlow{
              std::istringstream brick_info( mesh);
              brick_info >> dx >> dy >> dz;
              DROPS::Point3DCL vel(0.0);
-             vel[0]=P.get<double>("Exp.WallVelocity")*((pt[2]-dz/2)*2/dz)*(dz/(dz+2*P.get<double>("Mat.ViscFluid")/P.get<double>("SpeBnd.beta2")));
+             vel[0]=P.get<double>("Exp.WallVelocity")*((pt[2]-dz/2)*2/dz)*(dz/(dz+2*P.get<double>("Mat.ViscFluid")/P.get<double>("SlipBnd.Beta2")));
              return vel;
         }
     static DROPS::RegisterVectorFunction regunitupwallvel("UpwallVel", UpwallVel);
@@ -1074,7 +1074,7 @@ namespace CylinderTest2{
     static DROPS::RegisterVectorFunction regvelcyWall2("CylinderWall2", Wall);
     static DROPS::RegisterScalarFunction regvelcyPre2("CylinderPre2", Pressure);
     static DROPS::RegisterVectorFunction regvelcyNatur("CylinderNatur2", Natur);
-    static DROPS::RegisterVectorFunction regvelcyf2("CylinderF2", VolForce);	
-    static DROPS::RegisterVectorFunction regvelcyNout2("CylinderN2", Nout);	
+    static DROPS::RegisterVectorFunction regvelcyf2("CylinderF2", VolForce);
+    static DROPS::RegisterVectorFunction regvelcyNout2("CylinderN2", Nout);
 }
 

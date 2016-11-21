@@ -150,18 +150,18 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     //DROPS::ScaMap & scamap = DROPS::ScaMap::getInstance();
     DROPS::InVecMap & invecmap = DROPS::InVecMap::getInstance();
     DROPS::MatchMap & matchmap = DROPS::MatchMap::getInstance();
-
-    instat_scalar_fun_ptr the_Young_angle;
-    instat_vector_fun_ptr the_Bnd_outnormal;
-
-    the_Young_angle= inscamap[P.get<std::string>("SpeBnd.CtAngle")];
-    the_Bnd_outnormal= invecmap[P.get<std::string>("SpeBnd.BndOutNormal")];
+    
+    //required to simulate flows with moving contact line
+    instat_scalar_fun_ptr Young_angle = inscamap[P.get<std::string>("SlipBnd.CtAngleFnc")];
+    instat_vector_fun_ptr bnd_outnormal = invecmap[P.get<std::string>("SlipBnd.BndOutNormal")];
 
     bool is_periodic = P.get<std::string>("DomainCond.PeriodicMatching", "none") != "none";
     match_fun periodic_match = is_periodic ? matchmap[P.get("DomainCond.PeriodicMatching", std::string("periodicx"))] : 0;
 
     MultiGridCL& MG= Stokes.GetMG();
     MeshDeformationCL& md = MeshDeformationCL::getInstance();
+    if(P.get<int>("DomainCond.GeomType")!= 10)
+        md.Initialize(&MG);
     MG.SetMeshDeformation(md);
 
     // initialization of surface tension
@@ -174,8 +174,8 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     // Creates new Levelset-Object, has to be cleaned manually
     LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsetbnddata, *sf, P.get_child("Levelset")) );
 
-    lset.SetYoungAngle(the_Young_angle);//set Young's Contact angle on the solid boundary
-    lset.SetBndOutNormal(the_Bnd_outnormal);//set outnormal of the domain boundary
+    lset.SetYoungAngle(Young_angle);    //set the Young's contact angle on the solid boundary
+    lset.SetBndOutNormal(bnd_outnormal);//set outer normal of the boundary of the domain
      if (is_periodic)
     {
         int n = 0;
@@ -648,14 +648,12 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 /*//I need to consider if to include these parameters to the default parameter files
 void SetMissingParameters(DROPS::ParamCL& P){
     //contactangle problem--------------------------------------------
-    P.put_if_unset<double>("SpeBnd.alpha", 0.0);
-    P.put_if_unset<double>("SpeBnd.beta1", 0.0);
-    P.put_if_unset<double>("SpeBnd.beta2", 0.0);
-    P.put_if_unset<double>("SpeBnd.SmoothZone", 0.0);
-    P.put_if_unset<std::string>("SpeBnd.CtAngle", "ConstantAngle");
-    P.put_if_unset<double>("SpeBnd.contactangle", 0.0);
-    P.put_if_unset<std::string>("SpeBnd.BndOutNormal", "OutNormalBrick");
-    P.put_if_unset<std::string>("SpeBnd.posDrop", "[0.5, 0, 0.5 ]");
+    P.put_if_unset<double>("SlipBnd.Alpha", 0.0);
+    P.put_if_unset<double>("Slipnd.Beta1", 0.0);
+    P.put_if_unset<double>("SlipBnd.Beta2", 0.0);
+    P.put_if_unset<std::string>("SlipBnd.CtAngleFnc", "ConstantAngle");
+    P.put_if_unset<double>("SlipBnd.CtAngle", 0.0);
+    P.put_if_unset<std::string>("SlipBnd.BndOutNormal", "OutNormalBrick");
 
     P.put_if_unset<std::string>("Exp.Solution_Vel", "None");
     P.put_if_unset<std::string>("Exp.Solution_GradPr", "None");
@@ -663,8 +661,6 @@ void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<int>("Exp.OutputInfo",1);
     //---------------------------------------------------------------
     P.put_if_unset<double>("Exp.SimuType", 0.0);
-    P.put_if_unset<double>("Stokes.epsP", 0.0);
-    P.put_if_unset<double>("Stokes.DirectSolve", 0);
 }*/
 
 int main (int argc, char** argv)

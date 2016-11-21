@@ -53,16 +53,15 @@ class StokesBndDataCL
     typedef VelBndDataCL::bnd_val_fun bnd_val_fun;
 };
 
-class SpecialBndHandleSystem2OnePhaseCL
+/// \brief Due to the weak imposition of bu * n = 0 with Nitsche's method, setup the integral of (bv * bn) * q on the slip bounary for uncut element  
+class SlipBndSystem2OnePhaseCL
 {
  private:
     const StokesBndDataCL& BndData_;
-    Point3DCL normal;
-    Uint unknownIdx[6];
   public:
-    SpecialBndHandleSystem2OnePhaseCL(const StokesBndDataCL& BndData): BndData_(BndData) {}
+    SlipBndSystem2OnePhaseCL(const StokesBndDataCL& BndData): BndData_(BndData) {}
     void setupB(const TetraCL& tet, SMatrixCL<1, 3> loc_b[10][4]);
-    void setupB(const TetraCL& tet, SMatrixCL<1, 3> loc_b[10][4], instat_vector_fun_ptr f);
+    void setupB(const TetraCL& tet, SMatrixCL<1, 3> loc_b[10][4], instat_vector_fun_ptr bnd_normal); // curved case
 };
 
 typedef StokesBndDataCL::VelBndDataCL StokesVelBndDataCL;

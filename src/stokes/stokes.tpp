@@ -422,7 +422,7 @@ class System2Accumulator_P2P1CL : public TetraAccumulatorCL
     const IdxDescCL& RowIdx;
     const IdxDescCL& ColIdx;
     MatrixCL& B;
-    SpecialBndHandleSystem2OnePhaseCL speBndHandle;
+    SlipBndSystem2OnePhaseCL SlipBndHandler;
 
     IdxT          prNumb[4];  ///< global numbering of the P1-unknowns
     LocalNumbP2CL n;          ///< global numbering of the P2-unknowns
@@ -466,7 +466,7 @@ template< class CoeffT>
 System2Accumulator_P2P1CL<CoeffT>::System2Accumulator_P2P1CL ( const CoeffT& coeff_arg, const StokesBndDataCL& BndData_arg,  MeshDeformationCL& md_arg,
     const IdxDescCL& RowIdx_arg, const IdxDescCL& ColIdx_arg,
     MatrixCL& B_arg, VecDescCL* c_arg, double t_arg)
-    : lat( PrincipalLatticeCL::instance( 2)), coeff( coeff_arg), BndData( BndData_arg), md(md_arg), t( t_arg), RowIdx( RowIdx_arg), ColIdx( ColIdx_arg), B( B_arg), speBndHandle(BndData)
+    : lat( PrincipalLatticeCL::instance( 2)), coeff( coeff_arg), BndData( BndData_arg), md(md_arg), t( t_arg), RowIdx( RowIdx_arg), ColIdx( ColIdx_arg), B( B_arg), SlipBndHandler(BndData)
 {
     c = c_arg;
     P2DiscCL::GetGradientsOnRef( GradRef);
@@ -560,8 +560,8 @@ void System2Accumulator_P2P1CL<CoeffT>::local_setup (const TetraCL& tet)
 //        }
 
     if(speBnd)
-        //speBndHandle.setupB(tet, locB, coeff.BndOutNormal);
-       speBndHandle.setupB(tet, locB);
+        //SlipBndHandler.setupB(tet, locB, coeff.BndOutNormal);
+       SlipBndHandler.setupB(tet, locB);
 }
 
 template< class CoeffT>
@@ -989,18 +989,18 @@ void StokesP2P1CL<Coeff>::CheckSolution(const VelVecDescCL* lsgvel, const VecDes
 
          L2_pr  += Quad5CL<> (std::pow(q5_pr-q5_pr_exact-c_pr,2)).quad(absdet);
 
-	 P2DiscCL::GetGradients( Grad, GradRef, T);
-	 q5_dvel= SMatrixCL<3,3>();
-	 for (int i=0; i<10; i++)
-	 {
-             q5_dvel += outer_product(loc_vel[i],Grad[i]);
+         P2DiscCL::GetGradients( Grad, GradRef, T);
+         q5_dvel= SMatrixCL<3,3>();
+         for (int i=0; i<10; i++)
+         {
+                 q5_dvel += outer_product(loc_vel[i],Grad[i]);
+             }
+             if( DLsgVel != NULL)
+         {
+             Quad5CL< SMatrixCL<3,3> > q5_dvel_diff( q5_dvel-q5_dvel_exact);
+             Frob_Dvel += Quad5CL<> (frobenius_norm_sq(q5_dvel_diff)).quad(absdet);
+             L2_div += Quad5CL<> (trace(q5_dvel)).quad(absdet);
          }
-         if( DLsgVel != NULL)
-	 {
-	     Quad5CL< SMatrixCL<3,3> > q5_dvel_diff( q5_dvel-q5_dvel_exact);
-	     Frob_Dvel += Quad5CL<> (frobenius_norm_sq(q5_dvel_diff)).quad(absdet);
-	     L2_div += Quad5CL<> (trace(q5_dvel)).quad(absdet);
-	 }
 
      }
      L2_pr = std::sqrt(L2_pr);
@@ -1008,7 +1008,7 @@ void StokesP2P1CL<Coeff>::CheckSolution(const VelVecDescCL* lsgvel, const VecDes
      {
          H1_vel = std::sqrt(L2_vel+Frob_Dvel); //L2_vel is squared here, Frob_Dvel is squared.
          Frob_Dvel = std::sqrt(Frob_Dvel);     //Frob_Dvel is the true value.
-	 L2_div = std::sqrt(std::fabs(L2_div));
+         L2_div = std::sqrt(std::fabs(L2_div));
      }
      L2_vel = std::sqrt(L2_vel);               //L2_vel is the true value.
 
