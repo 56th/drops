@@ -219,7 +219,7 @@ public:
                         volp += 1.0/6.0 * Vol;
                     else
                         voln += 1.0/6.0 * Vol;
-                    delete nodes;
+                    delete[] nodes;
                 }
 
             }
@@ -383,7 +383,7 @@ public:
                     /*     errl1p += q3_diffabs.quad(Vol); */
                     /* else */
                     /*     errl1n += q3_diffabs.quad(Vol); */
-                    delete nodes;
+                    delete[] nodes;
                 }
 
             }

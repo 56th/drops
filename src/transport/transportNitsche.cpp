@@ -215,7 +215,7 @@ double TransportP1XCL::CheckSolution(instat_scalar_fun_ptr Lsgn, instat_scalar_f
               errl1n += q_diffabs.quad(Vol);
               errh1n += q_diffGrad2.quad(Vol);
             }
-            delete nodes;
+            delete[] nodes;
           }
 
         }

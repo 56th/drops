@@ -91,11 +91,11 @@ class VelocityContainer
       return vfptr_;
     }
     
-    bool VelocityAsP2() const {
+    bool hasVelocityAsP2() const {
       return (v_ && Bnd_v_);
     }
      
-    bool VelocityAsFunctionPointer() const {
+    bool hasVelocityAsFunctionPointer() const {
       return (vfptr_);
     }
  
@@ -398,15 +398,15 @@ class TransformedP1FiniteElement{
     BaryCoordCL* nodes;
     Quad3CL<> q3_baseshape[4];
   public:
-    TransformedP1FiniteElement(P1FEGridfunctions& ap1fegfs, TetraCL* atet = NULL):tet(atet), p1fegfs(ap1fegfs){
+    TransformedP1FiniteElement(P1FEGridfunctions& ap1fegfs, TetraCL* atet = nullptr):tet(atet), p1fegfs(ap1fegfs){
       has_trafo_base=false;    
       has_Gram=false;    
       oninterface = false; 
-      nodes = NULL;
+      nodes = nullptr;
     }
     
     virtual ~TransformedP1FiniteElement(){
-      if (nodes) delete nodes;
+      if (nodes) delete[] nodes;
     }
     
     P1FEGridfunctions& GetGridfunctions(){
@@ -426,7 +426,7 @@ class TransformedP1FiniteElement{
 
     void SetSubTetra(const SArrayCL<BaryCoordCL,4>& cutT){
       vol = VolFrac(cutT) * absdet * 1.0/6.0;
-      if (nodes) delete nodes;
+      if (nodes) delete[] nodes;
       nodes = Quad3CL<>::TransformNodes(cutT);
       oninterface = true;
       
@@ -436,7 +436,7 @@ class TransformedP1FiniteElement{
     }
 
     TetraCL& GetTetra() const{
-      if(tet == NULL) throw DROPSErrCL("TransformedP1FiniteElement::GetTetra - No TetraCL object given!");
+      if(tet == nullptr) throw DROPSErrCL("TransformedP1FiniteElement::GetTetra - No TetraCL object given!");
       return *tet;
     }
     
@@ -529,7 +529,7 @@ class LocalConvDiffReacCoefficients{
         q5_source(tet,gcdcoefs.source,gcdcoefs.time), q3_source(tet,gcdcoefs.source,gcdcoefs.time),
         q5_mass(tet,gcdcoefs.mass,gcdcoefs.time), q3_mass(tet,gcdcoefs.mass,gcdcoefs.time)
     {
-      if (gcdcoefs.vel.VelocityAsP2()){
+      if (gcdcoefs.vel.hasVelocityAsP2()){
         q3_velocity = new Quad3CL<Point3DCL>(tet, gcdcoefs.vel.GetVelocityAsP2());
         lp2_velocity = new LocalP2CL<Point3DCL>(tet, gcdcoefs.vel.GetVelocityAsP2());
       }
