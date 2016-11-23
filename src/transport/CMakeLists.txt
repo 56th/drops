@@ -24,7 +24,7 @@ exec_ser(ns_transp
     num-quadrature num-renumber num-oseenprecond
     misc-dynamicload)
 if(NOT MPI)
-add_dependencies(ns_transp transport-transportCoeff misc-scalarFunctions misc-vectorFunctions)
+add_dependencies(ns_transp transport-transportCoeff misc-scalarFunctions misc-vectorFunctions spacetimetransp-sttranspCoeff)
 endif(NOT MPI)
 
 add_my_custom_targets(transport)

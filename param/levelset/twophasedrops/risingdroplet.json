@@ -270,7 +270,7 @@
                 "InitialCond":          0,                 // initial conditions (0 = zero, 1/10 stationary flow with  
                                                            //#[-> NavStokes.InitialValue] droplet which includes/dismiss surface tension,  
                                                            // 2 = stationary flow without droplet, -1 = read from file).
-                "InitialFile":          "mg/data",         //#[-> Restart.InputData. Set to "" for InitialCond = -1] file prefix when reading data for initial condition.
+                "InitialFile":          "mg/data",         //#[-> Restart.InputData. Set to "" for InitialCond != -1] file prefix when reading data for initial condition.
                 "BoundaryType":         "0!0!0!0!0!0",     // #[convert -> NavStokes.BoundaryData.Velocity] List of boundary types separated by a !.
                                                            // Each defining a boundary type for one boundary
                                                            // domain ( The following indices may be used:

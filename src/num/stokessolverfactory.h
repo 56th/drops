@@ -347,7 +347,7 @@ class StokesSolverFactoryCL : public StokesSolverFactoryBaseCL<StokesT, Prolonga
     SchurPreBaseCL*     CreateSPc();
 
   public:
-    StokesSolverFactoryCL(StokesT& Stokes, ParamCL& P, ParamCL& PBase);
+    StokesSolverFactoryCL(StokesT& Stokes, ParamCL& PSolver, const ParamCL& PTime);
     ~StokesSolverFactoryCL();
 
     // checks, whether the combination of Oseen solver, A and S preconditioner is valid.
@@ -378,7 +378,7 @@ class StokesSolverFactoryCL : public StokesSolverFactoryBaseCL<StokesT, Prolonga
 
 template <class StokesT, class ProlongationVelT, class ProlongationPT>
 StokesSolverFactoryCL<StokesT, ProlongationVelT, ProlongationPT>::
-    StokesSolverFactoryCL(StokesT& Stokes, ParamCL& PSolver, ParamCL& PTime)
+    StokesSolverFactoryCL(StokesT& Stokes, ParamCL& PSolver, const ParamCL& PTime)
     : base_(Stokes, PSolver),
         kA_(PTime.get<int>("NumSteps") != 0 ? PTime.get<double>("NumSteps")/PTime.get<double>("FinalTime") : 0.0), // PTime.get<int>("NumSteps") == 0: stat. problem
         kM_(PTime.get<double>("Theta")),
