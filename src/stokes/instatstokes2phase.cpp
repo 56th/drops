@@ -2754,7 +2754,7 @@ class SlipBndSystem1TwoPhaseP2CL
     /// set up rhs terms if the boundary is moving
     void setupRhs(const TetraCL& tet, Point3DCL loc_b[10], double t); 
     /// Set up contact line dissipation term when Beta_L =\=0
-    void CLdiss(const TetraCL& tet, LocalSystem1DataCL& loc); 
+    //void CLdiss(const TetraCL& tet, LocalSystem1DataCL& loc); 
 };
 
 void SlipBndSystem1TwoPhaseP2CL::setup(const TetraCL& tet, const SMatrixCL<3,3>& T, const LocalP2CL<>& ls,  LocalSystem1DataCL& loc)
@@ -2880,7 +2880,7 @@ void SlipBndSystem1TwoPhaseP2CL::setupRhs(const TetraCL& tet, Point3DCL loc_b[10
 
 
 /// For the case beta_L =/= 0
-void SlipBndSystem1TwoPhaseP2CL::CLdiss(const TetraCL& tet, LocalSystem1DataCL& loc)  //need to be rewritten
+/*void SlipBndSystem1TwoPhaseP2CL::CLdiss(const TetraCL& tet, LocalSystem1DataCL& loc)  //need to be rewritten
 {
     bool SpeBnd=false;
     for(Uint v=0; v<4; v++)
@@ -2958,7 +2958,7 @@ void SlipBndSystem1TwoPhaseP2CL::CLdiss(const TetraCL& tet, LocalSystem1DataCL& 
             }
         }
     }
-}
+}*/
 
 /// \brief Setup of the local P2 "system 1" on a tetra intersected by the dividing surface.
 class LocalSystem1TwoPhase_P2CL
@@ -3327,7 +3327,7 @@ void System1Accumulator_P2CL::local_setup (const TetraCL& tet)
         local_twophase.setup( T, absdet, tet, ls_loc, t, locInt, loc);
         if(speBnd){
             SlipBndHandler2.setup(tet, T, ls_loc, loc); //update loc for special boundary condtion
-            SlipBndHandler2.CLdiss(tet, loc);
+            //SlipBndHandler2.CLdiss(tet, loc);
         }
     }
         

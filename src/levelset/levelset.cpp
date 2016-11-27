@@ -451,197 +451,41 @@ void MarkInterface ( const LevelsetP2CL::const_DiscSolCL& lset, double width, Mu
     }
 }
 
-/// \brief Accumulator for the Young's force on the three-phase contact line.
-///
-/// Computes the integral
-///         \f[ \sigma \int_{MCL} \cos(\theta)v\cdot \tau ds \f]
-/// with \f$\tau \f$ being the normal direction of the moving contact line in tangential plain of domain boundary.
-//class YoungForceAccumulatorCL : public  TetraAccumulatorCL //removed this LZ
-//{
-// private:
-//    VecDescCL  SmPhi_;
-//    const BndDataCL<>& lsetbnd_;
-//    VecDescCL& f;
-//   // SMatrixCL<3,3> T;
-//    InterfaceTriangleCL triangle;
-//
-//    const double sigma_;
-//    instat_scalar_fun_ptr angle_;	//Young's contact angle
-//    instat_vector_fun_ptr outnormal_;//outnormal of the domain boundary
-//
-//    bool SpeBnd; //special boundary condition
-//
-//   // LocalP1CL<Point3DCL> Grad[10], GradRef[10];
-//    IdxT Numb[10];
-//    LocalP2CL<> velR_p[4][8], velR_n[4][8]; // for P2R basis on children
-// //   LocalP2CL<> loc_phi;
-//
-//  public:
-//    YoungForceAccumulatorCL( const LevelsetP2CL& ls, VecDescCL& f_Gamma, double sigma,instat_scalar_fun_ptr cangle,instat_vector_fun_ptr outnormal)
-//     :  SmPhi_(ls.Phi),lsetbnd_(ls.GetBndData()),f(f_Gamma), sigma_(sigma),angle_(cangle),outnormal_(outnormal)
-//    { ls.MaybeSmooth( SmPhi_.Data);
-//    //P2DiscCL::GetGradientsOnRef( GradRef);
-//    }
-//
-//    void begin_accumulation ()
-//        {
-//            // uncomment for Geomview output
-//            //std::ofstream fil("surf.off");
-//            //fil << "appearance {\n-concave\nshading smooth\n}\nLIST\n{\n";
-//        }
-//        void finalize_accumulation()
-//        {
-//            // uncomment for Geomview output
-//            //fil << "}\n";
-//        }
-//    void visit (const TetraCL&);
-//
-//    TetraAccumulatorCL* clone (int /*tid*/) { return new YoungForceAccumulatorCL ( *this); };
-//};
-//
-//void YoungForceAccumulatorCL::visit ( const TetraCL& t)
-//{
-//	SpeBnd=false;
-//	for(Uint v=0; v<4; v++)
-//	   	if(lsetbnd_.GetBC(*t.GetFace(v))==Slip0BC||lsetbnd_.GetBC(*t.GetFace(v))==SlipBC ||lsetbnd_.GetBC(*t.GetFace(v))==SymmBC )
-//	   	{
-//	   		SpeBnd=true; break;
-//	   	}
-//	if(!SpeBnd)
-//	{
-//		for(Uint v=0; v<6; v++)
-//			if(lsetbnd_.GetBC(*t.GetEdge(v))==Slip0BC||lsetbnd_.GetBC(*t.GetEdge(v))==SlipBC ||lsetbnd_.GetBC(*t.GetEdge(v))==SymmBC)
-//			{
-//				SpeBnd=true; break;
-//			}
-//		if(!SpeBnd)
-//		return;
-//	}
-//    const Uint idx_f=   f.RowIdx->GetIdx();
-//    const bool velXfem= f.RowIdx->IsExtended();
-//    if (velXfem)
-//    	throw DROPSErrCL("WARNING: YoungForceAccumulatorCL : not implemented for velocity XFEM method yet!");
-//  //  double det;
-//
-//   // GetTrafoTr( T, det, t);
-//
-//  //  loc_phi.assign( t, SmPhi_, lsetbnd_);
-//    triangle.BInit( t, SmPhi_,lsetbnd_); //we have to use this init function!!!!!!!!!
-//    triangle.SetBndOutNormal(outnormal_);
-//    for (int v=0; v<10; ++v)
-//    {   const UnknownHandleCL& unk= v<4 ? t.GetVertex(v)->Unknowns : t.GetEdge(v-4)->Unknowns;
-//        Numb[v]= unk.Exist(idx_f) ? unk(idx_f) : NoIdx;
-//    }
-//	LocalP2CL<double> phi[10];
-//	for(Uint i=0; i<10; ++i)
-//		phi[i][i] = 1;
-//	Point3DCL normal_mcl;
-//	double costheta[5];
-//	BaryCoordCL quadBarys[5];
-//	Point3DCL outnormalOnMcl[5]; //outnormal of the domain boundary
-//	double sintheta_D;//sin\theta_d
-//	double weight[5]={0.568888889, 0.47862867,0.47862867,0.236926885,0.236926885};
-//	//integral in [-1,1]
-//	double qupt[5]={0,-0.53846931,0.53846931,-0.906179846,0.906179846};
-//	for (int ch=0; ch<8; ++ch)
-////	for(int ch=8;ch<9;++ch)
-//    {
-//
-//        if (!triangle.ComputeMCLForChild(ch)) // no patch for this child
-//            continue;
-//
-//        BaryCoordCL Barys[2];
-//        Point3DCL pt0,pt1;
-//        Point3DCL midpt;
-//        double length;
-//        Uint ncl=triangle.GetNumMCL();
-//        for(Uint i=0;i<ncl;i++)
-//        {
-//        	length = triangle.GetInfoMCL(i,Barys[0],Barys[1],pt0,pt1);
-//        	normal_mcl = triangle.GetMCLNormal(i);
-//        	sintheta_D= triangle.IsSymmType(i) ? 1 :sin(triangle.GetActualContactAngle(i));
-//        	for(Uint j=0;j<5;j++)
-//        	{
-//        		quadBarys[j]=(Barys[0]+Barys[1])/2+qupt[j]*(Barys[1]-Barys[0])/2;
-//        		midpt=(pt0+pt1)/2 + qupt[j]*(pt1-pt0)/2;
-//        		costheta[j]= triangle.IsSymmType(i) ? 0 : cos(angle_(midpt,0));
-//        		outnormalOnMcl[j]=outnormal_(midpt,0);
-//        	}
-//           	for (int v=0; v<10; ++v)
-//        	{
-//				Point3DCL value;
-//        		const IdxT Numbv= v<10 ? Numb[v] : (velXfem && Numb[v-10]!=NoIdx ? f.RowIdx->GetXidx()[Numb[v-10]] : NoIdx);
-//        		if (Numbv==NoIdx) continue;
-//				for (int j=0; j<5; j++)
-//				{
-//					value += weight[j]*costheta[j]*phi[v](quadBarys[j])*normal_mcl;       // cos (theta_e) v \dot tau_cl
-//					value += weight[j]*sintheta_D*phi[v](quadBarys[j])*outnormalOnMcl[j]; // sin (theta_D) v \dot n
-//
-//				}
-//
-//			    value = value * length/2;
-//        		//higher order quadrature is used!!
-//        		for (int j=0; j<3; ++j)
-//        		{
-//        			f.Data[Numbv+j] += sigma_*value[j];
-//        		}
-//        	}
-//        }
-//    } // Ende der for-Schleife ueber die Kinder
-//}
 
 /// \brief Impoved Accumulator for the Young's force on the three-phase contact line.
-///
+/// The word "imporved" stands for that the improved normal vector of interface triangles are used
 /// Computes the integral
-///         \f[ \sigma \int_{MCL} \cos(\theta)v\cdot \tau ds \f]
-/// with \f$\tau \f$ being the normal direction of the moving contact line in tangential plain of domain boundary.
-/// we compute the force using the outnormal of the levelset instead of the straight contact line
+///         \f[ \sigma \int_{MCL} \cos(\theta_e) v \cdot \tau ds \f]
+/// with \f$\tau \f$ being the normal direction of the moving contact line on the slip boundary.
+/// Computes also the intergral \f[  \sigma \int_{MCL}  \sin (theta_D) v \cdot n ds \f]
+/// with n being the normal of the slip boundary
 class ImprovedYoungForceAccumulatorCL : public  TetraAccumulatorCL
 {
  private:
     VecDescCL  SmPhi_;
     const BndDataCL<>& lsetbnd_;
     VecDescCL& f;
-   // SMatrixCL<3,3> T;
-    InterfaceTriangleCL triangle;
+    InterfaceLineCL line;
 
     const double sigma_;
-    instat_scalar_fun_ptr angle_;    //Young's contact angle
-    instat_vector_fun_ptr outnormal_;//outnormal of the domain boundary
-
-    bool SpeBnd; //special boundary condition
-
-   // LocalP1CL<Point3DCL> Grad[10], GradRef[10];
+    instat_scalar_fun_ptr angle_;    //Young's equilibrium contact angle
+    instat_vector_fun_ptr outnormal_;//outer normal of the (slip) boundary
     IdxT Numb[10];
-    LocalP2CL<> velR_p[4][8], velR_n[4][8]; // for P2R basis on children
- //   LocalP2CL<> loc_phi;
 
   public:
     ImprovedYoungForceAccumulatorCL( const LevelsetP2CL& ls, VecDescCL& f_Gamma, double sigma,instat_scalar_fun_ptr cangle,instat_vector_fun_ptr outnormal)
      :  SmPhi_(ls.Phi),lsetbnd_(ls.GetBndData()),f(f_Gamma), sigma_(sigma),angle_(cangle),outnormal_(outnormal)
-    { ls.MaybeSmooth( SmPhi_.Data);
-    //P2DiscCL::GetGradientsOnRef( GradRef);
-    }
+    { ls.MaybeSmooth( SmPhi_.Data);}
 
-    void begin_accumulation ()
-        {
-            // uncomment for Geomview output
-            //std::ofstream fil("surf.off");
-            //fil << "appearance {\n-concave\nshading smooth\n}\nLIST\n{\n";
-        }
-        void finalize_accumulation()
-        {
-            // uncomment for Geomview output
-            //fil << "}\n";
-        }
+    void begin_accumulation (){}
+    void finalize_accumulation(){}
     void visit (const TetraCL&);
-
     TetraAccumulatorCL* clone (int /*tid*/) { return new ImprovedYoungForceAccumulatorCL ( *this); };
 };
 
 void ImprovedYoungForceAccumulatorCL::visit ( const TetraCL& t)
 {
-    SpeBnd=false;
+    bool SpeBnd = false; //has slip or symmetry bounary segments
     //check if the tetra contains one face or one edge on slip or symmetric boundary.
     for(Uint v=0; v<4; v++)
         if(lsetbnd_.GetBC(*t.GetFace(v))==Slip0BC||lsetbnd_.GetBC(*t.GetFace(v))==SlipBC||lsetbnd_.GetBC(*t.GetFace(v))==SymmBC )
@@ -657,16 +501,16 @@ void ImprovedYoungForceAccumulatorCL::visit ( const TetraCL& t)
                 SpeBnd=true;
                 break;
             }
-        if(!SpeBnd)
-        return;
     }
+    if(!SpeBnd)
+        return;
     const Uint idx_f=   f.RowIdx->GetIdx();
     const bool velXfem= f.RowIdx->IsExtended();
     if (velXfem)
         throw DROPSErrCL("WARNING: ImprovedYoungForceAccumulatorCL : not implemented for velocity XFEM method yet!");
     //Initialize one interface patch
-    triangle.BInit( t, SmPhi_,lsetbnd_); //we have to use this init function!!!!!!!!!
-    triangle.SetBndOutNormal(outnormal_);
+    line.BInit( t, SmPhi_,lsetbnd_); 
+    line.SetBndOutNormal(outnormal_);
     for (int v=0; v<10; ++v)
     {   const UnknownHandleCL& unk= v<4 ? t.GetVertex(v)->Unknowns : t.GetEdge(v-4)->Unknowns;
         Numb[v]= unk.Exist(idx_f) ? unk(idx_f) : NoIdx;
@@ -674,58 +518,48 @@ void ImprovedYoungForceAccumulatorCL::visit ( const TetraCL& t)
     LocalP2CL<double> phi[10];
     for(Uint i=0; i<10; ++i)
         phi[i][i] = 1;
-        
-    Point3DCL normal_mcl[5];     //normal of moving contact lines in tangential surface
-    Point3DCL outnormalOnMcl[5]; //outnormal of the domain boundary
-    double costheta[5];          //cos\theta_s
-    double sintheta_D[5];        //sin\theta_d
-    BaryCoordCL quadBarys[5];
-    double weight[5]={0.568888889, 0.47862867,0.47862867,0.236926885,0.236926885};
-    //integral in [-1,1]
-    double qupt[5]={0,-0.53846931,0.53846931,-0.906179846,0.906179846};
 
-    for (int ch=0; ch<8; ++ch)
-//	for(int ch=8;ch<9;++ch)
+    for (int ch=0; ch<8; ++ch) // go through all the children
     {
-        if (!triangle.ComputeMCLForChild(ch)) // no patch for this child
+        if (!line.ComputeMCLForChild(ch)) // no MCL for this child
             continue;
-        BaryCoordCL Barys[2];
-        Point3DCL pt0,pt1;
-        Point3DCL midpt;
-        double length;
-        Uint ncl=triangle.GetNumMCL();
+
+        Uint ncl=line.GetNumMCL();
         for(Uint i=0;i<ncl;i++)
         {
-            length = triangle.GetInfoMCL(i,Barys[0],Barys[1],pt0,pt1);
-            for(Uint j=0;j<5;j++)
-            {
-                midpt=(pt0+pt1)/2 + qupt[j]*(pt1-pt0)/2;
-                normal_mcl[j] = triangle.GetImprovedMCLNormal(i,(qupt[j]+1)/2);
-                quadBarys[j]=(Barys[0]+Barys[1])/2+qupt[j]*(Barys[1]-Barys[0])/2;
-                costheta[j]=triangle.IsSymmType(i) ? 0 : cos(angle_(midpt,0));
-                sintheta_D[j]=triangle.IsSymmType(i) ? 1 : sin(triangle.GetImprovedActualContactAngle(i,(qupt[j]+1)/2));
-                outnormalOnMcl[j]=outnormal_(midpt,0);
+            BaryCoordCL Barys[2]; //Barycentric coordinates of two end points
+            Point3DCL Pt[2];      //Cartesian coordinates of two end points
+            double length = line.GetInfoMCL(i,Barys[0],Barys[1],Pt[0], Pt[1]);
+            Quad9_1DCL<double> EquilibriumCtAngle(t, Barys, angle_);   
+            Quad9_1DCL<double> DynamicCtAngle = line.GetDynamicCtAngle(t, i);
+            
+            //Note apply member function in GridFunctionCL requires template argument. Possibly a loop here can be avoided.
+            for(int i=0; i< Quad9_1DDataCL::NumNodesC; i++){
+                EquilibriumCtAngle[i] = std:: cos(EquilibriumCtAngle[i]);
+                DynamicCtAngle[i] = std:: sin(DynamicCtAngle[i]);
             }
+            Quad9_1DCL<double> costheta_e = line.IsSymmType(i) ? Quad9_1DCL<double>(0) : EquilibriumCtAngle;  
+            Quad9_1DCL<double> sintheta_d = line.IsSymmType(i) ? Quad9_1DCL<double>(1) : DynamicCtAngle; 
+
+            Quad9_1DCL<Point3DCL> normal_MCL = line.GetImprovedMCLNormalOnSlipBnd(t, i);     //outer normal of moving contact lines on the slip surface
+            Quad9_1DCL<Point3DCL> normal_SlipBnd(t, Barys, outnormal_);                      //outer normal of the slip boundary
             for (int v=0; v<10; ++v)
             {
+                Quad9_1DCL<double> phiquadv(phi[v], Barys);
                 Point3DCL value;
                 const IdxT Numbv= v<10 ? Numb[v] : (velXfem && Numb[v-10]!=NoIdx ? f.RowIdx->GetXidx()[Numb[v-10]] : NoIdx);
                 if (Numbv==NoIdx) continue;
-                //5 points Gauss–Legendre quadrature is used.
-                for (int j=0; j<5; j++)
-                {
-                    value += weight[j]*costheta[j]*phi[v](quadBarys[j])*normal_mcl[j];       // cos (theta_e) v \dot tau_cl
-                    value += weight[j]*sintheta_D[j]*phi[v](quadBarys[j])*outnormalOnMcl[j]; // sin (theta_D) v \dot n
-                }
-                value = value * length/2;
+                value += Quad9_1DCL<Point3DCL>(normal_MCL * costheta_e * phiquadv ).quad(0.5*length); // cos (theta_e) v \dot tau_cl
+                value += Quad9_1DCL<Point3DCL>(normal_SlipBnd * sintheta_d * phiquadv ).quad(0.5*length); // sin (theta_D) v \dot n
                 for (int j=0; j<3; ++j)
                 {
                     f.Data[Numbv+j] += sigma_*value[j];
                 }
             }
         }
-    } // Ende der for-Schleife ueber die Kinder
+    } 
 }
+
 
 //*****************************************************************************
 //                               LevelsetP2CL

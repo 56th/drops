@@ -62,10 +62,10 @@ class InterfacePatchCL
     int numtriangles_;    ///< number of triangles in the intersection with the interface (0, 1, 2);
     Point3DCL Coord_[10]; ///< coordinates of the vertices and edge-barycenters of T
 
-    bool cut_point_on_face[4][4];     ///< if (i,j)-th value is true, the i-th point of the cut is on j-th face
-    BndCondT  BC_Face_[4];				  ///< boundary condition type for all four faces
-    BndCondT  BC_Edge_[6];				///< boundary condition type for all six edges
-  //  Point3DCL outnormal_[4];		  ///< out normal of the faces
+    bool cut_point_on_face[4][4];       ///< if (i,j)-th value is true, the i-th point of the cut is on j-th face
+    BndCondT  BC_Face_[4];              ///< boundary condition type for all four faces
+    BndCondT  BC_Edge_[6];              ///< boundary condition type for all six edges
+  //  Point3DCL outnormal_[4];          ///< out normal of the faces
 
 
   private:
@@ -162,38 +162,50 @@ class InterfaceTriangleCL : public InterfacePatchCL
     double         DetA_;   //detminant = 2 * area of triangle
     Point3DCL       B_[3];
     Point2DCL       ab_;
-    Uint     numMCL_;	       //number of moving contact lines
-    Uint     IdxMCL_[4][2]; //the edge index  for each contact line
-    instat_vector_fun_ptr outnormal_; ///the outnormal of the boundary. instat might be useful for varying boundary.
 
     BaryCoordCL TransformToSubTetra (const BaryCoordCL& b); ///< compute st_*b \todo remove this by introducing a column-oriented small matrix class
-    bool SymmType[4];              //store if a contact line segment is symmetric
 
   public:
     bool ComputeForChild( Uint ch);                            ///< returns true, if a patch exists for this child
-    bool ComputeMCLForChild(Uint ch);                          ///< returns true, if a moving contact line exists for this child
-                                                               ///< called after BInit()!!
-    Uint GetNumMCL();	                                          ///< returns numMCL_
-    void SetBndOutNormal(instat_vector_fun_ptr outnormal);     ///set outnormal
-    //double GetInfoMCL(Uint v, BaryCoordCL& bary0, BaryCoordCL& bary1, Point3DCL& pt0, Point3DCL& pt1, Uint& face, Point3DCL& bnd_normal);
-    double GetInfoMCL(Uint v, BaryCoordCL& bary0, BaryCoordCL& bary1, Point3DCL& pt0, Point3DCL& pt1);
+                                                               ///< it must be called after BInit()
     double GetAbsDet( Uint tri= 0) const { return DetA_*(tri==0 ? 1.0 : GetAreaFrac()); } ///< Returns the Determinant for surface integration on the triangle \p tri.
     double GetAreaFrac()   const { return intersec_==4 ? ab_[0]+ab_[1]-1 : 0; }                   ///< Quotient of the areas of the first and the second triangle.
     template<class ValueT>
     ValueT quad2D( const LocalP2CL<ValueT>&, Uint tri= 0) const;  ///< integrate on triangle \p tri, quadrature exact up to degree 2
-    const Point3DCL& GetGradId( Uint i) const { return B_[i]; }   ///< Returns the projection of the i-th standard-basis-vector of \f$R^3\f$ on the patch.
+    const Point3DCL& GetGradId( Uint i) const { return B_[i]; }   ///< Returns the projection of the i-th standard-basis-vector of \f$R^3\f$ on the patch.    
     Point3DCL GetNormal () const;                         ///< Returns the unit normal to the linear approximation of \f$\Gamma\f$, that points from \f$\{\varphi<0\}\f$ to \f$\{\varphi<0\}\f$.
     Quad5_2DCL<Point3DCL> GetImprovedNormal(Uint) const;  ///< Returns the improved unit normal
-    Point3DCL GetImprovedNormalOnMCL(Uint,double bary1D) const;  ///< Returns the improved unit normal on moving contact line
-    Point3DCL GetMCLNormal(Uint) const;                          ///< Returns the unit normal to the contact line in tangential surface of the boundary
-    Point3DCL GetImprovedMCLNormal(Uint v,double bary1D) const; ///< Returns the unit normal to the contact line in tangential surface of the boundary
-                                                            ///computed in an improved way using levelset function
-                                                            ///v denotes the v-th contact line(at most two). bary1D is the bary coordinate on the straight contact line
-                                                            ///call after SetBndoutNormal()
-    double GetActualContactAngle(Uint) const;               ///< Returns the contact angle 
-    double GetImprovedActualContactAngle(Uint,double bary1D) const;	 ///< Returns the contact angle
     Point3DCL ApplyProj( const Point3DCL& grad) const { return grad[0]*B_[0] + grad[1]*B_[1] + grad[2]*B_[2]; }
-    bool IsSymmType(Uint i) {return SymmType[i];}    ///<return if a contact line segment is symmetric
+};
+
+//***********************************************************************************************************
+// InterfaceLineCL is used to handle the cases in which the interface intersects with slip/symmetry boundary.
+// The number of contact line segments are computed and the information of the end nodes of the segments are
+// computed too. In addition, the normal vectors at the contact line are computed.
+//***********************************************************************************************************
+class InterfaceLineCL : public InterfacePatchCL
+{
+  private:
+    Uint     numMCL_;	                      ///< number of moving contact lines (MCL)
+    Uint     IdxMCL_[4][2];                ///< the edge index for each contact line
+    instat_vector_fun_ptr outnormal_;      ///< the outer normal of the (slip) boundary
+    bool SymmType[4];                      ///< store if a contact line segment is symmetric
+
+  public:
+    bool ComputeMCLForChild(Uint ch);                          ///< returns true, if a moving contact line exists for this child
+                                                               ///< it must be called after BInit()
+    Uint GetNumMCL();	                                          ///< returns number of MCL segmetns
+    void SetBndOutNormal(instat_vector_fun_ptr outnormal);     ///< set the outer normal of the slip boundary
+    bool IsSymmType(Uint i) {return SymmType[i];}              ///<return if a contact line segment is on symmetry boundary
+    //double GetInfoMCL(Uint v, BaryCoordCL& bary0, BaryCoordCL& bary1, Point3DCL& pt0, Point3DCL& pt1, Uint& face, Point3DCL& bnd_normal);
+    double GetInfoMCL(Uint v, BaryCoordCL& bary0, BaryCoordCL& bary1, Point3DCL& pt0, Point3DCL& pt1); ///< return the length of the MCL
+    Quad9_1DCL<Point3DCL> GetImprovedNormalAtMCL(Uint v) const;  ///< Returns the improved unit normal of the interface at the moving contact line
+                                                                 ///set the BaryCoord and Point3D of two end nodes
+    Quad9_1DCL<Point3DCL> GetImprovedMCLNormalOnSlipBnd(const TetraCL& t, Uint v) const;    ///< Returns the unit outer normal at the contact line which lies on the slip boundary                                                           ///computed in an improved way using levelset function
+                                                                            ///v denotes the v-th contact line. 
+                                                                            ///It must be called after SetBndoutNormal() 
+    Quad9_1DCL<double> GetDynamicCtAngle(const TetraCL& t, Uint v) const;   ///< Returns the contact angle
+
 };
 
 

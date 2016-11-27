@@ -34,7 +34,7 @@
 
 namespace DROPS
 {
-
+typedef double    (*scalar_fun_ptr)(double);
 typedef double    (*instat_scalar_fun_ptr)(const Point3DCL&, double);
 typedef Point3DCL (*instat_vector_fun_ptr)(const Point3DCL&, double);
 typedef double    (*scalar_tetra_function)(const TetraCL&, const BaryCoordCL&, double);
@@ -888,6 +888,69 @@ DROPS_DEFINE_VALARRAY_DERIVATIVE(Quad5CL, T, base_type)
     inline T quadP2 (int i, double absdet) const;
 };
 
+/// \brief Contains the nodes and weights of a Gauss–Legendre quadrature rule on the reference interval [-1 1]. 
+/// It uses 5 nodes an is exact up to degree 9.
+
+class Quad9_1DDataCL
+{
+  public:
+    Quad9_1DDataCL (){};
+
+    enum { NumNodesC= 5 };
+    enum { Dim = 1 };
+
+    static const double        Node[NumNodesC];   ///< quadrature nodes
+    static const double        Weight[NumNodesC]; ///< quadrature weights for each node
+    
+    /// Calculates the barycentric coordinates of the quadrature points
+    /// of the interval (in 1D) given by the first argument with respect to the
+    /// tetrahedron and stores them in the second argument.
+    /// RAIterT is a random-access-iterator to a sequence of BaryCoordCL
+    template <class RAIterT>
+    static void SetBaryCoord (const BaryCoordCL* const, RAIterT);
+};
+
+template<class T=double>
+class Quad9_1DCL: public GridFunctionCL<T>
+{
+  public:
+    typedef GridFunctionCL<T> base_type;
+    typedef typename base_type::value_type value_type;
+    typedef typename base_type::instat_fun_ptr instat_fun_ptr;
+    typedef Quad9_1DDataCL DataClass;
+
+  protected:
+    typedef Quad9_1DCL<T> self_;
+
+  public:
+    Quad9_1DCL(): base_type(value_type(), DataClass::NumNodesC) {}
+    Quad9_1DCL(const value_type& t): base_type( t, Quad9_1DCL::NumNodesC) {}
+    Quad9_1DCL(const TetraCL&, const BaryCoordCL* const, instat_fun_ptr, double= 0.0);
+    Quad9_1DCL(const LocalP1CL<value_type>&, const BaryCoordCL*const );
+    Quad9_1DCL(const LocalP2CL<value_type>&, const BaryCoordCL*const );
+
+DROPS_DEFINE_VALARRAY_DERIVATIVE(Quad9_1DCL, T, base_type)
+
+    inline self_&
+    assign(const TetraCL&, const BaryCoordCL* const, instat_fun_ptr , double= 0.0);
+    inline self_&
+    assign(const LocalP1CL<value_type>&, const BaryCoordCL* const);
+    inline self_&
+    assign(const LocalP2CL<value_type>&, const BaryCoordCL* const);
+
+    /// Calculates the barycentric coordinates of the quadrature points
+    /// of the interval (in 1D) given by the first argument with respect to the
+    /// tetrahedron and stores them in the second argument.
+    static void SetBaryCoord (const BaryCoordCL* const p, BaryCoordCL* NodeInTetra) {
+        DataClass::SetBaryCoord ( p, NodeInTetra);
+    }
+    // Integration: using explicit numbers as weights instead of using member variable from DataClass saves two muliplication operations.
+    T quad (double absdet) const {
+      return absdet*(0.5688888889 *(*this)[0] + 0.4786286705*((*this)[1]+(*this)[2]) + 0.2369268851*((*this)[3]+(*this)[4]) );
+    }
+};
+
+
 /// \brief Contains the nodes and weights of a positive quadrature rule on the reference triangle. It uses 7 nodes an is exact up to degree 5.
 ///
 /// The data is initialized exactly once on program-startup by the global object in num/discretize.cpp.
@@ -989,6 +1052,8 @@ class Quad5_4DDataCL
     static STBaryCoordCL         Node[NumNodesC];   ///< quadrature nodes
     static const double        Weight[NumNodesC]; ///< quadrature weights for each node
 };
+
+
 
 
 
