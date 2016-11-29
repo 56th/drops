@@ -212,6 +212,10 @@ template <class VertexCutMergingPolicyT>
     vertexes_.swap( edgecut.cut_vertex_container());
 }
 
+
+//***************************************************************************************************
+//                                        BndTriangPartitionCL
+//***************************************************************************************************
 template <class VertexCutMergingPolicyT>
  const BndTriangPartitionCL::TriangleT BndTriangPartitionCL::make_sub_triangle(const RefTrianglePartitionCL::TriangleT& ref_tri, const PrincipalLatticeCL::TetraT& lattice_tet,
         const double lset[4], Uint lattice_num_vertexes, VertexCutMergingPolicyT& edgecut)
@@ -245,7 +249,7 @@ template <class VertexPartitionPolicyT, class VertexCutMergingPolicyT>
 
     VertexCutMergingPolicyT edgecut( lat.vertex_begin()); // Stores the genuine cuts.
 
-    TriangleContT  loc_triangles; // temporary container for the positive tetras.
+    TriangleContT  loc_triangles; // temporary container for the positive triangle.
     double loc_ls[4];
     byte   loc_ls_sign[4];
     for (PrincipalLatticeCL::const_tetra_iterator lattice_tet= lat.tetra_begin(), lattice_end= lat.tetra_end(); lattice_tet != lattice_end; ++lattice_tet) {
@@ -254,7 +258,6 @@ template <class VertexPartitionPolicyT, class VertexCutMergingPolicyT>
         bool OnCutBnd = on_cutBnd( ls, ls_sign, lat, *lattice_tet, loc_ls, loc_ls_sign, face);
         if(OnCutBnd)
         {
-            //std::cout<<"****************** One cut boundary face is found"<<std::endl;
             const RefTrianglePartitionCL cut(loc_ls_sign, Ubyte(face));                          //casting from unsigned int to unsigned char?
             for (RefTrianglePartitionCL::const_triangle_iterator it= cut.triangle_begin(), end= cut.triangle_end(); it != end; ++it)
                 (cut.sign( it) == -1 ? triangles_ : loc_triangles).push_back( make_sub_triangle(

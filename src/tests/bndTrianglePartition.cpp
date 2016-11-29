@@ -58,7 +58,7 @@ void test_triangle_partition()
               std::cout << "The triangle is cut to " << tri.size() << " Sub-triangles;"<<std::endl;
               for (DROPS::RefTrianglePartitionCL::const_triangle_iterator it= tri.triangle_begin(), end= tri.triangle_end(); it != end; ++it)
               std::cout << "Sign of the triangle: " <<tri.sign(it)<< " Indices of vertices: "<<int((*it)[0])<<" "<< int((*it)[1])<< " "<<int((*it)[2]) <<std::endl;
-              std::cout <<"TrianglePartitionCL------------------------------------------------------"<<std::endl;			  
+              std::cout <<"TrianglePartitionCL------------------------------------------------------"<<std::endl; 
               BndTri.make_partition2D<DROPS::SortedVertexPolicyCL, DROPS::MergeCutPolicyCL> ( DROPS::PrincipalLatticeCL::instance(1), int(VertexNum), ls_value);
               std::cout<< "Size of negative triangle(s): "<< BndTri.triangle_size(DROPS::NegTetraC)<<std::endl;
               for (DROPS::BndTriangPartitionCL::const_triangle_iterator it= BndTri.triangle_begin(), end= BndTri.triangle_end(); it != end; ++it)
@@ -67,7 +67,7 @@ void test_triangle_partition()
                 consistency=false;
               c++;
           }
-    std::cout <<"TrianglePartitionCL------------------------------------------------------"<<std::endl;	
+    std::cout <<"TrianglePartitionCL------------------------------------------------------"<<std::endl;
     if(false)
         std::cout<<"The vertex size and the triangle size of BndTrianglePartitionCL is not consistent with Ref..."<<std::endl;
     else
@@ -98,7 +98,7 @@ void test_bnd_integral()
     DROPS::BrickBuilderCL brick(orig, 2.*DROPS::std_basis<3>(1), 2.*DROPS::std_basis<3>(2), 2.*DROPS::std_basis<3>(3), num_sub, num_sub, num_sub);
     DROPS::MultiGridCL mg( brick);
     const DROPS::PrincipalLatticeCL& lat= DROPS::PrincipalLatticeCL::instance( num_sub_lattice);
-    DROPS::GridFunctionCL<> ls( lat.vertex_size());	
+    DROPS::GridFunctionCL<> ls( lat.vertex_size());
     DROPS::BndTriangPartitionCL BndTri;
     double area_neg= 0.;
     double area_pos= 0.;
@@ -119,7 +119,6 @@ void test_bnd_integral()
                 //double tmp_neg, tmp_pos;
                 area_neg +=quad( integrand, qdom, DROPS::NegTetraC);
                 area_pos +=quad( integrand, qdom, DROPS::PosTetraC);
-                //area_neg+= tmp_neg; area_pos+= tmp_pos;
             }
         }
     }

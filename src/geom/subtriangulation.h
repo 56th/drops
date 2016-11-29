@@ -205,8 +205,10 @@ class SurfacePatchCL
 };
 
 
-/// \brief Partition the boundary face cut by the interface to sub-triangles
-// Todo: TetraSignEnum is confusing for understanding the codes, rename to TriangleSignEnum maybe
+/// \brief In cases that a triangle on the boundary is cut by the interface of two fluids, we want to partition this cut triangle to subtriangles for integration.
+/// This class partitions the cut triangle by the interface on the boundary to sub-triangles
+/// Todo: TetraSignEnum is confusing for understanding the codes, rename to TriangleSignEnum maybe
+/// If you add/change functionalities or refactor code of this class, please check the unit test case: Test/bndTrianglePartition.cpp
 class BndTriangPartitionCL
 {
   public:
@@ -218,9 +220,6 @@ class BndTriangPartitionCL
     typedef LatticePartitionTypesNS::const_vertex_iterator const_vertex_iterator;
 
   private:
-    //typedef std::pair<Uint, Uint> RenumberVertexPairT; ///< Helper type to handle zero-vertexes
-
-
     TriangleContT     triangles_;               ///< All triangles of the cut boundary face in the order: negative triangles, positive triangles
     Uint       pos_triangles_begin_;            ///< begin of the subsequence of positive triangles
 
