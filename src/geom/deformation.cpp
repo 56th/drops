@@ -147,7 +147,6 @@ void MeshDeformationCL::CheckForCurved(){
             Point3DCL dc;
             for (Uint k = 0; k < 3; ++k)
                 dc[k] = (*pointsol_).Data[edge.Unknowns(pidx)+k] - c[k];
-            //std::cout << " dc.norm = " << dc.norm() << std::endl;
             if (dc.norm() > 2e-8 * edgelength) // angle is larger than approx. 1e-8
             {
                 curved = true;
@@ -200,16 +199,6 @@ LocalP2CL<Point3DCL> MeshDeformationCL::GetLocalP2Deformation( const TetraCL& te
 
 LocalP1CL<Point3DCL> MeshDeformationCL::GetLocalP1Deformation( const TetraCL& tet){
     return LocalP1CL<Point3DCL>(tet, *pointsol_, *bnd_);
-/*    LocalP1CL<Point3DCL> ret;
-    const Uint pidx( mlidx_->GetIdx());
-    for (Uint i = 0; i < 4; ++i)
-    {
-        const VertexCL& v(*tet.GetVertex(i));
-        if (!v.Unknowns.Exist(pidx)) throw DROPSErrCL(" MeshDeformationCL::GetLocalP1Deformation: no vertex value!");
-        for (Uint k = 0; k < 3; ++k)
-            ret[i][k] = (*pointsol_).Data[v.Unknowns(pidx)+k];
-    }
-    return ret;*/
 }
 
 Point3DCL MeshDeformationCL::GetTransformedVertexCoord( const VertexCL &v)

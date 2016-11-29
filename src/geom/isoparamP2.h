@@ -34,11 +34,11 @@ namespace DROPS
 
 /** calculates the transpose of the transformation  Tetra -> RefTetra at
  *  each point (important for isoparametric elements).
- *  if \f$ \Phi \f$ denotes the trafo from \f$ T_ref \f$ to \f$ T \f$
+ *  if \f$ \Phi \f$ denotes the transformation from \f$ T_ref \f$ to \f$ T \f$
  *  then the result is \f$ T = (\nabla \Phi)^{-T} \f$ and 
  *  det \f$ = det(\nabla \Phi) \f$
- *  Inputs are p the point on the reference triangle and pt, the TEN points 
- *  of the second order curved tetraeder as a CurvedTetraCL.  */
+ *  Inputs are p,  the coordinates on the reference tetrahedron 
+ *  also ct, the ten points on the curved tetrahedron        */
 inline void GetTrafoTrAtPoint( SMatrixCL<3,3>& T, double& det, const Point3DCL& p, const LocalP2CL<Point3DCL> & ct)
 {
     double M[3][3];  
@@ -70,6 +70,13 @@ inline void GetTrafoTrAtPoint( SMatrixCL<3,3>& T, double& det, const Point3DCL& 
     T(2,2)= (M[0][0]*M[1][1] - M[1][0]*M[0][1])/det;      
 }
 
+/** calculates the transpose of the transformation  Tetra -> RefTetra at
+ *  each point (important for isoparametric elements).
+ *  if \f$ \Phi \f$ denotes the transformation from \f$ T_ref \f$ to \f$ T \f$
+ *  then the result is \f$ T = (\nabla \Phi)^{-T} \f$ and 
+ *  det \f$ = det(\nabla \Phi) \f$
+ *  Inputs are p,  the barycentric coordinates on the reference tetrahedron
+ *  also ct, the ten points on the curved tetrahedron*/
 inline void GetTrafoTrAtPoint( SMatrixCL<3,3>& T, double& det, const BaryCoordCL& p, const LocalP2CL<Point3DCL> & ct)
 {
     double M[3][3];  
@@ -135,14 +142,15 @@ inline void GetTrafoAsQuad( const LocalFE & ct, QuadCL_double & adet, QuadCL_mat
         adet[i] = std::abs(adet[i]);
     }
 }
+//*************************************************************************************************
+//*                                  Two dimentional transformation
+//*************************************************************************************************
 
-/** calculates the transpose of the transformation  Tetra -> RefTetra at
- *  each point (important for isoparametric elements).
- *  if \f$ \Phi \f$ denotes the trafo from \f$ T_ref \f$ to \f$ T \f$
- *  then the result is \f$ T = (\nabla \Phi)^{-T} \f$ and 
- *  det \f$ = det(\nabla \Phi) \f$
- *  Inputs are p the point on the reference triangle and pt, the TEN points 
- *  of the second order curved tetraeder as a CurvedTetraCL.  */
+/** calculates the transpose of the transformation  Triangle -> RefTriangle at
+ *  each point (important for isoparametric elements). 
+ *  Inputs are p,  the coordinates on the reference tetrahedron in which the triangle lie
+ *  also ct, the ten points on the curved tetrahedron in which the triangle lie
+ *  Barycentric coordinates of the vertices of the triangle  */
 inline void Get2DTrafoTrAtPoint( SMatrixCL<3,3>& T, double& adet, Point3DCL& Nout, const Point3DCL& p, const LocalP2CL<Point3DCL> & ct, BaryCoordCL Bary[3])
 {
     double M[3][3], M2D[3][3];  
@@ -189,9 +197,11 @@ inline void Get2DTrafoTrAtPoint( SMatrixCL<3,3>& T, double& adet, Point3DCL& Nou
     T(2,2)= (M[0][0]*M[1][1] - M[1][0]*M[0][1])/det; 
     cross_product(Nout, v1, v2);
     adet = Nout.norm();
-    Nout /= Nout.norm(); 
+    Nout /= adet; 
 }
 
+// For isoparametric FEM, the transformation matrix and the determinant for the transformation from the reference triangel to a triangle is not a constant.
+// This function compute the transformation matrix T, the determinant adet and also the outer normal vector on the triangle
 template<class LocalFE, class Quad2DCL_double, class Quad2DCL_Point3DCL, class QuadCL_mat>
 inline void Get2DTrafoAsQuad( const LocalFE & ct, BaryCoordCL Bary[3], Quad2DCL_Point3DCL& Nout, Quad2DCL_double & adet, QuadCL_mat & T)
 {

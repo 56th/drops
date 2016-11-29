@@ -2731,20 +2731,19 @@ class SlipBndSystem1TwoPhaseP2CL
 
     const VecDescCL&    Phi_;
     const BndDataCL<>& lsetbnd_;
-    InterfaceTriangleCL triangle;
     instat_vector_fun_ptr outnormal_;                       //outnormal of the domain boundary
-
-    bool SpeBnd;                                            //special boundary condition
     const double mu1_, mu2_;                                //dynamic viscosities
-    const double beta1_, beta2_;                            //Slip length, beta1_=beta2_=0 for symmetric Bnd;
+    const double beta1_, beta2_;                            //beta1_=beta2_=0 for symmetric Bnd;
     const double betaL_; 
     const double alpha_;                                    //Coefficient for Nitche method
     LocalP1CL<Point3DCL> GradRef[10];
     std::valarray<double> ls_loc;
 
   public:
-    SlipBndSystem1TwoPhaseP2CL(const StokesBndDataCL& BndData, const VecDescCL& Phi, const BndDataCL<>& lsetbnd, instat_vector_fun_ptr outnormal, double mu1, double mu2, const double beta1=0, const double beta2=0, const double betaL=0, const double alpha=0)
-    : lat( PrincipalLatticeCL::instance(2)), BndData_(BndData), Phi_(Phi), lsetbnd_(lsetbnd), outnormal_(outnormal), mu1_(mu1), mu2_(mu2), beta1_(beta1), beta2_(beta2), betaL_(betaL), alpha_(alpha), ls_loc( lat.vertex_size())
+    SlipBndSystem1TwoPhaseP2CL(const StokesBndDataCL& BndData, const VecDescCL& Phi, const BndDataCL<>& lsetbnd, 
+    instat_vector_fun_ptr outnormal, double mu1, double mu2, const double beta1=0, const double beta2=0, const double betaL=0, const double alpha=0)
+    : lat( PrincipalLatticeCL::instance(2)), BndData_(BndData), Phi_(Phi), lsetbnd_(lsetbnd), 
+    outnormal_(outnormal), mu1_(mu1), mu2_(mu2), beta1_(beta1), beta2_(beta2), betaL_(betaL), alpha_(alpha), ls_loc( lat.vertex_size())
     { P2DiscCL::GetGradientsOnRef( GradRef); }
 
     double mu  (int sign) const { return sign > 0 ?  mu1_  : mu2_; }
@@ -2753,8 +2752,8 @@ class SlipBndSystem1TwoPhaseP2CL
     void setup(const TetraCL& tet, const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, LocalSystem1DataCL& loc);  
     /// set up rhs terms if the boundary is moving
     void setupRhs(const TetraCL& tet, Point3DCL loc_b[10], double t); 
-    /// Set up contact line dissipation term when Beta_L =\=0
-    //void CLdiss(const TetraCL& tet, LocalSystem1DataCL& loc); 
+    /// Set up the contact line dissipation term when Beta_L =\=0
+    void setupCL_dissipation(const TetraCL& tet, LocalSystem1DataCL& loc); 
 };
 
 void SlipBndSystem1TwoPhaseP2CL::setup(const TetraCL& tet, const SMatrixCL<3,3>& T, const LocalP2CL<>& ls,  LocalSystem1DataCL& loc)
@@ -2814,14 +2813,12 @@ void SlipBndSystem1TwoPhaseP2CL::setup(const TetraCL& tet, const SMatrixCL<3,3>&
             double temp1 = symmBC? 0: beta1_;
             double temp2 = symmBC? 0: beta2_;
             for(Uint i=0; i<10; ++i){
-                for(Uint j=0; j<=i; ++j){	
+                for(Uint j=0; j<=i; ++j){
                     quad( basisP2[i] * basisP2[j], q5dom, locInt[0].mass2D[i][j], locInt[1].mass2D[i][j]);
                     quad( gradP1[i] * basisP2[j] + gradP1[j] * basisP2[i], q5dom, locInt[0].grad2D[i][j], locInt[1].grad2D[i][j]);
                     // three additional terms
                     dm[j][i](0, 0)= dm[j][i](1, 1) = dm[j][i](2, 2) = temp1 * locInt[0].mass2D[i][j] + temp2* locInt[1].mass2D[i][j];
                     dm[j][i]     += ( (alpha_/h1*mu1_ -temp1)* locInt[0].mass2D[i][j] + (alpha_/h2* mu2_ - temp2) * locInt[1].mass2D[i][j] )* SMatrixCL<3,3> (outer_product(normal, normal));
-                    //dm[j][i]     += ( (alpha_/h1*mu1_)* locInt[0].mass2D[i][j] + (alpha_/h2* mu2_ ) * locInt[1].mass2D[i][j] )* SMatrixCL<3,3> (outer_product(normal, normal));
-                    //if(BndData_.Vel.GetBC(*tet.GetFace(k))!= SymmBC) not necessary
                     dm[j][i]     -= ( 2. * mu1_ * locInt[0].grad2D[i][j]+ 2.* mu2_ * locInt[1].grad2D[i][j] )* SMatrixCL<3,3> (outer_product(normal, normal));  
                     loc.Ak[j][i] += dm[j][i];
                     if (i != j){
@@ -2837,21 +2834,18 @@ void SlipBndSystem1TwoPhaseP2CL::setup(const TetraCL& tet, const SMatrixCL<3,3>&
 /// for non homogeneous slip boundary condition (the slip wall is moving)
 void SlipBndSystem1TwoPhaseP2CL::setupRhs(const TetraCL& tet, Point3DCL loc_b[10], double t)
 {
-
     for (Uint k =0; k< 4; ++k){ //Go throught all faces of a tet
         //BndTriangPartitionCL partition;
         //QuadDomainCL q5dom;
         Point3DCL normal;
         Uint unknownIdx[6];
-        //GridFunctionCL<double>   basisP2[10];
-        //GridFunctionCL<double>   gradP1[10];
         LocalP2CL<double> phi[6]; 
         Quad5_2DCL<double> locP2[6];
         Quad5_2DCL<Point3DCL> WallVel;
         BaryCoordCL bary[3];
         if( BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC ){
             const FaceCL& face = *tet.GetFace(k);
-            double absdet = FuncDet2D(	face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
+            double absdet = FuncDet2D(face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
                                             face.GetVertex(2)->GetCoord()-face.GetVertex(0)->GetCoord()); 
             tet.GetOuterNormal(k, normal);
             for (Uint i= 0; i<3; ++i)    
@@ -2878,77 +2872,59 @@ void SlipBndSystem1TwoPhaseP2CL::setupRhs(const TetraCL& tet, Point3DCL loc_b[10
     }
 }
 
-
 /// For the case beta_L =/= 0
-/*void SlipBndSystem1TwoPhaseP2CL::CLdiss(const TetraCL& tet, LocalSystem1DataCL& loc)  //need to be rewritten
+void SlipBndSystem1TwoPhaseP2CL::setupCL_dissipation(const TetraCL& tet, LocalSystem1DataCL& loc)  //need to be rewritten
 {
-    bool SpeBnd=false;
+    bool SlipBnd=false;
     for(Uint v=0; v<4; v++)
-    if(lsetbnd_.GetBC(*tet.GetFace(v))==Slip0BC||lsetbnd_.GetBC(*tet.GetFace(v))==SlipBC)
-    {
-        SpeBnd=true;
-        break;
-    }
-    if(!SpeBnd)
+        if(lsetbnd_.GetBC(*tet.GetFace(v))==Slip0BC||lsetbnd_.GetBC(*tet.GetFace(v))==SlipBC)
+        {
+            SlipBnd=true;
+            break;
+        }
+    if(!SlipBnd)
     {
         for(Uint v=0; v<6; v++)
             if(lsetbnd_.GetBC(*tet.GetEdge(v))==Slip0BC||lsetbnd_.GetBC(*tet.GetEdge(v))==SlipBC)
             {
-                SpeBnd=true;
+                SlipBnd=true;
                 break;
             }
-        if(!SpeBnd)
-        return;
     }
-    //Initialize one interface patch
-    triangle.BInit( tet, Phi_,lsetbnd_); 
-    triangle.SetBndOutNormal(outnormal_);
-    Point3DCL normal_mcl[5];     //normal of moving contact lines in tangential surface
-    Point3DCL outnormalOnMcl[5];    //outnormal of the domain boundary
-    BaryCoordCL quadBarys[5];
-    double weight[5]={0.568888889, 0.47862867,0.47862867,0.236926885,0.236926885};
-    //integral in [-1,1]
-    double qupt[5]={0,-0.53846931,0.53846931,-0.906179846,0.906179846};
-    
-    SMatrixCL<3, 3> dm[10][10];
+    if(!SlipBnd)
+        return;
+        
+    InterfaceLineCL line;
+    line.BInit( tet, Phi_,lsetbnd_); 
+    line.SetBndOutNormal(outnormal_);
     LocalP2CL<double> phi[10]; 
     for(Uint i=0; i<10; ++i)
     {
         phi[i][i] = 1;
     }
+    
+    SMatrixCL<3, 3> dm[10][10];
     for (int ch=0; ch<8; ++ch)
     {
-        if (!triangle.ComputeMCLForChild(ch)) // no  for this child
+        if (!line.ComputeMCLForChild(ch)) // no MCL for this child
             continue;
-        BaryCoordCL Barys[2];
-        Point3DCL pt0,pt1;
-        Point3DCL midpt;
-        double length;
-        Uint ncl=triangle.GetNumMCL();
+        Uint ncl=line.GetNumMCL();
         for(Uint i=0;i<ncl;i++)
         {
-            length = triangle.GetInfoMCL(i,Barys[0],Barys[1],pt0,pt1);
-            for(Uint j=0;j<5;j++)
-            {
-                midpt=(pt0+pt1)/2 + qupt[j]*(pt1-pt0)/2;
-                normal_mcl[j] = triangle.GetImprovedMCLNormal(i,(qupt[j]+1)/2);
-                quadBarys[j]=(Barys[0]+Barys[1])/2+qupt[j]*(Barys[1]-Barys[0])/2;
-                outnormalOnMcl[j]=outnormal_(midpt,0);
-            }
+            BaryCoordCL Barys[2]; //Barycentric coordinates of two end points
+            Point3DCL Pt[2];      //Cartesian coordinates of two end points
+            double length = line.GetInfoMCL(i,Barys[0],Barys[1], Pt[0], Pt[1]);
+            Quad9_1DCL<Point3DCL> normal_MCL = line.GetImprovedMCLNormalOnSlipBnd(tet, i);     //outer normal of moving contact lines on the slip surface
             for (Uint i=0; i<10; ++i)
             {
+                Quad9_1DCL<double> phiquadi(phi[i], Barys);
+                Quad9_1DCL<Point3DCL> phiquadiN (phiquadi * normal_MCL);
                 for(Uint j=0; j<=i; ++j)
                 {
-                    //5 points Gauss–Legendre quadrature is used.
-                    for(int m =0; m<3; m++){
-                        for(int n=0; n<3; n++){
-                            for (int v=0; v<5; v++)
-                            {
-                                dm[j][i](m, n) += weight[v]*phi[i](quadBarys[v])*phi[j](quadBarys[v])*normal_mcl[v][m]*normal_mcl[v][n];      
-                            }
-                        }
-                    }
-                    dm[j][i] = 0.5*length*betaL_*dm[j][i];
+                    Quad9_1DCL<double> phiquadj(phi[j], Barys);
+                    Quad9_1DCL<Point3DCL> phiquadjN (phiquadj * normal_MCL);
+                    // \int_L beta_L * (\bu * \bn_L) * (\bv * \bn_L)
+                    dm[j][i] = betaL_ * Quad9_1DCL< SMatrixCL<3, 3> > ( outer_product (phiquadiN, phiquadjN)).quad( 0.5*length); 
                     loc.Ak[j][i] += dm[j][i];
                     if (i != j){
                         assign_transpose( dm[i][j], dm[j][i]);
@@ -2958,7 +2934,7 @@ void SlipBndSystem1TwoPhaseP2CL::setupRhs(const TetraCL& tet, Point3DCL loc_b[10
             }
         }
     }
-}*/
+}
 
 /// \brief Setup of the local P2 "system 1" on a tetra intersected by the dividing surface.
 class LocalSystem1TwoPhase_P2CL
