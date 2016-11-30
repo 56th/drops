@@ -83,7 +83,8 @@ class BndCondInfoCL
     bool     IsDirichlet()  const { return bc_==Dir0BC || bc_==DirBC; }
     bool     IsNatural()    const { return bc_==Nat0BC || bc_==NatBC; }
     bool     IsPeriodic()   const { return bc_==Per1BC || bc_==Per2BC ; }
-    bool     IsSlip()       const { return bc_==Slip0BC || bc_==SlipBC || bc_==SymmBC; } // Note that Symmetric BC is considered as a special slip BC.
+    bool     IsSlip()       const { return bc_==Slip0BC || bc_==SlipBC; } 
+    bool     IsMovSlip()    const { return bc_==SlipBC; } 
     bool     IsSymmetric()  const { return bc_==SymmBC; } 
     BndCondT GetBC()        const { return bc_; }
 };
@@ -180,12 +181,12 @@ class BndCondCL
     inline bool IsOnPerBnd( const VertexCL&) const;
     inline bool IsOnPerBnd( const EdgeCL&)   const;
     inline bool IsOnPerBnd( const FaceCL&)   const;
-//    inline bool IsOnSlipBnd( const VertexCL&) const;
     inline bool IsOnSlipBnd( const EdgeCL&)   const;
     inline bool IsOnSlipBnd( const FaceCL&)   const;
-//    inline bool IsOnSymmBnd( const VertexCL&) const;
+    inline bool IsOnMovSlipBnd( const EdgeCL&)   const;
+    inline bool IsOnMovSlipBnd( const FaceCL&)   const;
     inline bool IsOnSymmBnd( const EdgeCL&)   const;
-    inline bool IsOnSymmBnd( const FaceCL&)   const;   // LZ keep it?
+    inline bool IsOnSymmBnd( const FaceCL&)   const;
 
     /// \name boundary segment
     /// Returns boundary segment with superior boundary condition of sub-simplex
@@ -372,26 +373,6 @@ inline bool BndCondCL::IsOnPerBnd( const VertexCL& v) const
     return HasPer;
 }
 
-/*inline bool BndCondCL::IsOnSlipBnd( const VertexCL& v) const
-{ // 
-    if ( !v.IsOnBoundary() || !BndCond_.size()) return false;
-    const BndCondT bc= GetBC(v);
-    if (bc==Slip0BC || bc==SlipBC || bc==SymmBC)
-        return true;
-    else
-        return false;
-}*/
-
-/*inline bool BndCondCL::IsOnSymmBnd( const VertexCL& v) const
-{ //
-    if ( !v.IsOnBoundary() || !BndCond_.size()) return false;
-    const BndCondT bc= GetBC(v);
-    if (bc==SymmBC)
-        return true;
-    else
-        return false;
-}*/
-
 inline BndCondT BndCondCL::GetBC( const VertexCL& v) const
 /// Returns BC on vertex \a v with lowest number (i.e. the superior BC on \a v)
 {
@@ -481,11 +462,20 @@ inline bool BndCondCL::IsOnSlipBnd( const EdgeCL& e) const
 {
     if ( !e.IsOnBoundary() || !BndCond_.size()) return false;
     const BndCondT bc= GetBC(e);
-    if (bc==Slip0BC || bc==SlipBC || bc==SymmBC)
+    if (bc==Slip0BC || bc==SlipBC )
         return true;
     else
         return false;
-    return true;
+}
+
+inline bool BndCondCL::IsOnMovSlipBnd( const EdgeCL& e) const
+{
+    if ( !e.IsOnBoundary() || !BndCond_.size()) return false;
+    const BndCondT bc= GetBC(e);
+    if (bc==SlipBC )
+        return true;
+    else
+        return false;
 }
 
 inline bool BndCondCL::IsOnSymmBnd( const EdgeCL& e) const
@@ -496,7 +486,6 @@ inline bool BndCondCL::IsOnSymmBnd( const EdgeCL& e) const
         return true;
     else
         return false;
-    return true;
 }
 
 inline BndCondT BndCondCL::GetBC( const EdgeCL& e) const
@@ -559,6 +548,11 @@ inline bool BndCondCL::IsOnPerBnd( const FaceCL& f) const
 inline bool BndCondCL::IsOnSlipBnd(const FaceCL& f) const
 {
     return f.IsOnBoundary() && BndCond_.size() && BndCond_[f.GetBndIdx()].IsSlip();
+}
+
+inline bool BndCondCL::IsOnMovSlipBnd(const FaceCL& f) const
+{
+    return f.IsOnBoundary() && BndCond_.size() && BndCond_[f.GetBndIdx()].IsMovSlip();
 }
 
 inline bool BndCondCL::IsOnSymmBnd( const FaceCL& f) const

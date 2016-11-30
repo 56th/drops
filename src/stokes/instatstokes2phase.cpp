@@ -112,7 +112,7 @@ void SlipBndSystem2_P2P1XCL::setupB(SMatrixCL<1, 3> loc_b[4][10], const TetraCL&
         QuadDomainCL              bndq5dom_;
         Point3DCL normal;
         Uint unknownIdx[6];
-        if( BndData_.Vel.GetBC(*tet.GetFace(k))==Slip0BC || BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC || BndData_.Vel.GetBC(*tet.GetFace(k))==SymmBC)
+        if( BndData_.Vel.IsOnSlipBnd(*tet.GetFace(k)) || BndData_.Vel.IsOnSymmBnd(*tet.GetFace(k)))
         {
 
             tet.GetOuterNormal(k, normal);
@@ -275,7 +275,7 @@ void System2Accumulator_P2P1XCL::local_setup (const TetraCL& tet)
     //if there is at least one slip or symmetric boundary on this tetra
     spebnd=false;
     for(int i =0; i< 4; ++i){
-        if(BndData.Vel.GetBC(*tet.GetFace(i))==Slip0BC  || BndData.Vel.GetBC(*tet.GetFace(i))==SlipBC || BndData.Vel.GetBC(*tet.GetFace(i))==SymmBC)
+        if(BndData.Vel.IsOnSlipBnd(*tet.GetFace(i)) || BndData.Vel.IsOnSymmBnd(*tet.GetFace(i)))
         {
             spebnd=true;
             break;
@@ -2329,8 +2329,8 @@ void SlipBndSystem1OnePhaseP2CL::setup(const TetraCL& tet, const SMatrixCL<3,3>&
         Quad5_2DCL<double> Grad2Di;   // \nabla phi_i* n
         BaryCoordCL bary[3];
         bool symmBC=false;
-        if( BndData_.Vel.GetBC(*tet.GetFace(k))==Slip0BC || BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC|| BndData_.Vel.GetBC(*tet.GetFace(k))==SymmBC){
-            if(BndData_.Vel.GetBC(*tet.GetFace(k))==SymmBC)
+        if( BndData_.Vel.IsOnSlipBnd(*tet.GetFace(k)) || BndData_.Vel.IsOnSymmBnd(*tet.GetFace(k))){
+            if(BndData_.Vel.IsOnSymmBnd(*tet.GetFace(k)))
                 symmBC=true;
             const FaceCL& face = *tet.GetFace(k);
             double absdet = FuncDet2D(	face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
@@ -2393,9 +2393,9 @@ void SlipBndSystem1OnePhaseP2CL::setup(const TetraCL& tet, const SMatrixCL<3,3>&
         Quad5_2DCL<Point3DCL> Nout; 
         BaryCoordCL bary[3];
         bool symmBC=false;
-        if( BndData_.Vel.GetBC(*tet.GetFace(k))==Slip0BC || BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC|| BndData_.Vel.GetBC(*tet.GetFace(k))==SymmBC)
+        if( BndData_.Vel.IsOnSlipBnd(*tet.GetFace(k)) || BndData_.Vel.IsOnSymmBnd(*tet.GetFace(k)))
         {
-            if(BndData_.Vel.GetBC(*tet.GetFace(k))==SymmBC)
+            if(BndData_.Vel.IsOnSymmBnd(*tet.GetFace(k)))
                 symmBC=true;
             const FaceCL& face = *tet.GetFace(k);
             double absdet = FuncDet2D(	face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
@@ -2465,7 +2465,7 @@ void SlipBndSystem1OnePhaseP2CL::setupRhs(const TetraCL& tet, Point3DCL loc_b[10
         Quad5_2DCL<double> locP2[6];
         Quad5_2DCL<Point3DCL> WallVel;
         BaryCoordCL bary[3];
-        if( BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC ){
+        if( BndData_.Vel.IsOnMovSlipBnd(*tet.GetFace(k))){
             const FaceCL& face = *tet.GetFace(k);
             double absdet = FuncDet2D(	face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
                                             face.GetVertex(2)->GetCoord()-face.GetVertex(0)->GetCoord()); 
@@ -2507,7 +2507,7 @@ void SlipBndSystem1OnePhaseP2CL::setupRhs(const TetraCL& tet, Point3DCL loc_b[10
         Quad5_2DCL<Point3DCL> WallVel;
         BaryCoordCL bary[3];
         Quad5_2DCL<Point3DCL> Nout; 
-        if( BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC ){
+        if( BndData_.Vel.IsOnMovSlipBnd(*tet.GetFace(k))){
             const FaceCL& face = *tet.GetFace(k);
             double absdet = FuncDet2D(	face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
                                             face.GetVertex(2)->GetCoord()-face.GetVertex(0)->GetCoord()); 
@@ -2774,11 +2774,11 @@ void SlipBndSystem1TwoPhaseP2CL::setup(const TetraCL& tet, const SMatrixCL<3,3>&
         LocalP1CL<double> Gradn[10];
         BaryCoordCL bary[3];
         bool symmBC=false;
-        if( BndData_.Vel.GetBC(*tet.GetFace(k))==Slip0BC || BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC|| BndData_.Vel.GetBC(*tet.GetFace(k))==SymmBC){
-            if(BndData_.Vel.GetBC(*tet.GetFace(k))==SymmBC)
+        if( BndData_.Vel.IsOnSlipBnd(*tet.GetFace(k)) || BndData_.Vel.IsOnSymmBnd(*tet.GetFace(k))){
+            if(BndData_.Vel.IsOnSymmBnd(*tet.GetFace(k)))
                 symmBC=true;
             const FaceCL& face = *tet.GetFace(k);
-           double absdet = FuncDet2D(face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
+            double absdet = FuncDet2D(face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
                                             face.GetVertex(2)->GetCoord()-face.GetVertex(0)->GetCoord()); 
             double h= std::sqrt(absdet);
             tet.GetOuterNormal(k, normal);
@@ -2843,7 +2843,7 @@ void SlipBndSystem1TwoPhaseP2CL::setupRhs(const TetraCL& tet, Point3DCL loc_b[10
         Quad5_2DCL<double> locP2[6];
         Quad5_2DCL<Point3DCL> WallVel;
         BaryCoordCL bary[3];
-        if( BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC ){
+        if( BndData_.Vel.IsOnMovSlipBnd(*tet.GetFace(k))){
             const FaceCL& face = *tet.GetFace(k);
             double absdet = FuncDet2D(face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
                                             face.GetVertex(2)->GetCoord()-face.GetVertex(0)->GetCoord()); 
@@ -2877,7 +2877,7 @@ void SlipBndSystem1TwoPhaseP2CL::setupCL_dissipation(const TetraCL& tet, LocalSy
 {
     bool SlipBnd=false;
     for(Uint v=0; v<4; v++)
-        if(lsetbnd_.GetBC(*tet.GetFace(v))==Slip0BC||lsetbnd_.GetBC(*tet.GetFace(v))==SlipBC)
+        if(lsetbnd_.IsOnSlipBnd(*tet.GetFace(v)))
         {
             SlipBnd=true;
             break;
@@ -2885,7 +2885,7 @@ void SlipBndSystem1TwoPhaseP2CL::setupCL_dissipation(const TetraCL& tet, LocalSy
     if(!SlipBnd)
     {
         for(Uint v=0; v<6; v++)
-            if(lsetbnd_.GetBC(*tet.GetEdge(v))==Slip0BC||lsetbnd_.GetBC(*tet.GetEdge(v))==SlipBC)
+            if(lsetbnd_.IsOnSlipBnd(*tet.GetEdge(v)))
             {
                 SlipBnd=true;
                 break;
@@ -3275,11 +3275,11 @@ void System1Accumulator_P2CL::local_setup (const TetraCL& tet)
 
     ls_loc.assign( tet, lset_Phi, lset_Bnd);
     const bool noCut= equal_signs( ls_loc);
+    
     speBnd = false;
-    //if speBnd = true , there is at least one slip or symmetric boundary on this tetra 
     for(int i =0; i< 4; ++i){
 
-        if( BndData.Vel.GetBC(*tet.GetFace(i))==Slip0BC || BndData.Vel.GetBC(*tet.GetFace(i))==SlipBC || BndData.Vel.GetBC(*tet.GetFace(i))==SymmBC)
+        if( BndData.Vel.IsOnSlipBnd(*tet.GetFace(i)) || BndData.Vel.IsOnSymmBnd(*tet.GetFace(i)))
         {
             speBnd = true;
             break;
@@ -3289,14 +3289,14 @@ void System1Accumulator_P2CL::local_setup (const TetraCL& tet)
         local_onephase.mu(  local_twophase.mu(  sign( ls_loc[0])));
         local_onephase.rho( local_twophase.rho( sign( ls_loc[0])));
         if(md.IsTetraCurved(tet))
-          local_onephase.setupIso( Tq, adet, loc);
+            local_onephase.setupIso( Tq, adet, loc);
         else
-        local_onephase.setup( T, absdet, loc);
+            local_onephase.setup( T, absdet, loc);
         if(speBnd){
            SlipBndHandler1.setMu(Coeff.mu(sign( ls_loc[0])));
            SlipBndHandler1.setBeta(Coeff.beta(sign( ls_loc[0])));
-           //speBndHandler1.setup(tet, T, loc, Coeff.BndOutNormal);  
-           SlipBndHandler1.setup(tet, T, loc);         //update loc for special boundary condtion
+           SlipBndHandler1.setup(tet, T, loc, Coeff.BndOutNormal);  
+           //SlipBndHandler1.setup(tet, T, loc);         //update loc for special boundary condtion
         }
     }
     else{
@@ -3342,7 +3342,7 @@ void System1Accumulator_P2CL::local_setup (const TetraCL& tet)
         }
         speBnd = false;
         for(int i =0; i< 4; ++i){
-            if(  BndData.Vel.GetBC(*tet.GetFace(i))==SlipBC )
+            if( BndData.Vel.IsOnMovSlipBnd(*tet.GetFace(i))) // when slip boundary is moving
             {
                     speBnd = true;
                     break;

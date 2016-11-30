@@ -103,14 +103,14 @@ double GetTimeOffset(){
     DROPS_FOR_TRIANG_CONST_TETRA( mg, lvl, it){
         SpeBnd=false;
         for(Uint v=0; v<4; v++)
-            if(lsetbnd.GetBC(*it->GetFace(v))==Slip0BC||lsetbnd.GetBC(*it->GetFace(v))==SlipBC)
+            if(lsetbnd.IsOnSlipBnd(*it->GetFace(v)))
             {
                 SpeBnd=true; break;
             }
         if(!SpeBnd)
         {
             for(Uint v=0; v<6; v++)
-                if(lsetbnd.GetBC(*it->GetEdge(v))==Slip0BC||lsetbnd.GetBC(*it->GetEdge(v))==SlipBC)
+                if(lsetbnd.IsOnSlipBnd(*it->GetEdge(v)))
                 {
                     SpeBnd=true; break;
                 }

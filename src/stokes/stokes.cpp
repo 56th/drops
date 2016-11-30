@@ -40,15 +40,15 @@ void SlipBndSystem2OnePhaseCL::setupB(const TetraCL& tet, SMatrixCL<1, 3> loc_b[
         Point3DCL normal;
         Uint unknownIdx[6];
         
-        if( BndData_.Vel.GetBC(*tet.GetFace(k))==Slip0BC || BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC || BndData_.Vel.GetBC(*tet.GetFace(k))==SymmBC){
-            const FaceCL& face = *tet.GetFace(k);            //Get a face on a slip boundary 
+        if( BndData_.Vel.IsOnSlipBnd(*tet.GetFace(k)) || BndData_.Vel.IsOnSymmBnd(*tet.GetFace(k))){
+            const FaceCL& face = *tet.GetFace(k);          
             double absdet = FuncDet2D(face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
                                       face.GetVertex(2)->GetCoord()-face.GetVertex(0)->GetCoord());
             tet.GetOuterNormal(k, normal);
             for (Uint i= 0; i<3; ++i)  
             {
-                unknownIdx[i]   = VertOfFace(k, i);          // index for Vertex
-                unknownIdx[i+3] = EdgeOfFace(k, i) + 4;      // ndex for Edge
+                unknownIdx[i]   = VertOfFace(k, i);
+                unknownIdx[i+3] = EdgeOfFace(k, i) + 4;
                 bary[i][unknownIdx[i]]=1;
                 phiPrP1[i][unknownIdx[i]]=1;
             }
@@ -61,10 +61,6 @@ void SlipBndSystem2OnePhaseCL::setupB(const TetraCL& tet, SMatrixCL<1, 3> loc_b[
                 for(Uint j=0; j<3; ++j){
                     pr2Dj.assign(phiPrP1[j], bary);  
                     Quad5_2DCL<double> quad2D(pr2Dj * vel2Di);
-                    //const double qq= quad2D.quad(absdet);
-                    //loc_b[unknownIdx[i]][unknownIdx[j]](0, 0)-= qq*normal[0];
-                    //loc_b[unknownIdx[i]][unknownIdx[j]](0, 1)-= qq*normal[1];
-                    //loc_b[unknownIdx[i]][unknownIdx[j]](0, 2)-= qq*normal[2];  
                     loc_b[unknownIdx[i]][unknownIdx[j]] -= quad2D.quad(absdet)*SMatrixCL<1,3>(normal); 
                 }
             }
@@ -91,7 +87,7 @@ void SlipBndSystem2OnePhaseCL::setupB(const TetraCL& tet, SMatrixCL<1, 3> loc_b[
         Uint unknownIdx[6];
 
         BaryCoordCL bary[3];
-        if( BndData_.Vel.GetBC(*tet.GetFace(k))==Slip0BC || BndData_.Vel.GetBC(*tet.GetFace(k))==SlipBC || BndData_.Vel.GetBC(*tet.GetFace(k))==SymmBC){
+        if( BndData_.Vel.IsOnSlipBnd(*tet.GetFace(k)) || BndData_.Vel.IsOnSymmBnd(*tet.GetFace(k))){
             const FaceCL& face = *tet.GetFace(k);            //Get a face on a special boundary 
             double absdet = FuncDet2D(face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
                                       face.GetVertex(2)->GetCoord()-face.GetVertex(0)->GetCoord());

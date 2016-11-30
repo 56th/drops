@@ -180,11 +180,15 @@ LevelsetP2CL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, F
     /// Discretize surface force
     void   AccumulateBndIntegral( VecDescCL& f) const;
     /// Set contact angle function(defined only on boundary).
+    
+    // move to a different class------------------------------
     void   SetYoungAngle(instat_scalar_fun_ptr CA) { CA_= CA; }
     ///Set  out normal function
     void   SetBndOutNormal(instat_vector_fun_ptr outnormal) { BndOutNormal_= outnormal; }
     ///Discretize Young Force on the three-phase contact line
     void   AccumulateYoungForce( VecDescCL& f) const;
+    // -------------------------------------------------------
+    
     /// Clear all matrices, should be called after grid change to avoid reuse of matrix pattern
     void   ClearMat() { E.clear(); H.clear(); }
     /// \name Evaluate Solution

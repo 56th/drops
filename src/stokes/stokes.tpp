@@ -527,7 +527,7 @@ void System2Accumulator_P2P1CL<CoeffT>::local_setup (const TetraCL& tet)
     speBnd = false;
     //if speBnd = true , there is at least one slip or symmetric boundary on this tetra 
     for(int i =0; i< 4; ++i){
-        if(BndData.Vel.GetBC(*tet.GetFace(i))==Slip0BC  || BndData.Vel.GetBC(*tet.GetFace(i))==SlipBC || BndData.Vel.GetBC(*tet.GetFace(i))==SymmBC)
+        if(BndData.Vel.IsOnSlipBnd(*tet.GetFace(i)) || BndData.Vel.IsOnSymmBnd(*tet.GetFace(i)) )
         {
             speBnd = true;
             break;
@@ -560,8 +560,8 @@ void System2Accumulator_P2P1CL<CoeffT>::local_setup (const TetraCL& tet)
 //        }
 
     if(speBnd)
-        //SlipBndHandler.setupB(tet, locB, coeff.BndOutNormal);
-       SlipBndHandler.setupB(tet, locB);
+        SlipBndHandler.setupB(tet, locB, coeff.BndOutNormal);
+        //SlipBndHandler.setupB(tet, locB);
 }
 
 template< class CoeffT>

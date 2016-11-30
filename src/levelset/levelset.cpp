@@ -488,7 +488,7 @@ void ImprovedYoungForceAccumulatorCL::visit ( const TetraCL& t)
     bool SpeBnd = false; //has slip or symmetry bounary segments
     //check if the tetra contains one face or one edge on slip or symmetric boundary.
     for(Uint v=0; v<4; v++)
-        if(lsetbnd_.GetBC(*t.GetFace(v))==Slip0BC||lsetbnd_.GetBC(*t.GetFace(v))==SlipBC||lsetbnd_.GetBC(*t.GetFace(v))==SymmBC )
+        if(lsetbnd_.IsOnSlipBnd(*t.GetFace(v)) ||lsetbnd_.IsOnSymmBnd(*t.GetFace(v)) )
         {
             SpeBnd=true;
             break;
@@ -496,7 +496,7 @@ void ImprovedYoungForceAccumulatorCL::visit ( const TetraCL& t)
     if(!SpeBnd)
     {
         for(Uint v=0; v<6; v++)
-            if(lsetbnd_.GetBC(*t.GetEdge(v))==Slip0BC||lsetbnd_.GetBC(*t.GetEdge(v))==SlipBC||lsetbnd_.GetBC(*t.GetEdge(v))==SymmBC )
+            if(lsetbnd_.IsOnSlipBnd(*t.GetEdge(v)) ||lsetbnd_.IsOnSymmBnd(*t.GetEdge(v)) )
             {
                 SpeBnd=true;
                 break;
@@ -903,7 +903,7 @@ double LevelsetP2CL::GetWetArea() const
 
     for(Uint v=0; v<4; v++)
     {
-        if(lsetbnd.GetBC(*it->GetFace(v))==Slip0BC||lsetbnd.GetBC(*it->GetFace(v))==SlipBC)
+        if(lsetbnd.IsOnSlipBnd(*it->GetFace(v)))
         {
             ls_loc0.assign( *it, Phi, BndData_);
             const bool noCut= equal_signs(ls_loc0);
@@ -933,7 +933,7 @@ double LevelsetP2CL::GetWetArea() const
     return area;
 }
 //>to do for parallel programe, we need add all values in different process
-double LevelsetP2CL::GetSurfaceEnergy() const
+/*double LevelsetP2CL::GetSurfaceEnergy() const
 {
     InterfaceTriangleCL triangle;
     const DROPS::Uint lvl = idx.TriangLevel();
@@ -965,9 +965,8 @@ double LevelsetP2CL::GetSurfaceEnergy() const
 
         for(Uint v=0; v<4; v++)
         {
-            if(lsetbnd.GetBC(*it->GetFace(v))==Slip0BC||lsetbnd.GetBC(*it->GetFace(v))==SlipBC)
+            if(lsetbnd.IsOnSlipBnd(*it->GetFace(v)))
             {
-                        //ls_loc0.assign( *it, Phi, BndData_);
                         evaluate_on_vertexes( GetSolution(), *it, lat, Addr( ls_loc));
                         const bool noCut= equal_signs(ls_loc);
                         if(noCut)
@@ -980,10 +979,10 @@ double LevelsetP2CL::GetSurfaceEnergy() const
                             }
                             sfdensity1.assign(*it, bary, CA_,0 );
                             for(Uint s=0;s<sfdensity1.size();s++)
-                                sfdensity1[s]=std::cos(sfdensity1[s]);//??
+                                sfdensity1[s]=std::cos(sfdensity1[s]);
 
-                            double absdet = FuncDet2D(	face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
-                                                        face.GetVertex(2)->GetCoord()-face.GetVertex(0)->GetCoord());
+                            double absdet = FuncDet2D(face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
+                                                      face.GetVertex(2)->GetCoord()-face.GetVertex(0)->GetCoord());
                             total_energy2 += -sftn*sfdensity1.quad(absdet);
                         }
                         else
@@ -993,18 +992,17 @@ double LevelsetP2CL::GetSurfaceEnergy() const
                             bndpartition_.make_partition2D<SortedVertexPolicyCL, MergeCutPolicyCL>( lat, v, ls_loc);
                             make_CompositeQuad5BndDomain2D( bndq5dom, bndpartition_,*it);
 
-                            resize_and_evaluate_on_vertexes(CA_,*it, bndq5dom,0, qpr);//???
+                            resize_and_evaluate_on_vertexes(CA_,*it, bndq5dom,0, qpr);
                             for(Uint s=0;s<qpr.size();s++)
-                                qpr[s]=std::cos(qpr[s]);//??
+                                qpr[s]=std::cos(qpr[s]);
                             total_energy2 += -sftn*quad( qpr, bndq5dom, NegTetraC);
                         }
             }
         }
 
     }
-    //std::cout<<total_energy1<<"  "<<total_energy2<<std::endl;
     return total_energy1+total_energy2;
-}
+}*/
 double LevelsetP2CL::GetVolume( double translation, int l) const
 {
     if (l==0)
