@@ -88,10 +88,8 @@ class LevelsetP2CL : public ProblemCL< LevelsetCoeffCL, LsetBndDataCL>
     double              curvDiff_, ///< amount of diffusion in curvature calculation
                         SD_;       ///< streamline diffusion
     SurfaceForceT       SF_;
-
     SurfaceTensionCL&   sf_;      ///< data for surface tension
-    instat_scalar_fun_ptr CA_;    ///<Young's contact angle on domain boundary
-    instat_vector_fun_ptr BndOutNormal_; ///outnormal of domain boundary
+
 
     void SetupSmoothSystem ( MatrixCL&, MatrixCL&)               const;
     void SmoothPhi( VectorCL& SmPhi, double diff)                const;
@@ -121,7 +119,6 @@ LevelsetP2CL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, F
     static LevelsetP2CL * Create(  MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, const ParamCL & P);
     static LevelsetP2CL * Create(  MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf,
                                    bool discontinuous = false, double SD = 0, double curvdiff = -1);
-
 
     /// Update PhiC (do nothing if continuous anyway)
     virtual void UpdateContinuous( ) = 0;
@@ -166,7 +163,7 @@ LevelsetP2CL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, F
     /// Apply smoothing to \a SmPhi, if curvDiff_ > 0
     void MaybeSmooth( VectorCL& SmPhi) const { if (curvDiff_>0) SmoothPhi( SmPhi, curvDiff_); }
     /// Set type of surface force.
-    void   SetSurfaceForce( SurfaceForceT SF) { SF_= SF; }
+    void SetSurfaceForce( SurfaceForceT SF) { SF_= SF; }
     /// Get type of surface force.
     SurfaceForceT GetSurfaceForce() const { return SF_; }
 
@@ -174,21 +171,8 @@ LevelsetP2CL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, F
     double GetInterfaceArea() const;
     ///returns the area of the solid-liquid(phi<0) interface
     double GetWetArea() const;
-    /// returns the "total energy energy" including the two-phase interface energy and the solid-liquid(phi<0) interface energy
-    double GetSurfaceEnergy() const;
-
     /// Discretize surface force
     void   AccumulateBndIntegral( VecDescCL& f) const;
-    /// Set contact angle function(defined only on boundary).
-    
-    // move to a different class------------------------------
-    void   SetYoungAngle(instat_scalar_fun_ptr CA) { CA_= CA; }
-    ///Set  out normal function
-    void   SetBndOutNormal(instat_vector_fun_ptr outnormal) { BndOutNormal_= outnormal; }
-    ///Discretize Young Force on the three-phase contact line
-    void   AccumulateYoungForce( VecDescCL& f) const;
-    // -------------------------------------------------------
-    
     /// Clear all matrices, should be called after grid change to avoid reuse of matrix pattern
     void   ClearMat() { E.clear(); H.clear(); }
     /// \name Evaluate Solution

@@ -219,6 +219,10 @@ private:
                  prM,
                  prMhat;
     mutable VectorBaseCL<VectorCL> cKernel;
+    SurfaceForceT       SurfForceType_;
+    SurfaceTensionCL*   SurfTension_;
+    instat_scalar_fun_ptr CtAngleFnc_;
+    instat_vector_fun_ptr BndOutNormal_;
 
   public:
     InstatStokes2PhaseP2P1CL( const MGBuilderCL& mgb, const TwoPhaseFlowCoeffCL& coeff, const BndDataCL& bdata, FiniteElementT prFE= P1_FE, double XFEMstab=0.1, FiniteElementT velFE= vecP2_FE, double EpsP = 0.0 )
@@ -309,15 +313,21 @@ private:
     double getGhPenStab(){ return epsP; }
     /// set Ghost Penalty stabilization factor
     void setGhPenStab( double EpsP ){ epsP = EpsP; }
+    
+    /// Set Equilibrium Contact Angle
+    void SetYoungAngle(instat_scalar_fun_ptr CtAngleFnc) { CtAngleFnc_= CtAngleFnc; }
+    /// Set out normal function of the slip boundary
+    void SetBndOutNormal(instat_vector_fun_ptr outnormal) { BndOutNormal_= outnormal; }
+    /// Set the surface forace type and the surface tension
+    void SetSurfTension(SurfaceTensionCL* Sf) { SurfForceType_ = SF_ImprovedLBVar; SurfTension_= Sf; }
+    /// Discretize Young Force on the three-phase contact line
+    void AccumulateYoungForce(const LevelsetP2CL& lset, VecDescCL& f) const;
 
     //This function can only be applied for one phase simulation, because the function doesn't consider any discontinuity in solutions;
     //It checks the L2 norm of discretized error of velocity and gradient of pressure
     void CheckOnePhaseSolution(const VelVecDescCL* DescVel, const VecDescCL* DescPr, const instat_vector_fun_ptr RefVel, const instat_vector_fun_ptr RefGradPr , const instat_scalar_fun_ptr RefPr) const;
-    void CheckTwoPhaseSolution(const VelVecDescCL* DescVel, const VecDescCL* DescPr, const LevelsetP2CL& lset, const VelVecDescCL* RefVel, const VecDescCL* RefPr);
     void CheckTwoPhaseSolution(const VelVecDescCL* DescVel, const VecDescCL* DescPr, const LevelsetP2CL& lset, const instat_vector_fun_ptr RefVel, const instat_scalar_fun_ptr RefPr);
 
-    //Get the total kinetic energy
-    double GetKineticEnergy(const LevelsetP2CL& lset) const;
     // To setup u-u_h
     //void SetupVelError(const instat_vector_fun_ptr RefVel);
     /// \name Evaluate Solution
@@ -329,7 +339,7 @@ private:
         { return const_DiscVelSolCL( &v, &GetBndData().Vel, &GetMG()); }
     // to get error in velocity	
     //const_DiscVelSolCL GetVelError(StokesBndDataCL::VelBndDataCL& bnd) const
-    //    { return const_DiscVelSolCL( &dv, &bnd, &GetMG()); }		
+    //    { return const_DiscVelSolCL( &dv, &bnd, &GetMG()); }
 
     const_DiscPrSolCL GetPrSolution( const VecDescCL& pr) const
         { return const_DiscPrSolCL( &pr, &GetBndData().Pr, &GetMG()); }

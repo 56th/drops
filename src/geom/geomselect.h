@@ -57,10 +57,6 @@ template< class BoundaryT>
 void BuildBoundaryData( const MultiGridCL* mgp, BoundaryT* &bnddata,
         const std::string& bnd_type, const std::string& bnd_funcs, match_fun periodic_match = 0, std::string* per_funcs = 0);
 
-template< class BoundaryT>
-void BuildlsetBoundaryData( const MultiGridCL* mgp, BoundaryT* &bnddata,
-        const std::string& bnd_type,const std::string& bnd_type1, const std::string& bnd_funcs, match_fun periodic_match = 0);
-
 } // end of namespace drops
 
 #include "geom/geomselect.tpp"

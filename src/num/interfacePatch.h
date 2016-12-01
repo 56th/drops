@@ -61,11 +61,8 @@ class InterfacePatchCL
     LocalP2CL<> PhiLoc_;  ///< levelset-function on T
     int numtriangles_;    ///< number of triangles in the intersection with the interface (0, 1, 2);
     Point3DCL Coord_[10]; ///< coordinates of the vertices and edge-barycenters of T
-
     bool cut_point_on_face[4][4];       ///< if (i,j)-th value is true, the i-th point of the cut is on j-th face
-    BndCondT  BC_Face_[4];              ///< boundary condition type for all four faces
-    BndCondT  BC_Edge_[6];              ///< boundary condition type for all six edges
-  //  Point3DCL outnormal_[4];          ///< out normal of the faces
+
 
 
   private:
@@ -84,8 +81,6 @@ class InterfacePatchCL
       void Init( const TetraCL& t, const SubTetraT& st, const LocalP2CL<double>& ls, double translation);
       ///< Wird nur von masstransport P1X verwendet      
       void Init( const SubTetraT& st, const LocalP2CL<double>& ls, double translation);
-      ///< Init including information of boundary information for tetrahedra surfaces. Used for MCL problem
-      void BInit( const TetraCL& t, const VecDescCL& ls,const BndDataCL<>& lsetbnd,  double translation= 0.);
 
       /// \name Use after Init
       /// \remarks The following functions are only valid, if Init(...) was called before! They refer to T. If st_ was given to Init, they refer to the transformation of T.
@@ -162,7 +157,6 @@ class InterfaceTriangleCL : public InterfacePatchCL
     double         DetA_;   //detminant = 2 * area of triangle
     Point3DCL       B_[3];
     Point2DCL       ab_;
-
     BaryCoordCL TransformToSubTetra (const BaryCoordCL& b); ///< compute st_*b \todo remove this by introducing a column-oriented small matrix class
 
   public:
@@ -188,6 +182,8 @@ class InterfaceLineCL : public InterfacePatchCL
   private:
     Uint     numMCL_;	                      ///< number of moving contact lines (MCL)
     Uint     IdxMCL_[4][2];                ///< the edge index for each contact line
+    BndCondT  BC_Face_[4];                 ///< boundary condition type for all four faces
+    BndCondT  BC_Edge_[6];                 ///< boundary condition type for all six edges
     instat_vector_fun_ptr outnormal_;      ///< the outer normal of the (slip) boundary
     bool SymmType[4];                      ///< store if a contact line segment is symmetric
 
@@ -195,6 +191,7 @@ class InterfaceLineCL : public InterfacePatchCL
     bool ComputeMCLForChild(Uint ch);                          ///< returns true, if a moving contact line exists for this child
                                                                ///< it must be called after BInit()
     Uint GetNumMCL();	                                          ///< returns number of MCL segmetns
+    void SetBndCondT(const TetraCL& tet, const BndDataCL<Point3DCL>& BndData);     ///< set the boundary condition type of the tetra
     void SetBndOutNormal(instat_vector_fun_ptr outnormal);     ///< set the outer normal of the slip boundary
     bool IsSymmType(Uint i) {return SymmType[i];}              ///<return if a contact line segment is on symmetry boundary
     //double GetInfoMCL(Uint v, BaryCoordCL& bary0, BaryCoordCL& bary1, Point3DCL& pt0, Point3DCL& pt1, Uint& face, Point3DCL& bnd_normal);

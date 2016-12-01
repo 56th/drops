@@ -414,7 +414,7 @@ void SolveStatProblem( StokesT& Stokes, LevelsetP2CL& lset,
     Stokes.SetLevelSet( lset);
     lset.UpdateMLPhi();
     lset.AccumulateBndIntegral( curv);
-    lset.AccumulateYoungForce ( curv);
+    Stokes.AccumulateYoungForce (lset, curv);
     Stokes.SetupSystem1( &Stokes.A, &Stokes.M, &Stokes.b, &Stokes.b, &cplM, lset, Stokes.v.t);
     Stokes.SetupPrStiff( &Stokes.prA, lset);
     Stokes.SetupPrMass ( &Stokes.prM, lset);
@@ -430,8 +430,8 @@ void SolveStatProblem( StokesT& Stokes, LevelsetP2CL& lset,
     std::cout << "Solving (Navier-)Stokes took "<<  duration << " sec.\n";
     std::cout << "iter: " << solver.GetIter() << "\tresid: " << solver.GetResid() << std::endl;
     if(checkSolution)
-        Stokes.CheckOnePhaseSolution( &Stokes.v, &Stokes.p, Stokes.Coeff_.RefVel, Stokes.Coeff_.RefGradPr, Stokes.Coeff_.RefPr);
-        //Stokes.CheckTwoPhaseSolution( &Stokes.v, &Stokes.p, lset, Stokes.Coeff_.RefVel, Stokes.Coeff_.RefPr);
+        //Stokes.CheckOnePhaseSolution( &Stokes.v, &Stokes.p, Stokes.Coeff_.RefVel, Stokes.Coeff_.RefGradPr, Stokes.Coeff_.RefPr);
+        Stokes.CheckTwoPhaseSolution( &Stokes.v, &Stokes.p, lset, Stokes.Coeff_.RefVel, Stokes.Coeff_.RefPr);
 }
 
 void SetInitialLevelsetConditions( LevelsetP2CL& lset, MultiGridCL& MG, ParamCL& P)

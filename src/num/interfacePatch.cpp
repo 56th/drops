@@ -65,29 +65,7 @@ void InterfacePatchCL::Init( const TetraCL& t, const LocalP2CL<double>& ls, doub
     barysubtetra_ = false;
 }
 
-//Init InterfacePatchCL include special surface boundary information
-void InterfacePatchCL::BInit( const TetraCL& t, const VecDescCL& ls,const BndDataCL<>& lsetbnd, double translation)
-{
-    ch_= -1;
-    LocalP2CL<double> locphi(t, ls, lsetbnd);
-    PhiLoc_= locphi + translation;
-    for (Uint v=0; v<10; ++v)
-    { // collect data on all DoF
-        Coord_[v]= v<4 ? t.GetVertex(v)->GetCoord() : GetBaryCenter( *t.GetEdge(v-4));
-        sign_[v]= Sign(PhiLoc_[v]);
-    }
-
-    for(Uint v=0; v<4; v++)
-    {
-        BC_Face_[v] =  lsetbnd.GetBC(*t.GetFace(v));
-    //	t.GetNormal(v, outnormal_[v], dir);
-    //	outnormal_[v]*=dir;
-    }
-    for(Uint v=0; v<6; v++)
-        BC_Edge_[v] =  lsetbnd.GetBC(*t.GetEdge(v));
-    barysubtetra_ = false;
-}
- SMatrixCL<3,4> GetCoordMatrix( const TetraCL& t)
+SMatrixCL<3,4> GetCoordMatrix( const TetraCL& t)
 {
    SMatrixCL<3,4> V(Uninitialized);
    for (int i = 0; i<3; ++i)
@@ -179,7 +157,7 @@ bool InterfacePatchCL::ComputeVerticesOfCut( Uint ch, bool compute_PQRS)
         {
             Bary_[intersec_]= BaryDoF_[v];
             if (compute_PQRS)
-            	PQRS_[intersec_]= Coord_[v];
+                PQRS_[intersec_]= Coord_[v];
             Edge_[intersec_++]= -1;
         }
     }
@@ -193,7 +171,7 @@ bool InterfacePatchCL::ComputeVerticesOfCut( Uint ch, bool compute_PQRS)
             const double lambda= EdgeIntersection( v0,  v1, PhiLoc_);
             Bary_[intersec_]= (1.-lambda)*BaryDoF_[v0] + lambda * BaryDoF_[v1];
             if (compute_PQRS)
-            	PQRS_[intersec_]= (1.-lambda) * Coord_[v0] + lambda * Coord_[v1];
+                PQRS_[intersec_]= (1.-lambda) * Coord_[v0] + lambda * Coord_[v1];
             Edge_[intersec_++]= edge;
             innersec_++;
         }
@@ -731,6 +709,14 @@ double InterfaceLineCL::GetInfoMCL(Uint v, BaryCoordCL& bary0, BaryCoordCL& bary
         return (pt1-pt0).norm();
 }
 
+void InterfaceLineCL::SetBndCondT(const TetraCL& tet, const BndDataCL<Point3DCL>& BndData)
+{
+    for(Uint v=0; v<4; v++)
+        BC_Face_[v] =  BndData.GetBC(*tet.GetFace(v));
+    for(Uint v=0; v<6; v++)
+        BC_Edge_[v] =  BndData.GetBC(*tet.GetEdge(v));
+}
+
 void InterfaceLineCL::SetBndOutNormal(instat_vector_fun_ptr outnormal)
 {
     outnormal_=outnormal;
@@ -885,10 +871,6 @@ LocalP2CL<double> ProjectIsoP2ChildToParentP1 (LocalP2CL<double> lpin, Uint chil
     }
     return res;
 }
-
-
-
-
 
 } // end of namespace DROPS
 
