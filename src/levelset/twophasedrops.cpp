@@ -99,10 +99,6 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     match_fun periodic_match = is_periodic ? matchmap[P.get("DomainCond.PeriodicMatching", std::string("periodicx"))] : 0;
 
     MultiGridCL& MG= Stokes.GetMG();
-    MeshDeformationCL& md = MeshDeformationCL::getInstance();
-    if(P.get<int>("DomainCond.GeomType")!= 10)
-        md.Initialize(&MG);
-    MG.SetMeshDeformation(md);
 
     // initialization of surface tension
     // choose a proper model for surface tension coefficient, see levelset/surfacetension.h
@@ -182,14 +178,12 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     SetInitialLevelsetConditions( lset, MG, P);
 
     double Vol = 0;
-    //Vol = lset.GetVolume();
-    if ((P.get("Exp.InitialLSet", std::string("Ellipsoid")) == "Ellipsoid" || P.get("Exp.InitialLSet", std::string("Ellipsoid")) == "Cylinder" 
-        || P.get("Exp.InitialLSet", std::string("Ellipsoid")) == "ContactDroplet" || P.get("Exp.InitialLSet", std::string("Ellipsoid")) == "HalfEllipsoid" 
-        || P.get("Exp.InitialLSet", std::string("Ellipsoid")) == "TaylorFlowDistance") && P.get<int>("Levelset.VolCorrection") != 0)
+    std::string InitialLSet= P.get("Exp.InitialLSet", std::string("Ellipsoid"));
+    if (   InitialLSet == "Ellipsoid"     || InitialLSet == "Cylinder" || InitialLSet == "ContactDroplet"
+        || InitialLSet == "HalfEllipsoid" || InitialLSet == "TaylorFlowDistance" && P.get<int>("Levelset.VolCorrection") != 0)
     {  
         if (P.get<double>("Exp.InitialVolume",-1.0) > 0 )
             Vol = P.get<double>("Exp.InitialVolume");      
-        std::string InitialLSet= P.get("Exp.InitialLSet", std::string("Ellipsoid"));
         if (InitialLSet == "Ellipsoid")
             Vol = EllipsoidCL::GetVolume();
         if (InitialLSet == "HalfEllipsoid")
@@ -220,15 +214,13 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 //     Stokes.pr_idx.GetFinest().   CreateNumbering( MG.GetLastLevel(), MG, Stokes.GetBndData().Pr, 0, &lset.Phi);
 
     StokesVelBndDataCL::bnd_val_fun ZeroVel = InVecMap::getInstance().find("ZeroVel")->second;
-    StokesVelBndDataCL::bnd_val_fun ImpactVel = InVecMap::getInstance().find("ImpactVel")->second;
     Stokes.SetIdx();
     Stokes.v.SetIdx  ( vidx);
     Stokes.p.SetIdx  ( pidx);
     if (P.get<int>("NavStokes.ShiftFrame") == 1)
         Stokes.InitVel( &Stokes.v, InVecMap::getInstance().find("InflowShiftFrame")->second);  // shifted zero velocity initial condition
     else
-        //Stokes.InitVel( &Stokes.v, ZeroVel);
-        Stokes.InitVel( &Stokes.v, ImpactVel);
+        Stokes.InitVel( &Stokes.v, ZeroVel);
 
     IteratedDownwindCL navstokes_downwind( P.get_child( "NavStokes.Downwind"));
     if (P.get<int>( "NavStokes.Downwind.Frequency") > 0) {
@@ -555,7 +547,6 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     IFInfo.Update( lset, Stokes.GetVelSolution());
     IFInfo.Write(Stokes.v.t);
     std::cout << std::endl;
-    
     if(sf) delete sf;
     delete timedisc;
     delete navstokessolver;
@@ -574,6 +565,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
 //     delete stokessolver1;
 }
+
 } // end of namespace DROPS
 
 /*//I need to consider if to include these parameters to the default parameter files
@@ -665,7 +657,7 @@ int main (int argc, char** argv)
     std::cout << "Generated boundary conditions for velocity, ";
     DROPS::BuildBoundaryData( mg, prbnddata, perbndtypestr, zerobndfun, periodic_match);
     std::cout << "pressure, ";
-    DROPS::BuildBoundaryData( mg, lsetbnddata,  perbndtypestr, zerobndfun, periodic_match);
+    DROPS::BuildBoundaryData( mg, lsetbnddata, perbndtypestr, zerobndfun, periodic_match);
     std::cout << "and levelset." << std::endl;
     DROPS::StokesBndDataCL bnddata(*velbnddata,*prbnddata);
 

@@ -61,7 +61,6 @@ class SlipBndSystem2OnePhaseCL
   public:
     SlipBndSystem2OnePhaseCL(const StokesBndDataCL& BndData): BndData_(BndData) {}
     void setupB(const TetraCL& tet, SMatrixCL<1, 3> loc_b[10][4]);
-    void setupB(const TetraCL& tet, SMatrixCL<1, 3> loc_b[10][4], instat_vector_fun_ptr bnd_normal); // curved case
 };
 
 typedef StokesBndDataCL::VelBndDataCL StokesVelBndDataCL;

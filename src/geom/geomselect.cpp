@@ -46,7 +46,7 @@ void BuildDomain( MultiGridCL* &mgp, const std::string& meshfile_name, int GeomT
         if (deserialization_file == "none"){
             mgp= new MultiGridCL( *mgb);
             // If we read netgen/gambit meshfiles, multi boundary tetras might exist
-            // mgp->SplitMultiBoundaryTetras();
+            mgp->SplitMultiBoundaryTetras();
         }
         else {
             FileBuilderCL filebuilder( deserialization_file, mgb);

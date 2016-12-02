@@ -738,24 +738,6 @@ void LevelsetP2CL::AccumulateBndIntegral( VecDescCL& f) const
     delete accu;
 }
 
-
-/*void LevelsetP2CL::AccumulateYoungForce( VecDescCL& f) const
-{
-    ScopeTimerCL scope("AccumulateYoungForce");
-    TetraAccumulatorCL *accu;
-    switch (SF_)
-    {
-      case SF_ImprovedLBVar:
-          accu= new ImprovedYoungForceAccumulatorCL( *this, f, sf_.GetSigma()(std_basis<3>(0), 0.),CA_,BndOutNormal_); break;
-      default:
-          throw DROPSErrCL("LevelsetP2CL::AccumulateYoungForce not implemented for non-constant surface tension");
-    }
-    TetraAccumulatorTupleCL accus;
-    accus.push_back( accu);
-    accumulate( accus, MG_, Phi.RowIdx->TriangLevel(), Phi.RowIdx->GetMatchingFunction(), Phi.RowIdx->GetBndInfo());
-    delete accu;
-}*/
-
 //>to do for parallel programe, we need add all values in different process
 double LevelsetP2CL::GetInterfaceArea() const
 {
