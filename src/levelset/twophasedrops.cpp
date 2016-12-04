@@ -111,8 +111,8 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsetbnddata, *sf, P.get_child("Levelset")) );
 
     //required to simulate flows with moving contact line
-    instat_scalar_fun_ptr Young_angle = inscamap[P.get<std::string>("SlipBnd.CtAngleFnc")];
-    instat_vector_fun_ptr bnd_outnormal = invecmap[P.get<std::string>("SlipBnd.BndOutNormal")];
+    instat_scalar_fun_ptr Young_angle = inscamap[P.get<std::string>("NavStokes.SlipBnd.CtAngleFnc")];
+    instat_vector_fun_ptr bnd_outnormal = invecmap[P.get<std::string>("NavStokes.SlipBnd.BndOutNormal")];
     Stokes.SetYoungAngle(Young_angle);
     Stokes.SetBndOutNormal(bnd_outnormal);
     Stokes.SetSurfTension(sf);
@@ -179,8 +179,8 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
     double Vol = 0;
     std::string InitialLSet= P.get("Exp.InitialLSet", std::string("Ellipsoid"));
-    if (   InitialLSet == "Ellipsoid"     || InitialLSet == "Cylinder" || InitialLSet == "ContactDroplet"
-        || InitialLSet == "HalfEllipsoid" || InitialLSet == "TaylorFlowDistance" && P.get<int>("Levelset.VolCorrection") != 0)
+    if ( (InitialLSet == "Ellipsoid"     || InitialLSet == "Cylinder" || InitialLSet == "ContactDroplet"
+        || InitialLSet == "HalfEllipsoid" || InitialLSet == "TaylorFlowDistance") && P.get<int>("Levelset.VolCorrection") != 0)
     {  
         if (P.get<double>("Exp.InitialVolume",-1.0) > 0 )
             Vol = P.get<double>("Exp.InitialVolume");      
@@ -570,20 +570,9 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
 /*//I need to consider if to include these parameters to the default parameter files
 void SetMissingParameters(DROPS::ParamCL& P){
-    //contactangle problem--------------------------------------------
-    P.put_if_unset<double>("SlipBnd.Alpha", 0.0);
-    P.put_if_unset<double>("Slipnd.Beta1", 0.0);
-    P.put_if_unset<double>("SlipBnd.Beta2", 0.0);
-    P.put_if_unset<std::string>("SlipBnd.CtAngleFnc", "ConstantAngle");
-    P.put_if_unset<double>("SlipBnd.CtAngle", 0.0);
-    P.put_if_unset<std::string>("SlipBnd.BndOutNormal", "OutNormalBrick");
-
     P.put_if_unset<std::string>("Exp.Solution_Vel", "None");
     P.put_if_unset<std::string>("Exp.Solution_GradPr", "None");
     P.put_if_unset<std::string>("Exp.Solution_Pr", "None");
-    P.put_if_unset<int>("Exp.OutputInfo",1);
-    //---------------------------------------------------------------
-    P.put_if_unset<double>("Exp.SimuType", 0.0);
 }*/
 
 int main (int argc, char** argv)

@@ -24,6 +24,16 @@
             "MaxRelComponentSize": "0.05",
             "WeakEdgeRatio": "0.2",
             "CrosswindLimit": "0.8660254037844387"
+        },
+        "SlipBnd":
+        {
+          "Beta1":                 0.05,
+          "Beta2":                 0.05,
+          "BetaL":                 0,
+          "NitschePenalty":        30,
+          "CtAngle":               60,
+          "CtAngleFnc":            "ConstantAngle",
+          "BndOutNormal":          "OutNormalBrick"
         }
     },
     "Levelset":

@@ -119,8 +119,8 @@ TwoPhaseFlowCoeffCL( ParamCL& P, bool dimless = false)
     rho_koeff2( film ? P.get<double>("Mat.DensFluid") : P.get<double>("Mat.DensDrop")),
     mu_koeff1( film ? P.get<double>("Mat.ViscGas") : P.get<double>("Mat.ViscFluid")),
     mu_koeff2( film ? P.get<double>("Mat.ViscFluid") : P.get<double>("Mat.ViscDrop")),
-    beta_coeff1(P.get<double>("SlipBnd.Beta1")),
-    beta_coeff2(P.get<double>("SlipBnd.Beta2")),
+    beta_coeff1(P.get<double>("NavStokes.SlipBnd.Beta1")),
+    beta_coeff2(P.get<double>("NavStokes.SlipBnd.Beta2")),
 
     
     rho( dimless ? JumpCL( 1., rho_koeff1/rho_koeff2)
@@ -132,7 +132,7 @@ TwoPhaseFlowCoeffCL( ParamCL& P, bool dimless = false)
     SurfTens (dimless ? surfTens/rho_koeff2 : surfTens),
     DilVisco( film ? P.get<double>("Mat.DilatationalVisco") : P.get<double>("SurfTens.DilatationalVisco")),
     ShearVisco( film ? P.get<double>("Mat.ShearVisco") : P.get<double>("SurfTens.ShearVisco")),
-    betaL(P.get<double>("SlipBnd.BetaL")), alpha(P.get<double>("SlipBnd.NitschePenalty")),
+    betaL(P.get<double>("NavStokes.SlipBnd.BetaL")), alpha(P.get<double>("NavStokes.SlipBnd.NitschePenalty")),
     g( P.get<DROPS::Point3DCL>("Exp.Gravity")),
     framevel( ns_shiftframe ? P.get<DROPS::Point3DCL>("NavStokes.FrameVel", DROPS::Point3DCL(0.0)) : DROPS::Point3DCL(0.0) )
     {
@@ -150,8 +150,8 @@ TwoPhaseFlowCoeffCL( ParamCL& P, bool dimless = false)
             RefPr = InScaMap::getInstance()[P.get<std::string>("Exp.Solution_Pr")];
         else
             RefPr = NULL;
-      if( P.get<std::string>("SlipBnd.BndOutNormal").compare("None")!=0)
-            BndOutNormal = InVecMap::getInstance()[P.get<std::string>("SlipBnd.BndOutNormal")];
+      if( P.get<std::string>("NavStokes.SlipBnd.BndOutNormal").compare("None")!=0)
+            BndOutNormal = InVecMap::getInstance()[P.get<std::string>("NavStokes.SlipBnd.BndOutNormal")];
         else
             BndOutNormal = NULL;
 }
