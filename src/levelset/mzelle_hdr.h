@@ -106,7 +106,6 @@ class HalfEllipsoidCL
         d/= Radius_;
         return std::abs( avgRad)*d.norm() - avgRad;
     }
-    //static double GetVolume() { return 2./3.*M_PI*Radius_[0]*Radius_[1]*Radius_[2]; }
     static double GetVolume() { return 1./6.*M_PI*Radius_[0]*Radius_[1]*Radius_[2]; }
     static Point3DCL& GetCenter() { return Mitte_; }
     static Point3DCL& GetRadius() { return Radius_; }
@@ -395,8 +394,7 @@ TimeDisc2PhaseCL* CreateTimeDisc( InstatNavierStokes2PhaseP2P1CL& Stokes, Levels
 }
 
 template <class StokesT>
-void SolveStatProblem( StokesT& Stokes, LevelsetP2CL& lset,
-                       NSSolverBaseCL<StokesT >& solver, bool checkSolution = false)
+void SolveStatProblem( StokesT& Stokes, LevelsetP2CL& lset, NSSolverBaseCL<StokesT >& solver)
 {
 #ifndef _PAR
     TimerCL time;
@@ -429,9 +427,6 @@ void SolveStatProblem( StokesT& Stokes, LevelsetP2CL& lset,
     duration = time.GetTime();
     std::cout << "Solving (Navier-)Stokes took "<<  duration << " sec.\n";
     std::cout << "iter: " << solver.GetIter() << "\tresid: " << solver.GetResid() << std::endl;
-    if(checkSolution)
-        //Stokes.CheckOnePhaseSolution( &Stokes.v, &Stokes.p, Stokes.Coeff_.RefVel, Stokes.Coeff_.RefGradPr, Stokes.Coeff_.RefPr);
-        Stokes.CheckTwoPhaseSolution( &Stokes.v, &Stokes.p, lset, Stokes.Coeff_.RefVel, Stokes.Coeff_.RefPr);
 }
 
 void SetInitialLevelsetConditions( LevelsetP2CL& lset, MultiGridCL& MG, ParamCL& P)

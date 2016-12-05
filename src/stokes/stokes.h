@@ -67,16 +67,6 @@ struct LocalSystem1DataCL
     double rho_phi[10];
 };
 
-/// \brief Due to the weak imposition of bu * n = 0 with Nitsche's method, setup the integral of (bv * bn) * q on the slip bounary for uncut element  
-/*class SlipBndSystem2OnePhaseCL
-{
- private:
-    const StokesBndDataCL& BndData_;
-  public:
-    SlipBndSystem2OnePhaseCL(const StokesBndDataCL& BndData): BndData_(BndData) {}
-    void setupB(const TetraCL& tet, SMatrixCL<1, 3> loc_b[10][4]);
-};*/
-
 typedef StokesBndDataCL::VelBndDataCL StokesVelBndDataCL;
 typedef StokesBndDataCL::PrBndDataCL  StokesPrBndDataCL;
 

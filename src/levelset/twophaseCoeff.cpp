@@ -499,24 +499,3 @@ namespace ContactAngle{
     static DROPS::RegisterScalarFunction regconstangle("ConstantAngle", ConstantAngle);
     static DROPS::RegisterVectorFunction regunitcubicoutnomal("OutNormalBrick", OutNormalBrick);
 }
-
-// Remove later
-namespace ImpactDroplet{
-    DROPS::Point3DCL ImpactVel(const DROPS::Point3DCL& p,double)
-    { 
-        double ImpactVel = P.get<double>("Exp.ImpactVel");
-        DROPS::Point3DCL origin = P.get<DROPS::Point3DCL>("Exp.PosDrop");
-        DROPS::Point3DCL radiusVec = P.get<DROPS::Point3DCL>("Exp.RadDrop");
-        double radius = radiusVec[0];
-        DROPS::Point3DCL DiffVec = p - origin;
-        double dist = DiffVec.norm();
-        DROPS::Point3DCL vel(0.0);
-        if (dist < radius)
-            vel[1]=-ImpactVel; 
-        else 
-            vel[0]=vel[1]=vel[2] =0.;
-        return vel;
-    }
-    static DROPS::RegisterVectorFunction regunitimpact("ImpactVel", ImpactVel);   
-}
-

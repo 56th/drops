@@ -38,7 +38,8 @@
 
 namespace DROPS
 {
-class StokesBndDataCL; //forward declaration
+//forward declaration
+class StokesBndDataCL;
 class LocalSystem1DataCL;
 
 /// \brief Update the local system 1 (nocut) with respect to slip Bnd and symmetric Bnd;

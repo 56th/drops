@@ -97,9 +97,6 @@ class TwoPhaseFlowCoeffCL
 
   public:
     DROPS::instat_vector_fun_ptr volforce;
-    DROPS::instat_vector_fun_ptr RefVel;
-    DROPS::instat_vector_fun_ptr RefGradPr;
-    DROPS::instat_scalar_fun_ptr RefPr;
     DROPS::instat_vector_fun_ptr BndOutNormal;
     const SmoothedJumpCL rho, mu;
     const SmoothedJumpCL beta;      //Coefficient for SlipBC
@@ -138,19 +135,7 @@ TwoPhaseFlowCoeffCL( ParamCL& P, bool dimless = false)
     {
         volforce = InVecMap::getInstance()[P.get<std::string>("Exp.VolForce")];
         var_tau_fncs = InScaMap::getInstance()[P.get<std::string>("SurfTens.VarTensionFncs")];
-        if( P.get<std::string>("Exp.Solution_Vel").compare("None")!=0)
-            RefVel = InVecMap::getInstance()[P.get<std::string>("Exp.Solution_Vel")];
-        else
-            RefVel = NULL;
-        if( P.get<std::string>("Exp.Solution_GradPr").compare("None")!=0)
-            RefGradPr = InVecMap::getInstance()[P.get<std::string>("Exp.Solution_GradPr")];
-        else
-            RefGradPr = NULL;
-        if( P.get<std::string>("Exp.Solution_Pr").compare("None")!=0)
-            RefPr = InScaMap::getInstance()[P.get<std::string>("Exp.Solution_Pr")];
-        else
-            RefPr = NULL;
-      if( P.get<std::string>("NavStokes.SlipBnd.BndOutNormal").compare("None")!=0)
+        if( P.get<std::string>("NavStokes.SlipBnd.BndOutNormal").compare("None")!=0)
             BndOutNormal = InVecMap::getInstance()[P.get<std::string>("NavStokes.SlipBnd.BndOutNormal")];
         else
             BndOutNormal = NULL;
@@ -173,10 +158,7 @@ TwoPhaseFlowCoeffCL( double rho1, double rho2, double mu1, double mu2, double su
     framevel( framevelocity)
     {
         volforce   = InVecMap::getInstance()["ZeroVel"];
-        RefVel     = InVecMap::getInstance()["ZeroVel"];
         var_tau_fncs = InScaMap::getInstance()["ConstTau"];
-        RefGradPr  = InVecMap::getInstance()["ZeroVel"];
-        RefPr      = InScaMap::getInstance()["Zero"];
         BndOutNormal = InVecMap::getInstance()["ZeroVel"];
     }
 };

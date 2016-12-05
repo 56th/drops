@@ -364,7 +364,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     IFInfo.WriteHeader();
 
     if (P.get<int>("Time.NumSteps") == 0)
-        SolveStatProblem( Stokes, lset, *navstokessolver, P.get<std::string>("Exp.Solution_Vel").compare("None")!=0);
+        SolveStatProblem( Stokes, lset, *navstokessolver);
 
     // for serialization of geometry and numerical data
     TwoPhaseStoreCL<InstatNavierStokes2PhaseP2P1CL> ser(MG, Stokes, lset, massTransp,
@@ -491,10 +491,6 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
             BndDataCL<> ifbnd( 0);
             std::cout << "surfactant on \\Gamma: " << Integral_Gamma( MG, *lset.PhiC, lset.GetBndData(), make_P1Eval(  MG, ifbnd, surfTransp.ic)) << '\n';
         }
-        if( P.get<std::string>("Exp.Solution_Vel").compare("None")!=0)
-            //Stokes.CheckOnePhaseSolution( &Stokes.v, &Stokes.p, Stokes.Coeff_.RefVel, Stokes.Coeff_.RefGradPr, Stokes.Coeff_.RefPr);
-            Stokes.CheckTwoPhaseSolution( &Stokes.v, &Stokes.p, lset, Stokes.Coeff_.RefVel, Stokes.Coeff_.RefPr);
-
         // WriteMatrices( Stokes, step);
 
         // grid modification
