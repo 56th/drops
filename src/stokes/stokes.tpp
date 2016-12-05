@@ -29,6 +29,7 @@
 #include "num/lattice-eval.h"
 #include <vector>
 #include <numeric>
+#include "stokes/slipBndOnePhase.h"
 
 #ifdef _PAR
 #  include "parallel/parallel.h"

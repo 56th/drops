@@ -28,6 +28,7 @@
 #include "num/lattice-eval.h"
 #include "misc/progressaccu.h"
 #include "misc/scopetimer.h"
+#include "stokes/slipBndOnePhase.h"
 
 #include <set>
 
@@ -2275,21 +2276,8 @@ void InstatStokes2PhaseP2P1CL::InitVel(VelVecDescCL* vec, instat_vector_fun_ptr 
 }
 
 
-/// \brief Raw data for "system 1", both for one phase and two phases.
-///
-/// scalar-valued mass-matrix, scalar-valued mu-Laplacian, genuinely tensor-valued part of the deformation tensor and the integrals of \f$\rho\phi_i\f$ for the gravitation as load-vector
-/// \todo: Precise description
-struct LocalSystem1DataCL
-{
-    double         M [10][10];
-    double         A [10][10];
-    SMatrixCL<3,3> Ak[10][10];
-
-    double rho_phi[10];
-};
-
 /// \brief Update the local system 1 (nocut) with respect to slip Bnd and symmetric Bnd;
-class SlipBndSystem1OnePhaseP2CL
+/*class SlipBndSystem1OnePhaseP2CL
 {
   private:
     const StokesBndDataCL& BndData_;
@@ -2402,7 +2390,7 @@ void SlipBndSystem1OnePhaseP2CL::setupRhs(const TetraCL& tet, Point3DCL loc_b[10
             }
         }
     }
-}
+}*/
 
 /// \brief Setup of the local "system 1" on a tetra in a single phase.
 class LocalSystem1OnePhase_P2CL

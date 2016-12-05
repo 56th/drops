@@ -50,7 +50,7 @@ class PrincipalLatticeCL
     class PrincipalLatticeCacheCL : public std::vector<const PrincipalLatticeCL*>
     {
       public:
-    	~PrincipalLatticeCacheCL() { for ( size_t i = 0; i< this->size(); ++i) if ((*this)[i]) delete (*this)[i];; }
+        ~PrincipalLatticeCacheCL() { for ( size_t i = 0; i< this->size(); ++i) if ((*this)[i]) delete (*this)[i];; }
     };
 
     static PrincipalLatticeCacheCL cache_;

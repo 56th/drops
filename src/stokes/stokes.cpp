@@ -27,7 +27,7 @@
 namespace DROPS
 {
 /// Setup the integral of (bv * bn) * q on the slip bounary for uncut element 
-void SlipBndSystem2OnePhaseCL::setupB(const TetraCL& tet, SMatrixCL<1, 3> loc_b[10][4])
+/*void SlipBndSystem2OnePhaseCL::setupB(const TetraCL& tet, SMatrixCL<1, 3> loc_b[10][4])
 {
 
     for (Uint k =0; k< 4; ++k) //Go throught all faces of a tet
@@ -67,6 +67,6 @@ void SlipBndSystem2OnePhaseCL::setupB(const TetraCL& tet, SMatrixCL<1, 3> loc_b[
         }
     }
 
-}
+}*/
 
 }

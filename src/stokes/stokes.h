@@ -53,15 +53,29 @@ class StokesBndDataCL
     typedef VelBndDataCL::bnd_val_fun bnd_val_fun;
 };
 
+
+/// \brief Raw data for "system 1", both for one phase and two phases.
+///
+/// scalar-valued mass-matrix, scalar-valued mu-Laplacian, genuinely tensor-valued part of the deformation tensor and the integrals of \f$\rho\phi_i\f$ for the gravitation as load-vector
+/// \todo: Precise description
+struct LocalSystem1DataCL
+{
+    double         M [10][10];
+    double         A [10][10];
+    SMatrixCL<3,3> Ak[10][10];
+
+    double rho_phi[10];
+};
+
 /// \brief Due to the weak imposition of bu * n = 0 with Nitsche's method, setup the integral of (bv * bn) * q on the slip bounary for uncut element  
-class SlipBndSystem2OnePhaseCL
+/*class SlipBndSystem2OnePhaseCL
 {
  private:
     const StokesBndDataCL& BndData_;
   public:
     SlipBndSystem2OnePhaseCL(const StokesBndDataCL& BndData): BndData_(BndData) {}
     void setupB(const TetraCL& tet, SMatrixCL<1, 3> loc_b[10][4]);
-};
+};*/
 
 typedef StokesBndDataCL::VelBndDataCL StokesVelBndDataCL;
 typedef StokesBndDataCL::PrBndDataCL  StokesPrBndDataCL;

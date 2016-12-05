@@ -182,8 +182,6 @@ TwoPhaseFlowCoeffCL( double rho1, double rho2, double mu1, double mu2, double su
 };
 
 /// problem class for instationary two-pase Stokes flow
-
-
 class InstatStokes2PhaseP2P1CL : public ProblemCL<TwoPhaseFlowCoeffCL, StokesBndDataCL>
 {
 private:
