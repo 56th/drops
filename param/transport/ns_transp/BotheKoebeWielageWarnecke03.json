@@ -90,7 +90,14 @@
                     "Gravity":            [0, 0, -9.81 ],  // gravity vector
                     "VolForce":           "ZeroVel"        // r.h.s. force of navier stokes
                                                            // equations (default: 'ZeroVel')
-                }                
+                },
+                "BoundaryData":
+                {
+                    "Velocity":
+                    {
+                        "Default":  ["Dir0BC"]
+                    }
+                }               
         },
 
 // Levelset
@@ -162,7 +169,8 @@
 		                "PcAIter":              2,      // maximum number of iterations for the preconditioner
 		                                                // of the A-Block
 		                "PcATol":               1e-99,  // tolerance for the preconditioner of the A-Block
-		                "PcSTol":               0.0001  // tolerance for the preconditioner of the Schur complement
+		                "PcSTol":               0.0001,  // tolerance for the preconditioner of the Schur complement
+		                "PcSIter":              200
                 	}
                 },
 
@@ -216,6 +224,14 @@
                     "SubIntervalsPerEdge":  1,
                     "SubTimeIntervals":     1,
                     "LevelsetLinearInTime": 1
+                },
+                "BoundaryDataPos":
+                {
+                    "Default":   ["Nat0BC"]
+                },
+                "BoundaryDataNeg":
+                {
+                    "Default":   ["Nat0BC"]
                 }
         },
 

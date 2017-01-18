@@ -193,6 +193,8 @@
                 "BoundaryType":         "Transport.BoundaryData.Deprecated_convert.BoundaryType",
                 "BoundaryFncs":         "Transport.BoundaryData.Deprecated_convert.BoundaryFncs",
                 "BoundaryFncst":        "Transport.BoundaryDataTransformed.Deprecated_convert.BoundaryFncst",
+                "BoundaryFncsPos":      "Transport.BoundaryData.Deprecated_convert.BoundaryFncsPos",
+                "BoundaryFncsNeg":      "Transport.BoundaryData.Deprecated_convert.BoundaryFncsNeg",
                 "DoTransp":             "Transp.Enable"      //#[->default=0 (Enable)] mass transport (0 = deactivated, 1 = activated).
         },
 
@@ -234,7 +236,9 @@
                 "E3": "Mesh.E3",               // ... 
                 "N1": "Mesh.N1",                     // Number of cells along the E1-direction,
                 "N2": "Mesh.N2",                     //                       the E2-direction,
-                "N3": "Mesh.N3"                      //                       the E3-direction.
+                "N3": "Mesh.N3",                     //                       the E3-direction.
+                "PeriodicMatching": "Mesh.PeriodicMatching", 
+                "RestartFile":      "Mesh.RestartFile"
          }, 
 
 // domain, boundary and initial conditions

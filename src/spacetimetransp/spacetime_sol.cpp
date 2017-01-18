@@ -47,7 +47,7 @@ SpaceTimeXSolutionCL::SpaceTimeXSolutionCL(MultiGridCL& mg, const BndDataCL<>& B
     mg_(mg),
     Bndneg_(Bndneg),
     Bndpos_(Bndpos),
-    stxfem_omit_param_(P.get<double>("Transp.STXFEMStab",0.0)),
+    stxfem_omit_param_(P.get<double>("Transp.XFEMReduced",0.0)),
     weight_pos_(P.get<double>("Transp.HPos",1.0)),
     weight_neg_(P.get<double>("Transp.HNeg",1.0)),
     st_x_idx_(P1SP1TX_FE,Bndneg,Bndpos,0,stxfem_omit_param_),
