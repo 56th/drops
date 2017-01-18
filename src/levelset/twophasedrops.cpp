@@ -590,9 +590,9 @@ int main (int argc, char** argv)
         throw DROPS::DROPSErrCL("Parameter error : Dilatational viscosity must be larger than surface shear viscosity");
     }
 
-    const std::string perMatchName= P.get( "NavStokes.BoundaryData.Velocity.PeriodicMatching", std::string());
+    const std::string perMatchName= P.get( "Mesh.PeriodicMatching", std::string());
     const bool is_periodic = !perMatchName.empty();
-    DROPS::match_fun periodic_match = is_periodic ? DROPS::MatchMap::getInstance()[perMatchName] : 0;
+    DROPS::match_fun periodic_match = is_periodic ? DROPS::MatchMap::getInstance()[perMatchName] : nullptr;
 
     DROPS::MultiGridCL* mg= 0;
     typedef DROPS::BndDataCL<DROPS::Point3DCL> VelBndDataCL;
@@ -603,7 +603,7 @@ int main (int argc, char** argv)
 
     try
     {
-        std::auto_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P));
+        std::unique_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P));
         mg = new DROPS::MultiGridCL( *builder);
     }
     catch (DROPS::DROPSParamErrCL& e)
@@ -611,7 +611,7 @@ int main (int argc, char** argv)
         std::cout << "\n"
                   << "  /----------------------------------------------------------------\\ \n"
                   << "  | WARNING: It seems you are using the old domain descriptions    | \n"
-                  << "  |          or your \"Domain\" section is not correct.              | \n"
+                  << "  |          or your \"Mesh\" section is not correct.                | \n"
                   << "  |          Please adapt your json-file to the new description.   | \n"
                   <<"  \\----------------------------------------------------------------/ \n"
                   << std::endl;

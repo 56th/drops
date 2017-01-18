@@ -1001,7 +1001,7 @@ int main (int argc, char** argv)
     DROPS::StokesPrBndDataCL  prbnddata;
     DROPS::LsetBndDataCL lsetbnddata;
 
-    std::auto_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P));
+    std::unique_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P));
     mg = new DROPS::MultiGridCL( *builder);
     read_BndData( velbnddata, *mg, P.get_child( "NavStokes.BoundaryData.Velocity"));
     read_BndData( prbnddata,  *mg, P.get_child( "NavStokes.BoundaryData.Pressure"));
