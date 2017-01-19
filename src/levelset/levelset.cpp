@@ -451,6 +451,7 @@ void MarkInterface ( const LevelsetP2CL::const_DiscSolCL& lset, double width, Mu
     }
 }
 
+
 //*****************************************************************************
 //                               LevelsetP2CL
 //*****************************************************************************
@@ -738,7 +739,6 @@ void LevelsetP2CL::AccumulateBndIntegral( VecDescCL& f) const
     delete accu;
 }
 
-//>to do for parallel programe, we need add all values in different process
 double LevelsetP2CL::GetInterfaceArea() const
 {
     InterfaceTriangleCL triangle;
@@ -750,15 +750,17 @@ double LevelsetP2CL::GetInterfaceArea() const
         for(int ch=0;ch<8;++ch)
         {
             if (!triangle.ComputeForChild(ch)) // no patch for this child
-                    continue;
+                continue;
             for(int v=0;v<triangle.GetNumTriangles();v++)
                 area += triangle.GetAbsDet(v);
         }
     }
+#ifdef _PAR
+    area = ProcCL::GlobalSum(area);
+#endif
     return area*0.5;
 }
 
-//>to do for parallel programe, we need add all values in different process
 double LevelsetP2CL::GetWetArea() const
 {
     InterfaceTriangleCL triangle;
@@ -771,37 +773,39 @@ double LevelsetP2CL::GetWetArea() const
     double area = 0;
     GridFunctionCL<> qpr;
     LocalP2CL<> ls_loc0;
-    DROPS_FOR_TRIANG_TETRA( MG_, lvl, it){
-
-    for(Uint v=0; v<4; v++)
-    {
-        if(lsetbnd.IsOnSlipBnd(*it->GetFace(v)))  // Do not use lsetbnd
+    DROPS_FOR_TRIANG_TETRA( MG_, lvl, it) {
+        for(Uint v=0; v<4; v++)
         {
-            ls_loc0.assign( *it, Phi, BndData_);
-            const bool noCut= equal_signs(ls_loc0);
-            if(noCut)
+            if(lsetbnd.IsOnSlipBnd(*it->GetFace(v)))  // Do not use lsetbnd
             {
-                if(ls_loc0[0]>0) continue;
-                const FaceCL& face = *it->GetFace(v);
-                double absdet = FuncDet2D(face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
-                                          face.GetVertex(2)->GetCoord()-face.GetVertex(0)->GetCoord());
-                area += absdet/2;
-            }
-            else
-            {
-                evaluate_on_vertexes( GetSolution(), *it, lat, Addr( ls_loc));
-                //Does this partition work for no cut situations??
-                bndpartition_.make_partition2D<SortedVertexPolicyCL, MergeCutPolicyCL>( lat, v, ls_loc);
-                make_CompositeQuad5BndDomain2D( bndq5dom_, bndpartition_,*it);
+                ls_loc0.assign( *it, Phi, BndData_);
+                const bool noCut= equal_signs(ls_loc0);
+                if(noCut)
+                {
+                    if(ls_loc0[0]>0) continue;
+                    const FaceCL& face = *it->GetFace(v);
+                    double absdet = FuncDet2D(face.GetVertex(1)->GetCoord()-face.GetVertex(0)->GetCoord(),
+                                              face.GetVertex(2)->GetCoord()-face.GetVertex(0)->GetCoord());
+                    area += absdet/2;
+                }
+                else
+                {
+                    evaluate_on_vertexes( GetSolution(), *it, lat, Addr( ls_loc));
+                    //Does this partition work for no-cut situations??
+                    bndpartition_.make_partition2D<SortedVertexPolicyCL, MergeCutPolicyCL>( lat, v, ls_loc);
+                    make_CompositeQuad5BndDomain2D( bndq5dom_, bndpartition_,*it);
 
-                LocalP1CL<double> fun;
-                for (Uint i= 0; i<4; ++i) fun[i]=1.0;
-                resize_and_evaluate_on_vertexes(fun, bndq5dom_, qpr);
-                area += quad( qpr, bndq5dom_, NegTetraC);
+                    LocalP1CL<double> fun;
+                    for (Uint i= 0; i<4; ++i) fun[i]=1.0;
+                    resize_and_evaluate_on_vertexes(fun, bndq5dom_, qpr);
+                    area += quad( qpr, 1., bndq5dom_, NegTetraC);
+                }
             }
         }
     }
-}
+#ifdef _PAR
+    area = ProcCL::GlobalSum(area);
+#endif
     return area;
 }
 

@@ -171,7 +171,10 @@ class BndCondCL
     inline BndCondT GetBC( const EdgeCL&, BndIdxT&)   const;
     inline BndCondT GetBC( const FaceCL&, BndIdxT&)   const;
     /// \}
-    /// Only used in creating numbering for unknown
+
+    /// \name check boundary condition
+    /// Only used in creating numbering for unknowns
+    /// \{
     inline bool IsOnDirBnd( const VertexCL&) const;
     inline bool IsOnDirBnd( const EdgeCL&)   const;
     inline bool IsOnDirBnd( const FaceCL&)   const;
@@ -187,6 +190,7 @@ class BndCondCL
     inline bool IsOnMovSlipBnd( const FaceCL&)   const;
     inline bool IsOnSymmBnd( const EdgeCL&)   const;
     inline bool IsOnSymmBnd( const FaceCL&)   const;
+    /// \}
 
     /// \name boundary segment
     /// Returns boundary segment with superior boundary condition of sub-simplex

@@ -47,7 +47,6 @@ namespace DROPS
 
 typedef BndDataCL<double>    LsetBndDataCL;
 
-
 enum SurfaceForceT
 /// different types of surface forces
 {
@@ -88,9 +87,8 @@ class LevelsetP2CL : public ProblemCL< LevelsetCoeffCL, LsetBndDataCL>
     double              curvDiff_, ///< amount of diffusion in curvature calculation
                         SD_;       ///< streamline diffusion
     SurfaceForceT       SF_;
+
     SurfaceTensionCL&   sf_;      ///< data for surface tension
-
-
     void SetupSmoothSystem ( MatrixCL&, MatrixCL&)               const;
     void SmoothPhi( VectorCL& SmPhi, double diff)                const;
     double GetVolume_Composite( double translation, int l)       const;
@@ -119,6 +117,7 @@ LevelsetP2CL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, F
     static LevelsetP2CL * Create(  MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, const ParamCL & P);
     static LevelsetP2CL * Create(  MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf,
                                    bool discontinuous = false, double SD = 0, double curvdiff = -1);
+
 
     /// Update PhiC (do nothing if continuous anyway)
     virtual void UpdateContinuous( ) = 0;

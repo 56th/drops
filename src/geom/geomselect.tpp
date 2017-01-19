@@ -58,6 +58,7 @@ void BuildBoundaryData( const MultiGridCL* mgp, BoundaryT* &bnddata,
 
     readBoundary( bnd_idx, bnd_type_string);
     readBoundary( bnd_names, bnd_funcs_string);
+
     typedef std::vector<BoundaryCL::BndType>   BndTypeCont;    
     BndTypeCont perbndt(num_bnd);  
 

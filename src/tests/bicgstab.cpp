@@ -25,8 +25,6 @@
 #include "num/krylovsolver.h"
 #include "num/precond.h"
 #include <iostream>
-#include <math.h>
-
 
 
 int Test()
@@ -93,7 +91,7 @@ int Test2()
 int main (int, char**)
 {
   try {
-      return Test() + Test2();
+    return Test() + Test2();
   }
   catch (DROPS::DROPSErrCL err) { err.handle(); }
 }

@@ -33,6 +33,7 @@
 namespace DROPS
 {
 
+
 typedef SingletonMapCL< instat_vector_fun_ptr> InVecMap;
 typedef SingletonMapCL< instat_scalar_fun_ptr> InScaMap;
 typedef SingletonMapCL< vector_tetra_function> VecTetMap;

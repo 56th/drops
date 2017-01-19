@@ -54,19 +54,6 @@ class StokesBndDataCL
 };
 
 
-/// \brief Raw data for "system 1", both for one phase and two phases.
-///
-/// scalar-valued mass-matrix, scalar-valued mu-Laplacian, genuinely tensor-valued part of the deformation tensor and the integrals of \f$\rho\phi_i\f$ for the gravitation as load-vector
-/// \todo: Precise description
-struct LocalSystem1DataCL
-{
-    double         M [10][10];
-    double         A [10][10];
-    SMatrixCL<3,3> Ak[10][10];
-
-    double rho_phi[10];
-};
-
 typedef StokesBndDataCL::VelBndDataCL StokesVelBndDataCL;
 typedef StokesBndDataCL::PrBndDataCL  StokesPrBndDataCL;
 
@@ -292,11 +279,6 @@ class StokesDoerflerMarkCL
     bool Estimate(const const_DiscPrSolCL&, const const_DiscVelSolCL&);
 };
 #endif // end of ifndef _PAR
-
-//======================================
-//        inline functions
-//======================================
-
 
 } // end of namespace DROPS
 

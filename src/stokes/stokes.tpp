@@ -404,8 +404,6 @@ void StokesP2P1CL<CoeffT>::SetupSystem1( MLMatDescCL* A, MLMatDescCL* M, VecDesc
     }
 }
 
-/// \brief Update the local system 2 (nocut) with respect to special boundary conditions: slip Bnd and symmetric Bnd;
-
 
 /// \brief Accumulator to set up the matrix B and, if requested the right-hand side C for two-phase flow.
 template<class CoeffT>
@@ -420,7 +418,7 @@ class System2Accumulator_P2P1CL : public TetraAccumulatorCL
     const IdxDescCL& RowIdx;
     const IdxDescCL& ColIdx;
     MatrixCL& B;
-    SlipBndSystem2OnePhaseCL SlipBndHandler;
+    SlipBndSystem2OnePhaseCL SlipBndHandler; ///< Update the local system 2 (nocut) with respect to special boundary conditions: slip Bnd and symmetric Bnd;
 
     IdxT          prNumb[4];  ///< global numbering of the P1-unknowns
     LocalNumbP2CL n;          ///< global numbering of the P2-unknowns
@@ -436,7 +434,7 @@ class System2Accumulator_P2P1CL : public TetraAccumulatorCL
     Quad2CL<Point3DCL> GradRef[10],
                        Grad[10];
     SMatrixCL<1,3>     locB[10][4];
-    bool speBnd;        //if there is a slip or symmetric boundary condtion
+    bool speBnd;        ///< indicates whether there is a slip or symmetric boundary condition
 
   private:
     ///\brief Computes the mapping from local to global data "n", the local matrices in loc and, if required, the Dirichlet-values needed to eliminate the boundary-dof from the global system.
@@ -960,9 +958,9 @@ void StokesP2P1CL<Coeff>::CheckSolution(const VelVecDescCL* lsgvel, const VecDes
          q5_dvel= SMatrixCL<3,3>();
          for (int i=0; i<10; i++)
          {
-                 q5_dvel += outer_product(loc_vel[i],Grad[i]);
-             }
-             if( DLsgVel != NULL)
+             q5_dvel += outer_product(loc_vel[i],Grad[i]);
+         }
+         if( DLsgVel != NULL)
          {
              Quad5CL< SMatrixCL<3,3> > q5_dvel_diff( q5_dvel-q5_dvel_exact);
              Frob_Dvel += Quad5CL<> (frobenius_norm_sq(q5_dvel_diff)).quad(absdet);

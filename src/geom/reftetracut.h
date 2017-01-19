@@ -235,9 +235,9 @@ RefTetraPartitionCL::instance (const double ls[4])
     return instance( ls_byte);
 }
 
-/// \brief In cases that a triangle on the boundary is cut by the interface of two fluids, we want to partition this cut triangle to subtriangles for integration.
+/// \brief In cases that a triangle on the boundary is cut by the interface of two fluids, we want to partition this cut triangle into subtriangles for integration.
 /// This class partitions the positive and negative part of the reference-triangle (a face of the tetra) with respect to a linear levelset-function.
-/// If you add/change functionalities or refactor code of this class, please check the unit test case: Test/bndTrianglePartition.cpp
+/// If you add/change functionalities or refactor code of this class, please check the unit test case: tests/bndTrianglePartition.cpp
 class RefTrianglePartitionCL
 {
   public:
@@ -254,7 +254,7 @@ class RefTrianglePartitionCL
 
   public:
     /// Setting the level-set value of the opposite vertex to the triangle to 0.  
-    /// With RefTetraPartitionCL we can first make a partition of the refTetra in which the refTriangle lie, 
+    /// With RefTetraPartitionCL we can first make a partition of the refTetra in which the refTriangle lies, 
     /// then we just map this refTetra partition to the face we are interested in.
     RefTrianglePartitionCL(byte ls[4], Ubyte VertexNum); 
     size_t size () const { return size_; }      ///< Number of triangles, 0, 1, or 2

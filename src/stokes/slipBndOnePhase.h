@@ -49,27 +49,30 @@ class SlipBndSystem1OnePhaseP2CL
     const StokesBndDataCL& BndData_;
     double mu_;
     double beta_;            //Slip coefficient, beta_=0 for symmetric Bnd;
-    const double alpha_;     //Coefficient for Nitche method
+    const double alpha_;     //Coefficient for Nitsche method
     LocalP1CL<Point3DCL> GradRef[10];
     public:
-    SlipBndSystem1OnePhaseP2CL(const StokesBndDataCL& BndData, const double alpha=0): BndData_(BndData), alpha_(alpha)
-    { P2DiscCL::GetGradientsOnRef( GradRef); 
+    SlipBndSystem1OnePhaseP2CL(const StokesBndDataCL& BndData, const double alpha=0)
+     : BndData_(BndData), alpha_(alpha)
+    {
+        P2DiscCL::GetGradientsOnRef( GradRef);
     }
     void setMu(double mu){mu_=mu;}
     void setBeta(double beta){beta_=beta;}
     /// update local system 1
-    void setup(const TetraCL& tet, const SMatrixCL<3,3>& T, LocalSystem1DataCL& loc);                             
+    void setup(const TetraCL& tet, const SMatrixCL<3,3>& T, SMatrixCL<3,3> Ak[10][10]);
     /// for Slip boundary condition (the slip wall is moving)
     void setupRhs(const TetraCL& tet, Point3DCL loc_b[10], double t);  
 };
 
-/// \brief Due to the weak imposition of bu * n = 0 with Nitsche's method, setup the integral of (bv * bn) * q on the slip bounary for uncut element  
+/// \brief Due to the weak imposition of bu * n = 0 with Nitsche's method, setup the integral of (bv * bn) * q on the slip boundary for uncut element
 class SlipBndSystem2OnePhaseCL
 {
  private:
     const StokesBndDataCL& BndData_;
   public:
-    SlipBndSystem2OnePhaseCL(const StokesBndDataCL& BndData): BndData_(BndData) {}
+    SlipBndSystem2OnePhaseCL(const StokesBndDataCL& BndData)
+     : BndData_(BndData) {}
     void setupB(const TetraCL& tet, SMatrixCL<1, 3> loc_b[10][4]);
 };
 

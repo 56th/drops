@@ -335,6 +335,8 @@ namespace filmperiodic{
     static DROPS::RegisterMatchingFunction regmatch1_y("periodicy", periodic_1side<1>);
     static DROPS::RegisterMatchingFunction regmatch1_z("periodicz", periodic_1side<2>);
 }
+
+
 double TaylorFlowDistance( const DROPS::Point3DCL& p, double)
 {
     static const double taylor_len = P.get<double>("Taylor.Length");
@@ -364,13 +366,32 @@ double TaylorFlowDistance( const DROPS::Point3DCL& p, double)
 static DROPS::RegisterScalarFunction regscataylor("TaylorFlowDistance", TaylorFlowDistance);
 
 
+DROPS::SVectorCL<3> TaylorInflow( const DROPS::Point3DCL& p, double)
+{
+    const double x = p[0] / 6e-3;
+    const double y = p[1] / 6e-3;
+    const double v = P.get<double>("Taylor.AverageInflowVelocity");
+    const double vz = 36*x*(1-x)*y*(1-y)*v;
+    return DROPS::MakePoint3D(0,0,-vz);
+}
+
+static DROPS::RegisterVectorFunction regvectaylor("TaylorInflow", TaylorInflow);
+
+double SmallDistance( const DROPS::Point3DCL&, double)
+{
+    return 0.525e-3;
+}
+
+static DROPS::RegisterScalarFunction regscasmalldist("SmallDistance", SmallDistance);
+
+
 //===============================================================================================
 //          Functions for twophasedrops-executable (Slip Boundary and Moving contact lines)
 //===============================================================================================
 
 namespace DisContPressure{
 
-double Pressure (const DROPS::Point3DCL& , double t)
+    double Pressure (const DROPS::Point3DCL& , double t)
     {
         double ret=0;	
         static bool first = true;

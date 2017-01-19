@@ -519,7 +519,7 @@ void SetInitialConditions(StokesT& Stokes, LevelsetP2CL& lset, MultiGridCL& MG, 
         }
 
         NSSolverBaseCL<StokesT> stokessolver( Stokes, *ssolver);
-        bool checkSolution = (P.get<std::string>("Exp.Solution_Vel").compare("None")!=0);
+        SolveStatProblem( Stokes, lset, stokessolver);
         delete ssolver;
 
       } break;

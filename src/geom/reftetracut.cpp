@@ -220,22 +220,22 @@ RefTrianglePartitionCL::RefTrianglePartitionCL(byte ls[4], Ubyte VertexNum)
     const RefTetraPartitionCL& RefTetraPart= RefTetraPartitionCL::instance(ls);
     size_=RefTetraPart.tetra_size(AllTetraC);
     if(size_> 3)
-       throw DROPSErrCL("Size of the triangles of RefTrianglePartitionCL is bigger than 3");
+        throw DROPSErrCL("Size of the triangles of RefTrianglePartitionCL is bigger than 3");
     Uint index=0;
-    for (RefTetraPartitionCL::const_tetra_iterator it= RefTetraPart.tetra_begin(), end=RefTetraPart.tetra_end(); it != end; ++it){
-     Uint j=0;
-     for(Uint i=0; i<4; ++i){
-         if((*it)[i]!=VertexNum){
-             vert[j]=(*it)[i];
-             ++j;
-            if (j > 3)
-                throw DROPSErrCL("Index of vertex of the triangle is bigger than 3");
-         }	 
-     }
-     //make a triangle and store its sign;
-     triangle_[index] = MakeTriangle(vert[0], vert[1], vert[2]);
-     sign_[index] = RefTetraPart.sign(it);
-     ++index;
+    for (RefTetraPartitionCL::const_tetra_iterator it= RefTetraPart.tetra_begin(), end=RefTetraPart.tetra_end(); it != end; ++it) {
+        Uint j=0;
+        for(Uint i=0; i<4; ++i) {
+            if((*it)[i]!=VertexNum) {
+                vert[j]=(*it)[i];
+                ++j;
+                if (j > 3)
+                    throw DROPSErrCL("Index of vertex of the triangle is bigger than 3");
+            }	 
+        }
+        //make a triangle and store its sign;
+        triangle_[index] = MakeTriangle(vert[0], vert[1], vert[2]);
+        sign_[index] = RefTetraPart.sign(it);
+        ++index;
     }
 }
 

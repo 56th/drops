@@ -327,7 +327,6 @@ void Solve( StokesT& Stokes, LevelsetP2CL& lset, VelVecDescCL& rhs )
 double L2ErrorPr( VecDescCL& p, const MatrixCL& M, double delta_p,
                   const MultiGridCL& MG, const FiniteElementT prFE,
                   const ExtIdxDescCL& Xidx )
-    //This if clause filters out too large/small pressure values due to xfem
 {
     NormalisePr( p.Data, M, prFE, Xidx );
 
@@ -431,15 +430,10 @@ void ExactPr( VecDescCL& p, double delta_p, const MultiGridCL& mg,
             p.Data[ it->Unknowns(idxnum) ] += analytic_p( GetBaryCenter( *it ), 0 );
         }
         break;
-    P.put_if_unset<int>("Levelset.Discontinuous", 0);
 
     default:
         throw DROPSErrCL( "ExactPr not implemented for this FE type!" );
     }
-	
-    P.put_if_unset<std::string>("Exp.Solution_Vel", "None");
-    P.put_if_unset<std::string>("Exp.Solution_GradPr", "None");
-    P.put_if_unset<std::string>("Exp.Solution_Pr", "None");
 }
 
 void NormalisePr( VectorCL& p, const MatrixCL& M,

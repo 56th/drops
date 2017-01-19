@@ -53,23 +53,11 @@ template <class GridFunT, class QuadDataT, class WeightSelectorT>
 template <class GridFunT>
   inline typename ValueHelperCL<GridFunT>::value_type
   quad (const GridFunT& f, double absdet, const QuadDomainCL& dom, TetraSignEnum s= AllTetraC);
-/// \brief Integrate on the negative, the positive part or on the whole tetra without using absdet
-template <class GridFunT>
-  inline typename ValueHelperCL<GridFunT>::value_type
-  quad (const GridFunT& f, const QuadDomainCL& dom, TetraSignEnum s= AllTetraC);
 
 /// \brief Integrate on the negative and the positive part of a tetra.
 template <class GridFunT>
   inline void
   quad (const GridFunT& f, double absdet, const QuadDomainCL& dom,
-    typename ValueHelperCL<GridFunT>::value_type& neg_int,
-    typename ValueHelperCL<GridFunT>::value_type& pos_int);
-///@}
-
-/// \brief Integrate on the negative and the positive part of a tetra without using absdet.
-template <class GridFunT>
-  inline void
-  quad (const GridFunT& f, const QuadDomainCL& dom,
     typename ValueHelperCL<GridFunT>::value_type& neg_int,
     typename ValueHelperCL<GridFunT>::value_type& pos_int);
 ///@}
@@ -264,8 +252,6 @@ template <class QuadDataT>
 inline const QuadDomain2DCL&
 make_CompositeQuad5Domain2D (QuadDomain2DCL& q, const SurfacePatchCL& p, const TetraCL& t);
 
-
-
 /// \brief Create an extrapolated quadrature rule.
 /// No sharing of quadrature points is performed.
 /// The extrapolation method is determined by extra.
@@ -304,8 +290,6 @@ class QuadDomain2DCL
     template <class QuadDataT, class LocalFET>
       friend const QuadDomain2DCL&
       make_ExtrapolatedQuadDomain2D (QuadDomain2DCL&, const LocalFET&, const TetraCL&, const ExtrapolationToZeroCL&);
-
-
     ///@}
 
   private:

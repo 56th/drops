@@ -852,6 +852,7 @@ template <class RAIterT>
     for (Uint i= 0; i < NumNodesC; ++i)
         NodeInTetra[i]= Node[i][0]*p[0] + Node[i][1]*p[1] + Node[i][2]*p[2];
 }
+
 //**************************************************************************
 // Class: Quad5_2DCL                                                       *
 //**************************************************************************
@@ -859,14 +860,10 @@ template<class T>
   inline Quad5_2DCL<T>&
   Quad5_2DCL<T>::assign(const TetraCL& s, const BaryCoordCL* const p, instat_fun_ptr f , double t)
 {
-    Point3DCL v[Quad5_2DDataCL::NumNodesC];
     BaryCoordCL Bary[Quad5_2DDataCL::NumNodesC];
-    for (Uint i= 0; i < Quad5_2DDataCL::NumNodesC; ++i){
-        Bary[i] = Quad5_2DDataCL::Node[i][0]*p[0]+Quad5_2DDataCL::Node[i][1]*p[1]+Quad5_2DDataCL::Node[i][2]*p[2];
-        v[i]= GetWorldCoord(s, Bary[i]);
-    }
+    SetInterface( p, Bary);
     for (Uint i= 0; i < Quad5_2DDataCL::NumNodesC; ++i)
-        (*this)[i]= f(v[i], t);
+        (*this)[i]= f( GetWorldCoord(s, Bary[i]), t);
 
     return *this;
 }

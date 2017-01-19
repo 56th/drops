@@ -38,7 +38,7 @@
 void test_tetra_cut ()
 {
     std::cout<<"=========================TetraPartition test: \n"
-    <<"all 81 level-set sign patterns will be prescribed, then the corresponding tetra partition visualization files will be created."<<std::endl;
+             <<"all 81 level-set sign patterns will be prescribed, then the corresponding tetra partition visualization files will be created."<<std::endl;
     DROPS::GridFunctionCL<> ls( 4);
     ls[0]= -1.; ls[1]= 0.; ls[2]= 0.; ls[3]= 0.;
     DROPS::TetraPartitionCL tet;

@@ -64,12 +64,12 @@ void test_triangle_partition()
               for (DROPS::BndTriangPartitionCL::const_triangle_iterator it= BndTri.triangle_begin(), end= BndTri.triangle_end(); it != end; ++it)
               std::cout << " Indices of vertices: "<<int((*it)[0])<<" "<< int((*it)[1])<< " "<<int((*it)[2]) <<std::endl;
               if ( BndTri.vertex_size() != (4 + tri.size() -1) || BndTri.triangle_size() != tri.size() )
-                consistency=false;
+                  consistency=false;
               c++;
           }
     std::cout <<"TrianglePartitionCL------------------------------------------------------"<<std::endl;
-    if(false)
-        std::cout<<"The vertex size and the triangle size of BndTrianglePartitionCL is not consistent with Ref..."<<std::endl;
+    if(!consistency)
+        std::cout<<"The vertex size and the triangle size of BndTrianglePartitionCL is NOT consistent with Ref..."<<std::endl;
     else
         std::cout<<"The vertex size and the triangle size of BndTrianglePartitionCL is consistent with Ref..."<<std::endl;
 }
@@ -87,14 +87,14 @@ inline double ball_instat (const DROPS::Point3DCL& p, double)
 void test_bnd_integral()
 {
     std::cout<<"=========================cut boundary integral test: \n"
-             <<"One cut boundary is integrated seperately by positive part and negative part"<<std::endl;
+             <<"The cut boundary x=0 is integrated separately by positive part and negative part"<<std::endl;
     DROPS::Uint num_sub = 32;
     DROPS::Uint num_sub_lattice = 2;
     DROPS::Point3DCL orig;
     orig[0] = -2;
     orig[2] = -1;
     orig[1] = -1;
-    // [-1, 1] x[0, 2] x[-1, 1] brick
+    // [-2, 0] x[-1, 1] x[-1, 1] brick
     DROPS::BrickBuilderCL brick(orig, 2.*DROPS::std_basis<3>(1), 2.*DROPS::std_basis<3>(2), 2.*DROPS::std_basis<3>(3), num_sub, num_sub, num_sub);
     DROPS::MultiGridCL mg( brick);
     const DROPS::PrincipalLatticeCL& lat= DROPS::PrincipalLatticeCL::instance( num_sub_lattice);
@@ -107,7 +107,7 @@ void test_bnd_integral()
     DROPS_FOR_TRIANG_TETRA( mg, 0, it) {
         evaluate_on_vertexes( ball_instat, *it, lat, 0., Addr( ls));
         DROPS::Uint facenum =3;
-        onbnd = (*it).IsBndSeg(facenum);   //it seems segment 3 is the face number for all "bottom" tetra
+        onbnd = (*it).IsBndSeg(facenum);   //it seems segment 3 is the face number for all bnd faces on x=0
         if(onbnd)
         {
             DROPS::Point3DCL normal;
@@ -117,13 +117,19 @@ void test_bnd_integral()
                 DROPS::make_CompositeQuad5BndDomain2D(qdom, BndTri, *it); 
                 DROPS::GridFunctionCL<> integrand( 1., qdom.vertex_size()); // Gridfunction with constant 1 everywhere
                 //double tmp_neg, tmp_pos;
-                area_neg +=quad( integrand, qdom, DROPS::NegTetraC);
-                area_pos +=quad( integrand, qdom, DROPS::PosTetraC);
+                area_neg +=quad( integrand, 1., qdom, DROPS::NegTetraC);
+                area_pos +=quad( integrand, 1., qdom, DROPS::PosTetraC);
             }
         }
     }
     //analytical solution of negative area is 0.78539815
-    std::cout << "Aear of the negative part: " << area_neg << ", area of the positive part: " << area_pos << std::endl;
+    const double area_neg_ref= 0.78539815;
+    std::cout << "Area of the negative part: " << area_neg << ", area of the positive part: " << area_pos << std::endl;
+    if (fabs(area_neg - area_neg_ref) > 1e-9 || fabs(area_neg + area_pos - 4.) > 1e-9)
+        std::cout << "This is NOT consistent with the reference solution" << std::endl;
+    else
+        std::cout << "This is consistent with the reference solution" << std::endl;
+
 }
 
 int main()

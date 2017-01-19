@@ -205,10 +205,10 @@ class SurfacePatchCL
 };
 
 
-/// \brief In cases that a triangle on the boundary is cut by the interface of two fluids, we want to partition this cut triangle to subtriangles for integration.
+/// \brief In cases that a triangle on the boundary is cut by the interface of two fluids, we want to partition this cut triangle into subtriangles for integration.
 /// This class partitions the cut triangle by the interface on the boundary to sub-triangles
-/// Todo: TetraSignEnum is confusing for understanding the codes, rename to TriangleSignEnum maybe
-/// If you add/change functionalities or refactor code of this class, please check the unit test case: Test/bndTrianglePartition.cpp
+/// Todo: TetraSignEnum is confusing for understanding the code, rename to TriangleSignEnum maybe
+/// If you add/change functionalities or refactor code of this class, please check the unit test case: tests/bndTrianglePartition.cpp
 class BndTriangPartitionCL
 {
   public:
@@ -249,7 +249,7 @@ class BndTriangPartitionCL
     const_triangle_iterator triangle_end   (TetraSignEnum s= AllTetraC) const 
         { return s == NegTetraC ? triangles_.begin() + pos_triangles_begin_ : triangles_.end(); }
 
-    //Vertices is not sorted like TetraPartitionCL
+    // Vertices are not sorted like TetraPartitionCL
     const_vertex_iterator vertex_begin () const
         { return vertexes_.begin(); }
     const_vertex_iterator vertex_end   () const

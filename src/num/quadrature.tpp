@@ -61,13 +61,6 @@ template <class GridFunT>
 }
 
 template <class GridFunT>
-  inline typename ValueHelperCL<GridFunT>::value_type
-  quad (const GridFunT& f, const QuadDomainCL& dom, TetraSignEnum s)
-{
-    return quad_impl( dom.weight_begin( s), f, dom.dof_begin( s), dom.dof_end( s));
-}
-
-template <class GridFunT>
   inline void
   quad (const GridFunT& f, double absdet, const QuadDomainCL& dom,
     typename ValueHelperCL<GridFunT>::value_type& neg_int,
@@ -75,16 +68,6 @@ template <class GridFunT>
 {
     neg_int= quad( f, absdet, dom, NegTetraC);
     pos_int= quad( f, absdet, dom, PosTetraC);
-}
-
-template <class GridFunT>
-  inline void
-  quad (const GridFunT& f, const QuadDomainCL& dom,
-    typename ValueHelperCL<GridFunT>::value_type& neg_int,
-    typename ValueHelperCL<GridFunT>::value_type& pos_int)
-{
-    neg_int= quad( f, dom, NegTetraC);
-    pos_int= quad( f, dom, PosTetraC);
 }
 
 ///\brief Helper to quad_{neg,pos}_integrand
@@ -356,7 +339,7 @@ template <class QuadDataT>
 
     q.vertexes_.resize( num_nodes*p.triangle_size());
 
-    q.pos_begin_= q.neg_end_= num_nodes*p.triangle_size( NegTetraC); ///will be added later after BndTriangPartitionCL include triangle_size( NegTetraC)
+    q.pos_begin_= q.neg_end_= num_nodes*p.triangle_size( NegTetraC); // will be added later after BndTriangPartitionCL includes triangle_size( NegTetraC)
 
     q.weights_.resize( num_nodes*p.triangle_size());
     q.all_weights_begin_= 0;

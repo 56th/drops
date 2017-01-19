@@ -94,7 +94,6 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     DROPS::MatchMap & matchmap = DROPS::MatchMap::getInstance();
     
 
-
     bool is_periodic = P.get<std::string>("DomainCond.PeriodicMatching", "none") != "none";
     match_fun periodic_match = is_periodic ? matchmap[P.get("DomainCond.PeriodicMatching", std::string("periodicx"))] : 0;
 
@@ -491,6 +490,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
             BndDataCL<> ifbnd( 0);
             std::cout << "surfactant on \\Gamma: " << Integral_Gamma( MG, *lset.PhiC, lset.GetBndData(), make_P1Eval(  MG, ifbnd, surfTransp.ic)) << '\n';
         }
+
         // WriteMatrices( Stokes, step);
 
         // grid modification
@@ -563,13 +563,6 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 }
 
 } // end of namespace DROPS
-
-/*//I need to consider if to include these parameters to the default parameter files
-void SetMissingParameters(DROPS::ParamCL& P){
-    P.put_if_unset<std::string>("Exp.Solution_Vel", "None");
-    P.put_if_unset<std::string>("Exp.Solution_GradPr", "None");
-    P.put_if_unset<std::string>("Exp.Solution_Pr", "None");
-}*/
 
 int main (int argc, char** argv)
 {
@@ -687,8 +680,7 @@ int main (int argc, char** argv)
         std::cout << "As far as I can tell the ParMultigridCL is sane\n";
 #endif
 
-    DROPS::InstatNavierStokes2PhaseP2P1CL prob( *mg, DROPS::TwoPhaseFlowCoeffCL(P), bnddata, P.get<double>("Stokes.XFEMStab")<0 ? DROPS::P1_FE : DROPS::P1X_FE, 
-                                                P.get<double>("Stokes.XFEMStab"), DROPS::vecP2_FE, P.get<double>("Stokes.epsP",0.0));
+    DROPS::InstatNavierStokes2PhaseP2P1CL prob( *mg, DROPS::TwoPhaseFlowCoeffCL(P), bnddata, P.get<double>("Stokes.XFEMStab")<0 ? DROPS::P1_FE : DROPS::P1X_FE, P.get<double>("Stokes.XFEMStab"), DROPS::vecP2_FE, P.get<double>("Stokes.epsP",0.0));
 
     Strategy( prob, *lsetbnddata, adap);    // do all the stuff
 

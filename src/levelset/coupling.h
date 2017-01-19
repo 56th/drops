@@ -96,7 +96,7 @@ class LinThetaScheme2PhaseCL: public TimeDisc2PhaseCL
     StokesSolverT& solver_;
     LsetSolverT&   lsetsolver_;
 
-    double stk_theta_, ls_theta_, xfem_eps_;
+    double stk_theta_, ls_theta_;
 
     VecDescCL    *cplA_;
     bool         implCurv_;
@@ -186,11 +186,9 @@ class CoupledTimeDisc2PhaseBaseCL: public TimeDisc2PhaseCL
     LsetSolverT&   lsetsolver_;
     double         tol_;
 
-    double         xfem_eps_;
     bool           withProj_;
     double         stab_;
     double         alpha_;
-   
 
     virtual void InitStep();
     virtual void CommitStep();
@@ -386,7 +384,6 @@ class RecThetaScheme2PhaseCL: public CoupledTimeDisc2PhaseBaseCL<LsetSolverT, Re
     using base_::lsetmod_;
     using base_::alpha_;
     using base_::stab_;
-    using base_::xfem_eps_;
 
     void ComputeDots ();
 
@@ -516,7 +513,7 @@ class FracStepScheme2PhaseCL : public BaseMethod<LsetSolverT, RelaxationPolicyT>
     FracStepScheme2PhaseCL( StokesT& Stokes, LevelsetP2CL& ls,
                                NSSolverBaseCL<StokesT>& solver, LsetSolverT& lsetsolver, LevelsetModifyCL& lsetmod,
                                double dt, double tol, double nonlinear= 1, bool withProjection= false, double stab= 0.0)
-        : base_( Stokes, ls, solver, lsetsolver, lsetmod, facdt_[0]*dt, tol,  0.5, 0.5, nonlinear, withProjection, stab), dt3_(dt), substep_(0) {}
+        : base_( Stokes, ls, solver, lsetsolver, lsetmod, facdt_[0]*dt, tol, 0.5, 0.5, nonlinear, withProjection, stab), dt3_(dt), substep_(0) {}
 
     double GetSubTimeStep() const { return facdt_[substep_]*dt3_; }
     double GetSubTheta()    const { return theta_[substep_]; }

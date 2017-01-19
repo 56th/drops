@@ -34,6 +34,7 @@
 
 namespace DROPS
 {
+
 typedef double    (*scalar_fun_ptr)(double);
 typedef double    (*instat_scalar_fun_ptr)(const Point3DCL&, double);
 typedef Point3DCL (*instat_vector_fun_ptr)(const Point3DCL&, double);
@@ -1052,8 +1053,6 @@ class Quad5_4DDataCL
     static STBaryCoordCL         Node[NumNodesC];   ///< quadrature nodes
     static const double        Weight[NumNodesC]; ///< quadrature weights for each node
 };
-
-
 
 
 

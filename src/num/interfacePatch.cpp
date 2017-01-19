@@ -177,7 +177,6 @@ bool InterfacePatchCL::ComputeVerticesOfCut( Uint ch, bool compute_PQRS)
         }
     }
     
-
     const double eps = 1e-9;
     
     for (int i = 0; i<intersec_; ++i){
@@ -522,8 +521,6 @@ bool InterfaceTriangleCL::ComputeForChild( Uint ch)
     return true; // computed patch of child;
 }
 
-
-
 Point3DCL InterfaceTriangleCL::GetNormal() const
 {
     const ChildDataCL data= GetChildData( ch_);
@@ -595,7 +592,7 @@ bool InterfaceLineCL::ComputeMCLForChild(Uint ch)
 {
     if( BC_Face_[0]==NoBC && BC_Face_[1]==NoBC && BC_Face_[2]==NoBC && BC_Face_[3]==NoBC
         && BC_Edge_[0]==NoBC && BC_Edge_[1]==NoBC && BC_Edge_[2]==NoBC && BC_Edge_[3]==NoBC && BC_Edge_[4]==NoBC && BC_Edge_[5]==NoBC )
-    {//The tetrahedra has no surface and edge on boundary
+    {//The tetrahedron has no surface and edge on boundary
             return false;
     }
     const bool iscut= ComputeVerticesOfCut( ch, /*compute_PQRS*/ true);
@@ -724,7 +721,7 @@ void InterfaceLineCL::SetBndOutNormal(instat_vector_fun_ptr outnormal)
 
 Quad9_1DCL<Point3DCL> InterfaceLineCL::GetImprovedNormalAtMCL(Uint v) const
 {
-        //note the algorithm used here is the same as the one used in interfaceTriangleCL.
+        //note that the algorithm used here is the same as the one used in interfaceTriangleCL.
         LocalP1CL<Point3DCL> GradRef[10], GradP2[10];
         P2DiscCL::GetGradientsOnRef( GradRef);
         SMatrixCL<3,3> T;
@@ -764,7 +761,7 @@ Quad9_1DCL<Point3DCL> InterfaceLineCL::GetImprovedNormalAtMCL(Uint v) const
         return normal;
 }
 
-//The method to compute out normal of MCL might have large error when the contact angle is small.
+// The method to compute the outer normal of MCL might have a large error when the contact angle is small.
 Quad9_1DCL<Point3DCL> InterfaceLineCL::GetImprovedMCLNormalOnSlipBnd(const TetraCL& tet, Uint v) const 
 {
     BaryCoordCL bary[2];
@@ -871,6 +868,10 @@ LocalP2CL<double> ProjectIsoP2ChildToParentP1 (LocalP2CL<double> lpin, Uint chil
     }
     return res;
 }
+
+
+
+
 
 } // end of namespace DROPS
 

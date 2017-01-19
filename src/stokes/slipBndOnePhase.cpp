@@ -30,11 +30,11 @@ namespace DROPS{
 //***********************************************************************
 //                  SlipBndSystem1OnePhaseP2CL
 //***********************************************************************
-void SlipBndSystem1OnePhaseP2CL::setup(const TetraCL& tet, const SMatrixCL<3,3>& T, LocalSystem1DataCL& loc)
+void SlipBndSystem1OnePhaseP2CL::setup(const TetraCL& tet, const SMatrixCL<3,3>& T, SMatrixCL<3,3> Ak[10][10])
 { 
     LocalP1CL<Point3DCL> Grad[10];
     P2DiscCL::GetGradients( Grad, GradRef, T);
-    for (Uint k =0; k< 4; ++k) //Go throught all faces of a tet
+    for (Uint k =0; k< 4; ++k) //Go through all faces of a tet
     {
         Point3DCL normal;
         SMatrixCL<3, 3> dm[10][10];
@@ -76,10 +76,10 @@ void SlipBndSystem1OnePhaseP2CL::setup(const TetraCL& tet, const SMatrixCL<3,3>&
                     dm[j][i]     += (alpha_/h * mu_ - temp) * mass2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));
                     // if(BndData_.Vel.GetBC(*tet.GetFace(k))!= SymmBC) not necessary
                     dm[j][i]     -=  2. * mu_ * Grad2D.quad(absdet) * SMatrixCL<3,3> (outer_product(normal, normal));  
-                    loc.Ak[j][i] += dm[j][i];
+                    Ak[j][i] += dm[j][i];
                     if (i != j){
                         assign_transpose( dm[i][j], dm[j][i]);
-                        loc.Ak[i][j] += dm[i][j];
+                        Ak[i][j] += dm[i][j];
                     }	
                 }
             }
