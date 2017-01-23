@@ -53,7 +53,17 @@
                         "MaxRelComponentSize": "Deprecated.Default.Downwind", // maximal cycle size before removing weak edges
                         "WeakEdgeRatio": "Deprecated.Default.Downwind",   // ration of the weak edges to remove for large cycles
                         "CrosswindLimit": "Deprecated.Default.Downwind" // cos(pi/6); smaller convection is not considered
-                }
+                },
+                "SlipBnd":    // #[-> NavStokes.BoundaryData] slip and symmetric boundary condition
+                {
+                  "Beta1":                       "NavStokes.BoundaryData.SlipBnd.Beta1",              //Slip coefficient for fluid 1
+                  "Beta2":                       "NavStokes.BoundaryData.SlipBnd.Beta2",              //Slip coefficient for fluid 2
+                  "BetaL":                       "NavStokes.BoundaryData.SlipBnd.BetaL",              //Slip coefficient for contact line
+                  "NitschePenalty":              "NavStokes.BoundaryData.SlipBnd.NitschePenalty",
+                  "CtAngle":                     "NavStokes.BoundaryData.SlipBnd.ContactAngle",       //constant equilibrium contact angle
+                  "CtAngleFnc":                  "NavStokes.BoundaryData.SlipBnd.ContactAngleFunc",   //Equilibrium contact angle as a function
+                  "BndOutNormal":                "NavStokes.BoundaryData.SlipBnd.BndOuterNormal"      //A function defining the outer normal of the domain 
+                }                
         },
 
 // Levelset solver

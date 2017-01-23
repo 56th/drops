@@ -135,8 +135,8 @@ class TwoPhaseFlowCoeffCL
         {
         volforce = InVecMap::getInstance()[P.get<std::string>("NavStokes.Coeff.VolForce")];
         var_tau_fncs = InScaMap::getInstance()[P.get<std::string>("NavStokes.Coeff.SurfTens.VarTensionFunc")];
-        if( P.get<std::string>("NavStokes.BoundaryData.SlipBnd.BndOutNormal").compare("None")!=0)
-            BndOutNormal = InVecMap::getInstance()[P.get<std::string>("NavStokes.BoundaryData.SlipBnd.BndOutNormal")];
+        if( P.get<std::string>("NavStokes.BoundaryData.SlipBnd.BndOuterNormal").compare("None")!=0)
+            BndOutNormal = InVecMap::getInstance()[P.get<std::string>("NavStokes.BoundaryData.SlipBnd.BndOuterNormal")];
         else
             BndOutNormal = nullptr;
     }

@@ -108,8 +108,8 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsetbnddata, *sf, P.get_child("Levelset")) );
 
     //required to simulate flows with moving contact line
-    instat_scalar_fun_ptr Young_angle = inscamap[P.get<std::string>("NavStokes.BoundaryData.SlipBnd.CtAngleFnc")];
-    instat_vector_fun_ptr bnd_outnormal = invecmap[P.get<std::string>("NavStokes.BoundaryData.SlipBnd.BndOutNormal")];
+    instat_scalar_fun_ptr Young_angle = inscamap[P.get<std::string>("NavStokes.BoundaryData.SlipBnd.ContactAngleFunc")];
+    instat_vector_fun_ptr bnd_outnormal = invecmap[P.get<std::string>("NavStokes.BoundaryData.SlipBnd.BndOuterNormal")];
     Stokes.SetYoungAngle(Young_angle);
     Stokes.SetBndOutNormal(bnd_outnormal);
     Stokes.SetSurfTension(sf);

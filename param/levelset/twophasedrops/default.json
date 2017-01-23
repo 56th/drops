@@ -75,9 +75,9 @@
                 "Beta2":                 0.05,
                 "BetaL":                 0,
                 "NitschePenalty":        30,
-                "CtAngle":               60,
-                "CtAngleFnc":            "ConstantAngle",
-                "BndOutNormal":          "OutNormalBrick"
+                "ContactAngle":          60,
+                "ContactAngleFunc":      "ConstantAngle",
+                "BndOuterNormal":        "OutNormalBrick"
             }
         }
     },

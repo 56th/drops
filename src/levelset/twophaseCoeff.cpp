@@ -487,7 +487,7 @@ namespace ContactAngle{
 
     double ConstantAngle(const DROPS::Point3DCL&,double)
     {
-       double angle = P.get<double>("NavStokes.BoundaryData.SlipBnd.CtAngle");
+       double angle = P.get<double>("NavStokes.BoundaryData.SlipBnd.ContactAngle");
         return angle/180.0*M_PI;
     }
 
