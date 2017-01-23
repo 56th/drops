@@ -151,4 +151,4 @@ namespace filmperiodic{
     static DROPS::RegisterMatchingFunction regmatch1_z("periodicz", periodic_1side<2>);
 }
 
-} // end of namespace "film"
+} // end of namespace "filmdistance"

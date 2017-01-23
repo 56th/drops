@@ -280,11 +280,6 @@ class StokesDoerflerMarkCL
 };
 #endif // end of ifndef _PAR
 
-//======================================
-//        inline functions
-//======================================
-
-
 } // end of namespace DROPS
 
 #include "stokes/stokes.tpp"

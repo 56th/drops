@@ -37,8 +37,8 @@
 
 void test_tetra_cut ()
 {
-	std::cout<<"=========================TetraPartition test: \n"
-	         <<"all 81 level-set sign patterns will be prescribed, then the corresponding tetra partition visualization files will be created."<<std::endl;
+    std::cout<<"=========================TetraPartition test: \n"
+             <<"all 81 level-set sign patterns will be prescribed, then the corresponding tetra partition visualization files will be created."<<std::endl;
     DROPS::GridFunctionCL<> ls( 4);
     ls[0]= -1.; ls[1]= 0.; ls[2]= 0.; ls[3]= 0.;
     DROPS::TetraPartitionCL tet;
@@ -69,8 +69,8 @@ void test_tetra_cut ()
 
 void test_cut_surface ()
 {
-	std::cout<<"=========================Surface patch test: \n"
-	         <<"all 81 level-set sign patterns will be prescribed in a tetra, then the corresponding interface patch visualization files will be created."<<std::endl;
+    std::cout<<"=========================Surface patch test: \n"
+             <<"all 81 level-set sign patterns will be prescribed in a tetra, then the corresponding interface patch visualization files will be created."<<std::endl;
     DROPS::GridFunctionCL<> ls( 4);
     ls[0]= -1.; ls[1]= 0.; ls[2]= 0.; ls[3]= 0.;
     DROPS::SurfacePatchCL tet;
@@ -96,15 +96,15 @@ void test_cut_surface ()
 
 void test_principal_lattice ()
 {
-	std::cout<<"=========================PrincipalLatticeCL test: \n"
-	         <<"4 principal lattice with 1, 2, 3, 4 intervals will be created respectively, and key information will be showed."<<std::endl;
+    std::cout<<"=========================PrincipalLatticeCL test: \n"
+             <<"4 principal lattice with 1, 2, 3, 4 intervals will be created respectively, and key information will be showed."<<std::endl;
     for (int i= 1; i <= 4; ++i) {
         const DROPS::PrincipalLatticeCL& lat= DROPS::PrincipalLatticeCL::instance( i);
         std::cout << "======================================= \n" 
-		          << "Number of intervals: "<<lat.num_intervals() 
-				  << "| " << "Number of vertices: "<<lat.vertex_size() 
-				  << "| " << "Number of tetra: "   <<lat.tetra_size() << std::endl;
-		std::cout << "=======================================Barycentric coordinates of vertices: "<<std::endl; 
+                  << "Number of intervals: "<<lat.num_intervals() 
+                  << "| " << "Number of vertices: "<<lat.vertex_size() 
+                  << "| " << "Number of tetra: "   <<lat.tetra_size() << std::endl;
+        std::cout << "=======================================Barycentric coordinates of vertices: "<<std::endl; 
         for (DROPS::PrincipalLatticeCL::const_vertex_iterator v= lat.vertex_begin(), end= lat.vertex_end(); v != end; ++v) {
             std::cout << /*lat.num_intervals()*/(*v) << std::endl;
         }
@@ -127,10 +127,10 @@ inline double sphere_instat (const DROPS::Point3DCL& p, double)
 
 void test_sphere_cut ()
 {
-	std::cout<<"=========================Sphere cut test: \n"
-	         <<"A principal lattice with 10 intervals will be cut by a sphere with 0.5 radius;\n"
+    std::cout<<"=========================Sphere cut test: \n"
+             <<"A principal lattice with 10 intervals will be cut by a sphere with 0.5 radius;\n"
              <<"Negative tetras and interface patch will be showed in two vtu files respectively."<<std::endl;
-	
+
     DROPS::TetraBuilderCL tetrabuilder( 0);
     DROPS::MultiGridCL mg( tetrabuilder);
 
@@ -156,8 +156,8 @@ void test_sphere_cut ()
 
 void test_sphere_integral ()
 {
-	std::cout<<"=========================Volume integral test: \n"
-	         <<"A 2x2x2 cubic is cut by a sphere with 0.5 radius;\n"
+    std::cout<<"=========================Volume integral test: \n"
+             <<"A 2x2x2 cubic is cut by a sphere with 0.5 radius;\n"
              <<"Negative part and positive part will be integrated seperately by using QuadDomainCL."<<std::endl;
     //std::cout << "Enter the number of subdivisions of the cube: ";
     DROPS::Uint num_sub = 8;
@@ -230,8 +230,8 @@ void test_extrapolated_sphere_integral ()
 
 void test_sphere_surface_integral ()
 {
-	std::cout<<"=========================Interface area integral test: \n"
-	         <<"A 2x2x2 cubic is cut by a sphere with 0.5 radius;\n"
+    std::cout<<"=========================Interface area integral test: \n"
+             <<"A 2x2x2 cubic is cut by a sphere with 0.5 radius;\n"
              <<"Interface area will be computed by using QuadDomain2DCL"<<std::endl;
     //std::cout << "Enter the number of subdivisions of the cube: ";
     DROPS::Uint num_sub = 8;

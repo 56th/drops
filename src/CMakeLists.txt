@@ -99,7 +99,7 @@ message(STATUS "###    GLOBAL EXE LINKER FLAGS: ${CMAKE_EXE_LINKER_FLAGS} ###")
 
 ###############################################################################
 # libs* functions are specializations of add_library, which allow us to add
-# multiple files in a single line. The ${HOME} directory is automatically 
+# multiple files in a single line. The ${HOME} directory is automatically
 # prepended.
 # THESE FUNCTIONS REQUIRE ${HOME}
 
@@ -155,10 +155,10 @@ else(WIN32)
 endif(WIN32)
 
 ###############################################################################
-# the exec command can be used to conveniently add an executable. 
+# the exec command can be used to conveniently add an executable.
 # Arguments: filename <link_objects...>
 # First a library and an executable target with suitable names are created.
-# Afterwards we add <link_objects...> as a requirement of the executable 
+# Afterwards we add <link_objects...> as a requirement of the executable
 # THIS FUNCTION REQUIRES ${HOME} and ${PAR_OBJ}
 
 function(exec_ f)

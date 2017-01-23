@@ -1,6 +1,6 @@
 /// \file instatstokes2phase.h
 /// \brief classes that constitute the 2-phase Stokes problem
-/// \author LNM RWTH Aachen: Patrick Esser, Joerg Grande, Sven Gross, Volker Reichelt, Thomas Ludescher; SC RWTH Aachen: Oliver Fortmeier
+/// \author LNM RWTH Aachen: Patrick Esser, Joerg Grande, Sven Gross, Volker Reichelt, Thomas Ludescher, Liang Zhang; SC RWTH Aachen: Oliver Fortmeier
 
 /*
  * This file is part of DROPS.
@@ -92,12 +92,17 @@ class TwoPhaseFlowCoeffCL
     bool film; // TL: delete?
     bool ns_shiftframe;
     double surfTens;
-    double rho_koeff1, rho_koeff2, mu_koeff1, mu_koeff2; // TL: changing order 1<->2 makes more sense, right?
+    double rho_koeff1, rho_koeff2, mu_koeff1, mu_koeff2;
+    double beta_coeff1, beta_coeff2; ///< slip bnd coeff for fluid 1/2
 
   public:
     DROPS::instat_vector_fun_ptr volforce;
+    DROPS::instat_vector_fun_ptr BndOutNormal;
     const SmoothedJumpCL rho, mu;
+    const SmoothedJumpCL beta;      ///< Coefficient for SlipBC
     const double SurfTens, DilVisco, ShearVisco;
+    const double betaL,             ///< contact line coefficient
+                 alpha;             ///< Nitsche coeff for slip bnd
     const Point3DCL g;
     const Point3DCL framevel;
     DROPS::instat_scalar_fun_ptr var_tau_fncs;
@@ -112,42 +117,53 @@ class TwoPhaseFlowCoeffCL
         rho_koeff2( P.get<double>("NavStokes.Coeff.DensNeg") ),
         mu_koeff1( P.get<double>("NavStokes.Coeff.ViscPos") ),
         mu_koeff2( P.get<double>("NavStokes.Coeff.ViscNeg") ),
+        beta_coeff1(P.get<double>("NavStokes.BoundaryData.SlipBnd.Beta1")),
+        beta_coeff2(P.get<double>("NavStokes.BoundaryData.SlipBnd.Beta2")),
 
         rho( dimless ? JumpCL( 1., rho_koeff1/rho_koeff2)
           : JumpCL( rho_koeff2, rho_koeff1), H_sm, P.get<double>("NavStokes.Coeff.SmoothZone")),
         mu( dimless ? JumpCL( 1., mu_koeff1/mu_koeff2)
           : JumpCL( mu_koeff2, mu_koeff1), H_sm, P.get<double>("NavStokes.Coeff.SmoothZone")),
+        beta(dimless ? JumpCL( 1., beta_coeff2/beta_coeff1)
+                     : JumpCL(beta_coeff2,beta_coeff1), H_sm, 0),
         SurfTens (dimless ? surfTens/rho_koeff2 : surfTens),
-        //DilVisco( film ? P.get<double>("Mat.DilatationalVisco") : P.get<double>("SurfTens.DilatationalVisco")),
-        //ShearVisco( film ? P.get<double>("Mat.ShearVisco") : P.get<double>("SurfTens.ShearVisco")),
         DilVisco( P.get<double>("NavStokes.Coeff.SurfTens.DilatationalVisco") ),
         ShearVisco( P.get<double>("NavStokes.Coeff.SurfTens.ShearVisco") ),
+        betaL(P.get<double>("NavStokes.BoundaryData.SlipBnd.BetaL")), alpha(P.get<double>("NavStokes.BoundaryData.SlipBnd.NitschePenalty")),
         g( P.get<DROPS::Point3DCL>("NavStokes.Coeff.Gravity")),
         framevel( ns_shiftframe ? P.get<DROPS::Point3DCL>("NavStokes.FrameVel", DROPS::Point3DCL(0.0)) : DROPS::Point3DCL(0.0) )
         {
         volforce = InVecMap::getInstance()[P.get<std::string>("NavStokes.Coeff.VolForce")];
         var_tau_fncs = InScaMap::getInstance()[P.get<std::string>("NavStokes.Coeff.SurfTens.VarTensionFunc")];
+        if( P.get<std::string>("NavStokes.BoundaryData.SlipBnd.BndOutNormal").compare("None")!=0)
+            BndOutNormal = InVecMap::getInstance()[P.get<std::string>("NavStokes.BoundaryData.SlipBnd.BndOutNormal")];
+        else
+            BndOutNormal = nullptr;
     }
 
-    TwoPhaseFlowCoeffCL( double rho1, double rho2, double mu1, double mu2, double surftension, Point3DCL gravity, Point3DCL framevelocity = Point3DCL(0.0), bool dimless = false, double dilatationalvisco = 0.0, double shearvisco = 0.0)
+    TwoPhaseFlowCoeffCL( double rho1, double rho2, double mu1, double mu2, double surftension, Point3DCL gravity, Point3DCL framevelocity = Point3DCL(0.0), bool dimless = false, double dilatationalvisco = 0.0, double shearvisco = 0.0, 
+                         double betaL_=0, double alpha_ = 1.0, double beta1 = 0.0, double beta2 =0.0)
       : rho( dimless ? JumpCL( 1., rho2/rho1)
                      : JumpCL( rho1, rho2), H_sm, 0),
         mu(  dimless ? JumpCL( 1., mu2/mu1)
                      : JumpCL( mu1, mu2), H_sm, 0),
+        beta( dimless? JumpCL( 1., beta2/beta1)
+                     : JumpCL(beta2,beta1), H_sm, 0),
         SurfTens( dimless ? surftension/rho1 : surftension),
         DilVisco( dilatationalvisco),
         ShearVisco( shearvisco),
+        betaL(betaL_),
+        alpha(alpha_), 
         g( gravity),
         framevel( framevelocity)
-        {
-          volforce = InVecMap::getInstance()["ZeroVel"];
-          var_tau_fncs = InScaMap::getInstance()["ConstTau"];
-        }
+    {
+        volforce = InVecMap::getInstance()["ZeroVel"];
+        var_tau_fncs = InScaMap::getInstance()["ConstTau"];
+        BndOutNormal = InVecMap::getInstance()["ZeroVel"];
+    }
 };
 
 /// problem class for instationary two-pase Stokes flow
-
-
 class InstatStokes2PhaseP2P1CL : public ProblemCL<TwoPhaseFlowCoeffCL, StokesBndDataCL>
 {
 private:
@@ -183,6 +199,10 @@ private:
                  prM,
                  prMhat;
     mutable VectorBaseCL<VectorCL> cKernel;
+    SurfaceForceT         SurfForceType_;
+    SurfaceTensionCL*     SurfTension_;
+    instat_scalar_fun_ptr CtAngleFnc_;
+    instat_vector_fun_ptr BndOutNormal_;
 
   public:
     InstatStokes2PhaseP2P1CL( const MGBuilderCL& mgb, const TwoPhaseFlowCoeffCL& coeff, const BndDataCL& bdata, FiniteElementT prFE= P1_FE, double XFEMstab=0.1, FiniteElementT velFE= vecP2_FE, double EpsP = 0.0 )
@@ -273,7 +293,15 @@ private:
     double getGhPenStab(){ return epsP; }
     /// set Ghost Penalty stabilization factor
     void setGhPenStab( double EpsP ){ epsP = EpsP; }
-
+    
+    /// Set Equilibrium Contact Angle
+    void SetYoungAngle(instat_scalar_fun_ptr CtAngleFnc) { CtAngleFnc_= CtAngleFnc; }
+    /// Set out normal function of the slip boundary
+    void SetBndOutNormal(instat_vector_fun_ptr outnormal) { BndOutNormal_= outnormal; }
+    /// Set the surface force type and the surface tension
+    void SetSurfTension(SurfaceTensionCL* Sf) { SurfForceType_ = SF_ImprovedLBVar; SurfTension_= Sf; }
+    /// Discretize Young Force on the three-phase contact line
+    void AccumulateYoungForce(const LevelsetP2CL& lset, VecDescCL& f) const;
 
     /// \name Evaluate Solution
     //@{

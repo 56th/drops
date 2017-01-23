@@ -248,7 +248,7 @@ void SetupLBP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls, cons
     InterfaceTriangleCL triangle;
 
     DROPS_FOR_TRIANG_CONST_TETRA( mg, lvl, it) {
-    	triangle.Init( *it, ls, lsetbnd);
+        triangle.Init( *it, ls, lsetbnd);
         if (triangle.Intersects()) { // We are at the phase boundary.
             GetLocalNumbP1NoBnd( numr, *it, *mat->RowIdx);
             GetLocalNumbP1NoBnd( numc, *it, *mat->ColIdx);
@@ -256,7 +256,7 @@ void SetupLBP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls, cons
             std::memset( coup, 0, 4*4*sizeof( double));
 
             for (int ch= 0; ch < 8; ++ch) {
-            	triangle.ComputeForChild( ch);
+                triangle.ComputeForChild( ch);
                 for (int tri= 0; tri < triangle.GetNumTriangles(); ++tri)
                     SetupLBP1OnTriangle( triangle, tri, grad, coup);
             }
@@ -361,7 +361,7 @@ void SetupMixedMassP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& l
     InterfaceTriangleCL triangle;
 
     DROPS_FOR_TRIANG_CONST_TETRA( mg, lvl, it) {
-    	triangle.Init( *it, ls, lsetbnd);
+        triangle.Init( *it, ls, lsetbnd);
         if (!triangle.Intersects()) continue; // We are at the phase boundary.
 
         GetLocalNumbP1NoBnd( rownum, *it, *mat->RowIdx);
@@ -369,7 +369,7 @@ void SetupMixedMassP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& l
         std::memset( coup, 0, 4*4*sizeof( double));
 
         for (int ch= 0; ch < 8; ++ch) {
-        	triangle.ComputeForChild( ch);
+            triangle.ComputeForChild( ch);
             for (int tri= 0; tri < triangle.GetNumTriangles(); ++tri)
                 SetupMixedMassP1OnTriangle ( &triangle.GetBary( tri), triangle.GetAbsDet( tri), p1, qp1, coup);
         }

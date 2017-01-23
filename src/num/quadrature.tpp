@@ -107,6 +107,13 @@ make_Quad2Data ()
     return quad2data;
 }
 
+inline const Quad5DataCL&
+make_Quad5Data ()
+{
+    static const Quad5DataCL quad5data;
+    return quad5data;
+}
+
 template <class QuadDataT>
   const QuadDomainCL&
   make_SimpleQuadDomain (QuadDomainCL& q, const TetraSignEnum& s)
@@ -320,6 +327,52 @@ template <class LocalFET>
   make_ExtrapolatedQuad5Domain2D (QuadDomain2DCL& q, const LocalFET& ls, const TetraCL& t, const ExtrapolationToZeroCL& extra)
 {
     return make_ExtrapolatedQuadDomain2D<Quad5_2DDataCL>( q, ls, t, extra);
+}
+
+
+template <class QuadDataT>
+  const QuadDomainCL&
+  make_CompositeQuadBndDomain2D (QuadDomainCL& q, const BndTriangPartitionCL& p, const TetraCL& t)
+{
+
+    const Uint num_nodes= QuadDataT::NumNodesC;
+
+    q.vertexes_.resize( num_nodes*p.triangle_size());
+
+    q.pos_begin_= q.neg_end_= num_nodes*p.triangle_size( NegTetraC); // will be added later after BndTriangPartitionCL includes triangle_size( NegTetraC)
+
+    q.weights_.resize( num_nodes*p.triangle_size());
+    q.all_weights_begin_= 0;
+    q.pos_weights_begin_= q.pos_begin_;
+
+
+
+    const typename BndTriangPartitionCL::const_vertex_iterator partition_vertexes= p.vertex_begin();
+    const typename QuadDomainCL::WeightContT triangle_weights( QuadDataT::Weight, num_nodes);
+
+    Uint beg= 0;
+    BaryCoordCL tri_bary[3];
+    Point3DCL   tri[3];
+
+    for (BndTriangPartitionCL::const_triangle_iterator it= p.triangle_begin(); it != p.triangle_end();
+        ++it, beg+= num_nodes) {
+        for (int i= 0; i < 3; ++i) {
+            tri_bary[i]= partition_vertexes[(*it)[i]];
+            tri[i]= GetWorldCoord( t, tri_bary[i]);
+        }
+        QuadDataT::SetInterface( tri_bary, q.vertexes_.begin() + beg);
+        const double absdet= FuncDet2D( tri[1] - tri[0], tri[2] - tri[0]);
+        q.weights_[std::slice( beg, num_nodes, 1)]= absdet*triangle_weights;
+    }
+
+    return q;
+
+}
+
+inline const QuadDomainCL&
+make_CompositeQuad5BndDomain2D  (QuadDomainCL& q, const BndTriangPartitionCL& p, const TetraCL& t)
+{
+    return make_CompositeQuadBndDomain2D<Quad5_2DDataCL>( q, p, t);
 }
 
 } // end of namespace DROPS

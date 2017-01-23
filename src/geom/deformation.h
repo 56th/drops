@@ -27,14 +27,13 @@
 
 //#include "geom/simplex.h"
 //#include "misc/container.h"
-#include "misc/problem.h"
-#include "num/bndData.h"
+//#include "misc/problem.h"
+//#include "num/bndData.h"
+//#include "geom/multigrid.h"
 #include "num/discretize.h"
-#include "geom/multigrid.h"
 
 namespace DROPS
 {
-
 
 class MeshDeformationCL
 {

@@ -88,6 +88,69 @@ Point3DCL EllipsoidCL::Radius_;
 
 static DROPS::RegisterScalarFunction regsca_ellipsoid("Ellipsoid", DROPS::EllipsoidCL::DistanceFct);
 
+class HalfEllipsoidCL
+{
+  private:
+    static Point3DCL Mitte_;
+    static Point3DCL Radius_;
+
+  public:
+    HalfEllipsoidCL( const Point3DCL& Mitte, const Point3DCL& Radius)
+    { Init( Mitte, Radius); }
+    static void Init( const Point3DCL& Mitte, const Point3DCL& Radius)
+    { Mitte_= Mitte;    Radius_= Radius; }
+    static double DistanceFct( const Point3DCL& p, double)
+    {
+        Point3DCL d= p - Mitte_;
+        const double avgRad= cbrt(Radius_[0]*Radius_[1]*Radius_[2]);
+        d/= Radius_;
+        return std::abs( avgRad)*d.norm() - avgRad;
+    }
+    static double GetVolume() { return 2./3.*M_PI*Radius_[0]*Radius_[1]*Radius_[2]; }
+    static Point3DCL& GetCenter() { return Mitte_; }
+    static Point3DCL& GetRadius() { return Radius_; }
+};
+
+Point3DCL HalfEllipsoidCL::Mitte_;
+Point3DCL HalfEllipsoidCL::Radius_;
+
+static DROPS::RegisterScalarFunction regsca_halfellipsoid("HalfEllipsoid", DROPS::HalfEllipsoidCL::DistanceFct);
+
+class ContactDropletCL
+{
+  private:
+    static Point3DCL Mitte_;
+    static Point3DCL Radius_;
+    static double Angle_;
+
+  public:
+    ContactDropletCL( const Point3DCL& Mitte, const Point3DCL& Radius, const double Angle)
+    { Init( Mitte, Radius, Angle); }
+    static void Init( const Point3DCL& Mitte, const Point3DCL& Radius, const double Angle)
+    { Mitte_= Mitte;    Radius_= Radius;  Angle_= Angle;}
+    static double DistanceFct( const Point3DCL& p, double)
+    {
+        Point3DCL d= p - Mitte_;
+        const double avgRad= cbrt(Radius_[0]*Radius_[1]*Radius_[2]);
+        d/= Radius_;
+        return std::abs( avgRad)*d.norm() - avgRad;
+    }
+    static double GetVolume() 
+    {
+        double R_Angle_ = Angle_/180 * M_PI;
+        return 1./3.*M_PI*Radius_[0]*Radius_[1]*Radius_[2] * (2.- 2.*std::cos(R_Angle_)- std::sin(R_Angle_)*std::sin(R_Angle_)*std::cos(R_Angle_)); 
+    }
+    static Point3DCL& GetCenter() { return Mitte_; }
+    static Point3DCL& GetRadius() { return Radius_; }
+    static double GetAngle() { return Angle_; }
+};
+
+Point3DCL ContactDropletCL::Mitte_;
+Point3DCL ContactDropletCL::Radius_;
+double ContactDropletCL::Angle_;
+
+static DROPS::RegisterScalarFunction regsca_contactdroplet("ContactDroplet", DROPS::ContactDropletCL::DistanceFct);
+
 /// \brief Represents a cylinder with ellipsoidal cross section
 class CylinderCL
 {
@@ -118,6 +181,36 @@ Point3DCL CylinderCL::Radius_;
 Usint     CylinderCL::axisDir_;
 
 static DROPS::RegisterScalarFunction regsca_cylinder("Cylinder", DROPS::CylinderCL::DistanceFct);
+
+
+/// \brief Represents a thin layer bounded by two parallel planes perpendicular to one axis
+class LayerCL
+{
+  private:
+    static Point3DCL Mitte_;
+    static Point3DCL Radius_;  ///< stores the width of the layer and axis lengths (former stored in entry given by axisDir_)
+    static Usint     axisDir_; ///< direction of axis (one of 0,1,2)
+
+  public:
+    LayerCL( const Point3DCL& Mitte, const Point3DCL& RadiusLength, Usint axisDir)
+    { Init( Mitte, RadiusLength, axisDir); }
+    static void Init( const Point3DCL& Mitte, const Point3DCL& RadiusLength, Usint axisDir)
+    { Mitte_= Mitte;    Radius_= RadiusLength;    axisDir_= axisDir; }
+    static double DistanceFct( const Point3DCL& p, double)
+    {
+        double d= p[axisDir_] - Mitte_[axisDir_];
+
+        return std::abs( d)  - Radius_[axisDir_]/2;
+    }
+    static double GetVolume() { return Radius_[0]*Radius_[1]*Radius_[2]; }
+    static Point3DCL& GetCenter() { return Mitte_; }
+};
+
+Point3DCL LayerCL::Mitte_;
+Point3DCL LayerCL::Radius_;
+Usint     LayerCL::axisDir_;
+
+static DROPS::RegisterScalarFunction regsca_layer("Layer", DROPS::LayerCL::DistanceFct);
 
 // collision setting (rising butanol droplet in water)
 //  RadDrop1 =  1.50e-3  1.500e-3  1.50e-3
@@ -161,62 +254,81 @@ Point3DCL TwoEllipsoidCL::Radius2_;
 
 static DROPS::RegisterScalarFunction regsca_twoellipsoid("TwoEllipsoid", DROPS::TwoEllipsoidCL::DistanceFct);
 
-class InterfaceInfoCL
+class TwoPhaseInfoBaseCL
 {
-  private:
+  protected:
     std::ofstream* file_;    ///< write information, to this file
 
+    void Update (const LevelsetP2CL& ls) {
+        std::pair<double, double> h= h_interface( ls.GetMG().GetTriangEdgeBegin( ls.PhiC->RowIdx->TriangLevel()), ls.GetMG().GetTriangEdgeEnd( ls.PhiC->RowIdx->TriangLevel()), *ls.PhiC);
+        h_min= h.first; h_max= h.second;
+    }
+
+  public:
+    double h_min, h_max;
+
+    TwoPhaseInfoBaseCL() : file_(nullptr), h_min(0), h_max(0) {}
+
+    virtual void WriteHeader() = 0;
+    virtual void Write (double time) = 0;
+    /// \brief Set file for writing
+    void Init(std::ofstream* file) { file_= file; }
+};
+
+class InterfaceInfoCL: public TwoPhaseInfoBaseCL
+{
+    typedef TwoPhaseInfoBaseCL BaseT;
   public:
     Point3DCL bary, vel, min, max;
-    double maxGrad, Vol, h_min, h_max, surfArea, sphericity;
+    double maxGrad, Vol, surfArea, sphericity;
 
 
     template<class DiscVelSolT>
     void Update (const LevelsetP2CL& ls, const DiscVelSolT& u) {
+        BaseT::Update( ls);
         ls.GetInfo( maxGrad, Vol, bary, vel, u, min, max, surfArea);
-        std::pair<double, double> h= h_interface( ls.GetMG().GetTriangEdgeBegin( ls.PhiC->RowIdx->TriangLevel()), ls.GetMG().GetTriangEdgeEnd( ls.PhiC->RowIdx->TriangLevel()), *ls.PhiC);
-        h_min= h.first; h_max= h.second;
         // sphericity is the ratio of surface area of a sphere of same volume and surface area of the approximative interface
         sphericity= std::pow(6*Vol, 2./3.)*std::pow(M_PI, 1./3.)/surfArea;
     }
     void WriteHeader() {
         if (file_)
-          (*file_) << "# time maxGradPhi volume bary_drop min_drop max_drop vel_drop h_min h_max surfArea sphericity" << std::endl;
+          (*file_) << "# time maxGradPhi volume bary_drop min_drop max_drop vel_drop h_min h_max surfArea sphericity\n";
     }
     void Write (double time) {
         if (file_)
           (*file_) << time << " " << maxGrad << " " << Vol << " " << bary << " " << min << " " << max << " " << vel << " " << h_min << " " << h_max << " " << surfArea << " " << sphericity << std::endl;
     }
-    /// \brief Set file for writing
-    void Init(std::ofstream* file) { file_= file; }
 } IFInfo;
 
-class FilmInfoCL
+class FilmInfoCL: public TwoPhaseInfoBaseCL
 {
+    typedef TwoPhaseInfoBaseCL BaseT;
   private:
-    std::ofstream* file_;    ///< write information, to this file
     double x_, z_;
   public:
     Point3DCL vel;
-    double maxGrad, Vol, h_min, h_max, point_h;
-
+    double maxGrad, Vol, point_h;
 
     template<class DiscVelSolT>
     void Update (const LevelsetP2CL& ls, const DiscVelSolT& u) {
+        BaseT::Update( ls);
         ls.GetFilmInfo( maxGrad, Vol, vel, u, x_, z_, point_h);
-        std::pair<double, double> h= h_interface( ls.GetMG().GetTriangEdgeBegin( ls.Phi.RowIdx->TriangLevel()), ls.GetMG().GetTriangEdgeEnd( ls.Phi.RowIdx->TriangLevel()), ls.Phi);
-        h_min= h.first; h_max= h.second;
     }
     void WriteHeader() {
-        if (file_)
-          (*file_) << "# time maxGradPhi volume vel_drop h_min h_max point_x point_z point_h" << std::endl;
+        if (file_) {
+            (*file_) << "Film Reynolds number Re_f = "
+                     << P.get<double>("Mat.DensFluid")*P.get<double>("Mat.DensFluid")*P.get<DROPS::Point3DCL>("Exp.Gravity")[0]*std::pow(P.get<double>("Exp.Thickness"),3)/P.get<double>("Mat.ViscFluid")/P.get<double>("Mat.ViscFluid")/3 << '\n';
+            (*file_) << "max. inflow velocity at film surface = "
+                     << P.get<double>("Mat.DensFluid")*P.get<DROPS::Point3DCL>("Exp.Gravity")[0]*P.get<double>("Exp.Thickness")*P.get<double>("Exp.Thickness")/P.get<double>("Mat.ViscFluid")/2 << '\n';
+            (*file_) << "# time maxGradPhi volume vel_drop h_min h_max point_x point_z point_h\n";
+        }
     }
     void Write (double time) {
         if (file_)
           (*file_) << time << " " << maxGrad << " " << Vol << " " << vel << " " << h_min << " " << h_max << " " << x_ << " " << z_<< " " << point_h << std::endl;
     }
-    /// \brief Set file for writing
-    void Init(std::ofstream* file, double x, double z) { file_= file; x_=x; z_=z;}
+    /// \brief Set file for writing and film length (x) and width (z). Note: film height (y) is determined from level set.
+    void Init(std::ofstream* file, double x, double z) { file_= file; x_= x; z_= z; }
 } FilmInfo;
 
 /// \brief factory for the time discretization schemes
@@ -295,8 +407,7 @@ TimeDisc2PhaseCL* CreateTimeDisc( InstatNavierStokes2PhaseP2P1CL& Stokes, Levels
 }
 
 template <class StokesT>
-void SolveStatProblem( StokesT& Stokes, LevelsetP2CL& lset,
-                       NSSolverBaseCL<StokesT >& solver)
+void SolveStatProblem( StokesT& Stokes, LevelsetP2CL& lset, NSSolverBaseCL<StokesT >& solver)
 {
 #ifndef _PAR
     TimerCL time;
@@ -314,6 +425,7 @@ void SolveStatProblem( StokesT& Stokes, LevelsetP2CL& lset,
     Stokes.SetLevelSet( lset);
     lset.UpdateMLPhi();
     lset.AccumulateBndIntegral( curv);
+    Stokes.AccumulateYoungForce (lset, curv);
     Stokes.SetupSystem1( &Stokes.A, &Stokes.M, &Stokes.b, &Stokes.b, &cplM, lset, Stokes.v.t);
     Stokes.SetupPrStiff( &Stokes.prA, lset);
     Stokes.SetupPrMass ( &Stokes.prM, lset);
@@ -607,7 +719,7 @@ double lin_in_y(const DROPS::Point3DCL& p)  // linear function in y-direction, z
 
 double sigma_const_grad_tau_y(const DROPS::Point3DCL& p, double) { return lin_in_y( p); }
 
-// Registration of funcitons
+// Registration of functions
 static DROPS::RegisterScalarFunction regconstsurftens("ConstTau", sigmaf);
 static DROPS::RegisterScalarFunction regconstgradtau_y("ConstGradTau_y", sigma_const_grad_tau_y);
 

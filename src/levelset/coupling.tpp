@@ -121,6 +121,7 @@ void LinThetaScheme2PhaseCL<LsetSolverT>::SolveLsNs()
     // rhs for new level set
     curv_->Clear( Stokes_.v.t);
     LvlSet_.AccumulateBndIntegral( *curv_);
+    Stokes_.AccumulateYoungForce( LvlSet_, *curv_);
     Stokes_.SetupRhs1( b_, LvlSet_, Stokes_.v.t);
 
     rhs_=  (1./dt_)*(Stokes_.M.Data*Stokes_.v.Data) + stk_theta_*b_->Data + cplA_->Data
@@ -229,6 +230,7 @@ void LinThetaScheme2PhaseCL<LsetSolverT>::Update()
 
     // Diskretisierung
     LvlSet_.AccumulateBndIntegral( *old_curv_);
+    Stokes_.AccumulateYoungForce( LvlSet_, *old_curv_);
     LvlSet_.SetupSystem( Stokes_.GetVelSolution(), dt_);
     LvlSet_.UpdateMLPhi();
 
@@ -334,6 +336,7 @@ void OperatorSplitting2PhaseCL<LsetSolverT>::DoStokesFPIter()
     time.Start();
     curv_->Clear( Stokes_.v.t);
     LvlSet_.AccumulateBndIntegral( *curv_);
+    Stokes_.AccumulateYoungForce( LvlSet_, *curv_);
     Stokes_.SetupSystem1( &Stokes_.A, &Stokes_.M, b_, cplA_, cplM_, LvlSet_, Stokes_.v.t);
     mat_->LinComb( 1./fracdt_, Stokes_.M.Data, alpha_, Stokes_.A.Data);
     if (Stokes_.UsesXFEM()) {
@@ -388,6 +391,7 @@ void OperatorSplitting2PhaseCL<LsetSolverT>::DoNonlinearFPIter()
     time.Start();
     curv_->Clear( Stokes_.v.t);
     LvlSet_.AccumulateBndIntegral( *curv_);
+    Stokes_.AccumulateYoungForce( LvlSet_, *curv_);
     Stokes_.SetupSystem1( &Stokes_.A, &Stokes_.M, b_, cplA_, cplM_, LvlSet_, Stokes_.v.t);
     time.Stop();
     std::cout << "Discretizing Stokes/Curv took "<<time.GetTime()<<" sec.\n";
@@ -615,6 +619,7 @@ void CoupledTimeDisc2PhaseBaseCL<LsetSolverT,RelaxationPolicyT>::SetupStokesMatV
 {
     curv_->Clear( Stokes_.v.t);
     LvlSet_.AccumulateBndIntegral( *curv_);
+    Stokes_.AccumulateYoungForce( LvlSet_, *curv_);
     LvlSet_.UpdateMLPhi();
 
     Stokes_.SetupSystem1( &Stokes_.A, &Stokes_.M, b_, b_, cplM_, LvlSet_, Stokes_.v.t);
@@ -1122,6 +1127,7 @@ void RecThetaScheme2PhaseCL<LsetSolverT,RelaxationPolicyT>::Update()
 
     // Diskretisierung
     LvlSet_.AccumulateBndIntegral( *old_curv_);
+    Stokes_.AccumulateYoungForce( LvlSet_, *old_curv_);
     LvlSet_.SetupSystem( Stokes_.GetVelSolution(), dt_);
     LvlSet_.UpdateMLPhi();
     Stokes_.SetupSystem1( &Stokes_.A, &Stokes_.M, old_b_, old_b_, old_cplM_, LvlSet_, Stokes_.v.t);

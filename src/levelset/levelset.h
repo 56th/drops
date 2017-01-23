@@ -162,9 +162,14 @@ LevelsetP2CL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, F
     /// Apply smoothing to \a SmPhi, if curvDiff_ > 0
     void MaybeSmooth( VectorCL& SmPhi) const { if (curvDiff_>0) SmoothPhi( SmPhi, curvDiff_); }
     /// Set type of surface force.
-    void   SetSurfaceForce( SurfaceForceT SF) { SF_= SF; }
+    void SetSurfaceForce( SurfaceForceT SF) { SF_= SF; }
     /// Get type of surface force.
     SurfaceForceT GetSurfaceForce() const { return SF_; }
+
+    ///returns the area of the two-phase flow interface(\phi=0)
+    double GetInterfaceArea() const;
+    ///returns the area of the solid-liquid(phi<0) interface
+    double GetWetArea() const;
     /// Discretize surface force
     void   AccumulateBndIntegral( VecDescCL& f) const;
     /// Clear all matrices, should be called after grid change to avoid reuse of matrix pattern

@@ -92,7 +92,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 {
     DROPS::InScaMap & inscamap = DROPS::InScaMap::getInstance();
     //DROPS::ScaMap & scamap = DROPS::ScaMap::getInstance();
-    //DROPS::InVecMap & vecmap = DROPS::InVecMap::getInstance();
+    DROPS::InVecMap & invecmap = DROPS::InVecMap::getInstance();
     //DROPS::MatchMap & matchmap = DROPS::MatchMap::getInstance();
 
     MultiGridCL& MG= Stokes.GetMG();
@@ -107,7 +107,14 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     // Creates new Levelset-Object, has to be cleaned manually
     LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsetbnddata, *sf, P.get_child("Levelset")) );
 
-    if (is_periodic) //CL: Anyone a better idea? perDirection from ParameterFile?
+    //required to simulate flows with moving contact line
+    instat_scalar_fun_ptr Young_angle = inscamap[P.get<std::string>("NavStokes.BoundaryData.SlipBnd.CtAngleFnc")];
+    instat_vector_fun_ptr bnd_outnormal = invecmap[P.get<std::string>("NavStokes.BoundaryData.SlipBnd.BndOutNormal")];
+    Stokes.SetYoungAngle(Young_angle);
+    Stokes.SetBndOutNormal(bnd_outnormal);
+    Stokes.SetSurfTension(sf);
+    
+    if (is_periodic)
     {
         int n = 0;
         if (perMatchName == "periodicx" || perMatchName == "periodicy" || perMatchName == "periodicz")
@@ -168,16 +175,21 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
     SetInitialLevelsetConditions( lset, MG, P);
 
-    double Vol= 0;
-
-
-    if (( (P.get("Levelset.InitialValue", std::string("Ellipsoid")) == "TaylorFlowDistance")
-          || (P.get("Levelset.InitialValue", std::string("Ellipsoid")) == "Ellipsoid"))
-        && (P.get<int>("Levelset.VolCorrection") != 0))
-    {
-        Vol= P.get<double>("Levelset.InitialVolume", -1.0);
-        if (Vol < 0)
-            Vol= EllipsoidCL::GetVolume();
+    double Vol = 0;
+    std::string InitialLSet= P.get("Levelset.InitialValue", std::string("Ellipsoid"));
+    if ( (InitialLSet == "Ellipsoid"     || InitialLSet == "Cylinder" || InitialLSet == "ContactDroplet"
+        || InitialLSet == "HalfEllipsoid" || InitialLSet == "TaylorFlowDistance") && P.get<int>("Levelset.VolCorrection") != 0)
+    {  
+        if (P.get<double>("Levelset.InitialVolume",-1.0) > 0 )
+            Vol = P.get<double>("Levelset.InitialVolume");      
+        if (InitialLSet == "Ellipsoid")
+            Vol = EllipsoidCL::GetVolume();
+        if (InitialLSet == "HalfEllipsoid")
+            Vol = HalfEllipsoidCL::GetVolume();
+        if (InitialLSet == "ContactDroplet")
+            Vol = ContactDropletCL::GetVolume();
+        if (InitialLSet.find("Cylinder")==0)
+            Vol = CylinderCL::GetVolume();
         std::cout << "initial rel. volume: " << lset.GetVolume()/Vol << std::endl;
         double dphi= lset.AdjustVolume( Vol, 1e-9);
         std::cout << "initial lset offset for correction is " << dphi << std::endl;
@@ -335,7 +347,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 //         Stokes.pr_idx.GetFinest().GetXidx().GetNumUnknownsStdFE(),
 //         stokessolverfactory.GetPVel()->GetFinest(), stokessolverfactory.GetPPr()->GetFinest());
 
-    SetInitialConditions( Stokes, lset, MG, P);    
+    SetInitialConditions( Stokes, lset, MG, P);
 
     // Time discretisation + coupling
     TimeDisc2PhaseCL* timedisc= CreateTimeDisc(Stokes, lset, navstokessolver, gm, P, lsetmod);
@@ -667,11 +679,19 @@ int main (int argc, char** argv)
     std::string InitialLSet= P.get("Levelset.InitialValue", std::string("Ellipsoid"));
     if (InitialLSet == "Ellipsoid")
         DROPS::EllipsoidCL::Init( P.get<DROPS::Point3DCL>("Levelset.PosDrop"), P.get<DROPS::Point3DCL>("Levelset.RadDrop"));
+    if (InitialLSet == "HalfEllipsoid")
+        DROPS::HalfEllipsoidCL::Init( P.get<DROPS::Point3DCL>("Levelset.PosDrop"), P.get<DROPS::Point3DCL>("Levelset.RadDrop"));
+    if (InitialLSet == "ContactDroplet")
+        DROPS::ContactDropletCL::Init( P.get<DROPS::Point3DCL>("Levelset.PosDrop"), P.get<DROPS::Point3DCL>("Levelset.RadDrop"), P.get<double>("Levelset.AngleDrop"));
     if  (InitialLSet == "TwoEllipsoid")
         DROPS::TwoEllipsoidCL::Init( P.get<DROPS::Point3DCL>("Levelset.PosDrop"), P.get<DROPS::Point3DCL>("Levelset.RadDrop"), P.get<DROPS::Point3DCL>("Levelset.PosDrop2"), P.get<DROPS::Point3DCL>("Levelset.RadDrop2"));
-    if (InitialLSet.find("Cylinder")==0) {
+    if  (InitialLSet.find("Layer")==0){
+        DROPS::LayerCL::Init( P.get<DROPS::Point3DCL>("Levelset.PosDrop"), P.get<DROPS::Point3DCL>("Levelset.RadDrop"), InitialLSet[5]-'X');
+        P.put("Exp.InitialLSet", InitialLSet= "Layer");
+    }
+    if (InitialLSet.find("Cylinder")==0){
         DROPS::CylinderCL::Init( P.get<DROPS::Point3DCL>("Levelset.PosDrop"), P.get<DROPS::Point3DCL>("Levelset.RadDrop"), InitialLSet[8]-'X');
-        P.put("Levelset.InitialValue", InitialLSet= "Cylinder");
+        P.put("Exp.InitialLSet", InitialLSet= "Cylinder");
     }
     typedef DROPS::DistMarkingStrategyCL MarkerT;
     MarkerT InitialMarker( DROPS::InScaMap::getInstance()[InitialLSet],

@@ -395,3 +395,137 @@ double SmallDistance( const DROPS::Point3DCL&, double)
 }
 
 static DROPS::RegisterScalarFunction regscasmalldist("SmallDistance", SmallDistance);
+
+
+//===============================================================================================
+//          Functions for twophasedrops-executable (Slip Boundary and Moving contact lines)
+//===============================================================================================
+
+namespace DisContPressure{
+
+    double Pressure (const DROPS::Point3DCL& , double t)
+    {
+        double ret=0;	
+        static bool first = true;
+        static DROPS::Point3DCL origin, VelR;
+        static double radius, surftension;
+        if(first){
+            origin = P.get<DROPS::Point3DCL>("Levelset.PosDrop");
+            VelR = P.get<DROPS::Point3DCL>("Levelset.RadDrop");
+            radius = P.get<double>("Levelset.EquiRadius");
+            surftension = P.get<double>("NavStokes.Coeff.SurfTens.SurfTension");
+            first = false;
+        }
+        //Hack: use time to tell in fluid 1 or fluid 2
+        if( t>3. && t<5 )
+            ret = 0;
+        else if(t >5.)
+            ret = 2.*surftension/radius;
+        return ret;
+    }
+    //========================================================================
+    //            Registration of functions in the func-container
+    //========================================================================
+    static DROPS::RegisterScalarFunction regscatestpr("DisContPressure", Pressure);
+}
+
+namespace OnePhaseSlipTest{
+
+    DROPS::SVectorCL<3> Velocity( const DROPS::Point3DCL& p,double)
+    {
+        DROPS::SVectorCL<3> v(0.);
+        v[0]= p[0]*p[0]*p[1]-2.*p[0]*p[0];
+        v[1]= -p[0]*p[1]*p[1]+3.*p[0]*p[1]-2.*p[0];
+        v[2]=  p[0]*p[2];
+        return v;
+    }
+
+    double Pressure(const DROPS::Point3DCL& p, double)
+    {
+        double pr = - std::cos(p[0]) + std::sin(p[1]);
+        return pr;
+    }
+
+    DROPS::SVectorCL<3> PressureGr(const DROPS::Point3DCL& p, double)
+    {
+        DROPS::SVectorCL<3> delp(0.);
+        delp[0]= std::sin(p[0]);
+        delp[1]= std::cos(p[1]);
+        delp[2]= 0;
+        return delp;
+
+    }
+
+    DROPS::SVectorCL<3> VolForce( const DROPS::Point3DCL& p, double)
+    {
+        DROPS::SVectorCL<3> f(0.);
+        f[0] = -2.*p[1]+4.;
+        f[1] = 2.*p[0];
+        f[2] = 0;
+        return f+PressureGr(p,0);
+    }
+
+    DROPS::SVectorCL<3> TopWall( const DROPS::Point3DCL& p,double)
+    {
+        DROPS::SVectorCL<3> v(0.);
+        v[0]= 0;
+        v[1]= 0;
+        v[2]= p[0]*p[2];
+        return v;
+    }
+    //========================================================================
+    //            Registration of functions in the func-container
+    //========================================================================
+    static DROPS::RegisterVectorFunction regvelVel("StatSlipVel", Velocity);
+    static DROPS::RegisterVectorFunction regvelWall("StatSlipWall", TopWall);
+    static DROPS::RegisterVectorFunction regvelf("StatSlipF", VolForce);
+    static DROPS::RegisterVectorFunction regvelgpr("StatSlipPrGrad",PressureGr);
+    static DROPS::RegisterScalarFunction regscapr("StatSlipPr", Pressure);
+}
+
+namespace ContactAngle{
+
+    double ConstantAngle(const DROPS::Point3DCL&,double)
+    {
+       double angle = P.get<double>("NavStokes.BoundaryData.SlipBnd.CtAngle");
+        return angle/180.0*M_PI;
+    }
+
+    DROPS::Point3DCL OutNormalBrick(const DROPS::Point3DCL& pt,double)
+    {
+        //"hack": assume cartesian domain with e1=[a,0,0], e2=[0,b,0], ..
+        static double dx, dy, dz;
+        static bool first = true;
+        if (first) {
+            if (P.get<std::string>("Mesh.Type") != std::string("BrickBuilder"))
+                 throw DROPS::DROPSErrCL("OutNormalBrick: only works for brick-shaped domain, please use other functions");
+            first = false;
+            dx = P.get<DROPS::Point3DCL>("Mesh.E1")[0];
+            dy = P.get<DROPS::Point3DCL>("Mesh.E2")[1];
+            dz = P.get<DROPS::Point3DCL>("Mesh.E3")[2];
+        }
+
+        const double EPS=1e-10;
+        DROPS::Point3DCL outnormal(0.0);
+        if(std::fabs(pt[0])<EPS)
+        {outnormal[0]=-1.0; }
+        else if(std::fabs(pt[0]-dx)<EPS)
+        {outnormal[0]=1.0; }
+        else if(std::fabs(pt[1])<EPS)
+        {outnormal[1]=-1.0; }
+        else if(std::fabs(pt[1]-dy)<EPS)
+        {outnormal[1]=1.0; }
+        else if(std::fabs(pt[2])<EPS)
+        {outnormal[2]=-1.0; }
+        else if(std::fabs(pt[2]-dz)<EPS)
+        {outnormal[2]=1.0; }
+        else
+             throw DROPS::DROPSErrCL("OutNormalBrick: error while computing outer normal");
+        return outnormal;
+    }
+    //========================================================================
+    //            Registration of functions in the func-container
+    //========================================================================
+    static DROPS::RegisterScalarFunction regconstangle("ConstantAngle", ConstantAngle);
+    static DROPS::RegisterVectorFunction regunitcubicoutnomal("OutNormalBrick", OutNormalBrick);
+}

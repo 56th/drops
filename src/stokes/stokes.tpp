@@ -29,6 +29,7 @@
 #include "num/lattice-eval.h"
 #include <vector>
 #include <numeric>
+#include "stokes/slipBndOnePhase.h"
 
 #ifdef _PAR
 #  include "parallel/parallel.h"
@@ -417,6 +418,7 @@ class System2Accumulator_P2P1CL : public TetraAccumulatorCL
     const IdxDescCL& RowIdx;
     const IdxDescCL& ColIdx;
     MatrixCL& B;
+    SlipBndSystem2OnePhaseCL SlipBndHandler; ///< Update the local system 2 (nocut) with respect to special boundary conditions: slip Bnd and symmetric Bnd;
 
     IdxT          prNumb[4];  ///< global numbering of the P1-unknowns
     LocalNumbP2CL n;          ///< global numbering of the P2-unknowns
@@ -432,10 +434,11 @@ class System2Accumulator_P2P1CL : public TetraAccumulatorCL
     Quad2CL<Point3DCL> GradRef[10],
                        Grad[10];
     SMatrixCL<1,3>     locB[10][4];
+    bool speBnd;        ///< indicates whether there is a slip or symmetric boundary condition
 
   private:
     ///\brief Computes the mapping from local to global data "n", the local matrices in loc and, if required, the Dirichlet-values needed to eliminate the boundary-dof from the global system.
-    void local_setup ();
+    void local_setup (const TetraCL& sit);
     ///\brief Update the global system.
     void update_global_system ();
 
@@ -455,10 +458,9 @@ class System2Accumulator_P2P1CL : public TetraAccumulatorCL
 };
 
 template< class CoeffT>
-System2Accumulator_P2P1CL<CoeffT>::System2Accumulator_P2P1CL ( const CoeffT& coeff_arg, const StokesBndDataCL& BndData_arg,
-    const IdxDescCL& RowIdx_arg, const IdxDescCL& ColIdx_arg,
-    MatrixCL& B_arg, VecDescCL* c_arg, double t_arg)
-    : lat( PrincipalLatticeCL::instance( 2)), coeff( coeff_arg), BndData( BndData_arg), t( t_arg), RowIdx( RowIdx_arg), ColIdx( ColIdx_arg), B( B_arg)
+System2Accumulator_P2P1CL<CoeffT>::System2Accumulator_P2P1CL ( const CoeffT& coeff_arg, const StokesBndDataCL& BndData_arg, 
+    const IdxDescCL& RowIdx_arg, const IdxDescCL& ColIdx_arg, MatrixCL& B_arg, VecDescCL* c_arg, double t_arg)
+    : lat( PrincipalLatticeCL::instance( 2)), coeff( coeff_arg), BndData( BndData_arg), t( t_arg), RowIdx( RowIdx_arg), ColIdx( ColIdx_arg), B( B_arg), SlipBndHandler(BndData)
 {
     c = c_arg;
     P2DiscCL::GetGradientsOnRef( GradRef);
@@ -485,10 +487,10 @@ void System2Accumulator_P2P1CL<CoeffT>::finalize_accumulation ()
 template< class CoeffT>
 void System2Accumulator_P2P1CL<CoeffT>::visit (const TetraCL& tet)
 {
-    double det;
+    double det=0.;
     GetTrafoTr( T, det, tet);
     P2DiscCL::GetGradients( Grad, GradRef, T);
-    absdet= std::fabs( det);
+    absdet= std::fabs( det); 
     n.assign( tet, ColIdx, BndData.Vel);
     GetLocalNumbP1NoBnd( prNumb, tet, RowIdx);
 
@@ -501,18 +503,30 @@ void System2Accumulator_P2P1CL<CoeffT>::visit (const TetraCL& tet)
                     : bf( GetBaryCenter( *tet.GetEdge( i-4)), t);
             }
     }
-    local_setup();
+    local_setup(tet);
     update_global_system();
 }
 
 template< class CoeffT>
-void System2Accumulator_P2P1CL<CoeffT>::local_setup ()
+void System2Accumulator_P2P1CL<CoeffT>::local_setup (const TetraCL& tet)
 {
-    // b(i,j) =  -\int psi_i * div( phi_j)
+    speBnd = false;
+    //if speBnd = true , there is at least one slip or symmetric boundary on this tetra 
+    for(int i =0; i< 4; ++i){
+        if(BndData.Vel.IsOnSlipBnd(*tet.GetFace(i)) || BndData.Vel.IsOnSymmBnd(*tet.GetFace(i)) )
+        {
+            speBnd = true;
+            break;
+        }
+    }
+    //   b(i,j) =  -\int psi_i * div( phi_j)
     for(int vel=0; vel<10; ++vel) {
         for(int pr=0; pr<4; ++pr)
             locB[vel][pr]= SMatrixCL<1,3>( quad( Grad[vel], absdet, Quad2Data_Mul_P1_CL(), pr));
     }
+
+    if(speBnd)
+        SlipBndHandler.setupB(tet, locB);
 }
 
 template< class CoeffT>
@@ -940,18 +954,18 @@ void StokesP2P1CL<Coeff>::CheckSolution(const VelVecDescCL* lsgvel, const VecDes
 
          L2_pr  += Quad5CL<> (std::pow(q5_pr-q5_pr_exact-c_pr,2)).quad(absdet);
 
-	 P2DiscCL::GetGradients( Grad, GradRef, T);
-	 q5_dvel= SMatrixCL<3,3>();
-	 for (int i=0; i<10; i++)
-	 {
+         P2DiscCL::GetGradients( Grad, GradRef, T);
+         q5_dvel= SMatrixCL<3,3>();
+         for (int i=0; i<10; i++)
+         {
              q5_dvel += outer_product(loc_vel[i],Grad[i]);
          }
          if( DLsgVel != NULL)
-	 {
-	     Quad5CL< SMatrixCL<3,3> > q5_dvel_diff( q5_dvel-q5_dvel_exact);
-	     Frob_Dvel += Quad5CL<> (frobenius_norm_sq(q5_dvel_diff)).quad(absdet);
-	     L2_div += Quad5CL<> (trace(q5_dvel)).quad(absdet);
-	 }
+         {
+             Quad5CL< SMatrixCL<3,3> > q5_dvel_diff( q5_dvel-q5_dvel_exact);
+             Frob_Dvel += Quad5CL<> (frobenius_norm_sq(q5_dvel_diff)).quad(absdet);
+             L2_div += Quad5CL<> (trace(q5_dvel)).quad(absdet);
+         }
 
      }
      L2_pr = std::sqrt(L2_pr);
@@ -959,7 +973,7 @@ void StokesP2P1CL<Coeff>::CheckSolution(const VelVecDescCL* lsgvel, const VecDes
      {
          H1_vel = std::sqrt(L2_vel+Frob_Dvel); //L2_vel is squared here, Frob_Dvel is squared.
          Frob_Dvel = std::sqrt(Frob_Dvel);     //Frob_Dvel is the true value.
-	 L2_div = std::sqrt(std::fabs(L2_div));
+         L2_div = std::sqrt(std::fabs(L2_div));
      }
      L2_vel = std::sqrt(L2_vel);               //L2_vel is the true value.
 
