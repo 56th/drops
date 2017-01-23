@@ -1,0 +1,33 @@
+# This file lists all parameter files which already have been converted
+# to the new json format.
+# Note: to be removed after everything has been converted.
+
+levelset/brick_transp/default.json
+levelset/brick_transp/brick_transp.json
+
+levelset/prJump/default.json
+levelset/prJump/prJump.json
+
+levelset/twophasedrops/default.json
+levelset/twophasedrops/risingdroplet.json
+
+osmosis/osmosis/default.json
+osmosis/osmosis/osmosis.json
+osmosis/osmosis/prokertII.json
+osmosis/osmosis/torus.json
+
+partests/?
+
+poisson/cdrdrops/?
+
+spacetimetransp/st_transp/default.json
+spacetimetransp/st_transp/BotheKoebeWielageWarnecke03.json
+
+stokes/?
+
+surfactant/surfactant/?
+
+tests/?
+
+transport/ns_transp/default.json
+transport/ns_transp/BotheKoebeWielageWarnecke03.json
