@@ -27,7 +27,8 @@ stokes/?
 
 surfactant/surfactant/?
 
-tests/?
+tests/f_Gamma/default.json
+tests/f_Gamma/f_Gamma.json
 
 transport/ns_transp/default.json
 transport/ns_transp/BotheKoebeWielageWarnecke03.json

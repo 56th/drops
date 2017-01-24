@@ -51,8 +51,8 @@ class ZeroFlowCL
     const DROPS::Point3DCL g;
 
     ZeroFlowCL( const DROPS::ParamCL& P)
-      : rho( DROPS::JumpCL( 1, 1), DROPS::H_sm, P.get<double>("Mat.SmoothZone")),
-         mu( DROPS::JumpCL( 1, 1),   DROPS::H_sm, P.get<double>("Mat.SmoothZone")),
+      : rho( DROPS::JumpCL( 1, 1), DROPS::H_sm, P.get<double>("NavStokes.Coeff.SmoothZone")),
+         mu( DROPS::JumpCL( 1, 1),   DROPS::H_sm, P.get<double>("NavStokes.Coeff.SmoothZone")),
         g()    {}
 };
 
@@ -82,9 +82,9 @@ double DistanceFct( const DROPS::Point3DCL& p)
 
 double DistanceFct( const DROPS::Point3DCL& p, double)
 { // ball
-    const DROPS::Point3DCL d= P.get<DROPS::Point3DCL>("Exp.PosDrop")-p;
+    const DROPS::Point3DCL d= P.get<DROPS::Point3DCL>("Levelset.PosDrop")-p;
 //    return d.norm_sq()-C.Radius*C.Radius; // exakte Darstellung mit P2-FE, aber keine Abstandsfunktion
-    return d.norm()-P.get<DROPS::Point3DCL>("Exp.RadDrop")[0];
+    return d.norm()-P.get<DROPS::Point3DCL>("Levelset.RadDrop")[0];
 }
 
 DROPS::Point3DCL Null( const DROPS::Point3DCL&, double)
@@ -174,7 +174,7 @@ void ApplyToTestFct( InstatStokes2PhaseP2P1CL& Stokes, const LsetBndDataCL& lsbn
 //     | f_Gamma(v) - f_{Gamma_h}(v) |  =   O(h^p)
 {
     MultiGridCL& MG= Stokes.GetMG();
-    const double curv= 2/P.get<DROPS::Point3DCL>("Exp.RadDrop")[0];
+    const double curv= 2/P.get<DROPS::Point3DCL>("Levelset.RadDrop")[0];
     SurfaceTensionCL sf( sigmaf, 0);
 
     LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsbnd, sf, P.get_child("Levelset")) );
@@ -202,7 +202,7 @@ void ApplyToTestFct( InstatStokes2PhaseP2P1CL& Stokes, const LsetBndDataCL& lsbn
     std::cout << Stokes.v.Data.size() << " velocity unknowns,\n";
     std::cout << lset.Phi.Data.size() << " levelset unknowns.\n";
 
-    const double Vol= 4./3*M_PI*std::pow( P.get<DROPS::Point3DCL>("Exp.RadDrop")[0], 3);
+    const double Vol= 4./3*M_PI*std::pow( P.get<DROPS::Point3DCL>("Levelset.RadDrop")[0], 3);
     std::cout << "Volumen = " << Vol << "\tKruemmung = " << curv << "\n\n";
     typedef std::map<int,double> LsgMapT;
     LsgMapT reflsg;
@@ -218,9 +218,9 @@ void ApplyToTestFct( InstatStokes2PhaseP2P1CL& Stokes, const LsetBndDataCL& lsbn
 //    reflsg[31]= 0;
 //    reflsg[32]= 0;
     reflsg[33]= curv*Vol;
-    reflsg[111]= curv*2*Vol*P.get<DROPS::Point3DCL>("Exp.PosDrop")[0];
-    reflsg[121]= curv*Vol*P.get<DROPS::Point3DCL>("Exp.PosDrop")[1];
-    reflsg[131]= curv*Vol*P.get<DROPS::Point3DCL>("Exp.PosDrop")[2];
+    reflsg[111]= curv*2*Vol*P.get<DROPS::Point3DCL>("Levelset.PosDrop")[0];
+    reflsg[121]= curv*Vol*P.get<DROPS::Point3DCL>("Levelset.PosDrop")[1];
+    reflsg[131]= curv*Vol*P.get<DROPS::Point3DCL>("Levelset.PosDrop")[2];
 //    reflsg[231]= 0;
 //    reflsg[221]= 0;
 //    reflsg[331]= 0;
@@ -250,7 +250,7 @@ void ApplyToTestFct( InstatStokes2PhaseP2P1CL& Stokes, const LsetBndDataCL& lsbn
     for (size_t i=0; i<refVec.size(); ++i)
         std::cout << refVec[i] << ",\t";
 
-    std::cout << "\n\n" << P.get<int>("AdaptRef.FinestLevel") << ",\t";
+    std::cout << "\n\n" << P.get<int>("Mesh.AdaptRef.FinestLevel") << ",\t";
     for (size_t i=0; i<errVec.size(); ++i)
         std::cout << errVec[i] << ",\t";
     std::cout << "\n\n";
@@ -265,7 +265,7 @@ void Compare_LaplBeltramiSF_ConstSF( InstatStokes2PhaseP2P1CL& Stokes, const Lse
 {
     MultiGridCL& MG= Stokes.GetMG();
     // Levelset-Disc.: Crank-Nicholson
-    const double curv= 2/P.get<DROPS::Point3DCL>("Exp.RadDrop")[0];
+    const double curv= 2/P.get<DROPS::Point3DCL>("Levelset.RadDrop")[0];
     SurfaceTensionCL sf( sigmaf, 0);
     LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsbnd, sf, P.get_child("Levelset")) );
 
@@ -293,7 +293,7 @@ void Compare_LaplBeltramiSF_ConstSF( InstatStokes2PhaseP2P1CL& Stokes, const Lse
     std::cout << Stokes.v.Data.size() << " velocity unknowns,\n";
     std::cout << lset.Phi.Data.size() << " levelset unknowns.\n";
 
-    const double Vol= 4./3*M_PI*std::pow( P.get<DROPS::Point3DCL>("Exp.RadDrop")[0], 3);
+    const double Vol= 4./3*M_PI*std::pow( P.get<DROPS::Point3DCL>("Levelset.RadDrop")[0], 3);
     std::cout << "Volumen = " << Vol << "\tKruemmung = " << curv << "\n\n";
 
     Stokes.SetupSystem1( &Stokes.A, &Stokes.M, &Stokes.b, &Stokes.b, &Stokes.b, lset, 0.);
@@ -380,17 +380,17 @@ int main (int argc, char** argv)
     DROPS::MultiGridCL mg( *builder);
 
     DROPS::StokesBndDataCL::VelBndDataCL velbnd( 0);
-    read_BndData( velbnd, mg, P.get_child( "Stokes.VelocityBndData"));
+    DROPS::read_BndData( velbnd, mg, P.get_child( "NavStokes.BoundaryData.Velocity"));
     DROPS::StokesBndDataCL::PrBndDataCL  prbnd( 0);
-    read_BndData( prbnd,  mg, P.get_child( "Stokes.PressureBndData"));
+    DROPS::read_BndData( prbnd,  mg, P.get_child( "NavStokes.BoundaryData.Pressure"));
 
     typedef DROPS::InstatStokes2PhaseP2P1CL MyStokesCL;
     MyStokesCL prob( mg, DROPS::TwoPhaseFlowCoeffCL(P), DROPS::StokesBndDataCL( velbnd, prbnd));
 
     DROPS::LsetBndDataCL lsbnd( 0);
-    read_BndData( lsbnd, mg, P.get_child( "Levelset.BndData"));
+    DROPS::read_BndData( lsbnd, mg, P.get_child( "Levelset.BndData"));
 
-    for (int i=0; i<P.get<int>("AdaptRef.FinestLevel"); ++i)
+    for (int i=0; i<P.get<int>("Mesh.AdaptRef.FinestLevel"); ++i)
     {
         MarkDrop( mg);
         mg.Refine();
