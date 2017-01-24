@@ -262,10 +262,10 @@ int TestRefine()
 
 int TestBuilder()
 {
-    DROPS::ParamCL P( "meshreader.json");
+    DROPS::ParamCL P( "../../param/tests/meshreader/meshreader.json");
     std::cout << P << std::endl;
 
-    std::auto_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P.get_child( "Domain")));
+    std::auto_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P ) );
     DROPS::MultiGridCL mg( *builder);
     std::cout << DROPS::SanityMGOutCL( mg) << std::endl;
     return 0;

@@ -3,7 +3,7 @@
 //    DROPS parameter file
 //    Test of MeshReaderCL.
 //=============================================================
-	"Domain":
+	"Mesh":
 	{
                 "Type": "ReadMeshBuilder",		// Reads a mesh-file from Netgen or FLUENT-UNS, FLUENT-RAMPANT
                 "Path": "../../meshes/messzelle.msh"	// Path of the input file

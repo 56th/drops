@@ -29,6 +29,7 @@ surfactant/surfactant/?
 
 tests/f_Gamma/default.json
 tests/f_Gamma/f_Gamma.json
+test/meshreader/meshreader.json
 
 transport/ns_transp/default.json
 transport/ns_transp/BotheKoebeWielageWarnecke03.json
