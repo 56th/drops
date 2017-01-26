@@ -25,7 +25,8 @@ spacetimetransp/st_transp/BotheKoebeWielageWarnecke03.json
 
 stokes/?
 
-surfactant/surfactant/?
+surfactant/surfactant/default.json
+surfactant/surfactant/surfactant.json
 
 tests/f_Gamma/default.json
 tests/f_Gamma/f_Gamma.json
