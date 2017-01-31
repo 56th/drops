@@ -5,20 +5,15 @@ libs(coupling levelset fastmarch surfacetension twophaseutils marking_strategy a
 target_link_libraries(levelset-levelset levelset-fastmarch misc-progressaccu misc-scopetimer)
 
 add_library(levelset-twophaseCoeff SHARED twophaseCoeff)
+add_library(levelset-filmCoeff SHARED filmCoeff)
+#set_property(TARGET levelset-filmCoeff PROPERTY SUFFIX "")
 
 if(NOT WIN32)
     target_link_libraries(levelset-twophaseCoeff)
+    target_link_libraries(levelset-filmCoeff)
 else(NOT WIN32)
     target_link_libraries(levelset-twophaseCoeff misc-funcmap misc-params)
 endif(NOT WIN32)
-
-if(NOT MPI)
-    add_library(levelset-filmCoeff SHARED filmCoeff)
-    #set_property(TARGET levelset-filmCoeff PROPERTY SUFFIX "")
-    if(NOT WIN32)
-        target_link_libraries(levelset-filmCoeff)
-    endif(NOT WIN32)
-endif(NOT MPI)
 
 if(MPI)
     set(PAR_OBJ DiST-DiST DiST-mpistream DiST-remotedata parallel-parallel parallel-partime parallel-exchange parallel-parmultigrid parallel-loadbal parallel-migrateunknowns parallel-decompose)
@@ -52,7 +47,7 @@ exec_par(twophasedrops geom-boundary geom-builder geom-deformation geom-simplex 
 exec_ser(twophasedrops geom-boundary geom-builder geom-deformation geom-simplex geom-multigrid num-unknowns geom-topo num-fe misc-problem levelset-levelset levelset-adaptriang levelset-marking_strategy misc-progressaccu misc-scopetimer misc-utils out-output num-discretize navstokes-instatnavstokes2phase misc-params levelset-fastmarch stokes-instatstokes2phase stokes-slipBndOnePhase num-MGsolver num-fe out-ensightOut num-oseenprecond poisson-transport2phase num-interfacePatch surfactant-ifacetransp levelset-surfacetension geom-geomselect levelset-twophaseutils num-hypre levelset-coupling misc-funcmap geom-principallattice geom-reftetracut geom-subtriangulation num-renumber num-quadrature misc-dynamicload out-vtkOut num-stokespardiso)
 
 
-# convention: makethose coefficient-defining shared objects are built which ared used in the default configuration of the executable..
+# convention: make sure that those coefficient-defining shared objects are built which ared used in the default configuration of the executable..
 add_dependencies(twophasedrops levelset-twophaseCoeff levelset-filmCoeff misc-scalarFunctions misc-vectorFunctions misc-csgFunctions)
 
 add_my_custom_targets(levelset)
