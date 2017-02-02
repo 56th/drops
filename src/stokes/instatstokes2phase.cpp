@@ -2448,8 +2448,8 @@ class SlipBndSystem1TwoPhaseP2CL
     const StokesBndDataCL& BndData_;
 
     const VecDescCL&    Phi_;
-    const BndDataCL<>& lsetbnd_;
-    instat_vector_fun_ptr outnormal_;                       //outnormal of the domain boundary
+    const BndDataCL<>& lsetBndData_;
+    instat_vector_fun_ptr BndOutNormal_;
     const double mu1_, mu2_;                                //dynamic viscosities
     const double beta1_, beta2_;                            //beta1_=beta2_=0 for symmetric Bnd;
     const double betaL_; 
@@ -2458,10 +2458,10 @@ class SlipBndSystem1TwoPhaseP2CL
     std::valarray<double> ls_loc;
 
   public:
-    SlipBndSystem1TwoPhaseP2CL(const StokesBndDataCL& BndData, const VecDescCL& Phi, const BndDataCL<>& lsetbnd, 
-    instat_vector_fun_ptr outnormal, double mu1, double mu2, const double beta1=0, const double beta2=0, const double betaL=0, const double alpha=0)
-    : lat( PrincipalLatticeCL::instance(2)), BndData_(BndData), Phi_(Phi), lsetbnd_(lsetbnd), 
-    outnormal_(outnormal), mu1_(mu1), mu2_(mu2), beta1_(beta1), beta2_(beta2), betaL_(betaL), alpha_(alpha), ls_loc( lat.vertex_size())
+    SlipBndSystem1TwoPhaseP2CL(const StokesBndDataCL& BndData, const VecDescCL& Phi, const BndDataCL<>& lsetBndData, 
+    instat_vector_fun_ptr BndOutNormal, double mu1, double mu2, const double beta1=0, const double beta2=0, const double betaL=0, const double alpha=0)
+    : lat( PrincipalLatticeCL::instance(2)), BndData_(BndData), Phi_(Phi), lsetBndData_(lsetBndData), 
+    BndOutNormal_(BndOutNormal), mu1_(mu1), mu2_(mu2), beta1_(beta1), beta2_(beta2), betaL_(betaL), alpha_(alpha), ls_loc( lat.vertex_size())
     { P2DiscCL::GetGradientsOnRef( GradRef); }
 
     double mu  (int sign) const { return sign > 0 ?  mu1_  : mu2_; }
@@ -2595,7 +2595,7 @@ void SlipBndSystem1TwoPhaseP2CL::setupCL_dissipation(const TetraCL& tet, LocalSy
 {
     bool SlipBnd=false;
     for(Uint v=0; v<4; v++)
-        if(lsetbnd_.IsOnSlipBnd(*tet.GetFace(v)))
+        if(BndData_.Vel.IsOnSlipBnd(*tet.GetFace(v)))
         {
             SlipBnd=true;
             break;
@@ -2603,7 +2603,7 @@ void SlipBndSystem1TwoPhaseP2CL::setupCL_dissipation(const TetraCL& tet, LocalSy
     if(!SlipBnd)
     {
         for(Uint v=0; v<6; v++)
-            if(lsetbnd_.IsOnSlipBnd(*tet.GetEdge(v)))
+            if(BndData_.Vel.IsOnSlipBnd(*tet.GetEdge(v)))
             {
                 SlipBnd=true;
                 break;
@@ -2613,8 +2613,9 @@ void SlipBndSystem1TwoPhaseP2CL::setupCL_dissipation(const TetraCL& tet, LocalSy
         return;
         
     InterfaceLineCL line;
-    line.Init( tet, Phi_,lsetbnd_); 
-    line.SetBndOutNormal(outnormal_);
+    line.Init( tet, Phi_,lsetBndData_); 
+    line.SetBndCondT(tet, BndData_.Vel);
+    line.SetBndOutNormal(BndOutNormal_);
     LocalP2CL<double> phi[10]; 
     for(Uint i=0; i<10; ++i)
     {
@@ -2627,12 +2628,12 @@ void SlipBndSystem1TwoPhaseP2CL::setupCL_dissipation(const TetraCL& tet, LocalSy
         if (!line.ComputeMCLForChild(ch)) // no MCL for this child
             continue;
         Uint ncl=line.GetNumMCL();
-        for(Uint i=0;i<ncl;i++)
+        for(Uint cl=0;cl<ncl;cl++)
         {
             BaryCoordCL Barys[2]; //Barycentric coordinates of two end points
             Point3DCL Pt[2];      //Cartesian coordinates of two end points
-            double length = line.GetInfoMCL(i,Barys[0],Barys[1], Pt[0], Pt[1]);
-            Quad9_1DCL<Point3DCL> normal_MCL = line.GetImprovedMCLNormalOnSlipBnd(tet, i);     //outer normal of moving contact lines on the slip surface
+            double length = line.GetInfoMCL(cl, Barys[0], Barys[1], Pt[0], Pt[1]);
+            Quad9_1DCL<Point3DCL> normal_MCL = line.GetImprovedMCLNormalOnSlipBnd(tet, cl);     //outer normal of moving contact lines on the slip surface
             for (Uint i=0; i<10; ++i)
             {
                 Quad9_1DCL<double> phiquadi(phi[i], Barys);
@@ -2642,7 +2643,7 @@ void SlipBndSystem1TwoPhaseP2CL::setupCL_dissipation(const TetraCL& tet, LocalSy
                     Quad9_1DCL<double> phiquadj(phi[j], Barys);
                     Quad9_1DCL<Point3DCL> phiquadjN (phiquadj * normal_MCL);
                     // \int_L beta_L * (\bu * \bn_L) * (\bv * \bn_L)
-                    dm[j][i] = betaL_ * Quad9_1DCL< SMatrixCL<3, 3> > ( outer_product (phiquadiN, phiquadjN)).quad( 0.5*length); 
+                    dm[j][i] = betaL_ * Quad9_1DCL< SMatrixCL<3, 3> > ( outer_product (phiquadiN, phiquadjN)).quad( 0.5*length); // absdet = (b-a)/(1-(-1)).
                     loc.Ak[j][i] += dm[j][i];
                     if (i != j){
                         assign_transpose( dm[i][j], dm[j][i]);
