@@ -16,7 +16,8 @@ osmosis/osmosis/osmosis.json
 osmosis/osmosis/prokertII.json
 osmosis/osmosis/torus.json
 
-partests/?
+partests/dist_ref_rising_drop/*
+partests/dist_TestRefPar/*
 
 poisson/cdrdrops/?
 

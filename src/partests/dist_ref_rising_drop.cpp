@@ -41,21 +41,11 @@ DROPS::ParamCL P;
 
 namespace DROPS{
 
-/// \brief Build a brick specified by Brick.Mesh of the parameter file
+/// \brief Build a brick specified by Mesh section of the parameter file
 void BuildBrick( MultiGridCL*& mg)
 {
-    int nx, ny, nz;
-    double dx, dy, dz;
-    std::string mesh( P.get<string>("Brick.Mesh","1x10x1@4x4x4")), delim("x@");
-    size_t idx;
-    while ((idx= mesh.find_first_of( delim)) != std::string::npos )
-        mesh[idx]= ' ';
-    std::istringstream brick_info( mesh);
-    brick_info >> dx >> dy >> dz >> nx >> ny >> nz;
-    Point3DCL orig, px, py, pz;
-    px[0]= dx; py[1]= dy; pz[2]= dz;
-    BrickBuilderCL builder( orig, px, py, pz, nx, ny, nz);
-    mg = new MultiGridCL( builder);
+    std::unique_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P));
+    mg = new DROPS::MultiGridCL( *builder);
 }
 
 
@@ -73,12 +63,12 @@ double DistToSphere( const Point3DCL& p, double)
 
 void RefineBrick( MultiGridCL& mg)
 {
-    const int f_level= P.get<int>("Exp.FinestLevel", 2),        // finest level
-              c_level= P.get<int>("Exp.CoarsestLevel", 0);      // coarsest level
-    const int min_ref_num= f_level - c_level;                   // minimal number of refinements
+    const int f_level= P.get<int>("Mesh.AdaptRef.FinestLevel", 2),        // finest level
+              c_level= P.get<int>("Mesh.AdaptRef.CoarsestLevel", 0);      // coarsest level
+    const int min_ref_num= f_level - c_level;                             // minimal number of refinements
     bool marked= true;
     for (int i= 0; i < 2*min_ref_num && marked; ++i) {
-        marked= MarkInterface( DistToSphere, P.get<double>("Exp.RefWidth",0.1), mg, (Uint)f_level, (Uint)c_level);
+        marked= MarkInterface( DistToSphere, P.get<double>("Mesh.AdaptRef.Width",0.1), mg, (Uint)f_level, (Uint)c_level);
         std::cout << "Mark interface for " << i << '/' << (2*min_ref_num) << " time, marked: " << marked << std::endl;
         mg.Refine();
     }
@@ -116,8 +106,8 @@ int main( int argc, char **argv)
 
         // writer for vtk-format
         DROPS::VTKOutCL *vtkwriter=0;
-        if (P.get("VTK.VTKOut", 0)!=0){
-            vtkwriter = new DROPS::VTKOutCL(*mg, "DROPS data", P.get<int>("Time.NumSteps")/P.get("VTK.VTKOut", 0)+1,
+        if (P.get("VTK.Freq", 0)!=0){
+            vtkwriter = new DROPS::VTKOutCL(*mg, "DROPS data", P.get<int>("Time.NumSteps")/P.get("VTK.Freq", 0)+1,
                                 P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName"), P.get<std::string>("VTK.VTKName"),
                                 P.get<int>("VTK.Binary"));
             vtkwriter->Write(0);
@@ -136,13 +126,13 @@ int main( int argc, char **argv)
         std::ofstream timings( oss.str().c_str());
 
         // Set initial drop
-        DROPS::origin  = P.get<DROPS::Point3DCL>("Exp.Origin");
+        DROPS::origin  = P.get<DROPS::Point3DCL>("Exp.DropOrigin");
         DROPS::drop_vel= P.get<DROPS::Point3DCL>("Exp.DropVel");
         DROPS::radius  = P.get<double>(          "Exp.DropRadius", 0.1);;
 
         DROPS::ParTimerCL timer;
 
-        for (int i=0; i<P.get<int>("Exp.NumSteps", 10); ++i) {
+        for (int i=0; i<P.get<int>("Time.NumSteps", 10); ++i) {
             timer.Reset();
             if (i!=0) {
                 std::cout << "=====================================\n- migration " << i+1 << "\n";
@@ -162,7 +152,7 @@ int main( int argc, char **argv)
             std::cout << "MG has " << mg->GetNumLevel() << " levels\n";
             if ( P.get<int>("Exp.CheckSanity", 1)!=0)
                 DROPS::CheckDiST( *mg, *sanityfile);
-            if (P.get("VTK.VTKOut", 0)!=0){
+            if (P.get("VTK.Freq", 0)!=0){
                 vtkwriter->Write(i+1);
             }
             timer.Stop();
