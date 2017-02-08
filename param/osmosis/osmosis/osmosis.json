@@ -16,8 +16,8 @@
         "Time":
         {
                 "NumSteps":             50,
-                "StepSize":             0.01,
-                "Scheme":               0.5
+                "FinalTime":            0.5,
+                "Theta":                0.5
         },
         
         "CSG":

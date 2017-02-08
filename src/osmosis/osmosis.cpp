@@ -192,7 +192,7 @@ void  OnlyOsmosisStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTria
         vtkwriter.Write(0);
 
 
-    const double dt = P.get<double>("Time.StepSize");
+    const double dt = P.get<int>("Time.NumSteps")!=0 ? P.get<double>("Time.FinalTime")/P.get<int>("Time.NumSteps") : 0;
 
     // Create the marking strategy for the adaptive mesh refinement.
     typedef DistMarkingStrategyCL MarkerT;

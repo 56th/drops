@@ -163,7 +163,7 @@ class OsmosisP1CL
         idx( P1_FE, 1, Bnd, mg.GetBnd().GetMatchFun()), oldidx( P1_FE, 1, Bnd, mg.GetBnd().GetMatchFun()),
         Velidx( vecP1_FE, BndVel),
         MG_( mg), Bnd_( Bnd), Bnd_v_(BndVel), Bnd_ls_(Bnd_ls), v_ (v),
-        theta_( P.get<double>("Time.Scheme")), dt_( P.get<double>("Time.StepSize")),
+        theta_( P.get<double>("Time.Theta")), dt_( P.get<int>("Time.NumSteps")!=0 ? P.get<double>("Time.FinalTime")/P.get<int>("Time.NumSteps") : 0),
         D_( P.get<double>("Osmosis.Diffusivity")),
         lset_( lset), oldlset_(oldlset),
         gm_( pc_, 20, P.get<int>("Solver.Iter"), P.get<double>("Solver.Tol"), false, false, RightPreconditioning),

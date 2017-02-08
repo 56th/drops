@@ -14,8 +14,8 @@
         "Time":
         {
                 "NumSteps":             100,
-                "StepSize":             0.025,
-                "Scheme":               0.5
+                "FinalTime":            2.5,
+                "Theta":                0.5
         },
 		
 		"Osmosis":
