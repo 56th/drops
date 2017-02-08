@@ -26,6 +26,8 @@
                                                 // of the A-Block
                 "PcATol":               "CouplingSolver.NavStokesSolver.OseenSolver.PcATol",  // #tolerance for the preconditioner of the A-Block
                 "PcSTol":               "CouplingSolver.NavStokesSolver.OseenSolver.PcSTol", // #tolerance for the preconditioner of the Schur complement
+                "Omega":                "CouplingSolver.NavStokesSolver.OseenSolver.Omega", // #relaxation of ssor
+                "Tau":                  "CouplingSolver.NavStokesSolver.OseenSolver.Tau", // #used in obsolete uzawa solvers
                 "DirectSolve":          "CouplingSolver.NavStokesSolver.OseenSolver.DirectSolve",
                 "XFEMStab":             "NavStokes.XFEMReduced",    // #[->NavStokes.XFEMReduced]threshold for discarding additional dof parameters in
                                                 // the XFEM pressure space. Using a negative value
@@ -139,7 +141,8 @@
                 "Partitioner":          "Deprecated.Reparam.Partitioner", 
                 "RefineStrategy":       "Deprecated.Reparam.RefineStrategy", 
                 "AddConcMarker":        "Mesh.AdaptRef.AddConcMarker",
-                "Threshold":            "Mesh.AdaptRef.Threshold"
+                "Threshold":            "Mesh.AdaptRef.Threshold",
+                "ModifyGrid":           "Mesh.AdaptRef.ModifyGrid"
         },
 
 // material data (all units are SI)
@@ -149,11 +152,23 @@
                 "ViscDrop":             "NavStokes.Coeff.ViscNeg",     //#[-> ViscNeg] dynamic viscosity of the droplet
                 "DensFluid":            "NavStokes.Coeff.DensPos",     //#[-> DensPos] density of the surrounding fluid
                 "ViscFluid":            "NavStokes.Coeff.ViscPos",      //#[-> ViscPos] dynamic viscosity of the surrounding fluid.
+                "Visc":                 "NavStokes.Coeff.Visc",
+                "Dens":                 "NavStokes.Coeff.Dens",
                 "SmoothZone":           "Deprecated.Default.Smoothzone"    //#[->default] (deprecated) defines the width of the transition zone
                                                 // surrounding the interface, where the density- and viscosity-
                                                 // jump is smoothed numerically. In the current version we always
                                                 // use a sharp interface w/o any smoothing, hence, this parameter
                                                 // has no effect.
+        },
+
+        
+        "StokesCoeff": 
+        {
+            "Solution_DVel":    "NavStokes.Coeff.Solution_DVel",
+            "Reaction":         "NavStokes.Coeff.Reaction",
+            "Solution_Pr":      "NavStokes.Coeff.Solution_Pr",
+            "Solution_Vel":     "NavStokes.Coeff.Solution_Vel",
+            "Source":           "NavStokes.Coeff.Source"
         },
 
 // experimental conditions (all units are SI)
