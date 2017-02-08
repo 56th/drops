@@ -24,7 +24,8 @@ poisson/cdrdrops/?
 spacetimetransp/st_transp/default.json
 spacetimetransp/st_transp/BotheKoebeWielageWarnecke03.json
 
-stokes/?
+stokes/errorestimator/MGsdropsPS.json --> link to sdropsP2/MGsdropsP2.json
+stokes/sdropsP2/MGsdropsP2.json
 
 surfactant/surfactant/default.json
 surfactant/surfactant/surfactant.json
