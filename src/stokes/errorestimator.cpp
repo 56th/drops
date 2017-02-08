@@ -552,7 +552,6 @@ int main ( int argc, char** argv)
 
         //create geometry
         DROPS::MultiGridCL* mg= 0;
-        DROPS::StokesBndDataCL* bdata = 0;
 
         //only for measuring cell, not used here
         //double r = 1;
@@ -563,18 +562,16 @@ int main ( int argc, char** argv)
         //DROPS::BuildDomain( mg, P.get<string>("DomainCond.MeshFile"), P.get<int>("DomainCond.GeomType"), serfile, r);
         //DROPS::BuildBoundaryData( mg, bdata, P.get<string>("DomainCond.BoundaryType"), P.get<string>("DomainCond.BoundaryFncs"));
 
-        typedef DROPS::BndDataCL<DROPS::Point3DCL> VelBndDataCL;
-        typedef DROPS::BndDataCL<double>    PrBndDataCL;
-        VelBndDataCL *velbnddata = new VelBndDataCL(0);;
-        PrBndDataCL *prbnddata = new PrBndDataCL(0);
-        DROPS::read_BndData( *velbnddata, *mg, P.get_child( "NavStokes.BoundaryData.Velocity"));
+        DROPS::BndDataCL<DROPS::Point3DCL> velbnddata(0);
+        DROPS::BndDataCL<double>           prbnddata(0);
+        DROPS::read_BndData( velbnddata, *mg, P.get_child( "NavStokes.BoundaryData.Velocity"));
         std::cout << "Generated boundary conditions for velocity ";
-        DROPS::read_BndData( *prbnddata,  *mg, P.get_child( "NavStokes.BoundaryData.Pressure"));
+        DROPS::read_BndData( prbnddata,  *mg, P.get_child( "NavStokes.BoundaryData.Pressure"));
         std::cout << "and pressure." << std::endl;
 
         // Setup the problem
         DROPS::StokesFlowCoeffCL tmp = DROPS::StokesFlowCoeffCL( P);
-        StokesOnBrickCL prob(*mg, tmp, DROPS::StokesBndDataCL(*velbnddata,*prbnddata) );
+        StokesOnBrickCL prob(*mg, tmp, DROPS::StokesBndDataCL(velbnddata,prbnddata) );
         timer.Stop();
         std::cout << " o time " << timer.GetTime() << " s" << std::endl;
 
@@ -603,7 +600,6 @@ int main ( int argc, char** argv)
         std::cout << "pressure min/max: "<<min<<", "<<max<<std::endl;
 
         delete mg;
-        delete bdata;
         return 0;
     }
     catch (DROPS::DROPSErrCL& err) { err.handle(); }
