@@ -25,6 +25,16 @@
 #include "misc/funcmap.h"
 #include "misc/params.h"
 
+DROPS::Point3DCL MeshSize()
+{
+    extern DROPS::ParamCL P;
+    static DROPS::Point3DCL meshsize( norm(P.get<DROPS::Point3DCL>("Mesh.E1")),
+                                      norm(P.get<DROPS::Point3DCL>("Mesh.E2")),
+                                      norm(P.get<DROPS::Point3DCL>("Mesh.E3")));
+    return meshsize;
+}
+
+
 double Initialcneg (const DROPS::Point3DCL& , double )
 {
     extern DROPS::ParamCL P;
@@ -1450,19 +1460,7 @@ static DROPS::RegisterVectorFunction regvec_testcase7_velocity("testcase7_vel", 
 
     bool periodic_3sides( const DROPS::Point3DCL& p, const DROPS::Point3DCL& q)
     {
-        extern DROPS::ParamCL P;
-        static bool first = true;
-        static DROPS::Point3DCL dx;
-        //dirty hack
-        if (first){
-            std::string mesh( P.get<std::string>("DomainCond.MeshFile")), delim("x@");
-            size_t idx_;
-            while ((idx_= mesh.find_first_of( delim)) != std::string::npos )
-                mesh[idx_]= ' ';
-            std::istringstream brick_info( mesh);
-            brick_info >> dx[0] >> dx[1] >> dx[2] ;
-            first = false;
-        }
+        static DROPS::Point3DCL dx= MeshSize();
         const DROPS::Point3DCL d= fabs(p-q), L= fabs(dx);
         
         bool matches = true;
@@ -1476,17 +1474,7 @@ static DROPS::RegisterVectorFunction regvec_testcase7_velocity("testcase7_vel", 
     template<int A, int B>
     bool periodic_2sides( const DROPS::Point3DCL& p, const DROPS::Point3DCL& q)
     {
-        extern DROPS::ParamCL P;
-        static bool first = true;
-        static DROPS::Point3DCL dx;
-        //dirty hack
-        if (first){
-            dx[0]= P.get<DROPS::Point3DCL>("Mesh.E1")[0];
-            dx[1]= P.get<DROPS::Point3DCL>("Mesh.E2")[1];
-            dx[2]= P.get<DROPS::Point3DCL>("Mesh.E3")[2];
-            first = false;
-        }
-
+        static DROPS::Point3DCL dx= MeshSize();
         const DROPS::Point3DCL d= fabs(p-q),
                                L= fabs(dx);
 
@@ -1499,17 +1487,8 @@ static DROPS::RegisterVectorFunction regvec_testcase7_velocity("testcase7_vel", 
     template<int A>
     bool periodic_1side( const DROPS::Point3DCL& p, const DROPS::Point3DCL& q)
     {
-        extern DROPS::ParamCL P;
+        static DROPS::Point3DCL dx= MeshSize();
 
-        static bool first = true;
-        static DROPS::Point3DCL dx;
-        //dirty hack
-        if (first){
-            dx[0]= P.get<DROPS::Point3DCL>("Mesh.E1")[0];
-            dx[1]= P.get<DROPS::Point3DCL>("Mesh.E2")[1];
-            dx[2]= P.get<DROPS::Point3DCL>("Mesh.E3")[2];
-            first = false;
-        }
         const int B = (A+1)%3;
         const int D = (B+1)%3;
         const DROPS::Point3DCL d= fabs(p-q), L= fabs(dx);

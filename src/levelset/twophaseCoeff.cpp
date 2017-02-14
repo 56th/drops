@@ -27,6 +27,15 @@
 
 extern DROPS::ParamCL P;
 
+
+DROPS::Point3DCL MeshSize()
+{
+    static DROPS::Point3DCL meshsize( norm(P.get<DROPS::Point3DCL>("Mesh.E1")),
+                                      norm(P.get<DROPS::Point3DCL>("Mesh.E2")),
+                                      norm(P.get<DROPS::Point3DCL>("Mesh.E3")));
+    return meshsize;
+}
+
 //========================================================================
 //          Functions for twophasedrops-executable (inflow)
 //========================================================================
@@ -68,10 +77,11 @@ namespace tpd_inflow{
     {
         static double RadInlet=   P.get<double>("Inflow.RadInlet");
         static double InflowVel=  P.get<double>("Inflow.InflowVel");
+        static int    FlowDir=    P.get<int>("Inflow.FlowDir");
         DROPS::SVectorCL<3> ret(0.);
         const double s2= RadInlet*RadInlet,
-                     r2= p.norm_sq() - p[P.get<int>("Inflow.FlowDir")]*p[P.get<int>("Inflow.FlowDir")];
-        ret[P.get<int>("Inflow.FlowDir")]= -(r2-s2)/s2*InflowVel;
+                     r2= p.norm_sq() - p[FlowDir]*p[FlowDir];
+        ret[FlowDir]= -(r2-s2)/s2*InflowVel;
 
         return ret;
     }
@@ -89,8 +99,7 @@ namespace tpd_inflow{
     DROPS::SVectorCL<3> InflowAxialExtensionalFlow( const DROPS::Point3DCL& p, double)
     {
         DROPS::SVectorCL<3> ret(0.);
-        DROPS::SVectorCL<3> PosDrop(0.);
-        PosDrop = P.get<DROPS::Point3DCL>("Levelset.PosDrop");
+        static DROPS::SVectorCL<3> PosDrop= P.get<DROPS::Point3DCL>("Levelset.PosDrop");
         ret[0]=-0.5*(p[0]-PosDrop[0]);
         ret[1]=-0.5*(p[1]-PosDrop[1]);
         ret[2]= p[2]-PosDrop[2];
@@ -101,8 +110,7 @@ namespace tpd_inflow{
     DROPS::SVectorCL<3> InflowShearFlowZ( const DROPS::Point3DCL& p, double)
     {
         DROPS::SVectorCL<3> ret(0.);
-        DROPS::SVectorCL<3> E3(0.);
-        E3 = P.get<DROPS::Point3DCL>("Mesh.E3");
+        static DROPS::SVectorCL<3> E3= P.get<DROPS::Point3DCL>("Mesh.E3");
         ret[0]=p[2]-0.5*E3[2];
         return P.get<double>("Inflow.ShearFlowFactor",1.0)*ret;
     }
@@ -146,15 +154,8 @@ namespace tpd_volforce{
         DROPS::SVectorCL<3> ret(0.);
         ret[D] = -P.get<DROPS::Point3DCL>("NavStokes.Coeff.Gravity")[D];
 
-        static bool first = true;
-        static DROPS::Point3DCL dx;
+        static DROPS::Point3DCL dx= MeshSize();
         //"hack": assume cartesian domain with e1=[a,0,0], e2=[0,b,0], ..
-        if (first){
-            first = false;
-            dx[0] = P.get<DROPS::Point3DCL>("Mesh.E1")[0];
-            dx[1] = P.get<DROPS::Point3DCL>("Mesh.E2")[1];
-            dx[2] = P.get<DROPS::Point3DCL>("Mesh.E3")[2];
-        }
 
         static double voldrop = 4./3.*M_PI* P.get<DROPS::Point3DCL>("Levelset.RadDrop")[0]*P.get<DROPS::Point3DCL>("Levelset.RadDrop")[1]*P.get<DROPS::Point3DCL>("Levelset.RadDrop")[2] ;
         static double brickvol = dx[0]* dx[1]* dx[2];
@@ -196,19 +197,7 @@ namespace levelsetdistance{
     double PeriodicEllipsoidDistance( const DROPS::Point3DCL& p, double)
     {
 
-        static bool first = true;
-        static DROPS::Point3DCL dx;
-
-        //hack
-        if (first){
-            first = false;
-            if (i==0)
-                dx = P.get<DROPS::Point3DCL>("Mesh.E1");
-            else if (i==1)
-                dx = P.get<DROPS::Point3DCL>("Mesh.E2");
-            else
-                dx = P.get<DROPS::Point3DCL>("Mesh.E3");
-        }
+        static DROPS::Point3DCL dx= MeshSize();
 
         DROPS::Point3DCL dp;
         dp[i] = dx[i];
@@ -292,16 +281,8 @@ namespace filmperiodic{
     bool periodic_2sides( const DROPS::Point3DCL& p, const DROPS::Point3DCL& q)
     {
 
-        static bool first = true;
-        static DROPS::Point3DCL dx;
-
+        static DROPS::Point3DCL dx= MeshSize();
         //"hack": assume cartesian domain with e1=[a,0,0], e2=[0,b,0], ..
-        if (first){
-            first = false;
-            dx[0] = P.get<DROPS::Point3DCL>("Mesh.E1")[0];
-            dx[1] = P.get<DROPS::Point3DCL>("Mesh.E2")[1];
-            dx[2] = P.get<DROPS::Point3DCL>("Mesh.E3")[2];
-        }
 
         const DROPS::Point3DCL d= fabs(p-q),
                                L= fabs(dx);
@@ -316,19 +297,7 @@ namespace filmperiodic{
     bool periodic_1side( const DROPS::Point3DCL& p, const DROPS::Point3DCL& q)
     {
 
-        static bool first = true;
-        static DROPS::Point3DCL dx;
-
-        //hack
-        if (first){
-            first = false;
-            if (A==0)
-                dx = P.get<DROPS::Point3DCL>("Mesh.E1");
-            else if (A==1)
-                dx = P.get<DROPS::Point3DCL>("Mesh.E2");
-            else
-                dx = P.get<DROPS::Point3DCL>("Mesh.E3");
-        }
+        static DROPS::Point3DCL dx= MeshSize();
 
         const int B = (A+1)%3;
         const int D = (B+1)%3;
@@ -406,16 +375,8 @@ namespace DisContPressure{
     double Pressure (const DROPS::Point3DCL& , double t)
     {
         double ret=0;	
-        static bool first = true;
-        static DROPS::Point3DCL origin, VelR;
-        static double radius, surftension;
-        if(first){
-            origin = P.get<DROPS::Point3DCL>("Levelset.PosDrop");
-            VelR = P.get<DROPS::Point3DCL>("Levelset.RadDrop");
-            radius = P.get<double>("Levelset.EquiRadius");
-            surftension = P.get<double>("NavStokes.Coeff.SurfTens.SurfTension");
-            first = false;
-        }
+        static double radius=      P.get<double>("Levelset.EquiRadius"),
+                      surftension= P.get<double>("NavStokes.Coeff.SurfTens.SurfTension");
         //Hack: use time to tell in fluid 1 or fluid 2
         if( t>3. && t<5 )
             ret = 0;
@@ -500,27 +461,28 @@ namespace ContactAngle{
             if (P.get<std::string>("Mesh.Type") != std::string("BrickBuilder"))
                  throw DROPS::DROPSErrCL("OutNormalBrick: only works for brick-shaped domain, please use other functions");
             first = false;
-            dx = P.get<DROPS::Point3DCL>("Mesh.E1")[0];
-            dy = P.get<DROPS::Point3DCL>("Mesh.E2")[1];
-            dz = P.get<DROPS::Point3DCL>("Mesh.E3")[2];
+            const DROPS::Point3DCL m= MeshSize();
+            dx = m[0];
+            dy = m[1];
+            dz = m[2];
         }
 
         const double EPS=1e-10;
         DROPS::Point3DCL outnormal(0.0);
         if(std::fabs(pt[0])<EPS)
-        {outnormal[0]=-1.0; }
+            outnormal[0]=-1.0;
         else if(std::fabs(pt[0]-dx)<EPS)
-        {outnormal[0]=1.0; }
+            outnormal[0]=1.0;
         else if(std::fabs(pt[1])<EPS)
-        {outnormal[1]=-1.0; }
+            outnormal[1]=-1.0;
         else if(std::fabs(pt[1]-dy)<EPS)
-        {outnormal[1]=1.0; }
+            outnormal[1]=1.0;
         else if(std::fabs(pt[2])<EPS)
-        {outnormal[2]=-1.0; }
+            outnormal[2]=-1.0;
         else if(std::fabs(pt[2]-dz)<EPS)
-        {outnormal[2]=1.0; }
+            outnormal[2]=1.0;
         else
-             throw DROPS::DROPSErrCL("OutNormalBrick: error while computing outer normal");
+            throw DROPS::DROPSErrCL("OutNormalBrick: error while computing outer normal");
         return outnormal;
     }
     //========================================================================

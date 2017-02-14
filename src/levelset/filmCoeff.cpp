@@ -34,9 +34,9 @@ namespace film {
 
 DROPS::Point3DCL MeshSize()
 {
-    static DROPS::Point3DCL meshsize( P.get<DROPS::Point3DCL>("Mesh.E1")[0],
-                                      P.get<DROPS::Point3DCL>("Mesh.E2")[1],
-                                      P.get<DROPS::Point3DCL>("Mesh.E3")[2]);
+    static DROPS::Point3DCL meshsize( norm(P.get<DROPS::Point3DCL>("Mesh.E1")),
+                                      norm(P.get<DROPS::Point3DCL>("Mesh.E2")),
+                                      norm(P.get<DROPS::Point3DCL>("Mesh.E3")));
     return meshsize;
 }
 

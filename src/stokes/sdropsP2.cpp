@@ -398,22 +398,15 @@ int main ( int argc, char** argv)
             DROPS::ProgressBarTetraAccumulatorCL::Activate();
 
         // Check MarkLower value
-        if( P.get<std::string>("Mesh.Type").compare("ReadMeshBuilder") == 0 ) P.put("Misc.MarkLower", 0);
+        if( P.get<std::string>("Mesh.Type").compare("ReadMeshBuilder") == 0 )
+            P.put("Misc.MarkLower", 0);
         else {
-//          int nx, ny, nz;
-//          double dx, dy, dz;
-//          std::string mesh( P.get<string>("DomainCond.MeshFile")), delim("x@");
-//          size_t idx;
-//          while ((idx= mesh.find_first_of( delim)) != std::string::npos )
-//            mesh[idx]= ' ';
-//          std::istringstream brick_info( mesh);
-//          brick_info >> dx >> dy >> dz >> nx >> ny >> nz;
-            double dy = P.get<DROPS::Point3DCL>("Mesh.E2")[1];
-          if (P.get("Misc.MarkLower", 0)<0 || P.get("Misc.MarkLower", 0) > dy)
-          {
-        	  std::cerr << "Wrong value of MarkLower\n";
-        	  return 1;
-          }
+            double dy = norm(P.get<DROPS::Point3DCL>("Mesh.E2"));
+            if (P.get("Misc.MarkLower", 0)<0 || P.get("Misc.MarkLower", 0) > dy)
+            {
+              std::cerr << "Wrong value of MarkLower\n";
+              return 1;
+            }
         }
 
         // time measurement
@@ -427,10 +420,6 @@ int main ( int argc, char** argv)
         //create geometry
         DROPS::MultiGridCL* mg= 0;
 
-        //only for measuring cell, not used here
-//        double r = 1;
-//        std::string serfile = "none";
-//        DROPS::BuildDomain( mg, P.get<string>("DomainCond.MeshFile"), P.get<int>("DomainCond.GeomType"), serfile, r);
         std::unique_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P));
         mg = new DROPS::MultiGridCL( *builder );
 
@@ -440,7 +429,6 @@ int main ( int argc, char** argv)
         std::cout << "Generated boundary conditions for velocity ";
         DROPS::read_BndData( prbnddata,  *mg, P.get_child( "NavStokes.BoundaryData.Pressure"));
         std::cout << "and pressure." << std::endl;
-//        DROPS::BuildBoundaryData( mg, bdata, P.get<string>("DomainCond.BoundaryType"), P.get<string>("DomainCond.BoundaryFncs"));
 
         // Setup the problem
         DROPS::StokesFlowCoeffCL tmp = DROPS::StokesFlowCoeffCL( P);

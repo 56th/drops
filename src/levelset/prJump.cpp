@@ -124,7 +124,6 @@ int main ( int argc, char** argv )
         const int n2   = P.get<int>("Mesh.N2");
         const int n3   = P.get<int>("Mesh.N3");
 
-        //const int n = P.get<int>("DomainCond.MeshFile");
         BrickBuilderCL builder( orig, e1, e2, e3, n1, n2, n3 );
 
         // Create Stokes Problem

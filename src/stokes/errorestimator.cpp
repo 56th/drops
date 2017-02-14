@@ -523,23 +523,16 @@ int main ( int argc, char** argv)
         DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
 
         // Check MarkLower value
-        if( P.get<std::string>("Mesh.Type").compare("ReadMeshBuilder") == 0) P.put("Error.MarkLower", 0);
+        if( P.get<std::string>("Mesh.Type").compare("ReadMeshBuilder") == 0)
+            P.put("Error.MarkLower", 0);
         else
         {
-//          int nx, ny, nz;
-//          double dx, dy, dz;
-//          std::string mesh( P.get<string>("DomainCond.MeshFile")), delim("x@");
-//          size_t idx;
-//          while ((idx= mesh.find_first_of( delim)) != std::string::npos )
-//            mesh[idx]= ' ';
-//          std::istringstream brick_info( mesh);
-//          brick_info >> dx >> dy >> dz >> nx >> ny >> nz;
-          double dy = P.get<DROPS::Point3DCL>("Mesh.E2")[1];
-          if (P.get("Error.MarkLower", 0)<0 || P.get("Error.MarkLower", 0) > dy)
-          {
-        	  std::cerr << "Wrong value of MarkLower\n";
-        	  return 1;
-          }
+            double dy = norm(P.get<DROPS::Point3DCL>("Mesh.E2"));
+            if (P.get("Error.MarkLower", 0)<0 || P.get("Error.MarkLower", 0) > dy)
+            {
+              std::cerr << "Wrong value of MarkLower\n";
+              return 1;
+            }
         }
 
         // time measurement
@@ -552,15 +545,8 @@ int main ( int argc, char** argv)
 
         //create geometry
         DROPS::MultiGridCL* mg= 0;
-
-        //only for measuring cell, not used here
-        //double r = 1;
-        //std::string serfile = "none";
-
         std::unique_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P));
         mg = new DROPS::MultiGridCL( *builder);
-        //DROPS::BuildDomain( mg, P.get<string>("DomainCond.MeshFile"), P.get<int>("DomainCond.GeomType"), serfile, r);
-        //DROPS::BuildBoundaryData( mg, bdata, P.get<string>("DomainCond.BoundaryType"), P.get<string>("DomainCond.BoundaryFncs"));
 
         DROPS::BndDataCL<DROPS::Point3DCL> velbnddata(0);
         DROPS::BndDataCL<double>           prbnddata(0);
