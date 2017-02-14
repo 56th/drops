@@ -173,7 +173,7 @@ void PeriodicEdgesCL::AccumulateMFR( int lvl)
 
 MultiGridCL::MultiGridCL (const MGBuilderCL& Builder)
     : TriangVertex_( *this), TriangEdge_( *this), TriangFace_( *this), TriangTetra_( *this), version_(0),
-    factory_( Vertices_, Edges_, Faces_, Tetras_), MeshDeform_(0)
+    factory_( Vertices_, Edges_, Faces_, Tetras_)
 {
 #ifdef _PAR
     DiST::InfoCL::Instance( this);  // tell InfoCL about the multigrid before(!) building the grid
@@ -392,8 +392,6 @@ void MultiGridCL::RefineGrid (Uint Level)
     for (Uint lvl= 0; lvl <= nextLevel; ++lvl)
         std::for_each( Vertices_[lvl].begin(), Vertices_[lvl].end(),
             std::mem_fun_ref( &VertexCL::DestroyRecycleBin));
-
-    IncrementVersion();
 
 #ifdef _PAR
     ParMultiGridCL::Instance().IdentifyEnd();
