@@ -166,7 +166,7 @@ void PoissonP1CL<Coeff>::Init( VecDescCL& vec, instat_scalar_fun_ptr func, doubl
         {
             if(ALE_)
             {
-                vec.Data[sit->Unknowns(idx)]= func( MG_.GetMeshDeformation().GetTransformedVertexCoord(*sit), t0);
+                vec.Data[sit->Unknowns(idx)]= func( md_.GetTransformedVertexCoord(*sit), t0);
             }  
             else
                 vec.Data[sit->Unknowns(idx)]= func( sit->GetCoord(), t0);
@@ -344,7 +344,7 @@ double PoissonP1CL<Coeff>::CheckSolution(const VecDescCL& lsg, scalar_tetra_func
         double absdet=0; //sum= 0;
         if(ALE_)
         {   
-           GetTrafoTrDet(det, MG_.GetMeshDeformation().GetLocalP1Deformation(*sit));
+           GetTrafoTrDet(det, md_.GetLocalP1Deformation(*sit));
            absdet = std::fabs(det);
         }
         else
@@ -990,6 +990,7 @@ void SetupConvection_P2(const MultiGridCL& MG_, const Coeff& Coeff_, const BndDa
   double tmp; //tell the vert points and the edge points
   Quad5CL<double> adet;
   Quad5CL< SMatrixCL<3, 3> > Tq;
+  MeshDeformationCL& md= MeshDeformationCL::getInstance();
 
   P2DiscCL::GetGradientsOnRef(GradRef);
   for(MultiGridCL::const_TriangTetraIteratorCL sit=MG_.GetTriangTetraBegin(lvl), send=MG_.GetTriangTetraEnd(lvl);
@@ -997,7 +998,7 @@ void SetupConvection_P2(const MultiGridCL& MG_, const Coeff& Coeff_, const BndDa
   {
 
       if(ALE_)
-        GetTrafoAsQuad(MG_.GetMeshDeformation().GetLocalP2Deformation(*sit), adet, Tq);
+        GetTrafoAsQuad( md.GetLocalP2Deformation(*sit), adet, Tq);
       else
       {
           GetTrafoTr(T, det, *sit);
@@ -1086,7 +1087,7 @@ void PoissonP2CL<Coeff>::Init( VecDescCL& vec, instat_scalar_fun_ptr func, doubl
         {
             if(ALE_)
             {
-                vec.Data[sit->Unknowns(idx)]= func( MG_.GetMeshDeformation().GetTransformedVertexCoord(*sit), t0);
+                vec.Data[sit->Unknowns(idx)]= func( md_.GetTransformedVertexCoord(*sit), t0);
             }   
             else
                 vec.Data[sit->Unknowns(idx)]= func( sit->GetCoord(), t0);
@@ -1101,7 +1102,7 @@ void PoissonP2CL<Coeff>::Init( VecDescCL& vec, instat_scalar_fun_ptr func, doubl
         {
            if(ALE_)
             {
-                vec.Data[sit->Unknowns(idx)]= func( MG_.GetMeshDeformation().GetTransformedEdgeBaryCenter(*sit), t0);
+                vec.Data[sit->Unknowns(idx)]= func( md_.GetTransformedEdgeBaryCenter(*sit), t0);
             }   
             else
                 vec.Data[sit->Unknowns(idx)]= func( GetBaryCenter( *sit), t0);
@@ -1148,7 +1149,7 @@ void PoissonP2CL<Coeff>::SetupInstatRhs(VecDescCL& vA, VecDescCL& vM, double tA,
                             send=const_cast<const MultiGridCL&>(MG_).GetTriangTetraEnd(lvl); sit != send; ++sit)
     {
         if(ALE_)
-          GetTrafoAsQuad(MG_.GetMeshDeformation().GetLocalP2Deformation(*sit), adet, Tq);
+          GetTrafoAsQuad( md_.GetLocalP2Deformation(*sit), adet, Tq);
         else
         {
           GetTrafoTr(T, det, *sit);
@@ -1271,13 +1272,14 @@ void SetupInstatSystem_P2( const MultiGridCL& MG, const Coeff&, const BndDataCL<
     double det, absdet;
     Quad5CL<double> adet;
     Quad5CL< SMatrixCL<3, 3> > Tq;
+    MeshDeformationCL& md= MeshDeformationCL::getInstance();
 
     P2DiscCL::GetGradientsOnRef(GradRef);
     for(MultiGridCL::const_TriangTetraIteratorCL sit=MG.GetTriangTetraBegin(lvl), send=MG.GetTriangTetraEnd(lvl);
     sit != send; ++sit)
     {
         if(ALE_)
-          GetTrafoAsQuad(MG.GetMeshDeformation().GetLocalP2Deformation(*sit), adet, Tq);
+          GetTrafoAsQuad( md.GetLocalP2Deformation(*sit), adet, Tq);
         else
         {
           GetTrafoTr(T, det, *sit);
@@ -1465,7 +1467,7 @@ double PoissonP2CL<Coeff>::CheckSolution(const VecDescCL& lsg, scalar_tetra_func
         double absdet=0; //sum= 0;
         if(ALE_)
         {   
-          GetTrafoAsQuad(MG_.GetMeshDeformation().GetLocalP2Deformation(*sit), adet, Tq);
+          GetTrafoAsQuad( md_.GetLocalP2Deformation(*sit), adet, Tq);
         }
         else
         {

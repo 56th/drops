@@ -26,7 +26,7 @@
                                                 // of the A-Block
                 "PcATol":               "CouplingSolver.NavStokesSolver.OseenSolver.PcATol",  // #tolerance for the preconditioner of the A-Block
                 "PcSTol":               "CouplingSolver.NavStokesSolver.OseenSolver.PcSTol", // #tolerance for the preconditioner of the Schur complement
-                "Omega":                "CouplingSolver.NavStokesSolver.OseenSolver.Omega", // #relaxation of ssor
+                "Omega":                "CouplingSolver.NavStokesSolver.OseenSolver.Relax", // #relaxation of ssor
                 "Tau":                  "CouplingSolver.NavStokesSolver.OseenSolver.Tau", // #used in obsolete uzawa solvers
                 "DirectSolve":          "CouplingSolver.NavStokesSolver.OseenSolver.DirectSolve",
                 "XFEMStab":             "NavStokes.XFEMReduced",    // #[->NavStokes.XFEMReduced]threshold for discarding additional dof parameters in
@@ -287,5 +287,53 @@
                                                            // from a function container during runtime.
                 "GeomType":             "Mesh.GeomType_convertTo_Type",
                 "MeshFile":             "Mesh.MeshFile_convertTo_E1E2E3_N1N2N3"
-        }
+        },
+
+// Poisson problem
+	    "Poisson":
+	    {
+		        "PcIter":       "Poisson.Solver.PcIter",   // inactive (former: iterations of the preconditioner)
+		        "PcTol":        "Poisson.Solver.PcTol",    // inactive (former: tolerance of the preconditioning solve)
+		        "Iter":         "Poisson.Solver.Iter",     // number of iterations of the iterativ solver
+		        "Restart":      "Poisson.Solver.Restart",  // used for GMRES
+		        "RelativeErr":  "Poisson.Solver.useRelTol",// use relative tolerances (otherwise absolute) 1 = true, 0 = false
+		        "Tol":          "Poisson.Solver.Tol",      // (relative/absolute) tolerance of iterative method
+		        "Method":       "Poisson.Solver.Solver",   // Methods describes Solver (first digit) + Preconditioner (last two digits)
+		            // First digit:
+		            //           1XX : Multigrid
+		            //           2XX : Prec. CG
+		            //           3XX : GMRES
+		            // last two digits: (Smoother + Coarse Solver[only for MG])
+		            //           X02 : Jacobi     + SSOR
+		            //           X03 : SSOR       + SSOR
+		            //           X04 : GS         + SSOR
+		            //           X05 : SGS        + SSOR
+		            //           X06 : SOR        + SSOR
+		            // BUT it exist only the following combinations:
+		            // 102,103,104,105,106,203,302,303
+		        "SmoothingSteps":   "Poisson.Solver.MG.SmoothingSteps",// for Multigrid: number of Smoothing steps;
+		        "NumLvl":           "Poisson.Solver.MG.NumLvl",        // for Multigird: number of used levels (-1 = all)
+		        "Relax":            "Poisson.Solver.Relax"             // SSOR relaxation factor
+	    },
+	    
+	    "PoissonCoeff":
+	    {
+		        "Diffusion":        "Poisson.Coeff.Diffusion",     // Diffusion coefficient
+		        "Reaction":         "Poisson.Coeff.Reaction",      // Reaction term [q]
+		        "Solution":         "Poisson.Solution",            // Solution of poisson problem [u]
+		        "Source":           "Poisson.Coeff.Source",        // Right hand side of PDE [f]
+		        "Flowfield":        "Poisson.Coeff.Flowfield",     // Convection velocity of PDE [b]
+		        "InitialVal":       "Poisson.InitialValue",        // initial value [u_0]
+		        "Convection":       "Poisson.Coeff.withConvection" // Do we have convection?
+	    },
+	    
+	    "Err": {
+		        "Meas": "Error.Meas",
+		        "NumRef":  "Error.NumRef",
+		        "RelReduction": "Error.RelReduction", 
+		        "DoMark": "Error.DoMark", 
+		        "MinRatio": "Error.MinRatio", 
+		        "Threshold": "Error.Threshold", 
+		        "DoErrorEstimate": "Error.DoErrorEstimate"
+    	} 
 }

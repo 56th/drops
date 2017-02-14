@@ -75,15 +75,13 @@ class SUPGCL
     SUPGCL(ParamCL para) { init(para); }
     void init(ParamCL para)
     {
-        double lx_, ly_, lz_;
-        int    nx_, ny_, nz_;
-        std::string mesh( para.get<std::string>("DomainCond.MeshFile")), delim("x@");
-        size_t idx_;
-        while ((idx_= mesh.find_first_of( delim)) != std::string::npos )
-            mesh[idx_]= ' ';
-        std::istringstream brick_info( mesh);
-        brick_info >> lx_ >> ly_ >> lz_ >> nx_ >> ny_ >> nz_;
-        int Ref_=para.get<int>("DomainCond.RefineSteps");
+        const double lx_= norm(para.get<Point3DCL>("Mesh.E1")),
+                     ly_= norm(para.get<Point3DCL>("Mesh.E2")),
+                     lz_= norm(para.get<Point3DCL>("Mesh.E3"));
+        const int    nx_= para.get<int>("Mesh.N1"),
+                     ny_= para.get<int>("Mesh.N2"),
+                     nz_= para.get<int>("Mesh.N3");
+        int Ref_=para.get<int>("Mesh.AdaptRef.FinestLevel");
         magnitude_ =para.get<double>("Stabilization.Magnitude");
         grids_     =para.get<double>("Stabilization.Grids");
         //pick up the longest edge
@@ -160,6 +158,8 @@ class PoissonP1CL : public ProblemCL<Coeff, PoissonBndDataCL>
   private:
     bool    adjoint_;
     SUPGCL& supg_;
+    bool    ALE_;           // ALE method
+    MeshDeformationCL& md_;
 
   public:
     typedef ProblemCL<Coeff, PoissonBndDataCL> base_;
@@ -175,7 +175,6 @@ class PoissonP1CL : public ProblemCL<Coeff, PoissonBndDataCL>
     typedef P1EvalCL<double, const BndDataCL, const VecDescCL> const_DiscSolCL;
     typedef double (*est_fun)(const TetraCL&, const VecDescCL&, const BndDataCL&);
 
-    bool        ALE_;           //ALE method
     MLIdxDescCL idx;
     VecDescCL   x;
     VecDescCL   b;
@@ -186,16 +185,18 @@ class PoissonP1CL : public ProblemCL<Coeff, PoissonBndDataCL>
 
 
     PoissonP1CL(const MGBuilderCL& mgb, const CoeffCL& coeff, const BndDataCL& bdata, SUPGCL& supg, bool ALE, bool adj=false)
-        : base_( mgb, coeff, bdata), adjoint_( adj), supg_(supg), ALE_(ALE), idx( P1_FE) {}
+        : base_( mgb, coeff, bdata), adjoint_( adj), supg_(supg), ALE_(ALE), md_(MeshDeformationCL::getInstance()), idx( P1_FE) {}
 
     PoissonP1CL(MultiGridCL& mg, const CoeffCL& coeff, const BndDataCL& bdata, SUPGCL& supg, bool ALE, bool adj=false)
-        : base_( mg, coeff, bdata), adjoint_( adj), supg_(supg), ALE_(ALE), idx( P1_FE) {}
+        : base_( mg, coeff, bdata), adjoint_( adj), supg_(supg), ALE_(ALE), md_(MeshDeformationCL::getInstance()), idx( P1_FE) {}
     // numbering of unknowns
     void CreateNumbering( Uint level, MLIdxDescCL* idx, match_fun match= 0)
         { idx->CreateNumbering( level, MG_, BndData_, match); }
     void DeleteNumbering( MLIdxDescCL* idx)
         { idx->DeleteNumbering( MG_); }
     void SetNumLvl( size_t n);
+
+    bool usesALE() const { return ALE_; }
 
     // set up matrices and rhs
     void SetupSystem         (MLMatDescCL&, VecDescCL&) const;
@@ -237,6 +238,10 @@ class PoissonP1CL : public ProblemCL<Coeff, PoissonBndDataCL>
 template <class Coeff>
 class PoissonP2CL : public ProblemCL<Coeff, PoissonBndDataCL>
 {
+  private:
+    bool ALE_;
+    MeshDeformationCL& md_;
+
   public:
     typedef ProblemCL<Coeff, PoissonBndDataCL> base_;
     typedef typename base_::BndDataCL               BndDataCL;
@@ -252,7 +257,6 @@ class PoissonP2CL : public ProblemCL<Coeff, PoissonBndDataCL>
     typedef double (*est_fun)(const TetraCL&, const VecDescCL&, const BndDataCL&);
 
     // new fields for the matrix A, the rhs b and the solution x
-    bool        ALE_; 
     MLIdxDescCL idx;
     VecDescCL   x;
     VecDescCL   b;
@@ -264,15 +268,17 @@ class PoissonP2CL : public ProblemCL<Coeff, PoissonBndDataCL>
 
     //create an element of the class
     PoissonP2CL(const MGBuilderCL& mgb, const CoeffCL& coeff,
-                const BndDataCL& bdata, bool ALE = false) : base_(mgb, coeff, bdata), ALE_(ALE), idx(P2_FE) {}
+                const BndDataCL& bdata, bool ALE = false) : base_(mgb, coeff, bdata), ALE_(ALE), md_(MeshDeformationCL::getInstance()), idx(P2_FE) {}
     PoissonP2CL(MultiGridCL& mg, const CoeffCL& coeff, const BndDataCL& bdata, bool ALE = false)
-        : base_( mg, coeff, bdata), ALE_(ALE), idx( P2_FE) {}
+        : base_( mg, coeff, bdata), ALE_(ALE), md_(MeshDeformationCL::getInstance()), idx( P2_FE) {}
     // numbering of unknowns
     void CreateNumbering( Uint level, MLIdxDescCL* idx, match_fun match= 0)
         { idx->CreateNumbering( level, MG_, BndData_, match); }
     void DeleteNumbering( MLIdxDescCL* idx)
         { idx->DeleteNumbering( MG_); }
     void SetNumLvl( size_t n);
+
+    bool usesALE() const { return ALE_; }
 
     // set up matrices and rhs
     void SetupSystem         ( MLMatDescCL&, VecDescCL&) const;

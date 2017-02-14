@@ -81,7 +81,7 @@ class InstatPoissonThetaSchemeCL
       _rhs( Poisson.b.RowIdx->NumUnknowns()), 
       _Zeta( Poisson.b.RowIdx->NumUnknowns()),
       _theta( _param.get<double>("Time.Theta")),
-      _Convection(_param.get<int>("PoissonCoeff.Convection")), _supg(_param.get<int>("Stabilization.SUPG")),
+      _Convection(_param.get<int>("Poisson.Coeff.withConvection")), _supg(_param.get<int>("Stabilization.SUPG")),
       _ale(_param.get<int>("ALE.wavy")),_firstStep(true)
     {
       _old_b->SetIdx( _b->RowIdx);

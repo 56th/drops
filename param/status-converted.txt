@@ -19,12 +19,13 @@ osmosis/osmosis/torus.json
 partests/dist_ref_rising_drop/*
 partests/dist_TestRefPar/*
 
-poisson/cdrdrops/?
+poisson/cdrdrops/default.json
+poisson/cdrdrops/statpoissonEx.json
 
 spacetimetransp/st_transp/default.json
 spacetimetransp/st_transp/BotheKoebeWielageWarnecke03.json
 
-stokes/errorestimator/MGsdropsPS.json --> link to sdropsP2/MGsdropsP2.json
+stokes/errorestimator/MGsdropsPS.json --> link to stokes/sdropsP2/MGsdropsP2.json
 stokes/sdropsP2/MGsdropsP2.json
 
 surfactant/surfactant/default.json
