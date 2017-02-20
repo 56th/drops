@@ -44,6 +44,8 @@ void BndCondInfo (BndCondT bc, std::ostream& os)
       case Nat0BC: /* OutflowBC has the same number */
                          os << "hom. Natural BC / outflow\n"; break;
       case NatBC:        os << "inhom. Natural BC\n"; break;
+      case Slip0BC:      os << "hom. slip BC\n"; break;
+      case SlipBC:       os << "inhom. slip BC\n"; break;
       case NoBC:         os << "no boundary\n"; break;
       case UndefinedBC_: os << "WARNING! unknown BC from ReadMeshBuilderCL\n"; break;
       default:           os << "WARNING! unknown BC\n";
@@ -52,8 +54,8 @@ void BndCondInfo (BndCondT bc, std::ostream& os)
 
 BndCondT string_to_BndCondT (std::string s)
 {
-    const char* names[]=    { "Dir0BC", "DirBC", "Per1BC", "Per2BC", "Nat0BC", "NatBC", "OutflowBC", "WallBC", "NoBC", "UndefinedBC_", "MaxBC_" };
-    const BndCondT types[]= {  Dir0BC,   DirBC,   Per1BC,   Per2BC,   Nat0BC,   NatBC,   OutflowBC,   WallBC,   NoBC,   UndefinedBC_,   MaxBC_  };
+    const char* names[]=    { "Dir0BC", "DirBC", "Per1BC", "Per2BC", "Nat0BC", "NatBC", "Slip0BC", "SlipBC", "OutflowBC", "WallBC", "NoBC", "UndefinedBC_", "MaxBC_" };
+    const BndCondT types[]= {  Dir0BC,   DirBC,   Per1BC,   Per2BC,   Nat0BC,   NatBC,   Slip0BC,   SlipBC,   OutflowBC,   WallBC,   NoBC,   UndefinedBC_,   MaxBC_  };
     const size_t num_types= sizeof( names)/sizeof( const char*);
 
     Uint i;
