@@ -62,8 +62,6 @@ exec_ser(gcr misc-utils)
 
 exec_ser(blockmat misc-utils)
 
-exec_ser(mass misc-utils)
-
 exec_ser(quad5 misc-utils geom-builder geom-deformation geom-simplex geom-multigrid geom-boundary geom-topo num-unknowns misc-problem num-fe num-discretize num-interfacePatch geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature)
 
 exec_ser(downwind misc-utils geom-multigrid geom-simplex geom-topo num-unknowns num-fe geom-deformation num-interfacePatch misc-problem)
