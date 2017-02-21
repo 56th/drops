@@ -47,17 +47,17 @@ int Test()
 
     std::cout << "nr0: "   << S.num_rows( 0) << "\tnr1: " << S.num_rows( 1) << "\tnr: " << S.num_rows()
               << "\nnc0: " << S.num_cols( 0) << "\tnc1: " << S.num_cols( 1) << "\tnc: " << S.num_cols()
-              << "\nop0: " << S.GetOperation( 0) << '\t' << S.GetBlock( 0) << '\n'
-              << "op1: " << S.GetOperation( 1) << '\t' << S.GetBlock( 1) << '\n'
-              << "op2: " << S.GetOperation( 2) << '\t' << S.GetBlock( 2) << '\n'
-              << "op3: " << S.GetOperation( 3) << '\t' << S.GetBlock( 3) << '\n';
-    std::cout << "A:" << &A << '\t' << A.num_rows() << "x" << A.num_cols() << '\n'
-              << "B:" << &B << '\t' << B.num_rows() << "x" << B.num_cols() << '\n';
+              << "\nop0: " << S.GetOperation( 0) << '\t' << *S.GetBlock( 0) << '\n'
+              << "op1: " << S.GetOperation( 1) << '\t' << *S.GetBlock( 1) << '\n'
+              << "op2: " << S.GetOperation( 2) << '\t' << *S.GetBlock( 2) << '\n'
+              << "op3: " << S.GetOperation( 3) << '\t' << S.GetBlock( 3) << '\n'; // this is an empty block, can not use de-reference operator *.
+    std::cout << "A:" << A << '\t' << A.num_rows() << "x" << A.num_cols() << '\n'
+              << "B:" << B << '\t' << B.num_rows() << "x" << B.num_cols() << '\n';
     DROPS::VectorCL x( S*b);
-    std::cout << "x0: " << x[0] << "\tx1: " << x[1] << "\tx2: " << x[2] << '\n';
+    std::cout << "x0: " << x[0] << " x1: " << x[1] << " x2: " << x[2] << '\n';
     DROPS::VectorCL y( 3);
     y= transp_mul( S, b);
-    std::cout << "y0: " << y[0] << "\ty1: " << y[1] << "\ty2: " << y[2] << '\n';
+    std::cout << "y0: " << y[0] << " y1: " << y[1] << " y2: " << y[2] << '\n';
     return 0;
 }
 
@@ -82,8 +82,8 @@ int TestComposite()
     std::cout << "nr: "   << S.num_rows()
               << "\nnc: " << S.num_cols()
               << "\nni: " << S.intermediate_dim()
-              << "\nop0: " << S.GetOperation( 0) << '\t' << S.GetBlock0() << '\n'
-              << "op1: " << S.GetOperation( 1) << '\t' << S.GetBlock1() << '\n';
+              << "\nop0: " << S.GetOperation( 0) << '\t' << *S.GetBlock0() << '\n'
+              << "op1: " << S.GetOperation( 1) << '\t' << *S.GetBlock1() << '\n';
     std::cout << "A:" << A << '\n' << A.num_rows() << "x" << A.num_cols() << '\n'
               << "B:" << B << '\n' << B.num_rows() << "x" << B.num_cols() << '\n';
     DROPS::VectorCL x( S*b);
@@ -93,24 +93,24 @@ int TestComposite()
     std::cout << "b2: " << b2 << '\n' << "transp_mul( B, b2): " << transp_mul( B, b2) << '\n';
 
     DROPS::VectorCL y( transp_mul( S, b2));
-    std::cout << "y.size(): " << y.size()  << " y0: " << y[0] << "\ty1: " << y[1] << "\n";
+    std::cout << "y.size(): " << y.size()  << " y0: " << y[0] << " y1: " << y[1] << "\n";
 
     DROPS::CompositeMatrixCL St( S.GetTranspose());
     std::cout << "nr: "   << St.num_rows()
               << "\nnc: " << St.num_cols()
               << "\nni: " << St.intermediate_dim()
-              << "\nop0: " << St.GetOperation( 0) << '\t' << St.GetBlock0() << '\n'
-              << "op1: " << St.GetOperation( 1) << '\t' << St.GetBlock1() << '\n';
-    std::cout << "A:" << &A << '\n' << A.num_rows() << "x" << A.num_cols() << '\n'
-              << "B:" << &B << '\n' << B.num_rows() << "x" << B.num_cols() << '\n';
+              << "\nop0: " << St.GetOperation( 0) << '\t' << *St.GetBlock0() << '\n'
+              << "op1: " << St.GetOperation( 1) << '\t' << *St.GetBlock1() << '\n';
+    std::cout << "A:" << A << '\n' << A.num_rows() << "x" << A.num_cols() << '\n'
+              << "B:" << B << '\n' << B.num_rows() << "x" << B.num_cols() << '\n';
 
     typedef DROPS::CompositeMatrixBaseCL<DROPS::CompositeMatrixCL, DROPS::MatrixCL, DROPS::DummyExchangeCL> CompositeMatrix3CL;
     CompositeMatrix3CL S2( &S, DROPS::MUL, ex, &B, DROPS::TRANSP_MUL, ex);
     std::cout << "nr: "   << S2.num_rows()
               << "\nnc: " << S2.num_cols()
               << "\nni: " << S2.intermediate_dim()
-              << "\nop0: " << S2.GetOperation( 0) << '\t' << S2.GetBlock0() << '\n'
-              << "op1: " << S2.GetOperation( 1) << '\t' << S2.GetBlock1() << '\n';
+              << "\nop0: " << S2.GetOperation( 0) << '\t' << S2.GetBlock0() << '\n' // stream output operator does not work for CompositeMatrixCL
+              << "op1: " << S2.GetOperation( 1) << '\t' << *S2.GetBlock1() << '\n';
     std::cout << "S2*b: " << S2*b << '\n';
 
     typedef DROPS::CompositeMatrixBaseCL<DROPS::CompositeMatrixCL, DROPS::VectorAsDiagMatrixCL, DROPS::DummyExchangeCL> CompositeMatrix4CL;
@@ -120,9 +120,9 @@ int TestComposite()
     std::cout << "nr: "   << S3.num_rows()
               << "\nnc: " << S3.num_cols()
               << "\nni: " << S3.intermediate_dim()
-              << "\nop0: " << S3.GetOperation( 0) << '\t' << S3.GetBlock0() << '\n'
-              << "op1: " << S3.GetOperation( 1) << '\t' << S3.GetBlock1() << '\n';
-    std::cout << "S2*b: " << S3*b << '\n';
+              << "\nop0: " << S3.GetOperation( 0) << '\t' << S3.GetBlock0() << '\n' // stream output operator does not work for CompositeMatrixCL
+              << "op1: " << S3.GetOperation( 1) << '\t' << S3.GetBlock1() << '\n';  // stream output operator does not work for VectorAsDiagMatrixCL
+    std::cout << "S3*b: " << S3*b << '\n';
 
     return 0;
 }
