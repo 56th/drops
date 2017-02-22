@@ -366,47 +366,8 @@ public:
         rpm_MinGrad_( rpm_MinGrad), lvs_VolCorrection_( lvs_VolCorrection), Vol_( Vol), step_( 0), per_(periodic) {}
 
 
-    void maybeDoReparam( LevelsetP2CL& lset) {
-        bool doReparam= rpm_Freq_ && step_%rpm_Freq_ == 0;
-        bool doVolCorr= lvs_VolCorrection_ && step_%lvs_VolCorrection_ == 0;
-
-        double lsetmaxGradPhi, lsetminGradPhi;
-
-        if (doReparam) {
-            lset.GetMaxMinGradPhi( lsetmaxGradPhi, lsetminGradPhi);
-            doReparam = (lsetmaxGradPhi > rpm_MaxGrad_ || lsetminGradPhi < rpm_MinGrad_);
-        }
-
-        // reparam levelset function
-        if (doReparam) {
-            std::cout << "before reparametrization: minGradPhi " << lsetminGradPhi << "\tmaxGradPhi " << lsetmaxGradPhi << '\n';
-            lset.Reparam( rpm_Method_, per_);
-            lset.GetMaxMinGradPhi( lsetmaxGradPhi, lsetminGradPhi);
-            std::cout << "after  reparametrization: minGradPhi " << lsetminGradPhi << "\tmaxGradPhi " << lsetmaxGradPhi << '\n';
-            // volume correction after reparametrization
-            if (doVolCorr) {
-                double dphi= lset.AdjustVolume( Vol_, 1e-9);
-                std::cout << "volume correction is " << dphi << std::endl;
-                lset.Phi.Data+= dphi;
-                std::cout << "new rel. volume: " << lset.GetVolume()/Vol_ << std::endl;
-            }
-        }
-    }
-
-    double maybeDoVolCorr( LevelsetP2CL& lset) {
-        bool doVolCorr= lvs_VolCorrection_ && step_%lvs_VolCorrection_ == 0;
-        double dphi = 0.0;
-
-        if (!doVolCorr) return dphi;
-
-        if (doVolCorr) {
-            dphi= lset.AdjustVolume( Vol_, 1e-9);
-            std::cout << "volume correction is " << dphi << std::endl;
-            lset.Phi.Data+= dphi;
-            std::cout << "new rel. volume: " << lset.GetVolume()/Vol_ << std::endl;
-        }
-        return dphi;
-    }
+    void   maybeDoReparam( LevelsetP2CL& lset);
+    double maybeDoVolCorr( LevelsetP2CL& lset);
 
     void init() {
         step_++;
