@@ -146,7 +146,7 @@ int main ( int argc, char** argv )
         sf = new SurfaceTensionCL( inscamap["ConstTau"]);
         double sigma = P.get<double>( "SurfTens.SurfTension" );
 
-        std::auto_ptr<LevelsetP2CL> lset_ptr
+        std::unique_ptr<LevelsetP2CL> lset_ptr
         (
             LevelsetP2CL::Create( MG, lsbnd, *sf,
                                   P.get<double>("Levelset.SD"),
@@ -305,7 +305,7 @@ void Solve( StokesT& Stokes, LevelsetP2CL& lset, VelVecDescCL& rhs )
     factory.SetMatrixA ( &Stokes.A.Data.GetFinest() );
     factory.SetMatrices( &Stokes.A.Data, &Stokes.B.Data,
                          &Stokes.M.Data, &Stokes.prM.Data, pidx );
-    std::auto_ptr<StokesSolverBaseCL> solver( factory.CreateStokesSolver() );
+    std::unique_ptr<StokesSolverBaseCL> solver( factory.CreateStokesSolver() );
 
     // ...and solve.
     TimerCL time;
