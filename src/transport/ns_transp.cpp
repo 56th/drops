@@ -676,12 +676,12 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbndda
     DisplayUnks(Stokes, lset, MG);
 
     const double Vol= EllipsoidCL::GetVolume();
+    lset.SetGlobalReferenceVolume( Vol);
+
     std::cout << "initial volume: " << lset.GetVolume()/Vol << std::endl;
-    double dphi= lset.AdjustVolume( Vol, 1e-9);
-    std::cout << "initial volume correction is " << dphi << std::endl;
-    lset.Phi.Data+= dphi;
-    oldlset.Phi.Data+= dphi;
-    std::cout << "new initial volume: " << lset.GetVolume()/Vol << std::endl;
+    lset.AdjustVolume();
+    std::cout << "initial lset volume adjustment:\n";
+    lset.GetVolumeAdjuster()->DebugOutput( std::cout);
 
     VelocityContainer vel(Stokes.v,Stokes.GetBndData().Vel,MG);
     //VelocityContainer vel(Flowfield);
@@ -775,7 +775,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbndda
            (/*restart*/100, P.get<int>("Levelset.Iter"), P.get<double>("Levelset.Tol"), *lidx, jacparpc,/*rel*/true, /*acc*/ true, /*modGS*/false, LeftPreconditioning, /*parmod*/true);
 #endif
 
-    LevelsetModifyCL lsetmod( P.get<int>("Reparam.Freq"), P.get<int>("Reparam.Method"), P.get<double>("Reparam.MaxGrad"), P.get<double>("Reparam.MinGrad"), P.get<int>("Levelset.VolCorrection"), Vol);
+    LevelsetModifyCL lsetmod( P.get<int>("Reparam.Freq"), P.get<int>("Reparam.Method"), P.get<double>("Reparam.MaxGrad"), P.get<double>("Reparam.MinGrad"), P.get<int>("Levelset.VolCorrection"));
 
     // Time discretisation + coupling
     TimeDisc2PhaseCL* timedisc= CreateTimeDisc(Stokes, lset, navstokessolver, gm, P, lsetmod);

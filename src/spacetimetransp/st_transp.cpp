@@ -225,12 +225,13 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     if (P.get("Exp.InitialLSet", std::string("Ellipsoid")) == "Ellipsoid"){
         Vol = EllipsoidCL::GetVolume();
         std::cout << "initial volume: " << lset.GetVolume()/Vol << std::endl;
-        double dphi= lset.AdjustVolume( Vol, 1e-9);
-        std::cout << "initial volume correction is " << dphi << std::endl;
-        lset.Phi.Data+= dphi;
-        std::cout << "new initial volume: " << lset.GetVolume()/Vol << std::endl;
-    }else{
+        lset.SetGlobalReferenceVolume( Vol);
+        lset.AdjustVolume();
+        std::cout << "initial lset volume adjustment:\n";
+        lset.GetVolumeAdjuster()->DebugOutput( std::cout);
+    } else {
         Vol = lset.GetVolume();
+        lset.SetGlobalReferenceVolume( Vol);
     }
 
     // TransportP1CL * massTransp = NULL;
@@ -327,7 +328,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     LsetPcT lset_pc;
     GMResSolverCL<LsetPcT>* gm = new GMResSolverCL<LsetPcT>( lset_pc, 200, P.get<int>("Levelset.Iter"), P.get<double>("Levelset.Tol"));
 
-    LevelsetModifyCL lsetmod( P.get<int>("Reparam.Freq"), P.get<int>("Reparam.Method"), P.get<double>("Reparam.MaxGrad"), P.get<double>("Reparam.MinGrad"), P.get<int>("Levelset.VolCorrection"), Vol, is_periodic);
+    LevelsetModifyCL lsetmod( P.get<int>("Reparam.Freq"), P.get<int>("Reparam.Method"), P.get<double>("Reparam.MaxGrad"), P.get<double>("Reparam.MinGrad"), P.get<int>("Levelset.VolCorrection"), is_periodic);
 
     UpdateProlongationCL<Point3DCL> PVel( Stokes.GetMG(), stokessolverfactory.GetPVel(), &Stokes.vel_idx, &Stokes.vel_idx);
     adap.push_back( &PVel);

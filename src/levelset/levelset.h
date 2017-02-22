@@ -363,25 +363,22 @@ private:
            rpm_MinGrad_;
     int    lvs_VolCorrection_;
 
-    const double Vol_;
-
     int    step_;
     bool   per_;
 
 public:
-    LevelsetModifyCL( int rpm_Freq, int rpm_Method, double rpm_MaxGrad, double rpm_MinGrad, int lvs_VolCorrection, double Vol, bool periodic=false) :
+    LevelsetModifyCL( int rpm_Freq, int rpm_Method, double rpm_MaxGrad, double rpm_MinGrad, int lvs_VolCorrection, bool periodic=false) :
         rpm_Freq_( rpm_Freq), rpm_Method_( rpm_Method), rpm_MaxGrad_( rpm_MaxGrad),
-        rpm_MinGrad_( rpm_MinGrad), lvs_VolCorrection_( lvs_VolCorrection), Vol_( Vol), step_( 0), per_(periodic) {}
+        rpm_MinGrad_( rpm_MinGrad), lvs_VolCorrection_( lvs_VolCorrection), step_( 0), per_(periodic) {}
 
 
-    void   maybeDoReparam( LevelsetP2CL& lset);
-    double maybeDoVolCorr( LevelsetP2CL& lset);
+    void maybeDoReparam( LevelsetP2CL& lset);
+    void maybeDoVolCorr( LevelsetP2CL& lset);
 
     void init() {
         step_++;
     }
 };
-
 
 
 /// marks all tetrahedra in the band |\p DistFct(x)| < \p width for refinement

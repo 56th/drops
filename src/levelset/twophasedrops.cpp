@@ -182,7 +182,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         || InitialLSet == "HalfEllipsoid" || InitialLSet == "TaylorFlowDistance") && P.get<int>("Levelset.VolCorrection") != 0)
     {  
         if (P.get<double>("Exp.InitialVolume",-1.0) > 0 )
-            Vol = P.get<double>("Exp.InitialVolume");      
+            Vol = P.get<double>("Exp.InitialVolume");
         if (InitialLSet == "Ellipsoid")
             Vol = EllipsoidCL::GetVolume();
         if (InitialLSet == "HalfEllipsoid")
@@ -192,12 +192,13 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         if (InitialLSet.find("Cylinder")==0)
             Vol = CylinderCL::GetVolume();
         std::cout << "initial rel. volume: " << lset.GetVolume()/Vol << std::endl;
-        double dphi= lset.AdjustVolume( Vol, 1e-9);
-        std::cout << "initial lset offset for correction is " << dphi << std::endl;
-        lset.Phi.Data+= dphi;
-        std::cout << "new initial rel. volume: " << lset.GetVolume()/Vol << std::endl;
-    }else{
+        lset.SetGlobalReferenceVolume( Vol);
+        lset.AdjustVolume();
+        std::cout << "initial lset volume adjustment:\n";
+        lset.GetVolumeAdjuster()->DebugOutput( std::cout);
+    } else {
         Vol = lset.GetVolume();
+        lset.SetGlobalReferenceVolume( Vol);
     }
 
     Stokes.CreateNumberingVel( MG.GetLastLevel(), vidx, periodic_match);
@@ -320,7 +321,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     LsetPcT lset_pc;
     GMResSolverCL<LsetPcT>* gm = new GMResSolverCL<LsetPcT>( lset_pc, 200, P.get<int>("Levelset.Iter"), P.get<double>("Levelset.Tol"));
 
-    LevelsetModifyCL lsetmod( P.get<int>("Reparam.Freq"), P.get<int>("Reparam.Method"), P.get<double>("Reparam.MaxGrad"), P.get<double>("Reparam.MinGrad"), P.get<int>("Levelset.VolCorrection"), Vol, is_periodic);
+    LevelsetModifyCL lsetmod( P.get<int>("Reparam.Freq"), P.get<int>("Reparam.Method"), P.get<double>("Reparam.MaxGrad"), P.get<double>("Reparam.MinGrad"), P.get<int>("Levelset.VolCorrection"), is_periodic);
 
     UpdateProlongationCL<Point3DCL> PVel( Stokes.GetMG(), stokessolverfactory.GetPVel(), &Stokes.vel_idx, &Stokes.vel_idx);
     adap.push_back( &PVel);
