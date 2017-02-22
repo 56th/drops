@@ -32,6 +32,7 @@
 #include "num/fe_repair.h"
 #include "levelset/mgobserve.h"
 #include "levelset/surfacetension.h"
+#include "levelset/volume_adjustment.h"
 #include "num/interfacePatch.h"
 #include "num/renumber.h"
 #include "num/prolongation.h"
@@ -60,6 +61,8 @@ class LevelsetCoeffCL {
 
 };
 
+/// forward declaration
+class VolumeAdjustmentCL;
 
 class LevelsetP2CL : public ProblemCL< LevelsetCoeffCL, LsetBndDataCL>
 /// abstract base class for continuous and discontinuous P2 level set discretization
@@ -96,6 +99,7 @@ class LevelsetP2CL : public ProblemCL< LevelsetCoeffCL, LsetBndDataCL>
     perDirSetT* perDirections;    ///< periodic directions
     typedef MLDataCL<ProlongationCL<double> > ProlongationT;
     ProlongationT P_;
+    mutable std::unique_ptr<VolumeAdjustmentCL> volume_adjuster_;
 
     bool IsDG;
 
@@ -159,6 +163,10 @@ LevelsetP2CL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, F
     double GetVolume( double translation= 0, int l= 2) const;
     /// volume correction to ensure no loss or gain of mass. The parameter l is passed to GetVolume().
     double AdjustVolume( double vol, double tol, double surf= 0., int l= 2) const;
+    /// volume correction to ensure no loss or gain of mass.
+    void AdjustVolume() const;
+    void SetGlobalReferenceVolume (double vol);
+    const VolumeAdjustmentCL* GetVolumeAdjuster() const { return volume_adjuster_.get(); }
     /// Apply smoothing to \a SmPhi, if curvDiff_ > 0
     void MaybeSmooth( VectorCL& SmPhi) const { if (curvDiff_>0) SmoothPhi( SmPhi, curvDiff_); }
     /// Set type of surface force.

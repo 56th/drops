@@ -23,6 +23,7 @@
 */
 
 #include "levelset/levelset.h"
+#include "levelset/volume_adjustment.h"
 #include "num/krylovsolver.h"
 #include "num/precond.h"
 #include "levelset/fastmarch.h"
@@ -859,6 +860,16 @@ double LevelsetP2CL::GetVolume_Composite( double translation, int l) const
     return vol;
 }
 
+void LevelsetP2CL::AdjustVolume () const
+{
+    volume_adjuster_->AdjustVolume();
+}
+
+void LevelsetP2CL::SetGlobalReferenceVolume (double vol)
+{
+    volume_adjuster_->SetGlobalReferenceVolume (vol);
+}
+
 double LevelsetP2CL::AdjustVolume (double vol, double tol, double surface, int l) const
 {
     tol*=vol;
@@ -1011,6 +1022,9 @@ LevelsetP2CL * LevelsetP2CL::Create(  MultiGridCL& MG, const LsetBndDataCL& lset
         plset = new LevelsetP2ContCL ( MG, lsetbnddata, sf, P.get<double>("SD"), P.get<double>("CurvDiff"));
     else
         plset = new LevelsetP2DiscontCL ( MG, lsetbnddata, sf, P.get<double>("SD"), P.get<double>("CurvDiff"));
+
+    plset->volume_adjuster_= VolumeAdjustmentCL::Create (plset, P);
+
     return plset;
 }
 
@@ -1022,11 +1036,9 @@ LevelsetP2CL * LevelsetP2CL::Create(  MultiGridCL& MG, const LsetBndDataCL& lset
         plset = new LevelsetP2ContCL ( MG, lsetbnddata, sf, SD, curvdiff);
     else
         plset = new LevelsetP2DiscontCL ( MG, lsetbnddata, sf, SD, curvdiff);
+    plset->volume_adjuster_ = std::unique_ptr<VolumeAdjustmentCL> ( new GlobalVolumeAdjustmentCL ( plset));
     return plset;
 }
-
-
-
 
 void LevelsetP2CL::SetNumLvl( size_t n)
 {

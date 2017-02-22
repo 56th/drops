@@ -1,8 +1,8 @@
 set(HOME levelset)
 
-libs(coupling levelset fastmarch surfacetension twophaseutils marking_strategy adaptriang)
+libs(coupling levelset fastmarch surfacetension twophaseutils marking_strategy adaptriang volume_adjustment)
 
-target_link_libraries(levelset-levelset levelset-fastmarch misc-progressaccu misc-scopetimer)
+target_link_libraries(levelset-levelset levelset-volume_adjustment levelset-fastmarch misc-progressaccu misc-scopetimer)
 
 add_library(levelset-twophaseCoeff SHARED twophaseCoeff)
 
