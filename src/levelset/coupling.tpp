@@ -546,7 +546,8 @@ void CoupledTimeDisc2PhaseBaseCL<LsetSolverT,RelaxationPolicyT>::InitStep()
 // compute all terms that don't change during the following FP iterations
 {
     lsetmod_.init();
-    dphi_ = 0;
+    dphi_.resize( LvlSet_.Phi.Data.size());
+    dphi_= 0.;
     std::cout << "InitStep-dt_: " << dt_ << std::endl;
     Stokes_.v.t+= dt_;
     Stokes_.p.t+= dt_;
@@ -589,7 +590,11 @@ void CoupledTimeDisc2PhaseBaseCL<LsetSolverT,RelaxationPolicyT>::EvalLsetNavStok
     duration=time.GetTime();
     std::cout << "Solving Levelset took " << duration << " sec.\n";
 
-    dphi_ = lsetmod_.maybeDoVolCorr( LvlSet_);
+    {
+        const VectorCL tmpphi= LvlSet_.Phi.Data;
+        lsetmod_.maybeDoVolCorr( LvlSet_);
+        dphi_= LvlSet_.Phi.Data - tmpphi;
+    }
 
     time.Reset();
     time.Start();

@@ -180,7 +180,7 @@ class CoupledTimeDisc2PhaseBaseCL: public TimeDisc2PhaseCL
     typedef TimeDisc2PhaseCL base_;
     typedef NSSolverBaseCL<StokesT> StokesSolverT;
 
-    double dphi_;
+    VectorCL dphi_;
 
     StokesSolverT& solver_;
     LsetSolverT&   lsetsolver_;
