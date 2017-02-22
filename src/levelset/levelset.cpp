@@ -870,40 +870,6 @@ void LevelsetP2CL::SetGlobalReferenceVolume (double vol)
     volume_adjuster_->SetGlobalReferenceVolume (vol);
 }
 
-double LevelsetP2CL::AdjustVolume (double vol, double tol, double surface, int l) const
-{
-    tol*=vol;
-
-    double v0=GetVolume(0., l)-vol;
-    if (std::abs(v0)<=tol) return 0;
-
-    double d0=0, d1=v0*(surface != 0. ? 1.1/surface : 0.23/std::pow(vol,2./3.));
-    // Hinweis: surf(Kugel) = [3/4/pi*vol(Kugel)]^(2/3) * 4pi
-    double v1=GetVolume(d1, l)-vol;
-    if (std::abs(v1)<=tol) return d1;
-
-    // Sekantenverfahren fuer Startwert
-    while (v1*v0 > 0) // gleiches Vorzeichen
-    {
-        const double d2=d1-1.2*v1*(d1-d0)/(v1-v0);
-        d0=d1; d1=d2; v0=v1; v1=GetVolume(d1, l)-vol;
-        if (std::abs(v1)<=tol) return d1;
-    }
-
-    // Anderson-Bjoerk fuer genauen Wert
-    while (true)
-    {
-        const double d2=(v1*d0-v0*d1)/(v1-v0),
-                     v2=GetVolume(d2,l)-vol;
-        if (std::abs(v2)<=tol) return d2;
-
-        if (v2*v1 < 0) // ungleiches Vorzeichen
-          { d0=d1; d1=d2; v0=v1; v1=v2; }
-        else
-          { const double c=1.0-v2/v1; d1=d2; v1=v2; v0*= c>0 ? c : 0.5; }
-    }
-}
-
 void LevelsetP2CL::SmoothPhi( VectorCL& SmPhi, double diff) const
 {
     Comment("Smoothing for curvature calculation\n", DebugDiscretizeC);
@@ -1104,11 +1070,12 @@ LevelsetRepairCL::post_refine ()
     ls_.UpdateContinuous();
 }
 
+
 //*****************************************************************************
 //                               LevelsetModifyCL
 //*****************************************************************************
-
-void LevelsetModifyCL::maybeDoReparam( LevelsetP2CL& lset) {
+void LevelsetModifyCL::maybeDoReparam( LevelsetP2CL& lset)
+{
     bool doReparam= rpm_Freq_ && step_%rpm_Freq_ == 0;
     bool doVolCorr= lvs_VolCorrection_ && step_%lvs_VolCorrection_ == 0;
 

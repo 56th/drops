@@ -215,6 +215,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     LSInit( mg, lset2.Phi, &sphere_2move, 0.);
 
     const double Vol= lset.GetVolume();
+    lset.SetGlobalReferenceVolume( Vol);
     std::cout << "droplet volume: " << Vol << std::endl;
 
     BndDataCL<Point3DCL> Bnd_v( 6, bc, bf);
@@ -277,10 +278,8 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
 
         std::cout << "rel. Volume: " << lset.GetVolume()/Vol << std::endl;
         if (P.get("Levelset.VolCorr", 0)) {
-            double dphi= lset.AdjustVolume( Vol, 1e-9);
-            std::cout << "volume correction is " << dphi << std::endl;
-            lset.Phi.Data+= dphi;
-            std::cout << "new rel. Volume: " << lset.GetVolume()/Vol << std::endl;
+            lset.AdjustVolume();
+            lset.GetVolumeAdjuster()->DebugOutput( std::cout);
         }
         //if (C.rpm_Freq && step%C.rpm_Freq==0) { // reparam levelset function
             // lset.ReparamFastMarching( C.rpm_Method);
@@ -298,10 +297,8 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
             }
             std::cout << "rel. Volume: " << lset.GetVolume()/Vol << std::endl;
             if (P.get("Levelset.VolCorr", 0)) {
-                double dphi= lset.AdjustVolume( Vol, 1e-9);
-                std::cout << "volume correction is " << dphi << std::endl;
-                lset.Phi.Data+= dphi;
-                std::cout << "new rel. Volume: " << lset.GetVolume()/Vol << std::endl;
+                lset.AdjustVolume();
+                lset.GetVolumeAdjuster()->DebugOutput( std::cout);
             }
         }
         ensight.Write( step*P.get<double>("Time.StepSize"));

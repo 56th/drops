@@ -161,9 +161,7 @@ LevelsetP2CL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, F
     /// l = 1 : integration on the tetra itself. l = 2 integration on the regular refinement.
     /// l < 0 : extrapolation from current level lvl to lvl - l - 1
     double GetVolume( double translation= 0, int l= 2) const;
-    /// volume correction to ensure no loss or gain of mass. The parameter l is passed to GetVolume().
-    double AdjustVolume( double vol, double tol, double surf= 0., int l= 2) const;
-    /// volume correction to ensure no loss or gain of mass.
+    /// Volume correction to ensure no loss or gain of mass.
     void AdjustVolume() const;
     void SetGlobalReferenceVolume (double vol);
     const VolumeAdjustmentCL* GetVolumeAdjuster() const { return volume_adjuster_.get(); }
