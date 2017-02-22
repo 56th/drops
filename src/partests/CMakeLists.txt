@@ -27,7 +27,7 @@ exec_par(dist_ref_rising_drop geom-simplex geom-multigrid geom-builder geom-topo
 
 exec_par(dist_exchange geom-simplex geom-multigrid geom-builder geom-topo geom-boundary num-unknowns misc-utils misc-problem num-discretize num-fe num-interfacePatch misc-scopetimer geom-deformation)
 
-exec_par(dist_sdropsP2 geom-boundary geom-builder geom-simplex geom-multigrid num-unknowns geom-topo num-fe misc-problem misc-utils num-discretize num-interfacePatch num-fe geom-reftetracut geom-principallattice misc-scopetimer geom-deformation)
+exec_par(dist_sdropsP2 geom-boundary geom-builder geom-simplex geom-multigrid num-unknowns geom-topo num-fe misc-problem misc-utils num-discretize num-interfacePatch num-fe geom-reftetracut geom-principallattice misc-scopetimer geom-deformation stokes-slipBndOnePhase)
 
 exec_par(dist_interp2 geom-simplex geom-multigrid geom-topo out-output num-unknowns geom-builder misc-problem num-interfacePatch num-fe geom-boundary misc-utils num-discretize geom-deformation)
 
