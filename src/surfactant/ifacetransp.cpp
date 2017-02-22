@@ -556,7 +556,7 @@ void
 InterfaceP1RepairCL::pre_refine ()
 {
     DROPS::NoBndDataCL<> dummy;
-    p1repair_= std::auto_ptr<RepairP1CL<double, NoBndDataCL>::type >(
+    p1repair_= std::unique_ptr<RepairP1CL<double, NoBndDataCL>::type >(
         new RepairP1CL<double, NoBndDataCL>::type( mg_, fullu_, dummy));
 }
 

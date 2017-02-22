@@ -273,7 +273,7 @@ class InterfaceP1RepairCL : public MGObserverCL
 
     IdxDescCL          fullp1idx_;
     VecDescCL          fullu_;
-    std::auto_ptr<RepairP1CL<double, NoBndDataCL>::type > p1repair_;
+    std::unique_ptr<RepairP1CL<double, NoBndDataCL>::type > p1repair_;
 
   public:
     InterfaceP1RepairCL (MultiGridCL& mg, const VecDescCL& lset_vd, const BndDataCL<>& lset_bnd, VecDescCL& u)

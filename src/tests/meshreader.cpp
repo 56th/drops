@@ -265,7 +265,7 @@ int TestBuilder()
     DROPS::ParamCL P( "meshreader.json");
     std::cout << P << std::endl;
 
-    std::auto_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P.get_child( "Domain")));
+    std::unique_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P.get_child( "Domain")));
     DROPS::MultiGridCL mg( *builder);
     std::cout << DROPS::SanityMGOutCL( mg) << std::endl;
     return 0;

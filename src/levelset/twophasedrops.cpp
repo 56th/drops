@@ -605,7 +605,7 @@ int main (int argc, char** argv)
 
     try
     {
-        std::auto_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P));
+        std::unique_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P));
         mg = new DROPS::MultiGridCL( *builder);
     }
     catch (DROPS::DROPSParamErrCL& e)

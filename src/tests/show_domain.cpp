@@ -50,7 +50,7 @@ int main (int argc, char** argv)
 
     DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
 
-    std::auto_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P.get_child( "Domain")));
+    std::unique_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P.get_child( "Domain")));
     DROPS::MultiGridCL mg( *builder);
     const DROPS::ParamCL::ptree_type* ch= 0;
     try {

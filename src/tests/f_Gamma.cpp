@@ -376,7 +376,7 @@ int main (int argc, char** argv)
 
     DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
 
-    std::auto_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P));
+    std::unique_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P));
     DROPS::MultiGridCL mg( *builder);
 
     DROPS::StokesBndDataCL::VelBndDataCL velbnd( 0);

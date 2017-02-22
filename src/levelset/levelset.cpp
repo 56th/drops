@@ -1041,7 +1041,7 @@ void LevelsetP2CL::SetNumLvl( size_t n)
 
 void LevelsetRepairCL::pre_refine()
 {
-    p2repair_= std::auto_ptr<RepairP2CL<double>::type >(
+    p2repair_= std::unique_ptr<RepairP2CL<double>::type >(
         new RepairP2CL<double>::type( ls_.GetMG(), ls_.Phi, ls_.GetBndData()));
 }
 
