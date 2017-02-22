@@ -391,7 +391,7 @@ DROPS::SVectorCL<3> PressureGr(const DROPS::Point3DCL& p, double)
 
 }
 
-DROPS::SVectorCL<3> VolForce( const DROPS::Point3DCL& p, double t)
+DROPS::SVectorCL<3> VolForce( const DROPS::Point3DCL& p, double)
 {
     DROPS::SVectorCL<3> f(0.);
     double nu =1;
