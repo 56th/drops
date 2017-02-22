@@ -258,6 +258,7 @@ void CheckMigration( LoadBalCL& lb)
     SurfaceTensionCL sft( DROPS::sigmaf);
     LevelsetP2CL & lset( * LevelsetP2CL::Create( mg, *lsetbnddata, sft) );
     lset.CreateNumbering( mg.GetLastLevel());
+    MLIdxDescCL* lidx= &lset.idx;
 
 
     // Create all the stuff which is necessary to make a Stokes class
