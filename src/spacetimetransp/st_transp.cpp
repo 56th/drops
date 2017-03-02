@@ -95,7 +95,6 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     // InVecMap & tdvectormap = InVecMap::getInstance();
     InScaMap & scalarmap = InScaMap::getInstance();
     InScaMap & inscamap = DROPS::InScaMap::getInstance();
-    MatchMap & matchmap = MatchMap::getInstance();
 
     // instat_scalar_fun_ptr Reaction = scalarmap["ReactionFct"];
     instat_scalar_fun_ptr Initialcneg = scalarmap[P.get<std::string>("Transp.InitialConcNeg")];
@@ -108,8 +107,6 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     // instat_scalar_fun_ptr distance = scalarmap[P.get<std::string>("Transp.Levelset")];
 
     // cBndDataCL *pBnd_pos, *pBnd_neg;
-
-    match_fun periodic_match = is_periodic ? matchmap[perMatchName] : 0;
 
     MultiGridCL& MG= Stokes.GetMG();
 
@@ -170,16 +167,16 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         lset.SetNumLvl(Stokes.GetMG().GetNumLevel());
     }
 
-    lset.CreateNumbering( MG.GetLastLevel(), periodic_match);
-    // oldlset.CreateNumbering( MG.GetLastLevel(), lidx, periodic_match);
+    lset.CreateNumbering( MG.GetLastLevel());
+    // oldlset.CreateNumbering( MG.GetLastLevel(), lidx);
     oldlset.Phi.SetIdx( lidx);
     PermutationT lset_downwind;
     lset.SetSurfaceForce( SF_ImprovedLBVar); // see levelset/levelset.h
 
     SetInitialLevelsetConditions( lset, MG, P);
     // SetInitialLevelsetConditions( oldlset, MG, P);
-    Stokes.CreateNumberingVel( MG.GetLastLevel(), vidx, periodic_match);
-    Stokes.CreateNumberingPr(  MG.GetLastLevel(), pidx, periodic_match, &lset);
+    Stokes.CreateNumberingVel( MG.GetLastLevel(), vidx);
+    Stokes.CreateNumberingPr(  MG.GetLastLevel(), pidx, &lset);
     PermutationT vel_downwind;
     // For a two-level MG-solver: P2P1 -- P2P1X; comment out the preceding CreateNumberings
 //     Stokes.SetNumVelLvl ( 2);
@@ -364,7 +361,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
 
     const double vmax = P.get<double>("Transp.MaxVelocity");
-    SpaceTimeXSolutionCL sol(MG, transp_Bnd_neg, transp_Bnd_pos, P, periodic_match);
+    SpaceTimeXSolutionCL sol(MG, transp_Bnd_neg, transp_Bnd_pos, P);
     sol.UpdateTimeSlab(oldlset,lset,vmax,NULL);
     sol.EvalTraces();
 
@@ -601,7 +598,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
                                                         P.get_child("Transp"));
             accus.push_back(&accu);
             std::cout << " accumulate " << std::endl;
-            accumulate( accus, MG, Idx.TriangLevel(), Idx.GetMatchingFunction(), Idx.GetBndInfo());
+            accumulate( accus, MG, Idx.TriangLevel(), Idx.GetBndInfo());
 
             std::cout << " solve " << std::endl;
 
@@ -663,7 +660,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         if (doNSDownwindNumbering) {
             if (!gridChanged) { // We must ensure that the permutation maps the original numbering of CreateNumbering to the downwind-numbering and that the renumbering starts in a known state, i.e. the original numbering.
                 vidx->DeleteNumbering( MG);
-                Stokes.CreateNumberingVel( MG.GetLastLevel(), vidx, periodic_match);
+                Stokes.CreateNumberingVel( MG.GetLastLevel(), vidx);
                 permute_Vector( Stokes.v.Data, invert_permutation( vel_downwind), 3);
             }
             vel_downwind= Stokes.downwind_numbering( lset, navstokes_downwind);
@@ -674,7 +671,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         if (doLsetDownwindNumbering) {
             if (!gridChanged) { // We must ensure that the permutation maps the original numbering of CreateNumbering to the downwind-numbering and that the renumbering starts in a known state, i.e. the original numbering.
                 lset.DeleteNumbering( lidx);
-                lset.CreateNumbering( MG.GetLastLevel(), periodic_match);
+                lset.CreateNumbering( MG.GetLastLevel());
                 permute_Vector( lset.Phi.Data, invert_permutation( lset_downwind));
             }
             lset_downwind= lset.downwind_numbering( Stokes.GetVelSolution(), levelset_downwind);
@@ -720,13 +717,12 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
 
 
-void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTriangCL& adap, bool is_periodic, const std::string& perMatchName)    // do just the transport stuff
+void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTriangCL& adap)    // do just the transport stuff
 {
     rusage usage;
 
     InVecMap & tdvectormap = InVecMap::getInstance();
     InScaMap & scalarmap = InScaMap::getInstance();
-    MatchMap & matchmap = MatchMap::getInstance();
 
     //instat_vector_fun_ptr Flowfield = tdvectormap[P.get<std::string>("Transp.Flow")];
     STVelocityContainer Flowfield (tdvectormap[P.get<std::string>("Transp.Flow")]);
@@ -745,8 +741,6 @@ void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTr
 
     read_BndData( Bnd_pos, MG, P.get_child( "Transp.BoundaryDataPos"));
     read_BndData( Bnd_neg, MG, P.get_child( "Transp.BoundaryDataNeg"));
-
-    DROPS::match_fun periodic_match = is_periodic ? matchmap[perMatchName] : 0;
 
     DROPS::instat_scalar_fun_ptr sigmap = 0;
     SurfaceTensionCL sf( sigmap, Bnd_neg);
@@ -793,7 +787,7 @@ void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTr
 
     const double vmax = P.get<double>("Transp.MaxVelocity");
 
-    SpaceTimeXSolutionCL sol(MG, Bnd_neg, Bnd_pos, P, periodic_match);
+    SpaceTimeXSolutionCL sol(MG, Bnd_neg, Bnd_pos, P);
     sol.UpdateTimeSlab(oldlset,lset,vmax,P.get<int>("Transp.Quadrature.LevelsetLinearInTime")==1?
                        NULL:distance);
     sol.EvalTraces();
@@ -912,7 +906,7 @@ void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTr
 
 
         std::cout << " accumulate " << std::endl;
-        accumulate( accus, MG, Idx.TriangLevel(), Idx.GetMatchingFunction(), Idx.GetBndInfo());
+        accumulate( accus, MG, Idx.TriangLevel(), Idx.GetBndInfo());
 
         std::cout << " solve " << std::endl;
         // former hacked stuff: if ( P.get("Transp.SpecialSolve", 0))
@@ -999,7 +993,7 @@ void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTr
 
             accus.push_back(&accuen);
             std::cout << " accumulate " << std::endl;
-            accumulate( accus, MG, Idx.TriangLevel(), Idx.GetMatchingFunction(), Idx.GetBndInfo());
+            accumulate( accus, MG, Idx.TriangLevel(), Idx.GetBndInfo());
         }
 
 
@@ -1116,7 +1110,6 @@ int main (int argc, char** argv)
 
     const std::string perMatchName= P.get( "Mesh.PeriodicMatching", std::string());
     const bool is_periodic = !perMatchName.empty();
-    DROPS::match_fun periodic_match = is_periodic ? DROPS::MatchMap::getInstance()[perMatchName] : 0;
 
     DROPS::MultiGridCL* mg= 0;
     typedef DROPS::BndDataCL<DROPS::Point3DCL> VelBndDataCL;
@@ -1127,13 +1120,12 @@ int main (int argc, char** argv)
 
     std::unique_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P));
     mg = new DROPS::MultiGridCL( *builder);
+    if (P.exists("Mesh.PeriodicBnd"))
+        DROPS::read_PeriodicBoundaries( *mg, P.get_child("Mesh.PeriodicBnd"));
     read_BndData( velbnddata, *mg, P.get_child( "NavStokes.BoundaryData.Velocity"));
     read_BndData( prbnddata,  *mg, P.get_child( "NavStokes.BoundaryData.Pressure"));
     read_BndData( lsetbnddata,*mg, P.get_child( "Levelset.BoundaryData"));
     DROPS::StokesBndDataCL bnddata( velbnddata, prbnddata);
-    if (is_periodic)
-        mg->GetBnd().SetPeriodicBnd( velbnddata);
-
 
     std::cout << "Generated MG of " << mg->GetLastLevel() << " levels." << std::endl;
 
@@ -1194,7 +1186,7 @@ int main (int argc, char** argv)
         Strategy( prob, lsetbnddata, adap, is_periodic, perMatchName);    // do all the stuff
     }
     else
-        OnlyTransportStrategy( *mg, lsetbnddata, adap, is_periodic, perMatchName);    // do just the transport stuff
+        OnlyTransportStrategy( *mg, lsetbnddata, adap);    // do just the transport stuff
 
     delete mg;
 

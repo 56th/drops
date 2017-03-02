@@ -160,7 +160,7 @@ class OsmosisP1CL
         LevelsetP2CL& lset, LevelsetP2CL& oldlset,
         DROPS::ParamCL& P, double initialtime=0, instat_scalar_fun_ptr reac=0, instat_scalar_fun_ptr rhs=0)
         : oldt_(initialtime), t_( initialtime), 
-        idx( P1_FE, 1, Bnd, mg.GetBnd().GetMatchFun()), oldidx( P1_FE, 1, Bnd, mg.GetBnd().GetMatchFun()),
+        idx( P1_FE, 1, Bnd), oldidx( P1_FE, 1, Bnd),
         Velidx( vecP1_FE, BndVel),
         MG_( mg), Bnd_( Bnd), Bnd_v_(BndVel), Bnd_ls_(Bnd_ls), v_ (v),
         theta_( P.get<double>("Time.Theta")), dt_( P.get<int>("Time.NumSteps")!=0 ? P.get<double>("Time.FinalTime")/P.get<int>("Time.NumSteps") : 0),

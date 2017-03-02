@@ -304,9 +304,8 @@ TransportRepairCL::post_refine ()
     VecDescCL loc_ct;
     IdxDescCL loc_cidx( P1_FE);
     VecDescCL& ct= c_.ct;
-    match_fun match= mg_.GetBnd().GetMatchFun();
 
-    loc_cidx.CreateNumbering( mg_.GetLastLevel(), mg_, c_.GetBndData(), match);
+    loc_cidx.CreateNumbering( mg_.GetLastLevel(), mg_, c_.GetBndData());
     loc_ct.SetIdx( &loc_cidx);
 
     p1repair_->repair( loc_ct);

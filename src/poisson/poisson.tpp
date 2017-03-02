@@ -88,7 +88,7 @@ void SetupPartialSystem_P1( const MultiGridCL& MG, const Coeff& , MatrixCL* Amat
     }
 
     //run accumulation
-    accumulate( accus, MG, RowIdx.TriangLevel(),RowIdx.GetMatchingFunction(), RowIdx.GetBndInfo());
+    accumulate( accus, MG, RowIdx.TriangLevel(), RowIdx.GetBndInfo());
     if (accua != 0) delete accua;
     if (accum != 0) delete accum;
     if (accuc != 0) delete accuc;
@@ -146,8 +146,7 @@ void PoissonP1CL<Coeff>::SetupInstatRhs(VecDescCL& vA, VecDescCL& vM, double t, 
 template<class Coeff>
 void PoissonP1CL<Coeff>::SetNumLvl( size_t n)
 {
-    match_fun match= MG_.GetBnd().GetMatchFun();
-    idx.resize( n, P1_FE, BndData_, match);
+    idx.resize( n, P1_FE, BndData_);
     A.Data.resize( idx.size());
     M.Data.resize( idx.size());
     U.Data.resize( idx.size());
@@ -1494,8 +1493,7 @@ double PoissonP2CL<Coeff>::CheckSolution(const VecDescCL& lsg, scalar_tetra_func
 template<class Coeff>
 void PoissonP2CL<Coeff>::SetNumLvl( size_t n)
 {
-    match_fun match= MG_.GetBnd().GetMatchFun();
-    idx.resize( n, P2_FE, BndData_, match);
+    idx.resize( n, P2_FE, BndData_);
     A.Data.resize( idx.size());
 }
 

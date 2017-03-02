@@ -269,8 +269,7 @@ void  StatMassSurfTransportStrategy( MultiGridCL& MG, InstatNavierStokes2PhaseP2
     //c_in: s. c_out but c_in is only used for visualization until now
     VecDescCL c_in;
     IdxDescCL p1idx(P1_FE,Bnd_c,0);
-    /// \todo for periodic stuff: matching function here
-    p1idx.CreateNumbering( MG.GetLastLevel(), MG, Bnd_c, MG.GetBnd().GetMatchFun(), &lset.Phi,&lsetbnddata);
+    p1idx.CreateNumbering( MG.GetLastLevel(), MG, Bnd_c, &lset.Phi,&lsetbnddata);
     c_in.SetIdx( &p1idx);
     c_out.SetIdx( &p1idx);
 
@@ -457,8 +456,7 @@ void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTr
     //c_in: s. c_out but c_in is only used for visualization until now
     VecDescCL c_in;
     IdxDescCL p1idx(P1_FE,Bnd_c,0);
-    /// \todo for periodic stuff: matching function here
-    p1idx.CreateNumbering( MG.GetLastLevel(), MG, Bnd_c, MG.GetBnd().GetMatchFun(), &lset.Phi,&lsetbnddata);
+    p1idx.CreateNumbering( MG.GetLastLevel(), MG, Bnd_c, &lset.Phi,&lsetbnddata);
     c_in.SetIdx( &p1idx);
     c_out.SetIdx( &p1idx);
 
@@ -657,7 +655,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbndda
     SetInitialLevelsetConditions( lset, MG, P);
     SetInitialLevelsetConditions( oldlset, MG, P);
     Stokes.CreateNumberingVel( MG.GetLastLevel(), vidx);
-    Stokes.CreateNumberingPr(  MG.GetLastLevel(), pidx, 0, &lset);
+    Stokes.CreateNumberingPr(  MG.GetLastLevel(), pidx, &lset);
     old_vidx.CreateNumbering( MG.GetLastLevel(), MG, Stokes.GetBndData().Vel);
     old_v.SetIdx  ( &old_vidx);
 
@@ -1003,6 +1001,8 @@ int main (int argc, char** argv)
 
     std::unique_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P));
     mg = new DROPS::MultiGridCL( *builder);
+    if (P.exists("Mesh.PeriodicBnd"))
+        DROPS::read_PeriodicBoundaries( *mg, P.get_child("Mesh.PeriodicBnd"));
     read_BndData( velbnddata, *mg, P.get_child( "NavStokes.BoundaryData.Velocity"));
     read_BndData( prbnddata,  *mg, P.get_child( "NavStokes.BoundaryData.Pressure"));
     read_BndData( lsetbnddata,*mg, P.get_child( "Levelset.BoundaryData"));

@@ -206,15 +206,15 @@ private:
 
   public:
     InstatStokes2PhaseP2P1CL( const MGBuilderCL& mgb, const TwoPhaseFlowCoeffCL& coeff, const BndDataCL& bdata, FiniteElementT prFE= P1_FE, double XFEMstab=0.1, FiniteElementT velFE= vecP2_FE, double EpsP = 0.0 )
-        : base_(mgb, coeff, bdata), epsP(EpsP), vel_idx(velFE, 1, bdata.Vel, 0, XFEMstab), pr_idx(prFE, 1, bdata.Pr, 0, XFEMstab), cKernel(0) { }
+        : base_(mgb, coeff, bdata), epsP(EpsP), vel_idx(velFE, 1, bdata.Vel, XFEMstab), pr_idx(prFE, 1, bdata.Pr, XFEMstab), cKernel(0) { }
     InstatStokes2PhaseP2P1CL( MultiGridCL& mg, const TwoPhaseFlowCoeffCL& coeff, const BndDataCL& bdata, FiniteElementT prFE= P1_FE, double XFEMstab=0.1, FiniteElementT velFE= vecP2_FE, double EpsP = 0.0)
-        : base_(mg, coeff, bdata), epsP(EpsP),  vel_idx(velFE, 1, bdata.Vel, 0, XFEMstab), pr_idx(prFE, 1, bdata.Pr, 0, XFEMstab), cKernel(0) { }
+        : base_(mg, coeff, bdata), epsP(EpsP),  vel_idx(velFE, 1, bdata.Vel, XFEMstab), pr_idx(prFE, 1, bdata.Pr, XFEMstab), cKernel(0) { }
 
     /// \name Numbering
     //@{
     /// Create/delete numbering of unknowns
-    void CreateNumberingVel( Uint level, MLIdxDescCL* idx, match_fun match= 0, const LevelsetP2CL* lsetp= 0);
-    void CreateNumberingPr ( Uint level, MLIdxDescCL* idx, match_fun match= 0, const LevelsetP2CL* lsetp= 0);
+    void CreateNumberingVel( Uint level, MLIdxDescCL* idx, const LevelsetP2CL* lsetp= 0);
+    void CreateNumberingPr ( Uint level, MLIdxDescCL* idx, const LevelsetP2CL* lsetp= 0);
     /// \brief Only used for XFEM
     void UpdateXNumbering( MLIdxDescCL* idx, const LevelsetP2CL& lset)
         {

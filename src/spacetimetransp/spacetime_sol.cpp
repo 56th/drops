@@ -41,8 +41,8 @@
 namespace DROPS
 {
 
-SpaceTimeXSolutionCL::SpaceTimeXSolutionCL(MultiGridCL& mg, const BndDataCL<>& Bndneg, const BndDataCL<>& Bndpos, 
-                                           ParamCL & P, match_fun match_in)
+SpaceTimeXSolutionCL::SpaceTimeXSolutionCL(MultiGridCL& mg, const BndDataCL<>& Bndneg, const BndDataCL<>& Bndpos,
+                                           ParamCL & P)
     :
     mg_(mg),
     Bndneg_(Bndneg),
@@ -50,22 +50,19 @@ SpaceTimeXSolutionCL::SpaceTimeXSolutionCL(MultiGridCL& mg, const BndDataCL<>& B
     stxfem_omit_param_(P.get<double>("Transp.XFEMReduced",0.0)),
     weight_pos_(P.get<double>("Transp.HPos",1.0)),
     weight_neg_(P.get<double>("Transp.HNeg",1.0)),
-    st_x_idx_(P1SP1TX_FE,Bndneg,Bndpos,0,stxfem_omit_param_),
-    fut_x_idx_(P1X_FE,Bndneg,Bndpos,0,0.0),
-    past_x_idx_(P1X_FE,Bndneg,Bndpos,0,0.0),
-    // neg_space_idx_(P1_FE,Bndneg,0,0.0),
-    // pos_space_idx_(P1_FE,Bndpos,0,0.0),
+    st_x_idx_(P1SP1TX_FE,Bndneg,Bndpos,stxfem_omit_param_),
+    fut_x_idx_(P1X_FE,Bndneg,Bndpos,0.0),
+    past_x_idx_(P1X_FE,Bndneg,Bndpos,0.0),
+    // neg_space_idx_(P1_FE,Bndneg,0.0),
+    // pos_space_idx_(P1_FE,Bndpos,0.0),
     lsetp2old(0), lsetp2new(0),
     p1idxn(P1_FE),
     p1idxp(P1_FE),
     future_vec_pos(&p1idxp),
     future_vec_neg(&p1idxn),
     past_vec_pos(&p1idxp),
-    past_vec_neg(&p1idxn),
-    match(match_in)
+    past_vec_neg(&p1idxn)
 {
-    Bndneg_.SetMatchingFunction( match_in);
-    Bndpos_.SetMatchingFunction( match_in);
     sol.SetIdx( &st_x_idx_);
     futurevec.SetIdx( &fut_x_idx_);
     pastvec.SetIdx( &past_x_idx_);
@@ -80,7 +77,7 @@ void SpaceTimeXSolutionCL::UpdateTimeSlab(const LevelsetP2CL & lsetold, const Le
     lsetp2new = &lsetnew;
     if (st_x_idx_.NumUnknowns() != 0)
         st_x_idx_.DeleteNumbering( mg_);
-    st_x_idx_.CreateNumbering( mg_.GetLastLevel(), mg_, Bndneg_, Bndpos_, match, &lsetold.Phi, &lsetold.GetBndData()); 
+    st_x_idx_.CreateNumbering( mg_.GetLastLevel(), mg_, Bndneg_, Bndpos_, &lsetold.Phi, &lsetold.GetBndData());
     const double told = lsetold.Phi.t;
     const double tnew = lsetnew.Phi.t;
     STXFEM::UpdateSTXNumbering( &st_x_idx_, mg_, lsetold.Phi, lsetnew.Phi, lset_fpt, TimeInterval(told,tnew), lsetold.GetBndData(), true, vmax);
@@ -91,7 +88,7 @@ void SpaceTimeXSolutionCL::EvalFutureTrace()
 {
     if (fut_x_idx_.NumUnknowns() != 0)
         fut_x_idx_.DeleteNumbering( mg_);
-    fut_x_idx_.CreateNumbering( mg_.GetLastLevel(), mg_, Bndneg_, Bndpos_, match, &(lsetp2new->Phi), &(lsetp2new->GetBndData())); 
+    fut_x_idx_.CreateNumbering( mg_.GetLastLevel(), mg_, Bndneg_, Bndpos_, &(lsetp2new->Phi), &(lsetp2new->GetBndData()));
     futurevec.SetIdx(&fut_x_idx_);
     STXFEM::GetFutureTrace(sol, futurevec, mg_);
     futurevec.t = lsetp2new->Phi.t;
@@ -115,7 +112,7 @@ void SpaceTimeXSolutionCL::EvalPastTrace()
 {
     if (past_x_idx_.NumUnknowns() != 0)
         past_x_idx_.DeleteNumbering( mg_);
-    past_x_idx_.CreateNumbering( mg_.GetLastLevel(), mg_, Bndneg_, Bndpos_, match, &(lsetp2old->Phi), &(lsetp2old->GetBndData())); 
+    past_x_idx_.CreateNumbering( mg_.GetLastLevel(), mg_, Bndneg_, Bndpos_, &(lsetp2old->Phi), &(lsetp2old->GetBndData()));
     pastvec.SetIdx(&past_x_idx_);
     STXFEM::GetPastTrace(sol, pastvec, mg_);
     pastvec.t = lsetp2old->Phi.t;
@@ -153,9 +150,8 @@ inline void
 {
     VecDescCL loc_c;
     IdxDescCL loc_cidx( P1_FE);
-    match_fun match= MG_.GetBnd().GetMatchFun();
 
-    loc_cidx.CreateNumbering( MG_.GetLastLevel(), MG_, cBnd_, match, &ls_.Phi, &ls_.GetBndData());
+    loc_cidx.CreateNumbering( MG_.GetLastLevel(), MG_, cBnd_, &ls_.Phi, &ls_.GetBndData());
     loc_c.SetIdx( &loc_cidx);
 
     p1repair_->repair( loc_c);

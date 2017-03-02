@@ -136,7 +136,6 @@ class BoundaryCL
     BndType         GetBndType(BndIdxT idx) const { return !BndType_.empty() ? BndType_[idx] : OtherBnd; }
 
     void      SetPeriodicBnd( const BndTypeCont& type, match_fun) const;
-    void      SetPeriodicBnd( const BndCondCL& bc) const;
     match_fun GetMatchFun() const { return match_; }
     bool      Matching ( const Point3DCL& p, const Point3DCL& q) const { return match_(p,q); }
     bool      HasPeriodicBnd() const { return match_; }
@@ -326,7 +325,7 @@ class MultiGridCL
     void MakeConsistentHashes();
 #endif
 
-    const ColorClassesCL& GetColorClasses (int Level, match_fun match, const BndCondCL& Bnd) const;
+    const ColorClassesCL& GetColorClasses (int Level, const BndCondCL& Bnd) const;
 
     bool IsSane (std::ostream&, int Level=-1) const;
 };

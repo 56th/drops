@@ -190,8 +190,8 @@ class PoissonP1CL : public ProblemCL<Coeff, PoissonBndDataCL>
     PoissonP1CL(MultiGridCL& mg, const CoeffCL& coeff, const BndDataCL& bdata, SUPGCL& supg, bool ALE, bool adj=false)
         : base_( mg, coeff, bdata), adjoint_( adj), supg_(supg), ALE_(ALE), md_(MeshDeformationCL::getInstance()), idx( P1_FE) {}
     // numbering of unknowns
-    void CreateNumbering( Uint level, MLIdxDescCL* idx, match_fun match= 0)
-        { idx->CreateNumbering( level, MG_, BndData_, match); }
+    void CreateNumbering( Uint level, MLIdxDescCL* idx)
+        { idx->CreateNumbering( level, MG_, BndData_); }
     void DeleteNumbering( MLIdxDescCL* idx)
         { idx->DeleteNumbering( MG_); }
     void SetNumLvl( size_t n);
@@ -272,8 +272,8 @@ class PoissonP2CL : public ProblemCL<Coeff, PoissonBndDataCL>
     PoissonP2CL(MultiGridCL& mg, const CoeffCL& coeff, const BndDataCL& bdata, bool ALE = false)
         : base_( mg, coeff, bdata), ALE_(ALE), md_(MeshDeformationCL::getInstance()), idx( P2_FE) {}
     // numbering of unknowns
-    void CreateNumbering( Uint level, MLIdxDescCL* idx, match_fun match= 0)
-        { idx->CreateNumbering( level, MG_, BndData_, match); }
+    void CreateNumbering( Uint level, MLIdxDescCL* idx)
+        { idx->CreateNumbering( level, MG_, BndData_); }
     void DeleteNumbering( MLIdxDescCL* idx)
         { idx->DeleteNumbering( MG_); }
     void SetNumLvl( size_t n);

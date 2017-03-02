@@ -64,26 +64,6 @@ void BoundaryCL::SetPeriodicBnd( const BndTypeCont& type, match_fun match) const
     match_= match;
 }
 
-void BoundaryCL::SetPeriodicBnd( const BndCondCL& bc ) const
-{
-    BndType_.resize(GetNumBndSeg());
-    for (BndIdxT i= 0; i<GetNumBndSeg(); ++i)
-    {
-        switch (bc.GetBndSeg(i).GetBC()) {
-            case DROPS::Per1BC:
-#ifdef _PAR
-                throw DROPSErrCL("No periodic boundary conditions implemented in the parallel version, yet");
-#endif
-                BndType_[i]= BoundaryCL::Per1Bnd; break;
-            case DROPS::Per2BC:
-                BndType_[i]= BoundaryCL::Per2Bnd; break;
-            default:
-                BndType_[i]= BoundaryCL::OtherBnd;
-        }
-    }
-    match_= bc.GetMatchingFunction();
-}
-
 BoundaryCL::BndType PeriodicEdgesCL::GetBndType( const EdgeCL& e) const
 {
     BoundaryCL::BndType type= BoundaryCL::OtherBnd;
@@ -1331,13 +1311,13 @@ void ColorClassesCL::compute_color_classes (MultiGridCL::const_TriangTetraIterat
     std::cout << "Creation of the tetra-coloring took " << duration << " seconds, " << num_colors() << " colors used." << '\n';
 }
 
-const ColorClassesCL& MultiGridCL::GetColorClasses (int Level, match_fun match, const BndCondCL& Bnd) const
+const ColorClassesCL& MultiGridCL::GetColorClasses (int Level, const BndCondCL& Bnd) const
 {
     if (Level < 0)
         Level+= GetNumLevel();
 
     if (colors_.find( Level) == colors_.end())
-        colors_[Level]= new ColorClassesCL( GetTriangTetraBegin( Level), GetTriangTetraEnd( Level), match, Bnd);
+        colors_[Level]= new ColorClassesCL( GetTriangTetraBegin( Level), GetTriangTetraEnd( Level), GetBnd().GetMatchFun(), Bnd);
 
     return *colors_[Level];
 }
@@ -1380,10 +1360,16 @@ void read_PeriodicBoundaries (MultiGridCL& mg, const ParamCL& P)
         BoundaryCL::BndType type= BoundaryCL::OtherBnd;
         try {
             const std::string s= it->second.get_value<std::string>();
-            if (s == "Per1Bnd")
+            if (s == "Per1BC")
                 type= BoundaryCL::Per1Bnd;
-            else if (s == "Per2Bnd")
+            else if (s == "Per2BC")
                 type= BoundaryCL::Per2Bnd;
+            else {
+                if (s.empty())
+                    throw DROPSParamErrCL("Specify PerBnd type without brackets '[...]'");
+                else
+                    throw DROPSParamErrCL("Unknown PerBnd type: "+s);
+            }
         } catch (DROPSParamErrCL e) {
             std:: cerr << "read_PeriodicBoundaries: While processing key '" << key << "'...\n";
             throw e;

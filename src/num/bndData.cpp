@@ -68,8 +68,7 @@ BndCondT string_to_BndCondT (std::string s)
 }
 
 
-BndCondCL::BndCondCL (BndIdxT numbndseg, const BndCondT* bc, match_fun mfun)
-    : mfun_( mfun)
+BndCondCL::BndCondCL (BndIdxT numbndseg, const BndCondT* bc)
 {
     BndCond_.resize( numbndseg);
     for (Uint i=0; i<numbndseg; ++i)
@@ -130,22 +129,6 @@ template <class T>
     std::vector<BndValFunT> bnd_fun(  num_bnd, default_fun);
 
 
-    // Try to read and set PeriodicMatching.
-    match_fun mfun= 0;
-    child= 0;
-    try {
-        child= &P.get_child( "PeriodicMatching");
-    } catch (DROPSParamErrCL e) {}
-    if (child != 0)
-        try {
-            const std::string s= child->get_value<std::string>();
-            if (s != "")
-                mfun= SingletonMapCL<match_fun>::getInstance()[s];
-        } catch (DROPSErrCL e) {
-            std:: cerr << "read_BndData: While processing 'PeriodicMatching'...\n";
-            throw e;
-        }
-
     // Read data for the boundary segments.
     for (ParamCL::ptree_const_iterator_type it= P.begin(), end= P.end(); it != end; ++it) {
         const std::string key= it->first;
@@ -178,11 +161,19 @@ template <class T>
         throw DROPSErrCL( os.str());
     }
 
+    // warn if PeriodicMatching is set (will be ignored), this should be done in Mesh.PeriodicBnd
+    child= 0;
+    try {
+        child= &P.get_child( "PeriodicMatching");
+    } catch (DROPSParamErrCL e) {}
+    if (child != 0)
+        std:: cerr << "read_BndData: Warning: 'PeriodicMatching' is ignored and should be specified in the param section 'Mesh.PeriodicBnd'!\n";
+
     // Enter the data to bnddata
     std::vector<BndCondInfoCL> bnd_info( num_bnd);
     for (Uint i= 0; i < num_bnd; ++i)
         bnd_info[i]= bnd_type[i];
-    bnddata.Init( bnd_info, bnd_fun, mfun);
+    bnddata.Init( bnd_info, bnd_fun);
 }
 
 /// Explicit instantiations for T = double and T = Point3DCL.

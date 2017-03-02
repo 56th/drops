@@ -690,17 +690,17 @@ void LevelsetP2DiscontCL::ApplyClementInterpolation() //LevelsetP2DiscontCL& dis
     }
 }
 
-void LevelsetP2CL::CreateNumbering( Uint level, match_fun match)
+void LevelsetP2CL::CreateNumbering( Uint level)
 {
-    idx.CreateNumbering( level, MG_, BndData_, match);
+    idx.CreateNumbering( level, MG_, BndData_);
     Phi.SetIdx(&idx);
 }
 
 
 
-void LevelsetP2CL::CreateNumbering( Uint level, MLIdxDescCL* idx, match_fun match)
+void LevelsetP2CL::CreateNumbering(Uint level, MLIdxDescCL* idx)
 {
-    idx->CreateNumbering( level, MG_, BndData_, match);
+    idx->CreateNumbering( level, MG_, BndData_);
 }
 
 
@@ -734,7 +734,7 @@ void LevelsetP2CL::AccumulateBndIntegral( VecDescCL& f) const
     ProgressBarTetraAccumulatorCL accup(MG_, "SurfTension Setup", Phi.RowIdx->TriangLevel());
     accus.push_back( &accup);
     accus.push_back( accu);
-    accumulate( accus, MG_, Phi.RowIdx->TriangLevel(), Phi.RowIdx->GetMatchingFunction(), Phi.RowIdx->GetBndInfo());
+    accumulate( accus, MG_, Phi.RowIdx->TriangLevel(), Phi.RowIdx->GetBndInfo());
 
     delete accu;
 }
@@ -1030,8 +1030,7 @@ LevelsetP2CL * LevelsetP2CL::Create(  MultiGridCL& MG, const LsetBndDataCL& lset
 
 void LevelsetP2CL::SetNumLvl( size_t n)
 {
-    match_fun match= MG_.GetBnd().GetMatchFun();
-    idx.resize( n, P2_FE, BndData_, match);
+    idx.resize( n, P2_FE, BndData_);
     MLPhi.resize(n);
 }
 
@@ -1052,9 +1051,8 @@ LevelsetRepairCL::post_refine ()
     VecDescCL loc_phi;
     MLIdxDescCL loc_lidx( P2_FE, ls_.idxC->size());
     VecDescCL& phiC= *ls_.PhiC;
-    match_fun match= ls_.GetMG().GetBnd().GetMatchFun();
 
-    loc_lidx.CreateNumbering( ls_.GetMG().GetLastLevel(), ls_.GetMG(), ls_.GetBndData(), match);
+    loc_lidx.CreateNumbering( ls_.GetMG().GetLastLevel(), ls_.GetMG(), ls_.GetBndData());
     loc_phi.SetIdx( &loc_lidx);
 
     if (ls_.IsDiscontinuous())
@@ -1063,7 +1061,7 @@ LevelsetRepairCL::post_refine ()
         VecDescCL& phiD= ls_.Phi;
         VecDescCL loc_phiD;
         MLIdxDescCL loc_ldidx( P2D_FE, ls_.idx.size());
-        ls_.CreateNumbering( ls_.GetMG().GetLastLevel(), &loc_ldidx, match);
+        ls_.CreateNumbering( ls_.GetMG().GetLastLevel(), &loc_ldidx);
         loc_phiD.SetIdx( &loc_ldidx);
         p2repair_->repair( loc_phiD);
 
