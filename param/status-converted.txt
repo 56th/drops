@@ -10,6 +10,19 @@ levelset/prJump/prJump.json
 
 levelset/twophasedrops/default.json
 levelset/twophasedrops/risingdroplet.json
+levelset/twophasedrops/butanol.json
+levelset/twophasedrops/mzi.json
+levelset/twophasedrops/risingbutanoldroplet.json
+levelset/twophasedrops/toluol.json
+levelset/twophasedrops/tworisingdroplets.json
+    ! levelset/twophasedrops/eindhoven.json <<< crashes with QRDecompCL::prepare_solve: rank-deficient
+      matrix, but so does the old version >>>
+
+    ! levelset/twophasedrops/marangoni.json <<< crashes with DROPS::DROPSPARAMERRCL >>>
+    ! levelset/twophasedrops/slidingDroplet.json <<< could not test properly, behaves like old version >>>
+    ! levelset/twophasedrops/taylorbubble.json   <<< could not test properly, behaves like old version >>>
+
+
 
 osmosis/osmosis/default.json
 osmosis/osmosis/osmosis.json

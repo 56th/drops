@@ -1,0 +1,158 @@
+{
+    "General": {
+        "DynamicLibs": [
+            "levelset/liblevelset-twophaseCoeff", 
+            "misc/libmisc-csgFunctions", 
+            "misc/libmisc-scalarFunctions", 
+            "misc/libmisc-vectorFunctions"
+        ], 
+        "DynamicLibsPrefix": "../", 
+        "ProgressBar": 1
+    }, 
+    "Time": {
+        "NumSteps": 10, 
+        "Scheme": 1, 
+        "FinalTime": 1.25, 
+        "Theta": 1
+    }, 
+    "CouplingSolver": {
+        "Iter": 20, 
+        "Tol": 1e-10, 
+        "ImplLB": 1, 
+        "LevelsetSolver": {
+            "Iter": 1000, 
+            "Tol": 1e-14
+        }, 
+        "NavStokesSolver": {
+            "Reduction": 0.1, 
+            "Nonlinear": 1, 
+            "OseenSolver": {
+                "UzawaInnerTol": 0.6, 
+                "Solver": 10102, 
+                "Iter": 200, 
+                "UzawaInnerIter": 1000, 
+                "PcAIter": 2, 
+                "Tol": 1e-08, 
+                "PcSTol": 0.0001, 
+                "PcATol": 1e-99
+            }, 
+            "Iter": 20, 
+            "Tol": 1e-10
+        }
+    }, 
+    "NavStokes": {
+        "XFEMReduced": 0.1, 
+        "Coeff": {
+            "SurfTens": {
+                "SurfTension": 1, 
+                "VarTensionFunc": "ConstTau"
+            }, 
+            "ViscNeg": 10, 
+            "VolForce": "ZeroVel", 
+            "DensPos": 10, 
+            "Gravity": [
+                0, 
+                0, 
+                -9.81
+            ], 
+            "DensNeg": 1, 
+            "ViscPos": 1
+        }, 
+        "InitialValue": 0, 
+        "BoundaryData": {
+            "Velocity": { 
+                "Default":["Dir0BC"]
+            }          
+        }
+    }, 
+    "CSG": {
+        "Geometry": "Two spheres", 
+        "Library": "/home/davzon/Work/14_2_2017_vanilla/drops/param/levelset/unspecified/twospheres.json"
+    }, 
+    "Levelset": {
+        "PosDrop": [
+            0.5, 
+            0.5, 
+            0.5
+        ], 
+        "InitialValue": "csg_fun", 
+        "Discontinuous": 0, 
+        "Reparam": {
+            "Freq": 1, 
+            "MinGrad": 0.1, 
+            "Method": 3, 
+            "MaxGrad": 10
+        }, 
+        "RadDrop": [
+            0.25, 
+            0.25, 
+            0.25
+        ], 
+        "VolCorrection": 1, 
+        "SD": 0.1
+    }, 
+    "Mesh": {
+        "Type": "BrickBuilder", 
+                "Origin": [0,0,0],
+                "E1": [1,0,0],    
+                "E2": [0,1,0],     
+                "E3": [0,0,2],     
+                "N1": 3,          
+                "N2": 3,          
+                "N3": 6,           
+        "RestartFile": "", 
+        "AdaptRef": {
+            "CoarsestLevel": 0, 
+            "Freq": 1, 
+            "LoadBalStrategy": 1011, 
+            "FinestLevel": 2, 
+            "Width": 0.1
+        }
+    }, 
+    "Inflow": {
+        "InflowAmpl": 0, 
+        "FlowDir": 0, 
+        "InflowVel": 0, 
+        "InflowFreq": 0, 
+        "RadInlet": 1
+    }, 
+    "Transp": {
+        "Enable": 0, 
+        "IniCPos": 0.1, 
+        "IniCNeg": 5, 
+        "Solver": {
+            "Tol": 1e-10, 
+            "Iter": 200
+        }, 
+        "DiffNeg": 0.01, 
+        "NitschePenalty": 50, 
+        "XFEMReduced": 0.05, 
+        "HPos": 1, 
+        "HNeg": 0.5, 
+        "DiffPos": 0.005
+    }, 
+    "SurfTransp": {
+        "XFEMReduced": -1.0, 
+        "Enable": 0, 
+        "Visc": 1e-05, 
+        "Solver": {
+            "Tol": 1e-10, 
+            "Iter": 1000
+        }
+    }, 
+    "VTK": {
+        "VTKDir": "vtk", 
+        "Binary": 1, 
+        "Freq": 1, 
+        "AddP1XPressure": 1, 
+        "VTKName": "risingdroplet"
+    }, 
+    "Restart": {
+        "OutputOverwrite": 1, 
+        "InputData": "", 
+        "Binary": 0, 
+        "OutputGrid": "out/grid",
+        "OutputData": "out/data", 
+        "OutputFreq": 0
+    }
+}
