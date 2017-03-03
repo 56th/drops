@@ -269,7 +269,7 @@
 // domain, boundary and initial conditions
         "DomainCond":
         {
-                "PeriodicMatching":     "Mesh.PeriodicMatching",            //#[-> NavStokes.BoundaryData, falls !="none"] matching function 
+                "PeriodicMatching":     "Mesh.PeriodicBnd.PeriodicMatching+ListPerBnd",            //#[-> NavStokes.BoundaryData, falls !="none"] matching function 
                                                            // identifier for periodic boundaries
                 "InitialCond":          "NavStokes.InitialValue",                 // initial conditions (0 = zero, 1/10 stationary flow with  
                                                            //#[-> NavStokes.InitialValue] droplet which includes/dismiss surface tension,  

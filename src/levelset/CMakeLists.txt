@@ -30,11 +30,11 @@ if(NOT MPI)
 add_dependencies(prJump levelset-twophaseCoeff misc-scalarFunctions misc-vectorFunctions)
 endif(NOT MPI)
 
-exec_ser(film geom-boundary geom-builder geom-deformation geom-simplex geom-multigrid num-unknowns geom-topo num-fe misc-problem levelset-levelset levelset-adaptriang levelset-marking_strategy misc-progressaccu misc-scopetimer misc-utils out-output num-discretize navstokes-instatnavstokes2phase misc-params levelset-fastmarch stokes-instatstokes2phase num-MGsolver num-fe out-ensightOut out-vtkOut num-oseenprecond num-interfacePatch levelset-surfacetension levelset-coupling misc-funcmap geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature num-renumber misc-dynamicload stokes-slipBndOnePhase)
+#exec_ser(film geom-boundary geom-builder geom-deformation geom-simplex geom-multigrid num-unknowns geom-topo num-fe misc-problem levelset-levelset levelset-adaptriang levelset-marking_strategy misc-progressaccu misc-scopetimer misc-utils out-output num-discretize navstokes-instatnavstokes2phase misc-params levelset-fastmarch stokes-instatstokes2phase num-MGsolver num-fe out-ensightOut out-vtkOut num-oseenprecond num-interfacePatch levelset-surfacetension levelset-coupling misc-funcmap geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature num-renumber misc-dynamicload stokes-slipBndOnePhase)
 # convention: make sure that those coefficient-defining shared objects are built which ared used in the default configuration of the executable..
-if(NOT MPI)
-add_dependencies(film levelset-filmCoeff misc-scalarFunctions misc-vectorFunctions)
-endif(NOT MPI)
+#if(NOT MPI)
+#add_dependencies(film levelset-filmCoeff misc-scalarFunctions misc-vectorFunctions)
+#endif(NOT MPI)
 
 exec_ser(brick_transp geom-boundary geom-builder geom-simplex geom-multigrid geom-deformation num-unknowns geom-topo num-fe misc-problem levelset-levelset misc-progressaccu misc-scopetimer misc-utils out-output num-discretize misc-params levelset-fastmarch num-fe poisson-transport2phase out-ensightOut out-vtkOut num-interfacePatch levelset-surfacetension stokes-instatstokes2phase misc-funcmap geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature misc-dynamicload stokes-slipBndOnePhase)
 # convention: make sure that those coefficient-defining shared objects are built which ared used in the default configuration of the executable..

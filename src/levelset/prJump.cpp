@@ -224,7 +224,7 @@ void Assemble( StokesT& Stokes, LevelsetP2CL& lset, VelVecDescCL& rhs )
     }
 
     Stokes.CreateNumberingVel( MG.GetLastLevel(), vidx );
-    Stokes.CreateNumberingPr( MG.GetLastLevel(), pidx, NULL, &lset );
+    Stokes.CreateNumberingPr( MG.GetLastLevel(), pidx, &lset );
 
     Stokes.SetIdx();
     Stokes.v.SetIdx( vidx );

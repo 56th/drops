@@ -168,8 +168,8 @@ class TransportP1XCL
         gm_( pc_, 20, P.get<int>("Transp.Solver.Iter"), P.get<double>("Transp.Solver.Tol"), false, false, RightPreconditioning),
         f_(rhs), c_(reac), omit_bound_( P.get<double>("Transp.XFEMReduced")), sdstab_(P.get<double>("Transp.SD")),
         oldt_(initialtime), t_( initialtime),
-        idx( P1X_FE, 1, Bndt, mg.GetBnd().GetMatchFun(), omit_bound_),
-        oldidx( P1X_FE, mg.GetLastLevel(), Bndt, mg.GetBnd().GetMatchFun(), omit_bound_)
+        idx( P1X_FE, 1, Bndt, omit_bound_),
+        oldidx( P1X_FE, mg.GetLastLevel(), Bndt, omit_bound_)
     {
         double D[2] = {P.get<double>("Transp.DiffPos"), P.get<double>("Transp.DiffNeg")};
         std::memcpy( D_, D, 2*sizeof( double));

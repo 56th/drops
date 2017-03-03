@@ -841,16 +841,15 @@ TransportXRepairCL::pre_refine ()
 void
 TransportXRepairCL::post_refine ()
 {
-    match_fun match= c_.GetMG().GetBnd().GetMatchFun();
     VecDescCL loc_ct;
-    IdxDescCL loc_cidx( P1X_FE, c_.GetBndData(), match, c_.GetXFEMOmitBound());
+    IdxDescCL loc_cidx( P1X_FE, c_.GetBndData(), c_.GetXFEMOmitBound());
     VecDescCL loc_oldct;
-    IdxDescCL loc_oldcidx( P1X_FE, c_.GetBndData(), match, c_.GetXFEMOmitBound());
+    IdxDescCL loc_oldcidx( P1X_FE, c_.GetBndData(), c_.GetXFEMOmitBound());
     VecDescCL& ct= c_.ct;
     VecDescCL& oldct= c_.oldct;
 
-    loc_cidx.CreateNumbering( mylvl, c_.GetMG(), c_.GetBndData(), match, &(c_.GetLevelset()),&(c_.GetLevelsetBnd()));
-    loc_oldcidx.CreateNumbering( mylvl, c_.GetMG(), c_.GetBndData(),  match, &(c_.GetOldLevelset()),&(c_.GetLevelsetBnd()));
+    loc_cidx.CreateNumbering( mylvl, c_.GetMG(), c_.GetBndData(), &(c_.GetLevelset()),&(c_.GetLevelsetBnd()));
+    loc_oldcidx.CreateNumbering( mylvl, c_.GetMG(), c_.GetBndData(),  &(c_.GetOldLevelset()),&(c_.GetLevelsetBnd()));
     loc_ct.SetIdx( &loc_cidx);
     loc_oldct.SetIdx( &loc_oldcidx);
     p1oldctrepair_->repair( loc_oldct);
@@ -929,8 +928,7 @@ void
     IdxDescCL    loc_vidx(vecP2_FE);
     VelVecDescCL& v= v_;
     Uint LastLevel= mg_.GetLastLevel();
-    match_fun match= mg_.GetBnd().GetMatchFun();
-    loc_vidx.CreateNumbering( mg_.GetLastLevel(), mg_, Bnd_v_, match );
+    loc_vidx.CreateNumbering( mg_.GetLastLevel(), mg_, Bnd_v_);
     if (LastLevel != v.RowIdx->TriangLevel()) {
         std::cout << "LastLevel: " << LastLevel
                   << " old v->TriangLevel: " << v.RowIdx->TriangLevel() << std::endl;

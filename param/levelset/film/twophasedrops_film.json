@@ -12,6 +12,7 @@
                 "DynamicLibsPrefix": "../", //where should we look for shared objects?
                 "DynamicLibs": [ //select libraries to be loaded after program start
                         "levelset/liblevelset-filmCoeff",
+                        "levelset/liblevelset-twophaseCoeff",
                         "misc/libmisc-scalarFunctions",
                         "misc/libmisc-vectorFunctions"
                 ]
@@ -30,6 +31,16 @@
                 
                 "RestartFile":            "",            // reads multigrid from deserialization files
                                                          // (to deactivate the reading choose "").
+		
+		"PeriodicBnd":
+		{
+			"PeriodicMatching":     "periodicxz",      // matching function
+			
+			"0":  "Per1BC",
+			"1":  "Per2BC",
+			"4":  "Per1BC",
+			"5":  "Per2BC"
+		},
 		// adaptive refinement
 		        "AdaptRef":
 		        {
@@ -127,8 +138,6 @@
 	        	{
 	        	        "Velocity":
 				        {
-				                "PeriodicMatching":     "periodicxz",      // matching function
-				                
 				                "0":  ["Per1BC"],
 				                "1":  ["Per2BC"],
 				                "2":  ["Dir0BC"],
@@ -138,8 +147,6 @@
 				        },
 				        "Pressure":
 				        {
-				                "PeriodicMatching":     "periodicxz",      // matching function
-				                
 				                "0":  ["Per1BC"],
 				                "1":  ["Per2BC"],
 				                "4":  ["Per1BC"],
@@ -172,8 +179,6 @@
 		        },
 		        "BoundaryData":
 		        {
-		                "PeriodicMatching":     "periodicxz",      // matching function
-		                
 		                "0":  ["Per1BC"],
 		                "1":  ["Per2BC"],
 		                "4":  ["Per1BC"],

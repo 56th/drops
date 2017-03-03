@@ -189,7 +189,7 @@ void ApplyToTestFct( InstatStokes2PhaseP2P1CL& Stokes, const LsetBndDataCL& lsbn
     lset.Init( DistanceFct);
 
     Stokes.CreateNumberingVel( MG.GetLastLevel(), vidx);
-    Stokes.CreateNumberingPr(  MG.GetLastLevel(), pidx, NULL, &lset);
+    Stokes.CreateNumberingPr(  MG.GetLastLevel(), pidx, &lset);
 
     VecDescCL f_Gamma( vidx), v( vidx);
     MG.SizeInfo( std::cout);
@@ -278,7 +278,7 @@ void Compare_LaplBeltramiSF_ConstSF( InstatStokes2PhaseP2P1CL& Stokes, const Lse
     lset.Init( DistanceFct);
 
     Stokes.CreateNumberingVel( MG.GetLastLevel(), vidx);
-    Stokes.CreateNumberingPr(  MG.GetLastLevel(), pidx, NULL, &lset);
+    Stokes.CreateNumberingPr(  MG.GetLastLevel(), pidx, &lset);
 
     VecDescCL f_Const( vidx), f_LaplBeltrami( vidx), v( vidx);
     MG.SizeInfo( std::cout);

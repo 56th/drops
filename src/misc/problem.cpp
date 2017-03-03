@@ -33,12 +33,11 @@ namespace DROPS
 const Uint        IdxDescCL::InvalidIdx = std::numeric_limits<Uint>::max();
 std::vector<bool> IdxDescCL::IdxFree;
 
-IdxDescCL::IdxDescCL( FiniteElementT fe, const BndCondCL& bnd, match_fun match, double omit_bound)
+IdxDescCL::IdxDescCL( FiniteElementT fe, const BndCondCL& bnd, double omit_bound)
     : FE_InfoCL( fe), Idx_( GetFreeIdx()), TriangLevel_( 0), NumUnknowns_( 0), Bnd_(bnd), Bnd_aux_(bnd),
       extIdx_( omit_bound != -99 ? omit_bound : IsExtended() ? 1./32. : -1.) 
 // default value for omit_bound is 1./32. for XFEM and -1 otherwise
 {
-    Bnd_.SetMatchingFunction( match);
 #ifdef _PAR
     ex_= new ExchangeCL();
 #else
@@ -46,13 +45,11 @@ IdxDescCL::IdxDescCL( FiniteElementT fe, const BndCondCL& bnd, match_fun match, 
 #endif
 }
 
-IdxDescCL::IdxDescCL( FiniteElementT fe, const BndCondCL& bnd1, const BndCondCL& bnd2, 
-                      match_fun match, double omit_bound)
+IdxDescCL::IdxDescCL( FiniteElementT fe, const BndCondCL& bnd1, const BndCondCL& bnd2, double omit_bound)
     : FE_InfoCL( fe), Idx_( GetFreeIdx()), TriangLevel_( 0), NumUnknowns_( 0), Bnd_(bnd1), Bnd_aux_(bnd2),
       extIdx_( omit_bound != -99 ? omit_bound : IsExtended() ? 1./32. : -1.) 
 // default value for omit_bound is 1./32. for XFEM and -1 otherwise
 {
-    Bnd_.SetMatchingFunction( match);
 #ifdef _PAR
     ex_= new ExchangeCL();
 #else
@@ -375,19 +372,20 @@ void IdxDescCL::CreateNumbStdFE( Uint level, MultiGridCL& mg)
     const Uint idxnum= GetIdx();
     TriangLevel_= level;
     NumUnknowns_ = 0;
+    match_fun match= mg.GetBnd().GetMatchFun();
 
     // allocate space for indices; number unknowns in TriangLevel level
-    if (GetMatchingFunction())
+    if (match)
     {
         if (NumUnknownsVertex())
             CreatePeriodicNumbOnSimplex( idxnum, NumUnknowns_, NumUnknownsVertex(),
-                mg.GetTriangVertexBegin(level), mg.GetTriangVertexEnd(level), Bnd_, level);
+                mg.GetTriangVertexBegin(level), mg.GetTriangVertexEnd(level), Bnd_, level, match);
         if (NumUnknownsEdge())
             CreatePeriodicNumbOnSimplex( idxnum, NumUnknowns_, NumUnknownsEdge(),
-                mg.GetTriangEdgeBegin(level), mg.GetTriangEdgeEnd(level), Bnd_, level);
+                mg.GetTriangEdgeBegin(level), mg.GetTriangEdgeEnd(level), Bnd_, level, match);
         if (NumUnknownsFace())
             CreatePeriodicNumbOnSimplex( idxnum, NumUnknowns_, NumUnknownsFace(),
-                mg.GetTriangFaceBegin(level), mg.GetTriangFaceEnd(level), Bnd_, level);
+                mg.GetTriangFaceBegin(level), mg.GetTriangFaceEnd(level), Bnd_, level, match);
         if (NumUnknownsTetra())
             CreateNumbOnTetra( idxnum, NumUnknowns_, NumUnknownsTetra(),
                 mg.GetTriangTetraBegin(level), mg.GetTriangTetraEnd(level), level);
@@ -457,21 +455,16 @@ void IdxDescCL::UpdateXNumbering( MultiGridCL& mg, const VecDescCL& lset, const 
 }
 
 void IdxDescCL::CreateNumbering( Uint level, MultiGridCL& mg, const BndCondCL& Bnd,
-    match_fun match, const VecDescCL* lsetp, const BndDataCL<>* lsetbnd)
+    const VecDescCL* lsetp, const BndDataCL<>* lsetbnd)
 {
-    CreateNumbering( level, mg, Bnd, Bnd, match, lsetp, lsetbnd);
+    CreateNumbering( level, mg, Bnd, Bnd, lsetp, lsetbnd);
 }
 
 void IdxDescCL::CreateNumbering( Uint level, MultiGridCL& mg, const BndCondCL& Bnd, const BndCondCL& Bnd_aux,
-    match_fun match, const VecDescCL* lsetp, const BndDataCL<>* lsetbnd)
+    const VecDescCL* lsetp, const BndDataCL<>* lsetbnd)
 {
     Bnd_= Bnd;
     Bnd_aux_= Bnd_aux;
-    if (match)
-    {
-        Bnd_.SetMatchingFunction( match);
-        Bnd_aux_.SetMatchingFunction( match);
-    }
     CreateNumbering( level, mg, lsetp, lsetbnd);
 }
 

@@ -87,7 +87,7 @@ double GetTimeOffset(){
     return timeoffset;
 }
 
-void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddata, AdapTriangCL& adap, const bool is_periodic, match_fun periodic_match, const std::string& perMatchName)
+void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddata, AdapTriangCL& adap, const bool is_periodic, const std::string& perMatchName)
 // flow control
 {
     DROPS::InScaMap & inscamap = DROPS::InScaMap::getInstance();
@@ -114,7 +114,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     Stokes.SetBndOutNormal(bnd_outnormal);
     Stokes.SetSurfTension(sf);
     
-    if (is_periodic)
+    if (is_periodic) /// \todo Periodic directions (used for reparam) should be set based on Mesh.PeriodicBnd. Export to function!
     {
         int n = 0;
         if (perMatchName == "periodicx" || perMatchName == "periodicy" || perMatchName == "periodicz")
@@ -156,13 +156,13 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         Stokes.SetNumPrLvl  ( Stokes.GetMG().GetNumLevel());
         lset.SetNumLvl(Stokes.GetMG().GetNumLevel());
     }
-    lset.CreateNumbering( MG.GetLastLevel(), periodic_match);
+    lset.CreateNumbering( MG.GetLastLevel());
 
     if (lset.IsDiscontinuous())
     {
         LevelsetP2DiscontCL& lsetD (dynamic_cast<LevelsetP2DiscontCL&>(lset));
         MLIdxDescCL* lidxc = lsetD.idxC;
-        lsetD.CreateNumbering( MG.GetLastLevel(), lidxc, periodic_match);
+        lsetD.CreateNumbering( MG.GetLastLevel(), lidxc);
         lsetD.PhiContinuous.SetIdx( lidxc);
     }
 
@@ -199,8 +199,8 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         Vol = lset.GetVolume();
     }
 
-    Stokes.CreateNumberingVel( MG.GetLastLevel(), vidx, periodic_match);
-    Stokes.CreateNumberingPr(  MG.GetLastLevel(), pidx, periodic_match, &lset);
+    Stokes.CreateNumberingVel( MG.GetLastLevel(), vidx);
+    Stokes.CreateNumberingPr(  MG.GetLastLevel(), pidx, &lset);
     PermutationT vel_downwind;
     // For a two-level MG-solver: P2P1 -- P2P1X; comment out the preceding CreateNumberings
 //     Stokes.SetNumVelLvl ( 2);
@@ -519,7 +519,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         if (doNSDownwindNumbering) {
             if (!gridChanged) { // We must ensure that the permutation maps the original numbering of CreateNumbering to the downwind-numbering and that the renumbering starts in a known state, i.e. the original numbering.
                 vidx->DeleteNumbering( MG);
-                Stokes.CreateNumberingVel( MG.GetLastLevel(), vidx, periodic_match);
+                Stokes.CreateNumberingVel( MG.GetLastLevel(), vidx);
                 permute_Vector( Stokes.v.Data, invert_permutation( vel_downwind), 3);
             }
             vel_downwind= Stokes.downwind_numbering( lset, navstokes_downwind);
@@ -530,7 +530,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         if (doLsetDownwindNumbering) {
             if (!gridChanged) { // We must ensure that the permutation maps the original numbering of CreateNumbering to the downwind-numbering and that the renumbering starts in a known state, i.e. the original numbering.
                 lset.DeleteNumbering( lidx);
-                lset.CreateNumbering( MG.GetLastLevel(), lidx, periodic_match);
+                lset.CreateNumbering( MG.GetLastLevel(), lidx);
                 lset.Phi.SetIdx( lidx);
                 permute_Vector( lset.Phi.Data, invert_permutation( lset_downwind));
             }
@@ -629,6 +629,8 @@ int main (int argc, char** argv)
                   << std::endl;
         DROPS::BuildDomain( mg, P.get<std::string>("DomainCond.MeshFile"), P.get<int>("DomainCond.GeomType"), P.get<std::string>("Mesh.RestartFile",""));
     }
+    if (P.exists("Mesh.PeriodicBnd"))
+        DROPS::read_PeriodicBoundaries ( *mg, P.get_child("Mesh.PeriodicBnd"));
     const bool noRestart= (P.get<std::string>("Mesh.RestartFile","")).empty() || P.get<std::string>("Mesh.RestartFile","") == "none";
 
     std::cout << "Generated MG of " << mg->GetLastLevel() << " levels." << std::endl;
@@ -644,9 +646,8 @@ int main (int argc, char** argv)
         std::cout << "pressure, ";
         read_BndData( *lsetbnddata,*mg, P.get_child( "Levelset.BoundaryData"));
         std::cout << "and levelset." << std::endl;
-        if (is_periodic)
-            mg->GetBnd().SetPeriodicBnd( *velbnddata);
-    } catch (DROPS::DROPSParamErrCL& e)
+    }
+    catch (DROPS::DROPSParamErrCL& e)
     {
         e.what( std::cout);
         delete velbnddata;
@@ -722,7 +723,7 @@ int main (int argc, char** argv)
                                                 P.get<double>("NavStokes.XFEMReduced"), DROPS::vecP2_FE,
                                                 P.get<double>("NavStokes.GhostPenalty",0.0));
 
-    Strategy( prob, *lsetbnddata, adap, is_periodic, periodic_match, perMatchName);    // do all the stuff
+    Strategy( prob, *lsetbnddata, adap, is_periodic, perMatchName);    // do all the stuff
 
     delete mg;
     delete velbnddata;

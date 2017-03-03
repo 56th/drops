@@ -91,8 +91,8 @@ class TransportP1CL
 
     /// \name Numbering
     ///@{
-    void CreateNumbering( Uint level, MLIdxDescCL* idx, match_fun match= 0)
-        { idx->CreateNumbering( level, MG_, Bnd_, match); }
+    void CreateNumbering( Uint level, MLIdxDescCL* idx)
+        { idx->CreateNumbering( level, MG_, Bnd_); }
     void DeleteNumbering( MLIdxDescCL* idx)
         { idx->DeleteNumbering( MG_); }
     ///@}
