@@ -34,6 +34,13 @@ partests/dist_TestRefPar/*
 
 poisson/cdrdrops/default.json
 poisson/cdrdrops/statpoissonEx.json
+poisson/cdrdrops/adjointEx.json
+poisson/cdrdrops/aleEX2.json
+poisson/cdrdrops/aleEX3.json
+poisson/cdrdrops/aleEX4.json
+poisson/cdrdrops/instatpoissonEx.json
+poisson/cdrdrops/instatsubgEX.json
+poisson/cdrdrops/statsubgEX.json
 
 spacetimetransp/st_transp/default.json
 spacetimetransp/st_transp/BotheKoebeWielageWarnecke03.json
