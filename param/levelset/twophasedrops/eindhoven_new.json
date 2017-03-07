@@ -8,15 +8,11 @@
         "DynamicLibsPrefix": "../", 
         "ProgressBar": 1
     }, 
-    "_comment": "#=============================================================\n\n#    DROPS parameter file for twophasedrops\n\n#    simulation of two-phase flow:\n\n#    droplet in brick\n\n#=============================================================\n\n# time stepping", 
     "Time": {
         "NumSteps": 100, 
         "Scheme": 1, 
         "FinalTime": 0.05, 
         "Theta": 1
-    }, 
-    "Stokes": {
-        "_comment": "# flow solver"
     }, 
     "CouplingSolver": {
         "Iter": 10, 
@@ -31,13 +27,13 @@
             "Nonlinear": 0, 
             "OseenSolver": {
                 "UzawaInnerTol": 0.6, 
-                "Solver": 20302, 
+                "Solver": 10301,
                 "Iter": 200, 
                 "UzawaInnerIter": 50, 
                 "PcAIter": 100, 
                 "Tol": 1e-12, 
                 "PcSTol": 0.0001, 
-                "PcATol": 0.01
+                "PcATol": 0.001
             }, 
             "Iter": 20, 
             "Tol": 1e-10
@@ -51,14 +47,14 @@
                 "VarTensionFunc": "ConstTau"
             }, 
             "ViscNeg": 0.001589, 
-            "DensPos": 998, 
+            "DensNeg": 749,
+            "ViscPos": 0.001002,
+            "DensPos": 998,
             "Gravity": [
                 0, 
                 -9.81, 
                 0
-            ], 
-            "DensNeg": 749, 
-            "ViscPos": 0.001002
+            ]
         }, 
         "InitialValue": 0, 
         "BoundaryData": {
@@ -79,7 +75,6 @@
             5e-05
         ], 
         "Discontinuous": 0, 
-        "_comment": "# levelset solver", 
         "Reparam": {
             "Freq": 1, 
             "MinGrad": 0.1, 
@@ -93,25 +88,6 @@
         ], 
         "VolCorrection": 1, 
         "SD": 0.1
-    }, 
-    "Deprecated": {
-        "Default": {
-            "Levelset": {
-                "CurvDiff": -1
-            }, 
-            "Smoothzone": 0.0001, 
-            "Projection": 0
-        }, 
-        "Theta": 0.5, 
-        "Reparam": {
-            "NarrowBand": -1
-        }
-    }, 
-    "Reparam": {
-        "_comment": "# re-initialization of levelset function"
-    }, 
-    "AdaptRef": {
-        "_comment": "# adaptive refinement"
     }, 
     "Mesh": {
         "Type": "BrickBuilder", 
@@ -127,15 +103,9 @@
             "CoarsestLevel": 0, 
             "Freq": 10, 
             "LoadBalStrategy": 1011, 
-            "FinestLevel": 2, 
+            "FinestLevel": 2,
             "Width": 1e-06
         }
-    }, 
-    "Mat": {
-        "_comment": "# material data, all units are SI"
-    }, 
-    "Exp": {
-        "_comment": "# experimental conditions"
     }, 
     "Inflow": {
         "InflowAmpl": 0, 
@@ -144,40 +114,10 @@
         "InflowFreq": 0, 
         "RadInlet": 0.005
     }, 
-    "SurfTens": {
-        "_comment": "# surface tension"
-    }, 
-    "Transp": {
-        "Enable": 0, 
-        "IniCPos": 0.1, 
-        "IniCNeg": 5, 
-        "Solver": {
-            "Tol": 1e-10, 
-            "Iter": 200
-        }, 
-        "_comment": "# mass transport", 
-        "NitschePenalty": 0, 
-        "XFEMReduced": 0.1, 
-        "HPos": 1, 
-        "HNeg": 0.5, 
-        "DiffPos": 0.005, 
-        "DiffNeg": 0.01
-    }, 
-    "SurfTransp": {
-        "XFEMReduced": -1.0, 
-        "_comment": "# surfactant transport", 
-        "Enable": 0, 
-        "Visc": 1e-05, 
-        "Solver": {
-            "Tol": 1e-10, 
-            "Iter": 1000
-        }
-    }, 
     "Ensight": {
         "Binary": 0, 
-        "EnsightOut": 0, 
+        "Freq": 0,
         "MasterOut": 1, 
-        "_comment": "# Ensight settings", 
         "EnsDir": "ensight", 
         "EnsCase": "eindhoven", 
         "GeomName": "channel"
@@ -185,21 +125,16 @@
     "VTK": {
         "VTKDir": "vtk", 
         "Binary": 0, 
-        "_comment": "#VTK output", 
         "Freq": 0, 
         "VTKName": "channel"
     }, 
     "Restart": {
         "Binary": 0, 
-        "_comment": "# Write out results", 
         "OutputGrid":"../out/grid",
         "OutputData":"../out/data",
         //"OutputGridData_convert": "./geometry/eindhoven", 
         "OutputOverwrite": 2, 
         "InputData": "", 
         "OutputFreq": 1
-    }, 
-    "DomainCond": {
-        "_comment": "# domain, bnd/ini conditions"
     }
 }

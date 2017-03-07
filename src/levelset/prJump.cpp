@@ -262,7 +262,7 @@ void Assemble( StokesT& Stokes, LevelsetP2CL& lset, VelVecDescCL& rhs )
     // Assemble the stabilisation matrix -- part of SetupSystem2 now
     /*
     time.Reset();
-    Stokes.SetupC( &Stokes.C, lset, P.get<double>("Stokes.epsP") );
+    Stokes.SetupC( &Stokes.C, lset, P.get<double>("NavStokes.GhostPenalty") );
     time.Stop();
     std::cout << "Assembling the stabilisation matrix took: " << time.GetTime()
               << " seconds." << std::endl;

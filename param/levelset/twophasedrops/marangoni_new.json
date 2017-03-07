@@ -89,57 +89,24 @@
         "VolCorrection": 1, 
         "SD": 0.1
     }, 
-    "Deprecated": {
-        "Default": {
-            "Levelset": {
-                "CurvDiff": -1
-            }, 
-            "Smoothzone": 0.0001, 
-            "Projection": 0
-        }, 
-        "Theta": 0.5, 
-        "Reparam": {
-            "NarrowBand": -1
-        }
-    }, 
-    "Coupling": {
-        "ConstStab": 0
-    }, 
     "Mesh": {
-        "Origin": [
-            0, 
-            0, 
-            0
-        ], 
-        "PeriodicMatching": "", 
-        "RestartFile": "", 
-        "AdaptRef": {
-            "CoarsestLevel": 0, 
-            "Freq": 1, 
-            "LoadBalStrategy": 1011, 
-            "FinestLevel": 2, 
-            "Width": 0.0004
-        }, 
-        "E1": [
-            0.016, 
-            0, 
-            0
-        ], 
+        "Type": "BrickBuilder",
+        "Origin": [0,0,0],
         "N1": 4, 
         "N2": 4, 
         "N3": 4, 
-        "Type": "BrickBuilder", 
-        "E3": [
-            0, 
-            0, 
-            0.016
-        ], 
-        "E2": [
-            0, 
-            0.016, 
-            0
-        ]
-    }, 
+        "E1": [0.016, 0, 0],
+        "E2": [0, 0.016, 0],
+        "E3": [0, 0, 0.016],
+        "RestartFile": "",
+        "AdaptRef": {
+            "CoarsestLevel": 0,
+            "Freq": 1,
+            "LoadBalStrategy": 1011,
+            "FinestLevel": 2,
+            "Width": 0.0004
+        }
+    },
     "Inflow": {
         "InflowAmpl": 0, 
         "FlowDir": 1, 
@@ -149,30 +116,6 @@
     }, 
     "SurfTens": {
        "GradTau": -25
-    }, 
-    "Transp": {
-        "Enable": 0, 
-        "IniCPos": 0.1, 
-        "IniCNeg": 5, 
-        "Solver": {
-            "Tol": 1e-10, 
-            "Iter": 200
-        }, 
-        "DiffNeg": 0.01, 
-        "NitschePenalty": 50, 
-        "XFEMReduced": 0.05, 
-        "HPos": 1, 
-        "HNeg": 0.5, 
-        "DiffPos": 0.005
-    }, 
-    "SurfTransp": {
-        "XFEMReduced": -1.0, 
-        "Enable": 0, 
-        "Visc": 1e-05, 
-        "Solver": {
-            "Tol": 1e-10, 
-            "Iter": 1000
-        }
     }, 
     "VTK": {
         "VTKDir": "vtk", 
@@ -187,8 +130,5 @@
         "OutputGrid": "mg/marangoniLvl3_grid",
         "OutputData": "mg/marangoniLvl3_data", 
         "OutputFreq": 0
-    },
-
-    "varTensionFunc": "ConstGradTau_y" 
-
+    }
 }

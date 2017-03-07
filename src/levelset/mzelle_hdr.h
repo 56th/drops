@@ -710,7 +710,7 @@ DROPS::Point3DCL gsigma (const DROPS::Point3DCL&, double) { return DROPS::Point3
 double lin_in_y(const DROPS::Point3DCL& p)  // linear function in y-direction, zero in the middle of the domain
 {
     static double sigma = P.get<double>("NavStokes.Coeff.SurfTens.SurfTension",1.0); // surface tension coefficient sigma : if tau is a variable, sigma is the constant part of tau.
-    static double Ly = P.get<DROPS::Point3DCL>("Domain.E2")[1];  // domain size in y
+    static double Ly = P.get<DROPS::Point3DCL>("Mesh.E2")[1];  // domain size in y
     static double grad_tau = P.get<double>("SurfTens.GradTau", 0.);  // gradient of tau
 
     return sigma + (p[1] - Ly*0.5)*grad_tau;  // grad_tau is the gradient of tau in y-direction

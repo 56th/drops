@@ -8,15 +8,11 @@
         "DynamicLibsPrefix": "../", 
         "ProgressBar": 1
     }, 
-    "_comment": "#=============================================================\n\n#    DROPS parameter file for twophasedrops\n\n#    simulation of two-phase flow:\n\n#    droplet in measuring cell used in NMR measurements\n\n#=============================================================\n\n# time stepping", 
     "Time": {
         "NumSteps": 10000, 
         "Scheme": 1, 
         "FinalTime": 2, 
         "Theta": 1
-    }, 
-    "Stokes": {
-        "_comment": "# flow solver"
     }, 
     "CouplingSolver": {
         "Iter": 10, 
@@ -69,20 +65,6 @@
             }
         }
     }, 
-    "Deprecated": {
-        "Default": {
-            "Levelset": {
-                "CurvDiff": -1
-            }, 
-            "Smoothzone": 0.0001, 
-            "Projection": 0, 
-            "Downwind": 0.866
-        }, 
-        "Theta": 0.5, 
-        "Reparam": {
-            "NarrowBand": -1
-        }
-    }, 
     "Levelset": {
         "PosDrop": [
             0, 
@@ -90,7 +72,6 @@
             0
         ], 
         "Discontinuous": 0, 
-        "_comment": "# levelset solver", 
         "Reparam": {
             "Freq": 10, 
             "MinGrad": 0.1, 
@@ -105,12 +86,6 @@
         "VolCorrection": 1, 
         "SD": 0.1
     }, 
-    "Reparam": {
-        "_comment": "# re-initialization of levelset function"
-    }, 
-    "AdaptRef": {
-        "_comment": "# adaptive refinement"
-    }, 
     "Mesh": {
         "Type": "ReadMeshBuilder", 
         //"MeshFile_convertTo_E1E2E3_N1N2N3": "../../meshes/NMR_05.msh", 
@@ -124,12 +99,6 @@
             "Width": 0.00025
         }
     }, 
-    "Mat": {
-        "_comment": "# material data, all units are SI"
-    }, 
-    "Exp": {
-        "_comment": "# experimental conditions"
-    }, 
     "Inflow": {
         "InflowAmpl": 0, 
         "FlowDir": 1, 
@@ -137,61 +106,18 @@
         "InflowFreq": 0, 
         "RadInlet": 0.0036
     }, 
-    "SurfTens": {
-        "_comment": "# surface tension"
-    }, 
-    "Transp": {
-        "Enable": 0, 
-        "IniCPos": 0.1, 
-        "IniCNeg": 5, 
-        "Solver": {
-            "Tol": 1e-10, 
-            "Iter": 200
-        }, 
-        "_comment": "# mass transport", 
-        "NitschePenalty": 0, 
-        "XFEMReduced": 0.1, 
-        "HPos": 1, 
-        "HNeg": 0.5, 
-        "DiffPos": 0.005, 
-        "DiffNeg": 0.01
-    }, 
-    "SurfTransp": {
-        "XFEMReduced": -1.0, 
-        "_comment": "# surfactant transport", 
-        "Enable": 0, 
-        "Visc": 1e-05, 
-        "Solver": {
-            "Tol": 1e-10, 
-            "Iter": 1000
-        }
-    }, 
-    "Ensight": {
-        "Binary": 0, 
-        "EnsightOut": 0, 
-        "MasterOut": 1, 
-        "_comment": "# Ensight settings", 
-        "EnsDir": "ensight", 
-        "EnsCase": "nsmzi", 
-        "GeomName": "nsmzi"
-    }, 
     "VTK": {
         "VTKDir": "vtk", 
         "Binary": 1, 
-        "_comment": "#VTK output", 
         "Freq": 1, 
         "VTKName": "nsmzi"
     }, 
     "Restart": {
         "Binary": 0, 
-        "_comment": "# Write out results, read in for restart", 
         "OutputGrid": "out/grid",
         "OutputData": "out/data", 
         "OutputOverwrite": 1, 
         "InputData": "", 
         "OutputFreq": 1
-    }, 
-    "DomainCond": {
-        "_comment": "# domain, bnd/ini conditions"
     }
 }

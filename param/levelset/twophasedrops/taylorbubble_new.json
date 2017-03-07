@@ -75,10 +75,11 @@
     "Levelset": {
        "BoundaryData":
         {
-                "5":      ["DirBC","SmallDistance"]
+                "5":      ["DirBC","SmallDistance"]   // causes trouble!!!
             
         },
         "Discontinuous": 0, 
+        "InitialVolume": 472.5e-09,
         "VolCorrection": 1, 
         "InitialValue": "TaylorFlowDistance", 
         "Reparam": {
@@ -126,19 +127,6 @@
         "InflowVel": 0, 
         "InflowFreq": 0, 
         "RadInlet": 0.001
-    }, 
-    "Exp": {
-        "InitialVolume": 472.5e-09
-       
-    }, 
-    "SurfTransp": {
-        "XFEMReduced": -1.0, 
-        "Enable": 0, 
-        "Visc": 1e-05, 
-        "Solver": {
-            "Tol": 1e-10, 
-            "Iter": 1000
-        }
     }, 
     "VTK": {
         "VTKDir": "vtk", 

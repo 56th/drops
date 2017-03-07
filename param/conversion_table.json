@@ -32,6 +32,7 @@
                 "XFEMStab":             "NavStokes.XFEMReduced",    // #[->NavStokes.XFEMReduced]threshold for discarding additional dof parameters in
                                                 // the XFEM pressure space. Using a negative value
                                                 // yields the standard FEM pressure space.
+                "epsP":                 "NavStokes.GhostPenalty",
                 "Theta":                "Time.Theta"       // #[-> Time] controls the implicitness of the theta-scheme
                                                 // for time discretization of the Navier-Stokes and
                                                 // level set equations. Theta = 0 yields the explicit and
