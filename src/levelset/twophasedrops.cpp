@@ -192,13 +192,13 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         if (InitialLSet.find("Cylinder")==0)
             Vol = CylinderCL::GetVolume();
         std::cout << "initial rel. volume: " << lset.GetVolume()/Vol << std::endl;
-        lset.SetGlobalReferenceVolume( Vol);
+        lset.InitVolume( Vol);
         lset.AdjustVolume();
         std::cout << "initial lset volume adjustment:\n";
         lset.GetVolumeAdjuster()->DebugOutput( std::cout);
     } else {
         Vol = lset.GetVolume();
-        lset.SetGlobalReferenceVolume( Vol);
+        lset.InitVolume( Vol);
     }
 
     Stokes.CreateNumberingVel( MG.GetLastLevel(), vidx, periodic_match);

@@ -215,7 +215,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     LSInit( mg, lset2.Phi, &sphere_2move, 0.);
 
     const double Vol= lset.GetVolume();
-    lset.SetGlobalReferenceVolume( Vol);
+    lset.InitVolume( Vol);
     std::cout << "droplet volume: " << Vol << std::endl;
 
     BndDataCL<Point3DCL> Bnd_v( 6, bc, bf);

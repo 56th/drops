@@ -865,9 +865,9 @@ void LevelsetP2CL::AdjustVolume () const
     volume_adjuster_->AdjustVolume();
 }
 
-void LevelsetP2CL::SetGlobalReferenceVolume (double vol)
+void LevelsetP2CL::InitVolume (double vol)
 {
-    volume_adjuster_->SetGlobalReferenceVolume (vol);
+    volume_adjuster_->InitVolume (vol);
 }
 
 void LevelsetP2CL::SmoothPhi( VectorCL& SmPhi, double diff) const
@@ -1070,6 +1070,15 @@ LevelsetRepairCL::post_refine ()
     ls_.UpdateContinuous();
 }
 
+void
+LevelsetRepairCL::pre_refine_sequence ()
+{}
+
+void
+LevelsetRepairCL::post_refine_sequence ()
+{
+    ls_.GetVolumeAdjuster()->Repair();
+}
 
 //*****************************************************************************
 //                               LevelsetModifyCL
@@ -1077,15 +1086,12 @@ LevelsetRepairCL::post_refine ()
 void LevelsetModifyCL::maybeDoReparam( LevelsetP2CL& lset)
 {
     bool doReparam= rpm_Freq_ && step_%rpm_Freq_ == 0;
-    bool doVolCorr= lvs_VolCorrection_ && step_%lvs_VolCorrection_ == 0;
-
     double lsetmaxGradPhi, lsetminGradPhi;
 
     if (doReparam) {
         lset.GetMaxMinGradPhi( lsetmaxGradPhi, lsetminGradPhi);
         doReparam = (lsetmaxGradPhi > rpm_MaxGrad_ || lsetminGradPhi < rpm_MinGrad_);
     }
-
     // reparam levelset function
     if (doReparam) {
         std::cout << "before reparametrization: minGradPhi " << lsetminGradPhi << "\tmaxGradPhi " << lsetmaxGradPhi << '\n';
@@ -1093,7 +1099,7 @@ void LevelsetModifyCL::maybeDoReparam( LevelsetP2CL& lset)
         lset.GetMaxMinGradPhi( lsetmaxGradPhi, lsetminGradPhi);
         std::cout << "after  reparametrization: minGradPhi " << lsetminGradPhi << "\tmaxGradPhi " << lsetmaxGradPhi << '\n';
         // volume correction after reparametrization
-        if (doVolCorr) {
+        if (lvs_VolCorrection_ != 0) {
             lset.AdjustVolume();
             lset.GetVolumeAdjuster()->DebugOutput (std::cout);
         }
@@ -1101,8 +1107,7 @@ void LevelsetModifyCL::maybeDoReparam( LevelsetP2CL& lset)
 }
 
 void LevelsetModifyCL::maybeDoVolCorr( LevelsetP2CL& lset) {
-    const bool doVolCorr= lvs_VolCorrection_ && step_%lvs_VolCorrection_ == 0;
-    if (doVolCorr) {
+    if (lvs_VolCorrection_ != 0) {
         lset.AdjustVolume();
         lset.GetVolumeAdjuster()->DebugOutput (std::cout);
     }

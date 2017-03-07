@@ -163,8 +163,9 @@ LevelsetP2CL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, F
     double GetVolume( double translation= 0, int l= 2) const;
     /// Volume correction to ensure no loss or gain of mass.
     void AdjustVolume() const;
-    void SetGlobalReferenceVolume (double vol);
+    void InitVolume (double vol);
     const VolumeAdjustmentCL* GetVolumeAdjuster() const { return volume_adjuster_.get(); }
+    VolumeAdjustmentCL* GetVolumeAdjuster() { return volume_adjuster_.get(); }
     /// Apply smoothing to \a SmPhi, if curvDiff_ > 0
     void MaybeSmooth( VectorCL& SmPhi) const { if (curvDiff_>0) SmoothPhi( SmPhi, curvDiff_); }
     /// Set type of surface force.
@@ -342,8 +343,8 @@ class LevelsetRepairCL : public MGObserverCL
     void pre_refine  ();
     void post_refine ();
 
-    void pre_refine_sequence  () {}
-    void post_refine_sequence () {}
+    void pre_refine_sequence  ();
+    void post_refine_sequence ();
     const IdxDescCL* GetIdxDesc() const { return ls_.Phi.RowIdx; }
 #ifdef _PAR
     const VectorCL*  GetVector()  const { return &ls_.Phi.Data; }

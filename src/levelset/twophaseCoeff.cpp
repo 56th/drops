@@ -220,6 +220,16 @@ namespace levelsetdistance{
         return x;
     }
 
+    double twodroplets( const DROPS::Point3DCL& p, double)
+    {
+        DROPS::Point3DCL midpoint_one; midpoint_one[0]=5.0;midpoint_one[1]=0.3;midpoint_one[2]=0.5;
+        DROPS::Point3DCL midpoint_two; midpoint_two[0]=5.0;midpoint_two[1]=0.7;midpoint_two[2]=0.5;
+        double dist_one= (p-midpoint_one).norm()-0.1;
+        double dist_two= (p-midpoint_two).norm()-0.15;
+        return std::min(dist_one,dist_two);
+    }
+
+    static DROPS::RegisterScalarFunction regsca_twodroplets("twodroplets", twodroplets);
     static DROPS::RegisterScalarFunction regsca_pdistx("planedistancex", planedistance<0>);
     static DROPS::RegisterScalarFunction regsca_pdisty("planedistancey", planedistance<1>);
     static DROPS::RegisterScalarFunction regsca_pdistz("planedistancez", planedistance<2>);

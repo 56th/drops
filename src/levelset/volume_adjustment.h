@@ -27,6 +27,9 @@
 
 #include <iosfwd>
 #include <memory>
+#include <valarray>
+#include <vector>
+#include "misc/container.h"
 
 namespace DROPS
 {
@@ -43,18 +46,22 @@ class VolumeAdjustmentCL
     double tol_= 1e-9;
     double global_reference_volume_= -1.0;
     int    num_subdivision_= 2;
+    
+    virtual void InitVolume_impl () {}
 
   public:
     static std::unique_ptr<VolumeAdjustmentCL> Create (LevelsetP2CL* lset, const ParamCL& P);
 
     VolumeAdjustmentCL (LevelsetP2CL* lset) : lset_ (lset) {}
+    virtual ~VolumeAdjustmentCL() {}
 
     VolumeAdjustmentCL& SetTol (double tol) {
         tol_= tol;
         return *this;
     }
-    VolumeAdjustmentCL& SetGlobalReferenceVolume (double refvol) {
+    VolumeAdjustmentCL& InitVolume (double refvol=-1.0) {
         global_reference_volume_= refvol;
+        InitVolume_impl();
         return *this;
     }
     VolumeAdjustmentCL& SetNumSubdivision (int numsubdiv) {
@@ -62,6 +69,7 @@ class VolumeAdjustmentCL
         return *this;
     }
 
+    virtual void Repair () {}  // called in LevelsetRepairCL::post_refine_sequence
     virtual void AdjustVolume () {}
     virtual void DebugOutput (std::ostream&) const;
 };
@@ -69,13 +77,60 @@ class VolumeAdjustmentCL
 class GlobalVolumeAdjustmentCL : public VolumeAdjustmentCL
 {
   private:
-    double dphi_;
+    double dphi_= 0.;
 
   public:
     GlobalVolumeAdjustmentCL (LevelsetP2CL* lset) : VolumeAdjustmentCL (lset) {}
 
     void AdjustVolume () override;
     void DebugOutput (std::ostream& os) const override;
+};
+
+
+
+// forward declarations
+class GraphComponentsCL;
+
+
+
+class ComponentBasedVolumeAdjustmentCL : public VolumeAdjustmentCL 
+{
+  private:
+      GraphComponentsCL& Split; // determines connected components and numbers them
+      std::valarray<double> Volumes; // volume per component
+      std::valarray<double> Volumes_backup; // old volumes per component
+      std::vector<Point3DCL> ReferencePoints; // markers for each connected component
+      std::vector<Point3DCL> ReferencePoints_backup; // old markers for each connected component
+      
+      double ComputeComponentAdjustment (int compnumber);
+      void CalculateInitialVolumes();
+      void CalculateVolumes(std::valarray<double>& volumes, std::valarray<double>* epsilons) const;
+      void FindReferencePoints();
+      void MatchComponents(); // uses the reference points to ensure a coherent numbering of the connected components between consecutive steps
+      void make_backup(bool complete=false);
+      
+      // Changes in Topology
+      bool Handle_topo_change();
+      
+      
+      double GetVolumeOfComponent(int i) {return Volumes[i];}
+      int GetNumberOfComponents() const;
+      Point3DCL GetReferencePoint(Uint i) {return ReferencePoints[i];}  
+      GraphComponentsCL& GetSplit();
+      
+      // initializes Split, Volumes and ReferencePoints plus their backups
+      void InitVolume_impl() override;
+
+      
+  public:
+      ComponentBasedVolumeAdjustmentCL(LevelsetP2CL* lset);
+      ~ComponentBasedVolumeAdjustmentCL();
+      
+      // initializes Split and Volumes, matches with the old components and recomputes ReferencePoints ... called after grid adaption
+      void Repair() override;
+      
+      void AdjustVolume () override;
+      void DebugOutput (std::ostream& os) const override;
 };
 
 } // end of namespace DROPS

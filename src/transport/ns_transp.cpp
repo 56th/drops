@@ -676,7 +676,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbndda
     DisplayUnks(Stokes, lset, MG);
 
     const double Vol= EllipsoidCL::GetVolume();
-    lset.SetGlobalReferenceVolume( Vol);
+    lset.InitVolume( Vol);
 
     std::cout << "initial volume: " << lset.GetVolume()/Vol << std::endl;
     lset.AdjustVolume();
