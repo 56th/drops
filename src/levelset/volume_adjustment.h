@@ -91,11 +91,30 @@ class GlobalVolumeAdjustmentCL : public VolumeAdjustmentCL
 // forward declarations
 class GraphComponentsCL;
 
+class ComponentCL
+{
+  public:
+    int c_= -1; // Number of this component;
+    double volume_= -1., // volume of this component
+           reference_volume_=-1.;
+    Point3DCL refPoint_; // marker for this connected component
+    bool doCorrection_= false;
+    std::valarray<double> char_function_;
+
+    ComponentCL (int c, double volume, double reference_volume, Point3DCL refPoint, bool doCorrection, const std::valarray<double>& char_function) : c_(c), volume_(volume), reference_volume_(reference_volume), refPoint_(refPoint), doCorrection_(doCorrection), char_function_(char_function) {}
+
+    void DebugOutput (std::ostream& os) const;
+};
 
 
 class ComponentBasedVolumeAdjustmentCL : public VolumeAdjustmentCL 
 {
   private:
+    std::vector<ComponentCL> components_,
+                             components_backup_;
+    std::vector<size_t> component_of_dof_,
+                        component_of_dof_backup_;
+
       GraphComponentsCL& Split; // determines connected components and numbers them
       std::valarray<double> Volumes; // volume per component
       std::valarray<double> Volumes_backup; // old volumes per component

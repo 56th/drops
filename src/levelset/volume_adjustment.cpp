@@ -109,10 +109,6 @@ void GlobalVolumeAdjustmentCL::DebugOutput (std::ostream& os) const
 }
 
 
-
-
-
-
 /// \brief Compute the strongly connected components of the directed graph
 //of a matrix.
 /// The square matrix M is interpreted as graph with vertices
@@ -407,10 +403,15 @@ void SetupAdjacency( MatrixCL& A, MatrixCL& B, const LevelsetP2CL& lset)
 }
 
 
-
+void ComponentCL::DebugOutput (std::ostream& os) const
+{
+     os << "c_: " << c_ << ", volume_: " << volume_ << ", reference_volume_: " << reference_volume_
+        << ", refPoint_: " << refPoint_ << ", doCorrection_: " << doCorrection_
+        << ", char_function_.sum(): " << char_function_.sum() << '\n';
+}
 
 ComponentBasedVolumeAdjustmentCL::ComponentBasedVolumeAdjustmentCL(LevelsetP2CL* lset)
-    : VolumeAdjustmentCL(lset),Split(*new GraphComponentsCL()) 
+    : VolumeAdjustmentCL(lset), Split(*new GraphComponentsCL()) 
 {}
 
 ComponentBasedVolumeAdjustmentCL::~ComponentBasedVolumeAdjustmentCL()
@@ -439,6 +440,17 @@ void ComponentBasedVolumeAdjustmentCL::InitVolume_impl()
     CalculateInitialVolumes();
     FindReferencePoints();
     make_backup(true);
+    Split.ExtendComponents(MeshAdja);
+    for (int c=0; c < (int)Split.num_components(); ++c) {
+        ComponentCL cp{c, Volumes[c], Volumes[c], ReferencePoints[c], Split.DoCorrection(c), Split.GetCharFunc (c)};
+        components_.push_back (cp);
+        components_backup_.push_back (cp);
+         
+    }
+    component_of_dof_= Split.component_map();
+    component_of_dof_backup_= Split.component_map();
+
+    DebugOutput (std::cout);
 }
       
 void ComponentBasedVolumeAdjustmentCL::Repair()
@@ -451,6 +463,19 @@ void ComponentBasedVolumeAdjustmentCL::Repair()
     MatchComponents();
     FindReferencePoints();
     make_backup();
+    Split.ExtendComponents(MeshAdja);
+
+    components_.clear();
+    components_backup_.clear();
+    for (int c=0; c < (int)Split.num_components(); ++c) {
+        ComponentCL cp{c, Volumes[c], Volumes[c], ReferencePoints[c], Split.DoCorrection(c), Split.GetCharFunc (c)};
+        components_.push_back (cp);
+        components_backup_.push_back (cp);
+         
+    }
+    component_of_dof_= Split.component_map();
+    component_of_dof_backup_= Split.component_map();
+    DebugOutput (std::cout);
 }
 
 void ComponentBasedVolumeAdjustmentCL::DebugOutput (std::ostream& os) const
@@ -459,6 +484,12 @@ void ComponentBasedVolumeAdjustmentCL::DebugOutput (std::ostream& os) const
     seq_out(std::begin(Volumes),std::end(Volumes),os,", ");
     os << std::endl << "ReferencePoints\n";
     seq_out(std::begin(ReferencePoints),std::end(ReferencePoints),os,", ");
+    os << std::endl << "components_:\n";
+    for (auto cp: components_)
+        cp.DebugOutput (os);
+    os << "components_backup_:\n";
+    for (auto cp: components_backup_)
+        cp.DebugOutput (os);
     os << std::endl;
 }
 
