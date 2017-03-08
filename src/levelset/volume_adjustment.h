@@ -115,40 +115,39 @@ class ComponentBasedVolumeAdjustmentCL : public VolumeAdjustmentCL
     std::vector<size_t> component_of_dof_,
                         component_of_dof_backup_;
 
-      GraphComponentsCL& Split; // determines connected components and numbers them
-      std::valarray<double> Volumes; // volume per component
-      std::valarray<double> Volumes_backup; // old volumes per component
-      std::vector<Point3DCL> ReferencePoints; // markers for each connected component
-      std::vector<Point3DCL> ReferencePoints_backup; // old markers for each connected component
-      
-      double ComputeComponentAdjustment (int compnumber);
-      double CalculateVolume(Uint c, double shift) const; // Compute volume of component c; for c == 0, shift must be 0.
-      void FindReferencePoints();
-      void MatchComponents(); // uses the reference points to ensure a coherent numbering of the connected components between consecutive steps
-      void make_backup(bool complete=false);
-      
-      // Changes in Topology
-      bool Handle_topo_change();
-      
-      
-      double GetVolumeOfComponent(int i) {return Volumes[i];}
-      Uint num_components() const;
-      Point3DCL GetReferencePoint(Uint i) {return ReferencePoints[i];}  
-      GraphComponentsCL& GetSplit();
-      
-      // initializes Split, Volumes and ReferencePoints plus their backups
-      void InitVolume_impl() override;
+    GraphComponentsCL& Split; // determines connected components and numbers them
+    std::valarray<double> Volumes; // volume per component
+    std::valarray<double> Volumes_backup; // old volumes per component
+    std::vector<Point3DCL> ReferencePoints; // markers for each connected component
+    std::vector<Point3DCL> ReferencePoints_backup; // old markers for each connected component
 
-      
+    double ComputeComponentAdjustment (int compnumber);
+    double CalculateVolume(Uint c, double shift) const; // Compute volume of component c; for c == 0, shift must be 0.
+    void FindReferencePoints();
+    void MatchComponents(); // uses the reference points to ensure a coherent numbering of the connected components between consecutive steps
+    void make_backup(bool complete=false);
+
+    // Changes in Topology
+    bool Handle_topo_change();
+
+
+    double GetVolumeOfComponent(int i) {return Volumes[i];}
+    Uint num_components() const;
+    Point3DCL GetReferencePoint(Uint i) {return ReferencePoints[i];}  
+    GraphComponentsCL& GetSplit();
+
+    // initializes Split, Volumes and ReferencePoints plus their backups
+    void InitVolume_impl() override;
+
   public:
-      ComponentBasedVolumeAdjustmentCL(LevelsetP2CL* lset);
-      ~ComponentBasedVolumeAdjustmentCL();
-      
-      // initializes Split and Volumes, matches with the old components and recomputes ReferencePoints ... called after grid adaption
-      void Repair() override;
-      
-      void AdjustVolume () override;
-      void DebugOutput (std::ostream& os) const override;
+    ComponentBasedVolumeAdjustmentCL(LevelsetP2CL* lset);
+    ~ComponentBasedVolumeAdjustmentCL();
+
+    // initializes Split and Volumes, matches with the old components and recomputes ReferencePoints ... called after grid adaption
+    void Repair() override;
+
+    void AdjustVolume () override;
+    void DebugOutput (std::ostream& os) const override;
 };
 
 } // end of namespace DROPS

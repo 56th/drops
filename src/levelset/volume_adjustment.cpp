@@ -410,9 +410,11 @@ void ComponentCL::DebugOutput (std::ostream& os) const
         << ", char_function_.sum(): " << char_function_.sum() << '\n';
 }
 
+
 //*****************************************************************************
 //                               ComponentBasedVolumeAdjustmentCL
 //*****************************************************************************
+
 ComponentBasedVolumeAdjustmentCL::ComponentBasedVolumeAdjustmentCL(LevelsetP2CL* lset)
     : VolumeAdjustmentCL(lset), Split(*new GraphComponentsCL()) 
 {}
@@ -434,7 +436,7 @@ GraphComponentsCL& ComponentBasedVolumeAdjustmentCL::GetSplit()
 }
 
 void ComponentBasedVolumeAdjustmentCL::InitVolume_impl()
-{              
+{
     MatrixCL CompAdja;
     MatrixCL MeshAdja;
     SetupAdjacency (CompAdja,MeshAdja, *lset_);
@@ -453,14 +455,14 @@ void ComponentBasedVolumeAdjustmentCL::InitVolume_impl()
         ComponentCL cp{c, Volumes[c], Volumes[c], ReferencePoints[c], Split.DoCorrection(c), Split.GetCharFunc (c)};
         components_.push_back (cp);
         components_backup_.push_back (cp);
-         
+
     }
     component_of_dof_= Split.component_map();
     component_of_dof_backup_= Split.component_map();
 
     DebugOutput (std::cout);
 }
-      
+
 void ComponentBasedVolumeAdjustmentCL::Repair()
 {
     MatrixCL CompAdja;
@@ -481,7 +483,6 @@ void ComponentBasedVolumeAdjustmentCL::Repair()
         ComponentCL cp{c, Volumes[c], Volumes[c], ReferencePoints[c], Split.DoCorrection(c), Split.GetCharFunc (c)};
         components_.push_back (cp);
         components_backup_.push_back (cp);
-         
     }
     component_of_dof_= Split.component_map();
     component_of_dof_backup_= Split.component_map();
@@ -504,7 +505,8 @@ void ComponentBasedVolumeAdjustmentCL::DebugOutput (std::ostream& os) const
 }
 
 
-void ComponentBasedVolumeAdjustmentCL::FindReferencePoints() {
+void ComponentBasedVolumeAdjustmentCL::FindReferencePoints()
+{
     std::vector<double> CurrentAbsMax(num_components(),std::numeric_limits<double>::min());
     ReferencePoints.clear();
     ReferencePoints.resize(num_components());
@@ -574,7 +576,8 @@ double ComponentBasedVolumeAdjustmentCL::ComputeComponentAdjustment (int c)
     );
 }
 
-void ComponentBasedVolumeAdjustmentCL::MatchComponents() {
+void ComponentBasedVolumeAdjustmentCL::MatchComponents()
+{
     Uint RPBS = ReferencePoints_backup.size();
 
     // Create and initialize temporary arrays to store the minimal distances to the reference points and the corresponding minimizer
@@ -612,14 +615,15 @@ void ComponentBasedVolumeAdjustmentCL::MatchComponents() {
     Split.write_component_map() = temp;                                // fill the new information into the private member "component_" of Split
 }
 
-void ComponentBasedVolumeAdjustmentCL::AdjustVolume() {
+void ComponentBasedVolumeAdjustmentCL::AdjustVolume()
+{
     MatrixCL ComponentAdja;
     MatrixCL FullAdja;
     SetupAdjacency(ComponentAdja, FullAdja, *lset_);
     Split.number_connected_components(ComponentAdja);
     Split.renumber_components(*lset_); // after this step component 0 is the surrounding liquid
     Volumes.resize (Split.num_components()); // neccessary to make num_components() return the current number of components.
-    
+
     FindReferencePoints();
     for (Uint c= 0; c < Volumes.size(); ++c)
         Volumes[c]= CalculateVolume(c, 0.);
@@ -647,14 +651,16 @@ void ComponentBasedVolumeAdjustmentCL::AdjustVolume() {
     make_backup();
 }
 
-void ComponentBasedVolumeAdjustmentCL::make_backup(bool complete) {
+void ComponentBasedVolumeAdjustmentCL::make_backup(bool complete)
+{
     Split.make_backup();
     ReferencePoints_backup=ReferencePoints;
     if(complete)
         Volumes_backup=Volumes;
 }
 
-bool ComponentBasedVolumeAdjustmentCL::Handle_topo_change(){
+bool ComponentBasedVolumeAdjustmentCL::Handle_topo_change()
+{
     bool change=false;
     Uint RPS =ReferencePoints.size();
     Uint RPBS=ReferencePoints_backup.size();
@@ -777,9 +783,5 @@ bool ComponentBasedVolumeAdjustmentCL::Handle_topo_change(){
     }
     return change;
 }
-
-
-
-
 
 } // end of namespace DROPS
