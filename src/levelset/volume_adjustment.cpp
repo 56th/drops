@@ -120,113 +120,31 @@ void GlobalVolumeAdjustmentCL::DebugOutput (std::ostream& os) const
 //breadth-first search.
 class GraphComponentsCL
 {
-private:
- std::vector<size_t> component_;      ///< component[i] is the number of the component of i.
- std::vector<size_t> component_backup_;
+  private:
+   std::vector<size_t> component_;      ///< component[i] is the number of the component of i.
+   std::vector<size_t> component_size_; ///< number of elements in component i.
 
- std::vector<size_t> extendedcomponent_;      ///< extendedcomponent[i] is the number of the extended component of i.
- std::vector<bool> DoCorrection_;
- std::vector<std::valarray<double> > comp_char_functions;
-
-
- /// \brief Extend all components but the one with number 0 by one level
- void ExtendOneStep( const MatrixCL& A, const std::vector<size_t>& helper);
-
- std::vector<size_t> component_size_; ///< number of elements in component i.
  /// \brief Perform a breadth-first search to discover the connected component of v.
- template < class T>
-   void visit_connected_component_of (size_t v, const SparseMatBaseCL<T>& M);
+   template < class T>
+     void visit_connected_component_of (size_t v, const SparseMatBaseCL<T>& M);
 
-public:
- /// \brief Enumerate the connected components of the graph of M.
- template <class T>
-   void number_connected_components (const SparseMatBaseCL<T>& M);
- /// \brief Number of strongly connected components.
- size_t                     num_components () const { return component_size_.size(); }
- /// \brief component_map()[i] is the number of the component, to which vertex i belongs.
- const std::vector<size_t>& component_map  () const { return component_; }
- const std::vector<size_t>& component_map_backup () const { return component_backup_; }
- const std::vector<size_t>& extended_component_map  () const { return extendedcomponent_; }
- bool DoCorrection (size_t x) const { return DoCorrection_[x]; }
- void make_backup() {component_backup_=component_;}
- void clear() {component_.clear(); component_backup_.clear(); extendedcomponent_.clear(); DoCorrection_.clear(); comp_char_functions.clear(); }
+  public:
+    /// \brief Enumerate the connected components of the graph of M.
+    template <class T>
+    void number_connected_components (const SparseMatBaseCL<T>& M);
+    /// \brief Number of strongly connected components.
+    size_t                     num_components () const { return component_size_.size(); }
+    /// \brief component_map()[i] is the number of the component, to which vertex i belongs.
+    const std::vector<size_t>& component_map  () const { return component_; }
+    void clear() { component_.clear(); component_size_.clear(); }
 
- std::vector<size_t>& write_component_map  () { return component_; }
-
- /// \brief component(c) contains all vertices in component c. The vertices are in ascending order.
- std::vector<size_t> component  (size_t c) const;
- /// \brief the number of vertices in component i.
- const std::vector<size_t>& component_size () const { return component_size_; }
- /// \brief High-level overview of the numbering process.
- inline void stats (std::ostream& os) const;
- /// \brief Renumbers the components in such a way, that the outer phase is always component 0
- void renumber_components(const LevelsetP2CL& lset);
- /// \brief Extends the connectivity components by a neighborhood of 2 DOFs
- void ExtendComponents(const MatrixCL& A);
- /// \brief This routine is called later in the process to generate characteristic functions for all the components
- void GenerateCharFunctions();
-
- const std::valarray<double>& GetCharFunc (Uint Komp) const {return comp_char_functions[Komp];}
+    /// \brief component(c) contains all vertices in component c. The vertices are in ascending order.
+    std::vector<size_t> component  (size_t c) const;
+    /// \brief the number of vertices in component i.
+    const std::vector<size_t>& component_size () const { return component_size_; }
+    /// \brief High-level overview of the numbering process.
+    inline void stats (std::ostream& os) const;
 };
-
-void GraphComponentsCL::GenerateCharFunctions(){
-    // initialize functions... give them the right dimension first
-    comp_char_functions.clear();
-    comp_char_functions.resize(num_components(),std::valarray<double>(extendedcomponent_.size()));
-    // check every point in the extendedcomponent_-function for which component is present and write into the corresponding characteristic function
-    for(Uint j=0; j<extendedcomponent_.size(); ++j)
-        comp_char_functions[extendedcomponent_[j]][j]=1;
-}
-
-void GraphComponentsCL::ExtendComponents(const MatrixCL& A){
-    ExtendOneStep(A,component_);
-    std::vector<size_t> temp(extendedcomponent_);
-    ExtendOneStep(A,temp);
-    GenerateCharFunctions();
-}
-
-void GraphComponentsCL::ExtendOneStep(const MatrixCL& A, const std::vector<size_t>& helper){
-    extendedcomponent_=helper;
-    for (size_t i=0; i<A.num_rows(); ++i)
-    {
-        const size_t v0=i;
-        if (helper[v0]==0)
-            continue;
-        for(size_t j=A.row_beg(i); j!=A.row_beg(i+1); j++)
-        {
-            const size_t v1=A.col_ind(j);
-            if (helper[v1]==0)
-                extendedcomponent_[v1]=helper[v0];
-            if(helper[v1]!=0 && helper[v1]!=helper[v0])
-            {
-               DoCorrection_[helper[v0]]=false;
-               DoCorrection_[helper[v1]]=false;
-            }
-        }
-    }
-}
-
-void GraphComponentsCL::renumber_components(const LevelsetP2CL& lset)
-{
-    // This routine ensures that component 0 is always the _outer_ component, means the surrounding fluid, where the levelset function takes positiv values
-    Uint komponente0=0;
-    Uint ticker=0;
-    for(; ticker<lset.Phi.Data.size(); ++ticker)
-        if(lset.Phi.Data[ticker]>0)
-        {
-            komponente0=component_map()[ticker];
-            break;
-        }
-    if(ticker==lset.Phi.Data.size())
-        throw DROPSErrCL("GraphComponentsCL::renumber_components: komponente0 not found");
-    if(komponente0==0) return;
-    std::swap(component_size_[0], component_size_[komponente0]);
-    for (uint a=0; a<component_.size(); ++a)
-        if(component_[a]==0)
-            component_[a]=komponente0;
-        else if(component_[a]==komponente0)
-            component_[a]=0;
-}
 
 std::vector<size_t> GraphComponentsCL::component (size_t c) const
 {
@@ -239,7 +157,6 @@ std::vector<size_t> GraphComponentsCL::component (size_t c) const
 
     return ret;
 }
-
 
 template <typename T>
   void
@@ -255,8 +172,6 @@ template <typename T>
             component_size_.push_back( 0); ///< Initialize a new component.
             visit_connected_component_of( v, M);
         }
-    DoCorrection_.resize(0);
-    DoCorrection_.resize(num_components(),true);
 }
 
 template <typename T>
@@ -388,7 +303,7 @@ void AdjacencyAccuCL::update_global_system ()
     }
 }
 
-void SetupAdjacency( MatrixCL& A, MatrixCL& B, const LevelsetP2CL& lset)
+void SetupAdjacency (MatrixCL& A, MatrixCL& B, const LevelsetP2CL& lset)
 /// Set up matrix A
 {
     // TimerCL time;
@@ -416,13 +331,11 @@ void ComponentCL::DebugOutput (std::ostream& os) const
 //*****************************************************************************
 
 ComponentBasedVolumeAdjustmentCL::ComponentBasedVolumeAdjustmentCL(LevelsetP2CL* lset)
-    : VolumeAdjustmentCL(lset), Split(*new GraphComponentsCL()) 
+    : VolumeAdjustmentCL(lset) 
 {}
 
 ComponentBasedVolumeAdjustmentCL::~ComponentBasedVolumeAdjustmentCL()
-{
-    delete &Split;
-}
+{}
 
 
 Uint ComponentBasedVolumeAdjustmentCL::num_components() const
@@ -430,62 +343,121 @@ Uint ComponentBasedVolumeAdjustmentCL::num_components() const
     return Volumes.size();
 }
 
-GraphComponentsCL& ComponentBasedVolumeAdjustmentCL::GetSplit()
+void ComponentBasedVolumeAdjustmentCL::compute_indicator_functions (const MatrixCL& A)
 {
-    return Split;
+    doCorrection_= std::vector<bool> (num_components(), true);
+
+    const std::vector<size_t> tmp (ExtendOneStep (A, component_of_dof_, doCorrection_));
+    const std::vector<size_t> tmp2 (ExtendOneStep (A, tmp, doCorrection_));
+
+    indicator_functions_= std::vector<std::valarray<double>> (num_components(), std::valarray<double>(component_of_dof_.size()));
+    // For every point in tmp2, check which component is present and write into the corresponding characteristic function.
+    for(Uint j= 0; j < component_of_dof_.size(); ++j)
+        indicator_functions_[tmp2[j]][j]= 1.;
 }
 
-void ComponentBasedVolumeAdjustmentCL::InitVolume_impl()
+std::vector<size_t> ComponentBasedVolumeAdjustmentCL::ExtendOneStep(const MatrixCL& A,
+    const std::vector<size_t>& cp,
+    std::vector<bool>& doCorrection) const
+{
+    std::vector<size_t> ret (cp);
+    for (size_t i= 0; i < A.num_rows(); ++i) {
+        const size_t v0= i;
+        if (cp[v0] == 0)
+            continue;
+        for (size_t j= A.row_beg (i); j != A.row_beg(i+1); ++j) {
+            const size_t v1= A.col_ind (j);
+            if (cp[v1] == 0)
+                ret[v1]= cp[v0];
+            if (cp[v1] != 0 && cp[v1] != cp[v0]) {
+               doCorrection[cp[v0]]= false;
+               doCorrection[cp[v1]]= false;
+            }
+        }
+    }
+    return ret;
+}
+
+void ComponentBasedVolumeAdjustmentCL::FindComponents ()
 {
     MatrixCL CompAdja;
     MatrixCL MeshAdja;
-    SetupAdjacency (CompAdja,MeshAdja, *lset_);
+    SetupAdjacency (CompAdja, MeshAdja, *lset_);
+    GraphComponentsCL Split;
     Split.number_connected_components(CompAdja);
-    Split.renumber_components(*lset_);
+
+    component_of_dof_= Split.component_map();
+    renumber_components();
+    Volumes.resize (Split.num_components()); // neccessary to make num_components() return the current number of components.
+
+    compute_indicator_functions (MeshAdja);
+}
+
+std::vector<size_t> ComponentBasedVolumeAdjustmentCL::component (size_t c) const
+{
+    std::vector<size_t> ret;
+    for (size_t i= 0; i < component_of_dof_.size(); ++i)
+        if (component_of_dof_[i] == c)
+            ret.push_back( i);
+    return ret;
+}
+
+void ComponentBasedVolumeAdjustmentCL::renumber_components()
+{
+    // Ensure that component 0 is always the component, where the levelset function takes positive values.
+    const auto it= std::find_if (std::begin (lset_->Phi.Data), std::end (lset_->Phi.Data),
+        [](double ls)->bool { return ls > 0.; });
+    if (it == std::end (lset_->Phi.Data))
+        throw DROPSErrCL("ComponentBasedVolumeAdjustmentCL::renumber_components: No positive level set value found.\n");
+    const Uint cp0= component_of_dof_[it - std::begin (lset_->Phi.Data)];
+    if(cp0 == 0)
+        return;
+
+    for (auto& c: component_of_dof_)
+        if (c == 0)
+            c= cp0;
+        else if (c == cp0)
+            c= 0;
+}
+
+
+void ComponentBasedVolumeAdjustmentCL::InitVolume_impl()
+{
+    FindComponents();
 
     // Compute initial volumes.
-    Volumes.resize(Split.num_components());
     for (Uint c= 0; c < Volumes.size(); ++c)
         Volumes[c]= CalculateVolume(c, 0.);
 
     FindReferencePoints();
     make_backup(true);
-    Split.ExtendComponents(MeshAdja);
+
     for (Uint c= 0; c < num_components(); ++c) {
-        ComponentCL cp{c, Volumes[c], Volumes[c], ReferencePoints[c], Split.DoCorrection(c), Split.GetCharFunc (c)};
+        ComponentCL cp{c, Volumes[c], Volumes[c], ReferencePoints[c], doCorrection_[c], indicator_functions_[c]};
         components_.push_back (cp);
         components_backup_.push_back (cp);
 
     }
-    component_of_dof_= Split.component_map();
-    component_of_dof_backup_= Split.component_map();
-
     DebugOutput (std::cout);
 }
 
 void ComponentBasedVolumeAdjustmentCL::Repair()
 {
-    MatrixCL CompAdja;
-    MatrixCL MeshAdja;
-    SetupAdjacency (CompAdja,MeshAdja, *lset_);
-    Split.clear();
-    Split.number_connected_components(CompAdja);
-    if (num_components() != Split.num_components())
+    const Uint old_num_components= num_components();
+    FindComponents();
+    if (num_components() != old_num_components)
         throw DROPSErrCL ("ComponentBasedVolumeAdjustmentCL::Repair: The mesh adaption changed the number of connected components. This is currently not handled.\n");
     MatchComponents();
     FindReferencePoints();
     make_backup();
-    Split.ExtendComponents(MeshAdja);
 
     components_.clear();
     components_backup_.clear();
     for (Uint c= 0; c < num_components(); ++c) {
-        ComponentCL cp{c, Volumes[c], Volumes[c], ReferencePoints[c], Split.DoCorrection(c), Split.GetCharFunc (c)};
+        ComponentCL cp{c, Volumes[c], Volumes[c], ReferencePoints[c], doCorrection_[c], indicator_functions_[c]};
         components_.push_back (cp);
         components_backup_.push_back (cp);
     }
-    component_of_dof_= Split.component_map();
-    component_of_dof_backup_= Split.component_map();
     DebugOutput (std::cout);
 }
 
@@ -517,7 +489,7 @@ void ComponentBasedVolumeAdjustmentCL::FindReferencePoints()
         n.assign_indices_only(*it, lset_->idx.GetFinest());
         for (Uint a=0;a<10;a++) {
             if (n.WithUnknowns(a)) {
-                const Uint CurrentComponent = Split.component_map()[n.num[a]];
+                const Uint CurrentComponent = component_of_dof_[n.num[a]];
                 if (CurrentAbsMax[CurrentComponent] < std::abs(loc_phi[a])) {
                     ReferencePoints[CurrentComponent] = a<4? it->GetVertex(a)->GetCoord() : GetBaryCenter(*it->GetEdge(a-4));
                     CurrentAbsMax[CurrentComponent] = std::abs(loc_phi[a]);
@@ -540,7 +512,7 @@ double ComponentBasedVolumeAdjustmentCL::CalculateVolume(Uint c, double shift) c
     VecDescCL Copy(&lset_->idx);
     Copy.Data= lset_->Phi.Data;
     if (c > 0 && shift != 0.)
-        Copy.Data+= shift*Split.GetCharFunc(c);
+        Copy.Data+= shift*indicator_functions_[c];
 
     DROPS_FOR_TRIANG_TETRA( lset_->GetMG(), lset_->idx.TriangLevel(), it) {
         n.assign_indices_only(*it, lset_->idx.GetFinest());
@@ -549,9 +521,9 @@ double ComponentBasedVolumeAdjustmentCL::CalculateVolume(Uint c, double shift) c
         bool comp_exists = false;
         for (Uint a= 0; a < 10; a++)
             if (n.WithUnknowns(a)) {
-                if (Split.component_map()[n.num[a]] == c)
+                if (component_of_dof_[n.num[a]] == c)
                     comp_exists = true;
-                else if (c > 0 && Split.component_map()[n.num[a]] > 0)   // by definition, component 0 is the surrounding liquid
+                else if (c > 0 && component_of_dof_[n.num[a]] > 0)   // by definition, component 0 is the surrounding liquid
                     loc_phi[a] = 1.0;                   // remove negative components which are not the considered component c (this change does not alter the position of the boundary of component c
         }
         if (!comp_exists)
@@ -565,12 +537,10 @@ double ComponentBasedVolumeAdjustmentCL::CalculateVolume(Uint c, double shift) c
     return ret;
 }
 
-double ComponentBasedVolumeAdjustmentCL::ComputeComponentAdjustment (int c)
+double ComponentBasedVolumeAdjustmentCL::ComputeComponentAdjustment (Uint c)
 {
     return compute_volume_correction (
-        [this,c](double x)->double {
-            return CalculateVolume(c, x);
-        },
+        [this,c](double x)->double { return CalculateVolume(c, x); },
         Volumes_backup[c],
         tol_
     );
@@ -604,38 +574,31 @@ void ComponentBasedVolumeAdjustmentCL::MatchComponents()
     }
 
     // Create a temporary function to store the component in each DOF
-    std::vector<size_t> temp(Split.component_map().size());
+    std::vector<size_t> temp(component_of_dof_.size());
     for (Uint old_component_number=0; old_component_number<RPBS; ++old_component_number) {
-        const Uint new_component_number = Split.component_map()[globalIDs[old_component_number]];
-        const std::vector<size_t>& componentI = Split.component(new_component_number); // gather all points that belong to the component with the new component number
+        const Uint new_component_number = component_of_dof_[globalIDs[old_component_number]];
+        const std::vector<size_t> componentI= component (new_component_number); // gather all points that belong to the component with the new component number
         for (Uint it=0; it<componentI.size(); ++it) {
             temp[componentI[it]] = old_component_number;                              // "color" them with respect to the old component number, i.e. relabel them
         }
     }
-    Split.write_component_map() = temp;                                // fill the new information into the private member "component_" of Split
+    component_of_dof_= temp;                                // Fill in the new information.
 }
 
 void ComponentBasedVolumeAdjustmentCL::AdjustVolume()
 {
-    MatrixCL ComponentAdja;
-    MatrixCL FullAdja;
-    SetupAdjacency(ComponentAdja, FullAdja, *lset_);
-    Split.number_connected_components(ComponentAdja);
-    Split.renumber_components(*lset_); // after this step component 0 is the surrounding liquid
-    Volumes.resize (Split.num_components()); // neccessary to make num_components() return the current number of components.
-
+    FindComponents();
     FindReferencePoints();
     for (Uint c= 0; c < Volumes.size(); ++c)
         Volumes[c]= CalculateVolume(c, 0.);
     if (!Handle_topo_change())
         MatchComponents();
 
-    Split.ExtendComponents(FullAdja);
     // adapt Level Set
     for (Uint i= 1; i < num_components(); ++i) {
-        if (Split.DoCorrection(i)) {
+        if (doCorrection_[i]) {
             const double s= ComputeComponentAdjustment(i);
-            lset_->Phi.Data+=Split.GetCharFunc(i)*s;
+            lset_->Phi.Data+=indicator_functions_[i]*s;
             std::cout << "Adjustment for component " << i << ": " << s << "\n";
         }
         else {
@@ -644,8 +607,7 @@ void ComponentBasedVolumeAdjustmentCL::AdjustVolume()
     }
     FindReferencePoints();
     make_backup();
-    SetupAdjacency(ComponentAdja, FullAdja, *lset_);
-    Split.number_connected_components(ComponentAdja);
+    FindComponents();
     MatchComponents();
     FindReferencePoints();
     make_backup();
@@ -653,10 +615,10 @@ void ComponentBasedVolumeAdjustmentCL::AdjustVolume()
 
 void ComponentBasedVolumeAdjustmentCL::make_backup(bool complete)
 {
-    Split.make_backup();
-    ReferencePoints_backup=ReferencePoints;
+    component_of_dof_backup_= component_of_dof_;
+    ReferencePoints_backup= ReferencePoints;
     if(complete)
-        Volumes_backup=Volumes;
+        Volumes_backup= Volumes;
 }
 
 bool ComponentBasedVolumeAdjustmentCL::Handle_topo_change()
@@ -702,7 +664,7 @@ bool ComponentBasedVolumeAdjustmentCL::Handle_topo_change()
             }
             std::vector<size_t> OldAffiliation(RPS);
             for (Uint i=1; i<RPS; ++i)
-                OldAffiliation[i] = Split.component_map_backup()[temp[i]];///!!!
+                OldAffiliation[i] = component_of_dof_backup_[temp[i]];///!!!
             // in OldAffiliation one finds the hypothetical affiliation of the new reference points with respect to the old components
 
             std::vector<size_t> SortingCopy(OldAffiliation);
@@ -735,7 +697,7 @@ bool ComponentBasedVolumeAdjustmentCL::Handle_topo_change()
             for (Uint a=0; a<RPBS; ++a) {
                 if (a == *finder)
                     continue;
-                Volumes[Split.component_map()[ORPN[a]]]=Volumes_backup[Split.component_map_backup()[ORPN[a]]];
+                Volumes[component_of_dof_[ORPN[a]]]=Volumes_backup[component_of_dof_backup_[ORPN[a]]];
             }
             // new status for the further simulation
             Volumes_backup.resize(Volumes.size());
@@ -771,7 +733,7 @@ bool ComponentBasedVolumeAdjustmentCL::Handle_topo_change()
             for (Uint a=0; a<RPS; ++a) Volumes[a]=0;
             // run through all old reference points, check which old volume was present and add it to the new volume at the same place
             for (Uint b=0; b<RPBS; ++b)
-                Volumes[Split.component_map()[temp[b]]]+=Volumes_backup[Split.component_map_backup()[temp[b]]];
+                Volumes[component_of_dof_[temp[b]]]+=Volumes_backup[component_of_dof_backup_[temp[b]]];
             // from here on forward the simulation is newly set up... the component numbers are not conserved in this method
             // new status for the further simulation
             Volumes_backup.resize(Volumes.size());

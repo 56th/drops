@@ -30,6 +30,7 @@
 #include <valarray>
 #include <vector>
 #include "misc/container.h"
+#include "num/spmat.h"
 
 namespace DROPS
 {
@@ -46,7 +47,7 @@ class VolumeAdjustmentCL
     double tol_= 1e-9;
     double global_reference_volume_= -1.0;
     int    num_subdivision_= 2;
-    
+
     virtual void InitVolume_impl () {}
 
   public:
@@ -87,10 +88,6 @@ class GlobalVolumeAdjustmentCL : public VolumeAdjustmentCL
 };
 
 
-
-// forward declarations
-class GraphComponentsCL;
-
 class ComponentCL
 {
   public:
@@ -112,16 +109,28 @@ class ComponentBasedVolumeAdjustmentCL : public VolumeAdjustmentCL
   private:
     std::vector<ComponentCL> components_,
                              components_backup_;
-    std::vector<size_t> component_of_dof_,
-                        component_of_dof_backup_;
 
-    GraphComponentsCL& Split; // determines connected components and numbers them
-    std::valarray<double> Volumes; // volume per component
-    std::valarray<double> Volumes_backup; // old volumes per component
+    std::vector<size_t> component_of_dof_, ///< component_of_dof_[i] is the number of the component of dof i.
+                        component_of_dof_backup_;
+    std::vector<bool> doCorrection_;
+    std::vector<std::valarray<double> > indicator_functions_;
+
+    std::vector<double> Volumes; // volume per component
+    std::vector<double> Volumes_backup; // old volumes per component
     std::vector<Point3DCL> ReferencePoints; // markers for each connected component
     std::vector<Point3DCL> ReferencePoints_backup; // old markers for each connected component
 
-    double ComputeComponentAdjustment (int compnumber);
+    void FindComponents ();
+    /// \brief Renumbers the components in such a way, that the outer phase is always component 0
+    void renumber_components();
+    /// \brief Helper of compute_indicator_functions. Extend all components (except 0) by one level.
+ void ExtendOneStep( const MatrixCL& A, const std::vector<size_t>& helper);
+
+    std::vector<size_t> ExtendOneStep (const MatrixCL& A, const std::vector<size_t>& cp, std::vector<bool>& doCorrection) const;
+    void compute_indicator_functions (const MatrixCL&);
+    std::vector<size_t> component (size_t c) const; // Returns a vector with all dofs in component c.
+
+    double ComputeComponentAdjustment (Uint c);
     double CalculateVolume(Uint c, double shift) const; // Compute volume of component c; for c == 0, shift must be 0.
     void FindReferencePoints();
     void MatchComponents(); // uses the reference points to ensure a coherent numbering of the connected components between consecutive steps
@@ -134,7 +143,6 @@ class ComponentBasedVolumeAdjustmentCL : public VolumeAdjustmentCL
     double GetVolumeOfComponent(int i) {return Volumes[i];}
     Uint num_components() const;
     Point3DCL GetReferencePoint(Uint i) {return ReferencePoints[i];}  
-    GraphComponentsCL& GetSplit();
 
     // initializes Split, Volumes and ReferencePoints plus their backups
     void InitVolume_impl() override;
