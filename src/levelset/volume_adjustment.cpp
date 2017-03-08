@@ -410,6 +410,9 @@ void ComponentCL::DebugOutput (std::ostream& os) const
         << ", char_function_.sum(): " << char_function_.sum() << '\n';
 }
 
+//*****************************************************************************
+//                               ComponentBasedVolumeAdjustmentCL
+//*****************************************************************************
 ComponentBasedVolumeAdjustmentCL::ComponentBasedVolumeAdjustmentCL(LevelsetP2CL* lset)
     : VolumeAdjustmentCL(lset), Split(*new GraphComponentsCL()) 
 {}
@@ -437,7 +440,12 @@ void ComponentBasedVolumeAdjustmentCL::InitVolume_impl()
     SetupAdjacency (CompAdja,MeshAdja, *lset_);
     Split.number_connected_components(CompAdja);
     Split.renumber_components(*lset_);
-    CalculateInitialVolumes();
+
+    // Compute initial volumes.
+    Volumes.resize(Split.num_components());
+    for (Uint c= 0; c < Volumes.size(); ++c)
+        Volumes[c]= CalculateVolume(c, 0.);
+
     FindReferencePoints();
     make_backup(true);
     Split.ExtendComponents(MeshAdja);
@@ -494,10 +502,6 @@ void ComponentBasedVolumeAdjustmentCL::DebugOutput (std::ostream& os) const
 }
 
 
-//*****************************************************************************
-//                               ComponentBasedVolumeAdjustmentCL
-//*****************************************************************************
-
 void ComponentBasedVolumeAdjustmentCL::FindReferencePoints() {
     std::vector<double> CurrentAbsMax(GetNumberOfComponents(),std::numeric_limits<double>::min());
     ReferencePoints.clear();
@@ -519,17 +523,10 @@ void ComponentBasedVolumeAdjustmentCL::FindReferencePoints() {
     }
 }
 
-void ComponentBasedVolumeAdjustmentCL::CalculateInitialVolumes() {
-    CalculateVolumes(Volumes, 0);
-    std::cout << "Initial Volumes" << std::endl;
-    for (Uint i=0; i<Volumes.size(); ++i)
-        std::cout << "Component "<< i << ": " << Volumes[i] << std::endl;
-}
-
-void ComponentBasedVolumeAdjustmentCL::CalculateVolumes(std::valarray<double>& volumes, std::valarray<double>* epsilons) const {
-    volumes.resize(0);
-    volumes.resize(Split.num_components());
-    const PrincipalLatticeCL& lat= PrincipalLatticeCL::instance ( 2);
+double ComponentBasedVolumeAdjustmentCL::CalculateVolume(Uint c, double shift) const
+{
+    double ret= 0.;
+    const PrincipalLatticeCL& lat= PrincipalLatticeCL::instance (2);
     std::valarray<double> ls_values (lat.vertex_size());
     QuadDomainCL qdom;
     LocalP2CL<> loc_phi;
@@ -537,70 +534,40 @@ void ComponentBasedVolumeAdjustmentCL::CalculateVolumes(std::valarray<double>& v
     LocalNumbP2CL n;
 
     VecDescCL Copy(&lset_->idx);
-    Copy.Data=lset_->Phi.Data;
+    Copy.Data= lset_->Phi.Data;
+    if (c > 0 && shift != 0.)
+        Copy.Data+= shift*Split.GetCharFunc(c);
 
-    if (epsilons!=0)
-        for (Uint i=0; i<epsilons->size(); ++i)
-            Copy.Data+=(*epsilons)[i]*Split.GetCharFunc(i);
-
-//    DROPS_FOR_TRIANG_TETRA( lset_->GetMG(), lset_->idx.TriangLevel(), it) {
-//        loc_phi.assign(*it,Copy,lset_->GetBndData());
-//        evaluate_on_vertexes (loc_phi, lat, Addr(ls_values));
-//        partition.make_partition< SortedVertexPolicyCL,MergeCutPolicyCL>(lat, ls_values);
-//        make_CompositeQuad3Domain( qdom, partition);
-//        DROPS::GridFunctionCL<> integrand( 1., qdom.vertex_size());
-//        n.assign_indices_only(*it, lset_->idx);
-//        for(uint a=0;a<10;a++)
-//            if(n.WithUnknowns(a) && Split.component_map()[n.num[a]]){
-//                // run over all DOF within the tetrahedron and check the values of component_map()[i] to decide, to which component the volume should be added
-//                volumes[Split.component_map()[n.num[a]]]+= quad( integrand, it->GetVolume()*6., qdom, NegTetraC);
-//                break;         // component 0 is the surrounding fluid
-//            }
-//        volumes[0]+= quad( integrand, it->GetVolume()*6., qdom, PosTetraC); // Volume of the positive part is always added to the surrounding fluid
-//    }
-
-    LocalP2CL<double> changed_loc_phi;
     DROPS_FOR_TRIANG_TETRA( lset_->GetMG(), lset_->idx.TriangLevel(), it) {
         n.assign_indices_only(*it, lset_->idx.GetFinest());
         loc_phi.assign(*it,Copy,lset_->GetBndData());
 
-        for (uint k=1;k<Split.num_components() ; k++) {
-            changed_loc_phi = loc_phi;
-            bool comp_exists = false;
-            for (uint a=0;a<10;a++)
-                 if (n.WithUnknowns(a)) {
-                     if (Split.component_map()[n.num[a]] == k)
-                         comp_exists = true;
-                     else if (Split.component_map()[n.num[a]] > 0)   // by definition, component 0 is the surrounding liquid
-                         changed_loc_phi[a] = 1.0;                   // remove negative components which are not the considered component k (this change does not alter the position of the boundary of component k
-                 }
-            if (!comp_exists)
-                continue;
-            evaluate_on_vertexes (changed_loc_phi, lat, Addr(ls_values));
-            partition.make_partition< SortedVertexPolicyCL,MergeCutPolicyCL>(lat, ls_values);
-            make_CompositeQuad3Domain( qdom, partition);
-            DROPS::GridFunctionCL<> integrand( 1., qdom.vertex_size());
-            volumes[k]+= quad( integrand, it->GetVolume()*6., qdom, NegTetraC);   // all remaining negative parts are of component k
+        bool comp_exists = false;
+        for (Uint a= 0; a < 10; a++)
+            if (n.WithUnknowns(a)) {
+                if (Split.component_map()[n.num[a]] == c)
+                    comp_exists = true;
+                else if (c > 0 && Split.component_map()[n.num[a]] > 0)   // by definition, component 0 is the surrounding liquid
+                    loc_phi[a] = 1.0;                   // remove negative components which are not the considered component c (this change does not alter the position of the boundary of component c
         }
-
+        if (!comp_exists)
+            continue;
         evaluate_on_vertexes (loc_phi, lat, Addr(ls_values));
-        partition.make_partition< SortedVertexPolicyCL,MergeCutPolicyCL>(lat, ls_values);
-        make_CompositeQuad3Domain( qdom, partition);
-        DROPS::GridFunctionCL<> integrand( 1., qdom.vertex_size());
-        volumes[0]+= quad( integrand, it->GetVolume()*6., qdom, PosTetraC); // Volume of the positive part is always added to the surrounding fluid
+        partition.make_partition< SortedVertexPolicyCL,MergeCutPolicyCL> (lat, ls_values);
+        make_CompositeQuad3Domain (qdom, partition);
+        DROPS::GridFunctionCL<> integrand (1., qdom.vertex_size());
+        ret+= quad( integrand, it->GetVolume()*6., qdom, c > 0 ? NegTetraC : PosTetraC);
     }
+    return ret;
 }
 
-double ComponentBasedVolumeAdjustmentCL::ComputeComponentAdjustment (int compnumber)
+double ComponentBasedVolumeAdjustmentCL::ComputeComponentAdjustment (int c)
 {
     return compute_volume_correction (
-        [this,compnumber](double x)->double {
-            std::valarray<double> shift(Split.num_components());
-            shift[compnumber]=x;
-            CalculateVolumes(Volumes, &shift);
-            return Volumes[compnumber];
+        [this,c](double x)->double {
+            return CalculateVolume(c, x);
         },
-        Volumes_backup[compnumber],
+        Volumes_backup[c],
         tol_
     );
 }
@@ -650,7 +617,8 @@ void ComponentBasedVolumeAdjustmentCL::AdjustVolume() {
     Split.number_connected_components(ComponentAdja);
     Split.renumber_components(*lset_); // after this step component 0 is the surrounding liquid
     FindReferencePoints();
-    CalculateVolumes(Volumes, 0);
+    for (Uint c= 0; c < Volumes.size(); ++c)
+        Volumes[c]= CalculateVolume(c, 0.);
     if (!Handle_topo_change())
         MatchComponents();
 
