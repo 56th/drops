@@ -423,9 +423,9 @@ ComponentBasedVolumeAdjustmentCL::~ComponentBasedVolumeAdjustmentCL()
 }
 
 
-int ComponentBasedVolumeAdjustmentCL::GetNumberOfComponents() const
+Uint ComponentBasedVolumeAdjustmentCL::num_components() const
 {
-    return Split.num_components();
+    return Volumes.size();
 }
 
 GraphComponentsCL& ComponentBasedVolumeAdjustmentCL::GetSplit()
@@ -449,7 +449,7 @@ void ComponentBasedVolumeAdjustmentCL::InitVolume_impl()
     FindReferencePoints();
     make_backup(true);
     Split.ExtendComponents(MeshAdja);
-    for (int c=0; c < (int)Split.num_components(); ++c) {
+    for (Uint c= 0; c < num_components(); ++c) {
         ComponentCL cp{c, Volumes[c], Volumes[c], ReferencePoints[c], Split.DoCorrection(c), Split.GetCharFunc (c)};
         components_.push_back (cp);
         components_backup_.push_back (cp);
@@ -468,6 +468,8 @@ void ComponentBasedVolumeAdjustmentCL::Repair()
     SetupAdjacency (CompAdja,MeshAdja, *lset_);
     Split.clear();
     Split.number_connected_components(CompAdja);
+    if (num_components() != Split.num_components())
+        throw DROPSErrCL ("ComponentBasedVolumeAdjustmentCL::Repair: The mesh adaption changed the number of connected components. This is currently not handled.\n");
     MatchComponents();
     FindReferencePoints();
     make_backup();
@@ -475,7 +477,7 @@ void ComponentBasedVolumeAdjustmentCL::Repair()
 
     components_.clear();
     components_backup_.clear();
-    for (int c=0; c < (int)Split.num_components(); ++c) {
+    for (Uint c= 0; c < num_components(); ++c) {
         ComponentCL cp{c, Volumes[c], Volumes[c], ReferencePoints[c], Split.DoCorrection(c), Split.GetCharFunc (c)};
         components_.push_back (cp);
         components_backup_.push_back (cp);
@@ -488,7 +490,7 @@ void ComponentBasedVolumeAdjustmentCL::Repair()
 
 void ComponentBasedVolumeAdjustmentCL::DebugOutput (std::ostream& os) const
 {
-    os << "ComponentBasedVolumeAdjustmentCL::Number of components " << GetNumberOfComponents() << "\nVolumes ";
+    os << "ComponentBasedVolumeAdjustmentCL::Number of components " << num_components() << "\nVolumes ";
     seq_out(std::begin(Volumes),std::end(Volumes),os,", ");
     os << std::endl << "ReferencePoints\n";
     seq_out(std::begin(ReferencePoints),std::end(ReferencePoints),os,", ");
@@ -503,9 +505,9 @@ void ComponentBasedVolumeAdjustmentCL::DebugOutput (std::ostream& os) const
 
 
 void ComponentBasedVolumeAdjustmentCL::FindReferencePoints() {
-    std::vector<double> CurrentAbsMax(GetNumberOfComponents(),std::numeric_limits<double>::min());
+    std::vector<double> CurrentAbsMax(num_components(),std::numeric_limits<double>::min());
     ReferencePoints.clear();
-    ReferencePoints.resize(GetNumberOfComponents());
+    ReferencePoints.resize(num_components());
     LocalNumbP2CL n;
     LocalP2CL<> loc_phi;
     DROPS_FOR_TRIANG_TETRA( lset_->GetMG(), lset_->idx.TriangLevel(), it) {
@@ -616,6 +618,8 @@ void ComponentBasedVolumeAdjustmentCL::AdjustVolume() {
     SetupAdjacency(ComponentAdja, FullAdja, *lset_);
     Split.number_connected_components(ComponentAdja);
     Split.renumber_components(*lset_); // after this step component 0 is the surrounding liquid
+    Volumes.resize (Split.num_components()); // neccessary to make num_components() return the current number of components.
+    
     FindReferencePoints();
     for (Uint c= 0; c < Volumes.size(); ++c)
         Volumes[c]= CalculateVolume(c, 0.);
@@ -624,7 +628,7 @@ void ComponentBasedVolumeAdjustmentCL::AdjustVolume() {
 
     Split.ExtendComponents(FullAdja);
     // adapt Level Set
-    for (Uint i= 1; i<Split.num_components(); ++i) {
+    for (Uint i= 1; i < num_components(); ++i) {
         if (Split.DoCorrection(i)) {
             const double s= ComputeComponentAdjustment(i);
             lset_->Phi.Data+=Split.GetCharFunc(i)*s;

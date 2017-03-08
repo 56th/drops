@@ -94,7 +94,7 @@ class GraphComponentsCL;
 class ComponentCL
 {
   public:
-    int c_= -1; // Number of this component;
+    Uint c_= -1; // Number of this component;
     double volume_= -1., // volume of this component
            reference_volume_=-1.;
     Point3DCL refPoint_; // marker for this connected component
@@ -132,7 +132,7 @@ class ComponentBasedVolumeAdjustmentCL : public VolumeAdjustmentCL
       
       
       double GetVolumeOfComponent(int i) {return Volumes[i];}
-      int GetNumberOfComponents() const;
+      Uint num_components() const;
       Point3DCL GetReferencePoint(Uint i) {return ReferencePoints[i];}  
       GraphComponentsCL& GetSplit();
       
