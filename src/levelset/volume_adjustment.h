@@ -120,6 +120,9 @@ class ComponentBasedVolumeAdjustmentCL : public VolumeAdjustmentCL
     std::vector<Point3DCL> ReferencePoints; // markers for each connected component
     std::vector<Point3DCL> ReferencePoints_backup; // old markers for each connected component
 
+    std::vector<Point3DCL> coord_of_dof_; // The points where the dofs live.
+
+    void init_coord_of_dof ();
     void FindComponents ();
     /// \brief Renumbers the components in such a way, that the outer phase is always component 0
     void renumber_components();

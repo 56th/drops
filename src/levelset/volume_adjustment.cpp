@@ -420,9 +420,27 @@ void ComponentBasedVolumeAdjustmentCL::renumber_components()
             c= 0;
 }
 
-
-void ComponentBasedVolumeAdjustmentCL::InitVolume_impl()
+void ComponentBasedVolumeAdjustmentCL::init_coord_of_dof ()
 {
+    coord_of_dof_.resize (lset_->Phi.Data.size());
+
+    const Uint lvl= lset_->Phi.GetLevel(),
+               idx= lset_->Phi.RowIdx->GetIdx();
+    const auto& MG= lset_->GetMG();
+
+    DROPS_FOR_TRIANG_CONST_VERTEX (MG, lvl, it)
+        if (it->Unknowns.Exist (idx))
+            coord_of_dof_[it->Unknowns (idx)]= it->GetCoord();
+
+    DROPS_FOR_TRIANG_CONST_EDGE (MG, lvl, it)
+        if (it->Unknowns.Exist (idx))
+            coord_of_dof_[it->Unknowns (idx)]= GetBaryCenter( *it);
+}
+
+
+void ComponentBasedVolumeAdjustmentCL::InitVolume_impl ()
+{
+    init_coord_of_dof();
     FindComponents();
 
     // Compute initial volumes.
@@ -443,6 +461,7 @@ void ComponentBasedVolumeAdjustmentCL::InitVolume_impl()
 
 void ComponentBasedVolumeAdjustmentCL::Repair()
 {
+    init_coord_of_dof();
     const Uint old_num_components= num_components();
     FindComponents();
     if (num_components() != old_num_components)
@@ -479,22 +498,15 @@ void ComponentBasedVolumeAdjustmentCL::DebugOutput (std::ostream& os) const
 
 void ComponentBasedVolumeAdjustmentCL::FindReferencePoints()
 {
-    std::vector<double> CurrentAbsMax(num_components(),std::numeric_limits<double>::min());
-    ReferencePoints.clear();
-    ReferencePoints.resize(num_components());
-    LocalNumbP2CL n;
-    LocalP2CL<> loc_phi;
-    DROPS_FOR_TRIANG_TETRA( lset_->GetMG(), lset_->idx.TriangLevel(), it) {
-        loc_phi.assign(*it,lset_->Phi,lset_->GetBndData());
-        n.assign_indices_only(*it, lset_->idx.GetFinest());
-        for (Uint a=0;a<10;a++) {
-            if (n.WithUnknowns(a)) {
-                const Uint CurrentComponent = component_of_dof_[n.num[a]];
-                if (CurrentAbsMax[CurrentComponent] < std::abs(loc_phi[a])) {
-                    ReferencePoints[CurrentComponent] = a<4? it->GetVertex(a)->GetCoord() : GetBaryCenter(*it->GetEdge(a-4));
-                    CurrentAbsMax[CurrentComponent] = std::abs(loc_phi[a]);
-                }
-            }
+    ReferencePoints= std::vector<Point3DCL> (num_components());
+
+    std::vector<double> tmp (num_components(), std::numeric_limits<double>::min());
+    const VectorCL& ls= lset_->Phi.Data;
+    for (size_t i= 0; i < component_of_dof_.size(); ++i) {
+        const Uint c= component_of_dof_[i];
+        if (std::abs (ls[i]) > tmp[c]) {
+            ReferencePoints[c] = coord_of_dof_[i];
+            tmp[c] = std::abs (ls[i]);
         }
     }
 }
