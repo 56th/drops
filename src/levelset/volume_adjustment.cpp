@@ -557,43 +557,35 @@ double ComponentBasedVolumeAdjustmentCL::ComputeComponentAdjustment (Uint c)
     );
 }
 
-void ComponentBasedVolumeAdjustmentCL::MatchComponents()
+// XXX What else apart from component_of_dof_ should be reordered? Volumes?
+void ComponentBasedVolumeAdjustmentCL::MatchComponents ()
 {
-    Uint RPBS = ReferencePoints_backup.size();
+    if (ReferencePoints_backup.size() != num_components())
+        throw DROPSErrCL ("ComponentBasedVolumeAdjustmentCL::MatchComponents: The number of components has changed.\n");
 
-    // Create and initialize temporary arrays to store the minimal distances to the reference points and the corresponding minimizer
-    std::vector<double> distances(RPBS, std::numeric_limits<double>::max());
-    std::vector<int> globalIDs(RPBS, -1);
+    // Temporary arrays to store the minimal distances to the old reference points and the new component of the minimizers.
+    std::vector<double> distances (num_components(), std::numeric_limits<double>::max());
+    std::vector<Uint> cnew (num_components(), -1); // cnew[cold] is the new component-number of the old component.
 
-    double tempdistance = 0.0;
-    LocalNumbP2CL n;
-    DROPS_FOR_TRIANG_TETRA( lset_->GetMG(), lset_->idx.TriangLevel(), it) {
-        n.assign_indices_only(*it, lset_->idx.GetFinest());
-        for (Uint a=0;a<10;a++) {
-            // if there is a DOF
-            if (n.WithUnknowns(a)) {
-                // Calculate the distance to every reference point... if it's smaller: store the new distance and global index
-                for (Uint ap=0; ap<RPBS; ++ap) {
-                    tempdistance = ((a<4 ? it->GetVertex(a)->GetCoord() : GetBaryCenter(*it->GetEdge(a-4)))-ReferencePoints_backup[ap]).norm();
-                    if (tempdistance < distances[ap]) {
-                        distances[ap] = tempdistance;
-                        globalIDs[ap] = n.num[a];
-                    }
-                }
+    for (size_t i= 0; i < component_of_dof_.size(); ++i) {
+        for (size_t cold= 0; cold < num_components(); ++cold) {
+            const double tmpdistance= (coord_of_dof_[i] - ReferencePoints_backup[cold]).norm();
+            if (tmpdistance < distances[cold]) {
+                distances[cold]= tmpdistance;
+                cnew[cold]= component_of_dof_[i];
             }
         }
     }
 
-    // Create a temporary function to store the component in each DOF
-    std::vector<size_t> temp(component_of_dof_.size());
-    for (Uint old_component_number=0; old_component_number<RPBS; ++old_component_number) {
-        const Uint new_component_number = component_of_dof_[globalIDs[old_component_number]];
-        const std::vector<size_t> componentI= component (new_component_number); // gather all points that belong to the component with the new component number
-        for (Uint it=0; it<componentI.size(); ++it) {
-            temp[componentI[it]] = old_component_number;                              // "color" them with respect to the old component number, i.e. relabel them
-        }
-    }
-    component_of_dof_= temp;                                // Fill in the new information.
+    // cnew represents a permutation. We need its inverse.
+    std::vector<Uint> cold(num_components(), -1);
+    for (Uint c= 0; c < num_components(); ++c)
+        cold[cnew[c]]= c;
+    
+
+    // Renumber component_of_dof_.
+    for (auto& c: component_of_dof_)
+        c= cold[c];
 }
 
 void ComponentBasedVolumeAdjustmentCL::AdjustVolume()
