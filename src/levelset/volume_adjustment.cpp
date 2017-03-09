@@ -375,7 +375,7 @@ std::vector<size_t> ComponentBasedVolumeAdjustmentCL::ExtendOneStep(const Matrix
             }
         }
     }
-    return ret;
+    return std::move (ret);
 }
 
 void ComponentBasedVolumeAdjustmentCL::FindComponents ()
@@ -399,14 +399,13 @@ std::vector<size_t> ComponentBasedVolumeAdjustmentCL::component (size_t c) const
     for (size_t i= 0; i < component_of_dof_.size(); ++i)
         if (component_of_dof_[i] == c)
             ret.push_back( i);
-    return ret;
+    return std::move (ret);
 }
 
-void ComponentBasedVolumeAdjustmentCL::renumber_components()
+void ComponentBasedVolumeAdjustmentCL::renumber_components ()
 {
     // Ensure that component 0 is always the component, where the levelset function takes positive values.
-    const auto it= std::find_if (std::begin (lset_->Phi.Data), std::end (lset_->Phi.Data),
-        [](double ls)->bool { return ls > 0.; });
+    const auto it= std::find_if (std::begin (lset_->Phi.Data), std::end (lset_->Phi.Data), [](double ls)->bool { return ls > 0.; });
     if (it == std::end (lset_->Phi.Data))
         throw DROPSErrCL("ComponentBasedVolumeAdjustmentCL::renumber_components: No positive level set value found.\n");
     const Uint cp0= component_of_dof_[it - std::begin (lset_->Phi.Data)];
