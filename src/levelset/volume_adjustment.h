@@ -89,8 +89,11 @@ class GlobalVolumeAdjustmentCL : public VolumeAdjustmentCL
 
 class ComponentBasedVolumeAdjustmentCL : public VolumeAdjustmentCL 
 {
+  public:
+    using component_vector= std::vector<size_t>;
+
   private:
-    std::vector<size_t>    component_of_dof_, ///< component_of_dof_[i] is the number of the component of dof i.
+    component_vector       component_of_dof_, ///< component_of_dof_[i] is the number of the component of dof i.
                            component_of_dof_backup_;
     std::vector<Point3DCL> coord_of_dof_; // The points where the dofs live.
 
@@ -107,7 +110,7 @@ class ComponentBasedVolumeAdjustmentCL : public VolumeAdjustmentCL
     /// \brief Renumbers the components in such a way, that the outer phase is always component 0
     void renumber_components();
     /// \brief Helper of compute_indicator_functions. Extend all components (except 0) by one level (except where they would overlap).
-    std::vector<size_t> ExtendOneStep (const MatrixCL& A, const std::vector<size_t>& cp, std::vector<bool>& doCorrection) const;
+    component_vector ExtendOneStep (const MatrixCL& A, const component_vector& cp, std::vector<bool>& doCorrection) const;
     /// \brief Compute the indicator_functions_ of the extension of each connected component. Also sets doCorrection_ to false if the extensions would overlap.
     void compute_indicator_functions (const MatrixCL&);
     /// \brief Compute the connected components of the level sets of lset_->Phi. This sets component_of_dof_, ReferencePoints, and calls compute_indicator_functions.
@@ -117,6 +120,8 @@ class ComponentBasedVolumeAdjustmentCL : public VolumeAdjustmentCL
     double CalculateVolume(Uint c, double shift) const;
     /// \brief For each component, find a point in coord_of_dof_ with largest absolute value of the level set function. Sets ReferencePoints.
     void FindReferencePoints();
+    /// \brief For each point in refpts, return the component_of_dof from the closest point in coord_of_dof_.
+    component_vector component_of_point (const std::vector<Point3DCL>& refpts, const component_vector& component_of_dof) const;
     /// \brief Searches ReferencePoints_backup in the new components to set up a permutation of old and new component numbers. Reorders component_of_dof_ and ReferencePoints.
     void MatchComponents();
 

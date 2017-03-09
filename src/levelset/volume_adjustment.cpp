@@ -334,8 +334,8 @@ void ComponentBasedVolumeAdjustmentCL::compute_indicator_functions (const Matrix
 {
     doCorrection_= std::vector<bool> (num_components(), true);
 
-    const std::vector<size_t> tmp (ExtendOneStep (A, component_of_dof_, doCorrection_));
-    const std::vector<size_t> tmp2 (ExtendOneStep (A, tmp, doCorrection_));
+    const component_vector tmp (ExtendOneStep (A, component_of_dof_, doCorrection_));
+    const component_vector tmp2 (ExtendOneStep (A, tmp, doCorrection_));
 
     indicator_functions_= std::vector<std::valarray<double>> (num_components(), std::valarray<double>(component_of_dof_.size()));
     // For every point in tmp2, check which component is present and write into the corresponding characteristic function.
@@ -343,11 +343,11 @@ void ComponentBasedVolumeAdjustmentCL::compute_indicator_functions (const Matrix
         indicator_functions_[tmp2[j]][j]= 1.;
 }
 
-std::vector<size_t> ComponentBasedVolumeAdjustmentCL::ExtendOneStep(const MatrixCL& A,
-    const std::vector<size_t>& cp,
-    std::vector<bool>& doCorrection) const
+auto ComponentBasedVolumeAdjustmentCL::ExtendOneStep(const MatrixCL& A,
+    const component_vector& cp,
+    std::vector<bool>& doCorrection) const -> component_vector
 {
-    std::vector<size_t> ret (cp);
+    component_vector ret (cp);
     for (size_t i= 0; i < A.num_rows(); ++i) {
         const size_t v0= i;
         if (cp[v0] == 0)
@@ -507,28 +507,35 @@ double ComponentBasedVolumeAdjustmentCL::CalculateVolume(Uint c, double shift) c
     return ret;
 }
 
+
+auto ComponentBasedVolumeAdjustmentCL::component_of_point (const std::vector<Point3DCL>& refpts,
+    const component_vector& component_of_dof) const -> component_vector
+{
+    // Temporary arrays to store the minimal distances to the points in pts and the new component of the minimizers.
+    std::vector<double> distances (refpts.size(), std::numeric_limits<double>::max());
+    component_vector cnew (refpts.size(), -1); // cnew[i] is the component number of refpts[i] with respect to component_of_dof.
+
+    for (size_t i= 0; i < component_of_dof.size(); ++i) {
+        for (size_t c= 0; c < refpts.size(); ++c) {
+            const double tmpdistance= (coord_of_dof_[i] - refpts[c]).norm();
+            if (tmpdistance < distances[c]) {
+                distances[c]= tmpdistance;
+                cnew[c]= component_of_dof[i];
+            }
+        }
+    }
+    return std::move (cnew);
+}
+
 // XXX What else apart from component_of_dof_ and ReferencePoints should be reordered? Volumes?
 void ComponentBasedVolumeAdjustmentCL::MatchComponents ()
 {
     if (ReferencePoints_backup.size() != num_components())
         throw DROPSErrCL ("ComponentBasedVolumeAdjustmentCL::MatchComponents: The number of components has changed.\n");
 
-    // Temporary arrays to store the minimal distances to the old reference points and the new component of the minimizers.
-    std::vector<double> distances (num_components(), std::numeric_limits<double>::max());
-    std::vector<Uint> cnew (num_components(), -1); // cnew[cold] is the new component-number of the old component.
-
-    for (size_t i= 0; i < component_of_dof_.size(); ++i) {
-        for (size_t cold= 0; cold < num_components(); ++cold) {
-            const double tmpdistance= (coord_of_dof_[i] - ReferencePoints_backup[cold]).norm();
-            if (tmpdistance < distances[cold]) {
-                distances[cold]= tmpdistance;
-                cnew[cold]= component_of_dof_[i];
-            }
-        }
-    }
-
-    // cnew represents a permutation. We need its inverse.
-    std::vector<Uint> cold(num_components(), -1);
+    const component_vector cnew (component_of_point (ReferencePoints_backup, component_of_dof_));
+    // cnew represents a permutation which maps the old component number (from ReferencePoints_backup) to the new. We need its inverse.
+    component_vector cold(num_components(), -1);
     for (Uint c= 0; c < num_components(); ++c)
         cold[cnew[c]]= c;
 
