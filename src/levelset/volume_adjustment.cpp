@@ -445,9 +445,10 @@ void ComponentBasedVolumeAdjustmentCL::InitVolume_impl ()
     // Compute initial volumes.
     for (Uint c= 0; c < Volumes.size(); ++c)
         Volumes[c]= CalculateVolume(c, 0.);
+    targetVolumes= Volumes;
 
     FindReferencePoints();
-    make_backup(true);
+    make_backup();
 
     for (Uint c= 0; c < num_components(); ++c) {
         ComponentCL cp{c, Volumes[c], Volumes[c], ReferencePoints[c], doCorrection_[c], indicator_functions_[c]};
@@ -572,7 +573,6 @@ void ComponentBasedVolumeAdjustmentCL::MatchComponents ()
     std::vector<Uint> cold(num_components(), -1);
     for (Uint c= 0; c < num_components(); ++c)
         cold[cnew[c]]= c;
-    
 
     // Renumber component_of_dof_.
     for (auto& c: component_of_dof_)
@@ -593,7 +593,7 @@ void ComponentBasedVolumeAdjustmentCL::AdjustVolume()
         std::cout << "Adjustment for component " << i << ": ";
         if (doCorrection_[i]) {
             const double s= compute_volume_correction ([this,i](double x)->double { return CalculateVolume(i, x); },
-                                                       Volumes_backup[i],
+                                                       targetVolumes[i],
                                                        tol_);
             lset_->Phi.Data+=indicator_functions_[i]*s;
             std::cout << s << "\n";
@@ -609,12 +609,10 @@ void ComponentBasedVolumeAdjustmentCL::AdjustVolume()
     make_backup();
 }
 
-void ComponentBasedVolumeAdjustmentCL::make_backup(bool complete)
+void ComponentBasedVolumeAdjustmentCL::make_backup()
 {
     component_of_dof_backup_= component_of_dof_;
     ReferencePoints_backup= ReferencePoints;
-    if(complete)
-        Volumes_backup= Volumes;
 }
 
 bool ComponentBasedVolumeAdjustmentCL::Handle_topo_change()
@@ -675,7 +673,7 @@ bool ComponentBasedVolumeAdjustmentCL::Handle_topo_change()
             // in finder there is the number of the old volume, which split up
 
             // get the old volume and redistribute it on a percentage basis
-            double VolumeToSplit = Volumes_backup[*finder];
+            double VolumeToSplit = targetVolumes[*finder];
 
             // find the first component that appears twice according to the old numbering
             finder_twofold = std::find(OldAffiliation.begin(),OldAffiliation.end(),*finder);
@@ -693,11 +691,11 @@ bool ComponentBasedVolumeAdjustmentCL::Handle_topo_change()
             for (Uint a=0; a<RPBS; ++a) {
                 if (a == *finder)
                     continue;
-                Volumes[component_of_dof_[ORPN[a]]]=Volumes_backup[component_of_dof_backup_[ORPN[a]]];
+                Volumes[component_of_dof_[ORPN[a]]]=targetVolumes[component_of_dof_backup_[ORPN[a]]];
             }
             // new status for the further simulation
-            Volumes_backup.resize(Volumes.size());
-            Volumes_backup=Volumes;
+            targetVolumes.resize(Volumes.size());
+            targetVolumes=Volumes;
         }
         else if (RPS==RPBS-1) { // component vanished
             // find out which of the old components coalesced
@@ -729,11 +727,11 @@ bool ComponentBasedVolumeAdjustmentCL::Handle_topo_change()
             for (Uint a=0; a<RPS; ++a) Volumes[a]=0;
             // run through all old reference points, check which old volume was present and add it to the new volume at the same place
             for (Uint b=0; b<RPBS; ++b)
-                Volumes[component_of_dof_[temp[b]]]+=Volumes_backup[component_of_dof_backup_[temp[b]]];
+                Volumes[component_of_dof_[temp[b]]]+=targetVolumes[component_of_dof_backup_[temp[b]]];
             // from here on forward the simulation is newly set up... the component numbers are not conserved in this method
             // new status for the further simulation
-            Volumes_backup.resize(Volumes.size());
-            Volumes_backup=Volumes;
+            targetVolumes.resize(Volumes.size());
+            targetVolumes=Volumes;
         }
         else {
             DROPSErrCL("ComponentBasedVolumeAdjustmentCL::Handle_topo_change() : Numbers of components differ by a number bigger than one... case not considered yet ... I give up...");

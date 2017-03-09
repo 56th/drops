@@ -116,7 +116,7 @@ class ComponentBasedVolumeAdjustmentCL : public VolumeAdjustmentCL
     std::vector<std::valarray<double> > indicator_functions_;
 
     std::vector<double> Volumes; // volume per component
-    std::vector<double> Volumes_backup; // old volumes per component
+    std::vector<double> targetVolumes; // target volume of each component
     std::vector<Point3DCL> ReferencePoints; // markers for each connected component
     std::vector<Point3DCL> ReferencePoints_backup; // old markers for each connected component
 
@@ -136,7 +136,7 @@ class ComponentBasedVolumeAdjustmentCL : public VolumeAdjustmentCL
     double CalculateVolume(Uint c, double shift) const; // Compute volume of component c; for c == 0, shift must be 0.
     void FindReferencePoints();
     void MatchComponents(); // uses the reference points to ensure a coherent numbering of the connected components between consecutive steps
-    void make_backup(bool complete=false);
+    void make_backup();
 
     // Changes in Topology
     bool Handle_topo_change();
