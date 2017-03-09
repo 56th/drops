@@ -318,14 +318,6 @@ void SetupAdjacency (MatrixCL& A, MatrixCL& B, const LevelsetP2CL& lset)
 }
 
 
-void ComponentCL::DebugOutput (std::ostream& os) const
-{
-     os << "c_: " << c_ << ", volume_: " << volume_ << ", reference_volume_: " << reference_volume_
-        << ", refPoint_: " << refPoint_ << ", doCorrection_: " << doCorrection_
-        << ", char_function_.sum(): " << char_function_.sum() << '\n';
-}
-
-
 //*****************************************************************************
 //                               ComponentBasedVolumeAdjustmentCL
 //*****************************************************************************
@@ -337,11 +329,6 @@ ComponentBasedVolumeAdjustmentCL::ComponentBasedVolumeAdjustmentCL(LevelsetP2CL*
 ComponentBasedVolumeAdjustmentCL::~ComponentBasedVolumeAdjustmentCL()
 {}
 
-
-Uint ComponentBasedVolumeAdjustmentCL::num_components() const
-{
-    return Volumes.size();
-}
 
 void ComponentBasedVolumeAdjustmentCL::compute_indicator_functions (const MatrixCL& A)
 {
@@ -393,15 +380,6 @@ void ComponentBasedVolumeAdjustmentCL::FindComponents ()
     compute_indicator_functions (MeshAdja);
 }
 
-std::vector<size_t> ComponentBasedVolumeAdjustmentCL::component (size_t c) const
-{
-    std::vector<size_t> ret;
-    for (size_t i= 0; i < component_of_dof_.size(); ++i)
-        if (component_of_dof_[i] == c)
-            ret.push_back( i);
-    return std::move (ret);
-}
-
 void ComponentBasedVolumeAdjustmentCL::renumber_components ()
 {
     // Ensure that component 0 is always the component, where the levelset function takes positive values.
@@ -450,12 +428,6 @@ void ComponentBasedVolumeAdjustmentCL::InitVolume_impl ()
     FindReferencePoints();
     make_backup();
 
-    for (Uint c= 0; c < num_components(); ++c) {
-        ComponentCL cp{c, Volumes[c], Volumes[c], ReferencePoints[c], doCorrection_[c], indicator_functions_[c]};
-        components_.push_back (cp);
-        components_backup_.push_back (cp);
-
-    }
     DebugOutput (std::cout);
 }
 
@@ -470,13 +442,6 @@ void ComponentBasedVolumeAdjustmentCL::Repair()
     FindReferencePoints();
     make_backup();
 
-    components_.clear();
-    components_backup_.clear();
-    for (Uint c= 0; c < num_components(); ++c) {
-        ComponentCL cp{c, Volumes[c], Volumes[c], ReferencePoints[c], doCorrection_[c], indicator_functions_[c]};
-        components_.push_back (cp);
-        components_backup_.push_back (cp);
-    }
     DebugOutput (std::cout);
 }
 
@@ -486,12 +451,6 @@ void ComponentBasedVolumeAdjustmentCL::DebugOutput (std::ostream& os) const
     seq_out(std::begin(Volumes),std::end(Volumes),os,", ");
     os << std::endl << "ReferencePoints\n";
     seq_out(std::begin(ReferencePoints),std::end(ReferencePoints),os,", ");
-    os << std::endl << "components_:\n";
-    for (auto cp: components_)
-        cp.DebugOutput (os);
-    os << "components_backup_:\n";
-    for (auto cp: components_backup_)
-        cp.DebugOutput (os);
     os << std::endl;
 }
 

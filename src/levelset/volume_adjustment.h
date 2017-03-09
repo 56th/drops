@@ -87,51 +87,31 @@ class GlobalVolumeAdjustmentCL : public VolumeAdjustmentCL
     void DebugOutput (std::ostream& os) const override;
 };
 
-
-class ComponentCL
-{
-  public:
-    Uint c_= -1; // Number of this component;
-    double volume_= -1., // volume of this component
-           reference_volume_=-1.;
-    Point3DCL refPoint_; // marker for this connected component
-    bool doCorrection_= false;
-    std::valarray<double> char_function_;
-
-    ComponentCL (int c, double volume, double reference_volume, Point3DCL refPoint, bool doCorrection, const std::valarray<double>& char_function) : c_(c), volume_(volume), reference_volume_(reference_volume), refPoint_(refPoint), doCorrection_(doCorrection), char_function_(char_function) {}
-
-    void DebugOutput (std::ostream& os) const;
-};
-
-
 class ComponentBasedVolumeAdjustmentCL : public VolumeAdjustmentCL 
 {
   private:
-    std::vector<ComponentCL> components_,
-                             components_backup_;
-
-    std::vector<size_t> component_of_dof_, ///< component_of_dof_[i] is the number of the component of dof i.
-                        component_of_dof_backup_;
-    std::vector<bool> doCorrection_;
-    std::vector<std::valarray<double> > indicator_functions_;
-
-    std::vector<double> Volumes; // volume per component
-    std::vector<double> targetVolumes; // target volume of each component
-    std::vector<Point3DCL> ReferencePoints; // markers for each connected component
-    std::vector<Point3DCL> ReferencePoints_backup; // old markers for each connected component
-
+    std::vector<size_t>    component_of_dof_, ///< component_of_dof_[i] is the number of the component of dof i.
+                           component_of_dof_backup_;
     std::vector<Point3DCL> coord_of_dof_; // The points where the dofs live.
 
+    std::vector<bool>                  doCorrection_;
+    std::vector<std::valarray<double>> indicator_functions_;
+    std::vector<double>                Volumes; // volume per component
+    std::vector<double>                targetVolumes; // target volume of each component
+    std::vector<Point3DCL>             ReferencePoints; // markers for each connected component
+    std::vector<Point3DCL>             ReferencePoints_backup; // old markers for each connected component
+
+    /// \brief Initialize coord_of_dof_.
     void init_coord_of_dof ();
-    void FindComponents ();
+
     /// \brief Renumbers the components in such a way, that the outer phase is always component 0
     void renumber_components();
-    /// \brief Helper of compute_indicator_functions. Extend all components (except 0) by one level.
- void ExtendOneStep( const MatrixCL& A, const std::vector<size_t>& helper);
-
+    /// \brief Helper of compute_indicator_functions. Extend all components (except 0) by one level (except where they would overlap).
     std::vector<size_t> ExtendOneStep (const MatrixCL& A, const std::vector<size_t>& cp, std::vector<bool>& doCorrection) const;
+    /// \brief Compute the indicator_functions_ of the extension of each connected component. Also sets doCorrection_ to false if the extensions would overlap.
     void compute_indicator_functions (const MatrixCL&);
-    std::vector<size_t> component (size_t c) const; // Returns a vector with all dofs in component c.
+    /// \brief Compute the connected components of the level sets of lset_->Phi. This sets component_of_dof_ and calls compute_indicator_functions.
+    void FindComponents ();
 
     double CalculateVolume(Uint c, double shift) const; // Compute volume of component c; for c == 0, shift must be 0.
     void FindReferencePoints();
@@ -142,8 +122,8 @@ class ComponentBasedVolumeAdjustmentCL : public VolumeAdjustmentCL
     bool Handle_topo_change();
 
 
-    double GetVolumeOfComponent(int i) {return Volumes[i];}
-    Uint num_components() const;
+    double GetVolumeOfComponent(int i) { return Volumes[i]; }
+    Uint num_components() const { return Volumes.size(); }
     Point3DCL GetReferencePoint(Uint i) {return ReferencePoints[i];}  
 
     // initializes Split, Volumes and ReferencePoints plus their backups
