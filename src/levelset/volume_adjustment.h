@@ -128,8 +128,8 @@ class ComponentBasedVolumeAdjustmentCL : public VolumeAdjustmentCL
     /// \brief Copy component_of_dof_ and ReferencePoints to their _backup siblings.
     void make_backup();
 
-    // Changes in Topology
-    bool Handle_topo_change();
+    /// \brief Adjust targetVolumes if the topology changes.
+    void Handle_topo_change();
 
     Uint   num_components() const { return Volumes.size(); }
 

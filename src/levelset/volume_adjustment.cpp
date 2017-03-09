@@ -551,11 +551,12 @@ void ComponentBasedVolumeAdjustmentCL::MatchComponents ()
 
 void ComponentBasedVolumeAdjustmentCL::AdjustVolume()
 {
+    const Uint old_num_components= num_components();
     FindComponents();
-    for (Uint c= 0; c < Volumes.size(); ++c)
-        Volumes[c]= CalculateVolume(c, 0.);
-    if (!Handle_topo_change())
+    if (num_components () == old_num_components)
         MatchComponents();
+    else
+        Handle_topo_change();
 
     // adapt Level Set
     for (Uint i= 1; i < num_components(); ++i) {
@@ -583,129 +584,61 @@ void ComponentBasedVolumeAdjustmentCL::make_backup()
     ReferencePoints_backup= ReferencePoints;
 }
 
-bool ComponentBasedVolumeAdjustmentCL::Handle_topo_change()
+void ComponentBasedVolumeAdjustmentCL::Handle_topo_change ()
 {
-    bool change=false;
-    Uint RPS =ReferencePoints.size();
-    Uint RPBS=ReferencePoints_backup.size();
-    if (RPS!=RPBS) {
-        change=true;
-        if (RPS==RPBS+1) { // New component: find out which one of the old components split up
-            // look up the old component numbers of the new reference points in the old map and store the results temporarily
-            std::vector<size_t> temp(RPS); // global index of the DOF closest to the referencepoint
-            // std::vector<size_t> tempOldGrid(RPS); not used yet
-            std::vector<size_t> ORPN(RPBS); // ORPN = Old reference point number ... global index of the DOF closest to the referencepoint_backup
-            std::vector<double> distances(std::numeric_limits<double>::max(),RPS);
-            // std::vector<double> DistanzenOldGrid(std::numeric_limits<double>::max(),RPS); not used yet
-            std::vector<double> distancesORPN(std::numeric_limits<double>::max(),RPBS);
-            double tempdistance;
-            // run over the up2date grid. for each old and new reference point one gets the closest DOF, including the distance of the DOF to the considered reference point
-            LocalNumbP2CL n;
-            DROPS_FOR_TRIANG_TETRA( lset_->GetMG(), lset_->idx.TriangLevel(), it) {
-                n.assign_indices_only(*it, lset_->idx.GetFinest());
-                for (Uint a=0; a<10; a++) {
-                    // if there is a DOF
-                    if (n.WithUnknowns(a)) {
-                        // Calculate the distance to every reference point... if it's smaller: store the new distance and global index
-                        for (Uint ap=0; ap<RPS; ++ap) {
-                            tempdistance = ((a<4 ? it->GetVertex(a)->GetCoord() : GetBaryCenter(*it->GetEdge(a-4)))-ReferencePoints[ap]).norm();
-                            if (tempdistance < distances[ap]) {
-                                distances[ap] = tempdistance;
-                                temp[ap] = n.num[a];
-                            }
-                        }
-                        for (Uint ap2=0; ap2<RPBS; ++ap2) {
-                            tempdistance = ((a<4 ? it->GetVertex(a)->GetCoord() : GetBaryCenter(*it->GetEdge(a-4)))-ReferencePoints_backup[ap2]).norm();
-                            if (tempdistance < distancesORPN[ap2]) {
-                                distancesORPN[ap2] = tempdistance;
-                                ORPN[ap2] = n.num[a];
-                            }
-                        }
-                    }
-                }
-            }
-            std::vector<size_t> OldAffiliation(RPS);
-            for (Uint i=1; i<RPS; ++i)
-                OldAffiliation[i] = component_of_dof_backup_[temp[i]];///!!!
-            // in OldAffiliation one finds the hypothetical affiliation of the new reference points with respect to the old components
+    for (Uint c= 0; c < Volumes.size(); ++c)
+        Volumes[c]= CalculateVolume(c, 0.);
 
-            std::vector<size_t> SortingCopy(OldAffiliation);
-            std::vector<size_t>::iterator finder;
-            std::vector<size_t>::iterator finder_twofold;
-
-            // compare pairwise and check which one appears twice
-            std::sort(SortingCopy.begin(),SortingCopy.end());
-            finder = std::adjacent_find(SortingCopy.begin(),SortingCopy.end());
-            if (finder == SortingCopy.end())
-                DROPSErrCL("ComponentBasedVolumeAdjustmentCL::Handle_topo_change(): New Component, but no old component appeared twice");
-            // in finder there is the number of the old volume, which split up
-
-            // get the old volume and redistribute it on a percentage basis
-            double VolumeToSplit = targetVolumes[*finder];
-
-            // find the first component that appears twice according to the old numbering
-            finder_twofold = std::find(OldAffiliation.begin(),OldAffiliation.end(),*finder);
-            size_t Comp1 = *finder_twofold;
-            // find the second component that appears twice according to the old numbering
-            // (there has to be a second one, otherwise there would have been an error message earlier)
-            size_t Comp2 = *(std::find(finder_twofold+1,OldAffiliation.end(),*finder));
-
-
-            double VolumeSum=Volumes[Comp1]+Volumes[Comp2];
-            // calculate the volumes as to how they should have been, in order to avoid any mass loss
-            Volumes[Comp1]=Volumes[Comp1]/VolumeSum*VolumeToSplit;
-            Volumes[Comp2]=Volumes[Comp2]/VolumeSum*VolumeToSplit;
-
-            for (Uint a=0; a<RPBS; ++a) {
-                if (a == *finder)
-                    continue;
-                Volumes[component_of_dof_[ORPN[a]]]=targetVolumes[component_of_dof_backup_[ORPN[a]]];
-            }
-            // new status for the further simulation
-            targetVolumes.resize(Volumes.size());
-            targetVolumes=Volumes;
-        }
-        else if (RPS==RPBS-1) { // component vanished
-            // find out which of the old components coalesced
-
-            std::vector<size_t> temp(RPBS);
-            std::vector<double> distances(std::numeric_limits<double>::max(),RPBS);
-
-            // run through grid and find the distance minimizers to all old reference points
-            double tempdistance;
-
-            LocalNumbP2CL n;
-            DROPS_FOR_TRIANG_TETRA( lset_->GetMG(), lset_->idx.TriangLevel(), it) {
-                n.assign_indices_only(*it, lset_->idx.GetFinest());
-                for (Uint a=0; a<10; a++) {
-                    // if there is a DOF
-                    if (n.WithUnknowns(a)) {
-                        // Calculate the distance to every reference point... if it's smaller: store the new distance and global index
-                        for (Uint ap=0; ap<RPBS; ++ap) {
-                            tempdistance = ((a<4 ? it->GetVertex(a)->GetCoord() : GetBaryCenter(*it->GetEdge(a-4)))-ReferencePoints_backup[ap]).norm();
-                            if (tempdistance < distances[ap]) {
-                                distances[ap] = tempdistance;
-                                temp[ap] = n.num[a];
-                            }
-                        }
-                    }
-                }
-            }
-            // initialize new volumes
-            for (Uint a=0; a<RPS; ++a) Volumes[a]=0;
-            // run through all old reference points, check which old volume was present and add it to the new volume at the same place
-            for (Uint b=0; b<RPBS; ++b)
-                Volumes[component_of_dof_[temp[b]]]+=targetVolumes[component_of_dof_backup_[temp[b]]];
-            // from here on forward the simulation is newly set up... the component numbers are not conserved in this method
-            // new status for the further simulation
-            targetVolumes.resize(Volumes.size());
-            targetVolumes=Volumes;
-        }
-        else {
-            DROPSErrCL("ComponentBasedVolumeAdjustmentCL::Handle_topo_change() : Numbers of components differ by a number bigger than one... case not considered yet ... I give up...");
-        }
+    const Uint RPS=  ReferencePoints.size(),
+               RPBS= ReferencePoints_backup.size();
+    if (std::abs(RPS - RPBS) > 1) {
+        std::cerr << "ComponentBasedVolumeAdjustmentCL::Handle_topo_change: The change of topology is too complicated. I am setting the target volumes to the current volumes and hoping the best.\n";
+        targetVolumes= Volumes;
+        return;
     }
-    return change;
+
+    if (RPS == RPBS + 1) { // New component: Find out which of the old components split up.
+        // Look up the old component numbers of the new reference points in the old map.
+        const component_vector cold_of_new (component_of_point (ReferencePoints, component_of_dof_backup_));
+
+        // Find the old component that has split up. It appears twice in cold_of_new.
+        component_vector tmp (cold_of_new);
+        std::sort (tmp.begin(), tmp.end());
+        const auto split_iter= std::adjacent_find (tmp.begin(), tmp.end());
+        if (split_iter == tmp.end())
+            throw DROPSErrCL ("ComponentBasedVolumeAdjustmentCL::Handle_topo_change: Could not find the component that has split up.\n");
+        const Uint split_comp= *split_iter;
+
+        // Find the corresponding two new components.
+        const auto comp1_iter= std::find (cold_of_new.begin(), cold_of_new.end(), split_comp);
+        const Uint Comp1= *comp1_iter,
+                   Comp2= *std::find(comp1_iter + 1, cold_of_new.end(), split_comp);
+       
+
+        // Distribute the old volume on a percentage basis onto the two new components.
+        const double VolumeToSplit= targetVolumes[split_comp],
+                     VolumeSum= Volumes[Comp1] + Volumes[Comp2];
+        Volumes[Comp1]= Volumes[Comp1]/VolumeSum*VolumeToSplit;
+        Volumes[Comp2]= Volumes[Comp2]/VolumeSum*VolumeToSplit;
+
+        // Update the target volumes.
+        for (Uint i= 0; i < RPS; ++i) {
+            if (cold_of_new[i] == split_comp)
+                continue;
+            Volumes[i]= targetVolumes[cold_of_new[i]];
+        }
+        targetVolumes= Volumes;
+    }
+    if (RPS == RPBS - 1) { // Component vanished: Find out which of the old components coalesced.
+        // Look up the new component numbers of the old reference points in the new map.
+        const component_vector cnew_of_old (component_of_point (ReferencePoints_backup, component_of_dof_));
+
+        // Update the target volumes.
+        Volumes= std::vector<double> (num_components());
+        for (Uint i= 0; i < targetVolumes.size(); ++ i)
+            Volumes[cnew_of_old[i]]+= targetVolumes[i];
+        targetVolumes= Volumes;
+    }
 }
 
 } // end of namespace DROPS
