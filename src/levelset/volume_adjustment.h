@@ -133,7 +133,6 @@ class ComponentBasedVolumeAdjustmentCL : public VolumeAdjustmentCL
     void compute_indicator_functions (const MatrixCL&);
     std::vector<size_t> component (size_t c) const; // Returns a vector with all dofs in component c.
 
-    double ComputeComponentAdjustment (Uint c);
     double CalculateVolume(Uint c, double shift) const; // Compute volume of component c; for c == 0, shift must be 0.
     void FindReferencePoints();
     void MatchComponents(); // uses the reference points to ensure a coherent numbering of the connected components between consecutive steps

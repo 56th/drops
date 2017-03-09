@@ -548,15 +548,6 @@ double ComponentBasedVolumeAdjustmentCL::CalculateVolume(Uint c, double shift) c
     return ret;
 }
 
-double ComponentBasedVolumeAdjustmentCL::ComputeComponentAdjustment (Uint c)
-{
-    return compute_volume_correction (
-        [this,c](double x)->double { return CalculateVolume(c, x); },
-        Volumes_backup[c],
-        tol_
-    );
-}
-
 // XXX What else apart from component_of_dof_ should be reordered? Volumes?
 void ComponentBasedVolumeAdjustmentCL::MatchComponents ()
 {
@@ -599,14 +590,16 @@ void ComponentBasedVolumeAdjustmentCL::AdjustVolume()
 
     // adapt Level Set
     for (Uint i= 1; i < num_components(); ++i) {
+        std::cout << "Adjustment for component " << i << ": ";
         if (doCorrection_[i]) {
-            const double s= ComputeComponentAdjustment(i);
+            const double s= compute_volume_correction ([this,i](double x)->double { return CalculateVolume(i, x); },
+                                                       Volumes_backup[i],
+                                                       tol_);
             lset_->Phi.Data+=indicator_functions_[i]*s;
-            std::cout << "Adjustment for component " << i << ": " << s << "\n";
+            std::cout << s << "\n";
         }
-        else {
-            std::cout << "Adjustment for component " << i << ": There hasn't been made any adjustment, components to close \n";
-        }
+        else
+            std::cout << "No adjustment, components are too close.\n";
     }
     FindReferencePoints();
     make_backup();
