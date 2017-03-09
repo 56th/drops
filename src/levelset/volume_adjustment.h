@@ -110,21 +110,23 @@ class ComponentBasedVolumeAdjustmentCL : public VolumeAdjustmentCL
     std::vector<size_t> ExtendOneStep (const MatrixCL& A, const std::vector<size_t>& cp, std::vector<bool>& doCorrection) const;
     /// \brief Compute the indicator_functions_ of the extension of each connected component. Also sets doCorrection_ to false if the extensions would overlap.
     void compute_indicator_functions (const MatrixCL&);
-    /// \brief Compute the connected components of the level sets of lset_->Phi. This sets component_of_dof_ and calls compute_indicator_functions.
+    /// \brief Compute the connected components of the level sets of lset_->Phi. This sets component_of_dof_, ReferencePoints, and calls compute_indicator_functions.
     void FindComponents ();
 
-    double CalculateVolume(Uint c, double shift) const; // Compute volume of component c; for c == 0, shift must be 0.
+     /// \brief Compute volume of component c; for c == 0, shift must be 0.
+    double CalculateVolume(Uint c, double shift) const;
+    /// \brief For each component, find a point in coord_of_dof_ with largest absolute value of the level set function. Sets ReferencePoints.
     void FindReferencePoints();
-    void MatchComponents(); // uses the reference points to ensure a coherent numbering of the connected components between consecutive steps
+    /// \brief Searches ReferencePoints_backup in the new components to set up a permutation of old and new component numbers. Reorders component_of_dof_ and ReferencePoints.
+    void MatchComponents();
+
+    /// \brief Copy component_of_dof_ and ReferencePoints to their _backup siblings.
     void make_backup();
 
     // Changes in Topology
     bool Handle_topo_change();
 
-
-    double GetVolumeOfComponent(int i) { return Volumes[i]; }
-    Uint num_components() const { return Volumes.size(); }
-    Point3DCL GetReferencePoint(Uint i) {return ReferencePoints[i];}  
+    Uint   num_components() const { return Volumes.size(); }
 
     // initializes Split, Volumes and ReferencePoints plus their backups
     void InitVolume_impl() override;
