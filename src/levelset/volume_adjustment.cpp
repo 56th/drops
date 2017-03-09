@@ -378,6 +378,7 @@ void ComponentBasedVolumeAdjustmentCL::FindComponents ()
     Volumes.resize (Split.num_components()); // neccessary to make num_components() return the current number of components.
 
     compute_indicator_functions (MeshAdja);
+    FindReferencePoints();
 }
 
 void ComponentBasedVolumeAdjustmentCL::renumber_components ()
@@ -425,7 +426,6 @@ void ComponentBasedVolumeAdjustmentCL::InitVolume_impl ()
         Volumes[c]= CalculateVolume(c, 0.);
     targetVolumes= Volumes;
 
-    FindReferencePoints();
     make_backup();
 
     DebugOutput (std::cout);
@@ -439,7 +439,6 @@ void ComponentBasedVolumeAdjustmentCL::Repair()
     if (num_components() != old_num_components)
         throw DROPSErrCL ("ComponentBasedVolumeAdjustmentCL::Repair: The mesh adaption changed the number of connected components. This is currently not handled.\n");
     MatchComponents();
-    FindReferencePoints();
     make_backup();
 
     DebugOutput (std::cout);
@@ -508,7 +507,7 @@ double ComponentBasedVolumeAdjustmentCL::CalculateVolume(Uint c, double shift) c
     return ret;
 }
 
-// XXX What else apart from component_of_dof_ should be reordered? Volumes?
+// XXX What else apart from component_of_dof_ and ReferencePoints should be reordered? Volumes?
 void ComponentBasedVolumeAdjustmentCL::MatchComponents ()
 {
     if (ReferencePoints_backup.size() != num_components())
@@ -536,12 +535,16 @@ void ComponentBasedVolumeAdjustmentCL::MatchComponents ()
     // Renumber component_of_dof_.
     for (auto& c: component_of_dof_)
         c= cold[c];
+
+    // Renumber ReferencePoints
+    const std::vector<Point3DCL> tmp (ReferencePoints);
+    for (Uint i= 0; i < tmp.size(); ++i)
+        ReferencePoints[cold[i]]= tmp[i];
 }
 
 void ComponentBasedVolumeAdjustmentCL::AdjustVolume()
 {
     FindComponents();
-    FindReferencePoints();
     for (Uint c= 0; c < Volumes.size(); ++c)
         Volumes[c]= CalculateVolume(c, 0.);
     if (!Handle_topo_change())
@@ -564,7 +567,6 @@ void ComponentBasedVolumeAdjustmentCL::AdjustVolume()
     make_backup();
     FindComponents();
     MatchComponents();
-    FindReferencePoints();
     make_backup();
 }
 
