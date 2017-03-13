@@ -589,8 +589,8 @@ void ComponentBasedVolumeAdjustmentCL::Handle_topo_change ()
     for (Uint c= 0; c < Volumes.size(); ++c)
         Volumes[c]= CalculateVolume(c, 0.);
 
-    const Uint RPS=  ReferencePoints.size(),
-               RPBS= ReferencePoints_backup.size();
+    const int RPS=  ReferencePoints.size(),
+              RPBS= ReferencePoints_backup.size();
     if (std::abs(RPS - RPBS) > 1) {
         std::cerr << "ComponentBasedVolumeAdjustmentCL::Handle_topo_change: The change of topology is too complicated. I am setting the target volumes to the current volumes and hoping the best.\n";
         targetVolumes= Volumes;
@@ -611,8 +611,8 @@ void ComponentBasedVolumeAdjustmentCL::Handle_topo_change ()
 
         // Find the corresponding two new components.
         const auto comp1_iter= std::find (cold_of_new.begin(), cold_of_new.end(), split_comp);
-        const Uint Comp1= *comp1_iter,
-                   Comp2= *std::find(comp1_iter + 1, cold_of_new.end(), split_comp);
+        const Uint Comp1= comp1_iter - cold_of_new.begin(),
+                   Comp2= std::find(comp1_iter + 1, cold_of_new.end(), split_comp) - cold_of_new.begin();
        
 
         // Distribute the old volume on a percentage basis onto the two new components.
