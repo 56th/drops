@@ -603,40 +603,21 @@ void ComponentBasedVolumeAdjustmentCL::Handle_topo_change ()
         return;
     }
 
-    if (RPS == RPBS + 1) { // New component: Find out which of the old components split up.
+    if (RPS == RPBS + 1) { // New component
         // Look up the old component numbers of the new reference points in the old map.
         const component_vector cold_of_new (component_of_point (ReferencePoints, component_of_dof_backup_, coord_of_dof_));
 
+        // Store the sum of the new volumes that make up the old components.
+        std::vector<double> VolumeSum (RPBS);
+        for (Uint i= 0; i < RPS; ++i)
+            VolumeSum[cold_of_new[i]]+= Volumes[i];
 
-        // Find the old component that has split up. It appears twice in cold_of_new.
-        component_vector tmp (cold_of_new);
-        std::sort (tmp.begin(), tmp.end());
-        const auto split_iter= std::adjacent_find (tmp.begin(), tmp.end());
-        if (split_iter == tmp.end())
-            throw DROPSErrCL ("ComponentBasedVolumeAdjustmentCL::Handle_topo_change: Could not find the component that has split up.\n");
-        const Uint split_comp= *split_iter;
-
-        // Find the corresponding two new components.
-        const auto comp1_iter= std::find (cold_of_new.begin(), cold_of_new.end(), split_comp);
-        const Uint Comp1= comp1_iter - cold_of_new.begin(),
-                   Comp2= std::find(comp1_iter + 1, cold_of_new.end(), split_comp) - cold_of_new.begin();
-       
-
-        // Distribute the old volume on a percentage basis onto the two new components.
-        const double VolumeToSplit= targetVolumes[split_comp],
-                     VolumeSum= Volumes[Comp1] + Volumes[Comp2];
-        Volumes[Comp1]= Volumes[Comp1]/VolumeSum*VolumeToSplit;
-        Volumes[Comp2]= Volumes[Comp2]/VolumeSum*VolumeToSplit;
-
-        // Update the target volumes.
-        for (Uint i= 0; i < RPS; ++i) {
-            if (cold_of_new[i] == split_comp)
-                continue;
-            Volumes[i]= targetVolumes[cold_of_new[i]];
-        }
+        // Update the target volumes. Distribute the old volume on a relative basis onto the new components.
+        for (Uint i= 0; i < RPS; ++i)
+            Volumes[i]= Volumes[i]/VolumeSum[cold_of_new[i]] * targetVolumes[cold_of_new[i]];
         targetVolumes= Volumes;
     }
-    if (RPS == RPBS - 1) { // Component vanished: Find out which of the old components coalesced.
+    if (RPS == RPBS - 1) { // Component vanished
         // Look up the new component numbers of the old reference points in the new map.
         const component_vector cnew_of_old (component_of_point (ReferencePoints_backup, component_of_dof_, coord_of_dof_));
 
