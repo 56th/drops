@@ -199,16 +199,15 @@ private:
                  prM,
                  prMhat;
     mutable VectorBaseCL<VectorCL> cKernel;
-    SurfaceForceT         SurfForceType_;
     SurfaceTensionCL*     SurfTension_;
     instat_scalar_fun_ptr CtAngleFnc_;
     instat_vector_fun_ptr BndOutNormal_;
 
   public:
     InstatStokes2PhaseP2P1CL( const MGBuilderCL& mgb, const TwoPhaseFlowCoeffCL& coeff, const BndDataCL& bdata, FiniteElementT prFE= P1_FE, double XFEMstab=0.1, FiniteElementT velFE= vecP2_FE, double EpsP = 0.0 )
-        : base_(mgb, coeff, bdata), epsP(EpsP), vel_idx(velFE, 1, bdata.Vel, XFEMstab), pr_idx(prFE, 1, bdata.Pr, XFEMstab), cKernel(0) { }
+        : base_(mgb, coeff, bdata), epsP(EpsP), vel_idx(velFE, 1, bdata.Vel, XFEMstab), pr_idx(prFE, 1, bdata.Pr, XFEMstab), cKernel(0), SurfTension_(nullptr) { }
     InstatStokes2PhaseP2P1CL( MultiGridCL& mg, const TwoPhaseFlowCoeffCL& coeff, const BndDataCL& bdata, FiniteElementT prFE= P1_FE, double XFEMstab=0.1, FiniteElementT velFE= vecP2_FE, double EpsP = 0.0)
-        : base_(mg, coeff, bdata), epsP(EpsP),  vel_idx(velFE, 1, bdata.Vel, XFEMstab), pr_idx(prFE, 1, bdata.Pr, XFEMstab), cKernel(0) { }
+        : base_(mg, coeff, bdata), epsP(EpsP),  vel_idx(velFE, 1, bdata.Vel, XFEMstab), pr_idx(prFE, 1, bdata.Pr, XFEMstab), cKernel(0), SurfTension_(nullptr) { }
 
     /// \name Numbering
     //@{
@@ -299,7 +298,7 @@ private:
     /// Set out normal function of the slip boundary
     void SetBndOutNormal(instat_vector_fun_ptr outnormal) { BndOutNormal_= outnormal; }
     /// Set the surface force type and the surface tension
-    void SetSurfTension(SurfaceTensionCL* Sf) { SurfForceType_ = SF_ImprovedLBVar; SurfTension_= Sf; }
+    void SetSurfTension(SurfaceTensionCL* Sf) { SurfTension_= Sf; }
     /// Discretize Young Force on the three-phase contact line
     void AccumulateYoungForce(const LevelsetP2CL& lset, VecDescCL& f) const;
 

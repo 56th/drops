@@ -56,6 +56,16 @@
             "Pressure":
             {
                 "Default":    ["NoBC"]
+            },
+            "SlipBnd":
+            {
+                "Beta1":                 0.05,
+                "Beta2":                 0.05,
+                "BetaL":                 0,
+                "NitschePenalty":        30,
+                "ContactAngle":          60,
+                "ContactAngleFunc":      "ConstantAngle",
+                "BndOuterNormal":        "ZeroVel"
             }
         },
         "Downwind":

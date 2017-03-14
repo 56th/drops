@@ -4748,15 +4748,17 @@ InstatStokes2PhaseP2P1CL::system2_accu (MLTetraAccumulatorTupleCL& accus, MLMatD
 
 void InstatStokes2PhaseP2P1CL::AccumulateYoungForce( const LevelsetP2CL& lset, VecDescCL& f) const
 {
+    if (!SurfTension_) ///\todo to be removed after surface tension data and accumulation has been completely moved from LevelsetP2CL to InstatStokes2PhaseP2P1CL
+        return;
     ScopeTimerCL scope("AccumulateYoungForce");
     TetraAccumulatorCL *accu;
-    switch (SurfForceType_)
+    switch (lset.GetSurfaceForce() )
     {
       case SF_ImprovedLBVar:
-          accu= new ImprovedYoungForceAccumulatorCL( lset, BndData_.Vel, f, SurfTension_->GetSigma()(std_basis<3>(0), 0.), CtAngleFnc_, BndOutNormal_); 
+          accu= new ImprovedYoungForceAccumulatorCL( lset, BndData_.Vel, f, SurfTension_->GetSigma()(std_basis<3>(0), 0.), CtAngleFnc_, BndOutNormal_);
           break;
       default:
-          throw DROPSErrCL("InstatStokes2PhaseP2P1CL::AccumulateYoungForce not implemented for non-constant surface tension");
+          throw DROPSErrCL("InstatStokes2PhaseP2P1CL::AccumulateYoungForce not implemented for this type of surface tension");
     }
     TetraAccumulatorTupleCL accus;
     accus.push_back( accu);
