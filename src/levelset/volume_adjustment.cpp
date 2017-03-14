@@ -433,12 +433,13 @@ void ComponentBasedVolumeAdjustmentCL::InitVolume_impl ()
 
 void ComponentBasedVolumeAdjustmentCL::Repair()
 {
+    const std::vector<Point3DCL> coord_of_dof_backup (std::move (coord_of_dof_));
     init_coord_of_dof();
     const Uint old_num_components= num_components();
     FindComponents();
     if (num_components() != old_num_components)
         throw DROPSErrCL ("ComponentBasedVolumeAdjustmentCL::Repair: The mesh adaption changed the number of connected components. This is currently not handled.\n");
-    MatchComponents();
+    MatchComponents (&coord_of_dof_backup);
     make_backup();
 
     DebugOutput (std::cout);
@@ -509,7 +510,7 @@ double ComponentBasedVolumeAdjustmentCL::CalculateVolume(Uint c, double shift) c
 
 
 auto ComponentBasedVolumeAdjustmentCL::component_of_point (const std::vector<Point3DCL>& refpts,
-    const component_vector& component_of_dof) const -> component_vector
+    const component_vector& component_of_dof, const std::vector<Point3DCL>& coord_of_dof) const -> component_vector
 {
     // Temporary arrays to store the minimal distances to the points in pts and the new component of the minimizers.
     std::vector<double> distances (refpts.size(), std::numeric_limits<double>::max());
@@ -517,7 +518,7 @@ auto ComponentBasedVolumeAdjustmentCL::component_of_point (const std::vector<Poi
 
     for (size_t i= 0; i < component_of_dof.size(); ++i) {
         for (size_t c= 0; c < refpts.size(); ++c) {
-            const double tmpdistance= (coord_of_dof_[i] - refpts[c]).norm();
+            const double tmpdistance= (coord_of_dof[i] - refpts[c]).norm();
             if (tmpdistance < distances[c]) {
                 distances[c]= tmpdistance;
                 cnew[c]= component_of_dof[i];
@@ -528,16 +529,21 @@ auto ComponentBasedVolumeAdjustmentCL::component_of_point (const std::vector<Poi
 }
 
 // XXX What else apart from component_of_dof_ and ReferencePoints should be reordered? Volumes?
-void ComponentBasedVolumeAdjustmentCL::MatchComponents ()
+void ComponentBasedVolumeAdjustmentCL::MatchComponents (const std::vector<Point3DCL>* coord_of_dof_backup)
 {
     if (ReferencePoints_backup.size() != num_components())
         throw DROPSErrCL ("ComponentBasedVolumeAdjustmentCL::MatchComponents: The number of components has changed.\n");
 
-    const component_vector cnew (component_of_point (ReferencePoints_backup, component_of_dof_));
-    // cnew represents a permutation which maps the old component number (from ReferencePoints_backup) to the new. We need its inverse.
-    component_vector cold(num_components(), -1);
+    // cold represents a permutation which maps the new component number (from ReferencePoints_) to the old.
+    const std::vector<Point3DCL>& coord_of_dof_backup_ref= coord_of_dof_backup == 0 ? coord_of_dof_ : *coord_of_dof_backup;
+    const component_vector cold (component_of_point (ReferencePoints, component_of_dof_backup_, coord_of_dof_backup_ref));
+    // cnew represents a permutation which maps the old component number (from ReferencePoints_backup) to the new.
+    const component_vector cnew (component_of_point (ReferencePoints_backup, component_of_dof_, coord_of_dof_));
+
+    // check that cold and cnew are inverse to each other.
     for (Uint c= 0; c < num_components(); ++c)
-        cold[cnew[c]]= c;
+        if (cnew[cold[c]] != c)
+            throw DROPSErrCL ("ComponentBasedVolumeAdjustmentCL::MatchComponents: The topology has changed.\n");
 
     // Renumber component_of_dof_.
     for (auto& c: component_of_dof_)
@@ -599,7 +605,8 @@ void ComponentBasedVolumeAdjustmentCL::Handle_topo_change ()
 
     if (RPS == RPBS + 1) { // New component: Find out which of the old components split up.
         // Look up the old component numbers of the new reference points in the old map.
-        const component_vector cold_of_new (component_of_point (ReferencePoints, component_of_dof_backup_));
+        const component_vector cold_of_new (component_of_point (ReferencePoints, component_of_dof_backup_, coord_of_dof_));
+
 
         // Find the old component that has split up. It appears twice in cold_of_new.
         component_vector tmp (cold_of_new);
@@ -631,7 +638,7 @@ void ComponentBasedVolumeAdjustmentCL::Handle_topo_change ()
     }
     if (RPS == RPBS - 1) { // Component vanished: Find out which of the old components coalesced.
         // Look up the new component numbers of the old reference points in the new map.
-        const component_vector cnew_of_old (component_of_point (ReferencePoints_backup, component_of_dof_));
+        const component_vector cnew_of_old (component_of_point (ReferencePoints_backup, component_of_dof_, coord_of_dof_));
 
         // Update the target volumes.
         Volumes= std::vector<double> (num_components());

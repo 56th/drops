@@ -120,10 +120,10 @@ class ComponentBasedVolumeAdjustmentCL : public VolumeAdjustmentCL
     double CalculateVolume(Uint c, double shift) const;
     /// \brief For each component, find a point in coord_of_dof_ with largest absolute value of the level set function. Sets ReferencePoints.
     void FindReferencePoints();
-    /// \brief For each point in refpts, return the component_of_dof from the closest point in coord_of_dof_.
-    component_vector component_of_point (const std::vector<Point3DCL>& refpts, const component_vector& component_of_dof) const;
-    /// \brief Searches ReferencePoints_backup in the new components to set up a permutation of old and new component numbers. Reorders component_of_dof_ and ReferencePoints.
-    void MatchComponents();
+    /// \brief For each point in refpts, return the component_of_dof from the closest point in coord_of_dof.
+    component_vector component_of_point (const std::vector<Point3DCL>& refpts, const component_vector& component_of_dof, const std::vector<Point3DCL>& coord_of_dof) const;
+    /// \brief Searches ReferencePoints_backup in the new components to set up a permutation of old and new component numbers. Reorders component_of_dof_ and ReferencePoints. (The default is coord_of_dof==&coord_of_dof_; Repair() uses the old coordinates.)
+    void MatchComponents(const std::vector<Point3DCL>* coord_of_dof= nullptr);
 
     /// \brief Copy component_of_dof_ and ReferencePoints to their _backup siblings.
     void make_backup();
