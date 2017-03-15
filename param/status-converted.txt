@@ -44,7 +44,15 @@ poisson/cdrdrops/convdiffEx.json
 
 spacetimetransp/st_transp/default.json
 spacetimetransp/st_transp/BotheKoebeWielageWarnecke03.json
-spacetimetransp/st_transp/ ------- 9 files missing
+spacetimetransp/st_transp/TaylorBubbleMass.json
+spacetimetransp/st_transp/RisingHieu.json
+spacetimetransp/st_transp/rising_st_mass.json
+spacetimetransp/st_transp/st_transp_json
+spacetimetransp/st_transp/testcase1.json
+spacetimetransp/st_transp/testcase2.json
+spacetimetransp/st_transp/testcase3.json
+spacetimetransp/st_transp/testcase7.json
+spacetimetransp/st_transp/testcase8.json
 
 stokes/errorestimator/MGsdropsPS.json --> link to stokes/sdropsP2/MGsdropsP2.json
 stokes/sdropsP2/MGsdropsP2.json

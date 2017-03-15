@@ -1,118 +1,125 @@
-//=============================================================
-//    DROPS parameter file for two phase mass transport
-//    simulation: (almost) artificial substance system
-//    stationary interface (no flow simulation)
-//=============================================================
 {
-        //General section
-        "General":
-        {
-                "ProgressBar":  1, //show progress bar
-                "DynamicLibsPrefix": "../", //where should we look for shared objects?
-                "DynamicLibs": [ //select libraries to be loaded after program start
-                        "misc/libmisc-scalarFunctions",
-                        "misc/libmisc-vectorFunctions",
-                        "misc/libmisc-csgFunctions",
-                        "spacetimetransp/libspacetimetransp-sttranspCoeff"
-                ]
-        },
-
-        // time stepping:
-        "Time":
-        {
-                "NumSteps":             10,
-                "EndTime":              0.1
-        },
-    
-        //adaptive refinement:
-        "AdaptRef":
-        {
-                "Freq":                 1,
-                "FinestLevel":          0,
-                "CoarsestLevel":        0,
-                "Width":                0.01,
-                "RefineStrategy":       1,
-                "LoadBalStrategy":      1,
-                "Partitioner":          1
-        },
-
-        // experimental conditions
-        "Exp":
-        {
-                "RadDrop":              [0.33333333333, 0.33333333333, 0.33333333333 ],
-                "PosDrop":              [1, 1, 1 ],
-                "RadInlet":             0.005
-        },
-
-        // experimental conditions
-        "TestCase3":
-        {
-                "v":                    2.0,
-                "r":                    4.0,
-                "C":                    1
-        },
-
-        "Transp":
-        {
-               "UseNSSol":             0,
-                "DoTransp":             1,
-                "Theta":                1,
-                "Iter":                 20000,
-                "Tol":                  1e-12,
-                "DiffPos":              40.0,
-                "DiffNeg":              20.0,
-                "HPos":                 2.0,
-                "HNeg":                 1,
-                "IniCPos":              0.0,
-                "IniCNeg":              0.0,
-                "InitialConcNeg":       "testcase3_sol_neg",
-                "InitialConcPos":       "testcase3_sol_pos",
-                "NitschePenalty":       125,
-                "STXFEMStab":           0, //0.001,
-                "Levelset":             "testcase3_lset",             //Only active if UseNSSol == 0
-                "Flow":                 "testcase3_vel",               //Only active if UseNSSol == 0
-                "RhsPos":               "testcase3_rhs_pos",                  //Only active if UseNSSol == 0
-                "RhsNeg":               "testcase3_rhs_neg",                  //Only active if UseNSSol == 0
-                "SolPos":               "testcase3_sol_pos",                  //Only active if UseNSSol == 0
-                "SolNeg":               "testcase3_sol_neg",                  //Only active if UseNSSol == 0
-                "BoundaryType":         "2!2!2!2!2!2",
-                "BoundaryFncsNeg":      "testcase3_sol_pos!testcase3_sol_pos!testcase3_sol_pos!testcase3_sol_pos!testcase3_sol_pos!testcase3_sol_pos",
-                "BoundaryFncsPos":      "testcase3_sol_pos!testcase3_sol_pos!testcase3_sol_pos!testcase3_sol_pos!testcase3_sol_pos!testcase3_sol_pos",
-
-                "DirectSolve":          0,
-                "Quadrature":
-                {       
-                    "SubIntervalsPerEdge":  2,
-                    "SubTimeIntervals":     1,
-                    "LevelsetLinearInTime": 0
-                }
-        },
-
-        "VTK":
-        {
-
-                "VTKOut":               1,
-                "VTKDir":               "vtk",
-                "VTKName":              "testcase3_",
-                "Binary":               0
-        },
-
-        //Write out results:
-        "Restart":
-        {
-                "Inputfile":            "none"
-        },
-
-        // Domain boundary and initial condition
-        "DomainCond":
-        {
-                "InitialCond":          0,
-                "GeomType":             1,
-                "InitialFile":          "none",
-                "MeshFile":             "2x2x2@16x16x16",
-                "PeriodicMatching":     "periodicx",
-                "BoundaryType":         "21!21!21!21!21!21",
-                "BoundaryFncs":         "ZeroVel!ZeroVel!ZeroVel!ZeroVel!ZeroVel!ZeroVel"
+    "General": {
+        "DynamicLibs": [
+            "misc/libmisc-scalarFunctions", 
+            "misc/libmisc-vectorFunctions", 
+            "misc/libmisc-csgFunctions", 
+            "spacetimetransp/libspacetimetransp-sttranspCoeff"
+        ], 
+        "DynamicLibsPrefix": "../", 
+        "ProgressBar": 1
+    }, 
+    "Time": {
+        "NumSteps": 10, 
+        "FinalTime": 0.1
+    }, 
+    "Mesh": {
+        "Type": "BrickBuilder",
+        "Origin":[0,0,0],
+        "E1": [2,0,0],           
+        "E2": [0,2,0],            
+        "E3": [0,0,2],            
+        "N1": 16,                 
+        "N2": 16,                 
+        "N3": 16, 
+      
+        "RestartFile": "", 
+        "AdaptRef": {
+            "CoarsestLevel": 0, 
+            "Freq": 1, 
+            "LoadBalStrategy": 1, 
+            "FinestLevel": 0, 
+            "Width": 0.01
         }
-
+    }, 
+    "Deprecated": {
+        "Theta": 1, 
+        "Reparam": {
+            "Partitioner": 1, 
+            "RefineStrategy": 1
+        }
+    }, 
+    "Levelset": {
+        "RadDrop": [
+            0.33333333333, 
+            0.33333333333, 
+            0.33333333333
+        ], 
+        "PosDrop": [
+            1, 
+            1, 
+            1
+        ]
+    }, 
+    "Inflow": {
+        "RadInlet": 0.005
+    }, 
+    "TestCase3": {
+        "C": 1, 
+        "r": 4.0, 
+        "v": 2.0
+    }, 
+    "Transp": {
+        "SolNeg": "testcase3_sol_neg", 
+        "UseNSSol": 0, 
+        "Enable": 1, 
+        "IniCPos": 0.0, 
+        "IniCNeg": 0.0, 
+        "Solver": {
+            "Tol": 1e-12, 
+            "Iter": 20000, 
+            "DirectSolve": 0
+        }, 
+        "DiffNeg": 20.0, 
+        "Flow": "testcase3_vel", 
+        "Levelset": "testcase3_lset", 
+        "NitschePenalty": 125, 
+        "Quadrature": {
+            "SubIntervalsPerEdge": 2, 
+            "LevelsetLinearInTime": 0, 
+            "SubTimeIntervals": 1
+        }, 
+        "InitialConcPos": "testcase3_sol_pos", 
+        "HPos": 2.0, 
+        "SolPos": "testcase3_sol_pos", 
+        "HNeg": 1, 
+        "InitialConcNeg": "testcase3_sol_neg", 
+        "DiffPos": 40.0, 
+        "RhsNeg": "testcase3_rhs_neg", 
+        "XFEMReduced": 0, 
+        "RhsPos": "testcase3_rhs_pos",
+        "BoundaryDataPos": {
+            "Default":["DirBC","testcase3_sol_pos"]  
+         },
+         "BoundaryDataNeg": {
+            "Default":["DirBC","testcase3_sol_pos"]  
+         },
+         "CompareResults": 0
+    }, 
+    "VTK": {
+        "VTKOut": 1,
+        "VTKDir": "vtk", 
+        "Binary": 0, 
+        "Freq": 1, 
+        "VTKName": "testcase3_"
+    }, 
+    "NavStokes": {
+        "InitialValue": 0, 
+        "BoundaryData": {
+            "PeriodicMatching":"periodicx",
+            "Velocity": {
+                "Default": ["Nat0BC","ZeroVel"]      
+            }
+            
+        },
+        "Coeff":{
+            "SurfTens":{
+                "ShearVisco": "0",
+                "DilatationalVisco" : 0
+            }  
+        }
+    }, 
+    "Restart": {
+        "InputData": ""
+    }
 }
