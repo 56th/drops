@@ -7,7 +7,7 @@ levelset/brick_transp/brick_transp.json
 
 levelset/prJump/default.json
 levelset/prJump/prJump.json
--------- circflow.json
+levelset/prJump/circflow.json
 
 levelset/twophasedrops/default.json
 levelset/twophasedrops/risingdroplet.json
@@ -40,7 +40,7 @@ poisson/cdrdrops/aleEX4.json
 poisson/cdrdrops/instatpoissonEx.json
 poisson/cdrdrops/instatsubgEX.json
 poisson/cdrdrops/statsubgEX.json
-------- convdiffEx.json
+poisson/cdrdrops/convdiffEx.json
 
 spacetimetransp/st_transp/default.json
 spacetimetransp/st_transp/BotheKoebeWielageWarnecke03.json
@@ -48,7 +48,13 @@ spacetimetransp/st_transp/ ------- 9 files missing
 
 stokes/errorestimator/MGsdropsPS.json --> link to stokes/sdropsP2/MGsdropsP2.json
 stokes/sdropsP2/MGsdropsP2.json
-stokes/sdropsP2/ ------- 9 files missing
+stokes/sdropsP2/drivcav_instat.json 
+stokes/sdropsP2/drivcav.json
+stokes/sdropsP2/stokes.json
+stokes/sdropsP2/FSdrops.json             <<< Both versions crash with: unknown Oseen solver Invalid solver combination >>>
+stokes/sdropsP2/isstokes.json            <<< Both versions crash with: unknown Oseen solver Invalid solver combination >>>
+stokes/sdropsP2/stsdrops.json            <<< crashes with DROPS::DROPSParamErrCL >>>
+
 
 surfactant/surfactant/default.json
 surfactant/surfactant/surfactant.json
@@ -56,7 +62,7 @@ surfactant/surfactant/surfactant.json
 tests/f_Gamma/default.json
 tests/f_Gamma/f_Gamma.json
 tests/meshreader/meshreader.json
-tests/reparam_init/ ----- reparam_init.json
+tests/reparam_init/reparam_init.json
 tests/reparamtest/reparam.json
 tests/serialization/serialization.json
 tests/show_domain/show_domain.json
