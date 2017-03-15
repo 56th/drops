@@ -1,96 +1,100 @@
-//=============================================================
-//    DROPS parameter file for two phase mass transport
-//    simulation: (almost) artificial substance system
-//    stationary interface (no flow simulation)
-//=============================================================
 {
-
-        "General":
-        {
-                "ProgressBar":  1, //show progress bar
-                "DynamicLibsPrefix": "../", //where should we look for shared objects?
-                "DynamicLibs": [ //select libraries to be loaded after program start
-                        "transport/libtransport-transportCoeff",
-                        "misc/libmisc-scalarFunctions",
-                        "misc/libmisc-vectorFunctions"
-                ]
-        },
-
-        // time stepping:
-        "Time":
-        {
-                "NumSteps":             2000,
-                "StepSize":             0.0005,
-                "Scheme":               1
-        },
-    
-        //adaptive refinement:
-        "AdaptRef":
-        {
-                "Freq":                 1,
-                "FinestLevel":          3,
-                "CoarsestLevel":        0,
-                "Width":                0.00045,
-                "RefineStrategy":       1,
-                "LoadBalStrategy":      1,
-                "Partitioner":          1
-        },
-
-        // experimental conditions
-        "Exp":
-        {
-                "RadDrop":              [1e-3, 1e-3, 1e-3 ],
-                "PosDrop":              [10e-3, 10e-3, 10e-3 ],
-                "RadInlet":             0.005
-        },
-
-        "Transp":
-        {
-                "UseNSSol":             0,
-                "DoTransp":             1,
-                "Theta":                1,
-                "Iter":                 200,
-                "Tol":                  1e-15,
-                "DiffPos":              5.8345e-05,
-                "DiffNeg":              2.29e-05,
-                "HPos":                 1.2143,
-                "HNeg":                 1,
-                "IniCPos":              0.01,
-                "IniCNeg":              0,
-                "NitschePenalty":       5,
-                "SDStabilization":      0,
-                "NitscheXFEMStab":      0.01,
-                "Levelset":             "Ellipsoid",             //Only active if UseNSSol == 0
-                "Flow":                 "ZeroVel",               //Only active if UseNSSol == 0
-                "BoundaryType":         "2!2!2!2!2!2",
-                "BoundaryFncs":         "IniCposFct!IniCposFct!IniCposFct!IniCposFct!IniCposFct!IniCposFct",
-                "BoundaryFncst":        "IniCposFct!IniCposFct!IniCposFct!IniCposFct!IniCposFct!IniCposFct"
-        },
-
-        "VTK":
-        {
-
-                "VTKOut":               5,
-                "VTKDir":               "vtk",
-                "VTKName":              "stationary_interface",
-                "Binary":               0
-        },
-
-        //Write out results:
-        "Restart":
-        {
-                "Inputfile":            "none"
-        },
-
-        // Domain boundary and initial condition
-        "DomainCond":
-        {
-                "InitialCond":          0,
-                "GeomType":             1,
-                "InitialFile":          "none",
-                "MeshFile":             "20e-3x20e-3x20e-3@10x10x10",
-                "BoundaryType":         "2!2!2!2!2!2!",
-                "BoundaryFncs":         "ZeroVel!ZeroVel!ZeroVel!ZeroVel!ZeroVel!ZeroVel"
+    "General": {
+        "DynamicLibs": [
+            "transport/libtransport-transportCoeff", 
+            "misc/libmisc-scalarFunctions", 
+            "misc/libmisc-vectorFunctions"
+        ], 
+        "DynamicLibsPrefix": "../", 
+        "ProgressBar": 1
+    }, 
+    "Time": {
+        "NumSteps": 2000, 
+        "Scheme": 1, 
+        "FinalTime": 1,
+        "Theta": 1
+    }, 
+    "Mesh": {
+        "Type": "BrickBuilder",     
+        "Origin": [0,0,0],          
+        "E1": [20e-3,0,0],             
+        "E2": [0,20e-3,0],              
+        "E3": [0,0,20e-3],              
+        "N1": 10,                    
+        "N2": 10,                    
+        "N3": 10, 
+        "RestartFile": "", 
+        "AdaptRef": {
+            "CoarsestLevel": 0, 
+            "Freq": 1, 
+            "LoadBalStrategy": 1, 
+            "FinestLevel": 3, 
+            "Width": 0.00045
         }
-
+    }, 
+    "Deprecated": {
+        "Theta": 1, 
+        "Reparam": {
+            "Partitioner": 1, 
+            "RefineStrategy": 1
+        }
+    }, 
+    "Levelset": {
+        "RadDrop": [
+            0.001, 
+            0.001, 
+            0.001
+        ], 
+        "PosDrop": [
+            0.01, 
+            0.01, 
+            0.01
+        ]
+    }, 
+    "Inflow": {
+        "RadInlet": 0.005
+    }, 
+    "Transp": {
+        "UseNSSol": 0, 
+        "Enable": 1, 
+        "IniCPos": 0.01, 
+        "IniCNeg": 0, 
+        "Solver": {
+            "Tol": 1e-15, 
+            "Iter": 200
+        }, 
+        "DiffNeg": 2.29e-05, 
+        "Flow": "ZeroVel", 
+        "Levelset": "Ellipsoid", 
+        "NitschePenalty": 5, 
+        "XFEMReduced": 0.01, 
+        "HPos": 1.2143, 
+        "HNeg": 1, 
+        "DiffPos": 5.8345e-05, 
+        "SDStabilization": 0,
+        "BoundaryData": {
+            "Default":["DirBC","IniCposFct"]
+        },
+        "BoundaryDataTransformed":{
+            "Default":["DirBC","IniCposFct"]
+        }
+    }, 
+    "VTK": {
+        "VTKDir": "vtk", 
+        "Binary": 0, 
+        "Freq": 5, 
+        "VTKName": "stationary_interface"
+    }, 
+    "NavStokes": {
+        "InitialValue": 0, 
+        "BoundaryData": {
+           "Velocity": {
+                "Default":["DirBC","ZeroVel"] 
+                      
+            }
+        }
+    }, 
+    "Restart": {
+        "InputData": ""
+    }
 }
