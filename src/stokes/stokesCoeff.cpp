@@ -345,12 +345,12 @@ double PrSolution( const DROPS::Point3DCL& p, double)
 
 double ConstQ(const DROPS::Point3DCL&, double =0)
 {
-    return P.get<double>("Mat.Dens");
+    return P.get<double>("NavStokes.Coeff.Dens");
 }
 
 DROPS::Point3DCL Source( const DROPS::Point3DCL& p, double)
 {
-    const double g= P.get<double>("Mat.Dens");
+    const double g= P.get<double>("NavStokes.Coeff.Dens");
     DROPS::SVectorCL<3> ret;
     ret[0]= g/3.*std::sin(p[0])*std::sin(p[1])*std::sin(p[2]);
     ret[1]= -g/3.*std::cos(p[0])*std::cos(p[1])*std::sin(p[2]);

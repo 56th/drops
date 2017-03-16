@@ -18,10 +18,10 @@
         "OseenSolver": {
             "Tau": 1, 
             "UzawaInnerTol": 1e-14, 
-            "Solver": 501101, 
+            "Solver": 20301,
             "Relax": 1, 
             "Iter": 100, 
-            "UzawaInnerIter": 1, 
+            "UzawaInnerIter": 100,
             "PcAIter": 100, 
             "Tol": 1e-08, 
             "PcSTol": 1e-09, 
