@@ -36,12 +36,6 @@
         "CurvDiff": -5e-09
     }, 
     
-    "Deprecated": 
-    {        
-        "Theta": 1
-    },
-    
-    
     "Inflow": 
     {
         "RadInlet": 0.0035

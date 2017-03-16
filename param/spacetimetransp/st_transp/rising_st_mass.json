@@ -67,20 +67,6 @@
               }
         }
     }, 
-    "Deprecated": {
-        "Default": {
-            "Levelset": "Zero!Zero!Zero!Zero!Zero!Zero", 
-            "Smoothzone": 0.05, 
-            "Projection": 0, 
-            "Downwind": 0.866
-        }, 
-        "Theta": 0.5, 
-        "Reparam": {
-            "Partitioner": 1, 
-            "NarrowBand": -1, 
-            "RefineStrategy": 1
-        }
-    }, 
     "Levelset": {
         "PosDrop": [
             0.5, 

@@ -31,13 +31,6 @@
             "Width": 0.01
         }
     }, 
-    "Deprecated": {
-        "Theta": 1, 
-        "Reparam": {
-            "Partitioner": 1, 
-            "RefineStrategy": 1
-        }
-    }, 
     "Levelset": {
         "RadDrop": [
             0.333333333333333, 

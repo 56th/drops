@@ -82,13 +82,13 @@
                                                 // discretization of the Navier-Stokes and level set equations.
                                                 // Theta = 0 yields the explicit and Theta = 1 the implicit
                                                 // Euler method. Theta = 0.5 results in the Crank-Nicholson scheme.
-                "BoundaryType":         "Deprecated.Default.Levelset",     // #[-> default] List of boundary types separated by a !.
+                "BoundaryType":         "Deprecated.Default.Levelset.BoundaryType",     // #[-> default] List of boundary types separated by a !.
                                                            // Each defining a boundary type for one boundary
                                                            // domain ( The following indices may be used:
                                                            //          Dir0BC= 0, DirBC= 2, Per1BC= 13,
                                                            //          Per2BC= 11, Nat0BC= 21, NatBC= 23,
                                                            //          NoBC= 98, UndefinedBC_= 99        ).
-                "BoundaryFncs":         "Deprecated.Default.Levelset", // #
+                "BoundaryFncs":         "Deprecated.Default.Levelset.BoundaryFncs", // #
                                                            // List of boundary functions separated by a !.
                                                            // Each string defines a function which is taken
                                                            // from a function container during runtime.

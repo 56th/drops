@@ -78,5 +78,5 @@ tests/show_domain/show_domain.json
 transport/ns_transp/default.json
 transport/ns_transp/BotheKoebeWielageWarnecke03.json
 transport/ns_transp/risingbutanoldroplet.json
-transport/ns_transp/stationary_masstransp.json           <<< results differ from old version >>>
+transport/ns_transp/stationary_masstransp.json
 transport/ns_transp/stat_mass_surf.json

@@ -24,14 +24,6 @@
     }, 
     
     
-    "Deprecated": {
-        "Reparam": {
-            "Partitioner": 1, 
-            "NarrowBand": -1
-        }
-    }, 
-    
-    
     "Mesh": 
     {
         "Type": "BrickBuilder",
