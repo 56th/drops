@@ -168,6 +168,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
     PermutationT lset_downwind;
 
+    ///\todo Is this really necessary? Already done ~20 lines above!
     if ( StokesSolverFactoryHelperCL().VelMGUsed(PSolver))
         Stokes.SetNumVelLvl ( Stokes.GetMG().GetNumLevel());
     if ( StokesSolverFactoryHelperCL().PrMGUsed(PSolver))
