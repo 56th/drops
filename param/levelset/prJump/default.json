@@ -26,8 +26,10 @@
                 "ContactAngle":          60,
                 "ContactAngleFunc":      "ConstantAngle",
                 "BndOuterNormal":        "OutNormalBrick"
-            }
+           }
+           
         }
+        
     },
     
     "Levelset":
