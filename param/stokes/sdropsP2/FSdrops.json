@@ -18,7 +18,7 @@
         "OseenSolver": {
             "Tau": 1, 
             "UzawaInnerTol": 1e-10, 
-            "Solver": 550000, 
+            "Solver": 20101,
             "Relax": 1, 
             "Iter": 200, 
             "UzawaInnerIter": 200, 

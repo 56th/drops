@@ -8,7 +8,6 @@ levelset/brick_transp/brick_transp.json
 levelset/prJump/default.json
 levelset/prJump/prJump.json
 levelset/prJump/circflow.json            <<<results differ from old version>>>
-
 levelset/twophasedrops/default.json
 levelset/twophasedrops/risingdroplet.json
 levelset/twophasedrops/butanol.json
@@ -59,9 +58,9 @@ stokes/sdropsP2/MGsdropsP2.json
 stokes/sdropsP2/drivcav_instat.json 
 stokes/sdropsP2/drivcav.json
 stokes/sdropsP2/stokes.json
-stokes/sdropsP2/FSdrops.json             <<< Both versions crash with: unknown Oseen solver Invalid solver combination >>>
-stokes/sdropsP2/isstokes.json            <<< Both versions crash with: unknown Oseen solver Invalid solver combination >>>
-stokes/sdropsP2/stsdrops.json            <<< crashes with DROPS::DROPSParamErrCL >>>
+stokes/sdropsP2/FSdrops.json
+stokes/sdropsP2/isstokes.json
+stokes/sdropsP2/stsdrops.json
 
 
 surfactant/surfactant/default.json
