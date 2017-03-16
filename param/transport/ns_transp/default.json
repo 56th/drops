@@ -94,7 +94,9 @@
             "MaxRelComponentSize": "0.05",
             "WeakEdgeRatio": "0.2",
             "CrosswindLimit": "0.8660254037844387"
-        }
+        },
+        "CurvDiff": -1,
+        "Discontinuous": 0
     },
     
     "General":

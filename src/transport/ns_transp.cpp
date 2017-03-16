@@ -647,10 +647,15 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbndda
     lset.SetSurfaceForce( SF_ImprovedLBVar);
 
     ParamCL PSolver= P.get_child("CouplingSolver.NavStokesSolver.OseenSolver");
-    if ( StokesSolverFactoryHelperCL().VelMGUsed(PSolver))
+    if ( StokesSolverFactoryHelperCL().VelMGUsed(PSolver)){
         Stokes.SetNumVelLvl ( Stokes.GetMG().GetNumLevel());
-    if ( StokesSolverFactoryHelperCL().PrMGUsed(PSolver))
+        lset.SetNumLvl(Stokes.GetMG().GetNumLevel());
+    }
+    if ( StokesSolverFactoryHelperCL().PrMGUsed(PSolver)){
         Stokes.SetNumPrLvl  ( Stokes.GetMG().GetNumLevel());
+        lset.SetNumLvl(Stokes.GetMG().GetNumLevel());
+    }
+    lset.CreateNumbering( MG.GetLastLevel());
 
     SetInitialLevelsetConditions( lset, MG, P);
     SetInitialLevelsetConditions( oldlset, MG, P);
@@ -775,6 +780,19 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbndda
 
     LevelsetModifyCL lsetmod( P.get<int>("Levelset.Reparam.Freq"), P.get<int>("Levelset.Reparam.Method"), P.get<double>("Levelset.Reparam.MaxGrad"), P.get<double>("Levelset.Reparam.MinGrad"), P.get<int>("Levelset.VolCorrection"), Vol);
 
+    UpdateProlongationCL<Point3DCL> PVel( Stokes.GetMG(), stokessolverfactory.GetPVel(), &Stokes.vel_idx, &Stokes.vel_idx);
+    adap.push_back( &PVel);
+    UpdateProlongationCL<double> PPr ( Stokes.GetMG(), stokessolverfactory.GetPPr(), &Stokes.pr_idx, &Stokes.pr_idx);
+    adap.push_back( &PPr);
+    UpdateProlongationCL<double> PLset( lset.GetMG(), lset.GetProlongation(), lset.idxC, lset.idxC);
+    adap.push_back( &PLset);
+    Stokes.P_ = stokessolverfactory.GetPVel();
+
+    // For a two-level MG-solver: P2P1 -- P2P1X;
+//     MakeP1P1XProlongation ( Stokes.vel_idx.NumUnknowns(), Stokes.pr_idx.NumUnknowns(),
+//         Stokes.pr_idx.GetFinest().GetXidx().GetNumUnknownsStdFE(),
+//         stokessolverfactory.GetPVel()->GetFinest(), stokessolverfactory.GetPPr()->GetFinest());
+
     // Time discretisation + coupling
     TimeDisc2PhaseCL* timedisc= CreateTimeDisc(Stokes, lset, navstokessolver, gm, P, lsetmod);
 
@@ -795,15 +813,6 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbndda
         stokessolverfactory.SetMatrices( timedisc->GetUpperLeftBlock(), &Stokes.B.Data,
                                          &Stokes.M.Data, &Stokes.prM.Data, &Stokes.pr_idx);
     }
-
-    UpdateProlongationCL<Point3DCL> PVel( Stokes.GetMG(), stokessolverfactory.GetPVel(), &Stokes.vel_idx, &Stokes.vel_idx);
-    adap.push_back( &PVel);
-    UpdateProlongationCL<double> PPr ( Stokes.GetMG(), stokessolverfactory.GetPPr(), &Stokes.pr_idx, &Stokes.pr_idx);
-    adap.push_back( &PPr);
-    // For a two-level MG-solver: P2P1 -- P2P1X;
-//     MakeP1P1XProlongation ( Stokes.vel_idx.NumUnknowns(), Stokes.pr_idx.NumUnknowns(),
-//         Stokes.pr_idx.GetFinest().GetXidx().GetNumUnknownsStdFE(),
-//         stokessolverfactory.GetPVel()->GetFinest(), stokessolverfactory.GetPPr()->GetFinest());
 
     std::ofstream* infofile = 0;
     IF_MASTER {

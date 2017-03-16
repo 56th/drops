@@ -216,11 +216,11 @@
                 "NitscheXFEMStab":      "Transp.XFEMReduced",
                 "STXFEMStab":           "Transp.XFEMReduced",
                 "Theta":                "Deprecated.Theta",
-                "BoundaryType":         "Transport.BoundaryData.Deprecated_convert.BoundaryType",
-                "BoundaryFncs":         "Transport.BoundaryData.Deprecated_convert.BoundaryFncs",
-                "BoundaryFncst":        "Transport.BoundaryDataTransformed.Deprecated_convert.BoundaryFncst",
-                "BoundaryFncsPos":      "Transport.BoundaryData.Deprecated_convert.BoundaryFncsPos",
-                "BoundaryFncsNeg":      "Transport.BoundaryData.Deprecated_convert.BoundaryFncsNeg",
+                "BoundaryType":         "Transp.BoundaryData.Deprecated_convert.BoundaryType",
+                "BoundaryFncs":         "Transp.BoundaryData.Deprecated_convert.BoundaryFncs",
+                "BoundaryFncst":        "Transp.BoundaryDataTransformed.Deprecated_convert.BoundaryFncst",
+                "BoundaryFncsPos":      "Transp.BoundaryData.Deprecated_convert.BoundaryFncsPos",
+                "BoundaryFncsNeg":      "Transp.BoundaryData.Deprecated_convert.BoundaryFncsNeg",
                 "DoTransp":             "Transp.Enable"      //#[->default=0 (Enable)] mass transport (0 = deactivated, 1 = activated).
         },
 
