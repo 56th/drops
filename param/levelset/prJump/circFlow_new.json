@@ -1,9 +1,4 @@
 {
-     
-    "Stokes": {
-        "PrintMatrices": "false", 
-        "_comment": "# flow solver"
-    }, 
     "OseenSolver": {
         "UzawaInnerTol": "0.6", 
         "Solver": "30211", 
@@ -18,11 +13,12 @@
         "XFEMReduced": "0", 
         "Coeff": {
             "SurfTens": {
-                "SurfTension": "10", 
+                "ArtificialForce": "1",
+                "SurfTension": "10",
                 "ShearVisco": "0", 
                 "DilatationalVisco": "0", 
                 "VarTensionFunc": "ConstTau"
-            }, 
+            },
             "ViscNeg": "1", 
             "VolForce": "ZeroVel", 
             "DensPos": "1", 
@@ -49,19 +45,15 @@
         "FinalTime": "0", 
         "NumSteps": "0"
     }, 
-    "AdaptRef": {
-        "_comment": "# adaptive refinement"
-    }, 
     "Mesh": {
-        "Type":"BrickBuildter", 
-        "Origin":[0,0,0],
-        "E1":[1,0,0],
-        "E2":[0,1,0],
-        "E3":[0,0,1],
+        "Type": "BrickBuilder",
+        "Origin": [-1,-1,-1],           // Origin
+        "E1": [2,0,0],                  // Basis to span the object,
+        "E2": [0,2,0],                  // not necessary orthonormal
+        "E3": [0,0,2],                  // ...
         "N1":4,
         "N2":4,
         "N3":4,
-        //"MeshFile_convertTo_E1E2E3_N1N2N3": "4", 
         "RestartFile": "", 
         "AdaptRef": {
             "CoarsestLevel": "0", 
@@ -71,33 +63,12 @@
             "Width": "100"
         }
     }, 
-    "Mat": {
-        "_comment": "# material data, all units are SI"
-    }, 
-    "Deprecated": {
-        "Default": {
-            "Smoothzone": "1e-05", 
-            "Levelset": {
-                "CurvDiff": "0"
-            }, 
-            "Downwind": "0.8660254037844387", 
-            "Projection": "0"
-        }, 
-        "Theta": "0", 
-        "Reparam": {
-            "NarrowBand": "0"
-        }
-    }, 
-    "Exp": {
-        "_comment": "# experimental conditions"
-    }, 
     "Levelset": {
         "PosDrop": [
             "0", 
             "0", 
             "0"
         ], 
-        "_comment": "# levelset solver", 
         "Reparam": {
             "Freq": "0", 
             "MinGrad": "0", 
@@ -119,16 +90,11 @@
         "InflowFreq": "0", 
         "RadInlet": "0"
     }, 
-    "SurfTens": {
-        "_comment": "# surface tension", 
-        "ArtificialForce": "1"
-    }, 
     "VTK": {
         "Binary": "0", 
         "MasterOut": "1", 
         "vtkDir": "vtk", 
         "vtkOut": "true", 
-        "_comment": "# VTK settings", 
         "GeomName": "Cube", 
         "vtkCase": "prJump"
     }, 
@@ -141,9 +107,6 @@
         "DynamicLibsPrefix": "../", 
         "ProgressBar": "1"
     }, 
-    "Reparam": {
-        "_comment": "# re-initialization of levelset function"
-    }, 
     "Transp": {
         "Enable": "0", 
         "IniCPos": "0", 
@@ -152,7 +115,6 @@
             "Tol": "0", 
             "Iter": "0"
         }, 
-        "_comment": "# mass transport", 
         "NitschePenalty": "0", 
         "XFEMReduced": "0", 
         "HPos": "0", 
@@ -162,7 +124,6 @@
     }, 
     "SurfTransp": {
         "XFEMReduced": "0", 
-        "_comment": "# surfactant transport", 
         "Enable": "0", 
         "Visc": "0", 
         "Solver": {
@@ -172,14 +133,10 @@
     }, 
     "Restart": {
         "Binary": "0", 
-        "_comment": "# Write out results, read in for restart", 
         "OutputGrid": "0",
         "OutputData": "0",
         "OutputOverwrite": "0", 
         "InputData": "", 
         "OutputFreq": "0"
-    }, 
-    "DomainCond": {
-        "_comment": "# domain, bnd/ini conditions"
     }
 }

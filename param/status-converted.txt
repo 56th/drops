@@ -7,7 +7,8 @@ levelset/brick_transp/brick_transp.json
 
 levelset/prJump/default.json
 levelset/prJump/prJump.json
-levelset/prJump/circflow.json            <<<results differ from old version>>>
+levelset/prJump/circflow.json
+
 levelset/twophasedrops/default.json
 levelset/twophasedrops/risingdroplet.json
 levelset/twophasedrops/butanol.json

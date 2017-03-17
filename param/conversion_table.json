@@ -203,7 +203,8 @@
                 "VarTensionFncs":       "NavStokes.Coeff.SurfTens.VarTensionFunc",   //#[-> varTensionFunc]
                 "ConcentrationDep":     "NavStokes.Coeff.SurfTens.ConcentrationDep",
                 "DilatationalVisco":    "NavStokes.Coeff.SurfTens.DilatationalVisco",
-                "ShearVisco":           "NavStokes.Coeff.SurfTens.ShearVisco"
+                "ShearVisco":           "NavStokes.Coeff.SurfTens.ShearVisco",
+                "ArtificialForce":      "NavStokes.Coeff.SurfTens.ArtificialForce"
         },
 
 // mass transport
