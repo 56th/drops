@@ -123,16 +123,13 @@ class ComponentBasedVolumeAdjustmentCL : public VolumeAdjustmentCL
     void FindReferencePoints();
     /// \brief For each point in refpts, return the component_of_dof from the closest point in coord_of_dof.
     component_vector component_of_point (const std::vector<Point3DCL>& refpts, const component_vector& component_of_dof, const std::vector<Point3DCL>& coord_of_dof) const;
-    /// \brief Searches ReferencePoints_backup in the new components to set up a permutation of old and new component numbers. Reorders component_of_dof_ and ReferencePoints. (The default is coord_of_dof==&coord_of_dof_; Repair() uses the old coordinates.)
+    /// \brief Recomputes targetVolumes_ based on a matching of old and new components.
     void MatchComponents();
 
     /// \brief Copy component_of_dof_ and ReferencePoints to their _backup siblings.
     void make_backup();
 
-    /// \brief Adjust targetVolumes if the topology changes.
-    void Handle_topo_change();
-
-    Uint   num_components() const { return Volumes.size(); }
+    Uint num_components() const { return Volumes.size(); }
 
     // initializes Split, Volumes and ReferencePoints plus their backups
     void InitVolume_impl() override;

@@ -435,10 +435,7 @@ void ComponentBasedVolumeAdjustmentCL::Repair()
 {
     coord_of_dof_backup_= std::move (coord_of_dof_);
     init_coord_of_dof();
-    const Uint old_num_components= num_components();
     FindComponents();
-    if (num_components() != old_num_components)
-        throw DROPSErrCL ("ComponentBasedVolumeAdjustmentCL::Repair: The mesh adaption changed the number of connected components. This is currently not handled.\n");
     MatchComponents ();
     coord_of_dof_backup_= coord_of_dof_;
     make_backup();
@@ -509,7 +506,6 @@ double ComponentBasedVolumeAdjustmentCL::CalculateVolume(Uint c, double shift) c
     return ret;
 }
 
-
 auto ComponentBasedVolumeAdjustmentCL::component_of_point (const std::vector<Point3DCL>& refpts,
     const component_vector& component_of_dof, const std::vector<Point3DCL>& coord_of_dof) const -> component_vector
 {
@@ -529,40 +525,52 @@ auto ComponentBasedVolumeAdjustmentCL::component_of_point (const std::vector<Poi
     return std::move (cnew);
 }
 
-// XXX What else apart from component_of_dof_ and ReferencePoints should be reordered? Volumes?
 void ComponentBasedVolumeAdjustmentCL::MatchComponents ()
 {
-    if (ReferencePoints_backup.size() != num_components())
-        throw DROPSErrCL ("ComponentBasedVolumeAdjustmentCL::MatchComponents: The number of components has changed.\n");
-
     // cold represents a permutation which maps the new component number (from ReferencePoints_) to the old.
     const component_vector cold (component_of_point (ReferencePoints, component_of_dof_backup_, coord_of_dof_backup_));
     // cnew represents a permutation which maps the old component number (from ReferencePoints_backup) to the new.
     const component_vector cnew (component_of_point (ReferencePoints_backup, component_of_dof_, coord_of_dof_));
 
-    // check that cold and cnew are inverse to each other.
-    for (Uint c= 0; c < num_components(); ++c)
-        if (cnew[cold[c]] != c)
-            throw DROPSErrCL ("ComponentBasedVolumeAdjustmentCL::MatchComponents: The topology has changed.\n");
 
-    // Renumber component_of_dof_.
-    for (auto& c: component_of_dof_)
-        c= cold[c];
+    // M will be the adjacency matrix of the undirected graph G: The nodes of G are the (old and new) components. The edges are given by the components of the reference points (in both directions).
+    MatrixCL M;
+    const size_t nold= cold.size(),
+                 nnew= cnew.size(),
+                 n= nold + nnew;
+    SparseMatBuilderCL<double> Mb (&M, n, n);
+    for (Uint i= 0; i < nold; ++i)
+        Mb (cnew[i] + nold, i)= Mb (i, cnew[i] + nold)= 1.;
+    for (Uint i= 0; i < nnew; ++i)
+        Mb (cold[i], i + nold)= Mb (i + nold, cold[i])= 1.;
+    Mb.Build();
+    std::cout << "ComponentBasedVolumeAdjustmentCL::MatchComponents: M: " << M << std::endl;
 
-    // Renumber ReferencePoints
-    const std::vector<Point3DCL> tmp (ReferencePoints);
-    for (Uint i= 0; i < tmp.size(); ++i)
-        ReferencePoints[cold[i]]= tmp[i];
+    GraphComponentsCL G;
+    G.number_connected_components (M);
+
+    // The new target volumes (for the new components) are computed on the connected components of G.
+    std::vector<double> newtargetVolumes (num_components());
+    for (size_t i= 0; i < G.num_components(); ++i) {
+        const component_vector& component (G.component (i));
+        double targetvolsum= 0.,
+               volsum= 0;
+        for (auto c: component) // All target volumes (of the old components) are summed up and and so are all current volumes (of the new components).
+            if (c < nold)
+                targetvolsum+= targetVolumes[c];
+            else
+                volsum+= Volumes[c - nold];
+        for (auto c: component) // Each new component gets its fraction (within the new components) of the total (old) targetVolume.
+            if (c >= nold)
+                newtargetVolumes[c - nold]= Volumes[c - nold]/volsum * targetvolsum;
+    }
+    targetVolumes= newtargetVolumes;
 }
 
 void ComponentBasedVolumeAdjustmentCL::AdjustVolume()
 {
-    const Uint old_num_components= num_components();
     FindComponents();
-    if (num_components () == old_num_components)
-        MatchComponents();
-    else
-        Handle_topo_change();
+    MatchComponents();
 
     // adapt Level Set
     for (Uint i= 1; i < num_components(); ++i) {
@@ -588,45 +596,6 @@ void ComponentBasedVolumeAdjustmentCL::make_backup()
 {
     component_of_dof_backup_= component_of_dof_;
     ReferencePoints_backup= ReferencePoints;
-}
-
-void ComponentBasedVolumeAdjustmentCL::Handle_topo_change ()
-{
-    for (Uint c= 0; c < Volumes.size(); ++c)
-        Volumes[c]= CalculateVolume(c, 0.);
-
-    const int RPS=  ReferencePoints.size(),
-              RPBS= ReferencePoints_backup.size();
-    if (std::abs(RPS - RPBS) > 1) {
-        std::cerr << "ComponentBasedVolumeAdjustmentCL::Handle_topo_change: The change of topology is too complicated. I am setting the target volumes to the current volumes and hoping the best.\n";
-        targetVolumes= Volumes;
-        return;
-    }
-
-    if (RPS == RPBS + 1) { // New component
-        // Look up the old component numbers of the new reference points in the old map.
-        const component_vector cold_of_new (component_of_point (ReferencePoints, component_of_dof_backup_, coord_of_dof_));
-
-        // Store the sum of the new volumes that make up the old components.
-        std::vector<double> VolumeSum (RPBS);
-        for (Uint i= 0; i < RPS; ++i)
-            VolumeSum[cold_of_new[i]]+= Volumes[i];
-
-        // Update the target volumes. Distribute the old volume on a relative basis onto the new components.
-        for (Uint i= 0; i < RPS; ++i)
-            Volumes[i]= Volumes[i]/VolumeSum[cold_of_new[i]] * targetVolumes[cold_of_new[i]];
-        targetVolumes= Volumes;
-    }
-    if (RPS == RPBS - 1) { // Component vanished
-        // Look up the new component numbers of the old reference points in the new map.
-        const component_vector cnew_of_old (component_of_point (ReferencePoints_backup, component_of_dof_, coord_of_dof_));
-
-        // Update the target volumes.
-        Volumes= std::vector<double> (num_components());
-        for (Uint i= 0; i < targetVolumes.size(); ++ i)
-            Volumes[cnew_of_old[i]]+= targetVolumes[i];
-        targetVolumes= Volumes;
-    }
 }
 
 } // end of namespace DROPS
