@@ -95,7 +95,8 @@ class ComponentBasedVolumeAdjustmentCL : public VolumeAdjustmentCL
   private:
     component_vector       component_of_dof_, ///< component_of_dof_[i] is the number of the component of dof i.
                            component_of_dof_backup_;
-    std::vector<Point3DCL> coord_of_dof_; // The points where the dofs live.
+    std::vector<Point3DCL> coord_of_dof_,        // The points where the dofs live.
+                           coord_of_dof_backup_; // The points where dofs_backup live (only different from coord_of_dof_ in Repair).
 
     std::vector<bool>                  doCorrection_;
     std::vector<std::valarray<double>> indicator_functions_;
@@ -123,7 +124,7 @@ class ComponentBasedVolumeAdjustmentCL : public VolumeAdjustmentCL
     /// \brief For each point in refpts, return the component_of_dof from the closest point in coord_of_dof.
     component_vector component_of_point (const std::vector<Point3DCL>& refpts, const component_vector& component_of_dof, const std::vector<Point3DCL>& coord_of_dof) const;
     /// \brief Searches ReferencePoints_backup in the new components to set up a permutation of old and new component numbers. Reorders component_of_dof_ and ReferencePoints. (The default is coord_of_dof==&coord_of_dof_; Repair() uses the old coordinates.)
-    void MatchComponents(const std::vector<Point3DCL>* coord_of_dof= nullptr);
+    void MatchComponents();
 
     /// \brief Copy component_of_dof_ and ReferencePoints to their _backup siblings.
     void make_backup();

@@ -419,6 +419,7 @@ void ComponentBasedVolumeAdjustmentCL::init_coord_of_dof ()
 void ComponentBasedVolumeAdjustmentCL::InitVolume_impl ()
 {
     init_coord_of_dof();
+    coord_of_dof_backup_= coord_of_dof_;
     FindComponents();
 
     // Compute initial volumes.
@@ -433,13 +434,14 @@ void ComponentBasedVolumeAdjustmentCL::InitVolume_impl ()
 
 void ComponentBasedVolumeAdjustmentCL::Repair()
 {
-    const std::vector<Point3DCL> coord_of_dof_backup (std::move (coord_of_dof_));
+    coord_of_dof_backup_= std::move (coord_of_dof_);
     init_coord_of_dof();
     const Uint old_num_components= num_components();
     FindComponents();
     if (num_components() != old_num_components)
         throw DROPSErrCL ("ComponentBasedVolumeAdjustmentCL::Repair: The mesh adaption changed the number of connected components. This is currently not handled.\n");
-    MatchComponents (&coord_of_dof_backup);
+    MatchComponents ();
+    coord_of_dof_backup_= coord_of_dof_;
     make_backup();
 
     DebugOutput (std::cout);
@@ -529,14 +531,13 @@ auto ComponentBasedVolumeAdjustmentCL::component_of_point (const std::vector<Poi
 }
 
 // XXX What else apart from component_of_dof_ and ReferencePoints should be reordered? Volumes?
-void ComponentBasedVolumeAdjustmentCL::MatchComponents (const std::vector<Point3DCL>* coord_of_dof_backup)
+void ComponentBasedVolumeAdjustmentCL::MatchComponents ()
 {
     if (ReferencePoints_backup.size() != num_components())
         throw DROPSErrCL ("ComponentBasedVolumeAdjustmentCL::MatchComponents: The number of components has changed.\n");
 
     // cold represents a permutation which maps the new component number (from ReferencePoints_) to the old.
-    const std::vector<Point3DCL>& coord_of_dof_backup_ref= coord_of_dof_backup == 0 ? coord_of_dof_ : *coord_of_dof_backup;
-    const component_vector cold (component_of_point (ReferencePoints, component_of_dof_backup_, coord_of_dof_backup_ref));
+    const component_vector cold (component_of_point (ReferencePoints, component_of_dof_backup_, coord_of_dof_backup_));
     // cnew represents a permutation which maps the old component number (from ReferencePoints_backup) to the new.
     const component_vector cnew (component_of_point (ReferencePoints_backup, component_of_dof_, coord_of_dof_));
 
