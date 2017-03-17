@@ -149,13 +149,12 @@ class GraphComponentsCL
 std::vector<size_t> GraphComponentsCL::component (size_t c) const
 {
     std::vector<size_t> ret;
-    ret.reserve( component_size()[c]);
-
+    ret.reserve (component_size()[c]);
     for (size_t i= 0; i < component_.size(); ++i)
         if (component_[i] == c)
             ret.push_back( i);
 
-    return ret;
+    return std::move (ret);
 }
 
 template <typename T>
