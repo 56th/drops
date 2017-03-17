@@ -114,7 +114,7 @@ class ComponentBasedVolumeAdjustmentCL : public VolumeAdjustmentCL
     component_vector ExtendOneStep (const MatrixCL& A, const component_vector& cp, std::vector<bool>& doCorrection) const;
     /// \brief Compute the indicator_functions_ of the extension of each connected component. Also sets doCorrection_ to false if the extensions would overlap.
     void compute_indicator_functions (const MatrixCL&);
-    /// \brief Compute the connected components of the level sets of lset_->Phi. This sets component_of_dof_, ReferencePoints, and calls compute_indicator_functions.
+    /// \brief Compute the connected components of the level sets of lset_->Phi. This sets component_of_dof_, ReferencePoints, and calls compute_indicator_functions. It also computes Volumes.
     void FindComponents ();
 
      /// \brief Compute volume of component c; for c == 0, shift must be 0.

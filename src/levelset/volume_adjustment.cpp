@@ -375,6 +375,8 @@ void ComponentBasedVolumeAdjustmentCL::FindComponents ()
     component_of_dof_= Split.component_map();
     renumber_components();
     Volumes.resize (Split.num_components()); // neccessary to make num_components() return the current number of components.
+    for (Uint c= 0; c < Volumes.size(); ++c)
+        Volumes[c]= CalculateVolume(c, 0.);
 
     compute_indicator_functions (MeshAdja);
     FindReferencePoints();
@@ -421,9 +423,7 @@ void ComponentBasedVolumeAdjustmentCL::InitVolume_impl ()
     coord_of_dof_backup_= coord_of_dof_;
     FindComponents();
 
-    // Compute initial volumes.
-    for (Uint c= 0; c < Volumes.size(); ++c)
-        Volumes[c]= CalculateVolume(c, 0.);
+    // Set initial target volumes.
     targetVolumes= Volumes;
 
     make_backup();
