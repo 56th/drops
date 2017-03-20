@@ -120,7 +120,7 @@ class ComponentBasedVolumeAdjustmentCL : public VolumeAdjustmentCL
      /// \brief Compute volume of component c; for c == 0, shift must be 0.
     double CalculateVolume(Uint c, double shift) const;
     /// \brief For each component, find a point in coord_of_dof_ with largest absolute value of the level set function. Sets ReferencePoints.
-    void FindReferencePoints();
+    void ComputeReferencePoints();
     /// \brief For each point in refpts, return the component_of_dof from the closest point in coord_of_dof.
     component_vector component_of_point (const std::vector<Point3DCL>& refpts, const component_vector& component_of_dof, const std::vector<Point3DCL>& coord_of_dof) const;
     /// \brief Recomputes targetVolumes_ based on a matching of old and new components.

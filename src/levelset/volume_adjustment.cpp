@@ -379,7 +379,7 @@ void ComponentBasedVolumeAdjustmentCL::FindComponents ()
         Volumes[c]= CalculateVolume(c, 0.);
 
     compute_indicator_functions (MeshAdja);
-    FindReferencePoints();
+    ComputeReferencePoints();
 }
 
 void ComponentBasedVolumeAdjustmentCL::renumber_components ()
@@ -453,7 +453,7 @@ void ComponentBasedVolumeAdjustmentCL::DebugOutput (std::ostream& os) const
 }
 
 
-void ComponentBasedVolumeAdjustmentCL::FindReferencePoints()
+void ComponentBasedVolumeAdjustmentCL::ComputeReferencePoints()
 {
     ReferencePoints= std::vector<Point3DCL> (num_components());
 
@@ -585,7 +585,7 @@ void ComponentBasedVolumeAdjustmentCL::AdjustVolume()
         else
             std::cout << "No adjustment, components are too close.\n";
     }
-    FindReferencePoints();
+    ComputeReferencePoints();
     make_backup();
     FindComponents();
     MatchComponents();
