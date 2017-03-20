@@ -73,11 +73,6 @@
     }, 
     
     "Levelset": {
-       "BoundaryData":
-        {
-                "5":      ["DirBC","SmallDistance"]   // causes trouble!!!
-            
-        },
         "Discontinuous": 0, 
         "InitialVolume": 472.5e-09,
         "VolCorrection": 1, 

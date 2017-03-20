@@ -17,7 +17,7 @@ levelset/twophasedrops/mzi.json
 levelset/twophasedrops/marangoni.json
 levelset/twophasedrops/risingbutanoldroplet.json
 levelset/twophasedrops/slidingDroplet.json
-levelset/twophasedrops/taylorbubble.json            <<< problem with Dirichlet bnd data for levelset, behaves like old version >>>
+levelset/twophasedrops/taylorbubble.json
 levelset/twophasedrops/toluol.json
 levelset/twophasedrops/tworisingdroplets.json
 
