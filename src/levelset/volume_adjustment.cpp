@@ -520,8 +520,8 @@ void ComponentBasedVolumeAdjustmentCL::MatchComponents ()
 
     // M will be the adjacency matrix of the undirected graph G: The nodes of G are the (old and new) components. The edges are given by the components of the reference points (in both directions).
     MatrixCL M;
-    const size_t nold= cold.size(),
-                 nnew= cnew.size(),
+    const size_t nnew= num_components(),
+                 nold= ReferencePoints_backup.size(),
                  n= nold + nnew;
     SparseMatBuilderCL<double> Mb (&M, n, n);
     for (Uint i= 0; i < nold; ++i)
