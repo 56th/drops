@@ -375,11 +375,12 @@ void ComponentBasedVolumeAdjustmentCL::FindComponents ()
     component_of_dof_= Split.component_map();
     renumber_components();
     Volumes.resize (Split.num_components()); // neccessary to make num_components() return the current number of components.
-    for (Uint c= 0; c < Volumes.size(); ++c)
+    for (Uint c= 0; c < num_components(); ++c)
         Volumes[c]= CalculateVolume(c, 0.);
 
-    compute_indicator_functions (MeshAdja);
+    sign_of_component_.resize (num_components());
     ComputeReferencePoints();
+    compute_indicator_functions (MeshAdja);
 }
 
 void ComponentBasedVolumeAdjustmentCL::renumber_components ()
@@ -435,6 +436,7 @@ void ComponentBasedVolumeAdjustmentCL::Repair()
 {
     coord_of_dof_backup_= std::move (coord_of_dof_);
     init_coord_of_dof();
+    sign_of_component_backup_= std::move (sign_of_component_);
     FindComponents();
     MatchComponents ();
     coord_of_dof_backup_= coord_of_dof_;
@@ -463,6 +465,7 @@ void ComponentBasedVolumeAdjustmentCL::ComputeReferencePoints()
         const Uint c= component_of_dof_[i];
         if (std::abs (ls[i]) > tmp[c]) {
             ReferencePoints[c] = coord_of_dof_[i];
+            sign_of_component_[c] = ls[i] > 0. ? 1 : -1;
             tmp[c] = std::abs (ls[i]);
         }
     }
@@ -507,7 +510,7 @@ double ComponentBasedVolumeAdjustmentCL::CalculateVolume(Uint c, double shift) c
 }
 
 auto ComponentBasedVolumeAdjustmentCL::component_of_point (const std::vector<Point3DCL>& refpts,
-    const component_vector& component_of_dof, const std::vector<Point3DCL>& coord_of_dof) const -> component_vector
+    const std::vector<int>& sign_of_component, const component_vector& component_of_dof, const std::vector<Point3DCL>& coord_of_dof, const std::vector<int>& sign_of_component2) const -> component_vector
 {
     // Temporary arrays to store the minimal distances to the points in pts and the new component of the minimizers.
     std::vector<double> distances (refpts.size(), std::numeric_limits<double>::max());
@@ -516,7 +519,8 @@ auto ComponentBasedVolumeAdjustmentCL::component_of_point (const std::vector<Poi
     for (size_t i= 0; i < component_of_dof.size(); ++i) {
         for (size_t c= 0; c < refpts.size(); ++c) {
             const double tmpdistance= (coord_of_dof[i] - refpts[c]).norm();
-            if (tmpdistance < distances[c]) {
+            const bool components_have_same_sign= sign_of_component[c] == sign_of_component2[component_of_dof[i]];
+            if (components_have_same_sign && tmpdistance < distances[c]) {
                 distances[c]= tmpdistance;
                 cnew[c]= component_of_dof[i];
             }
@@ -528,9 +532,9 @@ auto ComponentBasedVolumeAdjustmentCL::component_of_point (const std::vector<Poi
 void ComponentBasedVolumeAdjustmentCL::MatchComponents ()
 {
     // cold represents a permutation which maps the new component number (from ReferencePoints_) to the old.
-    const component_vector cold (component_of_point (ReferencePoints, component_of_dof_backup_, coord_of_dof_backup_));
+    const component_vector cold (component_of_point (ReferencePoints, sign_of_component_, component_of_dof_backup_, coord_of_dof_backup_, sign_of_component_backup_));
     // cnew represents a permutation which maps the old component number (from ReferencePoints_backup) to the new.
-    const component_vector cnew (component_of_point (ReferencePoints_backup, component_of_dof_, coord_of_dof_));
+    const component_vector cnew (component_of_point (ReferencePoints_backup, sign_of_component_backup_, component_of_dof_, coord_of_dof_, sign_of_component_));
 
 
     // M will be the adjacency matrix of the undirected graph G: The nodes of G are the (old and new) components. The edges are given by the components of the reference points (in both directions).
@@ -595,6 +599,7 @@ void ComponentBasedVolumeAdjustmentCL::AdjustVolume()
 void ComponentBasedVolumeAdjustmentCL::make_backup()
 {
     component_of_dof_backup_= component_of_dof_;
+    sign_of_component_backup_= sign_of_component_;
     ReferencePoints_backup= ReferencePoints;
 }
 

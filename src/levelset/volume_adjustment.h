@@ -93,12 +93,16 @@ class ComponentBasedVolumeAdjustmentCL : public VolumeAdjustmentCL
     using component_vector= std::vector<size_t>;
 
   private:
+    // Data for each dof
     component_vector       component_of_dof_, ///< component_of_dof_[i] is the number of the component of dof i.
                            component_of_dof_backup_;
     std::vector<Point3DCL> coord_of_dof_,        // The points where the dofs live.
                            coord_of_dof_backup_; // The points where dofs_backup live (only different from coord_of_dof_ in Repair).
 
+    // Data for each component
     std::vector<bool>                  doCorrection_;
+    std::vector<int>                   sign_of_component_;
+    std::vector<int>                   sign_of_component_backup_;
     std::vector<std::valarray<double>> indicator_functions_;
     std::vector<double>                Volumes; // volume per component
     std::vector<double>                targetVolumes; // target volume of each component
@@ -121,8 +125,8 @@ class ComponentBasedVolumeAdjustmentCL : public VolumeAdjustmentCL
     double CalculateVolume(Uint c, double shift) const;
     /// \brief For each component, find a point in coord_of_dof_ with largest absolute value of the level set function. Sets ReferencePoints.
     void ComputeReferencePoints();
-    /// \brief For each point in refpts, return the component_of_dof from the closest point in coord_of_dof.
-    component_vector component_of_point (const std::vector<Point3DCL>& refpts, const component_vector& component_of_dof, const std::vector<Point3DCL>& coord_of_dof) const;
+    /// \brief For each point in refpts, return the component_of_dof from the closest point in coord_of_dof with the same sign as sign_of_component_.
+    component_vector component_of_point (const std::vector<Point3DCL>& refpts, const std::vector<int>& sign_of_component, const component_vector& component_of_dof, const std::vector<Point3DCL>& coord_of_dof, const std::vector<int>& sign_of_component2) const;
     /// \brief Recomputes targetVolumes_ based on a matching of old and new components.
     void MatchComponents();
 
