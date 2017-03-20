@@ -347,15 +347,14 @@ auto ComponentBasedVolumeAdjustmentCL::ExtendOneStep(const MatrixCL& A,
     std::vector<bool>& doCorrection) const -> component_vector
 {
     component_vector ret (cp);
-    for (size_t i= 0; i < A.num_rows(); ++i) {
-        const size_t v0= i;
-        if (cp[v0] == 0)
+    for (size_t v0= 0; v0 < A.num_rows(); ++v0) {
+        if (sign_of_component_[cp[v0]] == 1)
             continue;
-        for (size_t j= A.row_beg (i); j != A.row_beg(i+1); ++j) {
+        for (size_t j= A.row_beg (v0); j != A.row_beg(v0 + 1); ++j) {
             const size_t v1= A.col_ind (j);
-            if (cp[v1] == 0)
+            if (sign_of_component_[cp[v1]] == 1)
                 ret[v1]= cp[v0];
-            if (cp[v1] != 0 && cp[v1] != cp[v0]) {
+            if (sign_of_component_[cp[v1]] == -1 && cp[v1] != cp[v0]) {
                doCorrection[cp[v0]]= false;
                doCorrection[cp[v1]]= false;
             }
@@ -373,7 +372,6 @@ void ComponentBasedVolumeAdjustmentCL::FindComponents ()
     Split.number_connected_components(CompAdja);
 
     component_of_dof_= Split.component_map();
-    renumber_components();
     Volumes.resize (Split.num_components()); // neccessary to make num_components() return the current number of components.
     for (Uint c= 0; c < num_components(); ++c)
         Volumes[c]= CalculateVolume(c, 0.);
@@ -381,23 +379,6 @@ void ComponentBasedVolumeAdjustmentCL::FindComponents ()
     sign_of_component_.resize (num_components());
     ComputeReferencePoints();
     compute_indicator_functions (MeshAdja);
-}
-
-void ComponentBasedVolumeAdjustmentCL::renumber_components ()
-{
-    // Ensure that component 0 is always the component, where the levelset function takes positive values.
-    const auto it= std::find_if (std::begin (lset_->Phi.Data), std::end (lset_->Phi.Data), [](double ls)->bool { return ls > 0.; });
-    if (it == std::end (lset_->Phi.Data))
-        throw DROPSErrCL("ComponentBasedVolumeAdjustmentCL::renumber_components: No positive level set value found.\n");
-    const Uint cp0= component_of_dof_[it - std::begin (lset_->Phi.Data)];
-    if(cp0 == 0)
-        return;
-
-    for (auto& c: component_of_dof_)
-        if (c == 0)
-            c= cp0;
-        else if (c == cp0)
-            c= 0;
 }
 
 void ComponentBasedVolumeAdjustmentCL::init_coord_of_dof ()
@@ -577,8 +558,12 @@ void ComponentBasedVolumeAdjustmentCL::AdjustVolume()
     MatchComponents();
 
     // adapt Level Set
-    for (Uint i= 1; i < num_components(); ++i) {
+    for (Uint i= 0; i < num_components(); ++i) {
         std::cout << "Adjustment for component " << i << ": ";
+        if (sign_of_component_[i] == 1) {
+            std::cout << "Skipping positive component.\n";
+            continue;
+        }
         if (doCorrection_[i]) {
             const double s= compute_volume_correction ([this,i](double x)->double { return CalculateVolume(i, x); },
                                                        targetVolumes[i],

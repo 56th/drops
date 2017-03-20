@@ -112,8 +112,6 @@ class ComponentBasedVolumeAdjustmentCL : public VolumeAdjustmentCL
     /// \brief Initialize coord_of_dof_.
     void init_coord_of_dof ();
 
-    /// \brief Renumbers the components in such a way, that the outer phase is always component 0
-    void renumber_components();
     /// \brief Helper of compute_indicator_functions. Extend all components (except 0) by one level (except where they would overlap).
     component_vector ExtendOneStep (const MatrixCL& A, const component_vector& cp, std::vector<bool>& doCorrection) const;
     /// \brief Compute the indicator_functions_ of the extension of each connected component. Also sets doCorrection_ to false if the extensions would overlap.
