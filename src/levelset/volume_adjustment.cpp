@@ -373,11 +373,11 @@ void ComponentBasedVolumeAdjustmentCL::FindComponents ()
 
     component_of_dof_= Split.component_map();
     Volumes.resize (Split.num_components()); // neccessary to make num_components() return the current number of components.
-    for (Uint c= 0; c < num_components(); ++c)
-        Volumes[c]= CalculateVolume(c, 0.);
 
     sign_of_component_.resize (num_components());
     ComputeReferencePoints();
+    for (Uint c= 0; c < num_components(); ++c)
+        Volumes[c]= CalculateVolume(c, 0.);
     compute_indicator_functions (MeshAdja);
 }
 
