@@ -318,6 +318,80 @@ void SetupAdjacency (MatrixCL& A, MatrixCL& B, const LevelsetP2CL& lset)
 
 
 //*****************************************************************************
+//                               VolumeAccuCL
+//*****************************************************************************
+
+class VolumeAccuCL : public TetraAccumulatorCL
+{
+  private:
+    const LevelsetP2CL& lset_;
+    const VecDescCL& ls_vd_;
+    size_t c_;
+    std::vector<int> sign_of_component_;
+    const ComponentBasedVolumeAdjustmentCL::component_vector& component_of_dof_;
+
+    const PrincipalLatticeCL& lat= PrincipalLatticeCL::instance (2);
+    std::valarray<double> ls_values= std::valarray<double> (lat.vertex_size());
+    QuadDomainCL qdom;
+    LocalP2CL<> loc_phi;
+    TetraPartitionCL partition;
+    LocalNumbP2CL n;
+
+    std::vector<double> volumes_omp;
+    double* thread_volume= 0;
+    double volume;
+
+  public:
+    VolumeAccuCL (const LevelsetP2CL& lset, const VecDescCL& ls_vd, size_t c, const std::vector<int>& sign_of_component, const ComponentBasedVolumeAdjustmentCL::component_vector& component_of_dof)
+        : lset_ (lset), ls_vd_ (ls_vd), c_ (c), sign_of_component_ (sign_of_component), component_of_dof_ (component_of_dof) {}
+
+    void begin_accumulation () {
+//         std::cout << "entering VolumeAccuCL: ";
+        volume= 0.;
+        volumes_omp= std::vector<double> (omp_get_max_threads());
+        thread_volume= &volumes_omp[0];
+    }
+    void finalize_accumulation() {
+        volume= std::accumulate (volumes_omp.begin(), volumes_omp.end(), 0.);
+//         std::cout << volume << ".\n";
+    }
+    void visit (const TetraCL& sit);
+    TetraAccumulatorCL* clone (int tid) {
+        VolumeAccuCL* cl= new VolumeAccuCL ( *this);
+        cl->thread_volume= &volumes_omp[tid];
+        return cl;
+    }
+
+    double get_volume () const { return volume; }
+};
+
+void VolumeAccuCL::visit (const TetraCL& tet)
+{
+    n.assign_indices_only (tet, lset_.idx.GetFinest());
+    loc_phi.assign (tet, ls_vd_, lset_.GetBndData());
+
+    bool comp_exists= false;
+    for (Uint i= 0; i < 10; i++)
+        if (n.WithUnknowns (i)) {
+            if (component_of_dof_[n.num[i]] == c_)
+                comp_exists= true;
+            // Remove different components (!= c_) of the same sign (this change does not alter
+            // the position of the boundary of component c_.
+            else if (sign_of_component_[c_] == sign_of_component_[component_of_dof_[n.num[i]]])
+                loc_phi[i]= -sign_of_component_[c_];
+        }
+    if (!comp_exists)
+        return;
+
+    evaluate_on_vertexes (loc_phi, lat, Addr (ls_values));
+    partition.make_partition< SortedVertexPolicyCL,MergeCutPolicyCL> (lat, ls_values);
+    make_CompositeQuad3Domain (qdom, partition);
+    GridFunctionCL<> integrand (1., qdom.vertex_size());
+    *thread_volume+= quad( integrand, 6.*tet.GetVolume(), qdom, sign_of_component_[c_] == -1 ? NegTetraC : PosTetraC);
+}
+
+
+//*****************************************************************************
 //                               ComponentBasedVolumeAdjustmentCL
 //*****************************************************************************
 
@@ -454,40 +528,17 @@ void ComponentBasedVolumeAdjustmentCL::ComputeReferencePoints()
 
 double ComponentBasedVolumeAdjustmentCL::CalculateVolume(Uint c, double shift) const
 {
-    double ret= 0.;
-    const PrincipalLatticeCL& lat= PrincipalLatticeCL::instance (2);
-    std::valarray<double> ls_values (lat.vertex_size());
-    QuadDomainCL qdom;
-    LocalP2CL<> loc_phi;
-    TetraPartitionCL partition;
-    LocalNumbP2CL n;
-
-    VecDescCL Copy(&lset_->idx);
+    VecDescCL Copy (&lset_->idx);
     Copy.Data= lset_->Phi.Data;
-    if (c > 0 && shift != 0.)
+    if (shift != 0.)
         Copy.Data+= shift*indicator_functions_[c];
 
-    DROPS_FOR_TRIANG_TETRA( lset_->GetMG(), lset_->idx.TriangLevel(), it) {
-        n.assign_indices_only(*it, lset_->idx.GetFinest());
-        loc_phi.assign(*it,Copy,lset_->GetBndData());
+    VolumeAccuCL accu(*lset_, Copy, c, sign_of_component_, component_of_dof_);
+    TetraAccumulatorTupleCL accus;
+    accus.push_back( &accu);
+    accumulate( accus, lset_->GetMG(), lset_->idx.TriangLevel(), lset_->idx.GetMatchingFunction(), lset_->idx.GetBndInfo());
 
-        bool comp_exists = false;
-        for (Uint a= 0; a < 10; a++)
-            if (n.WithUnknowns(a)) {
-                if (component_of_dof_[n.num[a]] == c)
-                    comp_exists = true;
-                else if (c > 0 && component_of_dof_[n.num[a]] > 0)   // by definition, component 0 is the surrounding liquid
-                    loc_phi[a] = 1.0;                   // remove negative components which are not the considered component c (this change does not alter the position of the boundary of component c
-        }
-        if (!comp_exists)
-            continue;
-        evaluate_on_vertexes (loc_phi, lat, Addr(ls_values));
-        partition.make_partition< SortedVertexPolicyCL,MergeCutPolicyCL> (lat, ls_values);
-        make_CompositeQuad3Domain (qdom, partition);
-        DROPS::GridFunctionCL<> integrand (1., qdom.vertex_size());
-        ret+= quad( integrand, it->GetVolume()*6., qdom, c > 0 ? NegTetraC : PosTetraC);
-    }
-    return ret;
+    return accu.get_volume();
 }
 
 auto ComponentBasedVolumeAdjustmentCL::component_of_point (const std::vector<Point3DCL>& refpts,
