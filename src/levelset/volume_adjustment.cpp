@@ -434,7 +434,7 @@ auto ComponentBasedVolumeAdjustmentCL::ExtendOneStep(const MatrixCL& A,
             }
         }
     }
-    return std::move (ret);
+    return ret;
 }
 
 void ComponentBasedVolumeAdjustmentCL::FindComponents ()
@@ -558,7 +558,7 @@ auto ComponentBasedVolumeAdjustmentCL::component_of_point (const std::vector<Poi
             }
         }
     }
-    return std::move (cnew);
+    return cnew;
 }
 
 void ComponentBasedVolumeAdjustmentCL::MatchComponents ()
