@@ -113,9 +113,9 @@ class ComponentBasedVolumeAdjustmentCL : public VolumeAdjustmentCL
     void init_coord_of_dof ();
 
     /// \brief Helper of compute_indicator_functions. Extend all components (except 0) by one level (except where they would overlap).
-    component_vector ExtendOneStep (const MatrixCL& A, const component_vector& cp, std::vector<bool>& doCorrection) const;
+    component_vector ExtendOneStep (const SparseMatBaseCL<unsigned char>& A, const component_vector& cp, std::vector<bool>& doCorrection) const;
     /// \brief Compute the indicator_functions_ of the extension of each connected component. Also sets doCorrection_ to false if the extensions would overlap.
-    void compute_indicator_functions (const MatrixCL&);
+    void compute_indicator_functions (const SparseMatBaseCL<unsigned char>&);
     /// \brief Compute the connected components of the level sets of lset_->Phi. This sets component_of_dof_, ReferencePoints, and calls compute_indicator_functions. It also computes Volumes.
     void FindComponents ();
 

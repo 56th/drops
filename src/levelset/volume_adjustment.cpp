@@ -109,8 +109,7 @@ void GlobalVolumeAdjustmentCL::DebugOutput (std::ostream& os) const
 }
 
 
-/// \brief Compute the strongly connected components of the directed graph
-//of a matrix.
+/// \brief Compute the strongly connected components of a directed graph.
 /// The square matrix M is interpreted as graph with vertices
 //0..M.nom_cols()-1.
 /// There is a directed edge (i,j), iff M_ij != 0. (The entries in row i
@@ -125,13 +124,13 @@ class GraphComponentsCL
    std::vector<size_t> component_size_; ///< number of elements in component i.
 
  /// \brief Perform a breadth-first search to discover the connected component of v.
-   template < class T>
-     void visit_connected_component_of (size_t v, const SparseMatBaseCL<T>& M);
+   template <class GraphT>
+     void visit_connected_component_of (size_t v, const GraphT& M);
 
   public:
-    /// \brief Enumerate the connected components of the graph of M.
-    template <class T>
-    void number_connected_components (const SparseMatBaseCL<T>& M);
+    /// \brief Enumerate the connected components of the graph M.
+    template <class GraphT>
+    void number_connected_components (const GraphT& M);
     /// \brief Number of strongly connected components.
     size_t                     num_components () const { return component_size_.size(); }
     /// \brief component_map()[i] is the number of the component, to which vertex i belongs.
@@ -157,11 +156,11 @@ std::vector<size_t> GraphComponentsCL::component (size_t c) const
     return std::move (ret);
 }
 
-template <typename T>
+template <typename GraphT>
   void
-  GraphComponentsCL::number_connected_components (const SparseMatBaseCL<T>& M)
+  GraphComponentsCL::number_connected_components (const GraphT& M)
 {
-    const size_t num_verts= M.num_cols();
+    const size_t num_verts= M.num_verts();
     component_.clear();
     component_.resize( num_verts, NoVert);
     component_size_.clear();
@@ -173,13 +172,14 @@ template <typename T>
         }
 }
 
-template <typename T>
+template <typename GraphT>
   void
-  GraphComponentsCL::visit_connected_component_of (size_t v0, const SparseMatBaseCL<T>& M)
+  GraphComponentsCL::visit_connected_component_of (size_t v0, const GraphT& M)
 {
     const size_t cur_component= component_size_.size() - 1;
     size_t* cur_component_size= &component_size_.back();
 
+    std::vector<size_t> successors; // all succsessors of v, see below.
     std::list<size_t> deque;
     deque.push_back( v0);
     while (!deque.empty()) {
@@ -187,35 +187,67 @@ template <typename T>
         deque.pop_front();
         component_[v]= cur_component;
         ++*cur_component_size;
-
-        const double* succ_val= M.GetFirstVal( v);
-        for (const size_t* succ= M.GetFirstCol( v), * rowend= M.GetFirstCol( v + 1); succ != rowend; ++succ, ++succ_val) {
-            if (*succ_val == T()) // Edges in the graph correspond to non-zero entries. Row i contains the successors of vertex i.
-                continue;
-            if (component_[*succ] == NoVert) {
-                component_[*succ]= cur_component;
-                deque.push_back( *succ);
+        successors= M.get_all_succsessors (v);
+        for (size_t w: successors)
+            if (component_[w] == NoVert) {
+                component_[w]= cur_component;
+                deque.push_back (w);
             }
-        }
     }
 }
 
 //*****************************************************************************
+//                               SparseMatrixGraphCL
+//*****************************************************************************
+class SparseMatrixGraphCL
+{
+  public:
+    using MatrixT= SparseMatBaseCL<unsigned char>;
+
+  private:
+    const MatrixT& M_;
+    unsigned char edge_limit= 0; // M_.val() > edge_val indicates an edge between the vertices given by row and column index.
+
+  public:
+    SparseMatrixGraphCL (const MatrixT& M) : M_ (M) {}
+
+    SparseMatrixGraphCL& set_edge_limit (unsigned char el) {
+        edge_limit= el;
+        return *this;
+    }
+
+    size_t num_verts () const  { return M_.num_cols(); }
+
+    std::vector<size_t> get_all_succsessors (size_t v) const {
+        std::vector<size_t> successors;
+        successors.reserve (M_.row_beg (v + 1) - M_.row_beg (v));
+        size_t w;
+        for (size_t e= M_.row_beg (v); e < M_.row_beg (v + 1); ++e)
+            if (M_.val( e) > edge_limit && (w= M_.col_ind( e)) != v)
+                successors.push_back( w);
+        return successors;
+    }
+};
+
+//*****************************************************************************
 //                               AdjacencyAccuCL
 //*****************************************************************************
-
 class AdjacencyAccuCL : public TetraAccumulatorCL
 {
   private:
+    static constexpr Uint edges_[25]= { // All edges of the regular children of the reference tetra, see VertOfEdgeAr.
+         6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16, 17,
+        30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41,
+        42
+    };
+
     const LevelsetP2CL& lset;
-    MatrixCL& A;
-    MatrixCL& B;
-    SparseMatBuilderCL<double>* mA_;
-    SparseMatBuilderCL<double>* mB_;
+    // M encodes the adjacency matrix of two graphs G_comp and G_mesh: a value > 0 is an edge in G_mesh, a value > 1 is an edge within a G_comp (i.e. the vertices of the edge have the same sign of the level set function).
+    SparseMatBaseCL<unsigned char>& M;
+    SparseMatBuilderCL<unsigned char>* mA_;
 
     LocalNumbP2CL n; ///< global numbering of the P2-unknowns
-    SMatrixCL<10,10> LocAdjaMat;
-    SMatrixCL<10,10> LocAdjaMatB;
+    unsigned char LocAdjaMat[10][10];
     LocalP2CL<> ls_loc;
 
     ///\brief Computes the mapping from local to global data "n", the local matrices in loc and, if required, the Dirichlet-values needed to eliminate the boundary-dof from the global system.
@@ -224,7 +256,7 @@ class AdjacencyAccuCL : public TetraAccumulatorCL
     void update_global_system ();
 
   public:
-    AdjacencyAccuCL (const LevelsetP2CL& ls, MatrixCL& Au, MatrixCL& Bu): lset(ls), A(Au), B(Bu){};
+    AdjacencyAccuCL (const LevelsetP2CL& ls, SparseMatBaseCL<unsigned char>& Marg) : lset (ls), M (Marg) {};
 
     ///\brief Initializes matrix-builders and load-vectors
     void begin_accumulation ();
@@ -233,26 +265,24 @@ class AdjacencyAccuCL : public TetraAccumulatorCL
 
     void visit (const TetraCL& sit);
 
-    TetraAccumulatorCL* clone (int /*tid*/) { return new AdjacencyAccuCL ( *this); };
+    TetraAccumulatorCL* clone (int /*tid*/) { return new AdjacencyAccuCL (*this); };
 };
+
+constexpr Uint AdjacencyAccuCL::edges_[25];
 
 void AdjacencyAccuCL::begin_accumulation ()
 {
     std::cout << "entering AdjacencyAccuCL: ";
     const size_t num_unks= lset.idx.NumUnknowns();
-    mA_= new SparseMatBuilderCL<double>( &A, num_unks, num_unks);
-    mB_= new SparseMatBuilderCL<double>( &B, num_unks, num_unks);
+    mA_= new SparseMatBuilderCL<unsigned char> (&M, num_unks, num_unks);
 }
 
 void AdjacencyAccuCL::finalize_accumulation ()
 {
     mA_->Build();
     delete mA_;
-    mB_->Build();
-    delete mB_;
 #ifndef _PAR
-    std::cout << A.num_nonzeros() << " nonzeros in A, ";
-    std::cout << B.num_nonzeros() << " nonzeros in B, ";
+    std::cout << M.num_nonzeros() << " nonzeros in M, ";
 #endif
     std::cout << '\n';
 }
@@ -265,50 +295,38 @@ void AdjacencyAccuCL::visit (const TetraCL& tet)
 
 void AdjacencyAccuCL::local_setup (const TetraCL& tet)
 {
-    ls_loc.assign( tet, lset.Phi, lset.GetBndData());
-    for (Uint e= 6; e<18; ++e) {
-        const Ubyte v0= VertOfEdge( e, 0),
-                    v1= VertOfEdge( e, 1);
+    ls_loc.assign (tet, lset.Phi, lset.GetBndData());
+    std::memset (LocAdjaMat, 0, sizeof (LocAdjaMat));
+    for (Uint e: edges_) {
+        const Ubyte v0= VertOfEdge (e, 0),
+                    v1= VertOfEdge (e, 1);
         const bool edge= (sign(ls_loc[v0]) + sign(ls_loc[v1]) >= 1) || (sign(ls_loc[v0])+sign(ls_loc[v1]) == -2);
-        LocAdjaMat( v0, v1)= LocAdjaMat( v1, v0)= edge;
-        LocAdjaMatB( v0, v1)= LocAdjaMatB( v1, v0)= 1;
-    }
-    for (Uint e= 30; e<43; ++e) {
-        const Ubyte v0= VertOfEdge( e, 0),
-                    v1= VertOfEdge( e, 1);
-        const bool edge= (sign(ls_loc[v0])+sign(ls_loc[v1]) >= 1) || (sign(ls_loc[v0])+sign(ls_loc[v1]) == -2);
-        LocAdjaMat( v0, v1)= LocAdjaMat( v1, v0)= edge;
-        LocAdjaMatB( v0, v1)= LocAdjaMatB( v1, v0)=1;
+        LocAdjaMat[v0][v1]= LocAdjaMat[v1][v0]= 1 + edge;
     }
     n.assign( tet, lset.idx.GetFinest(), lset.GetBndData());
 }
 
 void AdjacencyAccuCL::update_global_system ()
 {
-    SparseMatBuilderCL<double>& mA= *mA_;
-    SparseMatBuilderCL<double>& mB= *mB_;
+    SparseMatBuilderCL<unsigned char>& mA= *mA_;
 
-    for(int i= 0; i < 10; ++i){    // assemble row Numb[i]
-        if (n.WithUnknowns( i)) { // dof i is not on a Dirichlet boundary
+    for(int i= 0; i < 10; ++i) {    // assemble row Numb[i]
+        if (n.WithUnknowns (i)) { // dof i is not on a Dirichlet boundary
             for(int j= 0; j < 10; ++j) {
-                if (n.WithUnknowns( j)) { // dof j is not on a Dirichlet boundary
-                    if (LocAdjaMat(i,j) != 0.)
-                        mA( n.num[i], n.num[j])= LocAdjaMat(i,j);
-                    if (LocAdjaMatB(i,j) != 0.)
-                        mB( n.num[i], n.num[j])= LocAdjaMatB(i,j);
-                }
+                if (n.WithUnknowns (j) && LocAdjaMat[i][j] != 0)
+                    mA( n.num[i], n.num[j])= LocAdjaMat[i][j];
             }
         }
     }
 }
 
-void SetupAdjacency (MatrixCL& A, MatrixCL& B, const LevelsetP2CL& lset)
+void SetupAdjacency (SparseMatBaseCL<unsigned char>& A, const LevelsetP2CL& lset)
 /// Set up matrix A
 {
     // TimerCL time;
     // time.Start();
 
-    AdjacencyAccuCL accu(lset, A, B);
+    AdjacencyAccuCL accu(lset, A);
     TetraAccumulatorTupleCL accus;
     accus.push_back( &accu);
     accumulate( accus, lset.GetMG(), lset.idx.TriangLevel(), lset.idx.GetMatchingFunction(), lset.idx.GetBndInfo());
@@ -403,7 +421,7 @@ ComponentBasedVolumeAdjustmentCL::~ComponentBasedVolumeAdjustmentCL()
 {}
 
 
-void ComponentBasedVolumeAdjustmentCL::compute_indicator_functions (const MatrixCL& A)
+void ComponentBasedVolumeAdjustmentCL::compute_indicator_functions (const SparseMatBaseCL<unsigned char>& A)
 {
     doCorrection_= std::vector<bool> (num_components(), true);
 
@@ -416,7 +434,7 @@ void ComponentBasedVolumeAdjustmentCL::compute_indicator_functions (const Matrix
         indicator_functions_[tmp2[j]][j]= 1.;
 }
 
-auto ComponentBasedVolumeAdjustmentCL::ExtendOneStep(const MatrixCL& A,
+auto ComponentBasedVolumeAdjustmentCL::ExtendOneStep(const SparseMatBaseCL<unsigned char>& A,
     const component_vector& cp,
     std::vector<bool>& doCorrection) const -> component_vector
 {
@@ -439,11 +457,11 @@ auto ComponentBasedVolumeAdjustmentCL::ExtendOneStep(const MatrixCL& A,
 
 void ComponentBasedVolumeAdjustmentCL::FindComponents ()
 {
-    MatrixCL CompAdja;
-    MatrixCL MeshAdja;
-    SetupAdjacency (CompAdja, MeshAdja, *lset_);
+    // M encodes the adjacency matrix of two graphs G_comp and G_mesh: a value > 0 is an edge in G_mesh, a value > 1 is an edge within a G_comp (i.e. the vertices of the edge have the same sign of the level set function).
+    SparseMatBaseCL<unsigned char> M;
+    SetupAdjacency (M, *lset_);
     GraphComponentsCL Split;
-    Split.number_connected_components(CompAdja);
+    Split.number_connected_components (SparseMatrixGraphCL (M).set_edge_limit (1));
 
     component_of_dof_= Split.component_map();
     Volumes.resize (Split.num_components()); // neccessary to make num_components() return the current number of components.
@@ -452,7 +470,7 @@ void ComponentBasedVolumeAdjustmentCL::FindComponents ()
     ComputeReferencePoints();
     for (Uint c= 0; c < num_components(); ++c)
         Volumes[c]= CalculateVolume(c, 0.);
-    compute_indicator_functions (MeshAdja);
+    compute_indicator_functions (M);
 }
 
 void ComponentBasedVolumeAdjustmentCL::init_coord_of_dof ()
@@ -570,20 +588,20 @@ void ComponentBasedVolumeAdjustmentCL::MatchComponents ()
 
 
     // M will be the adjacency matrix of the undirected graph G: The nodes of G are the (old and new) components. The edges are given by the components of the reference points (in both directions).
-    MatrixCL M;
+    SparseMatBaseCL<unsigned char> M;
     const size_t nnew= num_components(),
                  nold= ReferencePoints_backup.size(),
                  n= nold + nnew;
-    SparseMatBuilderCL<double> Mb (&M, n, n);
+    SparseMatBuilderCL<unsigned char> Mb (&M, n, n);
     for (Uint i= 0; i < nold; ++i)
-        Mb (cnew[i] + nold, i)= Mb (i, cnew[i] + nold)= 1.;
+        Mb (cnew[i] + nold, i)= Mb (i, cnew[i] + nold)= 1;
     for (Uint i= 0; i < nnew; ++i)
-        Mb (cold[i], i + nold)= Mb (i + nold, cold[i])= 1.;
+        Mb (cold[i], i + nold)= Mb (i + nold, cold[i])= 1;
     Mb.Build();
     std::cout << "ComponentBasedVolumeAdjustmentCL::MatchComponents: M: " << M << std::endl;
 
     GraphComponentsCL G;
-    G.number_connected_components (M);
+    G.number_connected_components (SparseMatrixGraphCL (M));
 
     // The new target volumes (for the new components) are computed on the connected components of G.
     std::vector<double> newtargetVolumes (num_components());
