@@ -420,6 +420,35 @@ struct BlockTraitsCL<double>
     }
 };
 
+template <>
+struct BlockTraitsCL<unsigned char>
+{
+    typedef unsigned char block_type;
+    typedef std::pair<size_t, unsigned char> sort_pair_type;
+
+    static const Uint num_rows= 1;
+    static const Uint num_cols= 1;
+    static const bool no_reuse= false;
+
+    static inline void row_nnz (size_t* row_nnz_ar, size_t row, size_t num_blocks)
+        { row_nnz_ar[row]= num_blocks; }
+    template <class Iter>
+    static inline void insert_block_row (Iter begin, Iter end, const size_t* rb, size_t* colind, unsigned char* val) {
+        for (size_t j= rb[0]; begin != end; ++begin, ++j) {
+            colind[j]= begin->first;
+            val[j]= begin->second;
+        }
+    }
+    static inline sort_pair_type pair_copy (const std::pair<size_t, unsigned char>& p)
+        { return p; }
+
+    static inline unsigned char& get_entry_reuse (const size_t* col_idx_begin, const size_t* col_idx_end, size_t j, unsigned char* val) {
+        const size_t* pos= std::lower_bound( col_idx_begin, col_idx_end, j);
+        Assert( pos != col_idx_end, "SparseMatBuilderCL (): no such index", DebugNumericC);
+        return val[pos - col_idx_begin];
+    }
+};
+
 template <Uint Rows, Uint Cols>
 struct BlockTraitsCL< SMatrixCL<Rows, Cols> >
 {
