@@ -310,28 +310,11 @@ void AdjacencyAccuCL::update_global_system ()
 {
     SparseMatBuilderCL<unsigned char>& mA= *mA_;
 
-    for(int i= 0; i < 10; ++i) {    // assemble row Numb[i]
-        if (n.WithUnknowns (i)) { // dof i is not on a Dirichlet boundary
-            for(int j= 0; j < 10; ++j) {
+    for(int i= 0; i < 10; ++i) // assemble row Numb[i]
+        if (n.WithUnknowns (i)) // dof i is not on a Dirichlet boundary
+            for(int j= 0; j < 10; ++j)
                 if (n.WithUnknowns (j) && LocAdjaMat[i][j] != 0)
-                    mA( n.num[i], n.num[j])= LocAdjaMat[i][j];
-            }
-        }
-    }
-}
-
-void SetupAdjacency (SparseMatBaseCL<unsigned char>& A, const LevelsetP2CL& lset)
-/// Set up matrix A
-{
-    // TimerCL time;
-    // time.Start();
-
-    AdjacencyAccuCL accu(lset, A);
-    TetraAccumulatorTupleCL accus;
-    accus.push_back( &accu);
-    accumulate( accus, lset.GetMG(), lset.idx.TriangLevel(), lset.idx.GetMatchingFunction(), lset.idx.GetBndInfo());
-    // time.Stop();
-    // std::cout << "setup: " << time.GetTime() << " seconds" << std::endl;
+                    mA (n.num[i], n.num[j])= LocAdjaMat[i][j];
 }
 
 
@@ -457,11 +440,19 @@ auto ComponentBasedVolumeAdjustmentCL::ExtendOneStep(const SparseMatBaseCL<unsig
 
 void ComponentBasedVolumeAdjustmentCL::FindComponents ()
 {
+    // TimerCL time;
+    // time.Start();
     // M encodes the adjacency matrix of two graphs G_comp and G_mesh: a value > 0 is an edge in G_mesh, a value > 1 is an edge within a G_comp (i.e. the vertices of the edge have the same sign of the level set function).
     SparseMatBaseCL<unsigned char> M;
-    SetupAdjacency (M, *lset_);
+    AdjacencyAccuCL accu (*lset_, M);
+    TetraAccumulatorTupleCL accus;
+    accus.push_back (&accu);
+    accumulate (accus, lset_->GetMG(), lset_->idx.TriangLevel(), lset_->idx.GetMatchingFunction(), lset_->idx.GetBndInfo());
+    // time.Stop();
+    // std::cout << "setup: " << time.GetTime() << " seconds" << std::endl;
+
     GraphComponentsCL Split;
-    Split.number_connected_components (SparseMatrixGraphCL (M).set_edge_limit (1));
+    Split.number_connected_components (SparseMatrixGraphCL (M).set_edge_limit (1)); // Operate on the graph representing the components.
 
     component_of_dof_= Split.component_map();
     Volumes.resize (Split.num_components()); // neccessary to make num_components() return the current number of components.
@@ -470,7 +461,7 @@ void ComponentBasedVolumeAdjustmentCL::FindComponents ()
     ComputeReferencePoints();
     for (Uint c= 0; c < num_components(); ++c)
         Volumes[c]= CalculateVolume(c, 0.);
-    compute_indicator_functions (M);
+    compute_indicator_functions (M); // Uses the graph representing the whole mesh.
 }
 
 void ComponentBasedVolumeAdjustmentCL::init_coord_of_dof ()
