@@ -99,7 +99,6 @@
     "NavStokes": {
         "InitialValue": 0, 
         "BoundaryData": {
-            "PeriodicMatching":"periodicx",
             "Velocity": {
                 "Default": ["Nat0BC","ZeroVel"]      
             }

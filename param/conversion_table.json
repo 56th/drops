@@ -264,7 +264,7 @@
                 "N1": "Mesh.N1",                     // Number of cells along the E1-direction,
                 "N2": "Mesh.N2",                     //                       the E2-direction,
                 "N3": "Mesh.N3",                     //                       the E3-direction.
-                "PeriodicMatching": "Mesh.PeriodicMatching", 
+                "PeriodicMatching": "Mesh.PeriodicBnd.PeriodicMatching+ListPerBnd", 
                 "RestartFile":      "Mesh.RestartFile"
          }, 
 

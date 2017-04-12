@@ -87,7 +87,6 @@
     }, 
     "Mesh": {
         "Type": "BrickBuilder", 
-        "PeriodicMatching": "", 
         "Origin": [0,0,0],
         "E1": [6e-3,0,0],
         "E2": [0,6e-3,0],

@@ -24,6 +24,12 @@
         "N2": 17,                 
         "N3": 17,       
         "RestartFile": "", 
+        "PeriodicBnd":
+        {
+            "PeriodicMatching":"periodicx",
+            "0": "Per1BC",
+            "1": "Per2BC"
+        }
         "AdaptRef": {
             "CoarsestLevel": 0, 
             "Freq": 1, 
@@ -102,7 +108,6 @@
     "NavStokes": {
         "InitialValue": 0, 
         "BoundaryData": {
-            "PeriodicMatching":"periodicx",
             "Velocity": {
                 "Default":["Nat0BC","ZeroVel"],
                       "0":["Per1BC","ZeroVel"],

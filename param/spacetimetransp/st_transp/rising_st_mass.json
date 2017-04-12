@@ -91,9 +91,6 @@
     }, 
     "Mesh": {
         "Type": "BrickBuilder", 
-       // "PeriodicBnd": {
-       //     "PeriodicMatching+ListPerBnd": "none"
-       // }, 
         "Origin":[0,0,0],
         "E1": [1,0,0],           
         "E2": [0,1,0],            

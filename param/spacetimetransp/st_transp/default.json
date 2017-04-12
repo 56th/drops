@@ -100,7 +100,6 @@
     "Mesh":
     {
         "RestartFile": "",
-        "PeriodicMatching": ""
     },
     "Mat":
     {
