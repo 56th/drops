@@ -127,6 +127,7 @@ void BDinvBTPreCL::Update(const DummyExchangeCL& vel_ex, const DummyExchangeCL& 
 BDinvBTPreCL::~BDinvBTPreCL()
 {
     delete Bs_;
+    delete Cs_;
 #ifdef _PAR
     delete BDinvBT_;
 #endif

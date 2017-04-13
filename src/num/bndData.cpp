@@ -54,8 +54,8 @@ void BndCondInfo (BndCondT bc, std::ostream& os)
 
 BndCondT string_to_BndCondT (std::string s)
 {
-    const char* names[]=    { "Dir0BC", "DirBC", "Per1BC", "Per2BC", "Nat0BC", "NatBC", "Slip0BC", "SlipBC", "OutflowBC", "WallBC", "NoBC", "UndefinedBC_", "MaxBC_" };
-    const BndCondT types[]= {  Dir0BC,   DirBC,   Per1BC,   Per2BC,   Nat0BC,   NatBC,   Slip0BC,   SlipBC,   OutflowBC,   WallBC,   NoBC,   UndefinedBC_,   MaxBC_  };
+    const char* names[]=    { "Dir0BC", "DirBC", "Per1BC", "Per2BC", "Nat0BC", "NatBC", "Slip0BC", "SlipBC", "SymmBC", "OutflowBC", "WallBC", "NoBC", "UndefinedBC_", "MaxBC_" };
+    const BndCondT types[]= {  Dir0BC,   DirBC,   Per1BC,   Per2BC,   Nat0BC,   NatBC,   Slip0BC,   SlipBC,   SymmBC,   OutflowBC,   WallBC,   NoBC,   UndefinedBC_,   MaxBC_  };
     const size_t num_types= sizeof( names)/sizeof( const char*);
 
     Uint i;
