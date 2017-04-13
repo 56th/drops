@@ -604,7 +604,7 @@ int main (int argc, char** argv)
         throw DROPS::DROPSErrCL("Parameter error : Dilatational viscosity must be larger than surface shear viscosity");
     }
 
-    const std::string perMatchName= P.get( "Mesh.PeriodicMatching", std::string());
+    const std::string perMatchName= P.get( "Mesh.PeriodicBnd.PeriodicMatching", std::string());
     const bool is_periodic = !perMatchName.empty();
     DROPS::match_fun periodic_match = is_periodic ? DROPS::MatchMap::getInstance()[perMatchName] : nullptr;
 
