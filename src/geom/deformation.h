@@ -40,17 +40,17 @@ class MeshDeformationCL
 private:
 
     MultiGridCL * mg_;
-    MLIdxDescCL * mlidx_; // perhaps MultiLevel Idx just for future use...
-    VecDescCL * pointsol_;
+    MLIdxDescCL mlidx_; // perhaps MultiLevel Idx just for future use...
+    VecDescCL pointsol_;
     BndDataCL<Point3DCL> * bnd_;
+    size_t mgVersion_;
     std::map<const TetraCL*, bool> tet_is_curved;
-    bool isused_;
-    MeshDeformationCL() : mg_(0),mlidx_(0),pointsol_(0),bnd_(0){tet_is_curved.clear(); isused_=false;};
-    virtual ~MeshDeformationCL(){
-        if (mlidx_) delete mlidx_;
-        if (pointsol_) delete pointsol_;
-        if (bnd_) delete bnd_;
-    };
+    
+    MeshDeformationCL() : mg_(0), mlidx_( vecP2_FE), pointsol_(&mlidx_), bnd_(0), mgVersion_(0)
+    {}
+    virtual ~MeshDeformationCL()
+    { if (bnd_) delete bnd_; };
+    void MaybeUpdateNumbering(); ///< depending on the version of the multigrid, the numbering of mlidx_ is updated
 
     static Point3DCL instat_Identity3D (const Point3DCL & a, const double)
     {  return a;  }
@@ -63,15 +63,15 @@ public:
 
     void CheckForCurved();
     void Initialize( MultiGridCL* mg);
-    bool IsUsed(){ return isused_;}
+    bool IsUsed() const { return mg_!=nullptr;}
     bool IsTetraCurved(const TetraCL& tet);
-    LocalP2CL<Point3DCL> GetLocalP2Deformation( const TetraCL&);
-    LocalP1CL<Point3DCL> GetLocalP1Deformation( const TetraCL&);
+    LocalP2CL<Point3DCL> GetLocalP2Deformation( const TetraCL&) const;
+    LocalP1CL<Point3DCL> GetLocalP1Deformation( const TetraCL&) const;
     void SetEdgeDeformation(const EdgeCL& edge, const Point3DCL & p);
     void SetInnerEdgesPlanar();
-    Point3DCL GetTransformedVertexCoord( const VertexCL &);
-    Point3DCL GetTransformedEdgeBaryCenter( const EdgeCL &);
-    Point3DCL GetTransformedTetraBaryCenter( const TetraCL &);
+    Point3DCL GetTransformedVertexCoord( const VertexCL &) const;
+    Point3DCL GetTransformedEdgeBaryCenter( const EdgeCL &) const;
+    Point3DCL GetTransformedTetraBaryCenter( const TetraCL &) const;
 
 };
 

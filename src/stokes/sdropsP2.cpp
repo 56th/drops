@@ -168,6 +168,24 @@ namespace DROPS // for Strategy
 using ::MyStokesCL;
 
 template <class StokesProblemT>
+void ComputeProjectedDivergence(VecDescCL& divu, const StokesProblemT& Stokes)
+{
+    VectorCL rhs( divu.Data.size() );
+    rhs = Stokes.B.Data.GetFinest() * Stokes.v.Data - Stokes.c.Data;
+
+    JACPcCL jacpc;
+    PCGSolverCL<JACPcCL> pcgsolver( jacpc, 100, 1e-6, true );
+
+    int numiter;
+    double resid;
+    pcgsolver.Solve( Stokes.prM.Data.GetFinest(), divu.Data, rhs, DummyExchangeCL(), numiter, resid );
+
+    std::cout << "divergence projection: numiter: " << numiter << std::endl;
+    std::cout << "divergence projection:   reisd: " << resid << std::endl;
+
+}
+
+template <class StokesProblemT>
 void SolveStatProblem( StokesProblemT& Stokes, StokesSolverBaseCL& solver)
 {
     TimerCL timer;
@@ -180,7 +198,7 @@ void SolveStatProblem( StokesProblemT& Stokes, StokesSolverBaseCL& solver)
     std::cout << "Solving Stokes took "<<  duration << " sec.\n";
     std::cout << "iter: " << solver.GetIter() << "\tresid: " << solver.GetResid() << std::endl;
 
-    if( P.get<std::string>("StokesCoeff.Solution_Vel").compare("None")!=0)  // check whether solution is given
+    if( P.get<std::string>("NavStokes.Coeff.Solution_Vel").compare("None")!=0)  // check whether solution is given
         Stokes.CheckSolution( &Stokes.v, &Stokes.p, StokesFlowCoeffCL::LsgVel, StokesFlowCoeffCL::DLsgVel, StokesFlowCoeffCL::LsgPr, true);
 
 }
@@ -204,12 +222,13 @@ void Strategy( StokesProblemT& Stokes)
     Stokes.pr_idx.SetFE( P1_FE);
 
     //Modify Triangulation
-    if( P.get("Misc.ModifyGrid", 0) == 1)
-        MakeInitialTriangulation( MG, &SignedDistToInterface, P.get<double>("AdaptRef.Width"), P.get<int>("AdaptRef.CoarsestLevel"), P.get<int>("AdaptRef.FinestLevel"));
+    if( P.get("Mesh.AdaptRef.ModifyGrid", 0) == 1)
+        MakeInitialTriangulation( MG, &SignedDistToInterface, P.get<double>("Mesh.AdaptRef.Width"), P.get<int>("Mesh.AdaptRef.CoarsestLevel"), P.get<int>("Mesh.AdaptRef.FinestLevel"));
 
-    if( StokesSolverFactoryHelperCL().VelMGUsed(P))
+    ParamCL PSolver( P.get_child("NavStokesSolver.OseenSolver") );
+    if( StokesSolverFactoryHelperCL().VelMGUsed(PSolver))
     	Stokes.SetNumVelLvl( MG.GetNumLevel());
-    if( StokesSolverFactoryHelperCL().PrMGUsed(P))
+    if( StokesSolverFactoryHelperCL().PrMGUsed(PSolver))
         Stokes.SetNumPrLvl( MG.GetNumLevel());
 
     Stokes.CreateNumberingVel( MG.GetLastLevel(), &Stokes.vel_idx);
@@ -244,14 +263,15 @@ void Strategy( StokesProblemT& Stokes)
     // -------------------------------------------------------------------------
     std::cout << line << "Solve the linear equation system ...\n";
 
-    // type of preconditioner and solver
-    StokesSolverFactoryCL< StokesProblemT>         factory( Stokes, P);
+    // type of preconditioner and solver    
+    ParamCL PTime( P.get_child("Time") );
+    StokesSolverFactoryCL< StokesProblemT>         factory( Stokes, PSolver, PTime );
     StokesSolverBaseCL* stokessolver = factory.CreateStokesSolver();
 
-    if( StokesSolverFactoryHelperCL().VelMGUsed(P))
+    if( StokesSolverFactoryHelperCL().VelMGUsed(PSolver))
         SetupProlongationMatrix( MG, *factory.GetPVel(), &Stokes.vel_idx, &Stokes.vel_idx);
 
-    if( StokesSolverFactoryHelperCL().PrMGUsed(P))
+    if( StokesSolverFactoryHelperCL().PrMGUsed(PSolver))
         SetupProlongationMatrix( MG, *factory.GetPPr(), &Stokes.pr_idx, &Stokes.pr_idx);
 
     // choose time discretization scheme
@@ -259,7 +279,7 @@ void Strategy( StokesProblemT& Stokes)
     switch ( P.get<int>("Time.Scheme"))
     {
         case 1 :
-            TimeScheme = new InstatStokesThetaSchemeCL<StokesProblemT, StokesSolverBaseCL>( Stokes, *stokessolver, P.get<double>("Stokes.Theta"));
+            TimeScheme = new InstatStokesThetaSchemeCL<StokesProblemT, StokesSolverBaseCL>( Stokes, *stokessolver, P.get<double>("Time.Theta"));
             break;
         case 2 :
             TimeScheme = new StokesFracStepSchemeCL<InstatStokesThetaSchemeCL, StokesProblemT, StokesSolverBaseCL> ( Stokes, *stokessolver);
@@ -270,7 +290,7 @@ void Strategy( StokesProblemT& Stokes)
     StokesVelBndDataCL::bnd_val_fun ZeroVel = InVecMap::getInstance().find("ZeroVel")->second;
 
     if (P.get<int>("Time.NumSteps") == 0) {
-        if ( P.get<int>("Stokes.StokesMethod") < 500000) {
+        if ( P.get<int>("NavStokesSolver.OseenSolver.Solver") < 500000) {
             factory.SetMatrixA( &Stokes.A.Data.GetFinest());
             //for Stokes-MGM: coarse level solver uses bbt
             factory.SetMatrices( &Stokes.A.Data, &Stokes.B.Data,
@@ -280,12 +300,12 @@ void Strategy( StokesProblemT& Stokes)
 
     }
     else {
-        TimeScheme->SetTimeStep( P.get<double>("Time.StepSize"));
-        if ( P.get<std::string>("StokesCoeff.Solution_Vel").compare("None")!=0)
+        TimeScheme->SetTimeStep( P.get<double>("Time.FinalTime") / P.get<double>("Time.NumSteps") );
+        if ( P.get<std::string>("NavStokes.Coeff.Solution_Vel").compare("None")!=0)
             Stokes.InitVel( &Stokes.v, StokesFlowCoeffCL::LsgVel);
         else
             Stokes.InitVel( &Stokes.v, ZeroVel);
-        if (P.get<int>("Stokes.StokesMethod") < 500000) {
+        if (P.get<int>("NavStokesSolver.OseenSolver.Solver") < 500000) {
             factory.SetMatrixA ( &TimeScheme->GetUpperLeftBlock()->GetFinest());
             factory.SetMatrices( TimeScheme->GetUpperLeftBlock(), &Stokes.B.Data,
                                  &Stokes.M.Data, &Stokes.prM.Data, &Stokes.pr_idx);
@@ -293,7 +313,7 @@ void Strategy( StokesProblemT& Stokes)
     }
 
     // Output-Registrations:
-    Ensight6OutCL* ensight = NULL;
+    Ensight6OutCL* ensight = nullptr;
 
     if (P.get<int>("Ensight.EnsightOut",0)){
         // Initialize Ensight6 output
@@ -310,7 +330,11 @@ void Strategy( StokesProblemT& Stokes)
         ensight->Write();
     }
 
-    VTKOutCL * vtkwriter = NULL;
+    //create output for divergence of velocity
+    VecDescCL divu( Stokes.p.RowIdx );
+    ComputeProjectedDivergence( divu, Stokes );
+
+    VTKOutCL * vtkwriter = nullptr;
     if (P.get<int>("VTK.VTKOut",0)){
         vtkwriter = new VTKOutCL(MG, "DROPS data",
                                  P.get<int>("Time.NumSteps")/P.get("VTK.VTKOut", 0)+1,
@@ -324,6 +348,7 @@ void Strategy( StokesProblemT& Stokes)
                                  P.get<int>("VTK.UseDeformation"));
         vtkwriter->Register( make_VTKVector( Stokes.GetVelSolution(), "velocity") );
         vtkwriter->Register( make_VTKScalar( Stokes.GetPrSolution(), "pressure") );
+        vtkwriter->Register( make_VTKScalar( Stokes.GetPrSolution(divu), "divu"));
         vtkwriter->Write(Stokes.v.t);
     }
 
@@ -335,6 +360,7 @@ void Strategy( StokesProblemT& Stokes)
         std::cout << line << "Step: " << step << std::endl;
 
         TimeScheme->DoStep( Stokes.v.Data, Stokes.p.Data);
+        ComputeProjectedDivergence( divu, Stokes );
 
         timer.Stop();
         std::cout << " o Solved system with:\n"
@@ -348,7 +374,7 @@ void Strategy( StokesProblemT& Stokes)
 
     }
 
-    if( P.get<string>("StokesCoeff.Solution_Vel").compare("None")!=0 && P.get<int>("Time.NumSteps") != 0)  // check whether solution is given
+    if( P.get<string>("NavStokes.Coeff.Solution_Vel").compare("None")!=0 && P.get<int>("Time.NumSteps") != 0)  // check whether solution is given
         Stokes.CheckSolution( &Stokes.v, &Stokes.p, StokesFlowCoeffCL::LsgVel, StokesFlowCoeffCL::DLsgVel, StokesFlowCoeffCL::LsgPr, false);
 
     if (vtkwriter) delete vtkwriter;
@@ -372,21 +398,15 @@ int main ( int argc, char** argv)
             DROPS::ProgressBarTetraAccumulatorCL::Activate();
 
         // Check MarkLower value
-        if( P.get<int>("DomainCond.GeomType") == 0) P.put("Misc.MarkLower", 0);
+        if( P.get<std::string>("Mesh.Type").compare("ReadMeshBuilder") == 0 )
+            P.put("Misc.MarkLower", 0);
         else {
-          int nx, ny, nz;
-          double dx, dy, dz;
-          std::string mesh( P.get<string>("DomainCond.MeshFile")), delim("x@");
-          size_t idx;
-          while ((idx= mesh.find_first_of( delim)) != std::string::npos )
-            mesh[idx]= ' ';
-          std::istringstream brick_info( mesh);
-          brick_info >> dx >> dy >> dz >> nx >> ny >> nz;
-          if (P.get("Misc.MarkLower", 0)<0 || P.get("Misc.MarkLower", 0) > dy)
-          {
-        	  std::cerr << "Wrong value of MarkLower\n";
-        	  return 1;
-          }
+            double dy = norm(P.get<DROPS::Point3DCL>("Mesh.E2"));
+            if (P.get("Misc.MarkLower", 0)<0 || P.get("Misc.MarkLower", 0) > dy)
+            {
+              std::cerr << "Wrong value of MarkLower\n";
+              return 1;
+            }
         }
 
         // time measurement
@@ -399,28 +419,30 @@ int main ( int argc, char** argv)
 
         //create geometry
         DROPS::MultiGridCL* mg= 0;
-        DROPS::StokesBndDataCL* bdata = 0;
 
-        //only for measuring cell, not used here
-        double r = 1;
-        std::string serfile = "none";
+        std::unique_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P));
+        mg = new DROPS::MultiGridCL( *builder );
 
-        DROPS::BuildDomain( mg, P.get<string>("DomainCond.MeshFile"), P.get<int>("DomainCond.GeomType"), serfile, r);
-        DROPS::BuildBoundaryData( mg, bdata, P.get<string>("DomainCond.BoundaryType"), P.get<string>("DomainCond.BoundaryFncs"));
+        DROPS::BndDataCL<DROPS::Point3DCL> velbnddata(0);
+        DROPS::BndDataCL<double>           prbnddata(0);
+        DROPS::read_BndData( velbnddata, *mg, P.get_child( "NavStokes.BoundaryData.Velocity"));
+        std::cout << "Generated boundary conditions for velocity ";
+        DROPS::read_BndData( prbnddata,  *mg, P.get_child( "NavStokes.BoundaryData.Pressure"));
+        std::cout << "and pressure." << std::endl;
 
         // Setup the problem
         DROPS::StokesFlowCoeffCL tmp = DROPS::StokesFlowCoeffCL( P);
-        StokesOnBrickCL prob(*mg, tmp, *bdata);
+        StokesOnBrickCL prob( *mg, tmp, DROPS::StokesBndDataCL(velbnddata,prbnddata) );
         timer.Stop();
         std::cout << " o time " << timer.GetTime() << " s" << std::endl;
 
         // Refine the grid
         // ---------------------------------------------------------------------
-        std::cout << "Refine the grid " << P.get<int>("DomainCond.InitialCond") << " times regulary ...\n";
+        std::cout << "Refine the grid " << P.get<int>("Mesh.InitialRef") << " times regulary ...\n";
         timer.Reset();
 
         // Create new tetrahedra
-        for ( int ref=1; ref<=P.get<int>("DomainCond.InitialCond"); ++ref){
+        for ( int ref=1; ref<=P.get<int>("Mesh.InitialRef"); ++ref){
             std::cout << " refine (" << ref << ")\n";
             DROPS::MarkAll( *mg);
             mg->Refine();
@@ -447,7 +469,6 @@ int main ( int argc, char** argv)
 //      fil << DROPS::GeomSolOutCL<DROPS::PoissonP1CL<PoissonCoeffCL<DROPS::Params> >::DiscSolCL>( *mg, prob.GetSolution(), &colormap, -1, false, 0.0, prob.x.Data.min(), prob.x.Data.max()) << std::endl;
 //      std::cout << DROPS::GeomMGOutCL(*mg, -1, true) << std::endl;
         delete mg;
-        delete bdata;
         return 0;
     }
     catch (DROPS::DROPSErrCL err) { err.handle(); }

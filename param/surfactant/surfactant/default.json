@@ -1,1 +1,5 @@
-{} // empty defaults
+{
+    "Levelset": {
+        "CurvDiff": -1
+    }
+}

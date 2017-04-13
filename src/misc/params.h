@@ -148,6 +148,8 @@ class ParamCL
       }
     }
 
+    bool exists(const std::string &pathToNode, const boost::property_tree::ptree *ptTmp = 0 ) const;
+
     ptree_const_iterator_type begin () const { return pt.begin(); }
     ptree_const_iterator_type end () const { return pt.end(); }
 

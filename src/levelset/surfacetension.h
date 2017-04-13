@@ -89,7 +89,7 @@ class SurfaceTensionCL
 
     void SetConcentration(VecDescCL * c) {c_=c;}
     void SetBoundary (BndDataCL<> cBnd) {cBnd_ =  cBnd;}
-    void SetTime(double time) { c_->t=time; s_->t=time;}
+    void SetTime(double time) { if (c_) c_->t=time; if (s_) s_->t=time; }
     void SetVtkOutput(VecDescCL * sigma_vtk) {sigma_vtk_=sigma_vtk;}
 
     instat_scalar_fun_ptr GetSigma() const {return sigma_;}

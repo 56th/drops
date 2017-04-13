@@ -336,58 +336,71 @@ template<class LevelSetSolverT>
 TimeDisc2PhaseCL* CreateTimeDisc( InstatNavierStokes2PhaseP2P1CL& Stokes, LevelsetP2CL& lset,
     NSSolverBaseCL<InstatNavierStokes2PhaseP2P1CL>* stokessolver, LevelSetSolverT* lsetsolver, ParamCL& P, LevelsetModifyCL& lsetmod)
 {
-    if (P.get<int>("Time.NumSteps") == 0) return 0;
+    int numSteps        = P.get<int>("Time.NumSteps");
+
+    if( numSteps == 0)
+        return 0;
+
+    double theta        = P.get<double>("Time.Theta");
+    double lsTheta      = theta;
+    double tEnd         = P.get<double>("Time.FinalTime");
+    double stepSize     = tEnd / numSteps;
+    double implLB       = P.get<double>("CouplingSolver.ImplLB");
+    double couplingTol  = P.get<double>("CouplingSolver.Tol");
+    double couplingProj = P.get<double>("CouplingSolver.Projection");
+    double nonlinear    = P.get<double>("CouplingSolver.NavStokesSolver.Nonlinear");
+
     switch (P.get<int>("Time.Scheme"))
     {
         case 1 :
             return (new LinThetaScheme2PhaseCL<LevelSetSolverT>
-                        (Stokes, lset, *stokessolver, *lsetsolver, lsetmod, P.get<double>("Time.StepSize"), P.get<double>("Stokes.Theta"), P.get<double>("Levelset.Theta"), P.get<double>("NavStokes.Nonlinear"), P.get<double>("Coupling.Stab")));
+                        (Stokes, lset, *stokessolver, *lsetsolver, lsetmod, stepSize, theta, lsTheta, nonlinear, implLB));
         break;
         case 3 :
             std::cout << "[WARNING] use of ThetaScheme2PhaseCL is deprecated using RecThetaScheme2PhaseCL instead\n";
         case 2 :
             return (new RecThetaScheme2PhaseCL<LevelSetSolverT >
-                        (Stokes, lset, *stokessolver, *lsetsolver, lsetmod, P.get<double>("Time.StepSize"), P.get<double>("Coupling.Tol"), P.get<double>("Stokes.Theta"), P.get<double>("Levelset.Theta"), P.get<double>("NavStokes.Nonlinear"), P.get<int>("Coupling.Projection"), P.get<double>("Coupling.Stab")));
+                        (Stokes, lset, *stokessolver, *lsetsolver, lsetmod, stepSize, couplingTol, theta, lsTheta, nonlinear, couplingProj, implLB));
         break;
         case 4 :
             return (new OperatorSplitting2PhaseCL<LevelSetSolverT>
-                        (Stokes, lset, stokessolver->GetStokesSolver(), *lsetsolver, lsetmod, P.get<double>("Time.StepSize"), P.get<int>("Stokes.InnerIter"), P.get<double>("Stokes.InnerTol"), P.get<double>("NavStokes.Nonlinear")));
+                        (Stokes, lset, stokessolver->GetStokesSolver(), *lsetsolver, lsetmod, stepSize, P.get<int>("CouplingSolver.NavStokesSolver.OseenSolver.Iter"), P.get<double>("CouplingSolver.NavStokesSolver.OseenSolver.Tol"), nonlinear));
         break;
         case 6 :
             return (new SpaceTimeDiscTheta2PhaseCL<LevelSetSolverT>
-                        (Stokes, lset, *stokessolver, *lsetsolver, lsetmod, P.get<double>("Time.StepSize"), P.get<double>("Coupling.Tol"), P.get<double>("Stokes.Theta"), P.get<double>("Levelset.Theta"), P.get<double>("NavStokes.Nonlinear"), P.get<int>("Coupling.Projection"), P.get<double>("Coupling.Stab"), false));
+                        (Stokes, lset, *stokessolver, *lsetsolver, lsetmod, stepSize, couplingTol, theta, lsTheta, nonlinear, couplingProj, implLB, false));
         break;
         case 7 :
             return (new SpaceTimeDiscTheta2PhaseCL< LevelSetSolverT>
-                        (Stokes, lset, *stokessolver, *lsetsolver, lsetmod, P.get<double>("Time.StepSize"), P.get<double>("Coupling.Tol"), P.get<double>("Stokes.Theta"), P.get<double>("Levelset.Theta"), P.get<double>("NavStokes.Nonlinear"), P.get<int>("Coupling.Projection"), P.get<double>("Coupling.Stab"), true));
+                        (Stokes, lset, *stokessolver, *lsetsolver, lsetmod, stepSize, couplingTol, theta, lsTheta, nonlinear, couplingProj, implLB, true));
         break;
         case 8 :
             return (new EulerBackwardScheme2PhaseCL<LevelSetSolverT>
-                        (Stokes, lset, *stokessolver, *lsetsolver, lsetmod, P.get<double>("Time.StepSize"), P.get<double>("Coupling.Tol"), P.get<double>("NavStokes.Nonlinear"), P.get<int>("Coupling.Projection"), P.get<double>("Coupling.Stab")));
+                        (Stokes, lset, *stokessolver, *lsetsolver, lsetmod, stepSize, couplingTol, nonlinear, couplingProj, implLB));
         break;
         case 9 :
             return (new CrankNicolsonScheme2PhaseCL<RecThetaScheme2PhaseCL, LevelSetSolverT>
-                        (Stokes, lset, *stokessolver, *lsetsolver, lsetmod, P.get<double>("Time.StepSize"), P.get<double>("Coupling.Tol"), P.get<double>("NavStokes.Nonlinear"), P.get<int>("Coupling.Projection"), P.get<double>("Coupling.Stab")));
+                        (Stokes, lset, *stokessolver, *lsetsolver, lsetmod, stepSize, couplingTol, nonlinear, couplingProj, implLB));
         break;
         case 10 :
             return (new CrankNicolsonScheme2PhaseCL<SpaceTimeDiscTheta2PhaseCL, LevelSetSolverT>
-                        (Stokes, lset, *stokessolver, *lsetsolver, lsetmod, P.get<double>("Time.StepSize"), P.get<double>("Coupling.Tol"), P.get<double>("NavStokes.Nonlinear"), P.get<int>("Coupling.Projection"), P.get<double>("Coupling.Stab")));
+                        (Stokes, lset, *stokessolver, *lsetsolver, lsetmod, stepSize, couplingTol, nonlinear, couplingProj, implLB));
         break;
         case 11 :
             return (new FracStepScheme2PhaseCL<RecThetaScheme2PhaseCL, LevelSetSolverT >
-                        (Stokes, lset, *stokessolver, *lsetsolver, lsetmod, P.get<double>("Time.StepSize"), P.get<double>("Coupling.Tol"), P.get<double>("NavStokes.Nonlinear"), P.get<int>("Coupling.Projection"), P.get<double>("Coupling.Stab")));
+                        (Stokes, lset, *stokessolver, *lsetsolver, lsetmod, stepSize, couplingTol, nonlinear, couplingProj, implLB));
         break;
         case 12 :
             return (new FracStepScheme2PhaseCL<SpaceTimeDiscTheta2PhaseCL, LevelSetSolverT >
-                        (Stokes, lset, *stokessolver, *lsetsolver, lsetmod, P.get<double>("Time.StepSize"), P.get<double>("Coupling.Tol"), P.get<double>("NavStokes.Nonlinear"), P.get<int>("Coupling.Projection"), P.get<double>("Coupling.Stab")));
+                        (Stokes, lset, *stokessolver, *lsetsolver, lsetmod, stepSize, couplingTol, nonlinear, couplingProj, implLB));
         break;
         case 13 :
             return (new Frac2StepScheme2PhaseCL<RecThetaScheme2PhaseCL, LevelSetSolverT >
-                        (Stokes, lset, *stokessolver, *lsetsolver, lsetmod, P.get<double>("Time.StepSize"), P.get<double>("Coupling.Tol"), P.get<double>("NavStokes.Nonlinear"), P.get<int>("Coupling.Projection"), P.get<double>("Coupling.Stab")));
+                        (Stokes, lset, *stokessolver, *lsetsolver, lsetmod, stepSize, couplingTol, nonlinear, couplingProj, implLB));
         break;
         case 14 :
             return (new Frac2StepScheme2PhaseCL<SpaceTimeDiscTheta2PhaseCL, LevelSetSolverT >
-                        (Stokes, lset, *stokessolver, *lsetsolver, lsetmod, P.get<double>("Time.StepSize"), P.get<double>("Coupling.Tol"), P.get<double>("NavStokes.Nonlinear"), P.get<int>("Coupling.Projection"), P.get<double>("Coupling.Stab")));
+                        (Stokes, lset, *stokessolver, *lsetsolver, lsetmod, stepSize, couplingTol, nonlinear, couplingProj, implLB));
         break;
         default : throw DROPSErrCL("Unknown TimeDiscMethod");
     }
@@ -429,9 +442,29 @@ void SolveStatProblem( StokesT& Stokes, LevelsetP2CL& lset, NSSolverBaseCL<Stoke
     std::cout << "iter: " << solver.GetIter() << "\tresid: " << solver.GetResid() << std::endl;
 }
 
+bool ReadInitialConditionFromFile( const ParamCL &P )
+{
+    if( P.exists( std::string("Restart.InputData")) )
+    {
+        std::string inputDat = P.get<std::string>("Restart.InputData");
+        if( inputDat.empty() || inputDat == "none" )
+            return false;
+
+        return true;
+    }
+    return false;
+}
+
 void SetInitialLevelsetConditions( LevelsetP2CL& lset, MultiGridCL& MG, ParamCL& P)
 {
-    switch (P.get<int>("DomainCond.InitialCond"))
+    if( ReadInitialConditionFromFile( P ) )
+    {
+        ReadFEFromFile( lset.Phi, MG, P.get<std::string>("Restart.InputData")+"levelset",
+                        P.get<int>("Restart.Binary") );
+        return;
+    }
+
+    switch ( P.get<int>("NavStokes.InitialValue") )
     {
 #ifndef _PAR
       case -10: // read from ensight-file [deprecated]
@@ -443,11 +476,12 @@ void SetInitialLevelsetConditions( LevelsetP2CL& lset, MultiGridCL& MG, ParamCL&
 #endif
       case -1: // read from file
       {
-        ReadFEFromFile( lset.Phi, MG, P.get<std::string>("DomainCond.InitialFile")+"levelset", P.get<int>("Restart.Binary"));
+        throw DROPSErrCL("Specify \"Restart.InputData\" to read initial condition from file");
+        //ReadFEFromFile( lset.Phi, MG, P.get<std::string>("Restart.InputData")+"levelset", P.get<int>("Restart.Binary"));
       } break;
       case 0: case 1: case 10:
           //lset.Init( EllipsoidCL::DistanceFct);
-          lset.Init( DROPS::InScaMap::getInstance()[P.get("Exp.InitialLSet", std::string("Ellipsoid"))]);
+          lset.Init( DROPS::InScaMap::getInstance()[P.get("Levelset.InitialValue", std::string("Ellipsoid"))]);
         break;
       case  2: //flow without droplet
           lset.Init( DROPS::InScaMap::getInstance()["One"]);
@@ -460,7 +494,20 @@ template <typename StokesT>
 void SetInitialConditions(StokesT& Stokes, LevelsetP2CL& lset, MultiGridCL& MG, const ParamCL& P)
 {
     MLIdxDescCL* pidx= &Stokes.pr_idx;
-    switch (P.get<int>("DomainCond.InitialCond"))
+
+    if( ReadInitialConditionFromFile( P ) )
+    {
+        ReadFEFromFile( Stokes.v, MG, P.get<std::string>("Restart.InputData")+"velocity",
+                        P.get<int>("Restart.Binary"));
+        Stokes.UpdateXNumbering( pidx, lset);
+        Stokes.p.SetIdx( pidx);
+        // pass also level set, as p may be extended
+        ReadFEFromFile( Stokes.p, MG, P.get<std::string>("Restart.InputData")+"pressure",
+                        P.get<int>("Restart.Binary"), lset.PhiC);
+    }
+
+    const int inival= P.get<int>("NavStokes.InitialValue");
+    switch ( inival )
     {
 #ifndef _PAR
       case -10: // read from ensight-file [deprecated]
@@ -482,16 +529,17 @@ void SetInitialConditions(StokesT& Stokes, LevelsetP2CL& lset, MultiGridCL& MG, 
 #endif
       case -1: // read from file
       {
-        ReadFEFromFile( Stokes.v, MG, P.get<std::string>("DomainCond.InitialFile")+"velocity", P.get<int>("Restart.Binary"));
-        Stokes.UpdateXNumbering( pidx, lset);
-        Stokes.p.SetIdx( pidx);
-        ReadFEFromFile( Stokes.p, MG, P.get<std::string>("DomainCond.InitialFile")+"pressure", P.get<int>("Restart.Binary"), lset.PhiC); // pass also level set, as p may be extended
+        throw DROPSErrCL("Specify \"Restart.InputData\" to read initial condition from file");
+//        ReadFEFromFile( Stokes.v, MG, P.get<std::string>("Restart.InputData")+"velocity", P.get<int>("Restart.Binary"));
+//        Stokes.UpdateXNumbering( pidx, lset);
+//        Stokes.p.SetIdx( pidx);
+//        ReadFEFromFile( Stokes.p, MG, P.get<std::string>("Restart.InputData")+"pressure", P.get<int>("Restart.Binary"), lset.PhiC); // pass also level set, as p may be extended
       } break;
       case 0: // zero initial condition
           Stokes.UpdateXNumbering( pidx, lset);
           Stokes.p.SetIdx( pidx);
         break;
-      case 1: // stationary flow with surface tension
+      case 1: case 10: // stationary flow with/without surface tension
       {
         Stokes.UpdateXNumbering( pidx, lset);
         Stokes.p.SetIdx( pidx);
@@ -501,65 +549,46 @@ void SetInitialConditions(StokesT& Stokes, LevelsetP2CL& lset, MultiGridCL& MG, 
         typedef SSORPcCL PcT;
 #endif
         PcT pc;
-        PCGSolverCL<PcT> PCGsolver( pc, P.get<int>("Stokes.PcAIter"), P.get<double>("Stokes.PcATol"), true);
+        PCGSolverCL<PcT> PCGsolver( pc, P.get<int>("CouplingSolver.NavStokesSolver.OseenSolver.PcAIter"), P.get<double>("CouplingSolver.NavStokesSolver.OseenSolver.PcATol"), true);
         typedef SolverAsPreCL<PCGSolverCL<PcT> > PCGPcT;
         PCGPcT apc( PCGsolver);
-        StokesSolverBaseCL *ssolver = 0;
+        SchurPreBaseCL *schurpc=0;
+        const int iter= P.get<int>("CouplingSolver.NavStokesSolver.OseenSolver.Iter");
+        const double tol= P.get<double>("CouplingSolver.NavStokesSolver.OseenSolver.Tol"),
+                PcSTol= P.get<double>("CouplingSolver.NavStokesSolver.OseenSolver.PcSTol");
         if( Stokes.usesGhostPen() )
-        {
-            typedef BlockPreCL<ExpensivePreBaseCL, SchurPreBaseCL, LowerBlockPreCL>    LowerBlockPcT;
-            ISGhPenPreCL gpispc( &Stokes.prA.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.C.Data.GetFinest(), 0., 1., 1e-4, 1e-4, 200);
-            GCRSolverCL< LowerBlockPcT > gcrsolver( *(new LowerBlockPcT(apc, gpispc)),P.get<int>("Stokes.OuterIter"),P.get<int>("Stokes.OuterIter"),P.get<int>("Stokes.OuterTol") );
-            ssolver = new BlockMatrixSolverCL< GCRSolverCL<LowerBlockPcT> > ( gcrsolver );
-        }
+            schurpc= new ISGhPenPreCL( &Stokes.prA.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.C.Data.GetFinest(), 0., 1., PcSTol, PcSTol, 200);
         else
-        {
-            ISBBTPreCL bbtispc( &Stokes.B.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.M.Data.GetFinest(), Stokes.pr_idx.GetFinest(), 0.0, 1.0, 1e-4, 1e-4);
-            ssolver = new InexactUzawaCL<PCGPcT, ISBBTPreCL, APC_OTHER> ( apc, bbtispc, P.get<int>("Stokes.OuterIter"), P.get<double>("Stokes.OuterTol"), 0.6, 50);
+            schurpc= new ISBBTPreCL( &Stokes.B.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.M.Data.GetFinest(), Stokes.pr_idx.GetFinest(), 0.0, 1.0, PcSTol, PcSTol);
+        typedef BlockPreCL<ExpensivePreBaseCL, SchurPreBaseCL, LowerBlockPreCL>    LowerBlockPcT;
+        LowerBlockPcT blockPc(apc, *schurpc);
+        GCRSolverCL< LowerBlockPcT > gcrsolver( blockPc, iter, iter, tol, false);
+        BlockMatrixSolverCL< GCRSolverCL<LowerBlockPcT> > ssolver( gcrsolver );
+
+        if (inival==1) { // with surface tension
+            NSSolverBaseCL<StokesT> stokessolver( Stokes, ssolver);
+            SolveStatProblem( Stokes, lset, stokessolver);
+        } else { // without surface tension
+            TimerCL time;
+            VelVecDescCL curv( &Stokes.vel_idx);
+            time.Reset();
+            Stokes.SetupPrMass(  &Stokes.prM, lset/*, P.get<double>("Mat.ViscFluid"), C.mat_ViscGas*/);
+            Stokes.SetupSystem1( &Stokes.A, &Stokes.M, &Stokes.b, &Stokes.b, &curv, lset, Stokes.v.t);
+            Stokes.SetupSystem2( &Stokes.B, &Stokes.C, &Stokes.c, lset, Stokes.v.t);
+            curv.Clear( Stokes.v.t);
+            lset.AccumulateBndIntegral( curv);
+            time.Stop();
+            std::cout << "Discretizing Stokes/Curv for initial velocities took "<<time.GetTime()<<" sec.\n";
+
+            time.Reset();
+            ssolver.Solve( Stokes.A.Data, Stokes.B.Data, Stokes.C.Data,
+                Stokes.v.Data, Stokes.p.Data, Stokes.b.Data, Stokes.c.Data, Stokes.vel_idx.GetEx(), Stokes.pr_idx.GetEx());
+            time.Stop();
+            std::cout << "Solving Stokes for initial velocities took "<<time.GetTime()<<" sec.\n";
         }
-
-        NSSolverBaseCL<StokesT> stokessolver( Stokes, *ssolver);
-        SolveStatProblem( Stokes, lset, stokessolver);
-        delete ssolver;
-
+        delete schurpc;
       } break;
-      case 10: // stationary flow without surface tension
-      {       
-        TimerCL time;
-        VelVecDescCL curv( &Stokes.vel_idx);
-        time.Reset();
-        Stokes.SetupPrMass(  &Stokes.prM, lset/*, P.get<double>("Mat.ViscFluid"), C.mat_ViscGas*/);
-        Stokes.SetupSystem1( &Stokes.A, &Stokes.M, &Stokes.b, &Stokes.b, &curv, lset, Stokes.v.t);
-        Stokes.SetupSystem2( &Stokes.B, &Stokes.C, &Stokes.c, lset, Stokes.v.t);
-        curv.Clear( Stokes.v.t);
-        lset.AccumulateBndIntegral( curv);
-        time.Stop();
-        std::cout << "Discretizing Stokes/Curv for initial velocities took "<<time.GetTime()<<" sec.\n";
 
-        time.Reset();
-        SSORPcCL ssorpc;
-        PCGSolverCL<SSORPcCL> PCGsolver( ssorpc, P.get<int>("Stokes.PcAIter"), P.get<double>("Stokes.PcATol"), true);
-        typedef SolverAsPreCL<PCGSolverCL<SSORPcCL> > PCGPcT;
-        PCGPcT apc( PCGsolver);
-        StokesSolverBaseCL *ssolver = 0;
-        if( Stokes.usesGhostPen() )
-        {
-            typedef BlockPreCL<ExpensivePreBaseCL, SchurPreBaseCL, LowerBlockPreCL>    LowerBlockPcT;
-            ISGhPenPreCL gpispc( &Stokes.prA.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.C.Data.GetFinest(), 0., 1., P.get<double>("Stokes.PcSTol"), P.get<double>("Stokes.PcSTol"), 200);
-            GCRSolverCL< LowerBlockPcT > gcrsolver( *(new LowerBlockPcT(apc, gpispc)),P.get<int>("Stokes.OuterIter"),P.get<int>("Stokes.OuterIter"),P.get<int>("Stokes.OuterTol") );
-            ssolver = new BlockMatrixSolverCL< GCRSolverCL<LowerBlockPcT> > ( gcrsolver );
-        }
-        else
-        {
-            ISBBTPreCL bbtispc( &Stokes.B.Data.GetFinest(), &Stokes.prM.Data.GetFinest(), &Stokes.M.Data.GetFinest(), Stokes.pr_idx.GetFinest(), 0.0, 1.0, P.get<double>("Stokes.PcSTol"), P.get<double>("Stokes.PcSTol"));
-            ssolver = new InexactUzawaCL<PCGPcT, ISBBTPreCL, APC_OTHER> ( apc, bbtispc, P.get<int>("Stokes.OuterIter"), P.get<double>("Stokes.OuterTol"), 0.6, 50);
-        }
-        ssolver->Solve( Stokes.A.Data, Stokes.B.Data, Stokes.C.Data,
-            Stokes.v.Data, Stokes.p.Data, Stokes.b.Data, Stokes.c.Data, Stokes.vel_idx.GetEx(), Stokes.pr_idx.GetEx());
-        time.Stop();
-        std::cout << "Solving Stokes for initial velocities took "<<time.GetTime()<<" sec.\n";
-        delete ssolver; 
-      } break;    
       case  2: //Stationary flow without droplet
           Stokes.UpdateXNumbering( pidx, lset);
           Stokes.p.SetIdx( pidx);
@@ -581,6 +610,7 @@ class TwoPhaseStoreCL
     const TransportP1CL* transp_;//old
     const SpaceTimeXSolutionCL* st_transp_;//new
     std::string          path_;
+    std::string          mgPath_;
     Uint                 numRecoverySteps_;
     Uint                 recoveryStep_;
     bool                 binary_;
@@ -609,33 +639,45 @@ class TwoPhaseStoreCL
        *  \param binary save output  binary?
        *  */
     TwoPhaseStoreCL(MultiGridCL& mg, const StokesT& Stokes, const LevelsetP2CL& lset, const TransportP1CL* transp,
-                    const std::string& path, Uint recoverySteps=2, bool binary= false, const PermutationT& vel_downwind= PermutationT(), const PermutationT& lset_downwind= PermutationT())
-      : mg_(mg), Stokes_(Stokes), lset_(lset), transp_(transp), st_transp_(NULL), path_(path), numRecoverySteps_(recoverySteps),
+                    const std::string& solPath, const std::string& mgPath, Uint recoverySteps=2, bool binary= false, const PermutationT& vel_downwind= PermutationT(), const PermutationT& lset_downwind= PermutationT())
+      : mg_(mg), Stokes_(Stokes), lset_(lset), transp_(transp), st_transp_(NULL), path_(solPath), mgPath_(mgPath), numRecoverySteps_(recoverySteps),
         recoveryStep_(0), binary_( binary), vel_downwind_( vel_downwind), lset_downwind_( lset_downwind){}
 
 //new cstr with spacetimetransport-object (as reference to distinguish from std-cstr... - could be cleaned..)
     TwoPhaseStoreCL(MultiGridCL& mg, const StokesT& Stokes, const LevelsetP2CL& lset, const SpaceTimeXSolutionCL& st_transp,
-                    const std::string& path, Uint recoverySteps=2, bool binary= false, 
+                    const std::string& solPath, const std::string& mgPath, Uint recoverySteps=2, bool binary= false,
                     const PermutationT& vel_downwind= PermutationT(), const PermutationT& lset_downwind= PermutationT())
-        : mg_(mg), Stokes_(Stokes), lset_(lset), transp_(NULL), st_transp_(&st_transp), path_(path), numRecoverySteps_(recoverySteps),
+        : mg_(mg), Stokes_(Stokes), lset_(lset), transp_(NULL), st_transp_(&st_transp), path_(solPath), mgPath_(mgPath), numRecoverySteps_(recoverySteps),
         recoveryStep_(0), binary_( binary), vel_downwind_( vel_downwind), lset_downwind_( lset_downwind){}
 
     /// \brief Write all information in a file
     void Write()
     {
+        if( path_.empty() && mgPath_.empty() ) return;
+
         // Create filename
         std::stringstream filename;
+        std::stringstream mgFileName;
         const size_t postfix= numRecoverySteps_==0 ? recoveryStep_++ : (recoveryStep_++)%numRecoverySteps_;
-        filename << path_ << postfix;
+        if( path_.empty() )
+            filename << mgPath_ << postfix;
+        else
+            filename << path_ << postfix;
+        mgFileName << mgPath_ << postfix;
+
         // first master writes time info
         IF_MASTER
             WriteTime( filename.str() + "time");
 
         // write multigrid
-        MGSerializationCL ser( mg_, filename.str());
-        ser.WriteMG();
+        if( !mgPath_.empty() )
+        {
+            MGSerializationCL ser( mg_, mgFileName.str() );
+            ser.WriteMG();
+        }
 
-        // write numerical data
+        // write numerical data if path is specified
+        if( path_.empty() ) return;
         VecDescCL vel= Stokes_.v;
         permute_Vector( vel.Data, invert_permutation( vel_downwind_), 3);
         WriteFEToFile( vel, mg_, filename.str() + "velocity", binary_);
@@ -658,7 +700,7 @@ namespace SurfTens
 //==============================================================================
 // tau is constant
 double sigmaf (const DROPS::Point3DCL&, double) {
-    static double sigma = P.get<double>("SurfTens.SurfTension");
+    static double sigma = P.get<double>("NavStokes.Coeff.SurfTens.SurfTension");
     return sigma;
 }
 
@@ -667,8 +709,8 @@ DROPS::Point3DCL gsigma (const DROPS::Point3DCL&, double) { return DROPS::Point3
 //linear decrease of surface tension coefficient in y direction
 double lin_in_y(const DROPS::Point3DCL& p)  // linear function in y-direction, zero in the middle of the domain
 {
-    static double sigma = P.get<double>("SurfTens.SurfTension",1.0); // surface tension coefficient sigma : if tau is a variable, sigma is the constant part of tau.
-    static double Ly = P.get<DROPS::Point3DCL>("Domain.E2")[1];  // domain size in y
+    static double sigma = P.get<double>("NavStokes.Coeff.SurfTens.SurfTension",1.0); // surface tension coefficient sigma : if tau is a variable, sigma is the constant part of tau.
+    static double Ly = P.get<DROPS::Point3DCL>("Mesh.E2")[1];  // domain size in y
     static double grad_tau = P.get<double>("SurfTens.GradTau", 0.);  // gradient of tau
 
     return sigma + (p[1] - Ly*0.5)*grad_tau;  // grad_tau is the gradient of tau in y-direction

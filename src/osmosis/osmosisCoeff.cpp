@@ -33,7 +33,7 @@ double Initialcneg (const DROPS::Point3DCL& p, double )
 	static double r0 = 1.0;
 	static double dn = P.get<double>("Osmosis.Diffusivity");
 	static double vn = P.get<double>("Osmosis.GrowVelocity");
-	static DROPS::Point3DCL drop = P.get<DROPS::Point3DCL>("Exp.PosDrop");
+	static DROPS::Point3DCL drop = P.get<DROPS::Point3DCL>("Levelset.PosDrop");
 	double r2 = (p[0]-drop[0])*(p[0]-drop[0])
         		+ (p[1]-drop[1])*(p[1]-drop[1])
         		+ (p[2]-drop[2])*(p[2]-drop[2]);
@@ -51,7 +51,7 @@ double Initialcpos (const DROPS::Point3DCL& p, double )
 	static double r0 = 1.0;
 	static double dn = P.get<double>("Osmosis.Diffusivity");
 	static double vn = P.get<double>("Osmosis.GrowVelocity");
-	static DROPS::Point3DCL drop = P.get<DROPS::Point3DCL>("Exp.PosDrop");
+	static DROPS::Point3DCL drop = P.get<DROPS::Point3DCL>("Levelset.PosDrop");
 	double r2 = (p[0]-drop[0])*(p[0]-drop[0])
         		+ (p[1]-drop[1])*(p[1]-drop[1])
         		+ (p[2]-drop[2])*(p[2]-drop[2]);
@@ -89,7 +89,7 @@ double Heaviside (const DROPS::Point3DCL& p , double )
 double TransverseLinear (const DROPS::Point3DCL& p , double )
 {
     extern DROPS::ParamCL P;
-	static DROPS::Point3DCL center = P.get<DROPS::Point3DCL>("Exp.PosDrop");
+	static DROPS::Point3DCL center = P.get<DROPS::Point3DCL>("Levelset.PosDrop");
     const double axval = (p[0]-center[0])+2.0*(p[1]-center[1]);
 	if (0.125*(4.0+axval) > 0.5)
 		return 0.1;
@@ -108,7 +108,7 @@ double Torus( const DROPS::Point3DCL& pin, double)
     extern DROPS::ParamCL P;
     const double R_ = 1.2;
     const double r_ = 0.4;
-	static DROPS::Point3DCL center = P.get<DROPS::Point3DCL>("Exp.PosDrop");
+	static DROPS::Point3DCL center = P.get<DROPS::Point3DCL>("Levelset.PosDrop");
     DROPS::Point3DCL p = pin - center;
     return std::sqrt( p[2]*p[2] + std::pow( std::sqrt( p[0]*p[0] + p[1]*p[1]) - R_, 2) ) - r_;
 }
@@ -124,16 +124,11 @@ double Rhs (const DROPS::Point3DCL& ,  double )
 	return 0.;
 }
 
-double tid_ZeroFct (const DROPS::Point3DCL&, double)
-{  
-    return 0.;
-}
-
 double Dirichlet (const DROPS::Point3DCL& p, double )
 {
-/*  static double x0 = P.get<DROPS::Point3DCL>("Exp.PosDrop")[0];
-  static double y0 = P.get<DROPS::Point3DCL>("Exp.PosDrop")[1];
-  static double R = P.get<DROPS::Point3DCL>("Exp.RadDrop")[0];  */
+/*  static double x0 = P.get<DROPS::Point3DCL>("Levelset.PosDrop")[0];
+  static double y0 = P.get<DROPS::Point3DCL>("Levelset.PosDrop")[1];
+  static double R = P.get<DROPS::Point3DCL>("Levelset.RadDrop")[0];  */
 //  double x = p[0];
   double y = p[1];  
   
@@ -156,7 +151,7 @@ double Dirichlet (const DROPS::Point3DCL& p, double )
 double DirichletConst (const DROPS::Point3DCL& p, double )
 {
   extern DROPS::ParamCL P;
-  double y=p[1]-P.get<DROPS::Point3DCL>("Exp.PosDrop")[1];
+  double y=p[1]-P.get<DROPS::Point3DCL>("Levelset.PosDrop")[1];
   if (y>0)
     return P.get<double>("Transp.IniCPos");
   else
@@ -172,7 +167,7 @@ double DirichletPos (const DROPS::Point3DCL&, double )
 double DirichletConstt (const DROPS::Point3DCL& p, double )
 {
   extern DROPS::ParamCL P;
-  double y=p[1]-P.get<DROPS::Point3DCL>("Exp.PosDrop")[1];
+  double y=p[1]-P.get<DROPS::Point3DCL>("Levelset.PosDrop")[1];
   if (y>0)
     return P.get<double>("Transp.IniCPos");
   else
@@ -183,10 +178,10 @@ DROPS::SVectorCL<3> PotentialFlowfield (const DROPS::Point3DCL& p, double )
 {  
     extern DROPS::ParamCL P;
     DROPS::SVectorCL<3> ret(0.);
-    double x=p[0]-P.get<DROPS::Point3DCL>("Exp.PosDrop")[0]; double y=p[1]-P.get<DROPS::Point3DCL>("Exp.PosDrop")[1];
+    double x=p[0]-P.get<DROPS::Point3DCL>("Levelset.PosDrop")[0]; double y=p[1]-P.get<DROPS::Point3DCL>("Levelset.PosDrop")[1];
     double r2 = x*x+y*y;
     double r4 = r2*r2;
-    double R=P.get<DROPS::Point3DCL>("Exp.RadDrop")[0];
+    double R=P.get<DROPS::Point3DCL>("Levelset.RadDrop")[0];
     static bool test=true;
     if(test) { std::cout << "R = " << R << std::endl; test=false;}
     double R2 = R*R;
@@ -212,10 +207,10 @@ template<int i>
 double cylinderdistance( const DROPS::Point3DCL& p, double)
 {
     extern DROPS::ParamCL P;
-    double x=p[0]-P.get<DROPS::Point3DCL>("Exp.PosDrop")[0];
-    double y=p[1]-P.get<DROPS::Point3DCL>("Exp.PosDrop")[1];
-    double z=p[2]-P.get<DROPS::Point3DCL>("Exp.PosDrop")[2];
-    double R=P.get<DROPS::Point3DCL>("Exp.RadDrop")[i];
+    double x=p[0]-P.get<DROPS::Point3DCL>("Levelset.PosDrop")[0];
+    double y=p[1]-P.get<DROPS::Point3DCL>("Levelset.PosDrop")[1];
+    double z=p[2]-P.get<DROPS::Point3DCL>("Levelset.PosDrop")[2];
+    double R=P.get<DROPS::Point3DCL>("Levelset.RadDrop")[i];
     if (i == 0)
         return std::sqrt(std::abs(y*y+z*z)) - R;
     if (i == 1)
@@ -228,7 +223,7 @@ template<int i>
 double planedistance( const DROPS::Point3DCL& p, double)
 {
     extern DROPS::ParamCL P;
-    double x=p[i]-P.get<DROPS::Point3DCL>("Exp.PosDrop")[i];
+    double x=p[i]-P.get<DROPS::Point3DCL>("Levelset.PosDrop")[i];
     return x;
 }
 
@@ -268,8 +263,8 @@ double TwoEllipsoid (const DROPS::Point3DCL& p, double)
 double GrowingCylinder (const DROPS::Point3DCL& p, double)
 {
 	extern DROPS::ParamCL P;
-	DROPS::Point3DCL pos = P.get<DROPS::Point3DCL>("Exp.PosDrop");
-	DROPS::Point3DCL rad = P.get<double>("Exp.GrowDrop")*P.get<DROPS::Point3DCL>("Exp.RadDrop");
+	DROPS::Point3DCL pos = P.get<DROPS::Point3DCL>("Levelset.PosDrop");
+	DROPS::Point3DCL rad = P.get<double>("Exp.GrowDrop")*P.get<DROPS::Point3DCL>("Levelset.RadDrop");
 	DROPS::Point3DCL d = p - pos;
 	const double avgRad= sqrt(rad[0]*rad[1]);
 	//d/= rad;
@@ -283,8 +278,8 @@ double GrowingCylinder (const DROPS::Point3DCL& p, double)
 double GrowingEllipsoid (const DROPS::Point3DCL& p, double)
 {
 	extern DROPS::ParamCL P;
-	DROPS::Point3DCL pos = P.get<DROPS::Point3DCL>("Exp.PosDrop");
-	DROPS::Point3DCL rad = P.get<double>("Exp.GrowDrop")*P.get<DROPS::Point3DCL>("Exp.RadDrop");
+	DROPS::Point3DCL pos = P.get<DROPS::Point3DCL>("Levelset.PosDrop");
+	DROPS::Point3DCL rad = P.get<double>("Exp.GrowDrop")*P.get<DROPS::Point3DCL>("Levelset.RadDrop");
 	DROPS::Point3DCL d = p - pos;
 	const double avgRad= cbrt(rad[0]*rad[1]*rad[2]);
 	d/= rad;
@@ -297,8 +292,8 @@ double GrowingEllipsoid (const DROPS::Point3DCL& p, double)
 double SimpleEllipsoid (const DROPS::Point3DCL& p, double)
 {
 	extern DROPS::ParamCL P;
-	DROPS::Point3DCL pos = P.get<DROPS::Point3DCL>("Exp.PosDrop");
-	DROPS::Point3DCL rad = P.get<DROPS::Point3DCL>("Exp.RadDrop");
+	DROPS::Point3DCL pos = P.get<DROPS::Point3DCL>("Levelset.PosDrop");
+	DROPS::Point3DCL rad = P.get<DROPS::Point3DCL>("Levelset.RadDrop");
 	DROPS::Point3DCL d = p - pos;
 	const double avgRad= cbrt(rad[0]*rad[1]*rad[2]);
 	d/= rad;
@@ -311,8 +306,8 @@ double SimpleEllipsoid (const DROPS::Point3DCL& p, double)
 double TubeEll (const DROPS::Point3DCL& p, double)
 {
 	extern DROPS::ParamCL P;
-	static DROPS::Point3DCL pos = P.get<DROPS::Point3DCL>("Exp.PosDrop");
-	static DROPS::Point3DCL rad = P.get<DROPS::Point3DCL>("Exp.RadDrop");
+	static DROPS::Point3DCL pos = P.get<DROPS::Point3DCL>("Levelset.PosDrop");
+	static DROPS::Point3DCL rad = P.get<DROPS::Point3DCL>("Levelset.RadDrop");
 	DROPS::Point3DCL d = p - pos;
 	const double avgRad= cbrt(rad[0]*rad[1]*rad[2]);
 	d/= rad;
@@ -327,7 +322,7 @@ double Tube (const DROPS::Point3DCL& p, double)
 	extern DROPS::ParamCL P;
 	DROPS::Point3DCL ellp = p;
 	DROPS::Point3DCL ellp2 = p;
-	static DROPS::Point3DCL pos = P.get<DROPS::Point3DCL>("Exp.PosDrop");
+	static DROPS::Point3DCL pos = P.get<DROPS::Point3DCL>("Levelset.PosDrop");
 	ellp -= pos;
 	if (std::abs(ellp[i]) <= 0.5)
 		return cylinderdistance<i>(p, 0.0);
@@ -367,7 +362,6 @@ static DROPS::RegisterScalarFunction regsca_iniprokert("IniProkertII", Prokert_I
 static DROPS::RegisterScalarFunction regsca_inicpos("IniCposFct", Initialcpos);
 static DROPS::RegisterScalarFunction regsca_reaction("ReactionFct", Reaction);
 static DROPS::RegisterScalarFunction regsca_zero("ZeroFct", ZeroFct);
-static DROPS::RegisterScalarFunction regsca_tidzero("ZeroFct", tid_ZeroFct);
 static DROPS::RegisterScalarFunction regsca_Rhs("Rhs", Rhs);
 static DROPS::RegisterScalarFunction regsca_dir("Dirichlet", DirichletPos);
 static DROPS::RegisterScalarFunction regsca_sinx("Sinx", Sinx);

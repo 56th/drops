@@ -97,7 +97,7 @@ void SetupSystem2_P2P1( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& coeff,
     TetraAccumulatorTupleCL accus;
     MaybeAddProgressBar(MG, "System2(P2P1) Setup", accus, RowIdx->TriangLevel());
     accus.push_back( &accu);
-    accumulate( accus, MG, RowIdx->TriangLevel(), RowIdx->GetMatchingFunction(), RowIdx->GetBndInfo());
+    accumulate( accus, MG, RowIdx->TriangLevel(), RowIdx->GetBndInfo());
 }
 
 
@@ -324,7 +324,7 @@ void SetupSystem2_P2P1X( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& coeff
     TetraAccumulatorTupleCL accus;
     MaybeAddProgressBar(MG, "System2(P2P1X) Setup", accus, RowIdx->TriangLevel());
     accus.push_back( &p1x_accu);
-    accumulate( accus, MG, RowIdx->TriangLevel(), RowIdx->GetMatchingFunction(), RowIdx->GetBndInfo());
+    accumulate( accus, MG, RowIdx->TriangLevel(), RowIdx->GetBndInfo());
 }
 
 inline void ComputePgradV( LocalP2CL<Point3DCL>& PgradV, Uint pr, const Quad2CL<Point3DCL>& gradV)
@@ -2089,15 +2089,15 @@ void SetupPrStiff_P1D( const MultiGridCL& MG, const TwoPhaseFlowCoeffCL& Coeff, 
 // Create numbering
 // ----------------
 
-void InstatStokes2PhaseP2P1CL::CreateNumberingVel( Uint level, MLIdxDescCL* idx, match_fun match, const LevelsetP2CL* lsetp)
+void InstatStokes2PhaseP2P1CL::CreateNumberingVel( Uint level, MLIdxDescCL* idx, const LevelsetP2CL* lsetp)
 {
-    idx->CreateNumbering( level, MG_, BndData_.Vel, match, lsetp ? &(lsetp->Phi) : 0, lsetp ? &(lsetp->GetBndData()) : 0);
+    idx->CreateNumbering( level, MG_, BndData_.Vel, lsetp ? &(lsetp->Phi) : 0, lsetp ? &(lsetp->GetBndData()) : 0);
 }
 
 
-void InstatStokes2PhaseP2P1CL::CreateNumberingPr ( Uint level, MLIdxDescCL* idx, match_fun match, const LevelsetP2CL* lsetp)
+void InstatStokes2PhaseP2P1CL::CreateNumberingPr ( Uint level, MLIdxDescCL* idx, const LevelsetP2CL* lsetp)
 {
-    idx->CreateNumbering( level, MG_, BndData_.Pr, match, lsetp ? &(lsetp->Phi) : 0, lsetp ? &(lsetp->GetBndData()) : 0);
+    idx->CreateNumbering( level, MG_, BndData_.Pr, lsetp ? &(lsetp->Phi) : 0, lsetp ? &(lsetp->GetBndData()) : 0);
 }
 
 
@@ -3452,7 +3452,7 @@ void SetupSystem1_P2( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_,
     System1Accumulator_P2CL accu( Coeff_, BndData_, lset_phi, lset_bnd, RowIdx, A, M, b, cplA, cplM, t);
     TetraAccumulatorTupleCL accus;
     MaybeAddProgressBar(MG_, "System1(P2) Setup", accus, RowIdx.TriangLevel());    accus.push_back( &accu);
-    accumulate( accus, MG_, RowIdx.TriangLevel(), RowIdx.GetMatchingFunction(), RowIdx.GetBndInfo());
+    accumulate( accus, MG_, RowIdx.TriangLevel(), RowIdx.GetBndInfo());
     // time.Stop();
     // std::cout << "setup: " << time.GetTime() << " seconds" << std::endl;
 }
@@ -3469,7 +3469,7 @@ void SetupSystem1_P2X( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_
     TetraAccumulatorTupleCL accus;
     MaybeAddProgressBar(MG_, "System1(P2X) Setup", accus, RowIdx.TriangLevel());
     accus.push_back( &accu);
-    accumulate( accus, MG_, RowIdx.TriangLevel(), RowIdx.GetMatchingFunction(), RowIdx.GetBndInfo());
+    accumulate( accus, MG_, RowIdx.TriangLevel(), RowIdx.GetBndInfo());
     // time.Stop();
     // std::cout << "setup: " << time.GetTime() << " seconds" << std::endl;
 }
@@ -4061,7 +4061,7 @@ void SetupCplM_P2( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_, co
     TetraAccumulatorTupleCL accus;
     MaybeAddProgressBar(MG_, "CplM(P2) Setup", accus, cplM->RowIdx->TriangLevel());
     accus.push_back( &accu);
-    accumulate( accus, MG_, cplM->RowIdx->TriangLevel(), cplM->RowIdx->GetMatchingFunction(), cplM->RowIdx->GetBndInfo() );
+    accumulate( accus, MG_, cplM->RowIdx->TriangLevel(), cplM->RowIdx->GetBndInfo() );
 }
 
 void InstatStokes2PhaseP2P1CL::SetupCplM(VecDescCL *cplM, const LevelsetP2CL &lset, double t) const
@@ -4080,7 +4080,7 @@ void SetupAdotU_P2( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_, c
     TetraAccumulatorTupleCL accus;
     MaybeAddProgressBar(MG_, "AdotU(P2) Setup", accus, cplA->RowIdx->TriangLevel());
     accus.push_back( &accu);
-    accumulate( accus, MG_, cplA->RowIdx->TriangLevel(), cplA->RowIdx->GetMatchingFunction(), cplA->RowIdx->GetBndInfo() );
+    accumulate( accus, MG_, cplA->RowIdx->TriangLevel(), cplA->RowIdx->GetBndInfo() );
 }
 
 void InstatStokes2PhaseP2P1CL::SetupAdotU(VecDescCL *cplA, const VecDescCL &un, const LevelsetP2CL &lset, double t) const
@@ -4296,7 +4296,7 @@ void SetupLB_P2( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_, cons
     TetraAccumulatorTupleCL accus;
     MaybeAddProgressBar(MG_, "LapBeltr(P2) Setup", accus, RowIdx.TriangLevel());
     accus.push_back( &accu);
-    accumulate( accus, MG_, RowIdx.TriangLevel(), RowIdx.GetMatchingFunction(), RowIdx.GetBndInfo());
+    accumulate( accus, MG_, RowIdx.TriangLevel(), RowIdx.GetBndInfo());
 }
 
 
@@ -4645,7 +4645,7 @@ void SetupBS_P2( const MultiGridCL& MG_, const TwoPhaseFlowCoeffCL& Coeff_, cons
      TetraAccumulatorTupleCL accus;
      MaybeAddProgressBar(MG_, "BousScri(P2) Setup", accus, RowIdx.TriangLevel());
      accus.push_back( &accu);
-     accumulate( accus, MG_, RowIdx.TriangLevel(), RowIdx.GetMatchingFunction(), RowIdx.GetBndInfo());
+     accumulate( accus, MG_, RowIdx.TriangLevel(), RowIdx.GetBndInfo());
 }
 
 void InstatStokes2PhaseP2P1CL::SetupBS (MLMatDescCL* A, VecDescCL* cplA, const LevelsetP2CL& lset, double t) const
@@ -4749,19 +4749,21 @@ InstatStokes2PhaseP2P1CL::system2_accu (MLTetraAccumulatorTupleCL& accus, MLMatD
 
 void InstatStokes2PhaseP2P1CL::AccumulateYoungForce( const LevelsetP2CL& lset, VecDescCL& f) const
 {
+    if (!SurfTension_) ///\todo to be removed after surface tension data and accumulation has been completely moved from LevelsetP2CL to InstatStokes2PhaseP2P1CL
+        return;
     ScopeTimerCL scope("AccumulateYoungForce");
     TetraAccumulatorCL *accu;
-    switch (SurfForceType_)
+    switch (lset.GetSurfaceForce() )
     {
       case SF_ImprovedLBVar:
-          accu= new ImprovedYoungForceAccumulatorCL( lset, BndData_.Vel, f, SurfTension_->GetSigma()(std_basis<3>(0), 0.), CtAngleFnc_, BndOutNormal_); 
+          accu= new ImprovedYoungForceAccumulatorCL( lset, BndData_.Vel, f, SurfTension_->GetSigma()(std_basis<3>(0), 0.), CtAngleFnc_, BndOutNormal_);
           break;
       default:
-          throw DROPSErrCL("InstatStokes2PhaseP2P1CL::AccumulateYoungForce not implemented for non-constant surface tension");
+          throw DROPSErrCL("InstatStokes2PhaseP2P1CL::AccumulateYoungForce not implemented for this type of surface tension");
     }
     TetraAccumulatorTupleCL accus;
     accus.push_back( accu);
-    accumulate( accus, MG_, lset.Phi.RowIdx->TriangLevel(), lset.Phi.RowIdx->GetMatchingFunction(), lset.Phi.RowIdx->GetBndInfo());
+    accumulate( accus, MG_, lset.Phi.RowIdx->TriangLevel(), lset.Phi.RowIdx->GetBndInfo());
     delete accu;
 }
 
@@ -4883,9 +4885,8 @@ void InstatStokes2PhaseP2P1CL::SetIdx()
 
 void InstatStokes2PhaseP2P1CL::SetNumVelLvl( size_t n)
 {
-    match_fun match= MG_.GetBnd().GetMatchFun();
     const double bound = vel_idx.GetFinest().GetXidx().GetBound();
-    vel_idx.resize( n, GetVelFE(), BndData_.Vel, match, bound);
+    vel_idx.resize( n, GetVelFE(), BndData_.Vel, bound);
     A.Data.resize   (vel_idx.size());
     M.Data.resize   (vel_idx.size());
 }
@@ -4893,9 +4894,8 @@ void InstatStokes2PhaseP2P1CL::SetNumVelLvl( size_t n)
 
 void InstatStokes2PhaseP2P1CL::SetNumPrLvl( size_t n)
 {
-    match_fun match= MG_.GetBnd().GetMatchFun();
     const double bound = pr_idx.GetFinest().GetXidx().GetBound();
-    pr_idx.resize( n, GetPrFE(),  BndData_.Pr, match, bound);
+    pr_idx.resize( n, GetPrFE(),  BndData_.Pr, bound);
     B.Data.resize   (pr_idx.size());
     C.Data.resize   (pr_idx.size());
     prM.Data.resize (pr_idx.size());

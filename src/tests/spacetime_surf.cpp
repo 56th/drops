@@ -287,7 +287,7 @@ double Run (int numref, int numsteps, int subdivspace, int subdivtime)
           MaybeAddProgressBar(mg, "Surface integration", accus, -1);
           accus.push_back(&accu);
           // std::cout << " accumulate " << std::endl;
-          accumulate( accus, mg, lset_old.idx.TriangLevel(), lset_old.idx.GetMatchingFunction(), lset_old.idx.GetBndInfo());
+          accumulate( accus, mg, lset_old.idx.TriangLevel(), lset_old.idx.GetBndInfo());
           // getchar();
           ret += tmp;
 

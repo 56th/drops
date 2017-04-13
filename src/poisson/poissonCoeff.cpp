@@ -48,28 +48,15 @@ double NeuConst( const DROPS::Point3DCL& , double ) { return std::pow(-1.,sel)*4
 template<int sel>
 double NeuExp( const DROPS::Point3DCL& p, double t) { return std::pow(-1.,sel)*std::exp(t)*std::exp(p[0]+p[1]+p[2]); }
 
-/// boundary description of a neumann problem
+/// boundary description of a Neumann problem
 // uses polynomial function
 double NeuPoly( const DROPS::Point3DCL& p, double ) { return -64.0*p[0]*p[1]*(1.0-p[0])*(1.0-p[1]);}
 
 /// \brief Nusselt velocity profile for flat film
 DROPS::Point3DCL Nusselt(const DROPS::TetraCL& tet, const DROPS::BaryCoordCL& b, double)
 {
-    static bool first = true;
-    static double dx, dy;
-    static double Rho, Mu;   //density, viscosity
-    //dirty hack
-    if (first) {
-        std::string mesh( P.get<std::string>("DomainCond.MeshFile")), delim("x@");
-        size_t idx_;
-        while ((idx_= mesh.find_first_of( delim)) != std::string::npos )
-            mesh[idx_]= ' ';
-        std::istringstream brick_info( mesh);
-        brick_info >> dx >> dy;
-        Rho = P.get<double>("Exp.Rho");
-        Mu  = P.get<double>("Exp.Mu");
-        first = false;
-    }
+    static double dy= norm( P.get<DROPS::Point3DCL>("Mesh.E2"));
+    static double Rho= P.get<double>("Exp.Rho"), Mu= P.get<double>("Exp.Mu");   //density, viscosity
 
     DROPS::Point3DCL ret;
     const double d= DROPS::GetWorldCoord(tet,b)[1]/dy,
@@ -271,12 +258,12 @@ static DROPS::RegisterVectorTetraFunction regvecnus("Nusselt", Nusselt);
     /// \brief Solution
     double Solution( const DROPS::Point3DCL& p, double)
     {
-        double D = P.get<double>("PoissonCoeff.Diffusion");
+        double D = P.get<double>("Poisson.Coeff.Diffusion");
         return p[0] - (1 - exp(p[0]/D))/(1 - exp(1./D));
     }
     double tetraSolution(const DROPS::TetraCL& tet, const DROPS::BaryCoordCL& b, double) {
         const DROPS::Point3DCL p= DROPS::GetWorldCoord( tet, b);
-        double D = P.get<double>("PoissonCoeff.Diffusion");
+        double D = P.get<double>("Poisson.Coeff.Diffusion");
         return p[0] - (1 - exp(p[0]/D))/(1 - exp(1./D));
     }
     static DROPS::RegisterScalarTetraFunction regscaq("SUPG_Reaction",     Reaction    );
@@ -310,13 +297,8 @@ static DROPS::RegisterVectorTetraFunction regvecnus("Nusselt", Nusselt);
     double Source(const DROPS::TetraCL& tet, const DROPS::BaryCoordCL& b, double t) {
     // 1 - (1 + D)e^(-t-y)
         const DROPS::Point3DCL p= DROPS::GetWorldCoord( tet, b);
-        static bool first = true;
         //alpha to control diffusion parameter
-        static double alpha;
-        if (first) {
-            alpha= P.get<double>("PoissonCoeff.Diffusion");
-            first= false;
-        }
+        static double alpha= P.get<double>("Poisson.Coeff.Diffusion");
         double ret=0.;
         ret = 1. - (1 + alpha) * exp(-t-p[1]);
         return ret;
@@ -324,24 +306,14 @@ static DROPS::RegisterVectorTetraFunction regvecnus("Nusselt", Nusselt);
     /// \brief Solution
     double Solution( const DROPS::Point3DCL& p, double t)
     {
-        static bool first = true;
         //alpha to control diffusion parameter
-        static double alpha;
-        if (first) {
-            alpha = P.get<double>("PoissonCoeff.Diffusion");
-            first=false;
-        }
+        static double alpha= P.get<double>("Poisson.Coeff.Diffusion");
         return exp(-t-p[1]) + p[0] - (1 - exp(p[0]/alpha))/(1 - exp(1./alpha));
     }
     double tetraSolution(const DROPS::TetraCL& tet, const DROPS::BaryCoordCL& b, double t) {
         const DROPS::Point3DCL p= DROPS::GetWorldCoord( tet, b);
-        static bool first = true;
         //alpha to control diffusion parameter
-        static double alpha;
-        if (first) {
-            alpha = P.get<double>("PoissonCoeff.Diffusion");
-            first=false;
-        }
+        static double alpha= P.get<double>("Poisson.Coeff.Diffusion");
         return exp(-t-p[1]) + p[0] - (1 - exp(p[0]/alpha))/(1 - exp(1./alpha));
     }
     static DROPS::RegisterScalarTetraFunction regscaq("instatSUPG_Reaction",     Reaction    );
@@ -467,13 +439,8 @@ static DROPS::RegisterVectorTetraFunction regvecnus("Nusselt", Nusselt);
     }
     /// \brief Right-hand side
     double Source(const DROPS::TetraCL& tet, const DROPS::BaryCoordCL& bary, double t) {
-        static bool first = true;
         //alpha to control diffusion parameter, you could change a small number to make problem convection-dominated
-        static double alpha;
-        if (first) {
-            alpha= P.get<double>("PoissonCoeff.Diffusion");
-            first= false;
-        }
+        static double alpha= P.get<double>("Poisson.Coeff.Diffusion");
         DROPS::Point3DCL p = DROPS::GetWorldCoord( tet, bary);
         DROPS::Point3DCL ref = TransBack(p, t);
         double b= Grady(ref,t);
@@ -590,13 +557,8 @@ static DROPS::RegisterVectorTetraFunction regvecnus("Nusselt", Nusselt);
     }
     /// \brief Right-hand side
     double Source(const DROPS::TetraCL& tet, const DROPS::BaryCoordCL& bary, double t) {
-        static bool first = true;
         //alpha to control diffusion parameter, you could change a small number to make problem convection-dominated
-        static double alpha;
-        if(first){
-        alpha = P.get<double>("PoissonCoeff.Diffusion");
-        first=false;
-        }
+        static double alpha= P.get<double>("Poisson.Coeff.Diffusion");
         DROPS::Point3DCL ref = DROPS::GetRefCoord(tet, bary);
         double a= Gradx(ref,t);
         double b= Grady(ref,t);
@@ -691,13 +653,8 @@ static DROPS::RegisterVectorTetraFunction regvecnus("Nusselt", Nusselt);
     }
     /// \brief Right-hand side
     double Source(const DROPS::TetraCL& tet, const DROPS::BaryCoordCL& bary, double t) {
-        static bool first = true;
         //alpha to control diffusion parameter, you could change a small number to make problem convection-dominated
-        static double alpha;
-        if(first){
-        alpha = P.get<double>("PoissonCoeff.Diffusion");
-        first=false;
-        }
+        static double alpha= P.get<double>("Poisson.Coeff.Diffusion");
         DROPS::Point3DCL p = DROPS::GetWorldCoord( tet, bary);
         DROPS::Point3DCL ref = TransBack(p, t);
         double b= Grady(ref,t);

@@ -16,7 +16,7 @@ exec_par(dist_interface geom-simplex geom-multigrid geom-builder geom-topo geom-
 
 exec_par(dist_ref geom-simplex geom-multigrid geom-builder geom-topo geom-boundary num-unknowns misc-utils misc-problem num-discretize out-vtkOut parallel-parmultigrid num-fe num-interfacePatch levelset-levelset levelset-fastmarch levelset-surfacetension geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature misc-scopetimer geom-deformation)
 
-exec_par(dist_migration geom-simplex geom-multigrid geom-builder geom-topo geom-boundary num-unknowns misc-utils misc-problem num-discretize out-vtkOut parallel-parmultigrid num-fe num-interfacePatch levelset-levelset levelset-fastmarch levelset-surfacetension geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature misc-funcmap stokes-instatstokes2phase misc-scopetimer geom-deformation misc-dynamicload)
+exec_par(dist_migration geom-simplex geom-multigrid geom-builder geom-topo geom-boundary num-unknowns misc-utils misc-problem num-discretize out-vtkOut parallel-parmultigrid num-fe num-interfacePatch levelset-levelset levelset-fastmarch levelset-surfacetension geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature misc-funcmap stokes-instatstokes2phase stokes-slipBndOnePhase misc-scopetimer geom-deformation misc-dynamicload)
 if (MPI)
   add_dependencies(dist_migration misc-scalarFunctions misc-vectorFunctions)
 endif (MPI)

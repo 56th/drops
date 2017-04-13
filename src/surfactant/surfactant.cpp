@@ -40,7 +40,7 @@ std::string ensf; // basename of the ensight files
 
 DROPS::Point3DCL u_func (const DROPS::Point3DCL&, double)
 {
-    return P.get<DROPS::Point3DCL>("Exp.Velocity");
+    return P.get<DROPS::Point3DCL>("Flow.Velocity");
 }
 
 typedef DROPS::Point3DCL (*bnd_val_fun) (const DROPS::Point3DCL&, double);
@@ -57,18 +57,18 @@ bnd_val_fun bf[6]= {
 
 double sphere_2 (const DROPS::Point3DCL& p, double)
 {
-    DROPS::Point3DCL x( p - P.get<DROPS::Point3DCL>("Exp.PosDrop"));
+    DROPS::Point3DCL x( p - P.get<DROPS::Point3DCL>("Levelset.PosDrop"));
 
-    return x.norm() - P.get<DROPS::Point3DCL>("Exp.RadDrop")[0];
+    return x.norm() - P.get<DROPS::Point3DCL>("Levelset.RadDrop")[0];
 }
 
 typedef double (*dist_funT) (const DROPS::Point3DCL&, double);
 
 double sphere_2move (const DROPS::Point3DCL& p, double t)
 {
-    DROPS::Point3DCL x( p - (P.get<DROPS::Point3DCL>("Exp.PosDrop") + t*u_func(p, t)));
+    DROPS::Point3DCL x( p - (P.get<DROPS::Point3DCL>("Levelset.PosDrop") + t*u_func(p, t)));
 
-    return x.norm() - P.get<DROPS::Point3DCL>("Exp.RadDrop")[0];
+    return x.norm() - P.get<DROPS::Point3DCL>("Levelset.RadDrop")[0];
 }
 
 
@@ -88,7 +88,7 @@ double sol0 (const DROPS::Point3DCL& p, double)
 
 double sol0t (const DROPS::Point3DCL& p, double t)
 {
-    const Point3DCL q( p - (P.get<DROPS::Point3DCL>("Exp.PosDrop") + t*u_func(p, t)));
+    const Point3DCL q( p - (P.get<DROPS::Point3DCL>("Levelset.PosDrop") + t*u_func(p, t)));
     const double val( a*(3.*q[0]*q[0]*q[1] - q[1]*q[1]*q[1]));
 
 //    return q.norm_sq()/(12. + q.norm_sq())*val;
@@ -224,9 +224,10 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     VecDescCL v( &vidx);
     InitVel( mg, &v, Bnd_v, u_func, 0.);
 
-    lset2.SetupSystem( make_P2Eval( mg, Bnd_v, v), P.get<double>("Time.StepSize"));
+    const double dt= P.get<double>("Time.FinalTime")/P.get<int>("Time.NumSteps");
+    lset2.SetupSystem( make_P2Eval( mg, Bnd_v, v), dt);
 
-    SurfactantcGP1CL timedisc( mg, Bnd_v, P.get<double>("SurfTransp.Theta"), P.get<double>("SurfTransp.Visc"), &v, lset.Phi, lset.GetBndData(), P.get<double>("Time.StepSize"), P.get<int>("SurfTransp.Iter"), P.get<double>("SurfTransp.Tol"), P.get<double>("SurfTransp.OmitBound"));
+    SurfactantcGP1CL timedisc( mg, Bnd_v, P.get<double>("Time.Theta"), P.get<double>("SurfTransp.Visc"), &v, lset.Phi, lset.GetBndData(), dt, P.get<int>("SurfTransp.Solver.Iter"), P.get<double>("SurfTransp.Solver.Tol"), P.get<double>("SurfTransp.XFEMReduced"));
 
     LevelsetRepairCL lsetrepair( lset);
     adap.push_back( &lsetrepair);
@@ -249,7 +250,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     ensight.Register( make_Ensight6Scalar( ScalarFunAsP2EvalCL( sol0t, 0., &mg), "TrueSol",      ensf + ".sol", true));
     ensight.Write( 0.);
 
-    // timedisc.SetTimeStep( P.get<double>("Time.StepSize"), P.get<double>("SurfTransp.Theta"));
+    // timedisc.SetTimeStep( dt, P.get<double>("Time.Theta"));
 //    std::cout << "L_2-error: " << L2_error( mg, lset.Phi, timedisc.GetSolution(), &sol0t, 0.)
 //              << " norm of true solution: " << L2_norm( mg, lset.Phi, &sol0t, 0.)
 //              << std::endl;
@@ -257,23 +258,24 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     std::cerr << "initial surfactant on \\Gamma: " << Integral_Gamma( mg, lset.Phi, lset.GetBndData(), make_P1Eval(  mg, ifbnd, timedisc.ic)) << '\n';
 
     typedef DistMarkingStrategyCL MarkerT;
-    MarkerT marker( lset, P.get<double>( "AdaptRef.Width" ),
-                    0, P.get<int>( "AdaptRef.FinestLevel" ) );
+    MarkerT marker( lset, P.get<double>( "Mesh.AdaptRef.Width" ),
+                    0, P.get<int>( "Mesh.AdaptRef.FinestLevel" ) );
 
     adap.set_marking_strategy( &marker );
     for (int step= 1; step <= P.get<int>("Time.NumSteps"); ++step) {
         std::cout << "======================================================== step " << step << ":\n";
 
+        const double t= step*dt;
         timedisc.InitOld();
-        LSInit( mg, lset.Phi, &sphere_2move, step*P.get<double>("Time.StepSize"));
-        timedisc.DoStep( step*P.get<double>("Time.StepSize"));
+        LSInit( mg, lset.Phi, &sphere_2move, t);
+        timedisc.DoStep( t);
         std::cerr << "surfactant on \\Gamma: " << Integral_Gamma( mg, lset.Phi, lset.GetBndData(), make_P1Eval(  mg, ifbnd, timedisc.ic)) << '\n';
 
         //lset2.DoStep();
 //        VectorCL rhs( lset2.Phi.Data.size());
 //        lset2.ComputeRhs( rhs);
-//        lset2.SetupSystem( make_P2Eval( mg, Bnd_v, v, step*P.get<double>("Time.StepSize")));
-//        lset2.SetTimeStep( P.get<double>("Time.StepSize"));
+//        lset2.SetupSystem( make_P2Eval( mg, Bnd_v, v, t));
+//        lset2.SetTimeStep( dt);
 //        lset2.DoStep( rhs);
 
         std::cout << "rel. Volume: " << lset.GetVolume()/Vol << std::endl;
@@ -283,17 +285,17 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
         }
         //if (C.rpm_Freq && step%C.rpm_Freq==0) { // reparam levelset function
             // lset.ReparamFastMarching( C.rpm_Method);
-        if (P.get("AdaptRef.Freq", 0) != 0 && step%P.get("AdaptRef.Freq", 0) == 0) {
-            if (P.get("AdaptRef.Freq", 0) != 0) {
+        if (P.get("Mesh.AdaptRef.Freq", 0) != 0 && step%P.get("Mesh.AdaptRef.Freq", 0) == 0) {
+            if (P.get("Mesh.AdaptRef.Freq", 0) != 0) {
                 adap.UpdateTriang();
                 vidx.DeleteNumbering( mg);
                 vidx.CreateNumbering( mg.GetLastLevel(), mg, Bnd_v);
                 v.SetIdx( &vidx);
-                InitVel( mg, &v, Bnd_v, u_func, step*P.get<double>("Time.StepSize"));
-                LSInit( mg, lset.Phi, &sphere_2move, step*P.get<double>("Time.StepSize"));
+                InitVel( mg, &v, Bnd_v, u_func, t);
+                LSInit( mg, lset.Phi, &sphere_2move, t);
                 timedisc.Update();
 
-                lset2.SetupSystem( make_P2Eval( mg, Bnd_v, v), P.get<double>("Time.StepSize"));
+                lset2.SetupSystem( make_P2Eval( mg, Bnd_v, v), dt);
             }
             std::cout << "rel. Volume: " << lset.GetVolume()/Vol << std::endl;
             if (P.get("Levelset.VolCorr", 0)) {
@@ -301,9 +303,9 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
                 lset.GetVolumeAdjuster()->DebugOutput( std::cout);
             }
         }
-        ensight.Write( step*P.get<double>("Time.StepSize"));
-//        std::cout << "L_2-error: " << L2_error( mg, lset.Phi, timedisc.GetSolution(), &sol0t, step*P.get<double>("Time.StepSize"))
-//                  << " norm of true solution: " << L2_norm( mg, lset.Phi, &sol0t, step*P.get<double>("Time.StepSize"))
+        ensight.Write( t);
+//        std::cout << "L_2-error: " << L2_error( mg, lset.Phi, timedisc.GetSolution(), &sol0t, t)
+//                  << " norm of true solution: " << L2_norm( mg, lset.Phi, &sol0t, t)
 //                  << std::endl;
     }
     std::cout << std::endl;
@@ -320,19 +322,19 @@ int main (int argc, char* argv[])
 
     DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
 
-    ensf= P.get<std::string>("EnsightDir") + "/" + P.get<std::string>("EnsightCase"); // basename of the ensight files
+    ensf= P.get<std::string>("Ensight.EnsDir") + "/" + P.get<std::string>("Ensight.EnsCase"); // basename of the ensight files
 
     std::cout << "Setting up interface-PDE:\n";
     DROPS::BrickBuilderCL brick( DROPS::MakePoint3D( -2., -2., -2.),
                                  4.*DROPS::std_basis<3>( 1),
                                  4.*DROPS::std_basis<3>( 2),
                                  4.*DROPS::std_basis<3>( 3),
-                                 P.get<int>("InitialDivisions"), P.get<int>("InitialDivisions"), P.get<int>("InitialDivisions"));
+                                 P.get<int>("Mesh.InitialDivisions"), P.get<int>("Mesh.InitialDivisions"), P.get<int>("Mesh.InitialDivisions"));
     DROPS::MultiGridCL mg( brick);
     DROPS::AdapTriangCL adap( mg );
 
     typedef DROPS::DistMarkingStrategyCL InitMarkerT;
-    InitMarkerT initmarker( sphere_2, P.get<double>("AdaptRef.Width"), 0, P.get<int>("AdaptRef.FinestLevel") );
+    InitMarkerT initmarker( sphere_2, P.get<double>("Mesh.AdaptRef.Width"), 0, P.get<int>("Mesh.AdaptRef.FinestLevel") );
     adap.set_marking_strategy( &initmarker );
     adap.MakeInitialTriang();
     adap.set_marking_strategy( 0 );
@@ -350,8 +352,8 @@ int main (int argc, char* argv[])
 //    lset.Init( &sphere_2);
 
     // Initialize Ensight6 output
-    std::string ensf( P.get<std::string>("EnsightDir") + "/" + P.get<std::string>("EnsightCase"));
-    Ensight6OutCL ensight( P.get<std::string>("EnsightCase") + ".case", P.get<int>("Time.NumSteps") + 1);
+    std::string ensf( P.get<std::string>("Ensight.EnsDir") + "/" + P.get<std::string>("Ensight.EnsCase"));
+    Ensight6OutCL ensight( P.get<std::string>("Ensight.EnsCase") + ".case", P.get<int>("Time.NumSteps") + 1);
     // ensight.Register( make_Ensight6Geom      ( mg, mg.GetLastLevel(),   "Geometrie",     ensf + ".geo", true));
     ensight.Register( make_Ensight6Geom      ( mg, mg.GetLastLevel(),   "Geometrie",     ensf + ".geo", false));
     ensight.Register( make_Ensight6Scalar    ( lset.GetSolution(),      "Levelset",      ensf + ".scl", true));
@@ -362,7 +364,7 @@ int main (int argc, char* argv[])
     }
 
     DROPS::IdxDescCL ifaceidx( P1IF_FE);
-    ifaceidx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
+    ifaceidx.GetXidx().SetBound( P.get<double>("SurfTransp.XFEMReduced"));
     ifaceidx.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
     std::cout << "NumUnknowns: " << ifaceidx.NumUnknowns() << std::endl;
 
@@ -383,7 +385,7 @@ int main (int argc, char* argv[])
     typedef DROPS::SSORPcCL SurfPcT;
     SurfPcT surfpc;
     typedef DROPS::PCGSolverCL<SurfPcT> SurfSolverT;
-    SurfSolverT surfsolver( surfpc, P.get<int>("SurfTransp.Iter"), P.get<double>("SurfTransp.Tol"), true);
+    SurfSolverT surfsolver( surfpc, P.get<int>("SurfTransp.Solver.Iter"), P.get<double>("SurfTransp.Solver.Tol"), true);
 
     DROPS::VecDescCL x( &ifaceidx);
     surfsolver.Solve( L, x.Data, b.Data, x.RowIdx->GetEx());

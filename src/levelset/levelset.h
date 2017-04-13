@@ -130,8 +130,8 @@ LevelsetP2CL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, F
 
     /// \name Numbering
     ///@{
-    void CreateNumbering( Uint level, match_fun match= 0);
-    void CreateNumbering( Uint level, MLIdxDescCL* idx, match_fun match= 0);
+    void CreateNumbering(Uint level);
+    void CreateNumbering( Uint level, MLIdxDescCL* idx);
     void DeleteNumbering( MLIdxDescCL* idx)
         { idx->DeleteNumbering( MG_); }
     ///@}

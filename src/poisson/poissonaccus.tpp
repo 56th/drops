@@ -32,6 +32,7 @@ class Accumulator_P1CL : public TetraAccumulatorCL
   protected:
     const MultiGridCL& MG_;
     const BndDataCL<> * BndData_;
+    const MeshDeformationCL& md_;
     MatrixCL* Amat_;
     VecDescCL* b_;
     IdxDescCL& RowIdx_;
@@ -112,7 +113,7 @@ void Accumulator_P1CL<Coeff,QuadCL>::update_coupling(const TetraCL& tet)
 template<class Coeff,template <class T=double> class QuadCL>
 Accumulator_P1CL<Coeff,QuadCL>::Accumulator_P1CL(const MultiGridCL& MG, const BndDataCL<> * BndData, MatrixCL* Amat, VecDescCL* b,
         IdxDescCL& RowIdx, IdxDescCL& ColIdx, const double t_):
-        MG_(MG), BndData_(BndData), Amat_(Amat), b_(b), RowIdx_(RowIdx), ColIdx_(ColIdx),
+        MG_(MG), BndData_(BndData), md_(MeshDeformationCL::getInstance()), Amat_(Amat), b_(b), RowIdx_(RowIdx), ColIdx_(ColIdx),
         A_(0),
         lvl(RowIdx.TriangLevel()),
         idx(RowIdx.GetIdx()), t(t_)
@@ -153,6 +154,7 @@ class SourceAccumulator_P1CL : public Accumulator_P1CL<Coeff,QuadCL>
     typedef Accumulator_P1CL<Coeff,QuadCL> base_;
     using                           base_::MG_;
     using                           base_::BndData_;
+    using                           base_::md_;
     using                           base_::Amat_;
     using                           base_::b_;
     using                           base_::RowIdx_;
@@ -208,7 +210,7 @@ void SourceAccumulator_P1CL<Coeff,QuadCL>::local_setup (const TetraCL& tet)
     if(ALE_)
     {
         SMatrixCL<3,3> T;
-        GetTrafoTr(T, det, MG_.GetMeshDeformation().GetLocalP1Deformation(tet));
+        GetTrafoTr(T, det, md_.GetLocalP1Deformation(tet));
         P1DiscCL::GetGradients(G, T);
     }
     
@@ -254,6 +256,7 @@ class StiffnessAccumulator_P1CL : public Accumulator_P1CL<Coeff,QuadCL>
     typedef Accumulator_P1CL<Coeff,QuadCL> base_;
     using                           base_::MG_;
     using                           base_::BndData_;
+    using                           base_::md_;
     using                           base_::Amat_;
     using                           base_::b_;
     using                           base_::RowIdx_;
@@ -302,7 +305,7 @@ void StiffnessAccumulator_P1CL<Coeff,QuadCL>::local_setup (const TetraCL& tet)
     if(ALE_)
     {
         SMatrixCL<3,3> T;
-        GetTrafoTr(T, det, MG_.GetMeshDeformation().GetLocalP1Deformation(tet));
+        GetTrafoTr(T, det, md_.GetLocalP1Deformation(tet));
         P1DiscCL::GetGradients(G, T);
     }
    
@@ -345,6 +348,7 @@ class MassAccumulator_P1CL : public Accumulator_P1CL<Coeff,QuadCL>
     typedef Accumulator_P1CL<Coeff,QuadCL> base_;
     using                           base_::MG_;
     using                           base_::BndData_;
+    using                           base_::md_;
     using                           base_::Amat_;
     using                           base_::b_;
     using                           base_::RowIdx_;
@@ -393,7 +397,7 @@ void MassAccumulator_P1CL<Coeff,QuadCL>::local_setup (const TetraCL& tet)
     if(ALE_)
     {
         SMatrixCL<3,3> T;
-        GetTrafoTr(T, det, MG_.GetMeshDeformation().GetLocalP1Deformation(tet));
+        GetTrafoTr(T, det, md_.GetLocalP1Deformation(tet));
         P1DiscCL::GetGradients(G, T);
     }
 
@@ -429,6 +433,7 @@ class ConvectionAccumulator_P1CL : public Accumulator_P1CL<Coeff,QuadCL>
     typedef Accumulator_P1CL<Coeff,QuadCL> base_;
     using                           base_::MG_;
     using                           base_::BndData_;
+    using                           base_::md_;
     using                           base_::Amat_;
     using                           base_::b_;
     using                           base_::RowIdx_;
@@ -477,7 +482,7 @@ void ConvectionAccumulator_P1CL<Coeff,QuadCL>::local_setup (const TetraCL& sit)
     if(ALE_)
     {
         SMatrixCL<3,3> T;
-        GetTrafoTr(T, det, MG_.GetMeshDeformation().GetLocalP1Deformation(sit));
+        GetTrafoTr(T, det, md_.GetLocalP1Deformation(sit));
         P1DiscCL::GetGradients(G, T);
     }
     
