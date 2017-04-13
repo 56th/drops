@@ -259,7 +259,6 @@ class ParamCL;     // forward declaration for read_BndData below.
 ///
 /// All keys are optional.
 /// The default value can be specified via "Default"; if not set explicitly, it is UndefinedBC_.
-/// The key "PeriodicMatching" sets a matching function for the finite element space.
 /// All other keys are interpreted as boundary-segment indices.
 /// The values have the form ["BndCondT"] or ["BndCondT, "NameOfFunction"]; the second form is obligatory for non-homogeneous boundary values.
 template <class T>

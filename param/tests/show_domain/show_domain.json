@@ -13,7 +13,7 @@
     
     "Mesh": 
     {
-//		"PeriodicBndy": // It is only a convention that this is a subsection of Domain.
+//		"PeriodicBnd": // It is only a convention that this is a subsection of Domain.
 //		{
 //			"PeriodicMatching": "mymatch",
 //			"0": "Per1BC",

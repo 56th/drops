@@ -663,7 +663,7 @@ class ParamCL; // forward declaration for read_PeriodicBoundaries.
 /// The key PeriodicMatching is optional; ommitting it or setting it to the empty string disables periodic matching.
 /// The default for all boundary-segments is OtherBnd.
 /// All other keys are interpreted as boundary-segment indices.
-/// The values have the form "Per1Bnd" or "Per2Bnd".
+/// The values have the form "Per1BC" or "Per2BC".
 void read_PeriodicBoundaries (MultiGridCL& mg, const ParamCL& P);
 
 } // end of namespace DROPS
