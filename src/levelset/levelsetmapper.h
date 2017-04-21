@@ -110,6 +110,7 @@ class QuaQuaMapperCL
     mutable MyLocatorCL locator_;
 
     mutable base_point_newton_cacheCL cache_;
+    QuaQuaMapperFunctionCL* f_;
 
     mutable const TetraCL* tet;
     mutable BaryCoordCL xb;
@@ -125,16 +126,11 @@ class QuaQuaMapperCL
     void base_point_newton () const;
 
   public:
-    QuaQuaMapperCL (const MultiGridCL& mg, VecDescCL& lsarg, const VecDescCL& ls_grad_recarg, TetraToTetrasT* neighborhoods= 0, int maxiter= 100, double tol= 1e-7, bool use_line_search= true, double armijo_c= 1e-4, Uint max_damping_steps= 8)
-        : maxiter_( maxiter), tol_( tol), maxinneriter_( 100), innertol_( 5e-9),
-          use_line_search_( use_line_search), armijo_c_( armijo_c), max_damping_steps_( max_damping_steps),
-          ls( &lsarg, &nobnddata, &mg), ls_grad_rec( &ls_grad_recarg, &nobnddata_vec, &mg),
-          neighborhoods_( neighborhoods), locator_( mg, lsarg.GetLevel(), /*greedy*/ false),
-          cache_( ls, ls_grad_rec, gradrefp2), tet( 0), btet( 0), have_dph( false),
-          num_outer_iter( maxiter + 1), num_inner_iter( maxinneriter_ + 1),
-          base_point_time( 0.), locate_new_point_time( 0.), cur_num_outer_iter( 0), min_outer_iter(-1u), max_outer_iter( 0),
-          total_outer_iter( 0), total_inner_iter( 0), total_damping_iter( 0), total_base_point_calls( 0), total_locate_new_point_calls( 0)
-    { P2DiscCL::GetGradientsOnRef( gradrefp2); }
+    QuaQuaMapperCL (const MultiGridCL& mg, VecDescCL& lsarg, const VecDescCL& ls_grad_recarg,
+        TetraToTetrasT* neighborhoods= 0, int maxiter= 100, double tol= 1e-7,
+        bool use_line_search= true, double armijo_c= 1e-4, Uint max_damping_steps= 8);
+    QuaQuaMapperCL (const QuaQuaMapperCL&);
+    ~QuaQuaMapperCL ();
 
     void set_inner_iter_tol (Uint i, double t) {
         maxinneriter_= i;
