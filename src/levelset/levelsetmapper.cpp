@@ -114,7 +114,9 @@ class QuaQuaMapperFunctionCL
 
     bool dF_p=    false,
          dFinv_p= false;  // Remember if dF, dFinv have been initialized.
-    value_type xcur;  // Point at which F, dF, dFinv are set up.
+    value_type xcur;        // Point at which F, dF, dFinv are set up.
+    const TetraCL* btet= 0; // "
+    BaryCoordCL bxb;        // "
     Point3DCL x0; // World coordinates of initial point.
     Point3DCL gh; // Recovered gradient at xcur.
 
@@ -132,10 +134,13 @@ class QuaQuaMapperFunctionCL
     QuaQuaMapperFunctionCL (QuaQuaMapperCL* quaqua)
         : quaqua_ (quaqua) {}
 
-    // Take the initial point x0 from quaqua_ (tet and xb); compute xcur gh, and F.
-    QuaQuaMapperFunctionCL& set_point ();
-    value_type get_current_point () const { return xcur; }
-    Point3DCL get_gh () const { return gh; }
+    // Set initial point x0, btet, and bxb; compute xcur gh, and F.
+    QuaQuaMapperFunctionCL& set_initial_point (const TetraCL* tet, const BaryCoordCL& xb);
+
+    value_type      get_point () const { return xcur; }
+    BaryCoordCL     get_bary  () const { return bxb; }
+    const TetraCL*  get_tetra () const { return btet; }
+    Point3DCL       get_gh    () const { return gh; }
 
     value_type value (const value_type& x);
     value_type apply_derivative (const value_type& x, const value_type& v);
@@ -146,18 +151,18 @@ class QuaQuaMapperFunctionCL
 };
 
 QuaQuaMapperFunctionCL&
-QuaQuaMapperFunctionCL::set_point ()
+QuaQuaMapperFunctionCL::set_initial_point (const TetraCL* tet, const BaryCoordCL& xb)
 {
-    quaqua_->btet= quaqua_->tet;
-    quaqua_->bxb=  quaqua_->xb;
-    x0= GetWorldCoord (*quaqua_->btet, quaqua_->bxb);
+    btet= tet;
+    bxb=  xb;
+    x0= GetWorldCoord (*btet, bxb);
     std::copy (x0.begin(), x0.end(), xcur.begin());
     xcur[3]= 0.;
 
-    quaqua_->cache_->set_tetra( quaqua_->btet);
-    gh= quaqua_->cache_->loc_gh() (quaqua_->bxb);
+    quaqua_->cache_->set_tetra( btet);
+    gh= quaqua_->cache_->loc_gh() (bxb);
     F[0]= F[1]= F[2]= 0.;
-    F[3]= -quaqua_->cache_->locls() (quaqua_->bxb);
+    F[3]= -quaqua_->cache_->locls() (bxb);
 
     dF_p=    false;
     dFinv_p= false;
@@ -177,13 +182,13 @@ QuaQuaMapperFunctionCL::maybe_change_current_point (const value_type& x)
     const Point3DCL xx    (x.begin (),    x.begin  ()   + 3),
                     xcurx (xcur.begin (), xcur.begin () + 3);
     double l= 1.;
-    quaqua_->bxb= quaqua_->cache_->w2b()( xx);
-    quaqua_->locate_new_point( xcurx, xx - xcurx, quaqua_->btet, quaqua_->bxb, l);
+    bxb= quaqua_->cache_->w2b()( xx);
+    quaqua_->locate_new_point( xcurx, xx - xcurx, btet, bxb, l);
     if (l != 1.)
         std::cerr << " QuaQuaMapperFunctionCL::compute_F: l: " << l << std::endl;
 
     xcur= x;
-    quaqua_->cache_->set_tetra (quaqua_->btet);
+    quaqua_->cache_->set_tetra (btet);
     return true;
 }
 
@@ -191,10 +196,10 @@ void
 QuaQuaMapperFunctionCL::compute_F ()
 {
     // Setup Fnew= (p - xnew - snew*gh, -locls( bxbnew)).
-    gh= quaqua_->cache_->loc_gh() (quaqua_->bxb);
+    gh= quaqua_->cache_->loc_gh() (bxb);
     for (Uint i= 0; i < 3; ++i)
         F[i]= x0[i] - xcur[i] - xcur[3]*gh[i];
-    F[3]= -quaqua_->cache_->locls() ( quaqua_->bxb);
+    F[3]= -quaqua_->cache_->locls() ( bxb);
 }
 
 QuaQuaMapperFunctionCL::value_type
@@ -214,7 +219,7 @@ QuaQuaMapperFunctionCL::compute_dF ()
     SMatrixCL<3,3> dgh;
     Point3DCL tmp;
     for (Uint i= 0; i < 10; ++i) {
-        tmp= quaqua_->cache_->gradp2 (i) (quaqua_->bxb);
+        tmp= quaqua_->cache_->gradp2 (i) (bxb);
         g_ls+= quaqua_->cache_->locls()[i]*tmp;
         dgh+= outer_product (quaqua_->cache_->loc_gh()[i], tmp);
     }
@@ -485,20 +490,20 @@ void QuaQuaMapperCL::base_point_with_line_search () const
 void QuaQuaMapperCL::base_point_newton () const
 {
     // The function of which we search a root, ( x0 - x - s*gh(x), -ls(x) ).
-    btet= tet;
-    bxb= xb;
-    f_->set_point ();
+    f_->set_initial_point (tet, xb);
     size_t iter= maxiter_;
     double tol= tol_;
     size_t max_damping_steps= max_damping_steps_;
-    SVectorCL<4> x= f_->get_current_point();
+    SVectorCL<4> x= f_->get_point();
     newton_solve (*f_, x, iter, tol, max_damping_steps, armijo_c_);
+    btet= f_->get_tetra();
+    bxb= f_->get_bary();
+    // Compute the quasi-distance dh:
+    dh= x[3]*f_->get_gh().norm();
+
     cur_num_outer_iter= iter;
     ++num_outer_iter[iter];
     total_damping_iter+= max_damping_steps;
-
-    // Compute the quasi-distance dh:
-    dh= x[3]*f_->get_gh().norm();
 }
 
 
