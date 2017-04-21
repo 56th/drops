@@ -80,9 +80,13 @@ class base_point_newton_cacheCL
 };
 
 
+class QuaQuaMapperFunctionCL;
+
 class QuaQuaMapperCL
 {
   private:
+    friend QuaQuaMapperFunctionCL;
+
     int maxiter_;
     double tol_;
     int maxinneriter_;

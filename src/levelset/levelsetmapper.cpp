@@ -66,6 +66,181 @@ void base_point_newton_cacheCL::set_compute_gradp2 (bool b)
     compute_gradp2_= b;
 }
 
+class QuaQuaMapperFunctionCL
+{
+  public:
+    typedef SVectorCL<4> value_type;
+
+  private:
+    mutable QuaQuaMapperCL* quaqua_= 0;
+
+    bool dF_p=    false,
+         dFinv_p= false;  // Remember if F, dF, dFinv have been initialized.
+    value_type xcur;  // Point at which F, dF, dFinv are set up.
+    Point3DCL x0; // World coordinates of initial point.
+    Point3DCL gh; // Recovered gradient at xF.
+
+    value_type F;           // value at xF;
+    SMatrixCL<4, 4>  dF;    // Jacobian at xdFinv.
+    QRDecompCL<4, 4> dFinv; // Solver for Jacobian at xdFinv.
+
+    bool maybe_change_current_point (const value_type& x);
+
+    void compute_F ();     // Compute F at xcur.
+    void compute_dF ();    // Compute dF at xcur, requires compute_F.
+    void compute_dFinv (); // Compute dFinv at xcur, requires compute_F.
+
+  public:
+    QuaQuaMapperFunctionCL (QuaQuaMapperCL* quaqua)
+        : quaqua_ (quaqua) {}
+
+    // Take the initial point x0 from quaqua_ (tet and xb); compute xF and F.
+    QuaQuaMapperFunctionCL& set_point ();
+    value_type get_current_point () const { return xcur; }
+
+    value_type value (const value_type& x);
+    value_type apply_derivative (const value_type& x, const value_type& v);
+    value_type apply_derivative_inverse (const value_type& x, const value_type& v);
+    value_type apply_derivative_transpose (const value_type& x, const value_type& v);
+
+    double initial_damping_factor (const value_type& x, const value_type& dx, const value_type& F);
+};
+
+QuaQuaMapperFunctionCL&
+QuaQuaMapperFunctionCL::set_point ()
+{
+    quaqua_->btet= quaqua_->tet;
+    quaqua_->bxb=  quaqua_->xb;
+    x0= GetWorldCoord (*quaqua_->btet, quaqua_->bxb);
+    std::copy (x0.begin(), x0.end(), xcur.begin());
+    xcur[3]= 0.;
+
+    quaqua_->cache_.set_tetra( quaqua_->btet);
+    gh= quaqua_->cache_.loc_gh() (quaqua_->bxb);
+    F[0]= F[1]= F[2]= 0.;
+    F[3]= -quaqua_->cache_.locls() (quaqua_->bxb);
+
+    dF_p=    false;
+    dFinv_p= false;
+
+    return *this;
+}
+
+bool
+QuaQuaMapperFunctionCL::maybe_change_current_point (const value_type& x)
+{
+    if (xcur == x)
+        return false;
+
+    dF_p=    false;
+    dFinv_p= false;
+
+    const Point3DCL xx    (x.begin (),    x.begin  ()   + 3),
+                    xcurx (xcur.begin (), xcur.begin () + 3);
+    double l= 1.;
+    quaqua_->bxb= quaqua_->cache_.w2b()( xx);
+    quaqua_->locate_new_point( xcurx, xx - xcurx, quaqua_->btet, quaqua_->bxb, l);
+    if (l != 1.)
+        std::cerr << " QuaQuaMapperFunctionCL::compute_F: l: " << l << std::endl;
+
+    xcur= x;
+    quaqua_->cache_.set_tetra (quaqua_->btet);
+    return true;
+}
+
+void
+QuaQuaMapperFunctionCL::compute_F ()
+{
+    // Setup Fnew= (p - xnew - snew*gh, -locls( bxbnew)).
+    gh= quaqua_->cache_.loc_gh() (quaqua_->bxb);
+    for (Uint i= 0; i < 3; ++i)
+        F[i]= x0[i] - xcur[i] - xcur[3]*gh[i];
+    F[3]= -quaqua_->cache_.locls() ( quaqua_->bxb);
+}
+
+QuaQuaMapperFunctionCL::value_type
+QuaQuaMapperFunctionCL::value (const value_type& x)
+{
+    if (maybe_change_current_point (x))
+        compute_F ();
+    return F;
+}
+
+void
+QuaQuaMapperFunctionCL::compute_dF ()
+{
+    // Evaluate the gradient of locls in bxb: g_ls.
+    // Evaluate the Jacobian of gh in bxb: dgh.
+    Point3DCL g_ls;
+    SMatrixCL<3,3> dgh;
+    Point3DCL tmp;
+    for (Uint i= 0; i < 10; ++i) {
+        tmp= quaqua_->cache_.gradp2 (i) (quaqua_->bxb);
+        g_ls+= quaqua_->cache_.locls()[i]*tmp;
+        dgh+= outer_product (quaqua_->cache_.loc_gh()[i], tmp);
+    }
+
+    // Setup the blockmatrix M= (-I - s dgh | - gh, -g_ls^T | 0).
+    for (Uint i= 0; i < 3; ++i) {
+        for (Uint j= 0; j < 3; ++j)
+            dF (i, j)= -xcur[3]*dgh (i, j);
+        dF (i, i)-= 1.;
+        dF (i, 3)= -gh[i];
+        dF (3, i)= -g_ls[i];
+    }
+    dF (3, 3)= 0.;
+
+    dF_p= true;
+}
+
+QuaQuaMapperFunctionCL::value_type
+QuaQuaMapperFunctionCL::apply_derivative (const value_type& x, const value_type& v)
+{
+    if (maybe_change_current_point (x))
+        compute_F();
+    if (!dF_p)
+        compute_dF();
+    return dF*v;
+}
+
+QuaQuaMapperFunctionCL::value_type
+QuaQuaMapperFunctionCL::apply_derivative_transpose (const value_type& x, const value_type& v)
+{
+    if (maybe_change_current_point (x))
+        compute_F();
+    if (!dF_p)
+        compute_dF ();
+    return transp_mul(dF, v);
+}
+
+void
+QuaQuaMapperFunctionCL::compute_dFinv ()
+{
+    if (!dF_p)
+        compute_dF ();
+    dFinv.GetMatrix ()= dF;
+    dFinv.prepare_solve ();
+    dFinv_p= true;
+}
+
+QuaQuaMapperFunctionCL::value_type
+QuaQuaMapperFunctionCL::apply_derivative_inverse (const value_type& x, const value_type& v)
+{
+    if (maybe_change_current_point (x))
+        compute_F();
+    if (!dFinv_p)
+        compute_dFinv ();
+    value_type ret (v);
+    dFinv.Solve (ret);
+    return ret;
+}
+
+double
+QuaQuaMapperFunctionCL::initial_damping_factor (const value_type& /*x*/, const value_type& dx, const value_type& /*F*/)
+{
+    return 0.5*quaqua_->cache_.get_h()/MakePoint3D( dx[0], dx[1], dx[2]).norm();
+}
+
 // Return a tetra from neighborhood that contains v up to precision eps in barycentric coordinates.
 // Returns 0 on failure.
 void enclosing_tetra (const Point3DCL& v, const TetraSetT& neighborhood, double eps, const TetraCL*& tetra, BaryCoordCL& bary)
@@ -383,8 +558,21 @@ const QuaQuaMapperCL& QuaQuaMapperCL::base_point () const
     if (btet == 0) {
         if (use_line_search_ == true)
             base_point_with_line_search();
-        else
+        else {
+            QuaQuaMapperFunctionCL f (const_cast<QuaQuaMapperCL*> (this));
+            f.set_point ();
+            size_t maxiter= maxiter_;
+            double tol= tol_;
+            size_t max_damping_steps= max_damping_steps_;
+            SVectorCL<4> x= f.get_current_point();
+            newton_solve (f, x, maxiter, tol, max_damping_steps, armijo_c_);
+            const TetraCL* btet1= btet;
+            const BaryCoordCL bxb1= bxb;
+
             base_point_newton();
+            if (btet1 != btet || (bxb1 -bxb).norm() > 2.*tol_)
+                std::cout << "Hallo\n;";
+        }
     }
     timer.Stop();
     base_point_time+= timer.GetTime();
