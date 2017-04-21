@@ -43,43 +43,8 @@ typedef std::tr1::unordered_map<const TetraCL*, TetraSetT> TetraToTetrasT;
 
 typedef std::pair<const TetraCL*, BaryCoordCL> TetraBaryPairT;
 
-class base_point_newton_cacheCL
-{
-  private:
-    const TetraCL* tet;
-
-    const P2EvalCL<double, const NoBndDataCL<>, const VecDescCL>&             ls_;
-    const P2EvalCL<Point3DCL, const NoBndDataCL<Point3DCL>, const VecDescCL>& ls_grad_rec_;
-
-    const LocalP1CL<Point3DCL> (& gradrefp2_)[10];
-
-    LocalP2CL<>          locls_;
-    LocalP2CL<Point3DCL> loc_gh_;
-    LocalP1CL<Point3DCL> gradp2_[10];
-    World2BaryCoordCL    w2b_;
-    double h_;
-
-    bool compute_gradp2_;
-
-  public:
-    base_point_newton_cacheCL (const P2EvalCL<double, const NoBndDataCL<>, const VecDescCL>& ls,
-                               const P2EvalCL<Point3DCL, const NoBndDataCL<Point3DCL>, const VecDescCL>& ls_grad_rec,
-                               const LocalP1CL<Point3DCL> (& gradrefp2)[10])
-        : tet( 0), ls_( ls), ls_grad_rec_( ls_grad_rec), gradrefp2_( gradrefp2), compute_gradp2_( true)
-    {}
-
-    void set_tetra (const TetraCL* newtet);
-
-    void set_compute_gradp2 (bool b);
-
-    const LocalP2CL<>&          locls  () const { return locls_; }
-    const LocalP2CL<Point3DCL>& loc_gh () const { return loc_gh_; }
-    const LocalP1CL<Point3DCL>& gradp2 (Uint i) const { return gradp2_[i]; }
-    const World2BaryCoordCL&    w2b    () const { return w2b_; }
-    double                      get_h  () const { return h_; }
-};
-
-
+// Forward declaration of helper classes of QuaQuaMapperCL.
+class base_point_newton_cacheCL;
 class QuaQuaMapperFunctionCL;
 
 class QuaQuaMapperCL
@@ -109,7 +74,7 @@ class QuaQuaMapperCL
     TetraToTetrasT* neighborhoods_;
     mutable MyLocatorCL locator_;
 
-    mutable base_point_newton_cacheCL cache_;
+    mutable std::unique_ptr<base_point_newton_cacheCL> cache_;
     std::unique_ptr<QuaQuaMapperFunctionCL> f_;
 
     mutable const TetraCL* tet;

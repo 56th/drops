@@ -30,6 +30,44 @@
 namespace DROPS
 {
 
+class base_point_newton_cacheCL
+{
+  private:
+    const TetraCL* tet;
+
+    const P2EvalCL<double, const NoBndDataCL<>, const VecDescCL>&             ls_;
+    const P2EvalCL<Point3DCL, const NoBndDataCL<Point3DCL>, const VecDescCL>& ls_grad_rec_;
+
+    const LocalP1CL<Point3DCL> (& gradrefp2_)[10];
+
+    LocalP2CL<>          locls_;
+    LocalP2CL<Point3DCL> loc_gh_;
+    LocalP1CL<Point3DCL> gradp2_[10];
+    World2BaryCoordCL    w2b_;
+    double h_;
+
+    bool compute_gradp2_;
+
+  public:
+    base_point_newton_cacheCL (const P2EvalCL<double, const NoBndDataCL<>, const VecDescCL>& ls,
+                               const P2EvalCL<Point3DCL, const NoBndDataCL<Point3DCL>, const VecDescCL>& ls_grad_rec,
+                               const LocalP1CL<Point3DCL> (& gradrefp2)[10])
+        : tet( 0), ls_( ls), ls_grad_rec_( ls_grad_rec), gradrefp2_( gradrefp2), compute_gradp2_( true)
+    {}
+
+    void           set_tetra (const TetraCL* newtet);
+    const TetraCL* get_tetra () const { return tet; }
+
+    void set_compute_gradp2 (bool b);
+    bool get_compute_gradp2 () const { return compute_gradp2_; }
+
+    const LocalP2CL<>&          locls  () const { return locls_; }
+    const LocalP2CL<Point3DCL>& loc_gh () const { return loc_gh_; }
+    const LocalP1CL<Point3DCL>& gradp2 (Uint i) const { return gradp2_[i]; }
+    const World2BaryCoordCL&    w2b    () const { return w2b_; }
+    double                      get_h  () const { return h_; }
+};
+
 void base_point_newton_cacheCL::set_tetra (const TetraCL* newtet)
 {
     if (tet == newtet)
@@ -116,10 +154,10 @@ QuaQuaMapperFunctionCL::set_point ()
     std::copy (x0.begin(), x0.end(), xcur.begin());
     xcur[3]= 0.;
 
-    quaqua_->cache_.set_tetra( quaqua_->btet);
-    gh= quaqua_->cache_.loc_gh() (quaqua_->bxb);
+    quaqua_->cache_->set_tetra( quaqua_->btet);
+    gh= quaqua_->cache_->loc_gh() (quaqua_->bxb);
     F[0]= F[1]= F[2]= 0.;
-    F[3]= -quaqua_->cache_.locls() (quaqua_->bxb);
+    F[3]= -quaqua_->cache_->locls() (quaqua_->bxb);
 
     dF_p=    false;
     dFinv_p= false;
@@ -139,13 +177,13 @@ QuaQuaMapperFunctionCL::maybe_change_current_point (const value_type& x)
     const Point3DCL xx    (x.begin (),    x.begin  ()   + 3),
                     xcurx (xcur.begin (), xcur.begin () + 3);
     double l= 1.;
-    quaqua_->bxb= quaqua_->cache_.w2b()( xx);
+    quaqua_->bxb= quaqua_->cache_->w2b()( xx);
     quaqua_->locate_new_point( xcurx, xx - xcurx, quaqua_->btet, quaqua_->bxb, l);
     if (l != 1.)
         std::cerr << " QuaQuaMapperFunctionCL::compute_F: l: " << l << std::endl;
 
     xcur= x;
-    quaqua_->cache_.set_tetra (quaqua_->btet);
+    quaqua_->cache_->set_tetra (quaqua_->btet);
     return true;
 }
 
@@ -153,10 +191,10 @@ void
 QuaQuaMapperFunctionCL::compute_F ()
 {
     // Setup Fnew= (p - xnew - snew*gh, -locls( bxbnew)).
-    gh= quaqua_->cache_.loc_gh() (quaqua_->bxb);
+    gh= quaqua_->cache_->loc_gh() (quaqua_->bxb);
     for (Uint i= 0; i < 3; ++i)
         F[i]= x0[i] - xcur[i] - xcur[3]*gh[i];
-    F[3]= -quaqua_->cache_.locls() ( quaqua_->bxb);
+    F[3]= -quaqua_->cache_->locls() ( quaqua_->bxb);
 }
 
 QuaQuaMapperFunctionCL::value_type
@@ -176,9 +214,9 @@ QuaQuaMapperFunctionCL::compute_dF ()
     SMatrixCL<3,3> dgh;
     Point3DCL tmp;
     for (Uint i= 0; i < 10; ++i) {
-        tmp= quaqua_->cache_.gradp2 (i) (quaqua_->bxb);
-        g_ls+= quaqua_->cache_.locls()[i]*tmp;
-        dgh+= outer_product (quaqua_->cache_.loc_gh()[i], tmp);
+        tmp= quaqua_->cache_->gradp2 (i) (quaqua_->bxb);
+        g_ls+= quaqua_->cache_->locls()[i]*tmp;
+        dgh+= outer_product (quaqua_->cache_->loc_gh()[i], tmp);
     }
 
     // Setup the blockmatrix M= (-I - s dgh | - gh, -g_ls^T | 0).
@@ -239,7 +277,7 @@ QuaQuaMapperFunctionCL::apply_derivative_inverse (const value_type& x, const val
 double
 QuaQuaMapperFunctionCL::initial_damping_factor (const value_type& /*x*/, const value_type& dx, const value_type& /*F*/)
 {
-    return 0.5*quaqua_->cache_.get_h()/MakePoint3D( dx[0], dx[1], dx[2]).norm();
+    return 0.5*quaqua_->cache_->get_h()/MakePoint3D( dx[0], dx[1], dx[2]).norm();
 }
 
 // Return a tetra from neighborhood that contains v up to precision eps in barycentric coordinates.
@@ -265,7 +303,7 @@ QuaQuaMapperCL::QuaQuaMapperCL (const MultiGridCL& mg, VecDescCL& lsarg, const V
       use_line_search_( use_line_search), armijo_c_( armijo_c), max_damping_steps_( max_damping_steps),
       ls( &lsarg, &nobnddata, &mg), ls_grad_rec( &ls_grad_recarg, &nobnddata_vec, &mg),
       neighborhoods_( neighborhoods), locator_( mg, lsarg.GetLevel(), /*greedy*/ false),
-      cache_( ls, ls_grad_rec, gradrefp2), f_ (new QuaQuaMapperFunctionCL (this)), tet( 0), btet( 0), have_dph( false),
+      cache_( new base_point_newton_cacheCL (ls, ls_grad_rec, gradrefp2)), f_ (new QuaQuaMapperFunctionCL (this)), tet( 0), btet( 0), have_dph( false),
       num_outer_iter( maxiter + 1), num_inner_iter( maxinneriter_ + 1),
       base_point_time( 0.), locate_new_point_time( 0.), cur_num_outer_iter( 0), min_outer_iter(-1u), max_outer_iter( 0),
       total_outer_iter( 0), total_inner_iter( 0), total_damping_iter( 0), total_base_point_calls( 0), total_locate_new_point_calls( 0)
@@ -278,7 +316,7 @@ QuaQuaMapperCL::QuaQuaMapperCL (const QuaQuaMapperCL& q)
       use_line_search_( q.use_line_search_), armijo_c_( q.armijo_c_), max_damping_steps_( q.max_damping_steps_),
       ls( q.ls), ls_grad_rec( q.ls_grad_rec),
       neighborhoods_( q.neighborhoods_), locator_( q.locator_),
-      cache_( ls, ls_grad_rec, gradrefp2), f_ (new QuaQuaMapperFunctionCL (this)), tet( q.tet), btet( q.btet), have_dph( q.have_dph),
+      cache_( new base_point_newton_cacheCL (ls, ls_grad_rec, gradrefp2)), f_ (new QuaQuaMapperFunctionCL (this)), tet( q.tet), btet( q.btet), have_dph( q.have_dph),
       num_outer_iter( q.num_outer_iter), num_inner_iter(q.num_inner_iter),
       base_point_time( q.base_point_time), locate_new_point_time( q.locate_new_point_time), cur_num_outer_iter( q.cur_num_outer_iter), min_outer_iter(q.min_outer_iter), max_outer_iter( q.max_outer_iter),
       total_outer_iter( q.total_outer_iter), total_inner_iter( q.total_inner_iter), total_damping_iter( q.total_damping_iter), total_base_point_calls( q.total_base_point_calls), total_locate_new_point_calls( q.total_locate_new_point_calls)
@@ -286,6 +324,8 @@ QuaQuaMapperCL::QuaQuaMapperCL (const QuaQuaMapperCL& q)
     ls.SetBndData (&nobnddata);
     ls_grad_rec.SetBndData (&nobnddata_vec);
     P2DiscCL::GetGradientsOnRef( gradrefp2);
+    cache_->set_compute_gradp2 (q.cache_->get_compute_gradp2());
+    cache_->set_tetra (q.cache_->get_tetra());
 }
 
 
@@ -347,11 +387,11 @@ bool QuaQuaMapperCL::line_search (Point3DCL& x, const Point3DCL& nx, const Tetra
     BaryCoordCL newbary;
     double Fnew= std::numeric_limits<double>::max(); // Silence false warning.
 
-    const LocalP2CL<>&           locls= cache_.locls();
-    const LocalP2CL<Point3DCL>& loc_gh= cache_.loc_gh();
+    const LocalP2CL<>&           locls= cache_->locls();
+    const LocalP2CL<Point3DCL>& loc_gh= cache_->loc_gh();
 
-    cache_.set_tetra( tetra);
-    bary= cache_.w2b()( x);
+    cache_->set_tetra( tetra);
+    bary= cache_->w2b()( x);
     double F= locls( bary);
     for (; inneriter < maxinneriter_; ++inneriter) {
         if (std::abs( F) < innertol_)
@@ -364,7 +404,7 @@ bool QuaQuaMapperCL::line_search (Point3DCL& x, const Point3DCL& nx, const Tetra
             std::cout << "g_phi: " << gradval << "\tgy: " << nx << std::endl;
         dalpha= F/slope;
 
-        l= std::min( 1., 0.5*cache_.get_h()/std::abs( dalpha));
+        l= std::min( 1., 0.5*cache_->get_h()/std::abs( dalpha));
         Uint j;
         found_newtet= false;
         for (j= 0; j < max_damping_steps_; ++j, l*= 0.5) {
@@ -372,8 +412,8 @@ bool QuaQuaMapperCL::line_search (Point3DCL& x, const Point3DCL& nx, const Tetra
                 std::cerr << "QuaQuaMapperCL::line_search: Too much damping. inneriter: " << inneriter <<  " x: " << x << " dalpha: " << dalpha << " ls(x): " << locls( bary) << " l: " << l << " slope: " << slope << std::endl;
             }
             xnew= x - (l*dalpha)*nx;
-            cache_.set_tetra( tetra);
-            newbary= cache_.w2b()( xnew);
+            cache_->set_tetra( tetra);
+            newbary= cache_->w2b()( xnew);
             try {
                 locate_new_point( x, -dalpha*nx, newtet, newbary, l);
             }
@@ -381,7 +421,7 @@ bool QuaQuaMapperCL::line_search (Point3DCL& x, const Point3DCL& nx, const Tetra
                 continue;
             }
             found_newtet= true;
-            cache_.set_tetra( newtet);
+            cache_->set_tetra( newtet);
             // Setup Fnew= locls( newbary)).
             Fnew= locls( newbary);
 
@@ -418,14 +458,14 @@ void QuaQuaMapperCL::base_point_with_line_search () const
 
     Point3DCL n; // Current search direction.
 
-//     cache_.set_compute_gradp2( false);
-    cache_.set_tetra( btet); // To make get_h() well-defined.
+//     cache_->set_compute_gradp2( false);
+    cache_->set_tetra( btet); // To make get_h() well-defined.
 
     bool found_zero_level= false;
     int iter;
     for (iter= 1; iter < maxiter_; ++iter) {
         xold= x;
-        n=  cache_.loc_gh()( bxb);
+        n=  cache_->loc_gh()( bxb);
         n/= norm( n);
         x= x0 - alpha*n;
         found_zero_level= line_search( x, n, btet, bxb);
@@ -492,20 +532,20 @@ const QuaQuaMapperCL& QuaQuaMapperCL::jacobian () const
     if (btet == 0)
         base_point();
 
-//     cache_.set_compute_gradp2( true);
-    cache_.set_tetra( btet);
+//     cache_->set_compute_gradp2( true);
+    cache_->set_tetra( btet);
 
     // Evaluate the quasi normal field in bxb.
-    const LocalP2CL<Point3DCL>& loc_gh= cache_.loc_gh();
+    const LocalP2CL<Point3DCL>& loc_gh= cache_->loc_gh();
     const Point3DCL gh= loc_gh( bxb);
     const Point3DCL q_n= gh/gh.norm();
 
     // Evaluate the normal to the interface in bxb.
     Point3DCL n;
-    const LocalP2CL<>& locls= cache_.locls();
+    const LocalP2CL<>& locls= cache_->locls();
     Point3DCL gradp2_b[10];
     for (Uint i= 0; i < 10; ++i) {
-        gradp2_b[i]= cache_.gradp2( i)( bxb);
+        gradp2_b[i]= cache_->gradp2( i)( bxb);
         n+= locls[i]*gradp2_b[i];
     }
     n/= n.norm();
