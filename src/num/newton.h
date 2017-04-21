@@ -28,65 +28,6 @@
 namespace DROPS
 {
 
-// class QuaQuaBasePointFunctionCL
-// {
-//   public:
-//     typedef SVectorCL<4>   value_type;
-//     typedef SMatrixCL<4,4> derivative_type;
-// 
-//     bool found_newtet;
-//     btet= tet;
-//     bxb= xb;
-// 
-//     double    snew;
-//     BaryCoordCL bxbnew;
-//     const TetraCL* newtet;
-// 
-//         // Evaluate the gradient of locls in bxb: g_ls.
-//         g_ls= Point3DCL();
-//         for (Uint i= 0; i < 10; ++i) {
-//             gradp2_xb[i]= cache_.gradp2( i)( bxb);
-//             g_ls+= locls[i]*gradp2_xb[i];
-//         }
-// 
-//         // Evaluate the Jacobian of gh in bxb: dgh.
-//         dgh= SMatrixCL<3,3>();
-//         for (Uint i= 0; i < 10; ++i)
-//             dgh+= outer_product( loc_gh[i], gradp2_xb[i]);
-// 
-//         // Setup the blockmatrix M= (-I - s dgh | - gh, -g_ls^T | 0).
-//         for (Uint i= 0; i < 3; ++i) {
-//             for (Uint j= 0; j < 3; ++j) {
-//                 M( i,j)= -s*dgh( i,j);
-//             }
-//             M( i,i)-= 1.;
-//             M( i, 3)= -gh[i];
-//             M( 3, i)= -g_ls[i];
-//         }
-//         M( 3,3)= 0.;
-//         Msave= M;
-//         qr.prepare_solve();
-// 
-// 
-//         dx= MakePoint3D( fdx[0], fdx[1], fdx[2]);
-//         ds= fdx[3];
-// 
-//         l= std::min( 1., 0.5*cache_.get_h()/dx.norm());
-// 
-// };
-// 
-//     double s= 0., // scaled quasi-distance
-//            ds,    // increment part of fdx
-// 
-//     Point3DCL x0, x, dx; // World coordinates of initial and current bxb and the coordinate part of fdx.
-//     x0= x= GetWorldCoord( *btet, bxb);
-// 
-// Fnew.norm() < F.norm() + armijo_c_*inner_prod( transp_mul( Msave, F), fdx)/F.norm()*l)
-// 
-//         if (!found_newtet)
-//             throw DROPSErrCL( "QuaQuaMapperCL::base_point_newton: Could not find the right tetra.\n");
-
-
 namespace NewtonImplNS {
 
 template <typename T>
@@ -146,13 +87,17 @@ void newton_solve (FunctionT& fun, typename FunctionT::value_type& x, size_t& ma
         l= std::min( 1., fun.initial_damping_factor (x, dx, F));
         Uint j;
         for (j= 0; j < max_damping_steps && l >= min_step_length; ++j, l*= 0.5) {
+          try {
             Fnew= fun.value (x - l*dx);
+          } catch (DROPSErrCL) {
+            continue;
+          }
             if (std::sqrt (NewtonImplNS::dot (Fnew, Fnew)) < normF + armijo_slope*l)
                 break;
         }
         total_damping_iter+= j;
         if (l < min_step_length) {
-            std::cerr << "newton_solve: Too much damping. iter: " << iter << " x: " << x << " dx: " << dx << " l: " << l << " F: " << F << std::endl;
+//             std::cerr << "newton_solve: Too much damping. iter: " << iter << " x: " << x << " dx: " << dx << " l: " << l << " F: " << F << std::endl;
             break;
         }
         if (os)
