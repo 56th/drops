@@ -104,9 +104,11 @@ void newton_solve (FunctionT& fun, typename FunctionT::value_type& x, size_t& ma
             (*os) << "iter: " << iter << " x: " << x << " dx: " << dx << " l: " << l << " F: " << F << std::endl;
         x-= l*dx;
     }
-    if (iter >= maxiter) {
+    if (iter >= maxiter)
         std::cout << "newton_solve: max iteration number exceeded; \tx: " << x << "\t dx: " << dx << "\tl: " << l << "\t F: " << F << std::endl;
-    }
+    if (normF >= tol)
+        std::cout << "newton_solve: no convergence; tol: " << tol << " normF: " << normF << std::endl;
+
     maxiter= iter;
     tol= normF;
     max_damping_steps= total_damping_iter;
