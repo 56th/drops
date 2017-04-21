@@ -110,7 +110,7 @@ class QuaQuaMapperCL
     mutable MyLocatorCL locator_;
 
     mutable base_point_newton_cacheCL cache_;
-    QuaQuaMapperFunctionCL* f_;
+    std::unique_ptr<QuaQuaMapperFunctionCL> f_;
 
     mutable const TetraCL* tet;
     mutable BaryCoordCL xb;

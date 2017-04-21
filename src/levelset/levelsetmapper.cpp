@@ -290,9 +290,7 @@ QuaQuaMapperCL::QuaQuaMapperCL (const QuaQuaMapperCL& q)
 
 
 QuaQuaMapperCL::~QuaQuaMapperCL ()
-{
-    delete f_;
-}
+{}
 
 // Find a tetra in neighborhoods_[tet] enclosing x + d*dx; computes the barycentric coordinates in xb.
 // On entry, xb must contain the barycentric coordinates of x + d*dx.
