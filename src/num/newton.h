@@ -55,65 +55,6 @@ double dot (T x, T y)
 } // end of namespace NewtonImplNS
 
 
-/// FunctionT must define: * type_def for value_type,
-///     * value (x),
-///     * apply_derivative (x, v),
-///     * apply_derivative_inverse (x, v),
-///     * initial_damping_factor (x, dx, F) (must return a nonnegative value which is further limited to 1 in the algorithm).
-template <typename FunctionT>
-void newton_solve (FunctionT& fun, typename FunctionT::value_type& x, size_t& maxiter, double& tol, size_t& max_damping_steps, double armijo_c, std::ostream* os= 0)
-{
-    const double min_step_length= 1e-7; // Minimum value for step-length factor l.
-
-    typedef typename FunctionT::value_type value_type;
-    value_type dx, // Newton correction.
-               F,  // The function of which we search a root.
-               Fnew; // Helper in the step-size computation.
-    double l= 1.; // Damping factor for line search.
-    size_t total_damping_iter= 0; // Count all rejected steps sizes.
-    double normF;
-
-    size_t iter;
-    for (iter= 0; true; ++iter) {
-        F= fun.value (x);
-        normF= std::sqrt (NewtonImplNS::dot (F, F));
-        if (iter >= maxiter || normF < tol)
-            break;
-        dx= fun.apply_derivative_inverse (x, F);
-//         if (iter == 0) // Initial gradient descent step
-//             dx= fun.apply_derivative_transpose (x, F/normF);
-        const double armijo_slope= armijo_c*inner_prod( F, fun.apply_derivative (x, dx))/normF;
-        // Armijo-rule with backtracking
-        l= std::min( 1., fun.initial_damping_factor (x, dx, F));
-        Uint j;
-        for (j= 0; j < max_damping_steps && l >= min_step_length; ++j, l*= 0.5) {
-          try {
-            Fnew= fun.value (x - l*dx);
-          } catch (DROPSErrCL) {
-            continue;
-          }
-            if (std::sqrt (NewtonImplNS::dot (Fnew, Fnew)) < normF + armijo_slope*l)
-                break;
-        }
-        total_damping_iter+= j;
-        if (l < min_step_length) {
-//             std::cerr << "newton_solve: Too much damping. iter: " << iter << " x: " << x << " dx: " << dx << " l: " << l << " F: " << F << std::endl;
-            break;
-        }
-        if (os)
-            (*os) << "iter: " << iter << " x: " << x << " dx: " << dx << " l: " << l << " F: " << F << std::endl;
-        x-= l*dx;
-    }
-    if (iter >= maxiter)
-        std::cout << "newton_solve: max iteration number exceeded; \tx: " << x << "\t dx: " << dx << "\tl: " << l << "\t F: " << F << std::endl;
-    if (normF >= tol)
-        std::cout << "newton_solve: no convergence; tol: " << tol << " normF: " << normF << std::endl;
-
-    maxiter= iter;
-    tol= normF;
-    max_damping_steps= total_damping_iter;
-}
-
 /// FunctionT must define: * typedef for value_type,
 ///     * set_point (x),
 ///     * value (),
@@ -121,7 +62,7 @@ void newton_solve (FunctionT& fun, typename FunctionT::value_type& x, size_t& ma
 ///     * apply_derivative_inverse (v),
 ///     * initial_damping_factor (dx, F) (must return a nonnegative value which is further limited to 1 in the algorithm).
 template <typename FunctionT>
-void newton_solve_1 (FunctionT& fun, typename FunctionT::value_type& x, size_t& maxiter, double& tol, size_t& max_damping_steps, double armijo_c, std::ostream* os= 0)
+void newton_solve (FunctionT& fun, typename FunctionT::value_type& x, size_t& maxiter, double& tol, size_t& max_damping_steps, double armijo_c, std::ostream* os= 0)
 {
     const double min_step_length= 1e-7; // Minimum value for step-length factor l.
 

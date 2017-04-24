@@ -496,7 +496,7 @@ void QuaQuaMapperCL::base_point_newton () const
     double tol= tol_;
     size_t max_damping_steps= max_damping_steps_;
     SVectorCL<4> x= f_->get_point();
-    newton_solve_1 (*f_, x, iter, tol, max_damping_steps, armijo_c_);
+    newton_solve (*f_, x, iter, tol, max_damping_steps, armijo_c_);
     btet= f_->get_tetra();
     bxb= f_->get_bary();
     // Compute the quasi-distance dh:
@@ -927,7 +927,7 @@ const LocalQuaMapperCL& LocalQuaMapperCL::base_point () const
         LocalQuaMapperFunctionCL::value_type x;
         std::copy (p.begin (), p.end (), x.begin ());
         x[3]= 0.;
-        newton_solve_1 (*localF, x, maxiter, tol, max_damping_steps, armijo_c_);
+        newton_solve (*localF, x, maxiter, tol, max_damping_steps, armijo_c_);
         const Point3DCL x_spatial (x.begin (), x.begin () + 3);
         bxb= w2b (x_spatial);
         dh= (p - x_spatial).norm () * (x[3] > 0. ? 1. : -1.); // x[3]*loc_ls_grad (bxb).norm ();
