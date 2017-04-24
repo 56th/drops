@@ -226,88 +226,8 @@ class LocalQuaLineSearchFunctionCL
 };
 
 
-// The function of which we search a root is F(x, s) = ( p - x - s*gh(x), -(ls(x) - level_value ) ).
-// Its Jacobian is the blockmatrix dF(x, s) = (-I - s H_ls(x) | - g_ls(x), -g_ls(x)^T | 0).
-class LocalQuaMapperFunctionCL
-{
-  public:
-    typedef SVectorCL<4> value_type;
-
-  private:
-    Point3DCL p;          // Point to be projected.
-    LocalP2CL<> locls;
-    double level_value;
-    LocalP1CL<Point3DCL> locls_grad;
-    SMatrixCL<3, 3> locls_H; // Hessian of ls on tet.
-    double h;             // local mesh width at tet.
-    World2BaryCoordCL w2b;
-    double max_bary_step= 0.75;   // default 0.7; max. step size in barycentric coordinates in initial_damping_factor.
-
-    bool dF_p, dFinv_p;  // Remember if dF, dFinv have been initialized.
-    value_type xcur;  // Point at which F, dF, dFinv are set up.
-    BaryCoordCL bcur;       // Barycentric coordinates of the spatial part of xcur.
-    Point3DCL g_ls_cur; // Gradient of ls at xcur.
-
-    value_type F;           // value at xF;
-    SMatrixCL<4, 4>  dF;    // Jacobian at xdFinv.
-    QRDecompCL<4, 4> dFinv; // Solver for Jacobian at xdFinv.
-
-    void compute_F ();     // Compute F and set xF.
-    void compute_dF ();    // Compute dF and set xdF.
-    void compute_dFinv (); // Compute dFinv and set xdFinv.
-
-  public:
-    LocalQuaMapperFunctionCL (
-        const LocalP2CL<>& loclsarg,
-        const LocalP1CL<Point3DCL>& locls_gradarg,
-        const SMatrixCL<3, 3>& locls_Harg,
-        double harg,
-        const World2BaryCoordCL& w2barg)
-        : locls (loclsarg), level_value (0.), locls_grad (locls_gradarg), locls_H (locls_Harg),
-          h (harg), w2b (w2barg), dF_p (false), dFinv_p (false) {}
-    LocalQuaMapperFunctionCL () : level_value (0.), dF_p (false), dFinv_p (false) {}
-
-    LocalQuaMapperFunctionCL& set_tetra (
-        const LocalP2CL<>& loclsarg,
-        const LocalP1CL<Point3DCL>& locls_gradarg,
-        const SMatrixCL<3, 3>& locls_Harg,
-        double harg,
-        const World2BaryCoordCL& w2barg) {
-        locls= loclsarg;
-        locls_grad= locls_gradarg;
-        locls_H= locls_Harg;
-        h= harg;
-        w2b= w2barg;
-        dF_p= false;
-        dFinv_p= false;
-        return *this;
-    }
-
-    LocalQuaMapperFunctionCL& set_initial_point (const Point3DCL& x) {
-        p= x;
-        return *this;
-    }
-
-    LocalQuaMapperFunctionCL& set_level_value (double lsval) {
-        level_value= lsval;
-        return *this;
-    }
-
-    LocalQuaMapperFunctionCL& set_max_bary_step (double l) {
-        max_bary_step= l;
-        return *this;
-    }
-
-    bool set_point (const value_type& x);
-    value_type value ();
-    value_type apply_derivative (const value_type& v);
-    value_type apply_derivative_inverse (const value_type& v);
-    value_type apply_derivative_transpose (const value_type& v);
-
-    double initial_damping_factor (const value_type& dx, const value_type& F);
-
-    const LocalP1CL<Point3DCL>& get_locls_grad () const { return locls_grad; }
-};
+// forward declaration of helper of LocalQuaMapperCL.
+class LocalQuaMapperFunctionCL;
 
 class LocalQuaMapperCL
 {
@@ -332,46 +252,35 @@ class LocalQuaMapperCL
     mutable World2BaryCoordCL w2b;
     mutable Bary2WorldCoordCL b2w;
 
-    mutable const TetraCL* tet;
+    mutable const TetraCL* tet= nullptr;
     mutable BaryCoordCL xb; // point to be projected
     mutable BaryCoordCL bxb; // projection of xb
     mutable double dh;
-    mutable bool have_base_point,
-                 base_in_trust_region;
+    mutable bool have_base_point= false,
+                 base_in_trust_region= false;
     double lower_bary_for_trust_region= -1.;
 
-    mutable DeformationMethodE deformation_method;
-    mutable bool have_deformation;
+    mutable DeformationMethodE deformation_method= MAP_ZERO_LEVEL_SETS;
+    mutable bool have_deformation= false;
     mutable Point3DCL deformation;
 
-    mutable LocalQuaMapperFunctionCL localF;
+    mutable std::unique_ptr<LocalQuaMapperFunctionCL> localF;
 
     void base_point_newton () const;
 
   public:
-    LocalQuaMapperCL (const MultiGridCL& mg, VecDescCL& lsarg, int maxiter= 100, double tol= 1e-7, double armijo_c= 1e-4, Uint max_damping_steps= 8)
-        : maxiter_( maxiter), tol_( tol),
-          armijo_c_( armijo_c), max_damping_steps_( max_damping_steps),
-          ls( &lsarg, &nobnddata, &mg),
-          tet( 0), have_base_point (false), deformation_method (MAP_ZERO_LEVEL_SETS), have_deformation (false),
-          num_outer_iter( maxiter + 1),
-          base_point_time( 0.), locate_new_point_time( 0.), cur_num_outer_iter( 0), min_outer_iter(-1u), max_outer_iter( 0),
-          total_outer_iter( 0), total_damping_iter( 0), total_base_point_calls( 0) {
-        P2DiscCL::GetGradientsOnRef( gradrefp2);
-    }
+    LocalQuaMapperCL (const MultiGridCL& mg, VecDescCL& lsarg, int maxiter= 100, double tol= 1e-7, double armijo_c= 1e-4, Uint max_damping_steps= 8);
+    LocalQuaMapperCL (const LocalQuaMapperCL&);
+    ~LocalQuaMapperCL ();
 
     const LocalQuaMapperCL& set_point (const BaryCoordCL& xbarg) const;
     const LocalQuaMapperCL& set_tetra (const TetraCL* tetarg) const;
     const LocalQuaMapperCL& base_point () const;
-    const LocalQuaMapperCL& set_trust_region (double lb) {
-        lower_bary_for_trust_region= -lb;
-        localF.set_max_bary_step (.75);
-        return *this;
-    }
     const LocalQuaMapperCL& set_deformation_method (DeformationMethodE m) const {
         deformation_method= m;
         return *this;
     }
+    const LocalQuaMapperCL& set_trust_region (double lb);
 
     const LocalQuaMapperCL& compute_deformation () const;
 
@@ -390,15 +299,16 @@ class LocalQuaMapperCL
     mutable std::vector<size_t> num_outer_iter;
     mutable std::vector<size_t> num_inner_iter;
 
-    mutable double base_point_time,
-                   locate_new_point_time;
-    mutable Uint cur_num_outer_iter,
-                 min_outer_iter,
-                 max_outer_iter,
-                 total_outer_iter,
-                 total_damping_iter,
-                 total_base_point_calls;
+    mutable double base_point_time= 0.,
+                   locate_new_point_time= 0.;
+    mutable Uint cur_num_outer_iter= 0,
+                 min_outer_iter= -1u,
+                 max_outer_iter= 0,
+                 total_outer_iter= 0,
+                 total_damping_iter= 0,
+                 total_base_point_calls= 0;
 };
+
 
 // Compute the average of a LocalQuaMapperCL in all P2-dofs.
 class LocalQuaMapperP2CL
