@@ -142,12 +142,13 @@ class QuaQuaMapperFunctionCL
     const TetraCL*  get_tetra () const { return btet; }
     Point3DCL       get_gh    () const { return gh; }
 
-    value_type value (const value_type& x);
-    value_type apply_derivative (const value_type& x, const value_type& v);
-    value_type apply_derivative_inverse (const value_type& x, const value_type& v);
-    value_type apply_derivative_transpose (const value_type& x, const value_type& v);
+    bool set_point (const value_type& x);
+    value_type value ();
+    value_type apply_derivative (const value_type& v);
+    value_type apply_derivative_inverse ( const value_type& v);
+    value_type apply_derivative_transpose (const value_type& v);
 
-    double initial_damping_factor (const value_type& x, const value_type& dx, const value_type& F);
+    double initial_damping_factor (const value_type& dx, const value_type& F);
 };
 
 QuaQuaMapperFunctionCL&
@@ -171,24 +172,35 @@ QuaQuaMapperFunctionCL::set_initial_point (const TetraCL* tet, const BaryCoordCL
 }
 
 bool
-QuaQuaMapperFunctionCL::maybe_change_current_point (const value_type& x)
+QuaQuaMapperFunctionCL::set_point (const value_type& x)
 {
     if (xcur == x)
-        return false;
-
-    dF_p=    false;
-    dFinv_p= false;
+        return true;
 
     const Point3DCL xx    (x.begin (),    x.begin  ()   + 3),
                     xcurx (xcur.begin (), xcur.begin () + 3);
     double l= 1.;
-    bxb= quaqua_->cache_->w2b()( xx);
-    quaqua_->locate_new_point( xcurx, xx - xcurx, btet, bxb, l);
-    if (l != 1.)
-        std::cerr << " QuaQuaMapperFunctionCL::compute_F: l: " << l << std::endl;
+    BaryCoordCL newbxb= quaqua_->cache_->w2b()( xx);
+    const TetraCL* newbtet= btet;
+    try {
+        quaqua_->locate_new_point( xcurx, xx - xcurx, newbtet, newbxb, l);
+    } catch (DROPSErrCL) {
+        return false;
+    }
+    if (l != 1.) {
+        std::cerr << " QuaQuaMapperFunctionCL::set_point: l: " << l << std::endl;
+        return false;
+    }
 
+    dF_p=    false;
+    dFinv_p= false;
     xcur= x;
+    btet= newbtet;
+    bxb= newbxb;
     quaqua_->cache_->set_tetra (btet);
+    gh= quaqua_->cache_->loc_gh() (bxb);
+    compute_F ();
+
     return true;
 }
 
@@ -196,17 +208,14 @@ void
 QuaQuaMapperFunctionCL::compute_F ()
 {
     // Setup Fnew= (p - xnew - snew*gh, -locls( bxbnew)).
-    gh= quaqua_->cache_->loc_gh() (bxb);
     for (Uint i= 0; i < 3; ++i)
         F[i]= x0[i] - xcur[i] - xcur[3]*gh[i];
     F[3]= -quaqua_->cache_->locls() ( bxb);
 }
 
 QuaQuaMapperFunctionCL::value_type
-QuaQuaMapperFunctionCL::value (const value_type& x)
+QuaQuaMapperFunctionCL::value ()
 {
-    if (maybe_change_current_point (x))
-        compute_F ();
     return F;
 }
 
@@ -238,20 +247,16 @@ QuaQuaMapperFunctionCL::compute_dF ()
 }
 
 QuaQuaMapperFunctionCL::value_type
-QuaQuaMapperFunctionCL::apply_derivative (const value_type& x, const value_type& v)
+QuaQuaMapperFunctionCL::apply_derivative (const value_type& v)
 {
-    if (maybe_change_current_point (x))
-        compute_F();
     if (!dF_p)
         compute_dF();
     return dF*v;
 }
 
 QuaQuaMapperFunctionCL::value_type
-QuaQuaMapperFunctionCL::apply_derivative_transpose (const value_type& x, const value_type& v)
+QuaQuaMapperFunctionCL::apply_derivative_transpose (const value_type& v)
 {
-    if (maybe_change_current_point (x))
-        compute_F();
     if (!dF_p)
         compute_dF ();
     return transp_mul(dF, v);
@@ -268,10 +273,8 @@ QuaQuaMapperFunctionCL::compute_dFinv ()
 }
 
 QuaQuaMapperFunctionCL::value_type
-QuaQuaMapperFunctionCL::apply_derivative_inverse (const value_type& x, const value_type& v)
+QuaQuaMapperFunctionCL::apply_derivative_inverse (const value_type& v)
 {
-    if (maybe_change_current_point (x))
-        compute_F();
     if (!dFinv_p)
         compute_dFinv ();
     value_type ret (v);
@@ -280,7 +283,7 @@ QuaQuaMapperFunctionCL::apply_derivative_inverse (const value_type& x, const val
 }
 
 double
-QuaQuaMapperFunctionCL::initial_damping_factor (const value_type& /*x*/, const value_type& dx, const value_type& /*F*/)
+QuaQuaMapperFunctionCL::initial_damping_factor (const value_type& dx, const value_type& /*F*/)
 {
     return 0.5*quaqua_->cache_->get_h()/MakePoint3D( dx[0], dx[1], dx[2]).norm();
 }
@@ -495,7 +498,7 @@ void QuaQuaMapperCL::base_point_newton () const
     double tol= tol_;
     size_t max_damping_steps= max_damping_steps_;
     SVectorCL<4> x= f_->get_point();
-    newton_solve (*f_, x, iter, tol, max_damping_steps, armijo_c_);
+    newton_solve_1 (*f_, x, iter, tol, max_damping_steps, armijo_c_);
     btet= f_->get_tetra();
     bxb= f_->get_bary();
     // Compute the quasi-distance dh:
