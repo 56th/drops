@@ -243,18 +243,18 @@ class LocalQuaMapperFunctionCL
     World2BaryCoordCL w2b;
     double max_bary_step= 0.75;   // default 0.7; max. step size in barycentric coordinates in initial_damping_factor.
 
-    bool xF_p, xdF_p, xdFinv_p;  // Remember if xF, xdF, xdFinv have been initialized.
-    value_type xF, xdF, xdFinv;  // Points at which F, dF, dFinv are set up.
-    BaryCoordCL bxF, bxdF;       // Barycentric coordinates of the spatial part of xF, xdF, xdFinv.
-    Point3DCL g_ls_xF, g_ls_xdF; // Gradient of ls at xF, xdF, xdFinv.
+    bool dF_p, dFinv_p;  // Remember if dF, dFinv have been initialized.
+    value_type xcur;  // Point at which F, dF, dFinv are set up.
+    BaryCoordCL bcur;       // Barycentric coordinates of the spatial part of xcur.
+    Point3DCL g_ls_cur; // Gradient of ls at xcur.
 
     value_type F;           // value at xF;
     SMatrixCL<4, 4>  dF;    // Jacobian at xdFinv.
     QRDecompCL<4, 4> dFinv; // Solver for Jacobian at xdFinv.
 
-    void compute_F (const value_type& x);     // Compute F and set xF.
-    void compute_dF (const value_type& x);    // Compute dF and set xdF.
-    void compute_dFinv (const value_type& x); // Compute dFinv and set xdFinv.
+    void compute_F ();     // Compute F and set xF.
+    void compute_dF ();    // Compute dF and set xdF.
+    void compute_dFinv (); // Compute dFinv and set xdFinv.
 
   public:
     LocalQuaMapperFunctionCL (
@@ -264,8 +264,8 @@ class LocalQuaMapperFunctionCL
         double harg,
         const World2BaryCoordCL& w2barg)
         : locls (loclsarg), level_value (0.), locls_grad (locls_gradarg), locls_H (locls_Harg),
-          h (harg), w2b (w2barg), xF_p (false), xdF_p (false), xdFinv_p (false) {}
-    LocalQuaMapperFunctionCL () : level_value (0.), xF_p (false), xdF_p (false), xdFinv_p (false) {}
+          h (harg), w2b (w2barg), dF_p (false), dFinv_p (false) {}
+    LocalQuaMapperFunctionCL () : level_value (0.), dF_p (false), dFinv_p (false) {}
 
     LocalQuaMapperFunctionCL& set_tetra (
         const LocalP2CL<>& loclsarg,
@@ -278,13 +278,12 @@ class LocalQuaMapperFunctionCL
         locls_H= locls_Harg;
         h= harg;
         w2b= w2barg;
-        xF_p= false;
-        xdF_p= false;
-        xdFinv_p= false;
+        dF_p= false;
+        dFinv_p= false;
         return *this;
     }
 
-    LocalQuaMapperFunctionCL& set_point (const Point3DCL& x) {
+    LocalQuaMapperFunctionCL& set_initial_point (const Point3DCL& x) {
         p= x;
         return *this;
     }
@@ -299,12 +298,13 @@ class LocalQuaMapperFunctionCL
         return *this;
     }
 
-    value_type value (const value_type& x);
-    value_type apply_derivative (const value_type& x, const value_type& v);
-    value_type apply_derivative_inverse (const value_type& x, const value_type& v);
-    value_type apply_derivative_transpose (const value_type& x, const value_type& v);
+    bool set_point (const value_type& x);
+    value_type value ();
+    value_type apply_derivative (const value_type& v);
+    value_type apply_derivative_inverse (const value_type& v);
+    value_type apply_derivative_transpose (const value_type& v);
 
-    double initial_damping_factor (const value_type& x, const value_type& dx, const value_type& F);
+    double initial_damping_factor (const value_type& dx, const value_type& F);
 
     const LocalP1CL<Point3DCL>& get_locls_grad () const { return locls_grad; }
 };

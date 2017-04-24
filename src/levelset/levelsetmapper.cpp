@@ -657,92 +657,88 @@ double abs_det (const TetraCL& tet, const BaryCoordCL& xb, const QuaQuaMapperCL&
 }
 
 
-void
-LocalQuaMapperFunctionCL::compute_F (const value_type& x)
+bool
+LocalQuaMapperFunctionCL::set_point (const value_type& x)
 {
-    xF_p= true;
-    xF= x;
-    bxF= w2b (Point3DCL (x.begin (), x.begin () + 3));
-    g_ls_xF= locls_grad( bxF);
+    if (xcur == x)
+        return true;
+
+    xcur= x;
+    bcur= w2b (Point3DCL (x.begin (), x.begin () + 3));
+    g_ls_cur= locls_grad( bcur);
+    dF_p= dFinv_p= false;
+    compute_F ();
+
+    return true;
+}
+
+void
+LocalQuaMapperFunctionCL::compute_F ()
+{
     for (Uint i= 0; i < 3; ++i)
-        F[i]= p[i] - x[i] - x[3]*g_ls_xF[i];
-    F[3]= -(locls( bxF) - level_value);
+        F[i]= p[i] - xcur[i] - xcur[3]*g_ls_cur[i];
+    F[3]= -(locls( bcur) - level_value);
 }
 
 LocalQuaMapperFunctionCL::value_type
-LocalQuaMapperFunctionCL::value (const value_type& x)
+LocalQuaMapperFunctionCL::value ()
 {
-    if (!xF_p || !(xF == x))
-        compute_F (x);
     return F;
 }
 
 void
-LocalQuaMapperFunctionCL::compute_dF (const value_type& x)
+LocalQuaMapperFunctionCL::compute_dF ()
 {
-    xdF_p= true;
-    xdF= x;
-
-    if (xF_p && xF == xdF) {
-        bxdF= bxF;
-        g_ls_xdF= g_ls_xF;
-    }
-    else {
-        bxdF= w2b (Point3DCL (x.begin (), x.begin () + 3));
-        g_ls_xdF= locls_grad( bxdF);
-    }
+    dF_p= true;
 
     for (Uint i= 0; i < 3; ++i) {
         for (Uint j= 0; j < 3; ++j)
-            dF (i,j)= -x[3]*locls_H (i,j);
+            dF (i,j)= -xcur[3]*locls_H (i,j);
         dF (i,i)-= 1.;
-        dF (i, 3)= -g_ls_xdF[i];
-        dF (3, i)= -g_ls_xdF[i];
+        dF (i, 3)= -g_ls_cur[i];
+        dF (3, i)= -g_ls_cur[i];
     }
     dF( 3,3)= 0.;
 }
 
 LocalQuaMapperFunctionCL::value_type
-LocalQuaMapperFunctionCL::apply_derivative (const value_type& x, const value_type& v)
+LocalQuaMapperFunctionCL::apply_derivative (const value_type& v)
 {
-    if (!xdF_p || !(xdF == x))
-        compute_dF (x);
-// std::cerr << "LocalQuaMapperFunctionCL::apply_derivative: xdF: " << w2b (Point3DCL(x.begin (), x.begin () + 3)) << std::endl;
+    if (!dF_p)
+        compute_dF ();
     return dF*v;
 }
 
 LocalQuaMapperFunctionCL::value_type
-LocalQuaMapperFunctionCL::apply_derivative_transpose (const value_type& x, const value_type& v)
+LocalQuaMapperFunctionCL::apply_derivative_transpose (const value_type& v)
 {
-    if (!xdF_p || !(xdF == x))
-        compute_dF (x);
-    return transp_mul(dF, v);
+    if (!dF_p)
+        compute_dF ();
+    return transp_mul (dF, v);
 }
 
 void
-LocalQuaMapperFunctionCL::compute_dFinv (const value_type& x)
+LocalQuaMapperFunctionCL::compute_dFinv ()
 {
-    xdFinv_p= true;
-    xdFinv= x;
+    dFinv_p= true;
 
-    compute_dF (x);
-    SMatrixCL<4, 4>& M= dFinv.GetMatrix ();
-    M= dF;
+    compute_dF ();
+    dFinv.GetMatrix ()= dF;
     dFinv.prepare_solve ();
 }
 
 LocalQuaMapperFunctionCL::value_type
-LocalQuaMapperFunctionCL::apply_derivative_inverse (const value_type& x, const value_type& v)
+LocalQuaMapperFunctionCL::apply_derivative_inverse (const value_type& v)
 {
-    if (!xdFinv_p || !(xdFinv == x))
-        compute_dFinv (x);
+    if (!dFinv_p)
+        compute_dFinv ();
     value_type ret (v);
     dFinv.Solve (ret);
     return ret;
 }
 
 double
-LocalQuaMapperFunctionCL::initial_damping_factor (const value_type& /*x*/, const value_type& dx, const value_type& /*F*/)
+LocalQuaMapperFunctionCL::initial_damping_factor (const value_type& dx, const value_type& /*F*/)
 {
     // Choose initial damping factor so small that the step size in barycentric coordinates is at most max_bary_step.
     const BaryCoordCL bdir= w2b.map_direction (Point3DCL( dx.begin (), dx.begin () + 3));
@@ -808,12 +804,12 @@ const LocalQuaMapperCL& LocalQuaMapperCL::base_point () const
         double tol= tol_;
         size_t max_damping_steps= max_damping_steps_;
         const Point3DCL p= b2w (xb);
-        localF.set_point (p);
+        localF.set_initial_point (p);
         // Setup initial value.
         LocalQuaMapperFunctionCL::value_type x;
         std::copy (p.begin (), p.end (), x.begin ());
         x[3]= 0.;
-        newton_solve (localF, x, maxiter, tol, max_damping_steps, armijo_c_);
+        newton_solve_1 (localF, x, maxiter, tol, max_damping_steps, armijo_c_);
         const Point3DCL x_spatial (x.begin (), x.begin () + 3);
         bxb= w2b (x_spatial);
         dh= (p - x_spatial).norm () * (x[3] > 0. ? 1. : -1.); // x[3]*loc_ls_grad (bxb).norm ();
