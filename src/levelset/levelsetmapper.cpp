@@ -744,13 +744,9 @@ LocalQuaMapperFunctionCL::apply_derivative_inverse (const value_type& x, const v
 double
 LocalQuaMapperFunctionCL::initial_damping_factor (const value_type& /*x*/, const value_type& dx, const value_type& /*F*/)
 {
-    // Choose l so small that all barycentric coordinates of the new point are >= lower_bary.
+    // Choose initial damping factor so small that the step size in barycentric coordinates is at most max_bary_step.
     const BaryCoordCL bdir= w2b.map_direction (Point3DCL( dx.begin (), dx.begin () + 3));
-    double l= 1.;
-    for (Uint i= 0; i < 4; ++i)
-        if (std::abs (bdir[i]) > 1e-12)
-            l= std::min (l, std::abs ((bxdF[i] - lower_bary)/bdir[i]));
-    return l;
+    return bdir.norm() < 1e-12 ? 1. : max_bary_step/bdir.norm();
 }
 
 
@@ -833,7 +829,7 @@ const LocalQuaMapperCL& LocalQuaMapperCL::base_point () const
 //             char tmp;
 //             std::cin >> tmp;
 //         }
-        base_in_trust_region= maxiter < (size_t) maxiter_ && tol < tol_; // Otherwise, the iteration was terminated prematurely because the boundary of the trust region was reached.
+        base_in_trust_region= tol < tol_ && *std::min_element (bxb.begin(), bxb.end()) > lower_bary_for_trust_region; // We trust the base point, if the newton_solver converged and the base point is close enough to the tetra.
         have_base_point= true;
 
         min_outer_iter= std::min( min_outer_iter, (Uint) maxiter);

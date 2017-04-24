@@ -241,7 +241,7 @@ class LocalQuaMapperFunctionCL
     SMatrixCL<3, 3> locls_H; // Hessian of ls on tet.
     double h;             // local mesh width at tet.
     World2BaryCoordCL w2b;
-    double lower_bary;   // default -0.5; lower bound for the barycentric coordinates in initial_damping_factor.
+    double max_bary_step= 0.75;   // default 0.7; max. step size in barycentric coordinates in initial_damping_factor.
 
     bool xF_p, xdF_p, xdFinv_p;  // Remember if xF, xdF, xdFinv have been initialized.
     value_type xF, xdF, xdFinv;  // Points at which F, dF, dFinv are set up.
@@ -264,8 +264,8 @@ class LocalQuaMapperFunctionCL
         double harg,
         const World2BaryCoordCL& w2barg)
         : locls (loclsarg), level_value (0.), locls_grad (locls_gradarg), locls_H (locls_Harg),
-          h (harg), w2b (w2barg), lower_bary (-0.5), xF_p (false), xdF_p (false), xdFinv_p (false) {}
-    LocalQuaMapperFunctionCL () : level_value (0.), lower_bary (-0.5), xF_p (false), xdF_p (false), xdFinv_p (false) {}
+          h (harg), w2b (w2barg), xF_p (false), xdF_p (false), xdFinv_p (false) {}
+    LocalQuaMapperFunctionCL () : level_value (0.), xF_p (false), xdF_p (false), xdFinv_p (false) {}
 
     LocalQuaMapperFunctionCL& set_tetra (
         const LocalP2CL<>& loclsarg,
@@ -294,8 +294,8 @@ class LocalQuaMapperFunctionCL
         return *this;
     }
 
-    LocalQuaMapperFunctionCL& set_lower_bound_bary (double lb) {
-        lower_bary= lb;
+    LocalQuaMapperFunctionCL& set_max_bary_step (double l) {
+        max_bary_step= l;
         return *this;
     }
 
@@ -338,6 +338,7 @@ class LocalQuaMapperCL
     mutable double dh;
     mutable bool have_base_point,
                  base_in_trust_region;
+    double lower_bary_for_trust_region= -1.;
 
     mutable DeformationMethodE deformation_method;
     mutable bool have_deformation;
@@ -363,7 +364,8 @@ class LocalQuaMapperCL
     const LocalQuaMapperCL& set_tetra (const TetraCL* tetarg) const;
     const LocalQuaMapperCL& base_point () const;
     const LocalQuaMapperCL& set_trust_region (double lb) {
-        localF.set_lower_bound_bary (-lb);
+        lower_bary_for_trust_region= -lb;
+        localF.set_max_bary_step (.75);
         return *this;
     }
     const LocalQuaMapperCL& set_deformation_method (DeformationMethodE m) const {
