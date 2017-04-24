@@ -241,67 +241,64 @@ class LocalQuaMapperCL
 
 
 // Compute the average of a LocalQuaMapperCL in all P2-dofs.
+template <class TraitT>
 class LocalQuaMapperP2CL
 {
+  public:
+    using value_type= typename TraitT::value_type;
+    static const int num_components= TraitT::num_components;
+
   private:
     LocalQuaMapperCL f_;
 
-    double loc_[10];
+    value_type loc_[10];
+    bool valid_[10];
 
   public:
-    typedef double value_type;
-    static const int num_components= 1;
-
     LocalQuaMapperP2CL (const LocalQuaMapperCL& f)
         : f_( f) {}
 
     void set_tetra (const TetraCL* t) {
         f_.set_tetra (t);
         for (Uint i= 0; i < 10; ++i) {
-            f_.set_point(FE_P2CL::bary_coord[i])
-              .base_point ();
-            loc_[i]= f_.base_in_trust_region_p () ? f_.get_dh () : std::numeric_limits<double>::max ();
+            loc_[i]= TraitT::get (FE_P2CL::bary_coord[i], f_);
+            valid_[i]= f_.base_in_trust_region_p();
         }
     }
     value_type&       operator[] (size_t i)       { return loc_[i]; }
     const value_type& operator[] (size_t i) const { return loc_[i]; }
-    bool invalid_p (size_t i) const { return loc_[i] == std::numeric_limits<double>::max (); }
+    bool invalid_p (size_t i) const { return !valid_[i]; }
     void finalize_accumulation () {
         std::cout << "LocalQuaMapperP2CL::Distribution of outer iterations:\n";
         seq_out( f_.num_outer_iter.begin(), f_.num_outer_iter.end(), std::cout);
     }
 };
 
-// Compute the average of the mesh deformation in LocalQuaMapperCL in all P2-dofs.
-class LocalQuaMapperDeformationP2CL
+struct LocalQuaMapperP2DistanceTraitsCL
 {
-  private:
-    LocalQuaMapperCL f_;
-
-    Point3DCL loc_[10];
-
-  public:
-    typedef Point3DCL value_type;
-    static const int num_components= 3;
-
-    LocalQuaMapperDeformationP2CL (const LocalQuaMapperCL& f)
-        : f_( f) {}
-
-    void set_tetra (const TetraCL* t) {
-        f_.set_tetra (t);
-        for (Uint i= 0; i < 10; ++i)
-            loc_[i]= f_.set_point(FE_P2CL::bary_coord[i])
-                       .compute_deformation ()
-                       .get_deformation ();
-    }
-    value_type&       operator[] (size_t i)       { return loc_[i]; }
-    const value_type& operator[] (size_t i) const { return loc_[i]; }
-    bool invalid_p (size_t i) const { return loc_[i][0] == std::numeric_limits<double>::max (); }
-    void finalize_accumulation () {
-        std::cout << "LocalQuaMapperDeformationP2CL::Distribution of outer iterations:\n";
-        seq_out( f_.num_outer_iter.begin(), f_.num_outer_iter.end(), std::cout);
+    using value_type= double;
+    static const int num_components= 1;
+    static value_type get (const BaryCoordCL& b, const LocalQuaMapperCL& f) {
+        return f.set_point (b)
+                .base_point ()
+                .get_dh ();
     }
 };
+
+using LocalQuaMapperDistanceP2CL= LocalQuaMapperP2CL<LocalQuaMapperP2DistanceTraitsCL>;
+
+struct LocalQuaMapperP2DeformationTraitsCL
+{
+    using value_type= Point3DCL;
+    static const int num_components= 3;
+    static value_type get (const BaryCoordCL& b, const LocalQuaMapperCL& f) {
+        return f.set_point (b)
+                .compute_deformation ()
+                .get_deformation ();
+    }
+};
+
+using LocalQuaMapperDeformationP2CL= LocalQuaMapperP2CL<LocalQuaMapperP2DeformationTraitsCL>;
 
 } // end of namespace DROPS
 

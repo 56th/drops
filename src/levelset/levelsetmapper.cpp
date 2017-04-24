@@ -976,7 +976,6 @@ const LocalQuaMapperCL& LocalQuaMapperCL::compute_deformation () const
     have_base_point= false;
     base_point ();
     if (!base_in_trust_region_p ()) {
-        deformation= MakePoint3D (std::numeric_limits<double>::max (), 0., 0.);
         have_deformation= false;
         return *this;
     }

@@ -1512,9 +1512,9 @@ void StationaryStrategyDeformationP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangC
         /*max_damping_steps*/ P.get<Uint>( "LevelsetMapper.MaxDampingSteps"));
     locqua.set_trust_region (P.get<double>( "LevelsetMapper.TrustRegion"))
           .set_deformation_method (P.get<std::string>( "LevelsetMapper.DeformationMethod") == "map_local_level_sets" ? LocalQuaMapperCL::MAP_LOCAL_LEVEL_SETS : LocalQuaMapperCL::MAP_ZERO_LEVEL_SETS);
-    LocalQuaMapperP2CL locquap2(locqua); // Provides the interface for the Oswald-projection class.
+    LocalQuaMapperDistanceP2CL locquap2(locqua); // Provides the interface for the Oswald-projection class.
     VecDescCL locdist_vd ( &p2idx);
-    OswaldProjectionP2AccuCL<LocalQuaMapperP2CL> loc_dist_accu(locquap2, locdist_vd);
+    OswaldProjectionP2AccuCL<LocalQuaMapperDistanceP2CL> loc_dist_accu(locquap2, locdist_vd);
         loc_dist_accu.set_level_set_function (&lset.Phi, &lset.GetBndData(), &PrincipalLatticeCL::instance (1))
                      .set_check_averaging (true);
     TetraAccumulatorTupleCL accus2;
