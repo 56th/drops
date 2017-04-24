@@ -71,19 +71,19 @@ class QuaQuaMapperCL
     LocalP1CL<Point3DCL> gradrefp2[10];
 
     // The neighborhoods around each tetra in which base points are searched for.
-    TetraToTetrasT* neighborhoods_;
+    TetraToTetrasT* neighborhoods_= nullptr;
     mutable MyLocatorCL locator_;
 
     mutable std::unique_ptr<base_point_newton_cacheCL> cache_;
     std::unique_ptr<QuaQuaMapperFunctionCL> f_;
 
-    mutable const TetraCL* tet;
+    mutable const TetraCL* tet= nullptr;
     mutable BaryCoordCL xb;
-    mutable const TetraCL* btet;
+    mutable const TetraCL* btet= nullptr;
     mutable BaryCoordCL bxb;
     mutable double dh;
     mutable SMatrixCL<3,3> dph;
-    mutable bool have_dph;
+    mutable bool have_dph= false;
 
     void locate_new_point (const Point3DCL& x, const Point3DCL& dx, const TetraCL*& tet, BaryCoordCL& xb, double& d) const;
     bool line_search (Point3DCL& v, const Point3DCL& nx, const TetraCL*& tetra, BaryCoordCL& bary) const;
@@ -128,17 +128,18 @@ class QuaQuaMapperCL
     mutable std::vector<size_t> num_outer_iter;
     mutable std::vector<size_t> num_inner_iter;
 
-    mutable double base_point_time,
-                   locate_new_point_time;
-    mutable Uint cur_num_outer_iter,
-                 min_outer_iter,
-                 max_outer_iter,
-                 total_outer_iter,
-                 total_inner_iter,
-                 total_damping_iter,
-                 total_base_point_calls,
-                 total_locate_new_point_calls;
+    mutable double base_point_time= 0.,
+                   locate_new_point_time= 0.;
+    mutable Uint cur_num_outer_iter= 0,
+                 min_outer_iter= -1u,
+                 max_outer_iter= 0,
+                 total_outer_iter= 0,
+                 total_inner_iter= 0,
+                 total_damping_iter= 0,
+                 total_base_point_calls= 0,
+                 total_locate_new_point_calls= 0;
 };
+
 
 void compute_tetra_neighborhoods (const DROPS::MultiGridCL& mg, const VecDescCL& lsetPhi, const BndDataCL<>& lsetbnd, const PrincipalLatticeCL& lat, TetraToTetrasT& tetra_neighborhoods);
 

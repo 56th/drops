@@ -311,10 +311,8 @@ QuaQuaMapperCL::QuaQuaMapperCL (const MultiGridCL& mg, VecDescCL& lsarg, const V
       use_line_search_( use_line_search), armijo_c_( armijo_c), max_damping_steps_( max_damping_steps),
       ls( &lsarg, &nobnddata, &mg), ls_grad_rec( &ls_grad_recarg, &nobnddata_vec, &mg),
       neighborhoods_( neighborhoods), locator_( mg, lsarg.GetLevel(), /*greedy*/ false),
-      cache_( new base_point_newton_cacheCL (ls, ls_grad_rec, gradrefp2)), f_ (new QuaQuaMapperFunctionCL (this)), tet( 0), btet( 0), have_dph( false),
-      num_outer_iter( maxiter + 1), num_inner_iter( maxinneriter_ + 1),
-      base_point_time( 0.), locate_new_point_time( 0.), cur_num_outer_iter( 0), min_outer_iter(-1u), max_outer_iter( 0),
-      total_outer_iter( 0), total_inner_iter( 0), total_damping_iter( 0), total_base_point_calls( 0), total_locate_new_point_calls( 0)
+      cache_( new base_point_newton_cacheCL (ls, ls_grad_rec, gradrefp2)), f_ (new QuaQuaMapperFunctionCL (this)),
+      num_outer_iter( maxiter + 1), num_inner_iter( maxinneriter_ + 1)
 {
     P2DiscCL::GetGradientsOnRef( gradrefp2);
 }
