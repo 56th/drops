@@ -124,8 +124,6 @@ class QuaQuaMapperFunctionCL
     SMatrixCL<4, 4>  dF;    // Jacobian at xcur.
     QRDecompCL<4, 4> dFinv; // Solver for Jacobian at xcur.
 
-    bool maybe_change_current_point (const value_type& x);
-
     void compute_F ();     // Compute F at xcur.
     void compute_dF ();    // Compute dF at xcur, requires compute_F.
     void compute_dFinv (); // Compute dFinv at xcur, requires compute_F.
