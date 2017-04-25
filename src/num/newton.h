@@ -84,7 +84,7 @@ void newton_solve (FunctionT& fun, typename FunctionT::value_type& x, size_t& ma
         dx= fun.apply_derivative_inverse (F);
 //         if (iter == 0) // Initial gradient descent step
 //             dx= fun.apply_derivative_transpose (F/normF);
-        const double armijo_slope= armijo_c*inner_prod( F, fun.apply_derivative (dx))/normF;
+        const double armijo_slope= armijo_c*NewtonImplNS::dot( F, fun.apply_derivative (dx))/normF;
         // Armijo-rule with backtracking
         l= std::min( 1., fun.initial_damping_factor (dx, F));
         Uint j;
