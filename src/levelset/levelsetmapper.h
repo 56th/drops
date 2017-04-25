@@ -46,11 +46,13 @@ typedef std::pair<const TetraCL*, BaryCoordCL> TetraBaryPairT;
 // Forward declaration of helper classes of QuaQuaMapperCL.
 class base_point_newton_cacheCL;
 class QuaQuaMapperFunctionCL;
+class QuaQuaMapperLineSearchFunctionCL;
 
 class QuaQuaMapperCL
 {
   private:
     friend QuaQuaMapperFunctionCL;
+    friend QuaQuaMapperLineSearchFunctionCL;
 
     int maxiter_;
     double tol_;
@@ -76,6 +78,7 @@ class QuaQuaMapperCL
 
     mutable std::unique_ptr<base_point_newton_cacheCL> cache_;
     std::unique_ptr<QuaQuaMapperFunctionCL> f_;
+    std::unique_ptr<QuaQuaMapperLineSearchFunctionCL> f_line_search_;
 
     mutable const TetraCL* tet= nullptr;
     mutable BaryCoordCL xb;

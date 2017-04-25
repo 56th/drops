@@ -286,6 +286,119 @@ QuaQuaMapperFunctionCL::initial_damping_factor (const value_type& dx, const valu
     return 0.5*quaqua_->cache_->get_h()/MakePoint3D( dx[0], dx[1], dx[2]).norm();
 }
 
+
+class QuaQuaMapperLineSearchFunctionCL
+{
+  public:
+    typedef double value_type;
+
+  private:
+    mutable QuaQuaMapperCL* quaqua_= 0;
+
+    bool dF_p= false;  // Remember if dF has been initialized.
+    value_type xcur;        // Point at which F, dF, dFinv are set up.
+    const TetraCL* btet= 0; // "
+    BaryCoordCL bxb;        // "
+    Point3DCL x0,    // World coordinates of initial point.
+              nline; // Direction defining a line through x0.
+    Point3DCL gh; // Recovered gradient at xcur.
+
+    value_type F; // value at xcur;
+    double  dF;   // Jacobian at xcur.
+
+    void compute_F () {  // Compute F at xcur.
+        F= quaqua_->cache_->locls() ( bxb);
+    }
+
+    void compute_dF () { // Compute dF at xcur.
+        dF= -inner_prod( gh, nline);
+        dF_p= true;
+    }
+
+  public:
+    QuaQuaMapperLineSearchFunctionCL (QuaQuaMapperCL* quaqua)
+        : quaqua_ (quaqua) {}
+
+    // Set initial point x0, direction of the line nline, btet, and bxb; compute xcur gh, and F.
+    QuaQuaMapperLineSearchFunctionCL& set_initial_point (const TetraCL* tet, const BaryCoordCL& xb, const Point3DCL& n);
+
+    value_type      get_point () const { return xcur; }
+    BaryCoordCL     get_bary  () const { return bxb; }
+    const TetraCL*  get_tetra () const { return btet; }
+    Point3DCL       get_gh    () const { return gh; }
+
+    bool set_point (const value_type& x);
+    value_type value () { return F; };
+    value_type apply_derivative (const value_type& v) {
+        if (!dF_p)
+            compute_dF();
+        return dF*v;
+    }
+    value_type apply_derivative_inverse ( const value_type& v) {
+        if (!dF_p)
+            compute_dF ();
+        return v/dF;
+    }
+    value_type apply_derivative_transpose (const value_type& v) {
+        if (!dF_p)
+            compute_dF ();
+        return dF*v;
+    }
+
+    double initial_damping_factor (const value_type& dx, const value_type& /*F*/) {
+        return 0.5*quaqua_->cache_->get_h()/std::fabs( dx);
+    }
+};
+
+QuaQuaMapperLineSearchFunctionCL&
+QuaQuaMapperLineSearchFunctionCL::set_initial_point (const TetraCL* tet, const BaryCoordCL& xb, const Point3DCL& n)
+{
+    btet= tet;
+    bxb=  xb;
+    x0= GetWorldCoord (*btet, bxb);
+    xcur= 0.;
+    nline= n;
+
+    quaqua_->cache_->set_tetra( btet);
+    gh= quaqua_->cache_->loc_gh() (bxb);
+    F= quaqua_->cache_->locls() (bxb);
+
+    dF_p= false;
+
+    return *this;
+}
+
+bool
+QuaQuaMapperLineSearchFunctionCL::set_point (const value_type& x)
+{
+    if (xcur == x)
+        return true;
+
+    double l= 1.;
+    BaryCoordCL newbxb= quaqua_->cache_->w2b()( x0 - x*nline);
+    const TetraCL* newbtet= btet;
+    try {
+        quaqua_->locate_new_point( x0 - xcur*nline, (xcur - x)*nline, newbtet, newbxb, l);
+    } catch (DROPSErrCL) {
+        return false;
+    }
+    if (l != 1.) {
+        std::cerr << " QuaQuaMapperFunctionCL::set_point: l: " << l << std::endl;
+        return false;
+    }
+
+    dF_p= false;
+    xcur= x;
+    btet= newbtet;
+    bxb= newbxb;
+    quaqua_->cache_->set_tetra (btet);
+    gh= quaqua_->cache_->loc_gh() (bxb);
+    compute_F ();
+
+    return true;
+}
+
+
 // Return a tetra from neighborhood that contains v up to precision eps in barycentric coordinates.
 // Returns 0 on failure.
 void enclosing_tetra (const Point3DCL& v, const TetraSetT& neighborhood, double eps, const TetraCL*& tetra, BaryCoordCL& bary)
@@ -309,7 +422,7 @@ QuaQuaMapperCL::QuaQuaMapperCL (const MultiGridCL& mg, VecDescCL& lsarg, const V
       use_line_search_( use_line_search), armijo_c_( armijo_c), max_damping_steps_( max_damping_steps),
       ls( &lsarg, &nobnddata, &mg), ls_grad_rec( &ls_grad_recarg, &nobnddata_vec, &mg),
       neighborhoods_( neighborhoods), locator_( mg, lsarg.GetLevel(), /*greedy*/ false),
-      cache_( new base_point_newton_cacheCL (ls, ls_grad_rec, gradrefp2)), f_ (new QuaQuaMapperFunctionCL (this)),
+      cache_( new base_point_newton_cacheCL (ls, ls_grad_rec, gradrefp2)), f_ (new QuaQuaMapperFunctionCL (this)), f_line_search_ (new QuaQuaMapperLineSearchFunctionCL (this)),
       num_outer_iter( maxiter + 1), num_inner_iter( maxinneriter_ + 1)
 {
     P2DiscCL::GetGradientsOnRef( gradrefp2);
@@ -320,7 +433,7 @@ QuaQuaMapperCL::QuaQuaMapperCL (const QuaQuaMapperCL& q)
       use_line_search_( q.use_line_search_), armijo_c_( q.armijo_c_), max_damping_steps_( q.max_damping_steps_),
       ls( q.ls), ls_grad_rec( q.ls_grad_rec),
       neighborhoods_( q.neighborhoods_), locator_( q.locator_),
-      cache_( new base_point_newton_cacheCL (ls, ls_grad_rec, gradrefp2)), f_ (new QuaQuaMapperFunctionCL (this)), tet( q.tet), btet( q.btet), have_dph( q.have_dph),
+      cache_( new base_point_newton_cacheCL (ls, ls_grad_rec, gradrefp2)), f_ (new QuaQuaMapperFunctionCL (this)), f_line_search_ (new QuaQuaMapperLineSearchFunctionCL (this)), tet( q.tet), btet( q.btet), have_dph( q.have_dph),
       num_outer_iter( q.num_outer_iter), num_inner_iter(q.num_inner_iter),
       base_point_time( q.base_point_time), locate_new_point_time( q.locate_new_point_time), cur_num_outer_iter( q.cur_num_outer_iter), min_outer_iter(q.min_outer_iter), max_outer_iter( q.max_outer_iter),
       total_outer_iter( q.total_outer_iter), total_inner_iter( q.total_inner_iter), total_damping_iter( q.total_damping_iter), total_base_point_calls( q.total_base_point_calls), total_locate_new_point_calls( q.total_locate_new_point_calls)
@@ -380,75 +493,21 @@ const QuaQuaMapperCL& QuaQuaMapperCL::set_point (const TetraCL* tetarg, const Ba
 
 bool QuaQuaMapperCL::line_search (Point3DCL& x, const Point3DCL& nx, const TetraCL*& tetra, BaryCoordCL& bary) const
 {
-    bool found_newtet;
+    f_line_search_->set_initial_point (btet, bxb, nx);
+    size_t iter= maxinneriter_;
+    double tol= innertol_;
+    size_t max_damping_steps= max_damping_steps_;
+    double alpha= f_line_search_->get_point();
+    newton_solve (*f_line_search_, alpha, iter, tol, max_damping_steps, armijo_c_);
+    tetra= f_line_search_->get_tetra();
+    bary=  f_line_search_->get_bary();
+    x= x - alpha*nx;
 
-    double dalpha= 0.;
-    double l;
-    int inneriter= 0;
+    total_damping_iter+= max_damping_steps;
+    total_inner_iter+= iter;
+    ++num_inner_iter[iter];
 
-    Point3DCL xnew;
-    const TetraCL* newtet= tetra;
-    BaryCoordCL newbary;
-    double Fnew= std::numeric_limits<double>::max(); // Silence false warning.
-
-    const LocalP2CL<>&           locls= cache_->locls();
-    const LocalP2CL<Point3DCL>& loc_gh= cache_->loc_gh();
-
-    cache_->set_tetra( tetra);
-    bary= cache_->w2b()( x);
-    double F= locls( bary);
-    for (; inneriter < maxinneriter_; ++inneriter) {
-        if (std::abs( F) < innertol_)
-            break;
-
-        // Compute undamped Newton correction dalpha.
-        const Point3DCL& gradval= loc_gh( bary);
-        const double slope= inner_prod( gradval, nx);
-        if (std::abs( slope) < 1.0e-8)
-            std::cout << "g_phi: " << gradval << "\tgy: " << nx << std::endl;
-        dalpha= F/slope;
-
-        l= std::min( 1., 0.5*cache_->get_h()/std::abs( dalpha));
-        Uint j;
-        found_newtet= false;
-        for (j= 0; j < max_damping_steps_; ++j, l*= 0.5) {
-            if (l < 1e-7) {
-                std::cerr << "QuaQuaMapperCL::line_search: Too much damping. inneriter: " << inneriter <<  " x: " << x << " dalpha: " << dalpha << " ls(x): " << locls( bary) << " l: " << l << " slope: " << slope << std::endl;
-            }
-            xnew= x - (l*dalpha)*nx;
-            cache_->set_tetra( tetra);
-            newbary= cache_->w2b()( xnew);
-            try {
-                locate_new_point( x, -dalpha*nx, newtet, newbary, l);
-            }
-            catch (DROPSErrCL e) {
-                continue;
-            }
-            found_newtet= true;
-            cache_->set_tetra( newtet);
-            // Setup Fnew= locls( newbary)).
-            Fnew= locls( newbary);
-
-            // Armijo-rule
-            if (std::abs( Fnew) < std::abs( F) + armijo_c_*F*slope*dalpha/std::abs( F)*l) {
-                break;
-            }
-        }
-        total_damping_iter+= j;
-        if (!found_newtet)
-            throw DROPSErrCL( "QuaQuaMapperCL::line_search: Could not find the right tetra.\n");
-        tetra= newtet;
-        x= xnew;
-        bary= newbary;
-        F= Fnew;
-    }
-
-//     if (inneriter >= maxinneriter_)
-//         std::cout <<"QuaQuaMapperCL::line_search: Warning: max inner iteration number at x : " << x << " exceeded; ls.val: " << ls.val( *tetra, bary) << std::endl;
-    total_inner_iter+= inneriter;
-    ++num_inner_iter[inneriter];
-
-    return inneriter < maxinneriter_;
+    return tol < innertol_;
 }
 
 void QuaQuaMapperCL::base_point_with_line_search () const
@@ -463,15 +522,16 @@ void QuaQuaMapperCL::base_point_with_line_search () const
     Point3DCL n; // Current search direction.
 
 //     cache_->set_compute_gradp2( false);
-    cache_->set_tetra( btet); // To make get_h() well-defined.
 
     bool found_zero_level= false;
     int iter;
     for (iter= 1; iter < maxiter_; ++iter) {
         xold= x;
+        cache_->set_tetra( btet);
         n=  cache_->loc_gh()( bxb);
         n/= norm( n);
         x= x0 - alpha*n;
+
         found_zero_level= line_search( x, n, btet, bxb);
         alpha= inner_prod( n, x0 - x);
 
