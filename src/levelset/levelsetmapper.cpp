@@ -320,7 +320,7 @@ class QuaQuaMapperLineSearchFunctionCL
         : quaqua_ (quaqua) {}
 
     // Set initial point x0, direction of the line nline, btet, and bxb; compute xcur gh, and F.
-    QuaQuaMapperLineSearchFunctionCL& set_initial_point (const TetraCL* tet, const BaryCoordCL& xb, const Point3DCL& n);
+    QuaQuaMapperLineSearchFunctionCL& set_initial_point (const TetraCL* tet, const BaryCoordCL& xb, const Point3DCL& x0arg, const Point3DCL& n);
 
     value_type      get_point () const { return xcur; }
     BaryCoordCL     get_bary  () const { return bxb; }
@@ -351,11 +351,11 @@ class QuaQuaMapperLineSearchFunctionCL
 };
 
 QuaQuaMapperLineSearchFunctionCL&
-QuaQuaMapperLineSearchFunctionCL::set_initial_point (const TetraCL* tet, const BaryCoordCL& xb, const Point3DCL& n)
+QuaQuaMapperLineSearchFunctionCL::set_initial_point (const TetraCL* tet, const BaryCoordCL& xb, const Point3DCL& x0arg, const Point3DCL& n)
 {
     btet= tet;
     bxb=  xb;
-    x0= GetWorldCoord (*btet, bxb);
+    x0= x0arg;
     xcur= 0.;
     nline= n;
 
@@ -493,7 +493,7 @@ const QuaQuaMapperCL& QuaQuaMapperCL::set_point (const TetraCL* tetarg, const Ba
 
 bool QuaQuaMapperCL::line_search (Point3DCL& x, const Point3DCL& nx, const TetraCL*& tetra, BaryCoordCL& bary) const
 {
-    f_line_search_->set_initial_point (btet, bxb, nx);
+    f_line_search_->set_initial_point (btet, bxb, x, nx);
     size_t iter= maxinneriter_;
     double tol= innertol_;
     size_t max_damping_steps= max_damping_steps_;
@@ -515,7 +515,6 @@ void QuaQuaMapperCL::base_point_with_line_search () const
     btet= tet;
     bxb= xb;
 
-    double alpha= 0.;
     Point3DCL x, xold, x0; // World coordinates of current and previous xb and of the inital point.
     x0= x= GetWorldCoord( *btet, bxb);
 
@@ -529,11 +528,8 @@ void QuaQuaMapperCL::base_point_with_line_search () const
         xold= x;
         cache_->set_tetra( btet);
         n=  cache_->loc_gh()( bxb);
-        n/= norm( n);
-        x= x0 - alpha*n;
 
         found_zero_level= line_search( x, n, btet, bxb);
-        alpha= inner_prod( n, x0 - x);
 
         if ((xold - x).norm() < tol_ && found_zero_level)
             break;
@@ -543,7 +539,7 @@ void QuaQuaMapperCL::base_point_with_line_search () const
     }
     cur_num_outer_iter= iter;
     ++num_outer_iter[iter];
-    dh=  inner_prod( n, x0 - x);
+    dh=  inner_prod( n/n.norm(), x0 - x);
 }
 
 void QuaQuaMapperCL::base_point_newton () const
