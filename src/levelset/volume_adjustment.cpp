@@ -573,6 +573,10 @@ auto ComponentBasedVolumeAdjustmentCL::component_of_point (const std::vector<Poi
             }
         }
     }
+
+    if (std::count(cnew.begin(), cnew.end(),-1) > 0)
+        throw DROPSErrCL("ComponentBasedVolumeAdjustmentCL::component_of_point: Your problem changed from two-phase to one-phase or vice versa... this is not yet supported (and we encourage you to think about what you are doing!).\n");
+
     return cnew;
 }
 
