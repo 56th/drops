@@ -408,6 +408,12 @@ void ComponentBasedVolumeAdjustmentCL::compute_indicator_functions (const Sparse
 {
     doCorrection_= std::vector<bool> (num_components(), true);
 
+    if (num_components() == 2) {
+        indicator_functions_.clear();
+        for (Uint c=0; c<2; ++c)
+            indicator_functions_.push_back(sign_of_component_[c] == 1 ? std::valarray<double>() : std::valarray<double>(1.0, component_of_dof_.size()));
+    }
+
     const component_vector tmp (ExtendOneStep (A, component_of_dof_, doCorrection_));
     const component_vector tmp2 (ExtendOneStep (A, tmp, doCorrection_));
 
