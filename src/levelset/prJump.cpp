@@ -113,30 +113,37 @@ int main ( int argc, char** argv )
 
 
         // Create Initial Grid builder.
-        const double L = 1; // Vol = 8 L³
-        Point3DCL orig(-L), e1, e2, e3;
-        e1[0]= e2[1]= e3[2]= 2*L;
+        // const double L = 1; // Vol = 8 L³
+        Point3DCL orig = P.get<Point3DCL>("Mesh.Origin");
+        Point3DCL   e1 = P.get<Point3DCL>("Mesh.E1");
+        Point3DCL   e2 = P.get<Point3DCL>("Mesh.E2");
+        Point3DCL   e3 = P.get<Point3DCL>("Mesh.E3");
+        //Point3DCL orig(-L), e1, e2, e3;
+        //e1[0]= e2[1]= e3[2]= 2*L;
+        const int n1   = P.get<int>("Mesh.N1");
+        const int n2   = P.get<int>("Mesh.N2");
+        const int n3   = P.get<int>("Mesh.N3");
 
-        const int n = P.get<int>("DomainCond.MeshFile");
-        BrickBuilderCL builder( orig, e1, e2, e3, n, n, n );
+        BrickBuilderCL builder( orig, e1, e2, e3, n1, n2, n3 );
 
         // Create Stokes Problem
-        FiniteElementT prFE = P.get<double>("Stokes.XFEMStab") < 0 ? P1_FE : P1X_FE;
+        FiniteElementT prFE = P.get<double>("NavStokes.XFEMReduced") < 0 ? P1_FE : P1X_FE;
         TwoPhaseFlowCoeffCL coeffs(P); coeffs.volforce = &right_hand_side;
         StokesT prob( builder, coeffs,
                       StokesBndDataCL( 6, bc, bnd_fun ), prFE,
-                      P.get<double>("Stokes.XFEMStab"), vecP2_FE, P.get<double>("Stokes.epsP") );
+                      P.get<double>("NavStokes.XFEMReduced"), vecP2_FE,
+                      P.get<double>("NavStokes.GhostPenalty") );
 
         MultiGridCL& MG = prob.GetMG();
 
         // Refine the mesh around the interface.
-        EllipsoidCL::Init( P.get<Point3DCL>("Exp.PosDrop"),
-                           P.get<Point3DCL>("Exp.RadDrop") );
+        EllipsoidCL::Init( P.get<Point3DCL>("Levelset.PosDrop"),
+                           P.get<Point3DCL>("Levelset.RadDrop") );
 
         MarkerT marker( EllipsoidCL::DistanceFct,
-                        P.get<double>("AdaptRef.Width"),
-                        P.get<int>("AdaptRef.CoarsestLevel"),
-                        P.get<int>("AdaptRef.FinestLevel") );
+                        P.get<double>("Mesh.AdaptRef.Width"),
+                        P.get<int>("Mesh.AdaptRef.CoarsestLevel"),
+                        P.get<int>("Mesh.AdaptRef.FinestLevel") );
         AdapTriangCL adap( MG, &marker );
         adap.MakeInitialTriang();
 
@@ -144,7 +151,7 @@ int main ( int argc, char** argv )
         DROPS::InScaMap & inscamap = DROPS::InScaMap::getInstance();
         SurfaceTensionCL * sf;
         sf = new SurfaceTensionCL( inscamap["ConstTau"]);
-        double sigma = P.get<double>( "SurfTens.SurfTension" );
+        double sigma = P.get<double>( "NavStokes.Coeff.SurfTens.SurfTension" );
 
         std::unique_ptr<LevelsetP2CL> lset_ptr
         (
@@ -171,11 +178,11 @@ int main ( int argc, char** argv )
         // L2- and H1- errors of the solution.
         StokesT unscal_prob( MG, TwoPhaseFlowCoeffCL( 1, 1, 1, 1, 1, Point3DCL()),
                              StokesBndDataCL( 6, bc, bnd_fun ), prFE,
-                             P.get<double>("Stokes.XFEMStab") );
+                             P.get<double>("NavStokes.XFEMReduced") );
         Assemble( unscal_prob, lset, rhs );
 
-        const double delta_p = P.get<int>("SurfTens.ArtificialForce") ? sigma
-                               : sigma*2/P.get<Point3DCL>("Exp.RadDrop")[0];
+        const double delta_p = P.get<int>("NavStokes.Coeff.SurfTens.ArtificialForce") ? sigma
+                               : sigma*2/P.get<Point3DCL>("Levelset.RadDrop")[0];
         double unscal_error = L2ErrorPr( prob.p, unscal_prob.prM.Data.GetFinest(), delta_p,
                                          MG, prFE, prob.GetXidx() );
 
@@ -203,28 +210,32 @@ void Assemble( StokesT& Stokes, LevelsetP2CL& lset, VelVecDescCL& rhs )
     MultiGridCL& MG = Stokes.GetMG();
     MLIdxDescCL* vidx = &Stokes.vel_idx;
     MLIdxDescCL* pidx = &Stokes.pr_idx;
-    if ( StokesSolverFactoryHelperCL().VelMGUsed(P) )
+    ParamCL PSolver(P.get_child("OseenSolver"));
+    if ( StokesSolverFactoryHelperCL().VelMGUsed(PSolver) )
     {
         Stokes.SetNumVelLvl( MG.GetNumLevel() );
         lset.SetNumLvl( MG.GetNumLevel() );
     }
 
-    if ( StokesSolverFactoryHelperCL().PrMGUsed(P) )
+    if ( StokesSolverFactoryHelperCL().PrMGUsed(PSolver) )
     {
         Stokes.SetNumPrLvl( MG.GetNumLevel() );
         lset.SetNumLvl( MG.GetNumLevel() );
     }
 
     Stokes.CreateNumberingVel( MG.GetLastLevel(), vidx );
-    Stokes.CreateNumberingPr( MG.GetLastLevel(), pidx, NULL, &lset );
+    Stokes.CreateNumberingPr( MG.GetLastLevel(), pidx, &lset );
 
     Stokes.SetIdx();
     Stokes.v.SetIdx( vidx );
     Stokes.p.SetIdx( pidx );
     Stokes.InitVel( &Stokes.v, InVecMap::getInstance().find("ZeroVel")->second );
 
-    // Initialise prolongation matrices
-    StokesSolverFactoryCL<InstatStokes2PhaseP2P1CL> factory( Stokes, P );
+    // Initialise prolongation matrices    
+    ParamCL PTime(P.get_child("Time") );
+    StokesSolverFactoryCL<InstatStokes2PhaseP2P1CL> factory( Stokes,
+                                                             PSolver,
+                                                             PTime );
     UpdateProlongationCL<Point3DCL> PVel( MG, factory.GetPVel(), vidx, vidx );
     UpdateProlongationCL<double> PPr ( MG, factory.GetPPr(), pidx, pidx );
     UpdateProlongationCL<double> PLset( MG, lset.GetProlongation(),
@@ -251,7 +262,7 @@ void Assemble( StokesT& Stokes, LevelsetP2CL& lset, VelVecDescCL& rhs )
     // Assemble the stabilisation matrix -- part of SetupSystem2 now
     /*
     time.Reset();
-    Stokes.SetupC( &Stokes.C, lset, P.get<double>("Stokes.epsP") );
+    Stokes.SetupC( &Stokes.C, lset, P.get<double>("NavStokes.GhostPenalty") );
     time.Stop();
     std::cout << "Assembling the stabilisation matrix took: " << time.GetTime()
               << " seconds." << std::endl;
@@ -274,7 +285,7 @@ void Assemble( StokesT& Stokes, LevelsetP2CL& lset, VelVecDescCL& rhs )
     time.Reset();
     rhs.Clear( Stokes.v.t );
 
-    if (P.get<int>("SurfTens.ArtificialForce"))
+    if (P.get<int>("NavStokes.Coeff.SurfTens.ArtificialForce"))
         lset.SetSurfaceForce( SF_Const );
     else
         lset.SetSurfaceForce( SF_ImprovedLBVar);
@@ -294,8 +305,12 @@ void Solve( StokesT& Stokes, LevelsetP2CL& lset, VelVecDescCL& rhs )
     MLIdxDescCL* vidx = &Stokes.vel_idx;
     MLIdxDescCL* pidx = &Stokes.pr_idx;
 
-    // Initialise prolongation matrices
-    StokesSolverFactoryCL<InstatStokes2PhaseP2P1CL> factory( Stokes, P );
+    ParamCL PSolver(P.get_child("OseenSolver"));
+    ParamCL PTime(P.get_child("Time") );
+    // Initialise prolongation matrices    
+    StokesSolverFactoryCL<InstatStokes2PhaseP2P1CL> factory( Stokes,
+                                                             PSolver,
+                                                             PTime);
     UpdateProlongationCL<Point3DCL> PVel( MG, factory.GetPVel(), vidx, vidx );
     UpdateProlongationCL<double> PPr ( MG, factory.GetPPr(), pidx, pidx );
     UpdateProlongationCL<double> PLset( MG, lset.GetProlongation(),
@@ -552,7 +567,7 @@ void output( StokesT &Stokes, LevelsetP2CL& lset, BndDataCL<>& lsetbnd )
 
     vtk.Register( make_VTKScalar( Stokes.GetPrSolution(), "pressure" ) );
 
-    FiniteElementT prFE = P.get<double>("Stokes.XFEMStab") < 0 ? P1_FE : P1X_FE;
+    FiniteElementT prFE = P.get<double>("NavStokes.XFEMReduced") < 0 ? P1_FE : P1X_FE;
     if ( prFE == P1X_FE )
     {
         vtk.Register( make_VTKP1XScalar( MG, lset.Phi, Stokes.p, lsetbnd, "Xpressure" ) );
@@ -601,21 +616,21 @@ Point3DCL right_hand_side( const Point3DCL &p, double )
 
 double alpha_pos( double r2)
 {
-    static const double r2_IF= std::pow( P.get<Point3DCL>("Exp.RadDrop")[0], 2),
-            mu2= P.get<double>("Mat.ViscFluid"),
-            mu1= P.get<double>("Mat.ViscDrop");
+    static const double r2_IF= std::pow( P.get<Point3DCL>("Levelset.RadDrop")[0], 2),
+            mu2= P.get<double>("NavStokes.Coeff.ViscPos"),
+            mu1= P.get<double>("NavStokes.Coeff.ViscNeg");
     return 1./mu2 + (1./mu1 - 1./mu2)*std::exp( r2 - r2_IF);
 }
 
 double alpha_neg( double)
 {
-    static const double mu1= P.get<double>("Mat.ViscDrop");
+    static const double mu1= P.get<double>("NavStokes.Coeff.ViscNeg");
     return 1./mu1;
 }
 
 double alpha( double r2)
 {
-    static const double r2_IF= std::pow( P.get<Point3DCL>("Exp.RadDrop")[0], 2);
+    static const double r2_IF= std::pow( P.get<Point3DCL>("Levelset.RadDrop")[0], 2);
     return r2 < r2_IF ? alpha_neg( r2) : alpha_pos( r2);
 }
 

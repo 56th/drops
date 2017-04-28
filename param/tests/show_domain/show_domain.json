@@ -1,34 +1,31 @@
 {
-//=============================================================
-//    DROPS parameter file
-//    A brick with periodic boundaries.
-//=============================================================
-//General section
-	"General":
-	{
-		"ProgressBar":  0, //show progress bar
-		"DynamicLibsPrefix": "../", //where should we look for shared objects?
-		"DynamicLibs": [ //select libraries to be loaded after program start
-			"misc/libmisc-scalarFunctions",
-			"misc/libmisc-vectorFunctions"
-		]
-	},
-
-	"Domain":
-	{
-//		"Periodicity": // It is only a convention that this is a subsection of Domain.
+    "General": 
+    {
+        "DynamicLibs": 
+        [
+            "misc/libmisc-scalarFunctions", 
+            "misc/libmisc-vectorFunctions"
+        ], 
+        "DynamicLibsPrefix": "../", 
+        "ProgressBar": 0
+    }, 
+    
+    
+    "Mesh": 
+    {
+//		"PeriodicBnd": // It is only a convention that this is a subsection of Domain.
 //		{
 //			"PeriodicMatching": "mymatch",
-//			"0": "Per1Bnd",
-//			"1": "Per2Bnd"
+//			"0": "Per1BC",
+//			"1": "Per2BC"
 //		},
-		"Type": "BrickBuilder", // A parallelepiped
-		"Origin": [-1,-1,-1],	// Origin
-		"E1": [2,0,0],		// Basis to span the object,
-		"E2": [0,2,0],		// not necessary orthonormal
-		"E3": [0,0,2],		// ...
-		"N1": 5,		// Number of cells along the E1-direction,
-		"N2": 5,		//			 the E2-direction,
-		"N3": 5			//			 the E3-direction.
-	 }
+        "Type": "BrickBuilder", 
+        "Origin": [ -1, -1, -1 ], 
+        "N1": 5, 
+        "N2": 5, 
+        "N3": 5, 
+        "E1": [ 2, 0, 0 ], 
+        "E3": [ 0, 0, 2 ], 
+        "E2": [ 0, 2, 0 ]
+    }
 }

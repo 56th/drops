@@ -37,10 +37,9 @@ namespace DROPS
  * @param meshfile_name name of the gambit-meshfile or list of integers/double which determine the L-/B-/Cavity-/Brick domain, e.g. 1x1x1@2x3x2
  * @param GeomType type of the geometry: 0: GAMBIT mesh, 1: brick, 2: cavity, 3: l-brick, 4: b-brick
  * @param deserialization_file file that contains the (serialized) grid, "none": use standard builder
- * @param r_inlet inlet radius
 */
 void BuildDomain( MultiGridCL* &mgp, const std::string& meshfile_name, int GeomType,
-        const std::string& deserialization_file, double& r_inlet);
+        const std::string& deserialization_file);
 
 
 /// \brief determines boundary conditions
@@ -56,6 +55,10 @@ void BuildDomain( MultiGridCL* &mgp, const std::string& meshfile_name, int GeomT
 template< class BoundaryT>
 void BuildBoundaryData( const MultiGridCL* mgp, BoundaryT* &bnddata,
         const std::string& bnd_type, const std::string& bnd_funcs, match_fun periodic_match = 0, std::string* per_funcs = 0);
+
+template< class BoundaryT>
+void BuildBoundaryData( const MultiGridCL* mgp, BoundaryT* &bnddata,
+                        const ParamCL &P, match_fun periodic_match = 0, std::string* per_funcs = 0);
 
 } // end of namespace drops
 

@@ -41,16 +41,16 @@ namespace DROPS
 * member functions to create and delete numbering
 **************************************************************************************************/
 template <class Coeff>
-void StokesP2P1CL<Coeff>::CreateNumberingVel( Uint level, MLIdxDescCL* idx, match_fun match)
+void StokesP2P1CL<Coeff>::CreateNumberingVel( Uint level, MLIdxDescCL* idx)
 {
-    idx->CreateNumbering( level, MG_, BndData_.Vel, match);
+    idx->CreateNumbering( level, MG_, BndData_.Vel);
 }
 
 
 template <class Coeff>
-void StokesP2P1CL<Coeff>::CreateNumberingPr ( Uint level, MLIdxDescCL* idx, match_fun match)
+void StokesP2P1CL<Coeff>::CreateNumberingPr ( Uint level, MLIdxDescCL* idx)
 {
-    idx->CreateNumbering( level, MG_, BndData_.Pr, match);
+    idx->CreateNumbering( level, MG_, BndData_.Pr);
 }
 
 
@@ -382,7 +382,7 @@ void SetupSystem1_P2( const MultiGridCL& MG_, const CoeffT& Coeff_, const Stokes
     StokesSystem1Accumulator_P2CL<CoeffT> accu( Coeff_, BndData_, RowIdx, A, M, b, cplA, cplM, t);
     TetraAccumulatorTupleCL accus;
     accus.push_back( &accu);
-    accumulate( accus, MG_, RowIdx.TriangLevel(), RowIdx.GetMatchingFunction(), RowIdx.GetBndInfo());
+    accumulate( accus, MG_, RowIdx.TriangLevel(), RowIdx.GetBndInfo());
 }
 
 
@@ -553,7 +553,7 @@ void SetupSystem2_P2P1( const MultiGridCL& MG, const CoeffT& coeff, const Stokes
     System2Accumulator_P2P1CL<CoeffT> accu( coeff, BndData, *RowIdx, *ColIdx, *B, c, t);
     TetraAccumulatorTupleCL accus;
     accus.push_back( &accu);
-    accumulate( accus, MG, RowIdx->TriangLevel(), RowIdx->GetMatchingFunction(), RowIdx->GetBndInfo());
+    accumulate( accus, MG, RowIdx->TriangLevel(), RowIdx->GetBndInfo());
 }
 
 template <class CoeffT>
@@ -1100,8 +1100,7 @@ template <class Coeff>
 template <class Coeff>
 void StokesP2P1CL<Coeff>::SetNumVelLvl( size_t n)
 {
-    match_fun match= MG_.GetBnd().GetMatchFun();
-    vel_idx.resize( n, vecP2_FE, BndData_.Vel, match);
+    vel_idx.resize( n, vecP2_FE, BndData_.Vel);
     A.Data.resize ( vel_idx.size());
     M.Data.resize ( vel_idx.size());
 }
@@ -1109,8 +1108,7 @@ void StokesP2P1CL<Coeff>::SetNumVelLvl( size_t n)
 template <class Coeff>
 void StokesP2P1CL<Coeff>::SetNumPrLvl( size_t n)
 {
-    match_fun match= MG_.GetBnd().GetMatchFun();
-    pr_idx.resize( n, P1_FE,  BndData_.Pr, match);
+    pr_idx.resize( n, P1_FE,  BndData_.Pr);
     B.Data.resize( pr_idx.size());
     C.Data.resize( pr_idx.size());
     prM.Data.resize( pr_idx.size());

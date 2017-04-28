@@ -194,22 +194,22 @@ namespace AccumulatorImplNS {
 template <class AccuContainerT>
 struct do_accumulateCL
 {
-    static void accumulate (AccuContainerT& accus, const MultiGridCL& mg, int lastlvl, match_fun match, const BndCondCL& Bnd)
+    static void accumulate (AccuContainerT& accus, const MultiGridCL& mg, int lastlvl, const BndCondCL& Bnd)
     {
         for (typename AccuContainerT::iterator it= accus.begin(), end= accus.end(); it != end; ++it)
             do_accumulateCL<typename AccuContainerT::value_type>::accumulate(
-                *it, mg, lastlvl++ - accus.size() + 1, match, Bnd);
+                *it, mg, lastlvl++ - accus.size() + 1, Bnd);
     }
 };
 
 template <class VisitedT>
 struct do_accumulateCL<AccumulatorTupleCL<VisitedT> >
 {
-    static void accumulate (AccumulatorTupleCL<VisitedT>& accu, const MultiGridCL& mg, int lvl, __UNUSED__ match_fun match, __UNUSED__ const BndCondCL& Bnd)
+    static void accumulate (AccumulatorTupleCL<VisitedT>& accu, const MultiGridCL& mg, int lvl, __UNUSED__ const BndCondCL& Bnd)
     {
 #ifdef _OPENMP
         if (omp_get_max_threads() > 1)
-            accu( mg.GetColorClasses( lvl, match, Bnd));
+            accu( mg.GetColorClasses( lvl, Bnd));
         else
 #endif
             accu( mg.GetTriangTetraBegin( lvl), mg.GetTriangTetraEnd( lvl));
@@ -223,18 +223,18 @@ namespace AccumulatorFace {
 template <class AccuContainerT>
 struct do_accumulateCL
 {
-    static void accumulate (AccuContainerT& accus, const MultiGridCL& mg, int lastlvl, match_fun match, const BndCondCL& Bnd)
+    static void accumulate (AccuContainerT& accus, const MultiGridCL& mg, int lastlvl, const BndCondCL& Bnd)
     {
         for (typename AccuContainerT::iterator it= accus.begin(), end= accus.end(); it != end; ++it)
             do_accumulateCL<typename AccuContainerT::value_type>::accumulate(
-                *it, mg, lastlvl++ - accus.size() + 1, match, Bnd);
+                *it, mg, lastlvl++ - accus.size() + 1, Bnd);
     }
 };
 
 template <class VisitedT>
 struct do_accumulateCL<AccumulatorTupleCL<VisitedT> >
 {
-    static void accumulate (AccumulatorTupleCL<VisitedT>& accu, const MultiGridCL& mg, int lvl,__UNUSED__ match_fun match, __UNUSED__ const BndCondCL& Bnd)
+    static void accumulate (AccumulatorTupleCL<VisitedT>& accu, const MultiGridCL& mg, int lvl, __UNUSED__ const BndCondCL& Bnd)
     {
         // todo: find OpenMP compatible implementation
         /*if (omp_get_max_threads() > 1)
@@ -251,16 +251,16 @@ struct do_accumulateCL<AccumulatorTupleCL<VisitedT> >
 /// If accus is a container of AccumulatorTupleCL-objects, lvl is interpreted as last (finest) level to be used.
 template <class AccumulatorTupleT>
   inline void
-  accumulate (AccumulatorTupleT& accus, const MultiGridCL& mg, int lvl, match_fun match, const BndCondCL& Bnd)
+  accumulate (AccumulatorTupleT& accus, const MultiGridCL& mg, int lvl, const BndCondCL& Bnd)
 {
-    AccumulatorImplNS::do_accumulateCL<AccumulatorTupleT>::accumulate( accus, mg, lvl, match, Bnd);
+    AccumulatorImplNS::do_accumulateCL<AccumulatorTupleT>::accumulate( accus, mg, lvl, Bnd);
 }
 
 template <class AccumulatorTupleT>
   inline void
-  accumulate_faces (AccumulatorTupleT& accus, const MultiGridCL& mg, int lvl, match_fun match, const BndCondCL& Bnd)
+  accumulate_faces (AccumulatorTupleT& accus, const MultiGridCL& mg, int lvl, const BndCondCL& Bnd)
 {
-    AccumulatorFace::do_accumulateCL<AccumulatorTupleT>::accumulate( accus, mg, lvl, match, Bnd);
+    AccumulatorFace::do_accumulateCL<AccumulatorTupleT>::accumulate( accus, mg, lvl, Bnd);
 }
 
 /// \brief An AccumulatorTupleCL for each level.

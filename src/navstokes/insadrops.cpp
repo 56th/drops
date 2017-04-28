@@ -196,8 +196,7 @@ UpdateTriangulation(DROPS::NavierStokesP2P1CL<Coeff>& NS,
         shell_not_ready= ModifyGridStep( mg, Dist, width, c_level, f_level, t);
 
         // Repair velocity
-        match_fun match= NS.GetMG().GetBnd().GetMatchFun();
-        loc_vidx.CreateNumbering( mg.GetLastLevel(), mg, NS.GetBndData().Vel, match);
+        loc_vidx.CreateNumbering( mg.GetLastLevel(), mg, NS.GetBndData().Vel);
         if ( mg.GetLastLevel() != vidx1->TriangLevel()) {
             std::cout << "LastLevel: " << mg.GetLastLevel()
                       << " loc_vidx->TriangLevel: " << loc_vidx.TriangLevel() << std::endl;
@@ -211,7 +210,7 @@ UpdateTriangulation(DROPS::NavierStokesP2P1CL<Coeff>& NS,
         loc_v.Clear( t);
 
         // Repair pressure
-        loc_pidx.CreateNumbering( mg.GetLastLevel(), mg, NS.GetBndData().Pr, match);
+        loc_pidx.CreateNumbering( mg.GetLastLevel(), mg, NS.GetBndData().Pr);
         loc_p.SetIdx( &loc_pidx);
         p1repair.repair( loc_p);
         pidx1->DeleteNumbering( mg);

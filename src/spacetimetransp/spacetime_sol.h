@@ -95,13 +95,11 @@ private:
     VecDescCL past_vec_pos;
     VecDescCL past_vec_neg;
 
-
-    match_fun match;
 public:
 
     typedef P2EvalCL<double, const BndDataCL<>, const VecDescCL> const_DiscSolCL;
 
-    SpaceTimeXSolutionCL( MultiGridCL& mg, const BndDataCL<>& Bndneg, const BndDataCL<>& Bndpos, ParamCL & P, match_fun match_in = 0);
+    SpaceTimeXSolutionCL( MultiGridCL& mg, const BndDataCL<>& Bndneg, const BndDataCL<>& Bndpos, ParamCL & P);
     void UpdateTimeSlab( const LevelsetP2CL & lsetold, const LevelsetP2CL & lsetnew, double vmax = 1.0, instat_scalar_fun_ptr lset_fpt = NULL);
 
     void EvalFutureTrace();
@@ -219,7 +217,7 @@ public:
                         volp += 1.0/6.0 * Vol;
                     else
                         voln += 1.0/6.0 * Vol;
-                    delete nodes;
+                    delete[] nodes;
                 }
 
             }
@@ -383,7 +381,7 @@ public:
                     /*     errl1p += q3_diffabs.quad(Vol); */
                     /* else */
                     /*     errl1n += q3_diffabs.quad(Vol); */
-                    delete nodes;
+                    delete[] nodes;
                 }
 
             }

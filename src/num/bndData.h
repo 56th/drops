@@ -141,7 +141,6 @@ class BndSegDataCL: public BndCondInfoCL
 class BndCondCL
 {
   protected:
-    mutable match_fun mfun_;
     std::vector<BndCondInfoCL> BndCond_;
 
   public:
@@ -149,17 +148,11 @@ class BndCondCL
     /// containing the boundary conditions of the boundary segments.
     /// If \a bc is omitted, hom. natural boundary conditions are imposed (Nat0BC) for all boundary segments.
     /// For the special case \a numbndseg=0 we always have GetBC() = NoBC and IsOnXXXBnd(...) = false (aka NoBndCondCL)
-    BndCondCL( BndIdxT numbndseg, const BndCondT* bc= 0, match_fun mfun= 0);
+    BndCondCL( BndIdxT numbndseg, const BndCondT* bc= 0);
     /// \brief Initialize all members.
-    void Init (const std::vector<BndCondInfoCL>& BndCond, match_fun mfun) {
-        mfun_= mfun;
+    void Init (const std::vector<BndCondInfoCL>& BndCond) {
         BndCond_= BndCond;
     }
-
-    /// Get/Set the matching function. @{
-    match_fun GetMatchingFunction ()               const { return mfun_; }
-    void      SetMatchingFunction (match_fun mfun) const { mfun_= mfun; }
-    /// @}
 
     /// \name boundary condition
     /// Returns superior boundary condition of sub-simplex
@@ -221,14 +214,14 @@ class BndDataCL: public BndCondCL
     /// If \a bc and \a fun are given, they are assumed to be arrays of length \a numbndseg
     /// containing the boundary conditions and boundary data resp. of the boundary segments.
     /// If \a bc is omitted, hom. natural boundary conditions are imposed (Nat0BC) for all boundary segments.
-    /// \a fun should only be omitted, if all boundary conditions given are homogenious
+    /// \a fun should only be omitted, if all boundary conditions given are homogeneous
     /// and thus no boundary values have to be specified.
-    BndDataCL( BndIdxT numbndseg, const BndCondT* bc= 0, const bnd_val_fun* fun= 0);
+    BndDataCL( BndIdxT numbndseg= 0, const BndCondT* bc= 0, const bnd_val_fun* fun= 0);
     /// Deprecated ctor, just for compatibility with older code
     BndDataCL( BndIdxT numbndseg, const bool* isneumann, const bnd_val_fun* fun); // deprecated ctor!
 
-    void Init (const std::vector<BndCondInfoCL>& bnd_cond, const std::vector<bnd_val_fun>& BndFun, match_fun mfun) {
-        BndCondCL::Init( bnd_cond, mfun);
+    void Init (const std::vector<BndCondInfoCL>& bnd_cond, const std::vector<bnd_val_fun>& BndFun) {
+        BndCondCL::Init( bnd_cond);
         BndFun_= BndFun;
     }
 
@@ -266,7 +259,6 @@ class ParamCL;     // forward declaration for read_BndData below.
 ///
 /// All keys are optional.
 /// The default value can be specified via "Default"; if not set explicitly, it is UndefinedBC_.
-/// The key "PeriodicMatching" sets a matching function for the finite element space.
 /// All other keys are interpreted as boundary-segment indices.
 /// The values have the form ["BndCondT"] or ["BndCondT, "NameOfFunction"]; the second form is obligatory for non-homogeneous boundary values.
 template <class T>

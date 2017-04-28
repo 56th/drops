@@ -121,10 +121,9 @@ inline void
     VelVecDescCL loc_v;
     VelVecDescCL& v= stokes_.v;
     Uint LastLevel= stokes_.GetMG().GetLastLevel();
-    match_fun match= stokes_.GetMG().GetBnd().GetMatchFun();
     MLIdxDescCL loc_vidx( vecP2_FE, stokes_.vel_idx.size());
 
-    loc_vidx.CreateNumbering( LastLevel, stokes_.GetMG(), stokes_.GetBndData().Vel, match);
+    loc_vidx.CreateNumbering( LastLevel, stokes_.GetMG(), stokes_.GetBndData().Vel);
     /*
     if (LastLevel != v.RowIdx->TriangLevel()) {
         std::cout << "LastLevel: " << LastLevel
@@ -161,9 +160,8 @@ inline void
     VecDescCL loc_p;
     MLIdxDescCL loc_pidx( stokes_.GetPrFE(), stokes_.pr_idx.size());
     VecDescCL& p= stokes_.p;
-    match_fun match= stokes_.GetMG().GetBnd().GetMatchFun();
 
-    loc_pidx.CreateNumbering( stokes_.GetMG().GetLastLevel(), stokes_.GetMG(), stokes_.GetBndData().Pr, match, ls_.PhiC, &ls_.GetBndData());
+    loc_pidx.CreateNumbering( stokes_.GetMG().GetLastLevel(), stokes_.GetMG(), stokes_.GetBndData().Pr, ls_.PhiC, &ls_.GetBndData());
     loc_p.SetIdx( &loc_pidx);
 
     p1repair_->repair( loc_p);

@@ -1,25 +1,41 @@
 {
-    "Exp":
+    "NavStokes": 
     {
-        "VolForce": "ZeroVel",
-        "Gravity": "0 0 0 "
+        "BoundaryData":
+        {
+            "Pressure": { "Default": ["Nat0BC"] },            
+            "SlipBnd":
+            {
+                "Beta1": "0",
+                "Beta2": "0",
+                "BetaL": "0",
+                "NitschePenalty": "0",
+                "BndOuterNormal": "None"                
+            }
+        },
+        
+        "Coeff": 
+        {
+            "ViscNeg": "0.001", 
+            "ViscPos": "0.001",
+            "DensPos": "1000", 
+            "DensNeg": "1000", 
+            "SurfTens": 
+            {
+                "DilatationalVisco": "0", 
+                "ShearVisco": "0"
+            }, 
+            "VolForce": "ZeroVel", 
+            "Gravity": "0 0 0 ",
+            "SmoothZone": "1e-05"
+        }
     },
-    "SurfTens":
+    
+    
+    "Mesh": 
     {
-        "ShearVisco": "0",
-        "DilatationalVisco": "0"
-    },
-    "Mat":
-    {
-        "DensDrop": "1000",
-        "ViscDrop": "0.001",
-        "DensFluid": "1000",
-        "ViscFluid": "0.001",
-        "SmoothZone": "1e-05"
-    },
-    "Restart":
-    {
-        "Inputfile": "none"
-    }
+        "RestartFile": "none"
+    }    
+    
+    
 }
-

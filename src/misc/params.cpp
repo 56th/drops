@@ -45,6 +45,34 @@ namespace DROPS
     }
   }
 
+  bool ParamCL::exists(const std::string &pathToNode, const boost::property_tree::ptree *ptTmp) const
+  {
+      std::string::size_type n = pathToNode.find(".");
+      if( !ptTmp ) ptTmp = &pt;
+
+      if( n != std::string::npos )
+      {
+          std::string parent = pathToNode.substr(0,n);
+          std::string child  = pathToNode.substr(n+1);
+          try{
+              ptTmp = &(ptTmp->get_child( parent ));
+              return exists( child, ptTmp );
+          }
+          catch( DROPSErrCL e)
+          {
+              return false;
+          }
+      }
+
+      //typedef boost::property_tree::ptree ptree;
+      //ptree::const_assoc_iterator it = pt.find( pathToNode );
+      auto it = ptTmp->find( pathToNode );
+      if( it == ptTmp->not_found() )
+          return false;
+
+      return true;
+  }
+
   std::istream &operator>>(std::istream& stream, ParamCL& P)
   {
     try {
