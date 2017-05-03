@@ -453,7 +453,7 @@ void ComponentBasedVolumeAdjustmentCL::FindComponents ()
     AdjacencyAccuCL accu (*lset_, M);
     TetraAccumulatorTupleCL accus;
     accus.push_back (&accu);
-    accumulate (accus, lset_->GetMG(), lset_->idx.TriangLevel(), lset_->idx.GetMatchingFunction(), lset_->idx.GetBndInfo());
+    accumulate (accus, lset_->GetMG(), lset_->idx.TriangLevel(), lset_->idx.GetBndInfo());
     // time.Stop();
     // std::cout << "setup: " << time.GetTime() << " seconds" << std::endl;
 
@@ -551,7 +551,7 @@ double ComponentBasedVolumeAdjustmentCL::CalculateVolume(Uint c, double shift) c
     VolumeAccuCL accu(*lset_, Copy, c, sign_of_component_, component_of_dof_);
     TetraAccumulatorTupleCL accus;
     accus.push_back( &accu);
-    accumulate( accus, lset_->GetMG(), lset_->idx.TriangLevel(), lset_->idx.GetMatchingFunction(), lset_->idx.GetBndInfo());
+    accumulate( accus, lset_->GetMG(), lset_->idx.TriangLevel(), lset_->idx.GetBndInfo());
 
     return accu.get_volume();
 }
