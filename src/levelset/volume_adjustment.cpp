@@ -38,7 +38,12 @@ std::unique_ptr<VolumeAdjustmentCL> VolumeAdjustmentCL::Create (LevelsetP2CL* ls
     {
         case 0: return std::unique_ptr<VolumeAdjustmentCL> (new VolumeAdjustmentCL (lset));
         case 1: return std::unique_ptr<VolumeAdjustmentCL> (new GlobalVolumeAdjustmentCL (lset));
-        case 2: return std::unique_ptr<VolumeAdjustmentCL> (new ComponentBasedVolumeAdjustmentCL (lset));
+        case 2: {
+#ifdef _PAR
+            throw DROPSErrCL("ComponentBasedVolumeAdjustmentCL is not yet implemented in parallel.\n");
+#endif
+            return std::unique_ptr<VolumeAdjustmentCL> (new ComponentBasedVolumeAdjustmentCL (lset));
+        }
         default: throw DROPSErrCL("VolumeAdjustmentCL::Create: This case is not covered.\n");
     }
 }
