@@ -297,13 +297,14 @@ void AdjacencyAccuCL::local_setup (const TetraCL& tet)
 {
     ls_loc.assign (tet, lset.Phi, lset.GetBndData());
     std::memset (LocAdjaMat, 0, sizeof (LocAdjaMat));
+    n.assign( tet, lset.idx.GetFinest(), lset.GetBndData());
     for (Uint e: edges_) {
         const Ubyte v0= VertOfEdge (e, 0),
                     v1= VertOfEdge (e, 1);
-        const bool edge= (sign(ls_loc[v0]) + sign(ls_loc[v1]) >= 1) || (sign(ls_loc[v0])+sign(ls_loc[v1]) == -2);
+        // The domain is partitioned into (\Omega_pos+\Gamma)  \disjoint_union  \Omega_neg
+        const bool edge= (sign(ls_loc[v0]) + sign(ls_loc[v1]) >= 1) || (sign(ls_loc[v0])+sign(ls_loc[v1]) == -2) || (sign(ls_loc[v0])==0 && sign(ls_loc[v1])==0);
         LocAdjaMat[v0][v1]= LocAdjaMat[v1][v0]= 1 + edge;
     }
-    n.assign( tet, lset.idx.GetFinest(), lset.GetBndData());
 }
 
 void AdjacencyAccuCL::update_global_system ()
