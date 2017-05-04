@@ -330,7 +330,8 @@ class VolumeAccuCL : public TetraAccumulatorCL
     const VecDescCL& ls_vd_;
     size_t c_;
     std::vector<int> sign_of_component_;
-    const ComponentBasedVolumeAdjustmentCL::component_vector& component_of_dof_;
+    const ComponentBasedVolumeAdjustmentCL::component_vector* component_of_dof_ = nullptr;
+    const std::vector<std::valarray<double>>* indicator_functions_ = nullptr;
 
     const PrincipalLatticeCL& lat= PrincipalLatticeCL::instance (2);
     std::valarray<double> ls_values= std::valarray<double> (lat.vertex_size());
@@ -345,7 +346,11 @@ class VolumeAccuCL : public TetraAccumulatorCL
 
   public:
     VolumeAccuCL (const LevelsetP2CL& lset, const VecDescCL& ls_vd, size_t c, const std::vector<int>& sign_of_component, const ComponentBasedVolumeAdjustmentCL::component_vector& component_of_dof)
-        : lset_ (lset), ls_vd_ (ls_vd), c_ (c), sign_of_component_ (sign_of_component), component_of_dof_ (component_of_dof) {}
+        : lset_ (lset), ls_vd_ (ls_vd), c_ (c), sign_of_component_ (sign_of_component), component_of_dof_ (&component_of_dof) {}
+
+    void use_indicator_functions(const std::vector<std::valarray<double>>& indicator_functions) {
+        indicator_functions_ = &indicator_functions;
+    }
 
     void begin_accumulation () {
 //         std::cout << "entering VolumeAccuCL: ";
@@ -371,19 +376,31 @@ void VolumeAccuCL::visit (const TetraCL& tet)
 {
     n.assign_indices_only (tet, lset_.idx.GetFinest());
     loc_phi.assign (tet, ls_vd_, lset_.GetBndData());
-
-    bool comp_exists= false;
-    for (Uint i= 0; i < 10; i++)
-        if (n.WithUnknowns (i)) {
-            if (component_of_dof_[n.num[i]] == c_)
-                comp_exists= true;
-            // Remove different components (!= c_) of the same sign (this change does not alter
-            // the position of the boundary of component c_.
-            else if (sign_of_component_[c_] == sign_of_component_[component_of_dof_[n.num[i]]])
-                loc_phi[i]= -sign_of_component_[c_];
-        }
-    if (!comp_exists)
-        return;
+    // Shift in this case. Components have to be at least 4 P2 DOFs apart. Integrate over all tetrahedra in the two-neighbourhood (without any modifications).
+    if (indicator_functions_ != nullptr) {
+        double is= 0.;
+        for (Uint i= 0; i < 10; ++i)
+            if (n.WithUnknowns(i))
+                is+= (*indicator_functions_)[c_][n.num[i]];
+        if (is == 0.)
+            return;
+    }
+    // No shift in this case. Components may be arbitrarily close, therefore one has to handle the case with multiple negative components on a single tetrahedron.
+    else {
+        bool comp_exists= false;
+        for (Uint i= 0; i < 10; i++)
+            if (n.WithUnknowns (i)) {
+                if ((*component_of_dof_)[n.num[i]] == c_)
+                    comp_exists= true;
+                // Remove different components (!= c_) of the same sign (this change does not alter
+                // the position of the boundary of component c_.
+                else if (sign_of_component_[c_] == sign_of_component_[(*component_of_dof_)[n.num[i]]]) {
+                    loc_phi[i]= -sign_of_component_[c_];
+                }
+            }
+        if (!comp_exists)
+            return;
+    }
 
     evaluate_on_vertexes (loc_phi, lat, Addr (ls_values));
     partition.make_partition< SortedVertexPolicyCL,MergeCutPolicyCL> (lat, ls_values);
@@ -413,6 +430,7 @@ void ComponentBasedVolumeAdjustmentCL::compute_indicator_functions (const Sparse
         indicator_functions_.clear();
         for (Uint c=0; c<2; ++c)
             indicator_functions_.push_back(sign_of_component_[c] == 1 ? std::valarray<double>() : std::valarray<double>(1.0, component_of_dof_.size()));
+        return;
     }
 
     const component_vector tmp (ExtendOneStep (A, component_of_dof_, doCorrection_));
@@ -553,14 +571,15 @@ double ComponentBasedVolumeAdjustmentCL::CalculateVolume(Uint c, double shift) c
 {
     VecDescCL Copy (&lset_->idx);
     Copy.Data= lset_->Phi.Data;
-    if (shift != 0.)
-        Copy.Data+= shift*indicator_functions_[c];
 
     VolumeAccuCL accu(*lset_, Copy, c, sign_of_component_, component_of_dof_);
+    if (shift != 0.) {
+        Copy.Data+= shift*indicator_functions_[c];
+        accu.use_indicator_functions(indicator_functions_);
+    }
     TetraAccumulatorTupleCL accus;
     accus.push_back( &accu);
     accumulate( accus, lset_->GetMG(), lset_->idx.TriangLevel(), lset_->idx.GetBndInfo());
-
     return accu.get_volume();
 }
 
