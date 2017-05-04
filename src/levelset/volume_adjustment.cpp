@@ -282,9 +282,9 @@ void AdjacencyAccuCL::finalize_accumulation ()
     mA_->Build();
     delete mA_;
 #ifndef _PAR
-    std::cout << M.num_nonzeros() << " nonzeros in M, ";
+//    std::cout << M.num_nonzeros() << " nonzeros in M, ";
 #endif
-    std::cout << '\n';
+//    std::cout << '\n';
 }
 
 void AdjacencyAccuCL::visit (const TetraCL& tet)
@@ -518,7 +518,7 @@ void ComponentBasedVolumeAdjustmentCL::Repair()
 
 void ComponentBasedVolumeAdjustmentCL::DebugOutput (std::ostream& os) const
 {
-    os << "ComponentBasedVolumeAdjustmentCL::Number of components " << num_components() << "\nVolumes ";
+    os << "ComponentBasedVolumeAdjustmentCL: Number of components " << num_components() << "\nVolumes ";
     seq_out(std::begin(Volumes),std::end(Volumes),os,", ");
     os << std::endl << "ReferencePoints\n";
     seq_out(std::begin(ReferencePoints),std::end(ReferencePoints),os,", ");
@@ -600,7 +600,7 @@ void ComponentBasedVolumeAdjustmentCL::MatchComponents ()
     for (Uint i= 0; i < nnew; ++i)
         Mb (cold[i], i + nold)= Mb (i + nold, cold[i])= 1;
     Mb.Build();
-    std::cout << "ComponentBasedVolumeAdjustmentCL::MatchComponents: M: " << M << std::endl;
+    // std::cout << "ComponentBasedVolumeAdjustmentCL::MatchComponents: M: " << M << std::endl;
 
     GraphComponentsCL G;
     G.number_connected_components (SparseMatrixGraphCL (M));
