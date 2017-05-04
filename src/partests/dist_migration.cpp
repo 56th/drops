@@ -273,8 +273,8 @@ void CheckMigration( LoadBalCL& lb)
     InstatStokes2PhaseP2P1CL Stokes( mg, tpf, bnddata, DROPS::P1_FE, -0.1);
     MLIdxDescCL* vidx= &Stokes.vel_idx;
     MLIdxDescCL* pidx= &Stokes.pr_idx;
-    Stokes.CreateNumberingVel( mg.GetLastLevel(), vidx, periodic_match);
-    Stokes.CreateNumberingPr(  mg.GetLastLevel(), pidx, periodic_match, &lset);
+    Stokes.CreateNumberingVel( mg.GetLastLevel(), vidx);
+    Stokes.CreateNumberingPr(  mg.GetLastLevel(), pidx, &lset);
     Stokes.SetIdx();
     Stokes.v.SetIdx  ( vidx);
     Stokes.p.SetIdx  ( pidx);
