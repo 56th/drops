@@ -498,6 +498,13 @@ void ComponentBasedVolumeAdjustmentCL::InitVolume_impl ()
     // Set initial target volumes.
     targetVolumes= Volumes;
 
+    // Compatibility with global volume correction (in case the intial volume is know analytically, it is enforced prior to the simulation).
+    if (num_components() == 2){
+        const size_t cneg = sign_of_component_[0] == -1 ? 0 : 1;
+        if(global_reference_volume_ != -1.0)
+            targetVolumes[cneg] = global_reference_volume_;
+    }
+
     make_backup();
 
     DebugOutput (std::cout);
