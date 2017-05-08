@@ -63,6 +63,12 @@ class base_point_newton_cacheCL
 
     const LocalP2CL<>&          locls  () const { return locls_; }
     const LocalP2CL<Point3DCL>& loc_gh () const { return loc_gh_; }
+    Point3DCL                   loc_grad_ls (const BaryCoordCL& bary) const {
+        Point3DCL tmp;
+        for (Uint i= 0; i < 10; ++i)
+            tmp+= locls_[i]*gradp2_[i](bary);
+        return tmp;
+    }
     const LocalP1CL<Point3DCL>& gradp2 (Uint i) const { return gradp2_[i]; }
     const World2BaryCoordCL&    w2b    () const { return w2b_; }
     double                      get_h  () const { return h_; }
@@ -301,7 +307,9 @@ class QuaQuaMapperLineSearchFunctionCL
     BaryCoordCL bxb;        // "
     Point3DCL x0,    // World coordinates of initial point.
               nline; // Direction defining a line through x0.
-    Point3DCL gh; // Recovered gradient at xcur.
+    Point3DCL gh; // (Recovered) gradient at xcur.
+    // If use_recovered_gradient_in_place_of_gradient_= false (the default) this is the method from Joerg Grande "Analysis of Highly Accurate Finite Element Based Algorithms For Computing Distances To Level Sets", SINUM. Otherwise it is the ad hoc method from Arnold Reusken "A finite element level set redistancing method based on gradient recovery", SINUM, with a bit slower (and unproven) convergence.
+    bool use_recovered_gradient_in_place_of_gradient_= false;
 
     value_type F; // value at xcur;
     double  dF;   // Jacobian at xcur.
@@ -359,7 +367,8 @@ QuaQuaMapperLineSearchFunctionCL::set_initial_point (const TetraCL* tet, const B
     nline= n;
 
     quaqua_->cache_->set_tetra( btet);
-    gh= quaqua_->cache_->loc_gh() (bxb);
+    gh= use_recovered_gradient_in_place_of_gradient_ ?
+        quaqua_->cache_->loc_gh() (bxb) : quaqua_->cache_->loc_grad_ls (bxb);
     F= quaqua_->cache_->locls() (bxb);
 
     dF_p= false;
@@ -391,7 +400,8 @@ QuaQuaMapperLineSearchFunctionCL::set_point (const value_type& x)
     btet= newbtet;
     bxb= newbxb;
     quaqua_->cache_->set_tetra (btet);
-    gh= quaqua_->cache_->loc_gh() (bxb);
+    gh= use_recovered_gradient_in_place_of_gradient_ ?
+        quaqua_->cache_->loc_gh() (bxb) : quaqua_->cache_->loc_grad_ls(bxb);
     compute_F ();
 
     return true;
