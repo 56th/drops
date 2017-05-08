@@ -29,6 +29,7 @@
 #include "geom/subtriangulation.h"
 #include "num/fe.h"
 #include "num/discretize.h"
+#include "num/newton.h"
 #include "num/oswald_projection.h"
 #include "misc/problem.h"
 
@@ -54,13 +55,9 @@ class QuaQuaMapperCL
     friend QuaQuaMapperFunctionCL;
     friend QuaQuaMapperLineSearchFunctionCL;
 
-    int maxiter_;
-    double tol_;
-    int maxinneriter_;
-    double innertol_;
+    mutable NewtonSolverCL newton_solver_,
+                           inner_newton_solver_;
     bool use_line_search_;
-    double armijo_c_;
-    Uint max_damping_steps_;
 
     // The level set function.
     NoBndDataCL<> nobnddata;
@@ -101,9 +98,9 @@ class QuaQuaMapperCL
     ~QuaQuaMapperCL ();
 
     void set_inner_iter_tol (Uint i, double t) {
-        maxinneriter_= i;
-        innertol_= t;
-        num_inner_iter.resize( i + 1);
+        inner_newton_solver_.SetMaxIter (i);
+        inner_newton_solver_.SetTol (t);
+        num_inner_iter.resize (i + 1);
     }
 
     void set_tetra_neighborhoods (TetraToTetrasT& neigborhoods) { neighborhoods_= &neigborhoods; }
@@ -169,10 +166,7 @@ class LocalQuaMapperCL
     enum DeformationMethodE {MAP_LOCAL_LEVEL_SETS, MAP_ZERO_LEVEL_SETS};
 
   private:
-    int maxiter_;
-    double tol_;
-    double armijo_c_;
-    Uint max_damping_steps_;
+    mutable NewtonSolverCL newton_solver_;
 
     // The level set function.
     NoBndDataCL<> nobnddata;

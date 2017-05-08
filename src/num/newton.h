@@ -19,11 +19,11 @@
  * along with DROPS. If not, see <http://www.gnu.org/licenses/>.
  *
  *
- * Copyright 2016 Joerg Grande, Aachen, Germany
+ * Copyright 2016, 2017 Joerg Grande, Aachen, Germany
 */
 
 
-#include "misc/problem.h"
+#include "num/solverbase.h"
 
 namespace DROPS
 {
@@ -62,7 +62,7 @@ double dot (T x, T y)
 ///     * apply_derivative_inverse (v),
 ///     * initial_damping_factor (dx, F) (must return a nonnegative value which is further limited to 1 in the algorithm).
 template <typename FunctionT>
-void newton_solve (FunctionT& fun, typename FunctionT::value_type& x, size_t& maxiter, double& tol, size_t& max_damping_steps, double armijo_c, std::ostream* os= 0)
+void newton_solve (FunctionT& fun, typename FunctionT::value_type& x, int& maxiter, double& tol, int& max_damping_steps, double armijo_c, std::ostream* os= 0)
 {
     const double min_step_length= 1e-7; // Minimum value for step-length factor l.
 
@@ -113,5 +113,31 @@ void newton_solve (FunctionT& fun, typename FunctionT::value_type& x, size_t& ma
     tol= normF;
     max_damping_steps= total_damping_iter;
 }
+
+class NewtonSolverCL : public SolverBaseCL
+{
+  protected:
+    double armijo_c_;
+    int max_damping_steps_,
+        damping_steps_= -1;
+
+  public:
+    NewtonSolverCL (int maxiter, double tol, bool rel= false, std::ostream* output= nullptr, double armijo_c= 1e-2, int max_damping_steps= 10)
+        : SolverBaseCL (maxiter, tol, rel, output), armijo_c_ (armijo_c), max_damping_steps_ (max_damping_steps) {}
+
+    NewtonSolverCL& set_armijo_constant   (double armijo_c) { armijo_c_= armijo_c; return *this; }
+    NewtonSolverCL& set_max_damping_steps (int max_damping_steps) { max_damping_steps_= max_damping_steps; return *this; }
+
+    size_t get_num_damping_steps () const { return damping_steps_; }
+
+    template <typename FunctionT>
+    void Solve (FunctionT& F, typename FunctionT::value_type& x)
+    {
+        res_=  tol_;
+        iter_= maxiter_;
+        damping_steps_= max_damping_steps_;
+        newton_solve (F, x, iter_, res_, damping_steps_, armijo_c_, output_);
+    }
+};
 
 } // end of namespace DROPS

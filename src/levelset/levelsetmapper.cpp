@@ -25,7 +25,6 @@
 #include "levelset/levelsetmapper.h"
 #include "misc/scopetimer.h"
 #include "num/lattice-eval.h"
-#include "num/newton.h"
 
 namespace DROPS
 {
@@ -427,19 +426,20 @@ void enclosing_tetra (const Point3DCL& v, const TetraSetT& neighborhood, double 
 QuaQuaMapperCL::QuaQuaMapperCL (const MultiGridCL& mg, VecDescCL& lsarg, const VecDescCL& ls_grad_recarg,
     TetraToTetrasT* neighborhoods, int maxiter, double tol,
     bool use_line_search, double armijo_c, Uint max_damping_steps)
-    : maxiter_( maxiter), tol_( tol), maxinneriter_( 100), innertol_( 5e-9),
-      use_line_search_( use_line_search), armijo_c_( armijo_c), max_damping_steps_( max_damping_steps),
+    : newton_solver_ (maxiter, tol, false, nullptr, armijo_c, max_damping_steps),
+      inner_newton_solver_ ( 100, 5e-9, false, nullptr, armijo_c, max_damping_steps),
+      use_line_search_( use_line_search),
       ls( &lsarg, &nobnddata, &mg), ls_grad_rec( &ls_grad_recarg, &nobnddata_vec, &mg),
       neighborhoods_( neighborhoods), locator_( mg, lsarg.GetLevel(), /*greedy*/ false),
       cache_( new base_point_newton_cacheCL (ls, ls_grad_rec, gradrefp2)), f_ (new QuaQuaMapperFunctionCL (this)), f_line_search_ (new QuaQuaMapperLineSearchFunctionCL (this)),
-      num_outer_iter( maxiter + 1), num_inner_iter( maxinneriter_ + 1)
+      num_outer_iter( maxiter + 1), num_inner_iter( inner_newton_solver_.GetMaxIter() + 1)
 {
     P2DiscCL::GetGradientsOnRef( gradrefp2);
 }
 
 QuaQuaMapperCL::QuaQuaMapperCL (const QuaQuaMapperCL& q)
-    : maxiter_( q.maxiter_), tol_( q.tol_), maxinneriter_( q.maxinneriter_), innertol_( q.innertol_),
-      use_line_search_( q.use_line_search_), armijo_c_( q.armijo_c_), max_damping_steps_( q.max_damping_steps_),
+    : newton_solver_( q.newton_solver_), inner_newton_solver_( q.inner_newton_solver_),
+      use_line_search_( q.use_line_search_),
       ls( q.ls), ls_grad_rec( q.ls_grad_rec),
       neighborhoods_( q.neighborhoods_), locator_( q.locator_),
       cache_( new base_point_newton_cacheCL (ls, ls_grad_rec, gradrefp2)), f_ (new QuaQuaMapperFunctionCL (this)), f_line_search_ (new QuaQuaMapperLineSearchFunctionCL (this)), tet( q.tet), btet( q.btet), have_dph( q.have_dph),
@@ -503,20 +503,17 @@ const QuaQuaMapperCL& QuaQuaMapperCL::set_point (const TetraCL* tetarg, const Ba
 bool QuaQuaMapperCL::line_search (Point3DCL& x, const Point3DCL& nx, const TetraCL*& tetra, BaryCoordCL& bary) const
 {
     f_line_search_->set_initial_point (btet, bxb, x, nx);
-    size_t iter= maxinneriter_;
-    double tol= innertol_;
-    size_t max_damping_steps= max_damping_steps_;
     double alpha= f_line_search_->get_point();
-    newton_solve (*f_line_search_, alpha, iter, tol, max_damping_steps, armijo_c_);
+    inner_newton_solver_.Solve (*f_line_search_, alpha);
     tetra= f_line_search_->get_tetra();
     bary=  f_line_search_->get_bary();
-    x= x - alpha*nx;
+    x-= alpha*nx;
 
-    total_damping_iter+= max_damping_steps;
-    total_inner_iter+= iter;
-    ++num_inner_iter[iter];
+    total_damping_iter+= inner_newton_solver_.get_num_damping_steps();
+    total_inner_iter+= inner_newton_solver_.GetIter();
+    ++num_inner_iter[inner_newton_solver_.GetIter()];
 
-    return tol < innertol_;
+    return inner_newton_solver_.GetResid() < inner_newton_solver_.GetTol();
 }
 
 void QuaQuaMapperCL::base_point_with_line_search () const
@@ -533,17 +530,17 @@ void QuaQuaMapperCL::base_point_with_line_search () const
 
     bool found_zero_level= false;
     int iter;
-    for (iter= 1; iter < maxiter_; ++iter) {
+    for (iter= 1; iter < newton_solver_.GetMaxIter(); ++iter) {
         xold= x;
         cache_->set_tetra( btet);
         n=  cache_->loc_gh()( bxb);
 
         found_zero_level= line_search( x, n, btet, bxb);
 
-        if ((xold - x).norm() < tol_ && found_zero_level)
+        if ((xold - x).norm() < newton_solver_.GetTol() && found_zero_level)
             break;
     }
-    if (iter >= maxiter_) {
+    if (iter >= newton_solver_.GetMaxIter()) {
         std::cout << "QuaQuaMapperCL::base_point_with_line_search: max iteration number exceeded; |x - xold|: " << norm( xold - x) << "\tx: " << x << "\t n: " << n << "\t ls(x): " << ls.val( *btet, bxb) << "found_zero_level: " << found_zero_level << std::endl;
     }
     cur_num_outer_iter= iter;
@@ -555,19 +552,16 @@ void QuaQuaMapperCL::base_point_newton () const
 {
     // The function of which we search a root, ( x0 - x - s*gh(x), -ls(x) ).
     f_->set_initial_point (tet, xb);
-    size_t iter= maxiter_;
-    double tol= tol_;
-    size_t max_damping_steps= max_damping_steps_;
     SVectorCL<4> x= f_->get_point();
-    newton_solve (*f_, x, iter, tol, max_damping_steps, armijo_c_);
+    newton_solver_.Solve (*f_, x);
     btet= f_->get_tetra();
     bxb= f_->get_bary();
     // Compute the quasi-distance dh:
     dh= x[3]*f_->get_gh().norm();
 
-    cur_num_outer_iter= iter;
-    ++num_outer_iter[iter];
-    total_damping_iter+= max_damping_steps;
+    cur_num_outer_iter= newton_solver_.GetIter();
+    ++num_outer_iter[newton_solver_.GetIter()];
+    total_damping_iter+= newton_solver_.get_num_damping_steps();
 }
 
 
@@ -893,18 +887,16 @@ LocalQuaMapperFunctionCL::initial_damping_factor (const value_type& dx, const va
 
 
 LocalQuaMapperCL::LocalQuaMapperCL (const MultiGridCL& mg, VecDescCL& lsarg, int maxiter, double tol, double armijo_c, Uint max_damping_steps)
-    : maxiter_( maxiter), tol_( tol),
-      armijo_c_( armijo_c), max_damping_steps_( max_damping_steps),
+    : newton_solver_(maxiter, tol, false, nullptr, armijo_c, max_damping_steps),
       ls( &lsarg, &nobnddata, &mg),
       localF (new LocalQuaMapperFunctionCL()),
-      num_outer_iter( maxiter + 1)
+      num_outer_iter( newton_solver_.GetMaxIter() + 1)
 {
     P2DiscCL::GetGradientsOnRef( gradrefp2);
 }
 
 LocalQuaMapperCL::LocalQuaMapperCL (const LocalQuaMapperCL& q)
-    : maxiter_( q.maxiter_), tol_( q.tol_),
-      armijo_c_( q.armijo_c_), max_damping_steps_( q.max_damping_steps_),
+    : newton_solver_ (q.newton_solver_),
       ls( q.ls), loclsp1( q.loclsp1), gp1( q.gp1),
       w2b( q.w2b), b2w( q.b2w), tet( q.tet), xb( q.xb), bxb( q.bxb),
       dh( q.dh), have_base_point( q.have_base_point),
@@ -981,39 +973,25 @@ const LocalQuaMapperCL& LocalQuaMapperCL::base_point () const
     TimerCL timer;
 
     if (!have_base_point) {
-        size_t maxiter= maxiter_;
-        double tol= tol_;
-        size_t max_damping_steps= max_damping_steps_;
         const Point3DCL p= b2w (xb);
         localF->set_initial_point (p);
         // Setup initial value.
         LocalQuaMapperFunctionCL::value_type x;
         std::copy (p.begin (), p.end (), x.begin ());
         x[3]= 0.;
-        newton_solve (*localF, x, maxiter, tol, max_damping_steps, armijo_c_);
+        newton_solver_.Solve (*localF, x);
         const Point3DCL x_spatial (x.begin (), x.begin () + 3);
         bxb= w2b (x_spatial);
         dh= (p - x_spatial).norm () * (x[3] > 0. ? 1. : -1.); // x[3]*loc_ls_grad (bxb).norm ();
-//         if (maxiter >= (size_t) maxiter_) {
-//             dh= std::numeric_limits<double>::max();
-//             size_t maxiter= maxiter_;
-//             double tol= tol_;
-//             size_t max_damping_steps= max_damping_steps_;
-//             std::copy (p.begin (), p.end (), x.begin ());
-//             x[3]= 0.;
-//             newton_solve (*localF, x, maxiter, tol, max_damping_steps, armijo_c_, &std::cerr);
-//             std::cerr << "Press enter to continue.";
-//             char tmp;
-//             std::cin >> tmp;
-//         }
-        base_in_trust_region= tol < tol_ && *std::min_element (bxb.begin(), bxb.end()) > lower_bary_for_trust_region; // We trust the base point, if the newton_solver converged and the base point is close enough to the tetra.
+        base_in_trust_region= newton_solver_.GetResid() < newton_solver_.GetTol()
+            && *std::min_element (bxb.begin(), bxb.end()) > lower_bary_for_trust_region; // We trust the base point, if the newton_solver converged and the base point is close enough to the tetra.
         have_base_point= true;
 
-        min_outer_iter= std::min( min_outer_iter, (Uint) maxiter);
-        max_outer_iter= std::max( max_outer_iter, (Uint) maxiter);
-        total_outer_iter+= maxiter;
-        total_damping_iter+= max_damping_steps;
-        ++num_outer_iter[maxiter];
+        min_outer_iter= std::min( min_outer_iter, (Uint) newton_solver_.GetIter());
+        max_outer_iter= std::max( max_outer_iter, (Uint) newton_solver_.GetIter());
+        total_outer_iter+= newton_solver_.GetIter();
+        total_damping_iter+= newton_solver_.get_num_damping_steps();
+        ++num_outer_iter[newton_solver_.GetIter()];
     }
     timer.Stop();
     base_point_time+= timer.GetTime();
