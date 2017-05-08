@@ -33,7 +33,7 @@ namespace DROPS
 class base_point_newton_cacheCL
 {
   private:
-    const TetraCL* tet;
+    const TetraCL* tet= 0;
 
     const P2EvalCL<double, const NoBndDataCL<>, const VecDescCL>&             ls_;
     const P2EvalCL<Point3DCL, const NoBndDataCL<Point3DCL>, const VecDescCL>& ls_grad_rec_;
@@ -46,13 +46,13 @@ class base_point_newton_cacheCL
     World2BaryCoordCL    w2b_;
     double h_;
 
-    bool compute_gradp2_;
+    bool compute_gradp2_= true;
 
   public:
     base_point_newton_cacheCL (const P2EvalCL<double, const NoBndDataCL<>, const VecDescCL>& ls,
                                const P2EvalCL<Point3DCL, const NoBndDataCL<Point3DCL>, const VecDescCL>& ls_grad_rec,
                                const LocalP1CL<Point3DCL> (& gradrefp2)[10])
-        : tet( 0), ls_( ls), ls_grad_rec_( ls_grad_rec), gradrefp2_( gradrefp2), compute_gradp2_( true)
+        : ls_( ls), ls_grad_rec_( ls_grad_rec), gradrefp2_( gradrefp2)
     {}
 
     void           set_tetra (const TetraCL* newtet);
@@ -325,7 +325,6 @@ class QuaQuaMapperLineSearchFunctionCL
     value_type      get_point () const { return xcur; }
     BaryCoordCL     get_bary  () const { return bxb; }
     const TetraCL*  get_tetra () const { return btet; }
-    Point3DCL       get_gh    () const { return gh; }
 
     bool set_point (const value_type& x);
     value_type value () { return F; };
