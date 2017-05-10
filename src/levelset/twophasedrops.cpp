@@ -179,7 +179,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     double Vol = 0;
     std::string InitialLSet= P.get("Levelset.InitialValue", std::string("Ellipsoid"));
     if ( (InitialLSet == "Ellipsoid"     || InitialLSet == "Cylinder" || InitialLSet == "ContactDroplet"
-        || InitialLSet == "HalfEllipsoid" || InitialLSet == "TaylorFlowDistance") && P.get<int>("Levelset.VolCorrection") != 0)
+        || InitialLSet == "HalfEllipsoid" || InitialLSet == "TaylorFlowDistance"))
     {  
         if (P.get<double>("Levelset.InitialVolume",-1.0) > 0 )
             Vol = P.get<double>("Levelset.InitialVolume");
@@ -334,7 +334,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     LsetPcT lset_pc;
     GMResSolverCL<LsetPcT>* gm = new GMResSolverCL<LsetPcT>( lset_pc, 200, P.get<int>("CouplingSolver.LevelsetSolver.Iter"), P.get<double>("CouplingSolver.LevelsetSolver.Tol"));
 
-    LevelsetModifyCL lsetmod( P.get<int>("Levelset.Reparam.Freq"), P.get<int>("Levelset.Reparam.Method"), P.get<double>("Levelset.Reparam.MaxGrad"), P.get<double>("Levelset.Reparam.MinGrad"), P.get<int>("Levelset.VolCorrection"), is_periodic);
+    LevelsetModifyCL lsetmod( P.get<int>("Levelset.Reparam.Freq"), P.get<int>("Levelset.Reparam.Method"), P.get<double>("Levelset.Reparam.MaxGrad"), P.get<double>("Levelset.Reparam.MinGrad"), is_periodic);
 
     UpdateProlongationCL<Point3DCL> PVel( Stokes.GetMG(), stokessolverfactory.GetPVel(), &Stokes.vel_idx, &Stokes.vel_idx);
     adap.push_back( &PVel);

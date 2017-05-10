@@ -34,19 +34,39 @@ namespace DROPS
 
 std::unique_ptr<VolumeAdjustmentCL> VolumeAdjustmentCL::Create (LevelsetP2CL* lset, const ParamCL& P)
 {
-    switch (P.get<int>("VolCorrection"))
-    {
-        case 0: return std::unique_ptr<VolumeAdjustmentCL> (new VolumeAdjustmentCL (lset));
-        case 1: return std::unique_ptr<VolumeAdjustmentCL> (new GlobalVolumeAdjustmentCL (lset));
-        case 2: {
-#ifdef _PAR
-            throw DROPSErrCL("ComponentBasedVolumeAdjustmentCL is not yet implemented in parallel.\n");
-#endif
-            return std::unique_ptr<VolumeAdjustmentCL> (new ComponentBasedVolumeAdjustmentCL (lset));
-        }
-        default: throw DROPSErrCL("VolumeAdjustmentCL::Create: This case is not covered.\n");
+    const char* methods[] = { "None", "Global", "ComponentBased" };
+    std::string string_method;
+
+    try {
+        string_method = P.get<std::string>("VolCorrection");
     }
+    catch (DROPSParamErrCL& ) {
+        std::cerr << "VolumeAdjustmentCL::Create: Warning: The VolCorrection parameter expects a string (\"None\", \"Global\" or \"ComponentBased\"). Using no volume correction (\"None\") for this simulation.\n";
+        return std::unique_ptr<VolumeAdjustmentCL> (new VolumeAdjustmentCL (lset));
+    }
+    if (string_method == "0" || string_method == "1" || string_method == "2")
+        std::cerr << "VolumeAdjustmentCL::Create: Deprecated use of the VolCorrection parameter. The parameter expects a (non-empty) string (\"None\", \"Global\" or \"ComponentBased\").\n";
+    if (string_method == "" || string_method == "0") {
+        if (string_method == "")
+            std::cerr << "Using no volume correction (\"None\") for this simulation.\n";
+        return std::unique_ptr<VolumeAdjustmentCL> (new VolumeAdjustmentCL (lset));
+    }
+    else if (string_method == methods[0])
+        return std::unique_ptr<VolumeAdjustmentCL> (new VolumeAdjustmentCL (lset));
+    else if (string_method == "1" || string_method == methods[1])
+        return std::unique_ptr<VolumeAdjustmentCL> (new GlobalVolumeAdjustmentCL (lset));
+    else if (string_method == "2" || string_method == methods[2]) {
+#ifdef _PAR
+        throw DROPSErrCL("ComponentBasedVolumeAdjustmentCL is not yet implemented in parallel.\n");
+#endif
+        return std::unique_ptr<VolumeAdjustmentCL> (new ComponentBasedVolumeAdjustmentCL (lset));
+    }
+    else
+        throw DROPSErrCL("VolumeAdjustmentCL::Create: Please specify which volume correction method you want to use. The VolCorrection parameter expects one of the following strings: \"None\", \"Global\" or \"ComponentBased\".\n");
 }
+
+
+
 
 void VolumeAdjustmentCL::DebugOutput (std::ostream& os) const
 {
@@ -420,7 +440,7 @@ void VolumeAccuCL::visit (const TetraCL& tet)
 //*****************************************************************************
 
 ComponentBasedVolumeAdjustmentCL::ComponentBasedVolumeAdjustmentCL(LevelsetP2CL* lset)
-    : VolumeAdjustmentCL(lset) 
+    : VolumeAdjustmentCL(lset)
 {}
 
 ComponentBasedVolumeAdjustmentCL::~ComponentBasedVolumeAdjustmentCL()

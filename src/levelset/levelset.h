@@ -360,15 +360,14 @@ private:
            rpm_Method_;
     double rpm_MaxGrad_,
            rpm_MinGrad_;
-    int    lvs_VolCorrection_;
 
     int    step_;
     bool   per_;
 
 public:
-    LevelsetModifyCL( int rpm_Freq, int rpm_Method, double rpm_MaxGrad, double rpm_MinGrad, int lvs_VolCorrection, bool periodic=false) :
+    LevelsetModifyCL( int rpm_Freq, int rpm_Method, double rpm_MaxGrad, double rpm_MinGrad, bool periodic=false) :
         rpm_Freq_( rpm_Freq), rpm_Method_( rpm_Method), rpm_MaxGrad_( rpm_MaxGrad),
-        rpm_MinGrad_( rpm_MinGrad), lvs_VolCorrection_( lvs_VolCorrection), step_( 0), per_(periodic) {}
+        rpm_MinGrad_( rpm_MinGrad), step_( 0), per_(periodic) {}
 
 
     void maybeDoReparam( LevelsetP2CL& lset);

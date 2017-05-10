@@ -161,7 +161,7 @@ void Strategy( StokesProblemT& Stokes, const BndDataCL<>& lsbnd)
     typedef GMResSolverCL<SSORPcCL> LSetSolver;
     SSORPcCL ssorpc;
     LSetSolver gm( ssorpc, 100, 1000, 1e-7);
-    LevelsetModifyCL lsetmod( 0, 0, 0, 0, 0);
+    LevelsetModifyCL lsetmod( 0, 0, 0, 0);
     typedef NSSolverBaseCL<StokesProblemT> SolverT;
     SolverT dummyFP( Stokes, inexactuzawasolver);
     LinThetaScheme2PhaseCL<LSetSolver>

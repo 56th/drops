@@ -1097,18 +1097,14 @@ void LevelsetModifyCL::maybeDoReparam( LevelsetP2CL& lset)
         lset.GetMaxMinGradPhi( lsetmaxGradPhi, lsetminGradPhi);
         std::cout << "after  reparametrization: minGradPhi " << lsetminGradPhi << "\tmaxGradPhi " << lsetmaxGradPhi << '\n';
         // volume correction after reparametrization
-        if (lvs_VolCorrection_ != 0) {
-            lset.AdjustVolume();
-            lset.GetVolumeAdjuster()->DebugOutput (std::cout);
-        }
+        lset.AdjustVolume();
+        lset.GetVolumeAdjuster()->DebugOutput (std::cout);
     }
 }
 
 void LevelsetModifyCL::maybeDoVolCorr( LevelsetP2CL& lset) {
-    if (lvs_VolCorrection_ != 0) {
-        lset.AdjustVolume();
-        lset.GetVolumeAdjuster()->DebugOutput (std::cout);
-    }
+    lset.AdjustVolume();
+    lset.GetVolumeAdjuster()->DebugOutput (std::cout);
 }
 
 } // end of namespace DROPS
