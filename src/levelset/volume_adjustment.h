@@ -69,7 +69,6 @@ class VolumeAdjustmentCL
         num_subdivision_= numsubdiv;
         return *this;
     }
-
     virtual void Repair () {}  // called in LevelsetRepairCL::post_refine_sequence
     virtual void AdjustVolume () {}
     virtual void DebugOutput (std::ostream&) const;
@@ -87,27 +86,34 @@ class GlobalVolumeAdjustmentCL : public VolumeAdjustmentCL
     void DebugOutput (std::ostream& os) const override;
 };
 
+
+/// \brief Individual volume correction for each connected component.
+/// Automatically handles changes in topology.
+///
+/// Does not correct volumes of connected components which are too close together (distance has to be at least 4 P2 DOFs).
 class ComponentBasedVolumeAdjustmentCL : public VolumeAdjustmentCL 
 {
   public:
     using component_vector= std::vector<size_t>;
 
   private:
-    // Data for each dof
+    ///@{ Data for each dof
     component_vector       component_of_dof_, ///< component_of_dof_[i] is the number of the component of dof i.
                            component_of_dof_backup_;
-    std::vector<Point3DCL> coord_of_dof_,        // The points where the dofs live.
-                           coord_of_dof_backup_; // The points where dofs_backup live (only different from coord_of_dof_ in Repair).
+    std::vector<Point3DCL> coord_of_dof_,        ///< The points where the dofs live.
+                           coord_of_dof_backup_; ///< The points where dofs_backup live (only different from coord_of_dof_ in Repair).
+    ///@}
 
-    // Data for each component
+    ///@{ Data for each component
     std::vector<bool>                  doCorrection_;
     std::vector<int>                   sign_of_component_;
     std::vector<int>                   sign_of_component_backup_;
     std::vector<std::valarray<double>> indicator_functions_;
-    std::vector<double>                Volumes; // volume per component
-    std::vector<double>                targetVolumes; // target volume of each component
-    std::vector<Point3DCL>             ReferencePoints; // markers for each connected component
-    std::vector<Point3DCL>             ReferencePoints_backup; // old markers for each connected component
+    std::vector<double>                Volumes; ///< volume per component
+    std::vector<double>                targetVolumes; ///< target volume of each component
+    std::vector<Point3DCL>             ReferencePoints; ///< markers for each connected component
+    std::vector<Point3DCL>             ReferencePoints_backup; ///< old markers for each connected component
+    ///@}
 
     /// \brief Initialize coord_of_dof_.
     void init_coord_of_dof ();
