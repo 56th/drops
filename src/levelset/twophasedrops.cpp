@@ -441,6 +441,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         if (P.get<int>("VTK.AddP1XPressure",0) && Stokes.UsesXFEM())
             vtkwriter->Register( make_VTKP1XScalar( MG, *lset.PhiC, Stokes.p, "xpressure"));
         vtkwriter->Register( make_VTKScalar( lset.GetSolution(), "level-set") );
+        vtkwriter->Register( lset.GetVolumeAdjuster()->make_VTKComponentMap("ComponentMap") );
 
         if (massTransp) {
             vtkwriter->Register( make_VTKScalar( massTransp->GetSolution(), "massTransport") );

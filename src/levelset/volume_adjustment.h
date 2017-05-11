@@ -31,6 +31,7 @@
 #include <vector>
 #include "misc/container.h"
 #include "num/spmat.h"
+#include "out/vtkOut.h"
 
 namespace DROPS
 {
@@ -72,6 +73,7 @@ class VolumeAdjustmentCL
     virtual void Repair () {}  // called in LevelsetRepairCL::post_refine_sequence
     virtual void AdjustVolume () {}
     virtual void DebugOutput (std::ostream&) const;
+    virtual VTKVariableCL& make_VTKComponentMap(std::string var_name);
 };
 
 class GlobalVolumeAdjustmentCL : public VolumeAdjustmentCL
@@ -81,7 +83,6 @@ class GlobalVolumeAdjustmentCL : public VolumeAdjustmentCL
 
   public:
     GlobalVolumeAdjustmentCL (LevelsetP2CL* lset) : VolumeAdjustmentCL (lset) {}
-
     void AdjustVolume () override;
     void DebugOutput (std::ostream& os) const override;
 };
@@ -151,6 +152,7 @@ class ComponentBasedVolumeAdjustmentCL : public VolumeAdjustmentCL
 
     void AdjustVolume () override;
     void DebugOutput (std::ostream& os) const override;
+    VTKVariableCL& make_VTKComponentMap(std::string var_name);
 };
 
 } // end of namespace DROPS

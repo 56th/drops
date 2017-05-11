@@ -32,6 +32,37 @@
 namespace DROPS
 {
 
+class VTKComponentMapCL: public VTKVariableCL
+{
+  public:
+    using component_vector = ComponentBasedVolumeAdjustmentCL::component_vector;
+
+  private:
+    const LevelsetP2CL* lset_ = nullptr;
+    const component_vector* component_of_dof_ = nullptr;
+
+  public:
+    VTKComponentMapCL (std::string var_name)
+        : VTKVariableCL (var_name) {}
+    VTKComponentMapCL (const LevelsetP2CL* lset, const component_vector* component_of_dof, std::string var_name)
+        : VTKVariableCL (var_name), lset_(lset), component_of_dof_(component_of_dof) {}
+
+   /// \brief Called by VTKOutCL::Write().
+    void put( VTKOutCL&) const;
+    Uint GetDim() const { return 1; }
+};
+
+void VTKComponentMapCL::put( VTKOutCL& cf) const
+{
+    if (lset_ == nullptr)
+        return;
+    VecDescCL vd(const_cast<MLIdxDescCL*>(&lset_->idx));
+    for (size_t i = 0; i < component_of_dof_->size(); ++i)
+        vd.Data[i] = (*component_of_dof_)[i];
+    cf.PutScalar( make_P2Eval( lset_->GetMG(), lset_->GetBndData(), vd), varName());
+}
+
+
 std::unique_ptr<VolumeAdjustmentCL> VolumeAdjustmentCL::Create (LevelsetP2CL* lset, const ParamCL& P)
 {
     const char* methods[] = { "None", "Global", "ComponentBased" };
@@ -65,12 +96,14 @@ std::unique_ptr<VolumeAdjustmentCL> VolumeAdjustmentCL::Create (LevelsetP2CL* ls
         throw DROPSErrCL("VolumeAdjustmentCL::Create: Please specify which volume correction method you want to use. The VolCorrection parameter expects one of the following strings: \"None\", \"Global\" or \"ComponentBased\".\n");
 }
 
-
-
-
 void VolumeAdjustmentCL::DebugOutput (std::ostream& os) const
 {
     os << "VolumeAdjustmentCL: No volume adjustment.\n" << std::endl;
+}
+
+VTKVariableCL& VolumeAdjustmentCL::make_VTKComponentMap(std::string var_name)
+{
+    return *new VTKComponentMapCL(var_name);
 }
 
 template <class VolumeFunT>
@@ -132,7 +165,6 @@ void GlobalVolumeAdjustmentCL::DebugOutput (std::ostream& os) const
     os << "GlobalVolumeAdjustmentCL: shift for level set function dphi_: " << dphi_ << ", "
        "new rel. volume: " << lset_->GetVolume()/global_reference_volume_ << "." << std::endl;
 }
-
 
 /// \brief Compute the strongly connected components of a directed graph.
 /// The square matrix M is interpreted as graph with vertices
@@ -708,6 +740,11 @@ void ComponentBasedVolumeAdjustmentCL::make_backup()
     component_of_dof_backup_= component_of_dof_;
     sign_of_component_backup_= sign_of_component_;
     ReferencePoints_backup= ReferencePoints;
+}
+
+VTKVariableCL& ComponentBasedVolumeAdjustmentCL::make_VTKComponentMap(std::string var_name)
+{
+    return *new VTKComponentMapCL( lset_, &component_of_dof_, var_name);
 }
 
 } // end of namespace DROPS
