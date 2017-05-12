@@ -86,10 +86,10 @@ void SolveStatProblem( PoissonCL& Poisson, SolverT& solver, ParamCL& Param)
     // time measurements
 #ifndef _PAR
     TimerCL timer;
-    const bool doErrorEstimate= P.get<int>("Err.DoErrorEstimate");
+    const bool doErrorEstimate= P.get<int>("Error.DoErrorEstimate");
 #else
     const bool doErrorEstimate= false;
-    if (Param.get<int>("Err.DoErrorEstimate"))
+    if (Param.get<int>("Error.DoErrorEstimate"))
         std::cout << "Skipping Error-Estimation ..." << std::endl;
     ParTimerCL timer;
 #endif
@@ -103,7 +103,7 @@ void SolveStatProblem( PoissonCL& Poisson, SolverT& solver, ParamCL& Param)
         std::cout << " o time " << timer.GetTime() << " s" << std::endl;
 
         //If we need to add convection
-        if(Param.get<int>("PoissonCoeff.Convection"))
+        if(Param.get<int>("Poisson.Coeff.withConvection"))
         {
             std::cout << line << "Setup convection...\n";
             timer.Reset();
@@ -147,9 +147,10 @@ void SolveStatProblem( PoissonCL& Poisson, SolverT& solver, ParamCL& Param)
         MLIdxDescCL* old_idx= &loc_idx;
         VecDescCL* new_x= &Poisson.x;
         VecDescCL* old_x= &loc_x;
+        MeshDeformationCL& md= MeshDeformationCL::getInstance();
 
         DoerflerMarkCL<typename PoissonP1CL<PoissonCoeffCL>::est_fun, typename PoissonP1CL<PoissonCoeffCL>::base_>
-            Estimator( P.get<double>("Err.RelReduction"), P.get<double>("Err.MinRatio"), P.get<double>("Err.Threshold"), P.get<double>("Err.Meas"), P.get<int>("Err.DoMark"),
+            Estimator( P.get<double>("Error.RelReduction"), P.get<double>("Error.MinRatio"), P.get<double>("Error.Threshold"), P.get<double>("Error.Meas"), P.get<int>("Error.DoMark"),
                        &PoissonP1CL<PoissonCoeffCL>::ResidualErrEstimator, *static_cast<typename PoissonP1CL<PoissonCoeffCL>::base_*>(&Poisson) );
 
         int step= 0;
@@ -183,6 +184,14 @@ void SolveStatProblem( PoissonCL& Poisson, SolverT& solver, ParamCL& Param)
                 old_x->Reset();
              }
 
+            if( Poisson.usesALE())
+            {
+                md.SetMeshTransformation(PoissonCoeffCL::ALEDeform, -1, P.get<int>("ALE.OnlyBndCurved"), P.get<int>("ALE.P1")==0);
+                //ALE.InitGrid();
+            }
+            else
+                md.SetMeshIdentity();
+
             Poisson.A.SetIdx( new_idx, new_idx);             // tell A about numbering
             Poisson.SetupSystem( Poisson.A, Poisson.b);
             timer.Stop();
@@ -205,7 +214,7 @@ void SolveStatProblem( PoissonCL& Poisson, SolverT& solver, ParamCL& Param)
 
             std::swap( old_x, new_x);
             std::swap( old_idx, new_idx);
-        } while ( new_marks && step++ < P.get<int>("Err.NumRef"));
+        } while ( new_marks && step++ < P.get<int>("Error.NumRef"));
         // I want the solution to be in Poisson.x
         if ( old_x == &loc_x)
         {
@@ -234,7 +243,6 @@ void Strategy(PoissonCL& Poisson)
 
     MeshDeformationCL& md = MeshDeformationCL::getInstance();
     md.Initialize(&mg);
-    mg.SetMeshDeformation(md);
 
     //ALECL ALE(P, mg);
     // connection triangulation and vectors
@@ -282,7 +290,7 @@ void Strategy(PoissonCL& Poisson)
     std::cout << line << "Choose the poisson solver...\n";
     timer.Reset();
     // type of preconditioner and solver
-    PoissonSolverFactoryCL<> factory( P.get_child("Poisson"), Poisson.idx);
+    PoissonSolverFactoryCL<> factory( P.get_child("Poisson.Solver"), Poisson.idx);
     PoissonSolverBaseCL* solver = factory.CreatePoissonSolver();
 
     if ( factory.GetProlongation() != 0)
@@ -297,11 +305,10 @@ void Strategy(PoissonCL& Poisson)
         // discretize (setup linear equation system)
         std::cout << line << "Discretize (setup linear equation system) for instationary problem...\n";
         timer.Reset();
-        if(Poisson.ALE_)
+        if (Poisson.usesALE())
         {
-            mg.GetMeshDeformation().SetMeshTransformation(PoissonCoeffCL::ALEDeform, -1, P.get<int>("ALE.OnlyBndCurved"), P.get<int>("ALE.P1")==0);
+            md.SetMeshTransformation(PoissonCoeffCL::ALEDeform, -1, P.get<int>("ALE.OnlyBndCurved"), P.get<int>("ALE.P1")==0);
             //ALE.InitGrid();
-
         }
         Poisson.SetupInstatSystem( Poisson.A, Poisson.M, Poisson.x.t);
         Poisson.Init( Poisson.x, Poisson.Coeff_.InitialCondition, 0.0);
@@ -318,7 +325,7 @@ void Strategy(PoissonCL& Poisson)
 #ifndef _PAR
     //Ensight format
     Ensight6OutCL* ensight = NULL;
-    if (P.get<int>("Ensight.EnsightOut",0)){
+    if (P.get<int>("Ensight.Freq",0)){
         // Initialize Ensight6 output
         const std::string filename= P.get<std::string>("Ensight.EnsDir") + "/" + P.get<std::string>("Ensight.EnsCase");
         ensight = new Ensight6OutCL(P.get<std::string>("Ensight.EnsCase")+".case", P.get<int>("Time.NumSteps")+1,
@@ -331,7 +338,7 @@ void Strategy(PoissonCL& Poisson)
 #endif
     //VTK format
     VTKOutCL * vtkwriter = NULL;
-    if (P.get<int>("VTK.VTKOut",0)){
+    if (P.get<int>("VTK.Freq",0)){
         vtkwriter = new VTKOutCL(mg, "DROPS data",
                                  P.get<int>("Time.NumSteps")+1,
                                  P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName"),
@@ -350,16 +357,18 @@ void Strategy(PoissonCL& Poisson)
         //Creat instationary ThetaschemeCL to handle time integration for instationary problem and set time steps
         InstatPoissonThetaSchemeCL<PoissonCL, PoissonSolverBaseCL>
         ThetaScheme( Poisson, *solver, P);
-        ThetaScheme.SetTimeStep(P.get<double>("Time.StepSize") );
+        ThetaScheme.SetTimeStep(P.get<double>("Time.FinalTime")/P.get<int>("Time.NumSteps") );
         //Solve linear systerm in each time step
         for ( int step = 1; step <= P.get<int>("Time.NumSteps") ; ++step) {
             timer.Reset();
             std::cout << line << "Step: " << step << std::endl;
-            if(Poisson.ALE_)
+            if (Poisson.usesALE())
             {
-                mg.GetMeshDeformation().SetMeshTransformation(PoissonCoeffCL::ALEDeform, Poisson.x.t, P.get<int>("ALE.OnlyBndCurved"), P.get<int>("ALE.P1")==0 );   
+                md.SetMeshTransformation(PoissonCoeffCL::ALEDeform, Poisson.x.t, P.get<int>("ALE.OnlyBndCurved"), P.get<int>("ALE.P1")==0 );
                 //ALE.MovGrid(Poisson.x.t);
             }
+            else
+                md.SetMeshIdentity();
             ThetaScheme.DoStep( Poisson.x);
 
             timer.Stop();
@@ -377,7 +386,7 @@ void Strategy(PoissonCL& Poisson)
             }
 
 #ifndef _PAR
-            if (ensight && step%P.get<int>("Ensight.EnsightOut", 0)==0){
+            if (ensight && step%P.get<int>("Ensight.Freq", 0)==0){
                 std::cout << " o Ensight output ...\n";
                 timer.Reset();
                 ensight->Write( Poisson.x.t);
@@ -385,7 +394,7 @@ void Strategy(PoissonCL& Poisson)
                 std::cout << " o -time " << timer.GetTime() << " s" << std::endl;
             }
 #endif
-            if (vtkwriter && step%P.get<int>("VTK.VTKOut", 0)==0){
+            if (vtkwriter && step%P.get<int>("VTK.Freq", 0)==0){
                 std::cout << " o VTK output ...\n";
                 timer.Reset();
                 vtkwriter->Write( Poisson.x.t);
@@ -404,21 +413,6 @@ void Strategy(PoissonCL& Poisson)
 
 } // end of namespace DROPS
 
-/// \brief Set Default parameters here s.t. they are initialized.
-/// The result can be checked when Param-list is written to the output.
-void SetMissingParameters(DROPS::ParamCL& P){
-    P.put_if_unset<std::string>("VTK.TimeFileName",P.get<std::string>("VTK.VTKName"));
-    P.put_if_unset<int>("VTK.ReUseTimeFile",0);
-    P.put_if_unset<int>("VTK.UseDeformation",0);
-    P.put_if_unset<int>("VTK.UseOnlyP1",0);
-    P.put_if_unset<int>("Stabilization.SUPG",0);
-    P.put_if_unset<double>("Stabilization.Magnitude",1.0);
-    P.put_if_unset<int>("Stabilization.Grids",1);
-    P.put_if_unset<int>("ALE.wavy",0);
-    P.put_if_unset<int>("ALE.P1", 1);
-    P.put_if_unset<int>("ALE.OnlyBndCurved", 1);
-    P.put_if_unset<std::string>("ALE.Interface","Zero");
-}
 
 int main (int argc, char** argv)
 {
@@ -435,12 +429,11 @@ int main (int argc, char** argv)
 #endif
 
         DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/poisson/cdrdrops/statpoissonEx.json");
-        //Setup missing parameters
-        SetMissingParameters(P);
+        P.put_if_unset<std::string>("VTK.TimeFileName",P.get<std::string>("VTK.VTKName"));
         //output all the parameters
         std::cout << P << std::endl;
 
-        DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), 
+        DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"),
                            P.get<std::vector<std::string> >("General.DynamicLibs") );
 
         if (P.get<int>("General.ProgressBar"))
@@ -452,22 +445,22 @@ int main (int argc, char** argv)
 
         //create geometry
         DROPS::MultiGridCL* mg= 0;
-        DROPS::PoissonBndDataCL* bdata = 0;
+        DROPS::PoissonBndDataCL* bdata = new DROPS::PoissonBndDataCL(0);
 
-        //only for measuring cell, not used here
-        double r = 1;
-        std::string serfile = "none";
         //build computational domain
-        DROPS::BuildDomain( mg, P.get<std::string>("DomainCond.MeshFile"), P.get<int>("DomainCond.GeomType"), serfile, r);
+        std::unique_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P));
+        mg = new DROPS::MultiGridCL( *builder);
         //Setup boundary conditions
-        DROPS::BuildBoundaryData( mg, bdata, P.get<std::string>("DomainCond.BoundaryType"), P.get<std::string>("DomainCond.BoundaryFncs"));
+        read_BndData( *bdata, *mg, P.get_child( "Poisson.BoundaryData"));
+        for (int i=0; i<mg->GetBnd().GetNumBndSeg(); ++i)
+            std::cout << i << ": BC = " << bdata->GetBndSeg(i).GetBC() << std::endl;
         //Initialize SUPGCL class
         DROPS::SUPGCL supg;
         //SUPG stabilization, ALE method  and error estimation are not yet implemented for P2 case!
         if(!P.get<int>("Poisson.P1"))
         {
               P.put<int>("Stabilization.SUPG",0);
-              P.put<int>("Err.DoErrorEstimate",0);
+              P.put<int>("Error.DoErrorEstimate",0);
         }
         if(P.get<int>("Stabilization.SUPG"))
         {
@@ -483,7 +476,7 @@ int main (int argc, char** argv)
             probP1 = new DROPS::PoissonP1CL<DROPS::PoissonCoeffCL>( *mg, tmp, *bdata, supg, P.get<int>("ALE.wavy"));
         else
         {
-            probP2 = new DROPS::PoissonP2CL<DROPS::PoissonCoeffCL>( *mg, tmp, *bdata, P.get<int>("ALE.wavy"));            
+            probP2 = new DROPS::PoissonP2CL<DROPS::PoissonCoeffCL>( *mg, tmp, *bdata, P.get<int>("ALE.wavy"));
         }
 
 #ifdef _PAR
@@ -496,10 +489,10 @@ int main (int argc, char** argv)
         std::cout << " o time " << timer.GetTime() << " s" << std::endl;
 
         // Refine the grid
-        std::cout << "Refine the grid " << P.get<int>("DomainCond.RefineSteps") << " times regulary ...\n";
+        std::cout << "Refine the grid " << P.get<int>("Mesh.AdaptRef.FinestLevel") << " times regulary ...\n";
         timer.Reset();
         // Create new tetrahedra
-        for ( int ref=1; ref <= P.get<int>("DomainCond.RefineSteps"); ++ref){
+        for ( int ref=1; ref <= P.get<int>("Mesh.AdaptRef.FinestLevel"); ++ref){
             std::cout << " refine (" << ref << ")\n";
             DROPS::MarkAll( *mg);
             mg->Refine();

@@ -1,0 +1,30 @@
+#---------------------SPECIFICATION FILE----------------------------------------
+Type of test: serial
+Name of executable: blockmat
+#The path to the folder where the executable is located must be relative to the
+#/drops folder
+Folder of executable: tests
+Name of author: Liang Zhang
+#-------------------------------------------------------------------------------
+#------------------------------NUMBERS------------------------------------------
+#-------------------------------------------------------------------------------
+#------------------------------STRINGS------------------------------------------
+# String find = 1: you want to find this string,
+# = 0: you don't want to find this string
+String value:  "x0: 5 x1: 4 x2: 3"
+String find: 1
+String value:  "y0: 5 y1: 4 y2: 3"
+String find: 1
+String value:  "x.size(): 1 x0: 3"
+String find: 1
+String value:  "b2: 1      3"
+String find: 1
+String value:  "transp_mul( B, b2): 2      3 3"
+String find: 1
+String value:  "y.size(): 2 y0: 3 y1: 3"
+String find: 1
+String value:  "S2*b: 2      3 3"
+String find: 1
+String value:  "S3*b: 1      0"
+String find: 1
+#-------------------------------------------------------------------------------

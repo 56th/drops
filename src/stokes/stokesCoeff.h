@@ -55,25 +55,25 @@ class StokesFlowCoeffCL
     const DROPS::Point3DCL g;
 
     StokesFlowCoeffCL( const DROPS::ParamCL& P)
-      : rho( P.get<double>("Mat.Dens")),
-        nu( P.get<double>("Mat.Visc")),
-        g( P.get<DROPS::Point3DCL>("Exp.Gravity")){
+      : rho( P.get<double>("NavStokes.Coeff.Dens")),
+        nu( P.get<double>("NavStokes.Coeff.Visc")),
+        g( P.get<DROPS::Point3DCL>("NavStokes.Coeff.Gravity")){
         DROPS::InScaMap & scamap = DROPS::InScaMap::getInstance();
-        q = scamap[P.get<std::string>("StokesCoeff.Reaction")];
+        q = scamap[P.get<std::string>("NavStokes.Coeff.Reaction")];
         DROPS::InVecMap & vecmap = DROPS::InVecMap::getInstance();
-        f = vecmap[P.get<std::string>("StokesCoeff.Source")];
-        if( P.get<std::string>("StokesCoeff.Solution_Vel").compare("None")!=0)
-            LsgVel = vecmap[P.get<std::string>("StokesCoeff.Solution_Vel")];
+        f = vecmap[P.get<std::string>("NavStokes.Coeff.Source")];
+        if( P.get<std::string>("NavStokes.Coeff.Solution_Vel").compare("None")!=0)
+            LsgVel = vecmap[P.get<std::string>("NavStokes.Coeff.Solution_Vel")];
         else
             LsgVel = NULL;
         DROPS::InMatMap & matmap = DROPS::InMatMap::getInstance();
-        if( P.get<std::string>("StokesCoeff.Solution_DVel").compare("None")!=0)
-            DLsgVel = matmap[P.get<std::string>("StokesCoeff.Solution_DVel")];
+        if( P.get<std::string>("NavStokes.Coeff.Solution_DVel").compare("None")!=0)
+            DLsgVel = matmap[P.get<std::string>("NavStokes.Coeff.Solution_DVel")];
         else
             DLsgVel = NULL;
         DROPS::InScaMap & inscamap = DROPS::InScaMap::getInstance();
-        if( P.get<std::string>("StokesCoeff.Solution_Pr").compare("None")!=0)
-            LsgPr = inscamap[P.get<std::string>("StokesCoeff.Solution_Pr")];
+        if( P.get<std::string>("NavStokes.Coeff.Solution_Pr").compare("None")!=0)
+            LsgPr = inscamap[P.get<std::string>("NavStokes.Coeff.Solution_Pr")];
         else
             LsgPr = NULL;
     }

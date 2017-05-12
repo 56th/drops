@@ -1,0 +1,16 @@
+{
+    "VTK":
+    {
+        "VTKName": "show_domain",
+        "VTKDir": ".",
+        "Binary": "1",
+        "UseOnlyP1": "0",
+        "ReUseTimeFile": "0",
+        "UseDeformation": "0"
+    },
+    "General":
+    {
+        "DynamicLibsPrefix": "..\/"
+    }
+}
+

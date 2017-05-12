@@ -1,5 +1,5 @@
 /// \file spacetime_surf.cpp
-/// \brief space time setup test st interface 
+/// \brief space time setup test st interface
 /// \author LNM RWTH Aachen: Christoph Lehrenfeld
 
 /*
@@ -40,7 +40,7 @@ namespace DROPS
 // Accumulator for space time integrals
 class STSurfaceTestAccumulatorCL : public TetraAccumulatorCL
 {
-    protected:   
+    protected:
     const MultiGridCL& MG_;
 
     const LevelsetP2CL * lsetp2old;
@@ -57,7 +57,7 @@ class STSurfaceTestAccumulatorCL : public TetraAccumulatorCL
     bool sign[8]; //sign of levelset at vertices (4(space) x 2(time))
 
 //    const Uint lvl;
-    
+
 
     const double told;
     const double tnew;
@@ -68,22 +68,22 @@ class STSurfaceTestAccumulatorCL : public TetraAccumulatorCL
     const Uint subtimeintervals;
 
     double * surfarea;
-    
+
     double * minlst;
     double * maxlst;
 
-public: 
-    STSurfaceTestAccumulatorCL (const MultiGridCL& MG, 
+public:
+    STSurfaceTestAccumulatorCL (const MultiGridCL& MG,
                                 instat_scalar_fun_ptr lset_fpt_in,
                                 const LevelsetP2CL * lsetp2old_in,
                                 const LevelsetP2CL * lsetp2new_in,
                                 const double t1, const double t2,
                                 const int subdivspace_in,
-                                const int subdivtim_in, 
+                                const int subdivtim_in,
                                 double* surfarea_in,
                                 double* minlst_in,
                                 double* maxlst_in);
-    
+
     ///\brief Initializes matrix-builders and load-vectors
     void begin_accumulation ();
     ///\brief Builds the matrices
@@ -91,14 +91,14 @@ public:
 
     virtual void local_setup (const TetraCL& sit);
 
-    virtual void visit (const TetraCL&); 
+    virtual void visit (const TetraCL&);
 
     virtual TetraAccumulatorCL* clone (int /*tid*/) { return new STSurfaceTestAccumulatorCL ( *this); }
-    
+
 };
 
 
-STSurfaceTestAccumulatorCL::STSurfaceTestAccumulatorCL (const MultiGridCL& MG, 
+STSurfaceTestAccumulatorCL::STSurfaceTestAccumulatorCL (const MultiGridCL& MG,
                                                         instat_scalar_fun_ptr lset_fpt_in,
                                                         const LevelsetP2CL * lsetp2old_in,
                                                         const LevelsetP2CL * lsetp2new_in,
@@ -133,7 +133,7 @@ void STSurfaceTestAccumulatorCL::visit (const TetraCL& sit)
 
 /* --------------- STVolume Transport term (time deriv., convection, diffusion)  -------------- */
 void STSurfaceTestAccumulatorCL::local_setup (const TetraCL& sit)
-{    
+{
     ScopeTimer scopetiming("STSurfaceTestAccumulatorCL::local_setup - total");
 
     GetTrafoTr( T, det, sit);
@@ -144,8 +144,8 @@ void STSurfaceTestAccumulatorCL::local_setup (const TetraCL& sit)
     // const double h = std::pow(absdet,1.0/3.0);
     const double dt = tnew-told;
     // const double st_absdet= absdet * dt;
-    
-    
+
+
     LocalP2CL<> locPhi_old, locPhi_new;
     if (lset_fpt == NULL)
     {
@@ -169,26 +169,26 @@ void STSurfaceTestAccumulatorCL::local_setup (const TetraCL& sit)
         p_cstquad = new CompositeSTQuadCL<QuadRule>(refprism4,locPhi_old, locPhi_new,
                                                                   ints_per_space_edge, subtimeintervals);
     else
-        p_cstquad = new CompositeSTQuadCL<QuadRule>(sit, TimeInterval(told,tnew), lset_fpt, 
+        p_cstquad = new CompositeSTQuadCL<QuadRule>(sit, TimeInterval(told,tnew), lset_fpt,
                                                                   ints_per_space_edge, subtimeintervals);
-    
+
     CompositeSTQuadCL<QuadRule> & cstquad = *p_cstquad;
-    
+
     iscut = cstquad.HasInterface();
 
     LocalP2CL<> p0; // values for other time level are zero
-    
+
     if (iscut)
     {
         ScopeTimer scopetiming("STSurfaceTestAccumulatorCL::local_setup - cut - stintface");
 
-        const GridFunctionCL<Point4DCL> & n_st_ref (cstquad.GetNormalsOnInterface()); 
+        const GridFunctionCL<Point4DCL> & n_st_ref (cstquad.GetNormalsOnInterface());
         GridFunctionCL<Point4DCL> n_st = eval(transform_normals_in_spacetime,T,absdet,dt,n_st_ref);
         const GridFunctionCL<double> meas_nu = apply_and_eval(calc_nu_measure_and_normalize,n_st);
         // const GridFunctionCL<double> meas_nu = apply_and_eval(calc_norm_and_normalize,n_st);
         const GridFunctionCL<Point3DCL> spacenormals = eval(calc_spacenormal_from_stnormal,n_st);
 
-#pragma omp critical(surfarea)            
+#pragma omp critical(surfarea)
         *surfarea += cstquad.QuadOnInterface(meas_nu);
 
 
@@ -208,13 +208,13 @@ void STSurfaceTestAccumulatorCL::local_setup (const TetraCL& sit)
 
             if_tr_pts2[i] = Point4DCL(if_tr_pts[i], if_intpts[i][3]);
         }
-            
+
         // static int first = true;
         // if (first)
         // std::cout << " if_tr_pts2 = " << if_tr_pts2 << std::endl;
         // first = false;
 
-        const GridFunctionCL<double> lsetvals(lset_fpt ? cstquad.EvalOnInterface(lset_fpt, &stmap) : cstquad.EvalLinearOnInterface(locPhi_old, locPhi_new)); 
+        const GridFunctionCL<double> lsetvals(lset_fpt ? cstquad.EvalOnInterface(lset_fpt, &stmap) : cstquad.EvalLinearOnInterface(locPhi_old, locPhi_new));
         // std::cout << " lsetvals = " << lsetvals << std::endl;
         for (Uint i = 0; i < lsetvals.size(); ++i)
         {
@@ -256,7 +256,7 @@ double Run (int numref, int numsteps, int subdivspace, int subdivtime)
                                    1.0*std_basis<3>(3),
                                    2*numref, numref, numref);
       MultiGridCL mg( brick);
-      
+
       instat_scalar_fun_ptr sigma (0);
       SurfaceTensionCL sf( sigma, 0);
       BndCondT bc[6]= { NoBC, NoBC, NoBC, NoBC, NoBC, NoBC };
@@ -268,15 +268,13 @@ double Run (int numref, int numsteps, int subdivspace, int subdivtime)
       {
           const double told = (double)i/numsteps;
           const double tnew = (double)(i+1)/numsteps;
-          
+
           LevelsetP2CL & lset_old( * LevelsetP2CL::Create( mg, lsbnd, sf));
-          lset_old.idx.CreateNumbering( mg.GetLastLevel(), mg);
-          lset_old.Phi.SetIdx( &lset_old.idx);
+          lset_old.CreateNumbering( mg.GetLastLevel());
           lset_old.Init( lset_test, told);
 
           LevelsetP2CL & lset_new( * LevelsetP2CL::Create( mg, lsbnd, sf));
-          lset_new.idx.CreateNumbering( mg.GetLastLevel(), mg);
-          lset_new.Phi.SetIdx( &lset_new.idx);
+          lset_new.CreateNumbering( mg.GetLastLevel());
           lset_new.Init( lset_test, tnew);
 
           TetraAccumulatorTupleCL accus ;
@@ -289,10 +287,10 @@ double Run (int numref, int numsteps, int subdivspace, int subdivtime)
           MaybeAddProgressBar(mg, "Surface integration", accus, -1);
           accus.push_back(&accu);
           // std::cout << " accumulate " << std::endl;
-          accumulate( accus, mg, lset_old.idx.TriangLevel(), lset_old.idx.GetMatchingFunction(), lset_old.idx.GetBndInfo());
+          accumulate( accus, mg, lset_old.idx.TriangLevel(), lset_old.idx.GetBndInfo());
           // getchar();
           ret += tmp;
-                                   
+
           delete &lset_new;
           delete &lset_old;
       }
@@ -361,31 +359,31 @@ int main ()
 {
     DROPS::ProgressBarTetraAccumulatorCL::Activate();
     DROPS::SMatrixCL<SS,ST> res_global;
- 
+
     for (int p = 0, sr = sr0; p < SS; ++p, sr*=2)
         for (int q = 0, tr = tr0; q < ST; ++q, tr*=2)
         {
             std::cout << "\n\n run with ( sr = " << sr << ", tr = " << tr << ")" << std::endl;
             res_global(p,q) = DROPS::Run(  sr, tr, 1, 1);
             std::cout << "result ( sr = " << sr << ", tr = " << tr << ") : " << res_global(p,q) << std::endl;
-            //output_results(res_global);            
+            //output_results(res_global);
         }
 
-    output_results(res_global);            
+    output_results(res_global);
 
 
     DROPS::SMatrixCL<SS,ST> res_local;
- 
+
     for (int p = 0, sr = sr0; p < SS; ++p, sr*=2)
         for (int q = 0, tr = tr0; q < ST; ++q, tr*=2)
         {
             std::cout << "\n\n run with ( sr = " << sr << ", tr = " << tr << ")" << std::endl;
             res_local(p,q) = DROPS::Run(  1, 1, sr, tr);
             std::cout << "result ( sr = " << sr << ", tr = " << tr << ") : " << res_local(p,q) << std::endl;
-            //output_results(res_local);            
+            //output_results(res_local);
         }
 
-    output_results(res_local);            
+    output_results(res_local);
 
     return 0;
 }

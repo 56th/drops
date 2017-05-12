@@ -1,10 +1,4 @@
 {
-        "_comment":
-"#=============================================================
-#    DROPS parameter file for osmosis (level 1)
-#=============================================================
-# time stepping",
-
 //General section
         "General":
         {
@@ -20,12 +14,13 @@
         "Time":
         {
                 "NumSteps":             100,
-                "StepSize":             0.005,
-                "Scheme":               0.5
+                "FinalTime":            0.5,
+                "Theta":                0.5
         },
         
         "Osmosis":
         {
+                "XFEMReduced":            1e-4,
                 "Levelset":             "torus",
                 "ScaleInitialConc":     0,
                 "InitialConc":          "TransverseLinear",
@@ -35,14 +30,6 @@
                 "beta":                 0.25,
                 "RelStationary":        1e-10
         },      
-        
-        "Exp":
-        {
-                "RadDrop":              [0.8, 0.8, 0.8 ],
-                "PosDrop":              [2.0, 2.0, 2.0 ],
-                "Gravity":              [0, -9.81, 0 ],
-                "OmitBound":            1e-4
-        },  
         
         "Stabilisation":
         {
@@ -77,6 +64,8 @@
         
         "Levelset":
         {
+                "RadDrop":              [0.8, 0.8, 0.8 ],
+                "PosDrop":              [2.0, 2.0, 2.0 ],
                 "Tol":                  1e-10,
                 "Iter":                 1000,
                 "SD":                   0.1,
@@ -92,23 +81,9 @@
                 "VolCorrection":        0
         },
 
-        "AdaptRef":
-        {
-                "_comment":
-"# adaptive refinement",
-
-                "Freq":                 0,
-                "FinestLevel":          0,
-                "CoarsestLevel":        0,
-                "Width":                0.1,
-                "RefineStrategy":       1,
-                "LoadBalStrategy":      1,
-                "Partitioner":          1
-        },
-
         "VTK":
         {
-                "VTKOut":               1,
+                "Freq":                 1,
                 "VTKDir":               "vtk",
                 "VTKName":              "torus_weakCoup_1",
                 "Binary":               0
@@ -120,19 +95,33 @@
             "Plotname":                 "plot/strongCoup_1.plot"
         },
 
-        "DomainCond":
+		"Mesh":
+		{
+                "Type": "BrickBuilder", // A parallelepiped
+                "Origin": [0,0,0],      // Origin
+                "E1": [4,0,0],          // Basis to span the object,
+                "E2": [0,4,0],          // not necessary orthonormal 
+                "E3": [0,0,4],          // ... 
+                "N1": 10,               // Number of cells along the E1-direction,
+                "N2": 10,               //                       the E2-direction,
+                "N3": 10,               //                       the E3-direction.
+		// adaptive refinement
+		        "AdaptRef":
+		        {
+		                "Freq":                 0,
+		                "FinestLevel":          0,
+		                "CoarsestLevel":        0,
+		                "Width":                0.1,
+		                "RefineStrategy":       1,
+		                "LoadBalStrategy":      1,
+		                "Partitioner":          1
+		        }
+        },
+        
+        "NavStokes":
         {
-                "_comment":
-"# domain, bnd/ini conditions",
-
-                "InitialCond":          0,
-                "GeomType":             1,
-                "InitialFile":          "none",
-                "MeshFile":             "4x4x4@10x10x10",
-                "BoundaryType":         "21!21!21!21!21!21!",
-                "BoundaryFncs":         "ZeroVel!ZeroVel!ZeroVel!ZeroVel!ZeroVel!ZeroVel"
+        	"InitialValue":     0
         }
-
 }
 
 

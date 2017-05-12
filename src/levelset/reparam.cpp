@@ -180,14 +180,12 @@ void Strategy( ProblemT& prob, BndDataCL<>& lsetbnd, double dt, int num_steps, d
     SurfaceTensionCL sf( sigma, 0);
     LevelsetP2CL & lset( * LevelsetP2CL::Create( mg, lsetbnd, sf, false, 0.1, -1) );
 
-    MLIdxDescCL& lidx= lset.idx;
     MLIdxDescCL& vidx= prob.vel_idx;
     VecDescCL& vel=  prob.v;
 
     prob.CreateNumberingVel( mg.GetLastLevel(), &vidx);
-    lset.CreateNumbering(    mg.GetLastLevel(), &lidx);
+    lset.CreateNumbering   ( mg.GetLastLevel());
     vel.SetIdx( &vidx);
-    lset.Phi.SetIdx( &lidx);
     switch (bsp)
     {
         case 0:  lset.Init( Phi0); break;

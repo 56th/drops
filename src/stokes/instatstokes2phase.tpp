@@ -111,7 +111,7 @@ void computeLocalP2_pipj(LocalP2CL<> (&pipj)[4][4] );
 //*****************************************************************************
 inline void VelocityRepairCL::pre_refine()
 {
-    p2repair_= std::auto_ptr<RepairP2CL<Point3DCL>::type >(
+    p2repair_= std::unique_ptr<RepairP2CL<Point3DCL>::type >(
         new RepairP2CL<Point3DCL>::type( stokes_.GetMG(), stokes_.v, stokes_.GetBndData().Vel));
 }
 
@@ -121,10 +121,9 @@ inline void
     VelVecDescCL loc_v;
     VelVecDescCL& v= stokes_.v;
     Uint LastLevel= stokes_.GetMG().GetLastLevel();
-    match_fun match= stokes_.GetMG().GetBnd().GetMatchFun();
     MLIdxDescCL loc_vidx( vecP2_FE, stokes_.vel_idx.size());
 
-    loc_vidx.CreateNumbering( LastLevel, stokes_.GetMG(), stokes_.GetBndData().Vel, match);
+    loc_vidx.CreateNumbering( LastLevel, stokes_.GetMG(), stokes_.GetBndData().Vel);
     /*
     if (LastLevel != v.RowIdx->TriangLevel()) {
         std::cout << "LastLevel: " << LastLevel
@@ -151,7 +150,7 @@ inline void
 
 inline void PressureRepairCL::pre_refine()
 {
-    p1repair_= std::auto_ptr<RepairP1CL<double>::type >(
+    p1repair_= std::unique_ptr<RepairP1CL<double>::type >(
         new RepairP1CL<double>::type( stokes_.GetMG(), stokes_.p, stokes_.GetBndData().Pr));
 }
 
@@ -161,9 +160,8 @@ inline void
     VecDescCL loc_p;
     MLIdxDescCL loc_pidx( stokes_.GetPrFE(), stokes_.pr_idx.size());
     VecDescCL& p= stokes_.p;
-    match_fun match= stokes_.GetMG().GetBnd().GetMatchFun();
 
-    loc_pidx.CreateNumbering( stokes_.GetMG().GetLastLevel(), stokes_.GetMG(), stokes_.GetBndData().Pr, match, ls_.PhiC, &ls_.GetBndData());
+    loc_pidx.CreateNumbering( stokes_.GetMG().GetLastLevel(), stokes_.GetMG(), stokes_.GetBndData().Pr, ls_.PhiC, &ls_.GetBndData());
     loc_p.SetIdx( &loc_pidx);
 
     p1repair_->repair( loc_p);
@@ -178,7 +176,7 @@ inline void
 inline void
   PressureRepairCL::pre_refine_sequence ()
 {
-    p1xrepair_= std::auto_ptr<P1XRepairCL>( new P1XRepairCL( stokes_.GetMG(), stokes_.p));
+    p1xrepair_= std::unique_ptr<P1XRepairCL>( new P1XRepairCL( stokes_.GetMG(), stokes_.p));
 }
 
 inline void

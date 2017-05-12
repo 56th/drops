@@ -1,40 +1,49 @@
 {
-	"_comment":
-"#=============================================================
-#    DROPS parameter file for twophasedrops
-#    simulation of two-phase flow:
-#    droplet in measuring cell used in NMR measurements
-#=============================================================
-# time stepping",
+//=============================================================
+//    DROPS parameter file for twophasedrops
+//    simulation of two-phase flow:
+//    droplet in measuring cell used in NMR measurements
+//=============================================================
 
+    "Time":
+    {
+// time stepping
+		"NumSteps":			100
+	},
+    
 	"Exp":
 	{
-		"_comment":
-"# experimental conditions",
-
-		"FinestLevel":		2,
-		"CoarsestLevel":	0,
-		"NumSteps":			100,
-		"Origin":			[ 0.5, 0.2,  0.5],
+// experimental conditions
+		"DropOrigin":		[ 0.5, 0.2,  0.5],
 		"DropVel":			[ 0.0, 0.01, 0.0],
 		"DropRadius":		0.15,
-		"RefWidth":         0.1,
 		"CheckSanity":		0
 	},
 	
 	"VTK":
 	{
-		"_comment":
-"#VTK output",
-
-		"VTKOut":		0,
+// VTK output
+		"Freq":		0,
 		"VTKDir":		"vtk",
 		"VTKName":		"ref_rising_drop",
 		"Binary":		1
 	},
 	
-	"Brick":
-	{
-		"Mesh":		"1x3x1@8x24x8"
-	}
+    "Mesh":
+    {
+        "Type": "BrickBuilder",      // A parallelepiped
+        "Origin": [0,0,0],           // Origin
+        "E1": [1,0,0],               // Basis to span the object,
+        "E2": [0,3,0],               // not necessary orthonormal 
+        "E3": [0,0,1],               // ... 
+        "N1": 8,                     // Number of cells along the E1-direction,
+        "N2": 24,                     //                       the E2-direction,
+        "N3": 8,                     //                       the E3-direction.
+        "AdaptRef":
+        {
+            "FinestLevel":          2,
+            "CoarsestLevel":        0,
+            "Width":                0.1
+        }
+    }
 }

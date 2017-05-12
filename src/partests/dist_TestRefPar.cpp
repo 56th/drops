@@ -340,7 +340,7 @@ int main(int argc, char* argv[])
         const int me= DROPS::ProcCL::MyRank();
 
         // Parameter file einlesen ...
-        DROPS::read_parameter_file_from_cmdline( C, argc, argv);
+        DROPS::read_parameter_file_from_cmdline( C, argc, argv, "../../param/partests/dist_TestRefPar/Ref.json");
         std::cout << C << std::endl;
 
         const bool printTime= C.get<int>("Misc.PrintTime"),

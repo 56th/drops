@@ -1,0 +1,27 @@
+{
+    "Restart":
+    {
+        "Inputfile": ""
+    },
+    "Levelset":
+    {
+        "CurvDiff": "-1",
+        "SD": "1",
+        "Discontinuous":        0,       // Do not use DG for Levelset-Discretisation
+
+        "BoundaryData":
+        {
+        	"Default":  ["NoBC"]
+        }
+    },
+    "Transp":
+    {
+        "UseNSSol": "0"
+    },
+    "VTK":
+    {
+        "ReUseTimeFile": "0",
+        "UseOnlyP1": "0"
+    }
+}
+

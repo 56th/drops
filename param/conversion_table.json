@@ -1,0 +1,341 @@
+{
+//=============================================================
+//    how to convert json files to new json format:
+//    input for python param/convert_json.py
+//=============================================================
+
+// time stepping
+        "Time":
+        {
+                "StepSize":             "Time.StepSize_convertTo_FinalTime",  // #[ersetzt durch FinalTime = NumSteps*StepSize] time step size
+                "EndTime":              "Time.FinalTime" 
+        },
+
+// flow solver
+        "Stokes":
+        {
+                "StokesMethod":         "CouplingSolver.NavStokesSolver.OseenSolver.Solver",  // #[-> CouplingSolver.NavStokesSolver.OseenSolver] Stokes solver, cf. num/stokessolverfactory.h
+                "InnerIter":            "CouplingSolver.NavStokesSolver.OseenSolver.UzawaInnerIter",   // #maximum number of iterations for the inner solver
+                "OuterIter":            "CouplingSolver.NavStokesSolver.OseenSolver.Iter",    // #maximum number of iterations for the outer solver
+                "InnerTol":             "CouplingSolver.NavStokesSolver.OseenSolver.UzawaInnerTol",    // #tolerance for the inner solver. (! Attention:
+                                                // The inner solver tolerance should be chosen some
+                                                // orders of magnitude smaller than the outer solver
+                                                // tolerance, otherwise the outer solver diverges)
+                "OuterTol":             "CouplingSolver.NavStokesSolver.OseenSolver.Tol",  // #tolerance for the outer solver
+                "PcAIter":              "CouplingSolver.NavStokesSolver.OseenSolver.PcAIter",      // #maximum number of iterations for the preconditioner
+                                                // of the A-Block
+                "PcATol":               "CouplingSolver.NavStokesSolver.OseenSolver.PcATol",  // #tolerance for the preconditioner of the A-Block
+                "PcSTol":               "CouplingSolver.NavStokesSolver.OseenSolver.PcSTol", // #tolerance for the preconditioner of the Schur complement
+                "Omega":                "CouplingSolver.NavStokesSolver.OseenSolver.Relax", // #relaxation of ssor
+                "Tau":                  "CouplingSolver.NavStokesSolver.OseenSolver.Tau", // #used in obsolete uzawa solvers
+                "DirectSolve":          "CouplingSolver.NavStokesSolver.OseenSolver.DirectSolve",
+                "XFEMStab":             "NavStokes.XFEMReduced",    // #[->NavStokes.XFEMReduced]threshold for discarding additional dof parameters in
+                                                // the XFEM pressure space. Using a negative value
+                                                // yields the standard FEM pressure space.
+                "epsP":                 "NavStokes.GhostPenalty",
+                "Theta":                "Time.Theta"       // #[-> Time] controls the implicitness of the theta-scheme
+                                                // for time discretization of the Navier-Stokes and
+                                                // level set equations. Theta = 0 yields the explicit and
+                                                // Theta = 1 the implicit Euler method. Theta = 0.5 results
+                                                // in the Crank-Nicholson scheme.
+        },
+
+// Navier Stokes solver
+        "NavStokes":
+        {
+                "Nonlinear":            "CouplingSolver.NavStokesSolver.Nonlinear",      // #[-> NavStokesSolver] determination of the influence of the nonlinear
+                                                // inertia term. For Nonlinear = 0 the linear Stokes
+                                                // equation and for Nonlinear = 1 the full Navier-Stokes
+                                                // equation is solved.
+                "Tol":                  "CouplingSolver.NavStokesSolver.Tol",  // #tolerance for the Navier-Stokes solver.
+                "Iter":                 "CouplingSolver.NavStokesSolver.Iter",     // #maximum number of iterations for the Navier-Stokes solver.
+                "Reduction":            "CouplingSolver.NavStokesSolver.Reduction",    // #reduction of the Oseen residual by this factor.
+                "Downwind":                     // #[->default]
+                {
+                        "Frequency": "Deprecated.Default.Downwind",         // 0 disables downwind-numbering
+                        "MaxRelComponentSize": "Deprecated.Default.Downwind", // maximal cycle size before removing weak edges
+                        "WeakEdgeRatio": "Deprecated.Default.Downwind",   // ration of the weak edges to remove for large cycles
+                        "CrosswindLimit": "Deprecated.Default.Downwind" // cos(pi/6); smaller convection is not considered
+                },
+                "SlipBnd":    // #[-> NavStokes.BoundaryData] slip and symmetric boundary condition
+                {
+                  "Beta1":                       "NavStokes.BoundaryData.SlipBnd.Beta1",              //Slip coefficient for fluid 1
+                  "Beta2":                       "NavStokes.BoundaryData.SlipBnd.Beta2",              //Slip coefficient for fluid 2
+                  "BetaL":                       "NavStokes.BoundaryData.SlipBnd.BetaL",              //Slip coefficient for contact line
+                  "NitschePenalty":              "NavStokes.BoundaryData.SlipBnd.NitschePenalty",
+                  "CtAngle":                     "NavStokes.BoundaryData.SlipBnd.ContactAngle",       //constant equilibrium contact angle
+                  "CtAngleFnc":                  "NavStokes.BoundaryData.SlipBnd.ContactAngleFunc",   //Equilibrium contact angle as a function
+                  "BndOutNormal":                "NavStokes.BoundaryData.SlipBnd.BndOuterNormal"      //A function defining the outer normal of the domain 
+                }                
+        },
+
+// Levelset solver
+        "Levelset":
+        {
+                "Tol":                  "CouplingSolver.LevelsetSolver.Tol",  // #[-> CouplingSolver.LevesetSolver] tolerance for the level set solver.
+                "Iter":                 "CouplingSolver.LevelsetSolver.Iter",   // #maximum number of iterations for the level set solver.
+                "CurvDiff":             "Deprecated.Default.Levelset.CurvDiff",     // [-> default] smoothing of level set function before the discretization
+                                                // of the curvature term. ( ! Attention: The smoothing is only
+                                                // applied on temporary variables used for the curvature
+                                                // calculation. The interface remains unchanged.)
+                "Theta":                "Deprecated.Theta",      // #[-> Time] controls the implicitness of the theta-scheme for time
+                                                // discretization of the Navier-Stokes and level set equations.
+                                                // Theta = 0 yields the explicit and Theta = 1 the implicit
+                                                // Euler method. Theta = 0.5 results in the Crank-Nicholson scheme.
+                "BoundaryType":         "Deprecated.Default.Levelset.BoundaryType",     // #[-> default] List of boundary types separated by a !.
+                                                           // Each defining a boundary type for one boundary
+                                                           // domain ( The following indices may be used:
+                                                           //          Dir0BC= 0, DirBC= 2, Per1BC= 13,
+                                                           //          Per2BC= 11, Nat0BC= 21, NatBC= 23,
+                                                           //          NoBC= 98, UndefinedBC_= 99        ).
+                "BoundaryFncs":         "Deprecated.Default.Levelset.BoundaryFncs", // #
+                                                           // List of boundary functions separated by a !.
+                                                           // Each string defines a function which is taken
+                                                           // from a function container during runtime.
+
+
+               "Downwind":  // #[-> default]
+                {
+                        "Frequency": "Deprecated.Default.Downwind",         // 0 disables downwind-numbering
+                        "MaxRelComponentSize": "Deprecated.Default.Downwind", // maximal cycle size before removing weak edges
+                        "WeakEdgeRatio": "Deprecated.Default.Downwind",   // ration of the weak edges to remove for large cycles
+                        "CrosswindLimit": "Deprecated.Default.Downwind" // cos(pi/6); smaller convection is not considered
+                }
+        },
+
+// coupling of Navier-Stokes and level set
+        "Coupling":
+        {
+                "Tol":                  "CouplingSolver.Tol",  // #[-> CouplingSolver] tolerance for the coupling.
+                "Iter":                 "CouplingSolver.Iter",     // 3 maximum number of iterations for the fixed-point iteration.
+                                                // ( ! Attention: For Iter = -1 the calculation is carried out
+                                                // until convergence).
+                "Stab":                 "CouplingSolver.ImplLB",      // #[-> CouplingSolver.ImplLB] Laplace-Beltrami-stabilization.
+                "Projection":           "Deprecated.Default.Projection"       // #[-> default] If Projection = 1, a projection step is carried out before
+                                                // the fixed-point-iteration.
+        },
+
+// re-initialization of levelset function",
+        "Reparam":  //#[-> Levelset.Reparam]
+        {
+                "Freq":                 "Levelset.Reparam.Freq",      // number of timesteps before the levelset function is
+                                                // reparameterized. Freq = 0 deactivates the reparameterization.
+                "Method":               "Levelset.Reparam.Method",      // Method how to determine distance of frontier vertices and
+                                                // propagation scheme, see documentation of ReparamFactoryCLfor
+                                                // a detailed description
+                "MinGrad":              "Levelset.Reparam.MinGrad",    // minimal allowed norm of the gradient of the levelset function.
+                "MaxGrad":              "Levelset.Reparam.MaxGrad",     // maximal allowed norm of the gradient of the levelset function.
+                "NarrowBand":           "Deprecated.Reparam.NarrowBand" //#[-> default=-1] Narrow-Band method for the Euclidian method.
+                                                // (e. g. NarrowBand = 0.5 <=> all DOFs with < 50% of maximal
+                                                // level set value are considered).
+        },
+
+// adaptive refinement
+        "AdaptRef":               //#[->Mesh.AdaptRef]
+        {
+                "Freq":                 "Mesh.AdaptRef.Freq",      // number of timesteps before adaptive refinement is carried out.
+                "FinestLevel":          "Mesh.AdaptRef.FinestLevel",      // number of refinement levels and label of the finest level
+                                                // close to the phase boundary.
+                "CoarsestLevel":        "Mesh.AdaptRef.CoarsestLevel",      // label of coarsest level close to the phase boundary.
+                "Width":                "Mesh.AdaptRef.Width",    // domain of refinement.
+                "LoadBalStrategy":      "Mesh.AdaptRef.LoadBalStrategy",    //#[-> default=1011] load balancing method, see decompose.h for details
+                "Partitioner":          "Deprecated.Reparam.Partitioner", 
+                "RefineStrategy":       "Deprecated.Reparam.RefineStrategy", 
+                "AddConcMarker":        "Mesh.AdaptRef.AddConcMarker",
+                "Threshold":            "Mesh.AdaptRef.Threshold",
+                "ModifyGrid":           "Mesh.AdaptRef.ModifyGrid"
+        },
+
+// material data (all units are SI)
+        "Mat":  // #[->NavStokes.Coeff]
+        {
+                "DensDrop":             "NavStokes.Coeff.DensNeg",      //#[-> DensNeg] density of the droplet
+                "ViscDrop":             "NavStokes.Coeff.ViscNeg",     //#[-> ViscNeg] dynamic viscosity of the droplet
+                "DensFluid":            "NavStokes.Coeff.DensPos",     //#[-> DensPos] density of the surrounding fluid
+                "ViscFluid":            "NavStokes.Coeff.ViscPos",      //#[-> ViscPos] dynamic viscosity of the surrounding fluid.
+                "Visc":                 "NavStokes.Coeff.Visc",
+                "Dens":                 "NavStokes.Coeff.Dens",
+                "SmoothZone":           "Deprecated.Default.Smoothzone"    //#[->default] (deprecated) defines the width of the transition zone
+                                                // surrounding the interface, where the density- and viscosity-
+                                                // jump is smoothed numerically. In the current version we always
+                                                // use a sharp interface w/o any smoothing, hence, this parameter
+                                                // has no effect.
+        },
+
+        
+        "StokesCoeff": 
+        {
+            "Solution_DVel":    "NavStokes.Coeff.Solution_DVel",
+            "Reaction":         "NavStokes.Coeff.Reaction",
+            "Solution_Pr":      "NavStokes.Coeff.Solution_Pr",
+            "Solution_Vel":     "NavStokes.Coeff.Solution_Vel",
+            "Source":           "NavStokes.Coeff.Source"
+        },
+
+// experimental conditions (all units are SI)
+        "Exp":
+        {
+
+                "RadDrop":              "Levelset.RadDrop", //#[-> Levelset] radii of the ellipsoidal droplet at initial time.
+                                                             // ( ! Attention: If RadDrop is negativ, a flow
+                                                             // without a droplet is simulated).
+                "PosDrop":              "Levelset.PosDrop",    // #position of the droplet's centre at initial time.
+                "Gravity":              "NavStokes.Coeff.Gravity",      //#[-> NavStokes.Coeff] gravity vector
+                "FlowDir":              "Inflow.FlowDir",                   //#[remove] direction of the flow at the inlet.
+                                                             // FlowDir = 0 / 1 / 2 describes the x- / y- / z-
+                                                             // direction. If the flow is orientated in negativ
+                                                             // coordinate direction, a minus sign must be used
+                                                             // for the parameter InflowVel.
+                "InflowVel":            "Inflow.InflowVel",                   // #magnitude of the inflow velocity.
+                "RadInlet":             "Inflow.RadInlet",                   // #radius of the circular intake.
+                "InflowFreq":           "Inflow.InflowFreq",                   // #inflow frequency.
+                "InflowAmpl":           "Inflow.InflowAmpl",                   // #inflow amplitude.
+                "InitialLSet":          "Levelset.InitialValue",         //#[-> Levelset.InitialValue] choose a LevelSet function you want to start with
+                                                             // (default: 'Ellipsoid')
+                "VolForce":             "NavStokes.Coeff.VolForce"            //#[-> NavStokes.Coeff] r.h.s. force of navier stokes equations.
+                                                             // (default: 'ZeroVel')
+        },
+
+// surface tension
+        "SurfTens":  //#[-> NavStokes.Coeff.SurfTens]
+        {
+                "SurfTension":          "NavStokes.Coeff.SurfTens.SurfTension",      // surface tension coefficient.
+                "VarTensionFncs":       "NavStokes.Coeff.SurfTens.VarTensionFunc",   //#[-> varTensionFunc]
+                "ConcentrationDep":     "NavStokes.Coeff.SurfTens.ConcentrationDep",
+                "DilatationalVisco":    "NavStokes.Coeff.SurfTens.DilatationalVisco",
+                "ShearVisco":           "NavStokes.Coeff.SurfTens.ShearVisco",
+                "ArtificialForce":      "NavStokes.Coeff.SurfTens.ArtificialForce"
+        },
+
+// mass transport
+        "Transp":
+        {
+                "Iter":                 "Transp.Solver.Iter",
+                "Tol":                  "Transp.Solver.Tol",
+                "RelTol":               "Transp.Solver.useRelTol",
+                "DirectSolve":          "Transp.Solver.DirectSolve",
+                "NitscheXFEMStab":      "Transp.XFEMReduced",
+                "STXFEMStab":           "Transp.XFEMReduced",
+                "Theta":                "Deprecated.Theta",
+                "BoundaryType":         "Transp.BoundaryData.Deprecated_convert.BoundaryType",
+                "BoundaryFncs":         "Transp.BoundaryData.Deprecated_convert.BoundaryFncs",
+                "BoundaryFncst":        "Transp.BoundaryDataTransformed.Deprecated_convert.BoundaryFncst",
+                "BoundaryFncsPos":      "Transp.BoundaryData.Deprecated_convert.BoundaryFncsPos",
+                "BoundaryFncsNeg":      "Transp.BoundaryData.Deprecated_convert.BoundaryFncsNeg",
+                "DoTransp":             "Transp.Enable"      //#[->default=0 (Enable)] mass transport (0 = deactivated, 1 = activated).
+        },
+
+// surfactant transport
+        "SurfTransp":
+        {
+                "Iter":                 "SurfTransp.Solver.Iter",
+                "Tol":                  "SurfTransp.Solver.Tol",
+                "OmitBound":            "SurfTransp.XFEMReduced",
+                "Theta":                "Deprecated.Theta",
+                "DoTransp":             "SurfTransp.Enable"      //#[->default=0 (Enable)] 
+        },
+
+
+// Visualization Toolkit output format settings
+        "VTK":
+        {
+                "VTKOut":               "VTK.Freq"                 //#[-> VTK.Freq] VTK output (0 = off, 1 = on).
+        },
+
+// write out results, read in for restart
+        "Restart":
+        {
+                "Serialization":        "Restart.OutputFreq",                 //#[->OutputFreq] run serialization (0 = off, 1 = 0n).
+                "Overwrite":            "Restart.OutputOverwrite",                 //#[->OutputOverwrite] overwrite old output-files or create new ones
+                                                           // for every time step.
+                "Inputfile":            "Mesh.RestartFile",            //#[-> Mesh.RestartFile] reads multigrid from deserialization files
+                                                           // (to deactivate the reading choose Inputfile = "").
+                "Outputfile":           "Restart.OutputGridData_convert"         //#[-> OutputGrid/OutputData] writes multigrid to serialization files
+                                                           // (to deactivate the writing choose Outputfile = "").
+        },
+
+        "Domain":            //#[-> Mesh]
+        {
+                "Type": "Mesh.Type",      // A parallelepiped
+                "Origin": "Mesh.Origin",           // Origin
+                "E1": "Mesh.E1",               // Basis to span the object,
+                "E2": "Mesh.E2",               // not necessary orthonormal 
+                "E3": "Mesh.E3",               // ... 
+                "N1": "Mesh.N1",                     // Number of cells along the E1-direction,
+                "N2": "Mesh.N2",                     //                       the E2-direction,
+                "N3": "Mesh.N3",                     //                       the E3-direction.
+                "PeriodicMatching": "Mesh.PeriodicBnd.PeriodicMatching+ListPerBnd", 
+                "RestartFile":      "Mesh.RestartFile"
+         }, 
+
+// domain, boundary and initial conditions
+        "DomainCond":
+        {
+                "PeriodicMatching":     "Mesh.PeriodicBnd.PeriodicMatching+ListPerBnd",            //#[-> NavStokes.BoundaryData, falls !="none"] matching function 
+                                                           // identifier for periodic boundaries
+                "InitialCond":          "NavStokes.InitialValue",                 // initial conditions (0 = zero, 1/10 stationary flow with  
+                                                           //#[-> NavStokes.InitialValue] droplet which includes/dismiss surface tension,  
+                                                           // 2 = stationary flow without droplet, -1 = read from file).
+                "InitialFile":          "Restart.InputData",         //#[-> Restart.InputData. Set to "" for InitialCond != -1] file prefix when reading data for initial condition.
+                "BoundaryType":         "NavStokes.BoundaryData.Velocity.Deprecated_convert.BoundaryType",     // #[convert -> NavStokes.BoundaryData.Velocity] List of boundary types separated by a !.
+                                                           // Each defining a boundary type for one boundary
+                                                           // domain ( The following indices may be used:
+                                                           //          Dir0BC= 0, DirBC= 2, Per1BC= 13,
+                                                           //          Per2BC= 11, Nat0BC= 21, NatBC= 23,
+                                                           //          NoBC= 98, UndefinedBC_= 99        ).
+                "BoundaryFncs":         "NavStokes.BoundaryData.Velocity.Deprecated_convert.BoundaryFncs",
+                                                           // #[convert -> NavStokes.BoundaryData.Velocity] List of boundary functions separated by a !.
+                                                           // Each string defines a function which is taken
+                                                           // from a function container during runtime.
+                "GeomType":             "Mesh.GeomType_convertTo_Type",
+                "MeshFile":             "Mesh.MeshFile_convertTo_E1E2E3_N1N2N3"
+        },
+
+// Poisson problem
+	    "Poisson":
+	    {
+		        "PcIter":       "Poisson.Solver.PcIter",   // inactive (former: iterations of the preconditioner)
+		        "PcTol":        "Poisson.Solver.PcTol",    // inactive (former: tolerance of the preconditioning solve)
+		        "Iter":         "Poisson.Solver.Iter",     // number of iterations of the iterativ solver
+		        "Restart":      "Poisson.Solver.Restart",  // used for GMRES
+		        "RelativeErr":  "Poisson.Solver.useRelTol",// use relative tolerances (otherwise absolute) 1 = true, 0 = false
+		        "Tol":          "Poisson.Solver.Tol",      // (relative/absolute) tolerance of iterative method
+		        "Method":       "Poisson.Solver.Solver",   // Methods describes Solver (first digit) + Preconditioner (last two digits)
+		            // First digit:
+		            //           1XX : Multigrid
+		            //           2XX : Prec. CG
+		            //           3XX : GMRES
+		            // last two digits: (Smoother + Coarse Solver[only for MG])
+		            //           X02 : Jacobi     + SSOR
+		            //           X03 : SSOR       + SSOR
+		            //           X04 : GS         + SSOR
+		            //           X05 : SGS        + SSOR
+		            //           X06 : SOR        + SSOR
+		            // BUT it exist only the following combinations:
+		            // 102,103,104,105,106,203,302,303
+		        "SmoothingSteps":   "Poisson.Solver.MG.SmoothingSteps",// for Multigrid: number of Smoothing steps;
+		        "NumLvl":           "Poisson.Solver.MG.NumLvl",        // for Multigird: number of used levels (-1 = all)
+		        "Relax":            "Poisson.Solver.Relax"             // SSOR relaxation factor
+	    },
+	    
+	    "PoissonCoeff":
+	    {
+		        "Diffusion":        "Poisson.Coeff.Diffusion",     // Diffusion coefficient
+		        "Reaction":         "Poisson.Coeff.Reaction",      // Reaction term [q]
+		        "Solution":         "Poisson.Solution",            // Solution of poisson problem [u]
+		        "Source":           "Poisson.Coeff.Source",        // Right hand side of PDE [f]
+		        "Flowfield":        "Poisson.Coeff.Flowfield",     // Convection velocity of PDE [b]
+		        "InitialVal":       "Poisson.InitialValue",        // initial value [u_0]
+		        "Convection":       "Poisson.Coeff.withConvection" // Do we have convection?
+	    },
+	    
+	    "Err": {
+		        "Meas": "Error.Meas",
+		        "NumRef":  "Error.NumRef",
+		        "RelReduction": "Error.RelReduction", 
+		        "DoMark": "Error.DoMark", 
+		        "MinRatio": "Error.MinRatio", 
+		        "Threshold": "Error.Threshold", 
+		        "DoErrorEstimate": "Error.DoErrorEstimate"
+    	} 
+}

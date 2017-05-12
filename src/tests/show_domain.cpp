@@ -30,44 +30,31 @@
 #include "misc/dynamicload.h"
 
 // #include "misc/funcmap.h"
-// 
+//
 // bool mymatch (const DROPS::Point3DCL&, const DROPS::Point3DCL&)
 // { return true; }
-// 
+//
 // static DROPS::RegisterMatchingFunction regmymatch("mymatch",  mymatch);
 
-/// \brief Set Default parameters here s.t. they are initialized.
-/// The result can be checked when Param-list is written to the output.
-void SetMissingParameters (DROPS::ParamCL& P)
-{
-    P.put_if_unset<std::string>("VTK.VTKName", "show_domain");
-    P.put_if_unset<std::string>("VTK.VTKDir", ".");
-    P.put_if_unset<std::string>( "VTK.TimeFileName", P.get<std::string>("VTK.VTKName"));
-    P.put_if_unset<int>( "VTK.Binary", 1);
-    P.put_if_unset<int>( "VTK.UseOnlyP1", 0);
-    P.put_if_unset<int>( "VTK.ReUseTimeFile", 0);
-    P.put_if_unset<int>("VTK.UseDeformation", 0);
-
-    P.put_if_unset<std::string>("General.DynamicLibsPrefix", "../");
-}
 
 int main (int argc, char** argv)
 {
   try
   {
+
     DROPS::ParamCL P;
 
     DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/tests/show_domain/show_domain.json");
-    SetMissingParameters(P);
+    P.put_if_unset<std::string>( "VTK.TimeFileName", P.get<std::string>("VTK.VTKName"));
     std::cout << P << std::endl;
 
     DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
 
-    std::auto_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P.get_child( "Domain")));
+    std::unique_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P) );
     DROPS::MultiGridCL mg( *builder);
     const DROPS::ParamCL::ptree_type* ch= 0;
     try {
-        ch= &P.get_child( "Domain.Periodicity");
+        ch= &P.get_child( "Mesh.Periodicity");
     }
     catch (DROPS::DROPSParamErrCL) {}
     if (ch)

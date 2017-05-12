@@ -40,7 +40,7 @@ class ALECL{
     const ParamCL Para_;
     MultiGridCL& mg_;
     const double dt_;        //step size of time integration
-    double Ly_;        //Height of the reference iterface
+    const double Ly_;        //Height of the reference interface
 
   public:
     //free surface function
@@ -48,16 +48,9 @@ class ALECL{
 
     ALECL(ParamCL P, MultiGridCL& mg):
     IfALE_(P.get<int>("ALE.wavy")),
-    Para_(P), mg_(mg), dt_(Para_.get<double>("Time.StepSize"))
+    Para_(P), mg_(mg), dt_(P.get<int>("Time.NumSteps")!=0 ? P.get<double>("Time.FinalTime")/P.get<int>("Time.NumSteps") : 0),
+    Ly_(norm(P.get<DROPS::Point3DCL>("Mesh.E2")))
     {
-        double Lx_, Lz_;
-        std::string mesh( P.get<std::string>("DomainCond.MeshFile")), delim("x@");
-        size_t idx_;
-        while ((idx_= mesh.find_first_of( delim)) != std::string::npos )
-            mesh[idx_]= ' ';
-        std::istringstream brick_info( mesh);
-        brick_info >> Lx_ >> Ly_ >> Lz_ ;
-
         DROPS::InScaMap & scamap = DROPS::InScaMap::getInstance();
         interface_ = scamap[P.get<std::string>("ALE.Interface")];
     }

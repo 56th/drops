@@ -1,83 +1,69 @@
 {
-//=============================================================
-//    DROPS parameter file for reparam.cpp
-//    Testing reparametrization strategies
-//=============================================================
+    "General": {
+        "DynamicLibs": [
+            "levelset/liblevelset-twophaseCoeff", 
+            "misc/libmisc-scalarFunctions", 
+            "misc/libmisc-vectorFunctions"
+        ], 
+        "DynamicLibsPrefix": "../", 
+        "ProgressBar": 1
+    }, 
 
-//General section
-        "General":
+
+    "Levelset": 
+    {
+        "RadDrop": [ 0.1, 0.3, 0.4 ], 
+        "PosDrop": [ 0.5, 0.5, 0.5 ], 
+        "Reparam": 
         {
-                "ProgressBar":  1, //show progress bar
-                "DynamicLibsPrefix": "../", //where should we look for shared objects?
-                "DynamicLibs": [ //select libraries to be loaded after program start
-                        //"levelset/liblevelset-filmCoeff",
-                        "levelset/liblevelset-twophaseCoeff",
-                        "misc/libmisc-scalarFunctions",
-                        "misc/libmisc-vectorFunctions"
-                        //"poisson/libpoisson-poissonCoeff",
-                        //"stokes/libstokes-stokesCoeff",
-                        //"tests/libtests-csgtest",
-                        //"transport/libtransport-transportCoeff"
-                ]
-        },
-
-// re-initialization of levelset function",
-
-	"Reparam":
-	{
-		"Freq":		-1,
-		"Method":		3,
-		"MinGrad":		0.1,
-		"MaxGrad":		10,
-		"NarrowBand":		-1
-	},
-
-	"AdaptRef":
-	{
-		"_comment":
-"# adaptive refinement",
-
-		"Freq":		0,
-		"FinestLevel":		4,
-		"CoarsestLevel":		2,
-		"Width":		0.00025,
-		"LoadBalStrategy":		1,
-		"Partitioner":		1
-	},
-
-	"Exp":
-	{
-		"_comment":
-"# experimental conditions",
-
-		"RadDrop":		[0.1, 0.3, 0.4 ],
-		"PosDrop":		[0.5, 0.5, 0.5 ],
-		"Gravity":		[0, -9.81, 0 ],
-		"FlowDir":		1,
-		"InflowVel":		-0.035,
-		"InflowFreq":		0,
-		"InflowAmpl":		0,
-		"RadInlet":		0.0036
-	},
-
-	"Brick":
-	{
-		"BasicRefX":		2,
-		"BasicRefY":		2,
-		"BasicRefZ":		2,
-		"dim":		[1, 1, 1 ],
-		"orig":		[-0.5, -0.5, -0.5 ]
-	},
-
-	"VTK":
-	{
-		"_comment":
-"#VTK output",
-
-		"VTKOut":		0,
-		"VTKDir":		"vtk",
-		"VTKName":		"reparam",
-		"Binary":		0
-	}
-
+            "Freq": -1, 
+            "MinGrad": 0.1, 
+            "Method": 3, 
+            "MaxGrad": 10
+        }
+    }, 
+    
+    
+    "Mesh": 
+    {
+        "Type": "BrickBuilder",
+        "Origin": [-0.5, -0.5, -0.5],
+        "N1": 2, 
+        "N2": 2, 
+        "N3": 2, 
+        "E1": [ 1, 0, 0 ], 
+        "E2": [ 0, 1, 0 ],
+        "E3": [ 0, 0, 1 ], 
+        "AdaptRef": 
+        {
+            "CoarsestLevel": 2, 
+            "FinestLevel": 4, 
+            "Freq": 0, 
+            "Width": 0.00025,
+            "LoadBalStrategy": 1
+        }
+    },
+    
+    "NavStokes": 
+    {
+        "Coeff": { "Gravity": [ 0, -9.81, 0 ] }
+    }, 
+    
+    
+    "Inflow": 
+    {
+        "FlowDir": 1, 
+        "InflowVel": -0.035, 
+        "RadInlet": 0.0036, 
+        "InflowFreq": 0, 
+        "InflowAmpl": 0
+    },
+    
+    
+    "VTK": {
+        "VTKDir": "vtk", 
+        "VTKName": "reparam",
+        "Freq": 0, 
+        "Binary": 0    
+    }
 }

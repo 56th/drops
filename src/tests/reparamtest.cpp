@@ -257,16 +257,14 @@ void Strategy( DROPS::AdapTriangCL& adap, DROPS::BndDataCL<>& lsbnd)
 
 
     // writer for vtk-format
-    VTKOutCL vtkwriter(adap.GetMG(), "DROPS data", (P.get<int>("VTK.VTKOut") ? 3 : 0),
-                       P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName"), 
+    VTKOutCL vtkwriter(adap.GetMG(), "DROPS data", (P.get<int>("VTK.Freq") ? 3 : 0),
+                       P.get<std::string>("VTK.VTKDir"), P.get<std::string>("VTK.VTKName"),
                        P.get<std::string>("VTK.VTKName"), /* <- time file name */
                        P.get<int>("VTK.Binary"), 0, -1, 0);
     vtkwriter.Register( make_VTKScalar( lset.GetSolution(), "level-set") );
 
     // Create numbering and assign given distance function
-    lset.CreateNumbering( adap.GetMG().GetLastLevel(), &lset.idx);
-    lset.Phi.SetIdx( &lset.idx);
-
+    lset.CreateNumbering( adap.GetMG().GetLastLevel());
     // Write out information:
     size_t numLsetUnk= lset.Phi.Data.size();
 #ifdef _PAR
@@ -274,21 +272,21 @@ void Strategy( DROPS::AdapTriangCL& adap, DROPS::BndDataCL<>& lsbnd)
 #endif
     std::cout << numLsetUnk << " (accumulated) levelset unknowns.\n\n";
 
-    switch ( P.get<int>("Reparam.Freq")){
+    switch ( P.get<int>("Levelset.Reparam.Freq")){
         case -1 :
-            std::cout << "Taking torus of radi (" << P.get<DROPS::Point3DCL>("Exp.RadDrop")[0] << ',' << P.get<DROPS::Point3DCL>("Exp.RadDrop")[1] << ") as level set function\n" << std::endl;
+            std::cout << "Taking torus of radi (" << P.get<DROPS::Point3DCL>("Levelset.RadDrop")[0] << ',' << P.get<DROPS::Point3DCL>("Levelset.RadDrop")[1] << ") as level set function\n" << std::endl;
             lset.Init( TorusCL::DistanceFct);
             break;
         case  0 :
-            std::cout << "Taking ellipsoid at " << P.get<DROPS::Point3DCL>("Exp.PosDrop") << " and radi " << P.get<DROPS::Point3DCL>("Exp.RadDrop") << " as level set function\n" << std::endl;
+            std::cout << "Taking ellipsoid at " << P.get<DROPS::Point3DCL>("Exp.PosDrop") << " and radi " << P.get<DROPS::Point3DCL>("Levelset.RadDrop") << " as level set function\n" << std::endl;
             lset.Init( EllipsoidCL::DistanceFct);
             break;
         default:
-            std::cout << "Taking " << P.get<int>("Reparam.Freq") << " horizontal sclices as level set function" << std::endl;
+            std::cout << "Taking " << P.get<int>("Levelset.Reparam.Freq") << " horizontal sclices as level set function" << std::endl;
             lset.Init( HorizontalSlicesCL::DistanceFct);
     }
 
-    if (P.get<int>("VTK.VTKOut")){
+    if (P.get<int>("VTK.Freq")){
         vtkwriter.Write(0.0, true);
     }
 
@@ -299,13 +297,13 @@ void Strategy( DROPS::AdapTriangCL& adap, DROPS::BndDataCL<>& lsbnd)
     Disturb( lset.Phi.Data);
 
     // Perform re-parametrization
-    std::unique_ptr<ReparamCL> reparam= ReparamFactoryCL::GetReparam( adap.GetMG(), lset.Phi, P.get<int>("Reparam.Method"), /*periodic*/ false, &lset.GetBndData());
+    std::unique_ptr<ReparamCL> reparam= ReparamFactoryCL::GetReparam( adap.GetMG(), lset.Phi, P.get<int>("Levelset.Reparam.Method"), /*periodic*/ false, &lset.GetBndData());
     reparam->Perform();
 
 //    FastMarchCL fmm( adap.GetMG(), lset.Phi);
 //    fmm.Reparam( true, 1);
 
-    if (P.get<int>("VTK.VTKOut")){
+    if (P.get<int>("VTK.Freq")){
         vtkwriter.Write(1.0, true);
     }
 
@@ -314,7 +312,7 @@ void Strategy( DROPS::AdapTriangCL& adap, DROPS::BndDataCL<>& lsbnd)
 
     // Write difference as output
     VectorCL phiDiff( lset.Phi.Data-phiEx);
-    if (P.get<int>("VTK.VTKOut")){
+    if (P.get<int>("VTK.Freq")){
         std::swap( lset.Phi.Data, phiDiff);
         vtkwriter.Write(0.0, true);
         std::swap( lset.Phi.Data, phiDiff);
@@ -341,26 +339,26 @@ int main( int argc, char **argv)
         DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
 
         DROPS::MultiGridCL* mg= 0;
-        DROPS::Point3DCL a,b,c;
-        a[0]= P.get<DROPS::Point3DCL>("Brick.dim")[0];
-        b[1]= P.get<DROPS::Point3DCL>("Brick.dim")[1];
-        c[2]= P.get<DROPS::Point3DCL>("Brick.dim")[2];
-        DROPS::BrickBuilderCL mgb( P.get<DROPS::Point3DCL>("Brick.orig"), a, b, c, P.get<double>("Brick.BasicRefX"), P.get<double>("Brick.BasicRefY"), P.get<double>("Brick.BasicRefZ"));
+//        DROPS::Point3DCL a,b,c;
+//        a[0]= P.get<DROPS::Point3DCL>("Brick.dim")[0];
+//        b[1]= P.get<DROPS::Point3DCL>("Brick.dim")[1];
+//        c[2]= P.get<DROPS::Point3DCL>("Brick.dim")[2];
+//        DROPS::BrickBuilderCL mgb( P.get<DROPS::Point3DCL>("Brick.orig"), a, b, c, P.get<double>("Brick.BasicRefX"), P.get<double>("Brick.BasicRefY"), P.get<double>("Brick.BasicRefZ"));
+        DROPS::MGBuilderCL *mgb(  DROPS::make_MGBuilder(P) );
 
-        mg= new DROPS::MultiGridCL( mgb);
+        mg= new DROPS::MultiGridCL( *mgb);
 
         DROPS::AdapTriangCL adap( *mg, 0, -1 );
 
-        DROPS::EllipsoidCL::Init( P.get<DROPS::Point3DCL>("Exp.PosDrop"), P.get<DROPS::Point3DCL>("Exp.RadDrop"));
-        DROPS::HorizontalSlicesCL::Init( P.get<int>("Reparam.Freq"), P.get<DROPS::Point3DCL>("Brick.orig")[1], P.get<DROPS::Point3DCL>("Brick.orig")[1]+P.get<DROPS::Point3DCL>("Brick.dim")[1] );
-        DROPS::TorusCL::Init( P.get<DROPS::Point3DCL>("Exp.RadDrop")[0], P.get<DROPS::Point3DCL>("Exp.RadDrop")[1]);
-        DROPS::instat_scalar_fun_ptr distance= P.get<int>("Reparam.Freq")>0 ? DROPS::HorizontalSlicesCL::DistanceFct : DROPS::EllipsoidCL::DistanceFct;
+        DROPS::EllipsoidCL::Init( P.get<DROPS::Point3DCL>("Levelset.PosDrop"), P.get<DROPS::Point3DCL>("Levelset.RadDrop"));
+        DROPS::HorizontalSlicesCL::Init( P.get<int>("Levelset.Reparam.Freq"), P.get<DROPS::Point3DCL>("Mesh.Origin")[1], P.get<DROPS::Point3DCL>("Mesh.Origin")[1]+P.get<DROPS::Point3DCL>("Mesh.E2")[1] );
+        DROPS::TorusCL::Init( P.get<DROPS::Point3DCL>("Levelset.RadDrop")[0], P.get<DROPS::Point3DCL>("Levelset.RadDrop")[1]);
+        DROPS::instat_scalar_fun_ptr distance= P.get<int>("Levelset.Reparam.Freq")>0 ? DROPS::HorizontalSlicesCL::DistanceFct : DROPS::EllipsoidCL::DistanceFct;
 
         typedef DROPS::DistMarkingStrategyCL MarkerT;
-        MarkerT marker( distance, P.get<double>("AdaptRef.Width" ),
-                        P.get<int>("AdaptRef.CoarsestLevel"),
-                        P.get<int>("AdaptRef.FinestLevel") ); 
-
+        MarkerT marker( distance, P.get<double>("Mesh.AdaptRef.Width" ),
+                        P.get<int>("Mesh.AdaptRef.CoarsestLevel"),
+                        P.get<int>("Mesh.AdaptRef.FinestLevel") );
         adap.set_marking_strategy( &marker );
         adap.MakeInitialTriang();
 
@@ -373,6 +371,9 @@ int main( int argc, char **argv)
         adap.set_marking_strategy( 0 );
 
         std::cout << " reparamtest finished regularly" << std::endl;
+
+        delete mgb;
+        delete mg;
     } catch (DROPS::DROPSErrCL err) {
         err.handle();
     }

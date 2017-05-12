@@ -50,7 +50,7 @@ class PrincipalLatticeCL
     class PrincipalLatticeCacheCL : public std::vector<const PrincipalLatticeCL*>
     {
       public:
-    	~PrincipalLatticeCacheCL() { for ( size_t i = 0; i< this->size(); ++i) if ((*this)[i]) delete (*this)[i];; }
+        ~PrincipalLatticeCacheCL() { for ( size_t i = 0; i< this->size(); ++i) if ((*this)[i]) delete (*this)[i]; }
     };
 
     static PrincipalLatticeCacheCL cache_;
@@ -89,6 +89,8 @@ class PrincipalLatticeCL
     ///\brief number of tetras in the triangulation
     Uint tetra_size  () const { return n_*n_*n_; }
 
+    ///\brief Get barycentric coordinate of a vertex via index number
+	BaryCoordCL GetBaryCoord(Uint vertex_num) const { return vertex_[vertex_num];}
     ///\brief Access to vertexes and tetras as sequences (random access iterators)
     ///@{
     const_vertex_iterator vertex_begin ()  const { return vertex_.begin(); }

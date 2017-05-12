@@ -166,7 +166,7 @@ void Solve(const Mat &A, const Mat &B, const Mat &C, Vec &u, Vec &p, const Vec &
               << "   - real residuum pressure " << realresid2      << std::endl;
 }
 
-/// \brief Strategy to solve the Poisson problem on a given triangulation
+/// \brief Strategy to solve the Stokes problem on a given triangulation
 template <typename CoeffCL>
 void Strategy( StokesP2P1CL<CoeffCL>& Stokes)
 {

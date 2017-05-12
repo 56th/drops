@@ -116,7 +116,6 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
     DROPS::match_fun periodic_match = DROPS::MatchMap::getInstance()[P.get<std::string>("DomainCond.PeriodicMatching", std::string("periodicxz"))];
     MultiGridCL& MG= Stokes.GetMG();
 
-    MLIdxDescCL* lidx= &lset.idx;
     MLIdxDescCL* vidx= &Stokes.vel_idx;
     MLIdxDescCL* pidx= &Stokes.pr_idx;
     IdxDescCL ens_idx( P2_FE, NoBndDataCL<>());
@@ -130,8 +129,7 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
     EnsightIdxRepairCL ensrepair( MG, ens_idx);
     adap.push_back( &ensrepair);
 
-    lset.CreateNumbering(      MG.GetLastLevel(), lidx, periodic_match);
-    lset.Phi.SetIdx( lidx);
+    lset.CreateNumbering(      MG.GetLastLevel(), periodic_match);
     DROPS::instat_scalar_fun_ptr DistanceFct = DROPS::InScaMap::getInstance()[P.get("Exp.InitialLSet", std::string("WavyFilm"))];
     lset.Init( DistanceFct);
     if ( StokesSolverFactoryHelperCL().VelMGUsed(P))
@@ -305,7 +303,7 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
 
     // Level-Set-Solver
 #ifndef _PAR
-    typedef GMResSolverCL<SSORPcCL> LsetSolverT;
+    typedef GMResSolverCL<SSORPcCL> LsetSolverT; // In twophasedrops.cpp, the Gauss-Seidel preconditioner is used;
     SSORPcCL ssorpc;
     LsetSolverT* gm = new LsetSolverT( ssorpc, 100, P.get<int>("Levelset.Iter"), P.get<double>("Levelset.Tol"));
 #else
@@ -314,7 +312,8 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
     LsetSolverT *gm = new LsetSolverT
            (/*restart*/100, P.get<int>("Levelset.Iter"), P.get<double>("Levelset.Tol"), *lidx, jacparpc,/*rel*/true, /*acc*/ true, /*modGS*/false, LeftPreconditioning, /*parmod*/true);
 #endif
-    LevelsetModifyCL lsetmod( P.get<int>("Reparam.Freq"), P.get<int>("Reparam.Method"), /*rpm_MaxGrad*/ 1.0, /*rpm_MinGrad*/ 1.0, P.get<double>("Levelset.VolCorrection"), Vol, /*periodic*/ is_periodic);
+    LevelsetModifyCL lsetmod( P.get<int>("Reparam.Freq"), P.get<int>("Reparam.Method"), /*rpm_MaxGrad*/ 1.0, /*rpm_MinGrad*/ 1.0, /*periodic*/ is_periodic);
+    lset.InitVolume( Vol);
 
     LinThetaScheme2PhaseCL<LsetSolverT>
         cpl( Stokes, lset, *navstokessolver, *gm, lsetmod, P.get<double>("Time.StepSize"), P.get<double>("Stokes.Theta"), P.get<double>("Levelset.Theta"), P.get("NavierStokes.Nonlinear", 0.0), /*implicitCurv*/ true);
@@ -374,7 +373,7 @@ void Strategy( StokesProblemT& Stokes, LevelsetP2CL& lset, AdapTriangCL& adap, b
 
         if (ensight && step%10==0)
             ensight->Write(time_new);
-        if (vtkwriter && step%10==0)
+        if (vtkwriter && step%1==0)
             vtkwriter->Write(time_new);
         if (P.get("Restart.Serialization", 0) && step%P.get("Restart.Serialization", 0)==0)
             ser.Write();
@@ -426,30 +425,14 @@ void MarkLower (DROPS::MultiGridCL& mg, double y_max, DROPS::Uint maxLevel= ~0)
     }
 }
 
-/// \brief Set Default parameters here s.t. they are initialized.
-/// The result can be checked when Param-list is written to the output.
-void SetMissingParameters(DROPS::ParamCL& P){
-
-    P.put_if_unset<std::string>("Exp.VolForce", "ZeroVel");
-    P.put_if_unset<double>("Mat.DensDrop", 0.0);
-    P.put_if_unset<double>("Mat.ShearVisco", 0.0);
-    P.put_if_unset<double>("Mat.DilatationalVisco", 0.0);
-    P.put_if_unset<double>("SurfTens.ShearVisco", 0.0);
-    P.put_if_unset<double>("SurfTens.DilatationalVisco", 0.0);
-
-    P.put_if_unset<std::string>("VTK.TimeFileName",P.get<std::string>("VTK.VTKName"));
-    P.put_if_unset<int>("VTK.ReUseTimeFile",0);
-    P.put_if_unset<int>("VTK.UseDeformation",0);
-    P.put_if_unset<int>("VTK.UseOnlyP1",0);
-}
 
 
 int main (int argc, char** argv)
 {
   try
   {
-    DROPS::read_parameter_file_from_cmdline( P, argc, argv);
-    SetMissingParameters(P);
+    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/levelset/film/film.json");
+    P.put_if_unset<std::string>("VTK.TimeFileName",P.get<std::string>("VTK.VTKName"));
     std::cout << P << std::endl;
 
     DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
@@ -532,7 +515,7 @@ int main (int argc, char** argv)
     {
         DROPS::DistMarkingStrategyCL InitialMarker( DROPS::InScaMap::getInstance()[P.get("Ext.InitialLet", std::string("WavyFilm"))],
                                                     P.get<double>("AdaptRef.Width"), P.get<int>("AdaptRef.CoarsestLevel"),
-                                                    P.get<int>("AdaptRef.FinestLevel") ); 
+                                                    P.get<int>("AdaptRef.FinestLevel") );
         adap.set_marking_strategy( &InitialMarker );
         adap.MakeInitialTriang();
         adap.set_marking_strategy( 0 );

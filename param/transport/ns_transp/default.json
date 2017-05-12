@@ -1,0 +1,118 @@
+{
+    "VTK":
+    {
+        "ReUseTimeFile": "0",
+        "UseOnlyP1": "0",
+        "Freq": "0",
+        "VTKName": "ns_transp"
+    },
+    
+    "Transp":
+    {
+        "Enable": "0",
+        "Levelset": "Ellipsoid",
+        "Flow": "ZeroVel",
+        "Rhs": "Zero",
+        "SolPos": "Zero",
+        "SolNeg": "Zero",
+        "InitialConcNeg": "IniCnegFct",
+        "InitialConcPos": "IniCposFct",
+        "SD": 0, 
+        "BoundaryData": 
+        {
+        	"Default":   ["Nat0BC"]
+        },
+        "BoundaryDataTransformed": 
+        {
+        	"Default":   ["Nat0BC"]
+        }
+    },
+    
+    "SurfTransp":
+    {
+        "Enable": "0",
+        "Rhs": "Zero",
+        "Sol": "Zero"
+    },
+    
+    "Ensight":
+    {
+        "Freq": "0"
+    },
+    
+    "NavStokes":
+    {
+        "Coeff":
+        {
+            "VolForce": "ZeroVel",
+            "SmoothZone": 0
+        },
+        "BoundaryData":
+        {
+            "Velocity":
+            {
+                "Default":    ["Dir0BC"]
+            },
+            "Pressure":
+            {
+                "Default":    ["NoBC"]
+            },
+            "SlipBnd":
+            {
+                "Beta1":                 0.05,
+                "Beta2":                 0.05,
+                "BetaL":                 0,
+                "NitschePenalty":        30,
+                "ContactAngle":          60,
+                "ContactAngleFunc":      "ConstantAngle",
+                "BndOuterNormal":        "ZeroVel"
+            }
+        },
+        "Downwind":
+        {
+            "Frequency": "0",
+            "MaxRelComponentSize": "0.05",
+            "WeakEdgeRatio": "0.2",
+            "CrosswindLimit": "0.8660254037844387"
+        }
+    },
+    
+    "Restart":
+    {
+        "Inputfile": "none"
+    },
+    
+    "Levelset":
+    {
+        "BoundaryData":
+        {
+            "Default":			["NoBC"]
+        },
+        "Downwind":
+        {
+            "Frequency": "0",
+            "MaxRelComponentSize": "0.05",
+            "WeakEdgeRatio": "0.2",
+            "CrosswindLimit": "0.8660254037844387"
+        },
+        "CurvDiff": -1,
+        "Discontinuous": 0
+    },
+    
+    "General":
+    {
+        "ProgressBar": "0",
+        "DynamicLibsPrefix": "..\/"
+    }, 
+    
+    "CouplingSolver":
+    {
+	    "Projection":           0,  // If Projection = 1, a projection step is carried out before
+	                                // the fixed-point-iteration.
+	    "NavStokesSolver":
+	    {
+	        "Nonlinear": "0"
+	    }
+    }
+}
+

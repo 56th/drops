@@ -3,7 +3,7 @@
 //    Test the mesh-serialization
 //=============================================================
 {
-	"Domain":
+	"Mesh":
 	{
 		"RestartFile": "",	// If set, read the triangulation from the file (via FileBuilderCL).
 		"Type": "TetraBuilder",	// Creates a tetrahedron.

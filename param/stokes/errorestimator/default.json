@@ -1,0 +1,10 @@
+{
+    "NavStokes":
+    {
+        "BoundaryData":
+        {
+            "Pressure": { "Default": ["NoBC"] }
+        }
+    }
+} // empty defaults
+

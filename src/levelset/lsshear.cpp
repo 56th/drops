@@ -87,7 +87,6 @@ void Strategy( StokesProblemT& Stokes, const BndDataCL<>& lsbnd)
     SurfaceTensionCL sf( sigmaf);
     LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsbnd, sf, false, 0.1) );
 
-    MLIdxDescCL* lidx= &lset.idx;
     MLIdxDescCL* vidx= &Stokes.vel_idx;
     MLIdxDescCL* pidx= &Stokes.pr_idx;
     VelVecDescCL* v= &Stokes.v;
@@ -104,8 +103,7 @@ void Strategy( StokesProblemT& Stokes, const BndDataCL<>& lsbnd)
     TimerCL time;
     Stokes.CreateNumberingVel( MG.GetLastLevel(), vidx);
     Stokes.CreateNumberingPr ( MG.GetLastLevel(), pidx);
-    lset.CreateNumbering(      MG.GetLastLevel(), lidx);
-    lset.Phi.SetIdx( lidx);
+    lset.CreateNumbering     ( MG.GetLastLevel());
     lset.Init( DistanceFct);
 
     MG.SizeInfo( std::cout);
@@ -163,7 +161,7 @@ void Strategy( StokesProblemT& Stokes, const BndDataCL<>& lsbnd)
     typedef GMResSolverCL<SSORPcCL> LSetSolver;
     SSORPcCL ssorpc;
     LSetSolver gm( ssorpc, 100, 1000, 1e-7);
-    LevelsetModifyCL lsetmod( 0, 0, 0, 0, 0, 0);
+    LevelsetModifyCL lsetmod( 0, 0, 0, 0);
     typedef NSSolverBaseCL<StokesProblemT> SolverT;
     SolverT dummyFP( Stokes, inexactuzawasolver);
     LinThetaScheme2PhaseCL<LSetSolver>

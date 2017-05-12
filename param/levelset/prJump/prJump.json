@@ -7,83 +7,106 @@
 #    study the accuarcy and stability of various discretisations
 #======================================================================
 ",
-    "Stokes":
-    {
-        "_comment": "# flow solver",
-        "StokesMethod": "10211",
-        "XFEMStab": "0",
 
-        "InnerIter": "1000",
-        "OuterIter": "1000",
-        "InnerTol": "0.6",
-        "OuterTol": "1e-03",
-        "PcAIter": "100",
-        "PcATol": "0.01",
-        "PcSTol": "0.01",
-        "Theta": "1",
-        "epsP": "0.1",
-        "PrintMatrices": "false"
+    "Mesh":
+    {
+        "Type":                     "BrickBuilder", // A parallelepiped
+        "Origin": [-1,-1,-1],           // Origin
+        "E1": [2,0,0],               // Basis to span the object,
+        "E2": [0,2,0],               // not necessary orthonormal 
+        "E3": [0,0,2],               // ... 
+        "N1": 4,                     // Number of cells along the E1-direction,
+        "N2": 4,                     //                       the E2-direction,
+        "N3": 4,                     //                       the E3-direction.        
+                                        
+        // adaptive refinement
+        "AdaptRef":
+        {
+                "Freq":                 0,      // number of timesteps before adaptive refinement is carried out.
+                "FinestLevel":          1,      // number of refinement levels and label of the finest level
+                                                // close to the phase boundary.
+                "CoarsestLevel":        0,      // label of coarsest level close to the phase boundary.
+                "Width":                1e-08   // domain of refinement.
+        }
     },
-
-    "AdaptRef":
+    
+    // Disable timestepping, as we are solving a stationary problem.
+    "Time":
     {
-        "_comment": "# adaptive refinement",
-        "Freq": "0",
-        "FinestLevel": "3",
-        "CoarsestLevel": "0",
-        "Width": "1e-08",
-        "LoadBalStrategy": "1011"
+        "NumSteps":             0,      // number of time steps
+        "FinalTime":            0.0,    // final time of simulation (starting at 0)
+        "Scheme":               0,      // choose a specific time discretization
+        "Theta":                1       // controls the implicitness of the theta-scheme
+                                        // for time discretization of the Navier-Stokes and
+                                        // level set equations. Theta = 0 yields the explicit and
+                                        // Theta = 1 the implicit Euler method. Theta = 0.5 results
+                                        // in the Crank-Nicholson scheme.
     },
-
-    "Mat":
+    
+    
+    // coupling of Navier-Stokes and level set
+    "OseenSolver":
     {
-        "_comment": "# material data, all units are SI",
-        "DensDrop": "1",
-        "ViscDrop": "1",
-        "DensFluid": "1",
-        "ViscFluid": "1",
-        "SmoothZone": "1e-05",
-        "ShearVisco": "0",
-        "DilatationalVisco": "0"
+        "Solver":               10211,  // Stokes solver, cf. num/stokessolverfactory.h
+        "Iter":                 1000,    // maximum number of iterations for the outer solver
+        "Tol":                  1e-03,  // tolerance for the outer solver
+
+        "PcAIter":              100,      // maximum number of iterations for the preconditioner
+                                        // of the A-Block
+        "PcSIter":              100,    // maximum number of iterations for the preconditioner
+                                        // of the Schur complement TODO: use in stokessolverfactory
+        "PcATol":               0.01,  // tolerance for the preconditioner of the A-Block
+        "PcSTol":               0.01 // tolerance for the preconditioner of the Schur complement
     },
-
-    "Exp":
+    
+    "NavStokes":
     {
-        "_comment": "# experimental conditions",
-        "RadDrop":
-        [
-            "0.6666666",
-            "0.6666666",
-            "0.6666666"
-        ],
-        "PosDrop":
-        [
-            "0",
-            "0",
-            "0"
-        ],
-        "Gravity":
-        [
-            "0",
-            "0",
-            "0"
-        ],
-        "FlowDir": "0",
-        "InflowVel": "0",
-        "RadInlet": "0",
-        "InflowFreq": "0",
-        "InflowAmpl": "0",
-        "VolForce": "ZeroVel"
+        "Coeff":
+        {
+            "DensNeg":            1,      // density of the droplet
+            "ViscNeg":            1,     // dynamic viscosity of the droplet
+            "DensPos":            1,      // density of the surrounding fluid
+            "ViscPos":            1,     // dynamic viscosity of the surrounding fluid.
+            "SurfTens":
+            {
+                "SurfTension":    1,      // surface tension coefficient
+                "VarTensionFunc": "ConstTau",    // function for variable surface tension
+                "ArtificialForce": 1
+            },
+
+            "Gravity":            [0, 0, 0],  // gravity vector
+            "VolForce":           "ZeroVel"        // r.h.s. force of navier stokes
+                                                    // equations (default: 'ZeroVel')
+        },
+        
+        "InitialValue":         0,                 // initial conditions (0 = zero, 1/2 = stationary
+                                                    // flow with/without droplet).   //TODO : Entferne -1 aus DROPS
+
+        "XFEMReduced":          0.0,    // threshold for discarding additional dof parameters in
+                                        // the XFEM pressure space (0=keep all). Using a negative value
+                                        // yields the standard FEM pressure space.
+        "GhostPenalty":         0.1,    // ghost penalty stabilization used for pressure xfem space
+
+        "BoundaryData":
+        {
+            "Velocity":
+            {
+                "Default":              ["Dir0BC"]     // optional; if not set UndefinedBC_ is the default.                                               
+            }
+        }
     },
-
-    "SurfTens":
+    
+    "Levelset":
     {
-        "_comment": "# surface tension",
-        "SurfTension": "1",
-        "ArtificialForce": "0",
-	"VarTensionFncs": "ConstTau",
-	"DilatationalVisco": "0",
-	"ShearVisco": "0"
+        "InitialValue":         "Ellipsoid",               // choose a Levelset function you want
+                                                           // to start with (default: 'Ellipsoid')
+        "RadDrop":              [0.6666666,                // radii of the ellipsoidal droplet at
+                                 0.6666666,                // initial time.
+                                 0.6666666 ],              // ( ! Attention: If RadDrop is negative,
+                                                           // a flow without a droplet is simulated)
+        "PosDrop":              [0, 0, 0 ]                 // position of the droplet's center at                                                           
+                                                           // initial time.        
+    
     },
 
     "VTK":
@@ -91,7 +114,7 @@
         "_comment": "# VTK settings",
         "vtkOut": "true",
         "vtkCase": "prJump",
-        "vtkDir": "~/dropsbin/prjump_test/vtk",
+        "vtkDir": "vtk",
         "Binary": "0",
         "MasterOut": "1",
         "GeomName": "Cube"
@@ -113,124 +136,7 @@
             "misc/libmisc-scalarFunctions",
             "misc/libmisc-vectorFunctions"
         ]
-    },
-
-    // Disable timestepping, as we are solving a stationary problem.
-    "Time":
-    {
-        "NumSteps": "0",
-        "StepSize": "0",
-        "Scheme": "0"
-    },
-
-    // Disable the Navier-Stokes solver, as we are interested only in te
-    // Stokes part.
-    "NavStokes":
-    {
-        "Nonlinear": "0",
-        "Tol": "0",
-        "Iter": "0",
-        "Reduction": "0",
-        "Downwind":
-        {
-            "Frequency": "0",
-            "MaxRelComponentSize": "0.05",
-            "WeakEdgeRatio": "0.2",
-            "CrosswindLimit": "0.8660254037844387"
-        }
-    },
-
-    // Disable the levelset solver, as the interface is stationary.
-    "Levelset":
-    {
-        "_comment": "# levelset solver",
-        "Tol": "0",
-        "Iter": "0",
-        "SD": "0",
-        "CurvDiff": "0",
-        "VolCorrection": "0",
-        "Theta": "0",
-        "Downwind":
-        {
-            "Frequency": "0",
-            "MaxRelComponentSize": "0.05",
-            "WeakEdgeRatio": "0.2",
-            "CrosswindLimit": "0.8660254037844387"
-        }
-    },
-
-    // Thus no coupling is required.
-    "Coupling":
-    {
-        "Tol": "0",
-        "Iter": "0",
-        "Stab": "0",
-        "Projection": "0"
-    },
-
-    // No reinitialisation either.
-    "Reparam":
-    {
-        "_comment": "# re-initialization of levelset function",
-        "Freq": "0",
-        "Method": "0",
-        "MinGrad": "0",
-        "MaxGrad": "0",
-        "NarrowBand": "0"
-    },
-
-    // Do not solve the surfactant equation.
-    "Transp":
-    {
-        "_comment": "# mass transport",
-        "DoTransp": "0",
-        "Theta": "0",
-        "Iter": "0",
-        "Tol": "0",
-        "DiffPos": "0",
-        "DiffNeg": "0",
-        "HPos": "0",
-        "HNeg": "0",
-        "IniCPos": "0",
-        "IniCNeg": "0",
-        "NitschePenalty": "0",
-        "NitscheXFEMStab": "0"
-    },
-
-    // No surfactants...
-    "SurfTransp":
-    {
-        "_comment": "# surfactant transport",
-        "DoTransp": "0",
-        "Theta": "0",
-        "Iter": "0",
-        "Tol": "0",
-        "OmitBound": "0",
-        "Visc": "0"
-    },
-
-    // No restart, stationary problem...
-    "Restart":
-    {
-        "_comment": "# Write out results, read in for restart",
-        "Serialization": "0",
-        "Overwrite": "0",
-        "Inputfile": "0",
-        "Outputfile": "0",
-        "Binary": "0"
-    },
-
-    // Zero "initial" conditions. Do not really matter,
-    // we still have a stationary problem.
-    "DomainCond":
-    {
-        "_comment": "# domain, bnd/ini conditions",
-        "InitialCond": "1",
-        "GeomType": "0",
-        "InitialFile": "0",
-        "MeshFile": "4",
-        "BoundaryType": "0",
-        "BoundaryFncs": "0"
     }
+ 
 }
 

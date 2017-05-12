@@ -1,219 +1,140 @@
 {
-
-//General section
-     "General":
-     {
-             "ProgressBar":  1, //show progress bar
-             "DynamicLibsPrefix": "../", //where should we look for shared objects?
-             "DynamicLibs": [ //select libraries to be loaded after program start
-                     "levelset/liblevelset-twophaseCoeff",
-                     "misc/libmisc-scalarFunctions",
-                     "misc/libmisc-vectorFunctions"
-             ]
-     },
-
-
-	"_comment":
-"#=============================================================
-#    DROPS parameter file for twophasedrops
-#    simulation of two-phase flow:
-#    droplet in brick
-#=============================================================
-# time stepping",
-
-	"Time":
-	{
-		"NumSteps":		100,
-		"StepSize":		0.0005,
-		"Scheme":		1
-	},
-
-	"Stokes":
-	{
-		"_comment":
-"# flow solver",
-
-		"InnerIter":		50,
-		"OuterIter":		200,
-		"InnerTol":		0.6,
-		"OuterTol":		1e-12,
-		"StokesMethod":		20302,
-		"PcAIter":		100,
-		"PcATol":		0.01,
-		"PcSTol":		0.0001,
-		"XFEMStab":		0.1,
-		"Theta":		1
-	},
-
-	"NavStokes":
-	{
-		"Nonlinear":		0,
-		"Tol":		1e-10,
-		"Iter":		20,
-		"Reduction":		0.1
-	},
-
-	"Levelset":
-	{
-		"_comment":
-"# levelset solver",
-
-		"Tol":		1e-14,
-		"Iter":		1000,
-		"SD":		0.1,
-		"CurvDiff":		-1,
-		"VolCorrection":		1,
-		"Discontinuous":		0,
-		"Theta":		1
-	},
-
-	"Coupling":
-	{
-		"Tol":		1e-10,
-		"Iter":		10,
-		"Stab":		1,
-		"Projection":		0
-	},
-
-	"Reparam":
-	{
-		"_comment":
-"# re-initialization of levelset function",
-
-		"Freq":		1,
-		"Method":		3,
-		"MinGrad":		0.1,
-		"MaxGrad":		10,
-		"NarrowBand":		-1
-	},
-
-	"AdaptRef":
-	{
-		"_comment":
-"# adaptive refinement",
-
-		"Freq":		10,
-		"FinestLevel":		2,
-		"CoarsestLevel":		0,
-		"Width":		1e-06,
-		"LoadBalStrategy":		1011
-	},
-
-	"Mat":
-	{
-		"_comment":
-"# material data, all units are SI",
-
-		"DensDrop":		749,
-		"ViscDrop":		0.001589,
-		"DensFluid":		998,
-		"ViscFluid":		0.001002,
-		"SmoothZone":		0.0001
-	},
-
-	"Exp":
-	{
-		"_comment":
-"# experimental conditions",
-
-		"RadDrop":		[20e-6, 20e-6, 20e-6 ],
-		"PosDrop":		[30e-6, 25e-6, 50e-6 ],
-		"Gravity":		[0, -9.81, 0 ],
-		"FlowDir":		1,
-		"InflowVel":		4e-05,
-		"RadInlet":		0.005,
-		"InflowFreq":		0,
-		"InflowAmpl":		0
-	},
-
-	"SurfTens":
-	{
-		"_comment":
-"# surface tension",
-
-		"SurfTension":		0.046,
-                "VarTensionFncs":       "ConstTau"
-	},
-
-	"Transp":
-	{
-		"_comment":
-"# mass transport",
-
-		"DoTransp":		0,
-		"Theta":		0.5,
-		"Iter":		200,
-		"Tol":		1e-10,
-		"DiffPos":		0.005,
-		"DiffNeg":		0.01,
-		"HPos":		1,
-		"HNeg":		0.5,
-		"IniCPos":		0.1,
-		"IniCNeg":		5,
-		"NitschePenalty":		0,
-		"NitscheXFEMStab":		0.1
-	},
-
-	"SurfTransp":
-	{
-		"_comment":
-"# surfactant transport",
-
-		"DoTransp":		0,
-		"Theta":		0.5,
-		"Iter":		1000,
-		"Tol":		1e-10,
-		"OmitBound":		-1.0,
-		"Visc":		1e-5
-	},
-
-	"Ensight":
-	{
-		"_comment":
-"# Ensight settings",
-
-		"EnsightOut":		0,
-		"EnsCase":		"eindhoven",
-		"EnsDir":		"ensight",
-		"Binary":		0,
-		"MasterOut":		1,
-		"GeomName":		"channel"
-	},
-
-	"VTK":
-	{
-		"_comment":
-"#VTK output",
-
-		"VTKOut":		0,
-		"VTKDir":		"vtk",
-		"VTKName":		"channel",
-		"Binary":		0
-	},
-
-	"Restart":
-	{
-		"_comment":
-"# Write out results",
-
-		"Serialization":		1,
-		"Overwrite":		2,
-		"Inputfile":		"none",
-		"Outputfile":		"./geometry/eindhoven",
-		"Binary":		0
-	},
-
-	"DomainCond":
-	{
-		"_comment":
-"# domain, bnd/ini conditions",
-
-		"InitialCond":		0,
-		"GeomType":		1,
-		"InitialFile":		"none",
-		"MeshFile":		"500e-6x50e-6x100e-6@25x5x10",
-		"BoundaryType":		"2!23!0!0!0!0",
-		"BoundaryFncs":		"InflowBrick!ZeroVel!ZeroVel!ZeroVel!ZeroVel!ZeroVel"
-	}
-
+    "General": {
+        "DynamicLibs": [
+            "levelset/liblevelset-twophaseCoeff", 
+            "misc/libmisc-scalarFunctions", 
+            "misc/libmisc-vectorFunctions"
+        ], 
+        "DynamicLibsPrefix": "../", 
+        "ProgressBar": 1
+    }, 
+    "Time": {
+        "NumSteps": 100, 
+        "Scheme": 1, 
+        "FinalTime": 0.05, 
+        "Theta": 1
+    }, 
+    "CouplingSolver": {
+        "Iter": 10, 
+        "Tol": 1e-10, 
+        "ImplLB": 1, 
+        "LevelsetSolver": {
+            "Iter": 1000, 
+            "Tol": 1e-14
+        }, 
+        "NavStokesSolver": {
+            "Reduction": 0.1, 
+            "Nonlinear": 0, 
+            "OseenSolver": {
+                "UzawaInnerTol": 0.6, 
+                "Solver": 10301,
+                "Iter": 200, 
+                "UzawaInnerIter": 50, 
+                "PcAIter": 100, 
+                "Tol": 1e-12, 
+                "PcSTol": 0.0001, 
+                "PcATol": 0.001
+            }, 
+            "Iter": 20, 
+            "Tol": 1e-10
+        }
+    }, 
+    "NavStokes": {
+        "XFEMReduced": 0.1, 
+        "Coeff": {
+            "SurfTens": {
+                "SurfTension": 0.046, 
+                "VarTensionFunc": "ConstTau"
+            }, 
+            "ViscNeg": 0.001589, 
+            "DensNeg": 749,
+            "ViscPos": 0.001002,
+            "DensPos": 998,
+            "Gravity": [
+                0, 
+                -9.81, 
+                0
+            ]
+        }, 
+        "InitialValue": 0, 
+        "BoundaryData": {
+                "Velocity": {
+                            "0":["DirBC","InflowBrick"],                
+                            "1":["NatBC","ZeroVel"],
+                            "2":["Dir0BC"],
+                            "3":["Dir0BC"],
+                            "4":["Dir0BC"],
+                            "5":["Dir0BC"] 
+            }
+        }
+    }, 
+    "Levelset": {
+        "PosDrop": [
+            3e-05, 
+            2.5e-05, 
+            5e-05
+        ], 
+        "Discontinuous": 0, 
+        "Reparam": {
+            "Freq": 1, 
+            "MinGrad": 0.1, 
+            "Method": 3, 
+            "MaxGrad": 10
+        }, 
+        "RadDrop": [
+            2e-05, 
+            2e-05, 
+            2e-05
+        ], 
+        "VolCorrection": 1, 
+        "SD": 0.1
+    }, 
+    "Mesh": {
+        "Type": "BrickBuilder", 
+        "Origin": [0,0,0],         
+                "E1": [500e-6,0,0],
+                "E2": [0,50e-6,0],  
+                "E3": [0,0,100e-6], 
+                "N1": 25,
+                "N2": 5, 
+                "N3": 10,
+        "RestartFile": "", 
+        "AdaptRef": {
+            "CoarsestLevel": 0, 
+            "Freq": 10, 
+            "LoadBalStrategy": 1011, 
+            "FinestLevel": 2,
+            "Width": 1e-06
+        }
+    }, 
+    "Inflow": {
+        "InflowAmpl": 0, 
+        "FlowDir": 1, 
+        "InflowVel": 4e-05, 
+        "InflowFreq": 0, 
+        "RadInlet": 0.005
+    }, 
+    "Ensight": {
+        "Binary": 0, 
+        "Freq": 0,
+        "MasterOut": 1, 
+        "EnsDir": "ensight", 
+        "EnsCase": "eindhoven", 
+        "GeomName": "channel"
+    }, 
+    "VTK": {
+        "VTKDir": "vtk", 
+        "Binary": 0, 
+        "Freq": 0, 
+        "VTKName": "channel"
+    }, 
+    "Restart": {
+        "Binary": 0, 
+        "OutputGrid":"../out/grid",
+        "OutputData":"../out/data",
+        //"OutputGridData_convert": "./geometry/eindhoven", 
+        "OutputOverwrite": 2, 
+        "InputData": "", 
+        "OutputFreq": 1
+    }
 }
