@@ -19,7 +19,7 @@
  * along with DROPS. If not, see <http://www.gnu.org/licenses/>.
  *
  *
- * Copyright 2014 LNM RWTH Aachen, Germany
+ * Copyright 2014--2017 LNM RWTH Aachen, Germany
 */
 
 #ifndef DROPS_LEVELSETMAPPER_H
