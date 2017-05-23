@@ -3,6 +3,7 @@ set(HOME levelset)
 libs(coupling levelset fastmarch surfacetension twophaseutils marking_strategy adaptriang volume_adjustment)
 
 target_link_libraries(levelset-levelset levelset-volume_adjustment levelset-fastmarch misc-progressaccu misc-scopetimer)
+target_link_libraries(levelset-volume_adjustment out-vtkOut)
 
 add_library(levelset-twophaseCoeff SHARED twophaseCoeff)
 add_library(levelset-filmCoeff SHARED filmCoeff)
