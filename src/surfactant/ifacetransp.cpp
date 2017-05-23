@@ -119,7 +119,7 @@ void SetupInterfaceMassP1 (const MultiGridCL& mg, MatDescCL* matM, const VecDesc
     InterfaceMatrixAccuCL<LocalInterfaceMassP1CL, InterfaceCommonDataP1CL> accu( matM, LocalInterfaceMassP1CL( alpha), cdata);
     accus.push_back( &accu);
     const IdxDescCL* RowIdx= matM->RowIdx;
-    accumulate( accus, mg, RowIdx->TriangLevel(), RowIdx->GetMatchingFunction(), RowIdx->GetBndInfo());
+    accumulate( accus, mg, RowIdx->TriangLevel(), RowIdx->GetBndInfo());
 
     // WriteToFile( matM->Data, "mass.txt", "mass");
 }
@@ -251,7 +251,7 @@ void SetupLBP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls, cons
     InterfaceMatrixAccuCL<LocalLaplaceBeltramiP1CL, InterfaceCommonDataP1CL> accu( mat, LocalLaplaceBeltramiP1CL( D), cdata);
     accus.push_back( &accu);
     const IdxDescCL* RowIdx= mat->RowIdx;
-    accumulate( accus, mg, RowIdx->TriangLevel(), RowIdx->GetMatchingFunction(), RowIdx->GetBndInfo());
+    accumulate( accus, mg, RowIdx->TriangLevel(), RowIdx->GetBndInfo());
 
     // WriteToFile( mat->Data, "lb.txt", "lb");
 }
@@ -264,7 +264,7 @@ void SetupInterfaceRhsP1 (const MultiGridCL& mg, VecDescCL* v,
     accus.push_back( &cdata);
     InterfaceVectorAccuCL<LocalVectorP1CL, InterfaceCommonDataP1CL> loadaccu( v, LocalVectorP1CL( f, v->t), cdata);
     accus.push_back( &loadaccu);
-    accumulate( accus, mg, v->RowIdx->TriangLevel(), v->RowIdx->GetMatchingFunction(), v->RowIdx->GetBndInfo());
+    accumulate( accus, mg, v->RowIdx->TriangLevel(), v->RowIdx->GetBndInfo());
 
     // WriteToFile( v->Data, "rhs.txt", "Rhs");
 }
@@ -498,7 +498,7 @@ void SurfactantcGP1CL::Update()
         accus.push_back_acquire( oldcdata);
         accus.push_back_acquire( new InterfaceMatrixAccuCL<LocalInterfaceMassP1CL, InterfaceCommonDataP1CL>( &M2, LocalInterfaceMassP1CL(), *oldcdata, "old mass"));
     }
-    accumulate( accus, MG_, cidx->TriangLevel(), cidx->GetMatchingFunction(), cidx->GetBndInfo());
+    accumulate( accus, MG_, cidx->TriangLevel(), cidx->GetBndInfo());
 
 //     WriteToFile( M.Data, "cGcGM.txt", "mass");
 //     WriteToFile( A.Data, "cGcGA.txt", "Laplace-Beltrami");
@@ -539,7 +539,7 @@ VectorCL SurfactantcGP1CL::InitStep (double new_t)
         accus.push_back_acquire( new InterfaceVectorAccuCL<LocalVectorP1CL, InterfaceCommonDataP1CL>( &vd_load, LocalVectorP1CL( rhs_fun_, new_t), cdata, "load"));
 
     if (theta_ == 1.0) {
-        accumulate( accus, MG_, idx.TriangLevel(), idx.GetMatchingFunction(), idx.GetBndInfo());
+        accumulate( accus, MG_, idx.TriangLevel(), idx.GetBndInfo());
         return VectorCL( theta_*(vd_timeder.Data + dt_*vd_load.Data));
     }
 
@@ -558,7 +558,7 @@ VectorCL SurfactantcGP1CL::InitStep (double new_t)
     accus.push_back_acquire( make_wind_dependent_vectorP1_accu<LocalInterfaceConvectionP1CL>( &vd_oldres, &vd_oldic,  oldcdata,  make_P2Eval( MG_, Bnd_v_, oldv_), "convection on old iface"));
     accus.push_back_acquire( make_wind_dependent_vectorP1_accu<LocalInterfaceMassDivP1CL>   ( &vd_oldres, &vd_oldic,  oldcdata,  make_P2Eval( MG_, Bnd_v_, oldv_), "mass-div on old iface"));
 
-    accumulate( accus, MG_, idx.TriangLevel(), idx.GetMatchingFunction(), idx.GetBndInfo());
+    accumulate( accus, MG_, idx.TriangLevel(), idx.GetBndInfo());
     return VectorCL( theta_*vd_timeder.Data + (1. - theta_)*vd_oldtimeder.Data
                    + dt_*(theta_*vd_load.Data + (1. - theta_)*(vd_oldload.Data - vd_oldres.Data)));
 }
@@ -600,7 +600,7 @@ void
 InterfaceP1RepairCL::pre_refine ()
 {
     DROPS::NoBndDataCL<> dummy;
-    p1repair_= std::auto_ptr<RepairP1CL<double, NoBndDataCL>::type >(
+    p1repair_= std::unique_ptr<RepairP1CL<double, NoBndDataCL>::type >(
         new RepairP1CL<double, NoBndDataCL>::type( mg_, fullu_, dummy));
 }
 
@@ -865,7 +865,7 @@ void SurfactantSTP1CL::Update_cG()
         accus.push_back_acquire( new InterfaceVectorSTP1AccuCL<LocalVectorSTP1P1CL>( &load, &st_idx_, LocalVectorSTP1P1CL( rhs_fun_), cdata, /* cG_in_t*/ cG_in_t_, "load on ST-iface"));
     }
 
-    accumulate( accus, MG_, st_idx_.TriangLevel(), idx.GetMatchingFunction(), idx.GetBndInfo());
+    accumulate( accus, MG_, st_idx_.TriangLevel(), idx.GetBndInfo());
 
     // WriteToFile( cpl_new_dummy, "cpl_new_dummy.txt", "coupling on new interface -- always zero.");
 }
@@ -902,7 +902,7 @@ void SurfactantSTP1CL::Update_dG()
         accus.push_back_acquire( new InterfaceVectorSTP1AccuCL<LocalVectorSTP1P1CL>( &load, &st_idx_, LocalVectorSTP1P1CL( rhs_fun_), cdata, /* cG_in_t*/ cG_in_t_, "load on ST-iface"));
     }
 
-    accumulate( accus, MG_, st_idx_.TriangLevel(), idx.GetMatchingFunction(), idx.GetBndInfo());
+    accumulate( accus, MG_, st_idx_.TriangLevel(), idx.GetBndInfo());
 }
 
 void SurfactantSTP1CL::Update()
@@ -1149,7 +1149,7 @@ void SurfactantCharTransportP1CL::Update()
     if (rhs_fun_)
         accus.push_back_acquire( new InterfaceVectorAccuCL<LocalVectorP1CL, InterfaceCommonDataP1CL>( &vd_load, LocalVectorP1CL( rhs_fun_, ic.t), cdata, "load"));
 
-    accumulate( accus, MG_, cidx->TriangLevel(), cidx->GetMatchingFunction(), cidx->GetBndInfo());
+    accumulate( accus, MG_, cidx->TriangLevel(), cidx->GetBndInfo());
 
     load.resize( idx.NumUnknowns());
     load= vd_load.Data;

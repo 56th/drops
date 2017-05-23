@@ -1,0 +1,77 @@
+{
+    "General": {
+        "DynamicLibs": [
+            "stokes/libstokes-stokesCoeff", 
+            "misc/libmisc-scalarFunctions", 
+            "misc/libmisc-vectorFunctions"
+        ], 
+        "DynamicLibsPrefix": "../", 
+        "ProgressBar": 1
+    }, 
+    "Time": {
+        "NumSteps": 0, 
+        "Scheme": 1, 
+        "FinalTime": 0, 
+        "Theta": 1
+    }, 
+    "NavStokesSolver": {
+        "OseenSolver": {
+            "Tau": 1, 
+            "UzawaInnerTol": 1e-14, 
+            "Solver": 30207, 
+            "Relax": 1, 
+            "Iter": 200, 
+            "UzawaInnerIter": 1, 
+            "PcAIter": 1, 
+            "Tol": 1e-10, 
+            "PcSTol": 0.01, 
+            "PcATol": 1e-99
+            
+        }
+    }, 
+    "NavStokes": {
+        "Coeff": {
+            "Reaction": "ScaZero", 
+            "Solution_Vel": "VelSol_stokes", 
+            "Visc": 1, 
+            "Dens": 1, 
+            "Gravity": [
+                0, 
+                0, 
+                0
+            ], 
+            "Solution_DVel": "DVelSol_stokes", 
+            "Source": "Source_stokes", 
+            "Solution_Pr": "PrSol_stokes"
+        }, 
+        "InitialValue": 2, 
+        "BoundaryData": {
+            "Velocity": {
+                "Default":["DirBC","VelSol_stokes"]                        
+            }
+        }
+    }, 
+    "Mesh": {
+        "Type": "BrickBuilder", 
+        "Origin":[0,0,0],
+        "E1": [0.78540,0,0],
+        "E2": [0,0.78540,0],
+        "E3": [0,0,0.78540],
+        "N1": 3,
+        "N2": 3,
+        "N3": 3,
+        "InitialRef":   2
+    }, 
+        
+    "Restart": {
+        "InputData": ""
+    }, 
+    "Ensight": {
+        "Binary": 1, 
+        "EnsightOut": 0, 
+        "MasterOut": 1, 
+        "EnsDir": "ensight", 
+        "EnsCase": "FilmTemp", 
+        "GeomName": "test"
+    }
+}

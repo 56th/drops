@@ -1,0 +1,171 @@
+{
+    "General":
+    {
+        "ProgressBar": "0",
+        "DynamicLibsPrefix": "..\/"
+    },
+    
+    "Mesh":
+    {
+        "AdaptRef":
+        {
+            "LoadBalStrategy":      1011    // load balancing method, see decompose.h for details
+        }
+    },
+    
+    "CouplingSolver":
+    {
+        "Projection":             0,   // TODO: REMOVE
+        "NavStokesSolver":
+        {
+            "OseenSolver":
+            {
+                "DirectSolve":          0,      // whether to use a direct solver (here: PARDISO) or
+                                                // iterative solvers. If this is set to one, most other
+                                                // parameters in this section are irrelevant.
+                "UzawaInnerIter":       1000,   // maximum number of iterations for the inner solver
+                "UzawaInnerTol":        0.6     // tolerance for the inner solver. (! Attention:
+                                        // The inner solver tolerance should be chosen some
+                                        // orders of magnitude smaller than the outer solver
+                                        // tolerance, otherwise the outer solver diverges)
+            },
+            "Downwind":
+            {
+                "Frequency": 0,         // 0 disables downwind-numbering
+                "MaxRelComponentSize": 0.05, // maximal cycle size before removing weak edges
+                "WeakEdgeRatio": 0.2,   // ration of the weak edges to remove for large cycles
+                "CrosswindLimit": 0.866 // cos(pi/6); smaller convection is not considered
+            }
+        },
+        "LevelsetSolver":
+        {
+            "Downwind":
+            {
+                "Frequency": 0,         // 0 disables downwind-numbering
+                "MaxRelComponentSize": 0.05, // maximal cycle size before removing weak edges
+                "WeakEdgeRatio": 0.2,   // ration of the weak edges to remove for large cycles
+                "CrosswindLimit": 0.866 // cos(pi/6); smaller convection is not considered
+            }
+        }
+    },    
+
+    "NavStokes":
+    {
+        "ShiftFrame": "0",
+        "Coeff":
+        {
+            "VolForce": "ZeroVel",
+            "SmoothZone": 0,
+            "SurfTens":
+            {
+                "ShearVisco": "0",
+                "DilatationalVisco": "0",
+                "VarTensionFncs": "ConstTau"
+            }
+        },
+        "BoundaryData":
+        {
+            "Pressure":
+            {
+                "Default":    ["NoBC"]
+            },
+            "SlipBnd":
+            {
+                "Beta1":                 0.05,
+                "Beta2":                 0.05,
+                "BetaL":                 0,
+                "NitschePenalty":        30,
+                "ContactAngle":          60,
+                "ContactAngleFunc":      "ConstantAngle",
+                "BndOuterNormal":        "OutNormalBrick"
+            }
+        }
+    },
+    
+    "Levelset":
+    {
+        "Discontinuous": "0",
+        "CurvDiff":             -1,     // smoothing of level set function before the discretization
+                                        // of the curvature term. ( ! Attention: The smoothing is only
+                                        // applied on temporary variables used for the curvature
+                                        // calculation. The interface remains unchanged.)
+        "BoundaryData":
+        {
+                "Default":      ["NoBC"]
+        },
+        "Reparam":
+        {
+            "NarrowBand":           -1      // Narrow-Band method for the Euclidian method.
+                                            // (e. g. NarrowBand = 0.5 <=> all DOFs with < 50% of maximal
+                                            // level set value are considered).
+        }
+    },
+
+    "VTK":
+    {
+        "Binary":        1,                  // write out VTK files in binary format.
+        "ReUseTimeFile": "0",
+        "UseDeformation": "0",
+        "UseOnlyP1": "0",
+        "AddP1XPressure": "0",
+        "AddDGOutput": "0"
+    },
+    
+    "Transp":
+    {
+            "Enable":               0,
+            "Solver":
+            {
+                "Iter":             200,    // maximum number of iterations.
+                "Tol":              1e-10   // tolerance.
+            },
+
+            "BoundaryData":
+            {
+                    "Default":      ["Nat0BC"]
+            },
+            
+            "DiffPos":              0.005,  // diffusion coefficient (positive part).
+            "DiffNeg":              0.01,   // diffusion coefficient (negative part).                
+            "HenryPos":                 1,      // Henry scaling number outside the droplet
+            "HenryNeg":                 0.5,    // Henry scaling number inside the droplet
+            "IniCPos":              0.1,    // initial concentration (positive part).
+            "IniCNeg":              5,      // initial concentration (negative part).
+            "NitschePenalty":       50,     // inactive! Penalty parameter for Nitsche formulation
+            "XFEMReduced":      0.05    // treshold for discarding extending dof parameters.
+    },        
+    
+    "SurfTransp":
+    {
+            "Enable":               0,
+            "Solver":
+            {
+                "Iter":                 1000,   // maximum number of iterations.
+                "Tol":                  1e-10  // tolerance.
+            },
+            "XFEMReduced":            -1.0,   // reduction of traceFEM space. Negative number keeps all basis functions.
+            "Visc":                 1e-5    // diffusion coefficient
+    },
+    
+    "Restart":
+    {
+        "Inputfile": "none"
+    }
+
+// Inflow conditions (all units are SI), cf. twophaseCoeff.cpp
+//        "Inflow":
+//        {
+//        
+//                "FlowDir":              0,                   // direction of the flow at the inlet.
+//                                                             // FlowDir = 0 / 1 / 2 describes the x- / y- / z-
+//                                                             // direction. If the flow is orientated in negativ
+//                                                             // coordinate direction, a minus sign must be used
+//                                                             // for the parameter InflowVel.
+//                "InflowVel":            0,                   // magnitude of the inflow velocity.
+//                "RadInlet":             1,                   // radius of the circular intake.
+//                "InflowFreq":           0,                   // inflow frequency.
+//                "InflowAmpl":           0,                   // inflow amplitude.                
+//                
+//        },
+}
+

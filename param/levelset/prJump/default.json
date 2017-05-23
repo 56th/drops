@@ -1,0 +1,44 @@
+{
+    "NavStokes":
+    {
+        "Coeff":
+        {
+            "SmoothZone": 0,
+            "SurfTens":
+            {
+                "ShearVisco": "0",
+                "DilatationalVisco": "0",
+                "ArtificialForce": 0
+            }
+        },
+        "BoundaryData":
+        {
+            "Pressure":
+            {
+                "Default":    ["NoBC"]
+            },
+            "SlipBnd":
+            {
+                "Beta1":                 0.05,
+                "Beta2":                 0.05,
+                "BetaL":                 0,
+                "NitschePenalty":        30,
+                "ContactAngle":          60,
+                "ContactAngleFunc":      "ConstantAngle",
+                "BndOuterNormal":        "OutNormalBrick"
+           }
+           
+        }
+        
+    },
+    
+    "Levelset":
+    {
+        "SD":                   0.0,    // parameter controls the stability of the advection equation
+                                        // by streamline diffusion       
+        "CurvDiff":             -1      // smoothing of level set function before the discretization
+                                        // of the curvature term. ( ! Attention: The smoothing is only
+                                        // applied on temporary variables used for the curvature
+                                        // calculation. The interface remains unchanged.)
+    }
+}

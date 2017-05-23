@@ -1,0 +1,20 @@
+{
+    "VTK":
+    {
+        "VTKOut": "0",
+        "VTKName": ""
+    },
+    "General":
+    {
+        "ProgressBar": "0",
+        "DynamicLibsPrefix": "..\/"
+    },
+    "NavStokes":
+    {
+        "BoundaryData":
+        {
+            "Pressure": { "Default": ["NoBC"] }
+        }
+    }
+}
+

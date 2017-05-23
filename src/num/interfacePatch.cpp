@@ -65,7 +65,7 @@ void InterfacePatchCL::Init( const TetraCL& t, const LocalP2CL<double>& ls, doub
     barysubtetra_ = false;
 }
 
- SMatrixCL<3,4> GetCoordMatrix( const TetraCL& t)
+SMatrixCL<3,4> GetCoordMatrix( const TetraCL& t)
 {
    SMatrixCL<3,4> V(Uninitialized);
    for (int i = 0; i<3; ++i)
@@ -78,13 +78,13 @@ void InterfacePatchCL::Init( const TetraCL& t, const LocalP2CL<double>& ls, doub
 // Init for SubtetraT
 void InterfacePatchCL::Init( const TetraCL& t, const SubTetraT& st, const LocalP2CL<double>& ls, double translation)
 {
-	st_ = st;
+    st_ = st;
     ch_= -1;
 
     for (int v=0; v<10; ++v)
     {
-    	BaryCoordCL tempBaryCoord_ = v<4 ? st[v] : BaryCenter(st[VertOfEdge(v-4,0)],st[VertOfEdge(v-4,1)]);
-    	PhiLoc_[v] =ls( tempBaryCoord_) + translation;
+        BaryCoordCL tempBaryCoord_ = v<4 ? st[v] : BaryCenter(st[VertOfEdge(v-4,0)],st[VertOfEdge(v-4,1)]);
+        PhiLoc_[v] =ls( tempBaryCoord_) + translation;
     // collect data on all DoF
         Coord_[v]= GetCoordMatrix(t)* tempBaryCoord_;
         sign_[v]= Sign(PhiLoc_[v]);
@@ -112,8 +112,8 @@ void InterfacePatchCL::Init( const SubTetraT& st, const LocalP2CL<double>& ls,
 
     for (int v=0; v<10; ++v)
     {
-    	BaryCoordCL tempBaryCoord_ = v<4 ? st[v] : BaryCenter(st[VertOfEdge(v-4,0)],st[VertOfEdge(v-4,1)]);
-    	PhiLoc_[v] =ls( tempBaryCoord_) + translation;
+        BaryCoordCL tempBaryCoord_ = v<4 ? st[v] : BaryCenter(st[VertOfEdge(v-4,0)],st[VertOfEdge(v-4,1)]);
+        PhiLoc_[v] =ls( tempBaryCoord_) + translation;
     // collect data on all DoF
         Coord_[v]= zero;
         sign_[v]= Sign(PhiLoc_[v]);
@@ -157,7 +157,7 @@ bool InterfacePatchCL::ComputeVerticesOfCut( Uint ch, bool compute_PQRS)
         {
             Bary_[intersec_]= BaryDoF_[v];
             if (compute_PQRS)
-            	PQRS_[intersec_]= Coord_[v];
+                PQRS_[intersec_]= Coord_[v];
             Edge_[intersec_++]= -1;
         }
     }
@@ -171,13 +171,12 @@ bool InterfacePatchCL::ComputeVerticesOfCut( Uint ch, bool compute_PQRS)
             const double lambda= EdgeIntersection( v0,  v1, PhiLoc_);
             Bary_[intersec_]= (1.-lambda)*BaryDoF_[v0] + lambda * BaryDoF_[v1];
             if (compute_PQRS)
-            	PQRS_[intersec_]= (1.-lambda) * Coord_[v0] + lambda * Coord_[v1];
+                PQRS_[intersec_]= (1.-lambda) * Coord_[v0] + lambda * Coord_[v1];
             Edge_[intersec_++]= edge;
             innersec_++;
         }
     }
     
-    bool cut_point_on_face[4][4];
     const double eps = 1e-9;
     
     for (int i = 0; i<intersec_; ++i){
@@ -200,8 +199,8 @@ bool InterfacePatchCL::ComputeVerticesOfCut( Uint ch, bool compute_PQRS)
 
     // zero-level of measure 0.
     if (intersec_<3){
-    	return false;
-	}
+        return false;
+    }
     // computed cut of child;
     return true;
 }
@@ -258,7 +257,7 @@ InterfacePatchCL::SubTetraT InterfaceTetraCL::TransformToSubTetra(const Interfac
 
 bool InterfaceTetraCL::ComputeCutForChild( Uint ch)
 {
-	return ComputeVerticesOfCut( ch);
+    return ComputeVerticesOfCut( ch);
 }
 
 void InterfaceTetraCL::InsertSubTetra(const SubTetraT& BaryCoords, bool pos, Uint child)
@@ -541,49 +540,265 @@ Point3DCL InterfaceTriangleCL::GetNormal() const
 /* calculation of improved normal */
 Quad5_2DCL<Point3DCL> InterfaceTriangleCL::GetImprovedNormal(Uint n) const
 {
-	//TODO: GradRef static?
-	LocalP1CL<Point3DCL> GradRef[10], GradP2[10];
-	P2DiscCL::GetGradientsOnRef( GradRef);
-	SMatrixCL<3,3> T;
-	//double dummy;
-	//GetTrafoTr( T, dummy, tet);
+    //TODO: GradRef static?
+    LocalP1CL<Point3DCL> GradRef[10], GradP2[10];
+    P2DiscCL::GetGradientsOnRef( GradRef);
+    SMatrixCL<3,3> T;
+    //double dummy;
+    //GetTrafoTr( T, dummy, tet);
 
-	//Transoformation matrix, function: GetTrafoTr
-	//but without needing the tetra
-	double M[3][3];
-	const Point3DCL& pt0= Coord_[0];
-	for(int i=0; i<3; ++i)
-		for(int j=0; j<3; ++j)
-			M[j][i]= Coord_[i+1][j] - pt0[j];
-	double det=   M[0][0] * (M[1][1]*M[2][2] - M[1][2]*M[2][1])
-		 - M[0][1] * (M[1][0]*M[2][2] - M[1][2]*M[2][0])
-		 + M[0][2] * (M[1][0]*M[2][1] - M[1][1]*M[2][0]);
+    //Transoformation matrix, function: GetTrafoTr
+    //but without needing the tetra
+    double M[3][3];
+    const Point3DCL& pt0= Coord_[0];
+    for(int i=0; i<3; ++i)
+        for(int j=0; j<3; ++j)
+            M[j][i]= Coord_[i+1][j] - pt0[j];
+    double det=   M[0][0] * (M[1][1]*M[2][2] - M[1][2]*M[2][1])
+         - M[0][1] * (M[1][0]*M[2][2] - M[1][2]*M[2][0])
+         + M[0][2] * (M[1][0]*M[2][1] - M[1][1]*M[2][0]);
 
-	T(0,0)= (M[1][1]*M[2][2] - M[1][2]*M[2][1])/det;
-	T(0,1)= (M[2][0]*M[1][2] - M[1][0]*M[2][2])/det;
-	T(0,2)= (M[1][0]*M[2][1] - M[2][0]*M[1][1])/det;
-	T(1,0)= (M[2][1]*M[0][2] - M[0][1]*M[2][2])/det;
-	T(1,1)= (M[0][0]*M[2][2] - M[2][0]*M[0][2])/det;
-	T(1,2)= (M[2][0]*M[0][1] - M[0][0]*M[2][1])/det;
-	T(2,0)= (M[0][1]*M[1][2] - M[1][1]*M[0][2])/det;
-	T(2,1)= (M[1][0]*M[0][2] - M[0][0]*M[1][2])/det;
-	T(2,2)= (M[0][0]*M[1][1] - M[1][0]*M[0][1])/det;
+    T(0,0)= (M[1][1]*M[2][2] - M[1][2]*M[2][1])/det;
+    T(0,1)= (M[2][0]*M[1][2] - M[1][0]*M[2][2])/det;
+    T(0,2)= (M[1][0]*M[2][1] - M[2][0]*M[1][1])/det;
+    T(1,0)= (M[2][1]*M[0][2] - M[0][1]*M[2][2])/det;
+    T(1,1)= (M[0][0]*M[2][2] - M[2][0]*M[0][2])/det;
+    T(1,2)= (M[2][0]*M[0][1] - M[0][0]*M[2][1])/det;
+    T(2,0)= (M[0][1]*M[1][2] - M[1][1]*M[0][2])/det;
+    T(2,1)= (M[1][0]*M[0][2] - M[0][0]*M[1][2])/det;
+    T(2,2)= (M[0][0]*M[1][1] - M[1][0]*M[0][1])/det;
 
-	Quad5_2DCL<>          p2[10];
-	Quad5_2DCL<Point3DCL> GradQ[10]; // and their gradients
-	P2DiscCL::GetGradients( GradP2, GradRef, T);
-	Quad5_2DCL<Point3DCL> normal;
-	P2DiscCL::GetP2Basis( p2, &this->GetBary(n));
-	for (int v=0; v<10; ++v)
-	{
-		GradQ[v].assign( GradP2[v], &this->GetBary(n));
-		normal += this->GetPhi(v)*GradQ[v];
-	}
+    Quad5_2DCL<>          p2[10];
+    Quad5_2DCL<Point3DCL> GradQ[10]; // and their gradients
+    P2DiscCL::GetGradients( GradP2, GradRef, T);
+    Quad5_2DCL<Point3DCL> normal;
+    P2DiscCL::GetP2Basis( p2, &this->GetBary(n));
+    for (int v=0; v<10; ++v)
+    {
+        GradQ[v].assign( GradP2[v], &this->GetBary(n));
+        normal += this->GetPhi(v)*GradQ[v];
+    }
 
-	for (int i =0; i<Quad5_2DDataCL::NumNodesC; i++) if (normal[i].norm()>1e-8) normal[i]/= normal[i].norm();
+    for (int i =0; i<Quad5_2DDataCL::NumNodesC; i++) if (normal[i].norm()>1e-8) normal[i]/= normal[i].norm();
 
-	return normal;
+    return normal;
 }
+
+//***********************************************************************************************************
+//                                          InterfaceLineCL
+//***********************************************************************************************************
+
+bool InterfaceLineCL::ComputeMCLForChild(Uint ch)
+{
+    if( BC_Face_[0]==NoBC && BC_Face_[1]==NoBC && BC_Face_[2]==NoBC && BC_Face_[3]==NoBC
+        && BC_Edge_[0]==NoBC && BC_Edge_[1]==NoBC && BC_Edge_[2]==NoBC && BC_Edge_[3]==NoBC && BC_Edge_[4]==NoBC && BC_Edge_[5]==NoBC )
+    {//The tetrahedron has no surface and edge on boundary
+            return false;
+    }
+    const bool iscut= ComputeVerticesOfCut( ch, /*compute_PQRS*/ true);
+    if (!iscut) { // no change of sign on child
+         numtriangles_= 0;
+         return false;
+    }
+
+    numMCL_=0;
+    Uint num=0;
+    int idx[2];
+    for( int i=0; i<intersec_; i++ )
+    {
+        num=0; 
+        for( int j=0; j<4; j++ )
+        {
+            if( cut_point_on_face[i][j]==true && cut_point_on_face[(i+1)%intersec_][j]==true)
+            {
+                idx[num]=j;
+                num++;
+            }
+        }
+        if(num==1 &&(BC_Face_[idx[0]]==SlipBC||BC_Face_[idx[0]]==Slip0BC||BC_Face_[idx[0]]==SymmBC))
+        {
+            IdxMCL_[numMCL_][0]= i;
+            IdxMCL_[numMCL_][1]= (i+1)%intersec_;
+            if(BC_Face_[idx[0]]==SymmBC)
+                SymmType[numMCL_]= true;
+            else
+                SymmType[numMCL_]= false;
+            numMCL_++;
+        }
+        else if(num==2)//If the MCL intersects with one edge, one needs to check if the edge is on the boundary
+        {
+            for(Uint v=0;v<6;v++)
+            {
+                if(FaceOfEdge(v,0)==idx[0]&&FaceOfEdge(v,1)==idx[1]&&(BC_Edge_[v]==SlipBC||BC_Edge_[v]==Slip0BC||BC_Edge_[v]==SymmBC))
+                {	
+                    IdxMCL_[numMCL_][0]= i;
+                    IdxMCL_[numMCL_][1]= (i+1)%intersec_;
+                    if(BC_Edge_[v]==SymmBC)
+                        SymmType[numMCL_]= true;
+                    else
+                        SymmType[numMCL_]= false;
+                    numMCL_++;
+                }
+            }
+        }
+    }
+    if(intersec_==4 )
+        for( int i=0; i< 2; i++)
+        {
+            num=0;
+            for( int j=0; j<4; j++ )
+            {
+                if( cut_point_on_face[i][j]==true && cut_point_on_face[(i+2)%intersec_][j]==true)
+                {
+                    idx[num]=j;
+                    num++;
+                }
+            }
+            if(num==1 &&(BC_Face_[idx[0]]==SlipBC||BC_Face_[idx[0]]==Slip0BC||BC_Face_[idx[0]]==SymmBC))
+            {
+                IdxMCL_[numMCL_][0]= i;
+                IdxMCL_[numMCL_][1]= i+2;
+                if(BC_Face_[idx[0]]==SymmBC)
+                    SymmType[numMCL_]= true;
+                else
+                    SymmType[numMCL_]= false;
+                numMCL_++;
+            }
+            else if(num==2)//If the MCL intersects with one edge, one needs to check if the edge is on the boundary
+            {
+                for(Uint v=0;v<6;v++)
+                {
+                    if(FaceOfEdge(v,0)==idx[0]&&FaceOfEdge(v,1)==idx[1]&&(BC_Edge_[v]==SlipBC||BC_Edge_[v]==Slip0BC||BC_Edge_[v]==SymmBC))
+                    {	
+                        IdxMCL_[numMCL_][0]= i;
+                        IdxMCL_[numMCL_][1]= i+2;
+                        if(BC_Edge_[v]==SymmBC)
+                            SymmType[numMCL_]= true;
+                        else
+                            SymmType[numMCL_]= false;
+                        numMCL_++;
+                    }
+                }
+            }
+        }
+
+    if(numMCL_==0)
+        return false;
+    else
+        return true;
+}
+
+Uint InterfaceLineCL::GetNumMCL()
+{
+    return numMCL_;
+}
+
+double InterfaceLineCL::GetInfoMCL(Uint v, BaryCoordCL& bary0, BaryCoordCL& bary1, Point3DCL& pt0, Point3DCL& pt1)
+{
+    //read two indices for the two end points of the MCL segment
+    bary0 = Bary_[IdxMCL_[v][0]];
+    bary1 = Bary_[IdxMCL_[v][1]];
+    pt0 = PQRS_[IdxMCL_[v][0]];
+    pt1 = PQRS_[IdxMCL_[v][1]];
+    if (EqualToFace()) //If MCL is shared by two tetras
+        return (pt1-pt0).norm()/2;
+    else
+        return (pt1-pt0).norm();
+}
+
+void InterfaceLineCL::SetBndCondT(const TetraCL& tet, const BndDataCL<Point3DCL>& BndData)
+{
+    for(Uint v=0; v<4; v++)
+        BC_Face_[v] =  BndData.GetBC(*tet.GetFace(v));
+    for(Uint v=0; v<6; v++)
+        BC_Edge_[v] =  BndData.GetBC(*tet.GetEdge(v));
+}
+
+void InterfaceLineCL::SetBndOutNormal(instat_vector_fun_ptr outnormal)
+{
+    outnormal_=outnormal;
+}
+
+Quad9_1DCL<Point3DCL> InterfaceLineCL::GetImprovedNormalAtMCL(Uint v) const
+{
+        //note that the algorithm used here is the same as the one used in interfaceTriangleCL.
+        LocalP1CL<Point3DCL> GradRef[10], GradP2[10];
+        P2DiscCL::GetGradientsOnRef( GradRef);
+        SMatrixCL<3,3> T;
+
+        double M[3][3];
+        const Point3DCL& pt0= Coord_[0];
+        for(int i=0; i<3; ++i)
+            for(int j=0; j<3; ++j)
+                M[j][i]= Coord_[i+1][j] - pt0[j];
+        double det=   M[0][0] * (M[1][1]*M[2][2] - M[1][2]*M[2][1])
+                - M[0][1] * (M[1][0]*M[2][2] - M[1][2]*M[2][0])
+                + M[0][2] * (M[1][0]*M[2][1] - M[1][1]*M[2][0]);
+
+        T(0,0)= (M[1][1]*M[2][2] - M[1][2]*M[2][1])/det;
+        T(0,1)= (M[2][0]*M[1][2] - M[1][0]*M[2][2])/det;
+        T(0,2)= (M[1][0]*M[2][1] - M[2][0]*M[1][1])/det;
+        T(1,0)= (M[2][1]*M[0][2] - M[0][1]*M[2][2])/det;
+        T(1,1)= (M[0][0]*M[2][2] - M[2][0]*M[0][2])/det;
+        T(1,2)= (M[2][0]*M[0][1] - M[0][0]*M[2][1])/det;
+        T(2,0)= (M[0][1]*M[1][2] - M[1][1]*M[0][2])/det;
+        T(2,1)= (M[1][0]*M[0][2] - M[0][0]*M[1][2])/det;
+        T(2,2)= (M[0][0]*M[1][1] - M[1][0]*M[0][1])/det;
+
+        Quad9_1DCL<Point3DCL> GradQ[10];
+        P2DiscCL::GetGradients( GradP2, GradRef, T);
+        Quad9_1DCL<Point3DCL> normal;     //outnormal of the leveset at MCL
+        BaryCoordCL bary[2];
+        bary[0] = Bary_[IdxMCL_[v][0]];
+        bary[1] = Bary_[IdxMCL_[v][1]];
+        for (int v=0; v<10; ++v)
+        {
+            GradQ[v].assign( GradP2[v], bary);
+            normal += this->GetPhi(v)*GradQ[v];
+        }
+
+        for (int i =0; i<Quad9_1DDataCL::NumNodesC; i++) if (normal[i].norm()>1e-8) normal[i]/= normal[i].norm();
+        return normal;
+}
+
+// The method to compute the outer normal of MCL might have a large error when the contact angle is small.
+Quad9_1DCL<Point3DCL> InterfaceLineCL::GetImprovedMCLNormalOnSlipBnd(const TetraCL& tet, Uint v) const 
+{
+    BaryCoordCL bary[2];
+    bary[0] = Bary_[IdxMCL_[v][0]];
+    bary[1] = Bary_[IdxMCL_[v][1]];
+    Quad9_1DCL<Point3DCL> SlipBndNormal(tet, bary, outnormal_);
+    Quad9_1DCL<Point3DCL> NormalMCL=GetImprovedNormalAtMCL(v);
+    Quad9_1DCL<Point3DCL> n;   
+
+    n = NormalMCL - dot(NormalMCL, SlipBndNormal) * SlipBndNormal;
+    
+    for (int i =0; i<Quad9_1DDataCL::NumNodesC; i++) 
+        if (n[i].norm()>1e-8) n[i]/= n[i].norm();
+    
+    return n;
+
+}
+
+Quad9_1DCL<double> InterfaceLineCL::GetDynamicCtAngle(const TetraCL& tet, Uint v) const
+{
+    BaryCoordCL bary[2];
+    bary[0] = Bary_[IdxMCL_[v][0]];
+    bary[1] = Bary_[IdxMCL_[v][1]];
+    Quad9_1DCL<Point3DCL> NormalMCL=GetImprovedNormalAtMCL(v);
+    Quad9_1DCL<Point3DCL> SlipBndNormal(tet, bary, outnormal_);
+    Quad9_1DCL<double> inner_pro (dot(NormalMCL, SlipBndNormal));
+    Quad9_1DCL<double> CtAngle;
+    for (int i =0; i<Quad9_1DDataCL::NumNodesC; i++){
+        CtAngle[i] = std::acos(inner_pro[i]);
+        CtAngle[i] = M_PI - CtAngle[i];
+    }
+    return CtAngle;
+}
+
+//***********************************************************************************************************
+//                                     End of InterfaceLineCL
+//***********************************************************************************************************
 
 LocalP2CL<double> ProjectIsoP2ChildToParentP1 (LocalP2CL<double> lpin, Uint child){
     const double vertices[][3]=
@@ -604,14 +819,9 @@ LocalP2CL<double> ProjectIsoP2ChildToParentP1 (LocalP2CL<double> lpin, Uint chil
     double b[3];
     LocalP2CL<double> res(0.);
     int v0 = cdata.Vertices[0];
-    // for (int i=0; i<10; i++){
-    //     std::cout << " lpin[ " << i << "] = " << lpin[i] << std::endl;
-    // }
-    // std::cout << "v0 = " << v0 << std::endl;
 
     for (int i=0; i<3; i++){
         int vi = cdata.Vertices[i+1];
-        // std::cout << "vi = " << vi << std::endl;
         Point3DCL diff;
         for (int d=0; d<3; d++){
             diff[d]= vertices[vi][d] - vertices[v0][d];
@@ -620,8 +830,6 @@ LocalP2CL<double> ProjectIsoP2ChildToParentP1 (LocalP2CL<double> lpin, Uint chil
             M[i][j]= diff[j];
         }
         b[i] = lpin[vi]-lpin[v0];
-        // std::cout << " diff[ " << i << "] = " << diff << std::endl;
-        // std::cout << " b[ " << i << "] = " << b[i] << std::endl;
     }
 
 
@@ -646,7 +854,6 @@ LocalP2CL<double> ProjectIsoP2ChildToParentP1 (LocalP2CL<double> lpin, Uint chil
         for (int j = 0; j < 3; j++){
             G[i] += T[i][j] * b[j];
         }
-        // std::cout << "g(" << i << ") = " << G[i] << std::endl;
     }
 
     for (int i = 0; i < 4; i++){

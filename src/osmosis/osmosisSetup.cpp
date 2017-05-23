@@ -791,16 +791,15 @@ void
 OsmosisRepairCL::post_refine ()
 {
 	throw DROPSErrCL( "OsmosisRepairCL::post_refine: Sorry, not yet implemented.");
-    match_fun match= c_.GetMG().GetBnd().GetMatchFun();
     VecDescCL loc_conc;
-    IdxDescCL loc_cidx( P1X_FE, c_.GetBndData(), match, c_.GetXFEMOmitBound());
+    IdxDescCL loc_cidx( P1X_FE, c_.GetBndData(), c_.GetXFEMOmitBound());
     VecDescCL loc_oldconc;
-    IdxDescCL loc_oldcidx( P1X_FE, c_.GetBndData(), match, c_.GetXFEMOmitBound());
+    IdxDescCL loc_oldcidx( P1X_FE, c_.GetBndData(), c_.GetXFEMOmitBound());
     VecDescCL& conc= c_.conc;
     VecDescCL& oldconc= c_.oldconc;
 
-    loc_cidx.CreateNumbering( mylvl, c_.GetMG(), c_.GetBndData(), match, &(c_.GetLevelset()),&(c_.GetLevelsetBnd()));
-    loc_oldcidx.CreateNumbering( mylvl, c_.GetMG(), c_.GetBndData(),  match, &(c_.GetOldLevelset()),&(c_.GetLevelsetBnd()));
+    loc_cidx.CreateNumbering( mylvl, c_.GetMG(), c_.GetBndData(), &(c_.GetLevelset()),&(c_.GetLevelsetBnd()));
+    loc_oldcidx.CreateNumbering( mylvl, c_.GetMG(), c_.GetBndData(), &(c_.GetOldLevelset()),&(c_.GetLevelsetBnd()));
     loc_conc.SetIdx( &loc_cidx);
     loc_oldconc.SetIdx( &loc_oldcidx);
     //RepairAfterRefineP1( c_.GetSolution( conc), loc_conc);
@@ -823,7 +822,7 @@ OsmosisRepairCL::post_refine ()
 void
   OsmosisRepairCL::pre_refine_sequence ()
 {
-    oldp1xrepair_= std::auto_ptr<P1XRepairCL>( new P1XRepairCL( c_.GetMG(), c_.oldconc));
+    oldp1xrepair_= std::unique_ptr<P1XRepairCL>( new P1XRepairCL( c_.GetMG(), c_.oldconc));
 }
 
 void
@@ -854,8 +853,7 @@ void
     IdxDescCL    loc_vidx(vecP2_FE);
     VelVecDescCL& v= v_;
     Uint LastLevel= mg_.GetLastLevel();
-    match_fun match= mg_.GetBnd().GetMatchFun();
-    loc_vidx.CreateNumbering( mg_.GetLastLevel(), mg_, Bnd_v_, match ); 
+    loc_vidx.CreateNumbering( mg_.GetLastLevel(), mg_, Bnd_v_);
     if (LastLevel != v.RowIdx->TriangLevel()) {
         std::cout << "LastLevel: " << LastLevel
                   << " old v->TriangLevel: " << v.RowIdx->TriangLevel() << std::endl;

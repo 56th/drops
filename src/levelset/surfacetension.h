@@ -1,6 +1,6 @@
 /// \file surfacetension.h
 /// \brief compute the interfacial tension
-/// \author LNM RWTH Aachen: Hieu Nguyen; SC RWTH Aachen:
+/// \author LNM RWTH Aachen: Hieu Nguyen, Yuanjun Zhang; SC RWTH Aachen:
 
 /*
  * This file is part of DROPS.
@@ -40,6 +40,13 @@ enum InputMethodT
     Sigma_S=2   ///< surface tension as a function of surfactant concentration
 };
 
+enum SurfaceModelT
+/// different types of constitutive laws for surfactant
+{
+    LANGMUIR=0, ///< Langmuir model
+    LINEAR  =1  ///< simple linear model  
+};
+
 class SurfaceTensionCL
 {
   private:
@@ -47,34 +54,48 @@ class SurfaceTensionCL
     double C_[5], cp_;                  ///< coefficients for computing surface tension with Sigma_C
     instat_scalar_fun_ptr sigma_;       ///< variable surface tension with Sigma_X
     InputMethodT input_;
+    SurfaceModelT surfmodel_;
     VecDescCL * c_;                     ///< mass concentration
+    double smax_, T_;                   ///< smax_: maximum surfactant concentration (needed in Langmuir model); T_: temperature
+    VecDescCL * s_;                     ///< surfactant concentration (on the interface)
+
+    VecDescCL * sigma_vtk_;             ///< vtk output of the variable surface tension coefficient
 
     double sigma_c(double c) const;     ///< variable surface tension with Sigma_C
     double dsigma_dc(double c) const;   ///< variable surface tension gradient with Sigma_C
+    double sigma_s(double s) const;     ///< variable surface tension with Sigma_S
 
   public:
     SurfaceTensionCL ( instat_scalar_fun_ptr sigma)
-    :  cBnd_(BndDataCL<>(0)),  cp_(0.), sigma_(sigma), input_(Sigma_X), c_(0)
+        :  cBnd_(0),  cp_(0.), sigma_(sigma), input_(Sigma_X), surfmodel_(LANGMUIR), c_(0), smax_(0.), T_(0.), s_(0), sigma_vtk_(0)
     { std::memset( C_, 0, 5*sizeof( double));}
 
     SurfaceTensionCL ( instat_scalar_fun_ptr sigma, BndDataCL<> cBnd)
-    :  cBnd_(cBnd),  cp_(0.), sigma_(sigma), input_(Sigma_X), c_(0)
+    :  cBnd_(cBnd),  cp_(0.), sigma_(sigma), input_(Sigma_X), surfmodel_(LANGMUIR), c_(0), smax_(0.), T_(0.), s_(0), sigma_vtk_(0)
     { std::memset( C_, 0, 5*sizeof( double));}
 
     SurfaceTensionCL ( double C[5], double cp=0., BndDataCL<> cBnd = BndDataCL<>( 0),  VecDescCL* c =0)
-    :  cBnd_(cBnd),  cp_(cp), sigma_(0), input_(Sigma_C), c_(c)
+    :  cBnd_(cBnd),  cp_(cp), sigma_(0), input_(Sigma_C), surfmodel_(LANGMUIR), c_(c), smax_(0.), T_(0.), s_(0), sigma_vtk_(0)
     { std::memcpy( C_, C, 5*sizeof( double));}
 
+    SurfaceTensionCL ( double smax, instat_scalar_fun_ptr sigma, VecDescCL* s =0, double T =300, BndDataCL<> cBnd = BndDataCL<>( 0))
+    :  cBnd_(cBnd),  cp_(0.), sigma_(sigma), input_(Sigma_S), surfmodel_(LANGMUIR), c_(0), smax_(smax), T_(T), s_(s), sigma_vtk_(0)
+    { std::memset( C_, 0, 5*sizeof( double));}
 
     void SetInputMethod(InputMethodT input) {input_=input;}
     InputMethodT GetInputMethod() const {return input_;}
 
+    void SetSurfaceModel(SurfaceModelT surfmodel) {surfmodel_=surfmodel;}
+    SurfaceModelT GetSurfaceModel() const {return surfmodel_;}
+
     void SetConcentration(VecDescCL * c) {c_=c;}
     void SetBoundary (BndDataCL<> cBnd) {cBnd_ =  cBnd;}
-    void SetTime(double time) { c_->t=time;}
+    void SetTime(double time) { if (c_) c_->t=time; if (s_) s_->t=time; }
+    void SetVtkOutput(VecDescCL * sigma_vtk) {sigma_vtk_=sigma_vtk;}
 
     instat_scalar_fun_ptr GetSigma() const {return sigma_;}
     void SetCoeff (double C[5], double cp) {std::memcpy( C_, C, 5*sizeof( double)); cp_= cp;}
+    void SetIFCoeff (double smax, double T) {smax_=smax; T_=T;}
 
     /// \brief evaluate surface tension on triangle given by the first and second arguments
     void ComputeSF( const TetraCL&, const BaryCoordCL * const, Quad5_2DCL<>&) const;

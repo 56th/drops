@@ -35,6 +35,8 @@ int main( int argc, char **argv)
 {
 #ifdef _PAR
     DROPS::ProcCL::Instance(&argc, &argv);
+    // The following code should only be executed by the master
+    if (!DROPS::ProcCL::IamMaster()) return 0;
 #endif
     try {
         using DROPS::DiST::GeomIdCL;
@@ -86,11 +88,11 @@ int main( int argc, char **argv)
         std::cerr << "The container has the following vertices:" << std::endl;
         for ( RemoteDataListCL::iterator itr = list.begin(); itr!=list.end(); ++itr)
         {
-            std::cerr << "Coordinates:"<< (*itr).first.bary[0]         <<
-                                  "  " << (*itr).first.bary[1]         <<
-                                  "  " << (*itr).first.bary[2]         <<
-                            " Level: " << (*itr).first.level           <<
-                        " LocalPrio: " << (*itr).second.GetLocalPrio() << std::endl;
+            std::cerr << "Coordinates: " << (*itr).first.bary[0]         <<
+                                    "  " << (*itr).first.bary[1]         <<
+                                    "  " << (*itr).first.bary[2]         <<
+                              " Level: " << (*itr).first.level           <<
+                          " LocalPrio: " << (*itr).second.GetLocalPrio() << std::endl;
         }
 
         DROPS::DiST::PrioListT prioList;

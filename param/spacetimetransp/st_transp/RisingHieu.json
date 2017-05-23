@@ -1,0 +1,212 @@
+{
+    "General": {
+        "DynamicLibs": [
+            "misc/libmisc-scalarFunctions", 
+            "misc/libmisc-vectorFunctions", 
+            "misc/libmisc-csgFunctions", 
+            "spacetimetransp/libspacetimetransp-sttranspCoeff"
+        ], 
+        "DynamicLibsPrefix": "../", 
+        "ProgressBar": 1
+    }, 
+    "Time": {
+        "NumSteps": 200, 
+        "FinalTime": 1.0, 
+        "Scheme": 1, 
+        "Theta": 1
+    }, 
+    "CouplingSolver": {
+        "Iter": 20, 
+        "Tol": 1e-10, 
+        "ImplLB": 1, 
+        "LevelsetSolver": {
+            "Iter": 1000, 
+            "Tol": 1e-14
+        }, 
+        "NavStokesSolver": {
+            "Reduction": 0.1, 
+            "Nonlinear": 1, 
+            "OseenSolver": {
+                "UzawaInnerTol": 0.6, 
+                "Solver": 10109, 
+                "DirectSolve": 1, 
+                "Iter": 200, 
+                "UzawaInnerIter": 1000, 
+                "PcAIter": 2, 
+                "Tol": 1e-08, 
+                "PcSTol": 0.0001, 
+                "PcATol": 1e-99
+            }, 
+            "Iter": 20, 
+            "Tol": 1e-10
+        }
+    }, 
+    "NavStokes": {
+        "XFEMReduced": 0.1, 
+        "Coeff": {
+            "SurfTens": {
+                "SurfTension": 0.00163, 
+                "ShearVisco": 0, 
+                "DilatationalVisco": 0, 
+                "VarTensionFunc": "ConstTau"
+            }, 
+            "ViscNeg": 0.003281, 
+            "VolForce": "ZeroVel", 
+            "DensPos": 986.506, 
+            "Gravity": [
+                0, 
+                0, 
+                -9.81
+            ], 
+            "DensNeg": 845.442, 
+            "ViscPos": 0.001388
+        }, 
+        "InitialValue": 0, 
+        "BoundaryData": {
+            "Velocity": {
+                    "Default":["Dir0BC","ZeroVel"]
+                   
+            }
+        }
+    }, 
+    "Levelset": {
+        "PosDrop": [
+            0.0, 
+            0.0, 
+            0.0
+        ], 
+        "InitialValue": "Ellipsoid", 
+        "Discontinuous": 0, 
+        "Reparam": {
+            "Freq": 1, 
+            "MinGrad": 0.1, 
+            "Method": 13, 
+            "MaxGrad": 10
+        }, 
+        "RadDrop": [
+            0.002, 
+            0.002, 
+            0.002
+        ], 
+        "VolCorrection": 1, 
+        "SD": 0.1
+    }, 
+    "Mesh": {
+        "Origin": [
+            -0.006, 
+            -0.006, 
+            -0.006
+        ], 
+        "RestartFile": "none", 
+        "AdaptRef": {
+            "LoadBalStrategy": 1011, 
+            "Width": 0.0003, 
+            "AddConcMarker": 1, 
+            "CoarsestLevel": 0, 
+            "Freq": 1, 
+            "FinestLevel": 3
+        }, 
+        "E1": [
+            0.012, 
+            0, 
+            0
+        ], 
+       "N1": 4, 
+        "N2": 4, 
+        "N3": 8, 
+        "Type": "BrickBuilder", 
+        "E3": [
+            0, 
+            0, 
+            0.03
+        ], 
+        "E2": [
+            0, 
+            0.012, 
+            0
+        ]
+    }, 
+    "AdaptRef": {
+        "Threshold1": 0.01, 
+        "Threshold0": -0.025, 
+        "Threshold3": 0.0001, 
+        "Threshold2": 0.001
+    }, 
+    "Inflow": {
+        "InflowAmpl": 0, 
+        "FlowDir": 0, 
+        "InflowVel": 0, 
+        "InflowFreq": 0, 
+        "RadInlet": 1
+    }, 
+    "Exp": {
+        "CounterFlowVel": 0.01
+    }, 
+    "Transp": {
+        "SolPos": "Zero", 
+        "DiffNeg": 5.8345e-05, 
+        "RhsNeg": "Zero", 
+        "IniCPos": 0.0, 
+        "SolNeg": "Zero", 
+        "UseNSSol": 1, 
+        "Enable": 1, 
+        "NitschePenalty": 20, 
+        "DiffPos": 2.29e-05, 
+        "RhsPos": "Zero", 
+        "IniCNeg": 0.01, 
+        "Solver": {
+            "useRelTol": 1, 
+            "Tol": 1e-08, 
+            "Iter": 500, 
+            "DirectSolve": 0
+        }, 
+        "Flow": "straightsinus", 
+        "InitialConcPos": "IniCposFct", 
+        "Levelset": "MovingEllipsoid", 
+        "HNeg": 1.2143, 
+        "KappaRule": 2, 
+        "MaxVelocity": 1.0, 
+        "XFEMReduced": 0, 
+        "HPos": 1.0, 
+        "Quadrature": {
+            "SubIntervalsPerEdge": 1, 
+            "LevelsetLinearInTime": 1, 
+            "SubTimeIntervals": 1
+        },
+        "BoundaryDataPos": {
+            "Default":["Nat0BC","IniCposFct"]                
+        },
+        "BoundaryDataNeg": {
+            "Default":["Nat0BC","IniCnegFct"] 
+        },
+        "InitialConcNeg": "IniCnegFct"       
+    
+    
+    }, 
+    
+    "SurfTransp": {
+        "XFEMReduced": -1.0, 
+        "Enable": 0, 
+        "Visc": 1e-05, 
+        "Solver": {
+            "Tol": 1e-10, 
+            "Iter": 1000
+        }
+    }, 
+    "VTK": {
+        "Binary": 1, 
+        "UseDeformation": 0, 
+        "AddP1XPressure": 1, 
+        "VTKDir": "vtk", 
+        "VTKName": "RisingHieuC_", 
+        "Freq": 1
+    }, 
+    "Restart": {
+        "OutputOverwrite": 1, 
+        "InputData": "", 
+        "Binary": 0, 
+        "OutputGrid": "mg/gird",
+        "OutputData": "mg/data",
+        "OutputFreq": 1
+    }
+}

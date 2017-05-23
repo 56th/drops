@@ -1,0 +1,77 @@
+{
+    "General": {
+        "DynamicLibs": [
+            "stokes/libstokes-stokesCoeff", 
+            "misc/libmisc-scalarFunctions", 
+            "misc/libmisc-vectorFunctions"
+        ], 
+        "DynamicLibsPrefix": "../", 
+        "ProgressBar": 1
+    }, 
+    "Time": {
+        "NumSteps": 0, 
+        "Scheme": 1, 
+        "FinalTime": 0, 
+        "Theta": 1
+    }, 
+    "NavStokesSolver": {
+        "OseenSolver": {
+            "Tau": 1, 
+            "UzawaInnerTol": 1e-14, 
+            "Solver": 30207, 
+            "Relax": 1, 
+            "Iter": 200, 
+            "UzawaInnerIter": 1, 
+            "PcAIter": 1, 
+            "Tol": 1e-10, 
+            "PcSTol": 0.01, 
+            "PcATol": 1e-99
+            
+        }
+    }, 
+    "NavStokes": {
+        "Coeff": {
+            "Reaction": "ScaZero", 
+            "Solution_Vel": "None", 
+            "Visc": 1, 
+            "Dens": 1, 
+            "Gravity": [
+                0, 
+                0, 
+                0
+            ], 
+            "Solution_DVel": "None", 
+            "Source": "VecZero", 
+            "Solution_Pr": "None"
+        }, 
+        "InitialValue": 2, 
+        "BoundaryData": {
+            "Velocity": {
+                    "Default":["Dir0BC","VecZero"],
+                          "5":["DirBC","Inflow_drivcav_v2"]
+                 
+            }
+        }
+    }, 
+   "Mesh": {
+        "Type": "BrickBuilder", 
+        "Origin":[0,0,0],
+        "E1": [1,0,0],
+        "E2": [0,1,0],
+        "E3": [0,0,1],
+        "N1": 5,
+        "N2": 5,
+        "N3": 5,
+        "InitialRef":   2
+    }, 
+    "Restart": {
+        "InputData": ""
+    }, 
+    "VTK": {
+        "VTKDir": "vtk", 
+        "Binary": 1, 
+        "_comment": "#VTK output", 
+        "Freq": 1, 
+        "VTKName": "cavity"
+    }
+}

@@ -47,7 +47,7 @@ using namespace DROPS;
 
 DROPS::ParamCL P;
 
-std::auto_ptr<VTKOutCL> vtkwriter;
+std::unique_ptr<VTKOutCL> vtkwriter;
 
 DROPS::InVecMap& invecmap= DROPS::InVecMap::getInstance();
 DROPS::InScaMap& inscamap= DROPS::InScaMap::getInstance();
@@ -235,7 +235,7 @@ static RegisterScalarFunction regsca_axis_scaling_lset( "AxisScalingLset", axis_
 
 double axis_scaling_lset_ini (const Point3DCL& p, double)
 {
-    static const double t_end= P.get<Uint>( "Time.NumSteps")*P.get<double>( "Time.StepSize");
+    static const double t_end= P.get<double>( "Time.FinalTime");
     const double tout= t_end <= M_PI/2. ? t_end : M_PI/2.,
                  tin= t_end >= M_PI*3./2. ? M_PI*3./2. : (t_end >= M_PI ? t_end : 0.),
                  lout= axis_scaling_lset( p, tout),
@@ -614,28 +614,28 @@ SurfactantP1BaseCL* make_surfactant_timedisc( MultiGridCL& mg, LevelsetP2CL& lse
         ret= new SurfactantcGP1CL( mg,
             P.get<double>("SurfTransp.Theta"), P.get<double>("SurfTransp.Visc"),
             &v, Bnd_v, lset.Phi, lset.GetBndData(),
-            P.get<int>("SurfTransp.Iter"), P.get<double>("SurfTransp.Tol"),
-            P.get<double>("SurfTransp.OmitBound"));
+            P.get<int>("SurfTransp.Solver.Iter"), P.get<double>("SurfTransp.Solver.Tol"),
+            P.get<double>("SurfTransp.XFEMReduced"));
     else if (method == std::string( "spacetime-cGdG"))
         ret= new SurfactantSTP1CL( mg,
             P.get<double>("SurfTransp.Theta"), P.get<double>("SurfTransp.Visc"),
             &v, Bnd_v, lset.Phi, lset.GetBndData(),
             /* cG_in_t_ */ false, /* use_mass_div */ P.get<bool>( "SurfTransp.UseMassDiv"),
-            P.get<int>("SurfTransp.Iter"), P.get<double>("SurfTransp.Tol"),
-            P.get<double>("SurfTransp.OmitBound"));
+            P.get<int>("SurfTransp.Solver.Iter"), P.get<double>("SurfTransp.Solver.Tol"),
+            P.get<double>("SurfTransp.XFEMReduced"));
     else if (method == std::string( "spacetime-cGcG"))
         ret= new SurfactantSTP1CL( mg,
             P.get<double>("SurfTransp.Theta"), P.get<double>("SurfTransp.Visc"),
             &v, Bnd_v, lset.Phi, lset.GetBndData(),
             /* cG_in_t_ */ true, /* use_mass_div */ P.get<bool>( "SurfTransp.UseMassDiv"),
-            P.get<int>("SurfTransp.Iter"), P.get<double>("SurfTransp.Tol"),
-            P.get<double>("SurfTransp.OmitBound"));
+            P.get<int>("SurfTransp.Solver.Iter"), P.get<double>("SurfTransp.Solver.Tol"),
+            P.get<double>("SurfTransp.XFEMReduced"));
     else if (method == std::string( "characteristic-transport"))
         ret= new SurfactantCharTransportP1CL ( mg,
             P.get<double>("SurfTransp.Theta"), P.get<double>("SurfTransp.Visc"),
             &v, Bnd_v, lset.Phi, lset.GetBndData(),
-            P.get<int>("SurfTransp.Iter"), P.get<double>("SurfTransp.Tol"),
-            P.get<double>("SurfTransp.OmitBound"));
+            P.get<int>("SurfTransp.Solver.Iter"), P.get<double>("SurfTransp.Solver.Tol"),
+            P.get<double>("SurfTransp.XFEMReduced"));
     else
         throw DROPSErrCL( std::string( "make_surfactant_timedisc: Unknown method '") + method + std::string( "'.\n"));
 
@@ -647,7 +647,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
 {
     using namespace DROPS;
 
-    if (P.get<std::string>("Exp.Levelset") == std::string( "AxisScalingLset"))
+    if (P.get<std::string>("SurfTransp.Exp.Levelset") == std::string( "AxisScalingLset"))
         dynamic_cast<DistMarkingStrategyCL*>( adap.get_marking_strategy())->SetDistFct( axis_scaling_lset_ini);
 
     lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
@@ -661,6 +661,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     //LSInit( mg, lset2.Phi, the_lset_fun, 0.);
 
     const double Vol= lset.GetVolume();
+    lset.InitVolume( Vol);
     std::cout << "droplet volume: " << Vol << std::endl;
 
     BndDataCL<Point3DCL> Bnd_v( 6, bc_wind, bf_wind);
@@ -669,7 +670,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     VecDescCL v( &vidx);
     InitVel( mg, &v, Bnd_v, the_wind_fun, 0.);
 
-    //lset2.SetupSystem( make_P2Eval( mg, Bnd_v, v), P.get<double>("Time.StepSize"));
+    //lset2.SetupSystem( make_P2Eval( mg, Bnd_v, v), P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps"));
 
     std::auto_ptr<SurfactantP1BaseCL> timediscp( make_surfactant_timedisc( mg, lset, v, Bnd_v, P));
     SurfactantP1BaseCL& timedisc= *timediscp;
@@ -699,10 +700,10 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
         vtkwriter->Register( make_VTKScalar(      make_P2Eval( mg, nobnd, the_sol_vd),  "TrueSol"));
         vtkwriter->Write( 0.);
     }
-    //if (P.get<int>( "SolutionOutput.Freq") > 0)
-    //    DROPS::WriteFEToFile( timedisc.ic, mg, P.get<std::string>( "SolutionOutput.Path"), P.get<bool>( "SolutionOutput.Binary"));
+    //if (P.get<int>( "SurfTransp.SolutionOutput.Freq") > 0)
+    //    DROPS::WriteFEToFile( timedisc.ic, mg, P.get<std::string>( "SurfTransp.SolutionOutput.Path"), P.get<bool>( "SolutionOutput.Binary"));
 
-    const double dt= P.get<double>("Time.StepSize");
+    const double dt= P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps");
     double L_2x_err= L2_error( lset.Phi, lset.GetBndData(), timedisc.GetSolution(), the_sol_fun);
     std::cout << "L_2x-error: " << L_2x_err
               << "\nnorm of true solution: " << L2_norm( mg, lset.Phi, lset.GetBndData(), the_sol_fun)
@@ -739,22 +740,22 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
         std::cout << "H_1x-error: " << H_1x_err << std::endl;
         L_2tH_1x_err_sq+= 0.5*dt*std::pow( H_1x_err, 2);
         std::cout << "L_2tH_1x-error: " << std::sqrt( L_2tH_1x_err_sq) << std::endl;
-        if (vtkwriter.get() != 0 && step % P.get<int>( "VTK.VTKOut") == 0) {
+        if (vtkwriter.get() != 0 && step % P.get<int>( "VTK.Freq") == 0) {
             LSInit( mg, the_sol_vd, the_sol_fun, /*t*/ cur_time);
             vtkwriter->Write( cur_time);
         }
-        if (P.get<int>( "SolutionOutput.Freq") > 0 && step % P.get<int>( "SolutionOutput.Freq") == 0) {
+        if (P.get<int>( "SurfTransp.SolutionOutput.Freq") > 0 && step % P.get<int>( "SurfTransp.SolutionOutput.Freq") == 0) {
             std::ostringstream os1,
                                os2;
             os1 << P.get<int>( "Time.NumSteps");
-            os2 << P.get<std::string>( "SolutionOutput.Path") << std::setw( os1.str().size()) << step;
-            DROPS::WriteFEToFile( timedisc.ic, mg, os2.str(), P.get<bool>( "SolutionOutput.Binary"));
+            os2 << P.get<std::string>( "SurfTransp.SolutionOutput.Path") << std::setw( os1.str().size()) << step;
+            DROPS::WriteFEToFile( timedisc.ic, mg, os2.str(), P.get<bool>( "SurfTransp.SolutionOutput.Binary"));
         }
 //        lset2.DoStep();
 //        VectorCL rhs( lset2.Phi.Data.size());
 //        lset2.ComputeRhs( rhs);
 //        lset2.SetupSystem( make_P2Eval( mg, Bnd_v, v, cur_time));
-//        lset2.SetTimeStep( P.get<double>("Time.StepSize"));
+//        lset2.SetTimeStep( dt);
 //        lset2.DoStep( rhs);
 
 //         std::cout << "rel. Volume: " << lset.GetVolume()/Vol << std::endl;
@@ -766,7 +767,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
 //         }
         //if (C.rpm_Freq && step%C.rpm_Freq==0) { // reparam levelset function
             // lset.ReparamFastMarching( C.rpm_Method);
-        const bool doGridMod= P.get<int>("AdaptRef.Freq") && step%P.get<int>("AdaptRef.Freq") == 0;
+        const bool doGridMod= P.get<int>("Mesh.AdaptRef.Freq") && step%P.get<int>("Mesh.AdaptRef.Freq") == 0;
         const bool gridChanged= doGridMod ? adap.UpdateTriang() : false;
         if (gridChanged) {
             std::cout << "Triangulation changed.\n";
@@ -779,15 +780,11 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
             LSInit( mg, the_sol_vd, the_sol_fun, /*t*/ cur_time);
             // timedisc.Update(); // Called unconditionally in DoStep.
 
-            //lset2.SetupSystem( make_P2Eval( mg, Bnd_v, v), P.get<double>("Time.StepSize"));
+            //lset2.SetupSystem( make_P2Eval( mg, Bnd_v, v), dt);
 
             std::cout << "rel. Volume: " << lset.GetVolume()/Vol << std::endl;
-            if (P.get<int>( "Levelset.VolCorr")) {
-                double dphi= lset.AdjustVolume( Vol, 1e-9);
-                std::cout << "volume correction is " << dphi << std::endl;
-                lset.Phi.Data+= dphi;
-                std::cout << "new rel. Volume: " << lset.GetVolume()/Vol << std::endl;
-            }
+            lset.AdjustVolume();
+            lset.GetVolumeAdjuster()->DebugOutput( std::cout);
         }
     }
     std::cout << std::endl;
@@ -804,7 +801,7 @@ void StationaryStrategyP1 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DR
     LSInit( mg, lset.Phi, the_lset_fun, 0.);
 
     DROPS::IdxDescCL ifaceidx( P1IF_FE);
-    ifaceidx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
+    ifaceidx.GetXidx().SetBound( P.get<double>("SurfTransp.XFEMReduced"));
     ifaceidx.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
     std::cout << "NumUnknowns: " << ifaceidx.NumUnknowns() << std::endl;
 
@@ -826,14 +823,14 @@ void StationaryStrategyP1 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DR
     typedef DROPS::SSORPcCL SurfPcT;
     SurfPcT surfpc;
     typedef DROPS::PCGSolverCL<SurfPcT> SurfSolverT;
-    SurfSolverT surfsolver( surfpc, P.get<int>("SurfTransp.Iter"), P.get<double>("SurfTransp.Tol"), true);
+    SurfSolverT surfsolver( surfpc, P.get<int>("SurfTransp.Solver.Iter"), P.get<double>("SurfTransp.Solver.Tol"), true);
 
     DROPS::VecDescCL x( &ifaceidx);
     surfsolver.Solve( L, x.Data, b.Data, x.RowIdx->GetEx());
     std::cout << "Iter: " << surfsolver.GetIter() << "\tres: " << surfsolver.GetResid() << '\n';
 
-    if (P.get<int>( "SolutionOutput.Freq") > 0)
-        DROPS::WriteFEToFile( x, mg, P.get<std::string>( "SolutionOutput.Path"), P.get<bool>( "SolutionOutput.Binary"));
+    if (P.get<int>( "SurfTransp.SolutionOutput.Freq") > 0)
+        DROPS::WriteFEToFile( x, mg, P.get<std::string>( "SurfTransp.SolutionOutput.Path"), P.get<bool>( "SurfTransp.SolutionOutput.Binary"));
 
     DROPS::IdxDescCL ifacefullidx( DROPS::P1_FE);
     ifacefullidx.CreateNumbering( mg.GetLastLevel(), mg);
@@ -1368,7 +1365,7 @@ void StationaryStrategyP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DR
 
     // Setup an interface-P2 numbering
     DROPS::IdxDescCL ifacep2idx( P2IF_FE);
-    ifacep2idx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
+    ifacep2idx.GetXidx().SetBound( P.get<double>("SurfTransp.XFEMReduced"));
     ifacep2idx.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
     std::cout << "P2-NumUnknowns: " << ifacep2idx.NumUnknowns() << std::endl;
 
@@ -1416,7 +1413,7 @@ void StationaryStrategyP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DR
     InterfaceVectorAccuCL<LocalVectorP2CL, InterfaceCommonDataP2CL> acculoadp2( &bp2, LocalVectorP2CL( the_rhs_fun, bp2.t), cdatap2);
     accus.push_back( &acculoadp2);
 
-    accumulate( accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetMatchingFunction(), ifacep2idx.GetBndInfo());
+    accumulate( accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetBndInfo());
 
 //     TetraAccumulatorTupleCL mean_accus;
 //     mean_accus.push_back( &cdatap2);
@@ -1443,7 +1440,7 @@ void StationaryStrategyP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DR
 //     typedef DROPS::JACPcCL SurfPcT;
     SurfPcT surfpc;
     typedef DROPS::PCGSolverCL<SurfPcT> SurfSolverT;
-    SurfSolverT surfsolver( surfpc, P.get<int>("SurfTransp.Iter"), P.get<double>("SurfTransp.Tol"), true);
+    SurfSolverT surfsolver( surfpc, P.get<int>("SurfTransp.Solver.Iter"), P.get<double>("SurfTransp.Solver.Tol"), true);
 
     DROPS::VecDescCL xp2( &ifacep2idx);
     surfsolver.Solve( Lp2, xp2.Data, bp2.Data, xp2.RowIdx->GetEx());
@@ -1456,7 +1453,7 @@ void StationaryStrategyP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DR
     L2_accu.set_function( the_sol_fun, 0.);
     L2_accu.set_grad_function( the_sol_grad_fun, 0.);
     err_accus.push_back( &L2_accu);
-    accumulate( err_accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetMatchingFunction(), ifacep2idx.GetBndInfo());
+    accumulate( err_accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetBndInfo());
 
     {
         std::ofstream os( "quaqua_num_outer_iter.txt");
@@ -1467,8 +1464,8 @@ void StationaryStrategyP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DR
             os << i << '\t' << quaqua.num_inner_iter[i] << '\n';
     }
 
-    if (P.get<int>( "SolutionOutput.Freq") > 0)
-        DROPS::WriteFEToFile( xp2, mg, P.get<std::string>( "SolutionOutput.Path") + "_p2", P.get<bool>( "SolutionOutput.Binary"));
+    if (P.get<int>( "SurfTransp.SolutionOutput.Freq") > 0)
+        DROPS::WriteFEToFile( xp2, mg, P.get<std::string>( "SurfTransp.SolutionOutput.Path") + "_p2", P.get<bool>( "SurfTransp.SolutionOutput.Binary"));
 
     DROPS::NoBndDataCL<> nobnd;
     DROPS::NoBndDataCL<Point3DCL> nobnd_vec;
@@ -1495,7 +1492,7 @@ void StationaryStrategyDeformationP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangC
 
     // Setup an interface-P2 numbering
     DROPS::IdxDescCL ifacep2idx( P2IF_FE);
-    ifacep2idx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
+    ifacep2idx.GetXidx().SetBound( P.get<double>("SurfTransp.XFEMReduced"));
     ifacep2idx.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
     std::cout << "P2-NumUnknowns: " << ifacep2idx.NumUnknowns() << std::endl;
 
@@ -1524,7 +1521,7 @@ void StationaryStrategyDeformationP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangC
     loc_def_accu.set_level_set_function (&lset.Phi, &lset.GetBndData(), &PrincipalLatticeCL::instance (1))
                 .set_check_averaging (true);
     accus2.push_back( &loc_def_accu);
-    accumulate( accus2, mg, p2idx.TriangLevel(), p2idx.GetMatchingFunction(), p2idx.GetBndInfo());
+    accumulate( accus2, mg, p2idx.TriangLevel(), p2idx.GetBndInfo());
 
     // Compute neighborhoods of the tetras at the interface
     const PrincipalLatticeCL& lat= PrincipalLatticeCL::instance( 1);
@@ -1572,7 +1569,7 @@ void StationaryStrategyDeformationP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangC
     InterfaceVectorAccuCL<LocalVectorDeformP2CL, InterfaceCommonDataDeformP2CL> acculoadp2( &bp2, LocalVectorDeformP2CL( the_rhs_fun, bp2.t), cdatap2);
     accus.push_back( &acculoadp2);
 
-    accumulate( accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetMatchingFunction(), ifacep2idx.GetBndInfo());
+    accumulate( accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetBndInfo());
 
     DROPS::MatrixCL Lp2;
     Lp2.LinComb (1.0, Ap2.Data, 1.0, Mp2.Data, 1.0, Anp2.Data);
@@ -1587,7 +1584,7 @@ void StationaryStrategyDeformationP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangC
 // //     typedef DROPS::JACPcCL SurfPcT;
     SurfPcT surfpc;
     typedef DROPS::PCGSolverCL<SurfPcT> SurfSolverT;
-    SurfSolverT surfsolver( surfpc, P.get<int>("SurfTransp.Iter"), P.get<double>("SurfTransp.Tol"), true);
+    SurfSolverT surfsolver( surfpc, P.get<int>("SurfTransp.Solver.Iter"), P.get<double>("SurfTransp.Solver.Tol"), true);
 
     DROPS::VecDescCL xp2( &ifacep2idx);
     surfsolver.Solve( Lp2, xp2.Data, bp2.Data, xp2.RowIdx->GetEx());
@@ -1600,10 +1597,10 @@ void StationaryStrategyDeformationP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangC
     L2_accu.set_function( the_sol_fun, 0.);
     L2_accu.set_grad_function( the_sol_grad_fun, 0.);
     err_accus.push_back( &L2_accu);
-    accumulate( err_accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetMatchingFunction(), ifacep2idx.GetBndInfo());
+    accumulate( err_accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetBndInfo());
 
-    if (P.get<int>( "SolutionOutput.Freq") > 0)
-        DROPS::WriteFEToFile( xp2, mg, P.get<std::string>( "SolutionOutput.Path") + "_p2", P.get<bool>( "SolutionOutput.Binary"));
+    if (P.get<int>( "SurfTransp.SolutionOutput.Freq") > 0)
+        DROPS::WriteFEToFile( xp2, mg, P.get<std::string>( "SurfTransp.SolutionOutput.Path") + "_p2", P.get<bool>( "SurfTransp.SolutionOutput.Binary"));
 
     DROPS::NoBndDataCL<> nobnd;
     DROPS::NoBndDataCL<Point3DCL> nobnd_vec;
@@ -1626,42 +1623,42 @@ int main (int argc, char* argv[])
   try {
     ScopeTimerCL timer( "main");
 
-    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "surfactant.json");
+    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/surfactant/surfactant/surfactant.json");
     std::cout << P << std::endl;
 
     DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
 
     std::cout << "Setting up interface-PDE.\n";
-    WindVelocity= P.get<DROPS::Point3DCL>("Exp.Velocity");
-    RadDrop=      P.get<DROPS::Point3DCL>("Exp.RadDrop");
-    PosDrop=      P.get<DROPS::Point3DCL>("Exp.PosDrop");
-    RadTorus=     P.get<DROPS::Point2DCL>("Exp.RadTorus");
-    the_wind_fun= invecmap[P.get<std::string>("Exp.Wind")];
-    the_lset_fun= inscamap[P.get<std::string>("Exp.Levelset")];
-    the_rhs_fun=  inscamap[P.get<std::string>("Exp.Rhs")];
-    the_sol_fun=  inscamap[P.get<std::string>("Exp.Solution")];
-    if (P.get<std::string>("Exp.Solution") == "LaplaceBeltrami0Sol")
+    WindVelocity= P.get<DROPS::Point3DCL>("SurfTransp.Exp.Velocity");
+    RadDrop=      P.get<DROPS::Point3DCL>("SurfTransp.Exp.RadDrop");
+    PosDrop=      P.get<DROPS::Point3DCL>("SurfTransp.Exp.PosDrop");
+    RadTorus=     P.get<DROPS::Point2DCL>("SurfTransp.Exp.RadTorus");
+    the_wind_fun= invecmap[P.get<std::string>("SurfTransp.Exp.Wind")];
+    the_lset_fun= inscamap[P.get<std::string>("SurfTransp.Exp.Levelset")];
+    the_rhs_fun=  inscamap[P.get<std::string>("SurfTransp.Exp.Rhs")];
+    the_sol_fun=  inscamap[P.get<std::string>("SurfTransp.Exp.Solution")];
+    if (P.get<std::string>("SurfTransp.Exp.Solution") == "LaplaceBeltrami0Sol")
         the_sol_grad_fun=  &laplace_beltrami_0_sol_grad;
     for (Uint i= 0; i < 6; ++i)
         bf_wind[i]= the_wind_fun;
 
     std::cout << "Setting up domain:\n";
-    std::auto_ptr<MGBuilderCL> builder( make_MGBuilder( P.get_child( "Domain")));
+    std::unique_ptr<MGBuilderCL> builder( make_MGBuilder( P));
     DROPS::MultiGridCL mg( *builder);
     typedef DistMarkingStrategyCL MarkerT;
-    MarkerT marker( the_lset_fun, P.get<double>( "AdaptRef.Width"),
-                    P.get<int>( "AdaptRef.CoarsestLevel"), P.get<int>( "AdaptRef.FinestLevel"));
+    MarkerT marker( the_lset_fun, P.get<double>( "Mesh.AdaptRef.Width"),
+                    P.get<int>( "Mesh.AdaptRef.CoarsestLevel"), P.get<int>( "Mesh.AdaptRef.FinestLevel"));
 
     DROPS::AdapTriangCL adap( mg, &marker);
 
     // DROPS::LevelsetP2CL lset( mg, lsbnd, sf);
     DROPS::LevelsetP2CL& lset( *LevelsetP2CL::Create( mg, lsbnd, sf, P.get_child("Levelset")) );
 
-    if (P.get<int>("VTK.VTKOut",0))
-        vtkwriter= std::auto_ptr<VTKOutCL>( new VTKOutCL(
+    if (P.get<int>("VTK.Freq",0))
+        vtkwriter= std::unique_ptr<VTKOutCL>( new VTKOutCL(
             adap.GetMG(),
             "DROPS data",
-            P.get<int>("Time.NumSteps")/P.get<int>("VTK.VTKOut") + 1,
+            P.get<int>("Time.NumSteps")/P.get<int>("VTK.Freq") + 1,
             P.get<std::string>("VTK.VTKDir"),
             P.get<std::string>("VTK.VTKName"),
             P.get<std::string>("VTK.TimeFileName"),
@@ -1670,7 +1667,7 @@ int main (int argc, char* argv[])
             false, /* <- P2DG */
             -1,    /* <- level */
             P.get<bool>("VTK.ReUseTimeFile")));
-    if (P.get<bool>( "Exp.StationaryPDE")) {
+    if (P.get<bool>( "SurfTransp.Exp.StationaryPDE")) {
         if (P.get<std::string>("LevelsetMapper.DeformationMethod") != "")
             StationaryStrategyDeformationP2( mg, adap, lset);
         else {

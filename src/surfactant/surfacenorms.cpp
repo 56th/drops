@@ -37,21 +37,21 @@ DROPS::ParamCL P;
 
 DROPS::Point3DCL u_func (const DROPS::Point3DCL&, double)
 {
-    return P.get<DROPS::Point3DCL>("Exp.Velocity");
+    return P.get<DROPS::Point3DCL>("Flow.Velocity");
 }
 
 double sphere_2 (const DROPS::Point3DCL& p, double)
 {
-    DROPS::Point3DCL x( p - P.get<DROPS::Point3DCL>("Exp.PosDrop"));
+    DROPS::Point3DCL x( p - P.get<DROPS::Point3DCL>("Levelset.PosDrop"));
 
-    return x.norm() - P.get<DROPS::Point3DCL>("Exp.RadDrop")[0];
+    return x.norm() - P.get<DROPS::Point3DCL>("Levelset.RadDrop")[0];
 }
 
 double sphere_2move (const DROPS::Point3DCL& p, double t)
 {
-    DROPS::Point3DCL x( p - (P.get<DROPS::Point3DCL>("Exp.PosDrop") + t*u_func(p, t)));
+    DROPS::Point3DCL x( p - (P.get<DROPS::Point3DCL>("Levelset.PosDrop") + t*u_func(p, t)));
 
-    return x.norm() - P.get<DROPS::Point3DCL>("Exp.RadDrop")[0];
+    return x.norm() - P.get<DROPS::Point3DCL>("Levelset.RadDrop")[0];
 }
 
 typedef double (*dist_funT) (const DROPS::Point3DCL&, double);
@@ -72,7 +72,7 @@ const double a( -13./8.*std::sqrt( 35./M_PI));
 
 double sol0t (const DROPS::Point3DCL& p, double t)
 {
-    const DROPS::Point3DCL q( p - (P.get<DROPS::Point3DCL>("Exp.PosDrop") + t*u_func(p, t)));
+    const DROPS::Point3DCL q( p - (P.get<DROPS::Point3DCL>("Levelset.PosDrop") + t*u_func(p, t)));
     const double val( a*(3.*q[0]*q[0]*q[1] - q[1]*q[1]*q[1]));
 
     return q.norm_sq()/(12. + q.norm_sq())*val;
@@ -191,9 +191,9 @@ void Strategy (DROPS::AdapTriangCL& adap, DROPS::LevelsetP2CL& lset)
     const char* lvlstr[]= { "-lvl2/", "-lvl3/", "-lvl4/", "-lvl5/" };
 
     typedef DistMarkingStrategyCL MarkerT;
-    MarkerT marker( lset, P.get<double>("AdaptRef.Width"),
-                          0, 
-                          P.get<int>( "AdaptRef.FinestLevel" ) );
+    MarkerT marker( lset, P.get<double>("Mesh.AdaptRef.Width"),
+                          0,
+                          P.get<int>( "Mesh.AdaptRef.FinestLevel" ) );
     adap.set_marking_strategy( &marker );
 
   for (int l= 0; l < L; ++l) {
@@ -202,8 +202,8 @@ void Strategy (DROPS::AdapTriangCL& adap, DROPS::LevelsetP2CL& lset)
         DV[l][i].t = 1.0;
     }
 
-    std::string ensdir = P.get<std::string>("EnsightDir");
-    std::string enscase = P.get<std::string>("EnsightCase");
+    std::string ensdir = P.get<std::string>("Ensight.EnsDir");
+    std::string enscase = P.get<std::string>("Ensight.EnsCase");
     ReadEnsightP2SolCL reader( mg);
     reader.ReadScalar( ensdir + lvlstr[l] + enscase + ".sur1",   DV[l][0], bnd);
     reader.ReadScalar( ensdir + lvlstr[l] + enscase + ".sur2",   DV[l][1], bnd);
@@ -268,7 +268,7 @@ int main (int argc, char** argv)
 {
   try
   {
-    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "surfactant.json");
+    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/surfactant/surfactant/surfactant.json");
     std::cout << P << std::endl;
 
     DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
@@ -278,15 +278,15 @@ int main (int argc, char** argv)
                                  4.*DROPS::std_basis<3>( 1),
                                  4.*DROPS::std_basis<3>( 2),
                                  4.*DROPS::std_basis<3>( 3),
-                                 P.get<int>("InitialDivisions"), P.get<int>("InitialDivisions"), P.get<int>("InitialDivisions"));
+                                 P.get<int>("Mesh.InitialDivisions"), P.get<int>("Mesh.InitialDivisions"), P.get<int>("Mesh.InitialDivisions"));
     DROPS::MultiGridCL mg( brick);
 
     DROPS::AdapTriangCL adap( mg );
 
     typedef DROPS::DistMarkingStrategyCL InitialMarkerT;
-    InitialMarkerT initialmarker( sphere_2, P.get<double>("AdaptRef.Width"),
+    InitialMarkerT initialmarker( sphere_2, P.get<double>("Mesh.AdaptRef.Width"),
                                             0,
-                                            P.get<int>("AdaptRef.FinestLevel") );
+                                            P.get<int>("Mesh.AdaptRef.FinestLevel") );
 
     adap.set_marking_strategy( &initialmarker );
     adap.MakeInitialTriang();
@@ -300,8 +300,7 @@ int main (int argc, char** argv)
     DROPS::SurfaceTensionCL sf( sigma, 0);
     DROPS::LevelsetP2CL & lset( * DROPS::LevelsetP2CL::Create( mg, lsbnd, sf) );
 
-    lset.idx.CreateNumbering( mg.GetLastLevel(), mg);
-    lset.Phi.SetIdx( &lset.idx);
+    lset.CreateNumbering( mg.GetLastLevel());
     Strategy( adap, lset);
     delete &lset;
   }

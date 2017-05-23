@@ -159,7 +159,7 @@ Levelset {
   Iter		=	10000
   SD		=	0.1
   CurvDiff	=	5e-9
-  VolCorrection	=	1
+  VolCorrection	=	Global
 }
 
 # re-initialization of levelset function
@@ -286,11 +286,11 @@ Phasengrenze wird nicht ver"andert.
 \end{Desc}
 %
 \begin{Desc}
-{Levelset:VolCorrection}{$\in\{0,1\}$}{bool}
-schaltet die Volumenkorrektur an (\verb|VolCorrection=1|) oder aus 
-(\verb|VolCorrection=0|). Die Korrektur ist global, d.h. das Gesamtvolumen
-bleibt "uber der Zeit konstant. Die Korrektur erfolgt nach jedem Zeitschritt
-sowie nach jeder Reparametrisierung der Levelset-Funktion.
+{Levelset:VolCorrection}{$\in\{$None, Global, ComponentBased$\}$}{string}
+w\"ahlt die verwendete Volumenkorrektur aus. Die Korrektur erfolgt nach jedem Zeitschritt
+sowie nach jeder Reparametrisierung der Levelset-Funktion. Die globale Volumenkorrektur
+kann in der parallelen Version verwendet werden, die komponentenbasierte nicht. Diese
+handhabt daf\"ur automatisiert Ver\"anderungen in der Topologie.
 \end{Desc}
 
 

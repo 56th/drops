@@ -1,0 +1,121 @@
+{
+    "Transp":
+    {
+        "Enable": "0",
+        "Levelset": "Ellipsoid",
+        "Flow": "ZeroVel",
+        "RhsNeg": "Zero",
+        "RhsPos": "Zero",
+        "InitialConcNeg": "IniCnegFct",
+        "InitialConcPos": "IniCposFct",
+        "BoundaryType": "21!21!21!21!21!21",
+        "BoundaryFncs": "Zero!Zero!Zero!Zero!Zero!Zero",
+        "BoundaryFncst": "Zero!Zero!Zero!Zero!Zero!Zero",
+        "KappaRule": "0",
+        "Debug": "0",
+        "Mass": "0",
+        "NoConvection": "0",
+        "MaxVelocity": "1",
+        "AntiSymmetricConvection": "0",
+        "RhsApproximationOrderInTime": "2",
+        "ConvectionApproximationOrderInTime": "1"
+    },
+    "TestCase5":
+    {
+        "DeformationCase": "0"
+    },
+    "SurfTransp":
+    {
+        "Enable": "0"
+    },
+    "VTK":
+    {
+        "ReUseTimeFile": "0",
+        "UseOnlyP1": "0",
+        "Freq": "0",
+        "VTKName": "ns_transp"
+    },
+    "Ensight":
+    {
+        "Freq": "0"
+    },
+    "Levelset":
+    {
+        "Discontinuous": "0",
+        "SD": "1",
+        "CurvDiff": "0",
+        "Downwind":
+        {
+            "Frequency": "0",
+            "MaxRelComponentSize": "0.05",
+            "WeakEdgeRatio": "0.2",
+            "CrosswindLimit": "0.8660254037844387"
+        },
+        "BoundaryData":
+        {
+            "Default":    ["NoBC"]
+        }
+    },
+    "NavStokes":
+    {
+        "Downwind":
+        {
+            "Frequency": "0",
+            "MaxRelComponentSize": "0.05",
+            "WeakEdgeRatio": "0.2",
+            "CrosswindLimit": "0.8660254037844387"
+        },
+		"Coeff":
+		{
+		    "SmoothZone": 0, 
+		    "VolForce": "ZeroVel"
+		},
+        "BoundaryData":
+        {
+            "Pressure":
+            {
+                "Default":    ["NoBC"]
+            },
+            "SlipBnd":
+            {
+                "Beta1":                 0.05,
+                "Beta2":                 0.05,
+                "BetaL":                 0,
+                "NitschePenalty":        30,
+                "ContactAngle":          60,
+                "ContactAngleFunc":      "ConstantAngle",
+                "BndOuterNormal":        "ZeroVel"
+            }
+        },
+        "ShiftFrame": 0
+    },
+    "CouplingSolver":
+    {
+        "Projection": 0,
+    	"NavStokesSolver":
+    	{
+	        "Nonlinear": "0"
+        }
+    },
+    "Mesh":
+    {
+        "RestartFile": "",
+    },
+    "Mat":
+    {
+        "DensDrop": "0",
+        "ShearVisco": "0",
+        "DilatationalVisco": "0"
+    },
+    "SurfTens":
+    {
+        "ShearVisco": "0",
+        "DilatationalVisco": "0"
+    },
+    "General":
+    {
+        "ProgressBar": "0",
+        "DynamicLibsPrefix": "..\/"
+    }
+}
+

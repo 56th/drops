@@ -1,0 +1,194 @@
+{
+//=============================================================
+//    DROPS parameter file for twophasedrops
+//    simulation of two-phase flow:
+//    droplet in a cuboid
+//=============================================================
+
+//General section
+        "General":
+        {
+                "ProgressBar":  1, //show progress bar
+                "DynamicLibsPrefix": "../", //where should we look for shared objects?
+                "DynamicLibs": [ //select libraries to be loaded after program start
+                        "levelset/liblevelset-twophaseCoeff",
+                        "misc/libmisc-scalarFunctions",
+                        "misc/libmisc-vectorFunctions"
+                ]
+        },
+        
+        "Mesh":
+        {
+                "Type":                 "BrickBuilder", // A parallelepiped
+                "Origin": [0,0,0],           // Origin
+                "E1": [1,0,0],               // Basis to span the object,
+                "E2": [0,1,0],               // not necessary orthonormal 
+                "E3": [0,0,2],               // ... 
+                "N1": 3,                     // Number of cells along the E1-direction,
+                "N2": 3,                     //                       the E2-direction,
+                "N3": 6,                     //                       the E3-direction.
+                "RestartFile": "",           // If set, read the triangulation from the file (via FileBuilderCL).
+                                             // and set boundary segments via domain builder (specified in "Type")
+                                             
+                // adaptive refinement
+                "AdaptRef":
+                {
+                        "Freq":                 1,      // number of timesteps before adaptive refinement is carried out.
+                        "FinestLevel":          2,      // number of refinement levels and label of the finest level
+                                                        // close to the phase boundary.
+                        "CoarsestLevel":        0,      // label of coarsest level close to the phase boundary.
+                        "Width":                0.1     // domain of refinement.
+                }
+        },
+
+// time stepping
+        "Time":
+        {
+                "NumSteps":             10,     // number of time steps
+                "FinalTime":            1.25,    // final time of simulation (starting at 0)
+                "Scheme":               1,       // choose a specific time discretization
+                "Theta":                1       // controls the implicitness of the theta-scheme
+                                                // for time discretization of the Navier-Stokes and
+                                                // level set equations. Theta = 0 yields the explicit and
+                                                // Theta = 1 the implicit Euler method. Theta = 0.5 results
+                                                // in the Crank-Nicholson scheme.
+        },
+        
+// coupling of Navier-Stokes and level set
+        "CouplingSolver":
+        {
+                "Tol":                  1e-10,  // tolerance for the coupling.
+                "Iter":                 20,     // maximum number of iterations for the fixed-point iteration.
+                                                // ( ! Attention: For Iter = -1 the calculation is carried out
+                                                // until convergence).
+                "ImplLB":                 1,    // implicit Laplace-Beltrami in coupling of Navier-Stokes + Levelset 
+                                                // to stabilize fixed-point loop
+                
+                // Navier Stokes solver
+                "NavStokesSolver":
+                {
+                    "Nonlinear":            1,      // determination of the influence of the nonlinear
+                                                // inertia term. For Nonlinear = 0 the linear Stokes
+                                                // equation and for Nonlinear = 1 the full Navier-Stokes
+                                                // equation is solved.
+                    "Tol":                  1e-10,  // tolerance for the Navier-Stokes solver.
+                    "Iter":                 20,     // maximum number of iterations for the Navier-Stokes solver.
+                    "Reduction":            0.1,    // reduction of the Oseen residual by this factor.
+                    
+                    "OseenSolver":
+                    {
+                        "Solver":               10102,  // Stokes solver, cf. num/stokessolverfactory.h
+                        "Iter":                 200,    // maximum number of iterations for the outer solver
+                        "Tol":                  1e-08,  // tolerance for the outer solver
+                
+                        "PcAIter":              2,      // maximum number of iterations for the preconditioner
+                                                        // of the A-Block
+                        "PcSIter":              500,    // maximum number of iterations for the preconditioner
+                                                        // of the Schur complement TODO: use in stokessolverfactory
+                        "PcATol":               1e-99,  // tolerance for the preconditioner of the A-Block
+                        "PcSTol":               0.0001 // tolerance for the preconditioner of the Schur complement
+                     }
+                },
+                
+                    // Levelset solver
+                "LevelsetSolver":
+                {
+                        "Tol":                  1e-14,  // tolerance for the level set solver.
+                        "Iter":                 1000    // maximum number of iterations for the level set solver.
+                }
+        },
+        
+// flow problem
+        "NavStokes":
+        {
+            "Coeff":
+                {
+                    "DensNeg":            1,      // density of the droplet
+                    "ViscNeg":            10,     // dynamic viscosity of the droplet
+                    "DensPos":            10,      // density of the surrounding fluid
+                    "ViscPos":            1,     // dynamic viscosity of the surrounding fluid.
+                    "SurfTens":
+                    {
+                        "SurfTension":    1,      // surface tension coefficient
+                        "VarTensionFunc": "ConstTau"    // function for variable surface tension
+                    },
+
+                    "Gravity":            [0, 0, -9.81 ],  // gravity vector
+                    "VolForce":           "ZeroVel"        // r.h.s. force of navier stokes
+                                                           // equations (default: 'ZeroVel')
+                },
+                
+                "InitialValue":         0,                 // initial conditions (0 = zero, 1/2 = stationary
+                                                           // flow with/without droplet).   //TODO : Entferne -1 aus DROPS
+       
+                "XFEMReduced":          0.1,    // threshold for discarding additional dof parameters in
+                                                // the XFEM pressure space (0=keep all). Using a negative value
+                                                // yields the standard FEM pressure space.
+                "GhostPenalty":         0.0,    // ghost penalty stabilization used for pressure xfem space
+
+                "BoundaryData":
+                {
+                    "Velocity":
+                    {
+                        "Default":              ["Dir0BC"]     // optional; if not set UndefinedBC_ is the default.                                               
+                    }
+                }
+        },
+        
+        "Levelset":
+        {
+                "InitialValue":   "Ellipsoid",                     // choose a Levelset function you want
+                                                                   // to start with (default: 'Ellipsoid')
+                "RadDrop":              [0.25, 0.25, 0.25 ], // radii of the ellipsoidal droplet at
+                                                                   // initial time.
+                                                                   // ( ! Attention: If RadDrop is negative,
+                                                                   // a flow without a droplet is simulated)
+                "PosDrop":              [0.5, 0.5, 0.5 ], // position of the droplet's center at
+                                                                   // initial time.
+                "SD":                   0.1,    // parameter controls the stability of the advection equation
+                                                // by streamline diffusion
+                "VolCorrection":        1,      // control of the volume correction. For VolCorrection = 0 no
+                                                // correction is made and for VolCorrection = 1 it is carried
+                                                // out after each time step and reparameterization of the level
+                                                // set function.
+
+                // re-initialization of levelset function
+               "Reparam":
+               {
+                    "Freq":                 1,      // number of timesteps before the levelset function is
+                                                    // reparameterized. Freq = 0 deactivates the reparameterization.
+                    "Method":               3,     // Method how to determine distance of frontier vertices and
+                                                    // propagation scheme, see documentation of ReparamFactoryCLfor
+                                                    // a detailed description
+                    "MinGrad":              0.1,    // minimal allowed norm of the gradient of the levelset function.
+                    "MaxGrad":              10      // maximal allowed norm of the gradient of the levelset function.
+                }
+        },  
+        
+// Visualization Toolkit output format settings
+        "VTK":
+        {
+                "Freq":                 1,                 // VTK output (0 = off, n>0 = write every n-th step).
+                "VTKDir":               "vtk",             // local directory for VTK files.
+                "VTKName":              "risingdroplet",   // name of VTK files
+                "AddP1XPressure":       1                  // pressure output as p1 on neg. and p1 on pos. part      
+        },
+
+// write out results, read in for restart
+        "Restart":
+        {
+                "OutputFreq":           0,                 // run serialization (0 = off, n>0 = write every n-th step).
+                "OutputOverwrite":      1,                 // overwrite old output-files or create new ones
+                                                           // for every time step.
+                                                           // (0 = every step a new file, n>0 generate n files in total)
+                "OutputGrid":           "out/grid",        // writes multigrid to serialization files
+                                                           // (to deactivate the writing choose OutputGrid = "").
+                "OutputData":           "out/data",        // writes FE solutions
+                                                           // (to deactivate the writing choose OutputData = "").
+                                                           // "InputGrid"... does not exist; see "Mesh.RestartFile" above.
+                "InputData":            "",                // reads FE solutions
+                                                           // (to deactivate choose InputData = "").
+                "Binary":               1                  // use binary format
+        }
+
+}

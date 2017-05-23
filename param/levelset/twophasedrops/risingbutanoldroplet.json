@@ -1,0 +1,159 @@
+{
+    "General": {
+        "DynamicLibs": [
+            "levelset/liblevelset-twophaseCoeff", 
+            "misc/libmisc-scalarFunctions", 
+            "misc/libmisc-vectorFunctions"
+        ], 
+        "DynamicLibsPrefix": "../", 
+        "ProgressBar": 1
+    }, 
+    "Time": {
+        "NumSteps": 10, 
+        "Scheme": 1, 
+        "FinalTime": 0.003, 
+        "Theta": 1
+    }, 
+    "CouplingSolver": {
+        "Iter": 10, 
+        "Tol": 1e-10, 
+        "ImplLB": 1, 
+        "LevelsetSolver": {
+            "Iter": 1000, 
+            "Tol": 1e-10
+        }, 
+        "NavStokesSolver": {
+            "Reduction": 0.1, 
+            "Nonlinear": 1, 
+            "OseenSolver": {
+                "UzawaInnerTol": 0.6, 
+                "Solver": 10409, 
+                "Iter": 200, 
+                "UzawaInnerIter": 1000, 
+                "PcAIter": 500, 
+                "Tol": 1e-10, 
+                "PcSTol": 0.01, 
+                "PcATol": 0.01
+            }, 
+            "Iter": 20, 
+            "Tol": 1e-10
+        }
+    }, 
+    "NavStokes": {
+        "XFEMReduced": 0.1, 
+        "Coeff": {
+            "SurfTens": {
+                "SurfTension": 0.00163, 
+                "VarTensionFunc": "ConstTau"
+            }, 
+            "ViscNeg": 0.003281, 
+            "VolForce": "ZeroVel", 
+            "DensPos": 986.506, 
+            "Gravity": [
+                0, 
+                -9.81, 
+                0
+            ], 
+            "DensNeg": 845.442, 
+            "ViscPos": 0.001388
+        }, 
+        "InitialValue": 0, 
+        "BoundaryData": {
+            "Velocity": {
+                            "0":["Dir0BC"],                
+                            "1":["Dir0BC"],
+                            "2":["NatBC","ZeroVel"],
+                            "3":["DirBC","InflowBrick"],
+                            "4":["Dir0BC"],
+                            "5":["Dir0BC"] 
+            }
+        }
+    }, 
+    "Levelset": {
+        "PosDrop": [
+            0.006, 
+            0.003, 
+            0.006
+        ], 
+        "InitialValue": "Ellipsoid", 
+        "Discontinuous": 0, 
+        "Reparam": {
+            "Freq": 1, 
+            "MinGrad": 0.1, 
+            "Method": 11, 
+            "MaxGrad": 10
+        }, 
+        "RadDrop": [
+            0.002, 
+            0.002, 
+            0.002
+        ], 
+        "VolCorrection": 1, 
+        "SD": 0.1
+    }, 
+  
+    "Mesh": {
+        "Type": "BrickBuilder",
+        "Origin": [0,0,0],
+        "E1": [12e-3,0,0],              
+        "E2": [0,3e-2,0],               
+        "E3": [0,0,12e-3],              
+        "N1": 4,                    
+        "N2": 10,                    
+        "N3": 4,                    
+        "RestartFile": "", 
+        "AdaptRef": {
+            "CoarsestLevel": 0, 
+            "Freq": 1, 
+            "LoadBalStrategy": 1011, 
+            "FinestLevel": 3, 
+            "Width": 0.0004
+        }
+    }, 
+    "Inflow": {
+        "InflowAmpl": 0, 
+        "FlowDir": 1, 
+        "InflowVel": 0, 
+        "InflowFreq": 0, 
+        "RadInlet": 0.005
+    }, 
+    "Transp": {
+        "Enable": 0, 
+        "IniCPos": 0.1, 
+        "IniCNeg": 5, 
+        "Solver": {
+            "Tol": 1e-10, 
+            "Iter": 200
+        }, 
+        "DiffNeg": 0.01, 
+        "NitschePenalty": 50, 
+        "XFEMReduced": 0.05, 
+        "HPos": 1, 
+        "HNeg": 0.5, 
+        "DiffPos": 0.005
+    }, 
+    "SurfTransp": {
+        "XFEMReduced": -1.0, 
+        "Enable": 0, 
+        "Visc": 1e-05, 
+        "Solver": {
+            "Tol": 1e-10, 
+            "Iter": 1000
+        }
+    }, 
+    "VTK": {
+        "VTKDir": "vtk", 
+        "Binary": 1, 
+        "Freq": 1, 
+        "VTKName": "brick"
+    }, 
+    "Restart": {
+        "OutputOverwrite": 1, 
+        "InputData": "", 
+        "Binary": 0, 
+        "OutputGrid": "out/grid",        
+        "OutputData": "out/data",        
+                 
+        "OutputFreq": 0
+    }
+}

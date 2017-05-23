@@ -154,7 +154,7 @@ void PeriodicEdgesCL::AccumulateMFR( int lvl)
 
 MultiGridCL::MultiGridCL (const MGBuilderCL& Builder)
     : TriangVertex_( *this), TriangEdge_( *this), TriangFace_( *this), TriangTetra_( *this), version_(0),
-    factory_( Vertices_, Edges_, Faces_, Tetras_), MeshDeform_(0)
+    factory_( Vertices_, Edges_, Faces_, Tetras_)
 {
 #ifdef _PAR
     DiST::InfoCL::Instance( this);  // tell InfoCL about the multigrid before(!) building the grid
@@ -373,8 +373,6 @@ void MultiGridCL::RefineGrid (Uint Level)
     for (Uint lvl= 0; lvl <= nextLevel; ++lvl)
         std::for_each( Vertices_[lvl].begin(), Vertices_[lvl].end(),
             std::mem_fun_ref( &VertexCL::DestroyRecycleBin));
-
-    IncrementVersion();
 
 #ifdef _PAR
     ParMultiGridCL::Instance().IdentifyEnd();
@@ -1224,8 +1222,7 @@ class used_colors_CL
     }
 };
 
-void ColorClassesCL::compute_color_classes (MultiGridCL& mg, Uint lvl,
-                                            match_fun match, const BndCondCL& Bnd)
+void ColorClassesCL::compute_color_classes (MultiGridCL& mg, Uint lvl, const BndCondCL& Bnd)
 {
 #   ifdef _PAR
         ParTimerCL timer;
@@ -1236,7 +1233,7 @@ void ColorClassesCL::compute_color_classes (MultiGridCL& mg, Uint lvl,
 
     colors_.resize( 0);
 
-    IdxDescCL p2idx( P2_FE, Bnd, match);
+    IdxDescCL p2idx( P2_FE, Bnd);
     p2idx.CreateNumbering( lvl, mg);
     const Uint sys= p2idx.GetIdx();
     const size_t n= p2idx.NumUnknowns();
@@ -1327,13 +1324,13 @@ void ColorClassesCL::make_single_color_class (MultiGridCL::const_TriangTetraIter
     std::cout << "ColorClassesCL::make_single_color_class: Creation of the tetra-coloring took " << timer.GetTime() << " seconds.\n";
 }
 
-const ColorClassesCL& MultiGridCL::GetColorClasses (int Level, match_fun match, const BndCondCL& Bnd) const
+const ColorClassesCL& MultiGridCL::GetColorClasses (int Level, const BndCondCL& Bnd) const
 {
     if (Level < 0)
         Level+= GetNumLevel();
 
     if (colors_.find( Level) == colors_.end())
-        colors_[Level]= new ColorClassesCL( *this, Level, match, Bnd);
+        colors_[Level]= new ColorClassesCL( *this, Level, Bnd);
 
     return *colors_[Level];
 }
@@ -1376,10 +1373,16 @@ void read_PeriodicBoundaries (MultiGridCL& mg, const ParamCL& P)
         BoundaryCL::BndType type= BoundaryCL::OtherBnd;
         try {
             const std::string s= it->second.get_value<std::string>();
-            if (s == "Per1Bnd")
+            if (s == "Per1BC")
                 type= BoundaryCL::Per1Bnd;
-            else if (s == "Per2Bnd")
+            else if (s == "Per2BC")
                 type= BoundaryCL::Per2Bnd;
+            else {
+                if (s.empty())
+                    throw DROPSParamErrCL("Specify PerBnd type without brackets '[...]'");
+                else
+                    throw DROPSParamErrCL("Unknown PerBnd type: "+s);
+            }
         } catch (DROPSParamErrCL e) {
             std:: cerr << "read_PeriodicBoundaries: While processing key '" << key << "'...\n";
             throw e;

@@ -1,0 +1,49 @@
+{
+//=============================================================
+//    DROPS parameter file for twophasedrops
+//    simulation of two-phase flow:
+//    droplet in measuring cell used in NMR measurements
+//=============================================================
+
+    "Time":
+    {
+// time stepping
+		"NumSteps":			100
+	},
+    
+	"Exp":
+	{
+// experimental conditions
+		"DropOrigin":		[ 0.5, 0.2,  0.5],
+		"DropVel":			[ 0.0, 0.01, 0.0],
+		"DropRadius":		0.15,
+		"CheckSanity":		0
+	},
+	
+	"VTK":
+	{
+// VTK output
+		"Freq":		0,
+		"VTKDir":		"vtk",
+		"VTKName":		"ref_rising_drop",
+		"Binary":		1
+	},
+	
+    "Mesh":
+    {
+        "Type": "BrickBuilder",      // A parallelepiped
+        "Origin": [0,0,0],           // Origin
+        "E1": [1,0,0],               // Basis to span the object,
+        "E2": [0,3,0],               // not necessary orthonormal 
+        "E3": [0,0,1],               // ... 
+        "N1": 8,                     // Number of cells along the E1-direction,
+        "N2": 24,                     //                       the E2-direction,
+        "N3": 8,                     //                       the E3-direction.
+        "AdaptRef":
+        {
+            "FinestLevel":          2,
+            "CoarsestLevel":        0,
+            "Width":                0.1
+        }
+    }
+}

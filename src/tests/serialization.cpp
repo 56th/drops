@@ -34,10 +34,10 @@ Uint rule = 0;
 
 int Test_MGBuilderFactory ()
 {
-    ParamCL P( "serialization.json");
+    ParamCL P( "../../param/tests/serialization/serialization.json");
     std::cout << P << std::endl;
 
-    std::auto_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P.get_child( "Domain")));
+    std::unique_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P) );
     MultiGridCL mg( *builder);
     std::cout << SanityMGOutCL( mg) << std::endl;
 

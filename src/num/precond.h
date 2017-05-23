@@ -1310,6 +1310,50 @@ void Jacobi0(const Mat&, const Vec& Diag, Vec& x, const Vec& b, const double ome
     }
 }
 
+// add kernel information to preconditioner
+template <typename PreCon>
+class PreKernel
+{
+private:
+    const PreCon &prec_;
+    const VectorBaseCL<VectorCL> &kernelvecs_;
+
+  public:
+    PreKernel( const PreCon &prec, const VectorBaseCL<VectorCL> &kernelvecs): prec_(prec), kernelvecs_(kernelvecs){}
+
+
+    void Init(const MatrixCL& A) {}
+
+    template <typename Mat, typename Vec, typename ExT>
+    void Apply(const Mat& A, Vec& x, const Vec& b, const ExT&) const
+    {
+        prec_.Apply(A,x,b,0.0);
+        // change in loop size ...
+        for( size_t i = 1; i < kernelvecs_.size(); ++i )
+        {
+            VectorCL e  = kernelvecs_[i];
+            double eTb  = dot( e , b);
+
+            VectorCL Ae = A*e;
+            double eTAe = dot( e, Ae);
+
+            double alpha = eTb / eTAe;
+
+            axpy(alpha, e, x);
+        }
+    }
+
+    /// \brief Check if return preconditioned vectors are accumulated after calling Apply
+    bool RetAcc()   const { return false; }
+    /// \brief Check if the diagonal of the matrix is needed
+    bool NeedDiag() const { return false; }
+    /// \name Set diagonal of the matrix for consistency
+    //@{
+    void SetDiag(const VectorCL&) {}         // just for consistency
+    template<typename Mat, typename ExT>
+    void SetDiag(const Mat&, const ExT&) {}  // just for consistency
+    //@}
+};
 
 // Chebychev-polynomial based smoother/preconditionier
 template < bool InitialGuess, class Mat, class Vec, class ExT>

@@ -498,8 +498,7 @@ int TestExamples (MultiGridCL& mg, ParamCL& p)
     std::auto_ptr<LevelsetP2CL> lset_ptr( LevelsetP2CL::Create( mg, lsbnd, sf));
     LevelsetP2CL& lset= *lset_ptr;
 
-    lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
-    lset.Phi.SetIdx( &lset.idx);
+    lset.CreateNumbering( mg.GetLastLevel());
 
     IdxDescCL p1idx;
     p1idx.CreateNumbering( mg.GetLastLevel(), mg, lsbnd);
@@ -516,11 +515,10 @@ int TestExamples (MultiGridCL& mg, ParamCL& p)
 
    // writer for vtk-format
     VTKOutCL vtkwriter( mg, "DROPS data", num,
-                        P.get<std::string>( "VTK.VTKDir"),
-                        P.get<std::string>( "VTK.VTKName"),
-                        P.get<std::string>( "VTK.TimeFileName"),
-                        P.get<bool>( "VTK.Binary"),
-                        P.get<bool>( "VTK.UseOnlyP1"), /* <- onlyp1 */
+                        ".", "csg-examples",
+                        "csg-examples", /* <- time file name */
+                        true, /* <- binary */
+                        false, /* <- onlyp1 */
                         false, /* <- p2dg */
                         -1, /* <- level */
                         false, /* <- reusepvd */
@@ -561,8 +559,7 @@ int TestExamples (MultiGridCL& mg, ParamCL& p)
         p1idx.DeleteNumbering( mg);
         vecp2idx.DeleteNumbering( mg);
         mg.Refine();
-        lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
-        lset.Phi.SetIdx( &lset.idx);
+        lset.CreateNumbering( mg.GetLastLevel());
         lset.Init( csg_fun);
         p1idx.CreateNumbering( mg.GetLastLevel(), mg, lsbnd);
         ierr.SetIdx( &p1idx);
@@ -582,8 +579,7 @@ int TestExamples (MultiGridCL& mg, ParamCL& p)
             p1idx.DeleteNumbering( mg);
             vecp2idx.DeleteNumbering( mg);
             mg.Refine();
-            lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
-            lset.Phi.SetIdx( &lset.idx);
+            lset.CreateNumbering( mg.GetLastLevel());
             lset.Init( csg_fun);
             p1idx.CreateNumbering( mg.GetLastLevel(), mg, lsbnd);
             ierr.SetIdx( &p1idx);
@@ -608,8 +604,7 @@ int TestExamples (MultiGridCL& mg, ParamCL& p)
                 it->SetRemoveMark(); // level 0 will not be removed.
             mg.Refine();
         }
-        lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
-        lset.Phi.SetIdx( &lset.idx);
+        lset.CreateNumbering( mg.GetLastLevel());
         lset.Init( csg_fun);
         p1idx.CreateNumbering( mg.GetLastLevel(), mg, lsbnd);
         ierr.SetIdx( &p1idx);
@@ -634,19 +629,19 @@ int TestAdap (MultiGridCL& mg, ParamCL& p)
 {
     SurfaceTensionCL sf( sigmaf);   // dummy class
     LsetBndDataCL lsbnd( 6);
-    std::auto_ptr<LevelsetP2CL> lset_ptr( LevelsetP2CL::Create( mg, lsbnd, sf));
+    std::unique_ptr<LevelsetP2CL> lset_ptr( LevelsetP2CL::Create( mg, lsbnd, sf));
     LevelsetP2CL& lset= *lset_ptr;
 
     lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
     lset.Phi.SetIdx( &lset.idx);
 
     DistMarkingStrategyCL dist_marker( csg_fun,
-        P.get<double>("AdaptRef.Width"),
-        P.get<Uint>(  "AdaptRef.CoarsestLevel"),
-        P.get<Uint>(  "AdaptRef.FinestLevel"));
+        P.get<double>("Mesh.AdaptRef.Width"),
+        P.get<Uint>(  "Mesh.AdaptRef.CoarsestLevel"),
+        P.get<Uint>(  "Mesh.AdaptRef.FinestLevel"));
     CurvatureMarkingStrategyCL curv_marker( lset,
         PrincipalLatticeCL::instance( 2),
-        P.get<Uint>( "AdaptRef.CurvatureFinestLevel"));
+        P.get<Uint>( "Mesh.AdaptRef.CurvatureFinestLevel"));
     StrategyCombinerCL marker;
     marker.push_back( dist_marker);
     if (curv_marker.GetFineLevel() > dist_marker.GetFineLevel())
@@ -724,16 +719,16 @@ int TestAdap (MultiGridCL& mg, ParamCL& p)
             /*max_damping_steps*/ P.get<Uint>( "LevelsetMapper.MaxDampingSteps"));
         quaqua.set_inner_iter_tol( P.get<int>(    "LevelsetMapper.InnerIter"),
                                    P.get<double>( "LevelsetMapper.InnerTol"));
-        quaqua.get_locator().set_structured_coarse_grid( P.get_child( "Domain"));
+        quaqua.get_locator().set_structured_coarse_grid( P.get_child( "Mesh"));
 
         LocalQuaMapperCL locqua (mg, lset.Phi,
             /*maxiter*/ P.get<int>( "LevelsetMapper.Iter"),
             /*tol*/ P.get<double>( "LevelsetMapper.Tol"),
             /*armijo_c*/ P.get<double>( "LevelsetMapper.ArmijoConstant"),
             /*max_damping_steps*/ P.get<Uint>( "LevelsetMapper.MaxDampingSteps"));
-        LocalQuaMapperP2CL locquap2(locqua); // Provides the interface for the Oswald-projection class.
+        LocalQuaMapperDistanceP2CL locquap2(locqua); // Provides the interface for the Oswald-projection class.
         locdist.SetIdx( &p2idx);
-        OswaldProjectionP2AccuCL<LocalQuaMapperP2CL> loc_dist_accu(locquap2, locdist);
+        OswaldProjectionP2AccuCL<LocalQuaMapperDistanceP2CL> loc_dist_accu(locquap2, locdist);
 //         loc_dist_accu.set_check_averaging (true);
         TetraAccumulatorTupleCL accus2;
         accus2.push_back( &loc_dist_accu);
@@ -741,7 +736,7 @@ int TestAdap (MultiGridCL& mg, ParamCL& p)
         locdef.SetIdx( &vecp2idx);
         OswaldProjectionP2AccuCL<LocalQuaMapperDeformationP2CL> loc_def_accu(locquadefp2, locdef);
         accus2.push_back( &loc_def_accu);
-        accumulate( accus2, mg, p2idx.TriangLevel(), p2idx.GetMatchingFunction(), p2idx.GetBndInfo());
+        accumulate( accus2, mg, p2idx.TriangLevel(), p2idx.GetBndInfo());
 
         TetraAccumulatorTupleCL accus;
         InterfaceCommonDataP2CL cdatap2( lset.Phi, lset.GetBndData(), quaqua, PrincipalLatticeCL::instance( P.get<Uint>( "Subsampling")));
@@ -765,7 +760,7 @@ int TestAdap (MultiGridCL& mg, ParamCL& p)
             accus( cc);
         }
         else {
-            accumulate( accus, mg, p2idx.TriangLevel(), p2idx.GetMatchingFunction(), p2idx.GetBndInfo());
+            accumulate( accus, mg, p2idx.TriangLevel(), p2idx.GetBndInfo());
         }
         std::cout << "Distribution of outer iterations in thread 0:\n";
         seq_out( cdatap2.quaqua.num_outer_iter.begin(), cdatap2.quaqua.num_outer_iter.end(), std::cout);
@@ -791,25 +786,12 @@ int TestAdap (MultiGridCL& mg, ParamCL& p)
     return 0;
 }
 
-/// \brief Set Default parameters here s.t. they are initialized.
-/// The result can be checked when Param-list is written to the output.
-void SetMissingParameters (DROPS::ParamCL& P)
-{
-//     P.put_if_unset<std::string>("VTK.VTKName", "csgtest");
-    P.put_if_unset<std::string>("VTK.VTKDir", ".");
-    P.put_if_unset<std::string>( "VTK.TimeFileName", P.get<std::string>("VTK.VTKName"));
-    P.put_if_unset<int>( "VTK.Binary", 1);
-    P.put_if_unset<int>( "VTK.UseOnlyP1", 0);
-    P.put_if_unset<int>( "VTK.ReUseTimeFile", 0);
-    P.put_if_unset<int>("VTK.UseDeformation", 0);
-}
-
 int main (int argc, char** argv)
 {
     ScopeTimerCL timer( "main");
+    std::cout << "Boost version: " << BOOST_LIB_VERSION << std::endl;
   try {
-    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "csgtest.json");
-    SetMissingParameters(P);
+    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/tests/csgtest/csgtest.json");
     std::cout << P << std::endl;
 
     deco_cube_radius= P.get<double>( "deco_cube_parameters.radius");
@@ -820,7 +802,7 @@ int main (int argc, char** argv)
         perturbed_torus_alpha= P.get<double>( "perturbed_torus_parameters.alpha");
     }
 
-    std::auto_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P.get_child( "Domain")));
+    std::unique_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P));
     DROPS::MultiGridCL mg( *builder);
     if (P.get<std::string>( "Testcase") == "area") {
         MarkAll( mg);

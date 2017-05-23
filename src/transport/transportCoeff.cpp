@@ -28,9 +28,9 @@
 double Special (const DROPS::Point3DCL& p, double )
 {
     extern DROPS::ParamCL P;
-    static DROPS::Point3DCL x0 = P.get<DROPS::Point3DCL>("Exp.PosDrop");
+    static DROPS::Point3DCL x0 = P.get<DROPS::Point3DCL>("Levelset.PosDrop");
     static DROPS::Point3DCL shift = P.get<DROPS::Point3DCL>("Exp.Shift");
-    static double R = P.get<DROPS::Point3DCL>("Exp.RadDrop")[0];
+    static double R = P.get<DROPS::Point3DCL>("Levelset.RadDrop")[0];
     const double r = 0.05;
     DROPS::Point3DCL X = p-x0-shift;
 
@@ -107,9 +107,9 @@ double Rhs (const DROPS::Point3DCL& ,  double )
 
 double Dirichlet (const DROPS::Point3DCL& p, double )
 {
-/*  static double x0 = P.get<DROPS::Point3DCL>("Exp.PosDrop")[0];
-  static double y0 = P.get<DROPS::Point3DCL>("Exp.PosDrop")[1];
-  static double R = P.get<DROPS::Point3DCL>("Exp.RadDrop")[0];  */
+/*  static double x0 = P.get<DROPS::Point3DCL>("Levelset.PosDrop")[0];
+  static double y0 = P.get<DROPS::Point3DCL>("Levelset.PosDrop")[1];
+  static double R = P.get<DROPS::Point3DCL>("Levelset.RadDrop")[0];  */
 //  double x = p[0];
   double y = p[1];
 
@@ -132,7 +132,7 @@ double Dirichlet (const DROPS::Point3DCL& p, double )
 double DirichletConst (const DROPS::Point3DCL& p, double )
 {
   extern DROPS::ParamCL P;
-  double y=p[1]-P.get<DROPS::Point3DCL>("Exp.PosDrop")[1];
+  double y=p[1]-P.get<DROPS::Point3DCL>("Levelset.PosDrop")[1];
   if (y>0)
     return P.get<double>("Transp.IniCPos");
   else
@@ -148,7 +148,7 @@ double DirichletPos (const DROPS::Point3DCL&, double )
 double DirichletConstt (const DROPS::Point3DCL& p, double )
 {
   extern DROPS::ParamCL P;
-  double y=p[1]-P.get<DROPS::Point3DCL>("Exp.PosDrop")[1];
+  double y=p[1]-P.get<DROPS::Point3DCL>("Levelset.PosDrop")[1];
   if (y>0)
     return P.get<double>("Transp.IniCPos");
   else
@@ -159,10 +159,10 @@ DROPS::SVectorCL<3> PotentialFlowfield (const DROPS::Point3DCL& p, double )
 {
     extern DROPS::ParamCL P;
     DROPS::SVectorCL<3> ret(0.);
-    double x=p[0]-P.get<DROPS::Point3DCL>("Exp.PosDrop")[0]; double y=p[1]-P.get<DROPS::Point3DCL>("Exp.PosDrop")[1];
+    double x=p[0]-P.get<DROPS::Point3DCL>("Levelset.PosDrop")[0]; double y=p[1]-P.get<DROPS::Point3DCL>("Levelset.PosDrop")[1];
     double r2 = x*x+y*y;
     double r4 = r2*r2;
-    double R=P.get<DROPS::Point3DCL>("Exp.RadDrop")[0];
+    double R=P.get<DROPS::Point3DCL>("Levelset.RadDrop")[0];
     static bool test=true;
     if(test) { std::cout << "R = " << R << std::endl; test=false;}
     double R2 = R*R;
@@ -188,8 +188,8 @@ DROPS::SVectorCL<3> StraightFlowfield (const DROPS::Point3DCL&, double )
 double cylinderdistance( const DROPS::Point3DCL& p, double)
 {
     extern DROPS::ParamCL P;
-    double x=p[0]-P.get<DROPS::Point3DCL>("Exp.PosDrop")[0]; double y=p[1]-P.get<DROPS::Point3DCL>("Exp.PosDrop")[1];
-    double R=P.get<DROPS::Point3DCL>("Exp.RadDrop")[0];
+    double x=p[0]-P.get<DROPS::Point3DCL>("Levelset.PosDrop")[0]; double y=p[1]-P.get<DROPS::Point3DCL>("Levelset.PosDrop")[1];
+    double R=P.get<DROPS::Point3DCL>("Levelset.RadDrop")[0];
     static bool test=true;
     if(test) { std::cout << "R = " << R << std::endl; test=false;}
     return std::sqrt(std::abs(x*x+y*y)) - R;
@@ -199,7 +199,7 @@ template<int i>
 double planedistance( const DROPS::Point3DCL& p, double)
 {
     extern DROPS::ParamCL P;
-    double x=p[i]-P.get<DROPS::Point3DCL>("Exp.PosDrop")[i];
+    double x=p[i]-P.get<DROPS::Point3DCL>("Levelset.PosDrop")[i];
     return x;
 }
 

@@ -1,0 +1,105 @@
+{
+    "General": {
+        "DynamicLibs": [
+            "poisson/libpoisson-poissonCoeff", 
+            "misc/libmisc-scalarFunctions", 
+            "misc/libmisc-vectorFunctions"
+        ], 
+        "DynamicLibsPrefix": "../", 
+        "ProgressBar": 1
+    }, 
+    "Poisson": {
+        "InitialValue": "ALEEx4_Init", 
+        "Solver": {
+            "MG": {
+                "NumLvl": -1, 
+                "SmoothingSteps": 1
+            }, 
+            "Solver": 303, 
+            "Relax": 1, 
+            "Iter": 1000, 
+            "PcIter": 1, 
+            "PcTol": 0.1, 
+            "Tol": 1e-10, 
+            "useRelTol": 1, 
+            "Restart": 50
+        }, 
+        "Coeff": {
+            "Diffusion": 0.001, 
+            "Reaction": "Zero", 
+            "Flowfield": "ALEEx4_Velocity", 
+            "withConvection": 1, 
+            "Source": "ALEEx4_Source"
+        }, 
+        "BoundaryData": {
+            "Default":["DirBC","Zero"]
+        },
+        "Solution": "ALEEx4_Solution", 
+        "SolutionIsKnown": 1, 
+        "P1": 1
+    }, 
+    "DomainCond": {
+        "RefineSteps": 4
+    }, 
+    "Mesh": {
+        "Type": "BrickBuilder", 
+        "Origin":[0,0,0],
+        "E1": [1,0,0],
+        "E2": [0,0.2,0],
+        "E3": [0,0,0.2],
+        "N1": 5,
+        "N2": 1,
+        "N3": 1,
+        "AdaptRef":{
+            "FinestLevel": 4
+            }
+    }, 
+    "Restart": {
+        "InputData": ""
+    }, 
+    "Stabilization": {
+        "Magnitude": 1.0, 
+        "Grids": 1, 
+        "SUPG": 1
+    }, 
+    "ALE": {
+        "Interface": "ALEEx4_Interface", 
+        "wavy": 1
+    }, 
+    "Time": {
+        "NumSteps": 16, 
+        "Scheme": 1, 
+        "FinalTime": 0.4, 
+        "Theta": 1
+    },
+    "Exp": {
+        "Mu": 1.00412, 
+        "Heat": 5960, 
+        "Cp": 1500, 
+        "Rho": 998, 
+        "Lambda": 0.26
+    }, 
+    "Ensight": {
+        "Binary": 1, 
+        "EnsightOut": 0, 
+        "MasterOut": 1, 
+        "EnsDir": "ensight", 
+        "EnsCase": "FilmTemp", 
+        "GeomName": "test"
+    }, 
+    "Error": {
+        "Meas": 0.875, 
+        "NumRef": 6, 
+        "RelReduction": 0.1, 
+        "DoMark": 0, 
+        "MinRatio": 0, 
+        "Threshold": 0.6, 
+        "DoErrorEstimate": 0
+    }, 
+    "VTK": {
+        "VTKDir": "vtk", 
+        "Binary": 0, 
+        "Freq": 1, 
+        "VTKName": "ALE_303_RR2_"
+    }
+}

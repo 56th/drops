@@ -141,7 +141,7 @@ void SetupConvectionP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& 
     InterfaceMatrixAccuCL<LocalInterfaceConvectionP1CL<DiscVelSolT>, InterfaceCommonDataP1CL> accu( mat, LocalInterfaceConvectionP1CL<DiscVelSolT>( w), cdata);
     accus.push_back( &accu);
     const IdxDescCL* RowIdx= mat->RowIdx;
-    accumulate( accus, mg, RowIdx->TriangLevel(), RowIdx->GetMatchingFunction(), RowIdx->GetBndInfo());
+    accumulate( accus, mg, RowIdx->TriangLevel(), RowIdx->GetBndInfo());
 
     // WriteToFile( mat->Data, "convection.txt", "convection");
 }
@@ -185,7 +185,7 @@ void SetupMassDivP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls,
     InterfaceMatrixAccuCL<LocalInterfaceMassDivP1CL<DiscVelSolT>, InterfaceCommonDataP1CL> accu( mat, LocalInterfaceMassDivP1CL<DiscVelSolT>( w), cdata);
     accus.push_back( &accu);
     const IdxDescCL* RowIdx= mat->RowIdx;
-    accumulate( accus, mg, RowIdx->TriangLevel(), RowIdx->GetMatchingFunction(), RowIdx->GetBndInfo());
+    accumulate( accus, mg, RowIdx->TriangLevel(), RowIdx->GetBndInfo());
 
     // WriteToFile( mat->Data, "massdiv.txt", "massdiv");
 }

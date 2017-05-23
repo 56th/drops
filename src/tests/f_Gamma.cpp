@@ -35,6 +35,7 @@
 #include "levelset/levelsetmapper.h"
 #include "misc/params.h"
 #include "levelset/surfacetension.h"
+#include "levelset/mzelle_hdr.h"
 #include "misc/dynamicload.h"
 #include "num/gradient_recovery.h"
 #include "surfactant/ifacetransp.h"
@@ -232,24 +233,22 @@ void ApplyToTestFct( InstatStokes2PhaseP2P1CL& Stokes, const LsetBndDataCL& lsbn
 //     | f_Gamma(v) - f_{Gamma_h}(v) |  =   O(h^p)
 {
     MultiGridCL& MG= Stokes.GetMG();
-    const double curv= 2/P.get<DROPS::Point3DCL>("Exp.RadDrop")[0];
+    const double curv= 2/P.get<DROPS::Point3DCL>("Levelset.RadDrop")[0];
     SurfaceTensionCL sf( sigmaf, 0);
 
     LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsbnd, sf, P.get_child("Levelset")) );
 
 //    lset.SetSurfaceForce( SF_Const);
 
-    MLIdxDescCL* lidx= &lset.idx;
     MLIdxDescCL* vidx= &Stokes.vel_idx;
     MLIdxDescCL* pidx= &Stokes.pr_idx;
 
-    lset.CreateNumbering( MG.GetLastLevel(), lidx);
+    lset.CreateNumbering( MG.GetLastLevel());
 
-    lset.Phi.SetIdx( lidx);
     lset.Init( DistanceFct);
 
     Stokes.CreateNumberingVel( MG.GetLastLevel(), vidx);
-    Stokes.CreateNumberingPr(  MG.GetLastLevel(), pidx, NULL, &lset);
+    Stokes.CreateNumberingPr(  MG.GetLastLevel(), pidx, &lset);
 
     VecDescCL f_Gamma( vidx), v( vidx);
     MG.SizeInfo( std::cout);
@@ -262,7 +261,7 @@ void ApplyToTestFct( InstatStokes2PhaseP2P1CL& Stokes, const LsetBndDataCL& lsbn
     std::cout << Stokes.v.Data.size() << " velocity unknowns,\n";
     std::cout << lset.Phi.Data.size() << " levelset unknowns.\n";
 
-    const double Vol= 4./3*M_PI*std::pow( P.get<DROPS::Point3DCL>("Exp.RadDrop")[0], 3);
+    const double Vol= 4./3*M_PI*std::pow( P.get<DROPS::Point3DCL>("Levelset.RadDrop")[0], 3);
     std::cout << "Volumen = " << Vol << "\tKruemmung = " << curv << "\n\n";
     typedef std::map<int,double> LsgMapT;
     LsgMapT reflsg;
@@ -278,9 +277,9 @@ void ApplyToTestFct( InstatStokes2PhaseP2P1CL& Stokes, const LsetBndDataCL& lsbn
 //    reflsg[31]= 0;
 //    reflsg[32]= 0;
     reflsg[33]= curv*Vol;
-    reflsg[111]= curv*2*Vol*P.get<DROPS::Point3DCL>("Exp.PosDrop")[0];
-    reflsg[121]= curv*Vol*P.get<DROPS::Point3DCL>("Exp.PosDrop")[1];
-    reflsg[131]= curv*Vol*P.get<DROPS::Point3DCL>("Exp.PosDrop")[2];
+    reflsg[111]= curv*2*Vol*P.get<DROPS::Point3DCL>("Levelset.PosDrop")[0];
+    reflsg[121]= curv*Vol*P.get<DROPS::Point3DCL>("Levelset.PosDrop")[1];
+    reflsg[131]= curv*Vol*P.get<DROPS::Point3DCL>("Levelset.PosDrop")[2];
 //    reflsg[231]= 0;
 //    reflsg[221]= 0;
 //    reflsg[331]= 0;
@@ -310,7 +309,7 @@ void ApplyToTestFct( InstatStokes2PhaseP2P1CL& Stokes, const LsetBndDataCL& lsbn
     for (size_t i=0; i<refVec.size(); ++i)
         std::cout << refVec[i] << ",\t";
 
-    std::cout << "\n\n" << P.get<int>("AdaptRef.FinestLevel") << ",\t";
+    std::cout << "\n\n" << P.get<int>("Mesh.AdaptRef.FinestLevel") << ",\t";
     for (size_t i=0; i<errVec.size(); ++i)
         std::cout << errVec[i] << ",\t";
     std::cout << "\n\n";
@@ -325,22 +324,20 @@ void Compare_LaplBeltramiSF_ConstSF( InstatStokes2PhaseP2P1CL& Stokes, const Lse
 {
     MultiGridCL& MG= Stokes.GetMG();
     // Levelset-Disc.: Crank-Nicholson
-    const double curv= 2/P.get<DROPS::Point3DCL>("Exp.RadDrop")[0];
+    const double curv= 2/P.get<DROPS::Point3DCL>("Levelset.RadDrop")[0];
     SurfaceTensionCL sf( sigmaf, 0);
     LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsbnd, sf, P.get_child("Levelset")) );
 
 
-    MLIdxDescCL* lidx= &lset.idx;
     MLIdxDescCL* vidx= &Stokes.vel_idx;
     MLIdxDescCL* pidx= &Stokes.pr_idx;
 
-    lset.CreateNumbering( MG.GetLastLevel(), lidx);
+    lset.CreateNumbering( MG.GetLastLevel());
 
-    lset.Phi.SetIdx( lidx);
     lset.Init( DistanceFct);
 
     Stokes.CreateNumberingVel( MG.GetLastLevel(), vidx);
-    Stokes.CreateNumberingPr(  MG.GetLastLevel(), pidx, NULL, &lset);
+    Stokes.CreateNumberingPr(  MG.GetLastLevel(), pidx, &lset);
 
     VecDescCL f_Const( vidx), f_LaplBeltrami( vidx), v( vidx);
     MG.SizeInfo( std::cout);
@@ -355,13 +352,13 @@ void Compare_LaplBeltramiSF_ConstSF( InstatStokes2PhaseP2P1CL& Stokes, const Lse
     std::cout << Stokes.v.Data.size() << " velocity unknowns,\n";
     std::cout << lset.Phi.Data.size() << " levelset unknowns.\n";
 
-    const double Vol= 4./3*M_PI*std::pow( P.get<DROPS::Point3DCL>("Exp.RadDrop")[0], 3);
+    const double Vol= 4./3*M_PI*std::pow( P.get<DROPS::Point3DCL>("Levelset.RadDrop")[0], 3);
     std::cout << "Volumen = " << Vol << "\tKruemmung = " << curv << "\n\n";
 
     Stokes.SetupSystem1( &Stokes.A, &Stokes.M, &Stokes.b, &Stokes.b, &Stokes.b, lset, 0.);
 
     f_LaplBeltrami.Clear( Stokes.v.t);
-    lset.SetSurfaceForce( SF_ImprovedLB);
+    lset.SetSurfaceForce( SF_ImprovedLBVar);
 //     lset.SetSurfaceForce( SF_LB);
     lset.AccumulateBndIntegral( f_LaplBeltrami);
 
@@ -878,22 +875,22 @@ void AccumulateBndIntegral (LevelsetP2CL& lset, const PrincipalLatticeCL& lat, V
 
     InterfaceCommonDataP2CL cdatap2( lset.Phi, lset.GetBndData(), quaqua, lat);
     QuaQuaQuadDomainMapperAccuCL hoqdom_accu( cdatap2);
-    if (P.get<std::string>( "Exp.ComparisonSource") == "ObliqueLBVar2") {
+    if (P.get<std::string>( "TestCase.ComparisonSource") == "ObliqueLBVar2") {
         TetraAccumulatorTupleCL hoaccus;
         hoaccus.push_back( &cdatap2);
         hoaccus.push_back( &hoqdom_accu);
-        accumulate( hoaccus, lset.GetMG(), lvl, lset.Phi.RowIdx->GetMatchingFunction(), lset.Phi.RowIdx->GetBndInfo());
+        accumulate( hoaccus, lset.GetMG(), lvl, lset.Phi.RowIdx->GetBndInfo());
     }
 
     TetraAccumulatorTupleCL accus;
     accus.push_back( &cdatap2);
-    VarObliqueLaplaceBeltrami2AccuCL accu( lset, f_Gamma, lset.GetSF(), cdatap2, nt, hoqdom_accu.qmap, P.get<bool>( "SurfTens.UseMappedFESpace"));
-    if (P.get<std::string>( "SurfTens.TestFunction") == "exp_test_function")
+    VarObliqueLaplaceBeltrami2AccuCL accu( lset, f_Gamma, lset.GetSF(), cdatap2, nt, hoqdom_accu.qmap, P.get<bool>( "NavStokes.Coeff.SurfTens.UseMappedFESpace"));
+    if (P.get<std::string>( "NavStokes.Coeff.SurfTens.TestFunction") == "exp_test_function")
         accu.set_test_function( &exp_test_function);
-    if (P.get<bool>( "SurfTens.UseMatrixTension") == true)
+    if (P.get<bool>( "NavStokes.Coeff.SurfTens.UseMatrixTension") == true)
         accu.set_matrix_tension( &sigmaf_matrix);
-    if (P.get<std::string>( "Exp.ComparisonSource") == "ObliqueLBVar3") {
-        const Uint subsampling= std::ceil( P.get<double>( "Exp.SubsamplingFactor")*std::pow( 2., P.get<double>( "Exp.SubsamplingExponent")*lvl));
+    if (P.get<std::string>( "TestCase.ComparisonSource") == "ObliqueLBVar3") {
+        const Uint subsampling= std::ceil( P.get<double>( "TestCase.SubsamplingFactor")*std::pow( 2., P.get<double>( "TestCase.SubsamplingExponent")*lvl));
 //         const Uint subsampling= 1u << (lvl == 0 ? 0 : lvl - 1);
         std::cout << "ObliqueLBVar3: subsampling: " << subsampling << ".\n";
         accu.use_linear_subsampling( true);
@@ -901,8 +898,8 @@ void AccumulateBndIntegral (LevelsetP2CL& lset, const PrincipalLatticeCL& lat, V
         cdatap2.compute_absdet( false);
     }
     accus.push_back( &accu);
-    accumulate( accus, lset.GetMG(), lvl, lset.Phi.RowIdx->GetMatchingFunction(), lset.Phi.RowIdx->GetBndInfo());
-    if (P.get<std::string>( "Exp.ComparisonSource") == "ObliqueLBVar3") {
+    accumulate( accus, lset.GetMG(), lvl, lset.Phi.RowIdx->GetBndInfo());
+    if (P.get<std::string>( "TestCase.ComparisonSource") == "ObliqueLBVar3") {
         cdatap2.set_lattice( PrincipalLatticeCL::instance( 1)); // XXX: Enhancement: Computation of absdets now also works for general lattices.
         cdatap2.compute_absdet( true);
     }
@@ -1051,7 +1048,7 @@ void Compare_Oblique (DROPS::AdapTriangCL&, InstatStokes2PhaseP2P1CL& Stokes, Le
         accus.push_back( &accu);
         if (comparison_target == "VariableHelper")
             accu.set_sublevel( mg.GetLastLevel());
-        accumulate( accus, mg, vidx->TriangLevel(), vidx->GetMatchingFunction(), vidx->GetBndInfo());
+        accumulate( accus, mg, vidx->TriangLevel(), vidx->GetBndInfo());
     }
     else if (comparison_target == "Improved") {
         lset.SetSurfaceForce( SF_ImprovedLBVar);
@@ -1121,7 +1118,7 @@ void Compare_Oblique (DROPS::AdapTriangCL&, InstatStokes2PhaseP2P1CL& Stokes, Le
 /// \brief Set Default parameters here s.t. they are initialized.
 /// The result can be checked when Param-list is written to the output.
 void SetMissingParameters(DROPS::ParamCL& P){
-    P.put_if_unset<std::string>("Exp.VolForce", "ZeroVel");
+    P.put_if_unset<std::string>("TestCase.VolForce", "ZeroVel");
     P.put_if_unset<double>("SurfTens.ShearVisco", 0.0);
     P.put_if_unset<double>("SurfTens.DilatationalVisco", 0.0);
     P.put_if_unset<double>("Mat.DensDrop", 1);
@@ -1129,7 +1126,7 @@ void SetMissingParameters(DROPS::ParamCL& P){
     P.put_if_unset<double>("Mat.DensFluid", 1);
     P.put_if_unset<double>("Mat.ViscFluid", 1);
     P.put_if_unset<double>("Mat.SmoothZone", 1e-05);
-    P.put_if_unset<DROPS::Point3DCL>("Exp.Gravity", DROPS::Point3DCL());
+    P.put_if_unset<DROPS::Point3DCL>("TestCase.Gravity", DROPS::Point3DCL());
 }
 
 int main (int argc, char** argv)
@@ -1139,23 +1136,23 @@ int main (int argc, char** argv)
     ScopeTimerCL scope("main");
     std::cout.precision( 15);
 
-    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "f_Gamma.json");
-    SetMissingParameters(P);
+
+    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/tests/f_Gamma/f_Gamma.json");
     std::cout << P << std::endl;
 
-    SurfTension= P.get<double>( "SurfTens.SurfTension");
-    c= P.get<DROPS::Point3DCL>("Exp.PosDrop");
-    r= P.get<DROPS::Point3DCL>("Exp.RadDrop")[0];
-    h_iface= P.get<DROPS::Point3DCL>( "Domain.E1")[0]/P.get<double>( "Domain.N1")/std::pow(2., P.get<DROPS::Uint>( "AdaptRef.FinestLevel"));
+    SurfTension= P.get<double>( "NavStokes.Coeff.SurfTens.SurfTension");
+    c= P.get<DROPS::Point3DCL>("Levelset.PosDrop");
+    r= P.get<DROPS::Point3DCL>("Levelset.RadDrop")[0];
+    h_iface= P.get<DROPS::Point3DCL>( "Mesh.E1")[0]/P.get<double>( "Mesh.N1")/std::pow(2., P.get<DROPS::Uint>( "Mesh.AdaptRef.FinestLevel"));
 
     DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
 
-    std::auto_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P.get_child( "Domain")));
+    std::unique_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P));
     DROPS::MultiGridCL mg( *builder);
     typedef DROPS::DistMarkingStrategyCL MarkerT;
     MarkerT InitialMarker( DistanceFct,
-                           P.get<double>("AdaptRef.Width"),
-                           P.get<double>("AdaptRef.CoarsestLevel"), P.get<double>("AdaptRef.FinestLevel") );
+                           P.get<double>("Mesh.AdaptRef.Width"),
+                           P.get<double>("Mesh.AdaptRef.CoarsestLevel"), P.get<double>("Mesh.AdaptRef.FinestLevel") );
 
     DROPS::AdapTriangCL adap( mg, &InitialMarker);
     adap.MakeInitialTriang();
@@ -1163,16 +1160,16 @@ int main (int argc, char** argv)
     DROPS::SurfaceTensionCL sf( sigmaf);
     DROPS::LsetBndDataCL lsbnd( 0);
     read_BndData( lsbnd, mg, P.get_child( "Levelset.BndData"));
-    std::auto_ptr<DROPS::LevelsetP2CL> lsetp( DROPS::LevelsetP2CL::Create( mg, lsbnd, sf, P.get_child("Levelset")));
+    std::unique_ptr<DROPS::LevelsetP2CL> lsetp( DROPS::LevelsetP2CL::Create( mg, lsbnd, sf, P.get_child("Levelset")));
     DROPS::LevelsetP2CL& lset= *lsetp;
     lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
     lset.Phi.SetIdx( &lset.idx);
     lset.Init( DistanceFct);
 
     DROPS::StokesBndDataCL::VelBndDataCL velbnd( 0);
-    read_BndData( velbnd, mg, P.get_child( "Stokes.VelocityBndData"));
+    DROPS::read_BndData( velbnd, mg, P.get_child( "NavStokes.BoundaryData.Velocity"));
     DROPS::StokesBndDataCL::PrBndDataCL  prbnd( 0);
-    read_BndData( prbnd,  mg, P.get_child( "Stokes.PressureBndData"));
+    DROPS::read_BndData( prbnd,  mg, P.get_child( "NavStokes.BoundaryData.Pressure"));
 
     typedef DROPS::InstatStokes2PhaseP2P1CL MyStokesCL;
     MyStokesCL prob( mg, DROPS::TwoPhaseFlowCoeffCL(P), DROPS::StokesBndDataCL( velbnd, prbnd));
@@ -1192,10 +1189,10 @@ int main (int argc, char** argv)
     ));
 //     Compare_LaplBeltramiSF_ConstSF( prob, lsbnd);
 //     Compare_Oblique_Improved( adap, prob, lset);
-    if (P.get<std::string>( "Exp.ComparisonTarget") == "CoarseLevel")
-        Compare_Oblique_Coarse( adap, prob, lset, P.get<std::string>( "Exp.ComparisonSource"));
+    if (P.get<std::string>( "TestCase.ComparisonTarget") == "CoarseLevel")
+        Compare_Oblique_Coarse( adap, prob, lset, P.get<std::string>( "TestCase.ComparisonSource"));
     else
-        Compare_Oblique( adap, prob, lset, P.get<std::string>( "Exp.ComparisonSource"), P.get<std::string>( "Exp.ComparisonTarget"));
+        Compare_Oblique( adap, prob, lset, P.get<std::string>( "TestCase.ComparisonSource"), P.get<std::string>( "TestCase.ComparisonTarget"));
 
     rusage usage;
     getrusage( RUSAGE_SELF, &usage);

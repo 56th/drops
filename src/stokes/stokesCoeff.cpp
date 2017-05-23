@@ -121,7 +121,7 @@ DROPS::SVectorCL<3> VelSolution_stat( const DROPS::Point3DCL& p, double)
 
 double PrSolution_stat( const DROPS::Point3DCL& p, double)
 {
-	return std::cos(p[0])*std::sin(p[1])*std::sin(p[2]);
+    return std::cos(p[0])*std::sin(p[1])*std::sin(p[2]);
 }
 
 static DROPS::RegisterVectorFunction regvecsource("Source_FSdrops_stat",         Source_stat );
@@ -345,12 +345,12 @@ double PrSolution( const DROPS::Point3DCL& p, double)
 
 double ConstQ(const DROPS::Point3DCL&, double =0)
 {
-    return P.get<double>("Mat.Dens");
+    return P.get<double>("NavStokes.Coeff.Dens");
 }
 
 DROPS::Point3DCL Source( const DROPS::Point3DCL& p, double)
 {
-    const double g= P.get<double>("Mat.Dens");
+    const double g= P.get<double>("NavStokes.Coeff.Dens");
     DROPS::SVectorCL<3> ret;
     ret[0]= g/3.*std::sin(p[0])*std::sin(p[1])*std::sin(p[2]);
     ret[1]= -g/3.*std::cos(p[0])*std::cos(p[1])*std::sin(p[2]);
@@ -366,3 +366,42 @@ static DROPS::RegisterScalarFunction regscaconstq("ConstQ",      ConstQ);
 
 
 }// end of namespace
+
+namespace StSlip{
+
+DROPS::SVectorCL<3> Velocity( const DROPS::Point3DCL& p,double)
+{
+    DROPS::SVectorCL<3> v(0.);
+    v[0]=  0.1*std::sin(p[0])*(2.*p[1]-3);
+    v[1]= -0.1*std::cos(p[0])*(p[1] * p[1]-3 * p[1] + 2);
+    v[2]= 0;
+
+    return v;
+}
+
+DROPS::SVectorCL<3> PressureGr(const DROPS::Point3DCL& p, double)
+{
+    DROPS::SVectorCL<3> delp(0.);
+    double nu =1;
+    delp[0]= -0.1*nu*std::sin(p[0])*(2.*p[1]-3);
+    delp[1]=-0.2*nu*std::cos(p[0]);
+    delp[2]= 0;
+
+    return delp;
+
+}
+
+DROPS::SVectorCL<3> VolForce( const DROPS::Point3DCL& p, double)
+{
+    DROPS::SVectorCL<3> f(0.);
+    double nu =1;
+    f[0] =-0.1*nu*std::sin(p[0])*(2.*p[1]-3);
+    f[1] = 0;
+    f[2] =0.;
+    return f;
+}
+static DROPS::RegisterVectorFunction regvelStVel("StSlipVel", Velocity);
+static DROPS::RegisterVectorFunction regvelStf("StSlipF", VolForce);
+static DROPS::RegisterVectorFunction regvelStgpr("StSlipPrGrad",PressureGr);
+
+}

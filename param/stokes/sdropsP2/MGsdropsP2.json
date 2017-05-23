@@ -1,0 +1,110 @@
+{
+    "General": 
+    {
+        "DynamicLibs": 
+        [
+            "misc/libmisc-vectorFunctions", 
+            "misc/libmisc-scalarFunctions", 
+            "stokes/libstokes-stokesCoeff"
+        ], 
+        "DynamicLibsPrefix": "../", 
+        "ProgressBar": 1
+    }, 
+
+
+    "Time": 
+    {
+        "NumSteps": 0, 
+        "Scheme": 1, 
+        "FinalTime": 0, 
+        "Theta": 1
+    },
+
+
+    "NavStokesSolver": 
+    {
+        "OseenSolver": 
+        {
+            "Solver": 30207, 
+            "Iter": 200, 
+            "Tol": 1e-06, 
+            "PcAIter": 2, 
+            "PcSTol": 0.0001, 
+            "PcATol": 1e-99,
+            "UzawaInnerTol": 1e-10, 
+            "UzawaInnerIter": 200,        
+            "Tau": 1, 
+            "Omega": 1
+        }
+    }, 
+
+
+    "NavStokes": 
+    {
+        "Coeff": 
+        {
+            "Gravity": [0,0,0],
+            "Dens": 1, 
+            "Visc": 1,
+            "Solution_DVel":    "DVelSol_MGsdropsP2", 
+            "Reaction":         "ScaZero", 
+            "Solution_Pr":      "PrSol_MGsdropsP2", 
+            "Solution_Vel":     "VelSol_MGsdropsP2", 
+            "Source":           "Source_MGsdropsP2"
+        },
+
+        "BoundaryData": 
+        {
+            "Velocity": 
+            {
+                "Default":      [ "DirBC", "VelSol_MGsdropsP2" ]
+            }
+        }
+    }, 
+
+
+    "Mesh": 
+    {
+        "Type":         "BrickBuilder",
+        "Origin":       [0,0,0],
+        "E1":           [0.7854,0,0],
+        "E2":           [0,0.7854,0],
+        "E3":           [0,0,0.7854],
+        "N1":           3,
+        "N2":           3,
+        "N3":           3,
+        "InitialRef":   2,
+
+        "AdaptRef": 
+        {
+            "CoarsestLevel": 0, 
+            "FinestLevel": 2, 
+            "Width": 0,
+            "ModifyGrid": 0
+        }
+    }, 
+
+
+    "Ensight": 
+    {
+        "Binary": 1, 
+        "EnsightOut": 0, 
+        "MasterOut": 1, 
+        "EnsDir": "ensight", 
+        "EnsCase": "FilmTemp", 
+        "GeomName": "test"
+    },
+
+
+    "Error": 
+    {
+        "Meas": 0.48447307313, 
+        "MarkLower": 0.25, 
+        "NumRef": 2, 
+        "RelReduction": 0.1, 
+        "DoMark": 0, 
+        "MinRatio": 0, 
+        "Threshold": 0.6, 
+        "DoErrorEstimate": 1
+    } 
+}

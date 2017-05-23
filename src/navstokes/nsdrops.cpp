@@ -115,9 +115,9 @@ class UzawaSolverCL : public StokesSolverBaseCL
     double GetTau()            const { return _tau; }
     void   SetTau( double tau)       { _tau= tau; }
 
-    void Solve( const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p,
+    void Solve( const MatrixCL& A, const MatrixCL& B, const MatrixCL&, VectorCL& v, VectorCL& p,
                 const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&);
-    void Solve( const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p,
+    void Solve( const MLMatrixCL& A, const MLMatrixCL& B, const MLMatrixCL&, VectorCL& v, VectorCL& p,
                 const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&);
 };
 
@@ -162,15 +162,13 @@ void UzawaSolverCL<PoissonSolverT>::doSolve(
 }
 
 template <class PoissonSolverT>
-void UzawaSolverCL<PoissonSolverT>::Solve(
-    const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&)
+void UzawaSolverCL<PoissonSolverT>::Solve(const MatrixCL& A, const MatrixCL& B, const MatrixCL &, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&)
 {
     doSolve( A, B, v, p, b, c);
 }
 
 template <class PoissonSolverT>
-void UzawaSolverCL<PoissonSolverT>::Solve(
-    const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&)
+void UzawaSolverCL<PoissonSolverT>::Solve(const MLMatrixCL& A, const MLMatrixCL& B, const MLMatrixCL &, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&)
 {
     doSolve( A, B, v, p, b, c);
 }
@@ -226,6 +224,7 @@ void StrategyNavSt(NavierStokesP2P1CL<Coeff>& NS, int maxStep, double fp_tol, in
 
     MLMatDescCL* A= &NS.A;
     MLMatDescCL* B= &NS.B;
+    MLMatDescCL* C= &NS.C;
     MLMatDescCL* N= &NS.N;
     MLMatDescCL* M= &NS.M;
     VelVecDescCL  cplM( vidx1);
@@ -308,7 +307,7 @@ void StrategyNavSt(NavierStokesP2P1CL<Coeff>& NS, int maxStep, double fp_tol, in
         old_v1.Data= v1->Data;
         VelVecDescCL rhsN( vidx1);
         NS.SetupNonlinear( N, v1, &rhsN);
-        statsolver.Solve( A->Data, B->Data, *v1, p1->Data, b->Data, rhsN, c->Data, v1->RowIdx->GetEx(), p1->RowIdx->GetEx(), 1.);
+        statsolver.Solve( A->Data, B->Data, C->Data, *v1, p1->Data, b->Data, rhsN, c->Data, v1->RowIdx->GetEx(), p1->RowIdx->GetEx(), 1.);
 
 /*
         VectorCL d( vidx1->NumUnknowns), e( pidx1->NumUnknowns),

@@ -1,6 +1,6 @@
 /// \file instatstokes2phase.h
 /// \brief classes that constitute the 2-phase Stokes problem
-/// \author LNM RWTH Aachen: Patrick Esser, Joerg Grande, Sven Gross, Volker Reichelt; SC RWTH Aachen: Oliver Fortmeier
+/// \author LNM RWTH Aachen: Patrick Esser, Joerg Grande, Sven Gross, Volker Reichelt, Thomas Ludescher, Liang Zhang; SC RWTH Aachen: Oliver Fortmeier
 
 /*
  * This file is part of DROPS.
@@ -34,7 +34,7 @@
 #include "num/MGsolver.h"
 #include "num/fe_repair.h"
 #include "misc/funcmap.h"
-
+extern DROPS::ParamCL P;
 namespace DROPS
 {
 
@@ -79,8 +79,6 @@ void SetupLumpedMass (const MultiGridCL& MG, VectorCL& M, const IdxDescCL& RowId
                     const BndCondCL& bnd= BndCondCL( 0), const VecDescCL* lsetp=0, const BndDataCL<>* lsetbnd=0);
 
 
-
-
 // rho*du/dt - mu*laplace u + Dp = f + rho*g - okn
 //                        -div u = 0
 //                             u = u0, t=t0
@@ -91,55 +89,87 @@ class TwoPhaseFlowCoeffCL
 // \Omega_1 = Tropfen,    \Omega_2 = umgebendes Fluid
 
   private:
-    bool film;
+    bool film; // TL: delete?
+    bool ns_shiftframe;
     double surfTens;
     double rho_koeff1, rho_koeff2, mu_koeff1, mu_koeff2;
+    double beta_coeff1, beta_coeff2; ///< slip bnd coeff for fluid 1/2
 
   public:
     DROPS::instat_vector_fun_ptr volforce;
+    DROPS::instat_vector_fun_ptr BndOutNormal;
     const SmoothedJumpCL rho, mu;
+    const SmoothedJumpCL beta;      ///< Coefficient for SlipBC
     const double SurfTens, DilVisco, ShearVisco;
+    const double betaL,             ///< contact line coefficient
+                 alpha;             ///< Nitsche coeff for slip bnd
     const Point3DCL g;
+    const Point3DCL framevel;
+    DROPS::instat_scalar_fun_ptr var_tau_fncs;
 
     TwoPhaseFlowCoeffCL( ParamCL& P, bool dimless = false)
       //big question: film or measurecell? 1: measure, 2: film
-        : film( (P.get<double>("Mat.DensDrop") == 0.0) ),
-        surfTens( film ? P.get<double>("Mat.SurfTension") : P.get<double>("SurfTens.SurfTension")),
-        rho_koeff1( film ? P.get<double>("Mat.DensGas") : P.get<double>("Mat.DensFluid")),
-        rho_koeff2( film ? P.get<double>("Mat.DensFluid") : P.get<double>("Mat.DensDrop")),
-        mu_koeff1( film ? P.get<double>("Mat.ViscGas") : P.get<double>("Mat.ViscFluid")),
-        mu_koeff2( film ? P.get<double>("Mat.ViscFluid") : P.get<double>("Mat.ViscDrop")),
+            //If we merge film.cpp and twophasedrops.cpp, we don't need film flag anymore.
+        : film( false ), /// \todo change to something meaningful
+        ns_shiftframe( (P.get<int>("NavStokes.ShiftFrame", 0) == 1) ),
+        surfTens( P.get<double>("NavStokes.Coeff.SurfTens.SurfTension") ),
+        rho_koeff1( P.get<double>("NavStokes.Coeff.DensPos") ),
+        rho_koeff2( P.get<double>("NavStokes.Coeff.DensNeg") ),
+        mu_koeff1( P.get<double>("NavStokes.Coeff.ViscPos") ),
+        mu_koeff2( P.get<double>("NavStokes.Coeff.ViscNeg") ),
+        beta_coeff1(P.get<double>("NavStokes.BoundaryData.SlipBnd.Beta1")),
+        beta_coeff2(P.get<double>("NavStokes.BoundaryData.SlipBnd.Beta2")),
 
         rho( dimless ? JumpCL( 1., rho_koeff1/rho_koeff2)
-          : JumpCL( rho_koeff2, rho_koeff1), H_sm, P.get<double>("Mat.SmoothZone")),
+          : JumpCL( rho_koeff2, rho_koeff1), H_sm, P.get<double>("NavStokes.Coeff.SmoothZone")),
         mu( dimless ? JumpCL( 1., mu_koeff1/mu_koeff2)
-          : JumpCL( mu_koeff2, mu_koeff1), H_sm, P.get<double>("Mat.SmoothZone")),
+          : JumpCL( mu_koeff2, mu_koeff1), H_sm, P.get<double>("NavStokes.Coeff.SmoothZone")),
+        beta(dimless ? JumpCL( 1., beta_coeff2/beta_coeff1)
+                     : JumpCL(beta_coeff2,beta_coeff1), H_sm, 0),
         SurfTens (dimless ? surfTens/rho_koeff2 : surfTens),
-        DilVisco( film ? P.get<double>("Mat.DilatationalVisco") : P.get<double>("SurfTens.DilatationalVisco")),
-        ShearVisco( film ? P.get<double>("Mat.ShearVisco") : P.get<double>("SurfTens.ShearVisco")),
-        g( P.get<DROPS::Point3DCL>("Exp.Gravity"))
+        DilVisco( P.get<double>("NavStokes.Coeff.SurfTens.DilatationalVisco") ),
+        ShearVisco( P.get<double>("NavStokes.Coeff.SurfTens.ShearVisco") ),
+        betaL(P.get<double>("NavStokes.BoundaryData.SlipBnd.BetaL")), alpha(P.get<double>("NavStokes.BoundaryData.SlipBnd.NitschePenalty")),
+        g( P.get<DROPS::Point3DCL>("NavStokes.Coeff.Gravity")),
+        framevel( ns_shiftframe ? P.get<DROPS::Point3DCL>("NavStokes.FrameVel", DROPS::Point3DCL(0.0)) : DROPS::Point3DCL(0.0) )
         {
-        volforce = InVecMap::getInstance()[P.get<std::string>("Exp.VolForce")];
+        volforce = InVecMap::getInstance()[P.get<std::string>("NavStokes.Coeff.VolForce")];
+        var_tau_fncs = InScaMap::getInstance()[P.get<std::string>("NavStokes.Coeff.SurfTens.VarTensionFunc")];
+        if( P.get<std::string>("NavStokes.BoundaryData.SlipBnd.BndOuterNormal").compare("None")!=0)
+            BndOutNormal = InVecMap::getInstance()[P.get<std::string>("NavStokes.BoundaryData.SlipBnd.BndOuterNormal")];
+        else
+            BndOutNormal = nullptr;
     }
 
-    TwoPhaseFlowCoeffCL( double rho1, double rho2, double mu1, double mu2, double surftension, Point3DCL gravity, bool dimless = false, double dilatationalvisco = 0.0, double shearvisco = 0.0)
+    TwoPhaseFlowCoeffCL( double rho1, double rho2, double mu1, double mu2, double surftension, Point3DCL gravity, Point3DCL framevelocity = Point3DCL(0.0), bool dimless = false, double dilatationalvisco = 0.0, double shearvisco = 0.0, 
+                         double betaL_=0, double alpha_ = 1.0, double beta1 = 0.0, double beta2 =0.0)
       : rho( dimless ? JumpCL( 1., rho2/rho1)
                      : JumpCL( rho1, rho2), H_sm, 0),
         mu(  dimless ? JumpCL( 1., mu2/mu1)
                      : JumpCL( mu1, mu2), H_sm, 0),
+        beta( dimless? JumpCL( 1., beta2/beta1)
+                     : JumpCL(beta2,beta1), H_sm, 0),
         SurfTens( dimless ? surftension/rho1 : surftension),
         DilVisco( dilatationalvisco),
         ShearVisco( shearvisco),
-        g( gravity)    {
-          volforce = InVecMap::getInstance()["ZeroVel"];
-        }
+        betaL(betaL_),
+        alpha(alpha_), 
+        g( gravity),
+        framevel( framevelocity)
+    {
+        volforce = InVecMap::getInstance()["ZeroVel"];
+        var_tau_fncs = InScaMap::getInstance()["ConstTau"];
+        BndOutNormal = InVecMap::getInstance()["ZeroVel"];
+    }
 };
 
 /// problem class for instationary two-pase Stokes flow
-
-
 class InstatStokes2PhaseP2P1CL : public ProblemCL<TwoPhaseFlowCoeffCL, StokesBndDataCL>
 {
+private:
+    void computeGhostPenaltyKernel(MultiGridCL& mg, const LevelsetP2CL& lset , const IdxDescCL &prIdx) const;
+    double epsP;           ///< ghost penalty stabilization parameter
+
   public:
     typedef ProblemCL<TwoPhaseFlowCoeffCL, StokesBndDataCL>       base_;
     typedef base_::BndDataCL                                      BndDataCL;
@@ -166,19 +196,24 @@ class InstatStokes2PhaseP2P1CL : public ProblemCL<TwoPhaseFlowCoeffCL, StokesBnd
                  C,
                  M,
                  prA,
-                 prM;
+                 prM,
+                 prMhat;
+    mutable VectorBaseCL<VectorCL> cKernel;
+    SurfaceTensionCL*     SurfTension_;
+    instat_scalar_fun_ptr CtAngleFnc_;
+    instat_vector_fun_ptr BndOutNormal_;
 
   public:
-    InstatStokes2PhaseP2P1CL( const MGBuilderCL& mgb, const TwoPhaseFlowCoeffCL& coeff, const BndDataCL& bdata, FiniteElementT prFE= P1_FE, double XFEMstab=0.1, FiniteElementT velFE= vecP2_FE)
-        : base_(mgb, coeff, bdata), vel_idx(velFE, 1, bdata.Vel, 0, XFEMstab), pr_idx(prFE, 1, bdata.Pr, 0, XFEMstab) {}
-    InstatStokes2PhaseP2P1CL( MultiGridCL& mg, const TwoPhaseFlowCoeffCL& coeff, const BndDataCL& bdata, FiniteElementT prFE= P1_FE, double XFEMstab=0.1, FiniteElementT velFE= vecP2_FE)
-        : base_(mg, coeff, bdata),  vel_idx(velFE, 1, bdata.Vel, 0, XFEMstab), pr_idx(prFE, 1, bdata.Pr, 0, XFEMstab) {}
+    InstatStokes2PhaseP2P1CL( const MGBuilderCL& mgb, const TwoPhaseFlowCoeffCL& coeff, const BndDataCL& bdata, FiniteElementT prFE= P1_FE, double XFEMstab=0.1, FiniteElementT velFE= vecP2_FE, double EpsP = 0.0 )
+        : base_(mgb, coeff, bdata), epsP(EpsP), vel_idx(velFE, 1, bdata.Vel, XFEMstab), pr_idx(prFE, 1, bdata.Pr, XFEMstab), cKernel(0), SurfTension_(nullptr) { }
+    InstatStokes2PhaseP2P1CL( MultiGridCL& mg, const TwoPhaseFlowCoeffCL& coeff, const BndDataCL& bdata, FiniteElementT prFE= P1_FE, double XFEMstab=0.1, FiniteElementT velFE= vecP2_FE, double EpsP = 0.0)
+        : base_(mg, coeff, bdata), epsP(EpsP),  vel_idx(velFE, 1, bdata.Vel, XFEMstab), pr_idx(prFE, 1, bdata.Pr, XFEMstab), cKernel(0), SurfTension_(nullptr) { }
 
     /// \name Numbering
     //@{
     /// Create/delete numbering of unknowns
-    void CreateNumberingVel( Uint level, MLIdxDescCL* idx, match_fun match= 0, const LevelsetP2CL* lsetp= 0);
-    void CreateNumberingPr ( Uint level, MLIdxDescCL* idx, match_fun match= 0, const LevelsetP2CL* lsetp= 0);
+    void CreateNumberingVel( Uint level, MLIdxDescCL* idx, const LevelsetP2CL* lsetp= 0);
+    void CreateNumberingPr ( Uint level, MLIdxDescCL* idx, const LevelsetP2CL* lsetp= 0);
     /// \brief Only used for XFEM
     void UpdateXNumbering( MLIdxDescCL* idx, const LevelsetP2CL& lset)
         {
@@ -202,12 +237,16 @@ class InstatStokes2PhaseP2P1CL : public ProblemCL<TwoPhaseFlowCoeffCL, StokesBnd
     MLTetraAccumulatorTupleCL& system1_accu (MLTetraAccumulatorTupleCL& accus, MLMatDescCL* A, MLMatDescCL* M, VecDescCL* b, VecDescCL* cplA, VecDescCL* cplM, const LevelsetP2CL& lset, double t) const;
     /// Set up rhs b (depending on phase bnd)
     void SetupRhs1( VecDescCL* b, const LevelsetP2CL& lset, double t) const;
+    /// Set up coupling terms for M matrix at given time t for time integration
+    void SetupCplM( VecDescCL *cplM, const LevelsetP2CL &lset, double t) const;
+    /// Set up matrix vector product v = A^n*u^n - cplA at given time t
+    void SetupAdotU( VecDescCL *AdotU, const VecDescCL &un, const LevelsetP2CL &lset, double t) const;
     /// Set up the Laplace-Beltrami-Operator
     void SetupLB( MLMatDescCL* A, VecDescCL* cplA, const LevelsetP2CL& lset, double t) const;
     /// Set up the Boussinesq-Scriven Law of surface stress
     void SetupBS( MLMatDescCL* A, VecDescCL* cplA, const LevelsetP2CL& lset, double t) const;
     /// Set up matrix B and rhs c
-    void SetupSystem2( MLMatDescCL* B, VecDescCL* c, const LevelsetP2CL& lset, double t) const;
+    void SetupSystem2( MLMatDescCL* B, MLMatDescCL *C, VecDescCL* c, const LevelsetP2CL& lset, double t) const;
     MLTetraAccumulatorTupleCL& system2_accu (MLTetraAccumulatorTupleCL& accus, MLMatDescCL* B, VecDescCL* c, const LevelsetP2CL& lset, double t) const;
     /// Set up rhs c
     void SetupRhs2( VecDescCL* c, const LevelsetP2CL& lset, double t) const;
@@ -215,10 +254,12 @@ class InstatStokes2PhaseP2P1CL : public ProblemCL<TwoPhaseFlowCoeffCL, StokesBnd
     void SetupBdotv (VecDescCL* Bdotv, const VelVecDescCL* vel, const LevelsetP2CL& lset, double t) const;
     /// Set up the mass matrix for the pressure, scaled by \f$\mu^{-1}\f$.
     void SetupPrMass( MLMatDescCL* prM, const LevelsetP2CL& lset) const;
+    /// Set up the overlapping mass matrix for the pressure, scaled by \f$\mu^{-1}\f$.
+    void SetupPrMassHat( MLMatDescCL* prMhat, const LevelsetP2CL& lset) const;
     /// Set up the stabilisation matrix for the pressure.
     void SetupC( MLMatDescCL* matC, const LevelsetP2CL& lset, double eps_p ) const;
     /// Set up the stiffness matrix for the pressure, scaled by \f$\rho^{-1}\f$.
-    void SetupPrStiff(MLMatDescCL* prA, const LevelsetP2CL& lset) const;
+    void SetupPrStiff(MLMatDescCL* prA, const LevelsetP2CL& lset, double lambda=1.0) const;
     //@}
 
     /// Initialize velocity field
@@ -245,7 +286,21 @@ class InstatStokes2PhaseP2P1CL : public ProblemCL<TwoPhaseFlowCoeffCL, StokesBnd
     void GetPrOnPart( VecDescCL& p_part, const LevelsetP2CL& lset, bool posPart= true); // false = inner = Phi<0, true = outer = Phi>0
     /// Get CFL restriction for explicit time stepping
     double GetCFLTimeRestriction( LevelsetP2CL& lset);
-
+    /// check whether Ghost Penalty is used or not
+    bool usesGhostPen(){ return epsP > 0.0; }
+    /// get Ghost Penalty stabilization factor
+    double getGhPenStab(){ return epsP; }
+    /// set Ghost Penalty stabilization factor
+    void setGhPenStab( double EpsP ){ epsP = EpsP; }
+    
+    /// Set Equilibrium Contact Angle
+    void SetYoungAngle(instat_scalar_fun_ptr CtAngleFnc) { CtAngleFnc_= CtAngleFnc; }
+    /// Set out normal function of the slip boundary
+    void SetBndOutNormal(instat_vector_fun_ptr outnormal) { BndOutNormal_= outnormal; }
+    /// Set the surface force type and the surface tension
+    void SetSurfTension(SurfaceTensionCL* Sf) { SurfTension_= Sf; }
+    /// Discretize Young Force on the three-phase contact line
+    void AccumulateYoungForce(const LevelsetP2CL& lset, VecDescCL& f) const;
 
     /// \name Evaluate Solution
     //@{
@@ -269,7 +324,7 @@ class VelocityRepairCL : public MGObserverCL
 {
   private:
     InstatStokes2PhaseP2P1CL& stokes_;
-    std::auto_ptr<RepairP2CL<Point3DCL>::type > p2repair_;
+    std::unique_ptr<RepairP2CL<Point3DCL>::type > p2repair_;
 
   public:
     VelocityRepairCL (InstatStokes2PhaseP2P1CL& stokes)
@@ -296,8 +351,8 @@ class PressureRepairCL : public MGObserverCL
 {
   private:
     InstatStokes2PhaseP2P1CL& stokes_;
-    std::auto_ptr<P1XRepairCL> p1xrepair_;
-    std::auto_ptr<RepairP1CL<double>::type> p1repair_;
+    std::unique_ptr<P1XRepairCL> p1xrepair_;
+    std::unique_ptr<RepairP1CL<double>::type> p1repair_;
     const LevelsetP2CL& ls_;
 
   public:

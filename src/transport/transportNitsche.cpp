@@ -215,7 +215,7 @@ double TransportP1XCL::CheckSolution(instat_scalar_fun_ptr Lsgn, instat_scalar_f
               errl1n += q_diffabs.quad(Vol);
               errh1n += q_diffGrad2.quad(Vol);
             }
-            delete nodes;
+            delete[] nodes;
           }
 
         }
@@ -832,25 +832,24 @@ double TransportP1XCL::Interface_L2error() const
 void
 TransportXRepairCL::pre_refine ()
 {
-    p1oldctrepair_= std::auto_ptr<RepairP1CL<double>::type >(
+    p1oldctrepair_= std::unique_ptr<RepairP1CL<double>::type >(
         new RepairP1CL<double>::type( c_.GetMG(), c_.oldct, c_.GetBndData()));
-    p1ctrepair_= std::auto_ptr<RepairP1CL<double>::type >(
+    p1ctrepair_= std::unique_ptr<RepairP1CL<double>::type >(
         new RepairP1CL<double>::type( c_.GetMG(), c_.ct, c_.GetBndData()));
 }
 
 void
 TransportXRepairCL::post_refine ()
 {
-    match_fun match= c_.GetMG().GetBnd().GetMatchFun();
     VecDescCL loc_ct;
-    IdxDescCL loc_cidx( P1X_FE, c_.GetBndData(), match, c_.GetXFEMOmitBound());
+    IdxDescCL loc_cidx( P1X_FE, c_.GetBndData(), c_.GetXFEMOmitBound());
     VecDescCL loc_oldct;
-    IdxDescCL loc_oldcidx( P1X_FE, c_.GetBndData(), match, c_.GetXFEMOmitBound());
+    IdxDescCL loc_oldcidx( P1X_FE, c_.GetBndData(), c_.GetXFEMOmitBound());
     VecDescCL& ct= c_.ct;
     VecDescCL& oldct= c_.oldct;
 
-    loc_cidx.CreateNumbering( mylvl, c_.GetMG(), c_.GetBndData(), match, &(c_.GetLevelset()),&(c_.GetLevelsetBnd()));
-    loc_oldcidx.CreateNumbering( mylvl, c_.GetMG(), c_.GetBndData(),  match, &(c_.GetOldLevelset()),&(c_.GetLevelsetBnd()));
+    loc_cidx.CreateNumbering( mylvl, c_.GetMG(), c_.GetBndData(), &(c_.GetLevelset()),&(c_.GetLevelsetBnd()));
+    loc_oldcidx.CreateNumbering( mylvl, c_.GetMG(), c_.GetBndData(),  &(c_.GetOldLevelset()),&(c_.GetLevelsetBnd()));
     loc_ct.SetIdx( &loc_cidx);
     loc_oldct.SetIdx( &loc_oldcidx);
     p1oldctrepair_->repair( loc_oldct);
@@ -873,7 +872,7 @@ TransportXRepairCL::post_refine ()
 void
   TransportXRepairCL::pre_refine_sequence ()
 {
-    oldp1xrepair_= std::auto_ptr<P1XRepairCL>( new P1XRepairCL( c_.GetMG(), c_.oldct));
+    oldp1xrepair_= std::unique_ptr<P1XRepairCL>( new P1XRepairCL( c_.GetMG(), c_.oldct));
 }
 
 void
@@ -918,7 +917,7 @@ void VelTranspRepairCL::swap( IdxDescCL&, VectorCL&) {
 void
   VelTranspRepairCL::pre_refine ()
 {
-    p2repair_= std::auto_ptr<RepairP2CL<Point3DCL>::type >(
+    p2repair_= std::unique_ptr<RepairP2CL<Point3DCL>::type >(
         new RepairP2CL<Point3DCL>::type( mg_, v_, Bnd_v_));
 }
 
@@ -929,8 +928,7 @@ void
     IdxDescCL    loc_vidx(vecP2_FE);
     VelVecDescCL& v= v_;
     Uint LastLevel= mg_.GetLastLevel();
-    match_fun match= mg_.GetBnd().GetMatchFun();
-    loc_vidx.CreateNumbering( mg_.GetLastLevel(), mg_, Bnd_v_, match );
+    loc_vidx.CreateNumbering( mg_.GetLastLevel(), mg_, Bnd_v_);
     if (LastLevel != v.RowIdx->TriangLevel()) {
         std::cout << "LastLevel: " << LastLevel
                   << " old v->TriangLevel: " << v.RowIdx->TriangLevel() << std::endl;

@@ -1,0 +1,16 @@
+//=============================================================
+//    DROPS parameter file
+//    Test the mesh-serialization
+//=============================================================
+{
+	"Mesh":
+	{
+		"RestartFile": "",	// If set, read the triangulation from the file (via FileBuilderCL).
+		"Type": "TetraBuilder",	// Creates a tetrahedron.
+		"Rule": 0,		// Refinement rule (value between 0 and 63 or 128)
+		"P0": [0,0,0],		// The four 
+		"P1": [1,0,0],		// vertices
+		"P2": [0,1,0],		// of the 
+		"P3": [0,0,1]		// tetrahedron 
+	}
+}

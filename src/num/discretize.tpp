@@ -786,6 +786,77 @@ template <Uint Dim, class VertexT, class RAIterT, class BaryT>
 }
 
 template <class RAIterT>
+  void Quad9_1DDataCL::SetBaryCoord (const BaryCoordCL*const p, RAIterT NodeInTetra)
+{
+    for (Uint i= 0; i < NumNodesC; ++i)
+        NodeInTetra[i]= (p[0]+p[1])/2.+ Node[i]*(p[1]-p[0])/2.;
+}
+//**************************************************************************
+// Class: Quad9_1DCL                                                       *
+//**************************************************************************
+template<class T>
+  inline Quad9_1DCL<T>&
+  Quad9_1DCL<T>::assign(const TetraCL& s, const BaryCoordCL* const p, instat_fun_ptr f , double t)
+{
+    Point3DCL v[DataClass::NumNodesC];
+    BaryCoordCL NodeInTetra[DataClass::NumNodesC];
+    SetBaryCoord( p, NodeInTetra);
+    for (Uint i= 0; i < DataClass::NumNodesC; ++i){
+        v[i]= GetWorldCoord(s, NodeInTetra[i]);
+    }
+    for (Uint i= 0; i < DataClass::NumNodesC; ++i)
+        (*this)[i]= f(v[i], t);
+
+    return *this;
+}
+
+template<class T>
+  inline Quad9_1DCL<T>&
+  Quad9_1DCL<T>::assign(const LocalP1CL<value_type>& P1Fnc, const BaryCoordCL* const p)
+{
+    BaryCoordCL NodeInTetra[DataClass::NumNodesC];
+    SetBaryCoord( p, NodeInTetra);
+    for (size_t i= 0; i < DataClass::NumNodesC; ++i)
+        (*this)[i]= P1Fnc( NodeInTetra[i]);
+    return *this;
+}
+
+template<class T>
+  inline Quad9_1DCL<T>&
+  Quad9_1DCL<T>::assign(const LocalP2CL<value_type>& P2Fnc, const BaryCoordCL* const p)
+{
+    BaryCoordCL NodeInTetra[DataClass::NumNodesC];
+    SetBaryCoord( p, NodeInTetra);
+    std::valarray<double> P2_Val[10];
+    FE_P2CL::ApplyAll( DataClass::NumNodesC, NodeInTetra, P2_Val);
+    (*this)= P2Fnc[0]*(*static_cast<GridFunctionCL<>* >( &P2_Val[0]));
+    for (size_t i= 1; i < 10; ++i)
+        (*this)+= P2Fnc[i]*(*static_cast<GridFunctionCL<>* >( &P2_Val[i]));
+    return *this;
+}
+
+template<class T>
+  Quad9_1DCL<T>::Quad9_1DCL(const TetraCL& s, const BaryCoordCL*const p, instat_fun_ptr f, double t)
+  : base_type( value_type(), DataClass::NumNodesC)
+{
+    this->assign( s, p, f, t);
+}
+
+template<class T>
+  Quad9_1DCL<T>::Quad9_1DCL(const LocalP1CL<value_type>& P1Fnc, const BaryCoordCL* const p)
+  : base_type( value_type(), DataClass::NumNodesC)
+{
+    this->assign( P1Fnc, p);
+}
+
+template<class T>
+  Quad9_1DCL<T>::Quad9_1DCL(const LocalP2CL<value_type>& P2Fnc, const BaryCoordCL* const p)
+  : base_type( value_type(), DataClass::NumNodesC)
+{
+    this->assign( P2Fnc, p);
+}
+
+template <class RAIterT>
   inline void
   SetInterface (const BaryCoordCL*const p, Uint NumNodes, RAIterT NodeInTetra, const Point3DCL* const Node)
 {
@@ -801,11 +872,11 @@ template<class T>
   inline Quad5_2DCL<T>&
   Quad5_2DCL<T>::assign(const TetraCL& s, const BaryCoordCL* const p, instat_fun_ptr f , double t)
 {
-    Point3DCL v[3];
-    for (Uint k= 0; k < 3; ++k)
-        v[k]= GetWorldCoord(s, p[k]);
+    BaryCoordCL Bary[Quad5_2DDataCL::NumNodesC];
+    SetInterface( p, Bary);
     for (Uint i= 0; i < Quad5_2DDataCL::NumNodesC; ++i)
-        (*this)[i]= f( Quad5_2DDataCL::Node[i][0]*v[0]+Quad5_2DDataCL::Node[i][1]*v[1]+Quad5_2DDataCL::Node[i][2]*v[2], t) ;
+        (*this)[i]= f( GetWorldCoord(s, Bary[i]), t);
+
     return *this;
 }
 

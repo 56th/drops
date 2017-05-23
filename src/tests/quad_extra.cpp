@@ -14,7 +14,7 @@ using namespace DROPS;
 int degx, degy, degz;
 
 double f(const Point3DCL& p, double)
-{
+{ // f= x^degx y^degy z^degz
     return  (degx==0 ? 1. : std::pow( p[0], degx))
            *(degy==0 ? 1. : std::pow( p[1], degy))
            *(degz==0 ? 1. : std::pow( p[2], degz));
@@ -53,6 +53,7 @@ double exactint[56] = { // with maple
 
 void TestExactness_extrapolation(int num_extrapolation)
 {
+    std::cout << "\nTesting 3D quadrature on unit tetrahedron:" << std::endl;
     DROPS::TetraBuilderCL tet( 0);
     DROPS::MultiGridCL mg( tet);
     TetraCL& s= *mg.GetAllTetraBegin();
@@ -70,7 +71,6 @@ void TestExactness_extrapolation(int num_extrapolation)
 
     DROPS::GridFunctionCL<> integrand;
 
-    Quad5CL<> q;
     size_t c= 0;
     for (degz= 0; degz <= 5; ++degz) {
         for (degy= 0; degy + degz <= 5; ++degy) {
@@ -88,18 +88,10 @@ void TestExactness_extrapolation(int num_extrapolation)
     }
 }
 
-inline double tetracut (const DROPS::Point3DCL& p)
-{
-    double s = 1.;
-    if (p[2] == 0)
-        s = 0.;
-    // return p.norm() - 0.5;
-    return s;
-}
 
 inline double tetracut_instat (const DROPS::Point3DCL& p, double)
-{
-    return tetracut( p);
+{ // level set function for plane z = 1/2
+    return p[2] - 0.5;
 }
 
 int fakultaet (int n)
@@ -131,24 +123,21 @@ void TestExactness_extrapolation2D(int num_extrapolation)
         DROPS::LocalP2CL<> ls_loc( *it,&tetracut_instat);
         make_ExtrapolatedQuad5Domain2D( qdom, ls_loc,*it, extra);
         DROPS::GridFunctionCL<> integrand;
-        Quad5CL<> q;
         degz = 0;
-        int i =0.;
         for (degy= 0; degy <= 5; ++degy) {
             for (degx= 0; degx + degy <= 5; ++degx) {
-                exactint_surf[i] = 0.;
+                double exactint_surf= 0.;
                 for (int k = 0; k<= degy+1; ++k) {
-                    exactint_surf[i] += std::pow(-1,k)*binomi(degy+1,k)/(degx+k+1);
-                }
-                exactint_surf[i] *= 1./(degy+1);
+                    exactint_surf+= std::pow(-1,k)*binomi(degy+1,k)/(degx+k+1);
+                }    
+                exactint_surf*= 1./(degy+1)/std::pow( 2, degx+degy+2);
                 resize_and_evaluate_on_vertexes (f, s, qdom, 0., integrand);
                 std::cout << "degz: " << degz << "\tdegy: " << degy << "\tdegx: " << degx
-                          << "\t\tI-Q_h: " << exactint_surf[i] - 2*quad_2D(integrand, qdom)//q.quad( 1.)
-                          << "\tIntegral: " << 2*quad_2D(integrand,  qdom) <<  "             ";//q.quad( 1.)
+                          << "\t\tI-Q_h: " << exactint_surf - quad_2D(integrand, qdom)//q.quad( 1.)
+                          << "\tIntegral: " << quad_2D(integrand,  qdom) <<  "             ";//q.quad( 1.)
                 /*for (size_t i= 0; i < q.size(); ++i)
                     std::cout << '\t' << q[i];*/
                 std::cout << std::endl;
-                ++i;
              }
         }
     }

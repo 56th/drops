@@ -45,18 +45,18 @@ namespace DROPS
 
 MGBuilderCL* make_MGBuilder (const ParamCL& P)
 {
-    const std::string type= P.get<std::string>( "Type");
+    const std::string type= P.get<std::string>( "Mesh.Type");
     if (BuilderMap::getInstance().count( type) == 0) {
         const std::string msg= "make_MGBuilder: Builder for '" + type + "' not registered.\n";
         throw DROPSErrCL( msg);
     }
-    MGBuilderCL* tmp= BuilderMap::getInstance()[type]( P);
+    MGBuilderCL* tmp= BuilderMap::getInstance()[type]( P.get_child( "Mesh"));
 
     std::string restartfile;
     try {
-        restartfile= P.get<std::string>( "RestartFile");
-    } catch (DROPSParamErrCL) {}
-    if (restartfile == std::string())
+        restartfile= P.get<std::string>( "Mesh.RestartFile");
+    } catch (DROPSParamErrCL& ) {}
+    if (restartfile == "none" || restartfile == "" )
         return tmp;
     else
         return new FileBuilderCL( restartfile, tmp, /*delete_bndbuilder*/ true);

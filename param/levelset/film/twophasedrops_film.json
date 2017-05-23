@@ -1,0 +1,219 @@
+{
+//=============================================================
+//    DROPS parameter file for twophasedrops
+//    simulation of two-phase flow:
+//    falling film flow
+//=============================================================
+
+//General section
+        "General":
+        {
+                "ProgressBar": 0, //show progress bar
+                "DynamicLibsPrefix": "../", //where should we look for shared objects?
+                "DynamicLibs": [ //select libraries to be loaded after program start
+                        "levelset/liblevelset-filmCoeff",
+                        "levelset/liblevelset-twophaseCoeff",
+                        "misc/libmisc-scalarFunctions",
+                        "misc/libmisc-vectorFunctions"
+                ]
+        },
+        
+        "Mesh":
+        {
+                "Type": "BrickBuilder",     // A parallelepiped
+                "Origin": [0,0,-2e-3],      // Origin
+                "E1": [20.9e-3,0,0],        // Basis to span the object,
+                "E2": [0,4e-3,0],           // not necessary orthonormal 
+                "E3": [0,0,4e-3],           // ... 
+                "N1": 20,                   // Number of cells along the E1-direction,
+                "N2": 6,                    //                       the E2-direction,
+                "N3": 2,                    //                       the E3-direction.
+                
+                "RestartFile":            "",            // reads multigrid from deserialization files
+                                                         // (to deactivate the reading choose "").
+		
+		"PeriodicBnd":
+		{
+			"PeriodicMatching":     "periodicxz",      // matching function
+			
+			"0":  "Per1BC",
+			"1":  "Per2BC",
+			"4":  "Per1BC",
+			"5":  "Per2BC"
+		},
+		// adaptive refinement
+		        "AdaptRef":
+		        {
+		                "Freq":                 10,     // number of timesteps before adaptive refinement is carried out.
+		                "FinestLevel":          2,      // number of refinement levels and label of the finest level
+		                                                // close to the phase boundary.
+		                "CoarsestLevel":        0,      // label of coarsest level close to the phase boundary.
+		                "Width":                0.0005  // domain of refinement.
+		        }
+        },
+
+// time stepping
+        "Time":
+        {
+                "NumSteps":             10000,  // number of time steps
+                "FinalTime":            1,      // time step size
+                "Scheme":               1,      // choose a specific time discretization
+                "Theta":                1       // controls the implicitness of the theta-scheme
+                                                // for time discretization of the Navier-Stokes and
+                                                // level set equations. Theta = 0 yields the explicit and
+                                                // Theta = 1 the implicit Euler method. Theta = 0.5 results
+                                                // in the Crank-Nicholson scheme.
+        },
+
+// coupling of Navier-Stokes and level set
+        "CouplingSolver":
+        {
+                "Tol":                  1e-10,  // tolerance for the coupling.
+                "Iter":                 0,      // maximum number of iterations for the fixed-point iteration.
+                                                // ( ! Attention: For Iter = -1 the calculation is carried out
+                                                // until convergence).
+                "ImplLB":               1,      // Laplace-Beltrami-stabilization.
+                
+                // Navier Stokes solver
+                "NavStokesSolver":
+                {
+	                "Nonlinear":            0,      // determination of the influence of the nonlinear
+	                                                // inertia term. For Nonlinear = 0 the linear Stokes
+	                                                // equation and for Nonlinear = 1 the full Navier-Stokes
+	                                                // equation is solved.
+	                "Tol":                  5e-10,  // tolerance for the Navier-Stokes solver.
+	                "Iter":                 10,     // maximum number of iterations for the Navier-Stokes solver.
+	                "Reduction":            0.1,    // reduction of the Oseen residual by this factor.
+
+                    "OseenSolver":
+                    {
+		                "Solver":               10502,  // Stokes solver, cf. num/stokessolverfactory.h
+		                "Iter":                 200,    // maximum number of iterations for the outer solver
+		                "Tol":                  1e-8,   // tolerance for the outer solver
+		                "PcAIter":              200,    // maximum number of iterations for the preconditioner
+		                                                // of the A-Block
+		                "PcATol":               0.0001, // tolerance for the preconditioner of the A-Block
+		                "PcSTol":               0.0001  // tolerance for the preconditioner of the Schur complement
+                     }
+                },
+                
+                // Levelset solver
+                "LevelsetSolver":
+                {
+	                "Tol":                  1e-16,  // tolerance for the level set solver.
+	                "Iter":                 1000    // maximum number of iterations for the level set solver.
+                }
+        },
+        
+// Navier Stokes
+        "NavStokes":
+        {
+                "XFEMReduced":             1,   // threshold for discarding additional dof parameters in
+                                                // the XFEM pressure space. Using a negative value
+                                                // yields the standard FEM pressure space.
+
+                "InitialValue":          10,               // initial conditions (0 = zero, 1/10 stationary flow with  
+                                                           // droplet which includes/dismiss surface tension, 
+                                                           // 2 = stationary flow without droplet).
+
+		        "Coeff":
+		        {
+		       // material data, all units are SI
+		                "DensNeg":            909.3,      // density of liquid film
+		                "ViscNeg":            0.005183,   // dynamic viscosity of liquid film
+		                "DensPos":            1.2,		  // density of gas
+		                "ViscPos":            1.71e-05,	  // dynamic viscosity of gas
+
+		        		"Gravity":      [8.036, -5.627, 0 ],      // gravity vector  -> inclined film, 35 degree (0 degree = perpendicular)
+			            "VolForce":             "ZeroVel",        // r.h.s. force of navier stokes equations.
+			                                                      // (default: 'ZeroVel')
+				// surface tension
+				        "SurfTens":
+				        {
+				                "SurfTension":          0.022,      // surface tension coefficient.
+				                "VarTensionFunc":       "ConstTau"
+				        }
+	        	},
+	        	"BoundaryData":
+	        	{
+	        	        "Velocity":
+				        {
+				                "0":  ["Per1BC"],
+				                "1":  ["Per2BC"],
+				                "2":  ["Dir0BC"],
+				                "3":  ["Nat0BC"],
+				                "4":  ["Per1BC"],
+				                "5":  ["Per2BC"]
+				        },
+				        "Pressure":
+				        {
+				                "0":  ["Per1BC"],
+				                "1":  ["Per2BC"],
+				                "4":  ["Per1BC"],
+				                "5":  ["Per2BC"]
+				        }
+	        	}
+        },
+
+// Levelset 
+        "Levelset":
+        {
+                "InitialValue":          "WavyFilm",         // choose a LevelSet function you want to start with
+                                                             // (default: 'Ellipsoid')
+                "SD":                   1,      // parameter controls the stability of the advection equation
+                                                // by streamline diffusion
+                "VolCorrection":        1,      // control of the volume correction. For VolCorrection = 0 no
+                                                // correction is made and for VolCorrection = 1 it is carried
+                                                // out after each time step and reparameterization of the level
+                                                // set function.
+		// re-initialization of levelset function",
+		        "Reparam":
+		        {
+		                "Freq":                 1,      // number of timesteps before the levelset function is
+		                                                // reparameterized. Freq = 0 deactivates the reparameterization.
+		                "Method":               3,      // Method how to determine distance of frontier vertices and
+		                                                // propagation scheme, see documentation of ReparamFactoryCLfor
+		                                                // a detailed description
+		                "MinGrad":              1,      // minimal allowed norm of the gradient of the levelset function.
+		                "MaxGrad":              1       // maximal allowed norm of the gradient of the levelset function.
+		        },
+		        "BoundaryData":
+		        {
+		                "0":  ["Per1BC"],
+		                "1":  ["Per2BC"],
+		                "4":  ["Per1BC"],
+		                "5":  ["Per2BC"]
+		        }
+        },
+
+// Visualization Toolkit output format settings
+        "VTK":
+        {
+                "Freq":               1,                 // VTK output frequency (0 = off)
+                "VTKDir":               "vtk/film",             // local directory for VTK files.
+                "VTKName":               "filmStokesDMS-T05",   // name of VTK files
+                "AddP1XPressure":       1                // pressure output as p1 on neg. and p1 on pos. part      
+        },
+
+// write out results, read in for restart
+        "Restart":
+        {
+                "OutputFreq":        1,                 // serialization frequency (0 = off)
+                "OutputOverwrite":   1,                 // overwrite old output-files or create new ones
+                                                        // for every time step.
+                "OutputGrid":           "serial/filmNs.mg",         // writes multigrid to serialization files
+                "OutputData":           "serial/filmNs.mg",         // writes multigrid to serialization files
+                                                                    // (to deactivate the writing choose "").
+                "InputData":            "",             // file prefix when reading data for initial condition ("" to deactivate)
+                "Binary":               1                  
+        },
+
+        // experimental conditions for film (all units are SI)
+        "Film":
+        {
+		        "PumpAmpl":		0.2, 			        // rel. amplitude of initial wave in x direction 
+		        "PumpFreq":		10, 
+		        "Ampl_zDir":	0.5, 		            // rel. amplitude of initial wave in z direction
+		        "Thickness":	0.000635  	            // average film thickness
+        }
+}

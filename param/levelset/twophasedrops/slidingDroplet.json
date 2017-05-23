@@ -1,0 +1,153 @@
+{
+    "General": {
+        "DynamicLibs": [
+            "levelset/liblevelset-twophaseCoeff", 
+            "misc/libmisc-scalarFunctions", 
+            "misc/libmisc-vectorFunctions"
+        ], 
+        "DynamicLibsPrefix": "../", 
+        "ProgressBar": 0
+    }, 
+    "Time": {
+        "NumSteps": 200, 
+        "Scheme": 1, 
+        "FinalTime": 1, 
+        "Theta": 1
+    }, 
+    "CouplingSolver": {
+        "Iter": 20, 
+        "Tol": 1e-10, 
+        "ImplLB": 1, 
+        "LevelsetSolver": {
+            "Iter": 1000, 
+            "Tol": 1e-14
+        }, 
+        "NavStokesSolver": {
+            "Reduction": 0.1, 
+            "Nonlinear": 0, 
+            "OseenSolver": {
+                "UzawaInnerTol": 0.6, 
+                "Solver": 10111, 
+                "DirectSolve": 0,
+                "Iter": 200, 
+                "UzawaInnerIter": 1000, 
+                "PcAIter": 2, 
+                "Tol": 1e-08, 
+                "PcSTol": 0.0001, 
+                "PcATol": 1e-99
+            }, 
+            "Iter": 20, 
+            "Tol": 1e-10
+        }
+    }, 
+    "NavStokes": {
+        "XFEMReduced": 0, 
+        "GhostPenalty": 0.01,
+        "Coeff": {
+            "SurfTens": {
+                "SurfTension": 1.0, 
+                "VarTensionFunc": "ConstTau"
+            }, 
+            "ViscNeg": 1, 
+            "VolForce": "ZeroVel", 
+            "DensPos": 1, 
+            "Gravity": [
+                0, 
+                0, 
+                0
+            ], 
+            "DensNeg": 1, 
+            "ViscPos": 1
+        }, 
+        "InitialValue": 0, 
+        "BoundaryData": {
+            "Velocity": {
+                
+                    "Default":["Slip0BC"]
+            }, 
+            "SlipBnd": {
+                "BndOuterNormal": "OutNormalBrick", 
+                "ContactAngleFunc": "ConstantAngle", 
+                "BetaL": 0.05, 
+                "NitschePenalty": 30, 
+                "ContactAngle": 30, 
+                "Beta2": 0.05, 
+                "Beta1": 0.05
+            }
+        }
+    }, 
+    "Levelset": {
+        "PosDrop": [
+            0.25, 
+            0.0, 
+            0.25
+        ], 
+        "InitialValue": "HalfEllipsoid", 
+        "Discontinuous": 0, 
+        "Reparam": {
+            "Freq": 5, 
+            "MinGrad": 0.1, 
+            "Method": 3, 
+            "MaxGrad": 10
+        }, 
+        "RadDrop": [
+            0.1, 
+            0.1, 
+            0.1
+        ], 
+        "VolCorrection": 1, 
+        "SD": 0.1
+    }, 
+    "Mesh": {
+        "Type": "BrickBuilder", 
+                "Origin": [0,0,0],
+                "E1": [0.5,0,0],               
+                "E2": [0,0.15,0],              
+                "E3": [0,0,0.5],              
+                "N1": 8,                    
+                "N2": 3,                   
+                "N3": 8,
+        "RestartFile": "", 
+        "AdaptRef": {
+            "CoarsestLevel": 0, 
+            "Freq": 1, 
+            "LoadBalStrategy": 1011, 
+            "FinestLevel": 1, 
+            "Width": 0.03
+        }
+    }, 
+    "Inflow": {
+        "InflowAmpl": 0, 
+        "FlowDir": 0, 
+        "InflowVel": 0, 
+        "InflowFreq": 0, 
+        "RadInlet": 1
+    }, 
+    "Exp": {
+        "Solution_Pr": "Zero", 
+        "Solution_Vel": "", 
+        "ImpactVel": 0, 
+        "Solution_GradPr": ""
+    }, 
+    "SurfTens": {
+        "VarTension": 0, 
+        "RelPos": 1.5, 
+        "DirtFactor": 0.8, 
+        "JumpWidth": 0.0005
+    }, 
+    "VTK": {
+        "VTKDir": "vtk", 
+        "Binary": 1, 
+        "Freq": 1, 
+        "AddP1XPressure": 1, 
+        "VTKName": "SlidingDropletCtAngle30"
+    }, 
+    "Restart": {
+        "OutputOverwrite": 1, 
+        "InputData": "", 
+        "Binary": 0, 
+        "OutputGrid": "out/grid",
+        "OutputData": "out/data", 
+        "OutputFreq": 0
+    }
+}

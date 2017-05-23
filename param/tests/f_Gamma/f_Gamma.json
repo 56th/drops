@@ -1,0 +1,118 @@
+{
+//=============================================================
+//    DROPS parameter file
+//    Study different discretizations of interfacial tension
+//=============================================================
+    "General": 
+    {
+        "DynamicLibs": 
+        [
+            "misc/libmisc-scalarFunctions", 
+            "misc/libmisc-vectorFunctions"
+        ], 
+        "DynamicLibsPrefix": "../", 
+        "ProgressBar": 1
+    }, 
+    
+    "Time": {
+        "Theta": 1
+    },
+    
+    "CouplingSolver": 
+    {
+        "LevelsetSolver": 
+        {
+            "Iter": 10000, 
+            "Tol": 1e-14
+        }
+    },
+    
+    
+    "Levelset": 
+    {
+        "PosDrop": [ 0, 0, 0 ], 
+        "Discontinuous": 0, 
+        "BndData": { "Default": [ "NoBC" ] }, 
+        "RadDrop": [ 0.5, 0.5, 0.5 ], 
+        "VolCorrection": 0, 
+        "SD": 0,
+        "CurvDiff": -5e-09,
+        "BndData": { "Default": ["NoBC"] }
+    }, 
+
+    "LevelsetMapper":
+    {
+        "Tol":            1e-8,
+        "Iter":           50,
+        "ArmijoConstant": 1e-2,
+        "Method":         "Newton" // "FixedPointWithLineSearch" // "Newton"
+    },
+    
+    "Inflow": 
+    {
+        "RadInlet": 0.0035
+    }, 
+    
+    
+    "Mesh": 
+    {
+        "Type": "BrickBuilder", 
+        "Origin": [ -1, -1, -1 ], 
+        "N1": 4, 
+        "N2": 4, 
+        "N3": 4, 
+        "E1": [ 2, 0, 0 ], 
+        "E3": [ 0, 0, 2 ], 
+        "E2": [ 0, 2, 0 ],
+        "AdaptRef": 
+        {
+            "CoarsestLevel": 0, 
+            "FinestLevel": 3, 
+            "Width": 0.01 //10 //0.00049
+        }
+    }, 
+    "TestCase":
+
+    {
+        "ComparisonSource":    "ObliqueLBVar3", // "ObliqueLBVar", "ObliqueLBVar2", "ObliqueLBVar3"
+        "ComparisonTarget":    "CoarseLevel", // "Improved", "Helper", "LowerBound", "Norm", "CoarseLevel"
+        "SubsamplingExponent": 1.0,
+        "SubsamplingFactor":   0.5
+    },
+
+    "NavStokes": 
+    {
+        "Coeff": 
+        {
+            "SurfTens":
+            {
+                "SurfTension": 1, 
+                "VarTensionFunc": "ConstTau",
+                "ShearVisco": "0",
+                "DilatationalVisco": "0",
+
+                "UseMappedFESpace":  false,
+                "TestFunction":      "", // "exp_test_function", ""
+                "UseMatrixTension":  true
+            }
+        },
+
+        "BoundaryData":
+        {
+            "Velocity": { "Default": [ "DirBC", "VecZero" ] },
+            "Pressure": { "Default": [ "Nat0BC"] }
+        }
+    },
+
+    "VTK": // VTK output
+    {
+        "VTKOut":        1,
+        "VTKDir":        "vtk",
+        "VTKName":       "f_Gamma",
+        "TimeFileName":  "f_Gamma",
+        "Binary":        1,
+        "UseOnlyP1":     false,
+        "ReUseTimeFile": false
+    }
+    
+}

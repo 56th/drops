@@ -107,6 +107,10 @@ class Quad2DataCL; ///< forward declaration for the factory method
 inline const Quad2DataCL&
 make_Quad2Data ();
 
+class Quad5DataCL; ///< forward declaration for the factory method
+inline const Quad5DataCL&
+make_Quad5Data ();
+
 /// \brief Create a quadrature rule that equals a QuadDataCL-type rule.
 /// This lets one use a QuadDataCL-rule as QuadDomainCL. Generally, one should use the appropriate quad()-function for QuadDataCL-types directly and spare the copying. For obscure extrapolation rules, this approach is not possible, as a QuadDomainCL is required.
 /// The template-parameter QuadDataT must be given explicitly.
@@ -121,6 +125,11 @@ template <class QuadDataT>
 template <class QuadDataT>
   const QuadDomainCL&
   make_CompositeQuadDomain (QuadDomainCL& q,const TetraPartitionCL& p);
+
+template <class QuadDataT>
+  const QuadDomainCL&
+  make_CompositeQuadDomainBnd2D (QuadDomainCL& q, const BndTriangPartitionCL& p);
+
 
 ///\brief Initialize q as a composite Quad3DataCL-quadrature-rule.
 inline const QuadDomainCL&
@@ -151,6 +160,16 @@ template <class LocalFET>
   inline const QuadDomainCL&
   make_ExtrapolatedQuad5Domain (QuadDomainCL& q, const LocalFET& ls, const ExtrapolationToZeroCL& extra);
 
+/// \brief Create a composite quadrature rule for a boundary-triangle cut by moving contact lines.
+/// No sharing of quadrature points is performed.
+/// The template-parameter QuadDataT must be given explicitly.
+/// Helpers for common QuadData_2DCL are given below.
+template <class QuadDataT>
+  const QuadDomainCL&
+  make_CompositeQuadBndDomain2D (QuadDomainCL& q, const BndTriangPartitionCL& p, const TetraCL& t);
+///\brief Initialize q as a composite Quad5_2DDataCL-quadrature-rule for boundary triangles
+inline const QuadDomainCL&
+make_CompositeQuad5BndDomain2D (QuadDomainCL& q, const BndTriangPartitionCL& p, const TetraCL& t);
 
 /// \brief General quadrature-domain
 /// A quadrature rule is defined (and implemented) as a collection of quadrature points and a corresponding collection of weights.
@@ -182,6 +201,10 @@ class QuadDomainCL
     template <class QuadDataT, class LocalFET>
       friend const QuadDomainCL&
       make_ExtrapolatedQuadDomain (QuadDomainCL&, const LocalFET&, const ExtrapolationToZeroCL&);
+
+    template <class QuadDataT>
+      friend const QuadDomainCL&
+      make_CompositeQuadBndDomain2D (QuadDomainCL& q, const BndTriangPartitionCL& p, const TetraCL& t);
     ///@}
 
   private:

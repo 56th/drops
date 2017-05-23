@@ -1,0 +1,140 @@
+{
+    "General": {
+        "DynamicLibs": [
+            "levelset/liblevelset-twophaseCoeff", 
+            "misc/libmisc-scalarFunctions", 
+            "misc/libmisc-vectorFunctions"
+        ], 
+        "DynamicLibsPrefix": "../", 
+        "ProgressBar": 1
+    }, 
+    "Time": {
+        "NumSteps": 500, 
+        "Scheme": 1, 
+        "FinalTime": 0.05, 
+        "Theta": 0.5
+    }, 
+    "CouplingSolver": {
+        "Iter": -1, 
+        "Tol": 1e-12, 
+        "ImplLB": 0, 
+        "LevelsetSolver": {
+            "Iter": 10000, 
+            "Tol": 1e-14
+        }, 
+        "NavStokesSolver": {
+            "Reduction": 0.1, 
+            "Nonlinear": 0, 
+            "OseenSolver": {
+                "UzawaInnerTol": 0.6, 
+                "Solver": 10102, 
+                "Iter": 200, 
+                "UzawaInnerIter": 1000, 
+                "PcAIter": 2, 
+                "Tol": 1e-11, 
+                "PcSTol": 0.0001, 
+                "PcATol": 1e-99
+            }, 
+            "Iter": 20, 
+            "Tol": 5e-10
+        }
+    }, 
+    "NavStokes": {
+        "XFEMReduced": 0.1, 
+        "Coeff": {
+            "SurfTens": {
+                "SurfTension": 1, 
+                "VarTensionFunc": "ConstTau"
+            }, 
+            "ViscNeg": 0.0026, 
+            "VolForce": "ZeroVel", 
+            "DensPos": 1107, 
+            "Gravity": [
+                9.81, 
+                0, 
+                0
+            ], 
+            "DensNeg": 955, 
+            "ViscPos": 0.0012
+        }, 
+        "InitialValue": 1, 
+        "BoundaryData": {
+            "Velocity": {
+                "0":["DirBC","InflowCell"],
+                "1":["Nat0BC"],
+                "2":["Dir0BC"]
+                
+            }
+        }
+    }, 
+    "Levelset": {
+        "PosDrop": [
+            0.008, 
+            0, 
+            0
+        ], 
+        "InitialValue": "Ellipsoid", 
+        "Discontinuous": 0, 
+        "Reparam": {
+            "Freq": 0, 
+            "MinGrad": 0.1, 
+            "Method": 3, 
+            "MaxGrad": 10
+        }, 
+        "RadDrop": [
+            0.00175, 
+            0.00175, 
+            0.00175
+        ], 
+        "VolCorrection": 5, 
+        "SD": 0.1
+    }, 
+    "Mesh": {
+        "Type": "ReadMeshBuilder",
+        "Path": "../../meshes/messzelle.msh", 
+        "RestartFile": "", 
+        "AdaptRef": {
+            "CoarsestLevel": 0, 
+            "Freq": 0, 
+            "LoadBalStrategy": 1011, 
+            "FinestLevel": 2, 
+            "Width": 0.001
+        }
+    }, 
+    "Inflow": {
+        "InflowAmpl": 0, 
+        "FlowDir": 0, 
+        "InflowVel": 0.04, 
+        "InflowFreq": 0, 
+        "RadInlet": 0.02
+    }, 
+    "Transp": {
+        "Enable": 1, 
+        "IniCPos": 0.1, 
+        "IniCNeg": 5, 
+        "Solver": {
+            "Tol": 1e-10, 
+            "Iter": 200
+        }, 
+        "NitschePenalty": 0, 
+        "XFEMReduced": 0.1, 
+        "HPos": 1, 
+        "HNeg": 0.5, 
+        "DiffPos": 0.005, 
+        "DiffNeg": 0.01
+    }, 
+    "VTK": {
+        "VTKDir": "vtk", 
+        "Binary": 0, 
+        "Freq": 1, 
+        "VTKName": "nsmzi"
+    }, 
+    "Restart": {
+        "Binary": 0, 
+        "OutputGrid": "",
+        "OutputData": "", 
+        "OutputOverwrite": 1, 
+        "InputData": "", 
+        "OutputFreq": 0
+    }
+}

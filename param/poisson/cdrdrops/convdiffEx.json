@@ -1,0 +1,83 @@
+{
+    "General": {
+        "DynamicLibs": [
+            "poisson/libpoisson-poissonCoeff", 
+            "misc/libmisc-scalarFunctions", 
+            "misc/libmisc-vectorFunctions"
+        ], 
+        "DynamicLibsPrefix": "../", 
+        "ProgressBar": 1
+    }, 
+    "Poisson": {
+        "InitialValue": "Example3_InitialValue", 
+        "Solver": {
+            "MG": {
+                "NumLvl": -1, 
+                "SmoothingSteps": 1
+            }, 
+            "Solver": 302, 
+            "Relax": 1, 
+            "Iter": 200, 
+            "PcIter": 1, 
+            "PcTol": 0.1, 
+            "Tol": 1e-10, 
+            "useRelTol": 0, 
+            "Restart": 100
+        }, 
+        "Coeff": {
+            "Diffusion": 1, 
+            "Reaction": "Example3_Reaction", 
+            "Flowfield": "Example3_Flowfield", 
+            "withConvection": 1, 
+            "Source": "Example3_Source"
+        }, 
+        "BoundaryData": {
+            "Default":["Nat0BC","Zero"],
+                  "0":["DirBC","One"]
+        },
+        "Solution": "Example3_Solution", 
+        "SolutionIsKnown": 1, 
+        "P1": 1
+    }, 
+    "DomainCond": {
+        "RefineSteps": 3
+    }, 
+    "Mesh": {
+        "Type": "BrickBuilder", 
+        "Origin":[0,0,0],
+        "E1": [1,0,0],
+        "E2": [0,1,0],
+        "E3": [0,0,1],
+        "N1": 1,
+        "N2": 1,
+        "N3": 1,
+        "AdaptRef":{
+            "FinestLevel": 3
+            }
+    }, 
+    "Restart": {
+        "InputData": ""
+    }, 
+   
+    "Time": {
+        "NumSteps": 0, 
+        "Scheme": 1, 
+        "FinalTime": 0, 
+        "Theta": 1
+    }, 
+    "Error": {
+        "Meas": 0.875, 
+        "NumRef": 2, 
+        "RelReduction": 0.1, 
+        "DoMark": 1, 
+        "MinRatio": 0, 
+        "Threshold": 0.6, 
+        "DoErrorEstimate": 0
+    }, 
+    "VTK": {
+        "VTKDir": "vtk", 
+        "Binary": 0, 
+        "Freq": 1, 
+        "VTKName": "convdiff_ex_"
+    }
+}

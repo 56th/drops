@@ -51,11 +51,16 @@ exec_ser(quadCut misc-utils geom-builder geom-deformation geom-simplex geom-mult
 
 exec_ser(bicgstab misc-utils)
 
+if (MKL_HOME STREQUAL "")
+else (MKL_HOME STREQUAL "")
+  exec_ser(pardiso misc-utils)
+  target_link_libraries_ser(pardiso -fopenmp -Wl,--start-group ${MKL_HOME}/lib/intel64/libmkl_intel_ilp64.a ${MKL_HOME}/lib/intel64/libmkl_gnu_thread.a ${MKL_HOME}/lib/intel64/libmkl_core.a -Wl,--end-group -ldl -lpthread -lm) 
+endif (MKL_HOME STREQUAL "")
+
+
 exec_ser(gcr misc-utils)
 
 exec_ser(blockmat misc-utils)
-
-exec_ser(mass misc-utils)
 
 exec_ser(quad5 misc-utils geom-builder geom-deformation geom-simplex geom-multigrid geom-boundary geom-topo num-unknowns misc-problem num-fe num-discretize num-interfacePatch geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature)
 
@@ -65,12 +70,13 @@ exec_ser(quad5_2D misc-utils geom-builder geom-simplex geom-multigrid geom-bound
 
 exec_ser(interfaceP1FE misc-utils geom-builder geom-simplex geom-multigrid geom-deformation misc-scopetimer misc-progressaccu geom-boundary geom-topo num-unknowns misc-problem num-interfacePatch levelset-levelset levelset-fastmarch num-discretize num-fe levelset-surfacetension geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature)
 
-set(xfem-staticlibs ${BEGIN_STATIC_LIBS} misc-vectorFunctions ${END_STATIC_LIBS})
-exec_ser(xfem misc-utils geom-builder geom-simplex geom-multigrid geom-deformation misc-scopetimer misc-progressaccu geom-boundary geom-topo num-unknowns misc-problem num-interfacePatch num-fe num-discretize levelset-levelset levelset-fastmarch stokes-instatstokes2phase out-ensightOut levelset-surfacetension misc-funcmap misc-vectorFunctions geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature)
+#set(xfem-staticlibs ${BEGIN_STATIC_LIBS} misc-vectorFunctions ${END_STATIC_LIBS})
+exec_ser(xfem misc-utils geom-builder geom-simplex geom-multigrid geom-deformation misc-scopetimer misc-progressaccu geom-boundary geom-topo num-unknowns misc-problem num-interfacePatch num-fe num-discretize levelset-levelset levelset-fastmarch stokes-instatstokes2phase out-output out-ensightOut levelset-surfacetension misc-funcmap misc-vectorFunctions geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature misc-dynamicload stokes-slipBndOnePhase)
 
-exec_ser(f_Gamma geom-boundary geom-builder geom-simplex geom-multigrid geom-deformation misc-scopetimer misc-progressaccu num-unknowns geom-topo num-fe misc-problem levelset-adaptriang levelset-levelset levelset-marking_strategy misc-utils out-output num-discretize num-interfacePatch misc-params levelset-fastmarch stokes-instatstokes2phase levelset-surfacetension misc-funcmap misc-vectorFunctions geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature misc-dynamicload out-vtkOut levelset-levelsetmapper surfactant-ifacetransp out-ensightOut num-gradient_recovery)
+exec_ser(f_Gamma geom-boundary geom-builder geom-simplex geom-multigrid geom-deformation misc-scopetimer misc-progressaccu num-unknowns geom-topo num-fe misc-problem levelset-adaptriang levelset-levelset levelset-marking_strategy misc-utils out-output num-discretize num-interfacePatch misc-params levelset-fastmarch stokes-instatstokes2phase levelset-surfacetension misc-funcmap misc-vectorFunctions geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature misc-dynamicload stokes-slipBndOnePhase out-vtkOut levelset-levelsetmapper surfactant-ifacetransp out-ensightOut num-gradient_recovery)
 if(NOT MPI)
     add_dependencies(f_Gamma levelset-twophaseCoeff misc-scalarFunctions misc-vectorFunctions misc-csgFunctions)
+    add_dependencies(xfem levelset-twophaseCoeff misc-scalarFunctions misc-vectorFunctions)
 endif(NOT MPI)
 
 exec_ser(neq misc-utils)
@@ -89,6 +95,8 @@ endif(NOT MPI)
 
 exec_ser(principallattice misc-utils geom-principallattice num-discretize geom-deformation geom-topo num-fe num-interfacePatch misc-problem num-unknowns geom-simplex geom-multigrid geom-builder geom-boundary num-unknowns geom-reftetracut geom-subtriangulation num-quadrature)
 
+exec_ser(bndTrianglePartition misc-utils geom-principallattice num-discretize geom-deformation geom-topo num-fe num-interfacePatch misc-problem num-unknowns geom-simplex geom-multigrid geom-builder geom-boundary num-unknowns geom-reftetracut geom-subtriangulation num-quadrature geom-maketopo_helper)
+
 exec_ser(quad_extra misc-utils geom-builder geom-simplex geom-multigrid geom-deformation geom-boundary geom-topo num-unknowns misc-problem num-fe num-discretize num-interfacePatch geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature)
 
 exec_ser(csgtest levelset-adaptriang levelset-levelset levelset-levelsetmapper levelset-marking_strategy levelset-fastmarch geom-deformation misc-funcmap misc-scopetimer misc-progressaccu geom-simplex geom-multigrid geom-builder geom-topo geom-boundary num-unknowns misc-utils misc-problem num-discretize num-fe num-interfacePatch levelset-surfacetension misc-params out-vtkOut geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature geom-csg num-gradient_recovery surfactant-ifacetransp out-ensightOut)
@@ -103,6 +111,8 @@ if(NOT MPI)
     add_dependencies(show_domain levelset-twophaseCoeff misc-scalarFunctions misc-vectorFunctions misc-csgFunctions)
 endif(NOT MPI)
 
+exec_ser(base64test misc-base64)
+
 if(NOT MPI)
     add_dependencies(dynload misc-scalarFunctions misc-vectorFunctions)
 
@@ -111,11 +121,11 @@ if(NOT MPI)
         #${SUITESPARSE_HOME}/metis-4.0/libmetis.a not used for now
         find_package(BLAS)
         if (BLAS_FOUND)
-            target_link_libraries_ser(tests-directsolver ${SUITESPARSE_HOME}/UMFPACK/Lib/libumfpack.a ${SUITESPARSE_HOME}/CHOLMOD/Lib/libcholmod.a ${SUITESPARSE_HOME}/AMD/Lib/libamd.a ${SUITESPARSE_HOME}/COLAMD/Lib/libcolamd.a ${SUITESPARSE_HOME}/CCOLAMD/Lib/libccolamd.a ${SUITESPARSE_HOME}/CAMD/Lib/libcamd.a ${SUITESPARSE_HOME}/SuiteSparse_config/libsuitesparseconfig.a ${BLAS_LIBRARIES} lapack)
-            set_target_properties(tests-directsolver PROPERTIES COMPILE_FLAGS "-I${SUITESPARSE_HOME}/CHOLMOD/Include -I${SUITESPARSE_HOME}/SuiteSparse_config -I${SUITESPARSE_HOME}/UMFPACK/Include -I${SUITESPARSE_HOME}/AMD/Include")
+            target_link_libraries_ser(directsolver ${SUITESPARSE_HOME}/UMFPACK/Lib/libumfpack.a ${SUITESPARSE_HOME}/CHOLMOD/Lib/libcholmod.a ${SUITESPARSE_HOME}/AMD/Lib/libamd.a ${SUITESPARSE_HOME}/COLAMD/Lib/libcolamd.a ${SUITESPARSE_HOME}/CCOLAMD/Lib/libccolamd.a ${SUITESPARSE_HOME}/CAMD/Lib/libcamd.a ${SUITESPARSE_HOME}/SuiteSparse_config/libsuitesparseconfig.a ${BLAS_LIBRARIES} lapack)
+            set_target_properties(directsolver PROPERTIES COMPILE_FLAGS "-I${SUITESPARSE_HOME}/CHOLMOD/Include -I${SUITESPARSE_HOME}/SuiteSparse_config -I${SUITESPARSE_HOME}/UMFPACK/Include -I${SUITESPARSE_HOME}/AMD/Include")
         else(BLAS_FOUND)
             add_custom_target(GiveBlasWarning COMMENT "Warning: BLAS library not found, directsolver will not link properly.")
-            target_link_libraries(tests-directsolver GiveBlasWarning)
+            target_link_libraries(directsolver GiveBlasWarning)
         endif(BLAS_FOUND)    
     else()
         add_custom_target(directsolver COMMENT "Warning: SuiteSparse library not found, skipped compilation of directsolver.")

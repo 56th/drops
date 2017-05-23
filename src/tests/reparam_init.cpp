@@ -179,7 +179,7 @@ int main( int argc, char **argv)
     // TestDist();
     // return 0;
 
-    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "reparam_init.json");
+    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/tests/reparam_init/reparam_init.json");
     std::cout << P << std::endl;
 
     int numref;
@@ -209,16 +209,14 @@ int main( int argc, char **argv)
     DROPS::LsetBndDataCL lsbnd( 6, bcls, bfunls);
     LevelsetP2CL & lset( * LevelsetP2CL::Create( mg, lsbnd, sf) ) ;
 
-    lset.idx.CreateNumbering( mg.GetLastLevel(), mg);
-    lset.Phi.SetIdx( &lset.idx);
+    lset.CreateNumbering( mg.GetLastLevel());
 
     lset.Init( &sphere2_stat);
 
     LevelsetP2CL & lset_d( * LevelsetP2CL::Create( mg, lsbnd, sf) ) ;
 
 
-    lset_d.idx.CreateNumbering( mg.GetLastLevel(), mg);
-    lset_d.Phi.SetIdx( &lset_d.idx);
+    lset_d.CreateNumbering( mg.GetLastLevel());
     lset_d.Init( &sphere_dist_stat);
 
     VecDescCL vd_dist( &lset.idx);
@@ -241,8 +239,7 @@ int main( int argc, char **argv)
 
     LevelsetP2CL & lset_rep( * LevelsetP2CL::Create( mg, lsbnd, sf) ) ;
 
-    lset_rep.idx.CreateNumbering( mg.GetLastLevel(), mg);
-    lset_rep.Phi.SetIdx( &lset_rep.idx);
+    lset_rep.CreateNumbering( mg.GetLastLevel());
     lset_rep.Init( &sphere2_stat);
     lset_rep.Reparam( 3, false);
     ensight.Register( make_Ensight6Scalar( lset_rep.GetSolution(),  "Reparam",     ensf + "_reparam.scl"));

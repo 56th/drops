@@ -1,0 +1,117 @@
+{
+    "General": {
+        "DynamicLibs": [
+            "misc/libmisc-scalarFunctions", 
+            "misc/libmisc-vectorFunctions", 
+            "misc/libmisc-csgFunctions", 
+            "spacetimetransp/libspacetimetransp-sttranspCoeff"
+        ], 
+        "DynamicLibsPrefix": "../", 
+        "ProgressBar": 1
+    }, 
+    "Time": {
+        "NumSteps": 10, 
+        "FinalTime": 0.1
+    }, 
+    "Mesh": {
+        "Type": "BrickBuilder",
+        "Origin":[0,0,0],
+        "E1": [2,0,0],           
+        "E2": [0,2,0],            
+        "E3": [0,0,2],            
+        "N1": 16,                 
+        "N2": 16,                 
+        "N3": 16, 
+      
+        "RestartFile": "", 
+        "AdaptRef": {
+            "CoarsestLevel": 0, 
+            "Freq": 1, 
+            "LoadBalStrategy": 1, 
+            "FinestLevel": 0, 
+            "Width": 0.01
+        }
+    }, 
+    "Levelset": {
+        "RadDrop": [
+            0.33333333333, 
+            0.33333333333, 
+            0.33333333333
+        ], 
+        "PosDrop": [
+            1, 
+            1, 
+            1
+        ]
+    }, 
+    "Inflow": {
+        "RadInlet": 0.005
+    }, 
+    "TestCase3": {
+        "C": 1, 
+        "r": 4.0, 
+        "v": 2.0
+    }, 
+    "Transp": {
+        "SolNeg": "testcase3_sol_neg", 
+        "UseNSSol": 0, 
+        "Enable": 1, 
+        "IniCPos": 0.0, 
+        "IniCNeg": 0.0, 
+        "Solver": {
+            "Tol": 1e-12, 
+            "Iter": 20000, 
+            "DirectSolve": 0
+        }, 
+        "DiffNeg": 20.0, 
+        "Flow": "testcase3_vel", 
+        "Levelset": "testcase3_lset", 
+        "NitschePenalty": 125, 
+        "Quadrature": {
+            "SubIntervalsPerEdge": 2, 
+            "LevelsetLinearInTime": 0, 
+            "SubTimeIntervals": 1
+        }, 
+        "InitialConcPos": "testcase3_sol_pos", 
+        "HPos": 2.0, 
+        "SolPos": "testcase3_sol_pos", 
+        "HNeg": 1, 
+        "InitialConcNeg": "testcase3_sol_neg", 
+        "DiffPos": 40.0, 
+        "RhsNeg": "testcase3_rhs_neg", 
+        "XFEMReduced": 0, 
+        "RhsPos": "testcase3_rhs_pos",
+        "BoundaryDataPos": {
+            "Default":["DirBC","testcase3_sol_pos"]  
+         },
+         "BoundaryDataNeg": {
+            "Default":["DirBC","testcase3_sol_pos"]  
+         },
+         "CompareResults": 0
+    }, 
+    "VTK": {
+        "VTKOut": 1,
+        "VTKDir": "vtk", 
+        "Binary": 0, 
+        "Freq": 1, 
+        "VTKName": "testcase3_"
+    }, 
+    "NavStokes": {
+        "InitialValue": 0, 
+        "BoundaryData": {
+            "Velocity": {
+                "Default": ["Nat0BC","ZeroVel"]      
+            }
+            
+        },
+        "Coeff":{
+            "SurfTens":{
+                "ShearVisco": "0",
+                "DilatationalVisco" : 0
+            }  
+        }
+    }, 
+    "Restart": {
+        "InputData": ""
+    }
+}

@@ -22,9 +22,9 @@ exec_ser(ns_transp
     geom-geomselect  levelset-twophaseutils num-hypre levelset-coupling
     geom-principallattice geom-reftetracut geom-subtriangulation
     num-quadrature num-renumber num-oseenprecond
-    misc-dynamicload)
+    misc-dynamicload stokes-slipBndOnePhase)
 if(NOT MPI)
-add_dependencies(ns_transp transport-transportCoeff misc-scalarFunctions misc-vectorFunctions)
+add_dependencies(ns_transp transport-transportCoeff misc-scalarFunctions misc-vectorFunctions spacetimetransp-sttranspCoeff)
 endif(NOT MPI)
 
 add_my_custom_targets(transport)

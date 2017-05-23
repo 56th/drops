@@ -392,7 +392,7 @@ void LevelsetTetraAccumulator_P2DCL<DiscVelSolT>::finalize_accumulation ()
     // bH_->Build(); // FaceAccumulator takes care of bH
     // delete bH_;
 #ifndef _PAR
-    Comment(E.num_nonzeros() << " nonzeros in E, "<< H.num_nonzeros() << " nonzeros in H! " << std::endl, DebugDiscretizeC);
+    Comment(ls_.E.num_nonzeros() << " nonzeros in E, "<< ls_.H.num_nonzeros() << " nonzeros in H! " << std::endl, DebugDiscretizeC);
 #endif
 }
 
@@ -478,7 +478,7 @@ void LevelsetFaceAccumulator_P2DCL<DiscVelSolT>::finalize_accumulation ()
     delete bH_;
     std::cout << ls_.E.num_nonzeros() << " nonzeros in E, "<< ls_.H.num_nonzeros() << " nonzeros in H! " << std::endl;
 #ifndef _PAR
-    Comment(E.num_nonzeros() << " nonzeros in E, "<< H.num_nonzeros() << " nonzeros in H! " << std::endl, DebugDiscretizeC);
+    Comment(ls_.E.num_nonzeros() << " nonzeros in E, "<< ls_.H.num_nonzeros() << " nonzeros in H! " << std::endl, DebugDiscretizeC);
 #endif
 }
 
@@ -700,7 +700,7 @@ void LevelsetP2ContCL::SetupSystem( const DiscVelSolT& vel, const double dt)
     TetraAccumulatorTupleCL accus;
     MaybeAddProgressBar(MG_, "Levelset Setup", accus, Phi.RowIdx->TriangLevel());
     accus.push_back( &accu);
-    accumulate( accus, MG_, Phi.RowIdx->TriangLevel(), Phi.RowIdx->GetMatchingFunction(), Phi.RowIdx->GetBndInfo());
+    accumulate( accus, MG_, Phi.RowIdx->TriangLevel(), Phi.RowIdx->GetBndInfo());
     rhs.SetIdx( &idx.GetFinest());
     // rhs.Data.resize(Phi.RowIdx->NumUnknowns());
 }
@@ -715,12 +715,12 @@ void LevelsetP2DiscontCL::SetupSystem( const DiscVelSolT& vel, __UNUSED__ const 
     LevelsetTetraAccumulator_P2DCL<DiscVelSolT> accu_tet( *this, vel);
     TetraAccumulatorTupleCL accus_tet;
     accus_tet.push_back( &accu_tet);
-    accumulate( accus_tet, MG_, Phi.RowIdx->TriangLevel(), Phi.RowIdx->GetMatchingFunction(), Phi.RowIdx->GetBndInfo());
+    accumulate( accus_tet, MG_, Phi.RowIdx->TriangLevel(), Phi.RowIdx->GetBndInfo());
 
     LevelsetFaceAccumulator_P2DCL<DiscVelSolT> accu_face( *this, vel, accu_tet.GetHMatrix(), rhs);
     FaceAccumulatorTupleCL accus_face;
     accus_face.push_back( &accu_face);
-    accumulate_faces( accus_face, MG_, Phi.RowIdx->TriangLevel(), Phi.RowIdx->GetMatchingFunction(), Phi.RowIdx->GetBndInfo());
+    accumulate_faces( accus_face, MG_, Phi.RowIdx->TriangLevel(), Phi.RowIdx->GetBndInfo());
 }
 
 template <class DiscVelSolT>
@@ -734,7 +734,7 @@ PermutationT LevelsetP2CL::downwind_numbering (const DiscVelSolT& vel, IteratedD
     TetraAccumulatorTupleCL accus;
     MaybeAddProgressBar(MG_, "Downwind Numbering", accus, Phi.RowIdx->TriangLevel());
     accus.push_back( &accu);
-    accumulate( accus, this->GetMG(), idx.TriangLevel(), idx.GetMatchingFunction(), idx.GetBndInfo());
+    accumulate( accus, this->GetMG(), idx.TriangLevel(), idx.GetBndInfo());
 
     const PermutationT& p= dw.downwind_numbering( C);
     permute_fe_basis( GetMG(), idx.GetFinest(), p);

@@ -1,0 +1,35 @@
+{
+    "NavStokes": 
+    {
+        "BoundaryData":
+        {
+            "SlipBnd":
+            {
+                "Beta1": "0",
+                "Beta2": "0",
+                "BetaL": "0",
+                "NitschePenalty": "0",
+                "BndOuterNormal": "None"                
+            }
+        },
+        
+        "Coeff": 
+        {
+            "ViscNeg": "0.001", 
+            "ViscPos": "0.001",
+            "DensPos": "1000", 
+            "DensNeg": "1000", 
+            "VolForce": "ZeroVel", 
+            "Gravity": "0 0 0 ",
+            "SmoothZone": "1e-05"
+        }
+    },
+    
+    
+    "Mesh": 
+    {
+        "RestartFile": "none"
+    }    
+    
+    
+}

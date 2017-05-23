@@ -1,0 +1,22 @@
+{
+    "VTK":
+    {
+        "ReUseTimeFile": "0",
+        "UseDeformation": "0",
+        "UseOnlyP1": "0"
+    },
+    "Stabilization":
+    {
+        "SUPG": "0",
+        "Magnitude": "1",
+        "Grids": "1"
+    },
+    "ALE":
+    {
+        "wavy": "0",
+        "P1": "1",
+        "OnlyBndCurved": "1",
+        "Interface": "Zero"
+    }
+}
+

@@ -1,0 +1,24 @@
+{
+    "Exp":
+    {
+        "VolForce": "ZeroVel"
+    },
+    "Mat":
+    {
+        "DensDrop": "0",
+        "ShearVisco": "0",
+        "DilatationalVisco": "0"
+    },
+    "SurfTens":
+    {
+        "ShearVisco": "0",
+        "DilatationalVisco": "0"
+    },
+    "VTK":
+    {
+        "ReUseTimeFile": "0",
+        "UseDeformation": "0",
+        "UseOnlyP1": "0"
+    }
+}
+

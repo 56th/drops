@@ -490,14 +490,6 @@ SVectorCL<_Size> operator/(const SVectorCL<_Size>& v1,
 }
 
 template <Uint _Size>
-bool operator<(const SVectorCL<_Size>& v1,
-               const SVectorCL<_Size>& v2)
-{
-    for (Uint i=0; i<_Size; ++i) if(!( v1[i] < v2[i]) ) return false;
-    return true;
-}
-
-template <Uint _Size>
 SVectorCL<_Size> sqrt(const SVectorCL<_Size>& v)
 {
     SVectorCL<_Size> tempv( Uninitialized);

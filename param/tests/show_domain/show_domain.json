@@ -1,0 +1,31 @@
+{
+    "General": 
+    {
+        "DynamicLibs": 
+        [
+            "misc/libmisc-scalarFunctions", 
+            "misc/libmisc-vectorFunctions"
+        ], 
+        "DynamicLibsPrefix": "../", 
+        "ProgressBar": 0
+    }, 
+    
+    
+    "Mesh": 
+    {
+//		"PeriodicBnd": // It is only a convention that this is a subsection of Domain.
+//		{
+//			"PeriodicMatching": "mymatch",
+//			"0": "Per1BC",
+//			"1": "Per2BC"
+//		},
+        "Type": "BrickBuilder", 
+        "Origin": [ -1, -1, -1 ], 
+        "N1": 5, 
+        "N2": 5, 
+        "N3": 5, 
+        "E1": [ 2, 0, 0 ], 
+        "E3": [ 0, 0, 2 ], 
+        "E2": [ 0, 2, 0 ]
+    }
+}

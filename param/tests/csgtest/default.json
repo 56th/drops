@@ -1,0 +1,14 @@
+{
+    "deco_cube_parameters": {
+        "radius": 1.8,
+        "shift": -3
+    },
+
+    "VTK": {
+        "TimeFileName": "csgtest",
+        "Binary": 1,
+        "UseOnlyP1": 0,
+        "ReUseTimeFile": 0,
+        "UseDeformation": 0
+    }
+}

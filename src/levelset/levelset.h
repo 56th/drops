@@ -32,6 +32,7 @@
 #include "num/fe_repair.h"
 #include "levelset/mgobserve.h"
 #include "levelset/surfacetension.h"
+#include "levelset/volume_adjustment.h"
 #include "num/interfacePatch.h"
 #include "num/renumber.h"
 #include "num/prolongation.h"
@@ -50,18 +51,20 @@ typedef BndDataCL<double>    LsetBndDataCL;
 enum SurfaceForceT
 /// different types of surface forces
 {
-    SF_LB=0,            ///< Laplace-Beltrami discretization: \f$\mathcal O(h^{1/2})\f$
-    SF_ImprovedLB=1,    ///< improved Laplace-Beltrami discretization: \f$\mathcal O(h)\f$
-    SF_Const=2,         ///< surface force with constant curvature
-    SF_ImprovedLBVar=3, ///< improved Laplace-Beltrami discretization with variable surface tension
-    SF_ObliqueLBVar=4   ///< Laplace-Beltrami discretization with variable surface tension via oblique projector
+    SF_LB=0,             ///< Laplace-Beltrami discretization: \f$\mathcal O(h^{1/2})\f$
+    SF_Const=2,          ///< surface force with constant curvature
+    SF_ImprovedLBVar=3,  ///< improved Laplace-Beltrami discretization with variable surface tension
+    SF_ObliqueLBVar=4    ///< Laplace-Beltrami discretization with variable surface tension via oblique projector
 };
+
 
 /// not used at the moment
 class LevelsetCoeffCL {
 
 };
 
+/// forward declaration
+class VolumeAdjustmentCL;
 
 class LevelsetP2CL : public ProblemCL< LevelsetCoeffCL, LsetBndDataCL>
 /// abstract base class for continuous and discontinuous P2 level set discretization
@@ -98,12 +101,13 @@ class LevelsetP2CL : public ProblemCL< LevelsetCoeffCL, LsetBndDataCL>
     perDirSetT* perDirections;    ///< periodic directions
     typedef MLDataCL<ProlongationCL<double> > ProlongationT;
     ProlongationT P_;
+    mutable std::unique_ptr<VolumeAdjustmentCL> volume_adjuster_;
 
     bool IsDG;
 
   public:
     MatrixCL            E, H;  ///< E: mass matrix, H: convection matrix
-    VecDescCL           rhs;  ///< rhs due to boundary conditions 
+    VecDescCL           rhs;  ///< rhs due to boundary conditions
 
     bool IsDiscontinuous(){ return IsDG; }
 
@@ -111,7 +115,7 @@ class LevelsetP2CL : public ProblemCL< LevelsetCoeffCL, LsetBndDataCL>
 
 LevelsetP2CL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, FiniteElementT fetype, double SD= 0, double curvDiff= -1)
     : base_( mg, LevelsetCoeffCL(), bnd), idx(fetype), idxC(NULL), MLPhi( &idx), PhiC(NULL), curvDiff_( curvDiff), SD_( SD),
-        SF_(SF_ImprovedLB), sf_(sf), perDirections(NULL), IsDG(false)
+        SF_(SF_ImprovedLBVar), sf_(sf), perDirections(NULL), IsDG(false)
     {}
 
     virtual ~LevelsetP2CL(){
@@ -119,7 +123,7 @@ LevelsetP2CL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, F
     }
 
     static LevelsetP2CL * Create(  MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, const ParamCL & P);
-    static LevelsetP2CL * Create(  MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, 
+    static LevelsetP2CL * Create(  MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf,
                                    bool discontinuous = false, double SD = 0, double curvdiff = -1);
 
 
@@ -130,14 +134,15 @@ LevelsetP2CL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, F
 
     /// \name Numbering
     ///@{
-    void CreateNumbering( Uint level, MLIdxDescCL* idx, match_fun match= 0);
+    void CreateNumbering(Uint level);
+    void CreateNumbering( Uint level, MLIdxDescCL* idx);
     void DeleteNumbering( MLIdxDescCL* idx)
         { idx->DeleteNumbering( MG_); }
     ///@}
 
     /// initialize level set function
     virtual void Init( instat_scalar_fun_ptr, double t = 0) = 0;
-    
+
     /// \remarks call SetupSystem \em before calling SetTimeStep!
     template<class DiscVelSolT>
     void SetupSystem( const DiscVelSolT&, const double);
@@ -160,14 +165,22 @@ LevelsetP2CL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, F
     /// l = 1 : integration on the tetra itself. l = 2 integration on the regular refinement.
     /// l < 0 : extrapolation from current level lvl to lvl - l - 1
     double GetVolume( double translation= 0, int l= 2) const;
-    /// volume correction to ensure no loss or gain of mass. The parameter l is passed to GetVolume().
-    double AdjustVolume( double vol, double tol, double surf= 0., int l= 2) const;
+    /// Volume correction to ensure no loss or gain of mass.
+    void AdjustVolume() const;
+    void InitVolume (double vol);
+    const VolumeAdjustmentCL* GetVolumeAdjuster() const { return volume_adjuster_.get(); }
+    VolumeAdjustmentCL* GetVolumeAdjuster() { return volume_adjuster_.get(); }
     /// Apply smoothing to \a SmPhi, if curvDiff_ > 0
     void MaybeSmooth( VectorCL& SmPhi) const { if (curvDiff_>0) SmoothPhi( SmPhi, curvDiff_); }
     /// Set type of surface force.
-    void   SetSurfaceForce( SurfaceForceT SF) { SF_= SF; }
+    void SetSurfaceForce( SurfaceForceT SF) { SF_= SF; }
     /// Get type of surface force.
     SurfaceForceT GetSurfaceForce() const { return SF_; }
+
+    ///returns the area of the two-phase flow interface(\phi=0)
+    double GetInterfaceArea() const;
+    ///returns the area of the solid-liquid(phi<0) interface
+    double GetWetArea() const;
     /// Discretize surface force
     void   AccumulateBndIntegral( VecDescCL& f) const;
     /// Clear all matrices, should be called after grid change to avoid reuse of matrix pattern
@@ -254,29 +267,29 @@ class LevelsetP2ContCL: public LevelsetP2CL
     using base_::Coeff_;
     using base_::BndData_;
     using base_::GetBndData;
-    using base_::GetMG;  
+    using base_::GetMG;
     using base_::idx;
     using base_::idxC;
     using base_::Phi;
     using base_::PhiC;
   protected:
     using base_::IsDG;
-  
-    public: 
+
+    public:
     LevelsetP2ContCL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, double SD= 0, double curvDiff= -1)
         : base_( mg, bnd, sf, P2_FE, SD, curvDiff)
     {
         PhiC = &Phi;
         idxC = &idx;
     }
-    
+
     /// Update PhiC (do nothing)
     virtual void UpdateContinuous( );
-    /// Update Phi (do nothing) 
+    /// Update Phi (do nothing)
     virtual void UpdateDiscontinuous( );
 
     void Init( instat_scalar_fun_ptr, double t = 0); //void Init( instat_scalar_fun_ptr, double);
-    
+
     template<class DiscVelSolT>
     void SetupSystem( const DiscVelSolT&, const double);
 };
@@ -295,7 +308,7 @@ class LevelsetP2DiscontCL: public LevelsetP2CL
     using base_::Coeff_;
     using base_::BndData_;
     using base_::GetBndData;
-    using base_::GetMG;  
+    using base_::GetMG;
     using base_::idx;
     using base_::idxC;
     using base_::Phi;
@@ -307,7 +320,7 @@ class LevelsetP2DiscontCL: public LevelsetP2CL
     VecDescCL             PhiContinuous;        ///< level set function
 
 
-    public: 
+    public:
     LevelsetP2DiscontCL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, double SD= 0, double curvDiff= -1)
         : base_( mg, bnd, sf, P2D_FE, SD, curvDiff), idxContinuous(P2_FE, mg.GetNumLevel())
     {
@@ -315,7 +328,7 @@ class LevelsetP2DiscontCL: public LevelsetP2CL
         PhiC = &PhiContinuous;
         idxC = &idxContinuous;
     }
-    
+
     /// \name Numbering
     ///@{
     /* virtual void CreateNumbering( Uint level, IdxDescCL* idx, match_fun match= 0); */
@@ -328,12 +341,12 @@ class LevelsetP2DiscontCL: public LevelsetP2CL
 
     /// Update PhiC (Clement-Call...)
     virtual void UpdateContinuous( );
-    /// Update Phi (Prolongation...) 
+    /// Update Phi (Prolongation...)
     virtual void UpdateDiscontinuous( );
 
     void InitProjection( instat_scalar_fun_ptr, double t = 0);
     void Init( instat_scalar_fun_ptr, double t = 0);
-    
+
     void ApplyZeroOrderClementInterpolation();
     void ApplyClementInterpolation();
     void ProjectContinuousToDiscontinuous();
@@ -355,7 +368,7 @@ class LevelsetRepairCL : public MGObserverCL
 {
   private:
     LevelsetP2CL& ls_;
-    std::auto_ptr<RepairP2CL<double>::type > p2repair_;
+    std::unique_ptr<RepairP2CL<double>::type > p2repair_;
 
   public:
     /// \brief Construct a levelset repair class
@@ -365,8 +378,8 @@ class LevelsetRepairCL : public MGObserverCL
     void pre_refine  ();
     void post_refine ();
 
-    void pre_refine_sequence  () {}
-    void post_refine_sequence () {}
+    void pre_refine_sequence  ();
+    void post_refine_sequence ();
     const IdxDescCL* GetIdxDesc() const { return ls_.Phi.RowIdx; }
 #ifdef _PAR
     const VectorCL*  GetVector()  const { return &ls_.Phi.Data; }
@@ -382,66 +395,23 @@ private:
            rpm_Method_;
     double rpm_MaxGrad_,
            rpm_MinGrad_;
-    int    lvs_VolCorrection_;
-
-    const double Vol_;
 
     int    step_;
     bool   per_;
 
 public:
-    LevelsetModifyCL( int rpm_Freq, int rpm_Method, double rpm_MaxGrad, double rpm_MinGrad, int lvs_VolCorrection, double Vol, bool periodic=false) :
+    LevelsetModifyCL( int rpm_Freq, int rpm_Method, double rpm_MaxGrad, double rpm_MinGrad, bool periodic=false) :
         rpm_Freq_( rpm_Freq), rpm_Method_( rpm_Method), rpm_MaxGrad_( rpm_MaxGrad),
-        rpm_MinGrad_( rpm_MinGrad), lvs_VolCorrection_( lvs_VolCorrection), Vol_( Vol), step_( 0), per_(periodic) {}
+        rpm_MinGrad_( rpm_MinGrad), step_( 0), per_(periodic) {}
 
 
-    void maybeDoReparam( LevelsetP2CL& lset) {
-        bool doReparam= rpm_Freq_ && step_%rpm_Freq_ == 0;
-        bool doVolCorr= lvs_VolCorrection_ && step_%lvs_VolCorrection_ == 0;
-
-        double lsetmaxGradPhi, lsetminGradPhi;
-
-        if (doReparam) {
-            lset.GetMaxMinGradPhi( lsetmaxGradPhi, lsetminGradPhi);
-            doReparam = (lsetmaxGradPhi > rpm_MaxGrad_ || lsetminGradPhi < rpm_MinGrad_);
-        }
-
-        // reparam levelset function
-        if (doReparam) {
-            std::cout << "before reparametrization: minGradPhi " << lsetminGradPhi << "\tmaxGradPhi " << lsetmaxGradPhi << '\n';
-            lset.Reparam( rpm_Method_, per_);
-            lset.GetMaxMinGradPhi( lsetmaxGradPhi, lsetminGradPhi);
-            std::cout << "after  reparametrization: minGradPhi " << lsetminGradPhi << "\tmaxGradPhi " << lsetmaxGradPhi << '\n';
-            // volume correction after reparametrization
-            if (doVolCorr) {
-                double dphi= lset.AdjustVolume( Vol_, 1e-9);
-                std::cout << "volume correction is " << dphi << std::endl;
-                lset.Phi.Data+= dphi;
-                std::cout << "new rel. volume: " << lset.GetVolume()/Vol_ << std::endl;
-            }
-        }
-    }
-
-    double maybeDoVolCorr( LevelsetP2CL& lset) {
-        bool doVolCorr= lvs_VolCorrection_ && step_%lvs_VolCorrection_ == 0;
-        double dphi = 0.0;
-
-        if (!doVolCorr) return dphi;
-
-        if (doVolCorr) {
-            dphi= lset.AdjustVolume( Vol_, 1e-9);
-            std::cout << "volume correction is " << dphi << std::endl;
-            lset.Phi.Data+= dphi;
-            std::cout << "new rel. volume: " << lset.GetVolume()/Vol_ << std::endl;
-        }
-        return dphi;
-    }
+    void maybeDoReparam( LevelsetP2CL& lset);
+    void maybeDoVolCorr( LevelsetP2CL& lset);
 
     void init() {
         step_++;
     }
 };
-
 
 
 /// marks all tetrahedra in the band |\p DistFct(x)| < \p width for refinement

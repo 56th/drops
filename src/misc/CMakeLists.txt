@@ -1,6 +1,6 @@
 set(HOME misc)
 
-libs(funcmap params problem utils scopetimer progressaccu dynamicload)
+libs(funcmap params problem utils scopetimer progressaccu dynamicload base64)
 
 target_link_libraries(misc-problem num-interfacePatch geom-principallattice geom-subtriangulation)
 

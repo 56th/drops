@@ -196,8 +196,7 @@ UpdateTriangulation(DROPS::NavierStokesP2P1CL<Coeff>& NS,
         shell_not_ready= ModifyGridStep( mg, Dist, width, c_level, f_level, t);
 
         // Repair velocity
-        match_fun match= NS.GetMG().GetBnd().GetMatchFun();
-        loc_vidx.CreateNumbering( mg.GetLastLevel(), mg, NS.GetBndData().Vel, match);
+        loc_vidx.CreateNumbering( mg.GetLastLevel(), mg, NS.GetBndData().Vel);
         if ( mg.GetLastLevel() != vidx1->TriangLevel()) {
             std::cout << "LastLevel: " << mg.GetLastLevel()
                       << " loc_vidx->TriangLevel: " << loc_vidx.TriangLevel() << std::endl;
@@ -211,7 +210,7 @@ UpdateTriangulation(DROPS::NavierStokesP2P1CL<Coeff>& NS,
         loc_v.Clear( t);
 
         // Repair pressure
-        loc_pidx.CreateNumbering( mg.GetLastLevel(), mg, NS.GetBndData().Pr, match);
+        loc_pidx.CreateNumbering( mg.GetLastLevel(), mg, NS.GetBndData().Pr);
         loc_p.SetIdx( &loc_pidx);
         p1repair.repair( loc_p);
         pidx1->DeleteNumbering( mg);
@@ -305,9 +304,9 @@ class UzawaSolverCL : public StokesSolverBaseCL
     double GetTau()            const { return _tau; }
     void   SetTau( double tau)       { _tau= tau; }
 
-    void Solve( const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p,
+    void Solve( const MatrixCL& A, const MatrixCL& B, const MatrixCL&, VectorCL& v, VectorCL& p,
                 const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&);
-    void Solve( const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p,
+    void Solve( const MLMatrixCL& A, const MLMatrixCL& B, const MLMatrixCL&, VectorCL& v, VectorCL& p,
                 const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&);
 };
 
@@ -353,14 +352,14 @@ void UzawaSolverCL<PoissonSolverT>::doSolve(
 
 template <class PoissonSolverT>
 void UzawaSolverCL<PoissonSolverT>::Solve(
-    const MatrixCL& A, const MatrixCL& B, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&)
+    const MatrixCL& A, const MatrixCL& B, const MatrixCL&, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&)
 {
     doSolve( A, B, v, p, b, c);
 }
 
 template <class PoissonSolverT>
 void UzawaSolverCL<PoissonSolverT>::Solve(
-    const MLMatrixCL& A, const MLMatrixCL& B, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&)
+    const MLMatrixCL& A, const MLMatrixCL& B, const MLMatrixCL&, VectorCL& v, VectorCL& p, const VectorCL& b, const VectorCL& c, const DummyExchangeCL&, const DummyExchangeCL&)
 {
     doSolve( A, B, v, p, b, c);
 }

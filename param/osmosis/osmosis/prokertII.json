@@ -1,0 +1,123 @@
+{
+//General section
+        "General":
+        {
+                "ProgressBar":  1, //show progress bar
+                "DynamicLibsPrefix": "../", //where should we look for shared objects?
+                "DynamicLibs": [ //select libraries to be loaded after program start
+                        "misc/libmisc-scalarFunctions",
+                        "misc/libmisc-vectorFunctions",
+                        "osmosis/libosmosis-osmosisCoeff"
+                ]
+        },
+
+        "Time":
+        {
+                "NumSteps":             100,
+                "FinalTime":            2.5,
+                "Theta":                0.5
+        },
+		
+		"Osmosis":
+		{
+				"XFEMReduced":			1e-4,
+        		"Levelset":             "Ellipsoid",
+				"InitialConc":          "IniProkertII",
+				"ScaleInitialConc":     1,
+				"TotalConcentration":   8.37758040957, // ~= 8/3 pi
+				"Diffusivity":			0.1,
+				"alpha":				1,
+				"beta":					1
+		},		
+		
+		"Exp":
+        {
+                "PosConcCenter":        [1.25, 2.0, 1.25 ],
+                "ExpFactorA":           4.0,
+                "FactorB":              1.0
+        },	
+		
+		"Stabilisation":
+		{
+				"Active":				1,
+				"Scaling":				4.0,
+				"Exp":					1.0,
+				"Anisotropic":			1
+		},
+		
+		"Solver":
+		{
+				"Iter":                 1000,
+                "Tol":                  1e-16,
+				"Interface":			2
+		},
+		
+		"Coupling":
+		{
+				"Active":				0,
+				"Damping":				0.5,
+				"maxIter":				100,
+				"Tol":					1e-6
+		},
+
+        "Levelset":
+        {
+                "RadDrop":   	 		[1.0, 1.0, 1.0 ],
+				"PosDrop":          	[1.25, 1.5, 1.25 ],
+                "Tol":                  1e-10,
+                "Iter":                 500,
+                "SD":                   0.1,
+                "CurvDiff":             -1,
+                "VolCorrection":        0,
+                "Theta":                1
+        },
+		
+		"Reparam":
+		{
+				"Active":				0,
+				"method":				13,
+				"VolCorrection":		0
+		},
+
+        "VTK":
+        {
+                "Freq":                 10,
+                "VTKDir":               "vtk",
+                "VTKName":              "prokertII",
+                "Binary":               0
+        },
+
+		"GNUPlot":
+		{
+			"Out":						0,
+			"Plotname":					"TestCase5/plot/CoupLSInth20t10.plot"
+		},
+
+		"Mesh":
+		{
+                "Type": "BrickBuilder", // A parallelepiped
+                "Origin": [0,0,0],      // Origin
+                "E1": [2.5,0,0],          // Basis to span the object,
+                "E2": [0,3,0],          // not necessary orthonormal 
+                "E3": [0,0,2.5],          // ... 
+                "N1": 15,               // Number of cells along the E1-direction,
+                "N2": 18,               //                       the E2-direction,
+                "N3": 15,               //                       the E3-direction.
+		// adaptive refinement
+		        "AdaptRef":
+		        {
+		                "Freq":                 0,
+		                "FinestLevel":          0,
+		                "CoarsestLevel":        0,
+		                "Width":                0.1,
+		                "RefineStrategy":       1,
+		                "LoadBalStrategy":      1,
+		                "Partitioner":          1
+		        }
+        },
+        
+        "NavStokes":
+        {
+        	"InitialValue":     0
+        }
+}

@@ -148,12 +148,48 @@ private:
 };
 
 
-
-
 class LevelsetP2CL;
 class EdgeCL;
 class VertexCL;
-class ValueGetterCL;
+
+class ValueGetterCL
+{
+public:
+    virtual ~ValueGetterCL() {}
+    virtual double GetValue( const VertexCL& v ) const = 0;
+    virtual double GetValue( const EdgeCL&   e ) const = 0;
+    virtual double GetValue( const TetraCL&  t ) const = 0;
+    virtual ValueGetterCL* clone() const = 0;
+};
+
+class LevelsetP2GetterCL: public ValueGetterCL
+{
+public:
+    LevelsetP2GetterCL( const LevelsetP2CL& lset );
+
+    double GetValue( const VertexCL& v ) const;
+    double GetValue( const EdgeCL&   e ) const;
+    double GetValue( const TetraCL&  t ) const;
+    ValueGetterCL* clone() const;
+
+private:
+    const LevelsetP2CL& lset_;
+};
+
+class FunPtrGetterCL: public ValueGetterCL
+{
+public:
+    FunPtrGetterCL( instat_scalar_fun_ptr fct, double time = 0. );
+
+    double GetValue( const VertexCL& v ) const;
+    double GetValue( const EdgeCL&   e ) const;
+    double GetValue( const TetraCL&  t ) const;
+    ValueGetterCL* clone() const;
+
+private:
+    double time_;
+    instat_scalar_fun_ptr fct_;
+};
 
 /*!
  * \brief Refinement strategy according to a levelset function.

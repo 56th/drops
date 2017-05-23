@@ -91,11 +91,11 @@ class VelocityContainer
       return vfptr_;
     }
     
-    bool VelocityAsP2() const {
+    bool hasVelocityAsP2() const {
       return (v_ && Bnd_v_);
     }
      
-    bool VelocityAsFunctionPointer() const {
+    bool hasVelocityAsFunctionPointer() const {
       return (vfptr_);
     }
  
@@ -160,16 +160,16 @@ class OsmosisP1CL
         LevelsetP2CL& lset, LevelsetP2CL& oldlset,
         DROPS::ParamCL& P, double initialtime=0, instat_scalar_fun_ptr reac=0, instat_scalar_fun_ptr rhs=0)
         : oldt_(initialtime), t_( initialtime), 
-        idx( P1_FE, 1, Bnd, mg.GetBnd().GetMatchFun()), oldidx( P1_FE, 1, Bnd, mg.GetBnd().GetMatchFun()),
+        idx( P1_FE, 1, Bnd), oldidx( P1_FE, 1, Bnd),
         Velidx( vecP1_FE, BndVel),
         MG_( mg), Bnd_( Bnd), Bnd_v_(BndVel), Bnd_ls_(Bnd_ls), v_ (v),
-        theta_( P.get<double>("Time.Scheme")), dt_( P.get<double>("Time.StepSize")),
+        theta_( P.get<double>("Time.Theta")), dt_( P.get<int>("Time.NumSteps")!=0 ? P.get<double>("Time.FinalTime")/P.get<int>("Time.NumSteps") : 0),
         D_( P.get<double>("Osmosis.Diffusivity")),
         lset_( lset), oldlset_(oldlset),
         gm_( pc_, 20, P.get<int>("Solver.Iter"), P.get<double>("Solver.Tol"), false, false, RightPreconditioning),
         cg_( ssorpc_, P.get<int>("Solver.Iter"), P.get<double>("Solver.Tol"), false),
         f_(rhs), c_(reac),
-        omit_bound_(P.get<double>("Exp.OmitBound"))
+        omit_bound_(P.get<double>("Osmosis.XFEMReduced"))
     {
         if (theta_ >= 1.0 || theta_ <= 0.0)
         {
@@ -301,7 +301,7 @@ class OsmosisRepairCL : public MGObserverCL
 {
   private:
     OsmosisP1CL& c_;
-    std::auto_ptr<P1XRepairCL> oldp1xrepair_;
+    std::unique_ptr<P1XRepairCL> oldp1xrepair_;
     Uint mylvl;
   public:
     OsmosisRepairCL (OsmosisP1CL& c, Uint amylvl)
@@ -398,15 +398,15 @@ class TransformedP1FiniteElement{
     BaryCoordCL* nodes;
     Quad3CL<> q3_baseshape[4];
   public:
-    TransformedP1FiniteElement(P1FEGridfunctions& ap1fegfs, TetraCL* atet = NULL):tet(atet), p1fegfs(ap1fegfs){
+    TransformedP1FiniteElement(P1FEGridfunctions& ap1fegfs, TetraCL* atet = nullptr):tet(atet), p1fegfs(ap1fegfs){
       has_trafo_base=false;    
       has_Gram=false;    
       oninterface = false; 
-      nodes = NULL;
+      nodes = nullptr;
     }
     
     virtual ~TransformedP1FiniteElement(){
-      if (nodes) delete nodes;
+      if (nodes) delete[] nodes;
     }
     
     P1FEGridfunctions& GetGridfunctions(){
@@ -426,7 +426,7 @@ class TransformedP1FiniteElement{
 
     void SetSubTetra(const SArrayCL<BaryCoordCL,4>& cutT){
       vol = VolFrac(cutT) * absdet * 1.0/6.0;
-      if (nodes) delete nodes;
+      if (nodes) delete[] nodes;
       nodes = Quad3CL<>::TransformNodes(cutT);
       oninterface = true;
       
@@ -436,7 +436,7 @@ class TransformedP1FiniteElement{
     }
 
     TetraCL& GetTetra() const{
-      if(tet == NULL) throw DROPSErrCL("TransformedP1FiniteElement::GetTetra - No TetraCL object given!");
+      if(tet == nullptr) throw DROPSErrCL("TransformedP1FiniteElement::GetTetra - No TetraCL object given!");
       return *tet;
     }
     
@@ -529,7 +529,7 @@ class LocalConvDiffReacCoefficients{
         q5_source(tet,gcdcoefs.source,gcdcoefs.time), q3_source(tet,gcdcoefs.source,gcdcoefs.time),
         q5_mass(tet,gcdcoefs.mass,gcdcoefs.time), q3_mass(tet,gcdcoefs.mass,gcdcoefs.time)
     {
-      if (gcdcoefs.vel.VelocityAsP2()){
+      if (gcdcoefs.vel.hasVelocityAsP2()){
         q3_velocity = new Quad3CL<Point3DCL>(tet, gcdcoefs.vel.GetVelocityAsP2());
         lp2_velocity = new LocalP2CL<Point3DCL>(tet, gcdcoefs.vel.GetVelocityAsP2());
       }

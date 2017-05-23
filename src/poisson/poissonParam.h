@@ -65,25 +65,21 @@ class PoissonCoeffCL
 
     PoissonCoeffCL( ParamCL& P){
         C_=P;
-        int nz_;
-        double dz_;
-        std::string mesh( P.get<std::string>("DomainCond.MeshFile")), delim("x@");
-        size_t idx_;
-        while ((idx_= mesh.find_first_of( delim)) != std::string::npos )
-            mesh[idx_]= ' ';
-        std::istringstream brick_info( mesh);
-        brick_info >> dx_ >> dy_ >> dz_ >> nx_ >> ny_ >> nz_;
-        dt_=P.get<double>("Time.StepSize");  //step size used in ALEVelocity
+        nx_= P.get<int>("Mesh.N1");
+        ny_= P.get<int>("Mesh.N2");
+        dx_= norm(P.get<DROPS::Point3DCL>("Mesh.E1"));
+        dy_= norm(P.get<DROPS::Point3DCL>("Mesh.E2"));
+        dt_= P.get<int>("Time.NumSteps")!=0 ? P.get<double>("Time.FinalTime")/P.get<int>("Time.NumSteps") : 0;  //step size used in ALEVelocity
         DROPS::InScaMap & scamap = DROPS::InScaMap::getInstance();
         DROPS::ScaTetMap & scatet = DROPS::ScaTetMap::getInstance();
-        q = scatet[P.get<std::string>("PoissonCoeff.Reaction")];
-        alpha = P.get<double>("PoissonCoeff.Diffusion");
-        f = scatet[P.get<std::string>("PoissonCoeff.Source")];
-        Solution = scatet[P.get<std::string>("PoissonCoeff.Solution")];
-        //Solution = scamp[P.get<std::string>("PoissonCoeff.Solution")];
-        InitialCondition = scamap[P.get<std::string>("PoissonCoeff.InitialVal")];
+        q = scatet[P.get<std::string>("Poisson.Coeff.Reaction")];
+        alpha = P.get<double>("Poisson.Coeff.Diffusion");
+        f = scatet[P.get<std::string>("Poisson.Coeff.Source")];
+        Solution = scatet[P.get<std::string>("Poisson.Solution")];
+        //Solution = scamp[P.get<std::string>("Poisson.Solution")];
+        InitialCondition = scamap[P.get<std::string>("Poisson.InitialValue")];
         DROPS::VecTetMap & vectet = DROPS::VecTetMap::getInstance();
-        Vel = vectet[P.get<std::string>("PoissonCoeff.Flowfield")];
+        Vel = vectet[P.get<std::string>("Poisson.Coeff.Flowfield")];
 
         interface = scamap[P.get<std::string>("ALE.Interface")];
 

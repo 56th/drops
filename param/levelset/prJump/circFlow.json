@@ -1,0 +1,142 @@
+{
+    "OseenSolver": {
+        "UzawaInnerTol": "0.6", 
+        "Solver": "30211", 
+        "Iter": "1000", 
+        "UzawaInnerIter": "1000", 
+        "PcAIter": "10", 
+        "Tol": "1e-9", 
+        "PcSTol": "0.01", 
+        "PcATol": "0.01"
+    },          
+    "NavStokes": {
+        "XFEMReduced": "0", 
+        "Coeff": {
+            "SurfTens": {
+                "ArtificialForce": "1",
+                "SurfTension": "10",
+                "ShearVisco": "0", 
+                "DilatationalVisco": "0", 
+                "VarTensionFunc": "ConstTau"
+            },
+            "ViscNeg": "1", 
+            "VolForce": "ZeroVel", 
+            "DensPos": "1", 
+            "Gravity": [
+                "0", 
+                "0", 
+                "0"
+            ], 
+            "DensNeg": "1", 
+            "ViscPos": "1"
+        }, 
+        "InitialValue": "1", 
+        "GhostPenalty": "1", 
+        "BoundaryData": {
+            "Velocity": {
+                "Default":["Dir0BC"]    
+                   
+            }
+        }
+    }, 
+    "Time": {
+        "Theta": "1", 
+        "Scheme": "0", 
+        "FinalTime": "0", 
+        "NumSteps": "0"
+    }, 
+    "Mesh": {
+        "Type": "BrickBuilder",
+        "Origin": [-1,-1,-1],           // Origin
+        "E1": [2,0,0],                  // Basis to span the object,
+        "E2": [0,2,0],                  // not necessary orthonormal
+        "E3": [0,0,2],                  // ...
+        "N1":4,
+        "N2":4,
+        "N3":4,
+        "RestartFile": "", 
+        "AdaptRef": {
+            "CoarsestLevel": "0", 
+            "Freq": "0", 
+            "LoadBalStrategy": "1011", 
+            "FinestLevel": "2", 
+            "Width": "100"
+        }
+    }, 
+    "Levelset": {
+        "PosDrop": [
+            "0", 
+            "0", 
+            "0"
+        ], 
+        "Reparam": {
+            "Freq": "0", 
+            "MinGrad": "0", 
+            "Method": "0", 
+            "MaxGrad": "0"
+        }, 
+        "RadDrop": [
+            "0.6666666", 
+            "0.6666666", 
+            "0.6666666"
+        ], 
+        "VolCorrection": "0", 
+        "SD": "0"
+    }, 
+    "Inflow": {
+        "InflowAmpl": "0", 
+        "FlowDir": "0", 
+        "InflowVel": "0", 
+        "InflowFreq": "0", 
+        "RadInlet": "0"
+    }, 
+    "VTK": {
+        "Binary": "0", 
+        "MasterOut": "1", 
+        "vtkDir": "vtk", 
+        "vtkOut": "true", 
+        "GeomName": "Cube", 
+        "vtkCase": "prJump"
+    }, 
+    "General": {
+        "DynamicLibs": [
+            "levelset/liblevelset-twophaseCoeff", 
+            "misc/libmisc-scalarFunctions", 
+            "misc/libmisc-vectorFunctions"
+        ], 
+        "DynamicLibsPrefix": "../", 
+        "ProgressBar": "1"
+    }, 
+    "Transp": {
+        "Enable": "0", 
+        "IniCPos": "0", 
+        "IniCNeg": "0", 
+        "Solver": {
+            "Tol": "0", 
+            "Iter": "0"
+        }, 
+        "NitschePenalty": "0", 
+        "XFEMReduced": "0", 
+        "HPos": "0", 
+        "HNeg": "0", 
+        "DiffPos": "0", 
+        "DiffNeg": "0"
+    }, 
+    "SurfTransp": {
+        "XFEMReduced": "0", 
+        "Enable": "0", 
+        "Visc": "0", 
+        "Solver": {
+            "Tol": "0", 
+            "Iter": "0"
+        }
+    }, 
+    "Restart": {
+        "Binary": "0", 
+        "OutputGrid": "0",
+        "OutputData": "0",
+        "OutputOverwrite": "0", 
+        "InputData": "", 
+        "OutputFreq": "0"
+    }
+}

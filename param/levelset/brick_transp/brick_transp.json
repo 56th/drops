@@ -1,0 +1,89 @@
+{
+//General section
+     "General":
+     {
+             "ProgressBar":  1, //show progress bar
+             "DynamicLibsPrefix": "../", //where should we look for shared objects?
+             "DynamicLibs": [ //select libraries to be loaded after program start
+                     "levelset/liblevelset-twophaseCoeff",
+                     "misc/libmisc-scalarFunctions",
+                     "misc/libmisc-vectorFunctions"
+             ]
+     },
+
+// time stepping
+
+	"Time":
+	{
+		"NumSteps":		20,
+		"FinalTime":		1,
+		"Scheme":		2,
+        "Theta":		1.0
+	},
+
+	"NavStokes":
+	{
+        "Coeff":
+		{
+            "SurfTens":
+            {
+                "SurfTension":		1,
+                "VarTensionFunc":       "ConstTau"
+            }
+		}
+	},
+
+	"Levelset":
+	{
+		"RadDrop":		[0.3, 0.3, 0.3 ],
+		"PosDrop":		[0.5, 0.5, 0.5 ],
+        "SD":		0,
+        "Discontinuous": 0,
+        "CurvDiff":		-5e-9,
+        "VolCorrection":		0,
+        "Solver":
+        {
+            "Tol":		1e-14,
+            "Iter":		10000
+		}
+	},
+
+	"Inflow":
+	{
+		"Gravity":		[0, 0, 0 ],
+		"FlowDir":		1,
+		"InflowVel":		1,
+		"RadInlet":		0.5,
+		"InflowFreq":		0,
+		"InflowAmpl":		0
+	},
+
+	"Transp":
+	{
+		"Enable":		1,
+		"Theta":		0.5,
+		"Solver":
+		{
+            "Iter":		100,
+            "Tol":		1e-6
+        },
+		"DiffPos":		5e-3,
+		"DiffNeg":		1e-2,
+		"HPos":		1,
+		"HNeg":		0.5,
+		"IniCPos":		0.1,
+		"IniCNeg":		5,
+		"NitschePenalty":		0,
+		"NitscheXFEMStab":		0.1
+	},
+
+	"Ensight":
+	{
+		"EnsightOut":		0,
+		"EnsCase":		"brick_transp",
+		"EnsDir":		"ensight",
+		"Binary":		1,
+		"MasterOut":		1,
+		"GeomName":		"Brick"
+	}
+}

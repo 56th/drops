@@ -80,21 +80,24 @@ typedef P2EvalCL<SVectorCL<3>, const VelBndDataCL, const VecDescCL> const_DiscVe
 
 void Strategy (MultiGridCL& MG, const LsetBndDataCL& lsbnd)
 {
+    DROPS::InScaMap & inscamap = DROPS::InScaMap::getInstance();
 
     const DROPS::BndCondT v_bc[6]= { DROPS::Dir0BC, DROPS::Dir0BC, DROPS::DirBC, DROPS::DirBC, DROPS::Dir0BC, DROPS::Dir0BC };
     const vel_bnd_val_fun v_bfun[6]= { 0, 0, DROPS::InVecMap::getInstance()["InflowBrickTransp"], DROPS::InVecMap::getInstance()["InflowBrickTransp"], 0, 0};
     const DROPS::BndCondT c_bc[6]= { DROPS::DirBC, DROPS::DirBC, DROPS::DirBC, DROPS::DirBC, DROPS::DirBC, DROPS::DirBC };
     const c_bnd_val_fun c_bfun[6]= { & Initialcpos,  & Initialcpos, & Initialcpos,& Initialcpos, & Initialcpos, & Initialcpos };
 
+    // initialization of surface tension
+    // choose a proper model for surface tension coefficient, see levelset/surfacetension.h
+    SurfaceTensionCL * sf;
+    sf = new SurfaceTensionCL( inscamap[P.get<std::string>("NavStokes.Coeff.SurfTens.VarTensionFunc")]);
+    sf->SetInputMethod( Sigma_X);
 
-    SurfaceTensionCL sf( sigmaf, 0);
     // LevelsetP2CL lset( MG, lsbnd, sf, P.get<double>("Levelset.SD"), P.get<double>("Levelset.CurvDiff"));
     // Creates new Levelset-Object, has to be cleaned manually
-    LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsbnd, sf, P.get_child("Levelset")) );
+    LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsbnd, *sf, P.get_child("Levelset")) );
 
-    MLIdxDescCL* lidx= &lset.idx;
-    lset.CreateNumbering( MG.GetLastLevel(), lidx);
-    lset.Phi.SetIdx( lidx);
+    lset.CreateNumbering( MG.GetLastLevel());
     lset.Init( EllipsoidCL::DistanceFct);
 
     VelBndDataCL Bnd_v( 6, v_bc, v_bfun);
@@ -104,9 +107,10 @@ void Strategy (MultiGridCL& MG, const LsetBndDataCL& lsbnd)
     InitVel( MG, v, DROPS::InVecMap::getInstance()["InflowBrickTransp"]);
 
     cBndDataCL Bnd_c( 6, c_bc, c_bfun);
+    const double dt= P.get<double>("Time.FinalTime")/P.get<int>("Time.NumSteps");
 
     TransportP1CL c( MG, Bnd_c, Bnd_v, /*theta*/ 0.5, D, H, &v, lset,
-        P.get<double>("Time.StepSize"), P.get<int>("Stokes.OuterIter"), P.get<double>("Stokes.OuterTol"));
+        dt, P.get<int>("Transp.Solver.Iter"), P.get<double>("Transp.Solver.Tol"));
     MLIdxDescCL* cidx= &c.idx;
     c.CreateNumbering( MG.GetLastLevel(), cidx);
     c.ct.SetIdx( cidx);
@@ -134,15 +138,16 @@ void Strategy (MultiGridCL& MG, const LsetBndDataCL& lsbnd)
     if (P.get<int>("Ensight.EnsightOut"))
         ensight.Write();
 
-    c.SetTimeStep( P.get<double>("Time.StepSize"));
+    c.SetTimeStep( dt);
     for (int step= 1; step <= P.get<int>("Time.NumSteps"); ++step) {
         std::cout << "======================================================== Schritt " << step << ":\n";
-        c.DoStep( step*P.get<double>("Time.StepSize"));
+        c.DoStep( step*dt);
         if (P.get<int>("Ensight.EnsightOut"))
-            ensight.Write( step*P.get<double>("Time.StepSize"));
+            ensight.Write( step*dt);
     }
     std::cout << std::endl;
     delete &lset;
+    if(sf) delete sf;
 }
 
 } // end of namespace DROPS
@@ -151,7 +156,7 @@ void Strategy (MultiGridCL& MG, const LsetBndDataCL& lsbnd)
 int main (int argc, char** argv)
 {
   try {
-    DROPS::read_parameter_file_from_cmdline( P, argc, argv);
+    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/levelset/brick_transp/brick_transp.json");
     std::cout << P << std::endl;
 
     DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
@@ -160,7 +165,7 @@ int main (int argc, char** argv)
         DROPS::ProgressBarTetraAccumulatorCL::Activate();
 
     DROPS::Point3DCL e1(0.), e2(0.), e3(0.), orig;
-    e1[0]=2*P.get<double>("Exp.RadInlet"); e2[1]=1.0; e3[2]= 2*P.get<double>("Exp.RadInlet");
+    e1[0]=2*P.get<double>("Inflow.RadInlet"); e2[1]=1.0; e3[2]= 2*P.get<double>("Inflow.RadInlet");
     DROPS::BrickBuilderCL builder( orig, e1, e2, e3, 20, 20, 20);
     DROPS::MultiGridCL mg( builder);
 
@@ -169,7 +174,7 @@ int main (int argc, char** argv)
     DROPS::LsetBndDataCL lsbnd( 6, bcls, bfunls);
 
     std::cout << DROPS::SanityMGOutCL( mg) << std::endl;
-    DROPS::EllipsoidCL::Init( P.get<DROPS::Point3DCL>("Exp.PosDrop"), P.get<DROPS::Point3DCL>("Exp.RadDrop"));
+    DROPS::EllipsoidCL::Init( P.get<DROPS::Point3DCL>("Levelset.PosDrop"), P.get<DROPS::Point3DCL>("Levelset.RadDrop"));
 
     Strategy( mg, lsbnd);    // do all the stuff
 

@@ -1,0 +1,166 @@
+{
+    "General": {
+        "DynamicLibs": [
+            "misc/libmisc-scalarFunctions", 
+            "misc/libmisc-vectorFunctions",
+            "transport/libtransport-transportCoeff"
+        ], 
+        "DynamicLibsPrefix": "../", 
+        "ProgressBar": 1
+    }, 
+    "Time": {
+        "NumSteps": 2000, 
+        "Scheme": 1, 
+        "FinalTime": 1, 
+        "Theta": 1
+    }, 
+    "CouplingSolver": {
+        "Iter": 10, 
+        "Tol": 1e-10, 
+        "ImplLB": 0.1, 
+        "LevelsetSolver": {
+            "Iter": 1000, 
+            "Tol": 1e-10
+        }, 
+        "NavStokesSolver": {
+            "Reduction": 0.1, 
+            "Nonlinear": 1, 
+            "OseenSolver": {
+                "UzawaInnerTol": 0.6, 
+                "Solver": 10101,
+                "Iter": 200, 
+                "UzawaInnerIter": 1000, 
+                "PcAIter": 500,
+                "Tol": 1e-10, 
+                "PcSTol": 0.01, 
+                "PcATol": 0.01
+            }, 
+            "Iter": 20, 
+            "Tol": 1e-10
+        }
+    }, 
+    "NavStokes": {
+        "XFEMReduced": 0.01, 
+        "Coeff": {
+            "SurfTens": {
+                "SurfTension": 0.00163, 
+                "ConcentrationDep": 1, 
+                "ShearVisco": 0, 
+                "DilatationalVisco": 0, 
+                "VarTensionFunc": "ConstTau"
+            }, 
+            "ViscNeg": 0.003281, 
+            "DensPos": 986.506, 
+            "Gravity": [
+                0, 
+                -9.81, 
+                0
+            ], 
+            "DensNeg": 845.442, 
+            "ViscPos": 0.001388
+        }, 
+        "InitialValue": 0, 
+        "BoundaryData": {
+            "Velocity": {
+                "Default":["DirBC","ZeroVel"] 
+                    
+                
+            }
+        }
+    }, 
+    "Levelset": {
+        "RadDrop": [
+            0.001, 
+            0.001, 
+            0.001
+        ], 
+        "PosDrop": [
+            0.01,
+            0.01,
+            0.01
+        ],
+        "VolCorrection": 1,
+        "Discontinuous": 0,
+        "Reparam": {
+            "Freq": 1, 
+            "MinGrad": 0.1, 
+            "Method": 1, 
+            "MaxGrad": 10
+        }, 
+        "SD": 0.1
+    }, 
+    "Mesh": {
+        "Type": "BrickBuilder",     
+                "Origin": [0,0,0],          
+                "E1": [20e-3,0,0],             
+                "E2": [0,40e-3,0],              
+                "E3": [0,0,20e-3],              
+                "N1": 10,                    
+                "N2": 20,                    
+                "N3": 10, 
+        "RestartFile": "", 
+        "AdaptRef": {
+            "CoarsestLevel": 0, 
+            "Freq": 1, 
+            "LoadBalStrategy": 1, 
+            "FinestLevel": 3, 
+            "Width": 0.00045
+        }
+    }, 
+    "Inflow": {
+        "InflowAmpl": 0, 
+        "FlowDir": 1, 
+        "InflowVel": 0, 
+        "InflowFreq": 0, 
+        "RadInlet": 0.005
+    }, 
+    "Transp": {
+        "UseNSSol": 1, 
+        "Enable": 1, 
+        "IniCPos": 0.01, 
+        "IniCNeg": 0, 
+        "Solver": {
+            "Tol": 1e-15, 
+            "Iter": 200
+        }, 
+        "DiffNeg": 2.29e-05, 
+        "Flow": "ZeroVel", 
+        "Levelset": "Ellipsoid", 
+        "NitschePenalty": 100, 
+        "XFEMReduced": 0.01, 
+        "HPos": 1.2143, 
+        "HNeg": 1, 
+        "DiffPos": 5.8345e-05, 
+        "SDStabilization": 1,
+        "BoundaryData": {
+            "Default": ["DirBC","Dirichlet"]
+        },
+        "BoundaryDataTransformed": {
+            "Default": ["DirBC","Dirichlett"]
+        }
+    },
+    "SurfTransp": {
+        "XFEMReduced": -1, 
+        "Enable": 0, 
+        "Visc": 1e-05, 
+        "SDStabilization": 0, 
+        "Solver": {
+            "Tol": 1e-10, 
+            "Iter": 1000
+        }
+    }, 
+    "VTK": {
+        "VTKDir": "vtk", 
+        "Binary": 0, 
+        "Freq": 5, 
+        "VTKName": "risingbubble_butanol"
+    }, 
+    "Restart": {
+        "OutputOverwrite": 0, 
+        "InputData": "none", 
+        "Binary": 0, 
+        "OutputGrid": "./geometry/grid",
+        "OutputData": "./geometry/data",
+        "OutputFreq": 0
+    }
+}

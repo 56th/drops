@@ -85,7 +85,7 @@ void averaging_P2_gradient_recovery (const MultiGridCL& mg, const VecDescCL& f, 
     OswaldProjectionP2AccuCL<LocalP2GradientCL> accu( loc, grad);
     TetraAccumulatorTupleCL accus;
     accus.push_back( &accu);
-    accumulate( accus, mg, f.RowIdx->TriangLevel(), f.RowIdx->GetMatchingFunction(), f.RowIdx->GetBndInfo());
+    accumulate( accus, mg, f.RowIdx->TriangLevel(), f.RowIdx->GetBndInfo());
 }
 
 } // end of namespace DROPS

@@ -1,0 +1,115 @@
+{
+    "General": {
+        "DynamicLibs": [
+            "transport/libtransport-transportCoeff", 
+            "misc/libmisc-scalarFunctions", 
+            "misc/libmisc-vectorFunctions"
+        ], 
+        "DynamicLibsPrefix": "../", 
+        "ProgressBar": 1
+    }, 
+    "Time": {
+        "NumSteps": 2000, 
+        "Scheme": 1, 
+        "FinalTime": 1, 
+        "Theta": 1
+    }, 
+    "Mesh": {
+       "Type": "BrickBuilder",     
+        "Origin": [0,0,0],          
+        "E1": [3,0,0],             
+        "E2": [0,3,0],              
+        "E3": [0,0,3],              
+        "N1": 4,                    
+        "N2": 4,                    
+        "N3": 4,
+        "RestartFile": "", 
+        "AdaptRef": {
+            "CoarsestLevel": 0, 
+            "Freq": 1, 
+            "LoadBalStrategy": 1, 
+            "FinestLevel": 0, 
+            "Width": 0.00045
+        }
+    }, 
+    "Levelset": {
+        "RadDrop": [
+            1, 
+            1, 
+            1
+        ], 
+        "PosDrop": [
+            1.5, 
+            1.5, 
+            1.5
+        ]
+    }, 
+    "Inflow": {
+        "RadInlet": 0.005
+    }, 
+    "Transp": {
+        "SolNeg": "solMassNeg", 
+        "UseNSSol": 0, 
+        "Enable": 1, 
+        "SolPos": "solMassPos", 
+        "Solver": {
+            "Tol": 1e-10, 
+            "Iter": 500
+        }, 
+        "DiffNeg": 0.5, 
+        "Flow": "RotatingFlowfield", 
+        "Levelset": "Ellipsoid", 
+        "GradSolNeg": "gradMassNeg", 
+        "NitschePenalty": 0, 
+        "XFEMReduced": -1e-10, 
+        "HPos": 1, 
+        "GradSolPos": "gradMassPos", 
+        "HNeg": 1, 
+        "DiffPos": 1, 
+        "SDStabilization": 0, 
+        "Restart": 250, 
+        "Rhs": "rhsMassNoVel",
+        "BoundaryDataTransformed": {
+            "Default":["DirBC","solMassPos"]
+        },
+        "BoundaryData": {
+            "Default":["DirBC","solMassPos"]
+        }
+    
+    }, 
+    
+    "SurfTransp": {
+        "AdsorpPos": 2, 
+        "Enable": 1, 
+        "Visc": 1, 
+        "Rhs": "rhsSurfNoVel", 
+        "Solver": {
+            "Iter": 500, 
+            "Tol": 1e-10
+        }, 
+        "DesorpNeg": 2, 
+        "Sol": "solSurf", 
+        "XFEMReduced": -0.001, 
+        "AdsorpNeg": 0.5, 
+        "DesorpPos": 1
+    }, 
+    "NavStokes": {
+        "XFEMReduced": 0.01, 
+        "InitialValue": 0, 
+        "BoundaryData": {
+            "Velocity": {
+                "Default":["DirBC","RotatingFlowfield"]
+                   
+            }
+        }
+    }, 
+    "VTK": {
+        "VTKDir": "vtk", 
+        "Binary": 0, 
+        "Freq": 5, 
+        "VTKName": "stationary_interface"
+    }, 
+    "Restart": {
+        "InputData": ""
+    }
+}

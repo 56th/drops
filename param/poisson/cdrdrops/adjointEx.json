@@ -1,0 +1,83 @@
+{
+    "General": {
+        "DynamicLibs": [
+            "misc/libmisc-scalarFunctions", 
+            "misc/libmisc-vectorFunctions", 
+            "poisson/libpoisson-poissonCoeff"
+        ], 
+        "DynamicLibsPrefix": "../", 
+        "ProgressBar": 1
+    }, 
+    "Poisson": {
+        "InitialValue": "Adjoint_Solution", 
+        "Solver": {
+            "MG": {
+                "NumLvl": -1, 
+                "SmoothingSteps": 1
+            }, 
+            "Solver": 303, 
+            "Relax": 1, 
+            "Iter": 5000, 
+            "PcIter": 1, 
+            "PcTol": 0.1, 
+            "Tol": 1e-10, 
+            "useRelTol": 0, 
+            "Restart": 100
+        }, 
+        "Coeff": {
+            "Diffusion": 1, 
+            "Reaction": "Adjoint_Reaction", 
+            "Flowfield": "Adjoint_Flowfield", 
+            "withConvection": 1, 
+            "Source": "Adjoint_Source"
+        },
+        "BoundaryData": {    
+                "Default":["Nat0BC"],
+                      "0":["DirBC","Adjoint_Solution"]
+        },
+        "Solution": "Adjoint_Solution", 
+        "SolutionIsKnown": 1, 
+        "P1": 1
+    }, 
+    "DomainCond": {
+        "RefineSteps": 2
+    }, 
+    "Mesh": {
+        "Type": "BrickBuilder", 
+        //"MeshFile_convertTo_E1E2E3_N1N2N3": "1x1x1@4x4x4"
+        "Origin":[0,0,0],
+        "E1": [1,0,0],
+        "E2": [0,1,0],
+        "E3": [0,0,1],
+        "N1": 4,
+        "N2": 4,
+        "N3": 4,
+        "AdaptRef":{
+            "FinestLevel": 2
+         }    
+    }, 
+    "Restart": {
+        "InputData": ""
+    }, 
+    "Time": {
+        "NumSteps": 2, 
+        "Scheme": 1, 
+        "FinalTime": 0.2, 
+        "Theta": 0.5
+    }, 
+    "Error": {
+        "Meas": 0.875, 
+        "NumRef": 2, 
+        "RelReduction": 0.1, 
+        "DoMark": 1, 
+        "MinRatio": 0, 
+        "Threshold": 0.6, 
+        "DoErrorEstimate": 0
+    }, 
+    "VTK": {
+        "VTKDir": "vtk", 
+        "Binary": 0, 
+        "Freq": 0, 
+        "VTKName": "poisson_Adjoint_"
+    }
+}

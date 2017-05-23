@@ -57,15 +57,15 @@ class LocalNonlConvSystemOnePhase_P2CL
     void   rho (double new_rho)                   { rho_= new_rho;      }
     double rho () const                           { return rho_;        }
 
-    void setup (const SMatrixCL<3,3>& T, double absdet, LocalNonlConvDataCL& loc);
+  void setup (const SMatrixCL<3,3>& T, double absdet, LocalNonlConvDataCL& loc, Point3DCL frame_vel);
 };
 
-void LocalNonlConvSystemOnePhase_P2CL::setup (const SMatrixCL<3,3>& T, double absdet, LocalNonlConvDataCL& loc)
+void LocalNonlConvSystemOnePhase_P2CL::setup (const SMatrixCL<3,3>& T, double absdet, LocalNonlConvDataCL& loc, Point3DCL frame_vel)
 {
     P2DiscCL::GetGradients( Grad, GradRef, T);
     for (Uint i= 0; i < 10; ++i) {
         for (Uint j= 0; j < 10; ++j) {
-            loc.C[i][j]= rho() * Quad5CL<>( dot(velocity(),Grad[j])).quadP2(i,absdet);
+            loc.C[i][j]= rho() * Quad5CL<>( dot(velocity(),Grad[j]) - dot(frame_vel,Grad[j]) ).quadP2(i,absdet);
         }
     }
 }
@@ -103,15 +103,15 @@ class LocalNonlConvSystemSmoothedJumps_P2CL
     const Quad5CL<double> & levelset () const     { return lset_;  }
     const Quad5CL<double> & smoothed_rho () const { return qrho_; }
 
-    void setup (const SMatrixCL<3,3>& T, double absdet, LocalNonlConvDataCL& loc);
+    void setup (const SMatrixCL<3,3>& T, double absdet, LocalNonlConvDataCL& loc, Point3DCL frame_vel);
 };
 
-void LocalNonlConvSystemSmoothedJumps_P2CL::setup (const SMatrixCL<3,3>& T, double absdet, LocalNonlConvDataCL& loc)
+void LocalNonlConvSystemSmoothedJumps_P2CL::setup (const SMatrixCL<3,3>& T, double absdet, LocalNonlConvDataCL& loc, Point3DCL frame_vel)
 {
     P2DiscCL::GetGradients( Grad, GradRef, T);
     for (Uint i= 0; i < 10; ++i) {
         for (Uint j= 0; j < 10; ++j) {
-            loc.C[i][j]= Quad5CL<>( smoothed_rho() * dot(velocity(),Grad[j])) .quadP2(i,absdet);
+            loc.C[i][j]= Quad5CL<>( smoothed_rho() * ( dot(velocity(),Grad[j]) - dot(frame_vel,Grad[j])) ) .quadP2(i,absdet);
         }
     }
 }
@@ -148,10 +148,10 @@ class LocalNonlConvSystemTwoPhase_P2CL
 
     double rho (int sign) const                   { return sign > 0 ? rho_p : rho_n; }
 
-    void setup (const SMatrixCL<3,3>& T, double absdet, const LocalP2CL<Point3DCL> & velp2, const LocalP2CL<>& ls, LocalNonlConvDataCL& loc);
+    void setup (const SMatrixCL<3,3>& T, double absdet, const LocalP2CL<Point3DCL> & velp2, const LocalP2CL<>& ls, LocalNonlConvDataCL& loc, Point3DCL frame_vel);
 };
 
-void LocalNonlConvSystemTwoPhase_P2CL::setup (const SMatrixCL<3,3>& T, double absdet, const LocalP2CL<Point3DCL> & velp2, const LocalP2CL<>& ls, LocalNonlConvDataCL& loc)
+void LocalNonlConvSystemTwoPhase_P2CL::setup (const SMatrixCL<3,3>& T, double absdet, const LocalP2CL<Point3DCL> & velp2, const LocalP2CL<>& ls, LocalNonlConvDataCL& loc, Point3DCL frame_vel)
 {
     P2DiscCL::GetGradients( Grad, GradRef, T);
 
@@ -167,7 +167,7 @@ void LocalNonlConvSystemTwoPhase_P2CL::setup (const SMatrixCL<3,3>& T, double ab
     }
     for (int i= 0; i < 10; ++i) {
         for (int j= 0; j < 10; ++j) {
-            quad( qshape[i]*dot(velocity,qdshape[j]), absdet, q5dom, intneg, intpos);
+            quad( qshape[i]*( dot(velocity,qdshape[j]) - dot(frame_vel,qdshape[j])), absdet, q5dom, intneg, intpos);
             loc.C[i][j]= rho_p*intpos + rho_n*intneg;
         }
     }
@@ -277,15 +277,15 @@ void NonlConvSystemAccumulator_P2CL::local_setup (const TetraCL& tet)
     if (equal_signs( ls_loc)) {
         local_onephase.velocity( vel_loc);
         local_onephase.rho( local_twophase.rho( sign( ls_loc[0])));
-        local_onephase.setup( T, absdet, loc);
+        local_onephase.setup( T, absdet, loc, Coeff.framevel);
     }
     else {
         if (!smoothed)
-            local_twophase.setup( T, absdet, vel_loc, ls_loc, loc);
+            local_twophase.setup( T, absdet, vel_loc, ls_loc, loc, Coeff.framevel);
         else {
             local_smoothed_twophase.velocity( vel_loc);
             local_smoothed_twophase.levelset( ls_loc);
-            local_smoothed_twophase.setup( T, absdet, loc);
+            local_smoothed_twophase.setup( T, absdet, loc, Coeff.framevel);
         }
     }
     
@@ -327,7 +327,7 @@ void InstatNavierStokes2PhaseP2P1CL::SetupNonlinear_P2(MatrixCL& N, const VelVec
     ProgressBarTetraAccumulatorCL accup(MG_,"NonlConvSystem(P2) Setup",RowIdx.TriangLevel());
     accus.push_back( &accup);
     accus.push_back( &accu);
-    accumulate( accus, MG_, RowIdx.TriangLevel(), RowIdx.GetMatchingFunction(), RowIdx.GetBndInfo());
+    accumulate( accus, MG_, RowIdx.TriangLevel(), RowIdx.GetBndInfo());
 }
 
 
@@ -368,7 +368,7 @@ PermutationT InstatNavierStokes2PhaseP2P1CL::downwind_numbering (const LevelsetP
     DownwindAccu_P2CL accu( this->GetBndData().Vel, this->v, this->vel_idx.GetFinest(), C);
     TetraAccumulatorTupleCL accus;
     accus.push_back( &accu);
-    accumulate( accus, this->GetMG(), vel_idx.TriangLevel(), vel_idx.GetMatchingFunction(), vel_idx.GetBndInfo());
+    accumulate( accus, this->GetMG(), vel_idx.TriangLevel(), vel_idx.GetBndInfo());
 
     const PermutationT& p= dw.downwind_numbering( C);
     permute_fe_basis( GetMG(), vel_idx.GetFinest(), p);

@@ -1,0 +1,277 @@
+//=============================================================
+//    DROPS parameter file for twophasedrops
+//    simulation of two-phase flow:
+//    droplet in a cuboid
+//=============================================================
+{
+        //General section
+        "General":
+        {
+                "ProgressBar":  1, //show progress bar
+                "DynamicLibsPrefix": "../", //where should we look for shared objects?
+                "DynamicLibs": [ //select libraries to be loaded after program start
+                        "misc/libmisc-scalarFunctions",
+                        "misc/libmisc-vectorFunctions",
+                        "misc/libmisc-csgFunctions",
+                        "spacetimetransp/libspacetimetransp-sttranspCoeff"
+                ]
+        },
+
+        // time stepping:
+        "Time":
+        {
+                "NumSteps":             20,     // number of time steps
+                "FinalTime":            0.01,   // final time
+                "Scheme":               1,      // choose a specific time discretization
+                "Theta":                1       // controls the implicitness of the theta-scheme
+                                                // for time discretization of the Navier-Stokes and
+                                                // level set equations. Theta = 0 yields the explicit and
+                                                // Theta = 1 the implicit Euler method. Theta = 0.5 results
+                                                // in the Crank-Nicholson scheme.
+        },
+
+        "Mesh":
+        {
+            "Type": "BrickBuilder",      // A parallelepiped
+            "Origin": [-0.005,-0.005,0],           // Origin
+            "E1": [0.01,0,0],               // Basis to span the object,
+            "E2": [0,0.01,0],               // not necessary orthonormal 
+            "E3": [0,0,0.015],              // ... 
+            "N1": 6,                     // Number of cells along the E1-direction,
+            "N2": 6,                     //                       the E2-direction,
+            "N3": 9,                     //                       the E3-direction.
+	// adaptive refinement
+	        "AdaptRef":
+	        {
+	                "Freq":                 1,
+	                "FinestLevel":          3,
+	                "AddConcMarker":        1, // refinement adapted to concentration/gradient
+	                "Threshold0":           -0.025,
+	                "Threshold1":           0.01,
+	                "Threshold2":           0.001,
+	                "Threshold3":           0.0001,
+	                "CoarsestLevel":        0,
+	                "Width":                2e-4,
+	                "RefineStrategy":       1,
+	                "LoadBalStrategy":      1011,
+	                // "AdaptiveMassTransport":1,
+	                // "ErrorThresholdUpper":  0.5,
+	                // "ErrorThresholdLower":  0.001,
+	                "Partitioner":          1
+	        }
+	    },
+
+// Navier Stokes 
+        "NavStokes":
+        {
+                "InitialValue":         0,                 // initial conditions (0 = zero, 1/2 = stationary
+                                                           // flow with/without droplet, -1 = read from file).
+                "XFEMReduced":          0.1,    // threshold for discarding additional dof parameters in
+                                                // the XFEM pressure space. Using a negative value
+                                                // yields the standard FEM pressure space.
+	            "Coeff":
+                {
+	                "DensNeg":            1.122,
+	                "ViscNeg":            1.84e-3, //increased by a factor 100
+	                "DensPos":            1.205e3, //decreased by a factor 1
+	                "ViscPos":            0.75e-1, //increased by a factor 1
+			// surface tension
+			        "SurfTens":
+			        {
+			
+			                "SurfTension":          0.063,
+			                "VarTensionFunc":       "ConstTau",
+			                "ConcentrationDep":     0,
+			
+			                "DilatationalVisco":    0,
+			                "ShearVisco":		0
+			        },
+
+                    "Gravity":            [0, 0, -9.81 ],  // gravity vector
+                    "VolForce":           "ZeroVel"        // r.h.s. force of navier stokes
+                                                           // equations (default: 'ZeroVel')
+                },
+                "BoundaryData":
+                {
+                    "Velocity":
+                    {
+                        "Default":  ["Dir0BC"]
+                    }
+                }               
+        },
+
+// Levelset
+        "Levelset":
+        {
+        		"InitialValue":			"Ellipsoid",
+        		"RadDrop":              [0.002, 0.002, 0.002 ], // radii of the ellipsoidal droplet at initial time.
+                                                                // ( ! Attention: If RadDrop is negativ, a flow
+                                                                // without a droplet is simulated).
+                "PosDrop":              [0.000, 0.000, 0.005 ],    // position of the droplet's centre at initial time.
+        		
+                "SD":                   0.1,    // parameter controls the stability of the advection equation
+                                                // by streamline diffusion
+                "CurvDiff":             -1,     // smoothing of level set function before the discretization
+                                                // of the curvature term. ( ! Attention: The smoothing is only
+                                                // applied on temporary variables used for the curvature
+                                                // calculation. The interface remains unchanged.)
+                "VolCorrection":        1,      // control of the volume correction. For VolCorrection = 0 no
+                                                // correction is made and for VolCorrection = 1 it is carried
+                                                // out after each time step and reparameterization of the level
+                                                // set function.
+                "Discontinuous":        0,
+
+		// re-initialization of levelset function",
+		        "Reparam":
+		        {
+		                "Freq":                 1,      // number of timesteps before the levelset function is
+		                                                // reparameterized. Freq = 0 deactivates the reparameterization.
+		                "Method":               12,      // Method how to determine distance of frontier vertices and
+		                                                // propagation scheme, see documentation of ReparamFactoryCLfor
+		                                                // a detailed description
+		                "MinGrad":              0.1,    // minimal allowed norm of the gradient of the levelset function.
+		                "MaxGrad":              10,     // maximal allowed norm of the gradient of the levelset function.
+		                "NarrowBand":           -1      // Narrow-Band method for the Euclidian method.
+		                                                // (e. g. NarrowBand = 0.5 <=> all DOFs with < 50% of maximal
+		                                                // level set value are considered).
+		        }
+        },
+
+// solver for coupling of Navier-Stokes and level set
+        "CouplingSolver":
+        {
+                "Tol":                  1e-10,  // tolerance for the coupling.
+                "Iter":                 20,     // maximum number of iterations for the fixed-point iteration.
+                                                // ( ! Attention: For Iter = -1 the calculation is carried out
+                                                // until convergence).
+                "ImplLB":               1,      // Laplace-Beltrami-stabilization.
+                "NavStokesSolver":
+                {
+	                "Nonlinear":            0,      // determination of the influence of the nonlinear
+	                                                // inertia term. For Nonlinear = 0 the linear Stokes
+	                                                // equation and for Nonlinear = 1 the full Navier-Stokes
+	                                                // equation is solved.
+	                "Tol":                  1e-10,  // tolerance for the Navier-Stokes solver.
+	                "Iter":                 20,     // maximum number of iterations for the Navier-Stokes solver.
+	                "Reduction":            0.1,    // reduction of the Oseen residual by this factor.
+     
+                	"OseenSolver":
+                	{
+		                "DirectSolve":          0,
+		                "Solver":               10308,  // Stokes solver, cf. num/stokessolverfactory.h
+		                "InnerIter":            1000,   // maximum number of iterations for the inner solver
+		                "Iter":            200,    // maximum number of iterations for the outer solver
+		                "InnerTol":             0.6,    // tolerance for the inner solver. (! Attention:
+		                                                // The inner solver tolerance should be chosen some
+		                                                // orders of magnitude smaller than the outer solver
+		                                                // tolerance, otherwise the outer solver diverges)
+		                "Tol":             1e-08,  // tolerance for the outer solver
+		                "PcAIter":              2,      // maximum number of iterations for the preconditioner
+		                                                // of the A-Block
+		                "PcATol":               1e-99,  // tolerance for the preconditioner of the A-Block
+		                "PcSTol":               0.0001,  // tolerance for the preconditioner of the Schur complement
+		                "PcSIter":              200
+                	}
+                },
+
+                "LevelsetSolver":
+                {
+	                "Tol":                  1e-14,  // tolerance for the level set solver.
+	                "Iter":                 1000    // maximum number of iterations for the level set solver.
+                }        
+        },
+
+// mass transport
+        "Transp":
+        {
+                "Enable":               1,
+                "UseNSSol":             1,
+                "Solver":
+                {
+	                "Iter":                 2000,
+	                "Tol":                  1e-6,
+	                "useRelTol":            1,
+                    "DirectSolve":          0
+                },
+                "DiffPos":              19.16e-06, // increased by a factor 1
+                // "DiffPos":              58.06e-08,
+                "DiffNeg":              62.24e-08, // increased by a factor 1
+                // "DiffPos":              33, //toy parameters
+                // "DiffNeg":              1, //toy parameters
+                "HPos":                 33.3333333333333,
+                "HNeg":                 1,
+                "IniCPos":              0.0,
+                "IniCNeg":              1.00,
+                // "InitialConcNeg":       "inineg",
+                // "InitialConcPos":       "inipos",
+                "InitialConcNeg":       "IniCnegFct",
+                "InitialConcPos":       "IniCposFct",
+                "NitschePenalty":       20,
+                "XFEMReduced":          0, //0.001,
+                "SD":                   0,
+                "Levelset":             "MovingEllipsoid",             //Only active if UseNSSol == 0
+                "Flow":                 "straightsinus",               //Only active if UseNSSol == 0
+                // "Levelset":             "Ellipsoid",             //Only active if UseNSSol == 0
+                // "Flow":                 "ZeroVel",               //Only active if UseNSSol == 0
+                "RhsPos":               "Zero",                  //Only active if UseNSSol == 0
+                "RhsNeg":               "Zero",                  //Only active if UseNSSol == 0
+                "SolPos":               "Zero",
+                "SolNeg":               "Zero",
+                "KappaRule":            2,
+                "MaxVelocity":          1.0,
+                "Quadrature":
+                {       
+                    "SubIntervalsPerEdge":  1,
+                    "SubTimeIntervals":     1,
+                    "LevelsetLinearInTime": 1
+                },
+                "BoundaryDataPos":
+                {
+                    "Default":   ["Nat0BC"]
+                },
+                "BoundaryDataNeg":
+                {
+                    "Default":   ["Nat0BC"]
+                }
+        },
+
+// surfactant transport
+        "SurfTransp":
+        {
+                "Enable":               0,      // 
+                "Solver":
+                {
+                	"Iter":                 1000, 
+                	"Tol":                  1e-10
+                }, 
+                "XFEMReduced":          -1.0,   // 
+                "Visc":                 1e-5    // 
+        },
+
+
+// Visualization Toolkit output format settings
+        "VTK":
+        {
+                "Freq":                 1,                 // VTK output (0 = off, 1 = on).
+                "VTKDir":               "vtk",             // local directory for VTK files.
+                "VTKName":              "botheetal03_",    // name of VTK files
+                "AddP1XPressure":       1,                 // pressure output as p1 on neg. and p1 on pos. part      
+                "Binary":               1,                 // write out VTK files in binary format.
+				"UseDeformation":       0
+        },
+
+// write out results, read in for restart
+        "Restart":
+        {
+                "OutputFreq":           0,                 // run serialization each nth time step (0 = off).
+                "OutputOverwrite":      1,                 // overwrite old output-files or create new ones
+                                                           // for every time step.
+                "InputData":            "",                // reads FE solutions from deserialization files
+                                                           // (to deactivate the reading choose "").
+                "OutputGrid":           "mg/grid",         // writes multigrid to serialization files
+                                                           // (to deactivate the writing choose "").
+                "OutputData":           "mg/data",         // writes FE solutions to serialization files
+                                                           // (to deactivate the writing choose "").
+                "Binary":               1                  //
+        }
+}

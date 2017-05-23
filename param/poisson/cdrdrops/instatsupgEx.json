@@ -1,0 +1,95 @@
+{
+    "General": {
+        "DynamicLibs": [
+            "poisson/libpoisson-poissonCoeff", 
+            "misc/libmisc-scalarFunctions", 
+            "misc/libmisc-vectorFunctions"
+        ], 
+        "DynamicLibsPrefix": "../", 
+        "ProgressBar": 1
+    }, 
+    "Poisson": {
+        "InitialValue": "instatSUPG_Solution", 
+        "Solver": {
+            "MG": {
+                "NumLvl": -1, 
+                "SmoothingSteps": 1
+            }, 
+            "Solver": 303, 
+            "Relax": 1, 
+            "Iter": 1000, 
+            "PcIter": 1, 
+            "PcTol": 0.1, 
+            "Tol": 1e-08, 
+            "useRelTol": 0, 
+            "Restart": 50
+        }, 
+        "Coeff": {
+            "Diffusion": 0.01, 
+            "Reaction": "instatSUPG_Reaction", 
+            "Flowfield": "instatSUPG_Flowfield", 
+            "withConvection": 1, 
+            "Source": "instatSUPG_Source"
+        }, 
+        "BoundaryData": {
+            "Default": ["DirBC","instatSUPG_Solution"],
+                  "4": ["Nat0BC","Zero"],
+                  "5": ["Nat0BC","Zero"]
+        },
+        "Solution": "instatSUPG_tetraSolution", 
+        "SolutionIsKnown": 1, 
+        "P1": 1
+    }, 
+    "Stabilization": {
+        "Magnitude": 1.0, 
+        "Grids": 1, 
+        "SUPG": 1
+    }, 
+    "DomainCond": {
+        "RefineSteps": 2
+    }, 
+    "Mesh": {
+        "Type": "BrickBuilder", 
+        "Origin":[0,0,0],
+        "E1": [1,0,0],
+        "E2": [0,0.5,0],
+        "E3": [0,0,0.5],
+        "N1": 4,
+        "N2": 2,
+        "N3": 2,
+        "AdaptRef":{
+            "FinestLevel": 2
+            }
+    }, 
+    "Restart": {
+        "InputData": "none"
+    }, 
+    "Time": {
+        "NumSteps": 2, 
+        "Scheme": 1, 
+        "FinalTime": 0.8, 
+        "Theta": 1.0
+    }, 
+    "Exp": {
+        "Mu": 1.00412, 
+        "Heat": 5960, 
+        "Cp": 1500, 
+        "Rho": 998, 
+        "Lambda": 0.26
+    }, 
+    "Error": {
+        "Meas": 0.875, 
+        "NumRef": 2, 
+        "RelReduction": 0.1, 
+        "DoMark": 1, 
+        "MinRatio": 0, 
+        "Threshold": 0.6, 
+        "DoErrorEstimate": 0
+    }, 
+    "VTK": {
+        "VTKDir": "vtk", 
+        "Binary": 0, 
+        "Freq": 1, 
+        "VTKName": "instatSUPG2_"
+    }
+}

@@ -1,0 +1,93 @@
+{
+    "General": {
+        "DynamicLibs": [
+            "transport/libtransport-transportCoeff", 
+            "misc/libmisc-scalarFunctions", 
+            "misc/libmisc-vectorFunctions"
+        ], 
+        "DynamicLibsPrefix": "../", 
+        "ProgressBar": 1
+    }, 
+    "Time": {
+        "NumSteps": 2000, 
+        "Scheme": 1, 
+        "FinalTime": 1,
+        "Theta": 1
+    }, 
+    "Mesh": {
+        "Type": "BrickBuilder",     
+        "Origin": [0,0,0],          
+        "E1": [20e-3,0,0],             
+        "E2": [0,20e-3,0],              
+        "E3": [0,0,20e-3],              
+        "N1": 10,                    
+        "N2": 10,                    
+        "N3": 10, 
+        "RestartFile": "", 
+        "AdaptRef": {
+            "CoarsestLevel": 0, 
+            "Freq": 1, 
+            "LoadBalStrategy": 1, 
+            "FinestLevel": 3, 
+            "Width": 0.00045
+        }
+    }, 
+    "Levelset": {
+        "RadDrop": [
+            0.001, 
+            0.001, 
+            0.001
+        ], 
+        "PosDrop": [
+            0.01, 
+            0.01, 
+            0.01
+        ]
+    }, 
+    "Inflow": {
+        "RadInlet": 0.005
+    }, 
+    "Transp": {
+        "UseNSSol": 0, 
+        "Enable": 1, 
+        "IniCPos": 0.01, 
+        "IniCNeg": 0, 
+        "Solver": {
+            "Tol": 1e-15, 
+            "Iter": 200
+        }, 
+        "DiffNeg": 2.29e-05, 
+        "Flow": "ZeroVel", 
+        "Levelset": "Ellipsoid", 
+        "NitschePenalty": 5, 
+        "XFEMReduced": 0.01, 
+        "HPos": 1.2143, 
+        "HNeg": 1, 
+        "DiffPos": 5.8345e-05, 
+        "SDStabilization": 0,
+        "BoundaryData": {
+            "Default":["DirBC","IniCposFct"]
+        },
+        "BoundaryDataTransformed":{
+            "Default":["DirBC","IniCposFct"]
+        }
+    }, 
+    "VTK": {
+        "VTKDir": "vtk", 
+        "Binary": 0, 
+        "Freq": 5, 
+        "VTKName": "stationary_interface"
+    }, 
+    "NavStokes": {
+        "InitialValue": 0, 
+        "BoundaryData": {
+           "Velocity": {
+                "Default":["Dir0BC"]
+                      
+            }
+        }
+    }, 
+    "Restart": {
+        "InputData": ""
+    }
+}

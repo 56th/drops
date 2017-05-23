@@ -1,0 +1,140 @@
+{
+    "General": {
+        "DynamicLibs": [
+            "levelset/liblevelset-twophaseCoeff", 
+            "misc/libmisc-scalarFunctions", 
+            "misc/libmisc-vectorFunctions"
+        ], 
+        "DynamicLibsPrefix": "../", 
+        "ProgressBar": 1
+    }, 
+    "Time": {
+        "NumSteps": 100, 
+        "Scheme": 1, 
+        "FinalTime": 0.05, 
+        "Theta": 1
+    }, 
+    "CouplingSolver": {
+        "Iter": 10, 
+        "Tol": 1e-10, 
+        "ImplLB": 1, 
+        "LevelsetSolver": {
+            "Iter": 1000, 
+            "Tol": 1e-14
+        }, 
+        "NavStokesSolver": {
+            "Reduction": 0.1, 
+            "Nonlinear": 0, 
+            "OseenSolver": {
+                "UzawaInnerTol": 0.6, 
+                "Solver": 10301,
+                "Iter": 200, 
+                "UzawaInnerIter": 50, 
+                "PcAIter": 100, 
+                "Tol": 1e-12, 
+                "PcSTol": 0.0001, 
+                "PcATol": 0.001
+            }, 
+            "Iter": 20, 
+            "Tol": 1e-10
+        }
+    }, 
+    "NavStokes": {
+        "XFEMReduced": 0.1, 
+        "Coeff": {
+            "SurfTens": {
+                "SurfTension": 0.046, 
+                "VarTensionFunc": "ConstTau"
+            }, 
+            "ViscNeg": 0.001589, 
+            "DensNeg": 749,
+            "ViscPos": 0.001002,
+            "DensPos": 998,
+            "Gravity": [
+                0, 
+                -9.81, 
+                0
+            ]
+        }, 
+        "InitialValue": 0, 
+        "BoundaryData": {
+                "Velocity": {
+                            "0":["DirBC","InflowBrick"],                
+                            "1":["NatBC","ZeroVel"],
+                            "2":["Dir0BC"],
+                            "3":["Dir0BC"],
+                            "4":["Dir0BC"],
+                            "5":["Dir0BC"] 
+            }
+        }
+    }, 
+    "Levelset": {
+        "PosDrop": [
+            3e-05, 
+            2.5e-05, 
+            5e-05
+        ], 
+        "Discontinuous": 0, 
+        "Reparam": {
+            "Freq": 1, 
+            "MinGrad": 0.1, 
+            "Method": 3, 
+            "MaxGrad": 10
+        }, 
+        "RadDrop": [
+            2e-05, 
+            2e-05, 
+            2e-05
+        ], 
+        "VolCorrection": 1, 
+        "SD": 0.1
+    }, 
+    "Mesh": {
+        "Type": "BrickBuilder", 
+        "Origin": [0,0,0],         
+                "E1": [500e-6,0,0],
+                "E2": [0,50e-6,0],  
+                "E3": [0,0,100e-6], 
+                "N1": 25,
+                "N2": 5, 
+                "N3": 10,
+        "RestartFile": "", 
+        "AdaptRef": {
+            "CoarsestLevel": 0, 
+            "Freq": 10, 
+            "LoadBalStrategy": 1011, 
+            "FinestLevel": 2,
+            "Width": 1e-06
+        }
+    }, 
+    "Inflow": {
+        "InflowAmpl": 0, 
+        "FlowDir": 1, 
+        "InflowVel": 4e-05, 
+        "InflowFreq": 0, 
+        "RadInlet": 0.005
+    }, 
+    "Ensight": {
+        "Binary": 0, 
+        "Freq": 0,
+        "MasterOut": 1, 
+        "EnsDir": "ensight", 
+        "EnsCase": "eindhoven", 
+        "GeomName": "channel"
+    }, 
+    "VTK": {
+        "VTKDir": "vtk", 
+        "Binary": 0, 
+        "Freq": 0, 
+        "VTKName": "channel"
+    }, 
+    "Restart": {
+        "Binary": 0, 
+        "OutputGrid":"../out/grid",
+        "OutputData":"../out/data",
+        //"OutputGridData_convert": "./geometry/eindhoven", 
+        "OutputOverwrite": 2, 
+        "InputData": "", 
+        "OutputFreq": 1
+    }
+}

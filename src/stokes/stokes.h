@@ -89,11 +89,13 @@ class StokesP2P1CL : public ProblemCL<Coeff, StokesBndDataCL>
     VelVecDescCL b;
     VecDescCL    c;
     MLMatDescCL  A,
-                 B,
-                 C,        // Optional, for stabilisation.
+                 B,                 
                  M,
                  prA,
                  prM;
+    mutable MLMatDescCL C;          // Zero matrix by default. Optional, for stabilization.
+
+    VectorBaseCL<VectorCL> cKernel; // dummy, needed for preconditioner due to template structure
 
     StokesP2P1CL(const MGBuilderCL& mgb, const CoeffCL& coeff, const BndDataCL& bdata)
         : base_( mgb, coeff, bdata), vel_idx( vecP2_FE), pr_idx( P1_FE){}
@@ -103,8 +105,8 @@ class StokesP2P1CL : public ProblemCL<Coeff, StokesBndDataCL>
     /// \name Create and delete numbering of unknowns
     //@{
     /// Within parallel these functions also create the Exchange classes.
-    void CreateNumberingVel( Uint level, MLIdxDescCL* idx, match_fun match= 0);
-    void CreateNumberingPr ( Uint level, MLIdxDescCL* idx, match_fun match= 0);
+    void CreateNumberingVel( Uint level, MLIdxDescCL* idx);
+    void CreateNumberingPr ( Uint level, MLIdxDescCL* idx);
     void DeleteNumbering( MLIdxDescCL* idx)
         { idx->DeleteNumbering( MG_); }
     void SetNumVelLvl( size_t n);
@@ -146,11 +148,12 @@ class StokesP2P1CL : public ProblemCL<Coeff, StokesBndDataCL>
     const_DiscVelSolCL GetVelSolution( const VelVecDescCL& vel) const
         { return const_DiscVelSolCL( &vel, &GetBndData().Vel, &GetMG()); }
     //@}
-    bool UsesXFEM() { return false; } // just for consistency
+    bool UsesXFEM() { return false; }   // just for consistency
+    bool usesGhostPen(){ return false;} // just for consistency
 };
 
 //forward declarations
-/// \brief Accumulator to set up the matrix B and, if requested the right-hand side C for Stokes flow.
+/// \brief Accumulator to set up the matrix B and, if requested the right-hand side c for Stokes flow.
 template<class CoeffT>
 class System2Accumulator_P2P1CL;
 
@@ -193,10 +196,10 @@ class StokesP1BubbleP1CL : public ProblemCL<Coeff, StokesBndDataCL>
         : base_( mgb, coeff, bdata), vel_idx( vecP1Bubble_FE), pr_idx( P1_FE) {}
 
     // Create and delete numbering of unknowns
-    void CreateNumberingVel( Uint level, MLIdxDescCL* idx, match_fun match= 0)
-        { idx->CreateNumbering( level, MG_, BndData_.Vel, match); }
-    void CreateNumberingPr ( Uint level, MLIdxDescCL* idx, match_fun match= 0)
-        { idx->CreateNumbering( level, MG_, BndData_.Pr, match); }
+    void CreateNumberingVel( Uint level, MLIdxDescCL* idx)
+        { idx->CreateNumbering( level, MG_, BndData_.Vel); }
+    void CreateNumberingPr ( Uint level, MLIdxDescCL* idx)
+        { idx->CreateNumbering( level, MG_, BndData_.Pr); }
     void DeleteNumbering( MLIdxDescCL* idx)
         { idx->DeleteNumbering( MG_); }
     void SetNumVelLvl( size_t n);
@@ -276,11 +279,6 @@ class StokesDoerflerMarkCL
     bool Estimate(const const_DiscPrSolCL&, const const_DiscVelSolCL&);
 };
 #endif // end of ifndef _PAR
-
-//======================================
-//        inline functions
-//======================================
-
 
 } // end of namespace DROPS
 

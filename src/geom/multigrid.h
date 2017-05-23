@@ -40,7 +40,6 @@ namespace DROPS
 
 class MultiGridCL;
 class MGBuilderCL;
-class MeshDeformationCL;
 
 template <class SimplexT>
 struct TriangFillCL;
@@ -204,9 +203,8 @@ class MultiGridCL
     TriangFaceCL   TriangFace_;
     TriangTetraCL  TriangTetra_;
 
-    size_t     version_;                            ///< each modification of the multigrid increments this number
+    size_t           version_;                      ///< each modification of the multigrid increments this number
     SimplexFactoryCL factory_;                      ///< factory for generating simplices
-    MeshDeformationCL* MeshDeform_;
 
     mutable std::map<int, ColorClassesCL*> colors_; // map: level -> Color-classes of the tetra for that level
 
@@ -217,10 +215,11 @@ class MultiGridCL
 #endif
 
     void PrepareModify   () { Vertices_.PrepareModify(); Edges_.PrepareModify(); Faces_.PrepareModify(); Tetras_.PrepareModify(); }
-    void FinalizeModify  () { Vertices_.FinalizeModify(); Edges_.FinalizeModify(); Faces_.FinalizeModify(); Tetras_.FinalizeModify(); }
+    void FinalizeModify  () { Vertices_.FinalizeModify(); Edges_.FinalizeModify(); Faces_.FinalizeModify(); Tetras_.FinalizeModify(); IncrementVersion(); }
     void AppendLevel     () { Vertices_.AppendLevel(); Edges_.AppendLevel(); Faces_.AppendLevel(); Tetras_.AppendLevel(); }
     void RemoveLastLevel () { Vertices_.RemoveLastLevel(); Edges_.RemoveLastLevel(); Faces_.RemoveLastLevel(); Tetras_.RemoveLastLevel(); }
 
+    void IncrementVersion() { ++version_; }                    ///< Increment version of the multigrid
     void ClearTriangCache ();
 
     void RestrictMarks (Uint Level) { std::for_each( Tetras_[Level].begin(), Tetras_[Level].end(), std::mem_fun_ref(&TetraCL::RestrictMark)); }
@@ -239,7 +238,6 @@ class MultiGridCL
 #ifdef _PAR            
         DiST::InfoCL::Instance().Destroy();
 #endif 
-        //if (MeshDeform_) delete MeshDeform_; 
     }
 
     const BoundaryCL& GetBnd     () const { return Bnd_; }
@@ -307,7 +305,6 @@ class MultiGridCL
     Uint GetLastLevel() const { return Tetras_.GetNumLevel()-1; }
     Uint GetNumLevel () const { return Tetras_.GetNumLevel(); }
 
-    void   IncrementVersion() {++version_; }                    ///< Increment version of the multigrid
     size_t GetVersion() const { return version_; }              ///< Get version of the multigrid
 
     void Refine();                                              // in parallel mode, this function uses a parallel version for refinement!
@@ -319,8 +316,6 @@ class MultiGridCL
     void SizeInfo(std::ostream&);                               // all procs have to call this function in parallel mode!
     void ElemInfo(std::ostream&, int Level= -1) const;          // all procs have to call this function in parallel mode
     void DebugInfo(std::ostream&, int Level=-1) const;          ///< Put all vertices, edges, faces, and tetras on the stream
-    void SetMeshDeformation(MeshDeformationCL& MeshDeform) { MeshDeform_= &MeshDeform;}
-    MeshDeformationCL& GetMeshDeformation() const { return *MeshDeform_;}
 #ifdef _PAR
     Uint GetNumDistributedObjects() const;                      // get number of distributed objects
     Uint GetNumTriangTetra(int Level=-1);                       // get number of tetras of a given level
@@ -330,7 +325,7 @@ class MultiGridCL
     void MakeConsistentHashes();
 #endif
 
-    const ColorClassesCL& GetColorClasses (int Level, match_fun match, const BndCondCL& Bnd) const;
+    const ColorClassesCL& GetColorClasses (int Level, const BndCondCL& Bnd) const;
 
     bool IsSane (std::ostream&, int Level=-1) const;
 };
@@ -381,12 +376,11 @@ class ColorClassesCL
 
   public:
     ColorClassesCL () {}
-    ColorClassesCL (const MultiGridCL& mg, Uint lvl, match_fun match, const BndCondCL& Bnd) {
-        compute_color_classes( const_cast<MultiGridCL&>( mg), lvl, match, Bnd);
+    ColorClassesCL (const MultiGridCL& mg, Uint lvl, const BndCondCL& Bnd) {
+        compute_color_classes( const_cast<MultiGridCL&>( mg), lvl, Bnd);
     }
 
-    void compute_color_classes (MultiGridCL& mg, Uint lvl,
-                                match_fun match, const BndCondCL& Bnd);
+    void compute_color_classes (MultiGridCL& mg, Uint lvl, const BndCondCL& Bnd);
     /// \brief Put all tetras in the same class --> perfect parallelization.
     /// To avoid update races in code using this, you must only update tetra-specific data.
     void make_single_color_class(MultiGridCL::const_TriangTetraIteratorCL begin,
@@ -665,7 +659,7 @@ class ParamCL; // forward declaration for read_PeriodicBoundaries.
 /// The key PeriodicMatching is optional; ommitting it or setting it to the empty string disables periodic matching.
 /// The default for all boundary-segments is OtherBnd.
 /// All other keys are interpreted as boundary-segment indices.
-/// The values have the form "Per1Bnd" or "Per2Bnd".
+/// The values have the form "Per1BC" or "Per2BC".
 void read_PeriodicBoundaries (MultiGridCL& mg, const ParamCL& P);
 
 } // end of namespace DROPS
