@@ -57,7 +57,7 @@ bool CG(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, int& max_iter,
     /// \param[in]     measure_relative_tol  true: stop if |b - Ax|/|b| <= tol, false: stop if |b - Ax| <= tol.
     /// \return                 convergence within max_iter iterations
 {
-    Vec r( b - A*x_acc ), r_acc(r);
+    Vec r( A*x_acc - b ), r_acc(r);
     double normb= ExX.Norm( b, false),
            res,
            resid=ExX.Norm_sq( r, false, &r_acc);
