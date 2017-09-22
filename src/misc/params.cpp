@@ -173,6 +173,15 @@ template <typename T, Uint Size>
     }
   }
 
+// The function updates the ptree dst with the values in src. The variable path is only used for error messages. Defined below.
+void update_parameters (const boost::property_tree::ptree& src,  boost::property_tree::ptree& dst, std::string path);
+
+void ParamCL::update_from (const ptree_type& src)
+{
+    update_parameters (src, pt, "");
+}
+
+
 void read_parameter_file_from_cmdline (ParamCL& P, int argc, char **argv, std::string default_file)
 {
     // first read default parameters from default.json, searching in 1.) local directory or 2.) path from default_file
@@ -205,44 +214,10 @@ void read_parameter_file_from_cmdline (ParamCL& P, int argc, char **argv, std::s
         std::cout << "Using parameter file '" << argv[1] << "'." << std::endl;
         boost::property_tree::read_json( argv[1], params);
     }
-    update_parameters( params, P);
+    P.update_from (params);
 
     // finally, read parameters from command line specified by --add-param
     apply_parameter_modifications_from_cmdline( P, argc, argv);
-}
-
-
-void aux_update(const boost::property_tree::ptree& pt, ParamCL& P, std::string key, boost::property_tree::ptree& make_array)
-{
-    using boost::property_tree::ptree;
-    std::string path;
-
-    if (!key.empty())
-        key+= ".";
-
-    for (ptree::const_iterator it = pt.begin(); it != pt.end(); ++it) {
-        path= key + it->first;
-        if (path == key) { // json array
-	        path.erase( path.size()-1, 1);
-            make_array.push_back( *it);
-            P.put_child( path, make_array);
-        }
-        else {
-            if (!make_array.empty())
-                make_array = ptree();
-
-            P.put( path, it->second.data());
-        }
-
-        aux_update( it->second, P, path, make_array);
-    }
-}
-
-void update_parameters(const boost::property_tree::ptree& pt, ParamCL& P)
-{
-    boost::property_tree::ptree make_array;
-
-    aux_update(pt,P,std::string(),make_array);
 }
 
 
@@ -276,11 +251,82 @@ void apply_parameter_modifications_from_cmdline (ParamCL& P, int argc, char **ar
         } catch (boost::property_tree::ptree_error& e) {
               throw DROPSParamErrCL( "ParamCL::apply_parameter_modifications_from_cmdline: Error while reading from command line.\n" + std::string(e.what()) + '\n');
         }
-        update_parameters(changes,P);
-
+        P.update_from (changes);
     }
-
 }
+
+
+
+/// A ptree is a dictionary if it does not have data, and it has at least one child. In addition, at least one child must have a nontrivial (!= "") key.
+void update_parameters_dictionary (const boost::property_tree::ptree& src,  boost::property_tree::ptree& dst, std::string path)
+{
+    if (src.data() != boost::property_tree::ptree::data_type())
+        throw DROPSErrCL("update_parameters_dictionary: The dictionary in src at `" + path + "' contains unkeyed data.\n");
+
+    for (auto& dstch: dst) { // Update parameters which are already in dst.
+        const boost::property_tree::ptree* srcch= nullptr;
+        try {
+            srcch= &src.get_child (dstch.first);
+        } catch (boost::property_tree::ptree_error) {
+            continue;
+        }
+        update_parameters (*srcch, dstch.second, path + "." + dstch.first);
+    }
+    for (auto& srcch: src) { // Add parameters from src to dst which are not already in dst.
+        try {
+            dst.get_child (srcch.first);
+        } catch (boost::property_tree::ptree_error) {
+            dst.put_child (srcch.first, srcch.second);
+        }
+    }
+}
+
+/// A ptree is an array if it does not have data, and it has at least one child. In addition, all keys are == "".
+void update_parameters_array (const boost::property_tree::ptree& src,  boost::property_tree::ptree& dst, std::string path)
+{
+    if (src.data() != boost::property_tree::ptree::data_type())
+        throw DROPSErrCL("update_parameters_array: The array at `" + path + "' contains unindexed data.\n");
+    if (src.size() < dst.size())
+        throw DROPSErrCL("update_parameters_array: Refusing to update destination array with strictly smaller array from source at `" + path + "'.\n");
+
+    auto srcit= src.begin();
+    size_t i= 0;
+    std::stringstream s;
+    for (auto& dstch: dst) { // Note that src.size() >= dst.size() at this point.
+        if (srcit->first != "")
+            throw DROPSErrCL("update_parameters_array: Expected an array in the source at `" + path + "'.\n");
+        std::stringstream s;
+        s << '[' << i++ << ']';
+        update_parameters (srcit++->second, dstch.second, path + s.str());
+    }
+    dst.insert (dst.end(), srcit, src.end());
+}
+
+void update_parameters (const boost::property_tree::ptree& src,  boost::property_tree::ptree& dst, std::string path)
+{
+    if (src == boost::property_tree::ptree()) // nothing to do.
+        return;
+
+    if (dst == boost::property_tree::ptree()) //dst has no children and no data --> (deep) copy src to dst.
+        dst= src;
+    else if (dst.empty()) { // dst has no children but nontrivial data --> update scalar value.
+        if (!src.empty()) // Verify that src is not a dictionary or array.
+            throw DROPSErrCL("update_parameters: Expected a scalar type in src at `" + path + "'.\n");
+        dst.data()= src.data();
+    }
+    else { // dst has children.
+        if (dst.data() != boost::property_tree::ptree::data_type())
+            throw DROPSErrCL("update_parameters: Expected array or dictionary at `" + path + "'.\n");
+        std::string alldstkeys;
+        for (auto& dstch: dst)
+            alldstkeys+= dstch.first;
+        if (alldstkeys == "")
+            update_parameters_array (src, dst, path);
+        else
+            update_parameters_dictionary (src, dst, path);
+    }
+}
+
 
   // =====================================================
   //                    ReadParamsCL

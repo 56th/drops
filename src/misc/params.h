@@ -63,6 +63,9 @@ class ParamCL
 
     void read_json (std::string path);
 
+    /// \brief Adds and/or overrides parameters of this->pt as specified in src.
+    void update_from (const ptree_type& src);
+
     const ptree_type& get_child(const std::string& path) const {
       try {
         return pt.get_child( path);
@@ -163,7 +166,6 @@ class ParamCL
 
     std::ostream& print(std::ostream& s);
     void print(boost::property_tree::ptree child, std::string level, std::ostream& s);
-
 };
 
 /// \brief specialisation of standard get routine for Point3DCL
@@ -188,9 +190,6 @@ void read_parameter_file_from_cmdline (ParamCL& P, int argc, char** argv, std::s
 
 /// \brief Adds and/or overrides parameters of P directly from the command line
 void apply_parameter_modifications_from_cmdline (ParamCL& P, int argc, char **argv);
-
-/// \brief Adds and/or overrides parameters of P as specified in \a pt
-void update_parameters (const boost::property_tree::ptree& pt, ParamCL& P);
 
 //DELETE ReadParamsCL?
 ///   \brief Parser for parameter files used by ParamBaseCL.
