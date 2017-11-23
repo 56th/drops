@@ -6,7 +6,7 @@ Name of executable: cdrdrops
 Folder of executable: poisson
 #The path to the folder where the parameter-file is located must be relative to
 #the folder where the executable is situated
-Path of parameter-file: aleEx2.json
+Path of parameter-file: ../../param/poisson/cdrdrops/aleEx2.json
 Name of test: test_cdrdrops_run_simple_check
 Name of author: lehrenfeld
 #-------------------------------------------------------------------------------

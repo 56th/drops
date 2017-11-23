@@ -6,7 +6,7 @@ Name of executable: reparamtest
 Folder of executable: tests
 #The path to the folder where the parameter-file is located must be relative to
 #the folder where the executable is situated
-Path of parameter-file: reparam.json
+Path of parameter-file: ../../param/tests/reparamtest/reparam.json
 Name of test: testReaparamtest
 Name of author: Yuanjun Zhang
 #-------------------------------------------------------------------------------
