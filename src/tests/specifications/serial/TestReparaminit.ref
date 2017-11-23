@@ -6,8 +6,8 @@ Name of executable: reparam_init
 Folder of executable: tests
 #The path to the folder where the parameter-file is located must be relative to
 #the folder where the executable is situated
-Path of parameter-file: reparam_init.json
-Name of test: testReaparaminit
+Path of parameter-file: ../../param/tests/reparam_init/reparam_init.json
+Name of test: testReparaminit
 Name of author: Yuanjun Zhang
 #-------------------------------------------------------------------------------
 #------------------------------NUMBERS------------------------------------------
