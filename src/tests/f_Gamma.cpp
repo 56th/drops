@@ -46,7 +46,7 @@
 
 DROPS::ParamCL P;
 
-std::auto_ptr<DROPS::VTKOutCL> vtkwriter;
+std::unique_ptr<DROPS::VTKOutCL> vtkwriter;
 
 int FctCode=9;
 
@@ -957,7 +957,7 @@ void Compare_Oblique_Coarse (DROPS::AdapTriangCL&, InstatStokes2PhaseP2P1CL& Sto
     }
 
     DROPS::SurfaceTensionCL csf( sigmaf);
-    std::auto_ptr<DROPS::LevelsetP2CL> clsetp( DROPS::LevelsetP2CL::Create( mg, lset.GetBndData(), csf, P.get_child("Levelset")));
+    std::unique_ptr<DROPS::LevelsetP2CL> clsetp( DROPS::LevelsetP2CL::Create( mg, lset.GetBndData(), csf, P.get_child("Levelset")));
     DROPS::LevelsetP2CL& clset= *clsetp;
     clset.SetSurfaceForce( SF_ObliqueLBVar);
     MLVecDescCL::const_iterator ffit= ff_oblique.GetCoarsestIter();
@@ -1174,7 +1174,7 @@ int main (int argc, char** argv)
     typedef DROPS::InstatStokes2PhaseP2P1CL MyStokesCL;
     MyStokesCL prob( mg, DROPS::TwoPhaseFlowCoeffCL(P), DROPS::StokesBndDataCL( velbnd, prbnd));
 
-    vtkwriter= std::auto_ptr<DROPS::VTKOutCL>( new DROPS::VTKOutCL(
+    vtkwriter= std::unique_ptr<DROPS::VTKOutCL>( new DROPS::VTKOutCL(
         mg,
         "DROPS data",
         1,

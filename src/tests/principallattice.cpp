@@ -377,16 +377,16 @@ void test_extrapolated_sphere_surface_integral ()
 int main()
 {
     try {
-        // test_tetra_cut();
-        // test_cut_surface();
-        // test_principal_lattice();
-        // test_sphere_cut();
-        // test_sphere_integral();
+        test_tetra_cut();
+        test_cut_surface();
+        test_principal_lattice();
+        test_sphere_cut();
+        test_sphere_integral();
         // test_extrapolated_sphere_integral();
         test_sphere_surface_integral();
-        test_extrapolated_sphere_surface_integral();
+        // test_extrapolated_sphere_surface_integral();
         // write_sign_traits_1_2_3_4();
-        // test_tetra_prism_lattice();
+        test_tetra_prism_lattice();
     }
     catch (DROPS::DROPSErrCL err) { err.handle(); }
     return 0;

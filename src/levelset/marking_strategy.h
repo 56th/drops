@@ -271,7 +271,7 @@ public:
     Uint GetCoarseLevel() const { return 0; }
 
 private:
-    std::auto_ptr<ValueGetterCL> getter_;
+    std::unique_ptr<ValueGetterCL> getter_;
 
     Uint f_level_;
     bool modified_;

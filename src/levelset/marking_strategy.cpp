@@ -491,7 +491,7 @@ CurvatureMarkingStrategyCL& CurvatureMarkingStrategyCL::operator=( const Curvatu
 {
     if ( &rhs == this ) return *this;
 
-    getter_ = std::auto_ptr<ValueGetterCL>( rhs.getter_->clone());
+    getter_ = std::unique_ptr<ValueGetterCL>( rhs.getter_->clone());
     f_level_ = rhs.f_level_;
     modified_ = rhs.modified_;
     decision_ = rhs.decision_;
@@ -574,7 +574,7 @@ MarkingDecisionT CurvatureMarkingStrategyCL::GetDecision() const
 
 void CurvatureMarkingStrategyCL::SetDistFct (const LevelsetP2CL &fct)
 {
-    getter_= std::auto_ptr<ValueGetterCL>( new LevelsetP2GetterCL( fct));
+    getter_= std::unique_ptr<ValueGetterCL>( new LevelsetP2GetterCL( fct));
 }
 
 Uint CurvatureMarkingStrategyCL::GetFineLevel() const

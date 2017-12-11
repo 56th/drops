@@ -344,7 +344,7 @@ class VelocityRepairCL : public MGObserverCL
 ///
 /// For the P1-part, the actual work is done in post_refine().
 /// For the P1X-part, a P1XRepairCL is created in pre_refine_sequence() and used in
-/// post_refine_sequence(). Holding the P1XRepairCL* in an auto_ptr simplifies the use
+/// post_refine_sequence(). Holding the P1XRepairCL* in a unique_ptr simplifies the use
 /// of heap-memory: No memory is lost, even if successive calls of pre_refine_sequence()
 /// occur without interleaved post_refine_sequence()-calls.
 class PressureRepairCL : public MGObserverCL

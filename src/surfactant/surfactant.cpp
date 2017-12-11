@@ -672,7 +672,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
 
     //lset2.SetupSystem( make_P2Eval( mg, Bnd_v, v), P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps"));
 
-    std::auto_ptr<SurfactantP1BaseCL> timediscp( make_surfactant_timedisc( mg, lset, v, Bnd_v, P));
+    std::unique_ptr<SurfactantP1BaseCL> timediscp( make_surfactant_timedisc( mg, lset, v, Bnd_v, P));
     SurfactantP1BaseCL& timedisc= *timediscp;
     timedisc.SetRhs( the_rhs_fun);
 

@@ -110,7 +110,6 @@ int binomi (int n, int k)
 
 void TestExactness_extrapolation2D(int num_extrapolation)
 {
-    double exactint_surf[21];
     DROPS::TetraBuilderCL tet( 0);
     DROPS::MultiGridCL mg( tet);
     TetraCL& s= *mg.GetAllTetraBegin();

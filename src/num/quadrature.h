@@ -262,7 +262,7 @@ enum AbsdetPolicyEnum { TrivialAbsdet, Codim1Absdet, SpaceProjectedCodim1Absdet 
 /// \brief Create a composite quadrature rule for a surface-patch.
 /// No sharing of quadrature points is performed.
 /// The template-parameter QuadDataT must be given explicitly.
-/// The Policy-Template AbsdetPolicyT depends on the dimension Dim; choices are Codim1AbsdetCL for the standard absdet and TrivialAbsdetCL for absdet==1, SpatialAbsdetCL for the standard absdet divided by \sqrt(1 + (w*n)^2). The latter is actually useful, because on the spacetime, the iterated integral \int_t \int_{\Gamma(t)} equals (approximately) the spacetime-integral \int_\mathcal{G}, where one uses SpatialAbsdetCL.
+/// The Policy-Template AbsdetPolicyT depends on the dimension Dim; choices are Codim1Absdet for the standard absdet and TrivialAbsdet for absdet==1, SpaceProjectedCodim1Absdet for the standard absdet divided by \sqrt(1 + (w*n)^2). The latter is actually useful, because on the spacetime, the iterated integral \int_t \int_{\Gamma(t)} equals (approximately) the spacetime-integral \int_\mathcal{G}, where one uses SpatialAbsdet.
 /// Helpers for common QuadData_2DCL are given below.
 template <class QuadDataT,  AbsdetPolicyEnum AbsdetPolicy, Uint Dim>
   const QuadDomainCodim1CL<Dim>&
@@ -354,9 +354,7 @@ class QuadDomainCodim1CL
     QuadDomainCodim1CL () ///< empty default constructor
         {}
 
-    /// The default copy-constructor does the right thing
-    /// \brief copy assignment: resize the valarray for weights to make it behave like a container
-    QuadDomainCodim1CL& operator= (const QuadDomainCodim1CL&);
+    /// The default copy-constructor and (since C++11) the assignment operator do the right thing.
 
     /// \brief XXX: Hack to incrementally construct mapped QuadDomains with QuaQuaQuadDomainMapperAccuCL.
     void push_back_quad_node (const VertexT& v, double w) {

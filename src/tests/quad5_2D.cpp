@@ -239,7 +239,7 @@ void TestExactness_ST ()
 int main ()
 {
   try {
-    // TestExactness();
+    TestExactness();
     TestExactness_ST();
   }
   catch (DROPS::DROPSErrCL err) { err.handle(); }

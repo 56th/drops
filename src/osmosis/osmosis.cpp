@@ -264,7 +264,7 @@ int main (int argc, char** argv)
 
     DROPS::MultiGridCL* mg= 0;
     DROPS::LsetBndDataCL lsetbnddata;
-    std::auto_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P));
+    std::unique_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P));
     mg = new DROPS::MultiGridCL( *builder);
     read_BndData( lsetbnddata,*mg, P.get_child( "Levelset.BoundaryData"));
 

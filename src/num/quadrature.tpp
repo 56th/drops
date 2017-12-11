@@ -262,20 +262,6 @@ template <class LocalFET>
 }
 
 
-template <Uint Dim>
-QuadDomainCodim1CL<Dim>&
-QuadDomainCodim1CL<Dim>::operator= (const QuadDomainCodim1CL<Dim>& q)
-{
-    if ( &q == this)
-        return *this;
-
-    vertexes_= q.vertexes_;
-    weights_.resize( q.weights_.size());
-    weights_= q.weights_;
-
-    return *this;
-}
-
 template <class QuadDataT, AbsdetPolicyEnum AbsdetPolicy, Uint Dim>
   const QuadDomainCodim1CL<Dim>&
   make_CompositeQuadDomainCodim1 (QuadDomainCodim1CL<Dim>& q,

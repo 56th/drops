@@ -495,7 +495,7 @@ int TestExamples (MultiGridCL& mg, ParamCL& p)
 {
     SurfaceTensionCL sf( sigmaf);   // dummy class
     LsetBndDataCL lsbnd( 6);
-    std::auto_ptr<LevelsetP2CL> lset_ptr( LevelsetP2CL::Create( mg, lsbnd, sf));
+    std::unique_ptr<LevelsetP2CL> lset_ptr( LevelsetP2CL::Create( mg, lsbnd, sf));
     LevelsetP2CL& lset= *lset_ptr;
 
     lset.CreateNumbering( mg.GetLastLevel());
