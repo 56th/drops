@@ -7,20 +7,14 @@ target_link_libraries(levelset-volume_adjustment out-vtkOut)
 target_link_libraries(levelset-levelsetmapper geom-locator)
 
 add_library(levelset-twophaseCoeff SHARED twophaseCoeff)
+add_library(levelset-filmCoeff SHARED filmCoeff)
 
 if(NOT WIN32)
     target_link_libraries(levelset-twophaseCoeff)
+    target_link_libraries(levelset-filmCoeff)
 else(NOT WIN32)
     target_link_libraries(levelset-twophaseCoeff misc-funcmap misc-params)
 endif(NOT WIN32)
-
-if(NOT MPI)
-    add_library(levelset-filmCoeff SHARED filmCoeff)
-    #set_property(TARGET levelset-filmCoeff PROPERTY SUFFIX "")
-    if(NOT WIN32)
-        target_link_libraries(levelset-filmCoeff)
-    endif(NOT WIN32)
-endif(NOT MPI)
 
 if(MPI)
     set(PAR_OBJ DiST-DiST DiST-mpistream DiST-remotedata parallel-parallel parallel-partime parallel-exchange parallel-parmultigrid parallel-loadbal parallel-migrateunknowns parallel-decompose)
