@@ -25,7 +25,6 @@ def runtest(Test):
     else:
         command = command + "mpirun -np " + str(Test.numProcs) + " "
     command = command + Test.execFileName + " " + Test.pathParam +" &> ../tests/output/" + Test.testName +".out"
-    print("Running test " +Test.testName+ "...")
     retCode = os.system(command)
     if (retCode != 0):
         Test.status = 2
@@ -35,10 +34,14 @@ def runtest(Test):
 
 def runtests(testlist, compileproc=1):
     failedtests= []
+    i=1
+    n_test=len(testlist)
     for test in testlist:
         setup.compile(test, compileproc)
         #Run and gather the output of the tests
+        print "Running test " +test.testName+ "...\t(",i,"of",n_test,")"
         runtest(test)
+        i=i+1
         #perform the testing logic
         resultOfTest=checktest.main(test)
         report.main(test, resultOfTest)
