@@ -1233,7 +1233,11 @@ void ColorClassesCL::compute_color_classes (MultiGridCL& mg, Uint lvl, const Bnd
 
     colors_.resize( 0);
 
-    IdxDescCL p2idx( P2_FE, Bnd);
+    // strip all Dirichlet bc from Bnd
+    BndCondCL BndNoDirichlet= Bnd;
+    BndNoDirichlet.StripDirichletBC();
+
+    IdxDescCL p2idx( P2_FE, BndNoDirichlet);
     p2idx.CreateNumbering( lvl, mg);
     const Uint sys= p2idx.GetIdx();
     const size_t n= p2idx.NumUnknowns();

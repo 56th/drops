@@ -51,6 +51,12 @@ std::unique_ptr<DROPS::VTKOutCL> vtkwriter;
 int FctCode=9;
 
 double SurfTension;
+
+double const_sigmaf( const DROPS::Point3DCL&, double)
+{
+    return -1;
+}
+
 double sigmaf( const DROPS::Point3DCL& p, double)
 {
 //     return SurfTension;
@@ -325,7 +331,7 @@ void Compare_LaplBeltramiSF_ConstSF( InstatStokes2PhaseP2P1CL& Stokes, const Lse
     MultiGridCL& MG= Stokes.GetMG();
     // Levelset-Disc.: Crank-Nicholson
     const double curv= 2/P.get<DROPS::Point3DCL>("Levelset.RadDrop")[0];
-    SurfaceTensionCL sf( sigmaf, 0);
+    SurfaceTensionCL sf( const_sigmaf, 0);
     LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsbnd, sf, P.get_child("Levelset")) );
 
 
@@ -502,7 +508,7 @@ void SphereObliqueLaplaceBeltramiAccuCL::visit (const TetraCL& t)
     for (Uint i= 0; i < q_.vertex_size(); ++i)
         qnt_[i]/= norm( qnt_[i]);
     GridFunctionCL<> qalpha( dot( qnh_, qnt_));
-    // If a triangle has zero area, its normal is returned as 0; we avoid 
+    // If a triangle has zero area, its normal is returned as 0; we avoid
     // division by zero... the value will not matter later as the func-det in quad_2D is also 0.
     for (size_t i=0; i < qalpha.size(); ++i)
         if (std::fabs( qalpha[i]) == 0.)
@@ -689,7 +695,7 @@ void VarObliqueLaplaceBeltrami2AccuCL::visit_mapped_P2 (const TetraCL& t)
         qnt_[i]/= norm( qnt_[i]);
 
     GridFunctionCL<> qalpha( dot( qnq_, qnt_));
-    // ??? If a triangle has zero area, its normal is returned as 0; we avoid 
+    // ??? If a triangle has zero area, its normal is returned as 0; we avoid
     // division by zero... the value will not matter later as the func-det in quad_2D is also 0.
     for (size_t i= 0; i < qalpha.size(); ++i)
         if (std::fabs( qalpha[i]) == 0.)
@@ -748,7 +754,7 @@ void VarObliqueLaplaceBeltrami2AccuCL::visit_mapped_P2 (const TetraCL& t)
 
     n_.assign_indices_only( t, *f.RowIdx);
 
-    if (!sigmaf_matrix) 
+    if (!sigmaf_matrix)
         for (Uint i= 0; i < 10; ++i)
             add_to_global_vector( f.Data, -quad_2D( qsigma*w_[i], qdom), n_.num[i]);
     else
@@ -784,7 +790,7 @@ area+= quad_2D( ones, qdom);
         qnt_[i]/= norm( qnt_[i]);
 
     GridFunctionCL<> qalpha( dot( qnq_, qnt_));
-    // ??? If a triangle has zero area, its normal is returned as 0; we avoid 
+    // ??? If a triangle has zero area, its normal is returned as 0; we avoid
     // division by zero... the value will not matter later as the func-det in quad_2D is also 0.
     for (size_t i= 0; i < qalpha.size(); ++i)
         if (std::fabs( qalpha[i]) == 0.)
@@ -832,7 +838,7 @@ area+= quad_2D( ones, qdom);
         qnt_[i]/= norm( qnt_[i]);
 
     GridFunctionCL<> qalpha( dot( qnq_, qnt_));
-    // ??? If a triangle has zero area, its normal is returned as 0; we avoid 
+    // ??? If a triangle has zero area, its normal is returned as 0; we avoid
     // division by zero... the value will not matter later as the func-det in quad_2D is also 0.
     for (size_t i= 0; i < qalpha.size(); ++i)
         if (std::fabs( qalpha[i]) == 0.)
@@ -1115,20 +1121,6 @@ void Compare_Oblique (DROPS::AdapTriangCL&, InstatStokes2PhaseP2P1CL& Stokes, Le
 } // end of namespace DROPS
 
 
-/// \brief Set Default parameters here s.t. they are initialized.
-/// The result can be checked when Param-list is written to the output.
-void SetMissingParameters(DROPS::ParamCL& P){
-    P.put_if_unset<std::string>("TestCase.VolForce", "ZeroVel");
-    P.put_if_unset<double>("SurfTens.ShearVisco", 0.0);
-    P.put_if_unset<double>("SurfTens.DilatationalVisco", 0.0);
-    P.put_if_unset<double>("Mat.DensDrop", 1);
-    P.put_if_unset<double>("Mat.ViscDrop", 1);
-    P.put_if_unset<double>("Mat.DensFluid", 1);
-    P.put_if_unset<double>("Mat.ViscFluid", 1);
-    P.put_if_unset<double>("Mat.SmoothZone", 1e-05);
-    P.put_if_unset<DROPS::Point3DCL>("TestCase.Gravity", DROPS::Point3DCL());
-}
-
 int main (int argc, char** argv)
 {
   try
@@ -1181,14 +1173,13 @@ int main (int argc, char** argv)
         P.get<std::string>("VTK.VTKDir"),
         P.get<std::string>("VTK.VTKName"),
         P.get<std::string>("VTK.TimeFileName"),
-        P.get<int>("VTK.Binary"), 
+        P.get<int>("VTK.Binary"),
         P.get<bool>("VTK.UseOnlyP1"),
         false, /* <- P2DG */
         -1,    /* <- level */
         P.get<bool>("VTK.ReUseTimeFile")
     ));
-//     Compare_LaplBeltramiSF_ConstSF( prob, lsbnd);
-//     Compare_Oblique_Improved( adap, prob, lset);
+    Compare_LaplBeltramiSF_ConstSF( prob, lsbnd);
     if (P.get<std::string>( "TestCase.ComparisonTarget") == "CoarseLevel")
         Compare_Oblique_Coarse( adap, prob, lset, P.get<std::string>( "TestCase.ComparisonSource"));
     else

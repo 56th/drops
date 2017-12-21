@@ -153,6 +153,8 @@ class BndCondCL
     void Init (const std::vector<BndCondInfoCL>& BndCond) {
         BndCond_= BndCond;
     }
+    /// \brief Replace all Dirichlet by Neumann boundary conditions (yielding unknowns in all boundary DoFs)
+    void StripDirichletBC();
 
     /// \name boundary condition
     /// Returns superior boundary condition of sub-simplex

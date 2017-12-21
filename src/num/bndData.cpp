@@ -75,6 +75,13 @@ BndCondCL::BndCondCL (BndIdxT numbndseg, const BndCondT* bc)
         BndCond_[i]= bc ? bc[i] : Nat0BC;
 }
 
+void BndCondCL::StripDirichletBC()
+{
+    for (BndCondInfoCL& bc: BndCond_)
+        if (!bc.WithUnknowns()) // found Dirichlet bnd
+            bc= Nat0BC;
+}
+
 void assignZeroFunc( instat_scalar_fun_ptr& f)
 {
     f= SingletonMapCL<instat_scalar_fun_ptr>::getInstance()["Zero"];
