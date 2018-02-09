@@ -71,10 +71,10 @@ void newton_solve (FunctionT& fun, typename FunctionT::value_type& x, int& maxit
                F,  // The function of which we search a root.
                Fnew; // Helper in the step-size computation.
     double l= 1.; // Damping factor for line search.
-    size_t total_damping_iter= 0; // Count all rejected steps sizes.
+    int total_damping_iter= 0; // Count all rejected steps sizes.
     double normF;
 
-    size_t iter;
+    int iter;
     for (iter= 0; true; ++iter) {
         fun.set_point (x);
         F= fun.value ();
@@ -87,7 +87,7 @@ void newton_solve (FunctionT& fun, typename FunctionT::value_type& x, int& maxit
         const double armijo_slope= armijo_c*NewtonImplNS::dot( F, fun.apply_derivative (dx))/normF;
         // Armijo-rule with backtracking
         l= std::min( 1., fun.initial_damping_factor (dx, F));
-        Uint j;
+        int j;
         for (j= 0; j < max_damping_steps && l >= min_step_length; ++j, l*= 0.5) {
             if (!fun.set_point (x - l*dx))
                 continue;
