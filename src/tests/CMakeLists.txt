@@ -62,11 +62,11 @@ exec_ser(gcr misc-utils)
 
 exec_ser(blockmat misc-utils)
 
-exec_ser(quad5 misc-utils geom-builder geom-deformation geom-simplex geom-multigrid geom-boundary geom-topo num-unknowns misc-problem num-fe num-discretize num-interfacePatch geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature)
+exec_ser(quad5 misc-utils geom-boundary geom-builder geom-deformation geom-multigrid geom-principallattice geom-reftetracut geom-simplex geom-subtriangulation geom-topo num-unknowns misc-problem num-fe num-discretize num-interfacePatch num-quadrature)
 
 exec_ser(downwind misc-utils geom-multigrid geom-simplex geom-topo num-unknowns num-fe geom-deformation num-interfacePatch misc-problem)
 
-exec_ser(quad5_2D misc-utils geom-builder geom-simplex geom-multigrid geom-boundary geom-topo num-unknowns misc-problem geom-deformation num-fe num-discretize num-interfacePatch)
+exec_ser(quad5_2D misc-utils geom-boundary geom-builder geom-deformation geom-multigrid geom-principallattice geom-reftetracut geom-simplex geom-subtriangulation geom-topo num-unknowns misc-problem num-fe num-discretize num-interfacePatch)
 
 exec_ser(interfaceP1FE misc-utils geom-builder geom-simplex geom-multigrid geom-deformation misc-scopetimer misc-progressaccu geom-boundary geom-topo num-unknowns misc-problem num-interfacePatch levelset-levelset levelset-fastmarch num-discretize num-fe levelset-surfacetension geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature)
 

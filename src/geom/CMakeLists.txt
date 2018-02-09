@@ -16,6 +16,7 @@ target_link_libraries(geom-geomselect geom-builder)
 target_link_libraries(geom-multigrid geom-simplex num-bndData misc-params)
 target_link_libraries(geom-deformation misc-problem)
 target_link_libraries(geom-locator misc-utils geom-simplex)
+target_link_libraries(geom-subtriangulation geom-reftetracut)
 
 if(NOT MPI)
     exec(maketopo geom-maketopo_helper misc-utils)

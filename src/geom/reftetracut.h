@@ -141,6 +141,9 @@ class RefPatchCL
 template <Uint Dim>
 RefPatchCL<Dim> RefPatchCL<Dim>::instance_array_[SignTraitsCL<Dim>::num_pattern];
 
+extern template RefPatchCL<3> RefPatchCL<3>::instance_array_[SignTraitsCL<3>::num_pattern];
+extern template RefPatchCL<4> RefPatchCL<4>::instance_array_[SignTraitsCL<4>::num_pattern];
+
 template <Uint Dim>
 inline const RefPatchCL<Dim>&
 RefPatchCL<Dim>::instance (const byte ls[Dim + 1])
