@@ -712,6 +712,19 @@ class TetraCL
     void DebugInfo (std::ostream&) const;                                                  ///< get debug-information
 };
 
+
+///\brief A spatial tetra and a time interval t0 < t1.
+struct TetraPrismCL
+{
+    const TetraCL& t;
+    double t0,
+           t1;
+
+    TetraPrismCL (const TetraCL& targ, double t0arg, double t1arg)
+        : t( targ), t0( t0arg), t1( t1arg) {}
+};
+
+
 #ifdef _PAR
 /// \brief Cast a transferable object to a given Simplex type.
 template <typename SimplexT>
@@ -836,9 +849,17 @@ class World2BaryCoordCL
     QRDecompCL<4> qr_;
 
   public:
-    World2BaryCoordCL (const TetraCL& t);
+    World2BaryCoordCL (const TetraCL& t) { assign( t); }
     World2BaryCoordCL (const Point3DCL* coordVerts);
+    World2BaryCoordCL () {};
+
+    void assign (const TetraCL& t);
+
+    /// \brief Maps a point p to M\inv*(p, 1)^T.
     BaryCoordCL operator() (const Point3DCL& p) const;
+
+    /// \brief Maps a direction v to M\inv*(v, 0)^T. Given v= q - p, map_direction (v) = map(q) - map(p). 
+    BaryCoordCL map_direction (const Point3DCL& p) const;
 };
 
 ///\brief Compute world-coordinates from a tetra and barycentric coordinates.
@@ -851,12 +872,37 @@ class Bary2WorldCoordCL
   public:
     typedef Point3DCL value_type;
 
-    Bary2WorldCoordCL (const TetraCL& tet) : mat_( Uninitialized) {
-        for (int i= 0; i < 4; ++i)
-            mat_.col( i, tet.GetVertex( i)->GetCoord());
-    }
+    Bary2WorldCoordCL (const TetraCL& tet) : mat_( Uninitialized) { assign( tet); }
+    Bary2WorldCoordCL () : mat_( Uninitialized) {}
+
+    void assign (const TetraCL& tet);
+
     Point3DCL operator() (const BaryCoordCL& b) const { return mat_*b; }
 };
+
+///\brief Compute (space-time) world-coordinates from a tetra-prism and STCoord-coordinates.
+/// This class is suited for many consecutive evaluations. It can be used in std-algorithms.
+class STCoord2WorldCoordCL
+{
+  private:
+    const Bary2WorldCoordCL space_mapper_;
+    const double t0_,
+                 dt_;
+
+  public:
+    typedef Point4DCL value_type;
+
+    STCoord2WorldCoordCL (const TetraPrismCL& prism)
+        : space_mapper_( prism.t), t0_( prism.t0), dt_( prism.t1 - prism.t0) {}
+
+    Point3DCL space (const STCoordCL& b) const { return space_mapper_( b.x_bary); }
+    double    time  (const STCoordCL& b) const { return t0_ + dt_*b.t_ref; }
+    Point4DCL operator() (const STCoordCL& b) const {
+        const Point3DCL& x( space( b));
+        return MakePoint4D( x[0], x[1], x[2], time( b));
+    }
+};
+
 
 inline SMatrixCL<4,4> parent_to_child_bary (Ubyte ch)
 {

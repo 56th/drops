@@ -48,6 +48,19 @@ const double FE_P2CL::_D2H[10][3][3]= {
     { {0., 0., 4.}, {0., 0., 0.}, {4., 0., 0.} },
     { {0., 0., 0.}, {0., 0., 4.}, {0., 4., 0.} } };
 
+const BaryCoordCL FE_P2CL::bary_coord[10]= {
+    MakeBaryCoord(1., 0., 0., 0.),
+    MakeBaryCoord(0., 1., 0., 0.),
+    MakeBaryCoord(0., 0., 1., 0.),
+    MakeBaryCoord(0., 0., 0., 1.),
+
+    MakeBaryCoord(0.5, 0.5, 0., 0.),
+    MakeBaryCoord(0.5, 0., 0.5, 0.),
+    MakeBaryCoord(0., 0.5, 0.5, 0.),
+    MakeBaryCoord(0.5, 0., 0., 0.5),
+    MakeBaryCoord(0., 0.5, 0., 0.5),
+    MakeBaryCoord(0., 0., 0.5, 0.5) };
+
 void
 FE_P2CL::ApplyAll(Uint numpt, const BaryCoordCL* const pt, std::valarray<double>* v)
 {

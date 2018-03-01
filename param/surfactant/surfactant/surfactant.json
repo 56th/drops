@@ -1,68 +1,116 @@
+//    = DROPS parameter file for surfactant.cpp =
+//    tests of the surfactant model implementation:
+//    droplet in brick
 {
     "General": {
-        "DynamicLibs": [
-            "misc/libmisc-scalarFunctions", 
-            "misc/libmisc-vectorFunctions"
-        ], 
-        "DynamicLibsPrefix": "../", 
-        "ProgressBar": 1
-    }, 
-    "Time": {
-        "Theta": 0.5,
-        "NumSteps": 1, 
-        "FinalTime": 1
-    }, 
-    "Levelset": {
-        "PosDrop": [
-            0, 
-            0, 
-            0
-        ], 
-        "Discontinuous": 0, 
-        "Reparam": {
-            "Freq": 0, 
-            "Method": 1
-        }, 
-        "RadDrop": [
-            1, 
-            1, 
-            1
-        ], 
-        "VolCorrection": 0, 
-        "SD": 0.1
-    }, 
-    "CouplingSolver": {
-        "LevelsetSolver": {
-            "Iter": 500, 
-            "Tol": 1e-10
-        }
-    }, 
+        "ProgressBar":  1, //show progress bar
+        "DynamicLibsPrefix": "../", //where should we look for shared objects?
+        "DynamicLibs": [ //select libraries to be loaded after program start
+                        "misc/libmisc-scalarFunctions",
+                        "misc/libmisc-vectorFunctions"
+        ]
+    },
+
     "Mesh": {
-        "InitialDivisions": 2, 
+        "Type":        "BrickBuilder",
+        "Origin":      [-2, -2, -2],
+        "E1":          [ 4,  0,  0],
+        "E2":          [ 0,  4,  0],
+        "E3":          [ 0,  0,  4],
+        "N1":          4,
+        "N2":          4,
+        "N3":          4,
+        "RestartFile": "",
+
         "AdaptRef": {
-            "Width": 10, 
-            "Freq": 0, 
-            "FinestLevel": 3
+            "Freq":          0,
+            "Width":         10,
+            "CoarsestLevel": 0,
+            "FinestLevel":   3,
+            "SD":            0.1,
+            "CurvDiff":      -1,
+            "Discontinuous": 0
         }
-    }, 
-    "Flow": {
-        "Velocity": [
-            0, 
-            0, 
-            0.5
-        ] 
-    }, 
-    "SurfTransp": {
-        "XFEMReduced": -1, 
-        "Visc": 0.05, 
+    },
+
+    "Time": {
+        "FinalTime": 4,
+        "NumSteps":  16
+    },
+
+    "SurfTransp": { // surfactant transport
+        "Enabled": 1,
+
+        "Exp": { // experimental conditions
+            "RadDrop":  [1, 1, 1],
+            "PosDrop":  [0, 0, 0],
+            "RadTorus": [1, 0.7],
+            "Velocity": [0, 0, 0],
+
+            "StationaryPDE": true,
+            "Wind":     "ConstantWind",
+            "Levelset": "Ellipsoid",
+            "Rhs":      "LaplaceBeltrami0Rhs",
+            "Solution": "LaplaceBeltrami0Sol"
+//            "Wind":     "ToroidalFlowWind",
+//            "Levelset": "Torus",
+//            "Rhs":      "ToroidalFlowRhs",
+//            "Solution": "ToroidalFlowSol"
+//            "Wind":     "AxisScalingWind",
+//            "Levelset": "AxisScalingLset",
+//            "Rhs":      "AxisScalingRhs",
+//            "Solution": "AxisScalingSol"
+        },
+        "Method":     "cGcG", // "spacetime-cGcG" "spacetime-cGdG" "characteristic-transport"
+        "UseMassDiv": true, // only implemented for "spacetime-*"
+        "Theta":      0.5,
         "Solver": {
-            "Tol": 1e-10, 
-            "Iter": 1000
+            "Iter": 1000,
+            "Tol":  1e-10
+        },
+        "XFEMReduced":             -1,
+        "Visc":                    1, // 0.05,
+        "FEDegree":                2, // 1, 2
+        "NormalLaplaceCoefficent": 1.0,
+        "SolutionOutput": { // Machine readable output of the surfactant-solution
+            "Freq":   1,
+            "Path":   "solutions/iface_sol",
+            "Binary": true
         }
-    }, 
-    "TestCase": 1,
-    "Ensight": {
-        "EnsCase": "none", 
-        "EnsDir": "CNmass-lvl3"
+    },
+
+    "Levelset": {
+        "Solver": {
+            "Tol":           1e-14,
+            "Iter":          500
+        },
+        "SD":            0.1,
+        "CurvDiff":      -1,
+        "VolCorrection": "",
+        "Theta":         1,
+        "Discontinuous": 0
+    },
+
+    "LevelsetMapper": { // quasi-orthogonal coordinate system at the interface
+        "Tol":               1e-7,
+        "Iter":              20,
+        "ArmijoConstant":    1e-2,
+        "Method":            "Newton", // "FixedPointWithLineSearch" // "Newton"
+        "MaxDampingSteps":   8,
+        "TrustRegion":       1.0,
+        "DeformationMethod": "map_zero_level_sets" // "", "map_zero_level_sets", "map_local_level_sets"
+    },
+
+    "VTK": {
+        "Freq":           1,
+        "VTKDir":         "vtk",
+        "VTKName":        "surfactant",
+        "TimeFileName":   "surfactant",
+        "Binary":         1,
+        "UseOnlyP1":      false,
+        "ReUseTimeFile":  false,
+        "UseDeformation": "0",
+        "AddP1XPressure": "0",
+        "AddDGOutput":    "0"
     }
 }

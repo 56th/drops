@@ -374,24 +374,17 @@ class ColorClassesCL
   private:
     std::vector<ColorClassT> colors_;
 
-    typedef std::vector<size_t> TetraNumVecT;
-    typedef std::pair<size_t, size_t> ColorFreqT;
-
-    void compute_neighbors (MultiGridCL::const_TriangTetraIteratorCL begin,
-                            MultiGridCL::const_TriangTetraIteratorCL end,
-                            std::vector<TetraNumVecT>& neighbors, match_fun match, const BndCondCL& Bnd);
-    void fill_pointer_arrays (const std::list<ColorFreqT>& color_list,
-        const std::vector<int>& color,
-        MultiGridCL::const_TriangTetraIteratorCL begin,
-        MultiGridCL::const_TriangTetraIteratorCL end);
-
   public:
-    ColorClassesCL (MultiGridCL::const_TriangTetraIteratorCL begin,
-                    MultiGridCL::const_TriangTetraIteratorCL end, match_fun match, const BndCondCL& Bnd)
-    { compute_color_classes( begin, end, match, Bnd); }
+    ColorClassesCL () {}
+    ColorClassesCL (const MultiGridCL& mg, Uint lvl, const BndCondCL& Bnd) {
+        compute_color_classes( const_cast<MultiGridCL&>( mg), lvl, Bnd);
+    }
 
-    void compute_color_classes (MultiGridCL::const_TriangTetraIteratorCL begin,
-                                MultiGridCL::const_TriangTetraIteratorCL end, match_fun match, const BndCondCL& Bnd);
+    void compute_color_classes (MultiGridCL& mg, Uint lvl, const BndCondCL& Bnd);
+    /// \brief Put all tetras in the same class --> perfect parallelization.
+    /// To avoid update races in code using this, you must only update tetra-specific data.
+    void make_single_color_class(MultiGridCL::const_TriangTetraIteratorCL begin,
+                                 MultiGridCL::const_TriangTetraIteratorCL end);
 
     size_t num_colors () const { return colors_.size(); }
     const_iterator begin () const { return colors_.begin(); }
@@ -581,6 +574,8 @@ template <class SimplexT>
     const int level= StdIndex( lvl);
     Assert ( level >= 0 && level < static_cast<int>( mg_.GetNumLevel()),
         DROPSErrCL( "TriangCL::MaybeCreate: Wrong level."), DebugContainerC);
+#   pragma omp critical(TriangCL_MaybeCreate)
+  {
     if (triang_.size() != mg_.GetNumLevel()) {
         triang_.clear();
         triang_.resize( mg_.GetNumLevel());
@@ -590,6 +585,7 @@ template <class SimplexT>
         // Append a zero-pointer as explicit end-iterator of the sequence.
         triang_[level].push_back( 0);
     }
+  }
 }
 
 

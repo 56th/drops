@@ -234,5 +234,111 @@ extern const byte parent_to_child_bary_ar[];
 /// The accessor function SMatrixCL<4,4> child_to_parent_bary (Ubyte ch) is provided in geom/simplex.h.
 extern const byte child_to_parent_bary_ar[];
 
+
+/// connectivity of the reference-edge
+
+namespace RefEdge {
+
+const Uint NumVertsC= 2;
+
+/// Vertices of a given edge
+inline Ubyte VertOfEdge (Ubyte, Ubyte num) { return num; }
+
+/// Vertex opposing a given vertex
+/// Note, that this is different from the n-dimensional cases, n > 2, as vertexes and facets are the same in 1d. Therefore, they should not be numbered differently. This is a natural ordering, which also could have been used for tetras. However, changing this now would be painful.
+inline Ubyte OppVert (Ubyte vert) { return 1 - vert; }
+
+} // end of namespace DROPS::RefEdge
+
+
+/// connectivity of the reference-triangle
+
+namespace RefTri {
+
+const Uint NumVertsC= 3;
+const Uint NumEdgesC= 3;
+
+/// Vertices of a given edge
+const Ubyte vert_of_edge_ar[NumEdgesC][2]= {
+    {0,1}, {0,2}, {1,2}
+};
+inline Ubyte VertOfEdge (Ubyte edge, Ubyte num) { return vert_of_edge_ar[edge][num]; }
+
+/// Edge opposing a given vertex
+/// Note, that this is different from the higher-dimensional cases as edges and facets are the same in 2d. Therefore, they should not be numbered differently. This is a natural ordering, which also could have been used for tetras. However, changing this now would be painful.
+inline Ubyte OppEdge (Ubyte vert) { return 2 - vert; }
+
+} // end of namespace DROPS::RefTri
+
+
+/// connectivity of the reference-pentatope
+
+namespace RefPenta {
+
+const Uint NumVertsC= 5;
+const Uint NumEdgesC= 10;
+const Uint NumTrisC=  10;
+const Uint NumTetrasC= 5;
+
+/// Vertices of a given edge
+const Ubyte vert_of_edge_ar[NumEdgesC][2]= {
+    {0,1}, {0,2}, {1,2}, {0,3}, {1,3}, {2,3}, // The first six edges are from the reference-tetra
+    {0,4}, {1,4}, {2,4}, {3,4}
+};
+inline Ubyte VertOfEdge (Ubyte edge, Ubyte num) { return vert_of_edge_ar[edge][num]; }
+
+/// Edge given by two vertices
+const byte edge_by_vert_ar[NumVertsC][NumVertsC]= {
+    {-1,  0,  1,  3,  6},
+    { 0, -1,  2,  4,  7},
+    { 1,  2, -1,  5,  8},
+    { 3,  4,  5, -1,  9},
+    { 6,  7,  8,  9, -1}
+};
+inline byte EdgeByVert (Ubyte v0, Ubyte v1) { return edge_by_vert_ar[v0][v1]; }
+
+/// Vertices of a given tetra
+const Ubyte vert_of_tetra_ar[NumVertsC][4]= {
+    {1,2,3,4}, {0,2,3,4}, {0,1,3,4}, {0,1,2,4}, {0,1,2,3}
+};
+inline Ubyte VertOfTetra (Ubyte tetra, Ubyte num) { return vert_of_tetra_ar[tetra][num]; }
+
+/// Tetra opposing a given vertex
+inline Ubyte OppTetra (Ubyte vert) { return vert; }
+
+/// Vertex of the penta defined by vertex vert of the facet tetra.
+inline Ubyte VertByTetraVert (Ubyte tetra, Ubyte vert) { return vert + (tetra > vert ? 0 : 1); }
+/// Edge of the penta defined by edge of the facet tetra.
+inline Ubyte EdgeByTetraEdge (Ubyte tetra, Ubyte edge)
+{
+    return EdgeByVert( VertByTetraVert( tetra, DROPS::VertOfEdge( edge, 0)),
+                       VertByTetraVert( tetra, DROPS::VertOfEdge( edge, 1)));
+}
+
+} // end of namespace DROPS::RefPenta
+
+
+/// dimension-independent connectivity functions
+
+/// Vertices of a given edge
+template <Uint Dim>
+inline Ubyte VertOfEdge (Ubyte edge, Ubyte num); ///< not defined, but full specializations for Dim=1..4 are.
+
+template <>
+inline Ubyte VertOfEdge<1> (Ubyte, Ubyte num)
+{ return RefEdge::VertOfEdge( 0, num); }
+
+template <>
+inline Ubyte VertOfEdge<2> (Ubyte edge, Ubyte num)
+{ return RefTri::VertOfEdge( edge, num); }
+
+template <>
+inline Ubyte VertOfEdge<3> (Ubyte edge, Ubyte num)
+{ return VertOfEdge( edge, num); }
+
+template <>
+inline Ubyte VertOfEdge<4> (Ubyte edge, Ubyte num)
+{ return RefPenta::VertOfEdge( edge, num); }
+
 } // end  of namespace DROPS
 #endif

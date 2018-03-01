@@ -60,11 +60,27 @@ class DMatrixCL
         Assert(row<Rows_ && col<Cols_, DROPSErrCL("DMatrixCL::operator() const: Invalide index"), DebugNumericC);
         return Array_[col*Rows_+row];
     }
-    T* GetCol     (size_t col)                   {
+    T* GetCol       (size_t col)                 {
         Assert(col<Cols_, DROPSErrCL("DMatrixCL::GetCol: Invalide index"), DebugNumericC);
         return Array_+col*Rows_;
     }
+    const T* GetCol (size_t col) const           {
+        Assert(col<Cols_, DROPSErrCL("DMatrixCL::GetCol: Invalide index"), DebugNumericC);
+        return Array_+col*Rows_;
+    }
+    Uint num_rows() const { return Rows_; }  // Zeilenzahl
+    Uint num_cols() const { return Cols_; }  // Spaltenzahl
 };
+
+inline double
+frobenius_norm_sq (const DMatrixCL<double>& a)
+{
+    double ret = 0;
+    const double* d= a.GetCol( 0);
+    for (Uint i= 0; i < a.num_rows()*a.num_cols(); ++i)
+        ret += d[i]*d[i];
+    return ret;
+}
 
 
 template <class T, Uint _Size>
@@ -95,6 +111,10 @@ typedef SVectorCL<4> Point4DCL;
 typedef SVectorCL<4> BaryCoordCL;
 /// Stores barycentric coordinates of a space-time simplex (pentatope)
 typedef SVectorCL<5> STBaryCoordCL;
+
+/// Stores 4D coordinates
+typedef SVectorCL<4> Point4DCL;
+
 
 enum InitStateT { Uninitialized, Initialized };
 
@@ -559,6 +579,59 @@ inline SVectorCL<_Size> std_basis(Uint i)
     return ret;
 }
 
+/// By convention x_bary are barycentric coordinates with respect to a tetra; t_bary is a time in the (reference-) interval (0, 1);
+struct STCoordCL
+{
+    BaryCoordCL x_bary;
+    double      t_ref;
+
+    STCoordCL () : x_bary(), t_ref( 0.) {} ///< Default init to 0.
+    STCoordCL (const BaryCoordCL& b, double t)
+        : x_bary( b), t_ref( t) {}
+
+    STCoordCL& operator+= (const STCoordCL& v);
+};
+
+inline STCoordCL& STCoordCL::operator+= (const STCoordCL& v)
+{
+    x_bary+= v.x_bary;
+    t_ref += v.t_ref;
+    return *this;
+}
+
+inline STCoordCL operator+(const STCoordCL& v1,
+                           const STCoordCL& v2)
+{
+    return STCoordCL( v1.x_bary + v2.x_bary, v1.t_ref + v2.t_ref);
+}
+
+inline STCoordCL operator*(double d, const STCoordCL& v)
+{
+    return STCoordCL( d*v.x_bary, d*v.t_ref);
+}
+
+inline STCoordCL operator*(const STCoordCL& v, double d)
+{
+    return STCoordCL( d*v.x_bary, d*v.t_ref);
+}
+
+inline STCoordCL ConvexComb (double a,
+                               const STCoordCL& v1,
+                               const STCoordCL& v2)
+{
+    return STCoordCL( ConvexComb( a, v1.x_bary, v2.x_bary), (1.0-a)*v1.t_ref + a*v2.t_ref);
+}
+
+inline STCoordCL MakeSTCoord (const BaryCoordCL& b, double t)
+{
+    return STCoordCL( b, t);
+}
+
+inline std::ostream& operator<< (std::ostream& os, const STCoordCL& st)
+{
+    return os << st.x_bary << st.t_ref;
+}
+
 inline STBaryCoordCL
 MakeSTBaryCoord(double a, double b, double c, double d, double e)
 {
@@ -684,6 +757,15 @@ MakeSArray(T a, T b, T c, T d)
 {
     SArrayCL<T, 4> ret( Uninitialized);
     ret[0]= a; ret[1]= b; ret[2]= c; ret[3]= d;
+    return ret;
+}
+
+template<class T>
+SArrayCL<T, 5>
+MakeSArray(T a, T b, T c, T d, T e)
+{
+    SArrayCL<T, 5> ret( Uninitialized);
+    ret[0]= a; ret[1]= b; ret[2]= c; ret[3]= d; ret[4]= e;
     return ret;
 }
 
@@ -987,6 +1069,17 @@ assign_transpose (SMatrixCL<_Rows, _Rows>& out, const SMatrixCL<_Rows,_Rows>& in
     return out;
 }
 
+template <Uint _Rows, Uint _Cols>
+inline SMatrixCL<_Rows, _Cols> eye ()
+{
+    SMatrixCL<_Rows, _Cols> ret;
+
+    const Uint m= std::min( _Rows, _Cols);
+    for (Uint i= 0; i < m; ++i)
+        ret( i, i)= 1.;
+    return ret;
+}
+
 /// \brief \f$full_local+= (scalar_local^T) \operatorname{kroneckerproduct} Id_{3\times 3}\f$
 ///
 /// This is the operation that distributes a scalar-valued operator over the block-diagonal of a vector-valued operator.
@@ -1090,11 +1183,14 @@ class QRDecompCL
     void Solve (SVecCont<SVectorCL<Rows_> >& b) const;
     template <Uint Size>
     void Solve (SArrayCL<SVectorCL<Rows_>, Size>& b) const;
+    template <Uint Size>
+    void Solve (SMatrixCL<Rows_, Size>& b) const;
 
     ///@{ Apply (parts of) Q or Q^T
     void apply_reflection  (Uint j, SVectorCL<Rows_>& b) const;
     void apply_Q_transpose (SVectorCL<Rows_>& b) const;
     void apply_Q           (SVectorCL<Rows_>& b) const;
+    SMatrixCL<Rows_, Rows_> get_Q () const;
     ///@}
     ///\brief Computes the determinant of R (stable). For Rows_ > Cols_, the determinant of the upper Cols_ x Cols_ block of R is returned.
     double Determinant_R () const;
@@ -1131,8 +1227,22 @@ template <Uint Rows_, Uint Cols_>
     QRDecompCL<Rows_, Cols_>::apply_Q (SVectorCL<Rows_>& b) const
 {
     // The Q_j are symmetric, so to transpose Q^T one just has to reverse the order of application.
-    for (int j= Cols_ - 1; j >=0 ; --j)
+    for (Uint j= Cols_ - 1; j < Cols_; --j)
         apply_reflection( j, b);
+}
+
+template <Uint Rows_, Uint Cols_>
+  SMatrixCL<Rows_, Rows_>
+    QRDecompCL<Rows_, Cols_>::get_Q () const
+{
+    SMatrixCL<Rows_, Rows_> Q (eye<Rows_, Rows_> ());
+    SVectorCL<Rows_> tmp;
+    for (Uint j= 0; j < Rows_; ++j) {
+        tmp= Q.col( j);
+        apply_Q( tmp);
+        Q.col( j, tmp);
+    }
+    return Q;
 }
 
 template <Uint Rows_, Uint Cols_>
@@ -1214,6 +1324,19 @@ template <Uint Rows_, Uint Cols_>
         Solve( b[i]);
 }
 
+template <Uint Rows_, Uint Cols_>
+  template <Uint Size>
+    void
+    QRDecompCL<Rows_, Cols_>::Solve (SMatrixCL<Rows_, Size>& b) const
+{
+    SVectorCL<Rows_> c( Uninitialized);
+    for (Uint i= 0; i < Size; ++i) {
+        c= b.col (i);
+        Solve( c);
+        b.col( i, c);
+    }
+}
+
 /** Put the values of a_, d_ and beta_ in buffer. Note that buffer must be of size
     (Rows_ + 2)*Cols_
  */
@@ -1231,6 +1354,140 @@ template <Uint Rows_, Uint Cols_>
     std::copy( buffer, buffer + a_.size(), a_.begin());
     std::copy( buffer + a_.size(), buffer + a_.size() + Cols_, d_);
     std::copy( buffer + a_.size() + Cols_, buffer + a_.size() + 2*Cols_, beta_);
+}
+
+/// \brief Represents the Given-/Jacobi-rotation J=(c & s \\ -s & c) with respect to row/column-pairs p and q.
+class GivensRotationCL
+{
+  private:
+    size_t p_, q_; ///< Row/column-pairs i=j=p and i=j=q.
+    double c_, s_; ///< Cosine and sine.
+
+  public:
+
+    /// \brief Let A be a symmetric matrix, B= J^TAJ, then, B_{pq} = B_{qp} = 0.
+    template <typename Mat>
+    void inline compute_symmetric_rotation (const Mat& A, size_t p, size_t q);
+
+    ///\brief Compute A= J^TA.
+    template <typename Mat>
+    void apply_transpose_from_left (Mat& A) const;
+
+    ///\brief Compute A= AJ.
+    template <typename Mat>
+    void apply_from_right (Mat& A) const;
+
+    ///\brief Compute A= J^TAJ.
+    template <typename Mat>
+    void inline apply_conjugation (Mat& A) const;
+};
+
+template <typename Mat>
+void inline GivensRotationCL::compute_symmetric_rotation (const Mat& A, size_t p, size_t q)
+{
+    c_= 1.;
+    s_= 0.;
+    p_= p;
+    q_= q;
+    if (A( p, q) == 0.)
+        return;
+
+    const double tau= (A( q, q) - A( p, p))/(2.*A( p, q)),
+                 t= tau >= 0. ?  1./( tau + std::sqrt( 1. + tau*tau))
+                              : -1./(-tau + std::sqrt( 1. + tau*tau));
+    c_= 1./std::sqrt( 1. + t*t);
+    s_= t*c_;
+}
+
+template <typename Mat>
+void GivensRotationCL::apply_transpose_from_left (Mat& A) const
+{
+    double Apj, Aqj;
+    const size_t n= A.num_cols();
+    for (size_t j= 0; j < n; ++j) {
+        Apj= A( p_, j);
+        Aqj= A( q_, j);
+        A( p_, j)= c_*Apj - s_*Aqj;
+        A( q_, j)= s_*Apj + c_*Aqj;
+    }
+}
+
+template <typename Mat>
+void GivensRotationCL::apply_from_right (Mat& A) const
+{
+    double Aip, Aiq;
+    const size_t n= A.num_rows();
+    for (size_t i= 0; i < n; ++i) {
+        Aip= A( i, p_);
+        Aiq= A( i, q_);
+        A( i, p_)= c_*Aip - s_*Aiq;
+        A( i, q_)= s_*Aip + c_*Aiq;
+    }
+}
+
+template <typename Mat>
+void GivensRotationCL::apply_conjugation (Mat& A) const
+{
+    double Aip, Aiq, Api, Aqi;
+    const size_t n= A.num_rows();
+    for (size_t i= 0; i < n; ++i) {
+        if (i == p_ || i == q_)
+            continue;
+        Aip= A( i, p_);
+        Aiq= A( i, q_);
+        Api= A( p_, i);
+        Aqi= A( q_, i);
+        A( i, p_)= c_*Aip - s_*Aiq;
+        A( i, q_)= s_*Aip + c_*Aiq;
+        A( p_, i)= c_*Api - s_*Aqi;
+        A( q_, i)= s_*Api + c_*Aqi;
+    }
+    const double App= A( p_, p_), Apq= A( p_, q_), Aqp= A( q_, p_), Aqq= A( q_, q_),
+                 N= c_*s_*(Apq + Aqp), D= c_*s_*(App - Aqq),
+                 csq= c_*c_, ssq= s_*s_;
+    A( p_, p_)= csq*App + ssq*Aqq - N;
+    A( p_, q_)= csq*Apq - ssq*Aqp + D;
+    A( q_, p_)= csq*Aqp - ssq*Apq + D;
+    A( q_, q_)= csq*Aqq + ssq*App + N;
+}
+
+template <typename Mat>
+double off_diagonal_sq (const Mat& A)
+{
+    double off= 0.;
+    const size_t m= A.num_rows(),
+                 n= A.num_cols();
+    for (size_t i= 0; i < m; ++i)
+        for (size_t j= 0; j < n; ++j)
+            if (j != i)
+                off+= std::pow( A( i, j), 2);
+    return off;
+}
+
+///\brief Computes all eigenvalues of a symmetric matrix A up to tolerance tol; overwrites A.
+///
+/// If Q is given, then AQ=Q\Lambda, where \Lambda is the diagonal matrix returned in A and A is the original A.
+/// Q is an orthogonal matrix.
+template <typename Mat>
+void cyclic_jacobi (Mat& A, double tol, Mat* Q= 0)
+{
+    const size_t n= A.num_rows();
+    if (Q) {
+        std::fill_n( &(*Q)(0, 0), n*n, 0.);
+        for (size_t i= 0; i < n; ++i)
+            (*Q)( i, i)= 1.;
+    }
+    GivensRotationCL J;
+    const double eps= tol*std::sqrt( frobenius_norm_sq( A));
+    while (std::sqrt( off_diagonal_sq( A)) > eps) {
+        for (size_t p= 0; p < n - 1; ++p)
+            for (size_t q= p + 1; q < n; ++q) {
+                J.compute_symmetric_rotation( A, p, q);
+                J.apply_conjugation( A);
+                if (Q)
+                    J.apply_from_right( *Q);
+            }
+    }
 }
 
 //**************************************************************************

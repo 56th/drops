@@ -266,8 +266,11 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
     /// \todo rhs beruecksichtigen
     const double dt = P.get<double>("Time.FinalTime")/P.get<int>("Time.NumSteps");
-    SurfactantcGP1CL surfTransp( MG, Stokes.GetBndData().Vel, P.get<double>("Time.Theta"), P.get<double>("SurfTransp.Visc"), &Stokes.v, lset.Phi, lset.GetBndData(),
-                                 dt, P.get<int>("SurfTransp.Solver.Iter"), P.get<double>("SurfTransp.Solver.Tol"), P.get<double>("SurfTransp.XFEMReduced"));
+    SurfactantcGP1CL surfTransp( MG,
+        P.get<double>("Time.Theta"), P.get<double>("SurfTransp.Visc"),
+        &Stokes.v, Stokes.GetBndData().Vel, *lset.PhiC, lset.GetBndData(),
+        P.get<int>("SurfTransp.Solver.Iter"), P.get<double>("SurfTransp.Solver.Tol"),
+        P.get<double>("SurfTransp.XFEMReduced"));
     InterfaceP1RepairCL surf_repair( MG, lset.Phi, lset.GetBndData(), surfTransp.ic);
     if (P.get("SurfTransp.Enable", 0))
     {
@@ -275,7 +278,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         surfTransp.idx.CreateNumbering( MG.GetLastLevel(), MG, &lset.Phi, &lset.GetBndData());
         std::cout << "Surfactant transport: NumUnknowns: " << surfTransp.idx.NumUnknowns() << std::endl;
         surfTransp.ic.SetIdx( &surfTransp.idx);
-        surfTransp.Init( inscamap["surf_sol"]);
+        surfTransp.SetInitialValue( inscamap["surf_sol"]);
     }
 
     // Stokes-Solver
@@ -564,7 +567,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         IFInfo.Update( lset, Stokes.GetVelSolution());
         IFInfo.Write(time_old);
 
-        if (P.get("SurfTransp.Enable", 0)) surfTransp.InitOld();
+        if (P.get("SurfTransp.Enable", 0)) surfTransp.InitTimeStep();
         oldlset.Phi = lset.Phi;
         oldlset.Phi.t = told;
         VelVecDescCL vold(Stokes.v);

@@ -465,7 +465,10 @@ class TimerCL
 #ifndef _OPENMP
         getrusage(RUSAGE_SELF,&_t_begin);
 #else
-        _t_begin= omp_get_wtime();
+//         _t_begin= omp_get_wtime();
+        struct timeval tv;
+        gettimeofday(&tv, (struct timezone*)0);
+        _t_begin= (double)tv.tv_sec + (double)tv.tv_usec/1000000.;
 #endif
         }
     void Stop()
@@ -477,7 +480,10 @@ class TimerCL
               + double(_t_end.ru_utime.tv_usec - _t_begin.ru_utime.tv_usec
                       +_t_end.ru_stime.tv_usec - _t_begin.ru_stime.tv_usec)/1000000;
 #else
-        _time+= omp_get_wtime()-_t_begin;
+//         _time+= omp_get_wtime()-_t_begin;
+        struct timeval tv;
+        gettimeofday(&tv, (struct timezone*)0);
+        _time+= (double)tv.tv_sec + (double)tv.tv_usec/1000000. - _t_begin;
 #endif
         }
     //@}

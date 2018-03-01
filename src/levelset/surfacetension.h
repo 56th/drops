@@ -27,6 +27,7 @@
 
 #include "num/discretize.h"
 #include "num/bndData.h"
+#include "num/lattice-eval.h"
 
 namespace DROPS
 {
@@ -98,7 +99,21 @@ class SurfaceTensionCL
 
     /// \brief evaluate surface tension on triangle given by the first and second arguments
     void ComputeSF( const TetraCL&, const BaryCoordCL * const, Quad5_2DCL<>&) const;
+
+    /// \brief Evaluate the surface tension on every vertex of q.
+    template <class DomainT, class ResultIterT>
+      inline ResultIterT
+      evaluate_on_vertexes (const TetraCL& tet, const DomainT& dom, double t, ResultIterT result_iterator) const {
+        if (input_ ==  Sigma_X) {
+            return DROPS::evaluate_on_vertexes( sigma_, tet, dom, t, result_iterator);
+        }
+        else
+            throw DROPSErrCL( "SurfaceTensionCL::evaluate_on_vertexes: Input method is not yet implemented.\n");
+
+        return result_iterator;
+    }
 };
+
 
 }// end of name space DROPS
 

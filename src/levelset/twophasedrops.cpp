@@ -281,14 +281,17 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
 
     if( P.get<bool>("SurfTransp.Enable") )
     {
-        surfTransp = new SurfactantcGP1CL( MG, Stokes.GetBndData().Vel, P.get<double>("Time.Theta"), P.get<double>("SurfTransp.Visc"), &Stokes.v, *lset.PhiC, lset.GetBndData(),
-                                     dt, P.get<int>("SurfTransp.Solver.Iter"), P.get<double>("SurfTransp.Solver.Tol"), P.get<double>("SurfTransp.XFEMReduced"));
+        surfTransp = new SurfactantcGP1CL( MG,
+            P.get<double>("Time.Theta"), P.get<double>("SurfTransp.Visc"),
+            &Stokes.v, Stokes.GetBndData().Vel, *lset.PhiC, lset.GetBndData(),
+            P.get<int>("SurfTransp.Solver.Iter"), P.get<double>("SurfTransp.Solver.Tol"),
+            P.get<double>("SurfTransp.XFEMReduced"));
         surf_repair = new InterfaceP1RepairCL ( MG, *lset.PhiC, lset.GetBndData(), surfTransp->ic);
         adap.push_back( surf_repair);
         surfTransp->idx.CreateNumbering( MG.GetLastLevel(), MG, lset.PhiC, &lset.GetBndData());
         std::cout << "Surfactant transport: NumUnknowns: " << surfTransp->idx.NumUnknowns() << std::endl;
         surfTransp->ic.SetIdx( &surfTransp->idx);
-        surfTransp->Init( inscamap["surf_sol"]);
+        surfTransp->SetInitialValue( inscamap["surf_sol"]);
     }
 
     // Stokes-Solver    
@@ -410,7 +413,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
             ensight->Register( make_Ensight6Scalar( massTransp->GetSolution( massTransp->ct),
                                                     "TransConc",     ensf + ".ct",  true));
         }
-        if (P.get("SurfTransp.DoTransp", 0)) {
+        if (surfTransp != nullptr) {
             ensight->Register( make_Ensight6IfaceScalar( MG, surfTransp->ic,  "InterfaceSol",  ensf + ".sur", true));
         }
         if (Stokes.UsesXFEM())
@@ -447,7 +450,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
             vtkwriter->Register( make_VTKScalar( massTransp->GetSolution(), "massTransport") );
         }
 
-        if (P.get("SurfTransp.DoTransp", 0)) {
+        if (surfTransp != nullptr) {
             vtkwriter->Register( make_VTKIfaceScalar( MG, surfTransp->ic,  "InterfaceSol"));
         }
         vtkwriter->Write(Stokes.v.t);
@@ -497,7 +500,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
             sigma_vtk->Data = 0.;
         }
 
-        if ( surfTransp ) surfTransp->InitOld();
+        if ( surfTransp ) surfTransp->InitTimeStep();
         timedisc->DoStep( P.get<int>("CouplingSolver.Iter"));
         if (massTransp) massTransp->DoStep( time_new);
         if ( surfTransp ) {

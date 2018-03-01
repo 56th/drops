@@ -36,8 +36,12 @@
 
 namespace DROPS {
 
-/// \brief Common types used by TetraPartitionCL, SurfacePatchCL and their helpers
+/// \brief Common types used by TetraPartitionCL, SPatchCL and their helpers
 namespace LatticePartitionTypesNS {
+
+typedef SArrayCL<Uint, 5>          PentaT; ///< representation of a penta of the partition via its vertices: index in the vertex_-array
+typedef std::vector<PentaT>        PentaContT;
+typedef PentaContT::const_iterator const_penta_iterator;
 
 typedef SArrayCL<Uint, 4>          TetraT; ///< representation of a tetra of the partition via its vertices: index in the vertex_-array
 typedef std::vector<TetraT>        TetraContT;
@@ -49,6 +53,11 @@ typedef TriangleContT::const_iterator const_triangle_iterator;
 
 typedef std::vector<BaryCoordCL>    VertexContT;
 typedef VertexContT::const_iterator const_vertex_iterator;
+typedef VertexContT::      iterator       vertex_iterator;
+
+typedef std::vector<STCoordCL>        STVertexContT;
+typedef STVertexContT::const_iterator const_stvertex_iterator;
+typedef STVertexContT::      iterator       stvertex_iterator;
 
 } // end of namespace DROPS::LatticePartitionTypesNS
 
@@ -101,17 +110,17 @@ class TetraPartitionCL
     Uint        pos_vertex_begin_; ///< begin of the subsequence of vertexes of positive tetras
     Uint        neg_vertex_end_;   ///< end of the subsequence of of vertexes of negative tetras
 
-    template <class VertexCutMergingPolicyT>
+    template <template <Uint Dim> class VertexCutMergingPolicyT>
       const TetraT ///< Create a single sub-tetra and its vertexes
       make_sub_tetra (const RefTetraPartitionCL::TetraT& ref_tet, const PrincipalLatticeCL::TetraT& lattice_tet,
-        const double lset[4], Uint lattice_num_vertexes, VertexCutMergingPolicyT& edgecut);
+        const double lset[4], Uint lattice_num_vertexes, VertexCutMergingPolicyT<3>& edgecut);
 
   public:
     TetraPartitionCL () : pos_tetra_begin_( 0), pos_vertex_begin_( 0), neg_vertex_end_( 0) {} ///< Empty default-cut
 
     ///\brief Computes the partition of the principal lattice with num_intervals on each edge of the reference-tetra given the level set values in ls.
     template <class VertexPartitionPolicyT,
-              class VertexCutMergingPolicyT>
+              template <Uint Dim> class VertexCutMergingPolicyT>
     void make_partition (const PrincipalLatticeCL& lat, const std::valarray<double>& ls);
 
     Uint tetra_size  (TetraSignEnum s= AllTetraC) const ///< number of tetras with given sign
@@ -141,69 +150,191 @@ class TetraPartitionCL
 };
 
 
-class SurfacePatchCL; ///< forward declaration
+/// @{ forward declarations from simplex.h, which is only included in subtriangulation.cpp.
+class TetraCL;
+struct TetraPrismCL;
+class Bary2WorldCoordCL;
+class STCoord2WorldCoordCL;
+/// @}
+
+
+template <Uint Dim>
+struct DimensionTraitsCL
+{
+};
+
+template <>
+struct DimensionTraitsCL<3>
+{
+    typedef LatticePartitionTypesNS::TriangleT               FacetT;
+    typedef LatticePartitionTypesNS::TriangleContT           FacetContT;
+    typedef LatticePartitionTypesNS::const_triangle_iterator const_facet_iterator;
+
+    typedef BaryCoordCL                                    VertexT;
+    typedef LatticePartitionTypesNS::VertexContT           VertexContT;
+    typedef LatticePartitionTypesNS::const_vertex_iterator const_vertex_iterator;
+    typedef LatticePartitionTypesNS::      vertex_iterator       vertex_iterator;
+
+    typedef PrincipalLatticeCL         LatticeT;
+    typedef PrincipalLatticeCL::TetraT LatticeBodyT;
+
+    typedef RefPatchCL<3>         RefPatchT;
+    typedef RefPatchCL<3>::FacetT RefPatchFacetT;
+
+    typedef TetraCL WorldBodyT;
+
+    typedef Point3DCL                        WorldVertexT;
+    typedef std::vector<Point3DCL>           WorldVertexContT;
+    typedef WorldVertexContT::const_iterator const_world_vertex_iterator;
+
+    typedef Bary2WorldCoordCL VertexToWorldVertexMapperT;
+
+    typedef WorldVertexContT NormalContT;
+    typedef NormalContT::const_iterator const_normal_iterator;
+};
+
+template <>
+struct DimensionTraitsCL<4>
+{
+    typedef LatticePartitionTypesNS::TetraT               FacetT;
+    typedef LatticePartitionTypesNS::TetraContT           FacetContT;
+    typedef LatticePartitionTypesNS::const_tetra_iterator const_facet_iterator;
+
+    typedef STCoordCL                                        VertexT;
+    typedef LatticePartitionTypesNS::STVertexContT           VertexContT;
+    typedef LatticePartitionTypesNS::const_stvertex_iterator const_vertex_iterator;
+    typedef LatticePartitionTypesNS::      stvertex_iterator       vertex_iterator;
+
+    typedef TetraPrismLatticeCL         LatticeT;
+    typedef TetraPrismLatticeCL::PentaT LatticeBodyT;
+
+    typedef RefPatchCL<4>         RefPatchT;
+    typedef RefPatchCL<4>::FacetT RefPatchFacetT;
+
+    typedef TetraPrismCL WorldBodyT;
+
+    typedef Point4DCL                        WorldVertexT;
+    typedef std::vector<Point4DCL>           WorldVertexContT;
+    typedef WorldVertexContT::const_iterator const_world_vertex_iterator;
+
+    typedef STCoord2WorldCoordCL VertexToWorldVertexMapperT;
+
+    typedef WorldVertexContT NormalContT;
+    typedef NormalContT::const_iterator const_normal_iterator;
+};
+
+template <Uint Dim>
+class SPatchCL; ///< forward declaration
 
 ///\brief Debug-output to a stream: VTU-format for paraview (fwd-declaration neccessary due to friend declaration in TetraPartitionCL)
-void write_paraview_vtu (std::ostream&, const SurfacePatchCL&);
+void write_paraview_vtu (std::ostream&, const SPatchCL<3>&);
 
-///\brief Partition the principal lattice of a tetra t (n intervals on each edge) according to the sign of a levelset function ls. This class computes the triangles of the resulting piecewise trianglular interface.
+///\brief Partition the bodies of LatticeT according to the sign of a levelset function ls. This class computes the simplicial facets of the resulting piecewise linear interface.
 /// VertexCutMergingPolicyT: Determines, how often cut vertexes are stored.
 ///     Duplicate: A cut-vertex is added for each tetra, on which it is discovered; fast, but leads to more vertices, which in turn leads to more dof for quadrature rules that use the vertexes of the partition.
 ///     Merge: The edge cuts are memoized for each edge and added only once -- leads to the minimal amount of cut vertexes.
-class SurfacePatchCL
+template <Uint Dim>
+class SPatchCL
 {
   public:
-    typedef LatticePartitionTypesNS::TriangleT               TriangleT;
-    typedef LatticePartitionTypesNS::TriangleContT           TriangleContT;
-    typedef LatticePartitionTypesNS::const_triangle_iterator const_triangle_iterator;
+    typedef DimensionTraitsCL<Dim> DimTraitsT;
 
-    typedef LatticePartitionTypesNS::VertexContT           VertexContT;
-    typedef LatticePartitionTypesNS::const_vertex_iterator const_vertex_iterator;
+    typedef typename DimTraitsT::FacetT               FacetT;
+    typedef typename DimTraitsT::FacetContT           FacetContT;
+    typedef typename DimTraitsT::const_facet_iterator const_facet_iterator;
+
+    typedef typename DimTraitsT::VertexT               VertexT;
+    typedef typename DimTraitsT::VertexContT           VertexContT;
+    typedef typename DimTraitsT::const_vertex_iterator const_vertex_iterator;
+
+    typedef typename DimTraitsT::LatticeT        LatticeT;
+    typedef typename DimTraitsT::LatticeBodyT LatticeBodyT;
+
+    typedef typename DimTraitsT::RefPatchT      RefPatchT;
+    typedef typename DimTraitsT::RefPatchFacetT RefPatchFacetT;
+
+    typedef typename DimTraitsT::WorldBodyT WorldBodyT;
+
+    typedef typename DimTraitsT::WorldVertexT                WorldVertexT;
+    typedef typename DimTraitsT::WorldVertexContT            WorldVertexContT;
+    typedef typename DimTraitsT::const_world_vertex_iterator const_world_vertex_iterator;
+
+    typedef typename DimTraitsT::VertexToWorldVertexMapperT VertexToWorldVertexMapperT;
+
+    typedef typename DimTraitsT::NormalContT NormalContT;
+    typedef typename DimTraitsT::const_normal_iterator const_normal_iterator;
+
+    typedef std::vector<double>::const_iterator const_absdet_iterator;
 
   private:
     typedef std::pair<Uint, Uint> RenumberVertexPairT; ///< Helper type to handle zero-vertexes
 
-    TriangleContT     triangles_;            ///< All triangles of the interface.
-    std::vector<bool> is_boundary_triangle_; ///< True, iff the triangle is a face of one of the tetras of the principal lattice.
+    FacetContT        facets_;            ///< All facets of the interface.
+    std::vector<bool> is_boundary_facet_; ///< True, iff the facet is a facet of one of the simplexes of the principal lattice.
 
-    VertexContT vertexes_;
+    VertexContT      vertexes_;
+    mutable WorldVertexContT world_vertexes_;
 
-    template <class VertexCutMergingPolicyT>
-      const TriangleT ///< Create a single sub-triangle and its vertexes
-      make_sub_triangle (const RefTetraPatchCL::TriangleT& ref_tri, const PrincipalLatticeCL::TetraT& lattice_tet,
-        const PrincipalLatticeCL& lattice, const double lset[4],
+    mutable NormalContT         normals_;
+    mutable std::vector<double> absdets_;
+
+    template <template <Uint> class VertexCutMergingPolicyT>
+      const FacetT ///< Create a single sub-facet and its vertexes
+      make_sub_facet (const RefPatchFacetT& ref_tri, const LatticeBodyT& lattice_tet,
+        const LatticeT& lattice, const double lset[Dim],
         std::vector<Uint>& copied_vertexes, std::vector<RenumberVertexPairT>& renumber_zero_verts,
-        VertexCutMergingPolicyT& edgecut);
+        VertexCutMergingPolicyT<Dim>& edgecut);
 
   public:
     /// Empty default-interface
 
     ///\brief Computes the piecewise triangular interface for the principal lattice with num_intervals on each edge of the reference-tetra given the level set values in ls.
-    template <class VertexCutMergingPolicyT>
-    void make_patch (const PrincipalLatticeCL& lat, const std::valarray<double>& ls);
+    template <template <Uint> class VertexCutMergingPolicyT>
+    void make_patch (const LatticeT& lat, const std::valarray<double>& ls);
 
-    /// True, iff the triangle is a face of one of the tetras of the principal lattice.
+    /// True, iff the facet is a facet of one of the bodies of the principal lattice.
     ///@{
-    bool is_boundary_triangle (Uint i) const { return is_boundary_triangle_[i]; }
-    bool is_boundary_triangle (const_triangle_iterator it) const { return is_boundary_triangle_[it - triangles_.begin()]; }
+    bool is_boundary_facet (Uint i) const { return is_boundary_facet_[i]; }
+    bool is_boundary_facet (const_facet_iterator it) const { return is_boundary_facet_[it - facets_.begin()]; }
     ///@}
 
-    Uint triangle_size  () const ///< number of triangles
-         { return triangles_.size(); }
+    Uint facet_size  () const ///< number of triangles
+         { return facets_.size(); }
     Uint vertex_size () const ///< number of vertexes
          { return vertexes_.size(); }
+    bool empty () const { return facets_.empty(); } ///< True, iff there is no surface patch
+    void clear (); ///< reset to empty default-state
 
     /// Random-access to the tetras and vertices.
     ///@{
-    const_triangle_iterator triangle_begin () const { return triangles_.begin(); }
-    const_triangle_iterator triangle_end   () const { return triangles_.end(); }
+    const_facet_iterator facet_begin () const { return facets_.begin(); }
+    const_facet_iterator facet_end   () const { return facets_.end(); }
     const_vertex_iterator vertex_begin () const { return vertexes_.begin(); }
     const_vertex_iterator vertex_end   () const { return vertexes_.end(); }
     ///@}
 
-    friend void write_paraview_vtu (std::ostream&, const SurfacePatchCL&);
+    bool world_vertex_empty () const { return world_vertexes_.empty(); }
+    void compute_world_vertexes (const WorldBodyT& wb) const;
+    const_world_vertex_iterator world_vertex_begin () const { return world_vertexes_.begin(); }
+    const_world_vertex_iterator world_vertex_end   () const { return world_vertexes_.end(); }
+
+    bool absdets_empty () const { return absdets_.empty(); }
+    void compute_absdets (const WorldBodyT& wb) const;
+    const_absdet_iterator absdet_begin () const { return absdets_.begin(); }
+    const_absdet_iterator absdet_end   () const { return absdets_.end(); }
+
+    bool normal_empty () const { return normals_.empty(); }
+    // Also computes absdets.
+    void compute_normals (const WorldBodyT& wb) const;
+    const_normal_iterator normal_begin () const { return normals_.begin(); }
+    const_normal_iterator normal_end   () const { return normals_.end(); }
+
+#   pragma GCC diagnostic ignored "-Wnon-template-friend"
+    friend void write_paraview_vtu (std::ostream&, const SPatchCL<Dim>&);
+//#   pragma GCC diagnostic pop
 };
 
+typedef SPatchCL<3> SurfacePatchCL;
 
 /// \brief In cases that a triangle on the boundary is cut by the interface of two fluids, we want to partition this cut triangle into subtriangles for integration.
 /// This class partitions the cut triangle by the interface on the boundary to sub-triangles
@@ -227,14 +358,14 @@ class BndTriangPartitionCL
 
     template <class VertexCutMergingPolicyT>
       const TriangleT ///< Create a single sub-triangle and its vertexes
-      make_sub_triangle (const RefTetraPatchCL::TriangleT& ref_tri, const PrincipalLatticeCL::TetraT& lattice_tet,
+      make_sub_triangle (const RefTrianglePartitionCL::TriangleT& ref_tri, const PrincipalLatticeCL::TetraT& lattice_tet,
         const double lset[4], Uint lattice_num_vertexes,  VertexCutMergingPolicyT& edgecut);
 
   public:
     /// Empty default-interface
 
     ///\brief partition a cut face on the special boundary 
-    template <class VertexPartitionPolicyT,class VertexCutMergingPolicyT>
+    template <class VertexPartitionPolicyT, template <Uint Dim> class VertexCutMergingPolicyT>
     void make_partition2D (const PrincipalLatticeCL& lat, Uint face, const std::valarray<double>& ls);
 
     Uint triangle_size  (TetraSignEnum s= AllTetraC) const ///< number of triangles
@@ -320,16 +451,23 @@ class PartitionedVertexPolicyCL
 };
 
 ///\brief A cut-vertex is added to the list of vertexes for each tetra, on which it is discovered; fast, but leads to more vertices, which in turn leads to more dof for quadrature rules that use the vertexes of the partition.
+template <Uint Dim>
 class DuplicateCutPolicyCL
 {
   private:
-    typedef LatticePartitionTypesNS::VertexContT VertexContT;
+    typedef DimensionTraitsCL<Dim> DimTraitsT;
 
-    const PrincipalLatticeCL::const_vertex_iterator lattice_vertexes_;
+    typedef typename DimTraitsT::VertexT               VertexT;
+    typedef typename DimTraitsT::VertexContT           VertexContT;
+    typedef typename DimTraitsT::const_vertex_iterator const_vertex_iterator;
+
+    typedef typename DimTraitsT::LatticeT        LatticeT;
+
+    const typename LatticeT::const_vertex_iterator lattice_vertexes_;
     VertexContT vertexes_;
 
   public:
-    DuplicateCutPolicyCL (PrincipalLatticeCL::const_vertex_iterator lattice_vertexes)
+    DuplicateCutPolicyCL (typename LatticeT::const_vertex_iterator lattice_vertexes)
         : lattice_vertexes_( lattice_vertexes) {}
 
     ///\brief Add the cut vertex and return its number.
@@ -343,10 +481,17 @@ class DuplicateCutPolicyCL
 };
 
 ///\brief A cut-vertex is added to the list of vertexes only by the first tetra, on which it is discovered: cuts are memoized for each edge.
+template <Uint Dim>
 class MergeCutPolicyCL
 {
   private:
-    typedef LatticePartitionTypesNS::VertexContT VertexContT;
+    typedef DimensionTraitsCL<Dim> DimTraitsT;
+
+    typedef typename DimTraitsT::VertexT               VertexT;
+    typedef typename DimTraitsT::VertexContT           VertexContT;
+    typedef typename DimTraitsT::const_vertex_iterator const_vertex_iterator;
+
+    typedef typename DimTraitsT::LatticeT        LatticeT;
 
     struct UintPairHasherCL
     {
@@ -357,18 +502,18 @@ class MergeCutPolicyCL
     typedef std::pair<Uint, Uint> EdgeT;
     typedef DROPS_STD_UNORDERED_MAP<EdgeT, Uint, UintPairHasherCL> EdgeToCutMapT;
 
-    const PrincipalLatticeCL::const_vertex_iterator lattice_vertexes_;
+    const typename LatticeT::const_vertex_iterator lattice_vertexes_;
     VertexContT vertexes_;
     EdgeToCutMapT edge_to_cut_;
 
   public:
-    MergeCutPolicyCL (PrincipalLatticeCL::const_vertex_iterator lattice_vertexes)
+    MergeCutPolicyCL (typename LatticeT::const_vertex_iterator lattice_vertexes)
         : lattice_vertexes_( lattice_vertexes) {}
 
     ///\brief Return the number of the cut vertex, if it is already memoized, otherwise add it and return its number.
     Uint operator() (Uint v0, Uint v1, double ls0, double ls1) {
         const EdgeT e= v0 < v1 ? std::make_pair( v0, v1) : std::make_pair( v1, v0);
-        EdgeToCutMapT::const_iterator e_it= edge_to_cut_.find( e);
+        typename EdgeToCutMapT::const_iterator e_it= edge_to_cut_.find( e);
         if (e_it != edge_to_cut_.end())
             return e_it->second;
         else {

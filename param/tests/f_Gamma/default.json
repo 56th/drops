@@ -3,7 +3,6 @@
     {
         "BoundaryData":
         {
-            "Pressure": { "Default": ["Nat0BC"] },            
             "SlipBnd":
             {
                 "Beta1": "0",
@@ -20,11 +19,6 @@
             "ViscPos": "0.001",
             "DensPos": "1000", 
             "DensNeg": "1000", 
-            "SurfTens": 
-            {
-                "DilatationalVisco": "0", 
-                "ShearVisco": "0"
-            }, 
             "VolForce": "ZeroVel", 
             "Gravity": "0 0 0 ",
             "SmoothZone": "1e-05"

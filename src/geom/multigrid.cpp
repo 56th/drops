@@ -36,6 +36,7 @@
 #include "geom/multigrid.h"
 #include "misc/params.h"
 #include "misc/singletonmap.h"
+#include "misc/problem.h"
 #include "num/gauss.h"
 #include <iterator>
 #include <set>
@@ -1161,101 +1162,67 @@ void UnMarkAll (DROPS::MultiGridCL& mg)
      }
 }
 
-void ColorClassesCL::compute_neighbors (MultiGridCL::const_TriangTetraIteratorCL begin,
-                                        MultiGridCL::const_TriangTetraIteratorCL end,
-                                        std::vector<TetraNumVecT>& neighbors, match_fun match, const BndCondCL& Bnd)
+
+///\brief Helper to ColorClassesCL.
+/// b Is a (dynamic) bitset of used colors, global_b is one such bitset for each p1-dof.
+class used_colors_CL
 {
-    const size_t num_tetra= std::distance( begin, end);
-
-    typedef std::tr1::unordered_map<const VertexCL*, std::vector<const VertexCL*> > Per1MapT;
-    Per1MapT per1Map;
-
-    typedef std::tr1::unordered_map<const VertexCL*, TetraNumVecT> VertexMapT;
-    VertexMapT vertexMap;
-    // Collect all tetras, that have vertex v in vertexMap[v].
-    for (MultiGridCL::const_TriangTetraIteratorCL sit= begin; sit != end; ++sit)
-        for (int i= 0; i < 4; ++i)
-            vertexMap[sit->GetVertex( i)].push_back( sit - begin);
-
-    // in case of periodic boundaries: merge neighbors
-    if (match) {
-        typedef std::vector<const VertexCL*> VertexListT;
-        VertexListT listper1, listper2;
-        // collect vertices with boundary type Per1BC or Per2BC
-        for (VertexMapT::iterator it = vertexMap.begin(); it != vertexMap.end(); ++it) {
-            if (Bnd.GetBC( *(it->first)) == Per1BC)
-                listper1.push_back(&*(it->first));
-            if (Bnd.GetBC( *(it->first)) == Per2BC)
-                listper2.push_back(&*it->first);
-
+  private:
+    ///\brief count trailing zeros in the byte c.
+    static Uint ctz (unsigned char c) {
+        if (c == 0) // Short cut for 0 which could also be treated naturally by the following binary search.
+            return 8;
+        Uint n;
+#ifdef __GNUC__
+         n= __builtin_ctz( c);
+#else
+        n= 0;
+        if ((c & 15) == 0) { // 2^4 - 1
+            n+= 4;
+            c>>= 4;
         }
-        // match vertices in listper1 and listper2 and merge vertexMap entries
-        for (VertexListT::iterator it1 = listper1.begin(); it1 != listper1.end(); ++it1) {
-            for (VertexListT::iterator it2 = listper2.begin(); it2 != listper2.end(); ++it2)
-                if (match( GetBaryCenter( **it1), GetBaryCenter( **it2)))
-                    per1Map[*it1].push_back(*it2);
+        if ((c & 3) == 0) {  // 2^2 - 1
+            n+= 2;
+            c>>= 2;
         }
-        for (Per1MapT::iterator it=per1Map.begin(); it!=per1Map.end(); ++it)
-        {
-            TetraNumVecT& per2Vertices = vertexMap[it->first];
-            for (std::vector<const VertexCL*>::const_iterator itper2 = it->second.begin(); itper2 != it->second.end(); ++itper2)
-                per2Vertices.insert(per2Vertices.end(), vertexMap[*itper2].begin(), vertexMap[*itper2].end());
-            for (std::vector<const VertexCL*>::const_iterator itper2 = it->second.begin(); itper2 != it->second.end(); ++itper2)
-            {
-                vertexMap[*itper2].clear();
-                vertexMap[*itper2]= per2Vertices;
-            }
+        if ((c & 1) == 0) {  // 2^1 - 1
+            n+= 1;
+            c>>= 1;
         }
+#endif
+        return n;
     }
 
-    // For every tetra j, store all neighboring tetras in neighbors[j].
-    typedef std::set<size_t> TetraNumSetT;
-    std::vector<TetraNumSetT> neighborsets( num_tetra);
-#   pragma omp parallel
-    {
-#ifndef DROPS_WIN
-        size_t j;
-#else
-        int j;
-#endif
-#       pragma omp for
-        for (j= 0; j < num_tetra; ++j)
-            for (int i= 0; i < 4; ++i) {
-                const TetraNumVecT& tetra_nums= vertexMap[(begin + j)->GetVertex( i)];
-                neighborsets[j].insert( tetra_nums.begin(), tetra_nums.end());
-            }
-#       pragma omp for
-        for (j= 0; j < num_tetra; ++j) {
-            neighbors[j].resize( neighborsets[j].size());
-            std::copy( neighborsets[j].begin(), neighborsets[j].end(), neighbors[j].begin());
+    Uint size;
+    unsigned char* b;
+
+    const unsigned char* global_b;
+
+  public:
+    used_colors_CL (Uint nb, const unsigned char* global_barg)
+        : size( nb), b( new unsigned char[size]), global_b( global_barg) {}
+    ~used_colors_CL () {
+        delete[] b;
+    }
+
+    void assign( const TetraCL& t, Uint sys) {
+        size_t idx= t.GetVertex( 0)->Unknowns( sys);
+        std::copy( global_b + idx*size, global_b + (idx + 1)*size, b);
+        for (Uint i= 1; i < 4; ++i) {
+            idx= t.GetVertex( i)->Unknowns( sys);
+            for (Uint j= 0; j < size; ++j)
+                b[j]|= global_b[idx*size + j];
         }
     }
-}
+    Uint get_free_color () const {
+        Uint byte;
+        for (byte= 0; byte < size && b[byte] == 0xff /*a byte with all bits set*/; ++byte)
+            ;
+        return ctz( ~b[byte] & (b[byte] + 1)) + (byte << 3u); // The argument of ctz has exactly one bit set in the position of the least significant zero bit of b[byte] (provided b != 0xff, which cannot happen).
+    }
+};
 
-void ColorClassesCL::fill_pointer_arrays (
-    const std::list<ColorFreqT>& color_list, const std::vector<int>& color,
-    MultiGridCL::const_TriangTetraIteratorCL begin, MultiGridCL::const_TriangTetraIteratorCL end)
-{
-    colors_.resize( color_list.size());
-    for (std::list<ColorFreqT>::const_iterator it= color_list.begin(); it != color_list.end(); ++it)
-        colors_[it->first].reserve( it->second);
-    const size_t num_tetra= std::distance( begin, end);
-    for (size_t j= 0; j < num_tetra; ++j)
-        colors_[color[j]].push_back( &*(begin + j));
-
-#ifndef DROPS_WIN
-    size_t j;
-#else
-    int j;
-#endif
-    // tetra sorting for better memory access pattern
-    #pragma omp parallel for
-    for (j= 0; j < num_colors(); ++j)
-        sort( colors_[j].begin(), colors_[j].end());
-}
-
-void ColorClassesCL::compute_color_classes (MultiGridCL::const_TriangTetraIteratorCL begin,
-                                            MultiGridCL::const_TriangTetraIteratorCL end, match_fun match, const BndCondCL& Bnd)
+void ColorClassesCL::compute_color_classes (MultiGridCL& mg, Uint lvl, const BndCondCL& Bnd)
 {
 #   ifdef _PAR
         ParTimerCL timer;
@@ -1264,51 +1231,101 @@ void ColorClassesCL::compute_color_classes (MultiGridCL::const_TriangTetraIterat
 #   endif
         timer.Start();
 
-    const size_t num_tetra= std::distance( begin, end);
+    colors_.resize( 0);
 
-    // Build the adjacency lists (a vector of neighbors for each tetra).
-    std::vector<TetraNumVecT> neighbors( num_tetra);
-    compute_neighbors( begin, end, neighbors, match, Bnd);
+    // strip all Dirichlet bc from Bnd
+    BndCondCL BndNoDirichlet= Bnd;
+    BndNoDirichlet.StripDirichletBC();
 
-    // Color the tetras
-    std::vector<int> color( num_tetra, -1); // Color of each tetra
-    std::list<ColorFreqT> color_frequency;  // list of colors together with number of their occurrence
-    std::vector<int> used_colors; // list of the colors of all neighbors (multiple occurrences of the same color or -1 are allowed)
-    for (size_t j= 0; j < num_tetra; ++j) {
-        for (TetraNumVecT::iterator neigh_it= neighbors[j].begin(); neigh_it != neighbors[j].end(); ++neigh_it)
-            used_colors.push_back( color[*neigh_it]);
-        bool color_found= false;
-        std::list<ColorFreqT>::iterator it;
-        for (it= color_frequency.begin(); it != color_frequency.end(); ++it)
-            if (find( used_colors.begin(), used_colors.end(), it->first) == used_colors.end()) {
-                color_found= true;
-                break;
-            }
-        if (color_found) {
-            color[j]= it->first;
-            ++it->second;
-            // Move color to the end: LRU-policy for evenly used colors.
-            color_frequency.splice( color_frequency.end(), color_frequency, it);
-        }
-        else {
-            color_frequency.push_back( std::make_pair( color_frequency.size(), 1)); // Add new color with one use
-            color[j]= color_frequency.back().first;
-        }
-        used_colors.clear();
+    IdxDescCL p2idx( P2_FE, BndNoDirichlet);
+    p2idx.CreateNumbering( lvl, mg);
+    const Uint sys= p2idx.GetIdx();
+    const size_t n= p2idx.NumUnknowns();
+    VecDescBaseCL<VectorBaseCL<unsigned short> > numtetra( &p2idx);
+    DROPS_FOR_TRIANG_TETRA( mg, lvl, it) {
+        for (Uint i= 0; i < 4; ++i)
+            ++numtetra.Data[it->GetVertex( i)->Unknowns( sys)];
+        for (Uint i= 0; i < 6; ++i)
+            ++numtetra.Data[it->GetEdge( i)->Unknowns( sys)];
     }
-    neighbors.clear();
+    Uint maxcolors= 0,
+         tmp;
+    // Use the inclusion-exclusion principle to count all tetras which intersect each tetra
+    DROPS_FOR_TRIANG_TETRA( mg, lvl, it) {
+        tmp= 4*2 - 1; // Tetras at the faces (upper bound), the tetra itself
+        for (Uint i= 0; i < 4; ++i)
+            tmp+= numtetra.Data[it->GetVertex( i)->Unknowns( sys)];
+        for (Uint i= 0; i < 6; ++i)
+            tmp-=numtetra.Data[it->GetEdge( i)->Unknowns( sys)];
+        maxcolors= std::max( maxcolors, tmp);
+    }
+    ++maxcolors;
+    const Uint nb= ((maxcolors + 7u) & ~7u) >> 3u; // number of bytes with at least maxcolors bits.
+//     std::cerr << "\nmaxcolors: " << maxcolors << " nb: " << nb << " old maxcolors: " << 1 + 4*(*std::max_element( Addr( numtetra.Data), Addr( numtetra.Data) + n) - 1) << ".\n";
+    numtetra.Reset();
 
-    // Build arrays of pointers for the colors
-    fill_pointer_arrays( color_frequency, color, begin, end);
-    color.clear();
+    std::vector<unsigned char> color_bitsets( n*nb);
+    colors_.resize( maxcolors);
 
-    // for (size_t j= 0; j < num_colors(); ++j)
-    //     std::cout << "Color " << j << " has " << colors_[j].size() << " tetras." << std::endl;
-    // std::cout << std::endl;
+    size_t idx;
+    Uint c,    // The color in [0, maxcolors).
+         byte; // The byte in which bit number c is.
+    unsigned char bit_in_byte; // The bitmask with the bit corresponding to c set.
+    used_colors_CL used_colors( nb, Addr( color_bitsets));
+    DROPS_FOR_TRIANG_TETRA( mg, lvl, it) {
+        used_colors.assign( *it, sys);
+        c= used_colors.get_free_color();
+        colors_[c].push_back( &*it);
+
+        byte=         (c & ~7u) >> 3u;
+        bit_in_byte=  1u << (c & 7u);
+        for (Uint i= 0; i < 4; ++i) {
+            idx= it->GetVertex( i)->Unknowns( sys);
+            color_bitsets[idx*nb + byte] |= bit_in_byte;
+        }
+    }
+
+    p2idx.DeleteNumbering( mg);
+
+    Uint i;
+//     size_t tetracheck= 0;
+    // tetra sorting for better memory access pattern
+    for (i= 0; i < colors_.size() && !colors_[i].empty(); ++i) {
+        std::sort( colors_[i].begin(), colors_[i].end());
+//         tetracheck+= colors_[i].size();
+    }
+    colors_.resize( i);
+//     if (tetracheck != std::distance (mg.GetTriangTetraBegin( lvl), mg.GetTriangTetraEnd( lvl))) {
+//         std::cerr << "tetracheck: " << tetracheck << " numtetra: " << std::distance (mg.GetTriangTetraBegin( lvl), mg.GetTriangTetraEnd( lvl)) << ".\n";
+//         throw DROPSErrCL( "ColorClassesCL::my_compute_color_classes: messed up tetras.\n");
+//     }
 
     timer.Stop();
     const double duration= timer.GetTime();
-    std::cout << "Creation of the tetra-coloring took " << duration << " seconds, " << num_colors() << " colors used." << '\n';
+    std::cout << "ColorClassesCL::compute_color_classes: " << duration << " seconds, " << num_colors() << " colors.\n";
+}
+
+void ColorClassesCL::make_single_color_class (MultiGridCL::const_TriangTetraIteratorCL begin,
+                                              MultiGridCL::const_TriangTetraIteratorCL end)
+{
+#   ifdef _PAR
+        ParTimerCL timer;
+#   else
+        TimerCL timer;
+#   endif
+        timer.Start();
+
+    colors_.resize( 1);
+    colors_[0].clear();
+    colors_[0].reserve( std::distance( begin, end));
+    for (; begin != end; ++begin)
+        colors_[0].push_back( &*begin);
+
+    // tetra sorting for better memory access pattern
+    std::sort( colors_[0].begin(), colors_[0].end());
+
+    timer.Stop();
+    std::cout << "ColorClassesCL::make_single_color_class: Creation of the tetra-coloring took " << timer.GetTime() << " seconds.\n";
 }
 
 const ColorClassesCL& MultiGridCL::GetColorClasses (int Level, const BndCondCL& Bnd) const
@@ -1317,7 +1334,7 @@ const ColorClassesCL& MultiGridCL::GetColorClasses (int Level, const BndCondCL& 
         Level+= GetNumLevel();
 
     if (colors_.find( Level) == colors_.end())
-        colors_[Level]= new ColorClassesCL( GetTriangTetraBegin( Level), GetTriangTetraEnd( Level), GetBnd().GetMatchFun(), Bnd);
+        colors_[Level]= new ColorClassesCL( *this, Level, Bnd);
 
     return *colors_[Level];
 }

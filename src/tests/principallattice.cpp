@@ -23,6 +23,7 @@
 */
 
 #include "geom/principallattice.h"
+#include "geom/signtraits.h"
 #include "geom/subtriangulation.h"
 #include "num/quadrature.h"
 #include "misc/container.h"
@@ -34,6 +35,74 @@
 #include <sstream>
 #include <tr1/unordered_map>
 
+template <DROPS::Uint Dim>
+void
+write_sign_trait (const DROPS::SignTraitsCL<Dim>& c, std::ostream& os)
+{
+    os << "signs: ";
+    for (DROPS::Uint i= 0; i < Dim+1; ++i)
+        os << (int) c.sign( i) << ' ';
+    os << '\n';
+    os << (int) c.empty() << ' ' << (int) c.has_codim_le_1() << ' ' << (int) c.has_codim_0() << ' '
+       << (int) c.no_zero_vertex() << ' ' <<  (int) c.num_cut_simplexes()  << ' ' << (int) c.num_zero_vertexes () << '\n';
+    os << "cut_simplexes: ";
+    for (DROPS::Uint i= 0; i < c.num_cut_simplexes(); ++i)
+        os << (int) c[i] << ' ' << (int) c(i) << "  ";
+    os << '\n';
+}
+
+template <DROPS::Uint Dim>
+void
+write_refpatch (const DROPS::RefPatchCL<Dim>& p, std::ostream& os)
+{
+    os << "is:initialized: " << p.is_initialized () << " is_boundary_facet: " << p.is_boundary_facet ()
+       << " empty: " << p.empty () << " size: " << p.size () << "\nfacets:\n";
+    for (DROPS::Uint i= 0; i < p.size(); ++i) {
+        for (DROPS::Uint j= 0; j < Dim; ++j)
+            os << (int) p.facet_begin()[i][j] << ' ';
+    }
+    os << '\n';
+}
+
+void write_sign_traits_1_2_3_4 ()
+{
+    std::ofstream f1( "sign_trait1.txt");
+    std::ofstream f2( "sign_trait2.txt");
+    std::ofstream f3( "sign_trait3.txt");
+    std::ofstream f4( "sign_trait4.txt");
+    std::ofstream frefpatch3( "refpatch3.txt");
+    std::ofstream frefpatch4( "refpatch4.txt");
+    DROPS::byte ls[5];
+    int c= 0;
+    for (ls[0]= -1; ls[0] <= 1; ++ls[0]) {
+      for (ls[1]= -1; ls[1] <= 1; ++ls[1]) {
+        write_sign_trait( DROPS::SignTraitsCL<1>( ls), f1);
+        for (ls[2]= -1; ls[2] <= 1; ++ls[2]) {
+          write_sign_trait( DROPS::SignTraitsCL<2>( ls), f2);
+          for (ls[3]= -1; ls[3] <= 1; ++ls[3]) {
+            write_sign_trait( DROPS::SignTraitsCL<3>( ls), f3);
+            if (DROPS::SignTraitsCL<3>::pattern_idx( ls) != 0) {
+                write_refpatch( DROPS::RefPatchCL<3>::instance( ls), frefpatch3);
+            }
+            else {
+                frefpatch3 << "Skipping the zero-pattern for RefPatchCL.\n";
+            }
+            for (ls[4]= -1; ls[4] <= 1; ++ls[4], c++) {
+                std::cout << "c: " << c << " ls: " << (int) ls[0] << ' ' << (int) ls[1]
+                          << ' ' << (int) ls[2] << ' ' << (int) ls[3]  << ' ' << (int) ls[4]<< std::endl;
+                write_sign_trait( DROPS::SignTraitsCL<4>( ls), f4);
+                if (DROPS::SignTraitsCL<4>::pattern_idx( ls) != 0) {
+                    write_refpatch( DROPS::RefPatchCL<4>::instance( ls), frefpatch4);
+                }
+                else {
+                    frefpatch4 << "Skipping the zero-pattern for RefPatchCL.\n";
+                }
+            }
+          }
+        }
+      }
+    }
+}
 
 void test_tetra_cut ()
 {
@@ -73,7 +142,7 @@ void test_cut_surface ()
              <<"all 81 level-set sign patterns will be prescribed in a tetra, then the corresponding interface patch visualization files will be created."<<std::endl;
     DROPS::GridFunctionCL<> ls( 4);
     ls[0]= -1.; ls[1]= 0.; ls[2]= 0.; ls[3]= 0.;
-    DROPS::SurfacePatchCL tet;
+    DROPS::SPatchCL<3> tet;
     // tet.partition_principal_lattice ( 1, ls);
     // std::cerr << tet;
     int c= 0;
@@ -111,6 +180,22 @@ void test_principal_lattice ()
         std::cout << "=======================================Indices of each sub-tetra:" << std::endl;
         for (DROPS::PrincipalLatticeCL::const_tetra_iterator v= lat.tetra_begin(), end= lat.tetra_end(); v != end; ++v) {
             std::cout << (*v)[0] << ' '  << (*v)[1] << ' ' << (*v)[2] << ' ' << (*v)[3] << ' ' << std::endl;
+        }
+    }
+}
+
+void test_tetra_prism_lattice ()
+{
+    for (int t= 1; t <= 2; ++t) 
+        for (int x= 1; x <= 2; ++x) {
+            const DROPS::TetraPrismLatticeCL& tpl= DROPS::TetraPrismLatticeCL::instance( x, t);
+            std::cout << "=======================================" << tpl.num_intervals() << ' '<< tpl.num_time_intervals() << ' ' << tpl.vertex_size() << " " << tpl.penta_size() << std::endl;
+        for (DROPS::TetraPrismLatticeCL::const_vertex_iterator v= tpl.vertex_begin(), end= tpl.vertex_end(); v != end; ++v) {
+            std::cout << (*v) << std::endl;
+        }
+        std:: cout << "++++++++++++++++++++++++++++++++++++++" << std::endl;
+        for (DROPS::TetraPrismLatticeCL::const_penta_iterator v= tpl.penta_begin(), end= tpl.penta_end(); v != end; ++v) {
+            std::cout << (*v)[0] << ' '  << (*v)[1] << ' ' << (*v)[2] << ' ' << (*v)[3] << ' ' << (*v)[4] << std::endl;
         }
     }
 }
@@ -297,9 +382,11 @@ int main()
         test_principal_lattice();
         test_sphere_cut();
         test_sphere_integral();
-        //test_extrapolated_sphere_integral();
+        // test_extrapolated_sphere_integral();
         test_sphere_surface_integral();
-        //test_extrapolated_sphere_surface_integral();
+        // test_extrapolated_sphere_surface_integral();
+        // write_sign_traits_1_2_3_4();
+        test_tetra_prism_lattice();
     }
     catch (DROPS::DROPSErrCL err) { err.handle(); }
     return 0;

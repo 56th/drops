@@ -1,13 +1,13 @@
 set(HOME levelset)
 
-libs(coupling levelset fastmarch surfacetension twophaseutils marking_strategy adaptriang volume_adjustment)
+libs(coupling levelset levelsetmapper fastmarch surfacetension twophaseutils marking_strategy adaptriang volume_adjustment)
 
-target_link_libraries(levelset-levelset levelset-volume_adjustment levelset-fastmarch misc-progressaccu misc-scopetimer)
+target_link_libraries(levelset-levelset levelset-volume_adjustment levelset-fastmarch misc-progressaccu misc-scopetimer geom-locator)
 target_link_libraries(levelset-volume_adjustment out-vtkOut)
+target_link_libraries(levelset-levelsetmapper geom-locator)
 
 add_library(levelset-twophaseCoeff SHARED twophaseCoeff)
 add_library(levelset-filmCoeff SHARED filmCoeff)
-#set_property(TARGET levelset-filmCoeff PROPERTY SUFFIX "")
 
 if(NOT WIN32)
     target_link_libraries(levelset-twophaseCoeff)

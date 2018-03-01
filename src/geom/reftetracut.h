@@ -27,129 +27,148 @@
 
 #include "misc/container.h"
 #include "misc/staticinit.h"
+#include "geom/signtraits.h"
 
 namespace DROPS {
 
-///\brief Represents the reference tetra, which is cut by a linear level set function ls. The values of the latter are prescribed on the vertices.
-class SignPatternTraitCL
+template <Uint Dim>
+class RefPatchCL; ///< forward declaration for RefPatchBuilderCL.
+
+template <Uint Dim>
+class RefPatchBuilderCL
 {
-  private:
-    Ubyte num_root_vert_;  ///< number of vertices, where the level set function is zero.
-    Ubyte num_root_;       ///< number of roots of the level set function; invariant: num_root_vert <= num_root
-    byte sign_[4];         ///< Sign of the level set function of the vertices; \f$\in\{-1,0,1\}\f$
-    Ubyte cut_simplex_[4]; ///< local number with respect to the reference tetra of the object on the cut: [0,num_root_vert): vertex numbers in (0..3); [num_root_vert, num_root): edge numbers in (0..5). Both parts are sorted in increasing order.
-    Ubyte cut_simplex_rep_[4]; ///< local number of the object on the cut: (0..9)
-
-    void compute_cuts ();
-
   public:
-    SignPatternTraitCL () : num_root_vert_( 4), num_root_( 4) {} ///< Uninitialized default state
-    SignPatternTraitCL (const byte   ls[4]) { assign( ls); } ///< Assign the sign pattern on the vertices.
-    SignPatternTraitCL (const double ls[4]) { assign( ls); } ///< Assign a sign pattern on the vertices.
-    void assign (const byte   ls[4]); ///< Assign a sign pattern on the vertices.
-    void assign (const double ls[4]); ///< Assign a sign pattern on the vertices.
+    typedef SArrayCL<Ubyte, Dim> FacetT; ///< the vertices of a facet of the cut: the body's vertices are denoted by 0..Dim, the edge-cuts by edge-num + Dim + 1.
 
-    bool empty () const { return num_root_ == 0; } ///< True, iff there is no intersection.
-    bool is_2d () const { return num_root_ > 2; }  ///< True, iff the intersection has positive area.
-    bool is_3d () const { return num_root_vert_ == 4; }
-    bool no_zero_vertex () const { return num_root_vert_ == 0; } ///< True, iff there is no vertex, in which ls vanishes.
+    /// \brief Called by generic StaticInit in RefPatchCL.
+    static void StaticInit (RefPatchCL<Dim> instances[SignTraitsCL<Dim>::num_pattern]); ///< undefined
 
-    Ubyte num_cut_simplexes () const { return num_root_; } ///< Number of edges and vertices with a root of ls.
-    Ubyte num_zero_vertexes () const { return num_root_vert_; } ///< Number of vertices of the tetra that are roots of ls.
+    ///\brief maximal number of facets in any RefPatchCL.
+    enum { max_num_facets= 0 };
 
-    byte sign (int i) const { return sign_[i]; } ///< -1,0,1; sign of vertex i.
-
-    /// Return local number of edges/verts with a root of ls. For edges, [] returns a edge number in 0..5, and () returns an extended vertex number in 4..9.
-    ///@{
-    Ubyte operator[] (int i) const { return cut_simplex_[i]; }
-    Ubyte operator() (int i) const { return cut_simplex_rep_[i]; }
-    ///@}
-
-    friend std::ostream& operator<< (std::ostream&, const SignPatternTraitCL&); ///< Debug-output to a stream (dumps all members)
+    ///\brief Assign a sign pattern on the vertices; returns the value of RefPatchCL<Dim>::empty(). The generic version is undefined.
+    static bool assign (const SignTraitsCL<Dim>&, RefPatchCL<Dim>&);
 };
 
-inline Ubyte
-num_triangles (const SignPatternTraitCL& cut)
-{
-    return cut.is_2d() ? cut.num_cut_simplexes() - 2 : 0;
-}
-
-///\brief The triangles of the intersection of the reference-tetra with a linear levelset-function.
-///
-/// The class memoizes used sign-patterns if the triangulations are accessed via the instance( ls)-function. Individual instances may still be constructed (useful for debugging).
-class RefTetraPatchCL
+template <>
+class RefPatchBuilderCL<3>
 {
   public:
-    typedef SArrayCL<Ubyte, 3> TriangleT; ///< the vertices of a triangle of the cut: the tetra's vertices are denoted by 0..3, the edge-cuts by edge-num + 4, which is in 4..9.
-    typedef const TriangleT* const_triangle_iterator;
-    typedef       TriangleT*       triangle_iterator;
+    typedef SArrayCL<Ubyte, 3> FacetT;
 
-    /// \brief Initializes RefTetraPatchCL::instance_array_ (see below)  by calling RefTetraPatchCL::assign() for all non-zero sign patterns.
-    static void StaticInit ();
+    enum { max_num_facets= 2 }; // Number of facets: 0, 1, or 2. The maximum comes from a quadrilateral.
+
+  private:
+    static FacetT MakeTriangle (Ubyte v0, Ubyte v1, Ubyte v2) { return MakeSArray( v0, v1, v2); }
+
+  public:
+    static void StaticInit ( RefPatchCL<3> instances[SignTraitsCL<3>::num_pattern]);
+    static bool assign (const SignTraitsCL<3>&, RefPatchCL<3>&);
+};
+
+template <>
+class RefPatchBuilderCL<4>
+{
+  public:
+    typedef SArrayCL<Ubyte, 4> FacetT;
+
+    enum { max_num_facets= 3 }; // Number of facets: 0, 1, 2 or 3. The maximum comes from a triangular prism.
+
+  private:
+    ///\brief The extended vertex-number (see SignTraitsCL) on the reference-penta, given the extended vertex-number n (in 0..9) on the facet tetra.
+    static Ubyte PentaCutByTetraCut (Ubyte tetra, Ubyte n) {
+        return n < 4 ? RefPenta::VertByTetraVert( tetra, n)
+                     : RefPenta::EdgeByTetraEdge( tetra, n - 4) + 5;
+    }
+    static FacetT MakeTetra (Ubyte v0, Ubyte v1, Ubyte v2, Ubyte v3) { return MakeSArray( v0, v1, v2, v3); }
+    static bool cone_construction (const SignTraitsCL<4>& cut, RefPatchCL<4>& p, Ubyte f); ///< produce tetras as the convex hulls of v=cut( 0) and the cut of the facet-tetra f. Returns, whether the cut with f is on the boundary of the f.
+
+  public:
+    static void StaticInit ( RefPatchCL<4> instances[SignTraitsCL<4>::num_pattern]);
+    static bool assign (const SignTraitsCL<4>&, RefPatchCL<4>&);
+};
+
+///\brief The facets of the intersection of the reference-tetra with a linear levelset-function.
+///
+/// The class memoizes used sign-patterns if the triangulations are accessed via the instance( ls)-function. Individual instances may still be constructed (useful for debugging).
+template <Uint Dim>
+class RefPatchCL
+{
+  public:
+    typedef RefPatchBuilderCL<Dim> BuilderT;
+    typedef typename BuilderT::FacetT FacetT;
+    typedef const FacetT*             const_facet_iterator;
+    typedef       FacetT*             facet_iterator;
+
+    enum { max_num_facets= BuilderT::max_num_facets };
+
+    friend class RefPatchBuilderCL<Dim>;
+
+    /// \brief Initializes RefPatchCL::instance_array_ (see below)  by calling RefPatchCL::assign() for all non-zero sign patterns.
+    static void StaticInit () { BuilderT::StaticInit( RefPatchCL<Dim>::instance_array_); }
     static void StaticDestruct () {}
 
   private:
-    TriangleT triangle_[2];      ///< at most two triangles
-    Ubyte size_;                 ///< number of triangles
-    Ubyte is_boundary_triangle_; ///< true if the triangle is one of the tetra's faces.
+    FacetT facet_[max_num_facets]; ///< the facets
+    Ubyte size_;                   ///< number of facets
+    Ubyte is_boundary_facet_;      ///< true if the facet is one of the body's facets.
 
-    TriangleT MakeTriangle (Ubyte v0, Ubyte v1, Ubyte v2) const { return MakeSArray( v0, v1, v2); }
-
-    static RefTetraPatchCL instance_array_[81]; // 81 = 3^4 = all possible sign-patterns on the vertices
+    static RefPatchCL instance_array_[SignTraitsCL<Dim>::num_pattern];
 
   public:
-    RefTetraPatchCL () : size_( static_cast<Ubyte>( -1)), is_boundary_triangle_( 0) {} ///< Uninitialized default state
-    RefTetraPatchCL (const SignPatternTraitCL& cut) { assign( cut); } ///< Initialize with sign pattern on the vertices
-    bool assign (const SignPatternTraitCL& cut); ///< Assign a sign pattern on the vertices; returns the value of empty()
+    RefPatchCL () : size_( static_cast<Ubyte>( -1)), is_boundary_facet_( 0) {} ///< Uninitialized default state
+    RefPatchCL (const SignTraitsCL<Dim>& cut) { assign( cut); } ///< Initialize with sign pattern on the vertices
+    bool assign (const SignTraitsCL<Dim>& cut) { return BuilderT::assign( cut, *this); } ///< Assign a sign pattern on the vertices; returns the value of empty(). The assignment is delegated to the builder, which ensures the right actions depending on Dim.
 
-    bool  is_initialized () const { return size_ <= 2; } ///< True after assign(...)
+    bool  is_initialized () const { return size_ <= max_num_facets; } ///< True after assign(...)
 
-    ///@{ Recommended access to the triangles for a given sign-pattern; memoizes the result. The functions throw an error for the 0-sign-pattern.
-    static inline const RefTetraPatchCL& instance (const byte   ls[4]);
-    static inline const RefTetraPatchCL& instance (const double ls[4]);
+    ///@{ Recommended access to the facets for a given sign-pattern; memoizes the result. The functions throw an error for the 0-sign-pattern.
+    static inline const RefPatchCL& instance (const byte   ls[Dim + 1]);
+    static inline const RefPatchCL& instance (const double ls[Dim + 1]);
     ///@}
 
-    bool is_boundary_triangle () const { return is_boundary_triangle_ == 1; } ///< true, iff the triangle is one of the tetra's faces.
+    bool is_boundary_facet () const { return is_boundary_facet_ == 1; } ///< true, iff the facet is one of the tetra's faces.
 
     bool  empty () const { return size_ == 0; } ///< true, iff the area of the intersection is 0.
-    size_t size () const { return size_; }      ///< Number of triangles, 0, 1, or 2
+    size_t size () const { return size_; }      ///< Number of facets in 0..max_num_facets
 
-    ///@{ Random-access to the triangles
-    const_triangle_iterator triangle_begin () const { return triangle_; }
-    const_triangle_iterator triangle_end   () const { return triangle_ + size_; }
+    ///@{ Random-access to the facets
+    const_facet_iterator facet_begin () const { return facet_; }
+    const_facet_iterator facet_end   () const { return facet_ + size_; }
     ///@}
 };
 
-///\brief Return a signed array-index for the possible 3^4 sign-patterns on the vertices of a tetra.
-/// The index ranges from [-40..40].
-inline byte instance_idx (const byte ls[4])
-{
-    return  27*ls[0] + 9*ls[1] + 3*ls[2] + ls[3];
-}
+template <Uint Dim>
+RefPatchCL<Dim> RefPatchCL<Dim>::instance_array_[SignTraitsCL<Dim>::num_pattern];
 
-///\brief Return a signed array-index for the possible 3^4 sign-patterns on the vertices of a tetra.
-/// The index ranges from [-40..40].
-inline byte instance_idx (const double ls[4])
-{
-    return  27*sign( ls[0]) + 9*sign( ls[1]) + 3*sign( ls[2]) + sign( ls[3]);
-}
+extern template RefPatchCL<3> RefPatchCL<3>::instance_array_[SignTraitsCL<3>::num_pattern];
+extern template RefPatchCL<4> RefPatchCL<4>::instance_array_[SignTraitsCL<4>::num_pattern];
 
-inline const RefTetraPatchCL&
-RefTetraPatchCL::instance (const byte ls[4])
+template <Uint Dim>
+inline const RefPatchCL<Dim>&
+RefPatchCL<Dim>::instance (const byte ls[Dim + 1])
 {
-    const byte idx= instance_idx ( ls);
+    const byte idx= SignTraitsCL<Dim>::pattern_idx ( ls);
     if (idx == 0)
-        throw DROPSErrCL( "RefTetraPatchCL::instance: found 3-dim. zero level set, grid is too coarse!");
-    return instance_array_[idx + 40];
+        throw DROPSErrCL( "RefPatchCL::instance: found a full body in the zero level set, grid is too coarse!");
+    return RefPatchCL<Dim>::instance_array_[idx + SignTraitsCL<Dim>::zero_pattern_offset];
 }
 
-inline const RefTetraPatchCL&
-RefTetraPatchCL::instance (const double ls[4])
+template <Uint Dim>
+inline const RefPatchCL<Dim>&
+RefPatchCL<Dim>::instance (const double ls[Dim + 1])
 {
-    byte ls_byte[4];
-    std::transform( ls + 0, ls + 4, ls_byte + 0, DROPS::sign);
-    return instance( ls_byte);
+    byte ls_byte[Dim + 1];
+    std::transform( ls + 0, ls + Dim + 1, ls_byte + 0, DROPS::sign);
+    return RefPatchCL<Dim>::instance( ls_byte);
 }
+
+typedef RefPatchCL<3> RefTetraPatchCL;
+typedef RefPatchCL<4> RefPentaPatchCL;
+
+
+typedef SignTraitsCL<3> SignPatternTraitCL;
+
 
 ///\brief The tetras partition the positive and negative part of the reference-tetra with respect to a linear levelset-function ls.
 ///
@@ -221,7 +240,7 @@ class RefTetraPartitionCL
 inline const RefTetraPartitionCL&
 RefTetraPartitionCL::instance (const byte ls[4])
 {
-    const byte idx= instance_idx ( ls);
+    const byte idx= SignTraitsCL<3>::pattern_idx ( ls);
     if (idx == 0)
         throw DROPSErrCL( "RefTetraPartitionCL::instance: found 3-dim. zero level set, grid is too coarse!");
     return instance_array_[idx + 40];

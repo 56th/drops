@@ -21,10 +21,10 @@
  *
  * Copyright 2011 LNM/SC RWTH Aachen, Germany
 */
+#include "geom/principallattice.h"
+#include "geom/subtriangulation.h"
 #include "levelset/marking_strategy.h"
-
 #include "levelset/levelset.h"
-
 #include <limits>
 
 namespace DROPS
@@ -181,7 +181,9 @@ bool StrategyCombinerCL::modified() const
 
 void StrategyCombinerCL::SetUnmodified()
 {
-    modified_ = false;
+    modified_= false;
+    for (Uint i= 0; i < strategies_.size(); ++i)
+        strategies_[i]->SetUnmodified();
 }
 
 
@@ -233,9 +235,10 @@ void StrategyCombinerCL::pop_back()
 }
 
 
-
-
 ///////////////////////////////////////////
+// ValueGetter for DistMarkingStrategyCL //
+///////////////////////////////////////////
+
 LevelsetP2GetterCL::LevelsetP2GetterCL( const LevelsetP2CL& lset ): lset_( lset )
 {}
 
@@ -376,28 +379,22 @@ void DistMarkingStrategyCL::visit( const TetraCL &t )
 
     // In the shell:      level should be f_level_.
     // Outside the shell: level should be c_level_.
-    const Uint soll_level = ( d <= width_ || vzw ) ? f_level_ : c_level_;
+    const Uint soll_level= (d <= width_ || vzw) ? f_level_ : c_level_;
 
-    if ( l !=  soll_level || (l == soll_level && ! t.IsRegular()) )
-    {
+    if (l <  soll_level || (l == soll_level && ! t.IsRegular())) {
         // tetra will be marked for refinement/removement
-        if ( l <= soll_level )
-        {
-            t.SetRegRefMark();
-            modified_ = true;
-            decision_ = RefineC;
-        }
-        else
-        {
-            t.SetRemoveMark();
-            modified_ = true;
-            decision_ = CoarsenC;
-        }
+        t.SetRegRefMark();
+        modified_= true;
+        decision_= RefineC;
     }
-    else if ( l == soll_level )
-    {
+    else if (l > soll_level) {
+        t.SetRemoveMark();
+        modified_= true;
+        decision_= CoarsenC;
+        }
+    else { // l == soll_level && t.IsRegular()
         // Tetrahedra has exactly the level that we require.
-        decision_ = KeepC;
+        decision_= KeepC;
     }
 }
 
@@ -469,6 +466,125 @@ void DistMarkingStrategyCL::SetFineLevel( Uint level )
     {
         throw DROPSErrCL( "Refinementlevels are cheesy.\n" );
     }
+}
+
+///////////////////////////
+// CurvatureMarkingStrategyCL //
+///////////////////////////
+
+CurvatureMarkingStrategyCL::CurvatureMarkingStrategyCL(const LevelsetP2CL& dist, const PrincipalLatticeCL& lattice, Uint fine_level)
+    : getter_( new LevelsetP2GetterCL( dist) ), f_level_( fine_level ), modified_( false ), decision_( DontCareC ), lat( &lattice), ls_loc( lattice.vertex_size()), ls( &dist.Phi), lsetbnd( &dist.GetBndData())
+{
+    P2DiscCL::GetGradientsOnRef( Grefp2);
+}
+
+CurvatureMarkingStrategyCL::CurvatureMarkingStrategyCL( const CurvatureMarkingStrategyCL& rhs )
+    : getter_( rhs.getter_->clone() ),  f_level_( rhs.f_level_ ), modified_( rhs.modified_ ), decision_( rhs.decision_ ), lat( rhs.lat), ls_loc( rhs.ls_loc), ls( rhs.ls), lsetbnd( rhs.lsetbnd)
+{
+    P2DiscCL::GetGradientsOnRef( Grefp2);
+}
+
+CurvatureMarkingStrategyCL::~CurvatureMarkingStrategyCL()
+{}
+
+CurvatureMarkingStrategyCL& CurvatureMarkingStrategyCL::operator=( const CurvatureMarkingStrategyCL& rhs )
+{
+    if ( &rhs == this ) return *this;
+
+    getter_ = std::unique_ptr<ValueGetterCL>( rhs.getter_->clone());
+    f_level_ = rhs.f_level_;
+    modified_ = rhs.modified_;
+    decision_ = rhs.decision_;
+    lat= rhs.lat;
+    ls_loc.resize( rhs.ls_loc.size());
+    ls_loc= rhs.ls_loc;
+    ls= rhs.ls;
+    lsetbnd= rhs.lsetbnd;
+
+    return *this;
+}
+
+TetraAccumulatorCL* CurvatureMarkingStrategyCL::clone( int )
+{
+    return new CurvatureMarkingStrategyCL( *this );
+}
+
+MarkingStrategyCL* CurvatureMarkingStrategyCL::clone_strategy()
+{
+    return new CurvatureMarkingStrategyCL( *this );
+}
+
+void CurvatureMarkingStrategyCL::visit( const TetraCL &t )
+{
+        decision_= DontCareC;
+
+        locp2_ls.assign( t, *ls, *lsetbnd);
+        evaluate_on_vertexes( locp2_ls, *lat, Addr( ls_loc));
+        if (equal_signs( ls_loc))
+            return;
+
+        GetTrafoTr( M, det, t);
+        P2DiscCL::GetHessians( Hp2, M);
+        SMatrixCL<3,3> H;
+        P2DiscCL::GetGradients( Gp2, Grefp2, M);
+        Point3DCL G;
+        for (Uint d= 0; d < 10; ++d) {
+            H+= Hp2[d]*locp2_ls[d];
+            G+= Gp2[d]( bc)*locp2_ls[d];
+        }
+        const double h= ::cbrt( std::abs( det));
+
+        /// For $C^2$-regular $\varphi$, errQ$\in\mathcal{O}(h)$, $h\to 0$.
+        /// One could declare the curvature a resolved for $errQ \lesssim 1$. This
+        /// corresponds to the curvature being less than $h^{-1}$ (for
+        /// distance-like $\varphi$ with $\|D\varphi\|\approx 1$).
+        ///
+        /// For kinks in $\varphi$, errQ will remain constant (around
+        /// $[D\varphi]/{D\varphi}$). This is actually a feature as one can
+        /// reliably detect kinks by $1\lesssim errQ$.
+        const double errH= h*h*std::sqrt( trace( GramMatrix( H))),
+                     errG= h*G.norm(),
+                     errQ= errG < 1e-16 ? 1e16 : errH/errG;
+
+        if (errQ > 1.) {
+            if (t.GetLevel() < GetFineLevel()) {
+                t.SetRegRefMark();
+                modified_ = true;
+                decision_ = RefineC;
+            }
+            else if (t.GetLevel() == GetFineLevel())
+                decision_ = KeepC;
+        }
+}
+
+bool CurvatureMarkingStrategyCL::modified() const
+{
+    return modified_;
+}
+
+void CurvatureMarkingStrategyCL::SetUnmodified()
+{
+    modified_ = false;
+}
+
+MarkingDecisionT CurvatureMarkingStrategyCL::GetDecision() const
+{
+    return decision_;
+}
+
+void CurvatureMarkingStrategyCL::SetDistFct (const LevelsetP2CL &fct)
+{
+    getter_= std::unique_ptr<ValueGetterCL>( new LevelsetP2GetterCL( fct));
+}
+
+Uint CurvatureMarkingStrategyCL::GetFineLevel() const
+{
+    return f_level_;
+}
+
+void CurvatureMarkingStrategyCL::SetFineLevel( Uint level )
+{
+    f_level_= level;
 }
 
 }

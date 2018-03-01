@@ -324,6 +324,16 @@ operator* (const GridFunctionCL< SMatrixCL<Rows, Cols> >& a, const GridFunctionC
     return ret;
 }
 
+template <Uint Rows, Uint Cols>
+inline GridFunctionCL< SVectorCL<Cols> >
+transp_mul (const GridFunctionCL< SMatrixCL<Rows, Cols> >& a, const GridFunctionCL< SVectorCL<Rows> >& b)
+{
+    GridFunctionCL< SVectorCL<Cols> > ret( SVectorCL<Cols>(), a.size());
+    for (size_t i= 0; i<a.size(); ++i)
+        ret[i]= transp_mul( a[i], b[i]);
+    return ret;
+}
+
 template <Uint Dim>
 inline GridFunctionCL<double>
 dot(const GridFunctionCL<SVectorCL<Dim> >& a, const GridFunctionCL<SVectorCL<Dim> >& b)
@@ -554,7 +564,13 @@ class BaryEvalCL
 
   public:
     BaryEvalCL (const TetraCL& tet, double t, fun_type f)
-        : mapper_( tet), t_( t), f_(f) {}
+        : mapper_( tet), t_( t), f_( f) {}
+    BaryEvalCL ()
+        : t_( 0.), f_( 0) {}
+
+    void set      (const TetraCL& tet) { mapper_.assign( tet); }
+    void set_time (double time)        { t_= time; }
+    void set      (fun_type f)         { f_= f; }
 
     value_type operator() (const BaryCoordCL& b) const { return f_( mapper_( b), t_); }
 };
@@ -889,6 +905,59 @@ DROPS_DEFINE_VALARRAY_DERIVATIVE(Quad5CL, T, base_type)
     inline T quadP2 (int i, double absdet) const;
 };
 
+/// Compute the coordinates of the NumNodes quadrature-points in Node
+/// (which are given in barycentric coordinates of the (Dim-1)-simplex facet)
+/// in the coordinates used in facet. The result is written to NodeInBody.
+template <Uint Dim, class VertexT, class RAIterT, class BaryT>
+  inline void
+  SetInterface (const VertexT* const facet, Uint NumNodes, RAIterT NodeInBody, const BaryT* const Node);
+
+/// Calculates the barycentric coordinates of the quadrature points in Node
+/// of the triangle given by p with respect to the
+/// tetrahedron and stores them in the NodesInTetra.
+/// RAIterT is a random-access-iterator to a sequence of BaryCoordCL
+/// This is a special case of the above function for Dim==3.
+template <class RAIterT>
+inline void SetInterface (const BaryCoordCL* const p, Uint NumNodes, RAIterT NodeInTetra, const Point3DCL* const Node);
+
+/// \brief Contains the nodes and weights of a positive quadrature rule on the reference triangle. It uses 1 node an is exact up to degree 1.
+class Quad1_2DDataCL
+{
+  public:
+    enum { NumNodesC= 1 };
+
+    static const Point3DCL Node[NumNodesC];   ///< quadrature nodes
+    static const double    Wght[1];           ///< quadrature weights
+    static const double    Weight[NumNodesC]; ///< quadrature weights for each node
+
+    /// Calculates the barycentric coordinates of the quadrature points
+    /// of the triangle given by the 1st argument with respect to the
+    /// tetrahedron and stores them in the 2nd argument.
+    /// RAIterT is a random-access-iterator to a sequence of BaryCoordCL
+    template <class RAIterT>
+    static void SetInterface (const BaryCoordCL* const p, RAIterT NodeInTetra)
+    { DROPS::SetInterface( p, NumNodesC, NodeInTetra, Node); }
+};
+
+/// \brief Contains the nodes and weights of a positive quadrature rule on the reference triangle. It uses 4 nodes an is exact up to degree 2.
+class Quad2_2DDataCL
+{
+  public:
+    enum { NumNodesC= 4 };
+
+    static const Point3DCL Node[NumNodesC];   ///< quadrature nodes
+    static const double    Wght[2];           ///< quadrature weights
+    static const double    Weight[NumNodesC]; ///< quadrature weights for each node
+
+    /// Calculates the barycentric coordinates of the quadrature points
+    /// of the triangle given by the 1st argument with respect to the
+    /// tetrahedron and stores them in the 2nd argument.
+    /// RAIterT is a random-access-iterator to a sequence of BaryCoordCL
+    template <class RAIterT>
+    static void SetInterface (const BaryCoordCL* const p, RAIterT NodeInTetra)
+    { DROPS::SetInterface( p, NumNodesC, NodeInTetra, Node); }
+};
+
 /// \brief Contains the nodes and weights of a Gauss–Legendre quadrature rule on the reference interval [-1 1]. 
 /// It uses 5 nodes an is exact up to degree 9.
 
@@ -972,7 +1041,8 @@ class Quad5_2DDataCL
     /// tetrahedron and stores them in the 2nd argument.
     /// RAIterT is a random-access-iterator to a sequence of BaryCoordCL
     template <class RAIterT>
-    static void SetInterface (const BaryCoordCL* const, RAIterT);
+    static void SetInterface (const BaryCoordCL* const p, RAIterT NodeInTetra)
+    { DROPS::SetInterface( p, NumNodesC, NodeInTetra, Node); }
 };
 
 template<class T=double>
@@ -1265,7 +1335,7 @@ class P2DiscCL
     // p2[i] contains a Quad5_2DCL-object that is initialized with FE_P2CL::Hi
     static void GetP2Basis( Quad5_2DCL<> p2[10], const BaryCoordCL* const p);
     // compute gradients
-    static void GetGradients( LocalP1CL<Point3DCL> G[10], LocalP1CL<Point3DCL> GRef[10], const SMatrixCL<3,3> &T)
+    static void GetGradients( LocalP1CL<Point3DCL> G[10], const LocalP1CL<Point3DCL> GRef[10], const SMatrixCL<3,3> &T)
     { for (int i=0; i<10; ++i) for (int j=0; j<4; ++j) G[i][j]= T*GRef[i][j]; }
     static void GetGradients( Quad2CL<Point3DCL> G[10], Quad2CL<Point3DCL> GRef[10], const SMatrixCL<3,3> &T)
     { for (int i=0; i<10; ++i) for (int j=0; j<5; ++j) G[i][j]= T*GRef[i][j]; }
@@ -1281,6 +1351,17 @@ class P2DiscCL
     template<class GradT>
     static void GetFuncGradient( GradT& gradF, const LocalP2CL<>& F, const GradT G[10])
     { gradF= F[0]*G[0]; for (int i=1; i<10; ++i) gradF+= F[i]*G[i]; }
+    // Compute the Hessians H[d]= M*Href[d]*M^T
+    static void GetHessians (SMatrixCL<3,3> H[10], const SMatrixCL<3,3>& M) {
+        for (Uint d= 0; d< 10; ++d) {
+            std::memset( &H[d], 0, 3*3*sizeof( double));
+            for (Uint i= 0; i < 3; ++i)
+                for (Uint j= 0; j < 3; ++j)
+                    for (Uint k= 0; k < 3; ++k)
+                        for (Uint l= 0; l < 3; ++l)
+                            H[d](i,j)+= M(i, k)*M(j, l)*FE_P2CL::D2HRef( d, k, l);
+        }
+    }
     // cubatur formula for int f(x)*phi_i dx, exact up to degree 1
     static inline SVectorCL<3> Quad( const TetraCL& tetra, instat_vector_fun_ptr, Uint, double= 0.0);
     // cubatur formula for int f(x)*phi_i dx, exact up to degree 2

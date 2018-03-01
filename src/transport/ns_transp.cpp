@@ -152,6 +152,20 @@ static DROPS::RegisterVectorFunction regvec_gradn("gradMassNeg", mass_grad_n);
 static DROPS::RegisterVectorFunction regvec_rotxz("RotatingFlowfield", RotateVelXZ);
 
 
+/// \brief Short-hand for simple loops over the interface.
+/// \param t  - Reference to a tetra
+/// \param ls - Levelset-reference: Something that can be handed to InterfacePatchCL::Init as 2nd argument.
+/// \param bnd  - ???
+/// \param p  - The InterfacePatchCL that should be used.
+/// \param n  - Name of the integer to reference the interface-triangles
+#define DROPS_FOR_TETRA_INTERFACE_BEGIN( t, ls, bnd, p, n) \
+    (p).Init( (t), (ls), (bnd)); \
+    if ((p).Intersects()) { /*We are at the phase boundary.*/ \
+        for (int ch__= 0; ch__ < 8; ++ch__) { \
+            (p).ComputeForChild( ch__); \
+            for (int n= 0; n < (p).GetNumTriangles(); ++n) \
+
+#define DROPS_FOR_TETRA_INTERFACE_END }}
 
 /// L2 error on interface
 template <typename DiscP1FunT>
@@ -174,6 +188,7 @@ double L2_error_interface (const DROPS::MultiGridCL& mg, const DROPS::VecDescCL&
     }
     return std::sqrt( d);
 }
+
 
 namespace DROPS // for Strategy
 {
@@ -287,15 +302,13 @@ void  StatMassSurfTransportStrategy( MultiGridCL& MG, InstatNavierStokes2PhaseP2
     Stokes.CreateNumberingVel( MG.GetLastLevel(), &Stokes.vel_idx);
     Stokes.v.SetIdx( &Stokes.vel_idx);
     InitVel( MG, Stokes.v, Flowfield);
-    const double dt= P.get<double>("Time.FinalTime")/P.get<int>("Time.NumSteps");
-    SurfactantcGP1CL surfTransp( MG, Stokes.GetBndData().Vel, P.get<double>("Time.Theta"), P.get<double>("SurfTransp.Visc"), &Stokes.v, *lset.PhiC, lset.GetBndData(),
-                                 dt, P.get<int>("SurfTransp.Solver.Iter"), P.get<double>("SurfTransp.Solver.Tol"), P.get<double>("SurfTransp.XFEMReduced"));
+    SurfactantcGP1CL surfTransp( MG, P.get<double>("Time.Theta"), P.get<double>("SurfTransp.Visc"),  &Stokes.v, Stokes.GetBndData().Vel, *lset.PhiC, lset.GetBndData(), P.get<int>("SurfTransp.Solver.Iter"), P.get<double>("SurfTransp.Solver.Tol"), P.get<double>("SurfTransp.XFEMReduced"));
     InterfaceP1RepairCL surf_repair( MG, *lset.PhiC, lset.GetBndData(), surfTransp.ic);
     {
         adap.push_back( &surf_repair);
         surfTransp.idx.CreateNumbering( MG.GetLastLevel(), MG, lset.PhiC, &lset.GetBndData());
         surfTransp.ic.SetIdx( &surfTransp.idx);
-        surfTransp.Init( surfSol);
+        surfTransp.SetInitialValue( surfSol);
         std::cout << surfTransp.ic.Data.size() << " interface concentration unknowns" << std::endl;
     }
     const VectorCL surfExSol= surfTransp.ic.Data;
@@ -743,7 +756,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbndda
 
     const double dt= P.get<double>("Time.FinalTime")/P.get<int>("Time.NumSteps");
     /// \todo rhs beruecksichtigen
-    SurfactantcGP1CL surfTransp( MG, Stokes.GetBndData().Vel, P.get<double>("Time.Theta"), P.get<double>("SurfTransp.Visc"), &Stokes.v, lset.Phi, lset.GetBndData(), dt, P.get<int>("SurfTransp.Solver.Iter"), P.get<double>("SurfTransp.Solver.Tol"), P.get<double>("SurfTransp.XFEMReduced"));
+    SurfactantcGP1CL surfTransp( MG, P.get<double>("Time.Theta"), P.get<double>("SurfTransp.Visc"), &Stokes.v, Stokes.GetBndData().Vel, lset.Phi, lset.GetBndData(), P.get<int>("SurfTransp.Solver.Iter"), P.get<double>("SurfTransp.Solver.Tol"), P.get<double>("SurfTransp.XFEMReduced"));
     InterfaceP1RepairCL surf_repair( MG, lset.Phi, lset.GetBndData(), surfTransp.ic);
     if (P.get<int>("SurfTransp.Enable"))
     {
@@ -751,7 +764,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbndda
         surfTransp.idx.CreateNumbering( MG.GetLastLevel(), MG, &lset.Phi, &lset.GetBndData());
         std::cout << "Surfactant transport: NumUnknowns: " << surfTransp.idx.NumUnknowns() << std::endl;
         surfTransp.ic.SetIdx( &surfTransp.idx);
-        surfTransp.Init( &surf_sol);
+        surfTransp.SetInitialValue( &surf_sol);
     }
 
     // Stokes-Solver
@@ -915,7 +928,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbndda
 //         IFInfo.Write(Stokes.t, c_mean);
         IFInfo.Write(Stokes.v.t);
 
-        if (P.get<int>("SurfTransp.Enable")) surfTransp.InitOld();
+        if (P.get<int>("SurfTransp.Enable")) surfTransp.InitTimeStep();
         timedisc->DoStep( P.get<int>("CouplingSolver.Iter"));
 
 //         if (P.get("Transp.DoTransp", 0)) massTransp.DoStep( step*dt);

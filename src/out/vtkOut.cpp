@@ -25,6 +25,7 @@
 #include "out/vtkOut.h"
 #include "geom/simplex.h"
 #include "geom/deformation.h"
+#include "misc/base64.h"
 
 namespace DROPS
 {
@@ -334,107 +335,16 @@ void VTKOutCL::GatherCoord()
 
 }
 
-void Write6Bits( std::ostream& os, char array[8], unsigned int bitposition)
-/** This is a helper-function for the WriteBase64 routine. It picks out the right bit sequence and translates it into one ASCII character */
-{
-    unsigned char bitmask1,bitmask2,bitsequence1,bitsequence2;                                  // These are all helping variables for the reading process of the bitsequences.
-    char base64string[65]="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    switch(bitposition%8)                                                                       // Due to the fact that each byte has 8 bit and we read 6 bits every step, there are just 4 possibilities for positions in one byte. This switch covers those possibilites.
-    {                                                                                           // The modulo operator will give the position and the integer division will give back the byte one is in.
-    case 0:
-        bitmask1=0xFC;                                                                          // 0xFC=11111100 as Bitsequence
-        bitsequence1=(array[bitposition/8]&bitmask1);                                           // The integerdivision will result in the correct byte to check (see above). Checking whether the left 6 Bits are set.
-        bitsequence1>>=2;                                                                       // Rightshift of the Bitsequence, because the sequence must start at the 0-bit.
-        os<<base64string[bitsequence1];                                                       // Interpreting the sequence as Number between 0 and 63 and writing the corresponding base64 character into the file_
-        break;
-    case 2:
-        bitmask1=0x3F;                                                                          // 0x3F=00111111 as Bitsequence
-        bitsequence1=(array[bitposition/8]&bitmask1);                                           // Checking whether the right 6 Bits are set. No shift nessecary this time.
-        os<<base64string[bitsequence1];                                                         // Interpreting the sequence as Number between 0 and 63 and writing the corresponding base64 character into the file_
-        break;
-    case 4:
-        bitmask1=0x0F;                                                                          // 0x0F=00001111 as Bitsequence
-        bitmask2=0xC0;                                                                          // 0xC0=11000000 as Bitsequence
-        bitsequence1=(array[bitposition/8]&bitmask1);                                           // Checking whether the right 4 Bits are set.
-        bitsequence2=(array[bitposition/8+1]&bitmask2);                                         // Checking whether the left 2 Bits are set.
-        bitsequence1<<=2;                                                                       // Shifting the first Bitsequence two the left by two bits.
-        bitsequence2>>=6;                                                                       // Shifting the second Bitsequence two the right by six bits.
-        bitsequence1=(bitsequence1|bitsequence2);                                               // Combining the two Bitsequences
-        os<<base64string[bitsequence1];                                                         // Interpreting the final sequence as Number between 0 and 63 and writing the corresponding base64 character into the file_
-        break;
-    case 6:
-        bitmask1=0x03;                                                                          // 0x03=00000011 as Bitsequence
-        bitmask2=0xF0;                                                                          // 0xF0=11110000 as Bitsequence
-        bitsequence1=(array[bitposition/8]&bitmask1);                                           // Checking whether the right 2 Bits are set.
-        bitsequence2=(array[bitposition/8+1]&bitmask2);                                         // Checking whether the left 4 Bits are set.
-        bitsequence1<<=4;                                                                       // Shifting the first Bitsequence two the left by four bits.
-        bitsequence2>>=4;                                                                       // Shifting the second Bitsequence two the right by four bits.
-        bitsequence1=(bitsequence1|bitsequence2);                                               // Combining the two Bitsequences
-        os<<base64string[bitsequence1];                                                         // Interpreting the final sequence as Number between 0 and 63 and writing the corresponding base64 character into the file_
-        break;
-    }
-}
-
 template <class T>
 void WriteBase64( const VectorBaseCL<T>& x, std::ostream& os)
 /** Writes out a base64 encoded data-stream */
 {
-    unsigned int end=x.size()*sizeof(T);                                                            // This is the size-indicator which the reading routine needs in order to know how much data will come afterwards.
-    if (end<1) return;                                                                              // There is nothing to do if the vector is empty.
-    char base64string[65]="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";       // This string characterizes which number corresponds to which base64 character.
-    union Tvsc                                                                                      // Union is used to get the bit sequence of the Templatevariable into a char-variable. Another way to do this would be memcpy.
-    {
-        T f[2];
-        char c[8];
-    };
-    Tvsc Templatevschar;
-    memcpy(&Templatevschar.f[0],&end,4);                                                            // This is the alternative way described above. The size indicator is put into the first part of the union.
-    Templatevschar.f[1]=x[0];                                                                       // The starting point for the loop had to be set manually, because of the length indicator which must be the first entry to come.
-    unsigned int bitposition=0;                                                                     // Bitposition is always used as the current starting position for the next 6 bits to read.
-    unsigned char bitmask1,bitsequence1;                                                            // These are all helping variables for the reading process of the bitsequences.
-    unsigned int a=1;
-    while(a<x.size())                                                                               // As long as one did not reach the last entry of the vector...
-    {                                                                                               // {
-        if(bitposition>=32)                                                                         // This means the starting index for the next reading process reached the second entry of f[2]
-        {                                                                                           // if this is the case then...
-            Templatevschar.f[0]=Templatevschar.f[1];                                                // the first entry is replace with the second one
-            Templatevschar.f[1]=x[a];                                                               // the second entry is replaced with the next vector-entry of x
-            ++a;                                                                                    // the entry counter for x is increased
-            bitposition-=32;                                                                        // and the bitposition is decreased by 32, which is exactly the amount of bits one entry of f[2] has. So after all one is still at the same point in the bitstream!
-        }
-        Write6Bits( os, Templatevschar.c, bitposition);
-        bitposition+=6;                                                                             // Increasing the bitposition by 6, because this is the amount of bits one reads every step.
-    }                                                                                               // }
-    // Padding. When the last vector entry is reached and a is set to "end" the while loop above will end after one final run. The bitposition variable will then be somewhere between 6 and 12. The vectorentry x[end-1] will be stored in f[1] and therefor
-    // we will have to continue the process until we reach bitposition 64. This is what we do here.
-    while(bitposition<58)
-    {
-        Write6Bits( os, Templatevschar.c, bitposition);
-        bitposition+=6;
-    }
-    // The real padding-process starts here actually. We now have to check, whether the process ends with bit 64 precisely or whether we have to append zerobytes to make the bytesequence, which obviously has to be divisible by 8, also divisible by 6.
-    if(bitposition==58)                                                                             // Either one is at bit 58, which means that one has exactly one character left to write and does not need to append zero-bytes.
-    {
-        bitmask1=0x3F;                                                                              // Then one takes the last six bits (remember 0x3F=00111111 as bitsequence)
-        bitsequence1=Templatevschar.c[7]&bitmask1;                                                  // Checking whether the right 6 Bits are set.
-        os <<base64string[bitsequence1];                                                            // Interpreting the sequence as Number between 0 and 63 and writing the corresponding base64 character into the file_
-    }
-    if(bitposition==60)                                                                             // Or one is at bit 60, so that one will need 1 extra byte (because 60+6=66 is not divisible by 8, contrary to 66+6+6=72=64+8)
-    {
-        bitmask1=0x0F;                                                                              // Then one takes the last four bits (remember 0x0F=00001111 as bitsequence)
-        bitsequence1=Templatevschar.c[7]&bitmask1;                                                  // Checking whether the right 4 Bits are set.
-        bitsequence1<<=2;                                                                           // Shifting the bitsequence 2 bits to the left, which means inserting two zeros from the right.
-        os <<base64string[bitsequence1];                                                            // Interpreting the sequence as Number between 0 and 63 and writing the corresponding base64 character into the file_
-        os <<"=";                                                                                   // Appending one equal sign to the file, because every extra byte will lead to one equal sign. The zeros in the extra byte will not be transformed into "A"s to make it clear that they don't belong to the string in the first place!
-    }
-    if(bitposition==62)                                                                             // Or one is at bit 62, so that one will need 2 extra byte (because 62+6=68 is not divisible by 8, contrary to 62+6+6+6=80=64+8+8)
-    {
-        bitmask1=0x03;                                                                              // Then one takes the last two bits (remember 0x03=00000011 as bitsequence)
-        bitsequence1=Templatevschar.c[7]&bitmask1;                                                  // Checking whether the right 2 Bits are set.
-        bitsequence1<<=4;                                                                           // Shifting the bitsequence 2 bits to the left, which means inserting two zeros from the right.
-        os <<base64string[bitsequence1];                                                            // Interpreting the sequence as Number between 0 and 63 and writing the corresponding base64 character into the file_
-        os <<"==";                                                                                  // Appending two equal signs to the file_, due to the two needed extra bytes.
-    }
+    const size_t s= x.size()*sizeof( T);
+    const unsigned char* p= reinterpret_cast<const unsigned char*>( &s);
+    // If sizeof( size_t) > 4, this only works in little endian... which we hard-code in the vtu-file in any case.
+    Base64Encoding::encode( p, p + 4, os, /*wrap_lines*/ false);
+    p= reinterpret_cast<const unsigned char*>( Addr( x));
+    Base64Encoding::encode( p, p + s, os, /*wrap_lines*/ false);
 }
 
 void VTKOutCL::WriteCoords()

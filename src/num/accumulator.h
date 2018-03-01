@@ -153,15 +153,15 @@ void AccumulatorTupleCL<VisitedT>::operator() (ExternalIteratorCL begin, Externa
     finalize_iteration();
 }
 
-#ifdef _OPENMP
 template<class VisitedT>
 void AccumulatorTupleCL<VisitedT>::operator() (const ColorClassesCL& colors)
 {
     begin_iteration();
 
+#ifdef _OPENMP
     std::vector<ContainerT> clones( omp_get_max_threads());
     clone_accus( clones);
-    for (ColorClassesCL::const_iterator cit= colors.begin(); cit != colors.end() ;++cit) {
+    for (ColorClassesCL::const_iterator cit= colors.begin(); cit != colors.end(); ++cit) {
 #       pragma omp parallel
         {
             const int t_id= omp_get_thread_num();
@@ -178,9 +178,17 @@ void AccumulatorTupleCL<VisitedT>::operator() (const ColorClassesCL& colors)
     }
     delete_clones(clones);
 
+#else
+
+    for (ColorClassesCL::const_iterator cit= colors.begin(); cit != colors.end(); ++cit) {
+        for (ColorClassesCL::ColorClassT::const_iterator tit= cit->begin(); tit != cit->end(); ++tit)
+            std::for_each( accus_.begin(), accus_.end(), std::bind2nd( std::mem_fun( &AccumulatorCL<VisitedT>::visit), **tit));
+
+    }
+#endif
+
     finalize_iteration();
 }
-#endif
 
 
 /// \brief Accumulation over sequences of TetraCL.

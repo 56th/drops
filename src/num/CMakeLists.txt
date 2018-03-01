@@ -1,6 +1,6 @@
 set(HOME num)
 
-libs(bndData discretize fe hypre interfacePatch MGsolver oseenprecond quadrature renumber unknowns spacetime_geom spacetime_quad spacetime_map stokespardiso)
+libs(bndData discretize fe hypre interfacePatch MGsolver oseenprecond quadrature renumber unknowns gradient_recovery spacetime_geom spacetime_quad spacetime_map stokespardiso)
 
 if (MKL_HOME STREQUAL "")
 else (MKL_HOME STREQUAL "")

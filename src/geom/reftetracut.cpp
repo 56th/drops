@@ -30,68 +30,14 @@
 
 namespace DROPS {
 
-void
-SignPatternTraitCL::compute_cuts ()
+inline Ubyte
+num_triangles (const SignTraitsCL<3>& cut)
 {
-    for (Ubyte i= 0; i < NumVertsC; ++i)
-        if (sign( i) == 0)
-            cut_simplex_[num_root_vert_++]= i;
-    num_root_= num_root_vert_;
-    for (Ubyte i= 0; i < NumEdgesC; ++i)
-        if (sign( VertOfEdge( i, 0))*sign( VertOfEdge( i, 1)) == -1)
-            cut_simplex_[num_root_++]= i;
-    std::memcpy( cut_simplex_rep_, cut_simplex_, 4*sizeof(byte));
-    for (int i= num_root_vert_; i < num_root_; ++i)
-        cut_simplex_rep_[i]+= NumVertsC;
-}
-
-void
-SignPatternTraitCL::assign (const byte ls[4])
-{
-    num_root_vert_= num_root_= 0;
-
-    byte sum= 0;
-    for (Ubyte i= 0; i < NumVertsC; ++i)
-        sum+= (sign_[i]= ls[i]);
-    if (sum == 4 || sum == -4) // optimize the case of uncut tetras
-        return;
-
-    compute_cuts ();
-}
-
-void
-SignPatternTraitCL::assign (const double ls[4])
-{
-    num_root_vert_= num_root_= 0;
-
-    byte sum= 0;
-    for (Ubyte i= 0; i < NumVertsC; ++i)
-        sum+= (sign_[i]= sign( ls[i]));
-    if (sum == 4 || sum == -4) // optimize the case of uncut tetras
-        return;
-
-    compute_cuts ();
-}
-
-std::ostream&
-operator<< (std::ostream& out, const SignPatternTraitCL& c)
-{
-    out << static_cast<int>( c.num_root_vert_) << ' ' << static_cast<int>( c.num_root_) << '\n';
-    for (int i= 0; i < 4; ++i)
-        out << static_cast<int>( c.sign_[i]) << ' ';
-    out << '\n';
-    for (int i= 0; i < 4; ++i)
-        out << static_cast<int>( c.cut_simplex_[i]) << ' ';
-    out << '\n';
-    for (int i= 0; i < 4; ++i)
-        out << static_cast<int>( c.cut_simplex_rep_[i]) << ' ';
-    return out << '\n';
+    return cut.has_codim_le_1() ? cut.num_cut_simplexes() - 2 : 0;
 }
 
 
-RefTetraPatchCL RefTetraPatchCL::instance_array_[81];
-
-void RefTetraPatchCL::StaticInit ()
+void RefPatchBuilderCL<3>::StaticInit (RefPatchCL<3> instance_array[SignTraitsCL<3>::num_pattern])
 {
     byte ls[4];
     for (ls[0]= -1; ls[0] < 2; ++ls[0])
@@ -100,26 +46,94 @@ void RefTetraPatchCL::StaticInit ()
                 for (ls[3]= -1; ls[3] < 2; ++ls[3]) {
                     if ( ls[0] == 0 && ls[1] == 0 && ls[2] == 0 && ls[3] == 0)
                         continue;
-                    RefTetraPatchCL::instance_array_[instance_idx( ls) + 40].assign( ls);
+                    instance_array[SignTraitsCL<3>::pattern_idx( ls) + SignTraitsCL<3>::zero_pattern_offset].assign( ls);
                 }
 }
 
+bool
+RefPatchBuilderCL<3>::assign (const SignTraitsCL<3>& cut, RefPatchCL<3>& p)
+{
+    for (p.size_= 0; p.size_ < num_triangles( cut); ++p.size_)
+        p.facet_[p.size_]= RefPatchBuilderCL<3>::MakeTriangle( cut(p.size_), cut(p.size_ + 1), cut(p.size_ + 2));
+    p.is_boundary_facet_= cut.num_zero_vertexes() == 3 ? 1 : 0;
+    return p.empty();
+}
+
+template class RefPatchCL<3>;
+
 namespace {
-StaticInitializerCL<RefTetraPatchCL> RefTetraPatch_initializer_;
+StaticInitializerCL<RefPatchCL<3> > RefPatch3_initializer_;
 
 } // end of anonymous namespace
 
-bool
-RefTetraPatchCL::assign (const SignPatternTraitCL& cut)
+
+void RefPatchBuilderCL<4>::StaticInit (RefPatchCL<4> instance_array[SignTraitsCL<4>::num_pattern])
 {
-    for (size_= 0; size_ < num_triangles( cut); ++size_)
-        triangle_[size_]= MakeTriangle( cut(size_), cut(size_ + 1), cut(size_ + 2));
-    is_boundary_triangle_= cut.num_zero_vertexes() == 3 ? 1 : 0;
-    return empty();
+    byte ls[5];
+    for (ls[0]= -1; ls[0] < 2; ++ls[0])
+        for (ls[1]= -1; ls[1] < 2; ++ls[1])
+            for (ls[2]= -1; ls[2] < 2; ++ls[2])
+                for (ls[3]= -1; ls[3] < 2; ++ls[3])
+                    for (ls[4]= -1; ls[4] < 2; ++ls[4]) {
+                        if ( ls[0] == 0 && ls[1] == 0 && ls[2] == 0 && ls[3] == 0 && ls[4] == 0)
+                            continue;
+                        instance_array[SignTraitsCL<4>::pattern_idx( ls) + SignTraitsCL<4>::zero_pattern_offset].assign( ls);
+                    }
 }
 
+inline bool
+RefPatchBuilderCL<4>::cone_construction (const SignTraitsCL<4>& cut, RefPatchCL<4>& p, Ubyte f)
+{
+    const Ubyte v= cut( 0); // The tip of the cones.
+    byte f_ls[4]; // level set signs on the facet f of the penta.
+    for (Uint i= 0; i < 4; ++i)
+        f_ls[i]= cut.sign( RefPenta::VertOfTetra( f, i));
+//     const RefTetraPatchCL& pp= RefTetraPatchCL::instance( f_ls);
+//     for (RefTetraPatchCL::const_facet_iterator it= pp.facet_begin(), end= pp.facet_end(); it != end; ++it) {
+//         tetra_[size_++]= MakeTetra( v,
+//                                     PentaCutByTetraCut( f, it[0][0]),
+//                                     PentaCutByTetraCut( f, it[0][1])),
+//                                     PentaCutByTetraCut( f, it[0][2]));
+//     return p.is_boundary_facet();
+    SignPatternTraitCL f_cut( f_ls);
+    for (Uint i= 0; i < num_triangles( f_cut); ++i)
+        p.facet_[p.size_++]= MakeTetra( v,
+                                        PentaCutByTetraCut( f, f_cut( i)),
+                                        PentaCutByTetraCut( f, f_cut( i + 1)),
+                                        PentaCutByTetraCut( f, f_cut( i + 2)));
+    return f_cut.num_zero_vertexes() == 3 ? 1 : 0;
+}
 
-RefTetraPartitionCL RefTetraPartitionCL::instance_array_[81];
+bool
+RefPatchBuilderCL<4>::assign (const SignTraitsCL<4>& cut, RefPatchCL<4>& p)
+{
+    p.size_= 0;
+    p.is_boundary_facet_= 0;
+
+    if (cut.empty() || !cut.has_codim_le_1())
+        return p.empty();
+    // From here on, there are at least 4 roots of the level set function.
+
+    if (cut.no_zero_vertex()) { //cut(0) is an edge, there are two facets f0, f1 of the penta not containing it.
+        // is_on_boundary_ is false (otherwise, at least four zero-vertexes are needed).
+        for (Uint v= 0; v < 2; ++v)
+            cone_construction( cut, p, RefPenta::OppTetra( RefPenta::VertOfEdge( cut[0], v)));
+    }
+    else //cut(0) is a vertex, there is one facet f of the penta not containing it.
+        p.is_boundary_facet_= cone_construction( cut, p, RefPenta::OppTetra( cut[0]));
+
+    return p.empty();
+}
+
+template class RefPatchCL<4>;
+
+namespace {
+StaticInitializerCL<RefPatchCL<4> > RefPatch4_initializer_;
+
+} // end of anonymous namespace
+
+
+RefTetraPartitionCL RefTetraPartitionCL::instance_array_[SignTraitsCL<3>::num_pattern];
 
 void RefTetraPartitionCL::StaticInit ()
 {
@@ -130,7 +144,7 @@ void RefTetraPartitionCL::StaticInit ()
                 for (ls[3]= -1; ls[3] < 2; ++ls[3]) {
                     if ( ls[0] == 0 && ls[1] == 0 && ls[2] == 0 && ls[3] == 0)
                         continue;
-                    RefTetraPartitionCL::instance_array_[instance_idx( ls) + 40].assign( ls);
+                    RefTetraPartitionCL::instance_array_[SignTraitsCL<3>::pattern_idx( ls) + SignTraitsCL<3>::zero_pattern_offset].assign( ls);
                 }
 }
 

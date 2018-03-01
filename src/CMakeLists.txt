@@ -220,7 +220,7 @@ add_custom_target(stat COMMAND ls */*.cpp */*.tpp */*.h | xargs wc -l WORKING_DI
 
 add_custom_target(distclean COMMAND rm -rf ${CMAKE_CURRENT_BINARY_DIR}/*)
 
-add_custom_target(ctagsdb COMMAND ctags -R --tag-relative=yes --c++-types=+px --excmd=pattern --exclude=Makefile --exclude= --langmap=c++:+.tpp -f ${CMAKE_CURRENT_BINARY_DIR}/ctagsdb WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+add_custom_target(ctagsdb COMMAND ctags -R --c++-kinds=+p --extra=+q --fields=+iaS --tag-relative=yes --c++-types=+px --excmd=pattern --exclude=Makefile --exclude= --langmap=c++:+.tpp -f ${CMAKE_CURRENT_BINARY_DIR}/ctagsdb WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
 find_package(Doxygen)
 if(DOXYGEN_FOUND)

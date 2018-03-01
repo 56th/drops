@@ -71,8 +71,11 @@ bool AdapTriangCL::ModifyGridStep( bool lb )
     marker_->SetUnmodified();
 
     TetraAccumulatorTupleCL accutuple;
-    accutuple.push_back( marker_ );
-    accutuple( mg_.GetTriangTetraBegin(), mg_.GetTriangTetraEnd() );
+    accutuple.push_back( marker_);
+    ColorClassesCL cc;
+    const MultiGridCL& cmg= mg_; // To get the const-iterators.
+    cc.make_single_color_class( cmg.GetTriangTetraBegin(), cmg.GetTriangTetraEnd());
+    accutuple( cc);
 
     bool modified = marker_->modified();
 #ifdef _PAR
@@ -114,7 +117,6 @@ bool AdapTriangCL::UpdateTriang()
 
     double duration;
 
-    marker_->SetUnmodified();
     const int min_ref_num = marker_->GetFineLevel() - marker_->GetCoarseLevel();
     int i;
     observer_.notify_pre_refmig_sequence( GetMG() );

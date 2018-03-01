@@ -29,6 +29,7 @@
 #include "misc/container.h"
 #include "num/spmat.h"
 #include "num/spblockmat.h"
+#include "num/solverbase.h"
 
 namespace DROPS
 {
@@ -1753,37 +1754,6 @@ bool QMR(const Mat& A, Vec& x_acc, const Vec& b, const ExCL& ExX, Lanczos lan,
 //=============================================================================
 //  Drivers
 //=============================================================================
-
-/// What every iterative solver should have
-class SolverBaseCL
-{
-  protected:
-    int            maxiter_;
-    mutable int    iter_;
-    double         tol_;
-    mutable double res_;
-    bool           rel_;
-
-    mutable std::ostream* output_;
-
-    SolverBaseCL (int maxiter, double tol, bool rel= false, std::ostream* output= 0)
-        : maxiter_( maxiter), iter_( -1), tol_( tol), res_( -1.),
-          rel_( rel), output_( output)  {}
-    virtual ~SolverBaseCL() {}
-
-  public:
-    virtual void   SetTol     (double tol) { tol_= tol; }
-    virtual void   SetMaxIter (int iter)   { maxiter_= iter; }
-    virtual void   SetRelError(bool rel)   { rel_= rel; }
-
-    virtual double GetTol     () const { return tol_; }
-    virtual int    GetMaxIter () const { return maxiter_; }
-    virtual double GetResid   () const { return res_; }
-    virtual int    GetIter    () const { return iter_; }
-    virtual bool   GetRelError() const { return rel_; }
-
-    virtual void   SetOutput( std::ostream* os) { output_=os; }
-};
 
 /// Bare CG solver
 class CGSolverCL : public SolverBaseCL

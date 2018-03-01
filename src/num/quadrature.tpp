@@ -93,11 +93,19 @@ template <class GridFunT>
     return quad_single_domain_integrand( f, absdet, dom, PosTetraC);
 }
 
-template <class GridFunT>
+template <class GridFunT, Uint Dim>
   inline typename ValueHelperCL<GridFunT>::value_type
-  quad_2D (const GridFunT& f, const QuadDomain2DCL& dom)
+  quad_codim1 (const GridFunT& f, const QuadDomainCodim1CL<Dim>& dom)
 {
     return quad_impl( dom.weight_begin(), f, dom.dof_begin(), dom.dof_end());
+}
+
+template <class GridFunT>
+  inline typename ValueHelperCL<GridFunT>::value_type
+  quad_2D (const GridFunT& f, const QuadDomainCodim1CL<3>& dom)
+{
+    // return quad_impl( dom.weight_begin(), f, dom.dof_begin(), dom.dof_end());
+    return quad_codim1( f, dom);
 }
 
 inline const Quad2DataCL&
@@ -254,39 +262,109 @@ template <class LocalFET>
 }
 
 
-template <class QuadDataT>
-  const QuadDomain2DCL&
-  make_CompositeQuadDomain2D (QuadDomain2DCL& q, const SurfacePatchCL& p, const TetraCL& t)
+template <class QuadDataT, AbsdetPolicyEnum AbsdetPolicy, Uint Dim>
+  const QuadDomainCodim1CL<Dim>&
+  make_CompositeQuadDomainCodim1 (QuadDomainCodim1CL<Dim>& q,
+                                  const SPatchCL<Dim>& p,
+                                  const typename DimensionTraitsCL<Dim>::WorldBodyT& wb)
 {
+    q.clear();
+    if (p.empty())
+        return q;
+
     const Uint num_nodes= QuadDataT::NumNodesC;
+    q.vertexes_.resize( num_nodes*p.facet_size());
+    q.weights_.resize(  num_nodes*p.facet_size());
 
-    q.vertexes_.resize( 0);
-    q.vertexes_.resize( num_nodes*p.triangle_size());
-    q.weights_.resize( num_nodes*p.triangle_size());
+    if (AbsdetPolicy == SpaceProjectedCodim1Absdet && p.normal_empty())
+        p.compute_normals( wb);
+    else if (AbsdetPolicy == Codim1Absdet && p.absdets_empty())
+        p.compute_absdets( wb);
 
-    const typename SurfacePatchCL::const_vertex_iterator partition_vertexes= p.vertex_begin();
-    const typename QuadDomainCL::WeightContT triangle_weights( QuadDataT::Weight, num_nodes);
-    Uint beg= 0;
-    BaryCoordCL tri_bary[3];
-    Point3DCL   tri[3];
-    for (SurfacePatchCL::const_triangle_iterator it= p.triangle_begin(); it != p.triangle_end();
-        ++it, beg+= num_nodes) {
-        for (int i= 0; i < 3; ++i) {
-            tri_bary[i]= partition_vertexes[(*it)[i]];
-            tri[i]= GetWorldCoord( t, tri_bary[i]);
+    const typename SPatchCL<Dim>::const_vertex_iterator p_vertexes= p.vertex_begin();
+    const typename SPatchCL<Dim>::const_normal_iterator p_normals= p.normal_begin();
+    const typename SPatchCL<Dim>::const_absdet_iterator p_absdets= p.absdet_begin();
+
+    const typename QuadDomainCL::WeightContT facet_weights( QuadDataT::Weight, num_nodes);
+    double absdet;
+    Uint f= 0;
+    for (typename SPatchCL<Dim>::const_facet_iterator it= p.facet_begin(); it != p.facet_end(); ++it, ++f) {
+        const typename SPatchCL<Dim>::FacetT& facet= *it;
+        const typename QuadDomainCodim1CL<Dim>::VertexContT::iterator NodeInBody= q.vertexes_.begin() + f*num_nodes;
+        for (Uint i= 0; i < num_nodes; ++i) { // NodeInBody[i]= facet*Node[i]
+            NodeInBody[i]= p_vertexes[facet[0]]*QuadDataT::Node[i][0];
+            for (Uint j= 1; j < Dim; ++j)
+                NodeInBody[i]+= p_vertexes[facet[j]]*QuadDataT::Node[i][j];
         }
-        QuadDataT::SetInterface( tri_bary, q.vertexes_.begin() + beg);
-        const double absdet= (p.is_boundary_triangle (it) ? 0.5 : 1.)*FuncDet2D( tri[1] - tri[0], tri[2] - tri[0]);
-        q.weights_[std::slice( beg, num_nodes, 1)]= absdet*triangle_weights;
+        absdet= p.is_boundary_facet( it) ? 0.5 : 1.;
+        switch (AbsdetPolicy) {
+          case TrivialAbsdet: break;
+          case SpaceProjectedCodim1Absdet:
+            absdet*= std::sqrt( (1. - p_normals[f][Dim-1])*(1. + p_normals[f][Dim-1]));
+            // fall through
+          case Codim1Absdet:
+            absdet*= p_absdets[f];
+            break;
+          default: throw DROPSErrCL( "make_CompositeQuadDomainCodim1: Unknown AbsdetPolicy.\n");
+        }
+        q.weights_[std::slice( f*num_nodes, num_nodes, 1)]= absdet*facet_weights;
     }
 
     return q;
 }
 
 inline const QuadDomain2DCL&
+make_CompositeQuad1Domain2D (QuadDomain2DCL& q, const SurfacePatchCL& p, const TetraCL& t)
+{
+    return make_CompositeQuadDomainCodim1<Quad1_2DDataCL, Codim1Absdet, 3>( q, p, t);
+}
+
+inline const QuadDomain2DCL&
+make_CompositeQuad2Domain2D (QuadDomain2DCL& q, const SurfacePatchCL& p, const TetraCL& t)
+{
+    return make_CompositeQuadDomainCodim1<Quad2_2DDataCL, Codim1Absdet, 3>( q, p, t);
+}
+
+inline const QuadDomain2DCL&
 make_CompositeQuad5Domain2D (QuadDomain2DCL& q, const SurfacePatchCL& p, const TetraCL& t)
 {
-    return make_CompositeQuadDomain2D<Quad5_2DDataCL>( q, p, t);
+    return make_CompositeQuadDomainCodim1<Quad5_2DDataCL, Codim1Absdet, 3>( q, p, t);
+}
+
+inline const QuadDomainCodim1CL<4>&
+make_CompositeQuad2DomainSTCodim1 (QuadDomainCodim1CL<4>& q, const SPatchCL<4>& p, const TetraPrismCL& t)
+{
+    return make_CompositeQuadDomainCodim1<Quad2DataCL, Codim1Absdet, 4>( q, p, t);
+}
+
+inline const QuadDomainCodim1CL<4>&
+make_CompositeQuad5DomainSTCodim1 (QuadDomainCodim1CL<4>& q, const SPatchCL<4>& p, const TetraPrismCL& t)
+{
+    return make_CompositeQuadDomainCodim1<Quad5DataCL, Codim1Absdet, 4>( q, p, t);
+}
+
+inline const QuadDomainCodim1CL<4>&
+make_CompositeQuad5DomainSTCodim1WithoutAbsdet (QuadDomainCodim1CL<4>& q, const SPatchCL<4>& p, const TetraPrismCL& t)
+{
+    return make_CompositeQuadDomainCodim1<Quad5DataCL, TrivialAbsdet, 4>( q, p, t);
+}
+
+inline const QuadDomainCodim1CL<4>&
+make_CompositeQuad2DomainSTCodim1WithoutAbsdet (QuadDomainCodim1CL<4>& q, const SPatchCL<4>& p, const TetraPrismCL& t)
+{
+    return make_CompositeQuadDomainCodim1<Quad2DataCL, TrivialAbsdet, 4>( q, p, t);
+}
+
+inline const QuadDomainCodim1CL<4>&
+make_CompositeQuad2DomainSTCodim1SpatialAbsdet (QuadDomainCodim1CL<4>& q, const SPatchCL<4>& p, const TetraPrismCL& t)
+{
+    return make_CompositeQuadDomainCodim1<Quad2DataCL, SpaceProjectedCodim1Absdet, 4>( q, p, t);
+}
+
+inline const QuadDomainCodim1CL<4>&
+make_CompositeQuad5DomainSTCodim1SpatialAbsdet (QuadDomainCodim1CL<4>& q, const SPatchCL<4>& p, const TetraPrismCL& t)
+{
+    return make_CompositeQuadDomainCodim1<Quad5DataCL, SpaceProjectedCodim1Absdet, 4>( q, p, t);
 }
 
 /// \brief Multiply the weight for each level with the extrapolation factor and copy it to weights.
@@ -311,7 +389,7 @@ template <class QuadDataT, class LocalFET>
         const PrincipalLatticeCL& lat= extra.lattice( i);
         resize_and_evaluate_on_vertexes( ls, lat, ls_val);
         partition.make_patch<MergeCutPolicyCL>( lat, ls_val);
-        make_CompositeQuadDomain2D<QuadDataT>( qdom, partition, t);
+        make_CompositeQuadDomainCodim1<QuadDataT, Codim1Absdet, 3>( qdom, partition, t);
         std::copy( qdom.vertex_begin(), qdom.vertex_end(), std::back_inserter( q.vertexes_));
         w_vec.push_back( QuadDomain2DCL::WeightContT( qdom.weight_begin(), qdom.vertex_size()));
     }

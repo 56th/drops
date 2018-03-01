@@ -33,7 +33,11 @@
 namespace DROPS {
 
 class QuadDomainCL;   ///< forward declaration for quad
-class QuadDomain2DCL; ///< forward declaration for quad
+template <Uint Dim>
+class QuadDomainCodim1CL; ///< forward declaration for quad_codim1
+
+typedef QuadDomainCodim1CL<3> QuadDomain2DCL;
+
 
 ///\brief Integrate on a tetra using the QuadDataCL-rules from num/discretize.h
 /// Uses QuadDataT::Weight as weights.
@@ -75,15 +79,22 @@ template <class GridFunT>
   quad_pos_part_integrand (const GridFunT& f, double absdet, const QuadDomainCL& dom);
 ///@}
 
-/// \brief Integrate on a surface-patch
+/// \brief Integrate on a surface-patch of codimension 1.
+///@{
+template <class GridFunT, Uint Dim>
+  inline typename ValueHelperCL<GridFunT>::value_type
+  quad_codim1 (const GridFunT& f, const QuadDomainCodim1CL<Dim>& dom);
+
 template <class GridFunT>
   inline typename ValueHelperCL<GridFunT>::value_type
   quad_2D (const GridFunT& f, const QuadDomain2DCL& dom);
+///@}
 
 namespace CompositeQuadratureTypesNS {
 
 typedef std::valarray<double> WeightContT;
 typedef const double* const_weight_iterator;
+typedef       double*       weight_iterator;
 
 } // end of namespace DROPS::CompositeQudratureTypesNS
 
@@ -172,6 +183,7 @@ class QuadDomainCL
      ///\brief Container for the quadrature weights
     typedef CompositeQuadratureTypesNS::WeightContT           WeightContT;
     typedef CompositeQuadratureTypesNS::const_weight_iterator const_weight_iterator;
+    typedef CompositeQuadratureTypesNS::      weight_iterator       weight_iterator;
 
     /// Friend declaration for the factory methods; if their number becomes to big, a more elaborate factory-design is in order.
     ///@{
@@ -229,6 +241,11 @@ class QuadDomainCL
             : (s == PosTetraC ? pos_weights_begin_
                               : all_weights_begin_));
     }
+    weight_iterator weight_begin (TetraSignEnum s= AllTetraC) {
+        return Addr( weights_) + (s == NegTetraC ? 0
+            : (s == PosTetraC ? pos_weights_begin_
+                              : all_weights_begin_));
+    }
 
     /// \brief sequence of quadrature points in the given domain.
     ///@{
@@ -240,17 +257,46 @@ class QuadDomainCL
 };
 
 
+enum AbsdetPolicyEnum { TrivialAbsdet, Codim1Absdet, SpaceProjectedCodim1Absdet };
+
 /// \brief Create a composite quadrature rule for a surface-patch.
 /// No sharing of quadrature points is performed.
 /// The template-parameter QuadDataT must be given explicitly.
+/// The Policy-Template AbsdetPolicyT depends on the dimension Dim; choices are Codim1Absdet for the standard absdet and TrivialAbsdet for absdet==1, SpaceProjectedCodim1Absdet for the standard absdet divided by \sqrt(1 + (w*n)^2). The latter is actually useful, because on the spacetime, the iterated integral \int_t \int_{\Gamma(t)} equals (approximately) the spacetime-integral \int_\mathcal{G}, where one uses SpatialAbsdet.
 /// Helpers for common QuadData_2DCL are given below.
-template <class QuadDataT>
-  const QuadDomain2DCL&
-  make_CompositeQuadDomain2D (QuadDomain2DCL& q, const SurfacePatchCL& p, const TetraCL& t);
+template <class QuadDataT,  AbsdetPolicyEnum AbsdetPolicy, Uint Dim>
+  const QuadDomainCodim1CL<Dim>&
+  make_CompositeQuadDomainCodim1 (QuadDomainCodim1CL<Dim>& q, const SPatchCL<Dim>& p, const  typename DimensionTraitsCL<Dim>::WorldBodyT& t);
+
+///\brief Initialize q as a composite Quad0_2DDataCL-quadrature-rule.
+inline const QuadDomain2DCL&
+make_CompositeQuad1Domain2D (QuadDomain2DCL& q, const SurfacePatchCL& p, const TetraCL& t);
+
+///\brief Initialize q as a composite Quad2_2DDataCL-quadrature-rule.
+inline const QuadDomain2DCL&
+make_CompositeQuad2Domain2D (QuadDomain2DCL& q, const SurfacePatchCL& p, const TetraCL& t);
 
 ///\brief Initialize q as a composite Quad5_2DDataCL-quadrature-rule.
 inline const QuadDomain2DCL&
 make_CompositeQuad5Domain2D (QuadDomain2DCL& q, const SurfacePatchCL& p, const TetraCL& t);
+
+inline const QuadDomainCodim1CL<4>&
+make_CompositeQuad2DomainSTCodim1 (QuadDomainCodim1CL<4>& q, const SPatchCL<4>& p, const TetraPrismCL& t);
+
+inline const QuadDomainCodim1CL<4>&
+make_CompositeQuad5DomainSTCodim1 (QuadDomainCodim1CL<4>& q, const SPatchCL<4>& p, const TetraPrismCL& t);
+
+inline const QuadDomainCodim1CL<4>&
+make_CompositeQuad5DomainSTCodim1WithoutAbsdet (QuadDomainCodim1CL<4>& q, const SPatchCL<4>& p, const TetraPrismCL& t);
+
+inline const QuadDomainCodim1CL<4>&
+make_CompositeQuad2DomainSTCodim1WithoutAbsdet (QuadDomainCodim1CL<4>& q, const SPatchCL<4>& p, const TetraPrismCL& t);
+
+inline const QuadDomainCodim1CL<4>&
+make_CompositeQuad2DomainSTCodim1SpatialAbsdet (QuadDomainCodim1CL<4>& q, const SPatchCL<4>& p, const TetraPrismCL& t);
+
+inline const QuadDomainCodim1CL<4>&
+make_CompositeQuad5DomainSTCodim1SpatialAbsdet (QuadDomainCodim1CL<4>& q, const SPatchCL<4>& p, const TetraPrismCL& t);
 
 /// \brief Create an extrapolated quadrature rule.
 /// No sharing of quadrature points is performed.
@@ -270,22 +316,30 @@ template <class LocalFET>
 
 /// \brief General 2D-quadrature-domain
 /// A quadrature rule is defined (and implemented) as a collection of quadrature points and a corresponding collection of weights.
-class QuadDomain2DCL
+template <Uint Dim>
+class QuadDomainCodim1CL
 {
   public:
+    typedef DimensionTraitsCL<Dim> DimTraitsT;
+
      /// \brief Container for barycentric coordinates of quadrature points.
-    typedef LatticePartitionTypesNS::VertexContT           VertexContT;
-    typedef LatticePartitionTypesNS::const_vertex_iterator const_vertex_iterator;
+    typedef typename DimTraitsT::VertexT               VertexT;
+    typedef typename DimTraitsT::VertexContT           VertexContT;
+    typedef typename DimTraitsT::const_vertex_iterator const_vertex_iterator;
+    typedef typename DimTraitsT::      vertex_iterator       vertex_iterator;
 
      ///\brief Container for the quadrature weights
     typedef CompositeQuadratureTypesNS::WeightContT           WeightContT;
     typedef CompositeQuadratureTypesNS::const_weight_iterator const_weight_iterator;
+    typedef CompositeQuadratureTypesNS::      weight_iterator       weight_iterator;
 
     /// Friend declaration for the factory methods; if their number becomes to big, a more elaborate factory-design is in order.
     ///@{
-    template <class QuadDataT>
-      friend const QuadDomain2DCL&
-      make_CompositeQuadDomain2D (QuadDomain2DCL&, const SurfacePatchCL&, const TetraCL&);
+    template <class QuadDataT,  AbsdetPolicyEnum AbsdetPolicy, Uint D>
+      friend const QuadDomainCodim1CL<D>&
+      make_CompositeQuadDomainCodim1 (QuadDomainCodim1CL<D>& q,
+                                  const SPatchCL<D>& p,
+                                  const  typename DimensionTraitsCL<D>::WorldBodyT& t);
 
     template <class QuadDataT, class LocalFET>
       friend const QuadDomain2DCL&
@@ -297,12 +351,23 @@ class QuadDomain2DCL
     WeightContT weights_;
 
   public:
-    QuadDomain2DCL () ///< empty default constructor
+    QuadDomainCodim1CL () ///< empty default constructor
         {}
 
-    /// The default copy-constructor does the right thing
-    /// \brief copy assignment: resize the valarray for weights to make it behave like a container
-    QuadDomain2DCL& operator= (const QuadDomain2DCL&);
+    /// The default copy-constructor and (since C++11) the assignment operator do the right thing.
+
+    /// \brief XXX: Hack to incrementally construct mapped QuadDomains with QuaQuaQuadDomainMapperAccuCL.
+    void push_back_quad_node (const VertexT& v, double w) {
+        vertexes_.push_back( v);
+        std::valarray<double> wc( weights_.size() + 1);
+        wc[std::slice( 0, weights_.size(), 1)]= weights_;
+        wc[weights_.size()]= w;
+        weights_.resize( wc.size());
+        weights_= wc;
+    }
+
+    bool empty () const { return vertexes_.empty(); } ///< True, iff there are no quadrature-points
+    void clear () { vertexes_.clear(); weights_.resize( 0); } ///< reset to empty default-state
 
     /// \brief sequence of the indices of the vertexes (quadrature points)
     ///@{
@@ -315,11 +380,14 @@ class QuadDomain2DCL
 
     /// \brief Begin of the sequence of weights for integration
     const_weight_iterator weight_begin () const { return Addr( weights_); }
+          weight_iterator weight_begin ()       { return Addr( weights_); }
 
     /// \brief sequence of quadrature points
     ///@{
     const_vertex_iterator vertex_begin () const { return vertexes_.begin(); }
     const_vertex_iterator vertex_end   () const { return vertexes_.end(); }
+    vertex_iterator vertex_begin () { return vertexes_.begin(); }
+    vertex_iterator vertex_end   () { return vertexes_.end(); }
     ///@}
 };
 

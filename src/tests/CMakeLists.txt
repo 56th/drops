@@ -62,18 +62,18 @@ exec_ser(gcr misc-utils)
 
 exec_ser(blockmat misc-utils)
 
-exec_ser(quad5 misc-utils geom-builder geom-deformation geom-simplex geom-multigrid geom-boundary geom-topo num-unknowns misc-problem num-fe num-discretize num-interfacePatch geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature)
+exec_ser(quad5 misc-utils geom-boundary geom-builder geom-deformation geom-multigrid geom-principallattice geom-reftetracut geom-simplex geom-subtriangulation geom-topo num-unknowns misc-problem num-fe num-discretize num-interfacePatch num-quadrature)
 
 exec_ser(downwind misc-utils geom-multigrid geom-simplex geom-topo num-unknowns num-fe geom-deformation num-interfacePatch misc-problem)
 
-exec_ser(quad5_2D misc-utils geom-builder geom-simplex geom-multigrid geom-boundary geom-topo num-unknowns misc-problem geom-deformation num-fe num-discretize num-interfacePatch)
+exec_ser(quad5_2D misc-utils geom-boundary geom-builder geom-deformation geom-multigrid geom-principallattice geom-reftetracut geom-simplex geom-subtriangulation geom-topo num-unknowns misc-problem num-fe num-discretize num-interfacePatch)
 
 exec_ser(interfaceP1FE misc-utils geom-builder geom-simplex geom-multigrid geom-deformation misc-scopetimer misc-progressaccu geom-boundary geom-topo num-unknowns misc-problem num-interfacePatch levelset-levelset levelset-fastmarch num-discretize num-fe levelset-surfacetension geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature)
 
 #set(xfem-staticlibs ${BEGIN_STATIC_LIBS} misc-vectorFunctions ${END_STATIC_LIBS})
 exec_ser(xfem misc-utils geom-builder geom-simplex geom-multigrid geom-deformation misc-scopetimer misc-progressaccu geom-boundary geom-topo num-unknowns misc-problem num-interfacePatch num-fe num-discretize levelset-levelset levelset-fastmarch stokes-instatstokes2phase out-output out-ensightOut levelset-surfacetension misc-funcmap misc-vectorFunctions geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature misc-dynamicload stokes-slipBndOnePhase)
 
-exec_ser(f_Gamma geom-boundary geom-builder geom-simplex geom-multigrid geom-deformation misc-scopetimer misc-progressaccu num-unknowns geom-topo num-fe misc-problem levelset-levelset misc-utils out-output num-discretize num-interfacePatch misc-params levelset-fastmarch stokes-instatstokes2phase levelset-surfacetension misc-funcmap misc-vectorFunctions geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature misc-dynamicload stokes-slipBndOnePhase)
+exec_ser(f_Gamma geom-boundary geom-builder geom-simplex geom-multigrid geom-deformation misc-scopetimer misc-progressaccu num-unknowns geom-topo num-fe misc-problem levelset-adaptriang levelset-levelset levelset-marking_strategy misc-utils out-output num-discretize num-interfacePatch misc-params levelset-fastmarch stokes-instatstokes2phase levelset-surfacetension misc-funcmap misc-vectorFunctions geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature misc-dynamicload stokes-slipBndOnePhase out-vtkOut levelset-levelsetmapper surfactant-ifacetransp out-ensightOut num-gradient_recovery)
 if(NOT MPI)
     add_dependencies(f_Gamma levelset-twophaseCoeff misc-scalarFunctions misc-vectorFunctions misc-csgFunctions)
     add_dependencies(xfem levelset-twophaseCoeff misc-scalarFunctions misc-vectorFunctions)
@@ -99,14 +99,19 @@ exec_ser(bndTrianglePartition misc-utils geom-principallattice num-discretize ge
 
 exec_ser(quad_extra misc-utils geom-builder geom-simplex geom-multigrid geom-deformation geom-boundary geom-topo num-unknowns misc-problem num-fe num-discretize num-interfacePatch geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature)
 
-exec_ser(csgtest levelset-levelset levelset-fastmarch geom-deformation misc-funcmap misc-scopetimer misc-progressaccu geom-simplex geom-multigrid geom-builder geom-topo geom-boundary num-unknowns misc-utils misc-problem num-discretize num-fe num-interfacePatch levelset-surfacetension misc-params out-vtkOut geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature geom-csg)
+exec_ser(csgtest levelset-adaptriang levelset-levelset levelset-levelsetmapper levelset-marking_strategy levelset-fastmarch geom-deformation misc-funcmap misc-scopetimer misc-progressaccu geom-simplex geom-multigrid geom-builder geom-topo geom-boundary num-unknowns misc-utils misc-problem num-discretize num-fe num-interfacePatch levelset-surfacetension misc-params out-vtkOut geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature geom-csg num-gradient_recovery surfactant-ifacetransp out-ensightOut)
 
 exec_ser(dynload geom-simplex misc-funcmap misc-dynamicload)
 
 exec_ser(show_domain geom-boundary geom-builder geom-simplex geom-multigrid geom-deformation misc-scopetimer num-unknowns geom-topo num-fe misc-problem levelset-levelset misc-utils out-output num-discretize num-interfacePatch misc-params levelset-fastmarch stokes-instatstokes2phase levelset-surfacetension misc-funcmap misc-vectorFunctions geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature misc-dynamicload out-vtkOut)
+
+exec_ser(jacobi misc-utils)
+
 if(NOT MPI)
     add_dependencies(show_domain levelset-twophaseCoeff misc-scalarFunctions misc-vectorFunctions misc-csgFunctions)
 endif(NOT MPI)
+
+exec_ser(base64test misc-base64)
 
 if(NOT MPI)
     add_dependencies(dynload misc-scalarFunctions misc-vectorFunctions)
