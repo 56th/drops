@@ -69,7 +69,7 @@ class OswaldProjectionP2AccuCL : public TetraAccumulatorCL
 
   public:
     OswaldProjectionP2AccuCL (LocalP2T loc, VecDescCL& avg)
-        : loc_( loc), n_( 0), n_invalid_( 0), check_averaging_( false), avg_( avg), ls( 0), lsetbnd( 0) {}
+        : loc_( loc), n_( 0), n_invalid_( 0), check_averaging_( false), avg_( avg), ls( 0), lsetbnd( 0), lat( 0) {}
 
     OswaldProjectionP2AccuCL& set_check_averaging (bool b= true) {
         check_averaging_= b;
@@ -80,7 +80,7 @@ class OswaldProjectionP2AccuCL : public TetraAccumulatorCL
         ls= lsarg;
         lsetbnd= lsetbndarg;
         lat= latarg;
-        ls_loc.resize (lat->vertex_size ());
+        ls_loc.resize ( lat ? lat->vertex_size () : 0);
         return *this;
     }
 
