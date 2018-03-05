@@ -2059,6 +2059,8 @@ class LocalLaplaceBeltramiSTP1P1CL
         :D_( D) {}
 };
 
+
+
 template <class DiscVelSolT>
 class LocalMaterialDerivativeSTP1P1CL
 {
@@ -2203,9 +2205,11 @@ class SurfactantSTP1CL : public SurfactantP1BaseCL
   public:
     MatrixCL A,    ///< ST-diffusion matrix
              Mder, ///< ST-material-derivative matrix
+             MderT, ///< ST-material-derivative matrix transposed
              Mdiv, ///< ST-mass-matrix with interface-divergence of velocity
              Mold, ///< mass matrix on the old spatial interface; only used for cG_in_t_ == false.
              Mnew; ///< mass matrix on the new spatial interface; only used for cG_in_t_ == false and use_mass_div_ == false.
+
 
     VectorCL load, ///< load-vector
              cpl_A_,   ///< The cpl-Vectors are used only for cG_in_t_ == true.
@@ -2217,7 +2221,8 @@ class SurfactantSTP1CL : public SurfactantP1BaseCL
 
   private:
     bool cG_in_t_,
-         use_mass_div_;
+         use_mass_div_,
+         use_enhanced_repair_;
 
     STP1P1IdxDescCL st_idx_;
     VectorCL st_oldic_, ///< the old solution represented in the full space-time-FE-basis.
@@ -2229,8 +2234,8 @@ class SurfactantSTP1CL : public SurfactantP1BaseCL
   public:
     SurfactantSTP1CL (MultiGridCL& mg,
         double theta, double D, VecDescCL* v, const VelBndDataT& Bnd_v, VecDescCL& lset_vd, const BndDataCL<>& lsetbnd, bool cG_in_t, bool use_mass_div,
-        int iter= 1000, double tol= 1e-7, double omit_bound= -1.)
-    : SurfactantP1BaseCL( mg, theta, D, v, Bnd_v, lset_vd, lsetbnd, iter, tol, omit_bound), cG_in_t_( cG_in_t), use_mass_div_( use_mass_div)
+        int iter= 1000, double tol= 1e-7, double omit_bound= -1., bool use_enhanced_repair=false)
+    : SurfactantP1BaseCL( mg, theta, D, v, Bnd_v, lset_vd, lsetbnd, iter, tol, omit_bound), cG_in_t_( cG_in_t), use_mass_div_( use_mass_div), use_enhanced_repair_(use_enhanced_repair)
     {}
 
     /// save a copy of the old level-set and velocity; moves ic to oldic; must be called before DoStep.

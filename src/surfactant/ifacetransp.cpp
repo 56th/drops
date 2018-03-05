@@ -888,11 +888,16 @@ void SurfactantSTP1CL::Update_dG()
     InterfaceMatrixSTP1AccuCL<LocalSpatialInterfaceMassSTP1P1CL> newmass_accu( &Mnew, &st_idx_,
         LocalSpatialInterfaceMassSTP1P1CL( newspatialcdata, false), cdata, "mixed-mass on new iface");
     if (use_mass_div_) {
-        accus.push_back_acquire( make_wind_dependent_matrixSTP1P1_accu<LocalMaterialDerivativeSTP1P1CL>( &Mder, &st_idx_, cdata,  make_STP2P1Eval( MG_, Bnd_v_, oldv_, *v_), "material derivative on ST-iface"));
+        if (use_enhanced_repair_) {
+            accus.push_back( &newspatialcdata);
+            accus.push_back( &newmass_accu);
+            accus.push_back_acquire( make_wind_dependent_local_transpose_matrixSTP1P1_accu<LocalMaterialDerivativeSTP1P1CL>( &MderT, &st_idx_, cdata,  make_STP2P1Eval( MG_, Bnd_v_, oldv_, *v_), "material derivative transposed on ST-iface"));
+        }
         accus.push_back_acquire( make_wind_dependent_matrixSTP1P1_accu<LocalMassdivSTP1P1CL>( &Mdiv, &st_idx_, cdata,  make_STP2P1Eval( MG_, Bnd_v_, oldv_, *v_), "mass-div on ST-iface"));
+        accus.push_back_acquire( make_wind_dependent_matrixSTP1P1_accu<LocalMaterialDerivativeSTP1P1CL>( &Mder, &st_idx_, cdata,  make_STP2P1Eval( MG_, Bnd_v_, oldv_, *v_), "material derivative on ST-iface"));
     }
     else {
-        accus.push_back_acquire( make_wind_dependent_local_transpose_matrixSTP1P1_accu<LocalMaterialDerivativeSTP1P1CL>( &Mder, &st_idx_, cdata,  make_STP2P1Eval( MG_, Bnd_v_, oldv_, *v_), "material derivative on ST-iface"));
+        accus.push_back_acquire( make_wind_dependent_local_transpose_matrixSTP1P1_accu<LocalMaterialDerivativeSTP1P1CL>( &Mder, &st_idx_, cdata,  make_STP2P1Eval( MG_, Bnd_v_, oldv_, *v_), "material derivative transposed on ST-iface"));
         accus.push_back( &newspatialcdata);
         accus.push_back( &newmass_accu);
     }
@@ -918,6 +923,7 @@ void SurfactantSTP1CL::Update()
 //     WriteToFile( Mnew, "Mnew.txt", "mass on new iface");
 //     WriteToFile( A,    "A.txt",    "Laplace-Beltrami on ST-iface");
 //     WriteToFile( Mder, "Mder.txt", "material derivative on ST-iface");
+//     WriteToFile( MderT, "MderT.txt", "material derivative transposed on ST-iface");
 //     WriteToFile( Mdiv, "Mdiv.txt", "mass-div on ST-iface");
 //     WriteToFile( load, "load.txt", "load on ST-iface");
 //     WriteToFile( cpl_A_,   "cpl_A.txt",   "coupling for Laplace-Beltrami on ST-iface");
@@ -946,14 +952,22 @@ void SurfactantSTP1CL::DoStep ()
     }
     else {
         if (use_mass_div_) {
-            L.LinComb( 1., Mder, 1., Mdiv, 1., A, 1., Mold);
-            rhs= Mold*st_oldic_;
-        }
+            if (use_enhanced_repair_) {
+                //L.LinComb( 0.5, Mder, -0.5, MderT, 1., A, 0.5, Mdiv, 0.5, Mnew, 0.5, Mold);
+                L.LinComb( 1., Mder, 1., Mdiv, 1., A, 1., Mold);
+                rhs= Mold*st_oldic_;
+                                      }
+            else {
+                L.LinComb( 1., Mder, 1., Mdiv, 1., A, 1., Mold);
+                rhs= Mold*st_oldic_;
+                 }
+
+                           }
         else {
             L.LinComb( -1., Mder, 1., A, 1., Mnew);
             rhs= Mold*st_oldic_;
+             }
         }
-    }
     if (rhs_fun_ != 0)
         rhs+= load;
 
@@ -961,7 +975,50 @@ void SurfactantSTP1CL::DoStep ()
 
     {
         ScopeTimerCL timer( "SurfactantSTP1CL::DoStep: Solve");
+
         gm_.Solve( L, st_ic_, rhs, idx.GetEx());
+
+//        VectorCL testAlle=L*st_ic_;
+//        VectorCL testMder=Mder*st_ic_;
+//        VectorCL testA=A*st_ic_;
+//        VectorCL testMdiv=Mdiv*st_ic_;
+//        VectorCL testMold=Mold*st_ic_;
+//        VectorCL testMnew=Mnew*st_ic_;
+//        VectorCL testMderT=MderT*st_ic_;
+//        VectorCL ones(dim);
+//        WriteToFile( testAlle, "TestAlle.txt", "Loesungsmatrix mal Loesung");
+//        WriteToFile( testMder, "TestMder.txt", "MaterialDerivativeMatrix mal Loesung");
+//        WriteToFile( testA, "TestA.txt", "Steifigkeitsmatrix mal Loesung");
+//        WriteToFile( testMdiv, "TestMdiv.txt", "Masse-Divergenz-Matrix mal Loesung");
+//        WriteToFile( testMold, "TestMold.txt", "Massematrix(old) mal Loesung");
+//        WriteToFile( testMnew, "TestMnew.txt", "Massematrix(new) mal Loesung");
+//        WriteToFile( testMderT, "TestMderT.txt", "MaterialDerivativeMatrixTranponiert mal Loesung");
+
+//        for (Uint i=0; i<dim; i++)
+//        {
+//            ones[i]=1;
+//        }
+//        VectorCL testAlleOnes=L*ones;
+//        VectorCL testMderOnes=Mder*ones;
+//        VectorCL testAOnes=A*ones;
+//        VectorCL testMdivOnes=Mdiv*ones;
+//        VectorCL testMoldOnes=Mold*ones;
+//        VectorCL testMnewOnes=Mnew*ones;
+//        VectorCL testMderTOnes=MderT*ones;
+//        VectorCL RhsWithoutLoad=Mold*st_oldic_;
+//        MatrixCL achelp;
+//        achelp.LinComb(1,Mnew,-1,MderT,1,A);
+//        VectorCL divufalseOnes=achelp*ones;
+//        WriteToFile( testAlleOnes, "TestAlleOnes.txt", "Loesungsmatrix mal Einsvektor");
+//        WriteToFile( testMderOnes, "TestMderOnes.txt", "MaterialDerivativeMatrix mal Einsvektor");
+//        WriteToFile( testAOnes, "TestAOnes.txt", "Steifigkeitsmatrix mal Einsvektor");
+//        WriteToFile( testMdivOnes, "TestMdivOnes.txt", "Masse-Divergenz-Matrix mal Einsvektor");
+//        WriteToFile( testMoldOnes, "TestMoldOnes.txt", "Massematrix(old) mal Einsvektor");
+//        WriteToFile( testMnewOnes, "TestMnewOnes.txt", "Massematrix(new) mal Loesung");
+//        WriteToFile( testMderTOnes, "TestMderTOnes.txt", "MaterialDerivativeMatrixTranponiert mal Einsvektor");
+//        WriteToFile( rhs, "rhs.txt", "RechteSeite");
+//        WriteToFile( divufalseOnes, "divufalseOnes.txt", "divufalse Bilinearform mal Einsvektor");
+
     }
     std::cout << "SurfactantSTP1CL::DoStep: res = " << gm_.GetResid() << ", iter = " << gm_.GetIter() << std::endl;
 }

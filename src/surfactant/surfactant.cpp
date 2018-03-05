@@ -42,6 +42,7 @@
 #include <string>
 #include <tr1/unordered_map>
 #include <tr1/unordered_set>
+#include <misc/auto_diff.h>
 
 using namespace DROPS;
 
@@ -129,6 +130,34 @@ double heat_conduction_sol (const Point3DCL& p, double t)
     return std::exp( -6.*t)*heat_conduction_u0( p);
 }
 static RegisterScalarFunction regsca_heat_conduction_sol( "HeatConductionSol", heat_conduction_sol);
+// ==stationary test case constant velocity
+
+DROPS::Point3DCL const_vel_wind (const DROPS::Point3DCL& , double )
+{
+    return MakePoint3D( 1, 0., 0.);
+}
+static RegisterVectorFunction regvec_const_vel_wind( "ConstVelWind", const_vel_wind);
+
+double const_vel_lset (const Point3DCL& p, double t)
+{
+    return std::pow( p[0]-t, 2) + std::pow( p[1], 2) + std::pow( p[2], 2) - 0.89;
+}
+static RegisterScalarFunction regsca_const_vel_lset( "ConstVelLset", const_vel_lset);
+
+
+double const_vel_sol (const Point3DCL& , double )
+{
+    return 1;
+}
+static RegisterScalarFunction regsca_const_vel_sol( "ConstVelSol", const_vel_sol);
+
+double const_vel_rhs (const Point3DCL& , double )
+{
+    return 0;
+}
+
+static RegisterScalarFunction regsca_const_vel_rhs( "ConstVelRhs", const_vel_rhs);
+
 
 
 // ==non-stationary test-case "ToroidalFlow"==
@@ -213,7 +242,17 @@ double toroidal_flow_rhs (const Point3DCL& p, double t)
 }
 static RegisterScalarFunction regsca_toroidal_flow_rhs( "ToroidalFlowRhs", toroidal_flow_rhs);
 
+double toroidal_flow_sol2 (const Point3DCL& , double )
+{
+    return 1;
+}
+static RegisterScalarFunction regsca_toroidal_flow_sol2( "ToroidalFlowSol2", toroidal_flow_sol2);
 
+double toroidal_flow_rhs2 (const Point3DCL& , double )
+{
+    return 0;
+}
+static RegisterScalarFunction regsca_toroidal_flow_rhs2( "ToroidalFlowRhs2", toroidal_flow_rhs2);
 // ==non-stationary test case "AxisScaling"==
 
 double axis_scaling (double t)
@@ -266,17 +305,17 @@ double axis_scaling_rhs (const Point3DCL& p, double t)
 //     const Point3DCL n( tt/l);
 //     SMatrixCL<3,3> dn( (eye<3,3>() - outer_product( n, n))/l );
 //     dn(0,0)/= std::pow( a, 2); dn(1,0)/= std::pow( a, 2); dn(2,0)/= std::pow( a, 2);
-// 
+
 //     const Point3DCL w( MakePoint3D( 0.25*p[0]*std::cos( t)/a, 0., 0.));
 //     SMatrixCL<3,3> dw;
 //     dw(0,0)= 0.25*std::cos( t)/a;
-// 
+
 //     const Point3DCL grad_u( std::exp( -0.5*t)*MakePoint3D( p[1], p[0], 0.));
 //     SMatrixCL<3,3> Hess_u;
 //     Hess_u(0,1)= 1.;
 //     Hess_u(1,0)= 1.;
 //     Hess_u*= std::exp( -0.5*t);
-// 
+
 //     const double err= div_gamma_wind( n, dw) - reaction,
 //                errlb= laplace_beltrami_u( n, dn, grad_u, Hess_u) - diffusion*axis_scaling_sol( p, t);
 //     if (std::fabs( err) > 1e-12 || std::fabs( errlb) > 1e-12) {
@@ -285,10 +324,26 @@ double axis_scaling_rhs (const Point3DCL& p, double t)
 //         exit( 1);
 //     }
 //     return (mat_der + div_gamma_wind( n, dw))*axis_scaling_sol( p, t) - laplace_beltrami_u( n, dn, grad_u, Hess_u);
-
     return (mat_der + reaction - diffusion)*axis_scaling_sol( p, t);
+//    double x1=p[0],x2=p[1],x3=p[2];
+//    return (0.3125e-1 * x1 * x2 * (0.2e1 * pow(x2, 0.4e1) + 0.2e1 * pow(x3, 0.4e1) + 0.4e1 * x2 * x2 * x3 * x3) * pow(cos(t), 0.5e1) + (0.3125e-1 * x1 * x2 * (x2 * x2 + x3 * x3 - 0.5e0 * pow(x2, 0.4e1) - 0.5e0 * pow(x3, 0.4e1) - 0.1e1 * x2 * x2 * x3 * x3) * sin(t) + 0.3125e-1 * x1 * x2 * (0.20e2 * x2 * x2 + 0.20e2 * x3 * x3 - 0.10e2 * pow(x2, 0.4e1) - 0.10e2 * pow(x3, 0.4e1) - 0.20e2 * x2 * x2 * x3 * x3)) * pow(cos(t), 0.4e1) + (0.3125e-1 * x1 * x2 * (-0.32e2 * pow(x2, 0.4e1) - 0.32e2 * pow(x3, 0.4e1) - 0.64e2 * x2 * x2 * x3 * x3) * sin(t) + 0.3125e-1 * x1 * x2 * (-0.148e3 * pow(x2, 0.4e1) - 0.48e2 * x2 * x2 - 0.148e3 * pow(x3, 0.4e1) - 0.296e3 * x2 * x2 * x3 * x3 - 0.48e2 * x3 * x3)) * pow(cos(t), 0.3e1) + (0.3125e-1 * x1 * x2 * (0.65e2 * pow(x2, 0.4e1) + 0.65e2 * pow(x3, 0.4e1) + 0.130e3 * x2 * x2 * x3 * x3 - 0.32e2 - 0.178e3 * x2 * x2 - 0.178e3 * x3 * x3) * sin(t) + 0.3125e-1 * x1 * x2 * (0.148e3 * pow(x2, 0.4e1) + 0.148e3 * pow(x3, 0.4e1) + 0.296e3 * x2 * x2 * x3 * x3 - 0.384e3 - 0.872e3 * x2 * x2 - 0.872e3 * x3 * x3)) * pow(cos(t), 0.2e1) + (0.3125e-1 * x1 * x2 * (0.160e3 * pow(x2, 0.4e1) + 0.160e3 * pow(x3, 0.4e1) + 0.320e3 * x2 * x2 * x3 * x3 + 0.384e3 * x2 * x2 + 0.384e3 * x3 * x3) * sin(t) + 0.3125e-1 * x1 * x2 * (0.146e3 * pow(x2, 0.4e1) + 0.146e3 * pow(x3, 0.4e1) + 0.292e3 * x2 * x2 * x3 * x3 + 0.304e3 * x2 * x2 + 0.304e3 * x3 * x3 + 0.256e3)) * cos(t) + 0.3125e-1 * x1 * x2 * (0.2464e4 - 0.645e2 * pow(x2, 0.4e1) - 0.645e2 * pow(x3, 0.4e1) - 0.129e3 * x2 * x2 * x3 * x3 + 0.1713e4 * x2 * x2 + 0.1713e4 * x3 * x3) * sin(t) + 0.3125e-1 * x1 * x2 * (0.6016e4 - 0.138e3 * pow(x2, 0.4e1) - 0.138e3 * pow(x3, 0.4e1) - 0.276e3 * x2 * x2 * x3 * x3 + 0.852e3 * x2 * x2 + 0.852e3 * x3 * x3)) * pow(exp(t), -0.1e1 / 0.2e1) / (((0.625e-1 * x2 * x2 * x3 * x3 + 0.3125e-1 * pow(x2, 0.4e1) + 0.3125e-1 * pow(x3, 0.4e1)) * sin(t) + 0.625e0 * pow(x2, 0.4e1) + 0.625e0 * pow(x3, 0.4e1) + 0.125e1 * x2 * x2 * x3 * x3) * pow(cos(t), 0.4e1) + ((-0.40625e1 * pow(x2, 0.4e1) + (-0.1e1 - 0.8125e1 * x3 * x3) * x2 * x2 - 0.1e1 * x3 * x3 - 0.40625e1 * pow(x3, 0.4e1)) * sin(t) - 0.925e1 * pow(x2, 0.4e1) + (-0.12e2 - 0.185e2 * x3 * x3) * x2 * x2 - 0.925e1 * pow(x3, 0.4e1) - 0.12e2 * x3 * x3) * pow(cos(t), 0.2e1) + (0.403125e1 * pow(x2, 0.4e1) + (0.80625e1 * x3 * x3 + 0.33e2) * x2 * x2 + 0.403125e1 * pow(x3, 0.4e1) + 0.33e2 * x3 * x3 + 0.8e1) * sin(t) + 0.8625e1 * pow(x2, 0.4e1) + (0.1725e2 * x3 * x3 + 0.12e2) * x2 * x2 + 0.12e2 * x3 * x3 + 0.32e2 + 0.8625e1 * pow(x3, 0.4e1));
 }
 static RegisterScalarFunction regsca_axis_scaling_rhs( "AxisScalingRhs", axis_scaling_rhs);
+
+double axis_scaling_sol2 (const Point3DCL& , double )
+{
+    return 1;
+}
+static RegisterScalarFunction regsca_axis_scaling_sol2( "AxisScalingSol2", axis_scaling_sol2);
+
+double axis_scaling_rhs2 (const Point3DCL& p, double t)
+{
+  //double x1=p[0];
+  double x2=p[1];
+  double x3=p[2];
+  return -cos(t) * ((x2 * x2 + x3 * x3) * sin(t) + 0.4e1 * x2 * x2 + 0.4e1 * x3 * x3) / (-0.8e1 * sin(t) * x2 * x2 - 0.8e1 * sin(t) * x3 * x3 + pow(cos(t), 0.2e1) * x2 * x2 + pow(cos(t), 0.2e1) * x3 * x3 - x2 * x2 - x3 * x3 - 0.16e2);
+}
+static RegisterScalarFunction regsca_axis_scaling_rhs2( "AxisScalingRhs2", axis_scaling_rhs2);
 
 
 // ==non-stationary test case "Collision"==
@@ -334,6 +389,8 @@ DROPS::Point3DCL collision_wind (const DROPS::Point3DCL& x, double t)
 }
 static RegisterVectorFunction regvec_collision_wind( "CollisionWind", collision_wind);
 
+
+
 double collision_lset (const Point3DCL& x, double t)
 {
     const Point3DCL c1= collision_center_1( t);
@@ -347,23 +404,205 @@ double collision_lset (const Point3DCL& x, double t)
 }
 static RegisterScalarFunction regsca_collision_lset( "CollisionLset", collision_lset);
 
-double collision_sol (const Point3DCL& x, double)
+AutoDiff::ADFwdCL<double, 4> lset_AD(const DROPS::Point3DCL& x, double t)
 {
-    return 2.*std::cos( x[0])*std::cos(M_PI*x[1]);
+    AutoDiff::ADFwdCL<double, 4> p[4];
+    for (int i= 0; i < 3; ++i)
+            p[i].seed (x[i], i);
+    p[3].seed(t,3);
+    AutoDiff::ADFwdCL<double, 4> n1= pow((pow((p[0].value()-1.5*p[3].value()+1.5),2)+pow(p[1].value(),2)+pow(p[2].value(),2)),0.5)
+                                  < 1e-3 ? 1e-3 : pow((pow((p[0]-1.5*p[3]+1.5),2)+pow(p[1],2)+pow(p[2],2)),1.5);
+    AutoDiff::ADFwdCL<double, 4> n2= pow((pow((p[0].value()+1.5*p[3].value()-1.5),2)+pow(p[1].value(),2)+pow(p[2].value(),2)),0.5)
+                                  < 1e-3 ? 1e-3 : pow((pow((p[0]+1.5*p[3]-1.5),2)+pow(p[1],2)+pow(p[2],2)),1.5);
+    return 1-(1/n1)-(1/n2);
+}
+AutoDiff::ADFwdCL<double, 4> norm_phi_sq_AD(const DROPS::Point3DCL& x, double t)
+{
+    AutoDiff::ADFwdCL<double, 4> p[4];
+    for (int i= 0; i < 3; ++i)
+            p[i].seed (x[i], i);
+    p[3].seed(t,3);
+	return pow(0.3e1 / 0.2e1 * pow(pow(p[0] - 0.3e1 / 0.2e1 * p[3] + 0.3e1 / 0.2e1, 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * (0.2e1 * p[0] - 0.3e1 * p[3] + 0.3e1) + 0.3e1 / 0.2e1 * pow(pow(p[0] + 0.3e1 / 0.2e1 * p[3] - 0.3e1 / 0.2e1, 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * (0.2e1 * p[0] + 0.3e1 * p[3] - 0.3e1), 0.2e1) + pow(0.3e1 * pow(pow(p[0] - 0.3e1 / 0.2e1 * p[3] + 0.3e1 / 0.2e1, 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * p[1] + 0.3e1 * pow(pow(p[0] + 0.3e1 / 0.2e1 * p[3] - 0.3e1 / 0.2e1, 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * p[1], 0.2e1) + pow(0.3e1 * pow(pow(p[0] - 0.3e1 / 0.2e1 * p[3] + 0.3e1 / 0.2e1, 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * p[2] + 0.3e1 * pow(pow(p[0] + 0.3e1 / 0.2e1 * p[3] - 0.3e1 / 0.2e1, 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * p[2], 0.2e1);
+}
+AutoDiff::ADFwdCL<double, 4> wind_AD1(DROPS::Point3DCL x, double t)
+{
+    AutoDiff::ADFwdCL<double, 4> p[4];
+    for (int i= 0; i < 3; ++i)
+            p[i].seed (x[i], i);
+    p[3].seed(t,3);
+	return norm_phi_sq_AD(x,t).value() < 1e-6 ? 0 : (1/norm_phi_sq_AD(x,t))*(-(0.3e1 / 0.2e1 * pow(pow(p[0] - 0.3e1 / 0.2e1 * p[3] + 0.3e1 / 0.2e1, 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * (-0.3e1 * p[0] + 0.9e1 / 0.2e1 * p[3] - 0.9e1 / 0.2e1) + 0.3e1 / 0.2e1 * pow(pow(p[0] + 0.3e1 / 0.2e1 * p[3] - 0.3e1 / 0.2e1, 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * (0.3e1 * p[0] + 0.9e1 / 0.2e1 * p[3] - 0.9e1 / 0.2e1)) * (0.3e1 / 0.2e1 * pow(pow(p[0] - 0.3e1 / 0.2e1 * p[3] + 0.3e1 / 0.2e1, 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * (0.2e1 * p[0] - 0.3e1 * p[3] + 0.3e1) + 0.3e1 / 0.2e1 * pow(pow(p[0] + 0.3e1 / 0.2e1 * p[3] - 0.3e1 / 0.2e1, 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * (0.2e1 * p[0] + 0.3e1 * p[3] - 0.3e1)));
+}
+AutoDiff::ADFwdCL<double, 4> wind_AD2(DROPS::Point3DCL x, double t)
+{
+    AutoDiff::ADFwdCL<double, 4> p[4];
+    for (int i= 0; i < 3; ++i)
+            p[i].seed (x[i], i);
+    p[3].seed(t,3);
+return norm_phi_sq_AD(x,t).value() < 1e-6 ? 0 : (1/norm_phi_sq_AD(x,t))*(-(0.3e1 / 0.2e1 * pow(pow(p[0] - 0.3e1 / 0.2e1 * p[3] + 0.3e1 / 0.2e1, 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * (-0.3e1 * p[0] + 0.9e1 / 0.2e1 * p[3] - 0.9e1 / 0.2e1) + 0.3e1 / 0.2e1 * pow(pow(p[0] + 0.3e1 / 0.2e1 * p[3] - 0.3e1 / 0.2e1, 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * (0.3e1 * p[0] + 0.9e1 / 0.2e1 * p[3] - 0.9e1 / 0.2e1)) * (0.3e1 * pow(pow(p[0] - 0.3e1 / 0.2e1 * p[3] + 0.3e1 / 0.2e1, 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * p[1] + 0.3e1 * pow(pow(p[0] + 0.3e1 / 0.2e1 * p[3] - 0.3e1 / 0.2e1, 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * p[1]));
+}
+AutoDiff::ADFwdCL<double, 4> wind_AD3(DROPS::Point3DCL x, double t)
+{
+    AutoDiff::ADFwdCL<double, 4> p[4];
+    for (int i= 0; i < 3; ++i)
+            p[i].seed (x[i], i);
+    p[3].seed(t,3);
+return norm_phi_sq_AD(x,t).value() < 1e-6 ? 0 : (1/norm_phi_sq_AD(x,t))*(-(0.3e1 / 0.2e1 * pow(pow(p[0] - 0.3e1 / 0.2e1 * p[3] + 0.3e1 / 0.2e1, 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * (-0.3e1 * p[0] + 0.9e1 / 0.2e1 * p[3] - 0.9e1 / 0.2e1) + 0.3e1 / 0.2e1 * pow(pow(p[0] + 0.3e1 / 0.2e1 * p[3] - 0.3e1 / 0.2e1, 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * (0.3e1 * p[0] + 0.9e1 / 0.2e1 * p[3] - 0.9e1 / 0.2e1)) * (0.3e1 * pow(pow(p[0] - 0.3e1 / 0.2e1 * p[3] + 0.3e1 / 0.2e1, 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * p[2] + 0.3e1 * pow(pow(p[0] + 0.3e1 / 0.2e1 * p[3] - 0.3e1 / 0.2e1, 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * p[2]));
+}
+double tang_div(AutoDiff::ADFwdCL<double, 4> w1, AutoDiff::ADFwdCL<double, 4> w2,
+                          AutoDiff::ADFwdCL<double, 4> w3, AutoDiff::ADFwdCL<double, 4> phi)
+{
+    DROPS::Point3DCL grad_phi;
+    grad_phi[0]=phi.derivative()[0];
+    grad_phi[1]=phi.derivative()[1];
+    grad_phi[2]=phi.derivative()[2];
+    DROPS::Point3DCL n=grad_phi.norm()<1e-3? DROPS::Point3DCL() :   (1/grad_phi.norm())*grad_phi;
+    SMatrixCL<3,3> dw;
+    dw(0,0)=w1.derivative()[0];
+    dw(0,1)=w1.derivative()[1];
+    dw(0,2)=w1.derivative()[2];
+    dw(1,0)=w2.derivative()[0];
+    dw(1,1)=w2.derivative()[1];
+    dw(1,2)=w2.derivative()[2];
+    dw(2,0)=w3.derivative()[0];
+    dw(2,1)=w3.derivative()[1];
+    dw(2,2)=w3.derivative()[2];
+  return trace(dw)-inner_prod(n, dw*n);
+}
+
+DROPS::Point3DCL canonical_wind(const DROPS::Point3DCL& x, double t)
+{
+    AutoDiff::ADFwdCL<double,4> phi=lset_AD(x,t);
+    double phi_t=phi.derivative()[3];
+    DROPS::Point3DCL grad_phi;
+    grad_phi[0]=phi.derivative()[0];
+    grad_phi[1]=phi.derivative()[1];
+    grad_phi[2]=phi.derivative()[2];
+    return (-phi_t/grad_phi.norm_sq())*grad_phi;
+}
+
+double collision_sol (const Point3DCL& , double )
+{
+    return 1;
 }
 static RegisterScalarFunction regsca_collision_sol( "CollisionSol", collision_sol);
-
-double collision_sol2 (const Point3DCL& x, double)
+double collision_sol2 (const Point3DCL& , double )
 {
-    return x[0] < 0. ? 0 : 3. - x[0];
+     return  0;
 }
 static RegisterScalarFunction regsca_collision_sol2( "CollisionSol2", collision_sol2);
 
-double collision_rhs (const Point3DCL&, double)
+double collision_rhs (const Point3DCL& x, double t)
+{
+    double rr=tang_div(wind_AD1(x,t),wind_AD2(x,t),wind_AD3(x,t),lset_AD(x,t));
+    return rr;
+}
+static RegisterScalarFunction regsca_collision_rhs( "CollisionRhs", collision_rhs);
+
+double collision_rhs2 (const Point3DCL& , double )
 {
     return 0;
 }
-static RegisterScalarFunction regsca_collision_rhs( "CollisionRhs", collision_rhs);
+static RegisterScalarFunction regsca_collision_rhs2( "CollisionRhs2", collision_rhs2);
+
+//======================================================================================
+//Non-stationay test case Split
+
+const double split_p= 3.0;
+
+
+Point3DCL split_center_1 (double t)
+{
+    return -WindVelocity*t;
+}
+
+Point3DCL split_center_2 (double t)
+{
+    return -split_center_1( t);
+}
+double split_Dt_lset (const DROPS::Point3DCL& x, double t)
+{
+    Point3DCL x1= x - split_center_1( t),
+              x2= x - split_center_2( t);
+    const double n1= x1.norm() < 1e-3 ? 1e-3 : std::pow( x1.norm(), split_p + 2.),
+                 n2= x2.norm() < 1e-3 ? 1e-3 : std::pow( x2.norm(), split_p + 2.);
+    return split_p*(DROPS::inner_prod(WindVelocity, x1)/n1
+                      - DROPS::inner_prod( WindVelocity, x2)/n2);
+}
+DROPS::Point3DCL split_Dx_lset (const DROPS::Point3DCL& x, double t)
+{
+    Point3DCL x1= x - split_center_1( t),
+              x2= x - split_center_2( t);
+    const double n1= x1.norm() < 1e-3 ? 1e-3 : std::pow( x1.norm(), split_p + 2.),
+                 n2= x2.norm() < 1e-3 ? 1e-3 : std::pow( x2.norm(), split_p + 2.);
+    return split_p*(x1/n1 + x2/n2);
+}
+DROPS::Point3DCL split_wind (const DROPS::Point3DCL& x, double t)
+{
+    const Point3DCL Dphi= split_Dx_lset( x, t);
+    const double Dtphi=   split_Dt_lset( x, t);
+    const double n= Dphi.norm_sq();
+    return n < 1e-6 ? DROPS::Point3DCL() : (-Dtphi/n)*Dphi;
+}
+static RegisterVectorFunction regvec_split_wind( "SplitWind", split_wind);
+
+double split_lset (const Point3DCL& x, double t)
+{
+    const Point3DCL c1= split_center_1( t);
+    const Point3DCL x1= x - c1;
+    const Point3DCL c2= split_center_2( t);
+    const Point3DCL x2= x - c2;
+
+    const double n1= x1.norm() < 1e-3 ? 1e-3 : std::pow( x1.norm(), collision_p),
+                 n2= x2.norm() < 1e-3 ? 1e-3 : std::pow( x2.norm(), collision_p);
+    return RadDrop[0] - 1./n1  - 1./n2;
+}
+static RegisterScalarFunction regsca_split_lset( "SplitLset", split_lset);
+
+AutoDiff::ADFwdCL<double, 4> lset_AD_split(const DROPS::Point3DCL& x, double t)
+{
+    AutoDiff::ADFwdCL<double, 4> p[4];
+    for (int i= 0; i < 3; ++i)
+            p[i].seed (x[i], i);
+    p[3].seed(t,3);
+    return 1-(1/pow((pow((p[0]-1.5*p[3]),2)+pow(p[1],2)+pow(p[2],2)),1.5))-(1/pow((pow((p[0]+1.5*p[3]),2)+pow(p[1],2)+pow(p[2],2)),1.5));
+}
+AutoDiff::ADFwdCL<double, 4> wind_AD1_split(DROPS::Point3DCL x, double t)
+{
+    AutoDiff::ADFwdCL<double, 4> p[4];
+    for (int i= 0; i < 3; ++i)
+            p[i].seed (x[i], i);
+    p[3].seed(t,3);
+    return -(0.3e1 / 0.2e1 * pow(pow(p[0] + 0.15e1 * p[3], 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * (0.30e1 * p[0] + 0.450e1 * p[3]) + 0.3e1 / 0.2e1 * pow(pow(p[0] - 0.15e1 * p[3], 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * (-0.30e1 * p[0] + 0.450e1 * p[3])) / (pow(0.3e1 / 0.2e1 * pow(pow(p[0] + 0.15e1 * p[3], 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * (0.2e1 * p[0] + 0.30e1 * p[3]) + 0.3e1 / 0.2e1 * pow(pow(p[0] - 0.15e1 * p[3], 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * (0.2e1 * p[0] - 0.30e1 * p[3]), 0.2e1) + pow(0.3e1 * pow(pow(p[0] + 0.15e1 * p[3], 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * p[1] + 0.3e1 * pow(pow(p[0] - 0.15e1 * p[3], 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * p[1], 0.2e1) + pow(0.3e1 * pow(pow(p[0] + 0.15e1 * p[3], 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * p[2] + 0.3e1 * pow(pow(p[0] - 0.15e1 * p[3], 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * p[2], 0.2e1)) * (0.3e1 / 0.2e1 * pow(pow(p[0] + 0.15e1 * p[3], 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * (0.2e1 * p[0] + 0.30e1 * p[3]) + 0.3e1 / 0.2e1 * pow(pow(p[0] - 0.15e1 * p[3], 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * (0.2e1 * p[0] - 0.30e1 * p[3]));
+}
+AutoDiff::ADFwdCL<double, 4> wind_AD2_split(DROPS::Point3DCL x, double t)
+{
+    AutoDiff::ADFwdCL<double, 4> p[4];
+    for (int i= 0; i < 3; ++i)
+            p[i].seed (x[i], i);
+    p[3].seed(t,3);
+    return -(0.3e1 / 0.2e1 * pow(pow(p[0] + 0.15e1 * p[3], 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * (0.30e1 * p[0] + 0.450e1 * p[3]) + 0.3e1 / 0.2e1 * pow(pow(p[0] - 0.15e1 * p[3], 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * (-0.30e1 * p[0] + 0.450e1 * p[3])) / (pow(0.3e1 / 0.2e1 * pow(pow(p[0] + 0.15e1 * p[3], 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * (0.2e1 * p[0] + 0.30e1 * p[3]) + 0.3e1 / 0.2e1 * pow(pow(p[0] - 0.15e1 * p[3], 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * (0.2e1 * p[0] - 0.30e1 * p[3]), 0.2e1) + pow(0.3e1 * pow(pow(p[0] + 0.15e1 * p[3], 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * p[1] + 0.3e1 * pow(pow(p[0] - 0.15e1 * p[3], 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * p[1], 0.2e1) + pow(0.3e1 * pow(pow(p[0] + 0.15e1 * p[3], 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * p[2] + 0.3e1 * pow(pow(p[0] - 0.15e1 * p[3], 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * p[2], 0.2e1)) * (0.3e1 * pow(pow(p[0] + 0.15e1 * p[3], 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * p[1] + 0.3e1 * pow(pow(p[0] - 0.15e1 * p[3], 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * p[1]);
+}
+AutoDiff::ADFwdCL<double, 4> wind_AD3_split(DROPS::Point3DCL x, double t)
+{
+    AutoDiff::ADFwdCL<double, 4> p[4];
+    for (int i= 0; i < 3; ++i)
+            p[i].seed (x[i], i);
+    p[3].seed(t,3);
+    return -(0.3e1 / 0.2e1 * pow(pow(p[0] + 0.15e1 * p[3], 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * (0.30e1 * p[0] + 0.450e1 * p[3]) + 0.3e1 / 0.2e1 * pow(pow(p[0] - 0.15e1 * p[3], 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * (-0.30e1 * p[0] + 0.450e1 * p[3])) / (pow(0.3e1 / 0.2e1 * pow(pow(p[0] + 0.15e1 * p[3], 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * (0.2e1 * p[0] + 0.30e1 * p[3]) + 0.3e1 / 0.2e1 * pow(pow(p[0] - 0.15e1 * p[3], 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * (0.2e1 * p[0] - 0.30e1 * p[3]), 0.2e1) + pow(0.3e1 * pow(pow(p[0] + 0.15e1 * p[3], 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * p[1] + 0.3e1 * pow(pow(p[0] - 0.15e1 * p[3], 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * p[1], 0.2e1) + pow(0.3e1 * pow(pow(p[0] + 0.15e1 * p[3], 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * p[2] + 0.3e1 * pow(pow(p[0] - 0.15e1 * p[3], 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * p[2], 0.2e1)) * (0.3e1 * pow(pow(p[0] + 0.15e1 * p[3], 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * p[2] + 0.3e1 * pow(pow(p[0] - 0.15e1 * p[3], 0.2e1) + p[1] * p[1] + p[2] * p[2], -0.5e1 / 0.2e1) * p[2]);
+}
+double split_sol (const Point3DCL&, double)
+{
+    return 1;
+}
+static RegisterScalarFunction regsca_split_sol( "SplitSol", split_sol);
+
+double split_rhs (const Point3DCL& x, double t)
+{
+    double rr=tang_div(wind_AD1_split(x,t),wind_AD2_split(x,t),wind_AD3_split(x,t),lset_AD_split(x,t));
+    return rr;
+}
+static RegisterScalarFunction regsca_split_rhs( "SplitRhs", split_rhs);
+
 
 
 // ==Some spheres==
@@ -636,6 +875,13 @@ SurfactantP1BaseCL* make_surfactant_timedisc( MultiGridCL& mg, LevelsetP2CL& lse
             &v, Bnd_v, lset.Phi, lset.GetBndData(),
             P.get<int>("SurfTransp.Solver.Iter"), P.get<double>("SurfTransp.Solver.Tol"),
             P.get<double>("SurfTransp.XFEMReduced"));
+    else if (method == std::string( "spacetime-cGdG-EnhancedRepair"))
+        ret= new SurfactantSTP1CL( mg,
+            P.get<double>("SurfTransp.Theta"), P.get<double>("SurfTransp.Visc"),
+            &v, Bnd_v, lset.Phi, lset.GetBndData(),
+            /* cG_in_t_ */ false, /* use_mass_div */ P.get<bool>( "SurfTransp.UseMassDiv"),
+            P.get<int>("SurfTransp.Solver.Iter"), P.get<double>("SurfTransp.Solver.Tol"),
+            P.get<double>("SurfTransp.XFEMReduced"),/*use EnhancedRepair*/ true);
     else
         throw DROPSErrCL( std::string( "make_surfactant_timedisc: Unknown method '") + method + std::string( "'.\n"));
 
@@ -646,10 +892,9 @@ SurfactantP1BaseCL* make_surfactant_timedisc( MultiGridCL& mg, LevelsetP2CL& lse
 void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::LevelsetP2CL& lset)
 {
     using namespace DROPS;
-
+    adap.MakeInitialTriang();
     if (P.get<std::string>("SurfTransp.Exp.Levelset") == std::string( "AxisScalingLset"))
         dynamic_cast<DistMarkingStrategyCL*>( adap.get_marking_strategy())->SetDistFct( axis_scaling_lset_ini);
-
     lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
     lset.Phi.SetIdx( &lset.idx);
     // LinearLSInit( mg, lset.Phi, the_lset_fun, 0.);
@@ -769,6 +1014,8 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
             // lset.ReparamFastMarching( C.rpm_Method);
         const bool doGridMod= P.get<int>("Mesh.AdaptRef.Freq") && step%P.get<int>("Mesh.AdaptRef.Freq") == 0;
         const bool gridChanged= doGridMod ? adap.UpdateTriang() : false;
+         std::cout << "dogridmod " << doGridMod << std::endl;
+         std::cout << "gridchanged " << gridChanged << std::endl;
         if (gridChanged) {
             std::cout << "Triangulation changed.\n";
             vidx.DeleteNumbering( mg);
@@ -780,7 +1027,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
             LSInit( mg, the_sol_vd, the_sol_fun, /*t*/ cur_time);
             // timedisc.Update(); // Called unconditionally in DoStep.
 
-            //lset2.SetupSystem( make_P2Eval( mg, Bnd_v, v), dt);
+            //lset2.SetupSystem( make_P2Eval( mg, Bnd_v, v),
 
             std::cout << "rel. Volume: " << lset.GetVolume()/Vol << std::endl;
             lset.AdjustVolume();
@@ -1627,7 +1874,6 @@ int main (int argc, char* argv[])
     std::cout << P << std::endl;
 
     DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
-
     std::cout << "Setting up interface-PDE.\n";
     WindVelocity= P.get<DROPS::Point3DCL>("SurfTransp.Exp.Velocity");
     RadDrop=      P.get<DROPS::Point3DCL>("SurfTransp.Exp.RadDrop");
