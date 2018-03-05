@@ -28,86 +28,185 @@
 
 #include <cmath>
 
+#include "../misc/container.h"
+
 namespace DROPS
 {
 
-///\brief Forward-mode automatic differentiation.
+namespace AutoDiff {
+
+///\brief Forward-mode automatic differentiation with D independent variables.
 /// Providing one argument to the constructor creates a constant.
-/// Calling seed() turns an object into an instance of the independent variable.
-/// The parameter of seed (and the second constructor parameter) is useful for directional derivatives other than the partial derivatives.
-template <typename T>
+/// Calling seed(x, i) turns an object into an instance of the ith independent variable with value x.
+template <typename T, int D>
 class ADFwdCL
 {
+  public:
+    enum class FreeVariableE { free_variable };
+
+    using value_type= T;
+    using derivative_type= SVectorCL<D>;
+
   private:
-    T s,
-      ds;
+    value_type       s;
+     derivative_type ds;
 
   public:
-    ADFwdCL (T sarg= T(), T dsarg= T())
+    ADFwdCL ()
+        : ADFwdCL (value_type(), derivative_type()) {}
+    ADFwdCL (value_type sarg)
+        : ADFwdCL (sarg, derivative_type()) {}
+    ADFwdCL (value_type sarg, const derivative_type& dsarg)
         : s( sarg), ds( dsarg) {}
 
-    T value () const { return s; }
-    T derivative () const { return ds; }
+    ADFwdCL (value_type sarg, int i, FreeVariableE)
+        : s (sarg), ds (derivative_type()) {
+        ds[i]= 1;
+    }
 
-    void seed (T dsarg= T( 1)) { ds= dsarg; }
+    ADFwdCL (const ADFwdCL& ad)= default;
+    ADFwdCL (ADFwdCL&& ad)= default;
+    ADFwdCL& operator= (const ADFwdCL& ad)= default;
+
+    const value_type& value () const { return s; }
+    value_type&       value ()       { return s; }
+    const derivative_type& derivative () const { return ds; }
+    derivative_type&       derivative ()       { return ds; }
+
+    void seed (T sarg, int i) {
+        s= sarg;
+        std::fill_n (ds.begin(), D, value_type());
+        ds[i]= 1;
+    }
 };
 
-template <typename T>
-ADFwdCL<T> operator+ (ADFwdCL<T> f, ADFwdCL<T> g)
+template <typename T, int D>
+ADFwdCL<T, D> operator+ (ADFwdCL<T, D> f, ADFwdCL<T, D> g)
 {
-    return ADFwdCL<T>( f.value()      + g.value(),
-                       f.derivative() + g.derivative());
+    return ADFwdCL<T, D>( f.value()      + g.value(),
+                          f.derivative() + g.derivative());
 }
 
-template <typename T>
-ADFwdCL<T> operator- (ADFwdCL<T> f)
+template <typename T, int D>
+ADFwdCL<T, D> operator+ (double f, ADFwdCL<T, D> g)
 {
-    return ADFwdCL<T>( -f.value(),
-                       -f.derivative());
+    return ADFwdCL<T, D>( f + g.value(),
+                          g.derivative());
 }
 
-template <typename T>
-ADFwdCL<T> operator- (ADFwdCL<T> f, ADFwdCL<T> g)
+template <typename T, int D>
+ADFwdCL<T, D> operator+ (ADFwdCL<T, D> f, double g)
 {
-    return ADFwdCL<T>( f.value()      - g.value(),
-                       f.derivative() - g.derivative());
+    return ADFwdCL<T, D>( f.value() + g,
+                          f.derivative());
 }
 
-template <typename T>
-ADFwdCL<T> operator* (ADFwdCL<T> f, ADFwdCL<T> g)
+template <typename T, int D>
+ADFwdCL<T, D> operator- (ADFwdCL<T, D> f)
 {
-    return ADFwdCL<T>( f.value()*g.value(),
-                       f.derivative()*g.value() + f.value()*g.derivative());
+    return ADFwdCL<T, D>( -f.value(),
+                          -f.derivative());
 }
 
-template <typename T>
-ADFwdCL<T> operator/ (ADFwdCL<T> f, ADFwdCL<T> g)
+template <typename T, int D>
+ADFwdCL<T, D> operator- (ADFwdCL<T, D> f, ADFwdCL<T, D> g)
 {
-    return ADFwdCL<T>( f.value()/g.value(),
-                       (f.derivative()*g.value() - f.value()*g.derivative())/std::pow(g.value(), 2));
+    return ADFwdCL<T, D>( f.value()      - g.value(),
+                          f.derivative() - g.derivative());
 }
 
-template <typename T>
-ADFwdCL<T> pow (ADFwdCL<T> f, int i)
+template <typename T, int D>
+ADFwdCL<T, D> operator- (double f, ADFwdCL<T, D> g)
 {
-    return ADFwdCL<T>( std::pow( f.value(), i),
-                       i*std::pow( f.value(), i - 1));
+    return ADFwdCL<T, D>( f - g.value(),
+                          -g.derivative());
 }
 
-template <typename T>
-ADFwdCL<T> cos (ADFwdCL<T> f)
+template <typename T, int D>
+ADFwdCL<T, D> operator- (ADFwdCL<T, D> f, double g)
 {
-    return ADFwdCL<T>( std::cos( f.value()),
-                       -std::sin( f.value())*f.derivative());
+    return ADFwdCL<T, D>( f.value() - g,
+                          f.derivative());
 }
 
-template <typename T>
-ADFwdCL<T> sin (ADFwdCL<T> f)
+template <typename T, int D>
+ADFwdCL<T, D> operator* (ADFwdCL<T, D> f, ADFwdCL<T, D> g)
 {
-    return ADFwdCL<T>( std::sin( f.value()),
-                       std::cos( f.value())*f.derivative());
+    return ADFwdCL<T, D>( f.value()*g.value(),
+                          f.derivative()*g.value() + f.value()*g.derivative());
 }
 
+template <typename T, int D>
+ADFwdCL<T, D> operator* (double f, ADFwdCL<T, D> g)
+{
+    return ADFwdCL<T, D>( f*g.value(),
+                          f*g.derivative());
+}
+
+template <typename T, int D>
+ADFwdCL<T, D> operator* (ADFwdCL<T, D> f, double g)
+{
+    return ADFwdCL<T, D>( f.value()*g,
+                          f.derivative()*g);
+}
+
+template <typename T, int D>
+ADFwdCL<T, D> operator/ (ADFwdCL<T, D> f, ADFwdCL<T, D> g)
+{
+    return ADFwdCL<T, D>( f.value()/g.value(),
+                          (f.derivative()*g.value() - f.value()*g.derivative())/std::pow(g.value(), 2));
+}
+
+template <typename T, int D>
+ADFwdCL<T, D> operator/ (double f, ADFwdCL<T, D> g)
+{
+    return ADFwdCL<T, D>( f/g.value(),
+                          (-f)*g.derivative()/std::pow(g.value(), 2));
+}
+
+template <typename T, int D>
+ADFwdCL<T, D> operator/ (ADFwdCL<T, D> f, double g)
+{
+    return ADFwdCL<T, D>( f.value()/g,
+                          f.derivative()/g);
+}
+
+template <typename T, int D>
+ADFwdCL<T, D> pow (ADFwdCL<T, D> f, double i)
+{
+    return ADFwdCL<T, D>( std::pow( f.value(), i),
+                          i*std::pow( f.value(), i - 1)*f.derivative());
+}
+template <typename T, int D>
+ADFwdCL<T, D> sqrt (ADFwdCL<T, D> f)
+{
+    return ADFwdCL<T, D>( std::pow( f.value(), 0.5),
+                          0.5*std::pow( f.value(), -0.5)*f.derivative());
+}
+template <typename T, int D>
+ADFwdCL<T, D> cos (ADFwdCL<T, D> f)
+{
+    return ADFwdCL<T, D>( std::cos( f.value()),
+                         -std::sin( f.value())*f.derivative());
+}
+
+template <typename T, int D>
+ADFwdCL<T, D> sin (ADFwdCL<T, D> f)
+{
+    return ADFwdCL<T, D>( std::sin( f.value()),
+                          std::cos( f.value())*f.derivative());
+}
+template <typename T, int D>
+ADFwdCL<T, D> exp (ADFwdCL<T, D> f)
+{
+    return ADFwdCL<T, D>( std::exp( f.value()),
+                          std::exp( f.value())*f.derivative());
+}
+
+
+
+
+} // end of namespace DROPS::AutoDiff
 } // end of namespace DROPS
 
 #endif

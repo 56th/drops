@@ -403,23 +403,18 @@ double deco_cube_shift;
 
 void deco_cube_val_grad (const Point3DCL& pp, double& v, Point3DCL& g)
 {
-    typedef ADFwdCL<double> Adf;
-    const Adf cc( deco_cube_radius*deco_cube_radius),
-              shift( deco_cube_shift),
-              one( 1.);
-    Adf p[3],
-        gi;
-    for (Uint i= 0; i < 3; ++i) {
-        for (Uint j= 0; j < 3; ++j)
-            p[j]= Adf( pp[j]);
-        p[i].seed();
-        gi= (pow( p[0]*p[0] + p[1]*p[1] - cc, 2) + pow( p[2]*p[2] - one, 2))
-           *(pow( p[1]*p[1] + p[2]*p[2] - cc, 2) + pow( p[0]*p[0] - one, 2))
-           *(pow( p[2]*p[2] + p[0]*p[0] - cc, 2) + pow( p[1]*p[1] - one, 2))
-           + shift;
-        g[i]= gi.derivative();
-    }
-    v= gi.value();
+    typedef AutoDiff::ADFwdCL<double, 3> Adf;
+    const double cc( deco_cube_radius*deco_cube_radius),
+              shift( deco_cube_shift);
+    Adf p[3];
+    for (int i= 0; i < 3; ++i)
+        p[i].seed (pp[i], i);
+    const Adf y= (pow( p[0]*p[0] + p[1]*p[1] - cc, 2) + pow( p[2]*p[2] - 1., 2))
+        *(pow( p[1]*p[1] + p[2]*p[2] - cc, 2) + pow( p[0]*p[0] - 1., 2))
+        *(pow( p[2]*p[2] + p[0]*p[0] - cc, 2) + pow( p[1]*p[1] - 1., 2))
+        + shift;
+    g= y.derivative();
+    v= y.value();
 }
 
 double deco_cube (const Point3DCL& p, double)
@@ -440,6 +435,7 @@ double deco_cube (const Point3DCL& p, double)
 //     return v;
 }
 RegisterScalarFunction reg_deco_cube( "deco_cube", &deco_cube);
+
 
 const CSG::BodyCL* torus_body; // The (unperturbed) distance function
 double torus_distance (const Point3DCL& p, double)
