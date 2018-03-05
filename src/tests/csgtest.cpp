@@ -147,6 +147,85 @@ double suess (const Point3DCL& p, double)
 }
 RegisterScalarFunction reg_suess( "suess", &suess);
 
+
+double deco_cube_radius;
+double deco_cube_shift;
+
+void deco_cube_val_grad (const Point3DCL& pp, double& v, Point3DCL& g)
+{
+    typedef AutoDiff::ADFwdCL<double, 3> Adf;
+    const double cc( deco_cube_radius*deco_cube_radius),
+              shift( deco_cube_shift);
+    Adf p[3];
+    for (int i= 0; i < 3; ++i)
+        p[i].seed (pp[i], i);
+    const Adf y= (pow( p[0]*p[0] + p[1]*p[1] - cc, 2) + pow( p[2]*p[2] - 1., 2))
+        *(pow( p[1]*p[1] + p[2]*p[2] - cc, 2) + pow( p[0]*p[0] - 1., 2))
+        *(pow( p[2]*p[2] + p[0]*p[0] - cc, 2) + pow( p[1]*p[1] - 1., 2))
+        + shift;
+    g= y.derivative();
+    v= y.value();
+}
+
+double deco_cube (const Point3DCL& p, double)
+{
+    const double cc= deco_cube_radius*deco_cube_radius;
+    return  (std::pow( p[0]*p[0] + p[1]*p[1] - cc, 2) + std::pow( p[2]*p[2] - 1, 2))
+           *(std::pow( p[1]*p[1] + p[2]*p[2] - cc, 2) + std::pow( p[0]*p[0] - 1, 2))
+           *(std::pow( p[2]*p[2] + p[0]*p[0] - cc, 2) + std::pow( p[1]*p[1] - 1, 2)) + deco_cube_shift;
+//     const double cc= deco_cube_radius*deco_cube_radius;
+//     return  (std::abs( p[0]*p[0] + p[1]*p[1] - cc) + std::abs( p[2]*p[2] - 1))
+//            *(std::abs( p[1]*p[1] + p[2]*p[2] - cc) + std::abs( p[0]*p[0] - 1))
+//            *(std::abs( p[2]*p[2] + p[0]*p[0] - cc) + std::abs( p[1]*p[1] - 1)) + deco_cube_shift;
+//     double v;
+//     Point3DCL g;
+//     deco_cube_val_grad( p, v, g);
+// //     std::cout << "p: " << p << "\t\t " << v << "\t " << g.norm() << "\t\t " << v/g.norm() << std::endl;
+// //     return v/std::sqrt( 10. + g.norm_sq());
+//     return v;
+}
+RegisterScalarFunction reg_deco_cube( "deco_cube", &deco_cube);
+
+
+const CSG::BodyCL* torus_body; // The (unperturbed) distance function
+double torus_distance (const Point3DCL& p, double)
+{
+    return torus_body[0]( p, 0.);
+}
+double perturbed_torus_alpha; // perturbation parameter
+double perturbed_torus (const Point3DCL& p, double)
+{
+    return torus_body[0]( p, 0.)*(9. + 4.*std::cos( perturbed_torus_alpha*p[0]*p[1]/p.norm()));
+}
+RegisterScalarFunction reg_perturbed_torus( "perturbed_torus", &perturbed_torus);
+
+class LevelsetReinitCL : public MGObserverCL
+{
+  private:
+    LevelsetP2CL& ls_;
+    instat_scalar_fun_ptr f_;
+
+  public:
+    LevelsetReinitCL (LevelsetP2CL& ls, instat_scalar_fun_ptr f)
+        : ls_( ls), f_( f) {}
+
+    void pre_refine  () {};
+    void post_refine ();
+
+    void pre_refine_sequence  () {}
+    void post_refine_sequence () {}
+    const IdxDescCL* GetIdxDesc() const { return ls_.Phi.RowIdx; }
+};
+
+void
+LevelsetReinitCL::post_refine ()
+{
+    ls_.DeleteNumbering( &ls_.idx);
+    ls_.CreateNumbering( ls_.GetMG().GetLastLevel(), &ls_.idx);
+    ls_.Phi.SetIdx( &ls_.idx);
+    ls_.Init( f_);
+}
+
 //dummy
 double sigmaf (const Point3DCL&, double) { return 0.; }
 
