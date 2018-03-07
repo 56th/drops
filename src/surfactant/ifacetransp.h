@@ -736,6 +736,16 @@ class LocalInterfaceMassP1CL
 /// D is the diffusion-coefficient
 void SetupLBP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls, const BndDataCL<>& lsbnd, double D);
 
+void SetupStokesIF_P2P1( const MultiGridCL& MG_, MatDescCL* A_P2, MatDescCL* A_P2_stab, MatDescCL* B_P1P2, MatDescCL* M_P2, MatDescCL* S_P2, MatDescCL* L_P1P2, MatDescCL* L_P1P2_stab, MatDescCL* M_ScalarP1, MatDescCL* A_ScalarP1_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, bool fullgrad);
+void SetupStokesIF_P1P1( const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P1_stab, MatDescCL* B_P1P1, MatDescCL* M_P1, MatDescCL* S_P1, MatDescCL* L_P1P1, MatDescCL* L_P1P1_stab, MatDescCL* M_ScalarP1, MatDescCL* A_ScalarP1_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, bool fullgrad);
+void SetupStokesIF_P1P2( const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P1_stab, MatDescCL* B_P2P1, MatDescCL* M_P1, MatDescCL* S_P1, MatDescCL* L_P2P1, MatDescCL* L_P2P1_stab, MatDescCL* M_ScalarP2, MatDescCL* A_ScalarP2_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, bool fullgrad);
+void SetupStokesIF_P2P2( const MultiGridCL& MG_, MatDescCL* A_P2, MatDescCL* A_P2_stab, MatDescCL* B_P2P2, MatDescCL* M_P2, MatDescCL* S_P2, MatDescCL* L_P2P2, MatDescCL* L_P2P2_stab, MatDescCL* M_ScalarP2, MatDescCL* A_ScalarP2_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, bool fullgrad);
+
+void SetupInterfaceVectorRhsP1 (const MultiGridCL& mg, VecDescCL* v,
+    const VecDescCL& ls, const BndDataCL<>& lsbnd, instat_vector_fun_ptr f);
+void SetupInterfaceVectorRhsP2 (const MultiGridCL& mg, VecDescCL* v,
+    const VecDescCL& ls, const BndDataCL<>& lsbnd, instat_vector_fun_ptr f);
+
 class LocalLaplaceBeltramiP1CL
 {
   private:
@@ -1378,7 +1388,32 @@ make_VTKIfaceScalar (MultiGridCL& mg, const VecDescCL& u,
     return *new VTKIfaceScalarCL( mg, u, varName);
 }
 
-/// ==Space-Time-methods==
+class VTKIfaceVectorCL : public VTKVariableCL
+{
+  private:
+    const VecDescCL& u_;
+    MultiGridCL& mg_;
+    int P2_;
+    const BndDataCL<Point3DCL>& BndData_;
+
+  public:
+    VTKIfaceVectorCL (MultiGridCL& mg, const VecDescCL& u, std::string varName, int P2, const BndDataCL<Point3DCL>& BndData)
+        : VTKVariableCL( varName), u_( u), mg_( mg), P2_(P2), BndData_(BndData) {}
+
+      void put      (VTKOutCL& cf) const;
+      Uint GetDim() const { return 1; }
+};
+
+inline VTKIfaceVectorCL&
+make_VTKIfaceVector (MultiGridCL& mg, const VecDescCL& u,
+                     std::string varName, std::string FEdegree, const BndDataCL<Point3DCL>& BndData)
+{
+  //std::cout<<"Element :"<< FEdegree <<std::endl;
+  if(!FEdegree.compare("P2"))
+    return *new VTKIfaceVectorCL( mg, u, varName, 1, BndData);
+  else
+    return *new VTKIfaceVectorCL( mg, u, varName, 0, BndData);
+}/// ==Space-Time-methods==
 /// \todo Maybe introduce a new header
 
 ///\brief Bilinear space-time FE-function on a single TetraPrismCL.

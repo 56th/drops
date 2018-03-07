@@ -1292,6 +1292,7 @@ class P1DiscCL
     static inline void   GetGradients( Point3DCL H[4],    double& det, const TetraCL& t);
     static inline void   GetGradients( SMatrixCL<3,4>& H, double& det, const Point3DCL pt[4]);
     static inline void   GetGradients( Point3DCL H[4], const SMatrixCL<3,3>& T);
+    static void GetP1Basis( LocalP1CL<> p1[4]);
     static void GetP1Basis( Quad5_2DCL<> p1[4], const BaryCoordCL* const p);
 };
 
@@ -1332,6 +1333,8 @@ class P2DiscCL
     static void GetGradientsOnRef( Quad5CL<Point3DCL> GRef[10]);
     // The 2nd arg points to 3 vertices of the triangle
     static void GetGradientsOnRef( Quad5_2DCL<Point3DCL> GRef[10], const BaryCoordCL* const);
+    // p2[i] contains a LocalP2CL-object that is initialized with FE_P2CL::Hi
+    static void GetP2Basis( LocalP2CL<> p2[10]);
     // p2[i] contains a Quad5_2DCL-object that is initialized with FE_P2CL::Hi
     static void GetP2Basis( Quad5_2DCL<> p2[10], const BaryCoordCL* const p);
     // compute gradients

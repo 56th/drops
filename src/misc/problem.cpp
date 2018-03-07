@@ -346,6 +346,8 @@ void CreateNumbOnInterfaceVertex (const Uint idx, IdxT& counter, Uint stride,
             }
         }
     }
+    if (!match) return;
+    DoPeriodicMatching(s1, s2, match, idx);
 }
 
 /// \brief Routine to number P2-unknowns on the vertices and edges surrounding an
@@ -416,6 +418,8 @@ void CreateNumbOnInterfaceP2 (const Uint idx, IdxT& counter,
             }
         }
     }
+    if (!match) return;
+    DoPeriodicMatching(s1, s2, match, idx);
 }
 
 void IdxDescCL::CreateNumbOnInterface(Uint level, MultiGridCL& mg, const VecDescCL& ls,

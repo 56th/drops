@@ -71,7 +71,9 @@ enum FiniteElementT
 	P2X_FE=P2_FE+OFFSET_XFE,
 	P2R_FE=P2_FE+OFFSET_RFE,
 	P1IF_FE=P1_FE+OFFSET_IFFE,
-	P2IF_FE=P2_FE+OFFSET_IFFE,
+    P2IF_FE=P2_FE+OFFSET_IFFE,
+    vecP1IF_FE=P1_FE+OFFSET_IFFE+OFFSET_VECFE,
+    vecP2IF_FE=P2_FE+OFFSET_IFFE+OFFSET_VECFE,
     vecP1_FE=P1_FE+OFFSET_VECFE,
 	vecP2_FE=P2_FE+OFFSET_VECFE,
 	vecP1Bubble_FE=P1Bubble_FE+OFFSET_VECFE,
@@ -117,7 +119,9 @@ class FE_InfoCL
             case P2R_FE:
             case P2IF_FE:
             case P2_FE:          NumUnknownsVertex_= NumUnknownsEdge_= 1; break;
+            case vecP1IF_FE:
             case vecP1_FE:		 NumUnknownsVertex_ = 3; break;
+            case vecP2IF_FE:
             case vecP2X_FE:
             case vecP2R_FE:
             case vecP2_FE:       NumUnknownsVertex_= NumUnknownsEdge_= 3; break;
@@ -1027,6 +1031,45 @@ DeleteNumbOnSimplex( Uint idx, const Iter& begin, const Iter& end)
             it->Unknowns.Invalidate( idx);
 }
 
+template <class SimplexContT>
+void DoPeriodicMatching(SimplexContT& s1, SimplexContT& s2, match_fun match, const Uint idx)
+{
+    // match objects in s1 and s2
+    typedef typename SimplexContT::iterator psetIterT;
+
+//    std::ofstream f1("s1.txt"), f2("s2.txt");
+//
+//    for (psetIterT it2= s2.begin(), end2= s2.end(); it2!=end2; ++it2) {
+//        f2 << GetBaryCenter( **it2) << '\n';
+//    }
+//    f2.close();
+
+//    for (psetIterT it1= s1.begin(), end1= s1.end(); it1!=end1; ++it1) {
+//        f1 << GetBaryCenter( **it1) << '\n';
+//    }
+//    f1.close();
+
+    for (psetIterT it1= s1.begin(), end1= s1.end(); it1!=end1; ++it1)
+    {
+        //f1 << GetBaryCenter( **it1) << '\n';
+        // search corresponding object in s2
+        for (psetIterT it2= s2.begin(), end2= s2.end(); it2!=end2;)
+            if (match( GetBaryCenter( **it1), GetBaryCenter( **it2)) )
+            {
+                // it2 gets same number as it1
+                (*it2)->Unknowns( idx)= (*it1)->Unknowns( idx);
+                // remove it2 from s2
+                s2.erase( it2++);
+            }
+            else it2++;
+    }
+    if (!s2.empty()) {
+//        for (psetIterT it2= s2.begin(), end2= s2.end(); it2!=end2; ++it2)
+//            f2 << GetBaryCenter( **it2) << '\n';
+
+        throw DROPSErrCL( "DoPeriodicMatching: Periodic boundaries do not match!");
+    }
+}
 
 /// \name Helper routine to number unknowns on vertices, edges, faces on periodic boundaries.
 /// This function should not be used directly. CreateNumb is much more
@@ -1080,21 +1123,7 @@ void CreatePeriodicNumbOnSimplex( const Uint idx, IdxT& counter, Uint stride,
     }
     // now we have s1.size() <= s2.size()
     // match objects in s1 and s2
-    for (psetIterT it1= s1.begin(), end1= s1.end(); it1!=end1; ++it1)
-    {
-        // search corresponding object in s2
-        for (psetIterT it2= s2.begin(), end2= s2.end(); it2!=end2;)
-            if (match( GetBaryCenter( **it1), GetBaryCenter( **it2)) )
-            {
-                // it2 gets same number as it1
-                (*it2)->Unknowns( idx)= (*it1)->Unknowns( idx);
-                // remove it2 from s2
-                s2.erase( it2++);
-            }
-            else it2++;
-    }
-    if (!s2.empty())
-        throw DROPSErrCL( "CreatePeriodicNumbOnSimplex: Periodic boundaries do not match!");
+    DoPeriodicMatching(s1, s2, match, idx);
 }
 /// \}
 

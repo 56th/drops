@@ -162,6 +162,40 @@ void ISPreCL::Apply(const Mat&, Vec& p, const Vec& c, const ExT&, const ExT& pr_
     p+= kM_*p2_;
 }
 
+template <typename SolverT>
+class SurfaceLaplacePreCL : public SchurPreBaseCL
+{
+  private:
+    MatrixCL&  S_;
+    SolverT&   solver_;
+
+  public:
+    SurfaceLaplacePreCL(MatrixCL& S, SolverT& solver, double kA= 0., double kM= 0.)
+        : SchurPreBaseCL( kA, kM), S_( S), solver_( solver) {}
+
+    /// \brief Apply preconditioner
+    template <typename Mat, typename Vec, typename ExT>
+    void Apply(const Mat&, Vec& p, const Vec& c, const ExT& vel_ex, const ExT& pr_ex) const;
+#ifdef _PAR
+    void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const ExchangeCL& vel_ex, const ExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
+    void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const ExchangeCL& vel_ex, const ExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
+#endif
+    void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
+    void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
+
+    using SchurPreBaseCL::Apply;
+};
+
+template <class SolverT>
+template <typename Mat, typename Vec, typename ExT>
+void SurfaceLaplacePreCL<SolverT>::Apply(const Mat&, Vec& p, const Vec& c, const ExT&, const ExT& ex) const
+{
+    solver_.Solve(S_, p, c, ex);
+    if (solver_.GetIter() == solver_.GetMaxIter())
+        std::cout << "SurfaceLaplacePreCL::Apply (1st solve: iterations: " << solver_.GetIter()
+                  << "\tresidual: " <<  solver_.GetResid() << '\n';
+}
+
 
 //**************************************************************************
 // Preconditioner for the instationary two-phase Stokes-equations with

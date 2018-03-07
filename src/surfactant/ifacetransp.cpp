@@ -40,10 +40,12 @@ void Extend (const MultiGridCL& mg, const VecDescCL& x, VecDescCL& xext)
         xextidx( xext.RowIdx->GetIdx()),
         lvl( x.RowIdx->TriangLevel());
     xext.Data= 0.;
+    const int stride= x.RowIdx->NumUnknownsVertex();
 
     DROPS_FOR_TRIANG_CONST_VERTEX( mg, lvl, it) {
         if (it->Unknowns.Exist( xidx) && it->Unknowns.Exist( xextidx))
-            xext.Data[it->Unknowns( xextidx)]= x.Data[it->Unknowns( xidx)];
+            for (int k=0; k<stride; ++k)
+                xext.Data[it->Unknowns( xextidx)+k]= x.Data[it->Unknowns( xidx)+k];
     }
     if (x.RowIdx->GetFE() == P1IF_FE)
         return;
@@ -51,10 +53,12 @@ void Extend (const MultiGridCL& mg, const VecDescCL& x, VecDescCL& xext)
     // For P2IF_FE, also fixup the edge-dofs.
     DROPS_FOR_TRIANG_CONST_EDGE( mg, lvl, it) {
         if (it->Unknowns.Exist( xidx) && it->Unknowns.Exist( xextidx))
-            xext.Data[it->Unknowns( xextidx)]= x.Data[it->Unknowns( xidx)];
+            for (int k=0; k<stride; ++k)
+                xext.Data[it->Unknowns( xextidx)+k]= x.Data[it->Unknowns( xidx)+k];
     }
 }
 
+///\todo extend to vector-valued FE
 void Restrict (const MultiGridCL& mg, const VecDescCL& xext, VecDescCL& x)
 {
     const Uint xidx( x.RowIdx->GetIdx()),
@@ -268,6 +272,1340 @@ void SetupInterfaceRhsP1 (const MultiGridCL& mg, VecDescCL* v,
 
     // WriteToFile( v->Data, "rhs.txt", "Rhs");
 }
+
+  ////////////////////////////////////////////////////////////////////////////
+
+  /// SetupStokes
+/// \brief Setup of the local Stokes system on a tetra intersected by the dividing surface.
+class LocalStokesCL
+{
+  private:
+    const PrincipalLatticeCL& lat;
+    LocalP1CL<> P1Hat[4];
+    LocalP2CL<> P2Hat[10];
+    LocalP1CL<Point3DCL> P2GradRef[10], P2Grad[10];
+    Point3DCL P1Grad[4];
+    GridFunctionCL<Point3DCL> qnormal, qProj[3];
+    GridFunctionCL<Point3DCL> qsurfP1grad[4], qsurfP2grad[10];
+    GridFunctionCL<> qP1Hat[4], qP2Hat[10], qnormal_comp[3];
+
+
+    QuadDomain2DCL  q2Ddomain;
+    std::valarray<double> ls_loc;
+    SurfacePatchCL spatch;
+
+    QuadDomainCL q3Ddomain;
+    GridFunctionCL<Point3DCL> q3Dnormal, q3DexactNormal, q3DP2Grad[10];
+    GridFunctionCL<Point3DCL> q3DP1Grad[4];
+
+    bool fullGrad;
+
+    void Get_Normals(const LocalP2CL<>& ls, LocalP1CL<Point3DCL>&);
+
+  public:
+    LocalStokesCL ( bool fullGradient)
+        : lat( PrincipalLatticeCL::instance( 2)), ls_loc( lat.vertex_size()), fullGrad(fullGradient)
+    {
+        P1DiscCL::GetP1Basis( P1Hat);
+        P2DiscCL::GetP2Basis( P2Hat);
+        P2DiscCL::GetGradientsOnRef( P2GradRef);
+        std::cout<<"full gradient="<<fullGrad<<std::endl;
+    }
+
+    void calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const TetraCL& tet); ///< has to be called before any setup method!
+    void calc3DIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const TetraCL& tet); ///< has to be called after calcIntegrands!
+    void setupA_P2 (double A_P2[30][30]);
+    void setupA_P2_stab (double A_P2_stab[10][10], double absdet);
+    void setupA_P1 (double A_P1[12][12]);
+    void setupA_P1_stab (double A_P1_stab[4][4], double absdet);
+    void setupB_P1P2 (double B_P1P2[4][30]);
+    void setupB_P1P1 (double B_P1P1[4][12]);
+    void setupB_P2P2 (double B_P2P2[10][30]);
+    void setupB_P2P1 (double B_P2P1[10][12]);
+    void setupM_P2 (double M_P2[10][10]);
+    void setupM_P1 (double M_P1[4][4]);
+    void setupS_P2 (double S_P2[30][30]);
+    void setupS_P1 (double S_P1[12][12]);
+    void setupL_P1P1 (double L_P1P1[4][12]);
+    void setupL_P1P1_stab (double L_P1P1_stab[4][12], double absdet);
+    void setupL_P1P2 (double L_P1P2[4][30]);
+    void setupL_P1P2_stab (double L_P1P2_stab[4][30], double absdet);
+    void setupL_P2P1 (double L_P2P1[10][12]);
+    void setupL_P2P1_stab (double L_P2P1_stab[10][12], double absdet);
+    void setupL_P2P2 (double L_P2P2[10][30]);
+    void setupL_P2P2_stab (double L_P2P2_stab[10][30], double absdet);
+};
+
+DROPS::Point3DCL Normal_sphere2 (const DROPS::Point3DCL& p, double)
+{
+    DROPS::Point3DCL v(p[0]/(std::sqrt(p[0]*p[0]+p[1]*p[1]+p[2]*p[2])),p[1]/(std::sqrt(p[0]*p[0]+p[1]*p[1]+p[2]*p[2])),p[2]/(std::sqrt(p[0]*p[0]+p[1]*p[1]+p[2]*p[2])));
+    //DROPS::Point3DCL w(p[0], 0., 0.);
+    return v;
+}
+
+// The P2 levelset-function is used to compute the normals which are needed for the (improved) projection onto the interface, GradLP1 has to be set before
+void LocalStokesCL::Get_Normals(const LocalP2CL<>& ls, LocalP1CL<Point3DCL>& Normals)
+{
+    for(int i=0; i<10 ; ++i)
+    {
+        Normals+=ls[i]*P2Grad[i];
+    }
+
+}
+
+void LocalStokesCL::calc3DIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const TetraCL& tet)
+{
+    make_SimpleQuadDomain<Quad5DataCL> (q3Ddomain, AllTetraC);
+    LocalP1CL<Point3DCL> Normals;
+    Get_Normals(ls, Normals);
+
+    resize_and_evaluate_on_vertexes (Normals, q3Ddomain, q3Dnormal);
+    // Scale Normals accordingly to the Euclidean Norm (only consider the ones which make a contribution in the sense of them being big enough... otherwise one has to expect problems with division through small numbers)
+    for(Uint i=0; i<q3Dnormal.size(); ++i) {
+         //if(qnormal[i].norm()> 1e-8)
+         q3Dnormal[i]= q3Dnormal[i]/q3Dnormal[i].norm();
+    }
+
+    resize_and_evaluate_on_vertexes (&Normal_sphere2, tet, q3Ddomain, 0., q3DexactNormal);
+
+    for(int j=0; j<10; ++j) {
+        resize_and_evaluate_on_vertexes(P2Grad[j], q3Ddomain, q3DP2Grad[j]);
+    }
+
+    for(int j=0; j<4; ++j) {
+        q3DP1Grad[j].resize( q3Ddomain.vertex_size());
+        q3DP1Grad[j]= P1Grad[j];
+    }
+}
+
+void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const TetraCL& tet)
+{
+    P2DiscCL::GetGradients( P2Grad, P2GradRef, T);
+    P1DiscCL::GetGradients( P1Grad, T);
+    evaluate_on_vertexes( ls, lat, Addr( ls_loc));
+    spatch.make_patch<MergeCutPolicyCL>( lat, ls_loc);
+    // The routine takes the information about the tetrahedra and the cutting surface and generates a two-dimensional triangulation of the cut, including the necessary point-positions and weights for the quadrature
+    make_CompositeQuad5Domain2D ( q2Ddomain, spatch, tet);
+    LocalP1CL<Point3DCL> Normals;
+    Get_Normals(ls, Normals);
+    // Resize and evaluate Normals at all points which are needed for the two-dimensional quadrature-rule
+    resize_and_evaluate_on_vertexes (Normals, q2Ddomain, qnormal);
+    // Scale Normals accordingly to the Euclidean Norm (only consider the ones which make a contribution in the sense of them being big enough... otherwise one has to expect problems with division through small numbers)
+    for(Uint i=0; i<qnormal.size(); ++i) {
+         //if(qnormal[i].norm()> 1e-8)
+         qnormal[i]= qnormal[i]/qnormal[i].norm();
+    }
+    // Provide all components of the normals
+    for (int k=0; k<3; ++k) {
+        qnormal_comp[k].resize( q2Ddomain.vertex_size());
+        ExtractComponent( qnormal, qnormal_comp[k], k);
+    }
+
+    // Resize and evaluate P2 basis functions
+    for(int j=0; j<10 ;++j) {
+        resize_and_evaluate_on_vertexes( P2Hat[j], q2Ddomain, qP2Hat[j]);
+        resize_and_evaluate_on_vertexes( P2Grad[j], q2Ddomain, qsurfP2grad[j]);
+//        qsurfP2grad[j].resize( q2Ddomain.vertex_size());
+//        qsurfP2grad[j]= P2Grad[j];
+        qsurfP2grad[j]-= dot( qsurfP2grad[j], qnormal)*qnormal;
+    }
+    // Resize and evaluate of all the 4 P1 Gradient Functions and apply pointwise projections   (P grad \xi_j  for j=1..4)
+    for(int j=0; j<4 ;++j) {
+//        resize_and_evaluate_on_vertexes( P1Grad[j], q2Ddomain, qsurfP1grad[j]);
+        resize_and_evaluate_on_vertexes( P1Hat[j], q2Ddomain, qP1Hat[j]);
+        qsurfP1grad[j].resize( q2Ddomain.vertex_size());
+        qsurfP1grad[j]= P1Grad[j];
+        qsurfP1grad[j]-= dot( qsurfP1grad[j], qnormal)*qnormal;
+    }
+    // Apply pointwise projection to the 3 std basis vectors e_k
+    for(int k=0; k<3 ;++k) {
+        //resize_and_evaluate_on_vertexes( P1Grad[j], q2Ddomain, qsurfP1grad[j]);
+        qProj[k].resize( q2Ddomain.vertex_size());
+        Point3DCL e_k= DROPS::std_basis<3>( k+1);
+        qProj[k]= e_k;
+        qProj[k]-= dot( e_k, qnormal)*qnormal;
+    }
+}
+
+// TODO: Den Fall fullGrad testen!
+void LocalStokesCL::setupA_P2 (double A_P2[30][30])
+{
+    // Do all combinations for (i,j) i,j=30 x 30 and corresponding quadrature
+    for (int i=0; i < 10; ++i) {
+        for (int j=0; j<10; ++j) {
+            for (int k=0; k<3; ++k) {
+                Point3DCL e_k= DROPS::std_basis<3>( k+1);
+                for (int l=0; l<3; ++l) {
+                    Point3DCL e_l= DROPS::std_basis<3>( l+1);
+                    if (!fullGrad) {
+                        A_P2[3*i+k][3*j+l]= quad_2D( dot(e_k, qsurfP2grad[j])*dot(e_l, qsurfP2grad[i]) + dot(qsurfP2grad[i], qsurfP2grad[j])*dot(qProj[k], qProj[l]), q2Ddomain);
+                    }
+                    else {
+                        if(k==l) {
+                            A_P2[3*i+k][3*j+l]= quad_2D( dot(e_k, qsurfP2grad[j])*dot(e_l, qsurfP2grad[i]) + 0.5*dot(qsurfP2grad[i], qsurfP2grad[j]) + 0.5*dot(P2Grad[i], P2Grad[j])*dot(qProj[k], qProj[l]), q2Ddomain);
+                        }
+                        else {
+                            A_P2[3*i+k][3*j+l]= quad_2D( dot(e_k, qsurfP2grad[j])*dot(e_l, qsurfP2grad[i]) + 0.5*dot(P2Grad[i], P2Grad[j])*dot(qProj[k], qProj[l]), q2Ddomain);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// TODO: Den Fall fullGrad testen!
+void LocalStokesCL::setupA_P1 (double A_P1[12][12])
+{
+    // Do all combinations for (i,j) i,j=30 x 30 and corresponding quadrature
+    for (int i=0; i<4; ++i) {
+        for (int j=0; j<4; ++j) {
+            for (int k=0; k<3; ++k) {
+                Point3DCL e_k= DROPS::std_basis<3>( k+1);
+                for (int l=0; l<3; ++l) {
+                    Point3DCL e_l= DROPS::std_basis<3>( l+1);
+                    if (!fullGrad) {
+                        A_P1[3*i+k][3*j+l]= quad_2D( dot(e_k, qsurfP1grad[j])*dot(e_l, qsurfP1grad[i]) + dot(qsurfP1grad[i], qsurfP1grad[j])*dot(qProj[k], qProj[l]), q2Ddomain);
+                    }
+                    else {
+                        if(k==l) {
+                            A_P1[3*i+k][3*j+l]= quad_2D( dot(e_k, qsurfP1grad[j])*dot(e_l, qsurfP1grad[i]) + 0.5*dot(qsurfP1grad[i], qsurfP1grad[j]) + 0.5*inner_prod(P1Grad[i], P1Grad[j])*dot(qProj[k], qProj[l]), q2Ddomain);
+                        }
+                        else {
+                            A_P1[3*i+k][3*j+l]= quad_2D( dot(e_k, qsurfP1grad[j])*dot(e_l, qsurfP1grad[i]) + 0.5*inner_prod(P1Grad[i], P1Grad[j])*dot(qProj[k], qProj[l]), q2Ddomain);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// TODO: Den Fall fullGrad testen!
+void LocalStokesCL::setupB_P1P2 (double B_P1P2[4][30])
+{
+    GridFunctionCL<double> qsurfgrad_k;
+    qsurfgrad_k.resize( q2Ddomain.vertex_size());
+
+    // Do all combinations for (i,j) i,j=4 x 30 and corresponding quadrature
+    for (int k=0; k<3; ++k) {
+        for (int i=0; i < 4; ++i) {
+            ExtractComponent( qsurfP1grad[i], qsurfgrad_k, k);
+            for (int j=0; j<10; ++j) {
+                if (!fullGrad) {
+                    B_P1P2[i][3*j+k]= quad_2D( qsurfgrad_k*qP2Hat[j], q2Ddomain);
+                }
+                else
+                    B_P1P2[i][3*j+k]= quad_2D( P1Grad[i][k]*qP2Hat[j], q2Ddomain);
+            }
+        }
+    }
+}
+
+// TODO: Den Fall fullGrad testen!
+void LocalStokesCL::setupB_P2P2 (double B_P2P2[10][30])
+{
+    GridFunctionCL<double> qsurfgrad_k;
+    qsurfgrad_k.resize( q2Ddomain.vertex_size());
+
+    // Do all combinations for (i,j) i,j=4 x 30 and corresponding quadrature
+    for (int k=0; k<3; ++k) {
+        for (int i=0; i < 10; ++i) {
+            ExtractComponent( qsurfP2grad[i], qsurfgrad_k, k);
+            for (int j=0; j<10; ++j) {
+                if (!fullGrad) {
+                    B_P2P2[i][3*j+k]= quad_2D( qsurfgrad_k*qP2Hat[j], q2Ddomain);
+                }
+                else
+                    std::cout << "DOES NOT WORK YET!!!" << std::endl;//B_P2P2[i][3*j+k]= quad_2D( P2Grad[i][k]*qP2Hat[j], q2Ddomain);
+            }
+        }
+    }
+}
+
+// TODO: Den Fall fullGrad testen!
+void LocalStokesCL::setupB_P1P1 (double B_P1P1[4][12])
+{
+    GridFunctionCL<double> qsurfgrad_k;
+    qsurfgrad_k.resize( q2Ddomain.vertex_size());
+
+    // Do all combinations for (i,j) i,j=4 x 30 and corresponding quadrature
+    for (int k=0; k<3; ++k) {
+        for (int i=0; i < 4; ++i) {
+            ExtractComponent( qsurfP1grad[i], qsurfgrad_k, k);
+            for (int j=0; j<4; ++j) {
+                if (!fullGrad) {
+                    B_P1P1[i][3*j+k]= quad_2D( qsurfgrad_k*qP1Hat[j], q2Ddomain);
+                }
+                else
+                    B_P1P1[i][3*j+k]= quad_2D( P1Grad[i][k]*qP1Hat[j], q2Ddomain);
+            }
+        }
+    }
+}
+
+// TODO: Den Fall fullGrad testen!
+void LocalStokesCL::setupB_P2P1 (double B_P2P1[10][12])
+{
+    GridFunctionCL<double> qsurfgrad_k;
+    qsurfgrad_k.resize( q2Ddomain.vertex_size());
+
+    // Do all combinations for (i,j) i,j=4 x 30 and corresponding quadrature
+    for (int k=0; k<3; ++k) {
+        for (int i=0; i < 10; ++i) {
+            ExtractComponent( qsurfP2grad[i], qsurfgrad_k, k);
+            for (int j=0; j<4; ++j) {
+                if (!fullGrad) {
+                    B_P2P1[i][3*j+k]= quad_2D( qsurfgrad_k*qP1Hat[j], q2Ddomain);
+                }
+                else
+                    std::cout << "DOES NOT WORK YET!!!" << std::endl;//B_P2P1[i][3*j+k]= quad_2D( P2Grad[i][k]*qP1Hat[j], q2Ddomain);
+            }
+        }
+    }
+}
+
+void LocalStokesCL::setupM_P2 (double M_P2[10][10])
+{
+    // Do all combinations for (i,j) i,j=4 x 30 and corresponding quadrature
+    for (int i=0; i < 10; ++i) {
+        for (int j=0; j<10; ++j) {
+             M_P2[i][j]= quad_2D( qP2Hat[i]*qP2Hat[j], q2Ddomain);
+        }
+    }
+}
+
+void LocalStokesCL::setupM_P1 (double M_P1[4][4])
+{
+    // Do all combinations for (i,j) i,j=4 x 4 and corresponding quadrature
+    for (int i=0; i<4; ++i) {
+        for (int j=0; j<4; ++j) {
+             M_P1[i][j]= quad_2D( qP1Hat[i]*qP1Hat[j], q2Ddomain);
+        }
+    }
+}
+
+void LocalStokesCL::setupS_P2 (double S_P2[30][30])
+{
+    // Do all combinations for (i,j) i,j=30 x 30 and corresponding quadrature
+    for (int i=0; i < 10; ++i) {
+        for (int j=0; j<10; ++j) {
+            for (int k=0; k<3; ++k) {
+                for (int l=0; l<3; ++l) {
+                     S_P2[3*i+k][3*j+l]= quad_2D( qP2Hat[i]*qnormal_comp[k]*qP2Hat[j]*qnormal_comp[l], q2Ddomain);
+                }
+            }
+        }
+    }
+}
+
+void LocalStokesCL::setupS_P1 (double S_P1[12][12])
+{
+    // Do all combinations for (i,j) i,j=30 x 30 and corresponding quadrature
+    for (int i=0; i<4; ++i) {
+        for (int j=0; j<4; ++j) {
+            for (int k=0; k<3; ++k) {
+                for (int l=0; l<3; ++l) {
+                     S_P1[3*i+k][3*j+l]= quad_2D( qP1Hat[i]*qnormal_comp[k]*qP1Hat[j]*qnormal_comp[l], q2Ddomain);
+                }
+            }
+        }
+    }
+}
+
+void LocalStokesCL::setupL_P1P2 (double L_P1P2[4][30])
+{
+    //GridFunctionCL<double> qP1Hat;
+
+    // Do all combinations for (i,j) i,j=4 x 30 and corresponding quadrature
+    for (int i=0; i < 4; ++i) {
+       // resize_and_evaluate_on_vertexes( P1Hat[i], q2Ddomain, qP1Hat);
+        for (int j=0; j<10; ++j) {
+            for (int k=0; k<3; ++k) {
+                L_P1P2[i][3*j+k]= quad_2D( qP1Hat[i]*qP2Hat[j]*qnormal_comp[k], q2Ddomain);
+            }
+        }
+    }
+}
+
+void LocalStokesCL::setupL_P1P2_stab (double L_P1P2_stab[4][30], double absdet)
+{
+    // Do all combinations for (i,j) i,j=4 x 30 and corresponding quadrature
+    for (int i=0; i < 10; ++i) {
+        for (int j=0; j<3; ++j) {
+            Point3DCL e_j= DROPS::std_basis<3>( j+1);
+            for (int k=0; k<4; ++k) {
+                L_P1P2_stab[k][3*i+j]= quad(dot(q3Dnormal, q3DP2Grad[i])*dot(e_j, q3Dnormal)*dot(q3Dnormal, q3DP1Grad[k]), absdet, q3Ddomain, AllTetraC);
+            }
+        }
+    }
+}
+
+void LocalStokesCL::setupL_P1P1 (double L_P1P1[4][12])
+{
+   // GridFunctionCL<double> qP1Hat;
+
+    // Do all combinations for (i,j) i,j=4 x 30 and corresponding quadrature
+    for (int i=0; i < 4; ++i) {
+      //  resize_and_evaluate_on_vertexes( P1Hat[i], q2Ddomain, qP1Hat);
+        for (int j=0; j<4; ++j) {
+            for (int k=0; k<3; ++k) {
+                L_P1P1[i][3*j+k]= quad_2D( qP1Hat[i]*qP1Hat[j]*qnormal_comp[k], q2Ddomain);
+            }
+        }
+    }
+}
+
+void LocalStokesCL::setupL_P1P1_stab (double L_P1P1_stab[4][12], double absdet)
+{
+    // Do all combinations for (i,j) i,j=4 x 30 and corresponding quadrature
+    for (int i=0; i < 4; ++i) {
+        for (int j=0; j<3; ++j) {
+            Point3DCL e_j= DROPS::std_basis<3>( j+1);
+            for (int k=0; k<4; ++k) {
+                L_P1P1_stab[k][3*i+j]= quad(dot(q3Dnormal, q3DP1Grad[i])*dot(e_j, q3Dnormal)*dot(q3Dnormal, q3DP1Grad[k]), absdet, q3Ddomain, AllTetraC);
+            }
+        }
+    }
+}
+
+void LocalStokesCL::setupL_P2P1 (double L_P2P1[10][12])
+{
+    // Do all combinations for (i,j) i,j=10 x 30 and corresponding quadrature
+    for (int i=0; i < 10; ++i) {
+        for (int j=0; j<4; ++j) {
+            for (int k=0; k<3; ++k) {
+                L_P2P1[i][3*j+k]= quad_2D( qP2Hat[i]*qP1Hat[j]*qnormal_comp[k], q2Ddomain);
+            }
+        }
+    }
+}
+
+void LocalStokesCL::setupL_P2P1_stab (double L_P2P1_stab[10][12], double absdet)
+{
+    // Do all combinations for (i,j) i,j=4 x 30 and corresponding quadrature
+    for (int i=0; i < 4; ++i) {
+        for (int j=0; j<3; ++j) {
+            Point3DCL e_j= DROPS::std_basis<3>( j+1);
+            for (int k=0; k<10; ++k) {
+                L_P2P1_stab[k][3*i+j]= quad(dot(q3Dnormal, q3DP1Grad[i])*dot(e_j, q3Dnormal)*dot(q3Dnormal, q3DP2Grad[k]), absdet, q3Ddomain, AllTetraC);
+            }
+        }
+    }
+}
+
+void LocalStokesCL::setupL_P2P2 (double L_P2P2[10][30])
+{
+    // Do all combinations for (i,j) i,j=10 x 30 and corresponding quadrature
+    for (int i=0; i < 10; ++i) {
+        for (int j=0; j<10; ++j) {
+            for (int k=0; k<3; ++k) {
+                L_P2P2[i][3*j+k]= quad_2D( qP2Hat[i]*qP2Hat[j]*qnormal_comp[k], q2Ddomain);
+            }
+        }
+    }
+}
+
+void LocalStokesCL::setupL_P2P2_stab (double L_P2P2_stab[10][30], double absdet)
+{
+    // Do all combinations for (i,j) i,j=4 x 30 and corresponding quadrature
+    for (int i=0; i < 10; ++i) {
+        for (int j=0; j<3; ++j) {
+            Point3DCL e_j= DROPS::std_basis<3>( j+1);
+            for (int k=0; k<10; ++k) {
+                L_P2P2_stab[k][3*i+j]= quad(dot(q3Dnormal, q3DP2Grad[i])*dot(e_j, q3Dnormal)*dot(q3Dnormal, q3DP2Grad[k]), absdet, q3Ddomain, AllTetraC);
+            }
+        }
+    }
+}
+
+void LocalStokesCL::setupA_P2_stab (double A_P2_stab[10][10], double absdet)
+{
+    for (int i=0; i<10; ++i) {
+        for (int j=0; j<10; ++j) {
+           A_P2_stab[i][j] = quad(dot(q3Dnormal, q3DP2Grad[i])*dot(q3Dnormal, q3DP2Grad[j]), absdet, q3Ddomain, AllTetraC);
+        }
+    }
+}
+
+void LocalStokesCL::setupA_P1_stab (double A_P1_stab[4][4], double absdet)
+{
+    for (int i=0; i<4; ++i) {
+        for (int j=0; j<4; ++j) {
+           A_P1_stab[i][j] = quad(dot(q3Dnormal, q3DP1Grad[i])*dot(q3Dnormal, q3DP1Grad[j]), absdet, q3Ddomain, AllTetraC);
+        }
+    }
+}
+
+/// \brief Basis Class for Accumulator to set up the matrices for interface Stokes.
+class StokesIFAccumulator_P1P1CL : public TetraAccumulatorCL
+{
+  protected:
+    const VecDescCL& lset;
+    const LsetBndDataCL& lset_bnd;
+
+    IdxDescCL &P1Idx_, &ScalarP1Idx_;
+    //IdxT numP1[4], numScalarP1[4];
+
+    MatrixCL &A_P1_, &A_P1_stab_,  &B_P1P1_, &M_P1_, &S_P1_, &L_P1P1_, &L_P1P1_stab_, &M_ScalarP1_, &A_ScalarP1_stab_;
+    MatrixBuilderCL *mA_P1_, *mA_P1_stab_, *mB_P1P1_, *mM_P1_, *mS_P1_, *mL_P1P1_, *mL_P1P1_stab_, *mM_ScalarP1_, *mA_ScalarP1_stab_;
+    double locA_P1[12][12], locA_P1_stab[4][4], locB_P1P1[4][12], locM_P1[4][4], locS_P1[12][12], locL_P1P1[4][12], locL_P1P1_stab[4][12];
+
+    LocalStokesCL localStokes_;
+
+    SMatrixCL<3,3> T;
+    double det, absdet;
+    LocalP2CL<> ls_loc;
+    LocalNumbP1CL n, nScalar;
+
+    ///\brief Computes the mapping from local to global data "n", the local matrices in loc and.
+    void local_setup (const TetraCL& tet);
+    ///\brief Update the global system.
+    void update_global_system ();
+
+  public:
+    StokesIFAccumulator_P1P1CL ( const VecDescCL& ls, const LsetBndDataCL& ls_bnd, IdxDescCL& P1FE, IdxDescCL& ScalarP1FE, MatrixCL& A_P1, MatrixCL& A_P1_stab, MatrixCL& B_P1P1, MatrixCL& M_P1, MatrixCL& S_P1, MatrixCL& L_P1P1, MatrixCL& L_P1P1_stab, MatrixCL& M_ScalarP1, MatrixCL& A_ScalarP1_stab, bool fullGradient);
+
+    ///\brief Initializes matrix-builders and load-vectors
+    void begin_accumulation ();
+    ///\brief Builds the matrices
+    void finalize_accumulation();
+
+    void visit (const TetraCL& sit);
+
+    TetraAccumulatorCL* clone (int /*tid*/) { return new StokesIFAccumulator_P1P1CL ( *this); }
+
+};
+
+StokesIFAccumulator_P1P1CL::StokesIFAccumulator_P1P1CL( const VecDescCL& ls, const LsetBndDataCL& ls_bnd, IdxDescCL& P1FE, IdxDescCL& ScalarP1FE, MatrixCL& A_P1, MatrixCL& A_P1_stab, MatrixCL& B_P1P1, MatrixCL& M_P1, MatrixCL& S_P1, MatrixCL& L_P1P1, MatrixCL& L_P1P1_stab, MatrixCL& M_ScalarP1, MatrixCL& A_ScalarP1_stab, bool fullGradient)
+ : lset(ls), lset_bnd(ls_bnd), P1Idx_(P1FE), ScalarP1Idx_(ScalarP1FE), A_P1_(A_P1), A_P1_stab_(A_P1_stab), B_P1P1_(B_P1P1), M_P1_(M_P1), S_P1_(S_P1), L_P1P1_(L_P1P1), L_P1P1_stab_(L_P1P1_stab), M_ScalarP1_(M_ScalarP1), A_ScalarP1_stab_(A_ScalarP1_stab), localStokes_( fullGradient)
+{}
+
+void StokesIFAccumulator_P1P1CL::begin_accumulation ()
+{
+    std::cout << "entering StokesIF: \n";
+    const size_t num_unks_p1= P1Idx_.NumUnknowns(), num_unks_scalarp1= ScalarP1Idx_.NumUnknowns();
+    mA_P1_= new MatrixBuilderCL( &A_P1_, num_unks_p1, num_unks_p1);
+    mA_P1_stab_= new MatrixBuilderCL( &A_P1_stab_, num_unks_p1, num_unks_p1);
+    mB_P1P1_= new MatrixBuilderCL( &B_P1P1_, num_unks_scalarp1, num_unks_p1);
+    mM_P1_= new MatrixBuilderCL( &M_P1_, num_unks_p1, num_unks_p1);
+    mS_P1_= new MatrixBuilderCL( &S_P1_, num_unks_p1, num_unks_p1);
+    mL_P1P1_= new MatrixBuilderCL( &L_P1P1_, num_unks_scalarp1, num_unks_p1);
+    mL_P1P1_stab_= new MatrixBuilderCL( &L_P1P1_stab_, num_unks_scalarp1, num_unks_p1);
+    mM_ScalarP1_= new MatrixBuilderCL( &M_ScalarP1_, num_unks_scalarp1, num_unks_scalarp1);
+    mA_ScalarP1_stab_= new MatrixBuilderCL( &A_ScalarP1_stab_, num_unks_scalarp1, num_unks_scalarp1);
+}
+
+void StokesIFAccumulator_P1P1CL::finalize_accumulation ()
+{
+    mB_P1P1_->Build();
+    delete mB_P1P1_;
+    mL_P1P1_->Build();
+    delete mL_P1P1_;
+    mL_P1P1_stab_->Build();
+    delete mL_P1P1_stab_;
+    mA_P1_->Build();
+    delete mA_P1_;
+    mM_P1_->Build();
+    delete mM_P1_;
+    mS_P1_->Build();
+    delete mS_P1_;
+    mA_P1_stab_->Build();
+    delete mA_P1_stab_;
+    mM_ScalarP1_->Build();
+    delete mM_ScalarP1_;
+    mA_ScalarP1_stab_->Build();
+    delete mA_ScalarP1_stab_;
+#ifndef _PAR
+    std::cout << "StokesIF_P1P1:\t" << A_P1_.num_nonzeros() << " nonzeros in A, " << A_P1_stab_.num_nonzeros() << " nonzeros in A_stab, "
+              << B_P1P1_.num_nonzeros() << " nonzeros in B, " << M_P1_.num_nonzeros() << " nonzeros in M, " << S_P1_.num_nonzeros() << " nonzeros in S, "
+              << L_P1P1_.num_nonzeros() << " nonzeros in L, " << L_P1P1_stab_.num_nonzeros() << " nonzeros in L_stab, "
+              << M_ScalarP1_.num_nonzeros() << " nonzeros in M_ScalarP1, " << A_ScalarP1_stab_.num_nonzeros() << " nonzeros in A_ScalarP1_stab\n";
+#endif
+    // std::cout << '\n';
+}
+
+void StokesIFAccumulator_P1P1CL::visit (const TetraCL& tet)
+{
+    ls_loc.assign( tet, lset, lset_bnd);
+
+    if (!equal_signs( ls_loc))
+    {
+        local_setup( tet);
+        update_global_system();
+    }
+
+}
+
+void StokesIFAccumulator_P1P1CL::local_setup (const TetraCL& tet)
+{
+    GetTrafoTr( T, det, tet);
+    absdet= std::fabs( det);
+
+    n.assign( tet, P1Idx_, P1Idx_.GetBndInfo());
+    nScalar.assign( tet, ScalarP1Idx_, ScalarP1Idx_.GetBndInfo());
+
+    //GetLocalNumbP1NoBnd( numP1, tet, P1Idx_);
+    //GetLocalNumbP1NoBnd( numScalarP1, tet, ScalarP1Idx_);
+    localStokes_.calcIntegrands( T, ls_loc, tet);
+    localStokes_.calc3DIntegrands(T, ls_loc, tet);
+    localStokes_.setupA_P1( locA_P1);
+    localStokes_.setupA_P1_stab( locA_P1_stab, absdet);
+    localStokes_.setupB_P1P1( locB_P1P1);
+    localStokes_.setupM_P1( locM_P1);
+    localStokes_.setupS_P1( locS_P1);
+    localStokes_.setupL_P1P1( locL_P1P1);
+    localStokes_.setupL_P1P1_stab( locL_P1P1_stab, absdet);
+}
+
+void StokesIFAccumulator_P1P1CL::update_global_system ()
+{
+    MatrixBuilderCL& mA_P1= *mA_P1_;
+    MatrixBuilderCL& mA_P1_stab= *mA_P1_stab_;
+    MatrixBuilderCL& mB_P1P1= *mB_P1P1_;
+    MatrixBuilderCL& mM_P1= *mM_P1_;
+    MatrixBuilderCL& mS_P1= *mS_P1_;
+    MatrixBuilderCL& mL_P1P1= *mL_P1P1_;
+    MatrixBuilderCL& mL_P1P1_stab= *mL_P1P1_stab_;
+    MatrixBuilderCL& mM_ScalarP1= *mM_ScalarP1_;
+    MatrixBuilderCL& mA_ScalarP1_stab= *mA_ScalarP1_stab_;
+
+    for(int i= 0; i < 4; ++i) {
+        const IdxT ii= n.num[i];
+        if (ii==NoIdx || !(n.WithUnknowns( i))) continue;
+        for(int j=0; j < 4; ++j) {
+            const IdxT jj= n.num[j];
+            if (jj==NoIdx || !(n.WithUnknowns( j))) continue;
+            for (int k=0; k<3; ++k) {
+                for (int l=0; l<3; ++l) {
+                    mA_P1( ii+k, jj+l) += locA_P1[3*j+l][3*i+k];
+                    mS_P1( ii+k, jj+l) += locS_P1[3*j+l][3*i+k];
+                    if(k == l) {
+                        mM_P1( ii+k, jj+l) += locM_P1[j][i];
+                        mA_P1_stab( ii+k, jj+l) += locA_P1_stab[j][i];
+                    } else {
+                        mM_P1( ii+k, jj+l) += 0.;
+                        mA_P1_stab( ii+k, jj+l) += 0.;
+                    }
+                }
+             }
+        }
+        for (int j=0; j < 4; ++j) {
+            if (nScalar.num[j]==NoIdx || !(nScalar.WithUnknowns( j))) continue;
+            for (int k=0; k<3; ++k) {
+                mB_P1P1( nScalar.num[j], ii+k) += locB_P1P1[j][3*i+k];
+                mL_P1P1( nScalar.num[j], ii+k) += locL_P1P1[j][3*i+k];
+                mL_P1P1_stab( nScalar.num[j], ii+k) += locL_P1P1_stab[j][3*i+k];
+            }
+        }
+    }
+    for(int i= 0; i < 4; ++i) {
+        const IdxT ii= nScalar.num[i];
+        if (ii==NoIdx || !(nScalar.WithUnknowns( i))) continue;
+        for(int j=0; j <4; ++j) {
+            const IdxT jj= nScalar.num[j];
+            if (jj==NoIdx || !(nScalar.WithUnknowns( j))) continue;
+            mM_ScalarP1( ii, jj) += locM_P1[i][j];
+            mA_ScalarP1_stab( ii, jj) += locA_P1_stab[i][j];
+        }
+    }
+}
+
+void SetupStokesIF_P1P1( const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P1_stab, MatDescCL* B_P1P1, MatDescCL* M_P1, MatDescCL* S_P1, MatDescCL* L_P1P1, MatDescCL* L_P1P1_stab, MatDescCL* M_ScalarP1, MatDescCL* A_ScalarP1_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, bool fullgrad)
+{
+  ScopeTimerCL scope("SetupStokesIF_P1P1");
+  StokesIFAccumulator_P1P1CL accu( lset, lset_bnd, *(A_P1->RowIdx), *(L_P1P1->RowIdx), A_P1->Data, A_P1_stab->Data, B_P1P1->Data, M_P1->Data, S_P1->Data, L_P1P1->Data, L_P1P1_stab->Data, M_ScalarP1->Data, A_ScalarP1_stab->Data, fullgrad);
+  TetraAccumulatorTupleCL accus;
+  //    MaybeAddProgressBar(MG_, "LapBeltr(P2) Setup", accus, RowIdx.TriangLevel());
+  accus.push_back( &accu);
+  accumulate( accus, MG_, A_P1->GetRowLevel(), A_P1->RowIdx->GetMatchingFunction(), A_P1->RowIdx->GetBndInfo());
+}
+
+/// \brief Basis Class for Accumulator to set up the matrices for interface Stokes.
+class StokesIFAccumulator_P1P2CL : public TetraAccumulatorCL
+{
+  protected:
+    const VecDescCL& lset;
+    const LsetBndDataCL& lset_bnd;
+
+    IdxDescCL &P1Idx_, &ScalarP2Idx_;
+    //IdxT numP1[4], numScalarP1[4];
+
+    MatrixCL &A_P1_, &A_P1_stab_,  &B_P2P1_, &M_P1_, &S_P1_, &L_P2P1_, &L_P2P1_stab_, &M_ScalarP2_, &A_ScalarP2_stab_;
+    MatrixBuilderCL *mA_P1_, *mA_P1_stab_, *mB_P2P1_, *mM_P1_, *mS_P1_, *mL_P2P1_, *mL_P2P1_stab_, *mM_ScalarP2_, *mA_ScalarP2_stab_;
+    double locA_P1[12][12], locA_P1_stab[4][4], locA_P2_stab[10][10], locB_P2P1[10][12], locM_P1[4][4], locM_P2[10][10], locS_P1[12][12], locL_P2P1[10][12], locL_P2P1_stab[10][12];
+
+    LocalStokesCL localStokes_;
+
+    SMatrixCL<3,3> T;
+    double det, absdet;
+    LocalP2CL<> ls_loc;
+    LocalNumbP1CL n;
+    LocalNumbP2CL nScalar;
+
+    ///\brief Computes the mapping from local to global data "n", the local matrices in loc and.
+    void local_setup (const TetraCL& tet);
+    ///\brief Update the global system.
+    void update_global_system ();
+
+  public:
+    StokesIFAccumulator_P1P2CL ( const VecDescCL& ls, const LsetBndDataCL& ls_bnd, IdxDescCL& P1FE, IdxDescCL& ScalarP2FE, MatrixCL& A_P1, MatrixCL& A_P1_stab, MatrixCL& B_P2P1, MatrixCL& M_P1, MatrixCL& S_P1, MatrixCL& L_P2P1, MatrixCL& L_P2P1_stab, MatrixCL& M_ScalarP2, MatrixCL& A_ScalarP2_stab, bool fullGradient);
+
+    ///\brief Initializes matrix-builders and load-vectors
+    void begin_accumulation ();
+    ///\brief Builds the matrices
+    void finalize_accumulation();
+
+    void visit (const TetraCL& sit);
+
+    TetraAccumulatorCL* clone (int /*tid*/) { return new StokesIFAccumulator_P1P2CL ( *this); }
+
+};
+
+StokesIFAccumulator_P1P2CL::StokesIFAccumulator_P1P2CL( const VecDescCL& ls, const LsetBndDataCL& ls_bnd, IdxDescCL& P1FE, IdxDescCL& ScalarP2FE, MatrixCL& A_P1, MatrixCL& A_P1_stab, MatrixCL& B_P2P1, MatrixCL& M_P1, MatrixCL& S_P1, MatrixCL& L_P2P1, MatrixCL& L_P2P1_stab, MatrixCL& M_ScalarP2, MatrixCL& A_ScalarP2_stab, bool fullGradient)
+ : lset(ls), lset_bnd(ls_bnd), P1Idx_(P1FE), ScalarP2Idx_(ScalarP2FE), A_P1_(A_P1), A_P1_stab_(A_P1_stab), B_P2P1_(B_P2P1), M_P1_(M_P1), S_P1_(S_P1), L_P2P1_(L_P2P1), L_P2P1_stab_(L_P2P1_stab), M_ScalarP2_(M_ScalarP2), A_ScalarP2_stab_(A_ScalarP2_stab), localStokes_( fullGradient)
+{}
+
+void StokesIFAccumulator_P1P2CL::begin_accumulation ()
+{
+    std::cout << "entering StokesIF: \n";
+    const size_t num_unks_p1= P1Idx_.NumUnknowns(), num_unks_scalarp2= ScalarP2Idx_.NumUnknowns();
+    mA_P1_= new MatrixBuilderCL( &A_P1_, num_unks_p1, num_unks_p1);
+    mA_P1_stab_= new MatrixBuilderCL( &A_P1_stab_, num_unks_p1, num_unks_p1);
+    mB_P2P1_= new MatrixBuilderCL( &B_P2P1_, num_unks_scalarp2, num_unks_p1);
+    mM_P1_= new MatrixBuilderCL( &M_P1_, num_unks_p1, num_unks_p1);
+    mS_P1_= new MatrixBuilderCL( &S_P1_, num_unks_p1, num_unks_p1);
+    mL_P2P1_= new MatrixBuilderCL( &L_P2P1_, num_unks_scalarp2, num_unks_p1);
+    mL_P2P1_stab_= new MatrixBuilderCL( &L_P2P1_stab_, num_unks_scalarp2, num_unks_p1);
+    mM_ScalarP2_= new MatrixBuilderCL( &M_ScalarP2_, num_unks_scalarp2, num_unks_scalarp2);
+    mA_ScalarP2_stab_= new MatrixBuilderCL( &A_ScalarP2_stab_, num_unks_scalarp2, num_unks_scalarp2);
+}
+
+void StokesIFAccumulator_P1P2CL::finalize_accumulation ()
+{
+    mB_P2P1_->Build();
+    delete mB_P2P1_;
+    mL_P2P1_->Build();
+    delete mL_P2P1_;
+    mL_P2P1_stab_->Build();
+    delete mL_P2P1_stab_;
+    mA_P1_->Build();
+    delete mA_P1_;
+    mM_P1_->Build();
+    delete mM_P1_;
+    mS_P1_->Build();
+    delete mS_P1_;
+    mA_P1_stab_->Build();
+    delete mA_P1_stab_;
+    mM_ScalarP2_->Build();
+    delete mM_ScalarP2_;
+    mA_ScalarP2_stab_->Build();
+    delete mA_ScalarP2_stab_;
+#ifndef _PAR
+    std::cout << "StokesIF_P1P2:\t" << A_P1_.num_nonzeros() << " nonzeros in A, " << A_P1_stab_.num_nonzeros() << " nonzeros in A_stab, "
+              << B_P2P1_.num_nonzeros() << " nonzeros in B, " << M_P1_.num_nonzeros() << " nonzeros in M, " << S_P1_.num_nonzeros() << " nonzeros in S, "
+              << L_P2P1_.num_nonzeros() << " nonzeros in L, " << L_P2P1_stab_.num_nonzeros() << " nonzeros in L_stab, "
+              << M_ScalarP2_.num_nonzeros() << " nonzeros in M_ScalarP1, " << A_ScalarP2_stab_.num_nonzeros() << " nonzeros in A_ScalarP1_stab\n";
+#endif
+    // std::cout << '\n';
+}
+
+void StokesIFAccumulator_P1P2CL::visit (const TetraCL& tet)
+{
+    ls_loc.assign( tet, lset, lset_bnd);
+
+    if (!equal_signs( ls_loc))
+    {
+        local_setup( tet);
+        update_global_system();
+    }
+
+}
+
+void StokesIFAccumulator_P1P2CL::local_setup (const TetraCL& tet)
+{
+    GetTrafoTr( T, det, tet);
+    absdet= std::fabs( det);
+
+    n.assign( tet, P1Idx_, P1Idx_.GetBndInfo());
+    nScalar.assign( tet, ScalarP2Idx_, ScalarP2Idx_.GetBndInfo());
+
+    //GetLocalNumbP1NoBnd( numP1, tet, P1Idx_);
+    //GetLocalNumbP1NoBnd( numScalarP1, tet, ScalarP1Idx_);
+    localStokes_.calcIntegrands( T, ls_loc, tet);
+    localStokes_.calc3DIntegrands(T, ls_loc, tet);
+    localStokes_.setupA_P1( locA_P1);
+    localStokes_.setupA_P1_stab( locA_P1_stab, absdet);
+    localStokes_.setupA_P2_stab( locA_P2_stab, absdet);
+    localStokes_.setupB_P2P1( locB_P2P1);
+    localStokes_.setupM_P1( locM_P1);
+    localStokes_.setupM_P2( locM_P2);
+    localStokes_.setupS_P1( locS_P1);
+    localStokes_.setupL_P2P1( locL_P2P1);
+    localStokes_.setupL_P2P1_stab( locL_P2P1_stab, absdet);
+}
+
+void StokesIFAccumulator_P1P2CL::update_global_system ()
+{
+    MatrixBuilderCL& mA_P1= *mA_P1_;
+    MatrixBuilderCL& mA_P1_stab= *mA_P1_stab_;
+    MatrixBuilderCL& mB_P2P1= *mB_P2P1_;
+    MatrixBuilderCL& mM_P1= *mM_P1_;
+    MatrixBuilderCL& mS_P1= *mS_P1_;
+    MatrixBuilderCL& mL_P2P1= *mL_P2P1_;
+    MatrixBuilderCL& mL_P2P1_stab= *mL_P2P1_stab_;
+    MatrixBuilderCL& mM_ScalarP2= *mM_ScalarP2_;
+    MatrixBuilderCL& mA_ScalarP2_stab= *mA_ScalarP2_stab_;
+
+    for(int i= 0; i < 4; ++i) {
+        const IdxT ii= n.num[i];
+        if (ii==NoIdx || !(n.WithUnknowns( i))) continue;
+        for(int j=0; j < 4; ++j) {
+            const IdxT jj= n.num[j];
+            if (jj==NoIdx || !(n.WithUnknowns( j))) continue;
+            for (int k=0; k<3; ++k) {
+                for (int l=0; l<3; ++l) {
+                    mA_P1( ii+k, jj+l) += locA_P1[3*j+l][3*i+k];
+                    mS_P1( ii+k, jj+l) += locS_P1[3*j+l][3*i+k];
+                    if(k == l) {
+                        mM_P1( ii+k, jj+l) += locM_P1[j][i];
+                        mA_P1_stab( ii+k, jj+l) += locA_P1_stab[j][i];
+                    } else {
+                        mM_P1( ii+k, jj+l) += 0.;
+                        mA_P1_stab( ii+k, jj+l) += 0.;
+                    }
+                }
+             }
+        }
+        for (int j=0; j < 10; ++j) {
+            if (nScalar.num[j]==NoIdx || !(nScalar.WithUnknowns( j))) continue;
+            for (int k=0; k<3; ++k) {
+                mB_P2P1( nScalar.num[j], ii+k) += locB_P2P1[j][3*i+k];
+                mL_P2P1( nScalar.num[j], ii+k) += locL_P2P1[j][3*i+k];
+                mL_P2P1_stab( nScalar.num[j], ii+k) += locL_P2P1_stab[j][3*i+k];
+            }
+        }
+    }
+    for(int i= 0; i < 10; ++i) {
+        const IdxT ii= nScalar.num[i];
+        if (ii==NoIdx || !(nScalar.WithUnknowns( i))) continue;
+        for(int j=0; j < 10; ++j) {
+            const IdxT jj= nScalar.num[j];
+            if (jj==NoIdx || !(nScalar.WithUnknowns( j))) continue;
+            mM_ScalarP2( ii, jj) += locM_P2[i][j];
+            mA_ScalarP2_stab( ii, jj) += locA_P2_stab[i][j];
+        }
+    }
+}
+
+void SetupStokesIF_P1P2( const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P1_stab, MatDescCL* B_P2P1, MatDescCL* M_P1, MatDescCL* S_P1, MatDescCL* L_P2P1, MatDescCL* L_P2P1_stab, MatDescCL* M_ScalarP2, MatDescCL* A_ScalarP2_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, bool fullgrad)
+{
+  ScopeTimerCL scope("SetupStokesIF_P1P2");
+  StokesIFAccumulator_P1P2CL accu( lset, lset_bnd, *(A_P1->RowIdx), *(L_P2P1->RowIdx), A_P1->Data, A_P1_stab->Data, B_P2P1->Data, M_P1->Data, S_P1->Data, L_P2P1->Data, L_P2P1_stab->Data, M_ScalarP2->Data, A_ScalarP2_stab->Data, fullgrad);
+  TetraAccumulatorTupleCL accus;
+  //    MaybeAddProgressBar(MG_, "LapBeltr(P2) Setup", accus, RowIdx.TriangLevel());
+  accus.push_back( &accu);
+  accumulate( accus, MG_, A_P1->GetRowLevel(), A_P1->RowIdx->GetMatchingFunction(), A_P1->RowIdx->GetBndInfo());
+}
+
+/// \brief Accumulator to set up the matrices for interface Stokes.
+class StokesIFAccumulator_P2P1CL : public TetraAccumulatorCL
+{
+  private:
+    const VecDescCL& lset;
+    const LsetBndDataCL& lset_bnd;
+
+    IdxDescCL& P2Idx_;
+    IdxDescCL& ScalarP1Idx_;
+    IdxT numP2[10], numScalarP1[4];
+
+    MatrixCL &A_P2_, &A_P2_stab_, &B_P1P2_, &M_P2_, &S_P2_, &L_P1P2_, &L_P1P2_stab_, &M_ScalarP1_, &A_ScalarP1_stab_;
+    MatrixBuilderCL *mA_P2_, *mA_P2_stab_, *mB_P1P2_, *mM_P2_, *mS_P2_, *mL_P1P2_, *mL_P1P2_stab_, *mM_ScalarP1_, *mA_ScalarP1_stab_ ;
+
+    double locA_P2[30][30], locA_P2_stab[10][10], locB_P1P2[4][30], locM_P2[10][10], locS_P2[30][30], locL_P1P2[4][30], locL_P1P2_stab[4][30], locM_ScalarP1[4][4], locA_ScalarP1_stab[4][4];
+
+    LocalStokesCL localStokes_;
+
+    SMatrixCL<3,3> T;
+    double det, absdet;
+    LocalP2CL<> ls_loc;
+
+    ///\brief Computes the mapping from local to global data "n", the local matrices in loc and.
+    void local_setup (const TetraCL& tet);
+    ///\brief Update the global system.
+    void update_global_system ();
+
+  public:
+    StokesIFAccumulator_P2P1CL ( const VecDescCL& ls, const LsetBndDataCL& ls_bnd, IdxDescCL& P2FE, IdxDescCL& ScalarP1FE, MatrixCL& A_P2, MatrixCL& A_P2_stab, MatrixCL& B_P1P2, MatrixCL& M_P2, MatrixCL& S_P2, MatrixCL& L_P1P2, MatrixCL& L_P1P2_stab, MatrixCL& M_ScalarP1, MatrixCL& A_ScalarP1_stab, bool fullGradient);
+
+    ///\brief Initializes matrix-builders and load-vectors
+    void begin_accumulation ();
+    ///\brief Builds the matrices
+    void finalize_accumulation();
+
+    void visit (const TetraCL& sit);
+
+    TetraAccumulatorCL* clone (int /*tid*/) { return new StokesIFAccumulator_P2P1CL ( *this); }
+};
+
+StokesIFAccumulator_P2P1CL::StokesIFAccumulator_P2P1CL( const VecDescCL& ls, const LsetBndDataCL& ls_bnd, IdxDescCL& P2FE, IdxDescCL& ScalarP1FE, MatrixCL& A_P2, MatrixCL& A_P2_stab, MatrixCL& B_P1P2, MatrixCL& M_P2, MatrixCL& S_P2, MatrixCL& L_P1P2, MatrixCL& L_P1P2_stab, MatrixCL& M_ScalarP1, MatrixCL& A_ScalarP1_stab, bool fullGradient)
+ : lset(ls), lset_bnd(ls_bnd), P2Idx_(P2FE), ScalarP1Idx_(ScalarP1FE), A_P2_(A_P2), A_P2_stab_(A_P2_stab), B_P1P2_(B_P1P2), M_P2_(M_P2), S_P2_(S_P2), L_P1P2_(L_P1P2), L_P1P2_stab_(L_P1P2_stab), M_ScalarP1_(M_ScalarP1), A_ScalarP1_stab_(A_ScalarP1_stab), localStokes_( fullGradient)
+{}
+
+void StokesIFAccumulator_P2P1CL::begin_accumulation ()
+{
+    std::cout << "entering StokesIF: \n";
+    const size_t num_unks_scalarp1= ScalarP1Idx_.NumUnknowns(), num_unks_p2= P2Idx_.NumUnknowns();
+    mA_P2_= new MatrixBuilderCL( &A_P2_, num_unks_p2, num_unks_p2);
+    mA_P2_stab_= new MatrixBuilderCL( &A_P2_stab_, num_unks_p2, num_unks_p2);
+    mB_P1P2_= new MatrixBuilderCL( &B_P1P2_, num_unks_scalarp1, num_unks_p2);
+    mM_P2_= new MatrixBuilderCL( &M_P2_, num_unks_p2, num_unks_p2);
+    mS_P2_= new MatrixBuilderCL( &S_P2_, num_unks_p2, num_unks_p2);
+    mL_P1P2_= new MatrixBuilderCL( &L_P1P2_, num_unks_scalarp1, num_unks_p2);
+    mL_P1P2_stab_= new MatrixBuilderCL( &L_P1P2_stab_, num_unks_scalarp1, num_unks_p2);
+    mM_ScalarP1_= new MatrixBuilderCL( &M_ScalarP1_, num_unks_scalarp1, num_unks_scalarp1);
+    mA_ScalarP1_stab_= new MatrixBuilderCL( &A_ScalarP1_stab_, num_unks_scalarp1, num_unks_scalarp1);
+}
+
+void StokesIFAccumulator_P2P1CL::finalize_accumulation ()
+{
+    mA_P2_->Build();
+    delete mA_P2_;
+    mA_P2_stab_->Build();
+    delete mA_P2_stab_;
+    mB_P1P2_->Build();
+    delete mB_P1P2_;
+    mM_P2_->Build();
+    delete mM_P2_;
+    mS_P2_->Build();
+    delete mS_P2_;
+    mL_P1P2_->Build();
+    delete mL_P1P2_;
+    mL_P1P2_stab_->Build();
+    delete mL_P1P2_stab_;
+    mM_ScalarP1_->Build();
+    delete mM_ScalarP1_;
+    mA_ScalarP1_stab_->Build();
+    delete mA_ScalarP1_stab_;
+
+#ifndef _PAR
+    std::cout << "StokesIF_P2P1:\t" << A_P2_.num_nonzeros() << " nonzeros in A, " << A_P2_stab_.num_nonzeros() << " nonzeros in A_stab, "
+              << B_P1P2_.num_nonzeros() << " nonzeros in B, " << M_P2_.num_nonzeros() << " nonzeros in M, " << S_P2_.num_nonzeros() << " nonzeros in S, "
+              << L_P1P2_.num_nonzeros() << " nonzeros in L, " << L_P1P2_stab_.num_nonzeros() << " nonzeros in L_stab, "
+              << M_ScalarP1_.num_nonzeros() << " nonzeros in M_ScalarP1, " << A_ScalarP1_stab_.num_nonzeros() << " nonzeros in A_ScalarP1_stab\n";
+#endif
+    // std::cout << '\n';
+}
+
+void StokesIFAccumulator_P2P1CL::visit (const TetraCL& tet)
+{
+    ls_loc.assign( tet, lset, lset_bnd);
+
+    if (!equal_signs( ls_loc))
+    {
+        local_setup( tet);
+        update_global_system();
+    }
+
+}
+
+void StokesIFAccumulator_P2P1CL::local_setup (const TetraCL& tet)
+{
+    GetTrafoTr( T, det, tet);
+    absdet= std::fabs( det);
+
+    GetLocalNumbP2NoBnd( numP2, tet, P2Idx_);
+    GetLocalNumbP1NoBnd( numScalarP1, tet, ScalarP1Idx_);
+    localStokes_.calcIntegrands( T, ls_loc, tet);
+    localStokes_.calc3DIntegrands(T, ls_loc, tet);
+    localStokes_.setupA_P2( locA_P2);
+    localStokes_.setupA_P2_stab( locA_P2_stab, absdet);
+    localStokes_.setupB_P1P2( locB_P1P2);
+    localStokes_.setupM_P2( locM_P2);
+    localStokes_.setupS_P2( locS_P2);
+    localStokes_.setupL_P1P2( locL_P1P2);
+    localStokes_.setupL_P1P2_stab( locL_P1P2_stab, absdet);
+    localStokes_.setupM_P1( locM_ScalarP1);
+    localStokes_.setupA_P1_stab( locA_ScalarP1_stab, absdet);
+}
+
+void StokesIFAccumulator_P2P1CL::update_global_system ()
+{
+    MatrixBuilderCL& mA_P2= *mA_P2_;
+    MatrixBuilderCL& mA_P2_stab= *mA_P2_stab_;
+    MatrixBuilderCL& mB_P1P2= *mB_P1P2_;
+    MatrixBuilderCL& mM_P2= *mM_P2_;
+    MatrixBuilderCL& mS_P2= *mS_P2_;
+    MatrixBuilderCL& mL_P1P2= *mL_P1P2_;
+    MatrixBuilderCL& mL_P1P2_stab= *mL_P1P2_stab_;
+    MatrixBuilderCL& mM_ScalarP1= *mM_ScalarP1_;
+    MatrixBuilderCL& mA_ScalarP1_stab= *mA_ScalarP1_stab_;
+
+    for(int i= 0; i < 10; ++i) {
+        const IdxT ii= numP2[i];
+        if (ii==NoIdx) continue;
+        for(int j=0; j <10; ++j) {
+            const IdxT jj= numP2[j];
+            if (jj==NoIdx) continue;
+            for (int k=0; k<3; ++k) {
+                for (int l=0; l<3; ++l) {
+                    mA_P2( ii+k, jj+l) += locA_P2[3*j+l][3*i+k];
+                    mS_P2( ii+k, jj+l) += locS_P2[3*j+l][3*i+k];
+                    if(k == l) {
+                        mM_P2( ii+k, jj+l) += locM_P2[j][i];
+                        mA_P2_stab( ii+k, jj+l) += locA_P2_stab[j][i];
+                    } else {
+                        mM_P2( ii+k, jj+l) += 0.;
+                        mA_P2_stab( ii+k, jj+l) += 0.;
+                    }
+                }
+             }
+        }
+        for (int j=0; j < 4; ++j) {
+            if (numScalarP1[j]==NoIdx) continue;
+            for (int k=0; k<3; ++k) {
+                mB_P1P2( numScalarP1[j], ii+k) += locB_P1P2[j][3*i+k];
+                mL_P1P2( numScalarP1[j], ii+k) += locL_P1P2[j][3*i+k];
+                mL_P1P2_stab( numScalarP1[j], ii+k) += locL_P1P2_stab[j][3*i+k];
+            }
+        }
+    }
+    for(int i= 0; i < 4; ++i) {
+        const IdxT ii= numScalarP1[i];
+        if (ii==NoIdx) continue;
+        for(int j=0; j <4; ++j) {
+            const IdxT jj= numScalarP1[j];
+            if (jj==NoIdx) continue;
+            mM_ScalarP1( ii, jj) += locM_ScalarP1[i][j];
+            mA_ScalarP1_stab( ii, jj) += locA_ScalarP1_stab[i][j];
+        }
+    }
+}
+
+void SetupStokesIF_P2P1( const MultiGridCL& MG_, MatDescCL* A_P2, MatDescCL* A_P2_stab, MatDescCL* B_P1P2, MatDescCL* M_P2, MatDescCL* S_P2, MatDescCL* L_P1P2, MatDescCL* L_P1P2_stab, MatDescCL* M_ScalarP1, MatDescCL* A_ScalarP1_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, bool fullgrad)
+{
+  ScopeTimerCL scope("SetupStokesIF");
+  StokesIFAccumulator_P2P1CL accu( lset, lset_bnd, *(A_P2->RowIdx), *(B_P1P2->RowIdx), A_P2->Data, A_P2_stab->Data, B_P1P2->Data, M_P2->Data, S_P2->Data, L_P1P2->Data, L_P1P2_stab->Data, M_ScalarP1->Data, A_ScalarP1_stab->Data, fullgrad);
+  TetraAccumulatorTupleCL accus;
+  //    MaybeAddProgressBar(MG_, "LapBeltr(P2) Setup", accus, RowIdx.TriangLevel());
+  accus.push_back( &accu);
+  accumulate( accus, MG_, A_P2->GetRowLevel(), A_P2->RowIdx->GetMatchingFunction(), A_P2->RowIdx->GetBndInfo());
+}
+
+/// \brief Accumulator to set up the matrices for interface Stokes.
+class StokesIFAccumulator_P2P2CL : public TetraAccumulatorCL
+{
+  private:
+    const VecDescCL& lset;
+    const LsetBndDataCL& lset_bnd;
+
+    IdxDescCL& P2Idx_;
+    IdxDescCL& ScalarP2Idx_;
+    IdxT numP2[10], numScalarP2[10];
+
+    MatrixCL &A_P2_, &A_P2_stab_, &B_P2P2_, &M_P2_, &S_P2_, &L_P2P2_, &L_P2P2_stab_, &M_ScalarP2_, &A_ScalarP2_stab_;
+    MatrixBuilderCL *mA_P2_, *mA_P2_stab_, *mB_P2P2_, *mM_P2_, *mS_P2_, *mL_P2P2_, *mL_P2P2_stab_, *mM_ScalarP2_, *mA_ScalarP2_stab_ ;
+
+    double locA_P2[30][30], locA_P2_stab[10][10], locB_P2P2[10][30], locM_P2[10][10], locS_P2[30][30], locL_P2P2[10][30], locL_P2P2_stab[10][30], locM_ScalarP2[10][10], locA_ScalarP2_stab[10][10];
+
+    LocalStokesCL localStokes_;
+
+    SMatrixCL<3,3> T;
+    double det, absdet;
+    LocalP2CL<> ls_loc;
+
+    ///\brief Computes the mapping from local to global data "n", the local matrices in loc and.
+    void local_setup (const TetraCL& tet);
+    ///\brief Update the global system.
+    void update_global_system ();
+
+  public:
+    StokesIFAccumulator_P2P2CL ( const VecDescCL& ls, const LsetBndDataCL& ls_bnd, IdxDescCL& P2FE, IdxDescCL& ScalarP2FE, MatrixCL& A_P2, MatrixCL& A_P2_stab, MatrixCL& B_P2P2, MatrixCL& M_P2, MatrixCL& S_P2, MatrixCL& L_P2P2, MatrixCL& L_P2P2_stab, MatrixCL& M_ScalarP2, MatrixCL& A_ScalarP2_stab, bool fullGradient);
+
+    ///\brief Initializes matrix-builders and load-vectors
+    void begin_accumulation ();
+    ///\brief Builds the matrices
+    void finalize_accumulation();
+
+    void visit (const TetraCL& sit);
+
+    TetraAccumulatorCL* clone (int /*tid*/) { return new StokesIFAccumulator_P2P2CL ( *this); }
+};
+
+StokesIFAccumulator_P2P2CL::StokesIFAccumulator_P2P2CL( const VecDescCL& ls, const LsetBndDataCL& ls_bnd, IdxDescCL& P2FE, IdxDescCL& ScalarP2FE, MatrixCL& A_P2, MatrixCL& A_P2_stab, MatrixCL& B_P2P2, MatrixCL& M_P2, MatrixCL& S_P2, MatrixCL& L_P2P2, MatrixCL& L_P2P2_stab, MatrixCL& M_ScalarP2, MatrixCL& A_ScalarP2_stab, bool fullGradient)
+ : lset(ls), lset_bnd(ls_bnd), P2Idx_(P2FE), ScalarP2Idx_(ScalarP2FE), A_P2_(A_P2), A_P2_stab_(A_P2_stab), B_P2P2_(B_P2P2), M_P2_(M_P2), S_P2_(S_P2), L_P2P2_(L_P2P2), L_P2P2_stab_(L_P2P2_stab), M_ScalarP2_(M_ScalarP2), A_ScalarP2_stab_(A_ScalarP2_stab), localStokes_( fullGradient)
+{}
+
+void StokesIFAccumulator_P2P2CL::begin_accumulation ()
+{
+    std::cout << "entering StokesIF: \n";
+    const size_t num_unks_scalarp2= ScalarP2Idx_.NumUnknowns(), num_unks_p2= P2Idx_.NumUnknowns();
+    mA_P2_= new MatrixBuilderCL( &A_P2_, num_unks_p2, num_unks_p2);
+    mA_P2_stab_= new MatrixBuilderCL( &A_P2_stab_, num_unks_p2, num_unks_p2);
+    mB_P2P2_= new MatrixBuilderCL( &B_P2P2_, num_unks_scalarp2, num_unks_p2);
+    mM_P2_= new MatrixBuilderCL( &M_P2_, num_unks_p2, num_unks_p2);
+    mS_P2_= new MatrixBuilderCL( &S_P2_, num_unks_p2, num_unks_p2);
+    mL_P2P2_= new MatrixBuilderCL( &L_P2P2_, num_unks_scalarp2, num_unks_p2);
+    mL_P2P2_stab_= new MatrixBuilderCL( &L_P2P2_stab_, num_unks_scalarp2, num_unks_p2);
+    mM_ScalarP2_= new MatrixBuilderCL( &M_ScalarP2_, num_unks_scalarp2, num_unks_scalarp2);
+    mA_ScalarP2_stab_= new MatrixBuilderCL( &A_ScalarP2_stab_, num_unks_scalarp2, num_unks_scalarp2);
+}
+
+void StokesIFAccumulator_P2P2CL::finalize_accumulation ()
+{
+    mA_P2_->Build();
+    delete mA_P2_;
+    mA_P2_stab_->Build();
+    delete mA_P2_stab_;
+    mB_P2P2_->Build();
+    delete mB_P2P2_;
+    mM_P2_->Build();
+    delete mM_P2_;
+    mS_P2_->Build();
+    delete mS_P2_;
+    mL_P2P2_->Build();
+    delete mL_P2P2_;
+    mL_P2P2_stab_->Build();
+    delete mL_P2P2_stab_;
+    mM_ScalarP2_->Build();
+    delete mM_ScalarP2_;
+    mA_ScalarP2_stab_->Build();
+    delete mA_ScalarP2_stab_;
+
+#ifndef _PAR
+    std::cout << "StokesIF_P2P2:\t" << A_P2_.num_nonzeros() << " nonzeros in A, " << A_P2_stab_.num_nonzeros() << " nonzeros in A_stab, "
+              << B_P2P2_.num_nonzeros() << " nonzeros in B, " << M_P2_.num_nonzeros() << " nonzeros in M, " << S_P2_.num_nonzeros() << " nonzeros in S, "
+              << L_P2P2_.num_nonzeros() << " nonzeros in L, " << L_P2P2_stab_.num_nonzeros() << " nonzeros in L_stab, "
+              << M_ScalarP2_.num_nonzeros() << " nonzeros in M_ScalarP2, " << A_ScalarP2_stab_.num_nonzeros() << " nonzeros in A_ScalarP2_stab\n";
+#endif
+    // std::cout << '\n';
+}
+
+void StokesIFAccumulator_P2P2CL::visit (const TetraCL& tet)
+{
+    ls_loc.assign( tet, lset, lset_bnd);
+
+    if (!equal_signs( ls_loc))
+    {
+        local_setup( tet);
+        update_global_system();
+    }
+
+}
+
+void StokesIFAccumulator_P2P2CL::local_setup (const TetraCL& tet)
+{
+    GetTrafoTr( T, det, tet);
+    absdet= std::fabs( det);
+
+    GetLocalNumbP2NoBnd( numP2, tet, P2Idx_);
+    GetLocalNumbP2NoBnd( numScalarP2, tet, ScalarP2Idx_);
+    localStokes_.calcIntegrands( T, ls_loc, tet);
+    localStokes_.calc3DIntegrands(T, ls_loc, tet);
+    localStokes_.setupA_P2( locA_P2);
+    localStokes_.setupA_P2_stab( locA_P2_stab, absdet);
+    localStokes_.setupB_P2P2( locB_P2P2);
+    localStokes_.setupM_P2( locM_P2);
+    localStokes_.setupS_P2( locS_P2);
+    localStokes_.setupL_P2P2( locL_P2P2);
+    localStokes_.setupL_P2P2_stab( locL_P2P2_stab, absdet);
+    localStokes_.setupM_P2( locM_ScalarP2);
+    localStokes_.setupA_P2_stab( locA_ScalarP2_stab, absdet);
+}
+
+void StokesIFAccumulator_P2P2CL::update_global_system ()
+{
+    MatrixBuilderCL& mA_P2= *mA_P2_;
+    MatrixBuilderCL& mA_P2_stab= *mA_P2_stab_;
+    MatrixBuilderCL& mB_P2P2= *mB_P2P2_;
+    MatrixBuilderCL& mM_P2= *mM_P2_;
+    MatrixBuilderCL& mS_P2= *mS_P2_;
+    MatrixBuilderCL& mL_P2P2= *mL_P2P2_;
+    MatrixBuilderCL& mL_P2P2_stab= *mL_P2P2_stab_;
+    MatrixBuilderCL& mM_ScalarP2= *mM_ScalarP2_;
+    MatrixBuilderCL& mA_ScalarP2_stab= *mA_ScalarP2_stab_;
+
+    for(int i= 0; i < 10; ++i) {
+        const IdxT ii= numP2[i];
+        if (ii==NoIdx) continue;
+        for(int j=0; j <10; ++j) {
+            const IdxT jj= numP2[j];
+            if (jj==NoIdx) continue;
+            for (int k=0; k<3; ++k) {
+                for (int l=0; l<3; ++l) {
+                    mA_P2( ii+k, jj+l) += locA_P2[3*j+l][3*i+k];
+                    mS_P2( ii+k, jj+l) += locS_P2[3*j+l][3*i+k];
+                    if(k == l) {
+                        mM_P2( ii+k, jj+l) += locM_P2[j][i];
+                        mA_P2_stab( ii+k, jj+l) += locA_P2_stab[j][i];
+                    } else {
+                        mM_P2( ii+k, jj+l) += 0.;
+                        mA_P2_stab( ii+k, jj+l) += 0.;
+                    }
+                }
+             }
+        }
+        for (int j=0; j < 10; ++j) {
+            if (numScalarP2[j]==NoIdx) continue;
+            for (int k=0; k<3; ++k) {
+                mB_P2P2( numScalarP2[j], ii+k) += locB_P2P2[j][3*i+k];
+                mL_P2P2( numScalarP2[j], ii+k) += locL_P2P2[j][3*i+k];
+                mL_P2P2_stab( numScalarP2[j], ii+k) += locL_P2P2_stab[j][3*i+k];
+            }
+        }
+    }
+    for(int i= 0; i < 10; ++i) {
+        const IdxT ii= numScalarP2[i];
+        if (ii==NoIdx) continue;
+        for(int j=0; j < 10; ++j) {
+            const IdxT jj= numScalarP2[j];
+            if (jj==NoIdx) continue;
+            mM_ScalarP2( ii, jj) += locM_ScalarP2[i][j];
+            mA_ScalarP2_stab( ii, jj) += locA_ScalarP2_stab[i][j];
+        }
+    }
+}
+
+void SetupStokesIF_P2P2( const MultiGridCL& MG_, MatDescCL* A_P2, MatDescCL* A_P2_stab, MatDescCL* B_P2P2, MatDescCL* M_P2, MatDescCL* S_P2, MatDescCL* L_P2P2, MatDescCL* L_P2P2_stab, MatDescCL* M_ScalarP2, MatDescCL* A_ScalarP2_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, bool fullgrad)
+{
+  ScopeTimerCL scope("SetupStokesIF");
+  StokesIFAccumulator_P2P2CL accu( lset, lset_bnd, *(A_P2->RowIdx), *(B_P2P2->RowIdx), A_P2->Data, A_P2_stab->Data, B_P2P2->Data, M_P2->Data, S_P2->Data, L_P2P2->Data, L_P2P2_stab->Data, M_ScalarP2->Data, A_ScalarP2_stab->Data, fullgrad);
+  TetraAccumulatorTupleCL accus;
+  //    MaybeAddProgressBar(MG_, "LapBeltr(P2) Setup", accus, RowIdx.TriangLevel());
+  accus.push_back( &accu);
+  accumulate( accus, MG_, A_P2->GetRowLevel(), A_P2->RowIdx->GetMatchingFunction(), A_P2->RowIdx->GetBndInfo());
+}
+
+void SetupInterfaceVectorRhsP1 (const MultiGridCL& mg, VecDescCL* v,
+    const VecDescCL& ls, const BndDataCL<>& lsetbnd, instat_vector_fun_ptr f)
+{
+    const IdxT num_unks= v->RowIdx->NumUnknowns();
+    const Uint lvl = v->GetLevel();
+
+    double totalsurfarea(0.);
+
+    v->Clear(0);
+
+    //IdxT num[10];
+
+    LocalNumbP1CL n;
+
+    std::cout << "entering SetupInterfaceVectorRhsP1: " << num_unks << " dof... ";
+
+    LocalP1CL<> p1[4];
+    P1DiscCL::GetP1Basis( p1);
+
+//    LocalP2CL<> p2[10];
+//    for(int i=0; i<10; i++)  // P2-Basis-Functions
+//      p2[i][i] = 1.;
+
+    Quad5_2DCL<double> q1[4]; //basis function
+
+    // double det, absdet;
+
+    InterfaceTriangleCL triangle;
+
+    Point3DCL e_k;
+
+    DROPS_FOR_TRIANG_CONST_TETRA( mg, lvl, it) {
+        triangle.Init( *it, ls, lsetbnd);
+        if (triangle.Intersects()) { // We are at the phase boundary.
+          n.assign( *it, *v->RowIdx, lsetbnd);
+          //GetLocalNumbP2NoBnd( num, *it, *v->RowIdx);
+
+            for (int ch= 0; ch < 8; ++ch) {
+                triangle.ComputeForChild( ch);
+                for (int tri= 0; tri < triangle.GetNumTriangles(); ++tri) {
+                  //P2DiscCL::GetP2Basis( q2, &triangle.GetBary( tri));
+                    for (int i= 0; i < 4; ++i)
+                      q1[i].assign( p1[i], &triangle.GetBary( tri));
+
+                    Quad5_2DCL<Point3DCL> qf( *it, &triangle.GetBary( tri), f);
+                    Quad5_2DCL<double> surfarea(1.0), rhs;
+                    totalsurfarea += surfarea.quad( triangle.GetAbsDet( tri));
+
+                    for (int i= 0; i < 4; ++i) {
+                        if (n.num[i] == NoIdx) continue;
+                        //rhs = qf*q2[i];
+                        for (int k=0; k<3; ++k) {
+                            e_k= DROPS::std_basis<3>( k+1);
+                            rhs = dot(e_k, qf)*q1[i];
+                            v->Data[n.num[i] + k] += rhs.quad( triangle.GetAbsDet( tri));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    std::cout << " VectorRhs set up." << std::endl;
+    std::cout << "Total surface area: "<<totalsurfarea<<std::endl;
+}
+
+void SetupInterfaceVectorRhsP2 (const MultiGridCL& mg, VecDescCL* v,
+    const VecDescCL& ls, const BndDataCL<>& lsetbnd, instat_vector_fun_ptr f)
+{
+    const IdxT num_unks= v->RowIdx->NumUnknowns();
+    const Uint lvl = v->GetLevel();
+
+    double totalsurfarea(0.);
+
+    v->Clear(0);
+
+    //IdxT num[10];
+
+    LocalNumbP2CL n;
+
+    std::cout << "entering SetupInterfaceVectorRhsP2: " << num_unks << " dof... ";
+
+    LocalP2CL<> p2[10];
+    P2DiscCL::GetP2Basis( p2);
+
+//    LocalP2CL<> p2[10];
+//    for(int i=0; i<10; i++)  // P2-Basis-Functions
+//      p2[i][i] = 1.;
+
+    Quad5_2DCL<double> q2[10]; //basis function
+
+    // double det, absdet;
+
+    InterfaceTriangleCL triangle;
+
+    Point3DCL e_k;
+
+    DROPS_FOR_TRIANG_CONST_TETRA( mg, lvl, it) {
+        triangle.Init( *it, ls, lsetbnd);
+        if (triangle.Intersects()) { // We are at the phase boundary.
+          n.assign( *it, *v->RowIdx, lsetbnd);
+          //GetLocalNumbP2NoBnd( num, *it, *v->RowIdx);
+
+            for (int ch= 0; ch < 8; ++ch) {
+                triangle.ComputeForChild( ch);
+                for (int tri= 0; tri < triangle.GetNumTriangles(); ++tri) {
+                  //P2DiscCL::GetP2Basis( q2, &triangle.GetBary( tri));
+                    for (int i= 0; i < 10; ++i)
+                      q2[i].assign( p2[i], &triangle.GetBary( tri));
+
+                    Quad5_2DCL<Point3DCL> qf( *it, &triangle.GetBary( tri), f);
+                    Quad5_2DCL<double> surfarea(1.0), rhs;
+                    totalsurfarea += surfarea.quad( triangle.GetAbsDet( tri));
+
+                    for (int i= 0; i < 10; ++i) {
+                        if (n.num[i] == NoIdx) continue;
+                        //rhs = qf*q2[i];
+                        for (int k=0; k<3; ++k) {
+                            e_k= DROPS::std_basis<3>( k+1);
+                            rhs = dot(e_k, qf)*q2[i];
+                            v->Data[n.num[i] + k] += rhs.quad( triangle.GetAbsDet( tri));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    std::cout << " VectorRhs set up." << std::endl;
+    std::cout << "Total surface area: "<<totalsurfarea<<std::endl;
+}
+
 
 void P1Init (instat_scalar_fun_ptr icf, VecDescCL& ic, const MultiGridCL& mg, double t)
 {
@@ -681,6 +2019,28 @@ VTKIfaceScalarCL::put (VTKOutCL& cf) const
         cf.PutScalar( make_P2Eval( mg_, bnd, uext), varName());
 
     fullidx.DeleteNumbering( mg_);
+}
+
+void VTKIfaceVectorCL::put (VTKOutCL& cf) const
+{
+    IdxDescCL pidx;
+    if(P2_)
+      pidx.SetFE(vecP2_FE);
+    else
+      pidx.SetFE(vecP1_FE);
+    pidx.CreateNumbering( u_.RowIdx->TriangLevel(), mg_);
+    std::cout<<"vtk unknows: "<<pidx.NumUnknowns()<<std::endl;
+    VecDescCL pu( &pidx);
+    Extend( mg_, u_, pu);
+
+    P2EvalCL<SVectorCL<3>, const BndDataCL<Point3DCL>, const VecDescBaseCL<VectorCL> > eval2(&pu, &BndData_, &mg_);
+    P1EvalCL<SVectorCL<3>, const BndDataCL<Point3DCL>, const VecDescBaseCL<VectorCL> > eval1(&pu, &BndData_, &mg_);
+    if(P2_)
+      cf.PutVector( eval2, varName());
+    else
+      cf.PutVector( eval1, varName());
+
+    pidx.DeleteNumbering( mg_);
 }
 
 

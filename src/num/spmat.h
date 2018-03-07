@@ -706,6 +706,8 @@ public:
                               double, const SparseMatBaseCL<T>&,
                               double, const SparseMatBaseCL<T>&);
 
+    SparseMatBaseCL& concat_under (const SparseMatBaseCL<T>&, const SparseMatBaseCL<T>&);
+
     void insert_col (size_t c, const VectorBaseCL<T>& v);
 
     ///\brief Resize to new dimensions. The old content is lost.
@@ -1178,6 +1180,77 @@ void ortho( VectorBaseCL<T>& v, const VectorBaseCL<T>& k, const SparseMatBaseCL<
     const double alpha= dot(v,Yk)/dot(k,Yk);
     v-= alpha*k;
 }
+
+template <typename T>
+SparseMatBaseCL<T>& SparseMatBaseCL<T>::concat_under (const SparseMatBaseCL<T>& A, const SparseMatBaseCL<T>& B)
+{
+    num_rows(A.num_rows() + B.num_rows());
+    num_cols(A.num_cols());
+    num_nonzeros(A.num_nonzeros() + B.num_nonzeros());
+    _rowbeg[0] = 0;
+
+    IncrementVersion();
+
+    size_t maxiteration;
+
+    if(A.num_nonzeros() + B.num_nonzeros() < A.num_rows() + B.num_rows())
+    {
+        maxiteration = A.num_rows() + B.num_rows();
+    }
+    else
+    {
+        maxiteration = A.num_nonzeros() + B.num_nonzeros();
+    }
+
+    for (size_t i = 0; i<maxiteration; i++)
+    {
+        if(i<A.num_nonzeros())
+        {
+            _val[i] = A.val(i);
+            _colind[i] = A.col_ind(i);
+        }
+        if(i<A.num_rows()+1)
+        {
+            _rowbeg[i] = A.row_beg(i);
+        }
+        if((i>=A.num_nonzeros()) && (i<B.num_nonzeros()+A.num_nonzeros()))
+        {
+            _val[i] = B.val(i-A.num_nonzeros());
+            _colind[i] = B.col_ind(i-A.num_nonzeros());
+        }
+        if((i>=A.num_rows()) && (i<B.num_rows()+A.num_rows()))
+        {
+            _rowbeg[i+1] = B.row_beg(i+1-A.num_rows()) + A.row_beg(A.num_rows());
+        }
+    }
+
+//    for (size_t i = 0; i<A.num_nonzeros(); i++)
+//    {
+//        _val[i] = A.val(i);
+//        _colind[i] = A.col_ind(i);
+//    }
+
+//    for (size_t i = 0; i<A.num_rows()+1; i++)
+//    {
+//        _rowbeg[i] = A.row_beg(i);
+//    }
+
+//    for (size_t i = 0; i<B.num_nonzeros(); i++)
+//    {
+//        _val[i+A.num_nonzeros()] = B.val(i);
+//        _colind[i+A.num_nonzeros()] = B.col_ind(i);
+//    }
+
+//    for (size_t i = 0; i<B.num_rows(); i++)
+//    {
+//        _rowbeg[i+A.num_rows()+1] = B.row_beg(i+1) + A.row_beg(A.num_rows());
+//    }
+
+
+    return *this;
+
+}
+
 
 /// \brief Compute the linear combination of two sparse matrices efficiently.
 /// The new sparsity pattern is computed by merging the lists of _colind (removing the duplicates) row by row.
