@@ -918,7 +918,7 @@ void SetupStokesIF_P1P1( const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P
   TetraAccumulatorTupleCL accus;
   //    MaybeAddProgressBar(MG_, "LapBeltr(P2) Setup", accus, RowIdx.TriangLevel());
   accus.push_back( &accu);
-  accumulate( accus, MG_, A_P1->GetRowLevel(), A_P1->RowIdx->GetMatchingFunction(), A_P1->RowIdx->GetBndInfo());
+  accumulate( accus, MG_, A_P1->GetRowLevel(), A_P1->RowIdx->GetBndInfo());
 }
 
 /// \brief Basis Class for Accumulator to set up the matrices for interface Stokes.
@@ -1105,7 +1105,7 @@ void SetupStokesIF_P1P2( const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P
   TetraAccumulatorTupleCL accus;
   //    MaybeAddProgressBar(MG_, "LapBeltr(P2) Setup", accus, RowIdx.TriangLevel());
   accus.push_back( &accu);
-  accumulate( accus, MG_, A_P1->GetRowLevel(), A_P1->RowIdx->GetMatchingFunction(), A_P1->RowIdx->GetBndInfo());
+  accumulate( accus, MG_, A_P1->GetRowLevel(), A_P1->RowIdx->GetBndInfo());
 }
 
 /// \brief Accumulator to set up the matrices for interface Stokes.
@@ -1289,7 +1289,7 @@ void SetupStokesIF_P2P1( const MultiGridCL& MG_, MatDescCL* A_P2, MatDescCL* A_P
   TetraAccumulatorTupleCL accus;
   //    MaybeAddProgressBar(MG_, "LapBeltr(P2) Setup", accus, RowIdx.TriangLevel());
   accus.push_back( &accu);
-  accumulate( accus, MG_, A_P2->GetRowLevel(), A_P2->RowIdx->GetMatchingFunction(), A_P2->RowIdx->GetBndInfo());
+  accumulate( accus, MG_, A_P2->GetRowLevel(), A_P2->RowIdx->GetBndInfo());
 }
 
 /// \brief Accumulator to set up the matrices for interface Stokes.
@@ -1473,7 +1473,7 @@ void SetupStokesIF_P2P2( const MultiGridCL& MG_, MatDescCL* A_P2, MatDescCL* A_P
   TetraAccumulatorTupleCL accus;
   //    MaybeAddProgressBar(MG_, "LapBeltr(P2) Setup", accus, RowIdx.TriangLevel());
   accus.push_back( &accu);
-  accumulate( accus, MG_, A_P2->GetRowLevel(), A_P2->RowIdx->GetMatchingFunction(), A_P2->RowIdx->GetBndInfo());
+  accumulate( accus, MG_, A_P2->GetRowLevel(), A_P2->RowIdx->GetBndInfo());
 }
 
 void SetupInterfaceVectorRhsP1 (const MultiGridCL& mg, VecDescCL* v,
@@ -2011,12 +2011,11 @@ VTKIfaceScalarCL::put (VTKOutCL& cf) const
     fullidx.CreateNumbering( u_.RowIdx->TriangLevel(), mg_);
     VecDescCL uext( &fullidx);
     Extend( mg_, u_, uext);
-    BndDataCL<> bnd( 0);
 
     if (u_.RowIdx->GetFE() == P1IF_FE)
-        cf.PutScalar( make_P1Eval( mg_, bnd, uext), varName());
+        cf.PutScalar( make_P1Eval( mg_, BndData_, uext), varName());
     else if (u_.RowIdx->GetFE() == P2IF_FE)
-        cf.PutScalar( make_P2Eval( mg_, bnd, uext), varName());
+        cf.PutScalar( make_P2Eval( mg_, BndData_, uext), varName());
 
     fullidx.DeleteNumbering( mg_);
 }

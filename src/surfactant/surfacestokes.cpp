@@ -63,7 +63,7 @@ void InitVecLaplace(const MultiGridCL& MG, LevelsetP2CL& lset, DROPS::VecDescCL&
 int main (int argc, char* argv[])
 {
   try {
-    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "surfactant.json");
+    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/surfactant/surfactant/default.json");
     std::cout << P << std::endl;
 
     DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
@@ -158,14 +158,14 @@ int main (int argc, char* argv[])
     BndDataCL<double> pbnd( 0);
     read_BndData( pbnd, mg, P.get_child( "Stokes.PressureBndData"));
 
-    DROPS::IdxDescCL ifaceVecP2idx( vecP2IF_FE, vbnd, vbnd.GetMatchingFunction());
-    DROPS::IdxDescCL ifaceVecP1idx( vecP1IF_FE, vbnd, vbnd.GetMatchingFunction());
-    DROPS::IdxDescCL ifaceP1idx( P1IF_FE, pbnd, pbnd.GetMatchingFunction());
-    DROPS::IdxDescCL ifaceP2idx( P2IF_FE, pbnd, pbnd.GetMatchingFunction());
-    DROPS::IdxDescCL vecP2idx( vecP2_FE, vbnd, vbnd.GetMatchingFunction());
-    DROPS::IdxDescCL vecP1idx( vecP1_FE, vbnd, vbnd.GetMatchingFunction());
-    DROPS::IdxDescCL P1FEidx( P1_FE, pbnd, pbnd.GetMatchingFunction());
-    DROPS::IdxDescCL P2FEidx( P2_FE, pbnd, pbnd.GetMatchingFunction());
+    DROPS::IdxDescCL ifaceVecP2idx( vecP2IF_FE, vbnd);
+    DROPS::IdxDescCL ifaceVecP1idx( vecP1IF_FE, vbnd);
+    DROPS::IdxDescCL ifaceP1idx( P1IF_FE, pbnd);
+    DROPS::IdxDescCL ifaceP2idx( P2IF_FE, pbnd);
+    DROPS::IdxDescCL vecP2idx( vecP2_FE, vbnd);
+    DROPS::IdxDescCL vecP1idx( vecP1_FE, vbnd);
+    DROPS::IdxDescCL P1FEidx( P1_FE, pbnd);
+    DROPS::IdxDescCL P2FEidx( P2_FE, pbnd);
 
     ifaceVecP2idx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
     ifaceVecP2idx.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
@@ -456,6 +456,7 @@ int main (int argc, char* argv[])
         Ahat.LinComb(1., A.Data, 1., M.Data, eta, S.Data, epsilon, A_stab.Data);
         Bhat.LinComb(1., L.Data, hat_epsilon, L_stab.Data);
 
+
         WriteToFile(Ahat, "MatrixAhat2", "Test");
         WriteToFile(Bhat, "MatrixBhat2", "Test");
         WriteToFile(Schur_hat, "MatrixSchur_hat2", "Test");
@@ -468,8 +469,9 @@ int main (int argc, char* argv[])
         //VectorCL calcrhs2 = Bhat*vSol.Data;
         //sfsdf
         VectorCL calcrhs2 = Bhat*ZeroVec.Data;
+        MatrixCL Zero(calcrhs2);
 
-        stokessolver->Solve(Ahat, Bhat, v.Data, p.Data, rhs.Data, calcrhs2, v.RowIdx->GetEx(), p.RowIdx->GetEx() ); // Does not work in parallel!!!
+        stokessolver->Solve(Ahat, Bhat, Zero, v.Data, p.Data, rhs.Data, calcrhs2, v.RowIdx->GetEx(), p.RowIdx->GetEx() ); // Does not work in parallel!!!
 
         std::cout << "Iter: " << stokessolver->GetIter() << "\tres: " << stokessolver->GetResid() << '\n';
 
@@ -700,8 +702,8 @@ std::cout << "The value of pSol^T*L_stab*v is: " << dot(L_stab.Data*v.Data, pSol
     vtkwriter->Register( make_VTKIfaceVector(mg, rhs, "rhs", velFE, vbnd));
 //    vtkwriter->Register( make_VTKIfaceVector(mg, vSol3, "velSol3", "P1", vbnd));
     vtkwriter->Register( make_VTKIfaceVector(mg, v, "velocity", velFE, vbnd));
-    vtkwriter->Register( make_VTKIfaceScalar(mg, p, "pressure", prFE, pbnd));
-    vtkwriter->Register( make_VTKIfaceScalar(mg, pSol, "pSol", prFE, pbnd));
+    vtkwriter->Register( make_VTKIfaceScalar(mg, p, "pressure", pbnd));
+    vtkwriter->Register( make_VTKIfaceScalar(mg, pSol, "pSol", pbnd));
     vtkwriter->Write(0);
 
 //////////////////////////////////////////////////////////////////////////////
