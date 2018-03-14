@@ -118,7 +118,7 @@
 "# adaptive refinement",
 
 		"Freq":		0,
-		"FinestLevel":  3,
+		"FinestLevel":  2,
 		"Width":		10
 	},
 
@@ -137,7 +137,7 @@
                 "_comment":
 "# surface stokes",
 
-                "FE":           "P1P1", //P2P2, P2P1, P1P1
+                "FE":           "P2P1", //P2P2, P2P1, P1P1
                 "fullgrad":     0,
                 "model":        "VectorLaplaceLagrange", //VectorLaplaceLagrange, VectorLaplacePenalty,
                 "testcase":         "1"

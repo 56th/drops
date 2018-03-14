@@ -362,7 +362,7 @@ void CreateNumbOnInterfaceVertex (const Uint idx, IdxT& counter, Uint stride,
 /// Upon return, counter contains the first number, that was not used,
 /// that is \# Unknowns+stride.
 /// A more user friendly interface is provided by IdxDescCL::CreateNumbOnInterface.
-void CreateNumbOnInterfaceP2 (const Uint idx, IdxT& counter,
+void CreateNumbOnInterfaceP2 (const Uint idx, IdxT& counter, Uint stride,
         const MultiGridCL::TriangVertexIteratorCL& vbegin,
         const MultiGridCL::TriangVertexIteratorCL& vend,
         const MultiGridCL::TriangEdgeIteratorCL& ebegin,
@@ -371,7 +371,7 @@ void CreateNumbOnInterfaceP2 (const Uint idx, IdxT& counter,
         const MultiGridCL::TriangTetraIteratorCL& end,
         const VecDescCL& ls, const BndDataCL<>& lsetbnd, double omit_bound= -1./*default to using all dof*/)
 {
-    const size_t stride= 1;
+    //const size_t stride= 1;
 
     LocalP2CL<> p2[10];
     for (int i= 0; i < 10; ++i)
@@ -433,12 +433,12 @@ void IdxDescCL::CreateNumbOnInterface(Uint level, MultiGridCL& mg, const VecDesc
     NumUnknowns_= 0;
 
     // allocate space for indices; number unknowns in TriangLevel level
-    if (GetFE() == P1IF_FE)
+    if ((GetFE() == P1IF_FE) || (GetFE() == vecP1IF_FE))
         CreateNumbOnInterfaceVertex( idxnum, NumUnknowns_, NumUnknownsVertex(),
             mg.GetTriangVertexBegin(level), mg.GetTriangVertexEnd(level),
             mg.GetTriangTetraBegin( level), mg.GetTriangTetraEnd( level), ls, lsetbnd, omit_bound);
-    else if (GetFE() == P2IF_FE)
-        CreateNumbOnInterfaceP2( idxnum, NumUnknowns_,
+    else if ((GetFE() == P2IF_FE) || (GetFE() == vecP2IF_FE))
+        CreateNumbOnInterfaceP2( idxnum, NumUnknowns_, NumUnknownsVertex(),
             mg.GetTriangVertexBegin(level), mg.GetTriangVertexEnd(level),
             mg.GetTriangEdgeBegin(level),   mg.GetTriangEdgeEnd(level),
             mg.GetTriangTetraBegin( level), mg.GetTriangTetraEnd( level),

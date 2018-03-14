@@ -108,7 +108,7 @@ int main (int argc, char* argv[])
 
     // adaptive mesh refinement based on level set function
     typedef DROPS::DistMarkingStrategyCL InitMarkerT;
-    InitMarkerT initmarker( levelset_fun, P.get<double>("AdaptRef.Width"), 0, P.get<int>("AdaptRef.FinestLevel") );
+    InitMarkerT initmarker( levelset_fun, P.get<double>("Mesh.AdaptRef.Width"), 0, P.get<int>("Mesh.AdaptRef.FinestLevel") );
     adap.set_marking_strategy( &initmarker );
     adap.MakeInitialTriang();
     adap.set_marking_strategy( 0 );
@@ -140,7 +140,7 @@ int main (int argc, char* argv[])
     bool fullgrad = P.get<bool>("SurfStokes.fullgrad");
     std::string model = P.get<std::string>("SurfStokes.model");
     std::string testcase = P.get<std::string>("SurfStokes.testcase");
-    double h = P.get<DROPS::Point3DCL>("Domain.E1")[0]/P.get<double>("Domain.N1")*std::pow(2., -P.get<double>("AdaptRef.FinestLevel"));
+    double h = P.get<DROPS::Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")*std::pow(2., -P.get<double>("Mesh.AdaptRef.FinestLevel"));
     double eta = 0.; //Constant for penalty
     double epsilon = 1.0*std::pow(h,1.0); //Constant for A_stab
     double hat_epsilon = epsilon; //Constant for L_stab
@@ -167,21 +167,21 @@ int main (int argc, char* argv[])
     DROPS::IdxDescCL P1FEidx( P1_FE, pbnd);
     DROPS::IdxDescCL P2FEidx( P2_FE, pbnd);
 
-    ifaceVecP2idx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
+    ifaceVecP2idx.GetXidx().SetBound( P.get<double>("SurfTransp.XFEMReduced"));
     ifaceVecP2idx.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
-    ifaceVecP1idx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
+    ifaceVecP1idx.GetXidx().SetBound( P.get<double>("SurfTransp.XFEMReduced"));
     ifaceVecP1idx.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
-    ifaceP1idx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
+    ifaceP1idx.GetXidx().SetBound( P.get<double>("SurfTransp.XFEMReduced"));
     ifaceP1idx.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
-    ifaceP2idx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
+    ifaceP2idx.GetXidx().SetBound( P.get<double>("SurfTransp.XFEMReduced"));
     ifaceP2idx.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
-    vecP2idx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
+    vecP2idx.GetXidx().SetBound( P.get<double>("SurfTransp.XFEMReduced"));
     vecP2idx.CreateNumbering(mg.GetLastLevel(), mg);
-    vecP1idx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
+    vecP1idx.GetXidx().SetBound( P.get<double>("SurfTransp.XFEMReduced"));
     vecP1idx.CreateNumbering(mg.GetLastLevel(), mg);
-    P1FEidx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
+    P1FEidx.GetXidx().SetBound( P.get<double>("SurfTransp.XFEMReduced"));
     P1FEidx.CreateNumbering(mg.GetLastLevel(), mg);
-    P2FEidx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
+    P2FEidx.GetXidx().SetBound( P.get<double>("SurfTransp.XFEMReduced"));
     P2FEidx.CreateNumbering(mg.GetLastLevel(), mg);
     std::cout << "NumUnknowns Vector IFP2: " << ifaceVecP2idx.NumUnknowns() << std::endl;
     std::cout << "NumUnknowns Vector IFP1: " << ifaceVecP1idx.NumUnknowns() << std::endl;
