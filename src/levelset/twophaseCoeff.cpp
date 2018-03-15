@@ -327,66 +327,6 @@ namespace filmperiodic{
     static DROPS::RegisterMatchingFunction regmatch1_z("periodicz", periodic_1side<2>);
 }
 
-template<int A, int B>
-bool periodic_2sides_lift( const DROPS::Point3DCL& p, const DROPS::Point3DCL& q)
-{
-
-    static bool first = true;
-    static DROPS::Point3DCL dx= MeshSize();
-
-    double h = 2.0;
-//    double InitialDivision = P.get<double>("Domain.N1");
-//    double FinestLevel = P.get<double>("AdaptRef.FinestLevel");
-//    if (P.get<int>("AdaptRef.FinestLevel") == 0) {
-//        h = dx[0]*(1/(InitialDivision));
-//    } else {
-//        h = dx[0]*(1/InitialDivision)*(pow(2.0, -FinestLevel));
-//    }
-
-
-    const DROPS::Point3DCL d= fabs(p-q),
-                           L= fabs(dx);
-
-    const int D = 3 - A - B;
-    bool ret = false;
-    if (d[D] < 1e-12 && std::abs( d[A] - L[A]) < 1e-12) {
-        if (((p[A] == -2.) && (p[B] + h < 2) && (std::abs( p[B] + h - q[B]) < 1e-12)) || ((q[A] == -2.) && (q[B] + h <= 2) && (std::abs( q[B] + h - p[B]) < 1e-12))) {
-            ret = true;
-        }
-        if (((p[A] == -2.) && (p[B] + h > 2) && (std::abs( p[B] + h - 4 - q[B]) < 1e-12)) || ((q[A] == -2.) && (q[B] + h > 2) && (std::abs( q[B] + h - 4 - p[B]) < 1e-12))) {
-            ret = true;
-        }
-        if (((p[A] == -2.) && (p[B] + h == 2) && (std::abs( p[B] + h - q[B]) < 1e-12)) || ((q[A] == -2.) && (q[B] + h == 2) && (std::abs( q[B] + h - p[B]) < 1e-12))) {
-            ret = true;
-        }
-        if (((p[A] == -2.) && (p[B] + h == 2) && (q[B] == -2.)) || ((q[A] == -2.) && (q[B] + h == 2) && (p[B] == -2.))) {
-            ret = true;
-        }
-    }
-    if (std::abs( d[A] - L[A]) < 1e-12 && std::abs( d[D] - L[D]) < 1e-12) {
-        if (((p[A] == -2.) && (p[B] + h < 2) && (std::abs( p[B] + h - q[B]) < 1e-12)) || ((q[A] == -2.) && (q[B] + h <= 2) && (std::abs( q[B] + h - p[B]) < 1e-12))) {
-            ret = true;
-        }
-        if (((p[A] == -2.) && (p[B] + h > 2) && (std::abs( p[B] + h - 4 - q[B]) < 1e-12)) || ((q[A] == -2.) && (q[B] + h > 2) && (std::abs( q[B] + h - 4 - p[B]) < 1e-12))) {
-            ret = true;
-        }
-        if (((p[A] == -2.) && (p[B] + h == 2) && (std::abs( p[B] + h - q[B]) < 1e-12)) || ((q[A] == -2.) && (q[B] + h == 2) && (std::abs( q[B] + h - p[B]) < 1e-12))) {
-            ret = true;
-        }
-        if (((p[A] == -2.) && (p[B] + h == 2) && (q[B] == -2.)) || ((q[A] == -2.) && (q[B] + h == 2) && (p[B] == -2.))) {
-            ret = true;
-        }
-    }
-    if ((d[B] + d[A] < 1e-12 && std::abs( d[D] - L[D]) < 1e-12)) {
-       ret = true;
-    }
-
-    return ret;
-}
-
-static DROPS::RegisterMatchingFunction regmatch2_xy_xlift("periodicxy_xlift", periodic_2sides_lift<0,1>);
-//static DROPS::RegisterMatchingFunction regmatch2_yz_xlift("periodicyz_xlift", periodic_2sides_lift<0,2>);
-
 double TaylorFlowDistance( const DROPS::Point3DCL& p, double)
 {
     static const double taylor_len = P.get<double>("Taylor.Length");
