@@ -1571,6 +1571,10 @@ void StationaryStrategyDeformationP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangC
 
     accumulate( accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetBndInfo());
 
+    double h = P.get<DROPS::Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")*std::pow(2., -P.get<double>("Mesh.AdaptRef.FinestLevel"));
+
+    std::cout << "h: " << h  << '\n';
+
     DROPS::MatrixCL Lp2;
     Lp2.LinComb (1.0, Ap2.Data, 1.0, Mp2.Data, 1.0, Anp2.Data);
 //     MatrixCL& Lp2= Mp2.Data;

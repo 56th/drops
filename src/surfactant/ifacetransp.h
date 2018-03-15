@@ -267,6 +267,7 @@ class InterfaceCommonDataP2CL : public TetraAccumulatorCL
     }
 };
 
+
 class InterfaceCommonDataDeformP2CL;
 
 class LocalMeshTransformationCL
@@ -323,6 +324,21 @@ class LocalMeshTransformationCL
         Ginv_wwT= eye<3, 3> ();
         Gqr.Solve (Ginv_wwT);
         Ginv_wwT-= outer_product (w, w);
+
+//        QRDecompCL<3, 3> qrdphi;
+//        qrdphi.GetMatrix() = dPhix;
+//        qrdphi.prepare_solve();
+//        SMatrixCL<3, 3> dphiinv = eye<3, 3> ();
+//        SMatrixCL<3, 3> dphiinvT = eye<3, 3> ();
+//        qrdphi.Solve(dphiinv);
+//        assign_transpose(dphiinvT, dphiinv);
+//        SMatrixCL<3, 3> Proj = eye<3, 3> ();
+//        Point3DCL p = b2w(xb);
+//        DROPS::Point3DCL v(p[0]/(std::sqrt(p[0]*p[0]+p[1]*p[1]+p[2]*p[2])),p[1]/(std::sqrt(p[0]*p[0]+p[1]*p[1]+p[2]*p[2])),p[2]/(std::sqrt(p[0]*p[0]+p[1]*p[1]+p[2]*p[2])));
+//        Proj-= outer_product(v,v);
+//        Ginv_wwT = dphiinv*Proj*dphiinvT;
+
+
 
         const SMatrixCL<2, 2> gr= GramMatrix (dPhix*Q);
         JPhiQ= std::sqrt(gr(0, 0)*gr(1, 1) - gr(0, 1)*gr(1, 0));
@@ -1371,7 +1387,7 @@ class VTKIfaceScalarCL : public VTKVariableCL
     const BndDataCL<double>& BndData_;
 
   public:
-    VTKIfaceScalarCL (MultiGridCL& mg, const VecDescCL& u, std::string varName, const BndDataCL<double>& BndData = BndDataCL<double>(0))
+    VTKIfaceScalarCL (MultiGridCL& mg, const VecDescCL& u, std::string varName, const BndDataCL<double> BndData = BndDataCL<double>(0))
         : VTKVariableCL( varName), u_( u), mg_( mg), BndData_( BndData) {}
 
     void put      (VTKOutCL& cf) const;
@@ -1384,7 +1400,7 @@ class VTKIfaceScalarCL : public VTKVariableCL
 /// because they help to avoid template parameters in user code.
 inline VTKIfaceScalarCL&
 make_VTKIfaceScalar (MultiGridCL& mg, const VecDescCL& u,
-    std::string varName, const BndDataCL<double>& BndData)
+    std::string varName, const BndDataCL<double> BndData = BndDataCL<double>(0))
 {
     return *new VTKIfaceScalarCL( mg, u, varName, BndData);
 }

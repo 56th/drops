@@ -26,7 +26,7 @@
             "Freq":          0,
             "Width":         10,
             "CoarsestLevel": 0,
-            "FinestLevel":   3,
+            "FinestLevel":   4,
             "SD":            0.1,
             "CurvDiff":      -1,
             "Discontinuous": 0
@@ -73,7 +73,7 @@
         "FEDegree":                2, // 1, 2
         "NormalLaplaceCoefficent": 1.0,
         "SolutionOutput": { // Machine readable output of the surfactant-solution
-            "Freq":   1,
+            "Freq":   0,
             "Path":   "solutions/iface_sol",
             "Binary": true
         }
