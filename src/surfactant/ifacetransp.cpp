@@ -793,10 +793,15 @@ resize_and_scatter_piecewise_spatial_normal (const SPatchCL<4>& surf, const Quad
         throw DROPSErrCL( "resize_and_scatter_piecewise_spatial_normal: qdom.vertex_size is not a multiple of surf.facet_size.\n");
 
     const SPatchCL<4>::const_normal_iterator n= surf.normal_begin();
+    Point3DCL tmp;
     for (Uint i= 0; i < surf.facet_size(); ++i) {
-        const Point3DCL& tmp= MakePoint3D( n[i][0], n[i][1], n[i][2]);
-        std::fill_n( &spatial_normal[i*NodesPerFacet], NodesPerFacet, tmp/tmp.norm());
+        tmp= MakePoint3D( n[i][0], n[i][1], n[i][2]);
+        if (tmp.norm()>=1e-10){
+            tmp/=tmp.norm(); //Do not normalize if vector is too short -> Avoid NaN on tiny patches
+        }
+        std::fill_n( &spatial_normal[i*NodesPerFacet], NodesPerFacet, tmp);
     }
+
 }
 
 
@@ -978,14 +983,22 @@ void SurfactantSTP1CL::DoStep ()
 
         gm_.Solve( L, st_ic_, rhs, idx.GetEx());
 
-//        VectorCL testAlle=L*st_ic_;
-//        VectorCL testMder=Mder*st_ic_;
-//        VectorCL testA=A*st_ic_;
-//        VectorCL testMdiv=Mdiv*st_ic_;
-//        VectorCL testMold=Mold*st_ic_;
-//        VectorCL testMnew=Mnew*st_ic_;
-//        VectorCL testMderT=MderT*st_ic_;
+//        MatrixCL testAlle=L*st_ic_;
+//        MatrixCL testMder=Mder*st_ic_;
+//        MatrixCL testA=A*st_ic_;
+//        MatrixCL testMdiv=Mdiv*st_ic_;
+//        MatrixCL testMold=Mold*st_ic_;
+//        MatrixCL testMnew=Mnew*st_ic_;
+//        MatrixCL testMderT=MderT*st_ic_;
 //        VectorCL ones(dim);
+//        for (Uint i=0; i<dim; i++)
+//        {
+//            ones[i]=1;
+//        }
+//        MatrixCL achelp;
+//        achelp.LinComb(1.,Mnew,-1.,MderT,1.,A);
+//        MatrixCL divufalse=achelp*st_ic_;
+//        MatrixCL divufalseOnes=achelp*ones;
 //        WriteToFile( testAlle, "TestAlle.txt", "Loesungsmatrix mal Loesung");
 //        WriteToFile( testMder, "TestMder.txt", "MaterialDerivativeMatrix mal Loesung");
 //        WriteToFile( testA, "TestA.txt", "Steifigkeitsmatrix mal Loesung");
@@ -993,22 +1006,17 @@ void SurfactantSTP1CL::DoStep ()
 //        WriteToFile( testMold, "TestMold.txt", "Massematrix(old) mal Loesung");
 //        WriteToFile( testMnew, "TestMnew.txt", "Massematrix(new) mal Loesung");
 //        WriteToFile( testMderT, "TestMderT.txt", "MaterialDerivativeMatrixTranponiert mal Loesung");
+//        WriteToFile( divufalse, "divufalse.txt", "divufalse Bilinearform mal Loesung");
+//        MatrixCL testAlleOnes=L*ones;
+//        MatrixCL testMderOnes=Mder*ones;
+//        MatrixCL testAOnes=A*ones;
+//        MatrixCL testMdivOnes=Mdiv*ones;
+//        MatrixCL testMoldOnes=Mold*ones;
+//        MatrixCL testMnewOnes=Mnew*ones;
+//        MatrixCL testMderTOnes=MderT*ones;
+//        MatrixCL RhsWithoutLoad=Mold*st_oldic_;
+//        MatrixCL rhsMatrix=rhs;
 
-//        for (Uint i=0; i<dim; i++)
-//        {
-//            ones[i]=1;
-//        }
-//        VectorCL testAlleOnes=L*ones;
-//        VectorCL testMderOnes=Mder*ones;
-//        VectorCL testAOnes=A*ones;
-//        VectorCL testMdivOnes=Mdiv*ones;
-//        VectorCL testMoldOnes=Mold*ones;
-//        VectorCL testMnewOnes=Mnew*ones;
-//        VectorCL testMderTOnes=MderT*ones;
-//        VectorCL RhsWithoutLoad=Mold*st_oldic_;
-//        MatrixCL achelp;
-//        achelp.LinComb(1,Mnew,-1,MderT,1,A);
-//        VectorCL divufalseOnes=achelp*ones;
 //        WriteToFile( testAlleOnes, "TestAlleOnes.txt", "Loesungsmatrix mal Einsvektor");
 //        WriteToFile( testMderOnes, "TestMderOnes.txt", "MaterialDerivativeMatrix mal Einsvektor");
 //        WriteToFile( testAOnes, "TestAOnes.txt", "Steifigkeitsmatrix mal Einsvektor");
@@ -1016,8 +1024,9 @@ void SurfactantSTP1CL::DoStep ()
 //        WriteToFile( testMoldOnes, "TestMoldOnes.txt", "Massematrix(old) mal Einsvektor");
 //        WriteToFile( testMnewOnes, "TestMnewOnes.txt", "Massematrix(new) mal Loesung");
 //        WriteToFile( testMderTOnes, "TestMderTOnes.txt", "MaterialDerivativeMatrixTranponiert mal Einsvektor");
-//        WriteToFile( rhs, "rhs.txt", "RechteSeite");
+//        WriteToFile( rhsMatrix, "rhs.txt", "RechteSeite");
 //        WriteToFile( divufalseOnes, "divufalseOnes.txt", "divufalse Bilinearform mal Einsvektor");
+//        WriteToFile( RhsWithoutLoad, "RhsWithoutLoad.txt", "RHSwithout load");
 
     }
     std::cout << "SurfactantSTP1CL::DoStep: res = " << gm_.GetResid() << ", iter = " << gm_.GetIter() << std::endl;

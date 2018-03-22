@@ -154,6 +154,12 @@ SPatchCL<Dim>::compute_normals (const WorldBodyT& wb) const
             absdets_.push_back( std::fabs( qr.Determinant_R()));
             tmp= std_basis<Dim>( Dim);
             qr.apply_Q( tmp); // tmp has unit length.
+            if (std::abs(std::abs(tmp[3])-1)<=1e-10){
+               std::cout << "ST-Normal in t-direction appears, absdet of tetrahedron: " <<std::fabs( qr.Determinant_R())<< std::endl;
+            }
+            if (std::abs(tmp[0])<=1e-10 && std::abs(tmp[1])<=1e-10 && std::abs(tmp[2])<=1e-10 && std::abs(tmp[3])<=1e-10){
+               std::cout << "ST-Normal==0 appears, absdet of tetrahedron: " <<std::fabs( qr.Determinant_R())<< std::endl;
+            }
             normals_.push_back( tmp);
 
         }

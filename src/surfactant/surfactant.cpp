@@ -140,24 +140,56 @@ static RegisterVectorFunction regvec_const_vel_wind( "ConstVelWind", const_vel_w
 
 double const_vel_lset (const Point3DCL& p, double t)
 {
-    return std::pow( p[0]-t, 2) + std::pow( p[1], 2) + std::pow( p[2], 2) - 0.89;
+    return std::pow( p[0]-t, 2.) + std::pow( p[1], 2.) + std::pow( p[2], 2.) - 0.89;
 }
 static RegisterScalarFunction regsca_const_vel_lset( "ConstVelLset", const_vel_lset);
-
+//double const_vel_lset_ini (const Point3DCL& p, double)
+//{
+//    // static const double t_end= P.get<double>( "Time.FinalTime");
+//    const double //tout= t_end,
+//                 tin= 0,
+//                // lout= const_vel_lset( p, tout),
+//                 lin= const_vel_lset( p, tin);
+//    return lin;
+//}
 
 double const_vel_sol (const Point3DCL& , double )
 {
-    return 1;
+    return 1.;
 }
 static RegisterScalarFunction regsca_const_vel_sol( "ConstVelSol", const_vel_sol);
 
 double const_vel_rhs (const Point3DCL& , double )
 {
-    return 0;
+    return 0.;
 }
 
 static RegisterScalarFunction regsca_const_vel_rhs( "ConstVelRhs", const_vel_rhs);
+double const_vel_sol2 (const Point3DCL& p, double t )
+{
+    return std::exp(-t)*p[0]*p[1];
+}
+static RegisterScalarFunction regsca_const_vel_sol2( "ConstVelSol2", const_vel_sol2);
 
+double const_vel_rhs2 (const Point3DCL& p, double t)
+{
+    double x1=p[0]; double x2=p[1]; double x3=p[2];
+    return -(double) x2 * (std::pow(x1, 0.3e1) + (double) (-2 * t - 1) * x1 * x1 + (double) (t * t + x2 * x2 + x3 * x3 + 2 * t - 6) * x1 - (double) (t * t) - (double) (x2 * x2) - (double) (x3 * x3) + (double) (4 * t)) * std::exp(-(double) t) / ((double) (t * t) - 0.2e1 * (double) t * x1 + x1 * x1 + (double) (x2 * x2) + (double) (x3 * x3));
+}
+
+static RegisterScalarFunction regsca_const_vel_rhs2( "ConstVelRhs2", const_vel_rhs2);
+double const_vel_sol3 (const Point3DCL& , double t )
+{
+    return t;
+}
+static RegisterScalarFunction regsca_const_vel_sol3( "ConstVelSol3", const_vel_sol3);
+
+double const_vel_rhs3 (const Point3DCL& , double )
+{
+    return 1.;
+}
+
+static RegisterScalarFunction regsca_const_vel_rhs3( "ConstVelRhs3", const_vel_rhs3);
 
 
 // ==non-stationary test-case "ToroidalFlow"==
@@ -177,7 +209,23 @@ DROPS::SMatrixCL<3,3> rotation_matrix (const DROPS::Point3DCL& p, double t)
     m(2,2)= 1.;
     return m;
 }
-
+double ellipsoid2_lset (const DROPS::Point3DCL& p, double)
+{
+ return p[0]*p[0]+p[1]*p[1]+p[2]*p[2]/2.25-1.0;
+}
+static RegisterScalarFunction regsca_ellipsoid2_lset( "Ellipsoid2_Lset", ellipsoid2_lset);
+double Testu_scalar_fun (const DROPS::Point3DCL& p, double)
+{
+     if(p[0]==0 && p[1]==0 && p[2]==0){
+         return p[0] * 0.0;
+     }
+     else {
+    //return 3 * p[0] * p[0] - p[1] * p[2];  // Fall 1
+     //return (0.3e1 * pow(p[0], 0.9e1) - pow(p[1], 0.6e1) * p[2] * p[2]) / (p[0] * p[0] + p[1] * p[1] + 0.4e1 / 0.9e1 * p[2] * p[2]);
+         return p[0] * p[0] * p[1] - p[0] * p[1] * p[2] - 0.1e-3 * p[0];
+    }
+}
+static RegisterScalarFunction regsca_philipskram_sol( "PhilipsKramSol", Testu_scalar_fun);
 DROPS::Point3DCL toroidal_flow (const DROPS::Point3DCL& p, double t)
 {
     return rotation_matrix( p, t)*p;
@@ -244,13 +292,13 @@ static RegisterScalarFunction regsca_toroidal_flow_rhs( "ToroidalFlowRhs", toroi
 
 double toroidal_flow_sol2 (const Point3DCL& , double )
 {
-    return 1;
+    return 1.;
 }
 static RegisterScalarFunction regsca_toroidal_flow_sol2( "ToroidalFlowSol2", toroidal_flow_sol2);
 
 double toroidal_flow_rhs2 (const Point3DCL& , double )
 {
-    return 0;
+    return 0.;
 }
 static RegisterScalarFunction regsca_toroidal_flow_rhs2( "ToroidalFlowRhs2", toroidal_flow_rhs2);
 // ==non-stationary test case "AxisScaling"==
@@ -293,12 +341,12 @@ static RegisterScalarFunction regsca_axis_scaling_sol( "AxisScalingSol", axis_sc
 double axis_scaling_rhs (const Point3DCL& p, double t)
 {
     const double a= axis_scaling( t);
-    const double bf4= (p/MakePoint3D( std::pow( a, 2), 1., 1.)).norm_sq();
-    const double bf6= (p/MakePoint3D( std::pow( a, 3), 1., 1.)).norm_sq();
+    const double bf4= (p/MakePoint3D( std::pow( a, 2.), 1., 1.)).norm_sq();
+    const double bf6= (p/MakePoint3D( std::pow( a, 3.), 1., 1.)).norm_sq();
 
     const double mat_der=  0.25*std::cos( t)/a - 0.5;
-    const double reaction= 0.25*std::cos( t)/a/bf4*( std::pow( p[1], 2) + std::pow( p[2], 2));
-    const double diffusion= (-2./std::pow( a, 2) - (1. + 1./std::pow( a, 2))*( 2. + 1./std::pow( a, 2) - bf6/bf4))/bf4;
+    const double reaction= 0.25*std::cos( t)/a/bf4*( std::pow( p[1], 2.) + std::pow( p[2], 2.));
+    const double diffusion= (-2./std::pow( a, 2.) - (1. + 1./std::pow( a, 2.))*( 2. + 1./std::pow( a, 2.) - bf6/bf4))/bf4;
 
 //     const Point3DCL tt( p/MakePoint3D( std::pow( a, 2), 1., 1.));
 //     const double l= tt.norm();
@@ -332,7 +380,7 @@ static RegisterScalarFunction regsca_axis_scaling_rhs( "AxisScalingRhs", axis_sc
 
 double axis_scaling_sol2 (const Point3DCL& , double )
 {
-    return 1;
+    return 1.;
 }
 static RegisterScalarFunction regsca_axis_scaling_sol2( "AxisScalingSol2", axis_scaling_sol2);
 
@@ -895,6 +943,8 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     adap.MakeInitialTriang();
     if (P.get<std::string>("SurfTransp.Exp.Levelset") == std::string( "AxisScalingLset"))
         dynamic_cast<DistMarkingStrategyCL*>( adap.get_marking_strategy())->SetDistFct( axis_scaling_lset_ini);
+   // if (P.get<std::string>("SurfTransp.Exp.Levelset") == std::string( "ConstVelLset"))
+   //     dynamic_cast<DistMarkingStrategyCL*>( adap.get_marking_strategy())->SetDistFct( const_vel_lset_ini);
     lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
     lset.Phi.SetIdx( &lset.idx);
     // LinearLSInit( mg, lset.Phi, the_lset_fun, 0.);
@@ -958,6 +1008,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     double H_1x_err= H1_error( lset.Phi, lset.GetBndData(), timedisc.GetSolution(), the_sol_fun);
     std::cout << "H_1x-error: " << H_1x_err << std::endl;
     double L_2tH_1x_err_sq= 0.5*dt*std::pow( H_1x_err, 2);
+    double L_2tL_2x_err_sq= 0.5*dt*std::pow( L_2x_err, 2);
     BndDataCL<> ifbnd( 0);
     std::cout << "initial surfactant on \\Gamma: " << Integral_Gamma( mg, lset.Phi, lset.GetBndData(), make_P1Eval(  mg, ifbnd, timedisc.ic)) << '\n';
 
@@ -974,10 +1025,12 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
         InitVel( mg, &v, Bnd_v, the_wind_fun, cur_time);
         timedisc.DoStep( cur_time);
         std::cout << "surfactant on \\Gamma: " << Integral_Gamma( mg, lset.Phi, lset.GetBndData(), make_P1Eval(  mg, ifbnd, timedisc.ic)) << '\n';
+        L_2tL_2x_err_sq+= (step > 1 ? 0.5 : 0.)*dt*std::pow( L_2x_err, 2);
         L_2x_err= L2_error( lset.Phi, lset.GetBndData(), timedisc.GetSolution(), the_sol_fun);
         std::cout << "L_2x-error: " << L_2x_err
                   << "\nnorm of true solution: " << L2_norm( mg, lset.Phi, lset.GetBndData(), the_sol_fun)
                   << std::endl;
+
         L_inftL_2x_err= std::max( L_inftL_2x_err, L_2x_err);
         std::cout << "L_inftL_2x-error: " << L_inftL_2x_err << std::endl;
         L_2tH_1x_err_sq+= (step > 1 ? 0.5 : 0.)*dt*std::pow( H_1x_err, 2);
@@ -985,6 +1038,13 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
         std::cout << "H_1x-error: " << H_1x_err << std::endl;
         L_2tH_1x_err_sq+= 0.5*dt*std::pow( H_1x_err, 2);
         std::cout << "L_2tH_1x-error: " << std::sqrt( L_2tH_1x_err_sq) << std::endl;
+
+
+
+        L_2tL_2x_err_sq+= 0.5*dt*std::pow( L_2x_err, 2);
+        std::cout << "L_2tL_2x-error: " << std::sqrt( L_2tL_2x_err_sq) << std::endl;
+
+
         if (vtkwriter.get() != 0 && step % P.get<int>( "VTK.Freq") == 0) {
             LSInit( mg, the_sol_vd, the_sol_fun, /*t*/ cur_time);
             vtkwriter->Write( cur_time);

@@ -1826,6 +1826,9 @@ class STInterfaceCommonDataCL : public TetraAccumulatorCL
         evaluate_on_vertexes( st_local_ls, lat, Addr( ls_loc));
         if (equal_signs( ls_loc))
             return;
+//        if (t.GetId().GetIdent()==7170){
+//            std::cout << "hier ID=7170" << std::endl;
+//        }
         surf.make_patch<MergeCutPolicyCL>( lat, ls_loc);
         surf.compute_normals( TetraPrismCL( t, t0, t1));
         make_CompositeQuad5DomainSTCodim1SpatialAbsdet( q5dom, surf, TetraPrismCL( t, t0, t1));
@@ -2050,8 +2053,13 @@ class LocalLaplaceBeltramiSTP1P1CL
 
         for (int i= 0; i < 8; ++i) {
             coup[i][i]= D_* quad_codim1( dot( q[i], q[i]), qdom);
-            for(int j= 0; j < i; ++j)
+            for(int j= 0; j < i; ++j){
+                    if(quad_codim1( dot( q[i], q[j]), qdom)!=quad_codim1( dot( q[i], q[j]), qdom))
+                    {
+                        std::cout << "NAN in LocalLaplaceBeltramiSTP1P1CL " <<spatial_n[118]<< std::endl;
+                    }
                 coup[i][j]= coup[j][i]= D_* quad_codim1( dot( q[i], q[j]), qdom);
+            }
         }
     }
 
