@@ -297,10 +297,16 @@ template <class QuadDataT, AbsdetPolicyEnum AbsdetPolicy, Uint Dim>
                 NodeInBody[i]+= p_vertexes[facet[j]]*QuadDataT::Node[i][j];
         }
         absdet= p.is_boundary_facet( it) ? 0.5 : 1.;
+        //double r1;
+        //double n1;
         switch (AbsdetPolicy) {
           case TrivialAbsdet: break;
           case SpaceProjectedCodim1Absdet:
-            absdet*= std::sqrt( (1. - p_normals[f][Dim-1])*(1. + p_normals[f][Dim-1]));
+            //n1=p_normals[f][0]/std::sqrt((1. - p_normals[f][Dim-1])*(1. + p_normals[f][Dim-1]));
+            //n2=p_normals[f][1]/std::sqrt((1. - p_normals[f][Dim-1])*(1. + p_normals[f][Dim-1]));
+            //n3=p_normals[f][2]/std::sqrt((1. - p_normals[f][Dim-1])*(1. + p_normals[f][Dim-1]));
+            //r1=1/(std::sqrt(1+std::pow(n1,2))); // Teste: bei const velocity (1,0,0) mit echtem w, statt approx w_h (sonst)
+            absdet*=std::sqrt( (1. - p_normals[f][Dim-1])*(1. + p_normals[f][Dim-1]));;
             // fall through
           case Codim1Absdet:
             absdet*= p_absdets[f];
