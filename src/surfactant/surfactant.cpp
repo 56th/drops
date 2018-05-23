@@ -110,7 +110,7 @@ double torus (const Point3DCL& p, double)
 }
 static RegisterScalarFunction regsca_torus_lset( "Torus", torus);
 
-// ==non-stationary test case "HeatConduction"
+// ==non-stationary test case "HeatConduction"( MG_, Bnd_v_, oldv_, *v_)
 // "ConstantWind" 0
 // "Ellipsoid" pos:[0,0,0], rad:[1,1,1]
 
@@ -130,11 +130,11 @@ double heat_conduction_sol (const Point3DCL& p, double t)
     return std::exp( -6.*t)*heat_conduction_u0( p);
 }
 static RegisterScalarFunction regsca_heat_conduction_sol( "HeatConductionSol", heat_conduction_sol);
-// ==stationary test case constant velocity
+// ==instationary test case constant velocity
 
 DROPS::Point3DCL const_vel_wind (const DROPS::Point3DCL& , double )
 {
-    return MakePoint3D( 1, 0., 0.);
+    return MakePoint3D( 1., 0., 0.);
 }
 static RegisterVectorFunction regvec_const_vel_wind( "ConstVelWind", const_vel_wind);
 
@@ -190,6 +190,210 @@ double const_vel_rhs3 (const Point3DCL& , double )
 }
 
 static RegisterScalarFunction regsca_const_vel_rhs3( "ConstVelRhs3", const_vel_rhs3);
+double const_vel_sol4 (const Point3DCL& p, double t )
+{
+    return p[0]*p[1]*t;
+}
+static RegisterScalarFunction regsca_const_vel_sol4( "ConstVelSol4", const_vel_sol4);
+
+double const_vel_rhs4 (const Point3DCL& p, double t)
+{
+    double x1=p[0]; double x2=p[1]; double x3=p[2];
+    return (double) x2 * (pow(t, 0.3e1) + (double) (-x1 - 4) * t * t + (double) (-x1 * x1 + x2 * x2 + x3 * x3 + 6 * x1) * t + (double) (x1 * (x1 * x1 + x2 * x2 + x3 * x3))) / (t * t - 0.2e1 * t * (double) x1 + (double) (x1 * x1) + (double) (x2 * x2) + (double) (x3 * x3));
+}
+
+static RegisterScalarFunction regsca_const_vel_rhs4( "ConstVelRhs4", const_vel_rhs4);
+
+// instationary test case quartervelociy
+DROPS::Point3DCL quarter_const_vel_wind (const DROPS::Point3DCL& , double )
+{
+    return MakePoint3D( 0.25, 0., 0.);
+}
+static RegisterVectorFunction regvec_quarter_const_vel_wind( "QuarterConstVelWind", quarter_const_vel_wind);
+
+double quarter_const_vel_lset (const Point3DCL& p, double t)
+{
+    return std::pow( p[0]-0.25*t, 2.) + std::pow( p[1], 2.) + std::pow( p[2], 2.) - 0.89;
+}
+static RegisterScalarFunction regsca_quarter_const_vel_lset( "QuarterConstVelLset", quarter_const_vel_lset);
+
+
+double quarter_const_vel_sol (const Point3DCL& p, double t)
+{
+    return exp(-t)*p[0]*p[1];
+}
+static RegisterScalarFunction regsca_quarter_const_vel_sol( "QuarterConstVelSol", quarter_const_vel_sol);
+
+double quarter_const_vel_rhs (const Point3DCL& p, double t)
+{
+    double x1=p[0], x2=p[1], x3=p[2];
+    return (-0.625e-1 * t * t * x1 + 0.5e0 * t * x1 * x1 - pow(x1, 0.3e1) - x2 * x2 * x1 - x1 * x3 * x3 + 0.15625e-1 * t * t - 0.125e0 * x1 * t + 0.25e0 * x1 * x1 + 0.25e0 * x2 * x2 + 0.25e0 * x3 * x3 - t + 0.6e1 * x1) * exp(-t) * x2 / (x1 * x1 - 0.5e0 * x1 * t + 0.625e-1 * t * t + x2 * x2 + x3 * x3);
+}
+static RegisterScalarFunction regsca_quarter_const_vel_rhs( "QuarterConstVelRhs", quarter_const_vel_rhs);
+
+
+// ==instationary test case shrinking_sphere
+
+DROPS::Point3DCL shrinking_sphere_wind (const DROPS::Point3DCL& p, double t)
+{
+    double x1=p[0]; double x2=p[1]; double x3=p[2];
+    if (x1==0 && x2==0 && x3==0){
+        return MakePoint3D(0,0,0);
+    }
+    else{
+        return MakePoint3D(-0.3e1 / 0.4e1 * sqrt(exp(-t)) * pow(x1 * x1 + x2 * x2 + x3 * x3, -0.1e1 / 0.2e1) * x1, -0.3e1 / 0.4e1 * sqrt(exp(-t)) * pow(x1 * x1 + x2 * x2 + x3 * x3, -0.1e1 / 0.2e1) * x2, -0.3e1 / 0.4e1 * sqrt(exp(-t)) * pow(x1 * x1 + x2 * x2 + x3 * x3, -0.1e1 / 0.2e1) * x3 );
+    }
+}
+static RegisterVectorFunction regvec_shrinking_sphere_wind( "shrinking_sphereWind", shrinking_sphere_wind);
+
+double shrinking_sphere_lset (const Point3DCL& p, double t)
+{
+    double x1=p[0]; double x2=p[1]; double x3=p[2];
+    return x1 * x1 + x2 * x2 + x3 * x3 - 0.9e1 / 0.4e1 / exp(t);
+}
+static RegisterScalarFunction regsca_shrinking_sphere_lset( "shrinking_sphereLset", shrinking_sphere_lset);
+
+double shrinking_sphere_sol (const Point3DCL& , double )
+{
+    return 1.;
+}
+static RegisterScalarFunction regsca_shrinking_sphere_sol( "shrinking_sphereSol", shrinking_sphere_sol);
+
+double shrinking_sphere_rhs (const Point3DCL& , double )
+{
+    return -1.;
+}
+
+static RegisterScalarFunction regsca_shrinking_sphere_rhs( "shrinking_sphereRhs", shrinking_sphere_rhs);
+
+
+double shrinking_sphere_solPaper1 (const Point3DCL& p, double t)
+{
+    return (1+p[0]*p[1]*p[2])*exp(t);
+}
+static RegisterScalarFunction regsca_shrinking_sphere_solPaper1( "shrinking_sphereSolPaper1", shrinking_sphere_solPaper1);
+
+double shrinking_sphere_rhsPaper1 (const Point3DCL& p, double t)
+{
+    return (-1.5*exp(t)+16./3.*exp(2.*t))*p[0]*p[1]*p[2];
+}
+static RegisterScalarFunction regsca_shrinking_sphere_rhsPaper1( "shrinking_sphereRhsPaper1", shrinking_sphere_rhsPaper1);
+
+
+double shrinking_sphere_solPaper2 (const Point3DCL& , double t)
+{
+    return exp(t);
+}
+static RegisterScalarFunction regsca_shrinking_sphere_solPaper2( "shrinking_sphereSolPaper2", shrinking_sphere_solPaper2);
+
+double shrinking_sphere_rhsPaper2 (const Point3DCL& , double )
+{
+    return 0;
+}
+
+static RegisterScalarFunction regsca_shrinking_sphere_rhsPaper2( "shrinking_sphereRhsPaper2", shrinking_sphere_rhsPaper2);
+
+// ==instationary test case shrinking_sphere with constant velocity
+
+DROPS::Point3DCL shrinking_sphere_wind2 (const DROPS::Point3DCL& p, double )
+{
+    double x1=p[0]; double x2=p[1]; double x3=p[2];
+    if (x1==0 && x2==0 && x3==0){
+        return MakePoint3D(0,0,0);
+    }
+    else{
+        return MakePoint3D(-pow(x1 * x1 + x2 * x2 + x3 * x3, -0.1e1 / 0.2e1) * x1,-pow(x1 * x1 + x2 * x2 + x3 * x3, -0.1e1 / 0.2e1) * x2,-pow(x1 * x1 + x2 * x2 + x3 * x3, -0.1e1 / 0.2e1) * x3);
+    }
+}
+static RegisterVectorFunction regvec_shrinking_sphere_wind2( "shrinking_sphereWind2", shrinking_sphere_wind2);
+
+double shrinking_sphere_lset2 (const Point3DCL& p, double t)
+{
+    double x1=p[0]; double x2=p[1]; double x3=p[2];
+    return x1 * x1 + x2 * x2 + x3 * x3 - pow(0.9e1 / 0.4e1 - t, 0.2e1);
+}
+static RegisterScalarFunction regsca_shrinking_sphere_lset2( "shrinking_sphereLset2", shrinking_sphere_lset2);
+
+double shrinking_sphere_sol2 (const Point3DCL& , double )
+{
+    return 1.;
+}
+static RegisterScalarFunction regsca_shrinking_sphere_sol2( "shrinking_sphereSol2", shrinking_sphere_sol2);
+
+double shrinking_sphere_rhs2 (const Point3DCL& , double t)
+{
+    return 8/(4*t-9);
+}
+
+static RegisterScalarFunction regsca_shrinking_sphere_rhs2( "shrinking_sphereRhs2", shrinking_sphere_rhs2);
+
+// ==instationary test case rotating sphere
+
+DROPS::Point3DCL rotating_sphere_wind (const DROPS::Point3DCL& p, double )
+{
+    double x1=p[0]; double x2=p[1];
+        return MakePoint3D(-x2,x1,0);
+}
+static RegisterVectorFunction regvec_rotating_sphere_wind( "rotating_sphereWind", rotating_sphere_wind);
+
+double rotating_sphere_lset (const Point3DCL& p, double )
+{
+        return std::pow( p[0], 2.) + std::pow( p[1], 2.) + std::pow( p[2], 2.) - 0.89;
+}
+static RegisterScalarFunction regsca_rotating_sphere_lset( "rotating_sphereLset", rotating_sphere_lset);
+
+double rotating_sphere_sol (const Point3DCL& , double )
+{
+    return 1.;
+}
+static RegisterScalarFunction regsca_rotating_sphere_sol( "rotating_sphereSol", rotating_sphere_sol);
+
+double rotating_sphere_rhs (const Point3DCL& , double )
+{
+    return 0;
+}
+
+static RegisterScalarFunction regsca_rotating_sphere_rhs( "rotating_sphereRhs", rotating_sphere_rhs);
+
+// ==instationary test case thin_ellipsoid
+
+DROPS::Point3DCL thin_ellipsoid_wind (const DROPS::Point3DCL& p, double t)
+{
+    double x1=p[0]; double x2=p[1];double x3=p[2];
+        return MakePoint3D((-0.20000e5 * x2 * x2 - 0.20000e5 * x3 * x3 + 0.178e3) * x1 / (0.320000e6 * pow(t, 0.3e1) * x2 * x2 + 0.320000e6 * pow(t, 0.3e1) * x3 * x3 + 0.2400000e7 * t * t * x2 * x2 + 0.2400000e7 * t * t * x3 * x3 + 0.5980000e7 * t * x2 * x2 + 0.5980000e7 * t * x3 * x3 + 0.4950000e7 * x2 * x2 + 0.4950000e7 * x3 * x3 + 0.178e3 * t + 0.445e3)
+,-0.8e1 / (0.160000e6 * t * t * x2 * x2 + 0.160000e6 * t * t * x3 * x3 + 0.800000e6 * t * x2 * x2 + 0.800000e6 * t * x3 * x3 + 0.990000e6 * x2 * x2 + 0.990000e6 * x3 * x3 + 0.89e2) * (0.20000e5 * t * x2 * x2 + 0.20000e5 * t * x3 * x3 + 0.50000e5 * x2 * x2 + 0.50000e5 * x3 * x3 - 0.178e3 * t - 0.445e3) * x2
+,-0.8e1 / (0.160000e6 * t * t * x2 * x2 + 0.160000e6 * t * t * x3 * x3 + 0.800000e6 * t * x2 * x2 + 0.800000e6 * t * x3 * x3 + 0.990000e6 * x2 * x2 + 0.990000e6 * x3 * x3 + 0.89e2) * (0.20000e5 * t * x2 * x2 + 0.20000e5 * t * x3 * x3 + 0.50000e5 * x2 * x2 + 0.50000e5 * x3 * x3 - 0.178e3 * t - 0.445e3) * x3
+);
+}
+static RegisterVectorFunction regvec_thin_ellipsoid_wind( "thin_ellipsoidWind", thin_ellipsoid_wind);
+
+double thin_ellipsoid_lset (const Point3DCL& p, double t)
+{
+    double x1=p[0]; double x2=p[1];double x3=p[2];
+        return x1 * x1 * pow(0.10e1 + 0.4e0 * t, -0.2e1) + 0.1e3 * x2 * x2 + 0.1e3 * x3 * x3 - 0.89e0;;
+}
+static RegisterScalarFunction regsca_thin_ellipsoid_lset( "thin_ellipsoidLset", thin_ellipsoid_lset);
+
+double thin_ellipsoid_sol (const Point3DCL& , double )
+{
+    return 1.;
+}
+static RegisterScalarFunction regsca_thin_ellipsoid_sol( "thin_ellipsoidSol", thin_ellipsoid_sol);
+
+double thin_ellipsoid_rhs (const Point3DCL& p, double t)
+{
+    double x1=p[0]; double x2=p[1];double x3=p[2];
+    return ((-0.9266896436e28 * pow(x3, 0.10e2) + (-0.7549475917e24 * x1 * x1 + 0.8156312605e26 - 0.4633448217e29 * x2 * x2) * pow(x3, 0.8e1) + (-0.9266896434e29 * pow(x2, 0.4e1) + (-0.3019790366e25 * x1 * x1 + 0.3262525043e27) * x2 * x2 + x1 * x1 * 0.666174561400000086e22 - 0.7137290240e19 * pow(x1, 0.4e1) + 0.809888462300000236e22 + pow(x1, 0.3e1) * (-0.253567486652173102e5) + x1 * (-0.307869141455447716e5)) * pow(x3, 0.6e1) + (-0.9266896434e29 * pow(x2, 0.6e1) + (-0.4529685549e25 * x1 * x1 + 0.4893787561e27) * pow(x2, 0.4e1) + (-0.2141187072e20 * pow(x1, 0.4e1) + x1 * x1 * 0.199852368399999959e23 + 0.242966538799999940e23) * x2 * x2 + 0.6324865741e17 * pow(x1, 0.4e1) + x1 * x1 * 0.509010506700000000e18 + 0.179425326000000032e18) * pow(x3, 0.4e1) + (-0.4633448217e29 * pow(x2, 0.8e1) + (-0.3019790367e25 * x1 * x1 + 0.3262525043e27) * pow(x2, 0.6e1) + (-0.2141187072e20 * pow(x1, 0.4e1) + x1 * x1 * 0.199852368399999959e23 + 0.242966538799999940e23) * pow(x2, 0.4e1) + (0.1264973148e18 * pow(x1, 0.4e1) + x1 * x1 * 0.1018021013000000000e19 + 0.358850651900000000e18) * x2 * x2 + 0.7585240859e13 * x1 * x1 + 0.2430897869e13 * pow(x1, 0.4e1)) * x3 * x3 - 0.9266896438e28 * pow(x2, 0.10e2) + (-0.7549475917e24 * x1 * x1 + 0.8156312605e26) * pow(x2, 0.8e1) + (x1 * x1 * 0.666174561400000086e22 - 0.7137290240e19 * pow(x1, 0.4e1) + 0.809888462300000236e22 + pow(x1, 0.3e1) * (-0.253567486652173102e5) + x1 * (-0.307869141455447716e5)) * pow(x2, 0.6e1) + (x1 * x1 * 0.509010506600000000e18 + 0.6324865741e17 * pow(x1, 0.4e1) + 0.179425325900000000e18) * pow(x2, 0.4e1) + (0.7585240859e13 * x1 * x1 + 0.2430897869e13 * pow(x1, 0.4e1)) * x2 * x2 + 0.721888256e7 * pow(x1, 0.4e1)) * pow(t, 0.4e1) + (-0.1677298689e27 * pow(x3, 0.10e2) + (-0.4151312383e21 * x1 * x1 + 0.1489059170e25 - 0.8386493445e27 * x2 * x2) * pow(x3, 0.8e1) + (-0.1677298688e28 * pow(x2, 0.4e1) + (-0.1660524954e22 * x1 * x1 + 0.5956236680e25) * x2 * x2 + 0.3693548142e19 * x1 * x1 + 0.3324533647e20) * pow(x3, 0.6e1) + (-0.1677298687e28 * pow(x2, 0.6e1) + (-0.2490787430e22 * x1 * x1 + 0.8934355018e25) * pow(x2, 0.4e1) + (0.1108064442e20 * x1 * x1 + 0.9973600938e20) * x2 * x2 + 0.9966924595e13 * x1 * x1 + 0.9759097608e14) * pow(x3, 0.4e1) + (-0.8386493452e27 * pow(x2, 0.8e1) + (-0.1660524954e22 * x1 * x1 + 0.5956236678e25) * pow(x2, 0.6e1) + (0.1108064442e20 * x1 * x1 + 0.9973600938e20) * pow(x2, 0.4e1) + (0.1993384919e14 * x1 * x1 + 0.1951819522e15) * x2 * x2) * x3 * x3 - 0.1677298689e27 * pow(x2, 0.10e2) + (-0.4151312383e21 * x1 * x1 + 0.1489059170e25) * pow(x2, 0.8e1) + (0.3693548142e19 * x1 * x1 + 0.3324533646e20) * pow(x2, 0.6e1) + (0.9966924595e13 * x1 * x1 + 0.9759097606e14) * pow(x2, 0.4e1)) * pow(t, 0.10e2) + (-0.3810670240e28 * pow(x3, 0.10e2) + (-0.6264090080e24 * x1 * x1 + 0.3339665478e26 - 0.1905335120e29 * x2 * x2) * pow(x3, 0.8e1) + (-0.3810670240e29 * pow(x2, 0.4e1) + (-0.2505636032e25 * x1 * x1 + 0.1335866191e27) * x2 * x2 + x1 * x1 * 0.549846400199999934e22 - 0.1772838400e20 * pow(x1, 0.4e1) + 0.459611906200000004e22) * pow(x3, 0.6e1) + (-0.3810670240e29 * pow(x2, 0.6e1) + (-0.3758454048e25 * x1 * x1 + 0.2003799288e27) * pow(x2, 0.4e1) + (-0.5318515200e20 * pow(x1, 0.4e1) + x1 * x1 * 0.164953920299999953e23 + pow(x1, 0.3e1) * (-0.188951617019483820e6) + x1 * (-0.157519645478514052e6) + 0.137883571799999990e23) * x2 * x2 + 0.1560806528e18 * pow(x1, 0.4e1) + x1 * x1 * 0.679394942599999872e18 + 0.149904608199999968e18) * pow(x3, 0.4e1) + (-0.1905335120e29 * pow(x2, 0.8e1) + (-0.2505636032e25 * x1 * x1 + 0.1335866191e27) * pow(x2, 0.6e1) + (-0.5318515200e20 * pow(x1, 0.4e1) + x1 * x1 * 0.164953920299999953e23 + pow(x1, 0.3e1) * (-0.188951617019483820e6) + x1 * (-0.157519645478514052e6) + 0.137883571799999990e23) * pow(x2, 0.4e1) + (0.3121613056e18 * pow(x1, 0.4e1) + x1 * x1 * 0.1358789885000000512e19 + 0.299809216300000192e18) * x2 * x2 + 0.1898340523e14 * x1 * x1 + 0.1511707008e14 * pow(x1, 0.4e1)) * x3 * x3 - 0.3810670240e28 * pow(x2, 0.10e2) + (-0.6264090080e24 * x1 * x1 + 0.3339665478e26) * pow(x2, 0.8e1) + (x1 * x1 * 0.549846400199999934e22 - 0.1772838400e20 * pow(x1, 0.4e1) + 0.459611906200000004e22) * pow(x2, 0.6e1) + (0.1560806528e18 * pow(x1, 0.4e1) + x1 * x1 * 0.679394942599999872e18 + 0.149904608199999968e18) * pow(x2, 0.4e1) + (0.1898340523e14 * x1 * x1 + 0.1511707008e14 * pow(x1, 0.4e1)) * x2 * x2 + 0.270708096e9 * pow(x1, 0.4e1)) * t * t + (-0.6103852834e25 * pow(x3, 0.10e2) + (-0.1006632960e19 * x1 * x1 + 0.5426993876e23 - 0.3051926417e26 * x2 * x2) * pow(x3, 0.8e1) + (-0.6103852836e26 * pow(x2, 0.4e1) + (-0.4026531840e19 * x1 * x1 + 0.2170797552e24) * x2 * x2 + 0.8959033344e16 * x1 * x1 + 0.4837014951e18) * pow(x3, 0.6e1) + (0.2365483439e12 - 0.6103852836e26 * pow(x2, 0.6e1) + (-0.6039797760e19 * x1 * x1 + 0.3256196328e24) * pow(x2, 0.4e1) + (0.2687710003e17 * x1 * x1 + 0.1451104484e19) * x2 * x2) * pow(x3, 0.4e1) + (-0.3051926418e26 * pow(x2, 0.8e1) + (-0.4026531840e19 * x1 * x1 + 0.2170797552e24) * pow(x2, 0.6e1) + (0.2687710003e17 * x1 * x1 + 0.1451104484e19) * pow(x2, 0.4e1) + 0.4730966878e12 * x2 * x2) * x3 * x3 - 0.6103852834e25 * pow(x2, 0.10e2) + (-0.1006632960e19 * x1 * x1 + 0.5426993878e23) * pow(x2, 0.8e1) + (0.8959033344e16 * x1 * x1 + 0.4837014952e18) * pow(x2, 0.6e1) + 0.2365483439e12 * pow(x2, 0.4e1)) * pow(t, 0.12e2) + (-0.1682954066e28 * pow(x3, 0.10e2) + (-0.1943470211e23 * x1 * x1 + 0.1490822886e26 - 0.8414770331e28 * x2 * x2) * pow(x3, 0.8e1) + (-0.1682954065e29 * pow(x2, 0.4e1) + (-0.7773880843e23 * x1 * x1 + 0.5963291543e26) * x2 * x2 + x1 * x1 * 0.172653929499999994e21 - 0.2621440000e16 * pow(x1, 0.4e1) + 0.623040398500000039e21 + pow(x1, 0.3e1) * (-0.149011611938476563e3) + x1 * (-0.537695076907534258e3)) * pow(x3, 0.6e1) + (-0.1682954067e29 * pow(x2, 0.6e1) + (-0.1166082126e24 * x1 * x1 + 0.8944937315e26) * pow(x2, 0.4e1) + (-0.7864320000e16 * pow(x1, 0.4e1) + x1 * x1 * 0.517961788200000029e21 + 0.186912119799999994e22) * x2 * x2 + 0.2333081600e14 * pow(x1, 0.4e1) + x1 * x1 * 0.280247078700000050e16 + 0.4578042065000000e16) * pow(x3, 0.4e1) + (-0.8414770323e28 * pow(x2, 0.8e1) + (-0.7773880842e23 * x1 * x1 + 0.5963291543e26) * pow(x2, 0.6e1) + (-0.7864320000e16 * pow(x1, 0.4e1) + x1 * x1 * 0.517961788200000029e21 + 0.186912119799999994e22) * pow(x2, 0.4e1) + (0.4666163200e14 * pow(x1, 0.4e1) + x1 * x1 * 0.5604941576000000e16 + 0.9156084129000002e16) * x2 * x2 + 0.2772050903e10 * x1 * x1) * x3 * x3 - 0.1682954065e28 * pow(x2, 0.10e2) + (-0.1943470211e23 * x1 * x1 + 0.1490822887e26) * pow(x2, 0.8e1) + (x1 * x1 * 0.172653929499999961e21 - 0.2621440000e16 * pow(x1, 0.4e1) + 0.623040398299999896e21) * pow(x2, 0.6e1) + (0.2333081600e14 * pow(x1, 0.4e1) + x1 * x1 * 0.280247078700000050e16 + 0.4578042065000000e16) * pow(x2, 0.4e1) + 0.2772050903e10 * x2 * x2 * x1 * x1) * pow(t, 0.8e1) + (-0.8904501355e28 * pow(x3, 0.10e2) + (-0.4840254681e24 * x1 * x1 + 0.7852025415e26 - 0.4452250679e29 * x2 * x2) * pow(x3, 0.8e1) + (-0.8904501356e29 * pow(x2, 0.4e1) + (-0.1936101873e25 * x1 * x1 + 0.3140810167e27) * x2 * x2 + x1 * x1 * 0.428030799200000043e22 - 0.2288844800e19 * pow(x1, 0.4e1) + 0.648240145400000204e22) * pow(x3, 0.6e1) + (-0.8904501356e29 * pow(x2, 0.6e1) + (-0.2904152810e25 * x1 * x1 + 0.4711215251e27) * pow(x2, 0.4e1) + (-0.6866534400e19 * pow(x1, 0.4e1) + x1 * x1 * 0.128409239800000010e23 + pow(x1, 0.3e1) * (-0.487896613776683807e5) + x1 * (-0.738307741518386174e5) + 0.194472043700000045e23) * x2 * x2 + 0.2032697344e17 * pow(x1, 0.4e1) + x1 * x1 * 0.244643582499999936e18 + 0.114710931399999984e18) * pow(x3, 0.4e1) + (-0.4452250679e29 * pow(x2, 0.8e1) + (-0.1936101872e25 * x1 * x1 + 0.3140810168e27) * pow(x2, 0.6e1) + (-0.6866534400e19 * pow(x1, 0.4e1) + x1 * x1 * 0.128409239800000010e23 + pow(x1, 0.3e1) * (-0.487896613776683807e5) + x1 * (-0.738307741518386174e5) + 0.194472043700000045e23) * pow(x2, 0.4e1) + (0.4065394688e17 * pow(x1, 0.4e1) + x1 * x1 * 0.489287164999999936e18 + 0.229421863000000000e18) * x2 * x2 + 0.2426410807e13 * x1 * x1 + 0.3893329920e12 * pow(x1, 0.4e1)) * x3 * x3 - 0.8904501361e28 * pow(x2, 0.10e2) + (-0.4840254681e24 * x1 * x1 + 0.7852025415e26) * pow(x2, 0.8e1) + (x1 * x1 * 0.428030799200000043e22 - 0.2288844800e19 * pow(x1, 0.4e1) + 0.648240145400000204e22) * pow(x2, 0.6e1) + (0.2032697344e17 * pow(x1, 0.4e1) + x1 * x1 * 0.244643582499999936e18 + 0.114710931399999984e18) * pow(x2, 0.4e1) + (0.2426410807e13 * x1 * x1 + 0.3893329920e12 * pow(x1, 0.4e1)) * x2 * x2) * pow(t, 0.5e1) + (-0.3661089514e26 * pow(x3, 0.10e2) + (-0.3019898880e20 * x1 * x1 + 0.3252934523e24 - 0.1830544758e27 * x2 * x2) * pow(x3, 0.8e1) + (-0.3661089516e27 * pow(x2, 0.4e1) + (-0.1207959552e21 * x1 * x1 + 0.1301173809e25) * x2 * x2 + 0.2687710003e18 * x1 * x1 + 0.4836483383e19) * pow(x3, 0.6e1) + (0.7096450306e13 - 0.3661089516e27 * pow(x2, 0.6e1) + (-0.1811939328e21 * x1 * x1 + 0.1951760714e25) * pow(x2, 0.4e1) + (0.8063130008e18 * x1 * x1 + 0.1450945014e20) * x2 * x2) * pow(x3, 0.4e1) + (-0.1830544759e27 * pow(x2, 0.8e1) + (-0.1207959552e21 * x1 * x1 + 0.1301173809e25) * pow(x2, 0.6e1) + (0.8063130008e18 * x1 * x1 + 0.1450945014e20) * pow(x2, 0.4e1) + 0.1419290063e14 * x2 * x2) * x3 * x3 - 0.3661089514e26 * pow(x2, 0.10e2) + (-0.3019898880e20 * x1 * x1 + 0.3252934523e24) * pow(x2, 0.8e1) + (0.2687710003e18 * x1 * x1 + 0.4836483384e19) * pow(x2, 0.6e1) + 0.7096450306e13 * pow(x2, 0.4e1)) * pow(t, 0.11e2) + (-0.3435973836e22 * pow(x3, 0.10e2) + (-0.1717986918e23 * x2 * x2 + 0.3058016715e20) * pow(x3, 0.8e1) + (0.1223206686e21 * x2 * x2 - 0.3435973836e23 * pow(x2, 0.4e1)) * pow(x3, 0.6e1) + (0.1834810029e21 * pow(x2, 0.4e1) - 0.3435973836e23 * pow(x2, 0.6e1)) * pow(x3, 0.4e1) + (-0.1717986918e23 * pow(x2, 0.8e1) + 0.1223206686e21 * pow(x2, 0.6e1)) * x3 * x3 + 0.3058016715e20 * pow(x2, 0.8e1) - 0.3435973836e22 * pow(x2, 0.10e2)) * pow(t, 0.15e2) + (-0.1268704800e28 * pow(x3, 0.10e2) + (-0.2840064480e24 * x1 * x1 + 0.1109212696e26 - 0.6343524000e28 * x2 * x2) * pow(x3, 0.8e1) + (-0.1268704800e29 * pow(x2, 0.4e1) + (-0.1136025792e25 * x1 * x1 + 0.4436850784e26) * x2 * x2 + x1 * x1 * 0.248516608200000039e22 - 0.1260864000e20 * pow(x1, 0.4e1) + 0.176650973599999957e22) * pow(x3, 0.6e1) + (-0.1268704800e29 * pow(x2, 0.6e1) + (-0.1704038688e25 * x1 * x1 + 0.6655276176e26) * pow(x2, 0.4e1) + (-0.3782592000e20 * pow(x1, 0.4e1) + x1 * x1 * 0.745549824500000044e22 + 0.529952920800000161e22) * x2 * x2 + 0.1105194880e18 * pow(x1, 0.4e1) + x1 * x1 * 0.376647985800000000e18 + 0.68240999199999992e17) * pow(x3, 0.4e1) + (-0.6343524000e28 * pow(x2, 0.8e1) + (-0.1136025792e25 * x1 * x1 + 0.4436850784e26) * pow(x2, 0.6e1) + (-0.3782592000e20 * pow(x1, 0.4e1) + x1 * x1 * 0.745549824500000044e22 + 0.529952920800000161e22) * pow(x2, 0.4e1) + (0.2210389760e18 * pow(x1, 0.4e1) + x1 * x1 * 0.753295971500000128e18 + 0.136481998400000000e18) * x2 * x2 + 0.1356924331e14 * x1 * x1 + 0.1505623680e14 * pow(x1, 0.4e1)) * x3 * x3 - 0.1268704800e28 * pow(x2, 0.10e2) + (-0.2840064480e24 * x1 * x1 + 0.1109212696e26) * pow(x2, 0.8e1) + (x1 * x1 * 0.248516608200000039e22 - 0.1260864000e20 * pow(x1, 0.4e1) + 0.176650973599999957e22) * pow(x2, 0.6e1) + (0.1105194880e18 * pow(x1, 0.4e1) + x1 * x1 * 0.376647985800000000e18 + 0.68240999199999992e17) * pow(x2, 0.4e1) + (0.1356924331e14 * x1 * x1 + 0.1505623680e14 * pow(x1, 0.4e1)) * x2 * x2 + 0.451180160e9 * pow(x1, 0.4e1)) * t + (-0.7514313718e24 * pow(x3, 0.10e2) + (-0.3757156860e25 * x2 * x2 + 0.668439450299999768e22) * pow(x3, 0.8e1) + (-0.7514313719e25 * pow(x2, 0.4e1) + x2 * x2 * 0.267375780300000015e23 + 0.29767881449999992e17) * pow(x3, 0.6e1) + (x2 * x2 * 0.89303644330000000e17 - 0.7514313719e25 * pow(x2, 0.6e1) + pow(x2, 0.4e1) * 0.401063670600000057e23) * pow(x3, 0.4e1) + (-0.3757156860e25 * pow(x2, 0.8e1) + pow(x2, 0.4e1) * 0.89303644330000016e17 + pow(x2, 0.6e1) * 0.267375780300000057e23) * x3 * x3 + 0.6684394505e22 * pow(x2, 0.8e1) - 0.7514313718e24 * pow(x2, 0.10e2) + pow(x2, 0.6e1) * 0.29767881450000004e17) * pow(t, 0.13e2) + (-0.6535477504e28 * pow(x3, 0.10e2) + (-0.2262223093e24 * x1 * x1 + 0.5772786258e26 - 0.3267738752e29 * x2 * x2) * pow(x3, 0.8e1) + (-0.6535477503e29 * pow(x2, 0.4e1) + (-0.9048892377e24 * x1 * x1 + 0.2309114504e27) * x2 * x2 + x1 * x1 * 0.200420021400000030e22 - 0.4584243200e18 * pow(x1, 0.4e1) + 0.389118664000000072e22 + pow(x1, 0.3e1) * (-0.651460140943527222e4) + x1 * (-0.126425904944297981e5)) * pow(x3, 0.6e1) + (-0.6535477502e29 * pow(x2, 0.6e1) + (-0.1357333857e25 * x1 * x1 + 0.3463671755e27) * pow(x2, 0.4e1) + (-0.1375272960e19 * pow(x1, 0.4e1) + x1 * x1 * 0.601260064099999941e22 + 0.116735599299999983e23) * x2 * x2 + 0.4077060096e16 * pow(x1, 0.4e1) + x1 * x1 * 0.81632726719999952e17 + 0.53483257099999976e17) * pow(x3, 0.4e1) + (-0.3267738752e29 * pow(x2, 0.8e1) + (-0.9048892377e24 * x1 * x1 + 0.2309114504e27) * pow(x2, 0.6e1) + (-0.1375272960e19 * pow(x1, 0.4e1) + x1 * x1 * 0.601260064099999941e22 + 0.116735599299999983e23) * pow(x2, 0.4e1) + (0.8154120192e16 * pow(x1, 0.4e1) + x1 * x1 * 0.163265453500000000e18 + 0.106966514200000016e18) * x2 * x2 + 0.4851666591e12 * x1 * x1 + 0.2595553280e11 * pow(x1, 0.4e1)) * x3 * x3 - 0.6535477512e28 * pow(x2, 0.10e2) + (-0.2262223094e24 * x1 * x1 + 0.5772786257e26) * pow(x2, 0.8e1) + (x1 * x1 * 0.200420021400000057e22 - 0.4584243200e18 * pow(x1, 0.4e1) + 0.389118664100000144e22) * pow(x2, 0.6e1) + (0.4077060096e16 * pow(x1, 0.4e1) + x1 * x1 * 0.81632726719999952e17 + 0.53483257099999976e17) * pow(x2, 0.4e1) + (0.4851666591e12 * x1 * x1 + 0.2595553280e11 * pow(x1, 0.4e1)) * x2 * x2) * pow(t, 0.6e1) + (-0.5900202000e23 * x1 * x1 + 0.1726427340e25 - 0.9899010000e27 * x2 * x2) * pow(x3, 0.8e1) + (-0.9899010000e27 * pow(x2, 0.8e1) + (-0.2360080800e24 * x1 * x1 + 0.6905709360e25) * pow(x2, 0.6e1) + (-0.1176120000e20 * pow(x1, 0.4e1) + x1 * x1 * 0.154352860200000029e22 + pow(x1, 0.3e1) * (-0.208920880595542258e5) + x1 * (-0.127400973168038654e5) + 0.945624821999999910e21) * pow(x2, 0.4e1) + (0.6837336000e17 * pow(x1, 0.4e1) + x1 * x1 * 0.187876614800000032e18 + 0.28480747599999996e17) * x2 * x2 + 0.4243913380e13 * x1 * x1 + 0.6241748000e13 * pow(x1, 0.4e1)) * x3 * x3 + (-0.5900202000e23 * x1 * x1 + 0.1726427340e25) * pow(x2, 0.8e1) + (x1 * x1 * 0.514509534000000074e21 - 0.3920400000e19 * pow(x1, 0.4e1) + 0.315208273999999992e21 + pow(x1, 0.3e1) * (-0.696402935318474192e4) + x1 * (-0.424669910560128847e4)) * pow(x2, 0.6e1) + (0.3418668000e17 * pow(x1, 0.4e1) + x1 * x1 * 0.93938307400000016e17 + 0.14240373799999998e17) * pow(x2, 0.4e1) + (0.4243913380e13 * x1 * x1 + 0.6241748000e13 * pow(x1, 0.4e1)) * x2 * x2 + (-0.1979802000e28 * pow(x2, 0.6e1) + (-0.3540121200e24 * x1 * x1 + 0.1035856404e26) * pow(x2, 0.4e1) + (-0.1176120000e20 * pow(x1, 0.4e1) + x1 * x1 * 0.154352860200000029e22 + pow(x1, 0.3e1) * (-0.208920880595542258e5) + x1 * (-0.127400973168038654e5) + 0.945624821999999910e21) * x2 * x2 + 0.3418668000e17 * pow(x1, 0.4e1) + x1 * x1 * 0.93938307400000016e17 + 0.14240373799999998e17) * pow(x3, 0.4e1) + (-0.3737387312e28 * pow(x3, 0.10e2) + (-0.7766018620e23 * x1 * x1 + 0.3306256935e26 - 0.1868693656e29 * x2 * x2) * pow(x3, 0.8e1) + (-0.3737387310e29 * pow(x2, 0.4e1) + (-0.3106407451e24 * x1 * x1 + 0.1322502777e27) * x2 * x2 + x1 * x1 * 0.689076817099999937e21 - 0.5242880000e17 * pow(x1, 0.4e1) + 0.177952274800000002e22) * pow(x3, 0.6e1) + (-0.3737387310e29 * pow(x2, 0.6e1) + (-0.4659611173e24 * x1 * x1 + 0.1983754165e27) * pow(x2, 0.4e1) + (-0.1572864000e18 * pow(x1, 0.4e1) + x1 * x1 * 0.206723045100000012e22 + pow(x1, 0.3e1) * (-0.223517417907714844e4) + x1 * (-0.577114476225855378e4) + 0.533856824699999853e22) * x2 * x2 + 0.4666163200e15 * pow(x1, 0.4e1) + x1 * x1 * 0.18673448520000004e17 + 0.18323256470000000e17) * pow(x3, 0.4e1) + (-0.1868693657e29 * pow(x2, 0.8e1) + (-0.3106407449e24 * x1 * x1 + 0.1322502777e27) * pow(x2, 0.6e1) + (-0.1572864000e18 * pow(x1, 0.4e1) + x1 * x1 * 0.206723045100000038e22 + pow(x1, 0.3e1) * (-0.223517417907714844e4) + x1 * (-0.577114476333936909e4) + 0.533856824799999925e22) * pow(x2, 0.4e1) + (0.9332326400e15 * pow(x1, 0.4e1) + x1 * x1 * 0.37346897020000000e17 + 0.36646512930000008e17) * x2 * x2 + 0.5544101804e11 * x1 * x1) * x3 * x3 - 0.3737387312e28 * pow(x2, 0.10e2) + (-0.7766018620e23 * x1 * x1 + 0.3306256936e26) * pow(x2, 0.8e1) + (x1 * x1 * 0.689076817099999937e21 - 0.5242880000e17 * pow(x1, 0.4e1) + 0.177952274800000002e22) * pow(x2, 0.6e1) + (x1 * x1 * 0.18673448510000000e17 + 0.4666163200e15 * pow(x1, 0.4e1) + 0.18323256460000004e17) * pow(x2, 0.4e1) + 0.5544101804e11 * x2 * x2 * x1 * x1) * pow(t, 0.7e1) + (-0.7121127936e28 * pow(x3, 0.10e2) + (-0.8371271936e24 * x1 * x1 + 0.6254872838e26 - 0.3560563967e29 * x2 * x2) * pow(x3, 0.8e1) + (-0.7121127935e29 * pow(x2, 0.4e1) + (-0.3348508774e25 * x1 * x1 + 0.2501949134e27) * x2 * x2 + x1 * x1 * 0.736866526099999818e22 - 0.1423370240e20 * pow(x1, 0.4e1) + 0.735843410499999891e22) * pow(x3, 0.6e1) + (-0.7121127935e29 * pow(x2, 0.6e1) + (-0.5022763162e25 * x1 * x1 + 0.3752923702e27) * pow(x2, 0.4e1) + (-0.4270110720e20 * pow(x1, 0.4e1) + x1 * x1 * 0.221059957600000032e23 + pow(x1, 0.3e1) * (-0.151704807649366558e6) + x1 * (-0.151203064742564718e6) + 0.220753023200000035e23) * x2 * x2 + 0.1257704141e18 * pow(x1, 0.4e1) + x1 * x1 * 0.726018835900000000e18 + 0.199602102699999968e18) * pow(x3, 0.4e1) + (-0.3560563967e29 * pow(x2, 0.8e1) + (-0.3348508774e25 * x1 * x1 + 0.2501949134e27) * pow(x2, 0.6e1) + (-0.4270110720e20 * pow(x1, 0.4e1) + x1 * x1 * 0.221059957600000032e23 + pow(x1, 0.3e1) * (-0.151704807649366558e6) + x1 * (-0.151203064742564718e6) + 0.220753023200000035e23) * pow(x2, 0.4e1) + (0.2515408283e18 * pow(x1, 0.4e1) + x1 * x1 * 0.1452037672000000000e19 + 0.399204205400000000e18) * x2 * x2 + 0.1517770058e14 * x1 * x1 + 0.8086770688e13 * pow(x1, 0.4e1)) * x3 * x3 - 0.7121127940e28 * pow(x2, 0.10e2) + (-0.8371271936e24 * x1 * x1 + 0.6254872838e26) * pow(x2, 0.8e1) + (x1 * x1 * 0.736866526099999818e22 - 0.1423370240e20 * pow(x1, 0.4e1) + 0.735843410499999891e22) * pow(x2, 0.6e1) + (x1 * x1 * 0.726018835800000000e18 + 0.1257704141e18 * pow(x1, 0.4e1) + 0.199602102800000000e18) * pow(x2, 0.4e1) + (0.1517770058e14 * x1 * x1 + 0.8086770688e13 * pow(x1, 0.4e1)) * x2 * x2 + 0.721888256e8 * pow(x1, 0.4e1)) * pow(t, 0.3e1) + (-0.6441914071e23 * pow(x3, 0.10e2) + (-0.3220957036e24 * x2 * x2 + 0.573234789400000004e21) * pow(x3, 0.8e1) + (-0.6441914072e24 * pow(x2, 0.4e1) + x2 * x2 * 0.229293915799999978e22 + 0.850510898900000e15) * pow(x3, 0.6e1) + (x2 * x2 * 0.255153269599999950e16 - 0.6441914072e24 * pow(x2, 0.6e1) + pow(x2, 0.4e1) * 0.343940873899999966e22) * pow(x3, 0.4e1) + (-0.3220957036e24 * pow(x2, 0.8e1) + pow(x2, 0.4e1) * 0.255153269600000050e16 + pow(x2, 0.6e1) * 0.229293915800000030e22) * x3 * x3 + 0.5732347895e21 * pow(x2, 0.8e1) - 0.6441914071e23 * pow(x2, 0.10e2) + pow(x2, 0.6e1) * 0.850510898900000125e15) * pow(t, 0.14e2) + (-0.8589934588e20 * pow(x3, 0.10e2) + (-0.4294967296e21 * x2 * x2 + 0.7645041787e18) * pow(x3, 0.8e1) + (0.3058016714e19 * x2 * x2 - 0.8589934592e21 * pow(x2, 0.4e1)) * pow(x3, 0.6e1) + (0.4587025074e19 * pow(x2, 0.4e1) - 0.8589934592e21 * pow(x2, 0.6e1)) * pow(x3, 0.4e1) + (-0.4294967296e21 * pow(x2, 0.8e1) + 0.3058016715e19 * pow(x2, 0.6e1)) * x3 * x3 + 0.7645041787e18 * pow(x2, 0.8e1) - 0.8589934588e20 * pow(x2, 0.10e2)) * pow(t, 0.16e2) + (-0.5987346947e27 * pow(x3, 0.10e2) + (-0.3457679360e22 * x1 * x1 + 0.5310055471e25 - 0.2993673473e28 * x2 * x2) * pow(x3, 0.8e1) + (-0.5987346944e28 * pow(x2, 0.4e1) + (-0.1383071744e23 * x1 * x1 + 0.2124022190e26) * x2 * x2 + 0.3074534932e20 * x1 * x1 + 0.1661900372e21) * pow(x3, 0.6e1) + (-0.5987346944e28 * pow(x2, 0.6e1) + (-0.2074607617e23 * x1 * x1 + 0.3186033286e26) * pow(x2, 0.4e1) + (0.9223604800e20 * x1 * x1 + 0.4985701116e21) * x2 * x2 + 0.2491731149e15 * x1 * x1 + 0.8135045384e15) * pow(x3, 0.4e1) + (-0.2993673473e28 * pow(x2, 0.8e1) + (-0.1383071744e23 * x1 * x1 + 0.2124022190e26) * pow(x2, 0.6e1) + (0.9223604800e20 * x1 * x1 + 0.4985701116e21) * pow(x2, 0.4e1) + (0.4983462297e15 * x1 * x1 + 0.1627009077e16) * x2 * x2) * x3 * x3 - 0.5987346946e27 * pow(x2, 0.10e2) + (-0.3457679360e22 * x1 * x1 + 0.5310055472e25) * pow(x2, 0.8e1) + (0.3074534932e20 * x1 * x1 + 0.1661900372e21) * pow(x2, 0.6e1) + (0.2491731149e15 * x1 * x1 + 0.8135045377e15) * pow(x2, 0.4e1)) * pow(t, 0.9e1) + (-0.1979802000e28 * pow(x2, 0.4e1) + (-0.2360080800e24 * x1 * x1 + 0.6905709360e25) * x2 * x2 + x1 * x1 * 0.514509534000000074e21 - 0.3920400000e19 * pow(x1, 0.4e1) + 0.315208273999999992e21 + pow(x1, 0.3e1) * (-0.696402935318474192e4) + x1 * (-0.424669910560128847e4)) * pow(x3, 0.6e1) + 0.281987600e9 * pow(x1, 0.4e1) - 0.1979802000e27 * pow(x2, 0.10e2) - 0.1979802000e27 * pow(x3, 0.10e2)) * pow(0.1e1 + 0.4e0 * t, -0.2e1) * pow(0.256e3 * pow(t, 0.4e1) * x2 * x2 + 0.256e3 * pow(t, 0.4e1) * x3 * x3 + 0.2560e4 * pow(t, 0.3e1) * x2 * x2 + 0.2560e4 * pow(t, 0.3e1) * x3 * x3 + 0.9600e4 * t * t * x2 * x2 + 0.9600e4 * t * t * x3 * x3 + 0.16000e5 * t * x2 * x2 + 0.16000e5 * t * x3 * x3 + x1 * x1 + 0.10000e5 * x2 * x2 + 0.10000e5 * x3 * x3, -0.2e1) * pow(0.160000e6 * t * t * x2 * x2 + 0.160000e6 * t * t * x3 * x3 + 0.800000e6 * t * x2 * x2 + 0.800000e6 * t * x3 * x3 + 0.990000e6 * x2 * x2 + 0.990000e6 * x3 * x3 + 0.89e2, -0.2e1) / (0.320000e6 * pow(t, 0.3e1) * x2 * x2 + 0.320000e6 * pow(t, 0.3e1) * x3 * x3 + 0.2400000e7 * t * t * x2 * x2 + 0.2400000e7 * t * t * x3 * x3 + 0.5980000e7 * t * x2 * x2 + 0.5980000e7 * t * x3 * x3 + 0.4950000e7 * x2 * x2 + 0.4950000e7 * x3 * x3 + 0.178e3 * t + 0.445e3);
+}
+
+static RegisterScalarFunction regsca_thin_ellipsoid_rhs( "thin_ellipsoidRhs", thin_ellipsoid_rhs);
+
+
+
+
+
+
+
 
 
 // ==non-stationary test-case "ToroidalFlow"==
@@ -923,13 +1127,13 @@ SurfactantP1BaseCL* make_surfactant_timedisc( MultiGridCL& mg, LevelsetP2CL& lse
             &v, Bnd_v, lset.Phi, lset.GetBndData(),
             P.get<int>("SurfTransp.Solver.Iter"), P.get<double>("SurfTransp.Solver.Tol"),
             P.get<double>("SurfTransp.XFEMReduced"));
-    else if (method == std::string( "spacetime-cGdG-EnhancedRepair"))
+    else if (method == std::string( "spacetime-cGdG-Mixed"))
         ret= new SurfactantSTP1CL( mg,
             P.get<double>("SurfTransp.Theta"), P.get<double>("SurfTransp.Visc"),
             &v, Bnd_v, lset.Phi, lset.GetBndData(),
             /* cG_in_t_ */ false, /* use_mass_div */ P.get<bool>( "SurfTransp.UseMassDiv"),
             P.get<int>("SurfTransp.Solver.Iter"), P.get<double>("SurfTransp.Solver.Tol"),
-            P.get<double>("SurfTransp.XFEMReduced"),/*use EnhancedRepair*/ true);
+            P.get<double>("SurfTransp.XFEMReduced"),/*use MixedFormulation*/ true);
     else
         throw DROPSErrCL( std::string( "make_surfactant_timedisc: Unknown method '") + method + std::string( "'.\n"));
 
@@ -1024,6 +1228,8 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
         LSInit( mg, lset.Phi, the_lset_fun, cur_time);
         InitVel( mg, &v, Bnd_v, the_wind_fun, cur_time);
         timedisc.DoStep( cur_time);
+//        P1EvalCL discsol;
+//        discsol=make_P1Eval(  mg, ifbnd, timedisc.ic);
         std::cout << "surfactant on \\Gamma: " << Integral_Gamma( mg, lset.Phi, lset.GetBndData(), make_P1Eval(  mg, ifbnd, timedisc.ic)) << '\n';
         L_2tL_2x_err_sq+= (step > 1 ? 0.5 : 0.)*dt*std::pow( L_2x_err, 2);
         L_2x_err= L2_error( lset.Phi, lset.GetBndData(), timedisc.GetSolution(), the_sol_fun);
