@@ -700,7 +700,27 @@ template <template <class> class LocalMatrixT, class DiscVelSolT>
     return new InterfaceMatrixAccuCL< LocalMatrixT<DiscVelSolT>, InterfaceCommonDataP1CL>( mat,
         LocalMatrixT<DiscVelSolT>( wind), cdata, name);
 }
+  class LocalInterfaceStabiVecP1CL
+  {
+    private:
+      std::valarray<double> q[4];
+      QuadDomain2DCL qdom;
+    public:
+      static const FiniteElementT row_fe_type= P1IF_FE,
+                                  col_fe_type= P1IF_FE;
 
+      double coup[4];
+
+      void setup (const TetraCL& t, const InterfaceCommonDataP1CL& cdata) {
+          make_CompositeQuad2Domain2D ( qdom, cdata.surf, t);
+          for (int i= 0; i < 4; ++i)
+              resize_and_evaluate_on_vertexes ( cdata.p1[i], qdom, q[i]);
+          for (int i= 0; i < 4; ++i) {
+              coup[i]= quad_2D( q[i], qdom);
+          }
+      }
+      LocalInterfaceStabiVecP1CL (){}
+  };
 
 class LocalInterfaceMassP1CL
 {
@@ -1214,6 +1234,7 @@ class SurfactantP1BaseCL
 
     GSPcCL                  pc_;
     GMResSolverCL<GSPcCL>   gm_;
+
     double omit_bound_; ///< not used atm
 
   public:
@@ -1796,7 +1817,7 @@ class STInterfaceCommonDataCL : public TetraAccumulatorCL
     std::valarray<double> ls_loc;
     SPatchCL<4> surf;
     QuadDomainCodim1CL<4> q5dom;
-
+    QuadDomainCL          qdom; //for normal stabilization, need all tetras that cut the ST-manifold
     const double t0,
                  t1;
 
@@ -1826,12 +1847,10 @@ class STInterfaceCommonDataCL : public TetraAccumulatorCL
         evaluate_on_vertexes( st_local_ls, lat, Addr( ls_loc));
         if (equal_signs( ls_loc))
             return;
-//        if (t.GetId().GetIdent()==7170){
-//            std::cout << "hier ID=7170" << std::endl;
-//        }
         surf.make_patch<MergeCutPolicyCL>( lat, ls_loc);
         surf.compute_normals( TetraPrismCL( t, t0, t1));
         make_CompositeQuad5DomainSTCodim1SpatialAbsdet( q5dom, surf, TetraPrismCL( t, t0, t1));
+        make_SimpleQuadDomain<Quad5DataCL> (qdom, AllTetraC);
     }
     virtual STInterfaceCommonDataCL* clone (int clone_id) {
         return the_clones[clone_id]= new STInterfaceCommonDataCL( *this);
@@ -2019,6 +2038,83 @@ class LocalSpatialInterfaceMassSTP1P1CL
         }
     }
 };
+//class LocalSpatialInterfaceNormalGradStabiSTP1P1CL
+//{
+//  private:
+//    const InterfaceCommonDataP1CL& spatialcdata_;
+//    const bool on_old_iface_;
+//    Point3DCL grad[4];
+//    GridFunctionCL<Point3DCL> n,
+//                              q[4];
+//    double dummy;
+//    GridFunctionCL<Point3DCL> qgradx,
+//                              qngradx[8],
+//                              spatial_n;
+//   LocalSTP1CL<Point3DCL> gradx[8];
+//    GridFunctionCL<> qn[4];
+//    LocalP1CL<Point3DCL> gradp2[4];
+//  public:
+//    double coup[8][8];
+//    static const ZeroPolicyEnum ZeroPolicy= RemoveExactLocalZeros;
+//    LocalSpatialInterfaceNormalGradStabiSTP1P1CL (const InterfaceCommonDataP1CL& spatialcdata, bool on_old_iface= true)
+//        : spatialcdata_( spatialcdata), on_old_iface_( on_old_iface)
+//    { std::memset( coup, 0, 8*8*sizeof(double)); }
+//    void setup (const TetraPrismCL& prism, const STInterfaceCommonDataCL& cdata) {
+//            //P1DiscCL::GetGradients( grad,dummy, prism.t);
+//             STP1P1DiscCL::GetSpatialGradients( prism, gradx);
+//            for (int i= 0; i < 4; ++i) {
+//               // q[i].resize( cdata.qdom.vertex_size());
+//               // q[i]=grad[i];
+//               // resize_and_evaluate_on_vertexes (gradp2[i], cdata.qdom, qgradx[i]);
+//                //evaluate_on_vertexes( gradx[i], cdata.qdom, Addr( qgradx));
+//            //    q[i].resize( qdom.vertex_size());
+//             //   q[i]= qgradx - dot( qgradx, spatial_n)*spatial_n;
+//            }
+ //              resize_and_evaluate_on_vertexes ( gradx, cdata.qdom, qgradx);
+//               qngradx[i].resize (cdata.qdom.vertex_size ());
+//               for (Uint j= 0; j < qgradp2[i].size(); ++j) {
+//                    cdata.Phi.set_point (cdata.qdom.vertex_begin()[j], true);
+//                    qngradp2[i][j]= inner_prod( cdata.Phi.w, qgradp2[i][j]);
+//                 }
+//        std::memset( coup, 0, 8*8*sizeof(double));
+//        for (Uint i= 0; i < 8 ; ++i) {
+//            coup[i][i]= quad(dot(qgradx[i],qgradx[i]),1.,cdata.qdom);
+//            for(Uint j= 0; j < i; ++j)
+//                coup[i][j]= coup[j][i]= quad(dot(qgradx[j],qgradx[i]),1.,cdata.qdom);
+//        }
+//    }
+//};
+
+
+
+class LocalSpatialStabiMatrixSTP1P1CL
+{
+  private:
+    const InterfaceCommonDataP1CL& spatialcdata_;
+    LocalInterfaceStabiVecP1CL spatial_stabi_;
+    const bool on_old_iface_;
+
+  public:
+    double coup[8][8];
+    static const ZeroPolicyEnum ZeroPolicy= RemoveExactLocalZeros;
+    LocalSpatialStabiMatrixSTP1P1CL (const InterfaceCommonDataP1CL& spatialcdata, bool on_old_iface= true)
+        : spatialcdata_( spatialcdata), on_old_iface_( on_old_iface)
+    { std::memset( coup, 0, 8*8*sizeof(double)); }
+    void setup (const TetraPrismCL& p, const STInterfaceCommonDataCL&) {
+        spatial_stabi_.setup( p.t, spatialcdata_.get_clone());
+        // on_old_iface_==true: The basis functions for t1 are all zero on the interface at t0
+        //                      --> zero-init in the constructor.
+        // else: The basis functions for t0 are all zero on the interface at t1.
+        // For use_cG_in_time_ == true && use_massdiv_ == false: The rows [4..7) are modified, thus:
+        std::memset( coup, 0, 8*8*sizeof(double));
+        const Uint offset= on_old_iface_ ? 0 : 4;
+        for (Uint i= 0; i < 4 ; ++i) {
+            coup[i + offset][i + offset]= spatial_stabi_.coup[i]*spatial_stabi_.coup[i];
+            for(Uint j= 0; j < i; ++j)
+                coup[i + offset][j + offset]= coup[j + offset][i + offset]= spatial_stabi_.coup[i]*spatial_stabi_.coup[j];
+        }
+    }
+};
 
 void
 resize_and_scatter_piecewise_spatial_normal (const SPatchCL<4>& surf, const QuadDomainCodim1CL<4>& qdom, std::valarray<Point3DCL>& spatial_normal);
@@ -2054,10 +2150,6 @@ class LocalLaplaceBeltramiSTP1P1CL
         for (int i= 0; i < 8; ++i) {
             coup[i][i]= D_* quad_codim1( dot( q[i], q[i]), qdom);
             for(int j= 0; j < i; ++j){
-                    if(quad_codim1( dot( q[i], q[j]), qdom)!=quad_codim1( dot( q[i], q[j]), qdom))
-                    {
-                        std::cout << "NAN in LocalLaplaceBeltramiSTP1P1CL " <<spatial_n[118]<< std::endl;
-                    }
                 coup[i][j]= coup[j][i]= D_* quad_codim1( dot( q[i], q[j]), qdom);
             }
         }
@@ -2083,8 +2175,9 @@ class LocalMaterialDerivativeSTP1P1CL
     GridFunctionCL<Point4DCL> qw,
                               qgrad;
     std::valarray<double>     q[8],
+                              qtest[8],
                               qwdotgrad[8];
-
+    GridFunctionCL<Point4DCL> spacetime_n;
   public:
     double coup[8][8];
     static const ZeroPolicyEnum ZeroPolicy= KeepLocalZeros;
@@ -2092,24 +2185,27 @@ class LocalMaterialDerivativeSTP1P1CL
     void setup (const TetraPrismCL& prism, const STInterfaceCommonDataCL& cdata) {
         loc_w_.assign( prism.t, w_);
         resize_and_evaluate_on_vertexes( STWindProxyCL( loc_w_), cdata.q5dom, qw);
+        resize_and_scatter_piecewise_normal( cdata.surf, cdata.q5dom, spacetime_n);
         qgrad.resize( cdata.q5dom.vertex_size());
         STP1P1DiscCL::GetGradients( prism, grad);
         for (int i= 0; i < 8; ++i) {
             evaluate_on_vertexes( grad[i], cdata.q5dom, Addr( qgrad));
             qwdotgrad[i].resize( cdata.q5dom.vertex_size());
-            qwdotgrad[i]= dot( qw, qgrad);
+            qtest[i]=dot( qw, qgrad);
+            qwdotgrad[i]= dot( qw, qgrad)-(dot(spacetime_n,qw)*dot(spacetime_n,qgrad));
+
             resize_and_evaluate_on_vertexes( STP1P1DiscCL::ref_val[i], cdata.q5dom, q[i]);
         }
-
         for (int i= 0; i < 8; ++i) {
-            for(int j= 0; j < 8; ++j)
-                (transpose_local_matrix_ ? coup[j][i] : coup[i][j])= quad_codim1( qwdotgrad[j]*q[i], cdata.q5dom);
+            for(int j= 0; j < 8; ++j){
+                    (transpose_local_matrix_ ? coup[j][i] : coup[i][j])= quad_codim1( qwdotgrad[j]*q[i], cdata.q5dom);
         }
     }
-
+}
     LocalMaterialDerivativeSTP1P1CL (const DiscVelSolT& w, const bool transpose_local_matrix= false)
         :w_( w), transpose_local_matrix_( transpose_local_matrix) {}
 };
+
 
 template <class DiscVelSolT>
 class LocalMassdivSTP1P1CL
@@ -2216,7 +2312,9 @@ class SurfactantSTP1CL : public SurfactantP1BaseCL
              MderT, ///< ST-material-derivative matrix transposed
              Mdiv, ///< ST-mass-matrix with interface-divergence of velocity
              Mold, ///< mass matrix on the old spatial interface; only used for cG_in_t_ == false.
-             Mnew; ///< mass matrix on the new spatial interface; only used for cG_in_t_ == false and use_mass_div_ == false.
+             Mnew, ///< mass matrix on the new spatial interface; only used for cG_in_t_ == false and use_mass_div_ == false.
+             stabi_old,///stabi old time
+             stabi_new;///stabi new time
 
 
     VectorCL load, ///< load-vector
@@ -2230,7 +2328,7 @@ class SurfactantSTP1CL : public SurfactantP1BaseCL
   private:
     bool cG_in_t_,
          use_mass_div_,
-         use_enhanced_repair_;
+         use_mixed_formulation_;
 
     STP1P1IdxDescCL st_idx_;
     VectorCL st_oldic_, ///< the old solution represented in the full space-time-FE-basis.
@@ -2242,8 +2340,8 @@ class SurfactantSTP1CL : public SurfactantP1BaseCL
   public:
     SurfactantSTP1CL (MultiGridCL& mg,
         double theta, double D, VecDescCL* v, const VelBndDataT& Bnd_v, VecDescCL& lset_vd, const BndDataCL<>& lsetbnd, bool cG_in_t, bool use_mass_div,
-        int iter= 1000, double tol= 1e-7, double omit_bound= -1., bool use_enhanced_repair=false)
-    : SurfactantP1BaseCL( mg, theta, D, v, Bnd_v, lset_vd, lsetbnd, iter, tol, omit_bound), cG_in_t_( cG_in_t), use_mass_div_( use_mass_div), use_enhanced_repair_(use_enhanced_repair)
+        int iter= 1000, double tol= 1e-7, double omit_bound= -1., bool use_mixed_formulation=false)
+    : SurfactantP1BaseCL( mg, theta, D, v, Bnd_v, lset_vd, lsetbnd, iter, tol, omit_bound), cG_in_t_( cG_in_t), use_mass_div_( use_mass_div), use_mixed_formulation_(use_mixed_formulation)
     {}
 
     /// save a copy of the old level-set and velocity; moves ic to oldic; must be called before DoStep.

@@ -28,12 +28,12 @@
 #include "levelset/levelset.h"
 #include "num/spmat.h"
 #include "misc/scopetimer.h"
+#include "num/gradient_recovery.h"
 #include <cstring>
 #include <cmath>
 
 
 namespace DROPS {
-
 void Extend (const MultiGridCL& mg, const VecDescCL& x, VecDescCL& xext)
 {
     const Uint xidx( x.RowIdx->GetIdx()),
@@ -54,6 +54,8 @@ void Extend (const MultiGridCL& mg, const VecDescCL& x, VecDescCL& xext)
             xext.Data[it->Unknowns( xextidx)]= x.Data[it->Unknowns( xidx)];
     }
 }
+
+
 
 void Restrict (const MultiGridCL& mg, const VecDescCL& xext, VecDescCL& x)
 {
@@ -892,9 +894,15 @@ void SurfactantSTP1CL::Update_dG()
     InterfaceCommonDataP1CL newspatialcdata( lset_vd_, lsetbnd_);
     InterfaceMatrixSTP1AccuCL<LocalSpatialInterfaceMassSTP1P1CL> newmass_accu( &Mnew, &st_idx_,
         LocalSpatialInterfaceMassSTP1P1CL( newspatialcdata, false), cdata, "mixed-mass on new iface");
+    InterfaceMatrixSTP1AccuCL<LocalSpatialStabiMatrixSTP1P1CL> oldstabi_accu( &stabi_old, &st_idx_,
+        LocalSpatialStabiMatrixSTP1P1CL( oldspatialcdata, true), cdata, "stabi on old iface");
+    InterfaceMatrixSTP1AccuCL<LocalSpatialStabiMatrixSTP1P1CL> newstabi_accu( &stabi_new, &st_idx_,
+        LocalSpatialStabiMatrixSTP1P1CL( newspatialcdata,false), cdata, "stabi on new iface");
     if (use_mass_div_) {
-        if (use_enhanced_repair_) {
+        if (use_mixed_formulation_) {
             accus.push_back( &newspatialcdata);
+            accus.push_back(&oldstabi_accu);
+            accus.push_back(&newstabi_accu);
             accus.push_back( &newmass_accu);
             accus.push_back_acquire( make_wind_dependent_local_transpose_matrixSTP1P1_accu<LocalMaterialDerivativeSTP1P1CL>( &MderT, &st_idx_, cdata,  make_STP2P1Eval( MG_, Bnd_v_, oldv_, *v_), "material derivative transposed on ST-iface"));
         }
@@ -918,7 +926,7 @@ void SurfactantSTP1CL::Update_dG()
 void SurfactantSTP1CL::Update()
 {
     ScopeTimerCL timer( "SurfactantSTP1CL::Update");
-    // std::cout << "SurfactantSTP1CL::Update:\n";
+     std::cout << "SurfactantSTP1CL::Update:\n";
     if (cG_in_t_)
         Update_cG();
     else
@@ -936,13 +944,13 @@ void SurfactantSTP1CL::Update()
 //     WriteToFile( cpl_div_, "cpl_div.txt", "coupling for mass-div on ST-iface");
 //     WriteToFile( cpl_old_, "cpl_old.txt", "coupling ini-values on old iface");
 
-    // std::cout << "SurfactantSTP1CL::Update: Finished\n";
+     std::cout << "SurfactantSTP1CL::Update: Finished\n";
 }
 
 void SurfactantSTP1CL::DoStep ()
 {
     Update();
-
+    //double sigma=0;
     MatrixCL L;
     VectorCL rhs( dim);
     if (cG_in_t_) {
@@ -957,9 +965,12 @@ void SurfactantSTP1CL::DoStep ()
     }
     else {
         if (use_mass_div_) {
-            if (use_enhanced_repair_) {
-                //L.LinComb( 0.5, Mder, -0.5, MderT, 1., A, 0.5, Mdiv, 0.5, Mnew, 0.5, Mold);
-                L.LinComb( 1., Mder, 1., Mdiv, 1., A, 1., Mold);
+            if (use_mixed_formulation_) {
+                L.LinComb( 0.5, Mder, -0.5, MderT, 1., A, 0.5, Mdiv, 0.5, Mnew, 0.5, Mold);
+                //L.LinComb( 0.5, Mder, -0.5, MderT, 1., A, 0.5, Mdiv, 0.5, Mnew, 0.5, Mold, sigma*0.5*dt_, stabi_new, sigma*0.5*dt_, stabi_old);
+                //L.LinComb( 1., Mder, 1., Mdiv, 1., A, 1., Mold, sigma*0.5*dt_, stabi_new, sigma*0.5*dt_, stabi_old);
+                //L.LinComb( 1., Mder, 1., Mdiv, 1., A, 1., Mold);
+                //L2.LinComb( -1., MderT, 1., A, 1., Mnew);
                 rhs= Mold*st_oldic_;
                                       }
             else {
@@ -980,9 +991,25 @@ void SurfactantSTP1CL::DoStep ()
 
     {
         ScopeTimerCL timer( "SurfactantSTP1CL::DoStep: Solve");
-
+//        VectorCL rhs2( dim);
+//        VectorCL Ltruelsg(dim);
+//        for (Uint i=0; i<dim; i++)
+//        {
+//            rhs2[i]=0;
+//            Ltruelsg[i]=rand() % 100;
+//            Ltruelsg[i]*=100000;
+//        }
         gm_.Solve( L, st_ic_, rhs, idx.GetEx());
-
+        //gm_.Solve( L, Ltruelsg, rhs2, idx.GetEx());
+        //std::cout << "Ltruelsg: res = " << norm( L*Ltruelsg - rhs2) << std::endl;
+//        WriteToFile( L, "divutrue.txt", "Loesungsmatrix mit divu=true");
+//        WriteToFile( L2, "divufalse.txt", "MLoesungsmatrix mit divu=false");
+//        WriteToFile( Lmix, "divumix.txt", "MLoesungsmatrix mit divu=false");
+//        WriteToFile( st_ic_, "LsgTrue.txt", "Loesung mit divu=true");
+//        WriteToFile( MderT*st_ic_, "MderTstic.txt", "MderT mal gute Loesung");
+//        WriteToFile( Mnew*st_ic_, "Mnewstic.txt", "Mnew mal gute Loesung");
+//        WriteToFile( A*st_ic_, "Astic.txt", "A mal gute Loesung");
+//        WriteToFile( rhs, "rhs.txt", "rhs");
 //        MatrixCL testAlle=L*st_ic_;
 //        MatrixCL testMder=Mder*st_ic_;
 //        MatrixCL testA=A*st_ic_;
@@ -1007,13 +1034,16 @@ void SurfactantSTP1CL::DoStep ()
 //        WriteToFile( testMnew, "TestMnew.txt", "Massematrix(new) mal Loesung");
 //        WriteToFile( testMderT, "TestMderT.txt", "MaterialDerivativeMatrixTranponiert mal Loesung");
 //        WriteToFile( divufalse, "divufalse.txt", "divufalse Bilinearform mal Loesung");
-//        MatrixCL testAlleOnes=L*ones;
-//        MatrixCL testMderOnes=Mder*ones;
-//        MatrixCL testAOnes=A*ones;
-//        MatrixCL testMdivOnes=Mdiv*ones;
-//        MatrixCL testMoldOnes=Mold*ones;
-//        MatrixCL testMnewOnes=Mnew*ones;
-//        MatrixCL testMderTOnes=MderT*ones;
+//        VectorCL testAlleOnes=L*ones;
+//        VectorCL testMderOnes=Mder*ones;
+//        VectorCL testAOnes=A*ones;
+//        VectorCL testMdivOnes=Mdiv*ones;
+//        VectorCL testMoldOnes=Mold*ones;
+//        VectorCL testMnewOnes=Mnew*ones;
+//        VectorCL testMderTOnes=MderT*ones;
+//        MatrixCL testMStabiOnes;
+//        testMStabiOnes.LinComb(sigma*0.5*dt_,stabi_new, sigma*0.5*dt_,stabi_old);
+//        VectorCL testStabiOnes=testMStabiOnes*ones;
 //        MatrixCL RhsWithoutLoad=Mold*st_oldic_;
 //        MatrixCL rhsMatrix=rhs;
 
@@ -1024,6 +1054,7 @@ void SurfactantSTP1CL::DoStep ()
 //        WriteToFile( testMoldOnes, "TestMoldOnes.txt", "Massematrix(old) mal Einsvektor");
 //        WriteToFile( testMnewOnes, "TestMnewOnes.txt", "Massematrix(new) mal Loesung");
 //        WriteToFile( testMderTOnes, "TestMderTOnes.txt", "MaterialDerivativeMatrixTranponiert mal Einsvektor");
+//        WriteToFile( testStabiOnes, "TestMStabiOnes.txt", "StabiMatrix mal Einsvektor");
 //        WriteToFile( rhsMatrix, "rhs.txt", "RechteSeite");
 //        WriteToFile( divufalseOnes, "divufalseOnes.txt", "divufalse Bilinearform mal Einsvektor");
 //        WriteToFile( RhsWithoutLoad, "RhsWithoutLoad.txt", "RHSwithout load");
