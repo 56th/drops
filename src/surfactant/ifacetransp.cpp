@@ -890,7 +890,9 @@ void SurfactantSTP1CL::Update_dG()
     InterfaceMatrixSTP1AccuCL<LocalLaplaceBeltramiSTP1P1CL> lb_accu( &A, &st_idx_,
         LocalLaplaceBeltramiSTP1P1CL( D_), cdata, "Laplace-Beltrami on ST-iface");
     accus.push_back( &lb_accu);
-
+    InterfaceMatrixSTP1AccuCL<LocalSTNormalGradStabiSTP1P1CL> norm_stabi_accu( &M_NormalStabi, &st_idx_,
+        LocalSTNormalGradStabiSTP1P1CL(), cdata, "Normalstabi on st-interface");
+    accus.push_back( &norm_stabi_accu);
     InterfaceCommonDataP1CL newspatialcdata( lset_vd_, lsetbnd_);
     InterfaceMatrixSTP1AccuCL<LocalSpatialInterfaceMassSTP1P1CL> newmass_accu( &Mnew, &st_idx_,
         LocalSpatialInterfaceMassSTP1P1CL( newspatialcdata, false), cdata, "mixed-mass on new iface");
@@ -950,7 +952,7 @@ void SurfactantSTP1CL::Update()
 void SurfactantSTP1CL::DoStep ()
 {
     Update();
-    //double sigma=0;
+    double sigma=1;
     MatrixCL L;
     VectorCL rhs( dim);
     if (cG_in_t_) {
@@ -966,7 +968,7 @@ void SurfactantSTP1CL::DoStep ()
     else {
         if (use_mass_div_) {
             if (use_mixed_formulation_) {
-                L.LinComb( 0.5, Mder, -0.5, MderT, 1., A, 0.5, Mdiv, 0.5, Mnew, 0.5, Mold);
+                L.LinComb( 0.5, Mder, -0.5, MderT, 1., A, 0.5, Mdiv, 0.5, Mnew, 0.5, Mold, sigma, M_NormalStabi);
                 //L.LinComb( 0.5, Mder, -0.5, MderT, 1., A, 0.5, Mdiv, 0.5, Mnew, 0.5, Mold, sigma*0.5*dt_, stabi_new, sigma*0.5*dt_, stabi_old);
                 //L.LinComb( 1., Mder, 1., Mdiv, 1., A, 1., Mold, sigma*0.5*dt_, stabi_new, sigma*0.5*dt_, stabi_old);
                 //L.LinComb( 1., Mder, 1., Mdiv, 1., A, 1., Mold);
@@ -974,13 +976,13 @@ void SurfactantSTP1CL::DoStep ()
                 rhs= Mold*st_oldic_;
                                       }
             else {
-                L.LinComb( 1., Mder, 1., Mdiv, 1., A, 1., Mold);
+                L.LinComb( 1., Mder, 1., Mdiv, 1., A, 1., Mold, sigma, M_NormalStabi);
                 rhs= Mold*st_oldic_;
                  }
 
                            }
         else {
-            L.LinComb( -1., Mder, 1., A, 1., Mnew);
+            L.LinComb( -1., Mder, 1., A, 1., Mnew, sigma, M_NormalStabi);
             rhs= Mold*st_oldic_;
              }
         }

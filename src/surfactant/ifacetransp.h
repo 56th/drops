@@ -2038,53 +2038,40 @@ class LocalSpatialInterfaceMassSTP1P1CL
         }
     }
 };
-//class LocalSpatialInterfaceNormalGradStabiSTP1P1CL
-//{
-//  private:
-//    const InterfaceCommonDataP1CL& spatialcdata_;
-//    const bool on_old_iface_;
-//    Point3DCL grad[4];
-//    GridFunctionCL<Point3DCL> n,
-//                              q[4];
-//    double dummy;
-//    GridFunctionCL<Point3DCL> qgradx,
-//                              qngradx[8],
-//                              spatial_n;
-//   LocalSTP1CL<Point3DCL> gradx[8];
-//    GridFunctionCL<> qn[4];
-//    LocalP1CL<Point3DCL> gradp2[4];
-//  public:
-//    double coup[8][8];
-//    static const ZeroPolicyEnum ZeroPolicy= RemoveExactLocalZeros;
-//    LocalSpatialInterfaceNormalGradStabiSTP1P1CL (const InterfaceCommonDataP1CL& spatialcdata, bool on_old_iface= true)
-//        : spatialcdata_( spatialcdata), on_old_iface_( on_old_iface)
-//    { std::memset( coup, 0, 8*8*sizeof(double)); }
-//    void setup (const TetraPrismCL& prism, const STInterfaceCommonDataCL& cdata) {
-//            //P1DiscCL::GetGradients( grad,dummy, prism.t);
-//             STP1P1DiscCL::GetSpatialGradients( prism, gradx);
-//            for (int i= 0; i < 4; ++i) {
-//               // q[i].resize( cdata.qdom.vertex_size());
-//               // q[i]=grad[i];
-//               // resize_and_evaluate_on_vertexes (gradp2[i], cdata.qdom, qgradx[i]);
-//                //evaluate_on_vertexes( gradx[i], cdata.qdom, Addr( qgradx));
-//            //    q[i].resize( qdom.vertex_size());
-//             //   q[i]= qgradx - dot( qgradx, spatial_n)*spatial_n;
-//            }
- //              resize_and_evaluate_on_vertexes ( gradx, cdata.qdom, qgradx);
-//               qngradx[i].resize (cdata.qdom.vertex_size ());
-//               for (Uint j= 0; j < qgradp2[i].size(); ++j) {
-//                    cdata.Phi.set_point (cdata.qdom.vertex_begin()[j], true);
-//                    qngradp2[i][j]= inner_prod( cdata.Phi.w, qgradp2[i][j]);
-//                 }
-//        std::memset( coup, 0, 8*8*sizeof(double));
-//        for (Uint i= 0; i < 8 ; ++i) {
-//            coup[i][i]= quad(dot(qgradx[i],qgradx[i]),1.,cdata.qdom);
-//            for(Uint j= 0; j < i; ++j)
-//                coup[i][j]= coup[j][i]= quad(dot(qgradx[j],qgradx[i]),1.,cdata.qdom);
-//        }
-//    }
-//};
+class LocalSTNormalGradStabiSTP1P1CL
+{
+private:
+  LocalSTP1CL<Point4DCL> gradx[8];
+  double dummy;
+  GridFunctionCL<Point4DCL> qgradx,
+                            st_n;
+  std::valarray<double>     q[8];
+  QuadDomainCodim1CL<4> qdom;
+double D_; // diffusion coefficient
+public:
+  double coup[8][8];
+  static const ZeroPolicyEnum ZeroPolicy= KeepLocalZeros;
 
+  void setup (const TetraPrismCL& prism, const STInterfaceCommonDataCL& cdata) {
+      make_CompositeQuad2DomainSTCodim1SpatialAbsdet( qdom, cdata.surf, prism);
+      resize_and_scatter_piecewise_normal( cdata.surf, qdom, st_n);
+
+      STP1P1DiscCL::GetGradients( prism, gradx);
+      qgradx.resize( qdom.vertex_size());
+      for (int i= 0; i < 8; ++i) {
+          evaluate_on_vertexes( gradx[i], qdom, Addr( qgradx));
+          q[i].resize( qdom.vertex_size());
+          q[i]= dot( qgradx, st_n);
+      }
+      for (int i= 0; i < 8; ++i) {
+          coup[i][i]=quad_codim1( q[i]*q[i], qdom);
+          for(int j= 0; j < i; ++j){
+              coup[i][j]= coup[j][i]= quad_codim1( q[i]* q[j], qdom);
+          }
+      }
+  }
+  LocalSTNormalGradStabiSTP1P1CL () {}
+};
 
 
 class LocalSpatialStabiMatrixSTP1P1CL
@@ -2175,7 +2162,6 @@ class LocalMaterialDerivativeSTP1P1CL
     GridFunctionCL<Point4DCL> qw,
                               qgrad;
     std::valarray<double>     q[8],
-                              qtest[8],
                               qwdotgrad[8];
     GridFunctionCL<Point4DCL> spacetime_n;
   public:
@@ -2191,8 +2177,7 @@ class LocalMaterialDerivativeSTP1P1CL
         for (int i= 0; i < 8; ++i) {
             evaluate_on_vertexes( grad[i], cdata.q5dom, Addr( qgrad));
             qwdotgrad[i].resize( cdata.q5dom.vertex_size());
-            qtest[i]=dot( qw, qgrad);
-            qwdotgrad[i]= dot( qw, qgrad)-(dot(spacetime_n,qw)*dot(spacetime_n,qgrad));
+            qwdotgrad[i]= dot( qw, qgrad)-(dot(spacetime_n,qw)*dot(spacetime_n,qgrad)); //(I-nn^T)*(w,1)^T*Nabla_(x,t)u (n are s-t-normals)
 
             resize_and_evaluate_on_vertexes( STP1P1DiscCL::ref_val[i], cdata.q5dom, q[i]);
         }
@@ -2314,7 +2299,8 @@ class SurfactantSTP1CL : public SurfactantP1BaseCL
              Mold, ///< mass matrix on the old spatial interface; only used for cG_in_t_ == false.
              Mnew, ///< mass matrix on the new spatial interface; only used for cG_in_t_ == false and use_mass_div_ == false.
              stabi_old,///stabi old time
-             stabi_new;///stabi new time
+             stabi_new,///stabi new time
+             M_NormalStabi; ///normal stabi on st-interface
 
 
     VectorCL load, ///< load-vector
