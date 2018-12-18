@@ -496,7 +496,7 @@ void H1_Vector_error_P1 (const DROPS::MultiGridCL& mg, const DROPS::VecDescCL& l
                     d_surf += qH1_surfgrad.quad( triangle.GetAbsDet( tri));
                     d_advanced_surf += qH1_advanced_surfgrad.quad( triangle.GetAbsDet( tri));
                     d_normal_velocity += qL2_normal_velocity.quad( triangle.GetAbsDet( tri));
-                    if(isnan( d_normal_velocity)) {
+                    if(std::isnan( d_normal_velocity)) {
                         std::cout << "NaN" << std::endl;
                     }
                 }
