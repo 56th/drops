@@ -285,9 +285,9 @@ class LocalStokesCL
     LocalP2CL<> P2Hat[10];
     LocalP1CL<Point3DCL> P2GradRef[10], P2Grad[10];
     Point3DCL P1Grad[4];
-    GridFunctionCL<Point3DCL> qnormal, qProj[3];
+    GridFunctionCL<Point3DCL> qnormal, qrotP1[12], qvP1, qvProjP1, qProj[3];
     GridFunctionCL<Point3DCL> qsurfP1grad[4], qsurfP2grad[10];
-    GridFunctionCL<> qP1Hat[4], qP2Hat[10], qnormal_comp[3];
+    GridFunctionCL<> qP1Hat[4], qP2Hat[10], qconvP1[4], qdivP1, qnormal_comp[3], qvProjP1_comp[3], qvP1_comp[3];
 
 
     QuadDomain2DCL  q2Ddomain;
@@ -296,7 +296,7 @@ class LocalStokesCL
 
     QuadDomainCL q3Ddomain;
     GridFunctionCL<Point3DCL> q3Dnormal, q3DexactNormal, q3DP2Grad[10];
-    GridFunctionCL<Point3DCL> q3DP1Grad[4];
+    GridFunctionCL<Point3DCL> q3DP1Grad[4], q2DP1Grad[4];
 
     bool fullGrad;
 
@@ -313,6 +313,7 @@ class LocalStokesCL
     }
 
     void calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const TetraCL& tet); ///< has to be called before any setup method!
+    void calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const LocalP1CL<Point3DCL>& v, const TetraCL& tet); // for conv term
     void calc3DIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const TetraCL& tet); ///< has to be called after calcIntegrands!
     void setupA_P2 (double A_P2[30][30]);
     void setupA_P2_stab (double A_P2_stab[10][10], double absdet);
@@ -334,6 +335,12 @@ class LocalStokesCL
     void setupL_P2P1_stab (double L_P2P1_stab[10][12], double absdet);
     void setupL_P2P2 (double L_P2P2[10][30]);
     void setupL_P2P2_stab (double L_P2P2_stab[10][30], double absdet);
+    // Navier-Stokes:
+    void setupN_P1 (double N_P1[12][12]);
+    void setupNT_P1 (double NT_P1[12][12]);
+    void setupOmega_P1P1 (double Omega_P1P1[4][12]);
+    void setupD_P1 (double D_P1[4][4]);
+    void setupM_P1_stab (double M_P1_stab[4][4], double absdet);
 };
 
 DROPS::Point3DCL Normal_sphere2 (const DROPS::Point3DCL& p, double)
@@ -424,6 +431,212 @@ void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& l
         Point3DCL e_k= DROPS::std_basis<3>( k+1);
         qProj[k]= e_k;
         qProj[k]-= dot( e_k, qnormal)*qnormal;
+    }
+}
+
+// for convective term
+void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const LocalP1CL<Point3DCL>& v , const TetraCL& tet)
+{
+
+    P2DiscCL::GetGradients( P2Grad, P2GradRef, T);
+    P1DiscCL::GetGradients( P1Grad, T);
+    evaluate_on_vertexes( ls, lat, Addr( ls_loc));
+    spatch.make_patch<MergeCutPolicyCL>( lat, ls_loc);
+    // The routine takes the information about the tetrahedra and the cutting surface and generates a two-dimensional triangulation of the cut, including the necessary point-positions and weights for the quadrature
+    make_CompositeQuad5Domain2D ( q2Ddomain, spatch, tet);
+    LocalP1CL<Point3DCL> Normals;
+    Get_Normals(ls, Normals);
+    // Resize and evaluate Normals at all points which are needed for the two-dimensional quadrature-rule
+
+    /////////////////Y
+    //resize_and_evaluate_on_vertexes (&Normal_sphere2, tet, q2Ddomain,0., qnormal);
+    resize_and_evaluate_on_vertexes (Normals, q2Ddomain, qnormal);
+    /////////////////
+
+    for(int j=0; j<4; ++j) {
+                q2DP1Grad[j].resize( q2Ddomain.vertex_size());
+                q2DP1Grad[j]= P1Grad[j];
+            }
+
+
+    // Scale Normals accordingly to the Euclidean Norm (only consider the ones which make a contribution in the sense of them being big enough... otherwise one has to expect problems with division through small numbers)
+    for(Uint i=0; i<qnormal.size(); ++i) {
+         //if(qnormal[i].norm()> 1e-8)
+         qnormal[i]= qnormal[i]/qnormal[i].norm();
+    }
+    // Provide all components of the normals
+    for (int k=0; k<3; ++k) {
+        qnormal_comp[k].resize( q2Ddomain.vertex_size());
+        ExtractComponent( qnormal, qnormal_comp[k], k);
+    }
+
+    // Resize and evaluate P2 basis functions
+    for(int j=0; j<10 ;++j) {
+        resize_and_evaluate_on_vertexes( P2Hat[j], q2Ddomain, qP2Hat[j]);
+        resize_and_evaluate_on_vertexes( P2Grad[j], q2Ddomain, qsurfP2grad[j]);
+//        qsurfP2grad[j].resize( q2Ddomain.vertex_size());
+//        qsurfP2grad[j]= P2Grad[j];
+        qsurfP2grad[j]-= dot( qsurfP2grad[j], qnormal)*qnormal;
+    }
+    // Resize and evaluate of all the 4 P1 Gradient Functions and apply pointwise projections   (P grad \xi_j  for j=1..4)
+
+    for(int j=0; j<4 ;++j) {
+//        resize_and_evaluate_on_vertexes( P1Grad[j], q2Ddomain, qsurfP1grad[j]);
+        resize_and_evaluate_on_vertexes( P1Hat[j], q2Ddomain, qP1Hat[j]);
+        qsurfP1grad[j].resize( q2Ddomain.vertex_size());
+        qsurfP1grad[j]= P1Grad[j];
+        qsurfP1grad[j]-= dot( qsurfP1grad[j], qnormal)*qnormal;
+
+    }
+    // Apply pointwise projection to the 3 std basis vectors e_k
+    for(int k=0; k<3 ;++k) {
+        //resize_and_evaluate_on_vertexes( P1Grad[j], q2Ddomain, qsurfP1grad[j]);
+        qProj[k].resize( q2Ddomain.vertex_size());
+        Point3DCL e_k= DROPS::std_basis<3>( k+1);
+        qProj[k]= e_k;
+
+        qProj[k]-= dot( e_k, qnormal)*qnormal;
+
+    }
+
+    //physical velocity, tetra P1 function
+    LocalP1CL<Point3DCL> velocity;
+    for(int i=0; i<4 ; ++i)
+    {
+    	velocity += v[i]*P1Hat[i];
+    }
+
+    //restrict to a tri(quad) element or "trace" it
+    resize_and_evaluate_on_vertexes (velocity, q2Ddomain, qvP1);
+
+
+    //get tangential part of tri P1 function
+    qvProjP1.resize( q2Ddomain.vertex_size());
+    qvProjP1 = qvP1;
+    qvProjP1 -= dot(qvP1, qnormal)*qnormal;
+
+
+    //P1 function Projected discrete velocity
+    GridFunctionCL<Point3DCL> qvdiscP1;
+    LocalP1CL<> v_comp;
+
+ 	for(int n=0; n<3 ; ++n)
+ 	{
+ 		ExtractComponent( v, v_comp, n);
+ 		qvdiscP1 += v_comp*qProj[n];
+
+ 	}
+    resize_and_evaluate_on_vertexes (velocity, q2Ddomain, qvdiscP1);
+
+
+    qdivP1.resize( q2Ddomain.vertex_size());
+    for(int m=0; m<4 ; ++m)
+    {
+    	qdivP1 += dot(qvdiscP1[m],qsurfP1grad[m]);
+    }
+
+
+
+    //extract components of tangential velocity as tri P1 functions
+    for (int k=0; k<3; ++k) {
+    	 qvProjP1_comp[k].resize( q2Ddomain.vertex_size());
+          ExtractComponent( qvProjP1, qvProjP1_comp[k], k);
+      }
+
+   /* std::cout << "min|v|     : " <<std::sqrt( dot(v,v).min() ) << std::endl;
+
+    std::cout << "max|v|     : " <<std::sqrt( dot(v,v).max() ) << std::endl;
+
+
+    std::cout << "|velocity| : " <<std::sqrt( dot(velocity,velocity).max() ) << std::endl;
+*/
+   /* std::cout << "|qvP1|     : " <<std::sqrt( dot(qvP1,qvP1).max() ) << std::endl;
+    std::cout << "|qvProjP1|     : " <<std::sqrt( dot(qvProjP1,qvProjP1).max() ) << std::endl;
+    std::cout << "|qvProjP1_comp|     : " <<std::sqrt((qvProjP1_comp[0]*qvProjP1_comp[0]+qvProjP1_comp[1]*qvProjP1_comp[1]+qvProjP1_comp[2]*qvProjP1_comp[2]).max() ) << std::endl;
+*/
+
+    //for convective nonlinear term
+    for(int i=0; i<4 ;++i) {
+    	qconvP1[i].resize( q2Ddomain.vertex_size());
+    	qconvP1[i] = dot( qsurfP1grad[i], qvP1)  ;
+   }
+
+
+    //for calculation curl
+   for (int i=0; i<4; i++)
+    {
+    	for (int k=0; k<3; k++)
+    	{
+    		GridFunctionCL<Point3DCL>  qlocal;
+    		//LocalP1CL<Point3DCL> qlocal;
+    		qlocal.resize(q2Ddomain.vertex_size());
+
+    		for (int index=0; index<3; index++)
+    		{
+    			if (k==index) continue;
+    			int right_index;
+    			int multiplier;
+    			if (index==0)
+    			{
+    				if (k==1)
+    				{
+    					right_index=2;
+    					multiplier=-1;
+    				}
+    				else if (k==2)
+    				{
+    					right_index=1;
+    					multiplier=1;
+    				}
+    			}
+    			else if (index==1)
+    			{
+    				if (k==0)
+    				{
+    					right_index=2;
+    					multiplier=1;
+    				}
+    				else if (k==2)
+    				{
+    					right_index=0;
+    					multiplier=-1;
+    				}
+    			}
+    			else if (index==2)
+    			{
+    				if (k==0)
+    				{
+    					right_index=1;
+    					multiplier=-1;
+    				}
+    				else if (k==1)
+    				{
+    					right_index=0;
+    					multiplier=1;
+    				}
+    			}
+
+
+    			GridFunctionCL<double>  ql;
+    			ql.resize( q2Ddomain.vertex_size());
+
+    			ExtractComponent( q2DP1Grad[i], ql, right_index);
+
+
+    			Point3DCL e= DROPS::std_basis<3>( index+1);
+    			GridFunctionCL<Point3DCL> ee ;
+				ee.resize( q2Ddomain.vertex_size());
+				ee= multiplier*e;
+    			qlocal += ql*ee;
+
+    		}
+
+    		qrotP1[3*i+k].resize( q2Ddomain.vertex_size());
+    		//resize_and_evaluate_on_vertexes (qlocal, q2Ddomain, qrotP1[3*i+k]);
+    		qrotP1[3*i+k]=qlocal;
+   		 //std::cout << "|qrotP1|     : " <<std::sqrt( dot(qrotP1[3*i+k],qrotP1[3*i+k]).max() ) << std::endl;
+
+    	}
     }
 }
 
@@ -737,6 +950,94 @@ void LocalStokesCL::setupA_P1_stab (double A_P1_stab[4][4], double absdet)
     }
 }
 
+// Navier-Stokes:
+
+void LocalStokesCL::setupN_P1 (double N_P1[12][12])
+{
+    // Do all combinations for (i,j) i,j=12 x 12 and corresponding quadrature
+    for (int i=0; i<4; ++i) {
+        for (int j=0; j<4; ++j) {
+            for (int k=0; k<3; ++k) {
+                for (int l=0; l<3; ++l) {
+                    N_P1[3*i+k][3*j+l]= quad_2D( qP1Hat[j]
+											   * dot(qProj[k], qProj[l])*qconvP1[i], q2Ddomain);
+                }
+            }
+        }
+    }
+}
+
+void LocalStokesCL::setupNT_P1 (double NT_P1[12][12])
+{
+    // Do all combinations for (i,j) i,j=12 x 12 and corresponding quadrature
+    for (int i=0; i<4; ++i) {
+        for (int j=0; j<4; ++j) {
+            for (int k=0; k<3; ++k) {
+                for (int l=0; l<3; ++l) {
+                	Point3DCL e_l= DROPS::std_basis<3>( l+1);
+
+                	NT_P1[3*i+k][3*j+l] = quad_2D(qP1Hat[j]*
+                			dot( e_l, qsurfP1grad[i])
+							*qvProjP1_comp[k]
+										   , q2Ddomain);
+                }
+            }
+        }
+    }
+}
+
+void LocalStokesCL::setupOmega_P1P1 (double Omega_P1P1[4][12])
+{
+	//GridFunctionCL<double> qsurfgrad_k;
+
+
+    // Do all combinations for (i,j) i,j=4 x 30 and corresponding quadrature
+    for (int k=0; k<3; ++k) {
+        for (int i=0; i < 4; ++i) {
+
+            for (int m=0; m<4; ++m) {
+              	//Omega_P1P1[m][3*i+k]= quad_2D( dot( qrotP1[3*i+k], qrotP1[3*i+k])*qP1Hat[m], q2Ddomain);
+
+            	Omega_P1P1[m][3*i+k]= quad_2D( dot( qnormal, qrotP1[3*i+k])*qP1Hat[m], q2Ddomain);
+            }
+        }
+    }
+}
+
+void LocalStokesCL::setupD_P1(double D_P1[4][4])
+{
+
+    // Do all combinations for (i,j) i,j=4 x 4 and corresponding quadrature
+    for (int i=0; i<4; ++i) {
+        for (int j=0; j<4; ++j) {
+        	/*for (int k=0; k<3; ++k) {
+        		for (int l=0; l<3; ++l) {
+        			if (k==l)
+        			{*/
+
+        				D_P1[i][j]= quad_2D( qdivP1*
+        						qP1Hat[i]*qP1Hat[j]  , q2Ddomain);
+
+
+        	/*		}
+        		}
+        	}*/
+        }
+    }
+
+
+}
+
+void LocalStokesCL::setupM_P1_stab (double M_P1_stab[4][4], double absdet)
+{
+    for (int i=0; i<4; ++i) {
+        for (int j=0; j<4; ++j) {
+           M_P1_stab[i][j] = quad(dot(q3DP1Grad[i], q3DP1Grad[j]), absdet, q3Ddomain, AllTetraC);
+
+        }
+    }
+}
+
 /// \brief Basis Class for Accumulator to set up the matrices for interface Stokes.
 class StokesIFAccumulator_P1P1CL : public TetraAccumulatorCL
 {
@@ -911,6 +1212,229 @@ void StokesIFAccumulator_P1P1CL::update_global_system ()
     }
 }
 
+/// \brief Basis Class for Accumulator to set up the matrices for interface Navier-Stokes.
+// TODO: derive from Stokes?
+class NavierStokesIFAccumulator_P1P1CL : public TetraAccumulatorCL
+{
+  protected:
+    const VecDescCL& lset;
+    const VecDescCL& velocity;
+    const LsetBndDataCL& lset_bnd;
+    const BndDataCL<Point3DCL>& velocity_bnd;
+    IdxDescCL &P1Idx_, &ScalarP1Idx_;
+    //IdxT numP1[4], numScalarP1[4];
+
+    MatrixCL &A_P1_, &A_P1_stab_,  &B_P1P1_, &Omega_P1P1_, &N_P1_, &NT_P1_,&M_P1_,&D_P1_, &S_P1_, &L_P1P1_, &L_P1P1_stab_, &M_ScalarP1_, &A_ScalarP1_stab_,  &Schur_normalP1_stab_;
+    MatrixBuilderCL *mA_P1_, *mA_P1_stab_, *mB_P1P1_,*mOmega_P1P1_,*mN_P1_,  *mNT_P1_,*mM_P1_,*mD_P1_, *mS_P1_, *mL_P1P1_, *mL_P1P1_stab_, *mM_ScalarP1_, *mA_ScalarP1_stab_, *mSchur_normalP1_stab_;
+    double locA_P1[12][12], locA_P1_stab[4][4], locB_P1P1[4][12],locOmega_P1P1[4][12],locN_P1[12][12], locNT_P1[12][12],locM_P1[4][4],locD_P1[4][4], locM_P1_stab[4][4], locS_P1[12][12], locL_P1P1[4][12], locL_P1P1_stab[4][12];
+
+    LocalStokesCL localStokes_;
+
+    SMatrixCL<3,3> T;
+    double det, absdet;
+    LocalP2CL<> ls_loc;
+    LocalP1CL<Point3DCL> v_loc;
+    LocalNumbP1CL n, nScalar;
+
+    ///\brief Computes the mapping from local to global data "n", the local matrices in loc and.
+    void local_setup (const TetraCL& tet);
+    ///\brief Update the global system.
+    void update_global_system ();
+
+  public:
+    NavierStokesIFAccumulator_P1P1CL ( const VecDescCL& ls, const VecDescCL& v, const LsetBndDataCL& ls_bnd, const BndDataCL<Point3DCL>& v_bnd, IdxDescCL& P1FE, IdxDescCL& ScalarP1FE, MatrixCL& A_P1, MatrixCL& A_P1_stab, MatrixCL& B_P1P1,MatrixCL& Omega_P1P1, MatrixCL& N_P1, MatrixCL& NT_P1, MatrixCL& M_P1, MatrixCL& D_P1, MatrixCL& S_P1, MatrixCL& L_P1P1, MatrixCL& L_P1P1_stab, MatrixCL& M_ScalarP1, MatrixCL& A_ScalarP1_stab, MatrixCL& Schur_normalP1_stab, bool fullGradient);
+
+    ///\brief Initializes matrix-builders and load-vectors
+    void begin_accumulation ();
+    ///\brief Builds the matrices
+    void finalize_accumulation();
+
+    void visit (const TetraCL& sit);
+
+    TetraAccumulatorCL* clone (int /*tid*/) { return new NavierStokesIFAccumulator_P1P1CL ( *this); }
+
+};
+
+NavierStokesIFAccumulator_P1P1CL::NavierStokesIFAccumulator_P1P1CL( const VecDescCL& ls, const VecDescCL& v, const LsetBndDataCL& ls_bnd, const BndDataCL<Point3DCL>& v_bnd, IdxDescCL& P1FE, IdxDescCL& ScalarP1FE, MatrixCL& A_P1, MatrixCL& A_P1_stab, MatrixCL& B_P1P1,MatrixCL& Omega_P1P1, MatrixCL& N_P1, MatrixCL& NT_P1, MatrixCL& M_P1,MatrixCL& D_P1, MatrixCL& S_P1, MatrixCL& L_P1P1, MatrixCL& L_P1P1_stab, MatrixCL& M_ScalarP1, MatrixCL& A_ScalarP1_stab, MatrixCL& Schur_normalP1_stab, bool fullGradient)
+ : lset(ls), velocity(v), lset_bnd(ls_bnd), velocity_bnd(v_bnd), P1Idx_(P1FE), ScalarP1Idx_(ScalarP1FE), A_P1_(A_P1), A_P1_stab_(A_P1_stab), B_P1P1_(B_P1P1),Omega_P1P1_(Omega_P1P1),N_P1_(N_P1), NT_P1_(NT_P1),M_P1_(M_P1),D_P1_(D_P1), S_P1_(S_P1), L_P1P1_(L_P1P1), L_P1P1_stab_(L_P1P1_stab), M_ScalarP1_(M_ScalarP1), A_ScalarP1_stab_(A_ScalarP1_stab),Schur_normalP1_stab_(Schur_normalP1_stab), localStokes_( fullGradient)
+{}
+
+void NavierStokesIFAccumulator_P1P1CL::begin_accumulation ()
+{
+    std::cout << "entering StokesIF: \n";
+    const size_t num_unks_p1= P1Idx_.NumUnknowns(), num_unks_scalarp1= ScalarP1Idx_.NumUnknowns();
+    mA_P1_= new MatrixBuilderCL( &A_P1_, num_unks_p1, num_unks_p1);
+    mN_P1_= new MatrixBuilderCL( &N_P1_, num_unks_p1, num_unks_p1);
+    mNT_P1_= new MatrixBuilderCL( &NT_P1_, num_unks_p1, num_unks_p1);
+    mA_P1_stab_= new MatrixBuilderCL( &A_P1_stab_, num_unks_p1, num_unks_p1);
+    mB_P1P1_= new MatrixBuilderCL( &B_P1P1_, num_unks_scalarp1, num_unks_p1);
+    mOmega_P1P1_= new MatrixBuilderCL( &Omega_P1P1_, num_unks_scalarp1, num_unks_p1);
+    mM_P1_= new MatrixBuilderCL( &M_P1_, num_unks_p1, num_unks_p1);
+    mD_P1_= new MatrixBuilderCL( &D_P1_, num_unks_p1, num_unks_p1);
+    mS_P1_= new MatrixBuilderCL( &S_P1_, num_unks_p1, num_unks_p1);
+    mL_P1P1_= new MatrixBuilderCL( &L_P1P1_, num_unks_scalarp1, num_unks_p1);
+    mL_P1P1_stab_= new MatrixBuilderCL( &L_P1P1_stab_, num_unks_scalarp1, num_unks_p1);
+    mM_ScalarP1_= new MatrixBuilderCL( &M_ScalarP1_, num_unks_scalarp1, num_unks_scalarp1);
+    mA_ScalarP1_stab_= new MatrixBuilderCL( &A_ScalarP1_stab_, num_unks_scalarp1, num_unks_scalarp1);
+    mSchur_normalP1_stab_= new MatrixBuilderCL( &Schur_normalP1_stab_, num_unks_scalarp1, num_unks_scalarp1);
+}
+
+void NavierStokesIFAccumulator_P1P1CL::finalize_accumulation ()
+{
+
+    mB_P1P1_->Build();
+    delete mB_P1P1_;
+    mOmega_P1P1_->Build();
+        delete mOmega_P1P1_;
+    mL_P1P1_->Build();
+    delete mL_P1P1_;
+    mL_P1P1_stab_->Build();
+    delete mL_P1P1_stab_;
+    mA_P1_->Build();
+    delete mA_P1_;
+    mN_P1_->Build();
+    delete mN_P1_;
+    mNT_P1_->Build();
+    delete mNT_P1_;
+    mM_P1_->Build();
+    delete mM_P1_;
+
+    mD_P1_->Build();
+        delete mD_P1_;
+
+    mS_P1_->Build();
+    delete mS_P1_;
+    mA_P1_stab_->Build();
+    delete mA_P1_stab_;
+    mM_ScalarP1_->Build();
+    delete mM_ScalarP1_;
+    mA_ScalarP1_stab_->Build();
+    delete mA_ScalarP1_stab_;
+    mSchur_normalP1_stab_->Build();
+	delete mSchur_normalP1_stab_;
+#ifndef _PAR
+    std::cout << "StokesIF_P1P1:\t" << A_P1_.num_nonzeros() << " nonzeros in A, " << A_P1_stab_.num_nonzeros() << " nonzeros in A_stab, " << N_P1_.num_nonzeros() << " nonzeros in N, "
+    		<< NT_P1_.num_nonzeros() << " nonzeros in NT, "
+    		<< B_P1P1_.num_nonzeros() << " nonzeros in B, " << Omega_P1P1_.num_nonzeros() << " nonzeros in Omega, " << M_P1_.num_nonzeros() << " nonzeros in M, "<< D_P1_.num_nonzeros() << " nonzeros in D, " << S_P1_.num_nonzeros() << " nonzeros in S, "
+              << L_P1P1_.num_nonzeros() << " nonzeros in L, " << L_P1P1_stab_.num_nonzeros() << " nonzeros in L_stab, "
+              << M_ScalarP1_.num_nonzeros() << " nonzeros in M_ScalarP1, " << A_ScalarP1_stab_.num_nonzeros() << " nonzeros in A_ScalarP1_stab\n";
+#endif
+    // std::cout << '\n';
+}
+
+void NavierStokesIFAccumulator_P1P1CL::visit (const TetraCL& tet)
+{
+    ls_loc.assign( tet, lset, lset_bnd);
+    v_loc.assign( tet, velocity, velocity_bnd);
+
+    if (!equal_signs( ls_loc))
+    {
+        local_setup( tet);
+        update_global_system();
+    }
+
+}
+
+void NavierStokesIFAccumulator_P1P1CL::local_setup (const TetraCL& tet)
+{
+    GetTrafoTr( T, det, tet);
+    absdet= std::fabs( det);
+
+    n.assign( tet, P1Idx_, P1Idx_.GetBndInfo());
+    nScalar.assign( tet, ScalarP1Idx_, ScalarP1Idx_.GetBndInfo());
+
+    //GetLocalNumbP1NoBnd( numP1, tet, P1Idx_);
+    //GetLocalNumbP1NoBnd( numScalarP1, tet, ScalarP1Idx_);
+
+
+    localStokes_.calcIntegrands( T, ls_loc, v_loc, tet);
+    localStokes_.calc3DIntegrands(T, ls_loc, tet);
+    localStokes_.setupA_P1( locA_P1);
+    localStokes_.setupN_P1( locN_P1);
+    localStokes_.setupNT_P1( locNT_P1);
+    localStokes_.setupA_P1_stab( locA_P1_stab, absdet);
+    localStokes_.setupB_P1P1( locB_P1P1);
+    localStokes_.setupOmega_P1P1( locOmega_P1P1);
+    localStokes_.setupM_P1( locM_P1);
+
+    localStokes_.setupD_P1( locD_P1);
+    localStokes_.setupM_P1_stab( locM_P1_stab, absdet);
+    localStokes_.setupS_P1( locS_P1);
+    localStokes_.setupL_P1P1( locL_P1P1);
+    localStokes_.setupL_P1P1_stab( locL_P1P1_stab, absdet);
+
+}
+
+void NavierStokesIFAccumulator_P1P1CL::update_global_system ()
+{
+    MatrixBuilderCL& mA_P1= *mA_P1_;
+    MatrixBuilderCL& mA_P1_stab= *mA_P1_stab_;
+    MatrixBuilderCL& mB_P1P1= *mB_P1P1_;
+    MatrixBuilderCL& mOmega_P1P1= *mOmega_P1P1_;
+    MatrixBuilderCL& mN_P1= *mN_P1_;
+    MatrixBuilderCL& mNT_P1= *mNT_P1_;
+    MatrixBuilderCL& mM_P1= *mM_P1_;
+    MatrixBuilderCL& mD_P1= *mD_P1_;
+    MatrixBuilderCL& mS_P1= *mS_P1_;
+    MatrixBuilderCL& mL_P1P1= *mL_P1P1_;
+    MatrixBuilderCL& mL_P1P1_stab= *mL_P1P1_stab_;
+    MatrixBuilderCL& mM_ScalarP1= *mM_ScalarP1_;
+    MatrixBuilderCL& mA_ScalarP1_stab= *mA_ScalarP1_stab_;
+    MatrixBuilderCL& mSchur_normalP1_stab= *mSchur_normalP1_stab_;
+
+int count =0;
+    for(int i= 0; i < 4; ++i) {
+        const IdxT ii= n.num[i];
+        if (ii==NoIdx || !(n.WithUnknowns( i))) continue;
+        for(int j=0; j < 4; ++j) {
+            const IdxT jj= n.num[j];
+            if (jj==NoIdx || !(n.WithUnknowns( j))) continue;
+            for (int k=0; k<3; ++k) {
+                for (int l=0; l<3; ++l) {
+                    mA_P1( ii+k, jj+l) += locA_P1[3*j+l][3*i+k];
+                    mN_P1( ii+k, jj+l) += locN_P1[3*j+l][3*i+k];
+                    mNT_P1( ii+k, jj+l) += locNT_P1[3*j+l][3*i+k];
+                    mS_P1( ii+k, jj+l) += locS_P1[3*j+l][3*i+k];
+
+                    if(k == l) {
+                    	mM_P1( ii+k, jj+l) += locM_P1[j][i];
+
+                    	mD_P1( ii+k, jj+l) += locD_P1[j][i];
+
+                    	count++;
+                    	mA_P1_stab( ii+k, jj+l) += locA_P1_stab[j][i];
+                    } else {
+                    	mM_P1( ii+k, jj+l) += 0.;
+                    	mD_P1( ii+k, jj+l) += 0.;
+                    	mA_P1_stab( ii+k, jj+l) += 0.;
+                    }
+
+                }
+             }
+        }
+        for (int j=0; j < 4; ++j) {
+            if (nScalar.num[j]==NoIdx || !(nScalar.WithUnknowns( j))) continue;
+            for (int k=0; k<3; ++k) {
+                mB_P1P1( nScalar.num[j], ii+k) += locB_P1P1[j][3*i+k];
+                mOmega_P1P1( nScalar.num[j], ii+k) += locOmega_P1P1[j][3*i+k];
+                mL_P1P1( nScalar.num[j], ii+k) += locL_P1P1[j][3*i+k];
+                mL_P1P1_stab( nScalar.num[j], ii+k) += locL_P1P1_stab[j][3*i+k];
+            }
+        }
+    }
+    for(int i= 0; i < 4; ++i) {
+        const IdxT ii= nScalar.num[i];
+        if (ii==NoIdx || !(nScalar.WithUnknowns( i))) continue;
+        for(int j=0; j <4; ++j) {
+            const IdxT jj= nScalar.num[j];
+            if (jj==NoIdx || !(nScalar.WithUnknowns( j))) continue;
+            mM_ScalarP1( ii, jj) += locM_P1[i][j];
+            mA_ScalarP1_stab( ii, jj) += locM_P1_stab[i][j];
+            mSchur_normalP1_stab( ii, jj) += locA_P1_stab[i][j];
+        }
+    }
+}
+
 void SetupStokesIF_P1P1( const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P1_stab, MatDescCL* B_P1P1, MatDescCL* M_P1, MatDescCL* S_P1, MatDescCL* L_P1P1, MatDescCL* L_P1P1_stab, MatDescCL* M_ScalarP1, MatDescCL* A_ScalarP1_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, bool fullgrad)
 {
   ScopeTimerCL scope("SetupStokesIF_P1P1");
@@ -919,6 +1443,16 @@ void SetupStokesIF_P1P1( const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P
   //    MaybeAddProgressBar(MG_, "LapBeltr(P2) Setup", accus, RowIdx.TriangLevel());
   accus.push_back( &accu);
   accumulate( accus, MG_, A_P1->GetRowLevel(), A_P1->RowIdx->GetBndInfo());
+}
+
+void SetupNavierStokesIF_P1P1( const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P1_stab, MatDescCL* B_P1P1, MatDescCL* Omega_P1P1, MatDescCL* N_P1, MatDescCL* NT_P1, MatDescCL* M_P1, MatDescCL* D_P1,MatDescCL* S_P1, MatDescCL* L_P1P1, MatDescCL* L_P1P1_stab, MatDescCL* M_ScalarP1, MatDescCL* A_ScalarP1_stab, MatDescCL* Schur_normalP1_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, const VecDescCL& velocity, const BndDataCL<Point3DCL>& velocity_bnd, bool fullgrad)
+{
+  ScopeTimerCL scope("SetupStokesIF_P1P1");
+  NavierStokesIFAccumulator_P1P1CL accu( lset, velocity, lset_bnd, velocity_bnd, *(A_P1->RowIdx), *(L_P1P1->RowIdx), A_P1->Data, A_P1_stab->Data, B_P1P1->Data, Omega_P1P1->Data,  N_P1->Data, NT_P1->Data, M_P1->Data, D_P1->Data, S_P1->Data, L_P1P1->Data, L_P1P1_stab->Data, M_ScalarP1->Data, A_ScalarP1_stab->Data, Schur_normalP1_stab->Data, fullgrad);
+  TetraAccumulatorTupleCL accus;
+  //    MaybeAddProgressBar(MG_, "LapBeltr(P2) Setup", accus, RowIdx.TriangLevel());
+  accus.push_back( &accu);
+  accumulate( accus, MG_, A_P1->GetRowLevel(), /*A_P1->RowIdx->GetMatchingFunction(),*/ A_P1->RowIdx->GetBndInfo());
 }
 
 /// \brief Basis Class for Accumulator to set up the matrices for interface Stokes.
@@ -1477,7 +2011,7 @@ void SetupStokesIF_P2P2( const MultiGridCL& MG_, MatDescCL* A_P2, MatDescCL* A_P
 }
 
 void SetupInterfaceVectorRhsP1 (const MultiGridCL& mg, VecDescCL* v,
-    const VecDescCL& ls, const BndDataCL<>& lsetbnd, instat_vector_fun_ptr f)
+    const VecDescCL& ls, const BndDataCL<>& lsetbnd, instat_vector_fun_ptr f, double t)
 {
     const IdxT num_unks= v->RowIdx->NumUnknowns();
     const Uint lvl = v->GetLevel();
@@ -1520,7 +2054,7 @@ void SetupInterfaceVectorRhsP1 (const MultiGridCL& mg, VecDescCL* v,
                     for (int i= 0; i < 4; ++i)
                       q1[i].assign( p1[i], &triangle.GetBary( tri));
 
-                    Quad5_2DCL<Point3DCL> qf( *it, &triangle.GetBary( tri), f);
+                    Quad5_2DCL<Point3DCL> qf( *it, &triangle.GetBary( tri), f,t);
                     Quad5_2DCL<double> surfarea(1.0), rhs;
                     totalsurfarea += surfarea.quad( triangle.GetAbsDet( tri));
 
@@ -1539,6 +2073,7 @@ void SetupInterfaceVectorRhsP1 (const MultiGridCL& mg, VecDescCL* v,
     }
     std::cout << " VectorRhs set up." << std::endl;
     std::cout << "Total surface area: "<<totalsurfarea<<std::endl;
+    
 }
 
 void SetupInterfaceVectorRhsP2 (const MultiGridCL& mg, VecDescCL* v,

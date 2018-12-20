@@ -195,7 +195,7 @@ function(add_my_custom_targets f)
   add_custom_target(${f}-coeffs DEPENDS misc-scalarFunctions misc-vectorFunctions levelset-twophaseCoeff levelset-filmCoeff poisson-poissonCoeff stokes-stokesCoeff)
 endfunction(add_my_custom_targets f)
 
-set(PACKAGES parallel levelset poisson DiST geom num out misc osmosis stokes navstokes surfactant spacetimetransp transport partests tests)
+set(PACKAGES parallel levelset poisson DiST geom num out misc osmosis stokes navstokes surfactant spacetimetransp transport partests tests surfnavierstokes)
 string(REPLACE ";" " " PACKAGES_STRING "${PACKAGES}")
 
 option(TESTS "compile tests" OFF)
