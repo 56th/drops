@@ -260,18 +260,69 @@ void SetupLBP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls, cons
     // WriteToFile( mat->Data, "lb.txt", "lb");
 }
 
-void SetupInterfaceRhsP1 (const MultiGridCL& mg, VecDescCL* v,
-    const VecDescCL& ls, const BndDataCL<>& lsetbnd, instat_scalar_fun_ptr f)
+ /// P1
+void SetupInterfaceRhsP1OnTriangle (const LocalP1CL<> p1[4],
+    Quad5_2DCL<> q[4],VectorCL& v, const IdxT Numb[4],
+    const TetraCL& t, const BaryCoordCL triangle[3], double det,
+    instat_scalar_fun_ptr f,double time=0)
 {
-    TetraAccumulatorTupleCL accus;
-    InterfaceCommonDataP1CL cdata( ls, lsetbnd);
-    accus.push_back( &cdata);
-    InterfaceVectorAccuCL<LocalVectorP1CL, InterfaceCommonDataP1CL> loadaccu( v, LocalVectorP1CL( f, v->t), cdata);
-    accus.push_back( &loadaccu);
-    accumulate( accus, mg, v->RowIdx->TriangLevel(), v->RowIdx->GetBndInfo());
+    for (int i= 0; i < 4; ++i)
+        q[i].assign( p1[i], triangle);
+    Quad5_2DCL<> qf( t, triangle, f,time), r;
 
-    // WriteToFile( v->Data, "rhs.txt", "Rhs");
+    for (int i= 0; i < 4; ++i) {
+        if (Numb[i] == NoIdx) continue;
+        r= qf*q[i];
+        v[Numb[i]]+= r.quad( det);
+    }
 }
+
+
+void SetupInterfaceRhsP1 (const MultiGridCL& mg, VecDescCL* v,
+    const VecDescCL& ls, const BndDataCL<>& lsetbnd, instat_scalar_fun_ptr f, double t)
+{
+    const IdxT num_unks= v->RowIdx->NumUnknowns();
+    const Uint lvl = v->GetLevel();
+
+    v->Clear(0);
+    IdxT num[4];
+
+    std::cout << "entering SetupInterfaceRhsP1: " << num_unks << " dof... ";
+
+    LocalP1CL<> p1[4];
+    p1[0][0]= p1[1][1]= p1[2][2]= p1[3][3]= 1.; // P1-Basis-Functions
+    Quad5_2DCL<double> q[4], m;
+
+    InterfaceTriangleCL triangle;
+
+    DROPS_FOR_TRIANG_CONST_TETRA( mg, lvl, it) {
+        triangle.Init( *it, ls, lsetbnd);
+        if (triangle.Intersects()) { // We are at the phase boundary.
+            GetLocalNumbP1NoBnd( num, *it, *v->RowIdx);
+
+            for (int ch= 0; ch < 8; ++ch) {
+                triangle.ComputeForChild( ch);
+                for (int tri= 0; tri < triangle.GetNumTriangles(); ++tri)
+                    SetupInterfaceRhsP1OnTriangle( p1, q, v->Data, num,
+                        *it, &triangle.GetBary( tri), triangle.GetAbsDet( tri), f,t);
+            }
+        }
+    }
+    std::cout << " Rhs set up." << std::endl;
+}
+
+// void SetupInterfaceRhsP1 (const MultiGridCL& mg, VecDescCL* v,
+//     const VecDescCL& ls, const BndDataCL<>& lsetbnd, instat_scalar_fun_ptr f, double t)
+// {
+//     TetraAccumulatorTupleCL accus;
+//     InterfaceCommonDataP1CL cdata( ls, lsetbnd);
+//     accus.push_back( &cdata);
+//     InterfaceVectorAccuCL<LocalVectorP1CL, InterfaceCommonDataP1CL> loadaccu( v, LocalVectorP1CL( f, v->t), cdata);
+//     accus.push_back( &loadaccu);
+//     accumulate( accus, mg, v->RowIdx->TriangLevel(), v->RowIdx->GetBndInfo());
+
+//     // WriteToFile( v->Data, "rhs.txt", "Rhs");
+// }
 
   ////////////////////////////////////////////////////////////////////////////
 

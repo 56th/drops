@@ -1123,7 +1123,7 @@ class LocalNormalLaplaceDeformP2CL
 /// \brief The routine sets up the load-vector in v on the interface defined by ls.
 ///        It belongs to the FE induced by standard P1-elements.
 void SetupInterfaceRhsP1 (const MultiGridCL& mg, VecDescCL* v,
-    const VecDescCL& ls, const BndDataCL<>& lsbnd, instat_scalar_fun_ptr f);
+    const VecDescCL& ls, const BndDataCL<>& lsbnd, instat_scalar_fun_ptr f, double t = 0.);
 
 
 ///\brief Initialize the QuadDomain2DCL-object qdom for quadrature with Quad5_2DCL on the lattice lat of t, given the level set in ls and bnd.
