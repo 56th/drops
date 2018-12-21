@@ -61,7 +61,7 @@ int main (int argc, char* argv[]) {
 
   try {
     
-    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "surfactant.json");
+    DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/surfnavierstokes/No_Bnd_Condition.json");
     std::cout << P << std::endl;
 
     DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
@@ -74,7 +74,6 @@ int main (int argc, char* argv[]) {
     //                                 4.*DROPS::std_basis<3>( 3),
     //                                 P.get<int>("InitialDivisions"), P.get<int>("InitialDivisions"), P.get<int>("InitialDivisions"));
     //    DROPS::MultiGridCL mg( brick);
-
     std::auto_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P));
     DROPS::MultiGridCL mg( *builder);
     const DROPS::ParamCL::ptree_type* ch= 0;
