@@ -116,7 +116,7 @@ int main (int argc, char* argv[]) {
 
     // adaptive mesh refinement based on level set function
     typedef DROPS::DistMarkingStrategyCL InitMarkerT;
-    InitMarkerT initmarker( levelset_fun, P.get<double>("AdaptRef.Width"), 0, P.get<int>("AdaptRef.FinestLevel") );
+    InitMarkerT initmarker( levelset_fun, P.get<double>("Mesh.AdaptRef.Width"), 0, P.get<int>("Mesh.AdaptRef.FinestLevel") );
     adap.set_marking_strategy( &initmarker );
     adap.MakeInitialTriang();
     adap.set_marking_strategy( 0 );
@@ -149,7 +149,7 @@ int main (int argc, char* argv[]) {
     bool fullgrad = P.get<bool>("SurfNavStokes.fullgrad");
     std::string model = P.get<std::string>("SurfNavStokes.model");
     std::string testcase = P.get<std::string>("SurfNavStokes.testcase");
-    double h = P.get<DROPS::Point3DCL>("Domain.E1")[0]/P.get<double>("Domain.N1")*std::pow(2., -P.get<double>("AdaptRef.FinestLevel"));
+    double h = P.get<DROPS::Point3DCL>("Domain.E1")[0]/P.get<double>("Domain.N1")*std::pow(2., -P.get<double>("Mesh.AdaptRef.FinestLevel"));
     double tau = P.get<double>("Time.StepSize");
     ParameterNS::nu = P.get<double>("SurfNavStokes.kinematic_viscosity");
 
@@ -839,7 +839,7 @@ int main (int argc, char* argv[]) {
         //set up a txt file for custom time output
         std::ofstream log_solo( dirname +"/"
         					  + "eta="+ std::to_string(float(eta))+ "_"
-        					  + "l="  + P.get<std::string>("AdaptRef.FinestLevel")
+        					  + "l="  + P.get<std::string>("Mesh.AdaptRef.FinestLevel")
 							  + "_nu=" + P.get<std::string>("SurfNavStokes.kinematic_viscosity")
         					  + "_Plot_" + filename
 							  + P.get<std::string>("SurfNavStokes.nonlinear_term") + "_"
@@ -850,7 +850,7 @@ int main (int argc, char* argv[]) {
         //set up a txt file for error time output
         std::ofstream log_error( dirname +"/"
         		+ "eta="+ std::to_string(float(eta))+ "_"
-        		+ "l="  + P.get<std::string>("AdaptRef.FinestLevel")
+        		+ "l="  + P.get<std::string>("Mesh.AdaptRef.FinestLevel")
 				+ "_nu=" + P.get<std::string>("SurfNavStokes.kinematic_viscosity")
 				+ "_Error_" + filename
 				+ P.get<std::string>("SurfNavStokes.nonlinear_term") + "_"
