@@ -126,6 +126,7 @@ int main (int argc, char* argv[]) {
     SurfaceTensionCL sf( sigma, 0);
 
     BndDataCL<double> lsbnd( 0);
+
     read_BndData( lsbnd, mg, P.get_child( "Levelset.BndData"));
 
     DROPS::LevelsetP2CL & lset( * DROPS::LevelsetP2CL::Create( mg, lsbnd, sf) );

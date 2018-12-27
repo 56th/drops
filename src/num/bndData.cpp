@@ -82,14 +82,30 @@ void BndCondCL::StripDirichletBC()
             bc= Nat0BC;
 }
 
+double zeroScalarFunc(const Point3DCL&, double) {
+    return 0.;
+}
+
 void assignZeroFunc( instat_scalar_fun_ptr& f)
 {
-    f= SingletonMapCL<instat_scalar_fun_ptr>::getInstance()["Zero"];
+    static auto called = false;
+    auto& map = SingletonMapCL<instat_scalar_fun_ptr>::getInstance();
+    if (!called) MapRegisterCL<instat_scalar_fun_ptr>("Zero", zeroScalarFunc);
+    called = true;
+    f = map["Zero"];
+}
+
+Point3DCL zeroVectorFunc(const Point3DCL&, double) {
+    return Point3DCL(0., 0., 0.);
 }
 
 void assignZeroFunc( instat_vector_fun_ptr& f)
 {
-    f= SingletonMapCL<instat_vector_fun_ptr>::getInstance()["ZeroVel"];
+    static auto called = false;
+    auto& map = SingletonMapCL<instat_vector_fun_ptr>::getInstance();
+    if (!called) MapRegisterCL<instat_vector_fun_ptr>("ZeroVel", zeroVectorFunc);
+    called = true;
+    f = map["ZeroVel"];
 }
 
 
