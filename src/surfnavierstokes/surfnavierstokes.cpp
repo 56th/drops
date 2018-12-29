@@ -215,7 +215,7 @@ int main (int argc, char* argv[]) {
     //TestAllP2MatricesWithP1Matrices(mg, lset, ifaceVecP2idx, ifaceVecP1idx, ifaceP1idx, fullgrad);
 
     // construct FE vectors (initialized with zero)
-     DROPS::VecDescCL v, vSol, vInit, p, curl,curlSol, pSol, rhs, rhs2, curl_proj,ZeroVec;
+     DROPS::VecDescCL v, vSol, vInit, p, curl,curlSol, pSol, rhs, rhs2, curl_proj, ZeroVec;
      DROPS::VecDescCL v_iter, v_temp,v_aux,v_old,v_oldold,p_aux,p_temp,p_iter,p_old;//for steady nonlinear procedure or BDF2
      if( !FE.compare("P2P1")) {
          v.SetIdx( &ifaceVecP2idx);
@@ -833,10 +833,10 @@ int main (int argc, char* argv[]) {
         vtkwriter->Register( make_VTKIfaceVector(mg, rhs, "rhs", velFE, vbnd));
         vtkwriter->Register( make_VTKIfaceVector(mg, v, "velocity", velFE, vbnd));
         vtkwriter->Register( make_VTKIfaceScalar(mg, p, "pressure", /*prFE,*/ pbnd));
-        // vtkwriter->Register( make_VTKIfaceScalar(mg, curl, "vorticity", /*prFE,*/ pbnd));
-        // vtkwriter->Register( make_VTKIfaceScalar(mg, curlSol, "vortSol", /*prFE,*/ pbnd));
-        // vtkwriter->Register( make_VTKIfaceScalar(mg, rhs2, "rhs2", /*prFE,*/ pbnd));
-        // vtkwriter->Register( make_VTKIfaceScalar(mg, pSol, "pSol", /*prFE,*/ pbnd));
+        vtkwriter->Register( make_VTKIfaceScalar(mg, curl, "vorticity", /*prFE,*/ pbnd));
+        vtkwriter->Register( make_VTKIfaceScalar(mg, curlSol, "vortSol", /*prFE,*/ pbnd));
+        vtkwriter->Register( make_VTKIfaceScalar(mg, rhs2, "rhs2", /*prFE,*/ pbnd));
+        vtkwriter->Register(make_VTKIfaceScalar(mg, pSol, "pSol", /*prFE,*/ pbnd));
 
         //set up a txt file for custom time output
         std::ofstream log_solo( dirname +"/"
@@ -879,11 +879,7 @@ int main (int argc, char* argv[]) {
             InitScalar(mg, p, extpsol);
         	//output of initial data and exact solutions to vtk and custom
         	vtkwriter->Write(0);//send v to vtk
-
-std::cout << "1\n";
-
             vxtent.SetIdx( &vecP1idx);
-
         	Extend(mg, vInit, vxtent);
         	BndDataCL<Point3DCL> bndvec = vbnd;
         	BndDataCL<double> bndscalar = pbnd;
@@ -901,8 +897,7 @@ std::cout << "1\n";
                 vxtent.SetIdx(&vecP1idx);
                 Extend(mg, v, vxtent);
                 BndDataCL<Point3DCL> bndvec = vbnd;
-                double error_L2 = L2_Vector_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndvec, vxtent),
-                                                  extvsol, 0);
+                double error_L2 = L2_Vector_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndvec, vxtent), extvsol, 0);
                 log << "The L2-Norm of v - vSol is: " << error_L2 << std::endl;
                 log_error << std::to_string((float) error_L2) << "\t";
                 double l2norm = L2_Vector_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndvec, vxtent),
@@ -932,7 +927,6 @@ std::cout << "1\n";
                 log << "The L2-Norm of p  is: " << L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndscalar, pxtent), &ZeroScalarFun);
                 //log << "The M-Norm of p - pSol is: " << std::sqrt(L2_Lagrange*L2_Lagrange + alpha*dot(Schur_stab.Data*p.Data, p.Data)) << std::endl;
             }
-
 
         	for (int i = 0; i < P.get<double>("Time.NumSteps"); i++)
         	{
@@ -1162,8 +1156,6 @@ std::cout << "1\n";
         		log.close();
         	}//eng of time iteration
 
-std::cout << "1\n";
-
         }
         else if ( P.get<std::string>("SurfNavStokes.instationary") == "none" )
         {
@@ -1317,7 +1309,7 @@ std::cout << "1\n";
         	} else if( !velFE.compare("P1")) {
         		vxtent.SetIdx( &vecP1idx);
         		Extend(mg, v, vxtent);
-        		BndDataCL<Point3DCL> bndvec = vbnd;
+        		BndDataCL<Point3DCL> bndvec = vbnd; // !!!
         		log << "The L2-Norm of v - vSol is: " << L2_Vector_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndvec, vxtent), extvsol) << std::endl;
         		double l2norm = L2_Vector_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndvec, vxtent), &ZeroVectorFun);
         		log << "The L2-Norm of v  is: " << l2norm<< std::endl;

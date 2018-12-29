@@ -872,6 +872,7 @@ template<class T>
   inline Quad5_2DCL<T>&
   Quad5_2DCL<T>::assign(const TetraCL& s, const BaryCoordCL* const p, instat_fun_ptr f , double t)
 {
+    if (!f) throw std::invalid_argument("invalid func pointer passed in Quad5_2DCL<T>::assign");
     BaryCoordCL Bary[Quad5_2DDataCL::NumNodesC];
     SetInterface( p, Bary);
     for (Uint i= 0; i < Quad5_2DDataCL::NumNodesC; ++i)

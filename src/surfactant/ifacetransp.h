@@ -1388,7 +1388,7 @@ class VTKIfaceScalarCL : public VTKVariableCL
     const BndDataCL<double>& BndData_;
 
   public:
-    VTKIfaceScalarCL (MultiGridCL& mg, const VecDescCL& u, std::string varName, const BndDataCL<double> BndData = BndDataCL<double>(0))
+    VTKIfaceScalarCL (MultiGridCL& mg, const VecDescCL& u, std::string varName, const BndDataCL<double>& BndData = BndDataCL<double>(0))
         : VTKVariableCL( varName), u_( u), mg_( mg), BndData_( BndData) {}
 
     void put      (VTKOutCL& cf) const;
@@ -1401,7 +1401,7 @@ class VTKIfaceScalarCL : public VTKVariableCL
 /// because they help to avoid template parameters in user code.
 inline VTKIfaceScalarCL&
 make_VTKIfaceScalar (MultiGridCL& mg, const VecDescCL& u,
-    std::string varName, const BndDataCL<double> BndData = BndDataCL<double>(0))
+    std::string varName, const BndDataCL<double>& BndData = BndDataCL<double>(0))
 {
     return *new VTKIfaceScalarCL( mg, u, varName, BndData);
 }

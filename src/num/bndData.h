@@ -342,7 +342,7 @@ inline bool BndCondCL::IsOnDirBnd( const VertexCL& v) const
 { // v is on dir bnd, iff it is on one or more dir bnd segments
     if ( !v.IsOnBoundary() || !BndCond_.size()) return false;
     for (VertexCL::const_BndVertIt it= v.GetBndVertBegin(), end= v.GetBndVertEnd(); it!=end; ++it)
-        if ( BndCond_[it->GetBndIdx()].IsDirichlet() )
+        if (BndCond_[it->GetBndIdx()].IsDirichlet())
             return true;
     return false;
 }
