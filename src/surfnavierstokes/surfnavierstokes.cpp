@@ -78,7 +78,7 @@ int main (int argc, char* argv[]) {
     DROPS::MultiGridCL mg( *builder);
     const DROPS::ParamCL::ptree_type* ch= 0;
     try {
-        ch= &P.get_child( "Domain.Periodicity");
+        ch= &P.get_child( "Mesh.Periodicity");
     }
     catch (DROPS::DROPSParamErrCL) {}
     if (ch)
@@ -150,7 +150,7 @@ int main (int argc, char* argv[]) {
     bool fullgrad = P.get<bool>("SurfNavStokes.fullgrad");
     std::string model = P.get<std::string>("SurfNavStokes.model");
     std::string testcase = P.get<std::string>("SurfNavStokes.testcase");
-    double h = P.get<DROPS::Point3DCL>("Domain.E1")[0]/P.get<double>("Domain.N1")*std::pow(2., -P.get<double>("Mesh.AdaptRef.FinestLevel"));
+    double h = P.get<DROPS::Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")*std::pow(2., -P.get<double>("Mesh.AdaptRef.FinestLevel"));
     double tau = P.get<double>("Time.StepSize");
     ParameterNS::nu = P.get<double>("SurfNavStokes.kinematic_viscosity");
 
@@ -824,6 +824,7 @@ int main (int argc, char* argv[]) {
        	std::string dirname  = P.get<std::string>("Output.Directory") + "/" + model + "_" + levelset_fun_str + "/" + "test" + testcase + "_h=" + std::to_string(float(h));
 
        	std::cout << "dirname: " << dirname << std::endl;
+
        	//set up VTK output
        	VTKOutCL * vtkwriter = NULL;
        	vtkwriter = new VTKOutCL(mg, "DROPS data", (int)P.get<double>("Time.NumSteps")/P.get<int>("Output.every timestep"), dirname , filename, "none", 0);
@@ -832,10 +833,10 @@ int main (int argc, char* argv[]) {
         vtkwriter->Register( make_VTKIfaceVector(mg, rhs, "rhs", velFE, vbnd));
         vtkwriter->Register( make_VTKIfaceVector(mg, v, "velocity", velFE, vbnd));
         vtkwriter->Register( make_VTKIfaceScalar(mg, p, "pressure", /*prFE,*/ pbnd));
-        vtkwriter->Register( make_VTKIfaceScalar(mg, curl, "vorticity", /*prFE,*/ pbnd));
-        vtkwriter->Register( make_VTKIfaceScalar(mg, curlSol, "vortSol", /*prFE,*/ pbnd));
-        vtkwriter->Register( make_VTKIfaceScalar(mg, rhs2, "rhs2", /*prFE,*/ pbnd));
-        vtkwriter->Register( make_VTKIfaceScalar(mg, pSol, "pSol", /*prFE,*/ pbnd));
+        // vtkwriter->Register( make_VTKIfaceScalar(mg, curl, "vorticity", /*prFE,*/ pbnd));
+        // vtkwriter->Register( make_VTKIfaceScalar(mg, curlSol, "vortSol", /*prFE,*/ pbnd));
+        // vtkwriter->Register( make_VTKIfaceScalar(mg, rhs2, "rhs2", /*prFE,*/ pbnd));
+        // vtkwriter->Register( make_VTKIfaceScalar(mg, pSol, "pSol", /*prFE,*/ pbnd));
 
         //set up a txt file for custom time output
         std::ofstream log_solo( dirname +"/"
@@ -860,10 +861,12 @@ int main (int argc, char* argv[]) {
         log_error << "Time" << "\tL_2(uT-ext_uT)\t" <<  "\tadvH_1(u-ext_u)\t" <<  "\tsurfH_1(u-ext_u)\t" <<  "\tH_1(u-ext_u)\t" << "\tL_2(uN)\t" << "\tL_2(p-ext_p)" << std::endl;
         double mu = P.get<double>("SurfNavStokes.kinematic_viscosity");
         std::cout << "viscosity: " << mu << std::endl;
+        std::cout << "test is instationary: " << P.get<std::string>("SurfNavStokes.instationary") << '\n';
 
         //NAVIER-STOKES starts here
         if ( P.get<std::string>("SurfNavStokes.instationary") != "none" )
         {
+
         	//initial velocity for backward Euler formula
         	v=vInit;
         	v_old=vInit;
@@ -876,7 +879,11 @@ int main (int argc, char* argv[]) {
             InitScalar(mg, p, extpsol);
         	//output of initial data and exact solutions to vtk and custom
         	vtkwriter->Write(0);//send v to vtk
-        	vxtent.SetIdx( &vecP1idx);
+
+std::cout << "1\n";
+
+            vxtent.SetIdx( &vecP1idx);
+
         	Extend(mg, vInit, vxtent);
         	BndDataCL<Point3DCL> bndvec = vbnd;
         	BndDataCL<double> bndscalar = pbnd;
@@ -887,10 +894,10 @@ int main (int argc, char* argv[]) {
 
         	bool experimental=false;
 
-  ///////
             std::ofstream log( dirname +"/"+ filename   + "_time="+std::to_string(0) + ".txt");
             log_error <<  std::to_string((float)0) << "\t";
-            if( !velFE.compare("P1")) {
+
+            if ( !velFE.compare("P1")) {
                 vxtent.SetIdx(&vecP1idx);
                 Extend(mg, v, vxtent);
                 BndDataCL<Point3DCL> bndvec = vbnd;
@@ -915,18 +922,16 @@ int main (int argc, char* argv[]) {
                 log << "The L2-Norm of v * n is: " << normal_velocity << std::endl;
                 log_error << std::to_string((float) normal_velocity) << "\t";
             }
-                if ( !prFE.compare("P1")) {
-                    pxtent.SetIdx( &P1FEidx);
-                    Extend(mg, p, pxtent);
-                    BndDataCL<double> bndscalar = pbnd;
-                    double L2_Lagrange =L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndscalar, pxtent), extpsol, 0);
-                    log << "The L2-Norm of p - pSol is: " << L2_Lagrange << std::endl;
-                    log_error <<  std::to_string((float)L2_Lagrange) << std::endl;
-                    log << "The L2-Norm of p  is: " << L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndscalar, pxtent), &ZeroScalarFun);
-                    //log << "The M-Norm of p - pSol is: " << std::sqrt(L2_Lagrange*L2_Lagrange + alpha*dot(Schur_stab.Data*p.Data, p.Data)) << std::endl;
-                }
-
-//////
+            if ( !prFE.compare("P1")) {
+                pxtent.SetIdx( &P1FEidx);
+                Extend(mg, p, pxtent);
+                BndDataCL<double> bndscalar = pbnd;
+                double L2_Lagrange =L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndscalar, pxtent), extpsol, 0);
+                log << "The L2-Norm of p - pSol is: " << L2_Lagrange << std::endl;
+                log_error <<  std::to_string((float)L2_Lagrange) << std::endl;
+                log << "The L2-Norm of p  is: " << L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndscalar, pxtent), &ZeroScalarFun);
+                //log << "The M-Norm of p - pSol is: " << std::sqrt(L2_Lagrange*L2_Lagrange + alpha*dot(Schur_stab.Data*p.Data, p.Data)) << std::endl;
+            }
 
 
         	for (int i = 0; i < P.get<double>("Time.NumSteps"); i++)
@@ -1055,8 +1060,8 @@ int main (int argc, char* argv[]) {
 
         		/*std::cout << "REMOVE THIS!" << std::endl;
         		MatrixCL Adyncopy=Adyn;
-        		Adyn.LinComb(1.0, Adyncopy, 1.0, M.Data);
-*/
+        		Adyn.LinComb(1.0, Adyncopy, 1.0, M.Data);*/
+
         		//solve linear system
        			Solver->Solve(Adyn, Bhat, Chat, v.Data, p.Data, instantrhs.Data, rhs2.Data,v.RowIdx->GetEx(), p.RowIdx->GetEx() );
 
@@ -1074,7 +1079,7 @@ int main (int argc, char* argv[]) {
 
         		curl_proj.Data = Omega.Data*v.Data  - ( dot(Omega.Data*v.Data,id2) / dot(id2,id2) ) * id2;
         		//GMResSolver_.Solve(Mhat, curl.Data,curl_proj.Data , rhs2.Data);
-//        		curl.Data = rhs2.Data;
+                //curl.Data = rhs2.Data;
 
         		//postprocess output to normalize pressure
         		p.Data -=  dot(Schur.Data * p.Data,id2) / dot(Schur.Data*id2,id2) * id2;
@@ -1156,6 +1161,9 @@ int main (int argc, char* argv[]) {
 
         		log.close();
         	}//eng of time iteration
+
+std::cout << "1\n";
+
         }
         else if ( P.get<std::string>("SurfNavStokes.instationary") == "none" )
         {
@@ -1358,6 +1366,7 @@ int main (int argc, char* argv[]) {
     std::cout << "The average iterationsnumber of the Schur-preconditioner is: " << Schuraverage << '\n' << " ...with a variation of: " << Schurvariation << std::endl;
 
     delete &lset;
+    
     return 0;
   }
   catch (DROPS::DROPSErrCL err) { err.handle(); }

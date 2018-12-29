@@ -1364,7 +1364,7 @@ void NavierStokesIFAccumulator_P1P1CL::finalize_accumulation ()
     mSchur_normalP1_stab_->Build();
 	delete mSchur_normalP1_stab_;
 #ifndef _PAR
-    std::cout << "StokesIF_P1P1:\t" << A_P1_.num_nonzeros() << " nonzeros in A, " << A_P1_stab_.num_nonzeros() << " nonzeros in A_stab, " << N_P1_.num_nonzeros() << " nonzeros in N, "
+    std::cout << "NavierStokesIF_P1P1:\t" << A_P1_.num_nonzeros() << " nonzeros in A, " << A_P1_stab_.num_nonzeros() << " nonzeros in A_stab, " << N_P1_.num_nonzeros() << " nonzeros in N, "
     		<< NT_P1_.num_nonzeros() << " nonzeros in NT, "
     		<< B_P1P1_.num_nonzeros() << " nonzeros in B, " << Omega_P1P1_.num_nonzeros() << " nonzeros in Omega, " << M_P1_.num_nonzeros() << " nonzeros in M, "<< D_P1_.num_nonzeros() << " nonzeros in D, " << S_P1_.num_nonzeros() << " nonzeros in S, "
               << L_P1P1_.num_nonzeros() << " nonzeros in L, " << L_P1P1_stab_.num_nonzeros() << " nonzeros in L_stab, "
@@ -2595,6 +2595,7 @@ VTKIfaceScalarCL::put (VTKOutCL& cf) const
     if (u_.RowIdx->GetFE() == P2IF_FE)
         fullidx.SetFE( P2_FE);
     fullidx.CreateNumbering( u_.RowIdx->TriangLevel(), mg_);
+    std::cout<<"vtk scalar unknowns: "<<fullidx.NumUnknowns()<<std::endl;
     VecDescCL uext( &fullidx);
     Extend( mg_, u_, uext);
 
@@ -2614,7 +2615,7 @@ void VTKIfaceVectorCL::put (VTKOutCL& cf) const
     else
       pidx.SetFE(vecP1_FE);
     pidx.CreateNumbering( u_.RowIdx->TriangLevel(), mg_);
-    std::cout<<"vtk unknows: "<<pidx.NumUnknowns()<<std::endl;
+    std::cout<<"vtk vector unknowns: "<<pidx.NumUnknowns()<<std::endl;
     VecDescCL pu( &pidx);
     Extend( mg_, u_, pu);
 
