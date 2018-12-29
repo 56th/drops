@@ -1,11 +1,8 @@
-//    = DROPS parameter file for surfactant.cpp =
-//    tests of the surfactant model implementation:
-//    droplet in brick
 {
     "General": {
-        "ProgressBar":  1, //show progress bar
-        "DynamicLibsPrefix": "../", //where should we look for shared objects?
-        "DynamicLibs": [ //select libraries to be loaded after program start
+        "ProgressBar":  1,
+        "DynamicLibsPrefix": "../",
+        "DynamicLibs": [
                         "misc/libmisc-scalarFunctions",
                         "misc/libmisc-vectorFunctions"
         ]
@@ -26,7 +23,7 @@
             "Freq":          0,
             "Width":         10,
             "CoarsestLevel": 0,
-            "FinestLevel":   3,
+            "FinestLevel":   2,
             "SD":            0.1,
             "CurvDiff":      -1,
             "Discontinuous": 0
@@ -38,10 +35,10 @@
         "NumSteps":  16
     },
 
-    "SurfTransp": { // surfactant transport
+    "SurfTransp": {
         "Enabled": 1,
 
-        "Exp": { // experimental conditions
+        "Exp": {
             "RadDrop":  [1, 1, 1],
             "PosDrop":  [0, 0, 0],
             "RadTorus": [1, 0.7],
@@ -52,28 +49,21 @@
             "Levelset": "Ellipsoid",
             "Rhs":      "LaplaceBeltrami0Rhs",
             "Solution": "LaplaceBeltrami0Sol"
-//            "Wind":     "ToroidalFlowWind",
-//            "Levelset": "Torus",
-//            "Rhs":      "ToroidalFlowRhs",
-//            "Solution": "ToroidalFlowSol"
-//            "Wind":     "AxisScalingWind",
-//            "Levelset": "AxisScalingLset",
-//            "Rhs":      "AxisScalingRhs",
-//            "Solution": "AxisScalingSol"
+
         },
-        "Method":     "cGcG", // "spacetime-cGcG" "spacetime-cGdG" "characteristic-transport"
-        "UseMassDiv": true, // only implemented for "spacetime-*"
+        "Method":     "cGcG",
+        "UseMassDiv": true,
         "Theta":      0.5,
         "Solver": {
             "Iter": 1000,
             "Tol":  1e-10
         },
         "XFEMReduced":             -1,
-        "Visc":                    1, // 0.05,
-        "FEDegree":                2, // 1, 2
+        "Visc":                    1,
+        "FEDegree":                2,
         "NormalLaplaceCoefficent": 1.0,
-        "SolutionOutput": { // Machine readable output of the surfactant-solution
-            "Freq":   1,
+        "SolutionOutput": {
+            "Freq":   0,
             "Path":   "solutions/iface_sol",
             "Binary": true
         }
@@ -91,14 +81,14 @@
         "Discontinuous": 0
     },
 
-    "LevelsetMapper": { // quasi-orthogonal coordinate system at the interface
+    "LevelsetMapper": {
         "Tol":               1e-7,
         "Iter":              20,
         "ArmijoConstant":    1e-2,
-        "Method":            "Newton", // "FixedPointWithLineSearch" // "Newton"
+        "Method":            "Newton",
         "MaxDampingSteps":   8,
         "TrustRegion":       1.0,
-        "DeformationMethod": "map_zero_level_sets" // "", "map_zero_level_sets", "map_local_level_sets"
+        "DeformationMethod": "map_zero_level_sets"
     },
 
     "VTK": {
