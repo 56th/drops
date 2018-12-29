@@ -381,7 +381,6 @@ DROPS::Point3DCL d_sphere_dist (const DROPS::Point3DCL& p, double)
     return x/x.norm();
 }
 
-
 typedef double (*dist_funT) (const DROPS::Point3DCL&, double);
 
 double sphere_2move (const DROPS::Point3DCL& p, double t)
@@ -389,6 +388,7 @@ double sphere_2move (const DROPS::Point3DCL& p, double t)
     DROPS::Point3DCL x( p - (PosDrop + t*constant_wind(p, t)));
     return x.norm() - RadDrop[0];
 }
+static RegisterScalarFunction regsca_movell_lset( "MovingEllipsoid", sphere_2move);
 
 SMatrixCL<3,3> dp_sphere (const DROPS::Point3DCL& x, double)
 {

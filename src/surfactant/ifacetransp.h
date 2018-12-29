@@ -1385,11 +1385,11 @@ class VTKIfaceScalarCL : public VTKVariableCL
   private:
     const VecDescCL&   u_;
     MultiGridCL&       mg_;
-    const BndDataCL<double>& BndData_;
+    const BndDataCL<double> BndData_;
 
   public:
     VTKIfaceScalarCL (MultiGridCL& mg, const VecDescCL& u, std::string varName, const BndDataCL<double>& BndData = BndDataCL<double>(0))
-        : VTKVariableCL( varName), u_( u), mg_( mg), BndData_( BndData) {}
+        : VTKVariableCL( varName), u_( u), mg_( mg), BndData_(BndData) {}
 
     void put      (VTKOutCL& cf) const;
     Uint GetDim() const { return 1; }

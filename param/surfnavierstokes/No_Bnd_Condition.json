@@ -23,7 +23,7 @@
             "Freq":          0,
             "Width":         0,
             "CoarsestLevel": 0,
-            "FinestLevel":   4,
+            "FinestLevel":   3,
             "SD":            0.1,
             "CurvDiff":      -1,
             "Discontinuous": 0
@@ -87,13 +87,13 @@
     "Time": {
         "Read":     0,
         "Write":    "yes",
-        "NumSteps":	100,
-        "StepSize": 0.01
+        "NumSteps":	160,
+        "StepSize": 0.025
     },
     
     "Levelset": {
         "_comment":      "# levelset solver not used",
-        "case":          "torus",
+        "case":          "sphere_2",
         "Theta":         1,
         "VolCorrection": 0,
         "SD":		     0.1,
@@ -150,10 +150,10 @@
                 "FE":           "P1P1", 
                 "fullgrad":     0,
                 "model":        "NavierStokes",
-                "testcase":      "1",
+                "testcase":      "17",
                 "instationary": "BDF2",
                 "nonlinear_term": "convective",
-                "kinematic_viscosity": 0.0001
+                "kinematic_viscosity": 1
     },
 
     "SurfTransp": {

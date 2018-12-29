@@ -14,9 +14,9 @@
         "E1":          [ 4,  0,  0],
         "E2":          [ 0,  4,  0],
         "E3":          [ 0,  0,  4],
-        "N1":          4,
-        "N2":          4,
-        "N3":          4,
+        "N1":          16,
+        "N2":          16,
+        "N3":          16,
         "RestartFile": "",
 
         "AdaptRef": {
@@ -32,7 +32,7 @@
 
     "Time": {
         "FinalTime": 4,
-        "NumSteps":  16
+        "NumSteps":  32
     },
 
     "SurfTransp": {
@@ -42,11 +42,11 @@
             "RadDrop":  [1, 1, 1],
             "PosDrop":  [0, 0, 0],
             "RadTorus": [1, 0.7],
-            "Velocity": [0, 0, 0],
+            "Velocity": [0.2, 0, 0],
 
-            "StationaryPDE": true,
+            "StationaryPDE": false,
             "Wind":     "ConstantWind",
-            "Levelset": "Ellipsoid",
+            "Levelset": "MovingEllipsoid",
             "Rhs":      "LaplaceBeltrami0Rhs",
             "Solution": "LaplaceBeltrami0Sol"
 
