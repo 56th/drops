@@ -3173,4 +3173,458 @@ void SurfactantCharTransportP1CL::DoStep (double new_t)
     CommitStep();
 }
 
+class LocalCahnHilliardCL
+{
+  private:
+    const PrincipalLatticeCL& lat;
+    LocalP1CL<> P1Hat[4];
+    LocalP2CL<> P2Hat[10];
+    Point3DCL P1Grad[4];
+    LocalP1CL<Point3DCL>  P2GradRef[10], P2Grad[10];
+    GridFunctionCL<Point3DCL> qnormal;
+    GridFunctionCL<Point3DCL> qsurfP1grad[4];
+    GridFunctionCL<Point3DCL> q3DsurfP1grad[4];
+
+    GridFunctionCL<> mobility2D,well_potential_second_derivative[4], qP1Hat[4], qnormal_comp[3];
+
+
+    QuadDomain2DCL  q2Ddomain;
+    std::valarray<double> ls_loc;
+    SurfacePatchCL spatch;
+
+    QuadDomainCL q3Ddomain;
+    GridFunctionCL<Point3DCL> q3Dnormal;
+    GridFunctionCL<Point3DCL> q3DP1Grad[4],q2DP1Grad[4];
+
+    void Get_Normals(const LocalP2CL<>& ls, LocalP1CL<Point3DCL>&);
+
+  public:
+    LocalCahnHilliardCL ( )
+        : lat( PrincipalLatticeCL::instance( 2)), ls_loc( lat.vertex_size())
+    {
+        P1DiscCL::GetP1Basis( P1Hat);
+        P2DiscCL::GetP2Basis( P2Hat);
+        P2DiscCL::GetGradientsOnRef( P2GradRef);
+     }
+
+    void calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const LocalP1CL<Point3DCL>& v,const LocalP1CL<>& chi , const TetraCL& tet); ///< has to be called before any setup method!
+    void calc3DIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const TetraCL& tet); ///< has to be called after calcIntegrands!
+
+    void setupM_P1 (double M_P1[4][4]);
+    void setupNormalStab_P1 (double NormalStab_P1[4][4],double absdet);
+    void setupTangentStab_P1 (double TangentStab_P1[4][4],double absdet);
+    void setupVolumeStab_P1 (double VolumeStab_P1[4][4],double absdet);
+
+
+    void setupL_P1 (double L_P1[4][4]);
+    void setupLM_P1 (double LM_P1[4][4]);
+    void setupGprimeprime_P1 (double Gprimeprime_P1[4][4]);
+
+
+};
+
+void LocalCahnHilliardCL::calc3DIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const TetraCL& tet)
+{
+    make_SimpleQuadDomain<Quad5DataCL> (q3Ddomain, AllTetraC);
+    LocalP1CL<Point3DCL> Normals;
+    Get_Normals(ls, Normals);
+
+    resize_and_evaluate_on_vertexes (Normals, q3Ddomain, q3Dnormal);
+
+    // Scale Normals accordingly to the Euclidean Norm (only consider the ones which make a contribution in the sense of them being big enough... otherwise one has to expect problems with division through small numbers)
+    for(Uint i=0; i<q3Dnormal.size(); ++i) {
+         //if(q3Dnormal[i].norm()> 1e-8)
+         q3Dnormal[i]= q3Dnormal[i]/q3Dnormal[i].norm();
+    }
+
+    for(int j=0; j<4; ++j) {
+        q3DP1Grad[j].resize( q3Ddomain.vertex_size());
+        q3DP1Grad[j]= P1Grad[j];
+    }
+}
+
+double Mobility_function(double x)
+{
+	return(std::sqrt((1.-x)*(x)*(1.-x)*(x)));
+	//return(1);
+}
+
+double Potential_function(const double x)
+    {
+        return((1.-x)*(x)*(1.-x)*(x)*0.25);
+    }
+
+double Potential_prime_function(const double x)
+{
+    //return(-x);
+    return((x-1.)*(x)*(x-0.5));
+    //return(-(0.)*(3./2.)*x*x + (1.)*x/2. + (0.)*x*x*x);
+}
+
+    double Potential_prime_convex_function(const double x)
+    {
+      return(x/2. + x*x*x);
+    }
+
+    double Potential_prime_concave_function(const double x)
+    {
+        return(-(3./2.)*x*x);
+    }
+
+    double Potential_prime_prime_function(const double x)
+    {
+        return((x-1.)*(x)+2.*(x-0.5)*(x-0.5));
+        //return (-(0.)*3.*x+(1.)*1./2. + (0.)*3.*x*x);
+    }
+
+    double Potential_prime_prime_convex_function(const double x)
+    {
+        return(1./2.+3.*x*x);
+        //return (-(0.)*3.*x+(1.)*1./2. + (0.)*3.*x*x);
+    }
+
+void LocalCahnHilliardCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const LocalP1CL<Point3DCL>& v ,const LocalP1CL<>& chi , const TetraCL& tet)
+{
+
+    P2DiscCL::GetGradients( P2Grad, P2GradRef, T);
+    P1DiscCL::GetGradients( P1Grad, T);
+    evaluate_on_vertexes( ls, lat, Addr( ls_loc));
+    spatch.make_patch<MergeCutPolicyCL>( lat, ls_loc);
+
+    // The routine takes the information about the tetrahedra and the cutting surface and generates a two-dimensional triangulation of the cut, including the necessary point-positions and weights for the quadrature
+    make_CompositeQuad5Domain2D ( q2Ddomain, spatch, tet);
+    LocalP1CL<Point3DCL> Normals;
+    Get_Normals(ls, Normals);
+
+    // Resize and evaluate Normals at all points which are needed for the two-dimensional quadrature-rule
+    resize_and_evaluate_on_vertexes (Normals, q2Ddomain, qnormal);
+
+    for(int j=0; j<4; ++j) {
+    	q2DP1Grad[j].resize( q2Ddomain.vertex_size());
+        q2DP1Grad[j]= P1Grad[j];
+    }
+
+    // Scale Normals accordingly to the Euclidean Norm (only consider the ones which make a contribution in the sense of them being big enough... otherwise one has to expect problems with division through small numbers)
+    for(Uint i=0; i<qnormal.size(); ++i) {
+         //if(qnormal[i].norm()> 1e-8)
+         qnormal[i]= qnormal[i]/qnormal[i].norm();
+    }
+
+    // Provide all components of the normals
+    for (int k=0; k<3; ++k) {
+        qnormal_comp[k].resize( q2Ddomain.vertex_size());
+        ExtractComponent( qnormal, qnormal_comp[k], k);
+    }
+
+    for(int j=0; j<4 ;++j) {
+        resize_and_evaluate_on_vertexes( P1Hat[j], q2Ddomain, qP1Hat[j]);
+        qsurfP1grad[j].resize( q2Ddomain.vertex_size());
+        qsurfP1grad[j]= P1Grad[j];
+        qsurfP1grad[j]-= dot( qsurfP1grad[j], qnormal)*qnormal;
+    }
+
+    for(int j=0; j<4 ;++j) {
+        q3DsurfP1grad[j].resize( q3Ddomain.vertex_size());
+        q3DsurfP1grad[j]= P1Grad[j];
+        q3DsurfP1grad[j]-= dot( q3DsurfP1grad[j], q3Dnormal)*q3Dnormal;
+    }
+
+    //physical velocity, tetra P1 function
+    LocalP1CL<Point3DCL> velocity;
+    for(int i=0; i<4 ; ++i)
+    {
+    	velocity += v[i]*P1Hat[i];
+    }
+
+    //volume fraction , tetra P1 function
+      LocalP1CL<> mobility;
+      for(int i=0; i<4 ; ++i)
+      {
+    	mobility += Mobility_function(chi[i])*P1Hat[i];
+      }
+      resize_and_evaluate_on_vertexes (mobility, q2Ddomain, mobility2D);
+
+    //LocalP1CL<> well_potential_second_derivative[4];
+    for(int i=0; i<4 ; ++i)
+    {
+        well_potential_second_derivative[i] = Potential_prime_prime_function(chi[i])*qP1Hat[i];
+    }
+    //resize_and_evaluate_on_vertexes (well_potential_second_derivative, q2Ddomain, well_potential_second_derivative_2D);
+
+
+}
+
+// The P2 levelset-function is used to compute the normals which are needed for the (improved) projection onto the interface, GradLP1 has to be set before
+void LocalCahnHilliardCL::Get_Normals(const LocalP2CL<>& ls, LocalP1CL<Point3DCL>& Normals)
+{
+    for(int i=0; i<10 ; ++i)
+    {
+        Normals+=ls[i]*P2Grad[i];
+    }
+
+}
+
+void LocalCahnHilliardCL::setupM_P1 (double M_P1[4][4])
+{
+    // Do all combinations for (i,j) i,j=4 x 4 and corresponding quadrature
+    for (int i=0; i<4; ++i) {
+        for (int j=0; j<4; ++j) {
+             M_P1[i][j]= quad_2D( qP1Hat[i]*qP1Hat[j], q2Ddomain);
+        }
+    }
+}
+
+    void LocalCahnHilliardCL::setupNormalStab_P1 (double NormalStab_P1[4][4], double absdet)
+    {
+        // Do all combinations for (i,j) i,j=4 x 4 and corresponding quadrature
+        for (int i=0; i<4; ++i) {
+            for (int j=0; j<4; ++j) {
+                NormalStab_P1[i][j]= quad(dot(q3Dnormal, q3DP1Grad[i])*dot(q3Dnormal, q3DP1Grad[j]), absdet, q3Ddomain, AllTetraC);
+
+            }
+        }
+    }
+
+
+    void LocalCahnHilliardCL::setupTangentStab_P1 (double TangentStab_P1[4][4], double absdet)
+    {
+        // Do all combinations for (i,j) i,j=4 x 4 and corresponding quadrature
+        for (int i=0; i<4; ++i) {
+            for (int j=0; j<4; ++j) {
+                TangentStab_P1[i][j]= quad(dot(q3DsurfP1grad[i], q3DsurfP1grad[j]), absdet, q3Ddomain, AllTetraC);
+
+            }
+        }
+    }
+
+    void LocalCahnHilliardCL::setupVolumeStab_P1 (double VolumeStab_P1[4][4], double absdet)
+    {
+        // Do all combinations for (i,j) i,j=4 x 4 and corresponding quadrature
+        for (int i=0; i<4; ++i) {
+            for (int j=0; j<4; ++j) {
+                VolumeStab_P1[i][j]= quad(dot(q3DP1Grad[i], q3DP1Grad[j]), absdet, q3Ddomain, AllTetraC);
+
+            }
+        }
+    }
+
+void LocalCahnHilliardCL::setupL_P1 (double L_P1[4][4])
+{
+    // Do all combinations for (i,j) i,j=4 x 4 and corresponding quadrature
+    for (int i=0; i<4; ++i) {
+        for (int j=0; j<4; ++j) {
+             L_P1[i][j]= quad_2D( dot(qsurfP1grad[i], qsurfP1grad[j]), q2Ddomain);
+        }
+    }
+}
+
+void LocalCahnHilliardCL::setupLM_P1 (double LM_P1[4][4])
+{
+    // Do all combinations for (i,j) i,j=4 x 4 and corresponding quadrature
+    for (int i=0; i<4; ++i) {
+        for (int j=0; j<4; ++j) {
+             LM_P1[i][j]= quad_2D( mobility2D*dot(qsurfP1grad[i], qsurfP1grad[j]), q2Ddomain);
+        }
+    }
+}
+
+void LocalCahnHilliardCL::setupGprimeprime_P1 (double Gprimeprime_P1[4][4])
+    {
+        // Do all combinations for (i,j) i,j=4 x 4 and corresponding quadrature
+        for (int i=0; i<4; ++i) {
+            for (int j=0; j<4; ++j) {
+                Gprimeprime_P1[i][j]= quad_2D( well_potential_second_derivative[i]*qP1Hat[j], q2Ddomain);
+            }
+        }
+    }
+
+/// \brief Basis Class for Accumulator to set up the matrices for interface Stokes.
+class CahnHilliardIFAccumulator_P1P1CL : public TetraAccumulatorCL
+{
+  protected:
+    const VecDescCL& lset;
+    const VecDescCL& velocity;
+    const VecDescCL& volume_fraction;
+    const LsetBndDataCL& lset_bnd;
+    const BndDataCL<Point3DCL>& velocity_bnd;
+    const BndDataCL<>& volume_fraction_bnd;
+    IdxDescCL &P1Idx_, &ScalarP1Idx_;
+
+
+    MatrixCL &M_P1_, &NormalStab_P1_, &TangentStab_P1_,&VolumeStab_P1_, &L_P1P1_, &LM_P1P1_, &Gprimeprime_P1P1_;
+    MatrixBuilderCL *mM_P1_,*mNormalStab_P1_, *mTangentStab_P1_, *mVolumeStab_P1_, *mL_P1P1_, *mLM_P1P1_, *mGprimeprime_P1P1_;
+    double locM_P1[4][4], locNormalStab_P1[4][4], locTangentStab_P1[4][4],  locVolumeStab_P1[4][4], locL_P1P1[4][4],
+            locLM_P1P1[4][4], locGprimeprime_P1P1[4][4];
+
+    LocalCahnHilliardCL localCahnHilliard_;
+
+    SMatrixCL<3,3> T;
+    double det, absdet;
+    LocalP2CL<> ls_loc;
+    LocalP1CL<Point3DCL> v_loc;
+    LocalP1CL<> chi_loc;
+    LocalNumbP1CL n, nScalar;
+
+    ///\brief Computes the mapping from local to global data "n", the local matrices in loc and.
+    void local_setup (const TetraCL& tet);
+    ///\brief Update the global system.
+    void update_global_system ();
+
+  public:
+    CahnHilliardIFAccumulator_P1P1CL ( const VecDescCL& ls, const VecDescCL& v,const VecDescCL& chi, const LsetBndDataCL& ls_bnd, const BndDataCL<Point3DCL>& v_bnd,const BndDataCL<>& chi_bnd, IdxDescCL& P1FE, IdxDescCL& ScalarP1FE,  MatrixCL& M_P1, MatrixCL& NormalStab_P1,MatrixCL& TangentStab_P1, MatrixCL& VolumeStab_P1,  MatrixCL& L_P1P1,  MatrixCL& LM_P1P1 ,  MatrixCL& Gprimeprime_P1P1);
+
+    ///\brief Initializes matrix-builders and load-vectors
+    void begin_accumulation ();
+    ///\brief Builds the matrices
+    void finalize_accumulation();
+
+    void visit (const TetraCL& sit);
+
+    TetraAccumulatorCL* clone (int /*tid*/) { return new CahnHilliardIFAccumulator_P1P1CL ( *this); }
+
+};
+
+CahnHilliardIFAccumulator_P1P1CL::CahnHilliardIFAccumulator_P1P1CL( const VecDescCL& ls, const VecDescCL& v, const VecDescCL& chi, const LsetBndDataCL& ls_bnd, const BndDataCL<Point3DCL>& v_bnd,const BndDataCL<>& chi_bnd, IdxDescCL& P1FE, IdxDescCL& ScalarP1FE, MatrixCL& M_P1, MatrixCL& NormalStab_P1, MatrixCL& TangentStab_P1,  MatrixCL& VolumeStab_P1,  MatrixCL& L_P1P1, MatrixCL& LM_P1P1, MatrixCL& Gprimeprime_P1P1 )
+ : lset(ls), velocity(v), volume_fraction(chi), lset_bnd(ls_bnd), velocity_bnd(v_bnd),volume_fraction_bnd(chi_bnd), P1Idx_(P1FE), ScalarP1Idx_(ScalarP1FE), M_P1_(M_P1), NormalStab_P1_(NormalStab_P1), TangentStab_P1_(TangentStab_P1), VolumeStab_P1_(VolumeStab_P1), L_P1P1_(L_P1P1), LM_P1P1_(LM_P1P1), Gprimeprime_P1P1_(Gprimeprime_P1P1), localCahnHilliard_()
+{}
+
+void CahnHilliardIFAccumulator_P1P1CL::begin_accumulation ()
+{
+    std::cout << "entering CahnHilliardIF: \n";
+    const size_t num_unks_p1= P1Idx_.NumUnknowns(), num_unks_scalarp1= ScalarP1Idx_.NumUnknowns();
+
+    mM_P1_= new MatrixBuilderCL( &M_P1_, num_unks_scalarp1, num_unks_scalarp1);
+    mNormalStab_P1_= new MatrixBuilderCL( &NormalStab_P1_, num_unks_scalarp1, num_unks_scalarp1);
+    mTangentStab_P1_= new MatrixBuilderCL( &TangentStab_P1_, num_unks_scalarp1, num_unks_scalarp1);
+    mVolumeStab_P1_= new MatrixBuilderCL( &VolumeStab_P1_, num_unks_scalarp1, num_unks_scalarp1);
+    mL_P1P1_= new MatrixBuilderCL( &L_P1P1_, num_unks_scalarp1, num_unks_scalarp1);
+    mLM_P1P1_= new MatrixBuilderCL( &LM_P1P1_, num_unks_scalarp1, num_unks_scalarp1);
+    mGprimeprime_P1P1_= new MatrixBuilderCL( &Gprimeprime_P1P1_, num_unks_scalarp1, num_unks_scalarp1);
+
+
+
+}
+
+void CahnHilliardIFAccumulator_P1P1CL::finalize_accumulation ()
+{
+
+
+    mL_P1P1_->Build();
+    delete mL_P1P1_;
+
+    mLM_P1P1_->Build();
+    delete mLM_P1P1_;
+
+    mGprimeprime_P1P1_->Build();
+    delete mGprimeprime_P1P1_;
+
+    mM_P1_->Build();
+    delete mM_P1_;
+
+    mNormalStab_P1_->Build();
+    delete mNormalStab_P1_;
+
+    mTangentStab_P1_->Build();
+    delete mTangentStab_P1_;
+
+    mVolumeStab_P1_->Build();
+    delete mVolumeStab_P1_;
+
+#ifndef _PAR
+    std::cout << "CahnHilliardIF_P1P1:\t"
+    		  << M_P1_.num_nonzeros() 	<< " nonzeros in Mass, "
+             << NormalStab_P1_.num_nonzeros() 	<< " nonzeros in Normal, "
+            << TangentStab_P1_.num_nonzeros() 	<< " nonzeros in Tang, "
+            << VolumeStab_P1_.num_nonzeros() 	<< " nonzeros in Vol, "
+            << L_P1P1_.num_nonzeros() << " nonzeros in Laplacian, "
+			  << LM_P1P1_.num_nonzeros() << " nonzeros in LaplacianM, "
+            << Gprimeprime_P1P1_.num_nonzeros() << " nonzeros in LaplacianM, "  << std::endl;
+
+#endif
+    // std::cout << '\n';
+}
+
+void CahnHilliardIFAccumulator_P1P1CL::visit (const TetraCL& tet)
+{
+    ls_loc.assign( tet, lset, lset_bnd);
+    v_loc.assign( tet, velocity, velocity_bnd);
+    chi_loc.assign( tet, volume_fraction, volume_fraction_bnd);
+
+    if (!equal_signs( ls_loc))
+    {
+        local_setup( tet);
+        update_global_system();
+    }
+
+}
+
+void CahnHilliardIFAccumulator_P1P1CL::local_setup (const TetraCL& tet)
+{
+    GetTrafoTr( T, det, tet);
+    absdet= std::fabs( det);
+
+    n.assign( tet, P1Idx_, P1Idx_.GetBndInfo());
+    nScalar.assign( tet, ScalarP1Idx_, ScalarP1Idx_.GetBndInfo());
+
+
+    localCahnHilliard_.calcIntegrands( T, ls_loc, v_loc, chi_loc, tet);
+    localCahnHilliard_.calc3DIntegrands(T, ls_loc, tet);
+
+    localCahnHilliard_.setupM_P1( locM_P1);
+    localCahnHilliard_.setupNormalStab_P1( locNormalStab_P1, absdet);
+    localCahnHilliard_.setupTangentStab_P1( locTangentStab_P1, absdet);
+    localCahnHilliard_.setupVolumeStab_P1( locVolumeStab_P1, absdet);
+
+
+    localCahnHilliard_.setupL_P1( locL_P1P1);
+    localCahnHilliard_.setupLM_P1( locLM_P1P1);
+
+    localCahnHilliard_.setupGprimeprime_P1( locGprimeprime_P1P1);
+
+
+}
+
+void CahnHilliardIFAccumulator_P1P1CL::update_global_system ()
+{
+    MatrixBuilderCL& mM_P1= *mM_P1_;
+    MatrixBuilderCL& mNormalStab_P1= *mNormalStab_P1_;
+    MatrixBuilderCL& mTangentStab_P1= *mTangentStab_P1_;
+    MatrixBuilderCL& mVolumeStab_P1= *mVolumeStab_P1_;
+
+    MatrixBuilderCL& mL_P1P1= *mL_P1P1_;
+    MatrixBuilderCL& mLM_P1P1= *mLM_P1P1_;
+    MatrixBuilderCL& mGprimeprime_P1P1= *mGprimeprime_P1P1_;
+
+
+    int count =0;
+
+    for(int i= 0; i < 4; ++i) {
+        const IdxT ii= nScalar.num[i];
+        if (ii==NoIdx || !(nScalar.WithUnknowns( i))) continue;
+        for(int j=0; j <4; ++j) {
+            const IdxT jj= nScalar.num[j];
+            if (jj==NoIdx || !(nScalar.WithUnknowns( j))) continue;
+            mM_P1( ii, jj) += locM_P1[i][j];
+            mNormalStab_P1( ii, jj) += locNormalStab_P1[i][j];
+            mTangentStab_P1( ii, jj) += locTangentStab_P1[i][j];
+            mVolumeStab_P1( ii, jj) += locVolumeStab_P1[i][j];
+            mL_P1P1( ii, jj) += locL_P1P1[i][j];
+            mLM_P1P1( ii, jj) += locLM_P1P1[i][j];
+            mGprimeprime_P1P1( ii, jj) += locGprimeprime_P1P1[j][i];
+
+        }
+    }
+}
+
+void SetupCahnHilliardIF_P1P1( const MultiGridCL& MG_,  MatDescCL* M_P1, MatDescCL* NormalStab_P1, MatDescCL* TangentStab_P1,MatDescCL* VolumeStab_P1, MatDescCL* L_P1P1 , MatDescCL* LM_P1P1,  MatDescCL* Gprimeprime_P1P1, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, const VecDescCL& velocity,  const BndDataCL<Point3DCL>& velocity_bnd, const VecDescCL& chi,const BndDataCL<>& chi_bnd)
+{
+  ScopeTimerCL scope("SetupCahnHilliardIF_P1P1");
+  CahnHilliardIFAccumulator_P1P1CL accu( lset, velocity, chi, lset_bnd, velocity_bnd, chi_bnd, *(M_P1->RowIdx), *(L_P1P1->RowIdx),  M_P1->Data, NormalStab_P1->Data, TangentStab_P1->Data, VolumeStab_P1->Data,  L_P1P1->Data,  LM_P1P1->Data,  Gprimeprime_P1P1->Data);
+  TetraAccumulatorTupleCL accus;
+  //    MaybeAddProgressBar(MG_, "LapBeltr(P2) Setup", accus, RowIdx.TriangLevel());
+  accus.push_back( &accu);
+  accumulate( accus, MG_, M_P1->GetRowLevel(), /*M_P1->RowIdx->GetMatchingFunction(),*/ M_P1->RowIdx->GetBndInfo());
+
+}
+
 } // end of namespace DROPS

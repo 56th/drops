@@ -8,18 +8,27 @@
                         
                 ]
         },
-        
-        "Domain":
-        {
 
+        "Mesh": {
             "Type": "BrickBuilder", 
             "Origin": [-1.66666,-1.66666,-1.66666],
-		"E1": [3.33333, 0,0],
-		"E2": [0,3.33333,0],		
-		"E3": [0,0,3.33333],		
-		"N1": 2,
-		"N2": 2,		
-		"N3": 2			
+            "E1": [3.33333, 0,0],		
+            "E2": [0,3.33333,0],		
+            "E3": [0,0,3.33333],		
+            "N1": 2,		
+            "N2": 2,		
+            "N3": 2,
+            "RestartFile": "",
+            "AdaptRef": {
+                "_comment":      "# adaptive refinement",
+                "Freq":          0,
+                "Width":         0,
+                "CoarsestLevel": 0,
+                "FinestLevel":   3,
+                "SD":            0.1,
+                "CurvDiff":      -1,
+                "Discontinuous": 0
+            }
         },
 	 
 	    "Stokes":
@@ -82,8 +91,8 @@
         {
             "Read" : 0,
             "Write": "yes",
-            "NumSteps":	640,
-            "StepSize": 0.00078125
+            "NumSteps":	80,
+            "StepSize": 0.00625
             },
         
      
@@ -130,7 +139,7 @@
     "# adaptive refinement",
 
             "Freq":		0,
-            "FinestLevel":    6,
+            "FinestLevel":    3,
             "Width":		0
         },
 
@@ -196,8 +205,8 @@
         
         "Output":
         {
-            "Directory":    "vtk",
-            "every timestep": "10"
+            "Directory":    "../../output",
+            "every timestep": "1"
         }
 
 }

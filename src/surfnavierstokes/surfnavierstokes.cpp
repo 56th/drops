@@ -1059,7 +1059,6 @@ int main (int argc, char* argv[]) {
         		//solve linear system
        			Solver->Solve(Adyn, Bhat, Chat, v.Data, p.Data, instantrhs.Data, rhs2.Data,v.RowIdx->GetEx(), p.RowIdx->GetEx() );
 
-
        			//std::cout <<  (3./(2.*tau)) * v.Data  - (2./tau) * v_old.Data + (1./(2.*tau)) * v_oldold.Data;
 
                 //rhs.Data    -= ( dot(rhs.Data,id)   / dot(id,id)   ) * id;
