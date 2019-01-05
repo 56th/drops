@@ -35,6 +35,8 @@
 #include "out/vtkOut.h"
 #include "num/fe_repair.h"
 #include "num/quadrature.h"
+#include "num/oseensolver.h"
+
 
 #ifndef DROPS_IFACETRANSP_H
 #define DROPS_IFACETRANSP_H
@@ -1213,77 +1215,252 @@ class InterfaceDebugP2CL : public TetraAccumulatorCL
     virtual InterfaceDebugP2CL* clone (int /*clone_id*/) { return new InterfaceDebugP2CL( *this); }
 };
 
+/// \brief P1-discretization and solution of an equation on the interface
+class SurfacePDEP1BaseCL
+        {
+    public:
+        typedef BndDataCL<Point3DCL>  VelBndDataT;
+        typedef NoBndDataCL<>         BndDataT;
+
+    protected:
+        MultiGridCL&  MG_;
+        //SolverBaseCL& solver_;
+
+        double  theta_, ///< time scheme parameter
+                dt_;    ///< time step size
+
+        BndDataT            Bnd_;    ///< Dummy boundary data for interface solution
+
+        const VelBndDataT&  Bnd_v_;  ///< Boundary condition for the velocity
+        VecDescCL*          v_;      ///< velocity at current time step
+        VecDescCL&          lset_vd_;///< levelset at current time step
+        const BndDataCL<>&  lsetbnd_;///< level set boundary
+
+        VecDescCL           oldls_;  ///< levelset at old time
+        VecDescCL           oldv_;   ///< velocity at old time
+        double              oldt_;   ///< old time
+
+    public:
+        SurfacePDEP1BaseCL(MultiGridCL& mg,
+                         double theta, VecDescCL* v, const VelBndDataT& Bnd_v, VecDescCL& lset_vd, const BndDataCL<>& lsetbnd,
+                         int iter= 1000, double tol= 1e-7, double omit_bound= -1.)
+                : MG_( mg), theta_( theta), dt_( 0.), Bnd_v_( Bnd_v), v_( v), lset_vd_( lset_vd), lsetbnd_( lsetbnd)
+        {}
+        virtual ~SurfacePDEP1BaseCL () {}
+
+        const MultiGridCL& GetMG() const { return MG_; }
+
+        //SolverBaseCL& GetSolver() { return solver_; }
+
+        /// set the parameter of the theta-scheme for time stepping
+        void SetTheta (double theta);
+
+        /// perform one time step to new_t.
+        virtual void DoStep (double /*new_t*/) {}
+    };
 
 /// \brief P1-discretization and solution of the transport equation on the interface
-class SurfactantP1BaseCL
-{
-  public:
-    typedef BndDataCL<Point3DCL>                              VelBndDataT;
-    typedef NoBndDataCL<>                                     BndDataT;
-    typedef P1EvalCL<double, const BndDataT, VecDescCL>       DiscSolCL;
-    typedef P1EvalCL<double, const BndDataT, const VecDescCL> const_DiscSolCL;
+    class SurfactantP1BaseCL: public SurfacePDEP1BaseCL
+    {
+    public:
+        typedef P1EvalCL<double, const BndDataT, VecDescCL>       DiscSolCL;
+        typedef P1EvalCL<double, const BndDataT, const VecDescCL> const_DiscSolCL;
 
-    IdxDescCL idx; ///< index desctription for concentration at current time
-    VecDescCL ic;  ///< concentration on the interface at current time
+        IdxDescCL idx; ///< index desctription for concentration at current time
+        VecDescCL ic;  ///< concentration on the interface at current time
 
-  protected:
-    MultiGridCL&  MG_;
-    double        D_,     ///< diffusion coefficient
-                  theta_, ///< time scheme parameter
-                  dt_;    ///< time step size
-    instat_scalar_fun_ptr rhs_fun_; ///< function for a right-hand side
+    protected:
+        double        D_;     ///< diffusion coefficient
 
-    BndDataT            Bnd_;    ///< Dummy boundary data for interface solution
+        instat_scalar_fun_ptr rhs_fun_; ///< function for a right-hand side
 
-    const VelBndDataT&  Bnd_v_;  ///< Boundary condition for the velocity
-    VecDescCL*          v_;      ///< velocity at current time step
-    VecDescCL&          lset_vd_;///< levelset at current time step
-    const BndDataCL<>&  lsetbnd_;///< level set boundary
+        IdxDescCL           oldidx_; ///< idx that corresponds to old time (and oldls_)
+        VectorCL            oldic_;  ///< interface concentration at old time
 
-    IdxDescCL           oldidx_; ///< idx that corresponds to old time (and oldls_)
-    VectorCL            oldic_;  ///< interface concentration at old time
-    VecDescCL           oldls_;  ///< levelset at old time
-    VecDescCL           oldv_;   ///< velocity at old time
-    double              oldt_;   ///< old time
+        GSPcCL                  pc_;
+        GMResSolverCL<GSPcCL>   gm_;
 
-    GSPcCL                  pc_;
-    GMResSolverCL<GSPcCL>   gm_;
-    double omit_bound_; ///< not used atm
+//    //block solver`
+//    DiagBlockPcT block_pc_;
+//    GMResSolverCL<DiagBlockPcT> GMRes_;
+//    BlockMatrixSolverCL<GMResBlockT> block_gm_;
 
-  public:
-    SurfactantP1BaseCL (MultiGridCL& mg,
-        double theta, double D, VecDescCL* v, const VelBndDataT& Bnd_v, VecDescCL& lset_vd, const BndDataCL<>& lsetbnd,
-        int iter= 1000, double tol= 1e-7, double omit_bound= -1.)
-    : idx( P1IF_FE), MG_( mg), D_( D), theta_( theta), dt_( 0.), rhs_fun_( 0),
-        Bnd_v_( Bnd_v), v_( v), lset_vd_( lset_vd), lsetbnd_( lsetbnd), oldidx_( P1IF_FE), gm_( pc_, 100, iter, tol, true),
-        omit_bound_( omit_bound)
-    { idx.GetXidx().SetBound( omit_bound); }
-    virtual ~SurfactantP1BaseCL () {}
+        double omit_bound_; ///< not used atm
 
-    const MultiGridCL& GetMG() const { return MG_; }
-    GMResSolverCL<GSPcCL>& GetSolver() { return gm_; }
+    public:
+        SurfactantP1BaseCL (MultiGridCL& mg,
+                            double theta, double D, VecDescCL* v, const VelBndDataT& Bnd_v, VecDescCL& lset_vd, const BndDataCL<>& lsetbnd,
+                            int iter= 1000, double tol= 1e-7, double omit_bound= -1.)
+                : SurfacePDEP1BaseCL(mg, theta, v, Bnd_v, lset_vd, lsetbnd),
+                  idx( P1IF_FE), D_( D),  rhs_fun_( 0), oldidx_( P1IF_FE), gm_( pc_, 100, iter, tol, true), omit_bound_( omit_bound)
+        { idx.GetXidx().SetBound( omit_bound);}
 
-    const_DiscSolCL GetSolution() const
+        virtual ~SurfactantP1BaseCL () {}
+
+        GMResSolverCL<GSPcCL>& GetSolver() { return gm_; }
+
+        const_DiscSolCL GetSolution() const
         { return const_DiscSolCL( &ic, &Bnd_, &MG_); }
-    const_DiscSolCL GetSolution( const VecDescCL& Myic) const
+        const_DiscSolCL GetSolution( const VecDescCL& Myic) const
         { return const_DiscSolCL( &Myic, &Bnd_, &MG_); }
 
-    /// initialize the interface concentration
-    void SetInitialValue (instat_scalar_fun_ptr, double t= 0.);
+        /// initialize the interface concentration
+        void SetInitialValue (instat_scalar_fun_ptr, double t= 0.);
 
-    /// set the parameter of the theta-scheme for time stepping
-    void SetRhs (instat_scalar_fun_ptr);
+        /// set the parameter of the theta-scheme for time stepping
+        void SetRhs (instat_scalar_fun_ptr);
 
-    /// set the parameter of the theta-scheme for time stepping
-    void SetTheta (double theta);
+        /// save a copy of the old level-set and velocity; moves ic to oldic; must be called before DoStep.
+        virtual void InitTimeStep ();
 
-    /// save a copy of the old level-set and velocity; moves ic to oldic; must be called before DoStep.
-    virtual void InitTimeStep ();
+        /// perform one time step to new_t.
+        virtual void DoStep (double /*new_t*/) {}
+    };
 
-    /// perform one time step to new_t.
-    virtual void DoStep (double /*new_t*/) {}
-};
+/// \brief P1-discretization and solution of the CahnHilliard equation on the interface
+class CahnHilliardP1BaseCL: public SurfacePDEP1BaseCL
+    {
+    public:
+        typedef P1EvalCL<double, const BndDataT, VecDescCL>       DiscSolCL;
+        typedef P1EvalCL<double, const BndDataT, const VecDescCL> const_DiscSolCL;
 
+        typedef PCGSolverCL<SSORPcCL> PCGSolverT;
+        typedef BlockPreCL<SchurPreBaseCL, SchurPreBaseCL, DiagBlockPreCL>  DiagBlockPcT; //block preconditioner
+        typedef GMResSolverCL<DiagBlockPcT> GMResBlockT; //block GMRES solver
+
+        IdxDescCL idx_c; ///< index desctription for concentration at current time
+        VecDescCL ic;  ///< concentration on the interface at current time
+
+        IdxDescCL idx_mu; ///< index desctription for chemical potential at current time
+        VecDescCL imu;  ///< chemical potential on the interface at current time
+
+    protected:
+        double        sigma_;     ///< mobility coefficient
+        double        epsilon_;  ///< epsilon coefficient
+
+        instat_scalar_fun_ptr rhs_fun3_; ///< function for a right-hand side to concentration equation
+        instat_scalar_fun_ptr rhs_fun4_; ///< function for a right-hand side chemical potential equation
+
+
+    IdxDescCL           oldidx_c_; ///< idx_c that corresponds to old time (and oldls_)
+        VectorCL            oldic_;  ///< interface concentration at old time
+
+        IdxDescCL           oldidx_mu_; ///< idx_mu that corresponds to old time (and oldls_)
+        VectorCL            oldimu_;  ///< interface chemical potential at old time
+
+
+        //block solver
+        GSPcCL                  pc_;
+        GMResSolverCL<GSPcCL>   gm_;
+
+        SSORPcCL symmPcPc_;
+       // MatrixCL Precond3_, Precond4_;
+        PCGSolverT PCGSolver3_, PCGSolver4_;
+        //SurfaceLaplacePreCL<PCGSolverT> spc3_, spc4_;
+        DummyPreCL dummy_pc_;
+        DiagBlockPcT block_pc_;
+        GMResBlockT GMRes_;
+        BlockMatrixSolverCL<GMResBlockT> block_gm_;
+
+        double omit_bound_; ///< not used atm
+
+    public:
+        CahnHilliardP1BaseCL (MultiGridCL& mg,
+                              double theta, double sigma, double epsilon, VecDescCL* v, const VelBndDataT& Bnd_v, VecDescCL& lset_vd, const BndDataCL<>& lsetbnd,
+                              //MatrixCL Precond3 , MatrixCL Precond4,
+                              int iter= 1000, double tol= 1e-7, double iterA=500, double tolA=1e-3, double iterB=500, double tolB=1e-3, double omit_bound= -1.)
+                : SurfacePDEP1BaseCL(mg, theta, v, Bnd_v, lset_vd, lsetbnd), idx_c( P1IF_FE), idx_mu( P1IF_FE), omit_bound_( omit_bound),
+                sigma_( sigma), epsilon_( epsilon),  rhs_fun3_( 0), rhs_fun4_( 0), oldidx_c_( P1IF_FE), oldidx_mu_( P1IF_FE),
+                PCGSolver3_(symmPcPc_, iterA, tolA, true),
+                PCGSolver4_(symmPcPc_, iterB, tolB, true),
+                //spc3_( Precond3, PCGSolver3_), spc4_( Precond4, PCGSolver4_),
+                dummy_pc_(0,0),
+                block_pc_(dummy_pc_,dummy_pc_),
+                GMRes_(block_pc_, 100, iter, tol, true),
+                gm_(pc_, 100, iter, tol, true),
+                block_gm_(GMRes_)
+        {
+//
+//            PCGSolver3_ = PCGSolverT(symmPcPc_, iterA, tolA, true);
+//            PCGSolver4_ = PCGSolverT(symmPcPc_, iterB, tolB, true);
+//            //spc3_( Precond3, PCGSolver3_), spc4_( Precond4, PCGSolver4_),
+//            block_pc_= DiagBlockPcT(DummyPreCL(0,0),DummyPreCL(0,0));
+//            GMRes_ = GMResBlockT(block_pc_, 100, iter, tol, true);
+//            block_gm_ = BlockMatrixSolverCL<GMResBlockT>(GMRes_);
+            idx_c.GetXidx().SetBound( omit_bound);
+            idx_mu.GetXidx().SetBound( omit_bound);
+        }
+
+        virtual ~CahnHilliardP1BaseCL () {}
+
+        BlockMatrixSolverCL<GMResBlockT>& GetSolver() { return block_gm_; }
+
+        const_DiscSolCL GetConcentr() const
+        { return const_DiscSolCL( &ic, &Bnd_, &MG_); }
+        const_DiscSolCL GetConcentr( const VecDescCL& Myic) const
+        { return const_DiscSolCL( &Myic, &Bnd_, &MG_); }
+
+
+        const_DiscSolCL GetPotential() const
+        { return const_DiscSolCL( &imu, &Bnd_, &MG_); }
+        const_DiscSolCL GetPotential( const VecDescCL& Myimu) const
+        { return const_DiscSolCL( &Myimu, &Bnd_, &MG_); }
+
+        /// initialize the interface concentration
+        void SetInitialValue (instat_scalar_fun_ptr, double t= 0.);
+
+        /// set the parameter of the theta-scheme for time stepping
+        void SetRhs (instat_scalar_fun_ptr,instat_scalar_fun_ptr);
+
+        /// save a copy of the old level-set and velocity; moves ic to oldic; must be called before DoStep.
+        virtual void InitTimeStep ();
+
+        /// perform one time step to new_t.
+        virtual void DoStep (double /*new_t*/) {}
+    };
+
+class CahnHilliardcGP1CL : public CahnHilliardP1BaseCL
+    {
+    public:
+        MatDescCL A,  ///< diffusion matrix
+                M,  ///< mass matrix
+                C,  ///< convection matrix
+                Md, ///< mass matrix with interface-divergence of velocity
+                M2; ///< mass matrix: new trial- and test- functions on old interface
+
+    private:
+        MatrixCL      A_, B_, C_, D_; ///< blocks of the matrix
+
+
+    public:
+        CahnHilliardcGP1CL (MultiGridCL& mg, double theta, double sigma, double epsilon,
+                            VecDescCL* v, const VelBndDataT& Bnd_v, VecDescCL& lset_vd, const BndDataCL<>& lsetbnd,
+                            //MatrixCL Precond3 , MatrixCL Precond4,
+                            int iter= 1000, double tol= 1e-7, double iterA=500, double tolA=1e-3, double iterB=500, double tolB=1e-3,double omit_bound= -1.)
+                : CahnHilliardP1BaseCL( mg, theta, sigma, epsilon, v, Bnd_v, lset_vd, lsetbnd,
+                        //Precond3 , Precond4,
+                        iter, tol, iterA, tolA, iterB, tolB, omit_bound)
+        {}
+
+        /// save a copy of the old level-set and velocity; moves ic to oldic; must be called before DoStep.
+        // void InitTimeStep (); // as in the base
+
+        /// perform one time step
+        virtual void DoStep (double new_t);
+
+        /// \name For internal use only
+        /// The following member functions are added to enable an easier implementation
+        /// of the coupling navstokes-levelset. They should not be called by a common user.
+        /// Use DoStep() instead.
+        ///@{
+        VectorCL InitStep3 (double new_t);
+        VectorCL InitStep4 (double new_t);
+
+    void DoStep (const VectorCL&, const VectorCL&);
+        void CommitStep ();
+        void Update ();
+        ///@}
+    };
 
 /// \brief P1-discretization and solution of the transport equation on the interface
 class SurfactantcGP1CL : public SurfactantP1BaseCL

@@ -96,6 +96,8 @@ public:
     void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const ExchangeCL& vel_ex, const ExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
     void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const ExchangeCL& vel_ex, const ExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
 #endif
+        void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const DummyExchangeCL& p_ex) const { Apply<>( A, x, b, p_ex, p_ex); }
+
     void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
     void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
 
