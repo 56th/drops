@@ -50,6 +50,7 @@ class SchurPreBaseCL
   public:
     SchurPreBaseCL( double kA, double kM, std::ostream* output= 0) : kA_( kA), kM_( kM), output_(output) {}
     virtual ~SchurPreBaseCL() {}
+
     void SetWeights( double kA, double kM) { kA_ = kA; kM_ = kM; }
     double getka(){return kA_;}
     double getkm(){return kM_;}
@@ -74,11 +75,15 @@ class SchurPreBaseCL
     //@{
     bool NeedDiag() const { return false; }
     void SetDiag(const VectorCL&) {}        // just for consistency
-    template<typename Mat, typename ExT>
+    virtual void Reset(const MatrixCL){};
+
+        template<typename Mat, typename ExT>
     void SetDiag(const Mat&, const ExT&) {} // just for consistency
     bool RetAcc()   const { return true; }
     //@}
 };
+
+
 
 /// Dummy Schur complement preconditioner, acts like the identity matrix.
 class DummyPreCL : public SchurPreBaseCL
@@ -175,6 +180,13 @@ class SurfaceLaplacePreCL : public SchurPreBaseCL
   public:
     SurfaceLaplacePreCL(MatrixCL& S, SolverT& solver, double kA= 0., double kM= 0.)
         : SchurPreBaseCL( kA, kM), S_( S), solver_( solver) {}
+
+    /// \brief Change preconditioner matrix
+    virtual void Reset(const MatrixCL Snew)
+    {
+        S_=Snew;
+    }
+
 
     /// \brief Apply preconditioner
     template <typename Mat, typename Vec, typename ExT>

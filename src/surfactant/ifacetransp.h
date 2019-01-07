@@ -1327,6 +1327,7 @@ class CahnHilliardP1BaseCL: public SurfacePDEP1BaseCL
         typedef PCGSolverCL<SSORPcCL> PCGSolverT;
         typedef BlockPreCL<SchurPreBaseCL, SchurPreBaseCL, DiagBlockPreCL>  DiagBlockPcT; //block preconditioner
         typedef GMResSolverCL<DiagBlockPcT> GMResBlockT; //block GMRES solver
+        typedef BlockMatrixSolverCL<GMResBlockT> GMResBlockSolver;
 
         IdxDescCL idx_c; ///< index desctription for concentration at current time
         VecDescCL ic;  ///< concentration on the interface at current time
@@ -1350,17 +1351,17 @@ class CahnHilliardP1BaseCL: public SurfacePDEP1BaseCL
 
 
         //block solver
-        GSPcCL                  pc_;
-        GMResSolverCL<GSPcCL>   gm_;
+//        GSPcCL                  pc_;
+//        GMResSolverCL<GSPcCL>   gm_;
+        MatrixCL dummy_matrix_;
 
         SSORPcCL symmPcPc_;
-       // MatrixCL Precond3_, Precond4_;
         PCGSolverT PCGSolver3_, PCGSolver4_;
-        //SurfaceLaplacePreCL<PCGSolverT> spc3_, spc4_;
-        DummyPreCL dummy_pc_;
+        SurfaceLaplacePreCL<PCGSolverT> spc3_, spc4_;
+
         DiagBlockPcT block_pc_;
         GMResBlockT GMRes_;
-        BlockMatrixSolverCL<GMResBlockT> block_gm_;
+        GMResBlockSolver block_gm_;
 
         double omit_bound_; ///< not used atm
 
@@ -1373,20 +1374,12 @@ class CahnHilliardP1BaseCL: public SurfacePDEP1BaseCL
                 sigma_( sigma), epsilon_( epsilon),  rhs_fun3_( 0), rhs_fun4_( 0), oldidx_c_( P1IF_FE), oldidx_mu_( P1IF_FE),
                 PCGSolver3_(symmPcPc_, iterA, tolA, true),
                 PCGSolver4_(symmPcPc_, iterB, tolB, true),
-                //spc3_( Precond3, PCGSolver3_), spc4_( Precond4, PCGSolver4_),
-                dummy_pc_(0,0),
-                block_pc_(dummy_pc_,dummy_pc_),
+                spc3_( dummy_matrix_, PCGSolver3_), spc4_( dummy_matrix_, PCGSolver4_),
+                block_pc_(spc3_,spc4_),
                 GMRes_(block_pc_, 100, iter, tol, true),
-                gm_(pc_, 100, iter, tol, true),
+                //gm_(pc_, 100, iter, tol, true),
                 block_gm_(GMRes_)
         {
-//
-//            PCGSolver3_ = PCGSolverT(symmPcPc_, iterA, tolA, true);
-//            PCGSolver4_ = PCGSolverT(symmPcPc_, iterB, tolB, true);
-//            //spc3_( Precond3, PCGSolver3_), spc4_( Precond4, PCGSolver4_),
-//            block_pc_= DiagBlockPcT(DummyPreCL(0,0),DummyPreCL(0,0));
-//            GMRes_ = GMResBlockT(block_pc_, 100, iter, tol, true);
-//            block_gm_ = BlockMatrixSolverCL<GMResBlockT>(GMRes_);
             idx_c.GetXidx().SetBound( omit_bound);
             idx_mu.GetXidx().SetBound( omit_bound);
         }

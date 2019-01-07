@@ -2464,6 +2464,12 @@ void SurfactantP1BaseCL::InitTimeStep ()
         }
         accumulate( accus, MG_, cidx->TriangLevel(), cidx->GetBndInfo());
 
+
+
+        block_pc_.GetPC1().Reset(M.Data);
+        block_pc_.GetPC2().Reset(M.Data);
+
+
 //     WriteToFile( M.Data, "cGcGM.txt", "mass");
 //     WriteToFile( A.Data, "cGcGA.txt", "Laplace-Beltrami");
 //     WriteToFile( C.Data, "cGcGC.txt", "material derivative");
