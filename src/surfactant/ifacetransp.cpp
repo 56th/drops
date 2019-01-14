@@ -2436,39 +2436,39 @@ void SurfactantP1BaseCL::InitTimeStep ()
         // std::cout << "SurfactantcGP1CL::Update:\n";
 
         IdxDescCL* cidx= ic.RowIdx;
-        M.Data.clear();
-        M.SetIdx( cidx, cidx);
-        A.Data.clear();
-        A.SetIdx( cidx, cidx);
-        C.Data.clear();
-        C.SetIdx( cidx, cidx);
-        Md.Data.clear();
-        Md.SetIdx( cidx, cidx);
+        Mass.Data.clear();
+        Mass.SetIdx( cidx, cidx);
+        Laplace.Data.clear();
+        Laplace.SetIdx( cidx, cidx);
+        Conv.Data.clear();
+        Conv.SetIdx( cidx, cidx);
+        Massd.Data.clear();
+        Massd.SetIdx( cidx, cidx);
 
         TetraAccumulatorTupleCL accus;
         InterfaceCommonDataP1CL cdata( lset_vd_, lsetbnd_);
         accus.push_back( &cdata);
-        InterfaceMatrixAccuCL<LocalInterfaceMassP1CL, InterfaceCommonDataP1CL> mass_accu( &M, LocalInterfaceMassP1CL(), cdata, "mass");
+        InterfaceMatrixAccuCL<LocalInterfaceMassP1CL, InterfaceCommonDataP1CL> mass_accu( &Mass, LocalInterfaceMassP1CL(), cdata, "mass");
         accus.push_back( &mass_accu);
-        InterfaceMatrixAccuCL<LocalLaplaceBeltramiP1CL, InterfaceCommonDataP1CL> lb_accu( &A, LocalLaplaceBeltramiP1CL( sigma_), cdata, "Laplace-Beltrami");
+        InterfaceMatrixAccuCL<LocalLaplaceBeltramiP1CL, InterfaceCommonDataP1CL> lb_accu( &Laplace, LocalLaplaceBeltramiP1CL( 1.), cdata, "Laplace-Beltrami");
         accus.push_back( &lb_accu);
-        accus.push_back_acquire( make_wind_dependent_matrixP1_accu<LocalInterfaceConvectionP1CL>( &C,  cdata,  make_P2Eval( MG_, Bnd_v_, *v_), "convection"));
-        accus.push_back_acquire( make_wind_dependent_matrixP1_accu<LocalInterfaceMassDivP1CL>   ( &Md, cdata,  make_P2Eval( MG_, Bnd_v_, *v_), "massdiv"));
+        accus.push_back_acquire( make_wind_dependent_matrixP1_accu<LocalInterfaceConvectionP1CL>( &Conv,  cdata,  make_P2Eval( MG_, Bnd_v_, *v_), "convection"));
+        accus.push_back_acquire( make_wind_dependent_matrixP1_accu<LocalInterfaceMassDivP1CL>   ( &Massd, cdata,  make_P2Eval( MG_, Bnd_v_, *v_), "massdiv"));
 
         if (theta_ != 1.0) {
-            M2.Data.clear();
-            M2.SetIdx( cidx, cidx);
+            Mass2.Data.clear();
+            Mass2.SetIdx( cidx, cidx);
             InterfaceCommonDataP1CL* oldcdata= new InterfaceCommonDataP1CL( oldls_, lsetbnd_);
             accus.push_back_acquire( oldcdata);
-            accus.push_back_acquire( new InterfaceMatrixAccuCL<LocalInterfaceMassP1CL, InterfaceCommonDataP1CL>( &M2, LocalInterfaceMassP1CL(), *oldcdata, "old mass"));
+            accus.push_back_acquire( new InterfaceMatrixAccuCL<LocalInterfaceMassP1CL, InterfaceCommonDataP1CL>( &Mass2, LocalInterfaceMassP1CL(), *oldcdata, "old mass"));
         }
         accumulate( accus, MG_, cidx->TriangLevel(), cidx->GetBndInfo());
-
-
-
-        block_pc_.GetPC1().Reset(M.Data);
-        block_pc_.GetPC2().Reset(M.Data);
-
+        MatrixCL Precond3,Precond4;
+        double rho=0;
+        Precond3.LinComb(1.0, Mass.Data, sigma_*dt_, Laplace.Data);//, rho, Volume_stab.Data);
+        Precond4.LinComb(1.0    , Mass.Data,   epsilon_, Laplace.Data);//, rho, Volume_stab.Data);        }
+        block_pc_.GetPC1().Reset(Precond3);
+        block_pc_.GetPC2().Reset(Precond4);
 
 //     WriteToFile( M.Data, "cGcGM.txt", "mass");
 //     WriteToFile( A.Data, "cGcGA.txt", "Laplace-Beltrami");
@@ -2545,7 +2545,8 @@ void SurfactantP1BaseCL::InitTimeStep ()
         imu.SetIdx( &idx_mu);
 
 
-        VecDescCL vd_timeder( &idx_mu),    // right-hand sides from integrals over the old/new interface
+        VecDescCL well_potential( &idx_mu), //double-well potential
+                vd_timeder( &idx_mu),    // right-hand sides from integrals over the old/new interface
                 vd_oldtimeder( &idx_mu),
                 vd_load( &idx_mu),
                 vd_oldres( &idx_mu),
@@ -2564,10 +2565,10 @@ void SurfactantP1BaseCL::InitTimeStep ()
         if (rhs_fun4_)
             accus.push_back_acquire( new InterfaceVectorAccuCL<LocalVectorP1CL, InterfaceCommonDataP1CL>( &vd_load, LocalVectorP1CL( rhs_fun4_, new_t), cdata, "load"));
 
-        if (theta_ == 1.0) {
-            accumulate( accus, MG_, idx_mu.TriangLevel(), idx_mu.GetBndInfo());
-            return VectorCL( theta_*(vd_timeder.Data + dt_*vd_load.Data));
-        }
+//        if (theta_ == 1.0) {
+//            accumulate( accus, MG_, idx_mu.TriangLevel(), idx_mu.GetBndInfo());
+//            return VectorCL( theta_*(vd_timeder.Data + dt_*vd_load.Data));
+//        }
 
         InterfaceCommonDataP1CL oldcdata( oldls_, lsetbnd_);
         accus.push_back( &oldcdata);
@@ -2575,43 +2576,52 @@ void SurfactantP1BaseCL::InitTimeStep ()
         if (rhs_fun4_)
             accus.push_back_acquire( new InterfaceVectorAccuCL<LocalVectorP1CL, InterfaceCommonDataP1CL>( &vd_oldload, LocalVectorP1CL( rhs_fun4_, oldt_), oldcdata, "load on old iface"));
 
-        InterfaceVectorAccuCL<LocalMatVecP1CL<LocalInterfaceMassP1CL>, InterfaceCommonDataP1CL> old_mass_accu( &vd_oldtimeder,
-                                                                                                               LocalMatVecP1CL<LocalInterfaceMassP1CL>( LocalInterfaceMassP1CL(), &vd_oldimu), oldcdata, "mixed-mass on old iface");
-        accus.push_back( &old_mass_accu);
-        InterfaceVectorAccuCL<LocalMatVecP1CL<LocalLaplaceBeltramiP1CL>, InterfaceCommonDataP1CL> old_lb_accu( &vd_oldres,
-                                                                                                               LocalMatVecP1CL<LocalLaplaceBeltramiP1CL>( LocalLaplaceBeltramiP1CL( sigma_), &vd_oldimu), oldcdata, "Laplace-Beltrami on old iface");
-        accus.push_back( &old_lb_accu);
-        accus.push_back_acquire( make_wind_dependent_vectorP1_accu<LocalInterfaceConvectionP1CL>( &vd_oldres, &vd_oldimu,  oldcdata,  make_P2Eval( MG_, Bnd_v_, oldv_), "convection on old iface"));
-        accus.push_back_acquire( make_wind_dependent_vectorP1_accu<LocalInterfaceMassDivP1CL>   ( &vd_oldres, &vd_oldimu,  oldcdata,  make_P2Eval( MG_, Bnd_v_, oldv_), "mass-div on old iface"));
+//        InterfaceVectorAccuCL<LocalMatVecP1CL<LocalInterfaceMassP1CL>, InterfaceCommonDataP1CL> old_mass_accu( &vd_oldtimeder,
+//                                                                                                               LocalMatVecP1CL<LocalInterfaceMassP1CL>( LocalInterfaceMassP1CL(), &vd_oldimu), oldcdata, "mixed-mass on old iface");
+//        accus.push_back( &old_mass_accu);
+//        InterfaceVectorAccuCL<LocalMatVecP1CL<LocalLaplaceBeltramiP1CL>, InterfaceCommonDataP1CL> old_lb_accu( &vd_oldres,
+//                                                                                                               LocalMatVecP1CL<LocalLaplaceBeltramiP1CL>( LocalLaplaceBeltramiP1CL( sigma_), &vd_oldimu), oldcdata, "Laplace-Beltrami on old iface");
+//        accus.push_back( &old_lb_accu);
+//        accus.push_back_acquire( make_wind_dependent_vectorP1_accu<LocalInterfaceConvectionP1CL>( &vd_oldres, &vd_oldimu,  oldcdata,  make_P2Eval( MG_, Bnd_v_, oldv_), "convection on old iface"));
+//        accus.push_back_acquire( make_wind_dependent_vectorP1_accu<LocalInterfaceMassDivP1CL>   ( &vd_oldres, &vd_oldimu,  oldcdata,  make_P2Eval( MG_, Bnd_v_, oldv_), "mass-div on old iface"));
+//
+//        accumulate( accus, MG_, idx_mu.TriangLevel(), idx_mu.GetBndInfo());
 
-        accumulate( accus, MG_, idx_mu.TriangLevel(), idx_mu.GetBndInfo());
-        return VectorCL( theta_*vd_timeder.Data + (1. - theta_)*vd_oldtimeder.Data
-                         + dt_*(theta_*vd_load.Data + (1. - theta_)*(vd_oldload.Data - vd_oldres.Data)));
+        for (int i=0; i<well_potential.Data.size();i++)
+        {
+            well_potential.Data[i]=Potential_prime_function(ic.Data[i]);//BDF1
+        }
+
+        return VectorCL(-1.*(Mass.Data*well_potential.Data));
     }
 
 
     void CahnHilliardcGP1CL::DoStep(const VectorCL &rhs3, const VectorCL &rhs4) {
         Update();
-        B_.LinComb(0.0, M.Data,0.0, M.Data);
-        C_.LinComb(0.0, M.Data,0.0, M.Data);
 
+//      B_.LinComb(0.0, Mass.Data,0.0, Mass.Data);
+//      C_.LinComb(0.0, Mass.Data,0.0, Mass.Data);
 
-        if (theta_ == 1.)
-            A_.LinComb(theta_, M.Data, dt_ * theta_, A.Data, dt_ * theta_, Md.Data, dt_ * theta_, C.Data);
-        else {
-            MatrixCL m;
-            m.LinComb(theta_, M.Data, dt_ * theta_, A.Data, dt_ * theta_, Md.Data, dt_ * theta_, C.Data);
-            A_.LinComb(1., m, 1. - theta_, M2.Data);
-        }
-        D_.LinComb(1.0, A_, 0.0, M.Data);
+        double c=1.0;//BDF1
+        double S=0.;//no nonlinearity stabilization
+        double alpha=0;//no  volume stabilization
+
+        A_.LinComb(sigma_*dt_, Laplace.Data, 0., Mass.Data);//, alpha, Volume_stab.Data);
+        B_.LinComb(c, Mass.Data, dt_ , Massd.Data, dt_, Conv.Data);
+
+        C_.LinComb(0.,   Laplace.Data, -1.0*epsilon_, Mass.Data);
+        D_.LinComb(epsilon_*epsilon_,  Laplace.Data,
+                //   -1., Gprimeprime.Data,
+                  S, Mass.Data);//,alpha*epsilon_*epsilon_, Volume_stab.Data);
+
+        //A_.LinComb(theta_, Mass.Data, dt_ * theta_, Laplace.Data, dt_ * theta_, Massd.Data, dt_ * theta_, Conv.Data);
+        //D_.LinComb(1.0, A_, 0.0, Mass.Data);
         std::cout << "Before solve: res = " << norm(A_ * ic.Data - rhs3) << std::endl;
         {
             ScopeTimerCL timer("CahnHilliardP1BaseCL::DoStep: Solve");
             block_gm_.Solve(A_, B_, C_, D_, ic.Data, imu.Data, rhs3, rhs4, ic.RowIdx->GetEx(),imu.RowIdx->GetEx());
             //gm_.Solve( A_, ic.Data, rhs3, ic.RowIdx->GetEx());
             //gm_.Solve( A_, imu.Data, rhs4, imu.RowIdx->GetEx());
-
-
         }
         std::cout << "CahnHilliardP1BaseCL::DoStep: res = " << block_gm_.GetResid() << ", iter = " << block_gm_.GetIter() << std::endl;
     }
@@ -3497,8 +3507,8 @@ double Potential_function(const double x)
 
 double Potential_prime_function(const double x)
 {
-    //return(-x);
-    return((x-1.)*(x)*(x-0.5));
+    return(0);
+    //return((x-1.)*(x)*(x-0.5));
     //return(-(0.)*(3./2.)*x*x + (1.)*x/2. + (0.)*x*x*x);
 }
 

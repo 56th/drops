@@ -119,7 +119,7 @@ static RegisterScalarFunction regsca_torus_lset( "Torus", torus);
 
 double constant_sol (const Point3DCL& , double )
 {
-    return (7.0);
+    return (0.7);
 }
 static RegisterScalarFunction regsca_constant_sol( "ConstantSolution", constant_sol);
 

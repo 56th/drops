@@ -812,6 +812,9 @@ class LocalLaplaceBeltramiP1CL
         :D_( D) {}
 };
 
+
+
+
 /// \brief The routine sets up the convection-matrix in mat on the interface defined by ls.
 ///        It belongs to the FE induced by standard P1-elements.
 ///
@@ -1129,6 +1132,8 @@ class LocalNormalLaplaceDeformP2CL
         :D_( D) {}
 };
 
+
+
 /// \brief The routine sets up the load-vector in v on the interface defined by ls.
 ///        It belongs to the FE induced by standard P1-elements.
 void SetupInterfaceRhsP1 (const MultiGridCL& mg, VecDescCL* v,
@@ -1415,11 +1420,17 @@ class CahnHilliardP1BaseCL: public SurfacePDEP1BaseCL
 class CahnHilliardcGP1CL : public CahnHilliardP1BaseCL
     {
     public:
-        MatDescCL A,  ///< diffusion matrix
-                M,  ///< mass matrix
-                C,  ///< convection matrix
-                Md, ///< mass matrix with interface-divergence of velocity
-                M2; ///< mass matrix: new trial- and test- functions on old interface
+        MatDescCL Laplace,  ///< diffusion matrix div_Gamma( grad_Gamma)
+                  LaplaceM,  ///< diffusion matrix with mobility div_Gamma(M grad_Gamma)
+
+                Volume_stab, ///< stabilization matrix
+
+
+    Mass,  ///< mass matrix
+                Conv,  ///< convection matrix
+                Massd, ///< mass matrix with interface-divergence of velocity
+                Mass2; ///< mass matrix: new trial- and test- functions on old interface
+
 
     private:
         MatrixCL      A_, B_, C_, D_; ///< blocks of the matrix
