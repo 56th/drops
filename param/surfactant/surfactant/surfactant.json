@@ -14,16 +14,16 @@
         "E1":          [ 4,  0,  0],
         "E2":          [ 0,  4,  0],
         "E3":          [ 0,  0,  4],
-        "N1":          16,
-        "N2":          16,
-        "N3":          16,
+        "N1":          2,
+        "N2":          2,
+        "N3":          2,
         "RestartFile": "",
 
         "AdaptRef": {
             "Freq":          0,
             "Width":         10,
             "CoarsestLevel": 0,
-            "FinestLevel":   2,
+            "FinestLevel":   3,
             "SD":            0.1,
             "CurvDiff":      -1,
             "Discontinuous": 0

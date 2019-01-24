@@ -52,6 +52,7 @@ DROPS::InVecMap& invecmap= DROPS::InVecMap::getInstance();
 DROPS::InScaMap& inscamap= DROPS::InScaMap::getInstance();
 
 instat_vector_fun_ptr the_wind_fun;
+instat_vector_fun_ptr the_normal_fun;
 instat_scalar_fun_ptr the_lset_fun;
 instat_scalar_fun_ptr the_rhs_fun;
 instat_scalar_fun_ptr the_conc_sol_fun;
@@ -103,6 +104,7 @@ double ellipsoid (const DROPS::Point3DCL& p, double)
     return x.norm_sq() - 1.;
 }
 static RegisterScalarFunction regsca_ellipsoid_lset( "Ellipsoid", ellipsoid);
+
 
 
 DROPS::Point2DCL RadTorus; // R= RadTorus[0], r= RadTorus[1]; R > r for tori with a hole.
@@ -416,6 +418,16 @@ double sphere_2move (const DROPS::Point3DCL& p, double t)
 
 static RegisterScalarFunction regsca_moving_sphere_lset( "MovingEllipsoid", sphere_2move);
 
+DROPS::Point3DCL normal_sphere_2move (const DROPS::Point3DCL& p, double t)
+{
+    DROPS::Point3DCL x= (p - PosDrop - t*constant_wind(p, t));//--constant wind
+    if(x.norm()>0.000001)
+        return x/x.norm();
+    else
+        return x;
+}
+static RegisterVectorFunction regvec_moving_sphere_normal( "NormalMovingEllipsoid", normal_sphere_2move);
+
 
 SMatrixCL<3,3> dp_sphere (const DROPS::Point3DCL& x, double)
 {
@@ -484,6 +496,34 @@ double sol0t (const DROPS::Point3DCL& p, double t)
 //    return q.norm_sq()/(12. + q.norm_sq())*val;
     return 1. + q.norm_sq()/(12. + q.norm_sq())*val;
 }
+
+// test on a unit sphere:  mobility=const, stationary omega=harmonic, chi=harmonic/2
+double Test1_chiSol (const DROPS::Point3DCL& pp, double t)
+{
+    DROPS::Point3DCL p(pp  - t*constant_wind(pp,t));
+    return ((1./2.)*(sqrt(0.3e1) * pow(0.3141592654e1, -0.1e1 / 0.2e1) * p[2] * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), -0.1e1 / 0.2e1) / 0.2e1));
+
+}
+static RegisterScalarFunction regsca_spherical_harmonic( "1/2*First spherical harmonic", Test1_chiSol);
+
+double Test1_omegaSol (const DROPS::Point3DCL& pp, double t)
+{
+    DROPS::Point3DCL p(pp  - t*constant_wind(pp,t));
+
+    return ((1.)*(sqrt(0.3e1) * pow(0.3141592654e1, -0.1e1 / 0.2e1) * p[2] * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), -0.1e1 / 0.2e1) / 0.2e1));
+
+}
+static RegisterScalarFunction regsca_half_spherical_harmonic( "First spherical harmonic", Test1_omegaSol);
+
+double Test1_rhs3 (const DROPS::Point3DCL& pp, double t)
+{
+    DROPS::Point3DCL p(pp  - t*constant_wind(pp,t));
+
+    if (p.norm()<0.01) return (0);
+    return ((2.)*(sqrt(0.3e1) * pow(0.3141592654e1, -0.1e1 / 0.2e1) * p[2] * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), -0.1e1 / 0.2e1) / 0.2e1));
+
+}
+static RegisterScalarFunction regsca_rhs1_harmonic( "First spherical harmonic rhs", Test1_rhs3);
 
 // ==stationary test case "LaplaceBeltrami1"==
 // Torus with R= RadTorus[0]= 1., r= RadTorus[1]= 0.6, wind == 0
@@ -632,7 +672,7 @@ void InitVel ( const MultiGridCL& mg, VecDescCL* vec, BndDataCL<Point3DCL>& Bnd,
 
 CahnHilliardP1BaseCL* make_cahnhilliard_timedisc( MultiGridCL& mg, LevelsetP2CL& lset,
                                               VecDescCL& v, const BndDataCL<Point3DCL>& Bnd_v,
-                                              const ParamCL& P)
+                                              const ParamCL& P, const double & dist=0)
 {
     CahnHilliardP1BaseCL* ret= 0;
     const std::string method= P.get<std::string>( "SurfSeparation.Method");
@@ -642,13 +682,15 @@ CahnHilliardP1BaseCL* make_cahnhilliard_timedisc( MultiGridCL& mg, LevelsetP2CL&
 
     if (method == std::string( "cGcG"))
         ret= new CahnHilliardcGP1CL( mg,
-            P.get<double>("SurfSeparation.Theta"), P.get<double>("SurfSeparation.Mobility"), P.get<double>("SurfSeparation.Epsilon"),
-            &v, Bnd_v, lset.Phi, lset.GetBndData(),
-            //Ident, Ident,
+            P.get<double>("SurfSeparation.Theta"), P.get<double>("SurfSeparation.Mobility"),
+                    P.get<double>("SurfSeparation.Epsilon"),
+            &v, Bnd_v, lset.Phi, lset.GetBndData(), the_normal_fun, dist,
+            P.get<DROPS::Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")*std::pow(2., -P.get<double>("Mesh.AdaptRef.FinestLevel")),
             P.get<int>("SurfSeparation.Solver.Iter"), P.get<double>("SurfSeparation.Solver.Tol"),
             P.get<int>("SurfSeparation.Solver.PcAIter"), P.get<double>("SurfSeparation.Solver.PcATol"),
             P.get<int>("SurfSeparation.Solver.PcBIter"), P.get<double>("SurfSeparation.Solver.PcBTol"),
             P.get<double>("SurfSeparation.XFEMReduced"));
+
     else
         throw DROPSErrCL( std::string( "make_cahnhilliard_timedisc: Unknown method '") + method + std::string( "'.\n"));
 
@@ -683,15 +725,21 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     InitVel( mg, &v, Bnd_v, the_wind_fun, 0.);
 
     //lset2.SetupSystem( make_P2Eval( mg, Bnd_v, v), P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps"));
+    double dist=1.0*P.get<DROPS::Point3DCL>("SurfSeparation.Exp.Velocity").norm()*P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps")
+                +P.get<DROPS::Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")/pow(2,P.get<int>("Mesh.AdaptRef.FinestLevel")+1);
 
-    std::unique_ptr<CahnHilliardP1BaseCL> timediscp( make_cahnhilliard_timedisc( mg, lset, v, Bnd_v, P));
+    std::unique_ptr<CahnHilliardP1BaseCL> timediscp( make_cahnhilliard_timedisc( mg, lset, v, Bnd_v, P, dist));
     CahnHilliardP1BaseCL& timedisc= *timediscp;
     timedisc.SetRhs( the_rhs_fun, the_zero_fun);
 
     LevelsetRepairCL lsetrepair( lset);
     adap.push_back( &lsetrepair);
+
     InterfaceP1RepairCL ic_repair( mg, lset.Phi, lset.GetBndData(), timedisc.ic);
     adap.push_back( &ic_repair);
+
+    InterfaceP1RepairCL imu_repair( mg, lset.Phi, lset.GetBndData(), timedisc.imu);
+    adap.push_back( &imu_repair);
     //LevelsetRepairCL lset2repair( lset2);
     //adap.push_back( &lset2repair);
 
@@ -737,7 +785,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     std::cout << "H_1x-error: " << H_1x_err << std::endl;
     double L_2tH_1x_err_sq= 0.5*dt*std::pow( H_1x_err, 2);
     BndDataCL<> ifbnd( 0);
-    std::cout << "initial phase on \\Gamma: " << Integral_Gamma( mg, lset.Phi, lset.GetBndData(), make_P1Eval(  mg, ifbnd, timedisc.ic)) << '\n';
+    std::cout << "initial concentration on \\Gamma: " << Integral_Gamma( mg, lset.Phi, lset.GetBndData(), make_P1Eval(  mg, ifbnd, timedisc.ic)) << '\n';
 
     dynamic_cast<DistMarkingStrategyCL*>( adap.get_marking_strategy())->SetDistFct( lset);
     for (int step= 1; step <= P.get<int>("Time.NumSteps"); ++step) {
@@ -751,7 +799,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
         LSInit( mg, lset.Phi, the_lset_fun, cur_time);
         InitVel( mg, &v, Bnd_v, the_wind_fun, cur_time);
         timedisc.DoStep( cur_time);
-        std::cout << "phase on \\Gamma: " << Integral_Gamma( mg, lset.Phi, lset.GetBndData(), make_P1Eval(  mg, ifbnd, timedisc.ic)) << '\n';
+        std::cout << "concentration on \\Gamma: " << Integral_Gamma( mg, lset.Phi, lset.GetBndData(), make_P1Eval(  mg, ifbnd, timedisc.ic)) << '\n';
         L_2x_err= L2_error( lset.Phi, lset.GetBndData(), timedisc.GetConcentr(), the_conc_sol_fun);
         std::cout << "L_2x-error: " << L_2x_err
                   << "\nnorm of true solution: " << L2_norm( mg, lset.Phi, lset.GetBndData(), the_conc_sol_fun)
@@ -1588,7 +1636,7 @@ void StationaryStrategyDeformationP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangC
     InterfaceMatrixAccuCL<LocalLaplaceBeltramiDeformP2CL, InterfaceCommonDataDeformP2CL> accuAp2( &Ap2, LocalLaplaceBeltramiDeformP2CL( P.get<double>("SurfSeparation.Visc")), cdatap2, "Ap2");
     accus.push_back( &accuAp2);
     DROPS::MatDescCL Anp2( &ifacep2idx, &ifacep2idx);
-    InterfaceMatrixAccuCL<LocalNormalLaplaceDeformP2CL, InterfaceCommonDataDeformP2CL> accuAnp2( &Anp2, LocalNormalLaplaceDeformP2CL (P.get<double>("SurfSeparation.NormalLaplaceCoefficent")), cdatap2, "Anp2");
+    InterfaceMatrixAccuCL<LocalNormalLaplaceDeformP2CL, InterfaceCommonDataDeformP2CL> accuAnp2( &Anp2, LocalNormalLaplaceDeformP2CL (P.get<double>("SurfSeparation.NormalLaplaceCoefficient")), cdatap2, "Anp2");
     accus.push_back( &accuAnp2);
     DROPS::VecDescCL bp2( &ifacep2idx);
     InterfaceVectorAccuCL<LocalVectorDeformP2CL, InterfaceCommonDataDeformP2CL> acculoadp2( &bp2, LocalVectorDeformP2CL( the_rhs_fun, bp2.t), cdatap2);
@@ -1643,7 +1691,7 @@ void StationaryStrategyDeformationP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangC
     }
 }
 
-int main (int argc, char* argv[])
+int  main (int argc, char* argv[])
 {
   try {
     ScopeTimerCL timer( "main");
@@ -1659,6 +1707,7 @@ int main (int argc, char* argv[])
     PosDrop=      P.get<DROPS::Point3DCL>("SurfSeparation.Exp.PosDrop");
     RadTorus=     P.get<DROPS::Point2DCL>("SurfSeparation.Exp.RadTorus");
     the_wind_fun= invecmap[P.get<std::string>("SurfSeparation.Exp.Wind")];
+    the_normal_fun= invecmap[P.get<std::string>("SurfSeparation.Exp.Normal")];
     the_lset_fun= inscamap[P.get<std::string>("SurfSeparation.Exp.Levelset")];
     the_rhs_fun=  inscamap[P.get<std::string>("SurfSeparation.Exp.Rhs")];
     the_conc_sol_fun=  inscamap[P.get<std::string>("SurfSeparation.Exp.ConcentrationSolution")];

@@ -2440,10 +2440,14 @@ void SurfactantP1BaseCL::InitTimeStep ()
         Mass.SetIdx( cidx, cidx);
         Laplace.Data.clear();
         Laplace.SetIdx( cidx, cidx);
+        LaplaceM.Data.clear();
+        LaplaceM.SetIdx( cidx, cidx);
         Conv.Data.clear();
         Conv.SetIdx( cidx, cidx);
         Massd.Data.clear();
         Massd.SetIdx( cidx, cidx);
+        Volume_stab.Data.clear();
+        Volume_stab.SetIdx( cidx, cidx);
 
         TetraAccumulatorTupleCL accus;
         InterfaceCommonDataP1CL cdata( lset_vd_, lsetbnd_);
@@ -2455,6 +2459,9 @@ void SurfactantP1BaseCL::InitTimeStep ()
         accus.push_back_acquire( make_wind_dependent_matrixP1_accu<LocalInterfaceConvectionP1CL>( &Conv,  cdata,  make_P2Eval( MG_, Bnd_v_, *v_), "convection"));
         accus.push_back_acquire( make_wind_dependent_matrixP1_accu<LocalInterfaceMassDivP1CL>   ( &Massd, cdata,  make_P2Eval( MG_, Bnd_v_, *v_), "massdiv"));
 
+        InterfaceMatrixAccuCL<LocalNormalLaplaceBulkP1CL, InterfaceCommonDataP1CL> normalstab_accu( &Volume_stab, LocalNormalLaplaceBulkP1CL( 1., dt_, normal_, ic.t), cdata, "Normal_stab");
+        accus.push_back( &normalstab_accu);
+
         if (theta_ != 1.0) {
             Mass2.Data.clear();
             Mass2.SetIdx( cidx, cidx);
@@ -2464,9 +2471,8 @@ void SurfactantP1BaseCL::InitTimeStep ()
         }
         accumulate( accus, MG_, cidx->TriangLevel(), cidx->GetBndInfo());
         MatrixCL Precond3,Precond4;
-        double rho=0;
-        Precond3.LinComb(1.0, Mass.Data, sigma_*dt_, Laplace.Data);//, rho, Volume_stab.Data);
-        Precond4.LinComb(1.0    , Mass.Data,   epsilon_, Laplace.Data);//, rho, Volume_stab.Data);        }
+        Precond3.LinComb(1.0, Mass.Data, sigma_*dt_, Laplace.Data, 1*dt_*rho_, Volume_stab.Data);
+        Precond4.LinComb(1.0, Mass.Data,   epsilon_*epsilon_, Laplace.Data, 1*epsilon_*epsilon_*rho_, Volume_stab.Data);
         block_pc_.GetPC1().Reset(Precond3);
         block_pc_.GetPC2().Reset(Precond4);
 
@@ -2545,22 +2551,22 @@ void SurfactantP1BaseCL::InitTimeStep ()
         imu.SetIdx( &idx_mu);
 
 
-        VecDescCL well_potential( &idx_mu), //double-well potential
-                vd_timeder( &idx_mu),    // right-hand sides from integrals over the old/new interface
-                vd_oldtimeder( &idx_mu),
-                vd_load( &idx_mu),
-                vd_oldres( &idx_mu),
+        VecDescCL well_potential( &idx_mu),//double-well potential
                 vd_oldload( &idx_mu),
+                vd_load( &idx_mu);
+              /*  vd_timeder( &idx_mu),    // right-hand sides from integrals over the old/new interface
+                vd_oldtimeder( &idx_mu),
+                vd_oldres( &idx_mu),
                 vd_oldimu( &oldidx_mu_);  // the initial data.
         vd_oldimu.Data= oldimu_;
-        vd_oldimu.t= oldt_;
+        vd_oldimu.t= oldt_;*/
 
         TetraAccumulatorTupleCL accus;
         InterfaceCommonDataP1CL cdata( lset_vd_, lsetbnd_);
         accus.push_back( &cdata);
-        InterfaceVectorAccuCL<LocalMatVecP1CL<LocalInterfaceMassP1CL>, InterfaceCommonDataP1CL> mass_accu( &vd_timeder,
+       /* InterfaceVectorAccuCL<LocalMatVecP1CL<LocalInterfaceMassP1CL>, InterfaceCommonDataP1CL> mass_accu( &vd_timeder,
                                                                                                            LocalMatVecP1CL<LocalInterfaceMassP1CL>( LocalInterfaceMassP1CL(), &vd_oldimu), cdata, "mixed-mass");
-        accus.push_back( &mass_accu);
+        accus.push_back( &mass_accu);*/
 
         if (rhs_fun4_)
             accus.push_back_acquire( new InterfaceVectorAccuCL<LocalVectorP1CL, InterfaceCommonDataP1CL>( &vd_load, LocalVectorP1CL( rhs_fun4_, new_t), cdata, "load"));
@@ -2592,7 +2598,8 @@ void SurfactantP1BaseCL::InitTimeStep ()
             well_potential.Data[i]=Potential_prime_function(ic.Data[i]);//BDF1
         }
 
-        return VectorCL(-1.*(Mass.Data*well_potential.Data));
+        //return VectorCL(-1.*(Mass.Data*well_potential.Data));
+        return VectorCL(theta_*vd_load.Data+(1-theta_)*vd_oldload.Data);
     }
 
 
@@ -2603,23 +2610,23 @@ void SurfactantP1BaseCL::InitTimeStep ()
 //      C_.LinComb(0.0, Mass.Data,0.0, Mass.Data);
 
         double c=1.0;//BDF1
-        double S=0.;//no nonlinearity stabilization
-        double alpha=0;//no  volume stabilization
+        double S=0.;//no  stabilization with time derivative
 
-        A_.LinComb(sigma_*dt_, Laplace.Data, 0., Mass.Data);//, alpha, Volume_stab.Data);
+        A_.LinComb(sigma_*dt_, Laplace.Data, 1*rho_*dt_, Volume_stab.Data);
         B_.LinComb(c, Mass.Data, dt_ , Massd.Data, dt_, Conv.Data);
 
-        C_.LinComb(0.,   Laplace.Data, -1.0*epsilon_, Mass.Data);
+        C_.LinComb(0.,   Laplace.Data, -1.0, Mass.Data);
         D_.LinComb(epsilon_*epsilon_,  Laplace.Data,
                 //   -1., Gprimeprime.Data,
-                  S, Mass.Data);//,alpha*epsilon_*epsilon_, Volume_stab.Data);
+                  S, Mass.Data,
+                  1*rho_*epsilon_*epsilon_, Volume_stab.Data);
 
         //A_.LinComb(theta_, Mass.Data, dt_ * theta_, Laplace.Data, dt_ * theta_, Massd.Data, dt_ * theta_, Conv.Data);
         //D_.LinComb(1.0, A_, 0.0, Mass.Data);
         std::cout << "Before solve: res = " << norm(A_ * ic.Data - rhs3) << std::endl;
         {
             ScopeTimerCL timer("CahnHilliardP1BaseCL::DoStep: Solve");
-            block_gm_.Solve(A_, B_, C_, D_, ic.Data, imu.Data, rhs3, rhs4, ic.RowIdx->GetEx(),imu.RowIdx->GetEx());
+            block_gm_.Solve(A_, B_, C_, D_, imu.Data, ic.Data, rhs3, rhs4, ic.RowIdx->GetEx(),imu.RowIdx->GetEx());
             //gm_.Solve( A_, ic.Data, rhs3, ic.RowIdx->GetEx());
             //gm_.Solve( A_, imu.Data, rhs4, imu.RowIdx->GetEx());
         }
@@ -3507,8 +3514,8 @@ double Potential_function(const double x)
 
 double Potential_prime_function(const double x)
 {
-    return(0);
-    //return((x-1.)*(x)*(x-0.5));
+    //return(0);
+    return((x-1.)*(x)*(x-0.5));
     //return(-(0.)*(3./2.)*x*x + (1.)*x/2. + (0.)*x*x*x);
 }
 

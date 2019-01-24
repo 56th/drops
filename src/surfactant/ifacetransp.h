@@ -812,7 +812,121 @@ class LocalLaplaceBeltramiP1CL
         :D_( D) {}
 };
 
+    class LocalLaplaceMobilityP1CL
+    {
+    private:
+        double D_; // diffusion coefficient=1
 
+        Point3DCL grad[4];
+        double dummy;
+        GridFunctionCL<Point3DCL> n,
+                q[4];
+        std::valarray<double> absdet;
+
+    public:
+        static const FiniteElementT row_fe_type= P1IF_FE,
+                col_fe_type= P1IF_FE;
+
+        double coup[4][4];
+
+        void setup (const TetraCL& t, const InterfaceCommonDataP1CL& cdata) {
+            n.resize( cdata.surf.facet_size());
+            absdet.resize( cdata.surf.facet_size());
+            if (cdata.surf.normal_empty())
+                cdata.surf.compute_normals( t);
+            std::copy( cdata.surf.normal_begin(), cdata.surf.normal_end(), sequence_begin( n));
+            std::copy( cdata.surf.absdet_begin(), cdata.surf.absdet_end(), sequence_begin( absdet));
+            P1DiscCL::GetGradients( grad, dummy, t);
+            for(int i= 0; i < 4; ++i) {
+                q[i].resize( cdata.surf.facet_size());
+                q[i]= grad[i] - dot( grad[i], n)*n;
+            }
+            for (int i= 0; i < 4; ++i) {
+                coup[i][i]= D_* /*area of reference triangle*/ 0.5*(dot(q[i], q[i])*absdet).sum();
+                for(int j= 0; j < i; ++j)
+                    coup[i][j]= coup[j][i]= D_* /*area of reference triangle*/ 0.5*(dot(q[i], q[j])*absdet).sum();
+            }
+        }
+
+        LocalLaplaceMobilityP1CL (double D)
+                :D_( D) {}
+    };
+
+/// \brief The routine sets up the Laplace-matrix in mat in bulk element in a narrow band near the interface defined by ls.
+///        It belongs to the FE induced by standard P1-elements.
+///        Notmal gradient is used for stabilization in solving surface diffusion equation
+/// D is the diffusion-coefficient
+
+    class LocalNormalLaplaceBulkP1CL
+    {
+    private:
+        double D_; // diffusion coefficient- stabilization parameter?
+        double dt_;
+        instat_vector_fun_ptr normal_;
+        double time_;
+
+        Point3DCL grad[4];
+        double dummy;
+        double absdet;
+        //GridFunctionCL<Point3DCL> q[4];
+        Quad5CL<double> U_Grad[4];
+        Quad5CL<Point3DCL> qnormal;
+
+    public:
+        static const FiniteElementT row_fe_type= P1IF_FE,
+                col_fe_type= P1IF_FE;
+        double coup[4][4];
+
+//        void setup (const TetraCL& tet, const NarrowBandCommonDataP1CL& cdata) {
+//
+//            P1DiscCL::GetGradients( grad, dummy, tet);
+//
+//            qnormal.assign(tet,normal_,time_,Quad5DataCL::Node);
+//
+//            for(int i=0; i<4; ++i)
+//                U_Grad[i]=dot( qnormal, Quad5CL<Point3DCL>( grad[i]));
+//
+//            absdet=std::abs(dummy);
+//
+//            dummy=std::pow(absdet,1./3); //of order h--meshsize of the tetra hedra~~!!!!
+//            //  std::cout<<"dummy  "<<dummy<<std::endl;
+//            for (int i= 0; i < 4; ++i) {
+//                for(int j= 0; j <= i; ++j)
+//                {
+//                    Quad5CL<double> res3( U_Grad[i] * U_Grad[j]);
+//                    coup[i][j]= coup[j][i]=D_*(1.0+1.0/(dummy+dt_))*res3.quad(absdet/6);//D_*(D_/dummy+dummy/dt_+0.2)*// D_*
+//                    //  	std::cout<<i<<" "<<j<<" : "<<coup[i][j]<<"  "<<coup[j][i]<<" ; ";
+//                }
+//                //   std::cout<<std::endl;
+//            }
+//            // std::cin>>dummy;
+//        }
+        void setup (const TetraCL& tet, const InterfaceCommonDataP1CL& cdata) {
+
+            P1DiscCL::GetGradients( grad, dummy, tet);
+
+            qnormal.assign(tet,normal_,time_,Quad5DataCL::Node);
+
+            for(int i=0; i<4; ++i)
+                U_Grad[i]=dot( qnormal, Quad5CL<Point3DCL>( grad[i]));
+
+            absdet=std::abs(dummy);
+
+            dummy=std::pow(absdet,1./3); //of order h--meshsize of the tetra hedra~~!!!!
+            //std::cout<<"dummy  "<<dummy<<std::endl;
+            for (int i= 0; i < 4; ++i) {
+                for(int j= 0; j <= i; ++j)
+                {
+                    Quad5CL<double> res3( U_Grad[i] * U_Grad[j]);
+                    coup[i][j]= coup[j][i]= D_*res3.quad(absdet/6);//dummy*
+                    // 	std::cout<<coup[i][j]<<std::endl;
+                }
+            }
+            // std::cin>>dummy;
+        }
+        LocalNormalLaplaceBulkP1CL (double D,double dt,instat_vector_fun_ptr normal, double t)
+                :D_( D),dt_(dt),normal_(normal),time_(t) {}
+    };
 
 
 /// \brief The routine sets up the convection-matrix in mat on the interface defined by ls.
@@ -1423,27 +1537,29 @@ class CahnHilliardcGP1CL : public CahnHilliardP1BaseCL
         MatDescCL Laplace,  ///< diffusion matrix div_Gamma( grad_Gamma)
                   LaplaceM,  ///< diffusion matrix with mobility div_Gamma(M grad_Gamma)
 
-                Volume_stab, ///< stabilization matrix
+                Volume_stab, ///< stabilization matrix, tetra integral over normal gradients
 
-
-    Mass,  ///< mass matrix
+                Mass,  ///< mass matrix
                 Conv,  ///< convection matrix
                 Massd, ///< mass matrix with interface-divergence of velocity
                 Mass2; ///< mass matrix: new trial- and test- functions on old interface
 
+    const double& width_;///< we extend only a band near the zero leve set with a width
+    const double rho_;///<stabilization parameter for Volume_stab
 
     private:
         MatrixCL      A_, B_, C_, D_; ///< blocks of the matrix
+        instat_vector_fun_ptr normal_; ///< the normal vector function
 
 
     public:
         CahnHilliardcGP1CL (MultiGridCL& mg, double theta, double sigma, double epsilon,
                             VecDescCL* v, const VelBndDataT& Bnd_v, VecDescCL& lset_vd, const BndDataCL<>& lsetbnd,
-                            //MatrixCL Precond3 , MatrixCL Precond4,
+                            instat_vector_fun_ptr normal,const double & width, const double rho,
                             int iter= 1000, double tol= 1e-7, double iterA=500, double tolA=1e-3, double iterB=500, double tolB=1e-3,double omit_bound= -1.)
                 : CahnHilliardP1BaseCL( mg, theta, sigma, epsilon, v, Bnd_v, lset_vd, lsetbnd,
-                        //Precond3 , Precond4,
-                        iter, tol, iterA, tolA, iterB, tolB, omit_bound)
+                        iter, tol, iterA, tolA, iterB, tolB, omit_bound),
+                  normal_(normal),width_(width), rho_(rho)
         {}
 
         /// save a copy of the old level-set and velocity; moves ic to oldic; must be called before DoStep.

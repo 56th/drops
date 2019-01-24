@@ -75,7 +75,6 @@ int main (int argc, char* argv[])
     if (ch)
         read_PeriodicBoundaries( mg, *ch);
 
-    DROPS::AdapTriangCL adap( mg );
 
     // choose level set
     instat_scalar_fun_ptr levelset_fun;
@@ -95,9 +94,11 @@ int main (int argc, char* argv[])
 
     // adaptive mesh refinement based on level set function
     typedef DROPS::DistMarkingStrategyCL InitMarkerT;
-    InitMarkerT initmarker( levelset_fun, P.get<double>("AdaptRef.Width"), 0, P.get<int>("AdaptRef.FinestLevel") );
-    adap.set_marking_strategy( &initmarker );
-    adap.MakeInitialTriang();
+    InitMarkerT initmarker( levelset_fun, P.get<double>("Mesh.AdaptRef.Width"), P.get<int>("Mesh.AdaptRef.CoarsestLevel"), P.get<int>("Mesh.AdaptRef.FinestLevel") );
+    //adap.set_marking_strategy( &initmarker );
+      DROPS::AdapTriangCL adap( mg, &initmarker );
+
+      adap.MakeInitialTriang();
     adap.set_marking_strategy( 0 );
 
     // create level set
@@ -128,7 +129,7 @@ int main (int argc, char* argv[])
 
     std::string model = P.get<std::string>("SurfCahnHilliard.model");
     std::string testcase = P.get<std::string>("SurfCahnHilliard.testcase");
-    double h = P.get<DROPS::Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")*std::pow(2., -P.get<double>("AdaptRef.FinestLevel"));
+    double h = P.get<DROPS::Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")*std::pow(2., -P.get<double>("Mesh.AdaptRef.FinestLevel"));
 
     double tau = P.get<double>("Time.StepSize");
     if (P.get<std::string>("SurfCahnHilliard.instationary") == "none") tau=1;
@@ -470,14 +471,14 @@ int main (int argc, char* argv[])
             //set up a txt file for error time output
             std::ofstream log_plot( dirname +"/"
                                      + "Plot_" + filename
-                                     + "l="  + P.get<std::string>("AdaptRef.FinestLevel") + "_"
+                                     + "l="  + P.get<std::string>("Mesh.AdaptRef.FinestLevel") + "_"
                                      + P.get<std::string>("SurfCahnHilliard.instationary") + "="
                                      + std::to_string(float(tau))
                                      + ".txt");
 
             log_global.open( dirname +"/"
                                      + "Global_" + filename
-                                     + "l="  + P.get<std::string>("AdaptRef.FinestLevel") + "_"
+                                     + "l="  + P.get<std::string>("Mesh.AdaptRef.FinestLevel") + "_"
                                      + P.get<std::string>("SurfCahnHilliard.instationary") + "="
                                      + std::to_string(float(tau)) +
                                      ".txt");
@@ -704,11 +705,11 @@ int main (int argc, char* argv[])
         {
             std::ofstream log_plot( dirname +"/"
                                     + "Plot_" + filename
-                                    + "l="  + P.get<std::string>("AdaptRef.FinestLevel")
+                                    + "l="  + P.get<std::string>("Mesh.AdaptRef.FinestLevel")
                                     + ".txt");
             log_global.open( dirname +"/"
                                       + "Global_" + filename
-                                      + "l="  + P.get<std::string>("AdaptRef.FinestLevel")
+                                      + "l="  + P.get<std::string>("Mesh.AdaptRef.FinestLevel")
                                       + ".txt");
             SetupInterfaceRhsP1(mg, &rhs3, lset.Phi, lset.GetBndData(), extrhs3, 0);
             SetupInterfaceRhsP1(mg, &rhs4, lset.Phi, lset.GetBndData(), extrhs4, 0);

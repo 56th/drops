@@ -108,10 +108,10 @@
             "4":	["NoBC"],
             "5":	["NoBC"]
         },
-        "Solver": {
-            "Tol":		     1e-10,
-            "Iter":		     500
-        }
+          "Solver": {
+              "Tol":		     1e-10,
+              "Iter":		     500
+          }
     },
 
     "Reparam":

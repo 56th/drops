@@ -75,7 +75,7 @@ class SchurPreBaseCL
     //@{
     bool NeedDiag() const { return false; }
     void SetDiag(const VectorCL&) {}        // just for consistency
-    virtual void Reset(const MatrixCL&){};
+    virtual void Reset(const MatrixCL){};
 
         template<typename Mat, typename ExT>
     void SetDiag(const Mat&, const ExT&) {} // just for consistency
@@ -182,7 +182,7 @@ class SurfaceLaplacePreCL : public SchurPreBaseCL
         : SchurPreBaseCL( kA, kM), S_( S), solver_( solver) {}
 
     /// \brief Change preconditioner matrix
-    virtual void Reset(const MatrixCL& Snew)
+    virtual void Reset(const MatrixCL Snew)
     {
         S_=Snew;
     }
