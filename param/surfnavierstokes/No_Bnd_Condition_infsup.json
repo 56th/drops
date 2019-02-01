@@ -23,7 +23,7 @@
             "Freq":          0,
             "Width":         0,
             "CoarsestLevel": 0,
-            "FinestLevel":   4,
+            "FinestLevel":   5,
             "SD":            0.1,
             "CurvDiff":      -1,
             "Discontinuous": 0
@@ -136,7 +136,7 @@
     "SurfNavStokes":
     {
                 "_comment": "# surface navier stokes",
-                "FE":           "P1P1", 
+                "FE":           "P2P1",
                 "fullgrad":     0,
                 "model":        "NavierStokes",
                 "testcase":      "0",
@@ -171,7 +171,7 @@
     
     "Output":
     {
-        "Directory":      "../../output",
+        "Directory":      "../../../MKL-Eigs-for-Sparse-Matrices/output",
         "every timestep": "1"
     }
 }

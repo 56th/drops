@@ -302,7 +302,7 @@ int main (int argc, char* argv[]) {
         Schur_normal_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
 
         SetupNavierStokesIF_P1P1(mg, &A, &A_stab, &B, &Omega, &N, &NT, &M, &D, &S, &L, &L_stab, &Schur, &Schur_stab, &Schur_normal_stab, lset.Phi, lset.GetBndData(), v, vbnd, fullgrad);
-        // SetupStokesIF_P1P1(mg, &A, &A_stab, &B, &M, &S, &L, &L_stab, &Schur, &Schur_stab, lset.Phi, lset.GetBndData(), fullgrad);
+        //    SetupStokesIF_P1P1(mg, &A, &A_stab, &B, &M, &S, &L, &L_stab, &Schur, &Schur_stab, lset.Phi, lset.GetBndData(), fullgrad);
 
         Schur_hat.LinComb(1., Schur.Data, rho, Schur_stab.Data);
 
@@ -400,6 +400,24 @@ int main (int argc, char* argv[]) {
     	Solver = stokessolver;
     }
 
+    // export matrices to test inf-sup constant for P1-P1 / P2-P1
+    if (P.get<std::string>("SurfNavStokes.instationary") == "infsup") {
+        std::cout << "test inf-sup constant\n";
+        MatrixCL A_final, B_final, C_full, C_n, M_final;
+        A_final.LinComb(1., A.Data, 1., M.Data, eta, S.Data, epsilon, A_stab.Data);
+        B_final.LinComb(1., B.Data, 0., B.Data);
+        C_full. LinComb(alpha, Schur_stab.Data, 0., Schur_stab.Data);
+        C_n.    LinComb(alpha, Schur_normal_stab.Data, 0., Schur_normal_stab.Data);
+        M_final.LinComb(1., Schur.Data, 0., Schur.Data);
+        std::string outDir = P.get<std::string>("Output.Directory") + '/' + P.get<std::string>("SurfNavStokes.FE") + "/blocks/h=" + std::to_string(float(h)) + "_";
+        std::cout << "exporting matrices to " + outDir + "*\n";
+        std::ofstream(outDir + "A.mtx") << A_final;
+        std::ofstream(outDir + "B.mtx") << B_final;
+        std::ofstream(outDir + "C_full.mtx") << C_full;
+        std::ofstream(outDir + "C_n.mtx") << C_n;
+        std::ofstream(outDir + "M.mtx") << M_final;
+        return 0;
+    }
 
     // set function pointers and rhs vectors for different test cases
     DROPS::instat_vector_fun_ptr extvsol, extsol_grad1, extsol_grad2, extsol_grad3, extvinit, extrhs;
@@ -826,17 +844,17 @@ int main (int argc, char* argv[]) {
        	std::cout << "dirname: " << dirname << std::endl;
 
        	//set up VTK output
-       	VTKOutCL * vtkwriter = NULL;
+       	VTKOutCL* vtkwriter = nullptr;
        	vtkwriter = new VTKOutCL(mg, "DROPS data", (int)P.get<double>("Time.NumSteps")/P.get<int>("Output.every timestep"), dirname , filename, "none", 0);
-        vtkwriter->Register( make_VTKScalar( lset.GetSolution(), "level-set") );
-        vtkwriter->Register( make_VTKIfaceVector(mg, vSol, "velSol", velFE, vbnd));
-        vtkwriter->Register( make_VTKIfaceVector(mg, rhs, "rhs", velFE, vbnd));
-        vtkwriter->Register( make_VTKIfaceVector(mg, v, "velocity", velFE, vbnd));
-        vtkwriter->Register( make_VTKIfaceScalar(mg, p, "pressure", /*prFE,*/ pbnd));
-        vtkwriter->Register( make_VTKIfaceScalar(mg, curl, "vorticity", /*prFE,*/ pbnd));
-        vtkwriter->Register( make_VTKIfaceScalar(mg, curlSol, "vortSol", /*prFE,*/ pbnd));
-        vtkwriter->Register( make_VTKIfaceScalar(mg, rhs2, "rhs2", /*prFE,*/ pbnd));
-        vtkwriter->Register(make_VTKIfaceScalar(mg, pSol, "pSol", /*prFE,*/ pbnd));
+       	vtkwriter->Register(make_VTKScalar(lset.GetSolution(), "level-set"));
+       	vtkwriter->Register(make_VTKIfaceVector(mg, vSol, "velSol", velFE, vbnd));
+       	vtkwriter->Register(make_VTKIfaceVector(mg, rhs, "rhs", velFE, vbnd));
+       	vtkwriter->Register(make_VTKIfaceVector(mg, v, "velocity", velFE, vbnd));
+       	vtkwriter->Register(make_VTKIfaceScalar(mg, p, "pressure", /*prFE,*/ pbnd));
+       	vtkwriter->Register(make_VTKIfaceScalar(mg, curl, "vorticity", /*prFE,*/ pbnd));
+       	vtkwriter->Register(make_VTKIfaceScalar(mg, curlSol, "vortSol", /*prFE,*/ pbnd));
+       	vtkwriter->Register(make_VTKIfaceScalar(mg, rhs2, "rhs2", /*prFE,*/ pbnd));
+       	vtkwriter->Register(make_VTKIfaceScalar(mg, pSol, "pSol", /*prFE,*/ pbnd));
 
         //set up a txt file for custom time output
         std::ofstream log_solo( dirname +"/"
@@ -956,34 +974,16 @@ int main (int argc, char* argv[]) {
         			//interpolated from previous timesteps, "wind"
         			v_aux.Data = 2.0*v.Data-v_old.Data;
         		}
-        		else if (P.get<std::string>("SurfNavStokes.instationary") == "infsup") {}
         		else
         		{
         			std::cout << "problem is instationary, pick BDF1 or BDF2" << std::endl;
         			return 0;
         		}
 
-        		//set up current matrices based in previous timestep velocity and levelset
-        		SetupNavierStokesIF_P1P1(mg, &A, &A_stab, &B, &Omega, &N, &NT, &M, &D, &S,  &L, &L_stab, &Schur, &Schur_stab, &Schur_normal_stab, lset.Phi, lset.GetBndData(), v_aux, vbnd, fullgrad);
+                //set up current matrices based in previous timestep velocity and levelset
+                SetupNavierStokesIF_P1P1(mg, &A, &A_stab, &B, &Omega, &N, &NT, &M, &D, &S,  &L, &L_stab, &Schur, &Schur_stab, &Schur_normal_stab, lset.Phi, lset.GetBndData(), v_aux, vbnd, fullgrad);
 
-        		// export matrices to test inf-sup constant for P1-P1 / P2-P1
-        		if (P.get<std::string>("SurfNavStokes.instationary") == "infsup") {
-        		    std::cout << "test inf-sup constant\n";
-                    MatrixCL A_final, B_final, C_full, C_n;
-                    A_final.LinComb(1., A.Data, 1., M.Data, eta, S.Data, epsilon, A_stab.Data);
-                    B_final.LinComb(1., B.Data, 0., B.Data);
-                    C_full. LinComb(alpha, Schur_stab.Data, 0., Schur_stab.Data);
-                    C_n.    LinComb(alpha, Schur_normal_stab.Data, 0., Schur_normal_stab.Data);
-                    std::string outDir = P.get<std::string>("Output.Directory") + "/infsup/" + P.get<std::string>("SurfNavStokes.FE") + "/h=" + std::to_string(float(h)) + "_";
-                    std::cout << "exporting matrices to " + outDir + "*\n";
-                    std::ofstream(outDir + "A.mtx") << A_final;
-                    std::ofstream(outDir + "B.mtx") << B_final;
-                    std::ofstream(outDir + "C_full.mtx") << C_full;
-                    std::ofstream(outDir + "C_n.mtx") << C_n;
-        		    return 0;
-        		}
-
-        		//construct final matrices for a linear solver
+                //construct final matrices for a linear solver
         		Ahat.LinComb(mu, A.Data, c/tau, M.Data, eta, S.Data, epsilon, A_stab.Data);
         		Bhat.LinComb(1., B.Data, 0., B.Data);
         		Chat.LinComb(0, Schur.Data, -alpha, Schur_stab.Data);
