@@ -413,9 +413,11 @@ int main (int argc, char* argv[]) {
         std::cout << "exporting matrices to " + outDir + "*\n";
         std::ofstream(outDir + "A.mtx") << A_final;
         std::ofstream(outDir + "B.mtx") << B_final;
-        std::ofstream(outDir + "C_full.mtx") << C_full;
-        std::ofstream(outDir + "C_n.mtx") << C_n;
         std::ofstream(outDir + "M.mtx") << M_final;
+        if (P.get<std::string>("SurfNavStokes.FE") == "P1P1") {
+            std::ofstream(outDir + "C_full.mtx") << C_full;
+            std::ofstream(outDir + "C_n.mtx") << C_n;
+        }
         return 0;
     }
 
