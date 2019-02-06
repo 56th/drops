@@ -321,7 +321,8 @@ template <typename Mat, typename Vec, typename PreCon, typename ExT>
 bool
 GMRES(const Mat& A, Vec& x, const Vec& b, const ExT& ex, PreCon& M,
       int /*restart parameter*/ m, int& max_iter, double& tol,
-      bool measure_relative_tol= true, bool calculate2norm= false, PreMethGMRES method = LeftPreconditioning)
+      bool measure_relative_tol= true, bool calculate2norm= false, PreMethGMRES method = RightPreconditioning,
+      std::ostream* output=0)
 {
     m= (m <= max_iter) ? m : max_iter; // m > max_iter only wastes memory.
 
@@ -350,8 +351,15 @@ GMRES(const Mat& A, Vec& x, const Vec& b, const ExT& ex, PreCon& M,
 
     resid = beta/normb;
     if (resid <= tol) {
+        std::cout << "norm of initial residual: " << beta <<std::endl;
+        std::cout << "resid: " << resid <<std::endl;
+        std::cout << "tol: " << tol <<std::endl;
+        std::cout << "max_iter: " << max_iter <<std::endl;
         tol= resid;
         max_iter= 0;
+        {
+            //std::cout << "          GMRES exits from the beginning, converged in: " << max_iter << " iterations with residual: " << resid << std::endl;
+        }
         return true;
     }
 
@@ -369,6 +377,7 @@ GMRES(const Mat& A, Vec& x, const Vec& b, const ExT& ex, PreCon& M,
                 w=A*w;
             }
             else M.Apply( A, w, A*v[i], ex);
+
             for (int k= 0; k <= i; ++k ) {
                 H( k, i)= dot( w, v[k]);
                 w-= H( k, i)*v[k];
@@ -400,6 +409,7 @@ GMRES(const Mat& A, Vec& x, const Vec& b, const ExT& ex, PreCon& M,
                           << "\tabsolute preconditioned residual 2-norm: "
                           << std::fabs( s[i+1]) << '\n';
             }
+
             if (resid <= tol) {
                 if (method == RightPreconditioning)
                 {
@@ -411,6 +421,9 @@ GMRES(const Mat& A, Vec& x, const Vec& b, const ExT& ex, PreCon& M,
                 else GMRES_Update( x, i, H, s, v);
                 tol= resid;
                 max_iter= j;
+                {
+                   // std::cout << "          GMRES exit from the middle, converged in " << max_iter << " iterations with residual: " << resid << std::endl;
+                }
                 return true;
             }
         }
@@ -433,10 +446,15 @@ GMRES(const Mat& A, Vec& x, const Vec& b, const ExT& ex, PreCon& M,
         if (resid <= tol) {
             tol= resid;
             max_iter= j;
+            {
+                //std::cout << "          GMRES exit from the end, converged in " << max_iter << " iterations with residual: " << resid << std::endl;
+            }
             return true;
         }
     }
     tol= resid;
+    std::cout << "GMRES DIDN'T converge after " << j << " iterations with residual: " << resid << std::endl;
+
     return false;
 }
 

@@ -2628,6 +2628,13 @@ double Test11_chiSol (const DROPS::Point3DCL& p, double t) {
     return ( (0.1e1 - a * exp(-t / T)) * (p[0] / (pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1)) * p[1] + 0.1e1) / 0.2e1);
 }
 
+double Test12_chiSol (const DROPS::Point3DCL& pp, double t)
+{
+    DROPS::Point3DCL p(pp );
+    return (1./2.+(1./2.)*(sqrt(0.3e1) * pow(0.3141592654e1, -0.1e1 / 0.2e1) * p[2] * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), -0.1e1 / 0.2e1) / 0.2e1));
+
+}
+
 double Test11_rhs3 (const DROPS::Point3DCL& p, double  t) {
     double a=0.8;
     double T=0.25;

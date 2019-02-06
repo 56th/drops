@@ -11,6 +11,7 @@ exec_ser(separation geom-boundary geom-builder geom-simplex geom-multigrid geom-
 if(NOT MPI)
 add_dependencies(surfactant misc-scalarFunctions misc-vectorFunctions)
 add_dependencies(surfphasesep misc-scalarFunctions misc-vectorFunctions levelset-twophaseCoeff)
+add_dependencies(separation misc-scalarFunctions misc-vectorFunctions levelset-twophaseCoeff)
 endif(NOT MPI)
 
 add_my_custom_targets(surfphasesep)

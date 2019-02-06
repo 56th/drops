@@ -93,8 +93,8 @@
   {
     "Read" : 0,
     "Write": "yes",
-    "NumSteps":	80,
-    "StepSize": 0.00625
+    "NumSteps":	1000,
+    "StepSize": 0.0025
   },
 
 
@@ -154,10 +154,10 @@
     "_comment": "# surface cahn-hilliard",
     "FE":           "P1P1",
     "model":        "CahnHilliard",
-    "testcase":      "6",
-    "instationary": "BDF2",
+    "testcase":      "12",
+    "instationary": "BDF1",
     "mobility": 1,
-    "epsilon": 0.1
+    "epsilon": 0.05
   },
 
   "SurfNavStokes":
@@ -201,7 +201,7 @@
 
   "Output":
   {
-    "Directory":    "../../output/",
+    "Directory":    "../../../drops_vladimir/output/vtk",
     "every timestep": "1"
   }
 

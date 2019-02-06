@@ -705,6 +705,11 @@ public:
                               double, const SparseMatBaseCL<T>&,
                               double, const SparseMatBaseCL<T>&,
                               double, const SparseMatBaseCL<T>&);
+    SparseMatBaseCL& LinComb (double, const SparseMatBaseCL<T>&,
+                              double, const SparseMatBaseCL<T>&,
+                              double, const SparseMatBaseCL<T>&,
+                              double, const SparseMatBaseCL<T>&,
+                              double, const SparseMatBaseCL<T>&);
 
     SparseMatBaseCL& concat_under (const SparseMatBaseCL<T>&, const SparseMatBaseCL<T>&);
 
@@ -1376,6 +1381,18 @@ SparseMatBaseCL<T>& SparseMatBaseCL<T>::LinComb (double coeffA, const SparseMatB
     SparseMatBaseCL<T> tmp;
     tmp.LinComb( coeffA, A, coeffB, B, coeffC, C);
     return this->LinComb( 1.0, tmp, coeffD, D);
+}
+
+template <typename T>
+SparseMatBaseCL<T>& SparseMatBaseCL<T>::LinComb (double coeffA, const SparseMatBaseCL<T>& A,
+                                                 double coeffB, const SparseMatBaseCL<T>& B,
+                                                 double coeffC, const SparseMatBaseCL<T>& C,
+                                                 double coeffD, const SparseMatBaseCL<T>& D,
+                                                 double coeffE, const SparseMatBaseCL<T>& E)
+{
+    SparseMatBaseCL<T> tmp;
+    tmp.LinComb( coeffA, A, coeffB, B, coeffC, C, coeffD, D);
+    return this->LinComb( 1.0, tmp, coeffE, E);
 }
 
 /// \brief Inserts v as column c. The old columns [c, num_cols()) are shifted to the right.

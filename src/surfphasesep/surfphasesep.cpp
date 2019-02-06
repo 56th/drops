@@ -380,6 +380,11 @@ int main (int argc, char* argv[])
             extrhs3 = &Test11_rhs3;
 
         }
+        if( !testcase.compare("12")) {
+            std::cout << "Test case 12: Cahn-Hilliard with  harmonic initial condition" << std::endl;
+            extchisol = &Test12_chiSol;
+        }
+
     } else if( !levelset_fun_str.compare("tamarind")) {
         if (!testcase.compare("9")) {
             std::cout << "Test case 9: Allen-Cahn with random initial condition " << std::endl;

@@ -10,13 +10,13 @@
 
     "Mesh": {
         "Type":        "BrickBuilder",
-        "Origin":      [-2, -2, -2],
-        "E1":          [ 4,  0,  0],
-        "E2":          [ 0,  4,  0],
-        "E3":          [ 0,  0,  4],
-        "N1":          16,
-        "N2":          16,
-        "N3":          16,
+        "Origin":      [-1.66666, -1.66666, -1.66666],
+        "E1":          [ 3.33333,  0,  0],
+        "E2":          [ 0,  3.33333,  0],
+        "E3":          [ 0,  0,  3.33333],
+        "N1":          1,
+        "N2":          1,
+        "N3":          1,
         "RestartFile": "",
 
         "AdaptRef": {
@@ -34,8 +34,8 @@
     {
         "Read" : 0,
         "Write": "yes",
-        "NumSteps":	80,
-        "FinalTime": 0.5
+        "NumSteps":	2,
+        "FinalTime": 5
     },
 
     "SurfSeparation": {
@@ -44,35 +44,35 @@
             "RadDrop":  [1, 0, 0],
             "PosDrop":  [0, 0, 0],
             "RadTorus": [1, 0.1],
-            "Velocity": [0.0, 0.0, 2.0],
+            "Velocity": [0.0, 0.0, 0.1],
 
             "StationaryPDE": false,
             "Wind":     "ConstantWind",
             "Levelset": "MovingEllipsoid",
             "Normal": "NormalMovingEllipsoid",
-            "Rhs":      "First spherical harmonic rhs",
-            "ConcentrationSolution": "1/2*First spherical harmonic",
-            "ChemicalPotentialSolution": "First spherical harmonic"
+            "Rhs":      "Rhs from Second spherical harmonic",
+            "ConcentrationSolution": "Second spherical harmonic",
+            "ChemicalPotentialSolution": "Omega from Second spherical harmonic"
 
         },
         "Method":     "cGcG", 
         "UseMassDiv": true, 
         "Theta":      1,
         "Solver": {
-          "PcAIter":      500,
+                "PcAIter":      500,
                 "PcATol":       1e-4,
                 "PcBIter":      500,
                 "PcBTol":       1e-4,
             "Iter": 1000,
-            "Tol":  1e-10
+            "Tol":  1e-9
         },
         "XFEMReduced":             -1,
         "Mobility":                    1,
-        "Epsilon":                   1,
+        "Epsilon":                   0.1,
         "FEDegree":                1,
         "NormalLaplaceCoefficient": 1.0,
         "SolutionOutput": { 
-            "Freq":   1,
+            "Freq":   0,
             "Path":   "../../output/solutions/iface_sol",
             "Binary": true
         }
@@ -101,8 +101,8 @@
     },
 
     "VTK": {
-        "Freq":           1,
-        "VTKDir":         "../../output/vtk",
+        "Freq":           100,
+        "VTKDir":         "../../output/",
         "VTKName":        "separation",
         "TimeFileName":   "separation",
         "Binary":         1,

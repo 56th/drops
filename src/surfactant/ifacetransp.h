@@ -556,10 +556,10 @@ class InterfaceMatrixAccuCL : public TetraAccumulatorCL
         const FiniteElementT mat_row_fe= mat_->RowIdx->GetFE(),
                              mat_col_fe= mat_->ColIdx->GetFE();
 
-        std::cout << "InterfaceMatrixAccuCL::begin_accumulation";
-        if (name_ != std::string())
+        //std::cout << "InterfaceMatrixAccuCL::begin_accumulation";
+        /*if (name_ != std::string())
             std::cout << " for \"" << name_ << "\"";
-        std::cout  << ": " << num_rows << " rows, " << num_cols << " cols.\n";
+        std::cout  << ": " << num_rows << " rows, " << num_cols << " cols.\n";*/
         if (mat_row_fe != LocalMatrixT::row_fe_type)
             std::cout << "Warning: LocalMatrixT and MatDescCL have different FE-type for rows.\n";
         if (mat_col_fe != LocalMatrixT::col_fe_type)
@@ -573,10 +573,10 @@ class InterfaceMatrixAccuCL : public TetraAccumulatorCL
         M->Build();
         delete M;
         M= 0;
-        std::cout << "InterfaceMatrixAccuCL::finalize_accumulation";
+       /* std::cout << "InterfaceMatrixAccuCL::finalize_accumulation";
         if (name_ != std::string())
             std::cout << " for \"" << name_ << "\"";
-        std::cout << ": " << mat_->Data.num_nonzeros() << " nonzeros." << std::endl;
+        std::cout << ": " << mat_->Data.num_nonzeros() << " nonzeros." << std::endl;*/
     }
 
     virtual void visit (const TetraCL& t) {
@@ -613,10 +613,10 @@ class InterfaceVectorAccuCL : public TetraAccumulatorCL
     void set_name (const std::string& n) { name_= n; }
 
     virtual void begin_accumulation () {
-        std::cout << "InterfaceVectorAccuCL::begin_accumulation";
+        /*std::cout << "InterfaceVectorAccuCL::begin_accumulation";
         if (name_ != std::string())
             std::cout << " for \"" << name_ << "\"";
-        std::cout  << ": " << y_->RowIdx->NumUnknowns() << " rows.\n";
+        std::cout  << ": " << y_->RowIdx->NumUnknowns() << " rows.\n";*/
         if (y_->RowIdx->GetFE() != LocalVectorT::row_fe_type)
             std::cout << "Warning: LocalVectorT and VecDescCL have different FE-type for rows.\n";
     }
@@ -719,6 +719,14 @@ template <template <class> class LocalMatrixT, class DiscVelSolT>
         LocalMatrixT<DiscVelSolT>( wind), cdata, name);
 }
 
+/// \brief Convenience-function to reduce the number of explicit template-parameters for the massdiv- and the convection-matrix.
+    template <template <class> class LocalMatrixT, class DiscVelSolT>
+    inline InterfaceMatrixAccuCL< LocalMatrixT<DiscVelSolT>, InterfaceCommonDataP1CL>*
+    make_concentration_dependent_matrixP1_accu (MatDescCL* mat, const InterfaceCommonDataP1CL& cdata, const  instat_vector_fun_ptr normal, double time, const DiscVelSolT& wind, std::string name= std::string())
+    {
+        return new InterfaceMatrixAccuCL< LocalMatrixT<DiscVelSolT>, InterfaceCommonDataP1CL>( mat,
+                LocalMatrixT<DiscVelSolT>( wind, normal, time), cdata, name);
+    }
 
 class LocalInterfaceMassP1CL
 {
@@ -746,6 +754,7 @@ class LocalInterfaceMassP1CL
 
     LocalInterfaceMassP1CL (double alpha= 1.) : alpha_( alpha) {}
 };
+
 
 
 /// \brief The routine sets up the Laplace-Beltrami-matrix in mat on the interface defined by ls.
@@ -812,15 +821,32 @@ class LocalLaplaceBeltramiP1CL
         :D_( D) {}
 };
 
+    template <typename DiscVelSolT>
     class LocalLaplaceMobilityP1CL
     {
     private:
-        double D_; // diffusion coefficient=1
+
+        QuadDomain2DCL qdom;
+        double time_;
+        instat_vector_fun_ptr normal_;
+
+        std::valarray<double> mobility;
+        std::valarray<double> qmobility;
+
+        const DiscVelSolT concentr_;
+
+        LocalP1CL<double> concentr_loc;
+        GridFunctionCL<> qconcentr;
+
+        LocalP1CL<double> P1Hat[4];
 
         Point3DCL grad[4];
         double dummy;
-        GridFunctionCL<Point3DCL> n,
-                q[4];
+        GridFunctionCL<Point3DCL> n, q[4], qq[4];
+        LocalP1CL<Point3DCL> Normals;
+
+        GridFunctionCL<Point3DCL> qnormal;
+
         std::valarray<double> absdet;
 
     public:
@@ -830,26 +856,45 @@ class LocalLaplaceBeltramiP1CL
         double coup[4][4];
 
         void setup (const TetraCL& t, const InterfaceCommonDataP1CL& cdata) {
-            n.resize( cdata.surf.facet_size());
-            absdet.resize( cdata.surf.facet_size());
-            if (cdata.surf.normal_empty())
-                cdata.surf.compute_normals( t);
-            std::copy( cdata.surf.normal_begin(), cdata.surf.normal_end(), sequence_begin( n));
-            std::copy( cdata.surf.absdet_begin(), cdata.surf.absdet_end(), sequence_begin( absdet));
+
+            make_CompositeQuad5Domain2D( qdom, cdata.surf, t);
+            concentr_loc.assign( t, concentr_);
+            //resize_and_evaluate_on_vertexes( concentr_loc, qdom, qconcentr);
+
             P1DiscCL::GetGradients( grad, dummy, t);
-            for(int i= 0; i < 4; ++i) {
-                q[i].resize( cdata.surf.facet_size());
-                q[i]= grad[i] - dot( grad[i], n)*n;
+
+            //qnormal.assign(t, normal_, time_);
+            resize_and_evaluate_on_vertexes( normal_, t, qdom, time_, qnormal);
+
+            /*// Scale Normals accordingly to the Euclidean Norm (only consider the ones which make a contribution in the sense of them being big enough... otherwise one has to expect problems with division through small numbers)
+            for(Uint i=0; i<qnormal.size(); ++i) {
+                //if(qnormal[i].norm()> 1e-8)
+                qnormal[i]= qnormal[i]/qnormal[i].norm();
+            }*/
+
+            for(int j=0; j<4 ;++j) {
+                qq[j].resize( qdom.vertex_size());
+                qq[j]= grad[j];
+                qq[j]-= dot( qq[j], qnormal)*qnormal;
             }
-            for (int i= 0; i < 4; ++i) {
-                coup[i][i]= D_* /*area of reference triangle*/ 0.5*(dot(q[i], q[i])*absdet).sum();
-                for(int j= 0; j < i; ++j)
-                    coup[i][j]= coup[j][i]= D_* /*area of reference triangle*/ 0.5*(dot(q[i], q[j])*absdet).sum();
+
+            LocalP1CL<> mobility;
+            for(int i=0; i<4 ; ++i)
+            {
+                mobility += Mobility_function(concentr_loc[i])*cdata.p1[i];
             }
+            resize_and_evaluate_on_vertexes (mobility, qdom, qmobility);
+
+
+            for (int i= 0; i < 4; ++i)
+                for(int j= 0; j < 4; ++j) {
+                    coup[i][j]= quad_2D( qmobility*dot(qq[i],qq[j]), qdom);
+                }
+
         }
 
-        LocalLaplaceMobilityP1CL (double D)
-                :D_( D) {}
+        LocalLaplaceMobilityP1CL (const DiscVelSolT& conc, instat_vector_fun_ptr normal, double t)
+                :concentr_(conc), normal_(normal), time_(t) {}
     };
 
 /// \brief The routine sets up the Laplace-matrix in mat in bulk element in a narrow band near the interface defined by ls.
@@ -1454,7 +1499,11 @@ class CahnHilliardP1BaseCL: public SurfacePDEP1BaseCL
         IdxDescCL idx_mu; ///< index desctription for chemical potential at current time
         VecDescCL imu;  ///< chemical potential on the interface at current time
 
-    protected:
+        VecDescCL iface;  ///< interface mesh at current time
+    VecDescCL iface_old;  ///< interface mesh at current time
+
+
+protected:
         double        sigma_;     ///< mobility coefficient
         double        epsilon_;  ///< epsilon coefficient
 
@@ -1477,7 +1526,6 @@ class CahnHilliardP1BaseCL: public SurfacePDEP1BaseCL
         SSORPcCL symmPcPc_;
         PCGSolverT PCGSolver3_, PCGSolver4_;
         SurfaceLaplacePreCL<PCGSolverT> spc3_, spc4_;
-
         DiagBlockPcT block_pc_;
         GMResBlockT GMRes_;
         GMResBlockSolver block_gm_;
@@ -1495,7 +1543,7 @@ class CahnHilliardP1BaseCL: public SurfacePDEP1BaseCL
                 PCGSolver4_(symmPcPc_, iterB, tolB, true),
                 spc3_( dummy_matrix_, PCGSolver3_), spc4_( dummy_matrix_, PCGSolver4_),
                 block_pc_(spc3_,spc4_),
-                GMRes_(block_pc_, 100, iter, tol, true),
+                GMRes_(block_pc_, 50, iter, tol, false, true, LeftPreconditioning, true, false),
                 //gm_(pc_, 100, iter, tol, true),
                 block_gm_(GMRes_)
         {
@@ -1519,7 +1567,7 @@ class CahnHilliardP1BaseCL: public SurfacePDEP1BaseCL
         { return const_DiscSolCL( &Myimu, &Bnd_, &MG_); }
 
         /// initialize the interface concentration
-        void SetInitialValue (instat_scalar_fun_ptr, double t= 0.);
+        void SetInitialValue (instat_scalar_fun_ptr,instat_scalar_fun_ptr, double t= 0.);
 
         /// set the parameter of the theta-scheme for time stepping
         void SetRhs (instat_scalar_fun_ptr,instat_scalar_fun_ptr);
@@ -1539,6 +1587,7 @@ class CahnHilliardcGP1CL : public CahnHilliardP1BaseCL
 
                 Volume_stab, ///< stabilization matrix, tetra integral over normal gradients
 
+                Ident,
                 Mass,  ///< mass matrix
                 Conv,  ///< convection matrix
                 Massd, ///< mass matrix with interface-divergence of velocity
@@ -1546,7 +1595,7 @@ class CahnHilliardcGP1CL : public CahnHilliardP1BaseCL
 
     const double& width_;///< we extend only a band near the zero leve set with a width
     const double rho_;///<stabilization parameter for Volume_stab
-
+    const double S_;//stabilization parameter for time derivative;
     private:
         MatrixCL      A_, B_, C_, D_; ///< blocks of the matrix
         instat_vector_fun_ptr normal_; ///< the normal vector function
@@ -1555,11 +1604,11 @@ class CahnHilliardcGP1CL : public CahnHilliardP1BaseCL
     public:
         CahnHilliardcGP1CL (MultiGridCL& mg, double theta, double sigma, double epsilon,
                             VecDescCL* v, const VelBndDataT& Bnd_v, VecDescCL& lset_vd, const BndDataCL<>& lsetbnd,
-                            instat_vector_fun_ptr normal,const double & width, const double rho,
-                            int iter= 1000, double tol= 1e-7, double iterA=500, double tolA=1e-3, double iterB=500, double tolB=1e-3,double omit_bound= -1.)
+                            instat_vector_fun_ptr normal,const double & width, double rho, double S,
+                            int iter= 999, double tol= 1.1e-7, double iterA=499, double tolA=1.1e-3, double iterB=499, double tolB=1.1e-3,double omit_bound= -1.)
                 : CahnHilliardP1BaseCL( mg, theta, sigma, epsilon, v, Bnd_v, lset_vd, lsetbnd,
                         iter, tol, iterA, tolA, iterB, tolB, omit_bound),
-                  normal_(normal),width_(width), rho_(rho)
+                  normal_(normal),width_(width), rho_(rho), S_(S)
         {}
 
         /// save a copy of the old level-set and velocity; moves ic to oldic; must be called before DoStep.
@@ -1575,6 +1624,7 @@ class CahnHilliardcGP1CL : public CahnHilliardP1BaseCL
         ///@{
         VectorCL InitStep3 (double new_t);
         VectorCL InitStep4 (double new_t);
+        void InitStep(VectorCL&, VectorCL&, double new_t);
 
     void DoStep (const VectorCL&, const VectorCL&);
         void CommitStep ();
