@@ -409,7 +409,7 @@ int main (int argc, char* argv[]) {
         C_full. LinComb(alpha, Schur_stab.Data, 0., Schur_stab.Data);
         C_n.    LinComb(alpha, Schur_normal_stab.Data, 0., Schur_normal_stab.Data);
         M_final.LinComb(1., Schur.Data, 0., Schur.Data);
-        std::string outDir = P.get<std::string>("Output.Directory") + '/' + P.get<std::string>("SurfNavStokes.FE") + "/blocks/h=" + std::to_string(float(h)) + "_";
+        std::string outDir = P.get<std::string>("Output.Directory") + '/' + P.get<std::string>("Levelset.case") + '/' + P.get<std::string>("SurfNavStokes.FE") + "/blocks/h=" + std::to_string(float(h)) + "_";
         std::cout << "exporting matrices to " + outDir + "*\n";
         std::ofstream(outDir + "A.mtx") << A_final;
         std::ofstream(outDir + "B.mtx") << B_final;
