@@ -102,7 +102,6 @@ private:
     Uint f_level_;
     bool hacked_;
     double hacked_width_;
-    bool modified_;
     MarkingDecisionT decision_;
     std::ofstream *& distributionout_;
     bool owndistout_;
