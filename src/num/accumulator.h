@@ -55,6 +55,9 @@ class AccumulatorCL
     virtual AccumulatorCL* clone (int clone_id)= 0;
 
     virtual ~AccumulatorCL () {}
+    bool& modified() { return modified_; }
+protected:
+    bool modified_ = false;
 };
 
 /// \brief Accumulation over sequences of TetraCL.
@@ -176,6 +179,10 @@ void AccumulatorTupleCL<VisitedT>::operator() (const ColorClassesCL& colors)
                 std::for_each( clones[t_id].begin(), clones[t_id].end(), std::bind2nd( std::mem_fun( &AccumulatorCL<VisitedT>::visit), *cc[j]));
         }
     }
+    // if at least one thread modified the accus_ object, then we must have accus_ "modified" member variable flag set to be true
+    for (size_t i = 0; i < accus_.size(); ++i)
+        for (size_t j = 1; j < clones.size(); ++j)
+            if ((accus_[i]->modified() = accus_[i]->modified() || clones[j][i]->modified())) break;
     delete_clones(clones);
 
 #else

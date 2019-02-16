@@ -23,7 +23,7 @@
             "Freq":          0,
             "Width":         0,
             "CoarsestLevel": 0,
-            "FinestLevel":   4,
+            "FinestLevel":   5,
             "SD":            0.1,
             "CurvDiff":      -1,
             "Discontinuous": 0

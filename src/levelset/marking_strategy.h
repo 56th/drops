@@ -84,7 +84,7 @@ public:
 class UniformMarkingStrategyCL: public MarkingStrategyCL
 {
 public:
-    UniformMarkingStrategyCL( Uint Level) : level_(Level), decision_(DontCareC), modified_(false) {}
+    UniformMarkingStrategyCL( Uint Level) : level_(Level), decision_(DontCareC) {}
     ~UniformMarkingStrategyCL() {}
     void visit( const TetraCL& t );
     TetraAccumulatorCL* clone (int clone_id);
@@ -101,7 +101,6 @@ public:
 private:
     Uint level_;
     MarkingDecisionT decision_;
-    bool modified_;
 };
 
 
