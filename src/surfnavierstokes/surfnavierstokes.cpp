@@ -120,6 +120,15 @@ int main (int argc, char* argv[]) {
     adap.set_marking_strategy( &initmarker );
     adap.MakeInitialTriang();
     adap.set_marking_strategy( 0 );
+    double h = P.get<DROPS::Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")*std::pow(2., -P.get<double>("Mesh.AdaptRef.FinestLevel"));
+
+    if (levelset_fun_str == "sphere_2" && (P.exists("Levelset.ShiftNorm") || P.exists("Levelset.ShiftNormRel")) && P.exists("Levelset.ShiftDir")) {
+        auto shiftNorm = P.exists("Levelset.ShiftNormRel") ? P.get<double>("Levelset.ShiftNormRel") * h : P.get<double>("Levelset.ShiftNorm");
+        sphere_2_shift = P.get<DROPS::Point3DCL>("Levelset.ShiftDir");
+        sphere_2_shift /= sphere_2_shift.norm();
+        sphere_2_shift *= shiftNorm;
+        std::cout << "Refined bulk mesh is constracted w/ Levelset.ShiftNorm = 0; now we set\n\tsphere_2_shift = " << sphere_2_shift << '\n';
+    }
 
     // create level set
     instat_scalar_fun_ptr sigma (0);
@@ -150,7 +159,6 @@ int main (int argc, char* argv[]) {
     bool fullgrad = P.get<bool>("SurfNavStokes.fullgrad");
     std::string model = P.get<std::string>("SurfNavStokes.model");
     std::string testcase = P.get<std::string>("SurfNavStokes.testcase");
-    double h = P.get<DROPS::Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")*std::pow(2., -P.get<double>("Mesh.AdaptRef.FinestLevel"));
     double tau = P.get<double>("Time.StepSize");
     ParameterNS::nu = P.get<double>("SurfNavStokes.kinematic_viscosity");
 
@@ -409,7 +417,10 @@ int main (int argc, char* argv[]) {
         C_full. LinComb(alpha, Schur_stab.Data, 0., Schur_stab.Data);
         C_n.    LinComb(alpha, Schur_normal_stab.Data, 0., Schur_normal_stab.Data);
         M_final.LinComb(1., Schur.Data, 0., Schur.Data);
-        std::string outDir = P.get<std::string>("Output.Directory") + '/' + P.get<std::string>("Levelset.case") + '/' + P.get<std::string>("SurfNavStokes.FE") + "/blocks/h=" + std::to_string(float(h)) + "_";
+        auto surfName = P.get<std::string>("Levelset.case");
+        if (P.exists("Levelset.ShiftNormRel"))
+            surfName += "_shift=" + P.get<std::string>("Levelset.ShiftNormRel") + "h";
+        std::string outDir = P.get<std::string>("Output.Directory") + '/' + surfName + '/' + P.get<std::string>("SurfNavStokes.FE") + "/blocks/h=" + std::to_string(float(h)) + "_";
         std::cout << "exporting matrices to " + outDir + "*\n";
         std::ofstream(outDir + "A.mtx") << A_final;
         std::ofstream(outDir + "B.mtx") << B_final;

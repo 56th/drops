@@ -61,12 +61,14 @@ bnd_val_fun bf[6]= {
 
 ///////////////////////// Levelset-functions //////////////////////////////////////
 
+DROPS::Point3DCL sphere_2_shift(0.);
 double sphere_2 (const DROPS::Point3DCL& p, double)
 {
 //    DROPS::Point3DCL x( p - P.get<DROPS::Point3DCL>("Exp.PosDrop"));
 
 //    return x.norm() - P.get<DROPS::Point3DCL>("Exp.RadDrop")[0];
-    return p[0]*p[0]+p[1]*p[1]+p[2]*p[2]-1;
+//    return p[0]*p[0]+p[1]*p[1]+p[2]*p[2]-1;
+    return pow(p[0] - sphere_2_shift[0], 2.) + pow(p[1] - sphere_2_shift[1], 2.) + pow(p[2] - sphere_2_shift[2], 2.) - 1.;
 }
 
 double tamarind (const DROPS::Point3DCL& p, double)
