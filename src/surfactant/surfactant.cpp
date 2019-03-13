@@ -36,7 +36,9 @@
 #include "misc/omp_variable.h"
 #include "geom/subtriangulation.h"
 #include "num/gradient_recovery.h"
-
+/*
+#include "surfphasesep/separation.
+*/
 #include <cmath>
 #include <fstream>
 #include <string>
@@ -54,6 +56,8 @@ DROPS::InScaMap& inscamap= DROPS::InScaMap::getInstance();
 
 instat_vector_fun_ptr the_wind_fun;
 instat_scalar_fun_ptr the_lset_fun;
+instat_vector_fun_ptr the_normal_fun;//only for surfactant extension method
+
 instat_scalar_fun_ptr the_rhs_fun;
 instat_scalar_fun_ptr the_sol_fun;
 instat_vector_fun_ptr the_sol_grad_fun;
@@ -112,24 +116,88 @@ static RegisterScalarFunction regsca_torus_lset( "Torus", torus);
 // ==non-stationary test case "HeatConduction"
 // "ConstantWind" 0
 // "Ellipsoid" pos:[0,0,0], rad:[1,1,1]
-
 double heat_conduction_u0 (const Point3DCL& p)
 {
-    return p[0]*p[1];
+    //  return 1+p[0]*p[1]*p[2]/pow(p.norm(),3);//Ex0 and new Ex00
+    //  return 2*p[0]*p[1]*p[2]/pow(p.norm(),3);//Ex0-1
+    //     return 1; //Ex0-ode
+    //   return 1;//new Ex0SurfTransp
+    return 1+p[0]+p[1]+p[2]; //new Ex000
+//	double a=100;
+//	return 1*a+(p[0]+p[1]+p[2])/p.norm()/a;//new Ex000-1; new Ex000-2
 }
 
-double heat_conduction_rhs (const Point3DCL&, double)
+double heat_conduction_rhs (const Point3DCL& p, double t)
 {
-    return 0.;
+    return 0;//new Ex000//new Ex000-constant wind
+//	double a=100;
+//	return (p[0]+p[1]+p[2])*exp(-t)/p.norm()/a;//new Ex000-1
+//	return 2*(p[0]+p[1]+p[2])/p.norm()/a-a*exp(-t); //new Ex000-2
+    //   return 11*p[0]*p[1]*p[2]*exp(-t);//Ex0
+    //     return 11*p[0]*p[1]*p[2]*exp(-t)+12*p[0]*p[1]*p[2];//Ex0-1
+//	return -exp(-t);//Ex0-ode
+
+//	double D=P.get<double>("SurfTransp.Visc");
+//	double m=10;
+//	return m*cos(m*t);//Ex0-ode1
+//	return p[0]/p.norm()*p[1]/p.norm()*p[2]/p.norm()*(12*D*sin(m*t)+m*cos(m*t));//new Ex0
+//        return p[0]*p[1]*p[2]*(12*D+m*cos(m*t))*std::exp(sin(m*t));//new Ex00
 }
 static RegisterScalarFunction regsca_heat_conduction_rhs( "HeatConductionRhs", heat_conduction_rhs);
 
 double heat_conduction_sol (const Point3DCL& p, double t)
 {
-    return std::exp( -6.*t)*heat_conduction_u0( p);
+    double D=P.get<double>("SurfTransp.Visc");
+    // return std::exp( -6.*t)*heat_conduction_u0( p);
+    //    return 1+std::exp(-t)*p[0]*p[1]*p[2];//Ex0
+//	return (1+std::exp(-t))*p[0]*p[1]*p[2];//Ex0-1
+//	return exp(-t);//Ex0-odeSurfTransp
+    //      return std::exp(-2.0*t)*(p[0]+p[1]+p[2])+1;//new Ex000
+//	double a=100;
+//	return exp(-t)*(p[0]+p[1]+p[2])/p.norm()/a+1;//new Ex000-1
+//	return a*exp(-t)+(p[0]+p[1]+p[2])/p.norm()/a;//new Ex000-2
+//	double m=10;
+//	return 1+sin(m*t);//Ex0-ode1
+//	return 1+p[0]/p.norm()*p[1]/p.norm()*p[2]/p.norm()*sin(m*t);//new Ex0
+//        return 1+p[0]*p[1]*p[2]*std::exp(sin(m*t));//mew Ex00
+    DROPS::Point3DCL x= (p - PosDrop - t*constant_wind(p, t));
+    return std::exp(-2.0*D*t)*(x[0]+x[1]+x[2])+1;//new Ex000-- constant wind
 }
 static RegisterScalarFunction regsca_heat_conduction_sol( "HeatConductionSol", heat_conduction_sol);
 
+DROPS::Point3DCL heat_conduction_surfgradsol (const DROPS::Point3DCL& p, double t)
+{
+    Point3DCL surfgrad;
+    double D=P.get<double>("SurfTransp.Visc");
+//	double a=100;
+/*	double b=(p[0]+p[1]+p[2])/p.norm();
+	surfgrad[0]=1-b*p[0]/p.norm();
+	surfgrad[1]=1-b*p[1]/p.norm();
+	surfgrad[2]=1-b*p[2]/p.norm();
+        surfgrad*=std::exp(-2.*t);*///new Ex000
+//	surfgrad*=exp(-t)/a;  //new Ex000-1
+//	surfgrad/=a;
+//	double nm=p.norm();
+//	double a=3*p[0]/nm*p[1]/nm*p[2]/nm;
+//	surfgrad[0]=p[1]/nm*p[2]/nm-a*p[0]/nm;
+//	surfgrad[1]=p[0]/nm*p[2]/nm-a*p[1]/nm;
+//	surfgrad[2]=p[0]/nm*p[1]/nm-a*p[2]/nm;//*/
+//	double m=10;
+//	surfgrad*=sin(m*t); //new Ex0
+//        surfgrad*=std::exp(sin(m*t));//new Ex00
+//	surfgrad*=std::exp(-t); //Ex0
+//	surfgrad*=(1+std::exp(-t)); //Ex0-1
+//	surfgrad*=0; //Ex0-ode
+
+    DROPS::Point3DCL x= (p - PosDrop - t*constant_wind(p, t));
+    double b=(x[0]+x[1]+x[2])/x.norm();
+    surfgrad[0]=1-b*x[0]/x.norm();
+    surfgrad[1]=1-b*x[1]/x.norm();
+    surfgrad[2]=1-b*x[2]/x.norm();
+    surfgrad*=std::exp(-2.*D*t);///new Ex000--constant wind
+    return surfgrad;
+}
+static RegisterVectorFunction regvec_heat_conduction_surfgradsol( "HeatConductionSurfGradSol", heat_conduction_surfgradsol);
 
 // ==non-stationary test-case "ToroidalFlow"==
 // Level set: "torus" with RadTorus
@@ -365,7 +433,103 @@ double collision_rhs (const Point3DCL&, double)
 }
 static RegisterScalarFunction regsca_collision_rhs( "CollisionRhs", collision_rhs);
 
+double zero_function (const Point3DCL& , double)
+{
+    return 0;
+}
+static RegisterScalarFunction regsca_zero_sca_fun( "ZeroScalarFun", zero_function);
 
+DROPS::Point3DCL mergedrop_wind (const DROPS::Point3DCL& p, double t)
+{
+    DROPS::Point3DCL  c1,c2;
+    c1[0]=1.5*(t-1),c1[1]=0,c1[2]=0;
+    c2[0]=-1.5*(t-1),c2[1]=0,c2[2]=0;
+
+    DROPS::Point3DCL x1( p - c1);
+    DROPS::Point3DCL x2( p - c2);
+
+    Point3DCL wd;
+    /* if(x1.norm()!=0&&x2.norm()!=0)
+     {
+         double a=-4.5*x1[0]/std::pow(x1.norm(),5) + 4.5*x2[0]/std::pow(x2.norm(),5);
+         wd=3/std::pow(x1.norm(),5)*x1+3/std::pow(x2.norm(),5)*x2;
+         if(wd.norm_sq()!=0)
+             wd=-a/wd.norm_sq()*wd;
+         else
+            wd=-a*wd;
+     }*/
+    double a=-4.5*x1[0]*std::pow(x2.norm(),5) + 4.5*x2[0]*std::pow(x1.norm(),5);
+    wd=3*std::pow(x2.norm(),5)*x1+3*std::pow(x1.norm(),5)*x2;
+    if(wd.norm_sq()!=0)
+        wd=-a/wd.norm_sq()*wd;
+    else
+        wd=-a*wd;
+    return wd;
+}
+static RegisterVectorFunction regvec_mergedrop_wind( "MergeDropWind", mergedrop_wind);
+
+double mergedrop_lset (const Point3DCL& p, double t)
+{
+    // std::cout<<t<<" ";
+    DROPS::Point3DCL  c1,c2;
+    c1[0]=1.5*(t-1),c1[1]=0,c1[2]=0;
+    c2[0]=-1.5*(t-1),c2[1]=0,c2[2]=0;
+
+    DROPS::Point3DCL x1( p - c1);
+    DROPS::Point3DCL x2( p - c2);
+    // std::cout<<1.0-1./std::pow(x1.norm(),3)<<std::endl;
+    if(x1.norm()!=0&&x2.norm()!=0)
+        return  1- 1./std::pow(x1.norm(),3)-1.0/std::pow(x2.norm(),3);
+    else
+        return   -10*(std::pow(x1.norm(),3)*std::pow(x2.norm(),3)-std::pow(x1.norm(),3)-std::pow(x2.norm(),3));//-1./std::pow(x2.norm(),3);
+
+}
+static RegisterScalarFunction regsca_mergedrop_lset( "MergeDropLset", mergedrop_lset);
+
+DROPS::Point3DCL normal_mergedrop (const Point3DCL& p, double t)
+{
+    // std::cout<<t<<" ";
+    DROPS::Point3DCL  c1,c2;
+    c1[0]=1.5*(t-1),c1[1]=0,c1[2]=0;
+    c2[0]=-1.5*(t-1),c2[1]=0,c2[2]=0;
+
+    DROPS::Point3DCL x1( p - c1);
+    DROPS::Point3DCL x2( p - c2);
+
+    DROPS::Point3DCL grad;
+    if(x1.norm()!=0&&x2.norm()!=0){
+        grad=-3*(std::pow(x1.norm(),5)*x1+std::pow(x2.norm(),5)*x2);
+        return  grad.norm()>0.000001?grad/grad.norm():grad;
+    }
+    else
+        return   0*grad;//-1./std::pow(x2.norm(),3);
+
+}
+static RegisterVectorFunction regsca_normal_mergedrop( "NormalMergeDrop", normal_mergedrop);
+
+
+double mergedrop_sol (const Point3DCL& p, double t)
+{
+    if(p[0]>=0)
+        return   3-p[0];
+    else return 0;
+}
+static RegisterScalarFunction regsca_mergedrop_sol( "MergeDropSol", mergedrop_sol);
+
+DROPS::Point3DCL mergedrop_surfgradsol (const DROPS::Point3DCL& p, double t)
+{
+    Point3DCL surfgrad;
+    return surfgrad;
+}
+static RegisterVectorFunction regvec_mergedrop_surfgradsol( "MergeDropSurfGradSol", mergedrop_surfgradsol);
+
+
+double mergedrop_rhs (const Point3DCL& p, double t)
+{
+    return 0; //Ex3
+}
+static RegisterScalarFunction regsca_mergedrop_rhs( "MergeDropRhs", mergedrop_rhs);
+//////////////////////////////////////////////////////////////////////////////////////////////
 // ==Some spheres==
 
 double sphere_dist (const DROPS::Point3DCL& p, double)
@@ -389,6 +553,17 @@ double sphere_2move (const DROPS::Point3DCL& p, double t)
     return x.norm() - RadDrop[0];
 }
 static RegisterScalarFunction regsca_movell_lset( "MovingEllipsoid", sphere_2move);
+
+
+DROPS::Point3DCL normal_sphere_2move (const DROPS::Point3DCL& p, double t)
+{
+    DROPS::Point3DCL x= (p - PosDrop - t*constant_wind(p, t));//--constant wind
+    if(x.norm()>0.000001)
+        return x/x.norm();
+    else
+        return x;
+}
+static RegisterVectorFunction regvec_moving_sphere_normal( "NormalMovingEllipsoid", normal_sphere_2move);
 
 SMatrixCL<3,3> dp_sphere (const DROPS::Point3DCL& x, double)
 {
@@ -605,7 +780,7 @@ void InitVel ( const MultiGridCL& mg, VecDescCL* vec, BndDataCL<Point3DCL>& Bnd,
 
 SurfactantP1BaseCL* make_surfactant_timedisc( MultiGridCL& mg, LevelsetP2CL& lset,
                                               VecDescCL& v, const BndDataCL<Point3DCL>& Bnd_v,
-                                              const ParamCL& P)
+                                              const ParamCL& P, const double & dist=0)
 {
     SurfactantP1BaseCL* ret= 0;
     const std::string method= P.get<std::string>( "SurfTransp.Method");
@@ -636,6 +811,16 @@ SurfactantP1BaseCL* make_surfactant_timedisc( MultiGridCL& mg, LevelsetP2CL& lse
             &v, Bnd_v, lset.Phi, lset.GetBndData(),
             P.get<int>("SurfTransp.Solver.Iter"), P.get<double>("SurfTransp.Solver.Tol"),
             P.get<double>("SurfTransp.XFEMReduced"));
+    else if (method == std::string( "NarrowBandStabilization"))
+    {
+        std::cout<<"Test Method NarrowBand :"<<dist<<std::endl;
+        ret= new SurfactantNarrowBandStblP1CL ( mg,
+                                                P.get<double>("SurfTransp.Theta"), P.get<double>("SurfTransp.Visc"),
+                                                &v, Bnd_v, lset.Phi, lset.GetBndData(),the_normal_fun, dist,
+                                                1./(P.get<DROPS::Point3DCL>("Mesh.E1")[0]/(P.get<double>("Mesh.N1"))),
+                                                P.get<int>("SurfTransp.Solver.Iter"),P.get<double>("SurfTransp.Solver.Tol"),
+                                                P.get<double>("SurfTransp.XFEMReduced"));/**/
+    }
     else
         throw DROPSErrCL( std::string( "make_surfactant_timedisc: Unknown method '") + method + std::string( "'.\n"));
 
@@ -671,8 +856,10 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     InitVel( mg, &v, Bnd_v, the_wind_fun, 0.);
 
     //lset2.SetupSystem( make_P2Eval( mg, Bnd_v, v), P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps"));
+    double dist=2*P.get<DROPS::Point3DCL>("SurfTransp.Exp.Velocity").norm()*P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps")
+                +2*P.get<DROPS::Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")/pow(2,P.get<int>("Mesh.AdaptRef.FinestLevel")+1);
 
-    std::unique_ptr<SurfactantP1BaseCL> timediscp( make_surfactant_timedisc( mg, lset, v, Bnd_v, P));
+    std::unique_ptr<SurfactantP1BaseCL> timediscp( make_surfactant_timedisc( mg, lset, v, Bnd_v, P,dist));
     SurfactantP1BaseCL& timedisc= *timediscp;
     timedisc.SetRhs( the_rhs_fun);
 
@@ -684,10 +871,12 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     //adap.push_back( &lset2repair);
 
     // Init Interface-Sol
-    timedisc.idx.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
+    timedisc.idx.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData(), dist);
     std::cout << "NumUnknowns: " << timedisc.idx.NumUnknowns() << std::endl;
     timedisc.ic.SetIdx( &timedisc.idx);
     timedisc.SetInitialValue( the_sol_fun, 0.);
+    timedisc.iface.SetIdx( &timedisc.idx);
+    timedisc.iface_old.SetIdx( &timedisc.idx);
 
     BndDataCL<> nobnd( 0);
     VecDescCL the_sol_vd( &lset.idx);
@@ -695,6 +884,8 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     if (vtkwriter.get() != 0) {
         vtkwriter->Register( make_VTKScalar(      lset.GetSolution(),              "Levelset") );
         vtkwriter->Register( make_VTKIfaceScalar( mg, timedisc.ic,                 "InterfaceSol"));
+        vtkwriter->Register( make_VTKIfaceScalar( mg, timedisc.iface,                 "interface_mesh"));
+        vtkwriter->Register( make_VTKIfaceScalar( mg, timedisc.iface_old,                 "old_interface_mesh"));
         vtkwriter->Register( make_VTKVector(      make_P2Eval( mg, Bnd_v, v),      "Velocity"));
         //vtkwriter->Register( make_VTKScalar(      lset2.GetSolution(),             "Levelset2"));
         vtkwriter->Register( make_VTKScalar(      make_P2Eval( mg, nobnd, the_sol_vd),  "TrueSol"));
@@ -717,7 +908,41 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     std::cout << "initial surfactant on \\Gamma: " << Integral_Gamma( mg, lset.Phi, lset.GetBndData(), make_P1Eval(  mg, ifbnd, timedisc.ic)) << '\n';
 
     dynamic_cast<DistMarkingStrategyCL*>( adap.get_marking_strategy())->SetDistFct( lset);
-    for (int step= 1; step <= P.get<int>("Time.NumSteps"); ++step) {
+
+    double total_mass=Integral_Gamma(mg, lset.Phi,lset.GetBndData(),make_P1Eval(mg, ifbnd, timedisc.ic));
+    //In the first step, we use some smaller time step to solve the problem
+    // double discrete_mass=0;
+    int N1=(int)1./dt;
+    for (int step= 1; step <= N1; ++step)
+      {
+          const double cur_time= step*dt/N1;
+          timedisc.InitTimeStep();
+
+          LSInit( mg, lset.Phi, the_lset_fun, cur_time);
+          InitVel( mg, &v, Bnd_v, the_wind_fun, cur_time);
+          timedisc.DoStep0( cur_time);
+          total_mass=Integral_Gamma(mg, lset.Phi,lset.GetBndData(),make_P1Eval(mg, ifbnd, timedisc.ic));
+        //  if(step==1)
+       //   	discrete_mass=total_mass;
+          //L_2tL_2x_err_sq+= (step > 1 ? 0.5 : 0.)*dt/10*std::pow( L_2x_err, 2);
+          L_2x_err= L2_error( lset.Phi, lset.GetBndData(), timedisc.GetSolution(), the_sol_fun);
+          std::cout << "L_2x-error: " << L_2x_err
+                            << "\nnorm of true solution: " << L2_norm( mg, lset.Phi, lset.GetBndData(), the_sol_fun)
+                            << std::endl;
+          L_inftL_2x_err= std::max( L_inftL_2x_err, L_2x_err);
+          std::cout << "L_inftL_2x-eerror: " << L_inftL_2x_err << std::endl;
+          //L_2tL_2x_err_sq+= 0.5*dt/10*std::pow( L_2x_err, 2);
+         // std::cout << "L_2tL_2x-error: " << std::sqrt( L_2tL_2x_err_sq) << std::endl;
+          L_2tH_1x_err_sq+= (step > 1 ? 0.5 : 0.)*dt/N1*std::pow( H_1x_err, 2);
+              //    H_1x_err= H1_error( lset.Phi, lset.GetBndData(), timedisc.GetSolution(), the_sol_fun);
+          H_1x_err= H1_error( lset.Phi, lset.GetBndData(), timedisc.GetSolution(), the_sol_fun);
+          std::cout << "H_1x-error: " << H_1x_err << std::endl;
+          L_2tH_1x_err_sq+= 0.5*dt/N1*std::pow( H_1x_err, 2);
+              //    L_2tH_1x_err_sq+= dt*std::pow( H_1x_err, 2);
+          std::cout << "L_2tH_1x-error: " << std::sqrt( L_2tH_1x_err_sq) << std::endl;
+      }
+
+    for (int step= 2; step <= P.get<int>("Time.NumSteps"); ++step) {
         std::cout << "======================================================== step " << step << ":\n";
         ScopeTimerCL timer( "Strategy: Time-loop");
         const double cur_time= step*dt;
@@ -1639,9 +1864,12 @@ int main (int argc, char* argv[])
     RadTorus=     P.get<DROPS::Point2DCL>("SurfTransp.Exp.RadTorus");
     the_wind_fun= invecmap[P.get<std::string>("SurfTransp.Exp.Wind")];
     the_lset_fun= inscamap[P.get<std::string>("SurfTransp.Exp.Levelset")];
-    the_rhs_fun=  inscamap[P.get<std::string>("SurfTransp.Exp.Rhs")];
+      the_normal_fun= invecmap[P.get<std::string>("SurfTransp.Exp.Normal")];
+      the_rhs_fun=  inscamap[P.get<std::string>("SurfTransp.Exp.Rhs")];
     the_sol_fun=  inscamap[P.get<std::string>("SurfTransp.Exp.Solution")];
-    if (P.get<std::string>("SurfTransp.Exp.Solution") == "LaplaceBeltrami0Sol")
+      the_sol_grad_fun = invecmap[P.get<std::string>("SurfTransp.Exp.SurfGradSol")];
+
+      if (P.get<std::string>("SurfTransp.Exp.Solution") == "LaplaceBeltrami0Sol")
         the_sol_grad_fun=  &laplace_beltrami_0_sol_grad;
     for (Uint i= 0; i < 6; ++i)
         bf_wind[i]= the_wind_fun;

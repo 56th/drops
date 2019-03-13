@@ -348,6 +348,68 @@ void CreateNumbOnInterfaceVertex (const Uint idx, IdxT& counter, Uint stride,
     }
 }
 
+/// \brief Routine to number unknowns on the vertices in a strip surrounding an
+/// interface(distance less than a parameter dist).
+///
+/// This function allocates memory for the Unknown-indices in system
+/// idx on all vertices belonging to tetras between begin and end which
+/// are in a narrow band of the zero level of lset.
+///
+/// The first number used is the initial value of counter, the next
+/// numbers are counter+stride, counter+2*stride, and so on.
+/// Upon return, counter contains the first number, that was not used,
+/// that is \# Unknowns+stride.
+/// A more user friendly interface is provided by IdxDescCL::CreateNumbNearInterface.
+    void CreateNumbNearInterfaceVertex (const Uint idx, IdxT& counter, Uint stride,
+                                        const MultiGridCL::TriangVertexIteratorCL& vbegin,
+                                        const MultiGridCL::TriangVertexIteratorCL& vend,
+                                        const MultiGridCL::TriangTetraIteratorCL& begin,
+                                        const MultiGridCL::TriangTetraIteratorCL& end,
+                                        const VecDescCL& ls, const BndDataCL<>& lsetbnd, double dist,double omit_bound= -1./*default to using all dof*/)
+    {
+        if (stride == 0) return;
+        std::cout<<"Notice-----the level-set function is assume to be a signed distance function!!\n";
+        std::cout<<"Test "<<dist<<std::endl;
+        LocalP2CL<> hat_sq[4]; // values of phi_i*phi_i
+        for (int i= 0; i < 4; ++i)  {
+            hat_sq[i][i]= 1.;
+            for (int j = 0; j < 4; ++j)
+                if (i != j) hat_sq[i][EdgeByVert( i, j) + 4]= 0.25;
+        }
+        // first set NoIdx in all vertices
+        for (MultiGridCL::TriangVertexIteratorCL vit= vbegin; vit != vend; ++vit) {
+            vit->Unknowns.Prepare(idx);
+            vit->Unknowns.Invalidate(idx);
+        }
+        // then create numbering of vertices at the interface
+        const PrincipalLatticeCL& lat= PrincipalLatticeCL::instance( 2);
+        std::valarray<double> ls_loc( lat.vertex_size());
+        LocalP2CL<> locp2_ls;
+        //  SPatchCL<3> patch;
+        // QuadDomainCodim1CL<3> qdom;
+        //  std::valarray<double> shape_sq; // square of a P1-shape-function as integrand
+        for (MultiGridCL::TriangTetraIteratorCL it= begin; it != end; ++it) {
+            locp2_ls.assign( *it, ls, lsetbnd);
+            evaluate_on_vertexes( locp2_ls, lat, Addr( ls_loc));
+            if (distance( ls_loc)>dist)
+                continue;
+
+            //   patch.make_patch<MergeCutPolicyCL>( lat, ls_loc);
+            //   make_CompositeQuad2Domain2D( qdom, patch, *it);
+            //   shape_sq.resize( qdom.vertex_size());
+            for (Uint i= 0; i < NumVertsC; ++i) {
+                UnknownHandleCL& unknowns= const_cast<VertexCL*>( it->GetVertex( i))->Unknowns;
+                if (unknowns.Exist( idx))
+                    continue;
+
+                //      evaluate_on_vertexes( hat_sq[i], qdom, Addr( shape_sq));
+                //     if (quad_codim1( shape_sq, qdom) > 0) {
+                unknowns( idx)= counter;
+                counter+= stride;
+                //    }
+            }
+        }
+    }
 /// \brief Routine to number P2-unknowns on the vertices and edges surrounding an
 /// interface.
 ///
@@ -444,6 +506,26 @@ void IdxDescCL::CreateNumbOnInterface(Uint level, MultiGridCL& mg, const VecDesc
         throw DROPSErrCL( "CreateNumbOnInterface: Only vertex and edge unknowns are implemented.\n" );
 }
 
+    void IdxDescCL::CreateNumbNearInterface(Uint level, MultiGridCL& mg, const VecDescCL& ls,
+                                            const BndDataCL<>& lsetbnd, double dist,double omit_bound)
+/// Uses CreateNumbNearInterfaceVertex on the triangulation with level \p level on the multigrid \p mg.
+/// One can only create P1-elements.
+    {
+        // set up the index description
+        const Uint idxnum= GetIdx();
+        TriangLevel_= level;
+        NumUnknowns_= 0;
+
+        // allocate space for indices; number unknowns in TriangLevel level
+        if (NumUnknownsVertex() != 0)
+            CreateNumbNearInterfaceVertex( idxnum, NumUnknowns_, NumUnknownsVertex(),
+                                           mg.GetTriangVertexBegin(level), mg.GetTriangVertexEnd(level),
+                                           mg.GetTriangTetraBegin( level), mg.GetTriangTetraEnd( level), ls, lsetbnd, dist,omit_bound);
+
+        if (NumUnknownsEdge() != 0 || NumUnknownsFace() != 0 || NumUnknownsTetra() != 0)
+            throw DROPSErrCL( "CreateNumbOnInterface: Only vertex unknowns are implemented\n" );
+    }
+
 void IdxDescCL::CreateNumbStdFE( Uint level, MultiGridCL& mg)
 // numbering of standard FE
 {
@@ -522,6 +604,7 @@ void IdxDescCL::CreateNumbering( Uint level, MultiGridCL& mg, const VecDescCL* l
 #endif
 }
 
+
 void IdxDescCL::UpdateXNumbering( MultiGridCL& mg, const VecDescCL& lset, const BndDataCL<>& lsetbnd)
 {
     if (IsExtended() && !IsExtendedSpaceTime()) {
@@ -531,6 +614,56 @@ void IdxDescCL::UpdateXNumbering( MultiGridCL& mg, const VecDescCL& lset, const 
 #endif
     }
 }
+
+    void IdxDescCL::CreateNumbering( Uint level, MultiGridCL& mg, const VecDescCL* lsetp, const BndDataCL<>* lsetbnd, double width)
+/// Memory for the Unknown-Indices on TriangLevel level is allocated
+/// and the unknowns are numbered.
+/// If a matching function is specified, numbering on periodic boundaries
+/// is performed, too.width
+/// After that the extended DoFs are numbered for extended FE.
+    {
+
+        if (width>0) {
+            if (lsetp == 0)
+                throw DROPSErrCL("IdxDescCL::CreateNumbering: no level set function for interface numbering given");
+
+            CreateNumbNearInterface(level, mg, *lsetp, *lsetbnd, width, GetXidx().GetBound());
+        }
+        else {
+
+            if (IsNearInterface()) {
+#ifdef _PAR
+                throw DROPSErrCL("IdxDescCL::CreateNumbering: Check first, if numbering on interface works in parDROPS.");
+#endif
+                if (lsetp == 0)
+                    throw DROPSErrCL("IdxDescCL::CreateNumbering: no level set function for interface numbering given");
+
+                CreateNumbNearInterface(level, mg, *lsetp, *lsetbnd, width, GetXidx().GetBound());
+            } else if (IsOnInterface()) {
+#ifdef _PAR
+                throw DROPSErrCL("IdxDescCL::CreateNumbering: Check first, if numbering on interface works in parDROPS.");
+#endif
+                if (lsetp == 0)
+                    throw DROPSErrCL("IdxDescCL::CreateNumbering: no level set function for interface numbering given");
+                CreateNumbOnInterface(level, mg, *lsetp, *lsetbnd, GetXidx().GetBound());
+            } else {
+                CreateNumbStdFE(level, mg);
+                if (IsExtended()) {
+                    if (lsetp == 0) {
+                        std::cout << "I am extended" << std::endl;
+                        throw DROPSErrCL("IdxDescCL::CreateNumbering: no level set function for XFEM numbering given");
+                    }
+                    NumUnknowns_ = extIdx_.UpdateXNumbering(this, mg, *lsetp, *lsetbnd, true);
+                }
+            }
+        }
+#ifdef _PAR
+        ex_->CreateList(mg, this, true, true);
+#endif
+    }
+
+
+
 
 void IdxDescCL::CreateNumbering( Uint level, MultiGridCL& mg, const BndCondCL& Bnd,
     const VecDescCL* lsetp, const BndDataCL<>* lsetbnd)

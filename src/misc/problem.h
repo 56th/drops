@@ -71,6 +71,7 @@ enum FiniteElementT
 	P2X_FE=P2_FE+OFFSET_XFE,
 	P2R_FE=P2_FE+OFFSET_RFE,
 	P1IF_FE=P1_FE+OFFSET_IFFE,
+    P1IF_FE1=P1_FE+OFFSET_IFFE+4,
     P2IF_FE=P2_FE+OFFSET_IFFE,
     vecP1IF_FE=P1_FE+OFFSET_IFFE+OFFSET_VECFE,
     vecP2IF_FE=P2_FE+OFFSET_IFFE+OFFSET_VECFE,
@@ -109,6 +110,7 @@ class FE_InfoCL
             case P0_FE:          NumUnknownsTetra_= 1; break;
             case P1_FE:
             case P1IF_FE:
+            case P1IF_FE1:
             case P1X_FE:         NumUnknownsVertex_= 1; break;
             case P1SP1T_FE:
             case P1SP1TX_FE:     NumUnknownsVertex_= 2; break;
@@ -143,6 +145,9 @@ class FE_InfoCL
 
     /// \brief Returns true for interface FE
     bool IsOnInterface() const { return fe_& OFFSET_IFFE; }
+    /// \brief Returns true for interface FE1-- solve problem in a strip
+    bool IsNearInterface() const { return fe_ & (OFFSET_IFFE+4); }
+
     bool IsDG() const { return fe_ & OFFSET_DFE;}
 
     /// \brief Number of unknowns on the simplex-type
@@ -303,7 +308,8 @@ class IdxDescCL: public FE_InfoCL
     void CreateNumbStdFE( Uint level, MultiGridCL& mg);
     /// \brief Number unknowns on the vertices surrounding an interface.
     void CreateNumbOnInterface(Uint level, MultiGridCL& mg, const VecDescCL& ls, const BndDataCL<>& lsetbnd, double omit_bound= -1./*default to using all dof*/);
-
+        /// \brief Number unknowns on the vertices in a trip surrounding an interface.
+        void CreateNumbNearInterface(Uint level, MultiGridCL& mg, const VecDescCL& ls, const BndDataCL<>& lsetbnd,double width, double dist=0./*default to using dof in cut tetra*/);
   public:
     using FE_InfoCL::IsExtended;
 
@@ -353,6 +359,8 @@ class IdxDescCL: public FE_InfoCL
     /// \brief Used to number unknowns.
     void CreateNumbering( Uint level, MultiGridCL& mg, const VecDescCL* lsetp= 0, const BndDataCL<>* lsetbnd =0);
     /// \brief Used to number unknowns and store boundary condition.
+    /// \brief Used to number unknowns.
+    void CreateNumbering( Uint level, MultiGridCL& mg, const VecDescCL* lsetp, const BndDataCL<>* lsetbnd ,double width);
     void CreateNumbering( Uint level, MultiGridCL& mg, const BndCondCL& Bnd, const VecDescCL* lsetp= 0, const BndDataCL<>* lsetbnd =0);
     void CreateNumbering( Uint level, MultiGridCL& mg, const BndCondCL& Bnd, const BndCondCL& Bnd_aux, const VecDescCL* lsetp= 0, const BndDataCL<>* lsetbnd =0);
     /// \brief Used to number unknowns taking boundary condition from \a baseIdx

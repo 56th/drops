@@ -398,7 +398,108 @@ double collision_rhs (const Point3DCL&, double)
 static RegisterScalarFunction regsca_collision_rhs( "CollisionRhs", collision_rhs);
 
 
+DROPS::Point3DCL mergedrop_wind (const DROPS::Point3DCL& p, double t)
+{
+    DROPS::Point3DCL  c1,c2;
+    double velocity=0.1;
+    c1=MakePoint3D( -1.5, 0., 0.) + WindVelocity*t;
+    c2=-c1;
+   /* c1[0]=1.5*(t-1),c1[1]=0,c1[2]=0;
+    c2[0]=-1.5*(t-1),c2[1]=0,c2[2]=0;*/
+
+    DROPS::Point3DCL x1( p - c1);
+    DROPS::Point3DCL x2( p - c2);
+
+    Point3DCL wd;
+    /* if(x1.norm()!=0&&x2.norm()!=0)
+     {
+         double a=-4.5*x1[0]/std::pow(x1.norm(),5) + 4.5*x2[0]/std::pow(x2.norm(),5);
+         wd=3/std::pow(x1.norm(),5)*x1+3/std::pow(x2.norm(),5)*x2;
+         if(wd.norm_sq()!=0)
+             wd=-a/wd.norm_sq()*wd;
+         else
+            wd=-a*wd;
+     }*/
+    double a=-4.5*x1[0]*std::pow(x2.norm(),5) + 4.5*x2[0]*std::pow(x1.norm(),5);
+    wd=3*std::pow(x2.norm(),5)*x1+3*std::pow(x1.norm(),5)*x2;
+    if(wd.norm_sq()!=0)
+        wd=-a/wd.norm_sq()*wd;
+    else
+        wd=-a*wd;
+    return wd;
+}
+static RegisterVectorFunction regvec_mergedrop_wind( "MergeDropWind", mergedrop_wind);
+
+double mergedrop_lset (const Point3DCL& p, double t)
+{
+    // std::cout<<t<<" ";
+    DROPS::Point3DCL  c1,c2;
+    double velocity=0.1;
+/*    c1[0]=1.5*(t-5),c1[1]=0,c1[2]=0;
+    c2[0]=-1.5*(t-5),c2[1]=0,c2[2]=0;*/
+    c1=MakePoint3D( -1.5, 0., 0.) + WindVelocity*t;
+    c2=-c1;
+    DROPS::Point3DCL x1( p - c1);
+    DROPS::Point3DCL x2( p - c2);
+    // std::cout<<1.0-1./std::pow(x1.norm(),3)<<std::endl;
+    if(x1.norm()!=0&&x2.norm()!=0)
+        return  1- 1./std::pow(x1.norm(),3)-1.0/std::pow(x2.norm(),3);
+    else
+        return   -10*(std::pow(x1.norm(),3)*std::pow(x2.norm(),3)-std::pow(x1.norm(),3)-std::pow(x2.norm(),3));//-1./std::pow(x2.norm(),3);
+
+}
+static RegisterScalarFunction regsca_mergedrop_lset( "MergeDropLset", mergedrop_lset);
+
+DROPS::Point3DCL normal_mergedrop (const Point3DCL& p, double t)
+{
+    // std::cout<<t<<" ";
+    DROPS::Point3DCL  c1,c2;
+    double velocity=1.5;
+  /*  c1[0]=1.5*(t-5),c1[1]=0,c1[2]=0;
+    c2[0]=-1.5*(t-5),c2[1]=0,c2[2]=0;*/
+    c1=MakePoint3D( -1.5, 0., 0.) + WindVelocity*t;
+    c2=-c1;
+
+    DROPS::Point3DCL x1( p - c1);
+    DROPS::Point3DCL x2( p - c2);
+
+    DROPS::Point3DCL grad;
+    if(x1.norm()!=0&&x2.norm()!=0){
+        grad=-3*(std::pow(x1.norm(),5)*x1+std::pow(x2.norm(),5)*x2);
+        return  grad.norm()>0.000001?grad/grad.norm():grad;
+    }
+    else
+        return   0*grad;//-1./std::pow(x2.norm(),3);
+
+}
+static RegisterVectorFunction regsca_normal_mergedrop( "NormalMergeDrop", normal_mergedrop);
+
+
+double mergedrop_sol (const Point3DCL& p, double t)
+{
+    if(p[0]>=0)
+        return   1;
+    else return 0;
+}
+static RegisterScalarFunction regsca_mergedrop_sol( "MergeDropSol", mergedrop_sol);
+
+DROPS::Point3DCL mergedrop_surfgradsol (const DROPS::Point3DCL& p, double t)
+{
+    Point3DCL surfgrad;
+    return surfgrad;
+}
+static RegisterVectorFunction regvec_mergedrop_surfgradsol( "MergeDropSurfGradSol", mergedrop_surfgradsol);
+
+
+double mergedrop_rhs (const Point3DCL& p, double t)
+{
+    return 0; //Ex3
+}
+static RegisterScalarFunction regsca_mergedrop_rhs( "MergeDropRhs", mergedrop_rhs);
+//////////////////////////////////////////////////////////////////////////////////////////////
+
 // ==Some spheres==
+
 
 double sphere_dist (const DROPS::Point3DCL& p, double)
 {
@@ -734,7 +835,16 @@ CahnHilliardP1BaseCL* make_cahnhilliard_timedisc( MultiGridCL& mg, LevelsetP2CL&
             P.get<int>("SurfSeparation.Solver.PcAIter"), P.get<double>("SurfSeparation.Solver.PcATol"),
             P.get<int>("SurfSeparation.Solver.PcBIter"), P.get<double>("SurfSeparation.Solver.PcBTol"),
             P.get<double>("SurfSeparation.XFEMReduced"));
-
+    else if (method == std::string( "NarrowBandStabilization"))
+        ret= new CahnHilliardNarrowBandStblP1CL( mg,
+                                     P.get<double>("SurfSeparation.Theta"), P.get<double>("SurfSeparation.Mobility"),
+                                     P.get<double>("SurfSeparation.Epsilon"),
+                                     &v, Bnd_v, lset.Phi, lset.GetBndData(), the_normal_fun, dist,
+                                     P.get<DROPS::Point3DCL>("Mesh.E1")[0]/(2.*P.get<double>("Mesh.N1")), 1.,//S=beta_s,
+                                     P.get<int>("SurfSeparation.Solver.Iter"), P.get<double>("SurfSeparation.Solver.Tol"),
+                                     P.get<int>("SurfSeparation.Solver.PcAIter"), P.get<double>("SurfSeparation.Solver.PcATol"),
+                                     P.get<int>("SurfSeparation.Solver.PcBIter"), P.get<double>("SurfSeparation.Solver.PcBTol"),
+                                     P.get<double>("SurfSeparation.XFEMReduced"));
     else
         throw DROPSErrCL( std::string( "make_cahnhilliard_timedisc: Unknown method '") + method + std::string( "'.\n"));
 
@@ -784,7 +894,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     InitVel( mg, &v, Bnd_v, the_wind_fun, 0.);
 
     //lset2.SetupSystem( make_P2Eval( mg, Bnd_v, v), P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps"));
-    double dist=1.0*P.get<DROPS::Point3DCL>("SurfSeparation.Exp.Velocity").norm()*P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps")
+    double dist=2.0*P.get<DROPS::Point3DCL>("SurfSeparation.Exp.Velocity").norm()*P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps")
                 +P.get<DROPS::Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")/pow(2,P.get<int>("Mesh.AdaptRef.FinestLevel")+1);
 
     std::unique_ptr<CahnHilliardP1BaseCL> timediscp( make_cahnhilliard_timedisc( mg, lset, v, Bnd_v, P, dist));
@@ -803,14 +913,12 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     //adap.push_back( &lset2repair);
 
     // Init concentration     // Init chemical potential
-    timedisc.idx_c.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
+    timedisc.idx_c.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData(), dist);
     std::cout << "Concentration NumUnknowns: " << timedisc.idx_c.NumUnknowns() << std::endl;
     timedisc.ic.SetIdx( &timedisc.idx_c);
-    timedisc.idx_mu.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
-    std::cout << "ChemPotential NumUnknowns: " << timedisc.idx_mu.NumUnknowns() << std::endl;
-    timedisc.imu.SetIdx( &timedisc.idx_mu);
-    timedisc.iface.SetIdx( &timedisc.idx_mu);
-    timedisc.iface_old.SetIdx( &timedisc.idx_mu);
+    timedisc.imu.SetIdx( &timedisc.idx_c);
+    timedisc.iface.SetIdx( &timedisc.idx_c);
+    timedisc.iface_old.SetIdx( &timedisc.idx_c);
 
     timedisc.SetInitialValue( the_poten_sol_fun, the_conc_sol_fun, 0.);
 
@@ -874,7 +982,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
         LSInit( mg, lset.Phi, the_lset_fun, cur_time);
         InitVel( mg, &v, Bnd_v, the_wind_fun, cur_time);
 
-        timedisc.DoStep( cur_time);
+        timedisc.DoStep0( cur_time);
 
         std::cout << "concentration on \\Gamma: " << Integral_Gamma( mg, lset.Phi, lset.GetBndData(), make_P1Eval(  mg, ifbnd, timedisc.ic)) << '\n';
         std::cout << "chemical potential on \\Gamma: " << Integral_Gamma( mg, lset.Phi, lset.GetBndData(), make_P1Eval(  mg, ifbnd, timedisc.imu)) << '\n';

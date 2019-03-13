@@ -40,6 +40,19 @@ template <class GridFunT>
     return static_cast<size_t>( std::abs( sum)) == f.size(); // std::abs return a signed type --> silence g++ warning
 }
 
+    template <class GridFunT>
+    double  distance (const GridFunT& f)
+    {
+        double min_val= 10000;
+        if(equal_signs( f))
+        {
+            for (Uint i= 0; i < f.size(); ++i)
+                min_val= std::min( std::fabs(f[i]),min_val);
+        }
+        else
+            min_val=0;
+        return min_val;
+    }
 ///\brief Write the sign of the levelset function src to the sequence dst.
 inline void
 copy_levelset_sign (const std::valarray<double>& src, std::valarray<byte>& dst)

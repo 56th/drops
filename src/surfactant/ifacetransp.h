@@ -76,6 +76,10 @@ void SetupInterfaceSorptionP1X (const MultiGridCL& MG, const VecDescCL& ls, cons
 /// Non-existent dofs get NoIdx.
 void GetLocalNumbInterface(IdxT* Numb, const TetraCL& s, const IdxDescCL& idx);
 
+
+/// \brief Helper for the accumulators: inserts the local matrix coup into M.
+    void update_global_matrix_P1 (MatrixBuilderCL& M, const double coup[4][4], const IdxT numr[4], const IdxT numc[4]);
+
 /// \todo This should be a generic function somewhere in num or misc.
 void P1Init (instat_scalar_fun_ptr icf, VecDescCL& ic, const MultiGridCL& mg, double t);
 
@@ -556,10 +560,10 @@ class InterfaceMatrixAccuCL : public TetraAccumulatorCL
         const FiniteElementT mat_row_fe= mat_->RowIdx->GetFE(),
                              mat_col_fe= mat_->ColIdx->GetFE();
 
-        //std::cout << "InterfaceMatrixAccuCL::begin_accumulation";
-        /*if (name_ != std::string())
+        std::cout << "InterfaceMatrixAccuCL::begin_accumulation";
+        if (name_ != std::string())
             std::cout << " for \"" << name_ << "\"";
-        std::cout  << ": " << num_rows << " rows, " << num_cols << " cols.\n";*/
+        std::cout  << ": " << num_rows << " rows, " << num_cols << " cols.\n";
         if (mat_row_fe != LocalMatrixT::row_fe_type)
             std::cout << "Warning: LocalMatrixT and MatDescCL have different FE-type for rows.\n";
         if (mat_col_fe != LocalMatrixT::col_fe_type)
@@ -638,6 +642,126 @@ class InterfaceVectorAccuCL : public TetraAccumulatorCL
     virtual InterfaceVectorAccuCL* clone (int /*clone_id*/) { return new InterfaceVectorAccuCL( *this); }
 };
 
+
+    class NarrowBandCommonDataP1CL : public TetraAccumulatorCL
+    {
+    private:
+        NarrowBandCommonDataP1CL** the_clones;
+
+        const VecDescCL*   ls;      // P2-level-set
+        const BndDataCL<>* lsetbnd; // boundary data for the level set function
+        const double & dist;//to characterize the width of the narrow band
+        LocalP2CL<> locp2_ls;
+        bool inband_;
+
+    public:
+        const PrincipalLatticeCL& lat;
+        LocalP1CL<> p1[4];
+
+        std::valarray<double> ls_loc;
+        SurfacePatchCL surf;
+
+        const NarrowBandCommonDataP1CL& get_clone () const {
+            const int tid= omp_get_thread_num();
+            return tid == 0 ? *this : the_clones[tid][0];
+        }
+
+        bool empty () const { return surf.empty(); }
+        bool in_band() const {return inband_;}
+
+        NarrowBandCommonDataP1CL (const VecDescCL& ls_arg, const BndDataCL<>& lsetbnd_arg, const double & dst)//need check the distantce~!!!!!!
+                : ls( &ls_arg), lsetbnd( &lsetbnd_arg),dist(dst) ,lat( PrincipalLatticeCL::instance( 2)), ls_loc( lat.vertex_size())
+        { p1[0][0]= p1[1][1]= p1[2][2]= p1[3][3]= 1.; inband_=true;} // P1-Basis-Functions
+        NarrowBandCommonDataP1CL ()
+                : ls( 0), lsetbnd( 0),dist(0), lat( PrincipalLatticeCL::instance( 2))
+        { p1[0][0]= p1[1][1]= p1[2][2]= p1[3][3]= 1.; } // P1-Basis-Functions
+
+        virtual ~NarrowBandCommonDataP1CL () {}
+
+        virtual void begin_accumulation   () {
+            the_clones= new NarrowBandCommonDataP1CL*[omp_get_max_threads()];
+            the_clones[0]= this;
+        }
+        virtual void finalize_accumulation() {
+            delete[] the_clones;
+        }
+        virtual void visit (const TetraCL& t) {
+            surf.clear();
+            locp2_ls.assign( t, *ls, *lsetbnd);
+            evaluate_on_vertexes( locp2_ls, lat, Addr( ls_loc));
+            //  std::cout<<dist<<std::endl;
+            inband_=true;
+            if (distance( ls_loc)>dist)
+                // if (equal_signs( ls_loc))
+            {
+                inband_=false;
+                return;
+            }
+            surf.make_patch<MergeCutPolicyCL>( lat, ls_loc);
+        }
+        virtual NarrowBandCommonDataP1CL* clone (int clone_id) {
+            return the_clones[clone_id]= new NarrowBandCommonDataP1CL( *this);
+        }
+    };
+
+    template <class LocalMatrixT>
+    class NarrowBandMatrixAccuP1CL : public TetraAccumulatorCL
+    {
+    private:
+        const NarrowBandCommonDataP1CL& cdata_;
+        std::string name_;
+
+        MatDescCL* mat_; // the matrix
+        MatrixBuilderCL* M;
+
+        LocalMatrixT local_mat;
+
+        Uint lvl;
+        IdxT numr[4],
+                numc[4];
+
+    public:
+        NarrowBandMatrixAccuP1CL (MatDescCL* Mmat, const LocalMatrixT& loc_mat, const NarrowBandCommonDataP1CL& cdata,
+                                  std::string name= std::string())
+                : cdata_( cdata), name_( name), mat_( Mmat), M( 0), local_mat( loc_mat) {}
+        virtual ~NarrowBandMatrixAccuP1CL () {}
+
+        void set_name (const std::string& n) { name_= n; }
+
+        virtual void begin_accumulation () {
+            const IdxT num_rows= mat_->RowIdx->NumUnknowns();
+            const IdxT num_cols= mat_->ColIdx->NumUnknowns();
+            std::cout << "NarrowBandMatrixAccuP1CL::begin_accumulation";
+            if (name_ != std::string())
+                std::cout << " for \"" << name_ << "\"";
+            std::cout  << ": " << num_rows << " rows, " << num_cols << " cols.\n";
+            lvl = mat_->GetRowLevel();
+            M= new MatrixBuilderCL( &mat_->Data, num_rows, num_cols);
+        }
+
+        virtual void finalize_accumulation () {
+            M->Build();
+            delete M;
+            M= 0;
+            std::cout << "NarrowBandMatrixAccuP1CL::finalize_accumulation";
+            if (name_ != std::string())
+                std::cout << " for \"" << name_ << "\"";
+            std::cout << ": " << mat_->Data.num_nonzeros() << " nonzeros." << std::endl;
+        }
+
+        virtual void visit (const TetraCL& t) {
+
+            const NarrowBandCommonDataP1CL& cdata= cdata_.get_clone();
+            if (!cdata.in_band())
+                return;
+            local_mat.setup( t, cdata);
+            GetLocalNumbP1NoBnd( numr, t, *mat_->RowIdx);
+            GetLocalNumbP1NoBnd( numc, t, *mat_->ColIdx);
+            update_global_matrix_P1( *M, local_mat.coup, numr, numc);
+        }
+
+        virtual NarrowBandMatrixAccuP1CL* clone (int /*clone_id*/) { return new NarrowBandMatrixAccuP1CL( *this); }
+    };
 
 /// \brief Compute the load-vector corresponding to the function f on a single tetra.
 class LocalVectorP1CL
@@ -811,9 +935,9 @@ class LocalLaplaceBeltramiP1CL
             q[i]= grad[i] - dot( grad[i], n)*n;
         }
         for (int i= 0; i < 4; ++i) {
-            coup[i][i]= D_* /*area of reference triangle*/ 0.5*(dot(q[i], q[i])*absdet).sum();
+            coup[i][i]= D_* 0.5*(dot(q[i], q[i])*absdet).sum();
             for(int j= 0; j < i; ++j)
-                coup[i][j]= coup[j][i]= D_* /*area of reference triangle*/ 0.5*(dot(q[i], q[j])*absdet).sum();
+                coup[i][j]= coup[j][i]= D_* 0.5*(dot(q[i], q[j])*absdet).sum();
         }
     }
 
@@ -922,30 +1046,31 @@ class LocalLaplaceBeltramiP1CL
                 col_fe_type= P1IF_FE;
         double coup[4][4];
 
-//        void setup (const TetraCL& tet, const NarrowBandCommonDataP1CL& cdata) {
-//
-//            P1DiscCL::GetGradients( grad, dummy, tet);
-//
-//            qnormal.assign(tet,normal_,time_,Quad5DataCL::Node);
-//
-//            for(int i=0; i<4; ++i)
-//                U_Grad[i]=dot( qnormal, Quad5CL<Point3DCL>( grad[i]));
-//
-//            absdet=std::abs(dummy);
-//
-//            dummy=std::pow(absdet,1./3); //of order h--meshsize of the tetra hedra~~!!!!
-//            //  std::cout<<"dummy  "<<dummy<<std::endl;
-//            for (int i= 0; i < 4; ++i) {
-//                for(int j= 0; j <= i; ++j)
-//                {
-//                    Quad5CL<double> res3( U_Grad[i] * U_Grad[j]);
-//                    coup[i][j]= coup[j][i]=D_*(1.0+1.0/(dummy+dt_))*res3.quad(absdet/6);//D_*(D_/dummy+dummy/dt_+0.2)*// D_*
-//                    //  	std::cout<<i<<" "<<j<<" : "<<coup[i][j]<<"  "<<coup[j][i]<<" ; ";
-//                }
-//                //   std::cout<<std::endl;
-//            }
-//            // std::cin>>dummy;
-//        }
+        void setup (const TetraCL& tet, const NarrowBandCommonDataP1CL& cdata) {
+
+            P1DiscCL::GetGradients( grad, dummy, tet);
+
+            qnormal.assign(tet,normal_,time_,Quad5DataCL::Node);
+
+            for(int i=0; i<4; ++i)
+                U_Grad[i]=dot( qnormal, Quad5CL<Point3DCL>( grad[i]));
+
+            absdet=std::abs(dummy);
+
+            dummy=std::pow(absdet,1./3); //of order h--meshsize of the tetra hedra~~!!!!
+            //  std::cout<<"dummy  "<<dummy<<std::endl;
+            for (int i= 0; i < 4; ++i) {
+                for(int j= 0; j <= i; ++j)
+                {
+                    Quad5CL<double> res3( U_Grad[i] * U_Grad[j]);
+                    coup[i][j]= coup[j][i]=D_*//(1.0+1.0/(dummy+dt_))*
+                            res3.quad(absdet/6);//D_*(D_/dummy+dummy/dt_+0.2)*// D_*
+                    //  	std::cout<<i<<" "<<j<<" : "<<coup[i][j]<<"  "<<coup[j][i]<<" ; ";
+                }
+                //   std::cout<<std::endl;
+            }
+            // std::cin>>dummy;
+        }
         void setup (const TetraCL& tet, const InterfaceCommonDataP1CL& cdata) {
 
             P1DiscCL::GetGradients( grad, dummy, tet);
@@ -1423,6 +1548,8 @@ class SurfacePDEP1BaseCL
         virtual void DoStep (double /*new_t*/) {}
     };
 
+
+
 /// \brief P1-discretization and solution of the transport equation on the interface
     class SurfactantP1BaseCL: public SurfacePDEP1BaseCL
     {
@@ -1432,6 +1559,9 @@ class SurfacePDEP1BaseCL
 
         IdxDescCL idx; ///< index desctription for concentration at current time
         VecDescCL ic;  ///< concentration on the interface at current time
+
+        VecDescCL iface;  ///< interface mesh at current time
+        VecDescCL iface_old;  ///< interface mesh at current time
 
     protected:
         double        D_;     ///< diffusion coefficient
@@ -1456,9 +1586,20 @@ class SurfacePDEP1BaseCL
                             double theta, double D, VecDescCL* v, const VelBndDataT& Bnd_v, VecDescCL& lset_vd, const BndDataCL<>& lsetbnd,
                             int iter= 1000, double tol= 1e-7, double omit_bound= -1.)
                 : SurfacePDEP1BaseCL(mg, theta, v, Bnd_v, lset_vd, lsetbnd),
-                  idx( P1IF_FE), D_( D),  rhs_fun_( 0), oldidx_( P1IF_FE), gm_( pc_, 100, iter, tol, true), omit_bound_( omit_bound)
+                  idx( P1IF_FE), D_( D),  rhs_fun_( 0), oldidx_( P1IF_FE), gm_( pc_, 100, iter, tol, true),
+                  omit_bound_( omit_bound)
         { idx.GetXidx().SetBound( omit_bound);}
 
+        /*SurfactantP1BaseCL (MultiGridCL& mg,
+                            double theta, double D, VecDescCL* v, const VelBndDataT& Bnd_v, VecDescCL& lset_vd, const BndDataCL<>& lsetbnd,double width,
+                            int iter= 1000, double tol= 1e-10, double omit_bound= -1.)//This is to implement a method in a trip near the interface
+        // width is the distance between the interface and the boundary of the strip.
+        // omit_bound is not used any more
+                : SurfacePDEP1BaseCL(mg, theta, v, Bnd_v, lset_vd, lsetbnd),
+                idx( P1IF_FE), D_( D), rhs_fun_( 0), oldidx_( P1IF_FE), gm_( pc_, 1000, iter, tol, true),
+                  omit_bound_( omit_bound)
+        { idx.GetXidx().SetBound( omit_bound); }//we use the idx.extIdx_.omit_bound_ to transfer the information of the width of the strip
+        //This will be used in IndexDescCL::CreatNumbering()*/
         virtual ~SurfactantP1BaseCL () {}
 
         GMResSolverCL<GSPcCL>& GetSolver() { return gm_; }
@@ -1477,8 +1618,76 @@ class SurfacePDEP1BaseCL
         /// save a copy of the old level-set and velocity; moves ic to oldic; must be called before DoStep.
         virtual void InitTimeStep ();
 
+        virtual void DoStep0 (double /*new_t*/) {}  //used only in Class: SurfactantExtensionP1CL
+
         /// perform one time step to new_t.
         virtual void DoStep (double /*new_t*/) {}
+    };
+
+    class TransportP2FunctionCL;//???
+
+///The class is based on a stablized term in a narrow band near the interface
+    class SurfactantNarrowBandStblP1CL: public SurfactantP1BaseCL
+    {
+    public:
+        IdxDescCL full_idx;
+        MatDescCL Laplace,  ///< diffusion matrix,
+                Volume_stab, ///< stabilization matrix,
+                Mass,  ///< mass matrix
+                Conv,  ///< convection matrix
+                Massd; ///< mass matrix with interface-divergence of velocity
+
+        VecDescCL rhsext1;
+        VectorCL load, ///< for a load-function
+                rhs1_, ///< for the extension initial data
+                rhs2_; ///< for the extension initial data
+        const double width_;
+        const double rho_;///<stabilization parameter for Volume_stab
+
+
+    private:
+        MatrixCL      L_; ///< sum of matrices
+        //  instat_scalar_fun_ptr lvlset_; ///< must be the signed distance function
+        instat_vector_fun_ptr normal_; ///< the level-set function
+        TransportP2FunctionCL* fulltransport_;
+
+    public:
+        SurfactantNarrowBandStblP1CL (MultiGridCL& mg,
+                                      double theta, double D, VecDescCL* v, const VelBndDataT& Bnd_v, VecDescCL& lset_vd, const BndDataCL<>& lsetbnd,
+                                      instat_vector_fun_ptr normal,const double width, double rho,
+                                      int iter= 1000, double tol= 1e-7, double omit_bound= -1.)
+                :  SurfactantP1BaseCL( mg, theta, D, v, Bnd_v, lset_vd, lsetbnd, iter, tol, omit_bound),
+                //: SurfactantP1BaseCL( mg, theta, D, v, Bnd_v, lset_vd, lsetbnd, width, iter, tol, omit_bound),
+        full_idx( P2_FE), rhsext1(), normal_(normal), width_(width), rho_(rho)
+                   {}
+
+        /// \remarks call SetupSystem \em before calling SetTimeStep!
+        //void SetTimeStep( double dt, double theta=-1);
+
+        /// perform one time step
+
+        void DoStep0 (double new_t); //Backward Euler
+        void DoStep (double new_t);  //BDF2 method
+
+        const_DiscSolCL GetSolution() const
+        { return const_DiscSolCL( &ic, &Bnd_, &MG_); }
+        const_DiscSolCL GetSolution( const VecDescCL& Myic) const
+        { return const_DiscSolCL( &Myic, &Bnd_, &MG_); }
+        ///@}
+
+        /// \name For internal use only
+        /// The following member functions are added to enable an easier implementation
+        /// of the coupling navstokes-levelset. They should not be called by a common user.
+        /// Use DoStep() instead.
+        ///@{
+        void InitStep1 (double new_t);// one-step--Implicit Euler
+        void InitStep2 (double new_t);// two-step--BDF2 Euler, Use Backward Euler in the first time step
+        void InitStep3 (double new_t);// two-step--BDF2 Euler, In the first time step, solve the equation with smaller time step
+        void DoStep1 (); //one step-- Implicit Euler
+        void DoStep2 (); //two step-- BDF2 method
+        void CommitStep ();
+        void Update ();
+        ///@}
     };
 
 /// \brief P1-discretization and solution of the CahnHilliard equation on the interface
@@ -1496,11 +1705,11 @@ class CahnHilliardP1BaseCL: public SurfacePDEP1BaseCL
         IdxDescCL idx_c; ///< index desctription for concentration at current time
         VecDescCL ic;  ///< concentration on the interface at current time
 
-        IdxDescCL idx_mu; ///< index desctription for chemical potential at current time
+        /*IdxDescCL idx_mu; ///< index desctription for chemical potential at current time*/
         VecDescCL imu;  ///< chemical potential on the interface at current time
 
         VecDescCL iface;  ///< interface mesh at current time
-    VecDescCL iface_old;  ///< interface mesh at current time
+        VecDescCL iface_old;  ///< interface mesh at current time
 
 
 protected:
@@ -1514,13 +1723,13 @@ protected:
     IdxDescCL           oldidx_c_; ///< idx_c that corresponds to old time (and oldls_)
         VectorCL            oldic_;  ///< interface concentration at old time
 
-        IdxDescCL           oldidx_mu_; ///< idx_mu that corresponds to old time (and oldls_)
+        //IdxDescCL           oldidx_mu_; ///< idx_mu that corresponds to old time (and oldls_)
         VectorCL            oldimu_;  ///< interface chemical potential at old time
 
 
-        //block solver
-//        GSPcCL                  pc_;
-//        GMResSolverCL<GSPcCL>   gm_;
+
+        GSPcCL                  pc_;
+        GMResSolverCL<GSPcCL>   gm_;
         MatrixCL dummy_matrix_;
 
         SSORPcCL symmPcPc_;
@@ -1537,18 +1746,18 @@ protected:
                               double theta, double sigma, double epsilon, VecDescCL* v, const VelBndDataT& Bnd_v, VecDescCL& lset_vd, const BndDataCL<>& lsetbnd,
                               //MatrixCL Precond3 , MatrixCL Precond4,
                               int iter= 1000, double tol= 1e-7, double iterA=500, double tolA=1e-3, double iterB=500, double tolB=1e-3, double omit_bound= -1.)
-                : SurfacePDEP1BaseCL(mg, theta, v, Bnd_v, lset_vd, lsetbnd), idx_c( P1IF_FE), idx_mu( P1IF_FE), omit_bound_( omit_bound),
-                sigma_( sigma), epsilon_( epsilon),  rhs_fun3_( 0), rhs_fun4_( 0), oldidx_c_( P1IF_FE), oldidx_mu_( P1IF_FE),
+                : SurfacePDEP1BaseCL(mg, theta, v, Bnd_v, lset_vd, lsetbnd), idx_c( P1IF_FE), /*idx_mu( P1IF_FE),*/ omit_bound_( omit_bound),
+                sigma_( sigma), epsilon_( epsilon),  rhs_fun3_( 0), rhs_fun4_( 0), oldidx_c_( P1IF_FE), /*oldidx_mu_( P1IF_FE),*/
                 PCGSolver3_(symmPcPc_, iterA, tolA, true),
                 PCGSolver4_(symmPcPc_, iterB, tolB, true),
                 spc3_( dummy_matrix_, PCGSolver3_), spc4_( dummy_matrix_, PCGSolver4_),
                 block_pc_(spc3_,spc4_),
-                GMRes_(block_pc_, 50, iter, tol, false, true, LeftPreconditioning, true, false),
-                //gm_(pc_, 100, iter, tol, true),
+                GMRes_(block_pc_, 50, iter, tol, false, false, LeftPreconditioning, true, false),
+                gm_(pc_, 50, iter, tol, true),
                 block_gm_(GMRes_)
         {
             idx_c.GetXidx().SetBound( omit_bound);
-            idx_mu.GetXidx().SetBound( omit_bound);
+            //idx_mu.GetXidx().SetBound( omit_bound);
         }
 
         virtual ~CahnHilliardP1BaseCL () {}
@@ -1577,7 +1786,9 @@ protected:
 
         /// perform one time step to new_t.
         virtual void DoStep (double /*new_t*/) {}
-    };
+        virtual void DoStep0 (double /*new_t*/) {}
+
+};
 
 class CahnHilliardcGP1CL : public CahnHilliardP1BaseCL
     {
@@ -1627,6 +1838,75 @@ class CahnHilliardcGP1CL : public CahnHilliardP1BaseCL
         void InitStep(VectorCL&, VectorCL&, double new_t);
 
     void DoStep (const VectorCL&, const VectorCL&);
+        void CommitStep ();
+        void Update ();
+        ///@}
+    };
+
+///The class is based on a stablized term in a narrow band near the interface
+    class CahnHilliardNarrowBandStblP1CL: public CahnHilliardP1BaseCL
+    {
+    public:
+        IdxDescCL full_idx;
+        MatDescCL Laplace,  ///< diffusion matrix,
+                LaplaceM,  ///< diffusion matrix with mobility div_Gamma(M grad_Gamma)
+                Volume_stab, ///< stabilization matrix,
+                Mass,  ///< mass matrix
+                Conv,  ///< convection matrix
+                Massd, ///< mass matrix with interface-divergence of velocity
+                Mass2; ///< mass matrix: new trial- and test- functions on old interface
+
+        const double S_;//stabilization parameter for time derivative;
+
+        VecDescCL rhsext1;
+        VectorCL load, ///< for a load-function
+                rhs1_, ///< for the extension initial data
+                rhs2_; ///< for the extension initial data
+
+        const double width_;
+        const double rho_;///<stabilization parameter for Volume_stab
+
+
+    private:
+        MatrixCL      A_, B_, C_, D_; ///< blocks of the matrix
+        ///< //  instat_scalar_fun_ptr lvlset_; ///< must be the signed distance function
+        instat_vector_fun_ptr normal_; ///< the level-set function
+        //TransportP2FunctionCL* fulltransport_;
+
+    public:
+        CahnHilliardNarrowBandStblP1CL (MultiGridCL& mg, double theta, double sigma, double epsilon,
+                VecDescCL* v, const VelBndDataT& Bnd_v, VecDescCL& lset_vd, const BndDataCL<>& lsetbnd,
+                instat_vector_fun_ptr normal,const double  width, double rho, double S,
+        int iter= 999, double tol= 1.1e-7, double iterA=499, double tolA=1.1e-3, double iterB=499, double tolB=1.1e-3,double omit_bound= -1.)
+        : CahnHilliardP1BaseCL( mg, theta, sigma, epsilon, v, Bnd_v, lset_vd, lsetbnd,
+                iter, tol, iterA, tolA, iterB, tolB, omit_bound),
+          full_idx( P2_FE), rhsext1(), normal_(normal),width_(width), rho_(rho), S_(S)
+        {}
+
+        /// \remarks call SetupSystem \em before calling SetTimeStep!
+        //void SetTimeStep( double dt, double theta=-1);
+
+        /// perform one time step
+
+        void DoStep0 (double new_t); //Backward Euler
+        void DoStep (double new_t);  //BDF2 method
+
+       /* const_DiscSolCL GetSolution() const
+        { return const_DiscSolCL( &ic, &Bnd_, &MG_); }
+        const_DiscSolCL GetSolution( const VecDescCL& Myic) const
+        { return const_DiscSolCL( &Myic, &Bnd_, &MG_); }
+        ///@}*/
+
+        /// \name For internal use only
+        /// The following member functions are added to enable an easier implementation
+        /// of the coupling navstokes-levelset. They should not be called by a common user.
+        /// Use DoStep() instead.
+        ///@{
+        void InitStep1 (VectorCL&, VectorCL&, double new_t);// one-step--Implicit Euler
+        void InitStep2 (double new_t);// two-step--BDF2 Euler, Use Backward Euler in the first time step
+        void InitStep3 (double new_t);// two-step--BDF2 Euler, In the first time step, solve the equation with smaller time step
+        void DoStep1 (VectorCL&, VectorCL&); //one step-- Implicit Euler
+        void DoStep2 (VectorCL& ,VectorCL& ); //two step-- BDF2 method
         void CommitStep ();
         void Update ();
         ///@}

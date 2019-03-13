@@ -3,68 +3,75 @@
         "ProgressBar":  1,
         "DynamicLibsPrefix": "../",
         "DynamicLibs": [
-                        "misc/libmisc-scalarFunctions",
-                        "misc/libmisc-vectorFunctions"
+            "misc/libmisc-scalarFunctions",
+            "misc/libmisc-vectorFunctions"
         ]
     },
 
     "Mesh": {
         "Type":        "BrickBuilder",
-        "Origin":      [-2, -2, -2],
-        "E1":          [ 4,  0,  0],
-        "E2":          [ 0,  4,  0],
-        "E3":          [ 0,  0,  4],
-        "N1":          2,
-        "N2":          2,
-        "N3":          2,
+        "Origin":      [-1.66666, -1.66666, -1.66666],
+        "E1":          [ 3.33333,  0,  0],
+        "E2":          [ 0,  3.33333,  0],
+        "E3":          [ 0,  0,  3.33333],
+        "N1":         64,
+        "N2":          64,
+        "N3":          64,
         "RestartFile": "",
 
         "AdaptRef": {
             "Freq":          0,
             "Width":         10,
             "CoarsestLevel": 0,
-            "FinestLevel":   3,
+            "FinestLevel":   0,
             "SD":            0.1,
             "CurvDiff":      -1,
             "Discontinuous": 0
         }
     },
 
-    "Time": {
-        "FinalTime": 4,
-        "NumSteps":  32
+    "Time":
+    {
+        "Read" : 0,
+        "Write": "yes",
+        "NumSteps":	64,
+        "FinalTime": 1
     },
 
     "SurfTransp": {
-        "Enabled": 1,
 
         "Exp": {
-            "RadDrop":  [1, 1, 1],
+            "RadDrop":  [1, 0, 0],
             "PosDrop":  [0, 0, 0],
-            "RadTorus": [1, 0.7],
-            "Velocity": [0.2, 0, 0],
+            "RadTorus": [1, 0.1],
+            "Velocity": [0.2, 0.0, 0.0],
 
             "StationaryPDE": false,
-            "Wind":     "ConstantWind",
-            "Levelset": "MovingEllipsoid",
-            "Rhs":      "LaplaceBeltrami0Rhs",
-            "Solution": "LaplaceBeltrami0Sol"
-
+            "Wind":			"ConstantWind",
+            "Levelset":		"MovingEllipsoid",
+            "Normal":		"NormalMovingEllipsoid",
+            "Rhs":			"HeatConductionRhs",
+            "Solution":		"HeatConductionSol",
+            "SurfGradSol":  "HeatConductionSurfGradSol"
         },
-        "Method":     "cGcG",
+        "Method":     "NarrowBandStabilization",
         "UseMassDiv": true,
-        "Theta":      0.5,
+        "Visc": 1.0,
+        "Theta":      1,
         "Solver": {
+            "PcAIter":      500,
+            "PcATol":       1e-4,
+            "PcBIter":      500,
+            "PcBTol":       1e-4,
             "Iter": 1000,
-            "Tol":  1e-10
+            "Tol":  1e-9
         },
         "XFEMReduced":             -1,
-        "Visc":                    1,
-        "FEDegree":                2,
-        "NormalLaplaceCoefficent": 1.0,
+        "FEDegree":                1,
+        "NormalLaplaceCoefficient": 1.0,
         "SolutionOutput": {
             "Freq":   0,
-            "Path":   "solutions/iface_sol",
+            "Path":   "../../output/solutions/iface_sol",
             "Binary": true
         }
     },
@@ -93,7 +100,7 @@
 
     "VTK": {
         "Freq":           1,
-        "VTKDir":         "vtk",
+        "VTKDir":         "../../output/",
         "VTKName":        "surfactant",
         "TimeFileName":   "surfactant",
         "Binary":         1,

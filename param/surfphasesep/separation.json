@@ -10,13 +10,13 @@
 
     "Mesh": {
         "Type":        "BrickBuilder",
-        "Origin":      [-1.66666, -1.66666, -1.66666],
-        "E1":          [ 3.33333,  0,  0],
+        "Origin":      [-3.38333, -1.61666, -1.61666],
+        "E1":          [ 6.66666,  0,  0],
         "E2":          [ 0,  3.33333,  0],
         "E3":          [ 0,  0,  3.33333],
-        "N1":          1,
-        "N2":          1,
-        "N3":          1,
+        "N1":          32,
+        "N2":          16,
+        "N3":          16,
         "RestartFile": "",
 
         "AdaptRef": {
@@ -34,8 +34,8 @@
     {
         "Read" : 0,
         "Write": "yes",
-        "NumSteps":	2,
-        "FinalTime": 5
+        "NumSteps":	512,
+        "FinalTime": 1
     },
 
     "SurfSeparation": {
@@ -44,18 +44,18 @@
             "RadDrop":  [1, 0, 0],
             "PosDrop":  [0, 0, 0],
             "RadTorus": [1, 0.1],
-            "Velocity": [0.0, 0.0, 0.1],
+            "Velocity": [1.5, 0.0, 0.0],
 
             "StationaryPDE": false,
-            "Wind":     "ConstantWind",
-            "Levelset": "MovingEllipsoid",
-            "Normal": "NormalMovingEllipsoid",
-            "Rhs":      "Rhs from Second spherical harmonic",
-            "ConcentrationSolution": "Second spherical harmonic",
-            "ChemicalPotentialSolution": "Omega from Second spherical harmonic"
+            "Wind":     "MergeDropWind",
+            "Levelset": "MergeDropLset",
+            "Normal": "NormalMergeDrop",
+            "Rhs":      "ZeroScalarFun",
+            "ConcentrationSolution": "MergeDropSol",
+            "ChemicalPotentialSolution": "ZeroScalarFun"
 
         },
-        "Method":     "cGcG", 
+        "Method":     "NarrowBandStabilization",
         "UseMassDiv": true, 
         "Theta":      1,
         "Solver": {
@@ -101,7 +101,7 @@
     },
 
     "VTK": {
-        "Freq":           100,
+        "Freq":           1,
         "VTKDir":         "../../output/",
         "VTKName":        "separation",
         "TimeFileName":   "separation",
