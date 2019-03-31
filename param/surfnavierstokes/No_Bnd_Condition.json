@@ -23,7 +23,7 @@
             "Freq":          0,
             "Width":         0,
             "CoarsestLevel": 0,
-            "FinestLevel":   3,
+            "FinestLevel":   4,
             "SD":            0.1,
             "CurvDiff":      -1,
             "Discontinuous": 0
@@ -142,9 +142,9 @@
                 "FE":           "P1P1", 
                 "fullgrad":     0,
                 "model":        "NavierStokes",
-                "testcase":      "17",
-                "instationary": "BDF2",
-                "nonlinear_term": "convective",
+                "testcase":      "8",
+                "instationary": "none",
+                "nonlinear_term": "none",
                 "kinematic_viscosity": 1
     },
 
