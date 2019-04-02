@@ -1192,7 +1192,13 @@ int main (int argc, char* argv[]) {
             rhs2.Data     -= ( dot(rhs2.Data,id2) / dot(id2,id2) ) * id2;
 
         	//current timestep logfile
-        	std::ofstream log( dirname +"/"+ filename   + "time="+std::to_string(1) + ".txt");
+            std::string shiftName = "";
+        	if (P.exists("Levelset.ShiftNormRel"))
+                shiftName = "_shift=" + P.get<std::string>("Levelset.ShiftNormRel") + "h";
+            else if (P.exists("Levelset.ShiftNorm"))
+                shiftName = "_shift=" + P.get<std::string>("Levelset.ShiftNorm");
+
+        	std::ofstream log( dirname +"/"+ filename   + "time="+std::to_string(1) + shiftName + ".txt");
 
         	if (  ( P.get<std::string>("SurfNavStokes.nonlinear_term") == "convective" )
         	   || ( P.get<std::string>("SurfNavStokes.nonlinear_term") == "rotational" )

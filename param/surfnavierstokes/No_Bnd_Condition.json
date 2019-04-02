@@ -23,7 +23,7 @@
             "Freq":          0,
             "Width":         0,
             "CoarsestLevel": 0,
-            "FinestLevel":   4,
+            "FinestLevel":   1,
             "SD":            0.1,
             "CurvDiff":      -1,
             "Discontinuous": 0
@@ -112,9 +112,8 @@
             "Tol":		     1e-10,
             "Iter":		     500
         },
-	"ShiftNorm":	0,
-	"ShiftNormRel":	0,
- 	"ShiftDir":	[0, 1, 1]
+	"ShiftNorm":	0.01,
+ 	"ShiftDir":	[1, 1, 1]
     },
 
     "Reparam":
