@@ -112,8 +112,8 @@
             "Tol":		     1e-10,
             "Iter":		     500
         },
-	"ShiftNorm":	0.01,
- 	"ShiftDir":	[1, 1, 1]
+        "ShiftNormRel":	0.3,
+ 	    "ShiftDir":	[1, 1, 1]
     },
 
     "Reparam":

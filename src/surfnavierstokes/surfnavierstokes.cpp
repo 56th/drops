@@ -114,21 +114,22 @@ int main (int argc, char* argv[]) {
         std::cout << "The levelset is the torus_flower." << std::endl;
     }
 
+    double h = P.get<DROPS::Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")*std::pow(2., -P.get<double>("Mesh.AdaptRef.FinestLevel"));
+    if (levelset_fun_str == "sphere_2" && (P.exists("Levelset.ShiftNorm") || P.exists("Levelset.ShiftNormRel")) && P.exists("Levelset.ShiftDir")) {
+        auto shiftNorm = P.exists("Levelset.ShiftNormRel") ? P.get<double>("Levelset.ShiftNormRel") * h : P.get<double>("Levelset.ShiftNorm");
+        sphere_2_shift = P.get<DROPS::Point3DCL>("Levelset.ShiftDir");
+        sphere_2_shift /= sphere_2_shift.norm();
+        sphere_2_shift *= shiftNorm;
+        std::cout << "Refined bulk mesh will be constracted w/\n\tLevelset.ShiftNorm = " << sphere_2_shift << '\n';
+    }
+
     // adaptive mesh refinement based on level set function
     typedef DROPS::DistMarkingStrategyCL InitMarkerT;
     InitMarkerT initmarker( levelset_fun, P.get<double>("Mesh.AdaptRef.Width"), 0, P.get<int>("Mesh.AdaptRef.FinestLevel") );
     adap.set_marking_strategy( &initmarker );
     adap.MakeInitialTriang();
     adap.set_marking_strategy( 0 );
-    double h = P.get<DROPS::Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")*std::pow(2., -P.get<double>("Mesh.AdaptRef.FinestLevel"));
-
-    if (levelset_fun_str == "sphere_2" && (P.exists("Levelset.ShiftNorm") || P.exists("Levelset.ShiftNormRel")) && P.exists("Levelset.ShiftDir")) {
-        auto shiftNorm = P.exists("Levelset.ShiftNormRel") ? P.get<double>("Levelset.ShiftNormRel") * h : P.get<double>("Levelset.ShiftNorm");
-        sphere_2_shift = P.get<DROPS::Point3DCL>("Levelset.ShiftDir");
-        sphere_2_shift /= sphere_2_shift.norm();
-        sphere_2_shift *= shiftNorm;
-        std::cout << "Refined bulk mesh is constracted w/ Levelset.ShiftNorm = 0; now we set\n\tsphere_2_shift = " << sphere_2_shift << '\n';
-    }
+    sphere_2_shift *= 0.;
 
     // create level set
     instat_scalar_fun_ptr sigma (0);
