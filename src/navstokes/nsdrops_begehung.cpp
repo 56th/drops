@@ -378,9 +378,9 @@ PlotMTVSolOutCL<DiscVel>::put(std::ostream &os) const
         if ( std::fabs(tit->GetCoord()[1] -0.5 ) > 1.e-10 )
             continue;
 
-            os << tit->GetCoord()[0] << ' ' << tit->GetCoord()[2] << " 0.0\t"
-               << _discsol.val(*tit)[0] << ' ' << _discsol.val(*tit)[2] << _discsol.val(*tit)[1]
-               << '\n';
+        os << tit->GetCoord()[0] << ' ' << tit->GetCoord()[2] << " 0.0\t"
+            << _discsol.val(*tit)[0] << ' ' << _discsol.val(*tit)[2] << _discsol.val(*tit)[1]
+            << '\n';
     }
     os.flags(old_format);
     return os  << std::endl;

@@ -242,7 +242,7 @@ void NonlConvSystemAccumulator_P2CL::begin_accumulation ()
     std::cout << "entering NonlConvSystemP2CL";
     if (smoothed)
         std::cout << " [smoothed]";
-	std::cout << "\n";
+    std::cout << "\n";
     const size_t num_unks_vel= RowIdx.NumUnknowns();
     mN_= new SparseMatBuilderCL<double, SDiagMatrixCL<3> >( &N, num_unks_vel, num_unks_vel);
     if (cplN != 0) {

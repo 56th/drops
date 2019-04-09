@@ -661,8 +661,8 @@ void InitZeroExactCL::DetermineDistances()
             }
         }
     }
-    if (perp)    delete perp;    perp=0;
-    if (locPerp) delete locPerp; locPerp=0;
+    if (perp)    { delete perp;    perp=0; }
+    if (locPerp) { delete locPerp; locPerp=0; }
 }
 }
 
