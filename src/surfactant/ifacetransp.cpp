@@ -326,19 +326,23 @@ void SetupInterfaceRhsP1 (const MultiGridCL& mg, VecDescCL* v,
 
   ////////////////////////////////////////////////////////////////////////////
 
-  /// SetupStokes
+/// SetupStokes
 /// \brief Setup of the local Stokes system on a tetra intersected by the dividing surface.
-class LocalStokesCL
-{
+class LocalStokesCL {
   private:
+    bool useExactNormals;
     const PrincipalLatticeCL& lat;
     LocalP1CL<> P1Hat[4];
     LocalP2CL<> P2Hat[10];
     LocalP1CL<Point3DCL> P2GradRef[10], P2Grad[10];
     Point3DCL P1Grad[4];
-    GridFunctionCL<Point3DCL> qnormal, qrotP1[12], qvP1, qvProjP1, qProj[3];
+
+    GridFunctionCL<Point3DCL>
+            qP2Normal,
+            qExactOrP2Normal,
+            qrotP1[12], qvP1, qvProjP1, qProj[3];
     GridFunctionCL<Point3DCL> qsurfP1grad[4], qsurfP2grad[10];
-    GridFunctionCL<> qP1Hat[4], qP2Hat[10], qconvP1[4], qdivP1, qnormal_comp[3], qvProjP1_comp[3], qvP1_comp[3];
+    GridFunctionCL<> qP1Hat[4], qP2Hat[10], qconvP1[4], qdivP1, qP2NormalComp[3], qvProjP1_comp[3], qvP1_comp[3];
 
 
     QuadDomain2DCL  q2Ddomain;
@@ -354,15 +358,19 @@ class LocalStokesCL
     void Get_Normals(const LocalP2CL<>& ls, LocalP1CL<Point3DCL>&);
 
   public:
-    LocalStokesCL ( bool fullGradient)
-        : lat( PrincipalLatticeCL::instance( 2)), ls_loc( lat.vertex_size()), fullGrad(fullGradient)
-    {
-        P1DiscCL::GetP1Basis( P1Hat);
-        P2DiscCL::GetP2Basis( P2Hat);
-        P2DiscCL::GetGradientsOnRef( P2GradRef);
+    LocalStokesCL(bool fullGradient, size_t n = 2, bool uen = false)
+        : lat(PrincipalLatticeCL::instance(n))
+        , ls_loc(lat.vertex_size())
+        , fullGrad(fullGradient)
+        , useExactNormals(uen) {
+        P1DiscCL::GetP1Basis(P1Hat);
+        P2DiscCL::GetP2Basis(P2Hat);
+        P2DiscCL::GetGradientsOnRef(P2GradRef);
         std::cout<<"full gradient="<<fullGrad<<std::endl;
+        std::cout<<"numb of virtual subedges="<<n<<std::endl;
     }
-
+    Uint num_intervals() const { return lat.num_intervals(); }
+    void exportPatchInfo(std::string const & path, const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const TetraCL& tet);
     void calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const TetraCL& tet); ///< has to be called before any setup method!
     void calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const LocalP1CL<Point3DCL>& v, const TetraCL& tet); // for conv term
     void calc3DIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const TetraCL& tet); ///< has to be called after calcIntegrands!
@@ -419,10 +427,8 @@ void LocalStokesCL::calc3DIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>&
 
     resize_and_evaluate_on_vertexes (Normals, q3Ddomain, q3Dnormal);
     // Scale Normals accordingly to the Euclidean Norm (only consider the ones which make a contribution in the sense of them being big enough... otherwise one has to expect problems with division through small numbers)
-    for(Uint i=0; i<q3Dnormal.size(); ++i) {
-         //if(qnormal[i].norm()> 1e-8)
+    for(Uint i=0; i<q3Dnormal.size(); ++i)
          q3Dnormal[i]= q3Dnormal[i]/q3Dnormal[i].norm();
-    }
 
     resize_and_evaluate_on_vertexes (&Normal_sphere2, tet, q3Ddomain, 0., q3DexactNormal);
 
@@ -436,192 +442,167 @@ void LocalStokesCL::calc3DIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>&
     }
 }
 
-void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const TetraCL& tet)
-{
-    P2DiscCL::GetGradients( P2Grad, P2GradRef, T);
-    P1DiscCL::GetGradients( P1Grad, T);
-    evaluate_on_vertexes( ls, lat, Addr( ls_loc));
-    spatch.make_patch<MergeCutPolicyCL>( lat, ls_loc);
+void LocalStokesCL::exportPatchInfo(std::string const & path, const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const TetraCL& tet) {
+    // std::stringstream stdout;
+    auto id = tet.GetId().GetIdent();
+    // stdout << "tet id: " << id << '\n';
+    std::ofstream
+        vertices    (path + "/" + std::to_string(id) + "_vertices.txt"),
+        triangles   (path + "/" + std::to_string(id) + "_triangles.txt"),
+        normals     (path + "/" + std::to_string(id) + "_normals.txt"),
+        tetrahedron(path + "/" + std::to_string(id) + "_tetrahedron.txt");
+
+    evaluate_on_vertexes(ls, lat, Addr(ls_loc));
+    spatch.make_patch<MergeCutPolicyCL>(lat, ls_loc);
+
+    // export tet
+    for (auto v = tet.GetVertBegin(); v != tet.GetVertEnd(); ++v)
+        tetrahedron << (*v)->GetCoord() << '\n';
+
+    // export vertices
+    // stdout << "vertices:\n";
+    spatch.compute_world_vertexes(tet);
+    for (auto v = spatch.world_vertex_begin(); v != spatch.world_vertex_end(); ++v) {
+        // stdout << (*v) << '\n';
+        vertices << (*v) << '\n';
+    }
+
+    // export triangles
+    // stdout << "triangles:\n";
+    for (auto t = spatch.facet_begin(); t != spatch.facet_end(); ++t) {
+        // stdout << (*t) << '\n';
+        triangles << (*t) << '\n';
+    }
+
+    // export normals
+    // stdout << "normals:\n";
+    spatch.compute_normals(tet);
+    for (auto n = spatch.normal_begin(); n != spatch.normal_end(); ++n) {
+        // stdout << (*n) << '\n';
+        normals << (*n) << '\n';
+    }
+
+    // stdout << '\n';
+    // std::cout << stdout.str();
+}
+
+void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const TetraCL& tet) {
+    P2DiscCL::GetGradients(P2Grad, P2GradRef, T);
+    P1DiscCL::GetGradients(P1Grad, T);
+    evaluate_on_vertexes(ls, lat, Addr(ls_loc));
+    spatch.make_patch<MergeCutPolicyCL>(lat, ls_loc);
     // The routine takes the information about the tetrahedra and the cutting surface and generates a two-dimensional triangulation of the cut, including the necessary point-positions and weights for the quadrature
-    make_CompositeQuad5Domain2D ( q2Ddomain, spatch, tet);
+    make_CompositeQuad5Domain2D(q2Ddomain, spatch, tet);
     LocalP1CL<Point3DCL> Normals;
     Get_Normals(ls, Normals);
     // Resize and evaluate Normals at all points which are needed for the two-dimensional quadrature-rule
-    resize_and_evaluate_on_vertexes (Normals, q2Ddomain, qnormal);
+    resize_and_evaluate_on_vertexes(Normals, q2Ddomain, qP2Normal);
     // Scale Normals accordingly to the Euclidean Norm (only consider the ones which make a contribution in the sense of them being big enough... otherwise one has to expect problems with division through small numbers)
-    for(Uint i=0; i<qnormal.size(); ++i) {
-         //if(qnormal[i].norm()> 1e-8)
-         qnormal[i]= qnormal[i]/qnormal[i].norm();
+    for(Uint i=0; i<qP2Normal.size(); ++i) {
+        qP2Normal[i]= qP2Normal[i]/qP2Normal[i].norm();
+    }
+    qExactOrP2Normal = qP2Normal;
+    if (useExactNormals) {
+        size_t numbOfQuadPoints = qP2Normal.size() / spatch.facet_size();
+//        std::stringstream stdout;
+//        stdout << "tet id: " << tet.GetId().GetIdent() << '\n';
+//        stdout << "numb of quad points: " << numbOfQuadPoints << '\n';
+        std::vector<Point3DCL> qExactNormalInit;
+        qExactNormalInit.reserve(numbOfQuadPoints * spatch.facet_size());
+        spatch.compute_normals(tet);
+        for (auto n = spatch.normal_begin(); n != spatch.normal_end(); ++n)
+            for (size_t i = 0; i < numbOfQuadPoints; ++i)
+                qExactNormalInit.emplace_back(*n);
+        qExactOrP2Normal.resize(qExactNormalInit.size());
+        std::copy(qExactNormalInit.begin(), qExactNormalInit.end(), begin(qExactOrP2Normal));
+//        for (auto const & v : qExactOrP2Normal)
+//            stdout << v << '\n';
+//        std::cout << stdout.str();
     }
     // Provide all components of the normals
     for (int k=0; k<3; ++k) {
-        qnormal_comp[k].resize( q2Ddomain.vertex_size());
-        ExtractComponent( qnormal, qnormal_comp[k], k);
+        qP2NormalComp[k].resize( q2Ddomain.vertex_size());
+        ExtractComponent( qP2Normal, qP2NormalComp[k], k);
     }
-
     // Resize and evaluate P2 basis functions
     for(int j=0; j<10 ;++j) {
         resize_and_evaluate_on_vertexes( P2Hat[j], q2Ddomain, qP2Hat[j]);
         resize_and_evaluate_on_vertexes( P2Grad[j], q2Ddomain, qsurfP2grad[j]);
-//        qsurfP2grad[j].resize( q2Ddomain.vertex_size());
-//        qsurfP2grad[j]= P2Grad[j];
-        qsurfP2grad[j]-= dot( qsurfP2grad[j], qnormal)*qnormal;
+        qsurfP2grad[j]-= dot( qsurfP2grad[j], qExactOrP2Normal)*qExactOrP2Normal;
     }
     // Resize and evaluate of all the 4 P1 Gradient Functions and apply pointwise projections   (P grad \xi_j  for j=1..4)
     for(int j=0; j<4 ;++j) {
-//        resize_and_evaluate_on_vertexes( P1Grad[j], q2Ddomain, qsurfP1grad[j]);
         resize_and_evaluate_on_vertexes( P1Hat[j], q2Ddomain, qP1Hat[j]);
         qsurfP1grad[j].resize( q2Ddomain.vertex_size());
         qsurfP1grad[j]= P1Grad[j];
-        qsurfP1grad[j]-= dot( qsurfP1grad[j], qnormal)*qnormal;
+        qsurfP1grad[j]-= dot( qsurfP1grad[j], qExactOrP2Normal)*qExactOrP2Normal;
     }
     // Apply pointwise projection to the 3 std basis vectors e_k
     for(int k=0; k<3 ;++k) {
-        //resize_and_evaluate_on_vertexes( P1Grad[j], q2Ddomain, qsurfP1grad[j]);
         qProj[k].resize( q2Ddomain.vertex_size());
         Point3DCL e_k= DROPS::std_basis<3>( k+1);
         qProj[k]= e_k;
-        qProj[k]-= dot( e_k, qnormal)*qnormal;
+        qProj[k]-= dot(e_k, qExactOrP2Normal)*qExactOrP2Normal;
     }
 }
 
 // for convective term
-void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const LocalP1CL<Point3DCL>& v , const TetraCL& tet)
+void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const LocalP1CL<Point3DCL>& v, const TetraCL& tet)
 {
-
-    P2DiscCL::GetGradients( P2Grad, P2GradRef, T);
-    P1DiscCL::GetGradients( P1Grad, T);
-    evaluate_on_vertexes( ls, lat, Addr( ls_loc));
-    spatch.make_patch<MergeCutPolicyCL>( lat, ls_loc);
-    // The routine takes the information about the tetrahedra and the cutting surface and generates a two-dimensional triangulation of the cut, including the necessary point-positions and weights for the quadrature
-    make_CompositeQuad5Domain2D ( q2Ddomain, spatch, tet);
-    LocalP1CL<Point3DCL> Normals;
-    Get_Normals(ls, Normals);
-    // Resize and evaluate Normals at all points which are needed for the two-dimensional quadrature-rule
-
-    /////////////////Y
-    //resize_and_evaluate_on_vertexes (&Normal_sphere2, tet, q2Ddomain,0., qnormal);
-    resize_and_evaluate_on_vertexes (Normals, q2Ddomain, qnormal);
-    /////////////////
-
+    calcIntegrands(T, ls, tet);
     for(int j=0; j<4; ++j) {
-                q2DP1Grad[j].resize( q2Ddomain.vertex_size());
-                q2DP1Grad[j]= P1Grad[j];
-            }
-
-
-    // Scale Normals accordingly to the Euclidean Norm (only consider the ones which make a contribution in the sense of them being big enough... otherwise one has to expect problems with division through small numbers)
-    for(Uint i=0; i<qnormal.size(); ++i) {
-         //if(qnormal[i].norm()> 1e-8)
-         qnormal[i]= qnormal[i]/qnormal[i].norm();
+        q2DP1Grad[j].resize( q2Ddomain.vertex_size());
+        q2DP1Grad[j] = P1Grad[j];
     }
-    // Provide all components of the normals
-    for (int k=0; k<3; ++k) {
-        qnormal_comp[k].resize( q2Ddomain.vertex_size());
-        ExtractComponent( qnormal, qnormal_comp[k], k);
-    }
-
-    // Resize and evaluate P2 basis functions
-    for(int j=0; j<10 ;++j) {
-        resize_and_evaluate_on_vertexes( P2Hat[j], q2Ddomain, qP2Hat[j]);
-        resize_and_evaluate_on_vertexes( P2Grad[j], q2Ddomain, qsurfP2grad[j]);
-//        qsurfP2grad[j].resize( q2Ddomain.vertex_size());
-//        qsurfP2grad[j]= P2Grad[j];
-        qsurfP2grad[j]-= dot( qsurfP2grad[j], qnormal)*qnormal;
-    }
-    // Resize and evaluate of all the 4 P1 Gradient Functions and apply pointwise projections   (P grad \xi_j  for j=1..4)
-
-    for(int j=0; j<4 ;++j) {
-//        resize_and_evaluate_on_vertexes( P1Grad[j], q2Ddomain, qsurfP1grad[j]);
-        resize_and_evaluate_on_vertexes( P1Hat[j], q2Ddomain, qP1Hat[j]);
-        qsurfP1grad[j].resize( q2Ddomain.vertex_size());
-        qsurfP1grad[j]= P1Grad[j];
-        qsurfP1grad[j]-= dot( qsurfP1grad[j], qnormal)*qnormal;
-
-    }
-    // Apply pointwise projection to the 3 std basis vectors e_k
-    for(int k=0; k<3 ;++k) {
-        //resize_and_evaluate_on_vertexes( P1Grad[j], q2Ddomain, qsurfP1grad[j]);
-        qProj[k].resize( q2Ddomain.vertex_size());
-        Point3DCL e_k= DROPS::std_basis<3>( k+1);
-        qProj[k]= e_k;
-
-        qProj[k]-= dot( e_k, qnormal)*qnormal;
-
-    }
-
     //physical velocity, tetra P1 function
     LocalP1CL<Point3DCL> velocity;
-    for(int i=0; i<4 ; ++i)
-    {
+    for(int i=0; i<4 ; ++i) {
     	velocity += v[i]*P1Hat[i];
     }
-
     //restrict to a tri(quad) element or "trace" it
     resize_and_evaluate_on_vertexes (velocity, q2Ddomain, qvP1);
-
-
     //get tangential part of tri P1 function
     qvProjP1.resize( q2Ddomain.vertex_size());
     qvProjP1 = qvP1;
-    qvProjP1 -= dot(qvP1, qnormal)*qnormal;
-
-
+    qvProjP1 -= dot(qvP1, qExactOrP2Normal)*qExactOrP2Normal;
     //P1 function Projected discrete velocity
     GridFunctionCL<Point3DCL> qvdiscP1;
     LocalP1CL<> v_comp;
-
  	for(int n=0; n<3 ; ++n)
  	{
  		ExtractComponent( v, v_comp, n);
  		qvdiscP1 += v_comp*qProj[n];
-
  	}
     resize_and_evaluate_on_vertexes (velocity, q2Ddomain, qvdiscP1);
-
-
     qdivP1.resize( q2Ddomain.vertex_size());
     for(int m=0; m<4 ; ++m)
     {
     	qdivP1 += dot(qvdiscP1[m],qsurfP1grad[m]);
     }
-
-
-
     //extract components of tangential velocity as tri P1 functions
     for (int k=0; k<3; ++k) {
     	 qvProjP1_comp[k].resize( q2Ddomain.vertex_size());
           ExtractComponent( qvProjP1, qvProjP1_comp[k], k);
       }
-
-   /* std::cout << "min|v|     : " <<std::sqrt( dot(v,v).min() ) << std::endl;
-
+    /*std::cout << "min|v|     : " <<std::sqrt( dot(v,v).min() ) << std::endl;
     std::cout << "max|v|     : " <<std::sqrt( dot(v,v).max() ) << std::endl;
-
-
-    std::cout << "|velocity| : " <<std::sqrt( dot(velocity,velocity).max() ) << std::endl;
-*/
-   /* std::cout << "|qvP1|     : " <<std::sqrt( dot(qvP1,qvP1).max() ) << std::endl;
+    std::cout << "|velocity| : " <<std::sqrt( dot(velocity,velocity).max() ) << std::endl;*/
+    /*std::cout << "|qvP1|     : " <<std::sqrt( dot(qvP1,qvP1).max() ) << std::endl;
     std::cout << "|qvProjP1|     : " <<std::sqrt( dot(qvProjP1,qvProjP1).max() ) << std::endl;
-    std::cout << "|qvProjP1_comp|     : " <<std::sqrt((qvProjP1_comp[0]*qvProjP1_comp[0]+qvProjP1_comp[1]*qvProjP1_comp[1]+qvProjP1_comp[2]*qvProjP1_comp[2]).max() ) << std::endl;
-*/
-
+    std::cout << "|qvProjP1_comp|     : " <<std::sqrt((qvProjP1_comp[0]*qvProjP1_comp[0]+qvProjP1_comp[1]*qvProjP1_comp[1]+qvProjP1_comp[2]*qvProjP1_comp[2]).max() ) << std::endl;*/
     //for convective nonlinear term
     for(int i=0; i<4 ;++i) {
     	qconvP1[i].resize( q2Ddomain.vertex_size());
     	qconvP1[i] = dot( qsurfP1grad[i], qvP1)  ;
-   }
-
-
+    }
     //for calculation curl
-   for (int i=0; i<4; i++)
+    for (int i=0; i<4; i++)
     {
     	for (int k=0; k<3; k++)
     	{
     		GridFunctionCL<Point3DCL>  qlocal;
     		//LocalP1CL<Point3DCL> qlocal;
     		qlocal.resize(q2Ddomain.vertex_size());
-
     		for (int index=0; index<3; index++)
     		{
     			if (k==index) continue;
@@ -666,14 +647,9 @@ void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& l
     					multiplier=1;
     				}
     			}
-
-
     			GridFunctionCL<double>  ql;
     			ql.resize( q2Ddomain.vertex_size());
-
     			ExtractComponent( q2DP1Grad[i], ql, right_index);
-
-
     			Point3DCL e= DROPS::std_basis<3>( index+1);
     			GridFunctionCL<Point3DCL> ee ;
 				ee.resize( q2Ddomain.vertex_size());
@@ -681,12 +657,10 @@ void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& l
     			qlocal += ql*ee;
 
     		}
-
     		qrotP1[3*i+k].resize( q2Ddomain.vertex_size());
     		//resize_and_evaluate_on_vertexes (qlocal, q2Ddomain, qrotP1[3*i+k]);
     		qrotP1[3*i+k]=qlocal;
-   		 //std::cout << "|qrotP1|     : " <<std::sqrt( dot(qrotP1[3*i+k],qrotP1[3*i+k]).max() ) << std::endl;
-
+    		//std::cout << "|qrotP1|     : " <<std::sqrt( dot(qrotP1[3*i+k],qrotP1[3*i+k]).max() ) << std::endl;
     	}
     }
 }
@@ -856,7 +830,7 @@ void LocalStokesCL::setupS_P2 (double S_P2[30][30])
         for (int j=0; j<10; ++j) {
             for (int k=0; k<3; ++k) {
                 for (int l=0; l<3; ++l) {
-                     S_P2[3*i+k][3*j+l]= quad_2D( qP2Hat[i]*qnormal_comp[k]*qP2Hat[j]*qnormal_comp[l], q2Ddomain);
+                     S_P2[3*i+k][3*j+l]= quad_2D( qP2Hat[i]*qP2NormalComp[k]*qP2Hat[j]*qP2NormalComp[l], q2Ddomain);
                 }
             }
         }
@@ -870,7 +844,7 @@ void LocalStokesCL::setupS_P1 (double S_P1[12][12])
         for (int j=0; j<4; ++j) {
             for (int k=0; k<3; ++k) {
                 for (int l=0; l<3; ++l) {
-                     S_P1[3*i+k][3*j+l]= quad_2D( qP1Hat[i]*qnormal_comp[k]*qP1Hat[j]*qnormal_comp[l], q2Ddomain);
+                     S_P1[3*i+k][3*j+l]= quad_2D( qP1Hat[i]*qP2NormalComp[k]*qP1Hat[j]*qP2NormalComp[l], q2Ddomain);
                 }
             }
         }
@@ -886,7 +860,7 @@ void LocalStokesCL::setupL_P1P2 (double L_P1P2[4][30])
        // resize_and_evaluate_on_vertexes( P1Hat[i], q2Ddomain, qP1Hat);
         for (int j=0; j<10; ++j) {
             for (int k=0; k<3; ++k) {
-                L_P1P2[i][3*j+k]= quad_2D( qP1Hat[i]*qP2Hat[j]*qnormal_comp[k], q2Ddomain);
+                L_P1P2[i][3*j+k]= quad_2D( qP1Hat[i]*qP2Hat[j]*qP2NormalComp[k], q2Ddomain);
             }
         }
     }
@@ -914,7 +888,7 @@ void LocalStokesCL::setupL_P1P1 (double L_P1P1[4][12])
       //  resize_and_evaluate_on_vertexes( P1Hat[i], q2Ddomain, qP1Hat);
         for (int j=0; j<4; ++j) {
             for (int k=0; k<3; ++k) {
-                L_P1P1[i][3*j+k]= quad_2D( qP1Hat[i]*qP1Hat[j]*qnormal_comp[k], q2Ddomain);
+                L_P1P1[i][3*j+k]= quad_2D( qP1Hat[i]*qP1Hat[j]*qP2NormalComp[k], q2Ddomain);
             }
         }
     }
@@ -939,7 +913,7 @@ void LocalStokesCL::setupL_P2P1 (double L_P2P1[10][12])
     for (int i=0; i < 10; ++i) {
         for (int j=0; j<4; ++j) {
             for (int k=0; k<3; ++k) {
-                L_P2P1[i][3*j+k]= quad_2D( qP2Hat[i]*qP1Hat[j]*qnormal_comp[k], q2Ddomain);
+                L_P2P1[i][3*j+k]= quad_2D( qP2Hat[i]*qP1Hat[j]*qP2NormalComp[k], q2Ddomain);
             }
         }
     }
@@ -964,7 +938,7 @@ void LocalStokesCL::setupL_P2P2 (double L_P2P2[10][30])
     for (int i=0; i < 10; ++i) {
         for (int j=0; j<10; ++j) {
             for (int k=0; k<3; ++k) {
-                L_P2P2[i][3*j+k]= quad_2D( qP2Hat[i]*qP2Hat[j]*qnormal_comp[k], q2Ddomain);
+                L_P2P2[i][3*j+k]= quad_2D( qP2Hat[i]*qP2Hat[j]*qP2NormalComp[k], q2Ddomain);
             }
         }
     }
@@ -1049,7 +1023,7 @@ void LocalStokesCL::setupOmega_P1P1 (double Omega_P1P1[4][12])
             for (int m=0; m<4; ++m) {
               	//Omega_P1P1[m][3*i+k]= quad_2D( dot( qrotP1[3*i+k], qrotP1[3*i+k])*qP1Hat[m], q2Ddomain);
 
-            	Omega_P1P1[m][3*i+k]= quad_2D( dot( qnormal, qrotP1[3*i+k])*qP1Hat[m], q2Ddomain);
+            	Omega_P1P1[m][3*i+k]= quad_2D( dot( qExactOrP2Normal, qrotP1[3*i+k])*qP1Hat[m], q2Ddomain);
             }
         }
     }
@@ -1268,6 +1242,7 @@ void StokesIFAccumulator_P1P1CL::update_global_system ()
 class NavierStokesIFAccumulator_P1P1CL : public TetraAccumulatorCL
 {
   protected:
+    const LevelsetP2CL& lSet;
     const VecDescCL& lset;
     const VecDescCL& velocity;
     const LsetBndDataCL& lset_bnd;
@@ -1293,7 +1268,7 @@ class NavierStokesIFAccumulator_P1P1CL : public TetraAccumulatorCL
     void update_global_system ();
 
   public:
-    NavierStokesIFAccumulator_P1P1CL ( const VecDescCL& ls, const VecDescCL& v, const LsetBndDataCL& ls_bnd, const BndDataCL<Point3DCL>& v_bnd, IdxDescCL& P1FE, IdxDescCL& ScalarP1FE, MatrixCL& A_P1, MatrixCL& A_P1_stab, MatrixCL& B_P1P1,MatrixCL& Omega_P1P1, MatrixCL& N_P1, MatrixCL& NT_P1, MatrixCL& M_P1, MatrixCL& D_P1, MatrixCL& S_P1, MatrixCL& L_P1P1, MatrixCL& L_P1P1_stab, MatrixCL& M_ScalarP1, MatrixCL& A_ScalarP1_stab, MatrixCL& Schur_normalP1_stab, bool fullGradient);
+    NavierStokesIFAccumulator_P1P1CL ( const LevelsetP2CL& ls, const VecDescCL& v, const LsetBndDataCL& ls_bnd, const BndDataCL<Point3DCL>& v_bnd, IdxDescCL& P1FE, IdxDescCL& ScalarP1FE, MatrixCL& A_P1, MatrixCL& A_P1_stab, MatrixCL& B_P1P1,MatrixCL& Omega_P1P1, MatrixCL& N_P1, MatrixCL& NT_P1, MatrixCL& M_P1, MatrixCL& D_P1, MatrixCL& S_P1, MatrixCL& L_P1P1, MatrixCL& L_P1P1_stab, MatrixCL& M_ScalarP1, MatrixCL& A_ScalarP1_stab, MatrixCL& Schur_normalP1_stab, bool fullGradient);
 
     ///\brief Initializes matrix-builders and load-vectors
     void begin_accumulation ();
@@ -1306,8 +1281,8 @@ class NavierStokesIFAccumulator_P1P1CL : public TetraAccumulatorCL
 
 };
 
-NavierStokesIFAccumulator_P1P1CL::NavierStokesIFAccumulator_P1P1CL( const VecDescCL& ls, const VecDescCL& v, const LsetBndDataCL& ls_bnd, const BndDataCL<Point3DCL>& v_bnd, IdxDescCL& P1FE, IdxDescCL& ScalarP1FE, MatrixCL& A_P1, MatrixCL& A_P1_stab, MatrixCL& B_P1P1,MatrixCL& Omega_P1P1, MatrixCL& N_P1, MatrixCL& NT_P1, MatrixCL& M_P1,MatrixCL& D_P1, MatrixCL& S_P1, MatrixCL& L_P1P1, MatrixCL& L_P1P1_stab, MatrixCL& M_ScalarP1, MatrixCL& A_ScalarP1_stab, MatrixCL& Schur_normalP1_stab, bool fullGradient)
- : lset(ls), velocity(v), lset_bnd(ls_bnd), velocity_bnd(v_bnd), P1Idx_(P1FE), ScalarP1Idx_(ScalarP1FE), A_P1_(A_P1), A_P1_stab_(A_P1_stab), B_P1P1_(B_P1P1),Omega_P1P1_(Omega_P1P1),N_P1_(N_P1), NT_P1_(NT_P1),M_P1_(M_P1),D_P1_(D_P1), S_P1_(S_P1), L_P1P1_(L_P1P1), L_P1P1_stab_(L_P1P1_stab), M_ScalarP1_(M_ScalarP1), A_ScalarP1_stab_(A_ScalarP1_stab),Schur_normalP1_stab_(Schur_normalP1_stab), localStokes_( fullGradient)
+NavierStokesIFAccumulator_P1P1CL::NavierStokesIFAccumulator_P1P1CL( const LevelsetP2CL& ls, const VecDescCL& v, const LsetBndDataCL& ls_bnd, const BndDataCL<Point3DCL>& v_bnd, IdxDescCL& P1FE, IdxDescCL& ScalarP1FE, MatrixCL& A_P1, MatrixCL& A_P1_stab, MatrixCL& B_P1P1,MatrixCL& Omega_P1P1, MatrixCL& N_P1, MatrixCL& NT_P1, MatrixCL& M_P1,MatrixCL& D_P1, MatrixCL& S_P1, MatrixCL& L_P1P1, MatrixCL& L_P1P1_stab, MatrixCL& M_ScalarP1, MatrixCL& A_ScalarP1_stab, MatrixCL& Schur_normalP1_stab, bool fullGradient)
+ : lSet(ls), lset(ls.Phi), velocity(v), lset_bnd(ls_bnd), velocity_bnd(v_bnd), P1Idx_(P1FE), ScalarP1Idx_(ScalarP1FE), A_P1_(A_P1), A_P1_stab_(A_P1_stab), B_P1P1_(B_P1P1),Omega_P1P1_(Omega_P1P1),N_P1_(N_P1), NT_P1_(NT_P1),M_P1_(M_P1),D_P1_(D_P1), S_P1_(S_P1), L_P1P1_(L_P1P1), L_P1P1_stab_(L_P1P1_stab), M_ScalarP1_(M_ScalarP1), A_ScalarP1_stab_(A_ScalarP1_stab),Schur_normalP1_stab_(Schur_normalP1_stab), localStokes_(fullGradient, ls.numbOfVirtualSubEdges, ls.useExactNormals)
 {}
 
 void NavierStokesIFAccumulator_P1P1CL::begin_accumulation ()
@@ -1394,11 +1369,11 @@ void NavierStokesIFAccumulator_P1P1CL::local_setup (const TetraCL& tet)
     n.assign( tet, P1Idx_, P1Idx_.GetBndInfo());
     nScalar.assign( tet, ScalarP1Idx_, ScalarP1Idx_.GetBndInfo());
 
-    //GetLocalNumbP1NoBnd( numP1, tet, P1Idx_);
-    //GetLocalNumbP1NoBnd( numScalarP1, tet, ScalarP1Idx_);
+    // GetLocalNumbP1NoBnd( numP1, tet, P1Idx_);
+    // GetLocalNumbP1NoBnd( numScalarP1, tet, ScalarP1Idx_);
+    // localStokes_.exportPatchInfo("../../../MKL-Eigs-for-Sparse-Matrices/output/patch/hOver" + std::to_string(localStokes_.num_intervals()), T, ls_loc, tet);
 
-
-    localStokes_.calcIntegrands( T, ls_loc, v_loc, tet);
+    localStokes_.calcIntegrands(T, ls_loc, v_loc, tet);
     localStokes_.calc3DIntegrands(T, ls_loc, tet);
     localStokes_.setupA_P1( locA_P1);
     localStokes_.setupN_P1( locN_P1);
@@ -1511,7 +1486,7 @@ void SetupNavierStokesIF_P1P1(
         MatDescCL* L_P1P1_stab,
         MatDescCL* M_ScalarP1,
         MatDescCL* A_ScalarP1_stab,
-        MatDescCL* Schur_normalP1_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, const VecDescCL& velocity, const BndDataCL<Point3DCL>& velocity_bnd, bool fullgrad)
+        MatDescCL* Schur_normalP1_stab, const LevelsetP2CL& lset, const LsetBndDataCL& lset_bnd, const VecDescCL& velocity, const BndDataCL<Point3DCL>& velocity_bnd, bool fullgrad)
 {
   ScopeTimerCL scope("SetupNavierStokesIF_P1P1");
   NavierStokesIFAccumulator_P1P1CL accu( lset, velocity, lset_bnd, velocity_bnd, *(A_P1->RowIdx), *(L_P1P1->RowIdx), A_P1->Data, A_P1_stab->Data, B_P1P1->Data, Omega_P1P1->Data,  N_P1->Data, NT_P1->Data, M_P1->Data, D_P1->Data, S_P1->Data, L_P1P1->Data, L_P1P1_stab->Data, M_ScalarP1->Data, A_ScalarP1_stab->Data, Schur_normalP1_stab->Data, fullgrad);

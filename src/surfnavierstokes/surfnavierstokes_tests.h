@@ -549,7 +549,7 @@ void TestAllP2MatricesWithP1Matrices(const MultiGridCL& MG, LevelsetP2CL& lset, 
     Schur_normalP1_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
 
 
-    SetupNavierStokesIF_P1P1(MG, &A_P1, &A_P1_stab, &B_P1P1, &Omega_P1P1,&C_P1,&CT_P1, &M_P1,&D_P1, &S_P1, &L_P1P1, &L_P1P1_stab, &Schur_P1, &Schur_P1_stab,&Schur_normalP1_stab, lset.Phi, lset.GetBndData(),
+    SetupNavierStokesIF_P1P1(MG, &A_P1, &A_P1_stab, &B_P1P1, &Omega_P1P1,&C_P1,&CT_P1, &M_P1,&D_P1, &S_P1, &L_P1P1, &L_P1P1_stab, &Schur_P1, &Schur_P1_stab,&Schur_normalP1_stab, lset, lset.GetBndData(),
     		//Y
     		lset.Phi, bb,
 			//

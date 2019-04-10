@@ -106,6 +106,8 @@ class LevelsetP2CL : public ProblemCL< LevelsetCoeffCL, LsetBndDataCL>
     bool IsDG;
 
   public:
+    size_t numbOfVirtualSubEdges = 2;
+    bool   useExactNormals = false;
     MatrixCL            E, H;  ///< E: mass matrix, H: convection matrix
     VecDescCL           rhs;  ///< rhs due to boundary conditions
 

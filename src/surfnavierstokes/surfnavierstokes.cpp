@@ -115,6 +115,7 @@ int main (int argc, char* argv[]) {
     }
 
     double h = P.get<DROPS::Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")*std::pow(2., -P.get<double>("Mesh.AdaptRef.FinestLevel"));
+    std::cout << "h is: " << std::to_string(float(h)) << std::endl;
     if (levelset_fun_str == "sphere_2" && (P.exists("Levelset.ShiftNorm") || P.exists("Levelset.ShiftNormRel")) && P.exists("Levelset.ShiftDir")) {
         auto shiftNorm = P.exists("Levelset.ShiftNormRel") ? P.get<double>("Levelset.ShiftNormRel") * h : P.get<double>("Levelset.ShiftNorm");
         sphere_2_shift = P.get<DROPS::Point3DCL>("Levelset.ShiftDir");
@@ -140,6 +141,9 @@ int main (int argc, char* argv[]) {
     read_BndData( lsbnd, mg, P.get_child( "Levelset.BndData"));
 
     DROPS::LevelsetP2CL & lset( * DROPS::LevelsetP2CL::Create( mg, lsbnd, sf) );
+    lset.numbOfVirtualSubEdges = P.get<size_t >("Levelset.NumbOfVirtualSubEdges");
+    lset.useExactNormals = P.get<std::string>("Levelset.UseExactNormals") == "yes" ? true : false;
+    if (lset.useExactNormals) std::cout << "Using EXACT normals in surf integrands\n";
 
     lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
     lset.Phi.SetIdx( &lset.idx);
@@ -173,7 +177,6 @@ int main (int argc, char* argv[]) {
 
     double hat_epsilon =           epsilon; //Constant for L_stab
 
-    std::cout << "h is: " << h << std::endl;
     std::cout << "tau is: " << tau << std::endl;
     ParameterNS::h = h;
 
@@ -310,7 +313,7 @@ int main (int argc, char* argv[]) {
         Schur_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
         Schur_normal_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
 
-        SetupNavierStokesIF_P1P1(mg, &A, &A_stab, &B, &Omega, &N, &NT, &M, &D, &S, &L, &L_stab, &Schur, &Schur_stab, &Schur_normal_stab, lset.Phi, lset.GetBndData(), v, vbnd, fullgrad);
+        SetupNavierStokesIF_P1P1(mg, &A, &A_stab, &B, &Omega, &N, &NT, &M, &D, &S, &L, &L_stab, &Schur, &Schur_stab, &Schur_normal_stab, lset, lset.GetBndData(), v, vbnd, fullgrad);
         //    SetupStokesIF_P1P1(mg, &A, &A_stab, &B, &M, &S, &L, &L_stab, &Schur, &Schur_stab, lset.Phi, lset.GetBndData(), fullgrad);
 
         Schur_hat.LinComb(1., Schur.Data, rho, Schur_stab.Data);
@@ -995,7 +998,7 @@ int main (int argc, char* argv[]) {
         		}
 
                 //set up current matrices based in previous timestep velocity and levelset
-                SetupNavierStokesIF_P1P1(mg, &A, &A_stab, &B, &Omega, &N, &NT, &M, &D, &S,  &L, &L_stab, &Schur, &Schur_stab, &Schur_normal_stab, lset.Phi, lset.GetBndData(), v_aux, vbnd, fullgrad);
+                SetupNavierStokesIF_P1P1(mg, &A, &A_stab, &B, &Omega, &N, &NT, &M, &D, &S,  &L, &L_stab, &Schur, &Schur_stab, &Schur_normal_stab, lset, lset.GetBndData(), v_aux, vbnd, fullgrad);
 
                 //construct final matrices for a linear solver
         		Ahat.LinComb(mu, A.Data, c/tau, M.Data, eta, S.Data, epsilon, A_stab.Data);
@@ -1199,7 +1202,11 @@ int main (int argc, char* argv[]) {
             else if (P.exists("Levelset.ShiftNorm"))
                 shiftName = "_shift=" + P.get<std::string>("Levelset.ShiftNorm");
 
-        	std::ofstream log( dirname +"/"+ filename   + "time="+std::to_string(1) + shiftName + ".txt");
+            std::string normalsName = "_normals=";
+            if (lset.useExactNormals) normalsName += "exact";
+            else normalsName += "P2";
+
+        	std::ofstream log( dirname +"/"+ filename   + "time="+std::to_string(1) + normalsName + shiftName + ".txt");
 
         	if (  ( P.get<std::string>("SurfNavStokes.nonlinear_term") == "convective" )
         	   || ( P.get<std::string>("SurfNavStokes.nonlinear_term") == "rotational" )
@@ -1227,7 +1234,7 @@ int main (int argc, char* argv[]) {
         			p_old = p;
 
         		    //setup matrices based on v_old
-        			SetupNavierStokesIF_P1P1(mg, &A, &A_stab, &B, &Omega, &N, &NT, &M, &D, &S, &L, &L_stab, &Schur, &Schur_stab, &Schur_normal_stab, lset.Phi, lset.GetBndData(), v_old, vbnd, fullgrad);
+        			SetupNavierStokesIF_P1P1(mg, &A, &A_stab, &B, &Omega, &N, &NT, &M, &D, &S, &L, &L_stab, &Schur, &Schur_stab, &Schur_normal_stab, lset, lset.GetBndData(), v_old, vbnd, fullgrad);
 
         			Ahat.LinComb(mu, A.Data, 1.0, M.Data, eta, S.Data, epsilon, A_stab.Data);
         			Bhat.LinComb(1., B.Data, 0.,B.Data);
