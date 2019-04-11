@@ -128,6 +128,14 @@ template <class T>
     return std::inner_product( Addr( v), Addr( v) + v.size(), Addr( w), T());
 }
 
+template <class T>
+inline VectorBaseCL<T> operator-(const VectorBaseCL<T>& v, const VectorBaseCL<T>& w) {
+    Assert( v.size()==w.size(), "operator-: incompatible dimensions", DebugNumericC);
+    auto r = v;
+    std::transform(begin(r), end(r), begin(w), begin(r), std::minus<T>());
+    return r;
+}
+
 template <class VT>
   inline typename VT::value_type
   norm_sq(const VT& v)
@@ -1495,7 +1503,7 @@ y_Ax(T* __restrict y,
 
 
 template <typename _MatEntry, typename _VecEntry>
-VectorBaseCL<_VecEntry> operator * (const SparseMatBaseCL<_MatEntry>& A, const VectorBaseCL<_VecEntry>& x)
+VectorBaseCL<_VecEntry> operator*(const SparseMatBaseCL<_MatEntry>& A, const VectorBaseCL<_VecEntry>& x)
 {
     VectorBaseCL<_VecEntry> ret( A.num_rows());
     Assert( A.num_cols()==x.size(), "SparseMatBaseCL * VectorBaseCL: incompatible dimensions", DebugNumericC);
@@ -1507,7 +1515,6 @@ VectorBaseCL<_VecEntry> operator * (const SparseMatBaseCL<_MatEntry>& A, const V
           Addr( x));
     return ret;
 }
-
 
 // y+= A^T*x
 // fails, if num_rows==0.

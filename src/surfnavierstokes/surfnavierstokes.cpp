@@ -1329,51 +1329,78 @@ int main (int argc, char* argv[]) {
         	log << "eta is: " << std::to_string((float) eta*pow(h, -eta_order) )<< std::endl;
         	log << "Total iterations: " << Solver->GetIter() << '\n';
         	log	<< "Final residual: " << Solver->GetResid() << '\n';
-        	if( !velFE.compare("P2")) {
-        		vxtent.SetIdx( &vecP2idx);
-        		Extend(mg, v, vxtent);
-        		BndDataCL<Point3DCL> bndvec = vbnd;
-        		log << "The L2-Norm of v - vSol is: " << L2_Vector_error(mg, lset.Phi, lset.GetBndData(), make_P2Eval(mg, bndvec, vxtent), extvsol) << std::endl;
-        		double H1( 0.), surfH1( 0.), advanced_surfH1( 0.), normal_velocity;
-        		H1_Vector_error_P2(mg, lset.Phi, lset.GetBndData(), v, vbnd, extvsol, extsol_grad1, extsol_grad2, extsol_grad3, eta, H1, surfH1, advanced_surfH1, normal_velocity);
-        		//        std::cout << "The H1-Norm of v - vSol is: " << H1 << std::endl;
-        		//        std::cout << "The surfH1-Norm of v - vSol is: " << surfH1 << std::endl;
-        		log << "The advanced surfH1-Norm of v - vSol is: " << advanced_surfH1 << std::endl;
-        		log << "The U-Norm of v - vSol is: " << std::sqrt(advanced_surfH1*advanced_surfH1 + epsilon*dot(A_stab.Data*v.Data, v.Data)) << std::endl;
-        		log << "The L2-Norm of v * n is: " << normal_velocity << std::endl;
-        		if ( !prFE.compare("P1")) {
-        			pxtent.SetIdx( &P1FEidx);
-        			Extend(mg, p, pxtent);
-        			BndDataCL<double> bndscalar = pbnd;
-        			double L2_Lagrange =L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndscalar, pxtent), extpsol);
-        			log << "The L2-Norm of p - pSol is: " << L2_Lagrange << std::endl;
-        			log << "The M-Norm of p - pSol is: " << std::sqrt(L2_Lagrange*L2_Lagrange + hat_epsilon*dot(Schur_stab.Data*p.Data, p.Data)) << std::endl;
-        		}
-        	} else if( !velFE.compare("P1")) {
-        		vxtent.SetIdx( &vecP1idx);
-        		Extend(mg, v, vxtent);
-        		BndDataCL<Point3DCL> bndvec = vbnd; // !!!
-        		log << "The L2-Norm of v - vSol is: " << L2_Vector_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndvec, vxtent), extvsol) << std::endl;
-        		double l2norm = L2_Vector_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndvec, vxtent), &ZeroVectorFun);
-        		log << "The L2-Norm of v  is: " << l2norm<< std::endl;
-        		log_solo << std::to_string((float)(l2norm*l2norm*0.5)) << std::endl;
-        		double H1( 0.), surfH1( 0.), advanced_surfH1( 0.), normal_velocity( 0.);
-        		H1_Vector_error_P1(mg, lset.Phi, lset.GetBndData(), v, vbnd, extvsol, extsol_grad1, extsol_grad2, extsol_grad3, eta, H1, surfH1, advanced_surfH1, normal_velocity);
-        		//        std::cout << "The H1-Norm of v - vSol is: " << H1 << std::endl;
-        		//        std::cout << "The surfH1-Norm of v - vSol is: " << surfH1 << std::endl;
-        		log << "The advanced surfH1-Norm of v - vSol is: " << advanced_surfH1 << std::endl;
-        		//log << "The U-Norm of v - vSol is: " << std::sqrt(advanced_surfH1*advanced_surfH1 + epsilon*dot(A_stab.Data*v.Data, v.Data)) << std::endl;
-        		log << "The L2-Norm of v * n is: " << normal_velocity << std::endl;
-        		if ( !prFE.compare("P1")) {
-        			pxtent.SetIdx( &P1FEidx);
-        			Extend(mg, p, pxtent);
-        			BndDataCL<double> bndscalar = pbnd;
-        			double L2_Lagrange =L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndscalar, pxtent), extpsol);
-        			log << "The L2-Norm of p - pSol is: " << L2_Lagrange << std::endl;
-        			log << "The L2-Norm of p  is: " << L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndscalar, pxtent), &ZeroScalarFun);
-        			//log << "The M-Norm of p - pSol is: " << std::sqrt(L2_Lagrange*L2_Lagrange + alpha*dot(Schur_stab.Data*p.Data, p.Data)) << std::endl;
-        		}
-        	}
+
+            std::cout << "stiffness mtx is              " << Adyn.num_rows() << " * " << Adyn.num_cols() << '\n';
+            std::cout << "velocity soln size is         " << v.Data.size() << '\n';
+            std::cout << "exact velocity interp size is " << vSol.Data.size() << '\n';
+            std::cout << "pre mass mtx is               " << Schur.Data.num_rows() << " * " << Schur.Data.num_cols() << '\n';
+            std::cout << "pressure soln size is         " << p.Data.size() << '\n';
+            std::cout << "exact pressure interp size is " << pSol.Data.size() << '\n';
+
+            VectorCL vSolMinusV = vSol.Data - v.Data, pSolMinusP = pSol.Data - p.Data;
+            auto velL2          = sqrt(dot(v.Data, M.Data * v.Data));
+            auto velNormalL2    = sqrt(dot(v.Data, S.Data * v.Data));
+            auto velH1err       = sqrt(dot(vSolMinusV, A.Data * vSolMinusV));
+            auto velL2err       = sqrt(dot(vSolMinusV, M.Data * vSolMinusV));
+            auto preL2          = sqrt(dot(p.Data, Schur.Data * p.Data));
+            auto preL2err       = sqrt(dot(pSolMinusP, Schur.Data * pSolMinusP));
+
+            log << "The L2-Norm of v - vSol is: " << velL2err << '\n';
+            log << "The L2-Norm of v  is: " << velL2 << '\n';
+            log_solo << std::to_string((float)(velL2*velL2*0.5)) << '\n';
+            log << "The H1-Norm of v - vSol is: " << velH1err << '\n';
+            log << "The L2-Norm of v * n is: " << velNormalL2 << '\n';
+            log << "The L2-Norm of p - pSol is: " << preL2err << '\n';
+            log << "The L2-Norm of p  is: " << preL2;
+
+//            if( !velFE.compare("P2")) {
+//        		vxtent.SetIdx( &vecP2idx);
+//        		Extend(mg, v, vxtent);
+//        		BndDataCL<Point3DCL> bndvec = vbnd;
+//        		log << "The L2-Norm of v - vSol is: " << L2_Vector_error(mg, lset.Phi, lset.GetBndData(), make_P2Eval(mg, bndvec, vxtent), extvsol) << std::endl;
+//        		double H1( 0.), surfH1( 0.), advanced_surfH1( 0.), normal_velocity;
+//        		H1_Vector_error_P2(mg, lset.Phi, lset.GetBndData(), v, vbnd, extvsol, extsol_grad1, extsol_grad2, extsol_grad3, eta, H1, surfH1, advanced_surfH1, normal_velocity);
+//        		//        std::cout << "The H1-Norm of v - vSol is: " << H1 << std::endl;
+//        		//        std::cout << "The surfH1-Norm of v - vSol is: " << surfH1 << std::endl;
+//        		log << "The advanced surfH1-Norm of v - vSol is: " << advanced_surfH1 << std::endl;
+//        		log << "The U-Norm of v - vSol is: " << std::sqrt(advanced_surfH1*advanced_surfH1 + epsilon*dot(A_stab.Data*v.Data, v.Data)) << std::endl;
+//        		log << "The L2-Norm of v * n is: " << normal_velocity << std::endl;
+//        		if ( !prFE.compare("P1")) {
+//        			pxtent.SetIdx( &P1FEidx);
+//        			Extend(mg, p, pxtent);
+//        			BndDataCL<double> bndscalar = pbnd;
+//        			double L2_Lagrange =L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndscalar, pxtent), extpsol);
+//        			log << "The L2-Norm of p - pSol is: " << L2_Lagrange << std::endl;
+//        			log << "The M-Norm of p - pSol is: " << std::sqrt(L2_Lagrange*L2_Lagrange + hat_epsilon*dot(Schur_stab.Data*p.Data, p.Data)) << std::endl;
+//        		}
+//        	} else if( !velFE.compare("P1")) {
+//        		vxtent.SetIdx( &vecP1idx);
+//        		Extend(mg, v, vxtent);
+//        		BndDataCL<Point3DCL> bndvec = vbnd; // !!!
+//        		log << "The L2-Norm of v - vSol is: " << L2_Vector_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndvec, vxtent), extvsol) << std::endl;
+//        		double l2norm = L2_Vector_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndvec, vxtent), &ZeroVectorFun);
+//        		log << "The L2-Norm of v  is: " << l2norm<< std::endl;
+//        		log_solo << std::to_string((float)(l2norm*l2norm*0.5)) << std::endl;
+//        		double H1( 0.), surfH1( 0.), advanced_surfH1( 0.), normal_velocity( 0.);
+//
+//        		H1_Vector_error_P1(mg, lset.Phi, lset.GetBndData(), v, vbnd, extvsol, extsol_grad1, extsol_grad2, extsol_grad3, eta, H1, surfH1, advanced_surfH1, normal_velocity);
+//
+//        		//        std::cout << "The H1-Norm of v - vSol is: " << H1 << std::endl;
+//        		//        std::cout << "The surfH1-Norm of v - vSol is: " << surfH1 << std::endl;
+//        		log << "The advanced surfH1-Norm of v - vSol is: " << advanced_surfH1 << std::endl;
+//        		//log << "The U-Norm of v - vSol is: " << std::sqrt(advanced_surfH1*advanced_surfH1 + epsilon*dot(A_stab.Data*v.Data, v.Data)) << std::endl;
+//        		log << "The L2-Norm of v * n is: " << normal_velocity << std::endl;
+//        		if ( !prFE.compare("P1")) {
+//        			pxtent.SetIdx( &P1FEidx);
+//        			Extend(mg, p, pxtent);
+//        			BndDataCL<double> bndscalar = pbnd;
+//        			double L2_Lagrange =L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndscalar, pxtent), extpsol);
+//        			log << "The L2-Norm of p - pSol is: " << L2_Lagrange << std::endl;
+//        			log << "The L2-Norm of p  is: " << L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndscalar, pxtent), &ZeroScalarFun);
+//        			//log << "The M-Norm of p - pSol is: " << std::sqrt(L2_Lagrange*L2_Lagrange + alpha*dot(Schur_stab.Data*p.Data, p.Data)) << std::endl;
+//        		}
+//        	}
+
         }
 
         log_solo.close();
