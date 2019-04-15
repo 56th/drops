@@ -39,7 +39,7 @@ These can be used to compile the different executables.
 
 To build the MPI version of DROPS (to be used on a parallel computer),
 the graph partitioner library ParMETIS is used. Download ParMETIS 4.0.2
-and install it on your machine. After that, add the path to ParMETIS and METIS
+and install it on your machine. After that, modify the path to ParMETIS and METIS
 (which is part of ParMETIS) in the `CMakeSettings.txt` in the `src` directory.
 
 Of course, an MPI library is needed, which is often chosen by using a corresponding
@@ -78,5 +78,6 @@ For example, if the executable `twophasedrops`
 resides in the directory `drops/bin/levelset`, from within that directory call
 
 ```bash
+mkdir vtk  # for VTK output
 ./twophasedrops ../../param/levelset/twophasedrops/risingbutanoldroplet.json
 ```
