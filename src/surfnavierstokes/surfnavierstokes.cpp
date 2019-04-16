@@ -292,7 +292,7 @@ int main (int argc, char* argv[]) {
         Schur.SetIdx(&ifaceP1idx, &ifaceP1idx);
         Schur_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
 
-        SetupStokesIF_P2P1(mg, &A, &A_stab, &B, &M, &S, &L, &L_stab, &Schur, &Schur_stab, lset.Phi, lset.GetBndData(), fullgrad);
+        SetupStokesIF_P2P1(mg, &A, &A_stab, &B, &M, &S, &Schur, &Schur_normal_stab, lset, fullgrad);
 
         Schur_hat.LinComb(1., Schur.Data, rho, Schur_stab.Data);
     } else if( !FE.compare("P1P1")) {
@@ -313,8 +313,8 @@ int main (int argc, char* argv[]) {
         Schur_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
         Schur_normal_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
 
-        SetupNavierStokesIF_P1P1(mg, &A, &A_stab, &B, &Omega, &N, &NT, &M, &D, &S, &L, &L_stab, &Schur, &Schur_stab, &Schur_normal_stab, lset, lset.GetBndData(), v, vbnd, fullgrad);
-        //    SetupStokesIF_P1P1(mg, &A, &A_stab, &B, &M, &S, &L, &L_stab, &Schur, &Schur_stab, lset.Phi, lset.GetBndData(), fullgrad);
+        SetupNavierStokesIF_P1P1(mg, &A, &A_stab, &B, &Omega, &N, &NT, &M, &D, &S, &L, &L_stab, &Schur, &Schur_stab, &Schur_normal_stab, lset, v, vbnd, fullgrad);
+        // SetupStokesIF_P1P1(mg, &A, &A_stab, &B, &M, &S, &L, &L_stab, &Schur, &Schur_stab, lset.Phi, lset.GetBndData(), fullgrad);
 
         Schur_hat.LinComb(1., Schur.Data, rho, Schur_stab.Data);
 
@@ -998,7 +998,7 @@ int main (int argc, char* argv[]) {
         		}
 
                 //set up current matrices based in previous timestep velocity and levelset
-                SetupNavierStokesIF_P1P1(mg, &A, &A_stab, &B, &Omega, &N, &NT, &M, &D, &S,  &L, &L_stab, &Schur, &Schur_stab, &Schur_normal_stab, lset, lset.GetBndData(), v_aux, vbnd, fullgrad);
+                SetupNavierStokesIF_P1P1(mg, &A, &A_stab, &B, &Omega, &N, &NT, &M, &D, &S,  &L, &L_stab, &Schur, &Schur_stab, &Schur_normal_stab, lset, v_aux, vbnd, fullgrad);
 
                 //construct final matrices for a linear solver
         		Ahat.LinComb(mu, A.Data, c/tau, M.Data, eta, S.Data, epsilon, A_stab.Data);
@@ -1234,7 +1234,7 @@ int main (int argc, char* argv[]) {
         			p_old = p;
 
         		    //setup matrices based on v_old
-        			SetupNavierStokesIF_P1P1(mg, &A, &A_stab, &B, &Omega, &N, &NT, &M, &D, &S, &L, &L_stab, &Schur, &Schur_stab, &Schur_normal_stab, lset, lset.GetBndData(), v_old, vbnd, fullgrad);
+        			SetupNavierStokesIF_P1P1(mg, &A, &A_stab, &B, &Omega, &N, &NT, &M, &D, &S, &L, &L_stab, &Schur, &Schur_stab, &Schur_normal_stab, lset, v_old, vbnd, fullgrad);
 
         			Ahat.LinComb(mu, A.Data, 1.0, M.Data, eta, S.Data, epsilon, A_stab.Data);
         			Bhat.LinComb(1., B.Data, 0.,B.Data);

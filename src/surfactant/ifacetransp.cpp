@@ -1242,7 +1242,6 @@ void StokesIFAccumulator_P1P1CL::update_global_system ()
 class NavierStokesIFAccumulator_P1P1CL : public TetraAccumulatorCL
 {
   protected:
-    const LevelsetP2CL& lSet;
     const VecDescCL& lset;
     const VecDescCL& velocity;
     const LsetBndDataCL& lset_bnd;
@@ -1268,7 +1267,7 @@ class NavierStokesIFAccumulator_P1P1CL : public TetraAccumulatorCL
     void update_global_system ();
 
   public:
-    NavierStokesIFAccumulator_P1P1CL ( const LevelsetP2CL& ls, const VecDescCL& v, const LsetBndDataCL& ls_bnd, const BndDataCL<Point3DCL>& v_bnd, IdxDescCL& P1FE, IdxDescCL& ScalarP1FE, MatrixCL& A_P1, MatrixCL& A_P1_stab, MatrixCL& B_P1P1,MatrixCL& Omega_P1P1, MatrixCL& N_P1, MatrixCL& NT_P1, MatrixCL& M_P1, MatrixCL& D_P1, MatrixCL& S_P1, MatrixCL& L_P1P1, MatrixCL& L_P1P1_stab, MatrixCL& M_ScalarP1, MatrixCL& A_ScalarP1_stab, MatrixCL& Schur_normalP1_stab, bool fullGradient);
+    NavierStokesIFAccumulator_P1P1CL ( const LevelsetP2CL& ls, const VecDescCL& v, const BndDataCL<Point3DCL>& v_bnd, IdxDescCL& P1FE, IdxDescCL& ScalarP1FE, MatrixCL& A_P1, MatrixCL& A_P1_stab, MatrixCL& B_P1P1,MatrixCL& Omega_P1P1, MatrixCL& N_P1, MatrixCL& NT_P1, MatrixCL& M_P1, MatrixCL& D_P1, MatrixCL& S_P1, MatrixCL& L_P1P1, MatrixCL& L_P1P1_stab, MatrixCL& M_ScalarP1, MatrixCL& A_ScalarP1_stab, MatrixCL& Schur_normalP1_stab, bool fullGradient);
 
     ///\brief Initializes matrix-builders and load-vectors
     void begin_accumulation ();
@@ -1281,8 +1280,8 @@ class NavierStokesIFAccumulator_P1P1CL : public TetraAccumulatorCL
 
 };
 
-NavierStokesIFAccumulator_P1P1CL::NavierStokesIFAccumulator_P1P1CL( const LevelsetP2CL& ls, const VecDescCL& v, const LsetBndDataCL& ls_bnd, const BndDataCL<Point3DCL>& v_bnd, IdxDescCL& P1FE, IdxDescCL& ScalarP1FE, MatrixCL& A_P1, MatrixCL& A_P1_stab, MatrixCL& B_P1P1,MatrixCL& Omega_P1P1, MatrixCL& N_P1, MatrixCL& NT_P1, MatrixCL& M_P1,MatrixCL& D_P1, MatrixCL& S_P1, MatrixCL& L_P1P1, MatrixCL& L_P1P1_stab, MatrixCL& M_ScalarP1, MatrixCL& A_ScalarP1_stab, MatrixCL& Schur_normalP1_stab, bool fullGradient)
- : lSet(ls), lset(ls.Phi), velocity(v), lset_bnd(ls_bnd), velocity_bnd(v_bnd), P1Idx_(P1FE), ScalarP1Idx_(ScalarP1FE), A_P1_(A_P1), A_P1_stab_(A_P1_stab), B_P1P1_(B_P1P1),Omega_P1P1_(Omega_P1P1),N_P1_(N_P1), NT_P1_(NT_P1),M_P1_(M_P1),D_P1_(D_P1), S_P1_(S_P1), L_P1P1_(L_P1P1), L_P1P1_stab_(L_P1P1_stab), M_ScalarP1_(M_ScalarP1), A_ScalarP1_stab_(A_ScalarP1_stab),Schur_normalP1_stab_(Schur_normalP1_stab), localStokes_(fullGradient, ls.numbOfVirtualSubEdges, ls.useExactNormals)
+NavierStokesIFAccumulator_P1P1CL::NavierStokesIFAccumulator_P1P1CL( const LevelsetP2CL& ls, const VecDescCL& v, const BndDataCL<Point3DCL>& v_bnd, IdxDescCL& P1FE, IdxDescCL& ScalarP1FE, MatrixCL& A_P1, MatrixCL& A_P1_stab, MatrixCL& B_P1P1,MatrixCL& Omega_P1P1, MatrixCL& N_P1, MatrixCL& NT_P1, MatrixCL& M_P1,MatrixCL& D_P1, MatrixCL& S_P1, MatrixCL& L_P1P1, MatrixCL& L_P1P1_stab, MatrixCL& M_ScalarP1, MatrixCL& A_ScalarP1_stab, MatrixCL& Schur_normalP1_stab, bool fullGradient)
+ : lset(ls.Phi), velocity(v), lset_bnd(ls.GetBndData()), velocity_bnd(v_bnd), P1Idx_(P1FE), ScalarP1Idx_(ScalarP1FE), A_P1_(A_P1), A_P1_stab_(A_P1_stab), B_P1P1_(B_P1P1),Omega_P1P1_(Omega_P1P1),N_P1_(N_P1), NT_P1_(NT_P1),M_P1_(M_P1),D_P1_(D_P1), S_P1_(S_P1), L_P1P1_(L_P1P1), L_P1P1_stab_(L_P1P1_stab), M_ScalarP1_(M_ScalarP1), A_ScalarP1_stab_(A_ScalarP1_stab),Schur_normalP1_stab_(Schur_normalP1_stab), localStokes_(fullGradient, ls.numbOfVirtualSubEdges, ls.useExactNormals)
 {}
 
 void NavierStokesIFAccumulator_P1P1CL::begin_accumulation ()
@@ -1486,10 +1485,10 @@ void SetupNavierStokesIF_P1P1(
         MatDescCL* L_P1P1_stab,
         MatDescCL* M_ScalarP1,
         MatDescCL* A_ScalarP1_stab,
-        MatDescCL* Schur_normalP1_stab, const LevelsetP2CL& lset, const LsetBndDataCL& lset_bnd, const VecDescCL& velocity, const BndDataCL<Point3DCL>& velocity_bnd, bool fullgrad)
+        MatDescCL* Schur_normalP1_stab, const LevelsetP2CL& lset, const VecDescCL& velocity, const BndDataCL<Point3DCL>& velocity_bnd, bool fullgrad)
 {
   ScopeTimerCL scope("SetupNavierStokesIF_P1P1");
-  NavierStokesIFAccumulator_P1P1CL accu( lset, velocity, lset_bnd, velocity_bnd, *(A_P1->RowIdx), *(L_P1P1->RowIdx), A_P1->Data, A_P1_stab->Data, B_P1P1->Data, Omega_P1P1->Data,  N_P1->Data, NT_P1->Data, M_P1->Data, D_P1->Data, S_P1->Data, L_P1P1->Data, L_P1P1_stab->Data, M_ScalarP1->Data, A_ScalarP1_stab->Data, Schur_normalP1_stab->Data, fullgrad);
+  NavierStokesIFAccumulator_P1P1CL accu( lset, velocity, velocity_bnd, *(A_P1->RowIdx), *(L_P1P1->RowIdx), A_P1->Data, A_P1_stab->Data, B_P1P1->Data, Omega_P1P1->Data,  N_P1->Data, NT_P1->Data, M_P1->Data, D_P1->Data, S_P1->Data, L_P1P1->Data, L_P1P1_stab->Data, M_ScalarP1->Data, A_ScalarP1_stab->Data, Schur_normalP1_stab->Data, fullgrad);
   TetraAccumulatorTupleCL accus;
   //    MaybeAddProgressBar(MG_, "LapBeltr(P2) Setup", accus, RowIdx.TriangLevel());
   accus.push_back( &accu);
@@ -1694,10 +1693,10 @@ class StokesIFAccumulator_P2P1CL : public TetraAccumulatorCL
     IdxDescCL& ScalarP1Idx_;
     IdxT numP2[10], numScalarP1[4];
 
-    MatrixCL &A_P2_, &A_P2_stab_, &B_P1P2_, &M_P2_, &S_P2_, &L_P1P2_, &L_P1P2_stab_, &M_ScalarP1_, &A_ScalarP1_stab_;
-    MatrixBuilderCL *mA_P2_, *mA_P2_stab_, *mB_P1P2_, *mM_P2_, *mS_P2_, *mL_P1P2_, *mL_P1P2_stab_, *mM_ScalarP1_, *mA_ScalarP1_stab_ ;
+    MatrixCL &A_P2_, &A_P2_stab_, &B_P1P2_, &M_P2_, &S_P2_, &M_ScalarP1_, &A_ScalarP1_stab_;
+    MatrixBuilderCL *mA_P2_, *mA_P2_stab_, *mB_P1P2_, *mM_P2_, *mS_P2_, *mM_ScalarP1_, *mA_ScalarP1_stab_;
 
-    double locA_P2[30][30], locA_P2_stab[10][10], locB_P1P2[4][30], locM_P2[10][10], locS_P2[30][30], locL_P1P2[4][30], locL_P1P2_stab[4][30], locM_ScalarP1[4][4], locA_ScalarP1_stab[4][4];
+    double locA_P2[30][30], locA_P2_stab[10][10], locB_P1P2[4][30], locM_P2[10][10], locS_P2[30][30], locM_ScalarP1[4][4], locA_ScalarP1_stab[4][4];
 
     LocalStokesCL localStokes_;
 
@@ -1710,8 +1709,10 @@ class StokesIFAccumulator_P2P1CL : public TetraAccumulatorCL
     ///\brief Update the global system.
     void update_global_system ();
 
-  public:
-    StokesIFAccumulator_P2P1CL ( const VecDescCL& ls, const LsetBndDataCL& ls_bnd, IdxDescCL& P2FE, IdxDescCL& ScalarP1FE, MatrixCL& A_P2, MatrixCL& A_P2_stab, MatrixCL& B_P1P2, MatrixCL& M_P2, MatrixCL& S_P2, MatrixCL& L_P1P2, MatrixCL& L_P1P2_stab, MatrixCL& M_ScalarP1, MatrixCL& A_ScalarP1_stab, bool fullGradient);
+public:
+    StokesIFAccumulator_P2P1CL(const LevelsetP2CL& ls, IdxDescCL& P2FE, IdxDescCL& ScalarP1FE, MatrixCL& A_P2, MatrixCL& A_P2_stab, MatrixCL& B_P1P2, MatrixCL& M_P2, MatrixCL& S_P2, MatrixCL& M_ScalarP1, MatrixCL& A_ScalarP1_stab, bool fullGradient)
+    : lset(ls.Phi), lset_bnd(ls.GetBndData()), P2Idx_(P2FE), ScalarP1Idx_(ScalarP1FE), A_P2_(A_P2), A_P2_stab_(A_P2_stab), B_P1P2_(B_P1P2), M_P2_(M_P2), S_P2_(S_P2), M_ScalarP1_(M_ScalarP1), A_ScalarP1_stab_(A_ScalarP1_stab), localStokes_(fullGradient, ls.numbOfVirtualSubEdges, ls.useExactNormals)
+    {}
 
     ///\brief Initializes matrix-builders and load-vectors
     void begin_accumulation ();
@@ -1723,12 +1724,7 @@ class StokesIFAccumulator_P2P1CL : public TetraAccumulatorCL
     TetraAccumulatorCL* clone (int /*tid*/) { return new StokesIFAccumulator_P2P1CL ( *this); }
 };
 
-StokesIFAccumulator_P2P1CL::StokesIFAccumulator_P2P1CL( const VecDescCL& ls, const LsetBndDataCL& ls_bnd, IdxDescCL& P2FE, IdxDescCL& ScalarP1FE, MatrixCL& A_P2, MatrixCL& A_P2_stab, MatrixCL& B_P1P2, MatrixCL& M_P2, MatrixCL& S_P2, MatrixCL& L_P1P2, MatrixCL& L_P1P2_stab, MatrixCL& M_ScalarP1, MatrixCL& A_ScalarP1_stab, bool fullGradient)
- : lset(ls), lset_bnd(ls_bnd), P2Idx_(P2FE), ScalarP1Idx_(ScalarP1FE), A_P2_(A_P2), A_P2_stab_(A_P2_stab), B_P1P2_(B_P1P2), M_P2_(M_P2), S_P2_(S_P2), L_P1P2_(L_P1P2), L_P1P2_stab_(L_P1P2_stab), M_ScalarP1_(M_ScalarP1), A_ScalarP1_stab_(A_ScalarP1_stab), localStokes_( fullGradient)
-{}
-
-void StokesIFAccumulator_P2P1CL::begin_accumulation ()
-{
+void StokesIFAccumulator_P2P1CL::begin_accumulation() {
     std::cout << "entering StokesIF: \n";
     const size_t num_unks_scalarp1= ScalarP1Idx_.NumUnknowns(), num_unks_p2= P2Idx_.NumUnknowns();
     mA_P2_= new MatrixBuilderCL( &A_P2_, num_unks_p2, num_unks_p2);
@@ -1736,8 +1732,6 @@ void StokesIFAccumulator_P2P1CL::begin_accumulation ()
     mB_P1P2_= new MatrixBuilderCL( &B_P1P2_, num_unks_scalarp1, num_unks_p2);
     mM_P2_= new MatrixBuilderCL( &M_P2_, num_unks_p2, num_unks_p2);
     mS_P2_= new MatrixBuilderCL( &S_P2_, num_unks_p2, num_unks_p2);
-    mL_P1P2_= new MatrixBuilderCL( &L_P1P2_, num_unks_scalarp1, num_unks_p2);
-    mL_P1P2_stab_= new MatrixBuilderCL( &L_P1P2_stab_, num_unks_scalarp1, num_unks_p2);
     mM_ScalarP1_= new MatrixBuilderCL( &M_ScalarP1_, num_unks_scalarp1, num_unks_scalarp1);
     mA_ScalarP1_stab_= new MatrixBuilderCL( &A_ScalarP1_stab_, num_unks_scalarp1, num_unks_scalarp1);
 }
@@ -1754,22 +1748,15 @@ void StokesIFAccumulator_P2P1CL::finalize_accumulation ()
     delete mM_P2_;
     mS_P2_->Build();
     delete mS_P2_;
-    mL_P1P2_->Build();
-    delete mL_P1P2_;
-    mL_P1P2_stab_->Build();
-    delete mL_P1P2_stab_;
     mM_ScalarP1_->Build();
     delete mM_ScalarP1_;
     mA_ScalarP1_stab_->Build();
     delete mA_ScalarP1_stab_;
-
 #ifndef _PAR
     std::cout << "StokesIF_P2P1:\t" << A_P2_.num_nonzeros() << " nonzeros in A, " << A_P2_stab_.num_nonzeros() << " nonzeros in A_stab, "
               << B_P1P2_.num_nonzeros() << " nonzeros in B, " << M_P2_.num_nonzeros() << " nonzeros in M, " << S_P2_.num_nonzeros() << " nonzeros in S, "
-              << L_P1P2_.num_nonzeros() << " nonzeros in L, " << L_P1P2_stab_.num_nonzeros() << " nonzeros in L_stab, "
               << M_ScalarP1_.num_nonzeros() << " nonzeros in M_ScalarP1, " << A_ScalarP1_stab_.num_nonzeros() << " nonzeros in A_ScalarP1_stab\n";
 #endif
-    // std::cout << '\n';
 }
 
 void StokesIFAccumulator_P2P1CL::visit (const TetraCL& tet)
@@ -1798,8 +1785,6 @@ void StokesIFAccumulator_P2P1CL::local_setup (const TetraCL& tet)
     localStokes_.setupB_P1P2( locB_P1P2);
     localStokes_.setupM_P2( locM_P2);
     localStokes_.setupS_P2( locS_P2);
-    localStokes_.setupL_P1P2( locL_P1P2);
-    localStokes_.setupL_P1P2_stab( locL_P1P2_stab, absdet);
     localStokes_.setupM_P1( locM_ScalarP1);
     localStokes_.setupA_P1_stab( locA_ScalarP1_stab, absdet);
 }
@@ -1811,8 +1796,6 @@ void StokesIFAccumulator_P2P1CL::update_global_system ()
     MatrixBuilderCL& mB_P1P2= *mB_P1P2_;
     MatrixBuilderCL& mM_P2= *mM_P2_;
     MatrixBuilderCL& mS_P2= *mS_P2_;
-    MatrixBuilderCL& mL_P1P2= *mL_P1P2_;
-    MatrixBuilderCL& mL_P1P2_stab= *mL_P1P2_stab_;
     MatrixBuilderCL& mM_ScalarP1= *mM_ScalarP1_;
     MatrixBuilderCL& mA_ScalarP1_stab= *mA_ScalarP1_stab_;
 
@@ -1840,8 +1823,6 @@ void StokesIFAccumulator_P2P1CL::update_global_system ()
             if (numScalarP1[j]==NoIdx) continue;
             for (int k=0; k<3; ++k) {
                 mB_P1P2( numScalarP1[j], ii+k) += locB_P1P2[j][3*i+k];
-                mL_P1P2( numScalarP1[j], ii+k) += locL_P1P2[j][3*i+k];
-                mL_P1P2_stab( numScalarP1[j], ii+k) += locL_P1P2_stab[j][3*i+k];
             }
         }
     }
@@ -1864,18 +1845,14 @@ void SetupStokesIF_P2P1(
         MatDescCL* B_P1P2,
         MatDescCL* M_P2,
         MatDescCL* S_P2,
-        MatDescCL* L_P1P2,
-        MatDescCL* L_P1P2_stab,
         MatDescCL* M_ScalarP1,
         MatDescCL* A_ScalarP1_stab,
-        const VecDescCL& lset,
-        const LsetBndDataCL& lset_bnd,
+        const LevelsetP2CL& lset,
         bool fullgrad
 ) {
-  ScopeTimerCL scope("SetupStokesIF");
-  StokesIFAccumulator_P2P1CL accu( lset, lset_bnd, *(A_P2->RowIdx), *(B_P1P2->RowIdx), A_P2->Data, A_P2_stab->Data, B_P1P2->Data, M_P2->Data, S_P2->Data, L_P1P2->Data, L_P1P2_stab->Data, M_ScalarP1->Data, A_ScalarP1_stab->Data, fullgrad);
+  ScopeTimerCL scope("SetupStokesIF_P2P1");
+  StokesIFAccumulator_P2P1CL accu(lset, *(A_P2->RowIdx), *(B_P1P2->RowIdx), A_P2->Data, A_P2_stab->Data, B_P1P2->Data, M_P2->Data, S_P2->Data, M_ScalarP1->Data, A_ScalarP1_stab->Data, fullgrad);
   TetraAccumulatorTupleCL accus;
-  //    MaybeAddProgressBar(MG_, "LapBeltr(P2) Setup", accus, RowIdx.TriangLevel());
   accus.push_back( &accu);
   accumulate( accus, MG_, A_P2->GetRowLevel(), A_P2->RowIdx->GetBndInfo());
 }
