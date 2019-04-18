@@ -1693,10 +1693,10 @@ class StokesIFAccumulator_P2P1CL : public TetraAccumulatorCL
     IdxDescCL& ScalarP1Idx_;
     IdxT numP2[10], numScalarP1[4];
 
-    MatrixCL &A_P2_, &A_P2_stab_, &B_P1P2_, &M_P2_, &S_P2_, &M_ScalarP1_, &A_ScalarP1_stab_;
-    MatrixBuilderCL *mA_P2_, *mA_P2_stab_, *mB_P1P2_, *mM_P2_, *mS_P2_, *mM_ScalarP1_, *mA_ScalarP1_stab_;
+    MatrixCL &A_P2_, &A_P2_stab_, &B_P1P2_, &M_P2_, &S_P2_, &M_ScalarP1_, &M_ScalarP1_stab_, &A_ScalarP1_stab_;
+    MatrixBuilderCL *mA_P2_, *mA_P2_stab_, *mB_P1P2_, *mM_P2_, *mS_P2_, *mM_ScalarP1_, *mM_ScalarP1_stab_, *mA_ScalarP1_stab_;
 
-    double locA_P2[30][30], locA_P2_stab[10][10], locB_P1P2[4][30], locM_P2[10][10], locS_P2[30][30], locM_ScalarP1[4][4], locA_ScalarP1_stab[4][4];
+    double locA_P2[30][30], locA_P2_stab[10][10], locB_P1P2[4][30], locM_P2[10][10], locS_P2[30][30], locM_ScalarP1[4][4], locM_ScalarP1_stab[4][4], locA_ScalarP1_stab[4][4];
 
     LocalStokesCL localStokes_;
 
@@ -1710,8 +1710,8 @@ class StokesIFAccumulator_P2P1CL : public TetraAccumulatorCL
     void update_global_system ();
 
 public:
-    StokesIFAccumulator_P2P1CL(const LevelsetP2CL& ls, IdxDescCL& P2FE, IdxDescCL& ScalarP1FE, MatrixCL& A_P2, MatrixCL& A_P2_stab, MatrixCL& B_P1P2, MatrixCL& M_P2, MatrixCL& S_P2, MatrixCL& M_ScalarP1, MatrixCL& A_ScalarP1_stab, bool fullGradient)
-    : lset(ls.Phi), lset_bnd(ls.GetBndData()), P2Idx_(P2FE), ScalarP1Idx_(ScalarP1FE), A_P2_(A_P2), A_P2_stab_(A_P2_stab), B_P1P2_(B_P1P2), M_P2_(M_P2), S_P2_(S_P2), M_ScalarP1_(M_ScalarP1), A_ScalarP1_stab_(A_ScalarP1_stab), localStokes_(fullGradient, ls.numbOfVirtualSubEdges, ls.useExactNormals)
+    StokesIFAccumulator_P2P1CL(const LevelsetP2CL& ls, IdxDescCL& P2FE, IdxDescCL& ScalarP1FE, MatrixCL& A_P2, MatrixCL& A_P2_stab, MatrixCL& B_P1P2, MatrixCL& M_P2, MatrixCL& S_P2, MatrixCL& M_ScalarP1, MatrixCL& M_ScalarP1_stab, MatrixCL& A_ScalarP1_stab, bool fullGradient)
+    : lset(ls.Phi), lset_bnd(ls.GetBndData()), P2Idx_(P2FE), ScalarP1Idx_(ScalarP1FE), A_P2_(A_P2), A_P2_stab_(A_P2_stab), B_P1P2_(B_P1P2), M_P2_(M_P2), S_P2_(S_P2), M_ScalarP1_(M_ScalarP1), M_ScalarP1_stab_(M_ScalarP1_stab), A_ScalarP1_stab_(A_ScalarP1_stab), localStokes_(fullGradient, ls.numbOfVirtualSubEdges, ls.useExactNormals)
     {}
 
     ///\brief Initializes matrix-builders and load-vectors
@@ -1733,11 +1733,11 @@ void StokesIFAccumulator_P2P1CL::begin_accumulation() {
     mM_P2_= new MatrixBuilderCL( &M_P2_, num_unks_p2, num_unks_p2);
     mS_P2_= new MatrixBuilderCL( &S_P2_, num_unks_p2, num_unks_p2);
     mM_ScalarP1_= new MatrixBuilderCL( &M_ScalarP1_, num_unks_scalarp1, num_unks_scalarp1);
-    mA_ScalarP1_stab_= new MatrixBuilderCL( &A_ScalarP1_stab_, num_unks_scalarp1, num_unks_scalarp1);
+    mA_ScalarP1_stab_ = new MatrixBuilderCL( &A_ScalarP1_stab_, num_unks_scalarp1, num_unks_scalarp1);
+    mM_ScalarP1_stab_ = new MatrixBuilderCL( &M_ScalarP1_stab_, num_unks_scalarp1, num_unks_scalarp1);
 }
 
-void StokesIFAccumulator_P2P1CL::finalize_accumulation ()
-{
+void StokesIFAccumulator_P2P1CL::finalize_accumulation() {
     mA_P2_->Build();
     delete mA_P2_;
     mA_P2_stab_->Build();
@@ -1752,6 +1752,8 @@ void StokesIFAccumulator_P2P1CL::finalize_accumulation ()
     delete mM_ScalarP1_;
     mA_ScalarP1_stab_->Build();
     delete mA_ScalarP1_stab_;
+    mM_ScalarP1_stab_->Build();
+    delete mM_ScalarP1_stab_;
 #ifndef _PAR
     std::cout << "StokesIF_P2P1:\t" << A_P2_.num_nonzeros() << " nonzeros in A, " << A_P2_stab_.num_nonzeros() << " nonzeros in A_stab, "
               << B_P1P2_.num_nonzeros() << " nonzeros in B, " << M_P2_.num_nonzeros() << " nonzeros in M, " << S_P2_.num_nonzeros() << " nonzeros in S, "
@@ -1759,23 +1761,18 @@ void StokesIFAccumulator_P2P1CL::finalize_accumulation ()
 #endif
 }
 
-void StokesIFAccumulator_P2P1CL::visit (const TetraCL& tet)
-{
-    ls_loc.assign( tet, lset, lset_bnd);
-
-    if (!equal_signs( ls_loc))
-    {
-        local_setup( tet);
+void StokesIFAccumulator_P2P1CL::visit (const TetraCL& tet) {
+    ls_loc.assign(tet, lset, lset_bnd);
+    if (!equal_signs(ls_loc)) {
+        local_setup(tet);
         update_global_system();
     }
-
 }
 
 void StokesIFAccumulator_P2P1CL::local_setup (const TetraCL& tet)
 {
     GetTrafoTr( T, det, tet);
     absdet= std::fabs( det);
-
     GetLocalNumbP2NoBnd( numP2, tet, P2Idx_);
     GetLocalNumbP1NoBnd( numScalarP1, tet, ScalarP1Idx_);
     localStokes_.calcIntegrands( T, ls_loc, tet);
@@ -1786,18 +1783,19 @@ void StokesIFAccumulator_P2P1CL::local_setup (const TetraCL& tet)
     localStokes_.setupM_P2( locM_P2);
     localStokes_.setupS_P2( locS_P2);
     localStokes_.setupM_P1( locM_ScalarP1);
-    localStokes_.setupA_P1_stab( locA_ScalarP1_stab, absdet);
+    localStokes_.setupA_P1_stab(locA_ScalarP1_stab, absdet);
+    localStokes_.setupM_P1_stab(locM_ScalarP1_stab, absdet);
 }
 
-void StokesIFAccumulator_P2P1CL::update_global_system ()
-{
+void StokesIFAccumulator_P2P1CL::update_global_system() {
     MatrixBuilderCL& mA_P2= *mA_P2_;
     MatrixBuilderCL& mA_P2_stab= *mA_P2_stab_;
     MatrixBuilderCL& mB_P1P2= *mB_P1P2_;
     MatrixBuilderCL& mM_P2= *mM_P2_;
     MatrixBuilderCL& mS_P2= *mS_P2_;
     MatrixBuilderCL& mM_ScalarP1= *mM_ScalarP1_;
-    MatrixBuilderCL& mA_ScalarP1_stab= *mA_ScalarP1_stab_;
+    MatrixBuilderCL& mA_ScalarP1_stab = *mA_ScalarP1_stab_;
+    MatrixBuilderCL& mM_ScalarP1_stab = *mM_ScalarP1_stab_;
 
     for(int i= 0; i < 10; ++i) {
         const IdxT ii= numP2[i];
@@ -1834,6 +1832,7 @@ void StokesIFAccumulator_P2P1CL::update_global_system ()
             if (jj==NoIdx) continue;
             mM_ScalarP1( ii, jj) += locM_ScalarP1[i][j];
             mA_ScalarP1_stab( ii, jj) += locA_ScalarP1_stab[i][j];
+            mM_ScalarP1_stab( ii, jj) += locM_ScalarP1_stab[i][j];
         }
     }
 }
@@ -1846,12 +1845,13 @@ void SetupStokesIF_P2P1(
         MatDescCL* M_P2,
         MatDescCL* S_P2,
         MatDescCL* M_ScalarP1,
-        MatDescCL* A_ScalarP1_stab,
+        MatDescCL* M_ScalarP1_stab, // full stab
+        MatDescCL* A_ScalarP1_stab, // normal stab
         const LevelsetP2CL& lset,
         bool fullgrad
 ) {
   ScopeTimerCL scope("SetupStokesIF_P2P1");
-  StokesIFAccumulator_P2P1CL accu(lset, *(A_P2->RowIdx), *(B_P1P2->RowIdx), A_P2->Data, A_P2_stab->Data, B_P1P2->Data, M_P2->Data, S_P2->Data, M_ScalarP1->Data, A_ScalarP1_stab->Data, fullgrad);
+  StokesIFAccumulator_P2P1CL accu(lset, *(A_P2->RowIdx), *(B_P1P2->RowIdx), A_P2->Data, A_P2_stab->Data, B_P1P2->Data, M_P2->Data, S_P2->Data, M_ScalarP1->Data, M_ScalarP1_stab->Data, A_ScalarP1_stab->Data, fullgrad);
   TetraAccumulatorTupleCL accus;
   accus.push_back( &accu);
   accumulate( accus, MG_, A_P2->GetRowLevel(), A_P2->RowIdx->GetBndInfo());
