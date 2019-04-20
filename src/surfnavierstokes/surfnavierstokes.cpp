@@ -168,9 +168,10 @@ int main (int argc, char* argv[]) {
     ParameterNS::nu = P.get<double>("SurfNavStokes.kinematic_viscosity");
 
     double eta_order     = P.get<double>("SurfNavStokes.normal_penalty_pow");
+    double eta_factor    = P.get<double>("SurfNavStokes.normal_penalty_fac");
     double epsilon_order = 1.0;
     double alpha_order   = 1.0;
-    double eta 		     = 1.e0  * pow(h, eta_order); // constant for tangential penalty
+    double eta 		     = eta_factor * pow(h, eta_order); // constant for tangential penalty
     double epsilon       = 1.e0  * pow(h, epsilon_order); // constant for velocity stabilisation
     double alpha         = 1.e0  * pow(h, alpha_order); // constant for pressure stabilisation
     double rho           = 1.e0  * pow(h, 1); // constant for Schur complement preconditioner
