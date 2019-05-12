@@ -104,6 +104,44 @@ static RegisterVectorFunction regvec_constant_wind( "ConstantWind", constant_win
 
 DROPS::Point3DCL RadDrop;
 DROPS::Point3DCL PosDrop;
+
+DROPS::Point3DCL constant_rotation (const DROPS::Point3DCL& pp, double)
+{
+    DROPS::Point3DCL velocity;
+    cross_product(velocity, WindVelocity, pp);
+    return velocity;
+}
+static RegisterVectorFunction regvec_constant_rotation( "ConstantRotation", constant_rotation);
+
+DROPS::Point3DCL Rotate(const DROPS::Point3DCL& pp,
+        double t)
+{
+    double u=WindVelocity[0];
+    double v=WindVelocity[1];
+    double w=WindVelocity[2];
+    double L = (u*u + v * v + w * w);
+    double angle = std::sqrt(L)*(t);
+    double u2 = u * u;
+    double v2 = v * v;
+    double w2 = w * w;
+
+    SMatrixCL<3,3> rotationMatrix;
+
+    rotationMatrix(0,0) = (u2 + (v2 + w2) * cos(angle)) / L;
+    rotationMatrix(0,1) = (u * v * (1 - cos(angle)) - w * sqrt(L) * sin(angle)) / L;
+    rotationMatrix(0,2) = (u * w * (1 - cos(angle)) + v * sqrt(L) * sin(angle)) / L;
+
+    rotationMatrix(1,0) = (u * v * (1 - cos(angle)) + w * sqrt(L) * sin(angle)) / L;
+    rotationMatrix(1,1) = (v2 + (u2 + w2) * cos(angle)) / L;
+    rotationMatrix(1,2) = (v * w * (1 - cos(angle)) - u * sqrt(L) * sin(angle)) / L;
+
+    rotationMatrix(2,0) = (u * w * (1 - cos(angle)) - v * sqrt(L) * sin(angle)) / L;
+    rotationMatrix(2,1) = (v * w * (1 - cos(angle)) + u * sqrt(L) * sin(angle)) / L;
+    rotationMatrix(2,2) = (w2 + (u2 + v2) * cos(angle)) / L;
+    return(rotationMatrix*pp);
+
+}
+
 double ellipsoid (const DROPS::Point3DCL& p, double)
 {
     const DROPS::Point3DCL x= (p - PosDrop)/RadDrop;
@@ -483,6 +521,20 @@ double mergedrop_sol (const Point3DCL& p, double t)
 }
 static RegisterScalarFunction regsca_mergedrop_sol( "MergeDropSol", mergedrop_sol);
 
+double mergedrop_randomsol (const Point3DCL& p, double t)
+{
+    double random = ((double)rand() / RAND_MAX);
+    double k=0.5;
+    //return 0.5*(1.+p[0]);
+    //if(p[0]>0)
+    {
+        if (random<0.5) return(2*k*random);
+        else return(2*(1-k)*random + 2*k-1);
+    }
+    //else return 0;
+}
+static RegisterScalarFunction regsca_mergedrop_randomsol( "MergeDropRandomSol", mergedrop_randomsol);
+
 DROPS::Point3DCL mergedrop_surfgradsol (const DROPS::Point3DCL& p, double t)
 {
     Point3DCL surfgrad;
@@ -506,13 +558,14 @@ double sphere_dist (const DROPS::Point3DCL& p, double)
     DROPS::Point3DCL x( p - PosDrop);
     return x.norm() - RadDrop[0];
 }
-static RegisterScalarFunction regsca_sphere_dist_lset( "SphereDist", sphere_dist);
+static RegisterScalarFunction regsca_sphere_dist_lset( "Sphere", sphere_dist);
 
 DROPS::Point3DCL d_sphere_dist (const DROPS::Point3DCL& p, double)
 {
     DROPS::Point3DCL x( p - PosDrop);
     return x/x.norm();
 }
+static RegisterVectorFunction regsca_sphere_dist_normal( "NormalSphere", d_sphere_dist);
 
 
 typedef double (*dist_funT) (const DROPS::Point3DCL&, double);
@@ -635,40 +688,93 @@ static RegisterScalarFunction regsca_rhs1_harmonic( "First spherical harmonic rh
 
 double Test10_chiSol (const DROPS::Point3DCL& pp, double t)
 {
-    DROPS::Point3DCL p(pp  - t*constant_wind(pp,t));
+    //DROPS::Point3DCL p(pp  - t*constant_wind(pp,t));
+    DROPS::Point3DCL p=Rotate(pp, -t);
 
-    double a=0.8;
-    double T=2.5;
+    double a=0.0;
+    double T=0.25;
     return((0.1e1 - a * exp(-t / T)) * (p[0] / (pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1)) * p[1] + 0.1e1) / 0.2e1);
 }
 static RegisterScalarFunction regsca_secondspherical_harmonic( "Second spherical harmonic", Test10_chiSol);
 
 double Test10_omegaSol (const DROPS::Point3DCL& pp, double t)
 {
-    DROPS::Point3DCL p(pp  - t*constant_wind(pp,t));
+    //DROPS::Point3DCL p(pp  - t*constant_wind(pp,t));
+    DROPS::Point3DCL p=Rotate(pp, -t);
 
-    double a=0.8;
-    double T=2.5;
+    double a=0.0;
+    double T=0.25;
     if (p.norm()<0.01) return (0);
 
     double diffusion= -0.3e1 * ParameterNS::eps * ParameterNS::eps * (a * exp(-t / T) - 0.1e1) * p[1] * p[0] * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), -0.2e1);
     double well_potential= -(a * exp(-t / T) - 0.1e1) * (pow(p[0], 0.2e1) + p[0] * p[1] + pow(p[1], 0.2e1) + pow(p[2], 0.2e1)) * (exp(-t / T) * a * pow(p[0], 0.2e1) + exp(-t / T) * a * p[0] * p[1] + exp(-t / T) * a * pow(p[1], 0.2e1) + exp(-t / T) * a * pow(p[2], 0.2e1) + pow(p[0], 0.2e1) - p[0] * p[1] + pow(p[1], 0.2e1) + pow(p[2], 0.2e1)) * (exp(-t / T) * a * pow(p[0], 0.2e1) + exp(-t / T) * a * p[0] * p[1] + exp(-t / T) * a * pow(p[1], 0.2e1) + exp(-t / T) * a * pow(p[2], 0.2e1) - p[0] * p[1]) * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), -0.3e1) / 0.8e1;
-    return(diffusion+well_potential);
+    return((diffusion+well_potential)/ParameterNS::eps);
 }
 static RegisterScalarFunction regsca_omega_secondspherical_harmonic( "Omega from Second spherical harmonic", Test10_omegaSol);
 
 double Test10_rhs3 (const DROPS::Point3DCL& pp, double  t) {
-    DROPS::Point3DCL p(pp  - t*constant_wind(pp,t));
+    //DROPS::Point3DCL p(pp  - t*constant_wind(pp,t));
+    DROPS::Point3DCL p=Rotate(pp, -t);
 
-    double a=0.8;
-    double T=2.5;
+    double a=0.0;
+    double T=0.25;
     double inertia=a / T * exp(-t / T) * (p[0] / (pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1)) * p[1] + 0.1e1) / 0.2e1;
     double bidiffusion =  -0.3e1 / 0.16e2 * ParameterNS::sigma * ((pow(p[1], 0.4e1) - 0.3e1 / 0.2e1 * pow(p[1], 0.3e1) * p[0] + (-0.7e1 / 0.2e1 * pow(p[0], 0.2e1) + pow(p[2], 0.2e1)) * pow(p[1], 0.2e1) + (-0.3e1 / 0.2e1 * pow(p[0], 0.3e1) - 0.3e1 / 0.2e1 * p[0] * pow(p[2], 0.2e1)) * p[1] + pow(p[0], 0.4e1) + pow(p[0], 0.2e1) * pow(p[2], 0.2e1)) * pow(a, 0.3e1) * pow(pow(p[0], 0.2e1) + p[0] * p[1] + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), 0.3e1) * pow(exp(-t / T), 0.3e1) - 0.9e1 / 0.2e1 * p[0] * (pow(p[1], 0.4e1) - 0.2e1 / 0.3e1 * pow(p[1], 0.3e1) * p[0] + (-0.5e1 / 0.3e1 * pow(p[0], 0.2e1) + 0.4e1 / 0.3e1 * pow(p[2], 0.2e1)) * pow(p[1], 0.2e1) + (-0.2e1 / 0.3e1 * pow(p[0], 0.3e1) - 0.2e1 / 0.3e1 * p[0] * pow(p[2], 0.2e1)) * p[1] + pow(p[0], 0.4e1) + 0.4e1 / 0.3e1 * pow(p[0], 0.2e1) * pow(p[2], 0.2e1) + pow(p[2], 0.4e1) / 0.3e1) * a * a * p[1] * pow(pow(p[0], 0.2e1) + p[0] * p[1] + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), 0.2e1) * pow(exp(-t / T), 0.2e1) - 0.2e1 / 0.3e1 * a * (pow(p[0], 0.2e1) + p[0] * p[1] + pow(p[1], 0.2e1) + pow(p[2], 0.2e1)) * (pow(p[1], 0.8e1) - 0.3e1 / 0.4e1 * pow(p[1], 0.7e1) * p[0] + (0.3e1 * pow(p[2], 0.2e1) - (double) (6 * ParameterNS::eps * ParameterNS::eps) - 0.39e2 / 0.4e1 * pow(p[0], 0.2e1)) * pow(p[1], 0.6e1) - 0.9e1 / 0.4e1 * p[0] * (-(double) (8 * ParameterNS::eps * ParameterNS::eps) + pow(p[2], 0.2e1)) * pow(p[1], 0.5e1) + (0.3e1 * pow(p[2], 0.4e1) + (-(double) (12 * ParameterNS::eps * ParameterNS::eps) - 0.14e2 * pow(p[0], 0.2e1)) * pow(p[2], 0.2e1) + 0.24e2 * pow(p[0], 0.2e1) * (double) (ParameterNS::eps * ParameterNS::eps) + 0.13e2 / 0.4e1 * pow(p[0], 0.4e1)) * pow(p[1], 0.4e1) - 0.9e1 / 0.4e1 * p[0] * (p[2] - (double) (4 * ParameterNS::eps)) * (p[2] + (double) (4 * ParameterNS::eps)) * (pow(p[0], 0.2e1) + pow(p[2], 0.2e1)) * pow(p[1], 0.3e1) - 0.39e2 / 0.4e1 * (-0.4e1 / 0.39e2 * pow(p[2], 0.4e1) + (0.17e2 / 0.39e2 * pow(p[0], 0.2e1) + 0.8e1 / 0.13e2 * (double) ParameterNS::eps * (double) ParameterNS::eps) * pow(p[2], 0.2e1) + pow(p[0], 0.4e1) - 0.32e2 / 0.13e2 * pow(p[0], 0.2e1) * (double) (ParameterNS::eps * ParameterNS::eps)) * (pow(p[0], 0.2e1) + pow(p[2], 0.2e1)) * pow(p[1], 0.2e1) - 0.3e1 / 0.4e1 * p[0] * pow(pow(p[0], 0.2e1) + pow(p[2], 0.2e1), 0.2e1) * (-(double) (24 * ParameterNS::eps * ParameterNS::eps) + pow(p[0], 0.2e1) + pow(p[2], 0.2e1)) * p[1] + pow(p[0], 0.2e1) * pow(pow(p[0], 0.2e1) + pow(p[2], 0.2e1), 0.2e1) * (-(double) (6 * ParameterNS::eps * ParameterNS::eps) + pow(p[0], 0.2e1) + pow(p[2], 0.2e1))) * exp(-t / T) + 0.7e1 / 0.6e1 * (pow(p[1], 0.8e1) + (0.24e2 / 0.7e1 * pow(p[2], 0.2e1) - 0.96e2 / 0.7e1 * (double) ParameterNS::eps * (double) ParameterNS::eps - 0.6e1 / 0.7e1 * pow(p[0], 0.2e1)) * pow(p[1], 0.6e1) + (0.30e2 / 0.7e1 * pow(p[2], 0.4e1) + (-0.264e3 / 0.7e1 * (double) ParameterNS::eps * (double) ParameterNS::eps + 0.10e2 / 0.7e1 * pow(p[0], 0.2e1)) * pow(p[2], 0.2e1) - 0.120e3 / 0.7e1 * pow(p[0], 0.2e1) * (double) (ParameterNS::eps * ParameterNS::eps) + pow(p[0], 0.4e1)) * pow(p[1], 0.4e1) - 0.6e1 / 0.7e1 * (pow(p[0], 0.2e1) + pow(p[2], 0.2e1)) * (-0.8e1 / 0.3e1 * pow(p[2], 0.4e1) + (-0.8e1 / 0.3e1 * pow(p[0], 0.2e1) + (double) (40 * ParameterNS::eps * ParameterNS::eps)) * pow(p[2], 0.2e1) + pow(p[0], 0.4e1) + 0.20e2 * pow(p[0], 0.2e1) * (double) (ParameterNS::eps * ParameterNS::eps)) * pow(p[1], 0.2e1) + (0.3e1 / 0.7e1 * pow(p[2], 0.4e1) + (0.10e2 / 0.7e1 * pow(p[0], 0.2e1) - 0.72e2 / 0.7e1 * (double) ParameterNS::eps * (double) ParameterNS::eps) * pow(p[2], 0.2e1) + pow(p[0], 0.4e1) - 0.96e2 / 0.7e1 * pow(p[0], 0.2e1) * (double) (ParameterNS::eps * ParameterNS::eps)) * pow(pow(p[0], 0.2e1) + pow(p[2], 0.2e1), 0.2e1)) * p[0] * p[1]) * (a * (pow(p[0], 0.2e1) + p[0] * p[1] + pow(p[1], 0.2e1) + pow(p[2], 0.2e1)) * exp(-t / T) + pow(p[0], 0.2e1) - p[0] * p[1] + pow(p[1], 0.2e1) + pow(p[2], 0.2e1)) * pow(a * exp(-t / T) - 0.1e1, 0.3e1) * (pow(p[0], 0.2e1) + p[0] * p[1] + pow(p[1], 0.2e1) + pow(p[2], 0.2e1)) * pow(pow(0.1e1 - a * exp(-t / T), 0.2e1) * pow(p[0] / (pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1)) * p[1] + 0.1e1, 0.2e1) * pow(0.1e1 - (0.1e1 - a * exp(-t / T)) * (p[0] / (pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1)) * p[1] + 0.1e1) / 0.2e1, 0.2e1), -0.1e1 / 0.2e1) * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), -0.8e1);
-    return(inertia - bidiffusion);
+    return(inertia - bidiffusion/ParameterNS::eps);
 }
 static RegisterScalarFunction regsca_rhs10_harmonic( "Rhs from Second spherical harmonic", Test10_rhs3);
 
 
+
+double Test6_chiSol (const DROPS::Point3DCL& pp, double t)
+{
+        DROPS::Point3DCL p(pp  - t*constant_wind(pp,t));
+
+    double a=0.8;
+    double T=5;
+    return ((0.1e1 - a * exp(-t / T)) * (sqrt(0.3e1) * pow(0.3141592654e1, -0.1e1 / 0.2e1) * p[2] *
+                                         pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), -0.1e1 / 0.2e1) / 0.2e1 +
+                                         0.1e1 / 0.2e1));
+}
+static RegisterScalarFunction regsca_conc_decay( "DecayFirstHarmonicConc", Test6_chiSol);
+
+double Test6_omegaSol (const DROPS::Point3DCL& pp, double t)
+{
+        DROPS::Point3DCL p(pp  - t*constant_wind(pp,t));
+
+    double a=0.8;
+    double T=5;
+    double diffusion= - ParameterNS::eps * (a * exp(-t / T) - 0.1e1) * sqrt(0.3e1) * p[2] * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), -0.3e1 / 0.2e1) * pow(0.3141592654e1, -0.1e1 / 0.2e1);
+    double well_potential= ( -1. / ParameterNS::eps) * (a * exp(-t / T) - 0.1e1) * (sqrt(0.3e1) * p[2] +
+                                                                                    sqrt(0.3141592654e1) * sqrt(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1))) *
+                           (exp(-t / T) * sqrt(0.3e1) * a * p[2] + exp(-t / T) * sqrt(0.3141592654e1) * sqrt(pow(p[0], 0.2e1) +
+                                                                                                             pow(p[1], 0.2e1) +
+                                                                                                             pow(p[2], 0.2e1)) * a -
+                            sqrt(0.3e1) * p[2] + sqrt(0.3141592654e1) * sqrt(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1)))
+                           * (exp(-t / T) * sqrt(0.3e1) * a * p[2] + exp(-t / T) * sqrt(0.3141592654e1) * sqrt(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1)) * a - sqrt(0.3e1) * p[2])
+                           * pow(0.3141592654e1, -0.3e1 / 0.2e1) * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), -0.3e1 / 0.2e1) / 0.8e1;
+    return(diffusion+well_potential);
+}
+static RegisterScalarFunction regsca_poten_decay( "DecayFirstHarmonicPoten", Test6_omegaSol);
+
+
+double Test6_rhs3 (const DROPS::Point3DCL& pp, double  t) {
+        DROPS::Point3DCL p(pp  - t*constant_wind(pp,t));
+
+    double a=0.8;
+    double T=5;
+    double inertia=a / T * exp(-t / T) * (sqrt(0.3e1) * pow(0.3141592654e1, -0.1e1 / 0.2e1) * p[2] *
+                                          pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), -0.1e1 / 0.2e1)
+                                          / 0.2e1 + 0.1e1 / 0.2e1);
+    double bidiffusion = -0.9e1 / 0.32e2 * ParameterNS::sigma * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), -0.15e2)
+                         * pow(pow(a * exp(-t / T) - 0.1e1, 0.2e1) * pow(sqrt(0.3e1) * pow(0.3141592654e1, -0.1e1 / 0.2e1) * p[2] *
+                                                                         (a * exp(-t / T) - 0.1e1) * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), -0.1e1 / 0.2e1) +
+                                                                         a * exp(-t / T) + 0.1e1, 0.2e1) * pow(sqrt(0.3e1) *pow(0.3141592654e1,-0.1e1 / 0.2e1) * p[2] *
+                                                                                                               pow(pow(p[0], 0.2e1)+ pow(p[1], 0.2e1) + pow(p[2], 0.2e1), -0.1e1 / 0.2e1) + 0.1e1, 0.2e1), -0.1e1 / 0.2e1)
+                         * pow(a * exp(-t / T) - 0.1e1, 0.3e1) * (-pow(0.3141592654e1, 0.6e1) * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), 0.21e2 / 0.2e1) * sqrt(0.3e1) * a * (pow(a, 0.3e1) * ((pow(0.3141592654e1, 0.3e1) + 0.21e2 * 0.3141592654e1 * 0.3141592654e1 + 0.63e2 * 0.3141592654e1 + 0.27e2) * pow(p[2], 0.6e1) + 0.3e1 * (0.3141592654e1 - 0.3e1) * (0.3141592654e1 * 0.3141592654e1 + 0.11e2 * 0.3141592654e1 + 0.6e1) * (pow(p[0], 0.2e1) + pow(p[1], 0.2e1)) * pow(p[2], 0.4e1) + 0.3e1 * 0.3141592654e1 * (0.3141592654e1 * 0.3141592654e1 - 0.5e1 * 0.3141592654e1 - 0.48e2) * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1), 0.2e1) * pow(p[2], 0.2e1) + 0.3141592654e1 * 0.3141592654e1 * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1), 0.3e1) * (0.3141592654e1 - 0.18e2)) * pow(exp(-t / T), 0.3e1) + 0.2e1 * a * a * ((pow(0.3141592654e1, 0.3e1) - 0.63e2 * 0.3141592654e1 - 0.54e2) * pow(p[2], 0.6e1) + 0.3e1 * (pow(0.3141592654e1, 0.3e1) + 0.27e2 * 0.3141592654e1 + 0.36e2) * (pow(p[0], 0.2e1) + pow(p[1], 0.2e1)) * pow(p[2], 0.4e1) + 0.3e1 * 0.3141592654e1 * (0.3141592654e1 * 0.3141592654e1 + 0.48e2) * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1), 0.2e1) * pow(p[2], 0.2e1) + pow(0.3141592654e1, 0.3e1) * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1), 0.3e1)) * pow(exp(-t / T), 0.2e1) + 0.2e1 / 0.3e1 * a * ((pow(0.3141592654e1, 0.3e1) - 0.27e2 * 0.3141592654e1 * 0.3141592654e1 + 0.63e2 * 0.3141592654e1 + 0.243e3) * pow(p[2], 0.6e1) + ((0.3e1 * pow(0.3141592654e1, 0.3e1) - 0.27e2 * 0.3141592654e1 * 0.3141592654e1 - 0.108e3 * 0.3141592654e1 - 0.486e3) * pow(p[0], 0.2e1) + (0.3e1 * pow(0.3141592654e1, 0.3e1) - 0.27e2 * 0.3141592654e1 * 0.3141592654e1 - 0.108e3 * 0.3141592654e1 - 0.486e3) * pow(p[1], 0.2e1) + 0.4e1 * 0.3141592654e1 * ParameterNS::eps * ParameterNS::eps * (0.3141592654e1 * 0.3141592654e1 + 0.18e2 * 0.3141592654e1 + 0.9e1)) * pow(p[2], 0.4e1) + 0.3e1 * 0.3141592654e1 * (pow(p[0], 0.2e1) + pow(p[1], 0.2e1)) * ((0.3141592654e1 * 0.3141592654e1 + 0.9e1 * 0.3141592654e1 - 0.57e2) * pow(p[0], 0.2e1) + (0.3141592654e1 * 0.3141592654e1 + 0.9e1 * 0.3141592654e1 - 0.57e2) * pow(p[1], 0.2e1) + 0.8e1 / 0.3e1 * (0.3141592654e1 * 0.3141592654e1 + 0.9e1 / 0.2e1 * 0.3141592654e1 - 0.9e1 / 0.2e1) * ParameterNS::eps * ParameterNS::eps) * pow(p[2], 0.2e1) + 0.3141592654e1 * 0.3141592654e1 * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1), 0.2e1) * ((0.3141592654e1 + 0.27e2) * pow(p[0], 0.2e1) + (0.3141592654e1 + 0.27e2) * pow(p[1], 0.2e1) + 0.4e1 * ParameterNS::eps * ParameterNS::eps * (0.3141592654e1 - 0.9e1))) * exp(-t / T) + (-0.2e1 / 0.3e1 * pow(0.3141592654e1, 0.3e1) + 0.42e2 * 0.3141592654e1 - 0.108e3) * pow(p[2], 0.6e1) + ((-0.2e1 * pow(0.3141592654e1, 0.3e1) - 0.18e2 * 0.3141592654e1 + 0.216e3) * pow(p[0], 0.2e1) + (-0.2e1 * pow(0.3141592654e1, 0.3e1) - 0.18e2 * 0.3141592654e1 + 0.216e3) * pow(p[1], 0.2e1) + 0.16e2 / 0.3e1 * pow(0.3141592654e1, 0.3e1) * ParameterNS::eps * ParameterNS::eps - 0.48e2 * 0.3141592654e1 * ParameterNS::eps * ParameterNS::eps) * pow(p[2], 0.4e1) - 0.2e1 * 0.3141592654e1 * ((0.3141592654e1 * 0.3141592654e1 + 0.30e2) * pow(p[0], 0.2e1) + (0.3141592654e1 * 0.3141592654e1 + 0.30e2) * pow(p[1], 0.2e1) - 0.16e2 / 0.3e1 * 0.3141592654e1 * 0.3141592654e1 * ParameterNS::eps * ParameterNS::eps - 0.24e2 * ParameterNS::eps * ParameterNS::eps) * (pow(p[0], 0.2e1) + pow(p[1], 0.2e1)) * pow(p[2], 0.2e1) - 0.2e1 / 0.3e1 * pow(0.3141592654e1, 0.3e1) * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1), 0.2e1) * (-0.8e1 * ParameterNS::eps * ParameterNS::eps + pow(p[0], 0.2e1) + pow(p[1], 0.2e1))) * p[2] * exp(-t / T) / 0.6e1 + 0.2e1 * pow(exp(-t / T), 0.2e1) * a * a * p[2] * pow(0.3141592654e1, 0.8e1) * sqrt(0.3e1) * (pow(p[0], 0.2e1) + pow(p[1], 0.2e1) - 0.2e1 * pow(p[2], 0.2e1)) * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), 0.25e2 / 0.2e1) * (a * exp(-t / T) - 0.1e1) * (a * exp(-t / T) + 0.1e1) + pow(0.3141592654e1, 0.6e1) * ((0.3141592654e1 - 0.3e1) * pow(p[2], 0.2e1) + 0.3141592654e1 * (pow(p[0], 0.2e1) + pow(p[1], 0.2e1))) * ((0.3141592654e1 * 0.3141592654e1 - 0.12e2 * 0.3141592654e1 + 0.27e2) * pow(p[2], 0.4e1) + ((0.2e1 * 0.3141592654e1 * 0.3141592654e1 - 0.54e2) * pow(p[0], 0.2e1) + (0.2e1 * 0.3141592654e1 * 0.3141592654e1 - 0.54e2) * pow(p[1], 0.2e1) - 0.8e1 * 0.3141592654e1 * ParameterNS::eps * ParameterNS::eps * (0.3141592654e1 - 0.3e1)) * pow(p[2], 0.2e1) + 0.3141592654e1 * ((0.3141592654e1 + 0.12e2) * pow(p[0], 0.2e1) + (0.3141592654e1 + 0.12e2) * pow(p[1], 0.2e1) - 0.8e1 * ParameterNS::eps * ParameterNS::eps * (0.3141592654e1 + 0.3e1)) * (pow(p[0], 0.2e1) + pow(p[1], 0.2e1))) * sqrt(0.3e1) * p[2] * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), 0.21e2 / 0.2e1) / 0.18e2 + pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), 0.11e2) * (0.6e1 * exp(-t / T) * a * pow(p[2], 0.3e1) * pow(0.3141592654e1, 0.7e1) * sqrt(0.3e1) * (pow(p[0], 0.2e1) + pow(p[1], 0.2e1) - 0.2e1 * pow(p[2], 0.2e1)) * pow(a * exp(-t / T) - 0.1e1, 0.2e1) * sqrt(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1)) + ((-0.30e2 * pow(p[2], 0.6e1) + 0.30e2 * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1), 0.2e1) * pow(p[2], 0.2e1)) * pow(0.3141592654e1, 0.15e2 / 0.2e1) + 0.45e2 * (pow(p[0], 0.2e1) + pow(p[1], 0.2e1) - 0.3e1 / 0.5e1 * pow(p[2], 0.2e1)) * pow(p[2], 0.4e1) * pow(0.3141592654e1, 0.13e2 / 0.2e1) + pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), 0.2e1) * (pow(p[0], 0.2e1) + pow(p[1], 0.2e1) - 0.3e1 * pow(p[2], 0.2e1)) * pow(0.3141592654e1, 0.17e2 / 0.2e1)) * pow(a, 0.3e1) * pow(exp(-t / T), 0.3e1) + ((0.30e2 * pow(p[2], 0.6e1) - 0.30e2 * pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1), 0.2e1) * pow(p[2], 0.2e1)) * pow(0.3141592654e1, 0.15e2 / 0.2e1) - 0.135e3 * (pow(p[0], 0.2e1) + pow(p[1], 0.2e1) - 0.3e1 / 0.5e1 * pow(p[2], 0.2e1)) * pow(p[2], 0.4e1) * pow(0.3141592654e1, 0.13e2 / 0.2e1) + pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), 0.2e1) * (pow(p[0], 0.2e1) + pow(p[1], 0.2e1) - 0.3e1 * pow(p[2], 0.2e1)) * pow(0.3141592654e1, 0.17e2 / 0.2e1)) * a * a * pow(exp(-t / T), 0.2e1) - 0.2e1 / 0.3e1 * (0.45e2 / 0.2e1 * (-0.14e2 / 0.15e2 * pow(p[2], 0.4e1) + (pow(p[0], 0.2e1) / 0.15e2 + pow(p[1], 0.2e1) / 0.15e2 + 0.16e2 / 0.15e2 * ParameterNS::eps * ParameterNS::eps) * pow(p[2], 0.2e1) + (pow(p[0], 0.2e1) + pow(p[1], 0.2e1)) * (pow(p[0], 0.2e1) + pow(p[1], 0.2e1) - 0.4e1 / 0.5e1 * ParameterNS::eps * ParameterNS::eps)) * pow(p[2], 0.2e1) * pow(0.3141592654e1, 0.15e2 / 0.2e1) - 0.405e3 / 0.2e1 * (pow(p[0], 0.2e1) + pow(p[1], 0.2e1) - 0.3e1 / 0.5e1 * pow(p[2], 0.2e1)) * pow(p[2], 0.4e1) * pow(0.3141592654e1, 0.13e2 / 0.2e1) + (-0.5e1 / 0.2e1 * pow(p[2], 0.4e1) + (-0.3e1 / 0.2e1 * pow(p[0], 0.2e1) - 0.3e1 / 0.2e1 * pow(p[1], 0.2e1) + 0.8e1 * ParameterNS::eps * ParameterNS::eps) * pow(p[2], 0.2e1) + (pow(p[0], 0.2e1) + pow(p[1], 0.2e1)) * (-0.2e1 * ParameterNS::eps * ParameterNS::eps + pow(p[0], 0.2e1) + pow(p[1], 0.2e1))) * (pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1)) * pow(0.3141592654e1, 0.17e2 / 0.2e1)) * a * exp(-t / T) + 0.15e2 * (-0.14e2 / 0.15e2 * pow(p[2], 0.4e1) + (pow(p[0], 0.2e1) / 0.15e2 + pow(p[1], 0.2e1) / 0.15e2 + 0.16e2 / 0.15e2 * ParameterNS::eps * ParameterNS::eps) * pow(p[2], 0.2e1) + (pow(p[0], 0.2e1) + pow(p[1], 0.2e1)) * (pow(p[0], 0.2e1) + pow(p[1], 0.2e1) - 0.4e1 / 0.5e1 * ParameterNS::eps * ParameterNS::eps)) * pow(p[2], 0.2e1) * pow(0.3141592654e1, 0.15e2 / 0.2e1) - 0.45e2 * (pow(p[0], 0.2e1) + pow(p[1], 0.2e1) - 0.3e1 / 0.5e1 * pow(p[2], 0.2e1)) * pow(p[2], 0.4e1) * pow(0.3141592654e1, 0.13e2 / 0.2e1) - 0.2e1 / 0.3e1 * (-0.5e1 / 0.2e1 * pow(p[2], 0.4e1) + (-0.3e1 / 0.2e1 * pow(p[0], 0.2e1) - 0.3e1 / 0.2e1 * pow(p[1], 0.2e1) + 0.8e1 * ParameterNS::eps * ParameterNS::eps) * pow(p[2], 0.2e1) + (pow(p[0], 0.2e1) + pow(p[1], 0.2e1)) * (-0.2e1 * ParameterNS::eps * ParameterNS::eps + pow(p[0], 0.2e1) + pow(p[1], 0.2e1))) * (pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1)) * pow(0.3141592654e1, 0.17e2 / 0.2e1)) * a * exp(-t / T)) * sqrt(0.16e2) * pow(0.3141592654e1, -0.19e2 / 0.2e1) / ParameterNS::eps;
+    return(inertia - bidiffusion);
+}
+static RegisterScalarFunction regsca_rhs_decay( "DecayFirstHarmonicRhs", Test6_rhs3);
 
 // ==stationary test case "LaplaceBeltrami1"==
 // Torus with R= RadTorus[0]= 1., r= RadTorus[1]= 0.6, wind == 0
@@ -830,7 +936,7 @@ CahnHilliardP1BaseCL* make_cahnhilliard_timedisc( MultiGridCL& mg, LevelsetP2CL&
             P.get<double>("SurfSeparation.Theta"), P.get<double>("SurfSeparation.Mobility"),
                     P.get<double>("SurfSeparation.Epsilon"),
             &v, Bnd_v, lset.Phi, lset.GetBndData(), the_normal_fun, dist,
-            P.get<DROPS::Point3DCL>("Mesh.E1")[0]/(2.*P.get<double>("Mesh.N1")), 1.,//S=beta_s,
+            P.get<DROPS::Point3DCL>("Mesh.E1")[0]/(P.get<double>("Mesh.N1")), 1.,//S=beta_s,
             P.get<int>("SurfSeparation.Solver.Iter"), P.get<double>("SurfSeparation.Solver.Tol"),
             P.get<int>("SurfSeparation.Solver.PcAIter"), P.get<double>("SurfSeparation.Solver.PcATol"),
             P.get<int>("SurfSeparation.Solver.PcBIter"), P.get<double>("SurfSeparation.Solver.PcBTol"),
@@ -840,7 +946,8 @@ CahnHilliardP1BaseCL* make_cahnhilliard_timedisc( MultiGridCL& mg, LevelsetP2CL&
                                      P.get<double>("SurfSeparation.Theta"), P.get<double>("SurfSeparation.Mobility"),
                                      P.get<double>("SurfSeparation.Epsilon"),
                                      &v, Bnd_v, lset.Phi, lset.GetBndData(), the_normal_fun, dist,
-                                     P.get<DROPS::Point3DCL>("Mesh.E1")[0]/(2.*P.get<double>("Mesh.N1")), 1.,//S=beta_s,
+                                     1./(P.get<DROPS::Point3DCL>("Mesh.E1")[0]/(P.get<double>("Mesh.N1"))),
+                                     1.,//S=beta_s,
                                      P.get<int>("SurfSeparation.Solver.Iter"), P.get<double>("SurfSeparation.Solver.Tol"),
                                      P.get<int>("SurfSeparation.Solver.PcAIter"), P.get<double>("SurfSeparation.Solver.PcATol"),
                                      P.get<int>("SurfSeparation.Solver.PcBIter"), P.get<double>("SurfSeparation.Solver.PcBTol"),
@@ -894,8 +1001,8 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     InitVel( mg, &v, Bnd_v, the_wind_fun, 0.);
 
     //lset2.SetupSystem( make_P2Eval( mg, Bnd_v, v), P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps"));
-    double dist=2.0*P.get<DROPS::Point3DCL>("SurfSeparation.Exp.Velocity").norm()*P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps")
-                +P.get<DROPS::Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")/pow(2,P.get<int>("Mesh.AdaptRef.FinestLevel")+1);
+    double dist=1*(2.0*P.get<DROPS::Point3DCL>("SurfSeparation.Exp.Velocity").norm()*P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps")
+                +P.get<DROPS::Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")/pow(2,P.get<int>("Mesh.AdaptRef.FinestLevel")));
 
     std::unique_ptr<CahnHilliardP1BaseCL> timediscp( make_cahnhilliard_timedisc( mg, lset, v, Bnd_v, P, dist));
     CahnHilliardP1BaseCL& timedisc= *timediscp;
@@ -913,12 +1020,11 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     //adap.push_back( &lset2repair);
 
     // Init concentration     // Init chemical potential
-    timedisc.idx_c.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData(), dist);
-    std::cout << "Concentration NumUnknowns: " << timedisc.idx_c.NumUnknowns() << std::endl;
-    timedisc.ic.SetIdx( &timedisc.idx_c);
-    timedisc.imu.SetIdx( &timedisc.idx_c);
-    timedisc.iface.SetIdx( &timedisc.idx_c);
-    timedisc.iface_old.SetIdx( &timedisc.idx_c);
+    timedisc.idx.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData(), dist);//WARNING
+    std::cout << "Concentration NumUnknowns: " << timedisc.idx.NumUnknowns() << std::endl;
+    timedisc.ic.SetIdx( &timedisc.idx);
+    timedisc.imu.SetIdx( &timedisc.idx);
+    timedisc.iface.SetIdx( &timedisc.idx);
 
     timedisc.SetInitialValue( the_poten_sol_fun, the_conc_sol_fun, 0.);
 
@@ -933,7 +1039,6 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     if (vtkwriter.get() != 0) {
         vtkwriter->Register( make_VTKScalar(      lset.GetSolution(),              "Levelset") );
         vtkwriter->Register( make_VTKIfaceScalar( mg, timedisc.iface,                 "interface_mesh"));
-        vtkwriter->Register( make_VTKIfaceScalar( mg, timedisc.iface_old,                 "old_interface_mesh"));
         vtkwriter->Register( make_VTKIfaceScalar( mg, timedisc.ic,                 "concentration"));
         vtkwriter->Register( make_VTKIfaceScalar( mg, timedisc.imu,                 "chem_potential"));
         vtkwriter->Register( make_VTKVector(      make_P2Eval( mg, Bnd_v, v),      "Velocity"));
@@ -965,6 +1070,8 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     std::cout << "H_1x-omega_error: " << H_1x_omega_err << std::endl;
     double L_2tH_1x_chi_err_sq= 0.5*dt*std::pow( H_1x_chi_err, 2);
     double L_2tH_1x_omega_err_sq= 0.5*dt*std::pow( H_1x_omega_err, 2);
+    double L_2tL_2x_chi_err_sq= 0.5*dt*std::pow( L_2x_chi_err, 2);
+    double L_2tL_2x_omega_err_sq= 0.5*dt*std::pow( L_2x_omega_err, 2);
 
     BndDataCL<> ifbnd( 0);
     std::cout << "initial concentration on \\Gamma: " << Integral_Gamma( mg, lset.Phi, lset.GetBndData(), make_P1Eval(  mg, ifbnd, timedisc.ic)) << '\n';
@@ -988,31 +1095,40 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
         std::cout << "chemical potential on \\Gamma: " << Integral_Gamma( mg, lset.Phi, lset.GetBndData(), make_P1Eval(  mg, ifbnd, timedisc.imu)) << '\n';
 
         L_2x_chi_err= L2_error( lset.Phi, lset.GetBndData(), timedisc.GetConcentr(), the_conc_sol_fun);
-        L_2x_omega_err= L2_error( lset.Phi, lset.GetBndData(), timedisc.GetPotential(), the_poten_sol_fun);
-
         std::cout << "L_2x-chi_error: " << L_2x_chi_err
                   << "\nnorm of concentration solution: " << L2_norm( mg, lset.Phi, lset.GetBndData(), the_conc_sol_fun)
                   << std::endl;
+
+        L_2x_omega_err= L2_error( lset.Phi, lset.GetBndData(), timedisc.GetPotential(), the_poten_sol_fun);
         std::cout << "L_2x-omega_error: " << L_2x_omega_err
                   << "\nnorm of omega solution: " << L2_norm( mg, lset.Phi, lset.GetBndData(), the_poten_sol_fun)
                   << std::endl;
 
         L_inftL_2x_chi_err= std::max( L_inftL_2x_chi_err, L_2x_chi_err);
         std::cout << "L_inftL_2x-chi_error: " << L_inftL_2x_chi_err << std::endl;
+
         L_inftL_2x_omega_err= std::max( L_inftL_2x_omega_err, L_2x_omega_err);
         std::cout << "L_inftL_2x-omega_error: " << L_inftL_2x_omega_err << std::endl;
 
-        L_2tH_1x_chi_err_sq+= (step > 1 ? 0.5 : 0.)*dt*std::pow( H_1x_chi_err, 2);
+        //L_2tH_1x_chi_err_sq+= (step > 1 ? 0.5 : 0.)*dt*std::pow( H_1x_chi_err, 2);
         H_1x_chi_err= H1_error( lset.Phi, lset.GetBndData(), timedisc.GetConcentr(), the_conc_sol_fun);
         std::cout << "H_1x-chi_error: " << H_1x_chi_err << std::endl;
+
         L_2tH_1x_chi_err_sq+= 0.5*dt*std::pow( H_1x_chi_err, 2);
         std::cout << "L_2tH_1x-chi_error: " << std::sqrt( L_2tH_1x_chi_err_sq) << std::endl;
 
-        L_2tH_1x_omega_err_sq+= (step > 1 ? 0.5 : 0.)*dt*std::pow( H_1x_omega_err, 2);
+        //L_2tH_1x_omega_err_sq+= (step > 1 ? 0.5 : 0.)*dt*std::pow( H_1x_omega_err, 2);
         H_1x_omega_err= H1_error( lset.Phi, lset.GetBndData(), timedisc.GetPotential(), the_poten_sol_fun);
         std::cout << "H_1x-omega_error: " << H_1x_omega_err << std::endl;
+
         L_2tH_1x_omega_err_sq+= 0.5*dt*std::pow( H_1x_omega_err, 2);
         std::cout << "L_2tH_1x-omega_error: " << std::sqrt( L_2tH_1x_omega_err_sq) << std::endl;
+
+        L_2tL_2x_omega_err_sq+= 0.5*dt*std::pow( L_2x_omega_err, 2);
+        std::cout << "L_2tL_2x-omega_error: " << std::sqrt( L_2tL_2x_omega_err_sq) << std::endl;
+
+        L_2tL_2x_chi_err_sq+= 0.5*dt*std::pow( L_2x_chi_err, 2);
+        std::cout << "L_2tL2x-chi_error: " << std::sqrt( L_2tL_2x_chi_err_sq) << std::endl;
 
         if (vtkwriter.get() != 0 && step % P.get<int>( "VTK.Freq") == 0) {
             LSInit( mg, the_conc_sol_vd, the_conc_sol_fun, /*t*/ cur_time);
@@ -1066,9 +1182,20 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
         }
     }
     std::cout << std::endl;
-    std::cout << "L_2 energy error norm of 3- and 4-variable:\t" << std::sqrt(L_2tH_1x_omega_err_sq) <<"\t" << std::sqrt(L_2tH_1x_chi_err_sq) << std::endl;
-    log_global << "L_2 energy error norm of 3- and 4-variable:\t" << std::sqrt(L_2tH_1x_omega_err_sq) <<"\t" << std::sqrt(L_2tH_1x_chi_err_sq) << std::endl;
-    log_global << "C error norm of 3- and 4-variable:\t" << L_inftL_2x_omega_err<<"\t" << L_inftL_2x_chi_err << "\t" <<  std::endl;
+    std::cout << "L2t_L2x_omega L2t_L2x_chi L2t_H1x_omega L2t_H1x_chi Linft_L2x_omega Linft_L2x_chi  H1x_omega(T) H1x_chi(T) L2x_omega(T) L2x_chi(T)\t" <<std::endl
+        << std::sqrt(L_2tL_2x_omega_err_sq) <<"\t" << std::sqrt( L_2tL_2x_chi_err_sq)<<"\t"
+        << std::sqrt(L_2tH_1x_omega_err_sq) <<"\t" << std::sqrt(L_2tH_1x_chi_err_sq)<<"\t"
+        << L_inftL_2x_omega_err<<"\t" << L_inftL_2x_chi_err << "\t"
+        << H_1x_omega_err <<"\t" <<  H_1x_chi_err <<"\t"
+        << L_2x_omega_err <<"\t" << L_2x_chi_err << "\t"
+        <<std::endl;
+    log_global << "L2t_L2x_omega L2t_L2x_chi L2t_H1x_omega L2t_H1x_chi Linft_L2x_omega Linft_L2x_chi  H1x_omega(T) H1x_chi(T) L2x_omega(T) L2x_chi(T)\t" <<std::endl
+        << std::sqrt(L_2tL_2x_omega_err_sq) <<"\t" << std::sqrt( L_2tL_2x_chi_err_sq)<<"\t"
+        << std::sqrt(L_2tH_1x_omega_err_sq) <<"\t" << std::sqrt(L_2tH_1x_chi_err_sq)<<"\t"
+        << L_inftL_2x_omega_err<<"\t" << L_inftL_2x_chi_err << "\t"
+        << H_1x_omega_err <<"\t" <<  H_1x_chi_err <<"\t"
+        << L_2x_omega_err <<"\t" << L_2x_chi_err << "\t"
+        <<std::endl;
     //delete &lset2;
     log_global.close();
 }
@@ -1902,7 +2029,9 @@ void StationaryStrategyDeformationP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangC
 
 int  main (int argc, char* argv[])
 {
-  try {
+    srand(time(NULL));
+
+    try {
     ScopeTimerCL timer( "main");
 
     DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/surfphasesep/separation.json");

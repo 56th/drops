@@ -17,16 +17,16 @@
     "E1": [3.33333, 0,0],
     "E2": [0,3.33333,0],
     "E3": [0,0,3.33333],
-    "N1": 2,
-    "N2": 2,
-    "N3": 2,
+    "N1": 5,
+    "N2": 5,
+    "N3": 5,
     "RestartFile": "",
     "AdaptRef": {
       "_comment":      "# adaptive refinement",
       "Freq":          0,
       "Width":         10,
-      "CoarsestLevel": 0,
-      "FinestLevel":   3,
+      "CoarsestLevel": 7,
+      "FinestLevel":   7,
       "SD":            0.1,
       "CurvDiff":      -1,
       "Discontinuous": 0
@@ -93,8 +93,8 @@
   {
     "Read" : 0,
     "Write": "yes",
-    "NumSteps":	1000,
-    "StepSize": 0.0025
+    "NumSteps":	100,
+    "StepSize": 0.0001
   },
 
 
@@ -146,7 +146,7 @@
 
     "RadDrop":		[1, 1, 1 ],
     "PosDrop":		[0, 0, 0 ],
-    "Velocity":		[0, 0, 0.5 ]
+    "Velocity":		[0, 0, 0.0 ]
   },
 
   "SurfCahnHilliard":
@@ -154,10 +154,10 @@
     "_comment": "# surface cahn-hilliard",
     "FE":           "P1P1",
     "model":        "CahnHilliard",
-    "testcase":      "12",
-    "instationary": "BDF1",
+    "testcase":      "9",
+    "instationary": "BDF2",
     "mobility": 1,
-    "epsilon": 0.05
+    "epsilon": 0.01
   },
 
   "SurfNavStokes":
@@ -201,7 +201,7 @@
 
   "Output":
   {
-    "Directory":    "../../../drops_vladimir/output/vtk",
+    "Directory":    "../../output/",
     "every timestep": "1"
   }
 

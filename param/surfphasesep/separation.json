@@ -10,13 +10,13 @@
 
     "Mesh": {
         "Type":        "BrickBuilder",
-        "Origin":      [-3.38333, -1.61666, -1.61666],
-        "E1":          [ 6.66666,  0,  0],
+        "Origin":      [-1.66666, -1.66666, -1.66666],
+        "E1":          [ 3.33333,  0,  0],
         "E2":          [ 0,  3.33333,  0],
         "E3":          [ 0,  0,  3.33333],
-        "N1":          32,
-        "N2":          16,
-        "N3":          16,
+        "N1":          64,
+        "N2":          64,
+        "N3":          64,
         "RestartFile": "",
 
         "AdaptRef": {
@@ -25,6 +25,7 @@
             "CoarsestLevel": 0,
             "FinestLevel":   0,
             "SD":            0.1,
+
             "CurvDiff":      -1,
             "Discontinuous": 0
         }
@@ -34,8 +35,8 @@
     {
         "Read" : 0,
         "Write": "yes",
-        "NumSteps":	512,
-        "FinalTime": 1
+        "NumSteps": 1000,
+        "FinalTime": 10
     },
 
     "SurfSeparation": {
@@ -44,15 +45,17 @@
             "RadDrop":  [1, 0, 0],
             "PosDrop":  [0, 0, 0],
             "RadTorus": [1, 0.1],
-            "Velocity": [1.5, 0.0, 0.0],
+            "Velocity": [0.4, 0.0,  0.0],
 
             "StationaryPDE": false,
-            "Wind":     "MergeDropWind",
-            "Levelset": "MergeDropLset",
-            "Normal": "NormalMergeDrop",
+
+            "Wind":     "ConstantRotation",
+            "Levelset": "Sphere",
+            "Normal": "NormalSphere",
             "Rhs":      "ZeroScalarFun",
-            "ConcentrationSolution": "MergeDropSol",
+            "ConcentrationSolution": "MergeDropRandomSol",
             "ChemicalPotentialSolution": "ZeroScalarFun"
+
 
         },
         "Method":     "NarrowBandStabilization",
@@ -60,11 +63,11 @@
         "Theta":      1,
         "Solver": {
                 "PcAIter":      500,
-                "PcATol":       1e-4,
+                "PcATol":       1e-5,
                 "PcBIter":      500,
-                "PcBTol":       1e-4,
+                "PcBTol":       1e-5,
             "Iter": 1000,
-            "Tol":  1e-9
+            "Tol":  1e-10
         },
         "XFEMReduced":             -1,
         "Mobility":                    1,
@@ -72,7 +75,7 @@
         "FEDegree":                1,
         "NormalLaplaceCoefficient": 1.0,
         "SolutionOutput": { 
-            "Freq":   0,
+            "Freq":   1,
             "Path":   "../../output/solutions/iface_sol",
             "Binary": true
         }
@@ -90,6 +93,7 @@
         "Discontinuous": 0
     },
 
+
     "LevelsetMapper": { 
         "Tol":               1e-7,
         "Iter":              20,
@@ -101,8 +105,8 @@
     },
 
     "VTK": {
-        "Freq":           1,
-        "VTKDir":         "../../output/",
+        "Freq":           10,
+        "VTKDir":         "../../output_tmp/",
         "VTKName":        "separation",
         "TimeFileName":   "separation",
         "Binary":         1,

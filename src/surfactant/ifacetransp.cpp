@@ -1242,7 +1242,7 @@ void LocalStokesCL::setupA_P2_stab (double A_P2_stab[10][10], double absdet)
     }
 }
 
-void LocalStokesCL::setupA_P1_stab (double A_P1_stab[4][4], double absdet)
+void LocalStokesCL:: setupA_P1_stab (double A_P1_stab[4][4], double absdet)
 {
     for (int i=0; i<4; ++i) {
         for (int j=0; j<4; ++j) {
@@ -3180,20 +3180,24 @@ void SurfactantP1BaseCL::InitTimeStep ()
 
     void CahnHilliardP1BaseCL::InitTimeStep ()
     {
-        iface_old.SetIdx( &oldidx_c_);
-
-        if (oldidx_c_.NumUnknowns() > 0) {
-            oldidx_c_.DeleteNumbering(MG_);
-           // oldidx_mu_.DeleteNumbering(MG_);
+        if (oldoldidx_.NumUnknowns() > 0) {
+            oldoldidx_.DeleteNumbering(MG_);
         }
 
-        oldidx_c_.swap( idx_c);
+
+        if (oldidx_.NumUnknowns() > 0) {
+            oldoldidx_.swap( oldidx_);
+            oldoldic_.resize( oldic_.size());
+            oldoldic_= oldic_;
+            oldidx_.DeleteNumbering(MG_);
+        }
+
+        oldidx_.swap( idx);
         oldic_.resize( ic.Data.size());
         oldic_= ic.Data;
-
-        //oldidx_mu_.swap( idx_mu);
-        oldimu_.resize( ic.Data.size());
+        oldimu_.resize( imu.Data.size());
         oldimu_= imu.Data;
+
 
         oldt_= ic.t;
 
@@ -3237,7 +3241,7 @@ void SurfactantP1BaseCL::InitTimeStep ()
       /*  InterfaceMatrixAccuCL<LocalLaplaceMobilityP1CL, InterfaceCommonDataP1CL> lbmob_accu( &LaplaceM, LocalLaplaceMobilityP1CL( make_P1Eval( MG_, Bnd_, ic), normal_, ic.t), cdata, "Laplace-Mobility");
         accus.push_back( &lbmob_accu);*/
 
-        VecDescCL vd_oldic( &oldidx_c_);
+        VecDescCL vd_oldic( &oldidx_);
         vd_oldic.Data= oldic_;
         vd_oldic.t= oldt_;
         accus.push_back_acquire( make_concentration_dependent_matrixP1_accu<LocalLaplaceMobilityP1CL>( &LaplaceM,  cdata, normal_, oldt_,  make_P1Eval( MG_, Bnd_, vd_oldic), "Laplace_Mobility"));
@@ -3262,7 +3266,7 @@ void SurfactantP1BaseCL::InitTimeStep ()
         MatrixCL Ident(ones);
 
 
-        Precond3.LinComb(1.0, Mass.Data, sigma_*dt_, Laplace.Data, dt_*rho_, Volume_stab.Data);
+        Precond3.LinComb(1.0, Mass.Data, sigma_*dt_, LaplaceM.Data, dt_*rho_, Volume_stab.Data);
         Precond4.LinComb(1.0, Mass.Data, epsilon_*epsilon_, Laplace.Data, epsilon_*epsilon_*rho_, Volume_stab.Data);
         block_pc_.GetPC1().Reset(Precond3);
         block_pc_.GetPC2().Reset(Precond4);
@@ -3280,31 +3284,27 @@ void SurfactantP1BaseCL::InitTimeStep ()
         ic.t= new_t;
         imu.t= new_t;
         dt_= new_t - oldt_;
-        idx_c.CreateNumbering( oldidx_c_.TriangLevel(), MG_, &lset_vd_, &lsetbnd_);
-        std::cout << "new NumUnknowns: " << idx_c.NumUnknowns() << std::endl;
-        ic.SetIdx( &idx_c);
-        imu.SetIdx( &idx_c);
-        iface.SetIdx( &idx_c);
-        for (int i=0; i<idx_c.NumUnknowns();i++)
+        idx.CreateNumbering( oldidx_.TriangLevel(), MG_, &lset_vd_, &lsetbnd_);
+        std::cout << "new NumUnknowns: " << idx.NumUnknowns() << std::endl;
+        ic.SetIdx( &idx);
+        imu.SetIdx( &idx);
+        iface.SetIdx( &idx);
+        for (int i=0; i<idx.NumUnknowns();i++)
         {
             iface.Data[i]=1.;
         }
 
-        for (int i=0; i<iface_old.Data.size();i++)
-        {
-            iface_old.Data[i]=1.;
-        }
 
-        VecDescCL vd_timeder( &idx_c),    // right-hand sides from integrals over the old/new interface
-                vd_oldtimeder( &idx_c),
-                vd_load3( &idx_c),
-                vd_load4( &idx_c),
-                vd_oldres( &idx_c),
-                vd_oldload3( &idx_c),
-                vd_oldload4( &idx_c),
-                well_potential( &oldidx_c_),//double-well potential
-                vd_well( &idx_c),
-                vd_oldic( &oldidx_c_);  // the initial data.
+        VecDescCL vd_timeder( &idx),    // right-hand sides from integrals over the old/new interface
+                vd_oldtimeder( &idx),
+                vd_load3( &idx),
+                vd_load4( &idx),
+                vd_oldres( &idx),
+                vd_oldload3( &idx),
+                vd_oldload4( &idx),
+                well_potential( &oldidx_),//double-well potential
+                vd_well( &idx),
+                vd_oldic( &oldidx_);  // the initial data.
 
         vd_oldic.Data= oldic_;
         vd_oldic.t= oldt_;
@@ -3336,7 +3336,7 @@ void SurfactantP1BaseCL::InitTimeStep ()
 
 
         if (theta_ == 1.0) {
-            accumulate( accus, MG_, idx_c.TriangLevel(), idx_c.GetBndInfo());
+            accumulate( accus, MG_, idx.TriangLevel(), idx.GetBndInfo());
             rhs3 = VectorCL( theta_*(vd_timeder.Data + dt_*vd_load3.Data));
             rhs4 = VectorCL( (-1.)*vd_well.Data + (S_)*vd_timeder.Data + vd_load4.Data);
             return;
@@ -3367,7 +3367,7 @@ void SurfactantP1BaseCL::InitTimeStep ()
            oldcdata,  make_P2Eval( MG_, Bnd_v_, oldv_), "mass-div on old iface"));
 
 
-        accumulate( accus, MG_, idx_c.TriangLevel(), idx_c.GetBndInfo());
+        accumulate( accus, MG_, idx.TriangLevel(), idx.GetBndInfo());
 
         rhs3 = VectorCL( theta_*vd_timeder.Data + (1. - theta_)*vd_oldtimeder.Data
                     + dt_*(theta_*vd_load3.Data + (1. - theta_)*(vd_oldload3.Data - vd_oldres.Data)));
@@ -3383,26 +3383,23 @@ void SurfactantP1BaseCL::InitTimeStep ()
 
         ic.t= new_t;
         dt_= new_t - oldt_;
-        idx_c.CreateNumbering( oldidx_c_.TriangLevel(), MG_, &lset_vd_, &lsetbnd_); // InitTimeStep deletes oldidx_ and swaps idx and oldidx_.
-        std::cout << "new NumUnknowns: " << idx_c.NumUnknowns() << std::endl;
-        ic.SetIdx( &idx_c);
+        idx.CreateNumbering( oldidx_.TriangLevel(), MG_, &lset_vd_, &lsetbnd_); // InitTimeStep deletes oldidx_ and swaps idx and oldidx_.
+        std::cout << "new NumUnknowns: " << idx.NumUnknowns() << std::endl;
+        ic.SetIdx( &idx);
 
-        for (int i=0; i<idx_c.NumUnknowns();i++)
+        for (int i=0; i<idx.NumUnknowns();i++)
         {
             iface.Data[i]=1.;
         }
 
-        for (int i=0; i<iface_old.Data.size();i++)
-        {
-            iface_old.Data[i]=1.;
-        }
 
-        VecDescCL vd_timeder( &idx_c),    // right-hand sides from integrals over the old/new interface
-                vd_oldtimeder( &idx_c),
-                vd_load( &idx_c),
-                vd_oldres( &idx_c),
-                vd_oldload( &idx_c),
-                vd_oldic( &oldidx_c_);  // the initial data.
+
+        VecDescCL vd_timeder( &idx),    // right-hand sides from integrals over the old/new interface
+                vd_oldtimeder( &idx),
+                vd_load( &idx),
+                vd_oldres( &idx),
+                vd_oldload( &idx),
+                vd_oldic( &oldidx_);  // the initial data.
                 vd_oldic.Data= oldic_;
                 vd_oldic.t= oldt_;
 
@@ -3419,7 +3416,7 @@ void SurfactantP1BaseCL::InitTimeStep ()
             accus.push_back_acquire( new InterfaceVectorAccuCL<LocalVectorP1CL, InterfaceCommonDataP1CL>( &vd_load, LocalVectorP1CL( rhs_fun3_, new_t), cdata, "load"));
 
         if (theta_ == 1.0) {
-            accumulate( accus, MG_, idx_c.TriangLevel(), idx_c.GetBndInfo());
+            accumulate( accus, MG_, idx.TriangLevel(), idx.GetBndInfo());
             return VectorCL( theta_*(vd_timeder.Data + dt_*vd_load.Data));
         }
 
@@ -3451,15 +3448,15 @@ void SurfactantP1BaseCL::InitTimeStep ()
         imu.t= new_t;
         //dt_= new_t - oldt_;
 //        idx_mu.CreateNumbering( oldidx_mu_.TriangLevel(), MG_, &lset_vd_, &lsetbnd_); // InitTimeStep deletes oldidx_ and swaps idx and oldidx_.
-        imu.SetIdx( &idx_c);
+        imu.SetIdx( &idx);
 
 
-        VecDescCL well_potential( &oldidx_c_),//double-well potential
+        VecDescCL well_potential( &oldidx_),//double-well potential
                 //vd_oldload( &idx_mu),
-                vd_load( &idx_c),
-                vd( &idx_c),
-                vd_well( &idx_c),
-        vd_oldic( &oldidx_c_);  // the initial data.
+                vd_load( &idx),
+                vd( &idx),
+                vd_well( &idx),
+        vd_oldic( &oldidx_);  // the initial data.
         vd_oldic.Data= oldic_;
         vd_oldic.t= oldt_;
         /* vd_oldtimeder( &idx_mu),
@@ -3489,7 +3486,7 @@ void SurfactantP1BaseCL::InitTimeStep ()
             accus.push_back_acquire( new InterfaceVectorAccuCL<LocalVectorP1CL, InterfaceCommonDataP1CL>( &vd_load, LocalVectorP1CL( rhs_fun4_, new_t), cdata, "load"));
 
         if (theta_ == 1.0) {
-            accumulate( accus, MG_, idx_c.TriangLevel(), idx_c.GetBndInfo());
+            accumulate( accus, MG_, idx.TriangLevel(), idx.GetBndInfo());
             return VectorCL( (-1.)*vd_well.Data + (S_)*vd.Data + theta_*(vd_load.Data));
         }
 
@@ -3520,7 +3517,7 @@ void SurfactantP1BaseCL::InitTimeStep ()
         A_.LinComb(sigma_*dt_, LaplaceM.Data, rho_*dt_, Volume_stab.Data);
         B_.LinComb(c, Mass.Data, 0*dt_ , Massd.Data, dt_, Conv.Data);
 
-        C_.LinComb(0.,   Laplace.Data, -1.0, Mass.Data);
+        C_.LinComb(0.,   Laplace.Data, -epsilon_, Mass.Data);
         D_.LinComb(epsilon_*epsilon_,  Laplace.Data,
                 //   -1., Gprimeprime.Data,
                   S_, Mass.Data,
@@ -3532,7 +3529,7 @@ void SurfactantP1BaseCL::InitTimeStep ()
         std::cout << "      Before solve: res4 = " << norm(C_ * imu.Data  +D_ * ic.Data- rhs4) << std::endl;
 
         {
-            ScopeTimerCL timer("CahnHilliardP1BaseCL::DoStep: Solve");
+            ScopeTimerCL timer("CahnHilliardcGP1CL::DoStep: Solve");
             block_gm_.Solve(A_, B_, C_, D_, imu.Data, ic.Data, rhs3, rhs4, imu.RowIdx->GetEx(),ic.RowIdx->GetEx());
             /*ScopeTimerCL timer( "SurfactantcGP1CL::DoStep: Solve");
             MatrixCL L;
@@ -3543,10 +3540,10 @@ void SurfactantP1BaseCL::InitTimeStep ()
             std::cout << "      After  solve: res3 = " << norm(A_ * imu.Data  +B_ * ic.Data- rhs3) << std::endl;
             std::cout << "      After  solve: res4 = " << norm(C_ * imu.Data  +D_ * ic.Data- rhs4) << std::endl;
         }
-        std::cout << "CahnHilliardP1BaseCL::DoStep: res = " << block_gm_.GetResid() << ", iter = " << block_gm_.GetIter() << std::endl;
+        std::cout << "CahnHilliardcGP1CL::DoStep: res = " << block_gm_.GetResid() << ", iter = " << block_gm_.GetIter() << std::endl;
     }
 
-    void CahnHilliardcGP1CL::DoStep (double new_t)
+    void CahnHilliardcGP1CL:: DoStep (double new_t)
     {
         ScopeTimerCL timer( "CahnHilliardcGP1CL::DoStep");
 
@@ -3559,13 +3556,17 @@ void SurfactantP1BaseCL::InitTimeStep ()
         CommitStep();
     }
 
+    void CahnHilliardcGP1CL:: DoStep0 (double new_t)
+    {
+        DoStep(new_t);
+    }
     void CahnHilliardcGP1CL::CommitStep ()
     {
         return;
     }
 
-    ///CahnHilliardNarrowBandStblP1CL
-    void CahnHilliardNarrowBandStblP1CL:: Update()
+    ///StblP1CL
+    void CahnHilliardNarrowBandStblP1CL::   Update()
     {
         ScopeTimerCL timer( "CahnHilliardNarrowBandStblP1CL::Update");
         std::cout << "CahnHilliardNarrowBandStblP1CL::Update:\n";
@@ -3585,8 +3586,15 @@ void SurfactantP1BaseCL::InitTimeStep ()
         Massd.Data.clear();
         Massd.SetIdx( cidx, cidx);
 
-        VecDescCL old_conc( &idx_c);//extension of the old concentration to the current NarrowBand
-        Restrict( MG_, rhsext1, old_conc);     //rhsext has been computed already in InitStep1
+        Ident.Data.clear();
+        /*std::valarray<double> ones( 1., Mass.Data.num_rows());
+        Ident.Data=MatrixCL(ones);*/
+
+        VecDescCL conc_ext( &idx);//extension of the old concentration to the current NarrowBand
+        Restrict(MG_, conc_extrapol, conc_ext);
+//        if (oldoldic_.size()>0)
+//        conc_ext.Data =  2.0 * oldic_ - 1.0 * oldoldic_;
+//        else conc_ext.Data=1.0*oldic_;
 
         TetraAccumulatorTupleCL accus;
         InterfaceCommonDataP1CL cdata( lset_vd_, lsetbnd_);//
@@ -3598,20 +3606,29 @@ void SurfactantP1BaseCL::InitTimeStep ()
 
         InterfaceMatrixAccuCL<LocalLaplaceBeltramiP1CL, InterfaceCommonDataP1CL> lb_accu( &Laplace, LocalLaplaceBeltramiP1CL( 1.), cdata, "Laplace-Beltrami");
         accus.push_back( &lb_accu);
+       /* InterfaceMatrixAccuCL<LocalLaplaceP1CL, InterfaceCommonDataP1CL> lb_accu( &Laplace, LocalLaplaceP1CL( normal_, ic.t), cdata, "Laplace");
+        accus.push_back( &lb_accu);*/
 
 
-        accus.push_back_acquire( make_concentration_dependent_matrixP1_accu<LocalLaplaceMobilityP1CL>( &LaplaceM,  cdata, normal_, dt_,  make_P1Eval( MG_, Bnd_, old_conc), "Laplace_Mobility"));
+        accus.push_back_acquire( make_concentration_dependent_matrixP1_accu<LocalLaplaceMobilityP1CL>( &LaplaceM,  cdata, normal_, ic.t,  make_P1Eval( MG_, Bnd_, conc_ext), "Laplace_Mobility"));
 
-        NarrowBandCommonDataP1CL bdata( lset_vd_, lsetbnd_,width_);
-        accus.push_back( &bdata);
+        //WARNING
+       NarrowBandCommonDataP1CL bdata( lset_vd_, lsetbnd_,width_);
+       accus.push_back( &bdata);
 
-
-        NarrowBandMatrixAccuP1CL<LocalNormalLaplaceBulkP1CL> sb_accu( &Volume_stab, LocalNormalLaplaceBulkP1CL(1. ,dt_,normal_,ic.t), bdata, "NormalLaplaceBulk"); ///* To implement the stabilization Normal gradient
+        //InterfaceMatrixAccuCL<LocalFullGradientsP1CL, InterfaceCommonDataP1CL> sb_accu( &Volume_stab, LocalFullGradientsP1CL(normal_, oldt_), cdata, "Volume_stab");
+        //InterfaceMatrixAccuCL<LocalNormalLaplaceBulkP1CL, InterfaceCommonDataP1CL> sb_accu( &Volume_stab, LocalNormalLaplaceBulkP1CL( 1., dt_, normal_, oldt_), cdata, "Normal_stab");
+        //NarrowBandMatrixAccuP1CL<LocalFullGradientsP1CL> sb_accu( &Volume_stab, LocalFullGradientsP1CL(normal_, oldt_), bdata, "FullLaplaceBulk"); ///* To implement the stabilization Normal gradient
+        NarrowBandMatrixAccuP1CL<LocalNormalLaplaceBulkP1CL> sb_accu( &Volume_stab, LocalNormalLaplaceBulkP1CL( 1., dt_, normal_, oldt_), bdata, "NormalLaplaceBulk"); ///* To implement the stabilization Normal gradient
         accus.push_back( &sb_accu);
 
-        accus.push_back_acquire( make_wind_dependent_matrixP1_accu<LocalInterfaceConvectionP1CL>( &Conv,  cdata,  make_P2Eval( MG_, Bnd_v_, *v_), "convection"));
+       // accus.push_back_acquire( make_wind_dependent_matrixP1_accu<LocalInterfaceVelocityLaplaceP1CL>( &Volume_stab,  bdata, normal_, ic.t, make_P2Eval( MG_, Bnd_v_, *v_), "VelocityLaplace"));
 
-        accus.push_back_acquire( make_wind_dependent_matrixP1_accu<LocalInterfaceMassDivP1CL>( &Massd, cdata,  make_P2Eval( MG_, Bnd_v_, *v_), "massdiv"));
+
+        /*NarrowBandMatrixAccuP1CL<LocalInterfaceConvectionP1CL> conv_accu( &Conv, LocalInterfaceConvectionP1CL( 1., dt_, normal_, oldt_), bdata, "ConvBulk");
+        accus.push_back( &conv_accu);*/
+        accus.push_back_acquire( make_wind_dependent_matrixP1_accu<LocalInterfaceConvectionP1CL>( &Conv,  cdata,  make_P2Eval( MG_, Bnd_v_, *v_), "convection"));
+        //accus.push_back_acquire( make_wind_dependent_matrixP1_accu<LocalInterfaceMassDivP1CL>( &Massd, cdata,  make_P2Eval( MG_, Bnd_v_, *v_), "massdiv"));
 
 
         {
@@ -3630,8 +3647,24 @@ void SurfactantP1BaseCL::InitTimeStep ()
         MatrixCL Precond3, Precond4;
         /*std::valarray<double> ones( 1., Mass.Data.num_rows());
         MatrixCL Ident(ones);*/
-        Precond3.LinComb(1.0, Mass.Data, sigma_*dt_, Laplace.Data, dt_*rho_, Volume_stab.Data);
-        Precond4.LinComb(1.0, Mass.Data, epsilon_*epsilon_, Laplace.Data, epsilon_*epsilon_*rho_, Volume_stab.Data);
+//        std::valarray<double> ones( 1., Mass.Data.num_rows());
+//        Ident.Data=MatrixCL(ones);
+
+//        VectorCL id,random;
+//        id.resize(Mass.Data.num_rows(), 1);
+//        random.resize(Mass.Data.num_rows(), 0);
+//        for (int i=0; i<Mass.Data.num_rows(); i++)
+//        {
+//            random[i]=  - 5 + (rand() % 10)   ;
+//        }
+//        std::cout << "CHECKS:" << dot(Conv.Data *random,random) << "\t" <<  dot(Mass.Data*random,random)<< std::endl;
+//        //Precond3.LinComb(1.0, Mass.Data, 1.0*rho_, Volume_stab.Data, 0.0, Ident.Data);
+        //Precond4.LinComb(1.0, Mass.Data, 1.0*rho_, Volume_stab.Data, 0.0, Ident.Data);
+
+        Precond3.LinComb(1.0, Mass.Data, 1.0*rho_, Volume_stab.Data, 1.0*sigma_, LaplaceM.Data);
+        Precond4.LinComb(1.0, Mass.Data, 0.0, Conv.Data, 1.0*rho_*epsilon_*epsilon_, Volume_stab.Data, 1.0*epsilon_*epsilon_, Laplace.Data);
+//        Precond3.LinComb(1.0, Mass.Data, sigma_*dt_, Laplace.Data, dt_*rho_, Volume_stab.Data);
+//        Precond4.LinComb(1.0, Mass.Data, epsilon_*epsilon_, Laplace.Data, epsilon_*epsilon_*rho_, Volume_stab.Data);
         block_pc_.GetPC1().Reset(Precond3);
         block_pc_.GetPC2().Reset(Precond4);
     }
@@ -3640,42 +3673,48 @@ void SurfactantP1BaseCL::InitTimeStep ()
 // Implement Implicit Euler method
     void CahnHilliardNarrowBandStblP1CL::InitStep1 (VectorCL& rhs3, VectorCL& rhs4, double new_t)
     {
-        // ScopeTimerCL timer( "SurfactantNarrowBandStblP1CL::InitStep");
-        std::cout << "SurfactantNarrowBandStblP1CL::InitStep:\n";
+        // ScopeTimerCL timer( "CahnHilliardNarrowBandStblP1CL::InitStep1");
+        std::cout << "CahnHilliardNarrowBandStblP1CL::InitStep1:\n";
 
         ic.t= new_t;
         imu.t= new_t;
         dt_= new_t - oldt_;
-        idx_c.CreateNumbering( oldidx_c_.TriangLevel(), MG_, &lset_vd_, &lsetbnd_,width_); // InitTimeStep deletes oldidx_ and swaps idx and oldidx_.
-        std::cout << "new NumUnknowns: " << idx_c.NumUnknowns() << std::endl;
-        ic.SetIdx( &idx_c);
-        imu.SetIdx( &idx_c);
-        iface.SetIdx( &idx_c);//NarrowBand tetrahedras in VTK
-        for (int i=0; i<idx_c.NumUnknowns();i++)
+        idx.CreateNumbering( oldidx_.TriangLevel(), MG_, &lset_vd_, &lsetbnd_, width_); //WARNING// InitTimeStep deletes oldidx_ and swaps idx and oldidx_.
+        std::cout << "new NumUnknowns: " << idx.NumUnknowns() << std::endl;
+        ic.SetIdx( &idx);
+        imu.SetIdx( &idx);
+        iface.SetIdx( &idx);//NarrowBand tetrahedras in VTK
+        for (int i=0; i<idx.NumUnknowns();i++)
         {
             iface.Data[i]=1.;
         }
 
-        full_idx.CreateNumbering( idx_c.TriangLevel(), MG_);
+        full_idx.CreateNumbering( idx.TriangLevel(), MG_);
         std::cout << " full NumUnknowns: " << full_idx.NumUnknowns() << std::endl;
-        rhsext1.SetIdx(&full_idx);
+        ext1.SetIdx(&full_idx);
+        conc_extrapol.SetIdx(&full_idx);
 
-        VecDescCL vd_timeder( &idx_c),    // right-hand sides from integrals over the old/new interface
-                vd_oldtimeder( &idx_c),
-                vd_load3( &idx_c),
-                vd_load4( &idx_c),
-                vd_oldres( &idx_c),
-                vd_oldload3( &idx_c),
-                vd_oldload4( &idx_c),
-                well_potential( &idx_c),//double-well potential
-                vd_well( &idx_c),
-                vd_oldic( &oldidx_c_);  // the initial data.
+        VecDescCL vd_timeder( &idx),    // right-hand sides from integrals over the old/new interface
+                vd_oldtimeder( &idx),
+                vd_load3( &idx),
+                vd_load4( &idx),
+                vd_oldres( &idx),
+                vd_oldload3( &idx),
+                vd_oldload4( &idx),
+                well_potential( &idx),//double-well potential
+                vd_well( &idx),
+                vd_oldic( &oldidx_);  // the initial data.
+
 
         vd_oldic.Data= oldic_;
         vd_oldic.t= oldt_;
-        DROPS::ExtendP2( MG_, vd_oldic, rhsext1);
-        VecDescCL old_conc( &idx_c);//extension of the old concentration to the current NarrowBand
-        Restrict( MG_, rhsext1, old_conc);
+        DROPS::ExtendP2( MG_, vd_oldic, ext1);
+        VecDescCL old_conc( &idx);//extension of the old concentration to the current NarrowBand
+        Restrict( MG_, ext1, old_conc);
+        conc_extrapol.Data=1.0*ext1.Data;
+
+        //new
+        ic.Data=old_conc.Data;
 
         TetraAccumulatorTupleCL accus;
         InterfaceCommonDataP1CL cdata( lset_vd_, lsetbnd_);
@@ -3683,7 +3722,7 @@ void SurfactantP1BaseCL::InitTimeStep ()
 
         InterfaceVectorAccuCL<LocalMatVecP1CL<LocalInterfaceMassP1CL>, InterfaceCommonDataP1CL>
                 mass_accu( &vd_timeder, LocalMatVecP1CL<LocalInterfaceMassP1CL>( LocalInterfaceMassP1CL(), &old_conc),
-                           cdata, "mixed-mass");
+                           cdata, "concentration");
         accus.push_back( &mass_accu);
 
         for (int i=0; i<well_potential.Data.size();i++)
@@ -3698,21 +3737,28 @@ void SurfactantP1BaseCL::InitTimeStep ()
 
         if (rhs_fun3_)
             accus.push_back_acquire( new InterfaceVectorAccuCL<LocalVectorP1CL, InterfaceCommonDataP1CL>( &vd_load3,
-                                                                                                          LocalVectorP1CL( rhs_fun3_, new_t), cdata, "load3"));
+                                     LocalVectorP1CL( rhs_fun3_, new_t), cdata, "load3"));
 
         if (rhs_fun4_)
             accus.push_back_acquire( new InterfaceVectorAccuCL<LocalVectorP1CL, InterfaceCommonDataP1CL>( &vd_load4,
-                                                                                                          LocalVectorP1CL( rhs_fun4_, new_t), cdata, "load4"));
+                                     LocalVectorP1CL( rhs_fun4_, new_t), cdata, "load4"));
 
-        accumulate( accus, MG_, idx_c.TriangLevel(), idx_c.GetBndInfo());
-        rhs3 = VectorCL( 1.0*(vd_timeder.Data + dt_*vd_load3.Data));
+        accumulate( accus, MG_, idx.TriangLevel(), idx.GetBndInfo());
+
+        rhs3 = VectorCL( (1.0)*vd_timeder.Data + 1.0*dt_*vd_load3.Data);
+        //rhs3 = VectorCL( (1.0/dt_)*vd_timeder.Data + 1.0*vd_load3.Data);
         rhs4 = VectorCL( (-1.)*vd_well.Data + (S_)*vd_timeder.Data + vd_load4.Data);
 
-        WriteToFile( vd_oldic.Data, "vd_oldic.txt", "vd_oldic");
+        //        rhs3 = VectorCL( 1.0*(vd_timeder.Data + dt_*vd_load3.Data));
+//        rhs4 = VectorCL( (-1.)*vd_well.Data + (S_)*vd_timeder.Data + vd_load4.Data);
+
+
+
+       /* WriteToFile( vd_oldic.Data, "vd_oldic.txt", "vd_oldic");
         WriteToFile( rhsext1.Data, "rhsext1.txt", "rhsext1");
 
 
-        WriteToFile( vd_well.Data, "vd_well.txt", "vd_well");
+        WriteToFile( vd_well.Data, "vd_well.txt", "vd_well");*/
 
         return;
 
@@ -3726,44 +3772,114 @@ void SurfactantP1BaseCL::InitTimeStep ()
 
 // Implement BDF2 method
 //In the first step, we use the backward Euler method
-    void CahnHilliardNarrowBandStblP1CL::InitStep2 (double new_t)
-    {
-        /*
-        // ScopeTimerCL timer( "SurfactantcGP1CL::InitStep");
-        std::cout << "SurfactantNarrowBandStblP1CL::InitStep:\n";
+    void CahnHilliardNarrowBandStblP1CL::InitStep2 (VectorCL& rhs3, VectorCL& rhs4, double new_t) {
 
-        ic.t= new_t;
-        dt_= ic.t - oldt_;
+        ScopeTimerCL timer("CahnHilliardNarrowBandStblP1CL::InitStep2");
+        std::cout << "CahnHilliardNarrowBandStblP1CL::InitStep2:\n";
 
-
-
-        std::cout<<"Width of the Narrow Band: "<<2*width_<<std::endl;
-        // idx.GetXidx().SetBound( width_); //transfer the width_ to CreatNumbering
-        idx.CreateNumbering( oldidx_.TriangLevel(), MG_, &lset_vd_, &lsetbnd_,width_); // InitTimeStep deletes oldidx_ and swaps idx and oldidx_.
-        std::cout << "new NumUnknowns: " << idx.NumUnknowns();
-
-        full_idx.CreateNumbering( idx.TriangLevel(), MG_);
-        std::cout << " full NumUnknowns: " << full_idx.NumUnknowns() << std::endl;
-        DROPS::VecDescCL rhsext( &full_idx);
-
-
-        iface.SetIdx( &idx);
-        for (int i=0; i<idx.NumUnknowns();i++)
-        {
-            iface.Data[i]=1.;
+        ic.t = new_t;
+        imu.t= new_t;
+        dt_ = new_t - oldt_;
+        idx.CreateNumbering(oldidx_.TriangLevel(), MG_, &lset_vd_, &lsetbnd_ ,width_); // InitTimeStep deletes oldidx_ and swaps idx and oldidx_.
+        std::cout << "new NumUnknowns: " << idx.NumUnknowns() << std::endl;
+        ic.SetIdx(&idx);
+        imu.SetIdx(&idx);
+        iface.SetIdx(&idx);//NarrowBand tetrahedras in VTK
+        for (int i = 0; i < idx.NumUnknowns(); i++) {
+            iface.Data[i] = 1.;
         }
 
+        VecDescCL vd_timeder(&idx),    // right-hand sides from integrals over the old/new interface
+                vd_oldtimeder(&idx),
+                vd_load3(&idx),
+                vd_load4(&idx),
+                vd_oldres(&idx),
+                vd_oldload3(&idx),
+                vd_oldload4(&idx),
+                well_potential(&idx),//double-well potential
+                vd_well(&idx),
+                vd_conc_extr(&idx),
+                vd_oldic(&oldidx_),  // the previous timestep data.
+                vd_oldoldic(&oldoldidx_);  // the data previous to the previous data.
 
-        VecDescCL rhs( &oldidx_);
-        rhs.Data= (1./dt_)*oldic_;
-        DROPS::ExtendP2( MG_, rhs, rhsext);
-        //  WriteToFile( rhsext.Data, "Extended00.txt", "mass");
+
+        full_idx.CreateNumbering(idx.TriangLevel(), MG_);
+        std::cout << " full NumUnknowns: " << full_idx.NumUnknowns() << std::endl;
+        ext1.SetIdx(&full_idx);
+        ext2.SetIdx(&full_idx);
+        conc_extrapol.SetIdx(&full_idx);
 
 
-        if(new_t/dt_==1)
+        VecDescCL old_conc(&idx);//extension of the old concentration to the current NarrowBand
+        VecDescCL oldold_conc(&idx);//extension of the old old concentration to the current NarrowBand
+
+        vd_oldic.Data = oldic_;
+        vd_oldic.t = oldt_;
+        DROPS::ExtendP2(MG_, vd_oldic, ext1);
+
+        Restrict(MG_, ext1, old_conc);
+
+        vd_oldoldic.Data = oldoldic_;
+        vd_oldoldic.t = oldt_;
+        DROPS::ExtendP2(MG_, vd_oldoldic, ext2);
+        Restrict(MG_, ext2, oldold_conc);
+
+        //warning
+      /*  old_conc.Data=oldic_;
+        oldold_conc.Data=oldoldic_;*/
+
+        VecDescCL bdf2(&idx);
+        VecDescCL conc_ext(&idx);
+         {
+            bdf2.Data = 2.0 * old_conc.Data - 0.5 * oldold_conc.Data;
+            conc_ext.Data =  2.0 * old_conc.Data - 1.0 * oldold_conc.Data;
+            conc_extrapol.Data=2.0*ext1.Data-1.0*ext2.Data;
+
+            for (int i=0; i<well_potential.Data.size();i++)
+            {
+                well_potential.Data[i]=2.0*Potential_prime_function(old_conc.Data[i]) - 1.0*Potential_prime_function(oldold_conc.Data[i]);//interpolation
+            }
+        }
+        TetraAccumulatorTupleCL accus;
+        InterfaceCommonDataP1CL cdata( lset_vd_, lsetbnd_);
+        accus.push_back( &cdata);
+
+
+        InterfaceVectorAccuCL<LocalMatVecP1CL<LocalInterfaceMassP1CL>, InterfaceCommonDataP1CL>
+                deriv_accu( &vd_timeder, LocalMatVecP1CL<LocalInterfaceMassP1CL>( LocalInterfaceMassP1CL(), &bdf2),
+                           cdata, "time-der");
+        accus.push_back( &deriv_accu);
+
+        InterfaceVectorAccuCL<LocalMatVecP1CL<LocalInterfaceMassP1CL>, InterfaceCommonDataP1CL>
+                mass_accu( &vd_conc_extr, LocalMatVecP1CL<LocalInterfaceMassP1CL>( LocalInterfaceMassP1CL(), &conc_ext),
+                           cdata, "conc_extrap");
+        accus.push_back( &mass_accu);
+
+        InterfaceVectorAccuCL<LocalMatVecP1CL<LocalInterfaceMassP1CL>, InterfaceCommonDataP1CL>
+                well_accu( &vd_well, LocalMatVecP1CL<LocalInterfaceMassP1CL>( LocalInterfaceMassP1CL(), &well_potential),
+                           cdata, "chemical_potential");
+        accus.push_back( &well_accu);
+
+        if (rhs_fun3_)
+            accus.push_back_acquire( new InterfaceVectorAccuCL<LocalVectorP1CL, InterfaceCommonDataP1CL>( &vd_load3,
+                                                                                                          LocalVectorP1CL( rhs_fun3_, new_t), cdata, "load3"));
+
+        if (rhs_fun4_)
+            accus.push_back_acquire( new InterfaceVectorAccuCL<LocalVectorP1CL, InterfaceCommonDataP1CL>( &vd_load4,
+                                                                                                          LocalVectorP1CL( rhs_fun4_, new_t), cdata, "load4"));
+
+        accumulate( accus, MG_, idx.TriangLevel(), idx.GetBndInfo());
+
+        rhs3 = VectorCL( 1.0*(vd_timeder.Data + dt_*vd_load3.Data));
+        rhs4 = VectorCL( (-1.)*vd_well.Data + (S_)*vd_conc_extr.Data + vd_load4.Data);
+
+
+
+        ////////////////////////////from surfactant////////
+       /* if(new_t/dt_==1)
         {
             std::cout<<"test---1"<<std::endl;
-            VecDescCL rhs1( &idx);
+            VecDescCL rhs1( &idx_c);
             //Restrict( MG_, rhsext, rhs1);
             MassMultiply(MG_,rhsext,rhs1,lset_vd_, lsetbnd_);
             //std::cout<<"test---1"<<std::endl;
@@ -3784,6 +3900,7 @@ void SurfactantP1BaseCL::InitTimeStep ()
             rhs1_.resize( rhs1.Data.size());
             rhs1_= rhs1.Data*2.0-rhs2.Data*0.5;
         }
+
         rhsext1.Reset();
         rhsext1.SetIdx(&full_idx);
         rhsext1.Data=rhsext.Data;
@@ -3850,16 +3967,25 @@ void SurfactantP1BaseCL::InitTimeStep ()
     {
         Update();
 
-        double c=1.0;//BDF1
+        A_.LinComb(0.0, Mass.Data, 1.0*dt_*sigma_, LaplaceM.Data,  1.0*dt_*rho_, Volume_stab.Data);
+        B_.LinComb(1.0/(1.), Mass.Data, 1.0*dt_, Conv.Data);
+        C_.LinComb(-1.0*epsilon_, Mass.Data, 0.,   Mass.Data);
+        D_.LinComb(1.0*S_, Mass.Data, 1.0*epsilon_*epsilon_,  Laplace.Data,  1.0*rho_*epsilon_*epsilon_, Volume_stab.Data);
 
-        A_.LinComb(sigma_*dt_, LaplaceM.Data, rho_*dt_, Volume_stab.Data);
-        B_.LinComb(c, Mass.Data, 0*dt_ , Massd.Data, dt_, Conv.Data);
 
-        C_.LinComb(0.,   Laplace.Data, -1.0, Mass.Data);
-        D_.LinComb(epsilon_*epsilon_,  Laplace.Data,
-                //   -1., Gprimeprime.Data,
-                   S_, Mass.Data,
-                   rho_*epsilon_*epsilon_, Volume_stab.Data);
+
+
+
+//        double c=1.0;//BDF1
+//
+//        A_.LinComb(sigma_*dt_, LaplaceM.Data, rho_*dt_, Volume_stab.Data);
+//        B_.LinComb(c, Mass.Data, dt_, Conv.Data);//0*dt_ , Massd.Data,
+//
+//                C_.LinComb(0.,   Laplace.Data, -1.0, Mass.Data);
+//        D_.LinComb(epsilon_*epsilon_,  Laplace.Data,
+//                //   -1., Gprimeprime.Data,
+//                   S_, Mass.Data,
+//                   rho_*epsilon_*epsilon_, Volume_stab.Data);
 
         //WriteToFile( L_, "Matrix.txt", "system");
         //A_.LinComb(theta_, Mass.Data, dt_ * theta_, Laplace.Data, dt_ * theta_, Massd.Data, dt_ * theta_, Conv.Data);
@@ -3867,7 +3993,7 @@ void SurfactantP1BaseCL::InitTimeStep ()
         std::cout << "      Before solve: res3 = " << norm(A_ * imu.Data  +B_ * ic.Data- rhs3) << std::endl;
         std::cout << "      Before solve: res4 = " << norm(C_ * imu.Data  +D_ * ic.Data- rhs4) << std::endl;
         {
-            ScopeTimerCL timer("CahnHilliardP1BaseCL::DoStep: Solve");
+            ScopeTimerCL timer("CahnHilliardNarrowBandStblP1CL::DoStep1: Solve");
             block_gm_.Solve(A_, B_, C_, D_, imu.Data, ic.Data, rhs3, rhs4, imu.RowIdx->GetEx(),ic.RowIdx->GetEx());
             /*ScopeTimerCL timer( "SurfactantcGP1CL::DoStep: Solve");
             MatrixCL L;
@@ -3878,19 +4004,30 @@ void SurfactantP1BaseCL::InitTimeStep ()
             std::cout << "      After  solve: res3 = " << norm(A_ * imu.Data  +B_ * ic.Data- rhs3) << std::endl;
             std::cout << "      After  solve: res4 = " << norm(C_ * imu.Data  +D_ * ic.Data- rhs4) << std::endl;
         }
-        std::cout << "CahnHilliardP1BaseCL::DoStep: res = " << block_gm_.GetResid() << ", iter = " << block_gm_.GetIter() << std::endl;
+        //imu.Data = (epsilon_)*imu.Data;
+
+        std::cout << "CahnHilliardNarrowBandStblP1CL::DoStep1: res = " << block_gm_.GetResid() << ", iter = " << block_gm_.GetIter() << std::endl;
     }
 
 //BDF2 method
     void CahnHilliardNarrowBandStblP1CL::DoStep2 (VectorCL& rhs3, VectorCL& rhs4)
     {
-/*
-        ic.SetIdx( &idx);
-
         Update();
 
+        /*A_.LinComb(sigma_, LaplaceM.Data, rho_, Volume_stab.Data);
+        B_.LinComb(3./(2.*dt_), Mass.Data, 0., Conv.Data);
+        //0*dt_ , Massd.Data,
+
+        C_.LinComb(0.,   Laplace.Data, -epsilon_, Mass.Data);
+        D_.LinComb(epsilon_*epsilon_,  Laplace.Data,
+                //   -1., Gprimeprime.Data,
+                   S_, Mass.Data,
+                   rho_*epsilon_*epsilon_, Volume_stab.Data);
+        rhs3=(1./dt_)*rhs3;*/
+
         A_.LinComb(sigma_*dt_, LaplaceM.Data, rho_*dt_, Volume_stab.Data);
-        B_.LinComb(3./2., Mass.Data, 0*dt_ , Massd.Data, dt_, Conv.Data);
+        B_.LinComb(3./2., Mass.Data, dt_, Conv.Data);
+                //0*dt_ , Massd.Data,
 
         C_.LinComb(0.,   Laplace.Data, -1.0, Mass.Data);
         D_.LinComb(epsilon_*epsilon_,  Laplace.Data,
@@ -3911,20 +4048,8 @@ void SurfactantP1BaseCL::InitTimeStep ()
             std::cout << "      After  solve: res3 = " << norm(A_ * imu.Data  +B_ * ic.Data- rhs3) << std::endl;
             std::cout << "      After  solve: res4 = " << norm(C_ * imu.Data  +D_ * ic.Data- rhs4) << std::endl;
         }
+        //imu.Data = (epsilon_)*imu.Data;
         std::cout << "CahnHilliardP1BaseCL::DoStep: res = " << block_gm_.GetResid() << ", iter = " << block_gm_.GetIter() << std::endl;
-    */
-//        {
-//            L_.LinComb( 3./(2.*dt_), Mass.Data, 1., Laplace.Data,rho_, Volume_stab.Data, 1., Massd.Data,1.0,Conv.Data);
-//            // L_.LinComb( 3./(2.*dt_), M.Data, 1., Sb.Data, 1., Md.Data,1.0,C.Data);
-//
-//            // const VectorCL therhs((M.Data*rhs1_) + load);
-//            const VectorCL therhs(rhs1_ + load);//we multiply M in initstep
-//            std::cout  <<"  Before solve: res = " << norm( L_*ic.Data - therhs) << std::endl;
-//
-//            ScopeTimerCL timer( "SurfactantExtensionP1CL::DoStep: Solve");
-//            gm_.Solve( L_, ic.Data, therhs, ic.RowIdx->GetEx());
-//        }
-//        std::cout << "SurfactantExtensionP1CL::DoStep: res = " << gm_.GetResid() << ", iter = " << gm_.GetIter() << std::endl;
     }
 
     void CahnHilliardNarrowBandStblP1CL::CommitStep ()
@@ -3948,19 +4073,30 @@ void SurfactantP1BaseCL::InitTimeStep ()
 //BDF2 method
     void CahnHilliardNarrowBandStblP1CL::DoStep (double new_t)
     {
-        /*ScopeTimerCL timer( "SurfactantExtensionP1CL::::DoStep");
-         InitStep2( new_t);
+         ScopeTimerCL timer( "CahnHilliardNarrowBandP1CL::::DoStep");
+         VectorCL rhs3, rhs4;
+
+        /*InitStep1( rhs3, rhs4, new_t);
+        std::cout<<"BDF1 DoStep"<<std::endl;//first step~
+        DoStep1(rhs3, rhs4);*/
+
          if(new_t/(new_t-oldt_)==1)
          {
-             std::cout<<"test---1 DoStep"<<std::endl;//first step~
-             DoStep1();
+             InitStep1( rhs3, rhs4, new_t);
+             std::cout<<"BDF1 DoStep"<<std::endl;//first step~
+             DoStep1(rhs3, rhs4);
          }
-         else
-             DoStep2();/First step-- Backward Euler*/
+         else {
+             InitStep2(rhs3, rhs4, new_t);
+             std::cout<<"BDF2 DoStep"<<std::endl;//other steps
+             DoStep2(rhs3, rhs4);
+         }
+
+        CommitStep();
 
 //        InitStep3(new_t);
 //        DoStep2();
-//        CommitStep();/*In the first step, solve the equation by some smaller time stepsize-- */
+//        CommitStep();/*In the first step, solve the equation by some smaller timestep size-- */
 
         //   WriteToFile( temp_ic.Data, "Extended.txt", "mass");
 
@@ -4822,6 +4958,8 @@ void LocalCahnHilliardCL::calc3DIntegrands(const SMatrixCL<3,3>& T, const LocalP
         q3DP1Grad[j]= P1Grad[j];
     }
 }
+
+double inverse_square_root(double x) {return(1./std::sqrt(x));}
 
 double Mobility_function(double x)
 {

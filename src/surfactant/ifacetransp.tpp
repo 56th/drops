@@ -129,6 +129,23 @@ void LocalInterfaceConvectionP1CL<DiscVelSolT>::setup (const TetraCL& t, const I
             coup[i][j]= quad_2D( dot( grad[j], qw)*q[i], qdom);
 }
 
+    template <class DiscVelSolT>
+    void LocalInterfaceConvectionP1CL<DiscVelSolT>::setup (const TetraCL& t, const NarrowBandCommonDataP1CL& cdata)
+    {
+        make_CompositeQuad5Domain2D( qdom, cdata.surf, t);
+
+        w_loc.assign( t, w_);
+        resize_and_evaluate_on_vertexes( w_loc, qdom, qw);
+
+        P1DiscCL::GetGradients( grad, dummy, t);
+        for (int i= 0; i < 4; ++i)
+            resize_and_evaluate_on_vertexes( cdata.p1[i], qdom, q[i]);
+
+        for (int i= 0; i < 4; ++i)
+            for(int j= 0; j < 4; ++j)
+                coup[i][j]= quad_2D( dot( grad[j], qw)*q[i], qdom);
+    }
+
 
 template <class DiscVelSolT>
 void SetupConvectionP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls, const BndDataCL<>& lsetbnd, const DiscVelSolT& w)

@@ -358,7 +358,7 @@ GMRES(const Mat& A, Vec& x, const Vec& b, const ExT& ex, PreCon& M,
         tol= resid;
         max_iter= 0;
         {
-            //std::cout << "          GMRES exits from the beginning, converged in: " << max_iter << " iterations with residual: " << resid << std::endl;
+            std::cout << "          GMRES exits from the beginning, converged in: " << max_iter << " iterations with residual: " << resid << std::endl;
         }
         return true;
     }
@@ -410,6 +410,8 @@ GMRES(const Mat& A, Vec& x, const Vec& b, const ExT& ex, PreCon& M,
                           << std::fabs( s[i+1]) << '\n';
             }
 
+            std::cout << "          GMRES on " << j << " iteration with residual: " << resid << std::endl;
+
             if (resid <= tol) {
                 if (method == RightPreconditioning)
                 {
@@ -422,7 +424,7 @@ GMRES(const Mat& A, Vec& x, const Vec& b, const ExT& ex, PreCon& M,
                 tol= resid;
                 max_iter= j;
                 {
-                   // std::cout << "          GMRES exit from the middle, converged in " << max_iter << " iterations with residual: " << resid << std::endl;
+                    std::cout << "          GMRES exit from the middle, converged in " << max_iter << " iterations with residual: " << resid << std::endl;
                 }
                 return true;
             }
@@ -443,11 +445,13 @@ GMRES(const Mat& A, Vec& x, const Vec& b, const ExT& ex, PreCon& M,
         }
         beta=norm(r);
         resid= beta/normb;
+        std::cout << "          GMRES residual after " << j << " iterations with residual: "<< resid << std::endl;
+
         if (resid <= tol) {
             tol= resid;
             max_iter= j;
             {
-                //std::cout << "          GMRES exit from the end, converged in " << max_iter << " iterations with residual: " << resid << std::endl;
+                std::cout << "          GMRES exit from the end, converged in " << max_iter << " iterations with residual: " << resid << std::endl;
             }
             return true;
         }

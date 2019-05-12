@@ -843,6 +843,31 @@ template <template <class> class LocalMatrixT, class DiscVelSolT>
         LocalMatrixT<DiscVelSolT>( wind), cdata, name);
 }
 
+    template <template <class> class LocalMatrixT, class DiscVelSolT>
+    inline InterfaceMatrixAccuCL< LocalMatrixT<DiscVelSolT>, InterfaceCommonDataP1CL>*
+    make_wind_dependent_matrixP1_accu (MatDescCL* mat, const InterfaceCommonDataP1CL& cdata, const  instat_vector_fun_ptr normal, double time, const DiscVelSolT& wind, std::string name= std::string())
+    {
+
+        return new InterfaceMatrixAccuCL< LocalMatrixT<DiscVelSolT>, InterfaceCommonDataP1CL>( mat,
+                                                                         LocalMatrixT<DiscVelSolT>( wind,normal,time), cdata, name);
+    }
+/// \brief Convenience-function to reduce the number of explicit template-parameters for the massdiv- and the convection-matrix.
+    template <template <class> class LocalMatrixT, class DiscVelSolT>
+    inline NarrowBandMatrixAccuP1CL< LocalMatrixT<DiscVelSolT>>*
+    make_wind_dependent_matrixP1_accu (MatDescCL* mat, const NarrowBandCommonDataP1CL& cdata, const DiscVelSolT& wind, std::string name= std::string())
+    {
+        return new NarrowBandMatrixAccuP1CL< LocalMatrixT<DiscVelSolT>>( mat,
+                                                                         LocalMatrixT<DiscVelSolT>( wind), cdata, name);
+    }
+/// \brief Convenience-function to reduce the number of explicit template-parameters for the massdiv- and the convection-matrix.
+    template <template <class> class LocalMatrixT, class DiscVelSolT>
+    inline NarrowBandMatrixAccuP1CL< LocalMatrixT<DiscVelSolT>>*
+    make_wind_dependent_matrixP1_accu (MatDescCL* mat, const NarrowBandCommonDataP1CL& cdata, const  instat_vector_fun_ptr normal, double time, const DiscVelSolT& wind, std::string name= std::string())
+    {
+        return new NarrowBandMatrixAccuP1CL< LocalMatrixT<DiscVelSolT>>( mat,
+                LocalMatrixT<DiscVelSolT>( wind,normal,time), cdata, name);
+    }
+
 /// \brief Convenience-function to reduce the number of explicit template-parameters for the massdiv- and the convection-matrix.
     template <template <class> class LocalMatrixT, class DiscVelSolT>
     inline InterfaceMatrixAccuCL< LocalMatrixT<DiscVelSolT>, InterfaceCommonDataP1CL>*
@@ -895,6 +920,7 @@ void SetupStokesIF_P2P2      ( const MultiGridCL& MG_, MatDescCL* A_P2, MatDescC
 
 void SetupCahnHilliardIF_P1P1( const MultiGridCL& MG_,  MatDescCL* M_P1, MatDescCL* NormalStab_P1, MatDescCL* TangentStab_P1, MatDescCL* VolumeStab_P1, MatDescCL* L_P1P1 ,MatDescCL* LM_P1P1 ,MatDescCL* Gprimeprime_P1P1 , const VecDescCL& lset, const LsetBndDataCL& lset_bnd, const VecDescCL& velocity, const BndDataCL<Point3DCL>& velocity_bnd,const VecDescCL& volume_fraction, const BndDataCL<>& volume_fraction_bnd);
     double Mobility_function(double x);
+    double inverse_square_root(double x);
     double Potential_function(double x);
     double Potential_prime_function(double x);
     double Potential_prime_convex_function(double x);
@@ -1021,6 +1047,136 @@ class LocalLaplaceBeltramiP1CL
                 :concentr_(conc), normal_(normal), time_(t) {}
     };
 
+    class LocalFullGradientsP1CL
+    {
+    private:
+
+        QuadDomain2DCL qdom;
+        double time_;
+        instat_vector_fun_ptr normal_;
+
+        std::valarray<double> mobility;
+        std::valarray<double> qmobility;
+
+
+        LocalP1CL<double> concentr_loc;
+        GridFunctionCL<> qconcentr;
+
+        LocalP1CL<double> P1Hat[4];
+        Quad5CL<double> U_Grad[4];
+
+        Point3DCL grad[4];
+        double dummy;
+        GridFunctionCL<Point3DCL> n, q[4], qq[4];
+        LocalP1CL<Point3DCL> Normals;
+
+        GridFunctionCL<Point3DCL> qnormal;
+
+        double absdet;
+
+    public:
+        static const FiniteElementT row_fe_type= P1IF_FE,
+                col_fe_type= P1IF_FE;
+
+        double coup[4][4];
+        void setup (const TetraCL& tet, const NarrowBandCommonDataP1CL& bdata) {
+
+            P1DiscCL::GetGradients( grad, dummy, tet);
+
+            //qnormal.assign(tet,normal_,time_,Quad5DataCL::Node);
+
+            //for(int i=0; i<4; ++i)
+            //    U_Grad[i]=dot( qnormal, Quad5CL<Point3DCL>( grad[i]));
+
+            absdet=std::abs(dummy);
+
+            dummy=std::pow(absdet,1./3); //of order h--meshsize of the tetra hedra~~!!!!
+            //std::cout<<"dummy  "<<dummy<<std::endl;
+            for (int i= 0; i < 4; ++i) {
+                for(int j= 0; j <= i; ++j)
+                {
+                    Quad5CL<double> res3( dot(Quad5CL<Point3DCL>(grad[i]),Quad5CL<Point3DCL>(grad[j])));
+                    coup[i][j]= coup[j][i]= 1.0*res3.quad(absdet/6);//dummy*
+                    // 	std::cout<<coup[i][j]<<std::endl;
+                }
+            }
+            // std::cin>>dummy;
+        }
+        void setup (const TetraCL& tet, const InterfaceCommonDataP1CL& cdata) {
+
+            P1DiscCL::GetGradients( grad, dummy, tet);
+
+            //qnormal.assign(tet,normal_,time_,Quad5DataCL::Node);
+
+            //for(int i=0; i<4; ++i)
+            //    U_Grad[i]=dot( qnormal, Quad5CL<Point3DCL>( grad[i]));
+
+            absdet=std::abs(dummy);
+
+            dummy=std::pow(absdet,1./3); //of order h--meshsize of the tetra hedra~~!!!!
+            //std::cout<<"dummy  "<<dummy<<std::endl;
+            for (int i= 0; i < 4; ++i) {
+                for(int j= 0; j <= i; ++j)
+                {
+                    Quad5CL<double> res3( dot(Quad5CL<Point3DCL>(grad[i]),Quad5CL<Point3DCL>(grad[j])));
+                    coup[i][j]= coup[j][i]= 1.0*res3.quad(absdet/6);//dummy*
+                    // 	std::cout<<coup[i][j]<<std::endl;
+                }
+            }
+            // std::cin>>dummy;
+        }
+        /*void setup (const TetraCL& t, const InterfaceCommonDataP1CL& cdata) {
+
+            QuadDomainCL q3Ddomain;
+
+            make_SimpleQuadDomain<Quad5DataCL> (q3Ddomain, AllTetraC);
+
+            make_CompositeQuad5Domain2D( qdom, cdata.surf, t);
+            //resize_and_evaluate_on_vertexes( concentr_loc, qdom, qconcentr);
+
+            P1DiscCL::GetGradients( grad, dummy, t);
+
+            //qnormal.assign(t, normal_, time_);
+            resize_and_evaluate_on_vertexes( normal_, t, qdom, time_, qnormal);
+
+            // Scale Normals accordingly to the Euclidean Norm (only consider the ones which make a contribution in the sense of them being big enough... otherwise one has to expect problems with division through small numbers)
+            //for(Uint i=0; i<qnormal.size(); ++i) {
+                //if(qnormal[i].norm()> 1e-8)
+            //    qnormal[i]= qnormal[i]/qnormal[i].norm();
+            //}
+
+            for(int j=0; j<4 ;++j) {
+                qq[j].resize( qdom.vertex_size());
+                qq[j]= grad[j];
+                qq[j]-= dot( qq[j], qnormal)*qnormal;
+            }
+
+            for (int i= 0; i < 4; ++i)
+                for(int j= 0; j < 4; ++j) {
+                    coup[i][j]= quad( dot(grad[i],grad[j]), q3Ddomain);
+                }*//*
+            for(int i=0; i<4; ++i)
+                U_Grad[i]=dot( qnormal, Quad5CL<Point3DCL>( grad[i]));
+
+            absdet=std::abs(dummy);
+
+            dummy=std::pow(absdet,1./3); //of order h--meshsize of the tetra hedra~~!!!!
+            //std::cout<<"dummy  "<<dummy<<std::endl;
+            for (int i= 0; i < 4; ++i) {
+                for(int j= 0; j <= i; ++j)
+                {
+                    Quad5CL<double> res3( U_Grad[i] * U_Grad[j]);
+                    coup[i][j]= coup[j][i]= res3.quad(absdet/6);//dummy*
+                    // 	std::cout<<coup[i][j]<<std::endl;
+                }
+            }
+
+        }*/
+
+        LocalFullGradientsP1CL ( instat_vector_fun_ptr normal, double time)
+                :normal_(normal), time_(time) {}
+    };
+
 /// \brief The routine sets up the Laplace-matrix in mat in bulk element in a narrow band near the interface defined by ls.
 ///        It belongs to the FE induced by standard P1-elements.
 ///        Notmal gradient is used for stabilization in solving surface diffusion equation
@@ -1127,12 +1283,133 @@ class LocalInterfaceConvectionP1CL
     double coup[4][4];
 
     void setup (const TetraCL& t, const InterfaceCommonDataP1CL& cdata);
+    void setup (const TetraCL& t, const NarrowBandCommonDataP1CL& cdata);
+
 
     LocalInterfaceConvectionP1CL (const DiscVelSolT& w)
         :  w_( w) {}
 };
+//used to penalize gradients in the direction of ambient velocity field
+    template <class DiscVelSolT>
+    class LocalInterfaceVelocityLaplaceP1CL
+    {
+    private:
+        const DiscVelSolT w_; // wind
+        instat_vector_fun_ptr normal_;
+        double time_;
+        Quad5CL<Point3DCL> qnormal;
+        QuadDomain2DCL qdom;
+        Point3DCL grad[4];
+        double dummy;
+        double absdet;
+        Quad5CL<Point3DCL> w_loc;
+        Quad5CL<double> U_Gradw[4];
+        std::valarray<double> q[4];
+        GridFunctionCL<Point3DCL> qw;
 
-/// \brief The routine sets up the mass-matrix scaled with \f$ div_\Gamma v \f$ in mat on the interface
+    public:
+        static const FiniteElementT row_fe_type= P1IF_FE,
+                col_fe_type= P1IF_FE;
+
+        double coup[4][4];
+
+        void setup (const TetraCL& t, const InterfaceCommonDataP1CL& cdata);
+        void setup (const TetraCL& t, const NarrowBandCommonDataP1CL& cdata);
+
+        LocalInterfaceVelocityLaplaceP1CL (const DiscVelSolT& w, instat_vector_fun_ptr normal, double time)
+                :  w_( w), normal_(normal), time_(time) {}
+    };
+
+
+    template <class DiscVelSolT>
+    void LocalInterfaceVelocityLaplaceP1CL<DiscVelSolT>::setup (const TetraCL& tet, const InterfaceCommonDataP1CL& cdata)
+    {
+        //make_CompositeQuad5Domain2D( qdom, bdata.surf, t);
+        w_loc.assign( tet, w_);
+        //resize_and_evaluate_on_vertexes( w_loc, qdom, qw);
+//
+//        P1DiscCL::GetGradients( grad, dummy, t);
+//        for (int i= 0; i < 4; ++i)
+//            resize_and_evaluate_on_vertexes( cdata.p1[i], qdom, q[i]);
+//
+//        for (int i= 0; i < 4; ++i)
+//            for(int j= 0; j < 4; ++j)
+//                coup[i][j]= quad_2D( dot( grad[j], qw)*q[i], qdom);
+//
+        ////////
+
+        P1DiscCL::GetGradients( grad, dummy, tet);
+        qnormal.assign(tet,normal_,time_);
+
+        GridFunctionCL<double> inv_norm = dot(w_loc,w_loc).apply(inverse_square_root);
+//        for (int i=0;i<norm.size();i++) norm.apply(sqr)
+
+        for(int i=0; i<4; ++i) {
+            U_Gradw[i] = dot(qnormal, Quad5CL<Point3DCL>(grad[i]));
+
+        }
+        absdet=std::abs(dummy);
+
+        dummy=std::pow(absdet,1./3); //of order h--meshsize of the tetra hedra~~!!!!
+        //  std::cout<<"dummy  "<<dummy<<std::endl;
+        for (int i= 0; i < 4; ++i) {
+            for(int j= 0; j <= i; ++j)
+            {
+                Quad5CL<double> res3( U_Gradw[i] * U_Gradw[j]);
+                coup[i][j]= coup[j][i]=//(1.0+1.0/(dummy+dt_))*
+                        res3.quad(absdet/6);//D_*(D_/dummy+dummy/dt_+0.2)*// D_*
+                //  	std::cout<<i<<" "<<j<<" : "<<coup[i][j]<<"  "<<coup[j][i]<<" ; ";
+            }
+            //   std::cout<<std::endl;
+        }
+    }
+
+    template <class DiscVelSolT>
+    void LocalInterfaceVelocityLaplaceP1CL<DiscVelSolT>::setup (const TetraCL& tet, const NarrowBandCommonDataP1CL& bdata)
+    {
+        //make_CompositeQuad5Domain2D( qdom, bdata.surf, t);
+        w_loc.assign( tet, w_);
+        //resize_and_evaluate_on_vertexes( w_loc, qdom, qw);
+//
+//        P1DiscCL::GetGradients( grad, dummy, t);
+//        for (int i= 0; i < 4; ++i)
+//            resize_and_evaluate_on_vertexes( cdata.p1[i], qdom, q[i]);
+//
+//        for (int i= 0; i < 4; ++i)
+//            for(int j= 0; j < 4; ++j)
+//                coup[i][j]= quad_2D( dot( grad[j], qw)*q[i], qdom);
+//
+        ////////
+
+        P1DiscCL::GetGradients( grad, dummy, tet);
+        qnormal.assign(tet,normal_,time_,Quad5DataCL::Node);
+
+        GridFunctionCL<double> inv_norm = dot(w_loc,w_loc).apply(inverse_square_root);
+//        for (int i=0;i<norm.size();i++) norm.apply(sqr)
+
+        for(int i=0; i<4; ++i) {
+            U_Gradw[i] = 0.1*dot(qnormal, Quad5CL<Point3DCL>(grad[i]));
+            U_Gradw[i] += inv_norm*dot(w_loc, Quad5CL<Point3DCL>(grad[i]));
+
+        }
+
+        absdet=std::abs(dummy);
+
+        dummy=std::pow(absdet,1./3); //of order h--meshsize of the tetra hedra~~!!!!
+        //  std::cout<<"dummy  "<<dummy<<std::endl;
+        for (int i= 0; i < 4; ++i) {
+            for(int j= 0; j <= i; ++j)
+            {
+                Quad5CL<double> res3( U_Gradw[i] * U_Gradw[j]);
+                coup[i][j]= coup[j][i]=//(1.0+1.0/(dummy+dt_))*
+                        res3.quad(absdet/6);//D_*(D_/dummy+dummy/dt_+0.2)*// D_*
+                //  	std::cout<<i<<" "<<j<<" : "<<coup[i][j]<<"  "<<coup[j][i]<<" ; ";
+            }
+            //   std::cout<<std::endl;
+        }
+    }
+
+    /// \brief The routine sets up the mass-matrix scaled with \f$ div_\Gamma v \f$ in mat on the interface
 ///        defined by ls. It belongs to the FE induced by standard P1-elements.
 ///
 /// The template-parameter is only used to circumvent the exact type of the discrete
@@ -1702,14 +1979,13 @@ class CahnHilliardP1BaseCL: public SurfacePDEP1BaseCL
         typedef GMResSolverCL<DiagBlockPcT> GMResBlockT; //block GMRES solver
         typedef BlockMatrixSolverCL<GMResBlockT> GMResBlockSolver;
 
-        IdxDescCL idx_c; ///< index desctription for concentration at current time
+        IdxDescCL idx; ///< index desctription for concentration at current time
         VecDescCL ic;  ///< concentration on the interface at current time
 
         /*IdxDescCL idx_mu; ///< index desctription for chemical potential at current time*/
         VecDescCL imu;  ///< chemical potential on the interface at current time
 
         VecDescCL iface;  ///< interface mesh at current time
-        VecDescCL iface_old;  ///< interface mesh at current time
 
 
 protected:
@@ -1720,17 +1996,20 @@ protected:
         instat_scalar_fun_ptr rhs_fun4_; ///< function for a right-hand side chemical potential equation
 
 
-    IdxDescCL           oldidx_c_; ///< idx_c that corresponds to old time (and oldls_)
+        IdxDescCL           oldidx_; ///< idx that corresponds to old time (and oldoldls_)
+        IdxDescCL           oldoldidx_; ///< idx that corresponds to old old time (and oldoldls_)
+
         VectorCL            oldic_;  ///< interface concentration at old time
 
-        //IdxDescCL           oldidx_mu_; ///< idx_mu that corresponds to old time (and oldls_)
+        VectorCL            oldoldic_;  ///< interface concentration at old old time
+
         VectorCL            oldimu_;  ///< interface chemical potential at old time
 
 
 
         GSPcCL                  pc_;
         GMResSolverCL<GSPcCL>   gm_;
-        MatrixCL dummy_matrix_;
+        MatrixCL dummy_matrix3_, dummy_matrix4_;
 
         SSORPcCL symmPcPc_;
         PCGSolverT PCGSolver3_, PCGSolver4_;
@@ -1746,17 +2025,17 @@ protected:
                               double theta, double sigma, double epsilon, VecDescCL* v, const VelBndDataT& Bnd_v, VecDescCL& lset_vd, const BndDataCL<>& lsetbnd,
                               //MatrixCL Precond3 , MatrixCL Precond4,
                               int iter= 1000, double tol= 1e-7, double iterA=500, double tolA=1e-3, double iterB=500, double tolB=1e-3, double omit_bound= -1.)
-                : SurfacePDEP1BaseCL(mg, theta, v, Bnd_v, lset_vd, lsetbnd), idx_c( P1IF_FE), /*idx_mu( P1IF_FE),*/ omit_bound_( omit_bound),
-                sigma_( sigma), epsilon_( epsilon),  rhs_fun3_( 0), rhs_fun4_( 0), oldidx_c_( P1IF_FE), /*oldidx_mu_( P1IF_FE),*/
+                : SurfacePDEP1BaseCL(mg, theta, v, Bnd_v, lset_vd, lsetbnd), idx( P1IF_FE), /*idx_mu( P1IF_FE),*/ omit_bound_( omit_bound),
+                sigma_( sigma), epsilon_( epsilon),  rhs_fun3_( 0), rhs_fun4_( 0), oldidx_( P1IF_FE),oldoldidx_( P1IF_FE),
                 PCGSolver3_(symmPcPc_, iterA, tolA, true),
                 PCGSolver4_(symmPcPc_, iterB, tolB, true),
-                spc3_( dummy_matrix_, PCGSolver3_), spc4_( dummy_matrix_, PCGSolver4_),
+                spc3_( dummy_matrix3_, PCGSolver3_), spc4_( dummy_matrix4_, PCGSolver4_),
                 block_pc_(spc3_,spc4_),
-                GMRes_(block_pc_, 50, iter, tol, false, false, LeftPreconditioning, true, false),
+                GMRes_(block_pc_, 10, iter, tol, false, false, RightPreconditioning, true, false),
                 gm_(pc_, 50, iter, tol, true),
                 block_gm_(GMRes_)
         {
-            idx_c.GetXidx().SetBound( omit_bound);
+            idx.GetXidx().SetBound( omit_bound);
             //idx_mu.GetXidx().SetBound( omit_bound);
         }
 
@@ -1826,7 +2105,8 @@ class CahnHilliardcGP1CL : public CahnHilliardP1BaseCL
         // void InitTimeStep (); // as in the base
 
         /// perform one time step
-        virtual void DoStep (double new_t);
+        void DoStep (double new_t);
+        void DoStep0 (double new_t); //Backward Euler
 
         /// \name For internal use only
         /// The following member functions are added to enable an easier implementation
@@ -1837,20 +2117,21 @@ class CahnHilliardcGP1CL : public CahnHilliardP1BaseCL
         VectorCL InitStep4 (double new_t);
         void InitStep(VectorCL&, VectorCL&, double new_t);
 
-    void DoStep (const VectorCL&, const VectorCL&);
+        void DoStep (const VectorCL&, const VectorCL&);
         void CommitStep ();
         void Update ();
         ///@}
     };
 
 ///The class is based on a stablized term in a narrow band near the interface
-    class CahnHilliardNarrowBandStblP1CL: public CahnHilliardP1BaseCL
+    class    CahnHilliardNarrowBandStblP1CL: public CahnHilliardP1BaseCL
     {
     public:
         IdxDescCL full_idx;
         MatDescCL Laplace,  ///< diffusion matrix,
                 LaplaceM,  ///< diffusion matrix with mobility div_Gamma(M grad_Gamma)
                 Volume_stab, ///< stabilization matrix,
+                Ident,
                 Mass,  ///< mass matrix
                 Conv,  ///< convection matrix
                 Massd, ///< mass matrix with interface-divergence of velocity
@@ -1858,7 +2139,7 @@ class CahnHilliardcGP1CL : public CahnHilliardP1BaseCL
 
         const double S_;//stabilization parameter for time derivative;
 
-        VecDescCL rhsext1;
+        VecDescCL ext1, ext2, conc_extrapol;
         VectorCL load, ///< for a load-function
                 rhs1_, ///< for the extension initial data
                 rhs2_; ///< for the extension initial data
@@ -1880,8 +2161,14 @@ class CahnHilliardcGP1CL : public CahnHilliardP1BaseCL
         int iter= 999, double tol= 1.1e-7, double iterA=499, double tolA=1.1e-3, double iterB=499, double tolB=1.1e-3,double omit_bound= -1.)
         : CahnHilliardP1BaseCL( mg, theta, sigma, epsilon, v, Bnd_v, lset_vd, lsetbnd,
                 iter, tol, iterA, tolA, iterB, tolB, omit_bound),
-          full_idx( P2_FE), rhsext1(), normal_(normal),width_(width), rho_(rho), S_(S)
-        {}
+          full_idx( P2_FE), ext1(),ext2(), conc_extrapol(), normal_(normal),width_(width), rho_(rho), S_(S)
+        {
+
+            //ext1.SetIdx(&full_idx);
+
+            //ext2.SetIdx(&full_idx);
+
+        }
 
         /// \remarks call SetupSystem \em before calling SetTimeStep!
         //void SetTimeStep( double dt, double theta=-1);
@@ -1903,7 +2190,7 @@ class CahnHilliardcGP1CL : public CahnHilliardP1BaseCL
         /// Use DoStep() instead.
         ///@{
         void InitStep1 (VectorCL&, VectorCL&, double new_t);// one-step--Implicit Euler
-        void InitStep2 (double new_t);// two-step--BDF2 Euler, Use Backward Euler in the first time step
+        void InitStep2 (VectorCL&, VectorCL&, double new_t);// two-step--BDF2 Euler, Use Backward Euler in the first time step
         void InitStep3 (double new_t);// two-step--BDF2 Euler, In the first time step, solve the equation with smaller time step
         void DoStep1 (VectorCL&, VectorCL&); //one step-- Implicit Euler
         void DoStep2 (VectorCL& ,VectorCL& ); //two step-- BDF2 method
