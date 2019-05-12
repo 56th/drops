@@ -1562,7 +1562,7 @@ NavierStokesIFAccumulator_P1P1CL::NavierStokesIFAccumulator_P1P1CL( const VecDes
 
 void NavierStokesIFAccumulator_P1P1CL::begin_accumulation ()
 {
-    std::cout << "entering StokesIF: \n";
+    std::cout << "entering NavierStokesIF: \n";
     const size_t num_unks_p1= P1Idx_.NumUnknowns(), num_unks_scalarp1= ScalarP1Idx_.NumUnknowns();
     mA_P1_= new MatrixBuilderCL( &A_P1_, num_unks_p1, num_unks_p1);
     mN_P1_= new MatrixBuilderCL( &N_P1_, num_unks_p1, num_unks_p1);
@@ -1746,9 +1746,24 @@ void SetupStokesIF_P1P1( const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P
   accumulate( accus, MG_, A_P1->GetRowLevel(), A_P1->RowIdx->GetBndInfo());
 }
 
-void SetupNavierStokesIF_P1P1( const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P1_stab, MatDescCL* B_P1P1, MatDescCL* Omega_P1P1, MatDescCL* N_P1, MatDescCL* NT_P1, MatDescCL* M_P1, MatDescCL* D_P1,MatDescCL* S_P1, MatDescCL* L_P1P1, MatDescCL* L_P1P1_stab, MatDescCL* M_ScalarP1, MatDescCL* A_ScalarP1_stab, MatDescCL* Schur_normalP1_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, const VecDescCL& velocity, const BndDataCL<Point3DCL>& velocity_bnd, bool fullgrad)
+void SetupNavierStokesIF_P1P1(
+        const MultiGridCL& MG_,
+        MatDescCL* A_P1,
+        MatDescCL* A_P1_stab,
+        MatDescCL* B_P1P1,
+        MatDescCL* Omega_P1P1,
+        MatDescCL* N_P1,
+        MatDescCL* NT_P1,
+        MatDescCL* M_P1,
+        MatDescCL* D_P1,
+        MatDescCL* S_P1,
+        MatDescCL* L_P1P1,
+        MatDescCL* L_P1P1_stab,
+        MatDescCL* M_ScalarP1,
+        MatDescCL* A_ScalarP1_stab,
+        MatDescCL* Schur_normalP1_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, const VecDescCL& velocity, const BndDataCL<Point3DCL>& velocity_bnd, bool fullgrad)
 {
-  ScopeTimerCL scope("SetupStokesIF_P1P1");
+  ScopeTimerCL scope("SetupNavierStokesIF_P1P1");
   NavierStokesIFAccumulator_P1P1CL accu( lset, velocity, lset_bnd, velocity_bnd, *(A_P1->RowIdx), *(L_P1P1->RowIdx), A_P1->Data, A_P1_stab->Data, B_P1P1->Data, Omega_P1P1->Data,  N_P1->Data, NT_P1->Data, M_P1->Data, D_P1->Data, S_P1->Data, L_P1P1->Data, L_P1P1_stab->Data, M_ScalarP1->Data, A_ScalarP1_stab->Data, Schur_normalP1_stab->Data, fullgrad);
   TetraAccumulatorTupleCL accus;
   //    MaybeAddProgressBar(MG_, "LapBeltr(P2) Setup", accus, RowIdx.TriangLevel());
@@ -2117,8 +2132,21 @@ void StokesIFAccumulator_P2P1CL::update_global_system ()
     }
 }
 
-void SetupStokesIF_P2P1( const MultiGridCL& MG_, MatDescCL* A_P2, MatDescCL* A_P2_stab, MatDescCL* B_P1P2, MatDescCL* M_P2, MatDescCL* S_P2, MatDescCL* L_P1P2, MatDescCL* L_P1P2_stab, MatDescCL* M_ScalarP1, MatDescCL* A_ScalarP1_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, bool fullgrad)
-{
+void SetupStokesIF_P2P1(
+        const MultiGridCL& MG_,
+        MatDescCL* A_P2,
+        MatDescCL* A_P2_stab,
+        MatDescCL* B_P1P2,
+        MatDescCL* M_P2,
+        MatDescCL* S_P2,
+        MatDescCL* L_P1P2,
+        MatDescCL* L_P1P2_stab,
+        MatDescCL* M_ScalarP1,
+        MatDescCL* A_ScalarP1_stab,
+        const VecDescCL& lset,
+        const LsetBndDataCL& lset_bnd,
+        bool fullgrad
+) {
   ScopeTimerCL scope("SetupStokesIF");
   StokesIFAccumulator_P2P1CL accu( lset, lset_bnd, *(A_P2->RowIdx), *(B_P1P2->RowIdx), A_P2->Data, A_P2_stab->Data, B_P1P2->Data, M_P2->Data, S_P2->Data, L_P1P2->Data, L_P1P2_stab->Data, M_ScalarP1->Data, A_ScalarP1_stab->Data, fullgrad);
   TetraAccumulatorTupleCL accus;

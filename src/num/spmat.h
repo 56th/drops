@@ -1016,13 +1016,15 @@ void in (std::istream& is, VectorBaseCL<T>& v)
 }
 
 
-// Human/Matlab readable output
+// Human/Matlab .mtx readable output
 template <typename T>
 std::ostream& operator << (std::ostream& os, const SparseMatBaseCL<T>& A)
 {
     const size_t M = A.num_rows();
 
-    os << "% " << M << 'x' << A.num_cols() << ' ' << A.num_nonzeros() << " nonzeros\n";
+    // os << "% " << M << 'x' << A.num_cols() << ' ' << A.num_nonzeros() << " nonzeros\n";
+    auto field = std::is_same<T, double>::value ? "real" : "complex";
+    os << "%%MatrixMarket matrix coordinate " << field << " general\n" << A.num_rows() << ' ' << A.num_cols() << ' ' << A.num_nonzeros() << '\n';
 
     for (size_t row=0; row<M; ++row)
         for (size_t col=A.row_beg(row), rowend=A.row_beg(row+1); col<rowend; ++col)

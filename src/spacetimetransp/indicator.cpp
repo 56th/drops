@@ -43,7 +43,7 @@ ConcentrationMarkingStrategyCL::ConcentrationMarkingStrategyCL
                                     double )
 : lsetgetter_( new LevelsetP2GetterCL(lset) ), solneg(a_solneg), solpos(a_solpos), 
   thresholdlist_( thresholdlist ), c_level_( coarse_level ),
-  f_level_( fine_level ), hacked_(a_hacked), hacked_width_(a_hacked_width), modified_( false ), decision_( DontCareC ), distributionout_( distributionout), owndistout_(true)
+  f_level_( fine_level ), hacked_(a_hacked), hacked_width_(a_hacked_width), decision_( DontCareC ), distributionout_( distributionout), owndistout_(true)
 {
     if (distributionout_ != NULL) delete distributionout_;
     distributionout_ = new std::ofstream("distrib.out");
@@ -54,11 +54,19 @@ ConcentrationMarkingStrategyCL::ConcentrationMarkingStrategyCL
     }
 }
 
-ConcentrationMarkingStrategyCL::ConcentrationMarkingStrategyCL( const ConcentrationMarkingStrategyCL& rhs ):
- lsetgetter_( rhs.lsetgetter_->clone() ), solneg(rhs.solneg), solpos(rhs.solpos), thresholdlist_( rhs.thresholdlist_ ),
- c_level_( rhs.c_level_ ), f_level_( rhs.f_level_ ), hacked_( rhs.hacked_), hacked_width_( rhs.hacked_width_),
- modified_( rhs.modified_ ), decision_( rhs.decision_ ), distributionout_( rhs.distributionout_), owndistout_(false)
-{
+ConcentrationMarkingStrategyCL::ConcentrationMarkingStrategyCL( const ConcentrationMarkingStrategyCL& rhs )
+    : MarkingStrategyCL(rhs.modified_)
+    , lsetgetter_( rhs.lsetgetter_->clone() )
+    , solneg(rhs.solneg)
+    , solpos(rhs.solpos)
+    , thresholdlist_( rhs.thresholdlist_ )
+    , c_level_( rhs.c_level_ )
+    , f_level_( rhs.f_level_ )
+    , hacked_( rhs.hacked_)
+    , hacked_width_( rhs.hacked_width_)
+    , decision_( rhs.decision_ )
+    , distributionout_( rhs.distributionout_)
+    , owndistout_(false) {
 }
 
 ConcentrationMarkingStrategyCL::~ConcentrationMarkingStrategyCL()

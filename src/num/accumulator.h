@@ -42,6 +42,7 @@ template <class VisitedT>
 class AccumulatorCL
 {
   public:
+    AccumulatorCL(bool modified = false) : modified_(modified) {}
     /// \brief Called to initiate a new accumulation before any call of visit.
     virtual void begin_accumulation   () {}
     /// \brief Called to finalize the accumulation after all calls of visit.
@@ -55,6 +56,9 @@ class AccumulatorCL
     virtual AccumulatorCL* clone (int clone_id)= 0;
 
     virtual ~AccumulatorCL () {}
+    bool& modified() { return modified_; }
+protected:
+    bool modified_;
 };
 
 /// \brief Accumulation over sequences of TetraCL.
@@ -161,6 +165,7 @@ void AccumulatorTupleCL<VisitedT>::operator() (const ColorClassesCL& colors)
 #ifdef _OPENMP
     std::vector<ContainerT> clones( omp_get_max_threads());
     clone_accus( clones);
+    // std::vector<std::string> s(clones.size());
     for (ColorClassesCL::const_iterator cit= colors.begin(); cit != colors.end(); ++cit) {
 #       pragma omp parallel
         {
@@ -172,10 +177,20 @@ void AccumulatorTupleCL<VisitedT>::operator() (const ColorClassesCL& colors)
             int j;
 #endif
 #           pragma omp for schedule(dynamic)
-            for (j= 0; j < cc.size(); ++j)
-                std::for_each( clones[t_id].begin(), clones[t_id].end(), std::bind2nd( std::mem_fun( &AccumulatorCL<VisitedT>::visit), *cc[j]));
+            for (j= 0; j < cc.size(); ++j) {
+                std::for_each(clones[t_id].begin(), clones[t_id].end(),
+                              std::bind2nd(std::mem_fun(&AccumulatorCL<VisitedT>::visit), *cc[j]));
+                // if (s[t_id] == "") s[t_id] = "thread " + std::to_string(t_id) + ": ";
+                // if (clones[t_id][0]->modified()) s[t_id] += "(" + std::to_string(j) + ", " + std::to_string(clones[t_id][0]->modified()) + ") ";
+            }
         }
     }
+    // if at least one thread modified the accus_ object, then we must have accus_ "modified" member variable flag set to be true
+    for (size_t i = 0; i < accus_.size(); ++i)
+        for (size_t j = 1; j < clones.size(); ++j)
+            if ((accus_[i]->modified() = accus_[i]->modified() || clones[j][i]->modified())) break;
+    // std::cout << s[0] << " -> " << std::to_string(accus_[0]->modified()) << "\n\n";
+    // for (size_t i = 1; i < s.size(); ++i) std::cout << s[i] << "\n\n";
     delete_clones(clones);
 
 #else
