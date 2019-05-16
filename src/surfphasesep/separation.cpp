@@ -41,7 +41,7 @@
 #include <string>
 #include <tr1/unordered_map>
 #include <tr1/unordered_set>
-#include <stokes/instatstokes2phase.h>
+//#include <stokes/instatstokes2phase.h>
 
 using namespace DROPS;
 
