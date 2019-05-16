@@ -41,6 +41,7 @@
 #include <string>
 #include <tr1/unordered_map>
 #include <tr1/unordered_set>
+#include <stokes/instatstokes2phase.h>
 
 using namespace DROPS;
 
@@ -165,7 +166,7 @@ static RegisterScalarFunction regsca_torus_lset( "Torus", torus);
 
 double constant_sol (const Point3DCL& , double )
 {
-    return (0.7);
+    return (0.0);
 }
 static RegisterScalarFunction regsca_constant_sol( "ConstantSolution", constant_sol);
 
@@ -588,6 +589,47 @@ DROPS::Point3DCL normal_sphere_2move (const DROPS::Point3DCL& p, double t)
 }
 static RegisterVectorFunction regvec_moving_sphere_normal( "NormalMovingEllipsoid", normal_sphere_2move);
 
+double dilating_radius(double t)
+{
+    double a=0.2;
+    double b=1;
+    return(1.+a*std::sin(b*2.*3.141592*t));
+}
+double dilating_radius_prime(double t)
+{
+    double a=0.2;
+    double b=1;
+    return(b*2.*3.141592*a*std::cos(b*2.*3.141592*t));
+}
+
+double sphere_2dilate (const DROPS::Point3DCL& p, double t)
+{
+    DROPS::Point3DCL x((1.0/dilating_radius(t))*(p - PosDrop));
+    //x[0]=p[0]/dilating_radius(t);
+    return x.norm() - RadDrop[0];
+}
+
+static RegisterScalarFunction regsca_dilatating_sphere_lset( "DilatatingEllipsoid", sphere_2dilate);
+
+DROPS::Point3DCL normal_sphere_2dilate (const DROPS::Point3DCL& p, double t)
+{
+    DROPS::Point3DCL x= (1.0/(dilating_radius(t)*dilating_radius(t)))*(p - PosDrop );
+    //x[0]=p[0]/(dilating_radius(t)*dilating_radius(t));
+
+    if(x.norm()>0.000001)
+        return x/x.norm();
+    else
+        return x;
+}
+static RegisterVectorFunction regvec_dilate_sphere_normal( "NormalDilatatingEllipsoid", normal_sphere_2dilate);
+
+DROPS::Point3DCL sin_dilatation (const DROPS::Point3DCL& pp, double t)
+{
+    DROPS::Point3DCL x((dilating_radius_prime(t)/dilating_radius(t))*(pp - PosDrop));
+    return x;
+
+}
+static RegisterVectorFunction regvec_sin_dilatation( "UniformDilatation", sin_dilatation);
 
 SMatrixCL<3,3> dp_sphere (const DROPS::Point3DCL& x, double)
 {
@@ -1001,7 +1043,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     InitVel( mg, &v, Bnd_v, the_wind_fun, 0.);
 
     //lset2.SetupSystem( make_P2Eval( mg, Bnd_v, v), P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps"));
-    double dist=1*(2.0*P.get<DROPS::Point3DCL>("SurfSeparation.Exp.Velocity").norm()*P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps")
+    double dist=0.01*(2.0*P.get<DROPS::Point3DCL>("SurfSeparation.Exp.Velocity").norm()*P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps")
                 +P.get<DROPS::Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")/pow(2,P.get<int>("Mesh.AdaptRef.FinestLevel")));
 
     std::unique_ptr<CahnHilliardP1BaseCL> timediscp( make_cahnhilliard_timedisc( mg, lset, v, Bnd_v, P, dist));
@@ -1016,6 +1058,8 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
 
     InterfaceP1RepairCL imu_repair( mg, lset.Phi, lset.GetBndData(), timedisc.imu);
     adap.push_back( &imu_repair);
+
+
     //LevelsetRepairCL lset2repair( lset2);
     //adap.push_back( &lset2repair);
 
@@ -2069,6 +2113,10 @@ int  main (int argc, char* argv[])
                     P.get<int>( "Mesh.AdaptRef.CoarsestLevel"), P.get<int>( "Mesh.AdaptRef.FinestLevel"));
 
     DROPS::AdapTriangCL adap( mg, &marker);
+    //Yushutin
+    adap.MakeInitialTriang();
+    //adap.set_marking_strategy( 0 );
+    //
 
     // DROPS::LevelsetP2CL lset( mg, lsbnd, sf);
     DROPS::LevelsetP2CL& lset( *LevelsetP2CL::Create( mg, lsbnd, sf, P.get_child("Levelset")) );

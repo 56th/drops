@@ -1981,10 +1981,9 @@ class CahnHilliardP1BaseCL: public SurfacePDEP1BaseCL
 
         IdxDescCL idx; ///< index desctription for concentration at current time
         VecDescCL ic;  ///< concentration on the interface at current time
-
+        VecDescCL conc_extrapol;
         /*IdxDescCL idx_mu; ///< index desctription for chemical potential at current time*/
         VecDescCL imu;  ///< chemical potential on the interface at current time
-
         VecDescCL iface;  ///< interface mesh at current time
 
 
@@ -2027,6 +2026,7 @@ protected:
                               int iter= 1000, double tol= 1e-7, double iterA=500, double tolA=1e-3, double iterB=500, double tolB=1e-3, double omit_bound= -1.)
                 : SurfacePDEP1BaseCL(mg, theta, v, Bnd_v, lset_vd, lsetbnd), idx( P1IF_FE), /*idx_mu( P1IF_FE),*/ omit_bound_( omit_bound),
                 sigma_( sigma), epsilon_( epsilon),  rhs_fun3_( 0), rhs_fun4_( 0), oldidx_( P1IF_FE),oldoldidx_( P1IF_FE),
+                  conc_extrapol(),//yushutin
                 PCGSolver3_(symmPcPc_, iterA, tolA, true),
                 PCGSolver4_(symmPcPc_, iterB, tolB, true),
                 spc3_( dummy_matrix3_, PCGSolver3_), spc4_( dummy_matrix4_, PCGSolver4_),
@@ -2139,7 +2139,7 @@ class CahnHilliardcGP1CL : public CahnHilliardP1BaseCL
 
         const double S_;//stabilization parameter for time derivative;
 
-        VecDescCL ext1, ext2, conc_extrapol;
+        VecDescCL ext1, ext2;
         VectorCL load, ///< for a load-function
                 rhs1_, ///< for the extension initial data
                 rhs2_; ///< for the extension initial data
@@ -2161,7 +2161,9 @@ class CahnHilliardcGP1CL : public CahnHilliardP1BaseCL
         int iter= 999, double tol= 1.1e-7, double iterA=499, double tolA=1.1e-3, double iterB=499, double tolB=1.1e-3,double omit_bound= -1.)
         : CahnHilliardP1BaseCL( mg, theta, sigma, epsilon, v, Bnd_v, lset_vd, lsetbnd,
                 iter, tol, iterA, tolA, iterB, tolB, omit_bound),
-          full_idx( P2_FE), ext1(),ext2(), conc_extrapol(), normal_(normal),width_(width), rho_(rho), S_(S)
+          full_idx( P2_FE), ext1(),ext2(),
+          //conc_extrapol(),
+          normal_(normal),width_(width), rho_(rho), S_(S)
         {
 
             //ext1.SetIdx(&full_idx);

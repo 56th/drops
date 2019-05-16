@@ -1004,7 +1004,6 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
             the_sol_vd.SetIdx( &lset.idx);
             LSInit( mg, the_sol_vd, the_sol_fun, /*t*/ cur_time);
             // timedisc.Update(); // Called unconditionally in DoStep.
-
             //lset2.SetupSystem( make_P2Eval( mg, Bnd_v, v), dt);
 
             std::cout << "rel. Volume: " << lset.GetVolume()/Vol << std::endl;

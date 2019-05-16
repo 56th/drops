@@ -14,16 +14,16 @@
         "E1":          [ 3.33333,  0,  0],
         "E2":          [ 0,  3.33333,  0],
         "E3":          [ 0,  0,  3.33333],
-        "N1":          64,
-        "N2":          64,
-        "N3":          64,
+        "N1":          2,
+        "N2":          2,
+        "N3":          2,
         "RestartFile": "",
 
         "AdaptRef": {
-            "Freq":          0,
-            "Width":         10,
-            "CoarsestLevel": 0,
-            "FinestLevel":   0,
+            "Freq":          3,
+            "Width":         0.25,
+            "CoarsestLevel": 2,
+            "FinestLevel":   4,
             "SD":            0.1,
 
             "CurvDiff":      -1,
@@ -45,15 +45,15 @@
             "RadDrop":  [1, 0, 0],
             "PosDrop":  [0, 0, 0],
             "RadTorus": [1, 0.1],
-            "Velocity": [0.4, 0.0,  0.0],
+            "Velocity": [0.0, 0.0,  0.0],
 
             "StationaryPDE": false,
 
-            "Wind":     "ConstantRotation",
-            "Levelset": "Sphere",
-            "Normal": "NormalSphere",
+            "Wind":     "UniformDilatation",
+            "Levelset": "DilatatingEllipsoid",
+            "Normal": "NormalDilatatingEllipsoid",
             "Rhs":      "ZeroScalarFun",
-            "ConcentrationSolution": "MergeDropRandomSol",
+            "ConcentrationSolution": "ConstantSolution",
             "ChemicalPotentialSolution": "ZeroScalarFun"
 
 
@@ -105,8 +105,8 @@
     },
 
     "VTK": {
-        "Freq":           10,
-        "VTKDir":         "../../output_tmp/",
+        "Freq":           1,
+        "VTKDir":         "../../output/",
         "VTKName":        "separation",
         "TimeFileName":   "separation",
         "Binary":         1,
