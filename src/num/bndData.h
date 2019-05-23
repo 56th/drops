@@ -155,6 +155,8 @@ class BndCondCL
     }
     /// \brief Replace all Dirichlet by Neumann boundary conditions (yielding unknowns in all boundary DoFs)
     void StripDirichletBC();
+    /// \brief Replace all periodic by Neumann boundary conditions to prevent periodic numbering of unknowns
+    void StripPeriodicBC();
 
     /// \name boundary condition
     /// Returns superior boundary condition of sub-simplex

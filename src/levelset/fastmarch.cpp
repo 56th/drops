@@ -63,7 +63,9 @@ void ReparamDataCL::InitPerMap()
         return;
 
     const int    lvl     = phi.GetLevel();
-    augmIdx= new IdxDescCL( P2_FE, *bnd);
+    BndDataCL<>  bnd_no_per= *bnd;
+    bnd_no_per.StripPeriodicBC();
+    augmIdx= new IdxDescCL( P2_FE, bnd_no_per);
     augmIdx->CreateNumbering( lvl, mg);
     const Uint   augm_idx= augmIdx->GetIdx();
     const Uint   idx     = phi.RowIdx->GetIdx();
