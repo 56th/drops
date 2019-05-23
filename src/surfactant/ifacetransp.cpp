@@ -3852,6 +3852,9 @@ void SurfactantP1BaseCL::InitTimeStep ()
         DROPS::ExtendP2(MG_, vd_oldoldic, ext2);
         Restrict(MG_, ext2, oldold_conc);
 
+        //new
+        ic.Data=old_conc.Data;
+
         //warning
       /*  old_conc.Data=oldic_;
         oldold_conc.Data=oldoldic_;*/
@@ -4306,7 +4309,11 @@ void
 InterfaceP1RepairCL::post_refine_sequence ()
 {
     u_.RowIdx->DeleteNumbering( mg_);
-    u_.RowIdx->CreateNumbering( fullp1idx_.TriangLevel(), mg_, &lset_vd_, &lset_bnd_);
+
+    if (width_>0)
+         u_.RowIdx->CreateNumbering( fullp1idx_.TriangLevel(), mg_, &lset_vd_, &lset_bnd_, width_);
+    else u_.RowIdx->CreateNumbering( fullp1idx_.TriangLevel(), mg_, &lset_vd_, &lset_bnd_);
+
     u_.SetIdx( u_.RowIdx);
 
     Restrict( mg_, fullu_, u_);

@@ -10,20 +10,20 @@
 
     "Mesh": {
         "Type":        "BrickBuilder",
-        "Origin":      [-1.66666, -1.66666, -1.66666],
-        "E1":          [ 3.33333,  0,  0],
+        "Origin":      [-3.33333, -1.66666, -1.66666],
+        "E1":          [ 5,  0,  0],
         "E2":          [ 0,  3.33333,  0],
         "E3":          [ 0,  0,  3.33333],
-        "N1":          2,
+        "N1":          3,
         "N2":          2,
         "N3":          2,
         "RestartFile": "",
 
         "AdaptRef": {
-            "Freq":          3,
-            "Width":         0.25,
-            "CoarsestLevel": 2,
-            "FinestLevel":   4,
+            "Freq":          -1,
+            "Width":         -1,
+            "CoarsestLevel": 0,
+            "FinestLevel":  4,
             "SD":            0.1,
 
             "CurvDiff":      -1,
@@ -35,26 +35,28 @@
     {
         "Read" : 0,
         "Write": "yes",
-        "NumSteps": 1000,
-        "FinalTime": 10
+        "NumSteps": 64,
+        "FinalTime": 0.1
     },
 
     "SurfSeparation": {
 
         "Exp": {
             "RadDrop":  [1, 0, 0],
-            "PosDrop":  [0, 0, 0],
+            "PosDrop":  [-1.66667, 0, 0],
             "RadTorus": [1, 0.1],
-            "Velocity": [0.0, 0.0,  0.0],
+            "Velocity": [10.0, 0.0,  0.0],
+            "Angular": [10.0,0.0,0.0],
 
             "StationaryPDE": false,
 
-            "Wind":     "UniformDilatation",
-            "Levelset": "DilatatingEllipsoid",
-            "Normal": "NormalDilatatingEllipsoid",
-            "Rhs":      "ZeroScalarFun",
-            "ConcentrationSolution": "ConstantSolution",
-            "ChemicalPotentialSolution": "ZeroScalarFun"
+            "Wind":     "Mixed",
+            "Levelset": "MovingEllipsoid",
+            "Normal": "NormalMovingEllipsoid",
+
+            "Rhs":      "Rhs from Second spherical harmonic",
+            "ConcentrationSolution": "Second spherical harmonic",
+            "ChemicalPotentialSolution": "Omega from Second spherical harmonic"
 
 
         },
@@ -106,7 +108,7 @@
 
     "VTK": {
         "Freq":           1,
-        "VTKDir":         "../../output/",
+        "VTKDir":         "../../output_tmp/",
         "VTKName":        "separation",
         "TimeFileName":   "separation",
         "Binary":         1,

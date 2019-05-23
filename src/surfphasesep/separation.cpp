@@ -96,7 +96,8 @@ inline double laplace_beltrami_u (const Point3DCL& n,      const SMatrixCL<3,3>&
 }
 
 
-DROPS::Point3DCL WindVelocity;
+DROPS::Point3DCL WindVelocity, AngularVelocity;
+std::string dirname;
 DROPS::Point3DCL constant_wind (const DROPS::Point3DCL&, double)
 {
     return WindVelocity;
@@ -109,17 +110,23 @@ DROPS::Point3DCL PosDrop;
 DROPS::Point3DCL constant_rotation (const DROPS::Point3DCL& pp, double)
 {
     DROPS::Point3DCL velocity;
-    cross_product(velocity, WindVelocity, pp);
+    cross_product(velocity, AngularVelocity, pp);
     return velocity;
 }
 static RegisterVectorFunction regvec_constant_rotation( "ConstantRotation", constant_rotation);
 
+DROPS::Point3DCL mixed (const DROPS::Point3DCL& pp, double t)
+{
+     return (constant_rotation(pp,t)+constant_wind(pp,t));
+}
+static RegisterVectorFunction regvec_mixed( "Mixed", mixed);
+
 DROPS::Point3DCL Rotate(const DROPS::Point3DCL& pp,
         double t)
 {
-    double u=WindVelocity[0];
-    double v=WindVelocity[1];
-    double w=WindVelocity[2];
+    double u=AngularVelocity[0];
+    double v=AngularVelocity[1];
+    double w=AngularVelocity[2];
     double L = (u*u + v * v + w * w);
     double angle = std::sqrt(L)*(t);
     double u2 = u * u;
@@ -127,6 +134,8 @@ DROPS::Point3DCL Rotate(const DROPS::Point3DCL& pp,
     double w2 = w * w;
 
     SMatrixCL<3,3> rotationMatrix;
+
+    if (!(L>0)) return pp;
 
     rotationMatrix(0,0) = (u2 + (v2 + w2) * cos(angle)) / L;
     rotationMatrix(0,1) = (u * v * (1 - cos(angle)) - w * sqrt(L) * sin(angle)) / L;
@@ -166,9 +175,17 @@ static RegisterScalarFunction regsca_torus_lset( "Torus", torus);
 
 double constant_sol (const Point3DCL& , double )
 {
-    return (0.0);
+    return (0.5);
 }
 static RegisterScalarFunction regsca_constant_sol( "ConstantSolution", constant_sol);
+
+double coscoscos_sol (const Point3DCL& pp, double )
+{
+    double a=0.1;
+    Point3DCL p=(1./pp.norm())*pp;
+    return (0.5+a*std::cos(2*3.141592*p[0])*std::cos(2*3.141592*p[1])*std::cos(2*3.141592*p[2]));
+}
+static RegisterScalarFunction regsca_coscoscos_sol( "CosxCosyCoszSolution", coscoscos_sol);
 
 
 
@@ -592,13 +609,13 @@ static RegisterVectorFunction regvec_moving_sphere_normal( "NormalMovingEllipsoi
 double dilating_radius(double t)
 {
     double a=0.2;
-    double b=1;
+    double b=10;
     return(1.+a*std::sin(b*2.*3.141592*t));
 }
 double dilating_radius_prime(double t)
 {
     double a=0.2;
-    double b=1;
+    double b=10;
     return(b*2.*3.141592*a*std::cos(b*2.*3.141592*t));
 }
 
@@ -728,10 +745,22 @@ double Test1_rhs3 (const DROPS::Point3DCL& pp, double t)
 static RegisterScalarFunction regsca_rhs1_harmonic( "First spherical harmonic rhs", Test1_rhs3);
 
 
+double TestStationary_chiSol (const DROPS::Point3DCL& pp, double t)
+{
+    //DROPS::Point3DCL p(pp  - t*constant_wind(pp,t));
+    DROPS::Point3DCL p=Rotate(pp  - t*constant_wind(pp,t), -t) - PosDrop;
+
+    return((std::tanh((1./(2*std::sqrt(2)*ParameterNS::eps))*p[1]/pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), 0.5))  + 0.1e1) / 0.2e1);
+}
+
+static RegisterScalarFunction regsca_stationary_harmonic( "SteadyPhases", TestStationary_chiSol);
+
+
+
 double Test10_chiSol (const DROPS::Point3DCL& pp, double t)
 {
     //DROPS::Point3DCL p(pp  - t*constant_wind(pp,t));
-    DROPS::Point3DCL p=Rotate(pp, -t);
+    DROPS::Point3DCL p=Rotate(pp  - t*constant_wind(pp,t), -t) - PosDrop;
 
     double a=0.0;
     double T=0.25;
@@ -742,8 +771,8 @@ static RegisterScalarFunction regsca_secondspherical_harmonic( "Second spherical
 double Test10_omegaSol (const DROPS::Point3DCL& pp, double t)
 {
     //DROPS::Point3DCL p(pp  - t*constant_wind(pp,t));
-    DROPS::Point3DCL p=Rotate(pp, -t);
-
+    //DROPS::Point3DCL p=Rotate(pp, -t);
+ DROPS::Point3DCL p=Rotate(pp  - t*constant_wind(pp,t), -t)- PosDrop;
     double a=0.0;
     double T=0.25;
     if (p.norm()<0.01) return (0);
@@ -756,8 +785,8 @@ static RegisterScalarFunction regsca_omega_secondspherical_harmonic( "Omega from
 
 double Test10_rhs3 (const DROPS::Point3DCL& pp, double  t) {
     //DROPS::Point3DCL p(pp  - t*constant_wind(pp,t));
-    DROPS::Point3DCL p=Rotate(pp, -t);
-
+    //DROPS::Point3DCL p=Rotate(pp, -t);
+ DROPS::Point3DCL p=Rotate(pp - t*constant_wind(pp,t), -t)- PosDrop;
     double a=0.0;
     double T=0.25;
     double inertia=a / T * exp(-t / T) * (p[0] / (pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1)) * p[1] + 0.1e1) / 0.2e1;
@@ -1005,13 +1034,13 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
 {
     using namespace DROPS;
     //set up output
-    std::string dirname  = P.get<std::string>("VTK.VTKDir")  + "CahnHilliard" + "_" + P.get<std::string>("SurfSeparation.Exp.Levelset")  + "/"  "h=" + std::to_string(float(P.get<DROPS::Point3DCL>("Mesh.E1")[0]/(2*P.get<double>("Mesh.N1")))) + "_dt=" + std::to_string(float(P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps")));
+    //dirname  = P.get<std::string>("VTK.VTKDir")  + "CahnHilliard" + "_" + P.get<std::string>("SurfSeparation.Exp.Levelset")  + "/"  "l=" + std::to_string(int(P.get<int>("Mesh.AdaptRef.FinestLevel")))  + "_N=" + std::to_string(int(P.get<double>("Time.NumSteps")));
 
     std::cout << "dirname: " << dirname << std::endl;
-
     std::ofstream log_global;
     log_global.open( dirname +"/"
                      + "Errors.txt");
+    log_global.close();
 
     if (!log_global.is_open()) {
         log_global.open( dirname +"/"
@@ -1043,7 +1072,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     InitVel( mg, &v, Bnd_v, the_wind_fun, 0.);
 
     //lset2.SetupSystem( make_P2Eval( mg, Bnd_v, v), P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps"));
-    double dist=0.01*(2.0*P.get<DROPS::Point3DCL>("SurfSeparation.Exp.Velocity").norm()*P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps")
+    double dist=1*(2.0*P.get<DROPS::Point3DCL>("SurfSeparation.Exp.Velocity").norm()*P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps")
                 +P.get<DROPS::Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")/pow(2,P.get<int>("Mesh.AdaptRef.FinestLevel")));
 
     std::unique_ptr<CahnHilliardP1BaseCL> timediscp( make_cahnhilliard_timedisc( mg, lset, v, Bnd_v, P, dist));
@@ -1053,10 +1082,10 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     LevelsetRepairCL lsetrepair( lset);
     adap.push_back( &lsetrepair);
 
-    InterfaceP1RepairCL ic_repair( mg, lset.Phi, lset.GetBndData(), timedisc.ic);
+    InterfaceP1RepairCL ic_repair( mg, lset.Phi, lset.GetBndData(), timedisc.ic, dist);//dist should be nonzero only for NarrowBand!
     adap.push_back( &ic_repair);
 
-    InterfaceP1RepairCL imu_repair( mg, lset.Phi, lset.GetBndData(), timedisc.imu);
+    InterfaceP1RepairCL imu_repair( mg, lset.Phi, lset.GetBndData(), timedisc.imu, dist);
     adap.push_back( &imu_repair);
 
 
@@ -1203,9 +1232,13 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
 //         }
         //if (C.rpm_Freq && step%C.rpm_Freq==0) { // reparam levelset function
             // lset.ReparamFastMarching( C.rpm_Method);
-        const bool doGridMod= P.get<int>("Mesh.AdaptRef.Freq") && step%P.get<int>("Mesh.AdaptRef.Freq") == 0;
+            int freq=(int)(0.9*(dist/P.get<DROPS::Point3DCL>("SurfSeparation.Exp.Velocity").norm())/(P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps")));
+        //int freq=P.get<int>("Mesh.AdaptRef.Freq");
+        const bool doGridMod= freq && step%freq == 0;
         const bool gridChanged= doGridMod ? adap.UpdateTriang() : false;
+
         if (gridChanged) {
+
             std::cout << "Triangulation changed.\n";
             vidx.DeleteNumbering( mg);
             vidx.CreateNumbering( mg.GetLastLevel(), mg, Bnd_v);
@@ -1223,6 +1256,8 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
             std::cout << "rel. Volume: " << lset.GetVolume()/Vol << std::endl;
             lset.AdjustVolume();
             lset.GetVolumeAdjuster()->DebugOutput( std::cout);
+                                    //vtkwriter->Write( cur_time+dt/2.);
+
         }
     }
     std::cout << std::endl;
@@ -2083,9 +2118,10 @@ int  main (int argc, char* argv[])
 
     DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
 
-    std::string dirname  = P.get<std::string>("VTK.VTKDir")  + "CahnHilliard" + "_" + P.get<std::string>("SurfSeparation.Exp.Levelset")  + "/"  "h=" + std::to_string(float(P.get<DROPS::Point3DCL>("Mesh.E1")[0]/(2*P.get<double>("Mesh.N1")))) + "_dt=" + std::to_string(float(P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps")));
+    dirname  = P.get<std::string>("VTK.VTKDir")  + "CahnHilliard" + "_" + P.get<std::string>("SurfSeparation.Exp.Levelset")  + "/"   "l=" + std::to_string(int(P.get<int>("Mesh.AdaptRef.FinestLevel")))  + "_N=" + std::to_string(int(P.get<double>("Time.NumSteps")));
     std::cout << "Setting up interface-PDE.\n";
     WindVelocity= P.get<DROPS::Point3DCL>("SurfSeparation.Exp.Velocity");
+    AngularVelocity= P.get<DROPS::Point3DCL>("SurfSeparation.Exp.Angular");
     RadDrop=      P.get<DROPS::Point3DCL>("SurfSeparation.Exp.RadDrop");
     PosDrop=      P.get<DROPS::Point3DCL>("SurfSeparation.Exp.PosDrop");
     RadTorus=     P.get<DROPS::Point2DCL>("SurfSeparation.Exp.RadTorus");
@@ -2109,13 +2145,17 @@ int  main (int argc, char* argv[])
     std::unique_ptr<MGBuilderCL> builder( make_MGBuilder( P));
     DROPS::MultiGridCL mg( *builder);
     typedef DistMarkingStrategyCL MarkerT;
-    MarkerT marker( the_lset_fun, P.get<double>( "Mesh.AdaptRef.Width"),
+    double dist=1*(2.0*P.get<DROPS::Point3DCL>("SurfSeparation.Exp.Velocity").norm()*P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps")
+                +P.get<DROPS::Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")/pow(2,P.get<int>("Mesh.AdaptRef.FinestLevel")));
+
+    MarkerT marker( the_lset_fun,
+            2*dist,
+           // P.get<double>( "Mesh.AdaptRef.Width"),
                     P.get<int>( "Mesh.AdaptRef.CoarsestLevel"), P.get<int>( "Mesh.AdaptRef.FinestLevel"));
 
     DROPS::AdapTriangCL adap( mg, &marker);
     //Yushutin
     adap.MakeInitialTriang();
-    //adap.set_marking_strategy( 0 );
     //
 
     // DROPS::LevelsetP2CL lset( mg, lsbnd, sf);

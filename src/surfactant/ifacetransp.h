@@ -2255,9 +2255,42 @@ class InterfaceP1RepairCL : public MGObserverCL
     IdxDescCL          fullp1idx_;
     VecDescCL          fullu_;
     std::unique_ptr<RepairP1CL<double, NoBndDataCL>::type > p1repair_;
+ double width_;
+  public:
+    InterfaceP1RepairCL (MultiGridCL& mg, const VecDescCL& lset_vd, const BndDataCL<>& lset_bnd,  VecDescCL& u, double width=0)
+        : mg_( mg), lset_vd_( lset_vd), lset_bnd_( lset_bnd), u_( u), fullp1idx_( P1_FE), fullu_( &fullp1idx_), width_(width) {}
+
+    void pre_refine  ();
+    void post_refine ();
+
+    void pre_refine_sequence  ();
+    void post_refine_sequence ();
+    const IdxDescCL* GetIdxDesc() const { return u_.RowIdx; }
+#ifdef _PAR
+    const VectorCL*  GetVector()  const { return &fullu_.Data; }
+    void swap( IdxDescCL& idx, VectorCL& v) { fullu_.RowIdx->swap(idx); fullu_.Data.swap(v); }
+#endif
+};
+
+/// \brief Observes the MultiGridCL-changes by AdapTriangCL to repair an interface p1-function.
+///
+/// The function is extended to a P1-function on \f$ \Omega \f$ and then repaired as such. In
+/// post_refine_sequence() the new interface-index is generated and the function is restricted
+/// to it.
+class NarrowBandP1RepairCL : public MGObserverCL
+{
+  private:
+    MultiGridCL& mg_;
+    const VecDescCL&   lset_vd_;
+    const BndDataCL<>& lset_bnd_;
+    VecDescCL&         u_;
+
+    IdxDescCL          fullp1idx_;
+    VecDescCL          fullu_;
+    std::unique_ptr<RepairP1CL<double, NoBndDataCL>::type > p1repair_;
 
   public:
-    InterfaceP1RepairCL (MultiGridCL& mg, const VecDescCL& lset_vd, const BndDataCL<>& lset_bnd, VecDescCL& u)
+    NarrowBandP1RepairCL (MultiGridCL& mg, const VecDescCL& lset_vd, const BndDataCL<>& lset_bnd, VecDescCL& u)
         : mg_( mg), lset_vd_( lset_vd), lset_bnd_( lset_bnd), u_( u), fullp1idx_( P1_FE), fullu_( &fullp1idx_) {}
 
     void pre_refine  ();
