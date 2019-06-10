@@ -130,8 +130,8 @@
       "nonlinear_term":      "none",
       "kinematic_viscosity": 1,
       "stab":                "normal",
-      "normal_penalty_pow":  -3,
-      "normal_penalty_fac":  0.1
+      "normal_penalty_pow":  -2,
+      "normal_penalty_fac":  1
     },
 
     "SurfTransp": {

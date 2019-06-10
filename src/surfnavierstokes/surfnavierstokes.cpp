@@ -1357,9 +1357,12 @@ int main (int argc, char* argv[]) {
 
             VectorCL vSolMinusV = vSol.Data - v.Data, pSolMinusP = pSol.Data - p.Data;
             auto velL2          = sqrt(dot(v.Data, M.Data * v.Data));
-            auto velNormalL2    = sqrt(dot(v.Data, S.Data * v.Data));
+            auto velL2err       = dot(vSolMinusV, M.Data * vSolMinusV);
+            auto velNormalL2    = dot(v.Data, S.Data * v.Data);
+            auto velTangenL2    = sqrt(velL2err - velNormalL2);
+            velL2err = sqrt(velL2err);
+            velNormalL2 = sqrt(velNormalL2);
             auto velH1err       = sqrt(dot(vSolMinusV, A.Data * vSolMinusV));
-            auto velL2err       = sqrt(dot(vSolMinusV, M.Data * vSolMinusV));
             auto preL2          = sqrt(dot(p.Data, Schur.Data * p.Data));
             auto preL2err       = sqrt(dot(pSolMinusP, Schur.Data * pSolMinusP));
 
@@ -1369,7 +1372,8 @@ int main (int argc, char* argv[]) {
             log << "The H1-Norm of v - vSol is: " << velH1err << '\n';
             log << "The L2-Norm of v * n is: " << velNormalL2 << '\n';
             log << "The L2-Norm of p - pSol is: " << preL2err << '\n';
-            log << "The L2-Norm of p  is: " << preL2;
+            log << "The L2-Norm of p  is: " << preL2 << '\n';
+            log << "The L2-Norm of v_T - vSol  is: " << velTangenL2;
         }
 
         log_solo.close();
