@@ -458,15 +458,16 @@ namespace ContactAngle{
 
     double ConstantAngle(const DROPS::Point3DCL&,double)
     {
-       double angle = P.get<double>("NavStokes.BoundaryData.SlipBnd.ContactAngle");
+        static double angle = P.get<double>("NavStokes.BoundaryData.SlipBnd.ContactAngle");
         return angle/180.0*M_PI;
     }
 
-    DROPS::Point3DCL OutNormalBrick(const DROPS::Point3DCL& pt,double)
+    DROPS::Point3DCL OutNormalBrick(const DROPS::Point3DCL& p,double)
     {
         //"hack": assume cartesian domain with e1=[a,0,0], e2=[0,b,0], ..
         static double dx, dy, dz;
         static bool first = true;
+        static DROPS::Point3DCL orig= P.get<DROPS::Point3DCL>("Mesh.Origin");
         if (first) {
             if (P.get<std::string>("Mesh.Type") != std::string("BrickBuilder"))
                  throw DROPS::DROPSErrCL("OutNormalBrick: only works for brick-shaped domain, please use other functions");
@@ -478,6 +479,7 @@ namespace ContactAngle{
         }
 
         const double EPS=1e-10;
+        const DROPS::Point3DCL pt= p - orig;
         DROPS::Point3DCL outnormal(0.0);
         if(std::fabs(pt[0])<EPS)
             outnormal[0]=-1.0;
