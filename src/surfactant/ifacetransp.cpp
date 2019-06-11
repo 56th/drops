@@ -340,10 +340,12 @@ class LocalStokesCL {
     GridFunctionCL<Point3DCL>
             qP2Normal,
             qExactOrP2Normal,
-            qrotP1[12], qvP1, qvProjP1, qProj[3];
+            qrotP1[12], qvP1, qvProjP1,
+            qProj[3]; // ith element is ith ROW of P
     GridFunctionCL<Point3DCL> qsurfP1grad[4], qsurfP2grad[10];
     GridFunctionCL<> qP1Hat[4], qP2Hat[10], qconvP1[4], qdivP1, qP2NormalComp[3], qvProjP1_comp[3], qvP1_comp[3];
-
+    GridFunctionCL<SMatrixCL<3,3>> qP; // projection
+    GridFunctionCL<SMatrixCL<3,3>> qP1E[12]; // surface stress tensor
 
     QuadDomain2DCL  q2Ddomain;
     std::valarray<double> ls_loc;
@@ -539,11 +541,30 @@ void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& l
     }
     // Apply pointwise projection to the 3 std basis vectors e_k
     for(int k=0; k<3 ;++k) {
-        qProj[k].resize( q2Ddomain.vertex_size());
-        Point3DCL e_k= DROPS::std_basis<3>( k+1);
-        qProj[k]= e_k;
+        qProj[k].resize(q2Ddomain.vertex_size());
+        Point3DCL e_k = DROPS::std_basis<3>( k+1);
+        qProj[k] = e_k;
         qProj[k]-= dot(e_k, qExactOrP2Normal)*qExactOrP2Normal;
     }
+    // compute projection
+    qP.resize(q2Ddomain.vertex_size());
+    qP = eye<3, 3>() - outer_product(qExactOrP2Normal, qExactOrP2Normal);
+    // compute surface stress tensor
+    auto qVectP1Grad = [&](size_t vecShapeIndex) {
+        GridFunctionCL<SMatrixCL<3,3>> res(SMatrixCL<3,3>(), q2Ddomain.vertex_size());
+        auto scaShapeIndex = vecShapeIndex / 3;
+        auto row = vecShapeIndex - 3 * scaShapeIndex;
+        for (size_t i = 0; i < res.size(); ++i) {
+            SMatrixCL<3, 3> mtx(0.);
+            mtx.col(row, P1Grad[scaShapeIndex]);
+            // mtx.col(row, P2Grad[scaShapeIndex][i]);
+            assign_transpose(res[i], mtx);
+        }
+        return res;
+    };
+    for (size_t vecShapeIndex = 0; vecShapeIndex < 12; ++vecShapeIndex)
+        // qP1E[vecShapeIndex].resize(q2Ddomain.vertex_size());
+        qP1E[vecShapeIndex] = qP * sym_part(qVectP1Grad(vecShapeIndex)) * qP;
 }
 
 // for convective term
@@ -690,11 +711,36 @@ void LocalStokesCL::setupA_P2 (double A_P2[30][30])
             }
         }
     }
+    for (int i = 0; i < 30; ++i) {
+        for (int j = 0; j < 30; ++j)
+            std::cout << A_P2[i][j] << ' ';
+        std::cout << '\n';
+    }
 }
 
 // TODO: Den Fall fullGrad testen!
 void LocalStokesCL::setupA_P1 (double A_P1[12][12])
 {
+
+    for (size_t i = 0; i < 12; ++i)
+        for (size_t j = 0; j < 12; ++j)
+            A_P1[i][j] = quad_2D(2. * contract(qP1E[j], qP1E[i]), q2Ddomain);
+
+
+
+
+    double trace = 0., atrace = 0.;
+    for (int i = 0; i < 12; ++i) {
+        for (int j = 0; j < 12; ++j) {
+            std::cout << A_P1[i][j] << ' ';
+            trace += A_P1[i][j];
+            atrace += std::fabs(A_P1[i][j]);
+        }
+        std::cout << '\n';
+    }
+    std::cout << "trace = " << trace << '\n';
+    std::cout << "abs trace = " << atrace << '\n';
+
     // Do all combinations for (i,j) i,j=30 x 30 and corresponding quadrature
     for (int i=0; i<4; ++i) {
         for (int j=0; j<4; ++j) {
@@ -703,7 +749,8 @@ void LocalStokesCL::setupA_P1 (double A_P1[12][12])
                 for (int l=0; l<3; ++l) {
                     Point3DCL e_l= DROPS::std_basis<3>( l+1);
                     if (!fullGrad) {
-                        A_P1[3*i+k][3*j+l]= quad_2D( dot(e_k, qsurfP1grad[j])*dot(e_l, qsurfP1grad[i]) + dot(qsurfP1grad[i], qsurfP1grad[j])*dot(qProj[k], qProj[l]), q2Ddomain);
+                        A_P1[3 * i + k][3 * j + l] =
+                                quad_2D(dot(e_k, qsurfP1grad[j]) * dot(e_l, qsurfP1grad[i]) + dot(qsurfP1grad[i], qsurfP1grad[j]) * dot(qProj[k], qProj[l]), q2Ddomain);
                     }
                     else {
                         if(k==l) {
@@ -717,6 +764,20 @@ void LocalStokesCL::setupA_P1 (double A_P1[12][12])
             }
         }
     }
+
+    trace = 0.;
+    atrace = 0.;
+    for (int i = 0; i < 12; ++i) {
+        for (int j = 0; j < 12; ++j) {
+            std::cout << A_P1[i][j] << ' ';
+            trace += A_P1[i][j];
+            atrace += std::fabs(A_P1[i][j]);
+        }
+        std::cout << '\n';
+    }
+    std::cout << "trace = " << trace << '\n';
+    std::cout << "abs trace = " << atrace << '\n';
+
 }
 
 // TODO: Den Fall fullGrad testen!

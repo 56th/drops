@@ -346,13 +346,30 @@ dot(const GridFunctionCL<SVectorCL<Dim> >& a, const GridFunctionCL<SVectorCL<Dim
 
 template<Uint D>
 inline GridFunctionCL<double>
-dot(const SVectorCL<D> & a, const GridFunctionCL<SVectorCL<D> >& b)
-{
+dot(const SVectorCL<D> & a, const GridFunctionCL<SVectorCL<D> >& b) {
     GridFunctionCL<double> ret( 0.0, b.size());
     for (size_t i= 0; i<b.size(); ++i)
         ret[i]= inner_prod( a, b[i]);
     return ret;
 }
+
+inline GridFunctionCL<double>
+contract(GridFunctionCL<SMatrixCL<3,3>> const & A, GridFunctionCL<SMatrixCL<3,3>> const & B) {
+    GridFunctionCL<double> res(0., A.size());
+    for (size_t i = 0; i < A.size(); ++i)
+        for (size_t j = 0; j < 9; ++j)
+            res[i] += A[i][j] * B[i][j];
+    return res;
+}
+
+//template<Uint D>
+//inline GridFunctionCL<SMatrixCL<D,D>>
+//outer_product(GridFunctionCL<SVectorCL<D>> const & u, GridFunctionCL<SVectorCL<D>> const & v) {
+//    GridFunctionCL<SMatrixCL<D,D>> ret(0., u.size());
+//    for (size_t i = 0; i < u.size(); ++i)
+//        ret[i] = outer_product(u[i], v[i]);
+//    return ret;
+//}
 
 template <Uint Rows, Uint Cols>
 inline GridFunctionCL<double>
@@ -408,6 +425,14 @@ outer_product(const GridFunctionCL<Point3DCL>& a, const GridFunctionCL<Point3DCL
     for (size_t i= 0; i<b.size(); ++i)
         ret[i]= outer_product( a[i], b[i]);
     return ret;
+}
+
+inline GridFunctionCL<SMatrixCL<3,3>>
+sym_part(GridFunctionCL<SMatrixCL<3,3>> const & m) {
+    GridFunctionCL<SMatrixCL<3,3>> m_s(SMatrixCL<3,3>(), m.size());
+    for (size_t i = 0; i < m.size(); ++i)
+        m_s[i] = sym_part(m[i]);
+    return m_s;
 }
 
 inline GridFunctionCL< SMatrixCL<3,3> >
