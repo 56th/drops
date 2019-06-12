@@ -2615,7 +2615,6 @@ void SlipBndSystem1TwoPhaseP2CL::setupCL_dissipation(const TetraCL& tet, LocalSy
     InterfaceLineCL line;
     line.Init( tet, Phi_,lsetBndData_); 
     line.SetBndCondT(tet, BndData_.Vel);
-    line.SetBndOutNormal(BndOutNormal_);
     LocalP2CL<double> phi[10]; 
     for(Uint i=0; i<10; ++i)
     {
@@ -2633,7 +2632,7 @@ void SlipBndSystem1TwoPhaseP2CL::setupCL_dissipation(const TetraCL& tet, LocalSy
             BaryCoordCL Barys[2]; //Barycentric coordinates of two end points
             Point3DCL Pt[2];      //Cartesian coordinates of two end points
             double length = line.GetInfoMCL(cl, Barys[0], Barys[1], Pt[0], Pt[1]);
-            Quad9_1DCL<Point3DCL> normal_MCL = line.GetImprovedMCLNormalOnSlipBnd(tet, cl);     //outer normal of moving contact lines on the slip surface
+            Quad9_1DCL<Point3DCL> normal_MCL = line.GetImprovedMCLNormalOnSlipBnd(tet, cl, BndOutNormal_);     //outer normal of moving contact lines on the slip surface
             for (Uint i=0; i<10; ++i)
             {
                 Quad9_1DCL<double> phiquadi(phi[i], Barys);
@@ -4435,7 +4434,7 @@ class ImprovedYoungForceAccumulatorCL : public  TetraAccumulatorCL
   public:
     ImprovedYoungForceAccumulatorCL( const LevelsetP2CL& ls, const BndDataCL<Point3DCL>& VelBndData, VecDescCL& f_Gamma, double sigma, instat_scalar_fun_ptr CtAngle, instat_vector_fun_ptr outnormal)
      :  SmPhi_(ls.Phi), lsetBndData_(ls.GetBndData()), VelBndData_(VelBndData), f(f_Gamma), sigma_(sigma),angle_(CtAngle), BndOutNormal_(outnormal)
-    { ls.MaybeSmooth( SmPhi_.Data);}
+    { ls.MaybeSmooth( SmPhi_.Data); }
 
     void begin_accumulation (){}
     void finalize_accumulation(){}
@@ -4447,16 +4446,16 @@ void ImprovedYoungForceAccumulatorCL::visit ( const TetraCL& t)
 {
     bool SpeBnd = false; //has slip or symmetry bounary segments
     //check if the tetra contains one face or one edge on slip or symmetric boundary.
-    for(Uint v=0; v<4; v++)
-        if(VelBndData_.IsOnSlipBnd(*t.GetFace(v)) || VelBndData_.IsOnSymmBnd(*t.GetFace(v)) )
+    for( auto face= t.GetFacesBegin(); face!=t.GetFacesEnd(); ++face) 
+        if(VelBndData_.IsOnSlipBnd(**face) || VelBndData_.IsOnSymmBnd(**face) || VelBndData_.IsOnNatBnd(**face) )
         {
             SpeBnd=true;
             break;
         }
     if(!SpeBnd)
     {
-        for(Uint v=0; v<6; v++)
-            if(VelBndData_.IsOnSlipBnd(*t.GetEdge(v)) || VelBndData_.IsOnSymmBnd(*t.GetEdge(v)) )
+        for( auto edge= t.GetEdgesBegin(); edge!=t.GetEdgesEnd(); ++edge)
+            if(VelBndData_.IsOnSlipBnd(**edge) || VelBndData_.IsOnSymmBnd(**edge) || VelBndData_.IsOnNatBnd(**edge) )
             {
                 SpeBnd=true;
                 break;
@@ -4471,7 +4470,6 @@ void ImprovedYoungForceAccumulatorCL::visit ( const TetraCL& t)
     //Initialize one interface patch
     line.Init( t, SmPhi_, lsetBndData_); 
     line.SetBndCondT(t, VelBndData_);       // required to find moving contact line.
-    line.SetBndOutNormal(BndOutNormal_);
     for (int v=0; v<10; ++v)
     {   const UnknownHandleCL& unk= v<4 ? t.GetVertex(v)->Unknowns : t.GetEdge(v-4)->Unknowns;
         Numb[v]= unk.Exist(idx_f) ? unk(idx_f) : NoIdx;
@@ -4491,23 +4489,29 @@ void ImprovedYoungForceAccumulatorCL::visit ( const TetraCL& t)
             BaryCoordCL Barys[2]; //Barycentric coordinates of two end points
             Point3DCL Pt[2];      //Cartesian coordinates of two end points
             double length = line.GetInfoMCL(i,Barys[0],Barys[1],Pt[0], Pt[1]);
-            Quad9_1DCL<double> EquilibriumCtAngle(t, Barys, angle_);   
-            Quad9_1DCL<double> DynamicCtAngle = line.GetDynamicCtAngle(t, i);
-            Quad9_1DCL<double> costheta_e, sintheta_d;
-            //Note apply member function in GridFunctionCL requires template argument. 
-            for(int j=0; j< Quad9_1DDataCL::NumNodesC; j++){
-                costheta_e[j] = line.IsSymmType(i) ? 0 : std:: cos(EquilibriumCtAngle[j]);
-                sintheta_d[j] = line.IsSymmType(i) ? 1 : std:: sin(DynamicCtAngle[j]);
-            }
-            Quad9_1DCL<Point3DCL> normal_MCL = line.GetImprovedMCLNormalOnSlipBnd(t, i);     //outer normal of moving contact lines on the slip surface
-            Quad9_1DCL<Point3DCL> normal_SlipBnd(t, Barys, BndOutNormal_);                      //outer normal of the slip boundary
+            const Quad9_1DCL<Point3DCL> normal_Bnd(t, Barys, BndOutNormal_);             // outer normal of the boundary
+            Quad9_1DCL<Point3DCL> functional;
+            const BndCondInfoCL& bc= line.GetBC(i);
+            if (bc.IsSlip()) {
+                const Quad9_1DCL<> EquilibriumCtAngle(t, Barys, angle_),
+                    DynamicCtAngle = line.GetDynamicCtAngle(t, i, BndOutNormal_),
+                    costheta_e= Quad9_1DCL<>( std::cos(EquilibriumCtAngle)), 
+                    sintheta_d= Quad9_1DCL<>( std::sin(DynamicCtAngle));
+                const Quad9_1DCL<Point3DCL> normal_MCL = line.GetImprovedMCLNormalOnSlipBnd(t, i, BndOutNormal_); // outer normal of moving contact lines on the slip surface
+                functional= normal_MCL * costheta_e + normal_Bnd * sintheta_d; // cos (theta_e) n_cl + sin (theta_D) \dot n
+            } else if (bc.IsSymmetric())
+                functional= normal_Bnd;
+            else if (bc.IsNatural())
+                functional= line.GetImprovedMCLTangential(t, i, BndOutNormal_);
+            else 
+                throw DROPSErrCL("ImprovedYoungForceAccumulatorCL::visit: illegal boundary condition");
             for (int v=0; v<10; ++v)
             {
                 Quad9_1DCL<double> phiquadv(phi[v], Barys);
                 const IdxT Numbv= v<10 ? Numb[v] : (velXfem && Numb[v-10]!=NoIdx ? f.RowIdx->GetXidx()[Numb[v-10]] : NoIdx);
                 if (Numbv==NoIdx) continue;
-                // cos (theta_e) v \dot tau_cl + sin (theta_D) v \dot n
-                Point3DCL value = Quad9_1DCL<Point3DCL>(normal_MCL * costheta_e * phiquadv + normal_SlipBnd * sintheta_d * phiquadv ).quad(0.5*length); 
+                
+                Point3DCL value = Quad9_1DCL<Point3DCL>(functional * phiquadv ).quad(0.5*length); 
                 for (int j=0; j<3; ++j)
                     f.Data[Numbv+j] += sigma_*value[j];
             }
