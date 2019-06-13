@@ -392,6 +392,7 @@ class LocalStokesCL {
     void setupB_P2P2 (double B_P2P2[10][30]);
     void setupB_P2P1 (double B_P2P1[10][12]);
     void setupM_P2 (double M_P2[10][10]);
+    void setupM_P2_explicit (double M_P2[30][30]);
     void setupM_P1 (double M_P1[4][4]);
     void setupS_P2 (double S_P2[30][30]);
     void setupS_P1 (double S_P1[12][12]);
@@ -926,12 +927,29 @@ void LocalStokesCL::setupB_P2P1 (double B_P2P1[10][12])
     }
 }
 
-void LocalStokesCL::setupM_P2 (double M_P2[10][10])
-{
-    // Do all combinations for (i,j) i,j=4 x 30 and corresponding quadrature
-    for (int i=0; i < 10; ++i) {
-        for (int j=0; j<10; ++j) {
-             M_P2[i][j]= quad_2D( qP2Hat[i]*qP2Hat[j], q2Ddomain);
+void LocalStokesCL::setupM_P2 (double M_P2[10][10]) {
+     //Do all combinations for (i,j) i,j=4 x 30 and corresponding quadrature
+        for (int i=0; i < 10; ++i) {
+            for (int j=0; j<10; ++j) {
+                 M_P2[i][j] = quad_2D( qP2Hat[i]*qP2Hat[j], q2Ddomain);
+            }
+        }
+}
+
+void LocalStokesCL::setupM_P2_explicit(double M_P2[30][30]) {
+    for (size_t i = 0; i < 30; ++i) {
+        auto is = i / 3; // scalar shape index
+        auto in = i - 3 * is; // nonzero vect component
+        auto e_in = DROPS::std_basis<3>(in + 1);
+        for (size_t j = i; j < 30; ++j) {
+            auto js = j / 3; // scalar shape index
+            auto jn = j - 3 * js; // nonzero vect component
+            M_P2[i][j] = (in == jn)
+                    ? (formulation == "consistent")
+                        ? quad_2D(dot(e_in, qProj[jn]) * qP2Hat[js] * qP2Hat[is], q2Ddomain)
+                        : quad_2D(qP2Hat[js] * qP2Hat[is], q2Ddomain)
+                    : 0.;
+            M_P2[j][i] = M_P2[i][j];
         }
     }
 }
@@ -1819,7 +1837,7 @@ class StokesIFAccumulator_P2P1CL : public TetraAccumulatorCL
     MatrixCL &A_P2_, &A_P2_stab_, &B_P1P2_, &M_P2_, &S_P2_, &M_ScalarP1_, &M_ScalarP1_stab_, &A_ScalarP1_stab_;
     MatrixBuilderCL *mA_P2_, *mA_P2_stab_, *mB_P1P2_, *mM_P2_, *mS_P2_, *mM_ScalarP1_, *mM_ScalarP1_stab_, *mA_ScalarP1_stab_;
 
-    double locA_P2[30][30], locA_P2_stab[10][10], locB_P1P2[4][30], locM_P2[10][10], locS_P2[30][30], locM_ScalarP1[4][4], locM_ScalarP1_stab[4][4], locA_ScalarP1_stab[4][4];
+    double locA_P2[30][30], locA_P2_stab[10][10], locB_P1P2[4][30], locM_P2[30][30], locS_P2[30][30], locM_ScalarP1[4][4], locM_ScalarP1_stab[4][4], locA_ScalarP1_stab[4][4];
 
     LocalStokesCL localStokes_;
 
@@ -1903,7 +1921,7 @@ void StokesIFAccumulator_P2P1CL::local_setup (const TetraCL& tet)
     localStokes_.setupA_P2( locA_P2);
     localStokes_.setupA_P2_stab( locA_P2_stab, absdet);
     localStokes_.setupB_P1P2( locB_P1P2);
-    localStokes_.setupM_P2( locM_P2);
+    localStokes_.setupM_P2_explicit( locM_P2);
     localStokes_.setupS_P2( locS_P2);
     localStokes_.setupM_P1( locM_ScalarP1);
     localStokes_.setupA_P1_stab(locA_ScalarP1_stab, absdet);
@@ -1929,9 +1947,10 @@ void StokesIFAccumulator_P2P1CL::update_global_system() {
             for (int k=0; k<3; ++k) {
                 for (int l=0; l<3; ++l) {
                     mA_P2( ii+k, jj+l) += locA_P2[3*j+l][3*i+k];
+                    mM_P2( ii+k, jj+l) += locM_P2[3*j+l][3*i+k];
                     mS_P2( ii+k, jj+l) += locS_P2[3*j+l][3*i+k];
                     if(k == l) {
-                        mM_P2( ii+k, jj+l) += locM_P2[j][i];
+                        // mM_P2( ii+k, jj+l) += locM_P2[j][i];
                         mA_P2_stab( ii+k, jj+l) += locA_P2_stab[j][i];
                     } else {
                         mM_P2( ii+k, jj+l) += 0.;
