@@ -23,7 +23,7 @@
             "Freq":          0,
             "Width":         0,
             "CoarsestLevel": 0,
-            "FinestLevel":   1,
+            "FinestLevel":   4,
             "SD":            0.1,
             "CurvDiff":      -1,
             "Discontinuous": 0
@@ -101,7 +101,7 @@
             "Tol":		     1e-10,
             "Iter":		     500
         },
-        "NumbOfVirtualSubEdges" : 2,
+        "NumbOfVirtualSubEdges" : 4,
         "UseExactNormals" : "yes",
         "ShiftNormRel":	0.0,
  	    "ShiftDir":	[1, 1, 1]
@@ -125,7 +125,7 @@
       "FE":                  "P2P1",
       "fullgrad":            0,
       "model":               "NavierStokes",
-      "testcase":            "8",
+      "testcase":            "85",
       "instationary":        "none",
       "nonlinear_term":      "none",
       "kinematic_viscosity": 1,

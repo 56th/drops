@@ -535,6 +535,19 @@ int main (int argc, char* argv[]) {
         	InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
         	SetupInterfaceRhsP1(mg, &rhs2, lset.Phi, lset.GetBndData(), extrhs2);
         }
+        else if( !testcase.compare("85")) {
+            std::cout << "Test case 85 with vSol = P normal_ext ( [-z^2, y, x]^T ), pSol = (x*y^3/(x^2+y^2+z^2)^2+z/(x^2+y^2+z^2)^(1/2)); " << std::endl;
+            extvsol = &Test_A_plus_M_vSolVectorFun85;
+            extsol_grad1 = &Test_A_plus_M_vSolVectorFun85_Gradient1;
+            extsol_grad2 = &Test_A_plus_M_vSolVectorFun85_Gradient2;
+            extsol_grad3 = &Test_A_plus_M_vSolVectorFun85_Gradient3;
+            extpsol = &Test_A_plus_M_pSolScalarFun85;
+            extrhs = &Test_A_plus_M_RhsVectorFun85;
+            extrhs2 = &Test_A_plus_M_rhs2Fun85;
+            InitVector(mg, vInit, &Test_A_plus_M_vSolVectorFun85);
+            InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
+            SetupInterfaceRhsP1(mg, &rhs2, lset.Phi, lset.GetBndData(), extrhs2);
+        }
         else if( !testcase.compare("9")) {
         	std::cout << "Test case 9 with vSol = n x grad(y*z), pSol = (x*y^3/(x^2+y^2+z^2)^2+z/(x^2+y^2+z^2)^(1/2)); " << std::endl;
         	extvsol = &Test_A_plus_M_vSolVectorFun9;

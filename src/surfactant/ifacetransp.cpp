@@ -725,9 +725,11 @@ void LocalStokesCL::setupA_P2_explicit (double A_P2[30][30]) {
     for (size_t i = 0; i < 30; ++i) {
         auto is = i / 3; // scalar shape index
         auto in = i - 3 * is; // nonzero vect component
+        // std::cout << is << ' ' << in << '\n';
         for (size_t j = i; j < 30; ++j) {
             auto js = j / 3; // scalar shape index
             auto jn = j - 3 * js; // nonzero vect component
+            // std::cout << "  " << js << ' ' << jn << '\n';
             A_P2[i][j] = 2. * quad_2D(contract(qP2E[j] - (qP2Hat[js] * qExactOrP2NormalComp[jn]) * qHess, qP2E[i] - (qP2Hat[is] * qExactOrP2NormalComp[in]) * qHess), q2Ddomain);
             A_P2[j][i] = A_P2[i][j];
         }
