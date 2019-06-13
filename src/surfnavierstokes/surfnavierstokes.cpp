@@ -167,6 +167,7 @@ int main (int argc, char* argv[]) {
     double tau = P.get<double>("Time.StepSize");
     ParameterNS::nu = P.get<double>("SurfNavStokes.kinematic_viscosity");
 
+    auto formulation     = P.get<std::string>("SurfNavStokes.formulation");
     double eta_order     = P.get<double>("SurfNavStokes.normal_penalty_pow");
     double eta_factor    = P.get<double>("SurfNavStokes.normal_penalty_fac");
     double epsilon_order = 1.0;
@@ -297,7 +298,7 @@ int main (int argc, char* argv[]) {
         Schur.SetIdx(&ifaceP1idx, &ifaceP1idx);
         Schur_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
         Schur_normal_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
-        SetupStokesIF_P2P1(mg, &A, &A_stab, &B, &M, &S, &Schur, &Schur_stab, &Schur_normal_stab, lset, fullgrad);
+        SetupStokesIF_P2P1(mg, &A, &A_stab, &B, &M, &S, &Schur, &Schur_stab, &Schur_normal_stab, lset, fullgrad, formulation);
     } else if( !FE.compare("P1P1")) {
         A.SetIdx( &ifaceVecP1idx, &ifaceVecP1idx);
         A_stab.SetIdx( &ifaceVecP1idx, &ifaceVecP1idx);
@@ -1210,7 +1211,7 @@ int main (int argc, char* argv[]) {
             if (lset.useExactNormals) normalsName += "exact";
             else normalsName += "P2";
 
-        	std::ofstream log( dirname +"/"+ filename   + "time="+std::to_string(1) + "_m=" + std::to_string(lset.numbOfVirtualSubEdges) + "_" + FE + normalsName + shiftName + ".txt");
+        	std::ofstream log( dirname +"/"+ filename   + "time="+std::to_string(1) + "_m=" + std::to_string(lset.numbOfVirtualSubEdges) + "_" + FE + normalsName + shiftName + "_form=" + formulation + ".txt");
 
         	if (  ( P.get<std::string>("SurfNavStokes.nonlinear_term") == "convective" )
         	   || ( P.get<std::string>("SurfNavStokes.nonlinear_term") == "rotational" )

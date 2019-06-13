@@ -23,7 +23,7 @@
             "Freq":          0,
             "Width":         0,
             "CoarsestLevel": 0,
-            "FinestLevel":   4,
+            "FinestLevel":   1,
             "SD":            0.1,
             "CurvDiff":      -1,
             "Discontinuous": 0
@@ -101,7 +101,7 @@
             "Tol":		     1e-10,
             "Iter":		     500
         },
-        "NumbOfVirtualSubEdges" : 4,
+        "NumbOfVirtualSubEdges" : 2,
         "UseExactNormals" : "yes",
         "ShiftNormRel":	0.0,
  	    "ShiftDir":	[1, 1, 1]
@@ -131,7 +131,8 @@
       "kinematic_viscosity": 1,
       "stab":                "normal",
       "normal_penalty_pow":  -2,
-      "normal_penalty_fac":  1
+      "normal_penalty_fac":  1,
+      "formulation":         "consistent"
     },
 
     "SurfTransp": {

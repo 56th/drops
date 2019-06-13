@@ -262,6 +262,21 @@ operator*(const SMatrixCL<D,D>& A, const GridFunctionCL<SVectorCL<D> >& b)
     return ret;
 }
 
+inline SMatrixCL<3,3>&
+operator/=(SMatrixCL<3,3>& A, const GridFunctionCL<double>& b) {
+    for (size_t i = 0; i < A.size(); ++i)
+            A[i] /= b[i];
+    return A;
+}
+
+inline GridFunctionCL<double>
+sqrt(const GridFunctionCL<double>& a) {
+    auto ret = a;
+    for (size_t i = 0; i < a.size(); ++i)
+        ret[i] = std::sqrt(a[i]);
+    return ret;
+}
+
 template<Uint D>
 inline GridFunctionCL<SVectorCL<D> >
 operator*(const GridFunctionCL<double>& a, const GridFunctionCL<SVectorCL<D> >& b)
@@ -279,12 +294,21 @@ operator*=(GridFunctionCL<SVectorCL<D> >& a, double b)
 }
 
 template<Uint D>
-inline GridFunctionCL<SVectorCL<D> >
+inline GridFunctionCL<SVectorCL<D>>
 operator*( double a, const GridFunctionCL<SVectorCL<D> >& b)
 {
 
     GridFunctionCL<SVectorCL<D> > ret( b);
     return ret*= a;
+}
+
+template<Uint D>
+inline GridFunctionCL<SVectorCL<D>>
+operator/(GridFunctionCL<SVectorCL<D>> const & a, GridFunctionCL<double> const & b) {
+    GridFunctionCL<SVectorCL<D>> ret(a);
+    for (size_t i = 0; i < a.size(); ++i)
+        ret[i] /= b[i];
+    return ret;
 }
 
 template<Uint D>
@@ -336,11 +360,10 @@ transp_mul (const GridFunctionCL< SMatrixCL<Rows, Cols> >& a, const GridFunction
 
 template <Uint Dim>
 inline GridFunctionCL<double>
-dot(const GridFunctionCL<SVectorCL<Dim> >& a, const GridFunctionCL<SVectorCL<Dim> >& b)
-{
+dot(const GridFunctionCL<SVectorCL<Dim> >& a, const GridFunctionCL<SVectorCL<Dim> >& b) {
     GridFunctionCL<double> ret( 0.0, a.size());
     for (size_t i= 0; i<a.size(); ++i)
-        ret[i]= inner_prod( a[i], b[i]);
+        ret[i] = inner_prod(a[i], b[i]);
     return ret;
 }
 
@@ -359,6 +382,30 @@ contract(GridFunctionCL<SMatrixCL<3,3>> const & A, GridFunctionCL<SMatrixCL<3,3>
     for (size_t i = 0; i < A.size(); ++i)
         for (size_t j = 0; j < 9; ++j)
             res[i] += A[i][j] * B[i][j];
+    return res;
+}
+
+inline GridFunctionCL<SMatrixCL<3,3>>
+operator-(GridFunctionCL<SMatrixCL<3,3>> const & A, GridFunctionCL<SMatrixCL<3,3>> const & B) {
+    auto res = A;
+    for (size_t i = 0; i < A.size(); ++i)
+        res[i] -= B[i];
+    return res;
+}
+
+inline GridFunctionCL<SMatrixCL<3,3>>
+operator/(GridFunctionCL<SMatrixCL<3,3>> const & A, GridFunctionCL<double> const & a) {
+    GridFunctionCL<SMatrixCL<3,3>> res(SMatrixCL<3,3>(), A.size());
+    for (size_t i = 0; i < A.size(); ++i)
+        res[i] = A[i] / a[i];
+    return res;
+}
+
+inline GridFunctionCL<SMatrixCL<3,3>>
+operator*(std::valarray<double> const & a, GridFunctionCL<SMatrixCL<3,3>> const & A) {
+    auto res = A;
+    for (size_t i = 0; i < A.size(); ++i)
+        res[i] = a[i] * A[i];
     return res;
 }
 

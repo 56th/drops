@@ -335,6 +335,7 @@ class LocalStokesCL {
     LocalP1CL<> P1Hat[4];
     LocalP2CL<> P2Hat[10];
     LocalP1CL<Point3DCL> P2GradRef[10], P2Grad[10];
+    SMatrixCL<3,3> P2Hess[10];
     Point3DCL P1Grad[4];
 
     GridFunctionCL<Point3DCL>
@@ -342,11 +343,12 @@ class LocalStokesCL {
             qExactOrP2Normal,
             qrotP1[12], qvP1, qvProjP1,
             qProj[3]; // ith element is ith ROW of P
-    GridFunctionCL<Point3DCL> qP1grad[4], qSurfP1grad[4], qP2grad[10], qSurfP2grad[10];
-    GridFunctionCL<> qP1Hat[4], qP2Hat[10], qconvP1[4], qdivP1, qP2NormalComp[3], qvProjP1_comp[3], qvP1_comp[3];
+    GridFunctionCL<Point3DCL> qLsGrad, qP1grad[4], qSurfP1grad[4], qP2grad[10], qSurfP2grad[10];
+    GridFunctionCL<> qP1Hat[4], qP2Hat[10], qLsGradNorms, qLsGradNormsSq, qconvP1[4], qdivP1, qP2NormalComp[3], qExactOrP2NormalComp[3], qvProjP1_comp[3], qvP1_comp[3];
     GridFunctionCL<SMatrixCL<3,3>> qP; // projection
     GridFunctionCL<SMatrixCL<3,3>> qP1E[12]; // surface rate-of-strain stress tensor, qP1E[i] = $E_s(\phi_i)$, $\phi_i$ = ith vector (velocity) shape func
     GridFunctionCL<SMatrixCL<3,3>> qP2E[30];
+    GridFunctionCL<SMatrixCL<3,3>> qLsHess, qHess;
 
     QuadDomain2DCL  q2Ddomain;
     std::valarray<double> ls_loc;
@@ -356,13 +358,16 @@ class LocalStokesCL {
     GridFunctionCL<Point3DCL> q3Dnormal, q3DexactNormal, q3DP2Grad[10];
     GridFunctionCL<Point3DCL> q3DP1Grad[4], q2DP1Grad[4];
 
+    std::string formulation;
     bool fullGrad;
 
-    void Get_Normals(const LocalP2CL<>& ls, LocalP1CL<Point3DCL>&);
+    LocalP1CL<Point3DCL> getLevelsetGrad(LocalP2CL<> const &);
+    SMatrixCL<3, 3>      getLevelsetHess(LocalP2CL<> const &);
 
   public:
-    LocalStokesCL(bool fullGradient, size_t n = 2, bool uen = false)
+    LocalStokesCL(bool fullGradient, size_t n = 2, bool uen = false, std::string const & f = "inconsistent")
         : lat(PrincipalLatticeCL::instance(n))
+        , formulation(f)
         , ls_loc(lat.vertex_size())
         , fullGrad(fullGradient)
         , useExactNormals(uen) {
@@ -414,16 +419,23 @@ DROPS::Point3DCL Normal_sphere2 (const DROPS::Point3DCL& p, double)
 }
 
 // The P2 levelset-function is used to compute the normals which are needed for the (improved) projection onto the interface, GradLP1 has to be set before
-void LocalStokesCL::Get_Normals(const LocalP2CL<>& ls, LocalP1CL<Point3DCL>& Normals) {
-    for(int i=0; i<10 ; ++i)
-        Normals+=ls[i]*P2Grad[i];
+LocalP1CL<Point3DCL> LocalStokesCL::getLevelsetGrad(const LocalP2CL<>& ls) {
+    LocalP1CL<Point3DCL> res;
+    for(size_t i = 0; i < 10 ; ++i)
+        res += ls[i] * P2Grad[i];
+    return res;
+}
+
+SMatrixCL<3,3> LocalStokesCL::getLevelsetHess(const LocalP2CL<>& ls) {
+    SMatrixCL<3,3> res;
+    for(size_t i = 0; i < 10 ; ++i)
+        res += ls[i] * P2Hess[i];
+    return res;
 }
 
 void LocalStokesCL::calc3DIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const TetraCL& tet) {
     make_SimpleQuadDomain<Quad5DataCL> (q3Ddomain, AllTetraC);
-    LocalP1CL<Point3DCL> Normals;
-    Get_Normals(ls, Normals);
-
+    auto Normals = getLevelsetGrad(ls);
     resize_and_evaluate_on_vertexes (Normals, q3Ddomain, q3Dnormal);
     // Scale Normals accordingly to the Euclidean Norm (only consider the ones which make a contribution in the sense of them being big enough... otherwise one has to expect problems with division through small numbers)
     for(Uint i=0; i<q3Dnormal.size(); ++i)
@@ -487,19 +499,38 @@ void LocalStokesCL::exportPatchInfo(std::string const & path, const SMatrixCL<3,
 
 void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const TetraCL& tet) {
     P2DiscCL::GetGradients(P2Grad, P2GradRef, T);
+    P2DiscCL::GetHessians(P2Hess, T);
     P1DiscCL::GetGradients(P1Grad, T);
     evaluate_on_vertexes(ls, lat, Addr(ls_loc));
     spatch.make_patch<MergeCutPolicyCL>(lat, ls_loc);
     // The routine takes the information about the tetrahedra and the cutting surface and generates a two-dimensional triangulation of the cut, including the necessary point-positions and weights for the quadrature
     make_CompositeQuad5Domain2D(q2Ddomain, spatch, tet);
-    LocalP1CL<Point3DCL> Normals;
-    Get_Normals(ls, Normals);
-    // Resize and evaluate Normals at all points which are needed for the two-dimensional quadrature-rule
-    resize_and_evaluate_on_vertexes(Normals, q2Ddomain, qP2Normal);
-    // Scale Normals accordingly to the Euclidean Norm (only consider the ones which make a contribution in the sense of them being big enough... otherwise one has to expect problems with division through small numbers)
-    for(Uint i=0; i<qP2Normal.size(); ++i) {
-        qP2Normal[i]= qP2Normal[i]/qP2Normal[i].norm();
-    }
+// THIS CODE MAY BE HANDY LATER!!!
+//    std::cout << "numb of quad nodes: " << q2Ddomain.vertex_size() << '\n';
+//    std::cout << "barycentric:\n";
+//    for (auto v = q2Ddomain.vertex_begin(); v != q2Ddomain.vertex_end(); ++v) {
+//        std::cout << (*v) << '\n';
+//    }
+//    SPatchCL<3>::WorldVertexContT world_quad_nodes;
+//    world_quad_nodes.reserve(q2Ddomain.vertex_size());
+//    SPatchCL<3>::VertexToWorldVertexMapperT mapper(tet);
+//    std::transform(q2Ddomain.vertex_begin(), q2Ddomain.vertex_end(), std::back_inserter<SPatchCL<3>::WorldVertexContT>(world_quad_nodes), mapper);
+//    std::cout << "world:\n";
+//    for (auto v = world_quad_nodes.begin(); v != world_quad_nodes.end(); ++v) {
+//        std::cout << (*v) << '\n';
+//    }
+//    std::cout << '\n';
+// DO NOT DELETE
+    // compute normal
+    resize_and_evaluate_on_vertexes(getLevelsetGrad(ls), q2Ddomain, qLsGrad);
+    qLsGradNormsSq = dot(qLsGrad, qLsGrad);
+    qLsGradNorms   = sqrt(qLsGradNormsSq);
+    qP2Normal      = qLsGrad / qLsGradNorms;
+//    std::vector<double> qP2lsGradNorms(qP2Normal.size());
+//    for(Uint i = 0; i < qP2Normal.size(); ++i) { // Scale Normals accordingly to the Euclidean Norm (only consider the ones which make a contribution in the sense of them being big enough... otherwise one has to expect problems with division through small numbers)
+//        qP2lsGradNorms[i] = qP2Normal[i].norm();
+//        qP2Normal[i] = qP2Normal[i] / qP2lsGradNorms[i];
+//    }
     qExactOrP2Normal = qP2Normal;
     if (useExactNormals) {
         size_t numbOfQuadPoints = qP2Normal.size() / spatch.facet_size();
@@ -518,10 +549,16 @@ void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& l
 //            stdout << v << '\n';
 //        std::cout << stdout.str();
     }
+    // compute shape matrix
+    qLsHess.resize(q2Ddomain.vertex_size());
+    qLsHess = getLevelsetHess(ls);
+    qHess = (eye<3, 3>() - outer_product(qLsGrad, qLsGrad) / qLsGradNormsSq) * (qLsHess / qLsGradNorms);
     // Provide all components of the normals
-    for (int k=0; k<3; ++k) {
-        qP2NormalComp[k].resize( q2Ddomain.vertex_size());
-        ExtractComponent( qP2Normal, qP2NormalComp[k], k);
+    for (int k = 0; k < 3; ++k) {
+        qP2NormalComp[k].resize(q2Ddomain.vertex_size());
+        ExtractComponent(qP2Normal, qP2NormalComp[k], k);
+        qExactOrP2NormalComp[k].resize(q2Ddomain.vertex_size());
+        ExtractComponent(qExactOrP2Normal, qExactOrP2NormalComp[k], k);
     }
     // Resize and evaluate P2 basis functions
     for(int j=0; j<10 ;++j) {
@@ -544,7 +581,6 @@ void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& l
         qProj[k]-= dot(e_k, qExactOrP2Normal)*qExactOrP2Normal;
     }
     // compute projection
-    qP.resize(q2Ddomain.vertex_size());
     qP = eye<3, 3>() - outer_product(qExactOrP2Normal, qExactOrP2Normal);
     // compute surface stress tensor
     auto qVectGrad = [&](size_t vecShapeIndex, GridFunctionCL<Point3DCL>* P1OrP2grad) {
@@ -558,8 +594,8 @@ void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& l
         }
         return res;
     };
-    for (size_t vecShapeIndex = 0; vecShapeIndex < 12; ++vecShapeIndex)
-        qP1E[vecShapeIndex] = qP * sym_part(qVectGrad(vecShapeIndex, qP1grad)) * qP;
+//    for (size_t vecShapeIndex = 0; vecShapeIndex < 12; ++vecShapeIndex)
+//        qP1E[vecShapeIndex] = qP * sym_part(qVectGrad(vecShapeIndex, qP1grad)) * qP;
     for (size_t vecShapeIndex = 0; vecShapeIndex < 30; ++vecShapeIndex)
         qP2E[vecShapeIndex] = qP * sym_part(qVectGrad(vecShapeIndex, qP2grad)) * qP;
 }
@@ -684,26 +720,37 @@ void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& l
 
 void LocalStokesCL::setupA_P2_explicit (double A_P2[30][30]) {
     if (fullGrad) throw std::invalid_argument("fullgrad opt is not implemented for stiffnes mtx");
-    for (size_t i = 0; i < 30; ++i)
+//    std::cout << "\n\n" << qHess[0] << "\n\n";
+//    std::cout << qP[0] << "\n\n";
+    for (size_t i = 0; i < 30; ++i) {
+        auto is = i / 3; // scalar shape index
+        auto in = i - 3 * is; // nonzero vect component
         for (size_t j = i; j < 30; ++j) {
-            A_P2[i][j] = 2. * quad_2D(contract(qP2E[j], qP2E[i]), q2Ddomain);
+            auto js = j / 3; // scalar shape index
+            auto jn = j - 3 * js; // nonzero vect component
+            A_P2[i][j] = 2. * quad_2D(contract(qP2E[j] - (qP2Hat[js] * qExactOrP2NormalComp[jn]) * qHess, qP2E[i] - (qP2Hat[is] * qExactOrP2NormalComp[in]) * qHess), q2Ddomain);
             A_P2[j][i] = A_P2[i][j];
         }
-    double sum = 0., abs_sum = 0.;
-    for (int i = 0; i < 30; ++i) {
-        for (int j = 0; j < 30; ++j) {
-            std::cout << A_P2[i][j] << ' ';
-            sum += A_P2[i][j];
-            abs_sum += std::fabs(A_P2[i][j]);
-        }
-        std::cout << '\n';
     }
-    std::cout << "sum = " << sum << '\n';
-    std::cout << "abs sum = " << abs_sum << '\n';
+//    double sum = 0., abs_sum = 0.;
+//    for (int i = 0; i < 30; ++i) {
+//        for (int j = 0; j < 30; ++j) {
+//            std::cout << A_P2[i][j] << ' ';
+//            sum += A_P2[i][j];
+//            abs_sum += std::fabs(A_P2[i][j]);
+//        }
+//        std::cout << '\n';
+//    }
+//    std::cout << "sum = " << sum << '\n';
+//    std::cout << "abs sum = " << abs_sum << '\n';
 }
 
 // TODO: Den Fall fullGrad testen!
 void LocalStokesCL::setupA_P2 (double A_P2[30][30]) {
+    if (formulation == "consistent") {
+        setupA_P2_explicit(A_P2);
+        return;
+    }
     // Do all combinations for (i,j) i,j=30 x 30 and corresponding quadrature
     for (int i=0; i < 10; ++i) {
         for (int j=0; j<10; ++j) {
@@ -726,19 +773,18 @@ void LocalStokesCL::setupA_P2 (double A_P2[30][30]) {
             }
         }
     }
-    double sum = 0., abs_sum = 0.;
-    for (int i = 0; i < 30; ++i) {
-        for (int j = 0; j < 30; ++j) {
-            std::cout << A_P2[i][j] << ' ';
-            sum += A_P2[i][j];
-            abs_sum += std::fabs(A_P2[i][j]);
-        }
-        std::cout << '\n';
-    }
-    std::cout << "sum = " << sum << '\n';
-    std::cout << "abs sum = " << abs_sum << '\n';
-    setupA_P2_explicit(A_P2);
-    exit(0);
+//    double sum = 0., abs_sum = 0.;
+//    for (int i = 0; i < 30; ++i) {
+//        for (int j = 0; j < 30; ++j) {
+//            std::cout << A_P2[i][j] << ' ';
+//            sum += A_P2[i][j];
+//            abs_sum += std::fabs(A_P2[i][j]);
+//        }
+//        std::cout << '\n';
+//    }
+//    std::cout << "sum = " << sum << '\n';
+//    std::cout << "abs sum = " << abs_sum << '\n';
+//    exit(0);
 }
 
 // TODO: Den Fall fullGrad testen!
@@ -1785,8 +1831,8 @@ class StokesIFAccumulator_P2P1CL : public TetraAccumulatorCL
     void update_global_system ();
 
 public:
-    StokesIFAccumulator_P2P1CL(const LevelsetP2CL& ls, IdxDescCL& P2FE, IdxDescCL& ScalarP1FE, MatrixCL& A_P2, MatrixCL& A_P2_stab, MatrixCL& B_P1P2, MatrixCL& M_P2, MatrixCL& S_P2, MatrixCL& M_ScalarP1, MatrixCL& M_ScalarP1_stab, MatrixCL& A_ScalarP1_stab, bool fullGradient)
-    : lset(ls.Phi), lset_bnd(ls.GetBndData()), P2Idx_(P2FE), ScalarP1Idx_(ScalarP1FE), A_P2_(A_P2), A_P2_stab_(A_P2_stab), B_P1P2_(B_P1P2), M_P2_(M_P2), S_P2_(S_P2), M_ScalarP1_(M_ScalarP1), M_ScalarP1_stab_(M_ScalarP1_stab), A_ScalarP1_stab_(A_ScalarP1_stab), localStokes_(fullGradient, ls.numbOfVirtualSubEdges, ls.useExactNormals)
+    StokesIFAccumulator_P2P1CL(const LevelsetP2CL& ls, IdxDescCL& P2FE, IdxDescCL& ScalarP1FE, MatrixCL& A_P2, MatrixCL& A_P2_stab, MatrixCL& B_P1P2, MatrixCL& M_P2, MatrixCL& S_P2, MatrixCL& M_ScalarP1, MatrixCL& M_ScalarP1_stab, MatrixCL& A_ScalarP1_stab, bool fullGradient, std::string const & formulation)
+    : lset(ls.Phi), lset_bnd(ls.GetBndData()), P2Idx_(P2FE), ScalarP1Idx_(ScalarP1FE), A_P2_(A_P2), A_P2_stab_(A_P2_stab), B_P1P2_(B_P1P2), M_P2_(M_P2), S_P2_(S_P2), M_ScalarP1_(M_ScalarP1), M_ScalarP1_stab_(M_ScalarP1_stab), A_ScalarP1_stab_(A_ScalarP1_stab), localStokes_(fullGradient, ls.numbOfVirtualSubEdges, ls.useExactNormals, formulation)
     {}
 
     ///\brief Initializes matrix-builders and load-vectors
@@ -1923,10 +1969,11 @@ void SetupStokesIF_P2P1(
         MatDescCL* M_ScalarP1_stab, // full stab
         MatDescCL* A_ScalarP1_stab, // normal stab
         const LevelsetP2CL& lset,
-        bool fullgrad
+        bool fullgrad,
+        std::string const & formulation
 ) {
   ScopeTimerCL scope("SetupStokesIF_P2P1");
-  StokesIFAccumulator_P2P1CL accu(lset, *(A_P2->RowIdx), *(B_P1P2->RowIdx), A_P2->Data, A_P2_stab->Data, B_P1P2->Data, M_P2->Data, S_P2->Data, M_ScalarP1->Data, M_ScalarP1_stab->Data, A_ScalarP1_stab->Data, fullgrad);
+  StokesIFAccumulator_P2P1CL accu(lset, *(A_P2->RowIdx), *(B_P1P2->RowIdx), A_P2->Data, A_P2_stab->Data, B_P1P2->Data, M_P2->Data, S_P2->Data, M_ScalarP1->Data, M_ScalarP1_stab->Data, A_ScalarP1_stab->Data, fullgrad, formulation);
   TetraAccumulatorTupleCL accus;
   accus.push_back( &accu);
   accumulate( accus, MG_, A_P2->GetRowLevel(), A_P2->RowIdx->GetBndInfo());
@@ -3251,7 +3298,7 @@ class LocalCahnHilliardCL
     GridFunctionCL<Point3DCL> q3Dnormal;
     GridFunctionCL<Point3DCL> q3DP1Grad[4],q2DP1Grad[4];
 
-    void Get_Normals(const LocalP2CL<>& ls, LocalP1CL<Point3DCL>&);
+    void qP2ls(const LocalP2CL<>& ls, LocalP1CL<Point3DCL>&);
 
   public:
     LocalCahnHilliardCL ( )
@@ -3282,7 +3329,7 @@ void LocalCahnHilliardCL::calc3DIntegrands(const SMatrixCL<3,3>& T, const LocalP
 {
     make_SimpleQuadDomain<Quad5DataCL> (q3Ddomain, AllTetraC);
     LocalP1CL<Point3DCL> Normals;
-    Get_Normals(ls, Normals);
+    qP2ls(ls, Normals);
 
     resize_and_evaluate_on_vertexes (Normals, q3Ddomain, q3Dnormal);
 
@@ -3349,7 +3396,7 @@ void LocalCahnHilliardCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2C
     // The routine takes the information about the tetrahedra and the cutting surface and generates a two-dimensional triangulation of the cut, including the necessary point-positions and weights for the quadrature
     make_CompositeQuad5Domain2D ( q2Ddomain, spatch, tet);
     LocalP1CL<Point3DCL> Normals;
-    Get_Normals(ls, Normals);
+    qP2ls(ls, Normals);
 
     // Resize and evaluate Normals at all points which are needed for the two-dimensional quadrature-rule
     resize_and_evaluate_on_vertexes (Normals, q2Ddomain, qnormal);
@@ -3410,7 +3457,7 @@ void LocalCahnHilliardCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2C
 }
 
 // The P2 levelset-function is used to compute the normals which are needed for the (improved) projection onto the interface, GradLP1 has to be set before
-void LocalCahnHilliardCL::Get_Normals(const LocalP2CL<>& ls, LocalP1CL<Point3DCL>& Normals)
+void LocalCahnHilliardCL::qP2ls(const LocalP2CL<>& ls, LocalP1CL<Point3DCL>& Normals)
 {
     for(int i=0; i<10 ; ++i)
     {
