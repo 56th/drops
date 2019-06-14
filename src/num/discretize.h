@@ -385,8 +385,17 @@ contract(GridFunctionCL<SMatrixCL<3,3>> const & A, GridFunctionCL<SMatrixCL<3,3>
     return res;
 }
 
-inline GridFunctionCL<SMatrixCL<3,3>>
-operator-(GridFunctionCL<SMatrixCL<3,3>> const & A, GridFunctionCL<SMatrixCL<3,3>> const & B) {
+//inline GridFunctionCL<SMatrixCL<3,3>>
+//operator-(GridFunctionCL<SMatrixCL<3,3>> const & A, GridFunctionCL<SMatrixCL<3,3>> const & B) {
+//    auto res = A;
+//    for (size_t i = 0; i < A.size(); ++i)
+//        res[i] -= B[i];
+//    return res;
+//}
+
+template<typename T>
+inline GridFunctionCL<T>
+operator-(GridFunctionCL<T> const & A, GridFunctionCL<T> const & B) {
     auto res = A;
     for (size_t i = 0; i < A.size(); ++i)
         res[i] -= B[i];

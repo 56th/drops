@@ -88,9 +88,11 @@ int main (int argc, char* argv[]) {
 
     // choose level set
     instat_scalar_fun_ptr levelset_fun;
+    instat_vector_fun_ptr exact_normal;
     std::string levelset_fun_str = P.get<std::string>("Levelset.case");
     if( !levelset_fun_str.compare("sphere_2")) {
         levelset_fun = &sphere_2;
+        exact_normal = &sphere_2_normal;
         std::cout << "The levelset is the unit sphere." << std::endl;
     } else if( !levelset_fun_str.compare("xy_plane")) {
         levelset_fun = &xy_plane;
@@ -284,7 +286,9 @@ int main (int argc, char* argv[]) {
     // setup matrices
     DROPS::MatDescCL A, A_stab, B, Omega, N, NT, M,D, S, L, L_stab, Schur, Schur_stab, Schur_normal_stab;
     MatrixCL Schur_hat;
-
+    std::tuple<instat_vector_fun_ptr, double, double> normalErrors = { exact_normal, 0., 0. };
+    auto& normP2Err = std::get<1>(normalErrors);
+    auto& normExErr = std::get<2>(normalErrors);
     if( !FE.compare("P2P1")) {
         A.SetIdx( &ifaceVecP2idx, &ifaceVecP2idx);
         A_stab.SetIdx( &ifaceVecP2idx, &ifaceVecP2idx);
@@ -298,7 +302,7 @@ int main (int argc, char* argv[]) {
         Schur.SetIdx(&ifaceP1idx, &ifaceP1idx);
         Schur_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
         Schur_normal_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
-        SetupStokesIF_P2P1(mg, &A, &A_stab, &B, &M, &S, &Schur, &Schur_stab, &Schur_normal_stab, lset, fullgrad, formulation);
+        SetupStokesIF_P2P1(mg, &A, &A_stab, &B, &M, &S, &Schur, &Schur_stab, &Schur_normal_stab, lset, fullgrad, formulation, normalErrors);
     } else if( !FE.compare("P1P1")) {
         A.SetIdx( &ifaceVecP1idx, &ifaceVecP1idx);
         A_stab.SetIdx( &ifaceVecP1idx, &ifaceVecP1idx);
@@ -1387,7 +1391,9 @@ int main (int argc, char* argv[]) {
             log << "The L2-Norm of v * n is: " << velNormalL2 << '\n';
             log << "The L2-Norm of p - pSol is: " << preL2err << '\n';
             log << "The L2-Norm of p  is: " << preL2 << '\n';
-            log << "The L2-Norm of v_T - vSol  is: " << velTangenL2;
+            log << "The L2-Norm of v_T - vSol  is: " << velTangenL2 << '\n';
+            log << "P2 normal L2 error is: " << sqrt(normP2Err) << '\n';
+            log << "Exact normal L2 error is: " << sqrt(normExErr) << '\n';
         }
 
         log_solo.close();

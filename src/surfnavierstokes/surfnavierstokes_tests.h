@@ -568,7 +568,8 @@ void TestAllP2MatricesWithP1Matrices(const MultiGridCL& MG, LevelsetP2CL& lset, 
     Schur_P2_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
     Schur_P2_normal_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
 
-    SetupStokesIF_P2P1(MG, &A_P2, &A_P2_stab, &B_P1P2, &M_P2, &S_P2, &Schur_P2, &Schur_P2_stab, &Schur_P2_normal_stab, lset, fullgrad, "inconsistent");
+    std::tuple<instat_vector_fun_ptr, double, double> normalErrors = { nullptr, 0., 0. };
+    SetupStokesIF_P2P1(MG, &A_P2, &A_P2_stab, &B_P1P2, &M_P2, &S_P2, &Schur_P2, &Schur_P2_stab, &Schur_P2_normal_stab, lset, fullgrad, "inconsistent", normalErrors);
 
     DROPS::VecDescCL a, b, c, a_P2, b_P2;
     a.SetIdx( &ifaceVecP1idx);

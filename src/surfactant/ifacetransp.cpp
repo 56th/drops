@@ -328,6 +328,10 @@ void SetupInterfaceRhsP1 (const MultiGridCL& mg, VecDescCL* v,
 
 /// SetupStokes
 /// \brief Setup of the local Stokes system on a tetra intersected by the dividing surface.
+// using VectFun = std::function<Point3DCL(const Point3DCL&, double)>;
+
+std::tuple<instat_vector_fun_ptr, double, double> DummyNormalErrs = { nullptr, 0., 0.};
+
 class LocalStokesCL {
   private:
     bool useExactNormals;
@@ -339,8 +343,9 @@ class LocalStokesCL {
     Point3DCL P1Grad[4];
 
     GridFunctionCL<Point3DCL>
-            qP2Normal,
-            qExactOrP2Normal,
+            qP2Normal, // normal computed from P2 interpolant
+            qExactOrP2Normal, // either normal computed from P2 interpolant, or normals exact to patch of integration
+            qAnalyticNormal, // exact normal to exact surface
             qrotP1[12], qvP1, qvProjP1,
             qProj[3]; // ith element is ith ROW of P
     GridFunctionCL<Point3DCL> qLsGrad, qP1grad[4], qSurfP1grad[4], qP2grad[10], qSurfP2grad[10];
@@ -355,22 +360,28 @@ class LocalStokesCL {
     SurfacePatchCL spatch;
 
     QuadDomainCL q3Ddomain;
-    GridFunctionCL<Point3DCL> q3Dnormal, q3DexactNormal, q3DP2Grad[10];
+    GridFunctionCL<Point3DCL> q3Dnormal, q3DP2Grad[10];
     GridFunctionCL<Point3DCL> q3DP1Grad[4], q2DP1Grad[4];
 
     std::string formulation;
     bool fullGrad;
 
+    instat_vector_fun_ptr normAnalytic;
+
     LocalP1CL<Point3DCL> getLevelsetGrad(LocalP2CL<> const &);
     SMatrixCL<3, 3>      getLevelsetHess(LocalP2CL<> const &);
 
+    std::tuple<instat_vector_fun_ptr, double, double>& normalErrors;
+
   public:
-    LocalStokesCL(bool fullGradient, size_t n = 2, bool uen = false, std::string const & f = "inconsistent")
+    LocalStokesCL(bool fullGradient, size_t n = 2, bool uen = false, std::string const & f = "inconsistent", std::tuple<instat_vector_fun_ptr, double, double>& nE = DummyNormalErrs)
         : lat(PrincipalLatticeCL::instance(n))
+        , normalErrors(nE)
         , formulation(f)
         , ls_loc(lat.vertex_size())
         , fullGrad(fullGradient)
         , useExactNormals(uen) {
+        normAnalytic = std::get<0>(normalErrors);
         P1DiscCL::GetP1Basis(P1Hat);
         P2DiscCL::GetP2Basis(P2Hat);
         P2DiscCL::GetGradientsOnRef(P2GradRef);
@@ -412,13 +423,6 @@ class LocalStokesCL {
     void setupM_P1_stab (double M_P1_stab[4][4], double absdet);
 };
 
-DROPS::Point3DCL Normal_sphere2 (const DROPS::Point3DCL& p, double)
-{
-    DROPS::Point3DCL v(p[0]/(std::sqrt(p[0]*p[0]+p[1]*p[1]+p[2]*p[2])),p[1]/(std::sqrt(p[0]*p[0]+p[1]*p[1]+p[2]*p[2])),p[2]/(std::sqrt(p[0]*p[0]+p[1]*p[1]+p[2]*p[2])));
-    //DROPS::Point3DCL w(p[0], 0., 0.);
-    return v;
-}
-
 // The P2 levelset-function is used to compute the normals which are needed for the (improved) projection onto the interface, GradLP1 has to be set before
 LocalP1CL<Point3DCL> LocalStokesCL::getLevelsetGrad(const LocalP2CL<>& ls) {
     LocalP1CL<Point3DCL> res;
@@ -441,9 +445,6 @@ void LocalStokesCL::calc3DIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>&
     // Scale Normals accordingly to the Euclidean Norm (only consider the ones which make a contribution in the sense of them being big enough... otherwise one has to expect problems with division through small numbers)
     for(Uint i=0; i<q3Dnormal.size(); ++i)
          q3Dnormal[i]= q3Dnormal[i]/q3Dnormal[i].norm();
-
-    resize_and_evaluate_on_vertexes (&Normal_sphere2, tet, q3Ddomain, 0., q3DexactNormal);
-
     for(int j=0; j<10; ++j) {
         resize_and_evaluate_on_vertexes(P2Grad[j], q3Ddomain, q3DP2Grad[j]);
     }
@@ -533,6 +534,7 @@ void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& l
 //        qP2Normal[i] = qP2Normal[i] / qP2lsGradNorms[i];
 //    }
     qExactOrP2Normal = qP2Normal;
+    if (normAnalytic != nullptr) resize_and_evaluate_on_vertexes(normAnalytic, tet, q2Ddomain, 0., qAnalyticNormal);
     if (useExactNormals) {
         size_t numbOfQuadPoints = qP2Normal.size() / spatch.facet_size();
 //        std::stringstream stdout;
@@ -541,15 +543,31 @@ void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& l
         std::vector<Point3DCL> qExactNormalInit;
         qExactNormalInit.reserve(numbOfQuadPoints * spatch.facet_size());
         spatch.compute_normals(tet);
+        auto sgn = [](double val) {
+            return (0. < val) - (val < 0.);
+        };
         for (auto n = spatch.normal_begin(); n != spatch.normal_end(); ++n)
-            for (size_t i = 0; i < numbOfQuadPoints; ++i)
-                qExactNormalInit.emplace_back(*n);
+            for (size_t i = 0; i < numbOfQuadPoints; ++i) {
+                auto s = sgn(inner_prod(*n, qP2Normal[i]));
+                qExactNormalInit.emplace_back(s * (*n));
+            }
         qExactOrP2Normal.resize(qExactNormalInit.size());
         std::copy(qExactNormalInit.begin(), qExactNormalInit.end(), begin(qExactOrP2Normal));
 //        for (auto const & v : qExactOrP2Normal)
 //            stdout << v << '\n';
 //        std::cout << stdout.str();
+
+        // GridFunctionCL<double> n1(q2Ddomain.vertex_size());
+        // ExtractComponent(qExactOrP2Normal, n1, 0);
+        std::get<2>(normalErrors) += quad_2D(dot(qAnalyticNormal - qExactOrP2Normal, qAnalyticNormal - qExactOrP2Normal), q2Ddomain);
+        // std::get<2>(normalErrors) += quad_2D(n1 * n1, q2Ddomain);
     }
+    // GridFunctionCL<double> n2(q2Ddomain.vertex_size());
+    // ExtractComponent(qP2Normal, n2, 0);
+    std::get<1>(normalErrors) += quad_2D(dot(qAnalyticNormal - qP2Normal, qAnalyticNormal - qP2Normal), q2Ddomain);
+    // std::get<1>(normalErrors) += quad_2D(n2 * n2, q2Ddomain);
+
+
     // compute shape matrix
     qLsHess.resize(q2Ddomain.vertex_size());
     qLsHess = getLevelsetHess(ls);
@@ -1837,7 +1855,7 @@ class StokesIFAccumulator_P2P1CL : public TetraAccumulatorCL
     MatrixCL &A_P2_, &A_P2_stab_, &B_P1P2_, &M_P2_, &S_P2_, &M_ScalarP1_, &M_ScalarP1_stab_, &A_ScalarP1_stab_;
     MatrixBuilderCL *mA_P2_, *mA_P2_stab_, *mB_P1P2_, *mM_P2_, *mS_P2_, *mM_ScalarP1_, *mM_ScalarP1_stab_, *mA_ScalarP1_stab_;
 
-    double locA_P2[30][30], locA_P2_stab[10][10], locB_P1P2[4][30], locM_P2[30][30], locS_P2[30][30], locM_ScalarP1[4][4], locM_ScalarP1_stab[4][4], locA_ScalarP1_stab[4][4];
+    double locA_P2[30][30], locA_P2_stab[10][10], locB_P1P2[4][30], locM_P2[10][10], locS_P2[30][30], locM_ScalarP1[4][4], locM_ScalarP1_stab[4][4], locA_ScalarP1_stab[4][4];
 
     LocalStokesCL localStokes_;
 
@@ -1851,8 +1869,8 @@ class StokesIFAccumulator_P2P1CL : public TetraAccumulatorCL
     void update_global_system ();
 
 public:
-    StokesIFAccumulator_P2P1CL(const LevelsetP2CL& ls, IdxDescCL& P2FE, IdxDescCL& ScalarP1FE, MatrixCL& A_P2, MatrixCL& A_P2_stab, MatrixCL& B_P1P2, MatrixCL& M_P2, MatrixCL& S_P2, MatrixCL& M_ScalarP1, MatrixCL& M_ScalarP1_stab, MatrixCL& A_ScalarP1_stab, bool fullGradient, std::string const & formulation)
-    : lset(ls.Phi), lset_bnd(ls.GetBndData()), P2Idx_(P2FE), ScalarP1Idx_(ScalarP1FE), A_P2_(A_P2), A_P2_stab_(A_P2_stab), B_P1P2_(B_P1P2), M_P2_(M_P2), S_P2_(S_P2), M_ScalarP1_(M_ScalarP1), M_ScalarP1_stab_(M_ScalarP1_stab), A_ScalarP1_stab_(A_ScalarP1_stab), localStokes_(fullGradient, ls.numbOfVirtualSubEdges, ls.useExactNormals, formulation)
+    StokesIFAccumulator_P2P1CL(const LevelsetP2CL& ls, IdxDescCL& P2FE, IdxDescCL& ScalarP1FE, MatrixCL& A_P2, MatrixCL& A_P2_stab, MatrixCL& B_P1P2, MatrixCL& M_P2, MatrixCL& S_P2, MatrixCL& M_ScalarP1, MatrixCL& M_ScalarP1_stab, MatrixCL& A_ScalarP1_stab, bool fullGradient, std::string const & formulation, std::tuple<instat_vector_fun_ptr, double, double>& normalErrors)
+    : lset(ls.Phi), lset_bnd(ls.GetBndData()), P2Idx_(P2FE), ScalarP1Idx_(ScalarP1FE), A_P2_(A_P2), A_P2_stab_(A_P2_stab), B_P1P2_(B_P1P2), M_P2_(M_P2), S_P2_(S_P2), M_ScalarP1_(M_ScalarP1), M_ScalarP1_stab_(M_ScalarP1_stab), A_ScalarP1_stab_(A_ScalarP1_stab), localStokes_(fullGradient, ls.numbOfVirtualSubEdges, ls.useExactNormals, formulation, normalErrors)
     {}
 
     ///\brief Initializes matrix-builders and load-vectors
@@ -1916,12 +1934,15 @@ void StokesIFAccumulator_P2P1CL::local_setup (const TetraCL& tet)
     absdet= std::fabs( det);
     GetLocalNumbP2NoBnd( numP2, tet, P2Idx_);
     GetLocalNumbP1NoBnd( numScalarP1, tet, ScalarP1Idx_);
+
+    // localStokes_.exportPatchInfo("../../../MKL-Eigs-for-Sparse-Matrices/output/patch/hOver" + std::to_string(localStokes_.num_intervals()), T, ls_loc, tet);
+
     localStokes_.calcIntegrands( T, ls_loc, tet);
     localStokes_.calc3DIntegrands(T, ls_loc, tet);
     localStokes_.setupA_P2( locA_P2);
     localStokes_.setupA_P2_stab( locA_P2_stab, absdet);
     localStokes_.setupB_P1P2( locB_P1P2);
-    localStokes_.setupM_P2_explicit( locM_P2);
+    localStokes_.setupM_P2( locM_P2);
     localStokes_.setupS_P2( locS_P2);
     localStokes_.setupM_P1( locM_ScalarP1);
     localStokes_.setupA_P1_stab(locA_ScalarP1_stab, absdet);
@@ -1947,10 +1968,10 @@ void StokesIFAccumulator_P2P1CL::update_global_system() {
             for (int k=0; k<3; ++k) {
                 for (int l=0; l<3; ++l) {
                     mA_P2( ii+k, jj+l) += locA_P2[3*j+l][3*i+k];
-                    mM_P2( ii+k, jj+l) += locM_P2[3*j+l][3*i+k];
+                    // mM_P2( ii+k, jj+l) += locM_P2[3*j+l][3*i+k];
                     mS_P2( ii+k, jj+l) += locS_P2[3*j+l][3*i+k];
                     if(k == l) {
-                        // mM_P2( ii+k, jj+l) += locM_P2[j][i];
+                        mM_P2( ii+k, jj+l) += locM_P2[j][i];
                         mA_P2_stab( ii+k, jj+l) += locA_P2_stab[j][i];
                     } else {
                         mM_P2( ii+k, jj+l) += 0.;
@@ -1991,10 +2012,11 @@ void SetupStokesIF_P2P1(
         MatDescCL* A_ScalarP1_stab, // normal stab
         const LevelsetP2CL& lset,
         bool fullgrad,
-        std::string const & formulation
+        std::string const & formulation,
+        std::tuple<instat_vector_fun_ptr, double, double>& normalErrors
 ) {
   ScopeTimerCL scope("SetupStokesIF_P2P1");
-  StokesIFAccumulator_P2P1CL accu(lset, *(A_P2->RowIdx), *(B_P1P2->RowIdx), A_P2->Data, A_P2_stab->Data, B_P1P2->Data, M_P2->Data, S_P2->Data, M_ScalarP1->Data, M_ScalarP1_stab->Data, A_ScalarP1_stab->Data, fullgrad, formulation);
+  StokesIFAccumulator_P2P1CL accu(lset, *(A_P2->RowIdx), *(B_P1P2->RowIdx), A_P2->Data, A_P2_stab->Data, B_P1P2->Data, M_P2->Data, S_P2->Data, M_ScalarP1->Data, M_ScalarP1_stab->Data, A_ScalarP1_stab->Data, fullgrad, formulation, normalErrors);
   TetraAccumulatorTupleCL accus;
   accus.push_back( &accu);
   accumulate( accus, MG_, A_P2->GetRowLevel(), A_P2->RowIdx->GetBndInfo());

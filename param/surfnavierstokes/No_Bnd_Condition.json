@@ -131,7 +131,7 @@
       "kinematic_viscosity": 1,
       "stab":                "normal",
       "normal_penalty_pow":  -2,
-      "normal_penalty_fac":  10,
+      "normal_penalty_fac":  1,
       "formulation":         "consistent"
     },
 

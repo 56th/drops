@@ -72,6 +72,13 @@ double sphere_2 (const DROPS::Point3DCL& p, double)
     return pow(p[0] - sphere_2_shift[0], 2.) + pow(p[1] - sphere_2_shift[1], 2.) + pow(p[2] - sphere_2_shift[2], 2.) - 1.;
 }
 
+DROPS::Point3DCL sphere_2_normal (const DROPS::Point3DCL& p, double)
+{
+    DROPS::Point3DCL v(p[0]/(std::sqrt(p[0]*p[0]+p[1]*p[1]+p[2]*p[2])),p[1]/(std::sqrt(p[0]*p[0]+p[1]*p[1]+p[2]*p[2])),p[2]/(std::sqrt(p[0]*p[0]+p[1]*p[1]+p[2]*p[2])));
+    //DROPS::Point3DCL w(p[0], 0., 0.);
+    return v;
+}
+
 double tamarind (const DROPS::Point3DCL& p, double)
 {
 //    DROPS::Point3DCL x( p - P.get<DROPS::Point3DCL>("Exp.PosDrop"));
