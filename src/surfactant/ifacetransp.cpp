@@ -344,6 +344,7 @@ class LocalStokesCL {
 
     GridFunctionCL<Point3DCL>
             qP2Normal, // normal computed from P2 interpolant
+            qExactNormal, // normals exact to patch of integration
             qExactOrP2Normal, // either normal computed from P2 interpolant, or normals exact to patch of integration
             qAnalyticNormal, // exact normal to exact surface
             qrotP1[12], qvP1, qvProjP1,
@@ -528,46 +529,24 @@ void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& l
     qLsGradNormsSq = dot(qLsGrad, qLsGrad);
     qLsGradNorms   = sqrt(qLsGradNormsSq);
     qP2Normal      = qLsGrad / qLsGradNorms;
-//    std::vector<double> qP2lsGradNorms(qP2Normal.size());
-//    for(Uint i = 0; i < qP2Normal.size(); ++i) { // Scale Normals accordingly to the Euclidean Norm (only consider the ones which make a contribution in the sense of them being big enough... otherwise one has to expect problems with division through small numbers)
-//        qP2lsGradNorms[i] = qP2Normal[i].norm();
-//        qP2Normal[i] = qP2Normal[i] / qP2lsGradNorms[i];
-//    }
-    qExactOrP2Normal = qP2Normal;
     if (normAnalytic != nullptr) resize_and_evaluate_on_vertexes(normAnalytic, tet, q2Ddomain, 0., qAnalyticNormal);
-    if (useExactNormals) {
-        size_t numbOfQuadPoints = qP2Normal.size() / spatch.facet_size();
-//        std::stringstream stdout;
-//        stdout << "tet id: " << tet.GetId().GetIdent() << '\n';
-//        stdout << "numb of quad points: " << numbOfQuadPoints << '\n';
-        std::vector<Point3DCL> qExactNormalInit;
-        qExactNormalInit.reserve(numbOfQuadPoints * spatch.facet_size());
-        spatch.compute_normals(tet);
-        auto sgn = [](double val) {
+    size_t numbOfQuadPoints = qP2Normal.size() / spatch.facet_size();
+    std::vector<Point3DCL> qExactNormalInit;
+    qExactNormalInit.reserve(numbOfQuadPoints * spatch.facet_size());
+    spatch.compute_normals(tet);
+    auto sgn = [](double val) {
             return (0. < val) - (val < 0.);
-        };
-        for (auto n = spatch.normal_begin(); n != spatch.normal_end(); ++n)
-            for (size_t i = 0; i < numbOfQuadPoints; ++i) {
-                auto s = sgn(inner_prod(*n, qP2Normal[i]));
-                qExactNormalInit.emplace_back(s * (*n));
-            }
-        qExactOrP2Normal.resize(qExactNormalInit.size());
-        std::copy(qExactNormalInit.begin(), qExactNormalInit.end(), begin(qExactOrP2Normal));
-//        for (auto const & v : qExactOrP2Normal)
-//            stdout << v << '\n';
-//        std::cout << stdout.str();
-
-        // GridFunctionCL<double> n1(q2Ddomain.vertex_size());
-        // ExtractComponent(qExactOrP2Normal, n1, 0);
-        std::get<2>(normalErrors) += quad_2D(dot(qAnalyticNormal - qExactOrP2Normal, qAnalyticNormal - qExactOrP2Normal), q2Ddomain);
-        // std::get<2>(normalErrors) += quad_2D(n1 * n1, q2Ddomain);
-    }
-    // GridFunctionCL<double> n2(q2Ddomain.vertex_size());
-    // ExtractComponent(qP2Normal, n2, 0);
-    std::get<1>(normalErrors) += quad_2D(dot(qAnalyticNormal - qP2Normal, qAnalyticNormal - qP2Normal), q2Ddomain);
-    // std::get<1>(normalErrors) += quad_2D(n2 * n2, q2Ddomain);
-
-
+    };
+    for (auto n = spatch.normal_begin(); n != spatch.normal_end(); ++n)
+        for (size_t i = 0; i < numbOfQuadPoints; ++i) {
+            auto s = sgn(inner_prod(*n, qP2Normal[i]));
+            qExactNormalInit.emplace_back(s * (*n));
+        }
+    qExactNormal.resize(qExactNormalInit.size());
+    std::copy(qExactNormalInit.begin(), qExactNormalInit.end(), begin(qExactNormal));
+    qExactOrP2Normal = useExactNormals ? qExactNormal : qP2Normal;
+    std::get<2>(normalErrors) += quad_2D(dot(qAnalyticNormal - qExactNormal, qAnalyticNormal - qExactNormal), q2Ddomain);
+    std::get<1>(normalErrors) += quad_2D(dot(qAnalyticNormal - qP2Normal   , qAnalyticNormal - qP2Normal),    q2Ddomain);
     // compute shape matrix
     qLsHess.resize(q2Ddomain.vertex_size());
     qLsHess = getLevelsetHess(ls);
