@@ -350,11 +350,10 @@ class LocalStokesCL {
             qrotP1[12], qvP1, qvProjP1,
             qProj[3]; // ith element is ith ROW of P
     GridFunctionCL<Point3DCL> qLsGrad, qP1grad[4], qSurfP1grad[4], qP2grad[10], qSurfP2grad[10];
-    GridFunctionCL<> qP1Hat[4], qP2Hat[10], qLsGradNorms, qLsGradNormsSq, qconvP1[4], qdivP1, qP2NormalComp[3], qExactOrP2NormalComp[3], qvProjP1_comp[3], qvP1_comp[3];
+    GridFunctionCL<> qP1Hat[4], qP2Hat[10], qLsGradNorm, qconvP1[4], qdivP1, qP2NormalComp[3], qExactOrP2NormalComp[3], qvProjP1_comp[3], qvP1_comp[3];
     GridFunctionCL<SMatrixCL<3,3>> qP; // projection
-    GridFunctionCL<SMatrixCL<3,3>> qP1E[12]; // surface rate-of-strain stress tensor, qP1E[i] = $E_s(\phi_i)$, $\phi_i$ = ith vector (velocity) shape func
-    GridFunctionCL<SMatrixCL<3,3>> qP2E[30];
-    GridFunctionCL<SMatrixCL<3,3>> qLsHess, qHess;
+    GridFunctionCL<SMatrixCL<3,3>> qP2E[30]; // surface rate-of-strain stress tensor, qP1E[i] = $E_s(\phi_i)$, $\phi_i$ = ith vector (velocity) shape func
+    GridFunctionCL<SMatrixCL<3,3>> qHess;
 
     QuadDomain2DCL  q2Ddomain;
     std::valarray<double> ls_loc;
@@ -449,7 +448,6 @@ void LocalStokesCL::calc3DIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>&
     for(int j=0; j<10; ++j) {
         resize_and_evaluate_on_vertexes(P2Grad[j], q3Ddomain, q3DP2Grad[j]);
     }
-
     for(int j=0; j<4; ++j) {
         q3DP1Grad[j].resize( q3Ddomain.vertex_size());
         q3DP1Grad[j]= P1Grad[j];
@@ -526,31 +524,30 @@ void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& l
 // DO NOT DELETE
     // compute normal
     resize_and_evaluate_on_vertexes(getLevelsetGrad(ls), q2Ddomain, qLsGrad);
-    qLsGradNormsSq = dot(qLsGrad, qLsGrad);
-    qLsGradNorms   = sqrt(qLsGradNormsSq);
-    qP2Normal      = qLsGrad / qLsGradNorms;
+    qLsGradNorm   = sqrt(dot(qLsGrad, qLsGrad));
+    qP2Normal      = qLsGrad / qLsGradNorm;
     if (normAnalytic != nullptr) resize_and_evaluate_on_vertexes(normAnalytic, tet, q2Ddomain, 0., qAnalyticNormal);
     size_t numbOfQuadPoints = qP2Normal.size() / spatch.facet_size();
     std::vector<Point3DCL> qExactNormalInit;
     qExactNormalInit.reserve(numbOfQuadPoints * spatch.facet_size());
     spatch.compute_normals(tet);
-    auto sgn = [](double val) {
-            return (0. < val) - (val < 0.);
-    };
-    for (auto n = spatch.normal_begin(); n != spatch.normal_end(); ++n)
-        for (size_t i = 0; i < numbOfQuadPoints; ++i) {
-            auto s = sgn(inner_prod(*n, qP2Normal[i]));
-            qExactNormalInit.emplace_back(s * (*n));
-        }
+    auto sgn = [](double val) { return (0. < val) - (val < 0.); };
+    for (auto n = spatch.normal_begin(); n != spatch.normal_end(); ++n) {
+        auto normal = sgn(inner_prod(*n, qP2Normal[0])) * (*n);
+        for (size_t i = 0; i < numbOfQuadPoints; ++i) qExactNormalInit.emplace_back(normal);
+    }
     qExactNormal.resize(qExactNormalInit.size());
     std::copy(qExactNormalInit.begin(), qExactNormalInit.end(), begin(qExactNormal));
     qExactOrP2Normal = useExactNormals ? qExactNormal : qP2Normal;
     std::get<2>(normalErrors) += quad_2D(dot(qAnalyticNormal - qExactNormal, qAnalyticNormal - qExactNormal), q2Ddomain);
     std::get<1>(normalErrors) += quad_2D(dot(qAnalyticNormal - qP2Normal   , qAnalyticNormal - qP2Normal),    q2Ddomain);
-    // compute shape matrix
-    qLsHess.resize(q2Ddomain.vertex_size());
-    qLsHess = getLevelsetHess(ls);
-    qHess = (eye<3, 3>() - outer_product(qLsGrad, qLsGrad) / qLsGradNormsSq) * (qLsHess / qLsGradNorms);
+    // compute projector and shape matrix
+    qP.resize(q2Ddomain.vertex_size());
+    qP = eye<3, 3>() - outer_product(qP2Normal, qP2Normal);
+    qHess.resize(q2Ddomain.vertex_size());
+    qHess = getLevelsetHess(ls);
+    qHess = qP * (qHess / qLsGradNorm) * qP;
+    if (useExactNormals) qP = eye<3, 3>() - outer_product(qExactOrP2Normal, qExactOrP2Normal);
     // Provide all components of the normals
     for (int k = 0; k < 3; ++k) {
         qP2NormalComp[k].resize(q2Ddomain.vertex_size());
@@ -562,7 +559,7 @@ void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& l
     for(int j=0; j<10 ;++j) {
         resize_and_evaluate_on_vertexes(P2Hat[j], q2Ddomain, qP2Hat[j]);
         resize_and_evaluate_on_vertexes(P2Grad[j], q2Ddomain, qP2grad[j]);
-        qSurfP2grad[j] = qP2grad[j] - dot( qP2grad[j], qExactOrP2Normal)*qExactOrP2Normal;
+        qSurfP2grad[j] = qP2grad[j] - dot(qP2grad[j], qExactOrP2Normal)*qExactOrP2Normal;
     }
     // Resize and evaluate of all the 4 P1 Gradient Functions and apply pointwise projections   (P grad \xi_j  for j=1..4)
     for(int j=0; j<4 ;++j) {
@@ -572,14 +569,13 @@ void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& l
         qSurfP1grad[j] = qP1grad[j] - dot(qP1grad[j], qExactOrP2Normal)*qExactOrP2Normal;
     }
     // Apply pointwise projection to the 3 std basis vectors e_k
+    if (formulation != "consistent")
     for(int k=0; k<3 ;++k) {
         qProj[k].resize(q2Ddomain.vertex_size());
         Point3DCL e_k = DROPS::std_basis<3>( k+1);
         qProj[k] = e_k;
         qProj[k]-= dot(e_k, qExactOrP2Normal)*qExactOrP2Normal;
     }
-    // compute projection
-    qP = eye<3, 3>() - outer_product(qExactOrP2Normal, qExactOrP2Normal);
     // compute surface stress tensor
     auto qVectGrad = [&](size_t vecShapeIndex, GridFunctionCL<Point3DCL>* P1OrP2grad) {
         GridFunctionCL<SMatrixCL<3,3>> res(SMatrixCL<3,3>(), q2Ddomain.vertex_size());
@@ -592,8 +588,6 @@ void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& l
         }
         return res;
     };
-//    for (size_t vecShapeIndex = 0; vecShapeIndex < 12; ++vecShapeIndex)
-//        qP1E[vecShapeIndex] = qP * sym_part(qVectGrad(vecShapeIndex, qP1grad)) * qP;
     for (size_t vecShapeIndex = 0; vecShapeIndex < 30; ++vecShapeIndex)
         qP2E[vecShapeIndex] = qP * sym_part(qVectGrad(vecShapeIndex, qP2grad)) * qP;
 }
