@@ -169,15 +169,18 @@ int main (int argc, char* argv[]) {
     double tau = P.get<double>("Time.StepSize");
     ParameterNS::nu = P.get<double>("SurfNavStokes.kinematic_viscosity");
 
-    auto formulation     = P.get<std::string>("SurfNavStokes.formulation");
-    double eta_order     = P.get<double>("SurfNavStokes.normal_penalty_pow");
-    double eta_factor    = P.get<double>("SurfNavStokes.normal_penalty_fac");
-    double epsilon_order = 1.0;
-    double alpha_order   = 1.0;
-    double eta 		     = eta_factor * pow(h, eta_order); // constant for tangential penalty
-    double epsilon       = 1.e0  * pow(h, epsilon_order); // constant for velocity stabilisation
-    double alpha         = 1.e0  * pow(h, alpha_order); // constant for pressure stabilisation
-    double rho           = 1.e0  * pow(h, 1); // constant for Schur complement preconditioner
+    auto formulation    = P.get<std::string>("SurfNavStokes.formulation");
+    auto eta_order      = P.get<double>("SurfNavStokes.normal_penalty_pow");
+    auto eta_factor     = P.get<double>("SurfNavStokes.normal_penalty_fac");
+    auto eta 		    = eta_factor * pow(h, eta_order); // constant for normal penalty
+
+    auto epsilon_order  = P.get<double>("SurfNavStokes.vel_volumestab_pow");
+    auto epsilon_factor = P.get<double>("SurfNavStokes.vel_volumestab_fac");
+    auto epsilon        = epsilon_factor  * pow(h, epsilon_order); // constant for velocity stabilisation
+
+    auto alpha_order    = 1.0;
+    auto alpha          = 1.e0  * pow(h, alpha_order); // constant for pressure stabilisation
+    auto rho            = 1.e0  * pow(h, 1); // constant for Schur complement preconditioner
 
     double hat_epsilon =           epsilon; //Constant for L_stab
 
@@ -1228,7 +1231,7 @@ int main (int argc, char* argv[]) {
             if (lset.useExactNormals) normalsName += "exact";
             else normalsName += "P2";
 
-        	std::ofstream log( dirname +"/"+ filename   + "time="+std::to_string(1) + "_m=" + std::to_string(lset.numbOfVirtualSubEdges) + "_" + FE + normalsName + shiftName + "_form=" + formulation + ".txt");
+        	std::ofstream log( dirname +"/"+ filename   + "time="+std::to_string(1) + "_m=" + std::to_string(lset.numbOfVirtualSubEdges) + "_" + FE + normalsName + shiftName + "_form=" + formulation + "_vstab=" + std::to_string(epsilon_order) + ".txt");
 
         	if (  ( P.get<std::string>("SurfNavStokes.nonlinear_term") == "convective" )
         	   || ( P.get<std::string>("SurfNavStokes.nonlinear_term") == "rotational" )
