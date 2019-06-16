@@ -182,7 +182,7 @@ int main (int argc, char* argv[]) {
     auto alpha          = 1.e0  * pow(h, alpha_order); // constant for pressure stabilisation
     auto rho            = 1.e0  * pow(h, 1); // constant for Schur complement preconditioner
 
-    double hat_epsilon =           epsilon; //Constant for L_stab
+    double hat_epsilon  = epsilon; //Constant for L_stab
 
     std::cout << "tau is: " << tau << std::endl;
     ParameterNS::h = h;
@@ -1151,11 +1151,11 @@ int main (int argc, char* argv[]) {
         		//send to logfiles
         		log_error <<  std::to_string((float)(i+1)*tau) << "\t";
         		log_solo <<  std::to_string((float)(i+1)*tau) << "\t";
-        		log << "Time is: " << std::to_string((float)(i+1)*tau) << std::endl;
-        		log << "h is: " << h << std::endl;
-        		log << "alpha is: " << std::to_string((float) alpha*pow(h, -alpha_order) )<< std::endl;
-        		log << "epsilon is: " << std::to_string((float) epsilon*pow(h, -epsilon_order) )<< std::endl;
-        		log << "eta is: " << std::to_string((float) eta*pow(h, -eta_order) )<< std::endl;
+        		log << "Time is: "    << std::to_string((float)(i+1)*tau) << std::endl;
+        		log << "h is: "       << h << std::endl;
+        		log << "alpha is: "   << alpha/**pow(h, -alpha_order) )*/<< std::endl;
+        		log << "epsilon is: " << epsilon/**pow(h, -epsilon_order) )*/<< std::endl;
+        		log << "eta is: "     << eta/**pow(h, -eta_order) )<< std::endl*/;
         		log << "Total iterations: " << nonsym_stokessolver->GetIter() << '\n';
         		log	<< "Final residual: " << nonsym_stokessolver->GetResid() << '\n';
         		if( !velFE.compare("P2")) {
@@ -1331,8 +1331,8 @@ int main (int argc, char* argv[]) {
         	}
         	else //standart Stokes' case
         	{
-        		Adyn.LinComb(1., A.Data, 1.0, M.Data, eta, S.Data, epsilon, A_stab.Data);
-        		Bhat.LinComb(1., B.Data, 0.,B.Data);
+        		Adyn.LinComb(1., A.Data, 1., M.Data, eta, S.Data, epsilon, A_stab.Data);
+        		Bhat.LinComb(1., B.Data, 0., B.Data);
                 if (P.get<std::string>("SurfNavStokes.stab") == "full")
                     Chat.LinComb(0, Schur.Data, -alpha, Schur_stab.Data);
                 else if (P.get<std::string>("SurfNavStokes.stab") == "normal")
@@ -1342,7 +1342,7 @@ int main (int argc, char* argv[]) {
                     Chat.LinComb(0, Schur.Data, 0, Schur.Data);
                 }
         		transpose(B.Data, BTranspose);
-        		stokessolver->Solve(Adyn, Bhat, Chat, v.Data, p.Data, rhs.Data, rhs2.Data, v.RowIdx->GetEx(), p.RowIdx->GetEx() );
+        		stokessolver->Solve(Adyn, Bhat, Chat, v.Data, p.Data, rhs.Data, rhs2.Data, v.RowIdx->GetEx(), p.RowIdx->GetEx());
         	}
 
         	//postprocess output pressure up to constant
@@ -1363,9 +1363,9 @@ int main (int argc, char* argv[]) {
         	log_solo <<  std::to_string((float)1) << "\t";
         	log << "Time is: " << std::to_string((float)1) << std::endl;
         	log << "h is: " << h << std::endl;
-        	log << "alpha is: " << std::to_string((float) alpha*pow(h, -alpha_order) )<< std::endl;
-        	log << "epsilon is: " << std::to_string((float) epsilon*pow(h, -epsilon_order) )<< std::endl;
-        	log << "eta is: " << std::to_string((float) eta*pow(h, -eta_order) )<< std::endl;
+        	log << "alpha is: "   << alpha/**pow(h, -alpha_order)*/<< std::endl;
+        	log << "epsilon is: " << epsilon/**pow(h, -epsilon_order)*/<< std::endl;
+        	log << "eta is: "     << eta/**pow(h, -eta_order)*/<< std::endl;
         	log << "Total iterations: " << Solver->GetIter() << '\n';
         	log	<< "Final residual: " << Solver->GetResid() << '\n';
 

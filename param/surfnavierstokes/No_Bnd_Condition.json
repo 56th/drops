@@ -42,8 +42,8 @@
         "Tol":		     1e-10,
         "Iter":		     500
       },
-      "NumbOfVirtualSubEdges" : 6,
-      "UseExactNormals" : "P2",
+      "NumbOfVirtualSubEdges" : 8,
+      "UseExactNormals" : "yes",
       "ShiftNormRel":	0.0,
       "ShiftDir":	[1, 1, 1]
     },
