@@ -118,7 +118,7 @@ int main (int argc, char* argv[]) {
     }
 
     LocalStokesParam param;
-    param.input.exactNormal = exact_normal;
+    param.input.exactNormal = P.get<bool>("SurfNavStokes.ComputeNormalErr") ? exact_normal : nullptr;
 
     double h = P.get<DROPS::Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")*std::pow(2., -P.get<double>("Mesh.AdaptRef.FinestLevel"));
     std::cout << "h is: " << std::to_string(float(h)) << std::endl;

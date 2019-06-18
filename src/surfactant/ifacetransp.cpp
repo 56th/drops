@@ -512,9 +512,11 @@ void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& l
     qExactNormalInit.reserve(numbOfQuadPoints * spatch.facet_size());
     spatch.compute_normals(tet);
     auto sgn = [](double val) { return (0. < val) - (val < 0.); };
+    size_t patchIndex = 0;
     for (auto n = spatch.normal_begin(); n != spatch.normal_end(); ++n) {
-        auto normal = sgn(inner_prod(*n, qP2Normal[0])) * (*n);
+        auto normal = sgn(inner_prod(*n, qP2Normal[patchIndex * numbOfQuadPoints])) * (*n);
         for (size_t i = 0; i < numbOfQuadPoints; ++i) qExactNormalInit.emplace_back(normal);
+        ++patchIndex;
     }
     qExactNormal.resize(qExactNormalInit.size());
     std::copy(qExactNormalInit.begin(), qExactNormalInit.end(), begin(qExactNormal));
@@ -529,18 +531,20 @@ void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& l
     // compute projector and shape matrix
     qP.resize(q2Ddomain.vertex_size());
     qP = eye<3, 3>() - outer_product(qP2Normal, qP2Normal);
-    qHess.resize(q2Ddomain.vertex_size());
-    qHess = getLevelsetHess(ls);
-    qHess = qP * (qHess / qLsGradNorm) * qP;
+    if (param->input.formulation == LocalStokesParam::Formulation::consistent) {
+        qHess.resize(q2Ddomain.vertex_size());
+        qHess = getLevelsetHess(ls);
+        qHess = qP * (qHess / qLsGradNorm) * qP;
+    }
     if (useExactNormals) qP = eye<3, 3>() - outer_product(qExactOrP2Normal, qExactOrP2Normal);
-    // Provide all components of the normals
+    // provide all components of the normals
     for (int k = 0; k < 3; ++k) {
         qP2NormalComp[k].resize(q2Ddomain.vertex_size());
         ExtractComponent(qP2Normal, qP2NormalComp[k], k);
         qExactOrP2NormalComp[k].resize(q2Ddomain.vertex_size());
         ExtractComponent(qExactOrP2Normal, qExactOrP2NormalComp[k], k);
     }
-    // Resize and evaluate P2 basis functions
+    // resize and evaluate P2 basis functions
     for(int j=0; j<10 ;++j) {
         resize_and_evaluate_on_vertexes(P2Hat[j], q2Ddomain, qP2Hat[j]);
         resize_and_evaluate_on_vertexes(P2Grad[j], q2Ddomain, qP2grad[j]);
@@ -553,7 +557,7 @@ void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& l
         qP1grad[j] = P1Grad[j];
         qSurfP1grad[j] = qP1grad[j] - dot(qP1grad[j], qExactOrP2Normal)*qExactOrP2Normal;
     }
-    // Apply pointwise projection to the 3 std basis vectors e_k
+    // apply pointwise projection to the 3 std basis vectors e_k
     if (param->input.formulation == LocalStokesParam::Formulation::inconsistent)
         for(int k=0; k<3 ;++k) {
             qProj[k].resize(q2Ddomain.vertex_size());
@@ -706,7 +710,7 @@ void LocalStokesCL::setupA_P2_consistent(double A_P2[30][30]) {
             auto js = j / 3; // scalar shape index
             auto jn = j - 3 * js; // nonzero vect component
             // std::cout << "  " << js << ' ' << jn << '\n';
-            A_P2[i][j] = 2. * quad_2D(contract(qP2E[j] - (qP2Hat[js] * qExactOrP2NormalComp[jn]) * qHess, qP2E[i] - (qP2Hat[is] * qExactOrP2NormalComp[in]) * qHess), q2Ddomain);
+            A_P2[i][j] = 2. * quad_2D(contract(qP2E[j] - (qP2Hat[js] * qP2NormalComp[jn]) * qHess, qP2E[i] - (qP2Hat[is] * qP2NormalComp[in]) * qHess), q2Ddomain);
             A_P2[j][i] = A_P2[i][j];
         }
     }
@@ -729,28 +733,30 @@ void LocalStokesCL::setupA_P2(double A_P2[30][30]) {
         setupA_P2_consistent(A_P2);
         return;
     }
-    // Do all combinations for (i,j) i,j=30 x 30 and corresponding quadrature
-    for (int i=0; i < 10; ++i) {
-        for (int j=0; j<10; ++j) {
-            for (int k=0; k<3; ++k) {
-                Point3DCL e_k= DROPS::std_basis<3>( k+1);
-                for (int l=0; l<3; ++l) {
-                    Point3DCL e_l= DROPS::std_basis<3>( l+1);
-//                    if (!fullGrad) {
-                        A_P2[3*i+k][3*j+l]= quad_2D( dot(e_k, qSurfP2grad[j])*dot(e_l, qSurfP2grad[i]) + dot(qSurfP2grad[i], qSurfP2grad[j])*dot(qProj[k], qProj[l]), q2Ddomain);
-//                    }
-//                    else {
-//                        if(k==l) {
-//                            A_P2[3*i+k][3*j+l]= quad_2D( dot(e_k, qSurfP2grad[j])*dot(e_l, qSurfP2grad[i]) + 0.5*dot(qSurfP2grad[i], qSurfP2grad[j]) + 0.5*dot(P2Grad[i], P2Grad[j])*dot(qProj[k], qProj[l]), q2Ddomain);
-//                        }
-//                        else {
-//                            A_P2[3*i+k][3*j+l]= quad_2D( dot(e_k, qSurfP2grad[j])*dot(e_l, qSurfP2grad[i]) + 0.5*dot(P2Grad[i], P2Grad[j])*dot(qProj[k], qProj[l]), q2Ddomain);
-//                        }
-//                    }
-                }
-            }
+    for (size_t i = 0; i < 30; ++i) {
+        auto is = i / 3; // scalar shape index
+        auto in = i - 3 * is; // nonzero vect component
+        // std::cout << is << ' ' << in << '\n';
+        for (size_t j = i; j < 30; ++j) {
+            auto js = j / 3; // scalar shape index
+            auto jn = j - 3 * js; // nonzero vect component
+            // std::cout << "  " << js << ' ' << jn << '\n';
+            A_P2[i][j] = 2. * quad_2D(contract(qP2E[j], qP2E[i]), q2Ddomain);
+            A_P2[j][i] = A_P2[i][j];
         }
     }
+    // Do all combinations for (i,j) i,j=30 x 30 and corresponding quadrature
+//    for (int i=0; i < 10; ++i) {
+//        for (int j=0; j<10; ++j) {
+//            for (int k=0; k<3; ++k) {
+//                Point3DCL e_k= DROPS::std_basis<3>( k+1);
+//                for (int l=0; l<3; ++l) {
+//                    Point3DCL e_l= DROPS::std_basis<3>( l+1);
+//                    A_P2[3*i+k][3*j+l]= quad_2D( dot(e_k, qSurfP2grad[j])*dot(e_l, qSurfP2grad[i]) + dot(qSurfP2grad[i], qSurfP2grad[j])*dot(qProj[k], qProj[l]), q2Ddomain);
+//                }
+//            }
+//        }
+//    }
 //    double sum = 0., abs_sum = 0.;
 //    for (int i = 0; i < 30; ++i) {
 //        for (int j = 0; j < 30; ++j) {
