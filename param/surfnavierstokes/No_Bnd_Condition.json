@@ -21,6 +21,24 @@
         }
     },
 
+    "SurfNavStokes": {
+      "_comment":            "# surface navier stokes",
+      "FE":                  "P2P1",
+      "model":               "NavierStokes",
+      "testcase":            "85",
+      "instationary":        "none",
+      "nonlinear_term":      "none",
+      "kinematic_viscosity"   : 1,
+      "stab"                  : "normal",
+      "normal_penalty_pow"    : -2,
+      "normal_penalty_fac"    : 1,
+      "vel_volumestab_pow"    : 1,
+      "vel_volumestab_fac"    : 1,
+      "formulation"           : "consistent",
+      "NumbOfVirtualSubEdges" : 6,
+      "UsePatchNormals"       : true
+    },
+
     "Levelset": {
       "_comment":      "# levelset solver not used",
       "case":          "sphere_2",
@@ -42,27 +60,8 @@
         "Tol":		     1e-10,
         "Iter":		     500
       },
-      "NumbOfVirtualSubEdges" : 8,
-      "UseExactNormals" : "yes",
       "ShiftNormRel":	0.0,
       "ShiftDir":	[1, 1, 1]
-    },
-
-    "SurfNavStokes": {
-      "_comment":            "# surface navier stokes",
-      "FE":                  "P2P1",
-      "fullgrad":            0,
-      "model":               "NavierStokes",
-      "testcase":            "85",
-      "instationary":        "none",
-      "nonlinear_term":      "none",
-      "kinematic_viscosity": 1,
-      "stab":                "normal",
-      "normal_penalty_pow":  -2,
-      "normal_penalty_fac":  1,
-      "vel_volumestab_pow":  -1,
-      "vel_volumestab_fac":  1,
-      "formulation":         "consistent"
     },
 
     "General": {

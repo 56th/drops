@@ -35,6 +35,7 @@
 
 #include "num/oseensolver.h"
 #include <fstream>
+#include <surfactant/ifacetransp.h>
 
 #include "surfnavierstokes/surfnavierstokes_funcs.h"
 #include "surfnavierstokes/surfnavierstokes_utils.h"
@@ -116,6 +117,9 @@ int main (int argc, char* argv[]) {
         std::cout << "The levelset is the torus_flower." << std::endl;
     }
 
+    LocalStokesParam param;
+    param.input.exactNormal = exact_normal;
+
     double h = P.get<DROPS::Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")*std::pow(2., -P.get<double>("Mesh.AdaptRef.FinestLevel"));
     std::cout << "h is: " << std::to_string(float(h)) << std::endl;
     if (levelset_fun_str == "sphere_2" && (P.exists("Levelset.ShiftNorm") || P.exists("Levelset.ShiftNormRel")) && P.exists("Levelset.ShiftDir")) {
@@ -143,9 +147,10 @@ int main (int argc, char* argv[]) {
     read_BndData( lsbnd, mg, P.get_child( "Levelset.BndData"));
 
     DROPS::LevelsetP2CL & lset( * DROPS::LevelsetP2CL::Create( mg, lsbnd, sf) );
-    lset.numbOfVirtualSubEdges = P.get<size_t >("Levelset.NumbOfVirtualSubEdges");
-    lset.useExactNormals = P.get<std::string>("Levelset.UseExactNormals") == "yes" ? true : false;
-    if (lset.useExactNormals) std::cout << "Using EXACT normals in surf integrands\n";
+
+    param.input.numbOfVirtualSubEdges = P.get<size_t >("SurfNavStokes.NumbOfVirtualSubEdges");
+    param.input.usePatchNormal = P.get<bool>("SurfNavStokes.UsePatchNormals");
+    if (param.input.usePatchNormal) std::cout << "using patch normals in surf integrands\n";
 
     lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
     lset.Phi.SetIdx( &lset.idx);
@@ -163,13 +168,21 @@ int main (int argc, char* argv[]) {
         LgFE = FE.substr(2,2);
     }
 
-    bool fullgrad = P.get<bool>("SurfNavStokes.fullgrad");
     std::string model = P.get<std::string>("SurfNavStokes.model");
     std::string testcase = P.get<std::string>("SurfNavStokes.testcase");
     double tau = P.get<double>("Time.StepSize");
     ParameterNS::nu = P.get<double>("SurfNavStokes.kinematic_viscosity");
 
     auto formulation    = P.get<std::string>("SurfNavStokes.formulation");
+    if (formulation == "consistent") {
+        param.input.formulation = LocalStokesParam::Formulation::consistent;
+        std::cout << "using consistent penalty formulation\n";
+    }
+    else {
+        param.input.formulation = LocalStokesParam::Formulation::inconsistent;
+        std::cout << "using inconsistent penalty formulation\n";
+    }
+
     auto eta_order      = P.get<double>("SurfNavStokes.normal_penalty_pow");
     auto eta_factor     = P.get<double>("SurfNavStokes.normal_penalty_fac");
     auto eta 		    = eta_factor * pow(h, eta_order); // constant for normal penalty
@@ -289,9 +302,7 @@ int main (int argc, char* argv[]) {
     // setup matrices
     DROPS::MatDescCL A, A_stab, B, Omega, N, NT, M,D, S, L, L_stab, Schur, Schur_stab, Schur_normal_stab;
     MatrixCL Schur_hat;
-    std::tuple<instat_vector_fun_ptr, double, double> normalErrors = { exact_normal, 0., 0. };
-    auto& normP2Err = std::get<1>(normalErrors);
-    auto& normExErr = std::get<2>(normalErrors);
+
     if( !FE.compare("P2P1")) {
         A.SetIdx( &ifaceVecP2idx, &ifaceVecP2idx);
         A_stab.SetIdx( &ifaceVecP2idx, &ifaceVecP2idx);
@@ -305,7 +316,7 @@ int main (int argc, char* argv[]) {
         Schur.SetIdx(&ifaceP1idx, &ifaceP1idx);
         Schur_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
         Schur_normal_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
-        SetupStokesIF_P2P1(mg, &A, &A_stab, &B, &M, &S, &Schur, &Schur_stab, &Schur_normal_stab, lset, fullgrad, formulation, normalErrors);
+        SetupStokesIF_P2P1(mg, &A, &A_stab, &B, &M, &S, &Schur, &Schur_stab, &Schur_normal_stab, lset, &param);
     } else if( !FE.compare("P1P1")) {
         A.SetIdx( &ifaceVecP1idx, &ifaceVecP1idx);
         A_stab.SetIdx( &ifaceVecP1idx, &ifaceVecP1idx);
@@ -321,7 +332,7 @@ int main (int argc, char* argv[]) {
         Schur.SetIdx(&ifaceP1idx, &ifaceP1idx);
         Schur_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
         Schur_normal_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
-        SetupNavierStokesIF_P1P1(mg, &A, &A_stab, &B, &Omega, &N, &NT, &M, &D, &S, &L, &L_stab, &Schur, &Schur_stab, &Schur_normal_stab, lset, v, vbnd, fullgrad);
+        SetupNavierStokesIF_P1P1(mg, &A, &A_stab, &B, &Omega, &N, &NT, &M, &D, &S, &L, &L_stab, &Schur, &Schur_stab, &Schur_normal_stab, lset, v, vbnd, &param);
         // SetupStokesIF_P1P1(mg, &A, &A_stab, &B, &M, &S, &L, &L_stab, &Schur, &Schur_stab, lset.Phi, lset.GetBndData(), fullgrad);
     } else if( !FE.compare("P2P2")) {
         A.SetIdx( &ifaceVecP2idx, &ifaceVecP2idx);
@@ -333,7 +344,7 @@ int main (int argc, char* argv[]) {
         L_stab.SetIdx( &ifaceP2idx, &ifaceVecP2idx);
         Schur.SetIdx(&ifaceP2idx, &ifaceP2idx);
         Schur_stab.SetIdx(&ifaceP2idx, &ifaceP2idx);
-        SetupStokesIF_P2P2(mg, &A, &A_stab, &B, &M, &S, &L, &L_stab, &Schur, &Schur_stab, lset.Phi, lset.GetBndData(), fullgrad);
+        SetupStokesIF_P2P2(mg, &A, &A_stab, &B, &M, &S, &L, &L_stab, &Schur, &Schur_stab, lset.Phi, lset.GetBndData(), &param);
     } else if( !FE.compare("P1P2")) {
         A.SetIdx( &ifaceVecP1idx, &ifaceVecP1idx);
         A_stab.SetIdx( &ifaceVecP1idx, &ifaceVecP1idx);
@@ -344,7 +355,7 @@ int main (int argc, char* argv[]) {
         L_stab.SetIdx( &ifaceP2idx, &ifaceVecP1idx);
         Schur.SetIdx(&ifaceP2idx, &ifaceP2idx);
         Schur_stab.SetIdx(&ifaceP2idx, &ifaceP2idx);
-        SetupStokesIF_P1P2(mg, &A, &A_stab, &B, &M, &S, &L, &L_stab, &Schur, &Schur_stab, lset.Phi, lset.GetBndData(), fullgrad);
+        SetupStokesIF_P1P2(mg, &A, &A_stab, &B, &M, &S, &L, &L_stab, &Schur, &Schur_stab, lset.Phi, lset.GetBndData(), &param);
     }
     // Schur precond
     if (P.get<std::string>("SurfNavStokes.stab") == "full")
@@ -1017,7 +1028,7 @@ int main (int argc, char* argv[]) {
         		}
 
                 //set up current matrices based in previous timestep velocity and levelset
-                SetupNavierStokesIF_P1P1(mg, &A, &A_stab, &B, &Omega, &N, &NT, &M, &D, &S,  &L, &L_stab, &Schur, &Schur_stab, &Schur_normal_stab, lset, v_aux, vbnd, fullgrad);
+                SetupNavierStokesIF_P1P1(mg, &A, &A_stab, &B, &Omega, &N, &NT, &M, &D, &S,  &L, &L_stab, &Schur, &Schur_stab, &Schur_normal_stab, lset, v_aux, vbnd, &param);
 
                 //construct final matrices for a linear solver
         		Ahat.LinComb(mu, A.Data, c/tau, M.Data, eta, S.Data, epsilon, A_stab.Data);
@@ -1227,11 +1238,15 @@ int main (int argc, char* argv[]) {
             else if (P.exists("Levelset.ShiftNorm"))
                 shiftName = "_shift=" + P.get<std::string>("Levelset.ShiftNorm");
 
-            std::string normalsName = "_normals=";
-            if (lset.useExactNormals) normalsName += "exact";
-            else normalsName += "P2";
-
-        	std::ofstream log( dirname +"/"+ filename   + "time="+std::to_string(1) + "_m=" + std::to_string(lset.numbOfVirtualSubEdges) + "_" + FE + normalsName + shiftName + "_form=" + formulation + "_vstab=" + std::to_string(epsilon_order) + ".txt");
+        	std::ofstream log(
+        	     dirname + "/" + filename +
+        	    "time=1_m=" + std::to_string(param.input.numbOfVirtualSubEdges) +
+        	    "_" + FE +
+        	    "_patchnormals=" + std::to_string(param.input.usePatchNormal) +
+        	    shiftName +
+        	    "_form=" + formulation +
+        	    "_vstab=" + P.get<std::string>("SurfNavStokes.vel_volumestab_pow") + ".txt"
+        	);
 
         	if (  ( P.get<std::string>("SurfNavStokes.nonlinear_term") == "convective" )
         	   || ( P.get<std::string>("SurfNavStokes.nonlinear_term") == "rotational" )
@@ -1259,7 +1274,7 @@ int main (int argc, char* argv[]) {
         			p_old = p;
 
         		    //setup matrices based on v_old
-        			SetupNavierStokesIF_P1P1(mg, &A, &A_stab, &B, &Omega, &N, &NT, &M, &D, &S, &L, &L_stab, &Schur, &Schur_stab, &Schur_normal_stab, lset, v_old, vbnd, fullgrad);
+        			SetupNavierStokesIF_P1P1(mg, &A, &A_stab, &B, &Omega, &N, &NT, &M, &D, &S, &L, &L_stab, &Schur, &Schur_stab, &Schur_normal_stab, lset, v_old, vbnd, &param);
 
         			Ahat.LinComb(mu, A.Data, 1.0, M.Data, eta, S.Data, epsilon, A_stab.Data);
         			Bhat.LinComb(1., B.Data, 0.,B.Data);
@@ -1395,8 +1410,10 @@ int main (int argc, char* argv[]) {
             log << "The L2-Norm of p - pSol is: " << preL2err << '\n';
             log << "The L2-Norm of p  is: " << preL2 << '\n';
             log << "The L2-Norm of v_T - vSol  is: " << velTangenL2 << '\n';
-            log << "P2 normal L2 error is: " << sqrt(normP2Err) << '\n';
-            log << "Exact normal L2 error is: " << sqrt(normExErr) << '\n';
+            if (param.input.exactNormal != nullptr) {
+                log << "Levelset normal L2 error is: " << sqrt(param.output.normalErrSq.lvset) << '\n';
+                log << "Patch    normal L2 error is: " << sqrt(param.output.normalErrSq.patch) << '\n';
+            }
         }
 
         log_solo.close();

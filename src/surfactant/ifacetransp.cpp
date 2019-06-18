@@ -328,20 +328,15 @@ void SetupInterfaceRhsP1 (const MultiGridCL& mg, VecDescCL* v,
 
 /// SetupStokes
 /// \brief Setup of the local Stokes system on a tetra intersected by the dividing surface.
-// using VectFun = std::function<Point3DCL(const Point3DCL&, double)>;
-
-std::tuple<instat_vector_fun_ptr, double, double> DummyNormalErrs = { nullptr, 0., 0.};
 
 class LocalStokesCL {
-  private:
-    bool useExactNormals;
+private:
     const PrincipalLatticeCL& lat;
     LocalP1CL<> P1Hat[4];
     LocalP2CL<> P2Hat[10];
     LocalP1CL<Point3DCL> P2GradRef[10], P2Grad[10];
     SMatrixCL<3,3> P2Hess[10];
     Point3DCL P1Grad[4];
-
     GridFunctionCL<Point3DCL>
             qP2Normal, // normal computed from P2 interpolant
             qExactNormal, // normals exact to patch of integration
@@ -354,39 +349,24 @@ class LocalStokesCL {
     GridFunctionCL<SMatrixCL<3,3>> qP; // projection
     GridFunctionCL<SMatrixCL<3,3>> qP2E[30]; // surface rate-of-strain stress tensor, qP1E[i] = $E_s(\phi_i)$, $\phi_i$ = ith vector (velocity) shape func
     GridFunctionCL<SMatrixCL<3,3>> qHess;
-
     QuadDomain2DCL  q2Ddomain;
     std::valarray<double> ls_loc;
     SurfacePatchCL spatch;
-
     QuadDomainCL q3Ddomain;
     GridFunctionCL<Point3DCL> q3Dnormal, q3DP2Grad[10];
     GridFunctionCL<Point3DCL> q3DP1Grad[4], q2DP1Grad[4];
-
-    std::string formulation;
-    bool fullGrad;
-
-    instat_vector_fun_ptr normAnalytic;
-
     LocalP1CL<Point3DCL> getLevelsetGrad(LocalP2CL<> const &);
     SMatrixCL<3, 3>      getLevelsetHess(LocalP2CL<> const &);
-
-    std::tuple<instat_vector_fun_ptr, double, double>& normalErrors;
-
-  public:
-    LocalStokesCL(bool fullGradient, size_t n = 2, bool uen = false, std::string const & f = "inconsistent", std::tuple<instat_vector_fun_ptr, double, double>& nE = DummyNormalErrs)
-        : lat(PrincipalLatticeCL::instance(n))
-        , normalErrors(nE)
-        , formulation(f)
-        , ls_loc(lat.vertex_size())
-        , fullGrad(fullGradient)
-        , useExactNormals(uen) {
-        normAnalytic = std::get<0>(normalErrors);
+    LocalStokesParam* param;
+public:
+    LocalStokesCL(LocalStokesParam* param)
+        : param(param)
+        , lat(PrincipalLatticeCL::instance(param->input.numbOfVirtualSubEdges))
+        , ls_loc(lat.vertex_size()) {
         P1DiscCL::GetP1Basis(P1Hat);
         P2DiscCL::GetP2Basis(P2Hat);
         P2DiscCL::GetGradientsOnRef(P2GradRef);
-        std::cout<<"full gradient = "<<fullGrad<<std::endl;
-        std::cout<<"numb of virtual subedges = "<<n<<std::endl;
+        std::cout << "numb of virtual subedges = " << param->input.numbOfVirtualSubEdges << std::endl;
     }
     Uint num_intervals() const { return lat.num_intervals(); }
     void exportPatchInfo(std::string const & path, const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const TetraCL& tet);
@@ -394,7 +374,7 @@ class LocalStokesCL {
     void calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const LocalP1CL<Point3DCL>& v, const TetraCL& tet); // for conv term
     void calc3DIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const TetraCL& tet); ///< has to be called after calcIntegrands!
     void setupA_P2 (double A_P2[30][30]); // inconsistent method
-    void setupA_P2_explicit (double A_P2[30][30]); // explicit contraction of matrices; consistent or inconcistent methods
+    void setupA_P2_consistent (double A_P2[30][30]); // explicit contraction of matrices; consistent formulation
     void setupA_P2_stab (double A_P2_stab[10][10], double absdet);
     void setupA_P1 (double A_P1[12][12]);
     void setupA_P1_stab (double A_P1_stab[4][4], double absdet);
@@ -403,7 +383,7 @@ class LocalStokesCL {
     void setupB_P2P2 (double B_P2P2[10][30]);
     void setupB_P2P1 (double B_P2P1[10][12]);
     void setupM_P2 (double M_P2[10][10]);
-    void setupM_P2_explicit (double M_P2[30][30]);
+    void setupM_P2_consistent (double M_P2[30][30]);
     void setupM_P1 (double M_P1[4][4]);
     void setupS_P2 (double S_P2[30][30]);
     void setupS_P1 (double S_P1[12][12]);
@@ -504,7 +484,7 @@ void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& l
     P1DiscCL::GetGradients(P1Grad, T);
     evaluate_on_vertexes(ls, lat, Addr(ls_loc));
     spatch.make_patch<MergeCutPolicyCL>(lat, ls_loc);
-    // The routine takes the information about the tetrahedra and the cutting surface and generates a two-dimensional triangulation of the cut, including the necessary point-positions and weights for the quadrature
+    // the routine takes the information about the tetrahedra and the cutting surface and generates a two-dimensional triangulation of the cut, including the necessary point-positions and weights for the quadrature
     make_CompositeQuad5Domain2D(q2Ddomain, spatch, tet);
 // THIS CODE MAY BE HANDY LATER!!!
 //    std::cout << "numb of quad nodes: " << q2Ddomain.vertex_size() << '\n';
@@ -526,7 +506,7 @@ void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& l
     resize_and_evaluate_on_vertexes(getLevelsetGrad(ls), q2Ddomain, qLsGrad);
     qLsGradNorm   = sqrt(dot(qLsGrad, qLsGrad));
     qP2Normal      = qLsGrad / qLsGradNorm;
-    if (normAnalytic != nullptr) resize_and_evaluate_on_vertexes(normAnalytic, tet, q2Ddomain, 0., qAnalyticNormal);
+
     size_t numbOfQuadPoints = qP2Normal.size() / spatch.facet_size();
     std::vector<Point3DCL> qExactNormalInit;
     qExactNormalInit.reserve(numbOfQuadPoints * spatch.facet_size());
@@ -538,9 +518,14 @@ void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& l
     }
     qExactNormal.resize(qExactNormalInit.size());
     std::copy(qExactNormalInit.begin(), qExactNormalInit.end(), begin(qExactNormal));
+    auto useExactNormals = param->input.usePatchNormal;
     qExactOrP2Normal = useExactNormals ? qExactNormal : qP2Normal;
-    std::get<2>(normalErrors) += quad_2D(dot(qAnalyticNormal - qExactNormal, qAnalyticNormal - qExactNormal), q2Ddomain);
-    std::get<1>(normalErrors) += quad_2D(dot(qAnalyticNormal - qP2Normal   , qAnalyticNormal - qP2Normal),    q2Ddomain);
+    auto& normAnalytic = param->input.exactNormal;
+    if (normAnalytic != nullptr) {
+        resize_and_evaluate_on_vertexes(normAnalytic, tet, q2Ddomain, 0., qAnalyticNormal);
+        param->output.normalErrSq.patch += quad_2D(dot(qAnalyticNormal - qExactNormal, qAnalyticNormal - qExactNormal), q2Ddomain);
+        param->output.normalErrSq.lvset += quad_2D(dot(qAnalyticNormal - qP2Normal, qAnalyticNormal - qP2Normal), q2Ddomain);
+    }
     // compute projector and shape matrix
     qP.resize(q2Ddomain.vertex_size());
     qP = eye<3, 3>() - outer_product(qP2Normal, qP2Normal);
@@ -569,13 +554,13 @@ void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& l
         qSurfP1grad[j] = qP1grad[j] - dot(qP1grad[j], qExactOrP2Normal)*qExactOrP2Normal;
     }
     // Apply pointwise projection to the 3 std basis vectors e_k
-    if (formulation != "consistent")
-    for(int k=0; k<3 ;++k) {
-        qProj[k].resize(q2Ddomain.vertex_size());
-        Point3DCL e_k = DROPS::std_basis<3>( k+1);
-        qProj[k] = e_k;
-        qProj[k]-= dot(e_k, qExactOrP2Normal)*qExactOrP2Normal;
-    }
+    if (param->input.formulation == LocalStokesParam::Formulation::inconsistent)
+        for(int k=0; k<3 ;++k) {
+            qProj[k].resize(q2Ddomain.vertex_size());
+            Point3DCL e_k = DROPS::std_basis<3>( k+1);
+            qProj[k] = e_k;
+            qProj[k]-= dot(e_k, qExactOrP2Normal)*qExactOrP2Normal;
+        }
     // compute surface stress tensor
     auto qVectGrad = [&](size_t vecShapeIndex, GridFunctionCL<Point3DCL>* P1OrP2grad) {
         GridFunctionCL<SMatrixCL<3,3>> res(SMatrixCL<3,3>(), q2Ddomain.vertex_size());
@@ -710,8 +695,7 @@ void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& l
     }
 }
 
-void LocalStokesCL::setupA_P2_explicit (double A_P2[30][30]) {
-    if (fullGrad) throw std::invalid_argument("fullgrad opt is not implemented for stiffnes mtx");
+void LocalStokesCL::setupA_P2_consistent(double A_P2[30][30]) {
 //    std::cout << "\n\n" << qHess[0] << "\n\n";
 //    std::cout << qP[0] << "\n\n";
     for (size_t i = 0; i < 30; ++i) {
@@ -740,9 +724,9 @@ void LocalStokesCL::setupA_P2_explicit (double A_P2[30][30]) {
 }
 
 // TODO: Den Fall fullGrad testen!
-void LocalStokesCL::setupA_P2 (double A_P2[30][30]) {
-    if (formulation == "consistent") {
-        setupA_P2_explicit(A_P2);
+void LocalStokesCL::setupA_P2(double A_P2[30][30]) {
+    if (param->input.formulation == LocalStokesParam::Formulation::consistent) {
+        setupA_P2_consistent(A_P2);
         return;
     }
     // Do all combinations for (i,j) i,j=30 x 30 and corresponding quadrature
@@ -752,17 +736,17 @@ void LocalStokesCL::setupA_P2 (double A_P2[30][30]) {
                 Point3DCL e_k= DROPS::std_basis<3>( k+1);
                 for (int l=0; l<3; ++l) {
                     Point3DCL e_l= DROPS::std_basis<3>( l+1);
-                    if (!fullGrad) {
+//                    if (!fullGrad) {
                         A_P2[3*i+k][3*j+l]= quad_2D( dot(e_k, qSurfP2grad[j])*dot(e_l, qSurfP2grad[i]) + dot(qSurfP2grad[i], qSurfP2grad[j])*dot(qProj[k], qProj[l]), q2Ddomain);
-                    }
-                    else {
-                        if(k==l) {
-                            A_P2[3*i+k][3*j+l]= quad_2D( dot(e_k, qSurfP2grad[j])*dot(e_l, qSurfP2grad[i]) + 0.5*dot(qSurfP2grad[i], qSurfP2grad[j]) + 0.5*dot(P2Grad[i], P2Grad[j])*dot(qProj[k], qProj[l]), q2Ddomain);
-                        }
-                        else {
-                            A_P2[3*i+k][3*j+l]= quad_2D( dot(e_k, qSurfP2grad[j])*dot(e_l, qSurfP2grad[i]) + 0.5*dot(P2Grad[i], P2Grad[j])*dot(qProj[k], qProj[l]), q2Ddomain);
-                        }
-                    }
+//                    }
+//                    else {
+//                        if(k==l) {
+//                            A_P2[3*i+k][3*j+l]= quad_2D( dot(e_k, qSurfP2grad[j])*dot(e_l, qSurfP2grad[i]) + 0.5*dot(qSurfP2grad[i], qSurfP2grad[j]) + 0.5*dot(P2Grad[i], P2Grad[j])*dot(qProj[k], qProj[l]), q2Ddomain);
+//                        }
+//                        else {
+//                            A_P2[3*i+k][3*j+l]= quad_2D( dot(e_k, qSurfP2grad[j])*dot(e_l, qSurfP2grad[i]) + 0.5*dot(P2Grad[i], P2Grad[j])*dot(qProj[k], qProj[l]), q2Ddomain);
+//                        }
+//                    }
                 }
             }
         }
@@ -804,18 +788,18 @@ void LocalStokesCL::setupA_P1 (double A_P1[12][12]) {
                 Point3DCL e_k= DROPS::std_basis<3>( k+1);
                 for (int l=0; l<3; ++l) {
                     Point3DCL e_l= DROPS::std_basis<3>( l+1);
-                    if (!fullGrad) {
+//                    if (!fullGrad) {
                         A_P1[3 * i + k][3 * j + l] =
                                 quad_2D(dot(e_k, qSurfP1grad[j]) * dot(e_l, qSurfP1grad[i]) + dot(qSurfP1grad[i], qSurfP1grad[j]) * dot(qProj[k], qProj[l]), q2Ddomain);
-                    }
-                    else {
-                        if(k==l) {
-                            A_P1[3*i+k][3*j+l]= quad_2D( dot(e_k, qSurfP1grad[j])*dot(e_l, qSurfP1grad[i]) + 0.5*dot(qSurfP1grad[i], qSurfP1grad[j]) + 0.5*inner_prod(P1Grad[i], P1Grad[j])*dot(qProj[k], qProj[l]), q2Ddomain);
-                        }
-                        else {
-                            A_P1[3*i+k][3*j+l]= quad_2D( dot(e_k, qSurfP1grad[j])*dot(e_l, qSurfP1grad[i]) + 0.5*inner_prod(P1Grad[i], P1Grad[j])*dot(qProj[k], qProj[l]), q2Ddomain);
-                        }
-                    }
+//                    }
+//                    else {
+//                        if(k==l) {
+//                            A_P1[3*i+k][3*j+l]= quad_2D( dot(e_k, qSurfP1grad[j])*dot(e_l, qSurfP1grad[i]) + 0.5*dot(qSurfP1grad[i], qSurfP1grad[j]) + 0.5*inner_prod(P1Grad[i], P1Grad[j])*dot(qProj[k], qProj[l]), q2Ddomain);
+//                        }
+//                        else {
+//                            A_P1[3*i+k][3*j+l]= quad_2D( dot(e_k, qSurfP1grad[j])*dot(e_l, qSurfP1grad[i]) + 0.5*inner_prod(P1Grad[i], P1Grad[j])*dot(qProj[k], qProj[l]), q2Ddomain);
+//                        }
+//                    }
                 }
             }
         }
@@ -845,11 +829,11 @@ void LocalStokesCL::setupB_P1P2 (double B_P1P2[4][30])
         for (int i=0; i < 4; ++i) {
             ExtractComponent( qSurfP1grad[i], qsurfgrad_k, k);
             for (int j=0; j<10; ++j) {
-                if (!fullGrad) {
+//                if (!fullGrad) {
                     B_P1P2[i][3*j+k]= quad_2D( qsurfgrad_k*qP2Hat[j], q2Ddomain);
-                }
-                else
-                    B_P1P2[i][3*j+k]= quad_2D( P1Grad[i][k]*qP2Hat[j], q2Ddomain);
+//                }
+//                else
+//                    B_P1P2[i][3*j+k]= quad_2D( P1Grad[i][k]*qP2Hat[j], q2Ddomain);
             }
         }
     }
@@ -866,11 +850,11 @@ void LocalStokesCL::setupB_P2P2 (double B_P2P2[10][30])
         for (int i=0; i < 10; ++i) {
             ExtractComponent( qSurfP2grad[i], qsurfgrad_k, k);
             for (int j=0; j<10; ++j) {
-                if (!fullGrad) {
+//                if (!fullGrad) {
                     B_P2P2[i][3*j+k]= quad_2D( qsurfgrad_k*qP2Hat[j], q2Ddomain);
-                }
-                else
-                    std::cout << "DOES NOT WORK YET!!!" << std::endl;//B_P2P2[i][3*j+k]= quad_2D( P2Grad[i][k]*qP2Hat[j], q2Ddomain);
+//                }
+//                else
+//                    std::cout << "DOES NOT WORK YET!!!" << std::endl;//B_P2P2[i][3*j+k]= quad_2D( P2Grad[i][k]*qP2Hat[j], q2Ddomain);
             }
         }
     }
@@ -887,33 +871,26 @@ void LocalStokesCL::setupB_P1P1 (double B_P1P1[4][12])
         for (int i=0; i < 4; ++i) {
             ExtractComponent( qSurfP1grad[i], qsurfgrad_k, k);
             for (int j=0; j<4; ++j) {
-                if (!fullGrad) {
+//                if (!fullGrad) {
                     B_P1P1[i][3*j+k]= quad_2D( qsurfgrad_k*qP1Hat[j], q2Ddomain);
-                }
-                else
-                    B_P1P1[i][3*j+k]= quad_2D( P1Grad[i][k]*qP1Hat[j], q2Ddomain);
+//                }
+//                else
+//                    B_P1P1[i][3*j+k]= quad_2D( P1Grad[i][k]*qP1Hat[j], q2Ddomain);
             }
         }
     }
 }
 
 // TODO: Den Fall fullGrad testen!
-void LocalStokesCL::setupB_P2P1 (double B_P2P1[10][12])
-{
+void LocalStokesCL::setupB_P2P1 (double B_P2P1[10][12]) {
     GridFunctionCL<double> qsurfgrad_k;
     qsurfgrad_k.resize( q2Ddomain.vertex_size());
-
     // Do all combinations for (i,j) i,j=4 x 30 and corresponding quadrature
     for (int k=0; k<3; ++k) {
         for (int i=0; i < 10; ++i) {
             ExtractComponent( qSurfP2grad[i], qsurfgrad_k, k);
-            for (int j=0; j<4; ++j) {
-                if (!fullGrad) {
-                    B_P2P1[i][3*j+k]= quad_2D( qsurfgrad_k*qP1Hat[j], q2Ddomain);
-                }
-                else
-                    std::cout << "DOES NOT WORK YET!!!" << std::endl;//B_P2P1[i][3*j+k]= quad_2D( P2Grad[i][k]*qP1Hat[j], q2Ddomain);
-            }
+            for (int j=0; j<4; ++j)
+                B_P2P1[i][3*j+k]= quad_2D( qsurfgrad_k*qP1Hat[j], q2Ddomain);
         }
     }
 }
@@ -927,7 +904,7 @@ void LocalStokesCL::setupM_P2 (double M_P2[10][10]) {
         }
 }
 
-void LocalStokesCL::setupM_P2_explicit(double M_P2[30][30]) {
+void LocalStokesCL::setupM_P2_consistent(double M_P2[30][30]) {
     for (size_t i = 0; i < 30; ++i) {
         auto is = i / 3; // scalar shape index
         auto in = i - 3 * is; // nonzero vect component
@@ -935,10 +912,8 @@ void LocalStokesCL::setupM_P2_explicit(double M_P2[30][30]) {
         for (size_t j = i; j < 30; ++j) {
             auto js = j / 3; // scalar shape index
             auto jn = j - 3 * js; // nonzero vect component
-            M_P2[i][j] = (in == jn)
-                    ? (formulation == "consistent")
-                        ? quad_2D(dot(e_in, qProj[jn]) * qP2Hat[js] * qP2Hat[is], q2Ddomain)
-                        : quad_2D(qP2Hat[js] * qP2Hat[is], q2Ddomain)
+            M_P2[i][j] = in == jn
+                    ? quad_2D(dot(e_in, qProj[jn]) * qP2Hat[js] * qP2Hat[is], q2Ddomain)
                     : 0.;
             M_P2[j][i] = M_P2[i][j];
         }
@@ -1221,9 +1196,9 @@ class StokesIFAccumulator_P1P1CL : public TetraAccumulatorCL
     ///\brief Update the global system.
     void update_global_system ();
 
-  public:
-    StokesIFAccumulator_P1P1CL ( const VecDescCL& ls, const LsetBndDataCL& ls_bnd, IdxDescCL& P1FE, IdxDescCL& ScalarP1FE, MatrixCL& A_P1, MatrixCL& A_P1_stab, MatrixCL& B_P1P1, MatrixCL& M_P1, MatrixCL& S_P1, MatrixCL& L_P1P1, MatrixCL& L_P1P1_stab, MatrixCL& M_ScalarP1, MatrixCL& A_ScalarP1_stab, bool fullGradient);
-
+public:
+    StokesIFAccumulator_P1P1CL( const VecDescCL& ls, const LsetBndDataCL& ls_bnd, IdxDescCL& P1FE, IdxDescCL& ScalarP1FE, MatrixCL& A_P1, MatrixCL& A_P1_stab, MatrixCL& B_P1P1, MatrixCL& M_P1, MatrixCL& S_P1, MatrixCL& L_P1P1, MatrixCL& L_P1P1_stab, MatrixCL& M_ScalarP1, MatrixCL& A_ScalarP1_stab, LocalStokesParam* param)
+        : lset(ls), lset_bnd(ls_bnd), P1Idx_(P1FE), ScalarP1Idx_(ScalarP1FE), A_P1_(A_P1), A_P1_stab_(A_P1_stab), B_P1P1_(B_P1P1), M_P1_(M_P1), S_P1_(S_P1), L_P1P1_(L_P1P1), L_P1P1_stab_(L_P1P1_stab), M_ScalarP1_(M_ScalarP1), A_ScalarP1_stab_(A_ScalarP1_stab), localStokes_(param) {}
     ///\brief Initializes matrix-builders and load-vectors
     void begin_accumulation ();
     ///\brief Builds the matrices
@@ -1234,10 +1209,6 @@ class StokesIFAccumulator_P1P1CL : public TetraAccumulatorCL
     TetraAccumulatorCL* clone (int /*tid*/) { return new StokesIFAccumulator_P1P1CL ( *this); }
 
 };
-
-StokesIFAccumulator_P1P1CL::StokesIFAccumulator_P1P1CL( const VecDescCL& ls, const LsetBndDataCL& ls_bnd, IdxDescCL& P1FE, IdxDescCL& ScalarP1FE, MatrixCL& A_P1, MatrixCL& A_P1_stab, MatrixCL& B_P1P1, MatrixCL& M_P1, MatrixCL& S_P1, MatrixCL& L_P1P1, MatrixCL& L_P1P1_stab, MatrixCL& M_ScalarP1, MatrixCL& A_ScalarP1_stab, bool fullGradient)
- : lset(ls), lset_bnd(ls_bnd), P1Idx_(P1FE), ScalarP1Idx_(ScalarP1FE), A_P1_(A_P1), A_P1_stab_(A_P1_stab), B_P1P1_(B_P1P1), M_P1_(M_P1), S_P1_(S_P1), L_P1P1_(L_P1P1), L_P1P1_stab_(L_P1P1_stab), M_ScalarP1_(M_ScalarP1), A_ScalarP1_stab_(A_ScalarP1_stab), localStokes_( fullGradient)
-{}
 
 void StokesIFAccumulator_P1P1CL::begin_accumulation ()
 {
@@ -1399,8 +1370,8 @@ class NavierStokesIFAccumulator_P1P1CL : public TetraAccumulatorCL
     void update_global_system ();
 
   public:
-    NavierStokesIFAccumulator_P1P1CL ( const LevelsetP2CL& ls, const VecDescCL& v, const BndDataCL<Point3DCL>& v_bnd, IdxDescCL& P1FE, IdxDescCL& ScalarP1FE, MatrixCL& A_P1, MatrixCL& A_P1_stab, MatrixCL& B_P1P1,MatrixCL& Omega_P1P1, MatrixCL& N_P1, MatrixCL& NT_P1, MatrixCL& M_P1, MatrixCL& D_P1, MatrixCL& S_P1, MatrixCL& L_P1P1, MatrixCL& L_P1P1_stab, MatrixCL& M_ScalarP1, MatrixCL& A_ScalarP1_stab, MatrixCL& Schur_normalP1_stab, bool fullGradient);
-
+    NavierStokesIFAccumulator_P1P1CL( const LevelsetP2CL& ls, const VecDescCL& v, const BndDataCL<Point3DCL>& v_bnd, IdxDescCL& P1FE, IdxDescCL& ScalarP1FE, MatrixCL& A_P1, MatrixCL& A_P1_stab, MatrixCL& B_P1P1,MatrixCL& Omega_P1P1, MatrixCL& N_P1, MatrixCL& NT_P1, MatrixCL& M_P1,MatrixCL& D_P1, MatrixCL& S_P1, MatrixCL& L_P1P1, MatrixCL& L_P1P1_stab, MatrixCL& M_ScalarP1, MatrixCL& A_ScalarP1_stab, MatrixCL& Schur_normalP1_stab, LocalStokesParam* param)
+        : lset(ls.Phi), velocity(v), lset_bnd(ls.GetBndData()), velocity_bnd(v_bnd), P1Idx_(P1FE), ScalarP1Idx_(ScalarP1FE), A_P1_(A_P1), A_P1_stab_(A_P1_stab), B_P1P1_(B_P1P1),Omega_P1P1_(Omega_P1P1),N_P1_(N_P1), NT_P1_(NT_P1),M_P1_(M_P1),D_P1_(D_P1), S_P1_(S_P1), L_P1P1_(L_P1P1), L_P1P1_stab_(L_P1P1_stab), M_ScalarP1_(M_ScalarP1), A_ScalarP1_stab_(A_ScalarP1_stab),Schur_normalP1_stab_(Schur_normalP1_stab), localStokes_(param) {}
     ///\brief Initializes matrix-builders and load-vectors
     void begin_accumulation ();
     ///\brief Builds the matrices
@@ -1411,10 +1382,6 @@ class NavierStokesIFAccumulator_P1P1CL : public TetraAccumulatorCL
     TetraAccumulatorCL* clone (int /*tid*/) { return new NavierStokesIFAccumulator_P1P1CL ( *this); }
 
 };
-
-NavierStokesIFAccumulator_P1P1CL::NavierStokesIFAccumulator_P1P1CL( const LevelsetP2CL& ls, const VecDescCL& v, const BndDataCL<Point3DCL>& v_bnd, IdxDescCL& P1FE, IdxDescCL& ScalarP1FE, MatrixCL& A_P1, MatrixCL& A_P1_stab, MatrixCL& B_P1P1,MatrixCL& Omega_P1P1, MatrixCL& N_P1, MatrixCL& NT_P1, MatrixCL& M_P1,MatrixCL& D_P1, MatrixCL& S_P1, MatrixCL& L_P1P1, MatrixCL& L_P1P1_stab, MatrixCL& M_ScalarP1, MatrixCL& A_ScalarP1_stab, MatrixCL& Schur_normalP1_stab, bool fullGradient)
- : lset(ls.Phi), velocity(v), lset_bnd(ls.GetBndData()), velocity_bnd(v_bnd), P1Idx_(P1FE), ScalarP1Idx_(ScalarP1FE), A_P1_(A_P1), A_P1_stab_(A_P1_stab), B_P1P1_(B_P1P1),Omega_P1P1_(Omega_P1P1),N_P1_(N_P1), NT_P1_(NT_P1),M_P1_(M_P1),D_P1_(D_P1), S_P1_(S_P1), L_P1P1_(L_P1P1), L_P1P1_stab_(L_P1P1_stab), M_ScalarP1_(M_ScalarP1), A_ScalarP1_stab_(A_ScalarP1_stab),Schur_normalP1_stab_(Schur_normalP1_stab), localStokes_(fullGradient, ls.numbOfVirtualSubEdges, ls.useExactNormals)
-{}
 
 void NavierStokesIFAccumulator_P1P1CL::begin_accumulation ()
 {
@@ -1592,10 +1559,10 @@ int count =0;
     }
 }
 
-void SetupStokesIF_P1P1( const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P1_stab, MatDescCL* B_P1P1, MatDescCL* M_P1, MatDescCL* S_P1, MatDescCL* L_P1P1, MatDescCL* L_P1P1_stab, MatDescCL* M_ScalarP1, MatDescCL* A_ScalarP1_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, bool fullgrad)
+void SetupStokesIF_P1P1( const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P1_stab, MatDescCL* B_P1P1, MatDescCL* M_P1, MatDescCL* S_P1, MatDescCL* L_P1P1, MatDescCL* L_P1P1_stab, MatDescCL* M_ScalarP1, MatDescCL* A_ScalarP1_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, LocalStokesParam* param)
 {
   ScopeTimerCL scope("SetupStokesIF_P1P1");
-  StokesIFAccumulator_P1P1CL accu( lset, lset_bnd, *(A_P1->RowIdx), *(L_P1P1->RowIdx), A_P1->Data, A_P1_stab->Data, B_P1P1->Data, M_P1->Data, S_P1->Data, L_P1P1->Data, L_P1P1_stab->Data, M_ScalarP1->Data, A_ScalarP1_stab->Data, fullgrad);
+  StokesIFAccumulator_P1P1CL accu( lset, lset_bnd, *(A_P1->RowIdx), *(L_P1P1->RowIdx), A_P1->Data, A_P1_stab->Data, B_P1P1->Data, M_P1->Data, S_P1->Data, L_P1P1->Data, L_P1P1_stab->Data, M_ScalarP1->Data, A_ScalarP1_stab->Data, param);
   TetraAccumulatorTupleCL accus;
   //    MaybeAddProgressBar(MG_, "LapBeltr(P2) Setup", accus, RowIdx.TriangLevel());
   accus.push_back( &accu);
@@ -1617,10 +1584,10 @@ void SetupNavierStokesIF_P1P1(
         MatDescCL* L_P1P1_stab,
         MatDescCL* M_ScalarP1,
         MatDescCL* A_ScalarP1_stab,
-        MatDescCL* Schur_normalP1_stab, const LevelsetP2CL& lset, const VecDescCL& velocity, const BndDataCL<Point3DCL>& velocity_bnd, bool fullgrad)
+        MatDescCL* Schur_normalP1_stab, const LevelsetP2CL& lset, const VecDescCL& velocity, const BndDataCL<Point3DCL>& velocity_bnd, LocalStokesParam* param)
 {
   ScopeTimerCL scope("SetupNavierStokesIF_P1P1");
-  NavierStokesIFAccumulator_P1P1CL accu( lset, velocity, velocity_bnd, *(A_P1->RowIdx), *(L_P1P1->RowIdx), A_P1->Data, A_P1_stab->Data, B_P1P1->Data, Omega_P1P1->Data,  N_P1->Data, NT_P1->Data, M_P1->Data, D_P1->Data, S_P1->Data, L_P1P1->Data, L_P1P1_stab->Data, M_ScalarP1->Data, A_ScalarP1_stab->Data, Schur_normalP1_stab->Data, fullgrad);
+  NavierStokesIFAccumulator_P1P1CL accu( lset, velocity, velocity_bnd, *(A_P1->RowIdx), *(L_P1P1->RowIdx), A_P1->Data, A_P1_stab->Data, B_P1P1->Data, Omega_P1P1->Data,  N_P1->Data, NT_P1->Data, M_P1->Data, D_P1->Data, S_P1->Data, L_P1P1->Data, L_P1P1_stab->Data, M_ScalarP1->Data, A_ScalarP1_stab->Data, Schur_normalP1_stab->Data, param);
   TetraAccumulatorTupleCL accus;
   //    MaybeAddProgressBar(MG_, "LapBeltr(P2) Setup", accus, RowIdx.TriangLevel());
   accus.push_back( &accu);
@@ -1653,10 +1620,9 @@ class StokesIFAccumulator_P1P2CL : public TetraAccumulatorCL
     void local_setup (const TetraCL& tet);
     ///\brief Update the global system.
     void update_global_system ();
-
-  public:
-    StokesIFAccumulator_P1P2CL ( const VecDescCL& ls, const LsetBndDataCL& ls_bnd, IdxDescCL& P1FE, IdxDescCL& ScalarP2FE, MatrixCL& A_P1, MatrixCL& A_P1_stab, MatrixCL& B_P2P1, MatrixCL& M_P1, MatrixCL& S_P1, MatrixCL& L_P2P1, MatrixCL& L_P2P1_stab, MatrixCL& M_ScalarP2, MatrixCL& A_ScalarP2_stab, bool fullGradient);
-
+public:
+    StokesIFAccumulator_P1P2CL( const VecDescCL& ls, const LsetBndDataCL& ls_bnd, IdxDescCL& P1FE, IdxDescCL& ScalarP2FE, MatrixCL& A_P1, MatrixCL& A_P1_stab, MatrixCL& B_P2P1, MatrixCL& M_P1, MatrixCL& S_P1, MatrixCL& L_P2P1, MatrixCL& L_P2P1_stab, MatrixCL& M_ScalarP2, MatrixCL& A_ScalarP2_stab, LocalStokesParam* param)
+        : lset(ls), lset_bnd(ls_bnd), P1Idx_(P1FE), ScalarP2Idx_(ScalarP2FE), A_P1_(A_P1), A_P1_stab_(A_P1_stab), B_P2P1_(B_P2P1), M_P1_(M_P1), S_P1_(S_P1), L_P2P1_(L_P2P1), L_P2P1_stab_(L_P2P1_stab), M_ScalarP2_(M_ScalarP2), A_ScalarP2_stab_(A_ScalarP2_stab), localStokes_(param) {}
     ///\brief Initializes matrix-builders and load-vectors
     void begin_accumulation ();
     ///\brief Builds the matrices
@@ -1667,10 +1633,6 @@ class StokesIFAccumulator_P1P2CL : public TetraAccumulatorCL
     TetraAccumulatorCL* clone (int /*tid*/) { return new StokesIFAccumulator_P1P2CL ( *this); }
 
 };
-
-StokesIFAccumulator_P1P2CL::StokesIFAccumulator_P1P2CL( const VecDescCL& ls, const LsetBndDataCL& ls_bnd, IdxDescCL& P1FE, IdxDescCL& ScalarP2FE, MatrixCL& A_P1, MatrixCL& A_P1_stab, MatrixCL& B_P2P1, MatrixCL& M_P1, MatrixCL& S_P1, MatrixCL& L_P2P1, MatrixCL& L_P2P1_stab, MatrixCL& M_ScalarP2, MatrixCL& A_ScalarP2_stab, bool fullGradient)
- : lset(ls), lset_bnd(ls_bnd), P1Idx_(P1FE), ScalarP2Idx_(ScalarP2FE), A_P1_(A_P1), A_P1_stab_(A_P1_stab), B_P2P1_(B_P2P1), M_P1_(M_P1), S_P1_(S_P1), L_P2P1_(L_P2P1), L_P2P1_stab_(L_P2P1_stab), M_ScalarP2_(M_ScalarP2), A_ScalarP2_stab_(A_ScalarP2_stab), localStokes_( fullGradient)
-{}
 
 void StokesIFAccumulator_P1P2CL::begin_accumulation ()
 {
@@ -1804,10 +1766,10 @@ void StokesIFAccumulator_P1P2CL::update_global_system ()
     }
 }
 
-void SetupStokesIF_P1P2( const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P1_stab, MatDescCL* B_P2P1, MatDescCL* M_P1, MatDescCL* S_P1, MatDescCL* L_P2P1, MatDescCL* L_P2P1_stab, MatDescCL* M_ScalarP2, MatDescCL* A_ScalarP2_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, bool fullgrad)
+void SetupStokesIF_P1P2( const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P1_stab, MatDescCL* B_P2P1, MatDescCL* M_P1, MatDescCL* S_P1, MatDescCL* L_P2P1, MatDescCL* L_P2P1_stab, MatDescCL* M_ScalarP2, MatDescCL* A_ScalarP2_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, LocalStokesParam* param)
 {
   ScopeTimerCL scope("SetupStokesIF_P1P2");
-  StokesIFAccumulator_P1P2CL accu( lset, lset_bnd, *(A_P1->RowIdx), *(L_P2P1->RowIdx), A_P1->Data, A_P1_stab->Data, B_P2P1->Data, M_P1->Data, S_P1->Data, L_P2P1->Data, L_P2P1_stab->Data, M_ScalarP2->Data, A_ScalarP2_stab->Data, fullgrad);
+  StokesIFAccumulator_P1P2CL accu( lset, lset_bnd, *(A_P1->RowIdx), *(L_P2P1->RowIdx), A_P1->Data, A_P1_stab->Data, B_P2P1->Data, M_P1->Data, S_P1->Data, L_P2P1->Data, L_P2P1_stab->Data, M_ScalarP2->Data, A_ScalarP2_stab->Data, param);
   TetraAccumulatorTupleCL accus;
   //    MaybeAddProgressBar(MG_, "LapBeltr(P2) Setup", accus, RowIdx.TriangLevel());
   accus.push_back( &accu);
@@ -1842,8 +1804,8 @@ class StokesIFAccumulator_P2P1CL : public TetraAccumulatorCL
     void update_global_system ();
 
 public:
-    StokesIFAccumulator_P2P1CL(const LevelsetP2CL& ls, IdxDescCL& P2FE, IdxDescCL& ScalarP1FE, MatrixCL& A_P2, MatrixCL& A_P2_stab, MatrixCL& B_P1P2, MatrixCL& M_P2, MatrixCL& S_P2, MatrixCL& M_ScalarP1, MatrixCL& M_ScalarP1_stab, MatrixCL& A_ScalarP1_stab, bool fullGradient, std::string const & formulation, std::tuple<instat_vector_fun_ptr, double, double>& normalErrors)
-    : lset(ls.Phi), lset_bnd(ls.GetBndData()), P2Idx_(P2FE), ScalarP1Idx_(ScalarP1FE), A_P2_(A_P2), A_P2_stab_(A_P2_stab), B_P1P2_(B_P1P2), M_P2_(M_P2), S_P2_(S_P2), M_ScalarP1_(M_ScalarP1), M_ScalarP1_stab_(M_ScalarP1_stab), A_ScalarP1_stab_(A_ScalarP1_stab), localStokes_(fullGradient, ls.numbOfVirtualSubEdges, ls.useExactNormals, formulation, normalErrors)
+    StokesIFAccumulator_P2P1CL(const LevelsetP2CL& ls, IdxDescCL& P2FE, IdxDescCL& ScalarP1FE, MatrixCL& A_P2, MatrixCL& A_P2_stab, MatrixCL& B_P1P2, MatrixCL& M_P2, MatrixCL& S_P2, MatrixCL& M_ScalarP1, MatrixCL& M_ScalarP1_stab, MatrixCL& A_ScalarP1_stab, LocalStokesParam* param)
+    : lset(ls.Phi), lset_bnd(ls.GetBndData()), P2Idx_(P2FE), ScalarP1Idx_(ScalarP1FE), A_P2_(A_P2), A_P2_stab_(A_P2_stab), B_P1P2_(B_P1P2), M_P2_(M_P2), S_P2_(S_P2), M_ScalarP1_(M_ScalarP1), M_ScalarP1_stab_(M_ScalarP1_stab), A_ScalarP1_stab_(A_ScalarP1_stab), localStokes_(param)
     {}
 
     ///\brief Initializes matrix-builders and load-vectors
@@ -1984,12 +1946,10 @@ void SetupStokesIF_P2P1(
         MatDescCL* M_ScalarP1_stab, // full stab
         MatDescCL* A_ScalarP1_stab, // normal stab
         const LevelsetP2CL& lset,
-        bool fullgrad,
-        std::string const & formulation,
-        std::tuple<instat_vector_fun_ptr, double, double>& normalErrors
+        LocalStokesParam* param
 ) {
   ScopeTimerCL scope("SetupStokesIF_P2P1");
-  StokesIFAccumulator_P2P1CL accu(lset, *(A_P2->RowIdx), *(B_P1P2->RowIdx), A_P2->Data, A_P2_stab->Data, B_P1P2->Data, M_P2->Data, S_P2->Data, M_ScalarP1->Data, M_ScalarP1_stab->Data, A_ScalarP1_stab->Data, fullgrad, formulation, normalErrors);
+  StokesIFAccumulator_P2P1CL accu(lset, *(A_P2->RowIdx), *(B_P1P2->RowIdx), A_P2->Data, A_P2_stab->Data, B_P1P2->Data, M_P2->Data, S_P2->Data, M_ScalarP1->Data, M_ScalarP1_stab->Data, A_ScalarP1_stab->Data, param);
   TetraAccumulatorTupleCL accus;
   accus.push_back( &accu);
   accumulate( accus, MG_, A_P2->GetRowLevel(), A_P2->RowIdx->GetBndInfo());
@@ -2022,8 +1982,9 @@ class StokesIFAccumulator_P2P2CL : public TetraAccumulatorCL
     ///\brief Update the global system.
     void update_global_system ();
 
-  public:
-    StokesIFAccumulator_P2P2CL ( const VecDescCL& ls, const LsetBndDataCL& ls_bnd, IdxDescCL& P2FE, IdxDescCL& ScalarP2FE, MatrixCL& A_P2, MatrixCL& A_P2_stab, MatrixCL& B_P2P2, MatrixCL& M_P2, MatrixCL& S_P2, MatrixCL& L_P2P2, MatrixCL& L_P2P2_stab, MatrixCL& M_ScalarP2, MatrixCL& A_ScalarP2_stab, bool fullGradient);
+public:
+    StokesIFAccumulator_P2P2CL(const VecDescCL& ls, const LsetBndDataCL& ls_bnd, IdxDescCL& P2FE, IdxDescCL& ScalarP2FE, MatrixCL& A_P2, MatrixCL& A_P2_stab, MatrixCL& B_P2P2, MatrixCL& M_P2, MatrixCL& S_P2, MatrixCL& L_P2P2, MatrixCL& L_P2P2_stab, MatrixCL& M_ScalarP2, MatrixCL& A_ScalarP2_stab, LocalStokesParam* param)
+        : lset(ls), lset_bnd(ls_bnd), P2Idx_(P2FE), ScalarP2Idx_(ScalarP2FE), A_P2_(A_P2), A_P2_stab_(A_P2_stab), B_P2P2_(B_P2P2), M_P2_(M_P2), S_P2_(S_P2), L_P2P2_(L_P2P2), L_P2P2_stab_(L_P2P2_stab), M_ScalarP2_(M_ScalarP2), A_ScalarP2_stab_(A_ScalarP2_stab), localStokes_(param) {}
 
     ///\brief Initializes matrix-builders and load-vectors
     void begin_accumulation ();
@@ -2034,10 +1995,6 @@ class StokesIFAccumulator_P2P2CL : public TetraAccumulatorCL
 
     TetraAccumulatorCL* clone (int /*tid*/) { return new StokesIFAccumulator_P2P2CL ( *this); }
 };
-
-StokesIFAccumulator_P2P2CL::StokesIFAccumulator_P2P2CL( const VecDescCL& ls, const LsetBndDataCL& ls_bnd, IdxDescCL& P2FE, IdxDescCL& ScalarP2FE, MatrixCL& A_P2, MatrixCL& A_P2_stab, MatrixCL& B_P2P2, MatrixCL& M_P2, MatrixCL& S_P2, MatrixCL& L_P2P2, MatrixCL& L_P2P2_stab, MatrixCL& M_ScalarP2, MatrixCL& A_ScalarP2_stab, bool fullGradient)
- : lset(ls), lset_bnd(ls_bnd), P2Idx_(P2FE), ScalarP2Idx_(ScalarP2FE), A_P2_(A_P2), A_P2_stab_(A_P2_stab), B_P2P2_(B_P2P2), M_P2_(M_P2), S_P2_(S_P2), L_P2P2_(L_P2P2), L_P2P2_stab_(L_P2P2_stab), M_ScalarP2_(M_ScalarP2), A_ScalarP2_stab_(A_ScalarP2_stab), localStokes_( fullGradient)
-{}
 
 void StokesIFAccumulator_P2P2CL::begin_accumulation ()
 {
@@ -2169,10 +2126,9 @@ void StokesIFAccumulator_P2P2CL::update_global_system ()
     }
 }
 
-void SetupStokesIF_P2P2( const MultiGridCL& MG_, MatDescCL* A_P2, MatDescCL* A_P2_stab, MatDescCL* B_P2P2, MatDescCL* M_P2, MatDescCL* S_P2, MatDescCL* L_P2P2, MatDescCL* L_P2P2_stab, MatDescCL* M_ScalarP2, MatDescCL* A_ScalarP2_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, bool fullgrad)
-{
+void SetupStokesIF_P2P2(const MultiGridCL& MG_, MatDescCL* A_P2, MatDescCL* A_P2_stab, MatDescCL* B_P2P2, MatDescCL* M_P2, MatDescCL* S_P2, MatDescCL* L_P2P2, MatDescCL* L_P2P2_stab, MatDescCL* M_ScalarP2, MatDescCL* A_ScalarP2_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, LocalStokesParam* param) {
   ScopeTimerCL scope("SetupStokesIF");
-  StokesIFAccumulator_P2P2CL accu( lset, lset_bnd, *(A_P2->RowIdx), *(B_P2P2->RowIdx), A_P2->Data, A_P2_stab->Data, B_P2P2->Data, M_P2->Data, S_P2->Data, L_P2P2->Data, L_P2P2_stab->Data, M_ScalarP2->Data, A_ScalarP2_stab->Data, fullgrad);
+  StokesIFAccumulator_P2P2CL accu( lset, lset_bnd, *(A_P2->RowIdx), *(B_P2P2->RowIdx), A_P2->Data, A_P2_stab->Data, B_P2P2->Data, M_P2->Data, S_P2->Data, L_P2P2->Data, L_P2P2_stab->Data, M_ScalarP2->Data, A_ScalarP2_stab->Data, param);
   TetraAccumulatorTupleCL accus;
   //    MaybeAddProgressBar(MG_, "LapBeltr(P2) Setup", accus, RowIdx.TriangLevel());
   accus.push_back( &accu);
