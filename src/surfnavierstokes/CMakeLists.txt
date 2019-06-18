@@ -1,5 +1,8 @@
 set(HOME surfnavierstokes)
 
+# stop after the first err
+add_definitions(-Wfatal-errors)
+
 add_library(${HOME}-ifacetransp STATIC ../surfactant/ifacetransp)
 
 target_link_libraries(${HOME}-ifacetransp levelset-levelsetmapper)

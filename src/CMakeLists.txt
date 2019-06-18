@@ -234,3 +234,6 @@ if(DOXYGEN_FOUND)
 endif()
 
 add_custom_target(coeffs DEPENDS misc-scalarFunctions misc-vectorFunctions levelset-twophaseCoeff levelset-filmCoeff poisson-poissonCoeff stokes-stokesCoeff)
+
+# stop afret first comp error
+add_definitions(-Wfatal-errors)
