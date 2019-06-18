@@ -530,13 +530,13 @@ void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& l
     }
     // compute projector and shape matrix
     qP.resize(q2Ddomain.vertex_size());
-    qP = eye<3, 3>() - outer_product(qP2Normal, qP2Normal);
+    // qP = eye<3, 3>() - outer_product(qP2Normal, qP2Normal);
+    qP = eye<3, 3>() - outer_product(qExactOrP2Normal, qExactOrP2Normal);
     if (param->input.formulation == LocalStokesParam::Formulation::consistent) {
         qHess.resize(q2Ddomain.vertex_size());
         qHess = getLevelsetHess(ls);
         qHess = qP * (qHess / qLsGradNorm) * qP;
     }
-    if (useExactNormals) qP = eye<3, 3>() - outer_product(qExactOrP2Normal, qExactOrP2Normal);
     // provide all components of the normals
     for (int k = 0; k < 3; ++k) {
         qP2NormalComp[k].resize(q2Ddomain.vertex_size());
@@ -700,7 +700,12 @@ void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& l
 }
 
 void LocalStokesCL::setupA_P2_consistent(double A_P2[30][30]) {
-//    std::cout << "\n\n" << qHess[0] << "\n\n";
+//    std::cout << "\n\n" << ((qP2Hat[0] * qExactOrP2NormalComp[0]) * qHess).size() << "\n\n";
+//    std::cout << "\n\n" << qP2Hat[0].size() << "\n\n";
+//    std::cout << "\n\n" << qP2NormalComp[0].size() << "\n\n";
+//    std::cout << "\n\n" << contract(qP2E[0] - (qP2Hat[0] * qExactOrP2NormalComp[0]) * qHess, qP2E[0] - (qP2Hat[0] * qExactOrP2NormalComp[0]) * qHess).size() << "\n\n";
+//    std::cout << "\n\n" << 2 * qHess[0] << "\n\n";
+//    exit(0);
 //    std::cout << qP[0] << "\n\n";
     for (size_t i = 0; i < 30; ++i) {
         auto is = i / 3; // scalar shape index
@@ -710,7 +715,7 @@ void LocalStokesCL::setupA_P2_consistent(double A_P2[30][30]) {
             auto js = j / 3; // scalar shape index
             auto jn = j - 3 * js; // nonzero vect component
             // std::cout << "  " << js << ' ' << jn << '\n';
-            A_P2[i][j] = 2. * quad_2D(contract(qP2E[j] - (qP2Hat[js] * qP2NormalComp[jn]) * qHess, qP2E[i] - (qP2Hat[is] * qP2NormalComp[in]) * qHess), q2Ddomain);
+            A_P2[i][j] = 2. * quad_2D(contract(qP2E[j] - (qP2Hat[js] * qExactOrP2NormalComp[jn]) * qHess, qP2E[i] - (qP2Hat[is] * qExactOrP2NormalComp[in]) * qHess), q2Ddomain);
             A_P2[j][i] = A_P2[i][j];
         }
     }
