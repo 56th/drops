@@ -13,7 +13,7 @@
  * DROPS is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * GNU Lesser General Public License for more dtau_uils.
  *
  * You should have received a copy of the GNU Lesser General Public License
  * along with DROPS. If not, see <http://www.gnu.org/licenses/>.
@@ -187,19 +187,19 @@ int main (int argc, char* argv[]) {
         std::cout << "using inconsistent penalty formulation\n";
     }
 
-    auto eta_order      = P.get<double>("SurfNavStokes.normal_penalty_pow");
-    auto eta_factor     = P.get<double>("SurfNavStokes.normal_penalty_fac");
-    auto eta 		    = eta_factor * pow(h, eta_order); // constant for normal penalty
+    auto tau_u_order      = P.get<double>("SurfNavStokes.normal_penalty_pow");
+    auto tau_u_factor     = P.get<double>("SurfNavStokes.normal_penalty_fac");
+    auto tau_u 		    = tau_u_factor * pow(h, tau_u_order); // constant for normal penalty
 
-    auto epsilon_order  = P.get<double>("SurfNavStokes.vel_volumestab_pow");
-    auto epsilon_factor = P.get<double>("SurfNavStokes.vel_volumestab_fac");
-    auto epsilon        = epsilon_factor  * pow(h, epsilon_order); // constant for velocity stabilisation
+    auto rho_u_order  = P.get<double>("SurfNavStokes.vel_volumestab_pow");
+    auto rho_u_factor = P.get<double>("SurfNavStokes.vel_volumestab_fac");
+    auto rho_u        = rho_u_factor  * pow(h, rho_u_order); // constant for velocity stabilisation
 
-    auto alpha_order    = 1.0;
-    auto alpha          = 1.e0  * pow(h, alpha_order); // constant for pressure stabilisation
+    auto rho_p_order    = 1.0;
+    auto rho_p          = 1.e0  * pow(h, rho_p_order); // constant for pressure stabilisation
     auto rho            = 1.e0  * pow(h, 1); // constant for Schur complement preconditioner
 
-    double hat_epsilon  = epsilon; //Constant for L_stab
+    double hat_rho_u  = rho_u; //Constant for L_stab
 
     std::cout << "tau is: " << tau << std::endl;
     ParameterNS::h = h;
@@ -453,10 +453,10 @@ int main (int argc, char* argv[]) {
     if (P.get<std::string>("SurfNavStokes.instationary") == "infsup") {
         std::cout << "test inf-sup constant\n";
         MatrixCL A_final, B_final, C_full, C_n, M_final;
-        A_final.LinComb(1., A.Data, 1., M.Data, eta, S.Data, epsilon, A_stab.Data);
+        A_final.LinComb(1., A.Data, 1., M.Data, tau_u, S.Data, rho_u, A_stab.Data);
         B_final.LinComb(1., B.Data, 0., B.Data);
-        C_full. LinComb(alpha, Schur_stab.Data, 0., Schur_stab.Data);
-        C_n.    LinComb(alpha, Schur_normal_stab.Data, 0., Schur_normal_stab.Data);
+        C_full. LinComb(rho_p, Schur_stab.Data, 0., Schur_stab.Data);
+        C_n.    LinComb(rho_p, Schur_normal_stab.Data, 0., Schur_normal_stab.Data);
         M_final.LinComb(1., Schur.Data, 0., Schur.Data);
         auto surfName = P.get<std::string>("Levelset.case");
         if (P.exists("Levelset.ShiftNormRel"))
@@ -925,7 +925,7 @@ int main (int argc, char* argv[]) {
 
         //set up a txt file for custom time output
         std::ofstream log_solo( dirname +"/"
-        					  + "eta="+ std::to_string(float(eta))+ "_"
+        					  + "tau_u="+ std::to_string(float(tau_u))+ "_"
         					  + "l="  + P.get<std::string>("Mesh.AdaptRef.FinestLevel")
 							  + "_nu=" + P.get<std::string>("SurfNavStokes.kinematic_viscosity")
         					  + "_Plot_" + filename
@@ -936,7 +936,7 @@ int main (int argc, char* argv[]) {
 
         //set up a txt file for error time output
         std::ofstream log_error( dirname +"/"
-        		+ "eta="+ std::to_string(float(eta))+ "_"
+        		+ "tau_u="+ std::to_string(float(tau_u))+ "_"
         		+ "l="  + P.get<std::string>("Mesh.AdaptRef.FinestLevel")
 				+ "_nu=" + P.get<std::string>("SurfNavStokes.kinematic_viscosity")
 				+ "_Error_" + filename
@@ -954,7 +954,7 @@ int main (int argc, char* argv[]) {
         	v=vInit;
         	v_old=vInit;
 
-        	Mhat.LinComb(1., Schur.Data, alpha, Schur_normal_stab.Data);
+        	Mhat.LinComb(1., Schur.Data, rho_p, Schur_normal_stab.Data);
         	//renormalization to fullfill \int rhs = 0 in discrete sence
 
         	curl_proj.Data = Omega.Data*v.Data  - ( dot(Omega.Data*v.Data,id2) / dot(id2,id2) ) * id2;
@@ -989,14 +989,14 @@ int main (int argc, char* argv[]) {
 
                 double H1(0.), surfH1(0.), advanced_surfH1(0.), normal_velocity(0.);
                 H1_Vector_error_P1(mg, lset.Phi, lset.GetBndData(), v, vbnd, extvsol, extsol_grad1, extsol_grad2,
-                                   extsol_grad3, eta, H1, surfH1, advanced_surfH1, normal_velocity, 0);
+                                   extsol_grad3, tau_u, H1, surfH1, advanced_surfH1, normal_velocity, 0);
                 //        std::cout << "The H1-Norm of v - vSol is: " << H1 << std::endl;
                 //        std::cout << "The surfH1-Norm of v - vSol is: " << surfH1 << std::endl;
                 log << "The advanced surfH1-Norm of v - vSol is: " << advanced_surfH1 << std::endl;
                 log_error << std::to_string((float) advanced_surfH1) << "\t";
                 log_error << std::to_string((float) surfH1) << "\t";
                 log_error << std::to_string((float) H1) << "\t";
-                //log << "The U-Norm of v - vSol is: " << std::sqrt(advanced_surfH1*advanced_surfH1 + epsilon*dot(A_stab.Data*v.Data, v.Data)) << std::endl;
+                //log << "The U-Norm of v - vSol is: " << std::sqrt(advanced_surfH1*advanced_surfH1 + rho_u*dot(A_stab.Data*v.Data, v.Data)) << std::endl;
                 log << "The L2-Norm of v * n is: " << normal_velocity << std::endl;
                 log_error << std::to_string((float) normal_velocity) << "\t";
             }
@@ -1008,7 +1008,7 @@ int main (int argc, char* argv[]) {
                 log << "The L2-Norm of p - pSol is: " << L2_Lagrange << std::endl;
                 log_error <<  std::to_string((float)L2_Lagrange) << std::endl;
                 log << "The L2-Norm of p  is: " << L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndscalar, pxtent), &ZeroScalarFun);
-                //log << "The M-Norm of p - pSol is: " << std::sqrt(L2_Lagrange*L2_Lagrange + alpha*dot(Schur_stab.Data*p.Data, p.Data)) << std::endl;
+                //log << "The M-Norm of p - pSol is: " << std::sqrt(L2_Lagrange*L2_Lagrange + rho_p*dot(Schur_stab.Data*p.Data, p.Data)) << std::endl;
             }
 
         	for (int i = 0; i < P.get<double>("Time.NumSteps"); i++)
@@ -1049,12 +1049,12 @@ int main (int argc, char* argv[]) {
                 SetupNavierStokesIF_P1P1(mg, &A, &A_stab, &B, &Omega, &N, &NT, &M, &D, &S,  &L, &L_stab, &Schur, &Schur_stab, &Schur_normal_stab, lset, v_aux, vbnd, &param);
 
                 //construct final matrices for a linear solver
-        		Ahat.LinComb(mu, A.Data, c/tau, M.Data, eta, S.Data, epsilon, A_stab.Data);
+        		Ahat.LinComb(mu, A.Data, c/tau, M.Data, tau_u, S.Data, rho_u, A_stab.Data);
         		Bhat.LinComb(1., B.Data, 0., B.Data);
         		if (P.get<std::string>("SurfNavStokes.stab") == "full")
-        		    Chat.LinComb(0, Schur.Data, -alpha, Schur_stab.Data);
+        		    Chat.LinComb(0, Schur.Data, -rho_p, Schur_stab.Data);
         		else if (P.get<std::string>("SurfNavStokes.stab") == "normal")
-                    Chat.LinComb(0, Schur.Data, -alpha, Schur_normal_stab.Data);
+                    Chat.LinComb(0, Schur.Data, -rho_p, Schur_normal_stab.Data);
         		else {
         		    std::cout << "WRN: no stabilization is used!\n";
                     Chat.LinComb(0, Schur.Data, 0, Schur.Data);
@@ -1156,7 +1156,7 @@ int main (int argc, char* argv[]) {
 
         		std::cout << "dot(Omega*v, M*id2)" << dot(Omega.Data*id,Schur.Data*id2) << std::endl;
 
-        		Mhat.LinComb(1., Schur.Data, alpha, Schur_normal_stab.Data);
+        		Mhat.LinComb(1., Schur.Data, rho_p, Schur_normal_stab.Data);
         		//renormalization to fullfill \int rhs = 0 in discrete sence
 
         		curl_proj.Data = Omega.Data*v.Data  - ( dot(Omega.Data*v.Data,id2) / dot(id2,id2) ) * id2;
@@ -1182,9 +1182,9 @@ int main (int argc, char* argv[]) {
         		log_solo <<  std::to_string((float)(i+1)*tau) << "\t";
         		log << "Time is: "    << std::to_string((float)(i+1)*tau) << std::endl;
         		log << "h is: "       << h << std::endl;
-        		log << "alpha is: "   << alpha/**pow(h, -alpha_order) )*/<< std::endl;
-        		log << "epsilon is: " << epsilon/**pow(h, -epsilon_order) )*/<< std::endl;
-        		log << "eta is: "     << eta/**pow(h, -eta_order) )<< std::endl*/;
+        		log << "rho_p is: "   << rho_p/**pow(h, -rho_p_order) )*/<< std::endl;
+        		log << "rho_u is: " << rho_u/**pow(h, -rho_u_order) )*/<< std::endl;
+        		log << "tau_u is: "     << tau_u/**pow(h, -tau_u_order) )<< std::endl*/;
         		log << "Total iterations: " << nonsym_stokessolver->GetIter() << '\n';
         		log	<< "Final residual: " << nonsym_stokessolver->GetResid() << '\n';
         		if( !velFE.compare("P2")) {
@@ -1193,11 +1193,11 @@ int main (int argc, char* argv[]) {
         			BndDataCL<Point3DCL> bndvec = vbnd;
         			log << "The L2-Norm of v - vSol is: " << L2_Vector_error(mg, lset.Phi, lset.GetBndData(), make_P2Eval(mg, bndvec, vxtent), extvsol) << std::endl;
         			double H1( 0.), surfH1( 0.), advanced_surfH1( 0.), normal_velocity;
-        			H1_Vector_error_P2(mg, lset.Phi, lset.GetBndData(), v, vbnd, extvsol, extsol_grad1, extsol_grad2, extsol_grad3, eta, H1, surfH1, advanced_surfH1, normal_velocity);
+        			H1_Vector_error_P2(mg, lset.Phi, lset.GetBndData(), v, vbnd, extvsol, extsol_grad1, extsol_grad2, extsol_grad3, tau_u, H1, surfH1, advanced_surfH1, normal_velocity);
         			//        std::cout << "The H1-Norm of v - vSol is: " << H1 << std::endl;
         			//        std::cout << "The surfH1-Norm of v - vSol is: " << surfH1 << std::endl;
         			log << "The advanced surfH1-Norm of v - vSol is: " << advanced_surfH1 << std::endl;
-        			log << "The U-Norm of v - vSol is: " << std::sqrt(advanced_surfH1*advanced_surfH1 + epsilon*dot(A_stab.Data*v.Data, v.Data)) << std::endl;
+        			log << "The U-Norm of v - vSol is: " << std::sqrt(advanced_surfH1*advanced_surfH1 + rho_u*dot(A_stab.Data*v.Data, v.Data)) << std::endl;
         			log << "The L2-Norm of v * n is: " << normal_velocity << std::endl;
         			if ( !prFE.compare("P1")) {
         				pxtent.SetIdx( &P1FEidx);
@@ -1205,7 +1205,7 @@ int main (int argc, char* argv[]) {
         				BndDataCL<double> bndscalar = pbnd;
         				double L2_Lagrange =L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndscalar, pxtent), extpsol);
         				log << "The L2-Norm of p - pSol is: " << L2_Lagrange << std::endl;
-        				log << "The M-Norm of p - pSol is: " << std::sqrt(L2_Lagrange*L2_Lagrange + hat_epsilon*dot(Schur_stab.Data*p.Data, p.Data)) << std::endl;
+        				log << "The M-Norm of p - pSol is: " << std::sqrt(L2_Lagrange*L2_Lagrange + hat_rho_u*dot(Schur_stab.Data*p.Data, p.Data)) << std::endl;
         			}
         		} else if( !velFE.compare("P1")) {
         			vxtent.SetIdx( &vecP1idx);
@@ -1218,14 +1218,14 @@ int main (int argc, char* argv[]) {
         			log << "The L2-Norm of v  is: " << l2norm<< std::endl;
          			log_solo << std::to_string((float)(l2norm*l2norm*0.5)) << "\t" << std::to_string((float) dot(M.Data * v.Data,id) ) << "\t" << dot(M.Data * v.Data,rhs.Data) << std::endl;
         			double H1( 0.), surfH1( 0.), advanced_surfH1( 0.), normal_velocity( 0.);
-        			H1_Vector_error_P1(mg, lset.Phi, lset.GetBndData(), v, vbnd, extvsol, extsol_grad1, extsol_grad2, extsol_grad3, eta, H1, surfH1, advanced_surfH1, normal_velocity, (i+1)*tau);
+        			H1_Vector_error_P1(mg, lset.Phi, lset.GetBndData(), v, vbnd, extvsol, extsol_grad1, extsol_grad2, extsol_grad3, tau_u, H1, surfH1, advanced_surfH1, normal_velocity, (i+1)*tau);
         			//        std::cout << "The H1-Norm of v - vSol is: " << H1 << std::endl;
          			//        std::cout << "The surfH1-Norm of v - vSol is: " << surfH1 << std::endl;
         			log << "The advanced surfH1-Norm of v - vSol is: " << advanced_surfH1 << std::endl;
         			log_error <<  std::to_string((float)advanced_surfH1) << "\t";
         			log_error <<  std::to_string((float)surfH1) << "\t";
         			log_error <<  std::to_string((float)H1) << "\t";
-         	 		//log << "The U-Norm of v - vSol is: " << std::sqrt(advanced_surfH1*advanced_surfH1 + epsilon*dot(A_stab.Data*v.Data, v.Data)) << std::endl;
+         	 		//log << "The U-Norm of v - vSol is: " << std::sqrt(advanced_surfH1*advanced_surfH1 + rho_u*dot(A_stab.Data*v.Data, v.Data)) << std::endl;
         			log << "The L2-Norm of v * n is: " << normal_velocity << std::endl;
         			log_error <<  std::to_string((float)normal_velocity) <<  "\t";
 
@@ -1237,7 +1237,7 @@ int main (int argc, char* argv[]) {
         				log << "The L2-Norm of p - pSol is: " << L2_Lagrange << std::endl;
             			log_error <<  std::to_string((float)L2_Lagrange) << std::endl;
         				log << "The L2-Norm of p  is: " << L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndscalar, pxtent), &ZeroScalarFun);
-        				//log << "The M-Norm of p - pSol is: " << std::sqrt(L2_Lagrange*L2_Lagrange + alpha*dot(Schur_stab.Data*p.Data, p.Data)) << std::endl;
+        				//log << "The M-Norm of p - pSol is: " << std::sqrt(L2_Lagrange*L2_Lagrange + rho_p*dot(Schur_stab.Data*p.Data, p.Data)) << std::endl;
         			}
         		}
 
@@ -1263,7 +1263,8 @@ int main (int argc, char* argv[]) {
         	    "_patchnormals=" + std::to_string(param.input.usePatchNormal) +
         	    shiftName +
         	    "_form=" + formulation +
-        	    "_vstab=" + P.get<std::string>("SurfNavStokes.vel_volumestab_pow") + ".txt"
+        	    "_rhofac=" + P.get<std::string>("SurfNavStokes.vel_volumestab_fac") +
+                "_rhopow=" + P.get<std::string>("SurfNavStokes.vel_volumestab_pow") + ".txt"
         	);
 
         	if (  ( P.get<std::string>("SurfNavStokes.nonlinear_term") == "convective" )
@@ -1294,13 +1295,13 @@ int main (int argc, char* argv[]) {
         		    //setup matrices based on v_old
         			SetupNavierStokesIF_P1P1(mg, &A, &A_stab, &B, &Omega, &N, &NT, &M, &D, &S, &L, &L_stab, &Schur, &Schur_stab, &Schur_normal_stab, lset, v_old, vbnd, &param);
 
-        			Ahat.LinComb(mu, A.Data, 1.0, M.Data, eta, S.Data, epsilon, A_stab.Data);
+        			Ahat.LinComb(mu, A.Data, 1.0, M.Data, tau_u, S.Data, rho_u, A_stab.Data);
         			Bhat.LinComb(1., B.Data, 0.,B.Data);
         			transpose(B.Data, BTranspose);
                     if (P.get<std::string>("SurfNavStokes.stab") == "full")
-                        Chat.LinComb(0, Schur.Data, -alpha, Schur_stab.Data);
+                        Chat.LinComb(0, Schur.Data, -rho_p, Schur_stab.Data);
                     else if (P.get<std::string>("SurfNavStokes.stab") == "normal")
-                        Chat.LinComb(0, Schur.Data, -alpha, Schur_normal_stab.Data);
+                        Chat.LinComb(0, Schur.Data, -rho_p, Schur_normal_stab.Data);
                     else {
                         std::cout << "WRN: no stabilization is used!\n";
                         Chat.LinComb(0, Schur.Data, 0, Schur.Data);
@@ -1364,12 +1365,12 @@ int main (int argc, char* argv[]) {
         	}
         	else //standart Stokes' case
         	{
-        		Adyn.LinComb(1., A.Data, 1., M.Data, eta, S.Data, epsilon, A_stab.Data);
+        		Adyn.LinComb(1., A.Data, 1., M.Data, tau_u, S.Data, rho_u, A_stab.Data);
         		Bhat.LinComb(1., B.Data, 0., B.Data);
                 if (P.get<std::string>("SurfNavStokes.stab") == "full")
-                    Chat.LinComb(0, Schur.Data, -alpha, Schur_stab.Data);
+                    Chat.LinComb(0, Schur.Data, -rho_p, Schur_stab.Data);
                 else if (P.get<std::string>("SurfNavStokes.stab") == "normal")
-                    Chat.LinComb(0, Schur.Data, -alpha, Schur_normal_stab.Data);
+                    Chat.LinComb(0, Schur.Data, -rho_p, Schur_normal_stab.Data);
                 else {
                     std::cout << "WRN: no stabilization is used!\n";
                     Chat.LinComb(0, Schur.Data, 0, Schur.Data);
@@ -1396,9 +1397,9 @@ int main (int argc, char* argv[]) {
         	log_solo <<  std::to_string((float)1) << "\t";
         	log << "Time is: " << std::to_string((float)1) << std::endl;
         	log << "h is: " << h << std::endl;
-        	log << "alpha is: "   << alpha/**pow(h, -alpha_order)*/<< std::endl;
-        	log << "epsilon is: " << epsilon/**pow(h, -epsilon_order)*/<< std::endl;
-        	log << "eta is: "     << eta/**pow(h, -eta_order)*/<< std::endl;
+        	log << "rho_p is: "   << rho_p/**pow(h, -rho_p_order)*/<< std::endl;
+        	log << "rho_u is: " << rho_u/**pow(h, -rho_u_order)*/<< std::endl;
+        	log << "tau_u is: "     << tau_u/**pow(h, -tau_u_order)*/<< std::endl;
         	log << "Total iterations: " << Solver->GetIter() << '\n';
         	log	<< "Final residual: " << Solver->GetResid() << '\n';
 
