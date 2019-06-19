@@ -758,8 +758,10 @@ struct LocalStokesParam {
     struct {
         size_t numbOfVirtualSubEdges = 2;
         Formulation formulation = Formulation::consistent;
+        bool computeMatrices = true;
         bool usePatchNormal = true;
         instat_vector_fun_ptr exactNormal = nullptr;
+        instat_matrix_fun_ptr exactShape  = nullptr;
         instat_scalar_fun_ptr exactDistance = nullptr;
         instat_scalar_fun_ptr levelSet = nullptr;
     } input;
@@ -768,6 +770,7 @@ struct LocalStokesParam {
             double patch = 0.;
             double lvset = 0.;
         } normalErrSq;
+        double shapeErrSq = 0.;
         double maxGammaDist = 0.;
     } output;
 };

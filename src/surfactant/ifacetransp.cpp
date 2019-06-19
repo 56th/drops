@@ -28,6 +28,7 @@
 #include "levelset/levelset.h"
 #include "num/spmat.h"
 #include "misc/scopetimer.h"
+#include "ifacetransp.h"
 #include <cstring>
 #include <cmath>
 
@@ -348,7 +349,7 @@ private:
     GridFunctionCL<> qP1Hat[4], qP2Hat[10], qLsGradNorm, qconvP1[4], qdivP1, qP2NormalComp[3], qExactOrP2NormalComp[3], qvProjP1_comp[3], qvP1_comp[3];
     GridFunctionCL<SMatrixCL<3,3>> qP; // projection
     GridFunctionCL<SMatrixCL<3,3>> qP2E[30]; // surface rate-of-strain stress tensor, qP1E[i] = $E_s(\phi_i)$, $\phi_i$ = ith vector (velocity) shape func
-    GridFunctionCL<SMatrixCL<3,3>> qHess;
+    GridFunctionCL<SMatrixCL<3,3>> qHess, qAnalyticHess;
     QuadDomain2DCL  q2Ddomain;
     std::valarray<double> ls_loc;
     SurfacePatchCL spatch;
@@ -357,8 +358,8 @@ private:
     GridFunctionCL<Point3DCL> q3DP1Grad[4], q2DP1Grad[4];
     LocalP1CL<Point3DCL> getLevelsetGrad(LocalP2CL<> const &);
     SMatrixCL<3, 3>      getLevelsetHess(LocalP2CL<> const &);
-    LocalStokesParam* param;
 public:
+    LocalStokesParam* param;
     LocalStokesCL(LocalStokesParam* param)
         : param(param)
         , lat(PrincipalLatticeCL::instance(param->input.numbOfVirtualSubEdges))
@@ -520,23 +521,26 @@ void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& l
     }
     qExactNormal.resize(qExactNormalInit.size());
     std::copy(qExactNormalInit.begin(), qExactNormalInit.end(), begin(qExactNormal));
-    auto useExactNormals = param->input.usePatchNormal;
-    qExactOrP2Normal = useExactNormals ? qExactNormal : qP2Normal;
-    auto& normAnalytic = param->input.exactNormal;
-    if (normAnalytic != nullptr) {
-        resize_and_evaluate_on_vertexes(normAnalytic, tet, q2Ddomain, 0., qAnalyticNormal);
+    auto usePatchNormals = param->input.usePatchNormal;
+    qExactOrP2Normal = usePatchNormals ? qExactNormal : qP2Normal;
+    if (param->input.exactNormal != nullptr) {
+        resize_and_evaluate_on_vertexes(param->input.exactNormal, tet, q2Ddomain, 0., qAnalyticNormal);
         param->output.normalErrSq.patch += quad_2D(dot(qAnalyticNormal - qExactNormal, qAnalyticNormal - qExactNormal), q2Ddomain);
         param->output.normalErrSq.lvset += quad_2D(dot(qAnalyticNormal - qP2Normal, qAnalyticNormal - qP2Normal), q2Ddomain);
     }
     // compute projector and shape matrix
     qP.resize(q2Ddomain.vertex_size());
-    // qP = eye<3, 3>() - outer_product(qP2Normal, qP2Normal);
-    qP = eye<3, 3>() - outer_product(qExactOrP2Normal, qExactOrP2Normal);
-    if (param->input.formulation == LocalStokesParam::Formulation::consistent) {
+    qP = eye<3, 3>() - outer_product(qP2Normal, qP2Normal);
+    if (param->input.formulation == LocalStokesParam::Formulation::consistent || param->input.exactShape != nullptr) {
         qHess.resize(q2Ddomain.vertex_size());
         qHess = getLevelsetHess(ls);
         qHess = qP * (qHess / qLsGradNorm) * qP;
+        if (param->input.exactShape != nullptr) {
+            resize_and_evaluate_on_vertexes(param->input.exactShape, tet, q2Ddomain, 0., qAnalyticHess);
+            param->output.shapeErrSq += quad_2D(contract(qAnalyticHess - qHess, qAnalyticHess - qHess), q2Ddomain);
+        }
     }
+    if (usePatchNormals) qP = eye<3, 3>() - outer_product(qExactOrP2Normal, qExactOrP2Normal);
     // provide all components of the normals
     for (int k = 0; k < 3; ++k) {
         qP2NormalComp[k].resize(q2Ddomain.vertex_size());
@@ -710,11 +714,9 @@ void LocalStokesCL::setupA_P2_consistent(double A_P2[30][30]) {
     for (size_t i = 0; i < 30; ++i) {
         auto is = i / 3; // scalar shape index
         auto in = i - 3 * is; // nonzero vect component
-        // std::cout << is << ' ' << in << '\n';
         for (size_t j = i; j < 30; ++j) {
             auto js = j / 3; // scalar shape index
             auto jn = j - 3 * js; // nonzero vect component
-            // std::cout << "  " << js << ' ' << jn << '\n';
             A_P2[i][j] = 2. * quad_2D(contract(qP2E[j] - (qP2Hat[js] * qExactOrP2NormalComp[jn]) * qHess, qP2E[i] - (qP2Hat[is] * qExactOrP2NormalComp[in]) * qHess), q2Ddomain);
             A_P2[j][i] = A_P2[i][j];
         }
@@ -738,18 +740,11 @@ void LocalStokesCL::setupA_P2(double A_P2[30][30]) {
         setupA_P2_consistent(A_P2);
         return;
     }
-    for (size_t i = 0; i < 30; ++i) {
-        auto is = i / 3; // scalar shape index
-        auto in = i - 3 * is; // nonzero vect component
-        // std::cout << is << ' ' << in << '\n';
+    for (size_t i = 0; i < 30; ++i)
         for (size_t j = i; j < 30; ++j) {
-            auto js = j / 3; // scalar shape index
-            auto jn = j - 3 * js; // nonzero vect component
-            // std::cout << "  " << js << ' ' << jn << '\n';
             A_P2[i][j] = 2. * quad_2D(contract(qP2E[j], qP2E[i]), q2Ddomain);
             A_P2[j][i] = A_P2[i][j];
         }
-    }
     // Do all combinations for (i,j) i,j=30 x 30 and corresponding quadrature
 //    for (int i=0; i < 10; ++i) {
 //        for (int j=0; j<10; ++j) {
@@ -1788,8 +1783,7 @@ void SetupStokesIF_P1P2( const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P
 }
 
 /// \brief Accumulator to set up the matrices for interface Stokes.
-class StokesIFAccumulator_P2P1CL : public TetraAccumulatorCL
-{
+class StokesIFAccumulator_P2P1CL : public TetraAccumulatorCL {
   private:
     const VecDescCL& lset;
     const LsetBndDataCL& lset_bnd;
@@ -1870,29 +1864,28 @@ void StokesIFAccumulator_P2P1CL::visit (const TetraCL& tet) {
     ls_loc.assign(tet, lset, lset_bnd);
     if (!equal_signs(ls_loc)) {
         local_setup(tet);
-        update_global_system();
+        if (localStokes_.param->input.computeMatrices) update_global_system();
     }
 }
 
-void StokesIFAccumulator_P2P1CL::local_setup (const TetraCL& tet)
-{
+void StokesIFAccumulator_P2P1CL::local_setup (const TetraCL& tet) {
     GetTrafoTr( T, det, tet);
     absdet= std::fabs( det);
     GetLocalNumbP2NoBnd( numP2, tet, P2Idx_);
     GetLocalNumbP1NoBnd( numScalarP1, tet, ScalarP1Idx_);
-
     // localStokes_.exportPatchInfo("../../../MKL-Eigs-for-Sparse-Matrices/output/patch/hOver" + std::to_string(localStokes_.num_intervals()), T, ls_loc, tet);
-
     localStokes_.calcIntegrands( T, ls_loc, tet);
-    localStokes_.calc3DIntegrands(T, ls_loc, tet);
-    localStokes_.setupA_P2( locA_P2);
-    localStokes_.setupA_P2_stab( locA_P2_stab, absdet);
-    localStokes_.setupB_P1P2( locB_P1P2);
-    localStokes_.setupM_P2( locM_P2);
-    localStokes_.setupS_P2( locS_P2);
-    localStokes_.setupM_P1( locM_ScalarP1);
-    localStokes_.setupA_P1_stab(locA_ScalarP1_stab, absdet);
-    localStokes_.setupM_P1_stab(locM_ScalarP1_stab, absdet);
+    if (localStokes_.param->input.computeMatrices) {
+        localStokes_.calc3DIntegrands(T, ls_loc, tet);
+        localStokes_.setupA_P2(locA_P2);
+        localStokes_.setupA_P2_stab(locA_P2_stab, absdet);
+        localStokes_.setupB_P1P2(locB_P1P2);
+        localStokes_.setupM_P2(locM_P2);
+        localStokes_.setupS_P2(locS_P2);
+        localStokes_.setupM_P1(locM_ScalarP1);
+        localStokes_.setupA_P1_stab(locA_ScalarP1_stab, absdet);
+        localStokes_.setupM_P1_stab(locM_ScalarP1_stab, absdet);
+    }
 }
 
 void StokesIFAccumulator_P2P1CL::update_global_system() {
@@ -1904,7 +1897,6 @@ void StokesIFAccumulator_P2P1CL::update_global_system() {
     MatrixBuilderCL& mM_ScalarP1= *mM_ScalarP1_;
     MatrixBuilderCL& mA_ScalarP1_stab = *mA_ScalarP1_stab_;
     MatrixBuilderCL& mM_ScalarP1_stab = *mM_ScalarP1_stab_;
-
     for(int i= 0; i < 10; ++i) {
         const IdxT ii= numP2[i];
         if (ii==NoIdx) continue;

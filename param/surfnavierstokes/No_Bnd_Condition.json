@@ -37,7 +37,9 @@
       "formulation"           : "consistent",
       "NumbOfVirtualSubEdges" : 8,
       "UsePatchNormals"       : true,
-      "ComputeNormalErr"      : false
+      "ComputeNormalErr"      : true,
+      "ComputeShapeErr"       : true,
+      "Solve"                 : false
     },
 
     "Levelset": {

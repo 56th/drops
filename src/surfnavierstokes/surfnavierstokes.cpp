@@ -90,10 +90,12 @@ int main (int argc, char* argv[]) {
     // choose level set
     instat_scalar_fun_ptr levelset_fun;
     instat_vector_fun_ptr exact_normal;
+    instat_matrix_fun_ptr exact_shape;
     std::string levelset_fun_str = P.get<std::string>("Levelset.case");
     if( !levelset_fun_str.compare("sphere_2")) {
         levelset_fun = &sphere_2;
         exact_normal = &sphere_2_normal;
+        exact_shape  = &sphere_2_shape;
         std::cout << "The levelset is the unit sphere." << std::endl;
     } else if( !levelset_fun_str.compare("xy_plane")) {
         levelset_fun = &xy_plane;
@@ -119,6 +121,8 @@ int main (int argc, char* argv[]) {
 
     LocalStokesParam param;
     param.input.exactNormal = P.get<bool>("SurfNavStokes.ComputeNormalErr") ? exact_normal : nullptr;
+    param.input.exactShape  = P.get<bool>("SurfNavStokes.ComputeShapeErr")  ? exact_shape  : nullptr;
+    param.input.computeMatrices = P.get<bool>("SurfNavStokes.Solve");
 
     double h = P.get<DROPS::Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")*std::pow(2., -P.get<double>("Mesh.AdaptRef.FinestLevel"));
     std::cout << "h is: " << std::to_string(float(h)) << std::endl;
@@ -357,6 +361,20 @@ int main (int argc, char* argv[]) {
         Schur_stab.SetIdx(&ifaceP2idx, &ifaceP2idx);
         SetupStokesIF_P1P2(mg, &A, &A_stab, &B, &M, &S, &L, &L_stab, &Schur, &Schur_stab, lset.Phi, lset.GetBndData(), &param);
     }
+    if (P.get<bool>("SurfNavStokes.ComputeNormalErr") || P.get<bool>("SurfNavStokes.ComputeShapeErr")) {
+        auto dirname = P.get<std::string>("Output.Directory") + "/" + model + "_" + levelset_fun_str + "/" + "test" +
+                       testcase + "_h=" + std::to_string(float(h));
+        std::ofstream log(
+                dirname + "/normal_and_shape_errs_m=" + std::to_string(param.input.numbOfVirtualSubEdges) + ".txt"
+        );
+        if (P.get<bool>("SurfNavStokes.ComputeNormalErr")) {
+            log << "Levelset normal L2 error is: " << sqrt(param.output.normalErrSq.lvset) << '\n';
+            log << "Patch    normal L2 error is: " << sqrt(param.output.normalErrSq.patch) << '\n';
+        }
+        if (P.get<bool>("SurfNavStokes.ComputeShapeErr"))
+            log << "Shape operator L2 error is: " << sqrt(param.output.shapeErrSq) << '\n';
+    }
+    if (!param.input.computeMatrices) exit(0);
     // Schur precond
     if (P.get<std::string>("SurfNavStokes.stab") == "full")
         Schur_hat.LinComb(1., Schur.Data, rho, Schur_stab.Data);
@@ -1410,10 +1428,6 @@ int main (int argc, char* argv[]) {
             log << "The L2-Norm of p - pSol is: " << preL2err << '\n';
             log << "The L2-Norm of p  is: " << preL2 << '\n';
             log << "The L2-Norm of v_T - vSol  is: " << velTangenL2 << '\n';
-            if (param.input.exactNormal != nullptr) {
-                log << "Levelset normal L2 error is: " << sqrt(param.output.normalErrSq.lvset) << '\n';
-                log << "Patch    normal L2 error is: " << sqrt(param.output.normalErrSq.patch) << '\n';
-            }
         }
 
         log_solo.close();

@@ -62,7 +62,7 @@ bnd_val_fun bf[6]= {
 ///////////////////////// Levelset-functions //////////////////////////////////////
 
 DROPS::Point3DCL sphere_2_shift(0.);
-double sphere_2 (const DROPS::Point3DCL& p, double)
+double sphere_2(const DROPS::Point3DCL& p, double)
 {
 //    DROPS::Point3DCL x( p - P.get<DROPS::Point3DCL>("Exp.PosDrop"));
 
@@ -72,11 +72,26 @@ double sphere_2 (const DROPS::Point3DCL& p, double)
     return pow(p[0] - sphere_2_shift[0], 2.) + pow(p[1] - sphere_2_shift[1], 2.) + pow(p[2] - sphere_2_shift[2], 2.) - 1.;
 }
 
-DROPS::Point3DCL sphere_2_normal (const DROPS::Point3DCL& p, double)
-{
-    DROPS::Point3DCL v(p[0]/(std::sqrt(p[0]*p[0]+p[1]*p[1]+p[2]*p[2])),p[1]/(std::sqrt(p[0]*p[0]+p[1]*p[1]+p[2]*p[2])),p[2]/(std::sqrt(p[0]*p[0]+p[1]*p[1]+p[2]*p[2])));
-    //DROPS::Point3DCL w(p[0], 0., 0.);
+DROPS::Point3DCL sphere_2_normal(const DROPS::Point3DCL& p, double) {
+    auto den = std::sqrt(p[0]*p[0]+p[1]*p[1]+p[2]*p[2]);
+    DROPS::Point3DCL v(p[0]/den, p[1]/den, p[2]/den);
     return v;
+}
+
+SMatrixCL<3, 3> sphere_2_shape(const DROPS::Point3DCL& p, double) {
+    SMatrixCL<3, 3> res;
+    // auto den = pow(pow(p[0],2) + pow(p[1],2) + pow(p[2],2),1.5);
+    auto den = pow(p[0],2) + pow(p[1],2) + pow(p[2],2);
+    res(0, 0) = (pow(p[1],2) + pow(p[2],2)) / den;
+    res(0, 1) = (-1.*p[0]*p[1]) / den;
+    res(0, 2) = (-1.*p[0]*p[2]) / den;
+    res(1, 0) = res(0, 1);
+    res(1, 1) = (pow(p[0],2) + pow(p[2],2)) / den;
+    res(1, 2) = (-1.*p[1]*p[2]) / den;
+    res(2, 0) = res(0, 2);
+    res(2, 1) = res(1, 2);
+    res(2, 2) = (pow(p[0],2) + pow(p[1],2)) / den;
+    return res;
 }
 
 double tamarind (const DROPS::Point3DCL& p, double)
