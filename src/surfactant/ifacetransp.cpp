@@ -532,9 +532,12 @@ void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& l
     qP.resize(q2Ddomain.vertex_size());
     qP = eye<3, 3>() - outer_product(qP2Normal, qP2Normal);
     if (param->input.formulation == LocalStokesParam::Formulation::consistent || param->input.exactShape != nullptr) {
-        qHess.resize(q2Ddomain.vertex_size());
-        qHess = getLevelsetHess(ls);
-        qHess = qP * (qHess / qLsGradNorm) * qP;
+
+        qHess = qP;
+//        qHess.resize(q2Ddomain.vertex_size());
+//        qHess = getLevelsetHess(ls);
+//        qHess = qP * (qHess / qLsGradNorm) * qP;
+
         if (param->input.exactShape != nullptr) {
             resize_and_evaluate_on_vertexes(param->input.exactShape, tet, q2Ddomain, 0., qAnalyticHess);
             param->output.shapeErrSq += quad_2D(contract(qAnalyticHess - qHess, qAnalyticHess - qHess), q2Ddomain);

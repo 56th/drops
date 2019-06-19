@@ -33,7 +33,7 @@
       "normal_penalty_pow"    : -2,
       "normal_penalty_fac"    : 1,
       "vel_volumestab_pow"    : -1,
-      "vel_volumestab_fac"    : 0.1,
+      "vel_volumestab_fac"    : 1,
       "formulation"           : "consistent",
       "NumbOfVirtualSubEdges" : 8,
       "UsePatchNormals"       : true,
