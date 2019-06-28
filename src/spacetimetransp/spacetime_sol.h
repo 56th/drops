@@ -155,7 +155,7 @@ public:
         if (idx.NumUnknowns() != 0)
             idx.DeleteNumbering( mg_);
         idx.CreateNumbering( futurevec.RowIdx->TriangLevel(), mg_, *futurevec.RowIdx);
-        P1XtoP1 ( *futurevec.RowIdx, futurevec.Data, idx, cp.Data, cn.Data, lsetp2new->Phi, mg_);
+        P1XtoP1 ( *futurevec.RowIdx, futurevec.Data, idx, cp.Data, cn.Data, lsetp2new->Phi, lsetp2new->GetBndData(), mg_);
         cp.Data *= 1.0/weight_pos_;
         cn.Data *= 1.0/weight_neg_;
         cp.t = lsetp2new->Phi.t;

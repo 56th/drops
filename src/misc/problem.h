@@ -507,10 +507,10 @@ class MLIdxDescCL : public MLDataCL<IdxDescCL>
 };
 
 /// merges two p1-VectorCL into a p1x-VectorCL
-void P1toP1X ( const IdxDescCL& xidx, VectorCL& p1x, const IdxDescCL& idx, const VectorCL& posPart, const VectorCL& negPart, const VecDescCL& lset, const MultiGridCL& mg );
+void P1toP1X ( const IdxDescCL& xidx, VectorCL& p1x, const IdxDescCL& idx, const VectorCL& posPart, const VectorCL& negPart, const VecDescCL& lset, const BndDataCL<>& lset_bnd, const MultiGridCL& mg);
 
 /// splits a p1x-VectorCL into two p1-VectorCL
-void P1XtoP1 ( const IdxDescCL& xidx, const VectorCL& p1x, const IdxDescCL& idx, VectorCL& posPart, VectorCL& negPart, const VecDescCL& lset, const MultiGridCL& mg );
+void P1XtoP1 ( const IdxDescCL& xidx, const VectorCL& p1x, const IdxDescCL& idx, VectorCL& posPart, VectorCL& negPart, const VecDescCL& lset, const BndDataCL<>& lset_bnd, const MultiGridCL& mg );
 
 /// extracts component from vector valued FE vector
 void ExtractComponent( const VectorCL& vecFE, VectorCL& scalarFE, Uint comp, Uint stride=3);
@@ -674,7 +674,6 @@ class VecDescBaseCL
     /// \brief Read Data from a stream
     void Read(std::istream&, bool binary=false);
 };
-
 
 /// \brief A sparse matrix together with two IdxDescCL -objects,
 ///     that couple the row- and column- indices to simplices in a

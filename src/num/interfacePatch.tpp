@@ -222,17 +222,15 @@ ValueT InterfaceTriangleCL::quad2D( const LocalP2CL<ValueT>& f, Uint tri) const
 
 template <class It>
   std::pair<double, double>
-  h_interface (It begin, It end, const VecDescCL& ls)
+  h_interface (It begin, It end, const /*LevelsetP2CL::const_DiscSolCL*/ P2EvalCL<double, const BndDataCL<>, const VecDescCL>& ls)
 {
     double hmin= 1e99, hmax= -1.0; //, hmean= 0.;
     // size_t num= 0;
     // EdgeCL* emax= 0;
 
     for (; begin != end; ++begin)
-        if (   (ls.Data[begin->GetVertex( 0)->Unknowns( ls.RowIdx->GetIdx())]
-                *ls.Data[begin->Unknowns( ls.RowIdx->GetIdx())] <= 0.)
-            || (ls.Data[begin->GetVertex( 1)->Unknowns( ls.RowIdx->GetIdx())]
-                *ls.Data[begin->Unknowns( ls.RowIdx->GetIdx())] <= 0.)) {
+        if (   (ls.val( *begin->GetVertex( 0)) * ls.val(*begin) <= 0.)
+            || (ls.val( *begin->GetVertex( 1)) * ls.val(*begin) <= 0.)) {
             const double h= (begin->GetVertex( 0)->GetCoord() - begin->GetVertex( 1)->GetCoord()).norm();
             hmin= std::min( hmin, h);
             // if (h > hmax) emax= &*begin;

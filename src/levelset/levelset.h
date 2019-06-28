@@ -107,7 +107,7 @@ class LevelsetP2CL : public ProblemCL< LevelsetCoeffCL, LsetBndDataCL>
 
   public:
     MatrixCL            E, H;  ///< E: mass matrix, H: convection matrix
-    VecDescCL           rhs;  ///< rhs due to boundary conditions
+    VecDescCL           rhs;   ///< rhs due to boundary conditions, holding the couplings with H
 
     bool IsDiscontinuous(){ return IsDG; }
 
@@ -177,9 +177,9 @@ LevelsetP2CL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, F
     /// Get type of surface force.
     SurfaceForceT GetSurfaceForce() const { return SF_; }
 
-    ///returns the area of the two-phase flow interface(\phi=0)
+    /// returns the area of the two-phase flow interface(\phi=0)
     double GetInterfaceArea() const;
-    ///returns the area of the solid-liquid(phi<0) interface
+    /// returns the area of the solid-liquid(phi<0) interface
     double GetWetArea() const;
     /// Discretize surface force
     void   AccumulateBndIntegral( VecDescCL& f) const;
@@ -255,7 +255,7 @@ class SurfTensAccumulatorCL : public TetraAccumulatorCL
 
 
 /// levelset class for continuous P2FE
-///differs from discontinuous P2FE by Init and SetUpSystem
+/// differs from discontinuous P2FE by Init and SetUpSystem
 class LevelsetP2ContCL: public LevelsetP2CL
 {
   public:
@@ -296,7 +296,7 @@ class LevelsetP2ContCL: public LevelsetP2CL
 
 
 /// levelset class for discontinuous P2FE
-///differs from continuous P2FE by Init and SetUpSystem
+/// differs from continuous P2FE by Init and SetUpSystem
 class LevelsetP2DiscontCL: public LevelsetP2CL
 {
   public:

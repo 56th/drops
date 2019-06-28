@@ -260,7 +260,7 @@ class TwoPhaseInfoBaseCL
     std::ofstream* file_;    ///< write information, to this file
 
     void Update (const LevelsetP2CL& ls) {
-        std::pair<double, double> h= h_interface( ls.GetMG().GetTriangEdgeBegin( ls.PhiC->RowIdx->TriangLevel()), ls.GetMG().GetTriangEdgeEnd( ls.PhiC->RowIdx->TriangLevel()), *ls.PhiC);
+        std::pair<double, double> h= h_interface( ls.GetMG().GetTriangEdgeBegin( ls.PhiC->RowIdx->TriangLevel()), ls.GetMG().GetTriangEdgeEnd( ls.PhiC->RowIdx->TriangLevel()), ls.GetSolution());
         h_min= h.first; h_max= h.second;
     }
 
