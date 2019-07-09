@@ -43,30 +43,22 @@
 
 using namespace DROPS;
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////// Model Test Cases ////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////////////////////////
+//void InitVecLaplace(const MultiGridCL& MG, LevelsetP2CL& lset, DROPS::VecDescCL& rhs, DROPS::VecDescCL& vSol, DROPS::VecDescCL& pSol,
+//                    instat_vector_fun_ptr f_rhs, instat_vector_fun_ptr f_vsol, instat_scalar_fun_ptr f_psol, double t = 0.0) {
+//    if( vSol.RowIdx->NumUnknownsEdge()) {
+//        DROPS::SetupInterfaceVectorRhsP2(MG, &rhs, lset.Phi, lset.GetBndData(), f_rhs);
+//    } else {
+//        DROPS::SetupInterfaceVectorRhsP1(MG, &rhs, lset.Phi, lset.GetBndData(), f_rhs, t);
+//    }
+//    InitScalar(MG, pSol, f_psol);
+//    InitVector(MG, vSol, f_vsol);
+//}
 
-void InitVecLaplace(const MultiGridCL& MG, LevelsetP2CL& lset, DROPS::VecDescCL& rhs, DROPS::VecDescCL& vSol, DROPS::VecDescCL& pSol,
-                    instat_vector_fun_ptr f_rhs, instat_vector_fun_ptr f_vsol, instat_scalar_fun_ptr f_psol, double t = 0.0) {
-    if( vSol.RowIdx->NumUnknownsEdge()) {
-        DROPS::SetupInterfaceVectorRhsP2(MG, &rhs, lset.Phi, lset.GetBndData(), f_rhs);
-    } else {
-        DROPS::SetupInterfaceVectorRhsP1(MG, &rhs, lset.Phi, lset.GetBndData(), f_rhs, t);
-    }
-    InitScalar(MG, pSol, f_psol);
-    InitVector(MG, vSol, f_vsol);
-}
-
-int main (int argc, char* argv[]) {
-
+int main(int argc, char* argv[]) {
   try {
-    
     DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/surfnavierstokes/No_Bnd_Condition.json");
     std::cout << P << std::endl;
-
     DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
-
     // build initial mesh
     std::cout << "Setting up interface-PDE:\n";
     //    DROPS::BrickBuilderCL brick( DROPS::MakePoint3D( -2., -2., -53./48),
@@ -79,14 +71,10 @@ int main (int argc, char* argv[]) {
     DROPS::MultiGridCL mg( *builder);
     const DROPS::ParamCL::ptree_type* ch= 0;
     try {
-        ch= &P.get_child( "Mesh.Periodicity");
-    }
-    catch (DROPS::DROPSParamErrCL) {}
-    if (ch)
-        read_PeriodicBoundaries( mg, *ch);
-
-    DROPS::AdapTriangCL adap( mg );
-
+        ch= &P.get_child("Mesh.Periodicity");
+    } catch (DROPS::DROPSParamErrCL) {}
+    if (ch) read_PeriodicBoundaries(mg, *ch);
+    DROPS::AdapTriangCL adap(mg);
     // choose level set
     instat_scalar_fun_ptr levelset_fun;
     instat_vector_fun_ptr exact_normal;
@@ -118,12 +106,10 @@ int main (int argc, char* argv[]) {
         levelset_fun = &torus_flower;
         std::cout << "The levelset is the torus_flower." << std::endl;
     }
-
     LocalStokesParam param;
     param.input.exactNormal = P.get<bool>("SurfNavStokes.ComputeNormalErr") ? exact_normal : nullptr;
     param.input.exactShape  = P.get<bool>("SurfNavStokes.ComputeShapeErr")  ? exact_shape  : nullptr;
     param.input.computeMatrices = P.get<bool>("SurfNavStokes.Solve");
-
     double h = P.get<DROPS::Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")*std::pow(2., -P.get<double>("Mesh.AdaptRef.FinestLevel"));
     std::cout << "h is: " << std::to_string(float(h)) << std::endl;
     if (levelset_fun_str == "sphere_2" && (P.exists("Levelset.ShiftNorm") || P.exists("Levelset.ShiftNormRel")) && P.exists("Levelset.ShiftDir")) {
@@ -133,7 +119,6 @@ int main (int argc, char* argv[]) {
         sphere_2_shift *= shiftNorm;
         std::cout << "Refined bulk mesh will be constracted w/\n\tLevelset.ShiftNorm = " << sphere_2_shift << '\n';
     }
-
     // adaptive mesh refinement based on level set function
     typedef DROPS::DistMarkingStrategyCL InitMarkerT;
     InitMarkerT initmarker( levelset_fun, P.get<double>("Mesh.AdaptRef.Width"), 0, P.get<int>("Mesh.AdaptRef.FinestLevel") );
@@ -141,42 +126,29 @@ int main (int argc, char* argv[]) {
     adap.MakeInitialTriang();
     adap.set_marking_strategy( 0 );
     sphere_2_shift *= 0.;
-
     // create level set
     instat_scalar_fun_ptr sigma (0);
     SurfaceTensionCL sf( sigma, 0);
-
     BndDataCL<double> lsbnd( 0);
-
     read_BndData( lsbnd, mg, P.get_child( "Levelset.BndData"));
-
     DROPS::LevelsetP2CL & lset( * DROPS::LevelsetP2CL::Create( mg, lsbnd, sf) );
-
     param.input.numbOfVirtualSubEdges = P.get<size_t >("SurfNavStokes.NumbOfVirtualSubEdges");
     param.input.usePatchNormal = P.get<bool>("SurfNavStokes.UsePatchNormals");
     if (param.input.usePatchNormal) std::cout << "using patch normals in surf integrands\n";
-
     lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
     lset.Phi.SetIdx( &lset.idx);
-//    LinearLSInit( mg, lset.Phi, levelset_fun);
-    lset.Init( levelset_fun);
-
+    // LinearLSInit( mg, lset.Phi, levelset_fun);
+    lset.Init(levelset_fun);
     // parse FE types and some other parameters from json file
     std::string FE = P.get<std::string>("SurfNavStokes.FE");
     std::string velFE, prFE, LgFE;
     velFE = FE.substr(0,2);
     prFE = FE.substr(2,2);
-    if( FE.size()>4) {
-        LgFE = FE.substr(4,2);
-    } else {
-        LgFE = FE.substr(2,2);
-    }
-
+    LgFE = FE.size() > 4 ? FE.substr(4,2) : FE.substr(2,2);
     std::string model = P.get<std::string>("SurfNavStokes.model");
     std::string testcase = P.get<std::string>("SurfNavStokes.testcase");
     double tau = P.get<double>("Time.StepSize");
     ParameterNS::nu = P.get<double>("SurfNavStokes.kinematic_viscosity");
-
     auto formulation    = P.get<std::string>("SurfNavStokes.formulation");
     if (formulation == "consistent") {
         param.input.formulation = LocalStokesParam::Formulation::consistent;
@@ -186,34 +158,25 @@ int main (int argc, char* argv[]) {
         param.input.formulation = LocalStokesParam::Formulation::inconsistent;
         std::cout << "using inconsistent penalty formulation\n";
     }
-
-    auto tau_u_order      = P.get<double>("SurfNavStokes.normal_penalty_pow");
-    auto tau_u_factor     = P.get<double>("SurfNavStokes.normal_penalty_fac");
-    auto tau_u 		    = tau_u_factor * pow(h, tau_u_order); // constant for normal penalty
-
+    auto tau_u_order  = P.get<double>("SurfNavStokes.normal_penalty_pow");
+    auto tau_u_factor = P.get<double>("SurfNavStokes.normal_penalty_fac");
+    auto tau_u 		  = tau_u_factor * pow(h, tau_u_order); // constant for normal penalty
     auto rho_u_order  = P.get<double>("SurfNavStokes.vel_volumestab_pow");
     auto rho_u_factor = P.get<double>("SurfNavStokes.vel_volumestab_fac");
     auto rho_u        = rho_u_factor  * pow(h, rho_u_order); // constant for velocity stabilisation
-
-    auto rho_p_order    = 1.0;
-    auto rho_p          = 1.e0  * pow(h, rho_p_order); // constant for pressure stabilisation
-    auto rho            = 1.e0  * pow(h, 1); // constant for Schur complement preconditioner
-
+    auto rho_p_order  = 1.0;
+    auto rho_p        = 1.e0  * pow(h, rho_p_order); // constant for pressure stabilisation
+    auto rho          = 1.e0  * pow(h, 1); // constant for Schur complement preconditioner
     double hat_rho_u  = rho_u; //Constant for L_stab
-
     std::cout << "tau is: " << tau << std::endl;
     ParameterNS::h = h;
-
     // construct FE spaces
     BndDataCL<Point3DCL> vbnd( 0);
     read_BndData( vbnd, mg, P.get_child( "Stokes.VelocityBndData"));
-
 //  BndDataCL<double> vscalarbnd( 0);
 //  read_BndData( vscalarbnd, mg, P.get_child( "Stokes.VelocityBndData"));
-
     BndDataCL<double> pbnd( 0);
     read_BndData( pbnd, mg, P.get_child( "Stokes.PressureBndData"));
-
     DROPS::IdxDescCL ifaceVecP2idx( vecP2IF_FE, vbnd);
     DROPS::IdxDescCL ifaceVecP1idx( vecP1IF_FE, vbnd);
     DROPS::IdxDescCL ifaceP1idx( P1IF_FE, pbnd);
@@ -222,7 +185,6 @@ int main (int argc, char* argv[]) {
     DROPS::IdxDescCL vecP1idx( vecP1_FE, vbnd);
     DROPS::IdxDescCL P1FEidx( P1_FE, pbnd);
     DROPS::IdxDescCL P2FEidx( P2_FE, pbnd);
-
     ifaceVecP2idx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
     ifaceVecP2idx.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
     ifaceVecP1idx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
@@ -247,11 +209,9 @@ int main (int argc, char* argv[]) {
     std::cout << "NumUnknowns Vector P1: " << vecP1idx.NumUnknowns() << std::endl;
     std::cout << "NumUnknowns Scalar P2: " << P2FEidx.NumUnknowns() << std::endl;
     std::cout << "NumUnknowns Scalar P1: " << P1FEidx.NumUnknowns() << std::endl;
-
     //TestAllP2MatricesWithP1Matrices(mg, lset, ifaceVecP2idx, ifaceVecP1idx, ifaceP1idx, fullgrad);
-
     // construct FE vectors (initialized with zero)
-     DROPS::VecDescCL v, vSol, vInit, p, curl,curlSol, pSol, rhs, rhs2, curl_proj, ZeroVec;
+     DROPS::VecDescCL v, vSol, vInit, p, curl,curlSol, pSol, fRHS, gRHS, curl_proj, ZeroVec;
      DROPS::VecDescCL v_iter, v_temp,v_aux,v_old,v_oldold,p_aux,p_temp,p_iter,p_old;//for steady nonlinear procedure or BDF2
      if( !FE.compare("P2P1")) {
          v.SetIdx(&ifaceVecP2idx);
@@ -259,8 +219,8 @@ int main (int argc, char* argv[]) {
          vInit.SetIdx( &ifaceVecP2idx);
          p.SetIdx(&ifaceP1idx);
          pSol.SetIdx(&ifaceP1idx);
-         rhs.SetIdx(&ifaceVecP2idx);
-         rhs2.SetIdx(&ifaceP1idx);
+         fRHS.SetIdx(&ifaceVecP2idx);
+         gRHS.SetIdx(&ifaceP1idx);
          ZeroVec.SetIdx(&ifaceVecP2idx);
          //
          curl.SetIdx( &ifaceP1idx);
@@ -283,30 +243,28 @@ int main (int argc, char* argv[]) {
          p_temp.SetIdx( &ifaceP1idx);
          p_iter.SetIdx( &ifaceP1idx);
          pSol.SetIdx( &ifaceP1idx);
-         rhs2.SetIdx(&ifaceP1idx);
+         gRHS.SetIdx(&ifaceP1idx);
          curl_proj.SetIdx(&ifaceP1idx);
-         rhs.SetIdx( &ifaceVecP1idx);
+         fRHS.SetIdx( &ifaceVecP1idx);
          ZeroVec.SetIdx( &ifaceVecP1idx);
      } else if( !FE.compare("P2P2")) {
          v.SetIdx( &ifaceVecP2idx);
          vSol.SetIdx( &ifaceVecP2idx);
          p.SetIdx( &ifaceP2idx);
          pSol.SetIdx( &ifaceP2idx);
-         rhs.SetIdx( &ifaceVecP2idx);
+         fRHS.SetIdx( &ifaceVecP2idx);
          ZeroVec.SetIdx( &ifaceVecP2idx);
      } else if( !FE.compare("P1P2")) {
          v.SetIdx( &ifaceVecP1idx);
          vSol.SetIdx( &ifaceVecP1idx);
          p.SetIdx( &ifaceP2idx);
          pSol.SetIdx( &ifaceP2idx);
-         rhs.SetIdx( &ifaceVecP1idx);
+         fRHS.SetIdx( &ifaceVecP1idx);
          ZeroVec.SetIdx( &ifaceVecP1idx);
      }
-
     // setup matrices
     DROPS::MatDescCL A, A_stab, B, Omega, N, NT, M,D, S, L, L_stab, Schur, Schur_stab, Schur_normal_stab;
     MatrixCL Schur_hat;
-
     if( !FE.compare("P2P1")) {
         A.SetIdx( &ifaceVecP2idx, &ifaceVecP2idx);
         A_stab.SetIdx( &ifaceVecP2idx, &ifaceVecP2idx);
@@ -337,7 +295,6 @@ int main (int argc, char* argv[]) {
         Schur_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
         Schur_normal_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
         SetupNavierStokesIF_P1P1(mg, &A, &A_stab, &B, &Omega, &N, &NT, &M, &D, &S, &L, &L_stab, &Schur, &Schur_stab, &Schur_normal_stab, lset, v, vbnd, &param);
-        // SetupStokesIF_P1P1(mg, &A, &A_stab, &B, &M, &S, &L, &L_stab, &Schur, &Schur_stab, lset.Phi, lset.GetBndData(), fullgrad);
     } else if( !FE.compare("P2P2")) {
         A.SetIdx( &ifaceVecP2idx, &ifaceVecP2idx);
         A_stab.SetIdx( &ifaceVecP2idx, &ifaceVecP2idx);
@@ -384,54 +341,42 @@ int main (int argc, char* argv[]) {
         std::cout << "WRN: no stabilization is used! Schur precond = I\n";
         Schur_hat = std::valarray<double>(1., Schur.Data.num_rows());
     }
-
     // construct preconditioners
     typedef SSORPcCL      SymmPcPcT;
     typedef PCGSolverCL<SymmPcPcT> PCGSolverT;
     typedef SolverAsPreCL<PCGSolverT> PCGPcT;
-
     SymmPcPcT symmPcPc_;
     std::stringstream Astream;
     PCGSolverT PCGSolver_( symmPcPc_, P.get<int>("Solver.PcAIter"), P.get<double>("Solver.PcATol"), true, &Astream);
     PCGPcT PCGPc_( PCGSolver_);//velocity preconditioner
-
     std::stringstream Schurstream;
     PCGSolverT SchurPCGSolver (symmPcPc_, P.get<int>("Solver.PcBIter"), P.get<double>("Solver.PcBTol"), true, &Schurstream);
     SchurPreBaseCL *spc_ = new SurfaceLaplacePreCL<PCGSolverT>( Schur_hat, SchurPCGSolver);//pressure preconditioner
-    
     //construct symmteric block iterative solver
     typedef BlockPreCL<ExpensivePreBaseCL, SchurPreBaseCL, DiagSpdBlockPreCL>  DiagBlockPcT;
     typedef PLanczosONBCL<VectorCL, DiagBlockPcT> LanczosT;
     typedef PMResSolverCL<LanczosT> MinResT;
-
     DiagBlockPcT    *DBlock_ = new DiagBlockPcT( PCGPc_, *spc_);
     LanczosT *lanczos_ = new LanczosT( *DBlock_);
     MinResT *MinRes_ = new MinResT( *lanczos_,  P.get<int>("Solver.Iter"), P.get<double>("Solver.Tol"), /*relative*/ false);
     BlockMatrixSolverCL<MinResT> *stokessolver= new BlockMatrixSolverCL<MinResT>( *MinRes_);
-
     // construct preconditioners for nonsymmetric case
     typedef /*JACPcCL*/ SSORPcCL NonSymmPcPcT;
     typedef GMResSolverCL<NonSymmPcPcT> GMResSolverT;
     typedef SolverAsPreCL<GMResSolverT> GMResPcT;
-
     NonSymmPcPcT nonsymmPcPc_;
-
     std::stringstream PCstream;
     GMResSolverT GMResSolver_( nonsymmPcPc_, P.get<int>("Solver.PcAIter"), P.get<int>("Solver.PcAIter"), P.get<double>("Solver.PcATol"),
     		 /*bool relative=*/ true, /*bool calculate2norm=*/ false, /*PreMethGMRES method=*/ LeftPreconditioning,
 			     /*bool mod =*/ true,      /*bool useModGS =*/ false, &PCstream);
     GMResPcT GMResPc_nonsym( GMResSolver_);
-
     //setup iterative block solver for nonsymmetric case
     typedef GMResSolverCL<DiagBlockPcT> GMResT;
-
     DiagBlockPcT    *DBlock_nonsym = new DiagBlockPcT( GMResPc_nonsym, *spc_);
     GMResT *GMRes_ = new GMResT( *DBlock_nonsym, P.get<int>("Solver.Iter"), P.get<int>("Solver.Iter"), P.get<double>("Solver.Tol"),
     		 /*bool relative=*/ false, /*bool calculate2norm=*/ false, /*PreMethGMRES method=*/ LeftPreconditioning,
 		          /*bool mod =*/ true,      /*bool useModGS =*/ false);
     BlockMatrixSolverCL<GMResT> *nonsym_stokessolver= new BlockMatrixSolverCL<GMResT>( *GMRes_);
-
-
     //pick correct solver
     StokesSolverBaseCL *Solver;
     if (  ( P.get<std::string>("SurfNavStokes.nonlinear_term") == "convective" )
@@ -485,9 +430,8 @@ int main (int argc, char* argv[]) {
             extsol_grad2 = &Test_A_plus_M_vSolVectorFun1_Gradient2;
             extsol_grad3 = &Test_A_plus_M_vSolVectorFun1_Gradient3;
             extpsol = &Test_A_plus_M_pSolScalarFun1;
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, Test_A_plus_M_RhsVectorFun1, extvsol, extpsol);
-            SetupInterfaceRhsP1(mg, &rhs2, lset.Phi, lset.GetBndData(), Test_A_plus_M_rhs2Fun1);
-
+            extrhs = &Test_A_plus_M_RhsVectorFun1;
+            extrhs2 = &Test_A_plus_M_rhs2Fun1;
         } else if( !testcase.compare("2")) {
             std::cout << "Test case 2 with vSol = [-y, x, 0]^T" << std::endl;
             extvsol = &Test_A_plus_M_vSolVectorFun2;
@@ -495,7 +439,7 @@ int main (int argc, char* argv[]) {
             extsol_grad2 = &Test_A_plus_M_vSolVectorFun2_Gradient2;
             extsol_grad3 = &Test_A_plus_M_vSolVectorFun2_Gradient3;
             extpsol = &Test_A_plus_M_pSolScalarFun2;
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, Test_A_plus_M_RhsVectorFun2, extvsol, extpsol);
+            extrhs = &Test_A_plus_M_RhsVectorFun2;
         } else if( !testcase.compare("3")) {
             std::cout << "Test case 3 with vSol = [-x*y-x*z+y^2+z^2, x^2-x*y-y*z+z^2, x^2-x*z+y^2-y*z]^T" << std::endl;
             extvsol = &Test_A_plus_M_vSolVectorFun3;
@@ -503,14 +447,14 @@ int main (int argc, char* argv[]) {
             extsol_grad2 = &Test_A_plus_M_vSolVectorFun3_Gradient2;
             extsol_grad3 = &Test_A_plus_M_vSolVectorFun3_Gradient3;
             extpsol = &Test_A_plus_M_pSolScalarFun3;
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, Test_A_plus_M_RhsVectorFun3, extvsol, extpsol);
+            extrhs = &Test_A_plus_M_RhsVectorFun3;
         } else if( !testcase.compare("4")) {
             std::cout << "Test case 4 (only mass matrix) with vSol = [-x*y-x*z+y^2+z^2, x^2-x*y-y*z+z^2, x^2-x*z+y^2-y*z]^T" << std::endl;
             extvsol = &Test_A_plus_M_vSolVectorFun3;
             extsol_grad1 = &Test_A_plus_M_vSolVectorFun3_Gradient1;
             extsol_grad2 = &Test_A_plus_M_vSolVectorFun3_Gradient2;
             extsol_grad3 = &Test_A_plus_M_vSolVectorFun3_Gradient3;
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, Test_A_plus_M_RhsVectorFun3, extvsol, extpsol);
+            extrhs = &Test_A_plus_M_RhsVectorFun3;
         } else if( !testcase.compare("5")) {
             std::cout << "Test case 5 (1_in_spherical) with vSol = P[-z^2, y, x]^T" << std::endl;
             extvsol = &Test_A_plus_M_vSolVectorFun5;
@@ -519,7 +463,7 @@ int main (int argc, char* argv[]) {
             extsol_grad3 = &Test_A_plus_M_vSolVectorFun5_Gradient3;
             extpsol = &Test_A_plus_M_pSolScalarFun5;//&TestL_LagrangeFun24;
             //SetupInterfaceRhsP1(mg, &rhs2, lset.Phi, lset.GetBndData(), Test_A_plus_M_rhs2Fun1);
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, Test_A_plus_M_RhsVectorFun5, extvsol, extpsol);
+            extrhs = &Test_A_plus_M_RhsVectorFun5;
         } else if( !testcase.compare("0")) {
             std::cout << "Test case 0 zero solution" << std::endl;
             extvsol = &ZeroVectorFun;
@@ -530,8 +474,6 @@ int main (int argc, char* argv[]) {
             extrhs = &ZeroVectorFun;
             extrhs2 = &ZeroScalarFun;
             InitVector(mg, vInit, &ZeroVectorFun);
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
-            SetupInterfaceRhsP1(mg, &rhs2, lset.Phi, lset.GetBndData(), extrhs2);
         }
         else if( !testcase.compare("6")) {
             std::cout << "Test case 6 with vSol = P[1, 0, 0]^T, pSol = y/(x^2+y^2+z^2)^(1/2)" << std::endl;
@@ -543,8 +485,6 @@ int main (int argc, char* argv[]) {
             extrhs = &Test_A_plus_M_RhsVectorFun6;
             extrhs2 = &Test_A_plus_M_rhs2Fun6;
             InitVector(mg, vInit, &Test_A_plus_M_vSolVectorFun6);
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
-      	    SetupInterfaceRhsP1(mg, &rhs2, lset.Phi, lset.GetBndData(), extrhs2);
         } else if( !testcase.compare("7")) {
         	std::cout << "Test case 7 with pSol = x*y^3/(x^2+y^2+z^2)^2+z/(x^2+y^2+z^2)^(1/2); " << std::endl;
         	extvsol = &Test_A_plus_M_vSolVectorFun7;
@@ -555,8 +495,6 @@ int main (int argc, char* argv[]) {
             extrhs = &Test_A_plus_M_RhsVectorFun7;
             extrhs2 = &Test_A_plus_M_rhs2Fun7;
             InitVector(mg, vInit, &Test_A_plus_M_vSolVectorFun7);
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
-        	SetupInterfaceRhsP1(mg, &rhs2, lset.Phi, lset.GetBndData(), extrhs2);
         }
         else if( !testcase.compare("8")) {
         	std::cout << "Test case 8 with vSol = P[-z^2, y, x]^T, pSol = (x*y^3/(x^2+y^2+z^2)^2+z/(x^2+y^2+z^2)^(1/2)); " << std::endl;
@@ -568,8 +506,6 @@ int main (int argc, char* argv[]) {
             extrhs = &Test_A_plus_M_RhsVectorFun8;
             extrhs2 = &Test_A_plus_M_rhs2Fun8;
             InitVector(mg, vInit, &Test_A_plus_M_vSolVectorFun8);
-        	InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
-        	SetupInterfaceRhsP1(mg, &rhs2, lset.Phi, lset.GetBndData(), extrhs2);
         }
         else if( !testcase.compare("85")) {
             std::cout << "Test case 85 with vSol = P normal_ext ( [-z^2, y, x]^T ), pSol = (x*y^3/(x^2+y^2+z^2)^2+z/(x^2+y^2+z^2)^(1/2)); " << std::endl;
@@ -581,8 +517,6 @@ int main (int argc, char* argv[]) {
             extrhs = &Test_A_plus_M_RhsVectorFun85;
             extrhs2 = &Test_A_plus_M_rhs2Fun85;
             InitVector(mg, vInit, &Test_A_plus_M_vSolVectorFun85);
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
-            SetupInterfaceRhsP1(mg, &rhs2, lset.Phi, lset.GetBndData(), extrhs2);
         }
         else if( !testcase.compare("9")) {
         	std::cout << "Test case 9 with vSol = n x grad(y*z), pSol = (x*y^3/(x^2+y^2+z^2)^2+z/(x^2+y^2+z^2)^(1/2)); " << std::endl;
@@ -594,8 +528,6 @@ int main (int argc, char* argv[]) {
             extrhs = &Test_A_plus_M_RhsVectorFun9;
             extrhs2 = &Test_A_plus_M_rhs2Fun9;
             InitVector(mg, vInit, &Test_A_plus_M_vSolVectorFun9);
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
-            SetupInterfaceRhsP1(mg, &rhs2, lset.Phi, lset.GetBndData(), extrhs2);
         }
         else if( !testcase.compare("95")) {
             std::cout << "Test case 95 with vSol = P[1,0,0]^T, pSol = (x*y^3/(x^2+y^2+z^2)^2+z/(x^2+y^2+z^2)^(1/2)); " << std::endl;
@@ -607,8 +539,6 @@ int main (int argc, char* argv[]) {
             extrhs = &Test_A_plus_M_RhsVectorFun95;
             extrhs2 = &Test_A_plus_M_rhs2Fun95;
             InitVector(mg, vInit, &Test_A_plus_M_vSolVectorFun95);
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
-            SetupInterfaceRhsP1(mg, &rhs2, lset.Phi, lset.GetBndData(), extrhs2);
         }
         else if( !testcase.compare("10")) {
         	std::cout << "Test case 10 initial velocity = (2+3)spherical harmonics; " << std::endl;
@@ -619,9 +549,8 @@ int main (int argc, char* argv[]) {
         	extsol_grad3 = &Test_A_plus_M_vSolVectorFun10_Gradient3;
         	extpsol = &Test_A_plus_M_pSolScalarFun10;
         	extrhs = &Test_A_plus_M_RhsVectorFun10;
-        	InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
+            extrhs2 = &Test_A_plus_M_rhs2Fun10;
         	InitVector(mg, vInit, extvinit);
-        	SetupInterfaceRhsP1(mg, &rhs2, lset.Phi, lset.GetBndData(), Test_A_plus_M_rhs2Fun10);
         }
         else if( !testcase.compare("11")) {
         	std::cout << "Test case 11 = (6 + convection) with vSol = P[1, 0, 0]^T, pSol = y/(x^2+y^2+z^2)^(1/2)" << std::endl;
@@ -630,8 +559,7 @@ int main (int argc, char* argv[]) {
         	extsol_grad2 = &Test_A_plus_M_vSolVectorFun6_Gradient2;
         	extsol_grad3 = &Test_A_plus_M_vSolVectorFun6_Gradient3;
         	extpsol = &Test_A_plus_M_pSolScalarFun6;
-        	InitVecLaplace(mg, lset, rhs, vSol, pSol, Test_A_plus_M_RhsVectorFun11, extvsol, extpsol);
-        	SetupInterfaceRhsP1(mg, &rhs2, lset.Phi, lset.GetBndData(), Test_A_plus_M_rhs2Fun6);
+        	extrhs2 = &Test_A_plus_M_rhs2Fun6;
         }
         else if( !testcase.compare("12")) {
                	std::cout << "Test case 12 = (11 + Bernouli pressure) with vSol = P[1, 0, 0]^T, pSol = vSol^2/2 + y/(x^2+y^2+z^2)^(1/2)" << std::endl;
@@ -640,8 +568,7 @@ int main (int argc, char* argv[]) {
                	extsol_grad2 = &Test_A_plus_M_vSolVectorFun6_Gradient2;
                	extsol_grad3 = &Test_A_plus_M_vSolVectorFun6_Gradient3;
                	extpsol = &Test_A_plus_M_pBerSolScalarFun12;
-               	InitVecLaplace(mg, lset, rhs, vSol, pSol, Test_A_plus_M_RhsVectorFun11, extvsol, extpsol);
-               	SetupInterfaceRhsP1(mg, &rhs2, lset.Phi, lset.GetBndData(), Test_A_plus_M_rhs2Fun6);
+               	extrhs2 = &Test_A_plus_M_rhs2Fun6;
                }
         else if( !testcase.compare("13")) {
                 	std::cout << "Test case 13 = (8 + convection) with vSol = P[-z^2, y, x]^T, pSol = (x*y^3/(x^2+y^2+z^2)^2+z/(x^2+y^2+z^2)^(1/2)); " << std::endl;
@@ -653,8 +580,6 @@ int main (int argc, char* argv[]) {
                 	extrhs2 = &Test_A_plus_M_rhs2Fun8;
                 	extpsol = &Test_A_plus_M_pSolScalarFun8;
                     InitVector(mg, vInit, &Test_A_plus_M_vSolVectorFun8);
-                    InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
-                    SetupInterfaceRhsP1(mg, &rhs2, lset.Phi, lset.GetBndData(), extrhs2);
 
                 }
         else if( !testcase.compare("14")) {
@@ -664,20 +589,18 @@ int main (int argc, char* argv[]) {
         	extsol_grad2 = &Test_A_plus_M_vSolVectorFun8_Gradient2;
         	extsol_grad3 = &Test_A_plus_M_vSolVectorFun8_Gradient3;
         	extpsol = &Test_A_plus_M_pBerSolScalarFun14;
-        	InitVecLaplace(mg, lset, rhs, vSol, pSol, Test_A_plus_M_RhsVectorFun13, extvsol, extpsol);
-        	SetupInterfaceRhsP1(mg, &rhs2, lset.Phi, lset.GetBndData(), Test_A_plus_M_rhs2Fun8);
+        	extrhs2 = &Test_A_plus_M_rhs2Fun8;
         }
         else if( !testcase.compare("15")) {
-                	std::cout << "Test case 15 = (13 - Bernouli pressure) with vSol = P[-z^2, y, x]^T, pSol = - vSol^2/2 +  (x*y^3/(x^2+y^2+z^2)^2+z/(x^2+y^2+z^2)^(1/2)); " << std::endl;
-                	extvsol = &Test_A_plus_M_vSolVectorFun8;
-                	extrhs  = &Test_A_plus_M_RhsVectorFun13;
-                	extsol_grad1 = &Test_A_plus_M_vSolVectorFun8_Gradient1;
-                	extsol_grad2 = &Test_A_plus_M_vSolVectorFun8_Gradient2;
-                	extsol_grad3 = &Test_A_plus_M_vSolVectorFun8_Gradient3;
-                	extpsol = &Test_A_plus_M_pBerSolScalarFun15;
-                	InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
-                	SetupInterfaceRhsP1(mg, &rhs2, lset.Phi, lset.GetBndData(), Test_A_plus_M_rhs2Fun8);
-                }
+            std::cout << "Test case 15 = (13 - Bernouli pressure) with vSol = P[-z^2, y, x]^T, pSol = - vSol^2/2 +  (x*y^3/(x^2+y^2+z^2)^2+z/(x^2+y^2+z^2)^(1/2)); " << std::endl;
+            extvsol = &Test_A_plus_M_vSolVectorFun8;
+            extrhs  = &Test_A_plus_M_RhsVectorFun13;
+            extsol_grad1 = &Test_A_plus_M_vSolVectorFun8_Gradient1;
+            extsol_grad2 = &Test_A_plus_M_vSolVectorFun8_Gradient2;
+            extsol_grad3 = &Test_A_plus_M_vSolVectorFun8_Gradient3;
+            extpsol = &Test_A_plus_M_pBerSolScalarFun15;
+            extrhs2 = &Test_A_plus_M_rhs2Fun8;
+        }
         else if( !testcase.compare("16")) {
         	std::cout << "Test case 16 = from Killing to Killing; " << std::endl;
         	extvsol = &Test_A_plus_M_vSolVectorFun16;
@@ -689,65 +612,56 @@ int main (int argc, char* argv[]) {
         	extsol_grad2 = &Test_A_plus_M_vSolVectorFun10_Gradient2;
         	extsol_grad3 = &Test_A_plus_M_vSolVectorFun10_Gradient3;
         	InitVector(mg, vInit, &Test_A_plus_M_vSolVectorFun16);
-        	InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
         }
         else if( !testcase.compare("17")) {
-                	std::cout << "Test case 17 = swirled Killing; " << std::endl;
-                	ParameterNS::nu = P.get<double>("SurfNavStokes.kinematic_viscosity");
-                	extvsol = &Test_A_plus_M_vSolVectorFun17;
-                	extpsol = &Test_A_plus_M_pSolScalarFun10;
-                	extrhs  = &Test_A_plus_M_RhsVectorFun17  ;//viscosity is here!
-                	extrhs2  = &ZeroScalarFun;
-                	extsol_grad1 = &Test_A_plus_M_vSolVectorFun17_Gradient1;
-                	extsol_grad2 = &Test_A_plus_M_vSolVectorFun17_Gradient2;
-                	extsol_grad3 = &Test_A_plus_M_vSolVectorFun17_Gradient3;
-                	InitVector(mg, vInit, &Test_A_plus_M_vSolVectorFun17);
-                	InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
-                }
-        else if( !testcase.compare("18")) {
-                        	std::cout << "Test case 18 = Kelvin-Helmholtz; " << std::endl;
-                        	ParameterNS::nu = P.get<double>("SurfNavStokes.kinematic_viscosity");
-                        	extvsol = &Test_A_plus_M_vSolVectorFun18;
-                        	extpsol = &Test_A_plus_M_pSolScalarFun10;
-                        	extrhs  = &ZeroVectorFun  ;
-                        	extrhs2  = &ZeroScalarFun;
-                        	extsol_grad1 = &Test_A_plus_M_vSolVectorFun10_Gradient1;
-                        	extsol_grad2 = &Test_A_plus_M_vSolVectorFun10_Gradient2;
-                        	extsol_grad3 = &Test_A_plus_M_vSolVectorFun10_Gradient3;
-                        	InitVector(mg, vInit, &Test_A_plus_M_vSolVectorFun18);
-                        	InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
-
-                        }
-        else if( !testcase.compare("19")) {
-                                	std::cout << "Test case 19 = vorteces; " << std::endl;
-                                	ParameterNS::nu = P.get<double>("SurfNavStokes.kinematic_viscosity");
-                                	extvsol = &ZeroVectorFun;
-                                	extpsol = &ZeroScalarFun;
-                                 	extrhs  = &ZeroVectorFun  ;
-                                	extrhs2  = &ZeroScalarFun;
-                                	extsol_grad1 = &ZeroVectorFun;
-                                	extsol_grad2 = &ZeroVectorFun;
-                                	extsol_grad3 = &ZeroVectorFun;
-                                	InitVector(mg, vInit, &Test_A_plus_M_disturbed_test18);
-                                	InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
-                                }
-        else if( !testcase.compare("20")) {
-                                      	std::cout << "Test case 20 = test 17 + swirling depends on x; " << std::endl;
-                                      	ParameterNS::nu = P.get<double>("SurfNavStokes.kinematic_viscosity");
-                                      	extvsol = &Test_A_plus_M_vSolVectorFun20;
-                                      	extpsol = &ZeroScalarFun;
-                                      	extcurlsol = &Test_A_plus_M_curlFun20;
-                                      	extrhs  = &Test_A_plus_M_RhsVectorFun20  ;//viscosity is here!
-                                      	extrhs2  = &Test_A_plus_M_rhs2Fun20;
-                                      	extsol_grad1 = &Test_A_plus_M_vSolVectorFun20_Gradient1;
-                                      	extsol_grad2 = &Test_A_plus_M_vSolVectorFun20_Gradient2;
-                                      	extsol_grad3 = &Test_A_plus_M_vSolVectorFun20_Gradient3;
-                                      	InitVector(mg, vInit, &Test_A_plus_M_vSolVectorFun20);
-                                      	InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
-                                    	SetupInterfaceRhsP1(mg, &rhs2, lset.Phi, lset.GetBndData(), extrhs2);
-
+            std::cout << "Test case 17 = swirled Killing; " << std::endl;
+            ParameterNS::nu = P.get<double>("SurfNavStokes.kinematic_viscosity");
+            extvsol = &Test_A_plus_M_vSolVectorFun17;
+            extpsol = &Test_A_plus_M_pSolScalarFun10;
+            extrhs  = &Test_A_plus_M_RhsVectorFun17  ;//viscosity is here!
+            extrhs2  = &ZeroScalarFun;
+            extsol_grad1 = &Test_A_plus_M_vSolVectorFun17_Gradient1;
+            extsol_grad2 = &Test_A_plus_M_vSolVectorFun17_Gradient2;
+            extsol_grad3 = &Test_A_plus_M_vSolVectorFun17_Gradient3;
+            InitVector(mg, vInit, &Test_A_plus_M_vSolVectorFun17);
         }
-
+        else if( !testcase.compare("18")) {
+            std::cout << "Test case 18 = Kelvin-Helmholtz; " << std::endl;
+            ParameterNS::nu = P.get<double>("SurfNavStokes.kinematic_viscosity");
+            extvsol = &Test_A_plus_M_vSolVectorFun18;
+            extpsol = &Test_A_plus_M_pSolScalarFun10;
+            extrhs  = &ZeroVectorFun  ;
+            extrhs2  = &ZeroScalarFun;
+            extsol_grad1 = &Test_A_plus_M_vSolVectorFun10_Gradient1;
+            extsol_grad2 = &Test_A_plus_M_vSolVectorFun10_Gradient2;
+            extsol_grad3 = &Test_A_plus_M_vSolVectorFun10_Gradient3;
+            InitVector(mg, vInit, &Test_A_plus_M_vSolVectorFun18);
+        }
+        else if( !testcase.compare("19")) {
+            std::cout << "Test case 19 = vorteces; " << std::endl;
+            ParameterNS::nu = P.get<double>("SurfNavStokes.kinematic_viscosity");
+            extvsol = &ZeroVectorFun;
+            extpsol = &ZeroScalarFun;
+            extrhs  = &ZeroVectorFun  ;
+            extrhs2  = &ZeroScalarFun;
+            extsol_grad1 = &ZeroVectorFun;
+            extsol_grad2 = &ZeroVectorFun;
+            extsol_grad3 = &ZeroVectorFun;
+            InitVector(mg, vInit, &Test_A_plus_M_disturbed_test18);
+        }
+        else if( !testcase.compare("20")) {
+            std::cout << "Test case 20 = test 17 + swirling depends on x; " << std::endl;
+            ParameterNS::nu = P.get<double>("SurfNavStokes.kinematic_viscosity");
+            extvsol = &Test_A_plus_M_vSolVectorFun20;
+            extpsol = &ZeroScalarFun;
+            extcurlsol = &Test_A_plus_M_curlFun20;
+            extrhs  = &Test_A_plus_M_RhsVectorFun20  ;//viscosity is here!
+            extrhs2  = &Test_A_plus_M_rhs2Fun20;
+            extsol_grad1 = &Test_A_plus_M_vSolVectorFun20_Gradient1;
+            extsol_grad2 = &Test_A_plus_M_vSolVectorFun20_Gradient2;
+            extsol_grad3 = &Test_A_plus_M_vSolVectorFun20_Gradient3;
+            InitVector(mg, vInit, &Test_A_plus_M_vSolVectorFun20);
+        }
     } else if( !levelset_fun_str.compare("xy_plane")) {
         if( !testcase.compare("1")) {
             std::cout << "Test case 1 with vSol = [sin(Pi*x)sin(Pi*y), sin(Pi*x)sin(Pi*y), 0]^T" << std::endl;
@@ -755,21 +669,18 @@ int main (int argc, char* argv[]) {
             extsol_grad1 = &Test_A_plus_M_xy_plane_vSolVectorFun1_Gradient1;
             extsol_grad2 = &Test_A_plus_M_xy_plane_vSolVectorFun1_Gradient2;
             extsol_grad3 = &Test_A_plus_M_xy_plane_vSolVectorFun1_Gradient3;
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, Test_A_plus_M_xy_plane_RhsVectorFun1, extvsol, extpsol);
         } else if( !testcase.compare("2")) {
             std::cout << "Test case 2 with vSol = [sin(Pi/2*x)sin(Pi/2*y), sin(Pi/2*x)sin(Pi/2*y), 0]^T" << std::endl;
             extvsol = &Test_A_plus_M_xy_plane_vSolVectorFun2;
             extsol_grad1 = &Test_A_plus_M_xy_plane_vSolVectorFun2_Gradient1;
             extsol_grad2 = &Test_A_plus_M_xy_plane_vSolVectorFun2_Gradient2;
             extsol_grad3 = &Test_A_plus_M_xy_plane_vSolVectorFun2_Gradient3;
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, Test_A_plus_M_xy_plane_RhsVectorFun2, extvsol, extpsol);
         } else if( !testcase.compare("3")) {
             std::cout << "Test case 3 with vSol = [sin(Pi/4*x)sin(Pi/4*y), sin(Pi/4*x)sin(Pi/4*y), 0]^T" << std::endl;
             extvsol = &Test_A_plus_M_xy_plane_vSolVectorFun3;
             extsol_grad1 = &Test_A_plus_M_xy_plane_vSolVectorFun3_Gradient1;
             extsol_grad2 = &Test_A_plus_M_xy_plane_vSolVectorFun3_Gradient2;
             extsol_grad3 = &Test_A_plus_M_xy_plane_vSolVectorFun3_Gradient3;
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, Test_A_plus_M_xy_plane_RhsVectorFun3, extvsol, extpsol);
         } else if( !testcase.compare("Zero")) {
             extvsol = &ZeroVectorFun;
             extsol_grad1 = &ZeroVectorFun;
@@ -781,7 +692,6 @@ int main (int argc, char* argv[]) {
             extsol_grad1 = &Test_A_plus_M_xy_plane_vSolVectorFun4_Gradient1;
             extsol_grad2 = &Test_A_plus_M_xy_plane_vSolVectorFun4_Gradient2;
             extsol_grad3 = &Test_A_plus_M_xy_plane_vSolVectorFun4_Gradient3;
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, Test_A_plus_M_xy_plane_RhsVectorFun4, extvsol, extpsol);
         }
     } else if( !levelset_fun_str.compare("tilted_plane")) {
         if( !testcase.compare("1")) {
@@ -790,14 +700,12 @@ int main (int argc, char* argv[]) {
             extsol_grad1 = &Test_A_plus_M_tilted_plane_vSolVectorFun1_Gradient1;
             extsol_grad2 = &Test_A_plus_M_tilted_plane_vSolVectorFun1_Gradient2;
             extsol_grad3 = &Test_A_plus_M_tilted_plane_vSolVectorFun1_Gradient3;
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, Test_A_plus_M_tilted_plane_RhsVectorFun1, extvsol, extpsol);
         } else if( !testcase.compare("2")) {
             std::cout << "Test case 2 with vSol = [4/5*(x^2-4)*(z^2-4), 2/5*(x^2-4)*(z^2-4), (x^2-4)*(z^2-4)]^T" << std::endl;
             extvsol = &Test_A_plus_M_tilted_plane_vSolVectorFun2;
             extsol_grad1 = &Test_A_plus_M_tilted_plane_vSolVectorFun2_Gradient1;
             extsol_grad2 = &Test_A_plus_M_tilted_plane_vSolVectorFun2_Gradient2;
             extsol_grad3 = &Test_A_plus_M_tilted_plane_vSolVectorFun2_Gradient3;
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, Test_A_plus_M_tilted_plane_RhsVectorFun2, extvsol, extpsol);
         }
     } else if( !levelset_fun_str.compare("tilted_plane_xy")) {
         if( !testcase.compare("1")) {
@@ -806,7 +714,6 @@ int main (int argc, char* argv[]) {
             extsol_grad1 = &Test_A_plus_M_tilted_plane_xy_vSolVectorFun1_Gradient1;
             extsol_grad2 = &Test_A_plus_M_tilted_plane_xy_vSolVectorFun1_Gradient2;
             extsol_grad3 = &Test_A_plus_M_tilted_plane_xy_vSolVectorFun1_Gradient3;
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, Test_A_plus_M_tilted_plane_xy_RhsVectorFun1, extvsol, extpsol);
         } else if( !testcase.compare("Zero")) {
             extvsol = &ZeroVectorFun;
             extsol_grad1 = &ZeroVectorFun;
@@ -818,30 +725,26 @@ int main (int argc, char* argv[]) {
             extsol_grad1 = &Test_A_plus_M_tilted_plane_xy_vSolVectorFun2_Gradient1;
             extsol_grad2 = &Test_A_plus_M_tilted_plane_xy_vSolVectorFun2_Gradient2;
             extsol_grad3 = &Test_A_plus_M_tilted_plane_xy_vSolVectorFun2_Gradient3;
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, Test_A_plus_M_tilted_plane_xy_RhsVectorFun2, extvsol, extpsol);
         } else if( !testcase.compare("3")) {
             std::cout << "Test case 3 with vSol = [4/17*(z^2-4)^2*(y^2-4)^2, (z^2-4)^2*(y^2-4)^2, 16/17*(z^2-4)^2*(y^2-4)^2]^T" << std::endl;
             extvsol = &Test_A_plus_M_tilted_plane_xy_vSolVectorFun3;
             extsol_grad1 = &Test_A_plus_M_tilted_plane_xy_vSolVectorFun3_Gradient1;
             extsol_grad2 = &Test_A_plus_M_tilted_plane_xy_vSolVectorFun3_Gradient2;
             extsol_grad3 = &Test_A_plus_M_tilted_plane_xy_vSolVectorFun3_Gradient3;
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, Test_A_plus_M_tilted_plane_xy_RhsVectorFun3, extvsol, extpsol);
         }
     }
     else if( !levelset_fun_str.compare("cube_madeof_edges")) {
-           if( !testcase.compare("1")) {
-               std::cout << "Test case 1 with nonzero divergence" << std::endl;
-               extrhs  = &Test_cube_madeof_edges_RhsVectorFun1;
-               extvsol 		= &Test_cube_madeof_edges_vSolVectorFun1;
-               extsol_grad1 = &Test_cube_madeof_edges_vSolVectorFun1_Gradient1;
-               extsol_grad2 = &Test_cube_madeof_edges_vSolVectorFun1_Gradient2;
-               extsol_grad3 = &Test_cube_madeof_edges_vSolVectorFun1_Gradient3;
-               extpsol		= &Test_cube_madeof_edges_pSolScalarFun1;
-               InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
-               SetupInterfaceRhsP1(mg, &rhs2, lset.Phi, lset.GetBndData(), Test_cube_madeof_edges_rhs2Fun1 );
-
-           }
-    } else  if( !levelset_fun_str.compare("torus")) {
+        if( !testcase.compare("1")) {
+            std::cout << "Test case 1 with nonzero divergence" << std::endl;
+            extrhs = &Test_cube_madeof_edges_RhsVectorFun1;
+            extrhs2 = &Test_cube_madeof_edges_rhs2Fun1;
+            extvsol 		= &Test_cube_madeof_edges_vSolVectorFun1;
+            extsol_grad1 = &Test_cube_madeof_edges_vSolVectorFun1_Gradient1;
+            extsol_grad2 = &Test_cube_madeof_edges_vSolVectorFun1_Gradient2;
+            extsol_grad3 = &Test_cube_madeof_edges_vSolVectorFun1_Gradient3;
+            extpsol		= &Test_cube_madeof_edges_pSolScalarFun1;
+        }
+    } else if( !levelset_fun_str.compare("torus")) {
         if( !testcase.compare("1")) {
             std::cout << "Test case 1 = Arnold example; " << std::endl;
             ParameterNS::nu = P.get<double>("SurfNavStokes.kinematic_viscosity");
@@ -853,7 +756,6 @@ int main (int argc, char* argv[]) {
             extsol_grad2 = &ZeroVectorFun;
             extsol_grad3 = &ZeroVectorFun;
             InitVector(mg, vInit, extvsol);
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
         }
         if( !testcase.compare("2")) {
             std::cout << "Test case 2 = linear combinations; " << std::endl;
@@ -866,7 +768,6 @@ int main (int argc, char* argv[]) {
             extsol_grad2 = &ZeroVectorFun;
             extsol_grad3 = &ZeroVectorFun;
             InitVector(mg, vInit, extvsol);
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
         }
     } else  if( !levelset_fun_str.compare("torus_flower")) {
         if( !testcase.compare("1")) {
@@ -880,47 +781,44 @@ int main (int argc, char* argv[]) {
             extsol_grad2 = &ZeroVectorFun;
             extsol_grad3 = &ZeroVectorFun;
             InitVector(mg, vInit, extvsol);
-            InitVecLaplace(mg, lset, rhs, vSol, pSol, extrhs, extvsol, extpsol);
         }
     }
-
-/////////////////////////////////////// Navier-Stokes ///////////////////////////////////////
+    // set up interpolants for exact solution
+    InitScalar(mg, pSol, extpsol);
+    InitVector(mg, vSol, extvsol);
+    // set up rhs
+    InitVector(mg, fRHS,  extrhs);
+    InitScalar(mg, gRHS, extrhs2);
+    fRHS.Data = M.Data * fRHS.Data;
+    gRHS.Data = Schur.Data * gRHS.Data;
 
 	if( !model.compare("NavierStokes")) {
-
 		//set up discrete vectors and matrices
     	VectorCL id, id2, random ;
-        id.resize(rhs.Data.size(), 1);
-
-        random.resize(rhs.Data.size(), 0);
-        for (int i=0; i<rhs.Data.size(); i++)
-        {
-        	random[i]=  - 5 + (rand() % 10)   ;
-        }
-
-        id2.resize(rhs2.Data.size(), 1);
+        id.resize(fRHS.Data.size(), 1);
+        random.resize(fRHS.Data.size(), 0);
+        for (int i=0; i<fRHS.Data.size(); i++)
+        	random[i] = - 5 + (rand() % 10);
+        id2.resize(gRHS.Data.size(), 1);
         MatrixCL Adyn, Ahat, Bhat, Chat, Mhat;
         MatrixCL BTranspose, NTranspose;
         DROPS::VecDescCL instantrhs;
         DROPS::VecDescCL vxtent, pxtent;
-
         //set up output
         std::string filename = "test" + testcase + "_";
        	std::string dirname  = P.get<std::string>("Output.Directory") + "/" + model + "_" + levelset_fun_str + "/" + "test" + testcase + "_h=" + std::to_string(float(h));
-
        	std::cout << "dirname: " << dirname << std::endl;
-
        	//set up VTK output
        	VTKOutCL* vtkwriter = nullptr;
        	vtkwriter = new VTKOutCL(mg, "DROPS data", (int)P.get<double>("Time.NumSteps")/P.get<int>("Output.every timestep"), dirname , filename, "none", 0);
        	vtkwriter->Register(make_VTKScalar(lset.GetSolution(), "level-set"));
        	vtkwriter->Register(make_VTKIfaceVector(mg, vSol, "velSol", velFE, vbnd));
-       	vtkwriter->Register(make_VTKIfaceVector(mg, rhs, "rhs", velFE, vbnd));
+       	vtkwriter->Register(make_VTKIfaceVector(mg, fRHS, "rhs", velFE, vbnd));
        	vtkwriter->Register(make_VTKIfaceVector(mg, v, "velocity", velFE, vbnd));
        	vtkwriter->Register(make_VTKIfaceScalar(mg, p, "pressure", /*prFE,*/ pbnd));
        	vtkwriter->Register(make_VTKIfaceScalar(mg, curl, "vorticity", /*prFE,*/ pbnd));
        	vtkwriter->Register(make_VTKIfaceScalar(mg, curlSol, "vortSol", /*prFE,*/ pbnd));
-       	vtkwriter->Register(make_VTKIfaceScalar(mg, rhs2, "rhs2", /*prFE,*/ pbnd));
+       	vtkwriter->Register(make_VTKIfaceScalar(mg, gRHS, "gRHS", /*prFE,*/ pbnd));
        	vtkwriter->Register(make_VTKIfaceScalar(mg, pSol, "pSol", /*prFE,*/ pbnd));
 
         //set up a txt file for custom time output
@@ -958,7 +856,7 @@ int main (int argc, char* argv[]) {
         	//renormalization to fullfill \int rhs = 0 in discrete sence
 
         	curl_proj.Data = Omega.Data*v.Data  - ( dot(Omega.Data*v.Data,id2) / dot(id2,id2) ) * id2;
-        	//GMResSolver_.Solve(Mhat, curl.Data,curl_proj.Data , rhs2.Data);
+        	//GMResSolver_.Solve(Mhat, curl.Data,curl_proj.Data , gRHS.Data);
             InitScalar(mg, p, extpsol);
         	//output of initial data and exact solutions to vtk and custom
         	vtkwriter->Write(0);//send v to vtk
@@ -968,7 +866,7 @@ int main (int argc, char* argv[]) {
         	BndDataCL<double> bndscalar = pbnd;
         	double l2norm = L2_Vector_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndvec, vxtent), &ZeroVectorFun);
         	double mom = dot(M.Data * vInit.Data,id);
-        	double work = dot(M.Data * vInit.Data,rhs.Data);
+        	double work = dot(M.Data * vInit.Data,fRHS.Data);
         	log_solo << std::to_string(0.0) << "\t" << std::to_string((float)(l2norm*l2norm*0.5)) << "\t" << std::to_string((float)(mom))<< "\t" << std::to_string((float)(work)) << std::endl;
 
         	bool experimental=false;
@@ -1102,19 +1000,15 @@ int main (int argc, char* argv[]) {
         			std::cout << "nonlinear_term: none" << std::endl;
         			Adyn=Ahat;
         		}
-
         		//set up rhs from external forces
-        		SetupInterfaceVectorRhsP1(mg, &rhs, lset.Phi, lset.GetBndData(), extrhs, (i+1)*tau);
-        		rhs2.Data.resize(rhs2.Data.size(), 0.0);
-        		SetupInterfaceRhsP1(mg, &rhs2, lset.Phi, lset.GetBndData(), extrhs2, (i+1)*tau);
-
+                InitVector(mg, fRHS,  extrhs, (i+1)*tau);
+                InitScalar(mg, gRHS, extrhs2, (i+1)*tau);
+                fRHS.Data = M.Data * fRHS.Data;
+                gRHS.Data = Schur.Data * gRHS.Data;
         		//renormalization to fullfill \int rhs = 0 in discrete sence
-                //rhs.Data    -= ( dot(rhs.Data,id)   / dot(id,id)   ) * id;
-                rhs2.Data   -= ( dot(rhs2.Data,id2) / dot(id2,id2) ) * id2;
-
+                gRHS.Data   -= ( dot(gRHS.Data,id2) / dot(id2,id2) ) * id2;
         		//set actual external force to instant rhs
-        		instantrhs = rhs;
-
+        		instantrhs = fRHS;
         		// pick inertial term and reinitialise unknowns
         		if ( P.get<std::string>("SurfNavStokes.instationary") == "BDF1")
         		{
@@ -1146,7 +1040,7 @@ int main (int argc, char* argv[]) {
         		Adyn.LinComb(1.0, Adyncopy, 1.0, M.Data);*/
 
         		//solve linear system
-       			Solver->Solve(Adyn, Bhat, Chat, v.Data, p.Data, instantrhs.Data, rhs2.Data,v.RowIdx->GetEx(), p.RowIdx->GetEx() );
+       			Solver->Solve(Adyn, Bhat, Chat, v.Data, p.Data, instantrhs.Data, gRHS.Data,v.RowIdx->GetEx(), p.RowIdx->GetEx() );
 
        			//std::cout <<  (3./(2.*tau)) * v.Data  - (2./tau) * v_old.Data + (1./(2.*tau)) * v_oldold.Data;
 
@@ -1160,15 +1054,15 @@ int main (int argc, char* argv[]) {
         		//renormalization to fullfill \int rhs = 0 in discrete sence
 
         		curl_proj.Data = Omega.Data*v.Data  - ( dot(Omega.Data*v.Data,id2) / dot(id2,id2) ) * id2;
-        		//GMResSolver_.Solve(Mhat, curl.Data,curl_proj.Data , rhs2.Data);
-                //curl.Data = rhs2.Data;
+        		//GMResSolver_.Solve(Mhat, curl.Data,curl_proj.Data , gRHS.Data);
+                //curl.Data = gRHS.Data;
 
         		//postprocess output to normalize pressure
         		p.Data -=  dot(Schur.Data * p.Data,id2) / dot(Schur.Data*id2,id2) * id2;
 
                 //check residuals
         		std::cout << "norm( Adyn * v + B^T  * p  -  instantrhs) ist: " << norm(Adyn*v.Data + BTranspose*p.Data - instantrhs.Data) << std::endl;
-        	    std::cout << "norm( B    * v + Chat * p - rhs2) ist: " << norm(B.Data*v.Data + Chat * p.Data - rhs2.Data) << std::endl;
+        	    std::cout << "norm( B    * v + Chat * p - gRHS) ist: " << norm(B.Data*v.Data + Chat * p.Data - gRHS.Data) << std::endl;
 
         		//skip vtk output of needed
         		if ((i+1) % P.get<int>("Output.every timestep")  == 0)
@@ -1216,7 +1110,7 @@ int main (int argc, char* argv[]) {
         			log_error <<  std::to_string((float)error_L2) << "\t";
         			double l2norm = L2_Vector_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndvec, vxtent), &ZeroVectorFun, (i+1)*tau);
         			log << "The L2-Norm of v  is: " << l2norm<< std::endl;
-         			log_solo << std::to_string((float)(l2norm*l2norm*0.5)) << "\t" << std::to_string((float) dot(M.Data * v.Data,id) ) << "\t" << dot(M.Data * v.Data,rhs.Data) << std::endl;
+         			log_solo << std::to_string((float)(l2norm*l2norm*0.5)) << "\t" << std::to_string((float) dot(M.Data * v.Data,id) ) << "\t" << dot(M.Data * v.Data,fRHS.Data) << std::endl;
         			double H1( 0.), surfH1( 0.), advanced_surfH1( 0.), normal_velocity( 0.);
         			H1_Vector_error_P1(mg, lset.Phi, lset.GetBndData(), v, vbnd, extvsol, extsol_grad1, extsol_grad2, extsol_grad3, tau_u, H1, surfH1, advanced_surfH1, normal_velocity, (i+1)*tau);
         			//        std::cout << "The H1-Norm of v - vSol is: " << H1 << std::endl;
@@ -1247,7 +1141,7 @@ int main (int argc, char* argv[]) {
         }
         else if ( P.get<std::string>("SurfNavStokes.instationary") == "none" ) {
         	//renormalization to fullfill \int rhs = 0 in discrete sence
-            rhs2.Data     -= ( dot(rhs2.Data,id2) / dot(id2,id2) ) * id2;
+            gRHS.Data     -= ( dot(gRHS.Data,id2) / dot(id2,id2) ) * id2;
 
         	//current timestep logfile
             std::string shiftName = "";
@@ -1344,7 +1238,7 @@ int main (int argc, char* argv[]) {
 
 
         			//solve for v_aux, p_aux
-        			nonsym_stokessolver->Solve(Adyn, Bhat, Chat, v_aux.Data, p_aux.Data, rhs.Data, rhs2.Data,v.RowIdx->GetEx(), p.RowIdx->GetEx() );
+        			nonsym_stokessolver->Solve(Adyn, Bhat, Chat, v_aux.Data, p_aux.Data, fRHS.Data, gRHS.Data,v.RowIdx->GetEx(), p.RowIdx->GetEx() );
 
         			p_aux.Data -=  dot(Schur.Data * p_aux.Data,id2) / dot(Schur.Data*id2,id2) * id2;
 
@@ -1352,10 +1246,10 @@ int main (int argc, char* argv[]) {
         			v.Data = omega*v_aux.Data + (1-omega)*v_old.Data;
         			p.Data = omega*p_aux.Data + (1-omega)*p_old.Data;
 
-                    std::cout << "norm( Adyn*v + BTranspose*p - rhs ): " << norm(Adyn*v.Data + BTranspose*p.Data - rhs.Data)<<std::endl;
-                    std::cout << "norm( B * v + Chat*p - rhs2       ): " << norm( B.Data*v.Data + Chat*p.Data -rhs2.Data ) << std::endl;
+                    std::cout << "norm( Adyn*v + BTranspose*p - rhs ): " << norm(Adyn*v.Data + BTranspose*p.Data - fRHS.Data)<<std::endl;
+                    std::cout << "norm( B * v + Chat*p - gRHS       ): " << norm( B.Data*v.Data + Chat*p.Data -gRHS.Data ) << std::endl;
 
-                    res = pow( norm(Adyn*v.Data + BTranspose*p.Data - rhs.Data), 2.0) + pow( norm(B.Data*v.Data + Chat * p.Data - rhs2.Data), 2.0);
+                    res = pow( norm(Adyn*v.Data + BTranspose*p.Data - fRHS.Data), 2.0) + pow( norm(B.Data*v.Data + Chat * p.Data - gRHS.Data), 2.0);
         			std::cout << "residual^2 after nonlinear iteration #" << iter << ": " << res << std::endl;
         		}
         		while (  ( iter < max_iter)
@@ -1376,7 +1270,7 @@ int main (int argc, char* argv[]) {
                     Chat.LinComb(0, Schur.Data, 0, Schur.Data);
                 }
         		transpose(B.Data, BTranspose);
-        		stokessolver->Solve(Adyn, Bhat, Chat, v.Data, p.Data, rhs.Data, rhs2.Data, v.RowIdx->GetEx(), p.RowIdx->GetEx());
+        		stokessolver->Solve(Adyn, Bhat, Chat, v.Data, p.Data, fRHS.Data, gRHS.Data, v.RowIdx->GetEx(), p.RowIdx->GetEx());
         	}
 
         	//postprocess output pressure up to constant
@@ -1384,8 +1278,8 @@ int main (int argc, char* argv[]) {
 
 
         	//check residuals
-        	log << "norm( Adyn * v + B^T  * p -  rhs) ist: " << norm(Adyn*v.Data + BTranspose*p.Data - rhs.Data) << std::endl;
-        	log << "norm( B    * v + Chat * p - rhs2) ist: " << norm(B.Data*v.Data + Chat * p.Data - rhs2.Data) << std::endl;
+        	log << "norm( Adyn * v + B^T  * p -  rhs) ist: " << norm(Adyn*v.Data + BTranspose*p.Data - fRHS.Data) << std::endl;
+        	log << "norm( B    * v + Chat * p - gRHS) ist: " << norm(B.Data*v.Data + Chat * p.Data - gRHS.Data) << std::endl;
 
         	//skip vtk output of needed
         	if (P.get<int>("Output.every timestep") > 0)
@@ -1409,6 +1303,8 @@ int main (int argc, char* argv[]) {
             std::cout << "pre mass mtx is               " << Schur.Data.num_rows() << " * " << Schur.Data.num_cols() << '\n';
             std::cout << "pressure soln size is         " << p.Data.size() << '\n';
             std::cout << "exact pressure interp size is " << pSol.Data.size() << '\n';
+            std::cout << "f size is                     " << fRHS.Data.size() << '\n';
+            std::cout << "g size is                     " << gRHS.Data.size() << '\n';
 
             VectorCL vSolMinusV = vSol.Data - v.Data, pSolMinusP = pSol.Data - p.Data;
             auto velL2          = sqrt(dot(v.Data, M.Data * v.Data));
