@@ -764,6 +764,8 @@ struct LocalStokesParam {
         instat_matrix_fun_ptr exactShape  = nullptr;
         instat_scalar_fun_ptr exactDistance = nullptr;
         instat_scalar_fun_ptr levelSet = nullptr;
+        instat_vector_fun_ptr f = nullptr; // moment rhs
+        instat_scalar_fun_ptr g = nullptr; // - continuity eqn rhs
     } input;
     struct {
         struct {
@@ -775,7 +777,12 @@ struct LocalStokesParam {
     } output;
 };
 
-void SetupStokesIF_P2P1      ( const MultiGridCL& MG_, MatDescCL* A_P2, MatDescCL* A_P2_stab, MatDescCL* B_P1P2, MatDescCL* M_P2, MatDescCL* S_P2, MatDescCL* M_ScalarP1, MatDescCL* M_ScalarP1_stab, MatDescCL* A_ScalarP1_stab, const LevelsetP2CL& lset, LocalStokesParam*);
+struct StokesSystem {
+    MatDescCL A, A_stab, B, M, S, Schur, Schur_stab, Schur_normal_stab;
+    VecDescCL fRHS, gRHS;
+};
+
+void SetupStokesIF_P2P1      ( const MultiGridCL& MG_, const LevelsetP2CL&, StokesSystem*, LocalStokesParam*);
 void SetupStokesIF_P1P1      ( const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P1_stab, MatDescCL* B_P1P1, MatDescCL* M_P1, MatDescCL* S_P1, MatDescCL* L_P1P1, MatDescCL* L_P1P1_stab, MatDescCL* M_ScalarP1, MatDescCL* A_ScalarP1_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, LocalStokesParam*);
 void SetupNavierStokesIF_P1P1( const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P1_stab, MatDescCL* B_P1P1, MatDescCL* Omega_P1P1, MatDescCL* N_P1,  MatDescCL* NT_P1, MatDescCL* M_P1,MatDescCL* D_P1, MatDescCL* S_P1, MatDescCL* L_P1P1, MatDescCL* L_P1P1_stab, MatDescCL* M_ScalarP1, MatDescCL* A_ScalarP1_stab, MatDescCL* Schur_normalP1_stab, const LevelsetP2CL& lset, const VecDescCL& velocity, const BndDataCL<Point3DCL>& velocity_bnd, LocalStokesParam*);
 void SetupStokesIF_P1P2      ( const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P1_stab, MatDescCL* B_P2P1, MatDescCL* M_P1, MatDescCL* S_P1, MatDescCL* L_P2P1, MatDescCL* L_P2P1_stab, MatDescCL* M_ScalarP2, MatDescCL* A_ScalarP2_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, LocalStokesParam*);

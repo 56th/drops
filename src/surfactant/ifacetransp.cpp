@@ -344,9 +344,10 @@ private:
             qExactOrP2Normal, // either normal computed from P2 interpolant, or normals exact to patch of integration
             qAnalyticNormal, // exact normal to exact surface
             qrotP1[12], qvP1, qvProjP1,
-            qProj[3]; // ith element is ith ROW of P
+            qProj[3], // ith element is ith ROW of P
+            qF; // rhs
     GridFunctionCL<Point3DCL> qLsGrad, qP1grad[4], qSurfP1grad[4], qP2grad[10], qSurfP2grad[10];
-    GridFunctionCL<> qP1Hat[4], qP2Hat[10], qLsGradNorm, qconvP1[4], qdivP1, qP2NormalComp[3], qExactOrP2NormalComp[3], qvProjP1_comp[3], qvP1_comp[3];
+    GridFunctionCL<> qG, qP1Hat[4], qP2Hat[10], qLsGradNorm, qconvP1[4], qdivP1, qP2NormalComp[3], qExactOrP2NormalComp[3], qvProjP1_comp[3], qvP1_comp[3];
     GridFunctionCL<SMatrixCL<3,3>> qP; // projection
     GridFunctionCL<SMatrixCL<3,3>> qP2E[30]; // surface rate-of-strain stress tensor, qP1E[i] = $E_s(\phi_i)$, $\phi_i$ = ith vector (velocity) shape func
     GridFunctionCL<SMatrixCL<3,3>> qHess, qAnalyticHess;
@@ -384,8 +385,10 @@ public:
     void setupB_P2P2 (double B_P2P2[10][30]);
     void setupB_P2P1 (double B_P2P1[10][12]);
     void setupM_P2 (double M_P2[10][10]);
+    void setupF_P2 (double F_P2[30]);
     void setupM_P2_consistent (double M_P2[30][30]);
     void setupM_P1 (double M_P1[4][4]);
+    void setupG_P1 (double G_P1[4]);
     void setupS_P2 (double S_P2[30][30]);
     void setupS_P1 (double S_P1[12][12]);
     void setupL_P1P1 (double L_P1P1[4][12]);
@@ -503,11 +506,13 @@ void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& l
 //    }
 //    std::cout << '\n';
 // DO NOT DELETE
+    // compute rhs
+    if (param->input.f != nullptr) resize_and_evaluate_on_vertexes(param->input.f, tet, q2Ddomain, 0., qF);
+    if (param->input.g != nullptr) resize_and_evaluate_on_vertexes(param->input.g, tet, q2Ddomain, 0., qG);
     // compute normal
     resize_and_evaluate_on_vertexes(getLevelsetGrad(ls), q2Ddomain, qLsGrad);
     qLsGradNorm   = sqrt(dot(qLsGrad, qLsGrad));
     qP2Normal      = qLsGrad / qLsGradNorm;
-
     size_t numbOfQuadPoints = qP2Normal.size() / spatch.facet_size();
     std::vector<Point3DCL> qExactNormalInit;
     qExactNormalInit.reserve(numbOfQuadPoints * spatch.facet_size());
@@ -903,12 +908,18 @@ void LocalStokesCL::setupB_P2P1 (double B_P2P1[10][12]) {
 }
 
 void LocalStokesCL::setupM_P2 (double M_P2[10][10]) {
-     //Do all combinations for (i,j) i,j=4 x 30 and corresponding quadrature
-        for (int i=0; i < 10; ++i) {
-            for (int j=0; j<10; ++j) {
-                 M_P2[i][j] = quad_2D( qP2Hat[i]*qP2Hat[j], q2Ddomain);
-            }
-        }
+     for (int i=0; i < 10; ++i)
+         for (int j=0; j<10; ++j)
+             M_P2[i][j] = quad_2D( qP2Hat[i]*qP2Hat[j], q2Ddomain);
+}
+
+void LocalStokesCL::setupF_P2(double F_P2[30]) {
+    for (size_t i = 0; i < 30; ++i) {
+        auto is = i / 3; // scalar shape index
+        auto in = i - 3 * is; // nonzero vect component
+        auto e_in = DROPS::std_basis<3>(in + 1);
+        F_P2[i] = quad_2D(dot(e_in, qF) * qP2Hat[is], q2Ddomain);
+    }
 }
 
 void LocalStokesCL::setupM_P2_consistent(double M_P2[30][30]) {
@@ -927,14 +938,16 @@ void LocalStokesCL::setupM_P2_consistent(double M_P2[30][30]) {
     }
 }
 
-void LocalStokesCL::setupM_P1 (double M_P1[4][4])
-{
+void LocalStokesCL::setupM_P1 (double M_P1[4][4]) {
     // Do all combinations for (i,j) i,j=4 x 4 and corresponding quadrature
-    for (int i=0; i<4; ++i) {
-        for (int j=0; j<4; ++j) {
-             M_P1[i][j]= quad_2D( qP1Hat[i]*qP1Hat[j], q2Ddomain);
-        }
-    }
+    for (int i=0; i<4; ++i)
+        for (int j=0; j<4; ++j)
+             M_P1[i][j]= quad_2D(qP1Hat[i] * qP1Hat[j], q2Ddomain);
+}
+
+void LocalStokesCL::setupG_P1(double G_P1[4]) {
+    for (size_t i = 0; i < 4; ++i)
+        G_P1[i] = quad_2D(qG * qP1Hat[i], q2Ddomain);
 }
 
 void LocalStokesCL::setupS_P2 (double S_P2[30][30])
@@ -1200,7 +1213,7 @@ class StokesIFAccumulator_P1P1CL : public TetraAccumulatorCL
 
     ///\brief Computes the mapping from local to global data "n", the local matrices in loc and.
     void local_setup (const TetraCL& tet);
-    ///\brief Update the global system.
+    ///\brief Update the global system->
     void update_global_system ();
 
 public:
@@ -1373,7 +1386,7 @@ class NavierStokesIFAccumulator_P1P1CL : public TetraAccumulatorCL
 
     ///\brief Computes the mapping from local to global data "n", the local matrices in loc and.
     void local_setup (const TetraCL& tet);
-    ///\brief Update the global system.
+    ///\brief Update the global system->
     void update_global_system ();
 
   public:
@@ -1625,7 +1638,7 @@ class StokesIFAccumulator_P1P2CL : public TetraAccumulatorCL
 
     ///\brief Computes the mapping from local to global data "n", the local matrices in loc and.
     void local_setup (const TetraCL& tet);
-    ///\brief Update the global system.
+    ///\brief Update the global system->
     void update_global_system ();
 public:
     StokesIFAccumulator_P1P2CL( const VecDescCL& ls, const LsetBndDataCL& ls_bnd, IdxDescCL& P1FE, IdxDescCL& ScalarP2FE, MatrixCL& A_P1, MatrixCL& A_P1_stab, MatrixCL& B_P2P1, MatrixCL& M_P1, MatrixCL& S_P1, MatrixCL& L_P2P1, MatrixCL& L_P2P1_stab, MatrixCL& M_ScalarP2, MatrixCL& A_ScalarP2_stab, LocalStokesParam* param)
@@ -1788,30 +1801,40 @@ class StokesIFAccumulator_P2P1CL : public TetraAccumulatorCL {
   private:
     const VecDescCL& lset;
     const LsetBndDataCL& lset_bnd;
-
     IdxDescCL& P2Idx_;
     IdxDescCL& ScalarP1Idx_;
     IdxT numP2[10], numScalarP1[4];
-
     MatrixCL &A_P2_, &A_P2_stab_, &B_P1P2_, &M_P2_, &S_P2_, &M_ScalarP1_, &M_ScalarP1_stab_, &A_ScalarP1_stab_;
+    VectorCL &fRHS_, &gRHS_;
     MatrixBuilderCL *mA_P2_, *mA_P2_stab_, *mB_P1P2_, *mM_P2_, *mS_P2_, *mM_ScalarP1_, *mM_ScalarP1_stab_, *mA_ScalarP1_stab_;
-
     double locA_P2[30][30], locA_P2_stab[10][10], locB_P1P2[4][30], locM_P2[10][10], locS_P2[30][30], locM_ScalarP1[4][4], locM_ScalarP1_stab[4][4], locA_ScalarP1_stab[4][4];
-
+    double locF_P2[30], locG_P1[4];
     LocalStokesCL localStokes_;
-
     SMatrixCL<3,3> T;
     double det, absdet;
     LocalP2CL<> ls_loc;
-
     ///\brief Computes the mapping from local to global data "n", the local matrices in loc and.
     void local_setup (const TetraCL& tet);
-    ///\brief Update the global system.
+    ///\brief Update the global system->
     void update_global_system ();
 
 public:
-    StokesIFAccumulator_P2P1CL(const LevelsetP2CL& ls, IdxDescCL& P2FE, IdxDescCL& ScalarP1FE, MatrixCL& A_P2, MatrixCL& A_P2_stab, MatrixCL& B_P1P2, MatrixCL& M_P2, MatrixCL& S_P2, MatrixCL& M_ScalarP1, MatrixCL& M_ScalarP1_stab, MatrixCL& A_ScalarP1_stab, LocalStokesParam* param)
-    : lset(ls.Phi), lset_bnd(ls.GetBndData()), P2Idx_(P2FE), ScalarP1Idx_(ScalarP1FE), A_P2_(A_P2), A_P2_stab_(A_P2_stab), B_P1P2_(B_P1P2), M_P2_(M_P2), S_P2_(S_P2), M_ScalarP1_(M_ScalarP1), M_ScalarP1_stab_(M_ScalarP1_stab), A_ScalarP1_stab_(A_ScalarP1_stab), localStokes_(param)
+    StokesIFAccumulator_P2P1CL(const LevelsetP2CL& ls, StokesSystem* system, LocalStokesParam* param)
+    : lset(ls.Phi)
+    , lset_bnd(ls.GetBndData())
+    , P2Idx_(*(system->A.RowIdx))
+    , ScalarP1Idx_(*(system->B.RowIdx))
+    , A_P2_(system->A.Data)
+    , A_P2_stab_(system->A_stab.Data)
+    , B_P1P2_(system->B.Data)
+    , M_P2_(system->M.Data)
+    , S_P2_(system->S.Data)
+    , M_ScalarP1_(system->Schur.Data)
+    , M_ScalarP1_stab_(system->Schur_stab.Data)
+    , A_ScalarP1_stab_(system->Schur_normal_stab.Data)
+    , fRHS_(system->fRHS.Data)
+    , gRHS_(system->gRHS.Data)
+    , localStokes_(param)
     {}
 
     ///\brief Initializes matrix-builders and load-vectors
@@ -1835,6 +1858,8 @@ void StokesIFAccumulator_P2P1CL::begin_accumulation() {
     mM_ScalarP1_= new MatrixBuilderCL( &M_ScalarP1_, num_unks_scalarp1, num_unks_scalarp1);
     mA_ScalarP1_stab_ = new MatrixBuilderCL( &A_ScalarP1_stab_, num_unks_scalarp1, num_unks_scalarp1);
     mM_ScalarP1_stab_ = new MatrixBuilderCL( &M_ScalarP1_stab_, num_unks_scalarp1, num_unks_scalarp1);
+    fRHS_.resize(num_unks_p2, 0.);
+    gRHS_.resize(num_unks_scalarp1, 0.);
 }
 
 void StokesIFAccumulator_P2P1CL::finalize_accumulation() {
@@ -1886,26 +1911,32 @@ void StokesIFAccumulator_P2P1CL::local_setup (const TetraCL& tet) {
         localStokes_.setupM_P1(locM_ScalarP1);
         localStokes_.setupA_P1_stab(locA_ScalarP1_stab, absdet);
         localStokes_.setupM_P1_stab(locM_ScalarP1_stab, absdet);
+        localStokes_.setupF_P2(locF_P2);
+        localStokes_.setupG_P1(locG_P1);
     }
 }
 
 void StokesIFAccumulator_P2P1CL::update_global_system() {
-    MatrixBuilderCL& mA_P2= *mA_P2_;
-    MatrixBuilderCL& mA_P2_stab= *mA_P2_stab_;
-    MatrixBuilderCL& mB_P1P2= *mB_P1P2_;
-    MatrixBuilderCL& mM_P2= *mM_P2_;
-    MatrixBuilderCL& mS_P2= *mS_P2_;
-    MatrixBuilderCL& mM_ScalarP1= *mM_ScalarP1_;
-    MatrixBuilderCL& mA_ScalarP1_stab = *mA_ScalarP1_stab_;
-    MatrixBuilderCL& mM_ScalarP1_stab = *mM_ScalarP1_stab_;
-    for(int i= 0; i < 10; ++i) {
+    auto& mA_P2= *mA_P2_;
+    auto& mA_P2_stab= *mA_P2_stab_;
+    auto& mB_P1P2= *mB_P1P2_;
+    auto& mM_P2= *mM_P2_;
+    auto& mS_P2= *mS_P2_;
+    auto& mM_ScalarP1= *mM_ScalarP1_;
+    auto& mA_ScalarP1_stab = *mA_ScalarP1_stab_;
+    auto& mM_ScalarP1_stab = *mM_ScalarP1_stab_;
+    for(int i = 0; i < 10; ++i) {
         const IdxT ii= numP2[i];
         if (ii==NoIdx) continue;
-        for(int j=0; j <10; ++j) {
+        // assemble rhs
+        for (int k = 0; k < 3; ++k)
+            fRHS_[ii+k] += locF_P2[3*i+k];
+        // assemble mtx
+        for(int j = 0; j < 10; ++j) {
             const IdxT jj= numP2[j];
             if (jj==NoIdx) continue;
-            for (int k=0; k<3; ++k) {
-                for (int l=0; l<3; ++l) {
+            for (int k = 0; k < 3; ++k)
+                for (int l = 0; l < 3; ++l) {
                     mA_P2( ii+k, jj+l) += locA_P2[3*j+l][3*i+k];
                     // mM_P2( ii+k, jj+l) += locM_P2[3*j+l][3*i+k];
                     mS_P2( ii+k, jj+l) += locS_P2[3*j+l][3*i+k];
@@ -1917,7 +1948,6 @@ void StokesIFAccumulator_P2P1CL::update_global_system() {
                         mA_P2_stab( ii+k, jj+l) += 0.;
                     }
                 }
-             }
         }
         for (int j=0; j < 4; ++j) {
             if (numScalarP1[j]==NoIdx) continue;
@@ -1926,9 +1956,12 @@ void StokesIFAccumulator_P2P1CL::update_global_system() {
             }
         }
     }
-    for(int i= 0; i < 4; ++i) {
+    for(int i = 0; i < 4; ++i) {
         const IdxT ii= numScalarP1[i];
         if (ii==NoIdx) continue;
+        // assemble rhs
+        gRHS_[ii] += locG_P1[i];
+        // assemble mtx
         for(int j=0; j <4; ++j) {
             const IdxT jj= numScalarP1[j];
             if (jj==NoIdx) continue;
@@ -1939,24 +1972,12 @@ void StokesIFAccumulator_P2P1CL::update_global_system() {
     }
 }
 
-void SetupStokesIF_P2P1(
-        const MultiGridCL& MG_,
-        MatDescCL* A_P2,
-        MatDescCL* A_P2_stab,
-        MatDescCL* B_P1P2,
-        MatDescCL* M_P2,
-        MatDescCL* S_P2,
-        MatDescCL* M_ScalarP1,
-        MatDescCL* M_ScalarP1_stab, // full stab
-        MatDescCL* A_ScalarP1_stab, // normal stab
-        const LevelsetP2CL& lset,
-        LocalStokesParam* param
-) {
+void SetupStokesIF_P2P1(const MultiGridCL& MG_, const LevelsetP2CL& lset, StokesSystem* system, LocalStokesParam* param) {
   ScopeTimerCL scope("SetupStokesIF_P2P1");
-  StokesIFAccumulator_P2P1CL accu(lset, *(A_P2->RowIdx), *(B_P1P2->RowIdx), A_P2->Data, A_P2_stab->Data, B_P1P2->Data, M_P2->Data, S_P2->Data, M_ScalarP1->Data, M_ScalarP1_stab->Data, A_ScalarP1_stab->Data, param);
+  StokesIFAccumulator_P2P1CL accu(lset, system, param);
   TetraAccumulatorTupleCL accus;
-  accus.push_back( &accu);
-  accumulate( accus, MG_, A_P2->GetRowLevel(), A_P2->RowIdx->GetBndInfo());
+  accus.push_back(&accu);
+  accumulate(accus, MG_, system->A.GetRowLevel(), system->A.RowIdx->GetBndInfo());
 }
 
 /// \brief Accumulator to set up the matrices for interface Stokes.
@@ -1983,7 +2004,7 @@ class StokesIFAccumulator_P2P2CL : public TetraAccumulatorCL
 
     ///\brief Computes the mapping from local to global data "n", the local matrices in loc and.
     void local_setup (const TetraCL& tet);
-    ///\brief Update the global system.
+    ///\brief Update the global system->
     void update_global_system ();
 
 public:
@@ -3545,7 +3566,7 @@ class CahnHilliardIFAccumulator_P1P1CL : public TetraAccumulatorCL
 
     ///\brief Computes the mapping from local to global data "n", the local matrices in loc and.
     void local_setup (const TetraCL& tet);
-    ///\brief Update the global system.
+    ///\brief Update the global system->
     void update_global_system ();
 
   public:
