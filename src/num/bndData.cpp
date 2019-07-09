@@ -85,7 +85,7 @@ void BndCondCL::StripDirichletBC()
 void BndCondCL::StripPeriodicBC()
 {
     for (BndCondInfoCL& bc: BndCond_)
-        if (bc.IsPeriodic()) // found Dirichlet bnd
+        if (bc.IsPeriodic()) // found periodic bnd
             bc= Nat0BC;
 }
 

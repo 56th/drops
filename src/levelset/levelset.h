@@ -113,7 +113,7 @@ class LevelsetP2CL : public ProblemCL< LevelsetCoeffCL, LsetBndDataCL>
 
     const SurfaceTensionCL&   GetSF () const { return sf_; }
 
-LevelsetP2CL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, FiniteElementT fetype, double SD= 0, double curvDiff= -1)
+    LevelsetP2CL( MultiGridCL& mg, const LsetBndDataCL& bnd, SurfaceTensionCL& sf, FiniteElementT fetype, double SD= 0, double curvDiff= -1)
     : base_( mg, LevelsetCoeffCL(), bnd), idx(fetype), idxC(NULL), MLPhi( &idx), PhiC(NULL), curvDiff_( curvDiff), SD_( SD),
         SF_(SF_ImprovedLBVar), sf_(sf), perDirections(NULL), IsDG(false)
     {}
