@@ -54,6 +54,12 @@ using namespace DROPS;
 //    InitVector(MG, vSol, f_vsol);
 //}
 
+DROPS::Point3DCL shift;
+DROPS::Point3DCL shiftTransform(const Point3DCL& p) {
+    return p - shift;
+}
+
+
 int main(int argc, char* argv[]) {
     try {
         DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/surfnavierstokes/No_Bnd_Condition.json");
@@ -67,8 +73,17 @@ int main(int argc, char* argv[]) {
         //                                 4.*DROPS::std_basis<3>( 3),
         //                                 P.get<int>("InitialDivisions"), P.get<int>("InitialDivisions"), P.get<int>("InitialDivisions"));
         //    DROPS::MultiGridCL mg( brick);
-        std::auto_ptr<DROPS::MGBuilderCL> builder( DROPS::make_MGBuilder( P));
-        DROPS::MultiGridCL mg( *builder);
+        std::auto_ptr<DROPS::MGBuilderCL> builder(DROPS::make_MGBuilder(P));
+        DROPS::MultiGridCL mg(*builder);
+        double h = P.get<DROPS::Point3DCL>("Mesh.E1")[0] / P.get<double>("Mesh.N1") * std::pow(2., -P.get<double>("Mesh.AdaptRef.FinestLevel"));
+        std::cout << "h is: " << std::to_string(float(h)) << '\n';
+        // levelset shift
+        shift = P.get<DROPS::Point3DCL>("Levelset.ShiftDir", DROPS::Point3DCL(0., 0., 0.));
+        shift /= shift.norm();
+        auto shiftNorm = fabs(P.get<double>("Levelset.ShiftNorm", 0.));
+        shift *= shiftNorm;
+        std::cout << "surface shift is: " << shift << '\n';
+        mg.Transform(shiftTransform);
         const DROPS::ParamCL::ptree_type* ch= 0;
         try {
             ch= &P.get_child("Mesh.Periodicity");
@@ -110,22 +125,12 @@ int main(int argc, char* argv[]) {
         param.input.exactNormal = P.get<bool>("SurfNavStokes.ComputeNormalErr") ? exact_normal : nullptr;
         param.input.exactShape  = P.get<bool>("SurfNavStokes.ComputeShapeErr")  ? exact_shape  : nullptr;
         param.input.computeMatrices = P.get<bool>("SurfNavStokes.Solve");
-        double h = P.get<DROPS::Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")*std::pow(2., -P.get<double>("Mesh.AdaptRef.FinestLevel"));
-        std::cout << "h is: " << std::to_string(float(h)) << std::endl;
-        if (levelset_fun_str == "sphere_2" && (P.exists("Levelset.ShiftNorm") || P.exists("Levelset.ShiftNormRel")) && P.exists("Levelset.ShiftDir")) {
-            auto shiftNorm = P.exists("Levelset.ShiftNormRel") ? P.get<double>("Levelset.ShiftNormRel") * h : P.get<double>("Levelset.ShiftNorm");
-            sphere_2_shift = P.get<DROPS::Point3DCL>("Levelset.ShiftDir");
-            sphere_2_shift /= sphere_2_shift.norm();
-            sphere_2_shift *= shiftNorm;
-            std::cout << "Refined bulk mesh will be constracted w/\n\tLevelset.ShiftNorm = " << sphere_2_shift << '\n';
-        }
         // adaptive mesh refinement based on level set function
         typedef DROPS::DistMarkingStrategyCL InitMarkerT;
-        InitMarkerT initmarker( levelset_fun, P.get<double>("Mesh.AdaptRef.Width"), 0, P.get<int>("Mesh.AdaptRef.FinestLevel") );
-        adap.set_marking_strategy( &initmarker );
+        InitMarkerT initmarker(levelset_fun, P.get<double>("Mesh.AdaptRef.Width"), 0, P.get<int>("Mesh.AdaptRef.FinestLevel") );
+        adap.set_marking_strategy(&initmarker );
         adap.MakeInitialTriang();
-        adap.set_marking_strategy( 0 );
-        sphere_2_shift *= 0.;
+        adap.set_marking_strategy(0);
         // create level set
         instat_scalar_fun_ptr sigma (0);
         SurfaceTensionCL sf( sigma, 0);
@@ -716,9 +721,7 @@ int main(int argc, char* argv[]) {
             C_full. LinComb(rho_p, Schur_stab.Data, 0., Schur_stab.Data);
             C_n.    LinComb(rho_p, Schur_normal_stab.Data, 0., Schur_normal_stab.Data);
             M_final.LinComb(1., Schur.Data, 0., Schur.Data);
-            auto surfName = P.get<std::string>("Levelset.case");
-            if (P.exists("Levelset.ShiftNormRel"))
-                surfName += "_shift=" + P.get<std::string>("Levelset.ShiftNormRel") + "h";
+            auto surfName = P.get<std::string>("Levelset.case") +"_shift=" + P.get<std::string>("Levelset.ShiftNorm", "0");
             std::string outDir = P.get<std::string>("Output.Directory") + '/' + surfName + '/' + P.get<std::string>("SurfNavStokes.FE") + "/blocks/h=" + std::to_string(float(h)) + "_";
             std::cout << "exporting matrices to " + outDir + "*\n";
             std::ofstream(outDir + "A.mtx") << A_final;
@@ -1149,21 +1152,13 @@ int main(int argc, char* argv[]) {
             }
             else if ( P.get<std::string>("SurfNavStokes.instationary") == "none" ) {
                 //renormalization to fullfill \int rhs = 0 in discrete sence
-                gRHS.Data     -= ( dot(gRHS.Data,id2) / dot(id2,id2) ) * id2;
-
-                //current timestep logfile
-                std::string shiftName = "";
-                if (P.exists("Levelset.ShiftNormRel"))
-                    shiftName = "_shift=" + P.get<std::string>("Levelset.ShiftNormRel") + "h";
-                else if (P.exists("Levelset.ShiftNorm"))
-                    shiftName = "_shift=" + P.get<std::string>("Levelset.ShiftNorm");
-
+                gRHS.Data -= (dot(gRHS.Data, id2) / dot(id2, id2)) * id2;
                 std::ofstream log(
                      dirname + "/" + filename +
                     "time=1_m=" + std::to_string(param.input.numbOfVirtualSubEdges) +
                     "_" + FE +
                     "_patchnormals=" + std::to_string(param.input.usePatchNormal) +
-                    shiftName +
+                    "_shift=" + P.get<std::string>("Levelset.ShiftNorm", "0") +
                     "_form=" + formulation +
                     "_rhofac=" + P.get<std::string>("SurfNavStokes.vel_volumestab_fac") +
                     "_rhopow=" + P.get<std::string>("SurfNavStokes.vel_volumestab_pow") + ".txt"
@@ -1280,7 +1275,11 @@ int main(int argc, char* argv[]) {
                     transpose(B.Data, BTranspose);
                     stokessolver->Solve(Adyn, Bhat, Chat, v.Data, p.Data, fRHS.Data, gRHS.Data, v.RowIdx->GetEx(), p.RowIdx->GetEx());
                 }
-                if (P.get<int>("Output.every timestep") > 0) vtkwriter->Write(1); // skip vtk output if needed
+                if (P.get<int>("Output.every timestep") > 0) {
+                    std::cout << "writing vtk...\n";
+                    vtkwriter->Write(1); // skip vtk output if needed
+                }
+                else std::cout << "skipping vtk output\n";
                 auto velResSq = norm_sq(Adyn * v.Data + BTranspose * p.Data - fRHS.Data);
                 auto preResSq = norm_sq(B.Data * v.Data + Chat * p.Data - gRHS.Data);
                 auto residual = sqrt(velResSq + preResSq);
