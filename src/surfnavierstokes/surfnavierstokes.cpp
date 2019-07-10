@@ -699,6 +699,14 @@ int main(int argc, char* argv[]) {
             Schur_stab.SetIdx(&ifaceP2idx, &ifaceP2idx);
             SetupStokesIF_P1P2(mg, &A, &A_stab, &B, &M, &S, &L, &L_stab, &Schur, &Schur_stab, lset.Phi, lset.GetBndData(), &param);
         }
+        std::cout << "stiffness mtx is              " << A.Data.num_rows() << " * " << A.Data.num_cols() << '\n'
+                  << "velocity soln size is         " << v.Data.size() << '\n'
+                  << "exact velocity interp size is " << vSol.Data.size() << '\n'
+                  << "pre mass mtx is               " << Schur.Data.num_rows() << " * " << Schur.Data.num_cols() << '\n'
+                  << "pressure soln size is         " << p.Data.size() << '\n'
+                  << "exact pressure interp size is " << pSol.Data.size() << '\n'
+                  << "f size is                     " << fRHS.Data.size() << '\n'
+                  << "g size is                     " << gRHS.Data.size() << '\n';
         // export matrices to test inf-sup constant for P1-P1 / P2-P1
         if (P.get<std::string>("SurfNavStokes.instationary") == "infsup") {
             std::cout << "test inf-sup constant\n";
@@ -725,17 +733,15 @@ int main(int argc, char* argv[]) {
         if (P.get<bool>("SurfNavStokes.ComputeNormalErr") || P.get<bool>("SurfNavStokes.ComputeShapeErr")) {
             auto dirname = P.get<std::string>("Output.Directory") + "/" + model + "_" + levelset_fun_str + "/" + "test" +
                            testcase + "_h=" + std::to_string(float(h));
-            std::ofstream log(
-                    dirname + "/normal_and_shape_errs_m=" + std::to_string(param.input.numbOfVirtualSubEdges) + ".txt"
-            );
+            std::ofstream log(dirname + "/normal_and_shape_errs_m=" + std::to_string(param.input.numbOfVirtualSubEdges) + ".txt");
             if (P.get<bool>("SurfNavStokes.ComputeNormalErr")) {
-                log << "Levelset normal L2 error is: " << sqrt(param.output.normalErrSq.lvset) << '\n';
-                log << "Patch    normal L2 error is: " << sqrt(param.output.normalErrSq.patch) << '\n';
+                log << "levelset normal L2 error is: " << sqrt(param.output.normalErrSq.lvset) << '\n';
+                log << "patch    normal L2 error is: " << sqrt(param.output.normalErrSq.patch) << '\n';
             }
             if (P.get<bool>("SurfNavStokes.ComputeShapeErr"))
-                log << "Shape operator L2 error is: " << sqrt(param.output.shapeErrSq) << '\n';
+                log << "shape operator L2 error is: " << sqrt(param.output.shapeErrSq) << '\n';
         }
-        if (!param.input.computeMatrices) exit(0);
+        if (!param.input.computeMatrices) return 0;
         // Schur precond
         if (P.get<std::string>("SurfNavStokes.stab") == "full")
             Schur_hat.LinComb(1., Schur.Data, rho, Schur_stab.Data);
@@ -1274,40 +1280,24 @@ int main(int argc, char* argv[]) {
                     transpose(B.Data, BTranspose);
                     stokessolver->Solve(Adyn, Bhat, Chat, v.Data, p.Data, fRHS.Data, gRHS.Data, v.RowIdx->GetEx(), p.RowIdx->GetEx());
                 }
-
-                //postprocess output pressure up to constant
-                p.Data -=  dot(Schur.Data * p.Data,id2) / dot(Schur.Data*id2,id2) * id2;
-
-
-                //check residuals
-                log << "norm( Adyn * v + B^T  * p -  rhs) ist: " << norm(Adyn*v.Data + BTranspose*p.Data - fRHS.Data) << std::endl;
-                log << "norm( B    * v + Chat * p - gRHS) ist: " << norm(B.Data*v.Data + Chat * p.Data - gRHS.Data) << std::endl;
-
-                //skip vtk output of needed
-                if (P.get<int>("Output.every timestep") > 0)
-                {
-                    vtkwriter->Write(1);
-                }
-
-                //send to logfiles
+                if (P.get<int>("Output.every timestep") > 0) vtkwriter->Write(1); // skip vtk output if needed
+                auto velResSq = norm_sq(Adyn * v.Data + BTranspose * p.Data - fRHS.Data);
+                auto preResSq = norm_sq(B.Data * v.Data + Chat * p.Data - gRHS.Data);
+                auto residual = sqrt(velResSq + preResSq);
+                std::cout << "residual: " << residual << '\n';
+                // postprocess output pressure up to constant
+                p.Data -=  dot(Schur.Data * p.Data, id2) / dot(Schur.Data*id2, id2) * id2;
+                log << "norm(Adyn * v + B^T  * p -  rhs): " << sqrt(velResSq) << '\n'
+                    << "norm(B    * v + Chat * p - gRHS): " << sqrt(preResSq) << '\n';
+                // send to logfiles
                 log_solo <<  std::to_string((float)1) << "\t";
                 log << "Time is: " << std::to_string((float)1) << std::endl;
                 log << "h is: " << h << std::endl;
-                log << "rho_p is: "   << rho_p/**pow(h, -rho_p_order)*/<< std::endl;
-                log << "rho_u is: " << rho_u/**pow(h, -rho_u_order)*/<< std::endl;
-                log << "tau_u is: "     << tau_u/**pow(h, -tau_u_order)*/<< std::endl;
+                log << "rho_p is: "   << rho_p << std::endl;
+                log << "rho_u is: " << rho_u << std::endl;
+                log << "tau_u is: "     << tau_u << std::endl;
                 log << "Total iterations: " << Solver->GetIter() << '\n';
-                log	<< "Final residual: " << Solver->GetResid() << '\n';
-
-                std::cout << "stiffness mtx is              " << Adyn.num_rows() << " * " << Adyn.num_cols() << '\n';
-                std::cout << "velocity soln size is         " << v.Data.size() << '\n';
-                std::cout << "exact velocity interp size is " << vSol.Data.size() << '\n';
-                std::cout << "pre mass mtx is               " << Schur.Data.num_rows() << " * " << Schur.Data.num_cols() << '\n';
-                std::cout << "pressure soln size is         " << p.Data.size() << '\n';
-                std::cout << "exact pressure interp size is " << pSol.Data.size() << '\n';
-                std::cout << "f size is                     " << fRHS.Data.size() << '\n';
-                std::cout << "g size is                     " << gRHS.Data.size() << '\n';
-
+                log	<< "Final MINRES residual: " << Solver->GetResid() << '\n';
                 VectorCL vSolMinusV = vSol.Data - v.Data, pSolMinusP = pSol.Data - p.Data;
                 auto velL2          = sqrt(dot(v.Data, M.Data * v.Data));
                 auto velL2err       = dot(vSolMinusV, M.Data * vSolMinusV);
@@ -1318,43 +1308,36 @@ int main(int argc, char* argv[]) {
                 auto velH1err       = sqrt(dot(vSolMinusV, A.Data * vSolMinusV));
                 auto preL2          = sqrt(dot(p.Data, Schur.Data * p.Data));
                 auto preL2err       = sqrt(dot(pSolMinusP, Schur.Data * pSolMinusP));
-
                 log << "The L2-Norm of v - vSol is: " << velL2err << '\n';
                 log << "The L2-Norm of v  is: " << velL2 << '\n';
                 log_solo << std::to_string((float)(velL2*velL2*0.5)) << '\n';
                 log << "The H1-Norm of v - vSol is: " << velH1err << '\n';
                 log << "The L2-Norm of v * n is: " << velNormalL2 << '\n';
                 log << "The L2-Norm of p - pSol is: " << preL2err << '\n';
-                log << "The L2-Norm of p  is: " << preL2 << '\n';
-                log << "The L2-Norm of v_T - vSol  is: " << velTangenL2 << '\n';
+                log << "The L2-Norm of p is: " << preL2 << '\n';
+                log << "The L2-Norm of v_T - vSol is: " << velTangenL2 << '\n';
+                log << "Actual residual is: " << residual << '\n';
             }
-
             log_solo.close();
             log_error.close();
             std::cout << "Output is located: " << dirname << std::endl;
         }
-
-    /////////////////////////////////////// Error ///////////////////////////////////////
-
+        // error
         double Aaverage( 0.), Avariation( 0.), Schuraverage( 0.), Schurvariation( 0.);
         double PCaverage( 0.), PCvariation( 0.);
         std::stringstream Astreamcopy( Astream.str());
         std::stringstream PCstreamcopy( PCstream.str());
         std::stringstream Schurstreamcopy( Schurstream.str());
-
         RightComputeAverageIterations(Astream, Aaverage);
         ComputeAverageIterations(Schurstream, Schuraverage);
         RightComputeAverageIterations(PCstream, PCaverage);
         RightComputeVariationFromAverageIterations(Astreamcopy, Aaverage, Avariation);
         RightComputeVariationFromAverageIterations(PCstreamcopy, PCaverage, PCvariation);
         ComputeVariationFromAverageIterations(Schurstreamcopy, Schuraverage, Schurvariation);
-
         std::cout << "The average iterationsnumber of the A-preconditioner is: " <<     Aaverage     << '\n' << " ...with a variation of: " << Avariation << std::endl;
         std::cout << "The average iterationsnumber of the nonsymmetric A-preconditioner is: " <<     PCaverage     << '\n' << " ...with a variation of: " << PCvariation << std::endl;
         std::cout << "The average iterationsnumber of the Schur-preconditioner is: " << Schuraverage << '\n' << " ...with a variation of: " << Schurvariation << std::endl;
-
         delete &lset;
-
         return 0;
     }
     catch (DROPS::DROPSErrCL err) { err.handle(); }

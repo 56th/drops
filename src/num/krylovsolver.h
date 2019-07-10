@@ -1047,11 +1047,11 @@ class PLanczosONBCL
 //     if false, stop if (M^(-1)( b - Ax), b - Ax) <= tol.
 //-----------------------------------------------------------------------------
 template <typename Mat, typename Vec, typename Lanczos, typename ExT>
-bool PMINRES(const Mat& A, Vec& x, const Vec&, const ExT& ex, Lanczos& q, int& max_iter, double& tol, bool measure_relative_tol= false)
+bool PMINRES(const Mat& A, Vec& x, const Vec& rhs, const ExT& ex, Lanczos& q, int& max_iter, double& tol, bool measure_relative_tol = false)
 {
     Vec dx( x.size());
-    const double norm_r0= q.norm_r0();
-    double normb= std::fabs( norm_r0);
+    const double norm_r0 = q.norm_r0();
+    double normb= std::fabs(norm_r0);
     double res= norm_r0;
     bool lucky= q.breakdown();
     SBufferCL<double, 3> c;
@@ -1107,24 +1107,31 @@ bool PMINRES(const Mat& A, Vec& x, const Vec&, const ExT& ex, Lanczos& q, int& m
             b[0][0]= b[-1][1]; b[0][1]= 0.;
             GMRES_ApplyPlaneRotation( b[0][0], b[0][1], c[0], s[0]);
         }
-        dx= norm_r0*b[0][0]*p[0];
-        x+= dx;
+        dx = norm_r0 * b[0][0]*p[0];
+        x += dx;
+        res = std::fabs(norm_r0 * b[0][1])/normb;
+        std::cout << "PMINRES: k: " << k << "\tresidual: " << res << '\n';
+        if (res <= tol || lucky==true) {
+            auto realRes = norm(rhs - A*x);
+            if (realRes > tol) {
+                std::cout << "PMINRES: k: " << k << "\tTRUE residual: " << realRes << '\n';
+                // update residual
+                // ...
 
-        res= std::fabs( norm_r0*b[0][1])/normb;
-        if (k%10==0) std::cout << "PMINRES: k: " << k << "\tresidual: " << res << std::endl;
-        if (res<= tol || lucky==true) {
-            tol= res;
-            max_iter= k;
-            return true;
+            } else {
+                tol = res;
+                max_iter = k;
+                return true;
+            }
         }
-        q.next( A, ex);
+        q.next(A, ex);
         if (q.breakdown()) {
-            lucky= true;
-            std::cout << "PMINRES: lucky breakdown" << std::endl;
+            lucky = true;
+            std::cout << "PMINRES: lucky breakdown\n";
         }
         c.rotate(); s.rotate(); r.rotate(); p.rotate(); b.rotate();
     }
-    tol= res;
+    tol = res;
     return false;
 }
 
