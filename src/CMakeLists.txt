@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 2.8.1)
 
 project(drops)
 
+# stop after the first err
+add_definitions(-Wfatal-errors)
+
 cmake_policy(SET CMP0015 NEW) #allows us to give relative paths in ${PARMETIS_HOME} and ${METIS_HOME} (when given relative paths in librarys these will be interpreted as relative to the root source directory)
 include(CMakeSettings.txt)
 
@@ -9,9 +12,10 @@ include(CMakeSettings.txt)
 include_directories(${CMAKE_SOURCE_DIR})
 
 # matlab
-set(ENV{MATLABROOT} /usr/local/MATLAB/R2019a)
-message(STATUS "matlab root is: " $ENV{MATLABROOT})
-include_directories($ENV{MATLABROOT}/extern/include)
+#set(ENV{Matlab_ROOT_DIR} /usr/local/MATLAB/R2019a)
+find_package(Matlab REQUIRED)
+message(STATUS "matlab root is: " ${Matlab_ROOT_DIR})
+include_directories(${Matlab_ROOT_DIR}/extern/include)
 
 #use openMP
 message(STATUS "### GENERATOR is ${CMAKE_GENERATOR}")

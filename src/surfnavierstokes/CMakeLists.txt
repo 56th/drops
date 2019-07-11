@@ -1,8 +1,5 @@
 set(HOME surfnavierstokes)
 
-# stop after the first err
-add_definitions(-Wfatal-errors)
-
 add_library(${HOME}-ifacetransp STATIC ../surfactant/ifacetransp)
 
 target_link_libraries(${HOME}-ifacetransp levelset-levelsetmapper)
@@ -15,7 +12,7 @@ add_dependencies(surfnavierstokes misc-scalarFunctions misc-vectorFunctions leve
 endif(NOT MPI)
 
 # matlab for sparse mtx .mat binary output
-add_compile_options(-I$ENV{MATLABROOT}/extern/include)
-target_link_libraries(surfnavierstokes "-L$ENV{MATLABROOT}/extern/bin/glnxa64/" -lpthread -lMatlabDataArray -lMatlabEngine)
+add_compile_options(-I${Matlab_ROOT_DIR}/extern/include)
+target_link_libraries(surfnavierstokes "-L${Matlab_ROOT_DIR}/extern/bin/glnxa64/" -lpthread -lMatlabDataArray -lMatlabEngine)
 
 add_my_custom_targets(surfnavierstokes)
