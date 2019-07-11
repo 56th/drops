@@ -8,6 +8,11 @@ include(CMakeSettings.txt)
 #tell cmake to always include the home dir
 include_directories(${CMAKE_SOURCE_DIR})
 
+# matlab
+set(ENV{MATLABROOT} /usr/local/MATLAB/R2019a)
+message(STATUS "matlab root is: " $ENV{MATLABROOT})
+include_directories($ENV{MATLABROOT}/extern/include)
+
 #use openMP
 message(STATUS "### GENERATOR is ${CMAKE_GENERATOR}")
 if(CMAKE_GENERATOR MATCHES "Visual Studio 10")
@@ -234,6 +239,3 @@ if(DOXYGEN_FOUND)
 endif()
 
 add_custom_target(coeffs DEPENDS misc-scalarFunctions misc-vectorFunctions levelset-twophaseCoeff levelset-filmCoeff poisson-poissonCoeff stokes-stokesCoeff)
-
-# stop afret first comp error
-add_definitions(-Wfatal-errors)

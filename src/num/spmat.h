@@ -48,6 +48,10 @@
 # include "parallel/parallel.h"
 #endif
 
+// for .mat binary output
+#include "MatlabDataArray.hpp"
+#include "MatlabEngine.hpp"
+
 namespace DROPS
 {
 

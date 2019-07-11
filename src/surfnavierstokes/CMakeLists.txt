@@ -14,4 +14,8 @@ add_dependencies(surfactant misc-scalarFunctions misc-vectorFunctions)
 add_dependencies(surfnavierstokes misc-scalarFunctions misc-vectorFunctions levelset-twophaseCoeff)
 endif(NOT MPI)
 
+# matlab for sparse mtx .mat binary output
+add_compile_options(-I$ENV{MATLABROOT}/extern/include)
+target_link_libraries(surfnavierstokes "-L$ENV{MATLABROOT}/extern/bin/glnxa64/" -lpthread -lMatlabDataArray -lMatlabEngine)
+
 add_my_custom_targets(surfnavierstokes)
