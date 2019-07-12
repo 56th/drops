@@ -124,7 +124,7 @@ int main(int argc, char* argv[]) {
         LocalStokesParam param;
         param.input.exactNormal = P.get<bool>("SurfNavStokes.ComputeNormalErr") ? exact_normal : nullptr;
         param.input.exactShape  = P.get<bool>("SurfNavStokes.ComputeShapeErr")  ? exact_shape  : nullptr;
-        param.input.computeMatrices = P.get<bool>("SurfNavStokes.Solve");
+        param.input.computeMatrices = P.get<bool>("SurfNavStokes.ComputeMatrices");
         // adaptive mesh refinement based on level set function
         typedef DROPS::DistMarkingStrategyCL InitMarkerT;
         InitMarkerT initmarker(levelset_fun, P.get<double>("Mesh.AdaptRef.Width"), 0, P.get<int>("Mesh.AdaptRef.FinestLevel") );
@@ -712,30 +712,29 @@ int main(int argc, char* argv[]) {
                   << "exact pressure interp size is " << pSol.Data.size() << '\n'
                   << "f size is                     " << fRHS.Data.size() << '\n'
                   << "g size is                     " << gRHS.Data.size() << '\n';
+        std::string dirname  = P.get<std::string>("Output.Directory") + "/" + model + "_" + levelset_fun_str + "/" + "test" + testcase + "_h=" + std::to_string(float(h));
         // export matrices to test inf-sup constant for P1-P1 / P2-P1
-        if (P.get<std::string>("SurfNavStokes.instationary") == "infsup") {
+        if (param.input.computeMatrices && P.get<bool>("SurfNavStokes.ExportMatrices")) {
             std::cout << "test inf-sup constant\n";
-            MatrixCL A_final, B_final, C_full, C_n, M_final;
+            MatrixCL A_final;
             A_final.LinComb(1., A.Data, 1., M.Data, tau_u, S.Data, rho_u, A_stab.Data);
-            B_final.LinComb(1., B.Data, 0., B.Data);
-            C_full. LinComb(rho_p, Schur_stab.Data, 0., Schur_stab.Data);
-            C_n.    LinComb(rho_p, Schur_normal_stab.Data, 0., Schur_normal_stab.Data);
-            M_final.LinComb(1., Schur.Data, 0., Schur.Data);
+            auto C_full = Schur_stab.Data;
+            C_full *= rho_p;
+            auto C_n = Schur_normal_stab.Data;
+            C_n *= rho_p;
+            auto& B_final = B.Data;
+            auto& M_final = Schur.Data;
             auto surfName = P.get<std::string>("Levelset.case") +"_shift=" + P.get<std::string>("Levelset.ShiftNorm", "0");
-            std::string outDir = P.get<std::string>("Output.Directory") + '/' + surfName + '/' + P.get<std::string>("SurfNavStokes.FE") + "/blocks/h=" + std::to_string(float(h)) + "_";
-            std::cout << "exporting matrices to " + outDir + "*\n";
-            std::ofstream(outDir + "A.mtx") << A_final;
-            std::ofstream(outDir + "B.mtx") << B_final;
-            std::ofstream(outDir + "M.mtx") << M_final;
-            if (P.get<std::string>("SurfNavStokes.FE") == "P1P1") {
-                std::ofstream(outDir + "C_full.mtx") << C_full;
-                std::ofstream(outDir + "C_n.mtx") << C_n;
-            }
-            return 0;
+            auto format = P.get<std::string>("SurfNavStokes.ExportMatricesFormat") == "mtx" ? ".mtx" : ".mat";
+            auto expFunc = format == ".mtx" ? &MatrixCL::exportMTX : &MatrixCL::exportMAT;
+            std::cout << "exporting " << format << " matrices to " + dirname + "*\n";
+            (A_final.*expFunc)(dirname + "/A" + format);
+            (B_final.*expFunc)(dirname + "/B" + format);
+            (M_final.*expFunc)(dirname + "/M" + format);
+            (C_full.*expFunc)(dirname + "/C_full" + format);
+            (C_n.*expFunc)(dirname + "/C_full" + format);
         }
         if (P.get<bool>("SurfNavStokes.ComputeNormalErr") || P.get<bool>("SurfNavStokes.ComputeShapeErr")) {
-            auto dirname = P.get<std::string>("Output.Directory") + "/" + model + "_" + levelset_fun_str + "/" + "test" +
-                           testcase + "_h=" + std::to_string(float(h));
             std::ofstream log(dirname + "/normal_and_shape_errs_m=" + std::to_string(param.input.numbOfVirtualSubEdges) + ".txt");
             if (P.get<bool>("SurfNavStokes.ComputeNormalErr")) {
                 log << "levelset normal L2 error is: " << sqrt(param.output.normalErrSq.lvset) << '\n';
@@ -744,7 +743,7 @@ int main(int argc, char* argv[]) {
             if (P.get<bool>("SurfNavStokes.ComputeShapeErr"))
                 log << "shape operator L2 error is: " << sqrt(param.output.shapeErrSq) << '\n';
         }
-        if (!param.input.computeMatrices) return 0;
+        if (!P.get<bool>("SurfNavStokes.Solve")) return 0;
         // Schur precond
         if (P.get<std::string>("SurfNavStokes.stab") == "full")
             Schur_hat.LinComb(1., Schur.Data, rho, Schur_stab.Data);
@@ -817,7 +816,6 @@ int main(int argc, char* argv[]) {
             DROPS::VecDescCL vxtent, pxtent;
             //set up output
             std::string filename = "test" + testcase + "_";
-            std::string dirname  = P.get<std::string>("Output.Directory") + "/" + model + "_" + levelset_fun_str + "/" + "test" + testcase + "_h=" + std::to_string(float(h));
             std::cout << "dirname: " << dirname << std::endl;
             //set up VTK output
             VTKOutCL* vtkwriter = nullptr;
