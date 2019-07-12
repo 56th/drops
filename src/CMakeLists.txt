@@ -12,10 +12,16 @@ include(CMakeSettings.txt)
 include_directories(${CMAKE_SOURCE_DIR})
 
 # matlab
-#set(ENV{Matlab_ROOT_DIR} /usr/local/MATLAB/R2019a)
+# example: https://www.mathworks.com/help/matlab/matlab_external/build-c-engine-programs.html
 find_package(Matlab REQUIRED)
-message(STATUS "matlab root is: " ${Matlab_ROOT_DIR})
-include_directories(${Matlab_ROOT_DIR}/extern/include)
+if (Matlab_FOUND)
+    message(STATUS "### matlab root is ${Matlab_ROOT_DIR}")
+    include_directories(${Matlab_ROOT_DIR}/extern/include)
+else ()
+    set(Matlab_ROOT_DIR /opt/matlab)
+    message(WARNING "### matlab NOT found; it's root is to ${Matlab_ROOT_DIR}")
+    include_directories(${Matlab_ROOT_DIR}/extern/include)
+endif ()
 
 #use openMP
 message(STATUS "### GENERATOR is ${CMAKE_GENERATOR}")
