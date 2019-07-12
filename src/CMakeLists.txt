@@ -13,7 +13,7 @@ include_directories(${CMAKE_SOURCE_DIR})
 
 # matlab
 # example: https://www.mathworks.com/help/matlab/matlab_external/build-c-engine-programs.html
-find_package(Matlab REQUIRED)
+find_package(Matlab)
 if (Matlab_FOUND)
     message(STATUS "### matlab root is ${Matlab_ROOT_DIR}")
     include_directories(${Matlab_ROOT_DIR}/extern/include)
