@@ -731,15 +731,15 @@ int main(int argc, char* argv[]) {
             C_n *= rho_p;
             auto& B_final = B.Data;
             auto& M_final = Schur.Data;
-            auto surfName = P.get<std::string>("Levelset.case") +"_shift=" + P.get<std::string>("Levelset.ShiftNorm", "0");
+            auto path = dirname + "/" + "shift=" + P.get<std::string>("Levelset.ShiftNorm", "0") + "_form=" + formulation + "_";
             auto format = P.get<std::string>("SurfNavStokes.ExportMatricesFormat") == "mtx" ? ".mtx" : ".mat";
             auto expFunc = format == ".mtx" ? &MatrixCL::exportMTX : &MatrixCL::exportMAT;
             std::cout << "exporting " << format << " matrices to " + dirname + "*\n";
-            (A_final.*expFunc)(dirname + "/A" + format);
-            (B_final.*expFunc)(dirname + "/B" + format);
-            (M_final.*expFunc)(dirname + "/M" + format);
-            (C_full.*expFunc)(dirname + "/C_full" + format);
-            (C_n.*expFunc)(dirname + "/C_n" + format);
+            (A_final.*expFunc)(path + "A" + format);
+            (B_final.*expFunc)(path + "B" + format);
+            (M_final.*expFunc)(path + "M" + format);
+            (C_full.*expFunc)(path + "C_full" + format);
+            (C_n.*expFunc)(path + "C_n" + format);
         }
         if (P.get<bool>("SurfNavStokes.ComputeNormalErr") || P.get<bool>("SurfNavStokes.ComputeShapeErr")) {
             std::ofstream log(dirname + "/normal_and_shape_errs_m=" + std::to_string(param.input.numbOfVirtualSubEdges) + ".txt");
