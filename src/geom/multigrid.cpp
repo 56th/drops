@@ -38,6 +38,8 @@
 #include "misc/singletonmap.h"
 #include "misc/problem.h"
 #include "num/gauss.h"
+#include "geom/principallattice.h"
+#include "geom/subtriangulation.h"
 #include <iterator>
 #include <set>
 
@@ -831,6 +833,18 @@ bool MultiGridCL::IsSane (std::ostream& os, int Level) const
     return sane;
 }
 
+// std::vector<MultiGridCL::const_TriangTetraIteratorCL> MultiGridCL::getCutTetras(LevelsetP2CL const & lset) const {
+//    std::vector<const_TriangTetraIteratorCL> res;
+//    res.reserve(GetTetras().size());
+//    auto const & lat = PrincipalLatticeCL::instance(2);
+//    LocalP2CL<> ls_loc(lat.vertex_size());
+//    for (auto it = GetTriangTetraBegin(GetLastLevel()); it != GetTriangTetraEnd(GetLastLevel()); ++it) {
+//        ls_loc.assign(*it, lset.Phi, lset.GetBndData());
+//        if (!equal_signs(ls_loc))
+//            res.push_back(it);
+//    }
+//    return res;
+//}
 
 void MultiGridCL::SizeInfo(std::ostream& os)
 {

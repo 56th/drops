@@ -328,6 +328,8 @@ class MultiGridCL
     const ColorClassesCL& GetColorClasses (int Level, const BndCondCL& Bnd) const;
 
     bool IsSane (std::ostream&, int Level=-1) const;
+
+    // std::vector<const_TriangTetraIteratorCL> getCutTetras(LevelsetP2CL const &) const;
 };
 
 

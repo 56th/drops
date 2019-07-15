@@ -30,14 +30,24 @@ namespace DROPS
 {
 
 template <class GridFunT>
-  inline bool
-  equal_signs (const GridFunT& f)
-{
+inline bool equal_signs(const GridFunT& f) {
     int sum= 0;
-    for (Uint i= 0; i < f.size(); ++i)
-        sum+= sign( f[i]);
-
+    for (Uint i= 0; i < f.size(); ++i) sum += sign(f[i]);
     return static_cast<size_t>( std::abs( sum)) == f.size(); // std::abs return a signed type --> silence g++ warning
+}
+
+template <class GridFunT>
+inline bool isInCutMesh(GridFunT const & f) {
+    if (equal_signs(f)) return false;
+    std::vector<size_t> zerosIndicies;
+    zerosIndicies.reserve(f.size());
+    for (size_t i = 0; i < f.size(); ++i)
+        if (f[i] == 0.)
+            zerosIndicies.push_back(i);
+    if (zerosIndicies.size() == 0) return true;
+    std::stringstream err;
+    err << __func__ << ": levelset is exactly zero at node(s); not implemented yet";
+    throw std::invalid_argument(err.str());
 }
 
 ///\brief Write the sign of the levelset function src to the sequence dst.

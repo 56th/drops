@@ -483,6 +483,7 @@ void LocalStokesCL::exportPatchInfo(std::string const & path, const SMatrixCL<3,
 }
 
 void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const TetraCL& tet) {
+    ++param->output.numbOfCutTetras;
     P2DiscCL::GetGradients(P2Grad, P2GradRef, T);
     P2DiscCL::GetHessians(P2Hess, T);
     P1DiscCL::GetGradients(P1Grad, T);
@@ -1278,7 +1279,7 @@ void StokesIFAccumulator_P1P1CL::visit (const TetraCL& tet)
 {
     ls_loc.assign( tet, lset, lset_bnd);
 
-    if (!equal_signs( ls_loc))
+    if (isInCutMesh(ls_loc))
     {
         local_setup( tet);
         update_global_system();
@@ -1471,7 +1472,7 @@ void NavierStokesIFAccumulator_P1P1CL::visit (const TetraCL& tet)
     ls_loc.assign( tet, lset, lset_bnd);
     v_loc.assign( tet, velocity, velocity_bnd);
 
-    if (!equal_signs( ls_loc))
+    if (isInCutMesh(ls_loc))
     {
         local_setup( tet);
         update_global_system();
@@ -1702,7 +1703,7 @@ void StokesIFAccumulator_P1P2CL::visit (const TetraCL& tet)
 {
     ls_loc.assign( tet, lset, lset_bnd);
 
-    if (!equal_signs( ls_loc))
+    if (isInCutMesh(ls_loc))
     {
         local_setup( tet);
         update_global_system();
@@ -1856,8 +1857,8 @@ void StokesIFAccumulator_P2P1CL::begin_accumulation() {
     mM_P2_= new MatrixBuilderCL( &M_P2_, num_unks_p2, num_unks_p2);
     mS_P2_= new MatrixBuilderCL( &S_P2_, num_unks_p2, num_unks_p2);
     mM_ScalarP1_= new MatrixBuilderCL( &M_ScalarP1_, num_unks_scalarp1, num_unks_scalarp1);
-    mA_ScalarP1_stab_ = new MatrixBuilderCL( &A_ScalarP1_stab_, num_unks_scalarp1, num_unks_scalarp1);
-    mM_ScalarP1_stab_ = new MatrixBuilderCL( &M_ScalarP1_stab_, num_unks_scalarp1, num_unks_scalarp1);
+    mA_ScalarP1_stab_ = new MatrixBuilderCL(&A_ScalarP1_stab_, num_unks_scalarp1, num_unks_scalarp1);
+    mM_ScalarP1_stab_ = new MatrixBuilderCL(&M_ScalarP1_stab_, num_unks_scalarp1, num_unks_scalarp1);
     fRHS_.resize(num_unks_p2, 0.);
     gRHS_.resize(num_unks_scalarp1, 0.);
 }
@@ -1888,7 +1889,7 @@ void StokesIFAccumulator_P2P1CL::finalize_accumulation() {
 
 void StokesIFAccumulator_P2P1CL::visit (const TetraCL& tet) {
     ls_loc.assign(tet, lset, lset_bnd);
-    if (!equal_signs(ls_loc)) {
+    if (isInCutMesh(ls_loc)) {
         local_setup(tet);
         if (localStokes_.param->input.computeMatrices) update_global_system();
     }
@@ -2070,7 +2071,7 @@ void StokesIFAccumulator_P2P2CL::visit (const TetraCL& tet)
 {
     ls_loc.assign( tet, lset, lset_bnd);
 
-    if (!equal_signs( ls_loc))
+    if (isInCutMesh(ls_loc))
     {
         local_setup( tet);
         update_global_system();
@@ -2790,7 +2791,7 @@ void STP1P1IdxDescCL::CreateNumbering (Uint level, MultiGridCL& mg, const VecDes
     DROPS_FOR_TRIANG_TETRA ( mg, level, it) {
         local_st_lset.assign( *it, oldls, newls, lsetbnd);
         evaluate_on_vertexes( local_st_lset, lat, Addr( ls_loc));
-        if (equal_signs( ls_loc))
+        if (!isInCutMesh(ls_loc))
             continue;
 
         patch.make_patch<MergeCutPolicyCL>( lat, ls_loc);
@@ -3649,7 +3650,7 @@ void CahnHilliardIFAccumulator_P1P1CL::visit (const TetraCL& tet)
     v_loc.assign( tet, velocity, velocity_bnd);
     chi_loc.assign( tet, volume_fraction, volume_fraction_bnd);
 
-    if (!equal_signs( ls_loc))
+    if (isInCutMesh(ls_loc))
     {
         local_setup( tet);
         update_global_system();

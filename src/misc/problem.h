@@ -302,7 +302,7 @@ class IdxDescCL: public FE_InfoCL
     /// \brief Number unknowns for standard FE.
     void CreateNumbStdFE( Uint level, MultiGridCL& mg);
     /// \brief Number unknowns on the vertices surrounding an interface.
-    void CreateNumbOnInterface(Uint level, MultiGridCL& mg, const VecDescCL& ls, const BndDataCL<>& lsetbnd, double omit_bound= -1./*default to using all dof*/);
+    size_t CreateNumbOnInterface(Uint level, MultiGridCL& mg, const VecDescCL& ls, const BndDataCL<>& lsetbnd, double omit_bound= -1./*default to using all dof*/);
 
   public:
     using FE_InfoCL::IsExtended;
@@ -351,7 +351,8 @@ class IdxDescCL: public FE_InfoCL
     /// \name Numbering
     /// \{
     /// \brief Used to number unknowns.
-    void CreateNumbering( Uint level, MultiGridCL& mg, const VecDescCL* lsetp= 0, const BndDataCL<>* lsetbnd =0);
+    size_t CreateNumbering( Uint level, MultiGridCL& mg, const VecDescCL* lsetp= 0, const BndDataCL<>* lsetbnd =0);
+    // void CreateNumbering(MultiGridCL&, std::vector<MultiGridCL::const_TriangTetraIteratorCL> const &);
     /// \brief Used to number unknowns and store boundary condition.
     void CreateNumbering( Uint level, MultiGridCL& mg, const BndCondCL& Bnd, const VecDescCL* lsetp= 0, const BndDataCL<>* lsetbnd =0);
     void CreateNumbering( Uint level, MultiGridCL& mg, const BndCondCL& Bnd, const BndCondCL& Bnd_aux, const VecDescCL* lsetp= 0, const BndDataCL<>* lsetbnd =0);

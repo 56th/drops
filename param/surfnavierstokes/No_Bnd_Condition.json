@@ -34,14 +34,14 @@
       "vel_volumestab_pow":    -1,
       "vel_volumestab_fac":    1,
       "formulation":           "consistent",
-      "NumbOfVirtualSubEdges": 2,
-      "UsePatchNormals":       true,
+      "NumbOfVirtualSubEdges": 6,
+      "UsePatchNormals":       false,
       "ComputeMatrices":       true,
-      "ExportMatrices":        true,
-      "ExportMatricesFormat":  "mtx",
+      "ExportMatrices":        false,
+      "ExportMatricesFormat":  "mat",
       "ComputeNormalErr":      false,
       "ComputeShapeErr":       false,
-      "Solve":                 false
+      "Solve":                 true
     },
 
     "Levelset": {
@@ -58,7 +58,7 @@
         "Tol":  1e-10,
         "Iter": 500
       },
-      "ShiftNorm": 0.3,
+      "ShiftNorm": 0.0,
       "ShiftDir":  [1, 1, 1]
     },
 
@@ -120,6 +120,6 @@
     
     "Output": {
         "Directory":      "../../output",
-        "every timestep": "1"
+        "every timestep": "-1"
     }
 }

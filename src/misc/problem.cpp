@@ -297,15 +297,14 @@ void CreateNumbOnTetra( const Uint idx, IdxT& counter, Uint stride,
 /// Upon return, counter contains the first number, that was not used,
 /// that is \# Unknowns+stride.
 /// A more user friendly interface is provided by IdxDescCL::CreateNumbOnInterface.
-void CreateNumbOnInterfaceVertex (const Uint idx, IdxT& counter, Uint stride,
-        const MultiGridCL::TriangVertexIteratorCL& vbegin,
-        const MultiGridCL::TriangVertexIteratorCL& vend,
-        const MultiGridCL::TriangTetraIteratorCL& begin,
-        const MultiGridCL::TriangTetraIteratorCL& end,
-    const VecDescCL& ls, const BndDataCL<>& lsetbnd, double omit_bound= -1./*default to using all dof*/)
-{
-    if (stride == 0) return;
-
+size_t CreateNumbOnInterfaceVertex (const Uint idx, IdxT& counter, Uint stride,
+    const MultiGridCL::TriangVertexIteratorCL& vbegin,
+    const MultiGridCL::TriangVertexIteratorCL& vend,
+    const MultiGridCL::TriangTetraIteratorCL& begin,
+    const MultiGridCL::TriangTetraIteratorCL& end,
+    const VecDescCL& ls, const BndDataCL<>& lsetbnd, double omit_bound= -1./*default to using all dof*/) {
+    size_t numbOfActiveTetras = 0;
+    if (stride == 0) return numbOfActiveTetras;
     LocalP2CL<> hat_sq[4]; // values of phi_i*phi_i
     for (int i= 0; i < 4; ++i)  {
         hat_sq[i][i]= 1.;
@@ -318,34 +317,38 @@ void CreateNumbOnInterfaceVertex (const Uint idx, IdxT& counter, Uint stride,
         vit->Unknowns.Invalidate(idx);
     }
     // then create numbering of vertices at the interface
-    const PrincipalLatticeCL& lat= PrincipalLatticeCL::instance( 2);
-    std::valarray<double> ls_loc( lat.vertex_size());
+    const PrincipalLatticeCL& lat = PrincipalLatticeCL::instance(2);
+    std::valarray<double> ls_loc(lat.vertex_size());
     LocalP2CL<> locp2_ls;
     SPatchCL<3> patch;
     QuadDomainCodim1CL<3> qdom;
     std::valarray<double> shape_sq; // square of a P1-shape-function as integrand
-    for (MultiGridCL::TriangTetraIteratorCL it= begin; it != end; ++it) {
-        locp2_ls.assign( *it, ls, lsetbnd);
-        evaluate_on_vertexes( locp2_ls, lat, Addr( ls_loc));
-        if (equal_signs( ls_loc))
-            continue;
-
-        const double limit= omit_bound < 0. ? 0. : omit_bound*std::pow( it->GetVolume()*6, 4./3.);
-        patch.make_patch<MergeCutPolicyCL>( lat, ls_loc);
-        make_CompositeQuad2Domain2D( qdom, patch, *it);
-        shape_sq.resize( qdom.vertex_size());
-        for (Uint i= 0; i < NumVertsC; ++i) {
-            UnknownHandleCL& unknowns= const_cast<VertexCL*>( it->GetVertex( i))->Unknowns;
-            if (unknowns.Exist( idx))
+    for (MultiGridCL::TriangTetraIteratorCL it = begin; it != end; ++it) {
+        locp2_ls.assign(*it, ls, lsetbnd);
+        evaluate_on_vertexes(locp2_ls, lat, Addr(ls_loc));
+        if (!isInCutMesh(ls_loc)) continue;
+        const double limit = omit_bound < 0. ? 0. : omit_bound*std::pow(it->GetVolume()*6, 4./3.);
+        patch.make_patch<MergeCutPolicyCL>(lat, ls_loc);
+        if (patch.empty()) continue;
+        make_CompositeQuad2Domain2D(qdom, patch, *it);
+        shape_sq.resize(qdom.vertex_size());
+        auto active = false;
+        for (Uint i = 0; i < NumVertsC; ++i) {
+            UnknownHandleCL& unknowns = const_cast<VertexCL*>(it->GetVertex(i))->Unknowns;
+            if (unknowns.Exist(idx)) {
+                active = true;
                 continue;
-
-            evaluate_on_vertexes( hat_sq[i], qdom, Addr( shape_sq));
-            if (quad_codim1( shape_sq, qdom) > limit) {
-                unknowns( idx)= counter;
-                counter+= stride;
+            }
+            evaluate_on_vertexes(hat_sq[i], qdom, Addr(shape_sq));
+            if (quad_codim1(shape_sq, qdom) > limit) {
+                unknowns(idx) = counter;
+                counter += stride;
+                active = true;
             }
         }
+        numbOfActiveTetras += active;
     }
+    return numbOfActiveTetras;
 }
 
 /// \brief Routine to number P2-unknowns on the vertices and edges surrounding an
@@ -360,88 +363,97 @@ void CreateNumbOnInterfaceVertex (const Uint idx, IdxT& counter, Uint stride,
 /// Upon return, counter contains the first number, that was not used,
 /// that is \# Unknowns+stride.
 /// A more user friendly interface is provided by IdxDescCL::CreateNumbOnInterface.
-void CreateNumbOnInterfaceP2 (const Uint idx, IdxT& counter, Uint stride,
-        const MultiGridCL::TriangVertexIteratorCL& vbegin,
-        const MultiGridCL::TriangVertexIteratorCL& vend,
-        const MultiGridCL::TriangEdgeIteratorCL& ebegin,
-        const MultiGridCL::TriangEdgeIteratorCL& eend,
-        const MultiGridCL::TriangTetraIteratorCL& begin,
-        const MultiGridCL::TriangTetraIteratorCL& end,
-        const VecDescCL& ls, const BndDataCL<>& lsetbnd, double omit_bound= -1./*default to using all dof*/)
-{
+size_t CreateNumbOnInterfaceP2 (const Uint idx, IdxT& counter, Uint stride,
+    const MultiGridCL::TriangVertexIteratorCL& vbegin,
+    const MultiGridCL::TriangVertexIteratorCL& vend,
+    const MultiGridCL::TriangEdgeIteratorCL& ebegin,
+    const MultiGridCL::TriangEdgeIteratorCL& eend,
+    const MultiGridCL::TriangTetraIteratorCL& begin,
+    const MultiGridCL::TriangTetraIteratorCL& end,
+    const VecDescCL& ls, const BndDataCL<>& lsetbnd, double omit_bound= -1./*default to using all dof*/) {
     //const size_t stride= 1;
-
+    size_t numbOfActiveTetras = 0;
     LocalP2CL<> p2[10];
-    for (int i= 0; i < 10; ++i)
-        p2[i][i]= 1.;
+    for (int i = 0; i < 10; ++i) p2[i][i]= 1.;
     // first set NoIdx in all vertices
-    for (MultiGridCL::TriangVertexIteratorCL vit= vbegin; vit != vend; ++vit) {
+    for (MultiGridCL::TriangVertexIteratorCL vit = vbegin; vit != vend; ++vit) {
         vit->Unknowns.Prepare(idx);
         vit->Unknowns.Invalidate(idx);
     }
-    for (MultiGridCL::TriangEdgeIteratorCL   eit= ebegin; eit != eend; ++eit) {
+    for (MultiGridCL::TriangEdgeIteratorCL   eit = ebegin; eit != eend; ++eit) {
         eit->Unknowns.Prepare(idx);
         eit->Unknowns.Invalidate(idx);
     }
     // then create numbering of vertices at the interface
-    const PrincipalLatticeCL& lat= PrincipalLatticeCL::instance( 1);
-    std::valarray<double> ls_loc( lat.vertex_size());
+    const PrincipalLatticeCL& lat = PrincipalLatticeCL::instance(2/*1*/);
+    std::valarray<double> ls_loc(lat.vertex_size());
     LocalP2CL<> locp2_ls;
     SPatchCL<3> patch;
     QuadDomainCodim1CL<3> qdom;
     std::valarray<double> qp2; // P2-shape-function as integrand
-    for (MultiGridCL::TriangTetraIteratorCL it= begin; it != end; ++it) {
-        locp2_ls.assign( *it, ls, lsetbnd);
-        evaluate_on_vertexes( locp2_ls, lat, Addr( ls_loc));
-        if (equal_signs( ls_loc))
-            continue;
-
-        const double limit= omit_bound < 0. ? 0. : omit_bound*std::pow( it->GetVolume()*6, 4./3.);
-        patch.make_patch<MergeCutPolicyCL>( lat, ls_loc);
-        if (patch.empty())
-            continue;
-
-        make_CompositeQuad5Domain2D( qdom, patch, *it);
-        qp2.resize( qdom.vertex_size());
-        for (Uint i= 0; i < 10; ++i) {
-            UnknownHandleCL& unknowns= i < 4 ? const_cast<VertexCL*>( it->GetVertex( i))->Unknowns
-                                             : const_cast<EdgeCL*>( it->GetEdge( i - 4))->Unknowns;
-            if (unknowns.Exist( idx))
+    for (MultiGridCL::TriangTetraIteratorCL it = begin; it != end; ++it) {
+        locp2_ls.assign(*it, ls, lsetbnd);
+        evaluate_on_vertexes(locp2_ls, lat, Addr(ls_loc));
+//        auto const & lat2 = PrincipalLatticeCL::instance(1);
+//        std::valarray<double> ls_loc2(lat2.vertex_size());
+//        evaluate_on_vertexes(locp2_ls, lat2, Addr(ls_loc2));
+//        if (equal_signs(ls_loc) != equal_signs(ls_loc2)) {
+//            for (auto const & u : ls_loc)
+//                std::cout << u << ' ';
+//            std::cout << '\n';
+//            for (auto const & u : ls_loc2)
+//                std::cout << u << ' ';
+//            std::cout << '\n';
+//        }
+        if (!isInCutMesh(ls_loc)) continue;
+        const double limit = omit_bound < 0. ? 0. : omit_bound*std::pow(it->GetVolume()*6, 4./3.);
+        patch.make_patch<MergeCutPolicyCL>(lat, ls_loc);
+        if (patch.empty()) continue;
+        make_CompositeQuad5Domain2D(qdom, patch, *it);
+        qp2.resize(qdom.vertex_size());
+        auto active = false;
+        for (Uint i = 0; i < NumAllVertsC; ++i) {
+            UnknownHandleCL& unknowns = i < NumVertsC ? const_cast<VertexCL*>(it->GetVertex(i))->Unknowns : const_cast<EdgeCL*>(it->GetEdge(i - 4))->Unknowns;
+            if (unknowns.Exist(idx)) {
+                active = true;
                 continue;
-
-            evaluate_on_vertexes( p2[i], qdom, Addr( qp2));
-            if (quad_codim1( qp2*qp2, qdom) > limit) {
-                unknowns( idx)= counter;
-                counter+= stride;
+            }
+            evaluate_on_vertexes(p2[i], qdom, Addr(qp2));
+            if (quad_codim1(qp2*qp2, qdom) > limit) {
+                unknowns(idx) = counter;
+                counter += stride;
+                active = true;
             }
         }
+        numbOfActiveTetras += active;
     }
+    return numbOfActiveTetras;
 }
 
-void IdxDescCL::CreateNumbOnInterface(Uint level, MultiGridCL& mg, const VecDescCL& ls,
-                                      const BndDataCL<>& lsetbnd, double omit_bound)
+size_t IdxDescCL::CreateNumbOnInterface(Uint level, MultiGridCL& mg, const VecDescCL& ls, const BndDataCL<>& lsetbnd, double omit_bound)
 /// Uses CreateNumbOnInterfaceVertex on the triangulation with level \p level on the multigrid \p mg.
 /// One can create P1-and P2-elements.
 {
+    size_t numbOfActiveTetras;
     // set up the index description
     const Uint idxnum= GetIdx();
-    TriangLevel_= level;
-    NumUnknowns_= 0;
+    TriangLevel_ = level;
+    NumUnknowns_ = 0;
 
     // allocate space for indices; number unknowns in TriangLevel level
     if ((GetFE() == P1IF_FE) || (GetFE() == vecP1IF_FE))
-        CreateNumbOnInterfaceVertex( idxnum, NumUnknowns_, NumUnknownsVertex(),
+        numbOfActiveTetras = CreateNumbOnInterfaceVertex( idxnum, NumUnknowns_, NumUnknownsVertex(),
             mg.GetTriangVertexBegin(level), mg.GetTriangVertexEnd(level),
-            mg.GetTriangTetraBegin( level), mg.GetTriangTetraEnd( level), ls, lsetbnd, omit_bound);
+            mg.GetTriangTetraBegin(level), mg.GetTriangTetraEnd(level), ls, lsetbnd, omit_bound);
     else if ((GetFE() == P2IF_FE) || (GetFE() == vecP2IF_FE))
-        CreateNumbOnInterfaceP2( idxnum, NumUnknowns_, NumUnknownsVertex(),
+        numbOfActiveTetras = CreateNumbOnInterfaceP2( idxnum, NumUnknowns_, NumUnknownsVertex(),
             mg.GetTriangVertexBegin(level), mg.GetTriangVertexEnd(level),
             mg.GetTriangEdgeBegin(level),   mg.GetTriangEdgeEnd(level),
-            mg.GetTriangTetraBegin( level), mg.GetTriangTetraEnd( level),
+            mg.GetTriangTetraBegin(level), mg.GetTriangTetraEnd(level),
             ls, lsetbnd, omit_bound);
-
     if (NumUnknownsFace() != 0 || NumUnknownsTetra() != 0)
         throw DROPSErrCL( "CreateNumbOnInterface: Only vertex and edge unknowns are implemented.\n" );
+    return numbOfActiveTetras;
 }
 
 void IdxDescCL::CreateNumbStdFE( Uint level, MultiGridCL& mg)
@@ -485,20 +497,21 @@ void IdxDescCL::CreateNumbStdFE( Uint level, MultiGridCL& mg)
     }
 }
 
-void IdxDescCL::CreateNumbering( Uint level, MultiGridCL& mg, const VecDescCL* lsetp, const BndDataCL<>* lsetbnd)
+size_t IdxDescCL::CreateNumbering(Uint level, MultiGridCL& mg, const VecDescCL* lsetp, const BndDataCL<>* lsetbnd)
 /// Memory for the Unknown-Indices on TriangLevel level is allocated
 /// and the unknowns are numbered.
 /// If a matching function is specified, numbering on periodic boundaries
 /// is performed, too.
 /// After that the extended DoFs are numbered for extended FE.
 {
+    size_t numbOfActiveTetras = 0;
     if (IsOnInterface())
     {
 #ifdef _PAR
         throw DROPSErrCL("IdxDescCL::CreateNumbering: Check first, if numbering on interface works in parDROPS.");
 #endif
         if (lsetp == 0) throw DROPSErrCL("IdxDescCL::CreateNumbering: no level set function for interface numbering given");
-        CreateNumbOnInterface( level, mg, *lsetp, *lsetbnd, GetXidx().GetBound());
+        numbOfActiveTetras = CreateNumbOnInterface(level, mg, *lsetp, *lsetbnd, GetXidx().GetBound());
     }
     else {
         CreateNumbStdFE( level, mg);
@@ -520,7 +533,44 @@ void IdxDescCL::CreateNumbering( Uint level, MultiGridCL& mg, const VecDescCL* l
     if (!IsExtendedSpaceTime())
         ex_->CreateList(mg, this, true, true);
 #endif
+    return numbOfActiveTetras;
 }
+
+// void IdxDescCL::CreateNumbering(MultiGridCL& mg, std::vector<MultiGridCL::const_TriangTetraIteratorCL> const & cutTetrasIters) {
+//    if (!IsOnInterface()) throw std::invalid_argument("FE must live in cut cells");
+//    auto isP2 = GetFE() == P2IF_FE || GetFE() == vecP2IF_FE;
+//    // first set NoIdx in all vertices
+//    TriangLevel_ = mg.GetLastLevel();
+//    NumUnknowns_ = 0;
+//    auto& counter = NumUnknowns_;
+//    auto idx = GetIdx();
+//    auto stride = NumUnknownsVertex();
+//    for (auto vit = mg.GetTriangVertexBegin(TriangLevel_); vit != mg.GetTriangVertexEnd(TriangLevel_); ++vit) {
+//        vit->Unknowns.Prepare(idx);
+//        vit->Unknowns.Invalidate(idx);
+//    }
+//    if (isP2)
+//        for (auto eit = mg.GetTriangEdgeBegin(TriangLevel_); eit != mg.GetTriangEdgeEnd(TriangLevel_); ++eit) {
+//            eit->Unknowns.Prepare(idx);
+//            eit->Unknowns.Invalidate(idx);
+//        }
+//    // then create numbering of vertices at the interface
+//    for (auto const & it : cutTetrasIters) {
+//        for (Uint i = 0; i < NumVertsC; ++i) {
+//            UnknownHandleCL& unknowns = const_cast<VertexCL*>(it->GetVertex(i))->Unknowns;
+//            if (unknowns.Exist(idx)) continue;
+//            unknowns(idx) = counter;
+//            counter += stride;
+//        }
+//        if (isP2)
+//            for (Uint i = NumVertsC; i < NumAllVertsC; ++i) {
+//                UnknownHandleCL& unknowns = const_cast<EdgeCL*>(it->GetEdge(i - 4))->Unknowns;
+//                if (unknowns.Exist(idx)) continue;
+//                unknowns(idx) = counter;
+//                counter += stride;
+//            }
+//    }
+//}
 
 void IdxDescCL::UpdateXNumbering( MultiGridCL& mg, const VecDescCL& lset, const BndDataCL<>& lsetbnd)
 {

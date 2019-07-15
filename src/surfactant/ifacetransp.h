@@ -774,6 +774,7 @@ struct LocalStokesParam {
         } normalErrSq;
         double shapeErrSq = 0.;
         double maxGammaDist = 0.;
+        size_t numbOfCutTetras = 0;
     } output;
 };
 

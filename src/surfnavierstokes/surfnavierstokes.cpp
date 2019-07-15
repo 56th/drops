@@ -62,8 +62,8 @@ DROPS::Point3DCL shiftTransform(const Point3DCL& p) {
 
 int main(int argc, char* argv[]) {
     try {
-        DROPS::read_parameter_file_from_cmdline( P, argc, argv, "../../param/surfnavierstokes/No_Bnd_Condition.json");
-        std::cout << P << std::endl;
+        DROPS::read_parameter_file_from_cmdline(P, argc, argv, "../../param/surfnavierstokes/No_Bnd_Condition.json");
+        std::cout << P << '\n';
         DROPS::dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string> >("General.DynamicLibs") );
         // build initial mesh
         std::cout << "Setting up interface-PDE:\n";
@@ -128,7 +128,7 @@ int main(int argc, char* argv[]) {
         // adaptive mesh refinement based on level set function
         typedef DROPS::DistMarkingStrategyCL InitMarkerT;
         InitMarkerT initmarker(levelset_fun, P.get<double>("Mesh.AdaptRef.Width"), 0, P.get<int>("Mesh.AdaptRef.FinestLevel") );
-        adap.set_marking_strategy(&initmarker );
+        adap.set_marking_strategy(&initmarker);
         adap.MakeInitialTriang();
         adap.set_marking_strategy(0);
         // create level set
@@ -181,30 +181,36 @@ int main(int argc, char* argv[]) {
     //  BndDataCL<double> vscalarbnd( 0);
     //  read_BndData( vscalarbnd, mg, P.get_child( "Stokes.VelocityBndData"));
         BndDataCL<double> pbnd( 0);
-        read_BndData( pbnd, mg, P.get_child( "Stokes.PressureBndData"));
-        DROPS::IdxDescCL ifaceVecP2idx( vecP2IF_FE, vbnd);
-        DROPS::IdxDescCL ifaceVecP1idx( vecP1IF_FE, vbnd);
-        DROPS::IdxDescCL ifaceP1idx( P1IF_FE, pbnd);
-        DROPS::IdxDescCL ifaceP2idx( P2IF_FE, pbnd);
-        DROPS::IdxDescCL vecP2idx( vecP2_FE, vbnd);
-        DROPS::IdxDescCL vecP1idx( vecP1_FE, vbnd);
-        DROPS::IdxDescCL P1FEidx( P1_FE, pbnd);
-        DROPS::IdxDescCL P2FEidx( P2_FE, pbnd);
-        ifaceVecP2idx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
-        ifaceVecP2idx.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
-        ifaceVecP1idx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
-        ifaceVecP1idx.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
-        ifaceP1idx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
-        ifaceP1idx.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
-        ifaceP2idx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
-        ifaceP2idx.CreateNumbering( mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
-        vecP2idx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
+        read_BndData(pbnd, mg, P.get_child( "Stokes.PressureBndData"));
+        DROPS::IdxDescCL ifaceVecP2idx(vecP2IF_FE, vbnd);
+        DROPS::IdxDescCL ifaceVecP1idx(vecP1IF_FE, vbnd);
+        DROPS::IdxDescCL ifaceP1idx(P1IF_FE, pbnd);
+        DROPS::IdxDescCL ifaceP2idx(P2IF_FE, pbnd);
+        DROPS::IdxDescCL vecP2idx(vecP2_FE, vbnd);
+        DROPS::IdxDescCL vecP1idx(vecP1_FE, vbnd);
+        DROPS::IdxDescCL P1FEidx(P1_FE, pbnd);
+        DROPS::IdxDescCL P2FEidx(P2_FE, pbnd);
+        ifaceVecP2idx.GetXidx().SetBound(P.get<double>("SurfTransp.OmitBound"));
+        auto numbOfActiveTetrasP2 = ifaceVecP2idx.CreateNumbering(mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
+        ifaceVecP1idx.GetXidx().SetBound(P.get<double>("SurfTransp.OmitBound"));
+        auto numbOfActiveTetrasP1 = ifaceVecP1idx.CreateNumbering(mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
+        if (numbOfActiveTetrasP2 != numbOfActiveTetrasP1) {
+            std::stringstream err;
+            err << "inconsistent numb of cut tetras for P2 and P1: " << numbOfActiveTetrasP2 << " vs. " << numbOfActiveTetrasP1;
+            throw std::logic_error(err.str());
+        }
+        std::cout << "numb of active (cut) tetras is: " << numbOfActiveTetrasP1 << '\n';
+        ifaceP1idx.GetXidx().SetBound(P.get<double>("SurfTransp.OmitBound"));
+        ifaceP1idx.CreateNumbering(mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
+        ifaceP2idx.GetXidx().SetBound(P.get<double>("SurfTransp.OmitBound"));
+        ifaceP2idx.CreateNumbering(mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
+        vecP2idx.GetXidx().SetBound(P.get<double>("SurfTransp.OmitBound"));
         vecP2idx.CreateNumbering(mg.GetLastLevel(), mg);
-        vecP1idx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
+        vecP1idx.GetXidx().SetBound(P.get<double>("SurfTransp.OmitBound"));
         vecP1idx.CreateNumbering(mg.GetLastLevel(), mg);
-        P1FEidx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
+        P1FEidx.GetXidx().SetBound(P.get<double>("SurfTransp.OmitBound"));
         P1FEidx.CreateNumbering(mg.GetLastLevel(), mg);
-        P2FEidx.GetXidx().SetBound( P.get<double>("SurfTransp.OmitBound"));
+        P2FEidx.GetXidx().SetBound(P.get<double>("SurfTransp.OmitBound"));
         P2FEidx.CreateNumbering(mg.GetLastLevel(), mg);
         std::cout << "NumUnknowns Vector IFP2: " << ifaceVecP2idx.NumUnknowns() << std::endl;
         std::cout << "NumUnknowns Vector IFP1: " << ifaceVecP1idx.NumUnknowns() << std::endl;
@@ -704,7 +710,8 @@ int main(int argc, char* argv[]) {
             Schur_stab.SetIdx(&ifaceP2idx, &ifaceP2idx);
             SetupStokesIF_P1P2(mg, &A, &A_stab, &B, &M, &S, &L, &L_stab, &Schur, &Schur_stab, lset.Phi, lset.GetBndData(), &param);
         }
-        std::cout << "stiffness mtx is              " << A.Data.num_rows() << " * " << A.Data.num_cols() << '\n'
+        std::cout << "numb of cut tetras is         " << param.output.numbOfCutTetras << '\n'
+                  << "stiffness mtx is              " << A.Data.num_rows() << " * " << A.Data.num_cols() << '\n'
                   << "velocity soln size is         " << v.Data.size() << '\n'
                   << "exact velocity interp size is " << vSol.Data.size() << '\n'
                   << "pre mass mtx is               " << Schur.Data.num_rows() << " * " << Schur.Data.num_cols() << '\n'
@@ -732,7 +739,7 @@ int main(int argc, char* argv[]) {
             (B_final.*expFunc)(dirname + "/B" + format);
             (M_final.*expFunc)(dirname + "/M" + format);
             (C_full.*expFunc)(dirname + "/C_full" + format);
-            (C_n.*expFunc)(dirname + "/C_full" + format);
+            (C_n.*expFunc)(dirname + "/C_n" + format);
         }
         if (P.get<bool>("SurfNavStokes.ComputeNormalErr") || P.get<bool>("SurfNavStokes.ComputeShapeErr")) {
             std::ofstream log(dirname + "/normal_and_shape_errs_m=" + std::to_string(param.input.numbOfVirtualSubEdges) + ".txt");
