@@ -570,7 +570,7 @@ void output( StokesT &Stokes, LevelsetP2CL& lset, BndDataCL<>& lsetbnd )
     FiniteElementT prFE = P.get<double>("NavStokes.XFEMReduced") < 0 ? P1_FE : P1X_FE;
     if ( prFE == P1X_FE )
     {
-        vtk.Register( make_VTKP1XScalar( MG, lset.Phi, Stokes.p, lsetbnd, "Xpressure" ) );
+        vtk.Register( make_VTKP1XScalar( MG, lset.Phi, lsetbnd, Stokes.p, Stokes.GetBndData().Pr, "Xpressure" ) );
     }
     vtk.Register( make_VTKScalar( make_P2Eval( MG, lsetbnd, lset.Phi ), "levelset" ) );
 

@@ -298,7 +298,7 @@ int main (int argc, char** argv)
     ensight.Register( make_Ensight6Scalar   ( make_P2Eval( mg, ubnd, upos),    "up",       filename + ".up"));
     ensight.Register( make_Ensight6Scalar   ( make_P2Eval( mg, ubnd, uneg),    "un",       filename + ".un"));
     // Output the L_2-projection
-    ensight.Register( make_Ensight6P1XScalar( mg, lset.Phi, beta,              "ul",       filename + ".ul"));
+    ensight.Register( make_Ensight6P1XScalar( mg, lset.Phi, lset.GetBndData(), beta, "ul", filename + ".ul"));
 
     ensight.Write();
 

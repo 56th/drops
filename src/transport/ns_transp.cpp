@@ -513,7 +513,7 @@ void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTr
                                                     ensf + ".scl", true));
         ensight->Register( make_Ensight6Scalar( massTransp.GetSolution( massTransp.ct,true),
                                                 "TransConc",     ensf + ".ct",  true));
-        ensight->Register( make_Ensight6P1XScalar( MG, lset.Phi, massTransp.ct, "XTransConcentration",
+        ensight->Register( make_Ensight6P1XScalar( MG, lset.Phi, lset.GetBndData(), massTransp.ct, "XTransConcentration",
                                                    ensf + ".xconc", true));
         ensight->Write(0);
     }
@@ -867,7 +867,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbndda
 
         if (P.get<int>("Transp.Enable")) {
             ensight->Register( make_Ensight6Scalar( massTransp.GetSolution(),"Concentration", ensf + ".c",   true));
-            ensight->Register( make_Ensight6P1XScalar( MG, lset.Phi, massTransp.ct,
+            ensight->Register( make_Ensight6P1XScalar( MG, lset.Phi, lset.GetBndData(), massTransp.ct,
                                                       "XTransConcentration",   ensf + ".xconc", true));
 
         }
@@ -877,7 +877,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbndda
 
 #ifndef _PAR
         if (Stokes.UsesXFEM())
-            ensight->Register( make_Ensight6P1XScalar( MG, lset.Phi, Stokes.p, "XPressure",   ensf + ".pr", true));
+            ensight->Register( make_Ensight6P1XScalar( MG, lset.Phi, lset.GetBndData(), Stokes.p, "XPressure",   ensf + ".pr", true));
 #endif
         ensight->Write( Stokes.v.t);
     }
