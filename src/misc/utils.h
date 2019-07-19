@@ -55,11 +55,11 @@
 #  include <unordered_set>
 #  define DROPS_STD_UNORDERED_SET std::unordered_set
 #elif defined(__INTEL_COMPILER) || (__GNUC__>=4) || __xlC__
-#  include <tr1/unordered_map>
-#  define DROPS_STD_UNORDERED_MAP std::tr1::unordered_map
-#  define DROPS_STD_HASH          std::tr1::hash
-#  include <tr1/unordered_set>
-#  define DROPS_STD_UNORDERED_SET std::tr1::unordered_set
+#  include <unordered_map>
+#  define DROPS_STD_UNORDERED_MAP std::unordered_map
+#  define DROPS_STD_HASH          std::hash
+#  include <unordered_set>
+#  define DROPS_STD_UNORDERED_SET std::unordered_set
 #elif defined(__SUNPRO_CC) || defined(__PGI)
 #  include <hash_map>
 #  define DROPS_STD_UNORDERED_MAP std::hash_map
@@ -790,11 +790,11 @@ std::vector<std::pair<T1,T2> > Map2Vec( const std::map<T1,T2>& Map)
 
 #if __GNUC__ >= 4 && !defined(__INTEL_COMPILER)
 template <typename T1, typename T2>
-std::vector<std::pair<T1,T2> > Map2Vec( const std::tr1::unordered_map<T1,T2>& Map)
+std::vector<std::pair<T1,T2> > Map2Vec( const std::unordered_map<T1,T2>& Map)
 {
     std::vector<std::pair<T1,T2> > vec(Map.size());
     size_t pos=0;
-    for ( typename std::tr1::unordered_map<T1,T2>::const_iterator it=Map.begin(); it!=Map.end(); ++it, pos++)
+    for ( typename std::unordered_map<T1,T2>::const_iterator it=Map.begin(); it!=Map.end(); ++it, pos++)
         vec[pos]= std::pair<T1,T2>(it->first, it->second);
     return vec;
 }
