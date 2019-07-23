@@ -36,8 +36,8 @@ namespace ParameterNS {
 namespace Torus {
     double R=1;
     double r=0.2;
-       double k=0.0;
-       double f=0.0;
+    double k=0.0;
+    double f=0.0;
 //    double k=0.3;
 //    double f=4.0;
 }
@@ -160,15 +160,8 @@ double cube_madeof_edges (const DROPS::Point3DCL& p, double)
 ;
 }
 
-double torus (const DROPS::Point3DCL& p, double)
-{
-    //return pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) - 0.4e1, 0.2e1) + pow(pow(p[1], 0.2e1) - 0.1e1, 0.2e1) + pow(pow(p[1], 0.2e1) + pow(p[2], 0.2e1) - 0.4e1, 0.2e1) + pow(pow(p[0], 0.2e1) - 0.1e1, 0.2e1) + pow(pow(p[0], 0.2e1) + pow(p[2], 0.2e1) - 0.4e1, 0.2e1) + pow(pow(p[2], 0.2e1) - 0.1e1, 0.2e1) - 0.13e2;
-
-   double R=Torus::R;
-//    double r=0.4;
-    //return pow(p[2],2.0) + pow(std::sqrt(pow(p[0],2.0) + pow(p[1], 2.0)) - R, 2.0) - r*r;
-    return pow( pow(p[0],2.0) + pow(p[1], 2.0) + pow(p[2],2.0) + Torus::R*Torus::R - Torus::r*Torus::r, 2.0) - 4*Torus::R*Torus::R*(pow(p[0],2.0) + pow(p[1], 2.0));
-    //return (p[0]*p[0]+p[1]*p[1]+p[2]*p[2]-1)*(p[0]*p[0]+p[1]*p[1]+p[2]*p[2]-0.33);
+double torus (const DROPS::Point3DCL& p, double) {
+   return pow(pow(p[0], 2.) + pow(p[1], 2.) + pow(p[2], 2.) + Torus::R * Torus::R - Torus::r * Torus::r, 2.) - 4. * Torus::R * Torus::R * (pow(p[0], 2.) + pow(p[1], 2.));
 }
 
 double flower_shape(double x)

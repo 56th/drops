@@ -14,7 +14,7 @@
             "Freq":          0,
             "Width":         0,
             "CoarsestLevel": 0,
-            "FinestLevel":   1,
+            "FinestLevel":   4,
             "SD":            0.1,
             "CurvDiff":      -1,
             "Discontinuous": 0
@@ -24,7 +24,7 @@
     "SurfNavStokes": {
       "FE":                    "P2P1",
       "model":                 "NavierStokes",
-      "testcase":              "85",
+      "testcase":              "1",
       "instationary":          "none",
       "nonlinear_term":        "none",
       "kinematic_viscosity":   1,
@@ -34,18 +34,18 @@
       "vel_volumestab_pow":    -1,
       "vel_volumestab_fac":    1,
       "formulation":           "consistent",
-      "NumbOfVirtualSubEdges": 2,
+      "NumbOfVirtualSubEdges": 6,
       "UsePatchNormals":       false,
       "ComputeMatrices":       true,
       "ExportMatrices":        true,
       "ExportMatricesFormat":  "mat",
       "ComputeNormalErr":      false,
       "ComputeShapeErr":       false,
-      "Solve":                 true
+      "Solve":                 false
     },
 
     "Levelset": {
-      "case":          "sphere_2",
+      "case":          "torus",
       "Theta":         1,
       "VolCorrection": 0,
       "SD":            0.1,
@@ -120,6 +120,6 @@
     
     "Output": {
         "Directory":      "../../output",
-        "every timestep": "-1"
+        "every timestep": "1"
     }
 }
