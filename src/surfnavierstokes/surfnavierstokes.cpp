@@ -191,6 +191,7 @@ int main(int argc, char* argv[]) {
         DROPS::IdxDescCL P1FEidx(P1_FE, pbnd);
         DROPS::IdxDescCL P2FEidx(P2_FE, pbnd);
         ifaceVecP2idx.GetXidx().SetBound(P.get<double>("SurfTransp.OmitBound"));
+        auto numbOfTetras = mg.GetNumTriangTetra();
         auto numbOfActiveTetrasP2 = ifaceVecP2idx.CreateNumbering(mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
         ifaceVecP1idx.GetXidx().SetBound(P.get<double>("SurfTransp.OmitBound"));
         auto numbOfActiveTetrasP1 = ifaceVecP1idx.CreateNumbering(mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
@@ -199,7 +200,9 @@ int main(int argc, char* argv[]) {
             err << "inconsistent numb of cut tetras for P2 and P1: " << numbOfActiveTetrasP2 << " vs. " << numbOfActiveTetrasP1;
             throw std::logic_error(err.str());
         }
-        std::cout << "numb of active (cut) tetras is: " << numbOfActiveTetrasP1 << '\n';
+        std::cout
+            << "numb of tetras is: " << numbOfTetras << '\n'
+            << "numb of active (cut) tetras is: " << numbOfActiveTetrasP1 << " (" << (100. * numbOfActiveTetrasP1) / numbOfTetras << "%)\n";
         ifaceP1idx.GetXidx().SetBound(P.get<double>("SurfTransp.OmitBound"));
         ifaceP1idx.CreateNumbering(mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
         ifaceP2idx.GetXidx().SetBound(P.get<double>("SurfTransp.OmitBound"));

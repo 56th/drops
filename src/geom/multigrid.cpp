@@ -974,6 +974,14 @@ void MultiGridCL::DebugInfo(std::ostream& os, int Level) const
         sit->DebugInfo( os);
 }
 
+/// \brief Get number of tetrahedra of a given level
+Uint MultiGridCL::GetNumTriangTetra(int Level) {
+    Uint numTetra = 0;
+    DROPS_FOR_TRIANG_TETRA((*this), Level, It)
+        ++numTetra;
+    return numTetra;
+}
+
 #ifdef _PAR
 /// \brief Get number of distributed objects on local processor
 Uint MultiGridCL::GetNumDistributedObjects() const
@@ -991,16 +999,6 @@ Uint MultiGridCL::GetNumDistributedObjects() const
         if (!sit->IsLocal()) ++numdistTetra;
 
     return numdistVert+numdistEdge+numdistFace+numdistTetra;
-}
-
-/// \brief Get number of tetrahedra of a given level
-Uint MultiGridCL::GetNumTriangTetra(int Level)
-{
-    Uint numTetra=0;
-    DROPS_FOR_TRIANG_TETRA( (*this), Level, It) {
-        ++numTetra;
-    }
-    return numTetra;
 }
 
 /// \brief Get number of faces of a given level
