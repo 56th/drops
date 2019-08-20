@@ -169,8 +169,9 @@ int main(int argc, char* argv[]) {
         auto rho_u_order  = P.get<double>("SurfNavStokes.vel_volumestab_pow");
         auto rho_u_factor = P.get<double>("SurfNavStokes.vel_volumestab_fac");
         auto rho_u        = rho_u_factor  * pow(h, rho_u_order); // constant for velocity stabilisation
-        auto rho_p_order  = 1.0;
-        auto rho_p        = 1.e0  * pow(h, rho_p_order); // constant for pressure stabilisation
+        auto rho_p_order  = P.get<double>("SurfNavStokes.pre_volumestab_pow");
+        auto rho_p_factor = P.get<double>("SurfNavStokes.pre_volumestab_fac");
+	auto rho_p        = rho_p_factor  * pow(h, rho_p_order); // constant for pressure stabilisation
         auto rho          = 1.e0  * pow(h, 1); // constant for Schur complement preconditioner
         double hat_rho_u  = rho_u; //Constant for L_stab
         std::cout << "tau is: " << tau << std::endl;
