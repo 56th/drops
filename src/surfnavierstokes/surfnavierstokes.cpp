@@ -99,27 +99,27 @@ int main(int argc, char* argv[]) {
             levelset_fun = &sphere_2;
             exact_normal = &sphere_2_normal;
             exact_shape  = &sphere_2_shape;
-            std::cout << "The levelset is the unit sphere." << std::endl;
+            std::cout << "The levelset is the unit sphere." << '\n';
         } else if( !levelset_fun_str.compare("xy_plane")) {
             levelset_fun = &xy_plane;
-            std::cout << "The levelset is the xy-plane." << std::endl;
+            std::cout << "The levelset is the xy-plane." << '\n';
         } else if( !levelset_fun_str.compare("tilted_plane")) {
             levelset_fun = &tilted_plane;
-            std::cout << "The levelset is the tilted plane." << std::endl;
+            std::cout << "The levelset is the tilted plane." << '\n';
         } else if( !levelset_fun_str.compare("tilted_plane_xy")) {
             levelset_fun = &tilted_plane_xy;
-            std::cout << "The levelset is the tilted xy-plane." << std::endl;
+            std::cout << "The levelset is the tilted xy-plane." << '\n';
         } else if( !levelset_fun_str.compare("cube_madeof_edges")) {
             levelset_fun = &cube_madeof_edges;
-            std::cout << "The levelset is the cube_madeof_edges." << std::endl;
+            std::cout << "The levelset is the cube_madeof_edges." << '\n';
         }
         else if( !levelset_fun_str.compare("torus")) {
             levelset_fun = &torus;
-            std::cout << "The levelset is the torus." << std::endl;
+            std::cout << "The levelset is the torus." << '\n';
         }
         else if( !levelset_fun_str.compare("torus_flower")) {
             levelset_fun = &torus_flower;
-            std::cout << "The levelset is the torus_flower." << std::endl;
+            std::cout << "The levelset is the torus_flower." << '\n';
         }
         LocalStokesParam param;
         param.input.exactNormal = P.get<bool>("SurfNavStokes.ComputeNormalErr") ? exact_normal : nullptr;
@@ -171,10 +171,10 @@ int main(int argc, char* argv[]) {
         auto rho_u        = rho_u_factor  * pow(h, rho_u_order); // constant for velocity stabilisation
         auto rho_p_order  = P.get<double>("SurfNavStokes.pre_volumestab_pow");
         auto rho_p_factor = P.get<double>("SurfNavStokes.pre_volumestab_fac");
-	auto rho_p        = rho_p_factor  * pow(h, rho_p_order); // constant for pressure stabilisation
-        auto rho          = 1.e0  * pow(h, 1); // constant for Schur complement preconditioner
-        double hat_rho_u  = rho_u; //Constant for L_stab
-        std::cout << "tau is: " << tau << std::endl;
+        auto rho_p        = rho_p_factor  * pow(h, rho_p_order); // constant for pressure stabilisation
+        auto rho          = rho_p; // constant for Schur complement preconditioner
+        auto hat_rho_u    = rho_u; // constant for L_stab
+        std::cout << "tau is: " << tau << '\n';
         ParameterNS::h = h;
         // construct FE spaces
         BndDataCL<Point3DCL> vbnd( 0);
@@ -216,14 +216,14 @@ int main(int argc, char* argv[]) {
         P1FEidx.CreateNumbering(mg.GetLastLevel(), mg);
         P2FEidx.GetXidx().SetBound(P.get<double>("SurfTransp.OmitBound"));
         P2FEidx.CreateNumbering(mg.GetLastLevel(), mg);
-        std::cout << "NumUnknowns Vector IFP2: " << ifaceVecP2idx.NumUnknowns() << std::endl;
-        std::cout << "NumUnknowns Vector IFP1: " << ifaceVecP1idx.NumUnknowns() << std::endl;
-        std::cout << "NumUnknowns Scalar IFP2: " << ifaceP2idx.NumUnknowns() << std::endl;
-        std::cout << "NumUnknowns Scalar IFP1: " << ifaceP1idx.NumUnknowns() << std::endl;
-        std::cout << "NumUnknowns Vector P2: " << vecP2idx.NumUnknowns() << std::endl;
-        std::cout << "NumUnknowns Vector P1: " << vecP1idx.NumUnknowns() << std::endl;
-        std::cout << "NumUnknowns Scalar P2: " << P2FEidx.NumUnknowns() << std::endl;
-        std::cout << "NumUnknowns Scalar P1: " << P1FEidx.NumUnknowns() << std::endl;
+        std::cout << "NumUnknowns Vector IFP2: " << ifaceVecP2idx.NumUnknowns() << '\n';
+        std::cout << "NumUnknowns Vector IFP1: " << ifaceVecP1idx.NumUnknowns() << '\n';
+        std::cout << "NumUnknowns Scalar IFP2: " << ifaceP2idx.NumUnknowns() << '\n';
+        std::cout << "NumUnknowns Scalar IFP1: " << ifaceP1idx.NumUnknowns() << '\n';
+        std::cout << "NumUnknowns Vector P2: " << vecP2idx.NumUnknowns() << '\n';
+        std::cout << "NumUnknowns Vector P1: " << vecP1idx.NumUnknowns() << '\n';
+        std::cout << "NumUnknowns Scalar P2: " << P2FEidx.NumUnknowns() << '\n';
+        std::cout << "NumUnknowns Scalar P1: " << P1FEidx.NumUnknowns() << '\n';
         //TestAllP2MatricesWithP1Matrices(mg, lset, ifaceVecP2idx, ifaceVecP1idx, ifaceP1idx, fullgrad);
         // construct FE vectors (initialized with zero)
         DROPS::VecDescCL v, vSol, vInit, p, curl,curlSol, pSol, curl_proj, ZeroVec;
@@ -285,7 +285,7 @@ int main(int argc, char* argv[]) {
         DROPS::instat_scalar_fun_ptr extpsol = &ZeroScalarFun, extrhs2, extcurlsol=&ZeroScalarFun;
         if(!levelset_fun_str.compare("sphere_2")) {
               if(!testcase.compare("1")) {
-                  std::cout << "Test case 1 with vSol = P[-z^2, y, x]^T" << std::endl;
+                  std::cout << "Test case 1 with vSol = P[-z^2, y, x]^T" << '\n';
                   extvsol = &Test_A_plus_M_vSolVectorFun1;
                   extsol_grad1 = &Test_A_plus_M_vSolVectorFun1_Gradient1;
                   extsol_grad2 = &Test_A_plus_M_vSolVectorFun1_Gradient2;
@@ -294,7 +294,7 @@ int main(int argc, char* argv[]) {
                   extrhs = &Test_A_plus_M_RhsVectorFun1;
                   extrhs2 = &Test_A_plus_M_rhs2Fun1;
               } else if(!testcase.compare("2")) {
-                  std::cout << "Test case 2 with vSol = [-y, x, 0]^T" << std::endl;
+                  std::cout << "Test case 2 with vSol = [-y, x, 0]^T" << '\n';
                   extvsol = &Test_A_plus_M_vSolVectorFun2;
                   extsol_grad1 = &Test_A_plus_M_vSolVectorFun2_Gradient1;
                   extsol_grad2 = &Test_A_plus_M_vSolVectorFun2_Gradient2;
@@ -302,7 +302,7 @@ int main(int argc, char* argv[]) {
                   extpsol = &Test_A_plus_M_pSolScalarFun2;
                   extrhs = &Test_A_plus_M_RhsVectorFun2;
               } else if(!testcase.compare("3")) {
-                  std::cout << "Test case 3 with vSol = [-x*y-x*z+y^2+z^2, x^2-x*y-y*z+z^2, x^2-x*z+y^2-y*z]^T" << std::endl;
+                  std::cout << "Test case 3 with vSol = [-x*y-x*z+y^2+z^2, x^2-x*y-y*z+z^2, x^2-x*z+y^2-y*z]^T" << '\n';
                   extvsol = &Test_A_plus_M_vSolVectorFun3;
                   extsol_grad1 = &Test_A_plus_M_vSolVectorFun3_Gradient1;
                   extsol_grad2 = &Test_A_plus_M_vSolVectorFun3_Gradient2;
@@ -310,14 +310,14 @@ int main(int argc, char* argv[]) {
                   extpsol = &Test_A_plus_M_pSolScalarFun3;
                   extrhs = &Test_A_plus_M_RhsVectorFun3;
               } else if(!testcase.compare("4")) {
-                  std::cout << "Test case 4 (only mass matrix) with vSol = [-x*y-x*z+y^2+z^2, x^2-x*y-y*z+z^2, x^2-x*z+y^2-y*z]^T" << std::endl;
+                  std::cout << "Test case 4 (only mass matrix) with vSol = [-x*y-x*z+y^2+z^2, x^2-x*y-y*z+z^2, x^2-x*z+y^2-y*z]^T" << '\n';
                   extvsol = &Test_A_plus_M_vSolVectorFun3;
                   extsol_grad1 = &Test_A_plus_M_vSolVectorFun3_Gradient1;
                   extsol_grad2 = &Test_A_plus_M_vSolVectorFun3_Gradient2;
                   extsol_grad3 = &Test_A_plus_M_vSolVectorFun3_Gradient3;
                   extrhs = &Test_A_plus_M_RhsVectorFun3;
               } else if(!testcase.compare("5")) {
-                  std::cout << "Test case 5 (1_in_spherical) with vSol = P[-z^2, y, x]^T" << std::endl;
+                  std::cout << "Test case 5 (1_in_spherical) with vSol = P[-z^2, y, x]^T" << '\n';
                   extvsol = &Test_A_plus_M_vSolVectorFun5;
                   extsol_grad1 = &Test_A_plus_M_vSolVectorFun5_Gradient1;
                   extsol_grad2 = &Test_A_plus_M_vSolVectorFun5_Gradient2;
@@ -326,7 +326,7 @@ int main(int argc, char* argv[]) {
                   //SetupInterfaceRhsP1(mg, &rhs2, lset.Phi, lset.GetBndData(), Test_A_plus_M_rhs2Fun1);
                   extrhs = &Test_A_plus_M_RhsVectorFun5;
               } else if(!testcase.compare("0")) {
-                  std::cout << "Test case 0 zero solution" << std::endl;
+                  std::cout << "Test case 0 zero solution" << '\n';
                   extvsol = &ZeroVectorFun;
                   extsol_grad1 = &ZeroVectorFun;
                   extsol_grad2 = &ZeroVectorFun;
@@ -337,7 +337,7 @@ int main(int argc, char* argv[]) {
                   InitVector(mg, vInit, &ZeroVectorFun);
               }
               else if(!testcase.compare("6")) {
-                  std::cout << "Test case 6 with vSol = P[1, 0, 0]^T, pSol = y/(x^2+y^2+z^2)^(1/2)" << std::endl;
+                  std::cout << "Test case 6 with vSol = P[1, 0, 0]^T, pSol = y/(x^2+y^2+z^2)^(1/2)" << '\n';
                   extvsol = &Test_A_plus_M_vSolVectorFun6;
                   extsol_grad1 = &Test_A_plus_M_vSolVectorFun6_Gradient1;
                   extsol_grad2 = &Test_A_plus_M_vSolVectorFun6_Gradient2;
@@ -347,7 +347,7 @@ int main(int argc, char* argv[]) {
                   extrhs2 = &Test_A_plus_M_rhs2Fun6;
                   InitVector(mg, vInit, &Test_A_plus_M_vSolVectorFun6);
               } else if(!testcase.compare("7")) {
-                  std::cout << "Test case 7 with pSol = x*y^3/(x^2+y^2+z^2)^2+z/(x^2+y^2+z^2)^(1/2); " << std::endl;
+                  std::cout << "Test case 7 with pSol = x*y^3/(x^2+y^2+z^2)^2+z/(x^2+y^2+z^2)^(1/2); " << '\n';
                   extvsol = &Test_A_plus_M_vSolVectorFun7;
                   extsol_grad1 = &Test_A_plus_M_vSolVectorFun7_Gradient1;
                   extsol_grad2 = &Test_A_plus_M_vSolVectorFun7_Gradient2;
@@ -358,7 +358,7 @@ int main(int argc, char* argv[]) {
                   InitVector(mg, vInit, &Test_A_plus_M_vSolVectorFun7);
               }
               else if(!testcase.compare("8")) {
-                  std::cout << "Test case 8 with vSol = P[-z^2, y, x]^T, pSol = (x*y^3/(x^2+y^2+z^2)^2+z/(x^2+y^2+z^2)^(1/2)); " << std::endl;
+                  std::cout << "Test case 8 with vSol = P[-z^2, y, x]^T, pSol = (x*y^3/(x^2+y^2+z^2)^2+z/(x^2+y^2+z^2)^(1/2)); " << '\n';
                   extvsol = &Test_A_plus_M_vSolVectorFun8;
                   extsol_grad1 = &Test_A_plus_M_vSolVectorFun8_Gradient1;
                   extsol_grad2 = &Test_A_plus_M_vSolVectorFun8_Gradient2;
@@ -369,7 +369,7 @@ int main(int argc, char* argv[]) {
                   InitVector(mg, vInit, &Test_A_plus_M_vSolVectorFun8);
               }
               else if(!testcase.compare("85")) {
-                  std::cout << "Test case 85 with vSol = P normal_ext ( [-z^2, y, x]^T ), pSol = (x*y^3/(x^2+y^2+z^2)^2+z/(x^2+y^2+z^2)^(1/2)); " << std::endl;
+                  std::cout << "Test case 85 with vSol = P normal_ext ( [-z^2, y, x]^T ), pSol = (x*y^3/(x^2+y^2+z^2)^2+z/(x^2+y^2+z^2)^(1/2)); " << '\n';
                   extvsol = &Test_A_plus_M_vSolVectorFun85;
                   extsol_grad1 = &Test_A_plus_M_vSolVectorFun85_Gradient1;
                   extsol_grad2 = &Test_A_plus_M_vSolVectorFun85_Gradient2;
@@ -380,7 +380,7 @@ int main(int argc, char* argv[]) {
                   InitVector(mg, vInit, &Test_A_plus_M_vSolVectorFun85);
               }
               else if(!testcase.compare("9")) {
-                  std::cout << "Test case 9 with vSol = n x grad(y*z), pSol = (x*y^3/(x^2+y^2+z^2)^2+z/(x^2+y^2+z^2)^(1/2)); " << std::endl;
+                  std::cout << "Test case 9 with vSol = n x grad(y*z), pSol = (x*y^3/(x^2+y^2+z^2)^2+z/(x^2+y^2+z^2)^(1/2)); " << '\n';
                   extvsol = &Test_A_plus_M_vSolVectorFun9;
                   extsol_grad1 = &Test_A_plus_M_vSolVectorFun9_Gradient1;
                   extsol_grad2 = &Test_A_plus_M_vSolVectorFun9_Gradient2;
@@ -391,7 +391,7 @@ int main(int argc, char* argv[]) {
                   InitVector(mg, vInit, &Test_A_plus_M_vSolVectorFun9);
               }
               else if(!testcase.compare("95")) {
-                  std::cout << "Test case 95 with vSol = P[1,0,0]^T, pSol = (x*y^3/(x^2+y^2+z^2)^2+z/(x^2+y^2+z^2)^(1/2)); " << std::endl;
+                  std::cout << "Test case 95 with vSol = P[1,0,0]^T, pSol = (x*y^3/(x^2+y^2+z^2)^2+z/(x^2+y^2+z^2)^(1/2)); " << '\n';
                   extvsol = &Test_A_plus_M_vSolVectorFun95;
                   extsol_grad1 = &Test_A_plus_M_vSolVectorFun95_Gradient1;
                   extsol_grad2 = &Test_A_plus_M_vSolVectorFun95_Gradient2;
@@ -402,7 +402,7 @@ int main(int argc, char* argv[]) {
                   InitVector(mg, vInit, &Test_A_plus_M_vSolVectorFun95);
               }
               else if(!testcase.compare("10")) {
-                  std::cout << "Test case 10 initial velocity = (2+3)spherical harmonics; " << std::endl;
+                  std::cout << "Test case 10 initial velocity = (2+3)spherical harmonics; " << '\n';
                   extvsol = &Test_A_plus_M_vSolVectorFun10;
                   extvinit = &Test_A_plus_M_vInitVectorFun10;
                   extsol_grad1 = &Test_A_plus_M_vSolVectorFun10_Gradient1;
@@ -414,7 +414,7 @@ int main(int argc, char* argv[]) {
                   InitVector(mg, vInit, extvinit);
               }
               else if(!testcase.compare("11")) {
-                  std::cout << "Test case 11 = (6 + convection) with vSol = P[1, 0, 0]^T, pSol = y/(x^2+y^2+z^2)^(1/2)" << std::endl;
+                  std::cout << "Test case 11 = (6 + convection) with vSol = P[1, 0, 0]^T, pSol = y/(x^2+y^2+z^2)^(1/2)" << '\n';
                   extvsol = &Test_A_plus_M_vSolVectorFun6;
                   extsol_grad1 = &Test_A_plus_M_vSolVectorFun6_Gradient1;
                   extsol_grad2 = &Test_A_plus_M_vSolVectorFun6_Gradient2;
@@ -423,7 +423,7 @@ int main(int argc, char* argv[]) {
                   extrhs2 = &Test_A_plus_M_rhs2Fun6;
               }
               else if(!testcase.compare("12")) {
-                  std::cout << "Test case 12 = (11 + Bernouli pressure) with vSol = P[1, 0, 0]^T, pSol = vSol^2/2 + y/(x^2+y^2+z^2)^(1/2)" << std::endl;
+                  std::cout << "Test case 12 = (11 + Bernouli pressure) with vSol = P[1, 0, 0]^T, pSol = vSol^2/2 + y/(x^2+y^2+z^2)^(1/2)" << '\n';
                   extvsol = &Test_A_plus_M_vSolVectorFun6;
                   extsol_grad1 = &Test_A_plus_M_vSolVectorFun6_Gradient1;
                   extsol_grad2 = &Test_A_plus_M_vSolVectorFun6_Gradient2;
@@ -432,7 +432,7 @@ int main(int argc, char* argv[]) {
                   extrhs2 = &Test_A_plus_M_rhs2Fun6;
               }
               else if(!testcase.compare("13")) {
-                  std::cout << "Test case 13 = (8 + convection) with vSol = P[-z^2, y, x]^T, pSol = (x*y^3/(x^2+y^2+z^2)^2+z/(x^2+y^2+z^2)^(1/2)); " << std::endl;
+                  std::cout << "Test case 13 = (8 + convection) with vSol = P[-z^2, y, x]^T, pSol = (x*y^3/(x^2+y^2+z^2)^2+z/(x^2+y^2+z^2)^(1/2)); " << '\n';
                   extvsol = &Test_A_plus_M_vSolVectorFun8;
                   extsol_grad1 = &Test_A_plus_M_vSolVectorFun8_Gradient1;
                   extsol_grad2 = &Test_A_plus_M_vSolVectorFun8_Gradient2;
@@ -444,7 +444,7 @@ int main(int argc, char* argv[]) {
 
               }
               else if(!testcase.compare("14")) {
-                  std::cout << "Test case 14 = (13 + Bernouli pressure) with vSol = P[-z^2, y, x]^T, pSol = vSol^2/2 +  (x*y^3/(x^2+y^2+z^2)^2+z/(x^2+y^2+z^2)^(1/2)); " << std::endl;
+                  std::cout << "Test case 14 = (13 + Bernouli pressure) with vSol = P[-z^2, y, x]^T, pSol = vSol^2/2 +  (x*y^3/(x^2+y^2+z^2)^2+z/(x^2+y^2+z^2)^(1/2)); " << '\n';
                   extvsol = &Test_A_plus_M_vSolVectorFun8;
                   extsol_grad1 = &Test_A_plus_M_vSolVectorFun8_Gradient1;
                   extsol_grad2 = &Test_A_plus_M_vSolVectorFun8_Gradient2;
@@ -453,7 +453,7 @@ int main(int argc, char* argv[]) {
                   extrhs2 = &Test_A_plus_M_rhs2Fun8;
               }
               else if(!testcase.compare("15")) {
-                  std::cout << "Test case 15 = (13 - Bernouli pressure) with vSol = P[-z^2, y, x]^T, pSol = - vSol^2/2 +  (x*y^3/(x^2+y^2+z^2)^2+z/(x^2+y^2+z^2)^(1/2)); " << std::endl;
+                  std::cout << "Test case 15 = (13 - Bernouli pressure) with vSol = P[-z^2, y, x]^T, pSol = - vSol^2/2 +  (x*y^3/(x^2+y^2+z^2)^2+z/(x^2+y^2+z^2)^(1/2)); " << '\n';
                   extvsol = &Test_A_plus_M_vSolVectorFun8;
                   extrhs  = &Test_A_plus_M_RhsVectorFun13;
                   extsol_grad1 = &Test_A_plus_M_vSolVectorFun8_Gradient1;
@@ -463,7 +463,7 @@ int main(int argc, char* argv[]) {
                   extrhs2 = &Test_A_plus_M_rhs2Fun8;
               }
               else if(!testcase.compare("16")) {
-                  std::cout << "Test case 16 = from Killing to Killing; " << std::endl;
+                  std::cout << "Test case 16 = from Killing to Killing; " << '\n';
                   extvsol = &Test_A_plus_M_vSolVectorFun16;
                   extpsol = &Test_A_plus_M_pSolScalarFun10;
                   extrhs  = //&ZeroVectorFun;
@@ -475,7 +475,7 @@ int main(int argc, char* argv[]) {
                   InitVector(mg, vInit, &Test_A_plus_M_vSolVectorFun16);
               }
               else if(!testcase.compare("17")) {
-                  std::cout << "Test case 17 = swirled Killing; " << std::endl;
+                  std::cout << "Test case 17 = swirled Killing; " << '\n';
                   ParameterNS::nu = P.get<double>("SurfNavStokes.kinematic_viscosity");
                   extvsol = &Test_A_plus_M_vSolVectorFun17;
                   extpsol = &Test_A_plus_M_pSolScalarFun10;
@@ -487,7 +487,7 @@ int main(int argc, char* argv[]) {
                   InitVector(mg, vInit, &Test_A_plus_M_vSolVectorFun17);
               }
               else if(!testcase.compare("18")) {
-                  std::cout << "Test case 18 = Kelvin-Helmholtz; " << std::endl;
+                  std::cout << "Test case 18 = Kelvin-Helmholtz; " << '\n';
                   ParameterNS::nu = P.get<double>("SurfNavStokes.kinematic_viscosity");
                   extvsol = &Test_A_plus_M_vSolVectorFun18;
                   extpsol = &Test_A_plus_M_pSolScalarFun10;
@@ -499,7 +499,7 @@ int main(int argc, char* argv[]) {
                   InitVector(mg, vInit, &Test_A_plus_M_vSolVectorFun18);
               }
               else if(!testcase.compare("19")) {
-                  std::cout << "Test case 19 = vorteces; " << std::endl;
+                  std::cout << "Test case 19 = vorteces; " << '\n';
                   ParameterNS::nu = P.get<double>("SurfNavStokes.kinematic_viscosity");
                   extvsol = &ZeroVectorFun;
                   extpsol = &ZeroScalarFun;
@@ -511,7 +511,7 @@ int main(int argc, char* argv[]) {
                   InitVector(mg, vInit, &Test_A_plus_M_disturbed_test18);
               }
               else if(!testcase.compare("20")) {
-                  std::cout << "Test case 20 = test 17 + swirling depends on x; " << std::endl;
+                  std::cout << "Test case 20 = test 17 + swirling depends on x; " << '\n';
                   ParameterNS::nu = P.get<double>("SurfNavStokes.kinematic_viscosity");
                   extvsol = &Test_A_plus_M_vSolVectorFun20;
                   extpsol = &ZeroScalarFun;
@@ -525,19 +525,19 @@ int main(int argc, char* argv[]) {
               }
         } else if (!levelset_fun_str.compare("xy_plane")) {
               if( !testcase.compare("1")) {
-                  std::cout << "Test case 1 with vSol = [sin(Pi*x)sin(Pi*y), sin(Pi*x)sin(Pi*y), 0]^T" << std::endl;
+                  std::cout << "Test case 1 with vSol = [sin(Pi*x)sin(Pi*y), sin(Pi*x)sin(Pi*y), 0]^T" << '\n';
                   extvsol = &Test_A_plus_M_xy_plane_vSolVectorFun1;
                   extsol_grad1 = &Test_A_plus_M_xy_plane_vSolVectorFun1_Gradient1;
                   extsol_grad2 = &Test_A_plus_M_xy_plane_vSolVectorFun1_Gradient2;
                   extsol_grad3 = &Test_A_plus_M_xy_plane_vSolVectorFun1_Gradient3;
               } else if(!testcase.compare("2")) {
-                  std::cout << "Test case 2 with vSol = [sin(Pi/2*x)sin(Pi/2*y), sin(Pi/2*x)sin(Pi/2*y), 0]^T" << std::endl;
+                  std::cout << "Test case 2 with vSol = [sin(Pi/2*x)sin(Pi/2*y), sin(Pi/2*x)sin(Pi/2*y), 0]^T" << '\n';
                   extvsol = &Test_A_plus_M_xy_plane_vSolVectorFun2;
                   extsol_grad1 = &Test_A_plus_M_xy_plane_vSolVectorFun2_Gradient1;
                   extsol_grad2 = &Test_A_plus_M_xy_plane_vSolVectorFun2_Gradient2;
                   extsol_grad3 = &Test_A_plus_M_xy_plane_vSolVectorFun2_Gradient3;
               } else if(!testcase.compare("3")) {
-                  std::cout << "Test case 3 with vSol = [sin(Pi/4*x)sin(Pi/4*y), sin(Pi/4*x)sin(Pi/4*y), 0]^T" << std::endl;
+                  std::cout << "Test case 3 with vSol = [sin(Pi/4*x)sin(Pi/4*y), sin(Pi/4*x)sin(Pi/4*y), 0]^T" << '\n';
                   extvsol = &Test_A_plus_M_xy_plane_vSolVectorFun3;
                   extsol_grad1 = &Test_A_plus_M_xy_plane_vSolVectorFun3_Gradient1;
                   extsol_grad2 = &Test_A_plus_M_xy_plane_vSolVectorFun3_Gradient2;
@@ -548,7 +548,7 @@ int main(int argc, char* argv[]) {
                   extsol_grad2 = &ZeroVectorFun;
                   extsol_grad3 = &ZeroVectorFun;
               } else if(!testcase.compare("4")) {
-                  std::cout << "Test case 4 with vSol = [(x^2-4)*(y^2-4), (x^2-4)*(y^2-4), 0]^T" << std::endl;
+                  std::cout << "Test case 4 with vSol = [(x^2-4)*(y^2-4), (x^2-4)*(y^2-4), 0]^T" << '\n';
                   extvsol = &Test_A_plus_M_xy_plane_vSolVectorFun4;
                   extsol_grad1 = &Test_A_plus_M_xy_plane_vSolVectorFun4_Gradient1;
                   extsol_grad2 = &Test_A_plus_M_xy_plane_vSolVectorFun4_Gradient2;
@@ -556,13 +556,13 @@ int main(int argc, char* argv[]) {
               }
         } else if( !levelset_fun_str.compare("tilted_plane")) {
               if( !testcase.compare("1")) {
-                  std::cout << "Test case 1 with vSol = [4/5*sin(Pi*x)sin(Pi*z), 2/5*sin(Pi*x)sin(Pi*z), sin(Pi*x)sin(Pi*z)]^T" << std::endl;
+                  std::cout << "Test case 1 with vSol = [4/5*sin(Pi*x)sin(Pi*z), 2/5*sin(Pi*x)sin(Pi*z), sin(Pi*x)sin(Pi*z)]^T" << '\n';
                   extvsol = &Test_A_plus_M_tilted_plane_vSolVectorFun1;
                   extsol_grad1 = &Test_A_plus_M_tilted_plane_vSolVectorFun1_Gradient1;
                   extsol_grad2 = &Test_A_plus_M_tilted_plane_vSolVectorFun1_Gradient2;
                   extsol_grad3 = &Test_A_plus_M_tilted_plane_vSolVectorFun1_Gradient3;
               } else if( !testcase.compare("2")) {
-                  std::cout << "Test case 2 with vSol = [4/5*(x^2-4)*(z^2-4), 2/5*(x^2-4)*(z^2-4), (x^2-4)*(z^2-4)]^T" << std::endl;
+                  std::cout << "Test case 2 with vSol = [4/5*(x^2-4)*(z^2-4), 2/5*(x^2-4)*(z^2-4), (x^2-4)*(z^2-4)]^T" << '\n';
                   extvsol = &Test_A_plus_M_tilted_plane_vSolVectorFun2;
                   extsol_grad1 = &Test_A_plus_M_tilted_plane_vSolVectorFun2_Gradient1;
                   extsol_grad2 = &Test_A_plus_M_tilted_plane_vSolVectorFun2_Gradient2;
@@ -572,7 +572,7 @@ int main(int argc, char* argv[]) {
             if (!testcase.compare("1")) {
                 std::cout
                         << "Test case 1 with vSol = [4/17*sin(Pi*y)*sin(Pi*z), sin(Pi*y)*sin(Pi*z), 16/17*sin(Pi*y)*sin(Pi*z)]^T"
-                        << std::endl;
+                        << '\n';
                 extvsol = &Test_A_plus_M_tilted_plane_xy_vSolVectorFun1;
                 extsol_grad1 = &Test_A_plus_M_tilted_plane_xy_vSolVectorFun1_Gradient1;
                 extsol_grad2 = &Test_A_plus_M_tilted_plane_xy_vSolVectorFun1_Gradient2;
@@ -584,7 +584,7 @@ int main(int argc, char* argv[]) {
                 extsol_grad3 = &ZeroVectorFun;
             } else if (!testcase.compare("2")) {
                 std::cout << "Test case 2 with vSol = [4/17*(z^2-4)*(y^2-4), (z^2-4)*(y^2-4), 16/17*(z^2-4)*(y^2-4)]^T"
-                          << std::endl;
+                          << '\n';
                 extvsol = &Test_A_plus_M_tilted_plane_xy_vSolVectorFun2;
                 extsol_grad1 = &Test_A_plus_M_tilted_plane_xy_vSolVectorFun2_Gradient1;
                 extsol_grad2 = &Test_A_plus_M_tilted_plane_xy_vSolVectorFun2_Gradient2;
@@ -592,7 +592,7 @@ int main(int argc, char* argv[]) {
             } else if (!testcase.compare("3")) {
                 std::cout
                         << "Test case 3 with vSol = [4/17*(z^2-4)^2*(y^2-4)^2, (z^2-4)^2*(y^2-4)^2, 16/17*(z^2-4)^2*(y^2-4)^2]^T"
-                        << std::endl;
+                        << '\n';
                 extvsol = &Test_A_plus_M_tilted_plane_xy_vSolVectorFun3;
                 extsol_grad1 = &Test_A_plus_M_tilted_plane_xy_vSolVectorFun3_Gradient1;
                 extsol_grad2 = &Test_A_plus_M_tilted_plane_xy_vSolVectorFun3_Gradient2;
@@ -600,7 +600,7 @@ int main(int argc, char* argv[]) {
             }
         } else if( !levelset_fun_str.compare("cube_madeof_edges")) {
             if (!testcase.compare("1")) {
-                std::cout << "Test case 1 with nonzero divergence" << std::endl;
+                std::cout << "Test case 1 with nonzero divergence" << '\n';
                 extrhs = &Test_cube_madeof_edges_RhsVectorFun1;
                 extrhs2 = &Test_cube_madeof_edges_rhs2Fun1;
                 extvsol = &Test_cube_madeof_edges_vSolVectorFun1;
@@ -611,7 +611,7 @@ int main(int argc, char* argv[]) {
             }
         } else if( !levelset_fun_str.compare("torus")) {
             if (!testcase.compare("1")) {
-                std::cout << "Test case 1 = Arnold example; " << std::endl;
+                std::cout << "Test case 1 = Arnold example; " << '\n';
                 ParameterNS::nu = P.get<double>("SurfNavStokes.kinematic_viscosity");
                 extvsol = &Torus_vSolVectorArnold;
                 extpsol = &ZeroScalarFun;
@@ -623,7 +623,7 @@ int main(int argc, char* argv[]) {
                 InitVector(mg, vInit, extvsol);
             }
             if (!testcase.compare("2")) {
-                std::cout << "Test case 2 = linear combinations; " << std::endl;
+                std::cout << "Test case 2 = linear combinations; " << '\n';
                 ParameterNS::nu = P.get<double>("SurfNavStokes.kinematic_viscosity");
                 extvsol = &Torus_vSolVectorHarmonic;
                 extpsol = &ZeroScalarFun;
@@ -636,7 +636,7 @@ int main(int argc, char* argv[]) {
             }
         } else if (!levelset_fun_str.compare("torus_flower")) {
             if (!testcase.compare("1")) {
-                std::cout << "Test case 1 = harmonic; " << std::endl;
+                std::cout << "Test case 1 = harmonic; " << '\n';
                 ParameterNS::nu = P.get<double>("SurfNavStokes.kinematic_viscosity");
                 extvsol = &Torus_vSolVectorHarmonicPhi;
                 extpsol = &ZeroScalarFun;
@@ -827,7 +827,7 @@ int main(int argc, char* argv[]) {
             DROPS::VecDescCL vxtent, pxtent;
             //set up output
             std::string filename = "test" + testcase + "_";
-            std::cout << "dirname: " << dirname << std::endl;
+            std::cout << "dirname: " << dirname << '\n';
             //set up VTK output
             VTKOutCL* vtkwriter = nullptr;
             vtkwriter = new VTKOutCL(mg, "DROPS data", (int)P.get<double>("Time.NumSteps")/P.get<int>("Output.every timestep"), dirname , filename, "none", 0);
@@ -850,7 +850,7 @@ int main(int argc, char* argv[]) {
                                   + P.get<std::string>("SurfNavStokes.nonlinear_term") + "_"
                                   + P.get<std::string>("SurfNavStokes.instationary") + "="
                                   + std::to_string(float(tau)) + ".txt");
-            log_solo << "Time" <<  "\tKinetic\t" << "\tMomentum\t" << "\tWork" <<  std::endl;
+            log_solo << "Time" <<  "\tKinetic\t" << "\tMomentum\t" << "\tWork" <<  '\n';
 
             //set up a txt file for error time output
             std::ofstream log_error( dirname +"/"
@@ -861,9 +861,9 @@ int main(int argc, char* argv[]) {
                     + P.get<std::string>("SurfNavStokes.nonlinear_term") + "_"
                     + P.get<std::string>("SurfNavStokes.instationary") + "="
                     + std::to_string(float(tau)) + ".txt");
-            log_error << "Time" << "\tL_2(uT-ext_uT)\t" <<  "\tadvH_1(u-ext_u)\t" <<  "\tsurfH_1(u-ext_u)\t" <<  "\tH_1(u-ext_u)\t" << "\tL_2(uN)\t" << "\tL_2(p-ext_p)" << std::endl;
+            log_error << "Time" << "\tL_2(uT-ext_uT)\t" <<  "\tadvH_1(u-ext_u)\t" <<  "\tsurfH_1(u-ext_u)\t" <<  "\tH_1(u-ext_u)\t" << "\tL_2(uN)\t" << "\tL_2(p-ext_p)" << '\n';
             double mu = P.get<double>("SurfNavStokes.kinematic_viscosity");
-            std::cout << "viscosity: " << mu << std::endl;
+            std::cout << "viscosity: " << mu << '\n';
             std::cout << "test is instationary: " << P.get<std::string>("SurfNavStokes.instationary") << '\n';
 
             //NAVIER-STOKES starts here
@@ -887,7 +887,7 @@ int main(int argc, char* argv[]) {
                 double l2norm = L2_Vector_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndvec, vxtent), &ZeroVectorFun);
                 double mom = dot(M.Data * vInit.Data,id);
                 double work = dot(M.Data * vInit.Data,fRHS.Data);
-                log_solo << std::to_string(0.0) << "\t" << std::to_string((float)(l2norm*l2norm*0.5)) << "\t" << std::to_string((float)(mom))<< "\t" << std::to_string((float)(work)) << std::endl;
+                log_solo << std::to_string(0.0) << "\t" << std::to_string((float)(l2norm*l2norm*0.5)) << "\t" << std::to_string((float)(mom))<< "\t" << std::to_string((float)(work)) << '\n';
 
                 bool experimental=false;
 
@@ -899,23 +899,23 @@ int main(int argc, char* argv[]) {
                     Extend(mg, v, vxtent);
                     BndDataCL<Point3DCL> bndvec = vbnd;
                     double error_L2 = L2_Vector_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndvec, vxtent), extvsol, 0);
-                    log << "The L2-Norm of v - vSol is: " << error_L2 << std::endl;
+                    log << "The L2-Norm of v - vSol is: " << error_L2 << '\n';
                     log_error << std::to_string((float) error_L2) << "\t";
                     double l2norm = L2_Vector_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndvec, vxtent),
                                                     &ZeroVectorFun, 0);
-                    log << "The L2-Norm of v  is: " << l2norm << std::endl;
+                    log << "The L2-Norm of v  is: " << l2norm << '\n';
 
                     double H1(0.), surfH1(0.), advanced_surfH1(0.), normal_velocity(0.);
                     H1_Vector_error_P1(mg, lset.Phi, lset.GetBndData(), v, vbnd, extvsol, extsol_grad1, extsol_grad2,
                                        extsol_grad3, tau_u, H1, surfH1, advanced_surfH1, normal_velocity, 0);
-                    //        std::cout << "The H1-Norm of v - vSol is: " << H1 << std::endl;
-                    //        std::cout << "The surfH1-Norm of v - vSol is: " << surfH1 << std::endl;
-                    log << "The advanced surfH1-Norm of v - vSol is: " << advanced_surfH1 << std::endl;
+                    //        std::cout << "The H1-Norm of v - vSol is: " << H1 << '\n';
+                    //        std::cout << "The surfH1-Norm of v - vSol is: " << surfH1 << '\n';
+                    log << "The advanced surfH1-Norm of v - vSol is: " << advanced_surfH1 << '\n';
                     log_error << std::to_string((float) advanced_surfH1) << "\t";
                     log_error << std::to_string((float) surfH1) << "\t";
                     log_error << std::to_string((float) H1) << "\t";
-                    //log << "The U-Norm of v - vSol is: " << std::sqrt(advanced_surfH1*advanced_surfH1 + rho_u*dot(A_stab.Data*v.Data, v.Data)) << std::endl;
-                    log << "The L2-Norm of v * n is: " << normal_velocity << std::endl;
+                    //log << "The U-Norm of v - vSol is: " << std::sqrt(advanced_surfH1*advanced_surfH1 + rho_u*dot(A_stab.Data*v.Data, v.Data)) << '\n';
+                    log << "The L2-Norm of v * n is: " << normal_velocity << '\n';
                     log_error << std::to_string((float) normal_velocity) << "\t";
                 }
                 if (!prFE.compare("P1")) {
@@ -923,10 +923,10 @@ int main(int argc, char* argv[]) {
                     Extend(mg, p, pxtent);
                     BndDataCL<double> bndscalar = pbnd;
                     double L2_Lagrange =L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndscalar, pxtent), extpsol, 0);
-                    log << "The L2-Norm of p - pSol is: " << L2_Lagrange << std::endl;
-                    log_error <<  std::to_string((float)L2_Lagrange) << std::endl;
+                    log << "The L2-Norm of p - pSol is: " << L2_Lagrange << '\n';
+                    log_error <<  std::to_string((float)L2_Lagrange) << '\n';
                     log << "The L2-Norm of p  is: " << L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndscalar, pxtent), &ZeroScalarFun);
-                    //log << "The M-Norm of p - pSol is: " << std::sqrt(L2_Lagrange*L2_Lagrange + rho_p*dot(Schur_stab.Data*p.Data, p.Data)) << std::endl;
+                    //log << "The M-Norm of p - pSol is: " << std::sqrt(L2_Lagrange*L2_Lagrange + rho_p*dot(Schur_stab.Data*p.Data, p.Data)) << '\n';
                 }
 
                 for (int i = 0; i < P.get<double>("Time.NumSteps"); i++)
@@ -959,7 +959,7 @@ int main(int argc, char* argv[]) {
                     }
                     else
                     {
-                        std::cout << "problem is instationary, pick BDF1 or BDF2" << std::endl;
+                        std::cout << "problem is instationary, pick BDF1 or BDF2" << '\n';
                         return 0;
                     }
 
@@ -982,42 +982,42 @@ int main(int argc, char* argv[]) {
                     //pick the form of nonlinear term
                     if ( P.get<std::string>("SurfNavStokes.nonlinear_term") == "convective" )
                     {
-                        std::cout << "nonlinear_term: convective " << std::endl;
+                        std::cout << "nonlinear_term: convective " << '\n';
                         Adyn.LinComb(1, Ahat, 1, N.Data);
                     }
                     else if (P.get<std::string>("SurfNavStokes.nonlinear_term") == "rotational")
                     {
-                        std::cout << "nonlinear_term: rotational " << std::endl;
+                        std::cout << "nonlinear_term: rotational " << '\n';
 
                         Adyn.LinComb(1, Ahat, 1, N.Data, -1, NT.Data);
                     }
                     else if (P.get<std::string>("SurfNavStokes.nonlinear_term") == "strain")
                     {
-                        std::cout << "nonlinear_term: strain " << std::endl;
+                        std::cout << "nonlinear_term: strain " << '\n';
 
                         Adyn.LinComb(1, Ahat, 1, N.Data, 1, NT.Data);
                     }
                     else if (P.get<std::string>("SurfNavStokes.nonlinear_term") == "skew-symmetric")
                     {
-                        std::cout << "nonlinear_term: skew-symmetric " << std::endl;
+                        std::cout << "nonlinear_term: skew-symmetric " << '\n';
 
                         Adyn.LinComb(1, Ahat, 1, N.Data, 0.5, D.Data);
                     }
                     else if (P.get<std::string>("SurfNavStokes.nonlinear_term") == "conservative")
                     {
-                        std::cout << "nonlinear_term: conservative " << std::endl;
+                        std::cout << "nonlinear_term: conservative " << '\n';
 
                         Adyn.LinComb(1, Ahat, 1, N.Data, 1, D.Data);
                     }
                     else if (P.get<std::string>("SurfNavStokes.nonlinear_term") == "EMAC")
                     {
-                        std::cout << "nonlinear_term: EMAC " << std::endl;
+                        std::cout << "nonlinear_term: EMAC " << '\n';
 
                         Adyn.LinComb(1, Ahat, 1, N.Data, 1, NT.Data, 1, D.Data);
                     }
                     else
                     {
-                        std::cout << "nonlinear_term: none" << std::endl;
+                        std::cout << "nonlinear_term: none" << '\n';
                         Adyn=Ahat;
                     }
                     //set up rhs from external forces
@@ -1032,17 +1032,17 @@ int main(int argc, char* argv[]) {
                     // pick inertial term and reinitialise unknowns
                     if ( P.get<std::string>("SurfNavStokes.instationary") == "BDF1")
                     {
-                        std::cout << "inertial term: BDF1 " << std::endl;
+                        std::cout << "inertial term: BDF1 " << '\n';
                         instantrhs.Data += ( 1.0/tau ) * ( M.Data * v.Data) ;
                     }
                     else if ( P.get<std::string>("SurfNavStokes.instationary") == "BDF2")
                     {
 
                         if (i!=0) {
-                            std::cout << "inertial term: BDF2 " << std::endl;
+                            std::cout << "inertial term: BDF2 " << '\n';
                             instantrhs.Data += ( 2.0/tau ) * ( M.Data * v.Data) - ( 1.0/(2.0*tau)) * ( M.Data * v_old.Data) ;
                         } else {
-                            std::cout << "inertial term: BDF1 " << std::endl;
+                            std::cout << "inertial term: BDF1 " << '\n';
                             instantrhs.Data += ( 1.0/tau ) * ( M.Data * v.Data) ;
                         }
                         //v_oldold=v_old;
@@ -1051,11 +1051,11 @@ int main(int argc, char* argv[]) {
                     }
                     else
                     {
-                        std::cout << "problem is instationary, pick _BDF1_ or _BDF2_ or _none_" << std::endl;
+                        std::cout << "problem is instationary, pick _BDF1_ or _BDF2_ or _none_" << '\n';
                         return 0;
                     }
 
-                    /*std::cout << "REMOVE THIS!" << std::endl;
+                    /*std::cout << "REMOVE THIS!" << '\n';
                     MatrixCL Adyncopy=Adyn;
                     Adyn.LinComb(1.0, Adyncopy, 1.0, M.Data);*/
 
@@ -1065,10 +1065,10 @@ int main(int argc, char* argv[]) {
                     //std::cout <<  (3./(2.*tau)) * v.Data  - (2./tau) * v_old.Data + (1./(2.*tau)) * v_oldold.Data;
 
                     //rhs.Data    -= ( dot(rhs.Data,id)   / dot(id,id)   ) * id;
-                    std::cout << "norm(Omega * v ) ist: " << norm(Omega.Data*v.Data) << std::endl;
-                    std::cout << "norm(M * v ) ist: " << norm(M.Data*v.Data) << std::endl;
+                    std::cout << "norm(Omega * v ) ist: " << norm(Omega.Data*v.Data) << '\n';
+                    std::cout << "norm(M * v ) ist: " << norm(M.Data*v.Data) << '\n';
 
-                    std::cout << "dot(Omega*v, M*id2)" << dot(Omega.Data*id,Schur.Data*id2) << std::endl;
+                    std::cout << "dot(Omega*v, M*id2)" << dot(Omega.Data*id,Schur.Data*id2) << '\n';
 
                     Mhat.LinComb(1., Schur.Data, rho_p, Schur_normal_stab.Data);
                     //renormalization to fullfill \int rhs = 0 in discrete sence
@@ -1081,66 +1081,66 @@ int main(int argc, char* argv[]) {
                     p.Data -=  dot(Schur.Data * p.Data,id2) / dot(Schur.Data*id2,id2) * id2;
 
                     //check residuals
-                    std::cout << "norm( Adyn * v + B^T  * p  -  instantrhs) ist: " << norm(Adyn*v.Data + BTranspose*p.Data - instantrhs.Data) << std::endl;
-                    std::cout << "norm( B    * v + Chat * p - gRHS) ist: " << norm(B.Data*v.Data + Chat * p.Data - gRHS.Data) << std::endl;
+                    std::cout << "norm( Adyn * v + B^T  * p  -  instantrhs) ist: " << norm(Adyn*v.Data + BTranspose*p.Data - instantrhs.Data) << '\n';
+                    std::cout << "norm( B    * v + Chat * p - gRHS) ist: " << norm(B.Data*v.Data + Chat * p.Data - gRHS.Data) << '\n';
 
                     //skip vtk output of needed
                     if ((i+1) % P.get<int>("Output.every timestep")  == 0)
                     {
-                        std::cout << "output # : " << i << std::endl;
+                        std::cout << "output # : " << i << '\n';
                         vtkwriter->Write((i+1)*tau);
                     }
 
                     //send to logfiles
-                    log_error <<  std::to_string((float)(i+1)*tau) << "\t";
-                    log_solo <<  std::to_string((float)(i+1)*tau) << "\t";
-                    log << "Time is: "    << std::to_string((float)(i+1)*tau) << std::endl;
-                    log << "h is: "       << h << std::endl;
-                    log << "rho_p is: "   << rho_p/**pow(h, -rho_p_order) )*/<< std::endl;
-                    log << "rho_u is: " << rho_u/**pow(h, -rho_u_order) )*/<< std::endl;
-                    log << "tau_u is: "     << tau_u/**pow(h, -tau_u_order) )<< std::endl*/;
+                    log_error << std::to_string((float)(i+1)*tau) << '\t';
+                    log_solo << std::to_string((float)(i+1)*tau) << '\t';
+                    log << "Time is: " << std::to_string((float)(i+1)*tau) << '\n';
+                    log << "h is: " << h << '\n';
+                    log << "rho_p is: " << rho_p << '\n';
+                    log << "rho_u is: " << rho_u << '\n';
+                    log << "tau_u is: " << tau_u << '\n';
                     log << "Total iterations: " << nonsym_stokessolver->GetIter() << '\n';
                     log	<< "Final residual: " << nonsym_stokessolver->GetResid() << '\n';
                     if( !velFE.compare("P2")) {
                         vxtent.SetIdx( &vecP2idx);
                         Extend(mg, v, vxtent);
                         BndDataCL<Point3DCL> bndvec = vbnd;
-                        log << "The L2-Norm of v - vSol is: " << L2_Vector_error(mg, lset.Phi, lset.GetBndData(), make_P2Eval(mg, bndvec, vxtent), extvsol) << std::endl;
+                        log << "The L2-Norm of v - vSol is: " << L2_Vector_error(mg, lset.Phi, lset.GetBndData(), make_P2Eval(mg, bndvec, vxtent), extvsol) << '\n';
                         double H1( 0.), surfH1( 0.), advanced_surfH1( 0.), normal_velocity;
                         H1_Vector_error_P2(mg, lset.Phi, lset.GetBndData(), v, vbnd, extvsol, extsol_grad1, extsol_grad2, extsol_grad3, tau_u, H1, surfH1, advanced_surfH1, normal_velocity);
-                        //        std::cout << "The H1-Norm of v - vSol is: " << H1 << std::endl;
-                        //        std::cout << "The surfH1-Norm of v - vSol is: " << surfH1 << std::endl;
-                        log << "The advanced surfH1-Norm of v - vSol is: " << advanced_surfH1 << std::endl;
-                        log << "The U-Norm of v - vSol is: " << std::sqrt(advanced_surfH1*advanced_surfH1 + rho_u*dot(A_stab.Data*v.Data, v.Data)) << std::endl;
-                        log << "The L2-Norm of v * n is: " << normal_velocity << std::endl;
+                        //        std::cout << "The H1-Norm of v - vSol is: " << H1 << '\n';
+                        //        std::cout << "The surfH1-Norm of v - vSol is: " << surfH1 << '\n';
+                        log << "The advanced surfH1-Norm of v - vSol is: " << advanced_surfH1 << '\n';
+                        log << "The U-Norm of v - vSol is: " << std::sqrt(advanced_surfH1*advanced_surfH1 + rho_u*dot(A_stab.Data*v.Data, v.Data)) << '\n';
+                        log << "The L2-Norm of v * n is: " << normal_velocity << '\n';
                         if ( !prFE.compare("P1")) {
                             pxtent.SetIdx( &P1FEidx);
                             Extend(mg, p, pxtent);
                             BndDataCL<double> bndscalar = pbnd;
                             double L2_Lagrange =L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndscalar, pxtent), extpsol);
-                            log << "The L2-Norm of p - pSol is: " << L2_Lagrange << std::endl;
-                            log << "The M-Norm of p - pSol is: " << std::sqrt(L2_Lagrange*L2_Lagrange + hat_rho_u*dot(Schur_stab.Data*p.Data, p.Data)) << std::endl;
+                            log << "The L2-Norm of p - pSol is: " << L2_Lagrange << '\n';
+                            log << "The M-Norm of p - pSol is: " << std::sqrt(L2_Lagrange*L2_Lagrange + hat_rho_u*dot(Schur_stab.Data*p.Data, p.Data)) << '\n';
                         }
                     } else if( !velFE.compare("P1")) {
                         vxtent.SetIdx( &vecP1idx);
                         Extend(mg, v, vxtent);
                         BndDataCL<Point3DCL> bndvec = vbnd;
                         double error_L2 = L2_Vector_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndvec, vxtent), extvsol, (i+1)*tau);
-                        log << "The L2-Norm of v - vSol is: " << error_L2 << std::endl;
+                        log << "The L2-Norm of v - vSol is: " << error_L2 << '\n';
                         log_error <<  std::to_string((float)error_L2) << "\t";
                         double l2norm = L2_Vector_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndvec, vxtent), &ZeroVectorFun, (i+1)*tau);
-                        log << "The L2-Norm of v  is: " << l2norm<< std::endl;
-                        log_solo << std::to_string((float)(l2norm*l2norm*0.5)) << "\t" << std::to_string((float) dot(M.Data * v.Data,id) ) << "\t" << dot(M.Data * v.Data,fRHS.Data) << std::endl;
+                        log << "The L2-Norm of v  is: " << l2norm<< '\n';
+                        log_solo << std::to_string((float)(l2norm*l2norm*0.5)) << "\t" << std::to_string((float) dot(M.Data * v.Data,id) ) << "\t" << dot(M.Data * v.Data,fRHS.Data) << '\n';
                         double H1( 0.), surfH1( 0.), advanced_surfH1( 0.), normal_velocity( 0.);
                         H1_Vector_error_P1(mg, lset.Phi, lset.GetBndData(), v, vbnd, extvsol, extsol_grad1, extsol_grad2, extsol_grad3, tau_u, H1, surfH1, advanced_surfH1, normal_velocity, (i+1)*tau);
-                        //        std::cout << "The H1-Norm of v - vSol is: " << H1 << std::endl;
-                        //        std::cout << "The surfH1-Norm of v - vSol is: " << surfH1 << std::endl;
-                        log << "The advanced surfH1-Norm of v - vSol is: " << advanced_surfH1 << std::endl;
+                        //        std::cout << "The H1-Norm of v - vSol is: " << H1 << '\n';
+                        //        std::cout << "The surfH1-Norm of v - vSol is: " << surfH1 << '\n';
+                        log << "The advanced surfH1-Norm of v - vSol is: " << advanced_surfH1 << '\n';
                         log_error <<  std::to_string((float)advanced_surfH1) << "\t";
                         log_error <<  std::to_string((float)surfH1) << "\t";
                         log_error <<  std::to_string((float)H1) << "\t";
-                        //log << "The U-Norm of v - vSol is: " << std::sqrt(advanced_surfH1*advanced_surfH1 + rho_u*dot(A_stab.Data*v.Data, v.Data)) << std::endl;
-                        log << "The L2-Norm of v * n is: " << normal_velocity << std::endl;
+                        //log << "The U-Norm of v - vSol is: " << std::sqrt(advanced_surfH1*advanced_surfH1 + rho_u*dot(A_stab.Data*v.Data, v.Data)) << '\n';
+                        log << "The L2-Norm of v * n is: " << normal_velocity << '\n';
                         log_error <<  std::to_string((float)normal_velocity) <<  "\t";
 
                         if ( !prFE.compare("P1")) {
@@ -1148,10 +1148,10 @@ int main(int argc, char* argv[]) {
                             Extend(mg, p, pxtent);
                             BndDataCL<double> bndscalar = pbnd;
                             double L2_Lagrange =L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndscalar, pxtent), extpsol, (i+1)*tau);
-                            log << "The L2-Norm of p - pSol is: " << L2_Lagrange << std::endl;
-                            log_error <<  std::to_string((float)L2_Lagrange) << std::endl;
+                            log << "The L2-Norm of p - pSol is: " << L2_Lagrange << '\n';
+                            log_error <<  std::to_string((float)L2_Lagrange) << '\n';
                             log << "The L2-Norm of p  is: " << L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndscalar, pxtent), &ZeroScalarFun);
-                            //log << "The M-Norm of p - pSol is: " << std::sqrt(L2_Lagrange*L2_Lagrange + rho_p*dot(Schur_stab.Data*p.Data, p.Data)) << std::endl;
+                            //log << "The M-Norm of p - pSol is: " << std::sqrt(L2_Lagrange*L2_Lagrange + rho_p*dot(Schur_stab.Data*p.Data, p.Data)) << '\n';
                         }
                     }
 
@@ -1169,8 +1169,10 @@ int main(int argc, char* argv[]) {
                     "_patchnormals=" + std::to_string(param.input.usePatchNormal) +
                     "_shift=" + P.get<std::string>("Levelset.ShiftNorm", "0") +
                     "_form=" + formulation +
-                    "_rhofac=" + P.get<std::string>("SurfNavStokes.vel_volumestab_fac") +
-                    "_rhopow=" + P.get<std::string>("SurfNavStokes.vel_volumestab_pow") + ".txt"
+                    "_rhopfac=" + P.get<std::string>("SurfNavStokes.pre_volumestab_fac") +
+                    "_rhoppow=" + P.get<std::string>("SurfNavStokes.pre_volumestab_pow") +
+                    "_rhoufac=" + P.get<std::string>("SurfNavStokes.vel_volumestab_fac") +
+                    "_rhoupow=" + P.get<std::string>("SurfNavStokes.vel_volumestab_pow") + ".txt"
                 );
 
                 if (  ( P.get<std::string>("SurfNavStokes.nonlinear_term") == "convective" )
@@ -1181,13 +1183,13 @@ int main(int argc, char* argv[]) {
                    || ( P.get<std::string>("SurfNavStokes.nonlinear_term") == "EMAC" )
                    )
                 {
-                    log << "nonlinear_term term is: " << P.get<std::string>("SurfNavStokes.nonlinear_term") << std::endl;
+                    log << "nonlinear_term term is: " << P.get<std::string>("SurfNavStokes.nonlinear_term") << '\n';
                     //nonlinear procedure parameters
                     double omega=1.0;
                     double max_iter=30;
                     int iter = 0;
 
-                    std::cout<<"REMOVE IT!" << std::endl;
+                    std::cout<<"REMOVE IT!" << '\n';
                     //v=vInit;
 
                     //fixed point iterations
@@ -1214,36 +1216,36 @@ int main(int argc, char* argv[]) {
                         }
                         if ( P.get<std::string>("SurfNavStokes.nonlinear_term") == "convective" )
                         {
-                            std::cout << "nonlinear_term: convective " << std::endl;
+                            std::cout << "nonlinear_term: convective " << '\n';
                             Adyn.LinComb(1, Ahat, 1, N.Data);
 
                         }
                         else if (P.get<std::string>("SurfNavStokes.nonlinear_term") == "rotational")
                         {
-                            std::cout << "nonlinear_term: rotational " << std::endl;
+                            std::cout << "nonlinear_term: rotational " << '\n';
                             //transpose(N.Data, NTranspose);
                             Adyn.LinComb(1, Ahat, 1, N.Data, -1, NT.Data);
                         }
                         else if (P.get<std::string>("SurfNavStokes.nonlinear_term") == "strain")
                         {
-                            std::cout << "nonlinear_term: strain " << std::endl;
+                            std::cout << "nonlinear_term: strain " << '\n';
                             //transpose(N.Data, NTranspose);
                             Adyn.LinComb(1, Ahat, 1, N.Data, 1, NT.Data);
                         }else if (P.get<std::string>("SurfNavStokes.nonlinear_term") == "skew-symmetric")
                         {
-                            std::cout << "nonlinear_term: skew-symmetric " << std::endl;
+                            std::cout << "nonlinear_term: skew-symmetric " << '\n';
 
                             Adyn.LinComb(1, Ahat, 1, N.Data, 0.5, D.Data);
                         }
                         else if (P.get<std::string>("SurfNavStokes.nonlinear_term") == "conservative")
                         {
-                            std::cout << "nonlinear_term: conservative " << std::endl;
+                            std::cout << "nonlinear_term: conservative " << '\n';
 
                             Adyn.LinComb(1, Ahat, 1, N.Data, 1, D.Data);
                         }
                         else if (P.get<std::string>("SurfNavStokes.nonlinear_term") == "EMAC")
                         {
-                            std::cout << "nonlinear_term: EMAC " << std::endl;
+                            std::cout << "nonlinear_term: EMAC " << '\n';
 
                             Adyn.LinComb(1, Ahat, 1, N.Data, 1, NT.Data, 1, D.Data);
                         }
@@ -1258,16 +1260,16 @@ int main(int argc, char* argv[]) {
                         v.Data = omega*v_aux.Data + (1-omega)*v_old.Data;
                         p.Data = omega*p_aux.Data + (1-omega)*p_old.Data;
 
-                        std::cout << "norm( Adyn*v + BTranspose*p - rhs ): " << norm(Adyn*v.Data + BTranspose*p.Data - fRHS.Data)<<std::endl;
-                        std::cout << "norm( B * v + Chat*p - gRHS       ): " << norm( B.Data*v.Data + Chat*p.Data -gRHS.Data ) << std::endl;
+                        std::cout << "norm( Adyn*v + BTranspose*p - rhs ): " << norm(Adyn*v.Data + BTranspose*p.Data - fRHS.Data)<<'\n';
+                        std::cout << "norm( B * v + Chat*p - gRHS       ): " << norm( B.Data*v.Data + Chat*p.Data -gRHS.Data ) << '\n';
 
                         res = pow( norm(Adyn*v.Data + BTranspose*p.Data - fRHS.Data), 2.0) + pow( norm(B.Data*v.Data + Chat * p.Data - gRHS.Data), 2.0);
-                        std::cout << "residual^2 after nonlinear iteration #" << iter << ": " << res << std::endl;
+                        std::cout << "residual^2 after nonlinear iteration #" << iter << ": " << res << '\n';
                     }
                     while (  ( iter < max_iter)
                           && ( res > pow( P.get<double>("Solver.Tol"), 2.0) ) );
 
-                    std::cout << "# nonlinear iterations: " << iter << std::endl;
+                    std::cout << "# nonlinear iterations: " << iter << '\n';
                 }
                 else //standart Stokes' case
                 {
@@ -1299,11 +1301,11 @@ int main(int argc, char* argv[]) {
                     << "norm(B    * v + Chat * p - gRHS): " << sqrt(preResSq) << '\n';
                 // send to logfiles
                 log_solo <<  std::to_string((float)1) << "\t";
-                log << "Time is: " << std::to_string((float)1) << std::endl;
-                log << "h is: " << h << std::endl;
-                log << "rho_p is: "   << rho_p << std::endl;
-                log << "rho_u is: " << rho_u << std::endl;
-                log << "tau_u is: "     << tau_u << std::endl;
+                log << "Time is: " << std::to_string((float)1) << '\n';
+                log << "h is: " << h << '\n';
+                log << "rho_p is: "   << rho_p << '\n';
+                log << "rho_u is: " << rho_u << '\n';
+                log << "tau_u is: "     << tau_u << '\n';
                 log << "Total iterations: " << Solver->GetIter() << '\n';
                 log	<< "Final MINRES residual: " << Solver->GetResid() << '\n';
                 VectorCL vSolMinusV = vSol.Data - v.Data, pSolMinusP = pSol.Data - p.Data;
@@ -1328,7 +1330,7 @@ int main(int argc, char* argv[]) {
             }
             log_solo.close();
             log_error.close();
-            std::cout << "Output is located: " << dirname << std::endl;
+            std::cout << "Output is located: " << dirname << '\n';
         }
         // error
         double Aaverage( 0.), Avariation( 0.), Schuraverage( 0.), Schurvariation( 0.);
@@ -1342,9 +1344,9 @@ int main(int argc, char* argv[]) {
         RightComputeVariationFromAverageIterations(Astreamcopy, Aaverage, Avariation);
         RightComputeVariationFromAverageIterations(PCstreamcopy, PCaverage, PCvariation);
         ComputeVariationFromAverageIterations(Schurstreamcopy, Schuraverage, Schurvariation);
-        std::cout << "The average iterationsnumber of the A-preconditioner is: " <<     Aaverage     << '\n' << " ...with a variation of: " << Avariation << std::endl;
-        std::cout << "The average iterationsnumber of the nonsymmetric A-preconditioner is: " <<     PCaverage     << '\n' << " ...with a variation of: " << PCvariation << std::endl;
-        std::cout << "The average iterationsnumber of the Schur-preconditioner is: " << Schuraverage << '\n' << " ...with a variation of: " << Schurvariation << std::endl;
+        std::cout << "The average iterationsnumber of the A-preconditioner is: " <<     Aaverage     << '\n' << " ...with a variation of: " << Avariation << '\n';
+        std::cout << "The average iterationsnumber of the nonsymmetric A-preconditioner is: " <<     PCaverage     << '\n' << " ...with a variation of: " << PCvariation << '\n';
+        std::cout << "The average iterationsnumber of the Schur-preconditioner is: " << Schuraverage << '\n' << " ...with a variation of: " << Schurvariation << '\n';
         delete &lset;
         return 0;
     }
