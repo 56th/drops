@@ -1297,17 +1297,18 @@ int main(int argc, char* argv[]) {
                 std::cout << "residual: " << residual << '\n';
                 // postprocess output pressure up to constant
                 p.Data -=  dot(Schur.Data * p.Data, id2) / dot(Schur.Data*id2, id2) * id2;
-                log << "norm(Adyn * v + B^T  * p -  rhs): " << sqrt(velResSq) << '\n'
+                std::stringstream logss;
+                logss << "norm(Adyn * v + B^T  * p -  rhs): " << sqrt(velResSq) << '\n'
                     << "norm(B    * v + Chat * p - gRHS): " << sqrt(preResSq) << '\n';
                 // send to logfiles
                 log_solo <<  std::to_string((float)1) << "\t";
-                log << "Time is: " << std::to_string((float)1) << '\n';
-                log << "h is: " << h << '\n';
-                log << "rho_p is: "   << rho_p << '\n';
-                log << "rho_u is: " << rho_u << '\n';
-                log << "tau_u is: "     << tau_u << '\n';
-                log << "Total iterations: " << Solver->GetIter() << '\n';
-                log	<< "Final MINRES residual: " << Solver->GetResid() << '\n';
+                logss << "Time is: " << std::to_string((float)1) << '\n';
+                logss << "h is: " << h << '\n';
+                logss << "rho_p is: "   << rho_p << '\n';
+                logss << "rho_u is: " << rho_u << '\n';
+                logss << "tau_u is: "     << tau_u << '\n';
+                logss << "Total iterations: " << Solver->GetIter() << '\n';
+                logss	<< "Final MINRES residual: " << Solver->GetResid() << '\n';
                 VectorCL vSolMinusV = vSol.Data - v.Data, pSolMinusP = pSol.Data - p.Data;
                 auto velL2          = sqrt(dot(v.Data, M.Data * v.Data));
                 auto velL2err       = dot(vSolMinusV, M.Data * vSolMinusV);
@@ -1318,15 +1319,17 @@ int main(int argc, char* argv[]) {
                 auto velH1err       = sqrt(dot(vSolMinusV, A.Data * vSolMinusV));
                 auto preL2          = sqrt(dot(p.Data, Schur.Data * p.Data));
                 auto preL2err       = sqrt(dot(pSolMinusP, Schur.Data * pSolMinusP));
-                log << "The L2-Norm of v - vSol is: " << velL2err << '\n';
-                log << "The L2-Norm of v  is: " << velL2 << '\n';
+                logss << "The L2-Norm of v - vSol is: " << velL2err << '\n';
+                logss << "The L2-Norm of v  is: " << velL2 << '\n';
                 log_solo << std::to_string((float)(velL2*velL2*0.5)) << '\n';
-                log << "The H1-Norm of v - vSol is: " << velH1err << '\n';
-                log << "The L2-Norm of v * n is: " << velNormalL2 << '\n';
-                log << "The L2-Norm of p - pSol is: " << preL2err << '\n';
-                log << "The L2-Norm of p is: " << preL2 << '\n';
-                log << "The L2-Norm of v_T - vSol is: " << velTangenL2 << '\n';
-                log << "Actual residual is: " << residual << '\n';
+                logss << "The H1-Norm of v - vSol is: " << velH1err << '\n';
+                logss << "The L2-Norm of v * n is: " << velNormalL2 << '\n';
+                logss << "The L2-Norm of p - pSol is: " << preL2err << '\n';
+                logss << "The L2-Norm of p is: " << preL2 << '\n';
+                logss << "The L2-Norm of v_T - vSol is: " << velTangenL2 << '\n';
+                logss << "Actual residual is: " << residual << '\n';
+                log << logss.str();
+                std::cout << logss.str();
             }
             log_solo.close();
             log_error.close();
