@@ -39,11 +39,11 @@
       "NumbOfVirtualSubEdges": 2,
       "UsePatchNormals":       false,
       "ComputeMatrices":       true,
-      "ExportMatrices":        false,
+      "ExportMatrices":        true,
       "ExportMatricesFormat":  "mat",
       "ComputeNormalErr":      false,
       "ComputeShapeErr":       false,
-      "Solve":                 true
+      "Solve":                 false
     },
 
     "Levelset": {

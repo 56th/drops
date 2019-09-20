@@ -658,6 +658,8 @@ int main(int argc, char* argv[]) {
         auto& Schur = system.Schur;
         auto& Schur_stab = system.Schur_stab;
         auto& Schur_normal_stab = system.Schur_normal_stab;
+        auto& LB = system.LB;
+        auto& LB_stab = system.LB_stab;
         param.input.f = extrhs;
         param.input.g = extrhs2;
         MatrixCL Schur_hat;
@@ -744,6 +746,8 @@ int main(int argc, char* argv[]) {
             (M_final.*expFunc)(path + "M" + format);
             (C_full.*expFunc)(path + "C_full" + format);
             (C_n.*expFunc)(path + "C_n" + format);
+            (LB.Data.*expFunc)(path + "LB" + format);
+            (LB_stab.Data.*expFunc)(path + "LB_stab" + format);
         }
         if (P.get<bool>("SurfNavStokes.ComputeNormalErr") || P.get<bool>("SurfNavStokes.ComputeShapeErr")) {
             std::ofstream log(dirname + "/normal_and_shape_errs_m=" + std::to_string(param.input.numbOfVirtualSubEdges) + ".txt");

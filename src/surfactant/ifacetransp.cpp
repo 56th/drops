@@ -375,6 +375,7 @@ public:
     void calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const TetraCL& tet); ///< has to be called before any setup method!
     void calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const LocalP1CL<Point3DCL>& v, const TetraCL& tet); // for conv term
     void calc3DIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const TetraCL& tet); ///< has to be called after calcIntegrands!
+    void setupLB_P2(double LB_P2[10][10]);
     void setupA_P2 (double A_P2[30][30]); // inconsistent method
     void setupA_P2_consistent (double A_P2[30][30]); // explicit contraction of matrices; consistent formulation
     void setupA_P2_stab (double A_P2_stab[10][10], double absdet);
@@ -739,6 +740,14 @@ void LocalStokesCL::setupA_P2_consistent(double A_P2[30][30]) {
 //    }
 //    std::cout << "sum = " << sum << '\n';
 //    std::cout << "abs sum = " << abs_sum << '\n';
+}
+
+void LocalStokesCL::setupLB_P2(double LB_P2[10][10]) {
+    for (int i = 0; i < 10; ++i)
+        for (int j = i; j < 10; ++j) {
+            LB_P2[i][j] = quad_2D(dot(qSurfP2grad[j], qSurfP2grad[i]), q2Ddomain);
+            LB_P2[j][i] = LB_P2[i][j];
+        }
 }
 
 // TODO: Den Fall fullGrad testen!
@@ -1805,10 +1814,10 @@ class StokesIFAccumulator_P2P1CL : public TetraAccumulatorCL {
     IdxDescCL& P2Idx_;
     IdxDescCL& ScalarP1Idx_;
     IdxT numP2[10], numScalarP1[4];
-    MatrixCL &A_P2_, &A_P2_stab_, &B_P1P2_, &M_P2_, &S_P2_, &M_ScalarP1_, &M_ScalarP1_stab_, &A_ScalarP1_stab_;
+    MatrixCL &A_P2_, &A_P2_stab_, &B_P1P2_, &M_P2_, &S_P2_, &M_ScalarP1_, &M_ScalarP1_stab_, &A_ScalarP1_stab_, &LB_P2_, &LB_stab_P2_;
     VectorCL &fRHS_, &gRHS_;
-    MatrixBuilderCL *mA_P2_, *mA_P2_stab_, *mB_P1P2_, *mM_P2_, *mS_P2_, *mM_ScalarP1_, *mM_ScalarP1_stab_, *mA_ScalarP1_stab_;
-    double locA_P2[30][30], locA_P2_stab[10][10], locB_P1P2[4][30], locM_P2[10][10], locS_P2[30][30], locM_ScalarP1[4][4], locM_ScalarP1_stab[4][4], locA_ScalarP1_stab[4][4];
+    MatrixBuilderCL *mA_P2_, *mA_P2_stab_, *mB_P1P2_, *mM_P2_, *mS_P2_, *mM_ScalarP1_, *mM_ScalarP1_stab_, *mA_ScalarP1_stab_, *mLB_P2_, *mLB_stab_P2_;
+    double locA_P2[30][30], locA_P2_stab[10][10], locB_P1P2[4][30], locM_P2[10][10], locS_P2[30][30], locM_ScalarP1[4][4], locM_ScalarP1_stab[4][4], locA_ScalarP1_stab[4][4], locLB_P2[10][10];
     double locF_P2[30], locG_P1[4];
     LocalStokesCL localStokes_;
     SMatrixCL<3,3> T;
@@ -1833,6 +1842,8 @@ public:
     , M_ScalarP1_(system->Schur.Data)
     , M_ScalarP1_stab_(system->Schur_stab.Data)
     , A_ScalarP1_stab_(system->Schur_normal_stab.Data)
+    , LB_P2_(system->LB.Data)
+    , LB_stab_P2_(system->LB_stab.Data)
     , fRHS_(system->fRHS.Data)
     , gRHS_(system->gRHS.Data)
     , localStokes_(param)
@@ -1850,17 +1861,21 @@ public:
 
 void StokesIFAccumulator_P2P1CL::begin_accumulation() {
     std::cout << "entering StokesIF: \n";
-    const size_t num_unks_scalarp1= ScalarP1Idx_.NumUnknowns(), num_unks_p2= P2Idx_.NumUnknowns();
+    size_t num_unks_p1_scalar = ScalarP1Idx_.NumUnknowns();
+    size_t num_unks_p2 = P2Idx_.NumUnknowns();
     mA_P2_= new MatrixBuilderCL( &A_P2_, num_unks_p2, num_unks_p2);
     mA_P2_stab_= new MatrixBuilderCL( &A_P2_stab_, num_unks_p2, num_unks_p2);
-    mB_P1P2_= new MatrixBuilderCL( &B_P1P2_, num_unks_scalarp1, num_unks_p2);
+    mB_P1P2_= new MatrixBuilderCL( &B_P1P2_, num_unks_p1_scalar, num_unks_p2);
     mM_P2_= new MatrixBuilderCL( &M_P2_, num_unks_p2, num_unks_p2);
     mS_P2_= new MatrixBuilderCL( &S_P2_, num_unks_p2, num_unks_p2);
-    mM_ScalarP1_= new MatrixBuilderCL( &M_ScalarP1_, num_unks_scalarp1, num_unks_scalarp1);
-    mA_ScalarP1_stab_ = new MatrixBuilderCL(&A_ScalarP1_stab_, num_unks_scalarp1, num_unks_scalarp1);
-    mM_ScalarP1_stab_ = new MatrixBuilderCL(&M_ScalarP1_stab_, num_unks_scalarp1, num_unks_scalarp1);
+    mM_ScalarP1_= new MatrixBuilderCL( &M_ScalarP1_, num_unks_p1_scalar, num_unks_p1_scalar);
+    mA_ScalarP1_stab_ = new MatrixBuilderCL(&A_ScalarP1_stab_, num_unks_p1_scalar, num_unks_p1_scalar);
+    mM_ScalarP1_stab_ = new MatrixBuilderCL(&M_ScalarP1_stab_, num_unks_p1_scalar, num_unks_p1_scalar);
+    size_t num_unks_p2_scalar = num_unks_p2 / 3;
+    mLB_P2_ = new MatrixBuilderCL(&LB_P2_, num_unks_p2_scalar, num_unks_p2_scalar);
+    mLB_stab_P2_ = new MatrixBuilderCL(&LB_stab_P2_, num_unks_p2_scalar, num_unks_p2_scalar);
     fRHS_.resize(num_unks_p2, 0.);
-    gRHS_.resize(num_unks_scalarp1, 0.);
+    gRHS_.resize(num_unks_p1_scalar, 0.);
 }
 
 void StokesIFAccumulator_P2P1CL::finalize_accumulation() {
@@ -1880,6 +1895,10 @@ void StokesIFAccumulator_P2P1CL::finalize_accumulation() {
     delete mA_ScalarP1_stab_;
     mM_ScalarP1_stab_->Build();
     delete mM_ScalarP1_stab_;
+    mLB_P2_->Build();
+    delete mLB_P2_;
+    mLB_stab_P2_->Build();
+    delete mLB_stab_P2_;
 #ifndef _PAR
     std::cout << "StokesIF_P2P1:\t" << A_P2_.num_nonzeros() << " nonzeros in A, " << A_P2_stab_.num_nonzeros() << " nonzeros in A_stab, "
               << B_P1P2_.num_nonzeros() << " nonzeros in B, " << M_P2_.num_nonzeros() << " nonzeros in M, " << S_P2_.num_nonzeros() << " nonzeros in S, "
@@ -1912,6 +1931,7 @@ void StokesIFAccumulator_P2P1CL::local_setup (const TetraCL& tet) {
         localStokes_.setupM_P1(locM_ScalarP1);
         localStokes_.setupA_P1_stab(locA_ScalarP1_stab, absdet);
         localStokes_.setupM_P1_stab(locM_ScalarP1_stab, absdet);
+        localStokes_.setupLB_P2(locLB_P2);
         localStokes_.setupF_P2(locF_P2);
         localStokes_.setupG_P1(locG_P1);
     }
@@ -1926,6 +1946,8 @@ void StokesIFAccumulator_P2P1CL::update_global_system() {
     auto& mM_ScalarP1= *mM_ScalarP1_;
     auto& mA_ScalarP1_stab = *mA_ScalarP1_stab_;
     auto& mM_ScalarP1_stab = *mM_ScalarP1_stab_;
+    auto& mLB_P2 = *mLB_P2_;
+    auto& mLB_P2_stab = *mLB_stab_P2_;
     for(int i = 0; i < 10; ++i) {
         const IdxT ii= numP2[i];
         if (ii==NoIdx) continue;
@@ -1936,6 +1958,8 @@ void StokesIFAccumulator_P2P1CL::update_global_system() {
         for(int j = 0; j < 10; ++j) {
             const IdxT jj= numP2[j];
             if (jj==NoIdx) continue;
+            mLB_P2(ii/3, jj/3) += locLB_P2[j][i];
+            mLB_P2_stab(ii/3, jj/3) += locA_P2_stab[j][i];
             for (int k = 0; k < 3; ++k)
                 for (int l = 0; l < 3; ++l) {
                     mA_P2( ii+k, jj+l) += locA_P2[3*j+l][3*i+k];
