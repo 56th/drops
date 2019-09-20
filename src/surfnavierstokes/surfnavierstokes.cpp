@@ -122,9 +122,28 @@ int main(int argc, char* argv[]) {
             std::cout << "The levelset is the torus_flower." << '\n';
         }
         LocalStokesParam param;
+        StokesSystem system;
         param.input.exactNormal = P.get<bool>("SurfNavStokes.ComputeNormalErr") ? exact_normal : nullptr;
         param.input.exactShape  = P.get<bool>("SurfNavStokes.ComputeShapeErr")  ? exact_shape  : nullptr;
         param.input.computeMatrices = P.get<bool>("SurfNavStokes.ComputeMatrices");
+        param.input.numbOfVirtualSubEdges = P.get<size_t>("SurfNavStokes.NumbOfVirtualSubEdges");
+        param.input.usePatchNormal = P.get<bool>("SurfNavStokes.UsePatchNormals");
+        if (param.input.usePatchNormal) std::cout << "using patch normals in surf integrands\n";
+        auto formulation = P.get<std::string>("SurfNavStokes.formulation");
+        if (formulation == "consistent") {
+            param.input.formulation = LocalStokesParam::Formulation::consistent;
+            std::cout << "using consistent penalty formulation\n";
+        }
+        else {
+            param.input.formulation = LocalStokesParam::Formulation::inconsistent;
+            std::cout << "using inconsistent penalty formulation\n";
+        }
+        if (!P.get<bool>("SurfNavStokes.ExportMatrices")) {
+            system.Schur_full_stab.assemble = P.get<std::string>("SurfNavStokes.stab") == "full";
+            system.Schur_normal_stab.assemble = P.get<std::string>("SurfNavStokes.stab") == "normal";
+            system.LB.assemble = false;
+            system.LB_stab.assemble = false;
+        }
         // adaptive mesh refinement based on level set function
         typedef DROPS::DistMarkingStrategyCL InitMarkerT;
         InitMarkerT initmarker(levelset_fun, P.get<double>("Mesh.AdaptRef.Width"), 0, P.get<int>("Mesh.AdaptRef.FinestLevel") );
@@ -137,9 +156,6 @@ int main(int argc, char* argv[]) {
         BndDataCL<double> lsbnd( 0);
         read_BndData( lsbnd, mg, P.get_child( "Levelset.BndData"));
         DROPS::LevelsetP2CL & lset( * DROPS::LevelsetP2CL::Create( mg, lsbnd, sf) );
-        param.input.numbOfVirtualSubEdges = P.get<size_t >("SurfNavStokes.NumbOfVirtualSubEdges");
-        param.input.usePatchNormal = P.get<bool>("SurfNavStokes.UsePatchNormals");
-        if (param.input.usePatchNormal) std::cout << "using patch normals in surf integrands\n";
         lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
         lset.Phi.SetIdx( &lset.idx);
         // LinearLSInit( mg, lset.Phi, levelset_fun);
@@ -154,15 +170,6 @@ int main(int argc, char* argv[]) {
         std::string testcase = P.get<std::string>("SurfNavStokes.testcase");
         double tau = P.get<double>("Time.StepSize");
         ParameterNS::nu = P.get<double>("SurfNavStokes.kinematic_viscosity");
-        auto formulation    = P.get<std::string>("SurfNavStokes.formulation");
-        if (formulation == "consistent") {
-            param.input.formulation = LocalStokesParam::Formulation::consistent;
-            std::cout << "using consistent penalty formulation\n";
-        }
-        else {
-            param.input.formulation = LocalStokesParam::Formulation::inconsistent;
-            std::cout << "using inconsistent penalty formulation\n";
-        }
         auto tau_u_order  = P.get<double>("SurfNavStokes.normal_penalty_pow");
         auto tau_u_factor = P.get<double>("SurfNavStokes.normal_penalty_fac");
         auto tau_u 		  = tau_u_factor * pow(h, tau_u_order); // constant for normal penalty
@@ -228,7 +235,6 @@ int main(int argc, char* argv[]) {
         // construct FE vectors (initialized with zero)
         DROPS::VecDescCL v, vSol, vInit, p, curl,curlSol, pSol, curl_proj, ZeroVec;
         DROPS::VecDescCL v_iter, v_temp,v_aux,v_old,v_oldold,p_aux,p_temp,p_iter,p_old;//for steady nonlinear procedure or BDF2
-        StokesSystem system;
         auto& fRHS = system.fRHS;
         auto& gRHS = system.gRHS;
         if( !FE.compare("P2P1")) {
@@ -656,7 +662,7 @@ int main(int argc, char* argv[]) {
         auto& M = system.M;
         auto& S = system.S;
         auto& Schur = system.Schur;
-        auto& Schur_stab = system.Schur_stab;
+        auto& Schur_full_stab = system.Schur_full_stab;
         auto& Schur_normal_stab = system.Schur_normal_stab;
         auto& LB = system.LB;
         auto& LB_stab = system.LB_stab;
@@ -674,7 +680,7 @@ int main(int argc, char* argv[]) {
             L.SetIdx( &ifaceP1idx, &ifaceVecP2idx);
             L_stab.SetIdx( &ifaceP1idx, &ifaceVecP2idx);
             Schur.SetIdx(&ifaceP1idx, &ifaceP1idx);
-            Schur_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
+            Schur_full_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
             Schur_normal_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
             SetupStokesIF_P2P1(mg, lset, &system, &param);
         } else if( !FE.compare("P1P1")) {
@@ -690,9 +696,9 @@ int main(int argc, char* argv[]) {
             L.SetIdx( &ifaceP1idx, &ifaceVecP1idx);
             L_stab.SetIdx( &ifaceP1idx, &ifaceVecP1idx);
             Schur.SetIdx(&ifaceP1idx, &ifaceP1idx);
-            Schur_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
+            Schur_full_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
             Schur_normal_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
-            SetupNavierStokesIF_P1P1(mg, &A, &A_stab, &B, &Omega, &N, &NT, &M, &D, &S, &L, &L_stab, &Schur, &Schur_stab, &Schur_normal_stab, lset, v, vbnd, &param);
+            SetupNavierStokesIF_P1P1(mg, &A, &A_stab, &B, &Omega, &N, &NT, &M, &D, &S, &L, &L_stab, &Schur, &Schur_full_stab, &Schur_normal_stab, lset, v, vbnd, &param);
         } else if( !FE.compare("P2P2")) {
             A.SetIdx( &ifaceVecP2idx, &ifaceVecP2idx);
             A_stab.SetIdx( &ifaceVecP2idx, &ifaceVecP2idx);
@@ -702,8 +708,8 @@ int main(int argc, char* argv[]) {
             L.SetIdx( &ifaceP2idx, &ifaceVecP2idx);
             L_stab.SetIdx( &ifaceP2idx, &ifaceVecP2idx);
             Schur.SetIdx(&ifaceP2idx, &ifaceP2idx);
-            Schur_stab.SetIdx(&ifaceP2idx, &ifaceP2idx);
-            SetupStokesIF_P2P2(mg, &A, &A_stab, &B, &M, &S, &L, &L_stab, &Schur, &Schur_stab, lset.Phi, lset.GetBndData(), &param);
+            Schur_full_stab.SetIdx(&ifaceP2idx, &ifaceP2idx);
+            SetupStokesIF_P2P2(mg, &A, &A_stab, &B, &M, &S, &L, &L_stab, &Schur, &Schur_full_stab, lset.Phi, lset.GetBndData(), &param);
         } else if( !FE.compare("P1P2")) {
             A.SetIdx( &ifaceVecP1idx, &ifaceVecP1idx);
             A_stab.SetIdx( &ifaceVecP1idx, &ifaceVecP1idx);
@@ -713,8 +719,8 @@ int main(int argc, char* argv[]) {
             L.SetIdx( &ifaceP2idx, &ifaceVecP1idx);
             L_stab.SetIdx( &ifaceP2idx, &ifaceVecP1idx);
             Schur.SetIdx(&ifaceP2idx, &ifaceP2idx);
-            Schur_stab.SetIdx(&ifaceP2idx, &ifaceP2idx);
-            SetupStokesIF_P1P2(mg, &A, &A_stab, &B, &M, &S, &L, &L_stab, &Schur, &Schur_stab, lset.Phi, lset.GetBndData(), &param);
+            Schur_full_stab.SetIdx(&ifaceP2idx, &ifaceP2idx);
+            SetupStokesIF_P1P2(mg, &A, &A_stab, &B, &M, &S, &L, &L_stab, &Schur, &Schur_full_stab, lset.Phi, lset.GetBndData(), &param);
         }
         std::cout << "numb of cut tetras is         " << param.output.numbOfCutTetras << '\n'
                   << "stiffness mtx is              " << A.Data.num_rows() << " * " << A.Data.num_cols() << '\n'
@@ -731,19 +737,17 @@ int main(int argc, char* argv[]) {
             std::cout << "test inf-sup constant\n";
             MatrixCL A_final;
             A_final.LinComb(1., A.Data, 1., M.Data, tau_u, S.Data, rho_u, A_stab.Data);
-            auto C_full = Schur_stab.Data;
+            auto C_full = Schur_full_stab.Data;
             C_full *= rho_p;
             auto C_n = Schur_normal_stab.Data;
             C_n *= rho_p;
-            auto& B_final = B.Data;
-            auto& M_final = Schur.Data;
             auto path = dirname + "/" + "shift=" + P.get<std::string>("Levelset.ShiftNorm", "0") + "_form=" + formulation + "_";
             auto format = P.get<std::string>("SurfNavStokes.ExportMatricesFormat") == "mtx" ? ".mtx" : ".mat";
             auto expFunc = format == ".mtx" ? &MatrixCL::exportMTX : &MatrixCL::exportMAT;
             std::cout << "exporting " << format << " matrices to " + dirname + "*\n";
             (A_final.*expFunc)(path + "A" + format);
-            (B_final.*expFunc)(path + "B" + format);
-            (M_final.*expFunc)(path + "M" + format);
+            (B.Data.*expFunc)(path + "B" + format);
+            (Schur.Data.*expFunc)(path + "M" + format);
             (C_full.*expFunc)(path + "C_full" + format);
             (C_n.*expFunc)(path + "C_n" + format);
             (LB.Data.*expFunc)(path + "LB" + format);
@@ -761,7 +765,7 @@ int main(int argc, char* argv[]) {
         if (!P.get<bool>("SurfNavStokes.Solve")) return 0;
         // Schur precond
         if (P.get<std::string>("SurfNavStokes.stab") == "full")
-            Schur_hat.LinComb(1., Schur.Data, rho, Schur_stab.Data);
+            Schur_hat.LinComb(1., Schur.Data, rho, Schur_full_stab.Data);
         else if (P.get<std::string>("SurfNavStokes.stab") == "normal")
             Schur_hat.LinComb(1., Schur.Data, rho, Schur_normal_stab.Data);
         else {
@@ -930,7 +934,7 @@ int main(int argc, char* argv[]) {
                     log << "The L2-Norm of p - pSol is: " << L2_Lagrange << '\n';
                     log_error <<  std::to_string((float)L2_Lagrange) << '\n';
                     log << "The L2-Norm of p  is: " << L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndscalar, pxtent), &ZeroScalarFun);
-                    //log << "The M-Norm of p - pSol is: " << std::sqrt(L2_Lagrange*L2_Lagrange + rho_p*dot(Schur_stab.Data*p.Data, p.Data)) << '\n';
+                    //log << "The M-Norm of p - pSol is: " << std::sqrt(L2_Lagrange*L2_Lagrange + rho_p*dot(Schur_full_stab.Data*p.Data, p.Data)) << '\n';
                 }
 
                 for (int i = 0; i < P.get<double>("Time.NumSteps"); i++)
@@ -968,13 +972,13 @@ int main(int argc, char* argv[]) {
                     }
 
                     //set up current matrices based in previous timestep velocity and levelset
-                    SetupNavierStokesIF_P1P1(mg, &A, &A_stab, &B, &Omega, &N, &NT, &M, &D, &S,  &L, &L_stab, &Schur, &Schur_stab, &Schur_normal_stab, lset, v_aux, vbnd, &param);
+                    SetupNavierStokesIF_P1P1(mg, &A, &A_stab, &B, &Omega, &N, &NT, &M, &D, &S,  &L, &L_stab, &Schur, &Schur_full_stab, &Schur_normal_stab, lset, v_aux, vbnd, &param);
 
                     //construct final matrices for a linear solver
                     Ahat.LinComb(mu, A.Data, c/tau, M.Data, tau_u, S.Data, rho_u, A_stab.Data);
                     Bhat.LinComb(1., B.Data, 0., B.Data);
                     if (P.get<std::string>("SurfNavStokes.stab") == "full")
-                        Chat.LinComb(0, Schur.Data, -rho_p, Schur_stab.Data);
+                        Chat.LinComb(0, Schur.Data, -rho_p, Schur_full_stab.Data);
                     else if (P.get<std::string>("SurfNavStokes.stab") == "normal")
                         Chat.LinComb(0, Schur.Data, -rho_p, Schur_normal_stab.Data);
                     else {
@@ -1123,7 +1127,7 @@ int main(int argc, char* argv[]) {
                             BndDataCL<double> bndscalar = pbnd;
                             double L2_Lagrange =L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndscalar, pxtent), extpsol);
                             log << "The L2-Norm of p - pSol is: " << L2_Lagrange << '\n';
-                            log << "The M-Norm of p - pSol is: " << std::sqrt(L2_Lagrange*L2_Lagrange + hat_rho_u*dot(Schur_stab.Data*p.Data, p.Data)) << '\n';
+                            log << "The M-Norm of p - pSol is: " << std::sqrt(L2_Lagrange*L2_Lagrange + hat_rho_u*dot(Schur_full_stab.Data*p.Data, p.Data)) << '\n';
                         }
                     } else if( !velFE.compare("P1")) {
                         vxtent.SetIdx( &vecP1idx);
@@ -1155,7 +1159,7 @@ int main(int argc, char* argv[]) {
                             log << "The L2-Norm of p - pSol is: " << L2_Lagrange << '\n';
                             log_error <<  std::to_string((float)L2_Lagrange) << '\n';
                             log << "The L2-Norm of p  is: " << L2_error(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, bndscalar, pxtent), &ZeroScalarFun);
-                            //log << "The M-Norm of p - pSol is: " << std::sqrt(L2_Lagrange*L2_Lagrange + rho_p*dot(Schur_stab.Data*p.Data, p.Data)) << '\n';
+                            //log << "The M-Norm of p - pSol is: " << std::sqrt(L2_Lagrange*L2_Lagrange + rho_p*dot(Schur_full_stab.Data*p.Data, p.Data)) << '\n';
                         }
                     }
 
@@ -1205,13 +1209,13 @@ int main(int argc, char* argv[]) {
                         p_old = p;
 
                         //setup matrices based on v_old
-                        SetupNavierStokesIF_P1P1(mg, &A, &A_stab, &B, &Omega, &N, &NT, &M, &D, &S, &L, &L_stab, &Schur, &Schur_stab, &Schur_normal_stab, lset, v_old, vbnd, &param);
+                        SetupNavierStokesIF_P1P1(mg, &A, &A_stab, &B, &Omega, &N, &NT, &M, &D, &S, &L, &L_stab, &Schur, &Schur_full_stab, &Schur_normal_stab, lset, v_old, vbnd, &param);
 
                         Ahat.LinComb(mu, A.Data, 1.0, M.Data, tau_u, S.Data, rho_u, A_stab.Data);
                         Bhat.LinComb(1., B.Data, 0.,B.Data);
                         transpose(B.Data, BTranspose);
                         if (P.get<std::string>("SurfNavStokes.stab") == "full")
-                            Chat.LinComb(0, Schur.Data, -rho_p, Schur_stab.Data);
+                            Chat.LinComb(0, Schur.Data, -rho_p, Schur_full_stab.Data);
                         else if (P.get<std::string>("SurfNavStokes.stab") == "normal")
                             Chat.LinComb(0, Schur.Data, -rho_p, Schur_normal_stab.Data);
                         else {
@@ -1280,7 +1284,7 @@ int main(int argc, char* argv[]) {
                     Adyn.LinComb(1., A.Data, 1., M.Data, tau_u, S.Data, rho_u, A_stab.Data);
                     Bhat.LinComb(1., B.Data, 0., B.Data);
                     if (P.get<std::string>("SurfNavStokes.stab") == "full")
-                        Chat.LinComb(0, Schur.Data, -rho_p, Schur_stab.Data);
+                        Chat.LinComb(0, Schur.Data, -rho_p, Schur_full_stab.Data);
                     else if (P.get<std::string>("SurfNavStokes.stab") == "normal")
                         Chat.LinComb(0, Schur.Data, -rho_p, Schur_normal_stab.Data);
                     else {

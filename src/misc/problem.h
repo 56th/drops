@@ -712,6 +712,8 @@ class MatDescBaseCL
     void SetIdx( const IdxDescT*, const IdxDescT*);
     /// \brief Empty Data and set the index-pointers to 0.
     void Reset();
+    /// \brief Flag used by assembly routines to decide whether to populate the mtx or not
+    bool assemble = true;
 };
 
 typedef MatDescBaseCL<MatrixCL,IdxDescCL>     MatDescCL;

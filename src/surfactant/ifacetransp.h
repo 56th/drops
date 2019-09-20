@@ -779,7 +779,7 @@ struct LocalStokesParam {
 };
 
 struct StokesSystem {
-    MatDescCL A, A_stab, B, M, S, Schur, Schur_stab, Schur_normal_stab,
+    MatDescCL A, A_stab, B, M, S, Schur, Schur_full_stab, Schur_normal_stab,
               LB, LB_stab;
     VecDescCL fRHS, gRHS;
 };

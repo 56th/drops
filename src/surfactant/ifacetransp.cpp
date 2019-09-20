@@ -1840,7 +1840,7 @@ public:
     , M_P2_(system->M.Data)
     , S_P2_(system->S.Data)
     , M_ScalarP1_(system->Schur.Data)
-    , M_ScalarP1_stab_(system->Schur_stab.Data)
+    , M_ScalarP1_stab_(system->Schur_full_stab.Data)
     , A_ScalarP1_stab_(system->Schur_normal_stab.Data)
     , LB_P2_(system->LB.Data)
     , LB_stab_P2_(system->LB_stab.Data)
