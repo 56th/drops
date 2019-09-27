@@ -106,11 +106,9 @@ template<class BndValT = double>
 class BndSegDataCL: public BndCondInfoCL
 {
   public:
-    typedef BndValT (*bnd_val_fun)( const Point3DCL&, double);
-
+    using bnd_val_fun = std::function<BndValT(const Point3DCL&, double)>;
   private:
     bnd_val_fun  bnd_val_;
-
   public:
     BndSegDataCL( BndCondT bc= Nat0BC, bnd_val_fun f= 0)
       :  BndCondInfoCL(bc), bnd_val_(f)

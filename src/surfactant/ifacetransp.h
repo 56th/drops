@@ -151,11 +151,11 @@ typedef std::vector<TetraBaryPairT>            TetraBaryPairVectorT;
 
 template <class T, class ResultIterT>
   inline ResultIterT
-  evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const TetraBaryPairVectorT& pos, double t, ResultIterT result_iterator);
+  evaluate_on_vertexes (std::function<T(const Point3DCL&, double)> const & f, const TetraBaryPairVectorT& pos, double t, ResultIterT result_iterator);
 
 template <class T, class ResultContT>
   inline ResultContT&
-  resize_and_evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const TetraBaryPairVectorT& pos, double t, ResultContT& result_container);
+  resize_and_evaluate_on_vertexes (std::function<T(const Point3DCL&, double)> const & f, const TetraBaryPairVectorT& pos, double t, ResultContT& result_container);
 
 template <class PEvalT, class ResultIterT>
   inline ResultIterT
@@ -1666,9 +1666,8 @@ template <class T= double>
 class STCoordEvalCL
 {
   public:
-    typedef T (*fun_type)(const Point3DCL&, double);
+    using fun_type = std::function<T(Point3DCL const &, double)>;
     typedef T value_type;
-
   private:
     STCoord2WorldCoordCL mapper_;
     fun_type f_;
@@ -1682,14 +1681,14 @@ class STCoordEvalCL
 
 template <class T, class DomainT, class ResultIterT>
   inline ResultIterT
-  evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const TetraPrismCL& prism, const DomainT& dom, ResultIterT result_iterator)
+  evaluate_on_vertexes (std::function<T(const Point3DCL&, double)> const & f, const TetraPrismCL& prism, const DomainT& dom, ResultIterT result_iterator)
 {
     return std::transform( dom.vertex_begin(), dom.vertex_end(), result_iterator, STCoordEvalCL<T>( prism, f));
 }
 
 template <class T, class DomainT, class ResultContT>
   inline const ResultContT&
-  resize_and_evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const TetraPrismCL& prism, const DomainT& dom, ResultContT& result_container)
+  resize_and_evaluate_on_vertexes (std::function<T(const Point3DCL&, double)> const & f, const TetraPrismCL& prism, const DomainT& dom, ResultContT& result_container)
 {
     result_container.resize( dom.vertex_size());
     evaluate_on_vertexes( f, prism, dom, sequence_begin( result_container));

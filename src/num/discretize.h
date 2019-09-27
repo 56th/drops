@@ -35,16 +35,13 @@
 namespace DROPS
 {
 
-typedef double    (*scalar_fun_ptr)(double);
-typedef double    (*instat_scalar_fun_ptr)(const Point3DCL&, double);
-typedef Point3DCL (*instat_vector_fun_ptr)(const Point3DCL&, double);
-typedef double    (*scalar_tetra_function)(const TetraCL&, const BaryCoordCL&, double);
-typedef Point3DCL (*vector_tetra_function)(const TetraCL&, const BaryCoordCL&, double);
-typedef bool      (*match_fun)        (const Point3DCL&, const Point3DCL&);
-
-typedef double    (*SmoothFunT)           (double,double);
-typedef SMatrixCL<3, 3> (*instat_matrix_fun_ptr) (const Point3DCL&, double);
-
+using instat_scalar_fun_ptr = std::function<double(Point3DCL const &, double)>;
+using instat_vector_fun_ptr = std::function<Point3DCL(Point3DCL const &, double)>;
+using instat_matrix_fun_ptr = std::function<SMatrixCL<3, 3>(Point3DCL const &, double)>;
+using scalar_tetra_function = std::function<double(const TetraCL&, const BaryCoordCL&, double)>;
+using vector_tetra_function = std::function<Point3DCL(const TetraCL&, const BaryCoordCL&, double)>;
+typedef bool (*match_fun)(const Point3DCL&, const Point3DCL&);
+typedef double (*SmoothFunT)(double,double);
 
 // SmoothedJumpCL for jumping coefficients
 
@@ -104,10 +101,10 @@ class GridFunctionCL: public std::valarray<T>
   public:
     typedef T value_type;
     typedef std::valarray<T> base_type;
-    typedef value_type (*tetra_function)(const TetraCL&, const BaryCoordCL&, double);
-    typedef value_type (*instat_fun_ptr)(const Point3DCL&, double);
+    using tetra_function = std::function<value_type(const TetraCL&, const BaryCoordCL&, double)>;
+    using instat_fun_ptr = std::function<value_type(Point3DCL const &, double)>;
 
-  protected:
+protected:
     typedef GridFunctionCL<T> self_;
 
   public:
@@ -635,7 +632,7 @@ template <class T= double>
 class BaryEvalCL
 {
   public:
-    typedef T (*fun_type)(const Point3DCL&, double);
+    using fun_type = std::function<T(const Point3DCL&, double)>;
     typedef T value_type;
 
   private:
@@ -644,7 +641,7 @@ class BaryEvalCL
     fun_type f_;
 
   public:
-    BaryEvalCL (const TetraCL& tet, double t, fun_type f)
+    BaryEvalCL (const TetraCL& tet, double t, fun_type const & f)
         : mapper_( tet), t_( t), f_( f) {}
     BaryEvalCL ()
         : t_( 0.), f_( 0) {}
