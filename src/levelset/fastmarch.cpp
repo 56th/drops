@@ -1342,7 +1342,7 @@ void FastmarchingOnMasterCL::CollectLocalData(std::vector<byte>& typ, std::vecto
     DROPS_FOR_TRIANG_VERTEX( data_.mg, lvl, it){
 //        if ( it->IsExclusive(PrioMaster)){
             const IdxT dof= it->Unknowns(idx);
-            typ.push_back( data_.typ[ dof]);
+            typ.push_back( static_cast<byte>(data_.GetType( dof)));
             for ( int i=0; i<3; ++i)
                 coord.push_back( data_.coord[ dof][i]);
             values.push_back( data_.phi.Data[ dof]);
@@ -1352,7 +1352,7 @@ void FastmarchingOnMasterCL::CollectLocalData(std::vector<byte>& typ, std::vecto
     DROPS_FOR_TRIANG_EDGE( data_.mg, lvl, it){
 //        if ( it->IsExclusive(PrioMaster)){
             const IdxT dof= it->Unknowns(idx);
-            typ.push_back( data_.typ[ dof]);
+            typ.push_back( static_cast<byte>(data_.GetType( dof)));
             for ( int i=0; i<3; ++i)
                 coord.push_back( data_.coord[ dof][i]);
             values.push_back( data_.phi.Data[ dof]);
@@ -1408,8 +1408,9 @@ void FastmarchingOnMasterCL::Collect()
         data_.phi.Data.resize( values.size());
         std::copy( Addr(values), Addr(values)+values.size(), Addr(data_.phi.Data));
 
-        data_.typ.resize( types.size());
-        std::copy( Addr(types), Addr(types)+types.size(), Addr(data_.typ));
+        data_.type_.resize( types.size());
+        for( size_t i=0; i<types.size(); ++i)
+            data_.SetType( i, static_cast<ReparamDataCL::Type>(types[i]));
 
         data_.coord.resize( values.size());
         for ( size_t i=0; i<data_.coord.size(); ++i) for ( int j=0; j<3; ++j)
@@ -1592,7 +1593,7 @@ bool ParDirectDistanceCL::CommunicateFrontierCL::Gather( const DiST::Transferabl
     IdxT dof= t.Unknowns( actualData_->phi.RowIdx->GetIdx());   // where to find phi
     const Point3DCL tmp = actualData_->perpFoot[dof] ? (*(actualData_->perpFoot[dof])) : Point3DCL(std::numeric_limits<double>::max());
     // fill buffer
-    s << actualData_->phi.Data[dof] << tmp << (actualData_->typ[dof]==ReparamDataCL::Finished ? ProcCL::MyRank() : -1);
+    s << actualData_->phi.Data[dof] << tmp << (actualData_->IsFinished(dof) ? ProcCL::MyRank() : -1);
     return true;
 }
 
@@ -1634,7 +1635,7 @@ void ParDirectDistanceCL::CommunicateFrontierSetOnProcBnd()
 
         // Put own value into map
         TransferST tmp;
-        tmp.value= data_.typ[dof]==ReparamDataCL::Finished ? data_.phi.Data[dof] : std::numeric_limits<double>::max();;
+        tmp.value= data_.IsFinished(dof) ? data_.phi.Data[dof] : std::numeric_limits<double>::max();;
         tmp.procID= ProcCL::MyRank();
         tmp.perp= data_.perpFoot[ dof] ? *data_.perpFoot[dof] : Point3DCL(std::numeric_limits<double>::max());
         it->second.push_front( tmp);
@@ -1661,7 +1662,7 @@ void ParDirectDistanceCL::CommunicateFrontierSetOnProcBnd()
                 delete data_.perpFoot[dof]; data_.perpFoot[dof]=0;
             }
         }
-        data_.typ[dof]= minProc->procID==ProcCL::MyRank() ? ReparamDataCL::Finished : ReparamDataCL::Handled;
+        data_.SetType( dof, minProc->procID==ProcCL::MyRank() ? ReparamDataCL::Type::Finished : ReparamDataCL::Type::Handled);
     }
 }
 
@@ -1675,7 +1676,7 @@ void ParDirectDistanceCL::GatherFrontier()
     VectorCL allVals ( ProcCL::Gatherv( base::vals_,  -1)),
              allFront( ProcCL::Gatherv( base::front_, -1));
 
-    // local sets are not need any more ...
+    // local sets are not needed any more ...
     base::vals_.resize( allVals.size()); vals_=allVals;
     base::front_.resize( allFront.size()); front_=allFront;
 

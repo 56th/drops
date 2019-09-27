@@ -58,6 +58,8 @@ class ReparamDataCL
 
     VectorBaseCL<Type>       type_;       ///< type of each vertex, i.e., Finished, Close, Far
     bool gatherPerp;                      ///< Check if perpendicular foots are to be gathered
+    
+    friend class FastmarchingOnMasterCL;
 
   public:
     MultiGridCL&             mg;          ///< reference to the multigrid
