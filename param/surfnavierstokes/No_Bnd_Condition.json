@@ -1,4 +1,9 @@
 {
+    "Output": {
+      "Directory":  "../../output/surfnavierstokes",
+      "EveryStep":  "-1"
+    },
+
     "Mesh": {
         "Type": "BrickBuilder", 
         "Origin": [-1.66666,-1.66666,-1.66666],
@@ -22,12 +27,10 @@
     },
 
     "SurfNavStokes": {
+      "rho":                   1.0,
+      "mu":                    1.0,
+      "TestName":              "85",
       "FE":                    "P2P1",
-      "model":                 "NavierStokes",
-      "testcase":              "85",
-      "instationary":          "none",
-      "nonlinear_term":        "none",
-      "kinematic_viscosity":   1,
       "stab":                  "normal",
       "normal_penalty_pow":    -2,
       "normal_penalty_fac":    1,
@@ -41,13 +44,13 @@
       "ComputeMatrices":       true,
       "ExportMatrices":        true,
       "ExportMatricesFormat":  "mat",
-      "ComputeNormalErr":      false,
-      "ComputeShapeErr":       false,
-      "Solve":                 false
+      "ComputeNormalErr":      true,
+      "ComputeShapeErr":       true,
+      "Solve":                 false,
+      "IntegrateRHS":          true
     },
 
     "Levelset": {
-      "case":          "sphere_2",
       "Theta":         1,
       "VolCorrection": 0,
       "SD":            0.1,
@@ -78,10 +81,10 @@
     },
 
     "Time": {
-        "Read":     0,
-        "Write":    "yes",
-        "NumSteps":	1,
-        "StepSize": 0.025
+        "Read":         0,
+        "Write":        "yes",
+        "NumbOfSteps":  1,
+        "FinalTime":    1.0
     },
 
     "Reparam": {
@@ -118,10 +121,5 @@
         "PcBTol":       1e-4,
         "Iter":         1000,
         "Tol":          1e-8
-    },
-    
-    "Output": {
-        "Directory":      "../../output",
-        "every timestep": "-1"
     }
 }
