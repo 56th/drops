@@ -23,6 +23,10 @@ else ()
     include_directories(${Matlab_ROOT_DIR}/extern/include)
 endif ()
 
+# logger
+set(LOGGER_PATH ${CMAKE_SOURCE_DIR}/../Singleton-Logger/sln/Sources)
+include_directories(${LOGGER_PATH})
+
 #use openMP
 message(STATUS "### GENERATOR is ${CMAKE_GENERATOR}")
 if(CMAKE_GENERATOR MATCHES "Visual Studio 10")

@@ -1,9 +1,9 @@
 set(HOME surfnavierstokes)
 
-#add_library(surfactant-ifacetransp STATIC ../surfactant/ifacetransp)
-#target_link_libraries(surfactant-ifacetransp levelset-levelsetmapper)
-
 exec_ser(${HOME} geom-boundary geom-builder geom-simplex geom-multigrid geom-deformation num-unknowns geom-topo num-fe misc-problem levelset-levelset levelset-marking_strategy levelset-adaptriang misc-scopetimer misc-progressaccu misc-utils out-output num-discretize misc-params num-interfacePatch levelset-fastmarch surfactant-ifacetransp num-fe out-ensightOut levelset-surfacetension out-vtkOut geom-principallattice geom-reftetracut geom-subtriangulation num-quadrature misc-dynamicload misc-funcmap misc-scopetimer)
+
+# logger
+add_library(${HOME}-logger STATIC ${LOGGER_PATH}/SingletonLogger.cpp)
 
 # matlab for sparse mtx .mat binary output
 add_library(${HOME}-matlab1 SHARED IMPORTED)
@@ -16,11 +16,12 @@ set_target_properties(${HOME}-matlab2 PROPERTIES
     IMPORTED_LOCATION "${Matlab_ROOT_DIR}/extern/bin/glnxa64/libMatlabEngine.so"
     INTERFACE_INCLUDE_DIRECTORIES "${Matlab_ROOT_DIR}/extern/include"
 )
-target_link_libraries(${HOME} -lpthread ${HOME}-matlab1 ${HOME}-matlab2)
+
+target_link_libraries(${HOME} -lpthread ${HOME}-matlab1 ${HOME}-matlab2 ${HOME}-logger)
 
 if(NOT MPI)
-add_dependencies(surfactant misc-scalarFunctions misc-vectorFunctions)
-add_dependencies(surfnavierstokes misc-scalarFunctions misc-vectorFunctions levelset-twophaseCoeff)
+    add_dependencies(surfactant misc-scalarFunctions misc-vectorFunctions)
+    add_dependencies(surfnavierstokes misc-scalarFunctions misc-vectorFunctions levelset-twophaseCoeff)
 endif(NOT MPI)
 
 add_my_custom_targets(${HOME})
