@@ -758,7 +758,6 @@ struct LocalStokesParam {
     struct {
         size_t numbOfVirtualSubEdges = 2;
         Formulation formulation = Formulation::consistent;
-        bool computeMatrices = true;
         bool usePatchNormal = true;
         instat_vector_fun_ptr exactNormal = nullptr;
         instat_matrix_fun_ptr exactShape  = nullptr;
@@ -780,8 +779,9 @@ struct LocalStokesParam {
 
 struct StokesSystem {
     MatDescCL A, A_stab, B, N, M, S, Schur, Schur_full_stab, Schur_normal_stab,
-              LB, LB_stab;
-    VecDescCL fRHS, gRHS;
+              LB, LB_stab; // laplace-beltrami
+    VecDescCL fRHS, gRHS,
+              w; // wind
 };
 
 void SetupStokesIF_P2P1      ( const MultiGridCL& MG_, const LevelsetP2CL&, StokesSystem*, LocalStokesParam*);

@@ -1910,7 +1910,7 @@ void StokesIFAccumulator_P2P1CL::visit (const TetraCL& tet) {
     ls_loc.assign(tet, lset, lset_bnd);
     if (isInCutMesh(ls_loc)) {
         local_setup(tet);
-        if (localStokes_.param->input.computeMatrices) update_global_system();
+        update_global_system();
     }
 }
 
@@ -1921,20 +1921,18 @@ void StokesIFAccumulator_P2P1CL::local_setup (const TetraCL& tet) {
     GetLocalNumbP1NoBnd( numScalarP1, tet, ScalarP1Idx_);
     // localStokes_.exportPatchInfo("../../../MKL-Eigs-for-Sparse-Matrices/output/patch/hOver" + std::to_string(localStokes_.num_intervals()), T, ls_loc, tet);
     localStokes_.calcIntegrands( T, ls_loc, tet);
-    if (localStokes_.param->input.computeMatrices) {
-        localStokes_.calc3DIntegrands(T, ls_loc, tet);
-        localStokes_.setupA_P2(locA_P2);
-        localStokes_.setupA_P2_stab(locA_P2_stab, absdet);
-        localStokes_.setupB_P1P2(locB_P1P2);
-        localStokes_.setupM_P2(locM_P2);
-        localStokes_.setupS_P2(locS_P2);
-        localStokes_.setupM_P1(locM_ScalarP1);
-        localStokes_.setupA_P1_stab(locA_ScalarP1_stab, absdet);
-        localStokes_.setupM_P1_stab(locM_ScalarP1_stab, absdet);
-        localStokes_.setupLB_P2(locLB_P2);
-        localStokes_.setupF_P2(locF_P2);
-        localStokes_.setupG_P1(locG_P1);
-    }
+    localStokes_.calc3DIntegrands(T, ls_loc, tet);
+    localStokes_.setupA_P2(locA_P2);
+    localStokes_.setupA_P2_stab(locA_P2_stab, absdet);
+    localStokes_.setupB_P1P2(locB_P1P2);
+    localStokes_.setupM_P2(locM_P2);
+    localStokes_.setupS_P2(locS_P2);
+    localStokes_.setupM_P1(locM_ScalarP1);
+    localStokes_.setupA_P1_stab(locA_ScalarP1_stab, absdet);
+    localStokes_.setupM_P1_stab(locM_ScalarP1_stab, absdet);
+    localStokes_.setupLB_P2(locLB_P2);
+    localStokes_.setupF_P2(locF_P2);
+    localStokes_.setupG_P1(locG_P1);
 }
 
 void StokesIFAccumulator_P2P1CL::update_global_system() {

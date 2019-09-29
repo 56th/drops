@@ -56,45 +56,58 @@ DROPS::Point3DCL shiftTransform(const Point3DCL& p) {
 bool fpEqual(double a, double b) {
     return std::fabs(a - b) < 1e-10;
 }
+bool windRises(double nu, VecDescCL const & w, double& Pe) {
+    Pe = supnorm(w.Data) / nu;
+    return Pe > .1; // if the wind is more than 10% of the diffusion
+}
 
 int main(int argc, char* argv[]) {
     auto& logger = SingletonLogger::instance();
     try {
         logger.beg("read input .json");
-            ParamCL P;
-            read_parameter_file_from_cmdline(P, argc, argv, "../../param/surfnavierstokes/No_Bnd_Condition.json");
-            dynamicLoad(P.get<std::string>("General.DynamicLibsPrefix"), P.get<std::vector<std::string>>("General.DynamicLibs"));
-            logger.buf << P;
-            logger.log();
+            ParamCL inpJSON, outJSON;
+            read_parameter_file_from_cmdline(inpJSON, argc, argv, "../../param/surfnavierstokes/No_Bnd_Condition.json");
+            dynamicLoad(inpJSON.get<std::string>("General.DynamicLibsPrefix"), inpJSON.get<std::vector<std::string>>("General.DynamicLibs"));
+            auto dirName = inpJSON.get<std::string>("Output.Directory");
+            system(("mkdir -p " + dirName).c_str());
+            system(("rm -r -f " + dirName + "/*").c_str());
+            system((
+                "mkdir " + dirName + "/matrices ; "
+                "mkdir " + dirName + "/vtk ; "
+                "mkdir " + dirName + "/stats"
+            ).c_str());
+            std::ofstream output(dirName + "/output.json");
+            {
+                std::ofstream input(dirName + "/input.json");
+                input << inpJSON;
+                logger.buf << inpJSON;
+                logger.log();
+            }
         logger.end();
         logger.beg("set up test case");
             // parse FE types and some other parameters from json file
-            auto FE = P.get<std::string>("SurfNavStokes.FE");
+            auto FE = inpJSON.get<std::string>("SurfNavStokes.FE");
             auto velFE = FE.substr(0,2);
             auto preFE = FE.substr(2,2);
             logger.buf
                 << "velocity FE = " << velFE << '\n'
                 << "pressure FE = " << preFE;
             logger.log();
-            auto testName = P.get<std::string>("SurfNavStokes.TestName");
-            auto rho = P.get<double>("SurfNavStokes.rho");
-            auto mu = P.get<double>("SurfNavStokes.mu");
-            auto surfNavierStokesData = SurfNavierStokesDataFactory(testName, rho, mu);
-            logger.wrn("TODO: set mu and rho in the solution");
-            logger.buf
-                << "rho = " << rho << '\n'
-                << "mu  = " << mu;
+            auto testName = inpJSON.get<std::string>("SurfNavStokes.TestName");
+            auto nu = inpJSON.get<double>("SurfNavStokes.nu");
+            auto surfNavierStokesData = SurfNavierStokesDataFactory(testName, nu);
+            logger.wrn("TODO: set $\\nu$ in the solution");
+            logger.buf << "$\\nu$ = " << nu;
             logger.log();
             LocalStokesParam param;
-            param.input.f = P.get<bool>("SurfNavStokes.IntegrateRHS") ? surfNavierStokesData.f_T : nullptr;
-            param.input.g = P.get<bool>("SurfNavStokes.IntegrateRHS") ? surfNavierStokesData.m_g : nullptr;
-            param.input.exactNormal = P.get<bool>("SurfNavStokes.ComputeNormalErr") ? surfNavierStokesData.surface.n : nullptr;
-            param.input.exactShape = P.get<bool>("SurfNavStokes.ComputeShapeErr")  ? surfNavierStokesData.surface.H : nullptr;
-            param.input.computeMatrices = P.get<bool>("SurfNavStokes.ComputeMatrices");
-            param.input.numbOfVirtualSubEdges = P.get<size_t>("SurfNavStokes.NumbOfVirtualSubEdges");
-            param.input.usePatchNormal = P.get<bool>("SurfNavStokes.UsePatchNormals");
+            param.input.f = inpJSON.get<bool>("SurfNavStokes.IntegrateRHS") ? surfNavierStokesData.f_T : nullptr;
+            param.input.g = inpJSON.get<bool>("SurfNavStokes.IntegrateRHS") ? surfNavierStokesData.m_g : nullptr;
+            param.input.exactNormal = inpJSON.get<bool>("SurfNavStokes.ComputeNormalErr") ? surfNavierStokesData.surface.n : nullptr;
+            param.input.exactShape = inpJSON.get<bool>("SurfNavStokes.ComputeShapeErr") ? surfNavierStokesData.surface.H : nullptr;
+            param.input.numbOfVirtualSubEdges = inpJSON.get<size_t>("SurfNavStokes.NumbOfVirtualSubEdges");
+            param.input.usePatchNormal = inpJSON.get<bool>("SurfNavStokes.UsePatchNormals");
             if (param.input.usePatchNormal)  logger.log("using patch normals in surf integrands");
-            auto formulation = P.get<std::string>("SurfNavStokes.formulation");
+            auto formulation = inpJSON.get<std::string>("SurfNavStokes.formulation");
             if (formulation == "consistent") {
                 param.input.formulation = LocalStokesParam::Formulation::consistent;
                 logger.log("using consistent penalty formulation");
@@ -104,44 +117,41 @@ int main(int argc, char* argv[]) {
                 logger.log("using inconsistent penalty formulation");
             }
             StokesSystem stokesSystem;
-            if (!P.get<bool>("SurfNavStokes.ExportMatrices")) {
-                stokesSystem.Schur_full_stab.assemble = P.get<std::string>("SurfNavStokes.stab") == "full";
-                stokesSystem.Schur_normal_stab.assemble = P.get<std::string>("SurfNavStokes.stab") == "normal";
+            if (!inpJSON.get<bool>("SurfNavStokes.ExportMatrices")) {
+                stokesSystem.Schur_full_stab.assemble = inpJSON.get<std::string>("SurfNavStokes.stab") == "full";
+                stokesSystem.Schur_normal_stab.assemble = inpJSON.get<std::string>("SurfNavStokes.stab") == "normal";
                 stokesSystem.LB.assemble = false;
                 stokesSystem.LB_stab.assemble = false;
             }
-            auto h = P.get<DROPS::Point3DCL>("Mesh.E1")[0] / P.get<double>("Mesh.N1") * std::pow(2., -P.get<double>("Mesh.AdaptRef.FinestLevel"));
-            auto tau_u_order  = P.get<double>("SurfNavStokes.normal_penalty_pow");
-            auto tau_u_factor = P.get<double>("SurfNavStokes.normal_penalty_fac");
+            auto h = inpJSON.get<DROPS::Point3DCL>("Mesh.E1")[0] / inpJSON.get<double>("Mesh.N1") * std::pow(2., -inpJSON.get<double>("Mesh.AdaptRef.FinestLevel"));
+            auto tau_u_order  = inpJSON.get<double>("SurfNavStokes.normal_penalty_pow");
+            auto tau_u_factor = inpJSON.get<double>("SurfNavStokes.normal_penalty_fac");
             auto tau_u 		  = tau_u_factor * pow(h, tau_u_order); // constant for normal penalty
-            auto rho_u_order  = P.get<double>("SurfNavStokes.vel_volumestab_pow");
-            auto rho_u_factor = P.get<double>("SurfNavStokes.vel_volumestab_fac");
+            auto rho_u_order  = inpJSON.get<double>("SurfNavStokes.vel_volumestab_pow");
+            auto rho_u_factor = inpJSON.get<double>("SurfNavStokes.vel_volumestab_fac");
             auto rho_u        = rho_u_factor  * pow(h, rho_u_order); // constant for velocity stabilisation
-            auto rho_p_order  = P.get<double>("SurfNavStokes.pre_volumestab_pow");
-            auto rho_p_factor = P.get<double>("SurfNavStokes.pre_volumestab_fac");
+            auto rho_p_order  = inpJSON.get<double>("SurfNavStokes.pre_volumestab_pow");
+            auto rho_p_factor = inpJSON.get<double>("SurfNavStokes.pre_volumestab_fac");
             auto rho_p        = rho_p_factor  * pow(h, rho_p_order); // constant for pressure stabilisation
-            auto numbOfSteps  = P.get<size_t>("Time.NumbOfSteps");
-            auto finalTime    = P.get<double>("Time.FinalTime");
+            auto numbOfSteps  = inpJSON.get<size_t>("Time.NumbOfSteps");
+            auto finalTime    = inpJSON.get<double>("Time.FinalTime");
             auto stepSize     = finalTime / numbOfSteps;
             logger.buf << "$\\Delta t$ = " << stepSize;
             logger.log();
-            auto dirName = P.get<std::string>("Output.Directory");
-            system(("mkdir -p " + dirName).c_str());
-            std::ofstream output(dirName + "/output.json");
         logger.end();
         logger.beg("build mesh");
             logger.beg("build initial bulk mesh");
-                std::auto_ptr<DROPS::MGBuilderCL> builder(DROPS::make_MGBuilder(P));
+                std::auto_ptr<DROPS::MGBuilderCL> builder(DROPS::make_MGBuilder(inpJSON));
                 DROPS::MultiGridCL mg(*builder);
                 const DROPS::ParamCL::ptree_type* ch= 0;
                 try {
-                    ch = &P.get_child("Mesh.Periodicity");
+                    ch = &inpJSON.get_child("Mesh.Periodicity");
                 } catch (DROPS::DROPSParamErrCL) {}
                 if (ch) read_PeriodicBoundaries(mg, *ch);
                 // levelset shift
-                shift = P.get<DROPS::Point3DCL>("Levelset.ShiftDir", DROPS::Point3DCL(0., 0., 0.));
+                shift = inpJSON.get<DROPS::Point3DCL>("Levelset.ShiftDir", DROPS::Point3DCL(0., 0., 0.));
                 shift /= shift.norm();
-                auto shiftNorm = fabs(P.get<double>("Levelset.ShiftNorm", 0.));
+                auto shiftNorm = fabs(inpJSON.get<double>("Levelset.ShiftNorm", 0.));
                 shift *= shiftNorm;
                 mg.Transform(shiftTransform);
                 logger.buf << "surface shift = " << shift;
@@ -150,7 +160,7 @@ int main(int argc, char* argv[]) {
             logger.beg("refine towards the surface");
                 DROPS::AdapTriangCL adap(mg);
                 // adaptive mesh refinement based on level set function
-                DROPS::DistMarkingStrategyCL initmarker(surfNavierStokesData.surface.phi, P.get<double>("Mesh.AdaptRef.Width"), P.get<int>("Mesh.AdaptRef.CoarsestLevel"), P.get<int>("Mesh.AdaptRef.FinestLevel"));
+                DROPS::DistMarkingStrategyCL initmarker(surfNavierStokesData.surface.phi, inpJSON.get<double>("Mesh.AdaptRef.Width"), inpJSON.get<int>("Mesh.AdaptRef.CoarsestLevel"), inpJSON.get<int>("Mesh.AdaptRef.FinestLevel"));
                 adap.set_marking_strategy(&initmarker);
                 adap.MakeInitialTriang();
                 adap.set_marking_strategy(0);
@@ -165,7 +175,7 @@ int main(int argc, char* argv[]) {
             instat_scalar_fun_ptr sigma(0);
             SurfaceTensionCL sf(sigma, 0);
             BndDataCL<double> lsbnd(0);
-            read_BndData(lsbnd, mg, P.get_child("Levelset.BndData"));
+            read_BndData(lsbnd, mg, inpJSON.get_child("Levelset.BndData"));
             DROPS::LevelsetP2CL & lset(*DROPS::LevelsetP2CL::Create(mg, lsbnd, sf));
             lset.CreateNumbering(mg.GetLastLevel(), &lset.idx);
             lset.Phi.SetIdx(&lset.idx);
@@ -173,9 +183,9 @@ int main(int argc, char* argv[]) {
         logger.end();
         logger.beg("build FE spaces");
             BndDataCL<Point3DCL> vbnd(0);
-            read_BndData(vbnd, mg, P.get_child("Stokes.VelocityBndData"));
+            read_BndData(vbnd, mg, inpJSON.get_child("Stokes.VelocityBndData"));
             BndDataCL<double> pbnd(0);
-            read_BndData(pbnd, mg, P.get_child("Stokes.PressureBndData"));
+            read_BndData(pbnd, mg, inpJSON.get_child("Stokes.PressureBndData"));
             DROPS::IdxDescCL ifaceVecP2idx(vecP2IF_FE, vbnd);
             DROPS::IdxDescCL ifaceVecP1idx(vecP1IF_FE, vbnd);
             DROPS::IdxDescCL ifaceP1idx(P1IF_FE, pbnd);
@@ -184,9 +194,9 @@ int main(int argc, char* argv[]) {
             DROPS::IdxDescCL vecP1idx(vecP1_FE, vbnd);
             DROPS::IdxDescCL P1FEidx(P1_FE, pbnd);
             DROPS::IdxDescCL P2FEidx(P2_FE, pbnd);
-            ifaceVecP2idx.GetXidx().SetBound(P.get<double>("SurfTransp.OmitBound"));
+            ifaceVecP2idx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
             auto numbOfActiveTetrasP2 = ifaceVecP2idx.CreateNumbering(mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
-            ifaceVecP1idx.GetXidx().SetBound(P.get<double>("SurfTransp.OmitBound"));
+            ifaceVecP1idx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
             auto numbOfActiveTetrasP1 = ifaceVecP1idx.CreateNumbering(mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
             if (numbOfActiveTetrasP2 != numbOfActiveTetrasP1) {
                 std::stringstream err;
@@ -195,17 +205,17 @@ int main(int argc, char* argv[]) {
             }
             logger.buf << "numb of active (cut) tetras is: " << numbOfActiveTetrasP1 << " (" << (100. * numbOfActiveTetrasP1) / numbOfTetras << "%)\n";
             logger.log();
-            ifaceP1idx.GetXidx().SetBound(P.get<double>("SurfTransp.OmitBound"));
+            ifaceP1idx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
             ifaceP1idx.CreateNumbering(mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
-            ifaceP2idx.GetXidx().SetBound(P.get<double>("SurfTransp.OmitBound"));
+            ifaceP2idx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
             ifaceP2idx.CreateNumbering(mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
-            vecP2idx.GetXidx().SetBound(P.get<double>("SurfTransp.OmitBound"));
+            vecP2idx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
             vecP2idx.CreateNumbering(mg.GetLastLevel(), mg);
-            vecP1idx.GetXidx().SetBound(P.get<double>("SurfTransp.OmitBound"));
+            vecP1idx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
             vecP1idx.CreateNumbering(mg.GetLastLevel(), mg);
-            P1FEidx.GetXidx().SetBound(P.get<double>("SurfTransp.OmitBound"));
+            P1FEidx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
             P1FEidx.CreateNumbering(mg.GetLastLevel(), mg);
-            P2FEidx.GetXidx().SetBound(P.get<double>("SurfTransp.OmitBound"));
+            P2FEidx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
             P2FEidx.CreateNumbering(mg.GetLastLevel(), mg);
             logger.buf
                     << "numb of d.o.f. vector IFP2: " << ifaceVecP2idx.NumUnknowns() << '\n'
@@ -217,10 +227,10 @@ int main(int argc, char* argv[]) {
                     << "numb of d.o.f. scalar P2: " << P2FEidx.NumUnknowns() << '\n'
                     << "numb of d.o.f. scalar P1: " << P1FEidx.NumUnknowns();
             logger.log();
-            DROPS::VecDescCL u_0, u, u_prev, u_prev_prev, p_0, p;
+            VecDescCL u_star, u, u_prev, u_prev_prev, p_star, p;
             if (FE == "P2P1") {
                 u.SetIdx(&ifaceVecP2idx);
-                u_0.SetIdx(&ifaceVecP2idx);
+                u_star.SetIdx(&ifaceVecP2idx);
                 u_prev.SetIdx(&ifaceVecP2idx);
                 u_prev_prev.SetIdx(&ifaceVecP2idx);
                 stokesSystem.fRHS.SetIdx(&ifaceVecP2idx);
@@ -233,7 +243,7 @@ int main(int argc, char* argv[]) {
             }
             else if(FE == "P1P1") {
                 u.SetIdx(&ifaceVecP1idx);
-                u_0.SetIdx(&ifaceVecP1idx);
+                u_star.SetIdx(&ifaceVecP1idx);
                 u_prev.SetIdx(&ifaceVecP1idx);
                 u_prev_prev.SetIdx(&ifaceVecP1idx);
                 stokesSystem.fRHS.SetIdx(&ifaceVecP1idx);
@@ -245,9 +255,9 @@ int main(int argc, char* argv[]) {
                 stokesSystem.M.SetIdx(&ifaceVecP1idx, &ifaceVecP1idx);
                 stokesSystem.S.SetIdx(&ifaceVecP1idx, &ifaceVecP1idx);
             }
-            else throw std::invalid_argument("unknown FE pair");
+            else throw std::invalid_argument(FE + ": unknown FE pair");
             p.SetIdx(&ifaceP1idx);
-            p_0.SetIdx(&ifaceP1idx);
+            p_star.SetIdx(&ifaceP1idx);
             stokesSystem.gRHS.SetIdx(&ifaceP1idx);
             stokesSystem.Schur.SetIdx(&ifaceP1idx, &ifaceP1idx);
             stokesSystem.Schur_full_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
@@ -255,7 +265,8 @@ int main(int argc, char* argv[]) {
         logger.end();
         logger.beg("interpolate initial condition");
             InitVector(mg, u_prev, surfNavierStokesData.u_T);
-            // InitScalar(mg, p_0, surfNavierStokesData.p);
+            stokesSystem.w = u_prev;
+            // InitScalar(mg, p_star, surfNavierStokesData.p);
         logger.end();
         logger.beg("assemble");
             MatrixCL Schur_hat;
@@ -269,14 +280,15 @@ int main(int argc, char* argv[]) {
                 << "numb of cut tetras is         " << param.output.numbOfCutTetras << '\n'
                 << "stiffness mtx is              " << stokesSystem.A.Data.num_rows() << " * " << stokesSystem.A.Data.num_cols() << '\n'
                 << "velocity soln size is         " << u.Data.size() << '\n'
-                << "exact velocity interp size is " << u_0.Data.size() << '\n'
+                << "exact velocity interp size is " << u_star.Data.size() << '\n'
                 << "pre mass mtx is               " << stokesSystem.Schur.Data.num_rows() << " * " << stokesSystem.Schur.Data.num_cols() << '\n'
                 << "pressure soln size is         " << p.Data.size() << '\n'
-                << "exact pressure interp size is " << p_0.Data.size() << '\n'
+                << "exact pressure interp size is " << p_star.Data.size() << '\n'
                 << "f size is                     " << stokesSystem.fRHS.Data.size() << '\n'
                 << "g size is                     " << stokesSystem.gRHS.Data.size();
+            logger.log();
         logger.end();
-        if (param.input.computeMatrices && P.get<bool>("SurfNavStokes.ExportMatrices")) {
+        if (inpJSON.get<bool>("SurfNavStokes.ExportMatrices")) {
             logger.beg("export matrices to " + dirName);
                 MatrixCL A_final;
                 A_final.LinComb(1., stokesSystem.A.Data, 1., stokesSystem.M.Data, tau_u, stokesSystem.S.Data, rho_u, stokesSystem.A_stab.Data);
@@ -284,80 +296,91 @@ int main(int argc, char* argv[]) {
                 C_full *= rho_p;
                 auto C_n = stokesSystem.Schur_normal_stab.Data;
                 C_n *= rho_p;
-                auto format = P.get<std::string>("SurfNavStokes.ExportMatricesFormat") == "mtx" ? ".mtx" : ".mat";
+                std::string format = inpJSON.get<std::string>("SurfNavStokes.ExportMatricesFormat") == "mtx" ? ".mtx" : ".mat";
                 auto expFunc = format == ".mtx" ? &MatrixCL::exportMTX : &MatrixCL::exportMAT;
-                (A_final.*expFunc)(dirName + "/A" + format);
-                (stokesSystem.B.Data.*expFunc)(dirName + "/B" + format);
-                (stokesSystem.Schur.Data.*expFunc)(dirName + "/M" + format);
-                (C_full.*expFunc)(dirName + "/C_full" + format);
-                (C_n.*expFunc)(dirName + "/C_n" + format);
-                (stokesSystem.LB.Data.*expFunc)(dirName + "/LB" + format);
-                (stokesSystem.LB_stab.Data.*expFunc)(dirName + "/LB_stab" + format);
+                auto expMat = [&](MatrixCL& A, std::string const a, std::string const & b) {
+                    (A.*expFunc)(dirName + "/matrices/" + b + format);
+                    outJSON.put("Matrices." + a, "matrices/" + b + format);
+                };
+                expMat(A_final, "DiffusionReaction", "A");
+                expMat(stokesSystem.B.Data, "Divergence", "B");
+                expMat(C_full, "PressureFullStab", "C_full");
+                expMat(C_n, "PressureNormalStab", "C_n");
+                expMat(stokesSystem.LB.Data, "VelocityScalarLaplaceBeltrami", "LB");
+                expMat(stokesSystem.LB_stab.Data, "VelocityScalarLaplaceBeltramiNormalStab", "LB_stab");
+                logger.buf << outJSON;
+                logger.log();
             logger.end();
         }
-        if (P.get<bool>("SurfNavStokes.ComputeNormalErr")) {
-            P.put("Result.LevelsetNormalErr", sqrt(param.output.normalErrSq.lvset));
-            P.put("Result.PatchNormalErr", sqrt(param.output.normalErrSq.patch));
+        if (param.input.exactNormal) {
+            param.input.exactNormal = nullptr;
+            outJSON.put("Surface.LevelsetNormalErr", sqrt(param.output.normalErrSq.lvset));
+            outJSON.put("Surface.PatchNormalErr", sqrt(param.output.normalErrSq.patch));
         }
-        if (P.get<bool>("SurfNavStokes.ComputeShapeErr"))
-            P.put("Result.ShapeErr", sqrt(param.output.shapeErrSq));
-        if (!P.get<bool>("SurfNavStokes.Solve")) {
-            output << P;
-            logger.buf << P;
+        if (param.input.exactShape) {
+            param.input.exactShape = nullptr;
+            outJSON.put("Surface.ShapeErr", sqrt(param.output.shapeErrSq));
+        }
+        if (!inpJSON.get<bool>("SurfNavStokes.Solve")) {
+            output << outJSON;
+            logger.buf << outJSON;
             logger.log();
             return 0;
         }
         logger.beg("build preconditioners");
-            if (P.get<std::string>("SurfNavStokes.stab") == "full")
-                Schur_hat.LinComb(1., stokesSystem.Schur.Data, rho_p, stokesSystem.Schur_full_stab.Data);
-            else if (P.get<std::string>("SurfNavStokes.stab") == "normal")
-                Schur_hat.LinComb(1., stokesSystem.Schur.Data, rho_p, stokesSystem.Schur_normal_stab.Data);
-            else {
-                logger.wrn("no stabilization is used! Schur precond = I");
-                Schur_hat = std::valarray<double>(1., stokesSystem.Schur.Data.num_rows());
-            }
-            typedef SSORPcCL SymmPcPcT;
-            typedef PCGSolverCL<SymmPcPcT> PCGSolverT;
-            typedef SolverAsPreCL<PCGSolverT> PCGPcT;
-            SymmPcPcT symmPcPc_;
-            std::stringstream Astream;
-            PCGSolverT PCGSolver_(symmPcPc_, P.get<int>("Solver.PcAIter"), P.get<double>("Solver.PcATol"), true, &Astream);
-            PCGPcT PCGPc_(PCGSolver_);//velocity preconditioner
-            std::stringstream Schurstream;
-            PCGSolverT SchurPCGSolver (symmPcPc_, P.get<int>("Solver.PcBIter"), P.get<double>("Solver.PcBTol"), true, &Schurstream);
-            SchurPreBaseCL *spc_ = new SurfaceLaplacePreCL<PCGSolverT>(Schur_hat, SchurPCGSolver);//pressure preconditioner
-            //construct symmteric block iterative solver
-            typedef BlockPreCL<ExpensivePreBaseCL, SchurPreBaseCL, DiagSpdBlockPreCL>  DiagBlockPcT;
-            typedef PLanczosONBCL<VectorCL, DiagBlockPcT> LanczosT;
-            typedef PMResSolverCL<LanczosT> MinResT;
-            DiagBlockPcT    *DBlock_ = new DiagBlockPcT(PCGPc_, *spc_);
-            LanczosT *lanczos_ = new LanczosT(*DBlock_);
-            MinResT *MinRes_ = new MinResT(*lanczos_,  P.get<int>("Solver.Iter"), P.get<double>("Solver.Tol"), /*relative*/ false);
-            BlockMatrixSolverCL<MinResT> *symStokesSolver= new BlockMatrixSolverCL<MinResT>(*MinRes_);
-            // construct preconditioners for nonsymmetric case
-            typedef /*JACPcCL*/ SSORPcCL NonSymmPcPcT;
-            typedef GMResSolverCL<NonSymmPcPcT> GMResSolverT;
-            typedef SolverAsPreCL<GMResSolverT> GMResPcT;
-            NonSymmPcPcT nonsymmPcPc_;
-            std::stringstream PCstream;
-            GMResSolverT GMResSolver_(nonsymmPcPc_, P.get<int>("Solver.PcAIter"), P.get<int>("Solver.PcAIter"), P.get<double>("Solver.PcATol"),
-                     /*bool relative=*/ true, /*bool calculate2norm=*/ false, /*PreMethGMRES method=*/ LeftPreconditioning,
-                         /*bool mod =*/ true,      /*bool useModGS =*/ false, &PCstream);
-            GMResPcT GMResPc_nonsym(GMResSolver_);
-            //setup iterative block solver for nonsymmetric case
-            typedef GMResSolverCL<DiagBlockPcT> GMResT;
-            DiagBlockPcT    *DBlock_nonsym = new DiagBlockPcT(GMResPc_nonsym, *spc_);
-            GMResT *GMRes_ = new GMResT(*DBlock_nonsym, P.get<int>("Solver.Iter"), P.get<int>("Solver.Iter"), P.get<double>("Solver.Tol"),
-                     /*bool relative=*/ false, /*bool calculate2norm=*/ false, /*PreMethGMRES method=*/ LeftPreconditioning,
-                          /*bool mod =*/ true,      /*bool useModGS =*/ false);
-            BlockMatrixSolverCL<GMResT> *nonsymStokesSolver = new BlockMatrixSolverCL<GMResT>(*GMRes_);
-            StokesSolverBaseCL* stokesSolver;
+            logger.beg("Schur block");
+                if (inpJSON.get<std::string>("SurfNavStokes.stab") == "full")
+                    Schur_hat.LinComb(1., stokesSystem.Schur.Data, rho_p, stokesSystem.Schur_full_stab.Data);
+                else if (inpJSON.get<std::string>("SurfNavStokes.stab") == "normal")
+                    Schur_hat.LinComb(1., stokesSystem.Schur.Data, rho_p, stokesSystem.Schur_normal_stab.Data);
+                else {
+                    logger.wrn("no stabilization is used! Schur precond = I");
+                    Schur_hat = std::valarray<double>(1., stokesSystem.Schur.Data.num_rows());
+                }
+            logger.end();
+            logger.beg("diffusion-convection-reaction block");
+                typedef SSORPcCL SymmPcPcT;
+                typedef PCGSolverCL<SymmPcPcT> PCGSolverT;
+                typedef SolverAsPreCL<PCGSolverT> PCGPcT;
+                SymmPcPcT symmPcPc_;
+                std::stringstream Astream;
+                PCGSolverT PCGSolver_(symmPcPc_, inpJSON.get<int>("Solver.PcAIter"), inpJSON.get<double>("Solver.PcATol"), true, &Astream);
+                PCGPcT PCGPc_(PCGSolver_);//velocity preconditioner
+                std::stringstream Schurstream;
+                PCGSolverT SchurPCGSolver (symmPcPc_, inpJSON.get<int>("Solver.PcBIter"), inpJSON.get<double>("Solver.PcBTol"), true, &Schurstream);
+                SchurPreBaseCL *spc_ = new SurfaceLaplacePreCL<PCGSolverT>(Schur_hat, SchurPCGSolver);//pressure preconditioner
+                //construct symmteric block iterative solver
+                typedef BlockPreCL<ExpensivePreBaseCL, SchurPreBaseCL, DiagSpdBlockPreCL>  DiagBlockPcT;
+                typedef PLanczosONBCL<VectorCL, DiagBlockPcT> LanczosT;
+                typedef PMResSolverCL<LanczosT> MinResT;
+                DiagBlockPcT    *DBlock_ = new DiagBlockPcT(PCGPc_, *spc_);
+                LanczosT *lanczos_ = new LanczosT(*DBlock_);
+                MinResT *MinRes_ = new MinResT(*lanczos_, inpJSON.get<int>("Solver.Iter"), inpJSON.get<double>("Solver.Tol"), /*relative*/ false);
+                BlockMatrixSolverCL<MinResT> *symStokesSolver= new BlockMatrixSolverCL<MinResT>(*MinRes_);
+                // construct preconditioners for nonsymmetric case
+                typedef /*JACPcCL*/ SSORPcCL NonSymmPcPcT;
+                typedef GMResSolverCL<NonSymmPcPcT> GMResSolverT;
+                typedef SolverAsPreCL<GMResSolverT> GMResPcT;
+                NonSymmPcPcT nonsymmPcPc_;
+                std::stringstream PCstream;
+                GMResSolverT GMResSolver_(nonsymmPcPc_, inpJSON.get<int>("Solver.PcAIter"), inpJSON.get<int>("Solver.PcAIter"), inpJSON.get<double>("Solver.PcATol"),
+                         /*bool relative=*/ true, /*bool calculate2norm=*/ false, /*PreMethGMRES method=*/ LeftPreconditioning,
+                             /*bool mod =*/ true,      /*bool useModGS =*/ false, &PCstream);
+                GMResPcT GMResPc_nonsym(GMResSolver_);
+                //setup iterative block solver for nonsymmetric case
+                typedef GMResSolverCL<DiagBlockPcT> GMResT;
+                DiagBlockPcT    *DBlock_nonsym = new DiagBlockPcT(GMResPc_nonsym, *spc_);
+                GMResT *GMRes_ = new GMResT(*DBlock_nonsym, inpJSON.get<int>("Solver.Iter"), inpJSON.get<int>("Solver.Iter"), inpJSON.get<double>("Solver.Tol"),
+                         /*bool relative=*/ false, /*bool calculate2norm=*/ false, /*PreMethGMRES method=*/ LeftPreconditioning,
+                              /*bool mod =*/ true,      /*bool useModGS =*/ false);
+                BlockMatrixSolverCL<GMResT> *nonsymStokesSolver = new BlockMatrixSolverCL<GMResT>(*GMRes_);
+                StokesSolverBaseCL* stokesSolver;
+            logger.end();
         logger.end();
         logger.beg("solve");
+            VectorCL I_p;
+            I_p.resize(stokesSystem.gRHS.Data.size(),1.);
             //set up discrete vectors and matrices
-            VectorCL id, id2 ;
-            id.resize(stokesSystem.fRHS.Data.size(), 1.);
-            id2.resize(stokesSystem.gRHS.Data.size(),1.);
             MatrixCL A_dyn, C, B_T;
 //            MatrixCL A_dyn, Ahat, B, Chat, Mhat;
 //            MatrixCL B_T, NTranspose;
@@ -367,106 +390,109 @@ int main(int argc, char* argv[]) {
 //            std::string filename = "test" + testcase + "_";
 //            std::cout << "dirName: " << dirName << '\n';
 //            //set up VTK output
-            VTKOutCL* vtkwriter = nullptr;
-            vtkwriter = new VTKOutCL(mg, "DROPS data", (int)P.get<double>("Time.NumSteps")/P.get<int>("Output.EveryStep"), dirName , testName + "_", testName, 0);
-            vtkwriter->Register(make_VTKScalar(lset.GetSolution(), "level-set"));
-            vtkwriter->Register(make_VTKIfaceVector(mg, u_0, "u_*", velFE, vbnd));
-            vtkwriter->Register(make_VTKIfaceVector(mg, stokesSystem.fRHS, "f_T", velFE, vbnd));
-            vtkwriter->Register(make_VTKIfaceVector(mg, u, "u_h", velFE, vbnd));
-            vtkwriter->Register(make_VTKIfaceScalar(mg, p, "p_h", /*preFE,*/ pbnd));
-            vtkwriter->Register(make_VTKIfaceScalar(mg, stokesSystem.gRHS, "-g", /*preFE,*/ pbnd));
-            vtkwriter->Register(make_VTKIfaceScalar(mg, p_0, "p_*", /*preFE,*/ pbnd));
+            VTKOutCL* vtkWriter = nullptr;
+            vtkWriter = new VTKOutCL(mg, "DROPS data", (int)inpJSON.get<double>("Time.NumSteps") / inpJSON.get<int>("Output.EveryStep"), dirName + "/vtk", testName + "_", testName, 0);
+            vtkWriter->Register(make_VTKScalar(lset.GetSolution(), "level-set"));
+            vtkWriter->Register(make_VTKIfaceVector(mg, u_star, "u_*", velFE, vbnd));
+            vtkWriter->Register(make_VTKIfaceVector(mg, stokesSystem.fRHS, "f_T", velFE, vbnd));
+            vtkWriter->Register(make_VTKIfaceVector(mg, u, "u_h", velFE, vbnd));
+            vtkWriter->Register(make_VTKIfaceScalar(mg, p, "p_h", /*preFE,*/ pbnd));
+            vtkWriter->Register(make_VTKIfaceScalar(mg, stokesSystem.gRHS, "-g", /*preFE,*/ pbnd));
+            vtkWriter->Register(make_VTKIfaceScalar(mg, p_star, "p_*", /*preFE,*/ pbnd));
 
             std::unordered_map<std::string, std::vector<double>> stat;
 //
 //            //set up a txt file for custom time output
 //            std::ofstream log_solo(dirName +"/"
 //                                  + "tau_u="+ std::to_string(float(tau_u))+ "_"
-//                                  + "l="  + P.get<std::string>("Mesh.AdaptRef.FinestLevel")
-//                                  + "_nu=" + P.get<std::string>("SurfNavStokes.kinematic_viscosity")
+//                                  + "l="  + inpJSON.get<std::string>("Mesh.AdaptRef.FinestLevel")
+//                                  + "_nu=" + inpJSON.get<std::string>("SurfNavStokes.kinematic_viscosity")
 //                                  + "_Plot_" + filename
-//                                  + P.get<std::string>("SurfNavStokes.nonlinear_term") + "_"
-//                                  + P.get<std::string>("SurfNavStokes.instationary") + "="
+//                                  + inpJSON.get<std::string>("SurfNavStokes.nonlinear_term") + "_"
+//                                  + inpJSON.get<std::string>("SurfNavStokes.instationary") + "="
 //                                  + std::to_string(float(tau)) + ".txt");
 //            log_solo << "Time" <<  "\tKinetic\t" << "\tMomentum\t" << "\tWork" <<  '\n';
 //
 //            //set up a txt file for error time output
 //            std::ofstream log_error(dirName +"/"
 //                    + "tau_u="+ std::to_string(float(tau_u))+ "_"
-//                    + "l="  + P.get<std::string>("Mesh.AdaptRef.FinestLevel")
-//                    + "_nu=" + P.get<std::string>("SurfNavStokes.kinematic_viscosity")
+//                    + "l="  + inpJSON.get<std::string>("Mesh.AdaptRef.FinestLevel")
+//                    + "_nu=" + inpJSON.get<std::string>("SurfNavStokes.kinematic_viscosity")
 //                    + "_Error_" + filename
-//                    + P.get<std::string>("SurfNavStokes.nonlinear_term") + "_"
-//                    + P.get<std::string>("SurfNavStokes.instationary") + "="
+//                    + inpJSON.get<std::string>("SurfNavStokes.nonlinear_term") + "_"
+//                    + inpJSON.get<std::string>("SurfNavStokes.instationary") + "="
 //                    + std::to_string(float(tau)) + ".txt");
 //            log_error << "Time" << "\tL_2(uT-ext_uT)\t" <<  "\tadvH_1(u-ext_u)\t" <<  "\tsurfH_1(u-ext_u)\t" <<  "\tH_1(u-ext_u)\t" << "\tL_2(uN)\t" << "\tL_2(p-ext_p)" << '\n';
-//            double mu = P.get<double>("SurfNavStokes.kinematic_viscosity");
+//            double mu = inpJSON.get<double>("SurfNavStokes.kinematic_viscosity");
 //            std::cout << "viscosity: " << mu << '\n';
             transpose(stokesSystem.B.Data, B_T);
-            if (P.get<std::string>("SurfNavStokes.stab") == "full")
+            if (inpJSON.get<std::string>("SurfNavStokes.stab") == "full")
                 C.LinComb(0, stokesSystem.Schur.Data, -rho_p, stokesSystem.Schur_full_stab.Data);
-            else if (P.get<std::string>("SurfNavStokes.stab") == "normal")
+            else if (inpJSON.get<std::string>("SurfNavStokes.stab") == "normal")
                 C.LinComb(0, stokesSystem.Schur.Data, -rho_p, stokesSystem.Schur_normal_stab.Data);
             else
                 C.LinComb(0, stokesSystem.Schur.Data, 0, stokesSystem.Schur.Data);
-
+            double Pe; // peclet number
             logger.beg("t = t_1");
                 logger.beg("linear solve");
-                    stokesSystem.fRHS.Data += (1. / stepSize) * u_prev.Data;
-                    stokesSystem.gRHS.Data -= (dot(stokesSystem.gRHS.Data, id2) / dot(id2, id2)) * id2; // renormalize
-                    auto wind = rho * u_prev.Data;
-                    auto windRises = fpEqual(norm(wind), 0.);
-                    if (windRises) logger.log("using unsym solver");
-                    else logger.log("using sym solver");
-                    stokesSolver = windRises ? nonsymStokesSolver : symStokesSolver;
-                    A_dyn.LinComb(mu, stokesSystem.A.Data, rho / stepSize, stokesSystem.M.Data, tau_u, stokesSystem.S.Data, rho_u, stokesSystem.A_stab.Data);
+                    stokesSystem.fRHS.Data += (1. / stepSize) * (stokesSystem.M.Data * u_prev.Data);
+                    stokesSystem.gRHS.Data -= (dot(stokesSystem.gRHS.Data, I_p) / dot(I_p, I_p)) * I_p;
+                    A_dyn.LinComb(nu, stokesSystem.A.Data, 1. / stepSize, stokesSystem.M.Data, tau_u, stokesSystem.S.Data, rho_u, stokesSystem.A_stab.Data);
+                    if (windRises(nu, stokesSystem.w, Pe)) {
+                        stokesSolver = nonsymStokesSolver;
+                        logger.buf << "Pe = " << Pe << ", using non-symmetric solver";
+                    }
+                    else {
+                        stokesSolver = symStokesSolver;
+                        logger.buf << "Pe = " << Pe << ", using symmetric solver";
+                    }
                     stokesSolver->Solve(A_dyn, stokesSystem.B.Data, C, u.Data, p.Data, stokesSystem.fRHS.Data, stokesSystem.gRHS.Data, u.RowIdx->GetEx(), p.RowIdx->GetEx());
                 logger.end();
-                if (P.get<int>("Output.EveryStep") > 0) {
+                if (inpJSON.get<int>("Output.EveryStep") > 0) {
                     logger.beg("write vtk");
-                        vtkwriter->Write(1);
+                        vtkWriter->Write(1);
                     logger.end();
                 }
-                logger.beg("export stat");
-                    auto velResSq = norm_sq(A_dyn * u.Data + B_T * p.Data - stokesSystem.fRHS.Data);
-                    auto preResSq = norm_sq(stokesSystem.B.Data * u.Data + C * p.Data - stokesSystem.gRHS.Data);
-                    auto residual = sqrt(velResSq + preResSq);
-                    std::cout << "residual: " << residual << '\n';
-                    p.Data -=  dot(stokesSystem.Schur.Data * p.Data, id2) / dot(stokesSystem.Schur.Data*id2, id2) * id2;
-                    std::stringstream logss;
-                    logss << "norm(A_dyn * v + B^T  * p -  rhs): " << sqrt(velResSq) << '\n'
-                        << "norm(B    * v + C * p - stokesSystem.gRHS): " << sqrt(preResSq) << '\n';
-                    // send to logfiles
-
-                    logss << "Time is: " << std::to_string((float)1) << '\n';
-                    logss << "h is: " << h << '\n';
-                    logss << "rho_p is: "   << rho_p << '\n';
-                    logss << "rho_u is: " << rho_u << '\n';
-                    logss << "tau_u is: "     << tau_u << '\n';
-                    logss << "Total iterations: " << Solver->GetIter() << '\n';
-                    logss	<< "Final MINRES residual: " << Solver->GetResid() << '\n';
-                    VectorCL u_exactMinusV = u_exact.Data - v.Data, p_exactMinusP = p_exact.Data - p.Data;
-                    auto velL2          = sqrt(dot(v.Data, M.Data * v.Data));
-                    auto velL2err       = dot(u_exactMinusV, M.Data * u_exactMinusV);
-                    auto velNormalL2    = dot(v.Data, S.Data * v.Data);
-                    auto velTangenL2    = sqrt(velL2err - velNormalL2);
-                    velL2err = sqrt(velL2err);
-                    velNormalL2 = sqrt(velNormalL2);
-                    auto velH1err       = sqrt(dot(u_exactMinusV, A.Data * u_exactMinusV));
-                    auto preL2          = sqrt(dot(p.Data, Schur.Data * p.Data));
-                    auto preL2err       = sqrt(dot(p_exactMinusP, Schur.Data * p_exactMinusP));
-                    logss << "The L2-Norm of v - u_exact is: " << velL2err << '\n';
-                    logss << "The L2-Norm of v  is: " << velL2 << '\n';
-
-
-                    log_solo << std::to_string((float)(velL2*velL2*0.5)) << '\n';
-
-                    logss << "The H1-Norm of v - u_exact is: " << velH1err << '\n';
-                    logss << "The L2-Norm of v * n is: " << velNormalL2 << '\n';
-                    logss << "The L2-Norm of p - p_exact is: " << preL2err << '\n';
-                    logss << "The L2-Norm of p is: " << preL2 << '\n';
-                    logss << "The L2-Norm of v_T - u_exact is: " << velTangenL2 << '\n';
-                    logss << "Actual residual is: " << residual << '\n';
+//                logger.beg("export stat");
+//                    auto velResSq = norm_sq(A_dyn * u.Data + B_T * p.Data - stokesSystem.fRHS.Data);
+//                    auto preResSq = norm_sq(stokesSystem.B.Data * u.Data + C * p.Data - stokesSystem.gRHS.Data);
+//                    auto residual = sqrt(velResSq + preResSq);
+//                    std::cout << "residual: " << residual << '\n';
+//                    p.Data -=  dot(stokesSystem.Schur.Data * p.Data, I_p) / dot(stokesSystem.Schur.Data*I_p, I_p) * I_p;
+//                    std::stringstream logss;
+//                    logss << "norm(A_dyn * v + B^T  * p -  rhs): " << sqrt(velResSq) << '\n'
+//                        << "norm(B    * v + C * p - stokesSystem.gRHS): " << sqrt(preResSq) << '\n';
+//                    // send to logfiles
+//
+//                    logss << "Time is: " << std::to_string((float)1) << '\n';
+//                    logss << "h is: " << h << '\n';
+//                    logss << "rho_p is: "   << rho_p << '\n';
+//                    logss << "rho_u is: " << rho_u << '\n';
+//                    logss << "tau_u is: "     << tau_u << '\n';
+//                    logss << "Total iterations: " << Solver->GetIter() << '\n';
+//                    logss	<< "Final MINRES residual: " << Solver->GetResid() << '\n';
+//                    VectorCL u_exactMinusV = u_exact.Data - v.Data, p_exactMinusP = p_exact.Data - p.Data;
+//                    auto velL2          = sqrt(dot(v.Data, M.Data * v.Data));
+//                    auto velL2err       = dot(u_exactMinusV, M.Data * u_exactMinusV);
+//                    auto velNormalL2    = dot(v.Data, S.Data * v.Data);
+//                    auto velTangenL2    = sqrt(velL2err - velNormalL2);
+//                    velL2err = sqrt(velL2err);
+//                    velNormalL2 = sqrt(velNormalL2);
+//                    auto velH1err       = sqrt(dot(u_exactMinusV, A.Data * u_exactMinusV));
+//                    auto preL2          = sqrt(dot(p.Data, Schur.Data * p.Data));
+//                    auto preL2err       = sqrt(dot(p_exactMinusP, Schur.Data * p_exactMinusP));
+//                    logss << "The L2-Norm of v - u_exact is: " << velL2err << '\n';
+//                    logss << "The L2-Norm of v  is: " << velL2 << '\n';
+//
+//
+//                    log_solo << std::to_string((float)(velL2*velL2*0.5)) << '\n';
+//
+//                    logss << "The H1-Norm of v - u_exact is: " << velH1err << '\n';
+//                    logss << "The L2-Norm of v * n is: " << velNormalL2 << '\n';
+//                    logss << "The L2-Norm of p - p_exact is: " << preL2err << '\n';
+//                    logss << "The L2-Norm of p is: " << preL2 << '\n';
+//                    logss << "The L2-Norm of v_T - u_exact is: " << velTangenL2 << '\n';
+//                    logss << "Actual residual is: " << residual << '\n';
                 logger.end();
             logger.end();
             logger.beg("t = t_2, ..., t_n");

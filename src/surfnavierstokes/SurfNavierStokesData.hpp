@@ -20,10 +20,10 @@ namespace DROPS {
         std::string description;
     };
 
-    SurfNavierStokesData SurfNavierStokesDataFactory(std::string const & test, double rho, double mu) {
+    SurfNavierStokesData SurfNavierStokesDataFactory(std::string const & test, double nu) {
         SurfNavierStokesData data;
         if (test == "85") {
-            // TODO: add mu and rho!
+            // TODO: add nu!
             data.u_T = [](const DROPS::Point3DCL& p, double) {
                 DROPS::Point3DCL v;
                 v[0] = (-1.*(pow(p[2],4) + pow(p[0],2)*p[2]*std::sqrt(pow(p[0],2) + pow(p[1],2) + pow(p[2],2)) + pow(p[1],2)*(pow(p[2],2) + p[0]*std::sqrt(pow(p[0],2) + pow(p[1],2) + pow(p[2],2)))))/pow(pow(p[0],2) + pow(p[1],2) + pow(p[2],2),2);
