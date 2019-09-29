@@ -396,7 +396,7 @@ int main(int argc, char* argv[]) {
                 logger.beg("linear solve");
                     stokesSystem.fRHS.Data += (1. / stepSize) * (stokesSystem.M.Data * u_prev.Data);
                     stokesSystem.gRHS.Data -= (dot(stokesSystem.gRHS.Data, I_p) / dot(I_p, I_p)) * I_p;
-                    A_dyn.LinComb(1. / stepSize, stokesSystem.M.Data, /*1., stokesSystem.N.Data,*/ nu, stokesSystem.A.Data, tau_u, stokesSystem.S.Data, rho_u, stokesSystem.A_stab.Data);
+                    A_dyn.LinComb(1. / stepSize, stokesSystem.M.Data, 1., stokesSystem.N.Data, nu, stokesSystem.A.Data, tau_u, stokesSystem.S.Data, rho_u, stokesSystem.A_stab.Data);
                     stokesSolver = symStokesSolver;
                     if (windRises(nu, stokesSystem.w, Pe)) stokesSolver = nonsymStokesSolver;
                     logger.buf << "Pe = " << Pe << ", using " << (stokesSolver == symStokesSolver ? "" : "non-") << "symmetric solver";
