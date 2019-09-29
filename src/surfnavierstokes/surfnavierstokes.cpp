@@ -42,10 +42,7 @@
 #include "surfactant/ifacetransp.h"
 
 #include "SurfNavierStokesData.hpp"
-
-// #include "surfnavierstokes/surfnavierstokes_funcs.h"
 #include "surfnavierstokes/surfnavierstokes_utils.h"
-// #include "surfnavierstokes/surfnavierstokes_tests.h"
 
 using namespace DROPS;
 
@@ -53,9 +50,7 @@ DROPS::Point3DCL shift;
 DROPS::Point3DCL shiftTransform(const Point3DCL& p) {
     return p - shift;
 }
-bool fpEqual(double a, double b) {
-    return std::fabs(a - b) < 1e-10;
-}
+
 bool windRises(double nu, VecDescCL const & w, double& Pe) {
     Pe = supnorm(w.Data) / nu;
     return Pe > .1; // if the wind is more than 10% of the diffusion
@@ -85,44 +80,6 @@ int main(int argc, char* argv[]) {
             }
         logger.end();
         logger.beg("set up test case");
-            // parse FE types and some other parameters from json file
-            auto FE = inpJSON.get<std::string>("SurfNavStokes.FE");
-            auto velFE = FE.substr(0,2);
-            auto preFE = FE.substr(2,2);
-            logger.buf
-                << "velocity FE = " << velFE << '\n'
-                << "pressure FE = " << preFE;
-            logger.log();
-            auto testName = inpJSON.get<std::string>("SurfNavStokes.TestName");
-            auto nu = inpJSON.get<double>("SurfNavStokes.nu");
-            auto surfNavierStokesData = SurfNavierStokesDataFactory(testName, nu);
-            logger.wrn("TODO: set $\\nu$ in the solution");
-            logger.buf << "$\\nu$ = " << nu;
-            logger.log();
-            LocalStokesParam param;
-            param.input.f = inpJSON.get<bool>("SurfNavStokes.IntegrateRHS") ? surfNavierStokesData.f_T : nullptr;
-            param.input.g = inpJSON.get<bool>("SurfNavStokes.IntegrateRHS") ? surfNavierStokesData.m_g : nullptr;
-            param.input.exactNormal = inpJSON.get<bool>("SurfNavStokes.ComputeNormalErr") ? surfNavierStokesData.surface.n : nullptr;
-            param.input.exactShape = inpJSON.get<bool>("SurfNavStokes.ComputeShapeErr") ? surfNavierStokesData.surface.H : nullptr;
-            param.input.numbOfVirtualSubEdges = inpJSON.get<size_t>("SurfNavStokes.NumbOfVirtualSubEdges");
-            param.input.usePatchNormal = inpJSON.get<bool>("SurfNavStokes.UsePatchNormals");
-            if (param.input.usePatchNormal)  logger.log("using patch normals in surf integrands");
-            auto formulation = inpJSON.get<std::string>("SurfNavStokes.formulation");
-            if (formulation == "consistent") {
-                param.input.formulation = LocalStokesParam::Formulation::consistent;
-                logger.log("using consistent penalty formulation");
-            }
-            else {
-                param.input.formulation = LocalStokesParam::Formulation::inconsistent;
-                logger.log("using inconsistent penalty formulation");
-            }
-            StokesSystem stokesSystem;
-            if (!inpJSON.get<bool>("SurfNavStokes.ExportMatrices")) {
-                stokesSystem.Schur_full_stab.assemble = inpJSON.get<std::string>("SurfNavStokes.stab") == "full";
-                stokesSystem.Schur_normal_stab.assemble = inpJSON.get<std::string>("SurfNavStokes.stab") == "normal";
-                stokesSystem.LB.assemble = false;
-                stokesSystem.LB_stab.assemble = false;
-            }
             auto h = inpJSON.get<DROPS::Point3DCL>("Mesh.E1")[0] / inpJSON.get<double>("Mesh.N1") * std::pow(2., -inpJSON.get<double>("Mesh.AdaptRef.FinestLevel"));
             auto tau_u_order  = inpJSON.get<double>("SurfNavStokes.normal_penalty_pow");
             auto tau_u_factor = inpJSON.get<double>("SurfNavStokes.normal_penalty_fac");
@@ -136,7 +93,44 @@ int main(int argc, char* argv[]) {
             auto numbOfSteps  = inpJSON.get<size_t>("Time.NumbOfSteps");
             auto finalTime    = inpJSON.get<double>("Time.FinalTime");
             auto stepSize     = finalTime / numbOfSteps;
-            logger.buf << "$\\Delta t$ = " << stepSize;
+            logger.buf << "$\\Delta t$ = " << stepSize << '\n';
+            // parse FE types and some other parameters from json file
+            auto FE = inpJSON.get<std::string>("SurfNavStokes.FE");
+            auto velFE = FE.substr(0,2);
+            auto preFE = FE.substr(2,2);
+            logger.buf
+                << "velocity FE = " << velFE << '\n'
+                << "pressure FE = " << preFE << '\n';
+            auto testName = inpJSON.get<std::string>("SurfNavStokes.TestName");
+            auto nu = inpJSON.get<double>("SurfNavStokes.nu");
+            auto surfNavierStokesData = SurfNavierStokesDataFactory(testName, nu);
+            logger.buf << "$\\nu$ = " << nu << '\n';
+            LocalStokesParam param;
+            param.input.t = stepSize;
+            param.input.f = inpJSON.get<bool>("SurfNavStokes.IntegrateRHS") ? surfNavierStokesData.f_T : nullptr;
+            param.input.g = inpJSON.get<bool>("SurfNavStokes.IntegrateRHS") ? surfNavierStokesData.m_g : nullptr;
+            param.input.exactNormal = inpJSON.get<bool>("SurfNavStokes.ComputeNormalErr") ? surfNavierStokesData.surface.n : nullptr;
+            param.input.exactShape = inpJSON.get<bool>("SurfNavStokes.ComputeShapeErr") ? surfNavierStokesData.surface.H : nullptr;
+            param.input.numbOfVirtualSubEdges = inpJSON.get<size_t>("SurfNavStokes.NumbOfVirtualSubEdges");
+            param.input.usePatchNormal = inpJSON.get<bool>("SurfNavStokes.UsePatchNormals");
+            if (param.input.usePatchNormal)  logger.log("using patch normals in surf integrands");
+            auto formulation = inpJSON.get<std::string>("SurfNavStokes.formulation");
+            if (formulation == "consistent") {
+                param.input.formulation = LocalStokesParam::Formulation::consistent;
+                logger.buf << "using consistent penalty formulation\n";
+            }
+            else {
+                param.input.formulation = LocalStokesParam::Formulation::inconsistent;
+                logger.buf << "using inconsistent penalty formulation\n";
+            }
+            StokesSystem stokesSystem;
+            auto stab = inpJSON.get<std::string>("SurfNavStokes.stab");
+            if (!inpJSON.get<bool>("SurfNavStokes.ExportMatrices")) {
+                stokesSystem.Schur_full_stab.assemble   = (stab == "full");
+                stokesSystem.Schur_normal_stab.assemble = (stab == "normal");
+                stokesSystem.LB.assemble = false;
+                stokesSystem.LB_stab.assemble = false;
+            }
             logger.log();
         logger.end();
         logger.beg("build mesh");
@@ -329,9 +323,9 @@ int main(int argc, char* argv[]) {
         }
         logger.beg("build preconditioners");
             logger.beg("Schur block");
-                if (inpJSON.get<std::string>("SurfNavStokes.stab") == "full")
+                if (stab == "full")
                     Schur_hat.LinComb(1., stokesSystem.Schur.Data, rho_p, stokesSystem.Schur_full_stab.Data);
-                else if (inpJSON.get<std::string>("SurfNavStokes.stab") == "normal")
+                else if (stab == "normal")
                     Schur_hat.LinComb(1., stokesSystem.Schur.Data, rho_p, stokesSystem.Schur_normal_stab.Data);
                 else {
                     logger.wrn("no stabilization is used! Schur precond = I");
@@ -380,18 +374,17 @@ int main(int argc, char* argv[]) {
         logger.beg("solve");
             VectorCL I_p;
             I_p.resize(stokesSystem.gRHS.Data.size(),1.);
-            //set up discrete vectors and matrices
             MatrixCL A_dyn, C, B_T;
-//            MatrixCL A_dyn, Ahat, B, Chat, Mhat;
-//            MatrixCL B_T, NTranspose;
-//            DROPS::VecDescCL instantrhs;
-//            DROPS::VecDescCL vxtent, pxtent;
-//            //set up output
-//            std::string filename = "test" + testcase + "_";
-//            std::cout << "dirName: " << dirName << '\n';
-//            //set up VTK output
+            transpose(stokesSystem.B.Data, B_T);
+            if (stab == "full")
+                C.LinComb(0., stokesSystem.Schur.Data, -rho_p, stokesSystem.Schur_full_stab.Data);
+            else if (stab == "normal")
+                C.LinComb(0., stokesSystem.Schur.Data, -rho_p, stokesSystem.Schur_normal_stab.Data);
+            else
+                C.LinComb(0., stokesSystem.Schur.Data, 0., stokesSystem.Schur.Data);
+            double Pe; // peclet number
             VTKOutCL* vtkWriter = nullptr;
-            vtkWriter = new VTKOutCL(mg, "DROPS data", (int)inpJSON.get<double>("Time.NumSteps") / inpJSON.get<int>("Output.EveryStep"), dirName + "/vtk", testName + "_", testName, 0);
+            vtkWriter = new VTKOutCL(mg, "DROPS data", (int)inpJSON.get<double>("Time.NumbOfSteps") / inpJSON.get<int>("Output.EveryStep"), dirName + "/vtk", testName + "_", testName, 0);
             vtkWriter->Register(make_VTKScalar(lset.GetSolution(), "level-set"));
             vtkWriter->Register(make_VTKIfaceVector(mg, u_star, "u_*", velFE, vbnd));
             vtkWriter->Register(make_VTKIfaceVector(mg, stokesSystem.fRHS, "f_T", velFE, vbnd));
@@ -399,128 +392,104 @@ int main(int argc, char* argv[]) {
             vtkWriter->Register(make_VTKIfaceScalar(mg, p, "p_h", /*preFE,*/ pbnd));
             vtkWriter->Register(make_VTKIfaceScalar(mg, stokesSystem.gRHS, "-g", /*preFE,*/ pbnd));
             vtkWriter->Register(make_VTKIfaceScalar(mg, p_star, "p_*", /*preFE,*/ pbnd));
-
-            std::unordered_map<std::string, std::vector<double>> stat;
-//
-//            //set up a txt file for custom time output
-//            std::ofstream log_solo(dirName +"/"
-//                                  + "tau_u="+ std::to_string(float(tau_u))+ "_"
-//                                  + "l="  + inpJSON.get<std::string>("Mesh.AdaptRef.FinestLevel")
-//                                  + "_nu=" + inpJSON.get<std::string>("SurfNavStokes.kinematic_viscosity")
-//                                  + "_Plot_" + filename
-//                                  + inpJSON.get<std::string>("SurfNavStokes.nonlinear_term") + "_"
-//                                  + inpJSON.get<std::string>("SurfNavStokes.instationary") + "="
-//                                  + std::to_string(float(tau)) + ".txt");
-//            log_solo << "Time" <<  "\tKinetic\t" << "\tMomentum\t" << "\tWork" <<  '\n';
-//
-//            //set up a txt file for error time output
-//            std::ofstream log_error(dirName +"/"
-//                    + "tau_u="+ std::to_string(float(tau_u))+ "_"
-//                    + "l="  + inpJSON.get<std::string>("Mesh.AdaptRef.FinestLevel")
-//                    + "_nu=" + inpJSON.get<std::string>("SurfNavStokes.kinematic_viscosity")
-//                    + "_Error_" + filename
-//                    + inpJSON.get<std::string>("SurfNavStokes.nonlinear_term") + "_"
-//                    + inpJSON.get<std::string>("SurfNavStokes.instationary") + "="
-//                    + std::to_string(float(tau)) + ".txt");
-//            log_error << "Time" << "\tL_2(uT-ext_uT)\t" <<  "\tadvH_1(u-ext_u)\t" <<  "\tsurfH_1(u-ext_u)\t" <<  "\tH_1(u-ext_u)\t" << "\tL_2(uN)\t" << "\tL_2(p-ext_p)" << '\n';
-//            double mu = inpJSON.get<double>("SurfNavStokes.kinematic_viscosity");
-//            std::cout << "viscosity: " << mu << '\n';
-            transpose(stokesSystem.B.Data, B_T);
-            if (inpJSON.get<std::string>("SurfNavStokes.stab") == "full")
-                C.LinComb(0, stokesSystem.Schur.Data, -rho_p, stokesSystem.Schur_full_stab.Data);
-            else if (inpJSON.get<std::string>("SurfNavStokes.stab") == "normal")
-                C.LinComb(0, stokesSystem.Schur.Data, -rho_p, stokesSystem.Schur_normal_stab.Data);
-            else
-                C.LinComb(0, stokesSystem.Schur.Data, 0, stokesSystem.Schur.Data);
-            double Pe; // peclet number
             logger.beg("t = t_1");
                 logger.beg("linear solve");
                     stokesSystem.fRHS.Data += (1. / stepSize) * (stokesSystem.M.Data * u_prev.Data);
                     stokesSystem.gRHS.Data -= (dot(stokesSystem.gRHS.Data, I_p) / dot(I_p, I_p)) * I_p;
                     A_dyn.LinComb(nu, stokesSystem.A.Data, 1. / stepSize, stokesSystem.M.Data, tau_u, stokesSystem.S.Data, rho_u, stokesSystem.A_stab.Data);
-                    if (windRises(nu, stokesSystem.w, Pe)) {
-                        stokesSolver = nonsymStokesSolver;
-                        logger.buf << "Pe = " << Pe << ", using non-symmetric solver";
-                    }
-                    else {
-                        stokesSolver = symStokesSolver;
-                        logger.buf << "Pe = " << Pe << ", using symmetric solver";
-                    }
+                    stokesSolver = symStokesSolver;
+                    if (windRises(nu, stokesSystem.w, Pe)) stokesSolver = nonsymStokesSolver;
+                    logger.buf << "Pe = " << Pe << ", using " << (stokesSolver == symStokesSolver ? "" : "non-") << "symmetric solver";
+                    logger.log();
                     stokesSolver->Solve(A_dyn, stokesSystem.B.Data, C, u.Data, p.Data, stokesSystem.fRHS.Data, stokesSystem.gRHS.Data, u.RowIdx->GetEx(), p.RowIdx->GetEx());
                 logger.end();
-                if (inpJSON.get<int>("Output.EveryStep") > 0) {
-                    logger.beg("write vtk");
-                        vtkWriter->Write(1);
-                    logger.end();
-                }
-//                logger.beg("export stat");
-//                    auto velResSq = norm_sq(A_dyn * u.Data + B_T * p.Data - stokesSystem.fRHS.Data);
-//                    auto preResSq = norm_sq(stokesSystem.B.Data * u.Data + C * p.Data - stokesSystem.gRHS.Data);
-//                    auto residual = sqrt(velResSq + preResSq);
-//                    std::cout << "residual: " << residual << '\n';
-//                    p.Data -=  dot(stokesSystem.Schur.Data * p.Data, I_p) / dot(stokesSystem.Schur.Data*I_p, I_p) * I_p;
-//                    std::stringstream logss;
-//                    logss << "norm(A_dyn * v + B^T  * p -  rhs): " << sqrt(velResSq) << '\n'
-//                        << "norm(B    * v + C * p - stokesSystem.gRHS): " << sqrt(preResSq) << '\n';
-//                    // send to logfiles
-//
-//                    logss << "Time is: " << std::to_string((float)1) << '\n';
-//                    logss << "h is: " << h << '\n';
-//                    logss << "rho_p is: "   << rho_p << '\n';
-//                    logss << "rho_u is: " << rho_u << '\n';
-//                    logss << "tau_u is: "     << tau_u << '\n';
-//                    logss << "Total iterations: " << Solver->GetIter() << '\n';
-//                    logss	<< "Final MINRES residual: " << Solver->GetResid() << '\n';
-//                    VectorCL u_exactMinusV = u_exact.Data - v.Data, p_exactMinusP = p_exact.Data - p.Data;
-//                    auto velL2          = sqrt(dot(v.Data, M.Data * v.Data));
-//                    auto velL2err       = dot(u_exactMinusV, M.Data * u_exactMinusV);
-//                    auto velNormalL2    = dot(v.Data, S.Data * v.Data);
-//                    auto velTangenL2    = sqrt(velL2err - velNormalL2);
-//                    velL2err = sqrt(velL2err);
-//                    velNormalL2 = sqrt(velNormalL2);
-//                    auto velH1err       = sqrt(dot(u_exactMinusV, A.Data * u_exactMinusV));
-//                    auto preL2          = sqrt(dot(p.Data, Schur.Data * p.Data));
-//                    auto preL2err       = sqrt(dot(p_exactMinusP, Schur.Data * p_exactMinusP));
-//                    logss << "The L2-Norm of v - u_exact is: " << velL2err << '\n';
-//                    logss << "The L2-Norm of v  is: " << velL2 << '\n';
-//
-//
-//                    log_solo << std::to_string((float)(velL2*velL2*0.5)) << '\n';
-//
-//                    logss << "The H1-Norm of v - u_exact is: " << velH1err << '\n';
-//                    logss << "The L2-Norm of v * n is: " << velNormalL2 << '\n';
-//                    logss << "The L2-Norm of p - p_exact is: " << preL2err << '\n';
-//                    logss << "The L2-Norm of p is: " << preL2 << '\n';
-//                    logss << "The L2-Norm of v_T - u_exact is: " << velTangenL2 << '\n';
-//                    logss << "Actual residual is: " << residual << '\n';
+                logger.beg("output");
+                    auto exportStats = [&](size_t i) {
+                        std::ofstream stats(dirName + "/stats/t_" + std::to_string(i) + ".json");
+                        ParamCL tJSON;
+                        auto velResSq = norm_sq(A_dyn * u.Data + B_T * p.Data - stokesSystem.fRHS.Data);
+                        auto preResSq = norm_sq(stokesSystem.B.Data * u.Data + C * p.Data - stokesSystem.gRHS.Data);
+                        auto residual = sqrt(velResSq + preResSq);
+                        tJSON.put("Solver.ResidualNorm.True.Full", residual);
+                        tJSON.put("Solver.ResidualNorm.True.Velocity", sqrt(velResSq));
+                        tJSON.put("Solver.ResidualNorm.True.Pressure", sqrt(preResSq));
+                        tJSON.put("Solver.ResidualNorm.GMRES", stokesSolver->GetResid());
+                        tJSON.put("Solver.TotalIters", stokesSolver->GetIter());
+                        auto t = i * stepSize;
+                        tJSON.put("Time", t);
+                        tJSON.put("h", h);
+                        tJSON.put("Peclet", Pe);
+                        tJSON.put("MeshDepParams.rho_p", rho_p);
+                        tJSON.put("MeshDepParams.rho_u", rho_u);
+                        tJSON.put("MeshDepParams.tau_u", tau_u);
+                        InitVector(mg, u_star, surfNavierStokesData.u_T, t);
+                        InitScalar(mg, p_star, surfNavierStokesData.p, t);
+                        p.Data -= dot(stokesSystem.Schur.Data * p.Data, I_p) / dot(stokesSystem.Schur.Data * I_p, I_p) * I_p;
+                        VectorCL u_star_minus_u = u_star.Data - u.Data, p_star_minus_p = p_star.Data - p.Data;
+                        auto velL2 = sqrt(dot(u.Data, stokesSystem.M.Data * u.Data));
+                        auto velL2err = dot(u_star_minus_u, stokesSystem.M.Data * u_star_minus_u);
+                        auto velNormalL2 = dot(u.Data, stokesSystem.S.Data * u.Data);
+                        auto velTangenL2 = sqrt(velL2err - velNormalL2);
+                        velL2err = sqrt(velL2err);
+                        velNormalL2 = sqrt(velNormalL2);
+                        auto velH1err = sqrt(dot(u_star_minus_u, stokesSystem.A.Data * u_star_minus_u));
+                        auto preL2 = sqrt(dot(p.Data, stokesSystem.Schur.Data * p.Data));
+                        auto preL2err = sqrt(dot(p_star_minus_p, stokesSystem.Schur.Data * p_star_minus_p));
+                        tJSON.put("Integral.Error.VelocityL2", velL2err);
+                        tJSON.put("Integral.Error.VelocityTangentialL2", velTangenL2);
+                        tJSON.put("Integral.Error.VelocityNormalL2", velNormalL2);
+                        tJSON.put("Integral.Error.VelocityH1", velH1err);
+                        tJSON.put("Integral.Error.PressureL2", preL2err);
+                        tJSON.put("Integral.PressureL2", preL2);
+                        tJSON.put("Integral.VelocityL2", velL2);
+                        tJSON.put("Integral.KineticEnergy", .5 * velL2 * velL2);
+                        stats << tJSON;
+                        logger.buf << tJSON;
+                        logger.log();
+                    };
+                    exportStats(1);
+                    if (inpJSON.get<int>("Output.EveryStep") > 0) {
+                        logger.beg("write vtk");
+                            vtkWriter->Write(1);
+                        logger.end();
+                    }
                 logger.end();
             logger.end();
-            logger.beg("t = t_2, ..., t_n");
-                for (size_t i = 2; i <= numbOfSteps; ++i) {
+            for (size_t i = 2; i <= numbOfSteps; ++i) {
+                std::stringstream header;
+                header << "t = t_" << i << " (" << (100. * i) / numbOfSteps << "%)";
+                logger.beg(header.str());
                     logger.wrn("TODO!");
-                    logger.pro(i, numbOfSteps);
-                }
-            logger.end();
+                    // param.input.t =
+                    // ...
+                logger.end();
+            }
         logger.end();
-//        // error
-//        double Aaverage(0.), Avariation(0.), Schuraverage(0.), Schurvariation(0.);
-//        double PCaverage(0.), PCvariation(0.);
-//        std::stringstream Astreamcopy(Astream.str());
-//        std::stringstream PCstreamcopy(PCstream.str());
-//        std::stringstream Schurstreamcopy(Schurstream.str());
-//        RightComputeAverageIterations(Astream, Aaverage);
-//        ComputeAverageIterations(Schurstream, Schuraverage);
-//        RightComputeAverageIterations(PCstream, PCaverage);
-//        RightComputeVariationFromAverageIterations(Astreamcopy, Aaverage, Avariation);
-//        RightComputeVariationFromAverageIterations(PCstreamcopy, PCaverage, PCvariation);
-//        ComputeVariationFromAverageIterations(Schurstreamcopy, Schuraverage, Schurvariation);
-//        std::cout << "The average iterationsnumber of the A-preconditioner is: " <<     Aaverage     << '\n' << " ...with a variation of: " << Avariation << '\n';
-//        std::cout << "The average iterationsnumber of the nonsymmetric A-preconditioner is: " <<     PCaverage     << '\n' << " ...with a variation of: " << PCvariation << '\n';
-//        std::cout << "The average iterationsnumber of the Schur-preconditioner is: " << Schuraverage << '\n' << " ...with a variation of: " << Schurvariation << '\n';
-//        delete &lset;
+        // error
+        double Aaverage(0.), Avariation(0.), Schuraverage(0.), Schurvariation(0.);
+        double PCaverage(0.), PCvariation(0.);
+        std::stringstream Astreamcopy(Astream.str());
+        std::stringstream PCstreamcopy(PCstream.str());
+        std::stringstream Schurstreamcopy(Schurstream.str());
+        RightComputeAverageIterations(Astream, Aaverage);
+        ComputeAverageIterations(Schurstream, Schuraverage);
+        RightComputeAverageIterations(PCstream, PCaverage);
+        RightComputeVariationFromAverageIterations(Astreamcopy, Aaverage, Avariation);
+        RightComputeVariationFromAverageIterations(PCstreamcopy, PCaverage, PCvariation);
+        ComputeVariationFromAverageIterations(Schurstreamcopy, Schuraverage, Schurvariation);
+        logger.buf << "The average iterationsnumber of the A-preconditioner is: " <<     Aaverage     << '\n' << " ...with a variation of: " << Avariation << '\n';
+        logger.buf << "The average iterationsnumber of the nonsymmetric A-preconditioner is: " <<     PCaverage     << '\n' << " ...with a variation of: " << PCvariation << '\n';
+        logger.buf << "The average iterationsnumber of the Schur-preconditioner is: " << Schuraverage << '\n' << " ...with a variation of: " << Schurvariation << '\n';
+        logger.log();
+        delete &lset;
         return 0;
     } catch (std::exception const & e) {
         logger.err(e.what());
-        return 1;
+    } catch (DROPS::DROPSErrCL const & e) {
+        e.what(logger.buf);
+        logger.err(logger.buf.str());
+    } catch (...) {
+        logger.err("unknown error");
     }
+    return 1;
 }

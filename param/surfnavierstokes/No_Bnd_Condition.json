@@ -1,7 +1,7 @@
 {
     "Output": {
       "Directory":  "../../output/surfnavierstokes",
-      "EveryStep":  "-1"
+      "EveryStep":  "1"
     },
 
     "Mesh": {
@@ -27,8 +27,8 @@
     },
 
     "SurfNavStokes": {
-      "nu":                    2.0,
-      "TestName":              "85",
+      "nu":                    1.0,
+      "TestName":              "StokesSphere",
       "FE":                    "P2P1",
       "stab":                  "normal",
       "normal_penalty_pow":    -2,
@@ -38,13 +38,13 @@
       "pre_volumestab_pow":    1,
       "pre_volumestab_fac":    1,
       "formulation":           "consistent",
-      "NumbOfVirtualSubEdges": 2,
+      "NumbOfVirtualSubEdges": 1,
       "UsePatchNormals":       false,
-      "ExportMatrices":        true,
+      "ExportMatrices":        false,
       "ExportMatricesFormat":  "mat",
-      "ComputeNormalErr":      true,
-      "ComputeShapeErr":       true,
-      "Solve":                 false,
+      "ComputeNormalErr":      false,
+      "ComputeShapeErr":       false,
+      "Solve":                 true,
       "IntegrateRHS":          true
     },
 

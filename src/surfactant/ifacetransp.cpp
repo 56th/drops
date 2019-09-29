@@ -509,8 +509,8 @@ void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& l
 //    std::cout << '\n';
 // DO NOT DELETE
     // compute rhs
-    if (param->input.f != nullptr) resize_and_evaluate_on_vertexes(param->input.f, tet, q2Ddomain, 0., qF);
-    if (param->input.g != nullptr) resize_and_evaluate_on_vertexes(param->input.g, tet, q2Ddomain, 0., qG);
+    if (param->input.f != nullptr) resize_and_evaluate_on_vertexes(param->input.f, tet, q2Ddomain, param->input.t, qF);
+    if (param->input.g != nullptr) resize_and_evaluate_on_vertexes(param->input.g, tet, q2Ddomain, param->input.t, qG);
     // compute normal
     resize_and_evaluate_on_vertexes(getLevelsetGrad(ls), q2Ddomain, qLsGrad);
     qLsGradNorm   = sqrt(dot(qLsGrad, qLsGrad));
@@ -531,7 +531,7 @@ void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& l
     auto usePatchNormals = param->input.usePatchNormal;
     qExactOrP2Normal = usePatchNormals ? qExactNormal : qP2Normal;
     if (param->input.exactNormal != nullptr) {
-        resize_and_evaluate_on_vertexes(param->input.exactNormal, tet, q2Ddomain, 0., qAnalyticNormal);
+        resize_and_evaluate_on_vertexes(param->input.exactNormal, tet, q2Ddomain, param->input.t, qAnalyticNormal);
         param->output.normalErrSq.patch += quad_2D(dot(qAnalyticNormal - qExactNormal, qAnalyticNormal - qExactNormal), q2Ddomain);
         param->output.normalErrSq.lvset += quad_2D(dot(qAnalyticNormal - qP2Normal, qAnalyticNormal - qP2Normal), q2Ddomain);
     }
@@ -725,7 +725,7 @@ void LocalStokesCL::setupA_P2_consistent(double A_P2[30][30]) {
         for (size_t j = i; j < 30; ++j) {
             auto js = j / 3; // scalar shape index
             auto jn = j - 3 * js; // nonzero vect component
-            A_P2[i][j] = 2. * quad_2D(contract(qP2E[j] - (qP2Hat[js] * qExactOrP2NormalComp[jn]) * qHess, qP2E[i] - (qP2Hat[is] * qExactOrP2NormalComp[in]) * qHess), q2Ddomain);
+            A_P2[i][j] = quad_2D(contract(qP2E[j] - (qP2Hat[js] * qExactOrP2NormalComp[jn]) * qHess, qP2E[i] - (qP2Hat[is] * qExactOrP2NormalComp[in]) * qHess), q2Ddomain);
             A_P2[j][i] = A_P2[i][j];
         }
     }
@@ -758,7 +758,7 @@ void LocalStokesCL::setupA_P2(double A_P2[30][30]) {
     }
     for (size_t i = 0; i < 30; ++i)
         for (size_t j = i; j < 30; ++j) {
-            A_P2[i][j] = 2. * quad_2D(contract(qP2E[j], qP2E[i]), q2Ddomain);
+            A_P2[i][j] = quad_2D(contract(qP2E[j], qP2E[i]), q2Ddomain);
             A_P2[j][i] = A_P2[i][j];
         }
     // Do all combinations for (i,j) i,j=30 x 30 and corresponding quadrature

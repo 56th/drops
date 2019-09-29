@@ -756,6 +756,7 @@ void SetupLBP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls, cons
 struct LocalStokesParam {
     enum class Formulation { consistent, inconsistent };
     struct {
+        double t = 0.;
         size_t numbOfVirtualSubEdges = 2;
         Formulation formulation = Formulation::consistent;
         bool usePatchNormal = true;
