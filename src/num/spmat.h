@@ -708,15 +708,13 @@ public:
     SparseMatBaseCL& operator*= (T c);
     SparseMatBaseCL& operator/= (T c);
 
-    SparseMatBaseCL& LinComb (double, const SparseMatBaseCL<T>&,
-                              double, const SparseMatBaseCL<T>&);
-    SparseMatBaseCL& LinComb (double, const SparseMatBaseCL<T>&,
-                              double, const SparseMatBaseCL<T>&,
-                              double, const SparseMatBaseCL<T>&);
-    SparseMatBaseCL& LinComb (double, const SparseMatBaseCL<T>&,
-                              double, const SparseMatBaseCL<T>&,
-                              double, const SparseMatBaseCL<T>&,
-                              double, const SparseMatBaseCL<T>&);
+    SparseMatBaseCL& LinComb(double, SparseMatBaseCL<T> const &, double, SparseMatBaseCL<T> const &);
+    template <typename ...Args>
+    SparseMatBaseCL& LinComb(double a, SparseMatBaseCL const & A, double b, SparseMatBaseCL const & B, Args... args) {
+        SparseMatBaseCL<T> tmp;
+        tmp.LinComb(a, A, b, B);
+        return LinComb(1., tmp, args...);
+    }
 
     SparseMatBaseCL& concat_under (const SparseMatBaseCL<T>&, const SparseMatBaseCL<T>&);
 
@@ -1346,12 +1344,12 @@ SparseMatBaseCL<T>& SparseMatBaseCL<T>::concat_under (const SparseMatBaseCL<T>& 
 ///   die Anzahl der Unbekannten nicht aendert. Daher schalten wir die
 ///   Wiederverwendung vorerst global aus.
 template <typename T>
-SparseMatBaseCL<T>& SparseMatBaseCL<T>::LinComb (double coeffA, const SparseMatBaseCL<T>& A,
-                                                 double coeffB, const SparseMatBaseCL<T>& B)
-{
+SparseMatBaseCL<T>& SparseMatBaseCL<T>::LinComb(
+    double coeffA, SparseMatBaseCL<T> const & A,
+    double coeffB, SparseMatBaseCL<T> const & B
+) {
     Assert( A.num_rows()==B.num_rows() && A.num_cols()==B.num_cols(),
             "LinComb: incompatible dimensions", DebugNumericC);
-
     IncrementVersion();
     Comment( "LinComb: Creating NEW matrix" << std::endl, DebugNumericC);
     num_rows( A.num_rows());
@@ -1439,30 +1437,6 @@ SparseMatBaseCL<T>& SparseMatBaseCL<T>::LinComb (double coeffA, const SparseMatB
     } //end of omp parallel
     delete [] t_sum;
     return *this;
-}
-
-
-/// \brief Compute the linear combination of three sparse matrices.
-template <typename T>
-SparseMatBaseCL<T>& SparseMatBaseCL<T>::LinComb (double coeffA, const SparseMatBaseCL<T>& A,
-                                                 double coeffB, const SparseMatBaseCL<T>& B,
-                                                 double coeffC, const SparseMatBaseCL<T>& C)
-{
-    SparseMatBaseCL<T> tmp;
-    tmp.LinComb( coeffA, A, coeffB, B);
-    return this->LinComb( 1.0, tmp, coeffC, C);
-}
-
-/// \brief Compute the linear combination of four sparse matrices.
-template <typename T>
-SparseMatBaseCL<T>& SparseMatBaseCL<T>::LinComb (double coeffA, const SparseMatBaseCL<T>& A,
-                                                 double coeffB, const SparseMatBaseCL<T>& B,
-                                                 double coeffC, const SparseMatBaseCL<T>& C,
-                                                 double coeffD, const SparseMatBaseCL<T>& D)
-{
-    SparseMatBaseCL<T> tmp;
-    tmp.LinComb( coeffA, A, coeffB, B, coeffC, C);
-    return this->LinComb( 1.0, tmp, coeffD, D);
 }
 
 /// \brief Inserts v as column c. The old columns [c, num_cols()) are shifted to the right.
