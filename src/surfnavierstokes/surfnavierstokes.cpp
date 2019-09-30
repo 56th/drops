@@ -215,10 +215,10 @@ int main(int argc, char* argv[]) {
             P2FEidx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
             P2FEidx.CreateNumbering(mg.GetLastLevel(), mg);
             logger.buf
-                    << "numb of d.o.f. vector IFP2: " << ifaceVecP2idx.NumUnknowns() << '\n'
-                    << "numb of d.o.f. vector IFP1: " << ifaceVecP1idx.NumUnknowns() << '\n'
-                    << "numb of d.o.f. scalar IFP2: " << ifaceP2idx.NumUnknowns() << '\n'
-                    << "numb of d.o.f. scalar IFP1: " << ifaceP1idx.NumUnknowns() << '\n'
+                    << "numb of d.o.f. vector interface P2: " << ifaceVecP2idx.NumUnknowns() << '\n'
+                    << "numb of d.o.f. vector interface P1: " << ifaceVecP1idx.NumUnknowns() << '\n'
+                    << "numb of d.o.f. scalar interface P2: " << ifaceP2idx.NumUnknowns() << '\n'
+                    << "numb of d.o.f. scalar interface P1: " << ifaceP1idx.NumUnknowns() << '\n'
                     << "numb of d.o.f. vector P2: " << vecP2idx.NumUnknowns() << '\n'
                     << "numb of d.o.f. vector P1: " << vecP1idx.NumUnknowns() << '\n'
                     << "numb of d.o.f. scalar P2: " << P2FEidx.NumUnknowns() << '\n'
@@ -263,6 +263,7 @@ int main(int argc, char* argv[]) {
         logger.beg("interpolate initial condition");
             InitVector(mg, u_prev, surfNavierStokesData.u_T);
             stokesSystem.w = u_prev;
+            logger.wrn("TODO: add normal component to wind field");
         logger.end();
         logger.beg("assemble");
             MatrixCL Schur_hat;
@@ -295,10 +296,13 @@ int main(int argc, char* argv[]) {
                 std::string format = inpJSON.get<std::string>("SurfNavStokes.ExportMatricesFormat") == "mtx" ? ".mtx" : ".mat";
                 auto expFunc = format == ".mtx" ? &MatrixCL::exportMTX : &MatrixCL::exportMAT;
                 auto expMat = [&](MatrixCL& A, std::string const a, std::string const & b) {
-                    (A.*expFunc)(dirName + "/matrices/" + b + format);
-                    outJSON.put("Matrices." + a, "matrices/" + b + format);
+                    logger.beg(a);
+                        (A.*expFunc)(dirName + "/matrices/" + b + format);
+                        outJSON.put("Matrices." + a, "matrices/" + b + format);
+                    logger.end();
                 };
                 expMat(A_final, "DiffusionReaction", "A");
+                expMat(stokesSystem.N.Data, "Convection", "N");
                 expMat(stokesSystem.B.Data, "Divergence", "B");
                 expMat(C_full, "PressureFullStab", "C_full");
                 expMat(C_n, "PressureNormalStab", "C_n");
@@ -396,6 +400,13 @@ int main(int argc, char* argv[]) {
             vtkWriter->Register(make_VTKIfaceScalar(mg, p, "p_h", /*preFE,*/ pbnd));
             vtkWriter->Register(make_VTKIfaceScalar(mg, stokesSystem.gRHS, "-g", /*preFE,*/ pbnd));
             vtkWriter->Register(make_VTKIfaceScalar(mg, p_star, "p_*", /*preFE,*/ pbnd));
+            if (everyStep > 0) {
+                logger.beg("write initial condition to vtk");
+                    u_star = u_prev;
+                    u = u_prev;
+                    vtkWriter->Write(0);
+                logger.end();
+            }
             logger.beg("t = t_1");
                 logger.beg("linear solve");
                     stokesSystem.fRHS.Data += (1. / stepSize) * (stokesSystem.M.Data * u_prev.Data);
@@ -419,6 +430,8 @@ int main(int argc, char* argv[]) {
                         tJSON.put("Solver.ResidualNorm.True.Pressure", sqrt(preResSq));
                         tJSON.put("Solver.ResidualNorm.GMRES", stokesSolver->GetResid());
                         tJSON.put("Solver.TotalIters", stokesSolver->GetIter());
+                        tJSON.put("Solver.DOF.Velocity", stokesSystem.A.Data.num_rows());
+                        tJSON.put("Solver.DOF.Pressure", stokesSystem.Schur.Data.num_rows());
                         auto t = i * stepSize;
                         tJSON.put("Time", t);
                         tJSON.put("h", h);
