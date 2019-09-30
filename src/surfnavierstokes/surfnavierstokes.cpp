@@ -93,6 +93,9 @@ int main(int argc, char* argv[]) {
             auto numbOfSteps  = inpJSON.get<size_t>("Time.NumbOfSteps");
             auto finalTime    = inpJSON.get<double>("Time.FinalTime");
             auto stepSize     = finalTime / numbOfSteps;
+            auto everyStep = inpJSON.get<int>("Output.EveryStep");
+            int numbOfStepsVTK = ceil(static_cast<double>(everyStep) / everyStep);
+            if (numbOfStepsVTK < 0) numbOfStepsVTK = 0;
             logger.buf << "$\\Delta t$ = " << stepSize << '\n';
             // parse FE types and some other parameters from json file
             auto FE = inpJSON.get<std::string>("SurfNavStokes.FE");
@@ -260,7 +263,6 @@ int main(int argc, char* argv[]) {
         logger.beg("interpolate initial condition");
             InitVector(mg, u_prev, surfNavierStokesData.u_T);
             stokesSystem.w = u_prev;
-            // InitScalar(mg, p_star, surfNavierStokesData.p);
         logger.end();
         logger.beg("assemble");
             MatrixCL Schur_hat;
@@ -302,7 +304,9 @@ int main(int argc, char* argv[]) {
                 expMat(C_n, "PressureNormalStab", "C_n");
                 expMat(stokesSystem.LB.Data, "VelocityScalarLaplaceBeltrami", "LB");
                 expMat(stokesSystem.LB_stab.Data, "VelocityScalarLaplaceBeltramiNormalStab", "LB_stab");
-                logger.buf << outJSON;
+                stokesSystem.LB.assemble = false;
+                stokesSystem.LB_stab.assemble = false;
+            logger.buf << outJSON;
                 logger.log();
             logger.end();
         }
@@ -384,7 +388,7 @@ int main(int argc, char* argv[]) {
                 C.LinComb(0., stokesSystem.Schur.Data, 0., stokesSystem.Schur.Data);
             double Pe; // peclet number
             VTKOutCL* vtkWriter = nullptr;
-            vtkWriter = new VTKOutCL(mg, "DROPS data", (int)inpJSON.get<double>("Time.NumbOfSteps") / inpJSON.get<int>("Output.EveryStep"), dirName + "/vtk", testName + "_", testName, 0);
+            vtkWriter = new VTKOutCL(mg, "DROPS data", numbOfStepsVTK, dirName + "/vtk", testName + "_", testName, 0);
             vtkWriter->Register(make_VTKScalar(lset.GetSolution(), "level-set"));
             vtkWriter->Register(make_VTKIfaceVector(mg, u_star, "u_*", velFE, vbnd));
             vtkWriter->Register(make_VTKIfaceVector(mg, stokesSystem.fRHS, "f_T", velFE, vbnd));
@@ -446,21 +450,48 @@ int main(int argc, char* argv[]) {
                         stats << tJSON;
                         logger.buf << tJSON;
                         logger.log();
+                        if (everyStep > 0 && (i-1) % everyStep == 0) {
+                            logger.beg("write vtk");
+                                vtkWriter->Write(t);
+                            logger.end();
+                        }
                     };
                     exportStats(1);
-                    if (inpJSON.get<int>("Output.EveryStep") > 0) {
-                        logger.beg("write vtk");
-                            vtkWriter->Write(1);
-                        logger.end();
-                    }
                 logger.end();
             logger.end();
+            // no need to re-assemble these matrices:
+            stokesSystem.A.assemble = false;
+            stokesSystem.A_stab.assemble = false;
+            stokesSystem.B.assemble = false;
+            stokesSystem.M.assemble = false;
+            stokesSystem.S.assemble = false;
+            stokesSystem.Schur.assemble = false;
+            stokesSystem.Schur_full_stab.assemble = false;
+            stokesSystem.Schur_normal_stab.assemble = false;
             for (size_t i = 2; i <= numbOfSteps; ++i) {
                 std::stringstream header;
                 header << "t = t_" << i << " (" << (100. * i) / numbOfSteps << "%)";
                 logger.beg(header.str());
-                    param.input.t = i * stepSize;
-                    // ...
+                    logger.beg("assemble");
+                        u_prev_prev = u_prev;
+                        u_prev = u;
+                        param.input.t = i * stepSize;
+                        stokesSystem.w.Data = 2. * u_prev.Data - u_prev_prev.Data;
+                        SetupStokesIF_P2P1(mg, lset, &stokesSystem, &param);
+                        stokesSystem.fRHS.Data += (2. / stepSize) * (stokesSystem.M.Data * u_prev.Data) - (.5 / stepSize) * (stokesSystem.M.Data * u_prev_prev.Data);
+                        stokesSystem.gRHS.Data -= (dot(stokesSystem.gRHS.Data, I_p) / dot(I_p, I_p)) * I_p;
+                        A_dyn.LinComb(1.5 / stepSize, stokesSystem.M.Data, 1., stokesSystem.N.Data, nu, stokesSystem.A.Data, tau_u, stokesSystem.S.Data, rho_u, stokesSystem.A_stab.Data);
+                    logger.end();
+                    logger.beg("linear solve");
+                        stokesSolver = symStokesSolver;
+                        if (windRises(nu, stokesSystem.w, Pe)) stokesSolver = nonsymStokesSolver;
+                        logger.buf << "Pe = " << Pe << ", using " << (stokesSolver == symStokesSolver ? "" : "non-") << "symmetric solver";
+                        logger.log();
+                        stokesSolver->Solve(A_dyn, stokesSystem.B.Data, C, u.Data, p.Data, stokesSystem.fRHS.Data, stokesSystem.gRHS.Data, u.RowIdx->GetEx(), p.RowIdx->GetEx());
+                    logger.end();
+                    logger.beg("output");
+                        exportStats(i);
+                    logger.end();
                 logger.end();
             }
         logger.end();
