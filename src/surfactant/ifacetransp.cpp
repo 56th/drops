@@ -347,7 +347,7 @@ private:
             qP_row[3], // ith element is ith row (= column) of P
             qF, // rhs
             qWind; // wind field
-    GridFunctionCL<Point3DCL> qLsGrad, qP1grad[4], qSurfP1grad[4], qP2grad[10], qSurfP2grad[10];
+    GridFunctionCL<Point3DCL> qLsGrad, qP1Grad[4], qSurfP1Grad[4], qP2Grad[10], qSurfP2Grad[10];
     GridFunctionCL<> qG, qP1Hat[4], qP2Hat[10], qLsGradNorm, qconvP1[4], qdivP1, qP2NormalComp[3], qExactOrP2NormalComp[3], qvProjP1_comp[3], qvP1_comp[3];
     GridFunctionCL<SMatrixCL<3,3>> qP; // projection
     GridFunctionCL<SMatrixCL<3,3>> qP2E[30]; // surface rate-of-strain stress tensor, qP1E[i] = $E_s(\phi_i)$, $\phi_i$ = ith vector (velocity) shape func
@@ -541,15 +541,15 @@ void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& l
     // resize and evaluate P2 basis functions
     for(int j=0; j<10 ;++j) {
         resize_and_evaluate_on_vertexes(P2Hat[j], q2Ddomain, qP2Hat[j]);
-        resize_and_evaluate_on_vertexes(P2Grad[j], q2Ddomain, qP2grad[j]);
-        qSurfP2grad[j] = qP2grad[j] - dot(qP2grad[j], qExactOrP2Normal)*qExactOrP2Normal;
+        resize_and_evaluate_on_vertexes(P2Grad[j], q2Ddomain, qP2Grad[j]);
+        qSurfP2Grad[j] = qP2Grad[j] - dot(qP2Grad[j], qExactOrP2Normal)*qExactOrP2Normal;
     }
     // Resize and evaluate of all the 4 P1 Gradient Functions and apply pointwise projections   (P grad \xi_j  for j=1..4)
     for(int j=0; j<4 ;++j) {
         resize_and_evaluate_on_vertexes(P1Hat[j], q2Ddomain, qP1Hat[j]);
-        qP1grad[j].resize(q2Ddomain.vertex_size());
-        qP1grad[j] = P1Grad[j];
-        qSurfP1grad[j] = qP1grad[j] - dot(qP1grad[j], qExactOrP2Normal)*qExactOrP2Normal;
+        qP1Grad[j].resize(q2Ddomain.vertex_size());
+        qP1Grad[j] = P1Grad[j];
+        qSurfP1Grad[j] = qP1Grad[j] - dot(qP1Grad[j], qExactOrP2Normal)*qExactOrP2Normal;
     }
     // apply pointwise projection to the 3 std basis vectors e_k
     if (param->input.formulation == LocalStokesParam::Formulation::inconsistent)
@@ -572,7 +572,7 @@ void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& l
         return res;
     };
     for (size_t vecShapeIndex = 0; vecShapeIndex < 30; ++vecShapeIndex)
-        qP2E[vecShapeIndex] = qP * sym_part(qVectGrad(vecShapeIndex, qP2grad)) * qP;
+        qP2E[vecShapeIndex] = qP * sym_part(qVectGrad(vecShapeIndex, qP2Grad)) * qP;
 }
 
 template<typename Interp>
@@ -598,7 +598,7 @@ void LocalStokesCL::setupA_P2_consistent(double A_P2[30][30]) {
 void LocalStokesCL::setupLB_P2(double LB_P2[10][10]) {
     for (int i = 0; i < 10; ++i)
         for (int j = i; j < 10; ++j) {
-            LB_P2[i][j] = quad_2D(dot(qSurfP2grad[j], qSurfP2grad[i]), q2Ddomain);
+            LB_P2[i][j] = quad_2D(dot(qSurfP2Grad[j], qSurfP2Grad[i]), q2Ddomain);
             LB_P2[j][i] = LB_P2[i][j];
         }
 }
@@ -624,7 +624,7 @@ void LocalStokesCL::setupA_P1 (double A_P1[12][12]) {
                 Point3DCL e_k= DROPS::std_basis<3>(k+1);
                 for (int l=0; l<3; ++l) {
                     Point3DCL e_l= DROPS::std_basis<3>(l+1);
-                    A_P1[3 * i + k][3 * j + l] = quad_2D(dot(e_k, qSurfP1grad[j]) * dot(e_l, qSurfP1grad[i]) + dot(qSurfP1grad[i], qSurfP1grad[j]) * dot(qP_row[k], qP_row[l]), q2Ddomain);
+                    A_P1[3 * i + k][3 * j + l] = quad_2D(dot(e_k, qSurfP1Grad[j]) * dot(e_l, qSurfP1Grad[i]) + dot(qSurfP1Grad[i], qSurfP1Grad[j]) * dot(qP_row[k], qP_row[l]), q2Ddomain);
                 }
             }
         }
@@ -640,7 +640,7 @@ void LocalStokesCL::setupB_P1P2 (double B_P1P2[4][30])
     // Do all combinations for (i,j) i,j=4 x 30 and corresponding quadrature
     for (int k=0; k<3; ++k) {
         for (int i=0; i < 4; ++i) {
-            ExtractComponent(qSurfP1grad[i], qsurfgrad_k, k);
+            ExtractComponent(qSurfP1Grad[i], qsurfgrad_k, k);
             for (int j=0; j<10; ++j) {
 //                if (!fullGrad) {
                     B_P1P2[i][3*j+k]= quad_2D(qsurfgrad_k*qP2Hat[j], q2Ddomain);
@@ -661,7 +661,7 @@ void LocalStokesCL::setupB_P2P2 (double B_P2P2[10][30])
     // Do all combinations for (i,j) i,j=4 x 30 and corresponding quadrature
     for (int k=0; k<3; ++k) {
         for (int i=0; i < 10; ++i) {
-            ExtractComponent(qSurfP2grad[i], qsurfgrad_k, k);
+            ExtractComponent(qSurfP2Grad[i], qsurfgrad_k, k);
             for (int j=0; j<10; ++j) {
 //                if (!fullGrad) {
                     B_P2P2[i][3*j+k]= quad_2D(qsurfgrad_k*qP2Hat[j], q2Ddomain);
@@ -682,7 +682,7 @@ void LocalStokesCL::setupB_P1P1 (double B_P1P1[4][12])
     // Do all combinations for (i,j) i,j=4 x 30 and corresponding quadrature
     for (int k=0; k<3; ++k) {
         for (int i=0; i < 4; ++i) {
-            ExtractComponent(qSurfP1grad[i], qsurfgrad_k, k);
+            ExtractComponent(qSurfP1Grad[i], qsurfgrad_k, k);
             for (int j=0; j<4; ++j) {
 //                if (!fullGrad) {
                     B_P1P1[i][3*j+k]= quad_2D(qsurfgrad_k*qP1Hat[j], q2Ddomain);
@@ -701,7 +701,7 @@ void LocalStokesCL::setupB_P2P1 (double B_P2P1[10][12]) {
     // Do all combinations for (i,j) i,j=4 x 30 and corresponding quadrature
     for (int k=0; k<3; ++k) {
         for (int i=0; i < 10; ++i) {
-            ExtractComponent(qSurfP2grad[i], qsurfgrad_k, k);
+            ExtractComponent(qSurfP2Grad[i], qsurfgrad_k, k);
             for (int j=0; j<4; ++j)
                 B_P2P1[i][3*j+k]= quad_2D(qsurfgrad_k*qP1Hat[j], q2Ddomain);
         }
@@ -743,11 +743,10 @@ void LocalStokesCL::setupN_P2(double N_P2[30][30]) {
     for (size_t i = 0; i < 30; ++i) {
         auto is = i / 3; // scalar shape index
         auto in = i - 3 * is; // nonzero vect component
-        auto e_in = DROPS::std_basis<3>(in + 1);
         for (size_t j = 0; j < 30; ++j) {
             auto js = j / 3; // scalar shape index
             auto jn = j - 3 * js; // nonzero vect component
-            N_P2[i][j] = quad_2D(dot(qWind, qP2grad[js]) * dot(e_in, qP_row[jn]) * qP2Hat[is], q2Ddomain);
+            N_P2[i][j] = quad_2D(dot(qWind, qP2Grad[js]) * take(qP, jn, in) * qP2Hat[is], q2Ddomain);
         }
     }
 }
@@ -943,7 +942,7 @@ void LocalStokesCL::setupNT_P1 (double NT_P1[12][12])
                 	Point3DCL e_l= DROPS::std_basis<3>(l+1);
 
                 	NT_P1[3*i+k][3*j+l] = quad_2D(qP1Hat[j]*
-                			dot(e_l, qSurfP1grad[i])
+                			dot(e_l, qSurfP1Grad[i])
 							*qvProjP1_comp[k]
 										   , q2Ddomain);
                 }
@@ -1699,8 +1698,8 @@ void StokesIFAccumulator_P2P1CL::finalize_accumulation() {
 
 void StokesIFAccumulator_P2P1CL::visit(const TetraCL& tet) {
     ls_loc.assign(tet, lset, BndDataCL<>());
-    w_loc.assign(tet, system->w, BndDataCL<Point3DCL>());
     if (isInCutMesh(ls_loc)) {
+        w_loc.assign(tet, system->w, BndDataCL<Point3DCL>());
         local_setup(tet);
         update_global_system();
     }
@@ -3099,7 +3098,7 @@ class LocalCahnHilliardCL
     Point3DCL P1Grad[4];
     LocalP1CL<Point3DCL>  P2GradRef[10], P2Grad[10];
     GridFunctionCL<Point3DCL> qnormal;
-    GridFunctionCL<Point3DCL> qSurfP1grad[4];
+    GridFunctionCL<Point3DCL> qSurfP1Grad[4];
     GridFunctionCL<Point3DCL> q3DsurfP1grad[4];
 
     GridFunctionCL<> mobility2D,well_potential_second_derivative[4], qP1Hat[4], qnormal_comp[3];
@@ -3235,9 +3234,9 @@ void LocalCahnHilliardCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2C
 
     for(int j=0; j<4 ;++j) {
         resize_and_evaluate_on_vertexes(P1Hat[j], q2Ddomain, qP1Hat[j]);
-        qSurfP1grad[j].resize(q2Ddomain.vertex_size());
-        qSurfP1grad[j]= P1Grad[j];
-        qSurfP1grad[j]-= dot(qSurfP1grad[j], qnormal)*qnormal;
+        qSurfP1Grad[j].resize(q2Ddomain.vertex_size());
+        qSurfP1Grad[j]= P1Grad[j];
+        qSurfP1Grad[j]-= dot(qSurfP1Grad[j], qnormal)*qnormal;
     }
 
     for(int j=0; j<4 ;++j) {
@@ -3330,7 +3329,7 @@ void LocalCahnHilliardCL::setupL_P1 (double L_P1[4][4])
     // Do all combinations for (i,j) i,j=4 x 4 and corresponding quadrature
     for (int i=0; i<4; ++i) {
         for (int j=0; j<4; ++j) {
-             L_P1[i][j]= quad_2D(dot(qSurfP1grad[i], qSurfP1grad[j]), q2Ddomain);
+             L_P1[i][j]= quad_2D(dot(qSurfP1Grad[i], qSurfP1Grad[j]), q2Ddomain);
         }
     }
 }
@@ -3340,7 +3339,7 @@ void LocalCahnHilliardCL::setupLM_P1 (double LM_P1[4][4])
     // Do all combinations for (i,j) i,j=4 x 4 and corresponding quadrature
     for (int i=0; i<4; ++i) {
         for (int j=0; j<4; ++j) {
-             LM_P1[i][j]= quad_2D(mobility2D*dot(qSurfP1grad[i], qSurfP1grad[j]), q2Ddomain);
+             LM_P1[i][j]= quad_2D(mobility2D*dot(qSurfP1Grad[i], qSurfP1Grad[j]), q2Ddomain);
         }
     }
 }

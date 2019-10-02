@@ -382,6 +382,14 @@ contract(GridFunctionCL<SMatrixCL<3,3>> const & A, GridFunctionCL<SMatrixCL<3,3>
     return res;
 }
 
+inline GridFunctionCL<double>
+take(GridFunctionCL<SMatrixCL<3,3>> const & A, size_t i, size_t j) {
+    GridFunctionCL<double> res(0., A.size());
+    for (size_t n = 0; n < A.size(); ++n)
+        res[n] = A[n](i, j);
+    return res;
+}
+
 //inline GridFunctionCL<SMatrixCL<3,3>>
 //operator-(GridFunctionCL<SMatrixCL<3,3>> const & A, GridFunctionCL<SMatrixCL<3,3>> const & B) {
 //    auto res = A;
