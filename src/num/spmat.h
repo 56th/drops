@@ -49,8 +49,10 @@
 #endif
 
 // for .mat binary output
-#include "MatlabDataArray.hpp"
-#include "MatlabEngine.hpp"
+#ifdef _MATLAB
+    #include "MatlabDataArray.hpp"
+    #include "MatlabEngine.hpp"
+#endif
 
 namespace DROPS
 {
@@ -954,64 +956,35 @@ SparseMatBaseCL<T>& SparseMatBaseCL<T>::exportMTX(std::string const & path) {
 // (2) https://www.mathworks.com/help/matlab/matlab_external/pass-sparse-arrays-to-matlab-1.html
 template <typename T>
 SparseMatBaseCL<T>& SparseMatBaseCL<T>::exportMAT(std::string const & path) {
+    #ifdef _MATLAB
         std::unique_ptr<matlab::engine::MATLABEngine> matlabPtr = matlab::engine::startMATLAB();
-        size_t nnz = num_nonzeros();
-        std::vector<double> data;
-        std::vector<double/* https://www.mathworks.com/matlabcentral/answers/311752-sparse-function-cannot-get-integer-arrays-for-the-indices */> rows, cols;
-        data.reserve(nnz);
-        rows.reserve(nnz);
-        cols.reserve(nnz);
-        for (size_t row = 0; row < num_rows(); ++row)
-            for (size_t col = row_beg(row), rowend = row_beg(row + 1); col < rowend; ++col) {
-                rows.push_back(row + 1);
-                cols.push_back(col_ind(col) + 1);
-                data.push_back(val(col));
-            }
-        matlab::data::ArrayFactory factory;
-        auto i = factory.createArray({ 1, nnz }, rows.begin(), rows.end());
-        auto j = factory.createArray({ 1, nnz }, cols.begin(), cols.end());
-        auto v = factory.createArray({ 1, nnz }, data.begin(), data.end());
-        matlabPtr->setVariable(u"i", std::move(i));
-        matlabPtr->setVariable(u"j", std::move(j));
-        matlabPtr->setVariable(u"v", std::move(v));
-        std::stringstream stream;
-        stream << "tic; A = sparse(i, j, v, " << num_rows() << ", " << num_cols() << ", " << nnz << "); save('" << path << "', 'A'); toc";
-        auto statement = matlab::engine::convertUTF8StringToUTF16String(stream.str());
-        matlabPtr->eval(statement);
-        return *this;
-//    std::unique_ptr<matlab::engine::MATLABEngine> matlabPtr = matlab::engine::startMATLAB();
-//    // define the data for the sparse array
-//    size_t nnz = num_nonzeros();
-//    std::vector<double> data;
-//    std::vector<size_t> rows, cols;
-//    data.reserve(nnz);
-//    rows.reserve(nnz);
-//    cols.reserve(nnz);
-//    for (size_t row = 0; row < num_rows(); ++row)
-//        for (size_t col = row_beg(row), rowend = row_beg(row + 1); col < rowend; ++col) {
-//            rows.push_back(row);
-//            cols.push_back(col_ind(col));
-//            data.push_back(val(col));
-//        }
-//    // create buffers for the data
-//    matlab::data::ArrayFactory factory;
-//    auto data_p = factory.createBuffer<double>(nnz);
-//    auto rows_p = factory.createBuffer<size_t>(nnz);
-//    auto cols_p = factory.createBuffer<size_t>(nnz);
-//    // write data into the buffers
-//    double* dataPtr = data_p.get();
-//    size_t* rowsPtr = rows_p.get();
-//    size_t* colsPtr = cols_p.get();
-//    std::for_each(data.begin(), data.end(), [&](const double& e) { *(dataPtr++) = e; });
-//    std::for_each(rows.begin(), rows.end(), [&](const size_t& e) { *(rowsPtr++) = e; });
-//    std::for_each(cols.begin(), cols.end(), [&](const size_t& e) { *(colsPtr++) = e; });
-//    // use the buffers to create the sparse array
-//    matlab::data::SparseArray<double> arr = factory.createSparseArray<double>({ num_rows(), num_cols() }, nnz, std::move(data_p), std::move(rows_p), std::move(cols_p));
-//    // export .mat
-//    matlabPtr->setVariable(u"res", std::move(arr));
-//    auto statement = matlab::engine::convertUTF8StringToUTF16String("save('" + path + "', 'res');");
-//    matlabPtr->eval(statement);
-//    return *this;
+            size_t nnz = num_nonzeros();
+            std::vector<double> data;
+            std::vector<double/* https://www.mathworks.com/matlabcentral/answers/311752-sparse-function-cannot-get-integer-arrays-for-the-indices */> rows, cols;
+            data.reserve(nnz);
+            rows.reserve(nnz);
+            cols.reserve(nnz);
+            for (size_t row = 0; row < num_rows(); ++row)
+                for (size_t col = row_beg(row), rowend = row_beg(row + 1); col < rowend; ++col) {
+                    rows.push_back(row + 1);
+                    cols.push_back(col_ind(col) + 1);
+                    data.push_back(val(col));
+                }
+            matlab::data::ArrayFactory factory;
+            auto i = factory.createArray({ 1, nnz }, rows.begin(), rows.end());
+            auto j = factory.createArray({ 1, nnz }, cols.begin(), cols.end());
+            auto v = factory.createArray({ 1, nnz }, data.begin(), data.end());
+            matlabPtr->setVariable(u"i", std::move(i));
+            matlabPtr->setVariable(u"j", std::move(j));
+            matlabPtr->setVariable(u"v", std::move(v));
+            std::stringstream stream;
+            stream << "tic; A = sparse(i, j, v, " << num_rows() << ", " << num_cols() << ", " << nnz << "); save('" << path << "', 'A'); toc";
+            auto statement = matlab::engine::convertUTF8StringToUTF16String(stream.str());
+            matlabPtr->eval(statement);
+            return *this;
+    #else
+        throw std::invalid_argument("DROPS is compiled w/o matlab");
+    #endif
 }
 
 
