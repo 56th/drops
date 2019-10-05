@@ -4,20 +4,22 @@ exec_ser(${HOME} geom-boundary geom-builder geom-simplex geom-multigrid geom-def
 
 # logger
 add_library(${HOME}-logger STATIC ${LOGGER_PATH}/SingletonLogger.cpp)
+target_link_libraries(${HOME} ${HOME}-logger)
 
 # matlab for sparse mtx .mat binary output
-add_library(${HOME}-matlab1 SHARED IMPORTED)
-set_target_properties(${HOME}-matlab1 PROPERTIES
-    IMPORTED_LOCATION "${Matlab_ROOT_DIR}/extern/bin/glnxa64/libMatlabDataArray.so"
-    INTERFACE_INCLUDE_DIRECTORIES "${Matlab_ROOT_DIR}/extern/include"
-)
-add_library(${HOME}-matlab2 SHARED IMPORTED)
-set_target_properties(${HOME}-matlab2 PROPERTIES
-    IMPORTED_LOCATION "${Matlab_ROOT_DIR}/extern/bin/glnxa64/libMatlabEngine.so"
-    INTERFACE_INCLUDE_DIRECTORIES "${Matlab_ROOT_DIR}/extern/include"
-)
-
-target_link_libraries(${HOME} -lpthread ${HOME}-matlab1 ${HOME}-matlab2 ${HOME}-logger)
+if(Matlab_FOUND)
+    add_library(${HOME}-matlab1 SHARED IMPORTED)
+    set_target_properties(${HOME}-matlab1 PROPERTIES
+        IMPORTED_LOCATION "${Matlab_ROOT_DIR}/extern/bin/glnxa64/libMatlabDataArray.so"
+        INTERFACE_INCLUDE_DIRECTORIES "${Matlab_ROOT_DIR}/extern/include"
+    )
+    add_library(${HOME}-matlab2 SHARED IMPORTED)
+    set_target_properties(${HOME}-matlab2 PROPERTIES
+        IMPORTED_LOCATION "${Matlab_ROOT_DIR}/extern/bin/glnxa64/libMatlabEngine.so"
+        INTERFACE_INCLUDE_DIRECTORIES "${Matlab_ROOT_DIR}/extern/include"
+    )
+    target_link_libraries(${HOME} -lpthread ${HOME}-matlab1 ${HOME}-matlab2)
+endif()
 
 if(NOT MPI)
     add_dependencies(surfactant misc-scalarFunctions misc-vectorFunctions)
