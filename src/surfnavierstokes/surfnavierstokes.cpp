@@ -454,6 +454,11 @@ int main(int argc, char* argv[]) {
                         tJSON.put("MeshDepParams.rho_p", rho_p);
                         tJSON.put("MeshDepParams.rho_u", rho_u);
                         tJSON.put("MeshDepParams.tau_u", tau_u);
+                        auto velL2 = sqrt(dot(u.Data, stokesSystem.M.Data * u.Data));
+                        auto preL2 = sqrt(dot(p.Data, stokesSystem.Schur.Data * p.Data));
+                        tJSON.put("Integral.PressureL2", preL2);
+                        tJSON.put("Integral.VelocityL2", velL2);
+                        tJSON.put("Integral.KineticEnergy", .5 * velL2 * velL2);
                         if (surfNavierStokesData.exactSoln) {
                             InitVector(mg, u_star, surfNavierStokesData.u_T, t);
                             InitScalar(mg, p_star, surfNavierStokesData.p, t);
@@ -462,23 +467,18 @@ int main(int argc, char* argv[]) {
                             tJSON.put("Solver.ResidualNorm.ExactSoln.Pressure", std::get<1>(res));
                             tJSON.put("Solver.ResidualNorm.ExactSoln.Full", std::get<2>(res));
                             VectorCL u_star_minus_u = u_star.Data - u.Data, p_star_minus_p = p_star.Data - p.Data;
-                            auto velL2 = sqrt(dot(u.Data, stokesSystem.M.Data * u.Data));
                             auto velL2err = dot(u_star_minus_u, stokesSystem.M.Data * u_star_minus_u);
                             auto velNormalL2 = dot(u.Data, stokesSystem.S.Data * u.Data);
                             auto velTangenL2 = sqrt(velL2err - velNormalL2);
                             velL2err = sqrt(velL2err);
                             velNormalL2 = sqrt(velNormalL2);
                             auto velH1err = sqrt(dot(u_star_minus_u, stokesSystem.A.Data * u_star_minus_u));
-                            auto preL2 = sqrt(dot(p.Data, stokesSystem.Schur.Data * p.Data));
                             auto preL2err = sqrt(dot(p_star_minus_p, stokesSystem.Schur.Data * p_star_minus_p));
                             tJSON.put("Integral.Error.VelocityL2", velL2err);
                             tJSON.put("Integral.Error.VelocityTangentialL2", velTangenL2);
                             tJSON.put("Integral.Error.VelocityNormalL2", velNormalL2);
                             tJSON.put("Integral.Error.VelocityH1", velH1err);
                             tJSON.put("Integral.Error.PressureL2", preL2err);
-                            tJSON.put("Integral.PressureL2", preL2);
-                            tJSON.put("Integral.VelocityL2", velL2);
-                            tJSON.put("Integral.KineticEnergy", .5 * velL2 * velL2);
                             // tJSON.put("Temp.wNw", dot(u_prev.Data, stokesSystem.N.Data * u_prev.Data));
                         }
                         stats << tJSON;

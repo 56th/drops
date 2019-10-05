@@ -6,6 +6,7 @@
 #define SURF_NAVIER_STOKES_DATA_HPP
 
 #include "../num/discretize.h"
+#include "surfnavierstokes_funcs.h"
 
 namespace DROPS {
 
@@ -13,16 +14,40 @@ namespace DROPS {
         bool exactSoln;
         instat_vector_fun_ptr u_T, f_T, w_T = nullptr; // w_T = nullptr for the Navier-Stokes case
         instat_scalar_fun_ptr u_N, p, m_g; // m_g is "-g"
-        struct {
+        struct Surface {
             instat_scalar_fun_ptr phi;
             instat_vector_fun_ptr n;
             instat_matrix_fun_ptr H;
-        } surface;
+        };
+        Surface surface;
         std::string description;
     };
 
     SurfNavierStokesData SurfNavierStokesDataFactory(std::string const & test, double nu) {
         SurfNavierStokesData data;
+        SurfNavierStokesData::Surface sphere;
+        sphere.phi = [](Point3DCL const & p, double) {
+            return pow(p[0], 2.) + pow(p[1], 2.) + pow(p[2], 2.) - 1.;
+        };
+        sphere.n = [](Point3DCL const & p, double) {
+            auto den = std::sqrt(p[0]*p[0]+p[1]*p[1]+p[2]*p[2]);
+            Point3DCL v(p[0]/den, p[1]/den, p[2]/den);
+            return v;
+        };
+        sphere.H = [](Point3DCL const & p, double) {
+            SMatrixCL<3, 3> res;
+            auto den = pow(p[0],2) + pow(p[1],2) + pow(p[2],2);
+            res(0, 0) = (pow(p[1],2) + pow(p[2],2)) / den;
+            res(0, 1) = (-1.*p[0]*p[1]) / den;
+            res(0, 2) = (-1.*p[0]*p[2]) / den;
+            res(1, 0) = res(0, 1);
+            res(1, 1) = (pow(p[0],2) + pow(p[2],2)) / den;
+            res(1, 2) = (-1.*p[1]*p[2]) / den;
+            res(2, 0) = res(0, 2);
+            res(2, 1) = res(1, 2);
+            res(2, 2) = (pow(p[0],2) + pow(p[1],2)) / den;
+            return res;
+        };
         if (test == "StokesSphereSimple" || test == "OseenSphereSimple") {
             data.exactSoln = true;
             data.description =
@@ -54,28 +79,7 @@ namespace DROPS {
             data.m_g = [](Point3DCL const & p, double) {
                 return (2.*p[0])/(pow(p[0],2) + pow(p[1],2) + pow(p[2],2));
             };
-            data.surface.phi = [](Point3DCL const & p, double) {
-                return pow(p[0], 2.) + pow(p[1], 2.) + pow(p[2], 2.) - 1.;
-            };
-            data.surface.n = [](Point3DCL const & p, double) {
-                auto den = std::sqrt(p[0]*p[0]+p[1]*p[1]+p[2]*p[2]);
-                Point3DCL v(p[0]/den, p[1]/den, p[2]/den);
-                return v;
-            };
-            data.surface.H = [](Point3DCL const & p, double) {
-                SMatrixCL<3, 3> res;
-                auto den = pow(p[0],2) + pow(p[1],2) + pow(p[2],2);
-                res(0, 0) = (pow(p[1],2) + pow(p[2],2)) / den;
-                res(0, 1) = (-1.*p[0]*p[1]) / den;
-                res(0, 2) = (-1.*p[0]*p[2]) / den;
-                res(1, 0) = res(0, 1);
-                res(1, 1) = (pow(p[0],2) + pow(p[2],2)) / den;
-                res(1, 2) = (-1.*p[1]*p[2]) / den;
-                res(2, 0) = res(0, 2);
-                res(2, 1) = res(1, 2);
-                res(2, 2) = (pow(p[0],2) + pow(p[1],2)) / den;
-                return res;
-            };
+            data.surface = sphere;
             if (test == "OseenSphereSimple") {
                 data.description += "wind field is the same as soln\n";
                 data.w_T = data.u_T;
@@ -119,28 +123,7 @@ namespace DROPS {
             data.m_g = [](Point3DCL const & p, double) {
                 return (-1.*(4.*p[0]*pow(p[2],2) - 3.*pow(p[1],2)*std::sqrt(pow(p[0],2) + pow(p[1],2) + pow(p[2],2)) - 3.*p[0]*p[2]*std::sqrt(pow(p[0],2) + pow(p[1],2) + pow(p[2],2)) + pow(pow(p[0],2) + pow(p[1],2) + pow(p[2],2),1.5)))/pow(pow(p[0],2) + pow(p[1],2) + pow(p[2],2),2);
             };
-            data.surface.phi = [](Point3DCL const & p, double) {
-                return pow(p[0], 2.) + pow(p[1], 2.) + pow(p[2], 2.) - 1.;
-            };
-            data.surface.n = [](Point3DCL const & p, double) {
-                auto den = std::sqrt(p[0]*p[0]+p[1]*p[1]+p[2]*p[2]);
-                Point3DCL v(p[0]/den, p[1]/den, p[2]/den);
-                return v;
-            };
-            data.surface.H = [](Point3DCL const & p, double) {
-                SMatrixCL<3, 3> res;
-                auto den = pow(p[0],2) + pow(p[1],2) + pow(p[2],2);
-                res(0, 0) = (pow(p[1],2) + pow(p[2],2)) / den;
-                res(0, 1) = (-1.*p[0]*p[1]) / den;
-                res(0, 2) = (-1.*p[0]*p[2]) / den;
-                res(1, 0) = res(0, 1);
-                res(1, 1) = (pow(p[0],2) + pow(p[2],2)) / den;
-                res(1, 2) = (-1.*p[1]*p[2]) / den;
-                res(2, 0) = res(0, 2);
-                res(2, 1) = res(1, 2);
-                res(2, 2) = (pow(p[0],2) + pow(p[1],2)) / den;
-                return res;
-            };
+            data.surface = sphere;
             if (test == "OseenSphere") {
                 data.description += "wind field is the same as soln\n";
                 data.w_T = data.u_T;
@@ -152,6 +135,25 @@ namespace DROPS {
                     return v;
                 };
             }
+        }
+        else if (test == "KelvinHelmholtzSphere") {
+            data.exactSoln = false;
+            data.description =
+                    "phi = x^2 + y^2 + z^2 - 1, u_0 = K-H, p = 0\n";
+            data.u_T = Test_A_plus_M_vSolVectorFun18;
+            data.u_N = [](Point3DCL const &, double) {
+                return 0.;
+            };
+            data.p = [](Point3DCL const &, double) {
+                return 0.;
+            };
+            data.f_T = [=](Point3DCL const & p, double) {
+                return Point3DCL(0., 0., 0.);
+            };
+            data.m_g = [](Point3DCL const & p, double) {
+                return 0.;
+            };
+            data.surface = sphere;
         }
         else throw std::invalid_argument("test '" + test + "' is not defined");
         data.description += data.exactSoln ? "exact solution is available and the errors will be computed\n" : "exact solution is NOT available and the errors will NOT be computed\n";

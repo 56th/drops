@@ -27,8 +27,8 @@
     },
 
     "SurfNavStokes": {
-      "nu":                    1.0,
-      "TestName":              "StokesSphereSimple",
+      "nu":                    1e-4,
+      "TestName":              "KelvinHelmholtzSphere",
       "FE":                    "P2P1",
       "stab":                  "normal",
       "normal_penalty_pow":    -2,
@@ -81,7 +81,7 @@
     "Time": {
         "Read":         0,
         "Write":        "yes",
-        "NumbOfSteps":  5,
+        "NumbOfSteps":  10,
         "FinalTime":    1.0
     },
 
