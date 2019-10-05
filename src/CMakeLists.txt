@@ -11,14 +11,24 @@ include(CMakeSettings.txt)
 #tell cmake to always include the home dir
 include_directories(${CMAKE_SOURCE_DIR})
 
+# trilinos
+find_package(Trilinos PATHS ${TRILINOS_PATH}/lib/cmake/Trilinos ${TRILINOS_PATH})
+if(Trilinos_FOUND)
+    message(STATUS "Trilinos root is ${Trilinos_DIR}")
+    add_definitions("-D_TRILINOS=1")
+else()
+    message(WARNING "Trilinos not found")
+endif()
+
 # matlab
 # example: https://www.mathworks.com/help/matlab/matlab_external/build-c-engine-programs.html
 find_package(Matlab)
 if (Matlab_FOUND)
-    message(STATUS "### MATLAB root is ${Matlab_ROOT_DIR}")
+    message(STATUS "MATLAB root is ${Matlab_ROOT_DIR}")
     include_directories(${Matlab_ROOT_DIR}/extern/include)
     add_definitions("-D_MATLAB=1")
-#else ()
+else ()
+    message(WARNING "Matlab not found")
 #    set(Matlab_ROOT_DIR /opt/matlab)
 #    message(WARNING "### matlab NOT found; it's root is to ${Matlab_ROOT_DIR}")
 #    include_directories(${Matlab_ROOT_DIR}/extern/include)
