@@ -19,7 +19,7 @@
             "Freq":          0,
             "Width":         0,
             "CoarsestLevel": 0,
-            "FinestLevel":   2,
+            "FinestLevel":   6,
             "SD":            0.1,
             "CurvDiff":      -1,
             "Discontinuous": 0
@@ -27,7 +27,7 @@
     },
 
     "SurfNavStokes": {
-      "nu":                    1e-4,
+      "nu":                    1e-3,
       "TestName":              "KelvinHelmholtzSphere",
       "FE":                    "P2P1",
       "stab":                  "normal",
@@ -81,7 +81,7 @@
     "Time": {
         "Read":         0,
         "Write":        "yes",
-        "NumbOfSteps":  10,
+        "NumbOfSteps":  500,
         "FinalTime":    1.0
     },
 

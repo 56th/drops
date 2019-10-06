@@ -140,7 +140,31 @@ namespace DROPS {
             data.exactSoln = false;
             data.description =
                     "phi = x^2 + y^2 + z^2 - 1, u_0 = K-H, p = 0\n";
-            data.u_T = Test_A_plus_M_vSolVectorFun18;
+//            data.u_T = Test_A_plus_M_vSolVectorFun18;
+//            data.u_T = [=](Point3DCL const & p, double) {
+//                Point3DCL v(0., 0., 0.);
+//                if (p[2] < 0.) return v;
+//                v[0] = -p[1] / norm(p);
+//                v[1] = p[0] / norm(p);
+//                return v;
+//            };
+            auto ang = [](double x, double y) {
+                auto pi = 3.14;
+                if (x > 0 && y >= 0) return std::atan(y/x);
+                if (x > 0 && y < 0)  return std::atan(y/x) + 2. * pi;
+                if (x < 0)           return std::atan(y/x) + pi;
+                return sign(y) * pi / 2.;
+            };
+            auto freq = 10.;
+            auto ampl = .1;
+            data.u_T = [=](Point3DCL const & p, double) {
+                Point3DCL v(0., 0., 0.);
+                auto x = p / norm(p);
+                if (x[2] < ampl * std::sin(freq * ang(x[0], x[1]))) return v;
+                v[0] = -x[1];
+                v[1] = x[0];
+                return v;
+            };
             data.u_N = [](Point3DCL const &, double) {
                 return 0.;
             };
