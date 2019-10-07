@@ -8,6 +8,16 @@ include(CMakeSettings.txt)
 #tell cmake to always include the home dir
 include_directories(${CMAKE_SOURCE_DIR})
 
+# vtk
+find_package(VTK PATHS ${VTK_DIR})
+if(VTK_FOUND)
+    message(STATUS "VTK version is ${VTK_MAJOR_VERSION}.${VTK_MINOR_VERSION}")
+    include_directories(${VTK_INCLUDE_DIRS})
+    add_definitions("-D_VTK=1")
+else()
+    message(WARNING "VTK not found")
+endif()
+
 # trilinos
 find_package(Trilinos PATHS ${TRILINOS_PATH}/lib/cmake/Trilinos ${TRILINOS_PATH})
 if(Trilinos_FOUND)
