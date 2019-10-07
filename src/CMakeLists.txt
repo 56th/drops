@@ -82,7 +82,7 @@ else(WIN32)
 
 endif(WIN32)
 
-#compiler specific options
+# compiler specific options
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
     message(STATUS "setting flags for INTEL compiler")
     set(DROPS_CXX_FLAGS_DEBUG "${IPC_CXX_FLAGS_DEBUG}")
@@ -112,13 +112,15 @@ else(NOT DROPS_BUILD_TYPE)
     message(STATUS "BUILD TYPE: ${DROPS_BUILD_TYPE}")
 endif(NOT DROPS_BUILD_TYPE)
 
-#apply build type specific options
+# apply build type specific options
 if(DROPS_BUILD_TYPE STREQUAL "RELEASE")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${DROPS_CXX_FLAGS_RELEASE}")
 elseif(DROPS_BUILD_TYPE STREQUAL "DEBUG")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${DROPS_CXX_FLAGS_DEBUG}")
+elseif(DROPS_BUILD_TYPE STREQUAL "PROFILE")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${DROPS_CXX_FLAGS_DEBUG} -gp")
 endif()
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${DROPS_CXX_FLAGS} -fPIC")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
 
 message(STATUS "CXX_COMPILER:               ${CMAKE_CXX_COMPILER}")
 message(STATUS "GLOBAL COMPILER FLAGS:      ${CMAKE_CXX_FLAGS}")
