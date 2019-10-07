@@ -128,7 +128,7 @@ int main(int argc, char* argv[]) {
                 param.input.formulation = LocalStokesParam::Formulation::inconsistent;
                 logger.buf << "using inconsistent penalty formulation\n";
             }
-            StokesSystem stokesSystem;
+            SurfOseenSystem stokesSystem;
             auto stab = inpJSON.get<std::string>("SurfNavStokes.stab");
             if (!inpJSON.get<bool>("SurfNavStokes.ExportMatrices")) {
                 stokesSystem.Schur_full_stab.assemble   = (stab == "full");
@@ -298,7 +298,7 @@ int main(int argc, char* argv[]) {
                     };
                     if (!setWind(stokesSystem.w)) // Navier-Stokes case
                         stokesSystem.w = u_prev;
-                    SetupStokesIF_P2P1(mg, lset, &stokesSystem, &param);
+        SetupSurfOseen_P2P1(mg, lset, &stokesSystem, &param);
                     logger.buf
                             << "numb of cut tetras is         " << param.output.numbOfCutTetras << '\n'
                             << "stiffness mtx is              " << stokesSystem.A.Data.num_rows() << " * " << stokesSystem.A.Data.num_cols() << '\n'
@@ -512,7 +512,7 @@ int main(int argc, char* argv[]) {
                         param.input.t = i * stepSize;
                         if (!setWind(stokesSystem.w)) // Navier-Stokes case
                             stokesSystem.w.Data = 2. * u_prev.Data - u_prev_prev.Data;
-                        SetupStokesIF_P2P1(mg, lset, &stokesSystem, &param);
+                SetupSurfOseen_P2P1(mg, lset, &stokesSystem, &param);
                         stokesSystem.fRHS.Data += (2. / stepSize) * (stokesSystem.M.Data * u_prev.Data) - (.5 / stepSize) * (stokesSystem.M.Data * u_prev_prev.Data);
                         stokesSystem.gRHS.Data -= (dot(stokesSystem.gRHS.Data, I_p) / dot(I_p, I_p)) * I_p;
                         A_dyn.LinComb(1.5 / stepSize, stokesSystem.M.Data, 1., stokesSystem.N.Data, nu, stokesSystem.A.Data, tau_u, stokesSystem.S.Data, rho_u, stokesSystem.A_stab.Data);

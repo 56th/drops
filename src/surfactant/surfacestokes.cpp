@@ -209,7 +209,8 @@ int main (int argc, char* argv[])
         Schur.SetIdx(&ifaceP1idx, &ifaceP1idx);
         Schur_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
 
-        SetupStokesIF_P2P1(mg, &A, &A_stab, &B, &M, &S, &L, &L_stab, &Schur, &Schur_stab, lset.Phi, lset.GetBndData(), fullgrad);
+        SetupSurfOseen_P2P1(mg, &A, &A_stab, &B, &M, &S, &L, &L_stab, &Schur, &Schur_stab, lset.Phi, lset.GetBndData(),
+                            fullgrad);
 
         Schur_hat.LinComb(1., Schur.Data, rho, Schur_stab.Data);
     } else if( !FE.compare("P1P1")) {

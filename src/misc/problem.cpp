@@ -397,7 +397,7 @@ size_t CreateNumbOnInterfaceP2 (const Uint idx, IdxT& counter, Uint stride,
 //        auto const & lat2 = PrincipalLatticeCL::instance(1);
 //        std::valarray<double> ls_loc2(lat2.vertex_size());
 //        evaluate_on_vertexes(locp2_ls, lat2, Addr(ls_loc2));
-//        if (equal_signs(ls_loc) != equal_signs(ls_loc2)) {
+//        if (equal_signs(ls_loc) != equalSigns(ls_loc2)) {
 //            for (auto const & u : ls_loc)
 //                std::cout << u << ' ';
 //            std::cout << '\n';

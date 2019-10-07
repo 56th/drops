@@ -567,7 +567,8 @@ void TestAllP2MatricesWithP1Matrices(const MultiGridCL& MG, LevelsetP2CL& lset, 
     Schur_P2.SetIdx(&ifaceP1idx, &ifaceP1idx);
     Schur_P2_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
 
-    SetupStokesIF_P2P1(MG, &A_P2, &A_P2_stab, &B_P1P2, &M_P2, &S_P2, &L_P1P2, &L_P1P2_stab, &Schur_P2, &Schur_P2_stab, lset.Phi, lset.GetBndData(), param);
+    SetupSurfOseen_P2P1(MG, &A_P2, &A_P2_stab, &B_P1P2, &M_P2, &S_P2, &L_P1P2, &L_P1P2_stab, &Schur_P2, &Schur_P2_stab,
+                        lset.Phi, lset.GetBndData(), param);
 
     DROPS::VecDescCL a, b, c, a_P2, b_P2;
     a.SetIdx( &ifaceVecP1idx);

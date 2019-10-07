@@ -325,12 +325,9 @@ void SetupInterfaceRhsP1 (const MultiGridCL& mg, VecDescCL* v,
 //     // WriteToFile(v->Data, "rhs.txt", "Rhs");
 // }
 
-  ////////////////////////////////////////////////////////////////////////////
-
 /// SetupStokes
 /// \brief Setup of the local Stokes system on a tetra intersected by the dividing surface.
-
-class LocalStokesCL {
+class LocalSurfOseen {
 private:
     const PrincipalLatticeCL& lat;
     LocalP1CL<> P1Hat[4];
@@ -362,7 +359,7 @@ private:
     SMatrixCL<3, 3>      getLevelsetHess(LocalP2CL<> const &);
 public:
     LocalStokesParam* param;
-    LocalStokesCL(LocalStokesParam* param)
+    LocalSurfOseen(LocalStokesParam* param)
         : param(param)
         , lat(PrincipalLatticeCL::instance(param->input.numbOfVirtualSubEdges))
         , ls_loc(lat.vertex_size()) {
@@ -411,21 +408,21 @@ public:
     void setupM_P1_stab (double M_P1_stab[4][4], double absdet);
 };
 
-LocalP1CL<Point3DCL> LocalStokesCL::getLevelsetGrad(const LocalP2CL<>& ls) {
+LocalP1CL<Point3DCL> LocalSurfOseen::getLevelsetGrad(const LocalP2CL<>& ls) {
     LocalP1CL<Point3DCL> res;
     for(size_t i = 0; i < 10 ; ++i)
         res += ls[i] * P2Grad[i];
     return res;
 }
 
-SMatrixCL<3,3> LocalStokesCL::getLevelsetHess(const LocalP2CL<>& ls) {
+SMatrixCL<3,3> LocalSurfOseen::getLevelsetHess(const LocalP2CL<>& ls) {
     SMatrixCL<3,3> res;
     for(size_t i = 0; i < 10 ; ++i)
         res += ls[i] * P2Hess[i];
     return res;
 }
 
-void LocalStokesCL::calc3DIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const TetraCL& tet) {
+void LocalSurfOseen::calc3DIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const TetraCL& tet) {
     make_SimpleQuadDomain<Quad5DataCL> (q3Ddomain, AllTetraC);
     auto Normals = getLevelsetGrad(ls);
     resize_and_evaluate_on_vertexes (Normals, q3Ddomain, q3Dnormal);
@@ -441,7 +438,7 @@ void LocalStokesCL::calc3DIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>&
     }
 }
 
-void LocalStokesCL::exportPatchInfo(std::string const & path, const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const TetraCL& tet) {
+void LocalSurfOseen::exportPatchInfo(std::string const & path, const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const TetraCL& tet) {
     auto id = tet.GetId().GetIdent();
     std::ofstream
         vertices    (path + "/" + std::to_string(id) + "_vertices.txt"),
@@ -465,7 +462,7 @@ void LocalStokesCL::exportPatchInfo(std::string const & path, const SMatrixCL<3,
         normals << (*n) << '\n';
 }
 
-void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const TetraCL& tet) {
+void LocalSurfOseen::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, const TetraCL& tet) {
     ++param->output.numbOfCutTetras;
     P2DiscCL::GetGradients(P2Grad, P2GradRef, T);
     P2DiscCL::GetHessians(P2Hess, T);
@@ -576,13 +573,13 @@ void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& l
 }
 
 template<typename Interp>
-void LocalStokesCL::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, Interp const & w, const TetraCL& tet) {
+void LocalSurfOseen::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& ls, Interp const & w, const TetraCL& tet) {
     calcIntegrands(T, ls, tet);
     // compute wind
     resize_and_evaluate_on_vertexes(w, q2Ddomain, qWind);
 }
 
-void LocalStokesCL::setupA_P2_consistent(double A_P2[30][30]) {
+void LocalSurfOseen::setupA_P2_consistent(double A_P2[30][30]) {
     for (size_t i = 0; i < 30; ++i) {
         auto is = i / 3; // scalar shape index
         auto in = i - 3 * is; // nonzero vect component
@@ -595,7 +592,7 @@ void LocalStokesCL::setupA_P2_consistent(double A_P2[30][30]) {
     }
 }
 
-void LocalStokesCL::setupLB_P2(double LB_P2[10][10]) {
+void LocalSurfOseen::setupLB_P2(double LB_P2[10][10]) {
     for (int i = 0; i < 10; ++i)
         for (int j = i; j < 10; ++j) {
             LB_P2[i][j] = quad_2D(dot(qSurfP2Grad[j], qSurfP2Grad[i]), q2Ddomain);
@@ -604,7 +601,7 @@ void LocalStokesCL::setupLB_P2(double LB_P2[10][10]) {
 }
 
 // TODO: Den Fall fullGrad testen!
-void LocalStokesCL::setupA_P2(double A_P2[30][30]) {
+void LocalSurfOseen::setupA_P2(double A_P2[30][30]) {
     if (param->input.formulation == LocalStokesParam::Formulation::consistent) {
         setupA_P2_consistent(A_P2);
         return;
@@ -617,7 +614,7 @@ void LocalStokesCL::setupA_P2(double A_P2[30][30]) {
 }
 
 // TODO: Den Fall fullGrad testen!
-void LocalStokesCL::setupA_P1 (double A_P1[12][12]) {
+void LocalSurfOseen::setupA_P1 (double A_P1[12][12]) {
     for (int i=0; i<4; ++i) {
         for (int j=0; j<4; ++j) {
             for (int k=0; k<3; ++k) {
@@ -632,7 +629,7 @@ void LocalStokesCL::setupA_P1 (double A_P1[12][12]) {
 }
 
 // TODO: Den Fall fullGrad testen!
-void LocalStokesCL::setupB_P1P2 (double B_P1P2[4][30])
+void LocalSurfOseen::setupB_P1P2 (double B_P1P2[4][30])
 {
     GridFunctionCL<double> qsurfgrad_k;
     qsurfgrad_k.resize(q2Ddomain.vertex_size());
@@ -653,7 +650,7 @@ void LocalStokesCL::setupB_P1P2 (double B_P1P2[4][30])
 }
 
 // TODO: Den Fall fullGrad testen!
-void LocalStokesCL::setupB_P2P2 (double B_P2P2[10][30])
+void LocalSurfOseen::setupB_P2P2 (double B_P2P2[10][30])
 {
     GridFunctionCL<double> qsurfgrad_k;
     qsurfgrad_k.resize(q2Ddomain.vertex_size());
@@ -674,7 +671,7 @@ void LocalStokesCL::setupB_P2P2 (double B_P2P2[10][30])
 }
 
 // TODO: Den Fall fullGrad testen!
-void LocalStokesCL::setupB_P1P1 (double B_P1P1[4][12])
+void LocalSurfOseen::setupB_P1P1 (double B_P1P1[4][12])
 {
     GridFunctionCL<double> qsurfgrad_k;
     qsurfgrad_k.resize(q2Ddomain.vertex_size());
@@ -695,7 +692,7 @@ void LocalStokesCL::setupB_P1P1 (double B_P1P1[4][12])
 }
 
 // TODO: Den Fall fullGrad testen!
-void LocalStokesCL::setupB_P2P1 (double B_P2P1[10][12]) {
+void LocalSurfOseen::setupB_P2P1 (double B_P2P1[10][12]) {
     GridFunctionCL<double> qsurfgrad_k;
     qsurfgrad_k.resize(q2Ddomain.vertex_size());
     // Do all combinations for (i,j) i,j=4 x 30 and corresponding quadrature
@@ -708,13 +705,13 @@ void LocalStokesCL::setupB_P2P1 (double B_P2P1[10][12]) {
     }
 }
 
-void LocalStokesCL::setupM_P2 (double M_P2[10][10]) {
+void LocalSurfOseen::setupM_P2 (double M_P2[10][10]) {
      for (int i=0; i < 10; ++i)
          for (int j=0; j<10; ++j)
              M_P2[i][j] = quad_2D(qP2Hat[i]*qP2Hat[j], q2Ddomain);
 }
 
-void LocalStokesCL::setupF_P2(double F_P2[30]) {
+void LocalSurfOseen::setupF_P2(double F_P2[30]) {
     for (size_t i = 0; i < 30; ++i) {
         auto is = i / 3; // scalar shape index
         auto in = i - 3 * is; // nonzero vect component
@@ -723,7 +720,7 @@ void LocalStokesCL::setupF_P2(double F_P2[30]) {
     }
 }
 
-void LocalStokesCL::setupM_P2_consistent(double M_P2[30][30]) {
+void LocalSurfOseen::setupM_P2_consistent(double M_P2[30][30]) {
     for (size_t i = 0; i < 30; ++i) {
         auto is = i / 3; // scalar shape index
         auto in = i - 3 * is; // nonzero vect component
@@ -739,7 +736,7 @@ void LocalStokesCL::setupM_P2_consistent(double M_P2[30][30]) {
     }
 }
 
-void LocalStokesCL::setupN_P2(double N_P2[30][30]) {
+void LocalSurfOseen::setupN_P2(double N_P2[30][30]) {
     for (size_t i = 0; i < 30; ++i) {
         auto is = i / 3; // scalar shape index
         auto in = i - 3 * is; // nonzero vect component
@@ -751,19 +748,19 @@ void LocalStokesCL::setupN_P2(double N_P2[30][30]) {
     }
 }
 
-void LocalStokesCL::setupM_P1 (double M_P1[4][4]) {
+void LocalSurfOseen::setupM_P1 (double M_P1[4][4]) {
     // Do all combinations for (i,j) i,j=4 x 4 and corresponding quadrature
     for (int i=0; i<4; ++i)
         for (int j=0; j<4; ++j)
              M_P1[i][j]= quad_2D(qP1Hat[i] * qP1Hat[j], q2Ddomain);
 }
 
-void LocalStokesCL::setupG_P1(double G_P1[4]) {
+void LocalSurfOseen::setupG_P1(double G_P1[4]) {
     for (size_t i = 0; i < 4; ++i)
         G_P1[i] = quad_2D(qG * qP1Hat[i], q2Ddomain);
 }
 
-void LocalStokesCL::setupS_P2 (double S_P2[30][30])
+void LocalSurfOseen::setupS_P2 (double S_P2[30][30])
 {
     // Do all combinations for (i,j) i,j=30 x 30 and corresponding quadrature
     for (int i=0; i < 10; ++i) {
@@ -777,7 +774,7 @@ void LocalStokesCL::setupS_P2 (double S_P2[30][30])
     }
 }
 
-void LocalStokesCL::setupS_P1 (double S_P1[12][12])
+void LocalSurfOseen::setupS_P1 (double S_P1[12][12])
 {
     // Do all combinations for (i,j) i,j=30 x 30 and corresponding quadrature
     for (int i=0; i<4; ++i) {
@@ -791,7 +788,7 @@ void LocalStokesCL::setupS_P1 (double S_P1[12][12])
     }
 }
 
-void LocalStokesCL::setupL_P1P2 (double L_P1P2[4][30])
+void LocalSurfOseen::setupL_P1P2 (double L_P1P2[4][30])
 {
     //GridFunctionCL<double> qP1Hat;
 
@@ -806,7 +803,7 @@ void LocalStokesCL::setupL_P1P2 (double L_P1P2[4][30])
     }
 }
 
-void LocalStokesCL::setupL_P1P2_stab (double L_P1P2_stab[4][30], double absdet)
+void LocalSurfOseen::setupL_P1P2_stab (double L_P1P2_stab[4][30], double absdet)
 {
     // Do all combinations for (i,j) i,j=4 x 30 and corresponding quadrature
     for (int i=0; i < 10; ++i) {
@@ -819,7 +816,7 @@ void LocalStokesCL::setupL_P1P2_stab (double L_P1P2_stab[4][30], double absdet)
     }
 }
 
-void LocalStokesCL::setupL_P1P1 (double L_P1P1[4][12])
+void LocalSurfOseen::setupL_P1P1 (double L_P1P1[4][12])
 {
    // GridFunctionCL<double> qP1Hat;
 
@@ -834,7 +831,7 @@ void LocalStokesCL::setupL_P1P1 (double L_P1P1[4][12])
     }
 }
 
-void LocalStokesCL::setupL_P1P1_stab (double L_P1P1_stab[4][12], double absdet)
+void LocalSurfOseen::setupL_P1P1_stab (double L_P1P1_stab[4][12], double absdet)
 {
     // Do all combinations for (i,j) i,j=4 x 30 and corresponding quadrature
     for (int i=0; i < 4; ++i) {
@@ -847,7 +844,7 @@ void LocalStokesCL::setupL_P1P1_stab (double L_P1P1_stab[4][12], double absdet)
     }
 }
 
-void LocalStokesCL::setupL_P2P1 (double L_P2P1[10][12])
+void LocalSurfOseen::setupL_P2P1 (double L_P2P1[10][12])
 {
     // Do all combinations for (i,j) i,j=10 x 30 and corresponding quadrature
     for (int i=0; i < 10; ++i) {
@@ -859,7 +856,7 @@ void LocalStokesCL::setupL_P2P1 (double L_P2P1[10][12])
     }
 }
 
-void LocalStokesCL::setupL_P2P1_stab (double L_P2P1_stab[10][12], double absdet)
+void LocalSurfOseen::setupL_P2P1_stab (double L_P2P1_stab[10][12], double absdet)
 {
     // Do all combinations for (i,j) i,j=4 x 30 and corresponding quadrature
     for (int i=0; i < 4; ++i) {
@@ -872,7 +869,7 @@ void LocalStokesCL::setupL_P2P1_stab (double L_P2P1_stab[10][12], double absdet)
     }
 }
 
-void LocalStokesCL::setupL_P2P2 (double L_P2P2[10][30])
+void LocalSurfOseen::setupL_P2P2 (double L_P2P2[10][30])
 {
     // Do all combinations for (i,j) i,j=10 x 30 and corresponding quadrature
     for (int i=0; i < 10; ++i) {
@@ -884,7 +881,7 @@ void LocalStokesCL::setupL_P2P2 (double L_P2P2[10][30])
     }
 }
 
-void LocalStokesCL::setupL_P2P2_stab (double L_P2P2_stab[10][30], double absdet)
+void LocalSurfOseen::setupL_P2P2_stab (double L_P2P2_stab[10][30], double absdet)
 {
     // Do all combinations for (i,j) i,j=4 x 30 and corresponding quadrature
     for (int i=0; i < 10; ++i) {
@@ -897,7 +894,7 @@ void LocalStokesCL::setupL_P2P2_stab (double L_P2P2_stab[10][30], double absdet)
     }
 }
 
-void LocalStokesCL::setupA_P2_stab (double A_P2_stab[10][10], double absdet)
+void LocalSurfOseen::setupA_P2_stab (double A_P2_stab[10][10], double absdet)
 {
     for (int i=0; i<10; ++i) {
         for (int j=0; j<10; ++j) {
@@ -906,7 +903,7 @@ void LocalStokesCL::setupA_P2_stab (double A_P2_stab[10][10], double absdet)
     }
 }
 
-void LocalStokesCL::setupA_P1_stab (double A_P1_stab[4][4], double absdet)
+void LocalSurfOseen::setupA_P1_stab (double A_P1_stab[4][4], double absdet)
 {
     for (int i=0; i<4; ++i) {
         for (int j=0; j<4; ++j) {
@@ -917,7 +914,7 @@ void LocalStokesCL::setupA_P1_stab (double A_P1_stab[4][4], double absdet)
 
 // Navier-Stokes:
 
-void LocalStokesCL::setupN_P1 (double N_P1[12][12])
+void LocalSurfOseen::setupN_P1 (double N_P1[12][12])
 {
     // Do all combinations for (i,j) i,j=12 x 12 and corresponding quadrature
     for (int i=0; i<4; ++i) {
@@ -932,7 +929,7 @@ void LocalStokesCL::setupN_P1 (double N_P1[12][12])
     }
 }
 
-void LocalStokesCL::setupNT_P1 (double NT_P1[12][12])
+void LocalSurfOseen::setupNT_P1 (double NT_P1[12][12])
 {
     // Do all combinations for (i,j) i,j=12 x 12 and corresponding quadrature
     for (int i=0; i<4; ++i) {
@@ -951,7 +948,7 @@ void LocalStokesCL::setupNT_P1 (double NT_P1[12][12])
     }
 }
 
-void LocalStokesCL::setupOmega_P1P1 (double Omega_P1P1[4][12])
+void LocalSurfOseen::setupOmega_P1P1 (double Omega_P1P1[4][12])
 {
 	//GridFunctionCL<double> qsurfgrad_k;
 
@@ -969,7 +966,7 @@ void LocalStokesCL::setupOmega_P1P1 (double Omega_P1P1[4][12])
     }
 }
 
-void LocalStokesCL::setupD_P1(double D_P1[4][4])
+void LocalSurfOseen::setupD_P1(double D_P1[4][4])
 {
 
     // Do all combinations for (i,j) i,j=4 x 4 and corresponding quadrature
@@ -993,7 +990,7 @@ void LocalStokesCL::setupD_P1(double D_P1[4][4])
 
 }
 
-void LocalStokesCL::setupM_P1_stab (double M_P1_stab[4][4], double absdet)
+void LocalSurfOseen::setupM_P1_stab (double M_P1_stab[4][4], double absdet)
 {
     for (int i=0; i<4; ++i) {
         for (int j=0; j<4; ++j) {
@@ -1017,7 +1014,7 @@ class StokesIFAccumulator_P1P1CL : public TetraAccumulatorCL
     MatrixBuilderCL *mA_P1_, *mA_P1_stab_, *mB_P1P1_, *mM_P1_, *mS_P1_, *mL_P1P1_, *mL_P1P1_stab_, *mM_ScalarP1_, *mA_ScalarP1_stab_;
     double locA_P1[12][12], locA_P1_stab[4][4], locB_P1P1[4][12], locM_P1[4][4], locS_P1[12][12], locL_P1P1[4][12], locL_P1P1_stab[4][12];
 
-    LocalStokesCL localStokes_;
+    LocalSurfOseen localProblem;
 
     SMatrixCL<3,3> T;
     double det, absdet;
@@ -1031,7 +1028,7 @@ class StokesIFAccumulator_P1P1CL : public TetraAccumulatorCL
 
 public:
     StokesIFAccumulator_P1P1CL(const VecDescCL& ls, const LsetBndDataCL& ls_bnd, IdxDescCL& P1FE, IdxDescCL& ScalarP1FE, MatrixCL& A_P1, MatrixCL& A_P1_stab, MatrixCL& B_P1P1, MatrixCL& M_P1, MatrixCL& S_P1, MatrixCL& L_P1P1, MatrixCL& L_P1P1_stab, MatrixCL& M_ScalarP1, MatrixCL& A_ScalarP1_stab, LocalStokesParam* param)
-        : lset(ls), lset_bnd(ls_bnd), P1Idx_(P1FE), ScalarP1Idx_(ScalarP1FE), A_P1_(A_P1), A_P1_stab_(A_P1_stab), B_P1P1_(B_P1P1), M_P1_(M_P1), S_P1_(S_P1), L_P1P1_(L_P1P1), L_P1P1_stab_(L_P1P1_stab), M_ScalarP1_(M_ScalarP1), A_ScalarP1_stab_(A_ScalarP1_stab), localStokes_(param) {}
+        : lset(ls), lset_bnd(ls_bnd), P1Idx_(P1FE), ScalarP1Idx_(ScalarP1FE), A_P1_(A_P1), A_P1_stab_(A_P1_stab), B_P1P1_(B_P1P1), M_P1_(M_P1), S_P1_(S_P1), L_P1P1_(L_P1P1), L_P1P1_stab_(L_P1P1_stab), M_ScalarP1_(M_ScalarP1), A_ScalarP1_stab_(A_ScalarP1_stab), localProblem(param) {}
     ///\brief Initializes matrix-builders and load-vectors
     void begin_accumulation ();
     ///\brief Builds the matrices
@@ -1109,15 +1106,15 @@ void StokesIFAccumulator_P1P1CL::local_setup (const TetraCL& tet)
 
     //GetLocalNumbP1NoBnd(numP1, tet, P1Idx_);
     //GetLocalNumbP1NoBnd(numScalarP1, tet, ScalarP1Idx_);
-    localStokes_.calcIntegrands(T, ls_loc, tet);
-    localStokes_.calc3DIntegrands(T, ls_loc, tet);
-    localStokes_.setupA_P1(locA_P1);
-    localStokes_.setupA_P1_stab(locA_P1_stab, absdet);
-    localStokes_.setupB_P1P1(locB_P1P1);
-    localStokes_.setupM_P1(locM_P1);
-    localStokes_.setupS_P1(locS_P1);
-    localStokes_.setupL_P1P1(locL_P1P1);
-    localStokes_.setupL_P1P1_stab(locL_P1P1_stab, absdet);
+    localProblem.calcIntegrands(T, ls_loc, tet);
+    localProblem.calc3DIntegrands(T, ls_loc, tet);
+    localProblem.setupA_P1(locA_P1);
+    localProblem.setupA_P1_stab(locA_P1_stab, absdet);
+    localProblem.setupB_P1P1(locB_P1P1);
+    localProblem.setupM_P1(locM_P1);
+    localProblem.setupS_P1(locS_P1);
+    localProblem.setupL_P1P1(locL_P1P1);
+    localProblem.setupL_P1P1_stab(locL_P1P1_stab, absdet);
 }
 
 void StokesIFAccumulator_P1P1CL::update_global_system ()
@@ -1189,7 +1186,7 @@ class NavierStokesIFAccumulator_P1P1CL : public TetraAccumulatorCL
     MatrixBuilderCL *mA_P1_, *mA_P1_stab_, *mB_P1P1_,*mOmega_P1P1_,*mN_P1_,  *mNT_P1_,*mM_P1_,*mD_P1_, *mS_P1_, *mL_P1P1_, *mL_P1P1_stab_, *mM_ScalarP1_, *mA_ScalarP1_stab_, *mSchur_normalP1_stab_;
     double locA_P1[12][12], locA_P1_stab[4][4], locB_P1P1[4][12],locOmega_P1P1[4][12],locN_P1[12][12], locNT_P1[12][12],locM_P1[4][4],locD_P1[4][4], locM_P1_stab[4][4], locS_P1[12][12], locL_P1P1[4][12], locL_P1P1_stab[4][12];
 
-    LocalStokesCL localStokes_;
+    LocalSurfOseen localProblem;
 
     SMatrixCL<3,3> T;
     double det, absdet;
@@ -1204,7 +1201,7 @@ class NavierStokesIFAccumulator_P1P1CL : public TetraAccumulatorCL
 
   public:
     NavierStokesIFAccumulator_P1P1CL(const LevelsetP2CL& ls, const VecDescCL& v, const BndDataCL<Point3DCL>& v_bnd, IdxDescCL& P1FE, IdxDescCL& ScalarP1FE, MatrixCL& A_P1, MatrixCL& A_P1_stab, MatrixCL& B_P1P1,MatrixCL& Omega_P1P1, MatrixCL& N_P1, MatrixCL& NT_P1, MatrixCL& M_P1,MatrixCL& D_P1, MatrixCL& S_P1, MatrixCL& L_P1P1, MatrixCL& L_P1P1_stab, MatrixCL& M_ScalarP1, MatrixCL& A_ScalarP1_stab, MatrixCL& Schur_normalP1_stab, LocalStokesParam* param)
-        : lset(ls.Phi), velocity(v), lset_bnd(ls.GetBndData()), velocity_bnd(v_bnd), P1Idx_(P1FE), ScalarP1Idx_(ScalarP1FE), A_P1_(A_P1), A_P1_stab_(A_P1_stab), B_P1P1_(B_P1P1),Omega_P1P1_(Omega_P1P1),N_P1_(N_P1), NT_P1_(NT_P1),M_P1_(M_P1),D_P1_(D_P1), S_P1_(S_P1), L_P1P1_(L_P1P1), L_P1P1_stab_(L_P1P1_stab), M_ScalarP1_(M_ScalarP1), A_ScalarP1_stab_(A_ScalarP1_stab),Schur_normalP1_stab_(Schur_normalP1_stab), localStokes_(param) {}
+        : lset(ls.Phi), velocity(v), lset_bnd(ls.GetBndData()), velocity_bnd(v_bnd), P1Idx_(P1FE), ScalarP1Idx_(ScalarP1FE), A_P1_(A_P1), A_P1_stab_(A_P1_stab), B_P1P1_(B_P1P1), Omega_P1P1_(Omega_P1P1), N_P1_(N_P1), NT_P1_(NT_P1), M_P1_(M_P1), D_P1_(D_P1), S_P1_(S_P1), L_P1P1_(L_P1P1), L_P1P1_stab_(L_P1P1_stab), M_ScalarP1_(M_ScalarP1), A_ScalarP1_stab_(A_ScalarP1_stab), Schur_normalP1_stab_(Schur_normalP1_stab), localProblem(param) {}
     ///\brief Initializes matrix-builders and load-vectors
     void begin_accumulation ();
     ///\brief Builds the matrices
@@ -1302,23 +1299,23 @@ void NavierStokesIFAccumulator_P1P1CL::local_setup (const TetraCL& tet)
 
     // GetLocalNumbP1NoBnd(numP1, tet, P1Idx_);
     // GetLocalNumbP1NoBnd(numScalarP1, tet, ScalarP1Idx_);
-    // localStokes_.exportPatchInfo("../../../MKL-Eigs-for-Sparse-Matrices/output/patch/hOver" + std::to_string(localStokes_.num_intervals()), T, ls_loc, tet);
+    // localProblem.exportPatchInfo("../../../MKL-Eigs-for-Sparse-Matrices/output/patch/hOver" + std::to_string(localProblem.num_intervals()), T, ls_loc, tet);
 
-    localStokes_.calcIntegrands(T, ls_loc, v_loc, tet);
-    localStokes_.calc3DIntegrands(T, ls_loc, tet);
-    localStokes_.setupA_P1(locA_P1);
-    localStokes_.setupN_P1(locN_P1);
-    localStokes_.setupNT_P1(locNT_P1);
-    localStokes_.setupA_P1_stab(locA_P1_stab, absdet);
-    localStokes_.setupB_P1P1(locB_P1P1);
-    localStokes_.setupOmega_P1P1(locOmega_P1P1);
-    localStokes_.setupM_P1(locM_P1);
+    localProblem.calcIntegrands(T, ls_loc, v_loc, tet);
+    localProblem.calc3DIntegrands(T, ls_loc, tet);
+    localProblem.setupA_P1(locA_P1);
+    localProblem.setupN_P1(locN_P1);
+    localProblem.setupNT_P1(locNT_P1);
+    localProblem.setupA_P1_stab(locA_P1_stab, absdet);
+    localProblem.setupB_P1P1(locB_P1P1);
+    localProblem.setupOmega_P1P1(locOmega_P1P1);
+    localProblem.setupM_P1(locM_P1);
 
-    localStokes_.setupD_P1(locD_P1);
-    localStokes_.setupM_P1_stab(locM_P1_stab, absdet);
-    localStokes_.setupS_P1(locS_P1);
-    localStokes_.setupL_P1P1(locL_P1P1);
-    localStokes_.setupL_P1P1_stab(locL_P1P1_stab, absdet);
+    localProblem.setupD_P1(locD_P1);
+    localProblem.setupM_P1_stab(locM_P1_stab, absdet);
+    localProblem.setupS_P1(locS_P1);
+    localProblem.setupL_P1P1(locL_P1P1);
+    localProblem.setupL_P1P1_stab(locL_P1P1_stab, absdet);
 
 }
 
@@ -1441,7 +1438,7 @@ class StokesIFAccumulator_P1P2CL : public TetraAccumulatorCL
     MatrixBuilderCL *mA_P1_, *mA_P1_stab_, *mB_P2P1_, *mM_P1_, *mS_P1_, *mL_P2P1_, *mL_P2P1_stab_, *mM_ScalarP2_, *mA_ScalarP2_stab_;
     double locA_P1[12][12], locA_P1_stab[4][4], locA_P2_stab[10][10], locB_P2P1[10][12], locM_P1[4][4], locM_P2[10][10], locS_P1[12][12], locL_P2P1[10][12], locL_P2P1_stab[10][12];
 
-    LocalStokesCL localStokes_;
+    LocalSurfOseen localProblem;
 
     SMatrixCL<3,3> T;
     double det, absdet;
@@ -1455,7 +1452,7 @@ class StokesIFAccumulator_P1P2CL : public TetraAccumulatorCL
     void update_global_system ();
 public:
     StokesIFAccumulator_P1P2CL(const VecDescCL& ls, const LsetBndDataCL& ls_bnd, IdxDescCL& P1FE, IdxDescCL& ScalarP2FE, MatrixCL& A_P1, MatrixCL& A_P1_stab, MatrixCL& B_P2P1, MatrixCL& M_P1, MatrixCL& S_P1, MatrixCL& L_P2P1, MatrixCL& L_P2P1_stab, MatrixCL& M_ScalarP2, MatrixCL& A_ScalarP2_stab, LocalStokesParam* param)
-        : lset(ls), lset_bnd(ls_bnd), P1Idx_(P1FE), ScalarP2Idx_(ScalarP2FE), A_P1_(A_P1), A_P1_stab_(A_P1_stab), B_P2P1_(B_P2P1), M_P1_(M_P1), S_P1_(S_P1), L_P2P1_(L_P2P1), L_P2P1_stab_(L_P2P1_stab), M_ScalarP2_(M_ScalarP2), A_ScalarP2_stab_(A_ScalarP2_stab), localStokes_(param) {}
+        : lset(ls), lset_bnd(ls_bnd), P1Idx_(P1FE), ScalarP2Idx_(ScalarP2FE), A_P1_(A_P1), A_P1_stab_(A_P1_stab), B_P2P1_(B_P2P1), M_P1_(M_P1), S_P1_(S_P1), L_P2P1_(L_P2P1), L_P2P1_stab_(L_P2P1_stab), M_ScalarP2_(M_ScalarP2), A_ScalarP2_stab_(A_ScalarP2_stab), localProblem(param) {}
     ///\brief Initializes matrix-builders and load-vectors
     void begin_accumulation ();
     ///\brief Builds the matrices
@@ -1533,17 +1530,17 @@ void StokesIFAccumulator_P1P2CL::local_setup (const TetraCL& tet)
 
     //GetLocalNumbP1NoBnd(numP1, tet, P1Idx_);
     //GetLocalNumbP1NoBnd(numScalarP1, tet, ScalarP1Idx_);
-    localStokes_.calcIntegrands(T, ls_loc, tet);
-    localStokes_.calc3DIntegrands(T, ls_loc, tet);
-    localStokes_.setupA_P1(locA_P1);
-    localStokes_.setupA_P1_stab(locA_P1_stab, absdet);
-    localStokes_.setupA_P2_stab(locA_P2_stab, absdet);
-    localStokes_.setupB_P2P1(locB_P2P1);
-    localStokes_.setupM_P1(locM_P1);
-    localStokes_.setupM_P2(locM_P2);
-    localStokes_.setupS_P1(locS_P1);
-    localStokes_.setupL_P2P1(locL_P2P1);
-    localStokes_.setupL_P2P1_stab(locL_P2P1_stab, absdet);
+    localProblem.calcIntegrands(T, ls_loc, tet);
+    localProblem.calc3DIntegrands(T, ls_loc, tet);
+    localProblem.setupA_P1(locA_P1);
+    localProblem.setupA_P1_stab(locA_P1_stab, absdet);
+    localProblem.setupA_P2_stab(locA_P2_stab, absdet);
+    localProblem.setupB_P2P1(locB_P2P1);
+    localProblem.setupM_P1(locM_P1);
+    localProblem.setupM_P2(locM_P2);
+    localProblem.setupS_P1(locS_P1);
+    localProblem.setupL_P2P1(locL_P2P1);
+    localProblem.setupL_P2P1_stab(locL_P2P1_stab, absdet);
 }
 
 void StokesIFAccumulator_P1P2CL::update_global_system ()
@@ -1610,17 +1607,17 @@ void SetupStokesIF_P1P2(const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P1
 }
 
 /// \brief Accumulator to set up the matrices for interface Stokes.
-class StokesIFAccumulator_P2P1CL : public TetraAccumulatorCL {
+class SurfOseenAccumulatorP2P1 : public TetraAccumulatorCL {
   private:
     const VecDescCL& lset;
     IdxDescCL& P2Idx_;
     IdxDescCL& ScalarP1Idx_;
     IdxT numP2[10], numScalarP1[4];
-    StokesSystem* system;
+    SurfOseenSystem* system;
     MatrixBuilderCL *mN_P2_, *mA_P2_, *mA_P2_stab_, *mB_P1P2_, *mM_P2_, *mS_P2_, *mM_ScalarP1_, *mM_ScalarP1_stab_, *mA_ScalarP1_stab_, *mLB_P2_, *mLB_stab_P2_;
     double locN_P2[30][30], locA_P2[30][30], locA_P2_stab[10][10], locB_P1P2[4][30], locM_P2[10][10], locS_P2[30][30], locM_ScalarP1[4][4], locM_ScalarP1_stab[4][4], locA_ScalarP1_stab[4][4], locLB_P2[10][10];
     double locF_P2[30], locG_P1[4];
-    LocalStokesCL localStokes_;
+    LocalSurfOseen localProblem;
     SMatrixCL<3,3> T;
     double det, absdet;
     LocalP2CL<> ls_loc;
@@ -1631,22 +1628,22 @@ class StokesIFAccumulator_P2P1CL : public TetraAccumulatorCL {
     void update_global_system ();
 
 public:
-    StokesIFAccumulator_P2P1CL(const LevelsetP2CL& ls, StokesSystem* system, LocalStokesParam* param)
+    SurfOseenAccumulatorP2P1(const LevelsetP2CL& ls, SurfOseenSystem* system, LocalStokesParam* param)
     : lset(ls.Phi)
     , P2Idx_(*(system->A.RowIdx))
     , ScalarP1Idx_(*(system->B.RowIdx))
     , system(system)
-    , localStokes_(param)
+    , localProblem(param)
     {}
     ///\brief Initializes matrix-builders and load-vectors
     void begin_accumulation ();
     ///\brief Builds the matrices
     void finalize_accumulation();
     void visit (const TetraCL& sit);
-    TetraAccumulatorCL* clone (int /*tid*/) { return new StokesIFAccumulator_P2P1CL (*this); }
+    TetraAccumulatorCL* clone (int /*tid*/) { return new SurfOseenAccumulatorP2P1 (*this); }
 };
 
-void StokesIFAccumulator_P2P1CL::begin_accumulation() {
+void SurfOseenAccumulatorP2P1::begin_accumulation() {
     std::cout << "entering StokesIF: \n";
     size_t num_unks_p1_scalar = ScalarP1Idx_.NumUnknowns();
     size_t num_unks_p2 = P2Idx_.NumUnknowns();
@@ -1666,7 +1663,7 @@ void StokesIFAccumulator_P2P1CL::begin_accumulation() {
     system->gRHS.Data.resize(num_unks_p1_scalar, 0.);
 }
 
-void StokesIFAccumulator_P2P1CL::finalize_accumulation() {
+void SurfOseenAccumulatorP2P1::finalize_accumulation() {
     mA_P2_->Build();
     delete mA_P2_;
     mN_P2_->Build();
@@ -1696,7 +1693,7 @@ void StokesIFAccumulator_P2P1CL::finalize_accumulation() {
 //#endif
 }
 
-void StokesIFAccumulator_P2P1CL::visit(const TetraCL& tet) {
+void SurfOseenAccumulatorP2P1::visit(const TetraCL& tet) {
     ls_loc.assign(tet, lset, BndDataCL<>());
     if (isInCutMesh(ls_loc)) {
         w_loc.assign(tet, system->w, BndDataCL<Point3DCL>());
@@ -1705,29 +1702,29 @@ void StokesIFAccumulator_P2P1CL::visit(const TetraCL& tet) {
     }
 }
 
-void StokesIFAccumulator_P2P1CL::local_setup (const TetraCL& tet) {
+void SurfOseenAccumulatorP2P1::local_setup (const TetraCL& tet) {
     GetTrafoTr(T, det, tet);
     absdet = std::fabs(det);
     GetLocalNumbP2NoBnd(numP2, tet, P2Idx_);
     GetLocalNumbP1NoBnd(numScalarP1, tet, ScalarP1Idx_);
-    // localStokes_.exportPatchInfo("../../../MKL-Eigs-for-Sparse-Matrices/output/patch/hOver" + std::to_string(localStokes_.num_intervals()), T, ls_loc, tet);
-    localStokes_.calcIntegrands(T, ls_loc, w_loc, tet);
-    localStokes_.calc3DIntegrands(T, ls_loc, tet);
-    localStokes_.setupA_P2(locA_P2);
-    localStokes_.setupN_P2(locN_P2);
-    localStokes_.setupA_P2_stab(locA_P2_stab, absdet);
-    localStokes_.setupB_P1P2(locB_P1P2);
-    localStokes_.setupM_P2(locM_P2);
-    localStokes_.setupS_P2(locS_P2);
-    localStokes_.setupM_P1(locM_ScalarP1);
-    localStokes_.setupA_P1_stab(locA_ScalarP1_stab, absdet);
-    localStokes_.setupM_P1_stab(locM_ScalarP1_stab, absdet);
-    localStokes_.setupLB_P2(locLB_P2);
-    localStokes_.setupF_P2(locF_P2);
-    localStokes_.setupG_P1(locG_P1);
+    // localProblem.exportPatchInfo("../../../MKL-Eigs-for-Sparse-Matrices/output/patch/hOver" + std::to_string(localProblem.num_intervals()), T, ls_loc, tet);
+    localProblem.calcIntegrands(T, ls_loc, w_loc, tet);
+    localProblem.calc3DIntegrands(T, ls_loc, tet);
+    localProblem.setupA_P2(locA_P2);
+    localProblem.setupN_P2(locN_P2);
+    localProblem.setupA_P2_stab(locA_P2_stab, absdet);
+    localProblem.setupB_P1P2(locB_P1P2);
+    localProblem.setupM_P2(locM_P2);
+    localProblem.setupS_P2(locS_P2);
+    localProblem.setupM_P1(locM_ScalarP1);
+    localProblem.setupA_P1_stab(locA_ScalarP1_stab, absdet);
+    localProblem.setupM_P1_stab(locM_ScalarP1_stab, absdet);
+    localProblem.setupLB_P2(locLB_P2);
+    localProblem.setupF_P2(locF_P2);
+    localProblem.setupG_P1(locG_P1);
 }
 
-void StokesIFAccumulator_P2P1CL::update_global_system() {
+void SurfOseenAccumulatorP2P1::update_global_system() {
     auto& mA_P2 = *mA_P2_;
     auto& mN_P2 = *mN_P2_;
     auto& mA_P2_stab = *mA_P2_stab_;
@@ -1789,9 +1786,9 @@ void StokesIFAccumulator_P2P1CL::update_global_system() {
     }
 }
 
-void SetupStokesIF_P2P1(const MultiGridCL& MG_, const LevelsetP2CL& lset, StokesSystem* system, LocalStokesParam* param) {
-  ScopeTimerCL scope("SetupStokesIF_P2P1");
-  StokesIFAccumulator_P2P1CL accu(lset, system, param);
+void SetupSurfOseen_P2P1(const MultiGridCL& MG_, const LevelsetP2CL& lset, SurfOseenSystem* system, LocalStokesParam* param) {
+  ScopeTimerCL scope("SetupSurfOseen_P2P1");
+  SurfOseenAccumulatorP2P1 accu(lset, system, param);
   TetraAccumulatorTupleCL accus;
   accus.push_back(&accu);
   accumulate(accus, MG_, system->A.GetRowLevel(), system->A.RowIdx->GetBndInfo());
@@ -1813,7 +1810,7 @@ class StokesIFAccumulator_P2P2CL : public TetraAccumulatorCL
 
     double locA_P2[30][30], locA_P2_stab[10][10], locB_P2P2[10][30], locM_P2[10][10], locS_P2[30][30], locL_P2P2[10][30], locL_P2P2_stab[10][30], locM_ScalarP2[10][10], locA_ScalarP2_stab[10][10];
 
-    LocalStokesCL localStokes_;
+    LocalSurfOseen localProblem;
 
     SMatrixCL<3,3> T;
     double det, absdet;
@@ -1826,7 +1823,7 @@ class StokesIFAccumulator_P2P2CL : public TetraAccumulatorCL
 
 public:
     StokesIFAccumulator_P2P2CL(const VecDescCL& ls, const LsetBndDataCL& ls_bnd, IdxDescCL& P2FE, IdxDescCL& ScalarP2FE, MatrixCL& A_P2, MatrixCL& A_P2_stab, MatrixCL& B_P2P2, MatrixCL& M_P2, MatrixCL& S_P2, MatrixCL& L_P2P2, MatrixCL& L_P2P2_stab, MatrixCL& M_ScalarP2, MatrixCL& A_ScalarP2_stab, LocalStokesParam* param)
-        : lset(ls), lset_bnd(ls_bnd), P2Idx_(P2FE), ScalarP2Idx_(ScalarP2FE), A_P2_(A_P2), A_P2_stab_(A_P2_stab), B_P2P2_(B_P2P2), M_P2_(M_P2), S_P2_(S_P2), L_P2P2_(L_P2P2), L_P2P2_stab_(L_P2P2_stab), M_ScalarP2_(M_ScalarP2), A_ScalarP2_stab_(A_ScalarP2_stab), localStokes_(param) {}
+        : lset(ls), lset_bnd(ls_bnd), P2Idx_(P2FE), ScalarP2Idx_(ScalarP2FE), A_P2_(A_P2), A_P2_stab_(A_P2_stab), B_P2P2_(B_P2P2), M_P2_(M_P2), S_P2_(S_P2), L_P2P2_(L_P2P2), L_P2P2_stab_(L_P2P2_stab), M_ScalarP2_(M_ScalarP2), A_ScalarP2_stab_(A_ScalarP2_stab), localProblem(param) {}
 
     ///\brief Initializes matrix-builders and load-vectors
     void begin_accumulation ();
@@ -1902,17 +1899,17 @@ void StokesIFAccumulator_P2P2CL::local_setup (const TetraCL& tet)
 
     GetLocalNumbP2NoBnd(numP2, tet, P2Idx_);
     GetLocalNumbP2NoBnd(numScalarP2, tet, ScalarP2Idx_);
-    localStokes_.calcIntegrands(T, ls_loc, tet);
-    localStokes_.calc3DIntegrands(T, ls_loc, tet);
-    localStokes_.setupA_P2(locA_P2);
-    localStokes_.setupA_P2_stab(locA_P2_stab, absdet);
-    localStokes_.setupB_P2P2(locB_P2P2);
-    localStokes_.setupM_P2(locM_P2);
-    localStokes_.setupS_P2(locS_P2);
-    localStokes_.setupL_P2P2(locL_P2P2);
-    localStokes_.setupL_P2P2_stab(locL_P2P2_stab, absdet);
-    localStokes_.setupM_P2(locM_ScalarP2);
-    localStokes_.setupA_P2_stab(locA_ScalarP2_stab, absdet);
+    localProblem.calcIntegrands(T, ls_loc, tet);
+    localProblem.calc3DIntegrands(T, ls_loc, tet);
+    localProblem.setupA_P2(locA_P2);
+    localProblem.setupA_P2_stab(locA_P2_stab, absdet);
+    localProblem.setupB_P2P2(locB_P2P2);
+    localProblem.setupM_P2(locM_P2);
+    localProblem.setupS_P2(locS_P2);
+    localProblem.setupL_P2P2(locL_P2P2);
+    localProblem.setupL_P2P2_stab(locL_P2P2_stab, absdet);
+    localProblem.setupM_P2(locM_ScalarP2);
+    localProblem.setupA_P2_stab(locA_ScalarP2_stab, absdet);
 }
 
 void StokesIFAccumulator_P2P2CL::update_global_system ()

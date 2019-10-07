@@ -137,7 +137,7 @@ class InterfaceCommonDataP1CL : public TetraAccumulatorCL
         surf.clear();
         locp2_ls.assign( t, *ls, *lsetbnd);
         evaluate_on_vertexes( locp2_ls, lat, Addr( ls_loc));
-        if (equal_signs( ls_loc))
+        if (equalSigns(ls_loc))
             return;
         surf.make_patch<MergeCutPolicyCL>( lat, ls_loc);
     }
@@ -250,7 +250,7 @@ class InterfaceCommonDataP2CL : public TetraAccumulatorCL
         surf.clear();
         locp2_ls.assign( t, *ls, *lsetbnd);
         evaluate_on_vertexes( locp2_ls, *lat, Addr( ls_loc));
-        if (equal_signs( ls_loc))
+        if (equalSigns(ls_loc))
             return;
         surf.make_patch<MergeCutPolicyCL>( *lat, ls_loc);
         if (surf.empty())
@@ -429,7 +429,7 @@ class InterfaceCommonDataDeformP2CL : public TetraAccumulatorCL
         surf.clear();
         locp2_ls.assign( t, *ls, *lsetbnd);
         evaluate_on_vertexes( locp2_ls, *lat, Addr( ls_loc));
-        if (equal_signs( ls_loc))
+        if (equalSigns(ls_loc))
             return;
         surf.make_patch<MergeCutPolicyCL>( *lat, ls_loc);
         if (surf.empty())
@@ -778,14 +778,14 @@ struct LocalStokesParam {
     } output;
 };
 
-struct StokesSystem {
+struct SurfOseenSystem {
     MatDescCL A, A_stab, B, N, M, S, Schur, Schur_full_stab, Schur_normal_stab,
               LB, LB_stab; // laplace-beltrami
     VecDescCL fRHS, gRHS,
               w; // wind
 };
 
-void SetupStokesIF_P2P1      ( const MultiGridCL& MG_, const LevelsetP2CL&, StokesSystem*, LocalStokesParam*);
+void SetupSurfOseen_P2P1(const MultiGridCL& MG_, const LevelsetP2CL&, SurfOseenSystem*, LocalStokesParam*);
 void SetupStokesIF_P1P1      ( const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P1_stab, MatDescCL* B_P1P1, MatDescCL* M_P1, MatDescCL* S_P1, MatDescCL* L_P1P1, MatDescCL* L_P1P1_stab, MatDescCL* M_ScalarP1, MatDescCL* A_ScalarP1_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, LocalStokesParam*);
 void SetupNavierStokesIF_P1P1( const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P1_stab, MatDescCL* B_P1P1, MatDescCL* Omega_P1P1, MatDescCL* N_P1,  MatDescCL* NT_P1, MatDescCL* M_P1,MatDescCL* D_P1, MatDescCL* S_P1, MatDescCL* L_P1P1, MatDescCL* L_P1P1_stab, MatDescCL* M_ScalarP1, MatDescCL* A_ScalarP1_stab, MatDescCL* Schur_normalP1_stab, const LevelsetP2CL& lset, const VecDescCL& velocity, const BndDataCL<Point3DCL>& velocity_bnd, LocalStokesParam*);
 void SetupStokesIF_P1P2      ( const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P1_stab, MatDescCL* B_P2P1, MatDescCL* M_P1, MatDescCL* S_P1, MatDescCL* L_P2P1, MatDescCL* L_P2P1_stab, MatDescCL* M_ScalarP2, MatDescCL* A_ScalarP2_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, LocalStokesParam*);
@@ -1173,7 +1173,7 @@ make_CompositeQuad5Domain2D (QuadDomain2DCL& qdom, const TetraCL& t, const Princ
     LocalP2CL<> locp2_ls( t, ls, bnd);
     std::valarray<double> ls_loc( lat.vertex_size());
     evaluate_on_vertexes( locp2_ls, lat, Addr( ls_loc));
-    if (equal_signs( ls_loc)) {
+    if (equalSigns(ls_loc)) {
         qdom.clear();
         return qdom;
     }
@@ -1916,7 +1916,7 @@ class STInterfaceCommonDataCL : public TetraAccumulatorCL
         q5dom.clear();
         st_local_ls.assign( t, *old_ls, *new_ls, *lsetbnd);
         evaluate_on_vertexes( st_local_ls, lat, Addr( ls_loc));
-        if (equal_signs( ls_loc))
+        if (equalSigns(ls_loc))
             return;
         surf.make_patch<MergeCutPolicyCL>( lat, ls_loc);
         surf.compute_normals( TetraPrismCL( t, t0, t1));

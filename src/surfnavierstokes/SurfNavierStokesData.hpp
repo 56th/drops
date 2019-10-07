@@ -6,7 +6,7 @@
 #define SURF_NAVIER_STOKES_DATA_HPP
 
 #include "../num/discretize.h"
-#include "surfnavierstokes_funcs.h"
+// #include "surfnavierstokes_funcs.h"
 
 namespace DROPS {
 

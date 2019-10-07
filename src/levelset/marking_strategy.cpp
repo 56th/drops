@@ -519,7 +519,7 @@ void CurvatureMarkingStrategyCL::visit( const TetraCL &t )
 
         locp2_ls.assign( t, *ls, *lsetbnd);
         evaluate_on_vertexes( locp2_ls, *lat, Addr( ls_loc));
-        if (equal_signs( ls_loc))
+        if (equalSigns(ls_loc))
             return;
 
         GetTrafoTr( M, det, t);

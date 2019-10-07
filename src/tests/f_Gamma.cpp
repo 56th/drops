@@ -488,7 +488,7 @@ void SphereObliqueLaplaceBeltramiAccuCL::evaluate_sigma_on_vertexes (const Tetra
 void SphereObliqueLaplaceBeltramiAccuCL::visit (const TetraCL& t)
 {
     evaluate_on_vertexes( ls_.GetSolution(), t, *latp_, Addr( ls_val_));
-    if (equal_signs( ls_val_))
+    if (equalSigns(ls_val_))
         return;
 
     loc_ls_.assign( t, ls_.GetSolution());

@@ -840,7 +840,7 @@ bool MultiGridCL::IsSane (std::ostream& os, int Level) const
 //    LocalP2CL<> ls_loc(lat.vertex_size());
 //    for (auto it = GetTriangTetraBegin(GetLastLevel()); it != GetTriangTetraEnd(GetLastLevel()); ++it) {
 //        ls_loc.assign(*it, lset.Phi, lset.GetBndData());
-//        if (!equal_signs(ls_loc))
+//        if (!equalSigns(ls_loc))
 //            res.push_back(it);
 //    }
 //    return res;
