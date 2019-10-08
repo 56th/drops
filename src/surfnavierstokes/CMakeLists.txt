@@ -6,6 +6,11 @@ exec_ser(${HOME} geom-boundary geom-builder geom-simplex geom-multigrid geom-def
 add_library(${HOME}-logger STATIC ${LOGGER_PATH}/SingletonLogger.cpp)
 target_link_libraries(${HOME} ${HOME}-logger)
 
+# vtk
+if (VTK_FOUND)
+    target_link_libraries(${HOME} ${VTK_LIBRARIES})
+endif()
+
 # matlab for sparse mtx .mat binary output
 if(Matlab_FOUND)
     add_library(${HOME}-matlab1 SHARED IMPORTED)
