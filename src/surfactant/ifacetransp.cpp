@@ -329,20 +329,22 @@ void SetupInterfaceRhsP1 (const MultiGridCL& mg, VecDescCL* v,
 /// \brief Setup of the local Stokes system on a tetra intersected by the dividing surface.
 class LocalSurfOseen {
 private:
-    const PrincipalLatticeCL& lat;
+    PrincipalLatticeCL const & lat;
+    // shape funcs
     LocalP1CL<> P1Hat[4];
+    Point3DCL   P1Grad[4];
     LocalP2CL<> P2Hat[10];
     LocalP1CL<Point3DCL> P2GradRef[10], P2Grad[10];
     SMatrixCL<3,3> P2Hess[10];
-    Point3DCL P1Grad[4];
+    // quadratures
     GridFunctionCL<Point3DCL>
             qP2Normal, // normal computed from P2 interpolant
-            qExactNormal, // normals exact to patch of integration
-            qExactOrP2Normal, // either normal computed from P2 interpolant, or normals exact to patch of integration
-            qAnalyticNormal, // exact normal to exact surface
+            qPatchNormal, // normals exact to patch of integration
+            qPatchOrP2Normal, // either normal computed from P2 interpolant, or normals exact to patch of integration
+            qExactNormal, // exact normal to exact surface
             qrotP1[12], qvP1, qvProjP1,
             qP_row[3], // ith element is ith row (= column) of P
-            qF, // rhs
+            qF, // moment eqn rhs
             qWind; // wind field
     GridFunctionCL<Point3DCL> qLsGrad, qP1Grad[4], qSurfP1Grad[4], qP2Grad[10], qSurfP2Grad[10];
     GridFunctionCL<> qG, qP1Hat[4], qP2Hat[10], qLsGradNorm, qconvP1[4], qdivP1, qP2NormalComp[3], qExactOrP2NormalComp[3], qvProjP1_comp[3], qvP1_comp[3];
@@ -354,7 +356,7 @@ private:
     SurfacePatchCL spatch;
     QuadDomainCL q3Ddomain;
     GridFunctionCL<Point3DCL> q3Dnormal, q3DP2Grad[10];
-    GridFunctionCL<Point3DCL> q3DP1Grad[4], q2DP1Grad[4];
+    GridFunctionCL<Point3DCL> q3DP1Grad[4];
     LocalP1CL<Point3DCL> getLevelsetGrad(LocalP2CL<> const &);
     SMatrixCL<3, 3>      getLevelsetHess(LocalP2CL<> const &);
 public:
@@ -505,14 +507,14 @@ void LocalSurfOseen::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& 
         for (size_t i = 0; i < numbOfQuadPoints; ++i) qExactNormalInit.emplace_back(normal);
         ++patchIndex;
     }
-    qExactNormal.resize(qExactNormalInit.size());
-    std::copy(qExactNormalInit.begin(), qExactNormalInit.end(), begin(qExactNormal));
+    qPatchNormal.resize(qExactNormalInit.size());
+    std::copy(qExactNormalInit.begin(), qExactNormalInit.end(), begin(qPatchNormal));
     auto usePatchNormals = param->input.usePatchNormal;
-    qExactOrP2Normal = usePatchNormals ? qExactNormal : qP2Normal;
+    qPatchOrP2Normal = usePatchNormals ? qPatchNormal : qP2Normal;
     if (param->input.exactNormal != nullptr) {
-        resize_and_evaluate_on_vertexes(param->input.exactNormal, tet, q2Ddomain, param->input.t, qAnalyticNormal);
-        param->output.normalErrSq.patch += quad_2D(dot(qAnalyticNormal - qExactNormal, qAnalyticNormal - qExactNormal), q2Ddomain);
-        param->output.normalErrSq.lvset += quad_2D(dot(qAnalyticNormal - qP2Normal, qAnalyticNormal - qP2Normal), q2Ddomain);
+        resize_and_evaluate_on_vertexes(param->input.exactNormal, tet, q2Ddomain, param->input.t, qExactNormal);
+        param->output.normalErrSq.patch += quad_2D(dot(qExactNormal - qPatchNormal, qExactNormal - qPatchNormal), q2Ddomain);
+        param->output.normalErrSq.lvset += quad_2D(dot(qExactNormal - qP2Normal, qExactNormal - qP2Normal), q2Ddomain);
     }
     // compute projector and shape matrix
     qP.resize(q2Ddomain.vertex_size());
@@ -527,26 +529,26 @@ void LocalSurfOseen::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& 
             param->output.shapeErrSq += quad_2D(contract(qAnalyticHess - qHess, qAnalyticHess - qHess), q2Ddomain);
         }
     }
-    if (usePatchNormals) qP = eye<3, 3>() - outer_product(qExactOrP2Normal, qExactOrP2Normal);
+    if (usePatchNormals) qP = eye<3, 3>() - outer_product(qPatchOrP2Normal, qPatchOrP2Normal);
     // provide all components of the normals
     for (int k = 0; k < 3; ++k) {
         qP2NormalComp[k].resize(q2Ddomain.vertex_size());
         ExtractComponent(qP2Normal, qP2NormalComp[k], k);
         qExactOrP2NormalComp[k].resize(q2Ddomain.vertex_size());
-        ExtractComponent(qExactOrP2Normal, qExactOrP2NormalComp[k], k);
+        ExtractComponent(qPatchOrP2Normal, qExactOrP2NormalComp[k], k);
     }
     // resize and evaluate P2 basis functions
     for(int j=0; j<10 ;++j) {
         resize_and_evaluate_on_vertexes(P2Hat[j], q2Ddomain, qP2Hat[j]);
         resize_and_evaluate_on_vertexes(P2Grad[j], q2Ddomain, qP2Grad[j]);
-        qSurfP2Grad[j] = qP2Grad[j] - dot(qP2Grad[j], qExactOrP2Normal)*qExactOrP2Normal;
+        qSurfP2Grad[j] = qP2Grad[j] - dot(qP2Grad[j], qPatchOrP2Normal) * qPatchOrP2Normal;
     }
     // Resize and evaluate of all the 4 P1 Gradient Functions and apply pointwise projections   (P grad \xi_j  for j=1..4)
     for(int j=0; j<4 ;++j) {
         resize_and_evaluate_on_vertexes(P1Hat[j], q2Ddomain, qP1Hat[j]);
         qP1Grad[j].resize(q2Ddomain.vertex_size());
         qP1Grad[j] = P1Grad[j];
-        qSurfP1Grad[j] = qP1Grad[j] - dot(qP1Grad[j], qExactOrP2Normal)*qExactOrP2Normal;
+        qSurfP1Grad[j] = qP1Grad[j] - dot(qP1Grad[j], qPatchOrP2Normal) * qPatchOrP2Normal;
     }
     // apply pointwise projection to the 3 std basis vectors e_k
     if (param->input.formulation == LocalStokesParam::Formulation::inconsistent)
@@ -554,7 +556,7 @@ void LocalSurfOseen::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& 
             qP_row[k].resize(q2Ddomain.vertex_size());
             Point3DCL e_k = DROPS::std_basis<3>(k+1);
             qP_row[k] = e_k;
-            qP_row[k]-= dot(e_k, qExactOrP2Normal)*qExactOrP2Normal;
+            qP_row[k]-= dot(e_k, qPatchOrP2Normal) * qPatchOrP2Normal;
         }
     // compute surface stress tensor
     auto qVectGrad = [&](size_t vecShapeIndex, GridFunctionCL<Point3DCL>* P1OrP2grad) {
@@ -743,7 +745,7 @@ void LocalSurfOseen::setupN_P2(double N_P2[30][30]) {
         for (size_t j = 0; j < 30; ++j) {
             auto js = j / 3; // scalar shape index
             auto jn = j - 3 * js; // nonzero vect component
-            N_P2[i][j] = quad_2D(dot(qWind, qP2Grad[js]) * /*take(qP, jn, in) **/ qP2Hat[is], q2Ddomain);
+            N_P2[i][j] = quad_2D(dot(qWind, qP2Grad[js]) * take(qP, jn, in) * qP2Hat[is], q2Ddomain);
         }
     }
 }
@@ -960,7 +962,7 @@ void LocalSurfOseen::setupOmega_P1P1 (double Omega_P1P1[4][12])
             for (int m=0; m<4; ++m) {
               	//Omega_P1P1[m][3*i+k]= quad_2D(dot(qrotP1[3*i+k], qrotP1[3*i+k])*qP1Hat[m], q2Ddomain);
 
-            	Omega_P1P1[m][3*i+k]= quad_2D(dot(qExactOrP2Normal, qrotP1[3*i+k])*qP1Hat[m], q2Ddomain);
+            	Omega_P1P1[m][3*i+k]= quad_2D(dot(qPatchOrP2Normal, qrotP1[3 * i + k]) * qP1Hat[m], q2Ddomain);
             }
         }
     }
