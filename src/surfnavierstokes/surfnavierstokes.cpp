@@ -298,7 +298,7 @@ int main(int argc, char* argv[]) {
                     };
                     if (!setWind(stokesSystem.w)) // Navier-Stokes case
                         stokesSystem.w = u_prev;
-        SetupSurfOseen_P2P1(mg, lset, &stokesSystem, &param);
+                    SetupSurfOseen_P2P1(mg, lset, &stokesSystem, &param);
                     logger.buf
                             << "numb of cut tetras is         " << param.output.numbOfCutTetras << '\n'
                             << "stiffness mtx is              " << stokesSystem.A.Data.num_rows() << " * " << stokesSystem.A.Data.num_cols() << '\n'
@@ -310,6 +310,25 @@ int main(int argc, char* argv[]) {
                             << "f size is                     " << stokesSystem.fRHS.Data.size() << '\n'
                             << "g size is                     " << stokesSystem.gRHS.Data.size();
                     logger.log();
+//                    logger.beg("test N");
+//                        auto v1 = [](Point3DCL const & p, double) {
+//                            return Point3DCL(2. * p[0], -p[1], p[2]);
+//                        };
+//                        auto v2 = [](Point3DCL const &, double) {
+//                            return Point3DCL(1., 2., 3.);
+//                        };
+//                        VecDescCL V1, V2;
+//                        V1.SetIdx(&ifaceVecP2idx);
+//                        V2.SetIdx(&ifaceVecP2idx);
+//                        InitVector(mg, V1, v1);
+//                        InitVector(mg, V2, v2);
+//                        logger.buf
+//                            << "c(v1, v2) = (N v2, v1) = " << dot(stokesSystem.N.Data * V2.Data, V1.Data) << '\n'
+//                            << "c(v2, v1) = (N v1, v2) = " << dot(stokesSystem.N.Data * V1.Data, V2.Data) << '\n'
+//                            << "c(v1, v1) = (N v1, v1) = " << dot(stokesSystem.N.Data * V1.Data, V1.Data) << '\n'
+//                            << "c(w, w)   = (N w, w)   = " << dot(stokesSystem.N.Data * stokesSystem.w.Data, stokesSystem.w.Data) << '\n';
+//                        logger.log();
+//                    logger.end();
                     stokesSystem.fRHS.Data += (1. / stepSize) * (stokesSystem.M.Data * u_prev.Data);
                     VectorCL I_p;
                     I_p.resize(stokesSystem.gRHS.Data.size(),1.);
