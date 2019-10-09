@@ -74,6 +74,7 @@ namespace DROPS {
                 std::cout << "var size = " << var.value->size() << '\n';
                 array->SetName(var.name.c_str());
                 unstructuredGrid->GetPointData()->AddArray(array);
+                // https://vtk.org/Wiki/VTK/Examples/Cxx/PolyData/PolyDataCellNormals
             }
             // (3) write
             auto writer = vtkSmartPointer<vtkXMLUnstructuredGridWriter>::New();

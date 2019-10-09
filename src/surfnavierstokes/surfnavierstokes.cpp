@@ -34,9 +34,10 @@
 #include "levelset/adaptriang.h"
 #include "levelset/surfacetension.h"
 #include "misc/dynamicload.h"
-#include "out/vtkOut.h"
+//#include "out/vtkOut.h"
 #include "num/bndData.h"
 #include "num/precond.h"
+#include "VTKWriter.hpp"
 
 #include "num/oseensolver.h"
 #include "surfactant/ifacetransp.h"
@@ -271,18 +272,17 @@ int main(int argc, char* argv[]) {
             logger.end();
         logger.end();
         logger.beg("solve");
-            VTKOutCL* vtkWriter = nullptr;
+
+            VTKWriter vtkWriter(dirName + "/vtk/" + testName, mg);
+            // vtkWriter = new VTKOutCL(mg, "DROPS data", numbOfStepsVTK, dirName + "/vtk", testName + "_", testName, inpJSON.get<bool>("Output.Binary"));
             if (everyStep > 0) {
-                vtkWriter = new VTKOutCL(mg, "DROPS data", numbOfStepsVTK, dirName + "/vtk", testName + "_", testName, 0);
-                vtkWriter->Register(make_VTKScalar(lset.GetSolution(), "level-set"));
-                vtkWriter->Register(make_VTKIfaceVector(mg, u_star, "u_*", velFE, vbnd));
-                vtkWriter->Register(make_VTKIfaceVector(mg, stokesSystem.fRHS, "f_T", velFE, vbnd));
-                vtkWriter->Register(make_VTKIfaceVector(mg, u, "u_h", velFE, vbnd));
-                vtkWriter->Register(make_VTKIfaceScalar(mg, p, "p_h", /*preFE,*/ pbnd));
-                vtkWriter->Register(make_VTKIfaceScalar(mg, stokesSystem.gRHS, "-g", /*preFE,*/ pbnd));
-                vtkWriter->Register(make_VTKIfaceScalar(mg, p_star, "p_*", /*preFE,*/ pbnd));
+                vtkWriter.add("level-set", lset.Phi.Data);
+//                vtkWriter.add(make_VTKIfaceVector(mg, u_star, "u_*", velFE, vbnd));
+//                vtkWriter.add(make_VTKIfaceVector(mg, u, "u_h", velFE, vbnd));
+//                vtkWriter.add(make_VTKIfaceScalar(mg, p, "p_h", /*preFE,*/ pbnd));
+//                vtkWriter.add(make_VTKIfaceScalar(mg, p_star, "p_*", /*preFE,*/ pbnd));
                 logger.beg("write initial condition to vtk");
-                    vtkWriter->Write(0);
+                    vtkWriter.write(0);
                 logger.end();
             }
             logger.beg("t = t_1");
@@ -486,7 +486,7 @@ int main(int argc, char* argv[]) {
                         logger.log();
                         if (everyStep > 0 && (i-1) % everyStep == 0) {
                             logger.beg("write vtk");
-                                vtkWriter->Write(t);
+                                vtkWriter.write(t);
                             logger.end();
                         }
                     };
