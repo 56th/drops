@@ -389,7 +389,6 @@ public:
     void setupB_P2P1(double B_P2P1[10][12]);
     void setupM_P2(double M_P2[10][10]);
     void setupF_P2(double F_P2[30]);
-    void setupM_P2_consistent (double M_P2[30][30]);
     void setupM_P1 (double M_P1[4][4]);
     void setupG_P1 (double G_P1[4]);
     void setupS_P2 (double S_P2[30][30]);
@@ -722,22 +721,6 @@ void LocalSurfOseen::setupF_P2(double F_P2[30]) {
     }
 }
 
-void LocalSurfOseen::setupM_P2_consistent(double M_P2[30][30]) {
-    for (size_t i = 0; i < 30; ++i) {
-        auto is = i / 3; // scalar shape index
-        auto in = i - 3 * is; // nonzero vect component
-        auto e_in = DROPS::std_basis<3>(in + 1);
-        for (size_t j = i; j < 30; ++j) {
-            auto js = j / 3; // scalar shape index
-            auto jn = j - 3 * js; // nonzero vect component
-            M_P2[i][j] = in == jn
-                    ? quad_2D(dot(e_in, qP_row[jn]) * qP2Hat[js] * qP2Hat[is], q2Ddomain)
-                    : 0.;
-            M_P2[j][i] = M_P2[i][j];
-        }
-    }
-}
-
 void LocalSurfOseen::setupN_P2(double N_P2[30][30]) {
     for (size_t i = 0; i < 30; ++i) {
         auto is = i / 3; // scalar shape index
@@ -745,7 +728,7 @@ void LocalSurfOseen::setupN_P2(double N_P2[30][30]) {
         for (size_t j = 0; j < 30; ++j) {
             auto js = j / 3; // scalar shape index
             auto jn = j - 3 * js; // nonzero vect component
-            N_P2[i][j] = quad_2D(dot(qWind, qP2Grad[js]) * take(qP, jn, in) * qP2Hat[is], q2Ddomain);
+            N_P2[i][j] = quad_2D(dot(qWind, qP2Grad[js]) * qP2Hat[is] * take(qP, jn, in), q2Ddomain);
         }
     }
 }
