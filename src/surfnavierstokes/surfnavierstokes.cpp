@@ -34,7 +34,6 @@
 #include "levelset/adaptriang.h"
 #include "levelset/surfacetension.h"
 #include "misc/dynamicload.h"
-//#include "out/vtkOut.h"
 #include "num/bndData.h"
 #include "num/precond.h"
 #include "VTKWriter.hpp"
@@ -95,8 +94,6 @@ int main(int argc, char* argv[]) {
             auto finalTime    = inpJSON.get<double>("Time.FinalTime");
             auto stepSize     = finalTime / numbOfSteps;
             auto everyStep = inpJSON.get<int>("Output.EveryStep");
-            int numbOfStepsVTK = ceil(static_cast<double>(everyStep) / everyStep);
-            if (numbOfStepsVTK < 0) numbOfStepsVTK = 0;
             logger.buf << "$\\Delta t$ = " << stepSize << '\n';
             // parse FE types and some other parameters from json file
             auto FE = inpJSON.get<std::string>("SurfNavStokes.FE");
@@ -284,7 +281,6 @@ int main(int argc, char* argv[]) {
                 Extend(mg, p, p_ext);
                 vtkWriter.write(t);
             };
-            // vtkWriter = new VTKOutCL(mg, "DROPS data", numbOfStepsVTK, dirName + "/vtk", testName + "_", testName, inpJSON.get<bool>("Output.Binary"));
             if (everyStep > 0) {
                 // level-set
                 VTKWriter::VTKVar vtkLevelSet;

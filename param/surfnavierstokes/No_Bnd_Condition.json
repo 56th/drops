@@ -1,7 +1,7 @@
 {
     "Output": {
       "Directory":  "../../output/surfnavierstokes",
-      "EveryStep":  "1",
+      "EveryStep":  2,
       "Binary":     true
     },
 
@@ -20,7 +20,7 @@
             "Freq":          0,
             "Width":         0,
             "CoarsestLevel": 0,
-            "FinestLevel":   3,
+            "FinestLevel":   1,
             "SD":            0.1,
             "CurvDiff":      -1,
             "Discontinuous": 0
@@ -52,7 +52,7 @@
     "Time": {
       "Read":         0,
       "Write":        "yes",
-      "NumbOfSteps":  1,
+      "NumbOfSteps":  10,
       "FinalTime":    1.0
     },
 

@@ -37,7 +37,7 @@ namespace DROPS {
             vars.push_back(var);
             return *this;
         }
-        VTKWriter& write(double t) {
+        VTKWriter& write(double time) {
             std::string funcName = __func__;
             // (1) update mesh, cf. https://lorensen.github.io/VTKExamples/site/Cxx/IO/WriteVTU/
             vertexIndex.clear();
@@ -113,10 +113,34 @@ namespace DROPS {
             }
             // (3) write
             auto writer = vtkSmartPointer<vtkXMLUnstructuredGridWriter>::New();
-            writer->SetFileName((path + '_' + std::to_string(frame++) + ".vtu").c_str());
+            auto name = path + '_' + std::to_string(frame) + ".vtu";
+            writer->SetFileName(name.c_str());
             writer->SetInputData(unstructuredGrid);
             if (!binary) writer->SetDataModeToAscii();
             writer->Write();
+            // (4) update .pvd
+            name = name.substr(name.find_last_of("/\\") + 1);
+            if  (frame == 0) {
+                std::ofstream pvd(path + ".pvd");
+                pvd <<
+                    "<?xml version=\"1.0\"?>\n"
+                    "<VTKFile type=\"Collection\" version=\"0.1\" byte_order=\"LittleEndian\">\n"
+                    "<Collection>\n"
+                        "\t<DataSet timestep=\""<< time <<"\" group=\"\" part=\"0\" file=\"" << name <<"\"/>\n"
+                    "</Collection>\n"
+                    "</VTKFile>";
+            } else {
+                std::ofstream pvd;
+                pvd.open(path + ".pvd", std::ios_base::in);
+                if(!pvd.is_open()) std::logic_error(funcName + ": cannot reopen .pvd file");
+                pvd.seekp(-24, std::ios_base::end);
+                pvd <<
+                        "\t<DataSet timestep=\""<< time <<"\" group=\"\" part=\"0\" file=\"" << name <<"\"/>\n"
+                    "</Collection>\n"
+                    "</VTKFile>";
+                pvd.close();
+            }
+            ++frame;
             return *this;
         }
     };
