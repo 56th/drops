@@ -298,6 +298,7 @@ int main(int argc, char* argv[]) {
                 logger.beg("write initial condition to vtk");
                     writeVTK(0.);
                 logger.end();
+
             }
             logger.beg("t = t_1");
                 logger.beg("assemble");
@@ -495,14 +496,15 @@ int main(int argc, char* argv[]) {
                             tJSON.put("Integral.Error.PressureL2", preL2err);
                             // tJSON.put("Temp.wNw", dot(u_prev.Data, stokesSystem.N.Data * u_prev.Data));
                         }
-                        stats << tJSON;
-                        logger.buf << tJSON;
-                        logger.log();
                         if (everyStep > 0 && (i-1) % everyStep == 0) {
                             logger.beg("write vtk");
                                 writeVTK(t);
-                            logger.end();
+                            auto vtkTime = logger.end();
+                            tJSON.put("CPUTime.VTK", vtkTime);
                         }
+                        stats << tJSON;
+                        logger.buf << tJSON;
+                        logger.log();
                     };
                     exportStats(1);
                 logger.end();

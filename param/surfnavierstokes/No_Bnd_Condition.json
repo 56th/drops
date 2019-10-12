@@ -1,8 +1,8 @@
 {
     "Output": {
-      "Directory":  "../../output/surfnavierstokes",
-      "EveryStep":  2,
-      "Binary":     true
+      "Directory":  "../../output/new_vtk_ascii_3",
+      "EveryStep":  1,
+      "Binary":     false
     },
 
     "Mesh": {
@@ -20,7 +20,7 @@
             "Freq":          0,
             "Width":         0,
             "CoarsestLevel": 0,
-            "FinestLevel":   1,
+            "FinestLevel":   3,
             "SD":            0.1,
             "CurvDiff":      -1,
             "Discontinuous": 0
@@ -52,7 +52,7 @@
     "Time": {
       "Read":         0,
       "Write":        "yes",
-      "NumbOfSteps":  10,
+      "NumbOfSteps":  1,
       "FinalTime":    1.0
     },
 
