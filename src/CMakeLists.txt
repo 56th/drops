@@ -1,18 +1,21 @@
-cmake_minimum_required(VERSION 2.8.1)
+cmake_minimum_required(VERSION 3.3)
 
 project(drops)
 
-cmake_policy(SET CMP0015 NEW) #allows us to give relative paths in ${PARMETIS_HOME} and ${METIS_HOME} (when given relative paths in librarys these will be interpreted as relative to the root source directory)
+cmake_policy(SET CMP0015 NEW) # allows us to give relative paths in ${PARMETIS_HOME} and ${METIS_HOME} (when given relative paths in librarys these will be interpreted as relative to the root source directory)
 include(CMakeSettings.txt)
 
-#tell cmake to always include the home dir
+# tell cmake to always include the home dir
 include_directories(${CMAKE_SOURCE_DIR})
 
 # vtk
 find_package(VTK PATHS ${VTK_DIR})
 if(VTK_FOUND)
+    message(STATUS "VTK_DIR = ${VTK_DIR}")
+    message(STATUS "VTK_LIBRARIES = ${VTK_LIBRARIES}")
     message(STATUS "VTK version is ${VTK_MAJOR_VERSION}.${VTK_MINOR_VERSION}")
-    include_directories(${VTK_INCLUDE_DIRS})
+    # set(VTK_INCLUDE_DIRS /home/alexander/VTK/Common/Core)
+    # include_directories(${VTK_INCLUDE_DIRS})
     add_definitions("-D_VTK=1")
 else()
     message(WARNING "VTK not found")

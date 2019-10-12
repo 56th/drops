@@ -227,10 +227,12 @@ int main(int argc, char* argv[]) {
                     << "numb of d.o.f. scalar P2: " << P2FEidx.NumUnknowns() << '\n'
                     << "numb of d.o.f. scalar P1: " << P1FEidx.NumUnknowns();
             logger.log();
-            VecDescCL u_star, u, u_prev, u_prev_prev, p_star, p;
+            VecDescCL u_star, u_star_ext, u, u_ext, u_prev, u_prev_prev, p_star, p_star_ext, p, p_ext;
             if (FE == "P2P1") {
                 u.SetIdx(&ifaceVecP2idx);
+                u_ext.SetIdx(&vecP2idx);
                 u_star.SetIdx(&ifaceVecP2idx);
+                u_star_ext.SetIdx(&vecP2idx);
                 u_prev.SetIdx(&ifaceVecP2idx);
                 u_prev_prev.SetIdx(&ifaceVecP2idx);
                 stokesSystem.w.SetIdx(&ifaceVecP2idx);
@@ -242,24 +244,26 @@ int main(int argc, char* argv[]) {
                 stokesSystem.M.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
                 stokesSystem.S.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
             }
-            else if(FE == "P1P1") {
-                u.SetIdx(&ifaceVecP1idx);
-                u_star.SetIdx(&ifaceVecP1idx);
-                u_prev.SetIdx(&ifaceVecP1idx);
-                u_prev_prev.SetIdx(&ifaceVecP1idx);
-                stokesSystem.w.SetIdx(&ifaceVecP1idx);
-                stokesSystem.fRHS.SetIdx(&ifaceVecP1idx);
-                stokesSystem.gRHS.SetIdx(&ifaceP1idx);
-                stokesSystem.A.SetIdx(&ifaceVecP1idx, &ifaceVecP1idx);
-                stokesSystem.N.SetIdx(&ifaceVecP1idx, &ifaceVecP1idx);
-                stokesSystem.A_stab.SetIdx(&ifaceVecP1idx, &ifaceVecP1idx);
-                stokesSystem.B.SetIdx(&ifaceP1idx, &ifaceVecP1idx);
-                stokesSystem.M.SetIdx(&ifaceVecP1idx, &ifaceVecP1idx);
-                stokesSystem.S.SetIdx(&ifaceVecP1idx, &ifaceVecP1idx);
-            }
+//            else if(FE == "P1P1") {
+//                u.SetIdx(&ifaceVecP1idx);
+//                u_star.SetIdx(&ifaceVecP1idx);
+//                u_prev.SetIdx(&ifaceVecP1idx);
+//                u_prev_prev.SetIdx(&ifaceVecP1idx);
+//                stokesSystem.w.SetIdx(&ifaceVecP1idx);
+//                stokesSystem.fRHS.SetIdx(&ifaceVecP1idx);
+//                stokesSystem.gRHS.SetIdx(&ifaceP1idx);
+//                stokesSystem.A.SetIdx(&ifaceVecP1idx, &ifaceVecP1idx);
+//                stokesSystem.N.SetIdx(&ifaceVecP1idx, &ifaceVecP1idx);
+//                stokesSystem.A_stab.SetIdx(&ifaceVecP1idx, &ifaceVecP1idx);
+//                stokesSystem.B.SetIdx(&ifaceP1idx, &ifaceVecP1idx);
+//                stokesSystem.M.SetIdx(&ifaceVecP1idx, &ifaceVecP1idx);
+//                stokesSystem.S.SetIdx(&ifaceVecP1idx, &ifaceVecP1idx);
+//            }
             else throw std::invalid_argument(FE + ": unknown FE pair");
             p.SetIdx(&ifaceP1idx);
+            p_ext.SetIdx(&P1FEidx);
             p_star.SetIdx(&ifaceP1idx);
+            p_star_ext.SetIdx(&P1FEidx);
             stokesSystem.gRHS.SetIdx(&ifaceP1idx);
             stokesSystem.Schur.SetIdx(&ifaceP1idx, &ifaceP1idx);
             stokesSystem.Schur_full_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
@@ -272,17 +276,27 @@ int main(int argc, char* argv[]) {
             logger.end();
         logger.end();
         logger.beg("solve");
-
-            VTKWriter vtkWriter(dirName + "/vtk/" + testName, mg);
+            VTKWriter vtkWriter(dirName + "/vtk/" + testName, mg, inpJSON.get<bool>("Output.Binary"));
             // vtkWriter = new VTKOutCL(mg, "DROPS data", numbOfStepsVTK, dirName + "/vtk", testName + "_", testName, inpJSON.get<bool>("Output.Binary"));
             if (everyStep > 0) {
-                vtkWriter.add("level-set", lset.Phi.Data);
-//                vtkWriter.add(make_VTKIfaceVector(mg, u_star, "u_*", velFE, vbnd));
-//                vtkWriter.add(make_VTKIfaceVector(mg, u, "u_h", velFE, vbnd));
-//                vtkWriter.add(make_VTKIfaceScalar(mg, p, "p_h", /*preFE,*/ pbnd));
-//                vtkWriter.add(make_VTKIfaceScalar(mg, p_star, "p_*", /*preFE,*/ pbnd));
+                // level-set
+                VTKWriter::VTKVar vtkLevelSet;
+                vtkLevelSet.name = "level-set";
+                vtkLevelSet.value = &lset.Phi.Data;
+                vtkLevelSet.type = VTKWriter::VTKVar::Type::P2;
+                vtkWriter.add(vtkLevelSet);
+                vtkWriter.add(VTKWriter::VTKVar({ "u_h", &u_ext.Data, VTKWriter::VTKVar::Type::vectP2 }));
+                vtkWriter.add(VTKWriter::VTKVar({ "p_h", &p_ext.Data, VTKWriter::VTKVar::Type::P1 }));
+                if (surfNavierStokesData.exactSoln) {
+                    vtkWriter.add(VTKWriter::VTKVar({ "u_*", &u_star_ext.Data, VTKWriter::VTKVar::Type::vectP2 }));
+                    vtkWriter.add(VTKWriter::VTKVar({ "p_*", &p_star_ext.Data, VTKWriter::VTKVar::Type::P1 }));
+                }
                 logger.beg("write initial condition to vtk");
-                    vtkWriter.write(0);
+                    Extend(mg, u_star, u_star_ext);
+                    Extend(mg, u, u_ext);
+                    Extend(mg, p_star, p_star_ext);
+                    Extend(mg, p, p_ext);
+                    vtkWriter.write(0.);
                 logger.end();
             }
             logger.beg("t = t_1");
@@ -298,7 +312,7 @@ int main(int argc, char* argv[]) {
                     };
                     if (!setWind(stokesSystem.w)) // Navier-Stokes case
                         stokesSystem.w = u_prev;
-        SetupSurfOseen_P2P1(mg, lset, &stokesSystem, &param);
+                    SetupSurfOseen_P2P1(mg, lset, &stokesSystem, &param);
                     logger.buf
                             << "numb of cut tetras is         " << param.output.numbOfCutTetras << '\n'
                             << "stiffness mtx is              " << stokesSystem.A.Data.num_rows() << " * " << stokesSystem.A.Data.num_cols() << '\n'
@@ -486,6 +500,10 @@ int main(int argc, char* argv[]) {
                         logger.log();
                         if (everyStep > 0 && (i-1) % everyStep == 0) {
                             logger.beg("write vtk");
+                                Extend(mg, u_star, u_star_ext);
+                                Extend(mg, u, u_ext);
+                                Extend(mg, p_star, p_star_ext);
+                                Extend(mg, p, p_ext);
                                 vtkWriter.write(t);
                             logger.end();
                         }
@@ -512,7 +530,7 @@ int main(int argc, char* argv[]) {
                         param.input.t = i * stepSize;
                         if (!setWind(stokesSystem.w)) // Navier-Stokes case
                             stokesSystem.w.Data = 2. * u_prev.Data - u_prev_prev.Data;
-                SetupSurfOseen_P2P1(mg, lset, &stokesSystem, &param);
+                        SetupSurfOseen_P2P1(mg, lset, &stokesSystem, &param);
                         stokesSystem.fRHS.Data += (2. / stepSize) * (stokesSystem.M.Data * u_prev.Data) - (.5 / stepSize) * (stokesSystem.M.Data * u_prev_prev.Data);
                         stokesSystem.gRHS.Data -= (dot(stokesSystem.gRHS.Data, I_p) / dot(I_p, I_p)) * I_p;
                         A_dyn.LinComb(1.5 / stepSize, stokesSystem.M.Data, 1., stokesSystem.N.Data, nu, stokesSystem.A.Data, tau_u, stokesSystem.S.Data, rho_u, stokesSystem.A_stab.Data);
