@@ -18,7 +18,7 @@ namespace DROPS {
     class VTKWriter {
     public:
         struct VTKVar {
-            enum class Type { P2, vectP2, P1, vectP1 };
+            enum class Type { P2, vecP2, P1, vecP1 };
             std::string name;
             VectorCL* value;
             Type type;
@@ -99,7 +99,17 @@ namespace DROPS {
                     array->SetName(var.name.c_str());
                     unstructuredGrid->GetPointData()->AddArray(array);
                 }
-                // https://vtk.org/Wiki/VTK/Examples/Cxx/PolyData/PolyDataCellNormals
+                if (var.type == VTKVar::Type::vecP2) {
+                    if (var.value->size() != 3 * n)
+                        throw std::invalid_argument(funcName + ": inconsistent number of d.o.f. for vecP2 interpolant");
+                    auto array = vtkSmartPointer<vtkDoubleArray>::New();
+                    array->SetNumberOfComponents(3); // cf. https://vtk.org/Wiki/VTK/Examples/Cxx/PolyData/PolyDataCellNormals
+                    array->SetArray(&var.value->operator[](0), 3 * n, 1);
+                    array->SetName(var.name.c_str());
+                    unstructuredGrid->GetPointData()->AddArray(array);
+                }
+                if (var.type == VTKVar::Type::vecP1)
+                    throw std::logic_error(funcName + ": vecP1 export not yet implemented");
             }
             // (3) write
             auto writer = vtkSmartPointer<vtkXMLUnstructuredGridWriter>::New();

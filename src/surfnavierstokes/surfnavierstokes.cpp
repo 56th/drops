@@ -293,11 +293,11 @@ int main(int argc, char* argv[]) {
                 vtkLevelSet.type = VTKWriter::VTKVar::Type::P2;
                 vtkWriter
                     .add(vtkLevelSet)
-                    .add(VTKWriter::VTKVar({ "u_h", &u_ext.Data, VTKWriter::VTKVar::Type::vectP2 }))
+                    .add(VTKWriter::VTKVar({ "u_h", &u_ext.Data, VTKWriter::VTKVar::Type::vecP2 }))
                     .add(VTKWriter::VTKVar({ "p_h", &p_ext.Data, VTKWriter::VTKVar::Type::P1 }));
                 if (surfNavierStokesData.exactSoln)
                     vtkWriter
-                        .add(VTKWriter::VTKVar({ "u_*", &u_star_ext.Data, VTKWriter::VTKVar::Type::vectP2 }))
+                        .add(VTKWriter::VTKVar({ "u_*", &u_star_ext.Data, VTKWriter::VTKVar::Type::vecP2 }))
                         .add(VTKWriter::VTKVar({ "p_*", &p_star_ext.Data, VTKWriter::VTKVar::Type::P1 }));
                 logger.beg("write initial condition to vtk");
                     writeVTK(0.);
