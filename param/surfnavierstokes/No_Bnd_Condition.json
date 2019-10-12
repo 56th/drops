@@ -1,6 +1,6 @@
 {
     "Output": {
-      "Directory":  "../../output/new_vtk_ascii_3",
+      "Directory":  "../../output/new_vtk_ascii_5",
       "EveryStep":  1,
       "Binary":     false
     },
@@ -20,7 +20,7 @@
             "Freq":          0,
             "Width":         0,
             "CoarsestLevel": 0,
-            "FinestLevel":   3,
+            "FinestLevel":   5,
             "SD":            0.1,
             "CurvDiff":      -1,
             "Discontinuous": 0

@@ -31,17 +31,9 @@ namespace DROPS {
         std::unordered_map<VertexCL const *, size_t> vertexIndex;
         std::unordered_map<EdgeCL const *, size_t> edgeIndex;
         size_t frame = 0;
+        vtkSmartPointer<vtkUnstructuredGrid> unstructuredGrid = vtkSmartPointer<vtkUnstructuredGrid>::New();
     public:
-        VTKWriter(std::string const & path, MultiGridCL const & mg, bool binary = true) : path(path), mg(&mg), binary(binary) {}
-        VTKWriter& add(VTKVar const & var) {
-            vars.push_back(var);
-            return *this;
-        }
-        VTKWriter& write(double time) {
-            std::string funcName = __func__;
-            // (1) update mesh, cf. https://lorensen.github.io/VTKExamples/site/Cxx/IO/WriteVTU/
-            vertexIndex.clear();
-            edgeIndex.clear();
+        VTKWriter(std::string const & path_, MultiGridCL const & mg_, bool binary_ = true) : path(path_), mg(&mg_), binary(binary_) {
             size_t n = 0;
             auto points = vtkSmartPointer<vtkPoints>::New();
             for (auto it = mg->GetTriangVertexBegin(); it != mg->GetTriangVertexEnd(); ++it) {
@@ -70,10 +62,21 @@ namespace DROPS {
                 tetra->GetPointIds()->SetId(9, edgeIndex[it->GetEdge(EdgeByVert(2, 3))]);
                 cellArray->InsertNextCell(tetra);
             }
-            auto unstructuredGrid = vtkSmartPointer<vtkUnstructuredGrid>::New();
             unstructuredGrid->SetPoints(points);
             unstructuredGrid->SetCells(VTK_LAGRANGE_TETRAHEDRON, cellArray);
+        }
+        VTKWriter& add(VTKVar const & var) {
+            vars.push_back(var);
+            return *this;
+        }
+        VTKWriter& write(double time) {
+            std::string funcName = __func__;
+            // (1) update mesh, cf. https://lorensen.github.io/VTKExamples/site/Cxx/IO/WriteVTU/
+            // vertexIndex.clear();
+            // edgeIndex.clear();
+            // ...
             // (2) update vars
+            auto n = unstructuredGrid->GetNumberOfPoints();
             for (auto const & var : vars) {
                 if(var.type == VTKVar::Type::P2) {
                     if (var.value->size() != n)
