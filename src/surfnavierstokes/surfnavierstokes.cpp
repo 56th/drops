@@ -34,9 +34,9 @@
 #include "levelset/adaptriang.h"
 #include "levelset/surfacetension.h"
 #include "misc/dynamicload.h"
-#include "out/vtkOut.h"
 #include "num/bndData.h"
 #include "num/precond.h"
+#include "VTKWriter.hpp"
 
 #include "num/oseensolver.h"
 #include "surfactant/ifacetransp.h"
@@ -81,21 +81,19 @@ int main(int argc, char* argv[]) {
         logger.end();
         logger.beg("set up test case");
             auto h = inpJSON.get<DROPS::Point3DCL>("Mesh.E1")[0] / inpJSON.get<double>("Mesh.N1") * std::pow(2., -inpJSON.get<double>("Mesh.AdaptRef.FinestLevel"));
-            auto tau_u_order  = inpJSON.get<double>("SurfNavStokes.normal_penalty_pow");
-            auto tau_u_factor = inpJSON.get<double>("SurfNavStokes.normal_penalty_fac");
+            auto tau_u_order  = inpJSON.get<double>("SurfNavStokes.NormalPenaltyPower");
+            auto tau_u_factor = inpJSON.get<double>("SurfNavStokes.NormalPenaltyFactor");
             auto tau_u 		  = tau_u_factor * pow(h, tau_u_order); // constant for normal penalty
-            auto rho_u_order  = inpJSON.get<double>("SurfNavStokes.vel_volumestab_pow");
-            auto rho_u_factor = inpJSON.get<double>("SurfNavStokes.vel_volumestab_fac");
+            auto rho_u_order  = inpJSON.get<double>("SurfNavStokes.VelocityVolumestabPower");
+            auto rho_u_factor = inpJSON.get<double>("SurfNavStokes.VelocityVolumestabFactor");
             auto rho_u        = rho_u_factor  * pow(h, rho_u_order); // constant for velocity stabilisation
-            auto rho_p_order  = inpJSON.get<double>("SurfNavStokes.pre_volumestab_pow");
-            auto rho_p_factor = inpJSON.get<double>("SurfNavStokes.pre_volumestab_fac");
+            auto rho_p_order  = inpJSON.get<double>("SurfNavStokes.PressureVolumestabPower");
+            auto rho_p_factor = inpJSON.get<double>("SurfNavStokes.PressureVolumestabFactor");
             auto rho_p        = rho_p_factor  * pow(h, rho_p_order); // constant for pressure stabilisation
             auto numbOfSteps  = inpJSON.get<size_t>("Time.NumbOfSteps");
             auto finalTime    = inpJSON.get<double>("Time.FinalTime");
             auto stepSize     = finalTime / numbOfSteps;
             auto everyStep = inpJSON.get<int>("Output.EveryStep");
-            int numbOfStepsVTK = ceil(static_cast<double>(everyStep) / everyStep);
-            if (numbOfStepsVTK < 0) numbOfStepsVTK = 0;
             logger.buf << "$\\Delta t$ = " << stepSize << '\n';
             // parse FE types and some other parameters from json file
             auto FE = inpJSON.get<std::string>("SurfNavStokes.FE");
@@ -129,7 +127,7 @@ int main(int argc, char* argv[]) {
                 logger.buf << "using inconsistent penalty formulation\n";
             }
             SurfOseenSystem stokesSystem;
-            auto stab = inpJSON.get<std::string>("SurfNavStokes.stab");
+            auto stab = inpJSON.get<std::string>("SurfNavStokes.PressureVolumestabType");
             if (!inpJSON.get<bool>("SurfNavStokes.ExportMatrices")) {
                 stokesSystem.Schur_full_stab.assemble   = (stab == "full");
                 stokesSystem.Schur_normal_stab.assemble = (stab == "normal");
@@ -226,10 +224,12 @@ int main(int argc, char* argv[]) {
                     << "numb of d.o.f. scalar P2: " << P2FEidx.NumUnknowns() << '\n'
                     << "numb of d.o.f. scalar P1: " << P1FEidx.NumUnknowns();
             logger.log();
-            VecDescCL u_star, u, u_prev, u_prev_prev, p_star, p;
+            VecDescCL u_star, u_star_ext, u, u_ext, u_prev, u_prev_prev, p_star, p_star_ext, p, p_ext;
             if (FE == "P2P1") {
                 u.SetIdx(&ifaceVecP2idx);
+                u_ext.SetIdx(&vecP2idx);
                 u_star.SetIdx(&ifaceVecP2idx);
+                u_star_ext.SetIdx(&vecP2idx);
                 u_prev.SetIdx(&ifaceVecP2idx);
                 u_prev_prev.SetIdx(&ifaceVecP2idx);
                 stokesSystem.w.SetIdx(&ifaceVecP2idx);
@@ -241,24 +241,26 @@ int main(int argc, char* argv[]) {
                 stokesSystem.M.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
                 stokesSystem.S.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
             }
-            else if(FE == "P1P1") {
-                u.SetIdx(&ifaceVecP1idx);
-                u_star.SetIdx(&ifaceVecP1idx);
-                u_prev.SetIdx(&ifaceVecP1idx);
-                u_prev_prev.SetIdx(&ifaceVecP1idx);
-                stokesSystem.w.SetIdx(&ifaceVecP1idx);
-                stokesSystem.fRHS.SetIdx(&ifaceVecP1idx);
-                stokesSystem.gRHS.SetIdx(&ifaceP1idx);
-                stokesSystem.A.SetIdx(&ifaceVecP1idx, &ifaceVecP1idx);
-                stokesSystem.N.SetIdx(&ifaceVecP1idx, &ifaceVecP1idx);
-                stokesSystem.A_stab.SetIdx(&ifaceVecP1idx, &ifaceVecP1idx);
-                stokesSystem.B.SetIdx(&ifaceP1idx, &ifaceVecP1idx);
-                stokesSystem.M.SetIdx(&ifaceVecP1idx, &ifaceVecP1idx);
-                stokesSystem.S.SetIdx(&ifaceVecP1idx, &ifaceVecP1idx);
-            }
+//            else if(FE == "P1P1") {
+//                u.SetIdx(&ifaceVecP1idx);
+//                u_star.SetIdx(&ifaceVecP1idx);
+//                u_prev.SetIdx(&ifaceVecP1idx);
+//                u_prev_prev.SetIdx(&ifaceVecP1idx);
+//                stokesSystem.w.SetIdx(&ifaceVecP1idx);
+//                stokesSystem.fRHS.SetIdx(&ifaceVecP1idx);
+//                stokesSystem.gRHS.SetIdx(&ifaceP1idx);
+//                stokesSystem.A.SetIdx(&ifaceVecP1idx, &ifaceVecP1idx);
+//                stokesSystem.N.SetIdx(&ifaceVecP1idx, &ifaceVecP1idx);
+//                stokesSystem.A_stab.SetIdx(&ifaceVecP1idx, &ifaceVecP1idx);
+//                stokesSystem.B.SetIdx(&ifaceP1idx, &ifaceVecP1idx);
+//                stokesSystem.M.SetIdx(&ifaceVecP1idx, &ifaceVecP1idx);
+//                stokesSystem.S.SetIdx(&ifaceVecP1idx, &ifaceVecP1idx);
+//            }
             else throw std::invalid_argument(FE + ": unknown FE pair");
             p.SetIdx(&ifaceP1idx);
+            p_ext.SetIdx(&P1FEidx);
             p_star.SetIdx(&ifaceP1idx);
+            p_star_ext.SetIdx(&P1FEidx);
             stokesSystem.gRHS.SetIdx(&ifaceP1idx);
             stokesSystem.Schur.SetIdx(&ifaceP1idx, &ifaceP1idx);
             stokesSystem.Schur_full_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
@@ -271,19 +273,32 @@ int main(int argc, char* argv[]) {
             logger.end();
         logger.end();
         logger.beg("solve");
-            VTKOutCL* vtkWriter = nullptr;
+            VTKWriter vtkWriter(dirName + "/vtk/" + testName, mg, inpJSON.get<bool>("Output.Binary"));
+            auto writeVTK = [&](double t) {
+                Extend(mg, u_star, u_star_ext);
+                Extend(mg, u, u_ext);
+                Extend(mg, p_star, p_star_ext);
+                Extend(mg, p, p_ext);
+                vtkWriter.write(t);
+            };
             if (everyStep > 0) {
-                vtkWriter = new VTKOutCL(mg, "DROPS data", numbOfStepsVTK, dirName + "/vtk", testName + "_", testName, 0);
-                vtkWriter->Register(make_VTKScalar(lset.GetSolution(), "level-set"));
-                vtkWriter->Register(make_VTKIfaceVector(mg, u_star, "u_*", velFE, vbnd));
-                vtkWriter->Register(make_VTKIfaceVector(mg, stokesSystem.fRHS, "f_T", velFE, vbnd));
-                vtkWriter->Register(make_VTKIfaceVector(mg, u, "u_h", velFE, vbnd));
-                vtkWriter->Register(make_VTKIfaceScalar(mg, p, "p_h", /*preFE,*/ pbnd));
-                vtkWriter->Register(make_VTKIfaceScalar(mg, stokesSystem.gRHS, "-g", /*preFE,*/ pbnd));
-                vtkWriter->Register(make_VTKIfaceScalar(mg, p_star, "p_*", /*preFE,*/ pbnd));
+                // level-set
+                VTKWriter::VTKVar vtkLevelSet;
+                vtkLevelSet.name = "level-set";
+                vtkLevelSet.value = &lset.Phi.Data;
+                vtkLevelSet.type = VTKWriter::VTKVar::Type::P2;
+                vtkWriter
+                    .add(vtkLevelSet)
+                    .add(VTKWriter::VTKVar({ "u_h", &u_ext.Data, VTKWriter::VTKVar::Type::vecP2 }))
+                    .add(VTKWriter::VTKVar({ "p_h", &p_ext.Data, VTKWriter::VTKVar::Type::P1 }));
+                if (surfNavierStokesData.exactSoln)
+                    vtkWriter
+                        .add(VTKWriter::VTKVar({ "u_*", &u_star_ext.Data, VTKWriter::VTKVar::Type::vecP2 }))
+                        .add(VTKWriter::VTKVar({ "p_*", &p_star_ext.Data, VTKWriter::VTKVar::Type::P1 }));
                 logger.beg("write initial condition to vtk");
-                    vtkWriter->Write(0);
+                    writeVTK(0.);
                 logger.end();
+
             }
             logger.beg("t = t_1");
                 logger.beg("assemble");
@@ -500,14 +515,15 @@ int main(int argc, char* argv[]) {
                             tJSON.put("Integral.Error.PressureL2", preL2err);
                             // tJSON.put("Temp.wNw", dot(u_prev.Data, stokesSystem.N.Data * u_prev.Data));
                         }
+                        if (everyStep > 0 && (i-1) % everyStep == 0) {
+                            logger.beg("write vtk");
+                                writeVTK(t);
+                            auto vtkTime = logger.end();
+                            tJSON.put("CPUTime.VTK", vtkTime);
+                        }
                         stats << tJSON;
                         logger.buf << tJSON;
                         logger.log();
-                        if (everyStep > 0 && (i-1) % everyStep == 0) {
-                            logger.beg("write vtk");
-                                vtkWriter->Write(t);
-                            logger.end();
-                        }
                     };
                     exportStats(1);
                 logger.end();
@@ -531,7 +547,7 @@ int main(int argc, char* argv[]) {
                         param.input.t = i * stepSize;
                         if (!setWind(stokesSystem.w)) // Navier-Stokes case
                             stokesSystem.w.Data = 2. * u_prev.Data - u_prev_prev.Data;
-                SetupSurfOseen_P2P1(mg, lset, &stokesSystem, &param);
+                        SetupSurfOseen_P2P1(mg, lset, &stokesSystem, &param);
                         stokesSystem.fRHS.Data += (2. / stepSize) * (stokesSystem.M.Data * u_prev.Data) - (.5 / stepSize) * (stokesSystem.M.Data * u_prev_prev.Data);
                         stokesSystem.gRHS.Data -= (dot(stokesSystem.gRHS.Data, I_p) / dot(I_p, I_p)) * I_p;
                         A_dyn.LinComb(1.5 / stepSize, stokesSystem.M.Data, 1., stokesSystem.N.Data, nu, stokesSystem.A.Data, tau_u, stokesSystem.S.Data, rho_u, stokesSystem.A_stab.Data);
