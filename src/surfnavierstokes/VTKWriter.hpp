@@ -30,6 +30,7 @@ namespace DROPS {
         std::string path;
         std::unordered_map<VertexCL const *, size_t> vertexIndex;
         std::unordered_map<EdgeCL const *, size_t> edgeIndex;
+        size_t frame = 0;
     public:
         VTKWriter(std::string const & path, MultiGridCL const & mg, bool binary = true) : path(path), mg(&mg), binary(binary) {}
         VTKWriter& add(VTKVar const & var) {
@@ -102,7 +103,7 @@ namespace DROPS {
             }
             // (3) write
             auto writer = vtkSmartPointer<vtkXMLUnstructuredGridWriter>::New();
-            writer->SetFileName((path + '_' + std::to_string(t) + ".vtu").c_str());
+            writer->SetFileName((path + '_' + std::to_string(frame++) + ".vtu").c_str());
             writer->SetInputData(unstructuredGrid);
             if (!binary) writer->SetDataModeToAscii();
             writer->Write();

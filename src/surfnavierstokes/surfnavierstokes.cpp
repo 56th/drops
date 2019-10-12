@@ -82,14 +82,14 @@ int main(int argc, char* argv[]) {
         logger.end();
         logger.beg("set up test case");
             auto h = inpJSON.get<DROPS::Point3DCL>("Mesh.E1")[0] / inpJSON.get<double>("Mesh.N1") * std::pow(2., -inpJSON.get<double>("Mesh.AdaptRef.FinestLevel"));
-            auto tau_u_order  = inpJSON.get<double>("SurfNavStokes.normal_penalty_pow");
-            auto tau_u_factor = inpJSON.get<double>("SurfNavStokes.normal_penalty_fac");
+            auto tau_u_order  = inpJSON.get<double>("SurfNavStokes.NormalPenaltyPower");
+            auto tau_u_factor = inpJSON.get<double>("SurfNavStokes.NormalPenaltyFactor");
             auto tau_u 		  = tau_u_factor * pow(h, tau_u_order); // constant for normal penalty
-            auto rho_u_order  = inpJSON.get<double>("SurfNavStokes.vel_volumestab_pow");
-            auto rho_u_factor = inpJSON.get<double>("SurfNavStokes.vel_volumestab_fac");
+            auto rho_u_order  = inpJSON.get<double>("SurfNavStokes.VelocityVolumestabPower");
+            auto rho_u_factor = inpJSON.get<double>("SurfNavStokes.VelocityVolumestabFactor");
             auto rho_u        = rho_u_factor  * pow(h, rho_u_order); // constant for velocity stabilisation
-            auto rho_p_order  = inpJSON.get<double>("SurfNavStokes.pre_volumestab_pow");
-            auto rho_p_factor = inpJSON.get<double>("SurfNavStokes.pre_volumestab_fac");
+            auto rho_p_order  = inpJSON.get<double>("SurfNavStokes.PressureVolumestabPower");
+            auto rho_p_factor = inpJSON.get<double>("SurfNavStokes.PressureVolumestabFactor");
             auto rho_p        = rho_p_factor  * pow(h, rho_p_order); // constant for pressure stabilisation
             auto numbOfSteps  = inpJSON.get<size_t>("Time.NumbOfSteps");
             auto finalTime    = inpJSON.get<double>("Time.FinalTime");
@@ -130,7 +130,7 @@ int main(int argc, char* argv[]) {
                 logger.buf << "using inconsistent penalty formulation\n";
             }
             SurfOseenSystem stokesSystem;
-            auto stab = inpJSON.get<std::string>("SurfNavStokes.stab");
+            auto stab = inpJSON.get<std::string>("SurfNavStokes.PressureVolumestabType");
             if (!inpJSON.get<bool>("SurfNavStokes.ExportMatrices")) {
                 stokesSystem.Schur_full_stab.assemble   = (stab == "full");
                 stokesSystem.Schur_normal_stab.assemble = (stab == "normal");
@@ -277,6 +277,13 @@ int main(int argc, char* argv[]) {
         logger.end();
         logger.beg("solve");
             VTKWriter vtkWriter(dirName + "/vtk/" + testName, mg, inpJSON.get<bool>("Output.Binary"));
+            auto writeVTK = [&](double t) {
+                Extend(mg, u_star, u_star_ext);
+                Extend(mg, u, u_ext);
+                Extend(mg, p_star, p_star_ext);
+                Extend(mg, p, p_ext);
+                vtkWriter.write(t);
+            };
             // vtkWriter = new VTKOutCL(mg, "DROPS data", numbOfStepsVTK, dirName + "/vtk", testName + "_", testName, inpJSON.get<bool>("Output.Binary"));
             if (everyStep > 0) {
                 // level-set
@@ -284,19 +291,16 @@ int main(int argc, char* argv[]) {
                 vtkLevelSet.name = "level-set";
                 vtkLevelSet.value = &lset.Phi.Data;
                 vtkLevelSet.type = VTKWriter::VTKVar::Type::P2;
-                vtkWriter.add(vtkLevelSet);
-                vtkWriter.add(VTKWriter::VTKVar({ "u_h", &u_ext.Data, VTKWriter::VTKVar::Type::vectP2 }));
-                vtkWriter.add(VTKWriter::VTKVar({ "p_h", &p_ext.Data, VTKWriter::VTKVar::Type::P1 }));
-                if (surfNavierStokesData.exactSoln) {
-                    vtkWriter.add(VTKWriter::VTKVar({ "u_*", &u_star_ext.Data, VTKWriter::VTKVar::Type::vectP2 }));
-                    vtkWriter.add(VTKWriter::VTKVar({ "p_*", &p_star_ext.Data, VTKWriter::VTKVar::Type::P1 }));
-                }
+                vtkWriter
+                    .add(vtkLevelSet)
+                    .add(VTKWriter::VTKVar({ "u_h", &u_ext.Data, VTKWriter::VTKVar::Type::vectP2 }))
+                    .add(VTKWriter::VTKVar({ "p_h", &p_ext.Data, VTKWriter::VTKVar::Type::P1 }));
+                if (surfNavierStokesData.exactSoln)
+                    vtkWriter
+                        .add(VTKWriter::VTKVar({ "u_*", &u_star_ext.Data, VTKWriter::VTKVar::Type::vectP2 }))
+                        .add(VTKWriter::VTKVar({ "p_*", &p_star_ext.Data, VTKWriter::VTKVar::Type::P1 }));
                 logger.beg("write initial condition to vtk");
-                    Extend(mg, u_star, u_star_ext);
-                    Extend(mg, u, u_ext);
-                    Extend(mg, p_star, p_star_ext);
-                    Extend(mg, p, p_ext);
-                    vtkWriter.write(0.);
+                    writeVTK(0.);
                 logger.end();
             }
             logger.beg("t = t_1");
@@ -500,11 +504,7 @@ int main(int argc, char* argv[]) {
                         logger.log();
                         if (everyStep > 0 && (i-1) % everyStep == 0) {
                             logger.beg("write vtk");
-                                Extend(mg, u_star, u_star_ext);
-                                Extend(mg, u, u_ext);
-                                Extend(mg, p_star, p_star_ext);
-                                Extend(mg, p, p_ext);
-                                vtkWriter.write(t);
+                                writeVTK(t);
                             logger.end();
                         }
                     };
