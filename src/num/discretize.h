@@ -31,18 +31,12 @@
 #include "misc/problem.h"
 #include "misc/container.h"
 #include "num/fe.h"
+#include "num/functions.hpp"
 
-namespace DROPS
-{
-
-using instat_scalar_fun_ptr = std::function<double(Point3DCL const &, double)>;
-using instat_vector_fun_ptr = std::function<Point3DCL(Point3DCL const &, double)>;
-using instat_matrix_fun_ptr = std::function<SMatrixCL<3, 3>(Point3DCL const &, double)>;
-using scalar_tetra_function = std::function<double(const TetraCL&, const BaryCoordCL&, double)>;
-using vector_tetra_function = std::function<Point3DCL(const TetraCL&, const BaryCoordCL&, double)>;
-typedef bool (*match_fun)(const Point3DCL&, const Point3DCL&);
-typedef double (*SmoothFunT)(double,double);
-
+namespace DROPS {
+    using scalar_tetra_function = std::function<double(const TetraCL&, const BaryCoordCL&, double)>;
+    using vector_tetra_function = std::function<Point3DCL(const TetraCL&, const BaryCoordCL&, double)>;
+    using SmoothFunT = std::function<double(double, double)>;
 // SmoothedJumpCL for jumping coefficients
 
 class JumpCL
@@ -1226,9 +1220,9 @@ class Quad3PosWeightsCL
     static const BaryCoordCL* GetPoints() { return reinterpret_cast<const BaryCoordCL*>(_points[0]); }
 
     static inline double Quad(const TetraCL&, scalar_tetra_function, double);
-    static inline double Quad(const TetraCL&, instat_scalar_fun_ptr, double);
+    static inline double Quad(const TetraCL&, InstatScalarFunction, double);
     static inline SVectorCL<3> Quad(const TetraCL&, vector_tetra_function, double);
-    static inline SVectorCL<3> Quad(const TetraCL&, instat_vector_fun_ptr, double);
+    static inline SVectorCL<3> Quad(const TetraCL&, InstatVectorFunction, double);
 
     static inline double Quad(const double*);
     static inline SVectorCL<3> Quad(const SVectorCL<3>*);
@@ -1237,7 +1231,7 @@ class Quad3PosWeightsCL
       Quad(IteratorT, ValueT*const);
 };
 
-inline double Quad3PosWeightsCL::Quad(const TetraCL& t, instat_scalar_fun_ptr f, double tt)
+inline double Quad3PosWeightsCL::Quad(const TetraCL& t, InstatScalarFunction f, double tt)
 {
     const BaryCoordCL* pts= GetPoints();
     return ( f(GetWorldCoord(t, pts[0]), tt) + f(GetWorldCoord(t, pts[1]), tt)
@@ -1264,7 +1258,7 @@ inline SVectorCL<3> Quad3PosWeightsCL::Quad(const TetraCL& t, vector_tetra_funct
             +f(t, pts[6], tt) + f(t, pts[7], tt) )*3./80.;
 
 }
-inline SVectorCL<3> Quad3PosWeightsCL::Quad(const TetraCL& t, instat_vector_fun_ptr f, double tt)
+inline SVectorCL<3> Quad3PosWeightsCL::Quad(const TetraCL& t, InstatVectorFunction f, double tt)
 {
     const BaryCoordCL* pts= GetPoints();
     return ( f(GetWorldCoord(t, pts[0]), tt) + f(GetWorldCoord(t, pts[1]), tt)
@@ -1347,8 +1341,8 @@ class P1DiscCL
 
   public:
     // cubatur formula for int f(x) dx, exact up to degree 2
-    static inline double Quad(const TetraCL&, instat_scalar_fun_ptr, double= 0.0);
-    static inline SVectorCL<3> Quad(const TetraCL&, instat_vector_fun_ptr, double= 0.0);
+    static inline double Quad(const TetraCL&, InstatScalarFunction, double= 0.0);
+    static inline SVectorCL<3> Quad(const TetraCL&, InstatVectorFunction, double= 0.0);
     static inline SMatrixCL<3,3> Quad( const LocalP2CL< SMatrixCL<3,3> >& f, BaryCoordCL** bp);
     static inline SVectorCL<3> Quad( const LocalP2CL< SVectorCL<3> >& f, BaryCoordCL** bp);
     template<class ValueT>
@@ -1358,17 +1352,17 @@ class P1DiscCL
     template<class ValueT>
     static inline ValueT Quad( const LocalP2CL<ValueT>& f);
     // cubatur formula for int f(x)*phi_i dx, exact up to degree 1
-    static inline double Quad(const TetraCL&, instat_scalar_fun_ptr, Uint, double= 0.0);
+    static inline double Quad(const TetraCL&, InstatScalarFunction, Uint, double= 0.0);
     // cubatur formula for int f(x)*phi_i*phi_j dx, exact up to degree 1
-    static inline double Quad(const TetraCL&, instat_scalar_fun_ptr, Uint, Uint, double= 0.0);
+    static inline double Quad(const TetraCL&, InstatScalarFunction, Uint, Uint, double= 0.0);
     // cubatur formula for int f(x)*phi_i*phi_j dx, exact up to degree 1
     static inline double Quad(const TetraCL&, scalar_tetra_function, Uint, Uint, double= 0.0);
     // cubatur formula for int f(x)*phi_i over face, exact up to degree 1
-    static inline double Quad2D(const TetraCL&, Uint face, instat_scalar_fun_ptr, Uint, double= 0.0);
-    static inline SVectorCL<3> Quad2D(const TetraCL&, Uint face, instat_vector_fun_ptr, Uint, double= 0.0);
+    static inline double Quad2D(const TetraCL&, Uint face, InstatScalarFunction, Uint, double= 0.0);
+    static inline SVectorCL<3> Quad2D(const TetraCL&, Uint face, InstatVectorFunction, Uint, double= 0.0);
     // computes the square of the L2-norm of a given function f:
     // f^2 is integrated exact up to degree 2
-    static inline double norm_L2_sq(const TetraCL&, instat_scalar_fun_ptr, double= 0.0);
+    static inline double norm_L2_sq(const TetraCL&, InstatScalarFunction, double= 0.0);
     // returns int phi_i*phi_j dx
     static inline double GetMass( int i, int j) { return i!=j ? 1./120. : 1./60.; }
     // returns int phi_i dx
@@ -1452,7 +1446,7 @@ class P2DiscCL
         }
     }
     // cubatur formula for int f(x)*phi_i dx, exact up to degree 1
-    static inline SVectorCL<3> Quad( const TetraCL& tetra, instat_vector_fun_ptr, Uint, double= 0.0);
+    static inline SVectorCL<3> Quad(const TetraCL& tetra, InstatVectorFunction, Uint, double= 0.0);
     // cubatur formula for int f(x)*phi_i dx, exact up to degree 2
     template<class valT>
     static inline valT Quad( valT f[10], int i);
@@ -1528,7 +1522,7 @@ inline double VolFrac (const SMatrixCL<4, 4>& A)
            + M[0][2] * (M[1][0]*M[2][1] - M[1][1]*M[2][0]));
 }
 
-inline double P1DiscCL::Quad(const TetraCL& s, instat_scalar_fun_ptr coeff, double t)
+inline double P1DiscCL::Quad(const TetraCL& s, InstatScalarFunction coeff, double t)
 {
     return ( coeff(s.GetVertex(0)->GetCoord(), t)
             +coeff(s.GetVertex(1)->GetCoord(), t)
@@ -1537,7 +1531,7 @@ inline double P1DiscCL::Quad(const TetraCL& s, instat_scalar_fun_ptr coeff, doub
             + 2./15.*coeff(GetBaryCenter(s), t);
 }
 
-inline SVectorCL<3> P1DiscCL::Quad(const TetraCL& s, instat_vector_fun_ptr coeff, double t)
+inline SVectorCL<3> P1DiscCL::Quad(const TetraCL& s, InstatVectorFunction coeff, double t)
 {
     return ( coeff(s.GetVertex(0)->GetCoord(), t)
             +coeff(s.GetVertex(1)->GetCoord(), t)
@@ -1546,7 +1540,7 @@ inline SVectorCL<3> P1DiscCL::Quad(const TetraCL& s, instat_vector_fun_ptr coeff
             + 2./15.*coeff(GetBaryCenter(s), t);
 }
 
-inline double P1DiscCL::Quad( const TetraCL& s, instat_scalar_fun_ptr coeff, Uint i, double t)
+inline double P1DiscCL::Quad( const TetraCL& s, InstatScalarFunction coeff, Uint i, double t)
 {
     double f_Vert_i= coeff( s.GetVertex(i)->GetCoord(), t ),
            f_Bary  = coeff( GetBaryCenter(s), t ),
@@ -1599,7 +1593,7 @@ inline ValueT P1DiscCL::Quad( const LocalP2CL<ValueT>& f)
     return 1./30.*(f[4] + f[5] + f[6] + f[7] + f[8] + f[9]) - 1./120.*(f[0] + f[1] + f[2] + f[3]);
 }
 
-inline double P1DiscCL::Quad( const TetraCL& s, instat_scalar_fun_ptr coeff, Uint i, Uint j, double t)
+inline double P1DiscCL::Quad( const TetraCL& s, InstatScalarFunction coeff, Uint i, Uint j, double t)
 {
     double f_Vert_ij= coeff( s.GetVertex(i)->GetCoord(), t ),
            f_Bary  = coeff( GetBaryCenter(s), t ),
@@ -1641,7 +1635,7 @@ inline double P1DiscCL::Quad( const TetraCL& s, scalar_tetra_function coeff, Uin
     }
 }
 
-inline double P1DiscCL::Quad2D(const TetraCL& t, Uint face, instat_scalar_fun_ptr bfun, Uint vert, double time)
+inline double P1DiscCL::Quad2D(const TetraCL& t, Uint face, InstatScalarFunction bfun, Uint vert, double time)
 // Integrate neu_val() * phi_vert over face
 {
     Point3DCL v[3];
@@ -1661,7 +1655,7 @@ inline double P1DiscCL::Quad2D(const TetraCL& t, Uint face, instat_scalar_fun_pt
     return (11./240.*f0 + 1./240.*f1 + 9./80.*f2) * absdet;
 }
 
-inline SVectorCL<3> P1DiscCL::Quad2D(const TetraCL& t, Uint face, instat_vector_fun_ptr bfun, Uint vert, double time)
+inline SVectorCL<3> P1DiscCL::Quad2D(const TetraCL& t, Uint face, InstatVectorFunction bfun, Uint vert, double time)
 // Integrate neu_val() * phi_vert over face
 {
     Point3DCL v[3];
@@ -1681,7 +1675,7 @@ inline SVectorCL<3> P1DiscCL::Quad2D(const TetraCL& t, Uint face, instat_vector_
     return (11./240.*f0 + 1./240.*f1 + 9./80.*f2) * absdet;
 }
 
-inline double P1DiscCL::norm_L2_sq(const TetraCL& s, instat_scalar_fun_ptr coeff, double t)
+inline double P1DiscCL::norm_L2_sq(const TetraCL& s, InstatScalarFunction coeff, double t)
 {
     const double f0= coeff(s.GetVertex(0)->GetCoord(), t);
     const double f1= coeff(s.GetVertex(1)->GetCoord(), t);
@@ -1811,7 +1805,7 @@ inline SVectorCL<3> P1BubbleDiscCL::Quad(const SVectorCL<3>* vals, Uint i)
            +32./2835.*(vals[4] + vals[5] + vals[6] + vals[7] + vals[8] + vals[9]);
 }
 
-inline SVectorCL<3> P2DiscCL::Quad( const TetraCL& tetra, instat_vector_fun_ptr coeff, Uint i, double t)
+inline SVectorCL<3> P2DiscCL::Quad(const TetraCL& tetra, InstatVectorFunction coeff, Uint i, double t)
 {
     SVectorCL<3> f[5];
 

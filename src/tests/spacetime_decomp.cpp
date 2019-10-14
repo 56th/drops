@@ -47,7 +47,7 @@ double test_one(__UNUSED__ const Point3DCL& p, __UNUSED__ double t)
     return 1.0;
 }
 
-typedef double    (*instat_scalar_fun_ptr)(const DROPS::Point3DCL&, double);
+typedef double    (*InstatScalarFunction)(const DROPS::Point3DCL&, double);
 
 
 // Decompose reference prism4 into pentatopes. 

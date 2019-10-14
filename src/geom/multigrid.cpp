@@ -42,6 +42,7 @@
 #include "geom/subtriangulation.h"
 #include <iterator>
 #include <set>
+#include <stokes/stokesCoeff.h>
 
 namespace DROPS
 {
@@ -52,7 +53,7 @@ BoundaryCL::~BoundaryCL()
         delete *It;
 }
 
-void BoundaryCL::SetPeriodicBnd( const BndTypeCont& type, match_fun match) const
+void BoundaryCL::SetPeriodicBnd(const BndTypeCont& type, MatchFunction match) const
 {
     if (type.size()!=GetNumBndSeg())
         throw DROPSErrCL("BoundaryCL::SetPeriodicBnd: inconsistent vector size!");
@@ -461,7 +462,7 @@ void MultiGridCL::Scale( __UNUSED__ double s)
 #endif
 }
 
-void MultiGridCL::Transform( __UNUSED__ Point3DCL (*mapping)(const Point3DCL&))
+void MultiGridCL::Transform(VectorFunction const & mapping)
 {
 #ifndef _PAR
     for (VertexIterator it= GetAllVertexBegin(), end= GetAllVertexEnd(); it!=end; ++it)
@@ -1356,7 +1357,7 @@ void read_PeriodicBoundaries (MultiGridCL& mg, const ParamCL& P)
     const BoundaryCL& bnd= mg.GetBnd();
     const BndIdxT num_bnd= bnd.GetNumBndSeg();
 
-    match_fun mfun= 0;
+    MatchFunction mfun= 0;
     BoundaryCL::BndTypeCont bnd_type( num_bnd, BoundaryCL::OtherBnd);
 
     // Try to read and set PeriodicMatching.
@@ -1368,7 +1369,7 @@ void read_PeriodicBoundaries (MultiGridCL& mg, const ParamCL& P)
         try {
             const std::string s= child->get_value<std::string>();
             if (s != "")
-                mfun= SingletonMapCL<match_fun>::getInstance()[s];
+                mfun= SingletonMapCL<MatchFunction>::getInstance()[s];
         } catch (DROPSErrCL e) {
             std:: cerr << "read_PeriodicBoundaries: While processing 'PeriodicMatching'...\n";
             throw e;

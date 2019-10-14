@@ -96,8 +96,8 @@ class TwoPhaseFlowCoeffCL
     double beta_coeff1, beta_coeff2; ///< slip bnd coeff for fluid 1/2
 
   public:
-    DROPS::instat_vector_fun_ptr volforce;
-    DROPS::instat_vector_fun_ptr BndOutNormal;
+    DROPS::InstatVectorFunction volforce;
+    DROPS::InstatVectorFunction BndOutNormal;
     const SmoothedJumpCL rho, mu;
     const SmoothedJumpCL beta;      ///< Coefficient for SlipBC
     const double SurfTens, DilVisco, ShearVisco;
@@ -105,7 +105,7 @@ class TwoPhaseFlowCoeffCL
                  alpha;             ///< Nitsche coeff for slip bnd
     const Point3DCL g;
     const Point3DCL framevel;
-    DROPS::instat_scalar_fun_ptr var_tau_fncs;
+    DROPS::InstatScalarFunction var_tau_fncs;
 
     TwoPhaseFlowCoeffCL( ParamCL& P, bool dimless = false)
       //big question: film or measurecell? 1: measure, 2: film
@@ -200,8 +200,8 @@ private:
                  prMhat;
     mutable VectorBaseCL<VectorCL> cKernel;
     SurfaceTensionCL*     SurfTension_;
-    instat_scalar_fun_ptr CtAngleFnc_;
-    instat_vector_fun_ptr BndOutNormal_;
+    InstatScalarFunction CtAngleFnc_;
+    InstatVectorFunction BndOutNormal_;
 
   public:
     InstatStokes2PhaseP2P1CL( const MGBuilderCL& mgb, const TwoPhaseFlowCoeffCL& coeff, const BndDataCL& bdata, FiniteElementT prFE= P1_FE, double XFEMstab=0.1, FiniteElementT velFE= vecP2_FE, double EpsP = 0.0 )
@@ -263,7 +263,7 @@ private:
     //@}
 
     /// Initialize velocity field
-    void InitVel( VelVecDescCL*, instat_vector_fun_ptr, double t0= 0.) const;
+    void InitVel(VelVecDescCL*, InstatVectorFunction, double t0= 0.) const;
     /// Smooth velocity field
     void SmoothVel( VelVecDescCL*, int num= 1, double tau=0.5);
     /// Clear all matrices, should be called after grid change to avoid reuse of matrix pattern
@@ -294,9 +294,9 @@ private:
     void setGhPenStab( double EpsP ){ epsP = EpsP; }
     
     /// Set Equilibrium Contact Angle
-    void SetYoungAngle(instat_scalar_fun_ptr CtAngleFnc) { CtAngleFnc_= CtAngleFnc; }
+    void SetYoungAngle(InstatScalarFunction CtAngleFnc) { CtAngleFnc_= CtAngleFnc; }
     /// Set out normal function of the slip boundary
-    void SetBndOutNormal(instat_vector_fun_ptr outnormal) { BndOutNormal_= outnormal; }
+    void SetBndOutNormal(InstatVectorFunction outnormal) { BndOutNormal_= outnormal; }
     /// Set the surface force type and the surface tension
     void SetSurfTension(SurfaceTensionCL* Sf) { SurfTension_= Sf; }
     /// Discretize Young Force on the three-phase contact line

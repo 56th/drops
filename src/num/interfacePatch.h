@@ -191,9 +191,9 @@ class InterfaceLineCL : public InterfacePatchCL
     const BndCondInfoCL& GetBC(Uint mcl) const { return BC_MCL_[mcl]; } ///< returns boundary condition of contact line segment
     double GetInfoMCL(Uint mcl, BaryCoordCL& bary0, BaryCoordCL& bary1, Point3DCL& pt0, Point3DCL& pt1) const; ///< return the length of the MCL and set the BaryCoord and Point3D of two end nodes
     Quad9_1DCL<Point3DCL> GetImprovedNormalAtMCL(Uint mcl) const;  ///< Returns the improved unit normal of the interface at the moving contact line
-    Quad9_1DCL<Point3DCL> GetImprovedMCLNormalOnSlipBnd(const TetraCL& t, Uint mcl, instat_vector_fun_ptr normalBnd) const; ///< Returns the unit outer normal at the contact line which lies on the slip boundary                                                           ///computed in an improved way using levelset function
-    Quad9_1DCL<Point3DCL> GetImprovedMCLTangential     (const TetraCL& t, Uint mcl, instat_vector_fun_ptr normalBnd) const; ///< Returns the unit outer normal at the contact line tangential to the interface
-    Quad9_1DCL<double>    GetDynamicCtAngle            (const TetraCL& t, Uint mcl, instat_vector_fun_ptr normalBnd) const; ///< Returns the dynamic contact angle
+    Quad9_1DCL<Point3DCL> GetImprovedMCLNormalOnSlipBnd(const TetraCL& t, Uint mcl, InstatVectorFunction normalBnd) const; ///< Returns the unit outer normal at the contact line which lies on the slip boundary                                                           ///computed in an improved way using levelset function
+    Quad9_1DCL<Point3DCL> GetImprovedMCLTangential     (const TetraCL& t, Uint mcl, InstatVectorFunction normalBnd) const; ///< Returns the unit outer normal at the contact line tangential to the interface
+    Quad9_1DCL<double>    GetDynamicCtAngle            (const TetraCL& t, Uint mcl, InstatVectorFunction normalBnd) const; ///< Returns the dynamic contact angle
 
 };
 

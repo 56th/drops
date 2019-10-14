@@ -36,7 +36,7 @@ namespace DROPS
 /// Initialize P1X function
 /// (different initial values inside and outside second phase
 /// are provided by cn and cp)
-void TransportP1XCL::Init (instat_scalar_fun_ptr cn, instat_scalar_fun_ptr cp, double t)
+void TransportP1XCL::Init (InstatScalarFunction cn, InstatScalarFunction cp, double t)
 {
     ct.t = t;
     oldct.t = t;
@@ -149,8 +149,8 @@ double TransportP1XCL::MeanDropConcentration()
 }
 
 
-double TransportP1XCL::CheckSolution(instat_scalar_fun_ptr Lsgn, instat_scalar_fun_ptr Lsgp,
-        instat_vector_fun_ptr Gradn, instat_vector_fun_ptr Gradp, double time)
+double TransportP1XCL::CheckSolution(InstatScalarFunction Lsgn, InstatScalarFunction Lsgp,
+                                     InstatVectorFunction Gradn, InstatVectorFunction Gradp, double time)
 {
     VecDescCL cn (&idx);
     GetSolutionOnPart(cn, false, false);

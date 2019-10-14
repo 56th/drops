@@ -55,7 +55,7 @@ class VelocityContainer
     VecDescCL *v_;   
     const VelBndDataT*    Bnd_v_;     
     MultiGridCL*   MG_;  
-    instat_vector_fun_ptr vfptr_; 
+    InstatVectorFunction vfptr_;
     const_DiscVelSolCL * asp2;
   public:
     VelocityContainer(VecDescCL & v,const VelBndDataT& Bnd_v,MultiGridCL& MG):v_(&v),Bnd_v_(&Bnd_v), MG_(&MG),vfptr_(0)
@@ -63,7 +63,7 @@ class VelocityContainer
       asp2 = new const_DiscVelSolCL( v_, Bnd_v_, MG_);
     };
     
-    VelocityContainer(instat_vector_fun_ptr v):v_(0),Bnd_v_(0),MG_(0),vfptr_(v),asp2(0){};
+    VelocityContainer(InstatVectorFunction v): v_(0), Bnd_v_(0), MG_(0), vfptr_(v), asp2(0){};
     
     ~VelocityContainer()
     {
@@ -84,7 +84,7 @@ class VelocityContainer
           return const_DiscVelSolCL( &vel, Bnd_v_, MG_); 
         }
 
-    instat_vector_fun_ptr GetVelocityAsFunctionPointer() const
+    InstatVectorFunction GetVelocityAsFunctionPointer() const
     {
       if (!vfptr_)
         throw DROPSErrCL("velocity not prescribed as a function(pointer)");
@@ -146,8 +146,8 @@ class OsmosisP1CL
     /* GMResSolverCL<GSDiag0PcCL>   gm_; */
     PCGSolverCL<SSORPcCL> 	cg_;
     GSDiag0PcCL                  pc_;
-    instat_scalar_fun_ptr f_;         ///<source term
-    instat_scalar_fun_ptr c_;        ///<mass/reaction term
+    InstatScalarFunction f_;         ///<source term
+    InstatScalarFunction c_;        ///<mass/reaction term
     const double omit_bound_;
 
     void SetupInstatSystem(MatrixCL&, MatrixCL&, MatrixCL&, VecDescCL*, IdxDescCL&, const double) const;
@@ -158,7 +158,7 @@ class OsmosisP1CL
   public:
     OsmosisP1CL( MultiGridCL& mg, BndDataT& Bnd, VelBndDataT& BndVel, VelocityContainer& v, LsetBndDataCL& Bnd_ls,
         LevelsetP2CL& lset, LevelsetP2CL& oldlset,
-        DROPS::ParamCL& P, double initialtime=0, instat_scalar_fun_ptr reac=0, instat_scalar_fun_ptr rhs=0)
+        DROPS::ParamCL& P, double initialtime=0, InstatScalarFunction reac=0, InstatScalarFunction rhs=0)
         : oldt_(initialtime), t_( initialtime), 
         idx( P1_FE, 1, Bnd), oldidx( P1_FE, 1, Bnd),
         Velidx( vecP1_FE, BndVel),
@@ -195,9 +195,9 @@ class OsmosisP1CL
     }
     void DeleteNumbering( MLIdxDescCL* idx1) { idx1->DeleteNumbering( MG_); }
     /// initialize transformed concentration function
-    void Init( instat_scalar_fun_ptr, double t=0.0);
+    void Init( InstatScalarFunction, double t=0.0);
     // scale...
-    void InitWithScaling( instat_scalar_fun_ptr, double totalconcentration, double t=0.0);
+    void InitWithScaling( InstatScalarFunction, double totalconcentration, double t=0.0);
     /// Set one P1X Function as the other with according scaling parameters in the positive and negative domain parts
 
     void SetTimeStep( double dt, double theta=-1);
@@ -219,7 +219,7 @@ class OsmosisP1CL
     void DoStep( double new_t);
     void DoInterfaceStep(double& t);
     void DoLevelsetStep(double& t);
-    void SetRHS( instat_scalar_fun_ptr rhs) {f_= rhs;}
+    void SetRHS( InstatScalarFunction rhs) {f_= rhs;}
     const_DiscSolCL GetSolution() const
         { return const_DiscSolCL( &conc, &Bnd_, &MG_); }
     const_DiscSolCL GetSolution( const VecDescCL& Myc) const
@@ -257,7 +257,7 @@ class OsmosisP1CL
     void SolutionErrorCase2(double& , double& , double );
     void SolutionErrorCase3(double& , double& , double );
     void SolutionErrorCase4(double& , double& , double );
-    double CheckSolution(instat_scalar_fun_ptr Lsgn, instat_scalar_fun_ptr Lsgp, double time);
+    double CheckSolution(InstatScalarFunction Lsgn, InstatScalarFunction Lsgp, double time);
 
     //special osmosis functions
     instat_fun_ptr InterfaceVel(instat_fun_ptr kappa, instat_fun_ptr ct) const;
@@ -500,19 +500,19 @@ class GlobalConvDiffReacCoefficients{
     double D_;
     double time;    
     const VelocityContainer& vel;
-    instat_scalar_fun_ptr source;
-    instat_scalar_fun_ptr mass;
+    InstatScalarFunction source;
+    InstatScalarFunction mass;
   public:
 
-    GlobalConvDiffReacCoefficients(const double D, const VelocityContainer& u, instat_scalar_fun_ptr c, instat_scalar_fun_ptr f, double atime)
+    GlobalConvDiffReacCoefficients(const double D, const VelocityContainer& u, InstatScalarFunction c, InstatScalarFunction f, double atime)
       :  D_( D), time(atime), vel(u), source(f), mass(c){}
 
     double GetDiffusionCoef(){
     	return D_;
     }
 	
-	instat_scalar_fun_ptr GetSourceAsFuntionPointer(){return source;}
-	instat_scalar_fun_ptr GetMassAsFuntionPointer(){return mass;}
+	InstatScalarFunction GetSourceAsFuntionPointer(){return source;}
+	InstatScalarFunction GetMassAsFuntionPointer(){return mass;}
 };
 
 class LocalConvDiffReacCoefficients{
@@ -549,7 +549,7 @@ class LocalConvDiffReacCoefficients{
       return gcdcoefs.GetDiffusionCoef();
     }    
 	
-	instat_scalar_fun_ptr GetSourceAsFuntionPointer(){
+	InstatScalarFunction GetSourceAsFuntionPointer(){
 	  return gcdcoefs.GetSourceAsFuntionPointer();
 	}
 	double GetTime(){return gcdcoefs.time;}

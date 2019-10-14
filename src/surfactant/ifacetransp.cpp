@@ -265,7 +265,7 @@ void SetupLBP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls, cons
 void SetupInterfaceRhsP1OnTriangle (const LocalP1CL<> p1[4],
     Quad5_2DCL<> q[4],VectorCL& v, const IdxT Numb[4],
     const TetraCL& t, const BaryCoordCL triangle[3], double det,
-    instat_scalar_fun_ptr f,double time=0)
+    InstatScalarFunction f,double time=0)
 {
     for (int i= 0; i < 4; ++i)
         q[i].assign(p1[i], triangle);
@@ -280,7 +280,7 @@ void SetupInterfaceRhsP1OnTriangle (const LocalP1CL<> p1[4],
 
 
 void SetupInterfaceRhsP1 (const MultiGridCL& mg, VecDescCL* v,
-    const VecDescCL& ls, const BndDataCL<>& lsetbnd, instat_scalar_fun_ptr f, double t)
+    const VecDescCL& ls, const BndDataCL<>& lsetbnd, InstatScalarFunction f, double t)
 {
     const IdxT num_unks= v->RowIdx->NumUnknowns();
     const Uint lvl = v->GetLevel();
@@ -313,7 +313,7 @@ void SetupInterfaceRhsP1 (const MultiGridCL& mg, VecDescCL* v,
 }
 
 // void SetupInterfaceRhsP1 (const MultiGridCL& mg, VecDescCL* v,
-//     const VecDescCL& ls, const BndDataCL<>& lsetbnd, instat_scalar_fun_ptr f, double t)
+//     const VecDescCL& ls, const BndDataCL<>& lsetbnd, InstatScalarFunction f, double t)
 // {
 //     TetraAccumulatorTupleCL accus;
 //     InterfaceCommonDataP1CL cdata(ls, lsetbnd);
@@ -1960,7 +1960,7 @@ void SetupStokesIF_P2P2(const MultiGridCL& MG_, MatDescCL* A_P2, MatDescCL* A_P2
 }
 
 void SetupInterfaceVectorRhsP1 (const MultiGridCL& mg, VecDescCL* v,
-    const VecDescCL& ls, const BndDataCL<>& lsetbnd, instat_vector_fun_ptr f, double t)
+                                const VecDescCL& ls, const BndDataCL<>& lsetbnd, InstatVectorFunction f, double t)
 {
     const IdxT num_unks= v->RowIdx->NumUnknowns();
     const Uint lvl = v->GetLevel();
@@ -2026,7 +2026,7 @@ void SetupInterfaceVectorRhsP1 (const MultiGridCL& mg, VecDescCL* v,
 }
 
 void SetupInterfaceVectorRhsP2 (const MultiGridCL& mg, VecDescCL* v,
-    const VecDescCL& ls, const BndDataCL<>& lsetbnd, instat_vector_fun_ptr f)
+                                const VecDescCL& ls, const BndDataCL<>& lsetbnd, InstatVectorFunction f)
 {
     const IdxT num_unks= v->RowIdx->NumUnknowns();
     const Uint lvl = v->GetLevel();
@@ -2091,7 +2091,7 @@ void SetupInterfaceVectorRhsP2 (const MultiGridCL& mg, VecDescCL* v,
 }
 
 
-void P1Init (instat_scalar_fun_ptr icf, VecDescCL& ic, const MultiGridCL& mg, double t)
+void P1Init (InstatScalarFunction icf, VecDescCL& ic, const MultiGridCL& mg, double t)
 {
     const Uint lvl= ic.GetLevel(),
                idx= ic.RowIdx->GetIdx();
@@ -2253,12 +2253,12 @@ void gradient_trafo (const TetraCL& tet, const BaryCoordCL& xb, const QuaQuaMapp
     W= dphT + outer_product(nl, n/inner_prod(nl, n) - dph*nl);
 }
 
-void SurfactantP1BaseCL::SetInitialValue (instat_scalar_fun_ptr icf, double t)
+void SurfactantP1BaseCL::SetInitialValue (InstatScalarFunction icf, double t)
 {
     P1Init (icf, ic, MG_, t);
 }
 
-void SurfactantP1BaseCL::SetRhs (instat_scalar_fun_ptr rhs)
+void SurfactantP1BaseCL::SetRhs (InstatScalarFunction rhs)
 {
     rhs_fun_= rhs;
 }

@@ -50,7 +50,7 @@
 namespace DROPS
 {
 
-typedef double    (*instat_scalar_fun_ptr)(const DROPS::Point3DCL&, double);
+typedef double    (*InstatScalarFunction)(const DROPS::Point3DCL&, double);
 typedef std::pair<double,double> TimeInterval;
 
 /// struct which defines the relation a < b for Point4DCL (in order to use std::set-features)

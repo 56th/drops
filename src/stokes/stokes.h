@@ -127,11 +127,11 @@ class StokesP2P1CL : public ProblemCL<Coeff, StokesBndDataCL>
         the vector will contain the sum of the results after the call*/
     void SetupInstatRhs( VelVecDescCL* vA, VelVecDescCL* vB, VelVecDescCL* vI, double tA, VelVecDescCL* vf, double tf) const;
     /// \brief  Set initial value for velocities
-    void InitVel( VelVecDescCL*, instat_vector_fun_ptr, double t0= 0.) const;
+    void InitVel(VelVecDescCL*, InstatVectorFunction, double t0= 0.) const;
 
     /// \brief  Check system and computed solution
-    void GetDiscError (instat_vector_fun_ptr LsgVel, instat_scalar_fun_ptr LsgPr, double t= 0.0) const;
-    void CheckSolution(const VelVecDescCL*, const VecDescCL*, instat_vector_fun_ptr, instat_matrix_fun_ptr, instat_scalar_fun_ptr, bool) const;
+    void GetDiscError (InstatVectorFunction LsgVel, InstatScalarFunction LsgPr, double t= 0.0) const;
+    void CheckSolution(const VelVecDescCL*, const VecDescCL*, InstatVectorFunction, InstatMatrixFunction, InstatScalarFunction, bool) const;
 
     /// \brief  estimation a la Verfuerth
     static double ResidualErrEstimator(const TetraCL&, const const_DiscPrSolCL&, const const_DiscVelSolCL&, double t=0.0);
@@ -210,8 +210,8 @@ class StokesP1BubbleP1CL : public ProblemCL<Coeff, StokesBndDataCL>
     void SetupPrMass(MLMatDescCL*) const;
 
     // Check system and computed solution
-    void GetDiscError (instat_vector_fun_ptr LsgVel, instat_scalar_fun_ptr LsgPr, double =0.) const;
-    void CheckSolution(const VelVecDescCL*, const VecDescCL*, instat_vector_fun_ptr, instat_scalar_fun_ptr, double =0.) const;
+    void GetDiscError (InstatVectorFunction LsgVel, InstatScalarFunction LsgPr, double =0.) const;
+    void CheckSolution(const VelVecDescCL*, const VecDescCL*, InstatVectorFunction, InstatScalarFunction, double =0.) const;
 
     // estimation a la Verfuerth
     static double ResidualErrEstimator(const TetraCL&, const const_DiscPrSolCL&, const const_DiscVelSolCL&, double= 0.0);

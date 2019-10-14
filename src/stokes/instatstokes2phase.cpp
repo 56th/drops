@@ -2266,7 +2266,7 @@ void InstatStokes2PhaseP2P1CL::SetupPrStiff( MLMatDescCL* A_pr, const LevelsetP2
 }
 
 
-void InstatStokes2PhaseP2P1CL::InitVel(VelVecDescCL* vec, instat_vector_fun_ptr LsgVel, double t0) const
+void InstatStokes2PhaseP2P1CL::InitVel(VelVecDescCL* vec, InstatVectorFunction LsgVel, double t0) const
 {
     VectorCL& lsgvel= vec->Data;
     vec->t = t0;
@@ -2449,7 +2449,7 @@ class SlipBndSystem1TwoPhaseP2CL
 
     const VecDescCL&    Phi_;
     const BndDataCL<>& lsetBndData_;
-    instat_vector_fun_ptr BndOutNormal_;
+    InstatVectorFunction BndOutNormal_;
     const double mu1_, mu2_;                                //dynamic viscosities
     const double beta1_, beta2_;                            //beta1_=beta2_=0 for symmetric Bnd;
     const double betaL_; 
@@ -2458,8 +2458,8 @@ class SlipBndSystem1TwoPhaseP2CL
     std::valarray<double> ls_loc;
 
   public:
-    SlipBndSystem1TwoPhaseP2CL(const StokesBndDataCL& BndData, const VecDescCL& Phi, const BndDataCL<>& lsetBndData, 
-    instat_vector_fun_ptr BndOutNormal, double mu1, double mu2, const double beta1=0, const double beta2=0, const double betaL=0, const double alpha=0)
+    SlipBndSystem1TwoPhaseP2CL(const StokesBndDataCL& BndData, const VecDescCL& Phi, const BndDataCL<>& lsetBndData,
+                               InstatVectorFunction BndOutNormal, double mu1, double mu2, const double beta1=0, const double beta2=0, const double betaL=0, const double alpha=0)
     : lat( PrincipalLatticeCL::instance(2)), BndData_(BndData), Phi_(Phi), lsetBndData_(lsetBndData), 
     BndOutNormal_(BndOutNormal), mu1_(mu1), mu2_(mu2), beta1_(beta1), beta2_(beta2), betaL_(betaL), alpha_(alpha), ls_loc( lat.vertex_size())
     { P2DiscCL::GetGradientsOnRef( GradRef); }
@@ -2662,7 +2662,7 @@ class LocalSystem1TwoPhase_P2CL
 
     const double mu_p, mu_n;
     const double rho_p, rho_n;
-    instat_vector_fun_ptr rhs_func;
+    InstatVectorFunction rhs_func;
 
     LocalP1CL<Point3DCL> GradRefLP1[10], GradLP1[10];
     LocalP2CL<> p2;
@@ -2676,7 +2676,7 @@ class LocalSystem1TwoPhase_P2CL
     GridFunctionCL<Point3DCL> rhs;
 
   public:
-    LocalSystem1TwoPhase_P2CL (double mup, double mun, double rhop, double rhon, instat_vector_fun_ptr rhsFunc)
+    LocalSystem1TwoPhase_P2CL (double mup, double mun, double rhop, double rhon, InstatVectorFunction rhsFunc)
         : lat( PrincipalLatticeCL::instance( 2)), mu_p( mup), mu_n( mun), rho_p( rhop), rho_n( rhon), rhs_func(rhsFunc), ls_loc( lat.vertex_size())
     { P2DiscCL::GetGradientsOnRef( GradRefLP1); }
 
@@ -4112,11 +4112,11 @@ class LocalLBTwoPhase_P2CL
 
     double surfTension_;
     double t_;
-    DROPS::instat_scalar_fun_ptr var_tau_fncs_;
+    DROPS::InstatScalarFunction var_tau_fncs_;
     void Get_Normals(const LocalP2CL<>& ls, LocalP1CL<Point3DCL>&);
 
   public:
-    LocalLBTwoPhase_P2CL (double surfTension, DROPS::instat_scalar_fun_ptr var_tau_fncs = NULL, double t=0)
+    LocalLBTwoPhase_P2CL (double surfTension, DROPS::InstatScalarFunction var_tau_fncs = NULL, double t=0)
         : lat( PrincipalLatticeCL::instance( 2)), ls_loc( lat.vertex_size()), surfTension_( surfTension), t_(t), var_tau_fncs_(var_tau_fncs)
     { P2DiscCL::GetGradientsOnRef( GradRefLP1); }
 
@@ -4427,12 +4427,12 @@ class ImprovedYoungForceAccumulatorCL : public  TetraAccumulatorCL
     InterfaceLineCL line;
 
     const double sigma_;
-    instat_scalar_fun_ptr angle_;    //Young's equilibrium contact angle
-    instat_vector_fun_ptr BndOutNormal_;//outer normal of the (slip) boundary
+    InstatScalarFunction angle_;    //Young's equilibrium contact angle
+    InstatVectorFunction BndOutNormal_;//outer normal of the (slip) boundary
     IdxT Numb[10];
 
   public:
-    ImprovedYoungForceAccumulatorCL( const LevelsetP2CL& ls, const BndDataCL<Point3DCL>& VelBndData, VecDescCL& f_Gamma, double sigma, instat_scalar_fun_ptr CtAngle, instat_vector_fun_ptr outnormal)
+    ImprovedYoungForceAccumulatorCL(const LevelsetP2CL& ls, const BndDataCL<Point3DCL>& VelBndData, VecDescCL& f_Gamma, double sigma, InstatScalarFunction CtAngle, InstatVectorFunction outnormal)
      :  SmPhi_(ls.Phi), lsetBndData_(ls.GetBndData()), VelBndData_(VelBndData), f(f_Gamma), sigma_(sigma),angle_(CtAngle), BndOutNormal_(outnormal)
     { ls.MaybeSmooth( SmPhi_.Data); }
 

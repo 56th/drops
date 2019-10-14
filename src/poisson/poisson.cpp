@@ -28,7 +28,7 @@
 namespace DROPS
 {
 
-instat_scalar_fun_ptr StripTimeCL::func_= NULL;
+InstatScalarFunction StripTimeCL::func_= NULL;
 double                StripTimeCL::t_= 0;
 
 //===================================================

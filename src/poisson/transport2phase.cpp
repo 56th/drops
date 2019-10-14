@@ -27,7 +27,7 @@
 namespace DROPS
 {
 
-void TransportP1CL::Init (instat_scalar_fun_ptr cneg, instat_scalar_fun_ptr cpos)
+void TransportP1CL::Init (InstatScalarFunction cneg, InstatScalarFunction cpos)
 {
     const Uint lvl= ct.GetLevel(),
                idx= ct.RowIdx->GetIdx();

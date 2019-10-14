@@ -1,8 +1,8 @@
 {
     "Output": {
-      "Directory":  "../../output/new_vtk_ascii_5",
+      "Directory":  "../../output/tmp",
       "EveryStep":  1,
-      "Binary":     false
+      "Binary":     true
     },
 
     "Mesh": {
@@ -20,7 +20,7 @@
             "Freq":          0,
             "Width":         0,
             "CoarsestLevel": 0,
-            "FinestLevel":   5,
+            "FinestLevel":   1,
             "SD":            0.1,
             "CurvDiff":      -1,
             "Discontinuous": 0

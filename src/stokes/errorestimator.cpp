@@ -227,7 +227,7 @@ UpdateTriangulation(DROPS::StokesP2P1CL<Coeff>& NS,
         shell_not_ready= ModifyGridStep( mg, Dist, width, c_level, f_level, t);
 
         // Repair velocity
-        match_fun match= NS.GetMG().GetBnd().GetMatchFun();
+        MatchFunction match= NS.GetMG().GetBnd().GetMatchFun();
         loc_vidx.CreateNumbering( mg.GetLastLevel(), mg, NS.GetBndData().Vel, match);
         if ( mg.GetLastLevel() != vidx1->TriangLevel()) {
             std::cout << "LastLevel: " << mg.GetLastLevel()

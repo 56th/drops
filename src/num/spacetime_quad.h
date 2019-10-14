@@ -34,7 +34,7 @@ namespace DROPS
 {
 
 
-typedef double (*instat_scalar_fun_ptr)(const DROPS::Point3DCL&, double);
+typedef double (*InstatScalarFunction)(const DROPS::Point3DCL&, double);
 
 template <class IntRuleData,class Geom>
 void Gather4DIntegrationPoints(const std::vector<Geom> &, GridFunctionCL<Point4DCL> &);
@@ -82,10 +82,10 @@ protected:
     std::vector<Tetra4DCL> iftetras;
     bool  hasinterface;
 
-    GridFunctionCL<double> Eval ( instat_scalar_fun_ptr f, const GridFunctionCL<Point4DCL> & points,
+    GridFunctionCL<double> Eval ( InstatScalarFunction f, const GridFunctionCL<Point4DCL> & points,
                                   const SpaceTimeMapping * map = &SpaceTimeIdentity::getInstance()) const;
-    GridFunctionCL<Point3DCL> Eval ( instat_vector_fun_ptr f, const GridFunctionCL<Point4DCL> & points,
-                                  const SpaceTimeMapping * map = &SpaceTimeIdentity::getInstance()) const;
+    GridFunctionCL<Point3DCL> Eval (InstatVectorFunction f, const GridFunctionCL<Point4DCL> & points,
+                                    const SpaceTimeMapping * map = &SpaceTimeIdentity::getInstance()) const;
     template <class T>
     GridFunctionCL<T> EvalLinear ( const LocalP2CL<T> & fold, const LocalP2CL<T> & fnew, 
                                         const GridFunctionCL<Point4DCL> & points) const;
@@ -99,16 +99,16 @@ public:
     void Initialize(const TetraCL* tet, const TimeInterval* ti, 
                     const GeneralizedPrism4CL* refprism4,
                     const LocalP2CL<double>* lsetold, const LocalP2CL<double>* lsetnew, 
-                    instat_scalar_fun_ptr f, Uint ints_per_space_edge = 2, Uint subtimeintervals = 1);
+                    InstatScalarFunction f, Uint ints_per_space_edge = 2, Uint subtimeintervals = 1);
 
-    CompositeSTQuadCL(const TetraCL& tet, const TimeInterval& ti, instat_scalar_fun_ptr f, 
+    CompositeSTQuadCL(const TetraCL& tet, const TimeInterval& ti, InstatScalarFunction f,
                       Uint ints_per_space_edge = 2, Uint subtimeintervals = 1);
 
     CompositeSTQuadCL(const TetraCL& tet, const TimeInterval& ti, 
                       const LocalP2CL<double>& lsetold, const LocalP2CL<double>& lsetnew,
                       Uint ints_per_space_edge = 2, Uint subtimeintervals = 1);
 
-    CompositeSTQuadCL(const GeneralizedPrism4CL& refprism4, instat_scalar_fun_ptr f, 
+    CompositeSTQuadCL(const GeneralizedPrism4CL& refprism4, InstatScalarFunction f,
                       Uint ints_per_space_edge = 2, Uint subtimeintervals = 1);
 
     CompositeSTQuadCL(const GeneralizedPrism4CL& refprism4,
@@ -124,11 +124,11 @@ public:
     const GridFunctionCL<double> & GetInterfaceIntegrationWeights ( ) const;
     Uint NumberOfInterfaceIntegrationPoints ( ) const;
 
-    GridFunctionCL<double> EvalOnPart ( instat_scalar_fun_ptr f, bool posPart,
+    GridFunctionCL<double> EvalOnPart ( InstatScalarFunction f, bool posPart,
                                         const SpaceTimeMapping * map = &SpaceTimeIdentity::getInstance()) const;
-    GridFunctionCL<Point3DCL> EvalOnPart ( instat_vector_fun_ptr f, bool posPart,
-                                        const SpaceTimeMapping * map = &SpaceTimeIdentity::getInstance()) const;
-    GridFunctionCL<double> EvalOnInterface ( instat_scalar_fun_ptr f,
+    GridFunctionCL<Point3DCL> EvalOnPart (InstatVectorFunction f, bool posPart,
+                                          const SpaceTimeMapping * map = &SpaceTimeIdentity::getInstance()) const;
+    GridFunctionCL<double> EvalOnInterface ( InstatScalarFunction f,
                                              const SpaceTimeMapping * map = &SpaceTimeIdentity::getInstance()) const;
     template <class T>
     GridFunctionCL<T> EvalLinearOnPart ( const LocalP2CL<T>& fold, 

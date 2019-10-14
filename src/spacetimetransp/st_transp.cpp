@@ -96,15 +96,15 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
     InScaMap & scalarmap = InScaMap::getInstance();
     InScaMap & inscamap = DROPS::InScaMap::getInstance();
 
-    // instat_scalar_fun_ptr Reaction = scalarmap["ReactionFct"];
-    instat_scalar_fun_ptr Initialcneg = scalarmap[P.get<std::string>("Transp.InitialConcNeg")];
-    instat_scalar_fun_ptr Initialcpos = scalarmap[P.get<std::string>("Transp.InitialConcPos")];
-    instat_scalar_fun_ptr RhsNeg = scalarmap[P.get<std::string>("Transp.RhsNeg")];
-    instat_scalar_fun_ptr RhsPos = scalarmap[P.get<std::string>("Transp.RhsPos")];
-    // instat_scalar_fun_ptr SolNeg = scalarmap[P.get<std::string>("Transp.SolNeg")];
-    // instat_scalar_fun_ptr SolPos = scalarmap[P.get<std::string>("Transp.SolPos")];
+    // InstatScalarFunction Reaction = scalarmap["ReactionFct"];
+    InstatScalarFunction Initialcneg = scalarmap[P.get<std::string>("Transp.InitialConcNeg")];
+    InstatScalarFunction Initialcpos = scalarmap[P.get<std::string>("Transp.InitialConcPos")];
+    InstatScalarFunction RhsNeg = scalarmap[P.get<std::string>("Transp.RhsNeg")];
+    InstatScalarFunction RhsPos = scalarmap[P.get<std::string>("Transp.RhsPos")];
+    // InstatScalarFunction SolNeg = scalarmap[P.get<std::string>("Transp.SolNeg")];
+    // InstatScalarFunction SolPos = scalarmap[P.get<std::string>("Transp.SolPos")];
 
-    // instat_scalar_fun_ptr distance = scalarmap[P.get<std::string>("Transp.Levelset")];
+    // InstatScalarFunction distance = scalarmap[P.get<std::string>("Transp.Levelset")];
 
     // cBndDataCL *pBnd_pos, *pBnd_neg;
 
@@ -728,25 +728,25 @@ void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTr
     InVecMap & tdvectormap = InVecMap::getInstance();
     InScaMap & scalarmap = InScaMap::getInstance();
 
-    //instat_vector_fun_ptr Flowfield = tdvectormap[P.get<std::string>("Transp.Flow")];
+    //InstatVectorFunction Flowfield = tdvectormap[P.get<std::string>("Transp.Flow")];
     STVelocityContainer Flowfield (tdvectormap[P.get<std::string>("Transp.Flow")]);
 
-    // instat_scalar_fun_ptr Reaction = scalarmap["ReactionFct"];
-    instat_scalar_fun_ptr Initialcneg = scalarmap[P.get<std::string>("Transp.InitialConcNeg")];
-    instat_scalar_fun_ptr Initialcpos = scalarmap[P.get<std::string>("Transp.InitialConcPos")];
-    instat_scalar_fun_ptr RhsNeg = scalarmap[P.get<std::string>("Transp.RhsNeg")];
-    instat_scalar_fun_ptr RhsPos = scalarmap[P.get<std::string>("Transp.RhsPos")];
-    instat_scalar_fun_ptr SolNeg = scalarmap[P.get<std::string>("Transp.SolNeg")];
-    instat_scalar_fun_ptr SolPos = scalarmap[P.get<std::string>("Transp.SolPos")];
+    // InstatScalarFunction Reaction = scalarmap["ReactionFct"];
+    InstatScalarFunction Initialcneg = scalarmap[P.get<std::string>("Transp.InitialConcNeg")];
+    InstatScalarFunction Initialcpos = scalarmap[P.get<std::string>("Transp.InitialConcPos")];
+    InstatScalarFunction RhsNeg = scalarmap[P.get<std::string>("Transp.RhsNeg")];
+    InstatScalarFunction RhsPos = scalarmap[P.get<std::string>("Transp.RhsPos")];
+    InstatScalarFunction SolNeg = scalarmap[P.get<std::string>("Transp.SolNeg")];
+    InstatScalarFunction SolPos = scalarmap[P.get<std::string>("Transp.SolPos")];
 
-    instat_scalar_fun_ptr distance = scalarmap[P.get<std::string>("Transp.Levelset")];
+    InstatScalarFunction distance = scalarmap[P.get<std::string>("Transp.Levelset")];
 
     cBndDataCL Bnd_pos, Bnd_neg;
 
     read_BndData( Bnd_pos, MG, P.get_child( "Transp.BoundaryDataPos"));
     read_BndData( Bnd_neg, MG, P.get_child( "Transp.BoundaryDataNeg"));
 
-    DROPS::instat_scalar_fun_ptr sigmap = 0;
+    DROPS::InstatScalarFunction sigmap = 0;
     SurfaceTensionCL sf( sigmap, Bnd_neg);
     LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsetbnddata, sf, P.get_child("Levelset")) );
     LevelsetP2CL & oldlset( * LevelsetP2CL::Create( MG, lsetbnddata, sf, P.get_child("Levelset")) );
@@ -1147,7 +1147,7 @@ int main (int argc, char** argv)
     using DROPS::AdapTriangCL;
     using DROPS::DistMarkingStrategyCL;
 
-    DROPS::instat_scalar_fun_ptr distance = nullptr;
+    DROPS::InstatScalarFunction distance = nullptr;
     const bool restartFromFile= ReadInitialConditionFromFile(P);
     if (!P.get<int>("Transp.UseNSSol",1)) {
         DROPS::InScaMap & scalarmap = DROPS::InScaMap::getInstance();

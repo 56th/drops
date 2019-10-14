@@ -121,7 +121,7 @@ CompositeSTQuadCL<IntRuleData4D>::CompositeSTQuadCL(const TetraCL& tet, const Ti
 
 template <class IntRuleData4D>
 CompositeSTQuadCL<IntRuleData4D>::CompositeSTQuadCL(const TetraCL& tet, const TimeInterval& ti,
-                                                    instat_scalar_fun_ptr f,
+                                                    InstatScalarFunction f,
                                                     Uint ints_per_space_edge,
                                                     Uint subtimeintervals)
 {
@@ -130,7 +130,7 @@ CompositeSTQuadCL<IntRuleData4D>::CompositeSTQuadCL(const TetraCL& tet, const Ti
 
 template <class IntRuleData4D>
 CompositeSTQuadCL<IntRuleData4D>::CompositeSTQuadCL(const GeneralizedPrism4CL& refprism4,
-                                                    instat_scalar_fun_ptr f,
+                                                    InstatScalarFunction f,
                                                     Uint ints_per_space_edge,
                                                     Uint subtimeintervals)
 {
@@ -163,7 +163,7 @@ void CompositeSTQuadCL<IntRuleData4D>::Initialize(const TetraCL* tet, const Time
                                                   const GeneralizedPrism4CL* refprism4,
                                                   const LocalP2CL<double>* lsetold,
                                                   const LocalP2CL<double>* lsetnew,
-                                                  instat_scalar_fun_ptr f,
+                                                  InstatScalarFunction f,
                                                   Uint ints_per_space_edge,
                                                   Uint subtimeintervals)
 {
@@ -327,7 +327,7 @@ Uint CompositeSTQuadCL<IntRuleData4D>::NumberOfInterfaceIntegrationPoints ( ) co
 // (after CompositeSTQuadCL as been initialized)
 
 template <class IntRuleData4D>
-GridFunctionCL<double> CompositeSTQuadCL<IntRuleData4D>::Eval ( instat_scalar_fun_ptr f, 
+GridFunctionCL<double> CompositeSTQuadCL<IntRuleData4D>::Eval ( InstatScalarFunction f,
                                                                 const GridFunctionCL<Point4DCL> & points,
                                                                 const SpaceTimeMapping * map) const
 {
@@ -341,9 +341,9 @@ GridFunctionCL<double> CompositeSTQuadCL<IntRuleData4D>::Eval ( instat_scalar_fu
 }
 
 template <class IntRuleData4D>
-GridFunctionCL<Point3DCL> CompositeSTQuadCL<IntRuleData4D>::Eval ( instat_vector_fun_ptr f, 
-                                                                const GridFunctionCL<Point4DCL> & points,
-                                                                const SpaceTimeMapping * map) const
+GridFunctionCL<Point3DCL> CompositeSTQuadCL<IntRuleData4D>::Eval (InstatVectorFunction f,
+                                                                  const GridFunctionCL<Point4DCL> & points,
+                                                                  const SpaceTimeMapping * map) const
 {
     ScopeTimer scopetiming("CompositeSTQuadCL<..>::Eval(f)");
     GridFunctionCL<Point3DCL> vals(points.size());
@@ -372,14 +372,14 @@ GridFunctionCL<T> CompositeSTQuadCL<IntRuleData4D>::EvalLinear ( const LocalP2CL
 }
 
 template <class IntRuleData4D>
-GridFunctionCL<double> CompositeSTQuadCL<IntRuleData4D>::EvalOnInterface ( instat_scalar_fun_ptr f,
+GridFunctionCL<double> CompositeSTQuadCL<IntRuleData4D>::EvalOnInterface ( InstatScalarFunction f,
                                                                            const SpaceTimeMapping * map) const
 {
     return Eval(f,ips_if,map);
 }
 
 template <class IntRuleData4D>
-GridFunctionCL<double> CompositeSTQuadCL<IntRuleData4D>::EvalOnPart ( instat_scalar_fun_ptr f, 
+GridFunctionCL<double> CompositeSTQuadCL<IntRuleData4D>::EvalOnPart ( InstatScalarFunction f,
                                                                       bool posPart, 
                                                                       const SpaceTimeMapping * map) const
 {
@@ -390,9 +390,9 @@ GridFunctionCL<double> CompositeSTQuadCL<IntRuleData4D>::EvalOnPart ( instat_sca
 }
 
 template <class IntRuleData4D>
-GridFunctionCL<Point3DCL> CompositeSTQuadCL<IntRuleData4D>::EvalOnPart ( instat_vector_fun_ptr f, 
-                                                                      bool posPart, 
-                                                                      const SpaceTimeMapping * map) const
+GridFunctionCL<Point3DCL> CompositeSTQuadCL<IntRuleData4D>::EvalOnPart (InstatVectorFunction f,
+                                                                        bool posPart,
+                                                                        const SpaceTimeMapping * map) const
 {
     if (posPart)
         return Eval(f,ips_pos,map);

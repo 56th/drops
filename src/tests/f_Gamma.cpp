@@ -598,7 +598,7 @@ class VarObliqueLaplaceBeltrami2AccuCL : public SurfTensAccumulatorCL
     SMatrixCL<3, 3> T_;
     GridFunctionCL<double> qsigma;
 
-    instat_matrix_fun_ptr sigmaf_matrix;
+    InstatMatrixFunction sigmaf_matrix;
     GridFunctionCL< SMatrixCL<3,3> > qsigma_matrix;
 
     double area;
@@ -607,7 +607,7 @@ class VarObliqueLaplaceBeltrami2AccuCL : public SurfTensAccumulatorCL
     bool use_linear_subsampling_;
 
     double test_result;
-    instat_matrix_fun_ptr test_fun;
+    InstatMatrixFunction test_fun;
     GridFunctionCL< SMatrixCL<3,3> > qtest_fun;
 
     void visit_mapped_P2 (const TetraCL&);
@@ -621,9 +621,9 @@ class VarObliqueLaplaceBeltrami2AccuCL : public SurfTensAccumulatorCL
         P2DiscCL::GetGradientsOnRef( gradref_);
     }
 
-    void set_test_function (instat_matrix_fun_ptr f) { test_fun= f; }
+    void set_test_function (InstatMatrixFunction f) { test_fun= f; }
     void use_linear_subsampling (bool use) { use_linear_subsampling_= use; }
-    void set_matrix_tension (instat_matrix_fun_ptr p) { sigmaf_matrix= p; }
+    void set_matrix_tension (InstatMatrixFunction p) { sigmaf_matrix= p; }
 
     void begin_accumulation () {
         f.Data= 0.;

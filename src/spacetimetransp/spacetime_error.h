@@ -52,16 +52,16 @@ class EnergyNormErrorAccumulatorCL : public TetraAccumulatorCL
 
     const LevelsetP2CL * lsetp2old;
     const LevelsetP2CL * lsetp2new;
-    instat_scalar_fun_ptr lset_fpt;
+    InstatScalarFunction lset_fpt;
 
-    instat_scalar_fun_ptr sol_neg;
-    instat_scalar_fun_ptr sol_pos;
+    InstatScalarFunction sol_neg;
+    InstatScalarFunction sol_pos;
 
-    instat_scalar_fun_ptr sol_dt_neg;
-    instat_scalar_fun_ptr sol_dt_pos;
+    InstatScalarFunction sol_dt_neg;
+    InstatScalarFunction sol_dt_pos;
 
-    instat_vector_fun_ptr sol_grad_neg;
-    instat_vector_fun_ptr sol_grad_pos;
+    InstatVectorFunction sol_grad_neg;
+    InstatVectorFunction sol_grad_pos;
 
     double det;
     double absdet;
@@ -101,7 +101,7 @@ class EnergyNormErrorAccumulatorCL : public TetraAccumulatorCL
 public:
     EnergyNormErrorAccumulatorCL (const MultiGridCL& MG, const LevelsetP2CL * lsetp2old_in,
                                 const LevelsetP2CL * lsetp2new_in,
-                                instat_scalar_fun_ptr lset_fpt, const double t1, const double t2,
+                                InstatScalarFunction lset_fpt, const double t1, const double t2,
                                 const VecDescCL & oldsol_neg_in, const VecDescCL & oldsol_pos_in,
                                 const VecDescCL & newsol_neg_in, const VecDescCL & newsol_pos_in,
                                 const BndDataCL<> & Bnd_neg_in,

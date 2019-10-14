@@ -170,7 +170,7 @@ static DROPS::RegisterVectorFunction regvec_rotxz("RotatingFlowfield", RotateVel
 /// L2 error on interface
 template <typename DiscP1FunT>
 double L2_error_interface (const DROPS::MultiGridCL& mg, const DROPS::VecDescCL& ls, const DROPS::BndDataCL<>& lsbnd,
-    const DiscP1FunT& discsol, DROPS::instat_scalar_fun_ptr sol, double t)
+    const DiscP1FunT& discsol, DROPS::InstatScalarFunction sol, double t)
 {
     double d( 0.);
     const DROPS::Uint lvl = ls.GetLevel();
@@ -193,7 +193,7 @@ double L2_error_interface (const DROPS::MultiGridCL& mg, const DROPS::VecDescCL&
 namespace DROPS // for Strategy
 {
 
-void InitVel (const MultiGridCL& MG, VecDescCL& v, instat_vector_fun_ptr vf)
+void InitVel (const MultiGridCL& MG, VecDescCL& v, InstatVectorFunction vf)
 {
     const Uint lvl= v.GetLevel(),
                idx= v.RowIdx->GetIdx();
@@ -216,19 +216,19 @@ void  StatMassSurfTransportStrategy( MultiGridCL& MG, InstatNavierStokes2PhaseP2
     std::cout << "Entering Strategy for stationary mass/surfactant transport...\n";
     InVecMap & tdvectormap = InVecMap::getInstance();
     InScaMap & tdscalarmap = InScaMap::getInstance();
-    instat_vector_fun_ptr Flowfield = tdvectormap[P.get<std::string>("Transp.Flow")];
-    instat_scalar_fun_ptr Reaction = tdscalarmap["Zero"]; // tdscalarmap["ReactionFct"];
-    instat_scalar_fun_ptr massRhs = tdscalarmap[P.get<std::string>("Transp.Rhs")];
-    instat_scalar_fun_ptr distance = tdscalarmap[P.get<std::string>("Transp.Levelset")];
-    instat_scalar_fun_ptr massSol_p= tdscalarmap[P.get<std::string>("Transp.SolPos")];
-    instat_scalar_fun_ptr massSol_n= tdscalarmap[P.get<std::string>("Transp.SolNeg")];
+    InstatVectorFunction Flowfield = tdvectormap[P.get<std::string>("Transp.Flow")];
+    InstatScalarFunction Reaction = tdscalarmap["Zero"]; // tdscalarmap["ReactionFct"];
+    InstatScalarFunction massRhs = tdscalarmap[P.get<std::string>("Transp.Rhs")];
+    InstatScalarFunction distance = tdscalarmap[P.get<std::string>("Transp.Levelset")];
+    InstatScalarFunction massSol_p= tdscalarmap[P.get<std::string>("Transp.SolPos")];
+    InstatScalarFunction massSol_n= tdscalarmap[P.get<std::string>("Transp.SolNeg")];
     /* unused
-    instat_vector_fun_ptr massGrad_p= tdvectormap[P.get<std::string>("Transp.GradSolPos")];
-    instat_vector_fun_ptr massGrad_n= tdvectormap[P.get<std::string>("Transp.GradSolNeg")];
+    InstatVectorFunction massGrad_p= tdvectormap[P.get<std::string>("Transp.GradSolPos")];
+    InstatVectorFunction massGrad_n= tdvectormap[P.get<std::string>("Transp.GradSolNeg")];
     */
 
-    instat_scalar_fun_ptr surfRhs = tdscalarmap[P.get<std::string>("SurfTransp.Rhs")];
-    instat_scalar_fun_ptr surfSol = tdscalarmap[P.get<std::string>("SurfTransp.Sol")];
+    InstatScalarFunction surfRhs = tdscalarmap[P.get<std::string>("SurfTransp.Rhs")];
+    InstatScalarFunction surfSol = tdscalarmap[P.get<std::string>("SurfTransp.Sol")];
 
 
     cBndDataCL pBnd_c, pBnd_ct;
@@ -237,7 +237,7 @@ void  StatMassSurfTransportStrategy( MultiGridCL& MG, InstatNavierStokes2PhaseP2
     cBndDataCL & Bnd_c(pBnd_c);
     cBndDataCL & Bnd_ct(pBnd_ct);
 
-    DROPS::instat_scalar_fun_ptr sigmap = 0;
+    DROPS::InstatScalarFunction sigmap = 0;
     SurfaceTensionCL sf( sigmap, Bnd_c);
 
     LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsetbnddata, sf, false, 1, -1) ) ;
@@ -414,12 +414,12 @@ void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTr
 {
     InVecMap & tdvectormap = InVecMap::getInstance();
     InScaMap & tdscalarmap = InScaMap::getInstance();
-    instat_vector_fun_ptr Flowfield = tdvectormap[P.get<std::string>("Transp.Flow")];
-    instat_scalar_fun_ptr Reaction = tdscalarmap["ReactionFct"];
-    instat_scalar_fun_ptr Rhs = tdscalarmap[P.get<std::string>("Transp.Rhs")];
-    instat_scalar_fun_ptr Initialcneg = tdscalarmap[P.get<std::string>("Transp.InitialConcNeg")];
-    instat_scalar_fun_ptr Initialcpos = tdscalarmap[P.get<std::string>("Transp.InitialConcPos")];
-    instat_scalar_fun_ptr distance = tdscalarmap[P.get<std::string>("Transp.Levelset")];
+    InstatVectorFunction Flowfield = tdvectormap[P.get<std::string>("Transp.Flow")];
+    InstatScalarFunction Reaction = tdscalarmap["ReactionFct"];
+    InstatScalarFunction Rhs = tdscalarmap[P.get<std::string>("Transp.Rhs")];
+    InstatScalarFunction Initialcneg = tdscalarmap[P.get<std::string>("Transp.InitialConcNeg")];
+    InstatScalarFunction Initialcpos = tdscalarmap[P.get<std::string>("Transp.InitialConcPos")];
+    InstatScalarFunction distance = tdscalarmap[P.get<std::string>("Transp.Levelset")];
 
     cBndDataCL pBnd_c, pBnd_ct;
     read_BndData( pBnd_c, MG, P.get_child( "Transp.BoundaryData"));
@@ -427,7 +427,7 @@ void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTr
     cBndDataCL & Bnd_c(pBnd_c);
     cBndDataCL & Bnd_ct(pBnd_ct);
 
-    DROPS::instat_scalar_fun_ptr sigmap = 0;
+    DROPS::InstatScalarFunction sigmap = 0;
     SurfaceTensionCL sf( sigmap, Bnd_c);
 
     LevelsetP2CL & lset( * LevelsetP2CL::Create( MG, lsetbnddata, sf, false, 1, -1) ) ;
@@ -596,15 +596,15 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes,  LsetBndDataCL& lsetbndda
     InVecMap & tdvectormap = InVecMap::getInstance();
     InScaMap & tdscalarmap = InScaMap::getInstance();
 
-    instat_vector_fun_ptr Flowfield = tdvectormap["ZeroVel"];
-    instat_scalar_fun_ptr Reaction = tdscalarmap["ReactionFct"];
-    instat_scalar_fun_ptr Rhs = tdscalarmap[P.get<std::string>("Transp.Rhs")];
-    instat_scalar_fun_ptr Initialcneg = tdscalarmap[P.get<std::string>("Transp.InitialConcNeg")];
-    instat_scalar_fun_ptr Initialcpos = tdscalarmap[P.get<std::string>("Transp.InitialConcPos")];
+    InstatVectorFunction Flowfield = tdvectormap["ZeroVel"];
+    InstatScalarFunction Reaction = tdscalarmap["ReactionFct"];
+    InstatScalarFunction Rhs = tdscalarmap[P.get<std::string>("Transp.Rhs")];
+    InstatScalarFunction Initialcneg = tdscalarmap[P.get<std::string>("Transp.InitialConcNeg")];
+    InstatScalarFunction Initialcpos = tdscalarmap[P.get<std::string>("Transp.InitialConcPos")];
 
-    instat_scalar_fun_ptr distance = tdscalarmap[P.get<std::string>("Transp.Levelset")];
+    InstatScalarFunction distance = tdscalarmap[P.get<std::string>("Transp.Levelset")];
 
-    instat_scalar_fun_ptr sigmap = tdscalarmap[P.get<std::string>("NavStokes.Coeff.SurfTens.VarTensionFunc")];
+    InstatScalarFunction sigmap = tdscalarmap[P.get<std::string>("NavStokes.Coeff.SurfTens.VarTensionFunc")];
 
     cBndDataCL pBnd_c, pBnd_ct;
     read_BndData( pBnd_c, MG, P.get_child( "Transp.BoundaryData"));
@@ -1047,7 +1047,7 @@ int main (int argc, char** argv)
     if (!P.get<int>("Transp.UseNSSol",1) || !ReadInitialConditionFromFile(P))
     {
         DROPS::InScaMap & tdscalarmap = DROPS::InScaMap::getInstance();
-        DROPS::instat_scalar_fun_ptr distance = tdscalarmap[P.get("Transp.Levelset", std::string("Ellipsoid"))];
+        DROPS::InstatScalarFunction distance = tdscalarmap[P.get("Transp.Levelset", std::string("Ellipsoid"))];
 
         DistMarkingStrategyCL marker( distance,
                                       P.get<double>("Mesh.AdaptRef.Width"),

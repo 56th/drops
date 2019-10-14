@@ -151,7 +151,7 @@ void MakeP1P1XProlongation (size_t NumUnknownsVel, size_t NumUnknownsPr, size_t 
 template<class ValT, class DiscSolT>
 void ComputeErrorsP2(  ValT (*uPos)(const Point3DCL&, double), ValT (*uNeg)(const Point3DCL&, double), const DiscSolT& uhPos, const DiscSolT& uhNeg, ValT& L2, ValT& H1, ValT& L2_norm, ValT& H1_norm, const LevelsetP2CL& lset, double t);
 
-void ComputeErrorsP2R( const instat_vector_fun_ptr uPos, const instat_vector_fun_ptr uNeg, const VecDescCL& uh, const BndDataCL<Point3DCL>& bnd, Point3DCL& L2, Point3DCL& H1, const LevelsetP2CL& lset, double t=0.);
+void ComputeErrorsP2R(const InstatVectorFunction uPos, const InstatVectorFunction uNeg, const VecDescCL& uh, const BndDataCL<Point3DCL>& bnd, Point3DCL& L2, Point3DCL& H1, const LevelsetP2CL& lset, double t=0.);
 
 // ================ inline/template definitions ==================
 

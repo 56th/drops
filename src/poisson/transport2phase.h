@@ -97,7 +97,7 @@ class TransportP1CL
         { idx->DeleteNumbering( MG_); }
     ///@}
     /// initialize transformed concentration function
-    void Init( instat_scalar_fun_ptr, instat_scalar_fun_ptr cpos);
+    void Init( InstatScalarFunction, InstatScalarFunction cpos);
 
     /// \remarks call SetupSystem \em before calling SetTimeStep!
     void SetTimeStep( double dt, double theta=-1);

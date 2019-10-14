@@ -222,7 +222,7 @@ class STVelocityContainer
     VecDescCL *vnew_;   
     const VelBndDataT*    Bnd_v_;     
     MultiGridCL*   MG_;  
-    instat_vector_fun_ptr vfptr_; 
+    InstatVectorFunction vfptr_;
     const_DiscVelSolCL * asp2_old;
     const_DiscVelSolCL * asp2_new;
   public:
@@ -234,7 +234,7 @@ class STVelocityContainer
       asp2_new = new const_DiscVelSolCL( vnew_, Bnd_v_, MG_);
     };
     
-    STVelocityContainer(instat_vector_fun_ptr v):vold_(0),vnew_(0),Bnd_v_(0),MG_(0),vfptr_(v),asp2_old(0),asp2_new(0){};
+    STVelocityContainer(InstatVectorFunction v): vold_(0), vnew_(0), Bnd_v_(0), MG_(0), vfptr_(v), asp2_old(0), asp2_new(0){};
     
     ~STVelocityContainer()
     {
@@ -263,7 +263,7 @@ class STVelocityContainer
           return const_DiscVelSolCL( &vel, Bnd_v_, MG_); 
         }
 
-    instat_vector_fun_ptr GetVelocityAsFunctionPointer() const
+    InstatVectorFunction GetVelocityAsFunctionPointer() const
     {
       if (!vfptr_)
         throw DROPSErrCL("velocity not prescribed as a function(pointer)");
@@ -332,7 +332,7 @@ class STGeomApproxTestAccumulatorCL : public TetraAccumulatorCL
 
     const LevelsetP2CL * lsetp2old;
     const LevelsetP2CL * lsetp2new;
-    instat_scalar_fun_ptr lset_fpt;
+    InstatScalarFunction lset_fpt;
 
     double det;
     double absdet;
@@ -353,7 +353,7 @@ class STGeomApproxTestAccumulatorCL : public TetraAccumulatorCL
 public: 
     STGeomApproxTestAccumulatorCL (const MultiGridCL& MG, const LevelsetP2CL * lsetp2old_in,
                                    const LevelsetP2CL * lsetp2new_in, 
-                                   instat_scalar_fun_ptr lset_fpt, const double t1, const double t2,
+                                   InstatScalarFunction lset_fpt, const double t1, const double t2,
                                    const ParamCL::ptree_type & P);
     ///\brief Initializes matrix-builders and load-vectors
     void begin_accumulation ();
@@ -373,7 +373,7 @@ class InterfaceJumpAccumulatorCL : public TetraAccumulatorCL
 
     const LevelsetP2CL * lsetp2old;
     const LevelsetP2CL * lsetp2new;
-    instat_scalar_fun_ptr lset_fpt;
+    InstatScalarFunction lset_fpt;
 
     double det;
     double absdet;
@@ -406,7 +406,7 @@ class InterfaceJumpAccumulatorCL : public TetraAccumulatorCL
 public:
     InterfaceJumpAccumulatorCL (const MultiGridCL& MG, const LevelsetP2CL * lsetp2old_in,
                                 const LevelsetP2CL * lsetp2new_in,
-                                instat_scalar_fun_ptr lset_fpt, const double t1, const double t2,
+                                InstatScalarFunction lset_fpt, const double t1, const double t2,
                                 const VecDescCL & oldsol_neg_in, const VecDescCL & oldsol_pos_in,
                                 const VecDescCL & newsol_neg_in, const VecDescCL & newsol_pos_in,
                                 const BndDataCL<> & Bnd_neg_in,
@@ -566,16 +566,16 @@ class MassTestAccumulator_P1SP1TXCL : public STVolumeAccumulator_P1SP1TXCL
     using                           base_::told;
     using                           base_::tnew;
     using                           base_::iscut;
-    instat_scalar_fun_ptr rhs_neg;
-    instat_scalar_fun_ptr rhs_pos;
+    InstatScalarFunction rhs_neg;
+    InstatScalarFunction rhs_pos;
 
     public:
     MassTestAccumulator_P1SP1TXCL (const MultiGridCL& MG, const BndDataCL<> * BndData_neg_in, 
                                    const BndDataCL<> * BndData_pos_in, 
                                    const LevelsetP2CL * lsetp2old_in,
                                    const LevelsetP2CL * lsetp2new_in,
-                                   instat_scalar_fun_ptr rhs_neg_in,
-                                   instat_scalar_fun_ptr rhs_pos_in,
+                                   InstatScalarFunction rhs_neg_in,
+                                   InstatScalarFunction rhs_pos_in,
                                    MatrixCL* Amat, VecDescCL* b, 
                                    const IdxDescCL& RowIdx, const IdxDescCL& ColIdx, 
                                    const double t1, const double t2,
@@ -630,8 +630,8 @@ class SpatialLaplaceAccumulator_P1SP1TXCL : public STVolumeAccumulator_P1SP1TXCL
     using                           base_::told;
     using                           base_::tnew;
     using                           base_::iscut;
-    instat_scalar_fun_ptr rhs_neg;
-    instat_scalar_fun_ptr rhs_pos;
+    InstatScalarFunction rhs_neg;
+    InstatScalarFunction rhs_pos;
 
     /* QuadCL<> U_Grad[4]; */
 
@@ -640,8 +640,8 @@ class SpatialLaplaceAccumulator_P1SP1TXCL : public STVolumeAccumulator_P1SP1TXCL
                                          const BndDataCL<> * BndData_pos_in, 
                                          const LevelsetP2CL * lsetp2old_in,
                                          const LevelsetP2CL * lsetp2new_in,
-                                         instat_scalar_fun_ptr rhs_neg_in,
-                                         instat_scalar_fun_ptr rhs_pos_in,
+                                         InstatScalarFunction rhs_neg_in,
+                                         InstatScalarFunction rhs_pos_in,
                                          MatrixCL* Amat, VecDescCL* b, 
                                          const IdxDescCL& RowIdx, const IdxDescCL& ColIdx, 
                                          const double t1, const double t2,
@@ -698,11 +698,11 @@ class STTransportVolumeAccumulator_P1SP1TXCL : public STVolumeAccumulator_P1SP1T
     using                           base_::beta_neg;
     using                           base_::beta_pos;
     using                           base_::iscut;
-    instat_scalar_fun_ptr lset_fpt;
-    instat_scalar_fun_ptr rhs_neg;
-    instat_scalar_fun_ptr rhs_pos;
+    InstatScalarFunction lset_fpt;
+    InstatScalarFunction rhs_neg;
+    InstatScalarFunction rhs_pos;
     
-    /* instat_vector_fun_ptr convection; */
+    /* InstatVectorFunction convection; */
     STVelocityContainer & convection;
 
     const double alpha_neg;
@@ -731,9 +731,9 @@ class STTransportVolumeAccumulator_P1SP1TXCL : public STVolumeAccumulator_P1SP1T
                                             const BndDataCL<> * BndData_pos_in, 
                                             const LevelsetP2CL * lsetp2old_in,
                                             const LevelsetP2CL * lsetp2new_in,
-                                            instat_scalar_fun_ptr lset_fpt_in,
-                                            instat_scalar_fun_ptr rhs_neg_in,
-                                            instat_scalar_fun_ptr rhs_pos_in,
+                                            InstatScalarFunction lset_fpt_in,
+                                            InstatScalarFunction rhs_neg_in,
+                                            InstatScalarFunction rhs_pos_in,
                                             STVelocityContainer & convection_in,
                                             MatrixCL* Amat, VecDescCL* b, 
                                             const IdxDescCL& RowIdx, const IdxDescCL& ColIdx, 

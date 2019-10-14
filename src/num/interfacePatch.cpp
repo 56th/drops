@@ -745,7 +745,7 @@ Quad9_1DCL<Point3DCL> InterfaceLineCL::GetImprovedNormalAtMCL(Uint v) const
 }
 
 // The method to compute the outer normal of MCL might have a large error when the contact angle is small.
-Quad9_1DCL<Point3DCL> InterfaceLineCL::GetImprovedMCLNormalOnSlipBnd(const TetraCL& tet, Uint v, instat_vector_fun_ptr normalBnd) const 
+Quad9_1DCL<Point3DCL> InterfaceLineCL::GetImprovedMCLNormalOnSlipBnd(const TetraCL& tet, Uint v, InstatVectorFunction normalBnd) const
 {
     BaryCoordCL bary[2];
     bary[0] = Bary_[IdxMCL_[v][0]];
@@ -762,7 +762,7 @@ Quad9_1DCL<Point3DCL> InterfaceLineCL::GetImprovedMCLNormalOnSlipBnd(const Tetra
 }
 
 // The method to compute the outer normal of MCL might have a large error when the contact angle is small.
-Quad9_1DCL<Point3DCL> InterfaceLineCL::GetImprovedMCLTangential(const TetraCL& tet, Uint v, instat_vector_fun_ptr normalBnd) const 
+Quad9_1DCL<Point3DCL> InterfaceLineCL::GetImprovedMCLTangential(const TetraCL& tet, Uint v, InstatVectorFunction normalBnd) const
 {
     BaryCoordCL bary[2];
     bary[0] = Bary_[IdxMCL_[v][0]];
@@ -778,7 +778,7 @@ Quad9_1DCL<Point3DCL> InterfaceLineCL::GetImprovedMCLTangential(const TetraCL& t
 
 }
 
-Quad9_1DCL<double> InterfaceLineCL::GetDynamicCtAngle(const TetraCL& tet, Uint v, instat_vector_fun_ptr normalBnd) const
+Quad9_1DCL<double> InterfaceLineCL::GetDynamicCtAngle(const TetraCL& tet, Uint v, InstatVectorFunction normalBnd) const
 {
     BaryCoordCL bary[2];
     bary[0] = Bary_[IdxMCL_[v][0]];

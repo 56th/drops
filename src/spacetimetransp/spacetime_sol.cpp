@@ -71,7 +71,7 @@ SpaceTimeXSolutionCL::SpaceTimeXSolutionCL(MultiGridCL& mg, const BndDataCL<>& B
 
 
 void SpaceTimeXSolutionCL::UpdateTimeSlab(const LevelsetP2CL & lsetold, const LevelsetP2CL & lsetnew,
-                                          double vmax, instat_scalar_fun_ptr lset_fpt)
+                                          double vmax, InstatScalarFunction lset_fpt)
 {
     lsetp2old = &lsetold;
     lsetp2new = &lsetnew;

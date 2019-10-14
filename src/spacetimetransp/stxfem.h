@@ -42,7 +42,7 @@ namespace STXFEM
 
 void UpdateSTXNumbering( IdxDescCL* Idx, const MultiGridCL& mg, const VecDescCL& lset_old, 
                          const VecDescCL& lset_new, 
-                         instat_scalar_fun_ptr lset_fpt, const TimeInterval ti,
+                         InstatScalarFunction lset_fpt, const TimeInterval ti,
                          const BndDataCL<>& lsetbnd, 
                          bool NumberingChanged, double vmax);
 

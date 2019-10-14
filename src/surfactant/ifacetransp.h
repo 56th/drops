@@ -76,7 +76,7 @@ void SetupInterfaceSorptionP1X (const MultiGridCL& MG, const VecDescCL& ls, cons
 void GetLocalNumbInterface(IdxT* Numb, const TetraCL& s, const IdxDescCL& idx);
 
 /// \todo This should be a generic function somewhere in num or misc.
-void P1Init (instat_scalar_fun_ptr icf, VecDescCL& ic, const MultiGridCL& mg, double t);
+void P1Init (InstatScalarFunction icf, VecDescCL& ic, const MultiGridCL& mg, double t);
 
 /// \brief Resize normal according to qdom and fill in surf.normal. The normal must be precomputed.
 template <Uint Dim>
@@ -642,7 +642,7 @@ class InterfaceVectorAccuCL : public TetraAccumulatorCL
 class LocalVectorP1CL
 {
   private:
-    instat_scalar_fun_ptr f_;
+    InstatScalarFunction f_;
     double time_;
 
     LocalP1CL<> p1[4];
@@ -655,7 +655,7 @@ class LocalVectorP1CL
 
     double vec[4];
 
-    LocalVectorP1CL (instat_scalar_fun_ptr f, double time) : f_( f), time_( time) { p1[0][0]= p1[1][1]= p1[2][2]= p1[3][3]= 1.; }
+    LocalVectorP1CL (InstatScalarFunction f, double time) : f_( f), time_( time) { p1[0][0]= p1[1][1]= p1[2][2]= p1[3][3]= 1.; }
 
     void setup (const TetraCL& t, const InterfaceCommonDataP1CL& cdata, const IdxT numr[4]) {
         make_CompositeQuad5Domain2D ( qdom, cdata.surf, t);
@@ -760,12 +760,12 @@ struct LocalStokesParam {
         size_t numbOfVirtualSubEdges = 2;
         Formulation formulation = Formulation::consistent;
         bool usePatchNormal = true;
-        instat_vector_fun_ptr exactNormal = nullptr;
-        instat_matrix_fun_ptr exactShape  = nullptr;
-        instat_scalar_fun_ptr exactDistance = nullptr;
-        instat_scalar_fun_ptr levelSet = nullptr;
-        instat_vector_fun_ptr f = nullptr; // moment rhs
-        instat_scalar_fun_ptr g = nullptr; // - continuity eqn rhs
+        InstatVectorFunction exactNormal = nullptr;
+        InstatMatrixFunction exactShape  = nullptr;
+        InstatScalarFunction exactDistance = nullptr;
+        InstatScalarFunction levelSet = nullptr;
+        InstatVectorFunction f = nullptr; // moment rhs
+        InstatScalarFunction g = nullptr; // - continuity eqn rhs
     } input;
     struct {
         struct {
@@ -799,9 +799,9 @@ void SetupCahnHilliardIF_P1P1( const MultiGridCL& MG_,  MatDescCL* M_P1, MatDesc
     double Potential_prime_concave_function(double x);
 
 void SetupInterfaceVectorRhsP1 (const MultiGridCL& mg, VecDescCL* v,
-    const VecDescCL& ls, const BndDataCL<>& lsbnd, instat_vector_fun_ptr f, double t = 0.);
+                                const VecDescCL& ls, const BndDataCL<>& lsbnd, InstatVectorFunction f, double t = 0.);
 void SetupInterfaceVectorRhsP2 (const MultiGridCL& mg, VecDescCL* v,
-    const VecDescCL& ls, const BndDataCL<>& lsbnd, instat_vector_fun_ptr f);
+                                const VecDescCL& ls, const BndDataCL<>& lsbnd, InstatVectorFunction f);
 
 class LocalLaplaceBeltramiP1CL
 {
@@ -918,7 +918,7 @@ class LocalInterfaceMassDivP1CL
 class LocalVectorP2CL
 {
   private:
-    instat_scalar_fun_ptr f_;
+    InstatScalarFunction f_;
     double time_;
 
     std::valarray<double> qp2,
@@ -929,7 +929,7 @@ class LocalVectorP2CL
 
     double vec[10];
 
-    LocalVectorP2CL (instat_scalar_fun_ptr f, double time) : f_( f), time_( time) {}
+    LocalVectorP2CL (InstatScalarFunction f, double time) : f_( f), time_( time) {}
 
     void setup (const TetraCL&, const InterfaceCommonDataP2CL& cdata, const IdxT numr[10]) {
         resize_and_evaluate_on_vertexes( f_, cdata.qdom_projected.vertexes(), time_, qf);
@@ -1037,7 +1037,7 @@ class LocalMassP2CL
 class LocalVectorDeformP2CL
 {
   private:
-    instat_scalar_fun_ptr f_;
+    InstatScalarFunction f_;
     double time_;
 
     std::valarray<double> qp2,
@@ -1048,7 +1048,7 @@ class LocalVectorDeformP2CL
 
     double vec[10];
 
-    LocalVectorDeformP2CL (instat_scalar_fun_ptr f, double time) : f_( f), time_( time) {}
+    LocalVectorDeformP2CL (InstatScalarFunction f, double time) : f_( f), time_( time) {}
 
     void setup (const TetraCL& t, const InterfaceCommonDataDeformP2CL& cdata, const IdxT numr[10]) {
         resize_and_evaluate_on_vertexes( f_, t, cdata.qdom2d_full, time_, qf);
@@ -1163,7 +1163,7 @@ class LocalNormalLaplaceDeformP2CL
 /// \brief The routine sets up the load-vector in v on the interface defined by ls.
 ///        It belongs to the FE induced by standard P1-elements.
 void SetupInterfaceRhsP1 (const MultiGridCL& mg, VecDescCL* v,
-    const VecDescCL& ls, const BndDataCL<>& lsbnd, instat_scalar_fun_ptr f, double t = 0.);
+    const VecDescCL& ls, const BndDataCL<>& lsbnd, InstatScalarFunction f, double t = 0.);
 
 
 ///\brief Initialize the QuadDomain2DCL-object qdom for quadrature with Quad5_2DCL on the lattice lat of t, given the level set in ls and bnd.
@@ -1219,7 +1219,7 @@ class InterfaceDebugP2CL : public TetraAccumulatorCL
 
     VecDescCL* to_iface; // For all P2-dofs x at the interface: p_h(x) - x. Computed if to_iface != 0.
 
-    instat_matrix_fun_ptr ref_dp;
+    InstatMatrixFunction ref_dp;
     double (*ref_abs_det) (const TetraCL& t, const BaryCoordCL& b, const SurfacePatchCL& surf);
 
     double max_dph_err,
@@ -1232,7 +1232,7 @@ class InterfaceDebugP2CL : public TetraAccumulatorCL
   public:
     void store_offsets( VecDescCL& to_ifacearg) { to_iface= &to_ifacearg; }
     void set_true_area( double a) { true_area= a; }
-    void set_ref_dp   ( instat_matrix_fun_ptr rdp) { ref_dp= rdp; }
+    void set_ref_dp   (InstatMatrixFunction rdp) { ref_dp= rdp; }
     void set_ref_abs_det   ( double (*rad) (const TetraCL& t, const BaryCoordCL& b, const SurfacePatchCL& surf)) { ref_abs_det= rad; }
 
     InterfaceDebugP2CL (const InterfaceCommonDataP2CL& cdata);
@@ -1264,7 +1264,7 @@ class SurfactantP1BaseCL
     double        D_,     ///< diffusion coefficient
                   theta_, ///< time scheme parameter
                   dt_;    ///< time step size
-    instat_scalar_fun_ptr rhs_fun_; ///< function for a right-hand side
+    InstatScalarFunction rhs_fun_; ///< function for a right-hand side
 
     BndDataT            Bnd_;    ///< Dummy boundary data for interface solution
 
@@ -1302,10 +1302,10 @@ class SurfactantP1BaseCL
         { return const_DiscSolCL( &Myic, &Bnd_, &MG_); }
 
     /// initialize the interface concentration
-    void SetInitialValue (instat_scalar_fun_ptr, double t= 0.);
+    void SetInitialValue (InstatScalarFunction, double t= 0.);
 
     /// set the parameter of the theta-scheme for time stepping
-    void SetRhs (instat_scalar_fun_ptr);
+    void SetRhs (InstatScalarFunction);
 
     /// set the parameter of the theta-scheme for time stepping
     void SetTheta (double theta);
@@ -2056,7 +2056,7 @@ class InterfaceVectorSTP1AccuCL : public TetraAccumulatorCL
 class LocalVectorSTP1P1CL
 {
   private:
-    instat_scalar_fun_ptr f_;
+    InstatScalarFunction f_;
 
     std::valarray<double> qp1,
                           qf;
@@ -2064,7 +2064,7 @@ class LocalVectorSTP1P1CL
   public:
     double vec[8];
 
-    LocalVectorSTP1P1CL (instat_scalar_fun_ptr f) : f_( f) {}
+    LocalVectorSTP1P1CL (InstatScalarFunction f) : f_( f) {}
 
     void setup (const TetraPrismCL& prism, const STInterfaceCommonDataCL& cdata, const IdxT numr[8]) {
         resize_and_evaluate_on_vertexes( f_, prism, cdata.q5dom, qf);

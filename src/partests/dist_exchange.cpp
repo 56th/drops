@@ -43,7 +43,7 @@ double zero_func( const DROPS::Point3DCL&,   double) { return 0; }
 
 namespace DROPS{
 
-void InitP2( const MultiGridCL& mg, VecDescCL& vec, instat_scalar_fun_ptr func)
+void InitP2( const MultiGridCL& mg, VecDescCL& vec, InstatScalarFunction func)
 {
     Uint lvl= vec.GetLevel(),
          idx= vec.RowIdx->GetIdx();

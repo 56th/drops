@@ -38,7 +38,7 @@ namespace DROPS
 //====================================================
 
 /// Initialize P1 function 
-void OsmosisP1CL::Init (instat_scalar_fun_ptr cn, double t)
+void OsmosisP1CL::Init (InstatScalarFunction cn, double t)
 {
     conc.t = t;
     oldconc.t = t;
@@ -58,7 +58,7 @@ void OsmosisP1CL::Init (instat_scalar_fun_ptr cn, double t)
     
 }
 
-void OsmosisP1CL::InitWithScaling (instat_scalar_fun_ptr cn, double totalconcentration, double t)
+void OsmosisP1CL::InitWithScaling (InstatScalarFunction cn, double totalconcentration, double t)
 {
     Init(cn,t);
 
@@ -785,7 +785,7 @@ void OsmosisP1CL::SetupInstatMixedMassMatrix(MLMatDescCL& matM, VecDescCL& b, co
 //*****************************************************************************
 //                               OsmosisRepairCL
 //						FUNKTIONIERT AKTUELL NICHT
-//					   NEUE RepairAfterRefine NÖTIG
+//					   NEUE RepairAfterRefine Nï¿½TIG
 //*****************************************************************************
 void
 OsmosisRepairCL::post_refine ()

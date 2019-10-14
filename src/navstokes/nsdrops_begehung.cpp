@@ -30,7 +30,7 @@
 #include "navstokes/navstokes.h"
 #include <fstream>
 
-typedef double    (*instat_scalar_fun_ptr)(const DROPS::Point3DCL&, double);
+typedef double    (*InstatScalarFunction)(const DROPS::Point3DCL&, double);
 typedef DROPS::Point3DCL (*instat_vector_fun_ptr)(const DROPS::Point3DCL&, double);
 
 static double Reaction(const DROPS::Point3DCL&, double =0)
@@ -65,7 +65,7 @@ class StokesCoeffCL
 {
   public:
     //reaction
-    static instat_scalar_fun_ptr q;
+    static InstatScalarFunction q;
     //source term
     static instat_vector_fun_ptr f;
         
@@ -79,7 +79,7 @@ class StokesCoeffCL
 
 };
 
-instat_scalar_fun_ptr StokesCoeffCL::q;
+InstatScalarFunction StokesCoeffCL::q;
 instat_vector_fun_ptr StokesCoeffCL::f;
 
 

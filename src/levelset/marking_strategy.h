@@ -25,7 +25,7 @@
 #define MARKING_STRATEGY_H
 
 #include "num/accumulator.h"
-#include "num/discretize.h" // For instat_scalar_fun_ptr.
+#include "num/discretize.h" // For InstatScalarFunction.
 
 #include <vector>
 
@@ -178,7 +178,7 @@ private:
 class FunPtrGetterCL: public ValueGetterCL
 {
 public:
-    FunPtrGetterCL( instat_scalar_fun_ptr fct, double time = 0. );
+    FunPtrGetterCL( InstatScalarFunction fct, double time = 0. );
 
     double GetValue( const VertexCL& v ) const;
     double GetValue( const EdgeCL&   e ) const;
@@ -187,7 +187,7 @@ public:
 
 private:
     double time_;
-    instat_scalar_fun_ptr fct_;
+    InstatScalarFunction fct_;
 };
 
 /*!
@@ -199,7 +199,7 @@ private:
 class DistMarkingStrategyCL: public MarkingStrategyCL
 {
 public:
-    DistMarkingStrategyCL( instat_scalar_fun_ptr fct,
+    DistMarkingStrategyCL( InstatScalarFunction fct,
                            double width, Uint coarse_level, Uint fine_level,
                            double time = 0. );
     DistMarkingStrategyCL( const LevelsetP2CL &fct,
@@ -217,7 +217,7 @@ public:
 
     MarkingDecisionT GetDecision() const;
 
-    void SetDistFct( instat_scalar_fun_ptr fct, double time = 0 );
+    void SetDistFct( InstatScalarFunction fct, double time = 0 );
     void SetDistFct( const LevelsetP2CL& fct );
 
     double GetWidth() const;

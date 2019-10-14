@@ -12,12 +12,12 @@ namespace DROPS {
 
     struct SurfNavierStokesData {
         bool exactSoln;
-        instat_vector_fun_ptr u_T, f_T, w_T = nullptr; // w_T = nullptr for the Navier-Stokes case
-        instat_scalar_fun_ptr u_N, p, m_g; // m_g is "-g"
+        InstatVectorFunction u_T, f_T, w_T = nullptr; // w_T = nullptr for the Navier-Stokes case
+        InstatScalarFunction u_N, p, m_g; // m_g is "-g"
         struct Surface {
-            instat_scalar_fun_ptr phi;
-            instat_vector_fun_ptr n;
-            instat_matrix_fun_ptr H;
+            InstatScalarFunction phi;
+            InstatVectorFunction n;
+            InstatMatrixFunction H;
         };
         Surface surface;
         std::string description;

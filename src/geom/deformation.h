@@ -59,7 +59,7 @@ public:
     static MeshDeformationCL& getInstance();
 
     void SetMeshIdentity();
-    void SetMeshTransformation(instat_vector_fun_ptr f, const double t, bool only_bnd_edges_curved = false, bool P2 = false);
+    void SetMeshTransformation(InstatVectorFunction f, const double t, bool only_bnd_edges_curved = false, bool P2 = false);
 
     void CheckForCurved();
     void Initialize( MultiGridCL* mg);

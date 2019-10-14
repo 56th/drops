@@ -44,7 +44,7 @@ class ALECL{
 
   public:
     //free surface function
-    instat_scalar_fun_ptr interface_;
+    InstatScalarFunction interface_;
 
     ALECL(ParamCL P, MultiGridCL& mg):
     IfALE_(P.get<int>("ALE.wavy")),

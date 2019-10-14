@@ -1034,7 +1034,7 @@ DeleteNumbOnSimplex( Uint idx, const Iter& begin, const Iter& end)
 }
 
 template <class SimplexContT>
-void DoPeriodicMatching(SimplexContT& s1, SimplexContT& s2, match_fun match, const Uint idx)
+void DoPeriodicMatching(SimplexContT& s1, SimplexContT& s2, MatchFunction match, const Uint idx)
 {
     // match objects in s1 and s2
     typedef typename SimplexContT::iterator psetIterT;
@@ -1086,10 +1086,10 @@ void DoPeriodicMatching(SimplexContT& s1, SimplexContT& s2, match_fun match, con
 ///       indices from its l1-counterpart.
 /// \{
 template<class SimplexT>
-void CreatePeriodicNumbOnSimplex( const Uint idx, IdxT& counter, Uint stride,
-                        const ptr_iter<SimplexT>& begin,
-                        const ptr_iter<SimplexT>& end,
-                        const BndCondCL& Bnd, const Uint level, match_fun match)
+void CreatePeriodicNumbOnSimplex(const Uint idx, IdxT& counter, Uint stride,
+                                 const ptr_iter<SimplexT>& begin,
+                                 const ptr_iter<SimplexT>& end,
+                                 const BndCondCL& Bnd, const Uint level, MatchFunction match)
 {
     if (stride == 0) return;
 

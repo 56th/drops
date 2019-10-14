@@ -37,7 +37,7 @@ using namespace STXFEM;
 EnergyNormErrorAccumulatorCL::EnergyNormErrorAccumulatorCL(const MultiGridCL& MG, 
                                                        const LevelsetP2CL * lsetp2old_in,
                                                        const LevelsetP2CL * lsetp2new_in, 
-                                                       instat_scalar_fun_ptr lset_fpt_in, 
+                                                       InstatScalarFunction lset_fpt_in,
                                                        const double t1, const double t2,
                                                        const VecDescCL & old_sol_neg_in,
                                                        const VecDescCL & old_sol_pos_in,

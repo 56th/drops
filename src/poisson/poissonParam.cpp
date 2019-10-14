@@ -39,7 +39,7 @@ scalar_tetra_function PoissonCoeffCL::q;
 double PoissonCoeffCL::alpha;
 scalar_tetra_function PoissonCoeffCL::f;
 scalar_tetra_function PoissonCoeffCL::Solution;
-instat_scalar_fun_ptr PoissonCoeffCL::InitialCondition;
+InstatScalarFunction PoissonCoeffCL::InitialCondition;
 vector_tetra_function PoissonCoeffCL::Vel;
-instat_scalar_fun_ptr PoissonCoeffCL::interface;
+InstatScalarFunction PoissonCoeffCL::interface;
 }//end of namespace

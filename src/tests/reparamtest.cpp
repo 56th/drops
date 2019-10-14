@@ -353,7 +353,7 @@ int main( int argc, char **argv)
         DROPS::EllipsoidCL::Init( P.get<DROPS::Point3DCL>("Levelset.PosDrop"), P.get<DROPS::Point3DCL>("Levelset.RadDrop"));
         DROPS::HorizontalSlicesCL::Init( P.get<int>("Levelset.Reparam.Freq"), P.get<DROPS::Point3DCL>("Mesh.Origin")[1], P.get<DROPS::Point3DCL>("Mesh.Origin")[1]+P.get<DROPS::Point3DCL>("Mesh.E2")[1] );
         DROPS::TorusCL::Init( P.get<DROPS::Point3DCL>("Levelset.RadDrop")[0], P.get<DROPS::Point3DCL>("Levelset.RadDrop")[1]);
-        DROPS::instat_scalar_fun_ptr distance= P.get<int>("Levelset.Reparam.Freq")>0 ? DROPS::HorizontalSlicesCL::DistanceFct : DROPS::EllipsoidCL::DistanceFct;
+        DROPS::InstatScalarFunction distance= P.get<int>("Levelset.Reparam.Freq")>0 ? DROPS::HorizontalSlicesCL::DistanceFct : DROPS::EllipsoidCL::DistanceFct;
 
         typedef DROPS::DistMarkingStrategyCL MarkerT;
         MarkerT marker( distance, P.get<double>("Mesh.AdaptRef.Width" ),

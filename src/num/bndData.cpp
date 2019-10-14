@@ -89,19 +89,19 @@ void BndCondCL::StripPeriodicBC()
             bc= Nat0BC;
 }
 
-void assignZeroFunc(instat_scalar_fun_ptr& f) {
+void assignZeroFunc(InstatScalarFunction& f) {
     static auto called = false;
-    auto& map = SingletonMapCL<instat_scalar_fun_ptr>::getInstance();
-    if (!called) MapRegisterCL<instat_scalar_fun_ptr>("Zero", [](Point3DCL const &, double) { return 0.; });
+    auto& map = SingletonMapCL<InstatScalarFunction>::getInstance();
+    if (!called) MapRegisterCL<InstatScalarFunction>("Zero", [](Point3DCL const &, double) { return 0.; });
     called = true;
     f = map["Zero"];
 }
 
-void assignZeroFunc(instat_vector_fun_ptr& f)
+void assignZeroFunc(InstatVectorFunction& f)
 {
     static auto called = false;
-    auto& map = SingletonMapCL<instat_vector_fun_ptr>::getInstance();
-    if (!called) MapRegisterCL<instat_vector_fun_ptr>("ZeroVel", [](Point3DCL const &, double) { return Point3DCL(0., 0., 0.); });
+    auto& map = SingletonMapCL<InstatVectorFunction>::getInstance();
+    if (!called) MapRegisterCL<InstatVectorFunction>("ZeroVel", [](Point3DCL const &, double) { return Point3DCL(0., 0., 0.); });
     called = true;
     f = map["ZeroVel"];
 }

@@ -46,11 +46,6 @@
 
 using namespace DROPS;
 
-DROPS::Point3DCL shift;
-DROPS::Point3DCL shiftTransform(const Point3DCL& p) {
-    return p - shift;
-}
-
 bool windRises(double nu, VecDescCL const & w, double& Pe) {
     Pe = supnorm(w.Data) / nu;
     return Pe > .1; // if the wind is more than 10% of the diffusion
@@ -146,11 +141,13 @@ int main(int argc, char* argv[]) {
                 } catch (DROPS::DROPSParamErrCL) {}
                 if (ch) read_PeriodicBoundaries(mg, *ch);
                 // levelset shift
-                shift = inpJSON.get<DROPS::Point3DCL>("Levelset.ShiftDir", DROPS::Point3DCL(0., 0., 0.));
+                auto shift = inpJSON.get<DROPS::Point3DCL>("Levelset.ShiftDir", DROPS::Point3DCL(0., 0., 0.));
                 shift /= shift.norm();
                 auto shiftNorm = fabs(inpJSON.get<double>("Levelset.ShiftNorm", 0.));
                 shift *= shiftNorm;
-                mg.Transform(shiftTransform);
+                mg.Transform([&](Point3DCL const & p) {
+                    return p - shift;
+                });
                 logger.buf << "surface shift = " << shift;
                 logger.log();
             logger.end();
@@ -169,7 +166,7 @@ int main(int argc, char* argv[]) {
             logger.end();
         logger.end();
         logger.beg("interpolate level-set");
-            instat_scalar_fun_ptr sigma(0);
+            InstatScalarFunction sigma(0);
             SurfaceTensionCL sf(sigma, 0);
             BndDataCL<double> lsbnd(0);
             read_BndData(lsbnd, mg, inpJSON.get_child("Levelset.BndData"));
@@ -282,7 +279,6 @@ int main(int argc, char* argv[]) {
                 vtkWriter.write(t);
             };
             if (everyStep > 0) {
-                // level-set
                 VTKWriter::VTKVar vtkLevelSet;
                 vtkLevelSet.name = "level-set";
                 vtkLevelSet.value = &lset.Phi.Data;
@@ -298,7 +294,6 @@ int main(int argc, char* argv[]) {
                 logger.beg("write initial condition to vtk");
                     writeVTK(0.);
                 logger.end();
-
             }
             logger.beg("t = t_1");
                 logger.beg("assemble");

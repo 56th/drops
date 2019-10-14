@@ -31,7 +31,7 @@ using namespace DROPS;
 
 template<class DiscFunType>
 double L2_error (const DROPS::MultiGridCL& mg, const DROPS::VecDescCL& ls, const BndDataCL<>& lsbnd,
-    const DiscFunType& discsol, DROPS::instat_scalar_fun_ptr extsol, double t= 0.)
+    const DiscFunType& discsol, DROPS::InstatScalarFunction extsol, double t= 0.)
 {
     double d( 0.);
     const DROPS::Uint lvl = ls.GetLevel();
@@ -58,7 +58,7 @@ double L2_error (const DROPS::MultiGridCL& mg, const DROPS::VecDescCL& ls, const
 
 template<class DiscFunType>
 double L2_Vector_error (const DROPS::MultiGridCL& mg, const DROPS::VecDescCL& ls, const BndDataCL<>& lsbnd,
-    const DiscFunType& discsol, DROPS::instat_vector_fun_ptr extsol, double t= 0.)
+                        const DiscFunType& discsol, DROPS::InstatVectorFunction extsol, double t= 0.)
 {
     double d( 0.);
     const DROPS::Uint lvl = ls.GetLevel();
@@ -87,7 +87,7 @@ double L2_Vector_error (const DROPS::MultiGridCL& mg, const DROPS::VecDescCL& ls
 }
 
 double L2_norm (const DROPS::MultiGridCL& mg, const DROPS::VecDescCL& ls, const BndDataCL<>& lsbnd,
-    DROPS::instat_scalar_fun_ptr extsol, double t= 0.)
+    DROPS::InstatScalarFunction extsol, double t= 0.)
 {
     double d( 0.);
     const DROPS::Uint lvl = ls.GetLevel();
@@ -109,7 +109,7 @@ double L2_norm (const DROPS::MultiGridCL& mg, const DROPS::VecDescCL& ls, const 
     return std::sqrt( d);
 }
 
-void LinearLSInit (const DROPS::MultiGridCL& mg, DROPS::VecDescCL& ls, DROPS::instat_scalar_fun_ptr d, double t=0.)
+void LinearLSInit (const DROPS::MultiGridCL& mg, DROPS::VecDescCL& ls, DROPS::InstatScalarFunction d, double t=0.)
 {
     const DROPS::Uint lvl= ls.GetLevel(),
                       idx= ls.RowIdx->GetIdx();
@@ -122,7 +122,7 @@ void LinearLSInit (const DROPS::MultiGridCL& mg, DROPS::VecDescCL& ls, DROPS::in
             0.5*(ls.Data[it->GetVertex( 0)->Unknowns( idx)] + ls.Data[it->GetVertex( 1)->Unknowns( idx)]);
 }
 
-void InitScalar (const MultiGridCL& mg, VecDescCL& ic, instat_scalar_fun_ptr icf, double t= 0)
+void InitScalar (const MultiGridCL& mg, VecDescCL& ic, InstatScalarFunction icf, double t= 0)
 {
     const Uint lvl= ic.GetLevel(),
                idx= ic.RowIdx->GetIdx();
@@ -165,7 +165,7 @@ void InterpolateP2Vec (const MultiGridCL& mg, const VecDescCL& vP1, VecDescCL& v
     }
 }
 
-void InitVector(const MultiGridCL& MG, VecDescCL& vec, instat_vector_fun_ptr LsgVel, double t0 = 0)
+void InitVector(const MultiGridCL& MG, VecDescCL& vec, InstatVectorFunction LsgVel, double t0 = 0)
 {
     VectorCL& lsgvel= vec.Data;
     vec.t = t0;
@@ -194,7 +194,7 @@ void InitVector(const MultiGridCL& MG, VecDescCL& vec, instat_vector_fun_ptr Lsg
 
 // Scalar H1-error
 double H1_error (const DROPS::MultiGridCL& mg, const DROPS::VecDescCL& ls, const BndDataCL<>& lsbnd,
-                 const DROPS::VecDescCL& discsol, DROPS::instat_vector_fun_ptr extsol_grad, bool surfgradmark, double t=0.)
+                 const DROPS::VecDescCL& discsol, DROPS::InstatVectorFunction extsol_grad, bool surfgradmark, double t=0.)
 {
   double d( 0.), d_surf( 0.);
   const DROPS::Uint lvl = ls.GetLevel();
@@ -258,7 +258,7 @@ double H1_error (const DROPS::MultiGridCL& mg, const DROPS::VecDescCL& ls, const
 
 
 void H1_Vector_error_P2 (const DROPS::MultiGridCL& mg, const DROPS::VecDescCL& ls, const BndDataCL<>& lsbnd,
-                 const DROPS::VecDescCL& discsol, const DROPS::BndDataCL<Point3DCL>& bnddata, DROPS::instat_vector_fun_ptr extsol, DROPS::instat_vector_fun_ptr extsol_grad1, DROPS::instat_vector_fun_ptr extsol_grad2, DROPS::instat_vector_fun_ptr extsol_grad3, double eta, double& H1, double& simple_surfH1, double& advanced_surfH1, double& normal_velocity, double t=0.)
+                         const DROPS::VecDescCL& discsol, const DROPS::BndDataCL<Point3DCL>& bnddata, DROPS::InstatVectorFunction extsol, DROPS::InstatVectorFunction extsol_grad1, DROPS::InstatVectorFunction extsol_grad2, DROPS::InstatVectorFunction extsol_grad3, double eta, double& H1, double& simple_surfH1, double& advanced_surfH1, double& normal_velocity, double t=0.)
 {
     double d( 0.), d_surf( 0.), d_advanced_surf( 0.), d_normal_velocity( 0.);
     const DROPS::Uint lvl = ls.GetLevel();
@@ -379,7 +379,7 @@ void H1_Vector_error_P2 (const DROPS::MultiGridCL& mg, const DROPS::VecDescCL& l
 
 
 void H1_Vector_error_P1 (const DROPS::MultiGridCL& mg, const DROPS::VecDescCL& ls, const BndDataCL<>& lsbnd,
-                 const DROPS::VecDescCL& discsol, const DROPS::BndDataCL<Point3DCL>& bnddata, DROPS::instat_vector_fun_ptr extsol, DROPS::instat_vector_fun_ptr extsol_grad1, DROPS::instat_vector_fun_ptr extsol_grad2, DROPS::instat_vector_fun_ptr extsol_grad3, double eta, double& H1, double& simple_surfH1, double& advanced_surfH1, double& normal_velocity, double t=0.)
+                         const DROPS::VecDescCL& discsol, const DROPS::BndDataCL<Point3DCL>& bnddata, DROPS::InstatVectorFunction extsol, DROPS::InstatVectorFunction extsol_grad1, DROPS::InstatVectorFunction extsol_grad2, DROPS::InstatVectorFunction extsol_grad3, double eta, double& H1, double& simple_surfH1, double& advanced_surfH1, double& normal_velocity, double t=0.)
 {
     double d( 0.), d_surf( 0.), d_advanced_surf( 0.), d_normal_velocity( 0.);
     const DROPS::Uint lvl = ls.GetLevel();

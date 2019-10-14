@@ -462,7 +462,7 @@ void IdxDescCL::CreateNumbStdFE( Uint level, MultiGridCL& mg)
     const Uint idxnum= GetIdx();
     TriangLevel_= level;
     NumUnknowns_ = 0;
-    match_fun match= mg.GetBnd().GetMatchFun();
+    MatchFunction match= mg.GetBnd().GetMatchFun();
 
     // allocate space for indices; number unknowns in TriangLevel level
     if (match)

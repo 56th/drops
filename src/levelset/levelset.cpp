@@ -240,7 +240,7 @@ void NaiveLaplaceBeltramiAccuCL::visit( const TetraCL& t)
 
 void SF_ImprovedLaplBeltramiOnTriangle( const TetraCL& t, const BaryCoordCL * const p,
                                         const InterfaceTriangleCL&  triangle, const LocalP1CL<Point3DCL> Grad_f[10], const IdxT Numb[10],
-                                        instat_scalar_fun_ptr sigma, const Quad5_2DCL<Point3DCL> e[3],
+                                        InstatScalarFunction sigma, const Quad5_2DCL<Point3DCL> e[3],
                                         double det, VectorCL& f)
 {
     Quad5_2DCL<Point3DCL> Grad[10]; // Gradients of the P2-basis-functions
@@ -462,7 +462,7 @@ void VarObliqueLaplaceBeltramiAccuCL::visit (const TetraCL& t)
         add_to_global_vector( f.Data, -quad_2D( qsigma*w_[i], q_), n_.num[i]);
 }
 
-bool MarkInterface ( instat_scalar_fun_ptr DistFct, double width, MultiGridCL& mg, Uint f_level, Uint c_level, double t)
+bool MarkInterface ( InstatScalarFunction DistFct, double width, MultiGridCL& mg, Uint f_level, Uint c_level, double t)
 {
     bool marked= false;
     DROPS_FOR_TRIANG_TETRA( mg, /*default-level*/-1, it)
@@ -536,7 +536,7 @@ void LevelsetP2ContCL::UpdateDiscontinuous( ) { ; }
 
 // setting inital values for level set function in case of continuous P2 FE
 // via interpolation
-void LevelsetP2ContCL::Init( instat_scalar_fun_ptr phi0, double t)
+void LevelsetP2ContCL::Init( InstatScalarFunction phi0, double t)
 {
     const Uint lvl= Phi.GetLevel(),
                idx= Phi.RowIdx->GetIdx();
@@ -602,7 +602,7 @@ void LevelsetP2DiscontCL::ProjectContinuousToDiscontinuous()
 
 // setting inital values for level set function in case of discontinuous P2 FE
 // via elementwise L2-projection
-void LevelsetP2DiscontCL::InitProjection( instat_scalar_fun_ptr phi0, double t)
+void LevelsetP2DiscontCL::InitProjection( InstatScalarFunction phi0, double t)
 {
 // local mass matrix and its QR decomposition are computet on reference element only
     Uint idx_num = idx.GetIdx();
@@ -642,7 +642,7 @@ void LevelsetP2DiscontCL::InitProjection( instat_scalar_fun_ptr phi0, double t)
 
 }
 
-void LevelsetP2DiscontCL::Init( instat_scalar_fun_ptr phi0, double t)
+void LevelsetP2DiscontCL::Init( InstatScalarFunction phi0, double t)
 {
     Uint idx_num = idx.GetIdx();
     Uint lvl = idx.TriangLevel();

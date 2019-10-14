@@ -64,7 +64,7 @@ int main (int , char** )
         std::cout << " &insca = " << &insca << std::endl;
         std::cout << " &scatet = " << &scatet << std::endl;
 
-        DROPS::instat_scalar_fun_ptr test2(insca["Zero"]);
+        DROPS::InstatScalarFunction test2(insca["Zero"]);
         std::cout << " function pointer address of \"Zero\" in InScaMap: " 
                   << test2 << std::endl;
 

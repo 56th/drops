@@ -58,6 +58,12 @@
     #include "MatlabEngine.hpp"
 #endif
 
+// for casting to epetra
+#ifdef _TRILINOS
+    #include "Epetra_ConfigDefs.h"
+    #include "Epetra_SerialComm.h"
+#endif
+
 namespace DROPS
 {
 

@@ -42,7 +42,7 @@ void readBoundary ( std::vector<T>& bndcond, const std::string& bnd_type)
 
 template< class BoundaryT>
 void BuildBoundaryData( const MultiGridCL* mgp, BoundaryT* &bnddata,
-        const std::string& bnd_type_string, const std::string& bnd_funcs_string, match_fun periodic_match, std::string* per_funcs)
+        const std::string& bnd_type_string, const std::string& bnd_funcs_string, MatchFunction periodic_match, std::string* per_funcs)
 {
     const BoundaryCL& bnd= mgp->GetBnd();
     const BndIdxT num_bnd= bnd.GetNumBndSeg();
@@ -88,7 +88,7 @@ void BuildBoundaryData( const MultiGridCL* mgp, BoundaryT* &bnddata,
 
 template< class BoundaryT>
 void BuildBoundaryData(const MultiGridCL* mgp, BoundaryT* &bnddata,
-                        const ParamCL &P, match_fun periodic_match, std::string *per_funcs)
+                        const ParamCL &P, MatchFunction periodic_match, std::string *per_funcs)
 {
     const BoundaryCL& bnd= mgp->GetBnd();
     const BndIdxT num_bnd= bnd.GetNumBndSeg();

@@ -283,10 +283,10 @@ class PoissonP1CL: public ProblemCL<MGB, Coeff, PoissonBndDataCL>
     void SetupStiffnessMatrix(MatDescCL&) const;
     void SetupProlongation   (MatDescCL& P, IdxDescCL* cIdx, IdxDescCL* fIdx) const;
     // check computed solution etc.
-    double CheckSolution(const VecDescCL&, scalar_fun_ptr) const;
-    double CheckSolution(scalar_fun_ptr Lsg) const { return CheckSolution(x, Lsg); }
-    void GetDiscError (const MatDescCL&, scalar_fun_ptr) const;
-    void GetDiscError (scalar_fun_ptr Lsg) const { GetDiscError(A, Lsg); }
+    double CheckSolution(const VecDescCL&, ScalarFunction) const;
+    double CheckSolution(ScalarFunction Lsg) const { return CheckSolution(x, Lsg); }
+    void GetDiscError (const MatDescCL&, ScalarFunction) const;
+    void GetDiscError (ScalarFunction Lsg) const { GetDiscError(A, Lsg); }
 
     bool          EstimateError         (const VecDescCL&, const double, double&, est_fun);
     static double ResidualErrEstimator  (const TetraCL&, const VecDescCL&, const BndDataCL&);
@@ -367,7 +367,7 @@ class LevelsetP2CL
     
     void CreateNumbering( Uint level, IdxDescCL*);
     void DeleteNumbering();
-    void Init( scalar_fun_ptr);
+    void Init( ScalarFunction);
     // call SetupSystem *before* calling SetTimeStep!
     void SetupSystem( const DiscVelSolCL& vel);
     void SetTimeStep( double dt);
