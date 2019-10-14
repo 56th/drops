@@ -29,6 +29,7 @@
 #include "num/krylovsolver.h"
 #include "num/interfacePatch.h"
 #include "num/accumulator.h"
+#include "levelset/levelset.h"
 #include "levelset/levelsetmapper.h"
 #include "levelset/mgobserve.h"
 #include "out/ensightOut.h"
@@ -136,7 +137,7 @@ class InterfaceCommonDataP1CL : public TetraAccumulatorCL
         surf.clear();
         locp2_ls.assign( t, *ls, *lsetbnd);
         evaluate_on_vertexes( locp2_ls, lat, Addr( ls_loc));
-        if (equal_signs( ls_loc))
+        if (equalSigns(ls_loc))
             return;
         surf.make_patch<MergeCutPolicyCL>( lat, ls_loc);
     }
@@ -150,11 +151,11 @@ typedef std::vector<TetraBaryPairT>            TetraBaryPairVectorT;
 
 template <class T, class ResultIterT>
   inline ResultIterT
-  evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const TetraBaryPairVectorT& pos, double t, ResultIterT result_iterator);
+  evaluate_on_vertexes (std::function<T(const Point3DCL&, double)> const & f, const TetraBaryPairVectorT& pos, double t, ResultIterT result_iterator);
 
 template <class T, class ResultContT>
   inline ResultContT&
-  resize_and_evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const TetraBaryPairVectorT& pos, double t, ResultContT& result_container);
+  resize_and_evaluate_on_vertexes (std::function<T(const Point3DCL&, double)> const & f, const TetraBaryPairVectorT& pos, double t, ResultContT& result_container);
 
 template <class PEvalT, class ResultIterT>
   inline ResultIterT
@@ -249,7 +250,7 @@ class InterfaceCommonDataP2CL : public TetraAccumulatorCL
         surf.clear();
         locp2_ls.assign( t, *ls, *lsetbnd);
         evaluate_on_vertexes( locp2_ls, *lat, Addr( ls_loc));
-        if (equal_signs( ls_loc))
+        if (equalSigns(ls_loc))
             return;
         surf.make_patch<MergeCutPolicyCL>( *lat, ls_loc);
         if (surf.empty())
@@ -266,6 +267,7 @@ class InterfaceCommonDataP2CL : public TetraAccumulatorCL
         return the_clones[clone_id]= new InterfaceCommonDataP2CL( *this);
     }
 };
+
 
 class InterfaceCommonDataDeformP2CL;
 
@@ -323,6 +325,21 @@ class LocalMeshTransformationCL
         Ginv_wwT= eye<3, 3> ();
         Gqr.Solve (Ginv_wwT);
         Ginv_wwT-= outer_product (w, w);
+
+//        QRDecompCL<3, 3> qrdphi;
+//        qrdphi.GetMatrix() = dPhix;
+//        qrdphi.prepare_solve();
+//        SMatrixCL<3, 3> dphiinv = eye<3, 3> ();
+//        SMatrixCL<3, 3> dphiinvT = eye<3, 3> ();
+//        qrdphi.Solve(dphiinv);
+//        assign_transpose(dphiinvT, dphiinv);
+//        SMatrixCL<3, 3> Proj = eye<3, 3> ();
+//        Point3DCL p = b2w(xb);
+//        DROPS::Point3DCL v(p[0]/(std::sqrt(p[0]*p[0]+p[1]*p[1]+p[2]*p[2])),p[1]/(std::sqrt(p[0]*p[0]+p[1]*p[1]+p[2]*p[2])),p[2]/(std::sqrt(p[0]*p[0]+p[1]*p[1]+p[2]*p[2])));
+//        Proj-= outer_product(v,v);
+//        Ginv_wwT = dphiinv*Proj*dphiinvT;
+
+
 
         const SMatrixCL<2, 2> gr= GramMatrix (dPhix*Q);
         JPhiQ= std::sqrt(gr(0, 0)*gr(1, 1) - gr(0, 1)*gr(1, 0));
@@ -412,7 +429,7 @@ class InterfaceCommonDataDeformP2CL : public TetraAccumulatorCL
         surf.clear();
         locp2_ls.assign( t, *ls, *lsetbnd);
         evaluate_on_vertexes( locp2_ls, *lat, Addr( ls_loc));
-        if (equal_signs( ls_loc))
+        if (equalSigns(ls_loc))
             return;
         surf.make_patch<MergeCutPolicyCL>( *lat, ls_loc);
         if (surf.empty())
@@ -735,6 +752,56 @@ class LocalInterfaceMassP1CL
 ///
 /// D is the diffusion-coefficient
 void SetupLBP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls, const BndDataCL<>& lsbnd, double D);
+
+struct LocalStokesParam {
+    enum class Formulation { consistent, inconsistent };
+    struct {
+        double t = 0.;
+        size_t numbOfVirtualSubEdges = 2;
+        Formulation formulation = Formulation::consistent;
+        bool usePatchNormal = true;
+        instat_vector_fun_ptr exactNormal = nullptr;
+        instat_matrix_fun_ptr exactShape  = nullptr;
+        instat_scalar_fun_ptr exactDistance = nullptr;
+        instat_scalar_fun_ptr levelSet = nullptr;
+        instat_vector_fun_ptr f = nullptr; // moment rhs
+        instat_scalar_fun_ptr g = nullptr; // - continuity eqn rhs
+    } input;
+    struct {
+        struct {
+            double patch = 0.;
+            double lvset = 0.;
+        } normalErrSq;
+        double shapeErrSq = 0.;
+        double maxGammaDist = 0.;
+        size_t numbOfCutTetras = 0;
+    } output;
+};
+
+struct SurfOseenSystem {
+    MatDescCL A, A_stab, B, N, M, S, Schur, Schur_full_stab, Schur_normal_stab,
+              LB, LB_stab; // laplace-beltrami
+    VecDescCL fRHS, gRHS,
+              w; // wind
+};
+
+void SetupSurfOseen_P2P1(const MultiGridCL& MG_, const LevelsetP2CL&, SurfOseenSystem*, LocalStokesParam*);
+void SetupStokesIF_P1P1      ( const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P1_stab, MatDescCL* B_P1P1, MatDescCL* M_P1, MatDescCL* S_P1, MatDescCL* L_P1P1, MatDescCL* L_P1P1_stab, MatDescCL* M_ScalarP1, MatDescCL* A_ScalarP1_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, LocalStokesParam*);
+void SetupNavierStokesIF_P1P1( const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P1_stab, MatDescCL* B_P1P1, MatDescCL* Omega_P1P1, MatDescCL* N_P1,  MatDescCL* NT_P1, MatDescCL* M_P1,MatDescCL* D_P1, MatDescCL* S_P1, MatDescCL* L_P1P1, MatDescCL* L_P1P1_stab, MatDescCL* M_ScalarP1, MatDescCL* A_ScalarP1_stab, MatDescCL* Schur_normalP1_stab, const LevelsetP2CL& lset, const VecDescCL& velocity, const BndDataCL<Point3DCL>& velocity_bnd, LocalStokesParam*);
+void SetupStokesIF_P1P2      ( const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P1_stab, MatDescCL* B_P2P1, MatDescCL* M_P1, MatDescCL* S_P1, MatDescCL* L_P2P1, MatDescCL* L_P2P1_stab, MatDescCL* M_ScalarP2, MatDescCL* A_ScalarP2_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, LocalStokesParam*);
+void SetupStokesIF_P2P2      ( const MultiGridCL& MG_, MatDescCL* A_P2, MatDescCL* A_P2_stab, MatDescCL* B_P2P2, MatDescCL* M_P2, MatDescCL* S_P2, MatDescCL* L_P2P2, MatDescCL* L_P2P2_stab, MatDescCL* M_ScalarP2, MatDescCL* A_ScalarP2_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, LocalStokesParam*);
+
+void SetupCahnHilliardIF_P1P1( const MultiGridCL& MG_,  MatDescCL* M_P1, MatDescCL* NormalStab_P1, MatDescCL* TangentStab_P1, MatDescCL* VolumeStab_P1, MatDescCL* L_P1P1 ,MatDescCL* LM_P1P1 ,MatDescCL* Gprimeprime_P1P1 , const VecDescCL& lset, const LsetBndDataCL& lset_bnd, const VecDescCL& velocity, const BndDataCL<Point3DCL>& velocity_bnd,const VecDescCL& volume_fraction, const BndDataCL<>& volume_fraction_bnd);
+    double Mobility_function(double x);
+    double Potential_function(double x);
+    double Potential_prime_function(double x);
+    double Potential_prime_convex_function(double x);
+    double Potential_prime_concave_function(double x);
+
+void SetupInterfaceVectorRhsP1 (const MultiGridCL& mg, VecDescCL* v,
+    const VecDescCL& ls, const BndDataCL<>& lsbnd, instat_vector_fun_ptr f, double t = 0.);
+void SetupInterfaceVectorRhsP2 (const MultiGridCL& mg, VecDescCL* v,
+    const VecDescCL& ls, const BndDataCL<>& lsbnd, instat_vector_fun_ptr f);
 
 class LocalLaplaceBeltramiP1CL
 {
@@ -1096,7 +1163,7 @@ class LocalNormalLaplaceDeformP2CL
 /// \brief The routine sets up the load-vector in v on the interface defined by ls.
 ///        It belongs to the FE induced by standard P1-elements.
 void SetupInterfaceRhsP1 (const MultiGridCL& mg, VecDescCL* v,
-    const VecDescCL& ls, const BndDataCL<>& lsbnd, instat_scalar_fun_ptr f);
+    const VecDescCL& ls, const BndDataCL<>& lsbnd, instat_scalar_fun_ptr f, double t = 0.);
 
 
 ///\brief Initialize the QuadDomain2DCL-object qdom for quadrature with Quad5_2DCL on the lattice lat of t, given the level set in ls and bnd.
@@ -1106,7 +1173,7 @@ make_CompositeQuad5Domain2D (QuadDomain2DCL& qdom, const TetraCL& t, const Princ
     LocalP2CL<> locp2_ls( t, ls, bnd);
     std::valarray<double> ls_loc( lat.vertex_size());
     evaluate_on_vertexes( locp2_ls, lat, Addr( ls_loc));
-    if (equal_signs( ls_loc)) {
+    if (equalSigns(ls_loc)) {
         qdom.clear();
         return qdom;
     }
@@ -1358,10 +1425,11 @@ class VTKIfaceScalarCL : public VTKVariableCL
   private:
     const VecDescCL&   u_;
     MultiGridCL&       mg_;
+    const BndDataCL<double> BndData_;
 
   public:
-    VTKIfaceScalarCL (MultiGridCL& mg, const VecDescCL& u, std::string varName)
-        : VTKVariableCL( varName), u_( u), mg_( mg) {}
+    VTKIfaceScalarCL (MultiGridCL& mg, const VecDescCL& u, std::string varName, const BndDataCL<double>& BndData = BndDataCL<double>(0))
+        : VTKVariableCL( varName), u_( u), mg_( mg), BndData_(BndData) {}
 
     void put      (VTKOutCL& cf) const;
     Uint GetDim() const { return 1; }
@@ -1373,12 +1441,37 @@ class VTKIfaceScalarCL : public VTKVariableCL
 /// because they help to avoid template parameters in user code.
 inline VTKIfaceScalarCL&
 make_VTKIfaceScalar (MultiGridCL& mg, const VecDescCL& u,
-    std::string varName)
+    std::string varName, const BndDataCL<double>& BndData = BndDataCL<double>(0))
 {
-    return *new VTKIfaceScalarCL( mg, u, varName);
+    return *new VTKIfaceScalarCL( mg, u, varName, BndData);
 }
 
-/// ==Space-Time-methods==
+class VTKIfaceVectorCL : public VTKVariableCL
+{
+  private:
+    const VecDescCL& u_;
+    MultiGridCL& mg_;
+    int P2_;
+    const BndDataCL<Point3DCL>& BndData_;
+
+  public:
+    VTKIfaceVectorCL (MultiGridCL& mg, const VecDescCL& u, std::string varName, int P2, const BndDataCL<Point3DCL>& BndData)
+        : VTKVariableCL( varName), u_( u), mg_( mg), P2_(P2), BndData_(BndData) {}
+
+      void put      (VTKOutCL& cf) const;
+      Uint GetDim() const { return 1; }
+};
+
+inline VTKIfaceVectorCL&
+make_VTKIfaceVector (MultiGridCL& mg, const VecDescCL& u,
+                     std::string varName, std::string FEdegree, const BndDataCL<Point3DCL>& BndData)
+{
+  //std::cout<<"Element :"<< FEdegree <<std::endl;
+  if(!FEdegree.compare("P2"))
+    return *new VTKIfaceVectorCL( mg, u, varName, 1, BndData);
+  else
+    return *new VTKIfaceVectorCL( mg, u, varName, 0, BndData);
+}/// ==Space-Time-methods==
 /// \todo Maybe introduce a new header
 
 ///\brief Bilinear space-time FE-function on a single TetraPrismCL.
@@ -1574,9 +1667,8 @@ template <class T= double>
 class STCoordEvalCL
 {
   public:
-    typedef T (*fun_type)(const Point3DCL&, double);
+    using fun_type = std::function<T(Point3DCL const &, double)>;
     typedef T value_type;
-
   private:
     STCoord2WorldCoordCL mapper_;
     fun_type f_;
@@ -1590,14 +1682,14 @@ class STCoordEvalCL
 
 template <class T, class DomainT, class ResultIterT>
   inline ResultIterT
-  evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const TetraPrismCL& prism, const DomainT& dom, ResultIterT result_iterator)
+  evaluate_on_vertexes (std::function<T(const Point3DCL&, double)> const & f, const TetraPrismCL& prism, const DomainT& dom, ResultIterT result_iterator)
 {
     return std::transform( dom.vertex_begin(), dom.vertex_end(), result_iterator, STCoordEvalCL<T>( prism, f));
 }
 
 template <class T, class DomainT, class ResultContT>
   inline const ResultContT&
-  resize_and_evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const TetraPrismCL& prism, const DomainT& dom, ResultContT& result_container)
+  resize_and_evaluate_on_vertexes (std::function<T(const Point3DCL&, double)> const & f, const TetraPrismCL& prism, const DomainT& dom, ResultContT& result_container)
 {
     result_container.resize( dom.vertex_size());
     evaluate_on_vertexes( f, prism, dom, sequence_begin( result_container));
@@ -1824,7 +1916,7 @@ class STInterfaceCommonDataCL : public TetraAccumulatorCL
         q5dom.clear();
         st_local_ls.assign( t, *old_ls, *new_ls, *lsetbnd);
         evaluate_on_vertexes( st_local_ls, lat, Addr( ls_loc));
-        if (equal_signs( ls_loc))
+        if (equalSigns(ls_loc))
             return;
         surf.make_patch<MergeCutPolicyCL>( lat, ls_loc);
         surf.compute_normals( TetraPrismCL( t, t0, t1));

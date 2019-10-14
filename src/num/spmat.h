@@ -52,6 +52,12 @@
 # include "parallel/parallel.h"
 #endif
 
+// for .mat binary output
+#ifdef _MATLAB
+    #include "MatlabDataArray.hpp"
+    #include "MatlabEngine.hpp"
+#endif
+
 namespace DROPS
 {
 
@@ -130,6 +136,14 @@ template <class T>
 {
     Assert( v.size()==w.size(), "dot: incompatible dimensions", DebugNumericC);
     return std::inner_product( Addr( v), Addr( v) + v.size(), Addr( w), T());
+}
+
+template <class T>
+inline VectorBaseCL<T> operator-(const VectorBaseCL<T>& v, const VectorBaseCL<T>& w) {
+    Assert( v.size()==w.size(), "operator-: incompatible dimensions", DebugNumericC);
+    auto r = v;
+    std::transform(begin(r), end(r), begin(w), begin(r), std::minus<T>());
+    return r;
 }
 
 template <class VT>
@@ -700,15 +714,15 @@ public:
     SparseMatBaseCL& operator*= (T c);
     SparseMatBaseCL& operator/= (T c);
 
-    SparseMatBaseCL& LinComb (double, const SparseMatBaseCL<T>&,
-                              double, const SparseMatBaseCL<T>&);
-    SparseMatBaseCL& LinComb (double, const SparseMatBaseCL<T>&,
-                              double, const SparseMatBaseCL<T>&,
-                              double, const SparseMatBaseCL<T>&);
-    SparseMatBaseCL& LinComb (double, const SparseMatBaseCL<T>&,
-                              double, const SparseMatBaseCL<T>&,
-                              double, const SparseMatBaseCL<T>&,
-                              double, const SparseMatBaseCL<T>&);
+    SparseMatBaseCL& LinComb(double, SparseMatBaseCL<T> const &, double, SparseMatBaseCL<T> const &);
+    template <typename ...Args>
+    SparseMatBaseCL& LinComb(double a, SparseMatBaseCL const & A, double b, SparseMatBaseCL const & B, Args... args) {
+        SparseMatBaseCL<T> tmp;
+        tmp.LinComb(a, A, b, B);
+        return LinComb(1., tmp, args...);
+    }
+
+    SparseMatBaseCL& concat_under (const SparseMatBaseCL<T>&, const SparseMatBaseCL<T>&);
 
     void insert_col (size_t c, const VectorBaseCL<T>& v);
 
@@ -722,6 +736,9 @@ public:
 
     void permute_rows (const PermutationT&);
     void permute_columns (const PermutationT&);
+
+    SparseMatBaseCL& exportMTX(std::string const &);
+    SparseMatBaseCL& exportMAT(std::string const &);
 
     template <class, class>
       friend class SparseMatBuilderCL;
@@ -929,6 +946,51 @@ template <typename T>
     }
 }
 
+// export to .MTX ASCII format
+template <typename T>
+SparseMatBaseCL<T>& SparseMatBaseCL<T>::exportMTX(std::string const & path) {
+    std::ofstream out(path);
+    out << *this;
+    return *this;
+}
+
+// export to .MAT binary format
+// (0) https://www.mathworks.com/help/matlab/calling-matlab-engine-from-cpp-programs.html
+// (1) https://www.mathworks.com/help/matlab/apiref/matlab.engine.matlabengine.html
+// (2) https://www.mathworks.com/help/matlab/matlab_external/pass-sparse-arrays-to-matlab-1.html
+template <typename T>
+SparseMatBaseCL<T>& SparseMatBaseCL<T>::exportMAT(std::string const & path) {
+    #ifdef _MATLAB
+        std::unique_ptr<matlab::engine::MATLABEngine> matlabPtr = matlab::engine::startMATLAB();
+            size_t nnz = num_nonzeros();
+            std::vector<double> data;
+            std::vector<double/* https://www.mathworks.com/matlabcentral/answers/311752-sparse-function-cannot-get-integer-arrays-for-the-indices */> rows, cols;
+            data.reserve(nnz);
+            rows.reserve(nnz);
+            cols.reserve(nnz);
+            for (size_t row = 0; row < num_rows(); ++row)
+                for (size_t col = row_beg(row), rowend = row_beg(row + 1); col < rowend; ++col) {
+                    rows.push_back(row + 1);
+                    cols.push_back(col_ind(col) + 1);
+                    data.push_back(val(col));
+                }
+            matlab::data::ArrayFactory factory;
+            auto i = factory.createArray({ 1, nnz }, rows.begin(), rows.end());
+            auto j = factory.createArray({ 1, nnz }, cols.begin(), cols.end());
+            auto v = factory.createArray({ 1, nnz }, data.begin(), data.end());
+            matlabPtr->setVariable(u"i", std::move(i));
+            matlabPtr->setVariable(u"j", std::move(j));
+            matlabPtr->setVariable(u"v", std::move(v));
+            std::stringstream stream;
+            stream << "tic; A = sparse(i, j, v, " << num_rows() << ", " << num_cols() << ", " << nnz << "); save('" << path << "', 'A'); toc";
+            auto statement = matlab::engine::convertUTF8StringToUTF16String(stream.str());
+            matlabPtr->eval(statement);
+            return *this;
+    #else
+        throw std::invalid_argument("DROPS is compiled w/o matlab");
+    #endif
+}
+
 
 //**********************************************************************************
 //
@@ -1013,18 +1075,16 @@ void in (std::istream& is, VectorBaseCL<T>& v)
 }
 
 
-// Human/Matlab readable output
+// Human/Matlab .mtx readable output
 template <typename T>
-std::ostream& operator << (std::ostream& os, const SparseMatBaseCL<T>& A)
-{
+std::ostream& operator << (std::ostream& os, const SparseMatBaseCL<T>& A) {
     const size_t M = A.num_rows();
-
-    os << "% " << M << 'x' << A.num_cols() << ' ' << A.num_nonzeros() << " nonzeros\n";
-
+    auto field = std::is_same<T, double>::value ? "real" : "complex";
+    os << "%%MatrixMarket matrix coordinate " << field << " general\n" << A.num_rows() << ' ' << A.num_cols() << ' ' << A.num_nonzeros() << '\n';
+    os.precision(15);
     for (size_t row=0; row<M; ++row)
         for (size_t col=A.row_beg(row), rowend=A.row_beg(row+1); col<rowend; ++col)
-            os << row+1 << ' ' << A.col_ind(col)+1 << ' ' << A.val(col) << '\n';
-
+            os << row+1 << ' ' << A.col_ind(col)+1 << ' ' << std::scientific << A.val(col) << '\n';
     return os << std::flush;
 }
 
@@ -1183,6 +1243,77 @@ void ortho( VectorBaseCL<T>& v, const VectorBaseCL<T>& k, const SparseMatBaseCL<
     v-= alpha*k;
 }
 
+template <typename T>
+SparseMatBaseCL<T>& SparseMatBaseCL<T>::concat_under (const SparseMatBaseCL<T>& A, const SparseMatBaseCL<T>& B)
+{
+    num_rows(A.num_rows() + B.num_rows());
+    num_cols(A.num_cols());
+    num_nonzeros(A.num_nonzeros() + B.num_nonzeros());
+    _rowbeg[0] = 0;
+
+    IncrementVersion();
+
+    size_t maxiteration;
+
+    if(A.num_nonzeros() + B.num_nonzeros() < A.num_rows() + B.num_rows())
+    {
+        maxiteration = A.num_rows() + B.num_rows();
+    }
+    else
+    {
+        maxiteration = A.num_nonzeros() + B.num_nonzeros();
+    }
+
+    for (size_t i = 0; i<maxiteration; i++)
+    {
+        if(i<A.num_nonzeros())
+        {
+            _val[i] = A.val(i);
+            _colind[i] = A.col_ind(i);
+        }
+        if(i<A.num_rows()+1)
+        {
+            _rowbeg[i] = A.row_beg(i);
+        }
+        if((i>=A.num_nonzeros()) && (i<B.num_nonzeros()+A.num_nonzeros()))
+        {
+            _val[i] = B.val(i-A.num_nonzeros());
+            _colind[i] = B.col_ind(i-A.num_nonzeros());
+        }
+        if((i>=A.num_rows()) && (i<B.num_rows()+A.num_rows()))
+        {
+            _rowbeg[i+1] = B.row_beg(i+1-A.num_rows()) + A.row_beg(A.num_rows());
+        }
+    }
+
+//    for (size_t i = 0; i<A.num_nonzeros(); i++)
+//    {
+//        _val[i] = A.val(i);
+//        _colind[i] = A.col_ind(i);
+//    }
+
+//    for (size_t i = 0; i<A.num_rows()+1; i++)
+//    {
+//        _rowbeg[i] = A.row_beg(i);
+//    }
+
+//    for (size_t i = 0; i<B.num_nonzeros(); i++)
+//    {
+//        _val[i+A.num_nonzeros()] = B.val(i);
+//        _colind[i+A.num_nonzeros()] = B.col_ind(i);
+//    }
+
+//    for (size_t i = 0; i<B.num_rows(); i++)
+//    {
+//        _rowbeg[i+A.num_rows()+1] = B.row_beg(i+1) + A.row_beg(A.num_rows());
+//    }
+
+
+    return *this;
+
+}
+
+
 /// \brief Compute the linear combination of two sparse matrices efficiently.
 /// The new sparsity pattern is computed by merging the lists of _colind (removing the duplicates) row by row.
 /// \todo Das alte Pattern wiederzuverwenden, macht mal wieder Aerger:
@@ -1190,12 +1321,12 @@ void ortho( VectorBaseCL<T>& v, const VectorBaseCL<T>& k, const SparseMatBaseCL<
 ///   die Anzahl der Unbekannten nicht aendert. Daher schalten wir die
 ///   Wiederverwendung vorerst global aus.
 template <typename T>
-SparseMatBaseCL<T>& SparseMatBaseCL<T>::LinComb (double coeffA, const SparseMatBaseCL<T>& A,
-                                                 double coeffB, const SparseMatBaseCL<T>& B)
-{
+SparseMatBaseCL<T>& SparseMatBaseCL<T>::LinComb(
+    double coeffA, SparseMatBaseCL<T> const & A,
+    double coeffB, SparseMatBaseCL<T> const & B
+) {
     Assert( A.num_rows()==B.num_rows() && A.num_cols()==B.num_cols(),
             "LinComb: incompatible dimensions", DebugNumericC);
-
     IncrementVersion();
     Comment( "LinComb: Creating NEW matrix" << std::endl, DebugNumericC);
     num_rows( A.num_rows());
@@ -1283,30 +1414,6 @@ SparseMatBaseCL<T>& SparseMatBaseCL<T>::LinComb (double coeffA, const SparseMatB
     } //end of omp parallel
     delete [] t_sum;
     return *this;
-}
-
-
-/// \brief Compute the linear combination of three sparse matrices.
-template <typename T>
-SparseMatBaseCL<T>& SparseMatBaseCL<T>::LinComb (double coeffA, const SparseMatBaseCL<T>& A,
-                                                 double coeffB, const SparseMatBaseCL<T>& B,
-                                                 double coeffC, const SparseMatBaseCL<T>& C)
-{
-    SparseMatBaseCL<T> tmp;
-    tmp.LinComb( coeffA, A, coeffB, B);
-    return this->LinComb( 1.0, tmp, coeffC, C);
-}
-
-/// \brief Compute the linear combination of four sparse matrices.
-template <typename T>
-SparseMatBaseCL<T>& SparseMatBaseCL<T>::LinComb (double coeffA, const SparseMatBaseCL<T>& A,
-                                                 double coeffB, const SparseMatBaseCL<T>& B,
-                                                 double coeffC, const SparseMatBaseCL<T>& C,
-                                                 double coeffD, const SparseMatBaseCL<T>& D)
-{
-    SparseMatBaseCL<T> tmp;
-    tmp.LinComb( coeffA, A, coeffB, B, coeffC, C);
-    return this->LinComb( 1.0, tmp, coeffD, D);
 }
 
 /// \brief Inserts v as column c. The old columns [c, num_cols()) are shifted to the right.
@@ -1424,7 +1531,7 @@ y_Ax(T* __restrict y,
 
 
 template <typename _MatEntry, typename _VecEntry>
-VectorBaseCL<_VecEntry> operator * (const SparseMatBaseCL<_MatEntry>& A, const VectorBaseCL<_VecEntry>& x)
+VectorBaseCL<_VecEntry> operator*(const SparseMatBaseCL<_MatEntry>& A, const VectorBaseCL<_VecEntry>& x)
 {
     VectorBaseCL<_VecEntry> ret( A.num_rows());
     Assert( A.num_cols()==x.size(), "SparseMatBaseCL * VectorBaseCL: incompatible dimensions", DebugNumericC);
@@ -1436,7 +1543,6 @@ VectorBaseCL<_VecEntry> operator * (const SparseMatBaseCL<_MatEntry>& A, const V
           Addr( x));
     return ret;
 }
-
 
 // y+= A^T*x
 // fails, if num_rows==0.

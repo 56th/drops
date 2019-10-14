@@ -89,16 +89,22 @@ void BndCondCL::StripPeriodicBC()
             bc= Nat0BC;
 }
 
-void assignZeroFunc( instat_scalar_fun_ptr& f)
-{
-    f= SingletonMapCL<instat_scalar_fun_ptr>::getInstance()["Zero"];
+void assignZeroFunc(instat_scalar_fun_ptr& f) {
+    static auto called = false;
+    auto& map = SingletonMapCL<instat_scalar_fun_ptr>::getInstance();
+    if (!called) MapRegisterCL<instat_scalar_fun_ptr>("Zero", [](Point3DCL const &, double) { return 0.; });
+    called = true;
+    f = map["Zero"];
 }
 
-void assignZeroFunc( instat_vector_fun_ptr& f)
+void assignZeroFunc(instat_vector_fun_ptr& f)
 {
-    f= SingletonMapCL<instat_vector_fun_ptr>::getInstance()["ZeroVel"];
+    static auto called = false;
+    auto& map = SingletonMapCL<instat_vector_fun_ptr>::getInstance();
+    if (!called) MapRegisterCL<instat_vector_fun_ptr>("ZeroVel", [](Point3DCL const &, double) { return Point3DCL(0., 0., 0.); });
+    called = true;
+    f = map["ZeroVel"];
 }
-
 
 /// \brief Read an json-array with 1 or 2 members. The first is the BndCondT, the second possibly is a function-name.
 /// Implementation detail of read_BndData.

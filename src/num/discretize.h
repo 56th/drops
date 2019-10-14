@@ -35,16 +35,13 @@
 namespace DROPS
 {
 
-typedef double    (*scalar_fun_ptr)(double);
-typedef double    (*instat_scalar_fun_ptr)(const Point3DCL&, double);
-typedef Point3DCL (*instat_vector_fun_ptr)(const Point3DCL&, double);
-typedef double    (*scalar_tetra_function)(const TetraCL&, const BaryCoordCL&, double);
-typedef Point3DCL (*vector_tetra_function)(const TetraCL&, const BaryCoordCL&, double);
-typedef bool      (*match_fun)        (const Point3DCL&, const Point3DCL&);
-
-typedef double    (*SmoothFunT)           (double,double);
-typedef SMatrixCL<3, 3> (*instat_matrix_fun_ptr) (const Point3DCL&, double);
-
+using instat_scalar_fun_ptr = std::function<double(Point3DCL const &, double)>;
+using instat_vector_fun_ptr = std::function<Point3DCL(Point3DCL const &, double)>;
+using instat_matrix_fun_ptr = std::function<SMatrixCL<3, 3>(Point3DCL const &, double)>;
+using scalar_tetra_function = std::function<double(const TetraCL&, const BaryCoordCL&, double)>;
+using vector_tetra_function = std::function<Point3DCL(const TetraCL&, const BaryCoordCL&, double)>;
+typedef bool (*match_fun)(const Point3DCL&, const Point3DCL&);
+typedef double (*SmoothFunT)(double,double);
 
 // SmoothedJumpCL for jumping coefficients
 
@@ -104,10 +101,10 @@ class GridFunctionCL: public std::valarray<T>
   public:
     typedef T value_type;
     typedef std::valarray<T> base_type;
-    typedef value_type (*tetra_function)(const TetraCL&, const BaryCoordCL&, double);
-    typedef value_type (*instat_fun_ptr)(const Point3DCL&, double);
+    using tetra_function = std::function<value_type(const TetraCL&, const BaryCoordCL&, double)>;
+    using instat_fun_ptr = std::function<value_type(Point3DCL const &, double)>;
 
-  protected:
+protected:
     typedef GridFunctionCL<T> self_;
 
   public:
@@ -262,6 +259,21 @@ operator*(const SMatrixCL<D,D>& A, const GridFunctionCL<SVectorCL<D> >& b)
     return ret;
 }
 
+inline SMatrixCL<3,3>&
+operator/=(SMatrixCL<3,3>& A, const GridFunctionCL<double>& b) {
+    for (size_t i = 0; i < A.size(); ++i)
+            A[i] /= b[i];
+    return A;
+}
+
+inline GridFunctionCL<double>
+sqrt(const GridFunctionCL<double>& a) {
+    auto ret = a;
+    for (size_t i = 0; i < a.size(); ++i)
+        ret[i] = std::sqrt(a[i]);
+    return ret;
+}
+
 template<Uint D>
 inline GridFunctionCL<SVectorCL<D> >
 operator*(const GridFunctionCL<double>& a, const GridFunctionCL<SVectorCL<D> >& b)
@@ -279,12 +291,21 @@ operator*=(GridFunctionCL<SVectorCL<D> >& a, double b)
 }
 
 template<Uint D>
-inline GridFunctionCL<SVectorCL<D> >
+inline GridFunctionCL<SVectorCL<D>>
 operator*( double a, const GridFunctionCL<SVectorCL<D> >& b)
 {
 
     GridFunctionCL<SVectorCL<D> > ret( b);
     return ret*= a;
+}
+
+template<Uint D>
+inline GridFunctionCL<SVectorCL<D>>
+operator/(GridFunctionCL<SVectorCL<D>> const & a, GridFunctionCL<double> const & b) {
+    GridFunctionCL<SVectorCL<D>> ret(a);
+    for (size_t i = 0; i < a.size(); ++i)
+        ret[i] /= b[i];
+    return ret;
 }
 
 template<Uint D>
@@ -336,23 +357,80 @@ transp_mul (const GridFunctionCL< SMatrixCL<Rows, Cols> >& a, const GridFunction
 
 template <Uint Dim>
 inline GridFunctionCL<double>
-dot(const GridFunctionCL<SVectorCL<Dim> >& a, const GridFunctionCL<SVectorCL<Dim> >& b)
-{
+dot(const GridFunctionCL<SVectorCL<Dim> >& a, const GridFunctionCL<SVectorCL<Dim> >& b) {
     GridFunctionCL<double> ret( 0.0, a.size());
     for (size_t i= 0; i<a.size(); ++i)
-        ret[i]= inner_prod( a[i], b[i]);
+        ret[i] = inner_prod(a[i], b[i]);
     return ret;
 }
 
 template<Uint D>
 inline GridFunctionCL<double>
-dot(const SVectorCL<D> & a, const GridFunctionCL<SVectorCL<D> >& b)
-{
+dot(const SVectorCL<D> & a, const GridFunctionCL<SVectorCL<D> >& b) {
     GridFunctionCL<double> ret( 0.0, b.size());
     for (size_t i= 0; i<b.size(); ++i)
         ret[i]= inner_prod( a, b[i]);
     return ret;
 }
+
+inline GridFunctionCL<double>
+contract(GridFunctionCL<SMatrixCL<3,3>> const & A, GridFunctionCL<SMatrixCL<3,3>> const & B) {
+    GridFunctionCL<double> res(0., A.size());
+    for (size_t i = 0; i < A.size(); ++i)
+        for (size_t j = 0; j < 9; ++j)
+            res[i] += A[i][j] * B[i][j];
+    return res;
+}
+
+inline GridFunctionCL<double>
+take(GridFunctionCL<SMatrixCL<3,3>> const & A, size_t i, size_t j) {
+    GridFunctionCL<double> res(0., A.size());
+    for (size_t n = 0; n < A.size(); ++n)
+        res[n] = A[n](i, j);
+    return res;
+}
+
+//inline GridFunctionCL<SMatrixCL<3,3>>
+//operator-(GridFunctionCL<SMatrixCL<3,3>> const & A, GridFunctionCL<SMatrixCL<3,3>> const & B) {
+//    auto res = A;
+//    for (size_t i = 0; i < A.size(); ++i)
+//        res[i] -= B[i];
+//    return res;
+//}
+
+template<typename T>
+inline GridFunctionCL<T>
+operator-(GridFunctionCL<T> const & A, GridFunctionCL<T> const & B) {
+    auto res = A;
+    for (size_t i = 0; i < A.size(); ++i)
+        res[i] -= B[i];
+    return res;
+}
+
+inline GridFunctionCL<SMatrixCL<3,3>>
+operator/(GridFunctionCL<SMatrixCL<3,3>> const & A, GridFunctionCL<double> const & a) {
+    GridFunctionCL<SMatrixCL<3,3>> res(SMatrixCL<3,3>(), A.size());
+    for (size_t i = 0; i < A.size(); ++i)
+        res[i] = A[i] / a[i];
+    return res;
+}
+
+inline GridFunctionCL<SMatrixCL<3,3>>
+operator*(std::valarray<double> const & a, GridFunctionCL<SMatrixCL<3,3>> const & A) {
+    auto res = A;
+    for (size_t i = 0; i < A.size(); ++i)
+        res[i] = a[i] * A[i];
+    return res;
+}
+
+//template<Uint D>
+//inline GridFunctionCL<SMatrixCL<D,D>>
+//outer_product(GridFunctionCL<SVectorCL<D>> const & u, GridFunctionCL<SVectorCL<D>> const & v) {
+//    GridFunctionCL<SMatrixCL<D,D>> ret(0., u.size());
+//    for (size_t i = 0; i < u.size(); ++i)
+//        ret[i] = outer_product(u[i], v[i]);
+//    return ret;
+//}
 
 template <Uint Rows, Uint Cols>
 inline GridFunctionCL<double>
@@ -408,6 +486,14 @@ outer_product(const GridFunctionCL<Point3DCL>& a, const GridFunctionCL<Point3DCL
     for (size_t i= 0; i<b.size(); ++i)
         ret[i]= outer_product( a[i], b[i]);
     return ret;
+}
+
+inline GridFunctionCL<SMatrixCL<3,3>>
+sym_part(GridFunctionCL<SMatrixCL<3,3>> const & m) {
+    GridFunctionCL<SMatrixCL<3,3>> m_s(SMatrixCL<3,3>(), m.size());
+    for (size_t i = 0; i < m.size(); ++i)
+        m_s[i] = sym_part(m[i]);
+    return m_s;
 }
 
 inline GridFunctionCL< SMatrixCL<3,3> >
@@ -554,7 +640,7 @@ template <class T= double>
 class BaryEvalCL
 {
   public:
-    typedef T (*fun_type)(const Point3DCL&, double);
+    using fun_type = std::function<T(const Point3DCL&, double)>;
     typedef T value_type;
 
   private:
@@ -563,7 +649,7 @@ class BaryEvalCL
     fun_type f_;
 
   public:
-    BaryEvalCL (const TetraCL& tet, double t, fun_type f)
+    BaryEvalCL (const TetraCL& tet, double t, fun_type const & f)
         : mapper_( tet), t_( t), f_( f) {}
     BaryEvalCL ()
         : t_( 0.), f_( 0) {}
@@ -1292,6 +1378,7 @@ class P1DiscCL
     static inline void   GetGradients( Point3DCL H[4],    double& det, const TetraCL& t);
     static inline void   GetGradients( SMatrixCL<3,4>& H, double& det, const Point3DCL pt[4]);
     static inline void   GetGradients( Point3DCL H[4], const SMatrixCL<3,3>& T);
+    static void GetP1Basis( LocalP1CL<> p1[4]);
     static void GetP1Basis( Quad5_2DCL<> p1[4], const BaryCoordCL* const p);
 };
 
@@ -1332,6 +1419,8 @@ class P2DiscCL
     static void GetGradientsOnRef( Quad5CL<Point3DCL> GRef[10]);
     // The 2nd arg points to 3 vertices of the triangle
     static void GetGradientsOnRef( Quad5_2DCL<Point3DCL> GRef[10], const BaryCoordCL* const);
+    // p2[i] contains a LocalP2CL-object that is initialized with FE_P2CL::Hi
+    static void GetP2Basis( LocalP2CL<> p2[10]);
     // p2[i] contains a Quad5_2DCL-object that is initialized with FE_P2CL::Hi
     static void GetP2Basis( Quad5_2DCL<> p2[10], const BaryCoordCL* const p);
     // compute gradients

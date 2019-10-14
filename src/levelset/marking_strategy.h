@@ -61,6 +61,7 @@ enum MarkingDecisionT { CoarsenC, RefineC, KeepC, DontCareC };
 class MarkingStrategyCL: public TetraAccumulatorCL
 {
 public:
+    MarkingStrategyCL(bool modified = false) : TetraAccumulatorCL(modified) {}
     virtual ~MarkingStrategyCL() {}
     virtual  void visit( const TetraCL& t ) = 0;
     virtual  TetraAccumulatorCL* clone (int clone_id) = 0;
@@ -84,7 +85,7 @@ public:
 class UniformMarkingStrategyCL: public MarkingStrategyCL
 {
 public:
-    UniformMarkingStrategyCL( Uint Level) : level_(Level), decision_(DontCareC), modified_(false) {}
+    UniformMarkingStrategyCL( Uint Level) : level_(Level), decision_(DontCareC) {}
     ~UniformMarkingStrategyCL() {}
     void visit( const TetraCL& t );
     TetraAccumulatorCL* clone (int clone_id);
@@ -101,7 +102,6 @@ public:
 private:
     Uint level_;
     MarkingDecisionT decision_;
-    bool modified_;
 };
 
 
@@ -142,7 +142,6 @@ public:
     void pop_back();
 
 private:
-    bool modified_;
     MarkingDecisionT decision_;
     std::vector<MarkingStrategyCL*> strategies_;
 };
@@ -233,7 +232,6 @@ private:
     double width_;
     Uint c_level_;
     Uint f_level_;
-    bool modified_;
     MarkingDecisionT decision_;
 };
 
@@ -274,7 +272,6 @@ private:
     std::unique_ptr<ValueGetterCL> getter_;
 
     Uint f_level_;
-    bool modified_;
     MarkingDecisionT decision_;
 
     IdxT numry[4];

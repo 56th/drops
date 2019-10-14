@@ -58,6 +58,7 @@ class SchurPreBaseCL
     virtual void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const ExchangeCL& vel_ex, const ExchangeCL& p_ex) const = 0;
     virtual void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const ExchangeCL& vel_ex, const ExchangeCL& p_ex) const = 0;
 #endif
+    virtual void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const DummyExchangeCL& p_ex) const = 0;
     virtual void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& p_ex) const = 0;
     virtual void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& p_ex) const = 0;
 
@@ -160,6 +161,41 @@ void ISPreCL::Apply(const Mat&, Vec& p, const Vec& c, const ExT&, const ExT& pr_
 //    std::cout << " residual: " <<  (mnew_res= norm( M_*p2_ - c)) << '\t';
 //    std::cout << " reduction: " << mnew_res/mold_res << '\n';
     p+= kM_*p2_;
+}
+
+template <typename SolverT>
+class SurfaceLaplacePreCL : public SchurPreBaseCL
+{
+  private:
+    MatrixCL&  S_;
+    SolverT&   solver_;
+
+  public:
+    SurfaceLaplacePreCL(MatrixCL& S, SolverT& solver, double kA= 0., double kM= 0.)
+        : SchurPreBaseCL( kA, kM), S_( S), solver_( solver) {}
+
+    /// \brief Apply preconditioner
+    template <typename Mat, typename Vec, typename ExT>
+    void Apply(const Mat&, Vec& p, const Vec& c, const ExT& vel_ex, const ExT& pr_ex) const;
+#ifdef _PAR
+    void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const ExchangeCL& vel_ex, const ExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
+    void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const ExchangeCL& vel_ex, const ExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
+#endif
+    void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
+    void Apply(const MLMatrixCL& A, VectorCL& x, const VectorCL& b, const DummyExchangeCL& vel_ex, const DummyExchangeCL& p_ex) const { Apply<>( A, x, b, vel_ex, p_ex); }
+    void Apply(const MatrixCL& A,   VectorCL& x, const VectorCL& b, const DummyExchangeCL& p_ex) const { Apply<>( A, x, b, p_ex, p_ex); }
+
+    using SchurPreBaseCL::Apply;
+};
+
+template <class SolverT>
+template <typename Mat, typename Vec, typename ExT>
+void SurfaceLaplacePreCL<SolverT>::Apply(const Mat&, Vec& p, const Vec& c, const ExT&, const ExT& ex) const
+{
+    solver_.Solve(S_, p, c, ex);
+    if (solver_.GetIter() == solver_.GetMaxIter())
+        std::cout << "SurfaceLaplacePreCL::Apply (1st solve: iterations: " << solver_.GetIter()
+                  << "\tresidual: " <<  solver_.GetResid() << '\n';
 }
 
 
@@ -993,13 +1029,23 @@ struct UpperBlockPreCL
 /// Block-diagonal preconditioning strategy in BlockPreCL
 struct DiagBlockPreCL
 {
+//     template <class PC1T, class PC2T, class Mat, class Vec, class ExT>
+//     static void Apply (const PC1T& pc1, const PC2T& pc2, const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c, const ExT& vel_ex, const ExT& pr_ex) {
+//         pc1.Apply( A, v, b, vel_ex);
+//         if (!pc1.RetAcc())
+//             vel_ex.Accumulate(v);
+//         pc2.Apply( /*dummy*/ B, p, c, vel_ex, pr_ex);
+//         p*= -1.;
+//    }
     template <class PC1T, class PC2T, class Mat, class Vec, class ExT>
     static void Apply (const PC1T& pc1, const PC2T& pc2, const Mat& A, const Mat& B, Vec& v, Vec& p, const Vec& b, const Vec& c, const ExT& vel_ex, const ExT& pr_ex) {
-        pc1.Apply( A, v, b, vel_ex);
+        //pc1.Apply( A, v, b, vel_ex);
+        pc1.Apply( A, v, b, pr_ex, vel_ex);//YUSHUTIN
         if (!pc1.RetAcc())
             vel_ex.Accumulate(v);
         pc2.Apply( /*dummy*/ B, p, c, vel_ex, pr_ex);
-        p*= -1.;
+
+        //p*= -1.;
    }
 };
 

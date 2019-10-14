@@ -106,11 +106,9 @@ template<class BndValT = double>
 class BndSegDataCL: public BndCondInfoCL
 {
   public:
-    typedef BndValT (*bnd_val_fun)( const Point3DCL&, double);
-
+    using bnd_val_fun = std::function<BndValT(const Point3DCL&, double)>;
   private:
     bnd_val_fun  bnd_val_;
-
   public:
     BndSegDataCL( BndCondT bc= Nat0BC, bnd_val_fun f= 0)
       :  BndCondInfoCL(bc), bnd_val_(f)
@@ -346,7 +344,7 @@ inline bool BndCondCL::IsOnDirBnd( const VertexCL& v) const
 { // v is on dir bnd, iff it is on one or more dir bnd segments
     if ( !v.IsOnBoundary() || !BndCond_.size()) return false;
     for (VertexCL::const_BndVertIt it= v.GetBndVertBegin(), end= v.GetBndVertEnd(); it!=end; ++it)
-        if ( BndCond_[it->GetBndIdx()].IsDirichlet() )
+        if (BndCond_[it->GetBndIdx()].IsDirichlet())
             return true;
     return false;
 }

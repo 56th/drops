@@ -1,15 +1,56 @@
-cmake_minimum_required(VERSION 2.8.1)
+cmake_minimum_required(VERSION 3.3)
 
 project(drops)
 
-cmake_policy(SET CMP0015 NEW) #allows us to give relative paths in ${PARMETIS_HOME} and ${METIS_HOME} (when given relative paths in librarys these will be interpreted as relative to the root source directory)
+cmake_policy(SET CMP0015 NEW) # allows us to give relative paths in ${PARMETIS_HOME} and ${METIS_HOME} (when given relative paths in librarys these will be interpreted as relative to the root source directory)
 include(CMakeSettings.txt)
 
-#tell cmake to always include the home dir
+# tell cmake to always include the home dir
 include_directories(${CMAKE_SOURCE_DIR})
 
+# vtk
+find_package(VTK PATHS ${VTK_DIR})
+if(VTK_FOUND)
+    message(STATUS "VTK_DIR = ${VTK_DIR}")
+    message(STATUS "VTK_LIBRARIES = ${VTK_LIBRARIES}")
+    message(STATUS "VTK version is ${VTK_MAJOR_VERSION}.${VTK_MINOR_VERSION}")
+    # set(VTK_INCLUDE_DIRS /home/alexander/VTK/Common/Core)
+    # include_directories(${VTK_INCLUDE_DIRS})
+    add_definitions("-D_VTK=1")
+else()
+    message(WARNING "VTK not found")
+endif()
+
+# trilinos
+find_package(Trilinos PATHS ${TRILINOS_PATH}/lib/cmake/Trilinos ${TRILINOS_PATH})
+if(Trilinos_FOUND)
+    message(STATUS "Trilinos root is ${Trilinos_DIR}")
+    add_definitions("-D_TRILINOS=1")
+else()
+    message(WARNING "Trilinos not found")
+endif()
+
+# matlab
+# example: https://www.mathworks.com/help/matlab/matlab_external/build-c-engine-programs.html
+find_package(Matlab)
+if (Matlab_FOUND)
+    message(STATUS "MATLAB root is ${Matlab_ROOT_DIR}")
+    include_directories(${Matlab_ROOT_DIR}/extern/include)
+    add_definitions("-D_MATLAB=1")
+else ()
+    message(WARNING "Matlab not found")
+#    set(Matlab_ROOT_DIR /opt/matlab)
+#    message(WARNING "matlab NOT found; it's root is to ${Matlab_ROOT_DIR}")
+#    include_directories(${Matlab_ROOT_DIR}/extern/include)
+#    add_definitions("-D_MATLAB=1")
+endif ()
+
+# logger
+set(LOGGER_PATH ${CMAKE_SOURCE_DIR}/../Singleton-Logger/sln/Sources)
+include_directories(${LOGGER_PATH})
+
 #use openMP
-message(STATUS "### GENERATOR is ${CMAKE_GENERATOR}")
+message(STATUS "GENERATOR is ${CMAKE_GENERATOR}")
 if(CMAKE_GENERATOR MATCHES "Visual Studio 10")
   set(OpenMP_CXX_FLAGS "/openmp")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /openmp")
@@ -22,7 +63,7 @@ endif()
 
 #use MPI
 if(MPI)
-    message(STATUS "###  MPI active ###")
+    message(STATUS " MPI active")
     find_package(MPI REQUIRED)
 
     set(METIS_INCLUDE ${METIS_HOME}/include)
@@ -36,7 +77,7 @@ if(MPI)
     set(PARMETIS_LIBRARIES ${MPI_CXX_LIBRARIES} ${METIS_LIBRARY} ${PARMETIS_LIBRARY} m)
     add_definitions("-D_PAR=1")
 else(MPI)
-    message(STATUS "### MPI disabled ###")
+    message(STATUS "MPI disabled")
 endif(MPI)
 
 if(WIN32)
@@ -54,48 +95,50 @@ else(WIN32)
 
 endif(WIN32)
 
-#compiler specific options
+# compiler specific options
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
-    message(STATUS "### setting flags for INTEL compiler ###")
+    message(STATUS "setting flags for INTEL compiler")
     set(DROPS_CXX_FLAGS_DEBUG "${IPC_CXX_FLAGS_DEBUG}")
     set(DROPS_CXX_FLAGS_RELEASE "${IPC_CXX_FLAGS_RELEASE}")
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    message(STATUS "### setting flags for GCC compiler ###")
+    message(STATUS "setting flags for GCC compiler")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--as-needed")
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--as-needed")
     set(DROPS_CXX_FLAGS_DEBUG "${GCC_CXX_FLAGS_DEBUG}")
     set(DROPS_CXX_FLAGS_RELEASE "${GCC_CXX_FLAGS_RELEASE}")
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "XL")
-    message(STATUS "### setting flags for IBM XL compiler ###")
+    message(STATUS "setting flags for IBM XL compiler")
     set(DROPS_CXX_FLAGS_DEBUG "${XL_CXX_FLAGS_DEBUG}")
     set(DROPS_CXX_FLAGS_RELEASE "${XL_CXX_FLAGS_RELEASE}")
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    message(STATUS "### setting flags for CLANG compiler ###")
+    message(STATUS "setting flags for CLANG compiler")
     set(DROPS_CXX_FLAGS_DEBUG "${CLANG_CXX_FLAGS_DEBUG}")
     set(DROPS_CXX_FLAGS_RELEASE "${CLANG_CXX_FLAGS_RELEASE}")
 else()
-    message(STATUS "### could not determine compiler ${CMAKE_CXX_COMPILER_ID}, it seems to be neither gcc nor intel")
+    message(STATUS "could not determine compiler ${CMAKE_CXX_COMPILER_ID}, it seems to be neither gcc nor intel")
 endif()
 
 if(NOT DROPS_BUILD_TYPE)
     set(DROPS_BUILD_TYPE "DEBUG")
-    message(STATUS "### Setting DEFAULT build type: ${DROPS_BUILD_TYPE} ###")
+    message(WARNING "Setting DEFAULT build type: ${DROPS_BUILD_TYPE}")
 else(NOT DROPS_BUILD_TYPE)
-    message(STATUS "### BUILD TYPE:                 ${DROPS_BUILD_TYPE} ###")
+    message(STATUS "BUILD TYPE: ${DROPS_BUILD_TYPE}")
 endif(NOT DROPS_BUILD_TYPE)
 
-#apply build type specific options
+# apply build type specific options
 if(DROPS_BUILD_TYPE STREQUAL "RELEASE")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${DROPS_CXX_FLAGS_RELEASE}")
 elseif(DROPS_BUILD_TYPE STREQUAL "DEBUG")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${DROPS_CXX_FLAGS_DEBUG}")
+elseif(DROPS_BUILD_TYPE STREQUAL "PROFILE")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${DROPS_CXX_FLAGS_DEBUG} -gp")
 endif()
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${DROPS_CXX_FLAGS} -fPIC")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
 
-message(STATUS "### CXX_COMPILER:               ${CMAKE_CXX_COMPILER}")
-message(STATUS "### GLOBAL COMPILER FLAGS:      ${CMAKE_CXX_FLAGS} ###")
-message(STATUS "### GLOBAL SHARED LINKER FLAGS: ${CMAKE_SHARED_LINKER_FLAGS} ###")
-message(STATUS "###    GLOBAL EXE LINKER FLAGS: ${CMAKE_EXE_LINKER_FLAGS} ###")
+message(STATUS "CXX_COMPILER:               ${CMAKE_CXX_COMPILER}")
+message(STATUS "GLOBAL COMPILER FLAGS:      ${CMAKE_CXX_FLAGS}")
+message(STATUS "GLOBAL SHARED LINKER FLAGS: ${CMAKE_SHARED_LINKER_FLAGS}")
+message(STATUS "GLOBAL EXE LINKER FLAGS:    ${CMAKE_EXE_LINKER_FLAGS}")
 
 ###############################################################################
 # libs* functions are specializations of add_library, which allow us to add
@@ -195,7 +238,7 @@ function(add_my_custom_targets f)
   add_custom_target(${f}-coeffs DEPENDS misc-scalarFunctions misc-vectorFunctions levelset-twophaseCoeff levelset-filmCoeff poisson-poissonCoeff stokes-stokesCoeff)
 endfunction(add_my_custom_targets f)
 
-set(PACKAGES parallel levelset poisson DiST geom num out misc osmosis stokes navstokes surfactant spacetimetransp transport partests tests)
+set(PACKAGES parallel levelset poisson DiST geom num out misc osmosis stokes navstokes surfactant spacetimetransp transport partests tests surfnavierstokes surfphasesep)
 string(REPLACE ";" " " PACKAGES_STRING "${PACKAGES}")
 
 option(TESTS "compile tests" OFF)

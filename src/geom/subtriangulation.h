@@ -64,7 +64,7 @@ typedef STVertexContT::      iterator       stvertex_iterator;
 ///\brief sums the signs and returns fabs(sum) == \# dof. If true is returned, the interface does not intersect the domain of f up to subgrid-resolution.
 template <class GridFunT>
   inline bool
-  equal_signs (const GridFunT& f);
+  equalSigns (const GridFunT& f);
 
 
 class TetraPartitionCL; ///< forward declaration for output-routines

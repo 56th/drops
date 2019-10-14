@@ -248,7 +248,7 @@ void System2Accumulator_P2P1XCL::visit (const TetraCL& tet)
 {
     base_::visit( tet);
     evaluate_on_vertexes( lset_.GetSolution(), tet, lat, Addr( ls_loc_));
-    if (equal_signs( ls_loc_)) return; // extended basis functions have only support on tetra intersecting Gamma.
+    if (equalSigns(ls_loc_)) return; // extended basis functions have only support on tetra intersecting Gamma.
 
     partition_.make_partition<SortedVertexPolicyCL, MergeCutPolicyCL>( lat, ls_loc_);
     make_CompositeQuad2Domain( q2dom_, partition_);
@@ -2984,7 +2984,7 @@ void System1Accumulator_P2CL::local_setup (const TetraCL& tet)
     n.assign( tet, RowIdx, BndData.Vel);
 
     ls_loc.assign( tet, lset_Phi, lset_Bnd);
-    const bool noCut= equal_signs( ls_loc);
+    const bool noCut= equalSigns(ls_loc);
     
     speBnd = false;
     for(int i =0; i< 4; ++i) {
@@ -3173,7 +3173,7 @@ void CplMAccumulator_P2CL::local_setup (const TetraCL& tet)
     absdet= std::fabs( det);
 
     ls_loc.assign( tet, lset_Phi, lset_Bnd);
-    const bool noCut= equal_signs( ls_loc);
+    const bool noCut= equalSigns(ls_loc);
     if (noCut) {
         local_onephase.rho( local_twophase.rho( sign( ls_loc[0])) );
         local_onephase.setup( absdet, loc);
@@ -3283,7 +3283,7 @@ void AdotUAccumulator_P2CL::local_setup (const TetraCL& tet)
     n.assign( tet, RowIdx, BndData.Vel);
 
     ls_loc.assign( tet, lset_Phi, lset_Bnd);
-    const bool noCut= equal_signs( ls_loc);
+    const bool noCut= equalSigns(ls_loc);
     if (noCut) {
         local_onephase.mu(  local_twophase.mu(  sign( ls_loc[0] ) ) );
         local_onephase.setup( T, absdet, loc);
@@ -3385,7 +3385,7 @@ void System1Accumulator_P2XCL::local_setup (const TetraCL& tet)
 {
     base::local_setup( tet);
     // ls_loc already set in base::local_setup(...)
-    if (!equal_signs( ls_loc))
+    if (!equalSigns(ls_loc))
         localX_twophase.setup( ls_loc, locInt, locX);
     for (int sgn=0; sgn<2; ++sgn) // loop over neg/pos part
         add_transpose_kronecker_id( locX[sgn].Ak, locX[sgn].A);
@@ -4243,7 +4243,7 @@ void LBAccumulator_P2CL::visit (const TetraCL& tet)
 {
     ls_loc.assign( tet, lset, lset_bnd);
 
-    if (!equal_signs( ls_loc))
+    if (!equalSigns(ls_loc))
     {
         local_setup( tet);
         update_global_system();
@@ -4594,7 +4594,7 @@ void BSAccumulator_P2CL::visit (const TetraCL& tet)
 {
     ls_loc.assign( tet, *lset.PhiC, lset.GetBndData());
 
-    if (!equal_signs( ls_loc))
+    if (!equalSigns(ls_loc))
     {
         local_setup( tet);
         update_global_system();

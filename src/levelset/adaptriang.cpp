@@ -25,35 +25,26 @@
 namespace DROPS
 {
 
-void AdapTriangCL::MakeInitialTriang()
-{
-    if ( ! marker_ )
-    {
-        throw DROPSErrCL( "Attempt to initialise a mesh without a strategy.\n"
-                          "Here: file __FILE__, line __LINE__.\n" );
-    }
-
+void AdapTriangCL::MakeInitialTriang() {
+    if (!marker_) throw DROPSErrCL("Attempt to initialise a mesh without a strategy.\nHere: file __FILE__, line __LINE__.\n");
 #ifndef _PAR
     TimerCL time;
 #else
     ParTimerCL time;
 #endif
-
     time.Reset();
     time.Start();
     const Uint min_ref_num = marker_->GetFineLevel();
     Uint i;
     bool modified = true;
     for (i=0; i<2*min_ref_num && modified; ++i)
-        modified=ModifyGridStep(true);
-
+        modified = ModifyGridStep(true);
     time.Stop();
     const double duration=time.GetTime();
-
-    std::cout << "MakeInitialTriang: " << i
-                << " refinements in " << duration << " seconds\n"
-                << "last level: " << mg_.GetLastLevel() << '\n';
-    mg_.SizeInfo( std::cout );
+    std::cout << "MakeInitialTriang: " << i << '\n'
+              << "refinements in     " << duration << " seconds\n"
+              << "last level:         " << mg_.GetLastLevel() << '\n';
+    mg_.SizeInfo(std::cout);
 }
 
 bool AdapTriangCL::ModifyGridStep( bool lb )

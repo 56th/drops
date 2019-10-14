@@ -1,0 +1,173 @@
+{
+//=============================================================
+//    DROPS parameter file for surfactant.cpp
+//    tests of the surfactant model implementation:
+//    droplet in brick
+//=============================================================, 
+        "General":
+        {
+                "ProgressBar":  1, //show progress bar
+                "DynamicLibsPrefix": "../", //where should we look for shared objects?
+                "DynamicLibs": [ //select libraries to be loaded after program start
+                        //"levelset/liblevelset-filmCoeff",
+                        "levelset/liblevelset-twophaseCoeff",
+                        "misc/libmisc-scalarFunctions",
+                        "misc/libmisc-vectorFunctions"
+                        //"poisson/libpoisson-poissonCoeff",
+                        //"stokes/libstokes-stokesCoeff",
+                        //"tests/libtests-csgtest",
+                        //"transport/libtransport-transportCoeff"
+                ]
+        },
+        
+        "Domain":
+	{
+//		"Periodicity": // It is only a convention that this is a subsection of Domain.
+//		{
+//			"PeriodicMatching": "periodicxy",
+//			"0": "Per1Bnd",
+//			"1": "Per2Bnd"
+//		},
+		"Type": "BrickBuilder", // A parallelepiped
+		"Origin": [-1.66666,-1.66666,-1.66666],	// Origin
+		"E1": [3.33333,0,0],		// Basis to span the object,
+		"E2": [0,3.33333,0],		// not necessary orthonormal
+		"E3": [0,0,3.33333],		// ...
+		"N1": 2,		// Number of cells along the E1-direction,
+		"N2": 2,		//			 the E2-direction,
+		"N3": 2			//			 the E3-direction.
+	 },
+	 
+	 "Stokes":
+	{
+		"VelocityBndData":
+		{
+			"Default":	["NoBC"], // optional; if not set UndefinedBC_ is the default.
+
+//                        "PeriodicMatching": "periodicxy", // optional
+                                
+                        "0":	["NoBC"],
+                        "1":	["NoBC"],
+                        "2":	["NoBC"],
+                        "3":	["NoBC"],
+                        "4":	["NoBC"],
+                        "5":	["NoBC"]
+		},
+		"PressureBndData": 
+		{       
+                        "Default":	["NoBC"], // optional; if not set UndefinedBC_ is the default.
+
+//                        "PeriodicMatching": "periodicxy", // optional
+                                
+                        "0":	["NoBC"],
+                        "1":	["NoBC"],
+                        "2":	["NoBC"],
+                        "3":	["NoBC"],
+                        "4":	["NoBC"],
+                        "5":	["NoBC"]
+		}
+	},
+
+// time stepping,
+	"Time":
+	{
+		"NumSteps":		1,
+		"StepSize":		1
+	},
+
+	"Levelset":
+	{
+		"_comment":
+"# levelset solver                 not used",
+
+                "case":         "sphere_2", //sphere_2, xy_plane, tilted_plane
+		"Tol":		1e-10,
+		"Iter":		500,
+		"Theta":		1,
+		"SD":		0.1,
+		"CurvDiff":		-1,
+		"VolCorrection":		0,
+                "Discontinuous":                0,
+                "BndData": 
+                {
+                        "Default":	["NoBC"], // optional; if not set UndefinedBC_ is the default.
+
+//                        "PeriodicMatching": "periodicxy", // optional
+                                    
+                        "0":	["NoBC"],
+                        "1":	["NoBC"],
+                        "2":	["NoBC"],
+                        "3":	["NoBC"],
+                        "4":	["NoBC"],
+                        "5":	["NoBC"]
+                }
+	},
+
+	"Reparam":
+	{
+		"_comment":
+"# re-initialization of levelset function",
+
+		"Freq":		0,
+		"Method":		1
+	},
+
+	"AdaptRef":
+	{
+		"_comment":
+"# adaptive refinement",
+
+		"Freq":		0,
+		"FinestLevel":  2,
+		"Width":		10
+	},
+
+	"Exp":
+	{
+		"_comment":
+"# experimental conditions",
+
+		"RadDrop":		[1, 1, 1 ],
+		"PosDrop":		[0, 0, 0 ],
+		"Velocity":		[0, 0, 0.5 ]
+	},
+	
+	"SurfStokes":
+	{
+                "_comment":
+"# surface stokes",
+
+                "FE":           "P2P1", //P2P2, P2P1, P1P1
+                "fullgrad":     0,
+                "model":        "VectorLaplaceLagrange", //VectorLaplaceLagrange, VectorLaplacePenalty,
+                "testcase":         "1"
+	
+	},
+
+	"SurfTransp":
+	{
+		"_comment":
+"# surfactant transport",
+
+		"Theta":		0.5,
+		"OmitBound":		-1,
+		"Visc":		0.05,
+		"FEdegree":     2
+	},
+	"TestCase":		1,
+	"InitialDivisions":		2,
+	"EnsightCase":		"none",
+	"EnsightDir":		"CNmass-lvl3",
+	"LB":                   1,
+	
+        "Solver":
+        {
+                "PcAIter":      500,
+                "PcATol":       1e-4,
+                "PcBIter":      500,
+                "PcBTol":       1e-4,
+                "Iter":         100000,
+                "Tol":          1e-7
+        }
+
+}

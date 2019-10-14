@@ -217,6 +217,25 @@ class BlockMatrixSolverCL: public StokesSolverBaseCL
         v= x[std::slice( 0, M.num_cols( 0), 1)];
         p= x[std::slice( M.num_cols( 0), M.num_cols( 1), 1)];
     }
+
+    template <typename Mat, typename Vec>
+        void
+        Solve(const Mat& A, const Mat& B,const Mat& C, const Mat& D,  Vec& v, Vec& p, const Vec& b, const Vec& c, const DummyExchangeCL& vel_ex, const DummyExchangeCL& pr_ex) {
+            BlockMatrixBaseCL<Mat> M( &A, MUL, &B, MUL, &C, MUL, &D, MUL);
+            VectorCL rhs( M.num_rows());
+            rhs[std::slice( 0, M.num_rows( 0), 1)]= b;
+            rhs[std::slice( M.num_rows( 0), M.num_rows( 1), 1)]= c;
+            VectorCL x( M.num_cols());
+            x[std::slice( 0, M.num_cols( 0), 1)]= v;
+            x[std::slice( M.num_cols( 0), M.num_cols( 1), 1)]= p;
+            DummyExchangeBlockCL exBlock;
+            exBlock.AttachTo(vel_ex);
+            exBlock.AttachTo(pr_ex);
+            solver_.Solve( M, x, rhs, exBlock);
+            v= x[std::slice( 0, M.num_cols( 0), 1)];
+            p= x[std::slice( M.num_cols( 0), M.num_cols( 1), 1)];
+        }
+
 #ifdef _PAR
     void Solve( const MatrixCL& A, const MatrixCL& B, const MatrixCL& C, VectorCL& v, VectorCL& p,
                 const VectorCL& b, const VectorCL& c, const ExchangeCL& vel_ex, const ExchangeCL& pr_ex) {

@@ -69,19 +69,16 @@ void UniformMarkingStrategyCL::visit( const TetraCL &t )
 }
 
 
-StrategyCombinerCL::StrategyCombinerCL():
- modified_( false ), decision_( DontCareC ), strategies_( 0 )
+StrategyCombinerCL::StrategyCombinerCL(): decision_( DontCareC ), strategies_( 0 )
 {}
 
 
-StrategyCombinerCL::StrategyCombinerCL( const StrategyCombinerCL& rhs ):
- modified_( rhs.modified_ ), decision_( rhs.decision_ ),
- strategies_( rhs.strategies_.size() )
-{
+StrategyCombinerCL::StrategyCombinerCL( const StrategyCombinerCL& rhs )
+    : MarkingStrategyCL(rhs.modified_)
+    , decision_(rhs.decision_)
+    , strategies_(rhs.strategies_.size()) {
     for ( Uint i = 0; i < strategies_.size(); ++i )
-    {
         strategies_[ i ] = rhs.strategies_[ i ]->clone_strategy();
-    }
 }
 
 
@@ -295,7 +292,7 @@ DistMarkingStrategyCL::DistMarkingStrategyCL( const LevelsetP2CL &dist,
                                               double width,
                                               Uint coarse_level, Uint fine_level ):
  getter_( new LevelsetP2GetterCL(dist) ), width_( width ), c_level_( coarse_level ),
- f_level_( fine_level ), modified_( false ), decision_( DontCareC )
+ f_level_( fine_level ), decision_( DontCareC )
 {
     if ( f_level_ < c_level_ )
     {
@@ -308,7 +305,7 @@ DistMarkingStrategyCL::DistMarkingStrategyCL( instat_scalar_fun_ptr fct,
                                               Uint coarse_level, Uint fine_level,
                                               double time ):
  getter_( new FunPtrGetterCL(fct,time) ), width_( width ), c_level_( coarse_level ),
- f_level_( fine_level ), modified_( false ), decision_( DontCareC )
+ f_level_( fine_level ), decision_( DontCareC )
 {
     if ( f_level_ < c_level_ )
     {
@@ -316,11 +313,13 @@ DistMarkingStrategyCL::DistMarkingStrategyCL( instat_scalar_fun_ptr fct,
     }
 }
 
-DistMarkingStrategyCL::DistMarkingStrategyCL( const DistMarkingStrategyCL& rhs ):
- getter_( rhs.getter_->clone() ),  width_( rhs.width_ ),
- c_level_( rhs.c_level_ ), f_level_( rhs.f_level_ ),
- modified_( rhs.modified_ ), decision_( rhs.decision_ )
-{}
+DistMarkingStrategyCL::DistMarkingStrategyCL( const DistMarkingStrategyCL& rhs )
+    : MarkingStrategyCL(rhs.modified_)
+    , getter_( rhs.getter_->clone() ),  width_( rhs.width_ )
+    , c_level_( rhs.c_level_ )
+    , f_level_( rhs.f_level_ )
+    , decision_( rhs.decision_ ) {
+}
 
 DistMarkingStrategyCL::~DistMarkingStrategyCL()
 {
@@ -473,13 +472,13 @@ void DistMarkingStrategyCL::SetFineLevel( Uint level )
 ///////////////////////////
 
 CurvatureMarkingStrategyCL::CurvatureMarkingStrategyCL(const LevelsetP2CL& dist, const PrincipalLatticeCL& lattice, Uint fine_level)
-    : getter_( new LevelsetP2GetterCL( dist) ), f_level_( fine_level ), modified_( false ), decision_( DontCareC ), lat( &lattice), ls_loc( lattice.vertex_size()), ls( &dist.Phi), lsetbnd( &dist.GetBndData())
+    : getter_( new LevelsetP2GetterCL( dist) ), f_level_( fine_level ), decision_( DontCareC ), lat( &lattice), ls_loc( lattice.vertex_size()), ls( &dist.Phi), lsetbnd( &dist.GetBndData())
 {
     P2DiscCL::GetGradientsOnRef( Grefp2);
 }
 
 CurvatureMarkingStrategyCL::CurvatureMarkingStrategyCL( const CurvatureMarkingStrategyCL& rhs )
-    : getter_( rhs.getter_->clone() ),  f_level_( rhs.f_level_ ), modified_( rhs.modified_ ), decision_( rhs.decision_ ), lat( rhs.lat), ls_loc( rhs.ls_loc), ls( rhs.ls), lsetbnd( rhs.lsetbnd)
+    : MarkingStrategyCL(rhs.modified_), getter_( rhs.getter_->clone() ),  f_level_( rhs.f_level_ ), decision_( rhs.decision_ ), lat( rhs.lat), ls_loc( rhs.ls_loc), ls( rhs.ls), lsetbnd( rhs.lsetbnd)
 {
     P2DiscCL::GetGradientsOnRef( Grefp2);
 }
@@ -520,7 +519,7 @@ void CurvatureMarkingStrategyCL::visit( const TetraCL &t )
 
         locp2_ls.assign( t, *ls, *lsetbnd);
         evaluate_on_vertexes( locp2_ls, *lat, Addr( ls_loc));
-        if (equal_signs( ls_loc))
+        if (equalSigns(ls_loc))
             return;
 
         GetTrafoTr( M, det, t);

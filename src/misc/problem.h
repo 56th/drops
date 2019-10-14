@@ -71,7 +71,9 @@ enum FiniteElementT
 	P2X_FE=P2_FE+OFFSET_XFE,
 	P2R_FE=P2_FE+OFFSET_RFE,
 	P1IF_FE=P1_FE+OFFSET_IFFE,
-	P2IF_FE=P2_FE+OFFSET_IFFE,
+    P2IF_FE=P2_FE+OFFSET_IFFE,
+    vecP1IF_FE=P1_FE+OFFSET_IFFE+OFFSET_VECFE,
+    vecP2IF_FE=P2_FE+OFFSET_IFFE+OFFSET_VECFE,
     vecP1_FE=P1_FE+OFFSET_VECFE,
 	vecP2_FE=P2_FE+OFFSET_VECFE,
 	vecP1Bubble_FE=P1Bubble_FE+OFFSET_VECFE,
@@ -117,7 +119,9 @@ class FE_InfoCL
             case P2R_FE:
             case P2IF_FE:
             case P2_FE:          NumUnknownsVertex_= NumUnknownsEdge_= 1; break;
+            case vecP1IF_FE:
             case vecP1_FE:		 NumUnknownsVertex_ = 3; break;
+            case vecP2IF_FE:
             case vecP2X_FE:
             case vecP2R_FE:
             case vecP2_FE:       NumUnknownsVertex_= NumUnknownsEdge_= 3; break;
@@ -298,7 +302,7 @@ class IdxDescCL: public FE_InfoCL
     /// \brief Number unknowns for standard FE.
     void CreateNumbStdFE( Uint level, MultiGridCL& mg);
     /// \brief Number unknowns on the vertices surrounding an interface.
-    void CreateNumbOnInterface(Uint level, MultiGridCL& mg, const VecDescCL& ls, const BndDataCL<>& lsetbnd, double omit_bound= -1./*default to using all dof*/);
+    size_t CreateNumbOnInterface(Uint level, MultiGridCL& mg, const VecDescCL& ls, const BndDataCL<>& lsetbnd, double omit_bound= -1./*default to using all dof*/);
 
   public:
     using FE_InfoCL::IsExtended;
@@ -347,7 +351,8 @@ class IdxDescCL: public FE_InfoCL
     /// \name Numbering
     /// \{
     /// \brief Used to number unknowns.
-    void CreateNumbering( Uint level, MultiGridCL& mg, const VecDescCL* lsetp= 0, const BndDataCL<>* lsetbnd =0);
+    size_t CreateNumbering( Uint level, MultiGridCL& mg, const VecDescCL* lsetp= 0, const BndDataCL<>* lsetbnd =0);
+    // void CreateNumbering(MultiGridCL&, std::vector<MultiGridCL::const_TriangTetraIteratorCL> const &);
     /// \brief Used to number unknowns and store boundary condition.
     void CreateNumbering( Uint level, MultiGridCL& mg, const BndCondCL& Bnd, const VecDescCL* lsetp= 0, const BndDataCL<>* lsetbnd =0);
     void CreateNumbering( Uint level, MultiGridCL& mg, const BndCondCL& Bnd, const BndCondCL& Bnd_aux, const VecDescCL* lsetp= 0, const BndDataCL<>* lsetbnd =0);
@@ -706,6 +711,8 @@ class MatDescBaseCL
     void SetIdx( const IdxDescT*, const IdxDescT*);
     /// \brief Empty Data and set the index-pointers to 0.
     void Reset();
+    /// \brief Flag used by assembly routines to decide whether to populate the mtx or not
+    bool assemble = true;
 };
 
 typedef MatDescBaseCL<MatrixCL,IdxDescCL>     MatDescCL;
@@ -1026,6 +1033,45 @@ DeleteNumbOnSimplex( Uint idx, const Iter& begin, const Iter& end)
             it->Unknowns.Invalidate( idx);
 }
 
+template <class SimplexContT>
+void DoPeriodicMatching(SimplexContT& s1, SimplexContT& s2, match_fun match, const Uint idx)
+{
+    // match objects in s1 and s2
+    typedef typename SimplexContT::iterator psetIterT;
+
+//    std::ofstream f1("s1.txt"), f2("s2.txt");
+//
+//    for (psetIterT it2= s2.begin(), end2= s2.end(); it2!=end2; ++it2) {
+//        f2 << GetBaryCenter( **it2) << '\n';
+//    }
+//    f2.close();
+
+//    for (psetIterT it1= s1.begin(), end1= s1.end(); it1!=end1; ++it1) {
+//        f1 << GetBaryCenter( **it1) << '\n';
+//    }
+//    f1.close();
+
+    for (psetIterT it1= s1.begin(), end1= s1.end(); it1!=end1; ++it1)
+    {
+        //f1 << GetBaryCenter( **it1) << '\n';
+        // search corresponding object in s2
+        for (psetIterT it2= s2.begin(), end2= s2.end(); it2!=end2;)
+            if (match( GetBaryCenter( **it1), GetBaryCenter( **it2)) )
+            {
+                // it2 gets same number as it1
+                (*it2)->Unknowns( idx)= (*it1)->Unknowns( idx);
+                // remove it2 from s2
+                s2.erase( it2++);
+            }
+            else it2++;
+    }
+    if (!s2.empty()) {
+//        for (psetIterT it2= s2.begin(), end2= s2.end(); it2!=end2; ++it2)
+//            f2 << GetBaryCenter( **it2) << '\n';
+
+        throw DROPSErrCL( "DoPeriodicMatching: Periodic boundaries do not match!");
+    }
+}
 
 /// \name Helper routine to number unknowns on vertices, edges, faces on periodic boundaries.
 /// This function should not be used directly. CreateNumb is much more
@@ -1079,21 +1125,7 @@ void CreatePeriodicNumbOnSimplex( const Uint idx, IdxT& counter, Uint stride,
     }
     // now we have s1.size() <= s2.size()
     // match objects in s1 and s2
-    for (psetIterT it1= s1.begin(), end1= s1.end(); it1!=end1; ++it1)
-    {
-        // search corresponding object in s2
-        for (psetIterT it2= s2.begin(), end2= s2.end(); it2!=end2;)
-            if (match( GetBaryCenter( **it1), GetBaryCenter( **it2)) )
-            {
-                // it2 gets same number as it1
-                (*it2)->Unknowns( idx)= (*it1)->Unknowns( idx);
-                // remove it2 from s2
-                s2.erase( it2++);
-            }
-            else it2++;
-    }
-    if (!s2.empty())
-        throw DROPSErrCL( "CreatePeriodicNumbOnSimplex: Periodic boundaries do not match!");
+    DoPeriodicMatching(s1, s2, match, idx);
 }
 /// \}
 

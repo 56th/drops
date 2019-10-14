@@ -1,0 +1,203 @@
+{ 
+        "General":
+        {
+                "ProgressBar":  1, 
+                "DynamicLibsPrefix": "../", 
+                "DynamicLibs": [ 
+                        
+                        
+                ]
+        },
+        
+        "Domain":
+        {
+
+            "Type": "BrickBuilder", 
+            "Origin": [-1.66666,-1.66666,-1.66666],
+		"E1": [3.33333, 0,0],
+		"E2": [0,3.33333,0],		
+		"E3": [0,0,3.33333],		
+		"N1": 2,
+		"N2": 2,		
+		"N3": 2			
+        },
+	 
+	    "Stokes":
+        {
+            "VelocityBndData":
+            {
+                "Default":	["NoBC"], 
+
+                                    
+                            "0":	["NoBC"],
+                            "1":	["NoBC"],
+                            "2":	["NoBC"],
+                            "3":	["NoBC"],
+                            "4":	["NoBC"],
+                            "5":	["NoBC"]
+            },
+            "PressureBndData": 
+            {       
+                            "Default":	["NoBC"], 
+
+
+                                    
+                            "0":	["NoBC"],
+                            "1":	["NoBC"],
+                            "2":	["NoBC"],
+                            "3":	["NoBC"],
+                            "4":	["NoBC"],
+                            "5":	["NoBC"]
+            },
+            "VolumeFractionBndData": 
+            {       
+                            "Default":	["NoBC"], 
+
+
+                                    
+                            "0":	["NoBC"],
+                            "1":	["NoBC"],
+                            "2":	["NoBC"],
+                            "3":	["NoBC"],
+                            "4":	["NoBC"],
+                            "5":	["NoBC"]
+            },
+                "ChemPotentialBndData": 
+            {       
+                            "Default":	["NoBC"], 
+
+
+                                    
+                            "0":	["NoBC"],
+                            "1":	["NoBC"],
+                            "2":	["NoBC"],
+                            "3":	["NoBC"],
+                            "4":	["NoBC"],
+                            "5":	["NoBC"]
+            }
+        },
+
+
+        "Time":
+        {
+            "Read" : 0,
+            "Write": "yes",
+            "NumSteps":	40,
+            "StepSize": 0.0125
+            },
+        
+     
+        "Levelset":
+        {
+            "_comment":
+    "# levelset solver                 not used",
+
+                    "case":         "sphere_2",
+            "Tol":		1e-10,
+            "Iter":		500,
+            "Theta":		1,
+            "SD":		0.1,
+            "CurvDiff":		-1,
+            "VolCorrection":		0,
+                    "Discontinuous":                0,
+                    "BndData": 
+                    {
+                            "Default":	["NoBC"], 
+
+
+                                        
+                            "0":	["NoBC"],
+                            "1":	["NoBC"],
+                            "2":	["NoBC"],
+                            "3":	["NoBC"],
+                            "4":	["NoBC"],
+                            "5":	["NoBC"]
+                    }
+        },
+
+        "Reparam":
+        {
+            "_comment":
+    "# re-initialization of levelset function",
+
+            "Freq":		0,
+            "Method":		1
+        },
+
+        "AdaptRef":
+        {
+            "_comment":
+    "# adaptive refinement",
+
+            "Freq":		0,
+            "FinestLevel":    2,
+            "Width":		0
+        },
+
+        "Exp":
+        {
+            "_comment":
+    "# experimental conditions",
+
+            "RadDrop":		[1, 1, 1 ],
+            "PosDrop":		[0, 0, 0 ],
+            "Velocity":		[0, 0, 0.5 ]
+        },
+	
+        "SurfCahnHilliard":
+        {
+                    "_comment": "# surface cahn-hilliard",
+                    "FE":           "P1P1",
+                    "model":        "AllenCahn",
+                    "testcase":      "11",
+                    "instationary": "BDF2",
+                    "mobility": 1,
+                    "epsilon": 0.1
+        },
+	
+        "SurfNavStokes":
+        {
+                    "_comment": "# surface navier stokes",
+                    "FE":           "P1P1", 
+                    "fullgrad":     0,
+                    "model":        "NavierStokes",
+                    "testcase":      "95",
+                    "instationary": "BDF2",
+                    "nonlinear_term": "convective",
+                    "kinematic_viscosity": 1
+        },
+
+        "SurfTransp":
+        {
+            "_comment":
+    "# surfactant transport",
+
+            "Theta":		0.5,
+            "OmitBound":		-1,
+            "Visc":		0.05,
+            "FEdegree":     2
+        },
+        
+        "TestCase":		1,
+        "InitialDivisions":		2,
+        "EnsightCase":		"none",
+        "EnsightDir":		"CNmass-lvl3",
+        "LB":                   1,
+        
+        "Solver":
+        {
+                "PcAIter":      500,
+                "PcATol":       1e-4,
+                "PcBIter":      500,
+                "PcBTol":       1e-4,
+                "Iter":         1000,
+                "Tol":          1e-8
+        },
+        
+        "Output":
+        {
+            "Directory":    "vtk",
+            "every timestep": "1000"
+        }
+
+}

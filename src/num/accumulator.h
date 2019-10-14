@@ -42,6 +42,7 @@ template <class VisitedT>
 class AccumulatorCL
 {
   public:
+    AccumulatorCL(bool modified = false) : modified_(modified) {}
     /// \brief Called to initiate a new accumulation before any call of visit.
     virtual void begin_accumulation   () {}
     /// \brief Called to finalize the accumulation after all calls of visit.
@@ -55,6 +56,9 @@ class AccumulatorCL
     virtual AccumulatorCL* clone (int clone_id)= 0;
 
     virtual ~AccumulatorCL () {}
+    bool& modified() { return modified_; }
+protected:
+    bool modified_;
 };
 
 /// \brief Accumulation over sequences of TetraCL.
@@ -95,9 +99,9 @@ class AccumulatorTupleCL
     ~AccumulatorTupleCL ();
 
     /// \brief Registers a new accumulator.
-    void push_back (AccumulatorCL<VisitedT>* p) { accus_.push_back( p); }
+    void push_back (AccumulatorCL<VisitedT>* p) { accus_.push_back(p); }
     /// \brief Registers a new accumulator.
-    void push_back_acquire (AccumulatorCL<VisitedT>* p) { push_back( p); deletion_cache_.push_back( p); }
+    void push_back_acquire (AccumulatorCL<VisitedT>* p) { push_back(p); deletion_cache_.push_back(p); }
 
     /// \brief Calls the accumulators for each object in [begin, end).
     template <class ExternalIteratorCL>
@@ -109,22 +113,22 @@ class AccumulatorTupleCL
 template <class VisitedT>
 inline void AccumulatorTupleCL<VisitedT>::begin_iteration ()
 {
-    std::for_each( accus_.begin(), accus_.end(), std::mem_fun( &AccumulatorCL<VisitedT>::begin_accumulation));
+    std::for_each(accus_.begin(), accus_.end(), std::mem_fun(&AccumulatorCL<VisitedT>::begin_accumulation));
 }
 
 template <class VisitedT>
 inline void AccumulatorTupleCL<VisitedT>::finalize_iteration ()
 {
-    std::for_each( accus_.begin(), accus_.end(), std::mem_fun( &AccumulatorCL<VisitedT>::finalize_accumulation));
+    std::for_each(accus_.begin(), accus_.end(), std::mem_fun(&AccumulatorCL<VisitedT>::finalize_accumulation));
 }
 
 template<class VisitedT>
 void AccumulatorTupleCL<VisitedT>::clone_accus(std::vector<ContainerT>& clones)
 {
-    clones[0]= accus_;
-    for (size_t i= 1; i < clones.size(); ++i) {
-        clones[i].resize( accus_.size());
-        std::transform( accus_.begin(), accus_.end(), clones[i].begin(), std::bind2nd( std::mem_fun( &AccumulatorCL<VisitedT>::clone), i));
+    clones[0] = accus_;
+    for (size_t i = 1; i < clones.size(); ++i) {
+        clones[i].resize(accus_.size());
+        std::transform(accus_.begin(), accus_.end(), clones[i].begin(), std::bind2nd(std::mem_fun(&AccumulatorCL<VisitedT>::clone), i));
     }
 }
 
@@ -148,46 +152,43 @@ template <class ExternalIteratorCL>
 void AccumulatorTupleCL<VisitedT>::operator() (ExternalIteratorCL begin, ExternalIteratorCL end)
 {
     begin_iteration();
-    for ( ; begin != end; ++begin)
-        std::for_each( accus_.begin(), accus_.end(), std::bind2nd( std::mem_fun( &AccumulatorCL<VisitedT>::visit), *begin));
+    for (; begin != end; ++begin)
+        std::for_each(accus_.begin(), accus_.end(), std::bind2nd(std::mem_fun(&AccumulatorCL<VisitedT>::visit), *begin));
     finalize_iteration();
 }
 
 template<class VisitedT>
-void AccumulatorTupleCL<VisitedT>::operator() (const ColorClassesCL& colors)
-{
+void AccumulatorTupleCL<VisitedT>::operator() (const ColorClassesCL& colors) {
     begin_iteration();
-
-#ifdef _OPENMP
-    std::vector<ContainerT> clones( omp_get_max_threads());
-    clone_accus( clones);
-    for (ColorClassesCL::const_iterator cit= colors.begin(); cit != colors.end(); ++cit) {
-#       pragma omp parallel
-        {
-            const int t_id= omp_get_thread_num();
-            const ColorClassesCL::ColorClassT& cc= *cit;
-#ifndef DROPS_WIN
-            size_t j;
-#else
-            int j;
-#endif
-#           pragma omp for schedule(dynamic)
-            for (j= 0; j < cc.size(); ++j)
-                std::for_each( clones[t_id].begin(), clones[t_id].end(), std::bind2nd( std::mem_fun( &AccumulatorCL<VisitedT>::visit), *cc[j]));
+    #ifdef _OPENMP
+        std::vector<ContainerT> clones(omp_get_max_threads());
+        clone_accus(clones);
+        for (auto colorIter = colors.begin(); colorIter != colors.end(); ++colorIter) {
+            auto const & color = *colorIter;
+            #pragma omp parallel
+            {
+                auto const threadID = omp_get_thread_num();
+                #pragma omp for schedule(dynamic)
+                    for (size_t j = 0; j < color.size(); ++j)
+                        std::for_each(
+                                clones[threadID].begin(),
+                                clones[threadID].end(),
+                                std::bind2nd(std::mem_fun(&AccumulatorCL<VisitedT>::visit), *color[j])
+                        );
+            }
         }
-    }
-    delete_clones(clones);
-
-#else
-
-    for (ColorClassesCL::const_iterator cit= colors.begin(); cit != colors.end(); ++cit) {
-        for (ColorClassesCL::ColorClassT::const_iterator tit= cit->begin(); tit != cit->end(); ++tit)
-            std::for_each( accus_.begin(), accus_.end(), std::bind2nd( std::mem_fun( &AccumulatorCL<VisitedT>::visit), **tit));
-
-    }
-#endif
-
-    finalize_iteration();
+        // if at least one thread modified the accus_ object, then we must have accus_ "modified" member variable flag set to be true
+        for (size_t i = 0; i < accus_.size(); ++i)
+            for (size_t j = 1; j < clones.size(); ++j)
+                if ((accus_[i]->modified() = accus_[i]->modified() || clones[j][i]->modified()))
+                    break;
+        delete_clones(clones);
+    #else
+        for (auto cit = colors.begin(); cit != colors.end(); ++cit)
+            for (auto tit = cit->begin(); tit != cit->end(); ++tit)
+                std::for_each(accus_.begin(), accus_.end(), std::bind2nd(std::mem_fun(&AccumulatorCL<VisitedT>::visit), **tit));
+    #endif
+        finalize_iteration();
 }
 
 
@@ -216,12 +217,14 @@ struct do_accumulateCL<AccumulatorTupleCL<VisitedT> >
     static void accumulate (AccumulatorTupleCL<VisitedT>& accu, const MultiGridCL& mg, int lvl, __UNUSED__ const BndCondCL& Bnd)
     {
 #ifdef _OPENMP
-        if (omp_get_max_threads() > 1)
-            accu( mg.GetColorClasses( lvl, Bnd));
-        else
+        if (omp_get_max_threads() > 1) {
+            auto& colorClasses = mg.GetColorClasses(lvl, Bnd);
+            std::cout << "numb of color classes = " << colorClasses.num_colors() << '\n';
+            accu(colorClasses);
+        } else
 #endif
-            accu( mg.GetTriangTetraBegin( lvl), mg.GetTriangTetraEnd( lvl));
-    }
+            accu(mg.GetTriangTetraBegin(lvl), mg.GetTriangTetraEnd(lvl));
+        }
 };
 
 } // end of namespace DROPS::AccumulatorImplNS
@@ -246,9 +249,9 @@ struct do_accumulateCL<AccumulatorTupleCL<VisitedT> >
     {
         // todo: find OpenMP compatible implementation
         /*if (omp_get_max_threads() > 1)
-            accu( mg.GetColorClasses( lvl, match, Bnd));
+            accu(mg.GetColorClasses(lvl, match, Bnd));
         else*/
-            accu( mg.GetTriangFaceBegin( lvl), mg.GetTriangFaceEnd( lvl));
+            accu(mg.GetTriangFaceBegin(lvl), mg.GetTriangFaceEnd(lvl));
     }
 };
 
@@ -261,14 +264,14 @@ template <class AccumulatorTupleT>
   inline void
   accumulate (AccumulatorTupleT& accus, const MultiGridCL& mg, int lvl, const BndCondCL& Bnd)
 {
-    AccumulatorImplNS::do_accumulateCL<AccumulatorTupleT>::accumulate( accus, mg, lvl, Bnd);
+    AccumulatorImplNS::do_accumulateCL<AccumulatorTupleT>::accumulate(accus, mg, lvl, Bnd);
 }
 
 template <class AccumulatorTupleT>
   inline void
   accumulate_faces (AccumulatorTupleT& accus, const MultiGridCL& mg, int lvl, const BndCondCL& Bnd)
 {
-    AccumulatorFace::do_accumulateCL<AccumulatorTupleT>::accumulate( accus, mg, lvl, Bnd);
+    AccumulatorFace::do_accumulateCL<AccumulatorTupleT>::accumulate(accus, mg, lvl, Bnd);
 }
 
 /// \brief An AccumulatorTupleCL for each level.

@@ -1,0 +1,3 @@
+[submodule "Singleton-Logger"]
+	path = Singleton-Logger
+	url = https://github.com/56th/Singleton-Logger.git

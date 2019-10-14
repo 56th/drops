@@ -103,7 +103,7 @@ class OswaldProjectionP2AccuCL : public TetraAccumulatorCL
         if (ls != 0) {
             LocalP2CL<> locp2_ls( t, *ls, *lsetbnd);
             evaluate_on_vertexes( locp2_ls, *lat, Addr( ls_loc));
-            if (equal_signs( ls_loc))
+            if (equalSigns(ls_loc))
                 return;
         }
         loc_.set_tetra( &t);

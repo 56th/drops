@@ -274,7 +274,7 @@ void NonlConvSystemAccumulator_P2CL::local_setup (const TetraCL& tet)
 
     ls_loc.assign( tet, lset, lset_bnd);
     vel_loc.assign( tet, vel, BndData.Vel);
-    if (equal_signs( ls_loc)) {
+    if (equalSigns(ls_loc)) {
         local_onephase.velocity( vel_loc);
         local_onephase.rho( local_twophase.rho( sign( ls_loc[0])));
         local_onephase.setup( T, absdet, loc, Coeff.framevel);

@@ -424,7 +424,7 @@ resize_and_scatter_piecewise_spatial_normal (const SPatchCL<3>& surf, const Quad
 void VarObliqueLaplaceBeltramiAccuCL::visit (const TetraCL& t)
 {
     evaluate_on_vertexes( ls_.GetSolution(), t, lat_, Addr( ls_val_));
-    if (equal_signs( ls_val_))
+    if (equalSigns(ls_val_))
         return;
 
     loc_ls_.assign( t, ls_.GetSolution());
@@ -856,7 +856,7 @@ double LevelsetP2CL::GetWetArea() const
             if(lsetbnd.IsOnSlipBnd(*it->GetFace(v)))  // Do not use lsetbnd
             {
                 ls_loc0.assign( *it, Phi, BndData_);
-                const bool noCut= equal_signs(ls_loc0);
+                const bool noCut= equalSigns(ls_loc0);
                 if(noCut)
                 {
                     if(ls_loc0[0]>0) continue;

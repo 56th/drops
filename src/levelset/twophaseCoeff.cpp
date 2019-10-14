@@ -327,7 +327,6 @@ namespace filmperiodic{
     static DROPS::RegisterMatchingFunction regmatch1_z("periodicz", periodic_1side<2>);
 }
 
-
 double TaylorFlowDistance( const DROPS::Point3DCL& p, double)
 {
     static const double taylor_len = P.get<double>("Taylor.Length");

@@ -381,7 +381,6 @@ DROPS::Point3DCL d_sphere_dist (const DROPS::Point3DCL& p, double)
     return x/x.norm();
 }
 
-
 typedef double (*dist_funT) (const DROPS::Point3DCL&, double);
 
 double sphere_2move (const DROPS::Point3DCL& p, double t)
@@ -389,6 +388,7 @@ double sphere_2move (const DROPS::Point3DCL& p, double t)
     DROPS::Point3DCL x( p - (PosDrop + t*constant_wind(p, t)));
     return x.norm() - RadDrop[0];
 }
+static RegisterScalarFunction regsca_movell_lset( "MovingEllipsoid", sphere_2move);
 
 SMatrixCL<3,3> dp_sphere (const DROPS::Point3DCL& x, double)
 {
@@ -1570,6 +1570,10 @@ void StationaryStrategyDeformationP2 (DROPS::MultiGridCL& mg, DROPS::AdapTriangC
     accus.push_back( &acculoadp2);
 
     accumulate( accus, mg, ifacep2idx.TriangLevel(), ifacep2idx.GetBndInfo());
+
+    double h = P.get<DROPS::Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")*std::pow(2., -P.get<double>("Mesh.AdaptRef.FinestLevel"));
+
+    std::cout << "h: " << h  << '\n';
 
     DROPS::MatrixCL Lp2;
     Lp2.LinComb (1.0, Ap2.Data, 1.0, Mp2.Data, 1.0, Anp2.Data);

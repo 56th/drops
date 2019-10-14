@@ -482,6 +482,15 @@ void P2DiscCL::GetGradientsOnRef( Quad5_2DCL<Point3DCL> GRef[10],
         }
 }
 
+void P2DiscCL::GetP2Basis( LocalP2CL<> p2[10])
+{
+    for (int i= 0; i < 10; ++i) {
+        for (int j= 0; j < 10; ++j)
+            p2[i][j]= 0;
+        p2[i][i]= 1;
+    }
+}
+
 void P2DiscCL::GetP2Basis( Quad5_2DCL<> p2[10], const BaryCoordCL* const p)
 {
     BaryCoordCL NodeInTetra[Quad5_2DDataCL::NumNodesC];
@@ -498,6 +507,14 @@ void P2DiscCL::GetP2Basis( Quad5_2DCL<> p2[10], const BaryCoordCL* const p)
         p2[7][j]= FE_P2CL::H7( Node);
         p2[8][j]= FE_P2CL::H8( Node);
         p2[9][j]= FE_P2CL::H9( Node);
+    }
+}
+
+void P1DiscCL::GetP1Basis( LocalP1CL<> p1[4])
+{
+    for (int k=0; k<4; ++k) {
+        p1[k]= 0;
+        p1[k][k]= 1;
     }
 }
 
