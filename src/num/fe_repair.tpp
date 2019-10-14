@@ -117,7 +117,7 @@ template <class ValueT, template<class> class LocalFEDataT, template<class> clas
   AugmentedDofVecT
   RepairFECL<ValueT, LocalFEDataT, BndDataT>::collect_unrepaired_dofs (const TetraCL& t)
 {
-    LocalNumbCL n_new( t, *new_vd_->RowIdx);
+    LocalNumbCL n_new( t, *new_vd_->RowIdx, bnd_);
     AugmentedDofVecT dof;
     dof.reserve( localfedata_::NumUnknownsOnTetra);
     for (Uint i= 0; i < localfedata_::NumUnknownsOnTetra; ++i)
@@ -133,8 +133,8 @@ void RepairFECL<ValueT, LocalFEDataT, BndDataT>::unchanged_refinement (const Tet
 {
     const VectorCL& olddata= old_vd_.Data;
           VectorCL& newdata= new_vd_->Data;
-    LocalNumbCL n_old( t, *old_vd_.RowIdx);
-    LocalNumbCL n_new( t, *new_vd_->RowIdx);
+    LocalNumbCL n_old( t, *old_vd_.RowIdx, bnd_);
+    LocalNumbCL n_new( t, *new_vd_->RowIdx, bnd_);
     for (Uint i= 0; i < localfedata_::NumUnknownsOnTetra; ++i)
         if (n_new.WithUnknowns( i) && repair_needed( n_new.num[i])) {
             Assert( n_old.WithUnknowns( i), DROPSErrCL( "TetraRepairFECL::unchanged_refinement: "

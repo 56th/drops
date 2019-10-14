@@ -306,11 +306,11 @@ class MapleSolOutCL: public MGOutCL
 };
 
 /// \brief Write finite element function, stored in \a v, in a file, named \a filename
-void WriteFEToFile( const VecDescCL& v, MultiGridCL& mg, std::string filename, bool binary=false, const VecDescCL* lsetp=0);
+void WriteFEToFile( const VecDescCL& v, MultiGridCL& mg, std::string filename, bool binary=false, const VecDescCL* lsetp=nullptr, const BndDataCL<>* lsbnd= nullptr);
 
 /// Read a serialized finite element function from a file
 /// \pre CreateNumbering of v.RowIdx must have been called before
-void ReadFEFromFile( VecDescCL& v, MultiGridCL& mg, std::string filename, bool binary=false, const VecDescCL* lsetp=0);
+void ReadFEFromFile( VecDescCL& v, MultiGridCL& mg, std::string filename, bool binary=false, const VecDescCL* lsetp=nullptr, const BndDataCL<>* lsbnd= nullptr);
 
 /// \brief Write the permutation p (of an IdxDescCL), in a file, named \a filename
 /// The empty permutation is treated as identity.

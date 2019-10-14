@@ -2060,8 +2060,6 @@ class GMResRSolverCL : public SolverBaseCL
         if (output_ != 0)
             *output_ << "GmresRSolverCL: iterations: " << GetIter()
                      << "\tresidual: " << GetResid() << std::endl;
-            std::cout << "GmresRSolverCL: iterations: " << GetIter()
-                     << "\tresidual: " << GetResid() << std::endl;
     }
     template <typename Mat, typename Vec, typename ExT>
     void Solve(const Mat& A, Vec& x, const Vec& b, const ExT& ex, int& numIter, double& resid) const
@@ -2071,8 +2069,6 @@ class GMResRSolverCL : public SolverBaseCL
         GMRESR(A, x, b, ex, pc_, restart_, numIter, inner_maxiter_, resid, inner_tol_, rel_, method_);
         if (output_ != 0)
             *output_ << "GmresRSolverCL: iterations: " << GetIter()
-                     << "\tresidual: " << GetResid() << std::endl;
-            std::cout << "GmresRSolverCL: iterations: " << GetIter()
                      << "\tresidual: " << GetResid() << std::endl;
     }
 };

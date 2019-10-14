@@ -25,7 +25,11 @@
 #ifndef DROPS_SPMAT_H
 #define DROPS_SPMAT_H
 
-#define DROPS_SPARSE_MAT_BUILDER_USES_HASH_MAP (__GNUC__ >= 4 || defined(__INTEL_COMPILER) || DROPS_WIN)
+#if (__GNUC__ >= 4 || defined(__INTEL_COMPILER) || DROPS_WIN)
+#define DROPS_SPARSE_MAT_BUILDER_USES_HASH_MAP 1
+#else
+#define DROPS_SPARSE_MAT_BUILDER_USES_HASH_MAP 0
+#endif
 
 #include <iostream>
 #include <valarray>

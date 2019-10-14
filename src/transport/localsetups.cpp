@@ -27,7 +27,7 @@ bool IsRegBaryCoord(const SArrayCL<BaryCoordCL,4>& T)
 {
     for(int i= 0; i < 4; ++i)  
         for(int j= 0; j < 4; ++j) {
-            if (isnan(T[i][j])|| isinf(T[i][j])|| T[i][j] >1.|| T[i][j] <0.) {
+            if (std::isnan(T[i][j])|| std::isinf(T[i][j])|| T[i][j] >1.|| T[i][j] <0.) {
                 std::cout << "Irregular coordinate!\n";
                 return false;
         }
@@ -72,7 +72,7 @@ void SetupLocalTwoPhaseRhs(TransformedP1FiniteElement& transformedfel, Interface
         const SArrayCL<BaryCoordCL,4>& T =cut.GetTetra(k);
         if (!IsRegBaryCoord(T))  continue;
         double Vol = transformedfel.GetAbsDeterminant()*VolFrac(T);
-        if (isnan(Vol) || isinf(Vol)){
+        if (std::isnan(Vol) || std::isinf(Vol)){
             std::cout<<" SetupLocalTwoPhaseRhs: M Support of XFEM is too small.\t";
             continue;
         }
@@ -85,7 +85,7 @@ void SetupLocalTwoPhaseRhs(TransformedP1FiniteElement& transformedfel, Interface
               tmp = Quad3CL<>(qrhs*stabfe->GetTestShapeAsQuad3CL(i)).quad(Vol);
             else
               tmp = Quad3CL<>(qrhs*transformedfel.GetBaseShapeAsQuad3CL(i)).quad(Vol);
-            if (isnan(tmp) || isinf(tmp)) {
+            if (std::isnan(tmp) || std::isinf(tmp)) {
                 for( Uint j=0; j<4; ++j) {
                     elvecs.f_p[j]= 0.;
                     elvecs.f_n[j]= 0.;
@@ -198,7 +198,7 @@ void SetupLocalOneInterfaceSystem( TransformedP1FiniteElement& transformedfel, I
         if (stabfe) stabfe->CalcStabilization(IAmInPosPart);
         
         double Vol = absdet*VolFrac(T);
-        if (isnan(Vol)|| isinf(Vol)){
+        if (std::isnan(Vol)|| std::isinf(Vol)){
             std::cout<<"Vol " <<VolFrac(T)<<"\n";
             std::cout<<"SetupLocalOneInterfaceSystem: Support of XFEM is too small.\t";
             continue;
@@ -226,7 +226,7 @@ void SetupLocalOneInterfaceSystem( TransformedP1FiniteElement& transformedfel, I
                   iM = qM.quad(Vol) * hw;
                 }              
               
-                if (isnan(iM)|| isinf(iM)||isnan(iA)|| isinf(iA)||isnan(iC)|| isinf(iC)) {
+                if (std::isnan(iM)|| std::isinf(iM)||std::isnan(iA)|| std::isinf(iA)||std::isnan(iC)|| std::isinf(iC)) {
                     elmats.ResetSigned();
                     irreg = true;
                     break;
@@ -326,7 +326,7 @@ void SetupLocalOneInterfaceMassMatrix( InterfaceTetraCL& cut,                   
         if (!IsRegBaryCoord(T)) continue;
         
         double Vol = transfp1fel.GetAbsDeterminant()*VolFrac(T);
-        if (isnan(Vol)|| isinf(Vol)){
+        if (std::isnan(Vol)|| std::isinf(Vol)){
             std::cout<<"Vol " <<VolFrac(T)<<"\n";
             std::cout<<" Support of XFEM is too small.\t";
             continue;
@@ -346,7 +346,7 @@ void SetupLocalOneInterfaceMassMatrix( InterfaceTetraCL& cut,                   
                     Quad3CL<> qM(transfp1fel.GetBaseShapeAsQuad3CL(j)*transfp1fel.GetBaseShapeAsQuad3CL(i));
                     iM = qM.quad(Vol);
                 }
-                if (isnan(iM)|| isinf(iM)) {
+                if (std::isnan(iM)|| std::isinf(iM)) {
                     std::memset( M_n,0, 4*4*sizeof(double));
                     std::memset( M_p,0, 4*4*sizeof(double));
                     irreg=true;
@@ -428,7 +428,7 @@ void SetupLocalTwoInterfacesMassMatrix( InterfaceTetraCL& cut, InterfaceTetraCL&
                         iM = qM.quad(VolT)*hinv_old;
                     }                  
                   
-                    if (isnan(iM)|| isinf(iM)) {
+                    if (std::isnan(iM)|| std::isinf(iM)) {
                     ///> TODO: If a local value in a child tetrahedron is irregular, ignore this tetra
                     ///> The contribution of other tetra must be preserved
                     ///> For example tmpM21[4][4]
@@ -482,7 +482,7 @@ void SetupLocalTwoInterfacesMassMatrix( InterfaceTetraCL& cut, InterfaceTetraCL&
                       iM = qM.quad(Vol)*hinv_old;
                     }                          
                   
-                    if (isnan(iM)|| isinf(iM)) {
+                    if (std::isnan(iM)|| std::isinf(iM)) {
                         ///> TODO: If a local value in a child tetrahedron is irregular, ignore this tetra
                         ///> The contribution of other tetra must be preserved
                         ///> For example tmpM21[4][4]
@@ -511,7 +511,7 @@ void SetupLocalNitscheSystem( const BaryCoordCL * const p, const ExtIdxDescCL& X
     Quad5_2DCL<Point3DCL> n, Point3DCL G[4], LocalNumbP1CL ln, MatrixBuilderCL& A, const double det, const double D[2], 
     const double H, const double kappa[2], const double lambda, const double h, const int sign[4])
 {
-    if (isnan(det)|| isinf(det)){
+    if (std::isnan(det)|| std::isinf(det)){
         std::cout<<" Support of XFEM function is too small.\t";
         return;
     }

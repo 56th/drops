@@ -155,11 +155,13 @@ void LinThetaScheme2PhaseCL<LsetSolverT>::CommitStep()
         Stokes_.UpdatePressure( &Stokes_.p);
         Stokes_.c.SetIdx( &Stokes_.pr_idx);
         Stokes_.B.SetIdx( &Stokes_.pr_idx, &Stokes_.vel_idx);
+        Stokes_.C.SetIdx( &Stokes_.pr_idx, &Stokes_.pr_idx);
         Stokes_.prA.SetIdx( &Stokes_.pr_idx, &Stokes_.pr_idx);
         Stokes_.prM.SetIdx( &Stokes_.pr_idx, &Stokes_.pr_idx);
         // The MatrixBuilderCL's method of determining when to reuse the pattern
         // is not save for P1X-elements.
         Stokes_.B.Data.clear();
+        Stokes_.C.Data.clear();
         Stokes_.prA.Data.clear();
         Stokes_.prM.Data.clear();
         {
@@ -168,6 +170,8 @@ void LinThetaScheme2PhaseCL<LsetSolverT>::CommitStep()
             MaybeAddMLProgressbar( Stokes_.GetMG(), "System2", accus, Stokes_.vel_idx.TriangLevel() );
             Stokes_.system2_accu( accus, &Stokes_.B, &Stokes_.c, LvlSet_, Stokes_.v.t);
             accumulate( accus, Stokes_.GetMG(), Stokes_.vel_idx.TriangLevel(), Stokes_.vel_idx.GetBndInfo());
+            //stabilization
+            Stokes_.SetupC( &Stokes_.C, LvlSet_, Stokes_.getGhPenStab() );
         }
     }
     else
@@ -215,6 +219,7 @@ void LinThetaScheme2PhaseCL<LsetSolverT>::Update()
         // The MatrixBuilderCL's method of determining when to reuse the pattern
         // is not save for P1X-elements.
         Stokes_.B.Data.clear();
+        Stokes_.C.Data.clear();
         Stokes_.prA.Data.clear();
         Stokes_.prM.Data.clear();
     }
@@ -343,11 +348,13 @@ void OperatorSplitting2PhaseCL<LsetSolverT>::DoStokesFPIter()
         Stokes_.UpdatePressure( &Stokes_.p);
         Stokes_.c.SetIdx( &Stokes_.pr_idx);
         Stokes_.B.SetIdx( &Stokes_.pr_idx, &Stokes_.vel_idx);
+        Stokes_.C.SetIdx( &Stokes_.pr_idx, &Stokes_.vel_idx);
         Stokes_.prA.SetIdx( &Stokes_.pr_idx, &Stokes_.pr_idx);
         Stokes_.prM.SetIdx( &Stokes_.pr_idx, &Stokes_.pr_idx);
         // The MatrixBuilderCL's method of determining when to reuse the pattern
         // is not save for P1X-elements.
         Stokes_.B.Data.clear();
+        Stokes_.C.Data.clear();
         Stokes_.prA.Data.clear();
         Stokes_.prM.Data.clear();
         Stokes_.SetupSystem2( &Stokes_.B, &Stokes_.C, &Stokes_.c, LvlSet_, Stokes_.v.t);
@@ -632,11 +639,13 @@ void CoupledTimeDisc2PhaseBaseCL<LsetSolverT,RelaxationPolicyT>::SetupStokesMatV
         Stokes_.UpdatePressure( &Stokes_.p);
         Stokes_.c.SetIdx( &Stokes_.pr_idx);
         Stokes_.B.SetIdx( &Stokes_.pr_idx, &Stokes_.vel_idx);
+        Stokes_.C.SetIdx( &Stokes_.pr_idx, &Stokes_.vel_idx);
         Stokes_.prA.SetIdx( &Stokes_.pr_idx, &Stokes_.pr_idx);
         Stokes_.prM.SetIdx( &Stokes_.pr_idx, &Stokes_.pr_idx);
         // The MatrixBuilderCL's method of determining when to reuse the pattern
         // is not save for P1X-elements.
         Stokes_.B.Data.clear();
+        Stokes_.C.Data.clear();
         Stokes_.prA.Data.clear();
         Stokes_.prM.Data.clear();
         Stokes_.SetupSystem2( &Stokes_.B, &Stokes_.C, &Stokes_.c, LvlSet_, Stokes_.v.t);

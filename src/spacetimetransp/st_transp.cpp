@@ -470,7 +470,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
             ensight->Register( make_Ensight6IfaceScalar( MG, surfTransp.ic,  "InterfaceSol",  ensf + ".sur", true));
         }
         if (Stokes.UsesXFEM())
-            ensight->Register( make_Ensight6P1XScalar( MG, lset.Phi, Stokes.p, "XPressure",   ensf + ".pr", true));
+            ensight->Register( make_Ensight6P1XScalar( MG, lset.Phi, lset.GetBndData(), Stokes.p, "XPressure",   ensf + ".pr", true));
 
         ensight->Write( Stokes.v.t);
     }
@@ -498,7 +498,7 @@ void Strategy( InstatNavierStokes2PhaseP2P1CL& Stokes, LsetBndDataCL& lsetbnddat
         vtkwriter->Register( make_VTKVector( Stokes.GetVelSolution(), "velocity") );
         vtkwriter->Register( make_VTKScalar( Stokes.GetPrSolution(), "pressure") );
         if (P.get<int>("VTK.AddP1XPressure",0) && Stokes.UsesXFEM())
-            vtkwriter->Register( make_VTKP1XScalar( MG, lset.Phi, Stokes.p, "xpressure"));
+            vtkwriter->Register( make_VTKP1XScalar( MG, lset.Phi, lset.GetBndData(), Stokes.p, "xpressure"));
         vtkwriter->Register( make_VTKScalar( lset.GetSolution(), "level-set") );
 
         if (massTransp) {
@@ -815,8 +815,8 @@ void  OnlyTransportStrategy( MultiGridCL& MG, LsetBndDataCL& lsetbnddata, AdapTr
         vtkwriter->Register( make_VTKScalar( lset.GetSolution(), "level-set+") );
         vtkwriter->Register( make_VTKScalar( oldlset.GetSolution(), "level-set-") );
 
-        vtkwriter->Register( make_VTKP1XScalar(MG, lset.Phi, sol.GetFutureTrace(), Bnd_neg, Bnd_pos, "conc+"));
-        vtkwriter->Register( make_VTKP1XScalar(MG, oldlset.Phi, sol.GetPastTrace(), Bnd_neg, Bnd_pos, "conc-"));
+        vtkwriter->Register( make_VTKP1XScalar(MG, lset.Phi, lset.GetBndData(), sol.GetFutureTrace(), Bnd_neg, Bnd_pos, "conc+"));
+        vtkwriter->Register( make_VTKP1XScalar(MG, oldlset.Phi, oldlset.GetBndData(), sol.GetPastTrace(), Bnd_neg, Bnd_pos, "conc-"));
 
         vtkwriter->Write(0);
     }

@@ -458,42 +458,37 @@ namespace ContactAngle{
 
     double ConstantAngle(const DROPS::Point3DCL&,double)
     {
-       double angle = P.get<double>("NavStokes.BoundaryData.SlipBnd.ContactAngle");
+        static double angle = P.get<double>("NavStokes.BoundaryData.SlipBnd.ContactAngle");
         return angle/180.0*M_PI;
     }
 
-    DROPS::Point3DCL OutNormalBrick(const DROPS::Point3DCL& pt,double)
+    DROPS::Point3DCL OutNormalBrick(const DROPS::Point3DCL& p,double)
     {
         //"hack": assume cartesian domain with e1=[a,0,0], e2=[0,b,0], ..
-        static double dx, dy, dz;
         static bool first = true;
+        static DROPS::Point3DCL orig= P.get<DROPS::Point3DCL>("Mesh.Origin");
         if (first) {
             if (P.get<std::string>("Mesh.Type") != std::string("BrickBuilder"))
                  throw DROPS::DROPSErrCL("OutNormalBrick: only works for brick-shaped domain, please use other functions");
             first = false;
-            const DROPS::Point3DCL m= MeshSize();
-            dx = m[0];
-            dy = m[1];
-            dz = m[2];
         }
 
         const double EPS=1e-10;
+        const DROPS::Point3DCL pt= p - orig,
+                               pT= pt - MeshSize();
         DROPS::Point3DCL outnormal(0.0);
-        if(std::fabs(pt[0])<EPS)
-            outnormal[0]=-1.0;
-        else if(std::fabs(pt[0]-dx)<EPS)
-            outnormal[0]=1.0;
-        else if(std::fabs(pt[1])<EPS)
-            outnormal[1]=-1.0;
-        else if(std::fabs(pt[1]-dy)<EPS)
-            outnormal[1]=1.0;
-        else if(std::fabs(pt[2])<EPS)
-            outnormal[2]=-1.0;
-        else if(std::fabs(pt[2]-dz)<EPS)
-            outnormal[2]=1.0;
-        else
-            throw DROPS::DROPSErrCL("OutNormalBrick: error while computing outer normal");
-        return outnormal;
+        for(int i = 0; i < 3; i++)
+        {
+            if(std::fabs(pt[i])<EPS) {
+                outnormal[i]=-1.0;
+                return outnormal;
+            } 
+            else if(std::fabs(pT[i])<EPS) {
+                outnormal[i]=1.0;
+                return outnormal;
+            }
+        }
+        throw DROPS::DROPSErrCL("OutNormalBrick: called for non-boundary point");
     }
     //========================================================================
     //            Registration of functions in the func-container

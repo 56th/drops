@@ -931,14 +931,14 @@ void SetupSystem_P2( const MultiGridCL& MG, const Coeff&, const BndDataCL<> BndD
                     if ( i<4 ? BndData_.IsOnNatBnd(*sit->GetVertex(i))
                             : BndData_.IsOnNatBnd(*sit->GetEdge(i-4)) ) // vert/edge i is on natural boundary
                     {
-                      Uint face;
-                      int n=i<4? 3:2;  //Three faces for a vertex and two faces for a point on the edge;
-                      for (int f=0; f < n; ++f)
+                        Uint face;
+                        const int n=i<4? 3:2;  //Three faces for a vertex and two faces for a point on the edge;
+                        for (int f=0; f < n; ++f)
                         {
-                         face= i<4 ? FaceOfVert(i,f) : FaceOfEdge(i-4,f);
-                         if ( sit->IsBndSeg(face))
+                            face= i<4 ? FaceOfVert(i,f) : FaceOfEdge(i-4,f);
+                            if ( sit->IsBndSeg(face))
                             {
-                             b->Data[Numb[i]]+=QuadP2(*sit, face, BndData_, i);
+                                b->Data[Numb[i]]+=QuadP2(*sit, face, BndData_, i);
                             }
                         }
                     }
@@ -1217,16 +1217,16 @@ void PoissonP2CL<Coeff>::SetupInstatRhs(VecDescCL& vA, VecDescCL& vM, double tA,
                 vf.Data[Numb[i]]+=valf;                              //rhs.quadP2(i, absdet);
             }
             if ( i<4 ? BndData_.IsOnNatBnd(*sit->GetVertex(i))
-                   : BndData_.IsOnNatBnd(*sit->GetEdge(i-4)) )
+                     : BndData_.IsOnNatBnd(*sit->GetEdge(i-4)) )
             {
-              Uint face;
-              int n=i<4? 3:2;  //Three faces for a vertex and two faces for a point on the edge;
-              for (int f=0; f < n; ++f)
+                Uint face;
+                const int n=i<4? 3:2;  //Three faces for a vertex and two faces for a point on the edge;
+                for (int f=0; f < n; ++f)
                 {
-                 face= i<4 ? FaceOfVert(i,f) : FaceOfEdge(i-4,f);
-                 if ( sit->IsBndSeg(face))
+                    face= i<4 ? FaceOfVert(i,f) : FaceOfEdge(i-4,f);
+                    if ( sit->IsBndSeg(face))
                     {
-                     vA.Data[Numb[i]]+=QuadP2(*sit, face, BndData_, i);
+                        vA.Data[Numb[i]]+=QuadP2(*sit, face, BndData_, i);
                     }
                 }
             }
@@ -1278,13 +1278,13 @@ void SetupInstatSystem_P2( const MultiGridCL& MG, const Coeff&, const BndDataCL<
     sit != send; ++sit)
     {
         if(ALE_)
-          GetTrafoAsQuad( md.GetLocalP2Deformation(*sit), adet, Tq);
+            GetTrafoAsQuad( md.GetLocalP2Deformation(*sit), adet, Tq);
         else
         {
-          GetTrafoTr(T, det, *sit);
-          absdet=std::fabs(det);
-          adet = Quad5CL<double> (absdet);  
-          Tq   = Quad5CL< SMatrixCL<3, 3> > (T);  
+            GetTrafoTr(T, det, *sit);
+            absdet=std::fabs(det);
+            adet = Quad5CL<double> (absdet);  
+            Tq   = Quad5CL< SMatrixCL<3, 3> > (T);  
         }
         //collet some information about the edges and verts of the tetra and save it in the Numb and IsOnDirBnd
         for(int i=0; i<4; ++i)

@@ -181,14 +181,11 @@ bool InterfacePatchCL::ComputeVerticesOfCut( Uint ch, bool compute_PQRS)
     
     for (int i = 0; i<intersec_; ++i){
         for (int face = 0; face <4; ++face){
-            if (Bary_[i][face] < eps) 
-                cut_point_on_face[i][face] = true;
-            else
-                cut_point_on_face[i][face] = false;
+                cut_point_on_face[i][face] = (Bary_[i][face] < eps);
         }
     }
 
-    //cut is lying on an interface?
+    //cut is lying on a face?
     for (int face = 0; face <4; ++face){
         int on_face_cnt = 0;
         for (int i = 0; i<intersec_; ++i)
@@ -588,6 +585,11 @@ Quad5_2DCL<Point3DCL> InterfaceTriangleCL::GetImprovedNormal(Uint n) const
 //                                          InterfaceLineCL
 //***********************************************************************************************************
 
+bool is_on_MCL_Bnd( BndCondT BC)
+{
+    return BC==SlipBC || BC==Slip0BC || BC==SymmBC || BC==NatBC || BC== Nat0BC;
+}
+
 bool InterfaceLineCL::ComputeMCLForChild(Uint ch)
 {
     if( BC_Face_[0]==NoBC && BC_Face_[1]==NoBC && BC_Face_[2]==NoBC && BC_Face_[3]==NoBC
@@ -607,37 +609,32 @@ bool InterfaceLineCL::ComputeMCLForChild(Uint ch)
     for( int i=0; i<intersec_; i++ )
     {
         num=0; 
+        const int i_next= (i+1)%intersec_;
         for( int j=0; j<4; j++ )
         {
-            if( cut_point_on_face[i][j]==true && cut_point_on_face[(i+1)%intersec_][j]==true)
+            if( cut_point_on_face[i][j]==true && cut_point_on_face[i_next][j]==true)
             {
                 idx[num]=j;
-                num++;
+                ++num;
             }
         }
-        if(num==1 &&(BC_Face_[idx[0]]==SlipBC||BC_Face_[idx[0]]==Slip0BC||BC_Face_[idx[0]]==SymmBC))
+        if(num==1 && is_on_MCL_Bnd(BC_Face_[idx[0]]) )
         {
             IdxMCL_[numMCL_][0]= i;
-            IdxMCL_[numMCL_][1]= (i+1)%intersec_;
-            if(BC_Face_[idx[0]]==SymmBC)
-                SymmType[numMCL_]= true;
-            else
-                SymmType[numMCL_]= false;
-            numMCL_++;
+            IdxMCL_[numMCL_][1]= i_next;
+            BC_MCL_[numMCL_]= BC_Face_[idx[0]];
+            ++numMCL_;
         }
         else if(num==2)//If the MCL intersects with one edge, one needs to check if the edge is on the boundary
         {
             for(Uint v=0;v<6;v++)
             {
-                if(FaceOfEdge(v,0)==idx[0]&&FaceOfEdge(v,1)==idx[1]&&(BC_Edge_[v]==SlipBC||BC_Edge_[v]==Slip0BC||BC_Edge_[v]==SymmBC))
+                if(FaceOfEdge(v,0)==idx[0] && FaceOfEdge(v,1)==idx[1] && is_on_MCL_Bnd( BC_Edge_[v]) )
                 {	
                     IdxMCL_[numMCL_][0]= i;
-                    IdxMCL_[numMCL_][1]= (i+1)%intersec_;
-                    if(BC_Edge_[v]==SymmBC)
-                        SymmType[numMCL_]= true;
-                    else
-                        SymmType[numMCL_]= false;
-                    numMCL_++;
+                    IdxMCL_[numMCL_][1]= i_next;
+                    BC_MCL_[numMCL_]= BC_Edge_[v];
+                    ++numMCL_;
                 }
             }
         }
@@ -648,52 +645,43 @@ bool InterfaceLineCL::ComputeMCLForChild(Uint ch)
             num=0;
             for( int j=0; j<4; j++ )
             {
-                if( cut_point_on_face[i][j]==true && cut_point_on_face[(i+2)%intersec_][j]==true)
+                if( cut_point_on_face[i][j]==true && cut_point_on_face[i+2][j]==true)
                 {
                     idx[num]=j;
-                    num++;
+                    ++num;
                 }
             }
-            if(num==1 &&(BC_Face_[idx[0]]==SlipBC||BC_Face_[idx[0]]==Slip0BC||BC_Face_[idx[0]]==SymmBC))
+            if(num==1 && is_on_MCL_Bnd(BC_Face_[idx[0]]) )
             {
                 IdxMCL_[numMCL_][0]= i;
                 IdxMCL_[numMCL_][1]= i+2;
-                if(BC_Face_[idx[0]]==SymmBC)
-                    SymmType[numMCL_]= true;
-                else
-                    SymmType[numMCL_]= false;
-                numMCL_++;
+                BC_MCL_[numMCL_]= BC_Face_[idx[0]];
+                ++numMCL_;
             }
             else if(num==2)//If the MCL intersects with one edge, one needs to check if the edge is on the boundary
             {
                 for(Uint v=0;v<6;v++)
                 {
-                    if(FaceOfEdge(v,0)==idx[0]&&FaceOfEdge(v,1)==idx[1]&&(BC_Edge_[v]==SlipBC||BC_Edge_[v]==Slip0BC||BC_Edge_[v]==SymmBC))
+                    if(FaceOfEdge(v,0)==idx[0] && FaceOfEdge(v,1)==idx[1] && is_on_MCL_Bnd(BC_Edge_[v]) )
                     {	
                         IdxMCL_[numMCL_][0]= i;
                         IdxMCL_[numMCL_][1]= i+2;
-                        if(BC_Edge_[v]==SymmBC)
-                            SymmType[numMCL_]= true;
-                        else
-                            SymmType[numMCL_]= false;
-                        numMCL_++;
+                        BC_MCL_[numMCL_]= BC_Edge_[v];
+                        ++numMCL_;
                     }
                 }
             }
         }
 
-    if(numMCL_==0)
-        return false;
-    else
-        return true;
+    return numMCL_!=0; // MCL found?
 }
 
-Uint InterfaceLineCL::GetNumMCL()
+Uint InterfaceLineCL::GetNumMCL() const
 {
     return numMCL_;
 }
 
-double InterfaceLineCL::GetInfoMCL(Uint v, BaryCoordCL& bary0, BaryCoordCL& bary1, Point3DCL& pt0, Point3DCL& pt1)
+double InterfaceLineCL::GetInfoMCL(Uint v, BaryCoordCL& bary0, BaryCoordCL& bary1, Point3DCL& pt0, Point3DCL& pt1) const
 {
     //read two indices for the two end points of the MCL segment
     bary0 = Bary_[IdxMCL_[v][0]];
@@ -712,11 +700,6 @@ void InterfaceLineCL::SetBndCondT(const TetraCL& tet, const BndDataCL<Point3DCL>
         BC_Face_[v] =  BndData.GetBC(*tet.GetFace(v));
     for(Uint v=0; v<6; v++)
         BC_Edge_[v] =  BndData.GetBC(*tet.GetEdge(v));
-}
-
-void InterfaceLineCL::SetBndOutNormal(instat_vector_fun_ptr outnormal)
-{
-    outnormal_=outnormal;
 }
 
 Quad9_1DCL<Point3DCL> InterfaceLineCL::GetImprovedNormalAtMCL(Uint v) const
@@ -747,7 +730,7 @@ Quad9_1DCL<Point3DCL> InterfaceLineCL::GetImprovedNormalAtMCL(Uint v) const
 
         Quad9_1DCL<Point3DCL> GradQ[10];
         P2DiscCL::GetGradients( GradP2, GradRef, T);
-        Quad9_1DCL<Point3DCL> normal;     //outnormal of the leveset at MCL
+        Quad9_1DCL<Point3DCL> normal;     // outer normal of the leveset at MCL
         BaryCoordCL bary[2];
         bary[0] = Bary_[IdxMCL_[v][0]];
         bary[1] = Bary_[IdxMCL_[v][1]];
@@ -762,16 +745,14 @@ Quad9_1DCL<Point3DCL> InterfaceLineCL::GetImprovedNormalAtMCL(Uint v) const
 }
 
 // The method to compute the outer normal of MCL might have a large error when the contact angle is small.
-Quad9_1DCL<Point3DCL> InterfaceLineCL::GetImprovedMCLNormalOnSlipBnd(const TetraCL& tet, Uint v) const 
+Quad9_1DCL<Point3DCL> InterfaceLineCL::GetImprovedMCLNormalOnSlipBnd(const TetraCL& tet, Uint v, instat_vector_fun_ptr normalBnd) const 
 {
     BaryCoordCL bary[2];
     bary[0] = Bary_[IdxMCL_[v][0]];
     bary[1] = Bary_[IdxMCL_[v][1]];
-    Quad9_1DCL<Point3DCL> SlipBndNormal(tet, bary, outnormal_);
+    Quad9_1DCL<Point3DCL> SlipBndNormal(tet, bary, normalBnd);
     Quad9_1DCL<Point3DCL> NormalMCL=GetImprovedNormalAtMCL(v);
-    Quad9_1DCL<Point3DCL> n;   
-
-    n = NormalMCL - dot(NormalMCL, SlipBndNormal) * SlipBndNormal;
+    Quad9_1DCL<Point3DCL> n= Quad9_1DCL<Point3DCL>( NormalMCL - dot(NormalMCL, SlipBndNormal) * SlipBndNormal);  // P_S n_\Gamma
     
     for (int i =0; i<Quad9_1DDataCL::NumNodesC; i++) 
         if (n[i].norm()>1e-8) n[i]/= n[i].norm();
@@ -780,13 +761,30 @@ Quad9_1DCL<Point3DCL> InterfaceLineCL::GetImprovedMCLNormalOnSlipBnd(const Tetra
 
 }
 
-Quad9_1DCL<double> InterfaceLineCL::GetDynamicCtAngle(const TetraCL& tet, Uint v) const
+// The method to compute the outer normal of MCL might have a large error when the contact angle is small.
+Quad9_1DCL<Point3DCL> InterfaceLineCL::GetImprovedMCLTangential(const TetraCL& tet, Uint v, instat_vector_fun_ptr normalBnd) const 
+{
+    BaryCoordCL bary[2];
+    bary[0] = Bary_[IdxMCL_[v][0]];
+    bary[1] = Bary_[IdxMCL_[v][1]];
+    Quad9_1DCL<Point3DCL> BndNormal(tet, bary, normalBnd);
+    Quad9_1DCL<Point3DCL> NormalIF=GetImprovedNormalAtMCL(v);
+    Quad9_1DCL<Point3DCL> n= Quad9_1DCL<Point3DCL>( BndNormal - dot(NormalIF, BndNormal) * NormalIF); // P_\Gamma n_Bnd
+    
+    for (int i =0; i<Quad9_1DDataCL::NumNodesC; i++) 
+        if (n[i].norm()>1e-8) n[i]/= n[i].norm();
+    
+    return n;
+
+}
+
+Quad9_1DCL<double> InterfaceLineCL::GetDynamicCtAngle(const TetraCL& tet, Uint v, instat_vector_fun_ptr normalBnd) const
 {
     BaryCoordCL bary[2];
     bary[0] = Bary_[IdxMCL_[v][0]];
     bary[1] = Bary_[IdxMCL_[v][1]];
     Quad9_1DCL<Point3DCL> NormalMCL=GetImprovedNormalAtMCL(v);
-    Quad9_1DCL<Point3DCL> SlipBndNormal(tet, bary, outnormal_);
+    Quad9_1DCL<Point3DCL> SlipBndNormal(tet, bary, normalBnd);
     Quad9_1DCL<double> inner_pro (dot(NormalMCL, SlipBndNormal));
     Quad9_1DCL<double> CtAngle;
     for (int i =0; i<Quad9_1DDataCL::NumNodesC; i++){

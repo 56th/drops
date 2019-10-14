@@ -979,10 +979,10 @@ void Interpolate(P2EvalCL<Data, _BndData, _VD>& sol, const P2EvalCL<Data, _BndDa
                 ++num_vert_copy;
         }
 
-        std::cout << "Interpolate: " << num_vert_copy << " vertex-DoF copied, "
-                                     << num_edge_copy << " edge-DoF copied, "
-                                     << num_child_edge << " edge-DoF interpolated."
-                                     << std::endl;
+    std::cout << "Interpolate: " << num_vert_copy << " vertex-DoF copied, "
+                                 << num_edge_copy << " edge-DoF copied, "
+                                 << num_child_edge << " edge-DoF interpolated."
+                                 << std::endl;
 }
 
 template <class VecDescT, class BndDataT, class Cont>

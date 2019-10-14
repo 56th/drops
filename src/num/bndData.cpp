@@ -82,6 +82,13 @@ void BndCondCL::StripDirichletBC()
             bc= Nat0BC;
 }
 
+void BndCondCL::StripPeriodicBC()
+{
+    for (BndCondInfoCL& bc: BndCond_)
+        if (bc.IsPeriodic()) // found periodic bnd
+            bc= Nat0BC;
+}
+
 void assignZeroFunc( instat_scalar_fun_ptr& f)
 {
     f= SingletonMapCL<instat_scalar_fun_ptr>::getInstance()["Zero"];

@@ -62,11 +62,13 @@ inline void InitZeroP1CL<1>::ComputeOnChild( IdxT* Numb, int*, const ChildDataCL
 
     for (int v= 0; v < 4; ++v) {
         const IdxT MapNr= base::data_.Map( Numb[ data.Vertices[v]]);
+        if (MapNr==NoIdx)
+            continue;
 #pragma omp critical
 {
         sumNormGradPhi_[MapNr]+= normgrad*absdet;
         sumVol_[MapNr]+= absdet;
-        base::data_.typ[MapNr]= data_.Finished;
+        base::data_.SetType( MapNr, ReparamDataCL::Type::Finished);
 }
     }
 }
@@ -93,7 +95,7 @@ inline void InitZeroP1CL<0>::ComputeOnChild(IdxT* Numb, int* sign, const ChildDa
     }
 
     if (num < 3)
-        throw DROPSErrCL("FastMarchCL::InitZero: intersection missing");
+        throw DROPSErrCL("FastMarchCL::InitZeroP1CL: intersection missing");
 
     for (int repeat = 0; repeat < num - 2; ++repeat) { // fuer num==4 (Schnitt ABDC ist viereckig)
         // zwei Dreiecke ABC + DBC betrachten
@@ -107,6 +109,8 @@ inline void InitZeroP1CL<0>::ComputeOnChild(IdxT* Numb, int* sign, const ChildDa
                 continue;
 
             const IdxT Nr = Numb[data.Vertices[vert]], MapNr = base::data_.Map(Nr);
+            if (MapNr==NoIdx) // vertex on Dirichlet bnd
+                continue;
             const Point3DCL Crd = base::data_.coord[Nr], c = Crd - Schnitt[0];
             double dist = std::min(c.norm(), (Crd - Schnitt[1]).norm());
             dist = std::min(dist, (Crd - Schnitt[2]).norm());
@@ -117,14 +121,15 @@ inline void InitZeroP1CL<0>::ComputeOnChild(IdxT* Numb, int* sign, const ChildDa
             const Point3DCL lotfuss = (1-bary1-bary2) * Schnitt[0] + bary1*Schnitt[1]+bary2*Schnitt[2];
             if (data_.UsePerp()){
                 if ( bary1>0 && bary2>0){   // "lotfuss" is located inside tetra
-                    if ( data_.perpFoot[MapNr]==0)
+                    if ( data_.perpFoot[MapNr]==nullptr)
                         data_.perpFoot[MapNr]= new Point3DCL( lotfuss);
                     else
                         *data_.perpFoot[MapNr]= lotfuss;
                 }
                 else{
-                    if ( data_.perpFoot[MapNr]!=0) {
-                        delete data_.perpFoot[MapNr]; data_.perpFoot[MapNr]=0;
+                    if ( data_.perpFoot[MapNr]!=nullptr) {
+                        delete data_.perpFoot[MapNr]; 
+                        data_.perpFoot[MapNr]=nullptr;
                     }
                 }
             }
@@ -132,8 +137,8 @@ inline void InitZeroP1CL<0>::ComputeOnChild(IdxT* Numb, int* sign, const ChildDa
 
 #pragma omp critical
 {
-            if (base::data_.typ[MapNr] != data_.Finished) {
-                base::data_.typ[MapNr] = data_.Finished;
+            if (!base::data_.IsFinished(MapNr)) {
+                base::data_.SetType( MapNr, ReparamDataCL::Type::Finished);
                 base::data_.phi.Data[MapNr] = dist;
             }
             else
@@ -164,20 +169,17 @@ void InitZeroP1CL<scale>::Perform()
 #pragma omp parallel for private( sign, num_sign, Numb, PhiLoc)
     for ( int i=0; i<std::distance(data_.mg.GetTriangTetraBegin(lvl), data_.mg.GetTriangTetraEnd(lvl)); ++i ){
         MultiGridCL::TriangTetraIteratorCL it= data_.mg.GetTriangTetraBegin(lvl)+i;
-        for ( int v=0; v<10; ++v){ // collect data on all DoF
-            if (v<4)
-                Numb[v]= it->GetVertex(v)->Unknowns(idx);
-            else
-                Numb[v]= it->GetEdge(v-4)->Unknowns(idx);
+        PhiLoc.assign( *it, oldv, *data_.bnd);
+        for ( int v=0; v<10; ++v){ // collect data on all (augmented) DoFs
+            Numb[v]= v<4 ? it->GetVertex(v)->Unknowns(idx) : it->GetEdge(v-4)->Unknowns(idx);
 
-            const IdxT MapNr= data_.Map(Numb[v]);
-            sign[v]= std::abs( data_.old[MapNr])<1e-8 ? 0 : ( data_.old[MapNr]>0 ? 1 : -1);
+            sign[v]= InterfacePatchCL::Sign( PhiLoc[v]);
             if (sign[v]==0){
+                const IdxT MapNr= data_.Map(Numb[v]);
 #pragma omp critical
-                data_.typ[MapNr]= data_.Finished;
+                data_.SetType( MapNr, ReparamDataCL::Type::Finished);
             }
         }
-        PhiLoc.assign( *it, oldv, NoBndDataCL<>());
 
         for ( Uint ch=0; ch<MaxChildrenC; ++ch){
             const ChildDataCL data= GetChildData( RegRef.Children[ch]);
@@ -208,9 +210,9 @@ void InitZeroP1CL<scale>::Perform()
 #endif
 #pragma omp parallel for
         for (int i=0; i<(int)data_.phi.Data.size(); ++i){
-            if ( data_.typ[i]== data_.Finished) {                      // dof at interface
+            if ( data_.IsFinished(i) ) {                                // dof at interface
                 const double scaling= sumNormGradPhi_[i]/sumVol_[i];    // average norm
-                data_.phi.Data[i]= std::abs( data_.old[i])/scaling;
+                data_.phi.Data[i]= std::abs( data_.oldphi_augm[i])/scaling;
             }
         }
     }
@@ -353,16 +355,16 @@ InitZeroP2CL::RepTetra::RepTetra( const TetraCL& t, LocalP1CL<Point3DCL>* Gref, 
 {
     GetTrafoTr( T, det, t);
     P2DiscCL::GetGradients( G, Gref, T);
-    const Uint idx= data.phi.RowIdx->GetIdx();
+    const Uint idx= data.per ? data.augmIdx->GetIdx() : data.phi.RowIdx->GetIdx();
     for ( Uint v=0; v<NumVertsC; ++v){
         const IdxT dof= t.GetVertex(v)->Unknowns(idx);
         coord[v] = data.coord[dof];
-        valPhi[v]= data.phi.Data[dof];
+        valPhi[v]= data.oldphi_augm[dof];
     }
     for ( Uint e=0; e<NumEdgesC; ++e){
         const IdxT dof= t.GetEdge(e)->Unknowns(idx);
         coord[e+NumVertsC] = data.coord[dof];
-        valPhi[e+NumVertsC]= data.phi.Data[dof];
+        valPhi[e+NumVertsC]= data.oldphi_augm[dof];
     }
     baryCenter= GetBaryCenter( t);
 }

@@ -246,14 +246,14 @@ class Ensight6P1XScalarCL : public Ensight6VariableCL
                       vpos_;
 
     const VecDescCL& lset_;
-    BndDataCL<> bnd_;
+    BndDataCL<> lsetbnd_, bnd_;
     MultiGridCL& mg_;
 
   public:
-    Ensight6P1XScalarCL (MultiGridCL& mg, const VecDescCL& lset, const VecDescCL& v, const BndDataCL<>& bnd,
+    Ensight6P1XScalarCL (MultiGridCL& mg, const VecDescCL& lset, const BndDataCL<>& lsetbnd, const VecDescCL& v, const BndDataCL<>& bnd,
         std::string varName, std::string fileName, bool timedep= false)
         : Ensight6VariableCL( varName, fileName, timedep),
-          v_( v), vneg_( &p1idx_), vpos_( &p1idx_), lset_( lset), bnd_( bnd), mg_( mg) {}
+          v_( v), vneg_( &p1idx_), vpos_( &p1idx_), lset_( lset), lsetbnd_( lsetbnd), bnd_( bnd), mg_( mg) {}
     ~Ensight6P1XScalarCL () { if (p1idx_.NumUnknowns() != 0) p1idx_.DeleteNumbering( mg_); }
 
     void Describe (Ensight6OutCL& cf) const {
@@ -264,7 +264,7 @@ class Ensight6P1XScalarCL : public Ensight6VariableCL
         if (p1idx_.NumUnknowns() != 0)
             p1idx_.DeleteNumbering( mg_);
         p1idx_.CreateNumbering( v_.RowIdx->TriangLevel(), mg_, *v_.RowIdx);
-        P1XtoP1 ( *v_.RowIdx, v_.Data, p1idx_, vpos_.Data, vneg_.Data, lset_, mg_);
+        P1XtoP1 ( *v_.RowIdx, v_.Data, p1idx_, vpos_.Data, vneg_.Data, lset_, lsetbnd_, mg_);
     }
 };
 
@@ -273,17 +273,17 @@ class Ensight6P1XScalarCL : public Ensight6VariableCL
 /// This is just for uniform code; the analoguous functions for scalars and vectors are more useful because
 /// they help to avoid template parameters in user code.
 inline Ensight6P1XScalarCL&
-make_Ensight6P1XScalar (MultiGridCL& mg, const VecDescCL& lset, const VecDescCL& v,
+make_Ensight6P1XScalar (MultiGridCL& mg, const VecDescCL& lset, const BndDataCL<>& lsetbnd, const VecDescCL& v,
     std::string varName, std::string fileName, bool timedep= false)
 {
-    return *new Ensight6P1XScalarCL( mg, lset, v, BndDataCL<>( 0), varName, fileName, timedep);
+    return *new Ensight6P1XScalarCL( mg, lset, lsetbnd, v, BndDataCL<>( 0), varName, fileName, timedep);
 }
 
 inline Ensight6P1XScalarCL&
-make_Ensight6P1XScalar (MultiGridCL& mg, const VecDescCL& lset, const VecDescCL& v, const BndDataCL<>& bnd,
+make_Ensight6P1XScalar (MultiGridCL& mg, const VecDescCL& lset, const BndDataCL<>& lsetbnd, const VecDescCL& v, const BndDataCL<>& bnd,
     std::string varName, std::string fileName, bool timedep= false)
 {
-    return *new Ensight6P1XScalarCL( mg, lset, v, bnd, varName, fileName, timedep);
+    return *new Ensight6P1XScalarCL( mg, lset, lsetbnd, v, bnd, varName, fileName, timedep);
 }
 
 ///\brief Represents a vector-valued P2R function as two Ensight6 variables.
