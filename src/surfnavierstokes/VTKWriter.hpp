@@ -86,7 +86,7 @@ namespace DROPS {
                     array->SetName(var.name.c_str());
                     unstructuredGrid->GetPointData()->AddArray(array);
                 }
-                if (var.type == VTKVar::Type::P1) {
+                else if (var.type == VTKVar::Type::P1) {
                     auto  array = vtkSmartPointer<vtkDoubleArray>::New();
                     std::vector<double> value;
                     value.assign(&var.value->operator[](0), &var.value->operator[](0) + var.value->size());
@@ -102,7 +102,7 @@ namespace DROPS {
                     array->SetName(var.name.c_str());
                     unstructuredGrid->GetPointData()->AddArray(array);
                 }
-                if (var.type == VTKVar::Type::vecP2) {
+                else if (var.type == VTKVar::Type::vecP2) {
                     if (var.value->size() != 3 * n)
                         throw std::invalid_argument(funcName + ": inconsistent number of d.o.f. for vecP2 interpolant");
                     auto array = vtkSmartPointer<vtkDoubleArray>::New();
@@ -111,8 +111,28 @@ namespace DROPS {
                     array->SetName(var.name.c_str());
                     unstructuredGrid->GetPointData()->AddArray(array);
                 }
-                if (var.type == VTKVar::Type::vecP1)
-                    throw std::logic_error(funcName + ": vecP1 export not yet implemented");
+                else if (var.type == VTKVar::Type::vecP1) {
+                    std::vector<double> value;
+                    value.assign(&var.value->operator[](0), &var.value->operator[](0) + var.value->size());
+                    for (auto it = mg->GetTriangEdgeBegin(); it != mg->GetTriangEdgeEnd(); ++it) {
+                        auto i1 = 3 * vertexIndex[it->GetVertex(0)];
+                        auto i2 = 3 * vertexIndex[it->GetVertex(1)];
+                        value.push_back(.5 * (value[i1] + value[i2]));
+                        value.push_back(.5 * (value[i1 + 1] + value[i2 + 1]));
+                        value.push_back(.5 * (value[i1 + 2] + value[i2 + 2]));
+                    }
+                    if (value.size() != 3 * n)
+                        throw std::invalid_argument(funcName + ": inconsistent number of d.o.f. for vecP1 interpolant");
+                    auto* ptr = new double[3 * n];
+                    std::copy(value.begin(), value.end(), ptr);
+                    auto  array = vtkSmartPointer<vtkDoubleArray>::New();
+                    array->SetNumberOfComponents(3); // cf. https://vtk.org/Wiki/VTK/Examples/Cxx/PolyData/PolyDataCellNormals
+                    array->SetArray(ptr, 3 * n, 0 /* this will free the memory for ptr, cf. https://vtk.org/doc/release/5.6/html/a00505.html#d35ae5bee4aa873d543f1ab3eaf94454 */);
+                    array->SetName(var.name.c_str());
+                    unstructuredGrid->GetPointData()->AddArray(array);
+                }
+                else
+                    throw std::logic_error(funcName + ": export for " + typeid(var.type).name() + " not implemented");
             }
             // (3) write
             auto writer = vtkSmartPointer<vtkXMLUnstructuredGridWriter>::New();
