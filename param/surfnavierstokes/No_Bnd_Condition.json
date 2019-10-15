@@ -114,6 +114,17 @@
     "LB":               1,
     
     "Solver": {
+        "Outer" : {
+            "Iteration" : "GMRES",
+            "MaxIter" : 100,
+            "RelResTol" : 1e-8
+        },
+        "Inner" : {
+            "A" : {
+            },
+            "S" : {
+            }
+        },
         "PcAIter":      500,
         "PcATol":       1e-4,
         "PcBIter":      500,

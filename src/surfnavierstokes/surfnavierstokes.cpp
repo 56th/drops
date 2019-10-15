@@ -21,11 +21,9 @@
  *
  * Copyright 2009 LNM/SC RWTH Aachen, Germany
 */
+
 #include <fstream>
 #include <unordered_map>
-#include <surfactant/ifacetransp.h>
-
-#include "SingletonLogger.hpp"
 
 #include "surfactant/ifacetransp.h"
 #include "misc/params.h"
@@ -35,14 +33,23 @@
 #include "levelset/surfacetension.h"
 #include "misc/dynamicload.h"
 #include "num/bndData.h"
-#include "num/precond.h"
-#include "VTKWriter.hpp"
-
-#include "num/oseensolver.h"
 #include "surfactant/ifacetransp.h"
 
+#include "VTKWriter.hpp"
 #include "SurfNavierStokesData.hpp"
 #include "surfnavierstokes/surfnavierstokes_utils.h"
+#include "SingletonLogger.hpp"
+
+#include "BelosSolverFactory.hpp"
+#include "BelosLinearProblem.hpp"
+#include "BelosEpetraAdapter.hpp"
+#include "Epetra_CrsMatrix.h"
+#include "Epetra_MultiVector.h"
+#ifdef HAVE_MPI
+    #include "Epetra_MpiComm.h"
+#else
+    #include "Epetra_SerialComm.h"
+#endif
 
 using namespace DROPS;
 
@@ -54,6 +61,19 @@ bool windRises(double nu, VecDescCL const & w, double& Pe) {
 int main(int argc, char* argv[]) {
     auto& logger = SingletonLogger::instance();
     try {
+        logger.beg("mpi init");
+            #ifdef HAVE_MPI
+                    MPI_Init(&argc, &argv);
+                    Epetra_MpiComm Comm(MPI_COMM_WORLD);
+            #else
+                    Epetra_SerialComm Comm;
+            #endif
+            auto myRank = Comm.MyPID();
+            if (myRank == 0) {
+                logger.buf << "num proc = " << Comm.NumProc();
+                logger.log();
+            }
+        logger.end();
         logger.beg("read input .json");
             ParamCL inpJSON, outJSON;
             read_parameter_file_from_cmdline(inpJSON, argc, argv, "../../param/surfnavierstokes/No_Bnd_Condition.json");
@@ -75,7 +95,7 @@ int main(int argc, char* argv[]) {
             }
         logger.end();
         logger.beg("set up test case");
-            auto h = inpJSON.get<DROPS::Point3DCL>("Mesh.E1")[0] / inpJSON.get<double>("Mesh.N1") * std::pow(2., -inpJSON.get<double>("Mesh.AdaptRef.FinestLevel"));
+            auto h = inpJSON.get<Point3DCL>("Mesh.E1")[0] / inpJSON.get<double>("Mesh.N1") * std::pow(2., -inpJSON.get<double>("Mesh.AdaptRef.FinestLevel"));
             auto tau_u_order  = inpJSON.get<double>("SurfNavStokes.NormalPenaltyPower");
             auto tau_u_factor = inpJSON.get<double>("SurfNavStokes.NormalPenaltyFactor");
             auto tau_u 		  = tau_u_factor * pow(h, tau_u_order); // constant for normal penalty
@@ -133,15 +153,15 @@ int main(int argc, char* argv[]) {
         logger.end();
         logger.beg("build mesh");
             logger.beg("build initial bulk mesh");
-                std::auto_ptr<DROPS::MGBuilderCL> builder(DROPS::make_MGBuilder(inpJSON));
-                DROPS::MultiGridCL mg(*builder);
-                const DROPS::ParamCL::ptree_type* ch= 0;
+                std::auto_ptr<MGBuilderCL> builder(make_MGBuilder(inpJSON));
+                MultiGridCL mg(*builder);
+                const ParamCL::ptree_type* ch= 0;
                 try {
                     ch = &inpJSON.get_child("Mesh.Periodicity");
-                } catch (DROPS::DROPSParamErrCL) {}
+                } catch (DROPSParamErrCL) {}
                 if (ch) read_PeriodicBoundaries(mg, *ch);
                 // levelset shift
-                auto shift = inpJSON.get<DROPS::Point3DCL>("Levelset.ShiftDir", DROPS::Point3DCL(0., 0., 0.));
+                auto shift = inpJSON.get<Point3DCL>("Levelset.ShiftDir", Point3DCL(0., 0., 0.));
                 shift /= shift.norm();
                 auto shiftNorm = fabs(inpJSON.get<double>("Levelset.ShiftNorm", 0.));
                 shift *= shiftNorm;
@@ -152,9 +172,9 @@ int main(int argc, char* argv[]) {
                 logger.log();
             logger.end();
             logger.beg("refine towards the surface");
-                DROPS::AdapTriangCL adap(mg);
+                AdapTriangCL adap(mg);
                 // adaptive mesh refinement based on level set function
-                DROPS::DistMarkingStrategyCL initmarker(surfNavierStokesData.surface.phi, inpJSON.get<double>("Mesh.AdaptRef.Width"), inpJSON.get<int>("Mesh.AdaptRef.CoarsestLevel"), inpJSON.get<int>("Mesh.AdaptRef.FinestLevel"));
+                DistMarkingStrategyCL initmarker(surfNavierStokesData.surface.phi, inpJSON.get<double>("Mesh.AdaptRef.Width"), inpJSON.get<int>("Mesh.AdaptRef.CoarsestLevel"), inpJSON.get<int>("Mesh.AdaptRef.FinestLevel"));
                 adap.set_marking_strategy(&initmarker);
                 adap.MakeInitialTriang();
                 adap.set_marking_strategy(0);
@@ -170,7 +190,8 @@ int main(int argc, char* argv[]) {
             SurfaceTensionCL sf(sigma, 0);
             BndDataCL<double> lsbnd(0);
             read_BndData(lsbnd, mg, inpJSON.get_child("Levelset.BndData"));
-            DROPS::LevelsetP2CL & lset(*DROPS::LevelsetP2CL::Create(mg, lsbnd, sf));
+            std::shared_ptr<LevelsetP2CL> lsetPtr(LevelsetP2CL::Create(mg, lsbnd, sf));
+            auto& lset = *lsetPtr;
             lset.CreateNumbering(mg.GetLastLevel(), &lset.idx);
             lset.Phi.SetIdx(&lset.idx);
             lset.Init(surfNavierStokesData.surface.phi);
@@ -180,14 +201,14 @@ int main(int argc, char* argv[]) {
             read_BndData(vbnd, mg, inpJSON.get_child("Stokes.VelocityBndData"));
             BndDataCL<double> pbnd(0);
             read_BndData(pbnd, mg, inpJSON.get_child("Stokes.PressureBndData"));
-            DROPS::IdxDescCL ifaceVecP2idx(vecP2IF_FE, vbnd);
-            DROPS::IdxDescCL ifaceVecP1idx(vecP1IF_FE, vbnd);
-            DROPS::IdxDescCL ifaceP1idx(P1IF_FE, pbnd);
-            DROPS::IdxDescCL ifaceP2idx(P2IF_FE, pbnd);
-            DROPS::IdxDescCL vecP2idx(vecP2_FE, vbnd);
-            DROPS::IdxDescCL vecP1idx(vecP1_FE, vbnd);
-            DROPS::IdxDescCL P1FEidx(P1_FE, pbnd);
-            DROPS::IdxDescCL P2FEidx(P2_FE, pbnd);
+            IdxDescCL ifaceVecP2idx(vecP2IF_FE, vbnd);
+            IdxDescCL ifaceVecP1idx(vecP1IF_FE, vbnd);
+            IdxDescCL ifaceP1idx(P1IF_FE, pbnd);
+            IdxDescCL ifaceP2idx(P2IF_FE, pbnd);
+            IdxDescCL vecP2idx(vecP2_FE, vbnd);
+            IdxDescCL vecP1idx(vecP1_FE, vbnd);
+            IdxDescCL P1FEidx(P1_FE, pbnd);
+            IdxDescCL P2FEidx(P2_FE, pbnd);
             ifaceVecP2idx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
             auto numbOfActiveTetrasP2 = ifaceVecP2idx.CreateNumbering(mg.GetLastLevel(), mg, &lset.Phi, &lset.GetBndData());
             ifaceVecP1idx.GetXidx().SetBound(inpJSON.get<double>("SurfTransp.OmitBound"));
@@ -238,21 +259,6 @@ int main(int argc, char* argv[]) {
                 stokesSystem.M.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
                 stokesSystem.S.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
             }
-//            else if(FE == "P1P1") {
-//                u.SetIdx(&ifaceVecP1idx);
-//                u_star.SetIdx(&ifaceVecP1idx);
-//                u_prev.SetIdx(&ifaceVecP1idx);
-//                u_prev_prev.SetIdx(&ifaceVecP1idx);
-//                stokesSystem.w.SetIdx(&ifaceVecP1idx);
-//                stokesSystem.fRHS.SetIdx(&ifaceVecP1idx);
-//                stokesSystem.gRHS.SetIdx(&ifaceP1idx);
-//                stokesSystem.A.SetIdx(&ifaceVecP1idx, &ifaceVecP1idx);
-//                stokesSystem.N.SetIdx(&ifaceVecP1idx, &ifaceVecP1idx);
-//                stokesSystem.A_stab.SetIdx(&ifaceVecP1idx, &ifaceVecP1idx);
-//                stokesSystem.B.SetIdx(&ifaceP1idx, &ifaceVecP1idx);
-//                stokesSystem.M.SetIdx(&ifaceVecP1idx, &ifaceVecP1idx);
-//                stokesSystem.S.SetIdx(&ifaceVecP1idx, &ifaceVecP1idx);
-//            }
             else throw std::invalid_argument(FE + ": unknown FE pair");
             p.SetIdx(&ifaceP1idx);
             p_ext.SetIdx(&P1FEidx);
@@ -269,7 +275,7 @@ int main(int argc, char* argv[]) {
                 p = p_star;
             logger.end();
         logger.end();
-        logger.beg("solve");
+        logger.beg("set up vtk");
             VTKWriter vtkWriter(dirName + "/vtk/" + testName, mg, inpJSON.get<bool>("Output.Binary"));
             auto writeVTK = [&](double t) {
                 Extend(mg, u_star, u_star_ext);
@@ -295,6 +301,23 @@ int main(int argc, char* argv[]) {
                     writeVTK(0.);
                 logger.end();
             }
+        logger.end();
+        logger.beg("set up linear solver");
+            using MV = Epetra_MultiVector;
+            using OP = Epetra_Operator;
+            using ST = double;
+            using Teuchos::RCP;
+            using Teuchos::rcp;
+            using Teuchos::ParameterList;
+            using namespace Belos;
+            RCP<OP> belosMTX, belosPRE;
+            RCP<MV> belosLHS, belosRHS;
+            auto belosProblem = rcp(new LinearProblem<ST, MV, OP>(belosMTX, belosLHS, belosRHS));
+            SolverFactory<ST, MV, OP> factory;
+            RCP<ParameterList> belosParams;
+            // ...
+            auto belosSolver = factory.create(inpJSON.get<std::string>("Solver.Outer.Iteration"), belosParams);
+        logger.end();
             logger.beg("t = t_1");
                 logger.beg("assemble");
                     InitVector(mg, u_prev, surfNavierStokesData.u_T, 0.);
@@ -320,25 +343,6 @@ int main(int argc, char* argv[]) {
                             << "f size is                     " << stokesSystem.fRHS.Data.size() << '\n'
                             << "g size is                     " << stokesSystem.gRHS.Data.size();
                     logger.log();
-//                    logger.beg("test N");
-//                        auto v1 = [](Point3DCL const & p, double) {
-//                            return Point3DCL(2. * p[0], -p[1], p[2]);
-//                        };
-//                        auto v2 = [](Point3DCL const &, double) {
-//                            return Point3DCL(1., 2., 3.);
-//                        };
-//                        VecDescCL V1, V2;
-//                        V1.SetIdx(&ifaceVecP2idx);
-//                        V2.SetIdx(&ifaceVecP2idx);
-//                        InitVector(mg, V1, v1);
-//                        InitVector(mg, V2, v2);
-//                        logger.buf
-//                            << "c(v1, v2) = (N v2, v1) = " << dot(stokesSystem.N.Data * V2.Data, V1.Data) << '\n'
-//                            << "c(v2, v1) = (N v1, v2) = " << dot(stokesSystem.N.Data * V1.Data, V2.Data) << '\n'
-//                            << "c(v1, v1) = (N v1, v1) = " << dot(stokesSystem.N.Data * V1.Data, V1.Data) << '\n'
-//                            << "c(w, w)   = (N w, w)   = " << dot(stokesSystem.N.Data * stokesSystem.w.Data, stokesSystem.w.Data) << '\n';
-//                        logger.log();
-//                    logger.end();
                     stokesSystem.fRHS.Data += (1. / stepSize) * (stokesSystem.M.Data * u_prev.Data);
                     VectorCL I_p;
                     I_p.resize(stokesSystem.gRHS.Data.size(),1.);
@@ -397,66 +401,13 @@ int main(int argc, char* argv[]) {
                     logger.log();
                     return 0;
                 }
-                logger.beg("build preconditioners");
-                    logger.beg("Schur block");
-                        MatrixCL Schur_hat;
-                        if (stab == "full")
-                            Schur_hat.LinComb(1., stokesSystem.Schur.Data, rho_p, stokesSystem.Schur_full_stab.Data);
-                        else if (stab == "normal")
-                            Schur_hat.LinComb(1., stokesSystem.Schur.Data, rho_p, stokesSystem.Schur_normal_stab.Data);
-                        else {
-                            logger.wrn("no stabilization is used! Schur precond = I");
-                            Schur_hat = std::valarray<double>(1., stokesSystem.Schur.Data.num_rows());
-                        }
-                    logger.end();
-                    logger.beg("diffusion-convection-reaction block");
-                        typedef SSORPcCL SymmPcPcT;
-                        typedef PCGSolverCL<SymmPcPcT> PCGSolverT;
-                        typedef SolverAsPreCL<PCGSolverT> PCGPcT;
-                        SymmPcPcT symmPcPc_;
-                        std::stringstream Astream;
-                        PCGSolverT PCGSolver_(symmPcPc_, inpJSON.get<int>("Solver.PcAIter"), inpJSON.get<double>("Solver.PcATol"), true, &Astream);
-                        PCGPcT PCGPc_(PCGSolver_);//velocity preconditioner
-                        std::stringstream Schurstream;
-                        PCGSolverT SchurPCGSolver (symmPcPc_, inpJSON.get<int>("Solver.PcBIter"), inpJSON.get<double>("Solver.PcBTol"), true, &Schurstream);
-                        SchurPreBaseCL *spc_ = new SurfaceLaplacePreCL<PCGSolverT>(Schur_hat, SchurPCGSolver);//pressure preconditioner
-                        //construct symmteric block iterative solver
-                        typedef BlockPreCL<ExpensivePreBaseCL, SchurPreBaseCL, DiagSpdBlockPreCL>  DiagBlockPcT;
-                        typedef PLanczosONBCL<VectorCL, DiagBlockPcT> LanczosT;
-                        typedef PMResSolverCL<LanczosT> MinResT;
-                        DiagBlockPcT    *DBlock_ = new DiagBlockPcT(PCGPc_, *spc_);
-                        LanczosT *lanczos_ = new LanczosT(*DBlock_);
-                        MinResT *MinRes_ = new MinResT(*lanczos_, inpJSON.get<int>("Solver.Iter"), inpJSON.get<double>("Solver.Tol"), /*relative*/ false);
-                        BlockMatrixSolverCL<MinResT> *symStokesSolver= new BlockMatrixSolverCL<MinResT>(*MinRes_);
-                        // construct preconditioners for nonsymmetric case
-                        typedef /*JACPcCL*/ SSORPcCL NonSymmPcPcT;
-                        typedef GMResSolverCL<NonSymmPcPcT> GMResSolverT;
-                        typedef SolverAsPreCL<GMResSolverT> GMResPcT;
-                        NonSymmPcPcT nonsymmPcPc_;
-                        std::stringstream PCstream;
-                        GMResSolverT GMResSolver_(
-                                nonsymmPcPc_, inpJSON.get<int>("Solver.PcAIter"), inpJSON.get<int>("Solver.PcAIter"), inpJSON.get<double>("Solver.PcATol"),
-                                true, false,LeftPreconditioning,
-                                true, false, &PCstream
-                        );
-                        GMResPcT GMResPc_nonsym(GMResSolver_);
-                        //setup iterative block solver for nonsymmetric case
-                        typedef GMResSolverCL<DiagBlockPcT> GMResT;
-                        DiagBlockPcT    *DBlock_nonsym = new DiagBlockPcT(GMResPc_nonsym, *spc_);
-                        GMResT *GMRes_ = new GMResT(*DBlock_nonsym, inpJSON.get<int>("Solver.Iter"), inpJSON.get<int>("Solver.Iter"), inpJSON.get<double>("Solver.Tol"),
-                                /*bool relative=*/ false, /*bool calculate2norm=*/ false, /*PreMethGMRES method=*/ LeftPreconditioning,
-                                /*bool mod =*/ true,      /*bool useModGS =*/ false);
-                        BlockMatrixSolverCL<GMResT> *nonsymStokesSolver = new BlockMatrixSolverCL<GMResT>(*GMRes_);
-                        StokesSolverBaseCL* stokesSolver;
-                    logger.end();
-                logger.end();
                 logger.beg("linear solve");
                     double Pe; // peclet number
-                    stokesSolver = symStokesSolver;
-                    if (windRises(nu, stokesSystem.w, Pe)) stokesSolver = nonsymStokesSolver;
-                    logger.buf << "Pe = " << Pe << ", using " << (stokesSolver == symStokesSolver ? "" : "non-") << "symmetric solver";
-                    logger.log();
-                    stokesSolver->Solve(A_dyn, stokesSystem.B.Data, C, u.Data, p.Data, stokesSystem.fRHS.Data, stokesSystem.gRHS.Data, u.RowIdx->GetEx(), p.RowIdx->GetEx());
+                    // stokesSolver = symStokesSolver;
+                    // if (windRises(nu, stokesSystem.w, Pe)) stokesSolver = nonsymStokesSolver;
+                    // logger.buf << "Pe = " << Pe << ", using " << (stokesSolver == symStokesSolver ? "" : "non-") << "symmetric solver";
+                    // logger.log();
+                    // stokesSolver->Solve(A_dyn, stokesSystem.B.Data, C, u.Data, p.Data, stokesSystem.fRHS.Data, stokesSystem.gRHS.Data, u.RowIdx->GetEx(), p.RowIdx->GetEx());
                     p.Data -= dot(stokesSystem.Schur.Data * p.Data, I_p) / dot(stokesSystem.Schur.Data * I_p, I_p) * I_p;
                 logger.end();
                 logger.beg("output");
@@ -472,8 +423,8 @@ int main(int argc, char* argv[]) {
                         tJSON.put("Solver.ResidualNorm.True.Velocity", std::get<0>(res));
                         tJSON.put("Solver.ResidualNorm.True.Pressure", std::get<1>(res));
                         tJSON.put("Solver.ResidualNorm.True.Full", std::get<2>(res));
-                        tJSON.put("Solver.ResidualNorm.GMRES", stokesSolver->GetResid());
-                        tJSON.put("Solver.TotalIters", stokesSolver->GetIter());
+                        // tJSON.put("Solver.ResidualNorm.GMRES", stokesSolver->GetResid());
+                        // tJSON.put("Solver.TotalIters", stokesSolver->GetIter());
                         tJSON.put("Solver.DOF.Velocity", stokesSystem.A.Data.num_rows());
                         tJSON.put("Solver.DOF.Pressure", stokesSystem.Schur.Data.num_rows());
                         auto t = i * stepSize;
@@ -548,11 +499,11 @@ int main(int argc, char* argv[]) {
                         A_dyn.LinComb(1.5 / stepSize, stokesSystem.M.Data, 1., stokesSystem.N.Data, nu, stokesSystem.A.Data, tau_u, stokesSystem.S.Data, rho_u, stokesSystem.A_stab.Data);
                     logger.end();
                     logger.beg("linear solve");
-                        stokesSolver = symStokesSolver;
-                        if (windRises(nu, stokesSystem.w, Pe)) stokesSolver = nonsymStokesSolver;
-                        logger.buf << "Pe = " << Pe << ", using " << (stokesSolver == symStokesSolver ? "" : "non-") << "symmetric solver";
-                        logger.log();
-                        stokesSolver->Solve(A_dyn, stokesSystem.B.Data, C, u.Data, p.Data, stokesSystem.fRHS.Data, stokesSystem.gRHS.Data, u.RowIdx->GetEx(), p.RowIdx->GetEx());
+                        // stokesSolver = symStokesSolver;
+                        // if (windRises(nu, stokesSystem.w, Pe)) stokesSolver = nonsymStokesSolver;
+                        // logger.buf << "Pe = " << Pe << ", using " << (stokesSolver == symStokesSolver ? "" : "non-") << "symmetric solver";
+                        // logger.log();
+                        // stokesSolver->Solve(A_dyn, stokesSystem.B.Data, C, u.Data, p.Data, stokesSystem.fRHS.Data, stokesSystem.gRHS.Data, u.RowIdx->GetEx(), p.RowIdx->GetEx());
                         p.Data -= dot(stokesSystem.Schur.Data * p.Data, I_p) / dot(stokesSystem.Schur.Data * I_p, I_p) * I_p;
                     logger.end();
                     logger.beg("output");
@@ -560,28 +511,13 @@ int main(int argc, char* argv[]) {
                     logger.end();
                 logger.end();
             }
-        logger.end();
-        // error
-        double Aaverage(0.), Avariation(0.), Schuraverage(0.), Schurvariation(0.);
-        double PCaverage(0.), PCvariation(0.);
-        std::stringstream Astreamcopy(Astream.str());
-        std::stringstream PCstreamcopy(PCstream.str());
-        std::stringstream Schurstreamcopy(Schurstream.str());
-        RightComputeAverageIterations(Astream, Aaverage);
-        ComputeAverageIterations(Schurstream, Schuraverage);
-        RightComputeAverageIterations(PCstream, PCaverage);
-        RightComputeVariationFromAverageIterations(Astreamcopy, Aaverage, Avariation);
-        RightComputeVariationFromAverageIterations(PCstreamcopy, PCaverage, PCvariation);
-        ComputeVariationFromAverageIterations(Schurstreamcopy, Schuraverage, Schurvariation);
-        logger.buf << "The average iterationsnumber of the A-preconditioner is: " <<     Aaverage     << '\n' << " ...with a variation of: " << Avariation << '\n';
-        logger.buf << "The average iterationsnumber of the nonsymmetric A-preconditioner is: " <<     PCaverage     << '\n' << " ...with a variation of: " << PCvariation << '\n';
-        logger.buf << "The average iterationsnumber of the Schur-preconditioner is: " << Schuraverage << '\n' << " ...with a variation of: " << Schurvariation << '\n';
-        logger.log();
-        delete &lset;
+        #ifdef HAVE_MPI
+            MPI_Finalize() ;
+        #endif
         return 0;
     } catch (std::exception const & e) {
         logger.err(e.what());
-    } catch (DROPS::DROPSErrCL const & e) {
+    } catch (DROPSErrCL const & e) {
         e.what(logger.buf);
         logger.err(logger.buf.str());
     } catch (...) {

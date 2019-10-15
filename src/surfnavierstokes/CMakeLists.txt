@@ -15,6 +15,14 @@ if (VTK_FOUND)
     )
 endif()
 
+# trilinos
+if (Trilinos_FOUND)
+    target_link_libraries(${HOME}
+        ${Trilinos_LIBRARIES}
+        ${Trilinos_TPL_LIBRARIES}
+    )
+endif()
+
 # matlab for sparse mtx .mat binary output
 if(Matlab_FOUND)
     add_library(${HOME}-matlab1 SHARED IMPORTED)
