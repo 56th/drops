@@ -360,8 +360,8 @@ private:
     LocalP1CL<Point3DCL> getLevelsetGrad(LocalP2CL<> const &);
     SMatrixCL<3, 3>      getLevelsetHess(LocalP2CL<> const &);
 public:
-    LocalStokesParam* param;
-    LocalSurfOseen(LocalStokesParam* param)
+    SurfOseenParam* param;
+    LocalSurfOseen(SurfOseenParam* param)
         : param(param)
         , lat(PrincipalLatticeCL::instance(param->input.numbOfVirtualSubEdges))
         , ls_loc(lat.vertex_size()) {
@@ -518,7 +518,7 @@ void LocalSurfOseen::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& 
     // compute projector and shape matrix
     qP.resize(q2Ddomain.vertex_size());
     qP = eye<3, 3>() - outer_product(qP2Normal, qP2Normal);
-    if (param->input.formulation == LocalStokesParam::Formulation::consistent || param->input.exactShape != nullptr) {
+    if (param->input.formulation == SurfOseenParam::Formulation::consistent || param->input.exactShape != nullptr) {
         // qHess = qP;
         qHess.resize(q2Ddomain.vertex_size());
         qHess = getLevelsetHess(ls);
@@ -550,7 +550,7 @@ void LocalSurfOseen::calcIntegrands(const SMatrixCL<3,3>& T, const LocalP2CL<>& 
         qSurfP1Grad[j] = qP1Grad[j] - dot(qP1Grad[j], qPatchOrP2Normal) * qPatchOrP2Normal;
     }
     // apply pointwise projection to the 3 std basis vectors e_k
-    if (param->input.formulation == LocalStokesParam::Formulation::inconsistent)
+    if (param->input.formulation == SurfOseenParam::Formulation::inconsistent)
         for(int k=0; k<3 ;++k) {
             qP_row[k].resize(q2Ddomain.vertex_size());
             Point3DCL e_k = DROPS::std_basis<3>(k+1);
@@ -603,7 +603,7 @@ void LocalSurfOseen::setupLB_P2(double LB_P2[10][10]) {
 
 // TODO: Den Fall fullGrad testen!
 void LocalSurfOseen::setupA_P2(double A_P2[30][30]) {
-    if (param->input.formulation == LocalStokesParam::Formulation::consistent) {
+    if (param->input.formulation == SurfOseenParam::Formulation::consistent) {
         setupA_P2_consistent(A_P2);
         return;
     }
@@ -1012,7 +1012,7 @@ class StokesIFAccumulator_P1P1CL : public TetraAccumulatorCL
     void update_global_system ();
 
 public:
-    StokesIFAccumulator_P1P1CL(const VecDescCL& ls, const LsetBndDataCL& ls_bnd, IdxDescCL& P1FE, IdxDescCL& ScalarP1FE, MatrixCL& A_P1, MatrixCL& A_P1_stab, MatrixCL& B_P1P1, MatrixCL& M_P1, MatrixCL& S_P1, MatrixCL& L_P1P1, MatrixCL& L_P1P1_stab, MatrixCL& M_ScalarP1, MatrixCL& A_ScalarP1_stab, LocalStokesParam* param)
+    StokesIFAccumulator_P1P1CL(const VecDescCL& ls, const LsetBndDataCL& ls_bnd, IdxDescCL& P1FE, IdxDescCL& ScalarP1FE, MatrixCL& A_P1, MatrixCL& A_P1_stab, MatrixCL& B_P1P1, MatrixCL& M_P1, MatrixCL& S_P1, MatrixCL& L_P1P1, MatrixCL& L_P1P1_stab, MatrixCL& M_ScalarP1, MatrixCL& A_ScalarP1_stab, SurfOseenParam* param)
         : lset(ls), lset_bnd(ls_bnd), P1Idx_(P1FE), ScalarP1Idx_(ScalarP1FE), A_P1_(A_P1), A_P1_stab_(A_P1_stab), B_P1P1_(B_P1P1), M_P1_(M_P1), S_P1_(S_P1), L_P1P1_(L_P1P1), L_P1P1_stab_(L_P1P1_stab), M_ScalarP1_(M_ScalarP1), A_ScalarP1_stab_(A_ScalarP1_stab), localProblem(param) {}
     ///\brief Initializes matrix-builders and load-vectors
     void begin_accumulation ();
@@ -1185,7 +1185,7 @@ class NavierStokesIFAccumulator_P1P1CL : public TetraAccumulatorCL
     void update_global_system ();
 
   public:
-    NavierStokesIFAccumulator_P1P1CL(const LevelsetP2CL& ls, const VecDescCL& v, const BndDataCL<Point3DCL>& v_bnd, IdxDescCL& P1FE, IdxDescCL& ScalarP1FE, MatrixCL& A_P1, MatrixCL& A_P1_stab, MatrixCL& B_P1P1,MatrixCL& Omega_P1P1, MatrixCL& N_P1, MatrixCL& NT_P1, MatrixCL& M_P1,MatrixCL& D_P1, MatrixCL& S_P1, MatrixCL& L_P1P1, MatrixCL& L_P1P1_stab, MatrixCL& M_ScalarP1, MatrixCL& A_ScalarP1_stab, MatrixCL& Schur_normalP1_stab, LocalStokesParam* param)
+    NavierStokesIFAccumulator_P1P1CL(const LevelsetP2CL& ls, const VecDescCL& v, const BndDataCL<Point3DCL>& v_bnd, IdxDescCL& P1FE, IdxDescCL& ScalarP1FE, MatrixCL& A_P1, MatrixCL& A_P1_stab, MatrixCL& B_P1P1, MatrixCL& Omega_P1P1, MatrixCL& N_P1, MatrixCL& NT_P1, MatrixCL& M_P1, MatrixCL& D_P1, MatrixCL& S_P1, MatrixCL& L_P1P1, MatrixCL& L_P1P1_stab, MatrixCL& M_ScalarP1, MatrixCL& A_ScalarP1_stab, MatrixCL& Schur_normalP1_stab, SurfOseenParam* param)
         : lset(ls.Phi), velocity(v), lset_bnd(ls.GetBndData()), velocity_bnd(v_bnd), P1Idx_(P1FE), ScalarP1Idx_(ScalarP1FE), A_P1_(A_P1), A_P1_stab_(A_P1_stab), B_P1P1_(B_P1P1), Omega_P1P1_(Omega_P1P1), N_P1_(N_P1), NT_P1_(NT_P1), M_P1_(M_P1), D_P1_(D_P1), S_P1_(S_P1), L_P1P1_(L_P1P1), L_P1P1_stab_(L_P1P1_stab), M_ScalarP1_(M_ScalarP1), A_ScalarP1_stab_(A_ScalarP1_stab), Schur_normalP1_stab_(Schur_normalP1_stab), localProblem(param) {}
     ///\brief Initializes matrix-builders and load-vectors
     void begin_accumulation ();
@@ -1374,7 +1374,7 @@ int count =0;
     }
 }
 
-void SetupStokesIF_P1P1(const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P1_stab, MatDescCL* B_P1P1, MatDescCL* M_P1, MatDescCL* S_P1, MatDescCL* L_P1P1, MatDescCL* L_P1P1_stab, MatDescCL* M_ScalarP1, MatDescCL* A_ScalarP1_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, LocalStokesParam* param)
+void SetupStokesIF_P1P1(const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P1_stab, MatDescCL* B_P1P1, MatDescCL* M_P1, MatDescCL* S_P1, MatDescCL* L_P1P1, MatDescCL* L_P1P1_stab, MatDescCL* M_ScalarP1, MatDescCL* A_ScalarP1_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, SurfOseenParam* param)
 {
   ScopeTimerCL scope("SetupStokesIF_P1P1");
   StokesIFAccumulator_P1P1CL accu(lset, lset_bnd, *(A_P1->RowIdx), *(L_P1P1->RowIdx), A_P1->Data, A_P1_stab->Data, B_P1P1->Data, M_P1->Data, S_P1->Data, L_P1P1->Data, L_P1P1_stab->Data, M_ScalarP1->Data, A_ScalarP1_stab->Data, param);
@@ -1399,7 +1399,7 @@ void SetupNavierStokesIF_P1P1(
         MatDescCL* L_P1P1_stab,
         MatDescCL* M_ScalarP1,
         MatDescCL* A_ScalarP1_stab,
-        MatDescCL* Schur_normalP1_stab, const LevelsetP2CL& lset, const VecDescCL& velocity, const BndDataCL<Point3DCL>& velocity_bnd, LocalStokesParam* param)
+        MatDescCL* Schur_normalP1_stab, const LevelsetP2CL& lset, const VecDescCL& velocity, const BndDataCL<Point3DCL>& velocity_bnd, SurfOseenParam* param)
 {
   ScopeTimerCL scope("SetupNavierStokesIF_P1P1");
   NavierStokesIFAccumulator_P1P1CL accu(lset, velocity, velocity_bnd, *(A_P1->RowIdx), *(L_P1P1->RowIdx), A_P1->Data, A_P1_stab->Data, B_P1P1->Data, Omega_P1P1->Data,  N_P1->Data, NT_P1->Data, M_P1->Data, D_P1->Data, S_P1->Data, L_P1P1->Data, L_P1P1_stab->Data, M_ScalarP1->Data, A_ScalarP1_stab->Data, Schur_normalP1_stab->Data, param);
@@ -1436,7 +1436,7 @@ class StokesIFAccumulator_P1P2CL : public TetraAccumulatorCL
     ///\brief Update the global system->
     void update_global_system ();
 public:
-    StokesIFAccumulator_P1P2CL(const VecDescCL& ls, const LsetBndDataCL& ls_bnd, IdxDescCL& P1FE, IdxDescCL& ScalarP2FE, MatrixCL& A_P1, MatrixCL& A_P1_stab, MatrixCL& B_P2P1, MatrixCL& M_P1, MatrixCL& S_P1, MatrixCL& L_P2P1, MatrixCL& L_P2P1_stab, MatrixCL& M_ScalarP2, MatrixCL& A_ScalarP2_stab, LocalStokesParam* param)
+    StokesIFAccumulator_P1P2CL(const VecDescCL& ls, const LsetBndDataCL& ls_bnd, IdxDescCL& P1FE, IdxDescCL& ScalarP2FE, MatrixCL& A_P1, MatrixCL& A_P1_stab, MatrixCL& B_P2P1, MatrixCL& M_P1, MatrixCL& S_P1, MatrixCL& L_P2P1, MatrixCL& L_P2P1_stab, MatrixCL& M_ScalarP2, MatrixCL& A_ScalarP2_stab, SurfOseenParam* param)
         : lset(ls), lset_bnd(ls_bnd), P1Idx_(P1FE), ScalarP2Idx_(ScalarP2FE), A_P1_(A_P1), A_P1_stab_(A_P1_stab), B_P2P1_(B_P2P1), M_P1_(M_P1), S_P1_(S_P1), L_P2P1_(L_P2P1), L_P2P1_stab_(L_P2P1_stab), M_ScalarP2_(M_ScalarP2), A_ScalarP2_stab_(A_ScalarP2_stab), localProblem(param) {}
     ///\brief Initializes matrix-builders and load-vectors
     void begin_accumulation ();
@@ -1581,7 +1581,7 @@ void StokesIFAccumulator_P1P2CL::update_global_system ()
     }
 }
 
-void SetupStokesIF_P1P2(const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P1_stab, MatDescCL* B_P2P1, MatDescCL* M_P1, MatDescCL* S_P1, MatDescCL* L_P2P1, MatDescCL* L_P2P1_stab, MatDescCL* M_ScalarP2, MatDescCL* A_ScalarP2_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, LocalStokesParam* param)
+void SetupStokesIF_P1P2(const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P1_stab, MatDescCL* B_P2P1, MatDescCL* M_P1, MatDescCL* S_P1, MatDescCL* L_P2P1, MatDescCL* L_P2P1_stab, MatDescCL* M_ScalarP2, MatDescCL* A_ScalarP2_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, SurfOseenParam* param)
 {
   ScopeTimerCL scope("SetupStokesIF_P1P2");
   StokesIFAccumulator_P1P2CL accu(lset, lset_bnd, *(A_P1->RowIdx), *(L_P2P1->RowIdx), A_P1->Data, A_P1_stab->Data, B_P2P1->Data, M_P1->Data, S_P1->Data, L_P2P1->Data, L_P2P1_stab->Data, M_ScalarP2->Data, A_ScalarP2_stab->Data, param);
@@ -1613,7 +1613,7 @@ class SurfOseenAccumulatorP2P1 : public TetraAccumulatorCL {
     void update_global_system ();
 
 public:
-    SurfOseenAccumulatorP2P1(const LevelsetP2CL& ls, SurfOseenSystem* system, LocalStokesParam* param)
+    SurfOseenAccumulatorP2P1(const LevelsetP2CL& ls, SurfOseenSystem* system, SurfOseenParam* param)
     : lset(ls.Phi)
     , P2Idx_(*(system->A.RowIdx))
     , ScalarP1Idx_(*(system->B.RowIdx))
@@ -1638,7 +1638,7 @@ void SurfOseenAccumulatorP2P1::begin_accumulation() {
     mB_P1P2_= new MatrixBuilderCL(&system->B.Data, num_unks_p1_scalar, num_unks_p2);
     mM_P2_= new MatrixBuilderCL(&system->M.Data, num_unks_p2, num_unks_p2);
     mS_P2_= new MatrixBuilderCL(&system->S.Data, num_unks_p2, num_unks_p2);
-    mM_ScalarP1_= new MatrixBuilderCL(&system->Schur.Data, num_unks_p1_scalar, num_unks_p1_scalar);
+    mM_ScalarP1_= new MatrixBuilderCL(&system->M_p.Data, num_unks_p1_scalar, num_unks_p1_scalar);
     mA_ScalarP1_stab_ = new MatrixBuilderCL(&system->Schur_normal_stab.Data, num_unks_p1_scalar, num_unks_p1_scalar);
     mM_ScalarP1_stab_ = new MatrixBuilderCL(&system->Schur_full_stab.Data, num_unks_p1_scalar, num_unks_p1_scalar);
     size_t num_unks_p2_scalar = num_unks_p2 / 3;
@@ -1771,7 +1771,7 @@ void SurfOseenAccumulatorP2P1::update_global_system() {
     }
 }
 
-void SetupSurfOseen_P2P1(const MultiGridCL& MG_, const LevelsetP2CL& lset, SurfOseenSystem* system, LocalStokesParam* param) {
+void SetupSurfOseen_P2P1(const MultiGridCL& MG_, const LevelsetP2CL& lset, SurfOseenSystem* system, SurfOseenParam* param) {
   ScopeTimerCL scope("SetupSurfOseen_P2P1");
   SurfOseenAccumulatorP2P1 accu(lset, system, param);
   TetraAccumulatorTupleCL accus;
@@ -1807,7 +1807,7 @@ class StokesIFAccumulator_P2P2CL : public TetraAccumulatorCL
     void update_global_system ();
 
 public:
-    StokesIFAccumulator_P2P2CL(const VecDescCL& ls, const LsetBndDataCL& ls_bnd, IdxDescCL& P2FE, IdxDescCL& ScalarP2FE, MatrixCL& A_P2, MatrixCL& A_P2_stab, MatrixCL& B_P2P2, MatrixCL& M_P2, MatrixCL& S_P2, MatrixCL& L_P2P2, MatrixCL& L_P2P2_stab, MatrixCL& M_ScalarP2, MatrixCL& A_ScalarP2_stab, LocalStokesParam* param)
+    StokesIFAccumulator_P2P2CL(const VecDescCL& ls, const LsetBndDataCL& ls_bnd, IdxDescCL& P2FE, IdxDescCL& ScalarP2FE, MatrixCL& A_P2, MatrixCL& A_P2_stab, MatrixCL& B_P2P2, MatrixCL& M_P2, MatrixCL& S_P2, MatrixCL& L_P2P2, MatrixCL& L_P2P2_stab, MatrixCL& M_ScalarP2, MatrixCL& A_ScalarP2_stab, SurfOseenParam* param)
         : lset(ls), lset_bnd(ls_bnd), P2Idx_(P2FE), ScalarP2Idx_(ScalarP2FE), A_P2_(A_P2), A_P2_stab_(A_P2_stab), B_P2P2_(B_P2P2), M_P2_(M_P2), S_P2_(S_P2), L_P2P2_(L_P2P2), L_P2P2_stab_(L_P2P2_stab), M_ScalarP2_(M_ScalarP2), A_ScalarP2_stab_(A_ScalarP2_stab), localProblem(param) {}
 
     ///\brief Initializes matrix-builders and load-vectors
@@ -1950,7 +1950,7 @@ void StokesIFAccumulator_P2P2CL::update_global_system ()
     }
 }
 
-void SetupStokesIF_P2P2(const MultiGridCL& MG_, MatDescCL* A_P2, MatDescCL* A_P2_stab, MatDescCL* B_P2P2, MatDescCL* M_P2, MatDescCL* S_P2, MatDescCL* L_P2P2, MatDescCL* L_P2P2_stab, MatDescCL* M_ScalarP2, MatDescCL* A_ScalarP2_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, LocalStokesParam* param) {
+void SetupStokesIF_P2P2(const MultiGridCL& MG_, MatDescCL* A_P2, MatDescCL* A_P2_stab, MatDescCL* B_P2P2, MatDescCL* M_P2, MatDescCL* S_P2, MatDescCL* L_P2P2, MatDescCL* L_P2P2_stab, MatDescCL* M_ScalarP2, MatDescCL* A_ScalarP2_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, SurfOseenParam* param) {
   ScopeTimerCL scope("SetupStokesIF");
   StokesIFAccumulator_P2P2CL accu(lset, lset_bnd, *(A_P2->RowIdx), *(B_P2P2->RowIdx), A_P2->Data, A_P2_stab->Data, B_P2P2->Data, M_P2->Data, S_P2->Data, L_P2P2->Data, L_P2P2_stab->Data, M_ScalarP2->Data, A_ScalarP2_stab->Data, param);
   TetraAccumulatorTupleCL accus;

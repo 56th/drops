@@ -753,12 +753,14 @@ class LocalInterfaceMassP1CL
 /// D is the diffusion-coefficient
 void SetupLBP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls, const BndDataCL<>& lsbnd, double D);
 
-struct LocalStokesParam {
+struct SurfOseenParam {
     enum class Formulation { consistent, inconsistent };
+    enum class PressureVolumestab { full, normal };
     struct {
         double t = 0.;
         size_t numbOfVirtualSubEdges = 2;
         Formulation formulation = Formulation::consistent;
+        PressureVolumestab stab = PressureVolumestab::full;
         bool usePatchNormal = true;
         InstatVectorFunction exactNormal = nullptr;
         InstatMatrixFunction exactShape  = nullptr;
@@ -779,17 +781,17 @@ struct LocalStokesParam {
 };
 
 struct SurfOseenSystem {
-    MatDescCL A, A_stab, B, N, M, S, Schur, Schur_full_stab, Schur_normal_stab,
+    MatDescCL A, A_stab, B, N, M, S, M_p, C,
               LB, LB_stab; // laplace-beltrami
     VecDescCL fRHS, gRHS,
               w; // wind
 };
 
-void SetupSurfOseen_P2P1(const MultiGridCL& MG_, const LevelsetP2CL&, SurfOseenSystem*, LocalStokesParam*);
-void SetupStokesIF_P1P1      ( const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P1_stab, MatDescCL* B_P1P1, MatDescCL* M_P1, MatDescCL* S_P1, MatDescCL* L_P1P1, MatDescCL* L_P1P1_stab, MatDescCL* M_ScalarP1, MatDescCL* A_ScalarP1_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, LocalStokesParam*);
-void SetupNavierStokesIF_P1P1( const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P1_stab, MatDescCL* B_P1P1, MatDescCL* Omega_P1P1, MatDescCL* N_P1,  MatDescCL* NT_P1, MatDescCL* M_P1,MatDescCL* D_P1, MatDescCL* S_P1, MatDescCL* L_P1P1, MatDescCL* L_P1P1_stab, MatDescCL* M_ScalarP1, MatDescCL* A_ScalarP1_stab, MatDescCL* Schur_normalP1_stab, const LevelsetP2CL& lset, const VecDescCL& velocity, const BndDataCL<Point3DCL>& velocity_bnd, LocalStokesParam*);
-void SetupStokesIF_P1P2      ( const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P1_stab, MatDescCL* B_P2P1, MatDescCL* M_P1, MatDescCL* S_P1, MatDescCL* L_P2P1, MatDescCL* L_P2P1_stab, MatDescCL* M_ScalarP2, MatDescCL* A_ScalarP2_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, LocalStokesParam*);
-void SetupStokesIF_P2P2      ( const MultiGridCL& MG_, MatDescCL* A_P2, MatDescCL* A_P2_stab, MatDescCL* B_P2P2, MatDescCL* M_P2, MatDescCL* S_P2, MatDescCL* L_P2P2, MatDescCL* L_P2P2_stab, MatDescCL* M_ScalarP2, MatDescCL* A_ScalarP2_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, LocalStokesParam*);
+void SetupSurfOseen_P2P1(const MultiGridCL& MG_, const LevelsetP2CL&, SurfOseenSystem*, SurfOseenParam*);
+void SetupStokesIF_P1P1      (const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P1_stab, MatDescCL* B_P1P1, MatDescCL* M_P1, MatDescCL* S_P1, MatDescCL* L_P1P1, MatDescCL* L_P1P1_stab, MatDescCL* M_ScalarP1, MatDescCL* A_ScalarP1_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, SurfOseenParam*);
+void SetupNavierStokesIF_P1P1(const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P1_stab, MatDescCL* B_P1P1, MatDescCL* Omega_P1P1, MatDescCL* N_P1, MatDescCL* NT_P1, MatDescCL* M_P1, MatDescCL* D_P1, MatDescCL* S_P1, MatDescCL* L_P1P1, MatDescCL* L_P1P1_stab, MatDescCL* M_ScalarP1, MatDescCL* A_ScalarP1_stab, MatDescCL* Schur_normalP1_stab, const LevelsetP2CL& lset, const VecDescCL& velocity, const BndDataCL<Point3DCL>& velocity_bnd, SurfOseenParam*);
+void SetupStokesIF_P1P2      (const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P1_stab, MatDescCL* B_P2P1, MatDescCL* M_P1, MatDescCL* S_P1, MatDescCL* L_P2P1, MatDescCL* L_P2P1_stab, MatDescCL* M_ScalarP2, MatDescCL* A_ScalarP2_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, SurfOseenParam*);
+void SetupStokesIF_P2P2      (const MultiGridCL& MG_, MatDescCL* A_P2, MatDescCL* A_P2_stab, MatDescCL* B_P2P2, MatDescCL* M_P2, MatDescCL* S_P2, MatDescCL* L_P2P2, MatDescCL* L_P2P2_stab, MatDescCL* M_ScalarP2, MatDescCL* A_ScalarP2_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, SurfOseenParam*);
 
 void SetupCahnHilliardIF_P1P1( const MultiGridCL& MG_,  MatDescCL* M_P1, MatDescCL* NormalStab_P1, MatDescCL* TangentStab_P1, MatDescCL* VolumeStab_P1, MatDescCL* L_P1P1 ,MatDescCL* LM_P1P1 ,MatDescCL* Gprimeprime_P1P1 , const VecDescCL& lset, const LsetBndDataCL& lset_bnd, const VecDescCL& velocity, const BndDataCL<Point3DCL>& velocity_bnd,const VecDescCL& volume_fraction, const BndDataCL<>& volume_fraction_bnd);
     double Mobility_function(double x);

@@ -539,7 +539,7 @@ bool CheckValuesAsym(const MatrixCL& AP1, const MatrixCL& AP2, const VectorCL& a
     return equal;
 }
 
-void TestAllP2MatricesWithP1Matrices(const MultiGridCL& MG, LevelsetP2CL& lset, IdxDescCL& ifaceVecP2idx, IdxDescCL& ifaceVecP1idx, IdxDescCL& ifaceP1idx, LocalStokesParam* param)
+void TestAllP2MatricesWithP1Matrices(const MultiGridCL& MG, LevelsetP2CL& lset, IdxDescCL& ifaceVecP2idx, IdxDescCL& ifaceVecP1idx, IdxDescCL& ifaceP1idx, SurfOseenParam* param)
 {
     DROPS::MatDescCL A_P1, A_P1_stab, B_P1P1, M_P1, S_P1, L_P1P1, L_P1P1_stab, Schur_P1, Schur_P1_stab;
 

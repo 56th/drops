@@ -60,8 +60,13 @@
 
 // for casting to epetra
 #ifdef _TRILINOS
-    #include "Epetra_ConfigDefs.h"
-    #include "Epetra_SerialComm.h"
+    #include "Epetra_CrsMatrix.h"
+    #include "Epetra_Vector.h"
+    #ifdef HAVE_MPI
+        #include "Epetra_MpiComm.h"
+    #else
+        #include "Epetra_SerialComm.h"
+    #endif
 #endif
 
 namespace DROPS
@@ -82,6 +87,20 @@ class VectorBaseCL: public std::valarray<T>
 
     // ctors
     VectorBaseCL()                      : base_type()       {}
+    #ifdef _TRILINOS
+        explicit operator Epetra_Vector() const {
+            #ifdef HAVE_MPI
+                Epetra_MpiComm Comm(MPI_COMM_WORLD);
+            #else
+                Epetra_SerialComm Comm;
+            #endif
+            Epetra_Map map(this->size(), 0, Comm);
+            Epetra_Vector result(map);
+            for (size_t i = 0; i < this->size(); ++i)
+                result(i) = this->operator[](i);
+            return result;
+        }
+    #endif
 #ifdef VALARRAY_BUG
     VectorBaseCL (size_t s)             : base_type( T(),s) {}
 #else
@@ -745,6 +764,33 @@ public:
 
     SparseMatBaseCL& exportMTX(std::string const &);
     SparseMatBaseCL& exportMAT(std::string const &);
+
+    #ifdef _TRILINOS
+        explicit operator Epetra_CrsMatrix() const {
+            #ifdef HAVE_MPI
+                Epetra_MpiComm Comm(MPI_COMM_WORLD);
+            #else
+                Epetra_SerialComm Comm;
+            #endif
+            Epetra_Map rowMap(num_rows(), 0, Comm);
+            Epetra_Map colMap(num_cols(), 0, Comm);
+            std::vector<int> nnz(num_rows());
+            for (size_t i = 0; i < num_rows(); ++i)
+                nnz[i] = _rowbeg[i + 1] - _rowbeg[i];
+            Epetra_CrsMatrix result(Copy, rowMap, colMap, nnz.data(), true);
+            for (size_t i = 0; i < num_rows(); ++i) {
+                std::vector<double> values;
+                std::vector<int> columns;
+                for (size_t j = _rowbeg[i]; j < _rowbeg[i + 1]; ++j) {
+                    values.push_back(_val[j]);
+                    columns.push_back(_colind[j]);
+                }
+                result.InsertGlobalValues(i, values.size(), values.data(), columns.data());
+            }
+            result.FillComplete();
+            return result;
+        }
+    #endif
 
     template <class, class>
       friend class SparseMatBuilderCL;

@@ -38,14 +38,13 @@
       "VelocityVolumestabFactor": 1,
       "PressureVolumestabPower":  1,
       "PressureVolumestabFactor": 1,
-      "formulation":              "consistent",
+      "Formulation":              "consistent",
       "NumbOfVirtualSubEdges":    2,
       "UsePatchNormals":          false,
       "ExportMatrices":           false,
       "ExportMatricesFormat":     "mat",
       "ComputeNormalErr":         false,
       "ComputeShapeErr":          false,
-      "Solve":                    true,
       "IntegrateRHS":             true
     },
 
@@ -115,7 +114,8 @@
     
     "Solver": {
         "Outer" : {
-            "Iteration" : "GMRES",
+            "Iteration" : "MINRES",
+            "KrylovSubspaceSize" : 40,
             "MaxIter" : 100,
             "RelResTol" : 1e-8
         },

@@ -497,12 +497,12 @@ void LBB_constant( const StokesT &Stokes )
     PCGSolverT Asolver( symmpcpc, 500, 0.01, true );
     APcT Apc(Asolver);
 
-    // Approximate Schur.
+    // Approximate M_p.
     typedef ApproximateSchurComplMatrixCL<APcT, MatrixCL, DummyExchangeCL > SchurCL;
     SchurCL schur( A, Apc, B, C, DummyExchangeCL() );
 
 
-    // Schur-Inverter...
+    // M_p-Inverter...
     int tmp = 5000;
     typedef GCRSolverCL<ISGhPenPreCL> SolverT;
     ISGhPenPreCL Sprecond( &Apr, &M, &C );

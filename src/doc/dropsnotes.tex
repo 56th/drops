@@ -541,7 +541,7 @@ Der Vorkonditionierer verwendet f"ur den Poissonanteil der
 Stokes-Gleichungen eine Iteration des "ubergebenen Mehrgitter-V-Zyklus
 mit den in diesem eingestellten Gl"attern.
 
-Die Schur-Komplementmatrix wird durch einen SSOR-Schritt mit der
+Die M_p-Komplementmatrix wird durch einen SSOR-Schritt mit der
 $P_2$-Massenmatrix vorkonditioniert.
 
 \medskip
@@ -655,14 +655,14 @@ $$
 $$
 Sie sind in \prg{num/stokessolver.h} implementiert.
 
-\subsubsection{Schur-Verfahren}
-Die Schur-Komplementmatrix $S=BA^{-1}B^T$ wird in Drops durch die Klasse
+\subsubsection{M_p-Verfahren}
+Die M_p-Komplementmatrix $S=BA^{-1}B^T$ wird in Drops durch die Klasse
 \prg{SchurComplMatrixCL} in \prg{stokes/stokes.h} realisiert. Der Matrix-Vektor-Multiplikationsoperator
 verwendet zu L"osung des Gleichungssystems mit $A$ ein PCG-Verfahren mit dem
 in der \prg{SchurComplMatrixCL} definierten Vorkonditionierer. Dies ist gegenw"artig
 die \prg{SSORPcCL}.
 
-Damit kann das Schur-Verfahren in \prg{SchurSolverCL} und \prg{PSchurSolverCL} so
+Damit kann das M_p-Verfahren in \prg{SchurSolverCL} und \prg{PSchurSolverCL} so
 darstellen:
 \begin{enumerate}
 \item $r= BA^{-1}b -c$ berechnen: \quad $r= -c$, $Av = b$ l"osen, $r+= Bv$.

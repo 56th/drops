@@ -88,7 +88,7 @@ struct StokesSolverInfoCL
             case BDinvBT_SPC:      return "B D^-1 B^T";
             case SIMPLER_SPC:      return "SIMPLER";
             case MSIMPLER_SPC:     return "MSIMPLER";
-            case VankaSchur_SPC:   return "Vanka Schur";
+            case VankaSchur_SPC:   return "Vanka M_p";
             case VankaBlock_SPC:   return "block Vanka";
             case PVanka_SM:        return "Vanka smoother";
             case BraessSarazin_SM: return "Braess-Sarazin smoother";
@@ -209,7 +209,7 @@ class StokesSolverFactoryCL : public StokesSolverFactoryBaseCL<StokesT, Prolonga
 #endif
     SymmPcPcT symmPcPc_;
 
-// PC for instat. Schur complement
+// PC for instat. M_p complement
     SchurPreBaseCL  *spc_;
     DummyPreCL      nopc_;
     ISBBTPreCL      bbtispc_;

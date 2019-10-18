@@ -144,7 +144,7 @@ int main (int argc, char* argv[])
     double eta = 0.; //Constant for penalty
     double epsilon = 1.0*std::pow(h,1.0); //Constant for A_stab
     double hat_epsilon = epsilon; //Constant for L_stab
-    double rho = hat_epsilon; //Constant for Schur complement preconditioner
+    double rho = hat_epsilon; //Constant for M_p complement preconditioner
     std::cout << "h is: " << h << std::endl;
 
 
@@ -276,7 +276,7 @@ int main (int argc, char* argv[])
     SchurPreBaseCL *spc_ = new SurfaceLaplacePreCL<PCGSolverT>( Schur_hat, SchurPCGSolver);
     
     //ExpensivePreBaseCL *apc_;
-//    SchurPreBaseCL  *spc_ = new DummyPreCL(1,1);  // no preconditioning for Schur
+//    SchurPreBaseCL  *spc_ = new DummyPreCL(1,1);  // no preconditioning for M_p
     typedef BlockPreCL<ExpensivePreBaseCL, SchurPreBaseCL, DiagSpdBlockPreCL>  DiagBlockPcT;
     typedef PLanczosONBCL<VectorCL, DiagBlockPcT> LanczosT;
     typedef PMResSolverCL<LanczosT> MinResT;
@@ -627,7 +627,7 @@ int main (int argc, char* argv[])
     ComputeVariationFromAverageIterations(Schurstreamcopy, Schuraverage, Schurvariation);
 
     std::cout << "The average iterationsnumber of the A-preconditioner is " << Aaverage << " with a variation of " << Avariation << std::endl;
-    std::cout << "The average iterationsnumber of the Schur-preconditioner is: " << Schuraverage << " with a variation of " << Schurvariation << std::endl;
+    std::cout << "The average iterationsnumber of the M_p-preconditioner is: " << Schuraverage << " with a variation of " << Schurvariation << std::endl;
 
     //if( !testcase.compare("Zero")) {
 //        if( !levelset_fun_str.compare("xy_plane")) {

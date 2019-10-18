@@ -140,7 +140,7 @@ int main (int argc, char* argv[])
     double eta 		   = 1.e0  * pow(h, eta_order);//std::pow(2.e0,eta_index);; //constant for tangential penalty
     double epsilon     = 1.e0  * pow(h, epsilon_order); //constant for velocity stabilisation
     double alpha       = 1.e0  * pow(h, alpha_order); //constant for volume stabilisation
-    double rho         = 1.e0 * pow(h, 1); //constant for Schur complement preconditioner
+    double rho         = 1.e0 * pow(h, 1); //constant for M_p complement preconditioner
 
     std::cout << "h is: " << h << std::endl;
     std::cout << "tau is: " << tau << std::endl;

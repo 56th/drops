@@ -43,8 +43,9 @@
 #include "BelosSolverFactory.hpp"
 #include "BelosLinearProblem.hpp"
 #include "BelosEpetraAdapter.hpp"
+#include "Epetra_OperatorApply.hpp"
 #include "Epetra_CrsMatrix.h"
-#include "Epetra_MultiVector.h"
+#include "Epetra_Vector.h"
 #ifdef HAVE_MPI
     #include "Epetra_MpiComm.h"
 #else
@@ -124,7 +125,7 @@ int main(int argc, char* argv[]) {
             auto surfNavierStokesData = SurfNavierStokesDataFactory(testName, nu);
             logger.buf << surfNavierStokesData.description;
             logger.buf << "$\\nu$ = " << nu << '\n';
-            LocalStokesParam param;
+            SurfOseenParam param;
             param.input.f = inpJSON.get<bool>("SurfNavStokes.IntegrateRHS") ? surfNavierStokesData.f_T : nullptr;
             param.input.g = inpJSON.get<bool>("SurfNavStokes.IntegrateRHS") ? surfNavierStokesData.m_g : nullptr;
             param.input.exactNormal = inpJSON.get<bool>("SurfNavStokes.ComputeNormalErr") ? surfNavierStokesData.surface.n : nullptr;
@@ -132,22 +133,28 @@ int main(int argc, char* argv[]) {
             param.input.numbOfVirtualSubEdges = inpJSON.get<size_t>("SurfNavStokes.NumbOfVirtualSubEdges");
             param.input.usePatchNormal = inpJSON.get<bool>("SurfNavStokes.UsePatchNormals");
             if (param.input.usePatchNormal)  logger.log("using patch normals in surf integrands");
-            auto formulation = inpJSON.get<std::string>("SurfNavStokes.formulation");
+            auto formulation = inpJSON.get<std::string>("SurfNavStokes.Formulation");
             if (formulation == "consistent") {
-                param.input.formulation = LocalStokesParam::Formulation::consistent;
+                param.input.formulation = SurfOseenParam::Formulation::consistent;
                 logger.buf << "using consistent penalty formulation\n";
             }
             else {
-                param.input.formulation = LocalStokesParam::Formulation::inconsistent;
+                param.input.formulation = SurfOseenParam::Formulation::inconsistent;
                 logger.buf << "using inconsistent penalty formulation\n";
             }
-            SurfOseenSystem stokesSystem;
+            SurfOseenSystem surfOseenSystem;
             auto stab = inpJSON.get<std::string>("SurfNavStokes.PressureVolumestabType");
+            if (stab == "full") {
+                param.input.stab = SurfOseenParam::PressureVolumestab::full;
+                logger.buf << "using full pressure volume stabilization\n";
+            }
+            else {
+                param.input.stab = SurfOseenParam::PressureVolumestab::normal;
+                logger.buf << "using normal pressure volume stabilization\n";
+            }
             if (!inpJSON.get<bool>("SurfNavStokes.ExportMatrices")) {
-                stokesSystem.Schur_full_stab.assemble   = (stab == "full");
-                stokesSystem.Schur_normal_stab.assemble = (stab == "normal");
-                stokesSystem.LB.assemble = false;
-                stokesSystem.LB_stab.assemble = false;
+                surfOseenSystem.LB.assemble = false;
+                surfOseenSystem.LB_stab.assemble = false;
             }
             logger.log();
         logger.end();
@@ -243,31 +250,33 @@ int main(int argc, char* argv[]) {
                     << "numb of d.o.f. scalar P1: " << P1FEidx.NumUnknowns();
             logger.log();
             VecDescCL u_star, u_star_ext, u, u_ext, u_prev, u_prev_prev, p_star, p_star_ext, p, p_ext;
+            size_t n, m;
             if (FE == "P2P1") {
+                n = ifaceVecP2idx.NumUnknowns();
+                m = ifaceP1idx.NumUnknowns();
                 u.SetIdx(&ifaceVecP2idx);
                 u_ext.SetIdx(&vecP2idx);
                 u_star.SetIdx(&ifaceVecP2idx);
                 u_star_ext.SetIdx(&vecP2idx);
                 u_prev.SetIdx(&ifaceVecP2idx);
                 u_prev_prev.SetIdx(&ifaceVecP2idx);
-                stokesSystem.w.SetIdx(&ifaceVecP2idx);
-                stokesSystem.fRHS.SetIdx(&ifaceVecP2idx);
-                stokesSystem.A.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
-                stokesSystem.N.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
-                stokesSystem.A_stab.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
-                stokesSystem.B.SetIdx(&ifaceP1idx, &ifaceVecP2idx);
-                stokesSystem.M.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
-                stokesSystem.S.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
+                surfOseenSystem.w.SetIdx(&ifaceVecP2idx);
+                surfOseenSystem.fRHS.SetIdx(&ifaceVecP2idx);
+                surfOseenSystem.A.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
+                surfOseenSystem.N.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
+                surfOseenSystem.A_stab.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
+                surfOseenSystem.B.SetIdx(&ifaceP1idx, &ifaceVecP2idx);
+                surfOseenSystem.M.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
+                surfOseenSystem.S.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
             }
             else throw std::invalid_argument(FE + ": unknown FE pair");
             p.SetIdx(&ifaceP1idx);
             p_ext.SetIdx(&P1FEidx);
             p_star.SetIdx(&ifaceP1idx);
             p_star_ext.SetIdx(&P1FEidx);
-            stokesSystem.gRHS.SetIdx(&ifaceP1idx);
-            stokesSystem.Schur.SetIdx(&ifaceP1idx, &ifaceP1idx);
-            stokesSystem.Schur_full_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
-            stokesSystem.Schur_normal_stab.SetIdx(&ifaceP1idx, &ifaceP1idx);
+            surfOseenSystem.gRHS.SetIdx(&ifaceP1idx);
+            surfOseenSystem.M_p.SetIdx(&ifaceP1idx, &ifaceP1idx);
+            surfOseenSystem.C.SetIdx(&ifaceP1idx, &ifaceP1idx);
             logger.beg("interpolate initial data");
                 InitVector(mg, u_star, surfNavierStokesData.u_T, 0.);
                 InitScalar(mg, p_star, surfNavierStokesData.p, 0.);
@@ -306,211 +315,237 @@ int main(int argc, char* argv[]) {
             using MV = Epetra_MultiVector;
             using OP = Epetra_Operator;
             using ST = double;
-            using Teuchos::RCP;
-            using Teuchos::rcp;
-            using Teuchos::ParameterList;
+            using namespace Teuchos;
             using namespace Belos;
-            RCP<OP> belosMTX, belosPRE;
-            RCP<MV> belosLHS, belosRHS;
+            Epetra_Map mapVelocityPressure(static_cast<int>(n + m), 0, Comm);
+            auto belosLHS = rcp(new Epetra_Vector(mapVelocityPressure));
+            auto belosRHS = rcp(new Epetra_Vector(mapVelocityPressure));
+            RCP<OP> belosMTX;
             auto belosProblem = rcp(new LinearProblem<ST, MV, OP>(belosMTX, belosLHS, belosRHS));
-            SolverFactory<ST, MV, OP> factory;
-            RCP<ParameterList> belosParams;
-            // ...
-            auto belosSolver = factory.create(inpJSON.get<std::string>("Solver.Outer.Iteration"), belosParams);
+            RCP<ParameterList> belosParams = parameterList();
+            belosParams->set("Num Blocks", inpJSON.get<int>("Solver.Outer.KrylovSubspaceSize"));
+            belosParams->set("Maximum Iterations", inpJSON.get<int>("Solver.Outer.MaxIter"));
+            belosParams->set("Convergence Tolerance", inpJSON.get<double>("Solver.Outer.RelResTol"));
+            SolverFactory<ST, MV, OP> belosFactory;
+            logger.buf << "available iterations: " << belosFactory.supportedSolverNames();
+            logger.log();
+            auto belosSolver = belosFactory.create(inpJSON.get<std::string>("Solver.Outer.Iteration"), belosParams);
+            logger.buf << "outer solver: " << belosSolver->description();
+            logger.log();
         logger.end();
-            logger.beg("t = t_1");
-                logger.beg("assemble");
-                    InitVector(mg, u_prev, surfNavierStokesData.u_T, 0.);
-                    param.input.t = stepSize;
-                    auto setWind = [&](VecDescCL& wind) {
-                        if (surfNavierStokesData.w_T) { // Oseen (and Stokes) case
-                            InitVector(mg, wind, surfNavierStokesData.w_T, param.input.t);
-                            return true;
-                        }
-                        return false;
-                    };
-                    if (!setWind(stokesSystem.w)) // Navier-Stokes case
-                        stokesSystem.w = u_prev;
-                    SetupSurfOseen_P2P1(mg, lset, &stokesSystem, &param);
-                    logger.buf
-                            << "numb of cut tetras is         " << param.output.numbOfCutTetras << '\n'
-                            << "stiffness mtx is              " << stokesSystem.A.Data.num_rows() << " * " << stokesSystem.A.Data.num_cols() << '\n'
-                            << "velocity soln size is         " << u.Data.size() << '\n'
-                            << "exact velocity interp size is " << u_star.Data.size() << '\n'
-                            << "pre mass mtx is               " << stokesSystem.Schur.Data.num_rows() << " * " << stokesSystem.Schur.Data.num_cols() << '\n'
-                            << "pressure soln size is         " << p.Data.size() << '\n'
-                            << "exact pressure interp size is " << p_star.Data.size() << '\n'
-                            << "f size is                     " << stokesSystem.fRHS.Data.size() << '\n'
-                            << "g size is                     " << stokesSystem.gRHS.Data.size();
-                    logger.log();
-                    stokesSystem.fRHS.Data += (1. / stepSize) * (stokesSystem.M.Data * u_prev.Data);
-                    VectorCL I_p;
-                    I_p.resize(stokesSystem.gRHS.Data.size(),1.);
-                    stokesSystem.gRHS.Data -= (dot(stokesSystem.gRHS.Data, I_p) / dot(I_p, I_p)) * I_p;
-                    MatrixCL A_dyn, C, B_T;
-                    A_dyn.LinComb(1. / stepSize, stokesSystem.M.Data, 1., stokesSystem.N.Data, nu, stokesSystem.A.Data, tau_u, stokesSystem.S.Data, rho_u, stokesSystem.A_stab.Data);
-                    transpose(stokesSystem.B.Data, B_T);
-                    if (stab == "full")
-                        C.LinComb(0., stokesSystem.Schur.Data, -rho_p, stokesSystem.Schur_full_stab.Data);
-                    else if (stab == "normal")
-                        C.LinComb(0., stokesSystem.Schur.Data, -rho_p, stokesSystem.Schur_normal_stab.Data);
-                    else
-                        C.LinComb(0., stokesSystem.Schur.Data, 0., stokesSystem.Schur.Data);
-                logger.end();
-                if (inpJSON.get<bool>("SurfNavStokes.ExportMatrices")) {
-                    logger.beg("export matrices to " + dirName);
-                        MatrixCL A_final;
-                        A_final.LinComb(1., stokesSystem.A.Data, 1., stokesSystem.M.Data, tau_u, stokesSystem.S.Data, rho_u, stokesSystem.A_stab.Data);
-                        auto C_full = stokesSystem.Schur_full_stab.Data;
-                        C_full *= rho_p;
-                        auto C_n = stokesSystem.Schur_normal_stab.Data;
-                        C_n *= rho_p;
-                        std::string format = inpJSON.get<std::string>("SurfNavStokes.ExportMatricesFormat") == "mtx" ? ".mtx" : ".mat";
-                        auto expFunc = format == ".mtx" ? &MatrixCL::exportMTX : &MatrixCL::exportMAT;
-                        auto expMat = [&](MatrixCL& A, std::string const a, std::string const & b) {
-                            logger.beg(a);
-                            (A.*expFunc)(dirName + "/matrices/" + b + format);
-                            outJSON.put("Matrices." + a, "matrices/" + b + format);
-                            logger.end();
-                        };
-                        expMat(A_final, "DiffusionReaction", "A");
-                        expMat(stokesSystem.N.Data, "Convection", "N");
-                        expMat(stokesSystem.B.Data, "Divergence", "B");
-                        expMat(C_full, "PressureFullStab", "C_full");
-                        expMat(C_n, "PressureNormalStab", "C_n");
-                        expMat(stokesSystem.LB.Data, "VelocityScalarLaplaceBeltrami", "LB");
-                        expMat(stokesSystem.LB_stab.Data, "VelocityScalarLaplaceBeltramiNormalStab", "LB_stab");
-                        stokesSystem.LB.assemble = false;
-                        stokesSystem.LB_stab.assemble = false;
-                        logger.buf << outJSON;
-                        logger.log();
-                    logger.end();
-                }
-                if (param.input.exactNormal) {
-                    param.input.exactNormal = nullptr;
-                    outJSON.put("Surface.LevelsetNormalErr", sqrt(param.output.normalErrSq.lvset));
-                    outJSON.put("Surface.PatchNormalErr", sqrt(param.output.normalErrSq.patch));
-                }
-                if (param.input.exactShape) {
-                    param.input.exactShape = nullptr;
-                    outJSON.put("Surface.ShapeErr", sqrt(param.output.shapeErrSq));
-                }
-                if (!inpJSON.get<bool>("SurfNavStokes.Solve")) {
-                    output << outJSON;
-                    logger.buf << outJSON;
-                    logger.log();
-                    return 0;
-                }
-                logger.beg("linear solve");
-                    double Pe; // peclet number
-                    // stokesSolver = symStokesSolver;
-                    // if (windRises(nu, stokesSystem.w, Pe)) stokesSolver = nonsymStokesSolver;
-                    // logger.buf << "Pe = " << Pe << ", using " << (stokesSolver == symStokesSolver ? "" : "non-") << "symmetric solver";
-                    // logger.log();
-                    // stokesSolver->Solve(A_dyn, stokesSystem.B.Data, C, u.Data, p.Data, stokesSystem.fRHS.Data, stokesSystem.gRHS.Data, u.RowIdx->GetEx(), p.RowIdx->GetEx());
-                    p.Data -= dot(stokesSystem.Schur.Data * p.Data, I_p) / dot(stokesSystem.Schur.Data * I_p, I_p) * I_p;
-                logger.end();
-                logger.beg("output");
-                    auto residual = [&](VectorCL const & u, VectorCL const & p) {
-                        auto velResSq = norm_sq(A_dyn * u + B_T * p - stokesSystem.fRHS.Data);
-                        auto preResSq = norm_sq(stokesSystem.B.Data * u + C * p - stokesSystem.gRHS.Data);
-                        return std::tuple<double, double, double>(sqrt(velResSq), sqrt(preResSq), sqrt(velResSq + preResSq));
-                    };
-                    auto exportStats = [&](size_t i) {
-                        std::ofstream stats(dirName + "/stats/t_" + std::to_string(i) + ".json");
-                        ParamCL tJSON;
-                        auto res = residual(u.Data, p.Data);
-                        tJSON.put("Solver.ResidualNorm.True.Velocity", std::get<0>(res));
-                        tJSON.put("Solver.ResidualNorm.True.Pressure", std::get<1>(res));
-                        tJSON.put("Solver.ResidualNorm.True.Full", std::get<2>(res));
-                        // tJSON.put("Solver.ResidualNorm.GMRES", stokesSolver->GetResid());
-                        // tJSON.put("Solver.TotalIters", stokesSolver->GetIter());
-                        tJSON.put("Solver.DOF.Velocity", stokesSystem.A.Data.num_rows());
-                        tJSON.put("Solver.DOF.Pressure", stokesSystem.Schur.Data.num_rows());
-                        auto t = i * stepSize;
-                        tJSON.put("Time", t);
-                        tJSON.put("h", h);
-                        tJSON.put("Peclet", Pe);
-                        tJSON.put("MeshDepParams.rho_p", rho_p);
-                        tJSON.put("MeshDepParams.rho_u", rho_u);
-                        tJSON.put("MeshDepParams.tau_u", tau_u);
-                        auto velL2 = sqrt(dot(u.Data, stokesSystem.M.Data * u.Data));
-                        auto preL2 = sqrt(dot(p.Data, stokesSystem.Schur.Data * p.Data));
-                        tJSON.put("Integral.PressureL2", preL2);
-                        tJSON.put("Integral.VelocityL2", velL2);
-                        tJSON.put("Integral.KineticEnergy", .5 * velL2 * velL2);
-                        if (surfNavierStokesData.exactSoln) {
-                            InitVector(mg, u_star, surfNavierStokesData.u_T, t);
-                            InitScalar(mg, p_star, surfNavierStokesData.p, t);
-                            res = residual(u_star.Data, p_star.Data);
-                            tJSON.put("Solver.ResidualNorm.ExactSoln.Velocity", std::get<0>(res));
-                            tJSON.put("Solver.ResidualNorm.ExactSoln.Pressure", std::get<1>(res));
-                            tJSON.put("Solver.ResidualNorm.ExactSoln.Full", std::get<2>(res));
-                            VectorCL u_star_minus_u = u_star.Data - u.Data, p_star_minus_p = p_star.Data - p.Data;
-                            auto velL2err = dot(u_star_minus_u, stokesSystem.M.Data * u_star_minus_u);
-                            auto velNormalL2 = dot(u.Data, stokesSystem.S.Data * u.Data);
-                            auto velTangenL2 = sqrt(velL2err - velNormalL2);
-                            velL2err = sqrt(velL2err);
-                            velNormalL2 = sqrt(velNormalL2);
-                            auto velH1err = sqrt(dot(u_star_minus_u, stokesSystem.A.Data * u_star_minus_u));
-                            auto preL2err = sqrt(dot(p_star_minus_p, stokesSystem.Schur.Data * p_star_minus_p));
-                            tJSON.put("Integral.Error.VelocityL2", velL2err);
-                            tJSON.put("Integral.Error.VelocityTangentialL2", velTangenL2);
-                            tJSON.put("Integral.Error.VelocityNormalL2", velNormalL2);
-                            tJSON.put("Integral.Error.VelocityH1", velH1err);
-                            tJSON.put("Integral.Error.PressureL2", preL2err);
-                            // tJSON.put("Temp.wNw", dot(u_prev.Data, stokesSystem.N.Data * u_prev.Data));
-                        }
-                        if (everyStep > 0 && (i-1) % everyStep == 0) {
-                            logger.beg("write vtk");
-                                writeVTK(t);
-                            auto vtkTime = logger.end();
-                            tJSON.put("CPUTime.VTK", vtkTime);
-                        }
-                        stats << tJSON;
-                        logger.buf << tJSON;
-                        logger.log();
-                    };
-                    exportStats(1);
-                logger.end();
+        logger.beg("t = t_1");
+            logger.beg("assemble");
+                InitVector(mg, u_prev, surfNavierStokesData.u_T, 0.);
+                param.input.t = stepSize;
+                auto setWind = [&](VecDescCL& wind) {
+                    if (surfNavierStokesData.w_T) { // Oseen (and Stokes) case
+                        InitVector(mg, wind, surfNavierStokesData.w_T, param.input.t);
+                        return true;
+                    }
+                    return false;
+                };
+                if (!setWind(surfOseenSystem.w)) // Navier-Stokes case
+                    surfOseenSystem.w = u_prev;
+                SetupSurfOseen_P2P1(mg, lset, &surfOseenSystem, &param);
+                surfOseenSystem.fRHS.Data += (1. / stepSize) * (surfOseenSystem.M.Data * u_prev.Data);
+                VectorCL I_p;
+                I_p.resize(surfOseenSystem.gRHS.Data.size(), 1.);
+                surfOseenSystem.gRHS.Data -= (dot(surfOseenSystem.gRHS.Data, I_p) / dot(I_p, I_p)) * I_p;
+                surfOseenSystem.A.Data.LinComb(1. / stepSize, surfOseenSystem.M.Data, 1., surfOseenSystem.N.Data, nu, surfOseenSystem.A.Data, tau_u, surfOseenSystem.S.Data, rho_u, surfOseenSystem.A_stab.Data);
+                surfOseenSystem.C.Data *= -rho_p;
             logger.end();
-            // no need to re-assemble these matrices:
-            stokesSystem.A.assemble = false;
-            stokesSystem.A_stab.assemble = false;
-            stokesSystem.B.assemble = false;
-            stokesSystem.M.assemble = false;
-            stokesSystem.S.assemble = false;
-            stokesSystem.Schur.assemble = false;
-            stokesSystem.Schur_full_stab.assemble = false;
-            stokesSystem.Schur_normal_stab.assemble = false;
-            for (size_t i = 2; i <= numbOfSteps; ++i) {
-                std::stringstream header;
-                header << "t = t_" << i << " (" << (100. * i) / numbOfSteps << "%)";
-                logger.beg(header.str());
-                    logger.beg("assemble");
-                        u_prev_prev = u_prev;
-                        u_prev = u;
-                        param.input.t = i * stepSize;
-                        if (!setWind(stokesSystem.w)) // Navier-Stokes case
-                            stokesSystem.w.Data = 2. * u_prev.Data - u_prev_prev.Data;
-                        SetupSurfOseen_P2P1(mg, lset, &stokesSystem, &param);
-                        stokesSystem.fRHS.Data += (2. / stepSize) * (stokesSystem.M.Data * u_prev.Data) - (.5 / stepSize) * (stokesSystem.M.Data * u_prev_prev.Data);
-                        stokesSystem.gRHS.Data -= (dot(stokesSystem.gRHS.Data, I_p) / dot(I_p, I_p)) * I_p;
-                        A_dyn.LinComb(1.5 / stepSize, stokesSystem.M.Data, 1., stokesSystem.N.Data, nu, stokesSystem.A.Data, tau_u, stokesSystem.S.Data, rho_u, stokesSystem.A_stab.Data);
-                    logger.end();
-                    logger.beg("linear solve");
-                        // stokesSolver = symStokesSolver;
-                        // if (windRises(nu, stokesSystem.w, Pe)) stokesSolver = nonsymStokesSolver;
-                        // logger.buf << "Pe = " << Pe << ", using " << (stokesSolver == symStokesSolver ? "" : "non-") << "symmetric solver";
-                        // logger.log();
-                        // stokesSolver->Solve(A_dyn, stokesSystem.B.Data, C, u.Data, p.Data, stokesSystem.fRHS.Data, stokesSystem.gRHS.Data, u.RowIdx->GetEx(), p.RowIdx->GetEx());
-                        p.Data -= dot(stokesSystem.Schur.Data * p.Data, I_p) / dot(stokesSystem.Schur.Data * I_p, I_p) * I_p;
-                    logger.end();
-                    logger.beg("output");
-                        exportStats(i);
-                    logger.end();
-                logger.end();
-            }
+            logger.beg("convert to Epetra");
+//                auto splitEpetraVectors = [&](MV const & ab, Epetra_Vector& a, Epetra_Vector& b) {
+//                    for (size_t i = 0; i < n; ++i) a[i] = ab(0)->operator[](i);
+//                    for (size_t i = 0; i < m; ++i) b[i] = ab(0)->operator[](i + n);
+//                };
+                RCP<Epetra_CrsMatrix> A, B, C;
+                RCP<Epetra_Vector> fRHS, gRHS;
+                *A = static_cast<Epetra_CrsMatrix>(surfOseenSystem.A.Data);
+                *B = static_cast<Epetra_CrsMatrix>(surfOseenSystem.B.Data);
+                *C = static_cast<Epetra_CrsMatrix>(surfOseenSystem.C.Data);
+                *fRHS = static_cast<Epetra_Vector>(surfOseenSystem.fRHS.Data);
+                *gRHS = static_cast<Epetra_Vector>(surfOseenSystem.gRHS.Data);
+                auto joinEpetraVectors = [&](Epetra_Vector const & a, Epetra_Vector const & b, MV& ab) {
+                    for (size_t i = 0; i < n; ++i) (*ab(0))[i] = a[i];
+                    for (size_t i = 0; i < m; ++i) (*ab(0))[i + n] = b[i];
+                };
+                joinEpetraVectors(*fRHS, *gRHS, *belosRHS);
+                Epetra_Map mapVelocity(static_cast<int>(n), 0, Comm), mapPressure(static_cast<int>(m), 0, Comm);
+                belosMTX = rcp(new Epetra_OperatorApply([&](MV const & X, MV& Y) {
+                    double* view;
+                    X(0)->ExtractView(&view);
+                    Epetra_Vector x1(Epetra_DataAccess::View, mapVelocity, view);
+                    Epetra_Vector x2(Epetra_DataAccess::View, mapVelocity, view + n);
+                    Y(0)->ExtractView(&view);
+                    Epetra_Vector y11(Epetra_DataAccess::View, mapVelocity, view);
+                    auto y12 = y11;
+                    Epetra_Vector y21(Epetra_DataAccess::View, mapVelocity, view + n);
+                    auto y22 = y21;
+                    // y1
+                    A->Apply(x1, y11);
+                    B->SetUseTranspose(true);
+                    B->Apply(x2, y12);
+                    y11.Update(1., y12, 1.);
+                    // y2
+                    B->SetUseTranspose(false);
+                    B->Apply(x1, y21);
+                    C->Apply(x2, y22);
+                    y21.Update(1., y22, 1.);
+                }));
+            logger.end();
+            logger.beg("linear solve");
+                belosLHS->PutScalar(0.);
+                auto belosSolverResult = belosSolver->solve();
+                if (myRank == 0) {
+                    logger.buf << (belosSolverResult == Belos::Converged) ? "belos converged" : "belos did not converge";
+                    logger.log();
+                }
+            logger.end();
+            logger.beg("convert from Epetra");
+                for (size_t i = 0; i < n; ++i) u.Data[i] = (*belosLHS)[i];
+                for (size_t i = 0; i < m; ++i) p.Data[i] = (*belosLHS)[n + i];
+                p.Data -= dot(surfOseenSystem.M_p.Data * p.Data, I_p) / dot(surfOseenSystem.M_p.Data * I_p, I_p) * I_p;
+            logger.end();
+//                logger.beg("linear solve");
+//                    double Pe; // peclet number
+//                    // stokesSolver = symStokesSolver;
+//                    // if (windRises(nu, surfOseenSystem.w, Pe)) stokesSolver = nonsymStokesSolver;
+//                    // logger.buf << "Pe = " << Pe << ", using " << (stokesSolver == symStokesSolver ? "" : "non-") << "symmetric solver";
+//                    // logger.log();
+//                    // stokesSolver->Solve(A, surfOseenSystem.B.Data, C, u.Data, p.Data, surfOseenSystem.fRHS.Data, surfOseenSystem.gRHS.Data, u.RowIdx->GetEx(), p.RowIdx->GetEx());
+//                    p.Data -= dot(surfOseenSystem.M_p.Data * p.Data, I_p) / dot(surfOseenSystem.M_p.Data * I_p, I_p) * I_p;
+//                logger.end();
+//                logger.beg("output");
+//                    auto residual = [&](VectorCL const & u, VectorCL const & p) {
+//                        auto velResSq = norm_sq(A * u + B_T * p - surfOseenSystem.fRHS.Data);
+//                        auto preResSq = norm_sq(surfOseenSystem.B.Data * u + C * p - surfOseenSystem.gRHS.Data);
+//                        return std::tuple<double, double, double>(sqrt(velResSq), sqrt(preResSq), sqrt(velResSq + preResSq));
+//                    };
+//                    auto exportStats = [&](size_t i) {
+//                        std::ofstream stats(dirName + "/stats/t_" + std::to_string(i) + ".json");
+//                        ParamCL tJSON;
+//                        auto res = residual(u.Data, p.Data);
+//                        tJSON.put("Solver.ResidualNorm.True.Velocity", std::get<0>(res));
+//                        tJSON.put("Solver.ResidualNorm.True.Pressure", std::get<1>(res));
+//                        tJSON.put("Solver.ResidualNorm.True.Full", std::get<2>(res));
+//                        // tJSON.put("Solver.ResidualNorm.GMRES", stokesSolver->GetResid());
+//                        // tJSON.put("Solver.TotalIters", stokesSolver->GetIter());
+//                        tJSON.put("Solver.DOF.Velocity", surfOseenSystem.A.Data.num_rows());
+//                        tJSON.put("Solver.DOF.Pressure", surfOseenSystem.M_p.Data.num_rows());
+//                        auto t = i * stepSize;
+//                        tJSON.put("Time", t);
+//                        tJSON.put("h", h);
+//                        tJSON.put("Peclet", Pe);
+//                        tJSON.put("MeshDepParams.rho_p", rho_p);
+//                        tJSON.put("MeshDepParams.rho_u", rho_u);
+//                        tJSON.put("MeshDepParams.tau_u", tau_u);
+//                        auto velL2 = sqrt(dot(u.Data, surfOseenSystem.M.Data * u.Data));
+//                        auto preL2 = sqrt(dot(p.Data, surfOseenSystem.M_p.Data * p.Data));
+//                        tJSON.put("Integral.PressureL2", preL2);
+//                        tJSON.put("Integral.VelocityL2", velL2);
+//                        tJSON.put("Integral.KineticEnergy", .5 * velL2 * velL2);
+//                        if (surfNavierStokesData.exactSoln) {
+//                            InitVector(mg, u_star, surfNavierStokesData.u_T, t);
+//                            InitScalar(mg, p_star, surfNavierStokesData.p, t);
+//                            res = residual(u_star.Data, p_star.Data);
+//                            tJSON.put("Solver.ResidualNorm.ExactSoln.Velocity", std::get<0>(res));
+//                            tJSON.put("Solver.ResidualNorm.ExactSoln.Pressure", std::get<1>(res));
+//                            tJSON.put("Solver.ResidualNorm.ExactSoln.Full", std::get<2>(res));
+//                            VectorCL u_star_minus_u = u_star.Data - u.Data, p_star_minus_p = p_star.Data - p.Data;
+//                            auto velL2err = dot(u_star_minus_u, surfOseenSystem.M.Data * u_star_minus_u);
+//                            auto velNormalL2 = dot(u.Data, surfOseenSystem.S.Data * u.Data);
+//                            auto velTangenL2 = sqrt(velL2err - velNormalL2);
+//                            velL2err = sqrt(velL2err);
+//                            velNormalL2 = sqrt(velNormalL2);
+//                            auto velH1err = sqrt(dot(u_star_minus_u, surfOseenSystem.A.Data * u_star_minus_u));
+//                            auto preL2err = sqrt(dot(p_star_minus_p, surfOseenSystem.M_p.Data * p_star_minus_p));
+//                            tJSON.put("Integral.Error.VelocityL2", velL2err);
+//                            tJSON.put("Integral.Error.VelocityTangentialL2", velTangenL2);
+//                            tJSON.put("Integral.Error.VelocityNormalL2", velNormalL2);
+//                            tJSON.put("Integral.Error.VelocityH1", velH1err);
+//                            tJSON.put("Integral.Error.PressureL2", preL2err);
+//                            // tJSON.put("Temp.wNw", dot(u_prev.Data, surfOseenSystem.N.Data * u_prev.Data));
+//                        }
+////                        if (inpJSON.get<bool>("SurfNavStokes.ExportMatrices")) {
+////                            logger.beg("export matrices to " + dirName);
+////                            MatrixCL A_final;
+////                            A_final.LinComb(1., stokesSystem.A.Data, 1., stokesSystem.M.Data, tau_u, stokesSystem.S.Data, rho_u, stokesSystem.A_stab.Data);
+////                            auto C_full = stokesSystem.Schur_full_stab.Data;
+////                            C_full *= rho_p;
+////                            auto C_n = stokesSystem.Schur_normal_stab.Data;
+////                            C_n *= rho_p;
+////                            std::string format = inpJSON.get<std::string>("SurfNavStokes.ExportMatricesFormat") == "mtx" ? ".mtx" : ".mat";
+////                            auto expFunc = format == ".mtx" ? &MatrixCL::exportMTX : &MatrixCL::exportMAT;
+////                            auto expMat = [&](MatrixCL& A, std::string const a, std::string const & b) {
+////                                logger.beg(a);
+////                                (A.*expFunc)(dirName + "/matrices/" + b + format);
+////                                outJSON.put("Matrices." + a, "matrices/" + b + format);
+////                                logger.end();
+////                            };
+////                            expMat(A_final, "DiffusionReaction", "A");
+////                            expMat(stokesSystem.N.Data, "Convection", "N");
+////                            expMat(stokesSystem.B.Data, "Divergence", "B");
+////                            expMat(C_full, "PressureFullStab", "C_full");
+////                            expMat(C_n, "PressureNormalStab", "C_n");
+////                            expMat(stokesSystem.LB.Data, "VelocityScalarLaplaceBeltrami", "LB");
+////                            expMat(stokesSystem.LB_stab.Data, "VelocityScalarLaplaceBeltramiNormalStab", "LB_stab");
+////                            stokesSystem.LB.assemble = false;
+////                            stokesSystem.LB_stab.assemble = false;
+////                            logger.buf << outJSON;
+////                            logger.log();
+////                            logger.end();
+////                        }
+//                        if (everyStep > 0 && (i-1) % everyStep == 0) {
+//                            logger.beg("write vtk");
+//                                writeVTK(t);
+//                            auto vtkTime = logger.end();
+//                            tJSON.put("CPUTime.VTK", vtkTime);
+//                        }
+//                        stats << tJSON;
+//                        logger.buf << tJSON;
+//                        logger.log();
+//                    };
+//                    exportStats(1);
+//                logger.end();
+//            logger.end();
+//            // no need to re-assemble these matrices:
+//            surfOseenSystem.A.assemble = false;
+//            surfOseenSystem.A_stab.assemble = false;
+//            surfOseenSystem.B.assemble = false;
+//            surfOseenSystem.M.assemble = false;
+//            surfOseenSystem.S.assemble = false;
+//            surfOseenSystem.M_p.assemble = false;
+//            surfOseenSystem.Schur_full_stab.assemble = false;
+//            surfOseenSystem.Schur_normal_stab.assemble = false;
+//            for (size_t i = 2; i <= numbOfSteps; ++i) {
+//                std::stringstream header;
+//                header << "t = t_" << i << " (" << (100. * i) / numbOfSteps << "%)";
+//                logger.beg(header.str());
+//                    logger.beg("assemble");
+//                        u_prev_prev = u_prev;
+//                        u_prev = u;
+//                        param.input.t = i * stepSize;
+//                        if (!setWind(surfOseenSystem.w)) // Navier-Stokes case
+//                            surfOseenSystem.w.Data = 2. * u_prev.Data - u_prev_prev.Data;
+//                        SetupSurfOseen_P2P1(mg, lset, &surfOseenSystem, &param);
+//                        surfOseenSystem.fRHS.Data += (2. / stepSize) * (surfOseenSystem.M.Data * u_prev.Data) - (.5 / stepSize) * (surfOseenSystem.M.Data * u_prev_prev.Data);
+//                        surfOseenSystem.gRHS.Data -= (dot(surfOseenSystem.gRHS.Data, I_p) / dot(I_p, I_p)) * I_p;
+//                        A.LinComb(1.5 / stepSize, surfOseenSystem.M.Data, 1., surfOseenSystem.N.Data, nu, surfOseenSystem.A.Data, tau_u, surfOseenSystem.S.Data, rho_u, surfOseenSystem.A_stab.Data);
+//                    logger.end();
+//                    logger.beg("linear solve");
+//                        // stokesSolver = symStokesSolver;
+//                        // if (windRises(nu, surfOseenSystem.w, Pe)) stokesSolver = nonsymStokesSolver;
+//                        // logger.buf << "Pe = " << Pe << ", using " << (stokesSolver == symStokesSolver ? "" : "non-") << "symmetric solver";
+//                        // logger.log();
+//                        // stokesSolver->Solve(A, surfOseenSystem.B.Data, C, u.Data, p.Data, surfOseenSystem.fRHS.Data, surfOseenSystem.gRHS.Data, u.RowIdx->GetEx(), p.RowIdx->GetEx());
+//                        p.Data -= dot(surfOseenSystem.M_p.Data * p.Data, I_p) / dot(surfOseenSystem.M_p.Data * I_p, I_p) * I_p;
+//                    logger.end();
+//                    logger.beg("output");
+//                        exportStats(i);
+//                    logger.end();
+//                logger.end();
+//            }
         #ifdef HAVE_MPI
             MPI_Finalize() ;
         #endif
