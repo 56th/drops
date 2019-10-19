@@ -46,6 +46,7 @@
 #include "BelosEpetraAdapter.hpp"
 // amesos (sparse-direct solvers)
 #include "Amesos.h"
+#include "Amesos_ConfigDefs.h"
 #include "Amesos_BaseSolver.h"
 // epetra (vectors and operators / matrices)
 #include "Epetra_OperatorApply.hpp"
@@ -421,21 +422,38 @@ int main(int argc, char* argv[]) {
                     size_t numItersA = 0;
                     logger.log(inpJSON.get<std::string>("Solver.Inner.A.Comment"));
                     auto iterationA = inpJSON.get<std::string>("Solver.Inner.A.Iteration");
+                    // amesos
+                    Epetra_LinearProblem amesosProblem;
+                    RCP<Amesos_BaseSolver> amesosSolver;
+                    Amesos amesosFactory;
+                    // belos
+                    auto belosParamsA = parameterList();
+                    decltype(belosSolver) belosSolverA;
+                    // choose
                     if (iterationA.find("Amesos") != std::string::npos) { // Amesos
                         logger.log("using Amesos");
-                        Epetra_LinearProblem amesosProblem;
-                        amesosProblem.SetOperator(&A);
-                        Amesos amesosFactory;
                         if (!amesosFactory.Query(iterationA))
                             throw std::invalid_argument("solver " + iterationA + " is not available");
                         logger.log("solver: " + iterationA);
-                        auto amesosSolver = amesosFactory.Create(iterationA, amesosProblem);
+                        amesosProblem.SetOperator(&A);
+                        amesosSolver = rcp(amesosFactory.Create(iterationA, amesosProblem));
+                        logger.beg("symbolic factorization");
+                            AMESOS_CHK_ERR(amesosSolver->SymbolicFactorization());
+                        logger.end();
+                        logger.beg("numeric factorization");
+                            AMESOS_CHK_ERR(amesosSolver->NumericFactorization());
+                        logger.end();
+                        invA = [&](MV const &X, MV &Y) {
+                            amesosProblem.SetLHS(&Y);
+                            amesosProblem.SetRHS(const_cast<MV*>(&X));
+                            AMESOS_CHK_ERR(amesosSolver->Solve());
+                            numItersA++;
+                        };
                     } else { // Belos
                         logger.log("using Belos");
-                        RCP<ParameterList> belosParamsA = parameterList();
                         belosParamsA->set("Maximum Iterations", inpJSON.get<int>("Solver.Inner.A.MaxIter"));
                         belosParamsA->set("Convergence Tolerance", inpJSON.get<double>("Solver.Inner.A.RelResTol"));
-                        auto belosSolverA = belosFactory.create(iterationA, belosParamsA);
+                        belosSolverA = belosFactory.create(iterationA, belosParamsA);
                         logger.buf << "inner solver: " << belosSolverA->description();
                         logger.log();
                         invA = [&](MV const &X, MV &Y) {
