@@ -64,14 +64,16 @@ int main(int argc, char* argv[]) {
     try {
         logger.beg("mpi init");
             #ifdef HAVE_MPI
-                    MPI_Init(&argc, &argv);
-                    Epetra_MpiComm Comm(MPI_COMM_WORLD);
+                MPI_Init(&argc, &argv);
+                Epetra_MpiComm comm(MPI_COMM_WORLD);
+                logger.log("using Epetra_MpiComm");
             #else
-                    Epetra_SerialComm Comm;
+                Epetra_SerialComm comm;
+                logger.log("using Epetra_SerialComm");
             #endif
-            auto myRank = Comm.MyPID();
+            auto myRank = comm.MyPID();
             if (myRank == 0) {
-                logger.buf << "num proc = " << Comm.NumProc();
+                logger.buf << "num proc = " << comm.NumProc();
                 logger.log();
             }
         logger.end();
@@ -317,15 +319,15 @@ int main(int argc, char* argv[]) {
             using ST = double;
             using namespace Teuchos;
             using namespace Belos;
-            Epetra_Map mapVelocityPressure(static_cast<int>(n + m), 0, Comm);
-            auto belosLHS = rcp(new Epetra_Vector(mapVelocityPressure));
-            auto belosRHS = rcp(new Epetra_Vector(mapVelocityPressure));
-            RCP<OP> belosMTX;
-            auto belosProblem = rcp(new LinearProblem<ST, MV, OP>(belosMTX, belosLHS, belosRHS));
+            RCP<Epetra_Vector> belosLHS, belosRHS;
+            RCP<OP> belosMTX, belocPRE;
+            // auto belosProblem = rcp(new LinearProblem<ST, MV, OP>(belosMTX, belosLHS, belosRHS));
+            RCP<LinearProblem<ST, MV, OP>> belosProblem;
             RCP<ParameterList> belosParams = parameterList();
             belosParams->set("Num Blocks", inpJSON.get<int>("Solver.Outer.KrylovSubspaceSize"));
             belosParams->set("Maximum Iterations", inpJSON.get<int>("Solver.Outer.MaxIter"));
             belosParams->set("Convergence Tolerance", inpJSON.get<double>("Solver.Outer.RelResTol"));
+            belosParams->set("Verbosity", Belos::Errors + Belos::Warnings + Belos::TimingDetails + Belos::FinalSummary + Belos::IterationDetails);
             SolverFactory<ST, MV, OP> belosFactory;
             logger.buf << "available iterations: " << belosFactory.supportedSolverNames();
             logger.log();
@@ -359,47 +361,59 @@ int main(int argc, char* argv[]) {
 //                    for (size_t i = 0; i < n; ++i) a[i] = ab(0)->operator[](i);
 //                    for (size_t i = 0; i < m; ++i) b[i] = ab(0)->operator[](i + n);
 //                };
-                RCP<Epetra_CrsMatrix> A, B, C;
-                RCP<Epetra_Vector> fRHS, gRHS;
-                *A = static_cast<Epetra_CrsMatrix>(surfOseenSystem.A.Data);
-                *B = static_cast<Epetra_CrsMatrix>(surfOseenSystem.B.Data);
-                *C = static_cast<Epetra_CrsMatrix>(surfOseenSystem.C.Data);
-                *fRHS = static_cast<Epetra_Vector>(surfOseenSystem.fRHS.Data);
-                *gRHS = static_cast<Epetra_Vector>(surfOseenSystem.gRHS.Data);
-                auto joinEpetraVectors = [&](Epetra_Vector const & a, Epetra_Vector const & b, MV& ab) {
-                    for (size_t i = 0; i < n; ++i) (*ab(0))[i] = a[i];
-                    for (size_t i = 0; i < m; ++i) (*ab(0))[i + n] = b[i];
-                };
-                joinEpetraVectors(*fRHS, *gRHS, *belosRHS);
-                Epetra_Map mapVelocity(static_cast<int>(n), 0, Comm), mapPressure(static_cast<int>(m), 0, Comm);
+                logger.beg("cast matrices");
+                    auto A = static_cast<Epetra_CrsMatrix>(surfOseenSystem.A.Data);
+                    auto B = static_cast<Epetra_CrsMatrix>(surfOseenSystem.B.Data);
+                    auto C = static_cast<Epetra_CrsMatrix>(surfOseenSystem.C.Data);
+                logger.end();
+                logger.beg("cast rhs vectors");
+                    auto fRHS = static_cast<Epetra_Vector>(surfOseenSystem.fRHS.Data);
+                    auto gRHS = static_cast<Epetra_Vector>(surfOseenSystem.gRHS.Data);
+                    Epetra_Map mapVelocity(static_cast<int>(n), 0, comm), mapPressure(static_cast<int>(m), 0, comm), mapVelocityPressure(static_cast<int>(n + m), 0, comm);
+                    belosLHS = rcp(new Epetra_Vector(mapVelocityPressure));
+                    belosRHS = rcp(new Epetra_Vector(mapVelocityPressure));
+                    auto joinEpetraVectors = [&](Epetra_Vector const & a, Epetra_Vector const & b, MV& ab) {
+                        for (size_t i = 0; i < n; ++i) (*ab(0))[i] = a[i];
+                        for (size_t i = 0; i < m; ++i) (*ab(0))[i + n] = b[i];
+                    };
+                    joinEpetraVectors(fRHS, gRHS, *belosRHS);
+                logger.end();
                 belosMTX = rcp(new Epetra_OperatorApply([&](MV const & X, MV& Y) {
                     double* view;
                     X(0)->ExtractView(&view);
                     Epetra_Vector x1(Epetra_DataAccess::View, mapVelocity, view);
-                    Epetra_Vector x2(Epetra_DataAccess::View, mapVelocity, view + n);
+                    Epetra_Vector x2(Epetra_DataAccess::View, mapPressure, view + n);
                     Y(0)->ExtractView(&view);
                     Epetra_Vector y11(Epetra_DataAccess::View, mapVelocity, view);
                     auto y12 = y11;
-                    Epetra_Vector y21(Epetra_DataAccess::View, mapVelocity, view + n);
+                    Epetra_Vector y21(Epetra_DataAccess::View, mapPressure, view + n);
                     auto y22 = y21;
                     // y1
-                    A->Apply(x1, y11);
-                    B->SetUseTranspose(true);
-                    B->Apply(x2, y12);
+                    A.Multiply(false, x1, y11);
+                    B.Multiply(true, x2, y12);
                     y11.Update(1., y12, 1.);
                     // y2
-                    B->SetUseTranspose(false);
-                    B->Apply(x1, y21);
-                    C->Apply(x2, y22);
+                    B.Multiply(false, x1, y21);
+                    C.Multiply(false, x2, y22);
                     y21.Update(1., y22, 1.);
                 }));
+                belosProblem = rcp(new LinearProblem<ST, MV, OP>(belosMTX, belosLHS, belosRHS));
+            logger.end();
+            logger.beg("build preconditioners");
+                // ...
+                // belosProblem->setRightPrec(belocPRE);
             logger.end();
             logger.beg("linear solve");
                 belosLHS->PutScalar(0.);
+                belosProblem->setProblem();
+                belosSolver->setProblem(belosProblem);
+                std::cout << std::scientific;
                 auto belosSolverResult = belosSolver->solve();
                 if (myRank == 0) {
-                    logger.buf << (belosSolverResult == Belos::Converged) ? "belos converged" : "belos did not converge";
-                    logger.log();
+                    if (belosSolverResult == Belos::Converged)
+                        logger.log("belos converged");
+                    else
+                        logger.wrn("belos did not converge");
                 }
             logger.end();
             logger.beg("convert from Epetra");
@@ -416,99 +430,99 @@ int main(int argc, char* argv[]) {
 //                    // stokesSolver->Solve(A, surfOseenSystem.B.Data, C, u.Data, p.Data, surfOseenSystem.fRHS.Data, surfOseenSystem.gRHS.Data, u.RowIdx->GetEx(), p.RowIdx->GetEx());
 //                    p.Data -= dot(surfOseenSystem.M_p.Data * p.Data, I_p) / dot(surfOseenSystem.M_p.Data * I_p, I_p) * I_p;
 //                logger.end();
-//                logger.beg("output");
+            logger.beg("output");
 //                    auto residual = [&](VectorCL const & u, VectorCL const & p) {
 //                        auto velResSq = norm_sq(A * u + B_T * p - surfOseenSystem.fRHS.Data);
 //                        auto preResSq = norm_sq(surfOseenSystem.B.Data * u + C * p - surfOseenSystem.gRHS.Data);
 //                        return std::tuple<double, double, double>(sqrt(velResSq), sqrt(preResSq), sqrt(velResSq + preResSq));
 //                    };
-//                    auto exportStats = [&](size_t i) {
-//                        std::ofstream stats(dirName + "/stats/t_" + std::to_string(i) + ".json");
-//                        ParamCL tJSON;
-//                        auto res = residual(u.Data, p.Data);
+                    auto exportStats = [&](size_t i) {
+                        std::ofstream stats(dirName + "/stats/t_" + std::to_string(i) + ".json");
+                        ParamCL tJSON;
+                        // auto res = residual(u.Data, p.Data);
 //                        tJSON.put("Solver.ResidualNorm.True.Velocity", std::get<0>(res));
 //                        tJSON.put("Solver.ResidualNorm.True.Pressure", std::get<1>(res));
 //                        tJSON.put("Solver.ResidualNorm.True.Full", std::get<2>(res));
-//                        // tJSON.put("Solver.ResidualNorm.GMRES", stokesSolver->GetResid());
-//                        // tJSON.put("Solver.TotalIters", stokesSolver->GetIter());
-//                        tJSON.put("Solver.DOF.Velocity", surfOseenSystem.A.Data.num_rows());
-//                        tJSON.put("Solver.DOF.Pressure", surfOseenSystem.M_p.Data.num_rows());
-//                        auto t = i * stepSize;
-//                        tJSON.put("Time", t);
-//                        tJSON.put("h", h);
-//                        tJSON.put("Peclet", Pe);
-//                        tJSON.put("MeshDepParams.rho_p", rho_p);
-//                        tJSON.put("MeshDepParams.rho_u", rho_u);
-//                        tJSON.put("MeshDepParams.tau_u", tau_u);
-//                        auto velL2 = sqrt(dot(u.Data, surfOseenSystem.M.Data * u.Data));
-//                        auto preL2 = sqrt(dot(p.Data, surfOseenSystem.M_p.Data * p.Data));
-//                        tJSON.put("Integral.PressureL2", preL2);
-//                        tJSON.put("Integral.VelocityL2", velL2);
-//                        tJSON.put("Integral.KineticEnergy", .5 * velL2 * velL2);
-//                        if (surfNavierStokesData.exactSoln) {
-//                            InitVector(mg, u_star, surfNavierStokesData.u_T, t);
-//                            InitScalar(mg, p_star, surfNavierStokesData.p, t);
+                        // tJSON.put("Solver.ResidualNorm.GMRES", stokesSolver->GetResid());
+                        // tJSON.put("Solver.TotalIters", stokesSolver->GetIter());
+                        tJSON.put("Solver.DOF.Velocity", surfOseenSystem.A.Data.num_rows());
+                        tJSON.put("Solver.DOF.Pressure", surfOseenSystem.M_p.Data.num_rows());
+                        auto t = i * stepSize;
+                        tJSON.put("Time", t);
+                        tJSON.put("h", h);
+                        // tJSON.put("Peclet", Pe);
+                        tJSON.put("MeshDepParams.rho_p", rho_p);
+                        tJSON.put("MeshDepParams.rho_u", rho_u);
+                        tJSON.put("MeshDepParams.tau_u", tau_u);
+                        auto velL2 = sqrt(dot(u.Data, surfOseenSystem.M.Data * u.Data));
+                        auto preL2 = sqrt(dot(p.Data, surfOseenSystem.M_p.Data * p.Data));
+                        tJSON.put("Integral.PressureL2", preL2);
+                        tJSON.put("Integral.VelocityL2", velL2);
+                        tJSON.put("Integral.KineticEnergy", .5 * velL2 * velL2);
+                        if (surfNavierStokesData.exactSoln) {
+                            InitVector(mg, u_star, surfNavierStokesData.u_T, t);
+                            InitScalar(mg, p_star, surfNavierStokesData.p, t);
 //                            res = residual(u_star.Data, p_star.Data);
 //                            tJSON.put("Solver.ResidualNorm.ExactSoln.Velocity", std::get<0>(res));
 //                            tJSON.put("Solver.ResidualNorm.ExactSoln.Pressure", std::get<1>(res));
 //                            tJSON.put("Solver.ResidualNorm.ExactSoln.Full", std::get<2>(res));
-//                            VectorCL u_star_minus_u = u_star.Data - u.Data, p_star_minus_p = p_star.Data - p.Data;
-//                            auto velL2err = dot(u_star_minus_u, surfOseenSystem.M.Data * u_star_minus_u);
-//                            auto velNormalL2 = dot(u.Data, surfOseenSystem.S.Data * u.Data);
-//                            auto velTangenL2 = sqrt(velL2err - velNormalL2);
-//                            velL2err = sqrt(velL2err);
-//                            velNormalL2 = sqrt(velNormalL2);
-//                            auto velH1err = sqrt(dot(u_star_minus_u, surfOseenSystem.A.Data * u_star_minus_u));
-//                            auto preL2err = sqrt(dot(p_star_minus_p, surfOseenSystem.M_p.Data * p_star_minus_p));
-//                            tJSON.put("Integral.Error.VelocityL2", velL2err);
-//                            tJSON.put("Integral.Error.VelocityTangentialL2", velTangenL2);
-//                            tJSON.put("Integral.Error.VelocityNormalL2", velNormalL2);
-//                            tJSON.put("Integral.Error.VelocityH1", velH1err);
-//                            tJSON.put("Integral.Error.PressureL2", preL2err);
-//                            // tJSON.put("Temp.wNw", dot(u_prev.Data, surfOseenSystem.N.Data * u_prev.Data));
+                            VectorCL u_star_minus_u = u_star.Data - u.Data, p_star_minus_p = p_star.Data - p.Data;
+                            auto velL2err = dot(u_star_minus_u, surfOseenSystem.M.Data * u_star_minus_u);
+                            auto velNormalL2 = dot(u.Data, surfOseenSystem.S.Data * u.Data);
+                            auto velTangenL2 = sqrt(velL2err - velNormalL2);
+                            velL2err = sqrt(velL2err);
+                            velNormalL2 = sqrt(velNormalL2);
+                            auto velH1err = sqrt(dot(u_star_minus_u, surfOseenSystem.A.Data * u_star_minus_u));
+                            auto preL2err = sqrt(dot(p_star_minus_p, surfOseenSystem.M_p.Data * p_star_minus_p));
+                            tJSON.put("Integral.Error.VelocityL2", velL2err);
+                            tJSON.put("Integral.Error.VelocityTangentialL2", velTangenL2);
+                            tJSON.put("Integral.Error.VelocityNormalL2", velNormalL2);
+                            tJSON.put("Integral.Error.VelocityH1", velH1err);
+                            tJSON.put("Integral.Error.PressureL2", preL2err);
+                            // tJSON.put("Temp.wNw", dot(u_prev.Data, surfOseenSystem.N.Data * u_prev.Data));
+                        }
+//                        if (inpJSON.get<bool>("SurfNavStokes.ExportMatrices")) {
+//                            logger.beg("export matrices to " + dirName);
+//                            MatrixCL A_final;
+//                            A_final.LinComb(1., stokesSystem.A.Data, 1., stokesSystem.M.Data, tau_u, stokesSystem.S.Data, rho_u, stokesSystem.A_stab.Data);
+//                            auto C_full = stokesSystem.Schur_full_stab.Data;
+//                            C_full *= rho_p;
+//                            auto C_n = stokesSystem.Schur_normal_stab.Data;
+//                            C_n *= rho_p;
+//                            std::string format = inpJSON.get<std::string>("SurfNavStokes.ExportMatricesFormat") == "mtx" ? ".mtx" : ".mat";
+//                            auto expFunc = format == ".mtx" ? &MatrixCL::exportMTX : &MatrixCL::exportMAT;
+//                            auto expMat = [&](MatrixCL& A, std::string const a, std::string const & b) {
+//                                logger.beg(a);
+//                                (A.*expFunc)(dirName + "/matrices/" + b + format);
+//                                outJSON.put("Matrices." + a, "matrices/" + b + format);
+//                                logger.end();
+//                            };
+//                            expMat(A_final, "DiffusionReaction", "A");
+//                            expMat(stokesSystem.N.Data, "Convection", "N");
+//                            expMat(stokesSystem.B.Data, "Divergence", "B");
+//                            expMat(C_full, "PressureFullStab", "C_full");
+//                            expMat(C_n, "PressureNormalStab", "C_n");
+//                            expMat(stokesSystem.LB.Data, "VelocityScalarLaplaceBeltrami", "LB");
+//                            expMat(stokesSystem.LB_stab.Data, "VelocityScalarLaplaceBeltramiNormalStab", "LB_stab");
+//                            stokesSystem.LB.assemble = false;
+//                            stokesSystem.LB_stab.assemble = false;
+//                            logger.buf << outJSON;
+//                            logger.log();
+//                            logger.end();
 //                        }
-////                        if (inpJSON.get<bool>("SurfNavStokes.ExportMatrices")) {
-////                            logger.beg("export matrices to " + dirName);
-////                            MatrixCL A_final;
-////                            A_final.LinComb(1., stokesSystem.A.Data, 1., stokesSystem.M.Data, tau_u, stokesSystem.S.Data, rho_u, stokesSystem.A_stab.Data);
-////                            auto C_full = stokesSystem.Schur_full_stab.Data;
-////                            C_full *= rho_p;
-////                            auto C_n = stokesSystem.Schur_normal_stab.Data;
-////                            C_n *= rho_p;
-////                            std::string format = inpJSON.get<std::string>("SurfNavStokes.ExportMatricesFormat") == "mtx" ? ".mtx" : ".mat";
-////                            auto expFunc = format == ".mtx" ? &MatrixCL::exportMTX : &MatrixCL::exportMAT;
-////                            auto expMat = [&](MatrixCL& A, std::string const a, std::string const & b) {
-////                                logger.beg(a);
-////                                (A.*expFunc)(dirName + "/matrices/" + b + format);
-////                                outJSON.put("Matrices." + a, "matrices/" + b + format);
-////                                logger.end();
-////                            };
-////                            expMat(A_final, "DiffusionReaction", "A");
-////                            expMat(stokesSystem.N.Data, "Convection", "N");
-////                            expMat(stokesSystem.B.Data, "Divergence", "B");
-////                            expMat(C_full, "PressureFullStab", "C_full");
-////                            expMat(C_n, "PressureNormalStab", "C_n");
-////                            expMat(stokesSystem.LB.Data, "VelocityScalarLaplaceBeltrami", "LB");
-////                            expMat(stokesSystem.LB_stab.Data, "VelocityScalarLaplaceBeltramiNormalStab", "LB_stab");
-////                            stokesSystem.LB.assemble = false;
-////                            stokesSystem.LB_stab.assemble = false;
-////                            logger.buf << outJSON;
-////                            logger.log();
-////                            logger.end();
-////                        }
-//                        if (everyStep > 0 && (i-1) % everyStep == 0) {
-//                            logger.beg("write vtk");
-//                                writeVTK(t);
-//                            auto vtkTime = logger.end();
-//                            tJSON.put("CPUTime.VTK", vtkTime);
-//                        }
-//                        stats << tJSON;
-//                        logger.buf << tJSON;
-//                        logger.log();
-//                    };
-//                    exportStats(1);
-//                logger.end();
-//            logger.end();
+                        if (everyStep > 0 && (i-1) % everyStep == 0) {
+                            logger.beg("write vtk");
+                                writeVTK(t);
+                            auto vtkTime = logger.end();
+                            tJSON.put("CPUTime.VTK", vtkTime);
+                        }
+                        stats << tJSON;
+                        logger.buf << tJSON;
+                        logger.log();
+                    };
+                    exportStats(1);
+            logger.end();
+        logger.end();
 //            // no need to re-assemble these matrices:
 //            surfOseenSystem.A.assemble = false;
 //            surfOseenSystem.A_stab.assemble = false;

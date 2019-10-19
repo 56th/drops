@@ -17,11 +17,11 @@ namespace DROPS {
     private:
         ApplyType apply;
     public:
-        Epetra_OperatorApply(ApplyType const & aplly) : apply(apply) {}
+        Epetra_OperatorApply(ApplyType const & apply) : apply(apply) {}
         virtual ~Epetra_OperatorApply() {}
-        int Apply(const Epetra_MultiVector & X, Epetra_MultiVector & Y) const final {
+        int Apply(Epetra_MultiVector const & X, Epetra_MultiVector& Y) const final {
             apply(X, Y);
-            return 0;    
+            return 0;
         }
         int SetUseTranspose(bool UseTranspose) final {
             std::string funcName = __func__;
@@ -40,8 +40,7 @@ namespace DROPS {
             throw std::logic_error(funcName + ": not implemented");
         }
         bool UseTranspose() const {
-            std::string funcName = __func__;
-            throw std::logic_error(funcName + ": not implemented");
+            return false;
         }
         bool HasNormInf() const {
             std::string funcName = __func__;

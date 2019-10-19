@@ -90,14 +90,13 @@ class VectorBaseCL: public std::valarray<T>
     #ifdef _TRILINOS
         explicit operator Epetra_Vector() const {
             #ifdef HAVE_MPI
-                Epetra_MpiComm Comm(MPI_COMM_WORLD);
+                Epetra_MpiComm comm(MPI_COMM_WORLD);
             #else
-                Epetra_SerialComm Comm;
+                Epetra_SerialComm comm;
             #endif
-            Epetra_Map map(this->size(), 0, Comm);
-            Epetra_Vector result(map);
-            for (size_t i = 0; i < this->size(); ++i)
-                result(i) = this->operator[](i);
+            Epetra_Map map(static_cast<int>(this->size()), 0, comm);
+            double* view = const_cast<double*>(&(*this)[0]);
+            Epetra_Vector result(View, map, view);
             return result;
         }
     #endif
@@ -768,24 +767,29 @@ public:
     #ifdef _TRILINOS
         explicit operator Epetra_CrsMatrix() const {
             #ifdef HAVE_MPI
-                Epetra_MpiComm Comm(MPI_COMM_WORLD);
+                Epetra_MpiComm comm(MPI_COMM_WORLD);
             #else
-                Epetra_SerialComm Comm;
+                Epetra_SerialComm comm;
             #endif
-            Epetra_Map rowMap(num_rows(), 0, Comm);
-            Epetra_Map colMap(num_cols(), 0, Comm);
-            std::vector<int> nnz(num_rows());
-            for (size_t i = 0; i < num_rows(); ++i)
-                nnz[i] = _rowbeg[i + 1] - _rowbeg[i];
+            Epetra_Map rowMap(static_cast<int>(num_rows()), 0, comm);
+            Epetra_Map colMap(static_cast<int>(num_cols()), 0, comm);
+            auto numMyElements = rowMap.NumMyElements();
+            auto* myGlobalElements = rowMap.MyGlobalElements();
+            std::vector<int> nnz(numMyElements);
+            for (size_t i = 0; i < numMyElements; ++i) {
+                auto I = myGlobalElements[i];
+                nnz[i] = _rowbeg[I + 1] - _rowbeg[I];
+            }
             Epetra_CrsMatrix result(Copy, rowMap, colMap, nnz.data(), true);
-            for (size_t i = 0; i < num_rows(); ++i) {
+            for (size_t i = 0; i < numMyElements; ++i) {
+                auto I = myGlobalElements[i];
                 std::vector<double> values;
                 std::vector<int> columns;
-                for (size_t j = _rowbeg[i]; j < _rowbeg[i + 1]; ++j) {
+                for (size_t j = _rowbeg[I]; j < _rowbeg[I + 1]; ++j) {
                     values.push_back(_val[j]);
                     columns.push_back(_colind[j]);
                 }
-                result.InsertGlobalValues(i, values.size(), values.data(), columns.data());
+                result.InsertGlobalValues(I, values.size(), values.data(), columns.data());
             }
             result.FillComplete();
             return result;
@@ -793,7 +797,7 @@ public:
     #endif
 
     template <class, class>
-      friend class SparseMatBuilderCL;
+    friend class SparseMatBuilderCL;
 };
 
 template <typename T>

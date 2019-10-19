@@ -114,9 +114,9 @@
     
     "Solver": {
         "Outer" : {
-            "Iteration" : "MINRES",
-            "KrylovSubspaceSize" : 40,
-            "MaxIter" : 100,
+            "Iteration" : "GMRES",
+            "KrylovSubspaceSize" : 1000,
+            "MaxIter" : 1000,
             "RelResTol" : 1e-8
         },
         "Inner" : {
