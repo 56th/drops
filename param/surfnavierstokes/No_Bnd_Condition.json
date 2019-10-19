@@ -20,7 +20,7 @@
             "Freq":          0,
             "Width":         0,
             "CoarsestLevel": 0,
-            "FinestLevel":   2,
+            "FinestLevel":   1,
             "SD":            0.1,
             "CurvDiff":      -1,
             "Discontinuous": 0
@@ -116,11 +116,13 @@
         "Outer" : {
             "Iteration" : "GMRES",
             "OutputFrequency" : 10,
-            "KrylovSubspaceSize" : 1000,
+            "KrylovSubspaceSize" : 100,
             "MaxIter" : 2000,
             "RelResTol" : 1e-8
         },
         "Inner" : {
+            "Use" : true,
+            "Type" : "BlockDiagonal",
             "A" : {
             },
             "S" : {
