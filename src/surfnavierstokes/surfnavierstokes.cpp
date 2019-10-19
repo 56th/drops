@@ -366,7 +366,11 @@ int main(int argc, char* argv[]) {
                     auto B = static_cast<Epetra_CrsMatrix>(surfOseenSystem.B.Data);
                     printStat("B", B);
                     auto C = static_cast<Epetra_CrsMatrix>(surfOseenSystem.C.Data);
-                    printStat("C", C);
+                    printStat("C := -rho_p (pressure volume stabilization mtx)", C);
+                    MatrixCL S_tmp;
+                    S_tmp.LinComb(-1., surfOseenSystem.C.Data, 1., surfOseenSystem.M_p.Data);
+                    auto S = static_cast<Epetra_CrsMatrix>(S_tmp);
+                    printStat("S := M_p - C", S);
                 logger.end();
                 logger.beg("cast rhs vectors");
                     auto fRHS = static_cast<Epetra_Vector>(surfOseenSystem.fRHS.Data);
@@ -408,12 +412,40 @@ int main(int argc, char* argv[]) {
                     X(0)->ExtractCopy(view);
                 };
                 logger.beg("diffusion-convection-reaction block");
-                    auto invA = identity;
-                    // ...
+                    Epetra_OperatorApply::ApplyType invA = identity;
+                    size_t numItersA = 0;
+                    RCP<ParameterList> belosParamsA = parameterList();
+                    belosParamsA->set("Maximum Iterations", inpJSON.get<int>("Solver.Inner.A.MaxIter"));
+                    belosParamsA->set("Convergence Tolerance", inpJSON.get<double>("Solver.Inner.A.RelResTol"));
+                    auto belosSolverA = belosFactory.create(inpJSON.get<std::string>("Solver.Inner.A.Iteration"), belosParamsA);
+                    logger.buf << "inner solver: " << belosSolverA->description();
+                    logger.log();
+                    invA = [&](MV const & X, MV& Y) {
+                        Y.PutScalar(0.);
+                        auto belosProblemA = LinearProblem<ST, MV, OP>(rcpFromRef(A), rcpFromRef(Y), rcpFromRef(X));
+                        belosProblemA.setProblem();
+                        belosSolverA->setProblem(rcpFromRef(belosProblemA));
+                        belosSolverA->solve();
+                        numItersA += belosSolverA->getNumIters();
+                    };
                 logger.end();
                 logger.beg("schur complement block");
-                    auto invS = identity;
-                    // ...
+                    Epetra_OperatorApply::ApplyType invS = identity;
+                    size_t numItersS = 0;
+                    RCP<ParameterList> belosParamsS = parameterList();
+                    belosParamsS->set("Maximum Iterations", inpJSON.get<int>("Solver.Inner.S.MaxIter"));
+                    belosParamsS->set("Convergence Tolerance", inpJSON.get<double>("Solver.Inner.S.RelResTol"));
+                    auto belosSolverS = belosFactory.create(inpJSON.get<std::string>("Solver.Inner.S.Iteration"), belosParamsS);
+                    logger.buf << "inner solver: " << belosSolverS->description();
+                    logger.log();
+                    invS = [&](MV const & X, MV& Y) {
+                        Y.PutScalar(0.);
+                        auto belosProblemS = LinearProblem<ST, MV, OP>(rcpFromRef(S), rcpFromRef(Y), rcpFromRef(X));
+                        belosProblemS.setProblem();
+                        belosSolverS->setProblem(rcpFromRef(belosProblemS));
+                        belosSolverS->solve();
+                        numItersS += belosSolverS->getNumIters();
+                    };
                 logger.end();
                 auto precType = inpJSON.get<std::string>("Solver.Inner.Type");
                 if (precType == "BlockDiagonal") {
@@ -441,13 +473,14 @@ int main(int argc, char* argv[]) {
                         Epetra_Vector x2(Epetra_DataAccess::View, mapPressure, view + n);
                         Y(0)->ExtractView(&view);
                         Epetra_Vector y1(Epetra_DataAccess::View, mapVelocity, view);
+                        auto y1_tmp = y1;
                         Epetra_Vector y2(Epetra_DataAccess::View, mapPressure, view + n);
                         // y2
                         invS(x2, y2);
                         // y1
-                        B.Multiply(true, y2, y1);
-                        y1.Update(1., x2, -1.);
-                        invA(y1, y1);
+                        B.Multiply(true, y2, y1_tmp);
+                        y1_tmp.Update(1., x1, -1.);
+                        invA(y1_tmp, y1);
                     }));
                 }
                 if (inpJSON.get<bool>("Solver.Inner.Use"))
@@ -465,7 +498,7 @@ int main(int argc, char* argv[]) {
                     else
                         logger.wrn("belos did not converge");
                 }
-            logger.end();
+            auto solveTime = logger.end();
             logger.beg("convert from Epetra");
                 for (size_t i = 0; i < n; ++i) u.Data[i] = (*belosLHS)[i];
                 for (size_t i = 0; i < m; ++i) p.Data[i] = (*belosLHS)[n + i];
@@ -483,14 +516,20 @@ int main(int argc, char* argv[]) {
                         ParamCL tJSON;
                         transpose(surfOseenSystem.B.Data, B_T);
                         auto res = residual(u.Data, p.Data);
-                        tJSON.put("Solver.ResidualNorm.TrueAbsolute.Velocity", std::get<0>(res));
-                        tJSON.put("Solver.ResidualNorm.TrueAbsolute.Pressure", std::get<1>(res));
-                        tJSON.put("Solver.ResidualNorm.TrueAbsolute.Full", std::get<2>(res));
-                        tJSON.put("Solver.ResidualNorm.SolverRelative", belosSolver->achievedTol());
-                        tJSON.put("Solver.TotalIters", belosSolver->getNumIters());
-                        tJSON.put("Solver.DOF.Velocity", surfOseenSystem.A.Data.num_rows());
-                        tJSON.put("Solver.DOF.Pressure", surfOseenSystem.M_p.Data.num_rows());
-                        tJSON.put("Solver.Converged", belosSolverResult == Belos::Converged);
+                        tJSON.put("Solver.Outer.ResidualNorm.TrueAbsolute.Velocity", std::get<0>(res));
+                        tJSON.put("Solver.Outer.ResidualNorm.TrueAbsolute.Pressure", std::get<1>(res));
+                        tJSON.put("Solver.Outer.ResidualNorm.TrueAbsolute.Full", std::get<2>(res));
+                        tJSON.put("Solver.Outer.ResidualNorm.SolverRelative", belosSolver->achievedTol());
+                        tJSON.put("Solver.Outer.TotalIters", belosSolver->getNumIters());
+                        tJSON.put("Solver.Outer.DOF", n + m);
+                        tJSON.put("Solver.Outer.Converged", belosSolverResult == Belos::Converged);
+                        tJSON.put("CPUTime.LinearSolve", solveTime);
+                        tJSON.put("Solver.Inner.A.TotalIters", numItersA);
+                        tJSON.put("Solver.Inner.A.MeanIters", static_cast<double>(numItersA) / belosSolver->getNumIters());
+                        tJSON.put("Solver.Inner.A.DOF", n);
+                        tJSON.put("Solver.Inner.S.TotalIters", numItersS);
+                        tJSON.put("Solver.Inner.S.MeanIters", static_cast<double>(numItersS) / belosSolver->getNumIters());
+                        tJSON.put("Solver.Inner.S.DOF", m);
                         auto t = i * stepSize;
                         tJSON.put("Time", t);
                         tJSON.put("h", h);
@@ -507,9 +546,9 @@ int main(int argc, char* argv[]) {
                             InitVector(mg, u_star, surfNavierStokesData.u_T, t);
                             InitScalar(mg, p_star, surfNavierStokesData.p, t);
                             res = residual(u_star.Data, p_star.Data);
-                            tJSON.put("Solver.ResidualNorm.ExactSolnAbsolute.Velocity", std::get<0>(res));
-                            tJSON.put("Solver.ResidualNorm.ExactSolnAbsolute.Pressure", std::get<1>(res));
-                            tJSON.put("Solver.ResidualNorm.ExactSolnAbsolute.Full", std::get<2>(res));
+                            tJSON.put("Solver.Outer.ResidualNorm.ExactSolnAbsolute.Velocity", std::get<0>(res));
+                            tJSON.put("Solver.Outer.ResidualNorm.ExactSolnAbsolute.Pressure", std::get<1>(res));
+                            tJSON.put("Solver.Outer.ResidualNorm.ExactSolnAbsolute.Full", std::get<2>(res));
                             VectorCL u_star_minus_u = u_star.Data - u.Data, p_star_minus_p = p_star.Data - p.Data;
                             auto velL2err = dot(u_star_minus_u, surfOseenSystem.M.Data * u_star_minus_u);
                             auto velNormalL2 = dot(u.Data, surfOseenSystem.S.Data * u.Data);

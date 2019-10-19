@@ -20,7 +20,7 @@
             "Freq":          0,
             "Width":         0,
             "CoarsestLevel": 0,
-            "FinestLevel":   1,
+            "FinestLevel":   3,
             "SD":            0.1,
             "CurvDiff":      -1,
             "Discontinuous": 0
@@ -28,7 +28,7 @@
     },
 
     "SurfNavStokes": {
-      "nu":                       2.0,
+      "nu":                       1.0,
       "TestName":                 "StokesSphere",
       "FE":                       "P2P1",
       "PressureVolumestabType":   "normal",
@@ -114,25 +114,25 @@
     
     "Solver": {
         "Outer" : {
-            "Iteration" : "GMRES",
-            "OutputFrequency" : 10,
+            "Iteration" : "FLEXIBLE GMRES",
+            "OutputFrequency" : 1,
             "KrylovSubspaceSize" : 100,
-            "MaxIter" : 2000,
+            "MaxIter" : 200,
             "RelResTol" : 1e-8
         },
         "Inner" : {
             "Use" : true,
-            "Type" : "BlockDiagonal",
+            "Type" : "BlockTriangular",
             "A" : {
+              "Iteration" : "CG",
+              "MaxIter" : 100,
+              "RelResTol" : 1e-4
             },
             "S" : {
+              "Iteration" : "CG",
+              "MaxIter" : 100,
+              "RelResTol" : 1e-4
             }
-        },
-        "PcAIter":      500,
-        "PcATol":       1e-4,
-        "PcBIter":      500,
-        "PcBTol":       1e-4,
-        "Iter":         100,
-        "Tol":          1e-8
+        }
     }
 }
