@@ -780,7 +780,7 @@ public:
                 auto I = myGlobalElements[i];
                 nnz[i] = _rowbeg[I + 1] - _rowbeg[I];
             }
-            Epetra_CrsMatrix result(Copy, rowMap, colMap, nnz.data(), true);
+            Epetra_CrsMatrix result(Copy, rowMap, /*colMap,*/ nnz.data(), true);
             for (size_t i = 0; i < numMyElements; ++i) {
                 auto I = myGlobalElements[i];
                 std::vector<double> values;
@@ -791,7 +791,7 @@ public:
                 }
                 result.InsertGlobalValues(I, values.size(), values.data(), columns.data());
             }
-            result.FillComplete();
+            result.FillComplete(colMap, rowMap);
             return result;
         }
     #endif

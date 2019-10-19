@@ -327,7 +327,9 @@ int main(int argc, char* argv[]) {
             belosParams->set("Num Blocks", inpJSON.get<int>("Solver.Outer.KrylovSubspaceSize"));
             belosParams->set("Maximum Iterations", inpJSON.get<int>("Solver.Outer.MaxIter"));
             belosParams->set("Convergence Tolerance", inpJSON.get<double>("Solver.Outer.RelResTol"));
-            belosParams->set("Verbosity", Belos::Errors + Belos::Warnings + Belos::TimingDetails + Belos::FinalSummary + Belos::IterationDetails);
+            belosParams->set( "Output Frequency", inpJSON.get<int>("Solver.Outer.OutputFrequency"));
+            belosParams->set("Verbosity", Belos::Errors + Belos::Warnings + Belos::StatusTestDetails + Belos::TimingDetails + Belos::FinalSummary + Belos::IterationDetails);
+            belosParams->set("Output Style", Belos::Brief);
             SolverFactory<ST, MV, OP> belosFactory;
             logger.buf << "available iterations: " << belosFactory.supportedSolverNames();
             logger.log();
@@ -363,8 +365,15 @@ int main(int argc, char* argv[]) {
 //                };
                 logger.beg("cast matrices");
                     auto A = static_cast<Epetra_CrsMatrix>(surfOseenSystem.A.Data);
+                    auto printStat = [&](std::string const & name, Epetra_CrsMatrix const & A) {
+                        logger.buf << name << ": " << A.NumGlobalRows() << 'x' << A.NumGlobalCols() << ", " << A.NumGlobalNonzeros() << " nonzeros (" << (100. * A.NumGlobalNonzeros()) / (A.NumGlobalRows() * A.NumGlobalCols()) << "%)";
+                        logger.log();
+                    };
+                    printStat("A", A);
                     auto B = static_cast<Epetra_CrsMatrix>(surfOseenSystem.B.Data);
+                    printStat("B", B);
                     auto C = static_cast<Epetra_CrsMatrix>(surfOseenSystem.C.Data);
+                    printStat("C", C);
                 logger.end();
                 logger.beg("cast rhs vectors");
                     auto fRHS = static_cast<Epetra_Vector>(surfOseenSystem.fRHS.Data);
