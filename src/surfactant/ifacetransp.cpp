@@ -1391,7 +1391,7 @@ void SetupStokesIF_P1P2(const MultiGridCL& MG_, MatDescCL* A_P1, MatDescCL* A_P1
   accumulate(accus, MG_, A_P1->GetRowLevel(), A_P1->RowIdx->GetBndInfo());
 }
 
-/// \brief Accumulator to set up the matrices for interface Stokes.
+/// \brief Accumulator to set up the matrices for interface Oseen problem
 class SurfOseenAccumulatorP2P1 : public TetraAccumulatorCL {
   private:
     const VecDescCL& lset;
@@ -1451,6 +1451,7 @@ void SurfOseenAccumulatorP2P1::begin_accumulation() {
     mLB_P2_ = new MatrixBuilderCL(&system->LB.Data, num_unks_p2_scalar, num_unks_p2_scalar);
     mLB_stab_P2_ = new MatrixBuilderCL(&system->LB_stab.Data, num_unks_p2_scalar, num_unks_p2_scalar);
     system->fRHS.Data.resize(num_unks_p2, 0.);
+    system->alRHS.Data.resize(num_unks_p2, 0.);
     system->gRHS.Data.resize(num_unks_p1_scalar, 0.);
 }
 
@@ -1477,11 +1478,6 @@ void SurfOseenAccumulatorP2P1::finalize_accumulation() {
     delete mLB_P2_;
     mLB_stab_P2_->Build();
     delete mLB_stab_P2_;
-//#ifndef _PAR
-//    std::cout << "StokesIF_P2P1:\t" << A_P2_.num_nonzeros() << " nonzeros in A, " << A_P2_stab_.num_nonzeros() << " nonzeros in A_stab, "
-//              << B_P1P2_.num_nonzeros() << " nonzeros in B, " << M_P2_.num_nonzeros() << " nonzeros in M, " << S_P2_.num_nonzeros() << " nonzeros in S, "
-//              << M_ScalarP1_.num_nonzeros() << " nonzeros in M_ScalarP1, " << A_ScalarP1_stab_.num_nonzeros() << " nonzeros in A_ScalarP1_stab\n";
-//#endif
 }
 
 void SurfOseenAccumulatorP2P1::visit(const TetraCL& tet) {

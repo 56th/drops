@@ -325,10 +325,6 @@ int main(int argc, char* argv[]) {
             using ST = double;
             using namespace Teuchos;
             using namespace Belos;
-            RCP<Epetra_Vector> belosLHS, belosRHS;
-            RCP<OP> belosMTX, belocPRE;
-            // auto belosProblem = rcp(new LinearProblem<ST, MV, OP>(belosMTX, belosLHS, belosRHS));
-            RCP<LinearProblem<ST, MV, OP>> belosProblem;
             RCP<ParameterList> belosParams = parameterList();
             belosParams->set("Num Blocks", inpJSON.get<int>("Solver.Outer.KrylovSubspaceSize"));
             belosParams->set("Maximum Iterations", inpJSON.get<int>("Solver.Outer.MaxIter"));
@@ -363,6 +359,8 @@ int main(int argc, char* argv[]) {
                 surfOseenSystem.fRHS.Data += (1. / stepSize) * (surfOseenSystem.M.Data * u_prev.Data) - gamma * surfOseenSystem.alRHS.Data;
                 surfOseenSystem.sumA.Data.LinComb(1. / stepSize, surfOseenSystem.M.Data, gamma, surfOseenSystem.AL.Data, 1., surfOseenSystem.N.Data, nu, surfOseenSystem.A.Data, tau_u, surfOseenSystem.S.Data, rho_u, surfOseenSystem.A_stab.Data);
                 surfOseenSystem.C.Data *= -rho_p;
+                surfOseenSystem.Schur.Data.LinComb(-1., surfOseenSystem.C.Data, 1., surfOseenSystem.M_p.Data);
+                surfOseenSystem.Schur.Data *= 1. / (nu + gamma);
             logger.end();
             logger.beg("convert to Epetra");
                 logger.beg("cast matrices");
@@ -376,25 +374,21 @@ int main(int argc, char* argv[]) {
                     printStat("B", B);
                     auto C = static_cast<Epetra_CrsMatrix>(surfOseenSystem.C.Data);
                     printStat("C := -rho_p (pressure volume stabilization mtx)", C);
-                    MatrixCL S_tmp;
-                    S_tmp.LinComb(-1., surfOseenSystem.C.Data, 1., surfOseenSystem.M_p.Data);
-                    S_tmp *= 1. / (nu + gamma);
-                    auto S = static_cast<Epetra_CrsMatrix>(S_tmp);
+                    auto S = static_cast<Epetra_CrsMatrix>(surfOseenSystem.Schur.Data);
                     printStat("S := 1/(nu + gamma) (M_p - C)", S);
                 logger.end();
                 logger.beg("cast rhs vectors");
                     auto fRHS = static_cast<Epetra_Vector>(surfOseenSystem.fRHS.Data);
                     auto gRHS = static_cast<Epetra_Vector>(surfOseenSystem.gRHS.Data);
                     Epetra_Map mapVelocity(static_cast<int>(n), 0, comm), mapPressure(static_cast<int>(m), 0, comm), mapVelocityPressure(static_cast<int>(n + m), 0, comm);
-                    belosLHS = rcp(new Epetra_Vector(mapVelocityPressure));
-                    belosRHS = rcp(new Epetra_Vector(mapVelocityPressure));
+                    Epetra_Vector belosLHS(mapVelocityPressure), belosRHS(mapVelocityPressure);
                     auto joinEpetraVectors = [&](Epetra_Vector const & a, Epetra_Vector const & b, MV& ab) {
                         for (size_t i = 0; i < n; ++i) (*ab(0))[i] = a[i];
                         for (size_t i = 0; i < m; ++i) (*ab(0))[i + n] = b[i];
                     };
-                    joinEpetraVectors(fRHS, gRHS, *belosRHS);
+                    joinEpetraVectors(fRHS, gRHS, belosRHS);
                 logger.end();
-                belosMTX = rcp(new Epetra_OperatorApply([&](MV const & X, MV& Y) {
+                RCP<OP> belosMTX = rcp(new Epetra_OperatorApply([&](MV const & X, MV& Y) {
                     double* view;
                     X(0)->ExtractView(&view);
                     Epetra_Vector x1(Epetra_DataAccess::View, mapVelocity, view);
@@ -413,7 +407,6 @@ int main(int argc, char* argv[]) {
                     C.Multiply(false, x2, y22);
                     y21.Update(1., y22, 1.);
                 }));
-                belosProblem = rcp(new LinearProblem<ST, MV, OP>(belosMTX, belosLHS, belosRHS));
             logger.end();
             logger.beg("build preconditioners");
                 auto identity  = [](MV const & X, MV& Y) {
@@ -489,9 +482,10 @@ int main(int argc, char* argv[]) {
                     };
                 logger.end();
                 auto precType = inpJSON.get<std::string>("Solver.Inner.Type");
+                RCP<OP> belosPRE;
                 if (precType == "BlockDiagonal") {
                     logger.log("using block-diagonal preconditioner");
-                    belocPRE = rcp(new Epetra_OperatorApply([&](MV const & X, MV& Y) {
+                    belosPRE = rcp(new Epetra_OperatorApply([&](MV const & X, MV& Y) {
                         double* view;
                         X(0)->ExtractView(&view);
                         Epetra_Vector x1(Epetra_DataAccess::View, mapVelocity, view);
@@ -519,7 +513,7 @@ int main(int argc, char* argv[]) {
                 }
                 else {
                     logger.log("using block-triangular preconditioner");
-                    belocPRE = rcp(new Epetra_OperatorApply([&](MV const & X, MV& Y) {
+                    belosPRE = rcp(new Epetra_OperatorApply([&](MV const & X, MV& Y) {
                         double* view;
                         X(0)->ExtractView(&view);
                         Epetra_Vector x1(Epetra_DataAccess::View, mapVelocity, view);
@@ -536,13 +530,16 @@ int main(int argc, char* argv[]) {
                         invA(y1_tmp, y1);
                     }));
                 }
-                if (inpJSON.get<bool>("Solver.Inner.Use"))
-                    belosProblem->setRightPrec(belocPRE);
             logger.end();
             logger.beg("linear solve");
-                belosLHS->PutScalar(0.);
-                belosProblem->setProblem();
-                belosSolver->setProblem(belosProblem);
+            if (inpJSON.get<bool>("Solver.UsePreviousFrameAsInitialGuess")) {
+                for (size_t i = 0; i < n; ++i) belosLHS[i] = u.Data[i];
+                for (size_t i = 0; i < m; ++i) belosLHS[n + i] = p.Data[i];
+            } else belosLHS.PutScalar(0.);
+            auto belosProblem = LinearProblem<ST, MV, OP>(belosMTX, rcpFromRef(belosLHS), rcpFromRef(belosRHS));
+                if (inpJSON.get<bool>("Solver.Inner.Use")) belosProblem.setRightPrec(belosPRE);
+                belosProblem.setProblem();
+                belosSolver->setProblem(rcpFromRef(belosProblem));
                 std::cout << std::scientific;
                 auto belosSolverResult = belosSolver->solve();
                 if (myRank == 0) {
@@ -553,8 +550,8 @@ int main(int argc, char* argv[]) {
                 }
             auto solveTime = logger.end();
             logger.beg("convert from Epetra");
-                for (size_t i = 0; i < n; ++i) u.Data[i] = (*belosLHS)[i];
-                for (size_t i = 0; i < m; ++i) p.Data[i] = (*belosLHS)[n + i];
+                for (size_t i = 0; i < n; ++i) u.Data[i] = belosLHS[i];
+                for (size_t i = 0; i < m; ++i) p.Data[i] = belosLHS[n + i];
                 p.Data -= dot(surfOseenSystem.M_p.Data * p.Data, I_p) / dot(surfOseenSystem.M_p.Data * I_p, I_p) * I_p;
             logger.end();
             logger.beg("output");
@@ -655,34 +652,81 @@ int main(int argc, char* argv[]) {
         surfOseenSystem.C.assemble = false;
         surfOseenSystem.LB.assemble = false;
         surfOseenSystem.LB_stab.assemble = false;
-//            for (size_t i = 2; i <= numbOfSteps; ++i) {
-//                std::stringstream header;
-//                header << "t = t_" << i << " (" << (100. * i) / numbOfSteps << "%)";
-//                logger.beg(header.str());
-//                    logger.beg("assemble");
-//                        u_prev_prev = u_prev;
-//                        u_prev = u;
-//                        param.input.t = i * stepSize;
-//                        if (!setWind(surfOseenSystem.w)) // Navier-Stokes case
-//                            surfOseenSystem.w.Data = 2. * u_prev.Data - u_prev_prev.Data;
-//                        SetupSurfOseen_P2P1(mg, lset, &surfOseenSystem, &param);
-//                        surfOseenSystem.fRHS.Data += (2. / stepSize) * (surfOseenSystem.M.Data * u_prev.Data) - (.5 / stepSize) * (surfOseenSystem.M.Data * u_prev_prev.Data);
-//                        surfOseenSystem.gRHS.Data -= (dot(surfOseenSystem.gRHS.Data, I_p) / dot(I_p, I_p)) * I_p;
-//                        A.LinComb(1.5 / stepSize, surfOseenSystem.M.Data, 1., surfOseenSystem.N.Data, nu, surfOseenSystem.A.Data, tau_u, surfOseenSystem.S.Data, rho_u, surfOseenSystem.A_stab.Data);
-//                    logger.end();
-//                    logger.beg("linear solve");
-//                        // stokesSolver = symStokesSolver;
-//                        // if (windRises(nu, surfOseenSystem.w, Pe)) stokesSolver = nonsymStokesSolver;
-//                        // logger.buf << "Pe = " << Pe << ", using " << (stokesSolver == symStokesSolver ? "" : "non-") << "symmetric solver";
-//                        // logger.log();
-//                        // stokesSolver->Solve(A, surfOseenSystem.B.Data, C, u.Data, p.Data, surfOseenSystem.fRHS.Data, surfOseenSystem.gRHS.Data, u.RowIdx->GetEx(), p.RowIdx->GetEx());
-//                        p.Data -= dot(surfOseenSystem.M_p.Data * p.Data, I_p) / dot(surfOseenSystem.M_p.Data * I_p, I_p) * I_p;
-//                    logger.end();
-//                    logger.beg("output");
-//                        exportStats(i);
-//                    logger.end();
-//                logger.end();
-//            }
+        for (size_t i = 2; i <= numbOfSteps; ++i) {
+            numItersA = 0;
+            numItersS = 0;
+            std::stringstream header;
+            header << "t = t_" << i << " (" << (100. * i) / numbOfSteps << "%)";
+            logger.beg(header.str());
+                logger.beg("assemble");
+                    u_prev_prev = u_prev;
+                    u_prev = u;
+                    param.input.t = i * stepSize;
+                    auto wind = u_prev.Data;
+                    wind *= 2.;
+                    wind -= u_prev_prev.Data;
+                    setWind(wind);
+                    Pe = supnorm(surfOseenSystem.w.Data) / nu;
+                    logger.buf << "Pe = " << Pe;
+                    logger.log();
+                    SetupSurfOseen_P2P1(mg, lset, &surfOseenSystem, &param);
+                    surfOseenSystem.gRHS.Data -= (dot(surfOseenSystem.gRHS.Data, I_p) / dot(I_p, I_p)) * I_p;
+                    surfOseenSystem.fRHS.Data += (2. / stepSize) * (surfOseenSystem.M.Data * u_prev.Data) - (.5 / stepSize) * (surfOseenSystem.M.Data * u_prev_prev.Data) - gamma * surfOseenSystem.alRHS.Data;
+                    surfOseenSystem.sumA.Data.LinComb(1.5 / stepSize, surfOseenSystem.M.Data, gamma, surfOseenSystem.AL.Data, 1., surfOseenSystem.N.Data, nu, surfOseenSystem.A.Data, tau_u, surfOseenSystem.S.Data, rho_u, surfOseenSystem.A_stab.Data);
+                    surfOseenSystem.C.Data *= -rho_p;
+                    surfOseenSystem.Schur.Data.LinComb(-1., surfOseenSystem.C.Data, 1., surfOseenSystem.M_p.Data);
+                    surfOseenSystem.Schur.Data *= 1. / (nu + gamma);
+                logger.end();
+                logger.beg("convert to Epetra");
+                    logger.beg("cast matrices");
+                        A = static_cast<Epetra_CrsMatrix>(surfOseenSystem.sumA.Data);
+                        printStat("A", A);
+                        B = static_cast<Epetra_CrsMatrix>(surfOseenSystem.B.Data);
+                        printStat("B", B);
+                        C = static_cast<Epetra_CrsMatrix>(surfOseenSystem.C.Data);
+                        printStat("C := -rho_p (pressure volume stabilization mtx)", C);
+                        S = static_cast<Epetra_CrsMatrix>(surfOseenSystem.Schur.Data);
+                        printStat("S := 1/(nu + gamma) (M_p - C)", S);
+                    logger.end();
+                    logger.beg("cast rhs vectors");
+                        fRHS = static_cast<Epetra_Vector>(surfOseenSystem.fRHS.Data);
+                        gRHS = static_cast<Epetra_Vector>(surfOseenSystem.gRHS.Data);
+                        joinEpetraVectors(fRHS, gRHS, belosRHS);
+                    logger.end();
+                logger.end();
+                if (iterationA.find("Amesos") != std::string::npos) {
+                    logger.beg("symbolic factorization");
+                        AMESOS_CHK_ERR(amesosSolver->SymbolicFactorization());
+                    logger.end();
+                    logger.beg("numeric factorization");
+                        AMESOS_CHK_ERR(amesosSolver->NumericFactorization());
+                    logger.end();
+                }
+                logger.beg("linear solve");
+                    if (!inpJSON.get<bool>("Solver.UsePreviousFrameAsInitialGuess")) belosLHS.PutScalar(0.);
+                    belosProblem = LinearProblem<ST, MV, OP>(belosMTX, rcpFromRef(belosLHS), rcpFromRef(belosRHS));
+                    if (inpJSON.get<bool>("Solver.Inner.Use")) belosProblem.setRightPrec(belosPRE);
+                    belosProblem.setProblem();
+                    belosSolver->setProblem(rcpFromRef(belosProblem));
+                    std::cout << std::scientific;
+                    auto belosSolverResult = belosSolver->solve();
+                    if (myRank == 0) {
+                        if (belosSolverResult == Belos::Converged)
+                            logger.log("belos converged");
+                        else
+                            logger.wrn("belos did not converge");
+                    }
+                solveTime = logger.end();
+                logger.beg("convert from Epetra");
+                    for (size_t i = 0; i < n; ++i) u.Data[i] = belosLHS[i];
+                    for (size_t i = 0; i < m; ++i) p.Data[i] = belosLHS[n + i];
+                    p.Data -= dot(surfOseenSystem.M_p.Data * p.Data, I_p) / dot(surfOseenSystem.M_p.Data * I_p, I_p) * I_p;
+                logger.end();
+                logger.beg("output");
+                    exportStats(i);
+                logger.end();
+            logger.end();
+        }
         #ifdef HAVE_MPI
             MPI_Finalize() ;
         #endif

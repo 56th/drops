@@ -785,6 +785,7 @@ struct SurfOseenSystem {
               AL, // AL / grad-div stabilization mtx
               sumA, // accumulated from above
               M_p, C, // pressure mass and volume stabilization mtx
+              Schur, // schur complement approximation
               B, // divergence mtx
               LB, LB_stab; // laplace-beltrami
     VecDescCL fRHS, gRHS, // moment and continuity rhs
