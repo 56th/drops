@@ -255,7 +255,7 @@ int main(int argc, char* argv[]) {
                     << "numb of d.o.f. scalar P2: " << P2FEidx.NumUnknowns() << '\n'
                     << "numb of d.o.f. scalar P1: " << P1FEidx.NumUnknowns();
             logger.log();
-            VecDescCL u_star, u_star_ext, u, u_ext, u_prev, u_prev_prev, p_star, p_star_ext, p, p_ext, f, f_ext;
+            VecDescCL u_star, u_star_ext, u, u_ext, u_prev, u_prev_prev, p_star, p_star_ext, p, p_ext;
             size_t n, m;
             if (FE == "P2P1") {
                 n = ifaceVecP2idx.NumUnknowns();
@@ -266,8 +266,6 @@ int main(int argc, char* argv[]) {
                 u_star_ext.SetIdx(&vecP2idx);
                 u_prev.SetIdx(&ifaceVecP2idx);
                 u_prev_prev.SetIdx(&ifaceVecP2idx);
-                f.SetIdx(&ifaceVecP2idx);
-                f_ext.SetIdx(&vecP2idx);
                 surfOseenSystem.w.SetIdx(&ifaceVecP2idx);
                 surfOseenSystem.fRHS.SetIdx(&ifaceVecP2idx);
                 surfOseenSystem.alRHS.SetIdx(&ifaceVecP2idx);
@@ -289,7 +287,6 @@ int main(int argc, char* argv[]) {
             surfOseenSystem.C.SetIdx(&ifaceP1idx, &ifaceP1idx);
             logger.beg("interpolate initial data");
                 InitVector(mg, u_star, surfNavierStokesData.u_T, 0.);
-                InitVector(mg, f, surfNavierStokesData.f_T, 0.);
                 InitScalar(mg, p_star, surfNavierStokesData.p, 0.);
                 u = u_star;
                 p = p_star;
@@ -302,7 +299,6 @@ int main(int argc, char* argv[]) {
                 Extend(mg, u, u_ext);
                 Extend(mg, p_star, p_star_ext);
                 Extend(mg, p, p_ext);
-                Extend(mg, f, f_ext);
                 vtkWriter.write(t);
             };
             if (everyStep > 0) {
@@ -313,8 +309,7 @@ int main(int argc, char* argv[]) {
                 vtkWriter
                     .add(vtkLevelSet)
                     .add(VTKWriter::VTKVar({ "u_h", &u_ext.Data, VTKWriter::VTKVar::Type::vecP2 }))
-                    .add(VTKWriter::VTKVar({ "p_h", &p_ext.Data, VTKWriter::VTKVar::Type::P1 }))
-                    .add(VTKWriter::VTKVar({ "f", &f_ext.Data, VTKWriter::VTKVar::Type::vecP2 }));
+                    .add(VTKWriter::VTKVar({ "p_h", &p_ext.Data, VTKWriter::VTKVar::Type::P1 }));
                 if (surfNavierStokesData.exactSoln)
                     vtkWriter
                         .add(VTKWriter::VTKVar({ "u_*", &u_star_ext.Data, VTKWriter::VTKVar::Type::vecP2 }))
