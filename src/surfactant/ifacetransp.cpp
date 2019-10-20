@@ -726,7 +726,7 @@ void LocalSurfOseen::setupN_P2(double N_P2[30][30]) {
         for (size_t j = 0; j < 30; ++j) {
             auto js = j / 3; // scalar shape index
             auto jn = j - 3 * js; // nonzero vect component
-            N_P2[i][j] = quad_2D(dot(qWind, qP2Grad[js]) * qP2Hat[is] * take(qP, jn, in), q2Ddomain);
+            N_P2[i][j] = quad_2D(dot(qWind, qP2Grad[is]) * qP2Hat[js] * take(qP, in, jn), q2Ddomain);
         }
     }
 }
