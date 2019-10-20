@@ -20,7 +20,7 @@
             "Freq":          0,
             "Width":         0,
             "CoarsestLevel": 0,
-            "FinestLevel":   1,
+            "FinestLevel":   2,
             "SD":            0.1,
             "CurvDiff":      -1,
             "Discontinuous": 0
@@ -28,7 +28,8 @@
     },
 
     "SurfNavStokes": {
-      "nu":                       1.0,
+      "gamma" :                   0.0,
+      "nu":                       2.0,
       "TestName":                 "StokesSphere",
       "FE":                       "P2P1",
       "PressureVolumestabType":   "normal",
@@ -125,7 +126,7 @@
             "Type" : "BlockTriangular",
             "A" : {
               "Comment" : "Use Amesos_* (e.g. Amesos_Klu) for the sparse-direct solver. Or use some Belos iterations (e.g. CG or BICGSTAB)",
-              "Iteration" : "Amesos_Umfpack",
+              "Iteration" : "Amesos_Klu",
               "MaxIter" : 200,
               "RelResTol" : 1e-4
             },

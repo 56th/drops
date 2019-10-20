@@ -124,9 +124,11 @@ int main(int argc, char* argv[]) {
                 << "pressure FE = " << preFE << '\n';
             auto testName = inpJSON.get<std::string>("SurfNavStokes.TestName");
             auto nu = inpJSON.get<double>("SurfNavStokes.nu");
+            auto gamma = inpJSON.get<double>("SurfNavStokes.gamma");
             auto surfNavierStokesData = SurfNavierStokesDataFactory(testName, nu);
             logger.buf << surfNavierStokesData.description;
             logger.buf << "$\\nu$ = " << nu << '\n';
+            logger.buf << "$\\gamma$ = " << gamma << " (AL / grad-div stabilization constant)\n";
             SurfOseenParam param;
             param.input.f = inpJSON.get<bool>("SurfNavStokes.IntegrateRHS") ? surfNavierStokesData.f_T : nullptr;
             param.input.g = inpJSON.get<bool>("SurfNavStokes.IntegrateRHS") ? surfNavierStokesData.m_g : nullptr;
@@ -158,6 +160,8 @@ int main(int argc, char* argv[]) {
                 surfOseenSystem.LB.assemble = false;
                 surfOseenSystem.LB_stab.assemble = false;
             }
+            if (gamma == 0.)
+                surfOseenSystem.AL.assemble = false;
             logger.log();
         logger.end();
         logger.beg("build mesh");
@@ -251,7 +255,7 @@ int main(int argc, char* argv[]) {
                     << "numb of d.o.f. scalar P2: " << P2FEidx.NumUnknowns() << '\n'
                     << "numb of d.o.f. scalar P1: " << P1FEidx.NumUnknowns();
             logger.log();
-            VecDescCL u_star, u_star_ext, u, u_ext, u_prev, u_prev_prev, p_star, p_star_ext, p, p_ext;
+            VecDescCL u_star, u_star_ext, u, u_ext, u_prev, u_prev_prev, p_star, p_star_ext, p, p_ext, f, f_ext;
             size_t n, m;
             if (FE == "P2P1") {
                 n = ifaceVecP2idx.NumUnknowns();
@@ -262,9 +266,13 @@ int main(int argc, char* argv[]) {
                 u_star_ext.SetIdx(&vecP2idx);
                 u_prev.SetIdx(&ifaceVecP2idx);
                 u_prev_prev.SetIdx(&ifaceVecP2idx);
+                f.SetIdx(&ifaceVecP2idx);
+                f_ext.SetIdx(&vecP2idx);
                 surfOseenSystem.w.SetIdx(&ifaceVecP2idx);
                 surfOseenSystem.fRHS.SetIdx(&ifaceVecP2idx);
+                surfOseenSystem.alRHS.SetIdx(&ifaceVecP2idx);
                 surfOseenSystem.A.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
+                surfOseenSystem.AL.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
                 surfOseenSystem.N.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
                 surfOseenSystem.A_stab.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
                 surfOseenSystem.B.SetIdx(&ifaceP1idx, &ifaceVecP2idx);
@@ -281,6 +289,7 @@ int main(int argc, char* argv[]) {
             surfOseenSystem.C.SetIdx(&ifaceP1idx, &ifaceP1idx);
             logger.beg("interpolate initial data");
                 InitVector(mg, u_star, surfNavierStokesData.u_T, 0.);
+                InitVector(mg, f, surfNavierStokesData.f_T, 0.);
                 InitScalar(mg, p_star, surfNavierStokesData.p, 0.);
                 u = u_star;
                 p = p_star;
@@ -293,6 +302,7 @@ int main(int argc, char* argv[]) {
                 Extend(mg, u, u_ext);
                 Extend(mg, p_star, p_star_ext);
                 Extend(mg, p, p_ext);
+                Extend(mg, f, f_ext);
                 vtkWriter.write(t);
             };
             if (everyStep > 0) {
@@ -303,7 +313,8 @@ int main(int argc, char* argv[]) {
                 vtkWriter
                     .add(vtkLevelSet)
                     .add(VTKWriter::VTKVar({ "u_h", &u_ext.Data, VTKWriter::VTKVar::Type::vecP2 }))
-                    .add(VTKWriter::VTKVar({ "p_h", &p_ext.Data, VTKWriter::VTKVar::Type::P1 }));
+                    .add(VTKWriter::VTKVar({ "p_h", &p_ext.Data, VTKWriter::VTKVar::Type::P1 }))
+                    .add(VTKWriter::VTKVar({ "f", &f_ext.Data, VTKWriter::VTKVar::Type::vecP2 }));
                 if (surfNavierStokesData.exactSoln)
                     vtkWriter
                         .add(VTKWriter::VTKVar({ "u_*", &u_star_ext.Data, VTKWriter::VTKVar::Type::vecP2 }))
@@ -341,29 +352,26 @@ int main(int argc, char* argv[]) {
             logger.beg("assemble");
                 InitVector(mg, u_prev, surfNavierStokesData.u_T, 0.);
                 param.input.t = stepSize;
-                auto setWind = [&](VecDescCL& wind) {
-                    if (surfNavierStokesData.w_T) { // Oseen (and Stokes) case
-                        InitVector(mg, wind, surfNavierStokesData.w_T, param.input.t);
-                        return true;
-                    }
-                    return false;
+                auto setWind = [&](VectorCL const & wind) {
+                    if (surfNavierStokesData.w_T) // Oseen (and Stokes) case
+                        InitVector(mg, surfOseenSystem.w, surfNavierStokesData.w_T, param.input.t);
+                    else surfOseenSystem.w.Data = wind; // Navier-Stokes case
                 };
-                if (!setWind(surfOseenSystem.w)) // Navier-Stokes case
-                    surfOseenSystem.w = u_prev;
+                setWind(u_prev.Data);
                 auto Pe = supnorm(surfOseenSystem.w.Data) / nu;
                 logger.buf << "Pe = " << Pe;
                 logger.log();
                 SetupSurfOseen_P2P1(mg, lset, &surfOseenSystem, &param);
-                surfOseenSystem.fRHS.Data += (1. / stepSize) * (surfOseenSystem.M.Data * u_prev.Data);
                 VectorCL I_p;
-                I_p.resize(surfOseenSystem.gRHS.Data.size(), 1.);
+                I_p.resize(m, 1.);
                 surfOseenSystem.gRHS.Data -= (dot(surfOseenSystem.gRHS.Data, I_p) / dot(I_p, I_p)) * I_p;
-                surfOseenSystem.A.Data.LinComb(1. / stepSize, surfOseenSystem.M.Data, 1., surfOseenSystem.N.Data, nu, surfOseenSystem.A.Data, tau_u, surfOseenSystem.S.Data, rho_u, surfOseenSystem.A_stab.Data);
+                surfOseenSystem.fRHS.Data += (1. / stepSize) * (surfOseenSystem.M.Data * u_prev.Data) - gamma * surfOseenSystem.alRHS.Data;
+                surfOseenSystem.sumA.Data.LinComb(1. / stepSize, surfOseenSystem.M.Data, gamma, surfOseenSystem.AL.Data, 1., surfOseenSystem.N.Data, nu, surfOseenSystem.A.Data, tau_u, surfOseenSystem.S.Data, rho_u, surfOseenSystem.A_stab.Data);
                 surfOseenSystem.C.Data *= -rho_p;
             logger.end();
             logger.beg("convert to Epetra");
                 logger.beg("cast matrices");
-                    auto A = static_cast<Epetra_CrsMatrix>(surfOseenSystem.A.Data);
+                    auto A = static_cast<Epetra_CrsMatrix>(surfOseenSystem.sumA.Data);
                     auto printStat = [&](std::string const & name, Epetra_CrsMatrix const & A) {
                         logger.buf << name << ": " << A.NumGlobalRows() << 'x' << A.NumGlobalCols() << ", " << A.NumGlobalNonzeros() << " nonzeros (" << (100. * A.NumGlobalNonzeros()) / (A.NumGlobalRows() * A.NumGlobalCols()) << "%)";
                         logger.log();
@@ -375,8 +383,9 @@ int main(int argc, char* argv[]) {
                     printStat("C := -rho_p (pressure volume stabilization mtx)", C);
                     MatrixCL S_tmp;
                     S_tmp.LinComb(-1., surfOseenSystem.C.Data, 1., surfOseenSystem.M_p.Data);
+                    S_tmp *= 1. / (nu + gamma);
                     auto S = static_cast<Epetra_CrsMatrix>(S_tmp);
-                    printStat("S := M_p - C", S);
+                    printStat("S := 1/(nu + gamma) (M_p - C)", S);
                 logger.end();
                 logger.beg("cast rhs vectors");
                     auto fRHS = static_cast<Epetra_Vector>(surfOseenSystem.fRHS.Data);
@@ -556,7 +565,7 @@ int main(int argc, char* argv[]) {
             logger.beg("output");
                 MatrixCL B_T;
                 auto residual = [&](VectorCL const & u, VectorCL const & p) {
-                    auto velResSq = norm_sq(surfOseenSystem.A.Data * u + B_T * p - surfOseenSystem.fRHS.Data);
+                    auto velResSq = norm_sq(surfOseenSystem.sumA.Data * u + B_T * p - surfOseenSystem.fRHS.Data);
                     auto preResSq = norm_sq(surfOseenSystem.B.Data * u + surfOseenSystem.C.Data * p - surfOseenSystem.gRHS.Data);
                     return std::tuple<double, double, double>(sqrt(velResSq), sqrt(preResSq), sqrt(velResSq + preResSq));
                 };
@@ -572,7 +581,7 @@ int main(int argc, char* argv[]) {
                     tJSON.put("Solver.Outer.TotalIters", belosSolver->getNumIters());
                     tJSON.put("Solver.Outer.DOF", n + m);
                     tJSON.put("Solver.Outer.Converged", belosSolverResult == Belos::Converged);
-                    tJSON.put("CPUTime.LinearSolve", solveTime);
+                    tJSON.put("ElapsedTime.LinearSolve", solveTime);
                     tJSON.put("Solver.Inner.A.TotalIters", numItersA);
                     tJSON.put("Solver.Inner.A.MeanIters", static_cast<double>(numItersA) / belosSolver->getNumIters());
                     tJSON.put("Solver.Inner.A.DOF", n);
@@ -621,7 +630,7 @@ int main(int argc, char* argv[]) {
                                 tJSON.put("Matrices." + a, "../matrices/" + b + format);
                             logger.end();
                         };
-                        expMat(surfOseenSystem.A.Data, "DiffusionConvectionReaction", "A");
+                        expMat(surfOseenSystem.sumA.Data, "DiffusionConvectionReaction", "A");
                         expMat(surfOseenSystem.B.Data, "Divergence", "B");
                         expMat(surfOseenSystem.C.Data, "PressureVolumeStab", "C");
                         expMat(surfOseenSystem.LB.Data, "VelocityScalarLaplaceBeltrami", "LB");
@@ -632,7 +641,7 @@ int main(int argc, char* argv[]) {
                         logger.beg("write vtk");
                             writeVTK(t);
                         auto vtkTime = logger.end();
-                        tJSON.put("CPUTime.VTK", vtkTime);
+                        tJSON.put("ElapsedTime.VTK", vtkTime);
                     }
                     stats << tJSON;
                     logger.buf << tJSON;
