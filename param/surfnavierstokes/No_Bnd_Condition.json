@@ -1,6 +1,6 @@
 {
     "Output": {
-      "Directory":  "../../output/kh",
+      "Directory":  "../../output/tmp",
       "EveryStep":  1,
       "Binary":     true
     },
@@ -20,7 +20,7 @@
             "Freq":          0,
             "Width":         0,
             "CoarsestLevel": 0,
-            "FinestLevel":   3,
+            "FinestLevel":   4,
             "SD":            0.1,
             "CurvDiff":      -1,
             "Discontinuous": 0
@@ -29,7 +29,14 @@
 
     "SurfNavStokes": {
       "gamma" :                   1.0,
-      "nu":                       1e-4,
+      "nu" :                      1e-5,
+      "IC" : {
+        "Comment" : "initial condition parameters",
+        "KelvinHelmholtzSphere" : {
+          "Frequency" : 20.0,
+          "Amplitude" : 0.1
+        }
+      },
       "TestName":                 "KelvinHelmholtzSphere",
       "FE":                       "P2P1",
       "PressureVolumestabType":   "normal",
@@ -53,7 +60,7 @@
       "Read":         0,
       "Write":        "yes",
       "NumbOfSteps":  100,
-      "FinalTime":    1.0
+      "FinalTime":    20.0
     },
 
     "Levelset": {

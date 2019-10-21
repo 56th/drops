@@ -37,7 +37,7 @@
 
 #include "VTKWriter.hpp"
 #include "SurfNavierStokesData.hpp"
-#include "surfnavierstokes/surfnavierstokes_utils.h"
+#include "surfnavierstokes_utils.h"
 #include "SingletonLogger.hpp"
 
 // belos (iterative solvers)
@@ -125,7 +125,7 @@ int main(int argc, char* argv[]) {
             auto testName = inpJSON.get<std::string>("SurfNavStokes.TestName");
             auto nu = inpJSON.get<double>("SurfNavStokes.nu");
             auto gamma = inpJSON.get<double>("SurfNavStokes.gamma");
-            auto surfNavierStokesData = SurfNavierStokesDataFactory(testName, nu);
+            auto surfNavierStokesData = SurfNavierStokesDataFactory(testName, nu, inpJSON);
             logger.buf << surfNavierStokesData.description;
             logger.buf << "$\\nu$ = " << nu << '\n';
             logger.buf << "$\\gamma$ = " << gamma << " (AL / grad-div stabilization constant)\n";
