@@ -496,17 +496,16 @@ int main(int argc, char* argv[]) {
                         #ifdef _OPENMP
                             #pragma omp parallel num_threads(2)
                             {
-                                // y1
                                 #pragma omp single
-                                invA(x1, y1);
-                                // y2
-                                #pragma omp single
-                                invS(x2, y2);
+                                {
+                                    #pragma omp task
+                                        invA(x1, y1); // y1
+                                    #pragma omp task
+                                        invS(x2, y2); // y2
+                                }
                             }
                         #else
-                            // y1
                             invA(x1, y1);
-                            // y2
                             invS(x2, y2);
                         #endif
                     }));
