@@ -29,7 +29,7 @@
 
     "SurfNavStokes": {
       "gamma" :                   1.0,
-      "nu" :                      1.0,
+      "nu" :                      0.001,
       "IC" : {
         "Comment" : "initial condition parameters",
         "KelvinHelmholtzSphere" : {
@@ -60,7 +60,7 @@
       "Read":         0,
       "Write":        "yes",
       "NumbOfSteps":  1,
-      "FinalTime":    0.1
+      "FinalTime":    0.0001
     },
 
     "Levelset": {
@@ -139,7 +139,7 @@
               "RelResTol" : 1e-4
             },
             "S" : {
-              "S_L" : false,
+              "S_L" : true,
               "Iteration" : "CG",
               "MaxIter" : 200,
               "RelResTol" : 1e-4

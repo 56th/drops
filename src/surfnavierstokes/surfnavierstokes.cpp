@@ -360,8 +360,8 @@ int main(int argc, char* argv[]) {
                 surfOseenSystem.sumA.Data.LinComb(alpha, surfOseenSystem.M.Data, gamma, surfOseenSystem.AL.Data, 1., surfOseenSystem.N.Data, nu, surfOseenSystem.A.Data, tau_u, surfOseenSystem.S.Data, rho_u, surfOseenSystem.A_stab.Data);
                 surfOseenSystem.C.Data *= -rho_p;
                 MatrixCL S_M_tmp, S_L_tmp;
-                S_M_tmp.LinComb(1., surfOseenSystem.M_p.Data, -1., surfOseenSystem.C.Data);
-                S_L_tmp.LinComb(1., surfOseenSystem.A_p.Data, -1., surfOseenSystem.C.Data);
+                S_M_tmp.LinComb(1. / (gamma + nu), surfOseenSystem.M_p.Data, -1., surfOseenSystem.C.Data);
+                S_L_tmp.LinComb(1. / alpha, surfOseenSystem.A_p.Data, -1., surfOseenSystem.C.Data);
             logger.end();
             logger.beg("convert to Epetra");
                 logger.beg("cast matrices");
@@ -376,9 +376,9 @@ int main(int argc, char* argv[]) {
                     auto C = static_cast<Epetra_CrsMatrix>(surfOseenSystem.C.Data);
                     printStat("C := -rho_p (pressure volume stabilization mtx)", C);
                     auto S_M = static_cast<Epetra_CrsMatrix>(S_M_tmp);
-                    printStat("S_M := (M_p - C)", S_M);
+                    printStat("S_M := (\\nu + \\gamma)^{-1} M_p - C", S_M);
                     auto S_L = static_cast<Epetra_CrsMatrix>(S_L_tmp);
-                    printStat("S_L := (L_p - C)", S_L);
+                    printStat("S_L := \\alpha^{-1} L_p - C", S_L);
                 logger.end();
                 logger.beg("cast rhs vectors");
                     auto fRHS = static_cast<Epetra_Vector>(surfOseenSystem.fRHS.Data);
@@ -504,7 +504,7 @@ int main(int argc, char* argv[]) {
                             numItersS_L += belosSolverS_L->getNumIters();
                         }
                         // result
-                        Y_M.Update(alpha, Y_L, nu + gamma);
+                        Y_M.Update(1., Y_L, 1.);
                     };
                 logger.end();
                 auto precType = inpJSON.get<std::string>("Solver.Inner.Type");
@@ -703,8 +703,8 @@ int main(int argc, char* argv[]) {
                     alpha = 1.5 / stepSize;
                     surfOseenSystem.sumA.Data.LinComb(alpha, surfOseenSystem.M.Data, gamma, surfOseenSystem.AL.Data, 1., surfOseenSystem.N.Data, nu, surfOseenSystem.A.Data, tau_u, surfOseenSystem.S.Data, rho_u, surfOseenSystem.A_stab.Data);
                     surfOseenSystem.C.Data *= -rho_p;
-                    S_M_tmp.LinComb(1., surfOseenSystem.M_p.Data, -1., surfOseenSystem.C.Data);
-                    S_L_tmp.LinComb(1., surfOseenSystem.A_p.Data, -1., surfOseenSystem.C.Data);
+                    S_M_tmp.LinComb(1. / (gamma + nu), surfOseenSystem.M_p.Data, -1., surfOseenSystem.C.Data);
+                    S_L_tmp.LinComb(1. / alpha, surfOseenSystem.A_p.Data, -1., surfOseenSystem.C.Data);
                 logger.end();
                 logger.beg("convert to Epetra");
                     logger.beg("cast matrices");
@@ -715,9 +715,9 @@ int main(int argc, char* argv[]) {
                         C = static_cast<Epetra_CrsMatrix>(surfOseenSystem.C.Data);
                         printStat("C := -rho_p (pressure volume stabilization mtx)", C);
                         S_M = static_cast<Epetra_CrsMatrix>(S_M_tmp);
-                        printStat("S_M := (M_p - C)", S_M);
+                        printStat("S_M := (\\nu + \\gamma)^{-1} M_p - C", S_M);
                         S_L = static_cast<Epetra_CrsMatrix>(S_L_tmp);
-                        printStat("S_L := (L_p - C)", S_L);
+                        printStat("S_L := \\alpha^{-1} L_p - C", S_L);
                     logger.end();
                     logger.beg("cast rhs vectors");
                         fRHS = static_cast<Epetra_Vector>(surfOseenSystem.fRHS.Data);
