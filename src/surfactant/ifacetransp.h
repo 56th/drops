@@ -782,12 +782,11 @@ struct SurfOseenParam {
 
 struct SurfOseenSystem {
     MatDescCL A, A_stab, N, M, S, // velocity stiffness, volume stabilization, convection, mass, and normal penalty mtx
+              // LB, LB_stab; // laplace-beltrami
               AL, // AL / grad-div stabilization mtx
               sumA, // accumulated from above
-              M_p, C, // pressure mass and volume stabilization mtx
-              Schur, // schur complement approximation
-              B, // divergence mtx
-              LB, LB_stab; // laplace-beltrami
+              A_p, M_p, C, // pressure stiffness (laplace-beltrami), pressure mass, and volume stabilization mtx
+              B; // divergence mtx
     VecDescCL fRHS, gRHS, // moment and continuity rhs
               alRHS, // AL / grad-div stabilization rhs
               w; // wind

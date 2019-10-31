@@ -20,7 +20,7 @@
             "Freq":          0,
             "Width":         0,
             "CoarsestLevel": 0,
-            "FinestLevel":   4,
+            "FinestLevel":   2,
             "SD":            0.1,
             "CurvDiff":      -1,
             "Discontinuous": 0
@@ -29,7 +29,7 @@
 
     "SurfNavStokes": {
       "gamma" :                   1.0,
-      "nu" :                      1e-5,
+      "nu" :                      1.0,
       "IC" : {
         "Comment" : "initial condition parameters",
         "KelvinHelmholtzSphere" : {
@@ -37,7 +37,7 @@
           "Amplitude" : 0.1
         }
       },
-      "TestName":                 "KelvinHelmholtzSphere",
+      "TestName":                 "OseenSphere",
       "FE":                       "P2P1",
       "PressureVolumestabType":   "normal",
       "NormalPenaltyPower":       -2,
@@ -59,8 +59,8 @@
     "Time": {
       "Read":         0,
       "Write":        "yes",
-      "NumbOfSteps":  100,
-      "FinalTime":    20.0
+      "NumbOfSteps":  1,
+      "FinalTime":    0.1
     },
 
     "Levelset": {
@@ -139,6 +139,7 @@
               "RelResTol" : 1e-4
             },
             "S" : {
+              "S_L" : false,
               "Iteration" : "CG",
               "MaxIter" : 200,
               "RelResTol" : 1e-4
