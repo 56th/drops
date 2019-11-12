@@ -58,6 +58,7 @@ instat_scalar_fun_ptr the_lset_fun;
 instat_scalar_fun_ptr the_rhs_fun;
 instat_scalar_fun_ptr the_conc_sol_fun;
 instat_scalar_fun_ptr the_poten_sol_fun;
+instat_scalar_fun_ptr the_species_sol_fun;
 
 instat_scalar_fun_ptr the_zero_fun;
 
@@ -115,11 +116,11 @@ DROPS::Point3DCL constant_rotation (const DROPS::Point3DCL& pp, double)
 }
 static RegisterVectorFunction regvec_constant_rotation( "ConstantRotation", constant_rotation);
 
-DROPS::Point3DCL mixed (const DROPS::Point3DCL& pp, double t)
+DROPS::Point3DCL isometric(const DROPS::Point3DCL& pp, double t)
 {
      return (constant_rotation(pp,t)+constant_wind(pp,t));
 }
-static RegisterVectorFunction regvec_mixed( "Mixed", mixed);
+static RegisterVectorFunction regvec_isometric( "Isometric", isometric);
 
 DROPS::Point3DCL Rotate(const DROPS::Point3DCL& pp,
         double t)
@@ -173,15 +174,15 @@ static RegisterScalarFunction regsca_torus_lset( "Torus", torus);
 // "MovingEllipsoid" pos:[0,0,0], rad:[1,1,1]
 
 
-double constant_sol (const Point3DCL& , double )
+double constant_sol (const Point3DCL& pp, double )
 {
-    return (0.5);
+    return (0.1);
 }
 static RegisterScalarFunction regsca_constant_sol( "ConstantSolution", constant_sol);
 
 double coscoscos_sol (const Point3DCL& pp, double )
 {
-    double a=0.1;
+    double a=0.05;
     Point3DCL p=(1./pp.norm())*pp;
     return (0.5+a*std::cos(2*3.141592*p[0])*std::cos(2*3.141592*p[1])*std::cos(2*3.141592*p[2]));
 }
@@ -456,9 +457,11 @@ static RegisterScalarFunction regsca_collision_rhs( "CollisionRhs", collision_rh
 
 DROPS::Point3DCL mergedrop_wind (const DROPS::Point3DCL& p, double t)
 {
+    Point3DCL wd;
+
     DROPS::Point3DCL  c1,c2;
     double velocity=0.1;
-    c1=MakePoint3D( -1.5, 0., 0.) + WindVelocity*t;
+    c1=MakePoint3D( -1.5, 0., 0.) + MakePoint3D( 1.0, 0., 0.)*t;
     c2=-c1;
    /* c1[0]=1.5*(t-1),c1[1]=0,c1[2]=0;
     c2[0]=-1.5*(t-1),c2[1]=0,c2[2]=0;*/
@@ -466,7 +469,7 @@ DROPS::Point3DCL mergedrop_wind (const DROPS::Point3DCL& p, double t)
     DROPS::Point3DCL x1( p - c1);
     DROPS::Point3DCL x2( p - c2);
 
-    Point3DCL wd;
+    //Point3DCL wd;
     /* if(x1.norm()!=0&&x2.norm()!=0)
      {
          double a=-4.5*x1[0]/std::pow(x1.norm(),5) + 4.5*x2[0]/std::pow(x2.norm(),5);
@@ -479,21 +482,48 @@ DROPS::Point3DCL mergedrop_wind (const DROPS::Point3DCL& p, double t)
     double a=-4.5*x1[0]*std::pow(x2.norm(),5) + 4.5*x2[0]*std::pow(x1.norm(),5);
     wd=3*std::pow(x2.norm(),5)*x1+3*std::pow(x1.norm(),5)*x2;
     if(wd.norm_sq()!=0)
-        wd=-a/wd.norm_sq()*wd;
+        wd=-a/wd.norm_sq()*wd ;
     else
         wd=-a*wd;
     return wd;
 }
 static RegisterVectorFunction regvec_mergedrop_wind( "MergeDropWind", mergedrop_wind);
 
+DROPS::Point3DCL mergedrop_compositewind (const DROPS::Point3DCL& p, double t)
+{
+    double time_rate=1.0;
+    double time_shift=0.2385;
+    t=time_shift+time_rate*t;
+
+    double scaler;
+    scaler=1.;
+
+
+    //if (t>1.5) return Point3DCL(0,0,0);
+    double width=0.1;
+   double a=    1.-  std::tanh((1./(width))*(std::abs(p[0])));
+
+   double b= std::tanh((1./(width))*(-p[0]));
+
+   double norm=1;//std::sqrt(a*a+b*b);
+
+   return (time_rate)*((a/norm)*mergedrop_wind(p,t)+(b/norm)*MakePoint3D( 1, 0., 0.));//constant_wind(p,t));
+}
+static RegisterVectorFunction regvec_mergedrop_compositewind( "MergeDropCompositeWind", mergedrop_compositewind);
+
+
 double mergedrop_lset (const Point3DCL& p, double t)
 {
-    // std::cout<<t<<" ";
+    double time_rate=1.0;
+    double time_shift=0.2385;
+    t=time_shift+t*time_rate;
+
+    //if (t>1.5) t=1.5;
+
     DROPS::Point3DCL  c1,c2;
-    double velocity=0.1;
 /*    c1[0]=1.5*(t-5),c1[1]=0,c1[2]=0;
     c2[0]=-1.5*(t-5),c2[1]=0,c2[2]=0;*/
-    c1=MakePoint3D( -1.5, 0., 0.) + WindVelocity*t;
+    c1=MakePoint3D( -1.5, 0., 0.) + MakePoint3D( 1.0, 0., 0.)*t;
     c2=-c1;
     DROPS::Point3DCL x1( p - c1);
     DROPS::Point3DCL x2( p - c2);
@@ -508,12 +538,14 @@ static RegisterScalarFunction regsca_mergedrop_lset( "MergeDropLset", mergedrop_
 
 DROPS::Point3DCL normal_mergedrop (const Point3DCL& p, double t)
 {
-    // std::cout<<t<<" ";
+    double time_rate=1.0;
+    double time_shift=0.2385;
+    t=time_shift+t*time_rate;
+
     DROPS::Point3DCL  c1,c2;
-    double velocity=1.5;
   /*  c1[0]=1.5*(t-5),c1[1]=0,c1[2]=0;
     c2[0]=-1.5*(t-5),c2[1]=0,c2[2]=0;*/
-    c1=MakePoint3D( -1.5, 0., 0.) + WindVelocity*t;
+    c1=MakePoint3D( -1.5, 0., 0.) + MakePoint3D( 1.0, 0., 0.)*t;
     c2=-c1;
 
     DROPS::Point3DCL x1( p - c1);
@@ -522,7 +554,7 @@ DROPS::Point3DCL normal_mergedrop (const Point3DCL& p, double t)
     DROPS::Point3DCL grad;
     if(x1.norm()!=0&&x2.norm()!=0){
         grad=-3*(std::pow(x1.norm(),5)*x1+std::pow(x2.norm(),5)*x2);
-        return  grad.norm()>0.000001?grad/grad.norm():grad;
+        return  ((time_rate/std::abs(time_rate))*(grad.norm()>0.000001?grad/grad.norm():grad));
     }
     else
         return   0*grad;//-1./std::pow(x2.norm(),3);
@@ -533,9 +565,26 @@ static RegisterVectorFunction regsca_normal_mergedrop( "NormalMergeDrop", normal
 
 double mergedrop_sol (const Point3DCL& p, double t)
 {
-    if(p[0]>=0)
-        return   1;
-    else return 0;
+    double random = ((double)rand() / RAND_MAX);
+    double k=0.5;
+    double ampl=0.1;
+    //return 0.5*(1.+p[0]);
+    //if(p[0]>0)
+    {
+        if (random<0.5) return(1./3. + ampl*(2*k*random - 0.5));
+        if (random<0.5) return(1./3. + ampl*(2*k*random - 0.5));
+        else return(1./3.+ampl*(2*(1-k)*random + 2*k-1- 0.5));
+    }
+//    if(p[0]>=0)
+     //   return(2./3. + ampl*);
+//
+//    else     return(0);
+
+   /* if(p[0]>=0)
+            return((std::tanh((1./(2*std::sqrt(2)*ParameterNS::eps))*(p[0]-1.5+0.235)/pow(pow(p[0]-1.5, 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), 0.5))  + 0.1e1) / 0.2e1);
+
+    else     return((std::tanh((1./(2*std::sqrt(2)*ParameterNS::eps))*(-p[1])/pow(pow(p[0]+1.5, 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), 0.5))  + 0.1e1) / 0.2e1);
+*/
 }
 static RegisterScalarFunction regsca_mergedrop_sol( "MergeDropSol", mergedrop_sol);
 
@@ -608,15 +657,15 @@ static RegisterVectorFunction regvec_moving_sphere_normal( "NormalMovingEllipsoi
 
 double dilating_radius(double t)
 {
-    double a=0.2;
-    double b=10;
-    return(1.+a*std::sin(b*2.*3.141592*t));
+    double A=0.2;
+    double T=5;
+    return(1.+A*std::sin(T*2.*3.141592*t));
 }
 double dilating_radius_prime(double t)
 {
-    double a=0.2;
-    double b=10;
-    return(b*2.*3.141592*a*std::cos(b*2.*3.141592*t));
+    double A=0.2;
+    double T=5;
+    return(T*2.*3.141592*A*std::cos(T*2.*3.141592*t));
 }
 
 double sphere_2dilate (const DROPS::Point3DCL& p, double t)
@@ -647,6 +696,67 @@ DROPS::Point3DCL sin_dilatation (const DROPS::Point3DCL& pp, double t)
 
 }
 static RegisterVectorFunction regvec_sin_dilatation( "UniformDilatation", sin_dilatation);
+
+
+double sphere_2squeez (const DROPS::Point3DCL& p, double t)
+{
+    double a=1.0*dilating_radius(t);
+    double b=1.0;
+    double c=1.0;
+    DROPS::Point3DCL x;
+    x[0]=(p[0]-PosDrop[0])/a;
+    x[1]=(p[1]-PosDrop[1])/b;
+    x[2]=(p[2]-PosDrop[2])/c;
+    return x.norm() - 1.;
+}
+
+static RegisterScalarFunction regsca_squeezing_sphere_lset( "SqueezingEllipsoid", sphere_2squeez);
+
+DROPS::Point3DCL normal_sphere_2squeez (const DROPS::Point3DCL& p, double t)
+{
+    double a=1.0*dilating_radius(t);
+    double b=1.0;
+    double c=1.0;
+
+    DROPS::Point3DCL x;
+    x[0]=(p[0]-PosDrop[0])/a;
+    x[1]=(p[1]-PosDrop[1])/b;
+    x[2]=(p[2]-PosDrop[2])/c;
+
+    if(x.norm()>0.000001)
+        return x/x.norm();
+    else
+        return x;
+}
+static RegisterVectorFunction regvec_squeezing_sphere_normal( "NormalSqueezingEllipsoid", normal_sphere_2squeez);
+
+DROPS::Point3DCL sin_squeezing (const DROPS::Point3DCL& p, double t)
+{
+    double a=1.0*dilating_radius(t);
+    double b=1.0;
+    double c=1.0;
+
+    DROPS::Point3DCL primes;
+    primes[0]=1.0*dilating_radius_prime(t);
+    primes[1]=0.0;
+    primes[2]=0.0;
+
+    DROPS::Point3DCL x;
+    x[0]=std::pow( (p[0]-PosDrop[0])/a , 2);
+    x[1]=std::pow( (p[1]-PosDrop[1])/b , 2);
+    x[2]=std::pow( (p[2]-PosDrop[2])/c , 2);
+
+    DROPS::Point3DCL gradf;
+    gradf[0]=(p[0]-PosDrop[0])/a;
+    gradf[1]=(p[1]-PosDrop[1])/b;
+    gradf[2]=(p[2]-PosDrop[2])/c;
+
+    double norm_comp=inner_prod(x,primes)/x.norm_sq();
+    return norm_comp*gradf;
+
+}
+static RegisterVectorFunction regvec_squeezing( "SqueezingWind", sin_squeezing);
+
 
 SMatrixCL<3,3> dp_sphere (const DROPS::Point3DCL& x, double)
 {
@@ -748,9 +858,10 @@ static RegisterScalarFunction regsca_rhs1_harmonic( "First spherical harmonic rh
 double TestStationary_chiSol (const DROPS::Point3DCL& pp, double t)
 {
     //DROPS::Point3DCL p(pp  - t*constant_wind(pp,t));
-    DROPS::Point3DCL p=Rotate(pp  - t*constant_wind(pp,t), -t) - PosDrop;
+    DROPS::Point3DCL p=Rotate(pp  - t*constant_wind(pp,t), t) - PosDrop;
+    double shift=0;
 
-    return((std::tanh((1./(2*std::sqrt(2)*ParameterNS::eps))*p[1]/pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), 0.5))  + 0.1e1) / 0.2e1);
+   return((std::tanh(shift+(1./(2*std::sqrt(2)*ParameterNS::eps))*p[1]/pow(pow(p[0], 0.2e1) + pow(p[1], 0.2e1) + pow(p[2], 0.2e1), 0.5))  + 0.1e1) / 0.2e1);
 }
 
 static RegisterScalarFunction regsca_stationary_harmonic( "SteadyPhases", TestStationary_chiSol);
@@ -1037,18 +1148,31 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     //dirname  = P.get<std::string>("VTK.VTKDir")  + "CahnHilliard" + "_" + P.get<std::string>("SurfSeparation.Exp.Levelset")  + "/"  "l=" + std::to_string(int(P.get<int>("Mesh.AdaptRef.FinestLevel")))  + "_N=" + std::to_string(int(P.get<double>("Time.NumSteps")));
 
     std::cout << "dirname: " << dirname << std::endl;
+
+    std::ofstream log_errors;
+    log_errors.open( dirname +"/"
+                     + "Errors.txt");
+    log_errors.close();
+
+    if (!log_errors.is_open()) {
+        log_errors.open( dirname +"/"
+                         + "Errors.txt");}
+
     std::ofstream log_global;
     log_global.open( dirname +"/"
-                     + "Errors.txt");
+                         + "Global.txt");
     log_global.close();
 
     if (!log_global.is_open()) {
-        log_global.open( dirname +"/"
-                         + "Errors.txt");
+            log_global.open( dirname +"/"
+                             + "Global.txt");
 
         //std::cout<< "can't open file with computed errors in: " << dirname << std::endl;
         //return;
     }
+
+    log_global << "Time" << "\t" << "Lyapunov_energy" << "\t" << "Number_iterations" << std::endl;
+
     if (P.get<std::string>("SurfSeparation.Exp.Levelset") == std::string( "AxisScalingLset"))
         dynamic_cast<DistMarkingStrategyCL*>( adap.get_marking_strategy())->SetDistFct( axis_scaling_lset_ini);
     lset.CreateNumbering( mg.GetLastLevel(), &lset.idx);
@@ -1072,7 +1196,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     InitVel( mg, &v, Bnd_v, the_wind_fun, 0.);
 
     //lset2.SetupSystem( make_P2Eval( mg, Bnd_v, v), P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps"));
-    double dist=1*(2.0*P.get<DROPS::Point3DCL>("SurfSeparation.Exp.Velocity").norm()*P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps")
+    double dist=2.0*(2.0*P.get<DROPS::Point3DCL>("SurfSeparation.Exp.Velocity").norm()*P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps")
                 +P.get<DROPS::Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")/pow(2,P.get<int>("Mesh.AdaptRef.FinestLevel")));
 
     std::unique_ptr<CahnHilliardP1BaseCL> timediscp( make_cahnhilliard_timedisc( mg, lset, v, Bnd_v, P, dist));
@@ -1089,6 +1213,9 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     adap.push_back( &imu_repair);
 
 
+    InterfaceP1RepairCL is_repair( mg, lset.Phi, lset.GetBndData(), timedisc.is, dist);
+    adap.push_back( &is_repair);
+
     //LevelsetRepairCL lset2repair( lset2);
     //adap.push_back( &lset2repair);
 
@@ -1097,23 +1224,25 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     std::cout << "Concentration NumUnknowns: " << timedisc.idx.NumUnknowns() << std::endl;
     timedisc.ic.SetIdx( &timedisc.idx);
     timedisc.imu.SetIdx( &timedisc.idx);
+    timedisc.is.SetIdx( &timedisc.idx);
     timedisc.iface.SetIdx( &timedisc.idx);
 
-    timedisc.SetInitialValue( the_poten_sol_fun, the_conc_sol_fun, 0.);
-
+    timedisc.SetInitialValue( the_poten_sol_fun, the_conc_sol_fun, the_species_sol_fun, 0.);
 
     BndDataCL<> nobnd( 0);
     VecDescCL the_conc_sol_vd( &lset.idx);
     LSInit( mg, the_conc_sol_vd, the_conc_sol_fun, /*t*/ 0.);
     VecDescCL the_poten_sol_vd( &lset.idx);
     LSInit( mg, the_poten_sol_vd, the_poten_sol_fun, /*t*/ 0.);
-
+    VecDescCL the_species_sol_vd( &lset.idx);
+    LSInit( mg, the_species_sol_vd, the_species_sol_fun, /*t*/ 0.);
 
     if (vtkwriter.get() != 0) {
         vtkwriter->Register( make_VTKScalar(      lset.GetSolution(),              "Levelset") );
         vtkwriter->Register( make_VTKIfaceScalar( mg, timedisc.iface,                 "interface_mesh"));
         vtkwriter->Register( make_VTKIfaceScalar( mg, timedisc.ic,                 "concentration"));
         vtkwriter->Register( make_VTKIfaceScalar( mg, timedisc.imu,                 "chem_potential"));
+        vtkwriter->Register( make_VTKIfaceScalar( mg, timedisc.is,                 "species"));
         vtkwriter->Register( make_VTKVector(      make_P2Eval( mg, Bnd_v, v),      "Velocity"));
         //vtkwriter->Register( make_VTKScalar(      lset2.GetSolution(),             "Levelset2"));
         vtkwriter->Register( make_VTKScalar(      make_P2Eval( mg, nobnd, the_conc_sol_vd),  "concentration_exact"));
@@ -1151,71 +1280,94 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     std::cout << "initial chemical potential on \\Gamma: " << Integral_Gamma( mg, lset.Phi, lset.GetBndData(), make_P1Eval(  mg, ifbnd, timedisc.imu)) << '\n';
 
     dynamic_cast<DistMarkingStrategyCL*>( adap.get_marking_strategy())->SetDistFct( lset);
+
+    //subdivide first timesteps into substeps
+    int total_subs=1;
+    int sub_ratio=1;
     for (int step= 1; step <= P.get<int>("Time.NumSteps"); ++step) {
-        std::cout << "======================================================== step " << step << ":\n";
-        ScopeTimerCL timer( "Strategy: Time-loop");
-        const double cur_time= step*dt;
-        // Assumes (as the rest of Drops), that the current triangulation is acceptable to perform the time-step.
-        // If dt is large and AdapRef.Width is small, this may not be true.
-        // Watch for large differences in numbers of old and new dof.
-        timedisc.InitTimeStep();
-        LSInit( mg, lset.Phi, the_lset_fun, cur_time);
-        InitVel( mg, &v, Bnd_v, the_wind_fun, cur_time);
+        if (step>total_subs) sub_ratio=1;
 
-        timedisc.DoStep0( cur_time);
+        for (int substep= 1; substep <= sub_ratio; ++substep) {
 
-        std::cout << "concentration on \\Gamma: " << Integral_Gamma( mg, lset.Phi, lset.GetBndData(), make_P1Eval(  mg, ifbnd, timedisc.ic)) << '\n';
-        std::cout << "chemical potential on \\Gamma: " << Integral_Gamma( mg, lset.Phi, lset.GetBndData(), make_P1Eval(  mg, ifbnd, timedisc.imu)) << '\n';
 
-        L_2x_chi_err= L2_error( lset.Phi, lset.GetBndData(), timedisc.GetConcentr(), the_conc_sol_fun);
-        std::cout << "L_2x-chi_error: " << L_2x_chi_err
-                  << "\nnorm of concentration solution: " << L2_norm( mg, lset.Phi, lset.GetBndData(), the_conc_sol_fun)
-                  << std::endl;
+            std::cout << "======================================================== step " << step-1+((double)substep/(double)sub_ratio)  << ":\n";
+            ScopeTimerCL timer("Strategy: Time-loop");
+            const double cur_time = (step-1 + (double)substep/(double)sub_ratio) * dt;
+            double cur_dt=(1./(double)sub_ratio) * dt;
+            // Assumes (as the rest of Drops), that the current triangulation is acceptable to perform the time-step.
+            // If dt is large and AdapRef.Width is small, this may not be true.
+            // Watch for large differences in numbers of old and new dof.
+            timedisc.InitTimeStep();
+            LSInit(mg, lset.Phi, the_lset_fun, cur_time);
+            InitVel(mg, &v, Bnd_v, the_wind_fun, cur_time);
 
-        L_2x_omega_err= L2_error( lset.Phi, lset.GetBndData(), timedisc.GetPotential(), the_poten_sol_fun);
-        std::cout << "L_2x-omega_error: " << L_2x_omega_err
-                  << "\nnorm of omega solution: " << L2_norm( mg, lset.Phi, lset.GetBndData(), the_poten_sol_fun)
-                  << std::endl;
+            timedisc.DoStep0(cur_time);
 
-        L_inftL_2x_chi_err= std::max( L_inftL_2x_chi_err, L_2x_chi_err);
-        std::cout << "L_inftL_2x-chi_error: " << L_inftL_2x_chi_err << std::endl;
+            std::cout << "concentration on \\Gamma: "
+                      << Integral_Gamma(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, ifbnd, timedisc.ic)) << '\n';
+            std::cout << "chemical potential on \\Gamma: "
+                      << Integral_Gamma(mg, lset.Phi, lset.GetBndData(), make_P1Eval(mg, ifbnd, timedisc.imu)) << '\n';
 
-        L_inftL_2x_omega_err= std::max( L_inftL_2x_omega_err, L_2x_omega_err);
-        std::cout << "L_inftL_2x-omega_error: " << L_inftL_2x_omega_err << std::endl;
+            L_2x_chi_err = L2_error(lset.Phi, lset.GetBndData(), timedisc.GetConcentr(), the_conc_sol_fun);
+            std::cout << "L_2x-chi_error: " << L_2x_chi_err
+                      << "\nnorm of concentration solution: "
+                      << L2_norm(mg, lset.Phi, lset.GetBndData(), the_conc_sol_fun)
+                      << std::endl;
 
-        //L_2tH_1x_chi_err_sq+= (step > 1 ? 0.5 : 0.)*dt*std::pow( H_1x_chi_err, 2);
-        H_1x_chi_err= H1_error( lset.Phi, lset.GetBndData(), timedisc.GetConcentr(), the_conc_sol_fun);
-        std::cout << "H_1x-chi_error: " << H_1x_chi_err << std::endl;
+            L_2x_omega_err = L2_error(lset.Phi, lset.GetBndData(), timedisc.GetPotential(), the_poten_sol_fun);
+            std::cout << "L_2x-omega_error: " << L_2x_omega_err
+                      << "\nnorm of omega solution: " << L2_norm(mg, lset.Phi, lset.GetBndData(), the_poten_sol_fun)
+                      << std::endl;
 
-        L_2tH_1x_chi_err_sq+= 0.5*dt*std::pow( H_1x_chi_err, 2);
-        std::cout << "L_2tH_1x-chi_error: " << std::sqrt( L_2tH_1x_chi_err_sq) << std::endl;
+            L_inftL_2x_chi_err = std::max(L_inftL_2x_chi_err, L_2x_chi_err);
+            std::cout << "L_inftL_2x-chi_error: " << L_inftL_2x_chi_err << std::endl;
 
-        //L_2tH_1x_omega_err_sq+= (step > 1 ? 0.5 : 0.)*dt*std::pow( H_1x_omega_err, 2);
-        H_1x_omega_err= H1_error( lset.Phi, lset.GetBndData(), timedisc.GetPotential(), the_poten_sol_fun);
-        std::cout << "H_1x-omega_error: " << H_1x_omega_err << std::endl;
+            L_inftL_2x_omega_err = std::max(L_inftL_2x_omega_err, L_2x_omega_err);
+            std::cout << "L_inftL_2x-omega_error: " << L_inftL_2x_omega_err << std::endl;
 
-        L_2tH_1x_omega_err_sq+= 0.5*dt*std::pow( H_1x_omega_err, 2);
-        std::cout << "L_2tH_1x-omega_error: " << std::sqrt( L_2tH_1x_omega_err_sq) << std::endl;
+            //L_2tH_1x_chi_err_sq+= (step > 1 ? 0.5 : 0.)*dt*std::pow( H_1x_chi_err, 2);
+            H_1x_chi_err = H1_error(lset.Phi, lset.GetBndData(), timedisc.GetConcentr(), the_conc_sol_fun);
+            std::cout << "H_1x-chi_error: " << H_1x_chi_err << std::endl;
 
-        L_2tL_2x_omega_err_sq+= 0.5*dt*std::pow( L_2x_omega_err, 2);
-        std::cout << "L_2tL_2x-omega_error: " << std::sqrt( L_2tL_2x_omega_err_sq) << std::endl;
+            L_2tH_1x_chi_err_sq += 0.5 * cur_dt * std::pow(H_1x_chi_err, 2);
+            std::cout << "L_2tH_1x-chi_error: " << std::sqrt(L_2tH_1x_chi_err_sq) << std::endl;
 
-        L_2tL_2x_chi_err_sq+= 0.5*dt*std::pow( L_2x_chi_err, 2);
-        std::cout << "L_2tL2x-chi_error: " << std::sqrt( L_2tL_2x_chi_err_sq) << std::endl;
+            //L_2tH_1x_omega_err_sq+= (step > 1 ? 0.5 : 0.)*dt*std::pow( H_1x_omega_err, 2);
+            H_1x_omega_err = H1_error(lset.Phi, lset.GetBndData(), timedisc.GetPotential(), the_poten_sol_fun);
+            std::cout << "H_1x-omega_error: " << H_1x_omega_err << std::endl;
 
-        if (vtkwriter.get() != 0 && step % P.get<int>( "VTK.Freq") == 0) {
-            LSInit( mg, the_conc_sol_vd, the_conc_sol_fun, /*t*/ cur_time);
-            LSInit( mg, the_poten_sol_vd, the_poten_sol_fun, /*t*/ cur_time);
+            L_2tH_1x_omega_err_sq += 0.5 * cur_dt * std::pow(H_1x_omega_err, 2);
+            std::cout << "L_2tH_1x-omega_error: " << std::sqrt(L_2tH_1x_omega_err_sq) << std::endl;
 
-            vtkwriter->Write( cur_time);
-        }
-        if (P.get<int>( "SurfSeparation.SolutionOutput.Freq") > 0 && step % P.get<int>( "SurfSeparation.SolutionOutput.Freq") == 0) {
-            std::ostringstream os1,
-                               os2;
-            os1 << P.get<int>( "Time.NumSteps");
-            os2 << P.get<std::string>( "SurfSeparation.SolutionOutput.Path") << std::setw( os1.str().size()) << step;
-            DROPS::WriteFEToFile( timedisc.ic, mg, os2.str(), P.get<bool>( "SurfSeparation.SolutionOutput.Binary"));
-        }
+            L_2tL_2x_omega_err_sq += 0.5 * cur_dt * std::pow(L_2x_omega_err, 2);
+            std::cout << "L_2tL_2x-omega_error: " << std::sqrt(L_2tL_2x_omega_err_sq) << std::endl;
+
+            L_2tL_2x_chi_err_sq += 0.5 * cur_dt * std::pow(L_2x_chi_err, 2);
+            std::cout << "L_2tL2x-chi_error: " << std::sqrt(L_2tL_2x_chi_err_sq) << std::endl;
+
+            double Lyapunov_energy = (ParameterNS::eps / 2.) *
+                                     H1_error(lset.Phi, lset.GetBndData(), timedisc.GetConcentr(),
+                                              the_zero_fun)//dot(Laplace.Data*chi.Data,chi.Data)
+                                     + (1. / ParameterNS::eps) * Integral_Gamma(mg, lset.Phi, lset.GetBndData(),
+                                                                                make_P1Eval(mg, ifbnd,
+                                                                                            timedisc.ienergy));
+
+            log_global << cur_time << "\t" << Lyapunov_energy << "\t" << timedisc.GetSolver().GetIter() << "\n" << std::endl;
+
+            if ( (step<100) || (vtkwriter.get() != 0 && ((step) % P.get<int>("VTK.Freq")) == 0)) {
+                LSInit(mg, the_conc_sol_vd, the_conc_sol_fun, /*t*/ cur_time);
+                LSInit(mg, the_poten_sol_vd, the_poten_sol_fun, /*t*/ cur_time);
+
+                vtkwriter->Write(cur_time);
+            }
+            if (P.get<int>("SurfSeparation.SolutionOutput.Freq") > 0 &&
+                step % P.get<int>("SurfSeparation.SolutionOutput.Freq") == 0) {
+                std::ostringstream os1,
+                        os2;
+                os1 << P.get<int>("Time.NumSteps");
+                os2 << P.get<std::string>("SurfSeparation.SolutionOutput.Path") << std::setw(os1.str().size()) << step;
+                DROPS::WriteFEToFile(timedisc.ic, mg, os2.str(), P.get<bool>("SurfSeparation.SolutionOutput.Binary"));
+            }
 //        lset2.DoStep();
 //        VectorCL rhs( lset2.Phi.Data.size());
 //        lset2.ComputeRhs( rhs);
@@ -1230,34 +1382,38 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
 //             lset.Phi.Data+= dphi;
 //             std::cout << "new rel. Volume: " << lset.GetVolume()/Vol << std::endl;
 //         }
-        //if (C.rpm_Freq && step%C.rpm_Freq==0) { // reparam levelset function
+            //if (C.rpm_Freq && step%C.rpm_Freq==0) { // reparam levelset function
             // lset.ReparamFastMarching( C.rpm_Method);
-            int freq=(int)(0.9*(dist/P.get<DROPS::Point3DCL>("SurfSeparation.Exp.Velocity").norm())/(P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps")));
-        //int freq=P.get<int>("Mesh.AdaptRef.Freq");
-        const bool doGridMod= freq && step%freq == 0;
-        const bool gridChanged= doGridMod ? adap.UpdateTriang() : false;
+            /*int freq = (int) (0.5 * (dist / P.get<DROPS::Point3DCL>("SurfSeparation.Exp.Velocity").norm()) /
+                    ((1./(double)sub_ratio)*P.get<double>("Time.FinalTime") / P.get<double>("Time.NumSteps")));*/
+            int freq=P.get<int>("Mesh.AdaptRef.Freq");
+            const bool doGridMod = freq && step % freq == 0;
+            const bool gridChanged = doGridMod ? adap.UpdateTriang() : false;
 
-        if (gridChanged) {
+            if (gridChanged) {
 
-            std::cout << "Triangulation changed.\n";
-            vidx.DeleteNumbering( mg);
-            vidx.CreateNumbering( mg.GetLastLevel(), mg, Bnd_v);
-            v.SetIdx( &vidx);
-            InitVel( mg, &v, Bnd_v, the_wind_fun, cur_time);
-            LSInit( mg, lset.Phi, the_lset_fun, cur_time);
-            the_conc_sol_vd.SetIdx( &lset.idx);
-            LSInit( mg, the_conc_sol_vd, the_conc_sol_fun, /*t*/ cur_time);
-            the_poten_sol_vd.SetIdx( &lset.idx);
-            LSInit( mg, the_poten_sol_vd, the_poten_sol_fun, /*t*/ cur_time);
-            // timedisc.Update(); // Called unconditionally in DoStep.
+                std::cout << "Triangulation changed.\n";
+                vidx.DeleteNumbering(mg);
+                vidx.CreateNumbering(mg.GetLastLevel(), mg, Bnd_v);
+                v.SetIdx(&vidx);
+                InitVel(mg, &v, Bnd_v, the_wind_fun, cur_time);
+                LSInit(mg, lset.Phi, the_lset_fun, cur_time);
+                the_conc_sol_vd.SetIdx(&lset.idx);
+                LSInit(mg, the_conc_sol_vd, the_conc_sol_fun, /*t*/ cur_time);
+                the_poten_sol_vd.SetIdx(&lset.idx);
+                LSInit(mg, the_poten_sol_vd, the_poten_sol_fun, /*t*/ cur_time);
+                the_species_sol_vd.SetIdx(&lset.idx);
+                LSInit(mg, the_species_sol_vd, the_species_sol_fun, /*t*/ cur_time);
+                // timedisc.Update(); // Called unconditionally in DoStep.
 
-            //lset2.SetupSystem( make_P2Eval( mg, Bnd_v, v), dt);
+                //lset2.SetupSystem( make_P2Eval( mg, Bnd_v, v), dt);
 
-            std::cout << "rel. Volume: " << lset.GetVolume()/Vol << std::endl;
-            lset.AdjustVolume();
-            lset.GetVolumeAdjuster()->DebugOutput( std::cout);
-                                    //vtkwriter->Write( cur_time+dt/2.);
+                std::cout << "rel. Volume: " << lset.GetVolume() / Vol << std::endl;
+                lset.AdjustVolume();
+                lset.GetVolumeAdjuster()->DebugOutput(std::cout);
+                //vtkwriter->Write( cur_time+dt/2.);
 
+            }
         }
     }
     std::cout << std::endl;
@@ -1268,7 +1424,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
         << H_1x_omega_err <<"\t" <<  H_1x_chi_err <<"\t"
         << L_2x_omega_err <<"\t" << L_2x_chi_err << "\t"
         <<std::endl;
-    log_global << "L2t_L2x_omega L2t_L2x_chi L2t_H1x_omega L2t_H1x_chi Linft_L2x_omega Linft_L2x_chi  H1x_omega(T) H1x_chi(T) L2x_omega(T) L2x_chi(T)\t" <<std::endl
+    log_errors << "L2t_L2x_omega L2t_L2x_chi L2t_H1x_omega L2t_H1x_chi Linft_L2x_omega Linft_L2x_chi  H1x_omega(T) H1x_chi(T) L2x_omega(T) L2x_chi(T)\t" <<std::endl
         << std::sqrt(L_2tL_2x_omega_err_sq) <<"\t" << std::sqrt( L_2tL_2x_chi_err_sq)<<"\t"
         << std::sqrt(L_2tH_1x_omega_err_sq) <<"\t" << std::sqrt(L_2tH_1x_chi_err_sq)<<"\t"
         << L_inftL_2x_omega_err<<"\t" << L_inftL_2x_chi_err << "\t"
@@ -1277,7 +1433,9 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
         <<std::endl;
     //delete &lset2;
     log_global.close();
-}
+        log_errors.close();
+
+    }
 
 void StationaryStrategyP1 (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::LevelsetP2CL& lset)
 {
@@ -2131,7 +2289,9 @@ int  main (int argc, char* argv[])
     the_rhs_fun=  inscamap[P.get<std::string>("SurfSeparation.Exp.Rhs")];
     the_conc_sol_fun=  inscamap[P.get<std::string>("SurfSeparation.Exp.ConcentrationSolution")];
     the_poten_sol_fun=  inscamap[P.get<std::string>("SurfSeparation.Exp.ChemicalPotentialSolution")];
-    the_zero_fun= inscamap["ZeroScalarFun"];
+        the_species_sol_fun=  inscamap[P.get<std::string>("SurfSeparation.Exp.SpeciesSolution")];
+
+        the_zero_fun= inscamap["ZeroScalarFun"];
     double sigm = P.get<double>("SurfSeparation.Mobility");
     double eps = P.get<double>("SurfSeparation.Epsilon");
     ParameterNS::sigma = sigm;
@@ -2145,11 +2305,11 @@ int  main (int argc, char* argv[])
     std::unique_ptr<MGBuilderCL> builder( make_MGBuilder( P));
     DROPS::MultiGridCL mg( *builder);
     typedef DistMarkingStrategyCL MarkerT;
-    double dist=1*(2.0*P.get<DROPS::Point3DCL>("SurfSeparation.Exp.Velocity").norm()*P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps")
+    double dist=3*(2.0*P.get<DROPS::Point3DCL>("SurfSeparation.Exp.Velocity").norm()*P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps")
                 +P.get<DROPS::Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")/pow(2,P.get<int>("Mesh.AdaptRef.FinestLevel")));
 
     MarkerT marker( the_lset_fun,
-            2*dist,
+            dist,
            // P.get<double>( "Mesh.AdaptRef.Width"),
                     P.get<int>( "Mesh.AdaptRef.CoarsestLevel"), P.get<int>( "Mesh.AdaptRef.FinestLevel"));
 

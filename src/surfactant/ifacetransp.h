@@ -919,7 +919,9 @@ void SetupStokesIF_P1P2      ( const MultiGridCL& MG_, MatDescCL* A_P1, MatDescC
 void SetupStokesIF_P2P2      ( const MultiGridCL& MG_, MatDescCL* A_P2, MatDescCL* A_P2_stab, MatDescCL* B_P2P2, MatDescCL* M_P2, MatDescCL* S_P2, MatDescCL* L_P2P2, MatDescCL* L_P2P2_stab, MatDescCL* M_ScalarP2, MatDescCL* A_ScalarP2_stab, const VecDescCL& lset, const LsetBndDataCL& lset_bnd, bool fullgrad);
 
 void SetupCahnHilliardIF_P1P1( const MultiGridCL& MG_,  MatDescCL* M_P1, MatDescCL* NormalStab_P1, MatDescCL* TangentStab_P1, MatDescCL* VolumeStab_P1, MatDescCL* L_P1P1 ,MatDescCL* LM_P1P1 ,MatDescCL* Gprimeprime_P1P1 , const VecDescCL& lset, const LsetBndDataCL& lset_bnd, const VecDescCL& velocity, const BndDataCL<Point3DCL>& velocity_bnd,const VecDescCL& volume_fraction, const BndDataCL<>& volume_fraction_bnd);
-    double Mobility_function(double x);
+    double Mobility_function(double x,double t=0);
+    double Diffusion_function(double x,double t=0);
+
     double inverse_square_root(double x);
     double Potential_function(double x);
     double Potential_prime_function(double x);
@@ -1031,7 +1033,7 @@ class LocalLaplaceBeltramiP1CL
             LocalP1CL<> mobility;
             for(int i=0; i<4 ; ++i)
             {
-                mobility += Mobility_function(concentr_loc[i])*cdata.p1[i];
+                mobility += Mobility_function(concentr_loc[i], time_)*cdata.p1[i];
             }
             resize_and_evaluate_on_vertexes (mobility, qdom, qmobility);
 
@@ -1045,6 +1047,83 @@ class LocalLaplaceBeltramiP1CL
 
         LocalLaplaceMobilityP1CL (const DiscVelSolT& conc, instat_vector_fun_ptr normal, double t)
                 :concentr_(conc), normal_(normal), time_(t) {}
+    };
+
+    template <typename DiscVelSolT>
+    class LocalLaplaceNonlinearP1CL
+    {
+    private:
+
+        QuadDomain2DCL qdom;
+        double time_;
+        instat_vector_fun_ptr normal_;
+
+
+        std::valarray<double> mobility;
+        std::valarray<double> qmobility;
+
+        const DiscVelSolT concentr_;
+
+        LocalP1CL<double> concentr_loc;
+        GridFunctionCL<> qconcentr;
+
+        LocalP1CL<double> P1Hat[4];
+
+        Point3DCL grad[4];
+        double dummy;
+        GridFunctionCL<Point3DCL> n, q[4], qq[4];
+        LocalP1CL<Point3DCL> Normals;
+
+        GridFunctionCL<Point3DCL> qnormal;
+
+        std::valarray<double> absdet;
+
+    public:
+        static const FiniteElementT row_fe_type= P1IF_FE,
+                col_fe_type= P1IF_FE;
+
+        double coup[4][4];
+
+        void setup (const TetraCL& t, const InterfaceCommonDataP1CL& cdata) {
+
+            make_CompositeQuad5Domain2D( qdom, cdata.surf, t);
+            concentr_loc.assign( t, concentr_);
+            //resize_and_evaluate_on_vertexes( concentr_loc, qdom, qconcentr);
+
+            P1DiscCL::GetGradients( grad, dummy, t);
+
+            //qnormal.assign(t, normal_, time_);
+            resize_and_evaluate_on_vertexes( normal_, t, qdom, time_, qnormal);
+
+            /*// Scale Normals accordingly to the Euclidean Norm (only consider the ones which make a contribution in the sense of them being big enough... otherwise one has to expect problems with division through small numbers)
+            for(Uint i=0; i<qnormal.size(); ++i) {
+                //if(qnormal[i].norm()> 1e-8)
+                qnormal[i]= qnormal[i]/qnormal[i].norm();
+            }*/
+
+            for(int j=0; j<4 ;++j) {
+                qq[j].resize( qdom.vertex_size());
+                qq[j]= grad[j];
+                qq[j]-= dot( qq[j], qnormal)*qnormal;
+            }
+
+            LocalP1CL<> mobility;
+            for(int i=0; i<4 ; ++i)
+            {
+                mobility += Diffusion_function(concentr_loc[i], time_)*cdata.p1[i];
+            }
+            resize_and_evaluate_on_vertexes (mobility, qdom, qmobility);
+
+
+            for (int i= 0; i < 4; ++i)
+                for(int j= 0; j < 4; ++j) {
+                    coup[i][j]= quad_2D( qmobility*dot(qq[i],qq[j]), qdom);
+                }
+
+        }
+
+        LocalLaplaceNonlinearP1CL (const DiscVelSolT& conc, instat_vector_fun_ptr normal, double t)
+                :concentr_(conc), normal_(normal), time_(t)  {}
     };
 
     class LocalFullGradientsP1CL
@@ -1981,10 +2060,16 @@ class CahnHilliardP1BaseCL: public SurfacePDEP1BaseCL
 
         IdxDescCL idx; ///< index desctription for concentration at current time
         VecDescCL ic;  ///< concentration on the interface at current time
-        VecDescCL conc_extrapol;
-        /*IdxDescCL idx_mu; ///< index desctription for chemical potential at current time*/
+        VecDescCL ienergy;  ///< energy on the interface at current time
+
+    VecDescCL conc_extrapol;
+    VecDescCL species_extrapol;
+
+    /*IdxDescCL idx_mu; ///< index desctription for chemical potential at current time*/
         VecDescCL imu;  ///< chemical potential on the interface at current time
-        VecDescCL iface;  ///< interface mesh at current time
+    VecDescCL is;  ///< third species concentration on the interface at current time
+
+    VecDescCL iface;  ///< interface mesh at current time
 
 
 protected:
@@ -1993,12 +2078,14 @@ protected:
 
         instat_scalar_fun_ptr rhs_fun3_; ///< function for a right-hand side to concentration equation
         instat_scalar_fun_ptr rhs_fun4_; ///< function for a right-hand side chemical potential equation
+        instat_scalar_fun_ptr rhs_fun5_; ///< function for a right-hand side species equation
 
 
         IdxDescCL           oldidx_; ///< idx that corresponds to old time (and oldoldls_)
         IdxDescCL           oldoldidx_; ///< idx that corresponds to old old time (and oldoldls_)
 
         VectorCL            oldic_;  ///< interface concentration at old time
+         VectorCL           oldis_;  ///< interface species at old time
 
         VectorCL            oldoldic_;  ///< interface concentration at old old time
 
@@ -2048,6 +2135,10 @@ protected:
         const_DiscSolCL GetConcentr( const VecDescCL& Myic) const
         { return const_DiscSolCL( &Myic, &Bnd_, &MG_); }
 
+        const_DiscSolCL GetSpecies() const
+        { return const_DiscSolCL( &is, &Bnd_, &MG_); }
+        const_DiscSolCL GetSpecies( const VecDescCL& Myis) const
+        { return const_DiscSolCL( &Myis, &Bnd_, &MG_); }
 
         const_DiscSolCL GetPotential() const
         { return const_DiscSolCL( &imu, &Bnd_, &MG_); }
@@ -2055,7 +2146,7 @@ protected:
         { return const_DiscSolCL( &Myimu, &Bnd_, &MG_); }
 
         /// initialize the interface concentration
-        void SetInitialValue (instat_scalar_fun_ptr,instat_scalar_fun_ptr, double t= 0.);
+        void SetInitialValue (instat_scalar_fun_ptr,instat_scalar_fun_ptr,instat_scalar_fun_ptr, double t= 0.);
 
         /// set the parameter of the theta-scheme for time stepping
         void SetRhs (instat_scalar_fun_ptr,instat_scalar_fun_ptr);
@@ -2130,6 +2221,7 @@ class CahnHilliardcGP1CL : public CahnHilliardP1BaseCL
         IdxDescCL full_idx;
         MatDescCL Laplace,  ///< diffusion matrix,
                 LaplaceM,  ///< diffusion matrix with mobility div_Gamma(M grad_Gamma)
+                LaplaceNon,  ///< nonlinear diffusion matrix with div_Gamma(f grad_Gamma)
                 Volume_stab, ///< stabilization matrix,
                 Ident,
                 Mass,  ///< mass matrix
@@ -2139,7 +2231,7 @@ class CahnHilliardcGP1CL : public CahnHilliardP1BaseCL
 
         const double S_;//stabilization parameter for time derivative;
 
-        VecDescCL ext1, ext2;
+        VecDescCL ext1, ext2, ext3;
         VectorCL load, ///< for a load-function
                 rhs1_, ///< for the extension initial data
                 rhs2_; ///< for the extension initial data
@@ -2149,7 +2241,7 @@ class CahnHilliardcGP1CL : public CahnHilliardP1BaseCL
 
 
     private:
-        MatrixCL      A_, B_, C_, D_; ///< blocks of the matrix
+        MatrixCL      A_, B_, C_, D_, K_; ///< blocks of the matrix
         ///< //  instat_scalar_fun_ptr lvlset_; ///< must be the signed distance function
         instat_vector_fun_ptr normal_; ///< the level-set function
         //TransportP2FunctionCL* fulltransport_;
@@ -2161,7 +2253,7 @@ class CahnHilliardcGP1CL : public CahnHilliardP1BaseCL
         int iter= 999, double tol= 1.1e-7, double iterA=499, double tolA=1.1e-3, double iterB=499, double tolB=1.1e-3,double omit_bound= -1.)
         : CahnHilliardP1BaseCL( mg, theta, sigma, epsilon, v, Bnd_v, lset_vd, lsetbnd,
                 iter, tol, iterA, tolA, iterB, tolB, omit_bound),
-          full_idx( P2_FE), ext1(),ext2(),
+          full_idx( P2_FE), ext1(),ext2(), ext3(),
           //conc_extrapol(),
           normal_(normal),width_(width), rho_(rho), S_(S)
         {
@@ -2191,10 +2283,10 @@ class CahnHilliardcGP1CL : public CahnHilliardP1BaseCL
         /// of the coupling navstokes-levelset. They should not be called by a common user.
         /// Use DoStep() instead.
         ///@{
-        void InitStep1 (VectorCL&, VectorCL&, double new_t);// one-step--Implicit Euler
+        void InitStep1 (VectorCL&, VectorCL&, VectorCL&, double new_t);// one-step--Implicit Euler
         void InitStep2 (VectorCL&, VectorCL&, double new_t);// two-step--BDF2 Euler, Use Backward Euler in the first time step
         void InitStep3 (double new_t);// two-step--BDF2 Euler, In the first time step, solve the equation with smaller time step
-        void DoStep1 (VectorCL&, VectorCL&); //one step-- Implicit Euler
+        void DoStep1 (VectorCL&, VectorCL&,VectorCL&); //one step-- Implicit Euler
         void DoStep2 (VectorCL& ,VectorCL& ); //two step-- BDF2 method
         void CommitStep ();
         void Update ();
