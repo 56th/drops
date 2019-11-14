@@ -786,7 +786,7 @@ struct SurfOseenSystem {
               AL, // AL / grad-div stabilization mtx
               sumA, // accumulated from above
               A_p, M_p, C, // pressure stiffness (laplace-beltrami), pressure mass, and volume stabilization mtx
-              B; // divergence mtx
+              B, Q; // divergence and rhs-curl-projection mtx
     VecDescCL fRHS, gRHS, // moment and continuity rhs
               alRHS, // AL / grad-div stabilization rhs
               w; // wind

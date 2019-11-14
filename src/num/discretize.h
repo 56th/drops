@@ -358,6 +358,15 @@ dot(const GridFunctionCL<SVectorCL<Dim> >& a, const GridFunctionCL<SVectorCL<Dim
     return ret;
 }
 
+inline GridFunctionCL<Point3DCL>
+cross_product(GridFunctionCL<Point3DCL> const & a, GridFunctionCL<Point3DCL> const & b) {
+    GridFunctionCL<Point3DCL> res(Point3DCL(0., 0., 0.), a.size());
+    for (size_t i = 0; i < a.size(); ++i)
+        // res[i] = cross(a[i], b[i]);
+        cross_product(res[i], a[i], b[i]);
+    return res;
+}
+
 template<Uint D>
 inline GridFunctionCL<double>
 dot(const SVectorCL<D> & a, const GridFunctionCL<SVectorCL<D> >& b) {
