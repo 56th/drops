@@ -251,7 +251,7 @@ int main(int argc, char* argv[]) {
                     << "numb of d.o.f. scalar P2: " << P2FEidx.NumUnknowns() << '\n'
                     << "numb of d.o.f. scalar P1: " << P1FEidx.NumUnknowns();
             logger.log();
-            VecDescCL u_star, u_star_ext, u, u_ext, u_prev, u_prev_prev, p_star, p_star_ext, p, p_ext;
+            VecDescCL u_star, u_star_ext, u, u_ext, u_prev, u_prev_prev, surf_curl_u, surf_curl_u_ext, p_star, p_star_ext, p, p_ext;
             size_t n, m;
             if (FE == "P2P1") {
                 n = ifaceVecP2idx.NumUnknowns();
@@ -262,6 +262,8 @@ int main(int argc, char* argv[]) {
                 u_star_ext.SetIdx(&vecP2idx);
                 u_prev.SetIdx(&ifaceVecP2idx);
                 u_prev_prev.SetIdx(&ifaceVecP2idx);
+                surf_curl_u.SetIdx(&ifaceP1idx);
+                surf_curl_u_ext.SetIdx(&P1FEidx);
                 surfOseenSystem.w.SetIdx(&ifaceVecP2idx);
                 surfOseenSystem.fRHS.SetIdx(&ifaceVecP2idx);
                 surfOseenSystem.alRHS.SetIdx(&ifaceVecP2idx);
@@ -270,6 +272,7 @@ int main(int argc, char* argv[]) {
                 surfOseenSystem.N.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
                 surfOseenSystem.A_stab.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
                 surfOseenSystem.B.SetIdx(&ifaceP1idx, &ifaceVecP2idx);
+                surfOseenSystem.Q.SetIdx(&ifaceP1idx, &ifaceVecP2idx);
                 surfOseenSystem.M.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
                 surfOseenSystem.S.SetIdx(&ifaceVecP2idx, &ifaceVecP2idx);
             }
@@ -284,6 +287,7 @@ int main(int argc, char* argv[]) {
             surfOseenSystem.C.SetIdx(&ifaceP1idx, &ifaceP1idx);
             logger.beg("interpolate initial data");
                 InitVector(mg, u_star, surfNavierStokesData.u_T, 0.);
+                InitScalar(mg, surf_curl_u, [](Point3DCL const &, double) { return 1.; }, 0.);
                 InitScalar(mg, p_star, surfNavierStokesData.p, 0.);
                 u = u_star;
                 p = p_star;
@@ -294,6 +298,7 @@ int main(int argc, char* argv[]) {
             auto writeVTK = [&](double t) {
                 Extend(mg, u_star, u_star_ext);
                 Extend(mg, u, u_ext);
+                Extend(mg, surf_curl_u, surf_curl_u_ext);
                 Extend(mg, p_star, p_star_ext);
                 Extend(mg, p, p_ext);
                 vtkWriter.write(t);
@@ -306,6 +311,7 @@ int main(int argc, char* argv[]) {
                 vtkWriter
                     .add(vtkLevelSet)
                     .add(VTKWriter::VTKVar({ "u_h", &u_ext.Data, VTKWriter::VTKVar::Type::vecP2 }))
+                    .add(VTKWriter::VTKVar({ "surf_curl_u_h", &surf_curl_u_ext.Data, VTKWriter::VTKVar::Type::P1 }))
                     .add(VTKWriter::VTKVar({ "p_h", &p_ext.Data, VTKWriter::VTKVar::Type::P1 }));
                 if (surfNavierStokesData.exactSoln)
                     vtkWriter
@@ -362,7 +368,7 @@ int main(int argc, char* argv[]) {
                 MatrixCL S_M_tmp, S_L_tmp;
                 S_M_tmp.LinComb(1. / (gamma + nu), surfOseenSystem.M_p.Data, -1., surfOseenSystem.C.Data);
                 S_L_tmp.LinComb(1. / alpha, surfOseenSystem.A_p.Data, -1., surfOseenSystem.C.Data);
-            logger.end();
+            auto assembleTime = logger.end();
             logger.beg("convert to Epetra");
                 logger.beg("cast matrices");
                     auto A = static_cast<Epetra_CrsMatrix>(surfOseenSystem.sumA.Data);
@@ -557,11 +563,11 @@ int main(int argc, char* argv[]) {
                 }
             logger.end();
             logger.beg("linear solve");
-            if (inpJSON.get<bool>("Solver.UsePreviousFrameAsInitialGuess")) {
-                for (size_t i = 0; i < n; ++i) belosLHS[i] = u.Data[i];
-                for (size_t i = 0; i < m; ++i) belosLHS[n + i] = p.Data[i];
-            } else belosLHS.PutScalar(0.);
-            auto belosProblem = LinearProblem<ST, MV, OP>(belosMTX, rcpFromRef(belosLHS), rcpFromRef(belosRHS));
+                if (inpJSON.get<bool>("Solver.UsePreviousFrameAsInitialGuess")) {
+                    for (size_t i = 0; i < n; ++i) belosLHS[i] = u.Data[i];
+                    for (size_t i = 0; i < m; ++i) belosLHS[n + i] = p.Data[i];
+                } else belosLHS.PutScalar(0.);
+                auto belosProblem = LinearProblem<ST, MV, OP>(belosMTX, rcpFromRef(belosLHS), rcpFromRef(belosRHS));
                 if (inpJSON.get<bool>("Solver.Inner.Use")) belosProblem.setRightPrec(belosPRE);
                 belosProblem.setProblem();
                 belosSolver->setProblem(rcpFromRef(belosProblem));
@@ -579,6 +585,37 @@ int main(int argc, char* argv[]) {
                 for (size_t i = 0; i < m; ++i) p.Data[i] = belosLHS[n + i];
                 p.Data -= dot(surfOseenSystem.M_p.Data * p.Data, I_p) / dot(surfOseenSystem.M_p.Data * I_p, I_p) * I_p;
             logger.end();
+            logger.beg("project surface vorticity");
+                // mtx
+                MatrixCL M_tmp;
+                M_tmp.LinComb(1., surfOseenSystem.M_p.Data, -1., surfOseenSystem.C.Data);
+                auto M = static_cast<Epetra_CrsMatrix>(M_tmp);
+                // rhs
+                auto Q_times_u = surfOseenSystem.Q.Data * u.Data;
+                auto Q_times_u_view = static_cast<Epetra_Vector>(Q_times_u);
+                // solver
+                auto belosParamsW = parameterList();
+                belosParamsW->set("Maximum Iterations", 1000);
+                belosParamsW->set("Convergence Tolerance", 1e-8);
+                belosParamsW->set( "Output Frequency", 10);
+                belosParamsW->set("Verbosity", Belos::Errors + Belos::Warnings + Belos::StatusTestDetails + Belos::TimingDetails + Belos::FinalSummary + Belos::IterationDetails);
+                belosParamsW->set<int>("Output Style", Belos::Brief);
+                auto belosSolverW = belosFactory.create("CG", belosParamsW);
+                // solve
+                Epetra_Vector surf_curl_u_epetra(mapPressure);
+                surf_curl_u_epetra.PutScalar(0.);
+                auto belosProblemW = LinearProblem<ST, MV, OP>(rcpFromRef(M), rcpFromRef(surf_curl_u_epetra), rcpFromRef(Q_times_u_view));
+                belosProblemW.setProblem();
+                belosSolverW->setProblem(rcpFromRef(belosProblemW));
+                auto belosSolverResultW = belosSolverW->solve();
+                if (myRank == 0) {
+                    if (belosSolverResultW == Belos::Converged)
+                        logger.log("belos converged");
+                    else
+                        logger.wrn("belos did not converge");
+                }
+                for (size_t i = 0; i < m; ++i) surf_curl_u.Data[i] = surf_curl_u_epetra[i];
+            auto projectTime = logger.end();
             logger.beg("output");
                 MatrixCL B_T;
                 auto residual = [&](VectorCL const & u, VectorCL const & p) {
@@ -598,7 +635,11 @@ int main(int argc, char* argv[]) {
                     tJSON.put("Solver.Outer.TotalIters", belosSolver->getNumIters());
                     tJSON.put("Solver.Outer.DOF", n + m);
                     tJSON.put("Solver.Outer.Converged", belosSolverResult == Belos::Converged);
+                    tJSON.put("Solver.ProjectVorticity.TotalIters", belosSolverW->getNumIters());
+                    tJSON.put("Solver.ProjectVorticity.Converged", belosSolverResultW == Belos::Converged);
                     tJSON.put("ElapsedTime.LinearSolve", solveTime);
+                    tJSON.put("ElapsedTime.Assemble", assembleTime);
+                    tJSON.put("ElapsedTime.ProjectVorticity", projectTime);
                     tJSON.put("Solver.Inner.A.TotalIters", numItersA);
                     tJSON.put("Solver.Inner.A.MeanIters", static_cast<double>(numItersA) / belosSolver->getNumIters());
                     tJSON.put("Solver.Inner.A.DOF", n);
@@ -705,7 +746,7 @@ int main(int argc, char* argv[]) {
                     surfOseenSystem.C.Data *= -rho_p;
                     S_M_tmp.LinComb(1. / (gamma + nu), surfOseenSystem.M_p.Data, -1., surfOseenSystem.C.Data);
                     S_L_tmp.LinComb(1. / alpha, surfOseenSystem.A_p.Data, -1., surfOseenSystem.C.Data);
-                logger.end();
+                assembleTime = logger.end();
                 logger.beg("convert to Epetra");
                     logger.beg("cast matrices");
                         A = static_cast<Epetra_CrsMatrix>(surfOseenSystem.sumA.Data);
