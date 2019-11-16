@@ -11,8 +11,8 @@
         "E1": [3.33333, 0,0],		
         "E2": [0,3.33333,0],		
         "E3": [0,0,3.33333],		
-        "N1": 2,		
-        "N2": 2,		
+        "N1": 2,
+        "N2": 2,
         "N3": 2,
         "RestartFile": "",
         "AdaptRef": {
@@ -20,7 +20,7 @@
             "Freq":          0,
             "Width":         0,
             "CoarsestLevel": 0,
-            "FinestLevel":   2,
+            "FinestLevel":   4,
             "SD":            0.1,
             "CurvDiff":      -1,
             "Discontinuous": 0
@@ -29,15 +29,23 @@
 
     "SurfNavStokes": {
       "gamma" :                   1.0,
-      "nu" :                      0.001,
+      "nu" :                      1e-5,
       "IC" : {
         "Comment" : "initial condition parameters",
         "KelvinHelmholtzSphere" : {
           "Frequency" : 20.0,
           "Amplitude" : 0.1
+        },
+        "KelvinHelmholtzCristophSphere" : {
+          "Delta_0" : 0.1,
+          "cn" : 0.01,
+          "aa" : 1.0,
+          "ma" : 20.0,
+          "ab" : 0.0,
+          "mb" : 16.0
         }
       },
-      "TestName":                 "OseenSphere",
+      "TestName":                 "KelvinHelmholtzCristophSphere",
       "FE":                       "P2P1",
       "PressureVolumestabType":   "normal",
       "NormalPenaltyPower":       -2,
@@ -60,7 +68,7 @@
       "Read":         0,
       "Write":        "yes",
       "NumbOfSteps":  1,
-      "FinalTime":    0.0001
+      "FinalTime":    1
     },
 
     "Levelset": {
@@ -142,7 +150,7 @@
               "S_L" : true,
               "Iteration" : "CG",
               "MaxIter" : 200,
-              "RelResTol" : 1e-4
+              "RelResTol" : 1e-2
             }
         }
     }

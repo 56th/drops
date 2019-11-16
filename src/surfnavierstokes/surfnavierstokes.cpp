@@ -183,11 +183,23 @@ int main(int argc, char* argv[]) {
             logger.end();
             logger.beg("refine towards the surface");
                 AdapTriangCL adap(mg);
+                /*if (testName == "KelvinHelmholtzCristophSphere") {
+                    logger.beg("refine around equator");
+                        auto delta_0 = inpJSON.get<double>("SurfNavStokes.IC.KelvinHelmholtzCristophSphere.Delta_0");
+                        auto refEquator = [&](Point3DCL const & p, double t) {
+                            if (std::fabs(p[2]) > delta_0) return std::numeric_limits<double>::max();
+                            return 0.;
+                        };
+                        DistMarkingStrategyCL markerEquator(refEquator, inpJSON.get<double>("Mesh.AdaptRef.Width"), inpJSON.get<int>("Mesh.AdaptRef.CoarsestLevel"), inpJSON.get<int>("Mesh.AdaptRef.CoarsestLevel") + 1);
+                        adap.set_marking_strategy(&markerEquator);
+                        adap.MakeInitialTriang();
+                    logger.end();
+                }*/
                 // adaptive mesh refinement based on level set function
-                DistMarkingStrategyCL initmarker(surfNavierStokesData.surface.phi, inpJSON.get<double>("Mesh.AdaptRef.Width"), inpJSON.get<int>("Mesh.AdaptRef.CoarsestLevel"), inpJSON.get<int>("Mesh.AdaptRef.FinestLevel"));
-                adap.set_marking_strategy(&initmarker);
+                DistMarkingStrategyCL markerLset(surfNavierStokesData.surface.phi, inpJSON.get<double>("Mesh.AdaptRef.Width"), inpJSON.get<int>("Mesh.AdaptRef.CoarsestLevel"), inpJSON.get<int>("Mesh.AdaptRef.FinestLevel"));
+                adap.set_marking_strategy(&markerLset);
                 adap.MakeInitialTriang();
-                adap.set_marking_strategy(0);
+                adap.set_marking_strategy(nullptr);
                 auto numbOfTetras = mg.GetNumTriangTetra();
                 logger.buf
                     << "h = " << h << '\n'
@@ -379,7 +391,7 @@ int main(int argc, char* argv[]) {
                 belosParamsW->set("Maximum Iterations", 1000);
                 belosParamsW->set("Convergence Tolerance", 1e-8);
                 belosParamsW->set( "Output Frequency", 10);
-                // belosParamsW->set("Verbosity", Belos::Errors + Belos::Warnings + Belos::StatusTestDetails + Belos::TimingDetails + Belos::FinalSummary + Belos::IterationDetails);
+                belosParamsW->set("Verbosity", Belos::Errors + Belos::Warnings + Belos::StatusTestDetails);
                 belosParamsW->set<int>("Output Style", Belos::Brief);
                 auto belosSolverW = belosFactory.create("CG", belosParamsW);
                 // solve

@@ -17,6 +17,7 @@ namespace DROPS {
         struct Surface {
             InstatScalarFunction phi;
             InstatVectorFunction n;
+            InstatVectorFunction e;
             InstatMatrixFunction H;
         };
         Surface surface;
@@ -34,6 +35,7 @@ namespace DROPS {
             Point3DCL v(p[0]/den, p[1]/den, p[2]/den);
             return v;
         };
+        sphere.e = sphere.n;
         sphere.H = [](Point3DCL const & p, double) {
             SMatrixCL<3, 3> res;
             auto den = std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2);
@@ -156,6 +158,59 @@ namespace DROPS {
                 v[0] = -x[1];
                 v[1] = x[0];
                 return v;
+            };
+            data.u_N = [](Point3DCL const &, double) {
+                return 0.;
+            };
+            data.p = [](Point3DCL const &, double) {
+                return 0.;
+            };
+            data.f_T = [=](Point3DCL const & p, double) {
+                return Point3DCL(0., 0., 0.);
+            };
+            data.m_g = [](Point3DCL const & p, double) {
+                return 0.;
+            };
+            data.surface = sphere;
+        }
+        else if (test == "KelvinHelmholtzCristophSphere") {
+            data.exactSoln = false;
+            data.description = "phi = x^2 + y^2 + z^2 - 1, u_0 = Kelvin-Helmholtz, p = 0\n";
+            auto eta = [=](Point3DCL const & p) {
+                return -0.3183098861837907*std::asin(p[2]/std::sqrt(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2)));
+            };
+            auto arctan = [](double x, double y) {
+                auto pi = 3.1415926535897932;
+                if (x > 0 && y >= 0) return std::atan(y/x);
+                if (x > 0 && y < 0)  return std::atan(y/x) + 2. * pi;
+                if (x < 0)           return std::atan(y/x) + pi;
+                return sign(y) * pi / 2.;
+            };
+            auto xi = [=](Point3DCL const & p) {
+                return 0.15915494309189535*arctan(p[0],p[1]);
+            };
+            auto eXi = [=](Point3DCL const & p) {
+                return Point3DCL(-1.*p[1]*std::sqrt(1/(std::pow(p[0],2) + std::pow(p[1],2))), p[0]*std::sqrt(1/(std::pow(p[0],2) + std::pow(p[1],2))), 0.);
+            };
+            auto delta_0 = param.get<double>("SurfNavStokes.IC." + test + ".Delta_0");
+            auto cn = param.get<double>("SurfNavStokes.IC." + test + ".cn");
+            auto aa = param.get<double>("SurfNavStokes.IC." + test + ".aa");
+            auto ab = param.get<double>("SurfNavStokes.IC." + test + ".ab");
+            auto ma = param.get<double>("SurfNavStokes.IC." + test + ".ma");
+            auto mb = param.get<double>("SurfNavStokes.IC." + test + ".mb");
+            auto Hs = [=](double eta) {
+                return std::tanh(2. * eta / delta_0);
+            };
+            auto pert = [=](Point3DCL const & p) {
+                return Point3DCL(
+                    (0.05066059182116889*(-4.*p[1]*std::sqrt((std::pow(p[0],2) + std::pow(p[1],2))/(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2)))*std::sqrt(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2))*std::asin(p[2]/std::sqrt(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2)))*(aa*cos(0.5*ma*arctan(p[0],p[1])) + ab*cos(0.5*mb*arctan(p[0],p[1]))) + 9.869604401089358*p[0]*p[2]*std::pow(delta_0,2)*(aa*ma*sin(0.5*ma*arctan(p[0],p[1])) + ab*mb*sin(0.5*mb*arctan(p[0],p[1])))))/(std::pow(2.718281828459045,(0.10132118364233778*std::pow(std::asin(p[2]/std::sqrt(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2))),2))/std::pow(delta_0,2))*(std::pow(p[0],2) + std::pow(p[1],2))*std::sqrt(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2))*std::pow(delta_0,2)),
+                    (0.05066059182116889*(4.*p[0]*std::sqrt((std::pow(p[0],2) + std::pow(p[1],2))/(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2)))*std::sqrt(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2))*std::asin(p[2]/std::sqrt(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2)))*(aa*cos(0.5*ma*arctan(p[0],p[1])) + ab*cos(0.5*mb*arctan(p[0],p[1]))) + 9.869604401089358*p[1]*p[2]*std::pow(delta_0,2)*(aa*ma*sin(0.5*ma*arctan(p[0],p[1])) + ab*mb*sin(0.5*mb*arctan(p[0],p[1])))))/(std::pow(2.718281828459045,(0.10132118364233778*std::pow(std::asin(p[2]/std::sqrt(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2))),2))/std::pow(delta_0,2))*(std::pow(p[0],2) + std::pow(p[1],2))*std::sqrt(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2))*std::pow(delta_0,2)),
+                    (-0.5*(aa*ma*sin(0.5*ma*arctan(p[0],p[1])) + ab*mb*sin(0.5*mb*arctan(p[0],p[1]))))/(std::pow(2.718281828459045,(0.10132118364233778*std::pow(std::asin(p[2]/std::sqrt(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2))),2))/std::pow(delta_0,2))*std::sqrt(std::pow(p[0],2) + std::pow(p[1],2) + std::pow(p[2],2)))
+                );
+            };
+            data.u_T = [=](Point3DCL const & p, double) {
+                auto x = sphere.e(p, 0.);
+                return Hs(eta(x)) * std::sqrt(1. - p[3] * p[3]) * eXi(x) + cn * pert(x);
             };
             data.u_N = [](Point3DCL const &, double) {
                 return 0.;
