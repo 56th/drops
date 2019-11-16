@@ -190,6 +190,7 @@ namespace DROPS {
                 return 0.15915494309189535*arctan(p[0],p[1]);
             };
             auto eXi = [=](Point3DCL const & p) {
+                if (std::pow(p[0],2) + std::pow(p[1],2) == 0.) return Point3DCL(0., 0., 0.);
                 return Point3DCL(-1.*p[1]*std::sqrt(1/(std::pow(p[0],2) + std::pow(p[1],2))), p[0]*std::sqrt(1/(std::pow(p[0],2) + std::pow(p[1],2))), 0.);
             };
             auto delta_0 = param.get<double>("SurfNavStokes.IC." + test + ".Delta_0");
@@ -210,7 +211,7 @@ namespace DROPS {
             };
             data.u_T = [=](Point3DCL const & p, double) {
                 auto x = sphere.e(p, 0.);
-                return Hs(eta(x)) * std::sqrt(1. - p[3] * p[3]) * eXi(x) + cn * pert(x);
+                return Hs(eta(x)) * std::sqrt(1. - x[2] * x[2]) * eXi(x) + cn * pert(x);
             };
             data.u_N = [](Point3DCL const &, double) {
                 return 0.;
