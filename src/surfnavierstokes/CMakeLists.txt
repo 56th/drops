@@ -9,10 +9,10 @@ target_link_libraries(${HOME} ${HOME}-logger)
 # vtk
 if (VTK_FOUND)
     target_link_libraries(${HOME} ${VTK_LIBRARIES})
-    vtk_module_autoinit(
-        TARGETS ${HOME}
-        MODULES ${VTK_LIBRARIES}
-    )
+    #vtk_module_autoinit(
+    #    TARGETS ${HOME}
+    #    MODULES ${VTK_LIBRARIES}
+    #)
 endif()
 
 # trilinos

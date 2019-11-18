@@ -499,9 +499,9 @@ int main(int argc, char* argv[]) {
                         factorizationTime = logger.end();
                         invA = [&](MV const &X, MV &Y) {
                             amesosProblem.SetLHS(&Y);
-                            amesosProblem.SetRHS(const_cast<MV*>(&X));
-                            AMESOS_CHK_ERR(amesosSolver->Solve());
-                            numItersA++;
+			    amesosProblem.SetRHS(const_cast<MV*>(&X));
+			    amesosSolver->Solve();
+			    numItersA++;
                         };
                     } else { // Belos
                         logger.log("using Belos");
