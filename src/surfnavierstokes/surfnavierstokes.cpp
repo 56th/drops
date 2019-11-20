@@ -160,6 +160,7 @@ int main(int argc, char* argv[]) {
             if (gamma == 0.)
                 surfOseenSystem.AL.assemble = false;
             logger.log();
+            auto reFactorizeTol = inpJSON.get<double>("Solver.Inner.A.ReFactorizeTol");
         logger.end();
         logger.beg("build mesh");
             logger.beg("build initial bulk mesh");
@@ -360,7 +361,8 @@ int main(int argc, char* argv[]) {
                         InitVector(mg, surfOseenSystem.w, surfNavierStokesData.w_T, param.input.t);
                     else surfOseenSystem.w.Data = wind; // Navier-Stokes case
                 };
-                setWind(u_prev.Data);
+                auto wind = u_prev.Data;
+                setWind(wind);
                 auto Pe = supnorm(surfOseenSystem.w.Data) / nu;
                 logger.buf << "Pe = " << Pe;
                 logger.log();
@@ -418,7 +420,7 @@ int main(int argc, char* argv[]) {
                 logger.beg("cast matrices");
                     auto A = static_cast<Epetra_CrsMatrix>(surfOseenSystem.sumA.Data);
                     auto printStat = [&](std::string const & name, Epetra_CrsMatrix const & A) {
-                        logger.buf << name << ": " << A.NumGlobalRows() << 'x' << A.NumGlobalCols() << ", " << A.NumGlobalNonzeros() << " nonzeros (" << (100. * A.NumGlobalNonzeros()) / (A.NumGlobalRows() * A.NumGlobalCols()) << "%)";
+                        logger.buf << name << ": " << A.NumGlobalRows() << 'x' << A.NumGlobalCols() << ", " << A.NumGlobalNonzeros() << " nonzeros (" << (100. * A.NumGlobalNonzeros()) / (static_cast<double>(A.NumGlobalRows()) * A.NumGlobalCols()) << "%)";
                         logger.log();
                     };
                     printStat("A", A);
@@ -482,21 +484,27 @@ int main(int argc, char* argv[]) {
                     decltype(belosSolver) belosSolverA;
                     // choose
                     auto factorizationTime = 0.;
-                    if (iterationA.find("Amesos") != std::string::npos) { // Amesos
+                    int reFactorize = 1;
+                    auto useAmesos = iterationA.find("Amesos") != std::string::npos;
+                    std::function<void()> runFactorization;
+                    if (useAmesos) { // Amesos
                         logger.log("using Amesos");
                         if (!amesosFactory.Query(iterationA))
                             throw std::invalid_argument("solver " + iterationA + " is not available");
                         logger.log("solver: " + iterationA);
                         amesosProblem.SetOperator(&A);
                         amesosSolver = rcp(amesosFactory.Create(iterationA, amesosProblem));
-                        logger.beg("factorization");
-                            logger.beg("symbolic factorization");
-                                AMESOS_CHK_ERR(amesosSolver->SymbolicFactorization());
-                            logger.end();
-                            logger.beg("numeric factorization");
-                                AMESOS_CHK_ERR(amesosSolver->NumericFactorization());
-                            logger.end();
-                        factorizationTime = logger.end();
+                        runFactorization = [&]() {
+                            logger.beg("factorization");
+                                logger.beg("symbolic factorization");
+                                    AMESOS_CHK_ERR(amesosSolver->SymbolicFactorization());
+                                logger.end();
+                                logger.beg("numeric factorization");
+                                    AMESOS_CHK_ERR(amesosSolver->NumericFactorization());
+                                logger.end();
+                            factorizationTime = logger.end();
+                        };
+                        runFactorization();
                         invA = [&](MV const &X, MV &Y) {
                             amesosProblem.SetLHS(&Y);
                             amesosProblem.SetRHS(const_cast<MV*>(&X));
@@ -622,10 +630,8 @@ int main(int argc, char* argv[]) {
                 std::cout << std::scientific;
                 auto belosSolverResult = belosSolver->solve();
                 if (myRank == 0) {
-                    if (belosSolverResult == Belos::Converged)
-                        logger.log("belos converged");
-                    else
-                        logger.wrn("belos did not converge");
+                    if (belosSolverResult == Belos::Converged) logger.log("belos converged");
+                    else logger.wrn("belos did not converge");
                 }
             auto solveTime = logger.end();
             logger.beg("convert from Epetra");
@@ -677,6 +683,7 @@ int main(int argc, char* argv[]) {
                 tJSON.put("ElapsedTime.ProjectVorticity", projectTime);
                 tJSON.put("ElapsedTime.Factorization", factorizationTime);
                 tJSON.put("ElapsedTime.TimeStep", stepTime);
+                tJSON.put("Solver.Inner.A.ReFactorize", reFactorize);
                 tJSON.put("Solver.Inner.A.TotalIters", numItersA);
                 tJSON.put("Solver.Inner.A.MeanIters", static_cast<double>(numItersA) / belosSolver->getNumIters());
                 tJSON.put("Solver.Inner.A.DOF", n);
@@ -768,7 +775,8 @@ int main(int argc, char* argv[]) {
                     u_prev_prev = u_prev;
                     u_prev = u;
                     param.input.t = i * stepSize;
-                    auto wind = u_prev.Data;
+                    auto wind_prev = wind;
+                    wind = u_prev.Data;
                     wind *= 2.;
                     wind -= u_prev_prev.Data;
                     setWind(wind);
@@ -804,15 +812,11 @@ int main(int argc, char* argv[]) {
                     logger.end();
                 logger.end();
                 factorizationTime = 0.;
-                if (iterationA.find("Amesos") != std::string::npos) {
-                    logger.beg("factorization");
-                        logger.beg("symbolic factorization");
-                            AMESOS_CHK_ERR(amesosSolver->SymbolicFactorization());
-                        logger.end();
-                        logger.beg("numeric factorization");
-                            AMESOS_CHK_ERR(amesosSolver->NumericFactorization());
-                        logger.end();
-                    factorizationTime = logger.end();
+            reFactorize = 0;
+                if (useAmesos) {
+                    reFactorize = norm(wind - wind_prev) > reFactorizeTol * std::max(norm(wind), norm(wind_prev));
+                    if (reFactorize) runFactorization();
+                    else logger.log("using factorization from prev step");
                 }
                 logger.beg("linear solve");
                     if (!inpJSON.get<bool>("Solver.UsePreviousFrameAsInitialGuess")) belosLHS.PutScalar(0.);
@@ -821,12 +825,21 @@ int main(int argc, char* argv[]) {
                     belosProblem.setProblem();
                     belosSolver->setProblem(rcpFromRef(belosProblem));
                     std::cout << std::scientific;
-                    auto belosSolverResult = belosSolver->solve();
-                    if (myRank == 0) {
-                        if (belosSolverResult == Belos::Converged)
-                            logger.log("belos converged");
-                        else
-                            logger.wrn("belos did not converge");
+                    belosSolverResult = belosSolver->solve();
+                    if (belosSolverResult == Belos::Converged) logger.log("belos converged");
+                    else {
+                        logger.wrn("belos did not converge");
+                        if (inpJSON.get<bool>("Solver.Inner.Use") && useAmesos && !reFactorize) {
+                            //logger.buf << "change reFactorizeTol " << reFactorizeTol << " -> " << reFactorizeTol / 2. << "\ntrying again...";
+                            //logger.wrn();
+                            //reFactorizeTol /= 2.;
+                            reFactorize = true;
+                            runFactorization();
+                            belosLHS.PutScalar(0.);
+                            belosSolverResult = belosSolver->solve();
+                            if (belosSolverResult == Belos::Converged) logger.log("belos converged");
+                            else logger.wrn("belos did not converge");
+                        }
                     }
                 solveTime = logger.end();
                 logger.beg("convert from Epetra");

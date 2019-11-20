@@ -1,6 +1,6 @@
 {
     "Output": {
-      "Directory":  "../../output/tmp",
+      "Directory":  "../../output/kh4_new",
       "EveryStep":  1,
       "Binary":     true
     },
@@ -37,10 +37,10 @@
           "Amplitude" : 0.1
         },
         "KelvinHelmholtzCristophSphere" : {
-          "Delta_0" : 0.1,
+          "Delta_0" : 0.05,
           "cn" : 0.01,
           "aa" : 1.0,
-          "ma" : 20.0,
+          "ma" : 32.0,
           "ab" : 0.0,
           "mb" : 16.0
         }
@@ -67,8 +67,8 @@
     "Time": {
       "Read":         0,
       "Write":        "yes",
-      "NumbOfSteps":  1,
-      "FinalTime":    1
+      "NumbOfSteps":  80,
+      "FinalTime":    40
     },
 
     "Levelset": {
@@ -134,7 +134,7 @@
             "Iteration" : "FLEXIBLE GMRES",
             "OutputFrequency" : 1,
             "KrylovSubspaceSize" : 100,
-            "MaxIter" : 200,
+            "MaxIter" : 50,
             "RelResTol" : 1e-8
         },
         "Inner" : {
@@ -143,6 +143,7 @@
             "A" : {
               "Comment" : "Use Amesos_* (e.g. Amesos_Klu) for the sparse-direct solver. Or use some Belos iterations (e.g. CG or BICGSTAB)",
               "Iteration" : "Amesos_Klu",
+              "ReFactorizeTol" : 0.2,
               "MaxIter" : 200,
               "RelResTol" : 1e-4
             },
