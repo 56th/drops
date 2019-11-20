@@ -484,7 +484,7 @@ int main(int argc, char* argv[]) {
                     decltype(belosSolver) belosSolverA;
                     // choose
                     auto factorizationTime = 0.;
-                    int reFactorize = 1;
+                    std::string factorize = "Yes";
                     auto useAmesos = iterationA.find("Amesos") != std::string::npos;
                     std::function<void()> runFactorization;
                     if (useAmesos) { // Amesos
@@ -683,7 +683,7 @@ int main(int argc, char* argv[]) {
                 tJSON.put("ElapsedTime.ProjectVorticity", projectTime);
                 tJSON.put("ElapsedTime.Factorization", factorizationTime);
                 tJSON.put("ElapsedTime.TimeStep", stepTime);
-                tJSON.put("Solver.Inner.A.ReFactorize", reFactorize);
+                tJSON.put("Solver.Inner.A.Factorize", factorize);
                 tJSON.put("Solver.Inner.A.TotalIters", numItersA);
                 tJSON.put("Solver.Inner.A.MeanIters", static_cast<double>(numItersA) / belosSolver->getNumIters());
                 tJSON.put("Solver.Inner.A.DOF", n);
@@ -812,10 +812,12 @@ int main(int argc, char* argv[]) {
                     logger.end();
                 logger.end();
                 factorizationTime = 0.;
-            reFactorize = 0;
+                factorize = "No";
                 if (useAmesos) {
-                    reFactorize = norm(wind - wind_prev) > reFactorizeTol * std::max(norm(wind), norm(wind_prev));
-                    if (reFactorize) runFactorization();
+                    if (norm(wind - wind_prev) > reFactorizeTol * std::max(norm(wind), norm(wind_prev))) {
+                        factorize = "Yes";
+                        runFactorization();
+                    }
                     else logger.log("using factorization from prev step");
                 }
                 logger.beg("linear solve");
@@ -829,11 +831,14 @@ int main(int argc, char* argv[]) {
                     if (belosSolverResult == Belos::Converged) logger.log("belos converged");
                     else {
                         logger.wrn("belos did not converge");
-                        if (inpJSON.get<bool>("Solver.Inner.Use") && useAmesos && !reFactorize) {
+                        if (inpJSON.get<bool>("Solver.Inner.Use") && useAmesos && factorize == "No") {
                             //logger.buf << "change reFactorizeTol " << reFactorizeTol << " -> " << reFactorizeTol / 2. << "\ntrying again...";
                             //logger.wrn();
                             //reFactorizeTol /= 2.;
-                            reFactorize = true;
+                            factorize = "NoThenYes";
+                            numItersA = 0;
+                            numItersS_M = 0;
+                            numItersS_L = 0;
                             runFactorization();
                             belosLHS.PutScalar(0.);
                             belosSolverResult = belosSolver->solve();
@@ -842,6 +847,7 @@ int main(int argc, char* argv[]) {
                         }
                     }
                 solveTime = logger.end();
+                if (factorize == "NoThenYes") solveTime -= factorizationTime;
                 logger.beg("convert from Epetra");
                     for (size_t i = 0; i < n; ++i) u.Data[i] = belosLHS[i];
                     for (size_t i = 0; i < m; ++i) p.Data[i] = belosLHS[n + i];
