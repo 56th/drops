@@ -463,7 +463,7 @@ int main(int argc, char* argv[]) {
                 }));
             logger.end();
             logger.beg("build preconditioners");
-                auto identity  = [](MV const & X, MV& Y) {
+                auto identity = [](MV const & X, MV& Y) {
                     double* view;
                     Y(0)->ExtractView(&view);
                     X(0)->ExtractCopy(view);
@@ -499,9 +499,9 @@ int main(int argc, char* argv[]) {
                         factorizationTime = logger.end();
                         invA = [&](MV const &X, MV &Y) {
                             amesosProblem.SetLHS(&Y);
-			    amesosProblem.SetRHS(const_cast<MV*>(&X));
-			    amesosSolver->Solve();
-			    numItersA++;
+                            amesosProblem.SetRHS(const_cast<MV*>(&X));
+                            amesosSolver->Solve();
+                            numItersA++;
                         };
                     } else { // Belos
                         logger.log("using Belos");
@@ -696,6 +696,7 @@ int main(int argc, char* argv[]) {
                 auto preL2 = sqrt(dot(p.Data, surfOseenSystem.M_p.Data * p.Data));
                 tJSON.put("Integral.PressureL2", preL2);
                 tJSON.put("Integral.VelocityL2", velL2);
+                tJSON.put("Integral.VelocitySurfaceDivergenceL2", sqrt(dot(u.Data, surfOseenSystem.AL.Data * u.Data)));
                 tJSON.put("Integral.KineticEnergy", .5 * velL2 * velL2);
                 if (surfNavierStokesData.exactSoln) {
                     InitVector(mg, u_star, surfNavierStokesData.u_T, t);
