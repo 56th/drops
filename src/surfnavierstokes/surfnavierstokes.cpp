@@ -411,10 +411,11 @@ int main(int argc, char* argv[]) {
                         logger.wrn("belos did not converge");
                 }
                 for (size_t i = 0; i < m; ++i) surf_curl_u.Data[i] = surf_curl_u_epetra[i];
-                if (everyStep > 0)
-                logger.beg("write vtk");
-                    writeVTK(0.);
-                logger.end();
+                if (everyStep > 0) {
+                    logger.beg("write vtk");
+                       writeVTK(0.);
+                    logger.end();
+                }
             logger.end();
             logger.beg("convert to Epetra");
                 logger.beg("cast matrices");
@@ -744,7 +745,7 @@ int main(int argc, char* argv[]) {
                 }
                 if (everyStep > 0 && (i-1) % everyStep == 0) {
                     logger.beg("write vtk");
-                    writeVTK(t);
+                        writeVTK(t);
                     auto vtkTime = logger.end();
                     tJSON.put("ElapsedTime.VTK", vtkTime);
                 }
