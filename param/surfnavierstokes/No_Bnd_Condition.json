@@ -1,6 +1,6 @@
 {
     "Output": {
-      "Directory":  "../../output/kh4_new",
+      "Directory":  "/scratch/alex/kh6_1280_8",
       "EveryStep":  1,
       "Binary":     true
     },
@@ -20,7 +20,7 @@
             "Freq":          0,
             "Width":         0,
             "CoarsestLevel": 0,
-            "FinestLevel":   4,
+            "FinestLevel":   6,
             "SD":            0.1,
             "CurvDiff":      -1,
             "Discontinuous": 0
@@ -40,9 +40,9 @@
           "Delta_0" : 0.05,
           "cn" : 0.01,
           "aa" : 1.0,
-          "ma" : 32.0,
-          "ab" : 0.0,
-          "mb" : 16.0
+          "ma" : 16.0,
+          "ab" : 0.1,
+          "mb" : 20.0
         }
       },
       "TestName":                 "KelvinHelmholtzCristophSphere",
@@ -55,7 +55,7 @@
       "PressureVolumestabPower":  1,
       "PressureVolumestabFactor": 1,
       "Formulation":              "consistent",
-      "NumbOfVirtualSubEdges":    2,
+      "NumbOfVirtualSubEdges":    8,
       "UsePatchNormals":          false,
       "ExportMatrices":           false,
       "ExportMatricesFormat":     "mat",
@@ -67,8 +67,8 @@
     "Time": {
       "Read":         0,
       "Write":        "yes",
-      "NumbOfSteps":  80,
-      "FinalTime":    40
+      "NumbOfSteps":  1280,
+      "FinalTime":    20
     },
 
     "Levelset": {
