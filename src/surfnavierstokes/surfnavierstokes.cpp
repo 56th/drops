@@ -738,11 +738,11 @@ int main(int argc, char* argv[]) {
                         tJSON.put("Matrices." + a, "../matrices/" + b + format);
                         logger.end();
                     };
-                    expMat(surfOseenSystem.sumA.Data, "DiffusionConvectionReaction", "A");
-                    expMat(surfOseenSystem.B.Data, "Divergence", "B");
-                    expMat(surfOseenSystem.C.Data, "PressureVolumeStab", "C");
-                    // expMat(surfOseenSystem.LB.Data, "VelocityScalarLaplaceBeltrami", "LB");
-                    // expMat(surfOseenSystem.LB_stab.Data, "VelocityScalarLaplaceBeltramiNormalStab", "LB_stab");
+                    expMat(surfOseenSystem.A.Data, "VelocityDiffusionMatrix", "A");
+                    expMat(surfOseenSystem.M.Data, "VelocityMassMatrix", "M");
+                    // expMat(surfOseenSystem.sumA.Data, "DiffusionConvectionReaction", "A");
+                    // expMat(surfOseenSystem.B.Data, "Divergence", "B");
+                    // expMat(surfOseenSystem.C.Data, "PressureVolumeStab", "C");
                     logger.log();
                 }
                 if (everyStep > 0 && (i-1) % everyStep == 0) {

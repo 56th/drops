@@ -1,0 +1,158 @@
+{
+    "Output": {
+      "Directory":  "/scratch/alex/kh6_1280_8",
+      "EveryStep":  1,
+      "Binary":     true
+    },
+
+    "Mesh": {
+        "Type": "BrickBuilder", 
+        "Origin": [-1.66666,-1.66666,-1.66666],
+        "E1": [3.33333, 0,0],		
+        "E2": [0,3.33333,0],		
+        "E3": [0,0,3.33333],		
+        "N1": 2,
+        "N2": 2,
+        "N3": 2,
+        "RestartFile": "",
+        "AdaptRef": {
+            "_comment":      "# adaptive refinement",
+            "Freq":          0,
+            "Width":         0,
+            "CoarsestLevel": 0,
+            "FinestLevel":   6,
+            "SD":            0.1,
+            "CurvDiff":      -1,
+            "Discontinuous": 0
+        }
+    },
+
+    "SurfNavStokes": {
+      "gamma" :                   1.0,
+      "nu" :                      1e-5,
+      "IC" : {
+        "Comment" : "initial condition parameters",
+        "KelvinHelmholtzSphere" : {
+          "Frequency" : 20.0,
+          "Amplitude" : 0.1
+        },
+        "KelvinHelmholtzCristophSphere" : {
+          "Delta_0" : 0.05,
+          "cn" : 0.01,
+          "aa" : 1.0,
+          "ma" : 16.0,
+          "ab" : 0.1,
+          "mb" : 20.0
+        }
+      },
+      "TestName":                 "KelvinHelmholtzCristophSphere",
+      "FE":                       "P2P1",
+      "PressureVolumestabType":   "normal",
+      "NormalPenaltyPower":       -2,
+      "NormalPenaltyFactor":      1,
+      "VelocityVolumestabPower":  -1,
+      "VelocityVolumestabFactor": 1,
+      "PressureVolumestabPower":  1,
+      "PressureVolumestabFactor": 1,
+      "Formulation":              "consistent",
+      "NumbOfVirtualSubEdges":    8,
+      "UsePatchNormals":          false,
+      "ExportMatrices":           false,
+      "ExportMatricesFormat":     "mat",
+      "ComputeNormalErr":         false,
+      "ComputeShapeErr":          false,
+      "IntegrateRHS":             true
+    },
+
+    "Time": {
+      "Read":         0,
+      "Write":        "yes",
+      "NumbOfSteps":  1280,
+      "FinalTime":    20
+    },
+
+    "Levelset": {
+      "Theta":         1,
+      "VolCorrection": 0,
+      "SD":            0.1,
+      "CurvDiff":      -1,
+      "Discontinuous": 0,
+      "BndData": {
+        "Default": ["NoBC"], "0" : ["NoBC"], "1" : ["NoBC"], "2" : ["NoBC"], "3" : ["NoBC"], "4" : ["NoBC"], "5" : ["NoBC"]
+      },
+      "Solver": {
+        "Tol":  1e-10,
+        "Iter": 500
+      },
+      "ShiftNorm": 0.0,
+      "ShiftDir":  [1, 1, 1]
+    },
+
+    "General": {
+      "ProgressBar":  1,
+      "DynamicLibsPrefix": "../",
+      "DynamicLibs": []
+    },
+
+    "Stokes": {
+      "VelocityBndData":       { "Default": ["NoBC"], "0": ["NoBC"], "1": ["NoBC"], "2": ["NoBC"], "3": ["NoBC"], "4": ["NoBC"], "5": ["NoBC"] },
+      "PressureBndData":       { "Default": ["NoBC"], "0": ["NoBC"], "1": ["NoBC"], "2": ["NoBC"], "3": ["NoBC"], "4": ["NoBC"], "5": ["NoBC"] },
+      "VolumeFractionBndData": { "Default": ["NoBC"], "0": ["NoBC"], "1": ["NoBC"], "2": ["NoBC"], "3": ["NoBC"], "4": ["NoBC"], "5": ["NoBC"] },
+      "ChemPotentialBndData":  { "Default": ["NoBC"], "0": ["NoBC"], "1": ["NoBC"], "2": ["NoBC"], "3": ["NoBC"], "4": ["NoBC"], "5": ["NoBC"] }
+    },
+
+    "Reparam": {
+        "_comment": "# re-initialization of levelset function",
+        "Freq":		0,
+        "Method":	1
+    },
+
+    "Exp": {
+        "_comment": "# experimental conditions",
+        "RadDrop":		[1, 1, 1 ],
+        "PosDrop":		[0, 0, 0 ],
+        "Velocity":		[0, 0, 0.5 ]
+    },
+
+    "SurfTransp": {
+        "_comment":  "# surfactant transport",
+        "Theta":     0.5,
+        "OmitBound": -1,
+        "Visc":      0.05,
+        "FEdegree":  2
+    },
+        
+    "TestCase":         1,
+    "InitialDivisions": 2,
+    "EnsightCase":      "none",
+    "EnsightDir":       "CNmass-lvl3",
+    "LB":               1,
+    
+    "Solver": {
+        "UsePreviousFrameAsInitialGuess" : false,
+        "Outer" : {
+            "Iteration" : "FLEXIBLE GMRES",
+            "OutputFrequency" : 1,
+            "KrylovSubspaceSize" : 100,
+            "MaxIter" : 50,
+            "RelResTol" : 1e-8
+        },
+        "Inner" : {
+            "Use" : true,
+            "Type" : "BlockTriangular",
+            "A" : {
+              "Comment" : "Use Amesos_* (e.g. Amesos_Klu) for the sparse-direct solver. Or use some Belos iterations (e.g. CG or BICGSTAB)",
+              "Iteration" : "Amesos_Klu",
+              "ReFactorizeTol" : 0.2,
+              "MaxIter" : 200,
+              "RelResTol" : 1e-4
+            },
+            "S" : {
+              "S_L" : true,
+              "Iteration" : "CG",
+              "MaxIter" : 200,
+              "RelResTol" : 1e-2
+            }
+        }
+    }
+}
