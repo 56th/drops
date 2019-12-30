@@ -738,7 +738,9 @@ int main(int argc, char* argv[]) {
                         tJSON.put("Matrices." + a, "../matrices/" + b + format);
                         logger.end();
                     };
-                    expMat(surfOseenSystem.A.Data, "VelocityDiffusionMatrix", "A");
+                    MatrixCL K;
+                    K.LinComb(1., surfOseenSystem.A.Data, tau_u, surfOseenSystem.S.Data);
+                    expMat(K, "VelocityKornMatrix", "A");
                     expMat(surfOseenSystem.M.Data, "VelocityMassMatrix", "M");
                     // expMat(surfOseenSystem.sumA.Data, "DiffusionConvectionReaction", "A");
                     // expMat(surfOseenSystem.B.Data, "Divergence", "B");
