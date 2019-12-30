@@ -32,7 +32,7 @@ tg["import matrices (" <> inDir <> "*), n = " <> ToString@Length@A, time];
 
 
 time = First@AbsoluteTiming[
-	l = Eigenvalues[{A, M}, -5, Method->{"Arnoldi"}]; 
+	l = Abs/@Eigenvalues[{A, M}, -5, Method->{"Arnoldi"}]; 
 ];
 tg["lambda_min = " <> ToString[TeXForm@ScientificForm[#, 3]&/@l], time];
 Print[Export[inDir <> "lambda.json", <| "n" -> Length@A, "lambda_min" -> l, "time" -> time |>]];
