@@ -101,7 +101,7 @@ DROPS::Point3DCL WindVelocity, AngularVelocity;
 std::string dirname;
 DROPS::Point3DCL constant_wind (const DROPS::Point3DCL&, double)
 {
-    return WindVelocity;
+    return ((0.0)*WindVelocity);
 }
 static RegisterVectorFunction regvec_constant_wind( "ConstantWind", constant_wind);
 
@@ -571,9 +571,8 @@ double mergedrop_sol (const Point3DCL& p, double t)
     //return 0.5*(1.+p[0]);
     //if(p[0]>0)
     {
-        if (random<0.5) return(1./3. + ampl*(2*k*random - 0.5));
-        if (random<0.5) return(1./3. + ampl*(2*k*random - 0.5));
-        else return(1./3.+ampl*(2*(1-k)*random + 2*k-1- 0.5));
+        if (random<0.5) return(0.05 + ampl*(2*k*random - 0.5));
+        else return(0.05+ampl*(2*(1-k)*random + 2*k-1- 0.5));
     }
 //    if(p[0]>=0)
      //   return(2./3. + ampl*);
@@ -1171,7 +1170,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
         //return;
     }
 
-    log_global << "Time" << "\t" << "Lyapunov_energy" << "\t" << "Number_iterations" << std::endl;
+    log_global << "Time " << "\t" << "Lyapunov_energy " << "H1_energy " << "\t" << "Number_iterations " << std::endl;
 
     if (P.get<std::string>("SurfSeparation.Exp.Levelset") == std::string( "AxisScalingLset"))
         dynamic_cast<DistMarkingStrategyCL*>( adap.get_marking_strategy())->SetDistFct( axis_scaling_lset_ini);
@@ -1196,7 +1195,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
     InitVel( mg, &v, Bnd_v, the_wind_fun, 0.);
 
     //lset2.SetupSystem( make_P2Eval( mg, Bnd_v, v), P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps"));
-    double dist=2.0*(2.0*P.get<DROPS::Point3DCL>("SurfSeparation.Exp.Velocity").norm()*P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps")
+    double dist= 1*(2.0*P.get<DROPS::Point3DCL>("SurfSeparation.Exp.Velocity").norm()*P.get<double>("Time.FinalTime")/P.get<double>("Time.NumSteps")
                 +P.get<DROPS::Point3DCL>("Mesh.E1")[0]/P.get<double>("Mesh.N1")/pow(2,P.get<int>("Mesh.AdaptRef.FinestLevel")));
 
     std::unique_ptr<CahnHilliardP1BaseCL> timediscp( make_cahnhilliard_timedisc( mg, lset, v, Bnd_v, P, dist));
@@ -1283,7 +1282,7 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
 
     //subdivide first timesteps into substeps
     int total_subs=1;
-    int sub_ratio=1;
+    int sub_ratio=100;
     for (int step= 1; step <= P.get<int>("Time.NumSteps"); ++step) {
         if (step>total_subs) sub_ratio=1;
 
@@ -1351,10 +1350,15 @@ void Strategy (DROPS::MultiGridCL& mg, DROPS::AdapTriangCL& adap, DROPS::Levelse
                                      + (1. / ParameterNS::eps) * Integral_Gamma(mg, lset.Phi, lset.GetBndData(),
                                                                                 make_P1Eval(mg, ifbnd,
                                                                                             timedisc.ienergy));
+            double perimeter_estimator = ParameterNS::eps * H1_error(lset.Phi, lset.GetBndData(), timedisc.GetConcentr(),
+                                                  the_zero_fun);
+            log_global << cur_time << "\t" << Lyapunov_energy << "\t" << perimeter_estimator << "\t" << timedisc.GetSolver().GetIter() << "\n" << std::endl;
 
-            log_global << cur_time << "\t" << Lyapunov_energy << "\t" << timedisc.GetSolver().GetIter() << "\n" << std::endl;
-
-            if ( (step<100) || (vtkwriter.get() != 0 && ((step) % P.get<int>("VTK.Freq")) == 0)) {
+            if (
+                    (((substep) % 20) == 0)
+                    //(step<100)
+                    ||
+                    (vtkwriter.get() != 0 && ((step) % P.get<int>("VTK.Freq")) == 0)) {
                 LSInit(mg, the_conc_sol_vd, the_conc_sol_fun, /*t*/ cur_time);
                 LSInit(mg, the_poten_sol_vd, the_poten_sol_fun, /*t*/ cur_time);
 

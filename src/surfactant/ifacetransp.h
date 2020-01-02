@@ -921,6 +921,8 @@ void SetupStokesIF_P2P2      ( const MultiGridCL& MG_, MatDescCL* A_P2, MatDescC
 void SetupCahnHilliardIF_P1P1( const MultiGridCL& MG_,  MatDescCL* M_P1, MatDescCL* NormalStab_P1, MatDescCL* TangentStab_P1, MatDescCL* VolumeStab_P1, MatDescCL* L_P1P1 ,MatDescCL* LM_P1P1 ,MatDescCL* Gprimeprime_P1P1 , const VecDescCL& lset, const LsetBndDataCL& lset_bnd, const VecDescCL& velocity, const BndDataCL<Point3DCL>& velocity_bnd,const VecDescCL& volume_fraction, const BndDataCL<>& volume_fraction_bnd);
     double Mobility_function(double x,double t=0);
     double Diffusion_function(double x,double t=0);
+    double Density_function(double x,double t=0);
+
 
     double inverse_square_root(double x);
     double Potential_function(double x);
@@ -1525,6 +1527,41 @@ class LocalInterfaceMassDivP1CL
     LocalInterfaceMassDivP1CL (const DiscVelSolT& w)
         : w_( w) { P2DiscCL::GetGradientsOnRef( gradrefp2); }
 };
+
+    template <typename DiscVelSolT>
+    class LocalInterfaceMassRhoP1CL
+    {
+    private:
+        const DiscVelSolT w_;
+        double time_;
+        QuadDomain2DCL qdom;
+        LocalP1CL<Point3DCL> w_loc;
+        std::valarray<double> q[4];
+        double dummy;
+        std::valarray<double> qdensity;
+
+        //SMatrixCL<3,3> T;
+        //GridFunctionCL<Point3DCL> n,
+               // qgradp2i;
+        const DiscVelSolT concentr_;
+        LocalP1CL<double> concentr_loc;
+
+        //LocalP1CL<Point3DCL> gradrefp2[10],
+        //        gradp2[10];
+
+
+    public:
+        static const FiniteElementT row_fe_type= P1IF_FE,
+                col_fe_type= P1IF_FE;
+
+        double coup[4][4];
+
+        void setup (const TetraCL& t, const InterfaceCommonDataP1CL& cdata);
+
+        LocalInterfaceMassRhoP1CL(const DiscVelSolT& conc, instat_vector_fun_ptr normal, double t)
+        :concentr_(conc), time_(t){}
+
+    };
 
 /// \brief Compute the P2 load vector corresponding to the function f on a single tetra.
 class LocalVectorP2CL
@@ -2225,6 +2262,7 @@ class CahnHilliardcGP1CL : public CahnHilliardP1BaseCL
                 Volume_stab, ///< stabilization matrix,
                 Ident,
                 Mass,  ///< mass matrix
+                Massrho,  ///< mass matrix
                 Conv,  ///< convection matrix
                 Massd, ///< mass matrix with interface-divergence of velocity
                 Mass2; ///< mass matrix: new trial- and test- functions on old interface

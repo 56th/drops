@@ -10,10 +10,10 @@
 
     "Mesh": {
         "Type":        "BrickBuilder",
-        "Origin":      [-1.66667, -1.66667, -1.66667],
-        "E1":          [ 3.33333,  0,  0],
-        "E2":          [ 0,  3.33333,  0],
-        "E3":          [ 0,  0,  3.33333],
+        "Origin":      [-1.4, -1.4, -1.5],
+        "E1":          [ 3.3,  0,  0],
+        "E2":          [ 0,  3.3,  0],
+        "E3":          [ 0,  0,  3.3],
         "N1":          2,
         "N2":          2,
         "N3":          2,
@@ -23,7 +23,7 @@
             "Freq":          0,
             "Width":         -1,
             "CoarsestLevel": 0,
-            "FinestLevel": 4,
+            "FinestLevel": 6,
             "SD":            0.1,
 
             "CurvDiff":      -1,
@@ -36,7 +36,7 @@
         "Read" : 0,
         "Write": "yes",
         "NumSteps": 100,
-        "FinalTime":    1
+        "FinalTime":    100
     },
 
     "SurfSeparation": {
@@ -106,7 +106,7 @@
     },
 
     "VTK": {
-        "Freq":           1,
+        "Freq":           20,
         "VTKDir":         "../../output/",
         "VTKName":        "separation",
         "TimeFileName":   "separation",

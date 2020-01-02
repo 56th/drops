@@ -191,6 +191,43 @@ void LocalInterfaceMassDivP1CL<DiscVelSolT>::setup (const TetraCL& t, const Inte
     }
 }
 
+    template <class DiscVelSolT>
+    void LocalInterfaceMassRhoP1CL<DiscVelSolT>::setup (const TetraCL& t, const InterfaceCommonDataP1CL& cdata)
+    {
+        make_CompositeQuad5Domain2D ( qdom, cdata.surf, t);
+        concentr_loc.assign( t, concentr_);
+       // resize_and_scatter_piecewise_normal( cdata.surf, qdom, n);
+
+        //GetTrafoTr( T, dummy, t);
+        //P2DiscCL::GetGradients( gradp2, gradrefp2, T);
+        //w_loc.assign( t, w_);
+        //qgradp2i.resize( qdom.vertex_size());
+
+       /* qdivgamma_w.resize( qdom.vertex_size());
+        qdivgamma_w= 0.;
+        for (int i= 0; i < 10; ++i) {
+            evaluate_on_vertexes( gradp2[i], qdom, Addr( qgradp2i));
+            qdivgamma_w+= dot(w_loc[i], qgradp2i) - dot( w_loc[i], n)*dot( n, qgradp2i);
+        }
+        for (int i= 0; i < 4; ++i)
+            resize_and_evaluate_on_vertexes (cdata.p1[i], qdom, q[i]);*/
+
+        LocalP1CL<> density;
+        for(int i=0; i<4 ; ++i)
+        {
+            density += Density_function(concentr_loc[i], time_)*cdata.p1[i];
+        }
+        resize_and_evaluate_on_vertexes (density, qdom, qdensity);
+
+        for (int i= 0; i < 4; ++i)
+            resize_and_evaluate_on_vertexes (cdata.p1[i], qdom, q[i]);
+        for (int i= 0; i < 4; ++i)
+            for(int j= 0; j < 4; ++j) {
+                coup[i][j]= quad_2D( qdensity*q[i]*q[j], qdom);
+            }
+
+    }
+
 template <class DiscVelSolT>
 void SetupMassDivP1 (const MultiGridCL& mg, MatDescCL* mat, const VecDescCL& ls, const BndDataCL<>& lsetbnd, const DiscVelSolT& w)
 {

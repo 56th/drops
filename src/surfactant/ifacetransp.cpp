@@ -3604,6 +3604,8 @@ void SurfactantP1BaseCL::InitTimeStep ()
         IdxDescCL* cidx= ic.RowIdx;
         Mass.Data.clear();
         Mass.SetIdx( cidx, cidx);
+        Massrho.Data.clear();
+        Massrho.SetIdx( cidx, cidx);
         Laplace.Data.clear();
         Laplace.SetIdx( cidx, cidx);
         LaplaceM.Data.clear();
@@ -3639,6 +3641,9 @@ void SurfactantP1BaseCL::InitTimeStep ()
                 mass_accu( &Mass, LocalInterfaceMassP1CL(), cdata, "mass");
         accus.push_back( &mass_accu);
 
+        accus.push_back_acquire( make_concentration_dependent_matrixP1_accu<LocalInterfaceMassRhoP1CL>( &Massrho,  cdata, normal_, ic.t,  make_P1Eval( MG_, Bnd_, conc_ext), "Mass_rho"));
+
+
         InterfaceMatrixAccuCL<LocalLaplaceBeltramiP1CL, InterfaceCommonDataP1CL> lb_accu( &Laplace, LocalLaplaceBeltramiP1CL( 1.), cdata, "Laplace-Beltrami");
         accus.push_back( &lb_accu);
        /* InterfaceMatrixAccuCL<LocalLaplaceP1CL, InterfaceCommonDataP1CL> lb_accu( &Laplace, LocalLaplaceP1CL( normal_, ic.t), cdata, "Laplace");
@@ -3647,7 +3652,7 @@ void SurfactantP1BaseCL::InitTimeStep ()
 
         accus.push_back_acquire( make_concentration_dependent_matrixP1_accu<LocalLaplaceMobilityP1CL>( &LaplaceM,  cdata, normal_, ic.t,  make_P1Eval( MG_, Bnd_, conc_ext), "Laplace_Mobility"));
 
-       // accus.push_back_acquire( make_concentration_dependent_matrixP1_accu<LocalLaplaceNonlinearP1CL>( &LaplaceNon,  cdata, normal_, ic.t,  make_P1Eval( MG_, Bnd_, sp_ext), "Laplace_Nonlinear"));
+        accus.push_back_acquire( make_concentration_dependent_matrixP1_accu<LocalLaplaceNonlinearP1CL>( &LaplaceNon,  cdata, normal_, ic.t,  make_P1Eval( MG_, Bnd_, sp_ext), "Laplace_Nonlinear"));
 
 
         //WARNING
@@ -4043,11 +4048,11 @@ void SurfactantP1BaseCL::InitTimeStep ()
 
         A_.LinComb(0.0, Mass.Data, 1.0*sigma_*dt_, LaplaceM.Data,  1.0*rho_*dt_, Volume_stab.Data);
         B_.LinComb(1.0/(1.), Mass.Data, 1.0*dt_, Conv.Data);
-        C_.LinComb(-1.0*epsilon_, Mass.Data, 0.,   Mass.Data);
+        C_.LinComb(-1.0*epsilon_, Massrho.Data, 0.,   Mass.Data);
         D_.LinComb(1.0*S_, Mass.Data, 1.0*epsilon_*epsilon_,  Laplace.Data,  1.0*rho_*epsilon_*epsilon_, Volume_stab.Data);
 
 
-        //K_.LinComb(1.0, Mass.Data, 0.1*dt_, Laplace.Data, 1.0*rho_*dt_, Volume_stab.Data);
+        K_.LinComb(1.0, Mass.Data, 0.1*dt_, Laplace.Data, 1.0*rho_*dt_, Volume_stab.Data);
 
 //        double c=1.0;//BDF1
 //
@@ -4069,8 +4074,8 @@ void SurfactantP1BaseCL::InitTimeStep ()
             ScopeTimerCL timer("CahnHilliardNarrowBandStblP1CL::DoStep1: Solve");
             block_gm_.Solve(A_, B_, C_, D_, imu.Data, ic.Data, rhs3, rhs4, imu.RowIdx->GetEx(),ic.RowIdx->GetEx());
 
-            //rhs5 += (0.2*dt_)*(LaplaceNon.Data*ic.Data);
-            //PCGSolver3_.Solve(K_, is.Data, rhs5, is.RowIdx->GetEx());
+            rhs5 += (0.1*dt_)*(LaplaceNon.Data*ic.Data);
+            PCGSolver3_.Solve(K_, is.Data, rhs5, is.RowIdx->GetEx());
 
             for (int i=0; i<ienergy.Data.size();i++)
             {
@@ -5049,7 +5054,7 @@ double inverse_square_root(double x) {return(1./std::sqrt(x));}
 
 double Mobility_function(double x, double t)
 {
-    double scaling=1.; //std::exp(-1000*t);
+    double scaling=1.0; //1./Density_function(x, t); //std::exp(-1000*t);
 	return( scaling*std::sqrt((1.-x)*(x)*(1.-x)*(x)));
     //return(1);
 }
@@ -5060,6 +5065,12 @@ double Diffusion_function(double x, double t)
         return( x);
         //return(1);
     }
+
+double Density_function(double x, double t) {
+    double density_ratio= 1.; //std::exp(-1000*t);
+    return ( (1.-x) +  density_ratio*(x));
+    //return(1);
+}
 
 
 double Potential_function(const double x)
