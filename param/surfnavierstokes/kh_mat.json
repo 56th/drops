@@ -1,6 +1,6 @@
 {
     "Output": {
-      "Directory":  "../../output/kh3_mtx_1",
+      "Directory":  "../../output/kh1_mtx_1_sub",
       "EveryStep":  0,
       "Binary":     true
     },
@@ -20,7 +20,7 @@
             "Freq":          0,
             "Width":         0,
             "CoarsestLevel": 0,
-            "FinestLevel":   3,
+            "FinestLevel":   1,
             "SD":            0.1,
             "CurvDiff":      -1,
             "Discontinuous": 0

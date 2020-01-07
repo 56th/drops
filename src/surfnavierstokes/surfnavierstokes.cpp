@@ -743,7 +743,7 @@ int main(int argc, char* argv[]) {
                     expMat(K, "VelocityKornMatrix", "A");
                     expMat(surfOseenSystem.M.Data, "VelocityMassMatrix", "M");
                     // expMat(surfOseenSystem.sumA.Data, "DiffusionConvectionReaction", "A");
-                    // expMat(surfOseenSystem.B.Data, "Divergence", "B");
+                    expMat(surfOseenSystem.B.Data, "Divergence", "B");
                     // expMat(surfOseenSystem.C.Data, "PressureVolumeStab", "C");
                     logger.log();
                 }
