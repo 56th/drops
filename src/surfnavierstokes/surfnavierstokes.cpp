@@ -744,7 +744,7 @@ int main(int argc, char* argv[]) {
                     expMat(surfOseenSystem.M.Data, "VelocityMassMatrix", "M");
                     // expMat(surfOseenSystem.sumA.Data, "DiffusionConvectionReaction", "A");
                     expMat(surfOseenSystem.B.Data, "Divergence", "B");
-                    // expMat(surfOseenSystem.C.Data, "PressureVolumeStab", "C");
+                    expMat(surfOseenSystem.C.Data, "PressureVolumeStab", "C");
                     logger.log();
                 }
                 if (everyStep > 0 && (i-1) % everyStep == 0) {
