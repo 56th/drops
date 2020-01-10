@@ -4,7 +4,9 @@
 If[Length@$ScriptCommandLine < 3, Print["Error: please specify testcase path, eps"]; Quit[]];
 inDir = $ScriptCommandLine[[2]]<>"/matrices/";
 eps = ToExpression[$ScriptCommandLine[[3]]];
+If[Length@$ScriptCommandLine >= 4, num = ToExpression[$ScriptCommandLine[[4]]], num = 5];
 Print["eps = ", eps];
+Print["computing ", num, " smallest eigs"];
 
 
 Get["https://raw.githubusercontent.com/dih5/TgBot/master/TgBot/TgBot.m"];
@@ -41,7 +43,7 @@ tg["import matrices (" <> inDir <> "*), n = " <> ToString@Length@A, time];
 
 
 time = First@AbsoluteTiming[
-	l = Eigenvalues[{a, b}, -5, Method->{"Arnoldi"}]; 
+	l = Eigenvalues[{a, b}, -num, Method->{"Arnoldi"}]; 
 ];
 tg["lambda_min = " <> ToString[TeXForm@ScientificForm[#, 3]&/@l], time];
-Print[Export[inDir <> "lambda_eps=" <> ToString@DecimalForm[eps, Infinity] <> ".json", <| "n" -> Length@a, "lambda_min" -> l, "time" -> time |>]];
+Print[Export[inDir <> "lambda_eps=" <> ToString@DecimalForm[eps, Infinity] <> "_num=" <> ToString@num <>".json", <| "n" -> Length@a, "lambda_min" -> l, "time" -> time |>]];
