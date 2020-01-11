@@ -739,7 +739,7 @@ int main(int argc, char* argv[]) {
                         logger.end();
                     };
                     MatrixCL K;
-                    K.LinComb(1., surfOseenSystem.A.Data, tau_u, surfOseenSystem.S.Data);
+                    K.LinComb(1., surfOseenSystem.A.Data, tau_u, surfOseenSystem.S.Data, rho_u, surfOseenSystem.A_stab.Data);
                     expMat(K, "VelocityKornMatrix", "A");
                     expMat(surfOseenSystem.M.Data, "VelocityMassMatrix", "M");
                     // expMat(surfOseenSystem.sumA.Data, "DiffusionConvectionReaction", "A");
