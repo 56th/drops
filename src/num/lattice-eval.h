@@ -190,21 +190,21 @@ namespace DROPS {
 
     template <class T, class DomainT, class ResultIterT>
     inline ResultIterT
-    evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const TetraCL& tet, const DomainT& dom, double t, ResultIterT result_iterator)
+    evaluate_on_vertexes (InstatFunction<T> const & f, const TetraCL& tet, const DomainT& dom, double t, ResultIterT result_iterator)
     {
       return std::transform( dom.vertex_begin(), dom.vertex_end(), result_iterator, BaryEvalCL<T>( tet, t, f));
     }
 
     template <class T, class DomainT, class ResultIterT>
     inline ResultIterT
-    evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const TetraCL& tet, const DomainT& dom, TetraSignEnum s, double t, ResultIterT result_iterator)
+    evaluate_on_vertexes (InstatFunction<T> const & f, const TetraCL& tet, const DomainT& dom, TetraSignEnum s, double t, ResultIterT result_iterator)
     {
       return std::transform( dom.vertex_begin( s), dom.vertex_end( s), result_iterator, BaryEvalCL<T>( tet, t, f));
     }
 
     template <class T, class DomainT, class ResultContT>
     inline const ResultContT&
-    resize_and_evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const TetraCL& tet, const DomainT& dom, double t, ResultContT& result_container)
+    resize_and_evaluate_on_vertexes (InstatFunction<T> const & f, const TetraCL& tet, const DomainT& dom, double t, ResultContT& result_container)
     {
       result_container.resize( dom.vertex_size());
       evaluate_on_vertexes( f, tet, dom, t, sequence_begin( result_container));
@@ -213,7 +213,7 @@ namespace DROPS {
 
     template <class T, class DomainT, class ResultContT>
     inline const ResultContT&
-    resize_and_evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const TetraCL& tet, const DomainT& dom, TetraSignEnum s, double t, ResultContT& result_container)
+    resize_and_evaluate_on_vertexes (InstatFunction<T> const & f, const TetraCL& tet, const DomainT& dom, TetraSignEnum s, double t, ResultContT& result_container)
     {
       result_container.resize( dom.vertex_size( s));
       evaluate_on_vertexes( f, tet, dom, s, t, sequence_begin( result_container));

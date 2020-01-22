@@ -52,24 +52,24 @@ std::unique_ptr<VTKOutCL> vtkwriter;
 DROPS::InVecMap& invecmap= DROPS::InVecMap::getInstance();
 DROPS::InScaMap& inscamap= DROPS::InScaMap::getInstance();
 
-instat_vector_fun_ptr the_wind_fun;
-instat_vector_fun_ptr the_normal_fun;
-instat_scalar_fun_ptr the_lset_fun;
-instat_scalar_fun_ptr the_rhs_fun;
-instat_scalar_fun_ptr the_conc_sol_fun;
-instat_scalar_fun_ptr the_poten_sol_fun;
-instat_scalar_fun_ptr the_species_sol_fun;
+InstatVectorFunction the_wind_fun;
+InstatVectorFunction the_normal_fun;
+InstatScalarFunction the_lset_fun;
+InstatScalarFunction the_rhs_fun;
+InstatScalarFunction the_conc_sol_fun;
+InstatScalarFunction the_poten_sol_fun;
+InstatScalarFunction the_species_sol_fun;
 
-instat_scalar_fun_ptr the_zero_fun;
+InstatScalarFunction the_zero_fun;
 
-instat_vector_fun_ptr the_sol_grad_fun;
+InstatVectorFunction the_sol_grad_fun;
 
-typedef DROPS::Point3DCL (*bnd_val_fun) (const DROPS::Point3DCL&, double);
+using bnd_val_fun = InstatVectorFunction;
 
 DROPS::BndCondT bc_wind[6]= { DROPS::DirBC, DROPS::DirBC, DROPS::DirBC, DROPS::DirBC, DROPS::DirBC, DROPS::DirBC };
 bnd_val_fun bf_wind[6];
 
-instat_scalar_fun_ptr sigma( 0);
+InstatScalarFunction sigma( 0);
 SurfaceTensionCL sf( sigma, 0);
 DROPS::LsetBndDataCL lsbnd( 6);
 
@@ -634,7 +634,7 @@ DROPS::Point3DCL d_sphere_dist (const DROPS::Point3DCL& p, double)
 static RegisterVectorFunction regsca_sphere_dist_normal( "NormalSphere", d_sphere_dist);
 
 
-typedef double (*dist_funT) (const DROPS::Point3DCL&, double);
+using dist_funT = InstatScalarFunction;
 
 double sphere_2move (const DROPS::Point3DCL& p, double t)
 {
@@ -1003,7 +1003,7 @@ static RegisterScalarFunction regsca_laplace_beltrami_1_sol( "LaplaceBeltrami1So
 
 template<class DiscP1FunType>
 double L2_error (const DROPS::VecDescCL& ls, const BndDataCL<>& lsbnd,
-    const DiscP1FunType& discsol, DROPS::instat_scalar_fun_ptr extsol)
+    const DiscP1FunType& discsol, DROPS::InstatScalarFunction extsol)
 {
     const PrincipalLatticeCL& lat= PrincipalLatticeCL::instance( 2);
     const double t= discsol.GetTime();
@@ -1025,7 +1025,7 @@ double L2_error (const DROPS::VecDescCL& ls, const BndDataCL<>& lsbnd,
 /// The H1-error is then computed between the interpolant and the numerical solution.
 template<class DiscP1FunType>
 double H1_error (const DROPS::VecDescCL& ls, const BndDataCL<>& lsbnd,
-    const DiscP1FunType& discsol, DROPS::instat_scalar_fun_ptr extsol)
+    const DiscP1FunType& discsol, DROPS::InstatScalarFunction extsol)
 {
     IdxDescCL* idx= const_cast<IdxDescCL*>( discsol.GetSolution()->RowIdx);
     MatDescCL A( idx, idx);
@@ -1039,7 +1039,7 @@ double H1_error (const DROPS::VecDescCL& ls, const BndDataCL<>& lsbnd,
 }
 
 double L2_norm (const DROPS::MultiGridCL& mg, const DROPS::VecDescCL& ls, const BndDataCL<>& lsbnd,
-    DROPS::instat_scalar_fun_ptr extsol)
+    DROPS::InstatScalarFunction extsol)
 {
     const PrincipalLatticeCL& lat= PrincipalLatticeCL::instance( 2);
     const double t= ls.t;
@@ -1055,7 +1055,7 @@ double L2_norm (const DROPS::MultiGridCL& mg, const DROPS::VecDescCL& ls, const 
     return std::sqrt( d);
 }
 
-void LinearLSInit (const DROPS::MultiGridCL& mg, DROPS::VecDescCL& ls, DROPS::instat_scalar_fun_ptr d, double t= 0.)
+void LinearLSInit (const DROPS::MultiGridCL& mg, DROPS::VecDescCL& ls, DROPS::InstatScalarFunction d, double t= 0.)
 {
     const DROPS::Uint lvl= ls.GetLevel(),
                       idx= ls.RowIdx->GetIdx();
@@ -1082,7 +1082,7 @@ void LSInit (const DROPS::MultiGridCL& mg, DROPS::VecDescCL& ls, dist_funT d, do
     ls.t= t;
 }
 
-void InitVel ( const MultiGridCL& mg, VecDescCL* vec, BndDataCL<Point3DCL>& Bnd, instat_vector_fun_ptr LsgVel, double t= 0.)
+void InitVel ( const MultiGridCL& mg, VecDescCL* vec, BndDataCL<Point3DCL>& Bnd, InstatVectorFunction LsgVel, double t= 0.)
 {
     VectorCL& lsgvel= vec->Data;
     const Uint lvl  = vec->GetLevel(),
@@ -1509,12 +1509,12 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
     NoBndDataCL<> nobnddata;
     const VecDescCL* fvd;
 
-    instat_scalar_fun_ptr f;
+    InstatScalarFunction f;
     double f_time;
 
     LocalLaplaceBeltramiP2CL loc_lb;
 
-    instat_vector_fun_ptr f_grad;
+    InstatVectorFunction f_grad;
     double f_grad_time;
 
     InterfaceL2AccuP2CL* tid0p; // The object in OpenMP-thread 0, in which the following variables are updated.
@@ -1545,11 +1545,11 @@ class InterfaceL2AccuP2CL : public TetraAccumulatorCL
 
     void set_name (const std::string& n) { name_= n; }
     void set_grid_function (const VecDescCL& fvdarg) { fvd= &fvdarg; }
-    void set_function (const instat_scalar_fun_ptr farg, double f_time_arg= 0.) {
+    void set_function (const InstatScalarFunction farg, double f_time_arg= 0.) {
         f= farg;
         f_time= f_time_arg;
     }
-    void set_grad_function (const instat_vector_fun_ptr farg, double f_time_arg= 0.) {
+    void set_grad_function (const InstatVectorFunction farg, double f_time_arg= 0.) {
         f_grad= farg;
         f_grad_time= f_time_arg;
     }
@@ -1709,8 +1709,8 @@ class InterfaceApproxErrorDeformAccuCL : public TetraAccumulatorCL
     IdxT numry[4];
     double vec[4];
 
-    instat_scalar_fun_ptr d_; // exact distance
-    instat_vector_fun_ptr Dd_; // gradient of exact distance
+    InstatScalarFunction d_; // exact distance
+    InstatVectorFunction Dd_; // gradient of exact distance
     GridFunctionCL<> qd;
     GridFunctionCL<Point3DCL> qDderr;
 
@@ -1723,8 +1723,8 @@ class InterfaceApproxErrorDeformAccuCL : public TetraAccumulatorCL
         : yG_( yg), ydist_( ydist), cdata_ (cdataarg), d_ (0), Dd_ (0) {}
     virtual ~InterfaceApproxErrorDeformAccuCL () {}
 
-    InterfaceApproxErrorDeformAccuCL& set_d  (instat_scalar_fun_ptr darg)  {  d_= darg;  return *this; }
-    InterfaceApproxErrorDeformAccuCL& set_Dd (instat_vector_fun_ptr Ddarg) { Dd_= Ddarg; return *this; }
+    InterfaceApproxErrorDeformAccuCL& set_d  (InstatScalarFunction darg)  {  d_= darg;  return *this; }
+    InterfaceApproxErrorDeformAccuCL& set_Dd (InstatVectorFunction Ddarg) { Dd_= Ddarg; return *this; }
 
     virtual void begin_accumulation () {
         std::cout << "#InterfaceApproxErrorDeformAccuCL::begin_accumulation"
@@ -1799,13 +1799,13 @@ class InterfaceL2AccuDeformP2CL : public TetraAccumulatorCL
     NoBndDataCL<> nobnddata;
     const VecDescCL* fvd;
 
-    instat_scalar_fun_ptr f;
+    InstatScalarFunction f;
     double f_time;
 
     LocalLaplaceBeltramiDeformP2CL loc_lb;
     LocalNormalLaplaceDeformP2CL loc_ngrad;
 
-    instat_vector_fun_ptr f_grad;
+    InstatVectorFunction f_grad;
     double f_grad_time;
 
     InterfaceL2AccuDeformP2CL* tid0p; // The object in OpenMP-thread 0, in which the following variables are updated.
@@ -1838,11 +1838,11 @@ class InterfaceL2AccuDeformP2CL : public TetraAccumulatorCL
 
     void set_name (const std::string& n) { name_= n; }
     void set_grid_function (const VecDescCL& fvdarg) { fvd= &fvdarg; }
-    void set_function (const instat_scalar_fun_ptr farg, double f_time_arg= 0.) {
+    void set_function (const InstatScalarFunction farg, double f_time_arg= 0.) {
         f= farg;
         f_time= f_time_arg;
     }
-    void set_grad_function (const instat_vector_fun_ptr farg, double f_time_arg= 0.) {
+    void set_grad_function (const InstatVectorFunction farg, double f_time_arg= 0.) {
         f_grad= farg;
         f_grad_time= f_time_arg;
     }

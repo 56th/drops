@@ -62,7 +62,7 @@ template <Uint Dim>
 
 template <class T, class ResultIterT>
   inline ResultIterT
-  evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const TetraBaryPairVectorT& pos, double t, ResultIterT result_iterator)
+  evaluate_on_vertexes (InstatFunction<T> const & f, const TetraBaryPairVectorT& pos, double t, ResultIterT result_iterator)
 {
     BaryEvalCL<T> eval;
     eval.set( f);
@@ -80,7 +80,7 @@ template <class T, class ResultIterT>
 
 template <class T, class ResultContT>
   inline ResultContT&
-  resize_and_evaluate_on_vertexes (T (*f)(const Point3DCL&, double), const TetraBaryPairVectorT& pos, double t, ResultContT& result_container)
+  resize_and_evaluate_on_vertexes (InstatFunction<T> const & f, const TetraBaryPairVectorT& pos, double t, ResultContT& result_container)
 {
     result_container.resize( pos.size());
     evaluate_on_vertexes( f, pos, t, sequence_begin( result_container));

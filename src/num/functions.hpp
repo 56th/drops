@@ -8,9 +8,10 @@ namespace DROPS {
     using ScalarFunction = std::function<double(Point3DCL const &)>;
     using VectorFunction = std::function<Point3DCL(Point3DCL const &)>;
     using MatrixFunction = std::function<SMatrixCL<3, 3>(Point3DCL const &)>;
-    using InstatScalarFunction = std::function<double(Point3DCL const &, double)>;
-    using InstatVectorFunction = std::function<Point3DCL(Point3DCL const &, double)>;
-    using InstatMatrixFunction = std::function<SMatrixCL<3, 3>(Point3DCL const &, double)>;
+    template <typename T> using InstatFunction = std::function<T(Point3DCL const &, double)>;
+    using InstatScalarFunction = InstatFunction<double>;
+    using InstatVectorFunction = InstatFunction<Point3DCL>;
+    using InstatMatrixFunction = InstatFunction<SMatrixCL<3, 3>>;
     using MatchFunction = std::function<bool(const Point3DCL&, const Point3DCL&)>;
 }
 

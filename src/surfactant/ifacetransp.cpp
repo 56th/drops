@@ -2905,7 +2905,7 @@ void SurfactantP1BaseCL::InitTimeStep ()
     }
 
 
-    void CahnHilliardP1BaseCL::SetInitialValue (instat_scalar_fun_ptr icmu, instat_scalar_fun_ptr icc,instat_scalar_fun_ptr ics, double t)
+    void CahnHilliardP1BaseCL::SetInitialValue (InstatScalarFunction icmu, InstatScalarFunction icc,InstatScalarFunction ics, double t)
     {
         P1Init ( icc, ic, MG_, t);
         P1Init ( icmu, imu, MG_, t);
@@ -2913,7 +2913,7 @@ void SurfactantP1BaseCL::InitTimeStep ()
 
     }
 
-    void CahnHilliardP1BaseCL::SetRhs (instat_scalar_fun_ptr rhs3, instat_scalar_fun_ptr rhs4)
+    void CahnHilliardP1BaseCL::SetRhs (InstatScalarFunction rhs3, InstatScalarFunction rhs4)
     {
         rhs_fun3_= rhs3;
         rhs_fun4_= rhs4;

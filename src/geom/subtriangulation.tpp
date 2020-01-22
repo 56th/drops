@@ -53,7 +53,7 @@ namespace DROPS {
     double  distance (const GridFunT& f)
     {
         double min_val= 10000;
-        if(equal_signs( f))
+        if(equalSigns(f))
         {
             for (Uint i= 0; i < f.size(); ++i)
                 min_val= std::min( std::fabs(f[i]),min_val);
